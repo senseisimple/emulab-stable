@@ -1419,7 +1419,7 @@ function TBFreePCs()
 		     "left join nodetypeXpid_permissions as p ".
 		     "  on a.type=p.type ".
 		     "where b.node_id is null and a.role='testnode' ".
-		     "  and a.type like 'pc%' and p.pid is null");
+		     "  and nt.class = 'pc' and p.pid is null");
 
     return mysql_num_rows($query_result);
 }
@@ -1433,7 +1433,7 @@ function TBUserPCs($uid)
                      "left join experiments as e on b.pid=e.pid and ".
                      " b.eid=e.eid ".
 		     "where e.expt_head_uid='$uid' and e.pid!='emulab-ops' ".
-		     "  and a.role='testnode' and a.type like 'pc%'");
+		     "  and a.role='testnode' and nt.class = 'pc'");
 
     return mysql_num_rows($query_result);
 }
