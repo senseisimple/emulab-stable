@@ -11,29 +11,29 @@ Temp. worker co-ordination: Mac
 ***** Hardware
 **********************************************************************
 ISP110s:
-	Status: Ordered, 30 recived
-	Next shipment: 14, afternoon 8/13 or morning 8/14
+	Status: Ordered, 44 recived
+	Next shipment: ??
 	Responsible: Rob
 	Note: Rails are currently backordered, should be in next week 
 
 Network cables:
 	Status: Ordered
-	First shipment: Friday, 8/10
+	First shipment: Most should come Monday, 8/13
 	Responsible: Mac
 
 Rackmount nuts/screws:
 	Status: Ordered
-	Shipped: ??
-	Responsible: Mac or Leigh
+	Will ship: Friday, 8/10 
+	Responsible: Mac
 
 3ft Power cables from ValCom:
 	Status: Ordered
-	Shipped: With next ISPs
+	Shipped: By Monday (8/13)
 	Responsible: Rob
 
 Short power cables from Standard:
-	Status: Ordered
-	Shipped: ??
+	Status: Ordered, recived 60 1.5ft cables
+	Next shipment: Remainder of order (36 2ft. cables) 8/15 or 8/16
 	Responsible: Rob or Leigh
 
 Additional RPCs:
@@ -49,8 +49,7 @@ Cyclades:
 	Status: Recieved
 	Responsible: ??
 	Note: One host adapter installed in plastic, expanders need to be
-		hooked up. The other needs to be installed in the serial
-		server
+		hooked up. The other is installed in the serial server.
 
 Labels:
 	Avery labels for cables - pick them up at OfficeMax, etc.
@@ -59,6 +58,12 @@ Labels:
 Cable ties:
 	Pick them up at Home Depot
 	Responsible: Mike
+
+Cable management bars:
+	Simple horizontal metal bars to tie cables to
+	Responsible: Mac
+	Note: Corey suggests that the metal shop is the simplest way to go,
+		but they may take a week to deiver
 
 **********************************************************************
 ***** Testbed Software
@@ -78,6 +83,7 @@ power:
 Disk image:
 	Build a disk image that has any changes required for ISPs
 	Responsible: Rob
+	Note: Control interface may be differnt - anything else?
 
 **********************************************************************
 ***** Problems to resolve
@@ -90,6 +96,10 @@ Decide on machine numbering scheme:
 	Responsible: ??
 	Start at pc42?
 
+Serial server:
+	What machines can we use the Cyclades card in?
+	Responsible: ??
+
 **********************************************************************
 ***** Misc
 **********************************************************************
@@ -100,6 +110,11 @@ Cable labels:
 PC labels:
 	Responsible: Rob
 	Note: Will depend somewhat on our chosen numbering scheme
+
+Power outlets:
+	We need 2 outlets of at least 15 amps per rack
+	Responsible: Rob
+	Note: Talk to Corey Hatch
 
 **********************************************************************
 ***** Testbed state to update
@@ -210,13 +225,14 @@ Wiring: (Note: Mac has a file with some additional tips)
 ***** Schedule
 **********************************************************************
 To get the first rack set up, we need:
-	44 ISPs w/ rails
+	44 ISPs w/ rails (arrived, not yet installed)
 	At least 1/3 of the network/serial cables
-	At least 1/3 of the power cables
+	At least 1/3 of the power cables (enough have arrived)
 	'power' that can talk to RPCs
 	Working disk image
 	Automation tools
-	2 power outlets (we should have them now)
+	2 power outlets (we have them already)
+	Machine/cable labels
 
 The second rack requires:
 	44 more ISPs
