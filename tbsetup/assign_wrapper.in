@@ -423,6 +423,7 @@ while (1) {
     undef %plinks;
     undef %toreserve;
     undef %virtnodes;
+    my %subnodes = ();
     
     TBDebugTimeStamp("ptopgen started");
     # Snapshot
@@ -568,7 +569,7 @@ while (1) {
 			physnodesetreuse($physical, "reboot");
 		    }
 		    else {
-			physnodesetreuse($physical, "reboot");
+			physnodesetreuse($physical, "reused");
 		    }
 		}
 	    }
@@ -589,6 +590,13 @@ while (1) {
 		}
 		push(@{$virtnodes{$physical}}, $virtual);
 	    }
+	    elsif (virtnodeissubnode($virtual)) {
+		#
+		# Need to allocate the parent to. Should be optional?
+		# Save away and deal with once we have all the results.
+		#
+		$subnodes{$virtual} = $physical;
+	    }
 	    
 	    $v2pmap{$virtual} = $physical;
 	    if( ! defined($p2vmap{$physical}) ) {
@@ -596,6 +604,37 @@ while (1) {
 	    }
 	    push(@{$p2vmap{$physical}}, $virtual);
 	    printdb "  $virtual $physical\n";
+	}
+
+	#
+	# Process the subnodes. We have to allocate the parent at the same
+	# time, lest it get sucked away for some other purpose by another
+	# experiment. We might want to push this off into nalloc, but not
+	# sure yet.
+	#
+	for my $virtual (keys(%subnodes)) {
+	    my $physical = $subnodes{$virtual};
+	    my $parent;
+
+	    TBPhysNodeID($physical, \$parent);
+
+	    printdb "  Subnode: $virtual $physical $parent\n";
+
+	    #
+	    # See if we already have it. Swapmod, retry, or perhaps
+	    # the parent could be named separately? Or maybe there are
+	    # several subnodes on the physnode?
+	    #
+	    next
+		if (exists($p2vmap{$parent}));
+
+	    # Make up a name and add to the list.
+	    my $newvname = newvname($parent, "phost");
+
+	    $v2pmap{$newvname} = $parent;
+	    $p2vmap{$parent} = [ $newvname ];
+	    $toreserve{$parent} = 1;
+	    printdb "  Adding subnode host: $newvname $parent\n";
 	}
 
 	# read Edges
@@ -970,17 +1009,9 @@ if ($updating && !$impotent) {
 	    if (physnodeisvirtnode($pnode) ||
 		physnodereuse($pnode) eq "unused");
 
-	my $controlnet  = physnodecontrolnet($pnode);
-	my $controltest = "";
-
-	# Is it ever the case that the control net will be null?
-	# for a real node?
-	if (defined $controlnet) {
-	    $controltest = "and (card != '$controlnet')";
-	}
-
-	DBQueryFatal("update interfaces set IP='',IPaliases='' " .
-		     "where node_id='$pnode' $controltest");
+	DBQueryFatal("update interfaces set IP='',IPaliases=NULL " .
+		     "where node_id='$pnode' and ".
+		     "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'");
 
 	# Clean the veth_interfaces table for this node too.
 	DBQueryFatal("delete from veth_interfaces where node_id='$pnode'");
@@ -1031,8 +1062,15 @@ foreach $plink (keys(%plinks)) {
 	$trivial = 1;
 	printdb "plink $plink - trivial\n";
     }
-    
-    if (($lan,$virtA,$virtC) = ($plink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
+
+    if ($plink =~ m|^fakelink,(.+),(.+)$|) {
+	#
+	# A fakelink created for subnode sillyness. Ignore.
+	#
+	print "Skipping fakelink $plink\n";
+    }
+    elsif (($lan,$virtA,$virtC) =
+	   ($plink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
 	# trivial links do not have physical links, so no delay nodes.
 	if ($trivial) {
 	    next;
@@ -1940,7 +1978,7 @@ sub InitPnode($pnode, $vnode)
 		     " tarballs=''," .
 		     " startupcmd=''," .
 		     " failureaction=''," .
-		     " routertype='static'" .
+		     " routertype='" . TBDB_ROUTERTYPE_STATIC() . "'" .
 		     " where node_id='$pnode'");
 
 	$vname = "nsenode${nsenode_id}";
@@ -1969,11 +2007,13 @@ sub InitPnode($pnode, $vnode)
 	#
 	return;
     }
-    elsif (exists($virtnodes{$pnode}) || exists($delaynodes{$vnode})) {
+    elsif (!virtnodeisvnode($vnode) || exists($virtnodes{$pnode})) {
 	#
 	# One of our internally created nodes, which can be treated
-	# almost the same whether a delay node or a jailhost node.
+	# almost the same no matter what type.
 	#
+	my $routertype;
+
 	if (exists($delaynodes{$vnode})) {
 	    #
 	    # A delay node.
@@ -1982,8 +2022,9 @@ sub InitPnode($pnode, $vnode)
 	    $expt_stats{"delaynodes"} += 1;
 	    $vname = $vnode;
 	    $role  = TBDB_RSRVROLE_DELAYNODE;
+	    $routertype = TBDB_ROUTERTYPE_NONE;
 	}
-	else {
+	elsif (exists($virtnodes{$pnode})) {
 	    #
 	    # A node hosting jails
 	    #
@@ -1992,8 +2033,9 @@ sub InitPnode($pnode, $vnode)
 	    #
 	    # Set the vname to something useful.
 	    #
-	    $vname = newvhostvname($pnode);
+	    $vname = newvname($pnode, "vhost");
 	    $role  = TBDB_RSRVROLE_VIRTHOST;
+	    $routertype = TBDB_ROUTERTYPE_MANUAL;
 	}
 	fatal(1, "*** $0:\n".
 	         "    No OSID is defined for internal node $vname!")
@@ -2002,6 +2044,7 @@ sub InitPnode($pnode, $vnode)
 	DBQueryFatal("UPDATE nodes set ".
 		     " startstatus='none', ".
 		     " bootstatus='unknown', ".
+		     " routertype='$routertype', ".
 		     " ready=0 " .
 		     " where node_id='$pnode'");
     }
@@ -2394,14 +2437,15 @@ sub NewVethIface($$;$)
 }
 
 #
-# Give me a new name for a pnode hosting jails. We have to watch for names
-# that were made up previously (say, if this is an update).  Not allowed to
-# reuse names of course. We do not mark nodes as hosting, so have to infer
-# this from reserved_pnodes. I'm sure there is a better way to do this. 
+# Give me a new vname for an internally allocated node. We have to
+# watch for names that were made up previously (say, if this is an
+# update).  Not allowed to reuse names of course. We do not mark nodes
+# as hosting, so have to infer this from reserved_pnodes. I'm sure
+# there is a better way to do this.
 #
-sub newvhostvname($)
+sub newvname($$)
 {
-    my ($pnode) = @_;
+    my ($pnode, $prefix) = @_;
 
     #
     # First check to see if this pnode was already allocated (update)
@@ -2417,7 +2461,7 @@ sub newvhostvname($)
     }
     
     while (1) {
-	my $newname = "vhost-" . $virtnode_id;
+	my $newname = $prefix . "-" . $virtnode_id;
 	$virtnode_id++;
 
 	if (!defined($reserved_v2pmap{$newname})) {
@@ -2474,7 +2518,8 @@ sub LoadVirtNodes()
     printdb "Loading virt_nodes.\n";
 
     my $query_result =
-	DBQueryFatal("select distinct vn.*,nt.isremotenode,nt.isvirtnode ".
+	DBQueryFatal("select distinct vn.*, ".
+		     "  nt.isremotenode,nt.isvirtnode,nt.issubnode ".
 		     " from virt_nodes as vn ".
 		     "left join node_types as nt on ".
 		     "     nt.type=vn.type or nt.class=vn.type ".
@@ -2497,6 +2542,7 @@ sub LoadVirtNodes()
 	my $osname  = $rowref->{"osname"};
 	my $isremote= $rowref->{"isremotenode"};
 	my $isvirt  = $rowref->{"isvirtnode"};
+	my $issub   = $rowref->{"issubnode"};
 
 	# Extend the DB info with this stuff:
 	# The mapped osname to actual osid. 
@@ -2511,6 +2557,23 @@ sub LoadVirtNodes()
 				    $rowref->{"tarfiles"},
 				    $rowref->{"failureaction"},
 				    $rowref->{"routertype"} ];
+
+	#
+	# If a subnode, kill the fixed mapping. That was just to
+	# tell us the connection. We don't want to overload "fixed"
+	# within assign wrapper since its already overloaded.
+	#
+	if ($issub) {
+	    # Must be a parent. Set in the parser, either explicitly, or else
+	    # one is created if the user leaves it out.
+	    if (!defined($fixed) || $fixed eq "") {
+		fatal(1, "*** $0:\n".
+		         "    Subnode $vname must be fixed to its parent!\n");
+	    }
+	    $rowref->{"__parent"} = $fixed;
+	    $rowref->{"fixed"} = "";
+	    undef($fixed);
+	}
 
 	# Can fixed really get set to ""?
 	if (defined($fixed) && $fixed ne "") {
@@ -2607,6 +2670,8 @@ sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
 sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
 sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
 sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
+sub virtnodesetosid($$) { return $virt_nodes{$_[0]}->{"__osid"} = $_[1]; }
+sub virtnodeparent($)   { return $virt_nodes{$_[0]}->{"__parent"}; }
 sub virtnodepnode($)    { return $virt_nodes{$_[0]}->{"__physnode"}; }
 sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
 sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
@@ -2615,6 +2680,9 @@ sub virtnodeisremote($) {
 }
 sub virtnodeisvirt($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isvirtnode"};
+}
+sub virtnodeissubnode($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"issubnode"};
 }
 sub virtnodeisjailed($) {
     return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
@@ -2886,25 +2954,51 @@ sub CreateTopFile()
 	}
     }
 
+    # Now that the node list is out, spit out fakelinks for subnodes.
+    foreach my $node (keys(%virt_nodes)) {
+	my $vname = virtnodename($node);
+
+	if (virtnodeissubnode($vname)) {
+	    #
+	    # XXX: assign does not yet deal with subnodes. We have to
+	    # a link from the subnode to the parent so that assign grabs
+	    # the host too (or assign might use the host for something
+	    # else, like a delay node!).
+	    #
+	    # At some point assign will handle this properly.
+	    # XXX: Only one subnode works for now.
+	    # XXX: Hardwire the speed to 2GB so that a regular link
+	    #      will not statisfy it. Sigh, needed a special
+	    #      interface_type and interfaces table entries. 
+	    #
+	    my $parent = virtnodeparent($vname);
+	    
+	    print TOPFILE "link fakelink,$vname,$parent ".
+		"$vname $parent 2000000 0 0\n";
+
+	    #
+	    # XXX Set the OSID until I figure out something.
+	    #
+	    if (! defined(virtnodeosid($parent))) {
+		virtnodesetosid($parent, "emulab-ops-RHL73-IXPHOST");
+	    }
+	}
+    }
+
     foreach $lan (keys(%virt_lans)) {
-	@members = virtlanmembers($lan);
+	my @members = virtlanmembers($lan);
 	printdb "$lan - " . join(" ",@members) . "\n";
-	# Shark hack for rvr
-	$sharks = 0;
-	$nonsharks = 0;
-	$simnodes = 0;
-	$realnodes = 0;
-	$virtnodes = 0;
+	my $simnodes = 0;
+	my $realnodes = 0;
+	my $virtnodes = 0;
+	my $trivial_ok = 0;
 	my $emulated = virtlanemulated($lan);
 	my $uselinkdelay = virtlanlinkdelay($lan);
 	my $mustdelay = virtlanmustdelay($lan);
 	my $nobwshaping = virtlannobwshape($lan);
-	$trivial_ok = 0;
 	foreach $member (@members) {
 	    ($node) = (split(":",$member))[0];
-	    if (virtnodetype($node) eq "shark-shelf") {
-		$sharks++;
-	    } elsif (virtnodetype($node) eq "sim") {
+	    if (virtnodetype($node) eq "sim") {
 		$simnodes++;
 		$simnodelans{$lan} = 1;
 	    } else {
@@ -2925,11 +3019,10 @@ sub CreateTopFile()
 		    $virt_lans{$lan}->{"USEVETH"} = 1
 			if (virtnodeisvirt($node));
 		}
-		$nonsharks++;
 		$realnodes++;
 	    }
 	}
-	if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
+	if ($simnodes > 0 && $realnodes == 0) {
 	    $trivial_ok = 1;
 	}
 	if ($#members == 1) {
@@ -2954,15 +3047,13 @@ sub CreateTopFile()
 		  (!$nobwshaping &&
 		   ((($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
 		    (($delaywithswitch == 0) && 
-		     (($bw != $S100Kbs) &&
-		      (($sharks == 0) || ($nonsharks > 1)))))) || 
+		     (($bw != $S100Kbs))))) || 
 		  ($loss != 0)) ||
 		 (($rdelay >= $delaythresh) ||
 		  (!$nobwshaping &&
 		   ((($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
 		    (($delaywithswitch == 0) && !$nobwshaping &&
-		     (($rbw != $S100Kbs) &&
-		      (($sharks == 0) || ($nonsharks > 1)))))) || 
+		     (($rbw != $S100Kbs))))) ||
 		  ($rloss != 0)) ||
 		 # Link must be shaped for other reasons (q_red).
 		 $mustdelay ||
@@ -3063,14 +3154,12 @@ sub CreateTopFile()
 		if (((($delay >= $delaythresh) ||
 		      (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
 		      (($delaywithswitch == 0) && 
-		       (($bw != $S100Kbs) && (($sharks == 0) ||
-					      ($nonsharks > 1)))) ||
+		       (($bw != $S100Kbs))) ||
 		      ($loss != 0)) || 
 		     (($rdelay >= $delaythresh) ||
 		      (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
 		      (($delaywithswitch == 0) && 
-		       (($rbw != $S100Kbs) && (($sharks == 0) ||
-					       ($nonsharks > 1)))) ||
+		       (($rbw != $S100Kbs))) ||
 		      ($rloss != 0)) ||
 		     # Link must be shaped for other reasons (q_red).
 		     $mustdelay ||
@@ -3301,8 +3390,9 @@ sub LoadPhysResources()
 sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
 sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
 sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailflag"}; }
+sub physnodeissubnode($) { return $phys_nodes{$_[0]}->{"issubnode"}; }
 sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{"phys_nodeid"}; }
-sub physnodecontrolnet($){ return $phys_nodes{$_[0]}->{"control_net"}; }
+sub physnodecontroliface($){ return $phys_nodes{$_[0]}->{"control_iface"}; }
 sub physnodetype($)      { return $phys_nodes{$_[0]}->{"type"}; }
 sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
 sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
