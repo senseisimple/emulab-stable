@@ -10,6 +10,7 @@ RANDFILE		= $ENV::HOME/.rnd
 [ ca ]
 default_ca	= CA_default		# The default ca section
 prompt		= no
+default_bits	= 1024
 
 ####################################################################
 [ CA_default ]
