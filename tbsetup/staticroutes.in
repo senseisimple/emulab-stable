@@ -153,6 +153,9 @@ my %rlans    = ();
 # is the same for each member of a lan, no big deal.
 my %costs    = ();
 
+# Ditto for masks. Need to combine all this to save space.
+my %masks    = ();
+
 # Number of links per node, indexed by node (vname). This is strictly
 # for generating NS style output. When there is more than one link on
 # a node, we *must* generate net routes instead of host routes, or the
@@ -161,6 +164,8 @@ my %linkcount= ();
 
 # list of ports that a node is connected on. Indexed by node.
 my %nodeportlist = ();
+# Map vname:port (member) to the lan its in. 
+my %nodeport2lan = ();
 
 #
 # Convert list of nodes into a map of $vname:$port to IP. We will need the
@@ -200,7 +205,7 @@ if (! $dostatic) {
 # Now get the lans. 
 #
 $query_result =
-    DBQueryFatal("select vname,member,cost " .
+    DBQueryFatal("select vname,member,cost,mask " .
 		 "from virt_lans where pid='$pid' and eid='$eid'");
 if (!$query_result->numrows) {
     warn("*** $0:\n".
@@ -208,12 +213,14 @@ if (!$query_result->numrows) {
     exit(0);
 }
 
-while (my ($vname,$member,$cost) = $query_result->fetchrow_array) {
+while (my ($vname,$member,$cost,$mask) = $query_result->fetchrow_array) {
     if (! defined($lans{$vname})) {
 	$lans{$vname} = [];
     }
     push(@{$lans{$vname}},$member);
+    $nodeport2lan{$member} = $vname;
     $costs{$vname} = $cost;
+    $masks{$vname} = $mask;
 }
 
 #
@@ -415,12 +422,14 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	#
 	# This is the lan that contains the src and hop. (the link). 
 	#
-	my $srclan = $rlans{"$src:$hop"};
+	my $srclan  = $rlans{"$src:$hop"};
+	my $srcmask = $masks{$srclan};
 	
 	#
 	# This is the lan that contains the node one hop before dst and dst
 	# 
 	my $dstlan;
+	my $dstmask;
 	
 	#
 	# Members in the srclan and dstlan respectively
@@ -434,7 +443,8 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	# of the directly connected node
 	if ($dst eq $hop) {
 	    $directlyconn = 1;
-	    $dstlan = $rlans{"$src:$dst"};
+	    $dstlan  = $rlans{"$src:$dst"};
+	    $dstmask = $masks{$dstlan};
 	    @dstmembers = @{$lans{$dstlan}};
 	    @srcmembers = @{$lans{$srclan}};
 	    #
@@ -459,8 +469,8 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	} else {
 
 	    #
-	    # Now we need to find the destination lan (link) by stepping through
-	    # each hop till we get to it.
+	    # Now we need to find the destination lan (link) by
+	    # stepping through each hop till we get to it.
 	    #
 	    my $nhop = $hop;
 	    while (1) {
@@ -478,7 +488,8 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 		}
 		$nhop = $nnhop;
 	    }
-	    $dstlan = $rlans{"$nhop:$dst"};
+	    $dstlan  = $rlans{"$nhop:$dst"};
+	    $dstmask = $masks{$dstlan};
 	    
 	    if ($debug) {
 		print "$src --> $dst : $nhop:$dst\n";
@@ -506,12 +517,12 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	    }
 	    
 	    #
-	    # If optimzing create a net route and avoid a per-host entry for each
-	    # pair. Convert the route, but remember we did it so we can skip similar
-	    # routes in the future.
+	    # If optimzing create a net route and avoid a per-host
+	    # entry for each pair. Convert the route, but remember we
+	    # did it so we can skip similar routes in the future.
 	    #
 	    if ($optimize) {
-		my $newip = inet_ntoa(inet_aton($dstip) & inet_aton($NETMASK));
+		my $newip = inet_ntoa(inet_aton($dstip) & inet_aton($dstmask));
 		
 		if (defined($netroutes{"$src:$newip"})) {
 		    if ($netroutes{"$src:$newip"} ne $hop) {
@@ -554,8 +565,11 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 		next;
 	    }
 	    
-	    my $newip = $ips{"$dst:$port"};
-	    my $newipsubnet = inet_ntoa(inet_aton($newip) & inet_aton($NETMASK));
+	    my $newip   = $ips{"$dst:$port"};
+	    my $newmask = $masks{$nodeport2lan{"$dst:$port"}};
+	    
+	    my $newipsubnet = inet_ntoa(inet_aton($newip) &
+					inet_aton($newmask));
 	    
 	    # If we already have a route to newipsubnet via the same hop,
 	    # we don't need the host route
@@ -567,9 +581,11 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 		    $hostroutes[$srcid] = [];
 		}
 		my $newipbin = inet_aton($newip);
+		
 		push( @{$hostroutes[$srcid]}, 
-		      pack( "a4Ia4Ia4", $srcipbin, $dstid, $newipbin, $hopid, 
-			    $hopipbin) );
+		      pack( "a4Ia4a4Ia4", $srcipbin, $dstid,
+			    inet_aton($newmask),
+			    $newipbin, $hopid, $hopipbin) );
 		      
 	    }
 	}
@@ -586,8 +602,9 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	    $dbroutes[$srcid] = [];
 	}
 	push( @{$dbroutes[$srcid]}, 
-	      pack( "a4Ia4Ia4s", $srcipbin, $dstid, $dstipbin, $hopid, $hopipbin,
-		    type2bin($type)) );
+	      pack( "a4Ia4a4Ia4s", $srcipbin, $dstid,
+		    inet_aton($dstmask), $dstipbin, $hopid,
+		    $hopipbin, type2bin($type)) );
     }
 }
 
@@ -610,14 +627,14 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
     }
     my $src = $rmap{$srcid};
     foreach my $hostroute (@{$hostroutes[$srcid]}) {
-	my ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin) =
-	    unpack( "a4Ia4Ia4", $hostroute );
+	my ($srcipbin, $dstid, $dstmaskbin, $dstipbin, $hopid, $hopipbin) =
+	    unpack( "a4Ia4a4Ia4", $hostroute );
 	my $dstip;
 	my $dst = $rmap{$dstid};
 	my $hop = $rmap{$hopid};
 	my $type = 'host';
 	
-	my $dstipsubnet = inet_ntoa($dstipbin & inet_aton($NETMASK));
+	my $dstipsubnet = inet_ntoa($dstipbin & $dstmaskbin);
 	
 	# If we already have a net route to dstipsubnet via the same hop,
 	# we don't need the host route
@@ -646,8 +663,8 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	    $dbroutes[$srcid] = [];
 	}
 	push( @{$dbroutes[$srcid]}, 
-	      pack( "a4Ia4Ia4s", $srcipbin, $dstid, $dstipbin, $hopid, $hopipbin,
-		    type2bin($type)) );
+	      pack( "a4Ia4a4Ia4s", $srcipbin, $dstid, $dstmaskbin,
+		    $dstipbin, $hopid, $hopipbin, type2bin($type)) );
     }
 }
 
@@ -661,6 +678,8 @@ undef @hostroutes;
 undef %lans;
 %rlans = ();
 undef %rlans;
+%nodeport2lan = ();
+undef %nodeport2lan;
 
 if( $memdebug ) {
     $top =`top -n`;
@@ -686,8 +705,9 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
     if ( $optimize && $edgeoptimize ) {
 	$oneroute = 1;
 	foreach my $route (@{$dbroutes[$srcid]}) {
-	    ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin, $typebin) =
-		unpack( "a4Ia4Ia4s", $route);
+	    ($srcipbin, $dstid, $dstmaskbin, $dstipbin, $hopid, $hopipbin,
+	     $typebin) =
+		 unpack( "a4Ia4a4Ia4s", $route);
 	    $srcip = inet_ntoa($srcipbin);
 	    $dst = $rmap{$dstid};
 	    $dstip = inet_ntoa($dstipbin);
@@ -742,14 +762,16 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	}
     } else {
 	foreach my $route (@{$dbroutes[$srcid]}) {
-	    ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin, $typebin) =
-		unpack( "a4Ia4Ia4s", $route);
+	    ($srcipbin, $dstid, $dstmaskbin, $dstipbin, $hopid, $hopipbin,
+	     $typebin) =
+		unpack( "a4Ia4a4Ia4s", $route);
 	    $srcip = inet_ntoa($srcipbin);
 	    $dst = $rmap{$dstid};
 	    $dstip = inet_ntoa($dstipbin);
 	    $hop = $rmap{$hopid};
 	    $hopip = inet_ntoa($hopipbin);
 	    $type = bin2type($typebin);
+	    $mask = inet_ntoa($dstmaskbin);
 
 	    if ($impotent) {
 		if ($debug) {
@@ -762,7 +784,7 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 			print "route add -host $dstip $hopip\n";
 		    }
 		    else {
-			print "route add -net $dstip $hopip $NETMASK\n";
+			print "route add -net $dstip $hopip $mask\n";
 		    }
 		}
 		elsif ($format eq "suxs") {
@@ -770,14 +792,16 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 			print "route add -host $dstip gw $hopip\n";
 		    }
 		    else {
-			print "route add -net $dstip netmask $NETMASK gw $hopip\n";
+			print "route add -net $dstip netmask ".
+			    "$mask gw $hopip\n";
 		    }
 		}
 	    } else {
 		DBQueryFatal("insert into virt_routes ".
-			     " (pid,eid,vname,src,dst,nexthop,dst_type) ".
-			     " values ('$pid', '$eid', '$src', '$srcip', '$dstip', ".
-			     "         '$hopip', '$type')");
+			     " (pid,eid,vname,src,dst,nexthop,dst_type,".
+			     "  dst_mask) ".
+			     " values ('$pid', '$eid', '$src', '$srcip', ".
+			     "         '$dstip', '$hopip', '$type', '$mask')");
 	    }
 	}
     }
