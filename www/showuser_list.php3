@@ -70,7 +70,8 @@ while ($row = mysql_fetch_array($query_result)) {
     # Suck out a list of projects too.
     #
     $projmemb_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM group_membership where uid='$thisuid' order by pid");
+	"SELECT distinct pid FROM group_membership ".
+	"where uid='$thisuid' order by pid");
 
     echo "<tr>\n";
 

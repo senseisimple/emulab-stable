@@ -128,6 +128,14 @@ echo "<p><center>
 SHOWGROUPMEMBERS($pid, $gid);
 
 #
+# A delete option
+#
+echo "<p><center>
+       Do you want to delete this Group?
+       <A href='deletegroup.php3?pid=$pid&gid=$gid'>Yes</a>
+      </center>\n";
+
+#
 # Standard Testbed Footer
 # 
 PAGEFOOTER();

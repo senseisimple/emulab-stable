@@ -52,7 +52,74 @@ if (!$isadmin &&
     }
 }
 
+#
+# Show user info.
+# 
 SHOWUSER($target_uid);
+
+#
+# Lets show projects.
+#
+$query_result =
+    DBQueryFatal("select distinct g.pid,p.name from group_membership as g ".
+		 "left join projects as p on p.pid=g.pid ".
+		 "where uid='$target_uid' order by pid");
+
+if (mysql_num_rows($query_result)) {
+    echo "<center>
+          <h3>Project Membership</h3>
+          </center>
+          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+    echo "<tr>
+              <td align=center>PID</td>
+              <td align=center>Name</td>
+          </tr>\n";
+
+    while ($projrow = mysql_fetch_array($query_result)) {
+	$pid  = $projrow[pid];
+	$name = $projrow[name];
+
+        echo "<tr>
+                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
+                 <td>$name</td>
+             </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+#
+# And Experiments.
+#
+$query_result =
+    DBQueryFatal("select * from experiments  ".
+		 "where expt_head_uid='$target_uid' order by pid,eid");
+
+if (mysql_num_rows($query_result)) {
+    echo "<center>
+          <h3>Current Experiments</h3>
+          </center>
+          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+    echo "<tr>
+              <td align=center>PID</td>
+              <td align=center>EID</td>
+              <td align=center>Name</td>
+          </tr>\n";
+
+    while ($projrow = mysql_fetch_array($query_result)) {
+	$pid  = $projrow[pid];
+	$eid  = $projrow[eid];
+	$name = $projrow[expt_name];
+
+        echo "<tr>
+                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
+                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+                 <td>$name</td>
+             </tr>\n";
+    }
+    echo "</table>\n";
+}
 
 echo "</center>\n";
 
