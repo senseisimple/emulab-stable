@@ -142,7 +142,6 @@ TBDebugTimeStamp("assign_wrapper started");
 #  nodelans is indexed by virtual node and contains a list of
 #    <port>:<lan> that it is connected to.
 #  ips is indexed by nodeport and contains the IP addresses.
-#  lans is indexed by virtual lan and is a list of nodeport members.
 #  lannodes is indexed by physical name is the set of lan nodes.
 #  portbw is indexed by virtual nodeport and contains the bandwidth
 #    of that port. Note that port bandwidth in the interfaces table is
@@ -173,6 +172,11 @@ TBDebugTimeStamp("top started");
 # the virtual nodes in it.
 # sharkshelfid is used to generate ids for shark shelves.
 $sharkshelfid = 0;
+
+# lans is indexed by virtual lan and is a list of nodeport members.
+# emulated is 1 if the link/lan is emulated (virtual).
+my %lans     = ();
+my %emulated = ();
 
 # delayinfo stores the virt_lans info, and is indexed by virtual
 # lan:node:port and is a list of delay, bandwidth, lossrate, rdelay,
@@ -529,6 +533,7 @@ foreach $lan (keys(%lans)) {
     $realnodes = 0;
     $emulated = 0;
     $trivial_ok = 0;
+    $emulated{$lan} = 0;
     foreach $member (@members) {
 	($node) = (split(":",$member))[0];
 	if ($nodes{$node} eq "shark-shelf") {
@@ -539,10 +544,18 @@ foreach $lan (keys(%lans)) {
 	} else {
 	    if ($isvirtnode{$node}) {
 		$emulated++;
+		$emulated{$lan} = 1;
 	    }
 	    $nonsharks++;
 	    $realnodes++;
 	}
+    }
+    #
+    # Hmm, no emulated lans for now. 
+    #
+    if ($emulated && @members > 2) {
+	die("*** $0:\n".
+	    "    Emulated lans ($lan) not allowed yet! Only links.\n");
     }
     if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
 	$trivial_ok = 1;
@@ -1605,8 +1618,8 @@ my %IPaliases = ();
 foreach $vnodeport (keys(%portmap)) {
     ($vnode,$vport) = split(":",$vnodeport);
     $pport = $portmap{$vnodeport};
-    # Shark Hack
     if ($nodes{$vnode} eq "shark-shelf") {
+	# Shark Hack
 	$shelf = $v2pmap{$vnode};
 	$i = 1;
 	foreach $shark (@{$sharkshelves{$vnode}}) {
@@ -1614,8 +1627,9 @@ foreach $vnodeport (keys(%portmap)) {
 		    "where node_id = \"$shelf-$i\"");
 	    $i++;
 	}
+	# End Shark Hack
     }
-    elsif ($isvirtnode{$vnode}) {
+    else {
 	#
 	# Use ipaliases to catch if we have inserted an entry for this
 	# pnode/iface yet. If not, insert a normal entry. If so, we want to
@@ -1626,42 +1640,36 @@ foreach $vnodeport (keys(%portmap)) {
 	my $pnode = $v2pmap{$vnode};
 	my $ip    = $ips{$vnodeport};
 
-	if (defined($IPaliases{"$pnode:$pport"})) {
+	if (! defined($IPaliases{"$pnode:$pport"})) {
+	    printdb("IP: $pnode:$pport $ip\n");
+
+	    DBQueryFatal("update interfaces set IP='$ip',IPaliases=NULL " .
+			 "where node_id='$pnode' and iface='$pport'");
+
+	    #
+	    # If a sim node do something special? Avoid IP aliases too.
+	    #
+	    # XXX This appears to mean that in a sim node, the IP
+	    # address in the interface table is constantly overwritten?
+	    #
+	    if ($nodes{$vnode} eq "sim") {
+		if (! defined( $simnode_extips{$vnode})) {
+		    $simnode_extips{$vnode} = [];
+		}
+		push(@{$simnode_extips{$vnode}}, $ips{$vnodeport});
+	    }
+	    else {
+		$IPaliases{"$pnode:$pport"} = 1;
+	    }
+	}
+	else {
 	    printdb("IP: $pnode:$pport $ip (alias)\n");
 	    
 	    DBQueryFatal("update interfaces set ".
 			 " IPaliases=CONCAT_WS(',', '$ip', IPaliases) ".
 			 "where node_id='$pnode' and iface='$pport'");
 	}
-	else {
-	    printdb("IP: $pnode:$pport $ip\n");
-
-	    DBQueryFatal("update interfaces set IP='$ip',IPaliases=NULL " .
-			 "where node_id='$pnode' and iface='$pport'");
-	    
-	    $IPaliases{"$pnode:$pport"} = 1;
-	}
     }
-    else {
-	my $pnode = $v2pmap{$vnode};
-	my $ip    = $ips{$vnodeport};
-	
-	printdb("IP: $pnode:$pport $ip\n");
-	
-	DBQueryFatal("update interfaces set IP='$ip',IPaliases=NULL " .
-		     "where node_id='$pnode' and iface='$pport'");
-
-	# place to append to nseconfigs
-	if( $nodes{$vnode} eq "sim" ) {
-
-	  if( ! defined( $simnode_extips{$vnode}) ) {
-	    $simnode_extips{$vnode} = [];
-	  }
-
-	  push(@{$simnode_extips{$vnode}}, $ips{$vnodeport});
-	}
-    }
-    # End Shark Hack
 }
 
 # XXX NSE hack: We'll load the virt_routes table so as to
@@ -2325,24 +2333,51 @@ sub AddVlan($$$;$)
 	}
 	printdb "  $lan, \[" . join(" ",@{$vlantable{$lan}}) . "\]\n";
     }
-    else {
+    elsif ($emulated{$lan}) {
 	#
-	# Search for any vlans that contain these two members. If we
-	# find one, skip it. Otherwise, add a new one, generating a
-	# unique key based on the lan name (needed later for DB insert).
+	# Like above, except that in this case, its a bunch of vlinks
+	# sharing a smaller set of physical links, and since a node:port
+	# can be in only one vlan, we have to convert to a lan with all of
+	# the ports. The routing table on the node should deal with this
+	# properly, except for broadcast packets but thats okay. 
 	# 
+	# Search all existing vlans to see if either of the nodeports
+	# is already in a vlan. If not, its safe to start a new vlan.
+	# Otherwise, add just the nodeports that are missing to the old
+	# vlan.
+	#
 	foreach my $lanid (keys(%vlantable)) {
 	    my @members    = @{$vlantable{$lanid}};
 
 	    if (grep {$_ eq $nodeportA || $_ eq $nodeportB} @members) {
+		# Add the ones that are not there. 
+		if (! grep {$_ eq $nodeportA} @members) {
+		    push(@{$vlantable{$lanid}}, $nodeportA);
+		}
+		if (! grep {$_ eq $nodeportB} @members) {
+		    push(@{$vlantable{$lanid}}, $nodeportB);
+		}
+
+		printdb "  $lanid (DUP), ".
+		    "\[" . join(" ",@{$vlantable{$lanid}}) . "\]\n";
 		return;
 	    }
 	}
-	my $newid = "$lan:" . $vlanid++;
-	    
+
+	# Make up a name for the "super" vlan.
+	my $newid = "s$lan:" . $vlanid++;
+	
 	$vlantable{$newid} = [$nodeportA, $nodeportB];
 
-	printdb "  $newid, \[$nodeportA, $nodeportB\]\n";	
+	printdb "  $newid (SVLAN), \[$nodeportA, $nodeportB\]\n";	
+    }
+    else {
+	#
+	# Generate a new vlan of two members.
+	# 
+	$vlantable{$lan} = [$nodeportA, $nodeportB];
+
+	printdb "  $lan, \[$nodeportA, $nodeportB\]\n";	
     }
 }
 
