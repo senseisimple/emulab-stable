@@ -514,7 +514,16 @@ shutdown(int sig)
 	
 	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
 		die("open(%s) : %s", Ptyname, geterr(errno));
-	dup2(ptyfd, ofd);
+
+	/* XXX so we don't have to recompute the select mask */
+	if (ptyfd != ofd) {
+		dup2(ptyfd, ofd);
+		close(ptyfd);
+		ptyfd = ofd;
+	}
+
+	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
+		die("fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
 	
 	dolog(LOG_NOTICE, "pty reset");
 }
