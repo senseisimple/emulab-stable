@@ -350,6 +350,9 @@ foreach $node (keys(%nodes)) {
 	else {
 	    push @types, "sim:$simnode_capacity";
 	}
+	# Add CPU and RAM information
+	push @features, "?+cpu:$cpu_speed";
+	push @features, "?+ram:$ram";
 	push @types, "*lan:*";
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:100000";
