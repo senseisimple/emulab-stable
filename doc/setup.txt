@@ -78,6 +78,9 @@ switches. You can grab the Cisco MIBs from:
 ftp.cisco.com/pub/mibs
 The Intel ones can be found from the site for the 510T switches at:
 http://www.intel.com/network/connectivity/products/exp510t.htm
+If you have SNMP-controllable APC power controllers, grab the 'PowerNet MIB'
+from:
+http://www.apcc.com/tools/download/
 Now, a step that involves some voodoo I don't quite understand: make sure that
 /usr/local/share/snmp/mibs/.index exists (touch it if it doesn't), and chmod it
 to 666. Now, do an snmpwalk of some device (eg. 'snmpwalk cisco1 public') -
@@ -191,6 +194,10 @@ in /etc/rc.conf
 
 suidperl - In order for setuid perl scripts to work properly, you'll need to:
 chmod u+s /usr/bin/suidperl
+
+SSH keys - Generate an SSH key for root by running ssh-keygen. Put an empty
+passphrase on it. You'll want to copy boss:/root/.ssh/identity.pub to
+ops:/root/.ssh/authorized_keys so that boss has the appropriate access on ops.
 
 ##### Step 6 - Stuff to copy from an old boss node
 
