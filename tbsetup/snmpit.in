@@ -40,7 +40,7 @@ my $debug = 0;
 ######################################################################
 sub usage {
     print << "END";
-Usage: $0 [-h] [-v] [-n] [-i device]
+Usage: $0 [-h] [-v] [-n] [-i device] [-S stack]
 	  [-l] [-s] [-g]
 	  [-m name [ports]]
 	  [-T port name]
@@ -57,6 +57,8 @@ General:
   -n          Test mode - don't actually make any changes
   -i <device> Operate on <device>, overriding default device list. Can be
                   given multiple times
+  -S <stack>  Operate on the given stack, instead of the default of the
+                  experimental network
 
 VLAN Control:
   -t <pid> <eid>    Create all VLANs from database tables for an experiment
@@ -101,7 +103,7 @@ END
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','M','n','o=s@',
-    'p=s','r','s','t','T=s','u=s','U','v','w','y=s','x=s','z=s');
+    'p=s','r','s', 'S=s@', 't','T=s','u=s','U','v','w','y=s','x=s','z=s');
 # Unused: b,f,j,q
 
 if ($opt{h}) {
@@ -249,6 +251,24 @@ if (!@commands) {
 #
 
 #
+# User-supplied switch lists
+#
+my @supplied_switches = ();
+if ($opt{i}) {
+    push @supplied_switches, @{$opt{i}};
+}
+if ($opt{S}) {
+    foreach my $stack (@{$opt{S}}) {
+	my @switches = getSwitchesInStack($stack);
+	if (@switches) {
+	    push @supplied_switches, @switches;
+	} else {
+	    die "ERROR: No such switch stack: $stack\n";
+	}
+    }
+}
+
+#
 # Arguments for making private VLANs
 #
 # Build up a list of extra arguments to be passed to createVlan()
@@ -376,18 +396,20 @@ foreach my $command (@commands) {
     my @vlans;
     SWITCH: for ($operation) {
 	(/listvlans/ || /getstats/ || /make/ || /remove/) && do {
-	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
+	    @devicenames = @supplied_switches?
+			   @supplied_switches : getTestSwitches();
 	    last;
 	};
 	(/listports/) && do {
-	    @devicenames = $opt{i}? @{$opt{i}} :
+	    @devicenames = @supplied_switches? @supplied_switches :
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
 	};
 	(/tables/) && do {
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    @ports = getVlanPorts(@vlans);
-	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
+	    @devicenames = @supplied_switches?
+			   @supplied_switches : getTestSwitches();
 	    last;
 	};
 	(/reset/) && do {
@@ -395,11 +417,13 @@ foreach my $command (@commands) {
 	    # When we reset, we operate on all test switches, just to be safe
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
-	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
+	    @devicenames = @supplied_switches?
+			   @supplied_switches : getTestSwitches();
 	    last;
 	};
 	(/portcontrol/ || /trunkdisable/) && do {
-	    @devicenames = $opt{i}? @{$opt{i}} : getDeviceNames(@ports);
+	    @devicenames = @supplied_switches?
+	    		   @supplied_switches : getDeviceNames(@ports);
 	    last;
 	};
 	(/recreate/) && do {
@@ -407,14 +431,15 @@ foreach my $command (@commands) {
 	    # Safety check - cannot be used with -i . We have to operate on
 	    # all experimental switches
 	    #
-	    if ($opt{i}) {
-		die "-c and -i cannot be used together\n";
+	    if (@supplied_switches) {
+		die "-c and -i or -S cannot be used together\n";
 	    }
 	    @devicenames = getTestSwitches();
 	    last;
 	};
 	(/trunkenable/) && do {
-	    @devicenames = $opt{i}? @{$opt{i}} : getDeviceNames(@ports);
+	    @devicenames = @supplied_switches?
+	    		   @supplied_switches : getDeviceNames(@ports);
 	    @vlans = @optvlanids;
 	    last;
 	}
