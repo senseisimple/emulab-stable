@@ -47,68 +47,11 @@ $expiretime = date("m/d/Y", time() + (86400 * 90));
 <form action=grpadded.php3 method="post">
 <tr></tr>
 <tr></tr>
-<tr>
-    <td colspan=2>
-        Project Information <em>(replace the example entries)</em>
-    </td>
-</tr>
-
 <?php
-
-#
-#  Project Name:
-#
-echo "<tr>
-          <td>*Name (no blanks):</td>
-          <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"></td>
-      </tr>\n";
-
-#
-#  Long Name
-#
-echo "<tr>
-          <td>*Long name:</td>
-          <td><input type=\"text\" name=\"grp_name\"
-                     value=\"UCB Overlay Multicast\"></td>
-      </tr>\n";
-
-#
-#  URL
-#
-echo "<tr>
-         <td>+URL:</td>
-         <td><input type=\"text\" name=\"grp_URL\"
-                    value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
-      </tr>\n";
-
-#
-# Nodes and PCs
-# 
-echo "<tr>
-         <td>*Estimated #of PCs:</td>
-         <td><input type=\"text\" name=\"grp_pcs\"></td>
-      </tr>\n";
-
-echo "<tr>
-         <td>*Estimated #of Sharks:</td>
-         <td><input type=\"text\" name=\"grp_sharks\" value=\"0\"></td>
-      </tr>\n";
-
-#
-#  Expires
-#
-echo "<tr>
-          <td>When do you expect to be<br>done using the testbed</td>
-          <td><input type=\"text\" name=\"grp_expires\"
-                     value=\"$expiretime\"></td>
-      </tr>\n";
-
 
 #
 # User information.
 #
-echo "<tr></tr>\n";
-echo "<tr></tr>\n";
 echo "<tr>
           <td colspan=2>
               Project Head Information
@@ -244,10 +187,69 @@ echo "<tr>
       </tr>\n";
 }
 
+
+#
+# Project information
+#
+echo "<tr><td colspan='2'><hr></td></tr>\n";
+
+echo "<tr>
+         <td colspan='2'>
+             Project Information <em>(replace the example entries)</em>
+         </td>
+      </tr>\n";
+
+#
+#  Project Name:
+#
+echo "<tr>
+          <td>*Name (no blanks):</td>
+          <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"></td>
+      </tr>\n";
+
+#
+#  Long Name
+#
+echo "<tr>
+          <td>*Long name:</td>
+          <td><input type=\"text\" name=\"grp_name\"
+                     value=\"UCB Overlay Multicast\"></td>
+      </tr>\n";
+
+#
+#  URL
+#
+echo "<tr>
+         <td>+URL:</td>
+         <td><input type=\"text\" name=\"grp_URL\"
+                    value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
+      </tr>\n";
+
+#
+# Nodes and PCs
+# 
+echo "<tr>
+         <td>*Estimated #of PCs:</td>
+         <td><input type=\"text\" name=\"grp_pcs\"></td>
+      </tr>\n";
+
+echo "<tr>
+         <td>*Estimated #of Sharks:</td>
+         <td><input type=\"text\" name=\"grp_sharks\" value=\"0\"></td>
+      </tr>\n";
+
+#
+#  Expires
+#
+echo "<tr>
+          <td>When do you expect to be<br>done using the testbed</td>
+          <td><input type=\"text\" name=\"grp_expires\"
+                     value=\"$expiretime\"></td>
+      </tr>\n";
+
+
 ?>
 
-<tr></tr>
-<tr></tr>
 <tr>
     <td colspan="2">
         *Please describe how and why you'd like to use the testbed.<br>
