@@ -123,7 +123,8 @@ $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
-foreach $reload ( keys(%reloads)) {
+my @reloaded = ();
+foreach $reload ( keys %reloads ) {
   @list = @{$reloads{$reload}};
   # Call os_load to start the reload
   print STDERR "Starting reload for @list:\n";
@@ -131,19 +132,22 @@ foreach $reload ( keys(%reloads)) {
   print STDERR "Calling '$cmd'\n";
   if ( system($cmd) != 0 ) {
     print STDERR "WARNING: OS_LOAD FAILED ON @list!\n";
+  } else {
+    push (@reloaded, @list);
   }
   print STDERR "Reload for @list complete.\n";
 }
 
-if ( %reloads > 0 ) {
+if ( @reloaded > 0 ) {
   print "Locking tables.\n";
   $cmd = "lock tables nodes read, node_types read, reloads read, ".
     "interfaces write, reserved write";
   $sth = $dbh->query($cmd) 
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
   
-  foreach $n (keys(%reloads)) {
+  foreach $n ( @reloaded ) {
     # Change reservation (don't delete or we'll get races)
+    print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
     $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid' where ".
       "node_id='$n'";
     $sth = $dbh->query($cmd)
