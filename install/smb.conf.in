@@ -173,34 +173,11 @@ log level = 2
 
 #============================ Share Definitions ==============================
 
-#XXX: not sure we need this (?)
-[homes]
-   comment = Home Directories
-   browseable = no
-   writable = yes
-
 [share]
                 comment         = Shared files
                 path            = /share
 		browsable	= yes
-#                writable        = yes
+                writable        = no
 #                create mask     = 0770
 #                force create mode = 0660
 
-# XXX: Temp until we autogen share perms
-[proj]
-                comment         = Project dirs
-                path            = /proj
-		browsable	= yes
-                writable        = yes
-#                create mask     = 0770
-#                force create mode = 0660
-
-# XXX: Temp until we autogen share perms
-[users]
-                comment         = User dirs
-                path            = /users
-		browsable	= yes
-                writable        = yes
-#                create mask     = 0770
-#                force create mode = 0660
