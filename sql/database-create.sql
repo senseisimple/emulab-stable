@@ -159,8 +159,8 @@ CREATE TABLE eventlist (
   vname varchar(20) NOT NULL default '',
   objecttype smallint(5) unsigned NOT NULL default '0',
   eventtype smallint(5) unsigned NOT NULL default '0',
-  arguments tinytext,
-  atstring tinytext,
+  arguments text,
+  atstring text,
   PRIMARY KEY  (pid,eid,idx),
   KEY vnode (vnode)
 ) TYPE=MyISAM;

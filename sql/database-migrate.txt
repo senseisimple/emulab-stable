@@ -1312,3 +1312,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table new_interfaces add cable smallint;
        alter table new_interfaces add len tinyint;
+
+1.128: Increase size of eventlist arguments (and atstring) from
+       tinytext (255 chars) to text (65K chars) to avoid too-short problems
+       with program agent command lines. Note that the maximum size allowed
+       by table_regex checking will be set to 1024 for now.
+
+       alter table eventlist change arguments arguments text;
+       alter table eventlist change atstring atstring text;
+

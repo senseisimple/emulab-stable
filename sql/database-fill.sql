@@ -453,8 +453,8 @@ REPLACE INTO table_regex VALUES ('eventlist','vnode','text','redirect','virt_age
 REPLACE INTO table_regex VALUES ('eventlist','vname','text','regex','^[-\\w\\(\\)]+$',1,20,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
-REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:tinytext',0,0,NULL);
-REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:text',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:text',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z0-9][-a-zA-Z0-9]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
 REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','forcelinkdelays','int','redirect','default:boolean',0,0,NULL);
