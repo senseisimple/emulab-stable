@@ -1131,7 +1131,8 @@ CREATE TABLE virt_routes (
   dst_mask varchar(15) default '255.255.255.0',
   nexthop varchar(32) NOT NULL default '',
   cost int(11) NOT NULL default '0',
-  PRIMARY KEY  (pid,eid,vname,src,dst)
+  PRIMARY KEY  (pid,eid,vname,src,dst),
+  KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --
