@@ -1075,7 +1075,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 	# every reserved node.
 	#
 	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime, ".
 		         "nl.reported,nl.entry ".
@@ -1083,6 +1083,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 		         "left join nodes as n on n.node_id=r.node_id ".
 		         "left join node_types as nt on nt.type=n.type ".
 		         "left join node_status as ns on ns.node_id=r.node_id ".
+		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
 		         "inner join nodelogtemp as t on t.node_id=r.node_id ".
 		         "left join nodelog as nl on nl.node_id=r.node_id and nl.reported=t.reported ".
 
@@ -1092,13 +1093,14 @@ function SHOWNODES($pid, $eid, $sortby) {
     }
     else {
 	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 		         "from reserved as r ".
 		         "left join nodes as n on n.node_id=r.node_id ".
 		         "left join node_types as nt on nt.type=n.type ".
 		         "left join node_status as ns on ns.node_id=r.node_id ".
+		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
 		         "WHERE r.eid='$eid' and r.pid='$pid' ".
 		         "ORDER BY $sortclause");
     }
@@ -1130,10 +1132,22 @@ function SHOWNODES($pid, $eid, $sortby) {
 	    echo "  <th>Last Log<br>Time</th>
 		    <th>Last Log Message</th>\n";
 	}
-        echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a>
-		    </th>
-                <th><a href=\"faq.php3#UTT-TUNNEL\">Console</a></th>
-              </tr>\n";
+        echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
+                <th><a href=\"faq.php3#UTT-TUNNEL\">Console</a></th>";
+
+	# Only put out a RDP column header if there are any Windows nodes.
+	$windows_query_result = DBQueryFatal("SELECT r.pid,r.eid,n.node_id,oi.OS ".
+		         "from reserved as r ".
+		         "left join nodes as n on n.node_id=r.node_id ".
+		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
+		         "WHERE r.eid='$eid' and r.pid='$pid' and oi.OS='Windows'");
+	$anywindows = mysql_num_rows($windows_query_result);
+	if ($anywindows) {
+            echo "  <th>
+                        <a href=\"docwrapper.php3?docname=rdp-mime.html\">RDP</a>
+                    </th>\n";
+	}
+	echo "  </tr>\n";
 
 	$stalemark = "<b>?</b>";
 	$count = 0;
@@ -1148,6 +1162,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
 	    $isvirtnode    = $row[isvirtnode];
+	    $iswindowsnode = $row[OS]=='Windows';
 	    $idlehours = TBGetNodeIdleTime($node_id);
 	    $stale = TBGetNodeIdleStale($node_id);
 
@@ -1166,8 +1181,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 	    $count++;
 
 	    echo "<tr>
-                    <td><A href='shownode.php3?node_id=$node_id'>$node_id</a>
-                        </td>
+                    <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>
                     <td>$vname</td>\n";
 	    if ($pid == $TBOPSPID)
 		echo "<td>$rsrvtime</td>\n";
@@ -1175,7 +1189,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 	    if ($def_boot_osid) {
 		echo "<td>";
 		SPITOSINFOLINK($def_boot_osid);
-		echo "</td>";
+		echo "</td>\n";
 	    }
 	    else
 		echo "<td>&nbsp</td>\n";
@@ -1191,20 +1205,36 @@ function SHOWNODES($pid, $eid, $sortby) {
 
 	    if ($showlastlog) {
 		echo "  <td>$row[reported]</td>\n";
-		echo "  <td>$row[entry] (<a href='shownodelog.php3?node_id=$node_id'>LOG</a>)</td>\n";
+		echo "  <td>$row[entry] 
+                            (<a href='shownodelog.php3?node_id=$node_id'>LOG</a>)
+                        </td>\n";
 	    }
 
 	    echo "  <td align=center>
-                     <A href='nodessh.php3?node_id=$node_id'>
-                     <img src=\"ssh.gif\" alt=s></A></td>\n";
+                        <A href='nodessh.php3?node_id=$node_id'>
+                        <img src=\"ssh.gif\" alt=s></A>
+                    </td>\n";
+
 	    if ($isvirtnode) {
 		echo "<td>&nbsp</td>\n";
 	    }
 	    else {
 		echo "  <td align=center>
-                           <A href='nodetipacl.php3?node_id=$node_id'>
-                          <img src=\"console.gif\" alt=c></A></td>\n";
+                            <A href='nodetipacl.php3?node_id=$node_id'>
+                            <img src=\"console.gif\" alt=c></A>
+                        </td>\n";
 	    }
+
+	    if ($iswindowsnode) {
+		echo "  <td align=center>
+                            <A href='noderdp.php3?node_id=$node_id'>
+                            <img src=\"rdp.gif\" alt=r></A>
+                        </td>\n";
+	    }
+	    elseif ($anywindows) {
+		echo "  <td>&nbsp</td>\n";
+	    }
+
 	    echo "</tr>\n";
 	}
 	echo "</table>\n";

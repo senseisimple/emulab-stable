@@ -39,7 +39,7 @@ FILES  += $(wildcard $(SRCDIR)/*.php)
 FILES  += $(wildcard $(SRCDIR)/*.ico)
 FILES  += $(wildcard $(SRCDIR)/*.class)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml $(SRCDIR)/ssh-mime.pl \
-	  $(SRCDIR)/ssh-mime-windows.pl
+	  $(SRCDIR)/ssh-mime-windows.pl $(SRCDIR)/rdp-mime.pl
 
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
 AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)

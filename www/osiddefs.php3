@@ -12,6 +12,7 @@ $osid_oslist			= array();
 $osid_oslist["Linux"]		= 1;
 $osid_oslist["FreeBSD"]		= 1;
 $osid_oslist["NetBSD"]		= 1;
+$osid_oslist["Windows"]		= 1;
 $osid_oslist["Oskit"]		= 0;
 $osid_oslist["Other"]		= 1;
 
