@@ -482,20 +482,39 @@ if (strcmp($usr_email, $dbusr_email)) {
 #
 if ((isset($password1) && strcmp($password1, "")) &&
     (isset($password2) && strcmp($password2, ""))) {
-    
+
+    $query_result =
+	DBQueryFatal("select usr_pswd from users WHERE uid='$target_uid'");
+    if (! mysql_num_rows($query_result)) {
+	TBERROR("Error getting usr_pswd for $target_uid", 1);
+    }
+    $row = mysql_fetch_array($query_result);
+    $old_encoding = $row[usr_pswd];
+    $new_encoding = crypt("$password1", $old_encoding);
+
+    #
+    # Compare. Must change it!
+    # 
+    if (! strcmp($old_encoding, $new_encoding)) {
+	$errors["New Password"] = "New password is the same as old password";
+
+	SPITFORM($formfields, $errors);
+	PAGEFOOTER();
+	return;
+    }
+
     #
     # Insert into database. When changing password for someone else,
     # always set the expiration to right now so that the target user
     # is "forced" to change it. 
     #
-    $encoding = crypt("$password1");
     if ($uid != $target_uid)
 	$expires = "now()";
     else
 	$expires = "date_add(now(), interval 1 year)";
     
     $insert_result =
-	DBQueryFatal("UPDATE users SET usr_pswd='$encoding', ".
+	DBQueryFatal("UPDATE users SET usr_pswd='$new_encoding', ".
 		     "pswd_expires=$expires ".
 		     "WHERE uid='$target_uid'");
 
