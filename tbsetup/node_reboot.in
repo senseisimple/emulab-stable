@@ -226,7 +226,7 @@ if (! keys(%realnodes) && ! keys(%virtnodes)) {
 # in realmode.
 #
 
-my @sortednodes = sort(keys(%realnodes),keys(%virtnodes));
+my @sortednodes = sort(keys(%realnodes));
 
 if (!$realmode) {
     EventSendFatal(host      => $BOSSNODE ,
