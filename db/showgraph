@@ -1,8 +1,8 @@
 #!/usr/local/bin/perl -w
 
-if ($#ARGV >= 0) {
+if ($#ARGV >= 1) {
     #Help mode
-    print "Usage: showgraph\n";
+    print "Usage: showgraph [display]\n";
     print "\n";
     print "This shows a graph of the relations in the Testbed Database.\n";
     print "Fields or columns are shown as ellipses, and entities or tables\n";
@@ -17,13 +17,15 @@ if ($#ARGV >= 0) {
     print "This graph is generated from the current table and column setup\n";
     print "in the actual database, and is always current.\n";
     print "\n";
-    print "(If you keep getting errors, log into plastic.cs to run it.)";
+    print "If you get an 'Unable to open display' message, give a display \n";
+    print "parameter on the command line, and it will attempt to open it.\n";
     die("\n");
 } else  {
-
     use Mysql;
     require "ctime.pl";
 }
+
+my $display = shift;
 
 my $v = 0; # Verbose
 
@@ -45,7 +47,7 @@ print TMP "  display_edge_labels: yes\n  scaling: 0.40\n";
 print TMP "  height: 1000\n width: 500\n";
 print TMP "  priority_phase: yes\n  straight_phase: yes\n";
 print TMP "  crossingweight: medianbary\n  splines: yes\n";
-print TMP "  layoutalgorithm: minbackward\n  arrowmode: fixed\n";
+print TMP "  arrowmode: fixed\n";
 
 my $sth ="";
 my $cmd ="";
@@ -98,6 +100,10 @@ foreach $col ( sort keys %tablecols) {
 
 print TMP "}\n";
 close TMP;
-system("/usr/local/bin/xvcg -silent $filename");
 
+if ($display ne "") {
+  system("/usr/local/bin/xvcg -silent -display $display $filename");
+} else {
+  system("/usr/local/bin/xvcg -silent $filename");
+}
 exec "/bin/rm $filename";
