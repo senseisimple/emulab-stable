@@ -41,7 +41,7 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	rpm:${PORTSDIR}/archivers/rpm \
 	${LOCALBASE}/lib/tcl8.3/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
 	xvcg:${PORTSDIR}/graphics/vcg \
-	tftp-hpa:${PORTSDIR}/misc/tftp-hpa \
+	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
 	elvind:${PORTSDIR}/misc/elvind \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
 	sudo:${PORTSDIR}/security/sudo \
