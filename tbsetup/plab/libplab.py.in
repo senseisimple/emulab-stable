@@ -50,7 +50,7 @@ HTTPD_PORT = "1492"
 HTTP_PATH = "/" # ensure this ends in a slash
 ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
-DEF_ROOTBALL_NAME = "plabroot-2.tgz"
+DEF_ROOTBALL_NAME = "plabroot-3.tgz"
 
 verbose = 0
 debug = 0
