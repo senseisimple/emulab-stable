@@ -1,8 +1,16 @@
 #!/usr/local/bin/tclsh
 # Just parses the ir and prints out a basic human readible report.
 
-set scriptdir [file dirname [info script]]
+### Bootstrapping code.  The whole purpose of this is to find the
+# directory containing the script.
+set file [info script]
+while {![catch "file readlink $file" newfile]} {
+    set file $newfile
+}
+set scriptdir [file dirname $file]
 if {$scriptdir == "."} {set scriptdir [pwd]}
+###
+
 set updir [file dirname $scriptdir]
 
 source $updir/ir/libir.tcl
@@ -13,7 +21,7 @@ sql selectdb $DB tbdb
 namespace import TB_LIBIR::ir
 
 if {[llength $argv] == 0 || [llength $argv] > 2} {
-    puts stderr "Syntax: $argv0 [-v] <irfile>"
+    puts stderr "Syntax: $argv0 \[-v\] <irfile>"
     exit 1
 }
 
