@@ -221,6 +221,7 @@ COMMAND_PROTOTYPE(doroutelist);
 COMMAND_PROTOTYPE(dorole);
 COMMAND_PROTOTYPE(dorusage);
 COMMAND_PROTOTYPE(dodoginfo);
+COMMAND_PROTOTYPE(dohostkeys);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -292,6 +293,7 @@ struct command {
         { "role",	  FULLCONFIG_PHYS, 0, dorole},
         { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
         { "watchdoginfo", FULLCONFIG_ALL,  F_REMUDP|F_MINLOG, dodoginfo},
+        { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4852,7 +4854,8 @@ COMMAND_PROTOTYPE(dorusage)
 
 	if (sscanf(rdata, "LA1=%f LA5=%f LA15=%f DUSED=%f",
 		   &la1, &la5, &la15, &dused) != 4) {
-		error("RUSAGE: %s: Bad arguments\n", reqp->nodeid);
+		strncpy(buf, rdata, 64);
+		error("RUSAGE: %s: Bad arguments: %s...\n", reqp->nodeid, buf);
 		return 1;
 	}
 
@@ -4912,7 +4915,7 @@ COMMAND_PROTOTYPE(dodoginfo)
 	char		buf[MYBUFSIZE];
 	int		nrows, *iv;
 	int		iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup;
-	int		iv_rusage;
+	int		iv_rusage, iv_hkeys;
 
 	/*
 	 * XXX sitevar fetching should be a library function
@@ -4927,7 +4930,8 @@ COMMAND_PROTOTYPE(dodoginfo)
 		return 1;
 	}
 
-	iv_interval = iv_isalive = iv_ntpdrift = iv_cvsup = iv_rusage = -1;
+	iv_interval = iv_isalive = iv_ntpdrift = iv_cvsup =
+		iv_rusage = iv_hkeys = -1;
 	while (nrows) {
 		iv = 0;
 		row = mysql_fetch_row(res);
@@ -4939,6 +4943,8 @@ COMMAND_PROTOTYPE(dodoginfo)
 			iv = &iv_cvsup;
 		} else if (strcmp(row[0], "watchdog/rusage") == 0) {
 			iv = &iv_rusage;
+		} else if (strcmp(row[0], "watchdog/hostkeys") == 0) {
+			iv = &iv_hkeys;
 		} else if (strcmp(row[0], "watchdog/isalive/local") == 0) {
 			if (reqp->islocal && !reqp->isvnode)
 				iv = &iv_isalive;
@@ -4971,13 +4977,18 @@ COMMAND_PROTOTYPE(dodoginfo)
 	/*
 	 * XXX adjust for local policy
 	 * - vnodes and plab nodes do not send NTP drift or cvsup
+	 * - vnodes and plab nodes (except for plab service slice)
+	 *   do not report host keys
 	 * - widearea nodes do not record drift
 	 * - local nodes do not cvsup
 	 * - only a plab node service slice reports rusage
 	 *   (which it uses in place of isalive)
 	 */
-	if ((reqp->islocal && reqp->isvnode) || reqp->isplabdslice)
+	if ((reqp->islocal && reqp->isvnode) || reqp->isplabdslice) {
 		iv_ntpdrift = iv_cvsup = 0;
+		if (!reqp->isplabsvc)
+			iv_hkeys = 0;
+	}
 	if (!reqp->islocal)
 		iv_ntpdrift = 0;
 	else
@@ -4988,9 +4999,19 @@ COMMAND_PROTOTYPE(dodoginfo)
 		iv_isalive = 0;
 
 	OUTPUT(buf, sizeof(buf),
-	       "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d RUSAGE=%d\n",
-	       iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup, iv_rusage);
+	       "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d "
+	       "RUSAGE=%d HOSTKEYS=%d\n",
+	       iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup,
+	       iv_rusage, iv_hkeys);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
+	return 0;
+}
+
+/*
+ * XXX implement me!
+ */
+COMMAND_PROTOTYPE(dohostkeys)
+{
 	return 0;
 }
