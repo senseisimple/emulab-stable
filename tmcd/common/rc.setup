@@ -94,9 +94,17 @@ fi
 
 /bin/rm -f /var/at/jobs/S*
 /bin/rm -f /var/spool/at/S*
-if [ -s $BOOTDIR/startupcmd  ]; then
+if [ -s $BOOTDIR/startupcmd ]; then
         echo "Scheduling startup command to run in a little bit ..."
 	echo "$BINDIR/runstartup" | at -q S 'now + 2 minutes'
+fi
+
+#
+# Start the elvin proxy.
+#
+if [ -x $BINDIR/evproxy ]; then
+	echo "Starting elvin proxy daemon ..."
+	$BINDIR/evproxy -e `cat $BOOTDIR/nickname | awk -F. '{print $3"/"$2}'`
 fi
 
 if [ -x $BINDIR/rc.agents  ]; then
