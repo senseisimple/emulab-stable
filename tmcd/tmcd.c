@@ -108,9 +108,12 @@ static int	safesymlink(char *name1, char *name2);
 
 /* thread support */
 #define MAXCHILDREN	20
-#define MINCHILDREN	5
+#define MINCHILDREN	8
 static int	numchildren;
-static int	maxchildren = 10;
+static int	maxchildren       = 13;
+static int      num_udpservers    = 3;
+static int      num_altudpservers = 1;
+static int      num_alttcpservers = 1;
 static int	mypid;
 static volatile int killme;
 
@@ -339,7 +342,7 @@ setverbose(int sig)
 int
 main(int argc, char **argv)
 {
-	int			tcpsock, udpsock, i, ch, foo[4];
+	int			tcpsock, udpsock, i, ch;
 	int			alttcpsock, altudpsock;
 	int			status, pid;
 	int			portnum = TBSERVER_PORT;
@@ -347,6 +350,11 @@ main(int argc, char **argv)
 	char			buf[BUFSIZ];
 	struct hostent		*he;
 	extern char		build_info[];
+	int			server_counts[4]; /* udp,tcp,altudp,alttcp */
+	struct {
+		int	pid;
+		int	which;
+	} servers[MAXCHILDREN];
 
 	while ((ch = getopt(argc, argv, "dp:c:Xvi:")) != -1)
 		switch(ch) {
@@ -454,6 +462,7 @@ main(int argc, char **argv)
 		error("Could not make sockets!");
 		exit(1);
 	    }
+	    num_alttcpservers = num_altudpservers = 0;
 	} else {
 	    if (makesockets(portnum, &udpsock, &tcpsock) < 0 ||
 		makesockets(TBSERVER_PORT2, &altudpsock, &alttcpsock) < 0) {
@@ -514,28 +523,50 @@ main(int argc, char **argv)
 
 	/*
 	 * Now fork a set of children to handle requests. We keep the
-	 * pool at a set level. No need to get too fancy at this point,
-	 * although this approach *is* rather bogus. 
+	 * pool at a set level. There are 4 types of servers, each getting
+	 * a different number of servers. We do it this cause otherwise
+	 * we have to deal with the select storm problem; a bunch of processes
+	 * select on the same set of file descriptors, and all get woken up
+	 * when something comes in, then all read from the socket but only
+	 * one gets it and the others go back to sleep. There are various ways
+	 * to deal with this problem, but all of them are a lot more code!
 	 */
-	bzero(foo, sizeof(foo));
+	server_counts[0] = num_udpservers;
+	server_counts[1] = num_altudpservers;
+	server_counts[2] = num_alttcpservers;
+	server_counts[3] = maxchildren -
+		(num_udpservers + num_altudpservers + num_altudpservers);
+	bzero(servers, sizeof(servers));
+	
 	while (1) {
 		while (!killme && numchildren < maxchildren) {
-			int which = 0;
-			if (!foo[1])
-				which = 1;
-			else if (!debug && portnum == TBSERVER_PORT) {
-				if (!foo[2])
-					which = 2;
-				else if (!foo[3])
-					which = 3;
+			int which = 3;
+			
+			/*
+			 * Find which kind of server is short one.
+			 */
+			for (i = 0; i < 4; i++) {
+				if (server_counts[i]) {
+					which = i;
+					break;
+				}
 			}
-
+			
 			if ((pid = fork()) < 0) {
 				errorc("forking server");
 				goto done;
 			}
 			if (pid) {
-				foo[which] = pid;
+				server_counts[which]--;
+				/*
+				 * Find free slot
+				 */
+				for (i = 0; i < maxchildren; i++) {
+					if (!servers[i].pid)
+						break;
+				}
+				servers[i].pid   = pid;
+				servers[i].which = which;
 				numchildren++;
 				continue;
 			}
@@ -549,13 +580,13 @@ main(int argc, char **argv)
 			signal(SIGHUP, SIG_DFL);
 			
 			switch (which) {
-			case 0: tcpserver(tcpsock, portnum);
+			case 0: udpserver(udpsock, portnum);
 				break;
-			case 1: udpserver(udpsock, portnum);
+			case 1: udpserver(altudpsock, TBSERVER_PORT2);
 				break;
-			case 2: udpserver(altudpsock, TBSERVER_PORT2);
+			case 2: tcpserver(alttcpsock, TBSERVER_PORT2);
 				break;
-			case 3: tcpserver(alttcpsock, TBSERVER_PORT2);
+			case 3: tcpserver(tcpsock, portnum);
 				break;
 			}
 			exit(-1);
@@ -578,9 +609,16 @@ main(int argc, char **argv)
 			      pid, WEXITSTATUS(status));	  
 		}
 		numchildren--;
-		for (i = 0; i < (sizeof(foo)/sizeof(int)); i++) {
-			if (foo[i] == pid)
-				foo[i] = 0;
+
+		/*
+		 * Figure out which and what kind of server it was that died.
+		 */
+		for (i = 0; i < maxchildren; i++) {
+			if (servers[i].pid == pid) {
+				servers[i].pid = 0;
+				server_counts[servers[i].which]++;
+				break;
+			}
 		}
 		if (killme && !numchildren)
 			break;
@@ -647,6 +685,10 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
 	if (setsockopt(udpsock, SOL_SOCKET, SO_REUSEADDR,
 		       (char *)&i, sizeof(i)) < 0)
 		pwarning("setsockopt(SO_REUSEADDR)");;
+
+	i = 128 * 1024;
+	if (setsockopt(udpsock, SOL_SOCKET, SO_RCVBUF, &i, sizeof(i)) < 0)
+		pwarning("setsockopt(SO_RCVBUF)");
 	
 	/* Create name. */
 	name.sin_family = AF_INET;
@@ -680,7 +722,8 @@ udpserver(int sock, int portnum)
 	int			length, cc;
 	unsigned int		nreq = 0;
 	
-	info("udpserver starting: pid=%d sock=%d\n", mypid, sock);
+	info("udpserver starting: pid=%d sock=%d portnum=%d\n",
+	     mypid, sock, portnum);
 
 	/*
 	 * Wait for udp connections.
@@ -714,7 +757,8 @@ tcpserver(int sock, int portnum)
 	int			length, cc, newsock;
 	unsigned int		nreq = 0;
 	
-	info("tcpserver starting: pid=%d sock=%d\n", mypid, sock);
+	info("tcpserver starting: pid=%d sock=%d portnum=%d\n",
+	     mypid, sock, portnum);
 
 	/*
 	 * Wait for TCP connections.
