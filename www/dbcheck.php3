@@ -114,6 +114,13 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
 		"$token, $table, $column", 1);
     }
 
+    # Make sure the regex is anchored. Its a mistake not to be!
+    if (substr($check, 0, 1) != "^")
+	$check = "^" . $check;
+
+    if (substr($check, -1, 1) != "\$")
+	$check = $check . "\$";
+    
     if (!preg_match("/$check/", "$token")) {
 	$DBFieldErrstr = "Illegal characters";
 	return 0;
