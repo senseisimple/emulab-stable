@@ -161,7 +161,7 @@ sub newvlan ($) {
 #
 # Get type map.
 #
-my $query_result =
+$query_result =
     DBQueryFatal("select type,class from node_types");
 
 while (my ($type,$class) = $query_result->fetchrow_array()) {
@@ -447,6 +447,8 @@ if (!$impotent) {
 # format. We skip the "boss" node. Note this bogus test; need to change the
 # wansolver to allow v2p mappings when fixing a node. 
 #
+print STDOUT "Node Mapping:\n";
+
 foreach my $vnode (sort(keys(%virtnodes))) {
     if (!isremotenode($vnode)) {
 	next;
@@ -456,6 +458,8 @@ foreach my $vnode (sort(keys(%virtnodes))) {
 
     print STDOUT "$vnode mapsto $mapping\n";
 }
+# This print matters. Its how assign_wrapper knows it completed okay.
+print STDOUT "Success!\n";
 
 exit $failed;
 
@@ -510,7 +514,7 @@ sub runwansolver() {
     # the fixed nodes, but I'm not gonna worry about that right now since the
     # solver will just croak anyway. 
     #
-    open(INFO, "$waninfo $waninfoargs |") or
+    open(INFO, "$waninfo $waninfoargs | tee wanlinkinfo.output |") or
 	die("*** $0:\n".
 	    "    Could not start $waninfo: $!\n");
 
@@ -571,8 +575,8 @@ sub runwansolver() {
 	    my $colname = (!isremotenode($vnode2) ? $seenboss : $vnode2);
 
 	    if ($colname eq $rowname) {
-		$latmatrix{$rowname}{$colname} = 0;
-		$bwmatrix{$rowname}{$colname}  = 180000;
+		$latmatrix{$rowname}{$colname} = -1;
+		$bwmatrix{$rowname}{$colname}  = -1;
 		next;
 	    }
 	    if (!defined($virtlan)) {
