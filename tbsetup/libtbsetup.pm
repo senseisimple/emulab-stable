@@ -23,7 +23,7 @@ sub tbs_initlog {
     # Turn off line buffering.
     $| = 1; 
 
-    open(LOGFILE,">$logfile") || do {
+    open(LOGFILE,">>$logfile") || do {
 	print STDERR "Could not open $logfile for writing.\n";
 	exit(1);
     };
