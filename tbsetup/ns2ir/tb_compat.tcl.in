@@ -123,7 +123,7 @@ proc tb-set-node-rpms {node args} {
 	perror "\[tb-set-node-rpms] No rpms given."
 	return
     }
-    $node set rpms $args
+    $node set rpms [join $args :]
 }
 proc tb-set-node-startup {node cmd} {
     $node set startup $cmd
@@ -137,14 +137,14 @@ proc tb-set-node-tarfiles {node args} {
 	perror "\[tb-set-node-tarfiles] Arguments should be node and series of pairs."
 	return
     }
-    $node set tarfiles $args
+    $node set tarfiles [join $args :]
 }
 proc tb-set-node-deltas {node args} {
     if {$args == {}} {
 	perror "\[tb-set-node-deltas] No deltas given."
 	return
     }
-    $node set deltas $args
+    $node set deltas [join $args :]
 }
 
 # Lan/Link state routines.
