@@ -366,33 +366,85 @@
     <ul>
     <li>
     You can download the <code>tiptunnel</code>
-    <a href="downloads/tiptunnel-win32.zip">binary for Windows here</a>.
-    Unzip it, then follow the instructions from the readme.txt file within.
+    <a href="downloads/tiptunnel-win32.exe">installer for Windows here</a>.
+    Run the installer, then Internet Explorer should handle the links
+    correctly (on some versions of IE, you must tell IE to "open" the
+    ACL files twice every time you use a "Connect to serial line" link;
+    we are trying to fix this issue.)
+    You may need to follow the instructions below for Netscape or Mozilla 
+    if you are not using Internet Explorer.
     </li>
     <li>
     You can download the <code>tiptunnel</code> statically-linked x86
     <a href="downloads/tiptunnel-freebsd.tar.gz">binary for FreeBSD here</a>.
-    Follow the instructions for FreeBSD/Linux below.
     </li>
     <li>
     You can download the <code>tiptunnel</code> statically-linked x86
     <a href="downloads/tiptunnel-linux.tar.gz">binary for Linux here</a>.
-    Follow the instructions for FreeBSD/Linux below.
     </li>   
     <li>
     A source distribution will be available soon.
     </li>
     </ul>
+
     <h3>Instructions for Linux/FreeBSD:</h3>
-    <p>
-    Use <code>gunzip</code>, then <code>tar xvf</code> on the downloaded file.
-    Move the resulting <code>tiptunnel</code> binary into 
+    <ul>
+    <li>Use <code>gunzip</code>, then <code>tar xvf</code> on the downloaded file.</li>
+    <li>Move the resulting <code>tiptunnel</code> binary into 
     a directory of your choice (<code>/usr/local/bin</code>, 
-    or <code>~/bin</code> are two good places.)
-    Then, when you click on the "Connect to Serial Line" link,
-    tell your browser to always use that binary  
-    to open files of type "text/x-testbed-acl".
-    </p>
+    or <code>~/bin</code> are two good places.)</li>
+    <li>Set up your browser to handle MIME type "text/x-testbed-acl"
+    as outlined below.</li>
+    </ul>
+    <h3>Instructions for Windows</h3>
+    <ul>
+    <li>Unzip the distribution into a folder. 
+        Creating a "C:\Program Files\tiptunnel" directory and placing
+        the files there is a good idea. Be sure the dlls included
+        in the distribution remain in the same folder as the binary (exe).</li>
+    <li>Set up your browser to handle MIME type "text/x-testbed-acl"
+    as outlined below.</li>
+    </ul>
+    <h3>Netscape 4.7</h3>
+    <ul>
+    <li>Choose <code>preferences</code> from the <code>edit</code> menu.</li>
+    <li>Select <code>Navigator</code>, then <code>Applications</code> under
+        it.</li>
+    <li>Click the <code>New...</code> button.</li>
+    <li>In the <code>MIMEType</code> box, type <code>text/x-testbed-acl</code>
+    </li>
+    <li>In the <code>Suffixes</code> box, type <code>tbacl</code></li>
+    <li>Choose <code>Application</code> in the <code>Handled by</code>
+        box</li>
+    <li>Next to <code>Application</code>, either type the path to the
+        <code>tiptunnel</code> binary, or use <code>Choose...</code> to find
+        it.</li>
+    <li>Now, <b>be sure to</b> put a space, then <code>%s</code> after the
+        path to the application in the box. This tells netscape to actually
+        pass the aclfile into tiptunnel (Mozilla does not require this;
+        see below.)</li>
+    <li>Click <code>OK</code>, then <code>OK</code> again.</li>
+    <li>Clicking a "connect to serial line" link should now
+        bring up a connection in an xterm window.</li>
+    </ul> 
+    <h3>Mozilla</h3>
+    <ul>
+    <li>Choose <code>preferences</code> from the <code>edit</code> menu.</li>
+    <li>Select <code>Navigator</code>, then <code>Helper Applications</code> 
+        under it.</li>
+    <li>Click the <code>New Type...</code> button.</li>
+    <li>In the <code>MIMEType</code> box, type <code>text/x-testbed-acl</code>
+    </li>
+    <li>In the <code>File extension</code> box, type <code>tbacl</code></li>
+    <li>For <code>Application to use</code>, either type the path to the
+        <code>tiptunnel</code> binary, or use <code>Choose...</code> to find
+        it.</li>
+    <li>In Mozilla do <b>not</b> add a <code>%s</code>.</li>
+    <li>Click <code>OK</code>, then <code>OK</code> again.</li>
+    <li>Clicking a "connect to serial line" link should now
+        bring up a connection in an xterm window.</li>
+    </ul> 
+
 <li><a NAME="UTT-4"></a>
     <h3>Can I reboot (power cycle) my nodes?</h3>
     <p>
