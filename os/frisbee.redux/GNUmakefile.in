@@ -9,6 +9,10 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= os/frisbee.redux
 
+DISTFILES	= TODO client.c decls.h event.c event.h log.c log.h \
+		  network.c queue.h server.c trace.c trace.h utils.c utils.h
+EXPANDCOPYRIGHT	= /flux/doc/copyright/expand-copyr
+
 include $(OBJDIR)/Makeconf
 
 all:	frisbee frisbeed
@@ -33,7 +37,11 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= -static
 
-# Define this if you implementation of cond_vars works well
+#
+# Define this if your implementation of cond_vars works well
+# ("works well" in this case means doesn't hang forever or burn up
+# the CPU while in condwait).
+#
 #CFLAGS		+= -DCONDVARS_WORK
 
 # Define this to a non-zero value to enable recording of trace data
@@ -73,4 +81,27 @@ trace.o:	decls.h trace.h log.h
 install:	$(INSTALL_SBINDIR)/frisbeed
 
 clean:
-	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
+	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug \
+	frisbee-dist frisbee.tar frisbee.tar.gz
+
+frisbee.tar.gz: frisbee.tar
+	gzip -c frisbee.tar > frisbee.tar.gz
+
+frisbee.tar: frisbee-dist
+	tar cf frisbee.tar frisbee-dist
+	rm -rf frisbee-dist
+
+frisbee-dist: Makefile.sa Makefile-linux.sa README.sa $(DISTFILES)
+	rm -rf frisbee-dist
+	mkdir frisbee-dist frisbee-dist/frisbee frisbee-dist/doc
+	(cd $(SRCDIR); \
+		tar cf - Makefile.sa Makefile-linux.sa README.sa $(DISTFILES))|\
+			(cd frisbee-dist/frisbee; tar xf -)
+	mv frisbee-dist/frisbee/Makefile.sa frisbee-dist/frisbee/Makefile
+	mv frisbee-dist/frisbee/Makefile-linux.sa frisbee-dist/frisbee/Makefile-linux
+	mv frisbee-dist/frisbee/README.sa frisbee-dist/README
+	(cd frisbee-dist/frisbee; \
+		$(EXPANDCOPYRIGHT) Makefile README $(DISTFILES))
+	(cd ../imagezip; $(MAKE) imagezip.tar)
+	(cd frisbee-dist; tar xf -; mv imagezip-dist imagezip) \
+		< ../imagezip/imagezip.tar
