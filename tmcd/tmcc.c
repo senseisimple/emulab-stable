@@ -50,11 +50,11 @@ typedef int socklen_t;
 #include <resolv.h>
 #endif
 #endif
+#include <setjmp.h>
 
 #ifndef KEYFILE
 #define KEYFILE		"/etc/emulab.pkey"
 #endif
-#define UNIXSOCKVAR	"TMCCUNIXPATH"
 
 /*
  * We search a couple of dirs for the bossnode file.
@@ -118,9 +118,10 @@ usage()
 static int connected = 0;
 static int progress  = 0;
 static int waitfor   = 0;
+static sigjmp_buf progtimo;
 
 static void
-tooktoolong()
+tooktoolong(void)
 {
 	static int	lastprogress = 0;
 
@@ -131,8 +132,7 @@ tooktoolong()
 		return;
 	}
 
-	fprintf(stderr, "Timed out cause there was no progress!\n");
-	exit(-1);
+	siglongjmp(progtimo, 1);
 }
 
 int
@@ -143,8 +143,8 @@ main(int argc, char **argv)
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp;
 	FILE			*fp;
-	int			useudp    = 0;
-	char			*unixpath = NULL;
+	volatile int		useudp    = 0;
+	char			* volatile unixpath = NULL;
 	char			*bossnode = NULL;
 	int			version   = CURRENT_VERSION;
 	char			*vnodeid  = NULL;
@@ -202,14 +202,6 @@ main(int argc, char **argv)
 	}
 	if (unixpath && proxypath)
 		usage();
-
-	/*
-	 * Allow for environment to specify a unix socket, which is a
-	 * connection to a tmcc proxy. Note that a specific -l option
-	 * overrides the environment variable.
-	 */
-	if (!unixpath && !proxypath && (bp = getenv(UNIXSOCKVAR)))
-		unixpath = bp;
 
 	if (unixpath && (keyfile || bossnode)) {
 		fprintf(stderr,
@@ -326,10 +318,15 @@ main(int argc, char **argv)
 	buf[n] = '\0';
 
 	/*
-	 * When a timeout is requested, just let the signal kill us.
+	 * When a timeout is requested, setup the alarm and die if it triggers.
 	 */
 	if (waitfor) {
-		signal(SIGALRM, tooktoolong);
+		if (sigsetjmp(progtimo, 1) != 0) {
+			fprintf(stderr,
+				"Timed out because there was no progress!\n");
+			exit(-1);
+		}
+		signal(SIGALRM, (sig_t)tooktoolong);
 		alarm(waitfor);
 	}
 
@@ -339,6 +336,8 @@ main(int argc, char **argv)
 		n = dounix(buf, fileno(stdout), unixpath);
 	else
 		n = dotcp(buf, fileno(stdout), serverip);
+	if (waitfor)
+		alarm(0);
 	exit(n);
 }
 
@@ -522,11 +521,11 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 	n  = strlen(data);
 	cc = sendto(sock, data, n, 0, (struct sockaddr *)&name, sizeof(name));
 	if (cc != n) {
-		if (cc < 0) {
+		if (cc < 0)
 			perror("Writing to socket");
-			return -1;
-		}
-		fprintf(stderr, "short write (%d != %d)\n", cc, n);
+		else
+			fprintf(stderr, "short write (%d != %d)\n", cc, n);
+		close(sock);
 		return -1;
 	}
 	connected = 1;
@@ -534,13 +533,13 @@ doudp(char *data, int outfd, struct in_addr serverip, int portnum)
 	length = sizeof(client);
 	cc = recvfrom(sock, buf, sizeof(buf) - 1, 0,
 		      (struct sockaddr *)&client, &length);
-	progress += cc;
-
 	if (cc < 0) {
 		perror("Reading from socket");
+		close(sock);
 		return -1;
 	}
 	close(sock);
+	progress += cc;
 	if (dooutput(outfd, buf, cc) < 0)
 		return -1;
 	return 0;
@@ -704,7 +703,8 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 	 * Wait for TCP connections.
 	 */
 	while (1) {
-		int	rval, useudp = 0;
+		int	rval;
+		volatile int useudp = 0;
 		
 		length  = sizeof(client);
 		newsock = accept(sock, (struct sockaddr *)&client, &length);
@@ -752,10 +752,26 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 			fflush(stderr);
 		}
 
+		/*
+		 * Set a timeout for the server-side operation
+		 */
+		if (waitfor) {
+			if (sigsetjmp(progtimo, 1) != 0) {
+				fprintf(stderr,
+					"Server request timeout on: %s\n",
+					command);
+				close(newsock);
+				continue;
+			}
+			signal(SIGALRM, (sig_t)tooktoolong);
+			alarm(waitfor);
+		}
 		if (useudp)
 			rval = doudp(command, newsock, serverip, portlist[0]);
 		else
 			rval = dotcp(command, newsock, serverip);
+		if (waitfor)
+			alarm(0);
 		
 		if (rval < 0 && debug) {
 			fprintf(stderr, "Request failed!\n");
