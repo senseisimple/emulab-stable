@@ -21,7 +21,7 @@ $TBNSSUBDIR     = "nsdir";
 
 $TBAUTHCOOKIE   = "HashCookie";
 $TBAUTHTIMEOUT  = 10800;
-$TBAUTHDOMAIN   = "emulab.net";
+$TBAUTHDOMAIN   = ".emulab.net";
 #$TBAUTHDOMAIN   = "C884963-A.crvlls1.or.home.com";
 
 #
