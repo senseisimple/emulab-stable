@@ -1688,7 +1688,7 @@ sub TBImageLoadMaxOkay($$;@)
     }
 
     foreach my $OS ($query_result->fetchrow()) {
-	if ($OS && (!TBOSLoadMaxOkay($imageid,$node_count,@nodes))) {
+	if ($OS && (!TBOSLoadMaxOkay($OS,$node_count,@nodes))) {
 	    return 0;
 	}
     }
