@@ -152,6 +152,9 @@ my %costs    = ();
 # parser will be unhappy.
 my %linkcount= ();
 
+# list of ports that a node is connected on. Indexed by node.
+my %nodeportlist = ();
+
 #
 # Convert list of nodes into a map of $vname:$port to IP. We will need the
 # IPs later when filling in the virt_routes table.
@@ -164,6 +167,10 @@ while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
     
     $linkcount{$vname} = 0;
     
+    if (! defined($nodeportlist{$vname}) ) {
+      $nodeportlist{$vname} = [];
+    }
+    
     foreach my $ipinfo (split(" ", $ips)) {
 	my ($port,$ip) = split(":", $ipinfo);
 	$ips{"$vname:$port"} = $ip;
@@ -172,6 +179,7 @@ while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
 	    $rmap{$index} = $vname;
 	    $index++;
 	}
+	push( @{$nodeportlist{$vname}}, $port );
 	$linkcount{$vname} += 1;
     }
 }
@@ -285,6 +293,12 @@ if ($?) {
 my %routes	= ();
 my %netroutes   = ();
 
+#
+# Host route ips for interfaces of a dst node besides the nearest one
+# This is indexed by a node (i.e. a "src:dst" node) and is a list of dst ips
+# The hop info is obtained from the shortest path route
+my %hostrouteips = ();
+
 foreach my $result (@results) {
     my ($src, $dst, $hop);
 
@@ -373,6 +387,9 @@ foreach my $route (keys(%routes)) {
     # Want to find these.
     my ($srcip,$dstip,$hopip);
 
+    # remember the port for which we have dstip
+    my $dstport;
+    
     #
     # Scan dstmembers till we find the dst. This is the IP we want.
     #
@@ -381,6 +398,7 @@ foreach my $route (keys(%routes)) {
 
 	if ($node eq $dst) {
 	    $dstip = $ips{$member};
+	    $dstport = $port;
 	    last;
 	}
     }
@@ -406,6 +424,32 @@ foreach my $route (keys(%routes)) {
 	$dstip = $newip;
     }
 
+    # Construct host routes for the other interfaces of dst
+    foreach my $port (@{$nodeportlist{$dst}}) {
+
+      # We already have a route for the ip on dstport
+      if ( $port eq $dstport ) {
+	next;
+      }
+
+      my $newip = $ips{"$dst:$port"};
+      my $newipsubnet = inet_ntoa(inet_aton($newip) & inet_aton($NETMASK));
+
+      # If we already have a route to newipsubnet via the same hop,
+      # we don't need the host route
+      if ( defined($netroutes{"$src:$newipsubnet"}) &&
+	   $netroutes{"$src:$newipsubnet"} eq $hop ) {
+	next;
+	
+      } else {
+	
+	if (! defined($hostrouteips{"$src:$dst"}) ) {
+	  $hostrouteips{"$src:$dst"} = [];
+	}
+	push( @{$hostrouteips{"$src:$dst"}}, $newip );
+      }
+    }
+    
     #
     # Scan srcmembers to find the IPs for the src and hop.
     #
@@ -427,6 +471,12 @@ foreach my $route (keys(%routes)) {
 	    printf(STDERR "%s: %-23s --> %-23s - %s\n",
 		   ($type eq "net" ? "n" : "h"),
 		   "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
+
+	    foreach my $ip (@{$hostrouteips{"$src:$dst"}}) {
+	      printf(STDERR "%s: %-23s --> %-23s - %s\n",
+		     "h",
+		     "$src:$srcip", "$dst:$ip", "$hop:$hopip");
+	    }
 	}
 	if ($format eq "ns") {
 	    print "\$${src} add-route ";
@@ -436,6 +486,9 @@ foreach my $route (keys(%routes)) {
 	    else {
 		print "\$${dstlan} \$${hop}\n";
 	    }
+
+	    # No need to print the host routes in the 'ns' case
+	    # since we already have printed a route for $dst
 	}
 	elsif ($format eq "bsd") {
 	    if ($type eq "host") {
@@ -443,6 +496,10 @@ foreach my $route (keys(%routes)) {
 	    }
 	    else {
 		print "route add -net $dstip $hopip $NETMASK\n";
+	    }
+
+	    foreach my $ip (@{$hostrouteips{"$src:$dst"}}) {
+	      print"route add -host $ip $hopip\n";
 	    }
 	}
 	elsif ($format eq "suxs") {
@@ -452,6 +509,10 @@ foreach my $route (keys(%routes)) {
 	    else {
 		print "route add -net $dstip netmask $NETMASK gw $hopip\n";
 	    }
+
+	    foreach my $ip (@{$hostrouteips{"$src:$dst"}}) {
+	      print"route add -host $ip gw $hopip\n";
+	    }
 	}
     }
     else {
@@ -459,6 +520,13 @@ foreach my $route (keys(%routes)) {
 		     " (pid,eid,vname,src,dst,nexthop,dst_type) ".
 		     " values ('$pid', '$eid', '$src', '$srcip', '$dstip', ".
 		     "         '$hopip', '$type')");
+
+	foreach my $ip (@{$hostrouteips{"$src:$dst"}}) {
+	  DBQueryFatal("insert into virt_routes ".
+		       " (pid,eid,vname,src,dst,nexthop,dst_type) ".
+		       " values ('$pid', '$eid', '$src', '$srcip', '$ip', ".
+		       "         '$hopip', 'host')");
+	}
     }
 }
 
