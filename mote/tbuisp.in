@@ -309,6 +309,15 @@ MOTE: foreach my $mote (@motes) {
 	$errors++;
 	warn "Failed to upload code to $mote";
     }
+
+    # XXX - We have to reboot stargates after loading the mote. Disgusting,
+    # there should be some better way
+    if ($upload_method eq "ssh") {
+	if (system("$SSHTB -host $host shutdown -r now")) {
+	    $errors++;
+	    warn "Failed to upload code to $mote";
+	}
+    }
 }
 
 if ($errors) {
