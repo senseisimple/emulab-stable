@@ -4,6 +4,20 @@
  * All rights reserved.
  */
 
+/*
+ * This code is derived from the proxydhcp server downloaded from:
+ * http://www.bpbatch.org/downloads/proxydhcp.tar.gz
+ * That code has no copyright notice, but the README says:
+ *
+ *    PXE Proxy DHCP Server
+ *
+ *    Written by David Clerc & Marc Vuilleumier Stuckelberg,
+ *    CUI, University of Geneva, June 1998
+ *    http://cuiwww.unige.ch/info/pc/remote-boot/
+ *
+ * Thanks guys!
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
