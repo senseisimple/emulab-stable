@@ -99,6 +99,7 @@ sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(SYSETCDIR)/start_if.fxp1
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(SYSETCDIR)/start_if.fxp4
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(SYSETCDIR)/start_if.xl0
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.em0  $(SYSETCDIR)/start_if.em0
 	$(INSTALL) -m 755 $(SRCDIR)/periodic.conf $(SYSETCDIR)/periodic.conf
 	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh $(RCDIR)/testbed.sh
 
