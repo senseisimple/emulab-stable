@@ -56,6 +56,8 @@ static int	 doseek = 0;
 static int	 dofill = 0;
 static unsigned	 fillpat= 0;
 static int	 debug  = 0;
+static int	 dots   = 1;
+static int	 dotcol;
 static long long total  = 0;
 static char	 chunkbuf[SUBBLOCKSIZE];
 
@@ -99,6 +101,7 @@ usage(void)
 		" -z              Write zeros to free blocks.\n"
 		" -p pattern      Write 32 bit pattern to free blocks.\n"
 		"                 NOTE: Use -z/-p to avoid seeking.\n"
+		" -o              Output 'dots' indicating progress\n"
 		" -d              Turn on progressive levels of debugging\n");
 	exit(1);
 }	
@@ -110,10 +113,14 @@ main(int argc, char **argv)
 	int		i, ch, slice = 0;
 	struct timeval  stamp, estamp;
 
-	while ((ch = getopt(argc, argv, "dhs:zp:")) != -1)
+	while ((ch = getopt(argc, argv, "dhs:zp:o")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
+			break;
+
+		case 'o':
+			dots++;
 			break;
 
 		case 's':
@@ -211,6 +218,12 @@ main(int argc, char **argv)
 	}
  done:
 	close(infd);
+	if (dots) {
+		while (dotcol++ <= 64)
+			printf(" ");
+		
+		printf("%14qd\n", total);
+	}
 
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
@@ -312,7 +325,7 @@ inflate_subblock(char *chunkbufp)
 	}
 
 	if (debug == 1)
-		printf("Decompressing: %14qd --> ", offset);
+		fprintf(stderr, "Decompressing: %14qd --> ", offset);
 
 	while (1) {
 		/*
@@ -361,10 +374,11 @@ inflate_subblock(char *chunkbufp)
 				cc = size;
 
 			if (debug == 2) {
-				printf("%12qd %8d %8d %12qd %10qd %8d %5d %8d"
-				       "\n",
-				       offset, cc, count, total, size, ibsize,
-				       ibleft, d_stream.avail_in);
+				fprintf(stderr,
+					"%12qd %8d %8d %12qd %10qd %8d %5d %8d"
+					"\n",
+					offset, cc, count, total, size, ibsize,
+					ibleft, d_stream.avail_in);
 			}
 
 			if ((ccres = devwrite(outfd, bp, cc)) != cc) {
@@ -431,8 +445,17 @@ inflate_subblock(char *chunkbufp)
 	assert(size == 0);
 	assert(blockhdr->size == 0);
 
-	if (debug == 1)
-		printf("%14qd\n", total);
+	if (debug == 1) {
+		fprintf(stderr, "%14qd\n", total);
+	}
+	else if (dots) {
+		printf(".");
+		fflush(stdout);
+		if (dotcol++ > 63) {
+			dotcol = 0;
+			printf("%14qd\n", total);
+		}
+	}
 
 	return 0;
 }
