@@ -90,6 +90,12 @@ while ($row = mysql_fetch_row($found)) {
       $cmd = "update grp_memb set trust='$trust' where uid='$uid'";
       $cmd .= "and trust='none' and gid='$gid'";
       $result = mysql_db_query("tbdb",$cmd);
+      #
+      # Bogus grp vs proj issue.
+      #
+      $cmd = "insert into proj_memb (uid, pid) values ('$uid', '$gid')";
+      $result = mysql_db_query("tbdb",$cmd);
+
       mail("$email","TESTBED: Group Approval",
 	   "\nThis message is to notify you that you have been approved ".
 	   "as a member of \nthe $gid group with $trust permissions.\n".
