@@ -1,0 +1,5 @@
+#!/bin/sh
+
+DIR=@prefix@/sbin/
+
+exec $DIR/sshxmlrpc_server.py imageid

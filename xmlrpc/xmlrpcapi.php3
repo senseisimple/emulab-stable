@@ -148,6 +148,243 @@ simple integer reflecting an exit code from the server, and some
 output to help you determine what went wrong. Otherwise, the
 return value is documented in each method description. 
 
+<p>
+Finally, a quick note about the types accepted and returned by methods.  Most
+methods will accept a real XML-RPC type and try to coerce a string into that
+type.  For example, in python, passing <code>True</code> is equivalent to
+passing the string, "true".  When returning data, the methods will prefer to
+return typed values, rather than formatted strings.
+
+<ul>
+<li><b>/XMLRPC/emulab</b>
+<p>
+The <tt>emulab</tt> module provides general information about this Emulab
+installation.
+
+  <ul>
+  <li><tt><b>news</b></tt>: Get news item headers.  The optional
+  arguments are:<br><br>
+
+  <table cellpadding=2>
+    <tr>
+      <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+    </tr>
+    <tr></tr>
+    <tr>
+      <td><tt>starting</tt></td>
+      <td>date</td>
+      <td>-Inf.</td>
+      <td>The date to start searching for news items (e.g. "2003-07-23
+      10:13:00").</td>
+    </tr>
+    <tr>
+      <td><tt>ending</tt></td>
+      <td>date</td>
+      <td>+Inf.</td>
+      <td>The date to stop searching for news items.</td>
+    </tr>
+  </table>
+
+  <br>The return value is a list of hash tables with the following
+  elements:<br><br>
+
+  <table cellpadding=2>
+    <tr>
+      <th>Name</th><th>Type</th><th>Description</th>
+    </tr>
+    <tr>
+      <td><tt>subject</tt></td>
+      <td>string</td>
+      <td>The item's subject.</td>
+    </tr>
+    <tr>
+      <td><tt>author</tt></td>
+      <td>string</td>
+      <td>The item's author.</td>
+    </tr>
+    <tr>
+      <td><tt>date</tt></td>
+      <td>date</td>
+      <td>The date the item was posted.</td>
+    </tr>
+    <tr>
+      <td><tt>msgid</tt></td>
+      <td>integer</td>
+      <td>The item's unique identifier.  This value should be used as the
+      anchor when redirecting to the web site
+      (e.g. http://www.emulab.net/news.php3#32).</td>
+    </tr>
+  </table>
+
+  </ul>
+</ul>
+
+<ul>
+<li><b>/XMLRPC/user</b>
+<p>
+The <tt>user</tt> module provides access to user-specific information.
+
+  <ul>
+  <li><tt><b>nodecount</b></tt>: Get the number of nodes you have allocated.
+  There are no arguments and the method returns an integer.<br>
+
+  <br>
+  <li><tt><b>membership</b></tt>: Get the list of projects and subgroups of
+  which you are a member.  The return value is a hash table where each entry is
+  the name of a project and a list of subgroups.  The optional arguments
+  are:<br><br>
+
+  <table cellpadding=2>
+    <tr>
+      <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+    </tr>
+    <tr>
+      <td>permission</td>
+      <td>string</td>
+      <td>readinfo</td>
+      <td>The name of an action that the user would like to take.  The result
+      will then be narrowed to those groups where this action is possible.
+      Supported values:
+      <ul>
+      <li>readinfo - Read information about the project/group.
+      <li>createexpt - Create an experiment.
+      <li>makegroup - Create a sub-group.
+      <li>makeosid - Create an OS identifier.
+      <li>makeimageid - Create an image identifier.
+      </ul>
+      </td>
+    </tr>
+  </table>
+
+  </ul>
+</ul>
+
+<ul>
+<li><b>/XMLRPC/fs</b>
+<p>
+The <tt>fs</tt> module lets you examine the parts of the Emulab file system
+that can be exported to your experimental nodes.
+
+  <ul>
+  <li><tt><b>access</b></tt>: Check the accessibility of a path.  The path
+    must lie on an exported file system or the call will fail.  The return
+    value is true or false.  The required arguments are:<br><br>
+    <table cellpadding=2>
+      <tr>
+        <th>Name</th><th>Type</th><th>Description</th>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>path</tt></td>
+      <td>string</td>
+      <td>The path to check</td>
+     </tr>
+     <tr>
+      <td><tt>permission</tt></td>
+      <td>string</td>
+      <td>The access permission to check.  Value should be one of: "read",
+      "write", "execute", "exists".</td>
+     </tr>
+    </table>
+
+  <br>
+  <li><tt><b>listdir</b></tt>: Get a directory list for a given path.  The path
+    must lie on an exported file system of the call will fail.  The return
+    value is a list of tuples for each entry, described in detail below.  The
+    required arguments are:<br><br>
+    <table cellpadding=2>
+      <tr>
+        <th>Name</th><th>Type</th><th>Description</th>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>path</tt></td>
+      <td>string</td>
+      <td>The path to check</td>
+     </tr>
+    </table>
+
+    <br>
+    The return value is a list of tuples where each entry is organized as
+    follows:<br><br>
+
+    <table cellpadding=2>
+      <tr>
+        <th>Index</th><th>Type</th><th>Description</th>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td>0</td>
+      <td>string</td>
+      <td>The name of the entry.</td>
+     </tr>
+     <tr>
+      <td>1</td>
+      <td>character</td>
+      <td>The entry type, where:
+      <ul>
+      <li>'d' - directory
+      <li>'c' - character device
+      <li>'b' - block device
+      <li>'f' - regular file
+      <li>'l' - link
+      <li>'s' - socket
+      <li>'u' - unknown
+      </td>
+     </tr>
+     <tr>
+      <td>2</td>
+      <td>integer</td>
+      <td>Unix permission mask.</td>
+     </tr>
+     <tr>
+      <td>3</td>
+      <td>string</td>
+      <td>Name of the user owner.</td>
+     </tr>
+     <tr>
+      <td>4</td>
+      <td>string</td>
+      <td>Name of the group owner.</td>
+     </tr>
+     <tr>
+      <td>5</td>
+      <td>integer</td>
+      <td>The size of the file.</td>
+     </tr>
+     <tr>
+      <td>6</td>
+      <td>integer</td>
+      <td>The last access time as the number of seconds since the epoch.</td>
+     </tr>
+     <tr>
+      <td>7</td>
+      <td>integer</td>
+      <td>The last modified time as the number of seconds since the epoch.</td>
+     </tr>
+     <tr>
+      <td>8</td>
+      <td>integer</td>
+      <td>The creation time as the number of seconds since the epoch.</td>
+     </tr>
+    </table>
+
+    <br>
+    <li><tt><b>exports</b></tt>: Get the root list of file system exports
+    available to you.  This method takes no arguments and returns a list of
+    strings that represent the set of paths that are potentially accessible by
+    your experimental nodes.<br><br>
+
+    Note 1: The list does <i>not</i> include other user directories even though
+    they may be accessible.<br><br>
+
+    Note 2: The list <i>does</i> include all project and group directories that
+    you are a member of, even though the nodes will only be able to access the
+    project/group directories the experiment was created under.
+
+  </ul>
+</ul>
+
 <ul>
 <li><b>/XMLRPC/experiment</b>
 <p>
@@ -155,6 +392,23 @@ The <tt>experiment</tt> module lets you start, control, and terminate
 experiments.
 
   <ul>
+  <li><tt><b>constraints</b></tt>: Get the physical/policy constraints for
+  experiment parameters.  There are no arguments and the return value is a hash
+  table with the following elements:<br><br>
+
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr>
+    <td>idle/threshold</td>
+    <td>integer</td>
+    <td>The maximum number of hours allowed for the idleswap parameter.</td>
+  </tr>
+  </table>
+  
+
+  <br>
   <li><tt><b>startexp</b></tt>: Create an experiment. By default, the experiment
   is started as a <a href="tutorial/tutorial.php3#BatchMode"><em>batch</em></a>
   experiment, but you can use the <tt>batchmode</tt> option described below to
@@ -760,7 +1014,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
     The optional arguments are:<br><br>
     <table cellpadding=2>
      <tr>
-      <th>Name</th><th>type</th><th>Default</th><th>Description</th>
+      <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
      </tr>
      <tr></tr>
      <tr>
@@ -863,6 +1117,34 @@ The <tt>node</tt> module lets you control nodes in your experiments.
      </tr>
     </table>
     
+  </ul>
+</ul>
+
+<br>
+<ul>
+<li><b>/XMLRPC/osid</b>
+<p>
+The <tt>osid</tt> module lets you operate on OS descriptors.
+
+  <ul>
+  <li><tt><b>getlist</b></tt>: Get the list of OS identifiers you can access.
+  There are no arguments and the return value is a hash table containing the OS
+  IDs and their descriptions.
+
+  </ul>
+</ul>
+
+<br>
+<ul>
+<li><b>/XMLRPC/imageid</b>
+<p>
+The <tt>imageid</tt> module lets you operate on Image descriptors.
+
+  <ul>
+  <li><tt><b>getlist</b></tt>: Get the list of Image identifiers you can
+  access.  There are no arguments and the return value is a hash table
+  containing the Image IDs and their descriptions.
+
   </ul>
 </ul>
 

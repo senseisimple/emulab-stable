@@ -7,11 +7,17 @@
 import sys
 import socket
 import os
+import os.path
+import stat
 import popen2
 import tempfile
 import time
 import re
 import string
+import pwd
+import grp
+import errno
+import exceptions
 sys.path.append("@prefix@/lib")
 from libdb        import *
 from libtestbed   import SENDMAIL, TBOPS
@@ -22,6 +28,53 @@ TBDIR = "@prefix@"
 
 # Version
 VERSION = 0.1
+
+# Well known directories
+PROJROOT = "/proj"
+GROUPROOT = "/groups"
+SHAREROOT = "/share"
+USERSROOT = "/users"
+
+# List of directories exported to nodes via NFS.
+NFS_EXPORTS = [
+    PROJROOT,
+    GROUPROOT,
+    SHAREROOT,
+    USERSROOT,
+    ]
+
+# Base class for emulab specific exceptions.
+class EmulabError(exceptions.Exception):
+    pass
+
+# Exception thrown when logins are not allowed.
+class NoLoginsError(EmulabError):
+    pass
+
+# Exception thrown an unknown user tries to import this module.
+class UnknownUserError(EmulabError):
+    pass
+
+# User info from the passwd file
+UID = pwd.getpwuid(os.getuid())[0]
+ISADMIN = 0
+
+#
+# Do a "one time" initialization of user data from the database.
+#
+def InitUser():
+    global UID, ISADMIN
+    
+    userQuery = DBQueryFatal("SELECT admin FROM users AS u WHERE u.uid=%s",
+                             (UID,))
+    
+    if len(userQuery) == 0:
+        raise UnknownUserError, UID
+
+    ISADMIN = userQuery[0][0]
+    return
+
+InitUser()
 
 #
 # Arguments to methods are passed as a Dictionary. This converts to a XML
@@ -53,6 +106,476 @@ def CheckRequiredArgs(argdict, arglist):
     return None
 
 #
+# This class implements the server side of the XMLRPC interface to emulab as a
+# whole.
+#
+class emulab:
+    def __init__(self):
+        self.VERSION = VERSION
+        return
+
+    #
+    # Get the global 'notice' message that is usually printed under the menu
+    # on the web site.
+    #
+    def message(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        msg = TBGetSiteVar("web/message")
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=msg,
+                              output=msg)
+
+    #
+    # Get the news items as a list of {subject,author,date,msgid} items for
+    # dates between an option start and ending.
+    #
+    def news(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        # Process optional arguments.
+        starting = None;
+        if argdict.has_key("starting"):
+            if not re.match("^[-:\w]*$", str(argdict["starting"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed 'starting'!")
+            starting = sqldate(argdict["starting"])
+            pass
+
+        ending = None
+        if argdict.has_key("ending"):
+            if not re.match("^[-:\w]*$", str(argdict["ending"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed 'ending'!")
+            ending = sqldate(argdict["ending"])
+            pass
+
+        # Construct the SQL date comparison
+        if starting and ending:
+            comparison = "BETWEEN %s and %s"
+            sub = (starting, ending)
+            pass
+        elif starting:
+            comparison = "> %s"
+            sub = (starting,)
+            pass
+        elif ending:
+            comparison = "< %s"
+            sub = (ending,)
+            pass
+        else:
+            comparison = ""
+            sub = ()
+            pass
+
+        # Get the headlines and
+        dbres = DBQueryFatal("SELECT subject,author,date,msgid FROM webnews "
+                             "WHERE date "
+                             + comparison
+                             + " ORDER BY date DESC",
+                             sub)
+
+        # ... package them up
+        result = []
+        for res in dbres:
+            tmp = {}
+            tmp["subject"] = res[0]
+            tmp["author"] = res[1]
+            tmp["date"] = xmlrpclib.DateTime(
+                time.strptime(res[2], "%Y-%m-%d %H:%M:%S"))
+            tmp["msgid"] = res[3]
+            result.append(tmp)
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+    
+    pass
+
+
+#
+# This class implements the server side of the XMLRPC interface to user
+# specific information.
+#
+class user:
+    def __init__(self):
+        self.VERSION = VERSION
+        return
+
+    #
+    # Get the number of nodes this user is has allocated.
+    #
+    def nodecount(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        res = DBQueryFatal(
+            "SELECT a.node_id FROM nodes AS a "
+            "left join reserved as b on a.node_id=b.node_id "
+            "left join node_types as nt on a.type=nt.type "
+            "left join experiments as e on b.pid=e.pid and "
+            " b.eid=e.eid "
+            "WHERE e.expt_head_uid=%s and e.pid!='emulab-ops' "
+            "  and a.role='testnode' and nt.class = 'pc'",
+            (UID,))
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=len(res),
+                              output=str(len(res)))
+
+    #
+    # Get the listing of projects/groups that this user is a member of and,
+    # optionally, has the permission to perform some task.
+    #
+    def membership(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        permission = "readinfo"
+        if argdict.has_key("permission"):
+            permission = argdict["permission"]
+            pass
+
+        # Convert the permission to a SQL condition.
+        if permission == "readinfo":
+            trust_clause = "trust!='none'"
+            pass
+        elif permission == "makegroup":
+            trust_clause = "trust='project_root'"
+            pass
+        elif permission == "createexpt":
+            trust_clause = ("(trust='project_root' or trust='group_root' or "
+                            " trust='local_root')")
+            pass
+        elif permission == "makeosid" or permission == "makeimageid":
+            # XXX Handle admin
+            trust_clause = ("(trust='project_root' or trust='group_root' or "
+                            " trust='local_root')")
+            pass
+        else:
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output=("Bad permission value: "
+                                          + permission))
+
+        res = DBQueryFatal("SELECT distinct pid,gid FROM group_membership "
+                           "WHERE uid=%s and "
+                           + trust_clause
+                           + " ORDER BY pid",
+                           (UID,))
+
+        result = {}
+        for proj in res:
+            if result.has_key(proj[0]):
+                # Add group to existing project list
+                tmp = result[proj[0]]
+                tmp.append(proj[1])
+                pass
+            else:
+                # Add new project to root list
+                tmp = [proj[1],]
+                result[proj[0]] = tmp
+                pass
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    pass
+
+
+#
+# This class implements the server side of the XMLRPC interface to the emulab
+# NFS exports.
+#
+class fs:
+    def __init__(self):
+        self.VERSION = VERSION
+        return
+
+    #
+    # Check the accessibility of a path.
+    #
+    def access(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!");
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("permission", "path"))
+        if (argerror):
+            return argerror
+
+        try:
+            path = nfspath(argdict["path"]) # Scrub the path
+            
+            permission = argdict["permission"]
+
+            # Convert the permission to a python compatible value.
+            if permission == "read" or permission == "r":
+                accessmode = os.R_OK
+                pass
+            elif permission == "write" or permission == "w":
+                accessmode = os.W_OK
+                pass
+            elif permission == "execute" or permission == "x":
+                accessmode = os.X_OK
+                pass
+            elif permission == "exists" or permission == "e":
+                accessmode = os.F_OK
+                pass
+            else:
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output=("Bad permission value: "
+                                              + permission))
+            
+            res = os.access(path, accessmode)
+
+            return EmulabResponse(RESPONSE_SUCCESS,
+                                  value=res,
+                                  output=str(res))
+        except OSError, e:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  value=e,
+                                  output=(e.strerror + ": " + e.filename))
+
+        # Never reached...
+        assert False
+        pass
+
+    #
+    # Get a directory listing for a given path.
+    #
+    def listdir(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("path",))
+        if (argerror):
+            return argerror
+
+        try:
+            path = nfspath(argdict["path"]) # Scrub the path
+
+            # Make sure the path is accessible,
+            if not os.access(path, os.X_OK):
+                raise OSError(errno.EPERM, "Path is not accessible", path)
+
+            # ... get the directory listing, and
+            res = os.listdir(path)
+
+            # ... package it up into a platform independent from.
+            result = []
+            for entry in res:
+                try:
+                    st = os.stat(os.path.join(path, entry))
+                    # The UID/GID will be meaningless to the other side,
+                    # resolve them before sending it back.
+                    try:
+                        uname = pwd.getpwuid(st[stat.ST_UID])[0]
+                        pass
+                    except:
+                        # Unknown UID, just send the number as a string
+                        uname = str(st[stat.ST_UID])
+                        pass
+                    try:
+                        gname = grp.getgrgid(st[stat.ST_GID])[0]
+                        pass
+                    except:
+                        # Unknown GID, just send the number as a string
+                        gname = str(st[stat.ST_GID])
+                        pass
+                    result.append((entry,
+                                   filetype(st[stat.ST_MODE]),
+                                   stat.S_IMODE(st[stat.ST_MODE]),
+                                   uname,
+                                   gname,
+                                   st[stat.ST_SIZE],
+                                   st[stat.ST_ATIME],
+                                   st[stat.ST_MTIME],
+                                   st[stat.ST_CTIME]))
+                except OSError:
+                    pass
+                pass
+            retval = EmulabResponse(RESPONSE_SUCCESS,
+                                    value=result,
+                                    output=str(result))
+            pass
+        except OSError, e:
+            retval = EmulabResponse(RESPONSE_ERROR,
+                                    value=e,
+                                    output=(e.strerror + ": " + e.filename))
+            pass
+
+        return retval
+
+    #
+    # Get the list of potential NFS exports for an experiment.
+    #
+    def exports(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        # Start with the default set of exports, then
+        res = [
+            USERSROOT + "/" + UID, # XXX Use getpwuid() and handle admin
+            SHAREROOT,
+            ]
+
+        # ... add the project/group listings.
+        projs = DBQueryFatal("SELECT distinct pid,gid FROM group_membership "
+                             "WHERE uid=%s and trust!='none' ORDER BY pid",
+                             (UID,))
+
+        for proj in projs:
+            if proj[0] == proj[1]:
+                res.append(PROJROOT + "/" + proj[0])
+                pass
+            else:
+                res.append(GROUPROOT + "/" + proj[0] + "/" + proj[1])
+                pass
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=res,
+                              output=str(res))
+
+    pass
+
+
+#
+# This class implements the server side of the XMLRPC interface to image IDs.
+#
+class imageid:
+    def __init__(self):
+        self.VERSION = VERSION
+        return
+
+    def getlist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        # Get the listing that is accessible to this user and
+        res = DBQueryFatal(
+            "SELECT distinct i.imagename,i.description FROM images as i "
+            "left join group_membership as g on g.pid=i.pid "
+            "WHERE g.uid=%s or i.global",
+            (UID,))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No image ids?")
+
+        # ... package it up.
+        result = {}
+        for image in res:
+            tmp = {
+                "imageid" : image[0],
+                "description" : image[1],
+                }
+            result[image[0]] = tmp
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    pass
+
+
+#
+# This class implements the server side of the XMLRPC interface to OS IDs.
+#
+class osid:
+    def __init__(self):
+        self.VERSION = VERSION
+        return
+
+    def getlist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        # Get the listing that is accessible to this user and
+        res = DBQueryFatal("SELECT distinct o.osname,o.description FROM "
+                           "os_info as o "
+                           "left join group_membership as g on g.pid=o.pid "
+                           "where g.uid=%s or o.shared=1",
+                           (UID,))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No OS IDs?")
+
+        # ... package it up.
+        result = {}
+        for osid in res:
+            tmp = {
+                "osid" : osid[0],
+                "description" : osid[1],
+                }
+            result[osid[0]] = tmp
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    pass
+
+#
 # This class implements the server side of the XMLRPC interface to experiments.
 #
 class experiment:
@@ -72,11 +595,74 @@ class experiment:
     def echo(self, version, argdict):
         if not argdict.has_key("str"):
             return EmulabResponse(RESPONSE_BADARGS,
-                                 output="Must supply a string to echo!");
+                                  output="Must supply a string to echo!")
         
         return EmulabResponse(RESPONSE_SUCCESS, 0,
                              socket.gethostname() + ": " + str(version)
                              + " " + argdict["str"])
+
+    #
+    # Get the physical/policy constraints for experiment parameters.
+    #
+    def constraints(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        result = {
+            "idle/threshold" : TBGetSiteVar("idle/threshold"),
+            # XXX Add more...
+            }
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    #
+    # Get the list of experiments where the user is the head.
+    #
+    def getlist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        # XXX Let the user specify the pid/gid
+        dbres = DBQueryFatal("SELECT e.pid,e.gid,e.eid FROM experiments AS e "
+                             "WHERE expt_head_uid=%s",
+                             (UID,))
+
+        # Build a dictionary of projects that refer to a dictionary of groups
+        # that refer to a list of experiments in that group.
+        result = {}
+        for res in dbres:
+            if not result.has_key(res[0]):
+                result[res[0]] = {
+                    res[1] : [ res[2], ]
+                    }
+                pass
+            elif not result[res[0]].has_key(res[1]):
+                result[res[0]][res[1]] = [ res[2], ]
+                pass
+            else:
+                result[res[0]][res[1]].append(res[2])
+                pass
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
 
     #
     # Start an experiment using batchexp. We get the NS file inline, which
@@ -85,8 +671,13 @@ class experiment:
     def batchexp(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -97,7 +688,7 @@ class experiment:
         
         for opt, val in argdict.items():
             if opt == "batch":
-                if val == "false":
+                if not xbool(val):
                     argstr += " -i"
                     pass
                 pass
@@ -118,7 +709,7 @@ class experiment:
                 argstr += escapeshellarg(val)
                 pass
             elif opt == "swappable":
-                if val == "false":
+                if not xbool(val):
                     argstr += " -S "
                     argstr += argdict["noswap_reason"]
                     pass
@@ -132,22 +723,22 @@ class experiment:
                     pass
                 else:
                     argstr += " -l "
-                    argstr += escapeshellarg(val)
+                    argstr += escapeshellarg(str(val))
                     pass
                 pass
             elif opt == "noidleswap_reason":
                 pass
             elif opt == "autoswap" or opt == "max_duration":
                 argstr += " -a "
-                argstr += escapeshellarg(val)
+                argstr += escapeshellarg(str(val))
                 pass
             elif opt == "noswapin":
-                if val == "true":
+                if xbool(val):
                     argstr += " -f "
                     pass
                 pass
             elif opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
@@ -191,8 +782,13 @@ class experiment:
     def swapexp(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp", "direction"))
         if (argerror):
@@ -201,7 +797,7 @@ class experiment:
         argstr = "-q"
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
@@ -218,14 +814,19 @@ class experiment:
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
-    # swap an experiment using swapexp. We get the NS file inline, which
+    # modify an experiment using swapexp. We get the NS file inline, which
     # we have to write to a temp file first. 
     #
     def modify(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -236,17 +837,17 @@ class experiment:
         
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
             elif opt == "reboot":
-                if val == "true":
+                if xbool(val):
                     argstr += " -r "
                     pass
                 pass
             elif opt == "restart_eventsys":
-                if val == "true":
+                if xbool(val):
                     argstr += " -e "
                     pass
                 pass
@@ -288,8 +889,13 @@ class experiment:
     def endexp(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+        
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -298,7 +904,7 @@ class experiment:
         argstr = "-q"
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
@@ -319,8 +925,13 @@ class experiment:
     def state(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -338,18 +949,23 @@ class experiment:
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
                                   output="No such experiment!")
-        
+
         state = res[0][0]
         return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
 
     #
-    # Return the state of an experiment.
+    # Return the node/link mappings for an experiment.
     #
     def info(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp", "aspect"))
         if (argerror):
@@ -372,18 +988,47 @@ class experiment:
         mapping = None
 
         if state == "active":
-            dbres = DBQuery("select r.vname,r.node_id,n.type "
-                            "  from reserved as r "
-                            "left join nodes as n on r.node_id=n.node_id "
-                            "where r.pid=%s and r.eid=%s "
-                            "order by vname",
-                            (argdict["proj"], argdict["exp"]))
+            dbres = DBQuery(
+                "select r.vname,r.node_id,n.type,n.def_boot_osid,ns.status,"
+                "n.eventstate,"
+                "(unix_timestamp(now()) - unix_timestamp( "
+                "greatest(na.last_tty_act,na.last_net_act,na.last_cpu_act,"
+                "na.last_ext_act))),ni.load_1min,ni.load_5min,ni.load_15min"
+                "  from reserved as r "
+                "left join nodes as n on r.node_id=n.node_id "
+                "left join node_status as ns on ns.node_id=n.node_id "
+                "left join node_activity as na on na.node_id=n.node_id "
+                "left join node_idlestats as ni on ni.node_id=n.node_id "
+                "where r.pid=%s and r.eid=%s "
+                "order by r.vname",
+                (argdict["proj"], argdict["exp"]))
+            osmappings = {}
             mapping = {}
             for res in dbres:
                 tmp = {}
                 tmp["name"] = res[0]
                 tmp["node"] = res[1]
                 tmp["type"] = res[2]
+                if not osmappings.has_key(res[3]):
+                    osres = DBQuery(
+                        "SELECT osname from os_info where osid=%s", (res[3],))
+                    osmappings[res[3]] = osres[0][0]
+                    pass
+                tmp["osid"] = osmappings[res[3]]
+                tmp["status"] = res[4]
+                if res[5]:
+                    tmp["eventstatus"] = res[5]
+                    pass
+                tmp["idle"] = res[6]
+                if res[7]:
+                    tmp["load_1min"] = res[7]
+                    pass
+                if res[8]:
+                    tmp["load_5min"] = res[8]
+                    pass
+                if res[9]:
+                    tmp["load_15min"] = res[9]
+                    pass
                 mapping[res[0]] = tmp
                 pass
             pass
@@ -438,8 +1083,13 @@ class experiment:
     def nscheck(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argstr = ""
 
@@ -477,8 +1127,13 @@ class experiment:
     def delay_config(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict,
                                      ("proj", "exp", "link", "params"))
@@ -488,7 +1143,7 @@ class experiment:
         argstr = ""
         for opt, val in argdict.items():
             if opt == "persist":
-                if val == "true":
+                if xbool(val):
                     argstr += " -m "
                     pass
                 pass
@@ -503,7 +1158,7 @@ class experiment:
         argstr += " " + escapeshellarg(argdict["link"])
 
         for opt, val in argdict["params"].items():
-            argstr += " " + escapeshellarg(opt + "=" + val)
+            argstr += " " + escapeshellarg(opt + "=" + str(val))
             pass
         
         (exitval, output) = runcommand(TBDIR + "/bin/delay_config " + argstr)
@@ -518,8 +1173,13 @@ class experiment:
     def reboot(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -528,7 +1188,7 @@ class experiment:
         argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
@@ -549,8 +1209,13 @@ class experiment:
     def reload(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -559,7 +1224,7 @@ class experiment:
         argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "false":
+                if not xbool(val):
                     argstr += " -s "
                     pass
                 pass
@@ -597,22 +1262,135 @@ class node:
         return
 
     #
+    # Get the number of free nodes.
+    #
+    def available(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        res = DBQueryFatal("SELECT count(a.node_id) FROM nodes AS a "
+                           "left join reserved as b on a.node_id=b.node_id "
+                           "left join node_types as nt on a.type=nt.type "
+                           "left join nodetypeXpid_permissions as p "
+                           "  on a.type=p.type "
+                           "WHERE b.node_id is null and a.role='testnode' "
+                           "  and nt.class = 'pc' and p.pid is null and "
+                           "      (a.eventstate='ISUP' or "
+                           "       a.eventstate='PXEWAIT') and"
+                           "      (p.pid is null)")
+
+        if len(res) == 0:
+            result = 0
+            pass
+        else:
+            result = int(res[0][0])
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+
+    #
+    # Get the console parameters.
+    #
+    def console(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("node",))
+        if (argerror):
+            return argerror
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        if not re.match("^[-\w]*$", str(argdict["node"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node value!")
+        
+        # XXX Refactor the trust stuff
+        res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
+                           "left join experiments as e on "
+                           "     e.pid=r.pid and e.eid=r.eid "
+                           "WHERE r.node_id=%s",
+                           (argdict["node"],))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        trust = DBQueryFatal("SELECT trust FROM group_membership "
+                             "WHERE uid=%s and pid=%s and gid=%s",
+                             (UID, res[0][0], res[0][1]))
+
+        if len(trust) == 0:
+            return EmulabResponse(
+                RESPONSE_ERROR,
+                output=("You do not have permission to access: "
+                        + argdict["node"]))
+
+        res = DBQueryFatal("SELECT server,portnum,keylen,keydata "
+                           "FROM tiplines WHERE node_id=%s",
+                           (argdict["node"],))
+        
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        sha_fp = open("/usr/testbed/etc/capture.fingerprint").read()
+        sha_fp = sha_fp.split("=")[1].strip().replace(":", "")
+        
+        sha1_fp = open("/usr/testbed/etc/capture.sha1fingerprint").read()
+        sha1_fp = sha1_fp.split("=")[1].strip().replace(":", "")
+        
+        result = {
+            "server" : res[0][0],
+            "portnum" : res[0][1],
+            # "keylen" : res[0][2],
+            "keydata" : res[0][3],
+            "certsha" : sha_fp,
+            "certsha1" : sha1_fp,
+            }
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+
+    #
     # reboot nodes
     #
     def reboot(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
-            pass
+                                  output="Client version mismatch!")
 
-        argerror = CheckRequiredArgs(argdict, ("nodes"))
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("nodes",))
         if (argerror):
             return argerror
 
         argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
@@ -635,8 +1413,13 @@ class node:
     def create_image(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
             pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("imageid", "node"))
         if (argerror):
@@ -645,7 +1428,7 @@ class node:
         argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "true":
+                if xbool(val):
                     argstr += " -w "
                     pass
                 pass
@@ -670,17 +1453,22 @@ class node:
     def reload(self, version, argdict):
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
-                                 output="Client version mismatch!");
-            pass
+                                  output="Client version mismatch!")
 
-        argerror = CheckRequiredArgs(argdict, ("nodes"))
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("nodes",))
         if (argerror):
             return argerror
 
         argstr = ""
         for opt, val in argdict.items():
             if opt == "wait":
-                if val == "false":
+                if not xbool(val):
                     argstr += " -s "
                     pass
                 pass
@@ -748,7 +1536,112 @@ def writensfile(str):
                  "Could not write temporary NS file:\n" +
                  "%s:%s" % (sys.exc_type, sys.exc_value))
         return None
-        pass
 
     # Yuck. Need to maintain a ref so that the file is not deleted!
     return (fp, fp.name)
+
+#
+# Check for no logins.
+#
+def checknologins():
+    if TBGetSiteVar("web/nologins") != "0":
+        raise NoLoginsError, TBGetSiteVar("web/message")
+    return
+
+#
+# A helper function for getting a site variable.
+#
+def TBGetSiteVar(name):
+    res = DBQueryFatal("SELECT value,defaultvalue FROM sitevariables "
+                       "WHERE name=%s",
+                       (name,))
+
+    if len(res) == 0:
+        raise ValueError, "Unknown site variable: " + str(name)
+
+    if res[0][0]:
+        retval = res[0][0]
+        pass
+    else:
+        retval = res[0][1]
+        pass
+
+    return retval
+
+#
+# Convert a file mode mask into something human readable and cross-platform.
+#
+def filetype(mode):
+    if stat.S_ISDIR(mode):
+        retval = "d"
+        pass
+    elif stat.S_ISCHR(mode):
+        retval = "c"
+        pass
+    elif stat.S_ISBLK(mode):
+        retval = "b"
+        pass
+    elif stat.S_ISREG(mode):
+        retval = "f"
+        pass
+    elif stat.S_ISFIFO(mode):
+        retval = "q"
+        pass
+    elif stat.S_ISLNK(mode):
+        retval = "l"
+        pass
+    elif stat.S_ISSOCK(mode):
+        retval = "s"
+        pass
+    else:
+        retval = "u"
+        pass
+    return retval    
+
+#
+# A helper function for converting a value into a SQL date string.
+#
+def sqldate(value):
+    if isinstance(value, xmlrpclib.DateTime):
+        value = time.strptime(str(value), "%Y%m%dT%H:%M:%S")
+        value = time.strftime("%Y-%m-%d %H:%M:%S", value)
+        pass
+    return value
+
+#
+# A helper function for converting an XMLRPC value into a boolean.
+#
+def xbool(value):
+    retval = value
+    if value:
+        # XXX handle uppercase strings...
+        if (value == True or
+            value == "true" or
+            value == "yes" or
+            value == "on" or
+            value == "1"):
+            retval = True
+            pass
+        else:
+            retval = False
+            pass
+        pass
+    return retval
+
+#
+# Check for an acceptable NFS path.
+#
+def nfspath(value):
+    retval = os.path.realpath(value)
+
+    found = False
+    for export in NFS_EXPORTS:
+        if retval.startswith(export):
+            found = True
+            break
+        pass
+
+    if not found:
+        raise OSError(errno.EPERM, "Path is not an NFS export", value)
+
+    return retval
