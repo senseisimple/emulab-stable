@@ -292,7 +292,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	WRITESIDEBARBUTTON("Papers (Oct 28)", $TBDOCBASE, "pubs.php3");
-	WRITESIDEBARBUTTON("Software (Oct 21)",
+	WRITESIDEBARBUTTON("Software (Mar 12)",
 			       $TBDOCBASE, "software.php3");
 	WRITESIDEBARBUTTON("Add Widearea Node (CD)",
 				$TBDOCBASE, "cdrom.php");
@@ -399,9 +399,11 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("Node Status",
 				   $TBBASE, "nodecontrol_list.php3");
 
-		WRITESIDEBARBUTTON("ImageIDs and OSIDs",
-				   $TBBASE, "showimageid_list.php3");
-		
+		SIDEBARCELL("List <a " .
+			"href=\"$TBBASE/showimageid_list.php3\">" .
+	        	"ImageIDs</a> or <a " .
+	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a>");
+
 		if ($login_status & CHECKLOGIN_CVSWEB) {
 		    WRITESIDEBARBUTTON("CVS Repository",
 				       $TBBASE, "cvsweb/cvsweb.php3");
