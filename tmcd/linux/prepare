@@ -20,6 +20,8 @@ my $RUNDIR      = "/var/run";
 my $HISTORY     = "/.bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
 my $NTPDRIFT    = "/etc/ntp/drift";
+my $SFSUSERS    = "/etc/sfs/sfs_users";
+my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -123,3 +125,11 @@ system("rm -rf $RUNDIR/*.pid");
 
 print "Cleaing out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
+
+print "Removing SFS files ...\n";
+if (-f $SFSUSERS) {
+    system("rm -f $SFSUSERS ${SFSUSERS}.pub");
+}
+if (-f $SFSHOSTKEY) {
+    system("rm -f $SFSHOSTKEY");
+}

@@ -1817,6 +1817,14 @@ sub remotenodeupdate()
     {
 	local $tmcctimeout = 10;
     
+	if ($USESFS) {
+	    #
+	    # Setup SFS hostid.
+	    #
+	    print STDOUT "Setting up for SFS ... \n";
+	    dosfshostid();
+	}
+
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
     }

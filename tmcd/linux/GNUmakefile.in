@@ -79,3 +79,6 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown /etc/rc.d/init.d/
 	-ln -s /etc/rc.d/init.d/tbshutdown /etc/rc.d/rc3.d/S13tbshutdown
 	-ln -s /etc/rc.d/init.d/tbshutdown /etc/rc.d/rc6.d/K13tbshutdown
+	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh /etc/rc.d/init.d/sfs.sh
+	-ln -s /etc/rc.d/init.d/sfs.sh /etc/rc.d/rc3.d/S50sfs
+	-ln -s /etc/rc.d/init.d/sfs.sh /etc/rc.d/rc6.d/K50sfs

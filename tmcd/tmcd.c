@@ -1110,7 +1110,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * in those projects (crossed with group in the project). 
 		 */
 		res = mydb_query("select distinct  "
-				 "u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
 				 "UNIX_TIMESTAMP(u.usr_modified) "
@@ -2336,8 +2336,8 @@ COMMAND_PROTOTYPE(dosfshostid)
 		signal(SIGALRM, dosfshostiddead);
 		alarm(1);
 
-		if (unlink(dspath) < 0 ||
-		    symlink(sfspath, dspath) < 0) {
+		unlink(dspath);
+		if (symlink(sfspath, dspath) < 0) {
 			sfshostiddeadfl = 1;
 		}
 	}

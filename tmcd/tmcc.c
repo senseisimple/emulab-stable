@@ -97,7 +97,7 @@ main(int argc, char **argv)
 	int			useudp  = 0;
 #endif
 
-	while ((ch = getopt(argc, argv, "v:s:p:un:t:")) != -1)
+	while ((ch = getopt(argc, argv, "v:s:p:un:t:k:")) != -1)
 		switch(ch) {
 		case 'p':
 			portlist[0] = atoi(optarg);

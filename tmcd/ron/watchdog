@@ -43,8 +43,8 @@ use lib "/usr/local/etc/emulab";
 use libsetup;
 
 # Locals
-my $timeout = (60 * 60);	# In seconds of course. 
-my $logname = "/tmp/emulab-watchdog.debug";
+my $timeout = (60 * 60 * 12);	# In seconds of course. 
+my $logname = "/var/tmp/emulab-watchdog.debug";
 my $vndir   = "/var/emulab";
 my $pidfile = "/var/run/emulab-watchdog.pid";
 my $noboot  = 0;
@@ -217,6 +217,12 @@ while (1) {
     #
     print "Looking for new Emulab accounts ...\n";
     system("update -i");
+
+    #
+    # Do a cvsup to get updated software.
+    #
+    print "Looking for software updates ... \n";
+    system("runcvsup.sh");
 }
 
 #

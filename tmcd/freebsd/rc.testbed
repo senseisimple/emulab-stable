@@ -18,10 +18,10 @@ if [ -e /etc/testbed/ismfs ]; then
 	exit 0
 fi
 
-echo "Checking for file updates ..."
 export HOME=/root
 
 if [ -f /etc/testbed/supfile ]; then
+	echo "Checking for file updates ..."
 	set -- `/etc/testbed/tmcc bossinfo`
 	/usr/local/bin/cvsup -h $1 -e -1 -g -L 1 /etc/testbed/supfile
 fi

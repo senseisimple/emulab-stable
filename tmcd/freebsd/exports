@@ -1,0 +1,3 @@
+/       localhost -alldirs
+/var    localhost -alldirs
+/usr    localhost -alldirs

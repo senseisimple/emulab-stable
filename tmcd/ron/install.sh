@@ -19,8 +19,10 @@ if ($OSTYPE == "FreeBSD") then
 	ln -s liblocsetup-freebsd.pm liblocsetup.pm
 	rm -f /usr/local/etc/rc.d/testbed.sh
 	rm -f /usr/local/etc/rc.d/emulab.sh
-	rm -f /usr/local/etc/rc.d/Z.emulab.sh
-	cp -f rc.testbed /usr/local/etc/rc.d/Z.emulab.sh
+	rm -f /usr/local/etc/rc.d/z.emulab.sh
+	cp -f rc.testbed /usr/local/etc/rc.d/z.emulab.sh
+	rm -f /usr/local/etc/rc.d/0.cvsup.sh
+	cp -f cvsup.sh /usr/local/etc/rc.d/0.cvsup.sh
 else
 	ln -s liblocsetup-linux.pm liblocsetup.pm
 	rm -f /etc/init.d/emulab
@@ -32,7 +34,6 @@ else
 	rm -f /etc/rc5.d/S99emulab
 	ln -s ../init.d/emulab /etc/rc5.d/S99emulab
 endif
-cp /dev/null isrem
 chown emulabman . *
 chgrp bin . *
 chown root update vnodesetup
@@ -41,12 +42,13 @@ chown root /usr/bin/suidperl
 chmod u+s /usr/bin/suidperl
 chown emulabman client.pem emulab.pem
 chmod 640 client.pem emulab.pem
-/usr/bin/install -c -o root -g wheel -d -m 755 -o root -g 0 /var/emulab
+/usr/bin/install -c -o root -g wheel -d -m 755 /var/emulab
+/usr/bin/install -c -o root -g wheel -d -m 755 /var/emulab/sup
 
 if ( -e vtund ) then
   cp vtund /usr/local/sbin
-  /usr/bin/install -c -o root -g wheel -d -m 755 -o root -g 0 /var/log/vtund
-  /usr/bin/install -c -o root -g wheel -d -m 755 -o root -g 0 /var/lock/vtund
+  /usr/bin/install -c -o root -g wheel -d -m 755 /var/log/vtund
+  /usr/bin/install -c -o root -g wheel -d -m 755 /var/lock/vtund
 endif
 
 if (! -d ~emulabman/.ssh) then

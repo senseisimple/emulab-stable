@@ -51,6 +51,7 @@ if (! $nickname) {
     print STDOUT "No Testbed nickname available!\n";
     exit(0);
 }
+$nickname = lc($nickname);
 
 print STDOUT "Resetting hostname to ${nickname} ... ";
 

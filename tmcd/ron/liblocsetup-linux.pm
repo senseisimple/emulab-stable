@@ -12,7 +12,7 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP
+    qw ( $CP $EGREP $SFSSD $SFSCD
 	 os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_groupdel os_cleanup_node os_homedirdel
 	 os_routing_enable_forward os_routing_enable_gated
@@ -33,6 +33,8 @@ libsetup::libsetup_init($SETUPDIR);
 # 
 $CP		= "/bin/cp";
 $EGREP		= "/bin/egrep -q";
+$SFSSD		= "/usr/local/sbin/sfssd";
+$SFSCD		= "/usr/local/sbin/sfscd";
 
 #
 # These are not exported
@@ -98,7 +100,7 @@ sub os_usermod($$$$$)
 	$glist = "-G $glist";
     }
 
-    return system("$USERMOD -g $gid $glist -p $pswd $login");
+    return system("$USERMOD -g $gid $glist -p '$pswd' $login");
 
 }
 
@@ -126,7 +128,7 @@ sub os_useradd($$$$$$$$)
 	$glist = "-G $glist";
     }
 
-    if (system("$USERADD -M -u $uid -g $gid $glist -p $pswd ".
+    if (system("$USERADD -M -u $uid -g $gid $glist -p '$pswd' ".
 	       "-d $homedir -s /bin/tcsh -c \"$gcos\" $login") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;

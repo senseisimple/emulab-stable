@@ -1,0 +1,4 @@
+#
+# Make sure this matches the server!
+#
+WIDE host=boss.emulab.net base=/var/emulab prefix=/ preserve delete release=current

@@ -205,7 +205,7 @@ sub os_usermod($$$$$)
 	$glist = "-G $glist";
     }
 
-    if (system("$CHPASS $pswd $login") != 0) {
+    if (system("$CHPASS '$pswd' $login") != 0) {
 	warn "*** WARNING: $CHPASS $login error.\n";
 	return -1;
     }

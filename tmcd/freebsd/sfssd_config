@@ -1,0 +1,5 @@
+Server *
+ Release *
+  Service 1 /usr/local/lib/sfs/sfsrwsd
+  Service 2 /usr/local/lib/sfs/sfsauthd
+  Service 3 /usr/local/lib/sfs/rexd

@@ -85,3 +85,15 @@ script-install:	dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(INSTALL_DIR)/gated_fxp1.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(INSTALL_DIR)/gated_fxp4.conf
 	$(INSTALL) -m 755 $(SRCDIR)/shutdown.sh  $(RC_DIR)/shutdown.sh
+	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh  $(RC_DIR)/testbed.sh
+
+sfs-install:
+	$(INSTALL) -m 755 -o root -g wheel -d /etc/sfs
+	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RC_DIR)/sfs.sh
+	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
+	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config
+	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config $(ETCDIR)/sfs/sfssd_config
+	$(INSTALL) -m 755 -o sfs -g sfs -d /var/sfs
+	$(INSTALL) -m 775 -o sfs -g sfs -d /var/sfs/root
+	$(INSTALL) -m 775 -o sfs -g sfs -d /var/sfs/root/var
+	$(INSTALL) -m 775 -o sfs -g sfs -d /var/sfs/root/usr

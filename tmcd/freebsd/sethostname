@@ -66,6 +66,7 @@ if (! $nickname) {
     print STDOUT "No Testbed nickname available!\n";
     exit(0);
 }
+$nickname = lc($nickname);
 
 #
 # No prints. Something screwy in dhclient causes these prints

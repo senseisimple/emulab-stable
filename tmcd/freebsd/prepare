@@ -21,6 +21,8 @@ my $HISTORY     = "/root/.history";
 my $MAILFILE    = "/var/mail/root";
 my $LEASES      = "/var/db/dhclient.leases";
 my $NTPDRIFT    = "/etc/ntp/drift";
+my $SFSUSERS    = "/etc/sfs/sfs_users";
+my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -127,3 +129,11 @@ system("rm -rf /tmp/* /tmp/.??*");
 
 print "Removing dhclient leases ...\n";
 system("rm -f $LEASES");
+
+print "Removing SFS files ...\n";
+if (-f $SFSUSERS) {
+    system("rm -f $SFSUSERS ${SFSUSERS}.pub");
+}
+if (-f $SFSHOSTKEY) {
+    system("rm -f $SFSHOSTKEY");
+}

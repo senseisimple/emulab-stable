@@ -13,3 +13,4 @@ uucp:*:66:66::0:0:UUCP pseudo-user:/var/spool/uucppublic:/usr/libexec/uucp/uucic
 xten:*:67:67::0:0:X-10 daemon:/usr/local/xten:/sbin/nologin
 pop:*:68:6::0:0:Post Office Owner:/nonexistent:/sbin/nologin
 nobody:*:65534:65534::0:0:Unprivileged user:/nonexistent:/sbin/nologin
+sfs:*:77:77::0:0:SFS pseudo-user:/:/bin/nologin

@@ -13,7 +13,7 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
+    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line enable_ipod
@@ -196,7 +196,7 @@ sub os_usermod($$$$$)
 	$glist = "-G $glist";
     }
 
-    return system("$USERMOD -g $gid $glist -p $pswd $login");
+    return system("$USERMOD -g $gid $glist -p '$pswd' $login");
 }
 
 #
