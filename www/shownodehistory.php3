@@ -29,6 +29,12 @@ if (!$isadmin) {
 if (!isset($showall)) {
     $showall = 0;
 }
+if (!isset($count)) {
+    $count = 20;
+}
+if (!isset($reverse)) {
+    $reverse = 1;
+}
 
 if (!isset($node_id) || strcmp($node_id, "") == 0) {
     $node_id = "";
@@ -41,11 +47,45 @@ if (!isset($node_id) || strcmp($node_id, "") == 0) {
     }
 }
 
-echo "<b>Show: 
-         <a href='shownodehistory.php3?node_id=$node_id'>allocated only</a>,
-         <a href='shownodehistory.php3?node_id=$node_id&showall=1'>all</a>";
+$opts="node_id=$node_id&count=$count&reverse=$reverse";
+echo "<b>Show records: ";
+if ($showall) {
+    echo "<a href='shownodehistory.php3?$opts'>allocated only</a>,
+          all";
+} else {
+    echo "allocated only,
+          <a href='shownodehistory.php3?$opts&showall=1'>all</a>";
+}
 
-SHOWNODEHISTORY($node_id, $showall);
+$opts="node_id=$node_id&count=$count&showall=$showall";
+echo "<br><b>Order by: ";
+if ($reverse == 0) {
+    echo "<a href='shownodehistory.php3?$opts&reverse=1'>lastest first</a>,
+          earliest first";
+} else {
+    echo "lastest first,
+          <a href='shownodehistory.php3?$opts&reverse=0'>earliest first</a>";
+}
+
+$opts="node_id=$node_id&showall=$showall&reverse=$reverse";
+echo "<br><b>Show number: ";
+if ($count != 20) {
+    echo "<a href='shownodehistory.php3?$opts&count=20'>first 20</a>, ";
+} else {
+    echo "first 20, ";
+}
+if ($count != -20) {
+    echo "<a href='shownodehistory.php3?$opts&count=-20'>last 20</a>, ";
+} else {
+    echo "last 20, ";
+}
+if ($count != 0) {
+    echo "<a href='shownodehistory.php3?$opts&count=0'>all</a>";
+} else {
+    echo "all";
+}
+
+SHOWNODEHISTORY($node_id, $showall, $count, $reverse);
 
 #
 # Standard Testbed Footer

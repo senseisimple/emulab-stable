@@ -2216,13 +2216,14 @@ function SHOWNODE($node_id, $flags = 0) {
 #
 # Show history.
 #
-function SHOWNODEHISTORY($node_id, $showall = 0)
+function SHOWNODEHISTORY($node_id, $showall = 0, $count = 20, $reverse = 1)
 {
     global $TBSUEXEC_PATH;
     $atime = 0;
     $ftime = 0;
     $rtime = 0;
     $dtime = 0;
+    $nodestr = "";
 	
     $opt = "-ls";
     if (!$showall) {
@@ -2230,6 +2231,13 @@ function SHOWNODEHISTORY($node_id, $showall = 0)
     }
     if ($node_id == "") {
 	$opt .= "A";
+	$nodestr = "<th>Node</th>";
+    }
+    if ($reverse) {
+	$opt .= "r";
+    }
+    if ($count) {
+	    $opt .= " -n $count";
     }
     if ($fp = popen("$TBSUEXEC_PATH nobody nobody webnodehistory $opt $node_id", "r")) {
 	if (!$showall) {
@@ -2237,14 +2245,22 @@ function SHOWNODEHISTORY($node_id, $showall = 0)
 	} else {
 	    $str = "";
 	}
-	echo "<br>
-              <center>
-              $str History for Node $node_id.
-              </center><br>\n";
+	if ($node_id == "") {
+	    echo "<br>
+                  <center>
+                  $str History for All Nodes.
+                  </center><br>\n";
+	} else {
+	    echo "<br>
+                  <center>
+                  $str History for Node $node_id.
+                  </center><br>\n";
+	}
 
 	echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
 
 	echo "<tr>
+	       $nodestr
                <th>Pid</th>
                <th>Eid</th>
                <th>Allocated By</th>
@@ -2295,13 +2311,24 @@ function SHOWNODEHISTORY($node_id, $showall = 0)
 		} else {
 		    $eid = $results[6];
 		}
-		echo "<tr>
-                 <td>$pid</td>
-                 <td>$eid</td>
-                 <td>$uid</td>
-                 <td>$datestr</td>
-                 <td>$durstr</td>
-              </tr>\n";
+		if ($node_id == "") {
+		    echo "<tr>
+                          <td>$nodeid</td>
+                          <td>$pid</td>
+                          <td>$eid</td>
+                          <td>$uid</td>
+                          <td>$datestr</td>
+                          <td>$durstr</td>
+                          </tr>\n";
+		} else {
+		    echo "<tr>
+                          <td>$pid</td>
+                          <td>$eid</td>
+                          <td>$uid</td>
+                          <td>$datestr</td>
+                          <td>$durstr</td>
+                          </tr>\n";
+		}
 	    }
 	    $line = fgets($fp, 1024);
 	}
