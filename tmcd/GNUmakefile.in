@@ -107,6 +107,11 @@ mfs: client
 mfs-install: mfs
 	@$(MAKE) -C $(MDSUBDIR) mfs-install
 
+frisbee-mfs: client
+
+frisbee-mfs-install: frisbee-mfs
+	@$(MAKE) -C $(MDSUBDIR) frisbee-mfs-install
+
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)/tmcd

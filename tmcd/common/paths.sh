@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -31,6 +31,8 @@ elif [ -d /etc/testbed ]; then
 	BINDIR=/etc/testbed
 	VARDIR=/etc/testbed
 	BOOTDIR=/etc/testbed
+	LOGDIR=/tmp
+	LOCKDIR=/tmp
 	DBDIR=/etc/testbed
 elif [ -d /etc/rc.d/testbed ]; then
 	ETCDIR=/etc/rc.d/testbed

@@ -48,15 +48,19 @@ endif
 	$(MAKE) -C genhostsfile client-install
 
 mfs:
-ifeq ($(SYSTEM),FreeBSD)
 	$(MAKE) -C imagezip client
-endif
 
 mfs-install: mfs
-ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
 	$(MAKE) -C imagezip client-install
-endif
+
+frisbee-mfs:
+	$(MAKE) -C frisbee.redux client
+	$(MAKE) -C growdisk client
+
+frisbee-mfs-install: frisbee-mfs
+	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux client-install
+	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C growdisk client-install
 
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)

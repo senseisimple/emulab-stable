@@ -26,7 +26,7 @@ install:
 
 client: all
 client-install: client
-	$(INSTALL_PROGRAM) growdisk $(DESTDIR)$(CLIENT_BINDIR)
+	$(INSTALL_PROGRAM) -s growdisk $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
 	rm -f *.o growdisk growdisk.debug

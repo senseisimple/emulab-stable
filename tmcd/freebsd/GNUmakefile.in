@@ -28,7 +28,6 @@ all:	supfile injail $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DESTDIR		= 
 SYSETCDIR	= $(DESTDIR)/etc
 JAILDIR		= $(SYSETCDIR)/jail
 ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
@@ -46,6 +45,10 @@ destdircheck:
 	    echo "You must define DESTDIR for this target!"; \
 	    false; \
 	fi
+	@if [ "$(DESTDIR)" = "/" ]; then \
+	    echo "DESTDIR is '/', really really bad idea!"; \
+	    false; \
+	fi
 
 install client-install:	common-install etc-install \
 			sup-install script-install bin-install jail-install
@@ -57,6 +60,36 @@ mfs-install:	destdircheck common-install etc-install \
 	@if [ ! -f $(ISMFS) ]; then \
 	    echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"; \
 	fi
+
+#
+# XXX butt-uglies live here:
+#   - hardwire /etc/testbed instead of $(ETCDIR)
+#   - rather than keep a special copy of the master.passwd file that has
+#     root's shell as sh instead of csh, we just link sh to csh in the MFS.
+#   - no ismfs file since we don't run any perl scripts that need it
+#
+frisbee-mfs-install:	destdircheck
+	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.local $(SYSETCDIR)/rc.local
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhclient-exit-hooks
+	@if [ -r $(SRCDIR)/master.passwd ]; then \
+	    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
+	    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
+	    if [ ! -e $(DESTDIR)/bin/csh ]; then \
+		ln $(DESTDIR)/bin/sh $(DESTDIR)/bin/csh; \
+	    fi \
+	fi
+	@if [ -r $(SRCDIR)/group ]; then \
+	    $(INSTALL) -m 644 $(SRCDIR)/group $(SYSETCDIR); \
+	fi
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 -s ../tmcc-nossl $(SYSETCDIR)/testbed/tmcc
+	$(INSTALL) -m 755 -s ../findif $(SYSETCDIR)/testbed
 
 cdboot-install:	destdircheck common-install etc-install \
 			script-install bin-install

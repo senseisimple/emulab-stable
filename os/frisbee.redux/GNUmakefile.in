@@ -83,7 +83,9 @@ trace.o:	decls.h trace.h log.h
 
 install:	$(INSTALL_SBINDIR)/frisbeed
 
-client-install: frisbee
+client: frisbee
+
+client-install: client
 	$(INSTALL_PROGRAM) frisbee $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:

@@ -118,7 +118,13 @@ destdircheck:
 	    false; \
 	fi
 
-mfs:
+mfsoscheck:
+	@if [ `uname -s` != "FreeBSD" ]; then \
+	    echo "Must build MFS files on a FreeBSD system!"; \
+	    false; \
+	fi
+
+mfs: mfsoscheck
 	@$(MAKE) -C os mfs
 	@$(MAKE) -C sensors mfs
 	@$(MAKE) -C tmcd mfs
@@ -127,6 +133,16 @@ mfs-install: destdircheck mfs
 	@$(MAKE) -C os mfs-install
 	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
+
+frisbee-mfs: mfsoscheck
+	@$(MAKE) -C cdrom/groklilo client
+	@$(MAKE) -C os frisbee-mfs
+	@$(MAKE) -C tmcd frisbee-mfs
+
+frisbee-mfs-install: destdircheck frisbee-mfs
+	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
+	@$(MAKE) -C os frisbee-mfs-install
+	@$(MAKE) -C tmcd frisbee-mfs-install
 
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
