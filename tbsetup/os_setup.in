@@ -53,7 +53,6 @@ my @row;
 my $doreloading = 0;
 my $forcereload = 0;
 my %reload      = ();
-my $osload	= "$TB/bin/os_load";
     
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
