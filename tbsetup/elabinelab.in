@@ -310,6 +310,8 @@ SENDMAIL("$user_name <$user_email>",
 	 ("/tmp/opsnode.$$", "/tmp/bossnode.$$"));
 system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
 $UID  = $SAVEUID;
+
+# Run as real user for the next few scripts, which are setuid.
 $EUID = $UID;
 
 #
@@ -339,23 +341,27 @@ if ($?) {
     die("*** $0:\n".
 	"    Error rebooting the bossnode ($bossnode)!\n");
 }
+$EUID = 0;
 
 # Reboot the experimental nodes. They will come up inside the inner elab.
 # DO NOT WAIT! They are not going to report ISUP from this point on. 
 if (@expnodes) {
     print "Rebooting inner experimental nodes.\n";
     TBDebugTimeStamp("Rebooting experimental nodes");
+    # Run as real user again.
+    $EUID = $UID;
     system("$nodereboot @expnodes");
     if ($?) {
 	die("*** $0:\n".
 	    "    Error rebooting the expnodes (@expnodes)!\n");
     }
+    $EUID = 0;
 
     #
     # Instead, we ssh into the node and use a utility script to determine
     # when the nodes have rebooted and are in PXEWAIT (part of the inner elab).
     #
-    $EUID = 0;
+    # Run as real root for ssh.
     $UID  = 0;
 
     print "Waiting for nodes to reboot and join the inner emulab.\n";
@@ -367,7 +373,6 @@ if (@expnodes) {
 	exit(($debug ? 0 : -1));
     }
     $UID  = $SAVEUID;
-    $EUID = $UID;
 }
 }
 
@@ -803,6 +808,7 @@ sub TearDownEmulab()
     #
     # Now regen the DHCPD file.
     #
+    # Run as real user since script is setuid.
     $EUID = $UID;
     
     print "Regenerating DHCPD config file and restarting daemon.\n";
@@ -872,6 +878,7 @@ sub TearDownEmulab()
 	             "    Could not reboot some inner nodes!\n".
 		     "    Continuing anyway; outer boss will use power cycle.\n";
     }
+    $UID = $SAVEUID;
 
     #
     # Now we wait for them to reach PXEWAIT. Again, use our utility script
