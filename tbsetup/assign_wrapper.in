@@ -232,13 +232,15 @@ while (($type,$delayosid,$defosid) = $query_result->fetchrow_array()) {
 # into one pc850. Needs to change in distributed nse
 my @simnodelist;
 my %simnode_iplist = ();
-my %iptonodemap = ();
+my %iptonodemap    = ();
+my $nsenode_id     = 0;
 
 # XXX Remote/Virt node hacks. Turns out to be similar to NSE.
 my %isremotenode = ();
 my %isvirtnode   = ();
 my $remotecount  = 0;
 my $virtcount    = 0;
+my $virtnode_id  = 0;
 
 printdb "Loading virt_nodes.\n";
 $result =
@@ -1024,8 +1026,17 @@ if (scalar(keys(%isremotenode))) {
 	foreach my $virtual (keys(%v2vmap)) {
 	    my $physical = $v2vmap{$virtual};
 	    my $jailflag;
+	    my $phys_nodeid;
 
 	    TBIsNodeVirtual($physical, \$jailflag);
+	    TBPhysNodeID($physical, \$phys_nodeid);
+	    
+	    $v2pmap{$virtual} = $phys_nodeid;
+	    if ( !defined($p2vmap{$phys_nodeid})) {
+		$p2vmap{$phys_nodeid} = [];
+	    }
+	    push(@{$p2vmap{$phys_nodeid}}, $virtual);
+
 	    $jailed{$virtual}  = $jailflag;
 	}
 	TBDebugTimeStamp("wanassign finished");
@@ -1739,82 +1750,6 @@ foreach $vnode (keys(%v2vmap)) {
     InitPnode($pnode, $vnode);
 }
 
-# nsenode id
-# We create vnames for each nsenode that gets mapped from a set of
-# simulated nodes
-$nsenode_id  = 0;
-$virtnode_id = 0;
-
-foreach $pnode (keys(%p2vmap)) {
-    my $vnode = $p2vmap{$pnode}[0];
-    $i = 1;
-    if (defined($nodes{$vnode}) && 
-	($nodes{$vnode} eq "shark-shelf")) {
-	foreach $shark (@{$sharkshelves{$vnode}}) {
-	    $vname = (split(":",$shark))[0];
-	    DBQueryFatal("update reserved set vname=\"$vname\" where" .
-		     " node_id = \"$pnode-$i\"");
-	    $i++;
-	}	
-    } elsif ( defined($nodes{$vnode}) && $nodes{$vnode} eq "sim" ) {
-
-	# XXX NSE hack
-	# In this if block, we assume that if one vnode in the pnode is
-	# of "sim" type, the rest will also be
-	$vname = "nsenode$nsenode_id";
-	DBQueryFatal("update reserved set vname=\"$vname\" where" .
-		     " node_id = \"$pnode\"");
-	$nsenode_id++;
-
-	# Right now, we have only one row for nseconfigs per experiment.
-	# This will change in the distributed nse case. Also reparsing of
-	# nseconfigs will have to be done for the distributed case
-	DBQueryFatal("update nseconfigs set vname=\"$vname\" where" .
-		     " pid=\"$pid\" and eid=\"$eid\"");
-
-	# also append stuff to nse configs with ipaddr info for border
-	# nodes
-	# nseconfigs will be per nse physical node in the distributed
-	# case. needs fix later
-	if( $nseconfigs ne "" ) {
-	  DBQueryFatal("update nseconfigs set nseconfig=CONCAT( nseconfig, " .
-		       "\"$nseconfigs\") where pid=\"$pid\" and eid=\"$eid\"" .
-		       " and vname=\"$vname\"");
-	}
-    }
-    elsif (defined($virtnodes{$pnode})) {
-	#
-	# A pnode hosting jails. Set the vname to something useful
-	#
-	my $vname = "vhost-$virtnode_id";
-	$virtnode_id++;
-
-	DBQueryFatal("update reserved set vname='$vname' " .
-		     "where node_id='$pnode'");
-
-	printdb("vname: $pnode $vname\n");
-    }	
-    else {
-	DBQueryFatal("update reserved set vname='$vnode' " .
-		     "where node_id='$pnode'");
-
-	printdb("vname: $pnode $vnode\n");
-    }
-}
-
-#
-# XXX VIRTNODES HACK!
-#
-# Same operation as above, but for the virtual nodes, which are stored
-# in the v2vmap. 
-# 
-foreach $vnode (keys(%v2vmap)) {
-    my $vvnode = $v2vmap{$vnode};
-
-    DBQueryFatal("update reserved set vname='$vnode' where node_id='$vvnode'");
-    printdb("vname: $vvnode $vnode\n");
-}
-
 foreach $vnodeport (keys(%portbw)) {
     ($vnode,$vport) = split(":",$vnodeport);
     # SHARK HACK
@@ -1921,7 +1856,7 @@ foreach $lan (keys(%rnodelans)) {
 	# Note, if either side of the tunnel is on the local side, it
 	# is connected to the physical node (pcxxx), even if its talking
 	# to a local virtual node (say, a jail). Obviously, both sides
-	# cannot be local. 
+	# cannot be local. This is of course inconsistent.
 	#
 	if ($isremotenode{$vnode}) {
 	    $vvnode= $v2vmap{$vnode};
@@ -2045,12 +1980,10 @@ sub getnodeport {
     }
 };
 
-#
-# Setup a pnode after its been nalloc'ed with the right goo.
-#
 sub InitPnode($pnode, $vnode)
 {
     my ($pnode,$vnode) = @_;
+    my $vname = $vnode;
     my $osid;
     
     my $query_result =
@@ -2079,9 +2012,36 @@ sub InitPnode($pnode, $vnode)
 		     " failureaction=''," .
 		     " routertype='static'" .
 		     " where node_id='$pnode'");
+
+	$vname = "nsenode${nsenode_id}";
+	DBQueryFatal("update reserved set vname='$vname'" .
+		     "where node_id='$pnode'");
+	$nsenode_id++;
+
+	# Right now, we have only one row for nseconfigs per experiment.
+	# This will change in the distributed nse case. Also reparsing of
+	# nseconfigs will have to be done for the distributed case
+	DBQueryFatal("update nseconfigs set vname='$vname' " .
+		     "where pid='$pid' and eid='$eid'");
+
+	# also append stuff to nse configs with ipaddr info for border nodes
+	# nseconfigs will be per nse physical node in the distributed
+	# case. needs fix later
+	if ($nseconfigs ne "") {
+	    DBQueryFatal("update nseconfigs set ".
+			 " nseconfig=CONCAT(nseconfig, '$nseconfigs') ".
+			 "where pid='$pid' and eid='$eid' and ".
+			 "      vname='$vname'");
+	}
+    }
+    elsif ($isremotenode{$vnode} && $v2vmap{$vnode} ne $pnode) {
+	#
+	# We never allocate remote pnodes (always allocated), so skip.
+	#
+	return;
     }
     elsif (defined($virtnodes{$pnode})) {
-	# A node hosting jails. At the moment, we force these to
+	# A pnode hosting jails. At the moment, we force these to
 	# the delay osid.
 	$osid = $delayosids{$type};
 	
@@ -2089,13 +2049,20 @@ sub InitPnode($pnode, $vnode)
 		     " bootstatus=\"unknown\"," .
 		     " ready=0" .
 		     " where node_id=\"$pnode\"");
+
+	#
+	# A local pnode hosting jails. Set the vname to something useful.
+	#
+	$vname = "vhost-" . $virtnode_id;
+	$virtnode_id++;
+
+	DBQueryFatal("update reserved set vname='$vname' " .
+		     "where node_id='$pnode'");
     }
     else {
 	#
-	# $vnode is not a simulated or virtual (as in jail) node.
-	#
 	# We want to skip nodes that belong to the experiment but aren't
-	# virtual. I.e. delay nodes.
+	# user defined nodes. I.e. delay nodes.
 	#
 	if (($osname,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
 	     $failureaction,$routertype) = $query_result->fetchrow_array()) {
@@ -2123,6 +2090,9 @@ sub InitPnode($pnode, $vnode)
 			 " failureaction='$failureaction'," .
 			 " routertype='$routertype'" .
 			 " where node_id='$pnode'");
+
+	    DBQueryFatal("update reserved set vname='$vname' " .
+			 "where node_id='$pnode'");
 	}
 	elsif (! defined($lannodes{$p2vmap{$pnode}[0]})) {
 	    # Delay node
@@ -2132,8 +2102,13 @@ sub InitPnode($pnode, $vnode)
 			 " bootstatus=\"unknown\"," .
 			 " ready=0" .
 			 " where node_id=\"$pnode\"");
+
+	    DBQueryFatal("update reserved set vname='$vname' " .
+			 "where node_id='$pnode'");
 	}
     }
+    printdb("reserved vname: $pnode $vname\n");
+    
     #
     # Now call os_select.
     #
