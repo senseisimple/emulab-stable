@@ -39,7 +39,7 @@ if ((!isset($cdkey) || !strcmp($cdkey, "")) ||
 }
 
 if (!ereg("[0-9a-zA-Z]+", $cdkey) ||
-    !ereg("[0-9a-zA-Z]+", $privkey) ||
+    !ereg("[0-9a-zA-Z ]+", $privkey) ||
     !ereg("[0-9\.]+", $IP)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
@@ -57,8 +57,10 @@ if (! mysql_num_rows($query_result)) {
 $row = mysql_fetch_array($query_result);
 
 #
-# Grab the privkey record.
+# Grab the privkey record. First squeeze out any spaces.
 #
+$privkey = str_replace(" ", "", $privkey);
+
 $query_result =
     DBQueryFatal("select * from widearea_privkeys where privkey='$privkey'");
 
