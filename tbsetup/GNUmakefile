@@ -11,7 +11,7 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  tbprerun tbreport vpower vsnmpit killtip 
 DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir os_setup mkacct-ctrl mkacct rmacct \
-	          mkacct-ctrl
+	          mkacct-ctrl ifc_setup
 
 all:	$(BINS) $(SUBDIRS)
 
@@ -67,6 +67,10 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/os_setup
 	chown root $(INSTALL_LIBTBDIR)/os_setup
 	chmod u+s $(INSTALL_LIBTBDIR)/os_setup
+	chown root $(INSTALL_BINDIR)/ifc_setup
+	chmod u+s $(INSTALL_BINDIR)/ifc_setup
+	chown root $(INSTALL_LIBTBDIR)/ifc_setup
+	chmod u+s $(INSTALL_LIBTBDIR)/ifc_setup
 
 clean:
 	rm -f *.o $(BINS) core
