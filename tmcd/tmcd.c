@@ -824,7 +824,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 #else
 	cp = (istcp ? "TCP" : "UDP");
 #endif
-	setproctitle("%s: %s", reqp->nodeid, cp);
+	setproctitle("%s: %s", inet_ntoa(client->sin_addr), cp);
 
 	/*
 	 * Init the req structure.
@@ -852,9 +852,16 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 
 		/*
 		 * Look for VERSION. 
+		 * Check for clients that are newer than the server
+		 * and complain.
 		 */
 		if (sscanf(bp, "VERSION=%d", &i) == 1) {
 			version = i;
+			if (version > CURRENT_VERSION) {
+				error("%s: version skew: server=%d, request=%d, "
+				      "old TMCD installed?\n",
+				      CURRENT_VERSION, version);
+			}
 			continue;
 		}
 
@@ -5468,6 +5475,32 @@ COMMAND_PROTOTYPE(doemulabconfig)
 				       row[3]);
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPSIP=%s\n",
 				       row[2]);
+		}
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Finally, some package info
+	 */
+	res = mydb_query("select name,value from sitevariables "
+			 "where name like 'elabinelab/%%'", 2);
+	if (!res) {
+		error("EMULABCONFIG: %s: DB Error getting elab_in_elab\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	nrows = (int)mysql_num_rows(res);
+	while (nrows--) {
+		row = mysql_fetch_row(res);
+		if (strcmp(row[0], "elabinelab/pkg_path") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "PKG_PATH=%s\n",
+				       row[1]);
+		} else if (strcmp(row[0], "elabinelab/boss_pkg") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "BOSS_PKG=%s\n",
+				       row[1]);
+		} else if (strcmp(row[0], "elabinelab/ops_pkg") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "OPS_PKG=%s\n",
+				       row[1]);
 		}
 	}
 	mysql_free_result(res);
