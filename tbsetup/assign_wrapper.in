@@ -2101,7 +2101,7 @@ sub InitPnode($pnode, $vnode)
 	    if (!defined($osid));
 	
 	DBQueryFatal("UPDATE nodes set ".
-		     " startstatus='none', ".
+		     " startstatus=0, ".
 		     " bootstatus='unknown', ".
 		     " routertype='$routertype', ".
 		     " ready=0 " .
