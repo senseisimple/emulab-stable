@@ -40,6 +40,15 @@ my %pids	= ();
 my $SAVEUID	= $UID;
 my @row;
 
+#
+# This stuff is BOGUS! Quick hack for paper deadline to make Jay happy.
+#
+my $NETDISK     = "/tftpboot/netdisk";
+my $PAPERADDR	= "boss.emulab.net";
+my $IMAGE       = "/usr/testbed/images/wd0-all.ndz";
+my $RELOADCMD   = "${PAPERADDR}:${IMAGE} wd0";
+my %reload      = ();
+    
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
@@ -162,6 +171,19 @@ while (<IN>) {
     }
 
     #
+    # BOGUS
+    # 
+    $db_result = $DB->query("select pid from last_reservation ".
+			    "where node_id='$node'");
+    $reload{$node} = 0;
+    if ($db_result->numrows) {
+	@row = $db_result->fetchrow_array();
+	if ($row[0] ne $pid) {
+	    $reload{$node} = 1;
+	}
+    }
+
+    #
     # First see if the OS spec is a local one from the images table. We
     # leave it up to the user to make sure the OS is capable of running
     # on the node! This local image stuff is pretty hacky right now. I'm
@@ -246,6 +268,16 @@ foreach my $node ( keys %nodeos ) {
 	#
 	printf STDOUT "Skipping $node. You will need to load the OS.\n";
 	next;
+    }
+
+    #
+    # BOGUS!
+    #
+    if ($reload{$pc}) {
+	$sth = $DB->query("update nodes set ".
+			  "next_boot_path='$NETDISK',".
+			  "next_boot_cmd_line='$RELOADCMD' ".
+			  "where node_id='$pc'");
     }
 
     #
@@ -339,6 +371,11 @@ sub PowerCycle {
 sub WaitTillAlive {
     my ($pc) = @_;
 
+    my $maxwait = 150;
+    if ($reload{$pc}) {
+	$maxwait += 150;
+    }
+
     print STDERR "Waiting for $pc to come alive\n" if $dbg;
     #
     # Sigh, a long ping results in the script waiting until all the
@@ -363,8 +400,7 @@ sub WaitTillAlive {
 	  (int ($curtime/60))," min.\n";
 	}
 	$lasttime = $curtime;
-	# If I wait more than 150 seconds (2.5 min) it must be dead...
-	if ($i > 3 && $curtime > 150) { last; }
+	if ($i > 3 && $curtime > $maxwait) { last; }
     }
     close(PING);
     print STDERR "$pc is not responding. Better check into it.\n" if $dbg;

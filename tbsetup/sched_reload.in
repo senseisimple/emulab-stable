@@ -194,6 +194,12 @@ foreach my $node (@nodes) {
 	} else {
 	    push (@load_list,$pc);
 	}
+
+	#
+	# Kill the last_reservation so that whoever gets the node next
+	# won't be fooled into thinking a reload is required.
+	#
+	$sth = $DB->query("delete from last_reservation where node_id='$pc'");
     } else {
         print STDERR "Reserved.\n";      
     }
