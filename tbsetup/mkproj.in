@@ -24,6 +24,7 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $MKGROUP  = "$TB/sbin/mkgroup";
 my $MKACCT   = "$TB/sbin/tbacct add";
+my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
@@ -223,6 +224,45 @@ if (! -e $workdir) {
     }
     if (! chown($uid, $gid, "$workdir")) {
 	fatal("Could not chown $workdir to $uid/$gid: $!");
+    }
+}
+
+#
+# If approved to use remote nodes, then grant permission to use the
+# specific types of virtual nodes on those remote physical nodes.
+# Unfortunately, the node_types table does not store a relationship
+# between the phys type and the virtual types that are hosted on them.
+# Need to add that I guess, but in the meantime we have just 3 remote
+# phys types to worry about. 
+#
+my $query_result =
+    DBQueryFatal("select pcremote_ok from projects where pid='$pid'");
+if ($query_result->num_rows) {
+    my ($pcremote) = $query_result->fetchrow_array();
+
+    if (defined($pcremote)) {
+	print "$pcremote\n";
+	
+	foreach my $type (split(",", $pcremote)) {
+	    print "$type\n";
+	    
+	    if ($type eq "pcplabphys") {
+		$type = "pcplab";
+	    }
+	    elsif ($type eq "pcron") {
+		$type = "pcvwa";
+	    }
+	    elsif ($type eq "pcwa") {
+		$type = "pcvwa";
+	    }
+	    else {
+		fatal("Unknown remote type $type!");
+	    }
+	    print "$type\n";
+	    
+	    system("$GRANTTYPE -p $pid $type") == 0 or
+		fatal("Could not grant permission to use type $type!");
+	}
     }
 }
 

@@ -131,7 +131,7 @@ while (my ($nodetype,$nodeclass) = $query_result->fetchrow_array()) {
 
 	my $aux_result =
 	    DBQueryFatal("select auxtype from node_types_auxtypes ".
-			 "where type='$type'");
+			 "where type='$nodetype' or type='$nodeclass'");
 
 	while (my ($auxtype) = $aux_result->fetchrow_array()) {
 	    $newtypes{$auxtype} = 1
