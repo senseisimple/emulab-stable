@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 
 #
 # EMULAB-COPYRIGHT
@@ -9,8 +9,8 @@
 use English;
 use Getopt::Std;
 use XML::Parser;
-use RPC::XML;
-use RPC::XML::Parser;
+#use RPC::XML;
+#use RPC::XML::Parser;
 
 #
 # Convert between XML and DB representation of a virtual experiment.
@@ -55,43 +55,57 @@ my $XMLHEADER = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>";
 #
 my %virtual_tables = 
     ("experiments"		=> { rows  => undef, 
-				     tag   => "experiment",
+				     tag   => "settings",
+				     # Indicates a single row.
+				     row   => undef,
 				     attrs => [ ] },
      "virt_nodes"		=> { rows  => undef, 
 				     tag   => "nodes",
+				     row   => "node",
 				     attrs => [ "vname" ]},
      "virt_lans"		=> { rows  => undef, 
 				     tag   => "lans",
+				     row   => "lan",
 				     attrs => [ "vname" ]},
      "virt_lan_settings"	=> { rows  => undef, 
 				     tag   => "lan_settings",
+				     row   => "lan_setting",
 				     attrs => [ "vname", "capkey" ]},
      "virt_lan_member_settings" => { rows  => undef, 
 				     tag   => "lan_member_settings",
+				     row   => "lan_member_setting",
 				     attrs => [ "vname", "member", "capkey" ]},
      "virt_trafgens"		=> { rows  => undef, 
 				     tag   => "trafgens",
+				     row   => "trafgen",
 				     attrs => [ "vname", "vnode" ]},
      "virt_agents"		=> { rows  => undef, 
 				     tag   => "agents",
+				     row   => "agent",
 				     attrs => [ "vname", "vnode" ]},
      "virt_node_desires"	=> { rows  => undef, 
 				     tag   => "node_desires",
+				     row   => "node_desire",
 				     attrs => [ "vname", "desire" ]},
      "virt_routes"		=> { rows  => undef, 
 				     tag   => "routes",
+				     row   => "route",
 				     attrs => [ "vname", "src", "dst" ]},
      "virt_vtypes"		=> { rows  => undef, 
 				     tag   => "vtypes",
+				     row   => "vtype",
 				     attrs => [ "name" ]},
      "virt_programs"		=> { rows  => undef, 
 				     tag   => "programs",
+				     row   => "program",
 				     attrs => [ "vname", "vnode" ]},
      "nseconfigs"		=> { rows  => undef, 
 				     tag   => "nseconfigs",
+				     row   => "nseconfig",
 				     attrs => [ "vname" ]},
      "eventlist"		=> { rows  => undef, 
 				     tag   => "events",
+				     row   => "event",
 				     attrs => [ "vname" ]});
     
 
@@ -117,6 +131,14 @@ my %experiment_fields = ("multiplex_factor"		=> 1,
 			 "sync_server"			=> 1,
 		         "use_ipassign"			=> 1,
 		         "ipassign_args"		=> 1);
+
+# New parsing code state machine control.
+my $PARSING_NOTYET	= 0;
+my $PARSING_EXPERIMENT	= 1;
+my $PARSING_TABLE	= 2;
+my $PARSING_ROW		= 3;
+my $PARSING_SLOT	= 4;
+my $parserstate		= $PARSING_NOTYET;
 
 #
 # Turn off line buffering on output
@@ -198,7 +220,7 @@ if ($fromxml) {
     readXML($pid, $eid, $xmlfile, $fromparser);
 }
 else {
-    writeXML($pid, $eid);
+    writeXML_XML($pid, $eid);
 }
 exit(0);
 
@@ -229,8 +251,8 @@ sub readXML($$$$) {
 	# Create a parser.
 	#
 	my $parser = new XML::Parser(Style => 'Tree');
-	$parser->setHandlers('Start'   => \&StartElement,
-			     'End'     => \&EndElement,
+	$parser->setHandlers('Start'   => \&StartElement_FromParser,
+			     'End'     => \&EndElement_FromParser,
 			     'Char'    => \&ProcessElement);
 
 	fatal($@)
@@ -238,29 +260,15 @@ sub readXML($$$$) {
     }
     else {
 	#
-	# Convert data structure into table rows.
+	# Create a parser.
 	#
-	my $resp = RPC::XML::Parser->new()->parse(STDIN);
-	if (!ref($resp)) {
-	    fatal("Could not parse XML input!");
-	}
-	my $exp = $resp->value->value;
+	my $parser = new XML::Parser(Style => 'Tree');
+	$parser->setHandlers('Start'   => \&StartElement,
+			     'End'     => \&EndElement,
+			     'Char'    => \&ProcessElement);
 
-	if (!exists($exp->{"experiment"}) ||
-	    !exists($exp->{"experiment"}->{"settings"})) {
-	    fatal("Missing experiment settings structure!");
-	}
-	$virtual_tables{"experiments"}->{"rows"} =
-	    [ $exp->{"experiment"}->{"settings"} ];
-
-	foreach my $table (keys(%virtual_tables)) {
-	    my $tag = $virtual_tables{$table}{"tag"};
-
-	    if (exists($exp->{"experiment"}->{$tag})) {
-		$virtual_tables{$table}->{"rows"} =
-		    $exp->{"experiment"}->{$tag};
-	    }
-	}
+	fatal($@)
+	    if (eval { $parser->parse(*STDIN); return 1; } != 1);
     }
 
     # If these are the results of parsing the nse specifications,
@@ -330,7 +338,7 @@ sub readXML($$$$) {
 	foreach my $key (keys(%experiments_table)) {
 	    my $val = $experiments_table{$key};
 
-	    if ($val eq "NULL" || $val eq "") {
+	    if (!defined($val) || $val eq "NULL" || $val eq "") {
 		push(@setlist, "$key=NULL");
 	    }
 	    else {
@@ -408,7 +416,7 @@ sub readXML($$$$) {
 	    foreach my $key (keys(%rowhash)) {
 		my $val = $rowhash{$key};
 
-		if ($val eq "NULL") {
+		if (!defined($val) || $val eq "NULL") {
 		    push(@values, "NULL");
 		}
 		elsif ($val eq "") {
@@ -459,7 +467,7 @@ sub readXML($$$$) {
 #
 # Start an element.
 # 
-sub StartElement ($$$)
+sub StartElement_FromParser ($$$)
 {
     my ($expat, $element, %attrs) = @_;
 
@@ -518,7 +526,7 @@ sub StartElement ($$$)
 #
 # End an element.
 # 
-sub EndElement ($$)
+sub EndElement_FromParser ($$)
 {
     my ($expat, $element) = @_;
 
@@ -587,10 +595,267 @@ sub ProcessElement ($$)
 }
 
 #
+# Start an element.
+#
+sub StartElement ($$$)
+{
+    my ($expat, $element, %attrs) = @_;
+
+    #
+    # First element must be the experiment tag; It starts the process.
+    #
+    if ($parserstate == $PARSING_NOTYET) {
+	fatal("Must start with an experiment tag!")
+	    if ($element ne "experiment");
+
+	fatal("Out of sync at experiment start: $element")
+	    if (defined($current_expt) ||
+		defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	$current_expt = "$pid/$eid";
+	
+	#
+	# Sanity check pid/eid.
+	#
+	if ((exists($attrs{'pid'}) && $attrs{'pid'} ne $pid) ||
+	    (exists($attrs{'eid'}) && $attrs{'eid'} ne $eid)) {
+	    fatal("pid/eid mismatch!");
+	}
+	print "Starting new experiment $pid/$eid\n"
+	    if ($debug);
+	
+	$parserstate = $PARSING_EXPERIMENT;
+    }
+    elsif ($parserstate == $PARSING_EXPERIMENT) {
+	#
+	# Need to find the right table.
+	#
+	my $table;
+	
+	foreach my $key (keys(%virtual_tables)) {
+	    if ($virtual_tables{$key}->{"tag"} eq $element) {
+		$table = $key;
+		last;
+	    }
+	}
+	fatal("Unknown table: $element")
+	    if (!defined($table));
+
+	fatal("Out of sync at table start: $element")
+	    if (!defined($current_expt) ||
+		defined($current_table) ||
+		defined($current_row) ||
+		defined($current_slot));
+	
+	if (! defined($virtual_tables{$table}->{"rows"})) {
+	    $virtual_tables{$table}->{"rows"} = [];
+	}
+	$current_table = $table;
+	$parserstate   = $PARSING_TABLE;
+
+	print "Starting new table: $table\n"
+	    if ($debug);
+
+	# Skip to parsing a row.
+	if (!defined($virtual_tables{$current_table}->{"row"})) {
+	    $current_row = {};
+	    $parserstate = $PARSING_ROW;
+	}
+    }
+    elsif ($parserstate == $PARSING_TABLE) {
+	#
+	# A row in a table. row tag must match table tag.
+	#
+	fatal("Out of sync at row start: $element")
+	    if ((!defined($current_expt) ||
+		 !defined($current_table) ||
+		 defined($current_row) ||
+		 defined($current_slot)) ||
+		$virtual_tables{$current_table}->{"row"} ne $element);
+
+	print "Starting new row at $element in table: $current_table\n"
+	    if ($debug);
+	
+	$current_row = {};
+	$parserstate = $PARSING_ROW;
+    }
+    elsif ($parserstate == $PARSING_ROW) {
+	#
+	# A slot in a row.
+	# 
+	fatal("Out of sync at slot start: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		!defined($current_row) ||
+		defined($current_slot));
+
+	print "Starting new slot $element in table: $current_table\n"
+	    if ($debug);
+	
+	$parserstate  = $PARSING_SLOT;
+	$current_slot = $element;
+	$current_data = "";
+    }
+    else {
+	fatal("Out of sync at element: $element");
+    }
+}
+
+#
+# End an element.
+# 
+sub EndElement ($$)
+{
+    my ($expat, $element) = @_;
+
+    if ($parserstate == $PARSING_EXPERIMENT) {
+	fatal("Out of sync at experiment start: $element")
+	    if ($element ne "experiment" ||
+		(!defined($current_expt) ||
+		 defined($current_table) ||
+		 defined($current_row) ||
+		 defined($current_slot)));
+	undef($current_expt);
+	$parserstate = $PARSING_NOTYET;
+    }
+    elsif ($parserstate == $PARSING_TABLE) {
+	#
+	# A table termination.
+	#
+	fatal("Out of sync at element end: $element")
+	    if ((!defined($current_expt) ||
+		 !defined($current_table) ||
+		 defined($current_row) ||
+		 defined($current_slot)) ||
+		$element ne $virtual_tables{$current_table}->{"tag"});
+	undef($current_table);
+	$parserstate = $PARSING_EXPERIMENT;
+    }
+    elsif ($parserstate == $PARSING_ROW) {
+	#
+	# A row termination.
+	# 
+	fatal("Out of sync at row end: $element")
+	    if ((!defined($current_expt) ||
+		 !defined($current_table) ||
+		 !defined($current_row) ||
+		 defined($current_slot)) ||
+		(defined($virtual_tables{$current_table}->{"row"}) &&
+		 $element ne $virtual_tables{$current_table}->{"row"}));
+		
+	print "Adding new row $element to table $current_table\n"
+	    if ($debug);
+	
+	push(@{ $virtual_tables{$current_table}->{"rows"} }, $current_row);
+	undef($current_row);
+	$parserstate = $PARSING_TABLE;
+
+	# Skip to parsing an experiment
+	if (!defined($virtual_tables{$current_table}->{"row"})) {
+	    undef($current_table);
+	    $parserstate = $PARSING_EXPERIMENT;
+	}
+    }
+    elsif ($parserstate == $PARSING_SLOT) {
+	#
+	# A slot termination.
+	# 
+	fatal("Out of sync at slot end: $element")
+	    if (!defined($current_expt) ||
+		!defined($current_table) ||
+		!defined($current_row) ||
+		!defined($current_slot));
+    
+	#
+	# Always ignore pid/eid.
+	#
+	if ($current_slot ne "pid" && $current_slot ne "eid") {
+	    print "    Entering new slot: $current_slot: $current_data\n"
+		if ($debug);
+	    $current_row->{$current_slot} =
+		($current_data ne "__NULL__" ? $current_data : undef);
+	}
+	undef($current_slot);
+	undef($current_data);
+	$parserstate = $PARSING_ROW;
+    }
+}
+
+#
 # Convert a virtual experiment representation into XML and spit it out.
 # The DB holds the data of course.
 #
-sub writeXML($$) {
+sub writeXML_XML($$) {
+    my ($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select * from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result->numrows) {
+	fatal("No such experiment $pid/$eid exists!");
+    }
+
+    spitxml_header();
+    spitxml_opentag("experiment pid='$pid' eid='$eid'", 0);
+    spitxml_opentag("settings", 1);
+    spitxml_spaces(2);
+    
+    my $settings = $query_result->fetchrow_hashref();
+
+    foreach my $key (keys(%{ $settings })) {
+	my $data = $settings->{$key};
+	
+	spitxml_entity($key, $data, 0);
+    }
+    spitxml_closetag("settings", 1);
+
+    #
+    # Read in a set of tables that live at top level.
+    # 
+    foreach my $table (keys(%virtual_tables)) {
+	next
+	    if ($table eq "experiments");
+	
+	my $tabletag = $virtual_tables{$table}->{"tag"};
+	my $rowtag   = $virtual_tables{$table}->{"row"};
+
+	$query_result =
+	    DBQueryFatal("select * from $table ".
+			 "where eid='$eid' and pid='$pid'");
+
+	next
+	    if (! $query_result->numrows);
+
+	spitxml_opentag($tabletag, 1);
+	
+	while (my $rowref = $query_result->fetchrow_hashref()) {
+	    spitxml_opentag($rowtag, 2);
+	    spitxml_spaces(3);
+
+	    foreach my $key (keys(%{ $rowref })) {
+		my $data = $rowref->{$key};
+
+		next
+		    if ($key eq "pid" || $key eq "eid");
+
+		spitxml_entity($key, $data, 0);
+	    }
+	    print "\n";
+	    spitxml_closetag($rowtag, 2);
+	}
+	spitxml_closetag($tabletag, 1);
+    }
+
+    spitxml_closetag("experiment", 0);
+    return 0;
+}
+
+#
+# This is the old version; I will eventually remove it. 
+#
+sub writeXML_RPC($$) {
     my ($pid, $eid) = @_;
 
     my $query_result =
@@ -637,6 +902,57 @@ sub writeXML($$) {
     print $foo->as_string();
     
     return 0;
+}
+
+#
+# Utility functions to pretty print XML output, with specified indentation.
+#
+sub spitxml_spaces($)
+{
+    my ($level) = @_;
+
+    my $spaces = $level * 1;
+
+    printf("%${spaces}s", "");
+}
+    
+sub spitxml_opentag($$)
+{
+    my ($tag, $level) = @_;
+
+    spitxml_spaces($level);
+    print "<${tag}>\n";
+}
+
+sub spitxml_closetag($$)
+{
+    my ($tag, $level) = @_;
+
+    spitxml_spaces($level);
+    print "</${tag}>\n";
+}
+
+sub spitxml_header()
+{
+    print "$XMLHEADER\n";
+}
+
+sub spitxml_entity($$$)
+{
+    my ($tag, $data, $level) = @_;
+
+    $data = "__NULL__"
+	if (!defined($data));
+
+    spitxml_spaces($level)
+	if ($level);
+
+    if ($data eq "") {
+	print "<${tag}/>";
+    }
+    else {
+	print "<${tag}>" . xmlencode($data) . "</${tag}>";
+    }
 }
 
 #
