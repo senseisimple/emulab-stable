@@ -1,23 +1,14 @@
 #!/usr/local/bin/perl -w
 
 ### Really run with -T
-### Close all my pipes
-
 ###
 ### exp_accts - Makes accounts for all users in this experiment's project.
-###
 ### Adds accounts to currently booted OS only.
-###
-
-###
-### Todo:
-###      - create the user / make key / put in auth keys in tb machine
 ###
 
 use Mysql;
 
-my $d = 1;			#debug flag
-
+my $d = 0;			#debug flag
 if ($#ARGV < 0) { 
     die("Usage: exp_accts <eid>\n".
 	"Makes accounts for all users in an experiment's project.\n");
@@ -30,6 +21,7 @@ if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) {
 ##
 ## Check for valid user
 ##
+print "Checking for valid user.\n";
 open(WHO,"/usr/bin/whoami 2>&1 |");
 chop($_ = <WHO>);
 close(WHO);
@@ -44,6 +36,7 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 ## Check that we have a valid EID. If the EID
 ## doesn't exist, it's invalid.
 ##
+print "Checking that $eid is a valid EID\n";
 my $cmd = "select eid from experiments where eid='$eid'";
 my $sth = $dbh->query($cmd);
 my $rows =0;
@@ -59,6 +52,7 @@ if ( $rows != 1 ) { die("Invalid eid '$eid' (not in database).\n"); }
 ## Select user parameters for users in given experiment.
 ## Join: exp.pid -> p.pid
 ##
+print "Selecting users.\n";
 $cmd = 
   "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
   "from experiments as e ".
@@ -73,14 +67,13 @@ my %fullname = ();
 while (@row = $sth->fetchrow_array) {
     $passwd{$row[0]} = $row[1];
     $unix_uid{$row[0]} = $row[2];
-    $fullname{$row[0]} = $row[4];
-#    print "fullname: $fullname{$row[0]}\n";
-#    print "row4: $row[4]\n"; 
+    $fullname{$row[0]} = $row[3];
 }
 
 ##
 ## Select group ID for experiment.
 ##
+print "Selecting group ID for experiment.\n";
 $cmd = 
   "select unix_gid from groups as g ".
   "left join proj_grps as pg on g.gid = pg.gid ".
@@ -92,11 +85,11 @@ my $unix_gid = 65533;		# "nogroup"...
 if (@row = $sth->fetchrow_array) {
     $unix_gid = $row[0];
 }
-print "Unix GID: $unix_gid\n" if $d;
 
 ##
 ## Select machines.
 ##
+print "Selecting machines.\n";
 $cmd = 
   "select IP from interfaces as ip ".
   "left join reserved as r on r.node_id=ip.node_id ".
@@ -108,18 +101,12 @@ while (@row = $sth->fetchrow_array) {
     push(@nodes,$row[0]);
 }
 
-if ($d) {
-    print "Nodes: ";
-    foreach (@nodes) {
-	if ($_) { print "$_\t\n"; }
-    }
-}
-
 ##
 ## For each machine, ping to see if its alive.
 ## If alive, determine if its FreeBSD or Linux and
 ## create the user accounts. 
 ##
+
 my $last = "";
 my $OS = "";
 my $IP = "";
@@ -137,12 +124,11 @@ foreach $IP (@nodes) {
         }
         do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
 	close(PING); 
-        print "Got $1 ping packet(s) back from $IP.\n" if $d;
+
         if ( $1 > 0 ) {
             open(UNAME,"su1 ssh $IP uname -a 2>&1 |");
             $_ = <UNAME>;
 	    close(UNAME);
-            print "back from uname:$_";
 	    ## FreeBSD says "155.99.214.129: Connection refused"
 	    ##    and can also say "Host key doesn't match..."  
             if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) ) { 
@@ -151,7 +137,9 @@ foreach $IP (@nodes) {
 		@temp = split(" ",$_); 
 		$OS = $temp[0]; 
 	    }
-        } 
+        } else {
+	    print "Couldn't ping machine $IP\n";
+	}
 
         print "OS for $IP is $OS\n" if $d;
         if ($OS eq "Linux") {  
@@ -161,25 +149,19 @@ foreach $IP (@nodes) {
 	    ##
 	    ## Rather than use useradd's defaults (which are normally)
 	    ## fine, we're explicit.
-	    
+
+	    print "Creating group $unix_gid on $IP.\n";
 	    open(GROUPADD, "ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
-	    while (<GROUPADD>) { print "groupadd:$_"; }
+	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
 	    my $i = 1;
-	    foreach $user (keys %passwd) {
-		print "user$i: $user\n";
-		$i++;
-	    }
 	    foreach my $user (keys %passwd) {
-		print "user:$user\n";
-#		print "fn: $fullname{$user}\n";
-		print "pass:$passwd{$user}\n";
-		print "uid:$unix_uid{$user}\n";
-		print "ssh $IP /usr/sbin/useradd -c 'comment' -d /home/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |\n";
-		open(USERADD, "ssh $IP /usr/sbin/useradd -c 'comment' -d /home/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
-		while (<USERADD>) { print "useradd: $_"; }
+
+		print "Creating user $ser on $IP.\n";
+		open(USERADD, "ssh $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /home/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
+		while (<USERADD>) { print "$_"; }
 		close(USERADD);
-	    } 
+	    }
 
 	} elsif ($OS eq "FreeBSD") { 
 
@@ -214,8 +196,18 @@ foreach $IP (@nodes) {
 #/usr/sbin/pwd_mkdb: /etc/master.passwd: Inappropriate file type or format
 		
 	} else {  
-	    die "Unknown OS ($OS) on machine $IP.\n";
+	    print "$IP is unreachable or has an unknown OS ($OS).\n";
 	}
     }
 }
+
+
+
+
+
+
+
+
+
+
 
