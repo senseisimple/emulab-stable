@@ -200,6 +200,12 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	while (list($junk,$type) = each($plab_types)) {
 	    $descr = $plab_type_descr[$type];
 	    list($acount,$asites) = $plab_counts[$type];
+	    if (!$acount) {
+		$acount = 0;
+	    }
+	    if (!$asites) {
+		$asites = 0;
+	    }
 	    if ($formfields[type] && ($formfields[type] == $type)) {
 		$selected = "selected";
 	    } else {
