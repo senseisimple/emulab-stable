@@ -106,6 +106,7 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $headuid    = $projectrow[head_uid];
     $Pname      = $projectrow[name];
     $approved   = $projectrow[approved];
+    $created    = $projectrow[created];
     $expt_count = $projectrow[expt_count];
     $expt_last  = $projectrow[expt_last];
 
@@ -125,7 +126,10 @@ while ($projectrow = mysql_fetch_array($query_result)) {
 	echo "<td>$idle_row[0]</td>\n";
     }
     else {
-	echo "<td>--</td>\n";
+	$idle_query = mysql_db_query($TBDBNAME,
+		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$created\")");
+	$idle_row   = mysql_fetch_row($idle_query);
+	echo "<td>$idle_row[0]</td>\n";
     }
 
     echo "<td>$expt_count</td>\n";
