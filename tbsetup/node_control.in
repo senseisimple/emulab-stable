@@ -48,8 +48,8 @@ my %controlset =
  next_boot_osid		=> [1, 0, "next_boot_osid",	undef],
  next_boot_path		=> [1, 0, "next_boot_path",	undef],
  next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef],
- pxe_boot_path          => [1, 0, "pxe_boot_path",	undef],
- next_pxe_boot_path     => [1, 0, "next_pxe_boot_path",	undef],
+ pxe_boot_path          => [0, 0, "pxe_boot_path",	undef],
+ next_pxe_boot_path     => [0, 0, "next_pxe_boot_path",	undef],
  bios_version		=> [1, 0, "bios_version",	undef],
 );
   
