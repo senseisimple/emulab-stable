@@ -323,7 +323,6 @@ internal_event_poll(event_handle_t handle, int blocking, unsigned int timeout)
 	 */
 	if (timeout && elvin_timeout) {
 		elvin_error_t error;
-		elvin_error_clear(error);
 		elvin_sync_remove_timeout(elvin_timeout, error);
 	}
 
