@@ -18,7 +18,8 @@ BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
                   setdest webcopy
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
-		  opsreboot deletenode node_statewait grabwebcams
+		  opsreboot deletenode node_statewait grabwebcams \
+		  grabswitchconfig
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
                   websetdest
 

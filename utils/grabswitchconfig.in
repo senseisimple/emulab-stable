@@ -1,0 +1,135 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use lib '@prefix@/lib';
+use libdb;
+use snmpit_lib;
+use snmpit_cisco;
+
+# This could probably be a configure variable, but I don't see a reason to make
+# it on yet
+my $TFTPDIR = "/tftpboot";
+
+use strict;
+use English;
+
+sub usage() {
+    print "Usage: grapbswitchconfig <switch> <filename> [server]\n";
+    print "    <switch> must be (for now) a Cisco switch in the testbed DB\n";
+    print "    <filename> must be a file that does not exist in $TFTPDIR\n";
+    print "    [server] is the name or IP of the TFTP server to dump to\n";
+    print "    server defaults to the IP address on the interface for our\n";
+    print "    first hop to switch\n";
+    exit 1;
+}
+
+if (!TBAdmin($UID)) {
+    die "*** $0:\n" .
+        "    Sorry, only admins get to run this script\n";
+}
+
+if (@ARGV != 2 && @ARGV != 3) {
+    usage();
+}
+
+my ($switch, $filename, $server) = @ARGV;
+
+#
+# Make sure they gave us a Cisco
+#
+my $type = getDeviceType($switch);
+if ($type !~ /cisco/ && $type !~ /catalyst/) {
+    die "*** $0:\n" .
+        "    Sorry, only Cisco switches are support right now (type $type)\n";
+}
+
+#
+# Make sure the destintion file is TFTP-accessible
+#
+if ($filename !~ /^$TFTPDIR/) {
+    die "*** $0:\n" .
+        "    The file must reside in $TFTPDIR\n";
+}
+
+#
+# Try to set up an SNMP connection to the switch
+#
+my $sess = new snmpit_cisco($switch);
+if (!$sess) {
+    die "*** $0:\n" .
+        "    Failed to connect to $switch\n";
+}
+
+#
+# Try to determine the server to use if not given - since we often talk to
+# swtiches on 'private' interfaces, we can't just use 'hostname'.
+#
+if (!$server) {
+    #
+    # Use 'route get' to find out what interface we use to talk to this thing
+    #
+    my $iface;
+    foreach my $line (`route get $switch`) {
+        if ($line =~ /interface:\s+(\w+)/) {
+            $iface = $1;
+        }
+    }
+    if (!$iface) {
+        die "*** $0\n" .
+            "    Unable to determine interface to $switch\n";
+    }
+
+    #
+    # Use ifconfig to get that interface's IP address
+    #
+    foreach my $line (`ifconfig $iface`) {
+        if ($line =~ /inet\s+(\d+\.\d+\.\d+\.\d+)\s+/) {
+            $server = $1;
+        }
+    }
+    if (!$server) {
+        die "*** $0\n" .
+            "    Unable to determine IP address for $iface\n";
+    }
+
+}
+
+#
+# Try to make the file to dump config to
+#
+if (-e $filename) {
+    die "*** $0:\n" .
+        "    File $filename already exists\n";
+}
+
+if (!open(DUMPFILE,">$filename")) {
+    die "*** $0:\n" .
+        "    Failed to open $filename: $!\n";
+}
+close DUMPFILE;
+
+if (system "chmod 777 $filename") {
+    die "*** $0:\n" .
+        "    Failed to chmod $filename: $!\n";
+}
+
+
+#
+# Do the dump!
+#
+if (!$sess->writeConfigTFTP($server,$filename)) {
+    die "*** $0:\n" .
+        "    Dump to $filename on $server failed\n";
+}
+
+#
+# Chmod the file back to something reasonable
+#
+if (system "chmod 640 $filename") {
+    die "*** $0:\n" .
+        "    Failed to chmod $filename: $!\n";
+}

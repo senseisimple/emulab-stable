@@ -726,7 +726,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
 	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
 	utils/grabwebcams utils/loghole utils/webcopy \
-	utils/setdest utils/websetdest \
+	utils/setdest utils/websetdest utils/grabswitchconfig \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
 	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
