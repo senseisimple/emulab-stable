@@ -1,4 +1,4 @@
-Options Includes
+Options Includes FollowSymLinks
 
 ErrorDocument 404 /error.shtml
 ErrorDocument 403 /error.shtml
