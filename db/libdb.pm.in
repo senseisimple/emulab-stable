@@ -2368,6 +2368,10 @@ sub TBSaveExpLogFiles($$)
     my $workdir = TBExptWorkDir($pid, $eid);
     my $logdir  = TBExptLogDir($pid, $eid);
 
+    # What the hell is this file! Very annoying.
+    if (-e "$workdir/.rnd") {
+	system("/bin/rm -f $workdir/.rnd");
+    }
     system("/bin/cp -Rpf $workdir/ $logdir");
 
     return 1;
