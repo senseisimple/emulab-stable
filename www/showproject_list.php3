@@ -78,7 +78,8 @@ $ncounts = array();
 
 $query_result =
     DBQueryFatal("select e.pid, count(distinct e.eid) as ecount ".
-		 "from experiments as e group by e.pid");
+		 "from experiments as e where state!='$TB_EXPTSTATE_SWAPPED' ".
+		 "group by e.pid");
 
 while ($row = mysql_fetch_array($query_result)) {
     $pid   = $row[0];
