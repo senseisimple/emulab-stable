@@ -1,0 +1,16 @@
+## -*- mode: Text -*-
+##
+
+The file `patch-vhz-j64-2.4.20-31.9' is a modifed version of the "variable
+Hertz and 64-bit jiffies" patch found here:
+
+  http://www.kernel.org/pub/linux/kernel/people/rml/variable-HZ/v2.4/vhz-j64-2.4.23.patch
+
+Our version is backported to the Red Hat Linux 9 kernel, `linux-2.4.20-31.9'.
+
+See the following for more information:
+
+  http://www.kernel.org/pub/linux/kernel/people/rml/variable-HZ/v2.4/
+  http://www.kernel.org/pub/linux/kernel/people/rml/variable-HZ/v2.4/readme.txt
+
+## End of file.
