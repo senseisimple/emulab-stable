@@ -44,7 +44,7 @@ use POSIX qw(strftime);
 
 my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power";
-my $ipod	= "$TB/sbin/ipod";
+my $ipod	= "$TB/sbin/apod";
 my $logfile	= "$TB/log/power.log";
 my $ping	= "/sbin/ping";
 my %pids	= ();
