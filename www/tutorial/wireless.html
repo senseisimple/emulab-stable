@@ -18,9 +18,38 @@ nodes are located and what their node IDs are, see the <a
 href=https://www.emulab.net/floormap.php3>wireless floormaps</a> page.
 When you click on one of the colored dots, you will be taken to a page
 describing the node and what type of interfaces the node has installed
-in it. To use wireless nodes in an experiment, you must provide a few
-Emulab specific NS directives in your NS file, which are illustrated
-in the following small example:
+in it.
+
+<br>
+<br>
+Before using wireless nodes in an experiment, please read the following
+<b>Acceptable Use Policy</b> regarding wireless interfaces:
+
+<ul>
+<li> You may listen to anything you like; anyone who cares about the
+     privacy of their transmissions will certainly know to encrypt it!
+     
+<li> You may not send "large" amounts of traffic on the following list
+     of channels; they are considered "production networks" used by
+     other departments.
+     
+     <table align=center border=2 cellpadding=0 cellspacing=2>
+     <tr><th>Protocol</th><th>Channels</th></tr>
+     <tr><td>A</td><td>36, 38, 45, 52, 56, 60, 64</td></tr>
+     <tr><td>B/G</td><td>1, 3, 5, 6, 7, 9, 11</td></tr>
+     </table>
+
+<li> Do not use channels that another experiment on the testbed is
+     using. You can find out what channels are currently in use by
+     looking at the top of the
+     <a href=https://www.emulab.net/floormap.php3>wireless floormap</a>.
+     
+</ul>
+
+<br>
+To use wireless nodes in an experiment, you must provide a few Emulab
+specific NS directives in your NS file, which are illustrated in the
+following small example:
 
 	<code><pre>
 	source tb_compat.tcl
@@ -203,8 +232,22 @@ a lan) before you get a working set.
 <br>
 <br>
 To assist in this chore there are two Emulab specific NS extensions
-you can use in your NS file. The first is to use <tt>tb-fix-node</tt>
-for all (or some) of the nodes in your lan. Using the
+you can use in your NS file. The first approach is to use the
+<tt>tb-use-physnaming</tt> extension.
+
+	<code><pre>
+	tb-use-physnaming 1
+	
+	set pc222 [$ns node]
+	set pc223 [$ns node]
+	set pc224 [$ns node]
+	set pc225 [$ns node] </code></pre>
+
+which says that whenever a node is named by an existing physical node
+in the testbed, do an implicit fix-node. This saves a little bit of
+typing, and in some cases might be easier to manage then the second
+approach, which is to use <tt>tb-fix-node</tt> for all (or some) of
+the nodes in your lan. Using the
 <a href=https://www.emulab.net/floormap.php3>wireless floormaps</a>
 choose which nodes you want, and then in your NS file:
 
@@ -220,17 +263,4 @@ choose which nodes you want, and then in your NS file:
 	tb-fix-node $nodew4 pc225 </code></pre>
 
 Keep in mind that the physical nodes you choose must be free when you
-swap in your experiment! The second approach is to use the
-<tt>tb-use-physnaming</tt> extension.
-
-	<code><pre>
-	tb-use-physnaming 1
-	
-	set pc222 [$ns node]
-	set pc223 [$ns node]
-	set pc224 [$ns node]
-	set pc225 [$ns node] </code></pre>
-
-which says that whenever a node is named by an existing physical node
-in the testbed, do an implicit fix-node. This saves a little bit of
-typing, and in some cases might be easier to manage.
+swap in your experiment!
