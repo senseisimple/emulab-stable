@@ -49,7 +49,7 @@ my $killmode    = 0;
 my $dbuid;
 
 my $MAX_CHILDREN = 8;
-my $CHILD_TIMEOUT = 120;  # Two minutes
+my $CHILD_TIMEOUT = 600;  # Ten minutes - plab needs a LOOOOONNNGG TIME....
 
 #
 # Load the Testbed support stuff. 
@@ -321,7 +321,9 @@ while (1) {
 	    $UID = 0;
 
 	    if ($plab && $mode eq "setup") {
-		if (TBForkCmd("$TB/sbin/plabnode alloc $pid $eid $vnode", 1)) {
+		if (TBForkCmd("$TB/sbin/plabnode alloc ". 
+                              ($force ? "-f" : "").
+                              " $pid $eid $vnode", 1)) {
 		    print STDERR "*** $0:\n" .
                         "    Plab node allocation failed\n";
 		    # Should check DB state instead.
