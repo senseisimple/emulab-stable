@@ -1,0 +1,281 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2000-2003 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.Dd January 9, 2003
+.Dt IMAGEZIP 8
+.Os
+.Sh NAME
+.Nm imagezip
+.Nd create a compressed image of a complete disk or DOS partition
+.Sh SYNOPSIS
+.Nm
+.Op Fl bdhilorv
+.Op Fl c Ar count
+.Op Fl I Ar slice
+.Op Fl s Ar slice
+.Op Fl z Ar level
+.Ar device
+.Op outfile
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to create a compressed image of the complete disk or
+single DOS partition identified by
+.Ar device .
+The result is written to
+.Ar outfile
+or
+.Dv stdout .
+This image can later be uncompressed and installed using the companion
+.Xr imageunzip 8
+utility.
+.Nm 
+understands the format of several of the more popular filesystem types
+(BSD FFS, Linux EXT2FS, NTFS) and uses that knowledge to
+.Dq smartly compress
+the data, ensuring that only allocated blocks in a filesystem are
+compressed and saved in the image.  Free blocks within a filesystem are
+recorded but otherwise skipped.
+Conventional
+.Xr zlib 3
+compression is applied to the allocated data during smart compression
+and is also used on filesystem types which are not understood.
+.Pp
+When used to create a full disk image (the default), the
+.Ar device
+argument should refer to a 
+.Dq raw
+disk device such as
+.Pa /dev/ad1 .
+In this mode,
+.Nm
+expects the first sector of the disk to contain a DOS Master Boot Record (MBR)
+including a DOS partition table.
+The information in the DOS partition table is used to locate all the
+slices on the disk and determine what they contain.
+(Note:
+.Em slice
+is BSD-speak for a DOS-style partition.  A
+.Em partition
+in BSD is a subset of a slice, typically used to hold a filesystem.)
+Each slice is then processed in turn as described in the next paragraph.
+If a disk does not have a DOS partition table, the
+.Fl r
+option can be used to force
+.Nm
+to treat the disk as though it were a big bag of bits which it will
+then compress using conventional compression.
+.Pp
+To create a single slice image, the
+.Fl s
+option is used.
+.Nm
+will use the DOS partition table to look up the specified
+slice number and determine its location and type.
+The slice type determines the action of
+.Nm
+as follows:
+.Bl -hang
+.It Sy Unused
+(0).
+The slice is skipped.
+.It Sy FreeBSD/NetBSD/386BSD
+(165).
+.Nm
+will attempt to locate a BSD partition table and process each BSD
+partition in turn.  If no partition table is found,
+.Nm
+fails.  Within a BSD slice, filesystem partitions are smartly compressed,
+unused and swap partitions are skipped, and all others are
+compressed conventionally.
+.It Sy Linux filesystem
+(131).
+If the slice contains a Linux EXT2FS, it is smartly compressed.
+Otherwise
+.Nm
+fails.
+.It Sy Linux swap
+(130).
+The first 8KB (the bitmap) is compressed conventionally, the remainder
+of the slice is skipped.
+.El
+.Pp
+All unrecognized slice types are compressed conventionally.
+.Pp
+Command line arguments are:
+.Bl -tag -width "outfile"
+.It device
+The device to be imaged.  This is typically a disk special file.
+.It outfile
+The output file for the resulting image.  If not specified,
+.Va stdout
+is used.
+.El
+.Pp
+Recognized options are:
+.Bl -tag -width indent
+.It Fl b
+Tells
+.Nm
+that
+.Ar device
+is a BSD slice.  Should be used only when the device does not contain
+a DOS partition table and really does contains a BSD filesystem.
+Incompatible with
+.Fl l .
+You will probably never need this option.
+.It Fl c Ar count
+Explicitly tell
+.Nm
+how many sectors to compress in full disk mode.  Can be used to compress
+a subset of a disk.
+Incompatible with
+.Fl s .
+You will probably never need this option.
+.It Fl d
+Turn on debugging output.  Can be specified multiple times to increase
+the level of debugging output.
+.It Fl h
+Print a usage message.
+.It Fl I Ar slice
+In full disk mode, tells
+.Nm
+to skip a specific slice.  This option can be given multiple times to
+skip multiple slices.
+The slice number should be the DOS partition number which ranges from 1 to 4.
+Incompatible with
+.Fl s .
+.It Fl i
+Prints a variety of diagnostic information about what
+.Nm
+would do, but doesn't create an image file.
+.It Fl l
+Tells
+.Nm
+that
+.Ar device
+is a Linux filesystem slice.  Should be used only when the device does
+not contain a DOS partition table and really does contains a Linux filesystem.
+Incompatible with
+.Fl b .
+You will probably never need this option.
+.It Fl o
+Indicate the progress of image creation by printing a dot ('.') to
+.Dv stderr
+after every 1MB of compressed data is written to the output file.
+At the end of each line of dots, the input offset and elapsed time in
+seconds is also printed.
+.It Fl r
+Generate a
+.Dq raw
+image using conventional compression.  No smart compression is attempted
+and thus the disk need not contain a DOS MBR, disklabels,
+or any filesystem structure.
+.It Fl s Ar slice
+Create a slice image containing only the indicated slice.
+The slice number should be the DOS partition number which ranges from 1 to 4.
+.It Fl v
+Print the version number of
+.Nm
+and exit.
+.It Fl z Ar level
+Set the compression level (0-9) used by the
+.Xr zlib
+compression library.  Higher levels mean better compression but will cause
+.Nm
+to run longer.  Level 0 means no compression.  The default value is 4.
+.El
+.Sh DIAGNOSTICS
+The
+.Nm
+utility will exit with a status of zero if it successfully processes the
+entire disk or slice and creates the image.  It will exit non-zero if it
+runs out of memory, cannot parse the MBR or a filesystem, or gets an error
+reading or writing.
+.Sh IMPLEMENTATION NOTES
+If
+.Ar device
+is a device special file, it should always be the special file for
+an entire disk even when creating slice images.  The only exception is
+when using the
+.Fl b
+and
+.Fl l
+options.
+If
+.Ar device
+is not a regular file, it must be a seekable file type.
+Thus, pipes are not allowed and no provision is made for redirecting input
+to
+.Nm .
+.Pp
+Creating a partition image for each DOS partition on a disk and then 
+concatenating them together is
+.Em not
+the same as creating a full disk image of a disk, as the latter
+contains the initial (typically 63) sectors which are outside of any
+DOS partition.  Most importantly, this area is where the DOS MBR is stored.
+.Pp
+Since slice images do not contain the DOS MBR, you cannot load a slice image
+on a naked disk and expect it to boot.
+If you need such a bootable slice image, you can use the
+.Fl I
+option to ignore all but the slice you care about, thus
+creating a full disk image containing only that single slice.
+.Pp
+The output image,
+.Ar outfile ,
+created by imagezip should not be on the same disk
+that you are imaging since you would be changing the disk as it is saving.
+In general, it is a bad idea to create an image of an active disk.
+.Pp
+FreeBSD partition tables contain absolute, not slice relative, block
+numbers.
+.Nm
+contains code to recognize this and generates "relocation entries"
+for imageunzip to use.  But this is only one problem you will encounter
+if attempting to move a FreeBSD slice to a different location.
+.Pp
+Likewise, Linux boot boot blocks generated by LILO appear to contain
+absolute block numbers.  In theory, the
+.Nm
+relocation mechanism could handle this, but no one I know groks LILO.
+.Pp
+NTFS (Windows NT/2000/XP filesystem) can be handled but isn't in this
+release.
+.Sh EXAMPLES
+.Dl imagezip /dev/ad0 /nfs/backup/images/myimage.ndz
+.Pp
+Create a full disk image of the master IDE disk saving it across
+NFS to a remote machine.  This could be done with the machine in single
+user mode and the root filesystem mounted read-only, or it could be
+done from a CDROM or network booted system.
+.Pp
+.Dl imagezip /dev/ad0 | ssh backup 'cat > /backup/images/myimage.ndz'
+.Pp
+As above but uses ssh to transfer the image to the remote machine.
+.Pp
+.Dl imagezip -o -s 1 /dev/ad0 myimage.ndz
+.Pp
+Create a slice image of DOS partition 1 on the primary disk, amusing
+yourself by watching the dots go by.
+.Pp
+.Dl imagezip -r -z 9 /dev/ad0 | imageunzip - /dev/ad1
+.Pp
+A really slow way to copy one disk to another.
+.Sh SEE ALSO
+.Xr imageunzip 8 ,
+.Xr imagedump 8 ,
+.Xr fdisk 8 ,
+.Xr disklabel 8 ,
+.Xr zlib 3
+.Sh HISTORY
+The
+.Nm
+utility is part of the Netbed software (www.netbed.org).
+.Sh BUGS
+Full disk smart compression in
+.Nm
+is pretty x86 specific due to its reliance on the DOS MBR.

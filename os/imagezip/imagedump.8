@@ -1,0 +1,62 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2000-2003 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.Dd January 9, 2003
+.Dt IMAGEDUMP 8
+.Os
+.Sh NAME
+.Nm imagedump
+.Nd dump information about an imagezip compressed image file
+.Sh SYNOPSIS
+.Nm
+.Op Fl dv
+.Ar imagefile ...
+.Sh DESCRIPTION
+The
+.Nm
+utility can be used to view information about
+.Xr imagezip
+created image files.
+With no options,
+.Nm
+prints a summary for each image file specified.  This summary includes:
+the size of the image file, the size of the resulting uncompressed data,
+the compression factor achieved on allocated data (due to
+.Xr zlib Ns
+),
+the overall compression factor (due to smart filesystem aware compression and
+.Xr zlib Ns
+),
+and the amount of overhead and wasted space in the image file
+(due to the way in which compressed data is chunked in the image file).
+.Pp
+One or more
+.Fl d
+options can be specified to dump various levels of structure within the
+image file.
+.Pp
+The
+.Fl v
+option prints version information about
+.Nm
+itself.
+.Sh DIAGNOSTICS
+The
+.Nm
+utility will exit with a status of zero if it successfully parses and
+dumps all the listed image files.
+It will exit non-zero if there is any error.
+.Sh SEE ALSO
+.Xr imagezip 8 ,
+.Xr imageunzip 8 ,
+.Xr zlib 3
+.Sh HISTORY
+The
+.Nm
+utility is part of the Netbed software (www.netbed.org).
+.Sh BUGS
+The
+.Xr imagedump
+image format needs to be documented.
