@@ -56,9 +56,11 @@ if ( -e "/usr/testbed/etc/power.conf") {
 }
 my @line = ();
 while ( <CONF> ) {
-    if ( ! /^\#(.*)/ ) { 
+    if ( ! /^(\#.*)*$/ ) { #if its not blank or commented with #
 	chop;
+	#print "Got '$_':\t";
 	@line = split(/\t/);
+	#print "Split to ",join("*",@line),"\n";
 	$IPList{$line[0]}= $line[1];
 	$OutletList{$line[0]}= '-'.$line[2];
     }
