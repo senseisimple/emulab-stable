@@ -216,13 +216,14 @@ my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
 
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
+    $idleswap_time = min($idleswaptime * 60, $idleswap_time);
     $idleswaptime = $idleswap_time / 60.0;
 }
 
 my $swapsettings = 
  #"Name:        $expt_name\n" .
-  "Swappable:   $swappablestr".
-  ($swappablebit ? "\n" : " (Reason: $noswap)\n").
+ #"Swappable:   $swappablestr".
+ #($swappablebit ? "\n" : " (Reason: $noswap)\n").
   "Idle-Swap:   $idleswapstr".
   ($idleswapbit ? ", at $idleswaptime hours\n" : " (Reason: $noidleswap)\n").
   "Auto-Swap:   $autoswapstr".
@@ -317,7 +318,7 @@ if ($isbatchexpt) {
 #
 # Seems like too many states!
 #
-if ($estate ne EXPTSTATE_ACTIVE && $estate ne EXPTSTATE_SWAPPED) {
+if ($estate ne EXPTSTATE_ACTIVE && $estate ne EXPTSTATE_SWAPPED && !$force) {
     die("*** $0:\n".
 	"    It appears that experiment $pid/$eid is in transition.\n".
 	"    The user that created the experiment will be notified via\n".
@@ -583,14 +584,14 @@ my $message =
     "Experiment $eid in project $pid has been ";
 
 if ($inout eq "out" && ($idleswap || $autoswap || $force) ) {
-    $message .= "forcibly swapped out by\nTestbed Operations";
+    $message .= "forcibly swapped out by\nEmulab";
     if ($idleswap) {
 	$message .= " because it was idle for too long (Idle-Swap).\n".
 	  "(See also the Idle-Swap info in \n".
 	  "$TBDOCBASE/docwrapper.php3?docname=swapping.html )\n";
     } elsif ($autoswap) {
-	$message .= " because it was swapped in too long (Auto-Swap).\n".
-	  "(See also the Auto-Swap info in \n".
+	$message .= " because it exceeded its Maximum Duration.\n".
+	  "(See also the Max. Duration info in \n".
 	  "$TBDOCBASE/docwrapper.php3?docname=swapping.html )\n";
     } elsif ($force) {
 	$message .= ". (See also our Node Usage Policies in \n".
