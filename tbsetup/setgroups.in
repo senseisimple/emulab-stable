@@ -345,6 +345,12 @@ foreach my $uid (@userlist) {
 	    fatal("Could not modify user $uid record on $control_node.");
 	}
     }
+
+    #
+    # Now schedule account updates on all the nodes that this person has
+    # an account on.
+    #
+    TBNodeUpdateAccountsByUID($uid);
 }
 
 print "Updating email lists for: ".join(" ",@userlist)."\n";
