@@ -1,0 +1,37 @@
+In case of emergency!
+
+Booting paper
+-------------
+
+The tip line for paper is on snake.cs.utah.edu. (standard desktop
+machine).
+
+You can talk to power controller number 9 from snake by using "tip
+apc" to talk to power9. User is "apc", password is "^pwr".  The
+outlets are set up as follows:
+
+	plastic   - 8 
+	paper     - 6 
+	cyclades2 - 5 
+	cyclades1 - 7 
+
+The boot blocks are set up so that they will let you interrupt the
+boot on the VGA, but if you leave that alone, the last stage loader
+will run on the serial line. You can interrupt the boot there.
+
+Note that Mike and I built/installed new boot blocks on paper/plastic
+and snake that run at 115200. The defaul is 9600 for all 3 stages.
+
+Booting plastic
+---------------
+
+The tip line for plastic is on paper. Same comments as above apply.
+Remember that you can power cycle plastic from snake using the tip
+line to the APC.
+
+
+Booting tipserv1
+----------------
+
+The console line for tipserv1 is on plastic. At present there is no
+power controller for it.
