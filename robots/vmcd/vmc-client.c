@@ -244,13 +244,15 @@ int main(int argc, char *argv[])
 	FD_SET(serv_sock, &readfds);
 	
 	while (looping) {
+	    fd_set rreadyfds;
 	    int rc;
 
-	    rc = select(FD_SETSIZE, &readfds, NULL, NULL, NULL);
+	    rreadyfds = readfds;
+	    rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, NULL);
 	    if (rc > 0) {
 		int lpc;
 		
-		if (FD_ISSET(serv_sock, &readfds)) {
+		if (FD_ISSET(serv_sock, &rreadyfds)) {
 		    struct sockaddr_in peer_sin;
 		    socklen_t slen;
 		    int fd;
@@ -267,8 +269,9 @@ int main(int argc, char *argv[])
 		    }
 		}
 
-		for (lpc = 0; lpc < rc; lpc++) {
-		    if (FD_ISSET(lpc, &readfds)) {
+		for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+		    if ((lpc != serv_sock) && FD_ISSET(lpc, &rreadyfds)) {
+			info("dead connection %d\n", lpc);
 			close(lpc);
 			FD_CLR(lpc, &readfds);
 			FD_CLR(lpc, &clientfds);
