@@ -34,6 +34,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --enable-windows      Enable Windows XP support (requires third-party software)"
 ac_help="$ac_help
+  --enable-windowsclient      Enable Windows XP client support (requires third-party software)"
+ac_help="$ac_help
   --enable-mezzanine    Enable mezzanine support"
 ac_help="$ac_help
   --enable-testmode     Enable test mode
@@ -603,7 +605,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:607: checking host system type" >&5
+echo "configure:609: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -624,7 +626,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:628: checking build system type" >&5
+echo "configure:630: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -650,7 +652,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:654: checking for $ac_word" >&5
+echo "configure:656: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -682,7 +684,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:686: checking for $ac_word" >&5
+echo "configure:688: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -714,7 +716,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:718: checking for $ac_word" >&5
+echo "configure:720: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -746,7 +748,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:750: checking for $ac_word" >&5
+echo "configure:752: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -778,7 +780,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:782: checking for $ac_word" >&5
+echo "configure:784: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -811,7 +813,7 @@ fi
 # Extract the first word of "elvin-config", so it can be a program name with args.
 set dummy elvin-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:815: checking for $ac_word" >&5
+echo "configure:817: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_ELVIN_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -846,7 +848,7 @@ fi
 # Extract the first word of "javac", so it can be a program name with args.
 set dummy javac; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:850: checking for $ac_word" >&5
+echo "configure:852: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_JAVAC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -881,7 +883,7 @@ fi
 # Extract the first word of "jar", so it can be a program name with args.
 set dummy jar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:885: checking for $ac_word" >&5
+echo "configure:887: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_JAR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -917,7 +919,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:921: checking for $ac_word" >&5
+echo "configure:923: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1562,21 +1564,39 @@ if test "$enable_windows" = "yes"; then
 		  os/imagezip/ntfs/libntfs/GNUmakefile \
 		  os/imagezip/fat/GNUmakefile"
 	optional_subdirs="$optional_subdirs";
-	EXE_SUFFIX=".exe";
 	WINSUPPORT=1;
 else
 	winfiles="";
-	EXE_SUFFIX="";
 	WINSUPPORT=0;
 fi
 
+
+#
+# Enable Windows Client support.
+# Right now this means we are building the client software under CygWin.
+# You should also turn on --enable-windows.
+# Off by default.
+# 
+# Check whether --enable-windowsclient or --disable-windowsclient was given.
+if test "${enable_windowsclient+set}" = set; then
+  enableval="$enable_windowsclient"
+  :
+fi
+
+
+if test "$enable_windowsclient" = "yes"; then
+	# This is needed in strip and install actions.
+	EXE_SUFFIX=".exe";
+else
+	EXE_SUFFIX="";
+fi
 
 
 #
 # Check for the robot vision system dependencies.
 #
 echo $ac_n "checking how to run the C preprocessor""... $ac_c" 1>&6
-echo "configure:1580: checking how to run the C preprocessor" >&5
+echo "configure:1600: checking how to run the C preprocessor" >&5
 # On Suns, sometimes $CPP names a directory.
 if test -n "$CPP" && test -d "$CPP"; then
   CPP=
@@ -1591,13 +1611,13 @@ else
   # On the NeXT, cc -E runs the code through the compiler's parser,
   # not just through cpp.
   cat > conftest.$ac_ext <<EOF
-#line 1595 "configure"
+#line 1615 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1601: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1621: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -1608,13 +1628,13 @@ else
   rm -rf conftest*
   CPP="${CC-cc} -E -traditional-cpp"
   cat > conftest.$ac_ext <<EOF
-#line 1612 "configure"
+#line 1632 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1618: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1638: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -1625,13 +1645,13 @@ else
   rm -rf conftest*
   CPP="${CC-cc} -nologo -E"
   cat > conftest.$ac_ext <<EOF
-#line 1629 "configure"
+#line 1649 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1635: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1655: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -1659,17 +1679,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1663: checking for $ac_hdr" >&5
+echo "configure:1683: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1668 "configure"
+#line 1688 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1673: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1693: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -1702,7 +1722,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1706: checking for $ac_word" >&5
+echo "configure:1726: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1781,7 +1801,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1785: checking for a BSD compatible install" >&5
+echo "configure:1805: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1842,7 +1862,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1846: checking for $ac_word" >&5
+echo "configure:1866: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2018,7 +2038,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/mezzanine/libfg/GNUmakefile \
 	robots/mezzanine/libmezz/GNUmakefile \
 	robots/mezzanine/mezzanine/GNUmakefile \
-	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord"
+	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord "
 
 #
 # Do this for easy distclean.
