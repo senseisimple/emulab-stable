@@ -62,11 +62,28 @@ SUBPAGESTART();
 SUBMENUSTART("More Options");
 WRITESUBMENUBUTTON("Create an Image Descriptor",
 		   "newimageid_ez.php3");
-WRITESUBMENUBUTTON("Create an OS Descriptor",
-		   "newosid_form.php3");
+if ($isadmin) {
+    WRITESUBMENUBUTTON("Create an OS Descriptor",
+		       "newosid_form.php3");
+}
 WRITESUBMENUBUTTON("OS Descriptor list",
 		   "showosid_list.php3");
 SUBMENUEND();
+
+echo "Listed below are the Images that you can load on your nodes with the
+      <a href='tutorial/docwrapper.php3?docname=nscommands.html#OS'>
+      <tt>tb-set-node-os</tt></a> directive. If the OS you have selected for
+      a node is not loaded on that node when the experiment is swapped in,
+      the Testbed system will automatically reload that node's disk with the
+      appropriate image. You might notice that it takes a few minutes longer
+      to start start your experiment when selecting an OS that is not
+      already resident. Please be patient.
+      <br>
+      More information on how to create your own Images is in the
+      <a href='tutorial/tutorial.php3#CustomOS'>Custom OS</a> section of
+      the <a href='tutorial/tutorial.php3'>Emulab Tutorial.</a>
+      <br>\n";
+
 SUBPAGEEND();
 
 if (mysql_num_rows($query_result)) {
