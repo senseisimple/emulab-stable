@@ -9,6 +9,7 @@ WWWDEFS=ricci-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu
+TBAUDITEMAIL=ricci@cs.utah.edu
 TBACTIVEARCHIVE=ricci@cs.utah.edu
 TBUSERSARCHIVE=ricci@cs.utah.edu
 IPBASE=192.168

@@ -5,6 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=kwebb-emulab
 TBOPSEMAIL=kwebb@cs.utah.edu
 TBLOGSEMAIL=kwebb@cs.utah.edu
+TBAUDITEMAIL=kwebb@cs.utah.edu
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 FSNODE=fs.emulab.net

@@ -10,6 +10,7 @@ WWWDEFS=shash-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=shash+mini-ops@cs.utah.edu
 TBLOGSEMAIL=shash+mini-log@cs.utah.edu
+TBAUDITEMAIL=shash+mini-log@cs.utah.edu
 TBACTIVEARCHIVE=shash+activearch@cs.utah.edu
 TBUSERSARCHIVE=shash+usersarch@cs.utah.edu
 IPBASE=192.168

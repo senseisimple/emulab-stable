@@ -10,6 +10,7 @@ WWWDEFS=newbold-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=newbold+mini-ops@cs.utah.edu
 TBLOGSEMAIL=newbold+mini-log@cs.utah.edu
+TBAUDITEMAIL=newbold+mini-log@cs.utah.edu
 TBACTIVEARCHIVE=newbold+activearch@cs.utah.edu
 TBUSERSARCHIVE=newbold+usersarch@cs.utah.edu
 IPBASE=192.168

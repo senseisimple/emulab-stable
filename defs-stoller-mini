@@ -10,6 +10,7 @@ WWWDEFS=stoller-mini
 TBADMINGROUP=flux
 TBOPSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
 TBLOGSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
+TBAUDITEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
 IPBASE=192.168
 DELAYCAPACITY=1
 BOSSNODE=boss.mini.emulab.net

@@ -5,6 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=newbold-emulab
 TBOPSEMAIL=newbold@cs.utah.edu
 TBLOGSEMAIL=newbold@cs.utah.edu
+TBAUDITEMAIL=newbold@cs.utah.edu
 IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net

@@ -5,6 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=stoller-home
 TBOPSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
 TBLOGSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
+TBAUDITEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
 IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=golden-gw.ballmoss.com

@@ -5,6 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=shash-emulab
 TBOPSEMAIL=shash@cs.utah.edu
 TBLOGSEMAIL=shash@cs.utah.edu
+TBAUDITEMAIL=shash@cs.utah.edu
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 FSNODE=fs.emulab.net

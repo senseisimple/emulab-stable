@@ -9,6 +9,7 @@ WWWDEFS=mini
 TBADMINGROUP=flux
 TBOPSEMAIL=minitestbed-ops@flux.cs.utah.edu
 TBLOGSEMAIL=minitestbed-logs@flux.cs.utah.edu
+TBAUDITEMAIL=minitestbed-audit@flux.cs.utah.edu
 TBACTIVEARCHIVE=testbed-active-users-archive@flux.cs.utah.edu
 TBUSERSARCHIVE=testbed-users-archive@flux.cs.utah.edu
 IPBASE=192.168

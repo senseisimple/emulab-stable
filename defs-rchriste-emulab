@@ -5,6 +5,7 @@ TBDBNAME=tbdb
 WWWDEFS=rchriste-emulab
 TBOPSEMAIL=rchriste@cs.utah.edu
 TBLOGSEMAIL=rchriste@cs.utah.edu
+TBAUDITEMAIL=rchriste@cs.utah.edu
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 FSNODE=fs.emulab.net
