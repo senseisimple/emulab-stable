@@ -2,4 +2,4 @@
 # When the release is bumped, be sure to remove sup/sup/FBSD45-STD/checkouts
 # on the client.
 #
-FBSD45-STD host=boss.emulab.net base=/etc/testbed/sup prefix=/ preserve release=current
+FBSD47-STD base=@CLIENT_VARDIR@ prefix=/ preserve release=current
