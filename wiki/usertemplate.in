@@ -8,7 +8,7 @@ __These are your Projects/Groups:__
 __Permissions (leave these alone unless you know what you are doing, or ask us)__
 	* Set ALLOWTOPICVIEW = 
 	* Set ALLOWTOPICCHANGE = 
-	* Set ALLOWTOPICRENAME =
+	* Set ALLOWTOPICRENAME = 
 
 __TWiki permissions explained__
 	* The default permissions for Emulab user Wikis (this page) is
