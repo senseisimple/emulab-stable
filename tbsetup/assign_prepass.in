@@ -345,7 +345,7 @@ sub parse_solution($) {
     while (<SOL>) {
 	chomp;
 	/^End Edges$/ && last;
-	my ($name, $type, @plinks) = split /\s+/,$_,2;
+	my ($name, $type, @plinks) = split /\s+/,$_;
 	
 	#
 	# Phsical links are linksted as 'link interface', so part them up as
@@ -389,9 +389,6 @@ sub write_solution($$$) {
     my %links;
     while (my ($name, $node) = each %$nodegraph) {
 	foreach my $link (@{$node->{slinks}}) {
-	    if ($link->{'reversed'}) {
-		print "Found a reversed link - $link $link->{name}\n";
-	    }
 	    $links{$link->{'name'}} = $link;
 	}
     }
