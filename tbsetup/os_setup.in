@@ -173,6 +173,17 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     }
     
     #
+    # XXX - Ditto for tarfiles.
+    #
+    foreach my $tarspec (split(":", $row{'tarballs'})) {
+	my ($dir, $tar) = split(" ", $tarspec);
+	
+	if (! -e $tar) {
+	    die("Tarfile $tar for node $node does not exist!");
+	}
+    }
+    
+    #
     # If pingable, then the node is "waitable".
     #
     if (OSFeatureSupported($osid{$node}, "ping")) {
