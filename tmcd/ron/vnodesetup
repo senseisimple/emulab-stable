@@ -42,6 +42,11 @@ use lib "/usr/local/etc/testbed";
 use libsetup;
 
 #
+# Forward declarations for prototype checking
+#
+sub killvnode();
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
