@@ -108,6 +108,8 @@
                           shows no packet-loss (or delay). Why?</a>
      <li> <a href="#TR-4">I set a non-zero packet-loss (or delay) but 'ping'
                           shows a different packet-loss (or delay). Why?</a>
+     <li> <a href="#TR-5">I decreased the bandwidth on a link and now the
+                          ping time between the nodes has increased. Why?</a>
      </ul>
 </ul>
 
@@ -1378,4 +1380,40 @@
     90.25%, or a round trip loss rate of 9.75% on a 5% lossy link.
     </p>
 
+<li><a NAME="TR-5"></a>
+    <font size='+1'><b>I decreased the bandwidth on a link and now the
+      ping time between the nodes has increased. Why?</b></font>
+    <p>
+    Short answer: Decreasing the bandwidth of a link means that your
+    bytes take longer to get where they are going! 
+    </p>
+
+    <p>
+    Long Answer: A ping packet is 98 bytes of data; 56 bytes of data
+    plus 8 bytes of ICMP header plus 20 bytes of IP header plus 14
+    bytes of ethernet header. At 100Mbs those 98 bytes takes .0078ms
+    to traverse the wire, which is hardly noticeable! If you have set
+    the delay of your link to 10ms, then your ping packets will incur
+    10ms+0.0078ms of delay in each direction, for a 20ms roundtrip time.
+    </p>
+
+    <p>
+    Say you set the bandwith of your link to 250Kbs. The wire time for
+    those same 98 bytes is now 3ms. If your delay is 10ms like above,
+    then your ping packets will incur 10ms+3ms of delay in each
+    direction, for a 26ms roundtrip time! If you set the bandwith to
+    100Kbs, the wire time is now 7.8ms and your ping packets will
+    incur 10ms+7.8ms of delay in each direction, for a 35.6ms roundtrip
+    time!
+    </p>
+
+    <p>
+    Note: If you have a router connecting two nodes, then <em>each of
+    the two links</em> will incur the same wire time (and delay of
+    course). In the above 250Kbs example, each ping packet will incur
+    3ms of wire time to the router and <em>another</em> 3ms from the
+    router to the destination. The ping reply packet will see the same
+    6ms of wire time. If your delay is again 10ms, then the ping
+    roundtrip is 52ms. 
+    </p>    
 </ul>
