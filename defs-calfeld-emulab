@@ -10,7 +10,6 @@ TBLOGSEMAIL=calfeld@flux.cs.utah.edu
 TBWWWEMAIL=calfeld@flux.cs.utah.edu
 TBAPPROVALEMAIL=calfeld@flux.cs.utah.edu
 TBAUDITEMAIL=calfeld@flux.cs.utah.edu
-IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net

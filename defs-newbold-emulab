@@ -7,7 +7,6 @@ TBLOGSEMAIL=newbold@flux.utah.edu
 TBWWWEMAIL=newbold+www@cs.utah.edu
 TBAPPROVALEMAIL=newbold+approve@cs.utah.edu
 TBAUDITEMAIL=newbold@flux.utah.edu
-IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
