@@ -33,7 +33,7 @@
 
 int	infd, outfd;
 int	secsize	  = 512;	/* XXX bytes. */
-int	debug	  = 0;
+int	debug	  = 1;
 int     info      = 0;
 int     slicemode = 0;
 int     maxmode   = 0;
@@ -108,31 +108,52 @@ ssize_t
 mywrite(int fd, const void *buf, size_t nbytes)
 {
 	int		cc, i, count = 0;
+	off_t		startoffset, endoffset;
+	int		maxretries = 10;
+	
+	if ((startoffset = lseek(fd, (off_t) 0, SEEK_CUR)) < 0) {
+		perror("mywrite: seeking to get output file ptr");
+		exit(1);
+	}
 
-	while (nbytes) {
-		int	maxretries = 10;
-
-		for (i = 0; i < maxretries; i++) {
+	for (i = 0; i < maxretries; i++) {
+		while (nbytes) {
 			cc = write(fd, buf, nbytes);
 
 			if (cc > 0) {
 				nbytes -= cc;
 				buf    += cc;
 				count  += cc;
-				goto again;
+				continue;
 			}
 
 			if (i == 0)
 				perror("write error: will retry");
-
+	
 			sleep(1);
+			nbytes += count;
+			buf    -= count;
+			count   = 0;
+			goto again;
 		}
-		perror("write error: busted for too long");
-		fflush(stderr);
-		exit(1);
+		if (fsync(fd) < 0) {
+			perror("fsync error: will retry");
+			sleep(1);
+			nbytes += count;
+			buf    -= count;
+			count   = 0;
+			goto again;
+		}
+		return count;
 	again:
+		if (lseek(fd, startoffset, SEEK_SET) < 0) {
+			perror("mywrite: seeking to set file ptr");
+			exit(1);
+		}
 	}
-	return count;
+	perror("write error: busted for too long");
+	fflush(stderr);
+	exit(1);
 }
 
 /* Map partition number to letter */
@@ -224,7 +245,7 @@ main(argc, argv)
 		rval = read_image();
 #endif
 	sortskips();
-	if (debug)
+	if (debug > 2)
 		dumpskips();
 	makeranges();
 
@@ -1007,7 +1028,7 @@ makeranges(void)
 		numranges++;
 	}
 
-	if (debug) {
+	if (debug > 2) {
 		range = ranges;
 		while (range) {
 			printf("  %12d    %9d\n", range->start, range->size);
@@ -1019,11 +1040,14 @@ makeranges(void)
 /*
  * Compress the image.
  */
+static u_char   output_buffer[SUBBLOCKSIZE];
+static int	buffer_offset;
+
 int
 compress_image(void)
 {
 	int		cc, partial, i, count;
-	off_t		fileregoff, inputoffset, size, outputoffset;
+	off_t		inputoffset, size, outputoffset;
 	off_t		tmpoffset, rangesize, totalinput = 0;
 	struct range	*prange = ranges;
 	struct blockhdr *blkhdr;
@@ -1065,18 +1089,10 @@ compress_image(void)
 		/*
 		 * Reserve room for the subblock hdr and the region pairs.
 		 * We go back and fill it it later after the subblock is
-		 * written and we know much input data was compressed into
-		 * the block. We remember the offset so we can come back
-		 * to it later.
+		 * done and we know much input data was compressed into
+		 * the block. 
 		 */
-		if ((fileregoff = lseek(outfd, (off_t) 0, SEEK_CUR)) < 0) {
-			perror("remembering where block header goes");
-			exit(1);
-		}
-		if (lseek(outfd, DEFAULTREGIONSIZE, SEEK_CUR) < 0) {
-			perror("lseeking past block header and region pairs");
-			exit(1);
-		}
+		buffer_offset = DEFAULTREGIONSIZE;
 		
 		if (debug) {
 			printf("Compressing range: %14qd --> ", inputoffset);
@@ -1101,6 +1117,8 @@ compress_image(void)
 		if (debug)
 			printf("%12qd\n", inputoffset + size);
 
+		totalinput += size;
+
 		/*
 		 * The last subblock is special if inputmaxsec is nonzero.
 		 * In that case, we have to finish off the compression block
@@ -1122,28 +1140,17 @@ compress_image(void)
 		curregion++;
 
 		/*
-		 * Remember where in the output file we are.
+		 * Stash the region info into the beginning of the block.
 		 */
-		if ((tmpoffset = lseek(outfd, (off_t) 0, SEEK_CUR)) < 0) {
-			perror("seeking to remember output offset");
-			exit(1);
-		}
-		if (lseek(outfd, (off_t) fileregoff, SEEK_SET) < 0) {
-			perror("seeking back to block header offset");
-			exit(1);
-		}
-		if ((cc = mywrite(outfd, buf, sizeof(buf))) < 0) {
-			perror("writing subblock header and regions");
-			exit(1);
-		}
-		assert(cc == sizeof(buf));
+		memcpy(output_buffer, buf, sizeof(buf));
 
-		totalinput += size;
 		if (partial) {
-			if (lseek(outfd, (off_t) tmpoffset, SEEK_SET) < 0) {
-				perror("seeking back to where we where!");
-				exit(1);
-			}
+			/*
+			 * Write out the finished chunk to disk, and
+			 * start over from the beginning of the buffer.
+			 */
+			mywrite(outfd, output_buffer, sizeof(output_buffer));
+			buffer_offset = 0;
 			
 			outputoffset += size;
 			inputoffset  += size;
@@ -1172,19 +1179,11 @@ compress_image(void)
 	/*
 	 * Reserve room for the subblock hdr and the region pairs.
 	 * We go back and fill it it later after the subblock is
-	 * written and we know much input data was compressed into
-	 * the block. We remember the offset so we can come back
-	 * to it later.
+	 * done and we know much input data was compressed into
+	 * the block.
 	 */
-	if ((fileregoff = lseek(outfd, (off_t) 0, SEEK_CUR)) < 0) {
-		perror("remembering where block header goes");
-		exit(1);
-	}
-	if (lseek(outfd, DEFAULTREGIONSIZE, SEEK_CUR) < 0) {
-		perror("lseeking past block header and region pairs");
-		exit(1);
-	}
-		
+	buffer_offset = DEFAULTREGIONSIZE;
+	
 	while (prange) {
 		inputoffset = (off_t) prange->start * (off_t) secsize;
 
@@ -1202,7 +1201,7 @@ compress_image(void)
 		/*
 		 * Compress the chunk.
 		 */
-		if (debug < 3) {
+		if (debug > 0 && debug < 3) {
 			printf("Compressing range: %14qd --> ", inputoffset);
 			fflush(stdout);
 		}
@@ -1273,38 +1272,20 @@ compress_image(void)
 		blkhdr->regioncount = (curregion - regions);
 
 		/*
-		 * Remember where in the output file we are.
+		 * Stash the region info into the beginning of the block.
 		 */
-		if ((tmpoffset = lseek(outfd, (off_t) 0, SEEK_CUR)) < 0) {
-			perror("seeking to remember output offset");
-			exit(1);
-		}
-		if (lseek(outfd, (off_t) fileregoff, SEEK_SET) < 0) {
-			perror("seeking back to block header offset");
-			exit(1);
-		}
-		if ((cc = mywrite(outfd, buf, sizeof(buf))) < 0) {
-			perror("writing subblock header and regions");
-			exit(1);
-		}
-		assert(cc == sizeof(buf));
+		memcpy(output_buffer, buf, sizeof(buf));
 
-		if (lseek(outfd, (off_t) tmpoffset, SEEK_SET) < 0) {
-			perror("seeking back to where we where!");
-			exit(1);
-		}
-			
 		/*
-		 * Moving to the next block. Reserve the header area,
-		 * remembering where we are now so we can come back
-		 * later and write it.
+		 * Write out the finished chunk to disk.
 		 */
-		fileregoff = tmpoffset;
-		if (lseek(outfd, DEFAULTREGIONSIZE, SEEK_CUR) < 0) {
-			perror("lseeking past block header and region pairs");
-			exit(1);
-		}
-		curregion = regions;
+		mywrite(outfd, output_buffer, sizeof(output_buffer));
+
+		/*
+		 * Moving to the next block. Reserve the header area.
+		 */
+		buffer_offset = DEFAULTREGIONSIZE;
+		curregion     = regions;
 
 		/*
 		 * Okay, so its possible that we ended the region at the
@@ -1340,15 +1321,17 @@ compress_image(void)
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
 
-		if (lseek(outfd, (off_t) fileregoff, SEEK_SET) < 0) {
-			perror("seeking back to block header offset");
-			exit(1);
-		}
-		if ((cc = mywrite(outfd, buf, sizeof(buf))) < 0) {
-			perror("writing subblock header and regions");
-			exit(1);
-		}
-		assert(cc == sizeof(buf));
+		/*
+		 * Stash the region info into the beginning of the block.
+		 */
+		memcpy(output_buffer, buf, sizeof(buf));
+
+		/*
+		 * Write out the finished chunk to disk, and
+		 * start over from the beginning of the buffer.
+		 */
+		mywrite(outfd, output_buffer, sizeof(output_buffer));
+		buffer_offset = 0;
 	}
 
 	if (debug) {
@@ -1504,11 +1487,10 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		}
 		count = BSIZE - d_stream.avail_out;
 
-		if ((cc = mywrite(outfd, outbuf, count)) < 0) {
-			perror("writing output file");
-			exit(1);
-		}
-		assert(cc == count);
+		/* Stash into the output buffer */
+		memcpy(&output_buffer[buffer_offset], outbuf, count);
+		buffer_offset += count;
+		assert(buffer_offset <= SUBBLOCKSIZE);
 
 		/*
 		 * If we have reached the subblock maximum, then need
@@ -1567,11 +1549,11 @@ compress_finish(unsigned long *subblksize)
 	 */
 	count = BSIZE - d_stream.avail_out;
 	if (count) {
-		if ((cc = mywrite(outfd, outbuf, count)) < 0) {
-			perror("writing output file");
-			exit(1);
-		}
-		assert(cc == count);
+		/* Stash into the output buffer */
+		memcpy(&output_buffer[buffer_offset], outbuf, count);
+		buffer_offset += count;
+		assert(buffer_offset <= SUBBLOCKSIZE);
+
 		subblockleft -= count;
 		assert(subblockleft >= 0);
 	}
@@ -1592,15 +1574,16 @@ compress_finish(unsigned long *subblksize)
 			count = sizeof(outbuf);
 		else
 			count = subblockleft;
-			
-		if ((cc = mywrite(outfd, outbuf, count)) < 0) {
-			perror("writing output file");
-			exit(1);
-		}
-		assert(cc == count);
+
+		/* Stash zeros into the output buffer */
+		memcpy(&output_buffer[buffer_offset], outbuf, count);
+		buffer_offset += count;
+		assert(buffer_offset <= SUBBLOCKSIZE);
+
 		subblockleft -= count;
 	}
 
 	subblockleft = SUBBLOCKMAX;
 	return 1;
 }
+
