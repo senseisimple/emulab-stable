@@ -32,6 +32,7 @@ Agent instproc init {} {
     $self set proto {}
     $self set role {}
     $self set port {}
+    $self set generator "TG"
     global ::GLOBALS::last_class
     set ::GLOBALS::last_class $self
 }
@@ -74,6 +75,7 @@ Agent instproc updatedb {DB} {
     $self instvar node
     $self instvar proto
     $self instvar role
+    $self instvar generator
     $self instvar port
 
     if {$role == {}} {
@@ -95,7 +97,7 @@ Agent instproc updatedb {DB} {
 #   set dst_link [lindex [$target_vnode set portlist] 0]
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port) values ('$pid','$eid','$node','$application','$role','$proto', $port,'$target_vnode',$target_port)";
+    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port,generator) values ('$pid','$eid','$node','$application','$role','$proto', $port,'$target_vnode',$target_port,'$generator')";
 }
 
 # Agent/UDP 
