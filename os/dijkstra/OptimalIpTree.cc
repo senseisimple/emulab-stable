@@ -100,13 +100,22 @@ OptimalIpTree::OptimalIpTree(OptimalIpTree const & right)
     }
 }
 
+template<class T>
+void swap_modify(T & left, T & right)
+{
+    T temp;
+    temp = left;
+    left = right;
+    right = temp;
+}
+
 OptimalIpTree & OptimalIpTree::operator=(OptimalIpTree const & right)
 {
     OptimalIpTree swapper(right);
     m_firstHops.swap(swapper.m_firstHops);
     swap(m_depth, swapper.m_depth);
-    swap(m_children[0], swapper.m_children[0]);
-    swap(m_children[1], swapper.m_children[1]);
+    swap_modify(m_children[0], swapper.m_children[0]);
+    swap_modify(m_children[1], swapper.m_children[1]);
     return *this;
 }
 
