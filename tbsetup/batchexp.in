@@ -256,8 +256,6 @@ sub fatal($)
 #
 sub ParseArgs()
 {
-    print "@ARGV\n";
-    
     my %options = ();
     if (! getopts($optlist, \%options)) {
 	usage();
