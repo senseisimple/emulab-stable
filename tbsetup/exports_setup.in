@@ -97,6 +97,8 @@ print MAP "\n";
 #
 # First gather up all the nodes that are reserved and the required info.
 #
+# VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
+#
 $nodes_result =
     DBQueryFatal("select r.node_id,r.pid,r.eid,e.gid,i.IP from reserved as r ".
 		 "left join experiments as e on r.pid=e.pid and r.eid=e.eid ".
@@ -105,6 +107,7 @@ $nodes_result =
 		 "left join interfaces as i on r.node_id=i.node_id ".
 		 " and i.card=node_types.control_net ".
 		 " where i.IP!='NULL' and r.node_id not like 'sh%' ".
+		 "       and node_types.isvirtnode=0 ".
 		 "order by r.eid,e.gid,r.pid,nodes.priority");
 
 my %ipgroups	= ();
