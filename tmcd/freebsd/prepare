@@ -6,7 +6,7 @@ require 'ctime.pl';
 # Prepare the node for cutting a new image. Should be run just prior, on
 # each of the FreeBSD and Linux partitions.
 #
-my $SUPCHECKOUT = "/etc/testbed/sup/sup/FBSD43-STD/checkouts";
+my $SUPCHECKOUT = "/etc/testbed/sup/sup";
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
 my $FSTAB       = "/etc/fstab";
@@ -40,9 +40,9 @@ $| = 1;
 cleanup_node();
 
 print "Removing old sup checkouts ...\n";
-if (-e $SUPCHECKOUT) {
-    unlink($SUPCHECKOUT) or
-	die("Could not unlink $SUPCHECKOUT");
+if (-e $SUPCHECKDIR) {
+    system("rm -rf $SUPCHECKDIR/*") == 0 or
+	die("Could not unlink $SUPCHECKDIR");
 }
 
 print "Removing old DB files ...\n";
