@@ -31,6 +31,8 @@ use Getopt::Std;
 # 64 - Set to indicate 'recoverability'
 #      (E.g., no db or physical state was modified
 #       by the time the error occurred.)
+# -1 - An uncontrolled error (someone called die()). No recovery is possible
+#      so the caller has to check for this explicitly.
 #
 sub usage ()
 {
