@@ -37,7 +37,7 @@ my $TB		= "@prefix@";
 		"portstats"	=> "$TB/bin/portstats",
 		"readycount"	=> "$TB/bin/readycount",
 		"eventsys_control" => "$TB/bin/eventsys_control",
-		"tbresize"	=> "$TB/bin/tbresize"
+		"tbresize"	=> "$TB/bin/tbresize",
 		"batchexp"	=> "$TB/bin/batchexp"
 	   );
 
