@@ -316,11 +316,13 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
 # in user that has to be admin. So ignore the uid and make sure
 # there is a login status.
 #
-function ISADMIN($uid) {
+function ISADMIN($uid = 1) {
     global $CHECKLOGIN_STATUS;
     
-    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS)
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
+	$uid=GETUID();
 	TBERROR("ISADMIN: $uid is not logged in!", 1);
+    }
 
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINOFF)) ==
