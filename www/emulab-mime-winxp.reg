@@ -1,0 +1,74 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\.tbssh]
+@="tbssh_auto_file"
+
+[HKEY_CLASSES_ROOT\tbssh_auto_file]
+@="Emulab ssh connector"
+
+[HKEY_CLASSES_ROOT\tbssh_auto_file\shell]
+
+[HKEY_CLASSES_ROOT\tbssh_auto_file\shell\open]
+
+[HKEY_CLASSES_ROOT\tbssh_auto_file\shell\open\command]
+@="\"C:\\cygwin\\bin\\ssh-mime-winxp.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tbssh]
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tbssh\OpenWithList]
+"a"="iexplore.exe"
+"MRUList"="ba"
+"b"="ssh-mime-winxp.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tbssh\OpenWithProgids]
+"tbssh_auto_file"=hex(0):
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\.tbssh]
+@="tbssh_auto_file"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbssh_auto_file]
+@="Emulab ssh connector"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbssh_auto_file\shell]
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbssh_auto_file\shell\open]
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbssh_auto_file\shell\open\command]
+@="\"C:\\cygwin\\bin\\ssh-mime-winxp.exe\" \"%1\""
+
+[HKEY_CLASSES_ROOT\.tbrdp]
+@="tbrdp_auto_file"
+
+[HKEY_CLASSES_ROOT\tbrdp_auto_file]
+@="Emulab RDP connector"
+
+[HKEY_CLASSES_ROOT\tbrdp_auto_file\shell]
+
+[HKEY_CLASSES_ROOT\tbrdp_auto_file\shell\open]
+
+[HKEY_CLASSES_ROOT\tbrdp_auto_file\shell\open\command]
+@="\"C:\\cygwin\\bin\\rdp-mime-winxp.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tbrdp]
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tbrdp\OpenWithList]
+"a"="iexplore.exe"
+"MRUList"="ba"
+"b"="rdp-mime-winxp.exe"
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.tbrdp\OpenWithProgids]
+"tbrdp_auto_file"=hex(0):
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\.tbrdp]
+@="tbrdp_auto_file"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbrdp_auto_file]
+@="Emulab RDP connector"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbrdp_auto_file\shell]
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbrdp_auto_file\shell\open]
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\tbrdp_auto_file\shell\open\command]
+@="\"C:\\cygwin\\bin\\rdp-mime-winxp.exe\" \"%1\""
+
