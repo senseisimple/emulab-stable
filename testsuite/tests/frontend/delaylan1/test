@@ -1,6 +1,6 @@
 tb_prerun("tbprerun",0);
-tb_run("tbswapin -test",0);
-tb_run("tbswapout -test",0);
-tb_run("tbswapin -test",0);
-tb_run("tbswapout -test",0);
+tb_run("tbswapin",0);
+tb_run("tbswapout",0);
+tb_run("tbswapin",0);
+tb_run("tbswapout",0);
 tb_run("tbend",0);
