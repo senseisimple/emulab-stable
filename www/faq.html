@@ -19,7 +19,8 @@
      <li> <a href="#GS-3">I have an Emulab account. Now what?</a>
      <li> <a href="#GS-4">Can I be in more than one project?</a>
      <li> <a href="#GS-5">Can I change my Emulab password?</a>
-     <li> <a href="#GS-6">Where do I get help?</a>
+     <li> <a href="#GS-6">I'm a project leader. Can I designate TAs?</a>
+     <li> <a href="#GS-7">Where do I get help?</a>
      </ul>
 
 <li> <a href="#UTT">Using the Testbed</a>
@@ -34,6 +35,7 @@
                            backed up (filesaved)?</a>
      <li> <a href="#UTT-7">Are the nodes in my experiment backed up
                            (filesaved)?</a> 
+     <li> <a href="#UTT-Swapping">What is Swapping?</a> 
      </ul>
 
 <li> <a href="#HDS">Hardware setup</a>
@@ -73,7 +75,7 @@
     <h3>How do I start a project?</h3>
     <p>
     If you are new to the Testbed, simply click on the "Start Project"
-    link on the Emulab <a href="https://www.emulab.net">Home
+    link on the Emulab <a href="http://www.emulab.net">Home
     Page</a>. You will need to fill in the forms with your personal
     information and information about the project. Then click on the
     "Submit" button. Within a few days you will be contacted via email
@@ -93,7 +95,7 @@
     <h3>How do I join a project?</h3>
     <p>
     If you are new to the Testbed, simply click on the "Join Project"
-    link on the Emulab <a href="https://www.emulab.net">Home
+    link on the Emulab <a href="http://www.emulab.net">Home
     Page</a>. You will need to fill in the form with your personal
     information, and provide the name of the project you are trying to
     join (typically, the <i>Project Leader</i> will have told you the
@@ -143,6 +145,36 @@
     </p>
 
 <li><a NAME="GS-6"></a>
+    <h3>I'm a project leader. Can I designate TAs?</h3>
+    <p>
+    Yes. To designate a TA, you must first create a project
+    <em>group</em>. A project group is a lot like a unix group, and
+    in fact unix groups is the mechanism used to protect members of
+    one group from members of another group. When you create a group,
+    you designate a <em>group leader</em> who is responsible for
+    approving users who apply to join the group. Group leaders may
+    also terminate experiments that have been created by members of
+    the group. As Project Leader, you may also shift members of your
+    project in and out of your project's groups as you like, and you
+    are automatically a member of all groups within your project. As a
+    convenience, all new projects are created with one new group,
+    termed the <em>default group</em>. As its name implies, whenever
+    the group is left unspecified in a form, it defaults to the
+    project group (this allows you to create a project without any sub
+    groups at all; new members join the default group, new experiments
+    are created in the default group, etc.).
+    </p>
+
+    <p>
+    Project groups are created via the Project Information link at
+    your left. Simply go to the project page in which you want to
+    create a group, and look for the "Create New Group" link. More
+    information on project groups is available via the <a
+    href="doc.php3">Emulab Documentation</a> page in the
+    <a href="docwrapper.php3?docname=groups.html">Groups Tutorial</a>.
+    </p>
+
+<li><a NAME="GS-7"></a>
     <h3>Where do I get help?</h3>
     <p>
     If you cannot find an answer to your question in the
@@ -270,6 +302,26 @@
     files in your home directory (/users/<login>), also available via
     NFS to all of your nodes, but that is not the preferred location
     since quotas on /users are relatively small.
+    </p>
+    
+<li><a NAME="UTT-Swapping"></a>
+    <h3>What is Swapping</h3>
+    <p>
+    Swapping is when you (or us) temporarily swap your experiment out,
+    releasing all of the nodes in the experiment. Your experiment is
+    still resident in the Emulab database, and you can see its status
+    in the web interface, but no nodes are allocated. Once an
+    experiment is swapped out, you can swap it back in via the web
+    interface by going to the Experiment Information page for your
+    experiment, and clicking on the swapin option.
+    </p>
+
+    <p>
+    Be aware that we do not currently save any files that you may have
+    placed on your nodes. When your experiment is swapped back in, you
+    will likely get different nodes, and with fresh copies of the disk
+    images. For that reason, you should not swap your experiment out
+    unless you make arrangements to save and restore any state you need.
     </p>
     
 </ul>
