@@ -352,8 +352,9 @@ if (!isset($formfields[exp_id]) ||
     $errors["Experiment Name"] = "Missing Field";
 }
 else {
-    if (! ereg("^[-_a-zA-Z0-9]+$", $formfields[exp_id])) {
-	$errors["Experiment Name"] = "Must be alphanumeric characters only!";
+    if (! ereg("^[-a-zA-Z0-9]+$", $formfields[exp_id])) {
+	$errors["Experiment Name"] =
+	    "Must be alphanumeric characters only (dash okay)!";
     }
     elseif (strlen($formfields[exp_id]) > $TBDB_EIDLEN) {
 	$errors["Experiment Name"] =
