@@ -7,8 +7,21 @@
 <?php
 $returning=0;
 $my_passwd = $password1;
-$salt = strlen("$grp_head_uid");
-$enc = crypt("$my_passwd",$salt);
+$mypipe = popen(escapeshellcmd(
+    "/usr/testbed/bin/checkpass $my_passwd $grp_head_uid '$usr_name:$email'"),
+    "w+");
+if ($mypipe) {
+  $retval=fgets($mypipe,1024);
+  if (strcmp($retval,"ok\n")!=0) {
+    die("<h3>The password you have chosen will not work:<p>$retval</h3>");
+  }
+} else {
+  mail("newbold@cs.utah.edu","TESTBED: checkpass failure",
+       "\n$usr_name ($grp_head_uid) just tried to set up a testbed account,\n".
+       "but checkpass pipe did not open (returned '$mypipe').\n".
+       "\nThanks,\nMac\n");
+}
+$enc = crypt("$my_passwd");
 array_walk($HTTP_POST_VARS, 'addslashes');
 if (isset($gid) && isset($password1) && isset($email) && 
     (($password1 == $password2) || ($enc == $password2))) {
@@ -19,14 +32,14 @@ if (isset($gid) && isset($password1) && isset($email) &&
   $result2 = mysql_db_query("tbdb", $query2);
   if ($row = mysql_fetch_row($result2)) {
     die("<h3>The group name you have chosen is already in use. ".
-	"Please select another. If you are a returning user, you must "
-	  "log in and use your current password.</h3>");
+	"Please select another. If you are a returning user, you must ".
+	"log in and use your current password.</h3>");
   } elseif ($row = mysql_fetch_row($result)) {
     #returning user, making new group
     $usr_pswd = $row[0];
     if ($usr_pswd != $enc) {
       die("<H3>The username that you have chosen is already in use. ".
-	  "Please select another. If you are a returning user, you must "
+	  "Please select another. If you are a returning user, you must ".
 	  "log in and use your current password.</h3>\n");
     }
     $returning=1;

@@ -26,7 +26,7 @@ Please log in again.</h3>\n</body></html>";
       mysql_db_query("tbdb", $cmnd);
       exit;
     } else {
-      $timeout = time() + 600;
+      $timeout = time() + 86400;
       $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$auth_usr\"";
       mysql_db_query("tbdb", $cmnd);
     }
@@ -44,8 +44,9 @@ more or less access to your nodes:
 <ol>
 <li>User - Can log into machines in your experiments.
 <li>Local Root - Can have root access on machines, can create new experiments.
-<li>Group Root - Can approve users, create projects, and update any group info or personal info for group members.
-</ol>
+";
+#echo "<li>Group Root - Can approve users, create projects, and update any group info or personal info for group members.";
+echo "</ol>
 </p></h3>\n";
 $query="SELECT gid FROM grp_memb WHERE uid='$auth_usr' and trust='group_root'";
 $result = mysql_db_query("tbdb", $query);
@@ -101,8 +102,9 @@ if ( mysql_num_rows($found) == 0 ) {
 <option value='later'>Postpone</option></select></td>
 <td><select name=\"$uid-trust\">
 <option value='user'>User</option>
-<option value='local_root'>Local Root</option>
-<option value='group_root'>Group Root</option></select></td>
+<option value='local_root'>Local Root</option>";    
+    #echo "<option value='group_root'>Group Root</option>";
+    echo "</select></td>
 <td>&nbsp;$uid&nbsp;</td><td>&nbsp;$name&nbsp;</td><td>&nbsp;$email&nbsp;</td>
 <td>&nbsp;$addr&nbsp;</td><td>&nbsp;$phone&nbsp;</td>
 </tr>\n";

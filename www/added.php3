@@ -8,7 +8,21 @@ echo "
 <body>
 <h1>Adding information to the Testbed Database</h1>\n";
 $my_passwd=$pswd;
-$enc = crypt("$my_passwd", strlen($uid));
+$mypipe = popen(escapeshellcmd(
+    "/usr/testbed/bin/checkpass $my_passwd $grp_head_uid '$usr_name:$email'"),
+    "w+");
+if ($mypipe) {
+  $retval=fgets($mypipe,1024);
+  if (strcmp($retval,"ok\n")!=0) {
+    die("<h3>The password you have chosen will not work:<p>$retval</h3>");
+  }
+} else {
+  mail("newbold@cs.utah.edu","TESTBED: checkpass failure",
+       "\n$usr_name ($grp_head_uid) just tried to set up a testbed account,\n".
+       "but checkpass pipe did not open (returned '$mypipe').\n".
+       "\nThanks,\nMac\n");
+}
+$enc = crypt("$my_passwd");
 array_walk($HTTP_POST_VARS, 'addslashes');
 if (isset($pid)) { #add a project to the database
   if ($trust == 2) {

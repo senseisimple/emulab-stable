@@ -26,7 +26,7 @@ Please log in again.</h3>\n</body></html>";
       mysql_db_query("tbdb", $cmnd);
       exit;
     } else {
-      $timeout = time() + 600;
+      $timeout = time() + 86400;
       $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$auth_usr\"";
       mysql_db_query("tbdb", $cmnd);
     }
@@ -90,7 +90,7 @@ while ($row = mysql_fetch_row($found)) {
       $cmd = "update grp_memb set trust='$trust' where uid='$uid'";
       $cmd .= "and trust='none' and gid='$gid'";
       $result = mysql_db_query("tbdb",$cmd);
-      mail("$usr_email","TESTBED: Group Approval",
+      mail("$email","TESTBED: Group Approval",
 	   "\nThis message is to notify you that you have been approved ".
 	   "as a member of \nthe $gid group with $trust permissions.\n".
 	   "\nYour status as a Testbed user is now $newstatus.".
@@ -109,7 +109,7 @@ while ($row = mysql_fetch_row($found)) {
       while ( isset($group[$n]) ) { $cmd .= " or gid='$group[$n]'"; $n++; }
       $cmd .=")";
       $result = mysql_db_query("tbdb",$cmd);
-      mail("$usr_email","TESTBED: Group Membership Denied",
+      mail("$email","TESTBED: Group Membership Denied",
 	   "\nThis message is to notify you that you have been denied ".
 	   "as a member of \nthe $gid group.\n".
 	   "\nYour status as a Testbed user is still $status.".

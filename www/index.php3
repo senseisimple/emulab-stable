@@ -11,17 +11,21 @@ if (isset($login)) {
   unset($login);
   if (isset($auth_usr)) {
     addslashes($auth_usr);
-    $PSWD = crypt("$auth_passwd", strlen($auth_usr));
-    #echo "<pre>GOT PWD $PSWD</pre>";
-    $query = "SELECT * FROM users WHERE uid=\"$auth_usr\" ".
-       "AND usr_pswd=\"$PSWD\"";
+    $query = "SELECT usr_pswd FROM users WHERE uid=\"$auth_usr\"";
     $result = mysql_db_query("tbdb", $query);
-    $correct = mysql_num_rows($result);
-    if ($correct) {
+    $row = mysql_fetch_row($result);
+    $usr_pswd = $row[0];
+    #print "Got $usr_pswd from Database\n<br>";
+    $salt = substr($usr_pswd,0,2);
+    if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
+    #print "Got $salt for salt\n<br>";
+    $PSWD = crypt("$auth_passwd",$salt);
+    #echo "<pre>GOT PWD $PSWD</pre>";
+    if ($PSWD == $usr_pswd) {
       $query2 = "SELECT timeout FROM login WHERE uid=\"$auth_usr\"";
       $result2 = mysql_db_query("tbdb", $query2);
       $exists = mysql_num_rows($result2);
-      $timeout = time() + 600;
+      $timeout = time() + 86400;
       if ($exists) {
 	$cmnd="update login set timeout='$timeout' where uid='$auth_usr'";
 	mysql_db_query("tbdb", $cmnd);
@@ -67,7 +71,7 @@ Please log in again.</h3>\n";
       $cmnd = "DELETE FROM login WHERE uid=\"$auth_usr\"";
       mysql_db_query("tbdb", $cmnd);
     } else {
-      $timeout = time() + 600;
+      $timeout = time() + 86400;
       $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$auth_usr\"";
       mysql_db_query("tbdb", $cmnd);
     }
@@ -79,12 +83,30 @@ if (isset($auth_usr)) {
   $result = mysql_db_query("tbdb", $query);
   $status_row = mysql_fetch_row($result);
   $status = $status_row[0];
+  $query="SELECT trust FROM grp_memb WHERE uid='$auth_usr'";
+  $result = mysql_db_query("tbdb", $query);
+  $row = mysql_fetch_row($result);
+  $trust = $row[0];
   if ($status == "active") {
-    #echo "<p><A href='modify.html'>Update user information</A></p>\n";
-    #echo "<p><A href='addusr.php3?$auth_usr'>Add a user to your group</A></p>";
-    #echo "<p><A href='addproj.php3?$auth_usr'>Begin a project</A></p>\n";
-    #echo "<p><A href='addexp.php3?$auth_usr'>Begin an experiment</A></p>\n";
-    echo "<A href='approval.php3?$auth_usr'>New User Approval</A>\n";
+    if ($trust == "group_root") {
+      # Only group leaders can do these options
+      echo "<A href='approval.php3?$auth_usr'>New User Approval</A>\n";
+      echo "<p>Add a New User";
+      #echo "<p><A href='addusr.php3?$auth_usr'>Add a New User</A>";
+      echo "<p>Begin a Project";
+      #echo "<p><A href='addproj.php3?$auth_usr'>Begin a Project</A>\n";
+      echo "</p>";
+    }
+    if (($trust == "group_root") || ($trust == "local_root")) {
+      # Only local root people can do these options
+      echo "Begin an Experiment";
+      #echo "<p><A href='addexp.php3?$auth_usr'>Begin an Experiment</A>\n";
+      echo "</p>";
+    }
+    # Every active user can do these options
+    echo "<b>Update user information";
+    #echo "<p><A href='modify.html'>Update user information</A>\n";
+    echo "</p>\n";
   } elseif ($status == "unapproved") {
     echo "Your account has not been approved yet. Please try back ";
     echo "later. Contact ";
@@ -106,10 +128,10 @@ if (isset($auth_usr)) {
 <?php
 echo "<A href='addgrp.php3";
 if (isset($auth_usr)) { echo "?$auth_usr"; }
-echo "'>Apply for a Group</A>\n";
+echo "'>Apply to Start a Project</A>\n";
 echo "<p><A href='addusr.php3";
 if (isset($auth_usr)) { echo "?$auth_usr"; }
-echo "'>Apply for Group Membership</A>";
+echo "'>Apply to Join a Project</A>";
 ?>
 <hr><A href='faq.html'>Frequently<br>Asked<br>Questions</a></p>
 <table cellpadding='0' cellspacing='0' width="100%">
@@ -118,7 +140,7 @@ echo "'>Apply for Group Membership</A>";
 if (!isset($auth_usr)) {
   echo "<tr><td>Username:<input type='text' name='auth_usr' size=8></td></tr><tr><td>Password:<input type='password' name='auth_passwd' size=8></td></tr><tr><td align='center'><b><input type='submit' value='Login' name='login'></td></tr></b>";
 } else {
-  echo "<tr><td align='center'><b><input type='submit' value='Logout' name='logout'></b></td></tr>";
+  echo "<tr><td><input type='hidden' name='auth_usr' value='$auth_usr'</td><td align='center'><b><input type='submit' value='Logout' name='logout'></b></td></tr>";
 }
 ?>
 </form>

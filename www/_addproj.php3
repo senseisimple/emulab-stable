@@ -1,39 +1,41 @@
-<?php
-if (!isset($PHP_AUTH_USER)) {
-  Header("WWW-Authenticate: Basic realm=\"testbed\"");
-  Header("HTTP/1.0 401 Unauthorized");
-  die("User authenication is required to view these pages\n");
-} else {
-  addslashes($PHP_AUTH_USER);
-  $PSWD = crypt("$PHP_AUTH_PW", strlen($PHP_AUTH_USER));
-  $query = "SELECT * FROM users WHERE uid=\"$PHP_AUTH_USER\" AND usr_pswd=\"$PSWD\" AND trust_level > 0";
-  $result = mysql_db_query("tbdb", $query);
-  $numusers = mysql_num_rows($result);
-  $query2 = "SELECT timeout FROM login WHERE uid=\"$PHP_AUTH_USER\"";
-  $result2 = mysql_db_query("tbdb", $query2);
-  $n = mysql_num_rows($result2);
-  $row = mysql_fetch_row($result2);
-  if (($n == 0) || ($numusers == 0) || ($row[0] < time())) {
-   	$cmnd = "DELETE FROM login WHERE uid=\"$PHP_AUTH_USER\"";
-        mysql_db_query("tbdb", $cmnd);
-	Header("WWW-Authenticate: Basic realm=\"testbed\"");
-        Header("HTTP/1.0 401 Unauthorized");
-        die ("Authorization Failed\n");
-  }
-  $timeout = time() + 1800;
-  $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$PHP_AUTH_USER\"";
-  mysql_db_query("tbdb", $cmnd);
-}
-?>
-
 <html>
 <head>
 <title>New Project</title>
 <link rel="stylesheet" href="tbstyle.css" type="text/css">
 </head>
 <body>
-<H1>Begin a project</h1>
-
+<H1>Create a New Project</h1>
+<?php
+$auth_usr = "";
+if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
+  $auth_usr=$Vals[1];
+  addslashes($auth_usr);
+  $query = "SELECT timeout FROM login WHERE uid=\"$auth_usr\"";
+  $result = mysql_db_query("tbdb", $query);
+  $n = mysql_num_rows($result);
+  if ($n == 0) {
+    echo "<h3>You are not logged in. Please go back to the ";
+    echo "<a href=\"tbdb.html\" target=\"_top\"> Home Page </a> ";
+    echo "and log in first.</h3></body></html>";
+    exit;
+  } else {
+    $row = mysql_fetch_row($result);
+    if ($row[0] < time()) { # if their login expired
+      echo "<h3>You have been logged out due to inactivity.
+Please log in again.</h3>\n</body></html>";
+      $cmnd = "DELETE FROM login WHERE uid=\"$auth_usr\"";
+      mysql_db_query("tbdb", $cmnd);
+      exit;
+    } else {
+      $timeout = time() + 86400;
+      $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$auth_usr\"";
+      mysql_db_query("tbdb", $cmnd);
+    }
+  }
+} else {
+  unset($auth_usr);
+}
+?>
 <?php
 addslashes($PHP_AUTH_USER);
 $utime = time();

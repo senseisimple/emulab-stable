@@ -25,7 +25,7 @@ Please log in again.</h3>\n</body></html>";
       mysql_db_query("tbdb", $cmnd);
       exit;
     } else {
-      $timeout = time() + 600;
+      $timeout = time() + 86400;
       $cmnd = "UPDATE login SET timeout=\"$timeout\" where uid=\"$auth_usr\"";
       mysql_db_query("tbdb", $cmnd);
     }
