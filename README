@@ -1,11 +1,10 @@
-This is a snapshot of the current source code and CVS logs for
-the software that runs "emulab" at the University of Utah,
+This is a snapshot of the current source code for the software that runs
+Netbed (Emulab++) at the University of Utah:
    http://www.emulab.net/
 
 NOTE: See the file RESTRICTED-RIGHTS for restrictions on this interim
-snapshot.  In summary, you can't redistribute it or use it for
-commercial purposes.  Soon we will provide a better, redistributable
-version.
+snapshot.  In summary, for now you can't redistribute it or use it for
+commercial purposes.
 
 
 HOW TO
@@ -21,12 +20,10 @@ HELP
 For help and to report bugs and problems, mail
     testbed-ops@flux.cs.utah.edu
 
-Don't be shy!  No one's ever tried this before but us,
-although we have cloned ours internally, which should
-have caught most of the Utah'isms.
+Don't be shy!  
 We are happy to get on the phone with you, too,
 for "big picture" issues and problems.
 
 
 Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285
-February 26, 2002
+December 2, 2002

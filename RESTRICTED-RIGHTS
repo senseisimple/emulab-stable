@@ -3,17 +3,17 @@ non-Utah copyrights and are unchanged from the original (eg, cracklib
 and healthd), this emulab code snapshot has VERY RESTRICTED RIGHTS,
 notwithstanding any per-file copyrights to the contrary.
 
-This early snapshot of the emulab code is for use only for your own
+This snapshot of the netbed/emulab code is for use only for your own
 research or teaching, cannot be used for commercial purposes, and
 CANNOT BE REDISTRIBUTED.  You must exercise reasonable precautions to
 assure these conditions are met (e.g., make your group's members aware
 of these restricted rights, and limit access to your group's members).
 
-Soon, we will provide a somewhat more polished version that will be
-redistributable, and have internal copyrights saying so.  When that is
-provided you must destroy this version.
+We later intend to provide a version that will be redistributable, and
+have internal copyrights saying so.  When that is provided you must move
+to that version, destroying this version.
 
-February 26, 2002
+December 2, 2002
 
 Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285
 School of Computing
