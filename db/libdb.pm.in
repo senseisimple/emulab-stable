@@ -16,7 +16,7 @@
 #
 
 package libdb;
-use strict;
+#use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
@@ -3842,7 +3842,7 @@ sub TBFieldErrorString() { return $DBFieldErrstr; }
 #
 sub TBGrabFieldData()
 {
-    %DBFieldData = ();
+    $DBFieldData = ();
 
     my $query_result =
 	DBQueryFatal("select * from table_regex");
@@ -3878,7 +3878,7 @@ sub TBFieldData($$;$)
     my $toplevel;
     my $fielddata;
 
-    if (! defined(%DBFieldData)) {
+    if (! defined($DBFieldData)) {
 	TBGrabFieldData();
     }
     my $key = $table . ":" . $column;
