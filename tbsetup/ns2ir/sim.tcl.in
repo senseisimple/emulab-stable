@@ -683,6 +683,32 @@ Simulator instproc at {time eventstring} {
 	    set vname $obj
 	    $obj mustdelay
 	}
+	"Node" {
+	    set otype NODE
+	    switch -- $cmd {
+		"setdest" {
+		    if {[llength $event] < 5} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set x [lindex $event 2]
+		    set y [lindex $event 3]
+		    set speed [lindex $event 4]
+		    set evargs [lrange $event 5 end]
+		    ::TBCOMPAT::named-args [lrange $event 5 end] {
+			-orientation 0
+		    }
+		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$(-orientation)"
+		    set etype SETDEST
+		}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	}
 	"Queue" {
 	    set otype LINK
 	    set node [$obj get_node]

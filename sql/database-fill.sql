@@ -80,6 +80,7 @@ REPLACE INTO event_eventtypes VALUES (12,'SWAPOUT');
 REPLACE INTO event_eventtypes VALUES (13,'NSEEVENT');
 REPLACE INTO event_eventtypes VALUES (14,'REPORT');
 REPLACE INTO event_eventtypes VALUES (15,'ALERT');
+REPLACE INTO event_eventtypes VALUES (16,'SETDEST');
 
 --
 -- Dumping data for table `event_objecttypes`
@@ -96,6 +97,7 @@ REPLACE INTO event_objecttypes VALUES (6,'SIMULATOR');
 REPLACE INTO event_objecttypes VALUES (7,'LINKTEST');
 REPLACE INTO event_objecttypes VALUES (8,'NSE');
 REPLACE INTO event_objecttypes VALUES (9,'SLOTHD');
+REPLACE INTO event_objecttypes VALUES (10,'NODE');
 
 --
 -- Dumping data for table `exported_tables`

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,6 +23,7 @@ char *tbdb_objecttypes[] = {
 	TBDB_OBJECTTYPE_LINKTEST,
 	TBDB_OBJECTTYPE_NSE,
         TBDB_OBJECTTYPE_CANARYD,
+        TBDB_OBJECTTYPE_NODE,
 	0,
 };
 
@@ -43,6 +44,7 @@ char *tbdb_eventtypes[] = {
 	TBDB_EVENTTYPE_NSEEVENT,
         TBDB_EVENTTYPE_REPORT,
         TBDB_EVENTTYPE_ALERT,
+        TBDB_EVENTTYPE_SETDEST,
         TBDB_NODESTATE_ISUP, 
         TBDB_NODESTATE_REBOOTED, 
         TBDB_NODESTATE_REBOOTING, 

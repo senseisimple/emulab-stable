@@ -79,6 +79,11 @@ Node instproc init {s} {
     $self set fixed ""
     $self set nseconfig ""
 
+    $self set X_ ""
+    $self set Y_ ""
+    $self set Z_ ""
+    $self set orientation_ ""
+
     if { ${::GLOBALS::simulated} == 1 } {
 	$self set simulated 1
     } else {
