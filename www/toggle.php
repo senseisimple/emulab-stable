@@ -105,7 +105,7 @@ elseif ($type=="swappable" || $type=="idleswap" || $type=="autoswap") {
 		   "\nThe swap settings for $pid/$eid have changed.\n".
 		   "\nThe $type bit has been cleared.\n".
 		   "\nThe new settings are:\n".
-		   "Swappable:\t$s\t('$sr')\n".
+		  #"Swappable:\t$s\t('$sr')\n".
 		   "Idleswap:\t$i\t(after $it hrs)\t('$ir')\n".
 		   "Autoswap:\t$a\t(after $at hrs)\n".
 		   "\nCreator:\t$cuid ($cname <$cemail>)\n".
