@@ -1,0 +1,125 @@
+<html>
+<head>
+  <title>Utah Network Testbed - Testbed Specific ns Commands</title>
+  <link rel='stylesheet' href='../tbstyle2.css' type='text/css'>
+</head>
+<body>
+  <h1>Utah Network Testbed - Testbed Specific ns Commands</h1>
+  <p>This document describes embeddable commands, used 
+     to specify testbed-specific parameters inside ns files.</p> 
+  <h2>Format</h2>
+  <p>All testbed 'TB' commands are in the following form:</p>
+  <p><code>#TB <i>command</i> <i>arg1 arg2 .. argn</i></code</p>
+  <p>The <code>#TB</code> prefix is ignored as a comment
+     by traditional ns interpreters, so one ns file can be used for
+     both simulators and the testbed. </p> 
+  <h2>Commands:</h2>
+  <hr>
+  <a name="set-ip"></a>
+  <h3>set-ip</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-ip <i>node</i> <i>ip</i></code></p>
+  <p>Indicates that <i>node</i> should have the IP address <i>ip</i>.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-ip node1 198.168.0.5</code></p>
+  <hr>
+  <a name="set-ip-interface"></a>
+  <h3>set-ip-interface</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-ip-interface <i>node</i> <i>dest</i> <i>ip</i></code></p>
+  <p>This command is used to set the IP address of an interface
+     on a node with multiple links. The interface on <i>node</i> which 
+     connects to <i>dest</i> is given the ip address <i>ip</i>. </p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-ip-interface node2 node3 198.168.0.5</code></p>
+  <p><b>Note:</b></p>
+  <p>This command will not work for two nodes with multiple connections
+     between them.</p>
+  <hr>
+  <a name="set-hardware"></a>
+  <h3>set-hardware</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-hardware <i>node</i> <i>type</i> [<i>args</i>]</code></p>
+  <p>This command sets hardware specifications. Currently, the only <i>type</i> 
+     supported is <code>shark-shelf</code>, which indicates that <i>node</i> should
+     be a shelf (switched LAN) of 8 sharks (aka dnards).
+     <i>Node</i> may include wildcards '*' or '?'.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-hardware node8 shark-shelf</code></p>
+  <hr>
+  <a name="set-node-os"></a>
+  <h3>set-node-os</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-node-os <i>node</i> <i>os</i></code></p>
+  <p>Sets the operating system of one or more nodes; may be a standard OS 
+  (<code>FBSD40-STD</code> or <code>RHL62-STD</code>) or an OS created using 
+  <a href="#create-os"><code>create-os</code></a>. <i>Node</i> may include wildcards '*' or '?'.</p>
+  <p><b>Examples:</b></p>
+  <p><code>#TB set-node-os node6 FBSD40-STD</code></p>
+  <p><code>#TB set-node-os node3? MY-CUSTOM-OS</code></p>
+  <p><b>Note:</b></p>
+  <p>Nodes which are in use as delay nodes should only use <code>FBSD40-STD</code>.</p>
+
+  <hr>
+  <a name="set-node-deltas"></a>
+  <h3>set-node-deltas</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-node-deltas <i>node</i> <i>deltas</i></code></p>
+  <p>Used to apply user "deltas" to a node's installation. These deltas may install
+     packages or otherwise modify an existing, standard <code>FBSD40-STD</code> or <code>RHL62-STD</code>
+     installation. <i>Node</i> may include wildcards '*' or '?'.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-node-deltas node1 XXX</code></p>
+
+  <hr>
+  <a name="create-os"></a>
+  <h3>create-os</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB create-os <i>label</i> <i>imagepath</i> <i>partition</i></code></p>
+  <p>Creates a custom OS called <i>label</i>, for use in <a href="#set-node-os"><code>set-node-os</code></a>
+     commands. XXX <i>imagepath</i> is a path to the image on <code>ops.emulab.net</code> in your user
+     subdirectory. XXX something about <i>partition</i></p>
+  <p><b>Example:</b></p>
+  <p><code>#TB create-os MY-CUSTOM-OS XXX/XXX XXX</code></p>
+
+  <hr>
+  <a name="set-dnard-ip"></a>
+  <h3>set-dnard-ip</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-dnard-ip <i>shelf</i> <i>number</i> <i>ip</i></code></p>
+  <p>XXX Four score and twenty years ago, our fathers brought forth upon this
+     continent a new nation, conceived in <i>liberty</i>, and dedicated to
+     the proposition that all men are created equal.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-dnard-ip XXX 3 198.168.0.1</code></p>
+  <hr>
+  <a name="set-dnard-os"></a>
+  <h3>set-dnard-os</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-dnard-os <i>shelf</i> <i>number</i> <i>os</i></code></p>
+  <p>XXX Four score and twenty years ago, our fathers brought forth upon this
+     continent a new nation, conceived in <i>liberty</i>, and dedicated to
+     the proposition that all men are created equal.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-dnard-os XXX 2 XXX</code></p>
+
+  <hr>
+  <a name="set-link-loss"></a>
+  <h3>set-link-loss</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-link-loss <i>source</i> <i>dest</i> <i>rate</i></code></p>
+  <p>XXX Sets the loss rate of a link. <i>Rate</i> is between 0.0 and 1.0.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-link-loss node1 node12 0.1</code></p>
+
+  <hr>
+  <a name="set-lan-loss"></a>
+  <h3>set-lan-loss</h3>
+  <p><b>Format:</b></p>
+  <p><code>#TB set-lan-loss <i>source</i> <i>dest</i> <i>rate</i></code></p>
+  <p>XXX Sets the loss rate of a lan. <i>Rate</i> is between 0.0 and 1.0.</p>
+  <p><b>Example:</b></p>
+  <p><code>#TB set-lan-loss XXX 0.7</code></p>
+
+</body>
+</html>
