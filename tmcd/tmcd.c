@@ -39,6 +39,8 @@ static int doifconfig(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dodelay(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dohosts(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int dorpms(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp);
 
 struct command {
 	char	*cmdname;
@@ -50,6 +52,8 @@ struct command {
 	{ "accounts",  doaccounts },
 	{ "delay",     dodelay },
 	{ "hostnames", dohosts },
+	{ "rpms",      dorpms },
+	{ "runcmd",    doruncmd },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -60,11 +64,7 @@ main(int argc, char **argv)
 	int			length, i, err = 0;
 	struct sockaddr_in	name;
 
-#ifdef LBS
-	openlog("tmcd-test", LOG_PID, LOG_USER);
-#else
 	openlog("tmcd", LOG_PID, LOG_USER);
-#endif
 	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
 
 #ifndef LBS
@@ -829,6 +829,130 @@ dohosts(int sock, struct in_addr ipaddr, char *request, int tcp)
 	}
 	mysql_free_result(vnames_result);
 	
+	return 0;
+}
+
+/*
+ * Return RPM stuff.
+ */
+static int
+dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[BUFSIZ], *bp, *sp;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "DELAY: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid))
+		return 0;
+
+	/*
+	 * Get RPM list for the experiment. Might be per-machine at
+	 * some point.
+	 */
+	res = mydb_query("select rpms from experiments "
+			 "where pid='%s' and eid='%s'",
+			 1, pid, eid);
+
+	if (!res) {
+		syslog(LOG_ERR, "RPMS: %s: DB Error getting RPMS!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Text string is a colon separated list.
+	 */
+	row = mysql_fetch_row(res);
+	bp  = row[0];
+	sp  = bp;
+	do {
+		bp = strsep(&sp, ":");
+
+		sprintf(buf, "RPM=%s\n", bp);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		syslog(LOG_INFO, "RPM: %s", buf);
+		
+	} while (bp = sp);
+	
+	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return node run command. 
+ */
+static int
+doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[BUFSIZ], *bp, *sp;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "DELAY: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid))
+		return 0;
+
+	/*
+	 * Get RPM list for the experiment. Might be per-machine at
+	 * some point.
+	 */
+	res = mydb_query("select runcmd from experiments "
+			 "where pid='%s' and eid='%s'",
+			 1, pid, eid);
+
+	if (!res) {
+		syslog(LOG_ERR, "RPMS: %s: DB Error getting run command!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Simple text string.
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	
+	sprintf(buf, "RUNCMD=%s\n", row[0]);
+	client_writeback(sock, buf, strlen(buf), tcp);
+	syslog(LOG_INFO, "RUNCMD: %s", buf);
+	
+	mysql_free_result(res);
 	return 0;
 }
 
