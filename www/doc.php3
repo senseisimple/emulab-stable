@@ -84,6 +84,32 @@ PAGEHEADER("Documentation");
           (Changelog/Technical Details)</a></b>
 </ul>
 
+<h3>SIGCOMM Tutorial</h3>
+
+<p>
+You might also find it helpful to look through the tutorial given at
+SIGCOMM '02 by Jay Lepreau, Robert Ricci, and Mac
+Newbold, entitled "How To Use the Netbed (Emulab++) Network Testbeds."
+</p>
+
+<ul>
+<li><b>Slides</b> from the tutorial are available in
+    <a href = "http://www.cs.utah.edu/flux/testbed-docs/sigcomm02-tutorial/netbed-tut-sigcomm02.ppt">
+          PowerPoint Format</a>, 
+    and as PDFs, with 	
+    <a href = "http://www.cs.utah.edu/flux/testbed-docs/sigcomm02-tutorial/netbed-tut-sigcomm02-2up.pdf">
+          2 slides per page (full color)</a>, and
+    <a href = "http://www.cs.utah.edu/flux/testbed-docs/sigcomm02-tutorial/netbed-tut-sigcomm02-grey-6up.pdf">
+          6 slides per page (greyscale)</a>.
+
+<li><b>Tutorial files</b> such as NS files for the experiments, are available
+    as a
+    <a href = "http://www.cs.utah.edu/flux/testbed-docs/sigcomm02-tutorial/tutfiles.tar.gz">
+          tarball</a>, or
+    <a href = "http://www.cs.utah.edu/flux/testbed-docs/sigcomm02-tutorial/tutfiles">
+          individually</a>.
+</ul>
+
 <?php
 #
 # Standard Testbed Footer
