@@ -36,7 +36,7 @@ $plab_types = array('pcplab', 'pcplabdsl', 'pcplabinet', 'pcplabintl',
 $plab_type_descr = array('pcplab' => 'Any PlanetLab node',
 			 'pcplabdsl' => 'Nodes on DSL lines',
 			 'pcplabinet' => 'Commodity Internet, North America',
-		         'pcplabintl' => 'Outisde North America',
+		         'pcplabintl' => 'Outside North America',
 			 'pcplabinet2' => 'Internet2');
 
 #
@@ -68,10 +68,9 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	     "</b></p>\n";
     }
 
-    echo "Emulab's Planetlab support is recovering from their transition
-	  to PlanetLab 2.0.  Currently it's
-	  often working
-	  but is much slower than before.  Please report problems.
+    echo "Emulab's Planetlab support has mostly recovered from their transition
+	  to PlanetLab 2.0, although slice creation is about 3x slower.
+	  Please report problems.
           <br>\n";
 ### Possible status phrases:
 # largely working.
