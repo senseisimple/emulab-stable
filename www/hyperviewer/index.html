@@ -191,7 +191,8 @@ includes a good online manual.)</li>
     </ul>
   </ul>
 </ul>
-<div style="margin-left: 120px;">Test that everything is set up with:<br>
+<div style="margin-left: 120px;">Test that everything is set up, and
+accept the Boss host key with:<br>
 </div>
 <pre style="margin-left: 160px;">plink boss.emulab.net</pre>
 <ul>
@@ -209,11 +210,28 @@ page as above, and do the following once to get boss.emulab.net put
 into your .ssh/known_hosts file:<br>
 </div>
 <pre style="margin-left: 160px;">ssh boss.emulab.net<br></pre>
+<ul>
+  <ul>
+    <ul>
+      <li>Note: Unless you have <span style="font-weight: bold;">run
+the plink or ssh command</span> to boss.emulab.net in a shell, the SSH
+setup is not complete!&nbsp; Both of them ask the first time for you to
+accept the host key.&nbsp; Until that has been done, the HyperViewer
+client program will not be able to connect.<br>
+      </li>
+    </ul>
+  </ul>
+</ul>
 <div style="margin-left: 80px;"><span style="font-weight: bold;">Emulab
 user name:</span> If your Emulab user name is different from your login
 name, set the EMULAB_USER environment variable to your Emulab user
 name.&nbsp; hypview will use that in preference to the USER or USERNAME
-variables, and default to "guest" if none of them are set.<br>
+variables, and default to "guest" if none of them are set.&nbsp; This
+may be over-ridden in the Open/Experiment window.<br>
+<br>
+<span style="font-weight: bold;">Emulab project name:&nbsp;</span>
+Similarly, if you always use the same project name, you can set it to
+default in the EMULAB_PROJECT environment variable.<br>
 </div>
 <ul>
 </ul>
@@ -570,7 +588,8 @@ right is the <span style="font-weight: bold;">control panel</span>.<br>
 </div>
 <br>
 </div>
-<h4><a name="mouse">Mouse: dragging, rotation, and picking</a></h4>
+<h4><a name="mouse"></a>Mouse: dragging, rotation, and picking<br>
+</h4>
 <span style="font-weight: bold;"></span>
 <ul style="margin-left: 40px;">
   <li>Pressing the "Help" button, or selecting Help/Usage from the menu
@@ -738,22 +757,25 @@ Defaults to 12, the range is 1 to 30.<br>
 There is one more dialog panel which pops up when you select the
 <span style="font-weight: bold;">File/Open</span> menu item, or type
 Ctrl-O.&nbsp; You can read a .hyp file, or
-load an experiment from the database via XML-RPC.<br>
+load an experiment from the database via XML-RPC over SSH.<br>
 <ul>
   <li>There is no browser option yet.&nbsp; Ya just gotta type or
 cut-and-paste.&nbsp; (This is Alpha software!)</li>
   <li>For experiments, the optional root node is the host or lan from
 which the tree layout starts.&nbsp; If you know it, put it in.&nbsp;
 Otherwise the first lan in the database links list is chosen, or the
-first host if there are no lans.&nbsp; <br>
-  </li>
-</ul>
-<div style="margin-left: 40px;">The root node name may optionally be a <span
+first host if there are no lans.</li>
+  <li>The root node name may optionally be a <span
  style="font-style: italic;">glob</span> expression, with *, ?, and []
 wildcards.&nbsp; In that case we make up a root node name and put the
 matching nodes under it.&nbsp; There is an example of why you would
-want to do this below.<br>
-</div>
+want to do this <a href="#example">below</a>.</li>
+  <li>You can over-ride the default SSH login name and project name
+with the environment variables EMULAB_USER and EMULAB_PROJECT.&nbsp;
+For more on setting up the SSH connection to Emulab, see the section <a
+ href="#windows_ssh">above</a>.<br>
+  </li>
+</ul>
 <ul>
   <li>Since HyperViewer is set up to load a file, the experiment option
 actually writes a temp .hyp file.&nbsp; You will see the file name on
