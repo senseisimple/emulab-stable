@@ -1,0 +1,166 @@
+Notes on testing.
+
+* To configure you testbed tree for installation and testing outside
+  the real install tree, you want to do something like this:
+
+	./configure --prefix=/usr/testbed/devel/stoller \
+		--with-LEDA=/usr/testbed/LEDA/LEDA-4.0 \
+		--with-WWWDEFS=stoller-emulab
+
+  This will build against the installed LEDA goo, install it in the
+  directory of your choosing, and select the WWWDEFS file you gave it. This
+  last option is for testing your own version of web pages using the server
+  on paper.  Take a look at www/stoller-emulab-defs.php3, and compare that
+  against www/default-defs.php3. It should be obvious whats going on. You
+  should create a version for yourself since it is a good idea to test the
+  web pages too. Go ahead and commit the file if you like.
+
+* The --prefix argument above is choosen simply so that the same name
+  directory will exist in the same place on both paper and plastic.  This
+  allows you to do an install of both ops and the control software and
+  completely test everything.
+
+* To build and install, do this on paper:
+
+	gmake
+	gmake ops-install
+	su1 gmake post-install
+
+  On plastic:
+
+	gmake control-install
+
+  And now you have install trees on both paper and plastic, each with the
+  stuff appropriate to that machine. 
+
+* To test the web pages, you can use this URL:
+
+	https://www.emulab.net/~stoller/www/tbdb.html
+
+  Well, replace "stoller" with your login name. Note that this is a home
+  dir URL, so you will need to create a public_html directory in your home
+  directory, and stick a symlink in there that points to you www pages you
+  just installed. This is a little inconvenient, but I only had to do it
+  once.
+
+	cd ~/public_html
+	ln -s ../../../usr/testbed/devel/stoller/www .
+
+  WARNING: There is some danger here of course, since we don't want these
+  pages to be used by just anyone. I think we will need to drop in a
+  .htaccess file that permits just Utah people to use those pages.
+
+* In order to test on plastic as a real user, you need to create a new
+  user (via the web interface). Why? Well, you need a user on paper
+  with a shell that points to the right version (your version) of the
+  paperbag. You could edit the passwd file and change some other test
+  user, but I think its a good idea to go through the whole user
+  create process to make sure everything is working. You can easily
+  delete the test projects and users via the web interface.
+
+* So, now you have a new user on plastic and paper. You can log in as
+  that user and run some simple tests using the plasticbag scripts in
+  your /usr/testbed/devel/<login>/bin directory, which will access the
+  new paperbag on paper and run your programs.
+
+* You can also test directly on paper by setting your path to place
+  your new bin directory at the front. Better to do as much testing on
+  plastic as you can though.
+
+* In order to test your version of the web pages, but ensure that no
+  one else can use them, you will need to enable your home directory
+  in /usr/local/etc/apache/apache.conf, and then restart apache. You
+  only need to do this once though. Then in you public_html directory,
+  you need a .htaccess file like this (the last two are machines on my
+  home network).
+
+	<limit GET POST>
+	order deny,allow
+	deny from all
+	allow from 155.99.212.
+	allow from 206.163.75.136
+	allow from 206.163.153.25
+	</limit>
+
+* NOTE: You cannot test the testbed daemons since they listen on well
+  known ports on paper. I don't expect this to be a big problem since
+  those do not change a lot.
+
+* The DB name is still hardwired to "tbdb" in many places. However,
+  when those changes are finished, you will be able to change the name
+  of your DB with the configure option --with-TBDBNAME=name. Not an
+  accepted use of the --with option, but so what; configure should
+  allow arbitrary use specifed options to be passed through.
+
+  There are still issues to resolve with changing the DB, with respect
+  to reserving nodes.
+
+  Generating your own copy of the DB needs to be addressed.
+
+  
+
+
+My approach is intended to minimize the number of scripts that need to
+be run through configure rewritting to get the --prefix argument into
+them. I also want to enable testing from private install trees.  We
+also need to minimize security risks, so we can't use an environment
+variable of course, since we have a number of setuid scripts that
+cannot be invoking sub programs based on a path in an environment
+variable. Anyway, here is my rundown.
+
+* People test their own stuff by installing and running from thier
+  prefix directory. This is not as convenient as running out of your
+  source directory, but its the only workable solution that provides a
+  reasonable testing harness that looks like the real thing, and will
+  allow you to do testing with your own versions of things.
+
+* We use a --prefix directory. It defaults to /usr/testbed/. This
+  implies we start using configure. Other configurable items we need
+  to consider are the name of the DB and the paths in the web page
+  stuff so that we can test diffferent versions of the pages, using
+  different versions of the DB, etc.
+
+* All user executable "front end" programs should be installed to
+  ${PREFIX}/bin. (ex: tbrun, tbend). This is a flat directory.
+
+* All admin executable "front end" programs should be installed to
+  ${PREFIX}/sbin. (ex: os_load, nalloc, tmcd). This is a flat directory.
+
+* All of the other backend support stuff from tbsetup and other places
+  go into ${PREFIX}/libexec. This directory can have subdirs. The ir
+  parsing stuff, support perl/tcl libraries, etc.
+
+* Configuration files go into ${PREFIX}/etc. (ex: pxe).
+
+* There are no hardwired paths in the scripts. Any script that needs
+  to access another testbed program or library has to be rewritten by
+  configure. Something like this in "script.in" which will get
+  rewritten as "script"
+
+  $TBROOT = @TBROOT@;
+  $ENV{'PATH'} = "$TBROOT/bin:$TBROOT/sbin:...";
+  $handle_ip = "$TBROOT/libexec/ir/handle_ip";
+
+* DB name (tbdb). Same for the DB name. 
+
+* We rewrite www/defs.php3 with config, much as I do know for testing
+  on my home machine. This way, we can all share the web server,
+  running individual versions of the web pages. Your version of the
+  web pages can either operate on the real DB, or on your own private
+  version of the DB (say, tbdb-lbs) which you can create with
+  mysqldump for testing.
+
+* Even though the name of the DB is not hardwired in, there are still
+  problems with this approach, like allocating machines from your DB
+  that are already allocated in the real DB! We can probably solve
+  this with a little trick; reserve some nodes in the real testbed DB,
+  and reduce the number of nodes in your private DB to exactly that
+  set.
+
+* What about things like snmpit? Well, you gotta test that out using
+  the real switches. As long as you can test it from your own
+  directory, and with a set of nodes reserved out of the testbed DB,
+  it should be mostly safe. Use caution though.
+
+* Other cases like the above?
+
