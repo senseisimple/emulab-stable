@@ -1229,13 +1229,68 @@
     Each node has a partition at the end of the disk that you can use if
     you wish. In Linux, the partition is <code>/dev/hda4</code> ; in FreeBSD,
     it's </code>/dev/ad0s4</code> . There is no filesystem on this partition,
-    so you'll need to create it yourself. For example, in Linux:
-    <blockquote>
-	<code>
-	    mkfs /dev/hda4;<br>
-	    mount /dev/hda4 /mnt;
-	</code>
-    </blockquote>
+    so you'll need to create it yourself. 
+    </p>
+    For example, in Linux:
+    <ul>
+        <p>
+        <li>Set the correct partition type (type 83 - ext2fs):</li>
+        <blockquote>
+        <code>fdisk /dev/hda</code>
+        </blockquote>
+        <ul>
+            <li>Press 't' to change partition sysid.</li>
+            <li>Enter '4' as the partition to change.</li>
+            <li>Enter '83' to specify ext2fs.</li>
+            <li>Type 'w' to save and exit.</li>
+        </ul>
+        </p>
+        <p>
+        <li>Create the filesystem:</li>
+        <blockquote>
+	<code>mkfs /dev/hda4</code>
+        </blockquote>
+        </p>
+        <p>
+        <li>Mount the filesystem:</li>
+        <blockquote>
+        <code>mount /dev/hda4 /mnt</code>
+        </blockquote>
+        </p>
+    </ul>
+    In FreeBSD, follow these steps:
+    <ul>
+        <p>
+        <li>First, you need to set the correct partition type:</li>
+        <blockquote>
+        <code>fdisk -e /dev/ad0</code>
+        </blockquote>
+        <ul>
+            <li>Skip changes to partitions 1-3.</li>
+            <li>Edit partition four, and set the sysid to 165; leave other 
+            metrics alone.</li>
+        </ul>
+        </p>
+        <p>
+        <li>Next, you have to create a BSD disklabel on the partition:</li>
+        <blockquote>
+        <code>disklabel -w ad0s4 auto</code>
+        </blockquote>
+        </p>
+        <p>
+        <li>Create the filesystem:</li>
+        <blockquote>
+        <code>newfs /dev/ad0s4c</code>
+        </blockquote>
+        </p>
+        <p>
+        <li>Finally, mount it:</li>
+        <blockquote>
+        <code>mount /dev/ad0s4c /some/where</code>
+        </blockquote>
+        </p>
+    </ul>
+    <p>
     This partition is only 6 Gigs, the size of the leftover space on our
     smallest drives. If you need more space than this, it would be possible
     to enlarge this partition on some machines (for example, our pc850s
