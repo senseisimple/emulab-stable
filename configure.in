@@ -450,7 +450,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webdelay_config tbsetup/webbatchexp tbsetup/webreport \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/webswapexp tbsetup/swapexp \
-	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
+	tbsetup/endexp tbsetup/webendexp \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
 	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
@@ -487,7 +487,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
-	tmcd/tmcd.restart tmcd/plab/GNUmakefile \
+	tmcd/tmcd.restart tmcd/plab/GNUmakefile tmcd/common/config/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables utils/eventping \
