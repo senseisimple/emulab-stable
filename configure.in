@@ -383,8 +383,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/checkports tbsetup/webidlecheck tbsetup/webnodereboot \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tip/GNUmakefile \
-	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
-	tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
+	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
+	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
 	tmcd/tmcd.restart \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
