@@ -2950,13 +2950,11 @@ class elabinelab:
             
         res = DBQueryFatal("select i.node_id,r.pid,r.eid,"
                            "       e.elab_in_elab,e.state,e.expt_head_uid, "
-                           "       v.inner_elab_role "
+                           "       r.inner_elab_role "
                            "  from interfaces as i "
                            "left join reserved as r on r.node_id=i.node_id "
                            "left join experiments as e on e.pid=r.pid and "
                            "     e.eid=r.eid "
-                           "left join virt_nodes as v on v.vname=r.vname and "
-                           "     v.pid=r.pid and v.eid=r.eid "
                            "where i.IP=%s and i.role='ctrl'",
                            (self.clientip))
         
