@@ -1152,7 +1152,7 @@ SSLLogLevel info
 
 #  General setup for the virtual host
 DocumentRoot "@prefix@/www"
-ServerName www.@OURDOMAIN@
+ServerName @WWWHOST@
 ServerAdmin @TBOPSEMAIL@
 ErrorLog @prefix@/log/apache_error_log
 TransferLog @prefix@/log/apache_access_log

@@ -16,7 +16,7 @@ O                      = @SSLCERT_ORGNAME@
 OU                     = Server
 # The apache server wants the CommonName (CN) to match what we set "ServerName"
 # to in apache/http.conf.in (in the SSL section).
-CN                     = www.@OURDOMAIN@
+CN                     = @WWWHOST@
 emailAddress           = @TBOPSEMAIL@
 
 [ req_attributes ]
