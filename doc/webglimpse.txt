@@ -57,7 +57,7 @@ the makeLinkOutput function to this:
     	my($link, $title, $date) = @_;
     
     	if ($link =~ /^(.*)\/(.*\..*)$/) {
-    	    $link = "$main::urlpath/$1/docwrapper.php3?docname=$2\n";
+    	    $link = "$main::urlpath$1/docwrapper.php3?docname=$2\n";
     	}
     	
     	my $retstring =	"<hr><b><A HREF=\"".$link."\">";
