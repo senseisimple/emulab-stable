@@ -22,6 +22,7 @@ PAGEHEADER("Node Control Center");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
 # Admin users can control nodes.
@@ -29,10 +30,14 @@ LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
-               <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>,
-               <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
-               <a href='nodecontrol_list.php3?showtype=all'>all</a>.
-      </b><br><br>\n";
+               <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
+
+if ($isadmin) {
+    echo    ", <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
+               <a href='nodecontrol_list.php3?showtype=physical'>physical</a>,
+               <a href='nodecontrol_list.php3?showtype=all'>all</a>";
+}
+echo ".</b><br><br>\n";
 
 if (!isset($showtype)) {
     $showtype='pcs';
@@ -60,6 +65,11 @@ elseif (! strcmp($showtype, "virtnodes")) {
     $role   = "(role='virtnode')";
     $clause = "";
     $view   = "Virtual Nodes";
+}
+elseif (! strcmp($showtype, "physical")) {
+    $role   = "";
+    $clause = "(nt.isvirtnode=0)";
+    $view   = "Physical Nodes";
 }
 elseif (! strcmp($showtype, "widearea")) {
     $role   = "(role='testnode')";
