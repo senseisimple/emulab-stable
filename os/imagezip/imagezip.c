@@ -949,16 +949,16 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 {
 #define LINUX_SUPERBLOCK_OFFSET	1024
 #define LINUX_SUPERBLOCK_SIZE 	1024
-#define LINUX_GRPSPERBLK	\
-	(LINUX_SUPERBLOCK_SIZE/sizeof(struct ext2_group_desc))
+#define LINUX_MAXGRPSPERBLK	\
+	(EXT2_MAX_BLOCK_SIZE/sizeof(struct ext2_group_desc))
 
 	int			cc, i, numgroups, rval = 0;
 	struct ext2_super_block	fs;
-	struct ext2_group_desc	groups[LINUX_GRPSPERBLK];
+	struct ext2_group_desc	groups[LINUX_MAXGRPSPERBLK];
 	int			dosslice = slice + 1; /* DOS Numbering */
 
 	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
-	assert((sizeof(groups) & ~LINUX_SUPERBLOCK_SIZE) == 0);
+	assert((sizeof(groups) & ~EXT2_MAX_BLOCK_SIZE) == 0);
 
 	if (debug)
 		fprintf(stderr, "  P%d (Linux Slice)\n", dosslice);
@@ -986,13 +986,22 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 		      dosslice);
  		return (1);
  	}
-
-	if (debug) {
-		fprintf(stderr, "        bfree %9u, size %9d\n",
-		       fs.s_free_blocks_count, EXT2_BLOCK_SIZE(&fs));
+	if (EXT2_BLOCK_SIZE(&fs) < EXT2_MIN_BLOCK_SIZE ||
+	    EXT2_BLOCK_SIZE(&fs) > EXT2_MAX_BLOCK_SIZE) {
+	    warnx("Linux Slice %d: Block size not what I expect it to be: %d!",
+		  dosslice, EXT2_BLOCK_SIZE(&fs));
+	    return 1;
 	}
+
 	numgroups = fs.s_blocks_count / fs.s_blocks_per_group;
-	
+	if (debug) {
+		fprintf(stderr, "        count %9u, size %9d, pergroup %9d\n",
+			fs.s_blocks_count, EXT2_BLOCK_SIZE(&fs),
+			fs.s_blocks_per_group);
+		fprintf(stderr, "        bfree %9u, groups %9d\n",
+			fs.s_free_blocks_count, numgroups);
+	}
+
 	/*
 	 * Read each group descriptor. It says where the free block bitmap
 	 * lives. The absolute block numbers a group descriptor refers to
@@ -1004,11 +1013,19 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 		int gix;
 		off_t soff;
 
-		gix = (i % LINUX_GRPSPERBLK);
+		/*
+		 * Read the group descriptors in groups since they are
+		 * smaller than a sector size, packed into EXT2_BLOCK_SIZE
+		 * blocks right after the superblock. 
+		 */
+		gix = (i % EXT2_DESC_PER_BLOCK(&fs));
 		if (gix == 0) {
 			soff = sectobytes(start) +
-				((off_t)(EXT2_BLOCK_SIZE(&fs) +
-					 (i * sizeof(struct ext2_group_desc))));
+				((off_t)
+				 ((EXT2_BLOCK_SIZE(&fs) *
+				   (fs.s_first_data_block + 1)) +
+				  (i*sizeof(struct ext2_group_desc))));
+			
 			if (devlseek(infd, soff, SEEK_SET) < 0) {
 				warnx("Linux Slice %d: "
 				      "Could not seek to Group %d",
@@ -1036,7 +1053,8 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 				groups[gix].bg_free_blocks_count);
 		}
 
-		rval = read_linuxgroup(&fs, &groups[gix], i, start);
+		if ((rval = read_linuxgroup(&fs, &groups[gix], i, start)))
+			return rval;
 	}
 	
 	return 0;
@@ -1054,7 +1072,7 @@ read_linuxgroup(struct ext2_super_block *super,
 		int index,
 		u_int32_t sliceoffset /* Sector offset of slice */)
 {
-	char	*p, bitmap[0x1000];
+	char	*p, bitmap[EXT2_MAX_BLOCK_SIZE];
 	int	i, cc, max;
 	int	count, j;
 	off_t	offset;
@@ -1069,22 +1087,22 @@ read_linuxgroup(struct ext2_super_block *super,
 	}
 
 	/*
-	 * The bitmap is how big? Just make sure that its what we expect
-	 * since I don't know what the rules are.
+	 * Sanity check this number since it the number of blocks in
+	 * the group (bitmap size) is dependent on the block size. 
 	 */
-	if (EXT2_BLOCK_SIZE(super) != 0x1000 ||
-	    super->s_blocks_per_group  != 0x8000) {
-		warnx("Linux Group %d: "
-		      "Bitmap size not what I expect it to be!", index);
-		return 1;
+	if (super->s_blocks_per_group > (EXT2_BLOCK_SIZE(super) * 8)) {
+	    warnx("Linux Group %d: "
+		  "Block count not what I expect it to be: %d!",
+		  index, super->s_blocks_per_group);
+	    return 1;
 	}
 
-	if ((cc = devread(infd, bitmap, sizeof(bitmap))) < 0) {
+	if ((cc = devread(infd, bitmap, EXT2_BLOCK_SIZE(super))) < 0) {
 		warn("Linux Group %d: "
 		     "Could not read Group bitmap", index);
 		return 1;
 	}
-	if (cc != sizeof(bitmap)) {
+	if (cc != EXT2_BLOCK_SIZE(super)) {
 		warnx("Linux Group %d: Truncated Group bitmap", index);
 		return 1;
 	}
