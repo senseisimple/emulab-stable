@@ -571,23 +571,30 @@ sub mkrootfs($)
     #
     # Now a bunch of stuff to set up a nice environment in the jail.
     #
-    mysystem("cp -p $ETCJAIL/rc.conf $path/root/etc");
     mysystem("rm -f $path/root/etc/rc.conf.local");
-    mysystem("cp -p $ETCJAIL/rc.local $path/root/etc");
-    mysystem("cp -p $ETCJAIL/crontab $path/root/etc");
+    mysystem("cp -p $ETCJAIL/rc.conf $ETCJAIL/rc.local $ETCJAIL/crontab ".
+	     "$path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
     mysystem("ln -s /usr/compat $path/root/compat");
 
-    # No X11 forwarding. 
-    mysystem("cat $path/root/etc/ssh/sshd_config | ".
-	     "sed -e 's/^X11Forwarding.*yes/X11Forwarding no/' > ".
-	     "$path/root/tmp/sshd_foo");
-    mysystem("cp -f $path/root/tmp/sshd_foo $path/root/etc/ssh/sshd_config");
+    #
+    # Premunge the sshd config: no X11 forwarding and get rid of old
+    # ListenAddresses.
+    #
+    mysystem("sed -i .bak ".
+	     "-e 's/^X11Forwarding.*yes/X11Forwarding no/' ".
+	     "-e '/^ListenAddress/d' ".
+	     "$path/root/etc/ssh/sshd_config");
     
     # Port/Address for sshd.
     if ($IP ne $hostip) {
 	mysystem("echo 'ListenAddress $IP' >> ".
 		 "$path/root/etc/ssh/sshd_config");
+	my @ips = split(",", $jailconfig{IPADDRS});
+	foreach my $ip (@ips) {
+	    mysystem("echo 'ListenAddress $ip' >> ".
+		     "$path/root/etc/ssh/sshd_config");
+	}
     }
     else {
 	mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
@@ -614,12 +621,10 @@ sub mkrootfs($)
 	mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
     }
     else {
-	mysystem("cp -p /etc/group $path/root/etc");
-	mysystem("cp -p /etc/master.passwd $path/root/etc");
+	mysystem("cp -p /etc/group /etc/master.passwd $path/root/etc");
 	mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
 	# XXX
-	mysystem("cp -p $DBDIR/passdb.db $path/root/$DBDIR");
-	mysystem("cp -p $DBDIR/groupdb.db $path/root/$DBDIR");
+	mysystem("cp -p $DBDIR/passdb.db $DBDIR/groupdb.db $path/root/$DBDIR");
     }
     
     TBDebugTimeStamp("mkjail mounting NFS filesystems");
@@ -726,16 +731,24 @@ sub restorerootfs($)
 	mysystem("echo $IP > $path/root/var/emulab/boot/myip");
     }
 
-    # No X11 forwarding. 
-    mysystem("cat $path/root/etc/ssh/sshd_config | ".
-	     "sed -e 's/^X11Forwarding.*yes/X11Forwarding no/' > ".
-	     "$path/root/tmp/sshd_foo");
-    mysystem("cp -f $path/root/tmp/sshd_foo $path/root/etc/ssh/sshd_config");
+    #
+    # Premunge the sshd config: no X11 forwarding and get rid of old
+    # ListenAddresses.
+    #
+    mysystem("sed -i .bak ".
+	     "-e 's/^X11Forwarding.*yes/X11Forwarding no/' ".
+	     "-e '/^ListenAddress/d' ".
+	     "$path/root/etc/ssh/sshd_config");
     
     # Port/Address for sshd.
     if ($IP ne $hostip) {
 	mysystem("echo 'ListenAddress $IP' >> ".
 		 "$path/root/etc/ssh/sshd_config");
+	my @ips = split(",", $jailconfig{IPADDRS});
+	foreach my $ip (@ips) {
+	    mysystem("echo 'ListenAddress $ip' >> ".
+		     "$path/root/etc/ssh/sshd_config");
+	}
     }
     else {
 	mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
@@ -781,14 +794,11 @@ sub cleanmess($) {
     # And, some security stuff. We want to remove bits of stuff from the
     # jail that would enable it to talk to tmcd directly. 
     #
-    mysystem("rm -f $path/root/etc/emulab.cdkey");
-    mysystem("rm -f $path/root/etc/emulab.pkey");
+    mysystem("rm -f $path/root/etc/emulab.cdkey $path/root/etc/emulab.pkey");
 
     # This is /etc/emulab inside the jail.
-    mysystem("rm -f  $path/root/$ETCDIR/*.pem");
-    mysystem("rm -f  $path/root/$ETCDIR/cvsup.auth");
-    mysystem("rm -rf $path/root/$ETCDIR/.cvsup");
-    mysystem("rm -f  $path/root/$ETCDIR/master.passwd");
+    mysystem("rm -f $path/root/$ETCDIR/*.pem $path/root/$ETCDIR/master.passwd");
+    mysystem("rm -rf $path/root/$ETCDIR/cvsup.auth $path/root/$ETCDIR/.cvsup");
 
     #
     # Copy in emulabman if it exists.
