@@ -118,6 +118,19 @@ stoller     2003/06/26 15:30:02 MDT
   XML. 
   
 
+stoller     2003/06/23 13:55:30 MDT
+
+  Modified files:
+    cdrom/waboot         netbed-setup.pl register.pl waipconfig.pl 
+  Log:
+  Add support for DHCP to the NetBed CDROM.
+  
+  Revision  Changes    Path
+  1.5       +19 -8     testbed/cdrom/waboot/netbed-setup.pl
+  1.11      +17 -0     testbed/cdrom/waboot/register.pl
+  1.8       +77 -4     testbed/cdrom/waboot/waipconfig.pl
+
+
 stoller     2003/05/1 09:09:12 MDT
 	
   Modified files:
