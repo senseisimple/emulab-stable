@@ -2,14 +2,21 @@
 use English;
 require Mysql;
 
-#
 # A library of useful DB stuff. Mostly things that get done a lot.
 # Saves typing.
-#
 
-#
+package libdb;
+use Exporter;
+@ISA = "Exporter";
+@EXPORT =
+  qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
+       NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
+       NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
+       PROJMEMBERTRUST_TRUSTED TBAdmin NodeAccessCheck ProjMember ExpLeader
+       MarkNodeDown SetNodeBootStatus OSFeatureSupported IsShelved
+       NodeidToExp UIDInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal );
+
 # Configure variables
-#
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
