@@ -41,6 +41,9 @@ never compromised. Okay, lets get serious.
   passphrases. Typing a passphrase over the network is a really bad thing
   to do!
 
+  Let me repeat: DO NOT TYPE PASSWORDS OVER THE NETWORK WHEN LOGGING
+  INTO BOSS! USE THE SSH AGENT!
+
 * Watch for sudden changes in your logins. If you have been using an agent
   and not typing a password or passphrase for the last two years, and
   suddenly boss,ops,whatever asks you for a password, THINK THRICE!
