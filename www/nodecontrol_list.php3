@@ -240,6 +240,7 @@ while ($row = mysql_fetch_array($query_result)) {
     if (!$pid) {
 	$num_free++;
 	$freetypes[$type]++;
+	continue;
     }
     switch ($status) {
     case "up":
@@ -257,7 +258,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	break;
     }
 }
-$num_total = ($num_up + $num_down + $num_pd + $num_unk);
+$num_total = ($num_free + $num_up + $num_down + $num_pd + $num_unk);
 mysql_data_seek($query_result, 0);
 
 if (! strcmp($showtype, "widearea")) {
@@ -299,13 +300,13 @@ echo "<table>
            <b>Down</b></td>
            <td align=left>$num_down</td>
        </tr>
-       <tr><td align=right><b>Total</b></td>
-           <td align=left>$num_total</td>
-       </tr>
        <tr><td align=right>
            <img src='/autostatus-icons/whiteball.gif' alt=free>
            <b>Free</b></td>
            <td align=left>$num_free</td>
+       </tr>
+       <tr><td align=right><b>Total</b></td>
+           <td align=left>$num_total</td>
        </tr>
        <tr><td colspan=2 nowrap align=center>
                <b>Free Subtotals</b></td></tr>\n";
