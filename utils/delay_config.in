@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+
+my $TB = "@prefix@";
+
+push(@INC, "$TB/lib");
+require libdb;
+
+if ( @ARGV < 4 ) {
+  print STDERR
+    "Usage: delay_config <pid> <eid> <link> [<delay>] [<bw>] [<plr>]\n",
+    "  pid = Project ID\n",
+    "  eid = Experiment ID\n",
+    " link = link name from ns file, ie. 'link1' in\n",
+    "        'set link1 [\$ns duplex-link \$A \$B 100Mb 0ms DropTail]'\n",
+    "delay = one-way link delay in milliseconds\n",
+    "   bw = bw<NNN><U>, N=bandwidth (1-100), U=units (M=Mbps, k=kbps)\n",
+    "  plr = packet loss rate (0 <= plr < 1)\n";
+  exit(0); # so plasticwrap doesn't think ssh failed.
+}
+
+@_ = @ARGV;
+my $pid = shift || "";
+my $eid = shift || "";
+my $link = shift || "";
+
+my $sth = 
+  DBQueryFatal("select node_id,card0,card1,delay,bandwidth,lossrate from ".
+	       "delays where pid='$pid' and eid='$eid' and vname='$link'");
+
+my @row= $sth->fetchrow_array();
+if (!@row) { die("Link $link in proj. $pid, expt. $eid, not found.\n"); }
+my $node = $row[0];
+my $pipe1= $row[1]*10 + 110;
+my $pipe2= $row[2]*10 + 110;
+my $delay= $row[3];
+my $bw= $row[4];
+my $unit= "M";
+my $plr= $row[5];
+
+print "Found $node($pipe1,$pipe2), delay $delay, bw $bw$unit, plr $plr\n";
+
+my $n;
+while (defined ($n = shift)) {
+  if ($n =~ /bw(\d+)(\w)/) {
+    $bw = $1;
+    $unit = $2;
+    if (($bw > 100) || ($bw < 1) || !($unit =~ /^M|k$/)) {
+      die ("Illegal Bandwidth spec '$n'\n");
+    }
+    print "Setting Bandwidth $bw ${unit}bit/s.\n";
+  } elsif ( !($n =~ /^[0-9.]*$/) ) {
+    die ("Illegal parameter '$n'\n");
+  } elsif ($n >= 1 ) {
+    if ($n % 10 != 0) {
+      print "(Delay of $n may be rounded according to kernel settings)\n";
+    }
+    $delay = $n;
+    print "Setting Delay $delay ms.\n";
+  } elsif (($n >= 0) && ($n < 1)) {
+    $plr = $n;
+    print "Setting Packet Loss Rate ".($plr*100)."%.\n";
+  } else {
+    die ("Illegal parameter '$n'\n");
+  }
+}
+
+applyChanges() && updatedb();
+
+exit(0);
+
+sub applyChanges {
+  my $cmd1 = "";
+  $cmd1 .= " delay ${delay}ms bw ${bw}${unit}bit/s";
+  my $cmd2 = $cmd1;
+  $cmd1 .= " plr $plr";
+  my $ssh1 = "ssh -f -n $node 'sudo /sbin/ipfw pipe $pipe1 config $cmd1 ;".
+    "sudo /sbin/ipfw pipe $pipe2 config $cmd2'";
+  my $ssh2 = "ssh -f -n $node 'sudo /sbin/ipfw pipe $pipe1 config $cmd1'";
+  if ($cmd1 ne "") {
+    if ($cmd2 ne "") {
+      print "$ssh1\n";
+      system($ssh1) && die("Command '$ssh1' failed: $!\n");
+    } else {
+      print "$ssh2\n";
+      system($ssh2) && die("Command '$ssh2' failed: $!\n");
+    }
+  }
+  1;
+}
+
+sub updatedb {
+  # for now, we assume that the db holds Mbps for bw, and assume that
+  # this is what they set for the bw on the cmd line
+  if (! DBQuery("update delays set delay=$delay,bandwidth=$bw,lossrate=$plr ".
+		"where pid='$pid' and eid='$eid' and vname='$link'")) {
+    DBWarn("Couldn't update database!");
+  }
+  if (! DBQuery("update virt_lans set delay=$delay,bandwidth=$bw,".
+		"lossrate=$plr where pid='$pid' and eid='$eid' and ".
+		"vname='$link'")) {
+    DBWarn("Couldn't update database!");
+  }
+}
