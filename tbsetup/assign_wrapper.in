@@ -1009,7 +1009,7 @@ if ($updating && !$impotent) {
 	    if (physnodeisvirtnode($pnode) ||
 		physnodereuse($pnode) eq "unused");
 
-	DBQueryFatal("update interfaces set IP='',IPaliases=NULL " .
+	DBQueryFatal("update interfaces set IP='',IPaliases=NULL,mask=NULL " .
 		     "where node_id='$pnode' and ".
 		     "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'");
 
@@ -1461,6 +1461,7 @@ foreach $delayid (keys(%linkdelays)) {
 
     my $ip      = $ips{$member};
     my ($vnode) = split(":", $member);
+    my $mask    = virtlannetmask($lan);
 	
     #
     # We need to find the queue info. If its a member of a lan, there
@@ -1475,14 +1476,14 @@ foreach $delayid (keys(%linkdelays)) {
     printdb("linkdelay ($vnode,$iface): lan = $lan, member = $member\n");
 
     DBQueryFatal("insert into linkdelays " .
-		 " (node_id,iface,type,ip,pid,eid,vlan,vnode, ".
+		 " (node_id,iface,type,ip,netmask,pid,eid,vlan,vnode, ".
 		 "  pipe,delay,bandwidth,lossrate, ".
 		 "  q_limit,q_maxthresh,q_minthresh,q_weight, ".
 		 "  q_linterm,q_qinbytes,q_bytes,q_meanpsize, ".
 		 "  q_wait,q_setbit,q_droptail,q_red,q_gentle) ".
 		 " values " .
-		 " ('$pnode','$iface','simplex','$ip','$pid','$eid','$lan', ".
-		 "  '$vnode',$pipe,$delay,$bandwidth,$lossrate, ".
+		 " ('$pnode','$iface','simplex','$ip','$mask','$pid','$eid', ".
+		 "  '$lan','$vnode',$pipe,$delay,$bandwidth,$lossrate, ".
 		 "  $q_limit,$q_maxthresh,$q_minthresh,$q_weight, ".
 		 "  $q_linterm,$q_qinbytes,$q_bytes,$q_meanpsize, ".
 		 "  $q_wait,$q_setbit,$q_droptail,$q_red,$q_gentle)");
@@ -1543,6 +1544,7 @@ foreach $vnodeport (keys(%portmap)) {
     my ($vnode,$vport) = split(":",$vnodeport);
     my $pport = $portmap{$vnodeport};
     my $lan   = $memberof{$vnodeport};
+    my $mask  = virtlannetmask($lan);
     
     if (virtlanuseveth($lan)) {
 	#
@@ -1570,7 +1572,8 @@ foreach $vnodeport (keys(%portmap)) {
 	if (! defined($IPaliases{"$pnode:$pport"})) {
 	    printdb("IP: $pnode:$pport $ip\n");
 
-	    DBQueryFatal("update interfaces set IP='$ip',IPaliases=NULL " .
+	    DBQueryFatal("update interfaces set ".
+			 " IP='$ip',IPaliases=NULL,mask='$mask' " .
 			 "where node_id='$pnode' and iface='$pport'");
 
 	    #
@@ -1824,6 +1827,7 @@ foreach $lan (keys(%virt_lans)) {
     }
     my $server = $lantotunnelserver{$lan};
     my $ipport = $rnodetotunnelport{$server};
+    my $mask   = virtlannetmask($lan);
 
     # So we can figure out the peer ip.
     my ($member0,$member1) = @members;
@@ -1876,9 +1880,10 @@ foreach $lan (keys(%virt_lans)) {
 	
 	DBQueryFatal("insert into tunnels ".
 		     " (pid, eid, node_id, vname, isserver, ".
-		     "  port, peer_ip, assigned_ip, password) ".
+		     "  port, peer_ip, mask, assigned_ip, password) ".
 		     "values ('$pid', '$eid', '$vvnode', '$lan', $isserver, ".
-		     "         $ipport, '$ip', '$ips{$member}','$secretkey')");
+		     "         $ipport, '$ip', '$mask', ".
+		     "         '$ips{$member}','$secretkey')");
     }
 }
 
@@ -2414,7 +2419,7 @@ sub NewVethIface($$$;$)
     my $ip      = $ips{$vnodeport};
     my $vvnode  = "NULL";
     my $newveth;
-    #my $mask    = virtlannetmask($lan);
+    my $mask    = virtlannetmask($lan);
 
     # Mark as being a jail interface by establishing a connection
     # to the nodes table entry for the virtnode. 
@@ -2439,10 +2444,10 @@ sub NewVethIface($$$;$)
 	#
 	my $query_result = 
 	    DBQueryFatal("insert into veth_interfaces ".
-			 "(node_id, veth_id, mac, IP, iface, vnode_id) ".
+			 "(node_id, veth_id, mac, IP, iface, vnode_id, mask) ".
 			 "values ('$pnode', 0, '$mac', '$ip', " .
 			          (defined($pport) ? "'$pport'" : "NULL") .
-			 "        , $vvnode)");
+			 "        , $vvnode, '$mask')");
 	
 	my $newid = $query_result->insertid;
 	$newveth = "veth" . $newid;
