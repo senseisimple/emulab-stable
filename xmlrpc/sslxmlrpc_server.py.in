@@ -269,7 +269,7 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             pass
     
         return result
-    
+
     #
     # Flip to the user that is in the certificate.
     #
@@ -295,8 +295,13 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
 
         self.admin = self.isadminuser(self.user)
         if self.admin:
-            ALLOWED_PATHS.extend(map(lambda x: os.path.join(STD_DEVEL_PATH, x),
-                                     os.listdir(STD_DEVEL_PATH)))
+            try:
+                ALLOWED_PATHS.extend(map(lambda x:
+                                         os.path.join(STD_DEVEL_PATH, x),
+                                         os.listdir(STD_DEVEL_PATH)))
+                pass
+            except OSError:
+                pass
             pass
         
         self.glist = self.getusergroups(self.user);
