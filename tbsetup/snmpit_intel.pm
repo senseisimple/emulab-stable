@@ -157,7 +157,7 @@ sub portControl($$@) {
 
 #
 # Obtain a lock on the VLAN edit buffer. This must be done before VLANs
-# are created or removed, or ports are assigned to VLANs. Will retry 20
+# are created or removed, or ports are assigned to VLANs. Will retry 60
 # times before failing
 #
 # usage: vlanLock($self)
@@ -194,7 +194,7 @@ sub vlanLock($) {
     # has it locked.
     #
     my $tries = 1;
-    my $max_tries = 20;
+    my $max_tries = 60;
     while ($tries <= $max_tries) {
 
 	#
