@@ -199,7 +199,7 @@ else {
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	echo "slice1_md5=761b4c72c650ec0ad2bfbbcb46ed7c4d\n";
+	echo "slice1_md5=5bd32b4980473c332fefd54e59208210\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v3.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
@@ -207,7 +207,7 @@ else {
     else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_md5=761b4c72c650ec0ad2bfbbcb46ed7c4d\n";
+	echo "slice1_md5=5bd32b4980473c332fefd54e59208210\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
 	echo "slicex_md5=0a3398cee6104850adaee7afbe75f008\n";
