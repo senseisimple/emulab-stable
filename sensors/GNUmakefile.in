@@ -8,46 +8,65 @@ SUBDIR		= sensors
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= slothd canaryd
+SUBDIRS	= slothd
 
-all:	$(SUBDIRS)
+SYSTEM            := $(shell uname -s)
 
-include $(TESTBED_SRCDIR)/GNUmakerules
+ifeq ($(SYSTEM),FreeBSD)
+SUBDIRS	+= canaryd
+endif
 
-slothd:
-	@$(MAKE) -C slothd all
+SUBDIRCLIENT 	= $(addsufix -client $(SUBDIRS))
+SUBDIRINSTALL 	= $(addsufix -install $(SUBDIRS))
 
-canaryd:
-	@$(MAKE) -C canaryd all
+###############################################################################
 
-install: 
-	@$(MAKE) -C slothd install
-	@$(MAKE) -C canaryd install
+## `ACTIONS' is the set of actions that may be taken on a subdirectory or on
+## the current directory.  These become phony targets.
+##
+ACTIONS = all install client client-install clean distclean
 
-client:
-	@$(MAKE) -C slothd client
-	@$(MAKE) -C canaryd client
+## `TARGETS' is the set of all `<subdir>.<action>' targets.
+##
+TARGETS = $(foreach action,$(ACTIONS),$(addsuffix .$(action),$(SUBDIRS)))
 
-client-install: client
-	@$(MAKE) -C slothd client-install
-	@$(MAKE) -C canaryd client-install
+###############################################################################
 
-# mfs: same as client for now
-mfs:
-	@$(MAKE) -C slothd client
-mfs-install: mfs
-	@$(MAKE) -C slothd client-install
+## Explicitly mention `all' first, so that it will be the default target.  This
+## must be a double colon rule; see the rule for `ACTIONS' below.
+##
+.PHONY: all
+all::
 
-clean:		subdir-clean
+## Rules for generic actions.  Each is made by applying the action to all of
+## the subdirectories.  Note that these are defined as double-colon rules so
+## that one can add extra statements in separate rules if necessary.
+##
+.PHONY: $(ACTIONS)
+$(ACTIONS):: %: $(addsuffix .%,$(SUBDIRS))
 
-subdir-clean:
-	@$(MAKE) -C slothd clean
-	@$(MAKE) -C canaryd clean
+## Rules for targets of the form `<subdir>.<action>'.
+##
+.PHONY: $(TARGETS)
+$(TARGETS):
+	@$(MAKE) -C $(basename $@) $(patsubst .%,%,$(suffix $@))
 
-distclean:	subdir-distclean
+## Making a subdirectory is the same as making `<subdir>.<all>'.
+##
+.PHONY: $(SUBDIRS)
+$(SUBDIRS): %: %.all
 
-subdir-distclean:
-	@$(MAKE) -C slothd distclean
-	@$(MAKE) -C canaryd distclean
+###############################################################################
 
-.PHONY:	$(SUBDIRS)
+## Any extra actions can be defined here, e.g.:
+##
+## clean::
+##	$(RM) core
+
+###############################################################################
+
+mfs: client
+
+mfs-install: client-install
+
+.PHONY: mfs mfs-install
