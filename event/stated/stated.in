@@ -34,8 +34,12 @@ use Getopt::Std;
 #use strict;
 use English;
 use POSIX; # for strftime, and sigprocmask and friends
-use Sys::Syslog;
 use Fcntl; # file constants for pidfile
+use Sys::Syslog;
+# Important note about syslog: It defaults to using an inet socket,
+# but 'syslogd -s' (the default) doesn't listen for one. So either
+# run syslogd without -s, or use setlogsock('unix') before openlog.
+# (To get setlocksock: 'use Sys::Syslog qw(:DEFAULT setlogsock);' )
 
 # Number of iterations (roughly, seconds) after which we'll reload 
 # information from the database. This is so we don't end up with information
@@ -96,9 +100,9 @@ if (-e $pidfile) {
 if (!$debug) {
   # We use syslog, so redirect the output to nothing
   if (TBBackGround("/dev/null")) { exit(0); }
-  # set up syslog
-  openlog("stated","pid","user");
 }
+# set up syslog
+openlog("stated","pid","user");
 sysopen(PIDFILE, $pidfile, O_WRONLY | O_EXCL | O_CREAT) ||
   fatal("Couldn't create '$pidfile': $? $!\n");
 print PIDFILE "$$";
@@ -136,13 +140,18 @@ my %triggers  = getTriggers();
 # Gets set if a reload of state from the database should happen.
 my $do_reload = 0;
 
+# Set when I've got a child pinging a node for me.
+my $have_children = 0;
+
+# Keep track of which pid was pinging which node.
+my %children= (); # $children($child} = "pcXXX";
+
 # Make the daemon reload database state on a sighup - but I'm worried
 # about what would happen if we tried to do this mid-loop. So, we'll
 # just set a flag and do it when we're done with our current pass.
 $SIG{HUP}  = sub { info("SIGHUP - Reloading DB state\n"); $do_reload = 1; };
 
-# Set up other signals. Unblock USR1 in case we're here because of a
-# restart, and it still think's we're handling USR1.
+# Set up other signals.
 $SIG{USR1} = \&restart;
 $SIG{USR2} = \&cleanup;
 $SIG{INT}  = \&cleanup;
@@ -150,6 +159,11 @@ $SIG{QUIT} = \&cleanup;
 $SIG{ABRT} = \&cleanup;
 $SIG{TERM} = \&cleanup;
 $SIG{KILL} = \&cleanup;
+
+# Set up some notification throttling
+my $mailgap = 5; # in seconds
+my $lastmail = time - $mailgap; # Allow for immediate send on startup.
+my %msgs = ();
 
 info("stated starting up\n");
 
@@ -185,9 +199,19 @@ while (1) {
 		$iterations = 0;
 	}
 
+	if ($have_children) {
+	  # Check for kids that have finished
+	  handleChild();
+	}
+
+	# Send any messages in the queue if it is time
+	notify("",1);
+
 	$iterations++;
 	sleep(1);
 }
+
+exit(0);
 
 # Read the current states of nodes from the database
 sub readStates(;@) {
@@ -358,7 +382,7 @@ sub stateTransition($$) {
     if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
-	       "to $newstate\n".`/usr/testbed/sbin/inuse | grep $node\  `);
+	       "to $newstate\n".`/usr/testbed/sbin/inuse | grep $node\\  `);
     }
 
     my $now = time();
@@ -412,13 +436,12 @@ sub stateTransition($$) {
 	    opModeTransition($node,$nextmode);
 	} else { debug("No next mode.\n"); }
     }
-    
 }
 
 sub opModeTransition($$) {
-    
+
     my ($node,$newmode) = @_;
-    
+
     info("$node: Mode change to $newmode requested\n");
     # Check for invalid transitions
     my ($oldstate, $mode, $nextstate);
@@ -529,88 +552,102 @@ sub handleCtrlEvent($$) {
 # Check if we need to generate an ISUP
 #
 sub checkGenISUP($) {
-    my ($node) = @_;
-    info("$node: Checking ISUP Generation\n");
-    my $r = DBQueryWarn("select osfeatures from os_info as o ".
-			"left join nodes as n on o.osid=n.osid ".
-			"where node_id='$node' and osfeatures is not null");
-    my $osfeatures="";
-    # If we don't get anything back, assume it has no features.
-    if ($r->num_rows() > 0) { ($osfeatures) = $r->fetchrow(); }
-   
-    my @features = split(",",$osfeatures);
-    # Make sure features I care about are defined
-    my %can=("ping"=>0, "isup"=>0); 
-    foreach my $f (@features) {
-	$can{"\L$f"}=1; # make sure it's all lowercase
-    }
+  my ($node) = @_;
+  info("$node: Checking ISUP Generation\n");
+  my $r = DBQueryWarn("select osfeatures from os_info as o ".
+		      "left join nodes as n on o.osid=n.osid ".
+		      "where node_id='$node' and osfeatures is not null");
+  my $osfeatures="";
+  # If we don't get anything back, assume it has no features.
+  if ($r->num_rows() > 0) {
+    ($osfeatures) = $r->fetchrow();
+  }
 
-    # If os will send ISUP on its own, do nothing here.
-    if ($can{"isup"}) { return 0; }
+  my @features = split(",",$osfeatures);
+  # Make sure features I care about are defined
+  my %can=("ping"=>0, "isup"=>0);
+  foreach my $f (@features) {
+    $can{"\L$f"}=1;		# make sure it's all lowercase
+  }
 
-    # If os doesn't support isup but can ping, fork and ping it every
-    # 5 seconds and send isup when it pings, or timeout after too long.
-    if ($can{"ping"}) {
-	my $pid = fork();
-	if ($pid) { return 0; } # don't wait, return and go on with life
-	else {
-	    debug("Forked process to ping $node\n");
+  # If os will send ISUP on its own, do nothing here.
+  if ($can{"isup"}) {
+    debug("$node: Will send own ISUP\n"); return 0;
+  }
 
-	    my $wait=5; # 5 seconds between ping attempts
-	    my $maxtime=600; # Set the timer for 10 minutes
-	    
-	    # XXX : If our maxtime is very different from os_setup's
-	    #idea of how long a node should take to reboot, then we've
-	    #got a problem, since it might reboot the nodes.
+  # If os doesn't support isup but can ping, fork and ping it every
+  # few seconds and send isup when it pings, or timeout after too long.
+  if ($can{"ping"}) {
+    debug("$node: Needs to be pinged\n");
+    my $pid = fork();
+    if ($pid) {
+      $children{$pid}= $node;
+      $have_children = 1;
+      # don't wait, return and go on with life
+      return 0;
+    } else {
+      info("Forked process $$ to ping $node\n");
 
-	    # Set an alarm in case it never comes up...
-	    local $SIG{ALRM} = sub { 
-		notify("$node: checkGenISUP timed out waiting ".
-		       "for ping responses after $maxtime seconds.\n");
-		exit(); 
-	    };
-	    
-	    alarm $maxtime;
+      my $wait=5;		# 5 seconds between ping attempts
+      my $maxtime=600;		# Set the timer for 10 minutes
 
-	    my $n=0;
-	    while ( $n <= ($maxtime/$wait)) {
-		my $rv=system("/sbin/ping -c 1 -t 1 $node > /dev/null") >> 8;
-		if ($rv==0) {
-		    # we got a response
-		    debug("$node: ping response received... sending ISUP\n");
-		    stateTransition($node, TBDB_NODESTATE_ISUP);
-		    exit();
-		} elsif ($rv==2) {
-		    # no response
-		    debug("No ping response, waiting $wait seconds...\n");
-		} elsif ($rv==68) {
-		    # ping: cannot resolve $node: Unknown host
-		    notify("$node: ping couldn't resolve $node!\n");
-		    exit();
-		} else {
-		    notify("$node: checkGenISUP ping returned $rv!\n");
-		    exit();
-		}
-		sleep $wait;
-		$n+=1;
-	    }
-	    notify("$node: Sent $n pings in ".($n*$wait)." seconds ".
-		   "with no response.\n");
-	    exit();
+      # XXX : If our maxtime is very different from os_setup's
+      #idea of how long a node should take to reboot, then we've
+      #got a problem, since it might reboot the nodes.
+
+      # Set an alarm in case it never comes up...
+      local $SIG{ALRM} = sub { 
+	notify("$node: checkGenISUP timed out waiting ".
+	       "for ping responses after $maxtime seconds.\n");
+	exit(4);
+      };
+
+      alarm $maxtime;
+
+      my $n=0;
+      while ( $n <= ($maxtime/$wait)) {
+	my $status=system("/sbin/ping -c 1 -t 1 $node > /dev/null");
+	my $rv = $status >> 8;
+	my $sig = $status & 127;
+	debug("checkGenISUP: ping returned $status ($rv / $sig)\n");
+	if ($rv==0) {
+	  # we got a response
+	  info("$node: ping response received... sending ISUP\n");
+	  # We want to send an ISUP event for the node. But we
+	  # can't just call stateTransition, because that will
+	  # only make the change happen in our state, not the real
+	  # stated that we forked from. We do this by exit(0)
+	  # and the handleChild function will pick it up and
+	  # send the ISUP for us.
+	  exit(0);
+	} elsif ($rv==2) {
+	  # no response
+	  debug("$node: No ping response, waiting $wait seconds...\n");
+	} elsif ($rv==68) {
+	  # ping: cannot resolve $node: Unknown host
+	  notify("$node: ping couldn't resolve $node!\n");
+	  exit(2);
+	} else {
+	  notify("$node: checkGenISUP ping returned $rv!\n");
+	  exit(3);
 	}
+	sleep $wait;
+	$n+=1;
+      }
+      notify("$node: Sent $n pings in ".($n*$wait)." seconds ".
+	     "with no response.\n");
+      exit(1);
     }
-    # If os doesn't support ping or isup, stated sets it to ISUP at the
-    # same time.
-    
-    debug("$node: OS doesn't ping - sending ISUP\n");
-    stateTransition($node, TBDB_NODESTATE_ISUP);
-    
+  }
+  # If os doesn't support ping or isup, stated sets it to ISUP at the
+  # same time.
+
+  debug("$node: OS doesn't ping - sending ISUP\n");
+  stateTransition($node, TBDB_NODESTATE_ISUP);
 }
 
-#
 # Figure out if this node belongs to us (ie. if it's using our database.)
 # Returns 1 if it does, 0 if not
-#
 sub checkDBRedirect($) {
 
 	my ($node) = @_;
@@ -646,17 +683,47 @@ sub checkDBRedirect($) {
 	}
 }
 
-#
 # Reload state from the database
-#
 sub reload() {
-    	info("Reloading state from database\n");
-	%nodes     = readStates(%nodes);
-	%timeouts  = getTimeouts();
-	%valid     = getValid();
-	%modeTrans = getModeTrans();
-	%triggers  = getTriggers();
+  info("Reloading state from database\n");
+  %nodes     = readStates(%nodes);
+  %timeouts  = getTimeouts();
+  %valid     = getValid();
+  %modeTrans = getModeTrans();
+  %triggers  = getTriggers();
 }
+
+# This gets called to check for forked pids that have finished.  Right
+# now we only fork in checkGenISUP to ping nodes.
+sub handleChild() {
+  my $child = wait;
+  if ($child==-1) { return 0; }
+  my $node = $children{$child};
+  if (!defined($node)) { $node=""; }
+  my $stat = $?;
+  my $rv = $stat >> 8;
+  my $sig = $stat & 127;
+  debug("Child = $child, I am $$, children are: (".
+	join(",",sort keys %children).")\n");
+  if (($node ne "") && ($child!=-1) && ($child!=$$)) {
+    info("handleChild: pid $child (node $node), exited $rv (sig $sig)\n");
+    delete $children{$child};
+    if (($sig == 0) && ($rv == 0)) {
+      # Node is pingable, send isup
+      info("handleChild: Sending ISUP for $node)\n");
+      stateTransition($node, TBDB_NODESTATE_ISUP);
+    } else {
+      notify("handleChild: Caught a child that failed!\n".
+	     "pid $child (node $node), exited $rv (sig $sig)\n");
+    }
+  }
+  if (0+%children == 0) {
+    debug("No more children now.\n");
+    $have_children=0;
+  }
+  return 0;
+}
+
 
 sub debug(@) {
   if ($debug) { print @_; }
@@ -668,41 +735,94 @@ sub fatal($) {
   die($msg);
 }
 
-sub notify($) {
-  my $message = shift;
-  if (!$debug) {
-    SENDMAIL("Stated List <".$TBOPS.">",
-	     "Node State Daemon Messsage",$message,
-	     "Stated Daemon <".$TBOPS.">");
-  } else {
-    print "notify: Not sending mail in debug mode\n";
+sub showqueue() {
+  if ((keys %msgs) > 0) {
+    debug("\nMAILQUEUE:\n");
   }
-  info($message);
+  foreach $k (sort keys %msgs) {
+    my @l = @{$msgs{$k}};
+    debug("MSGS:\n$k==> (".(@l+0).",'".join("','",@l)."')\n");
+  }
+}
+
+sub notify($;$) {
+  my $message = shift;
+  my $checkonly = shift || 0;
+  # Use a timestamp, now that we're throttling mail
+  my $tstamp=strftime("%b %e %H:%M:%S",localtime);
+  showqueue();
+  if (!$checkonly) {
+    info($message);
+    # Queue up the message
+    # (The queue is a hash of lists of timestamps, keyed by message
+    if (defined($msgs{$message})) {
+      push(@{$msgs{$message}},$tstamp);
+    } else {
+      $msgs{$message} = [$tstamp];
+    }
+    showqueue();
+  }
+  my $now = time;
+  if ($now - $lastmail >= $mailgap) {
+    if ((keys %msgs)>0) {
+      debug("SENDING MAILQUEUE\n"."(now $now, lastmail $lastmail, ".
+	    ($now-$lastmail).">=$mailgap)\n");
+      my $mailbody="";
+      my $sep = '-'x5;
+      # We're okay to send. Make a digest of all the queued messages.
+      foreach my $msg (sort keys %msgs) {
+	my @tlist = @{$msgs{$msg}};
+	my $count = 0+@tlist;
+	$mailbody .= "\n$msg\n";
+	if ($count > 1) {
+	  my $first = shift @tlist;
+	  my $last = pop @tlist;
+	  $mailbody .= "($count copies from $first to $last)\n";
+	} else {
+	  $mailbody .= "($count copy at $tlist[0])\n";
+	}
+	$mailbody .= "$sep\n";
+      }
+      # Now reset the mail queue
+      %msgs = ();
+      showqueue();
+      $lastmail = time;
+      if (!$debug) {
+	SENDMAIL("Stated List <".$TBOPS.">",
+		 "Node State Daemon Messsage",$mailbody,
+		 "Stated Daemon <".$TBOPS.">");
+      } else {
+	debug("notify: Not sending mail in debug mode\n");
+	debug("MAIL CONTAINS:\n".$mailbody."\n");
+      }
+    }
+  }  # else do nothing, not time yet
 }
 
 sub info($;$) {
     my $message = shift;
     my $notice = shift || 0;
-    if (!$debug) {
-      # Use syslog
-      my $prio="info";
-      if ($notice) { $prio = "notice"; }
-      syslog($prio,$message);
-    } else {
+    # Use syslog
+    my $prio="info";
+    if ($notice) { $prio = "notice"; }
+    if ($debug) {
       # Print out log entries like this:
       # Sep 20 09:36:00 stated[238]: Reloading state from database
       print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
+      $message = "DEBUG: ".$message;
     }
+    syslog($prio,$message) || notify("syslog failed: $? $!\n");
 }
 
 # This gets called if we catch a signal USR1
 sub restart {
+  info("SIGUSER1 received: Performing final event poll before restarting\n");
+  event_poll($handle);
   my $params = join(" ",@args);
   my $prog = "";
   # If we're started from an abosolute path, use that.
   if ($0 =~ /^\//) { $prog = $0; } else { $prog = "$TB/sbin/stated"; }
-  info("SIGUSR1 received, restarting from '$prog".
-       ($params ne "" ? " $params" : "")."'\n");
+  info("Restarting from '$prog".($params ne "" ? " $params" : "")."'\n");
   if ($handle && event_unregister($handle) == 0) {
     warn "Unable to unregister with event system\n";
   }
@@ -731,8 +851,8 @@ sub cleanup {
 END {
   info("Exiting, cleaning up\n");
   if (defined($lockfile) && $lockfile ne "") { unlink $lockfile; }
-  # clean up Syslog if we were using it.
-  if (!$debug) { closelog(); }
+  # clean up Syslog
+  closelog();
   if ($handle) {
     if (event_unregister($handle) == 0) {
       die "Unable to unregister with event system\n";
