@@ -59,14 +59,14 @@ if (@ARGV) {
 # have to worry about missing something, and don't have to get the user to
 # guess which switch they're using
 #
-my @test_switches = getTestSwitches();
+my @test_switches = map {[$_,"experimental"]} getTestSwitches();
 
 if (!@test_switches) {
     die "No experimental switches found - make sure they're in the nodes ".
 	"table!\n";
 }
 
-my @control_switches = getControlSwitches();
+my @control_switches = map {[$_,"control"]} getControlSwitches();
 if (!@control_switches) {
     warn "Warning - No control switches found - you probably want to add them " .
 	"to the nodes table\n";
@@ -86,8 +86,9 @@ sub DEBUG {
 # Loop through each switch indvidually
 #
 SWITCHLOOP:
-foreach my $switch (@switches) {
-    DEBUG "Looking at switch $switch\n";
+foreach my $switchref (@switches) {
+    my ($switch, $class) = @$switchref;
+    DEBUG "Looking at switch $switch, class $class\n";
 
     #
     # I have _no_ idea if this will work on other switches!
@@ -329,7 +330,7 @@ SWITCH:
 		$status{$index} == 3));
 	    next if ($realports{$index} =~ /ifIndex/);
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
-		"$interfaces{$index}\n";
+		"$interfaces{$index},$class\n";
 	}
     }
 }
