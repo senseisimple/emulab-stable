@@ -1,0 +1,83 @@
+#!/usr/bin/perl -w
+
+# This is a very simple program that convers the virt_* tables in the DB
+# into a NS file.  Not the original NS file, but a NS file that, if parsed
+# will create identical virt_* entries.  Well, almost identical.  The virtual
+# ports get changed.
+
+use DBI;
+use lib "@prefix@/lib";
+use exitonwarn;
+$TBDB = "@TBDBNAME@";
+
+$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+    die "Could not connect to DB.\n";
+
+if ($#ARGV != 1) {
+    print STDERR "Syntax: $0 pid eid\n";
+    exit(1);
+}
+($pid,$eid) = @ARGV;
+
+print "source tb_compat.tcl\n";
+print "set ns [new Simulator]\n";
+
+$sth = $dbh->prepare("select ips,osid,cmd_line,rpms,deltas,startupcmd," .
+		     "tarfiles,vname,type,failureaction " .
+		     "from virt_nodes where pid=\"$pid\" and eid=\"$eid\"");
+$sth->execute;
+while (($ips,$osid,$cmdline,$rpms,$deltas,$startupcmd,
+	$tarfiles,$vname,$type,$failureaction) = $sth->fetchrow_array) {
+    print "set $vname [\$ns node]\n";
+    foreach $ippair (split(" ",$ips)) {
+	($port,$ip) = split(":",$ippair);
+	$ips{"$vname:$port"} = $ip;
+    }
+    print "tb-set-node-os $vname $osid\n";
+    print "tb-set-hardware $vname $type\n";
+    print "tb-set-node-cmdline $vname \"$cmdline\"\n";
+    if ($rpms ne "") {
+	print "tb-set-node-rpms $vname $rpms\n";
+    }
+    if ($deltas ne "") {
+	print "tb-set-node-deltas $vname $deltas\n";
+    }
+    print "tb-set-node-startup $vname \"$startupcmd\"\n";
+    if ($tarfiles ne "") {
+	print "tb-set-node-tarfiles $vname $tarfiles\n";
+    }
+    print "tb-set-node-failure-action $vname $failureaction\n";
+}
+$sth->finish;
+
+$sth = $dbh->prepare("select vname,delay,bandwidth,lossrate,member" .
+		     " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
+$sth->execute;
+%lans = ();
+while (($vname,$delay,$bw,$loss,$member) = $sth->fetchrow_array) {
+    if (!defined($lans{$vname})) {
+	$lans{$vname} = [];
+    } 
+    push(@{$lans{$vname}},[$member,$delay,$bw,$loss]);
+}
+$sth->finish;
+foreach $lan (keys(%lans)) {
+    $raw = "";
+    foreach $member (@{$lans{$lan}}) {
+	@info = @$member;
+	$nodeport = $info[0];
+	$node = (split(":",$nodeport))[0];
+	$raw .= "$node ";
+    }
+    print "set $lan [\$ns make-lan \"$raw\" 100Mb 0ms]\n";
+    foreach $member (@{$lans{$lan}}) {
+	($nodeport,$delay,$bw,$loss) = @$member;
+	($node,$port) = split(":",$nodeport);
+	print "tb-set-ip-lan $node $lan " . $ips{$nodeport} . "\n";
+	print "tb-set-node-lan-params $node $lan $delay $bw $loss\n";
+    }
+}
+
+print "\$ns run\n";
+
+
