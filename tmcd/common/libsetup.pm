@@ -2689,6 +2689,11 @@ sub vnodejailsetup($)
     print STDOUT "Checking Testbed jail configuration ...\n";
     dojailconfig();
 
+    #
+    # We need the event key outside the jail for the delay agent.
+    #
+    doeventkey();
+
     return ($pid, $eid, $vname);
 }    
 
