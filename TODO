@@ -128,6 +128,8 @@
   that saves the virt state so it can be visualized, and later swapped
   in. Or perhaps this is an experiment create option.
 
+  LBS: I added this, but its still an admin option.
+
 * Change hardwired degree 4 for vrons->rons to more flexible DB
   management. Related would be dynamic creation of virtual nodes
   instead of hardwired entries in the nodes table, but thats a lot of
@@ -142,10 +144,6 @@
   result of assign_wrapper. Most users have no idea why an experiment
   failed.
 
-* Fix RPC power controller, which was failing on long strings, as
-  reported by Mike.
-  (Done by Rob on May 21).
-
 * Add some kind of host table support to RON nodes so that programs
   can figure out IPs. This is going to be a pain.
 
@@ -156,8 +154,12 @@
   management tools to see of we can leverage something from them,
   especially for widearea nodes.
 
+  LBS: I did this. See message to tbops. 
+
 * Add frontend syntax to control (widearea) solver weights. delay,
   bandwidth, plr.
+
+  LBS: I did this, but Jay wants normalized numbers 
 
 * Setup the other RON nodes at MIT.
 
@@ -166,25 +168,24 @@
 * Web option to become another user (su). Might be possible after I
   clean up the auth stuff in the web page.
 
-* Get the tape library up and running.  This involves setting up a
-  Linux box to run the library, installing the software, etc., etc.
-
 * Bring in a bug tracking system we can use from the web interface.
   Need someone to look around for this. I hate GNATS!
   Rob mentioned RT (http://www.fsck.com/projects/rt).
 
 * CDROM installation of nodes.
 
-* Retry/reliability to tmcd from ron nodes. 
+* Retry/reliability to tmcd from ron nodes.
+
+  LBS: I have been working on this.
 
 *** Minor:
-
-* Fix up updown page. Get rid of virtual nodes. Move Sharks to the
-  bottom, or get rid of them all together. Mike, what do you think?
 
 * Frisbee work. Mike/Rob reported that Frisbee "rocks" up to about
   50-60 nodes, and then goes south in a hurry. I reported a couple of
   optimizations in email that we could apply.
+
+* Add support for ssh protocol 2 rsa/dsa keys. Requires minor changes
+  to mkacct, and the three web pages that parse the keys.
 
 * Move log files into experiment directory so that we can retain them
   for debugging. Right now the go to /tmp and get deleted when done.
