@@ -45,13 +45,14 @@ START nodes
 # <links> is a space separated list of link ids
 END nodes
 START links
-# <link> <src> <srcport> <dst> <dstport> <bandwidth_min> <bandwidth_max> <delay_min> <delay_max>
+# <link> <src> <srcport> <dst> <dstport> <bandwidth_min> <bandwidth_max> <delay_min> <delay_max> <loss_rate>
 # <link> is a unique link identifier.
 # <src> and <dst> are node identifiers (or lans).
 # <srcport> and <dstport> are integers.  A port of -1 indicates that
 # this information is N/A or unknown.
 # <bandwidth*> and <delay*> are optional.  They specify the boundaries of 
 # bandwidth and delay.
+# <loss_rate> is the rate of loss.  If omitted assumed to be 0.
 END links
 START lans
 # <lan> <switch> <links>

@@ -54,3 +54,7 @@ Node, it all cases <node> can include * and ? as wild cards and
 <number> can be a range a-b.
 
 #TB create-os <label> <image_path> <partition>
+
+#TB set-link-loss <src> <dst> <rate>
+
+Set the loss rate of a link.
