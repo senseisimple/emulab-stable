@@ -235,7 +235,7 @@ if (mysql_num_rows($experiments_result)) {
 	$pid  = $row["pid"];
 	$eid  = $row["eid"]; 
 	$huid = $row["expt_head_uid"];
-	$name = $row["expt_name"];
+	$name = stripslashes($row["expt_name"]);
 	$date = $row["d"];
 	$state= $row["state"];
 	$daysidle=0;

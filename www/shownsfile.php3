@@ -115,7 +115,7 @@ $query_result =
     DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
 if (mysql_num_rows($query_result)) {
     $row    = mysql_fetch_array($query_result);
-    $nsfile = $row[nsfile];
+    $nsfile = stripslashes($row[nsfile]);
 
     echo "<XMP>$nsfile</XMP>\n";
     flush();

@@ -140,7 +140,7 @@ function GENPLIST ($query_result)
     while ($projectrow = mysql_fetch_array($query_result)) {
 	$pid        = $projectrow[pid];
 	$headuid    = $projectrow[head_uid];
-	$Pname      = $projectrow[name];
+	$Pname      = stripslashes($projectrow[name]);
 	$approved   = $projectrow[approved];
 	$expt_count = $projectrow[expt_count];
 	$public     = $projectrow[public];

@@ -67,7 +67,7 @@ WRITESUBMENUBUTTON("Create an Image Descriptor",
 		   "newimageid_explain.php3");
 WRITESUBMENUBUTTON("Create an OS Descriptor",
 		   "newosid_form.php3");
-WRITESUBMENUBUTTON("Back to Image Descriptor list",
+WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
 SUBMENUEND();
 
@@ -99,7 +99,7 @@ echo "<tr>
 while ($row = mysql_fetch_array($query_result)) {
     $osname  = $row[osname];
     $osid    = $row[osid];
-    $descrip = $row[description];
+    $descrip = stripslashes($row[description]);
     $pid     = $row[pid];
 
     echo "<tr>

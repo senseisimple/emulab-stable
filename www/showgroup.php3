@@ -94,7 +94,7 @@ if (mysql_num_rows($query_result)) {
 
     while ($row = mysql_fetch_row($query_result)) {
         $eid  = $row[0];
-        $name = $row[1];
+        $name = stripslashes($row[1]);
 	if (!$name)
 	    $name = "--";
         echo "<tr>

@@ -21,7 +21,7 @@ echo "<center>
 
 $proj_created	= $row[created];
 $proj_expires	= $row[expires];
-$proj_name	= $row[name];
+$proj_name	= stripslashes($row[name]);
 $proj_URL	= $row[URL];
 $proj_funders	= $row[funders];
 $proj_head_uid	= $row[head_uid];

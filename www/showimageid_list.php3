@@ -65,7 +65,7 @@ WRITESUBMENUBUTTON("Create an Image Descriptor",
 		   "newimageid_explain.php3");
 WRITESUBMENUBUTTON("Create an OS Descriptor",
 		   "newosid_form.php3");
-WRITESUBMENUBUTTON("Back to OS Descriptor list",
+WRITESUBMENUBUTTON("OS Descriptor list",
 		   "showosid_list.php3");
 SUBMENUEND();
 SUBPAGEEND();
@@ -86,7 +86,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $imageid    = $row[imageid];
     # Must encode the imageid since Rob started using plus signs in the names.
     $url        = rawurlencode($imageid);
-    $descrip    = $row[description];
+    $descrip    = stripslashes($row[description]);
     $imagename  = $row[imagename];
     $pid        = $row[pid];
 

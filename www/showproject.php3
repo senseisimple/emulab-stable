@@ -76,7 +76,7 @@ if (mysql_num_rows($query_result)) {
 	$eid  = $projrow[eid];
 	$state= $projrow[state];
 	$nodes= $projrow["count(r.node_id)"];
-	$name = $projrow[expt_name];
+	$name = stripslashes($projrow[expt_name]);
 
         echo "<tr>
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
@@ -154,7 +154,7 @@ if (mysql_num_rows($query_result)) {
 
     while ($row = mysql_fetch_array($query_result)) {
         $gid      = $row[gid];
-        $desc     = $row[description];
+        $desc     = stripslashes($row[description]);
 	$leader   = $row[leader];
 
         echo "<tr>

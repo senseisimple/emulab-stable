@@ -621,9 +621,9 @@ WRITESUBMENUBUTTON("Create a new Image Descriptor",
 		   "newimageid_explain.php3");
 WRITESUBMENUBUTTON("Create a new OS Descriptor",
 		   "newosid_form.php3");
-WRITESUBMENUBUTTON("Back to Image Descriptor list",
+WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
-WRITESUBMENUBUTTON("Back to OS Descriptor list",
+WRITESUBMENUBUTTON("OS Descriptor list",
 		   "showosid_list.php3");
 SUBMENUEND();
 

@@ -27,7 +27,7 @@ function SHOWPROJECT($pid, $thisuid) {
     
     $proj_created	= $row[created];
     $proj_expires	= $row[expires];
-    $proj_name		= $row[name];
+    $proj_name		= stripslashes($row[name]);
     $proj_URL		= $row[URL];
     $proj_public        = $row[public];
     $proj_funders	= $row[funders];
@@ -159,7 +159,7 @@ function SHOWGROUP($pid, $gid) {
 
     $leader	= $row[leader];
     $created	= $row[created];
-    $description= $row[description];
+    $description= stripslashes($row[description]);
     $expt_count = $row[expt_count];
     $expt_last  = $row[expt_last];
     $unix_gid   = $row[unix_gid];
@@ -329,11 +329,11 @@ function SHOWUSER($uid) {
     $usr_expires = $row[usr_expires];
     $usr_email   = $row[usr_email];
     $usr_URL     = $row[usr_URL];
-    $usr_addr    = $row[usr_addr];
-    $usr_name    = $row[usr_name];
+    $usr_addr    = stripslashes($row[usr_addr]);
+    $usr_name    = stripslashes($row[usr_name]);
     $usr_phone   = $row[usr_phone];
-    $usr_title   = $row[usr_title];
-    $usr_affil   = $row[usr_affil];
+    $usr_title   = stripslashes($row[usr_title]);
+    $usr_affil   = stripslashes($row[usr_affil]);
     $status      = $row[status];
     $admin       = $row[admin];
     $adminoff    = $row[adminoff];
@@ -458,7 +458,7 @@ function SHOWEXP($pid, $eid) {
 
     $exp_gid     = $exprow[gid];
     $exp_expires = $exprow[expt_expires];
-    $exp_name    = $exprow[expt_name];
+    $exp_name    = stripslashes($exprow[expt_name]);
     $exp_created = $exprow[expt_created];
     $exp_start   = $exprow[expt_start];
     $exp_swapped = $exprow[expt_swapped];
@@ -714,7 +714,7 @@ function SHOWOSINFO($osid) {
 
     $osrow = mysql_fetch_array($query_result);
 
-    $os_description = $osrow[description];
+    $os_description = stripslashes($osrow[description]);
     $os_OS          = $osrow[OS];
     $os_version     = $osrow[version];
     $os_path        = $osrow[path];
@@ -840,7 +840,7 @@ function SHOWIMAGEID($imageid, $edit) {
 
     $imagename   = $row[imagename];
     $pid         = $row[pid];
-    $description = $row[description];
+    $description = stripslashes($row[description]);
     $loadpart	 = $row[loadpart];
     $loadlength	 = $row[loadlength];
     $part1_osid	 = $row[part1_osid];

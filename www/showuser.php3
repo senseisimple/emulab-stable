@@ -99,7 +99,7 @@ if (mysql_num_rows($query_result)) {
 	$eid  = $projrow[eid];
 	$state= $projrow[state];
 	$nodes= $projrow["count(r.node_id)"];
-	$name = $projrow[expt_name];
+	$name = stripslashes($projrow[expt_name]);
 
         echo "<tr>
                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
