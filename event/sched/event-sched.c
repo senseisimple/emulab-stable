@@ -433,11 +433,7 @@ get_static_events(event_handle_t handle)
 		error("getting static event list for %s/%s", pid, eid);
 		return 0;
 	}
-
-	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		mysql_free_result(res);
-		return 1;
-	}
+	nrows = (int) mysql_num_rows(res);
 
 	/*
 	 * Construct an address tuple for the notifications. We can reuse
