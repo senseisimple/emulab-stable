@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -43,14 +43,14 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	MYSQL_ROW row;
 	char dbquery[] =
 		"select n.next_boot_path, n.next_boot_cmd_line, "
-		"n.def_boot_osid, p.partition, n.def_boot_cmd_line, "
-	        "n.def_boot_path, o1.path, "
-	        "n.next_boot_osid, o2.path from nodes "
-		"as n left join partitions as p on n.node_id=p.node_id and "
-		"n.def_boot_osid=p.osid left join interfaces as i on "
-		"i.node_id=n.node_id "
-    	        "left join os_info as o1 on o1.osid=n.def_boot_osid "
-    	        "left join os_info as o2 on o2.osid=n.next_boot_osid "
+		"  n.def_boot_osid, p.partition, n.def_boot_cmd_line, "
+		"  n.def_boot_path, o1.path, n.next_boot_osid, o2.path "
+		" from interfaces as i "
+		"left join nodes as n on i.node_id=n.node_id "
+		"left join partitions as p on "
+		" n.node_id=p.node_id and n.def_boot_osid=p.osid "
+		"left join os_info as o1 on o1.osid=n.def_boot_osid "
+		"left join os_info as o2 on o2.osid=n.next_boot_osid "
 	        "where i.IP = '%s'";
 
 #define NEXT_BOOT_PATH		0
