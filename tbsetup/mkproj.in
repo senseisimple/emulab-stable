@@ -208,10 +208,10 @@ if (! -e "$GRPROOT/$pid") {
 my $workdir = TBDB_EXPT_WORKDIR() . "/$pid";
 
 if (! -e $workdir) {
-    if (! mkdir("$workdir", 0770)) {
+    if (! mkdir("$workdir", 0775)) {
 	fatal("Could not make directory $workdir: $!");
     }
-    if (! chmod(0770, "$workdir")) {
+    if (! chmod(0775, "$workdir")) {
 	fatal("Could not chmod directory $workdir: $!");
     }
     if (! chown($uid, $gid, "$workdir")) {
