@@ -782,6 +782,17 @@ CREATE TABLE users (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'userslastlogin'
+#
+
+CREATE TABLE userslastlogin (
+  uid varchar(10) NOT NULL default '',
+  date date default NULL,
+  time time default NULL,
+  PRIMARY KEY  (uid)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'virt_agents'
 #
 
