@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -14,13 +14,13 @@ if [ -x $BINDIR/tbshutdown ]; then
         $BINDIR/tbshutdown
 fi
 
-echo "Doing Testbed bootsetup configuration ..."
-$BINDIR/bootsetup
-
 if [ -x $BINDIR/rc.ipod ]; then
 	echo "Setting up IPOD ... "
         $BINDIR/rc.ipod
 fi
+
+echo "Doing Testbed bootsetup configuration ..."
+$BINDIR/bootsetup
 
 if [ -x $BOOTDIR/rc.tunnel ]; then
         echo "Setting up Testbed tunnels ..."
@@ -68,12 +68,6 @@ if [ -x $BINDIR/watchdog  ]; then
 	$BINDIR/watchdog
 fi
 
-if [ -x $BINDIR/bootvnodes  ]; then
-        echo "Booting up vnodes ..."
-	# Foreground mode.
-	$BINDIR/bootvnodes -f
-fi
-
 /bin/rm -f /var/at/jobs/S*
 /bin/rm -f /var/spool/at/S*
 if [ -s $BOOTDIR/startupcmd  ]; then
@@ -92,3 +86,12 @@ fi
 
 echo "Informing the testbed that we're up and running ..."
 $BINDIR/tmcc state ISUP
+
+# Now boot vnodes. Doing it after ISUP is better; os_setup will consider
+# the node ready, and move onto waiting for vnodes to boot. 
+if [ -x $BINDIR/bootvnodes  ]; then
+        echo "Booting up vnodes ..."
+	# Foreground mode.
+	$BINDIR/bootvnodes -f
+fi
+
