@@ -8,7 +8,11 @@ SUBDIR		= www
 
 include $(OBJDIR)/Makeconf
 
-all:
+#
+# Force dependencies to make sure configure regenerates if the .in file
+# is changed.
+# 
+all: defs.php3 dbdefs.php3
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

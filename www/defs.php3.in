@@ -12,9 +12,11 @@ include("$WWWDEFS"."-defs.php3");
 
 $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";
+$TBETC_DIR	= "$TBDIR"."etc/";
 $TBLIBEXEC_DIR	= "$TBDIR"."libexec/";
 $TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
 $TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
+$TBCSLOGINS     = "$TBETC_DIR/cslogins";
 
 $TBLIST_DIR     = "$TBDIR"."lists";
 $TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.list";
