@@ -638,15 +638,17 @@ function SHOWEXP($pid, $eid) {
     $lastact = TBGetExptLastAct($pid,$eid);
     $idletime = TBGetExptIdleTime($pid,$eid);
 
-    echo "<tr>
+    if ($lastact != -1) {
+	echo "<tr>
             <td>Last Activity: </td>
             <td class=\"left\">$lastact</td>
           </tr>\n";
 
-    echo "<tr>
+	echo "<tr>
             <td>Idle Time: </td>
             <td class=\"left\">$idletime hours</td>
           </tr>\n";
+    }
 
     if (! ($swapreqs=="" || $swapreqs==0)) {
 	echo "<tr>
