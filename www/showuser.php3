@@ -77,7 +77,7 @@ $query_result =
     DBQueryFatal("select e.*,count(r.node_id) from experiments as e ".
 		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
 		 "where expt_head_uid='$target_uid' ".
-		 "group by e.pid,e.eid");
+		 "group by e.pid,e.eid order by e.state,e.eid");
 
 if (mysql_num_rows($query_result)) {
     echo "<center>
