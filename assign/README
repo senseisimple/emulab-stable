@@ -1,12 +1,16 @@
+Note: The code for assign is currently in a messy state, as numerous options
+have been added to it to explore various improvements and behaviors for a
+paper. The preliminary version of this paper can be found in
+doc/paper/assign-tr.pdf , and is a good place to start to get an understanding
+of assign. A revised version will appear in the April 2003 issue of SIGCOMM
+Computer Communications Review. Once numbers for the final version of this
+paper habe been gathered, this code will get cleaned up substantially.
 
 running
 -------
 
 Typically assign is run in the following method:
-	assign -t <ptop> <top>
-
--h provides a brief help listing.  -a does nothing.  -b does nothing.
--t specifies a ptop file and is mandatory.  -o does very little of use.
+	assign <ptop> <top>
 
 
 ptop format
@@ -29,7 +33,7 @@ switch.
 
 OR
 
-link <link> <src>[:<smac>] <dst>[:<dmac>] <bw> <numb>
+link <link> <src>[:<smac>] <dst>[:<dmac>] <bw> <delay> <loss> [<num>]
 
 <link> is a string identifier for the link.
 
@@ -39,11 +43,12 @@ link <link> <src>[:<smac>] <dst>[:<dmac>] <bw> <numb>
 	other string to distinguish the ports of the nodes.  If committed
 	the string "(null)" is used instead.
 
-<bw> is the bandwidth, an integer.
+<bw>,<delay>,<loss> are the characteristics of the link.
 
 <num> is the number of links between those two pairs.
 
 Note: <smac> and <dmac> should not be present on switch<->switch links.
+
 
 top format
 ----------
@@ -64,7 +69,18 @@ node <node> <type> [<desires>]
 
 OR
 
-link <src> <dst> <bw> [emulated]
+link <link> <src> <dst> <bw>[:<underbw>:<overbw>[:<weight>]] <delay>[:<underdelay>:<overdelay>[:<weight>]] <loss>[:<underloss>:<overloss>[:<weight>]] [<rbw>[:<underbw>:<overbw>[:<weight>]] <rdelay>[:<underdelay>:<overdelay>[:<weight>]] <rloss>[:<underloss>:<overloss>[:<weight>]]] [nodelay|mustdelay] [emulated]
+
+<bw>,<delay>,<loss> are the characteristics of the link.  The optional
+delta arguments describe how far off the assignment can be (under and
+over).  A vaule of 0 is default, and a vaule of -1 indicates that best
+effort is fine.  The weights are optional floating points that allow
+the user to specify the relative importance of the parameters.  They
+default to 1.  One can also specify reverse delay characteristics.  If
+these are ommitted they default to the normal delay characteristics.
+
+nodelay if present indicates that this link should not be delayed.
+mustdelay indicates that link must be delayed.
 
 OR
 
@@ -111,15 +127,5 @@ time.
 compile time options
 --------------------
 
--DVERBOSE adds temperature output and functions as a crude progress meter.
+See compile-options.txt for a full list of the compile-time options.
 
--DSCORE_DEBUG adds a large amount of output detailing in great detail
-what is going on.
-
--DSCORE_DEBUG_MORE adds even more output.
-
--DSCORE_PCLASS spits out the equivalence classes at the beginning.
-
--DSCORE_PCLASS_MORE spits out lots of output during the assign loop.
-It works best with -DSCORE_DEBUG but does not require
--DSCORE_DEBUG_MORE.
