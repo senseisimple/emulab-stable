@@ -48,6 +48,9 @@ sub tbs_exec {
     while (<EXEC>) {
 	&tbs_out($_);
     }
+    close(EXEC) or
+	return $! ? $! : $?;
+
     return 0;
 };
 
