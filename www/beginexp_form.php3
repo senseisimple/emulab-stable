@@ -80,10 +80,10 @@ echo "<tr>
 
           <td rowspan>
               <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
-              <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
+              <input type=\"file\" name=\"exp_nsfile\" size=\"40\">
               <br>
               <br>
-              <input type=\"text\" name=\"exp_localnsfile\" size=\"40\">
+              <input type=\"text\" name=\"exp_localnsfile\" size=\"50\">
               </td>
       </tr>\n";
 
@@ -129,8 +129,8 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
-	  <td colspan=2>Pool Experiment?[<b>4</b>]:</td>
-          <td><input type=checkbox name=exp_shared value=Yep>&nbsp Yes</td>
+	  <td colspan=2>Batch Experiment?[<b>4</b>]:</td>
+          <td><input type=checkbox name=exp_batched value=Yep>&nbsp Yes</td>
      </tr>\n";
          
 echo "<tr>
@@ -155,7 +155,9 @@ echo "<h4><blockquote><blockquote><blockquote>
         <dt>[3]
             <dd>Leave blank to use the default group for the project.
         <dt>[4]
-            <dd>Leave unchecked unless you know what this means!
+            <dd>Check this if you want to create a
+                <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>
+                batch mode</a> experiment.
      </dl>
      </blockquote></blockquote></blockquote></h4>\n";
 

@@ -36,6 +36,15 @@ if (isset($exp_swappable)) {
     }
 }
 
+if (isset($exp_batched)) {
+    if (strcmp($exp_batched, "")) {
+	unset($exp_batched);
+    }
+    elseif (strcmp($exp_batched, "Yep")) {
+	USERERROR("Invalid argument for Batched", 1);
+    }
+}
+
 if (isset($exp_priority) &&
     strcmp($exp_priority, "low") && strcmp($exp_priority, "high")) {
   USERERROR("Invalid argument for Priority.", 1);
@@ -191,7 +200,7 @@ TBUserInfo($uid, $user_name, $user_email);
 #
 $expt_state = "new";
 
-# Shared experiments.
+# Shared experiments. (Deprecated for now!)
 if (isset($exp_shared) && strcmp($exp_shared, "Yep") == 0) {
     $exp_shared = 1;
 }
@@ -278,6 +287,10 @@ flush();
 $output = array();
 $retval = 0;
 $last   = time();
+$batch  = "-i";
+if (isset($exp_batched)) {
+    $batch = "";
+}
 
 #
 # Avoid SIGPROF in child.
@@ -285,7 +298,7 @@ $last   = time();
 set_time_limit(0);
 
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-	       "webbatchexp -i -x \"$exp_expires\" -E \"$exp_name\" ".
+	       "webbatchexp $batch -x \"$exp_expires\" -E \"$exp_name\" ".
 	       "$exp_priority $exp_swappable ".
 	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
  	       $output, $retval);
@@ -310,13 +323,23 @@ echo "<h3>
         Experiment
         <a href='showexp.php3?pid=$exp_pid&eid=$exp_id'>$exp_id</a>
         in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
-        is configuring!<br><br>
-        You will be notified via email when the experiment has been fully
-	configured and you are able to proceed. This typically takes less
-        than 10 minutes, depending on the number of nodes you have requested.
-        If you do not receive email notification within a reasonable amount
-        of time, please contact $TBMAILADDR.
-        <br>
+        is configuring!<br><br>\n";
+
+if (isset($exp_batched)) {
+    echo "Batch Mode experiments will be run when enough resources become
+          available. This might happen immediately, or it may take hours
+	  or days. You will be notified via email when the experiment has
+          been run. If you do not receive email notification within a
+          reasonable amount of time, please contact $TBMAILADDR.\n";
+}
+else {
+    echo "You will be notified via email when the experiment has been fully
+	  configured and you are able to proceed. This typically takes less
+          than 10 minutes, depending on the number of nodes you have requested.
+          If you do not receive email notification within a reasonable amount
+          of time, please contact $TBMAILADDR.\n";
+}
+echo "<br>
       </h3>\n";
 
 #
