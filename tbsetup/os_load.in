@@ -266,7 +266,10 @@ foreach my $node (@nodes) {
     # part of the slices, should only change the partition table entries
     # for the subset of slices that are written to disk.
     #
-    for ($i = 1; $i <= 4; $i++) {
+    my $startpart = $loadpart == 0 ? 1 : $loadpart;
+    my $endpart   = $loadpart + $loadlen;
+	
+    for ($i = $startpart; $i < $endpart; $i++) {
 	my $partname = "part${i}_osid";
 	
 	if (defined($imageid_row{$partname})) {
