@@ -28,8 +28,7 @@ Simulator instproc init {args} {
     # A counter for internal ids
     $self set id_counter 0
 
-    # A counter for subnets.  This is the lowest unused subnet
-    # suffix.
+    # Counters for subnets. 
     $self set subnet_counter 1
     $self set wa_subnet_counter 1
 
@@ -774,15 +773,72 @@ Simulator instproc lanlink {lan node} {
 # get_subnet
 # This is called by lanlinks.  When called get_subnet will find an available
 # IP subnet, mark it as used, and return it to the caller.
-Simulator instproc get_subnet {} {
+Simulator instproc get_subnet {netmask} {
     $self instvar subnet_base
     $self instvar subnets
-    $self instvar subnet_counter
 
-    for {set i $subnet_counter} {$i < 255} {incr i} {
-	if {! [info exists subnets($subnet_base.$i)]} {
-	    set subnet_counter $i
-	    return $subnet_base.$i
+    set netmaskint [inet_atohl $netmask]
+
+    set A $subnet_base
+    set C [expr ($netmaskint >> 8) & 0xff]
+    set D [expr $netmaskint & 0xff]
+    set minB 1
+    set maxB 254
+    set minC 0
+    set maxC 1
+    set incC 1
+    set minD 0
+    set maxD 1
+    set incD 1
+
+    # allow for 10. or 192.168. I know, could be more general.
+    if {[expr [llength [split $subnet_base .]]] == 2} {
+	# 192.168.
+	set A    [expr [lindex [split $subnet_base .] 0]]
+	set minB [expr [lindex [split $subnet_base .] 1]]
+	set maxB [expr $minB + 1]
+    }
+    if {$C != 0} {	
+	set minC [expr 256 - $C]
+	set maxC 255
+	set incC $minC
+    } 
+    if {$D != 0} {	
+	set minD [expr 256 - $D]
+	set maxD 255
+	set incD $minD
+    }
+
+    # We never let the user change the second octet. See tb-set-netmask.
+    for {set i $minB} {$i < $maxB} {incr i} {
+	for {set j $minC} {$j < $maxC} {set j [expr $j + $incC]} {
+	    for {set k $minD} {$k < $maxD} {set k [expr $k + $incD]} {
+		set subnet "$A.$i.$j.$k"
+		set subnetint [inet_atohl $subnet]
+
+		# No such subnet exists?
+		if {! [info exists subnets($subnetint)]} {
+		    set okay 1
+
+		    #
+		    # See if this subnet violates any existing subnet masks
+		    # Is this overly restrictive? Totally wrong?
+		    #
+		    foreach osubnetint [concat [array names subnets]] {
+			set onetmaskint $subnets($osubnetint)
+
+			if {[expr $subnetint & $onetmaskint] == $osubnetint ||
+ 			    [expr $osubnetint & $netmaskint] == $subnetint} {
+			    set okay 0
+			    break
+			}
+		    }
+		    if {$okay} {
+			$self use_subnet $subnet $netmask
+			return $subnet
+		    }
+		}
+	    }
 	}
     }
     perror "Ran out of subnets."
@@ -794,19 +850,25 @@ Simulator instproc get_subnet {} {
 Simulator instproc get_subnet_remote {} {
     $self instvar wa_subnet_counter
 
+    if {$wa_subnet_counter > 255} {
+	perror "Ran out of widearea subnets."
+	return 0
+    }
     set subnet $wa_subnet_counter
     incr wa_subnet_counter
-    set b [expr [expr $subnet & 0xff00] >> 8]
-    set c [expr $subnet & 0xff]
-    return 10.$b.$c
+    return "1.1.$subnet.0"
 }
 
 # use_subnet
 # This is called by the ip method of nodes.  It marks the passed subnet
 # as used and thus should never be returned by get_subnet.
-Simulator instproc use_subnet {subnet} {
+Simulator instproc use_subnet {subnet netmask} {
     $self instvar subnets
-    set subnets($subnet) {}
+
+    set subnetint [inet_atohl $subnet]
+    set netmaskint [inet_atohl $netmask]
+    
+    set subnets($subnetint) $netmaskint
 }
 
 # add_program

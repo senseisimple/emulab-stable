@@ -8,6 +8,7 @@
 
 use English;
 use Getopt::Std;
+use Socket;
     
 #
 # Parse an ns file. Since the parser runs arbitrary NS file for the user,
@@ -247,9 +248,10 @@ if ($?) {
 #
 # Now we have to fix up one minor thing; widearea tunnel IPs. These have
 # to be unique, but without the DB to ask, there is no easy way to arrange
-# that. 
-#
+# that.
+
 my %subnetmap = ();
+my $WANETMASK = "255.255.255.248";
 
 my $query_result =
     DBQueryFatal("select vname,ips from virt_nodes ".
@@ -262,20 +264,29 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 	my ($port,$ip) = split(":", $ipinfo);
 	my ($a,$b,$c,$d) = ($ip =~ /(\d+).(\d+).(\d+).(\d+)/);
 
-	if ($a eq "10") {
-	    if (! defined($subnetmap{"$a.$b.$c"})) {
+	if ($a eq "1" && $b eq "1") {
+	    my $net = inet_ntoa(inet_aton($WANETMASK) & inet_aton($ip));
+		
+	    if (! defined($subnetmap{$net})) {
 		DBQueryFatal("insert into ipsubnets ".
 			     "values ('$pid','$eid', NULL)");
 		my ($id) =
 		    DBQueryFatal("select LAST_INSERT_ID() ".
 				 "from ipsubnets")->fetchrow_array();
 
-		my $bb = ($id & 0xff00) >> 8;
-		my $cc = ($id & 0xff);
-		$subnetmap{"$a.$b.$c"} = "$a.$bb.$cc";
+		# We are going to shift the bits up so they do not conflict
+		# with the lower part.
+		if ($id >= 8192) {
+		    die("No more widearea subnets left!\n");
+		}
+		$id = $id << 3;
+
+		my $cc = ($id & 0xff00) >> 8;
+		my $dd = ($id & 0xf8);
+		$subnetmap{$net} = inet_aton("192.168.$cc.$dd");
 	    }
-	    my $newsubnet = $subnetmap{"$a.$b.$c"};
-	    push(@newiplist, "$port:${newsubnet}.$d");
+	    my $newsubnet = inet_ntoa($subnetmap{$net} | inet_aton("$d"));
+	    push(@newiplist, "$port:${newsubnet}");
 	}
 	else {
 	    push(@newiplist, $ipinfo);
@@ -300,13 +311,15 @@ if (keys(%subnetmap)) {
 	my ($a,$b,$c,$d) = ($ip =~ /(\d+).(\d+).(\d+).(\d+)/);
 	my $newip        = $ip;
 	my $newdstip     = $dstip;
+	my $net		 = inet_ntoa(inet_aton($WANETMASK) & inet_aton($ip));
 	
-	if (defined($subnetmap{"$a.$b.$c"})) {
-	    $newip = $subnetmap{"$a.$b.$c"} . ".$d";
+	if (defined($subnetmap{$net})) {
+	    $newip = inet_ntoa($subnetmap{$net} | inet_aton("$d"));
 	}
 	($a,$b,$c,$d) = ($dstip =~ /(\d+).(\d+).(\d+).(\d+)/);
-	if (defined($subnetmap{"$a.$b.$c"})) {
-	    $newdstip = $subnetmap{"$a.$b.$c"} . ".$d";
+	$net          = inet_ntoa(inet_aton($WANETMASK) & inet_aton($dstip));
+	if (defined($subnetmap{$net})) {
+	    $newdstip = inet_ntoa($subnetmap{$net} | inet_aton("$d"));
 	}
 	if ($ip ne $newip || $dstip ne $newdstip) {
 	    DBQueryFatal("update virt_trafgens set ".

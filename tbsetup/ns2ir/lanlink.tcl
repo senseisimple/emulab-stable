@@ -128,6 +128,9 @@ Link instproc init {s nodes bw d type} {
     $self set src_node $src
     $self set dst_node $dst
 
+    # The default netmask, which the user may change (at his own peril).
+    $self set netmask "255.255.255.0"
+
     var_import GLOBALS::new_counter
     set q1 q[incr new_counter]
     
@@ -179,7 +182,9 @@ LanLink instproc init {s nodes bw d type} {
 	    break
 	}
     }
-    
+
+    # The default netmask, which the user may change (at his own peril).
+    $self set netmask "255.255.255.0"
 
     # Make sure BW is reasonable. 
     # XXX: Should come from DB instead of hardwired max.
@@ -247,9 +252,11 @@ LanLink instproc fill_ips {} {
     $self instvar nodelist
     $self instvar sim
     $self instvar widearea
+    $self instvar netmask
     set isremote 0
+    set netmaskint [inet_atohl $netmask]
 
-    # Determined a subnet (if possible) and any used IP addresses in it.
+    # Determine a subnet (if possible) and any used IP addresses in it.
     # ips is a set which contains all used IP addresses in this LanLink.
     set subnet {}
     foreach nodeport $nodelist {
@@ -261,8 +268,10 @@ LanLink instproc fill_ips {} {
 	    if {$isremote} {
 		perror "Not allowed to specify IP subnet of a remote link!"
 	    }
-	    set subnet [join [lrange [split $ip .] 0 2] .]
+	    set ipint [inet_atohl $ip]
+	    set subnet [inet_hltoa [expr $ipint & $netmaskint]]
 	    set ips($ip) 1
+	    $sim use_subnet $subnet $netmask
 	}
     }
     if {$isremote && [$self info class] != "Link"} {
@@ -271,26 +280,37 @@ LanLink instproc fill_ips {} {
     }
     set widearea $isremote
 
+    # See parse-ns if you change this! 
+    if {$isremote && ($netmask != "255.255.255.248")} {
+	puts "Ignoring netmask for remote link; forcing 255.255.255.248"
+	set netmask "255.255.255.248"
+	set netmaskint [inet_atohl $netmask]
+    }
+
     # If we couldn't find a subnet we ask the Simulator for one.
     if {$subnet == {}} {
 	if {$isremote} {
 	    set subnet [$sim get_subnet_remote]
 	} else {
-	    set subnet [$sim get_subnet]
+	    set subnet [$sim get_subnet $netmask]
 	}
     }
 
     # Now we assign IP addresses to any node:port's without them.
     set ip_counter 2
+    set subnetint [inet_atohl $subnet]
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
 	set port [lindex $nodeport 1]
 	if {[$node ip $port] == {}} {
 	    set ip {}
-	    for {set i $ip_counter} {$i < 255} {incr i} {
-		if {! [info exists ips($subnet.$i)]} {
-		    set ip $subnet.$i
-		    set ips($subnet.$i) 1
+	    set max [expr ~ $netmaskint]
+	    for {set i $ip_counter} {$i < $max} {incr i} {
+		set nextip [inet_hltoa [expr $subnetint | $i]]
+		
+		if {! [info exists ips($nextip)]} {
+		    set ip $nextip
+		    set ips($ip) 1
 		    set ip_counter [expr $i + 1]
 		    break
 		}
@@ -315,6 +335,15 @@ LanLink instproc get_subnet {} {
     set port [lindex $nodeport 1]
 
     return [$node ip $port]
+}
+
+#
+# Return the subnet of a lan. Actually, just return one of the IPs.
+#
+LanLink instproc get_netmask {} {
+    $self instvar netmask
+
+    return $netmask
 }
 
 #
@@ -404,6 +433,7 @@ Link instproc updatedb {DB} {
     $self instvar nobwshaping
     $self instvar useveth
     $self instvar sim
+    $self instvar netmask
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -448,9 +478,9 @@ Link instproc updatedb {DB} {
 	
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
 	
-	set values [list $self $nodeportraw $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
 
 	$sim spitxml_data "virt_lans" $fields $values
     }
@@ -475,6 +505,7 @@ Lan instproc updatedb {DB} {
     $self instvar nobwshaping
     $self instvar useveth
     $self instvar sim
+    $self instvar netmask
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -516,11 +547,29 @@ Lan instproc updatedb {DB} {
 	
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
 	
-	set values [list $self $nodeportraw $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
 
 	$sim spitxml_data "virt_lans" $fields $values
     }
 }
 
+#
+# Convert IP/Mask to an integer (host order)
+#
+proc inet_atohl {ip} {
+    if {[scan $ip "%d.%d.%d.%d" a b c d] != 4} {
+	perror "\[inet_atohl] Invalid ip $ip; cannot be converted!"
+	return 0
+    }
+    return [expr ($a << 24) | ($b << 16) | ($c << 8) | $d]
+}
+proc inet_hltoa {ip} {
+    set a [expr ($ip >> 24) & 0xff]
+    set b [expr ($ip >> 16) & 0xff]
+    set c [expr ($ip >> 8)  & 0xff]
+    set d [expr ($ip >> 0)  & 0xff]
+
+    return "$a.$b.$c.$d"
+}

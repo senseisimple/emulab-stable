@@ -124,6 +124,31 @@ proc tb-set-ip-link {src link ip} {
     ::TBCOMPAT::set-ip $src $link $ip
 }
 
+#
+# Set the netmask. To make it easier to compute subnets later, do
+# allow the user to alter the netmask beyond the bottom 3 octets.
+# This restricts the user to a lan of 4095 nodes, but that seems okay
+# for now. 
+# 
+proc tb-set-netmask {lanlink netmask} {
+    var_import ::TBCOMPAT::IP
+    
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-netmask] $lanlink is not a link or a lan."
+	return
+    }
+    if {[regexp $IP $netmask] == 0} {
+	perror "\[tb-set-netmask] - $netmask is not a valid IP mask"
+	return
+    }
+    set netmaskint [inet_atohl $netmask]
+    if {[expr ($netmaskint & 0xFFFFF000)] != 0xFFFFF000} {
+	perror "\[tb-set-netmask] - $netmask is too big"
+	return
+    }
+    $lanlink set netmask $netmask
+}
+
 # Node state routines.
 proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes

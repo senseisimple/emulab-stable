@@ -234,9 +234,7 @@ Node instproc ip {port args} {
 	return [lindex $iplist $port]
     } else {
 	set ip [lindex $args 0]
-	set subnet [join [lrange [split $ip .] 0 2] .]
 	set iplist [lreplace $iplist $port $port $ip]
-	$sim use_subnet $subnet
     }    
 }
 
@@ -350,21 +348,26 @@ Node instproc add_routes_to_DB {DB} {
 		if {[llength [$dst set portlist]] != 1} {
 		    perror "\[add-route] $dst must have only one link."
 		}
+		set link  [lindex [$dst set portlist] 0]
+		set mask  [$link get_netmask]
 		set dstip [$dst ip 0]
 		set type  "host"
 	    }
 	    "SimplexLink" {
-		set link [$dst set mylink]
-		set src [$link set src_node]
+		set link  [$dst set mylink]
+		set mask  [$link get_netmask]
+		set src   [$link set src_node]
 		set dstip [$src ip [$src find_port $link]]
 		set type  "net"
 	    }
 	    "Link" {
 		set dstip [$dst get_subnet]
+		set mask  [$dst get_netmask]
 		set type  "net"
 	    }
 	    "Lan" {
 		set dstip [$dst get_subnet]
+		set mask  [$dst get_netmask]
 		set type  "net"
 	    }
 	    unknown {
@@ -372,7 +375,7 @@ Node instproc add_routes_to_DB {DB} {
 		return
 	    }
 	}
-	$sim spitxml_data "virt_routes" [list "vname" "dst" "nexthop" "dst_type" ] [list $self $dstip $hopip $type ]
+	$sim spitxml_data "virt_routes" [list "vname" "dst" "nexthop" "dst_type" "dst_mask"] [list $self $dstip $hopip $type $mask]
     }
 }
 
