@@ -12,7 +12,7 @@ use Getopt::Std;
 # XXX debugging
 #
 my $logaccept = 0;
-my $logreject = 1;
+my $logreject = 0;
 
 #
 # Hosts we need un-firewalled static routes for
