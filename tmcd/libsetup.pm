@@ -108,6 +108,7 @@ sub TMCCCMD_ROUTING()	{ "routing"; }
 sub TMCCCMD_TRAFFIC()	{ "trafgens"; }
 sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
 sub TMCCCMD_TUNNEL()	{ "tunnels"; }
+sub TMCCCMD_NSECONFIGS(){ "nseconfigs"; }
 
 #
 # Some things never change.
@@ -1109,8 +1110,25 @@ sub dotrafficconfig()
     if( $startnse ) {
 	print RC "$SETUPDIR/startnse &\n";
     }
-    
     close($TM);
+
+    # XXX hack: need a separate section for starting up NSE when we support simulated nodes
+    if( ! $startnse ) {
+
+	# start NSE if 'tmcc nseconfigs' is not empty
+	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
+	if( <$TM> ) {
+	    if ( ! $didopen ) {
+		open(RC, ">" . TMTRAFFICCONFIG)
+		    or die("Could not open " . TMTRAFFICCONFIG . ": $!");
+		print RC "#!/bin/sh\n";
+		$didopen = 1;	
+	    }
+	    print RC "$SETUPDIR/startnse &\n";
+	}
+	close($TM)
+    }
+    
     if ($didopen) {
 	printf RC "%s %s\n", TMCC(), TMCCCMD_READY();
 	close(RC);
