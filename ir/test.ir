@@ -8,7 +8,7 @@ C pc lAC lBC lCd
 d delay lCd lDd
 D pc lDd lDE lDF
 E pc lDE
-F pc LDF
+F pc lDF
 END nodes
 START links
 lAC A -1 C -1
