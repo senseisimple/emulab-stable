@@ -96,7 +96,7 @@ my %immediate = (
     isalive => 1,
     drift   => 0,
     cvsup   => 0,
-    rsuage  => 1,
+    rusage  => 1,
     hkeys   => 1,	 
 );
 
@@ -463,14 +463,15 @@ sub setintervals($)
 		    logmsg("setintervals: descheduling $key\n");
 		    qdelete($funcs{$key});
 		} elsif ($firsttime || $oiv{$key} == 0) {
-		    logmsg("setintervals: scheduling $key\n");
 		    #
 		    # Some commands need to be run at boottime,
 		    # schedule their first run immediately.
 		    #
 		    if ($firsttime && $immediate{$key}) {
+			logmsg("setintervals: scheduling $key now\n");
 			qinsert($curtime, $funcs{$key});
 		    } else {
+			logmsg("setintervals: scheduling $key\n");
 			qinsert($curtime + $iv{$key}, $funcs{$key});
 		    }
 		} else {
@@ -706,7 +707,7 @@ sub sendhkeys($)
     }
 
     if ($arg ne "") {
-	print "nodeinfo: keys: $arg\n"
+	print "hostkeys: $arg\n"
 	    if ($debug);
 
 	my %tmccargs = ();
