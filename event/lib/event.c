@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.8 2002-01-31 12:42:51 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.9 2002-02-19 15:45:24 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -37,7 +37,7 @@ static char hostname[MAXHOSTNAMELEN];
  */
 
 event_handle_t
-event_register(char *name)
+event_register(char *name, int threaded)
 {
     event_handle_t handle;
     elvin_handle_t server;
@@ -50,17 +50,41 @@ event_register(char *name)
 
     TRACE("registering with event system (hostname=\"%s\")\n", hostname);
 
-    /* Initialize the elvin synchronous interface: */
+    /* Allocate a handle to be returned to the caller: */
+    handle = xmalloc(sizeof(*handle));
 
-    status = elvin_sync_init_default();
+    /* Set up the Elvin interface pointers: */
+    if (threaded) {
+        handle->init = elvin_threaded_init_default;
+        handle->connect = elvin_threaded_connect;
+        handle->disconnect = elvin_threaded_disconnect;
+        handle->cleanup = elvin_threaded_cleanup;
+        handle->mainloop = NULL; /* no mainloop for mt programs */
+        handle->notify = elvin_threaded_notify;
+        handle->subscribe = elvin_threaded_add_subscription;
+    } else {
+        handle->init = elvin_sync_init_default;
+        handle->connect = elvin_sync_connect;
+        handle->disconnect = elvin_sync_disconnect;
+        handle->cleanup = elvin_sync_cleanup;
+        handle->mainloop = elvin_sync_default_mainloop;
+        handle->notify = elvin_sync_notify;
+        handle->subscribe = elvin_sync_add_subscription;
+    }
+
+    /* Initialize the elvin interface: */
+
+    status = handle->init();
     if (status == NULL) {
-        ERROR("elvin_sync_init_default failed\n");
+        ERROR("could not initialize Elvin\n");
+        free(handle);
         return 0;
     }
     server = elvin_handle_alloc(status);
     if (server == NULL) {
         ERROR("elvin_handle_alloc failed: ");
         elvin_error_fprintf(stderr, status);
+        free(handle);
         return 0;
     }
 
@@ -69,6 +93,7 @@ event_register(char *name)
     if (elvin_handle_set_discovery_scope(server, "testbed", status) == 0) {
         ERROR("elvin_handle_set_discovery_scope failed: ");
         elvin_error_fprintf(stderr, status);
+        free(handle);
         return 0;
     }
 
@@ -77,19 +102,19 @@ event_register(char *name)
         if (elvin_handle_append_url(server, name, status) == 0) {
             ERROR("elvin_handle_append_url failed: ");
             elvin_error_fprintf(stderr, status);
+            free(handle);
             return 0;
         }
     }
 
     /* Connect to the elvin server: */
-    if (elvin_sync_connect(server, status) == 0) {
-        ERROR("elvin_sync_connect failed: ");
+    if (handle->connect(server, status) == 0) {
+        ERROR("could not connect to Elvin server: ");
         elvin_error_fprintf(stderr, status);
+        free(handle);
         return 0;
     }
 
-    /* Allocate a handle to be returned to the caller: */
-    handle = xmalloc(sizeof(*handle));
     handle->server = server;
     handle->status = status;
 
@@ -113,8 +138,8 @@ event_unregister(event_handle_t handle)
     TRACE("unregistering with event system (hostname=\"%s\")\n", hostname);
 
     /* Disconnect from the elvin server: */
-    if (elvin_sync_disconnect(handle->server, handle->status) == 0) {
-        ERROR("elvin_sync_disconnect failed: ");
+    if (handle->disconnect(handle->server, handle->status) == 0) {
+        ERROR("could not disconnect from Elvin server: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
@@ -126,8 +151,8 @@ event_unregister(event_handle_t handle)
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
-    if (elvin_sync_cleanup(1, handle->status) == 0) {
-        ERROR("elvin_sync_cleanup failed: ");
+    if (handle->cleanup(1, handle->status) == 0) {
+        ERROR("could not clean up Elvin state: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
@@ -154,10 +179,15 @@ event_main(event_handle_t handle)
         return 0;
     }
 
+    if (!handle->mainloop) {
+        ERROR("multithreaded programs don't need to call event_main\n");
+        return 0;
+    }
+
     TRACE("entering event loop...\n");
 
-    if (elvin_sync_default_mainloop(&loop, handle->status) == 0) {
-        ERROR("elvin_sync_default_mainloop failed: ");
+    if (handle->mainloop(&loop, handle->status) == 0) {
+        ERROR("Elvin mainloop failed: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
@@ -184,11 +214,10 @@ event_notify(event_handle_t handle, event_notification_t notification)
     TRACE("sending event notification %p\n", notification);
 
     /* Send notification to Elvin server for routing: */
-    if (elvin_sync_notify(handle->server, notification, 1, NULL,
-                          handle->status)
+    if (handle->notify(handle->server, notification, 1, NULL, handle->status)
         == 0)
     {
-        ERROR("elvin_sync_notify failed: ");
+        ERROR("could not send event notification: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
@@ -812,13 +841,10 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
     arg->callback = callback;
     arg->data = data;
 
-    subscription = elvin_sync_add_subscription(handle->server,
-                                               expression, NULL, 1,
-                                               notify_callback,
-                                               arg,
-                                               handle->status);
+    subscription = handle->subscribe(handle->server, expression, NULL, 1,
+                                     notify_callback, arg, handle->status);
     if (subscription == NULL) {
-        ERROR("elvin_sync_add_subscription failed: ");
+        ERROR("could not subscribe to event %s: ", expression);
         elvin_error_fprintf(stderr, handle->status);
         return NULL;
     }
@@ -853,8 +879,8 @@ attr_traverse(void *rock, char *name, elvin_basetypes_t type,
 
 
 /*
- * Callback passed to elvin_sync_add_subscription in
- * event_subscribe. Used to provide our own callback above Elvin's.
+ * Callback passed to handle->subscribe in event_subscribe. Used to
+ * provide our own callback above Elvin's.
  */
 
 static void

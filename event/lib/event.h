@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.5 2002-01-31 12:42:51 imurdock Exp $
+ * $Id: event.h,v 1.6 2002-02-19 15:45:24 imurdock Exp $
  */
 
 #ifndef __EVENT_H__
@@ -22,6 +22,19 @@
 struct event_handle {
     elvin_handle_t server;
     elvin_error_t status;
+    /* API function pointers: */
+    elvin_error_t (*init)(void);
+    int (*connect)(elvin_handle_t handle, elvin_error_t error);
+    int (*disconnect)(elvin_handle_t handle, elvin_error_t error);
+    int (*cleanup)(int force, elvin_error_t error);
+    int (*mainloop)(int *do_loop, elvin_error_t error);
+    int (*notify)(elvin_handle_t handle, elvin_notification_t notification,
+                  int deliver_insecure, elvin_keys_t keys,
+                  elvin_error_t error);
+    elvin_subscription_t (*subscribe)(elvin_handle_t handle, char *sub_exp,
+                                      elvin_keys_t keys, int accept_insecure,
+                                      elvin_notify_cb_t callback, void *rock,
+                                      elvin_error_t error);
 };
 typedef struct event_handle * event_handle_t;
 
@@ -70,7 +83,7 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
  */
 
 /* event.c */
-event_handle_t event_register(char *name);
+event_handle_t event_register(char *name, int threaded);
 int event_unregister(event_handle_t handle);
 int event_main(event_handle_t handle);
 int event_notify(event_handle_t handle, event_notification_t notification);
