@@ -23,7 +23,7 @@ else
 EMCDIR=
 endif
 
-SUBDIRS	= $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
+SUBDIRS	= tbsetdest $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
 
 all:		all-subdirs
 client:		client-subdirs

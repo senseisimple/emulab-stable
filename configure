@@ -1842,7 +1842,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1811: checking for $ac_word" >&5
+echo "configure:1846: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1876,7 +1876,7 @@ else
 fi
 
 if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
-    { echo "configure: error: Rsync is required to use this software, see www.rsync.org." 1>&2; exit 1; }
+    echo "configure: warning: Rsync is required for logholes to work, see www.rsync.org." 1>&2
 fi
 
 outfiles="$outfiles Makeconf GNUmakefile \
@@ -2006,7 +2006,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower \
-	robots/GNUmakefile robots/mtp/GNUmakefile robots/emc/GNUmakefile \
+	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
+	robots/mtp/GNUmakefile robots/emc/GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
 	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
 	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \

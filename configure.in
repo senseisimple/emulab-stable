@@ -583,7 +583,7 @@ esac]
 
 AC_PATH_PROG(RSYNC, rsync, "", [${PATH}])
 if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
-    AC_MSG_ERROR([Rsync is required to use this software, see www.rsync.org.])
+    AC_MSG_WARN([Rsync is required for logholes to work, see www.rsync.org.])
 fi
 
 outfiles="$outfiles Makeconf GNUmakefile \
@@ -713,7 +713,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower \
-	robots/GNUmakefile robots/mtp/GNUmakefile robots/emc/GNUmakefile \
+	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
+	robots/mtp/GNUmakefile robots/emc/GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
 	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
 	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \
