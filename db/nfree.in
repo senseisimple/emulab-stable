@@ -53,7 +53,7 @@ if ($sth->numrows < 1) {
  
 $cmd = "lock tables nodes write, node_types read, scheduled_reloads read, ".
   "interfaces write, delays write, reserved write, last_reservation write,".
-  "next_reserve read";
+  "current_reloads write, next_reserve read";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
@@ -165,7 +165,7 @@ foreach my $n (@node_names) {
 	&& $error++);
 
   # Clean out the current_reloads table
-  $cmd = "delete from current_reloads where node_id='$'";
+  $cmd = "delete from current_reloads where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
