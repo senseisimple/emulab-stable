@@ -139,9 +139,10 @@ proc tb-set-hardware {node type args} {
     if {! ${GLOBALS::anonymous}} {
 	var_import ::TBCOMPAT::nodetypeXpid_permissions
 	var_import ::GLOBALS::pid
-	set allowed 0
+	set allowed 1
 	
 	if {[info exists nodetypeXpid_permissions($type)]} {
+	    set allowed 0
 	    foreach allowedpid $nodetypeXpid_permissions($type) {
 		if {$allowedpid == $pid} {
 		    set allowed 1
