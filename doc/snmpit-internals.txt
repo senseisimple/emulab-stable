@@ -240,3 +240,29 @@ not possible to do through SNMP something we'd been doing for years.
 
 You can, of course, try out the OIDs we use in snmpit_cisco and snmpit_intel -
 some of them may be supported on your switch.
+
+#####
+##### switchmac
+#####
+
+wwitchmac is a script, used at installation time, to print out all the MAC
+adresses a switch has learned, and what ports they're on. The idea is to
+eliminate the need for the testbed administrators to manually enter which nodes
+are connected to which ports on which switches.
+
+The stuff in this should be pretty standard - ie. this script has support for
+Intel, Nortel, and Cisco switches, and I suspect that one of these should work
+pretty similarly to whatever switch you're trying to port it to.
+
+In your switch vendor's documentation, take a look for the dot1dTpFdbTable in
+the BRIDGE-MIB (which is a standard one.)
+
+The main ickiness in this script is something called 'Community String
+Indexing' - see, the MIB is designed for switches that store one MAC table that
+is VLAN-independant (ie. you can't use the same MAC in two different VLANs at
+once.) Cisco keeps a MAC table per-VLAN. So, the way they get around this is to
+change the community string you use to get access to the MAC table for each
+VLAN.  So, if your community string is 'public', and you want to look at the
+MAC table for VLAN 42, you talk to the switch with the community string
+'public@42'. Terrible. I don't know if other switch vendors use this same hack,
+or if they will have some other hack of their own.
