@@ -46,6 +46,9 @@ if (isset($force) && $force == 1) {
 	}
 	if (!isset($idleswap)) { $idleswap=0; }
 	if (!isset($autoswap)) { $autoswap=0; }
+	if (!isset($forcetype)){ $forcetype="force"; }
+	if ($forcetype=="idleswap") { $idleswap=1; }
+	if ($forcetype=="autoswap") { $autoswap=1; }
 }
 else {
 	$force = 0;
@@ -109,7 +112,9 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 #
 if ($canceled) {
     echo "<center><h2><br>
-          Experiment $action canceled!
+          Experiment $action canceled <br> for experiment
+          <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>/<a
+             href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>!
           </h2></center>\n";
     
     PAGEFOOTER();
@@ -136,6 +141,14 @@ if (!$confirmed) {
 	if (!$swappable) {
 	    echo "<h2>Note: This experiment is <em>NOT</em> swappable!</h2>\n";
 	}
+	echo "Force Type: <select name=forcetype>\n";
+	echo "<option value=force ".($forcetype=="force"?"selected":"").
+	    ">Forced Swap</option>\n";
+	echo "<option value=idleswap ".($forcetype=="idleswap"?"selected":"").
+	    ">Idle-Swap</option>\n";
+	echo "<option value=autoswap ".($forcetype=="autoswap"?"selected":"").
+	    ">Auto-Swap</option>\n";
+	echo "</select><br><br>\n";
 	echo "<input type=hidden name=force value=$force>\n";
 	echo "<input type=hidden name=idleswap value=$idleswap>\n";
 	echo "<input type=hidden name=autoswap value=$autoswap>\n";
@@ -188,11 +201,17 @@ flush();
 # 
 set_time_limit(0);
 
+# Args for idleswap It passes them on to swapexp, or if it is just a
+# plain force swap, it passes -f for us.
+$args = "";
+if     ($idleswap) { $args = "-i"; }
+elseif ($autoswap) { $args = "-a"; }
+
 $output = array();
 $retval = 0;
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 	       ($force ?
-		"webidleswap $exp_pid $exp_eid" :
+		"webidleswap $args $exp_pid $exp_eid" :
 		"webswapexp -s $inout $exp_pid $exp_eid"),
  	       $output, $retval);
 

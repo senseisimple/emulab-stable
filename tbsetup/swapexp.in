@@ -16,11 +16,11 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-b] [-i] [-r] ".
+    print STDOUT "Usage: swapexp [-b] [-i | -a | -f] [-r] ".
 	"<-s in | out | restart | modify> <pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
-my  $optlist = "s:irb";
+my  $optlist = "biafrs:";
 
 #
 # Configure variables
@@ -29,6 +29,7 @@ my $TB     = "@prefix@";
 my $TBOPS  = "@TBOPSEMAIL@";
 my $TBLOGS = "@TBLOGSEMAIL@";
 my $TBINFO = "$TB/expinfo";
+my $TBDOCBASE = "@TBDOCBASE@";
 
 #
 # Testbed Support libraries
@@ -41,6 +42,8 @@ my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
 my $batch    = 0;
 my $idleswap = 0;
+my $autoswap = 0;
+my $force    = 0;
 my $reboot   = 0;
 my $errorstat= -1;
 
@@ -81,6 +84,12 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"i"})) {
     $idleswap = 1;
+}
+if (defined($options{"a"})) {
+    $autoswap = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
 }
 if (defined($options{"b"})) {
     $batch = 1;
@@ -531,9 +540,21 @@ if (defined($logname)) {
 my $message =
     "Experiment $eid in project $pid has been ";
 
-if ($idleswap) {
-    $message .= "forcibly swapped out by\n".
-	"Testbed Operations because it was idle for too long.\n";
+if ($idleswap || $autoswap || $force) {
+    $link="";
+    $message .= "forcibly swapped out by\nTestbed Operations";
+    if ($idleswap) {
+	$message .= " because it was idle for too long (Idle-Swap).\n".
+	  "(See also the Idle-Swap info in \n".
+	  "$TBDOCBASE/docwrapper.php3?docname=swapping.html )\n";
+    } elsif ($autoswap) {
+	$message .= " because it was swapped in too long (Auto-Swap).\n".
+	  "(See also the Auto-Swap info in \n".
+	  "$TBDOCBASE/docwrapper.php3?docname=swapping.html )\n";
+    } elsif ($force) {
+	$message .= ". (See also our Node Usage Policies in \n".
+	  "$TBDOCBASE/docwrapper.php3?docname=swapping.html )\n";
+    }
 }
 else {
     $message .= "$action.\n";

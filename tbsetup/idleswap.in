@@ -10,15 +10,14 @@ use English;
 use Getopt::Std;
 
 #
-# This gets invoked from the Web interface. 
-# Swap an experiment in, swap it out, restart or modify.
+# This gets invoked from the Web interface and from idlemail
 #
 sub usage()
 {
-    print STDOUT "Usage: idleswap [-r] <pid> <eid>\n";
+    print STDOUT "Usage: idleswap [-i | -a] <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "r";
+my  $optlist = "ia";
 
 #
 # Configure variables
@@ -30,68 +29,50 @@ my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $swapexp	= "$TB/bin/swapexp";
 
-#
 # Testbed Support libraries
-#
 use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
 
-#
 # Locals.
-#
-my $request	= 0;
-    
-#
+my $idleswap = 0;
+my $autoswap = 0;
+
 # Untaint the path
-# 
 $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-#
 # Turn off line buffering on output
-#
 $| = 1;
 
-#
 # We don't want to run this script unless its the real version.
-# 
 if ($EUID != 0) {
     die("*** $0:\n".
 	"    Must be root! Maybe its a development version?\n");
 }
 
-#
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
-# 
 if ($UID == 0) {
     die("*** $0:\n".
 	"    Please do not run this as root! Its already setuid!\n");
 }
 
-#
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
-#
 %options = ();
-if (! getopts($optlist, \%options)) {
-    usage();
-}
+if (! getopts($optlist, \%options)) { usage(); }
+if (defined($options{"i"})) { $idleswap = 1; }
+if (defined($options{"a"})) { $autoswap = 1; }
 
-if (defined($options{"r"})) {
-    $request = 1;
-}
 if (@ARGV != 2) {
     usage();
 }
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
 
-#
 # Untaint the arguments.
-#
 if ($pid =~ /^([-\@\w.]+)$/) {
     $pid = $1;
 }
@@ -105,9 +86,7 @@ else {
     die("Tainted argument $eid!\n");
 }
 
-#
 # Only admins can forcibly swap an idle experiment out.
-#
 if (! TBAdmin($UID)) {
     die("*** $0:\n".
 	"    Only testbed administrators can issue a forcible swap!\n");
@@ -123,9 +102,7 @@ if (AuditStart(0)) {
     exit(0);
 }
 
-#
 # Need to know the creator of the experiment.
-#
 my $query_result =
     DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
 
@@ -137,38 +114,33 @@ my %hashrow = $query_result->fetchhash();
 my $creator = $hashrow{'expt_head_uid'};
 my $gid     = $hashrow{'gid'};
 
-if (! $request) {
-    #
-    # Fire off the swap and exit.
-    #
-    # Flip to the creator. The swap happens as the creator of the
-    # experiment.
-    #
-    my ($unix_uid, $unix_gid, $unix_gname);
-
-    (undef,undef,$unix_uid) = getpwnam($creator) or
-	die("*** $0:\n".
-	    "    No such user $creator\n");
-    TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
-	die("*** $0:\n".
-	    "    No such group $pid/$gid\n");
-
-    # Send the email now, which terminates the audit.
-    AuditEnd();
-    
-    $EGID = $GID    = $unix_gid;
-    $EUID = $UID    = $unix_uid;
-    $ENV{'USER'}    = $creator;
-    $ENV{'LOGNAME'} = $creator;
-    
-    exec "$swapexp -i -s out $pid $eid";
-    die("*** $0:\n".
-	"    Failed to exec $swapexp!\n");
-}
-
+# Fire off the swap and exit.
 #
-# Stub out the request function. Mac can move this part in when its
-# time to automate the email.
-#
+# Flip to the creator. The swap happens as the creator of the
+# experiment.
+my ($unix_uid, $unix_gid, $unix_gname);
+
+(undef,undef,$unix_uid) = getpwnam($creator) or
+  die("*** $0:\n".
+      "    No such user $creator\n");
+TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gname) or
+  die("*** $0:\n".
+      "    No such group $pid/$gid\n");
+
+# Send the email now, which terminates the audit.
+AuditEnd();
+
+$EGID = $GID    = $unix_gid;
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $creator;
+$ENV{'LOGNAME'} = $creator;
+
+if    ($idleswap) { $arg = "-i"; }
+elsif ($autoswap) { $arg = "-a"; }
+else { $arg = "-f"; }
+
+exec "$swapexp $arg -s out $pid $eid";
+
 die("*** $0:\n".
-    "    The -r option is not implemented yet!\n");
+    "    Failed to exec $swapexp!\n");
+
