@@ -1,0 +1,61 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h1>Running an Experiment in a ''Secure'' Environment</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#Overview">Overview</a>
+<li> <a href="#Use">Use</a>
+<li> <a href="#Limitations">Current Limitations</a>
+<li> <a href="#KnownBugs">Known Bugs</a>
+<li> <a href="#Example">A Complete Example</a>
+</ul>
+
+<hr>
+<a NAME="Overview"></a><h2>Overview</h2>
+<p>
+Originally, the goal of an Emulab experiment was to provide an isolated
+environment in which to run tests.  Isolation here primarily meant resource
+isolation--preventing artifacts in an experiment due to other experiments or
+outside influences.  While basic authentication and protection mechanisms
+were used, the threat model being addressed was accidental "attacks" on
+isolation; e.g., a misconfigured interface causing flooding of another
+experiment's network.
+We are now building up the Emulab infrastructure to allow experimentation
+with more potent threats, in particular ''malware'', which attempts to
+actively exploit weaknesses on nodes and in the network.
+</p><p>
+Since Emulab is intended for use by researchers, we did not unnecessarily
+want to restrict access from the Internet to experimental nodes and visa-versa.
+Thus the central Emulab firewall is fairly permissive.  For high-risk
+experiments, this is not acceptable.  To address this, we have added
+<a href="docwrapper.php3?docname=firewall.html">per-experiment control net
+firewalls</a>.
+</p><p>
+Another decision made early on, for the convenience of users, was for extensive
+use of shared infrastructure such as a shared filesystem and a central login
+machine within Emulab allowing for efficient control of experiments.  Such
+shared infrastructure provides an easy target for malware, so through the
+use of <a href="elabinelab.php3">''Emulab in Emulab''</a>
+we provide per-experiment Emulab infrastructure.
+</p><p>
+By combining the two facilities, we enable containment of high-risk experiments
+without sacrificing the features that make Emulab so easy to use.
+</p>
+<a NAME="Use"></a><h2>Use</h2>
+<p>
+</p>
+<a NAME="Limitations"></a><h2>Limitations</h2>
+<p>
+</p>
+<a NAME="KnownBugs"></a><h2>Known Bugs</h2>
+<p>
+</p>
+<a NAME="Example"></a><h2>A Complete Example</h2>
+<p>
+</p>

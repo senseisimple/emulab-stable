@@ -1,10 +1,10 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2004 University of Utah and the Flux Group.
+   Copyright (c) 2004, 2005 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
-<h1>Simple Firewalled Experiment Support in Emulab</h1>
+<h1>Firewalled Experiment Support in Emulab</h1>
 </center>
 
 <h2>Contents</h2>
@@ -27,17 +27,17 @@ between nodes within an experiment, that is, the firewall is not part of
 your NS-specified network topology.
 The purpose of an Emulab firewall is to prevent experimental traffic from
 escaping, via the control network, to the internet due to a mis-configured
-application or router within an experiment.  In its initial
-<a href="#Limitations">limited</a>
-form, the Emulab firewall is intended to prevent accidental misuse and not
-malicious abuse.
+application or router within an experiment.  Control net firewalls are also
+a key component of Emulab ``high-security'' experiment environments.
 </p><p>
 The firewall is implemented by allocating an additional node to the experiment.
-This node is set as the default route for all other nodes in the experiment.
-Thus, all outgoing, non-experimental traffic will pass through the node.
-This firewall node, running IPFW on FreeBSD, can be configured in a number
-of ways to block or allow certain types of traffic.  Inbound traffic directed
-to the nodes does not pass through the firewall.
+Through switch-enforced VLANs, the experiment is given its own private
+control network connecting all nodes in the experiment.  Network traffic
+between experiment nodes and any hosts outside the experiment (Emulab
+infrastructure or Internet hosts in general) must pass through the firewall
+node.  The firewall is setup as a filtering layer2 bridge using IPFW2
+on FreeBSD and can be configured in a number
+of ways to block or allow certain types of traffic.
 </p>
 <a NAME="Use"></a><h2>Use</h2>
 <p>
@@ -46,27 +46,36 @@ in your NS file (there is currently no way to add a firewall via the Emulab
 client or experiment creation GUI):
 	<code><pre>
 	set fw [new Firewall $ns]
+	$fw set-type &lt;type&gt;
 	$fw set-style &lt;style&gt;
 	</code></pre>
 This tells Emulab to add a node called "fw" to your experiment, and provides
-a handle for adding rules to the firewall.  The "style" of the firewall is
-one of:
+a handle for adding rules to the firewall.
+The "type" of the firewall should be <code>ipfw2-vlan</code>.
+Another type, <code>ipfw</code>, <a href="#YeOleImpl">has been deprecated</a>
+and should not be used.
+In the future, there may be additional types for different firewall
+implementations (e.g., Linux with ipchains).
+The "style" of the firewall is one of:
 <ul>
-<li><i>closed</i>: A closed firewall allowing no outgoing traffic.
-This translates to the IPFW rule "deny ip from any to any". 
-<li><i>open</i>: A completely open firewall allowing all traffic.
-This translates to the IPFW rule "allow ip from any to any". 
-<li><i>basic</i>: A mostly closed firewall allowing only <code>ssh</code>
-and ICMP traffic.
+<li><code>open</code>: A completely open firewall allowing all traffic.
+This gives you a hook for setting up custom firewall rules (below).
+<li><code>closed</code>: A closed firewall allowing no communication with
+the outside world.  Nodes can still communicate in a limited fashion with
+the Emulab infrastructure.
+<li><code>basic</code>: A mostly closed firewall allowing only <code>ssh</code>
+connections with the outside world.
 </ul>
 The firewall can be augmented with user-specified rules as well:
 	<code><pre>
 	$fw add-rule &lt;IPFW format rule string&gt;
 	</code></pre>
-In the basic form, rules are numbered starting at 1.  Thus, rules are
+In the basic form, rules are numbered starting at 100.  Thus, rules are
 interpreted in the firewall in the order in which they appear in the NS file.
-The default rules for a firewall style are numbered starting at 50000, so
-user-specified rules are also interpreted before the default rule set.
+The default rules for a firewall style have numbers either less than 100
+or greater than 60000, so
+user-specified rules are interpreted ahead of all but the most important
+default rules.
 There is also a method allowing explicit numbering of rules:
 	<code><pre>
 	$fw add-numbered-rule &lt;ruleno&gt; &lt;IPFW format rule string&gt;
@@ -76,44 +85,27 @@ linked rules.  A <a href="#Example">complete example</a> is shown below.
 </p>
 <a NAME="Limitations"></a><h2>Limitations</h2>
 <p>
-One should note carefully the following issues, some of which limit an
-Emulab firewall from being safely used as a containment environment for
-Really Bad Stuff.
-Our ultimate goal is to produce a highly secure containment environment,
-this implementation is only the first step.
+One should note carefully the following issues.
 <ul>
-<li><b>The firewall is implemented using OS-provided routing</b>.
-Specifically, every node has its default route changed to point to the
-firewall node.  Sufficiently powerful applications could accidentally
-or intentionally change the default route back to the Emulab router
-thus circumventing all protection.  In the near future, nodes in an
-experiment will have their control net interfaces in a private LAN
-not including the Emulab router.  Thus they will be able to change their
-default route, but they won't be able to reach the outside world.
 <li><b>The firewall is just another node in the topology</b>.
 It is setup just like all other nodes, this includes enabling accounts
 and NFS access.  Thus anyone who can login to a node, can login to the
-firewall.  If they are root on a node, they are root on the firewall.
+firewall.  This is not as bad as it may sound since, in all but the open
+firewall style, the firewall node rejects all packets sent to it from the
+inside.  However, the nodes and the firewall do share common filesystems
+in /users and /proj.
 In the future, firewalls will have much more constrained access.
-<li><b>Intra-Emulab traffic is not firewalled</b>.
-As mentioned, this is not a firewall in the experiment topology so traffic
-over topology links (10.x.x.x address) is not firewalled.
-Additionally, traffic between nodes over the control net
-(155.98.36.x addresses) is not filtered since the control net is a LAN
-and all other nodes are directly reachable.  This will probably not
-change in the future.  Finally, traffic between the nodes and the Emulab
-infrastructure (boss and ops) does not pass through the firewall.  Host
-routes are explicitly setup to avoid the firewall.  This is a simplification
-for node setup, but will be fixed in the future.
-<li><b>The firewall must run Freebsd with IPFW</b>.
+<li><b>The firewall must run FreeBSD with IPFW</b>.
 However, this is not fundamental to the design and we hope that the
 firewall syntax will be general enough to support at least Linux with
 ipchains as well.
 <li><b>The firewall rule syntax is fixed</b>.
-In particular, it allows only fixed strings with no form of variable
-substitution.  This is evident in the <a href="#Example">example</a>
-where there are a number of unsightly hardwired IP addresses for Emulab
-infrastructure.
+In particular, it allows only fixed strings with no form of per-user
+or per-experiment variable substitution.
+There is a limited form of substitution used to plug in Emulab-wide
+parameters such as the Utah control network subnet.
+Since IPFW allows hostnames, you can at least
+use symbolic host names in place of IP addresses in your rules.
 <li><b>Firewall setup is static</b>.
 Rules are specified in the NS file at experiment creation time.
 Rules can be changed using experiment modify, or by logging into the firewall
@@ -132,7 +124,19 @@ guarantee that the affected traffic will make it to the outside world.
 <a NAME="KnownBugs"></a><h2>Known Bugs</h2>
 <p>
 There is a mighty fine line between a "limitation" and a "bug".
-For now, we are viewing things as the  <a href="#Limitations">former</a>.
+But this one probably crosses the line:
+<ul>
+<li><b>The firewall exposes more of the infrastructure than it should</b>.
+The Emulab node self-configuration and monitoring infrastructure uses a
+lot of difference services on the boss and ops nodes.  At the current time,
+we allow all those through.  Moreover, many of these, such as TFTP, cannot
+be pinned down too precisely in firewall rules, so the rules are more open
+than we would prefer.  Additionally, we also currently preserve the shared
+filesystem access model inside firewalled experiments, which permits not
+only attacks on NFS but allows for trojans to be placed in the filesystems.
+</ul>
+For particularly anti-social applications, you should check out
+<a href="elabinelab.php3">Emulab in Emulab</a>.
 </p>
 <a NAME="Example"></a><h2>A Complete Example</h2>
 <p>
@@ -149,17 +153,20 @@ Here is the NS code for a simple two node experiment with a firewall:
 
 	# create a firewall node
 	set fw [new Firewall $ns]
+	$fw set-type ipfw2-vlan
 	$fw set-style basic
 
-	# allow tracroute through
-	$fw add-rule "allow udp from 155.98.36.0/22 to any 33434-33524"
-	$fw add-rule "allow udp from any 33434-33524 to 155.98.36.0/22"
+	# allow traceroute through
+	$fw add-rule "allow udp from EMULAB_CNET to any 33434-33524"
+	$fw add-rule "allow udp from any 33434-33524 to EMULAB_CNET"
 
 	$ns run
 	</code></pre>
-Notice that the second added rule filters incoming traffic and
-is not strictly necessary right now since inbound traffic does not pass
-through the firewall.  This NS specification yields a topology that looks like:
+<code>EMULAB_CNET</code> is an example of the limited variable replacement
+capability.  In the Utah case, it expands to "155.98.36/22".  Note that
+even though this rule names the entire control net space of all experiments,
+it effects only those nodes within this experiment since the firewall is
+per-experiment.  This NS specification yields a topology that looks like:
 <br>
 <img src="firewall-experiment.png" alt="&lt;Three nodes, two connected&gt;">
 <br>
@@ -175,21 +182,68 @@ The <code>Experiment Details</code> web page for the experiment lists
 all the rules for the firewall:
 <code><pre>
 Firewall information:
-ID              Type     Style    Rule# Rule
---------------- -------- -------- ----- -----------------------------------
-fw              ipfw     basic        1 allow udp from 155.98.36.0/22 to any 33434-33524
-                                      2 allow udp from any 33434-33524 to 155.98.36.0/22
-                                  55000 allow ip from me to me
-                                  55100 allow ip from me to 155.98.32.0/23
-                                  55101 allow ip from 155.98.32.0/23 to me
-                                  55200 allow icmp from any to 155.98.36.0/22
-                                  55201 allow icmp from 155.98.36.0/22 to any
-                                  55300 allow tcp from any to 155.98.36.0/22 22
-                                  55301 allow tcp from 155.98.36.0/22 22 to any
-                                  55400 allow tcp from me 16534 to 155.98.36.0/22
-                                  55401 allow tcp from 155.98.36.0/22 to me 16534
-                                  55500 allow udp from 224.4.0.0/16 2917 to 224.4.0.0/16 2917
-                                  65534 deny ip from any to any
+ID              Type       Style    Rule# Rule
+--------------- ---------- -------- ----- -----------------------------------
+fw              ipfw2-vlan basic        2 check-state
+                                       10 allow all from me to me
+                                       11 deny all from any to me via vlan0
+                                       12 deny all from any to EMULAB_CNET via vlan0
+                                       13 allow mac-type arp
+                                       14 allow all from any to any frag
+                                       50 allow udp from any to EMULAB_NS 53 keep-state
+                                      100 allow udp from EMULAB_CNET to any 33434-33524
+                                      101 allow udp from any 33434-33524 to EMULAB_CNET
+                                    60000 allow tcp from any to any 22 setup keep-state
+                                    60010 allow ip from any to ntp1,ntp2 123 keep-state
+                                    60020 allow udp from any 514 to ops 514
+                                    60030 allow ip from any to fs 111 keep-state
+                                    60031 allow udp from any not 0-700 to fs keep-state
+                                    60032 allow udp from any to fs 900 keep-state
+                                    60033 allow udp from any to fs 2049 keep-state
+                                    60040 allow tcp from any to boss 5999 setup keep-state
+                                    60050 allow ip from any to ops 2917 keep-state
+                                    60060 allow udp from any to boss 8509
+                                    60080 allow udp from any to EMULAB_MCADDR
+                                    60081 allow udp from boss EMULAB_MCPORT to any EMULAB_MCPORT
+                                    60082 allow igmp from any to any
+                                    60090 allow icmp from any to any
+                                    61000 allow udp from any 68 to 255.255.255.255 67 recv vlan0
+                                    61001 allow udp from any 67 to any 68 in not recv vlan0
+                                    61010 allow udp from any to boss,ops 69 keep-state
+                                    61011 allow udp from boss,ops not 0-1023 to any not 0-1023 keep-state
+                                    61020 allow udp from any to boss 6969 keep-state
+                                    61021 allow ip from any to boss 7777 keep-state
+                                    65534 deny all from any to any
 </code></pre>
-Notice the rules involving multicast (224) and 155.98.32/23.  These allow all
-nodes to talk to Emulab infrastructure.
+Again, notice the rules with <code>EMULAB_</code> variables.  <code>NS</code>
+is the Emulab name server IP address, <code>CNET</code> the control network
+subnet, <code>MCADDR</code> and <code>MCPORT</code>, the multicast addresses
+and ports used by the Frisbee disk loader.  Other rules involving the hosts
+<code>boss</code>, <code>ops</code>, <code>fs</code>, <code>ntp1</code>,
+and <code>ntp2</code>, are Emulab infrastructure related.
+</p>
+<a NAME="YeOleImpl"></a><h2>The deprecated <code>ipfw</code> firewall</h2>
+<p>
+An earlier, less secure, firewall implementation did not require support
+from the switching infrastructure.  This "software" firewall solution,
+still allocated an extra node to act as an IP firewall.
+This node was then set as the default route for all other nodes in the
+experiment.  Thus, all outgoing, non-experimental traffic was passed through
+the node.  Inbound traffic directed to the nodes did not pass through the
+So in addition to <a href="#Limitations">the limitations above</a>
+you can add the following:
+<ul>
+<li><b>The firewall is implemented using OS-provided routing</b>.
+Specifically, every node has its default route changed to point to the
+firewall node.  Sufficiently powerful applications could accidentally
+or intentionally change the default route back to the Emulab router
+thus circumventing all protection.
+<li><b>Intra-Emulab traffic is not firewalled</b>.
+Traffic between nodes over the control net
+(155.98.36.x addresses) is not filtered since the shared control net is a LAN
+and all other nodes are directly reachable.
+Additionally, traffic between the nodes and the Emulab
+infrastructure (boss and ops) does not pass through the firewall.  Host
+routes are explicitly setup to avoid the firewall.
+</ul>
+</p>
