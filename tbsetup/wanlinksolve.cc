@@ -141,9 +141,6 @@
 // BAM!
 using namespace std;
 
-// keep freebsd from mumbling about gets(3) being unsafe.
-#define gets( x ) fgets( x, sizeof( x ), stdin  )
-
 // some code to enable when the solver wedges and we don't know why.
 #ifdef DEBUG
 int wedgecount;
@@ -652,13 +649,13 @@ int main( int argc, char ** argv )
 
   {
     if (verbose > 1) { printf("How many physical nodes?\n"); }
-    gets( line );
+    fgets( line, sizeof( line ), stdin );
     sscanf( line, "%i", &pnodes );
 
     if (verbose > 1) { printf("Okay, enter %i names for the physical nodes, one per line.\n", pnodes ); }
     for (int i = 0; i < pnodes; i++) {
       char name[1024];
-      gets( line );
+      fgets( line, sizeof( line ), stdin );
       sscanf( line, "%s", name );
       pnodeNames[i] = string( name );
       reversePNodeNames[string(name)] = i;
@@ -669,7 +666,7 @@ int main( int argc, char ** argv )
 			    " maximum number of virtual nodes allowed on each"
 			    " physical node.\n", pnodes ); }
       for (int i = 0; i < pnodes; i++) {
-	gets( line );
+	fgets( line, sizeof( line ), stdin );
 	sscanf( line, "%i", &(maxplex[i]));
 	available += maxplex[i];
       }
@@ -686,7 +683,7 @@ int main( int argc, char ** argv )
       }
       for (int y = 0; y < pnodes; y++) {
 	char * linePos = line;
-	gets( line );
+	fgets( line, sizeof( line ), stdin );
 	while (*linePos == ' ') { linePos++; } // skip leading whitespace
 	for (int x = 0; x < pnodes; x++) {
 	  float temp;
@@ -708,7 +705,7 @@ int main( int argc, char ** argv )
 
   {
     if (verbose > 1) { printf("How many virtual nodes?\n"); }
-    gets( line );
+    fgets( line, sizeof( line ), stdin );
     sscanf( line, "%i", &vnodes );
 
     if (vnodes > available) {
@@ -725,7 +722,7 @@ int main( int argc, char ** argv )
     for (int i = 0; i < vnodes; i++) {
       char name[1024];
       char pname[1024];
-      gets( line );
+      fgets( line, sizeof( line ), stdin );
       if (sscanf( line, "%s %s", name, pname ) == 2) {
 	map< string, int >::iterator it = reversePNodeNames.find( string( pname ) );
 	if (it == reversePNodeNames.end()) {
@@ -750,7 +747,7 @@ int main( int argc, char ** argv )
       }
       for (int y = 0; y < vnodes; y++) {
 	char * linePos = line;
-	gets( line );
+	fgets( line, sizeof( line ), stdin );
 	while (*linePos == ' ') { linePos++; } // skip leading whitespace
 	for (int x = 0; x < vnodes; x++) {
 	  float temp;
@@ -833,9 +830,9 @@ int main( int argc, char ** argv )
 		&(currentPool[pickABest( currentPool )]) );
       }
 
-      if (stddev < 0.1f) {
-	himutate = false;
-      }
+      //if (stddev < (avg / 10.0f))) {
+      himutate = false;
+      //}
 
       sortByError( nextPool );
 
