@@ -17,14 +17,27 @@ $isadmin = ISADMIN($uid);
 
 chdir("buildui");
 
-echo "<applet code=\"Netbuild.class\" width=800 height=600>
-       <param name=exporturl
-              value=\"$TBBASE/beginexp.php3\">
-       <pre>
-         The applet should be right here. Must be an error or something.
-       </pre>
-      </applet>\n";
 ?>
+
+<applet code="Netbuild.class" width=800 height=600>
+  <param name=exporturl
+         value="<?php echo $TBBASE?>/beginexp.php3">
+<pre>
+We're sorry, NetBuild in unable to run,
+as it seems your browser doesn't support Java.
+
+You should either enable Java in your browser, 
+download the latest version of a Java-compliant browser 
+(such as Netscape or Internet Explorer,) or quit using that 
+browser that doesn't support Java, you hippie.
+
+If you decide its worth it (and we think you will,) come back and enjoy NetBuild.
+We'll still be here waiting for you.	
+
+   - Testbed Ops
+</pre>
+</applet>
+
 <hr>
 <h2>Basic usage:</h2>
 <list>
