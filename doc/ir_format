@@ -1,6 +1,9 @@
-Version 0.3
+Version 0.4
 
 ChangeLog:
+
+0.4:
+Added ip and ip-mac sections.
 
 0.3:
 Incorporated a number of previous, unlogged changes.
@@ -163,6 +166,15 @@ START events
 # Future events might include traffic control, routing changes, etc.
 END events
 
+START ip
+# Records of the form
+# <node> <dst> <ip>
+END ip
+
+START ip-mac
+# Records of the form
+# <mac> <ip>
+END ip
 ----------------------------------------------------------------------
 
 Other possible sections:

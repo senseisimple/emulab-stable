@@ -1,0 +1,37 @@
+This document described the commands that are imbedded inside a ns
+file to express more, testbed specific information.
+
+Format
+
+All TB commands are in the form:
+
+#TB <command> <arguments>
+
+The prefix #TB both distinguishes them from ns commands and insures
+that the ns parser will ignore them (# is the comment character for
+Tcl and ns).
+
+
+Commands
+
+
+#TB set-ip <node> <ip>
+
+Ex.
+
+#TB set-ip node1 198.168.0.5
+
+This commands indicates the node <node> should be configured to have
+the IP address <ip>.
+
+
+#TB set-ip-interface <node> <dst> <ip>
+
+Ex.
+
+#TB set-ip-interface node2 node3 198.168.0.5
+
+This commands is used to set the IP address for nodes with multiple
+links.  It sets the IP for the interface the leads to <dst>.
+Currently there is no support when nodes have multiple connections
+between them.
