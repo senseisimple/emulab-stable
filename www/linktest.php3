@@ -232,7 +232,8 @@ if (!$confirmed) {
     SHOWEXP($pid, $eid, 1);
 
     echo "<br>\n";
-    echo "<form action=linktest.php3 method=post target=_linktest>";
+    echo "<form action=linktest.php3 method=post
+                target=Linktest_${pid}_${eid}>";
     echo "<input type=hidden name=pid value=$pid>\n";
     echo "<input type=hidden name=eid value=$eid>\n";
 
@@ -270,6 +271,7 @@ if (!$confirmed) {
 # Throw up a simple frameset.
 #
 echo "<html>
+      <title>Linktest for $pid/$eid</title>
       <script language=JavaScript>
           <!--
           function LinktestDone() {
