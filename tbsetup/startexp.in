@@ -214,14 +214,16 @@ if (system("/bin/cp", "$tempns", "$nsfile") != 0) {
 # Run the various scripts. We want to propogate the error from tbprerun
 # and tbrun back out, hence the bogus looking errorstat variable.
 #
-if (system("$tbdir/tbprerun -nologfile $pid $eid $nsfile") != 0) {
+#if (system("$tbdir/tbprerun -nologfile $pid $eid $nsfile") != 0) {
+if (system("$tbdir/tbprerun $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbprerun failed!\n");
 }
 # So fatal errors run tbend.
 $cleanme = 1;
 
-if (system("$tbdir/tbrun -nologfile $pid $eid $irfile") != 0) {
+#if (system("$tbdir/tbrun -nologfile $pid $eid $irfile") != 0) {
+if (system("$tbdir/tbrun $pid $eid $irfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbrun failed!\n");
 }

@@ -11,7 +11,7 @@ include $(OBJDIR)/Makeconf
 LIB_STUFF	= event.tcl stubs.tcl link.tcl \
 		  tcl-object.tcl node.tcl sim.tcl lan.tcl \
 		  tb_compat.tcl
-LIBEXEC_STUFF	= parse.tcl postparse 
+LIBEXEC_STUFF	= parse.tcl postparse conftrafgen
 
 #
 # Force dependencies on the scripts so that they will be rerun through

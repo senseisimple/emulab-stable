@@ -91,6 +91,12 @@ if (! -r $irfile) {
     exit(1);
 }
 
+&tbs_out("Preparing traffic generators.\n");
+if (&tbs_exec("conftrafgen $nsfile $tbcmdfile")) {
+    &tbs_out("Backward Compatability Failed.\n");
+    exit(1);
+}
+
 #&tbs_out("Backward Compatability.\n");
 if (&tbs_exec("extract_tb $nsfile $tbcmdfile")) {
     &tbs_out("Backward Compatability Failed.\n");
