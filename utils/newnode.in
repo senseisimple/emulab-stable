@@ -10,13 +10,13 @@
 # newnode - a script for moving nodes from the new_ tables into production.
 #
 
-use lib '/usr/testbed/devel/ricci/lib';
+use lib '@prefix@/lib';
 
 use libdb;
 
 use strict;
 
-my $TB = "/usr/testbed/devel/ricci";
+my $TB = "@prefix@";
 
 my $switchmac = "$TB/sbin/switchmac";
 my $sched_reload = "$TB/sbin/sched_reload";
@@ -44,7 +44,8 @@ my @node_ids = @ARGV;
 print "Getting MAC addresses from the switches (this could take a while!)\n";
 open(MAC,"$switchmac |") or die "Unable to fork: $!\n";
 my %wires;
-while (my $line = pop @switchmac) {
+my @lines = ('000000000000,intel1/1.17,1,unknown');
+while (my $line = <MAC>) {
     chomp $line;
     my ($MAC,$switchport,$vlan,$iface) = split /,/, $line;
     if ($switchport !~ /^([\w-]+)\/(\d+)\.(\d+)$/) {
@@ -52,7 +53,6 @@ while (my $line = pop @switchmac) {
     }
     my ($switch, $card, $port) = ($1,$2,$3);
     $wires{$MAC} = [$switch, $card, $port];
-    print "filling wires{$MAC}\n";
 }
 
 #
@@ -75,13 +75,13 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Grab information about the node from the new_nodes table
     #
-    $query_result = DBQueryFatal("SELECT type, IP FROM new_nodes " .
-	"WHERE node_id='$node_id'");
+    $query_result = DBQueryFatal("SELECT new_node_id, type, IP " .
+	"FROM new_nodes WHERE node_id='$node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: No pending node with that name exists!\n";
 	next NODE;
     }
-    my ($type, $IP) = $query_result->fetchrow();
+    my ($new_node_id, $type, $IP) = $query_result->fetchrow();
 
     #
     # Make sure that the new node is of a valid type, and grab a few other
@@ -99,7 +99,7 @@ NODE: foreach my $node_id (@node_ids) {
     # Grab the node's MACs from the new_interfaces table
     #
     $query_result = DBQueryFatal("SELECT iface, MAC, interface_type " .
-	"FROM new_interfaces WHERE node_id='$node_id'");
+	"FROM new_interfaces WHERE new_node_id='$new_node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: Must have at least one interface!\n";
 	next NODE;
@@ -194,8 +194,8 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Remove the node from the new_ tables
     #
-    DBQueryFatal("DELETE FROM new_nodes WHERE node_id='$node_id");
-    DBQueryFatal("DELETE FROM new_interfaces WHERE node_id='$node_id'");
+    DBQueryFatal("DELETE FROM new_nodes WHERE new_node_id=$new_node_id");
+    DBQueryFatal("DELETE FROM new_interfaces WHERE node_id=$new_node_id");
 
     print "$node_id succesfully added!";
 
