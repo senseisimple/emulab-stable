@@ -8,6 +8,7 @@ import libplab
 import xmlrpclib
 import time
 import socket
+import os
 
 TRIES = 3
 SLEEPINT = 5
