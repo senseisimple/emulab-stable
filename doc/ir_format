@@ -34,7 +34,7 @@ Sections can be within sections and no order is imposed.
 
 Sections:
 
-Topology: describes the base physical topology of the network.  
+Topology: describes the base desired topology of the network.  
 
 START topology
 START nodes
@@ -55,11 +55,12 @@ START links
 # <loss_rate> is the rate of loss.  If omitted assumed to be 0.
 END links
 START lans
-# <lan> <switch> <links>
+# <lan> "<nodes>" <bw> <delay> <links>
 # <lan> is a lan identifier and also acts as a node identifier for the
 # purposes of links.
-# <switch> is a string that maps to a physical switch.
-# <links> is a space separated list of links that attach to the lan.
+# <nodes> is a space seperated list of nodes
+# <bw> is the bandwidth of the LAN
+# <delay> is the latency of the LAN
 END lans
 END topology
 
