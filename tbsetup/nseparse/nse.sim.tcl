@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -307,6 +307,9 @@ Simulator instproc spitxml_init {} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
+    # Add a marker so xmlconvert can tell where user output stops and
+    puts "#### BEGIN XML ####"
+    # ... XML starts.
     puts "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
     puts "<virtual_experiment pid='$pid' eid='$eid'>"
 }
