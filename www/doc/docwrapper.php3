@@ -30,7 +30,7 @@ if (!$printable) {
 #
 # Need to sanity check the path! Allow only [word].{html,txt} files
 #
-if (!preg_match("/^[\w-]+\.(html|txt)$/", $docname)) {
+if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
     USERERROR("Illegal document name: $docname!", 1);
 }
 
