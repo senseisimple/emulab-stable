@@ -197,7 +197,7 @@ use libtestbed;
 my $TB		= "@prefix@";
 
 # Locals
-my $debug         = 1;
+my $debug         = 0;
 my $expt_min;
 my $expt_max;
 my %virt_types    = ();  # Indexed by virt type, gives number desired
