@@ -3187,7 +3187,8 @@ COMMAND_PROTOTYPE(doisalive)
 
 	mydb_update("update nodes "
 		    "set status='up',status_timestamp=now() "
-		    "where node_id='%s'", nodeid);
+		    "where node_id='%s' or phys_nodeid='%s'",
+		    nodeid, nodeid);
 
 	/*
 	 * Return info about what needs to be updated. 
