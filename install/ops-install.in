@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,6 +33,7 @@ my $BOSSNODE    = '@BOSSNODE@';
 my $BOSSNODE_IP = '@BOSSNODE_IP@';
 my $USERNODE_IP = '@USERNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
+my $WINSUPPORT  = @WINSUPPORT@;
 
 # For /share export below.
 my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
@@ -93,6 +94,7 @@ my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
+my $MV         = "/bin/mv";
 my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
 
@@ -113,7 +115,7 @@ my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
 my $CRONTAB         = "/etc/crontab";
 my $AUTHKEYS	    = "/root/.ssh/authorized_keys";
-
+my $SMBCONF         = "/usr/local/etc/smb.conf";
 
 #
 # Some directories we care about
@@ -258,6 +260,7 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     AppendToFileFatal($RCCONF,
 		      qq|sendmail_enable="YES"|,
 		      qq|nfs_server_enable="YES"|,
+		      ($WINSUPPORT ? qq|enable_smbd="YES"| : ()),
 		      qq|nfs_server_flags="-u -t -n 16"|,
 		      qq|syslogd_flags=""|);
 };
@@ -468,6 +471,22 @@ Phase "sudoers", "Editing $SUDOERS", sub {
     DoneIfEdited($SUDOERS);
     AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
 };
+
+if ($WINSUPPORT) {
+    Phase "samba", "Setting up Samba", sub {
+	Phase "smb.conf", "Installing smb.conf", sub {
+	    DoneIfEdited($SMBCONF);
+	    ExecQuietFatal("$CP -pf $TOP_OBJDIR/install/smb.conf $SMBCONF");
+	    AppendToFileFatal($SMBCONF,
+			      "# This file created by Emulab Control");
+	};
+	Phase "samba.sh", "Installing samba.sh", sub {
+	    DoneIfExists("$RCDIR/samba.sh");
+	    DoneIfDoesntExist("$RCDIR/samba.sh.sample");
+	    ExecQuietFatal("$MV -f $RCDIR/samba.sh.sample $RCDIR/samba.sh");
+	};
+    };
+}
 
 Phase "ssh", "Allowing root ssh", sub {
     Phase "sshdconfig", "Permitting root login through ssh", sub {
