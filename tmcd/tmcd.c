@@ -124,6 +124,7 @@ typedef struct {
 	char		class[TBDB_FLEN_NODECLASS];
 	char		creator[TBDB_FLEN_UID];
 	char		swapper[TBDB_FLEN_UID];
+	char		syncserver[TBDB_FLEN_VNAME];	/* The vname */
 	char		role[256];
 	char		testdb[256];
 } tmcdreq_t;
@@ -178,6 +179,7 @@ COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
 COMMAND_PROTOTYPE(doslothdparams);
 COMMAND_PROTOTYPE(doprogagents);
+COMMAND_PROTOTYPE(dosyncserver);
 
 struct command {
 	char	*cmdname;
@@ -220,6 +222,7 @@ struct command {
 	{ "jailconfig",	dojailconfig},
         { "sdparams",   doslothdparams},
         { "programs",   doprogagents},
+        { "syncserver", dosyncserver},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2406,9 +2409,14 @@ COMMAND_PROTOTYPE(doready)
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
-	if (!reqp->allocated) {
+	if (!reqp->allocated)
 		return 0;
-	}
+
+	/*
+	 * Vnodes not allowed!
+	 */
+	if (reqp->isvnode)
+		return 0;
 
 	/*
 	 * Update the ready_bits table.
@@ -2443,6 +2451,12 @@ COMMAND_PROTOTYPE(doreadycount)
 	 * Make sure currently allocated to an experiment!
 	 */
 	if (!reqp->allocated)
+		return 0;
+
+	/*
+	 * Vnodes not allowed!
+	 */
+	if (reqp->isvnode)
 		return 0;
 
 	/*
@@ -3521,7 +3535,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		res = mydb_query("select t.class,t.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
-				 " np.role,e.expt_head_uid,e.expt_swap_uid "
+				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
+				 " e.sync_server "
 				 " from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3534,13 +3549,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=np.type and i.card=t.control_net "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 13, reqp->vnodeid, inet_ntoa(ipaddr));
+				 14, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
-				 " e.expt_head_uid,e.expt_swap_uid "
+				 " e.expt_head_uid,e.expt_swap_uid, "
+				 " e.sync_server "
 				 " from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3550,7 +3566,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.card=t.control_net "
 				 "where i.IP='%s'",
-				 13, inet_ntoa(ipaddr));
+				 14, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3592,7 +3608,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		if (row[12]) 
 			strcpy(reqp->swapper, row[12]);
 		else
-			strcpy(reqp->swapper, reqp->swapper);
+			strcpy(reqp->swapper, reqp->creator);
 
 		/*
 		 * If there is no gid (yes, thats bad and a mistake), then 
@@ -3605,6 +3621,9 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 			error("iptonodeid: %s: No GID for %s/%s (pid/eid)!\n",
 			      reqp->nodeid, reqp->pid, reqp->eid);
 		}
+		/* Sync server for the experiment */
+		if (row[13]) 
+			strcpy(reqp->syncserver, row[13]);
 	}
 	if (row[9])
 		reqp->update_accounts = atoi(row[9]);
@@ -4552,6 +4571,35 @@ COMMAND_PROTOTYPE(doprogagents)
 			info("PROGAGENTS: %s", buf);
 	}
 	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return sync server info.
+ */
+COMMAND_PROTOTYPE(dosyncserver)
+{
+	char		buf[MYBUFSIZE];
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("SYNCSERVER: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+	if (!strlen(reqp->syncserver))
+		return 0;
+
+	sprintf(buf, "SYNCSERVER SERVER='%s.%s.%s.%s' ISSERVER=%d\n",
+		reqp->syncserver,
+		reqp->eid, reqp->pid, OURDOMAIN,
+		(strcmp(reqp->syncserver, reqp->nickname) ? 0 : 1));
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	if (verbose)
+		info("%s", buf);
+	
 	return 0;
 }
 
