@@ -164,6 +164,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $| = 1; #Turn off line buffering on output
 
+# Make sure that files written into the experiment subdir are group writable.
+umask(0002);
+
 #
 # Parse command arguments. Since Linktest is run via the event system,
 # parse out pairs of <symbol>=<value>.
