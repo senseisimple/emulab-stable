@@ -573,12 +573,11 @@ int main(int argc, char *argv[])
 			switch (mp.data.opcode) {
 			case MTP_WIGGLE_STATUS:
 			    mws = &mp.data.mtp_payload_u.wiggle_status;
-
+			    ro = roFindRobot(&unknown_bots, mws->robot_id);
 			    switch (mws->status) {
 			    case MTP_POSITION_STATUS_IDLE:
 				/* Got a response to an MTP_WIGGLE_START. */
-				if ((ro = roFindRobot(&unknown_bots,
-						      mws->robot_id)) == NULL) {
+				if (ro == NULL) {
 				    fatal("unknown bot %d\n", mws->robot_id);
 				}
 				else {
@@ -590,6 +589,7 @@ int main(int argc, char *argv[])
 				    lnAddTail(&wiggling_bots, &ro->ro_link);
 				}
 				break;
+				
 			    case MTP_POSITION_STATUS_COMPLETE:
 				/*
 				 * The robot finished his wiggle, check the
@@ -630,7 +630,24 @@ int main(int argc, char *argv[])
 				    lnAppendList(&vt_pool, &wiggle_frame);
 				}
 				break;
+				
 			    default:
+				if ((wiggle_bot != NULL) &&
+				    (wiggle_bot->ro_id == mws->robot_id)) {
+				    ro = wiggle_bot;
+				    wiggle_bot = NULL;
+				}
+				else if (ro != NULL) {
+				    lnRemove(&ro->ro_link);
+				}
+				else if ((ro = roFindRobot(&wiggling_bots,
+							   mws->robot_id)) != NULL) {
+				    lnRemove(&ro->ro_link);
+				}
+				if (ro != NULL) {
+				    gettimeofday(&(ro->ro_lost_timestamp), NULL);
+				    lnAddTail(&lost_bots, &ro->ro_link);
+				}
 				break;
 			    }
 			    break;
