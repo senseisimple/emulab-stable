@@ -2353,3 +2353,12 @@ last_net_act,last_cpu_act,last_ext_act);
 	  orientation float NOT NULL default '0',
 	  PRIMARY KEY  (pid,eid,vname)
 	) TYPE=MyISAM;
+
+1.305: Fix up minimum_nodes and maximum_nodes columns; they were
+       tinyints which is too small.
+
+        alter table experiments change minimum_nodes minimum_nodes \
+            int(6) unsigned default NULL;
+
+        alter table experiments change maximum_nodes maximum_nodes \
+            int(6) unsigned default NULL; 
