@@ -31,7 +31,7 @@ my $TBOPS = libtestbed::TB_OPSEMAIL;
 
 my $debug = 0;
 
-my $DEFAULT_RETRIES = 5;
+my $DEFAULT_RETRIES = 10;
 
 my %Devices=();
 # Devices maps device names to device IPs
@@ -572,9 +572,11 @@ sub snmpitGet($$;$) {
 	}
 
 	#
-	# Don't flood requests too fast
+	# Don't flood requests too fast. Randomize the sleep a little so that
+	# we don't end up with all our retries coming in at the same time.
 	#
-	sleep(1);
+	sleep(2);
+	select(undef, undef, undef, rand(2));
     }
 
     #
