@@ -201,11 +201,10 @@ while {$done == 0} {
     unlock
 }
 
-outs "!!! If any failures occur from now on run tbend to free up resources."
-
 outs "Syncing database with assignment."
 if {[catch "exec $postassign $irFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error syncing database. ($err)"
+    cleanup
     exit 1
 }
 
