@@ -1,21 +1,23 @@
 #!/usr/bin/perl -wT
 use English;
+use Getopt::Std;
    
-#
-# XXX Paper and plastic IP addresses wired into the kernel choice.
-#     Paths to the images are wired in.
-#     Path to netdisk is wired in.
-#     Need to reset the partitions when reloading the entire disk.
-# 
-
 #
 # Schedule the reloading of a disk partition on a node. If the node is
 # currently not reserved, start the loading now after reserving it to 
 # testbed:reloading. Otherwise, put the right info into the database, and 
 # nfree will do it when the node gets freed.
 # 
-# usage: sched_reload <imageid> <imagepart> <imagepath> <node> [node ...]
+# usage: sched_reload [-f] <imageid> <imagepart> <imagepath> <node> [node ...]
 #
+sub usage()
+{
+    print STDOUT "Usage: sched_reload [-f] <imageid> <imagepart> <imagepath> ".
+	"<node> [node ...]\n".
+	"Use the -f to force reload. Fail if node cannot be reserved.\n";
+    exit(-1);
+}
+my  $optlist = "f";
 
 #
 # Configure variables
@@ -23,18 +25,13 @@ use English;
 my $TB     = "@prefix@/bin";
 my $DBNAME = "@TBDBNAME@";
 
-my $rsh		= "sshtb -n -q";
-my $ssh		= "sshtb -n -q";
-my $NETDISK     = "/tftpboot/netdisk";
-my $power	= "$TB/power";
 my $osload      = "$TB/os_load";
-my $ping	= "/sbin/ping";
-my $dbg		= 1;
-my %waitfor     = ();
-my $SAVEUID	= $UID;
-my @row;
 my $name        = "";
 my $mereuser    = 0;
+my $error       = 0;
+my $debug       = 0;
+my $force	= 0;
+my @row;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -43,19 +40,30 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1; #Turn off line buffering on output
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-if ( $#ARGV < 3) {
-    die("Usage: sched_reload <imageid> <imagepart> <imagepath> <node> [node ...]\n".
-	"Schedules the loading of an OS image to a node partition.\n");
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
+if (@ARGV != 4) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = $options{"f"};
+}
+
 my $imageid   = shift;
 my $imagepart = shift;
 my $imagepath = shift;
 my @nodes     = @ARGV;
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 
 #
 # Figure out who called us. Root and admin types can do whatever they
@@ -81,22 +89,6 @@ if ($mereuser) {
 }
 
 #
-# Check to make sure that mere user is allowed to muck with nodes
-#
-#if ($mereuser) {
-#    foreach my $node (@nodes) {
-#	$db_result = $DB->query("select reserved.node_id from reserved ".
-#				"left join proj_memb on ".
-#				"reserved.pid=proj_memb.pid and ".
-#				"reserved.node_id='$node' ".
-#				"where proj_memb.uid='$name'");
-#	if ($db_result->numrows < 1) {
-#	    die("You do not have permission to load images on $node\n");
-#	}
-#    }
-#}
-
-#
 # We only support 0 or 4 right now.
 #
 if ($imagepart != 0 && $imagepart != 4) {
@@ -111,17 +103,6 @@ if (! -e $imagepath) {
 }
 if (! -f $imagepath) {
     die("$imagepath is not a plain file.\n");
-}
-
-#
-# 0 means load the entire disk. 
-#
-my $diskpart = "";
-if ($imagepart) {
-    $diskpart = "wd0 s${imagepart}";
-}
-else {
-    $diskpart = "wd0";
 }
 
 #
@@ -164,24 +145,14 @@ foreach my $node (@nodes) {
       next;
     }
     
-
-    # Always put it in the reloads table so TMCD knows to free it.
-    print STDERR "Scheduling reload for $pc:\n".
-      "Load OS $imageid to partition $imagepart from $imagepath\n";
-    $sth = $DB->query("replace into reloads ".
-		      "(node_id, partition, image_id, path)".
-		      "values ('$pc', '$imagepart',".
-		      "'$imageid', '$imagepath')");
-    if ($sth == 0) {
-      die("Database update failed (reloads). Aborted...\n");
-    }
-
     print STDERR "Checking if $pc is reserved...";
     $sth = $DB->query("select * from reserved where node_id='$pc'");
     if ($sth == 0) {
 	die("Database lookup failed (reserved). Aborted...\n");
     }
-    
+
+    my $allocated = 0;
+   
     if ( ($sth->num_rows()) < 1) {
         print STDERR "Available.\nReserving and adding to list.\n";
 	#
@@ -192,16 +163,36 @@ foreach my $node (@nodes) {
         if ( system($cmd) != 0 ) {
 	    print STDERR "WARNING: Could not reserve $pc!\n";
 	} else {
+	    #
+	    # Kill the last_reservation so that whoever gets the node next
+	    # won't be fooled into thinking a reload is required.
+	    #
+	    $sth = $DB->query("delete from last_reservation ".
+			      "where node_id='$pc'");
 	    push (@load_list,$pc);
+	    $allocated = 1;
 	}
-
-	#
-	# Kill the last_reservation so that whoever gets the node next
-	# won't be fooled into thinking a reload is required.
-	#
-	$sth = $DB->query("delete from last_reservation where node_id='$pc'");
     } else {
         print STDERR "Reserved.\n";      
+    }
+
+    #
+    # If force and not able to reserve, do not pend a reload.
+    # 
+    if ($force && !$allocated) {
+	$error++;
+	next;
+    }
+
+    # Put it in the reloads table so TMCD knows to free it.
+    print STDERR "Scheduling reload for $pc:\n".
+      "Load OS $imageid to partition $imagepart from $imagepath\n";
+    $sth = $DB->query("replace into reloads ".
+		      "(node_id, partition, image_id, path)".
+		      "values ('$pc', '$imagepart',".
+		      "'$imageid', '$imagepath')");
+    if ($sth == 0) {
+      die("Database update failed (reloads). Aborted...\n");
     }
 }
 
@@ -215,4 +206,4 @@ if (@load_list > 0) {
 }
 
 print STDOUT "Reload Scheduling Done!\n";
-exit 0;
+exit $error;
