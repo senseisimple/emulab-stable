@@ -36,11 +36,8 @@ if (isset($view_style) && $view_style == "plab") {
     $view['hide_proj'] = $view['hide_group'] = $view['hide_swap'] =
 	$view['hide_preload'] = $view['hide_batch'] = $view['quiet'] =
 	$view['plab_ns_message'] = 1;
-    include("plabexp_form.php3");
 }
-else {
-    include("beginexp_form.php3");
-}
+include("beginexp_form.php3");
 
 # Need this below;
 $idleswaptimeout = TBGetSiteVar("idle/threshold");
@@ -90,6 +87,8 @@ $url   = "$TBBASE/beginexp_xml.php3?".
          "nocookieuid=$uid&nocookieauth=" . $_COOKIE[$TBAUTHCOOKIE] .
          "&xmlcode=" . urlencode($xmlcode);
 $reply = "";
+
+# TBERROR(urldecode($url), 0);
 
 $fp = @fopen($url, "r");
 if ($fp == FALSE) {

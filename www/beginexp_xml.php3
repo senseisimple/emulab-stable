@@ -74,6 +74,10 @@ if (!isset($xmlcode)) {
 # Convert the xml into PHP datatypes; an array of arguments. We ignore the
 # the method for now. 
 $foo = xmlrpc_decode_request($xmlcode, $meth);
+if (!isset($foo)) {
+    TBERROR("Could not decode XML request!\n\n" .
+	    urldecode($xmlcode) . "\n", 1);
+}
 
 # First argument is the formfields array. 
 $formfields = $foo[0];
@@ -266,7 +270,7 @@ if (count($errors)) {
     XMLERROR();
 }
 
-$exp_desc    = addslashes($formfields[exp_description]);
+$exp_desc    = escapeshellarg($formfields[exp_description]);
 $exp_pid     = $formfields[exp_pid];
 $exp_gid     = ((isset($formfields[exp_gid]) && $formfields[exp_gid] != "") ?
 		$formfields[exp_gid] : $exp_pid);
@@ -387,7 +391,7 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 set_time_limit(0);
 
 $retval = SUEXEC($uid, $unix_gid,
-		 "webbatchexp $batcharg -x \"$exp_expires\" -E \"$exp_desc\" ".
+		 "webbatchexp $batcharg -x \"$exp_expires\" -E $exp_desc ".
 		 "$exp_priority $exp_swappable ".
 		 "-p $exp_pid -g $exp_gid -e $exp_id ".
 		 ($nonsfile ? "" : "$thensfile"),

@@ -60,6 +60,8 @@ function INITFORM($formfields, $projlist)
     $defaults[exp_autoswap_timeout]  = "10";
     $defaults[exp_localnsfile]       = "";
     $defaults[exp_nsfile]            = ""; # Multipart data.
+    $defaults[exp_preload]           = "no";
+    $defaults[exp_batched]           = "no";
 
     #
     # Allow formfields that are already set to override defaults
@@ -472,7 +474,7 @@ function SPITFORM($formfields, $errors)
     if (isset($view['hide_batch'])) {
 	if ($formfields['exp_batched']) {
 	    echo "<input type='hidden' name='formfields[exp_batched]'
-                         value='Yep'\n";
+                         value='$formfields[$value]'\n";
 	}
     } else {
 	echo "<tr>
@@ -500,7 +502,7 @@ function SPITFORM($formfields, $errors)
     if (isset($view['hide_preload'])) { 
 	if ($formfields['exp_preload']) {
 	    echo "<input type='hidden' name='formfields[exp_preload]'
-                         value='Yep'>\n";
+                         value='$formfields[$value]'>\n";
 	}
     } else {
 	echo "<tr>
