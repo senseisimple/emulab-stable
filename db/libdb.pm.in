@@ -1030,8 +1030,9 @@ sub MarkNodeDown($)
     $eid = NODEDEAD_EID;
 
     my $query_result =
-	DBQueryFatal("replace into next_reserve (node_id, pid, eid) ".
-		     "values ('$node', '$pid', '$eid')");    
+	DBQueryFatal("replace into next_reserve " .
+		     "(node_id, pid, eid, rsrv_time) " .
+		     "values ('$node', '$pid', '$eid', now())");    
 
     if ($query_result->num_rows < 1) {
 	DBWarn("WARNING: Could not mark $node down");
