@@ -165,6 +165,8 @@ use vars qw(@ISA @EXPORT);
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
 
+	 TBNodeType TBNodeTypeProcInfo
+
 	 TBExptRemoveVirtualState TBExptBackupVirtualState
 	 TBExptRestoreVirtualState
 
@@ -2958,6 +2960,51 @@ sub TBExptClearBackupState($$)
 	if (-e $pstateDir);
     system("/bin/rm -rf $vstateDir")
 	if (-e $vstateDir);
+}
+
+#
+# Return a node's type and class, in a two-element array
+# If the caller asked for a scalar, give them only the type
+# Returns undef if the node doesn't exist
+#
+sub TBNodeType($)
+{
+    my ($node) = @_;
+    my $result = DBQueryFatal("SELECT n.type, class FROM nodes AS n " .
+			      "LEFT JOIN node_types " .
+			      "    AS nt ON n.type = nt.type " .
+			      "WHERE n.node_id='$node'");
+    if ($result->num_rows() != 1) {
+	return undef;
+    }
+    
+    my ($type, $class) = $result->fetchrow();
+    if (!$class) {
+	return undef;
+    }
+
+    if (wantarray) {
+	return ($type, $class);
+    } else {
+	return $type;
+    }
+}
+
+#
+# Return a node's type CPU type and speed, in a two-element array
+# Returns undef if the type can't be found
+#
+sub TBNodeTypeProcInfo($)
+{
+    my ($type) = @_;
+    my $result = DBQueryFatal("SELECT proc, speed FROM node_types " .
+			      "WHERE type='$type'");
+    if ($result->num_rows() != 1) {
+	return undef;
+    }
+    
+    my ($proc, $speed) = $result->fetchrow();
+    return ($proc, $speed);
 }
 
 #
