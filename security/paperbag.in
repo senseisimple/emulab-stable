@@ -35,6 +35,7 @@ my $TB		= "@prefix@";
 		"delay_config"	=> "$TB/bin/delay_config",
 		"savelogs"	=> "$TB/bin/savelogs",
 		"portstats"	=> "$TB/bin/portstats",
+		"readycount"	=> "$TB/bin/readycount",
 		"eventsys_control" => "$TB/bin/eventsys_control"
 	   );
 
