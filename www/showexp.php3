@@ -141,7 +141,8 @@ WRITESUBMENUBUTTON("Edit Experiment Metadata",
 #
 # Admin and project/experiment leader get this option.
 #
-if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATE)) {
+if (strcmp($batchstate, TBDB_BATCHSTATE_RUNNING) == 0 &&
+    TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATE)) {
     WRITESUBMENUBUTTON("Update All Nodes",
 		       "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
 }
