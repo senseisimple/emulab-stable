@@ -37,9 +37,11 @@ endif
 #PTHREADCFLAGS	+= -DCONDVARS_WORK
 
 CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) -static
-LIBS 		= -lz $(PTHREADLIBS)
+LIBS 		= -lz
 UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
+HASHCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
+HASHLIBS	= $(LIBS) -lcrypto $(PTHREADLIBS)
 
 # UFS/UFS2
 ifeq ($(WITH_FFS),1)
@@ -75,7 +77,7 @@ SUBDIRS		+= fat
 FSLIBS		+= fat/libfat.a
 endif
 
-all:	$(SUBDIRS) imagezip imageunzip imagedump
+all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -91,11 +93,18 @@ imageunzip.o:	imageunzip.c
 imagedump: imagedump.o version.o
 	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
 
+imagehash: imagehash.o version.o
+	$(CC) $(CFLAGS) imagehash.o version.o $(HASHLIBS) -o imagehash
+
+imagehash.o:	imagehash.c
+	$(CC) -c $(HASHCFLAGS) -o imagehash.o $<
+
 ffs extfs ntfs fat:
 	@$(MAKE) SUBDIRCFLAGS="$(SUBDIRCFLAGS)" -C $@ all
 
 imagezip.o: sliceinfo.h imagehdr.h global.h
 imageunzip.o: imagehdr.h
+imagehash.o: imagehdr.h
 
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
