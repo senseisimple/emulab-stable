@@ -243,7 +243,7 @@ foreach left [array names to_assign] {
 	    set subnet [find_free_subnet $node]
 	}
 	set ip [find_free_ip $subnet]
-	lappend ip_section [list $node $ip]
+	lappend ip_section [list $node $dst $ip]
 	lappend ip_mac_section [list [subset $MACTABLE($node) $vlanmap($left)] $ip]
 	lappend ips_node($node) $ip
 }
