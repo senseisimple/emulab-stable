@@ -31,6 +31,8 @@ CREATE TABLE cameras (
   width float NOT NULL default '0',
   height float NOT NULL default '0',
   config tinytext,
+  fixed_x float NOT NULL default '0',
+  fixed_y float NOT NULL default '0',
   PRIMARY KEY  (name,building,floor)
 ) TYPE=MyISAM;
 
@@ -839,7 +841,7 @@ CREATE TABLE new_interfaces (
   switch_port tinyint(3) default NULL,
   cable smallint(6) default NULL,
   len tinyint(4) default NULL,
-  role tinytext default NULL,
+  role tinytext,
   PRIMARY KEY  (new_node_id,card)
 ) TYPE=MyISAM;
 
