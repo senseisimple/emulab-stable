@@ -18,13 +18,20 @@ use Exporter;
 		getTestSwitches getVlanPorts getExperimentVlans getDeviceNames
 	    	getDeviceType getInterfaceSettings mapPortsToDevices
 		getSwitchStack getStackType getTrunks getTrunksFromSwitches
-		getExperimentPorts tbsort );
+		getExperimentPorts snmpitGetWarn snmpitGetFatal
+		snmpitWarn snmpitFatal printVars tbsort );
 
 use English;
 use libdb;
+use libtestbed;
 use strict;
+use SNMP;
+
+my $TBOPS = libtestbed::TB_OPSEMAIL;
 
 my $debug = 0;
+
+my $DEFAULT_RETRIES = 5;
 
 my %Devices=();
 # Devices maps device names to device IPs
@@ -40,6 +47,8 @@ my %vlanmembers=();
 
 my %vlanids=();
 # vlanids maps pid:eid <==> id
+
+my $snmpitErrorString;
 
 #
 # Initialize the 
@@ -500,6 +509,159 @@ sub getTrunksFromSwitches($@) {
 
     return @trunks;
 
+}
+
+#
+# Get a set of SNMP variables from an SNMP session, retrying in case there are
+# transient errors.
+#
+# usage: snmpitGet(session, vars, [retries])
+# args:  session - SNMP::Session object, already connected to the SNMP
+#                  device
+#        vars    - An SNMP::VarList or SNMP::Varbind object containing the
+#                  OID(s) to fetch
+#        retries - Number of times to retry in case of failure
+# returns: 1 on sucess, 0 on failure
+#
+sub snmpitGet($$;$) {
+
+    my ($sess,$vars,$retries) = @_;
+
+    if (! defined($retries) ) {
+	$retries = $DEFAULT_RETRIES;
+    }
+
+    #
+    # Make sure we're given valid inputs
+    #
+    if (!$sess) {
+	$snmpitErrorString = "No valid SNMP session given!\n";
+	return 0;
+    }
+
+    if ((ref($vars) ne "SNMP::VarList") && (ref($vars) ne "SNMP::Varbind")) {
+	$snmpitErrorString = "No valid SNMP variables given!\n";
+	return 0;
+    }
+
+    #
+    # Retry several times
+    #
+    foreach my $retry ( 1 .. $retries) {
+    	my $status = $sess->get($vars);
+	#
+	# Avoid unitialized variable warnings when printing errors
+	#
+	if (! defined($status)) {
+	    $status = "(undefined)";
+	}
+
+	#
+	# We detect errors by looking at the ErrorNumber variable from the
+	# session
+	#
+	if ($sess->{ErrorNum}) {
+	   $snmpitErrorString = "Returned $status, ErrorNum was " .
+		   "$sess->{ErrorNum}\n";
+	    if ($sess->{ErrorStr}) {
+		$snmpitErrorString .= "Error string is: $sess->{ErrorStr}\n";
+	    }
+	} else {
+	    return 1;
+	}
+
+	#
+	# Don't flood requests too fast
+	#
+	sleep(1);
+    }
+
+    #
+    # If we made it out, all of the attempts must have failed
+    #
+    return 0;
+}
+
+#
+# Same as snmpitGet, but send mail if any error occur
+#
+sub snmpitGetWarn($$;$) {
+    my ($sess,$vars,$retries) = @_;
+    my $result;
+
+    $result = snmpitGet($sess,$vars,$retries);
+
+    if (! $result) {
+	snmpitWarn("SNMP GET failed");
+    }
+    return $result;
+}
+
+#
+# Same as snmpitGetWarn, but also exits from the program if there is a 
+# failure.
+#
+sub snmpitGetFatal($$;$) {
+    my ($sess,$vars,$retries) = @_;
+    my $result;
+
+    $result = snmpitGet($sess,$vars,$retries);
+
+    if (! $result) {
+	snmpitFatal("SNMP GET failed");
+    }
+    return $result;
+}
+
+#
+# Print out SNMP::VarList and SNMP::Varbind structures. Useful for debugging
+#
+sub printVars($) {
+    my ($vars) = @_;
+    if (ref($vars) eq "SNMP::VarList") {
+	print "[", join(", ",map( {"[".join(",",@$_)."\]";}  @$vars)), "]";
+    } elsif (ref($vars) eq "SNMP::Varbind") {
+	print "[", join(",",@$vars), "]";
+    } else {
+	print STDERR "printVars: Unknown type " . ref($vars) . " given\n";
+    }
+}
+
+#
+# Both print out an error message and mail it to the testbed ops. Prints out
+# the snmpitErrorString set by snmpitGet.
+#
+# usage: snmpitWarn(message)
+#
+sub snmpitWarn($) {
+
+    my ($message) = @_;
+
+    #
+    # Untaint $PRORAM_NAME
+    #
+    my $progname;
+    if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
+	$progname = $1;
+    } else {
+	$progname = "Tainted";
+    }
+
+    my $text = "$message - In $progname\n" .
+    	       "$snmpitErrorString\n";
+	
+    print STDERR "*** $text";
+
+    libtestbed::SENDMAIL($TBOPS, "snmpitError - $message", $text);
+}
+
+#
+# Like snmpitWarn, but die too
+#
+sub snmpitFatal($) {
+    my ($message) = @_;
+    snmpitWarn($message);
+    die("\n");
 }
 
 #
