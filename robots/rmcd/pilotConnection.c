@@ -502,7 +502,8 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 			if (!flipped_bearing) {
 			    flipped_bearing = 1;
 			    /* flip it */
-			    bearing = -bearing;
+			    /* bearing = -bearing; */
+			    bearing = 2.0f * M_PI - bearing;
 			    info("flipped bearing in waypoint gen\n");
 			}
 			else {
