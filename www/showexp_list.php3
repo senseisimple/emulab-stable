@@ -55,7 +55,9 @@ if (mysql_num_rows($experiments_result)) {
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
               <td width=10%>PID</td>
-              <td width=20%>EID</td>
+              <td width=10%>EID</td>
+              <td width=3%>PCs</td>
+              <td width=3%>Sharks</td>
               <td width=5% align=center>Terminate</td>
               <td width=65%>Name</td>
             </tr>\n";
@@ -65,10 +67,23 @@ if (mysql_num_rows($experiments_result)) {
 	$eid  = $row[eid];
 	$name = $row[expt_name];
 
+	$usage_query = mysql_db_query($TBDBNAME,
+	  "select n.type, count(*) from reserved as r left join nodes as n ".
+	  "on r.node_id=n.node_id where r.pid='$pid' and r.eid='$eid' ".
+	  "group by n.type;");
+
+	$usage["pc"]="";
+	$usage["shark"]="";
+	while ($n = mysql_fetch_array($usage_query)) {
+	  $usage[$n[0]] = $n[1];
+	}
+
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?exp_pideid=$pid\$\$$eid'>
                        $eid</A></td>
+                <td>".$usage["pc"]." &nbsp;</td>
+                <td>".$usage["shark"]." &nbsp;</td>
 	        <td align=center>
                     <A href='endexp.php3?exp_pideid=$pid\$\$$eid'>
                        <img alt=\"o\" src=\"redball.gif\"></A></td>
