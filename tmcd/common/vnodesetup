@@ -219,7 +219,7 @@ if (!$debug && !$interactive && TBBackGround($logname)) {
     if ($dojail) {
 	my $now   = time();
 	my $goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
-	my $count = 30;
+	my $count = 60;
 	
 	while ($count--) {
 	    sleep(1);
