@@ -17,6 +17,7 @@ PAGEHEADER("OS Descriptor Information");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
 # Verify form arguments.
@@ -41,8 +42,10 @@ SUBPAGESTART();
 SUBMENUSTART("More Options");
 WRITESUBMENUBUTTON("Delete this OS Descriptor",
 		   "deleteosid.php3?osid=$osid");
-WRITESUBMENUBUTTON("Create a new OS Descriptor",
-		   "newosid_form.php3");
+if ($isadmin) {
+     WRITESUBMENUBUTTON("Create a new OS Descriptor",
+			"newosid_form.php3");
+}
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
 		   "newimageid_ez.php3");
 WRITESUBMENUBUTTON("OS Descriptor list",

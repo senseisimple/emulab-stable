@@ -985,8 +985,10 @@ if (! isset($node)) {
 }
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
 		   "newimageid_ez.php3");
-WRITESUBMENUBUTTON("Create a new OS Descriptor",
-		   "newosid_form.php3");
+if ($isadmin) {
+    WRITESUBMENUBUTTON("Create a new OS Descriptor",
+	  	       "newosid_form.php3");
+}
 WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
 WRITESUBMENUBUTTON("OS Descriptor list",
