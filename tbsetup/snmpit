@@ -387,7 +387,7 @@ sub ParseArgs {
   die("What shall I do?\n")
     if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
 	  ||$on||$off||$cyc));
-  if ((@vlan||$f||@r||$l) && (!defined($i) || !$i)) { $i = "Gamma"; }
+  if ((@vlan||$f||@r||$l) && (!defined($i) || !$i)) { $i = "Cisco"; }
   if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
   elsif ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
   elsif ($i =~ /Gamma/i)  { $i = "155.99.214.172"; }
@@ -399,9 +399,11 @@ sub ParseArgs {
     elsif ($1 =~ /^[5-8]$/) { $device="Cisco"; } else { $device ="APC" ; }
   } else { $device ="APC" ; }
   die("\"$i\" is not a known switch:\nPossible completions are:\n",
-      "Alpha/155.99.214.170\nBeta /155.99.214.171\n",
-      "Gamma/155.99.214.172\nDelta/155.99.214.173\n", 
-      "Eta  /155.99.214.174\nCisco/155.99.214.175\n") 
+#      "Alpha/155.99.214.170\nBeta /155.99.214.171\n",
+#      "Gamma/155.99.214.172\nDelta/155.99.214.173\n", 
+#      "Eta  /155.99.214.174\n",
+#      "Cisco/155.99.214.175\n",
+      "Cisco/155.99.214.175\n") 
     if ( !($device =~ /^(Intel)|(Cisco)$/)  && 
 	 ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
   die("$i is not a power controller.\n") 
