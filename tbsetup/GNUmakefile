@@ -9,7 +9,7 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  delay_setup ifc_setup ifc_filegen \
 		  ir2ifc power resetvlans savevlans snmpit tbend \
 		  tbprerun tbreport vpower vsnmpit killtip \
-		  mkacct-ctrl_wrapper rmprojdir_wrapper
+		  mkacct-ctrl_wrapper rmacct-ctrl_wrapper rmprojdir_wrapper
 DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir rmprojdir os_setup mkacct rmacct \
 	          mkacct-ctrl rmacct-ctrl ifc_setup os_load
@@ -26,11 +26,7 @@ checkpass:
 #
 INSTALL_LIBTBDIR = $(INSTALL_LIBDIR)/tbsetup
 
-install: $(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_BINDIR)/, $(SUSCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(DATAFILES)) \
-	 subdir-install
+install: script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
 
 #
@@ -39,7 +35,12 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
 subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ir install	
-	@$(MAKE) -C ns2ir install	
+	@$(MAKE) -C ns2ir install
+
+script-install:	$(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
+	 $(addprefix $(INSTALL_BINDIR)/, $(SUSCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBTBDIR)/, $(DATAFILES))
 
 #
 # Leave these rules here. They should be flushed when we no longer
