@@ -299,7 +299,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/checkports \
+	tbsetup/checkports tbsetup/webidlecheck \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/ron/GNUmakefile \

@@ -46,13 +46,13 @@ while ($#ARGV >= 0) {
     $_ = shift;
     $_ =~ /^(.)(.)/;
     if ($1 ne '-') { next; }
-    if ($2 ne 'h' && $2 ne 't' && $2 ne 'p' && 
-	$2 ne 's' && $2 ne 'u' && $2 ne 'd') { next; }
+    if ($2 ne 'h' && $2 ne 't' && $2 ne 'p' && $2 ne 'f' &&
+	$2 ne 'u' && $2 ne 's' && $2 ne 'd') { next; }
     my $opt="\L$2";
     my $val = shift if ($#ARGV >= 0 && ($ARGV[0] =~ /^[^-]/));
     if (!defined($val)) { $val=1; }
     # Let -d be used multiple times
-    if ($2 eq 'd') { $d++; } else {
+    if ($opt eq 'd') { $d++; } else {
 	$$opt=$val;
     }
     if ($d>1) { print "$opt = $$opt\n"; }
@@ -170,8 +170,11 @@ while(@r=$result->fetchrow()) {
     $idle=!defined($active{"$pid/$eid"});
     $stale=!defined($fresh{"$pid/$eid"});
     print "Checking for $pid/$eid in active list\n" if $d;
+    # Now output the results
+    # IMPORTANT: If you make changes to output format, be sure to update
+    # testbed/www/showexp_list.php3 as well, since it reads this output
     my $str= "$pid/$eid";
-    $str = $str . " " x (30-length($str))."\t";
+    $str = $str . " " x (36-length($str))." ";
     $str .= ($idle? "inactive\t" : "\t\t" );
     $str .= ($stale?"stale\t" : "\t" );
     $str .= (!$swap? "unswappable\n" : "\n" );

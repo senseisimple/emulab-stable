@@ -22,15 +22,13 @@ if (! isset($showtype))
     $showtype="active";
 if (! isset($sortby))
     $sortby = "normal";
-if (! isset($minidledays))
-    $minidledays = "2";
 
 echo "<b>Show:
          <a href='showexp_list.php3?showtype=active&sortby=$sortby'>active</a>,
          <a href='showexp_list.php3?showtype=batch&sortby=$sortby'>batch</a>,";
 if ($isadmin) 
-     echo "\n<a href='showexp_list.php3?showtype=idle&sortby=$sortby".
-       "&minidledays=$minidledays'>idle</a>,";
+     echo "\n<a href='showexp_list.php3?showtype=idle&sortby=$sortby'".
+       ">idle</a>,";
 
 echo "\n       <a href='showexp_list.php3?showtype=all&sortby=$sortby'>all</a>.
       </b><br><br>\n";
@@ -54,7 +52,8 @@ elseif (! strcmp($showtype, "batch")) {
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     # Do not put active in the clause for same reason as active
     $title  = "Idle";
-    $having = "having (lastswap>=$minidledays)";
+    #$having = "having (lastswap>=1)"; # At least one day since swapin
+    $having = "having (lastswap>=0)";
     $idle = 1;
 }
 else {
@@ -102,6 +101,28 @@ if ($isadmin) {
                      "group by e.pid,e.eid ".
 		     "$having ".
 		     "order by $order");
+    if ($idle) {
+      # Run idlecheck and get the info
+      #print "<pre>Running idlecheck\n";
+      $x=exec("$TBSUEXEC_PATH $uid flux webidlecheck -s -u",
+	      $l, $rv);
+      reset($l);
+      while(list($index,$i) = each ($l)) {
+	list($ipid,$ieid,$word1, $word2, $word3) = split("[ \t/]+",$i);
+	#print "$ipid + $ieid + $word1 + $word2 + $word3\n";
+	$expt = "$ipid/$ieid";
+	$set = array($word1,$word2,$word3);
+	while(list($index,$tag) = each($set)) {
+	  if ($tag == "") { break; }
+	  if ($tag == "inactive") { $inactive[$expt]=1; }
+	  elseif ($tag == "stale") { $stale[$expt]=1; }
+	  elseif ($tag == "unswappable") { $unswap[$expt]=1; }
+	}
+	
+      }
+      #print "\nDone idlechecking...\n</pre>";
+    }
+      
 }
 else {
     if ($clause)
@@ -135,14 +156,7 @@ if (mysql_num_rows($experiments_result)) {
           </center>\n";
 
     if ($idle) {
-      echo "<center><b>Experiments that have been idle at least $minidledays days</b></center>\n";
-      echo "<center><h3>This will change soon - Slothd is on the way</h3></center>\n";
-      echo "<b>\"Days idle\" is defined as:<br>
-a) number of days since last login (as reported in last login column)<br>
-b) number of days it has been swapped in (if nobody has logged in)<br>
-</b><br>
-Note that it is not reliable in the case where they're using a special
-kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
+      echo "<center><b>Experiments that have been idle at least 1 day</b></center><p>\n";
     }
     
     #
@@ -200,6 +214,7 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	echo "<td width=17% align=center>Last Login</td>\n";
     if ($idle)
 	echo "<td width=4% align=center>Days Idle</td>
+              <td width=4% align=center>Slothd Info</td>
               <td width=4% align=center>Swap Req.</td>\n";
 
     echo "    <td width=60%>
@@ -224,8 +239,8 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	    $foo = "&nbsp;";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
-	        if ($idle && $daysidle<$minidledays)
-		  continue;
+	        #if ($idle && $daysidle < 1)
+		#  continue;
 		$foo = $lastexpnodelogins["date"] . " " .
 		 "(" . $lastexpnodelogins["uid"] . ")";
 	    } elseif ($state=="active") {
@@ -236,7 +251,26 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 
 	if ($idle) {
 	    $foo .= "</td><td align=center>$daysidle</td>\n";
-	    if ($swappable) {
+	    $foo .= "</td><td align=left>";
+	    $expt = "$pid/$eid";
+	    $str="";
+	    if ($inactive[$expt]==1) {
+	      if ($stale[$expt]==1 || $unswap[$expt]==1) {
+		$str .= "possibly inactive";
+	      } else {
+		$str .= "<b>inactive</b>";
+	      }
+	    }
+	    if ($stale[$expt]==1) { $str .= ", <b>no&nbsp;report</b> "; }
+	    # For now, don't show this tag, it's redundant
+            #if ($unswap[$expt]==1) { $str .= "unswappable"; }
+	    if ($str=="") { $str="&nbsp;"; }
+	    # sanity check
+	    if ($daysidle==0 && $inactive[$expt]==1) {
+	      $str .= "<b>FAILED SANITY CHECK:</b> has been logged into, but appears inactive. Contact Mac ASAP.";
+	    }
+	    $foo .= "$str</td>\n";
+	    if ($swappable && $inactive[$expt]==1 && $stale[$expt]!=1) {
 	        $foo .= "<td align=center valign=center>
                            <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
                               <img src=\"redball.gif\"></a>\n";
