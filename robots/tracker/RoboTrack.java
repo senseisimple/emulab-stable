@@ -38,7 +38,7 @@ public class RoboTrack extends JApplet {
     static final SimpleDateFormat TIME_FORMAT =
 	new SimpleDateFormat("hh:mm:ss");
     static final Date now = new Date();
-    String uid, auth;
+    String uid, auth, building, floor;
     boolean shelled = false;
     
     /*
@@ -55,10 +55,12 @@ public class RoboTrack extends JApplet {
 	    URLConnection uc;
 
 	    /* Get our parameters then */
-	    uid     = this.getParameter("uid");
-	    auth    = this.getParameter("auth");
-	    pipeurl = this.getParameter("pipeurl");
-	    baseurl = this.getParameter("floorurl");
+	    uid      = this.getParameter("uid");
+	    auth     = this.getParameter("auth");
+	    pipeurl  = this.getParameter("pipeurl");
+	    baseurl  = this.getParameter("floorurl");
+	    building = this.getParameter("building");
+	    floor    = this.getParameter("floor");
 	    pixels_per_meter = Double.parseDouble(this.getParameter("ppm"));
 
 	    // form the URL that we use to get the background image
@@ -1387,6 +1389,8 @@ public class RoboTrack extends JApplet {
      */
     public boolean GetNodeInfo() {
  	String urlstring = "nodeinfo.php3?fromapplet=1"
+	    + "&floor=" + floor
+	    + "&building=" + building
 	    + "&nocookieuid="
 	    + URLEncoder.encode(uid)
 	    + "&nocookieauth="
@@ -1458,6 +1462,8 @@ public class RoboTrack extends JApplet {
      */
     public boolean GetObstacles() {
  	String urlstring = "obstacles.php3?fromapplet=1"
+	    + "&floor=" + floor
+	    + "&building=" + building
 	    + "&nocookieuid="
 	    + URLEncoder.encode(uid)
 	    + "&nocookieauth="
@@ -1528,6 +1534,8 @@ public class RoboTrack extends JApplet {
      */
     public boolean GetCameras() {
  	String urlstring = "cameras.php3?fromapplet=1"
+	    + "&floor=" + floor
+	    + "&building=" + building
 	    + "&nocookieuid="
 	    + URLEncoder.encode(uid)
 	    + "&nocookieauth="

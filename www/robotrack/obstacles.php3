@@ -14,10 +14,22 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
-# One robot map right now ...
-# 
-$building = "MEB-ROBOTS";
-$floor    = 4;
+# Verify page arguments. Allow user to optionally specify building/floor.
+#
+if (isset($building) && $building != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[-\w]+$/", $building)) {
+	PAGEARGERROR("Invalid building argument.");
+    }
+    # Optional floor argument. Sanitize for the shell.
+    if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
+	PAGEARGERROR("Invalid floor argument.");
+    }
+}
+else {
+    $building = "MEB-ROBOTS";
+    $floor    = 4;
+}
 
 # Initial goo.
 header("Content-Type: text/plain");

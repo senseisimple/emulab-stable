@@ -13,7 +13,7 @@ LOGGEDINORDIE($uid);
 PAGEHEADER("Real Time Robot Tracking Applet");
 
 #
-# Verify page arguments. First allow user to optionally specify building/floor.
+# Verify page arguments. Allow user to optionally specify building/floor.
 #
 if (isset($building) && $building != "") {
     # Sanitize for the shell.
@@ -69,7 +69,7 @@ echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
                          shows the current position (x, y, orientation),
                          the destination position,
                          and the battery level (percentage and voltage).
-                         The shaded areas (blue border) are <em>exclusion</em>
+                         The shaded areas are <em>exclusion</em>
                          zones where robots are not allowed to go. You can
                          <b>right click</b> on a robot to bring up its
                          info page. See below for instructions on how to
@@ -104,7 +104,7 @@ if ($retval) {
 }
 
 $auth    = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
-$pipeurl = "robopipe.php3?foo=bar";
+$pipeurl = "robopipe.php3?building=$building&floor=$floor";
 $baseurl = "../floormap_aux.php3?prefix=$uniqueid";
 
 # Temp for debugging.
@@ -120,6 +120,8 @@ echo "<applet name='tracker' code='RoboTrack.class'
             <param name='uid' value='$uid'>
             <param name='auth' value='$auth'>
             <param name='ppm' value='$ppm'>
+            <param name='building' value='$building'>
+            <param name='floor' value='$floor'>
           </applet>\n";
 
 echo "<br>

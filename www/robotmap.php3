@@ -261,7 +261,8 @@ if ($isadmin || TBWebCamAllowed($uid)) {
     echo "  <a href=webcam.php3>Webcam View</a> (Updated in real time)";
     echo "  <br>\n";
 }
-echo "  <a href=robotrack/robotrack.php3>Track robots in real time</a>";
+echo "  <a href=robotrack/robotrack.php3?building=${building}&floor=${floor}>".
+        "Track robots in real time</a>";
 echo "  <br>\n";
 
 if (isset($map_x) && isset($map_y)) {
