@@ -67,7 +67,7 @@ software. If you plan to use the former method, you can skip this step.
 First, you'll want to protect the webdb script from outside browsers. Because
 of its flexibility, it would be quite dangerous if it were broken into. So, we
 add an additional layer of protection by limiting the IP addresses it may be
-used from. Open your apache.conf file (created as part of the boss
+used from. Open your httpd.conf file (created as part of the boss
 installation), and find the 'Directory' directives. Add a section such as
 this:
 <Directory /usr/testbed/www/webdb>
