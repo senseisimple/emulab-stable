@@ -183,6 +183,8 @@ echo "<center><br>";
 echo "<h3>Setting up experiment. This may take a few minutes ...</h3>";
 echo "</center>";
 
+flush();
+
 #
 # Run the scripts. We use a script wrapper to deal with changing
 # to the proper directory and to keep some of these details out
