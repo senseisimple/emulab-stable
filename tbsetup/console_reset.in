@@ -51,7 +51,8 @@ if ($UID && !TBAdmin($UID)) {
 # Get a list of all of the experimental nodes.
 #
 my $query_result =
-    DBQueryFatal("select node_id from nodes where role='testnode'");
+    DBQueryFatal("select node_id from nodes where role='testnode' ".
+		 "order by priority");
 
 while (@row = $query_result->fetchrow_array()) {
     my $node = $row[0];
