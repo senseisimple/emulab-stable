@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 
 #
 # EMULAB-COPYRIGHT
@@ -58,8 +58,8 @@ if ( defined($options{"v"}) ) {
 
 #my ($pid) = $ARGV[0];
 #my ($eid) = $ARGV[1];
-my ($pid) = $ARGV[0] =~ /([0-9a-zA-Z\-]+)/;
-my ($eid) = $ARGV[1] =~ /([0-9a-zA-Z\-]+)/;
+my ($pid) = $ARGV[0] =~ /([0-9a-zA-Z_\-]+)/;
+my ($eid) = $ARGV[1] =~ /([0-9a-zA-Z_\-]+)/;
 
 if ( defined($options{"t"}) ) { 
     my $result = DBQueryFatal("SELECT thumb_hash FROM vis_experiments " .
