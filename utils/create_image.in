@@ -9,6 +9,7 @@
 use English;
 use Getopt::Std;
 use POSIX qw(setsid);
+use File::Basename;
 
 #
 # Create a disk image.
@@ -203,9 +204,13 @@ my $filename = $imageid_row{'path'};
 my $isglobal = $imageid_row{'global'};
 
 #
-# If a global image, make up a name. Admin person will need to copy image
-# to boss.
+# Throw an error if the image is global; we cannot write images into
+# /usr/testbed/images. In fact, lets check the filename just in case.
 #
+if ($isglobal) {
+    die("*** $0:\n".
+	"    Not able to autocreate images that are marked global!\n");
+}
 
 # Untaint. Very silly.
 if ($filename =~ /^([-\w\.\/\+]+)$/) {
@@ -214,6 +219,34 @@ if ($filename =~ /^([-\w\.\/\+]+)$/) {
 else {
     die("*** $0:\n".
 	"    Bad filename: $filename!\n");
+}
+
+#
+# Make sure real path is someplace that makes sense; remember that the
+# image is created on the nodes, and it NFS mounts directories on ops.
+# Writing the image to anyplace else is just going to break things.
+#
+# Use realpath to resolve any symlinks.
+#
+my $translated = `realpath $filename`;
+if ($translated =~ /^([-\w\.\/]+)$/) {
+    $filename = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Bad data returned by realpath: $translated\n");
+}
+
+#
+# The file must reside in /proj, /groups, or /users. Since this script
+# runs as the caller, regular file permission checks ensure its a file
+# the user is allowed to use. 
+#
+if (! ($filename =~ /^\/proj/) &&
+    ! ($filename =~ /^\/groups/) &&
+    ! ($filename =~ /^\/users/)) {
+    die("*** $0:\n".
+	"    $filename does not resolve to an allowed directory!\n");
 }
 
 #

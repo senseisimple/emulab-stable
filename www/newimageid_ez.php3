@@ -879,7 +879,7 @@ if ($cancelled) {
 $confirmationWarning = "";
 
 #
-# If user doesn't define a node to suck the image from,
+# If user does not define a node to suck the image from,
 # we seek confirmation.
 #
 if (! isset($node)) {
@@ -1041,7 +1041,8 @@ if (isset($node)) {
           <br><br>\n";
     flush();
 
-    SUEXEC($uid, $unix_gid, "webcreateimage -p $pid $imagename $node", 1);
+    SUEXEC($uid, $unix_gid, "webcreateimage -p $pid $imagename $node",
+	   SUEXEC_ACTION_DUPDIE);
 
     echo "This will take 10 minutes or more; you will receive email
           notification when the image is complete. In the meantime,

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -80,7 +80,7 @@ if (! TBNodeAccessCheck($uid, $node, $TB_NODEACCESS_LOADIMAGE)) {
 }
 
 # Should check for file file_exists($image_path),
-# but that's too messy.
+# but too messy.
 
 if (! isset($confirmed) ) {
     echo "<center><form action='loadimage.php3' method='post'>\n".
@@ -107,7 +107,8 @@ echo "<br>
       <br><br>\n";
 flush();
 
-SUEXEC($uid, $unix_gid, "webcreateimage -p $image_pid $image_name $node", 1);
+SUEXEC($uid, $unix_gid, "webcreateimage -p $image_pid $image_name $node",
+       SUEXEC_ACTION_DUPDIE);
 
 echo "This will take 10 minutes or more; you will receive email
       notification when the snapshot is complete. In the meantime,

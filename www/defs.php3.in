@@ -209,6 +209,7 @@ define("SUEXEC_ACTION_CONTINUE",	0);
 define("SUEXEC_ACTION_DIE",		1);
 define("SUEXEC_ACTION_USERERROR",	2);
 define("SUEXEC_ACTION_IGNORE",		3);
+define("SUEXEC_ACTION_DUPDIE",		4);
 
 #
 # An suexec error.
@@ -235,6 +236,10 @@ function SUEXECERROR($action)
         break;
     case SUEXEC_ACTION_IGNORE:
 	break;
+    case SUEXEC_ACTION_DUPDIE:
+	TBERROR($foo, 0, 1);
+	USERERROR("<XMP>$foo</XMP>", 1);
+        break;
     default:
 	TBERROR($foo, 1, 1);
     }
