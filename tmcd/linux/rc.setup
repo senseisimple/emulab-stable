@@ -13,6 +13,11 @@ if [ -x /etc/rc.d/testbed/setup  ]; then
 	/etc/rc.d/testbed/setup
 fi
 
+if [ -x /etc/testbed/rc.tunnel ]; then
+        echo "Setting up Testbed tunnels ..."
+        /etc/testbed/rc.tunnel
+fi
+
 if [ -x /etc/rc.d/testbed/rc.ifc  ]; then
         echo "Setting up Testbed Interfaces ..."
 	/etc/rc.d/testbed/rc.ifc
@@ -20,7 +25,7 @@ fi
 
 if [ -x /etc/rc.d/testbed/rc.route ]; then
         echo "Setting up Testbed interface routing ..."
-	/etc/rc.d/testbed/rc.route
+	/etc/rc.d/testbed/rc.route enable
 fi
 
 if [ -x /etc/rc.d/testbed/rc.rpm  ]; then

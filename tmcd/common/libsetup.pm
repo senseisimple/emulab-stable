@@ -11,11 +11,13 @@ use Exporter;
 	 create_nicknames doifconfig dohostnames
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
+	 TBBackGround TBForkCmd remotenodeupdate remotenodevnodesetup
 
 	 OPENTMCC RUNTMCC MFS
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
-	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF 
+	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
+	 TMTRAFFICCONFIG TMROUTECONFIG TMVNODEDIR
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
@@ -49,6 +51,14 @@ sub libsetup_init($)
 use liblocsetup;
 
 #
+# For virtual (multiplexed nodes). If defined, tack onto tmcc command.
+# and use in pathnames. Not sure how this will be used later with jailed
+# virtual nodes, since they will run in their own environment, but without
+# jail we have to share the same namespace.
+#
+my $vnodeid	= "";
+
+#
 # These are the paths of various files and scripts that are part of the
 # setup library.
 #
@@ -62,8 +72,13 @@ sub TMNICKNAME()	{ "$SETUPDIR/nickname"; }
 sub FINDIF()		{ "$SETUPDIR/findif"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
 sub TMMOUNTDB()		{ "$SETUPDIR/mountdb"; }
-sub TMROUTECONFIG()     { "$SETUPDIR/rc.route"; }
-sub TMTRAFFICCONFIG()	{ "$SETUPDIR/rc.traffic"; }
+sub TMROUTECONFIG()     { "$SETUPDIR/$vnodeid/rc.route"; }
+sub TMTRAFFICCONFIG()	{ "$SETUPDIR/$vnodeid/rc.traffic"; }
+sub TMTUNNELCONFIG()	{ "$SETUPDIR/$vnodeid/rc.tunnel"; }
+sub TMVTUNDCONFIG()	{ "$SETUPDIR/$vnodeid/vtund.conf"; }
+sub TMPASSDB()		{ "$SETUPDIR/passdb"; }
+sub TMGROUPDB()		{ "$SETUPDIR/groupdb"; }
+sub TMVNODEDIR()	{ "$SETUPDIR/$vnodeid"; }
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -71,7 +86,7 @@ sub TMTRAFFICCONFIG()	{ "$SETUPDIR/rc.traffic"; }
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 3; };
+sub TMCD_VERSION()	{ 4; };
 
 #
 # These are the TMCC commands. 
@@ -92,12 +107,14 @@ sub TMCCCMD_MOUNTS()	{ "mounts"; }
 sub TMCCCMD_ROUTING()	{ "routing"; }
 sub TMCCCMD_TRAFFIC()	{ "trafgens"; }
 sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
+sub TMCCCMD_TUNNEL()	{ "tunnels"; }
 
 #
 # Some things never change.
 # 
 my $TARINSTALL  = "/usr/local/bin/install-tarfile %s %s";
 my $DELTAINSTALL= "/usr/local/bin/install-delta %s";
+my $VTUND       = "/usr/local/sbin/vtund";
 
 #
 # This is a debugging thing for my home network.
@@ -116,6 +133,11 @@ my $vname	= "";
 sub MFS()	{ if (-e "$SETUPDIR/ismfs") { return 1; } else { return 0; } }
 
 #
+# Same for a remote node.
+#
+sub REMOTE()	{ if (-e "$SETUPDIR/isrem") { return 1; } else { return 0; } }
+
+#
 # Open a TMCC connection and return the "stream pointer". Caller is
 # responsible for closing the stream and checking return value.
 #
@@ -124,12 +146,17 @@ sub MFS()	{ if (-e "$SETUPDIR/ismfs") { return 1; } else { return 0; } }
 sub OPENTMCC($;$)
 {
     my($cmd, $args) = @_;
+    my $vn = "";
     local *TM;
 
     if (!defined($args)) {
 	$args = "";
     }
-    my $foo = sprintf("%s -v %d %s %s %s |",
+    if ($vnodeid ne "") {
+	$vn = "-n $vnodeid";
+    }
+    
+    my $foo = sprintf("%s -v %d %s $vn %s %s |",
 		      TMCC, TMCD_VERSION, $NODE, $cmd, $args);
 
     open(TM, $foo)
@@ -151,6 +178,7 @@ sub RUNTMCC($;$)
     if (!defined($args)) {
 	$args = "";
     }
+    
     $TM = OPENTMCC($cmd, $args);
 
     close($TM)
@@ -171,19 +199,32 @@ sub inform_reboot()
 #
 # Reset to a moderately clean state.
 #
-sub cleanup_node () {
+sub cleanup_node ($) {
+    my ($scrub) = @_;
+    
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
-    unlink TMROUTECONFIG, TMTRAFFICCONFIG;
+    unlink TMROUTECONFIG, TMTRAFFICCONFIG, TMTUNNELCONFIG;
     unlink TMMOUNTDB . ".db";
 
-    printf STDOUT "Resetting %s file\n", HOSTSFILE;
-    if (system($CP, "-f", TMHOSTS, HOSTSFILE) != 0) {
-	printf STDERR "Could not copy default %s into place: $!\n", HOSTSFILE;
-	exit(1);
+    #
+    # If scrubbing, remove the password/group file DBs so that we revert
+    # to base set.
+    # 
+    if ($scrub) {
+	unlink TMPASSDB . ".db";
+	unlink TMGROUPDB . ".db";
     }
 
-    return os_cleanup_node();
+    if (! REMOTE()) {
+	printf STDOUT "Resetting %s file\n", HOSTSFILE;
+	if (system($CP, "-f", TMHOSTS, HOSTSFILE) != 0) {
+	    printf "Could not copy default %s into place: $!\n", HOSTSFILE;
+	    exit(1);
+	}
+    }
+
+    return os_cleanup_node($scrub);
 }
 
 #
@@ -345,6 +386,16 @@ sub doifconfig ()
 {
     my $TM;
     
+    #
+    # Kinda ugly, but there is too much perl goo included by Socket to put it
+    # on the MFS. 
+    # 
+    if (MFS()) {
+	return 1;
+    }
+    require Socket;
+    import Socket;
+    
     $TM = OPENTMCC(TMCCCMD_IFC);
 
     #
@@ -367,11 +418,12 @@ sub doifconfig ()
 	if ($_ =~ /$pat/) {
 	    my $iface;
 
-	    my $inet  = $2;
-	    my $mask  = $3;
-	    my $mac   = $4;
-	    my $speed = $5; 
-	    my $duplex= $6;
+	    my $inet     = $2;
+	    my $mask     = $3;
+	    my $mac      = $4;
+	    my $speed    = $5; 
+	    my $duplex   = $6;
+	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
 
 	    if ($iface = findiface($mac)) {
 		my $ifline =
@@ -379,6 +431,7 @@ sub doifconfig ()
 		    
 		print STDOUT "  $ifline\n";
 		print IFC "$ifline\n";
+		print IFC TMROUTECONFIG . " $routearg up\n";
 	    }
 	    else {
 		warn "*** WARNING: Bad MAC: $mac\n";
@@ -424,6 +477,8 @@ sub dorouterconfig ()
 {
     my @stuff   = ();
     my $routing = 0;
+    my %upmap   = ();
+    my %downmap = ();
     my $TM;
 
     $TM = OPENTMCC(TMCCCMD_ROUTING);
@@ -456,12 +511,6 @@ sub dorouterconfig ()
     print RC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
 
     #
-    # First turn on IP forwarding
-    #
-    my $rcline = os_routing_enable_forward();
-    print RC "$rcline\n";
-
-    #
     # Now convert static route info into OS route commands
     # Also check for use of gated and remember it.
     #
@@ -483,18 +532,50 @@ sub dorouterconfig ()
 	} elsif ($line =~ /ROUTERTYPE=(manual|static)/) {
 	    $usemanual = 1;
 	} elsif ($usemanual && $line =~ /$pat/) {
-	    my $dip = $1;
+	    my $dip   = $1;
 	    my $rtype = $2;
 	    my $dmask = $3;
-	    my $gate = $4;
-	    my $cost = $5;
+	    my $gate  = $4;
+	    my $cost  = $5;
+	    my $routearg = inet_ntoa(inet_aton($gate) & inet_aton($dmask));
 
-	    $rcline = os_routing_add_manual($rtype, $dip, $dmask, $gate, $cost);
-	    print RC "$rcline\n";
+	    if (! defined($upmap{$routearg})) {
+		$upmap{$routearg} = [];
+		$downmap{$routearg} = [];
+	    }
+	    $rcline = os_routing_add_manual($rtype, $dip, $dmask, $gate,$cost);
+	    push(@{$upmap{$routearg}}, $rcline);
+	    $rcline = os_routing_del_manual($rtype, $dip, $dmask, $gate,$cost);
+	    push(@{$downmap{$routearg}}, $rcline);
 	} else {
 	    warn "*** WARNING: Bad routing line: $line\n";
 	}
     }
+
+    print RC "case \"\$1\" in\n";
+    foreach my $arg (keys(%upmap)) {
+	print RC "  $arg)\n";
+	print RC "    case \"\$2\" in\n";
+	print RC "      up)\n";
+	foreach my $rcline (@{$upmap{$arg}}) {
+	    print RC "        $rcline\n";
+	}
+	print RC "      ;;\n";
+	print RC "      down)\n";
+	foreach my $rcline (@{$downmap{$arg}}) {
+	    print RC "        $rcline\n";
+	}
+	print RC "      ;;\n";
+	print RC "    esac\n";
+	print RC "  ;;\n";
+    }
+    print RC "  enable)\n";
+
+    #
+    # Turn on IP forwarding
+    #
+    my $rcline = os_routing_enable_forward();
+    print RC "    $rcline\n";
 
     #
     # Finally, enable gated if desired.
@@ -505,8 +586,11 @@ sub dorouterconfig ()
     #
     if ($usegated) {
 	$rcline = os_routing_enable_gated();
-	print RC "$rcline\n";
+	print RC "    $rcline\n";
     }
+    print RC "  ;;\n";
+    print RC "esac\n";
+    print RC "exit 0\n";
 
     close(RC);
     chmod(0755, TMROUTECONFIG);
@@ -565,38 +649,31 @@ sub dohostnames ()
 
 sub doaccounts ()
 {
-    my %oldaccounts = ();
     my %newaccounts = ();
+    my %newgroups   = ();
+    my %deletes     = ();
+    my %PWDDB;
+    my %GRPDB;
 
     my $TM = OPENTMCC(TMCCCMD_ACCT);
 
     #
-    # The strategy here is to grab the list of default accounts from our
-    # stub password file, and then add to that the list of accounts that
-    # are supposed to be on this machine as told to us by the TMCD. Then,
-    # go through the existing accounts in the real password file, and add
-    # the ones that are not there and remove the ones that should not be
-    # there.
+    # The strategy is to keep a record of all the groups and accounts
+    # added by the testbed system so that we know what to remove. We
+    # use a vanilla perl dbm for that, one for the groups and one for
+    # accounts. 
     #
-    # Removing groups is not neccessary, so just process those as we get
-    # from the TMCD.
-    # 
+    # First just get the current set of groups/accounts from tmcd.
+    #
     while (<$TM>) {
 	if ($_ =~ /^ADDGROUP NAME=([-\@\w.]+) GID=([0-9]+)/) {
-	    print STDOUT "  Group: $1/$2\n";
-
-	    $group = $1;
-	    $gid   = $2;
-
-	    ($exists) = getgrgid($gid);
-	    if ($exists) {
-		next;
+	    #
+	    # Group info goes in the hash table.
+	    #
+	    if (REMOTE()) {
+		$1 = "emu-$1";
 	    }
-	
-	    if (os_groupadd($group, $gid)) {
-		warn "*** WARNING: Error adding new group $1/$2\n";
-	    }
-	    next;
+	    $newgroups{"$1"} = $2
 	}
 	elsif ($_ =~ /^ADDUSER LOGIN=([0-9a-z]+)/) {
 	    #
@@ -606,66 +683,134 @@ sub doaccounts ()
 	    next;
 	}
 	else {
-	    warn "*** WARNING: Bad accounts line: $_";
+	    warn "*** WARNING: Bad accounts line: $_\n";
 	}
     }
     close($TM);
 
-    #
-    # All we need to know about the stub accounts is which ones should exist
-    # once we are done. Add those to the hash table we created above, but
-    # only if not in the list we got from the TMCD. This allows us to
-    # override the default accounts with new account info from the TMCD.
-    #
-    open(PASSWD, $TMPASSWD)
-	or die "Cannot open $TMPASSWD: $!";
-
-    while (<PASSWD>) {
-	if ($_ =~ /^([0-9a-z]+):/) {
-	    if (! defined($newaccounts{$1})) {
-		$newaccounts{$1} = "OLDUSER LOGIN=$1";
-	    }
-	}
-    }
-    close(PASSWD);
-
-    #
-    # Pick up the list of current accounts on this machine. Easier if
-    # I have both lists in hand as hash tables. Also note that changing
-    # the account list while doing a getpwent() loop can lead to unusual
-    # things happening. 
-    #
-    while (my $login = getpwent()) {
-	$oldaccounts{$login} = $login;
-    }
-
-    #
-    # First off, lets delete accounts that are no longer supposed to be here.
-    # We unmount the homedirs too (or try to!).
-    #
-    foreach my $login (keys %oldaccounts) {
-	if (!defined($newaccounts{$login})) {
-
-	    print "  Deleting User: $login\n";
-	    
-	    if (os_userdel($login) != 0) {
-		warn "*** WARNING: Error deleting user $login\n";
-	    }
-	}
-    }
-
-    #
-    # Now do the new accounts. We go through the entire list of accounts
-    # we got. This includes the list from the TMCD, and the list we get
-    # locally from the stub password file. We leave the stub accounts alone
-    # since they are in the list to prevent deletion. 
-    #
-    my $pat = q(ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
-    $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST=(.*));
-  
-    foreach my $login (keys %newaccounts) {
-	my $info = $newaccounts{$login};
+    dbmopen(%PWDDB, TMPASSDB, 0660) or
+	die("Cannot open " . TMPASSDB . ": $!\n");
 	
+    dbmopen(%GRPDB, TMGROUPDB, 0660) or
+	die("Cannot open " . TMGROUPDB . ": $!\n");
+
+    #
+    # Create any groups that do not currently exist. Add each to the
+    # DB as we create it.
+    #
+    while (($group, $gid) = each %newgroups) {
+	my ($exists,undef,$curgid) = getgrnam($group);
+	
+	if ($exists) {
+	    if ($gid != $curgid) {
+		warn "*** WARNING: $group/$gid mismatch with existing group\n";
+	    }
+	    next;
+	}
+
+	print "Adding group: $group/$gid\n";
+	    
+	if (os_groupadd($group, $gid)) {
+	    warn "*** WARNING: Error adding new group $group/$gid\n";
+	    next;
+	}
+	# Add to DB only if successful. 
+	$GRPDB{$group} = $gid;
+    }
+
+    #
+    # Now remove the ones that we created previously, but are now no longer
+    # in the group set (as told to us by the TMCD). Note, we cannot delete 
+    # them directly from the hash since that would mess up the foreach loop,
+    # so just stick them in temp and postpass it.
+    #
+    while (($group, $gid) = each %GRPDB) {
+	if (defined($newgroups{$group})) {
+	    next;
+	}
+
+	print "Removing group: $group/$gid\n";
+	
+	if (os_groupdel($group)) {
+	    warn "*** WARNING: Error removing group $group/$gid\n";
+	    next;
+	}
+	# Delete from DB only if successful. 
+	$deletes{$group} = $gid;
+    }
+    while (($group, $gid) = each %deletes) {
+	delete($GRPDB{$group});
+    }
+    %deletes = ();
+
+    # Write the DB back out!
+    dbmclose(%GRPDB);
+
+    #
+    # Repeat the same sequence for accounts, except we remove old accounts
+    # first. 
+    # 
+    while (($login, $uid) = each %PWDDB) {
+	if (defined($newaccounts{$login})) {
+	    next;
+	}
+
+	my ($exists,undef,$curuid,undef,
+	    undef,undef,undef,$homedir) = getpwnam($login);
+
+	#
+	# If the account is gone, someone removed it by hand. Remove it
+	# from the DB so we do not keep trying.
+	#
+	if (! defined($exists)) {
+	    warn "*** WARNING: Account for $login was already removed!\n";
+	    $deletes{$login} = $login;
+	    next;
+	}
+
+	#
+	# Check for mismatch, just in case. If there is a mismatch remove it
+	# from the DB so we do not keep trying.
+	#
+	if ($uid != $curuid) {
+	    warn "*** WARNING: ".
+		 "Account uid for $login has changed ($uid/$curuid)!\n";
+	    $deletes{$login} = $login;
+	    next;
+	}
+	
+	print "Removing user: $login\n";
+	
+	if (os_userdel($login) != 0) {
+	    warn "*** WARNING: Error removing user $login\n";
+	    next;
+	}
+
+	#
+	# Remove the home dir. 
+	#
+	# Must ask for the current home dir in case it came from pw.conf.
+	#
+	if (defined($homedir) &&
+	    index($homedir, "/${login}")) {
+	    if (os_homedirdel($login, $homedir) != 0) {
+	        warn "*** WARNING: Could not remove homedir $homedir.\n";
+	    }
+	}
+	
+	# Delete from DB only if successful. 
+	$deletes{$login} = $login;
+    }
+    
+    while (($login, $foo) = each %deletes) {
+	delete($PWDDB{$login});
+    }
+
+    my $pat = q(ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
+    $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
+    $pat   .= q(EMULABPUBKEY="(.*)" HOMEPUBKEY="(.*)");
+
+    while (($login, $info) = each %newaccounts) {
 	if ($info =~ /$pat/) {
 	    $pswd  = $2;
 	    $uid   = $3;
@@ -674,25 +819,86 @@ sub doaccounts ()
 	    $name  = $6;
 	    $hdir  = $7;
 	    $glist = $8;
+	    $ekey  = $9;
+	    $hkey  = $10;
 	    if ( $name =~ /^(([^:]+$|^))$/ ) {
 		$name = $1;
 	    }
-	    print STDOUT "  User: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
+	    print "User: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
 
-	    ($exists) = getpwuid($uid);
+	    my ($exists,undef,$curuid) = getpwnam($login);
+
 	    if ($exists) {
+		if (!defined($PWDDB{$login})) {
+		    warn "*** WARNING: ".
+			 "Skipping since $login existed before EmulabMan!\n";
+		    next;
+		}
+		if ($curuid != $uid) {
+		    warn "*** WARNING: ".
+			 "$login/$uid uid mismatch with existing login.\n";
+		    next;
+		}
+		print "Updating $login login info.\n";
 		os_usermod($login, $gid, "$glist", $root);
 		next;
 	    }
+	    print "Adding $login account.\n";
 
 	    if (os_useradd($login, $uid, $gid, $pswd, 
 			   "$glist", $hdir, $name, $root)) {
 		warn "*** WARNING: Error adding new user $login\n";
 		next;
 	    }
-	    next;
+	    # Add to DB only if successful. 
+	    $PWDDB{$login} = $uid;
+
+	    #
+	    # Create .ssh dir and populate it with an authkeys file.
+	    # Must ask for the current home dir since we rely on pw.conf.
+	    #
+	    my (undef,undef,undef,undef,
+		undef,undef,undef,$homedir) = getpwuid($uid);
+	    my $sshdir = "$homedir/.ssh";
+	    
+	    if (! -e $sshdir && ($ekey ne "" || $hkey ne "")) {
+		if (! mkdir($sshdir, 0700)) {
+		    warn("*** WARNING: Could not mkdir $sshdir: $!\n");
+		    next;
+		}
+		if (!chown($uid, $gid, $sshdir)) {
+		    warn("*** WARNING: Could not chown $sshdir: $!\n");
+		    next;
+		}
+		if (!open(AUTHKEYS, "> $sshdir/authorized_keys")) {
+		    warn("*** WARNING: Could not open $sshdir/keys: $!\n");
+		    next;
+		}
+		if ($ekey ne "") {
+		    print AUTHKEYS "$ekey\n";
+		}
+		if ($hkey ne "") {
+		    print AUTHKEYS "$hkey\n";
+		}
+		close(AUTHKEYS);
+
+		if (!chown($uid, $gid, "$sshdir/authorized_keys")) {
+		    warn("*** WARNING: Could not chown $sshdir/keys: $!\n");
+		    next;
+		}
+		if (!chmod(0600, "$sshdir/authorized_keys")) {
+		    warn("*** WARNING: Could not chmod $sshdir/keys: $!\n");
+		    next;
+		}
+	    }
+	}
+	else {
+	    warn("*** Bad accounts line: $info\n");
 	}
     }
+    # Write the DB back out!
+    dbmclose(%PWDDB);
+
     return 0;
 }
 
@@ -893,7 +1099,7 @@ sub dotrafficconfig()
 		print RC "#!/bin/sh\n";
 		$didopen = 1;
 	    }
-	    print RC "$cmdline -N $name -S $source -T $target -P $proto -R $role >/tmp/$name.debug 2>&1 &\n";
+	    print RC "$cmdline -N $name -S $source -T $target -P $proto -R $role >/tmp/${name}-${pid}-${eid}.debug 2>&1 &\n";
 	}
 	else {
 	    warn "*** WARNING: Bad traffic line: $_";
@@ -913,6 +1119,127 @@ sub dotrafficconfig()
     return 0;
 }
 
+sub dotunnels()
+{
+    my @tunnels;
+    my $pat;
+    my $TM;
+    my $didserver = 0;
+
+    #
+    # Kinda ugly, but there is too much perl goo included by Socket to put it
+    # on the MFS. 
+    # 
+    if (MFS()) {
+	return 1;
+    }
+    require Socket;
+    import Socket;
+    
+    $TM = OPENTMCC(TMCCCMD_TUNNEL);
+    while (<$TM>) {
+	push(@tunnels, $_);
+    }
+    close($TM);
+
+    if (! @tunnels) {
+	return 0;
+    }
+    my ($pid, $eid, $vname) = check_status();
+
+    open(RC, ">" . TMTUNNELCONFIG)
+	or die("Could not open " . TMTUNNELCONFIG . ": $!");
+    print RC "#!/bin/sh\n";
+    print RC "kldload if_tap\n";
+
+    open(CONF, ">" . TMVTUNDCONFIG)
+	or die("Could not open " . TMVTUNDCONFIG . ": $!");
+
+    print(CONF
+	  "options {\n".
+	  "  ifconfig    /sbin/ifconfig;\n".
+	  "  route       /sbin/route;\n".
+	  "}\n".
+	  "\n".
+	  "default {\n".
+	  "  persist     yes;\n".
+	  "  stat        yes;\n".
+	  "  keepalive   yes;\n".
+	  "  type        ether;\n".
+	  "}\n".
+	  "\n");
+    
+    $pat  = q(TUNNEL=([-\w.]+) ISSERVER=(\d) PEERIP=([-\w.]+) );
+    $pat .= q(PEERPORT=(\d+) PASSWORD=([-\w.]+) );
+    $pat .= q(ENCRYPT=(\d) COMPRESS=(\d) INET=([-\w.]+) );
+    $pat .= q(MASK=([-\w.]+) PROTO=([-\w.]+));
+
+    foreach my $tunnel (@tunnels) {
+	if ($tunnel =~ /$pat/) {
+	    #
+	    # The following is specific to vtund!
+	    #
+	    my $name     = $1;
+	    my $isserver = $2;
+	    my $peeraddr = $3;
+	    my $peerport = $4;
+	    my $password = $5;
+	    my $encrypt  = ($6 ? "yes" : "no");
+	    my $compress = ($7 ? "yes" : "no");
+	    my $inetip   = $8;
+	    my $mask     = $9;
+	    my $proto    = $10;
+	    my $routearg = inet_ntoa(inet_aton($inetip) & inet_aton($mask));
+
+	    my $cmd = "$VTUND -n -P $peerport -f ". TMVTUNDCONFIG;
+
+	    if ($isserver) {
+		if (!$didserver) {
+		    print RC
+			"$cmd -s >/tmp/vtund-${pid}-${eid}.debug 2>&1 &\n";
+		    $didserver = 1;
+		}
+	    }
+	    else {
+		print RC "$cmd $name $peeraddr ".
+		    " >/tmp/vtun-${pid}-${eid}-${name}.debug 2>&1 &\n";
+	    }
+	    #
+	    # Sheesh, vtund fails if it sees "//" in a path. 
+	    #
+	    my $config = TMROUTECONFIG;
+	    $config =~ s/\/\//\//g;
+	    
+	    print(CONF
+		  "$name {\n".
+		  "  password      $password;\n".
+		  "  compress      $compress;\n".
+		  "  encrypt       $encrypt;\n".
+		  "  proto         $proto;\n".
+		  "\n".
+		  "  up {\n".
+		  "    # Connection is Up\n".
+		  "    ifconfig \"%% $inetip netmask $mask\";\n".
+		  "    program " . $config . " \"$routearg up\" wait;\n".
+		  "  };\n".
+		  "  down {\n".
+		  "    # Connection is Down\n".
+		  "    ifconfig \"%% down\";\n".
+		  "    program " . $config . " \"$routearg down\" wait;\n".
+		  "  };\n".
+		  "}\n\n");
+	}
+	else {
+	    warn "*** WARNING: Bad tunnel line: $tunnel";
+	}
+    }
+
+    close(RC);
+    close(SERVER);
+    close(CLIENT);
+    chmod(0755, TMTUNNELCONFIG);
+    return 0;
+}
 
 #
 # Boot Startup code. This is invoked from the setup OS dependent script,
@@ -920,11 +1247,6 @@ sub dotrafficconfig()
 #
 sub bootsetup()
 {
-    #
-    # First clean up the node.
-    #
-    cleanup_node();
-
     #
     # Inform the master that we have rebooted.
     #
@@ -936,9 +1258,15 @@ sub bootsetup()
     print STDOUT "Checking Testbed reservation status ... \n";
     if (! check_status()) {
 	print STDOUT "  Free!\n";
+	cleanup_node(1);
 	return 0;
     }
     print STDOUT "  Allocated! $pid/$eid/$vname\n";
+
+    #
+    # Cleanup node. Flag indicates to gently clean ...
+    # 
+    cleanup_node(0);
 
     #
     # Setup a nicknames file. 
@@ -963,6 +1291,12 @@ sub bootsetup()
 	#
 	print STDOUT "Checking Testbed interface configuration ... \n";
 	doifconfig();
+
+        #
+        # Do tunnels
+        # 
+        print STDOUT "Checking Testbed tunnel configuration ... \n";
+        dotunnels();
 
 	#
 	# Host names configuration (/etc/hosts). 
@@ -1029,7 +1363,7 @@ sub nodeupdate()
     #
     if (! check_status()) {
 	print "Node is free. Cleaning up password and group files.\n";
-	cleanup_node();
+	cleanup_node(1);
 	return 0;
     }
 
@@ -1050,6 +1384,63 @@ sub nodeupdate()
     # 
     print STDOUT "Checking Testbed group/user configuration ... \n";
     doaccounts();
+
+    return 0;
+}
+
+# Remote node update. This gets fired off after reboot to update
+# accounts, mounts, etc. Its the start of shared node support. Quite
+# rough at the moment.
+#
+sub remotenodeupdate()
+{
+    #
+    # Do account stuff.
+    # 
+    print STDOUT "Checking Testbed group/user configuration ... \n";
+    doaccounts();
+
+    return 0;
+}
+
+#
+# Remote Node virtual node setup.
+#
+sub remotenodevnodesetup($)
+{
+    my ($vid) = @_;
+
+    #
+    # Set global vnodeid for tmcc commands.
+    #
+    $vnodeid = $vid;
+
+    #
+    # Make the directory where all this stuff is going to go.
+    #
+    if (! -e TMVNODEDIR) {
+	mkdir(TMVNODEDIR, 0755) or
+	    die("*** $0:\n".
+		"    Could not mkdir " . TMVNODEDIR . ": $!\n");
+    }
+    
+    #
+    # Do tunnels
+    # 
+    print STDOUT "Checking Testbed tunnel configuration ... \n";
+    dotunnels();
+
+    #
+    # Router Configuration.
+    #
+    print STDOUT "Checking Testbed routing configuration ... \n";
+    dorouterconfig();
+
+    #
+    # Traffic generator Configuration.
+    #
+    print STDOUT "Checking Testbed traffic generation configuration ...\n";
+    dotrafficconfig();
 
     return 0;
 }
@@ -1160,6 +1551,60 @@ sub whatsmynickname()
     }
 
     return "$vname.$eid.$pid";
+}
+
+#
+# Put ourselves into the background, directing output to the log file.
+# The caller provides the logfile name, which should have been created
+# with mktemp, just to be safe. Returns the usual return of fork. 
+#
+# usage int TBBackGround(char *filename).
+# 
+sub TBBackGround($)
+{
+    my($logname) = @_;
+    
+    my $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+    select(undef, undef, undef, 0.2);
+    
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller (the web server) will
+    # continue to wait even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    } else {
+	die("Bad data in logfile name: $logname\n");
+    }
+
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+    return 0;
+}
+
+#
+# Fork a process to exec a command. Return the pid to wait on.
+# 
+sub TBForkCmd($) {
+    my ($cmd) = @_;
+    my($mypid);
+
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    system($cmd);
+    exit($? >> 8);
 }
 
 1;

@@ -37,7 +37,7 @@ $| = 1;
 #
 # First clean up the node as it would be if free.
 #
-cleanup_node();
+cleanup_node(1);
 
 print "Removing old sup checkouts ...\n";
 if (-e $SUPCHECKDIR) {

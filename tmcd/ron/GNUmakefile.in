@@ -16,7 +16,8 @@ all:	bossnode
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-INSTALL_DIR	= /etc/local/etc/testbed
+DESTDIR		=
+INSTALL_DIR	= $(DESTDIR)/etc/local/etc/testbed
 INSTALL		= /usr/bin/install -c 
 INSTALL_PROG	= /usr/bin/install -c -m 755
 
@@ -24,6 +25,7 @@ install:	misc-install script-install bin-install
 
 dir-install:
 	-mkdir -p $(INSTALL_DIR)
+	cp /dev/null $(INSTALL_DIR)/isrem
 
 misc-install:	dir-install bossnode
 	$(INSTALL) bossnode $(INSTALL_DIR)/bossnode
@@ -33,10 +35,12 @@ bin-install:	dir-install
 
 script-install:	dir-install
 	$(INSTALL_PROG) $(SRCDIR)/update $(INSTALL_DIR)/update
-	$(INSTALL_PROG) $(SRCDIR)/libsetup.pm $(INSTALL_DIR)/libsetup.pm
+	$(INSTALL_PROG) $(SRCDIR)/vnodesetup $(INSTALL_DIR)/vnodesetup
+	$(INSTALL_PROG) $(SRCDIR)/../libsetup.pm $(INSTALL_DIR)/libsetup.pm
 	$(INSTALL_PROG) $(SRCDIR)/liblocsetup.pm $(INSTALL_DIR)/liblocsetup.pm
 	$(INSTALL_PROG) $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
 	$(INSTALL_PROG) $(SRCDIR)/mkemuman.sh $(INSTALL_DIR)/mkemuman.sh
+	$(INSTALL_PROG) $(SRCDIR)/upemuman.sh $(INSTALL_DIR)/upemuman.sh
 
 post-install:
 	chown root $(INSTALL_DIR)/update

@@ -9,7 +9,9 @@ use Exporter;
 @EXPORT =
     qw ( $CP $EGREP
 	 os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_groupdel os_cleanup_node
+	 os_groupdel os_cleanup_node os_homedirdel
+	 os_routing_enable_forward os_routing_enable_gated
+	 os_routing_add_manual os_routing_del_manual
        );
 
 # Must come after package declaration!
@@ -38,11 +40,13 @@ my $GROUPDEL	= "/usr/sbin/pw groupdel";
 my $CHPASS	= "/usr/bin/chpass -p";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $MKDIR	= "/bin/mkdir";
+my $ROUTE	= "/sbin/route";
 
 #
 # OS dependent part of cleanup node state.
 # 
-sub os_cleanup_node () {
+sub os_cleanup_node ($) {
+    my ($scrub) = @_;
 
     return 0;
 }
@@ -95,6 +99,17 @@ sub os_usermod($$$$)
 }
 
 #
+# Remove a homedir. Might someday archive and ship back.
+#
+sub os_homedirdel($$)
+{
+    my ($login, $homedir) = @_;
+    
+    print "Removing home directory: $homedir\n";
+    return(system("rm -rf $homedir"));
+}
+
+#
 # Add a user.
 # 
 sub os_useradd($$$$$$$$)
@@ -119,6 +134,54 @@ sub os_useradd($$$$$$$$)
 	return -1;
     }
     return 0;
+}
+
+#
+# OS dependent, routing-related commands
+#
+
+sub os_routing_enable_forward()
+{
+    return "echo 'IP forwarding not turned on!'";
+}
+
+sub os_routing_enable_gated()
+{
+    return "echo 'GATED IS NOT ALLOWED!'";
+}
+
+sub os_routing_add_manual($$$$$)
+{
+    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my $cmd;
+
+    if ($routetype eq "host") {
+	$cmd = "$ROUTE add -host $destip $gate";
+    } elsif ($routetype eq "net") {
+	$cmd = "$ROUTE add -net $destip $gate $destmask";
+    } else {
+	warn "*** WARNING: bad routing entry type: $routetype\n";
+	$cmd = "";
+    }
+
+    return $cmd;
+}
+
+sub os_routing_del_manual($$$$$)
+{
+    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my $cmd;
+
+    if ($routetype eq "host") {
+	$cmd = "$ROUTE delete -host $destip";
+    } elsif ($routetype eq "net") {
+	$cmd = "$ROUTE delete -net $destip $gate $destmask";
+    } else {
+	warn "*** WARNING: bad routing entry type: $routetype\n";
+	$cmd = "";
+    }
+
+    return $cmd;
 }
 
 1;

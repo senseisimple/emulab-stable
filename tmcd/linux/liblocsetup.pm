@@ -11,7 +11,8 @@ use Exporter;
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line enable_ipod
-	 os_routing_enable_forward os_routing_enable_gated os_routing_add_manual
+	 os_routing_enable_forward os_routing_enable_gated
+	 os_routing_add_manual os_routing_del_manual os_homedirdel
        );
 
 # Must come after package declaration!
@@ -56,9 +57,15 @@ my $ROUTE	= "/sbin/route";
 #
 # OS dependent part of cleanup node state.
 # 
-sub os_cleanup_node () {
+sub os_cleanup_node ($) {
+    my ($scrub) = @_;
+
     unlink @LOCKFILES;
 
+    if (! $scrub) {
+	return 0;
+    }
+    
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP $TMPASSWD /etc") != 0) {
 	print STDERR "Could not copy default group file into place: $!\n";
@@ -195,6 +202,14 @@ sub os_useradd($$$$$$$$)
 }
 
 #
+# Remove a homedir. Might someday archive and ship back.
+#
+sub os_homedirdel($$)
+{
+    return 0;
+}
+
+#
 # Generate and return an RPM install line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
@@ -289,6 +304,23 @@ sub os_routing_add_manual($$$$$)
 	$cmd = "$ROUTE add -host $destip gw $gate";
     } elsif ($routetype eq "net") {
 	$cmd = "$ROUTE add -net $destip netmask $destmask gw $gate";
+    } else {
+	warn "*** WARNING: bad routing entry type: $routetype\n";
+	$cmd = "";
+    }
+
+    return $cmd;
+}
+
+sub os_routing_del_manual($$$$$)
+{
+    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my $cmd;
+
+    if ($routetype eq "host") {
+	$cmd = "$ROUTE delete -host $destip";
+    } elsif ($routetype eq "net") {
+	$cmd = "$ROUTE delete -net $destip netmask $destmask gw $gate";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
 	$cmd = "";

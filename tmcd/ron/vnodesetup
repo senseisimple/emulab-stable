@@ -1,0 +1,169 @@
+#!/usr/bin/perl -wT
+use Getopt::Std;
+use English;
+
+#
+# Setup a single virtual experiment.
+#
+sub usage()
+{
+    print "Usage: vnodesetup [-k] <vnodeid>\n".
+	"Use the -k option to kill the virtual node.\n";
+    exit(1);
+}
+my $optlist = "k";
+my $killit  = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/local/bin:" .
+    "/usr/local/sbin:/usr/local/etc/testbed:/etc/testbed";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/usr/local/etc/testbed";
+use libsetup;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"k"})) {
+    $killit = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $vnodeid = $ARGV[0];
+
+if ($vnodeid =~ /^([\w]+)$/) {
+    $vnodeid = $1;
+}
+else {
+    die("Bad data in vnodeid: $vnodeid.");
+}
+
+#
+# Hacky. All this path stuff is hacky.
+# 
+my $logname = "/tmp/tbvnode-${vnodeid}.debug";
+my $pidfile = "/var/run/tbvnode-${vnodeid}.pid";
+
+#
+# If killing the virtual node, then kill the manager process. We use
+# the negative signal number to send to the process group so that all
+# stuff gets killed in one fell swoop.
+#
+if ($killit) {
+    if (! -e $pidfile) {
+	die("*** $0:\n".
+	    "    No pid for $vnodeid manager!\n");
+    }
+    $mpid = `cat $pidfile`;
+    $mpid =~ s/\n//;
+    # untaint
+    if ($mpid =~ /^([-\@\w.]+)$/) {
+	$mpid = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in pid: $mpid!\n");
+    }
+    
+    if (kill('TERM', $mpid) == 0) {
+	die("*** $0:\n".
+	    "    Could not kill(TERM) process $mpid: $!");
+    }
+    exit(0)
+}
+
+#
+# Invoke remotevnodesetup routine in the setup library. This will talk
+# to tmcd and create the rc files.
+#
+remotenodevnodesetup($vnodeid);
+
+#
+# Okay, lets detach now and continue on
+#
+if (TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Become real root so that route command works!
+#
+$UID = 0;
+
+#
+# Write our pid into the pid file so we can be killed later (when the
+# experiment is torn down).
+#
+open(PFILE, "> $pidfile")
+    or die("Could not open $pidfile: $!");
+print PFILE "$PID\n";
+close(PFILE);
+
+#
+# Okay, now startup the scripts.
+#
+if (-e TMTUNNELCONFIG) {
+    print "Starting Tunnels ...\n";
+    TBForkCmd(TMTUNNELCONFIG);
+}
+sleep(5);
+
+if (-e TMTRAFFICCONFIG) {
+    print "Starting Traffic Generators ...\n";
+    TBForkCmd(TMTRAFFICCONFIG);
+}
+sleep(1);
+
+#
+# Inform the TMCD we are ready.
+#
+system("tmcc -n $vnodeid state ISUP");
+
+#
+# Setup a handler to catch TERM, and kill our process group.
+#
+my $pgrp = getpgrp(0);
+
+sub handler () {
+    print "Exiting\n";
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    kill('TERM', -$pgrp);
+    sleep(10);
+    system("rm -rf " . TMVNODEDIR);
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Now we just sit and wait to be killed off by a signal sent to the
+# process group. Everything should get killed. 
+#
+while (1) {
+    sleep 5;
+}
+
+
+exit 0;

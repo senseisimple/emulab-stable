@@ -18,6 +18,11 @@ if [ -x /etc/testbed/setipod ]; then
         /etc/testbed/setipod
 fi
 
+if [ -x /etc/testbed/rc.tunnel ]; then
+        echo "Setting up Testbed tunnels ..."
+        /etc/testbed/rc.tunnel
+fi
+
 if [ -x /etc/testbed/rc.ifc ]; then
         echo "Setting up Testbed interfaces ..."
         /etc/testbed/rc.ifc
@@ -29,7 +34,7 @@ if [ -x /etc/testbed/rc.delay ]; then
         /etc/testbed/rc.delay
 elif [ -x /etc/testbed/rc.route ]; then
         echo "Setting up Testbed interface routing ..."
-	/etc/testbed/rc.route
+	/etc/testbed/rc.route enable
 fi
 
 if [ -x /etc/testbed/rc.rpm  ]; then

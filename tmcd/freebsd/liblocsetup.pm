@@ -11,7 +11,8 @@ use Exporter;
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line update_delays
-	 os_routing_enable_forward os_routing_enable_gated os_routing_add_manual
+	 os_routing_enable_forward os_routing_enable_gated
+	 os_routing_add_manual os_routing_del_manual os_homedirdel
        );
 
 # Must come after package declaration!
@@ -66,10 +67,16 @@ my $TMCCCMD_DELAY = "delay";
 #
 # OS dependent part of cleanup node state.
 # 
-sub os_cleanup_node () {
+sub os_cleanup_node ($) {
+    my ($scrub) = @_;
+
     unlink $TMDELAY;
     unlink $TMDELMAP;
 
+    if (! $scrub) {
+	return 0;
+    }
+    
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {
 	print STDERR "Could not copy default group file into place: $!\n";
@@ -204,6 +211,14 @@ sub os_useradd($$$$$$$$)
 	warn "*** WARNING: $CHPASS $login error.\n";
 	return -1;
     }
+    return 0;
+}
+
+#
+# Remove a homedir. Might someday archive and ship back.
+#
+sub os_homedirdel($$)
+{
     return 0;
 }
 
@@ -549,6 +564,23 @@ sub os_routing_add_manual($$$$$)
 	$cmd = "$ROUTE add -host $destip $gate";
     } elsif ($routetype eq "net") {
 	$cmd = "$ROUTE add -net $destip $gate $destmask";
+    } else {
+	warn "*** WARNING: bad routing entry type: $routetype\n";
+	$cmd = "";
+    }
+
+    return $cmd;
+}
+
+sub os_routing_del_manual($$$$$)
+{
+    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my $cmd;
+
+    if ($routetype eq "host") {
+	$cmd = "$ROUTE delete -host $destip";
+    } elsif ($routetype eq "net") {
+	$cmd = "$ROUTE delete -net $destip $gate $destmask";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
 	$cmd = "";
