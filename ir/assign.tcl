@@ -75,16 +75,37 @@ puts "Writing topfile ($tmpfile)"
 
 set topfp [open $tmpfile w]
 
+# calculate delay stuff
+set delayI 0
+set delayinfo {}
+foreach link [array names links] {
+    set src [lindex $links($link) 0]
+    set dst [lindex $links($link) 2]
+    set bw [string trimright [lindex $links($link) 4] "Mb"]
+    set delay [string trimright [lindex $links($link) 6] "ms"]
+    if {($bw != 100 && $bw != 10) ||
+	$delay > 0.25} {
+	# we need a delay node
+	set nodes(delay$delayI) [list delay]
+	set rlinks(dsrc_$link) [list $src -1 delay$delayI -1 100Mb 100Mb 1ms 1ms]
+	set rlinks(ddst_$link) [list $dst -1 delay$delayI -1 100Mb 100Mb 1ms 1ms]
+	lappend delayinfo "$link delay$delayI $bw $delay"
+	incr delayI
+    } else {
+	set rlinks($link) $links($link)
+    }
+}
+
 # write nodes
 foreach node [array names nodes] {
     puts $topfp "node $node [lindex $nodes($node) 0]"
 }
 
 # write links
-foreach link [array names links] {
-    set src [lindex $links($link) 0]
-    set dst [lindex $links($link) 2]
-    set bw [string trimright [lindex $links($link) 4] "Mb"]
+foreach link [array names rlinks] {
+    set src [lindex $rlinks($link) 0]
+    set dst [lindex $rlinks($link) 2]
+    set bw [string trimright [lindex $rlinks($link) 4] "Mb"]
     puts $topfp "link $link [lindex $src 0] [lindex $dst 0] $bw"
 }
 
@@ -145,6 +166,7 @@ set fp [open $argv a]
 
 puts "Adding virtual section"
 # XXX: we don't do links or lans yet
+# XXX: We need to handle delay links
 puts $fp "START virtual"
 puts $fp "START nodes"
 foreach switch [array names map] {
@@ -153,6 +175,17 @@ foreach switch [array names map] {
     }
 }
 puts $fp "END nodes"
+
+proc get_link_name {s} {
+    set t [split $s _]
+    set v [lindex $t 0]
+    if {$v == "dsrc" || $v == "ddst"} {
+	return [join [lrange $t 1 end] _]
+    } else {
+	return $s
+    }
+}
+
 puts $fp "START links"
 foreach link [array names plinks] {
     set pls {}
@@ -160,8 +193,15 @@ foreach link [array names plinks] {
 	if {[string index $element 0] == "("} {continue}
 	lappend pls $element
     }
-    puts $fp "$link $pls"
+    set name [get_link_name $link]
+    foreach l $pls {
+	lappend linktmp($name) $l
+    }
 }
+foreach link [array names linktmp] {
+    puts $fp "$link $linktmp($link)"
+}
+
 puts $fp "END links"
 puts $fp "END virtual"
 
@@ -182,12 +222,13 @@ proc getmac {s} {
 foreach link [array names plinks] {
     set t $plinks($link)
     set type [lindex $t 0]
+    set name [get_link_name $link]
     switch $type {
 	"intraswitch" {
 	    # 2 links, but each goes to a switch
 	    set srcmac [getmac [lindex $t 2]]
 	    set dstmac [getmac [lindex $t 4]]
-	    puts $fp "$link $srcmac $dstmac"
+	    lappend linktmpb($name) [list $srcmac $dstmac]
 	}
 	"interswitch" {
 	    # 3 or four links
@@ -202,17 +243,32 @@ foreach link [array names plinks] {
 		    lappend ll $mac
 		}
 	    }
-	    puts $fp "$link $ll"
+	    lappend linktmpb($name) $ll
 	}
 	"direct" {
 	    # 1 link
 	    set macs [split [string trim [lindex $t 2] "()"] ","]
-	    puts $fp "$link $macs"
+	    lappend linktmpb($name) $macs
 	}
+    }
+}
+foreach link [array names linktmpb] {
+    set llen [llength $linktmpb($link)]
+    set i 0
+    foreach l $linktmpb($link) {
+	puts $fp "$link-$i $l"
+	incr i
     }
 }
 
 puts $fp "END vlan"
+
+# add delay seciton
+puts $fp "START delay"
+foreach line $delayinfo {
+    puts $fp $line
+}
+puts $fp "END delay"
 
 close $fp
 

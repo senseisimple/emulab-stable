@@ -115,6 +115,19 @@ proc subset {A B} {
     return $ret
 }
 
+proc get_macs {l} {
+    global vlanmap
+    
+    set i 0
+    set macs {}
+    while {[info exists vlanmap($l-$i)]} {
+	set macs [concat $macs $vlanmap($l-$i)]
+	incr i
+    }
+
+    return $macs
+}
+
 set ip_section {}
 set ip_mac_section {}
 foreach linkline [ir get /topology/links] {
@@ -125,7 +138,7 @@ foreach linkline [ir get /topology/links] {
     # Look for an assigned ip
     if {[info exists IP($src:$dst)]} {
 	lappend ip_section [list $src $dst $IP($src:$dst)]
-	lappend ip_mac_section [list [subset $MACTABLE($src) $vlanmap($link)] $IP($src:$dst)]
+	lappend ip_mac_section [list [subset $MACTABLE($src) [get_macs $link]] $IP($src:$dst)]
 	set ips_assigned($IP($src:$dst)) 1
 	lappend ips_node($src) $IP($src:$dst)
     } elseif {[info exists IP($src)]} {
@@ -135,7 +148,7 @@ foreach linkline [ir get /topology/links] {
 	}
 	set single_node($src) 1
 	lappend ip_section [list $src $dst $IP($src)]
-	lappend ip_mac_section [list [subset $MACTABLE($src) $vlanmap($link)] $IP($src)]
+	lappend ip_mac_section [list [subset $MACTABLE($src) [get_macs $link]] $IP($src)]
 	set ips_assigned($IP($src)) 1
 	lappend ips_node($src) $IP($src)
     } else {
@@ -147,7 +160,7 @@ foreach linkline [ir get /topology/links] {
     }
     if {[info exists IP($dst:$src)]} {
 	lappend ip_section [list $dst $src $IP($dst:$src)]
-	lappend ip_mac_section [list [subset $MACTABLE($dst) $vlanmap($link)] $IP($dst:$src)]
+	lappend ip_mac_section [list [subset $MACTABLE($dst) [get_macs $link]] $IP($dst:$src)]
 	set ips_assigned($IP($dst:$src)) 1
 	lappend ips_node($dst) $IP($dst:$src)
     } elseif {[info exists IP($dst)]} {
@@ -157,7 +170,7 @@ foreach linkline [ir get /topology/links] {
 	}
 	set single_node($dst) 1
 	lappend ip_section [list $dst $src $IP($dst)]
-	lappend ip_mac_section [list [subset $MACTABLE($dst) $vlanmap($link)] $IP($dst)]
+	lappend ip_mac_section [list [subset $MACTABLE($dst) [get_macs $link]] $IP($dst)]
 	set ips_assigned($IP($dst)) 1
 	lappend ips_node($dst) $IP($dst)
     } else {
@@ -208,9 +221,9 @@ foreach left [array names to_assign] {
 	set ipA [find_free_ip $subnet]
 	set ipB [find_free_ip $subnet]
 	lappend ip_section [list $node $dst $ipA]
-	lappend ip_mac_section [list [subset $MACTABLE($node) $vlanmap($left)] $ipA]
+	lappend ip_mac_section [list [subset $MACTABLE($node) [get_macs $left]] $ipA]
 	lappend ip_section [list $dst $node $ipB]
-	lappend ip_mac_section [list [subset $MACTABLE($dst) $vlanmap($left)] $ipB]
+	lappend ip_mac_section [list [subset $MACTABLE($dst) [get_macs $left]] $ipB]
 	lappend ips_node($node) $ipA
 	lappend ips_node($dst) $ipB
     } else {
@@ -223,7 +236,7 @@ foreach left [array names to_assign] {
 	}
 	set ip [find_free_ip $subnet]
 	lappend ip_section [list $node $dst $ip]
-	lappend ip_mac_section [list [subset $MACTABLE($node) $vlanmap($left)] $ip]
+	lappend ip_mac_section [list [subset $MACTABLE($node) [get_macs $left]] $ip]
 	lappend ips_node($node) $ip
 }
 }
