@@ -139,3 +139,16 @@ last_net_act,last_cpu_act,last_ext_act);
 
        These fields had never been used, so the type change and init
        are okay.
+
+1.223: Create empty 'sitevariables' table with the following schema:
+
+       CREATE TABLE sitevariables (
+         name text NOT NULL,
+	 value text,
+	 defaultvalue text NOT NULL,
+	 description text,
+	 KEY name (name(32))
+       ) TYPE=MyISAM;
+
+
+

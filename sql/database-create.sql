@@ -905,6 +905,18 @@ CREATE TABLE scheduled_reloads (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'sitevariables'
+--
+
+CREATE TABLE sitevariables (
+  name text NOT NULL,
+  value text,
+  defaultvalue text NOT NULL,
+  description text,
+  KEY name (name(32))
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'state_timeouts'
 --
 
