@@ -8,8 +8,13 @@ SUBDIR		= utils
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= delay_config sshtb
+BIN_SCRIPTS	= delay_config sshtb create_image
 SBIN_SCRIPTS	= vlandiff vlansync
+#
+# These are the ones installed on plastic (users, control, etc). 
+# 
+USERBINS        = create_image
+USERBIN_SCRIPTS = delay_config
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -26,6 +31,11 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 # Control node installation (okay, plastic)
 #
 control-install: \
-	$(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS))
+	$(addprefix $(INSTALL_BINDIR)/, $(USERBIN_SCRIPTS))
+	cd $(INSTALL_BINDIR) && \
+		list='$(USERBINS)'; for file in $$list; do \
+			rm -f $$file; \
+			ln -s plasticwrap $$file; \
+		done;
 
 clean:

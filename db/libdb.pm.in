@@ -283,7 +283,7 @@ sub OSFeatureSupported($$) {
 # in the shelf/node, return 1 if it is. The shelf/node arguments are
 # optional, if all you want to do is see if its a shelf type thing.
 #
-# usage: IsShelved(char *nodeid, [\@shelf], [\@node])
+# usage: IsShelved(char *nodeid, [\$shelf], [\$node])
 #        returns 1 if the node is a shelf type thing. Optionally fills in info.
 #        returns 0 if the node is just a normal kind of node.
 #
@@ -300,6 +300,57 @@ sub IsShelved ($;$$) {
 	return 1;
     }
     return 0;
+}
+
+#
+# Map nodeid to its pid/eid.
+#
+# usage: NodeToExp(char *nodeid, \$pid, \$eid)
+#        returns 1 if the node is reserved.
+#        returns 0 if the node is not reserved.
+#
+sub NodeidToExp ($$$) {
+    my($nodeid, $pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select pid,eid from reserved where node_id='$nodeid'");
+
+    if ($query_result->num_rows < 1) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    $$pid = $row[0];
+    $$eid = $row[1];
+    return 1;
+}
+
+#
+# Map UID to user_login, user_name, and user_email.
+#
+# usage: UIDInfo(int uid, \$login, \$name, \$email)
+#        returns 1 if the UID is okay.
+#        returns 0 if the UID is bogus.
+#
+sub UIDInfo ($$$$) {
+    my($uid, $userlogin, $username, $useremail) = @_;
+
+    my($name) = getpwuid($uid)
+	or die "$uid not in passwd file\n";
+
+    my $query_result =
+	DBQueryFatal("select uid,usr_name,usr_email from users ".
+		     "where uid='$name'");
+
+    if ($query_result->num_rows < 1) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    $$userlogin = $row[0];
+    $$username  = $row[1];
+    $$useremail = $row[2];
+    return 1;
 }
 
 #

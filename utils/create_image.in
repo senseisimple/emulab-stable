@@ -1,0 +1,358 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Create a disk image.
+#
+# XXX: Device file should come from DB.
+#      Start/count slice computation is not generalized at all.
+#
+sub usage()
+{
+    print STDOUT "Usage: create-image <node> <imageid> <filename>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $PROJROOT	= "/proj";
+my $TFTPDIR     = "/tftpboot";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# 
+#
+my $BOSSADDR	= "boss.emulab.net";
+my $freebsd     = "$BOSSADDR:$TFTPDIR/pxeboot.freebsd";
+my $nodereboot	= "$TB/bin/node_reboot";
+my $createimage = "/usr/local/bin/create-image";
+my $device      = "/dev/rad0";
+my $mereuser    = 0;
+my %imageid_row = ();
+my $logname     = 0;
+my $debug       = 0;
+my @row;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 3) {
+    usage();
+}
+
+my $node     = $ARGV[0];
+my $imageid  = $ARGV[1];
+my $filename = $ARGV[2];
+
+#
+# Untaint the arguments.
+#
+if ($node =~ /^([-\w]+)$/) {
+    $node = $1;
+}
+else {
+    fatal("Tainted node name: $node");
+}
+# Note different taint check (allow /).
+if ($filename =~ /^([-\w.\/]+)$/) {
+    $filename = $1;
+}
+else {
+    fatal("Tainted output filename: $filename");
+}
+
+#
+# Figure out who called us. Root and admin types can do whatever they
+# want. Normal users can only run this on nodes in their own experiments.
+#
+if ($UID && !TBAdmin($UID)) {
+    if (! NodeAccessCheck(\$node)) {
+	die("*** You do not have permission to create an image from $node\n");
+    }
+    $mereuser = 1;
+}
+
+#
+# Get email info for user.
+#
+my $user_login;
+my $user_name;
+my $user_email;
+if (! UIDInfo($UID, \$user_login, \$user_name, \$user_email)) {
+    die("Cannot determine user name and email address");
+}
+
+#
+# We need the project id for test below. The target directory for the
+# output file has to be the node project directory, since that is the
+# directory that is going to be NFS mounted by default.
+#
+my $pid;
+my $eid;
+if (! NodeidToExp($node, \$pid, \$eid)) {
+    die("Could not map $node to its pid/eid");
+}
+
+#
+# Grab the imageid description from the DB. We do a permission check, but
+# mostly to avoid hard to track errors that would result if the user picked
+# the wrong one (which is likely to happen no matter what I do).
+#
+$db_result =
+    DBQueryFatal("select * from images where imageid='$imageid'");
+    
+if ($db_result->numrows < 1) {
+    die("No such imageid $imageid!");
+}
+%imageid_row = $db_result->fetchhash();
+
+my $imagepid = 0;
+if (defined($imageid_row{'pid'})) {
+    $imagepid = $imageid_row{'pid'};
+}
+    
+if ($mereuser && $imagepid && !ProjMember($imagepid)) {
+    die("You do not have permission to load imageid $imageid!");
+}
+
+#
+# Make sure that the filename is a /proj/$pid filename and a directory that
+# exists and is writeable for the user. We test this by creating the file.
+# Its going to get wiped anyway.
+#
+if (! ($filename =~ /^$PROJROOT\/$pid\/.*/)) {
+    die("File $filename for must reside someplace in $PROJROOT/$pid\n");
+}
+open(FILE, "> $filename") or
+    die("Could not create $filename: $!");
+close(FILE) or
+    die("Could not truncate $filename: $!");
+
+#
+# Okay, we want to build up a command line that will run the script on
+# on the client node. We use the imageid description to determine what
+# slice (or perhaps the entire disk) is going to be zipped up. We do not
+# allow arbitrary combos of course. 
+#
+my $startslice = $imageid_row{'loadpart'};
+my $loadlength = $imageid_row{'loadlength'};
+my $command    = "$createimage ";
+
+if ($startslice || $loadlength == 1) {
+    $command = "$command -s $startslice $device $filename";
+}
+else {
+    $command = "$command $device $filename";
+}
+
+#
+# Go to the background since this is going to take a while.
+# 
+if (!$debug && background()) {
+    #
+    # Parent exits normally
+    #
+    print STDOUT
+	"Your image from $node is being created\n".
+	"You will be notified via email when the image has been\n".
+	"completed, and you can load the image on another node.\n";
+	exit(0);
+}
+
+#
+# We want to save off the old pxeboot/startupcmd and replace them with
+# the special freebsd boot, and the command we created above. Then we
+# reboot the node, and wait for it to come back alive. We also clear the
+# startcommand status, and and use that to wait for the zipper to finish.
+# I think we need a better mechanism for determining when a node is booted
+# since we are basically stuck waiting for this, without knowing if the node
+# even came up okay.
+#
+$query_result =
+    DBQueryWarn("select pxe_boot_path,startupcmd from nodes ".
+                "where node_id='$node'");
+
+if (!$query_result ||
+    $query_result->numrows < 1) {
+    fatal("DB error getting node info for $node");
+}
+@row = $query_result->fetchrow_array();
+my $saved_pxebootpath = $row[0];
+my $saved_startupcmd  = $row[1];
+
+if (! DBQueryWarn("update nodes set pxe_boot_path='$freebsd', ".
+		  "startupcmd='$command', startstatus='none' ".
+		  "where node_id='$node'")) {
+    fatal("DB error updating node info for $node");
+}
+
+#
+# Reboot node. If this fails must reset.
+#
+if (system("$nodereboot $node")) {
+    cleanup();
+    fatal("Failed to reboot $node!");
+}
+
+#
+# Now we wait for the status to flip. We don't want to wait too long of
+# course. 
+#
+my $count  = 120;
+while ($count) {
+    my $result;
+    
+    $query_result =
+	DBQueryWarn("select startstatus from nodes where node_id='$node'");
+
+    if (!$query_result ||
+	$query_result->numrows < 1) {
+	cleanup();
+	fatal("DB error getting startstatus for $node");
+    }
+ 
+    @row = $query_result->fetchrow_array();
+    $result = $row[0];
+
+    if ("$result" ne "none") {
+	last;
+    }
+    if ($count && (($count % 6) == 0)) {
+	print "Still waiting ...\n";
+    }
+
+    sleep(10);
+    $count--;
+}
+cleanup();
+
+#
+# Need to reboot the node so that it comes out of the pxebooted kernel and
+# returns to its normal self. Its okay if this fails, although it should not.
+#
+if (system("$nodereboot $node")) {
+    print "*** Failed to reboot $node after zipper completed!\n";
+}
+
+#
+# If we timed out or if the result code was bad.
+#
+if (! $count) {
+    fatal("FAILED: Timed out generating image ... \n");
+}
+if ($result) {
+    fatal("FAILED: Returned error code $result generating image ... \n");
+}
+
+SENDMAIL("$user_name <$user_email>",
+	 "TESTBED: Image Creation on $node Completed: $pid/$eid",
+	 "Image creation on $node has completed. As you requested, the\n".
+	 "image has been written to $filename.\n".
+	 "You may now os_load this image on other nodes in your experiment.\n",
+	 "$TBOPS");
+
+exit 0;
+
+sub cleanup ()
+{
+    DBQueryWarn("update nodes set pxe_boot_path='$saved_pxebootpath', ".
+		"startupcmd='$saved_startupcmd' where node_id='$node'");
+}
+
+#
+# Put ourselves into the background so that caller sees immediate response.
+# Mail notification will happen later.
+# 
+sub background()
+{
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller (the web server) will
+    # continue to wait even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    #
+    # Create a temporary name for a log file and untaint it.
+    #
+    $logname = `mktemp /tmp/create-image-$pid-$eid.XXXXXX`;
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    } else {
+	die "Bad data in $logname";
+    }
+
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+    local $MAIL;
+    
+    #
+    # Send a message to the testbed list. Append the logfile if it got
+    # that far.
+    #
+    if (! ($MAIL =
+	   OPENMAIL("$user_name <$user_email>",
+		    "TESTBED: Image Creation Failure on $node: $pid/$eid",
+		    undef, "Cc: $TBOPS"))) {
+	die("Cannot start mail program!");
+    }
+
+    print $MAIL $mesg;
+
+    if (open(IN, "$logname")) {
+	print $MAIL "\n\n---------\n\n";
+	
+	while (<IN>) {
+	    print $MAIL "$_";
+	}
+	close(IN);
+    }
+    close($MAIL);
+    
+    unlink("$logname");
+    exit(-1);
+}
+
