@@ -336,7 +336,7 @@ sub dodelays ()
 	    $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
 	    $pat .= q(PIPE0=(\d+) DELAY0=([\d\.]+) BW0=(\d+) PLR0=([\d\.]+) );
 	    $pat .= q(PIPE1=(\d+) DELAY1=([\d\.]+) BW1=(\d+) PLR1=([\d\.]+) );
-	    $pat .= q(LINKNAME=([\d\w]+) );
+	    $pat .= q(LINKNAME=([-\d\w]+) );
 	    $pat .= q(RED0=(\d) RED1=(\d) );
 	    $pat .= q(LIMIT0=(\d+) );
 	    $pat .= q(MAXTHRESH0=(\d+) MINTHRESH0=(\d+) WEIGHT0=([\d\.]+) );
