@@ -168,12 +168,17 @@ while (1) {
             next;
         }
         
-	print "\n\#\#\# Checking $vnode on $pnode at " . TimeStamp() . "\n";
+        print "##############################################################################\n";
+	print "### Checking $vnode on $pnode at " . TimeStamp() . "\n";
 
 	#
 	# Try to tear it down, set it up, and wait for ISUP.
-	# 
-	system("vnode_setup -f -k -d $PLABMOND_PID $PLABMOND_EID $vnode");
+	#
+
+        # Bah, can't do unassign->assign in plab right now since unassign
+        # is async, and may clobber the immediate assign afterward.
+        #
+	#system("vnode_setup -f -k -d $PLABMOND_PID $PLABMOND_EID $vnode");
 	system("vnode_setup -f -d $PLABMOND_PID $PLABMOND_EID $vnode");
 	if ($?) {
 	    print "Failed to allocate $vnode on $pnode\n";

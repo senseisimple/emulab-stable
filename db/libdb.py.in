@@ -1,0 +1,90 @@
+# -*- python -*-
+
+#
+# Database functions
+#
+
+import sys
+import os
+import pwd
+
+import MySQLdb
+
+# XXX: inherit!
+debug = 1
+
+__dbName = "@TBDBNAME@"
+__dbQueryMaxtries = 1
+__dbConnMaxtries = 5
+
+__dbConnection = None
+
+def TBDBConnect():
+    global __dbConnection
+    
+    if __dbConnection:
+        return
+
+    # Create a DB username for accounting purposes
+    uid = os.getuid()
+    try:
+        name = pwd.getpwuid(uid)[0]
+    except KeyError:
+        name = "uid%d" % uid
+    dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
+
+    if debug:
+        print "Connecting to db %s as %s" % (__dbName, dbuser)
+
+    # Connect, with retries
+    for tries in range(__dbConnMaxtries):
+        try:
+            __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
+        except:
+            time.sleep(1)
+        else:
+            break
+    else:
+        raise RuntimeError, "Cannot connect to DB after several attempts!"
+
+def DBQueryFatal(queryPat, querySub = (), asDict = False):
+    TBDBConnect()
+    
+    if asDict:
+        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
+    else:
+        cursor = __dbConnection.cursor()
+
+    if debug:
+        print "Executing DB query %s" % queryPat
+
+    tries = __dbQueryMaxtries
+    while tries:
+        try:
+            cursor.execute(queryPat, querySub)
+            ret = cursor.fetchall()
+            if debug:
+                rs = `ret`
+                if len(rs) > 60:
+                    rs = rs[:60] + "..."
+                print "Result: %s" % rs
+            return ret
+        except MySQLdb.MySQLError:
+            tries -= 1
+            if tries == 0:
+                raise
+            else:
+                time.sleep(1)
+                try:
+                    __dbConnection.ping()
+                except MySQLdb.MySQLError: pass
+    tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
+    SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg, TBOPS)
+    raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
+
+def DBQuery(*args):
+    try:
+        ret = DBQueryFatal(*args)
+    except MySQLdb.MySQLError:
+        return None
+

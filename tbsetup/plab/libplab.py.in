@@ -11,38 +11,43 @@ it expects to find these in the @prefix@/etc/plab/ subdirectory.
 """
 
 import sys
-sys.path.append("@prefix@/lib/dslice")
-sys.path.append("@prefix@/lib/dslice/dslice")
-sys.path.append("@prefix@/lib/dslice/HTMLgen")
+sys.path.append("@prefix@/lib")
 
-import os, pwd, time
-import MySQLdb
-import agent, agentproxy
-import nodemgr, nodemgrproxy
-import lease
+import os, time
 import string
 import traceback
-import xmlrpclib
 import socket
-import signal
 
 from warnings import warn
 
 #
+# Testbed and DB access libs
+#
+from libtestbed import *
+from libdb import *
+
+#
+# Plab modules to import
+#
+from mod_PLC import mod_PLC
+from mod_dslice import mod_dslice
+
+agents = {'PLC'    : mod_PLC,
+          'dslice' : mod_dslice}
+
+#
 # Constants
 #
+DEF_AGENT = "PLC";
 
 LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
-AGENTIP = "dslice.planet-lab.org"
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
-DEF_TIMEOUT    = 1*60     # default timeout interval
 RENEW_TIMEOUT = 1*60     # give the node manager a minute to respond to renew
 FREE_TIMEOUT  = 1*60     # give the node manager a minute to respond to free
 
 TBOPS = "@TBOPSEMAIL@".replace("\\","")
 MAILTAG = "@THISHOMEBASE@"
-SCRIPTNAME = sys.argv[0][sys.argv[0].rfind("/")+1:]
 
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "hwdown"       # start life in hwdown
@@ -63,7 +68,6 @@ ALLOWED_NODES = ()
 NUMVNODES = 20
 
 PLABNODE = "@prefix@/sbin/plabnode"
-DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
 SSH = "@prefix@/bin/sshtb"
 NAMED_SETUP = "@prefix@/sbin/named_setup"
 
@@ -73,39 +77,8 @@ HTTP_PATH = "/" # ensure this ends in a slash
 ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
 DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
-SLICEPREFIX = "@PLAB_SLICEPREFIX@"
-
-#
-# PLC constants
-#
-DEF_PLC_URI = "https://www.planet-lab.org/db/slices/dynamicprog.php"
-DEF_PLC_USER = "lepreau@cs.utah.edu"
-DEF_PLC_PASS = "phurds"
-DEF_PLC_LEASELEN = 1*30*24*60*60   # add one month (XXX: for now)
-DEF_PLC_SHARES = 30
-EMULABMAN_EMAIL = "emulabman@emulab.net"
-DEF_PLAB_URL = "www.planet-lab.org"
-PLAB_LIST_URIS = ("/db/nodes/all_ips.php",)
-
-#
-# How many seconds to sleep between failures and how many times to try
-# commands to both the dslice agent, and individual node managers.
-#
-DEF_SLEEPINT = 5
-DEF_TRIES = 3
-
-#
-# output modifiers
-#
-verbose = 0
-debug = 0
-
-#
-# Method of operation
-#
-# current choices are: PLC or dslice
-#
-method = "PLC"
+#SLICEPREFIX = "@PLAB_SLICEPREFIX@"
+SLICEPREFIX = "utah"
 
 #
 # var to track failed renewals
@@ -122,532 +95,19 @@ sys.stdout = os.fdopen(sys.stdout.fileno(), sys.stdout.mode, 0)
 #
 signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
-#
-# General library functions
-#
-
-def handleArgs(args):
-    """
-    Takes a list of command-line arguments, interprets those at the
-    beginning that are meant for libplab (-vd), and returns the remainder
-    of the arguments.
-    """
-    global verbose, debug
-    import getopt
-    opts, args = getopt.getopt(args, "vd")
-
-    for o, a in opts:
-        if o == "-v":
-            verbose = 1
-        if o == "-d":
-            debug = 1
-    return args
-
-
-def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
-    """
-    Sends email to someone about something :)
-
-    This function is similar to its perl library counterpart.
-
-    ARGS:
-
-     To:      <string> Email address of recipient.
-     Subj:    <string> Subject of email.
-     Msg:     <string> Message text.
-     From:    <string> Email address of sender (optional).
-     Headers: <string> Extra header strings (must newline terminate all but
-                       the last one) (optional).
-     Files:   <tuple>  List of files to append to message body (optional).
-     
-    RETURNS:
-     Always returns 1
-
-    SIDE EFFECTS:
-     Can raise exceptions via called methods/functions.
-    """
-    Tag = MAILTAG.upper()
-    # damn, no good way to tell if this fails
-    sm = os.popen("/usr/sbin/sendmail -t", "w")
-    
-    #
-    # Sendmail will figure this out if not given.
-    # 
-    if From:
-	sm.write("From: %s\n" % From)
-        
-    if Headers:
-	sm.write("%s\n" % Headers)
-        
-    sm.write("X-NetBed: %s\n" % SCRIPTNAME)
-    sm.write("To: %s\n" % To)
-    sm.write("Subject: %s: %s\n" % (Tag, Subj))
-    sm.write("\n")
-    sm.write("%s\n" % Msg)
-    sm.write("\n")
-
-    if len(Files):
-        for fname in Files:
-            try:
-                infile = open(fname)
-            except IOError:
-                continue
-            
-            sm.write("\n--------- %s --------\n" % fname)
-
-            for line in infile.readlines():
-                sm.write(line)
-            
-            infile.close()
-    
-    sm.write("\n")
-    sm.close()
-    
-    return 1
-
-#
-# Print out a timestamp with optional message
-#
-def TIMESTAMP(msgstr = ""):
-    mytime = time.strftime("%H:%M:%S")
-    print "TIMESTAMP: %s %s" % (mytime, msgstr)
-    
-#
-# Termination signals, and global var to track if we got one when
-# they are disabled with disable_sigs
-#
-TERMSIGS = (signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
-gotsig = 0
-
-class SignalInterrupt(Exception):
-    def __init__(self, signum):
-        self.signum = signum
-
-#
-# Keep track of last terminal signal received
-#
-def localSigHandler(signum, frame):
-    """
-    Keep track of received signals.
-    """
-    global gotsig
-    gotsig = signum
-    if verbose:
-        print "Caught signal %s" % signum
-
-def disable_sigs(sigs):
-    """
-    Put signal watcher into place.  I wish you could just temporarily
-    block (but not ignore) signals in python - alas.
-    """
-    osigs = {}
-    for sig in sigs:
-        osigs[sig] = signal.signal(sig, localSigHandler)
-    return osigs
-
-def enable_sigs(osigs):
-    """
-    Reinstate old signal handlers and then raise an exception if
-    one was caught while we had them disabled.
-    """
-    global gotsig
-    
-    for sig,handler in osigs.items():
-        signal.signal(sig, handler)
-
-    if gotsig:
-        tmp = gotsig
-        gotsig = 0
-        raise SignalInterrupt(tmp)
-
-
-#
-# Local timeout error class and generic alarm handler
-# Also listed are a couple of state saving vars for the alarm handler
-# when the local one is installed.  The *_alarm calls are nestable
-#
-class TimeoutError: pass
-def alrmhandler(signum, frame):
-    if debug:
-        print "Timeout! Raising TimeoutError."
-    raise TimeoutError
-
-oalrmhandlerstk = []  # alarm handler stack
-oalrmtmostk = []      # alarm timeout stack
-
-def enable_alarm():
-    """
-    Install a little local alarm handler, stash away old one, and
-    it's pending alarm timeout (if set).
-    """
-    global oalrmhandlerstk, oalrmtmostk
-    oalrmhandlerstk.append(signal.signal(signal.SIGALRM, alrmhandler))
-    oalrmtmo = signal.alarm(0)
-    if oalrmtmo:
-        oalrmtmo += time.time()
-    oalrmtmostk.append(oalrmtmo)
-
-def disable_alarm():
-    """
-    Restore old handler and timeout.  If the old timeout has passed, warn,
-    and send the alarm signal immediately.
-    """
-    signal.signal(signal.SIGALRM, oalrmhandlerstk.pop())
-    oalrmtmo = oalrmtmostk.pop()
-    if oalrmtmo:
-        diff = oalrmtmo - time.time()
-        if diff > 0:
-            signal.alarm(diff)
-        else:
-            warn("missed a timeout deadline, sending SIGALRM immediately!")
-            os.kill(os.getpid(), signal.SIGALRM)
-    
-
-def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
-            disable_sigs_parent=(), disable_sigs_child=()):
-    """
-    Fork and run the given command, and optionally timeout in the parent.
-
-    ARGS:
-     cmd: <bound method | function> command to run.
-     args: <tuple> arguments to the above command.
-     timeout: <int> seconds to wait for child/command to complete
-              before killing it off and returning
-     disable_sigs_parent: <tuple of ints> signals to disable in parent
-     disable_sigs_child:  <tuple of ints> signals to disable in child
-
-    RETURNS:
-     two element tuple.  The first element is a boolean, indicating whether
-     or not an exception was caught while executing the command.  The second
-     element is the return code from the command (which could be meaningless
-     if an exception was caught).
-
-    SIDE EFFECTS:
-     Forks child process to run provided command.  Blocks signals
-     if instructed to with disable_sigs() (does an enable_sigs() before
-     returning).
-    """
-    osigs = None
-    childpid = os.fork()
-
-    # parent
-    if childpid:
-        gotexc = 0
-        exval = 256
-        if disable_sigs_parent:
-            osigs = disable_sigs(disable_sigs_parent)
-        enable_alarm()
-        signal.alarm(timeout)
-        while 1:
-            try:
-                exval = os.waitpid(childpid, 0)[1]
-            except TimeoutError:
-                print "Timeout waiting for command completion: %s" % \
-                      cmd.func_name
-                gotexc = 1
-                break
-            except OSError, e:
-                # Interrupted syscall: just jump back on it.
-                if e.errno == 4:
-                    continue
-                else:
-                    gotexc = 1
-                    break
-            except:
-                gotexc = 1
-                break
-            else:
-                break
-
-        signal.alarm(0)
-        if gotexc:
-            tb = "".join(traceback.format_exception_only(*sys.exc_info()[:2]))
-            print "Exception caught while trying to " \
-                  "run command %s\n%s" % (cmd.func_name, tb)
-            try: os.kill(childpid, signal.SIGUSR1)
-            except: pass
-            try: exval = os.wait()[1]
-            except: exval = 256
-        else:
-            if debug:
-                if os.WIFEXITED(exval):
-                    print "Process complete, exit value: %d" % \
-                          os.WEXITSTATUS(exval)
-                if os.WIFSIGNALED(exval):
-                    print "Process signalled: %d" % \
-                          os.WTERMSIG(exval)
-
-        disable_alarm()
-        if osigs:
-            enable_sigs(osigs)
-        return (gotexc, os.WEXITSTATUS(exval))
-
-    # child
-    else:
-        def sigusrexit(signum, frame):
-            if debug:
-                print "Received SIGUSR1, bailing out"
-            os._exit(1)
-
-        retval = 1
-        if disable_sigs_child:
-            osigs = disable_sigs(disable_sigs_child)
-        signal.signal(signal.SIGUSR1, sigusrexit)
-        try:
-            if type(args) == tuple:
-                retval = cmd(*args)
-            else:
-                retval = cmd(args)
-        except:
-            traceback.print_exception(*sys.exc_info())
-        os._exit(retval)
-
-
-#
-# Database functions
-#
-
-__dbName = "@TBDBNAME@"
-__dbQueryMaxtries = 1
-__dbConnMaxtries = 5
-
-__dbConnection = None
-
-def TBDBConnect():
-    global __dbConnection
-    
-    if __dbConnection:
-        return
-
-    # Create a DB username for accounting purposes
-    uid = os.getuid()
-    try:
-        name = pwd.getpwuid(uid)[0]
-    except KeyError:
-        name = "uid%d" % uid
-    dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
-
-    if debug:
-        print "Connecting to db %s as %s" % (__dbName, dbuser)
-
-    # Connect, with retries
-    for tries in range(__dbConnMaxtries):
-        try:
-            __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
-        except:
-            time.sleep(1)
-        else:
-            break
-    else:
-        raise RuntimeError, "Cannot connect to DB after several attempts!"
-
-def DBQueryFatal(queryPat, querySub = (), asDict = False):
-    TBDBConnect()
-    
-    if asDict:
-        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
-    else:
-        cursor = __dbConnection.cursor()
-
-    if debug:
-        print "Executing DB query %s" % queryPat
-
-    tries = __dbQueryMaxtries
-    while tries:
-        try:
-            cursor.execute(queryPat, querySub)
-            ret = cursor.fetchall()
-            if debug:
-                rs = `ret`
-                if len(rs) > 60:
-                    rs = rs[:60] + "..."
-                print "Result: %s" % rs
-            return ret
-        except MySQLdb.MySQLError:
-            tries -= 1
-            if tries == 0:
-                raise
-            else:
-                time.sleep(1)
-                try:
-                    __dbConnection.ping()
-                except MySQLdb.MySQLError: pass
-    tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
-    SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg, TBOPS)
-    raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
-
-def DBQuery(*args):
-    try:
-        ret = DBQueryFatal(*args)
-    except MySQLdb.MySQLError:
-        return None
-
-
-def tryXmlrpcCmd(cmd, args = (),
-                 inittries = DEF_TRIES,
-                 sleepint = DEF_SLEEPINT,
-                 raisefault = False):
-    """
-    This helper/wrapper function's job is to invoke the commands to the
-    central agent, or local node manager, taking steps to retry and
-    recover from failure.
-
-    ARGS:
-     cmd:        <bound method | function> command to try.
-     args:       <tuple> arguments to pass to the above command.
-     inittries:  <int> number of retries before the function gives up
-                 and reraises the last caught exception.
-     sleepint:   <int> how long to sleep (in seconds) between retries.
-     raisefault: <boolean> indicates whether or not to reraise an
-                 xmlrpclib Fault exception when caught.  When true it
-                 also adds a new 'triesleft' member to the Fault class
-                 instance containing the number of attempts this
-                 function had remaining when the Fault exception was
-                 encountered.
-
-    RETURNS:
-     This function returns the result returned by the passed in command.
-
-    SIDE EFFECTS:
-     Invokes the passed in command with the passed in arguments.
-     Catches protocol/socket exceptions for command retry.
-     (Optionally) catches xmlrpclib.Fault exceptions for command retry.
-     Adds a 'triesleft' member to all exceptions reraised prior to tries=0.
-     Understands TimeoutError exceptions, and will reraise them.
-     
-    """
-
-    tries = inittries
-    
-    if debug:
-        print "About to perform command %s with args:\n\t%s" % \
-              (cmd, args)
-    while 1:
-        tries = tries - 1
-        try:
-            if args:
-                # have to differentiate since the '*' operator wants
-                # a tuple - throws an exception if its operand isn't
-                if type(args) == tuple:
-                    return cmd(*args)
-                else:
-                    return cmd(args)
-            else:
-                return cmd()
-        except xmlrpclib.Fault, e:
-            print "XML-RPC Fault happened while executing agent " \
-                  "command: %s" % cmd.func_name
-            print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
-            if raisefault:
-                e.triesleft = tries
-                raise xmlrpclib.Fault, e
-        except TimeoutError, e:
-            if debug:
-                print "Caught a timeout error, setting triesleft and raising."
-            e.triesleft = tries
-            raise TimeoutError, e
-        except (socket.error, xmlrpclib.ProtocolError), e:
-            print "Encountered problem communicating with agent " \
-                  "while executing command: %s" % cmd.func_name
-            if debug:
-                print "Exception is of type: %s" % e
-
-        if tries > 0:
-            print "Sleeping for %s seconds, then retrying %s command" % \
-                  (sleepint, cmd.func_name)
-            time.sleep(sleepint)
-        else:
-            # XXX: perhaps this should raise its own, new type of
-            # exception.
-            print "Giving up after %s tries" % inittries
-            raise
-
-
-class PLCagent:
-    def __init__(self, slicename,
-                 uri = DEF_PLC_URI,
-                 username = DEF_PLC_USER,
-                 password = DEF_PLC_PASS):
-        if not slicename:
-            raise RuntimeError, "Must provide a slicename!"
-        self.__slice = {}
-        self.__slice['sliceName'] = slicename
-        self.__auth = {}
-        self.__auth['AuthMethod'] = "password"
-        self.__auth['username'] = username
-        self.__auth['AuthString'] = password
-        try:
-            self.__server = xmlrpclib.ServerProxy(uri)
-        except:
-            print "Failed to create XML-RPC proxy"
-            raise
-
-    def createSlice(self):
-        return self.__server.createSlice(self.__slice, self.__auth)
-
-    def deleteSlice(self):
-        return self.__server.deleteSlice(self.__slice, self.__auth)
-
-    def AssignNodes(self, nodelist):
-        if type(nodelist) != tuple:
-            nodelist = (nodelist,)
-        nodes = {}
-        nodes['nodeList'] = nodelist
-        return self.__server.AssignNodes(self.__slice, self.__auth, nodes)
-    
-    def UnAssignNodes(self, nodelist):
-        if type(nodelist) != tuple:
-            nodelist = (nodelist,)
-        nodes = {}
-        nodes['nodeList'] = nodelist
-        return self.__server.UnAssignNodes(self.__slice, self.__auth, nodes)
-
-    def AssignUsers(self, userlist):
-        if type(userlist) != tuple:
-            userlist = (userlist,)
-        users = {}
-        users['userList'] = userlist
-        return self.__server.AssignUsers(self.__slice, self.__auth, users)
-    
-    def UnAssignUsers(self, userlist):
-        if type(userlist) != tuple:
-            userlist = (userlist,)
-        users = {}
-        users['userList'] = userlist
-        return self.__server.UnAssignUsers(self.__slice, self.__auth, users)
-
-    def AssignShares(self, renewtime, numshares):
-        shareinfo = {}
-        shareinfo['renewTime'] = renewtime
-        shareinfo['share'] = numshares
-        return self.__server.AssignShares(self.__slice, self.__auth, shareinfo)
-
-    def InstantiateSliver(self, nodelist):
-        if type(nodelist) != tuple:
-            nodelist = (nodelist,)
-        nodes = {}
-        nodes['nodeList'] = nodelist
-        return self.__server.InstantiateSliver(self.__slice, self.__auth, nodes)
-
-    def listSlice(self):
-        return self.__server.listSlice(self.__auth)
-    
 
 #
 # Plab abstraction
 #
-
 class Plab:
-    def __init__(self, keyfile = DEFAULT_DATA_PATH + "key.pem",
-                 pubkeyfile = DEFAULT_DATA_PATH + "pubkey.pem",
-                 certfile = DEFAULT_DATA_PATH + "cert.pem",
-                 cacertfile = DEFAULT_DATA_PATH + "cacert.pem"):
-        for file in (keyfile, pubkeyfile, certfile, cacertfile):
-            if not os.path.exists(file):
-                raise RuntimeError, "Key or cert %s does not exist" % file
-        self.keyfile, self.pubkeyfile, self.certfile, self.cacertfile = \
-                      keyfile, pubkeyfile, certfile, cacertfile
-        self.__agentProxy = None
+    def __init__(self, agent = None):
+        if not agent:
+            self.agent = agents[DEF_AGENT]()
+            pass
+        if debug:
+            print "Using module: %s" % self.agent.modname
+            pass
+        pass
 
     def createSlice(self, pid, eid):
         """
@@ -688,29 +148,14 @@ class Plab:
         it's a list of the nodes reporting to ganglia that they support
         dslices)
         """
-        import httplib
-        
         print "Getting free Plab nodes ..."
+        avail = []
         try:
-            if method == "dslice":
-                agent = self._createAgentProxy(insecure = True)
-                avail = tryXmlrpcCmd(agent.getads)
-                
-            elif method == "PLC":
-                avail = []
-                conn = httplib.HTTPSConnection(DEF_PLAB_URL)
-                for ipuri in PLAB_LIST_URIS:
-                    conn.request("GET", ipuri)
-                    res = conn.getresponse()
-                    if res.status != 200:
-                        raise RuntimeError, "HTTP Error getting IPLIST: %s\n" \
-                              "Code: %d Reason: %s" % \
-                              (ipuri, res.status, res.reason)
-                    avail += res.read().split()
-                    
+            avail = self.agent.getFree()
+        # XXX: rewrite to use more elegant exception info gathering.
         except:
             extype, exval, extrace = sys.exc_info()
-            print "Error talking to dslice agent: %s: %s" % (extype, exval)
+            print "Error talking to agent: %s: %s" % (extype, exval)
             if debug:
                 print extrace
             print "Going back to sleep until next scheduled poll"
@@ -737,31 +182,11 @@ class Plab:
             print "Advertisements in allowed nodes list:\n%s" % ravail
             avail = ravail
 
+        # Get node info we already have.
         known = self.__getKnownPnodes()
         if debug:
             print "Got known pnodes:"
             print known
-
-#
-# Disable up/down marking - we now do this normally via isalive from
-# the emulab service slice.  Eventually, this code should be removed.
-#
-        # Mark known nodes that are not available as down and make sure
-        # those that are available are marked as up
-        #todown = []  # List of nodeid's
-        #toup = []  # List of nodeid's
-        #for ip in known.keys():
-        #    if not ip in avail:
-        #        todown.append(known[ip])
-        #    else:
-        #        toup.append(known[ip])
-        #if verbose:
-        #    print "%d known Plab nodes not available" % len(todown)
-        #    print "%d known Plab nodes available" % len(toup)
-        #self.__setVnodesStatus(todown, "down")
-        #self.__setPnodesStatus(todown, "down")
-        #self.__setVnodesStatus(toup, "up")
-        #self.__setPnodesStatus(toup, "up")
 
         # Add new nodes
         toadd = []  # List of IP's
@@ -827,48 +252,6 @@ class Plab:
                 results.remove(ip)
         return results
         
-    def __setVnodesStatus(self, pnodeids, status):
-        """
-        getFree helper function.  Sets the status of all vnodes that are
-        in state SHUTDOWN with a phys_nodeid from the given list.  Those
-        that are not in state SHUTDOWN should have a watchdog running, so
-        they don't need to be propped up.
-        """
-        if not len(pnodeids):
-            return
-        if debug:
-            print "Setting status to %s for vnodes of %s" % (status, pnodeids)
-        # Unfortunately, this query has to join nodes and node_status,
-        # which means it can't all be done with a single update (until
-        # we upgrade to MySQL 4.0.4 at least :)
-        clause = ", ".join(["%s"] * len(pnodeids))
-        res = DBQueryFatal("select node_id from nodes"
-                           " where eventstate = 'SHUTDOWN'"
-                           " and phys_nodeid in (" + clause + ")",
-                           pnodeids)
-        if len(res):
-            vnodeids = map(lambda x: x[0], res)
-            clause = ", ".join(["%s"] * len(vnodeids))
-            DBQueryFatal("update node_status set status = %s,"
-                         " status_timestamp = now()"
-                         " where node_id in (" + clause + ")",
-                         [status] + list(vnodeids))
-
-    def __setPnodesStatus(self, pnodeids, status):
-        """
-        getFree helper function.  Sets the status of all pnodes with a
-        node_id in the given list.
-        """
-        if not len(pnodeids):
-            return
-        if debug:
-            print "Setting status to %s for pnodes %s" % (status, pnodeids)
-        clause = ", ".join(["%s"] * len(pnodeids))
-        DBQueryFatal("update node_status set status = %s,"
-                     " status_timestamp = now()"
-                     " where node_id in (" + clause + ")",
-                     [status] + list(pnodeids))
-
     def __findLinkType(self, ip):
         """
         getFree helper function.  Figures out the link type of the given
@@ -916,6 +299,7 @@ class Plab:
         # Must be plain 'ole Internet
         return "pcplabinet", hostname
 
+    # XXX: review - make more robust
     def __addNode(self, ip, linktype, hostname):
         """
         getFree helper function.  Adds a new Plab pnode and associated
@@ -1066,6 +450,7 @@ class Plab:
             DBQueryFatal("unlock tables")
         return nodeid, priority
 
+    # XXX: Review..
     def renew(self):
         """
         Renews all of the Plab leases that are going to expire soon.
@@ -1126,38 +511,22 @@ class Plab:
                      failstr + "\n\nPlease look into it!", TBOPS)
 
 
-    def _createAgentProxy(self, insecure = False):
-        """
-        Creates an agent proxy connected to the Plab central agent.
-        Also caches the agent for later reuse.
-        """
-        if not self.__agentProxy:
-            if verbose:
-                print "Connecting to agent %s" % AGENTIP
-            if insecure:
-                args = (AGENTIP, agent.PORT)
-            else:
-                args = (AGENTIP, agent.PORT, agent.SSLPORT,
-                        self.keyfile, self.certfile, self.cacertfile)
-                self.__agentProxy = agentproxy.agentproxy(*args)
-        return self.__agentProxy
-
-
 #
 # Slice abstraction
 #
 
 class Slice:
+    # XXX: maybe add slicename arg
     def __init__(self, plab, pid, eid):
         self.plab = plab
         self.pid, self.eid = pid, eid
+        self.slicemeta = None
     
     def _create(self):
         """
         Creates a new slice that initially contains no nodes.  Don't call
         this directly, use Plab.createSlice instead.
         """
-        cleanup = 0
         res = DBQueryFatal("select idx from experiments "
                               "where pid=%s "
                               "and eid=%s",
@@ -1169,63 +538,24 @@ class Slice:
         
         print "Creating Plab slice %s." % self.slicename
 
-        # Method dependant slice creation steps
-        if method == "dslice":
-            self.privkey, self.pubkey = self.__genKeypair()
-            
-        elif method == "PLC":
-            self.agent = PLCagent(self.slicename)
-            self.privkey = self.pubkey = None
-            try:
-                try:
-                    res = tryXmlrpcCmd(self.agent.createSlice)
-                    if debug:
-                        print res
-                except:
-                    print "Failed to create slice %s" % self.slicename
-                    raise
-                try:
-                    res = tryXmlrpcCmd(self.agent.AssignUsers,
-                                       EMULABMAN_EMAIL)
-                    if debug:
-                        print res
-                except:
-                    print "Failed to assign emulabman to slice %s" % \
-                          self.slicename
-                    raise
-                try:
-                    res = tryXmlrpcCmd(self.agent.AssignShares,
-                                       (DEF_PLC_LEASELEN,
-                                       DEF_PLC_SHARES))
-                    if debug:
-                        print res
-                except:
-                    print "Failed to assign shares to slice %s" % \
-                          self.slicename
-                    raise
-            except:
-                cleanup = 1
-                
-        # Method independent slice creation steps
-        if not cleanup:
-            try:
+        try:
+            res, self.slicemeta = \
+                 self.plab.agent.createSlice(self.slicename)
+            if res:
                 DBQueryFatal("insert into plab_slices"
-                             " (pid, eid, slicename, privkey, pubkey) "
+                             " (pid, eid, slicename, slicemeta) "
                              " values (%s, %s, %s, %s, %s)",
                              (self.pid, self.eid, self.slicename,
-                              self.privkey, self.pubkey))
-            except:
-                cleanup = 1
-
-        if cleanup:
-            # Method dependant failure cleanup
-            if method == "PLC":
-                tryXmlrpcCmd(self.agent.deleteSlice)
-
-            # Method independant failure cleanup
+                              self.slicemeta))
+                pass
+            pass
+        except:
+            self.plab.agent.deleteSlice(self.slicename)
             DBQueryFatal("delete from plab_slices where slicename=%s",
                          (self.slicename,))
             raise
+
+        return res
 
     def _load(self):
         """
@@ -1237,16 +567,15 @@ class Slice:
         """
         if verbose:
             print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
-        res = DBQueryFatal("select slicename, privkey, pubkey from plab_slices"
+        res = DBQueryFatal("select slicename, slicemeta from plab_slices"
                            " where pid = %s and eid = %s",
                            (self.pid, self.eid))
         assert (len(res) > 0), \
                "No slice found for %s-%s" % (self.pid, self.eid)
         assert (len(res) == 1), \
                "Multiple slices found for %s-%s" % (self.pid, self.eid)
-        ((self.slicename, self.privkey, self.pubkey), ) = res
-        if method == "PLC":
-            self.agent = PLCagent(self.slicename)
+        ((self.slicename, self.slicemeta), ) = res
+        pass
 
     def destroy(self):
         """
@@ -1256,25 +585,25 @@ class Slice:
         slice is destroyed.
         """
         print "Destroying Plab slice %s." % self.slicename
-        if method == "dslice":
-            res = DBQueryFatal("select node_id from plab_slice_nodes"
-                               " where slicename = %s",
-                               (self.slicename))
-            print "\tRemoving any remaining nodes in slice.."
-            for (nodeid,) in res:
-                node = self.loadNode(nodeid)
-                node.free()
-                del node  # Encourage the GC'er
+        res = DBQueryFatal("select node_id from plab_slice_nodes"
+                           " where slicename = %s",
+                           (self.slicename))
+        print "\tRemoving any remaining nodes in slice.."
+        for (nodeid,) in res:
+            node = self.loadNode(nodeid)
+            node.free()
+            del node  # Encourage the GC'er
 
         osigs = disable_sigs(TERMSIGS)
-        
-        if method == "PLC":
-            try:
-                tryXmlrpcCmd(self.agent.deleteSlice)
-            except:
-                print "Failed to delete PLC slice!"
-                traceback.print_exc()
 
+        try:
+            self.plab.agent.deleteSlice(self.slicename)
+            pass
+        except:
+            print "Failed to delete slice!"
+            traceback.print_exc()
+            pass
+        
         try:
             print "\tRemoving slice DB entry."
             DBQueryFatal("delete from plab_slices where slicename = %s",
@@ -1289,12 +618,20 @@ class Slice:
         
         enable_sigs(osigs)
 
-    def createNode(self, nodeid):
+    def createNode(self, nodeid, force=False):
         """
         Node factory function
         """
+        # XXX: KRW - The following is a hack to help me with testing.
+        if not nodeid.startswith("plab"):
+            IP = socket.gethostbyname(nodeid)
+            qres = DBQueryFatal("select n.node_id from nodes as n left join "
+                                "interfaces as i on n.node_id = i.node_id "
+                                "where i.IP = %s", (IP,))
+            assert (len(qres) > 0), "Node does not exist in DB: %s" % nodeid
+            nodeid = qres[0][0] + "-20"
         node = Node(self, nodeid)
-        node._create()
+        node._create(force)
         return node
 
     def loadNode(self, nodeid):
@@ -1305,74 +642,19 @@ class Slice:
         node._load()
         return node
 
-    def __genKeypair(self):
-        """
-        Generates a passphrase-less RSA keypair and returns the PEM
-        format data to be stored in the slice's identity and
-        identity.pub files.
-        """
-        # XXX This is a workaround for a bug in M2Crypto
-        import tempfile
-
-        if verbose:
-            print "Generating slice keypair"
-        # pdssi = Plab Dynamic Slice SSH Identity
-        fname = tempfile.mktemp("pdssi%d" % os.getpid())
-        if debug:
-            print "Writing keypair to %s(.pub)" % fname
-        if os.spawnlp(os.P_WAIT, "ssh-keygen",
-                      "ssh-keygen", "-t", "rsa", "-b", "1024", "-P", "",
-                      "-f", fname, "-q"):
-            raise RuntimeError, "Error generating slice keypair"
-        
-        privkey = file(fname, "rb").read()
-        pubkey = file(fname + ".pub", "rb").read()
-        map(os.unlink, (fname, fname + ".pub"))
-        
-        return privkey, pubkey
-        
-        
-        # Below here is the way it _should_ be done
-        if verbose:
-            print "Generating slice keypair"
-        key = RSA.gen_key(1024, 35)    # OpenSSH ssh-keygen uses 35 for e
-
-        privkeyio = cStringIO.StringIO()
-        # Due to a current bug in M2Crypto, None cannot be passed as the
-        # cipher; therefore, passphraseless keys cannot be generated
-        key.save_key_bio(BIO.File(privkeyio), None)
-        privkey = privkeyio.getvalue()
-
-        pubkeyio = cStringIO.StringIO()
-        key.save_pub_key_bio(BIO.File(pubkeyio))
-        pubkey = pubkeyio.getvalue()
-
-        return privkey, pubkey
-
 #
 # Node abstraction
 #
 
 class Node:
     def __init__(self, slice, nodeid):
-        self.slice, self.agent = slice, slice.agent
+        self.slice = slice
         self.nodeid = nodeid
-        self.ip = self.__findIP()
-        self.__nodemgrProxy = None
-
-        if method == "PLC":
-            res = DBQueryFatal("select i.IP from"
-                               " nodes as n left join interfaces as i"
-                               " on n.phys_nodeid = i.node_id"
-                               " where n.node_id = %s limit 1",
-                               (nodeid,))
-            
-            assert (len(res) > 0), "%s not found in widearea_info table!" % \
-                   nodeid
-            self.IP = res[0][0]
+        self.IP = self.__findIP()
+        self.nodemeta = None
 
     # XXX: may want to rethink signal handling here.
-    def _create(self):
+    def _create(self, force=False):
         """
         Creates a new node.  This physically allocates the node into the
         slice through the dslice agent and node manager.  Note that no
@@ -1386,133 +668,27 @@ class Node:
         except:
             pass
         else:
-            raise RuntimeError, "Entry for plab node %s already exists " \
-                  "in the DB" % self.nodeid
+            if force:
+                print "Node entry exists in DB, but creation forced anyway."
+            else:
+                raise RuntimeError, "Entry for plab node %s already exists " \
+                      "in the DB" % self.nodeid
+            pass
 
-        if method == "dslice":
-            # Now get a ticket, and redeem it for a vm lease
-            print "Creating Plab node %s on %s." % (self.nodeid, self.ip)
-            agent = self.plab._createAgentProxy()
-            tickets = tryXmlrpcCmd(agent.newtickets,
-                                   (self.slice.slicename, 1, LEASELEN,
-                                    (self.ip,)))
-            assert (len(tickets) == 1), "%d tickets returned" % len(tickets)
-            self.ticketdata = tickets[0]
-            if debug:
-                print "Obtained ticket:"
-                print self.ticketdata
-
-            nodemgr = self._createNodemgrProxy()
-            self.leasedata = None
+        print "Creating Plab node %s on %s." % (self.nodeid, self.IP)
+        res, self.nodemeta, self.leaselen = \
+                    self.slice.plab.agent.createNode(self)
         
-            tries = DEF_TRIES
-            while 1:
-                TIMESTAMP("createnode %s try %d started." % (self.nodeid,
-                                                             DEF_TRIES-tries+1))
-                try:
-                    self.leasedata = tryXmlrpcCmd(nodemgr.newleasevm,
-                                                  (self.ticketdata,
-                                                   self.slice.privkey,
-                                                   self.slice.pubkey),
-                                                  inittries = tries,
-                                                  raisefault = True)
-
-                    # We may have actually gotten the lease/vm even though
-                    # the xmlrpc call appeared to fail.  We check for this
-                    # condition here, which will show up on subsequent allocation
-                    # attempts.
-                except xmlrpclib.Fault, e:
-                    if e.faultString.find("already exists") != -1:
-                        print "Lease for %s already exists; deleting." % self.nodeid
-                    nodeleases = tryXmlrpcCmd(nodemgr.getleases)
-                    for mylease in nodeleases:
-                        if mylease.find(self.slice.slicename) != -1:
-                            self.leasedata = mylease
-                            break
-                    else:
-                        raise RuntimeError, "Whoop!  Couldn't find my lease " \
-                              "even though it was supposed to be present!"
-                    if self._free():
-                        raise RuntimeError, "Could not delete lingering " \
-                              "lease for slice %s on %s" % \
-                              (self.slice.slicename, self.nodeid)
-                    
-                    if e.triesleft > 0:
-                        tries = e.triesleft
-                    else:
-                        raise
-                # success
-                else:
-                    break
-
-            # Good, we have a lease; now put an entry into the DB
-            if debug:
-                print "Obtained lease/vm:"
-                print self.leasedata
-            self.lease = lease.lease(self.leasedata)
-            # Note that the lease's end_time happens to be formatted the
-            # same as a SQL DATETIME (how conspicuously convenient...)
-            DBQueryFatal("insert into plab_slice_nodes"
-                         " (pid, eid, slicename, node_id,"
-                         " ticketdata, leasedata, leaseend)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (self.slice.pid, self.slice.eid,
-                          self.slice.slicename, self.nodeid,
-                          self.ticketdata, self.leasedata,
-                          self.lease.end_time))
-
-        elif method == "PLC":
-            TIMESTAMP("createnode %s started." % self.nodeid)
-
-            # add the node to the PLC slice.
-            tries = 3
-            while 1:
-                TIMESTAMP("createnode %s try %d started." % (self.nodeid,
-                                                             DEF_TRIES-tries+1))
-                try:
-                    res = tryXmlrpcCmd(self.agent.AssignNodes, self.IP,
-                                       inittries=tries, raisefault=True)
-                    if debug:
-                        print res
-
-                    # We may have actually gotten the lease/vm even though
-                    # the xmlrpc call appeared to fail.  We check for this
-                    # condition here, which will show up on subsequent
-                    # allocation attempts.
-                except xmlrpclib.Fault, e:
-                    if e.faultString.find("already assigned") != -1:
-                        print "Lease for %s already exists." % self.nodeid
-                        break
-                    elif e.triesleft > 0:
-                        tries = e.triesleft
-                    else:
-                        raise
-                # success
-                else:
-                    break
-
-            # push changes out immediately.
-            try:
-                res = tryXmlrpcCmd(self.agent.InstantiateSliver,
-                                   self.IP)
-                if debug:
-                    print res
-            except:
-                print "Failed to instantiate sliver %s on slice %s" % \
-                      (self.nodeid, self.slice.slicename)
-                raise
-
-            leaselen = time.time() + DEF_PLC_LEASELEN
-            DBQueryFatal("insert into plab_slice_nodes"
-                         " (pid, eid, slicename, node_id,"
-                         " ticketdata, leasedata, leaseend)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (self.slice.pid, self.slice.eid,
-                          self.slice.slicename, self.nodeid,
-                          None, None, leaselen))
+        DBQueryFatal("replace into plab_slice_nodes"
+                     " (pid, eid, slicename, node_id,"
+                     " nodemeta, leaseend)"
+                     " values (%s, %s, %s, %s, %s, %s, %s)",
+                     (self.slice.pid, self.slice.eid,
+                      self.slice.slicename, self.nodeid,
+                      self.nodemeta, self.leaselen))
 
         TIMESTAMP("createnode %s finished." % self.nodeid)
-
+        return
 
     def _load(self):
         """
@@ -1521,7 +697,7 @@ class Node:
         """
         if verbose:
             print "Loading node %s" % self.nodeid
-        res = DBQueryFatal("select slicename, ticketdata, leasedata"
+        res = DBQueryFatal("select slicename, nodemeta"
                            " from plab_slice_nodes where node_id = %s",
                            (self.nodeid))
         assert (len(res) > 0), \
@@ -1529,12 +705,10 @@ class Node:
                (self.nodeid, self.slice.slicename)
         assert (len(res) == 1), \
                "Multiple nodes found for nodeid %s" % self.nodeid
-        ((slicename, self.ticketdata, self.leasedata), ) = res
+        ((slicename, self.nodemeta), ) = res
         assert (slicename == self.slice.slicename), \
                "Node %s loaded by slice %s, but claims to be in slice %s" % \
                (self.nodeid, self.slice.slicename, slicename)
-        if method == "dslice":
-            self.lease = lease.lease(self.leasedata)
 
     def free(self):
         """
@@ -1554,13 +728,9 @@ class Node:
         instead, use Node.free()
         """
         deleted = 0
-
+        TIMESTAMP("freenode %s started." % self.nodeid)
         print "Freeing Plab node %s." % self.nodeid
         
-        # Get node manager handle
-        if method == "dslice":
-            nodemgr = self._createNodemgrProxy()
-
         # Remove the DB entry first.
         try:
             DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
@@ -1571,73 +741,12 @@ class Node:
             SENDMAIL(TBOPS, "Error: Couldn't remove plab vnode from DB",
                      "Unable to delete entry for sliver %s from the DB:"
                      "\n\n%s" % (self.nodeid, tbstr), TBOPS)
+            pass
 
-        if method == "dslice":
-            tries = DEF_TRIES
-            while 1:
-                TIMESTAMP("freenode %s try %d started." % (self.nodeid,
-                                                           DEF_TRIES-tries+1))
-                try:
-                    tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
-                                 inittries = tries, raisefault = 1)
-                except xmlrpclib.Fault, e:
-                    if e.faultString.find("does not exist") != -1:
-                        print "Lease for %s did not exist on node" % self.nodeid
-                        deleted = 1
-                        break
-                    elif e.triesleft > 0:
-                        tries = e.triesleft
-                    else:
-                        break
-                except:
-                    print "Warning: couldn't delete the lease for %s on %s" % \
-                          (self.slice.slicename, self.nodeid)
-                    tbstr = "".join(traceback.format_exception(*sys.exc_info()))
-                    SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
-                             "dslice %s" % (self.nodeid, self.slice.slicename),
-                             "Sliver lease deletion failed:\n\n%s" % tbstr, TBOPS)
-                    break
-                else:
-                    deleted = 1
-                    break
-
-        elif method == "PLC":
-            TIMESTAMP("freenode %s started." % self.nodeid)
-            try:
-                res = tryXmlrpcCmd(self.agent.UnAssignNodes, self.IP)
-                if debug:
-                    print res
-            except:
-                print "Failed to release node %s from slice %s" % \
-                      (self.nodeid, self.slice.slicename)
-                raise
-
+        deleted = self.plab.agent.freeNode(self)
+        
         TIMESTAMP("freenode %s finished." % self.nodeid)
         return not deleted
-
-    def addKey(self, identityfile):
-        """
-        Adds an ssh public key to the node.  Note that identityfile must
-        be the path of the public key.  This must be done before any
-        calls to becomeEmulba, addtoGroup, or unpackTgz, because those
-        commands rely on ssh'ing into the node.  Note also that this
-        should be one of the keys that ssh naturally knows about, or
-        those commands will fail.
-        """
-        if method == "PLC":
-            return
-        
-        if verbose:
-            print "Adding pubkey to node %s" % self.nodeid
-        if not identityfile.endswith(".pub"):
-            raise RuntimeError, "File %s doesn't look like a pubkey" % \
-                  identityfile
-        pubkey = file(identityfile, "rb").read().strip()
-        nodemgr = self._createNodemgrProxy()
-        ret = tryXmlrpcCmd(nodemgr.addkey, (self.slice.slicename, pubkey))
-        if debug:
-            print "Added key: %s" % `ret`
-        return ret
 
     def renew(self):
         """
@@ -1649,44 +758,13 @@ class Node:
                       disable_sigs_parent = TERMSIGS)
         return res[0] | res[1]
 
-    # XXX: fix for PLC
     def _renew(self):
-        """
-        Renew the lease for node belonging to this instance.  Don't
-        call this directly; instead, use Node.renew()
-        """
-        print "Renewing lease on Plab node %s." % self.nodeid
-        nodemgr = self._createNodemgrProxy()
-
-        tries = DEF_TRIES
-        while 1:
-            TIMESTAMP("renewnode %s try %d started." % (self.nodeid,
-                                                        DEF_TRIES-tries+1))
-            try:
-                self.leasedata = tryXmlrpcCmd(nodemgr.renewlease,
-                                              self.slice.slicename,
-                                              inittries = tries,
-                                              raisefault = True)
-            except xmlrpclib.Fault, e:
-                if e.faultString.find("does not exist") != -1:
-                    print "No lease found on %s for slice %s" % \
-                          (self.nodeid, self.slice.slicename)
-                    return 1
-                elif e.triesleft > 0:
-                    tries = e.triesleft
-                else:
-                    raise
-            else:
-                break
-
-        if debug:
-            print "Obtained new lease:"
-            print self.leasedata
-        self.lease = lease.lease(self.leasedata)
+        res, self.nodemeta, self.leaseend = \
+                       self.plab.agent.renewNode(self)
         DBQueryFatal("update plab_slice_nodes"
-                     " set leasedata = %s, leaseend = %s"
+                     " set nodemeta = %s, leaseend = %s"
                      " where node_id = %s",
-                     (self.leasedata, self.lease.end_time, self.nodeid))
+                     (self.nodemeta, self.leaseend, self.nodeid))
         TIMESTAMP("renewnode %s finished." % self.nodeid)
         return 0
 
@@ -1745,6 +823,7 @@ class Node:
         Copies a file from the local system to the remote node, doing so
         as root.
         """
+        import popen2
         if debug:
             print "Copying %s to %s on %s" % \
                   (localfile, remotefile, self.nodeid)
@@ -1752,10 +831,13 @@ class Node:
         # simply like an scp (because the I can't get remote root), or a
         # cat with a redirect (because sshtb munges the redirect and
         # winds up evaluating it in a local shell)
-        if os.system("%s -host %s 'dd of=%s' < '%s' > /dev/null 2>&1" %
-                     (SSH, self.nodeid, remotefile, localfile)):
-            raise RuntimeError, "Copying %s to %s failed" % \
-                  (localfile, remotefile)
+        cpyobj = popen2.Popen4("%s -host %s 'dd of=%s' < '%s'" %
+                               (SSH, self.nodeid, remotefile, localfile))
+        cpyout = cpyobj.fromchild.read()
+        cpystatus = cpyobj.wait()
+        if os.WEXITSTATUS(cpystatus):
+            raise RuntimeError, "Copying %s to %s failed (excode: %s):\n%s" % \
+                  (localfile, remotefile, os.WEXITSTATUS(cpystatus), cpyout)
 
     def __findIP(self):
         """
@@ -1769,25 +851,7 @@ class Node:
                            (self.nodeid))
         assert (len(res) > 0), \
                "No IP found for nodeid %s" % self.nodeid
-        ((ip, ), ) = res
+        ((IP, ), ) = res
         if debug:
-            print "Found IP %s for node %s" % (ip, self.nodeid)
-        return ip
-
-    def _createNodemgrProxy(self):
-        """
-        Creates a node manager proxy connected to this node's node
-        manager.  Also caches the nodemgr for later reuse.
-        """
-        if not self.__nodemgrProxy:
-            if verbose:
-                print "Connecting to nodemgr for %s on %s" % \
-                      (self.nodeid, self.ip)
-            self.__nodemgrProxy = \
-                                nodemgrproxy.nodemgrproxy(self.ip,
-                                                          nodemgr.PORT,
-                                                          nodemgr.SSLPORT,
-                                                          self.plab.keyfile,
-                                                          self.plab.certfile,
-                                                          self.plab.cacertfile)
-        return self.__nodemgrProxy
+            print "Found IP %s for node %s" % (IP, self.nodeid)
+        return IP

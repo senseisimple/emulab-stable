@@ -5,6 +5,7 @@ import sys, os
 sys.path.append("@prefix@/lib")
 import syslog
 import getopt
+from libtestbed import *
 import libplab
 
 GETFREE_PERIOD = 2*60
@@ -80,13 +81,13 @@ def doDaemon(func, period, logname):
 
     consecexc = MAXCONSECEXC
 
-    if not libplab.debug:
+    if not debug:
         daemonize(logname)
     while True:
         start = time.clock()
         try:
             func()
-        except libplab.SignalInterrupt, e:
+        except SignalInterrupt, e:
             print "Received signal %s in daemon loop, exiting." % e.signum
             sys.exit(0)
         except KeyboardInterrupt:
@@ -100,11 +101,11 @@ def doDaemon(func, period, logname):
                 print "Going back to sleep until next scheduled run"
             else:
                 print "Too many consecutive exceptions seen, bailing out!"
-                libplab.SENDMAIL(libplab.TBOPS, "Plabdaemon Exiting",
-                                 "The plab %s daemon has seen too many "
-                                 "consecutive exceptions and is bailing out."
-                                 "Someone needs to check the log!" %
-                                 func.func_name)
+                SENDMAIL(libplab.TBOPS, "Plabdaemon Exiting",
+                         "The plab %s daemon has seen too many "
+                         "consecutive exceptions and is bailing out."
+                         "Someone needs to check the log!" %
+                         func.func_name)
                 raise
 
         else:
@@ -119,7 +120,7 @@ def doDaemon(func, period, logname):
 def main(args):
     me = args[0]
     try:
-        args = libplab.handleArgs(args[1:])
+        args = handleArgs(args[1:])
         if not len(args):
             usage(me)
         command = args[0]

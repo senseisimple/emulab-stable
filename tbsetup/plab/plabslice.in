@@ -4,6 +4,7 @@
 import sys
 sys.path.append("@prefix@/lib")
 import getopt
+import libtestbed
 import libplab
 
 def usage(me):
@@ -13,7 +14,7 @@ def usage(me):
 def main(args):
     me = args[0]
     try:
-        command, pid, eid = libplab.handleArgs(args[1:])
+        command, pid, eid = libtestbed.handleArgs(args[1:])
     except getopt.GetoptError:
         usage(me)
     except ValueError:

@@ -1,0 +1,232 @@
+# -*- python -*-
+
+import sys
+sys.path.append("@prefix@/lib")
+
+import httplib
+import xmlrpclib
+
+from libtestbed import *
+
+#
+# PLC constants
+#
+DEF_PLC_URI = "https://www.planet-lab.org/db/slices/dynamicprog.php"
+DEF_PLC_USER = "lepreau@cs.utah.edu"
+DEF_PLC_PASS = "phurds"
+DEF_PLC_LEASELEN = 1*30*24*60*60   # add one month (XXX: for now)
+DEF_PLC_SHARES = 30
+EMULABMAN_EMAIL = "emulabman@emulab.net"
+DEF_PLAB_URL = "www.planet-lab.org"
+PLAB_LIST_URIS = ("/db/nodes/all_ips.php",)
+
+class PLCagent:
+    def __init__(self, slicename,
+                 uri = DEF_PLC_URI,
+                 username = DEF_PLC_USER,
+                 password = DEF_PLC_PASS):
+        if not slicename:
+            raise RuntimeError, "Must provide a slicename!"
+        self.__slice = {}
+        self.__slice['sliceName'] = slicename
+        self.__auth = {}
+        self.__auth['AuthMethod'] = "password"
+        self.__auth['username'] = username
+        self.__auth['AuthString'] = password
+        try:
+            self.__server = xmlrpclib.ServerProxy(uri)
+        except:
+            print "Failed to create XML-RPC proxy"
+            raise
+
+    def createSlice(self):
+        return self.__server.createSlice(self.__slice, self.__auth)
+
+    def deleteSlice(self):
+        print self.__auth
+        return self.__server.deleteSlice(self.__slice, self.__auth)
+
+    def AssignNodes(self, nodelist):
+        if type(nodelist) != tuple:
+            nodelist = (nodelist,)
+        nodes = {}
+        nodes['nodeList'] = nodelist
+        return self.__server.AssignNodes(self.__slice, self.__auth, nodes)
+    
+    def UnAssignNodes(self, nodelist):
+        if type(nodelist) != tuple:
+            nodelist = (nodelist,)
+        nodes = {}
+        nodes['nodeList'] = nodelist
+        return self.__server.UnAssignNodes(self.__slice, self.__auth, nodes)
+
+    def AssignUsers(self, userlist):
+        if type(userlist) != tuple:
+            userlist = (userlist,)
+        users = {}
+        users['userList'] = userlist
+        print self.__auth
+        return self.__server.AssignUsers(self.__slice, self.__auth, users)
+    
+    def UnAssignUsers(self, userlist):
+        if type(userlist) != tuple:
+            userlist = (userlist,)
+        users = {}
+        users['userList'] = userlist
+        return self.__server.UnAssignUsers(self.__slice, self.__auth, users)
+
+    def AssignShares(self, renewtime, numshares):
+        shareinfo = {}
+        shareinfo['renewTime'] = renewtime
+        shareinfo['share'] = numshares
+        return self.__server.AssignShares(self.__slice, self.__auth, shareinfo)
+
+    def InstantiateSliver(self, nodelist):
+        if type(nodelist) != tuple:
+            nodelist = (nodelist,)
+        nodes = {}
+        nodes['nodeList'] = nodelist
+        return self.__server.InstantiateSliver(self.__slice, self.__auth, nodes)
+
+    def listSlice(self):
+        return self.__server.listSlice(self.__auth)
+
+
+
+class mod_PLC:
+    def __init__(self):
+        self.modname = "mod_PLC"
+        pass
+
+    # XXX: fixup to use online hosts file
+    def getFree(self):
+
+        avail = []
+        conn = httplib.HTTPSConnection(DEF_PLAB_URL)
+        for ipuri in PLAB_LIST_URIS:
+            conn.request("GET", ipuri)
+            res = conn.getresponse()
+            if res.status != 200:
+                raise RuntimeError, "HTTP Error getting IPLIST: %s\n" \
+                      "Code: %d Reason: %s" % \
+                      (ipuri, res.status, res.reason)
+            avail += res.read().split()
+            pass
+        
+        return avail
+
+    def createSlice(self, slicename):
+
+        agent = PLCagent(slicename)
+
+        try:
+            res = tryXmlrpcCmd(agent.createSlice)
+            if debug:
+                print res
+                pass
+            pass
+        except:
+            print "Failed to create slice %s" % slicename
+            raise
+        
+        try:
+            res = tryXmlrpcCmd(agent.AssignUsers,
+                               EMULABMAN_EMAIL)
+            if debug:
+                print res
+                pass
+            pass
+        except:
+            print "Failed to assign emulabman to slice %s" % slicename
+            raise
+        
+        try:
+            res = tryXmlrpcCmd(agent.AssignShares,
+                               (DEF_PLC_LEASELEN,
+                                DEF_PLC_SHARES))
+            if debug:
+                print res
+                pass
+            pass
+        except:
+            print "Failed to assign shares to slice %s" % slicename
+            raise
+        
+        return (res, None)
+
+    def deleteSlice(self, slicename):
+        agent = PLCagent(slicename)
+        tryXmlrpcCmd(agent.deleteSlice)
+        pass
+
+    def createNode(self, node):
+        # add the node to the PLC slice.
+        agent = PLCagent(node.slice.slicename)
+        tries = 3
+        while 1:
+            TIMESTAMP("createnode %s try %d started." % (node.nodeid,
+                                                         DEF_TRIES-tries+1))
+            try:
+                res = tryXmlrpcCmd(agent.AssignNodes, node.IP,
+                                   inittries=tries, raisefault=True)
+                if debug:
+                    print res
+                    pass
+                pass
+            
+            # We may have actually gotten the lease/vm even though
+            # the xmlrpc call appeared to fail.  We check for this
+            # condition here, which will show up on subsequent
+            # allocation attempts.
+            except xmlrpclib.Fault, e:
+                if e.faultString.find("already assigned") != -1:
+                    print "Lease for %s already exists." % node.nodeid
+                    break
+                elif e.triesleft > 0:
+                    tries = e.triesleft
+                else:
+                    raise
+                pass
+            # success
+            else:
+                break
+
+            pass
+
+        # push changes out immediately.
+        try:
+            TIMESTAMP("Starting InstantiateSliver() on %s." % node.nodeid)
+            res = tryXmlrpcCmd(agent.InstantiateSliver, node.IP)
+            TIMESTAMP("InstantiateSliver() complete on %s." % node.nodeid)
+            if debug:
+                print res
+                pass
+            pass
+        
+        except:
+            print "Failed to instantiate sliver %s on slice %s" % \
+                  (node.nodeid, node.slice.slicename)
+            raise
+        
+        leaselen = time.time() + DEF_PLC_LEASELEN
+        return (res, None, leaselen)
+
+    def freeNode(self, node):
+        agent = PLCagent(node.slice.slicename)
+        try:
+            res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP)
+            if debug:
+                print res
+                pass
+            pass
+        except:
+            print "Failed to release node %s from slice %s" % \
+                  (node.nodeid, node.slice.slicename)
+            raise
+        return res
+
+    # XXX: implement
+    def renewNode(self, node, length = 0):
+        return(0,None,None)
+
+    

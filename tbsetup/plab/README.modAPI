@@ -1,0 +1,99 @@
+This document describes the Planetlab<->Elab adapter module API.
+
+Modules that wish to function as adaptors between Emulab and Planetlab
+must implement all the functions in this document that are not marked
+"optional".
+
+** Design principles:
+
+* Separation of concerns
+
+To the greatest extent possible, Elab should not be aware of Plab
+specifics, and vice versa.  libplab is the Emulab-centric side of this
+separation, while the Plab-specific access/adaptor modules are in
+separate files which represent different ways of interacting with
+Planetlab (for e.g., mod_PLC uses the PLC interface, while mod_dslice
+uses the dslice interface).
+
+* Modular architecture
+
+Nodes and slices are encapsulated in classes.  Some function
+prototypes below specify these objects as parameters.  
+
+Node objects have the following accessible elements:
+
+nodeid   - string naming the node this object represents (Elab specific)
+nodemeta - string of data specific to adapter module, related to node.
+slice    - slice object this node belongs to (or will belong to).
+IP       - IP address of this node
+
+Slice objects have the following accessible elements:
+
+slicename - string naming the slice this object represents
+slicemeta - string of data specific to adapter module, related to slice.
+
+
+Adapter modules should not rely on the presence of any other object
+members.
+
+** API:
+
+CONSTANT: modname - text string naming this module - just informational.
+
+FUNCTION: getFree
+ARGS: None
+RETURNS: list of IP addresses representing the available set of plab nodes.
+SIDE EFFECTS: None
+
+FUNCTION: createSlice
+ARGS: slicename - REQUIRED string naming the slice to create
+RETURNS: 2 element tuple (<int1>, <string1>)
+         <int1>    - integer representing success (1) or failure (0)
+         <string1> - string containing module-specific data.  'None'
+                     may be returned.  This data will be fed back to
+                     other module functions and will be saved off.
+SIDE EFFECTS: Causes the named plab slice to be created.
+
+
+FUNCTION: destroySlice
+ARGS: slicename - REQUIRED string naming the slice to destroy
+RETURNS: integer representing success (1) or failure (0)
+SIDE EFFECTS: Causes the named plab slice to be destroyed/removed.
+
+
+FUNCTION: createNode 
+ARGS: node  - REQUIRED node object representing the node to create 
+RETURNS: 3 element tuple (<int1>, <string1>, <string2>) 
+         <int1>    - integer representing success (1) or failure (0) 
+         <string1> - string containing node expiration date/time in
+                     SQL time format: 'YYYY-MM-DD HH:MM:SS' 
+         <string2> - string containing module-specific data for this node.
+                     This string will be fed back to other module functions 
+                     and will be saved off.
+SIDE EFFECTS: Allocates the given node to the given slice, and ensures
+              "emulabman" has ssh access to it.  Should not
+              successfully return until the plab vnode has been
+              allocated and instantiated (i.e., is ready to interact
+              with).  May be interrupted externally if it takes too long.
+
+
+FUNCTION: freeNode
+ARGS: node  - REQUIRED node object representing the node to free
+RETURNS: integer representing success (1) or failure (0)
+SIDE EFFECTS: Causes the given node to be removed from the slice, and its
+              resources freed.
+
+
+FUNCTION: renewNode
+ARGS: node  - REQUIRED node object representing the node to renew
+      length - OPTIONAL time (in seconds) length for renewal.
+RETURNS: 3 element tuple (<int1>, <string1>, <string2>) 
+         <int1>    - integer representing success (1) or failure (0) 
+         <string1> - string containing node expiration date/time in
+                     SQL time format: 'YYYY-MM-DD HH:MM:SS' 
+         <string2> - string containing module-specific data for this node.
+                     This string will be fed back to other module functions 
+                     and will be saved off.
+SIDE EFFECTS: Causes this node's 'lease' or 'lifetime' to be renewed.  This
+              function should strive to add as much time to the lease as
+              possible if 'length' is not specified.

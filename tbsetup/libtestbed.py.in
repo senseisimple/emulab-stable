@@ -1,0 +1,390 @@
+# -*- python -*-
+
+import sys
+import os
+import time
+import signal
+import xmlrpclib
+
+#
+# Constants
+#
+TBOPS             = "@TBOPSEMAIL@".replace("\\","")
+MAILTAG           = "@THISHOMEBASE@"
+SCRIPTNAME        = sys.argv[0][sys.argv[0].rfind("/")+1:]
+DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
+
+#
+# How many seconds to sleep between failures and how many times to try
+# commands to both the dslice agent, and individual node managers.
+#
+DEF_SLEEPINT = 5
+DEF_TRIES    = 3
+DEF_TIMEOUT  = 1*60     # default timeout interval
+
+#
+# informational output control variables
+#
+debug   = 0
+verbose = 0
+
+#
+# Handle generic arguments.
+#
+def handleArgs(args):
+    """
+    Takes a list of command-line arguments, interprets those at the
+    beginning that are meant for libplab (-vd), and returns the remainder
+    of the arguments.
+    """
+    global verbose, debug
+    import getopt
+    opts, args = getopt.getopt(args, "vd")
+
+    for o, a in opts:
+        if o == "-v":
+            verbose = 1
+        if o == "-d":
+            debug = 1
+    return args
+
+def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
+    """
+    Sends email to someone about something :)
+
+    This function is similar to its perl library counterpart.
+
+    ARGS:
+
+     To:      <string> Email address of recipient.
+     Subj:    <string> Subject of email.
+     Msg:     <string> Message text.
+     From:    <string> Email address of sender (optional).
+     Headers: <string> Extra header strings (must newline terminate all but
+                       the last one) (optional).
+     Files:   <tuple>  List of files to append to message body (optional).
+     
+    RETURNS:
+     Always returns 1
+
+    SIDE EFFECTS:
+     Can raise exceptions via called methods/functions.
+    """
+    Tag = MAILTAG.upper()
+    # damn, no good way to tell if this fails
+    sm = os.popen("/usr/sbin/sendmail -t", "w")
+    
+    #
+    # Sendmail will figure this out if not given.
+    # 
+    if From:
+	sm.write("From: %s\n" % From)
+        
+    if Headers:
+	sm.write("%s\n" % Headers)
+        
+    sm.write("X-NetBed: %s\n" % SCRIPTNAME)
+    sm.write("To: %s\n" % To)
+    sm.write("Subject: %s: %s\n" % (Tag, Subj))
+    sm.write("\n")
+    sm.write("%s\n" % Msg)
+    sm.write("\n")
+
+    if len(Files):
+        for fname in Files:
+            try:
+                infile = open(fname)
+            except IOError:
+                continue
+            
+            sm.write("\n--------- %s --------\n" % fname)
+
+            for line in infile.readlines():
+                sm.write(line)
+            
+            infile.close()
+    
+    sm.write("\n")
+    sm.close()
+    
+    return 1
+#
+# General library functions
+#
+
+#
+# Print out a timestamp with optional message
+#
+def TIMESTAMP(msgstr = ""):
+    mytime = time.strftime("%H:%M:%S")
+    print "TIMESTAMP: %s %s" % (mytime, msgstr)
+    
+#
+# Termination signals, and global var to track if we got one when
+# they are disabled with disable_sigs
+#
+TERMSIGS = (signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
+gotsig = 0
+
+class SignalInterrupt(Exception):
+    def __init__(self, signum):
+        self.signum = signum
+
+#
+# Keep track of last terminal signal received
+#
+def localSigHandler(signum, frame):
+    """
+    Keep track of received signals.
+    """
+    global gotsig
+    gotsig = signum
+    if verbose:
+        print "Caught signal %s" % signum
+
+def disable_sigs(sigs):
+    """
+    Put signal watcher into place.  I wish you could just temporarily
+    block (but not ignore) signals in python - alas.
+    """
+    osigs = {}
+    for sig in sigs:
+        osigs[sig] = signal.signal(sig, localSigHandler)
+    return osigs
+
+def enable_sigs(osigs):
+    """
+    Reinstate old signal handlers and then raise an exception if
+    one was caught while we had them disabled.
+    """
+    global gotsig
+    
+    for sig,handler in osigs.items():
+        signal.signal(sig, handler)
+
+    if gotsig:
+        tmp = gotsig
+        gotsig = 0
+        raise SignalInterrupt(tmp)
+
+
+#
+# Local timeout error class and generic alarm handler
+# Also listed are a couple of state saving vars for the alarm handler
+# when the local one is installed.  The *_alarm calls are nestable
+#
+class TimeoutError: pass
+def alrmhandler(signum, frame):
+    if debug:
+        print "Timeout! Raising TimeoutError."
+    raise TimeoutError
+
+oalrmhandlerstk = []  # alarm handler stack
+oalrmtmostk = []      # alarm timeout stack
+
+def enable_alarm():
+    """
+    Install a little local alarm handler, stash away old one, and
+    it's pending alarm timeout (if set).
+    """
+    global oalrmhandlerstk, oalrmtmostk
+    oalrmhandlerstk.append(signal.signal(signal.SIGALRM, alrmhandler))
+    oalrmtmo = signal.alarm(0)
+    if oalrmtmo:
+        oalrmtmo += time.time()
+    oalrmtmostk.append(oalrmtmo)
+
+def disable_alarm():
+    """
+    Restore old handler and timeout.  If the old timeout has passed, warn,
+    and send the alarm signal immediately.
+    """
+    signal.signal(signal.SIGALRM, oalrmhandlerstk.pop())
+    oalrmtmo = oalrmtmostk.pop()
+    if oalrmtmo:
+        diff = oalrmtmo - time.time()
+        if diff > 0:
+            signal.alarm(diff)
+        else:
+            warn("missed a timeout deadline, sending SIGALRM immediately!")
+            os.kill(os.getpid(), signal.SIGALRM)
+    
+
+def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
+            disable_sigs_parent=(), disable_sigs_child=()):
+    """
+    Fork and run the given command, and optionally timeout in the parent.
+
+    ARGS:
+     cmd: <bound method | function> command to run.
+     args: <tuple> arguments to the above command.
+     timeout: <int> seconds to wait for child/command to complete
+              before killing it off and returning
+     disable_sigs_parent: <tuple of ints> signals to disable in parent
+     disable_sigs_child:  <tuple of ints> signals to disable in child
+
+    RETURNS:
+     two element tuple.  The first element is a boolean, indicating whether
+     or not an exception was caught while executing the command.  The second
+     element is the return code from the command (which could be meaningless
+     if an exception was caught).
+
+    SIDE EFFECTS:
+     Forks child process to run provided command.  Blocks signals
+     if instructed to with disable_sigs() (does an enable_sigs() before
+     returning).
+    """
+    osigs = None
+    childpid = os.fork()
+
+    # parent
+    if childpid:
+        gotexc = 0
+        exval = 256
+        if disable_sigs_parent:
+            osigs = disable_sigs(disable_sigs_parent)
+        enable_alarm()
+        signal.alarm(timeout)
+        while 1:
+            try:
+                exval = os.waitpid(childpid, 0)[1]
+            except TimeoutError:
+                print "Timeout waiting for command completion: %s" % \
+                      cmd.func_name
+                gotexc = 1
+                break
+            except OSError, e:
+                # Interrupted syscall: just jump back on it.
+                if e.errno == 4:
+                    continue
+                else:
+                    gotexc = 1
+                    break
+            except:
+                gotexc = 1
+                break
+            else:
+                break
+
+        signal.alarm(0)
+        if gotexc:
+            tb = "".join(traceback.format_exception_only(*sys.exc_info()[:2]))
+            print "Exception caught while trying to " \
+                  "run command %s\n%s" % (cmd.func_name, tb)
+            try: os.kill(childpid, signal.SIGUSR1)
+            except: pass
+            try: exval = os.wait()[1]
+            except: exval = 256
+        else:
+            if debug:
+                if os.WIFEXITED(exval):
+                    print "Process complete, exit value: %d" % \
+                          os.WEXITSTATUS(exval)
+                if os.WIFSIGNALED(exval):
+                    print "Process signalled: %d" % \
+                          os.WTERMSIG(exval)
+
+        disable_alarm()
+        if osigs:
+            enable_sigs(osigs)
+        return (gotexc, os.WEXITSTATUS(exval))
+
+    # child
+    else:
+        def sigusrexit(signum, frame):
+            if debug:
+                print "Received SIGUSR1, bailing out"
+            os._exit(1)
+
+        retval = 1
+        if disable_sigs_child:
+            osigs = disable_sigs(disable_sigs_child)
+        signal.signal(signal.SIGUSR1, sigusrexit)
+        try:
+            if type(args) == tuple:
+                retval = cmd(*args)
+            else:
+                retval = cmd(args)
+        except:
+            traceback.print_exception(*sys.exc_info())
+        os._exit(retval)
+
+
+def tryXmlrpcCmd(cmd, args = (),
+                 inittries = DEF_TRIES,
+                 sleepint = DEF_SLEEPINT,
+                 raisefault = False):
+    """
+    This helper/wrapper function's job is to invoke the commands to the
+    central agent, or local node manager, taking steps to retry and
+    recover from failure.
+
+    ARGS:
+     cmd:        <bound method | function> command to try.
+     args:       <tuple> arguments to pass to the above command.
+     inittries:  <int> number of retries before the function gives up
+                 and reraises the last caught exception.
+     sleepint:   <int> how long to sleep (in seconds) between retries.
+     raisefault: <boolean> indicates whether or not to reraise an
+                 xmlrpclib Fault exception when caught.  When true it
+                 also adds a new 'triesleft' member to the Fault class
+                 instance containing the number of attempts this
+                 function had remaining when the Fault exception was
+                 encountered.
+
+    RETURNS:
+     This function returns the result returned by the passed in command.
+
+    SIDE EFFECTS:
+     Invokes the passed in command with the passed in arguments.
+     Catches protocol/socket exceptions for command retry.
+     (Optionally) catches xmlrpclib.Fault exceptions for command retry.
+     Adds a 'triesleft' member to all exceptions reraised prior to tries=0.
+     Understands TimeoutError exceptions, and will reraise them.
+     
+    """
+
+    tries = inittries
+    
+    if debug:
+        print "About to perform command %s with args:\n\t%s" % \
+              (cmd, args)
+    while 1:
+        tries = tries - 1
+        try:
+            if args:
+                # have to differentiate since the '*' operator wants
+                # a tuple - throws an exception if its operand isn't
+                if type(args) == tuple:
+                    return cmd(*args)
+                else:
+                    return cmd(args)
+            else:
+                return cmd()
+        except xmlrpclib.Fault, e:
+            print "XML-RPC Fault happened while executing agent " \
+                  "command: %s" % cmd.func_name
+            print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
+            if raisefault:
+                e.triesleft = tries
+                raise xmlrpclib.Fault, e
+        except TimeoutError, e:
+            if debug:
+                print "Caught a timeout error, setting triesleft and raising."
+            e.triesleft = tries
+            raise TimeoutError, e
+        except (socket.error, xmlrpclib.ProtocolError), e:
+            print "Encountered problem communicating with agent " \
+                  "while executing command: %s" % cmd.func_name
+            if debug:
+                print "Exception is of type: %s" % e
+
+        if tries > 0:
+            print "Sleeping for %s seconds, then retrying %s command" % \
+                  (sleepint, cmd.func_name)
+            time.sleep(sleepint)
+        else:
+            # XXX: perhaps this should raise its own, new type of
+            # exception.
+            print "Giving up after %s tries" % inittries
+            raise

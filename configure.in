@@ -476,6 +476,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
+        tbsetup/plab/libtestbed.py tbsetup/plab/libdb.py \
+        tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabdaemon \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
 	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
