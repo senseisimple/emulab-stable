@@ -81,13 +81,6 @@ if (&tbs_exec("named_setup")) {
     # 
 }
 
-&tbs_out("Clearing virt_names table\n");
-foreach (@nodes) {
-    $sth = $dbh->prepare("DELETE from virt_names where src_node_id = \"$_\" or dest_node_id = \"$_\"");
-    $sth->execute;
-    $sth->finish;
-}
-
 &tbs_out("Cleanup finished - " . &ctime(time) . "\n");
 
 0;
