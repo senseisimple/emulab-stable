@@ -15,6 +15,7 @@
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
+#include <LEDA/sortseq.h>
 #include <iostream.h>
 #include <string.h>
 #include <stdio.h>
@@ -67,7 +68,8 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	PG[no1].max_load = 0;
 	PG[no1].current_load = 0;
 	PG[no1].pnodes_used=0;
-	while ((scur = strsep(&snext," ")) != NULL) {
+	while ((scur = strsep(&snext," ")) != NULL &&
+	       (strcmp(scur,"-"))) {
 	  char *t,*load=scur;
 	  int iload;
 	  t = strsep(&load,":");
@@ -89,6 +91,20 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	    PG[no1].types.insert(stype,iload);
 	  }
 	}
+	/* Either end of line or - .  Read in features */
+	while ((scur = strsep(&snext," ")) != NULL) {
+	  char *feature=scur;
+	  double icost;
+	  char *t;
+	  t = strsep(&feature,":");
+	  string sfeat(t);
+	  if ((! feature) || sscanf(feature,"%lg",&icost) != 1) {
+	    fprintf(stderr,"Bad cost specifier for %s\n",t);
+	    icost = 0.01;
+	  }
+	  PG[no1].features.insert(sfeat,icost);
+	}
+	/* Done */
 	if (! isswitch)
 	  pnodes[n++]=no1;
 	nmap.insert(s, no1);

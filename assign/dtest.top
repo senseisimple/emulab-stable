@@ -1,0 +1,6 @@
+node A pc special:0.5
+node B pc
+node C pc
+link l1 A B 100
+link l2 A C 100
+link l3 B C 100

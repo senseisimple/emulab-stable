@@ -15,6 +15,7 @@ public:
       return i;
     }
 
+  sortseq<string,double> desires; // contains weight of each desire
   int posistion;		// index into pnode array
   int no_connections;		// how many unfulfilled connections from this node
   string type;

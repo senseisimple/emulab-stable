@@ -16,6 +16,7 @@ public:
     }
   
   dictionary<string,int> types;	// contains max nodes for each type
+  sortseq<string,double> features; // contains cost of each feature
   string current_type;
   bool typed;			// has it been typed
   int max_load;			// maxmium load for current type
@@ -36,7 +37,7 @@ public:
   friend istream & operator>>(istream &i, const tb_plink& edge)
     {
       return i;
-    }  
+    }
   int bandwidth;		// maximum bandwidth of this link
   int bw_used;			// how much is used
   int users;			// number of users in direct links

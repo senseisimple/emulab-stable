@@ -14,6 +14,7 @@
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
+#include <LEDA/sortseq.h>
 #include <iostream.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -234,6 +235,48 @@ void remove_node(node n)
   SADD(SCORE_UNASSIGNED);
   vinfo.unassigned++;
   violated++;
+
+  // features/desires
+  seq_item desire;
+  seq_item feature;
+  double value;
+  for (desire = vnoder.desires.min_item();desire;
+       desire = vnoder.desires.succ(desire)) {
+    feature = pnoder.features.lookup(vnoder.desires.key(desire));
+#ifdef SCORE_DEBUG
+    cerr << "  desire = " << vnoder.desires.key(desire) \
+	 << " " << vnoder.desires.inf(desire) << "\n";
+#endif
+    if (!feature) {
+      // Unmatched desire.  Remove cost.
+#ifdef SCORE_DEBUG
+      cerr << "    unmatched\n";
+#endif
+      value = vnoder.desires.inf(desire);
+      SSUB(SCORE_DESIRE*value);
+      if (value >= 1) {
+	violated--;
+	vinfo.desires--;
+      }
+    }
+  }
+  for (feature = pnoder.features.min_item();feature;
+       feature = pnoder.features.succ(feature)) {
+    desire = vnoder.desires.lookup(pnoder.features.key(feature));
+#ifdef SCORE_DEBUG
+    cerr << "  feature = " << pnoder.features.key(feature) \
+	 << " " << pnoder.features.inf(feature) << "\n";
+#endif
+    if (! desire) {
+      // Unused feature.  Remove weight
+#ifdef SCORE_DEBUG
+      cerr << "    unused\n";
+#endif
+      value = pnoder.features.inf(feature);
+      SSUB(SCORE_FEATURE*value);
+    }
+  }
+  
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
 #endif
@@ -463,6 +506,47 @@ int add_node(node n,int ploc)
   vinfo.unassigned--;
   violated--;
 
+  // features/desires
+  seq_item desire;
+  seq_item feature;
+  double value;
+  for (desire = vnoder.desires.min_item();desire;
+       desire = vnoder.desires.succ(desire)) {
+    feature = pnoder.features.lookup(vnoder.desires.key(desire));
+#ifdef SCORE_DEBUG
+    cerr << "  desire = " << vnoder.desires.key(desire) \
+	 << " " << vnoder.desires.inf(desire) << "\n";
+#endif
+    if (!feature) {
+      // Unmatched desire.  Add cost.
+#ifdef SCORE_DEBUG
+      cerr << "    unmatched\n";
+#endif
+      value = vnoder.desires.inf(desire);
+      SADD(SCORE_DESIRE*value);
+      if (value >= 1) {
+	violated++;
+	vinfo.desires++;
+      }
+    }
+  }
+  for (feature = pnoder.features.min_item();feature;
+       feature = pnoder.features.succ(feature)) {
+    desire = vnoder.desires.lookup(pnoder.features.key(feature));
+#ifdef SCORE_DEBUG
+    cerr << "  feature = " << pnoder.features.key(feature) \
+	 << " " << pnoder.features.inf(feature) << "\n";
+#endif
+    if (! desire) {
+      // Unused feature.  Add weight
+#ifdef SCORE_DEBUG
+      cerr << "    unused\n";
+#endif
+      value = pnoder.features.inf(feature);
+      SADD(SCORE_FEATURE*value);
+    }
+  }
+    
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  posistion = %d\n",vnoder.posistion);
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);

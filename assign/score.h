@@ -30,12 +30,19 @@ const float SCORE_UNASSIGNED = 1;
 // Cost of going over bandwidth
 const float SCORE_OVER_BANDWIDTH = 0.5;
 
+// Multiplier for desire costs
+const float SCORE_DESIRE = 1;
+
+// Multiplier for feature weights
+const float SCORE_FEATURE = 1;
+
 typedef struct {
   int unassigned;
   int pnode_load;
   int no_connection;
   int link_users;
   int bandwidth;
+  int desires;
 } violated_info;
 
 extern float score;

@@ -11,6 +11,7 @@
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
 #include <LEDA/node_pq.h>
+#include <LEDA/sortseq.h>
 
 #include "common.h"
 #include "virtual.h"
@@ -25,7 +26,7 @@ int parse_top(tb_vgraph &G, istream& i)
   node no1;
   string s1, s2;
   char inbuf[255];
-  char n1[32], n2[32], type[32];
+  char n1[32], n2[32];
   char lname[32];
   int num_nodes = 0;
   int bw;
@@ -39,18 +40,35 @@ int parse_top(tb_vgraph &G, istream& i)
     if (strlen(inbuf) == 0) { continue; }
 	    
     if (!strncmp(inbuf, "node", 4)) {
-      if (sscanf(inbuf, "node %s %s", n1, type) < 1) {
+      char *snext = inbuf;
+      char *scur = strsep(&snext," ");
+      if (strcmp("node",scur) != 0) {
 	fprintf(stderr, "bad node line: %s\n", inbuf);
       } else {
+	scur=strsep(&snext," ");
 	num_nodes++;
-	string s1(n1);
+	string s1(scur);
 	no1 = G.new_node();
 	unassigned_nodes.insert(no1,random());
-	G[no1].name=strdup(n1);
+	G[no1].name=strdup(scur);
 	G[no1].posistion = 0;
 	G[no1].no_connections=0;
 	nmap.insert(s1, no1);
-	G[no1].type=string(type);
+	scur=strsep(&snext," ");
+	G[no1].type=string(scur);
+	/* Read in desires */
+	while ((scur=strsep(&snext," ")) != NULL) {
+	  char *desire = scur;
+	  char *t;
+	  double iweight;
+	  t = strsep(&desire,":");
+	  string sdesire(t);
+	  if ((! desire) || sscanf(desire,"%lg",&iweight) != 1) {
+	    fprintf(stderr,"Bad desire specifier for %s\n",t);
+	    iweight = 0.01;
+	  }
+	  G[no1].desires.insert(sdesire,iweight);
+	}
       }
     } else if (!strncmp(inbuf, "link", 4)) {
       r=sscanf(inbuf, "link %s %s %s %d", lname, n1, n2,&bw);

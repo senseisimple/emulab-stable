@@ -1,0 +1,84 @@
+
+running
+-------
+
+Typically assign is run in the following method:
+	assign -b -t <ptop> <top>
+
+-h provides a brief help listing.  -a does nothing.  -b prevents the
+GUI.  -t specifies a ptop file.  -o does very little of use.
+
+
+ptop format
+-----------
+Each line is one either:
+
+node <node> <types> [- <features>]
+
+<node> is a string identifier for the node.
+
+<types> is a space separated list of <type>:<number>. 
+	<type> is a string identifier for the type.
+	<number> is the number of virtual nodes of that type that can fit.
+There is a special type of "switch" which indicates that the node is a
+switch.
+
+<features> is a space separated list of <feature>:<cost>
+	<feature> is a string identifier of the feature.
+	<cost> is the cost of the feature being wasted.
+
+OR
+
+link <link> <src>[:<smac>] <dst>[:<dmac>] <bw> <numb>
+
+<link> is a string identifier for the link.
+
+<src>,<dst> are the source and destination nodes.
+
+<smac>,<dmac> are optional arguments which are the MAC addresses or any
+	other string to distinguish the ports of the nodes.  If committed
+	the string "(null)" is used instead.
+
+<bw> is the bandwidth, an integer.
+
+<num> is the number of links between those two pairs.
+
+Note: <smac> and <dmac> should not be present on switch<->switch links.
+
+top format
+----------
+
+Each line is either:
+
+node <node> <type> [<desires>]
+
+<node> is a string identifier for the node.
+
+<type> is the type of the node.
+
+<desires> is a space separated list of <desire>:<weight>
+	<desire> is a string identifier of the desire.
+	<weight> is the cost of not having the desire fulfilled.
+		A weight >= 1.0 will also result in a violation if
+		not filled.
+
+
+features and desires
+--------------------
+
+Each physical node has feature/cost pairs associated with it.  Each
+virtual node has desire/weight pairs associated with it.  When a
+mapping is made any unused features add their cost to the score and
+any unfulfilled desires add their weight to the score.  Fulfilled
+desires/used features add nothing to the score.
+
+
+compile type options
+--------------------
+
+-DVERBOSE adds temperature output and functions as a crude progress meter.
+
+-DSCORE_DEBUG adds a large amount of output detailing in great detail
+what is going on.
+
+-DSCORE_DEBUG_MORE adds even more output.

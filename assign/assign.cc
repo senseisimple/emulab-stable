@@ -4,6 +4,7 @@
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
 #include <LEDA/node_pq.h>
+#include <LEDA/sortseq.h>
 #include <iostream.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -278,6 +279,7 @@ int assign()
   cout << "  no_connect: " << vinfo.no_connection << endl;
   cout << "  link_users: " << vinfo.link_users << endl;
   cout << "  bandwidth:  " << vinfo.bandwidth << endl;
+  cout << "  desires:    " << vinfo.desires << endl;
 
   return 0;
 }
