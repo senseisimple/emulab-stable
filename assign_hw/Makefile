@@ -7,7 +7,7 @@ LDFLAGS+= -O3 -fomit-frame-pointer -m486
 CXXFLAGS = -I${LEDA}/incl
 # Pick one of the two below.
 #CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
-CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE
+CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE
 DEPLIBS=$(OBJS)
 
 all: assign 

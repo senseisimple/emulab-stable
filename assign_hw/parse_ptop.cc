@@ -23,7 +23,7 @@
 extern node pnodes[MAX_PNODES];	// int -> node map
 node_array<int> switch_index;
 
-void parse_ptop(tb_pgraph &PG, istream& i)
+int parse_ptop(tb_pgraph &PG, istream& i)
 {
   int switchi=0;
   dictionary<string, node> nmap;
@@ -40,7 +40,7 @@ void parse_ptop(tb_pgraph &PG, istream& i)
   char *scur;
   int isswitch;
 
-  switch_index.init(PG,0);
+  switch_index.init(PG,MAX_PNODES,0);
   pnodes[0] = NULL;
   while (!i.eof()) {
     char *ret;
@@ -125,5 +125,6 @@ void parse_ptop(tb_pgraph &PG, istream& i)
       fprintf(stderr, "unknown directive: %s\n", inbuf);
     }
   }
+  return n-1;
 }
 

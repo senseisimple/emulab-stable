@@ -38,6 +38,14 @@ extern tb_pgraph PG;		// physical grpaph
 int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s);
 edge direct_link(node a,node b);
 
+#ifdef SCORE_DEBUG_MORE
+#define SADD(amount) fprintf(stderr,"SADD: %s = %.2f\n",#amount,amount);score+=amount
+#define SSUB(amount) fprintf(stderr,"SSUB: %s = %.2f\n",#amount,amount);score-=amount
+#else
+#define SADD(amount) score += amount
+#define SSUB(amount) score -= amount
+#endif
+
 /*
  * score()
  * Returns the score.
@@ -63,7 +71,7 @@ void init_score()
     tb_vnode &vn=G[n];
     vn.posistion=0;
     vn.no_connections=0;
-    score += SCORE_UNASSIGNED;
+    SADD(SCORE_UNASSIGNED);
     violated++;
   }
   forall_edges(e,G) {
@@ -137,13 +145,13 @@ void remove_node(node n)
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"   freeing link\n");
 #endif
-	score -= SCORE_DIRECT_LINK;
+	SSUB(SCORE_DIRECT_LINK);
       } else {
 	// getting close to no violations
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"   reducing users\n");
 #endif
-	score -= SCORE_DIRECT_LINK_PENALTY;
+	SSUB(SCORE_DIRECT_LINK_PENALTY);
 	violated--;
       }
     } else if (vlink->type == tb_vlink::LINK_INTERSWITCH) {
@@ -172,15 +180,15 @@ void remove_node(node n)
       // XXX add check for over bandwidth
 
       // adjust score apropriately.
-      score -= SCORE_INTERSWITCH_LINK;
-      if (second) 
-	score -= SCORE_INTERSWITCH_LINK;
+      SSUB(SCORE_INTERSWITCH_LINK);
+      if (second)
+	SSUB(SCORE_INTERSWITCH_LINK);
     } else if (vlink->type == tb_vlink::LINK_INTRASWITCH) {
       // INTRASWITCH LINK
 #ifdef SCORE_DEBUG
       fprintf(stderr,"   intraswitch link\n");
 #endif
-      score -= SCORE_INTRASWITCH_LINK;
+      SSUB(SCORE_INTRASWITCH_LINK);
     } else {
       // No link
       assert(0);
@@ -188,7 +196,7 @@ void remove_node(node n)
   }
 
   // remove scores associated with the node
-  score -= SCORE_NO_CONNECTION * vnoder.no_connections;
+  SSUB(SCORE_NO_CONNECTION*vnoder.no_connections);
   violated -= vnoder.no_connections;
 
   // adjust pnode scores
@@ -199,15 +207,15 @@ void remove_node(node n)
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  releasing pnode\n");
 #endif
-    score -= SCORE_PNODE;
+    SSUB(SCORE_PNODE);
     node the_switch=pnoder.the_switch;
     if (the_switch) {
-      if ((PG[the_switch].pnodes_used--) == 0) {
+      if ((--PG[the_switch].pnodes_used) == 0) {
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"  releasing switch %s\n",PG[the_switch].name);
 #endif
 	// release switch
-	score -= SCORE_SWITCH;
+	SSUB(SCORE_SWITCH);
       }
     }
     // revert pnode type
@@ -216,11 +224,11 @@ void remove_node(node n)
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  reducing penalty, new load = %d (>= %d)\n",pnoder.current_load,pnoder.max_load);
 #endif
-    score -= SCORE_PNODE_PENALTY;
+    SSUB(SCORE_PNODE_PENALTY);
     violated--;
   }
   // add score for unassigned node
-  score += SCORE_UNASSIGNED;
+  SADD(SCORE_UNASSIGNED);
   violated++;
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
@@ -243,7 +251,9 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
   fprintf(stderr,"SCORE: add_node(%s,%s[%d])\n",
 	  vnoder.name,pnoder.name,ploc);
-  fprintf(stderr,"  vnode type = %d\n",vnoder.type);
+  fprintf(stderr,"  vnode type = %d pnode switch = %s\n",vnoder.type,
+	  (pnoder.the_switch ? PG[pnoder.the_switch].name : "No switch"));
+  
 #endif
   
   // set up pnode
@@ -313,12 +323,12 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"    first user\n");
 #endif
-	  score += SCORE_DIRECT_LINK;
+	  SADD(SCORE_DIRECT_LINK);
 	} else {
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"    not first user - penalty\n");
 #endif
-	  score += SCORE_DIRECT_LINK_PENALTY;
+	  SADD(SCORE_DIRECT_LINK_PENALTY);
 	  violated++;
 	}
       } else if (pnoder.the_switch &&
@@ -328,7 +338,7 @@ int add_node(node n,int ploc)
 	fprintf(stderr,"   found intraswitch link\n");
 #endif
 	er->type = tb_vlink::LINK_INTRASWITCH;
-	score += SCORE_INTRASWITCH_LINK;
+	SADD(SCORE_INTRASWITCH_LINK);
       } else {
 	// try to find interswitch
 #ifdef SCORE_DEBUG
@@ -344,16 +354,16 @@ int add_node(node n,int ploc)
 #endif
 	  // couldn't fidn path.
 	  vnoder.no_connections++;
-	  score += SCORE_NO_CONNECTION;
+	  SADD(SCORE_NO_CONNECTION);
 	  violated++;
  	} else {
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"   found interswitch link (%p, %p)\n",first,second);
 #endif
 	  er->type=tb_vlink::LINK_INTERSWITCH;
-	  score += SCORE_INTERSWITCH_LINK;
+	  SADD(SCORE_INTERSWITCH_LINK);
 	  if (second)
-	    score += SCORE_INTERSWITCH_LINK;
+	    SADD(SCORE_INTERSWITCH_LINK);
 
 	  // add bandwidth usage
 	  PG[first].bw_used += er->bandwidth;
@@ -376,21 +386,29 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  load to high - penalty (%d)\n",pnoder.current_load);
 #endif
-    score += SCORE_PNODE_PENALTY;
+    SADD(SCORE_PNODE_PENALTY);
     violated++;
   } else {
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  load is fine\n");
 #endif
-    score += SCORE_PNODE;
+  }
+  if (pnoder.current_load == 1) {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  new pnode\n");
+#endif
+    SADD(SCORE_PNODE);
     if (pnoder.the_switch &&
-	(PG[pnoder.the_switch].pnodes_used++) == 1) {
-      score += SCORE_SWITCH;
+	(++PG[pnoder.the_switch].pnodes_used) == 1) {
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"  new switch\n");
+#endif
+      SADD(SCORE_SWITCH);
     }
   }
 
   // node no longer unassigned
-  score -= SCORE_UNASSIGNED;
+  SSUB(SCORE_UNASSIGNED);
   violated--;
 
 #ifdef SCORE_DEBUG

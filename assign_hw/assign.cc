@@ -46,7 +46,7 @@ float bestscore, absbest;
 extern node pnodes[MAX_PNODES];
 extern node_array<int> switch_index;
 void parse_top(tb_vgraph &G, istream& i);
-void parse_ptop(tb_pgraph &G, istream& i);
+int parse_ptop(tb_pgraph &G, istream& i);
 
 /*
  * Basic simulated annealing parameters:
@@ -423,8 +423,7 @@ int main(int argc, char **argv)
   argc -= optind;
   argv += optind;
 
-  //  srandom(time(NULL) + getpid());
-  srandom(42);
+  srandom(time(NULL) + getpid());
 
   /*
    * Set up the LEDA graph window environment.  Whenever
@@ -483,8 +482,7 @@ int main(int argc, char **argv)
       cerr << "Error opening file: " << topofile << endl;
       exit(-1);
     }
-    parse_ptop(PG,ptopfile);
-    nparts = PG.number_of_nodes();
+    nparts = parse_ptop(PG,ptopfile);
     cout << "Nparts: " << nparts << endl;
   }
 
