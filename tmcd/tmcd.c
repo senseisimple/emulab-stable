@@ -1296,6 +1296,7 @@ COMMAND_PROTOTYPE(doaccounts)
 
 		gidint     = -1;
 		tbadmin    = root = atoi(row[8]);
+		gcount     = 0;
 		
 		while (1) {
 			
