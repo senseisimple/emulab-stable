@@ -42,7 +42,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 16; };
+sub TMCD_VERSION()	{ 17; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -460,11 +460,11 @@ sub getifconfig($)
     
     my $ethpat  = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
     $ethpat    .= q(MAC=(\w*) SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)" );
-    $ethpat    .= q(IFACE=(\w*) RTABID=(\d*));
+    $ethpat    .= q(IFACE=(\w*) RTABID=(\d*) LAN=([-\w\(\)]*));
 
     my $vethpat = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
     $vethpat   .= q(ID=(\d*) VMAC=(\w*) PMAC=(\w*) RTABID=(\d*) );
-    $vethpat   .= q(ENCAPSULATE=(\d*));
+    $vethpat   .= q(ENCAPSULATE=(\d*) LAN=([-\w\(\)]*));
 
     my $setpat  = q(INTERFACE_SETTING MAC=(\w*) );
     $setpat    .= q(KEY='([-\w\.\:]*)' VAL='([-\w\.\:]*)');
@@ -497,6 +497,7 @@ sub getifconfig($)
 	    my $aliases  = $7;
 	    my $iface    = $8;
 	    my $rtabid   = $9;
+	    my $lan      = $10;
 
 	    # The server can specify an iface.
 	    if ($iface eq "" &&
@@ -515,6 +516,7 @@ sub getifconfig($)
 	    $ifconfig->{"ALIASES"}  = $aliases;
 	    $ifconfig->{"IFACE"}    = $iface;
 	    $ifconfig->{"RTABID"}   = $rtabid;
+	    $ifconfig->{"LAN"}      = $lan;
 	    $ifconfig->{"SETTINGS"} = {};
 	    push(@ifacelist, $ifconfig);
 	    $ifacehash{$mac}        = $ifconfig;
@@ -528,6 +530,7 @@ sub getifconfig($)
 	    my $iface    = undef;
 	    my $rtabid   = $7;
 	    my $encap    = $8;
+	    my $lan      = $9;
 
 	    #
 	    # Inside a jail, the vmac is really the pmac. That is, when the
@@ -560,10 +563,12 @@ sub getifconfig($)
 	    $ifconfig->{"IPMASK"}   = $mask;
 	    $ifconfig->{"ID"}       = $id;
 	    $ifconfig->{"VMAC"}     = $vmac;
+	    $ifconfig->{"MAC"}      = $vmac; # XXX
 	    $ifconfig->{"PMAC"}     = $pmac;
 	    $ifconfig->{"IFACE"}    = $iface;
 	    $ifconfig->{"RTABID"}   = $rtabid;
 	    $ifconfig->{"ENCAP"}    = $encap;
+	    $ifconfig->{"LAN"}      = $lan;
 	    push(@ifacelist, $ifconfig);
 	}
 	else {
