@@ -50,7 +50,7 @@ function GENHASH() {
     if (! $fp) {
         TBERROR("Error opening /dev/urandom", 1);
     }
-    $random_bytes = fread($fp, 8);
+    $random_bytes = fread($fp, 32);
     fclose($fp);
 
     $hash  = mhash (MHASH_MD5, bin2hex($retval) . " " . microtime());
