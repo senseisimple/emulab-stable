@@ -44,16 +44,16 @@ mtp_dump.o:	mtp.h
 test_mtp.sh: mtp_send mtp_recv
 
 mtp_test: mtp_test.o $(MTPLIBS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_test.o -L. -lmtp
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_test.o -L. -lmtp -lm
 
 mtp_send: mtp_send.o $(MTPLIBS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_send.o -L. -lmtp
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_send.o -L. -lmtp -lm
 
 mtp_recv: mtp_recv.o $(MTPLIBS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_recv.o -L. -lmtp
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_recv.o -L. -lmtp -lm
 
 mtp_dump: mtp_dump.o $(MTPLIBS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_dump.o -L. -lmtp
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_dump.o -L. -lmtp -lm
 
 CLASSES_SRC = $(wildcard $(SRCDIR)/*.java)
 

@@ -128,8 +128,6 @@ typedef enum {
     MA_ID,	 	 /*< (int) */
     MA_Code,	 	 /*< (int) */
     MA_Message,	 	 /*< (char *) */
-    MA_Horizontal,	 /*< (double) */
-    MA_Vertical,	 /*< (double) */
     MA_RobotLen,	 /*< (int) */
     MA_RobotVal,	 /*< (robot_config *) */
     MA_CameraLen,	 /*< (int) */
@@ -183,6 +181,42 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...);
 void mtp_free_packet(struct mtp_packet *mp);
 
 float mtp_theta(float theta);
+
+void mtp_polar(struct robot_position *current,
+	       struct robot_position *dest,
+	       float *r_out,
+	       float *theta_out);
+
+void mtp_cartesian(struct robot_position *current,
+		   float r,
+		   float theta,
+		   struct robot_position *dest_out);
+
+enum {
+    MCB_NORTH,
+    MCB_EAST,
+    MCB_WEST,
+    MCB_SOUTH
+};
+
+enum {
+    MCF_NORTH = (1L << MCB_NORTH),
+    MCF_EAST = (1L << MCB_EAST),
+    MCF_WEST = (1L << MCB_WEST),
+    MCF_SOUTH = (1L << MCB_SOUTH),
+};
+
+#define MTP_COMPASS_STRING(x) ( \
+    (x) == (MCF_NORTH|MCF_WEST) ? "nw" : \
+    (x) == (MCF_NORTH) ? "n" : \
+    (x) == (MCF_NORTH|MCF_EAST) ? "ne" : \
+    (x) == (MCF_EAST) ? "e" : \
+    (x) == (MCF_SOUTH|MCF_EAST) ? "se" : \
+    (x) == (MCF_SOUTH) ? "s" : \
+    (x) == (MCF_SOUTH|MCF_WEST) ? "sw" : \
+    (x) == (MCF_WEST) ? "w" : "u")
+
+int mtp_compass(float theta);
 
 /**
  * Print the contents of the given packet to the given FILE object.

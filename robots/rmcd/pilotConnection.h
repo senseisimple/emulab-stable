@@ -51,6 +51,7 @@ struct pilot_connection {
 
     struct obstacle_config pc_obstacles[32];
     unsigned int pc_obstacle_count;
+    unsigned int pc_waypoint_tries;
 };
 
 #define REL2ABS(_dst, _theta, _rpoint, _apoint) { \
@@ -63,6 +64,8 @@ struct pilot_connection {
 }
 
 struct pilot_connection *pc_add_robot(struct robot_config *rc);
+
+void pc_dump_info(void);
 
 /**
  * Map the robot ID to a gorobot_conn object.
@@ -81,7 +84,7 @@ void pc_override_state(struct pilot_connection *pc, pilot_state_t ps);
 void pc_change_state(struct pilot_connection *pc, pilot_state_t ps);
 void pc_handle_packet(struct pilot_connection *pc, struct mtp_packet *mp);
 void pc_handle_signal(fd_set *rready, fd_set *wready);
-
+void pc_handle_timeout(struct timeval *current_time);
 
 /**
  * How close does the robot have to be before it is considered at the intended
@@ -102,7 +105,7 @@ void pc_handle_signal(fd_set *rready, fd_set *wready);
 /**
  * Maximum number of times to try and refine the position before giving up.
  */
-#define MAX_REFINE_RETRIES 5
+#define MAX_REFINE_RETRIES 4
 
 #define MAX_PILOT_CONNECTIONS 128
 
@@ -117,7 +120,7 @@ struct pilot_connection_data {
 
 extern struct pilot_connection_data pc_data;
 
-int pc_point_in_bounds(struct pilot_connection_data *pcd,float x,float y);
-int pc_point_in_obstacle(struct pilot_connection_data *pcd,float x,float y);
+int pc_point_in_bounds(float x,float y);
+int pc_point_in_obstacle(float x,float y);
 
 #endif

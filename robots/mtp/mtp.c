@@ -59,8 +59,10 @@ static int mtp_read(char *handle, char *data, int len)
 
     assert(handle != NULL);
     assert(data != NULL);
-    
-    retval = read(mh->mh_fd, data, len);
+
+    do {
+	retval = read(mh->mh_fd, data, len);
+    } while ((retval == -1) && (errno == EINTR));
 
     if (retval == 0) {
 	mh->mh_flags |= MHF_EOF;
@@ -68,6 +70,9 @@ static int mtp_read(char *handle, char *data, int len)
     }
     else if (retval > 0) {
 	mh->mh_remaining += retval;
+    }
+    else {
+	printf(" mtp_read %d %s\n", retval, strerror(errno));
     }
     
     // printf("%d read(%p(%d), %p, %d)\n", retval, mh, mh->mh_fd, data, len);
@@ -618,6 +623,55 @@ float mtp_theta(float theta)
 	retval = theta;
     }
 
+    return retval;
+}
+
+void mtp_polar(struct robot_position *current,
+	       struct robot_position *dest,
+	       float *r_out,
+	       float *theta_out)
+{
+    assert(current != NULL);
+    assert(dest != NULL);
+    assert(r_out != NULL);
+    assert(theta_out != NULL);
+
+    *r_out = hypotf(current->x - dest->x, current->y - dest->y);
+    *theta_out = atan2f(current->y - dest->y, dest->x - current->x);
+}
+
+void mtp_cartesian(struct robot_position *current,
+		   float r,
+		   float theta,
+		   struct robot_position *dest_out)
+{
+    assert(current != NULL);
+    assert(dest_out != NULL);
+
+    dest_out->x = current->x + cos(theta) * r;
+    dest_out->y = current->y - sin(theta) * r;
+}
+
+int mtp_compass(float theta)
+{
+    int retval = 0;
+
+#define DEGREES_30 (0.52f)
+    
+    theta = mtp_theta(theta);
+
+    if ((theta >= DEGREES_30) && (theta <= (M_PI - DEGREES_30)))
+	retval |= MCF_NORTH;
+    
+    if ((theta <= (M_PI_2 - DEGREES_30)) && (theta >= (-M_PI_2 + DEGREES_30)))
+	retval |= MCF_EAST;
+    
+    if ((theta <= -DEGREES_30) && (theta >= (-M_PI + DEGREES_30)))
+	retval |= MCF_SOUTH;
+    
+    if ((theta >= (M_PI_2 + DEGREES_30) || (theta <= (-M_PI + DEGREES_30))))
+	retval |= MCF_WEST;
+    
     return retval;
 }
 

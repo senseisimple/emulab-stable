@@ -1,6 +1,7 @@
 
 #include "config.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -61,6 +62,61 @@ rc_code_t rc_compute_closest(float x, float y, rc_rectangle_t r)
     printf("closest %x\n", retval);
     
     return retval;
+}
+
+rc_code_t rc_closest_corner(float x, float y, rc_rectangle_t r)
+{
+    float tl, tr, bl, br, closest;
+    rc_code_t retval = 0;
+    
+    assert(r != NULL);
+
+    tl = hypotf(x - r->xmin, y - r->ymin);
+    tr = hypotf(x - r->xmax, y - r->ymin);
+    bl = hypotf(x - r->xmin, y - r->ymax);
+    br = hypotf(x - r->xmax, y - r->ymax);
+
+    closest = min(tl, min(tr, min(bl, br)));
+
+    if (tl == closest)
+	retval = RCF_TOP|RCF_LEFT;
+    else if (tr == closest)
+	retval = RCF_TOP|RCF_RIGHT;
+    else if (bl == closest)
+	retval = RCF_BOTTOM|RCF_LEFT;
+    else if (br == closest)
+	retval = RCF_BOTTOM|RCF_RIGHT;
+    else {
+	assert(0);
+    }
+    
+    return retval;
+}
+
+void rc_corner(rc_code_t rc, struct robot_position *rp, rc_rectangle_t r)
+{
+    assert(rc != 0);
+    assert(rp != NULL);
+    assert(r != NULL);
+
+    switch (rc) {
+    case RCF_TOP|RCF_LEFT:
+	rp->x = r->xmin;
+	rp->y = r->ymin;
+	break;
+    case RCF_TOP|RCF_RIGHT:
+	rp->x = r->xmax;
+	rp->y = r->ymin;
+	break;
+    case RCF_BOTTOM|RCF_LEFT:
+	rp->x = r->xmin;
+	rp->y = r->ymax;
+	break;
+    case RCF_BOTTOM|RCF_RIGHT:
+	rp->x = r->xmax;
+	rp->y = r->ymax;
+	break;
+    }
 }
 
 int rc_clip_line(rc_line_t line, rc_rectangle_t clip)

@@ -72,6 +72,26 @@ static void usage(void)
 	    "Usage: rmcd [-hd] [-l logfile] [-i pidfile] [-e emchost] [-p emcport]\n");
 }
 
+#if defined(SIGINFO)
+/* SIGINFO-related stuff */
+
+/**
+ * Variable used to tell the main loop that we received a SIGINFO.
+ */
+static int got_siginfo = 0;
+
+/**
+ * Handler for SIGINFO that sets the got_siginfo variable and breaks the main
+ * loop so we can really handle the signal.
+ *
+ * @param sig The actual signal number received.
+ */
+static void siginfo(int sig)
+{
+    got_siginfo = 1;
+}
+#endif
+
 /**
  * Handle an mtp packet from emcd.
  *
@@ -154,14 +174,19 @@ int main(int argc, char *argv[])
     int c, emc_port = 0, retval = EXIT_SUCCESS;
     char *logfile = NULL, *pidfile = NULL;
     mtp_handle_t emc_handle = NULL;
+    struct timeval last_time;
     fd_set readfds;
 
 #if 0
     {
 	struct robot_config rc = { 1, "fakegarcia" };
 	struct pilot_connection *pc;
+	struct mtp_config_rmc rmc;
 
 	debug = 3;
+
+	memset(&rmc, 0, sizeof(rmc));
+	pc_data.pcd_config = &rmc;
 	
 	pc = pc_add_robot(&rc);
 
@@ -270,6 +295,10 @@ int main(int argc, char *argv[])
 	}
     }
 
+#if defined(SIGINFO)
+    signal(SIGINFO, siginfo);
+#endif
+
     if (emc_hostname != NULL || emc_path != NULL) {
 	struct mtp_packet mp, rmp;
 	
@@ -301,7 +330,7 @@ int main(int argc, char *argv[])
 	    pc_data.pcd_config = rmc_config;
 	    
 	    /*
-	     * Walk through the robot list and connect to the gorobots daemons
+	     * Walk through the robot list and connect to the pilot daemons
 	     * running on the robots.
 	     */
 	    for (lpc = 0; lpc < rmc_config->robots.robots_len; lpc++) {
@@ -332,10 +361,21 @@ int main(int argc, char *argv[])
 
     while (looping) {
 	fd_set rreadyfds = readfds;
+	struct timeval tv, diff;
 	int rc;
 
-	rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, NULL);
+#if defined(SIGINFO)
+	if (got_siginfo) {
+	    pc_dump_info();
+	    got_siginfo = 0;
+	}
+#endif
 
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+	rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, &tv);
+	gettimeofday(&tv, NULL);
+	
 	if (rc > 0) {
 	    if (FD_ISSET(emc_handle->mh_fd, &rreadyfds)) {
 		do {
@@ -345,8 +385,14 @@ int main(int argc, char *argv[])
 
 	    pc_handle_signal(&rreadyfds, NULL);
 	}
-	else {
-	    errorc("accept\n");
+	else if (rc == -1 && errno != EINTR) {
+	    errorc("select\n");
+	}
+
+	timersub(&tv, &last_time, &diff);
+	if (diff.tv_sec > 1) {
+	    pc_handle_timeout(&tv);
+	    last_time = tv;
 	}
     }
   

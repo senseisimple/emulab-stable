@@ -35,8 +35,20 @@ typedef struct rc_line {
     float y1;
 } *rc_line_t;
 
+#define RC_CODE_STRING(x) ( \
+    (x) == (RCF_TOP|RCF_LEFT) ? "tl" : \
+    (x) == (RCF_TOP) ? "t" : \
+    (x) == (RCF_TOP|RCF_RIGHT) ? "tr" : \
+    (x) == (RCF_RIGHT) ? "r" : \
+    (x) == (RCF_BOTTOM|RCF_RIGHT) ? "br" : \
+    (x) == (RCF_BOTTOM) ? "b" : \
+    (x) == (RCF_BOTTOM|RCF_LEFT) ? "bl" : \
+    (x) == (RCF_LEFT) ? "l" : "u")
+
+void rc_corner(rc_code_t rc, struct robot_position *rp, rc_rectangle_t r);
 rc_code_t rc_compute_code(float x, float y, rc_rectangle_t r);
 rc_code_t rc_compute_closest(float x, float y, rc_rectangle_t r);
+rc_code_t rc_closest_corner(float x, float y, rc_rectangle_t r);
 int rc_clip_line(rc_line_t line, rc_rectangle_t clip);
 
 #endif

@@ -34,6 +34,9 @@ struct pilot_connection_data pc_data;
 #define cmp_fuzzy(x1, x2, tol) \
     ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
 
+#define min(x, y) ((x) < (y)) ? (x) : (y)
+#define max(x, y) ((x) > (y)) ? (x) : (y)
+
 /**
  * Compare two position objects to see if they are the "same", where "same" is
  * within some tolerance.
@@ -179,6 +182,44 @@ struct pilot_connection *pc_add_robot(struct robot_config *rc)
     return retval;
 }
 
+void pc_dump_info(void)
+{
+    int lpc;
+
+    info("info: pilot list\n");
+    for (lpc = 0; lpc < pc_data.pcd_connection_count; lpc++) {
+	struct pilot_connection *pc;
+	int lpc2;
+	
+	pc = &pc_data.pcd_connections[lpc];
+	info("  %s: flags=0x%x; state=%s; tries=%d\n"
+	     "    actual: %.2f %.2f %.2f\tlast:  %.2f %.2f %.2f\n"
+	     "    waypt:  %.2f %.2f %.2f %s\n"
+	     "    goal:   %.2f %.2f %.2f\n",
+	     pc->pc_robot->hostname,
+	     pc->pc_flags,
+	     state_strings[pc->pc_state],
+	     pc->pc_tries_remaining,
+	     pc->pc_last_pos.x, pc->pc_last_pos.y, pc->pc_last_pos.theta,
+	     pc->pc_actual_pos.x, pc->pc_actual_pos.y, pc->pc_actual_pos.theta,
+	     pc->pc_waypoint.x, pc->pc_waypoint.y, pc->pc_waypoint.theta,
+	     (pc->pc_flags & PCF_WAYPOINT) ? "(active)" : "(inactive)",
+	     pc->pc_goal_pos.x, pc->pc_goal_pos.y, pc->pc_goal_pos.theta);
+	for (lpc2 = 0; lpc2 < pc->pc_obstacle_count; lpc2++) {
+	    struct obstacle_config *oc;
+
+	    oc = &pc->pc_obstacles[lpc];
+	    info("   obstacle[%d] = %d -- %.2f %.2f %.2f %.2f\n",
+		 lpc,
+		 oc->id,
+		 oc->xmin,
+		 oc->ymin,
+		 oc->xmax,
+		 oc->ymax);
+	}
+    }
+}
+
 struct pilot_connection *pc_find_pilot(int robot_id)
 {
     struct pilot_connection *retval = NULL;
@@ -219,6 +260,7 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	
 	pc->pc_flags &= ~PCF_WAYPOINT;
 	pc->pc_obstacle_count = 0;
+	pc->pc_waypoint_tries = 0;
     }
     else {
 	int lpc;
@@ -239,11 +281,35 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	    rl.y1 = pc->pc_goal_pos.y;
 
 	    pc->pc_tries_remaining = MAX_REFINE_RETRIES;
+
+#if 0
+	    if ((pc->pc_waypoint_tries > 0) &&
+		(pc->pc_waypoint_tries % 3) == 0) {
+		info("*** expanding dynamic obstacle!");
+		oc->xmin -= 0.20;
+		oc->ymin -= 0.20;
+		oc->xmax += 0.20;
+		oc->ymax += 0.20;
+	    }
+#endif
 	    
-	    if ((rc_clip_line(&rl, oc) == 0) ||
-		(hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1) < 0.20)) {
+	    if (rc_compute_code(pc->pc_goal_pos.x,
+				pc->pc_goal_pos.y,
+				oc) == 0) {
 		if (debug) {
-		    info("debug: %s cleared obstacle\n", \
+		    info("debug: %s has a goal in an obstacle\n",
+			 pc->pc_robot->hostname);
+		}
+
+		pc->pc_tries_remaining = 0;
+		pc->pc_obstacle_count = 0;
+	    }
+	    else if ((rc_clip_line(&rl, oc) == 0) ||
+		     (hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1) < 0.20) ||
+		     ((oc->id == -1000) && (pc->pc_waypoint_tries > 20))) {
+		
+		if (debug) {
+		    info("debug: %s cleared obstacle\n",
 			 pc->pc_robot->hostname);
 		}
 		
@@ -252,18 +318,18 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 			sizeof(struct obstacle_config) * (32 - lpc));
 		pc->pc_obstacle_count -= 1;
 		lpc -= 1;
+		pc->pc_waypoint_tries = 0;
 	    }
 	    else {
 		float bearing;
 		rc_code_t rc;
 		int in_vision = 0;
 		int flipped_bearing = 0;
-
-		pc->pc_flags |= PCF_WAYPOINT;
+		int compass;
 
 		printf("clip %f %f %f %f\n",
 		       rl.x0, rl.y0, rl.x1, rl.y1);
-		switch (rc_compute_closest(rl.x0, rl.y0, oc)) {
+		switch ((rc = rc_compute_closest(rl.x0, rl.y0, oc))) {
 		case RCF_LEFT:
 		    rl.x0 = oc->xmin;
 		    break;
@@ -293,10 +359,32 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		    rl.y0 = oc->ymax;
 		    break;
 		}
+
+		if (rc_clip_line(&rl, oc) == 0 ||
+		    (hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1) < 0.05)) {
+		    info("debug: %s cleared obstacle 2\n", \
+			 pc->pc_robot->hostname);
+		    
+		    memmove(&pc->pc_obstacles[lpc],
+			    &pc->pc_obstacles[lpc + 1],
+			    sizeof(struct obstacle_config) * (32 - lpc));
+		    pc->pc_obstacle_count -= 1;
+		    lpc -= 1;
+		    pc->pc_waypoint_tries = 0;
+		    continue;
+		}
+		
+		pc->pc_flags |= PCF_WAYPOINT;
+		pc->pc_waypoint_tries += 1;
+
 		bearing = atan2f(rl.y0 - rl.y1, rl.x1 - rl.x0);
+		compass = mtp_compass(bearing);
 
 		if (debug) {
 		    info("debug: waypoint bearing %f\n", bearing);
+		    info("debug: side=%s; compass=%s\n",
+			 RC_CODE_STRING(rc),
+			 MTP_COMPASS_STRING(compass));
 		}
 
 		/*
@@ -317,103 +405,95 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 		 * control if we've tried stalling.
 		 */
 		while (!in_vision) {
+		    int new_rc = 0;
+		    
+		    switch (rc) {
+		    case RCF_TOP|RCF_LEFT:
+			if (compass & MCF_EAST)
+			    new_rc = RCF_TOP|RCF_RIGHT;
+			else if (compass & MCF_SOUTH)
+			    new_rc = RCF_BOTTOM|RCF_LEFT;
+			else
+			    assert(0);
+			break;
+		    case RCF_BOTTOM|RCF_LEFT:
+			if (compass & MCF_EAST)
+			    new_rc = RCF_BOTTOM|RCF_RIGHT;
+			else if (compass & MCF_NORTH)
+			    new_rc = RCF_TOP|RCF_LEFT;
+			else
+			    assert(0);
+			break;
+		    case RCF_BOTTOM|RCF_RIGHT:
+			if (compass & MCF_NORTH)
+			    new_rc = RCF_TOP|RCF_RIGHT;
+			else if (compass & MCF_WEST)
+			    new_rc = RCF_BOTTOM|RCF_LEFT;
+			else
+			    assert(0);
+			break;
+		    case RCF_TOP|RCF_RIGHT:
+			if (compass & MCF_SOUTH)
+			    new_rc = RCF_BOTTOM|RCF_RIGHT;
+			else if (compass & MCF_WEST)
+			    new_rc = RCF_TOP|RCF_LEFT;
+			else
+			    assert(0);
+			break;
+		    case RCF_LEFT:
+			if (compass & MCF_EAST)
+			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
+			else if (compass & MCF_NORTH)
+			    new_rc = RCF_TOP|RCF_LEFT;
+			else if (compass & MCF_SOUTH)
+			    new_rc = RCF_BOTTOM|RCF_LEFT;
+			else
+			    assert(0);
+			break;
+		    case RCF_TOP:
+			if (compass & MCF_SOUTH)
+			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
+			else if (compass & MCF_EAST)
+			    new_rc = RCF_TOP|RCF_RIGHT;
+			else if (compass & MCF_WEST)
+			    new_rc = RCF_TOP|RCF_LEFT;
+			else
+			    assert(0);
+			break;
+		    case RCF_RIGHT:
+			if (compass & MCF_WEST)
+			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
+			else if (compass & MCF_NORTH)
+			    new_rc = RCF_TOP|RCF_RIGHT;
+			else if (compass & MCF_SOUTH)
+			    new_rc = RCF_BOTTOM|RCF_RIGHT;
+			else
+			    assert(0);
+			break;
+		    case RCF_BOTTOM:
+			if (compass & MCF_NORTH)
+			    new_rc = rc_closest_corner(rl.x0, rl.y0, oc);
+			else if (compass & MCF_EAST)
+			    new_rc = RCF_BOTTOM|RCF_RIGHT;
+			else if (compass & MCF_WEST)
+			    new_rc = RCF_BOTTOM|RCF_LEFT;
+			else
+			    assert(0);
+			break;
 
-		    if (rl.x0 == oc->xmin && rl.y0 == oc->ymin) {
-			printf("  top left\n");
-			if (bearing > -M_PI_4) {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-		    }
-		    else if (rl.x0 == oc->xmin && rl.y0 == oc->ymax) {
-			printf("  bottom left\n");
-			if (bearing > M_PI_4) {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-		    }
-		    else if (rl.x0 == oc->xmax && rl.y0 == oc->ymax) {
-			printf("  bottom right\n");
-			if (bearing > (M_PI_2 + M_PI_4)) {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-		    }
-		    else if (rl.x0 == oc->xmax && rl.y0 == oc->ymin) {
-			printf("  top right\n");
-			if (bearing < -(M_PI_2 + M_PI_4)) {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-		    }
-		    else if (rl.x0 == oc->xmin) {
-			printf("  left\n");
-			if (bearing > 0.0) {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-		    }
-		    else if (rl.x0 == oc->xmax) {
-			printf("  right\n");
-			if (bearing > M_PI_2) {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-		    }
-		    else if (rl.y0 == oc->ymin) {
-			printf("  top\n");
-			if (bearing < -M_PI_2) {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymin;
-			}
-		    }
-		    else if (rl.y0 == oc->ymax) {
-			printf("  bottom\n");
-			if (bearing < M_PI_2) {
-			    pc->pc_waypoint.x = oc->xmax;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-			else {
-			    pc->pc_waypoint.x = oc->xmin;
-			    pc->pc_waypoint.y = oc->ymax;
-			}
-		    }
-		    else {
+		    default:
 			assert(0);
+			break;
 		    }
 
-		    if (pc_point_in_bounds(&pc_data,
-					   pc->pc_waypoint.x,
-					   pc->pc_waypoint.y
-					   )) {
+		    if (debug) {
+			info("debug: new corner -- %s\n", RC_CODE_STRING(new_rc));
+		    }
+		    
+		    rc_corner(new_rc, &pc->pc_waypoint, oc);
+
+		    if (pc_point_in_bounds(pc->pc_waypoint.x,
+					   pc->pc_waypoint.y)) {
 			in_vision = 1;
 			info("waypoint in vision\n");
 		    }
@@ -449,6 +529,16 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 	    }
 	}
     }
+
+    if (!(pc->pc_flags & PCF_WAYPOINT)) {
+	float distance, theta;
+
+	mtp_polar(&pc->pc_actual_pos, &pc->pc_goal_pos, &distance, &theta);
+	if (distance > 1.5) {
+	    pc->pc_flags |= PCF_WAYPOINT;
+	    mtp_cartesian(&pc->pc_actual_pos, 1.5, theta, &pc->pc_waypoint);
+	}
+    }
 }
 
 void pc_set_goal(struct pilot_connection *pc, struct robot_position *rp)
@@ -480,7 +570,8 @@ void pc_set_goal(struct pilot_connection *pc, struct robot_position *rp)
     }
     else {
 	pc->pc_goal_pos = *rp;
-	pc_change_state(pc, PS_PENDING_POSITION);
+	if (pc->pc_state != PS_START_WIGGLING && pc->pc_state != PS_WIGGLING)
+	    pc_change_state(pc, PS_PENDING_POSITION);
     }
 }
 
@@ -626,7 +717,6 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 	break;
 	
     case PS_WIGGLING:
-	printf("try wiggle %d\n", pc->pc_flags);
 	if (pc->pc_flags & PCF_WIGGLE_REVERSE) {
 	    mtp_init_packet(&mp,
 			    MA_Opcode, MTP_WIGGLE_STATUS,
@@ -640,13 +730,13 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 	    ps = PS_ARRIVED;
 	}
 	else {
-	    printf("** REVERSE %d\n", pc->pc_flags & PCF_CONTACT);
 	    mtp_init_packet(&pmp,
 			    MA_Opcode, MTP_COMMAND_GOTO,
 			    MA_Role, MTP_ROLE_RMC,
 			    MA_RobotID, pc->pc_robot->id,
 			    MA_CommandID, 2,
-			    MA_Theta, pc->pc_flags & PCF_CONTACT ? -M_PI : M_PI,
+			    MA_Theta, (pc->pc_flags & PCF_CONTACT ?
+				       -M_PI : M_PI),
 			    MA_TAG_DONE);
 	    send_pmp = 1;
 
@@ -793,7 +883,6 @@ static void pc_handle_update(struct pilot_connection *pc,
     case MTP_POSITION_STATUS_CONTACT:
 	pc->pc_flags &= ~PCF_VISION_POSITION;
 	pc->pc_flags |= PCF_CONTACT;
-	printf(" %d\n", pc->pc_flags);
 	pc_change_state(pc, pc->pc_state);
 	break;
     case MTP_POSITION_STATUS_COMPLETE:
@@ -876,7 +965,7 @@ static void pc_handle_report(struct pilot_connection *pc,
 	    }
 
 	    oc = &oc_fake;
-	    oc->id = 1000; // XXX
+	    oc->id = -1000; // XXX
 
 	    if (bearing < M_PI_4 && bearing > -M_PI_4) {
 		mcr->points[lpc].x = 0.15;
@@ -884,7 +973,8 @@ static void pc_handle_report(struct pilot_connection *pc,
 	    }
 	    else if (bearing >= -M_PI_4 && bearing < (M_PI_2 + M_PI_4)) {
 	    }
-	    else if (bearing >= (M_PI_2 + M_PI_4) || bearing < -(M_PI_2 + M_PI_4)) {
+	    else if (bearing >= (M_PI_2 + M_PI_4) ||
+		     bearing < -(M_PI_2 + M_PI_4)) {
 	    }
 	    else if (bearing < (M_PI_2 + M_PI_4) && (bearing > -M_PI_4)) {
 		mcr->points[lpc].x = -0.15;
@@ -903,9 +993,27 @@ static void pc_handle_report(struct pilot_connection *pc,
 	    oc->xmax = cp.x + OBSTACLE_BUFFER + 0.10;
 	    oc->ymin = cp.y - OBSTACLE_BUFFER - 0.10;
 	    oc->ymax = cp.y + OBSTACLE_BUFFER + 0.10;
-	    
-	    info("debug: dynamic obstacle %f %f %f %f\n",
-		 oc->xmin, oc->ymin, oc->xmax, oc->ymax);
+
+	    if (pc->pc_obstacles[pc->pc_obstacle_count - 1].id == -1000) {
+		struct obstacle_config *oc_old;
+
+		oc_old = &pc->pc_obstacles[pc->pc_obstacle_count - 1];
+		oc_old->xmin = min(oc->xmin, oc_old->xmin);
+		oc_old->ymin = min(oc->ymin, oc_old->ymin);
+		oc_old->xmax = max(oc->xmax, oc_old->xmax);
+		oc_old->ymax = max(oc->ymax, oc_old->ymax);
+		oc = NULL;
+		
+		info("debug: expanding dynamic obstacle %f %f %f %f\n",
+		     oc_old->xmin,
+		     oc_old->ymin,
+		     oc_old->xmax,
+		     oc_old->ymax);
+	    }
+	    else {
+		info("debug: dynamic obstacle %f %f %f %f\n",
+		     oc->xmin, oc->ymin, oc->xmax, oc->ymax);
+	    }
 	}
 
 	if (oc != NULL) {
@@ -968,14 +1076,22 @@ void pc_handle_signal(fd_set *rready, fd_set *wready)
     }
 }
 
-int pc_point_in_bounds(struct pilot_connection_data *pcd,float x,float y) {
+void pc_handle_timeout(struct timeval *current_time)
+{
+    assert(current_time != NULL);
+
+    
+}
+
+int pc_point_in_bounds(float x, float y)
+{
     int i;
     struct box *boxes;
     int boxes_len;
     int retval = 0;
 
-    boxes = pcd->pcd_config->bounds.bounds_val;
-    boxes_len = pcd->pcd_config->bounds.bounds_len;
+    boxes = pc_data.pcd_config->bounds.bounds_val;
+    boxes_len = pc_data.pcd_config->bounds.bounds_len;
 
     for (i = 0; i < boxes_len; ++i) {
 	if (x >= boxes[i].x && y >= boxes[i].y &&
@@ -990,14 +1106,14 @@ int pc_point_in_bounds(struct pilot_connection_data *pcd,float x,float y) {
     return retval;
 }
 
-int pc_point_in_obstacle(struct pilot_connection_data *pcd,float x,float y) {
+int pc_point_in_obstacle(float x, float y) {
     int i;
     struct obstacle_config *oc;
     int oc_len;
     int retval = 0;
 
-    oc = pcd->pcd_config->obstacles.obstacles_val;
-    oc_len = pcd->pcd_config->obstacles.obstacles_len;
+    oc = pc_data.pcd_config->obstacles.obstacles_val;
+    oc_len = pc_data.pcd_config->obstacles.obstacles_len;
 
     for (i = 0; i < oc_len; ++i) {
 	if (x >= oc[i].xmin && y >= oc[i].ymin &&
