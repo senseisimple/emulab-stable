@@ -52,6 +52,15 @@ loginit(int slog, char *name)
 	return 0;
 }
 
+/*
+ * Switch to syslog; caller has already opened syslog connection.
+ */
+void
+logsyslog(void)
+{
+	usesyslog = 1;
+}
+
 void
 info(const char *fmt, ...)
 {
