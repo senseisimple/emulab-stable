@@ -768,8 +768,11 @@ static int
 dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 
-	char *tmp, *buf;
+	char *tmp, *buf, *vname_list;
 	char pid[64], eid[64];
+	char nickname[128]; /* XXX: Shouldn't be statically sized, potential buffer
+						 * overflow
+						 */ 
 
 	char nodeid[32]; /* Testbed ID of the node */
 	int control_net; /* Control network interface on this host */
@@ -784,6 +787,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	MYSQL_RES	*interface_result;
 	MYSQL_RES	*nodes_result;
 	MYSQL_RES	*vlan_result;
+	MYSQL_RES	*reserved_result;
 	MYSQL_ROW	row;
 
 	struct node_interface *connected_interfaces, *temp_interface;
@@ -800,10 +804,10 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 */
 	if (nodeidtoexp(nodeid, pid, eid))
 		return 0;
-
 	/*
 	 * Figure out which of our interfaces is on the control network
 	 */
+
 	interface_result = mydb_query("SELECT control_net "
 			"FROM nodes LEFT JOIN node_types ON nodes.type = node_types.type "
 			"WHERE nodes.node_id = '%s'",
@@ -828,49 +832,87 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	mysql_free_result(interface_result);
 
 	/*
-	 * Now, we need to look through the vlans table to find a list of everything
-	 * that's directly connected
+	 * For the virt_lans table, we need the virtual name, not the node_id
 	 */
-	vlan_result = mydb_query("SELECT members "
-			"FROM vlans "
-			"WHERE members LIKE '%%%s:%%' AND pid='%s' AND eid='%s'",
-			1, nodeid,pid,eid);
+	if (nodeidtonickname(nodeid,nickname)) {
+		strcpy(nickname,nodeid);
+	}
+
+	syslog(LOG_NOTICE, "dohosts: nickname is %s", nickname);
+
+	/*
+	 * Now, we need to look through the virt_lans table to find a list of all the
+	 * VLANs we're in
+	 */
+	vlan_result = mydb_query("SELECT vname "
+			"FROM virt_lans "
+			"WHERE member LIKE '%s:%%' AND pid='%s' AND eid='%s'",
+			1, nickname,pid,eid);
 
 	if (!vlan_result) {
-		syslog(LOG_ERR, "dohosts: %s: DB Error getting interfaces!", nodeid);
+		syslog(LOG_ERR, "dohosts: %s: DB Error getting virt_lans!", nodeid);
 		return 1;
 	}
 
-	nvlans = (int)mysql_num_rows(interface_result);
+	nvlans = (int)mysql_num_rows(vlan_result);
+	connected_interfaces = NULL;
+
+	/*
+	 * Initializing vname_list to "0" makes the ORs easier to get right,
+	 * and I want to make sure this string gets malloc()ed, to prevent
+	 * problems with the free() inside the loop
+	 */
+	vname_list = (char*)malloc(2);
+	strcpy(vname_list,"0");
+
+	while (nvlans--) {
+		row = mysql_fetch_row(vlan_result);
+
+		/*
+		 * Add this vlan to an OR of vlan names that could contain direct neighbors
+		 */
+		tmp = (char*)malloc(strlen(vname_list) + strlen(row[0]) +14);
+		strcpy(tmp,vname_list);
+		strcat(tmp," OR vname ='");
+		strcat(tmp,row[0]);
+		strcat(tmp,"'");
+		free(vname_list);
+		vname_list = tmp;
+
+	}
+	mysql_free_result(vlan_result);
+
+	/*
+	 * Now, get the members of all these VLANs
+	 */
+	vlan_result = mydb_query("SELECT member "
+			"FROM virt_lans "
+			"WHERE pid='%s' AND eid='%s' AND ( %s )",
+			1, pid,eid,vname_list);
+	free(vname_list);
+
+	if (!vlan_result) {
+		syslog(LOG_ERR, "dohosts: %s: DB Error getting virt_lan members!", nodeid);
+		return 1;
+	}
+
+	nvlans = (int)mysql_num_rows(vlan_result);
 	connected_interfaces = NULL;
 
 	while (nvlans--) {
-		char *member_list, *member_list_start, *member, *endptr;
+		struct node_interface *interface;
 
 		row = mysql_fetch_row(vlan_result);
+
 		/*
-		 * NOTE: The following is not portable outside BSD, you'll likely
-		 * have to use the evil strtok(3) on on other platforms.
-		 * Making a copy of this string, and keeping track of it original
-		 * base, to make sure I don't introdce any memory leaks.
+		 * Add this member to the linked list of directly connected interfaces
 		 */
-		member_list = member_list_start = (char*)malloc(strlen(row[0]) +1);
-		strcpy(member_list,row[0]);
-		while (member = strsep(&member_list," ")) {
-			struct node_interface *interface;
-			/*
-			 * Add the interface to the list
-			 */
-
-			interface =
-				(struct node_interface *)malloc(sizeof(struct node_interface *));
-			interface->iface = (char*)malloc(strlen(member +1));
-			strcpy(interface->iface,member);
-			interface->next = connected_interfaces;
-			connected_interfaces = interface;
-		}
-
-		free(member_list_start);
+		syslog(LOG_NOTICE, "dohosts: Adding interface %s", row[0]);
+		interface = (struct node_interface *)malloc(sizeof(struct node_interface *));
+		interface->iface = (char*)malloc(strlen(row[0]) +1);
+		strcpy(interface->iface,row[0]);
+		interface->next = connected_interfaces;
+		connected_interfaces = interface;
 
 	}
 
@@ -881,13 +923,13 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * directly connected ones while looping through them.
 	 */
 	nodes_result = 
-		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, CONCAT(i.node_id,':',i.iface), i.card = t.control_net "
+		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, CONCAT(r.vname,':',i.card), i.card = t.control_net "
 				"FROM interfaces AS i LEFT JOIN reserved AS r ON i.node_id = r.node_id "
 				"LEFT JOIN nodes AS n ON i.node_id = n.node_id "
 				"LEFT JOIN node_types AS t ON n.type = t.type "
 				"WHERE IP IS NOT NULL AND IP != '' AND pid='%s' AND eid='%s'"
 				"ORDER BY node_id DESC, IP",
-				6,pid,eid,nodeid);
+				6,pid,eid);
 
 	if (!nodes_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
@@ -1849,6 +1891,9 @@ int
 directly_connected(struct node_interface *interfaces, char *iface) {
 
 	struct node_interface *traverse;
+
+	syslog(LOG_NOTICE, "directly_connected: checking %s", iface);
+
 	traverse = interfaces;
 	if (iface == NULL) {
 		/* Don't die if address is null */
@@ -1856,6 +1901,7 @@ directly_connected(struct node_interface *interfaces, char *iface) {
 	}
 
 	while (traverse != NULL) {
+		syslog(LOG_NOTICE, "directly_connected: checking against %s", traverse->iface);
 		if (!strcmp(traverse->iface,iface)) {
 			return 1;
 		}
