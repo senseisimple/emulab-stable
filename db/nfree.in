@@ -201,17 +201,16 @@ foreach my $n (@freed_nodes) {
     # Clean out all delays
     DBQueryWarn("delete from delays where node_id='$n'") || $error++;
 
-    # Find the control net interface for this node type, as well as some
-    # of the default values for its node type.
+    # Find the default values for its node type.
     my $result =
-	DBQueryFatal("select control_net,nt.osid,nt.pxe_boot_path, " .
+	DBQueryFatal("select nt.osid,nt.pxe_boot_path, " .
 		     "       n.def_boot_osid,n.def_boot_path, ".
 		     "       nt.isvirtnode, nt.imageable, o.osid ".
 		     " from nodes as n " .
 		     "left join node_types as nt on n.type=nt.type " .
 		     "left join os_info as o on o.path=nt.pxe_boot_path " .
 		     "where node_id='$n'");
-    my ($control, $osid, $pxe_boot_path, $def_boot_osid, $def_boot_path,
+    my ($osid, $pxe_boot_path, $def_boot_osid, $def_boot_path,
 	$isvirt, $imageable, $pxe_osid) = $result->fetchrow_array();
     if (!defined($pxe_osid) || $pxe_osid eq "") {
 	$pxe_osid = "-p $pxe_boot_path";
@@ -240,8 +239,10 @@ foreach my $n (@freed_nodes) {
     # Clean up interfaces by clearing IPs and/or aliases.
     if (! ($n =~ /sh\d+/)) {
         # Its not a shark, so clean out all IPs except the control net.
-	DBQueryWarn("update interfaces set IP='' " .
-		    "where node_id='$n' and card!='$control'") || $error++;
+	DBQueryWarn("update interfaces set IP='',IPaliases=NULL " .
+		    "where node_id='$n' and ".
+		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
+	    || $error++;
     } else {
 	# XXX Shark Hack!
 	DBQueryWarn("update interfaces set IPalias='' ".
