@@ -26,6 +26,7 @@ my $killmode = 0;
 # Configure variables
 my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
+my $BOSSNODE_IP = "@BOSSNODE_IP@";
 
 #
 # Untaint the path
@@ -280,7 +281,8 @@ while (1) {
 			my $addr = $1;
 			my $port = $2;
 
-			if (!exec("$FRISBEED -W $BW -m $addr -p $port $filename")) {
+			if (!exec("$FRISBEED -W $BW -m $addr -i $BOSSNODE_IP ".
+				  "-p $port $filename")) {
 				die("$$: Unable to exec $FRISBEED\n");
 			}
 		}
