@@ -13,8 +13,14 @@ WITH_NTFS	= @WINSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
+PTHREADCFLAGS	= -D_THREAD_SAFE \
+		  -I/usr/local/include/pthread/linuxthreads
+PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
+
 CFLAGS		= -O2 -g -static
-LIBS 		= -lz
+LIBS 		= -lz $(PTHREADLIBS)
+UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
+UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 
 # with NTFS
 ifeq ($(WITH_NTFS),1)
@@ -35,10 +41,13 @@ imagezip: $(NTFSDIR) imagezip.o version.o
 	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
 
 imageunzip: imageunzip.o version.o 
-	$(CC) $(CFLAGS) imageunzip.o version.o $(LIBS) -o imageunzip
+	$(CC) $(CFLAGS) imageunzip.o version.o $(UNZIPLIBS) -o imageunzip
+
+imageunzip.o:	imageunzip.c
+	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
 
 frisbee.o:	imageunzip.c
-	$(CC) -c $(CFLAGS) -DFRISBEE -o frisbee.o $<
+	$(CC) -c $(UNZIPCFLAGS) -DFRISBEE -o frisbee.o $<
 
 ntfs:
 	@$(MAKE) -C ntfs all
@@ -49,8 +58,9 @@ version.c: imagezip.c imageunzip.c
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 
 client-install: 
-	$(INSTALL_PROGRAM) imagezip /usr/local/bin/imagezip
-	$(INSTALL_PROGRAM) imageunzip /usr/local/bin/imageunzip
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin
+	$(INSTALL_PROGRAM) imagezip $(DESTDIR)/usr/local/bin/imagezip
+	$(INSTALL_PROGRAM) imageunzip $(DESTDIR)/usr/local/bin/imageunzip
 
 clean:
 	@if [ -d ntfs ]; then \

@@ -1588,8 +1588,7 @@ compress_image(void)
 		 * A partial range. Well, maybe a partial range.
 		 *
 		 * Go back and stick in the block header and the region
-		 * information. Since there are no skip ranges, there
-		 * is but a single region and it covers the entire block.
+		 * information.
 		 */
 		curregion->start = prange->start - inputminsec;
 		curregion->size  = size / secsize;
