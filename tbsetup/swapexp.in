@@ -387,9 +387,9 @@ else {
 	#
 	# Must be unlocked if called by the user.
 	#
-	die("*** $0:\n".
-	    "    Experiment $pid/$eid went into transition at $expt_locked!\n".
-	    "    You must wait until it is no longer in transition.\n")
+	ExitWithStatus(1,
+		  "Experiment $pid/$eid went into transition at $expt_locked!\n".
+		  "You must wait until it is no longer in transition.\n")
 	    if (defined($expt_locked));
 
 	#
