@@ -1,0 +1,14 @@
+__TWiki permissions explained__
+	* The default permissions for Emulab user Wikis (this page) is
+          that only *you* can access (read and write) your wiki (homepage).
+	* If you want to allow a specific Wiki user to view (read)
+          your homepage, edit this page (button in upper left) and add
+          their TWiki.WikiName to the ALLOWTOPICVIEW variable above.
+	* If you want to make your wiki homepage *world readable*, edit
+	  this page and clear the ALLOWTOPICVIEW variable above.
+	* We do not recommend that you allow world write to this page.
+	* More details (then you could possibly want) can be found in the
+          TWiki.TWikiAccessControl page.
+
+*In most cases, you probably want to leave this page alone, and add*
+*your TWiki.WikiTopics to specific project wikis.*
