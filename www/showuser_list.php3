@@ -134,9 +134,9 @@ echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2
 
 echo "<tr>
           <th>&nbsp</th>
-          <th><a href='showuser_list.php3?showactive=$showactive&sortby=uid'>
+          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uid'>
                  UID</a></th>
-          <th><a href='showuser_list.php3?showactive=$showactive&sortby=name'>
+          <th><a href='showuser_list.php3?showtype=$showtype&sortby=name'>
                  Name</a></th>
           <th>Projects</th>\n";
 
@@ -144,9 +144,9 @@ if (! strcmp($showtype, "inactive")) {
     echo "<th>Status</th>\n";
 }
 
-echo "    <th><a href='showuser_list.php3?showactive=$showactive&sortby=widle'>
+echo "    <th><a href='showuser_list.php3?showtype=$showtype&sortby=widle'>
                  Web<br>Idle</a></th>
-          <th><a href='showuser_list.php3?showactive=$showactive&sortby=uidle'>
+          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uidle'>
                  Users<br>Idle</a></th>\n";
 
 echo "</tr>\n";
