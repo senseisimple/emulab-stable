@@ -66,9 +66,8 @@ node node_3_2 pc
 link node_3_2 switch_3 100 2
 node node_3_3 pc
 link node_3_3 switch_3 100 2
-link switch_0 switch_1 1 500
-link switch_0 switch_2 1 500
-link switch_0 switch_3 1 200
-link switch_1 switch_2 1 500
-link switch_1 switch_3 1 200
-link switch_2 switch_3 1 200
+node CENTER switch
+link switch_0 CENTER 500 1
+link switch_1 CENTER 500 1
+link switch_2 CENTER 500 1
+link switch_3 CENTER 200 1
