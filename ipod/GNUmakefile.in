@@ -10,7 +10,7 @@ SUBDIR		= ipod
 
 include $(OBJDIR)/Makeconf
 
-all: ipod
+all: ipod apod
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -19,12 +19,14 @@ CFLAGS= -g -O2
 ipod: ipod.c
 	$(CC) $(CFLAGS) -o ipod $<
 
-install: all $(INSTALL_SBINDIR)/ipod
+install: all $(INSTALL_SBINDIR)/ipod $(INSTALL_SBINDIR)/apod
 	echo "Don't forget to do a post-install as root"
 
 post-install:
 	chown root $(INSTALL_SBINDIR)/ipod
 	chmod u+s $(INSTALL_SBINDIR)/ipod
+	chown root $(INSTALL_SBINDIR)/apod
+	chmod u+s $(INSTALL_SBINDIR)/apod
 
 #
 # Control node installation (okay, plastic)
@@ -33,4 +35,4 @@ control-install:
 	@echo "No wrapper for IPOD yet"
 
 clean:
-	rm -f ipod
+	rm -f ipod apod

@@ -27,8 +27,15 @@
 #include <signal.h>
 #include <arpa/inet.h>
 
+#define IPOD_ICMPTYPE	6
+#define IPOD_ICMPCODE	6
+#define IPOD_IPLEN	666
+#define IPOD_IDLEN	32
+
 int exit_on_first = 0;  /* Find fastest, then quit */
 int icmpid = 0;
+static char myid[IPOD_IDLEN];
+static int myidlen = 0;
 
 u_short in_cksum(u_short *addr, int len);
 void icmpmap_init();  /* For getting information */
@@ -134,9 +141,7 @@ int makehosts(char **hostlist)
 
 void usage(char *prog)
 {
-   fprintf(stderr,
-	   "%s  target1  target2 ... targetn\n",
-	   prog);
+   fprintf(stderr, "%s [ -i identityfile ] target [ target ... ]\n", prog);
 }
 
 /*
@@ -163,10 +168,12 @@ void initpacket(char *buf, int querytype, struct in_addr fromaddr)
    icmp->icmp_seq   = 1;
    icmp->icmp_cksum = 0;           /* We'll compute it later. */
    icmp->icmp_type  = querytype; 
-   icmp->icmp_code  = 6;
+   icmp->icmp_code  = IPOD_ICMPCODE;
+   if (myidlen)
+      memcpy(icmp->icmp_data, myid, myidlen);
 
-   icmplen = 666 - sizeof(struct ip);
-   ip->ip_len = sizeof(struct ip) + icmplen;
+   ip->ip_len = IPOD_IPLEN;
+   icmplen = IPOD_IPLEN - sizeof(struct ip);
    icmp->icmp_cksum = in_cksum((u_short *)icmp, icmplen);
 }
 
@@ -258,15 +265,42 @@ main(int argc, char **argv)
    struct in_addr fromaddr;
    int timeout = 5;  /* Default to 5 seconds */
    int broadcast = 0; /* Should we wait for all responses? */
+   int identityfile;
 
    fromaddr.s_addr = 0;
 
    progname = argv[0];
 
-   querytype = 6;  /* the magical death packet number */
+   querytype = IPOD_ICMPTYPE;  /* the magical death packet number */
 
-   argv++;
-   argc--;
+   while ((ch = getopt(argc, argv, "i:")) != -1)
+      switch(ch)
+      {
+      case 'i':
+	 if (optarg[0] == '-')
+	    identityfile = 0;
+	 else if ((identityfile = open(optarg, 0)) < 0)
+	 {
+	    perror(optarg);
+	    exit(1);
+	 }
+	 myidlen = read(identityfile, myid, IPOD_IDLEN);
+	 if (optarg[0] != '-')
+	    close(identityfile);
+         if (myidlen != IPOD_IDLEN)
+	 {
+	    fprintf(stderr, "%s: cannot read %d-byte identity\n",
+		    optarg[0] != '-' ? optarg : "<stdin>", IPOD_IDLEN);
+	    exit(2);
+	 }
+         break;
+      default:
+         usage(progname);
+	 exit(-1);
+      }
+
+   argc -= optind;
+   argv += optind;
    if (!argv[0] || !strlen(argv[0])) 
    {
       usage(progname);
