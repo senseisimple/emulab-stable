@@ -197,9 +197,6 @@ if ($UID && !TBAdmin($UID)) {
             "    You do not have permission to load images on one (or more) ".
 	    "nodes!\n");
     }
-    if (defined($imageid)) {
-	usage();
-    }
 }
 
 #
@@ -210,12 +207,12 @@ if (defined($imagename)) {
 	die("*** $0:\n".
 	    "    No such image $imagename in project $imagepid!\n");
     }
+}
 
-    if ($mereuser &&
-	! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
-	die("*** $0:\n".
-	    "    You do not have permission to load this image!\n");
-    }
+if (defined($imageid) && $mereuser &&
+    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
+    die("*** $0:\n".
+	"    You do not have permission to load this image!\n");
 }
 
 #
