@@ -32,7 +32,7 @@ else {
 # 
 function SPITFORM($formfields, $returning, $errors)
 {
-    global $TBDB_UIDLEN, $TBDB_PIDLEN;
+    global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDOCBASE, $WWWHOST;
     global $usr_keyfile;
 
     PAGEHEADER("Start a New Testbed Project");
@@ -312,6 +312,20 @@ function SPITFORM($formfields, $returning, $errors)
       </tr>\n";
 
     #
+    # Will you add a link?
+    #
+    echo "<tr>
+              <td colspan=2>*Will you add a link on your project page
+                             to <a href=\"$TBDOCBASE\">$WWWHOST</a>?
+              </td>
+              <td><input type=checkbox value=checked
+                         name=\"formfields[proj_linked]\"
+                         " . $formfields[proj_linked] . ">
+                         Yes &nbsp
+              </td>
+      </tr>\n";
+
+    #
     # Funders/Grant numbers
     #
     echo "<tr>
@@ -439,6 +453,7 @@ if (! isset($submit)) {
     $defaults[usr_URL] = "$HTTPTAG";
     $defaults[proj_sharks] = "0";
     $defaults[proj_public] = "checked";
+    $defaults[proj_linked] = "checked";
     
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();
@@ -607,6 +622,11 @@ if ((!isset($formfields[proj_public]) ||
      strcmp($formfields[proj_whynotpublic], "") == 0)) {
     $errors["Why Not Public?"] = "Missing Field";
 }
+if (isset($formfields[proj_linked]) &&
+    strcmp($formfields[proj_linked], "") &&
+    strcmp($formfields[proj_linked], "checked")) {
+    $errors["Link to Us"] = "Bad Value";
+}
 
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
@@ -707,6 +727,13 @@ if (!isset($formfields[proj_public]) ||
 else {
     $proj_public = "Yes";
     $public = 1;
+}
+if (!isset($formfields[proj_linked]) ||
+    strcmp($formfields[proj_linked], "checked")) {
+    $proj_linked = "No";
+}
+else {
+    $proj_linked = "Yes";
 }
 
 #
@@ -811,6 +838,7 @@ TBMAIL($TBMAIL_APPROVAL,
      "Project URL:     $proj_URL\n".
      "Public URL:      $proj_public\n".
      "Why Not Public:  $proj_whynotpublic\n".
+     "Link to Us?:     $proj_linked\n".
      "Funders:         $proj_funders\n".
      "Title:           $usr_title\n".
      "Affiliation:     $usr_affil\n".
