@@ -38,8 +38,8 @@ require exitonwarn; # exitonwarn isn't really a module, so just require it
 #
 # Actual swap-in and swap-out functions, defined below.
 #
-sub doSwapout();
-sub doSwapin();
+sub doSwapout;
+sub doSwapin;
 
 #
 # Turn off line buffering on output
@@ -62,7 +62,7 @@ my $cleanvlans;
 
 my $swapop = shift;	
 
-if (($swapop ne "in") && ($swapop ne "out")) {
+if (!$swapop || (($swapop ne "in") && ($swapop ne "out"))) {
     usage();
 }
 
@@ -168,7 +168,7 @@ if (! $errors) {
 # Do actual swapping
 #
 
-unset $nextState;
+undef $nextState;
 
 if (! $errors) {
     if ($swapop eq "in") {
@@ -191,6 +191,9 @@ if (! $errors) {
 	#   a) there were errors, 
 	#   b) doswapin() indicated (via $retry) a retry is appropriate,
 	#   c) we haven't tried too many times already.
+	#
+	# NOTE that if $TESTMODE == 1, retries are impossible, since
+        # $retry will never get set to 1.
 	#
 	while ($errors && $retry && $retries) {
 	    $retries--;
@@ -216,8 +219,13 @@ if (! $errors) {
 
 	    #
 	    # Swapin worked; exp is now ACTIVE.
+	    # (or TESTING) 
 	    #
-	    $nextState = EXPTSTATE_ACTIVE;
+	    if ($TESTMODE) {
+		$nextState = EXPTSTATE_TESTING;
+	    } else {
+		$nextState = EXPTSTATE_ACTIVE;
+	    }
 	} else {	    
 	    print STDERR "Cleaning up after errors.\n";
 	    doSwapout();
@@ -243,7 +251,7 @@ if (! $errors) {
 	    # 
 	    # Swapout worked; send exp to SWAPPED.
 	    #
-	    $nextState = EXPTSTATE_SWAPPED:
+	    $nextState = EXPTSTATE_SWAPPED;
 	} else {
 	    #
 	    # Swapout didn't fully work; leave exp in SWAPPING.
@@ -478,11 +486,6 @@ sub doSwapin {
     # Exit here if we are testing.
     if ($TESTMODE) {
 	print "Testing run - Stopping here.\n";
-	
-	if (! SetExpState($pid, $eid, EXPTSTATE_TESTING)) {
-	    print STDERR "*** Failed to set experiment state.\n";
-	    return 1;
-	}
 	return 0;
     }
 
