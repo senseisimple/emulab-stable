@@ -39,35 +39,41 @@ else
     # Does WSName return to the shell?  Log it and give it a minute to take effect.
     datehost="`date`: Host name '$hostname'"
     newhost=`/bin/hostname`
-    msg="$datehost WSName returned to the shell after changing to '$newhost'."
+    msg="$datehost WSName returned to shell as '$newhost' after WSName '$nodeid'."
     echo "$msg" >> $logfile
     echo "$msg"
     sleep 60
 
     # Should never get here!  Try /sbin/reboot.
     datehost="`date`: Host name '$hostname'"
-    newhost=`/bin/hostname`
-    msg="$datehost didn't reboot changing to '$newhost'!  Trying reboot."
+    msg="$datehost didn't reboot changing to '$nodeid'!  Trying reboot."
     echo "$msg" >> $logfile
     echo "$msg"
     /sbin/reboot
-    # Reboot returns to the shell.  Give it a minute to take effect.
-    sleep 60
+    # Reboot returns to the shell.  Give it a few seconds to take effect.
+    sleep 10
 
-    # Should never get here either!!!  Try /bin/shutdown.
+    # Should never get here either!!  Try /bin/shutdown.
     datehost="`date`: Host name '$hostname'"
-    newhost=`/bin/hostname`
-    msg="$datehost didn't /sbin/reboot changing to '$newhost'!  Trying shutdown."
+    msg="$datehost didn't /sbin/reboot changing to '$nodeid'!  Trying shutdown."
     echo "$msg" >> $logfile
     echo "$msg"
     /bin/shutdown -r -f now
-    # Shutdown returns to the shell.  Give it a minute to take effect.
-    sleep 60
+    # Shutdown returns to the shell.  Give it a few seconds to take effect.
+    sleep 10
+
+    # Last resort!!!  tsshutdn
+    datehost="`date`: Host name '$hostname'"
+    msg="$datehost didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
+    echo "$msg" >> $logfile
+    echo "$msg"
+    tsshutdn 1 /REBOOT /DELAY:1
+    # Shutdown shouldn't return to the shell.  Give it a few seconds to take effect.
+    sleep 10
 
     # Give up, log it, and go on.
     datehost="`date`: Host name '$hostname'"
-    newhost=`/bin/hostname`
-    msg="$datehost failed to reboot changing to '$newhost'."
+    msg="$datehost failed to reboot changing to '$nodeid'."
     echo "$msg" >> $logfile
     echo "$msg"
 fi

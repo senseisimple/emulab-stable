@@ -479,7 +479,8 @@ sub os_routing_enable_forward()
 {
     my $cmd;
 
-    $cmd = "sysctl -w net.ipv4.conf.all.forwarding=1";
+    ###$cmd = "sysctl -w net.ipv4.conf.all.forwarding=1";
+    $cmd = "";
     return $cmd;
 }
 
