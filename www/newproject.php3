@@ -86,6 +86,9 @@ if (strlen($proj_head_uid) > $TBDB_UIDLEN) {
 # 
 $proj_why  = addslashes($proj_why);
 $proj_name = addslashes($proj_name);
+$usr_affil = addslashes($usr_affil);
+$usr_title = addslashes($usr_title);
+$usr_addr  = addslashes($usr_addr);
 
 #
 # This is a new project request. Make sure it does not already exist.

@@ -83,8 +83,14 @@ $gid = $row[0];
 #   tbstopit <pid> <eid>
 #
 echo "<center><br>";
-echo "<h3>Terminating the experiment. This may take a few minutes ...</h3>";
-echo "</center>";
+echo "<h3>Terminating the experiment. This may take a few minutes ...
+          </center><br><br>
+	  Please do <em>not</em> click the 'Stop' button. This will cause
+	  the experiment teardown to terminate prematurely, which can cause
+  	  problems for future (other) experiments.
+      </h3>";
+
+flush();
 
 #
 # Run the scripts. We use a script wrapper to deal with changing

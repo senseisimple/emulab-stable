@@ -46,6 +46,14 @@ if (strlen($uid) > $TBDB_UIDLEN) {
 }
 
 #
+# Certain of these values must be escaped or otherwise sanitized.
+#
+$usr_name  = addslashes($usr_name);
+$usr_affil = addslashes($usr_affil);
+$usr_title = addslashes($usr_title);
+$usr_addr  = addslashes($usr_addr);
+
+#
 # See if this is a new user or one returning.
 #
 $query_result = mysql_db_query($TBDBNAME,
