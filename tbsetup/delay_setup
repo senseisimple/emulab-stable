@@ -1,0 +1,189 @@
+#!/usr/bin/perl -w
+
+my $rsh  = "echo ssh";
+my $rcp  = "echo scp";
+my $me   = "stoller";
+my $dbg  = 1; #debug
+my $net  = "fxp";
+my $pipe = 1;
+
+my %delaynodes  = ();
+my %delaylinks  = ();
+my %delayparams = ();
+
+$| = 1; #Turn off line buffering on output
+
+if ( $#ARGV < 0) {
+    die("Usage: delay_setup <ifc_file>\n". 	
+	"Sets delay node configuration from a .ir file.\n");
+}
+
+#
+# Must run as root.
+# 
+open(WHO,"/usr/bin/whoami 2>&1 |");
+$_ = <WHO>;
+chop;
+if ($_ ne $me) {
+    die("This won't work unless you run as user $me\n");
+}
+close(WHO);
+
+#
+# Open up the ir file.
+#
+if (-e "$ARGV[0]" ) {
+    open(IN,$ARGV[0]) || die("Couldn't open $ARGV[0]\n");
+}
+
+my $virtsection=0;
+
+#
+# Look for the start of the VIRTUAL section. Error if not found
+#
+while (<IN>) {
+    if ( /^start virtual/i ) { 
+	$virtsection=1; 
+	print STDERR "Start VIRTUAL section...\n" if $dbg;
+	last;
+    }
+}
+if ($virtsection == 0) {
+    die("No VIRTUAL section in $ARGV[0]\n");
+}
+
+#
+# Okay, parse the VIRTUAL section.
+# 
+if ($virtsection == 1) {
+    #
+    # Search the NODES section for delayX labels and save the name of the
+    # PC operating as the delay node (tbpcX).
+    # 
+    while (<IN>) {
+	if ( /^start nodes/i ) { 
+	    print STDERR "Start NODES section...\n" if $dbg;
+	    next;
+	}
+	elsif ( /^end nodes/i ) {
+	    print STDERR "End NODES section...\n" if $dbg;
+	    last;
+	}
+	my ($node,$pc) = split();
+	if ($node =~ /^delay/) {
+	    print STDERR "$node $pc\n" if $dbg;
+	    $delaynodes{$node} = $pc;
+	}
+    }
+
+    #
+    # Just record all the links for now. We will correlate them later.
+    # 
+    while (<IN>) {
+	if ( /^start links/i ) { 
+	    print STDERR "Start LINKS section...\n" if $dbg;
+	    next;
+	}
+	elsif ( /^end links/i ) {
+	    print STDERR "End LINKS section...\n" if $dbg;
+	    last;
+	}
+	chop;
+	#
+	# Just record all the links for now.
+	#
+	my ($link,$rest) = split(' ', $_, 2);
+	$delaylinks{$link} = [ split(' ', $rest) ];
+    }
+}
+
+foreach my $link ( keys %delaylinks ) {
+    my $rest = $delaylinks{$link};
+    print STDERR "$link @{ $rest }\n" if $dbg;
+}
+
+#
+# Skip to the end of the VIRTUAL section. Not really needed ...
+# 
+while (<IN>) {
+    if ( /^end virtual/i ) { 
+	$virtsection=0; 
+	print STDERR "End VIRTUAL section...\n" if $dbg;
+	last;
+    }
+}
+
+#
+# Now find the DELAY section.
+#
+while (<IN>) {
+    if ( /^start delay/i ) { 
+	print STDERR "Start DELAY section...\n" if $dbg;
+	last;
+    }
+}
+
+#
+# Parse the DELAY section till it ends.
+#
+while (<IN>) {
+    if ( /^end delay/i ) { 
+	print STDERR "End DELAY section...\n" if $dbg;
+	last;
+    }
+
+    chop;
+    my ($link, $node, $bandw, $delay) = split();
+    print STDERR "$link $node $bandw $delay\n" if $dbg;
+    $delayparams{$link} = [ $node, $bandw, $delay ];
+}
+
+close(IN);
+
+#
+# Okay, got everything we need. Generate some script files 
+#
+foreach my $link ( keys %delayparams ) {
+    my $node  = $delayparams{$link}[0];
+    my $bandw = $delayparams{$link}[1];
+    my $delay = $delayparams{$link}[2];
+    my $pc    = $delaynodes{$node};
+    my $cards = ();
+
+    print STDERR "$link, $node, $pc, $bandw, $delay\n" if $dbg;
+
+    foreach my $pclink ( @{ $delaylinks{$link} } ) {
+	if ($pclink =~ /$pc/) {
+	    $_ = $pclink;
+	    s/$pc-/$net/g;
+	    $pclink = $_;
+	    push @cards, $pclink;
+	}
+    }
+    my $e1 = $cards[0];
+    my $e2 = $cards[1];
+    
+    open(TEMP, ">/tmp/delayconfig");
+    print TEMP "sysctl -w net.link.ether.bridge_cfg=fxp4:6,";
+    print TEMP "$e1:69,$e2:69,\n";
+    print TEMP "sysctl -w net.link.ether.bridge=1\n";
+    print TEMP "sysctl -w net.link.ether.bridge_ipfw=1\n";
+
+    #
+    # Try to form unqiue pipe numbers, since at some point I'll have
+    # to deal with one node doing two delays,
+    # 
+    my $p1 = $pipe++;
+    my $p2 = $pipe++;
+    
+    print TEMP "ipfw add pipe $p1 ip from any to any in recv $e1\n";
+    print TEMP "ipfw add pipe $p2 ip from any to any in recv $e2\n";
+    print TEMP "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+    print TEMP "ipfw pipe $p2 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+    
+    close(TEMP);
+}
+
+print "End of input file.\nDone.\n";
+
+
