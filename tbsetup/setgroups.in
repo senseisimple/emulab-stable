@@ -243,8 +243,9 @@ foreach my $uid (@userlist) {
 	# and this is called from the editgroups web page.
 	#
 	$query_result =
-	    DBQueryFatal("select status from users where uid='$uid' ".
-			 "and status='" . USERSTATUS_ACTIVE . "'");
+	    DBQueryFatal("select status from users ".
+			 "where uid='$uid' and webonly=0 ".
+			 " and status='" . USERSTATUS_ACTIVE . "'");
 
 	if (!$query_result->numrows) {
 	    print "Skipping $uid; not in any groups!\n";
