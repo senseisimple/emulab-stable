@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
@@ -22,15 +22,12 @@ my $STALEAGE;
 sub usage()
 {
     print STDOUT
-	"Usage: plabmetrics [-d] [-i minutes ] [-n] [-f <xmlfile>]\n";
+	"Usage: plabmetrics [-d] [-n]\n";
     exit(-1);
 }
-my $optlist = "di:nf:";
+my $optlist = "dn";
 my $debug   = 0;
 my $impotent= 0;
-my $interval= 5;
-my $xmlfile;
-my $now     = time();
 my $mailit  = 1;
 
 #
@@ -66,17 +63,10 @@ use libdb;
 use libtestbed;
 
 # Locals
-my $tempfile	= "/tmp/plabxml.$$";
-my $agedfile    = "$TB/log/plabxml.txt";
-my %nodemap     = ();
 my $LOADMETRIC;
 my $MAXLOAD;
 my $MINDISK;
 
-# Current cluster and host.
-my $cluster;
-my $host;
-my $IP;
 my $metricsage;
 my %metrics;
 
@@ -97,22 +87,8 @@ if (@ARGV) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
-if (defined($options{"i"})) {
-    $interval = $options{"i"};
-}
 if (defined($options{"n"})) {
     $impotent = 1;
-}
-if (defined($options{"f"})) {
-    $xmlfile = $options{"f"};
-
-    # Note different taint check (allow /).
-    if ($xmlfile =~ /^([-\w.\/]+)$/) {
-	$xmlfile = $1;
-    }
-    else {
-	die("Tainted xmlfile name: $xmlfile");
-    }
 }
 
 #
@@ -120,12 +96,23 @@ if (defined($options{"f"})) {
 #
 if (TBSiteVarExists("plab/load_metric")) {
     $LOADMETRIC = TBGetSiteVar("plab/load_metric");
-    if ($LOADMETRIC !~ /^load_(one|five}fifteen)$/) {
+    if ($LOADMETRIC !~ /^load_(one|five|fifteen)$/) {
 	undef $LOADMETRIC;
+    }
+    else {
+	if ($LOADMETRIC eq "load_one") {
+	    $LOADMETRIC = "load_1min";
+	}
+	if ($LOADMETRIC eq "load_five") {
+	    $LOADMETRIC = "load_5min";
+	}
+	if ($LOADMETRIC eq "load_fifteen") {
+	    $LOADMETRIC = "load_15min";
+	}
     }
 }
 if (!defined($LOADMETRIC)) {
-    $LOADMETRIC = "load_fifteen";
+    $LOADMETRIC = "load_15min";
 }
 
 if (TBSiteVarExists("plab/max_load")) {
@@ -158,104 +145,40 @@ print "\n=== plabmetrics ".
     if $debug;
 
 #
-# Download the metrics from the plab site.
-# Do this before hitting the DB in case it fails.
-#
-if (defined($xmlfile)) {
-    fatal("Could not copy $xmlfile to $tempfile!")
-	if (system("cp -pf $xmlfile $tempfile"));
-}
-else {
-    #
-    # Must prevent hangs ...
-    #
-    my $syspid = fork();
-
-    if ($syspid) {
-	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 120;
-	waitpid($syspid, 0);
-	alarm 0;
-
-	my $failed = $?;
-	my $lasttime = $now;
-	if (-e "$agedfile") {
-	    $lasttime -= (stat($agedfile))[9];
-	}
-	$lasttime = int($lasttime / 60);
-	if ($failed) {
-	    # only send mail for the first missed interval
-	    if ($lasttime >= 2 * $interval) {
-		$mailit = 0;
-	    }
-	    fatal("Timed out downloading XML data from web site!")
-		if ($failed == 15);
-	    fatal("Could not download XML data from web site!");
-	} elsif ($lasttime >= 2 * $interval) {
-	    nonfatal("Successful download of XML data after $lasttime minutes!");
-	}
-    }
-    else {
-	exec("/usr/local/bin/wget -q -O $tempfile ".
-	     "http://www.planet-lab.org/xml/gmetad.xml");
-	exit(0);
-    }
-}
-
-#
 # Grab the node list from the DB in one query, which we use later to
 # map from the IP we get from the XML output, to our node_id. 
 #
 my $query_result =
-    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
+    DBQueryFatal("select n.node_id as plabnode, nr.*, ".
+		 "       now() - nr.status_timestamp as metricsage ".
+		 " from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
-		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "left join node_rusage as nr on nr.node_id=n.node_id ".
 		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
     		 "and nt.class='pcplabphys'");
 
-while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
-    $nodemap{$IP} = $nodeid;
+#
+# Loop through and insert metrics.
+# 
+while (my %row = $query_result->fetchhash()) {
+    my $nodeid = $row{'plabnode'};
+
+    InsertMetrics($nodeid, %row);
 }
-
-#
-# Finally, run the parser.
-#
-$p1 = new XML::Parser(Style => 'Tree');
-$p1->setHandlers('Start'   => \&StartElement,
-		 'End'     => \&EndElement);
-
-fatal($@)
-    if (eval { $p1->parsefile($tempfile); return 1; } != 1);
-
-#
-# Loop thru the IP map looking for any nodes that we have listed in the DB
-# but for which we got no metrics.  We will insert default values.
-#
-foreach my $arg (keys(%nodemap)) {
-    $IP = $arg;
-    if (defined($nodemap{$IP})) {
-	$host = $nodemap{$IP} . " ($IP)";
-	InsertMetrics();
-	undef($host);
-	undef($metricsage);
-	%metrics = ();
-    }
-}
-
-#
-# If the data came from the web server, copy to the aged file.
-# Only if root though
-#
-system("cp -f $tempfile $agedfile")
-    if (!defined($xmlfile) && !$UID);
-    
-unlink($tempfile)
-    if (-e $tempfile);
 exit(0);
 
-sub CheckMetrics()
+#
+# Insert the metrics we care about. Called for each node.
+#
+sub InsertMetrics($%)
 {
+    my ($nodeid)   = shift;
+    my (%metrics)  = @_;
+    my $metricsage = $metrics{'metricsage'};
     my $localdebug = $debug;
+    my $scaled;
+    my $load;
+    my $disk;
 
     #
     # See if we got any metric data.  If so, then check for stale data.
@@ -263,23 +186,24 @@ sub CheckMetrics()
     # it may be clock skew, so allow a little slop.
     #
     if (!defined($metricsage)) {
-	print "WARNING: $host: no metric data, ignoring\n"
+	print "WARNING: $nodeid: no metric data, ignoring\n"
 	    if $localdebug;
 	$metrics{$LOADMETRIC} = 999;
 	$localdebug = 0;
     } elsif ($metricsage < 0) {
 	if (-$metricsage > $STALESLOP) {
-	    print "WARNING: $host: metric data in the future, ignoring\n"
+	    print "WARNING: $nodeid: metric data in the future, ignoring\n"
 		if $localdebug;
 	    $metrics{$LOADMETRIC} = 999;
 	}
     } elsif ($STALEAGE == 0) {
 	if ($metricsage > 4 * 60 * 60) {
-	    print "WARNING: $host: metric data older than 4 hours, using anyway\n"
+	    print "WARNING: $nodeid: metric data older than 4 hours, ".
+		"using anyway\n"
 		if $localdebug;
 	}
     } elsif ($metricsage > $STALEAGE) {
-	print "WARNING: $host: stale metric data, ignoring\n"
+	print "WARNING: $nodeid: stale metric data, ignoring\n"
 	    if $localdebug;
 	$metrics{$LOADMETRIC} = 999;
     }
@@ -288,153 +212,49 @@ sub CheckMetrics()
     # Make sure all the metrics we might need are defined
     #
     if (!defined($metrics{$LOADMETRIC})) {
-	print "WARNING: $host: no $LOADMETRIC metric\n"
+	print "WARNING: $nodeid: no $LOADMETRIC metric\n"
 	    if $localdebug;
 	$metrics{$LOADMETRIC} = 999;
     }
-    if (!defined($metrics{disk_free}) || !defined($metrics{disk_total})) {
-	print "WARNING: $host: no disk_free/disk_total metrics, assuming enough\n"
+    if (!defined($metrics{disk_used})) {
+	print "WARNING: $nodeid: no disk_used metrics, assuming enough\n"
 	    if $localdebug;
-	$metrics{disk_free} = $metrics{disk_total} = 1;
+	$metrics{disk_used} = 0;
     }
-    $metrics{disk_total} = 1
-	if $metrics{disk_total} == 0;
-    $metrics{disk_free} = $metrics{disk_total}
-	if $metrics{disk_free} > $metrics{disk_total};
-}
 
-#
-# Insert the metrics we care about. Called for each node.
-#
-sub InsertMetrics()
-{
-    if (defined($nodemap{$IP})) {
-	my $nodeid   = $nodemap{$IP};
-	my $scaled;
-	my $load;
-	my $disk;
-
-	CheckMetrics();
-
-	#
-	# Load must be under MAXLOAD, favor those with lower load
-	#
-	$load = $metrics{$LOADMETRIC};
-	if ($MAXLOAD > 0) {
-	    $scaled = $load / $MAXLOAD;
-	} else {
-	    $scaled = 999.0;
-	}
+    #
+    # Load must be under MAXLOAD, favor those with lower load
+    #
+    $load = $metrics{$LOADMETRIC};
+    if ($MAXLOAD > 0) {
+	$scaled = $load / $MAXLOAD;
+    } else {
+	$scaled = 999.0;
+    }
 		
-	#
-	# Plab people request that we not start jobs on nodes
-	# with less than a certain amount of available disk space
-	#
-	if ($metrics{disk_free} / $metrics{disk_total} * 100.0 >= $MINDISK) {
-	    $disk = 0;
-	} else {
-	    $disk = 1;
-	}
+    #
+    # Plab people request that we not start jobs on nodes
+    # with less than a certain amount of available disk space
+    #
+    if ((100.0 - $metrics{disk_used}) >= $MINDISK) {
+	$disk = 0;
+    } else {
+	$disk = 1;
+    }
 
-	if (0&& $debug) {
-	    print STDERR "$nodeid ($host) $load $scaled $disk\n";
-	}
+    if ($debug || $impotent) {
+	print STDERR "$nodeid $load $scaled $disk\n";
+    }
 
-	if (!$impotent) {
-	    DBQueryWarn("replace delayed into node_features ".
-			" (node_id, feature, weight) ".
-			" values ('$nodeid', '+load', $scaled)");
-	    DBQueryWarn("replace delayed into node_features ".
-			" (node_id, feature, weight) ".
-			" values ('$nodeid', '+disk', $disk)");
-	}
-
-	# XXX so we can detect nodes in the DB for which we got no status
-	undef($nodemap{$IP});
+    if (!$impotent) {
+	DBQueryWarn("replace delayed into node_features ".
+		    " (node_id, feature, weight) ".
+		    " values ('$nodeid', '+load', $scaled)");
+	DBQueryWarn("replace delayed into node_features ".
+		    " (node_id, feature, weight) ".
+		    " values ('$nodeid', '+disk', $disk)");
     }
 }
-
-#
-# Start an element.
-# 
-sub StartElement ($$$)
-{
-    my ($expat, $element, %attrs) = @_;
-
-    SWITCH: for ($element) {
-	/^CLUSTER/i && do {
-	    fatal("Out of Sync: CLUSTER!")
-		if (defined($cluster) || defined($host));
-	    
-	    fatal("Malformed CLUSTER Element!")
-		if (!defined($attrs{"NAME"}));
-	    
-	    $cluster = $attrs{"NAME"};
-	    last SWITCH;
-	};
-	/^HOST/i && do {
-	    fatal("Out of Sync: HOST!")
-		if (defined($host) || !defined($cluster));
-	    
-	    fatal("Malformed HOST Element!")
-		if (!defined($attrs{"NAME"}));
-	    
-	    $host = $attrs{"NAME"};
-	    $IP   = $attrs{"IP"};
-
-	    $metricsage = $now - $attrs{"REPORTED"};
-	    last SWITCH;
-	};
-	/^METRIC/i && do {
-	    fatal("Out of Sync: METRIC!")
-		if (!defined($host) || !defined($cluster));
-
-	    fatal("Malformed METRIC Element!")
-		if (!defined($attrs{"NAME"}) ||
-		    !defined($attrs{"VAL"}));
-		
-	    $metrics{$attrs{"NAME"}} = $attrs{"VAL"};
-	    last SWITCH;
-	};
-    }
-}
-
-#
-# End an element.
-# 
-sub EndElement ($$)
-{
-    my ($expat, $element) = @_;
-
-    SWITCH: for ($element) {
-	/^CLUSTER/i && do {
-	    fatal("Out of Sync (End): CLUSTER!")
-		if (!defined($cluster) || defined($host));
-	    
-	    undef($cluster);
-	    last SWITCH;
-	};
-	/^HOST/i && do {
-	    fatal("Out of Sync (End): HOST!")
-		if (!defined($host) || !defined($cluster));
-
-	    InsertMetrics();
-
-	    undef($host);
-	    undef($IP);
-	    undef($metricsage);
-	    %metrics = ();
-	    last SWITCH;
-	};
-	/^METRIC/i && do {
-	    fatal("Out of Sync (End): METRIC!")
-		if (!defined($host) || !defined($cluster));
-
-	    last SWITCH;
-	};
-    }
-}
-
 
 sub fatal {
     my $msg = $_[0];
@@ -446,8 +266,6 @@ sub fatal {
     print "$msg\n"
 	if $debug;
 
-    unlink($tempfile)
-	if (defined($tempfile) && -e $tempfile);
     die($msg);
 }
 
