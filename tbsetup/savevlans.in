@@ -1,43 +1,43 @@
 #!/usr/local/bin/perl -wT
 #
-# savevlans - Saves vlans from the switches into a .ir file, suitable for 
-# restoring with 'snmpit -f <file>'.
+# savevlans - dump vlans table into a file, suitable for restoration with
+# "load data infile '$name' replace into table vlans;"
 #
 
 my $TBROOT = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+
+use Mysql;
+
+my $dbh;
+my $sth;
+
+my $d = 0;
+
+$dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
 $ENV{'PATH'} = '@prefix@/sbin:@prefix@/bin:/bin';
 
 my $time = `date +20%y%m%d-%H.%M.%S`;
 chomp ($time);
-my $name = "$TBROOT/backup/vlans-$time";
+my $name = "vlans-$time";
 $name =~ /^([a-zA-Z\/_\-0-9:\.\'\"]*).*$/;
 $name = $1;
 
 print "Saving VLAN configuration to '$name'\n";
 
-use Fcntl;
-sysopen(OUT, $name, (O_WRONLY | O_EXCL | O_CREAT) ) || 
-  die ("savevlans: couldn't open '$name' for writing: $!\n");
-
-open(LIST,"snmpit -l |") || die ("savevlans: couldn't run snmpit: $!\n");
-
-print OUT "START vlan\n";
-while(<LIST>) {
-  chop;
-  if (/(^ID)|(^--)|(^1 )/) { next; }
-  s/[\t ]+/ /g;
-  /(\d+)\s+(\S+)\s+(.*)?/;
-  if (!defined $3) { next; }
-  #print "split to $1, $2, $3\n";
-  if ($2 ne "default") { 
-    (my $name, my @IDs) = ($2,split(" ",$3));
-    print OUT "$name @IDs\n";
-  }
-
+my $cmd = "select * from vlans into outfile '/tmp/$name'";
+if ( ! ($sth = $dbh->query($cmd)) ) {
+  die("Failed SQL Command:\n$cmd\nError string is:".$dbh->errstr."\n");
 }
-print OUT "END vlan\n";
 
-close(LIST);
-close(OUT);
-chmod( 0444, $name);
+system("ls -l /tmp/vlan*") if $d;
+
+system("mv /tmp/$name $TBROOT/backup/") && # If it doesn't return 0, it failed
+  die("Couldn't move /tmp/$name to $TBROOT/backup/: $!");
+
+system("ls -l $TBROOT/backup/$name") if $d;
+chown( 0, 601, "$TBROOT/backup/$name");
+system("ls -l $TBROOT/backup/$name") if $d;
+chmod( 0444, "$TBROOT/backup/$name");
+system("ls -l $TBROOT/backup/$name") if $d;
