@@ -655,8 +655,9 @@ public class RoboTrack extends JApplet {
         }
 
         /*
-         * Certain cells are editable only when the robot is being dragged.
-	 * User can edit the new destinations in the table. 
+         * Dest x,y,o are editable only when the robot is being dragged.
+	 * The destination orientation is editable when being dragged *or*
+	 * anytime there is no current destination.
          */
         public boolean isCellEditable(int row, int col) {
 	    if (robots.size() == 0 || row >= robots.size())
@@ -664,7 +665,8 @@ public class RoboTrack extends JApplet {
 	    
 	    Robot robbie = (Robot) robotmap.elementAt(row);
 
-	    if (robbie.dragging && (col >= 6 && col <= 8))
+	    if ((robbie.dragging && (col >= 6 && col <= 8)) ||
+		(!robbie.gotdest && col == 8))
 		return true;
 	    return false;
         }
@@ -678,7 +680,8 @@ public class RoboTrack extends JApplet {
 	    
 	    Robot robbie = (Robot) robotmap.elementAt(row);
 
-	    if (robbie.dragging && (col >= 6 && col <= 8)) {
+	    if ((robbie.dragging && (col >= 6 && col <= 8)) ||
+		(!robbie.gotdest && col == 8)) {
 		String stmp = value.toString().trim();
 		double dtmp = Double.parseDouble(stmp);
 		
@@ -697,6 +700,33 @@ public class RoboTrack extends JApplet {
 		    robbie.drag_or = dtmp;
 		    robbie.dragor_string = stmp;
 		    break;
+		}
+		/*
+		 * If the change(s) left the robot within a couple of
+		 * pixels of its current location, then cancel this
+		 * drag operation. There is probably a better UI for
+		 * this.
+		 *
+		 * XXX I assume that the user will not be holding down the
+		 * left mouse button *and* editing a row in the table
+		 * (at the same time).
+		 */
+		if (Math.abs(robbie.drag_x - robbie.x) <= 1 &&
+		    Math.abs(robbie.drag_y - robbie.y) <= 1 &&
+		    robbie.drag_or == robbie.or) {
+		    robbie.dragging = false;
+		}
+		else if (!robbie.dragging) {
+		    /*
+		     * User changed the orientation, but the robot was not
+		     * currenly being dragged, so make sure things are
+		     * initialized properly for a drag.
+		     */
+		    robbie.drag_x   = robbie.x;
+		    robbie.drag_y   = robbie.y;
+		    robbie.dragx_meters = robbie.x_meters;
+		    robbie.dragy_meters = robbie.y_meters;
+		    robbie.dragging = true;
 		}
 		fireTableCellUpdated(row, col);
 		repaint();
@@ -734,17 +764,26 @@ public class RoboTrack extends JApplet {
 		    
 		    robbie.drag_x   = e.getX();
 		    robbie.drag_y   = e.getY();
-		    robbie.drag_or  = robbie.dor;
+
+		    /*
+		     * If already dragging, then leave the dest orientation
+		     * as it was. Otherwise, initialize it to the current
+		     * orientation.
+		     */
+		    if (!robbie.dragging) {
+			robbie.drag_or  = robbie.dor;
+			// For the table.
+			robbie.dragor_string = robbie.or_string;
+		    }
 		    robbie.dragging = true;
 
 		    // For the table.
-		    robbie.dragor_string = robbie.or_string;
 		    robbie.dragx_meters =
 			FORMATTER.format(robbie.drag_x / pixels_per_meter);
 		    robbie.dragy_meters =
 			FORMATTER.format(robbie.drag_y / pixels_per_meter);
 		    
-		    dragging        = true;
+		    dragging = true;
 		    repaint();
 
 		    maptable.setRowSelectionInterval(robbie.index,
@@ -823,10 +862,11 @@ public class RoboTrack extends JApplet {
 		     * If the release left the robot within a couple of
 		     * pixels of its current location, then cancel this
 		     * drag operation. There is a probably a better UI
-		     * for this. Let me know ...
+		     * for this. 
 		     */
 		    if (Math.abs(e.getX() - robbie.x) <= 2 &&
-			Math.abs(e.getY() - robbie.y) <= 2) {
+			Math.abs(e.getY() - robbie.y) <= 2 &&
+			robbie.drag_or == robbie.or) {
 			robbie.dragging = false;
 		    }
 		    repaint();

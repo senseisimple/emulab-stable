@@ -108,8 +108,10 @@ echo "<applet code='RoboTrack.class'
           </applet>\n";
 
 echo "<br>
+     <blockquote><blockquote>
      <center>
      <h3>Using the Robot Tracker Applet</h3>
+     </center>
      <ul>
      <li> Right Click over a robot or mote will pop up a browser window 
           showing information about the robot/mote.
@@ -118,8 +120,11 @@ echo "<br>
           table, if needed. Cancel by moving back to its original position. 
      <li> Left click over the background image brings up a menu to submit your 
           moves (start the robots on their way), or cancel the moves.
-     <li> Only one move per robot at a time. 
-     </ul>\n";
+     <li> Only one move per robot at a time.
+     <li> To change just the orientation (no drag), edit the destination
+          orientation column in the table. 
+     </ul>
+     <blockquote><blockquote>\n";
 
 PAGEFOOTER();
 ?>
