@@ -4809,7 +4809,7 @@ COMMAND_PROTOTYPE(dorusage)
 
 	if (reqp->isplabdslice) {
 		mydb_update("replace delayed into node_status "
-			    " (node_id, status, status_timestamp "
+			    " (node_id, status, status_timestamp) "
 			    " values ('%s', 'up', now())",
 			    reqp->pnodeid);
         }
