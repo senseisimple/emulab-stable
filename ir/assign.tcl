@@ -210,8 +210,8 @@ puts $fp "START vlan"
 # ok, this is harder.  We need to go through every link in links
 # and those that are in the current switch output the correct vlan.
 # We need to be especially careful to get the interlinks right.
-foreach switch [array names map] {
-    puts $fp "switch $switch"
+#foreach switch [array names map] {
+#    puts $fp "switch $switch"
     foreach link [array names links] {
 	set srcp [lindex $links($link) 0]
 	set dstp [lindex $links($link) 1]
@@ -225,11 +225,11 @@ foreach switch [array names map] {
 	    # output a vlan for this
 	    set srcp [lindex $nmap($src) 1]
 	    set dstp [lindex $nmap($dst) 1]
-	    puts $fp "[lindex $mac($srcp) $srcport] [lindex $mac($dstp) $dstport]"
+	    puts $fp "$link [lindex $mac($srcp) $srcport] [lindex $mac($dstp) $dstport]"
 	}
     }
-    puts $fp "end"
-}
+#    puts $fp "end"
+#}
 
 puts $fp "END vlan"
 
