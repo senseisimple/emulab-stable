@@ -80,6 +80,7 @@ my @ROOTCPDIRS	= ("etc", "root");
 my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", "opt",
 		   "bin", "sbin", "home", $LOCALMNTPNT);
 my @ROOTMNTDIRS = ("bin", "sbin", "usr");
+my @EMUVARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $VNFILEMBS   = 64;
 my $MAXVNDEVS	= 10;
 my $IP;
@@ -329,6 +330,20 @@ sub mkrootfs($)
     mysystem("mtree -nqdeU -f /etc/mtree/BSD.var.dist ".
 	     "-p $path/root/var >/dev/null 2>&1");
     mysystem("mkdir -p $path/root/$path");
+
+    #
+    # Make the emulab directories since they are not in the mtree file.
+    #
+    if (! -e "$path/root/var/emulab") {
+	mkdir("$path/root/var/emulab", 0755) or
+	    fatal("Could not mkdir 'emulab' in $path/root/var: $!");
+    }
+    foreach my $dir (@EMUVARDIRS) {
+	if (! -e "$path/root/var/emulab/$dir") {
+	    mkdir("$path/root/var/emulab/$dir", 0755) or
+		fatal("Could not mkdir 'dir' in $path/root/var/emulab: $!");
+	}
+    }
 
     #
     # Get a list of all the plain files and create zero length versions
