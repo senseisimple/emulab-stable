@@ -91,6 +91,9 @@ public:
   // For use with PRUNE_PCLASSES
   int refcount;
 
+  // Just used for debugging
+  bool is_own_class;
+
   friend ostream &operator<<(ostream &o, const tb_pclass& p)
   {
     o << p.name << "(" << &p << ") size=" << p.size <<

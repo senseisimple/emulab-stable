@@ -160,6 +160,7 @@ public:
 
   void remove_current_type() {
       typed = false;
+      current_type = "";
       current_type_record = NULL;
   }
 
