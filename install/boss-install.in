@@ -294,7 +294,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Checking for port installation", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.5")) {
+	if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT")) {
 	    PhaseSkip("Ports already installed");
 	}
 	if ($packagedir) {
