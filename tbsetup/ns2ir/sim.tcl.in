@@ -261,6 +261,8 @@ Simulator instproc run {} {
 	}
     }
 
+    # Default sync server.
+    set default_sync_server {}
 
     # Mark that a run statement exists
     set ran 1
@@ -311,7 +313,12 @@ Simulator instproc run {} {
     # Update the DB
     foreach node [lsort [array names node_list]] {
 	$node updatedb "sql"
+
+	if { $default_sync_server == {} } {
+	    set default_sync_server $node
+	}
     }
+    
     foreach lan [concat [array names lanlink_list]] {
 	$lan updatedb "sql"
     }
@@ -333,6 +340,9 @@ Simulator instproc run {} {
     if { $sync_server != {} } {
 	lappend fields "sync_server"
 	lappend values $sync_server
+    } elseif { $default_sync_server != {} } {
+	lappend fields "sync_server"
+	lappend values $default_sync_server
     }
     
     $self spitxml_data "experiments" $fields $values
