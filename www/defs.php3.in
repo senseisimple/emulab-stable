@@ -144,8 +144,12 @@ function PAGEFOOTER() {
     global $TBBASE;
 
     echo "<br><hr>
-          <center>[<a href=\"$TBBASE\">Network Testbed Home</a>]</center>
+	  <!-- Force full window! -->
+	  <base target=_top>
+          <center>[<a href=\"$TBBASE\">Emulab.Net Home</a>]</center>
           <center>
+           [<a href=\"http://www.cs.utah.edu/flux/testbed/\">
+               Utah Network Testbed</a>]
            [<a href=\"http://www.cs.utah.edu/flux/\">Flux Research Group</a>]
            [<a href=\"http://www.cs.utah.edu/\">School of Computing</a>]
            [<a href=\"http://www.utah.edu/\">University of Utah</a>]
