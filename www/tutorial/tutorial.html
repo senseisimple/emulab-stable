@@ -413,11 +413,10 @@ Reloading your disk with a fresh copy of the default image is easy,
 and requires no intervention by Emulab staff:
 
 	<code><pre><xmp>
-	os_load -w <node> [node ... ]			</xmp></code></pre>
+	os_load <node> [node ... ]			</xmp></code></pre>
 
-The <tt>-w</tt> option causes os_load to wait (not exit) until the
-nodes have been reloaded. This is the preferred mode of operation
-since otherwise you will need to check the console lines of each node
+os_load will wait (not exit) until the nodes have been reloaded,
+so that you do not need to check the console lines of each node
 to determine when the load is done.
 
 <p>
