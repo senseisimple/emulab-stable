@@ -13,7 +13,7 @@ never compromised. Okay, lets get serious.
 * When you have a real shell on boss; you get a different home dir. Normal
   users get ops:/users/homedir as their homedir on boss, but if you have a
   real shell, you get a distinct homedir. This is to protect your dot
-  files, and especially your .ssh directory, from a breakin ops or an
+  files, and especially your .ssh directory, from a breakin on ops or an
   experimental node that is currently mounting your ops homedir (via NFS,
   which is totally insecure). 
 
@@ -43,13 +43,16 @@ never compromised. Okay, lets get serious.
   Something is odd, and it is better to ask then to risk having your
   password snooped by some trojan.
 
-* Use good passwords and passphrases!
+* Use good passwords and passphrases! Passwords like "microsoft" are not a
+  good idea, and remember that Unix passwords are often limited to the
+  first 8 chars, but passphrases (ssl,ssh) can be any length and include
+  any characters. 
 
 * If you were not in the habit of using xlock, then you should now get in
   the habit. 
 
 * In order to install the testbed software, you need to be in group wheel,
-  which lets your use "sudo". No password to gain root is required.
+  which lets you use "sudo". No password to gain root is required.
   BE CAREFUL!
 
 
@@ -143,5 +146,7 @@ Okay, to install software into the main tree:
 	sudo gmake post-install
 
   Do not forget the post-install; the main tree will break and users will
-  be unhappy!
+  be unhappy if you forget this.
+
+
 
