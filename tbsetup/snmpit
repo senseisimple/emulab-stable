@@ -742,7 +742,9 @@ sub mac2ifIndex {
   my $cmd = "select i.MAC, w.node_id1, w.card1, w.port1, ".
     "w.node_id2,w.card2,w.port2 from interfaces as i ".
     "left join wires as w on w.node_id1 like concat(left(i.node_id,6),'%')".
-    " and i.card=w.card1 and i.port=w.port1 where $cond";
+    " and (i.card=w.card1 or i.node_id like 'tbsh%') and i.port=w.port1 ".
+    "where $cond";
+  print "Using query: $cmd\n" if $debug;
   my %Mod_Port = ();
   $sth = $dbh->query($cmd);
   while ( @_ = $sth->fetchrow_array()) {
@@ -760,8 +762,10 @@ sub mac2ifIndex {
   foreach $mac ( keys %Mod_Port) {
     print "Finding ifIndex: $Mod_Port{$mac}..." if $debug;
     $index = $sess->get([["$portIfIndex$Mod_Port{$mac}"]]);
-    print "Found $index\n" if $debug;
-    if (defined $index) { $ifIndex{$mac} = $index; }
+    if (defined $index) { 
+      print "Found $index\n" if $debug;
+      $ifIndex{$mac} = $index; 
+    } else { print "None Found\n" if $debug; }
   }
   return %ifIndex;
 }
