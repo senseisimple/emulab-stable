@@ -242,8 +242,8 @@ void usage(char *progname)
   info("entering function usage\n");
 #endif
   
-  ERROR("Usage: %s -s server [-p port] -f link-map-file\n",
-	    progname);
+  fprintf(stderr, "Usage: %s -s server [-p port] -f link-map-file\n",
+	  progname);
   exit(-1);
 }
 

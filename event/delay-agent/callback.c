@@ -107,7 +107,7 @@ void handle_pipes (char *objname, char *eventtype,
 }
 
 /***************** checkevent **************************************
-/* checks if we are handling the link for which we got the event
+ * checks if we are handling the link for which we got the event
  ***************** checkevent **************************************/
 
 int check_object (char *objname)
