@@ -30,8 +30,6 @@
             Starting your application automatically</a>
     <li> <a href="#ReadyBits">
             How do I know when all my nodes are ready?</a>
-    <li> <a href="#Delta">
-            Customizing an OS (How to create a <i>delta</i>)</a>
     <li> <a href="#Routing">
             Setting up IP routing between nodes</a>
     <li> <a href="#Simem">
@@ -471,7 +469,6 @@ or not work as you expect. Again, please feel free to contact us.
 <li> <a href="#TARBALLS">Installing Tar files automatically</a>
 <li> <a href="#Startupcmd">Starting your application automatically</a>
 <li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
-<li> <a href="#Delta">Customizing an OS (How to create a <i>delta</i>)</a>
 <li> <a href="#Routing">Setting up IP routing between nodes</a>
 <li> <a href="#Simem">Hybrid Experiments with Simulation and Emulation</a> 
      <img src="../new.gif" alt="&lt;NEW&gt;">
@@ -635,106 +632,6 @@ synchronization happening.  If in the future it appears that a
 generalized barrier synchronization would be more useful, we will
 investigate the implementation of such a feature.</i>
 
-</p>
-
-<li> <a NAME="Delta"></a>
-     <h3>Customizing an OS (How to create a <i>delta</i>)</h3>
-<p>
-
-If your set of operating system customizations cannot be easily
-contained within an RPM (or multiple RPMs), or if you are just not
-familiar with the RPM mechanism, then you can create your own
-operating system <i>delta</i>. A delta is like an RPM or Tar file in
-that it contains a bunch of files to be unpacked onto the node.  The
-difference is that with a delta you do not have to figure what files
-you changed, and how to automate the installation process.  Instead,
-you just allocate a node, change it anyway you like, and then issue
-the <tt>create-delta</tt> command. The resulting delta file can then
-be specified in your NS file using the Testbed NS extension
-<tt>tb-set-node-deltas</tt>. You can create one delta to install on
-all of your nodes, or several different deltas for various nodes in
-your experiment. When the nodes in your new experiment boot for the
-first time, the delta will be installed (all of the files unpacked)
-very early in the boot phase, and the node rebooted again (in case you
-have installed daemons that need to be started during initialization).
-Your experiment can then proceed. 
-
-<p>
-The key point is that the Testbed configuration software deals with
-figuring out what files you changed, installing the delta on your
-nodes, rebooting the nodes that have new software installed, and
-ensuring that any particular delta is installed only once on each
-node.
-
-<p>
-Lets step through an example. The first thing you need to do is
-create an experiment with a single node in it. The following NS file
-can be submitted to the "Begin Experiment" page. 
-
-<code><pre>
-set ns [new Simulator]			
-source tb_compat.tcl
-set nodeA [$ns node]
-tb-set-node-os $nodeA FBSD-STD
-$ns run					</code></pre>
-
-When you have received email notification that the experiment has
-configured, log into the node with <tt>ssh</tt>. Install whatever
-software you like, making sure to update the necessary files if you
-have installed daemons that need to be started automatically at boot
-time. After all of your software is installed, create the delta file
-with:
-
-<code><pre>
-sudo /usr/local/bin/create-delta /proj/testbed/foo.delta	</code></pre>
-
-The argument to the <tt>create-delta</tt> command is a complete
-pathname, which <b>must</b> reside someplace in your /proj directory
-(a subdirectory is fine).  You cannot write the delta file to any
-other filesystem. This restriction is enforced so that diskspace (and
-resources in general) can be accounted for on a per-project basis.
-It should be noted that a delta created on one OS
-cannot be installed on another. In other words, a delta created on a
-FreeBSD machine can only be installed on a FreeBSD machine. If you
-need the same software installed on a Linux machine as well, you will
-need to repeat this process with a node running Linux. See the section
-on <a href="docwrapper.php3?docname=nscommands.html#OS">
-<tt>tb-set-node-os</tt></a> in the
-<a href="docwrapper.php3?docname=nscommands.html">
-Extensions</a> reference.
-
-<p>
-After you have created your delta, you can then use it in subsequent
-experiments by using the Testbed NS extension
-<tt>tb-set-node-deltas</tt>.  For example, here is an NS file that
-creates a two node experiment, installs a different delta on each
-node, and then runs a program automatically on each node. Presumably,
-the startup program is installed by the delta, and encapsulates the
-experiment being performed.
-
-<code><pre>
-set ns [new Simulator]			
-source tb_compat.tcl
-set nodeA [$ns node]
-set nodeB [$ns node]
-tb-set-node-os $nodeA FBSD-STD
-tb-set-node-os $nodeB RHL-STD
-tb-set-node-deltas $nodeA /proj/testbed/deltas/silly-freebsd.delta
-tb-set-node-deltas $nodeB /proj/testbed/deltas/silly-linux.delta
-tb-set-node-startup $nodeA /usr/site/bin/run-my-experiment
-tb-set-node-startup $nodeB /usr/site/bin/run-my-experiment
-$ns run					</code></pre>
-
-<i>Implementation Notes:</i>
-<ul>
-<li> Deltas are created and installed with the unix filesystem backup
-     utilities <tt>dump</tt> and <tt>restore</tt>.
-<li> Beware of changing too many critical systems and/or too many
-     changes to the <tt>/etc/rc</tt> scripts.
-<li> If you find that your customizations are too much for the Delta
-     mechanism, feel free to contact us so that we can arrange to
-     create a complete snapshot of your system.
-</ul>
 </p>
 
 <li> <a NAME="Routing"></a>
@@ -1069,18 +966,20 @@ file.</i>
 <h2>Custom OS Images</h2>
 </center>
 
-Emulab allows you to create your own disk images and load them on your
-experimental nodes, automatically when your experiment is created or
-swapped in. Once you have created a custom disk image (and the
-associated <a href="https://www.emulab.net/newimageid_ez.php3">
-image/osid descriptor</a> for it, you can use that OSID in your NS
-file. When your experiment is swapped in, the testbed system will
-arrange for your disks to be loaded in parallel using a locally
-written multicast disk loading protocol. Experience has shown that it
-is much faster to load a disk image on 10 nodes at once, then it is to
-load a bunch of RPMS or tarballs on each node as it boots. So, while
-it may seem like overkill to create your own disk image, we can assure
-you it is not!
+If your set of operating system customizations cannot be easily
+contained within an RPM/TAR (or multiple RPM/TARs), then you can
+create your own custom OS image; Emulab allows you to create your own
+disk images and load them on your experimental nodes, automatically
+when your experiment is created or swapped in. Once you have created a
+custom disk image (and the associated <a
+href="https://www.emulab.net/newimageid_ez.php3"> image/osid
+descriptor</a> for it, you can use that OSID in your NS file. When
+your experiment is swapped in, the testbed system will arrange for
+your disks to be loaded in parallel using a locally written multicast
+disk loading protocol. Experience has shown that it is much faster to
+load a disk image on 10 nodes at once, then it is to load a bunch of
+RPMS or tarballs on each node as it boots. So, while it may seem like
+overkill to create your own disk image, we can assure you it is not!
 
 <p>
 The most common approach is to use the
