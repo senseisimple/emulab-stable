@@ -158,15 +158,29 @@ while (1) {
 #
 # Read the current states of nodes from the database
 #
-sub readStates() {
+sub readStates(;@) {
+    	my %oldnodes = @_;
+
 	debug("readStates called\n");
 	my $result = DBQueryFatal("SELECT node_id, eventstate, " .
 				  "state_timestamp FROM nodes");
 
 	my %nodes;
 	while (my ($node_id, $state, $time) = $result->fetchrow()) {
-		$nodes{$node_id}{state} = $state;
-		$nodes{$node_id}{time}  = $time;
+	    	#
+		# If there's an entry in oldnodes for this node, and it
+		# hasn't changed state or time, use the old entry (so that
+		# we don't lose information about which nodes we've already
+		# notified the ops about, etc.)
+		#
+		if ($oldnodes{$node_id} &&
+		   ($oldnodes{$node_id}{$state} eq $state) &&
+		   ($oldnodes{$node_id}{$time} == $time)) {
+		       $nodes{$node_id} = $oldnodes{$node_id};
+		} else { 
+		    $nodes{$node_id}{state} = $state;
+		    $nodes{$node_id}{time}  = $time;
+		}
 	}
 	return %nodes;
 }
@@ -239,7 +253,7 @@ sub handleEvent($$$) {
 #
 sub reload() {
     	print "Reloading state from database\n";
-	%nodes    = readStates();
+	%nodes    = readStates(%nodes);
 	%timeouts = getTimeouts();
 	%valid     = getValid();
 }
