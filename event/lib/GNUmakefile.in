@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
@@ -45,7 +51,7 @@ event_wrap.o:	$(SRCDIR)/event_wrap.c
 event.so:	event.o event_wrap.o util.o
 	ld -shared $^ $(OBJDIR)/lib/libtb/libtb.a \
 		`elvin-config --libs vin4c` -o event.so
-	
+
 LIB_STUFF       = event.pm event.so
 
 install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))

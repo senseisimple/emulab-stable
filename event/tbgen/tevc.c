@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * This is used to send Testbed events (reboot, ready, etc.) to the
  * testbed event client. It is intended to be wrapped up by a perl
  * script that will use the tmcc to figure out where the event server

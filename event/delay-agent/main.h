@@ -1,10 +1,14 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * agent-main.h --
  *
  *      Delay node agent data structures
  *
- *
- * @COPYRIGHT@
  */
 
 #ifndef __AGENT_MAIN_H

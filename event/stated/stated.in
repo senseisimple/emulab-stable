@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # stated - A daemon to monitor the states of nodes in the testbed. Recives
 # state change notification through the event system, and writes the new
 # state into the database.

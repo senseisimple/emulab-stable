@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * event-sched.c --
  *
  *      Testbed event scheduler.
@@ -8,7 +14,6 @@
  *      notifications it receives, and resending the notifications at
  *      the indicated times.
  *
- * @COPYRIGHT@
  */
 
 #include <stdio.h>

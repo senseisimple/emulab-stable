@@ -1,11 +1,14 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * event.h --
  *
  *      Definitions for the testbed event library.
  *
- * @COPYRIGHT@
- *
- * $Id: event.h,v 1.13 2002-03-25 23:02:45 ricci Exp $
  */
 
 #ifndef __EVENT_H__

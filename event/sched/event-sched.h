@@ -1,12 +1,15 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * event-sched.h --
  *
  *      This file contains definitions for the testbed event
  *      scheduler.
  *
- * @COPYRIGHT@
- *
- * $Id: event-sched.h,v 1.5 2002-05-05 14:11:49 stoller Exp $
  */
 
 #ifndef __SCHED_H__

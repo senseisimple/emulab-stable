@@ -1,10 +1,14 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * event.c --
  *
  *      Testbed event library.  Currently uses the Elvin publish/
  *      subscribe system for routing event notifications.
- *
- * @COPYRIGHT@
  */
 
 #include <stdio.h>

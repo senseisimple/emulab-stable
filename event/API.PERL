@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 This is the documentation for the Perl API to the event system...
 
 Theoretically, most event library calls should 'just work.' See the lists below
