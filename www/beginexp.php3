@@ -1,9 +1,15 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+#
+# Remove this if we need to bring this page back.
+#
+header("Location: beginexp_html.php3?" . $_SERVER['QUERY_STRING']);
+exit(0);
+
 include("defs.php3");
 
 #

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -142,7 +142,7 @@ function SPITFORM($formfields, $errors)
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $view, $view_style, $projlist;
 
-    PAGEHEADER("Begin a Testbed Experiment (XML Version)");
+    PAGEHEADER("Begin a Testbed Experiment");
 
     echo "<script language=JavaScript>
           <!--

@@ -384,14 +384,8 @@ function WRITESIDEBAR() {
 
 		WRITESIDEBARDIVIDER();
 
-                if ($login_status & CHECKLOGIN_STUDLY) {
- 		    WRITESIDEBARBUTTON("Begin an Experiment",
-				       $TBBASE, "beginexp_html.php3");
-                }
-                else {
- 		    WRITESIDEBARBUTTON("Begin an Experiment",
-				       $TBBASE, "beginexp.php3");
-                }
+ 		WRITESIDEBARBUTTON("Begin an Experiment",
+				   $TBBASE, "beginexp_html.php3");
 
 		# Put _NEW back when Plab is working again.
 		WRITESIDEBARBUTTON("Create a PlanetLab Slice",

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -459,7 +459,7 @@ function MAKENS($formfields) {
     #
     # Build up a URL to send the user to
     #
-    $url = "beginexp.php3?view_style=plab&formfields[exp_id]=" .
+    $url = "beginexp_html.php3?view_style=plab&formfields[exp_id]=" .
            urlencode($expname) . "&formfields[exp_description]=" .
 	   urlencode($descr) . "&formfields[exp_idleswap]=0" .
 	   "&formfields[exp_noidleswap_reason]=" .

@@ -314,8 +314,9 @@ elseif ($nsfilelocale == "inline") {
     # The NS file is encoded in the URL. Must create a temp file
     # to hold it, and pass through to the backend.
     #
-    # XXX Hard to believe, but there is no equiv of mkstemp in php3.
-    #
+    # Generate a hopefully unique filename that is hard to guess.
+    # See backend scripts.
+    # 
     list($usec, $sec) = explode(' ', microtime());
     srand((float) $sec + ((float) $usec * 100000));
     $foo = rand();
