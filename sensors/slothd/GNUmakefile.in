@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -29,7 +29,7 @@ all: $(SDPROGS) client
 
 include ${TESTBED_SRCDIR}/GNUmakerules
 
-slothd: slothd.o slothd.h version.o
+slothd-debug: slothd.o slothd.h version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
 
 sdcollectd: sdcollectd.o sdcollectd.h version.o $(TBLIB)
@@ -48,7 +48,7 @@ install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd) webfeedbac
 	$(INSTALL_PROGRAM) webfeedback $(INSTALL_LIBEXECDIR)
 
 client-install: client
-	$(INSTALL_PROGRAM) -s slothd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)$(EXE)
+	$(INSTALL_PROGRAM) slothd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)$(EXE)
 
 clean:
 	rm -f *.o $(SDPROGS) *~ core *.core version.c

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,11 +27,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 #CFLAGS += -DDEBUG
 CFLAGS += -O2 -g -static -I. -Wall
-SCFLAGS = $(CFLAGS) `elvin-config --cflags vin4c`
-TCFLAGS = $(CFLAGS) `elvin-config --cflags vin4mt`
+SCFLAGS = $(CFLAGS) `$(ELVIN_CONFIG) --cflags vin4c`
+TCFLAGS = $(CFLAGS) `$(ELVIN_CONFIG) --cflags vin4mt`
 # Special CFLAGS w/o warnings, for SWIG-generated code
 CFLAGS_NOWARN += -O2 -g -static -I.
-CFLAGS_NOWARN += `elvin-config --cflags vin4c`
+CFLAGS_NOWARN += `$(ELVIN_CONFIG) --cflags vin4c`
 ifeq ($(SYSTEM),Linux)
 PCORE  = -I/usr/lib/perl5/5.6.1/i386-linux/CORE
 else
@@ -100,10 +100,10 @@ event_wrap_py.o: $(SRCDIR)/event_wrap_py.c
 	$(CC) -c $(CFLAGS_NOWARN) $(PYCORE) $<
 
 event.so:	event.o event_wrap.o util.o
-	ld -shared $^ `elvin-config --libs vin4c` -lcrypto -o event.so
+	ld -shared $^ `$(ELVIN_CONFIG) --libs vin4c` -lcrypto -o event.so
 
 _tbevent.so:	event.o event_wrap_py.o util.o
-	ld -shared $^ `elvin-config --libs vin4c` -lcrypto -o $@
+	ld -shared $^ `$(ELVIN_CONFIG) --libs vin4c` -lcrypto -o $@
 
 LIB_STUFF       = event.pm event.so tbevent.py _tbevent.so
 

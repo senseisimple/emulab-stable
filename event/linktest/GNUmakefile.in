@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -30,20 +30,28 @@ all:	binaries $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_PROXY) \
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
-CFLAGS	 += -O -g -static -Wall
+CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4c`
+CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
 
-LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -lcrypto -lssl
-LIBS     += `elvin-config --libs vin4c`
+LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+
+ifeq ($(host_cpu),arm)
+else
+LDFLAGS  += -static
 ifeq ($(SYSTEM),Linux)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 ifeq ($(NEEDKERB),0)
  CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
  LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
 endif
-LIBS     += -ldl
+endif
+endif
+
+ifeq ($(SYSTEM),Linux)
+LIBS     	+= -ldl
 LOCAL_BINDIR	= linux
 endif
 
@@ -69,10 +77,10 @@ $(LOCAL_BINDIR):
 
 binaries: $(LOCAL_BINDIR) $(LOCAL_BINDIR)/$(DAEMON) $(LOCAL_BINDIR)/$(LTEVENT) 
 
-$(LOCAL_BINDIR)/$(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
+$(LOCAL_BINDIR)/$(DAEMON)-debug:	$(DAEMON_OBJS) $(LIBTB_OBJS)
 	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
-$(LOCAL_BINDIR)/$(LTEVENT):	$(LTEVENT_OBJS) $(LIBTB_OBJS)
+$(LOCAL_BINDIR)/$(LTEVENT)-debug:	$(LTEVENT_OBJS) $(LIBTB_OBJS)
 	$(CC) $(LDFLAGS) $(LTEVENT_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
 $(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
@@ -103,8 +111,8 @@ control-install:	binaries
 
 client: all
 client-install: client
-	$(INSTALL_PROGRAM) -s $(LOCAL_BINDIR)/$(DAEMON) $(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
-	$(INSTALL_PROGRAM) -s $(LOCAL_BINDIR)/$(LTEVENT) $(DESTDIR)$(CLIENT_BINDIR)/$(LTEVENT)
+	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(DAEMON) $(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
+	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) $(DESTDIR)$(CLIENT_BINDIR)/$(LTEVENT)
 	$(INSTALL_PROGRAM) $(SCRIPT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
 	$(INSTALL_PROGRAM) $(SRCDIR)/$(SCRIPT_TBCOMPAT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_TBCOMPAT)

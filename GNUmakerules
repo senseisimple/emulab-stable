@@ -68,6 +68,9 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 %_xdr.c: %.x %_xdr.h
 	rpcgen -c $< > $@
 
+%: %-debug
+	$(STRIP) -o $@ $<
+
 #
 # Rules to regen configure written files.
 #

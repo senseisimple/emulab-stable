@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -37,18 +37,22 @@ all:	tg2.0 $(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static #-Wall
+CFLAGS	 += -O -g #-Wall
 CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
 CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4c`
+CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
 CFLAGS	 += -DUSEEVENTS
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 # Expand the elvin-config list now so it can be filtered below.
-LIBS     += $(shell elvin-config --libs vin4c)
+LIBS     += $(shell $(ELVIN_CONFIG) --libs vin4c)
 
 SYSTEM   := $(shell uname -s)
+
+ifneq ($(host_cpu),arm)
+LDFLAGS  += -static
+endif
 
 ifeq ($(SYSTEM),FreeBSD)
 # FreeBSD
@@ -71,6 +75,7 @@ LIBS     := $(filter-out -lc,$(LIBS))
 LIBS	 += -lfl
 endif
 
+ifneq ($(host_cpu),arm)
 ifeq ($(SYSTEM),Linux)
 # Linux
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
@@ -78,9 +83,13 @@ ifeq ($(NEEDKERB),0)
  CFLAGS  += `/usr/kerberos/bin/krb5-config --cflags`
  LIBS    += `/usr/kerberos/bin/krb5-config --libs krb5`
 endif
+endif
+endif
+
+ifeq ($(SYSTEM),Linux)
 CFLAGS	 += -DLINUX
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
-LIBS	 += -ll -ldl
+LIBS	 += -ldl
 endif
 
 LEX	 = flex -l
@@ -94,8 +103,8 @@ tg.o: tg.y lex.yy.c
 	yacc -vd $<
 	$(CC) -g -o tg.o $(YCFLAGS) -c y.tab.c
 
-trafgen:	$(OBJS)
-	$(CC) $(LDFLAGS) -static -o $@ $(OBJS) $(LIBS)
+trafgen-debug:	$(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
@@ -103,7 +112,7 @@ install:
 
 client: $(PROGRAMS)
 client-install: client
-	$(INSTALL_PROGRAM) -s trafgen$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/trafgen$(EXE)
+	$(INSTALL_PROGRAM) trafgen$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/trafgen$(EXE)
 
 clean:
 	/bin/rm -f lex.yy.c y.* *.o $(PROGRAMS)

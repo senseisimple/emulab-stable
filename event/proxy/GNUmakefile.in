@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,19 +33,24 @@ $(LIBEVENTDIR)/%.a:
 	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O2 -g -static -Wall
+CFLAGS	 += -O2 -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4c`
+CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
 
 PFLAGS    = -pthread
 PFLAGS   += -DDEBUG
 PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-PFLAGS   += `elvin-config --cflags vin4mt`
+PFLAGS   += `$(ELVIN_CONFIG) --cflags vin4mt`
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `elvin-config --libs vin4c`
+LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+
+ifeq ($(host_cpu),arm)
+else
+LDFLAGS  += -static
+PLDFLAGS  += -static
 ifeq ($(SYSTEM),Linux)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 ifeq ($(NEEDKERB),0)
@@ -54,32 +59,33 @@ ifeq ($(NEEDKERB),0)
 endif
 LIBS     += -ldl
 endif
+endif
 
-PLDFLAGS  = -pthread -static
+PLDFLAGS  = -pthread
 PLDFLAGS += -L../lib -L${OBJDIR}/lib/libtb
 PLIBS     = -levent_r -ltb
 PLIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lcrypto -lm
 
-evproxy:	evproxy.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -static -o $@ evproxy.o $(LIBS)
+evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
+	$(CC) $(LDFLAGS) -o $@ evproxy.o $(LIBS)
 
-evproxyclient:	proxyclient.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -static -o $@ proxyclient.o $(LIBS)
+evproxyclient-debug:	proxyclient.o $(LIBTBDIR)/log.o
+	$(CC) $(LDFLAGS) -o $@ proxyclient.o $(LIBS)
 
-evproxyserver:	proxyserver.o $(LIBTBDIR)/log.o
-	$(CC) $(PLDFLAGS) -static -o $@ proxyserver.o $(PLIBS)
+evproxyserver-debug:	proxyserver.o $(LIBTBDIR)/log.o
+	$(CC) $(PLDFLAGS) -o $@ proxyserver.o $(PLIBS)
 
 proxyserver.o:  proxyserver.c
 	$(CC) $(PFLAGS) -c $<
 
-proxytest:	proxytest.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -static -o $@ proxytest.o $(LIBS)
+proxytest-debug:	proxytest.o $(LIBTBDIR)/log.o
+	$(CC) $(LDFLAGS) -o $@ proxytest.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 client: evproxy
 client-install: client
-	$(INSTALL_PROGRAM) -s evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
+	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

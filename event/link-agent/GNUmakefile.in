@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,13 +19,17 @@ all:	$(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static -Wall
+CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4c`
+CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
 
-LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `elvin-config --libs vin4c`
+LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+
+ifeq ($(host_cpu),arm)
+else
+LDFLAGS  += -static
 ifeq ($(SYSTEM),Linux)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 ifeq ($(NEEDKERB),0)
@@ -34,8 +38,13 @@ ifeq ($(NEEDKERB),0)
 endif
 LIBS     += -ldl
 endif
+endif
 
-link-agent:		link-agent.o
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl
+endif
+
+link-agent-debug:	link-agent.o
 	$(CC) $(LDFLAGS) -o $@ link-agent.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
@@ -44,7 +53,7 @@ install:
 
 client: $(PROGRAMS)
 client-install: client
-	$(INSTALL_PROGRAM) -s link-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/link-agent$(EXE)
+	$(INSTALL_PROGRAM) link-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/link-agent$(EXE)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

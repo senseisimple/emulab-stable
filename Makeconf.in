@@ -15,6 +15,8 @@ export STRIP    = @STRIP@
 export RANLIB	= @RANLIB@
 export AR	= @AR@
 
+export ELVIN_CONFIG = @ELVIN_CONFIG@
+
 export JAVAC	= @JAVAC@
 export JAR	= @JAR@
 

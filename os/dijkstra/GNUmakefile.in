@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,14 +17,14 @@ all:	dijkstra
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-dijkstra:	dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o \
+dijkstra-debug:	dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o \
                 bitmath.h Exception.h SingleSource.h IpTree.h dijkstra.h \
                 Compressor.h lib.h
-	$(CXX) $(CXXFLAGS) -static dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o $(LIBS) -o dijkstra
+	$(CXX) $(CXXFLAGS) -static dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o $(LIBS) -o $@
 
 client: all
 client-install: client
-	$(INSTALL_PROGRAM) -s dijkstra$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/dijkstra$(EXE)
+	$(INSTALL_PROGRAM) dijkstra$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/dijkstra$(EXE)
 
 clean:
 	rm -f *.o dijkstra

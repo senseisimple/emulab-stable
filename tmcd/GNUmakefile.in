@@ -81,11 +81,11 @@ tmcc-shared: tmcc.c decls.h $(SSLOBJ)
 	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(SSLOBJ) \
 		$(LFLAGS) $(TMLIBS)
 
-tmcc-nossl: tmcc.c decls.h
-	$(CC) $(CFLAGS) -static -g -o tmcc-nossl $< $(LFLAGS) $(TMSLIBS)
+tmcc-nossl-debug: tmcc.c decls.h
+	$(CC) $(CFLAGS) -static -g -o $@ $< $(LFLAGS) $(TMSLIBS)
 
-findif: findif.o
-	$(CC) $(CFLAGS) -g -o findif findif.o $(LFLAGS) -static
+findif-debug: findif.o
+	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) -static
 
 ssl.o:	ssl.c ssl.h decls.h
 

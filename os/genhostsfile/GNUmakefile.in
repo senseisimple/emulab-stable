@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,8 +18,8 @@ all:	genhostsfile genfromdb genfromtopo
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-genhostsfile:	genhostsfile.o
-	$(CC) $(CFLAGS) genhostsfile.o $(LIBS) -o genhostsfile
+genhostsfile-debug:	genhostsfile.o
+	$(CC) $(CFLAGS) genhostsfile.o $(LIBS) -o $@
 
 wgraph.o:	wgraph.cc wgraph.h
 
@@ -27,7 +27,7 @@ install:	$(INSTALL_LIBEXECDIR)/genhostsfile
 
 client: genhostsfile
 client-install: client
-	$(INSTALL_PROGRAM) -s genhostsfile$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/genhostsfile$(EXE)
+	$(INSTALL_PROGRAM) genhostsfile$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/genhostsfile$(EXE)
 
 clean:
 	rm -f *.o genhostsfile genfromtopo genfromdb

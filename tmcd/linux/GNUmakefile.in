@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -75,8 +75,8 @@ sup-install:	dir-install supfile
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
-	$(INSTALL) -m 755 -s ../tmcc-nossl$(EXE) $(BINDIR)/tmcc.bin$(EXE)
-	$(INSTALL) -m 755 -s ../findif$(EXE) $(BINDIR)/findif$(EXE)
+	$(INSTALL) -m 755 ../tmcc-nossl$(EXE) $(BINDIR)/tmcc.bin$(EXE)
+	$(INSTALL) -m 755 ../findif$(EXE) $(BINDIR)/findif$(EXE)
 
 etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group

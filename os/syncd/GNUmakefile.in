@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,30 +11,35 @@ SUBDIR		= os/syncd
 
 include $(OBJDIR)/Makeconf
 
-CFLAGS	= -Wall -O2 -g -static \
+CFLAGS	= -Wall -O2 -g \
 		  -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
 LIBS	= ${OBJDIR}/lib/libtb/libtb.a
+LDFLAGS =
+
+ifneq ($(host_cpu),arm)
+LDFLAGS  += -static
+endif
 
 all:	emulab-syncd emulab-sync
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-emulab-syncd:	emulab-syncd.o version.o decls.h
-	$(CC) $(CFLAGS) emulab-syncd.o version.o $(LIBS) -o emulab-syncd
+emulab-syncd-debug:	emulab-syncd.o version.o decls.h
+	$(CC) $(CFLAGS) emulab-syncd.o version.o $(LDFLAGS) $(LIBS) -o $@
 
-emulab-sync:	emulab-sync.o version.o decls.h
-	$(CC) $(CFLAGS) emulab-sync.o version.o $(LIBS) -o emulab-sync
+emulab-sync-debug:	emulab-sync.o version.o decls.h
+	$(CC) $(CFLAGS) emulab-sync.o version.o $(LDFLAGS) $(LIBS) -o $@
 
 version.c: emulab-syncd.c 
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 client: all
 client-install: client
-	$(INSTALL_PROGRAM) -s emulab-syncd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd$(EXE)
-	$(INSTALL_PROGRAM) -s emulab-sync$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-sync$(EXE)
+	$(INSTALL_PROGRAM) emulab-syncd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd$(EXE)
+	$(INSTALL_PROGRAM) emulab-sync$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-sync$(EXE)
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)$(CLIENT_MANDIR)/man1
-	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-syncd.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
-	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-sync.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
+	$(INSTALL_DATA) $(SRCDIR)/emulab-syncd.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
+	$(INSTALL_DATA) $(SRCDIR)/emulab-sync.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
 
 check:
 	sh $(SRCDIR)/syncd_test.sh
