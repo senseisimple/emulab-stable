@@ -629,7 +629,7 @@ sub RemoveVLAN {
       }
       $RetVal = $sess->getnext($VlanPortVlan);
       @data = @{$VlanPortVlan};
-    } while ( $data[0] =~ /^vlanPortVlan/ && $RetVal < 1000 ) ;    
+    } while ( $data[0] =~ /^vlanPortVlan/ ) ;    
     my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
     if ($r == 1) {
       print STDERR "VLAN #$r is the Control VLAN, and cannot be removed.\n";
@@ -821,19 +821,17 @@ sub ListVLANs {
     my $RetVal = $sess->getnext($VlanName);
     @data = @{$VlanName};
     my $num = 0;
-    $data[1] =~ /\.(.*)/;
-    $num = $1;
     do {
+      $data[1] =~ /\.(.*)/;
+      $num = $1;
       print "Got $RetVal   \t" if $debug;
       print "$data[0]\t$data[1] ($num)\t$data[2]\n" if $debug;
-      if ( !$Names{$num} ) { $Names{$num} = $RetVal; }
+      if ( !$Names{$num} && $num < 1000 ) { $Names{$num} = $RetVal; }
       #do the getnext at the end, because if we're on the last, the next
       #one is junk to all the processing instructions...
       $RetVal = $sess->getnext($VlanName);
       @data = @{$VlanName};
-      $data[1] =~ /\.(.*)/;
-      $num = $1;
-    } while ( $data[0] =~ /^vtpVlanName/ && $num < 1000 ) ;
+    } while ( $data[0] =~ /^vtpVlanName/ ) ;
     $RetVal = $sess->getnext($VlanPortVlan);
     @data = @{$VlanPortVlan};
     my $i = $sess->{DestHost};
@@ -853,7 +851,7 @@ sub ListVLANs {
       }
       $RetVal = $sess->getnext($VlanPortVlan);
       @data = @{$VlanPortVlan};
-    } while ( $data[0] =~ /^vlanPortVlan/ && $RetVal < 1000 ) ;
+    } while ( $data[0] =~ /^vlanPortVlan/ ) ;
     
   } else { 
     die("Invalid option 'list VLANs' for device of type $device.\n");
