@@ -141,7 +141,7 @@ class hvFrameUI(wxFrame):
         self.LabelNodeName = wxStaticText(self.Controls, -1, "Node name:")
         self.NodeName = wxTextCtrl(self.Controls, -1, "", style=wxTE_PROCESS_ENTER)
         self.LabelChildCount = wxStaticText(self.Controls, -1, "Child count:  ")
-        self.ChildCount = wxStaticText(self.Controls, -1, " 0")
+        self.ChildCount = wxStaticText(self.Controls, -1, " 0  ")
         self.LabelLinksIn = wxStaticText(self.Controls, -1, "Non-tree Links in:   0")
         self.ShowLinksIn = wxButton(self.Controls, -1, "show")
         self.HideLinksIn = wxButton(self.Controls, -1, "hide")
@@ -175,8 +175,6 @@ class hvFrameUI(wxFrame):
         # begin wxGlade: hvFrameUI.__set_properties
         self.SetTitle("wxHyperViewer")
         self.SetSize((760, 651))
-        self.hypView.SetSize((559, 693))
-        self.panel_1.SetSize((517, 615))
         self.ShowLinksIn.Enable(0)
         self.HideLinksIn.Enable(0)
         self.DescendLinksIn.SetValue(1)
@@ -199,8 +197,9 @@ class hvFrameUI(wxFrame):
         self.AnimStepCount.SetToolTipString("Number of frames per second in animated moves")
         self.label_6.SetToolTipString("Number of frames per animation")
         self.window_1.SetSize((760, 619))
-        self.window_1.SplitVertically(self.panel_1, self.Controls)
+        self.window_1.SplitVertically(self.panel_1, self.Controls, 560)
         # end wxGlade
+        self.window_1.SetMinimumPaneSize(21) # Keep the controls or viewer from disappearing.
 
     def __do_layout(self):
         # begin wxGlade: hvFrameUI.__do_layout
@@ -217,9 +216,11 @@ class hvFrameUI(wxFrame):
         sizer_7 = wxBoxSizer(wxHORIZONTAL)
         sizer_6 = wxBoxSizer(wxHORIZONTAL)
         sizer_3 = wxBoxSizer(wxVERTICAL)
-        sizer_3.Add(self.hypView, 99, 0, 0)
+        sizer_3.Add(self.hypView, 99, wxEXPAND, 0)
         self.panel_1.SetAutoLayout(1)
         self.panel_1.SetSizer(sizer_3)
+        sizer_3.Fit(self.panel_1)
+        sizer_3.SetSizeHints(self.panel_1)
         Nodes.Add(self.GoToTop, 0, 0, 15)
         sizer_6.Add(self.LabelNodeName, 0, 0, 10)
         sizer_6.Add(self.NodeName, 1, wxLEFT|wxEXPAND, 5)

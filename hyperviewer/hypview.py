@@ -130,8 +130,11 @@ class hvFrame(hvFrameUI):
     def __init__(self, *args, **kwds):
 	# Set up the wxGlade part.
 	hvFrameUI.__init__(self, *args, **kwds)
+
+	# Remember the original width of the controls panel in the splitter.
+	self.controlsWidth = self.window_1.GetSize().width - self.window_1.GetSashPosition()
 	
-	self.vwr = None		# Load data under the File menu and create the viewer there.
+	self.vwr = None		# Load data and create the viewer later in ReadTopFile.
 	self.currNode = None	# Nothing selected at first.
 
 	# Control events.  (HyperViewer events are connected after loading data.)
@@ -163,6 +166,8 @@ class hvFrame(hvFrameUI):
 	EVT_SLIDER(self.AnimStepCount, -1, self.OnAnimStepCount)	  # GTK
 	
 	# Other events.
+	EVT_SIZE(self.window_1, self.OnResizeWindow)
+	EVT_SPLITTER_SASH_POS_CHANGED(self.window_1, -1, self.OnSashChanged)
 	EVT_CLOSE(self, self.OnExit)
 	# These do nothing until the vwr is instantiated below.
 	EVT_IDLE(self.hypView, self.OnIdle)
@@ -226,6 +231,7 @@ class hvFrame(hvFrameUI):
 	EVT_MIDDLE_DOWN(self.hypView, self.OnClick)
 	EVT_MIDDLE_UP(self.hypView, self.OnClick)
 	EVT_MOTION(self.hypView, self.OnMove)
+	EVT_SIZE(self.hypView, self.OnResizeCanvas)
 
 	self.OnGoToTop(None)			     # Show info for the top node.
 	
@@ -236,7 +242,7 @@ class hvFrame(hvFrameUI):
     def DrawGL(self):
 	##print "in DrawGL"
 	self.vwr.drawFrame()
-	pass	
+	pass
     
     ##
     # The GUI displays information about the currently selected node.
@@ -479,7 +485,7 @@ class hvFrame(hvFrameUI):
 	pass
     
     ##
-    # Mouse motion events.
+    # Mouse motion events in the HyperViewer canvas.
     def OnMove(self, mouseEvent):
 	# Hyperviewer calls motion when a mouse button is clicked "active"
 	if mouseEvent.LeftIsDown() or mouseEvent.MiddleIsDown():
@@ -490,6 +496,31 @@ class hvFrame(hvFrameUI):
 	    self.vwr.passive(mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
 	    pass
 	self.vwr.redraw()
+	pass
+    
+    ##
+    # Resizing for the splitter window.
+    def OnResizeWindow(self, sizeEvent):
+	# Keep the width of the controls panel in the splitter constant.
+	self.window_1.SetSashPosition(self.window_1.GetSize().width - self.controlsWidth)
+	pass
+
+    def OnSashChanged(self, splitterEvent):
+	# Remember an intentional change in the controls panel width.
+	self.controlsWidth = self.window_1.GetSize().width - splitterEvent.GetSashPosition()
+	pass
+
+    ##
+    # Resizing for the HyperViewer canvas.
+    def OnResizeCanvas(self, sizeEvent):
+	# Tie the size of the canvas to the panel it's in.
+	size = self.panel_1.GetSize()
+	# We get two resize events: one with a width of 20.  Ignore it.
+	if size.width >= 20:
+	    self.hypView.SetSize(size)
+
+	    # Tell HyperViewer about the change.
+	    self.vwr.reshape(size.width, size.height)
 	pass
     
     ##
