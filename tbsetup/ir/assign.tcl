@@ -76,6 +76,15 @@ while {[gets $fp line] >= 0} {
     set links([lindex $line 0]) [lrange $line 1 end]
 }
 
+readto $fp "START lans"
+while {[gets $fp line] >= 0} {
+    if {[regexp "^\\#" $line] == 1} {continue}
+    if {$line == {}} {continue}
+    if {$line == "END lans"} {break}
+
+    set lans([lindex $line 0]) [lrange $line 1 end]
+}
+
 # close the ir for now
 close $fp
 
@@ -84,6 +93,26 @@ set tmpfile "/tmp/[pid].top"
 puts "Writing topfile ($tmpfile)"
 
 set topfp [open $tmpfile w]
+
+# translate lans into nodes and links
+foreach lan [array names lans] {
+    set laninfo $lans($lan)
+    set nodelist [lindex $laninfo 0]
+    set bw [lindex $laninfo 1]
+    set delay [lindex $laninfo 2]
+    set loss [lindex $laninfo 3]
+    set extlinks [lrange $laninfo 4 end]
+
+    # we create a node with the same name as the lan and type of lan
+    set nodes($lan) "lan $extlinks"
+    # the links of the node will be one for every node in the lan
+    # plus one for every external link to the lan
+    foreach node $nodelist {
+	set linkname lanlink-$lan-$node
+	set links($linkname) "$node -1 $lan -1 $bw $bw $delay $delay $loss"
+	set nodes($lan) "$nodes($lan) $linkname"
+    }
+}
 
 # calculate delay stuff
 set delayI 0
@@ -126,6 +155,7 @@ close $topfp
 # run assign on the topfile and $testbed
 puts "Running assign ($assign -b -t $testbed $tmpfile)"
 puts "  Log in [file dirname $irfile]/assign.log"
+
 set run 0
 while {$run < $maxrun} {
     set assignfp [open "|$assign -b -t $testbed $tmpfile | tee -a [file dirname $irfile]/assign.log" r]
@@ -143,6 +173,7 @@ while {$run < $maxrun} {
 	    continue
 	}
     }
+    puts "Done with assign"
     if {$problems > 0} {
 	incr run
 	puts "Run $run resulted in $problems violations."
@@ -166,6 +197,7 @@ while {$run < $maxrun} {
     }
     break
 }
+
 if {$run >= $maxrun} {
     puts "Could not find solution (not deleting $tmpfile)!"
     exit 1
@@ -183,6 +215,7 @@ puts $fp "START nodes"
 foreach switch [array names map] {
     foreach pair $map($switch) {
 	set v2pmap([lindex $pair 0]) [lindex $pair 1]
+	set p2vmap([lindex $pair 1]) [lindex $pair 0]
 	puts $fp "$pair"
     }
 }
@@ -216,39 +249,119 @@ foreach link [array names plinks] {
 proc node_name {s} {
     return [lindex [split $s -] 0]
 }
-foreach link [array names linktmp] {
-    # Any "duplicates" should go together.
-    # RULES: Can only swap a and b or c and d (i.e. within a link)
-    # This will only happen in the case of a delay node which will
-    # have four elements (two links of src/dst), we just check every
-    # case.
-    if {[llength $linktmp($link)] == 4} {
-	set a [lindex $linktmp($link) 0]
-	set b [lindex $linktmp($link) 1]
-	set c [lindex $linktmp($link) 2]
-	set d [lindex $linktmp($link) 3]
-	if {[node_name $b] == [node_name $d]} {
-	    set tmp $d
-	    set d $c
-	    set c $tmp
-	} elseif {[node_name $a] == [node_name $c]} {
-	    set tmp $b
-	    set b $a
-	    set a $tmp
-	} elseif {[node_name $a] == [node_name $d]} {
-	    set tmp $b
-	    set b $a
-	    set a $tmp
-	    set tmp $d
-	    set d $c
-	    set c $tmp
-	}
-	set linktmp($link) [list $a $b $c $d]
-    }
-    puts $fp "$link $linktmp($link)"
+proc is_lan {n} {
+    return [regexp {^lan[0-9]+$} [node_name $n]]
 }
-
+foreach link [array names linktmp] {
+    # Any sub-link (pair of nodes) with a lan node in it
+    # should be recorded for inclusion in the lan section and
+    # not spit out in the links section.  If there is another 
+    # sub-link it should be listed under a virtual link of the
+    # lan name.  All such sublinks should go under the same 
+    # virtual link.
+    set lanlink 0
+    foreach item $linktmp($link) {
+	if {[is_lan $item]} {set lanlink 1}
+    }
+    if {$lanlink == 0} {
+	# Any "duplicates" should go together.
+	# RULES: Can only swap a and b or c and d (i.e. within a link)
+	# This will only happen in the case of a delay node which will
+	# have four elements (two links of src/dst), we just check every
+	# case.
+	if {[llength $linktmp($link)] == 4} {
+	    set a [lindex $linktmp($link) 0]
+	    set b [lindex $linktmp($link) 1]
+	    set c [lindex $linktmp($link) 2]
+	    set d [lindex $linktmp($link) 3]
+	    if {[node_name $b] == [node_name $d]} {
+		set tmp $d
+		set d $c
+		set c $tmp
+	    } elseif {[node_name $a] == [node_name $c]} {
+		set tmp $b
+		set b $a
+		set a $tmp
+	    } elseif {[node_name $a] == [node_name $d]} {
+		set tmp $b
+		set b $a
+		set a $tmp
+		set tmp $d
+		set d $c
+		set c $tmp
+	    }
+	    set linktmp($link) [list $a $b $c $d]
+	}
+	puts $fp "$link $linktmp($link)"
+    } else {
+	if {[llength $linktmp($link)] == 2} {
+	    set A [lindex $linktmp($link) 0]
+	    set B [lindex $linktmp($link) 1]
+	    if {[is_lan $A]} {
+		lappend lansection($p2vmap([node_name $A])) [node_name $B]
+	    } 
+	    if {[is_lan $B]} {
+		lappend lansection($p2vmap([node_name $B])) [node_name $A]
+	    }
+	    set linktmp($link) [list $A $B]
+	    puts $fp "$link $A $B"
+	} else {
+	    set A [lindex $linktmp($link) 0]
+	    set B [lindex $linktmp($link) 1]
+	    set C [lindex $linktmp($link) 2]
+	    set D [lindex $linktmp($link) 3]
+	    set ABlan ""
+	    set CDlan ""
+	    if {[is_lan $A] || [is_lan $B]} {
+		# in a 4 link only one of the two will be a LAN
+		if {[is_lan $A]} {
+		    set ABlan [node_name $A]
+		    lappend lansection($p2vmap([node_name $A])) [node_name $B]
+		} else {
+		    set ABlan [node_name $B]
+		    lappend lansection($p2vmap([node_name $B])) [node_name $A]
+		}
+	    }
+	    if {[is_lan $C] || [is_lan $D]} {
+		# in a 4 link only one of the two will be a LAN
+		if {[is_lan $C]} {
+		    set CDlan [node_name $C]
+		    lappend lansection($p2vmap([node_name $C])) [node_name $D]
+		} else {
+		    set CDlan [node_name $D]
+		    lappend lansection($p2vmap([node_name $D])) [node_name $C]
+		}
+	    }
+	    if {$ABlan != "" && $CDlan != ""} {
+		# delayed lan<->lan link
+		set linktmp($link) [list $A $B $D $C]
+		puts $fp "$link $A $B $D $C"
+	    } else {
+		# delayed lan<->node link
+		if {$ABlan != ""} {
+		    lappend lanlinks($p2vmap($ABlan)) $C $D
+		} else {
+		    lappend lanlinks($p2vmap($CDlan)) $A $B
+		}
+	    }
+	}
+    }
+}
+if {[info exists lanlinks]} {
+    foreach lanlink [array names lanlinks] {
+	puts $fp "$lanlink $lanlinks($lanlink)"
+    }
+}
 puts $fp "END links"
+
+# write /virtual/lans section
+if {[info exists lansection]} {
+    puts $fp "START lans"
+    foreach lan [array names lansection] {
+	puts $fp "$lan $lansection($lan)"
+    }
+    puts $fp "END lans"
+}
 puts $fp "END virtual"
 
 ## now we apprend the vlan section
@@ -265,16 +378,95 @@ proc getmac {s} {
     }
 }
 
+proc find_base_lan {lan} {
+    global lanvlan
+
+    set current $lan
+    puts "find_base_lan $lan"
+    while {[info exists lanvlan($current)] &&
+	   [regexp {^=>([^ ]+)$} $lanvlan($current) match next] == 1} {
+	puts "  ->$next"
+	set current $next
+    }
+    puts "  ended on $current"
+    if {! [info exists lanvlan($current)]} {
+	return ""
+    } else {
+	return $current
+    }
+}
+proc tracelanvlan {a b op} {
+    upvar #0 $a A
+    puts "${a}($b) = $A($b)"
+}
+trace variable lanvlan w "tracelanvlan"
 foreach link [array names plinks] {
+puts "!plink $link - $plinks($link)"
     set t $plinks($link)
     set type [lindex $t 0]
     set name [get_link_name $link]
     switch $type {
 	"intraswitch" {
-	    # 2 links, but each goes to a switch
-	    set srcmac [getmac [lindex $t 2]]
-	    set dstmac [getmac [lindex $t 4]]
-	    lappend linktmpb($name) [list $srcmac $dstmac]
+	    set nodeA [lindex $t 1]
+	    set nodeB [lindex $t 3]
+	    if {[is_lan $nodeA]} {
+		set lan [node_name $nodeA]
+		set laninfo [lindex $t 4]
+	    } elseif {[is_lan $nodeB]} {
+		set lan [node_name $nodeB]
+		set laninfo [lindex $t 2]
+	    } else {
+		set lan {}
+	    }
+	    if {$lan == {}} {
+		# 2 links, but each goes to a switch
+		set srcmac [getmac [lindex $t 2]]
+		set dstmac [getmac [lindex $t 4]]
+		lappend linktmpb($name) [list $srcmac $dstmac]
+	    } elseif {[is_lan $nodeA] && [is_lan $nodeB]} {
+		# undelayed lan<->lan link
+		set Abase [find_base_lan $p2vmap([node_name $nodeA])]
+		set Bbase [find_base_lan $p2vmap([node_name $nodeB])]
+		puts "lan<->lan $nodeA ($Abase) $nodeB ($Bbase)"
+		if {$Abase == "" && $Bbase == ""} {
+		    set base $p2vmap([node_name $nodeA])
+		    set lanvlan($p2vmap([node_name $nodeB])) "=>$base"
+		} elseif {$Abase == ""} {
+		    set base $Bbase
+		    set lanvlan($p2vmap([node_name $nodeA])) "=>$base"
+		    if {$base != $p2vmap([node_name $nodeB])} {
+			set lanvlan($p2vmap([node_name $nodeB])) "=>$base"
+		    }
+		} elseif {$Bbase == ""} {
+		    puts "!=!=!=!="
+		    set base $Abase
+		    set lanvlan($p2vmap([node_name $nodeB])) "=>$base"
+		    if {$base != $p2vmap([node_name $nodeA])} {
+			set lanvlan($p2vmap([node_name $nodeA])) "=>$base"
+		    }
+		} else {
+		    puts stderr "Assert failure, two undelayed connected lans go to different sets - Internal error."
+		    exit 1
+		}
+		# No actual macs in this list
+		if {! [info exists lanvlan($base)]} {
+		    set lanvlan($base) ""
+		}
+	    } else {
+		# lan<->node link
+		set base [find_base_lan $p2vmap($lan)]
+		puts "$p2vmap($lan) => $base"
+		if {$base == ""} {set base $p2vmap($lan)}
+		lappend lanvlan($base) [getmac $laninfo]
+		# hack to get the vlan info in, the other
+		# vlan info showed up in the non-lan pair.
+		set mac [getmac [lindex $t 2]]
+		if {$mac == "null)"} {
+		    set mac [getmac [lindex $t 4]]
+		}
+		lappend linktmpb($name) [list $mac NA]
+#		set vlaninfo($name-1) [list $mac NA]
+	    }
 	}
 	"interswitch" {
 	    # 3 or four links
@@ -303,8 +495,16 @@ foreach link [array names linktmpb] {
     set i 0
     foreach l $linktmpb($link) {
 	set vlaninfo($link-$i) $l
-	puts $fp "$link-$i $l"
+	if {([lindex $l 0] != "NA") &&
+	    ([lindex $l 1] != "NA")} {
+	    puts $fp "$link-$i $l"
+	}
 	incr i
+    }
+}
+foreach lan [array names lanvlan] {
+    if {[regexp {^=>} $lanvlan($lan)] == 0} {
+	puts $fp "$lan $lanvlan($lan)"
     }
 }
 
@@ -313,6 +513,7 @@ puts $fp "END vlan"
 # add delay seciton
 puts $fp "START delay"
 foreach line $delayinfo {
+    puts "! $line"
     puts $fp [lrange $line 0 3]
 }
 puts $fp "END delay"
@@ -320,6 +521,12 @@ puts $fp "END delay"
 close $fp
 
 file delete $tmpfile
+
+# DEBUG
+foreach line [array names vlaninfo] {
+    puts "VLANINFO: $line - $vlaninfo($line)"
+}
+# END DEBUG
 
 # Add delay info to database
 # Note on interface numbers:  A delayed link has two vlans
@@ -335,8 +542,15 @@ foreach line $delayinfo {
     
     # extra macs of the two interfaces
     set mac0 [lindex $vlaninfo($link-0) 1]
+    if {$mac0 == "NA"} {
+	set mac0 [lindex $vlaninfo($link-0) 0]
+    }
     set mac1 [lindex $vlaninfo($link-1) 0]
+    if {$mac1 == "NA"} {
+	set mac1 [lindex $vlaninfo($link-0) 1]
+    }
 
+puts "!!$line = $mac0 $mac1"
     # use database to get interface numbers
     sql query $DB "select card from interfaces where mac = \"$mac0\""
     set int0 [sql fetchrow $DB]
@@ -349,10 +563,10 @@ foreach line $delayinfo {
     set pnode $v2pmap($node)
 
     # remove any current entry in the delays table
-    sql exec $DB "delete from delays where node_id = \"$pnode\""
-    
+#    sql exec $DB "delete from delays where node_id = \"$pnode\""
+
     # add this entry
-    sql exec $DB "insert into delays (node_id,card0,card1,delay,bandwidth,lossrate) values (\"$pnode\",\"$int0\",\"$int1\",\"$delay\",\"$bw\",\"$loss\")"
+#    sql exec $DB "insert into delays (node_id,card0,card1,delay,bandwidth,lossrate) values (\"$pnode\",\"$int0\",\"$int1\",\"$delay\",\"$bw\",\"$loss\")"
 }
 
 puts "Done"
