@@ -119,6 +119,8 @@ typedef struct {
 	char		nickname[TBDB_FLEN_VNAME];
 	char		type[TBDB_FLEN_NODETYPE];
 	char		class[TBDB_FLEN_NODECLASS];
+	char		creator[TBDB_FLEN_UID];
+	char		swapper[TBDB_FLEN_UID];
 	char		role[256];
 	char		testdb[256];
 } tmcdreq_t;
@@ -172,6 +174,7 @@ COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
 COMMAND_PROTOTYPE(doslothdparams);
+COMMAND_PROTOTYPE(doprogagents);
 
 struct command {
 	char	*cmdname;
@@ -213,6 +216,7 @@ struct command {
 	{ "tarball",	doatarball},
 	{ "jailconfig",	dojailconfig},
         { "sdparams",   doslothdparams},
+        { "programs",   doprogagents},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1032,10 +1036,16 @@ COMMAND_PROTOTYPE(doifconfig)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
+		/*
+		 * Note that PMAC might be NULL, which happens if there is
+		 * no underlying phys interface (say, colocated nodes in a
+		 * link).
+		 */
 		sprintf(buf,
 			"IFACETYPE=veth "
 			"INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s\n",
-			row[1], NETMASK, row[0], row[2], row[3]);
+			row[1], NETMASK, row[0], row[2],
+			row[3] ? row[3] : "none");
 
 		client_writeback(sock, buf, strlen(buf), tcp);
 		info("IFCONFIG: %s", buf);
@@ -1690,7 +1700,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 "left join veth_interfaces as v on "
-		 " v.node_id=d.node_id and v.iface=d.iface and v.IP=d.ip "
+		 " v.node_id=d.node_id and v.IP=d.ip "
 		 "where d.node_id='%s' %s",
 		 28, reqp->pnodeid, buf);
 	if (!res) {
@@ -2057,6 +2067,32 @@ COMMAND_PROTOTYPE(dohosts)
 		host = host->next;
 		hostcount++;
 	}
+#if 0
+	/*
+	 * List of control net addresses for jailed nodes.
+	 * Temporary.
+	 */
+	res = mydb_query("select r.node_id,r.vname,n.jailip "
+			 " from reserved as r "
+			 "left join nodes as n on n.node_id=r.node_id "
+			 "where r.pid='%s' and r.eid='%s' "
+			 "      and jailflag=1 and jailip is not null",
+			 3, reqp->pid, reqp->eid);
+	if (res) {
+	    if ((nrows = mysql_num_rows(res))) {
+		while (nrows--) {
+		    row = mysql_fetch_row(res);
+
+		    sprintf(buf, "NAME=%s IP=%s ALIASES='%s.%s.%s.%s'\n",
+			    row[0], row[2], row[1], reqp->eid, reqp->pid,
+			    OURDOMAIN);
+		    client_writeback(sock, buf, strlen(buf), tcp);
+		    hostcount++;
+		}
+	    }
+	    mysql_free_result(res);
+	}
+#endif
 	info("HOSTNAMES: %d hosts in list\n", hostcount);
  cleanup:
 	host = hosts;
@@ -2279,31 +2315,8 @@ COMMAND_PROTOTYPE(dostartcmd)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "CMD='%s' UID=", row[0]);
+	sprintf(buf, "CMD='%s' UID=%s\n", row[0], reqp->swapper);
 	mysql_free_result(res);
-
-	/*
-	 * Now get the UID from the experiments table and tack that onto
-	 * the string just created.
-	 */
-	res = mydb_query("select expt_head_uid from experiments "
-			 "where eid='%s' and pid='%s'",
-			 1, reqp->eid, reqp->pid);
-
-	if (!res) {
-		error("STARTUPCMD: %s: DB Error getting UID!\n", reqp->nodeid);
-		return 1;
-	}
-
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		return 0;
-	}
-	row = mysql_fetch_row(res);
-	strcat(buf, row[0]);
-	strcat(buf, "\n");
-	mysql_free_result(res);
-	
 	client_writeback(sock, buf, strlen(buf), tcp);
 	info("STARTUPCMD: %s", buf);
 	
@@ -2983,7 +2996,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	}
 	sprintf(&buf[strlen(buf)], " DISK=%s%d\n", disktype, disknum);
 	mysql_free_result(res);
-
+	
 	client_writeback(sock, buf, strlen(buf), tcp);
 	info("doloadinfo: %s", buf);
 	
@@ -3223,8 +3236,6 @@ COMMAND_PROTOTYPE(dostate)
  */
 COMMAND_PROTOTYPE(docreator)
 {
-	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 
 	/*
@@ -3233,29 +3244,9 @@ COMMAND_PROTOTYPE(docreator)
 	if (!reqp->allocated)
 		return 0;
 
-	/*
-	 * Now get the UID from the experiments table.
-	 */
-	res = mydb_query("select expt_head_uid from experiments "
-			 "where eid='%s' and pid='%s'",
-			 1, reqp->eid, reqp->pid);
-
-	if (!res) {
-		error("CREATOR: %s: DB Error getting UID!\n", reqp->nodeid);
-		return 1;
-	}
-
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		return 0;
-	}
-	row = mysql_fetch_row(res);
-	sprintf(buf, "CREATOR=%s\n", row[0]);
-	mysql_free_result(res);
-
+	sprintf(buf, "CREATOR=%s\n", reqp->creator);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	info("CREATOR: %s", buf);
-
 	return 0;
 }
 
@@ -3482,7 +3473,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		res = mydb_query("select t.class,t.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
-				 " np.role "
+				 " np.role,e.expt_head_uid,e.expt_swap_uid "
 				 " from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3495,12 +3486,13 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=np.type and i.card=t.control_net "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 11, reqp->vnodeid, inet_ntoa(ipaddr));
+				 13, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
-				 " n.update_accounts,n.role " 
+				 " n.update_accounts,n.role, "
+				 " e.expt_head_uid,e.expt_swap_uid "
 				 " from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3510,7 +3502,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.card=t.control_net "
 				 "where i.IP='%s'",
-				 11, inet_ntoa(ipaddr));
+				 13, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3547,6 +3539,12 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 			strncpy(reqp->nickname, row[6],sizeof(reqp->nickname));
 		else
 			strcpy(reqp->nickname, reqp->nodeid);
+
+		strcpy(reqp->creator, row[11]);
+		if (row[12]) 
+			strcpy(reqp->swapper, row[12]);
+		else
+			strcpy(reqp->swapper, reqp->swapper);
 
 		/*
 		 * If there is no gid (yes, thats bad and a mistake), then 
@@ -3650,38 +3648,6 @@ nodeidtocontrolnet(char *nodeid, int *net)
 
 	return 0;
 }
-
-#if 0
-/*
- * Map vnode to its phys node.
- */
-static int	vnodetophysnode(char *nodeid, char *physnode);
-
-static int
-vnodetophysnode(char *nodeid, char *physnode)
-{
-	MYSQL_RES	*res;
-	MYSQL_ROW	row;
-
-	res = mydb_query("select phys_nodeid from nodes where node_id='%s'",
-			 1, nodeid);
-
-	if (!res) {
-		error("vnodetophysnode: %s: DB Error!\n", nodeid);
-		return 1;
-	}
-
-	if (! (int)mysql_num_rows(res)) {
-		mysql_free_result(res);
-		return 1;
-	}
-	row = mysql_fetch_row(res);
-	strcpy(physnode, row[0]);
-	mysql_free_result(res);
-
-	return 0;
-}
-#endif
 
 /*
  * Check for DBname redirection.
@@ -4213,25 +4179,9 @@ COMMAND_PROTOTYPE(doatarball)
 		goto bad;
 	}
 	if (grp->gr_gid != statbuf.st_gid) {
-		res = mydb_query("select expt_head_uid from experiments "
-				 "where eid='%s' and pid='%s'",
-				 1, reqp->eid, reqp->pid);
-
-		if (!res) {
-			error("GETTAR: %s: DB Error getting expt head uid!\n",
-			      reqp->nodeid);
-			goto bad;
-		}
-		if ((int)mysql_num_rows(res) == 0) {
-			error("GETTAR: %s: Error getting expt head uid!\n",
-			      reqp->nodeid);
-			goto bad;
-		}
-		row = mysql_fetch_row(res);
-		
-		if ((pwd = getpwnam(row[0])) == NULL) {
+		if ((pwd = getpwnam(reqp->creator)) == NULL) {
 			error("GETTAR: %s: Could map uid %s!",
-			      reqp->nodeid, row[0]);
+			      reqp->nodeid, reqp->creator);
 			mysql_free_result(res);
 			goto bad;
 		}
@@ -4362,7 +4312,7 @@ COMMAND_PROTOTYPE(dojailconfig)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		low, high, sport;
+	int		low, high;
 
 	/*
 	 * Only vnodes get a jailconfig of course, and only allocated ones.
@@ -4402,10 +4352,11 @@ COMMAND_PROTOTYPE(dojailconfig)
 	mysql_free_result(res);
 
 	/*
-	 * Now need the sshdport for this node.
+	 * Now need the sshdport and jailip for this node.
 	 */
-	res = mydb_query("select sshdport from nodes where node_id='%s'",
-			 1, reqp->nodeid);
+	res = mydb_query("select sshdport,jailip from nodes "
+			 "where node_id='%s'",
+			 2, reqp->nodeid);
 	
 	if (!res) {
 		error("JAILCONFIG: %s: DB Error getting config!\n",
@@ -4418,10 +4369,13 @@ COMMAND_PROTOTYPE(dojailconfig)
 		return 0;
 	}
 	row   = mysql_fetch_row(res);
-	sport = atoi(row[0]);
-	mysql_free_result(res);
+
+	bzero(buf, sizeof(buf));
+	if (1 && row[1]) {
+		sprintf(buf, "JAILIP=\"%s,%s\"\n", row[1], "255.255.255.255");
+	}
 	
-	sprintf(buf,
+	sprintf(&buf[strlen(buf)], 
 		"PORTRANGE=\"%d,%d\"\n"
 		"SSHDPORT=%d\n"
 		"SYSVIPC=1\n"
@@ -4430,9 +4384,10 @@ COMMAND_PROTOTYPE(dojailconfig)
 		"INADDRANY=1\n"
 		"ROUTING=1\n"
 		"DEVMEM=1\n",
-		low, high, sport);
+		low, high, atoi(row[0]));
 
 	client_writeback(sock, buf, strlen(buf), tcp);
+	mysql_free_result(res);
 
 	/*
 	 * Now return the IP interface list that this jail has access to.
@@ -4488,3 +4443,58 @@ COMMAND_PROTOTYPE(doslothdparams)
   client_writeback(sock, buf, strlen(buf), tcp);
   return 0;
 }
+
+/*
+ * Return program agent info.
+ */
+COMMAND_PROTOTYPE(doprogagents)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("PROGAGENTS: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	res = mydb_query("select v.vname from virt_agents as v "
+			 "left join event_objecttypes as e on "
+			 "  e.idx=v.objecttype "
+			 "where e.type='PROGRAM' and "
+			 "      v.vnode='%s' and v.pid='%s' and v.eid='%s'",
+			 1, reqp->nickname, reqp->pid, reqp->eid);
+
+	if (!res) {
+		error("PROGRAM: %s: DB Error getting virt_agents\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	/*
+	 * First spit out the UID, then the agents one to a line.
+	 */
+	sprintf(buf, "UID=%s\n", reqp->swapper);
+	client_writeback(sock, buf, strlen(buf), tcp);
+	info("PROGAGENTS: %s", buf);
+	
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf, "AGENT=%s\n", row[0]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		info("PROGAGENTS: %s", buf);
+	}
+	mysql_free_result(res);
+	return 0;
+}
+
