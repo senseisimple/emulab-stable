@@ -41,6 +41,12 @@ $| = 1;
 #
 my $default_switchport_speed    = 100000;
 
+#
+# Yet more bogosity - we hardcode this weight, which is given to wide-area
+# (primarily plab) nodes to prefer spreading across sites
+#
+my $site_weight = 0.99;
+
 ######################################################################
 
 my $TBROOT = "@prefix@";
@@ -318,7 +324,7 @@ foreach $node (keys(%nodes)) {
 if ($widearea) {
     $result =
 	DBQueryFatal("select count(a.node_id),a.type,a.phys_nodeid,aa.type, ".
-		     "  ns.status ".
+		     "  ns.status, wn.site ".
 		     "  from nodes as a ".
  		     "left join reserved as b on a.node_id=b.node_id ".
 		     "left join nodes as aa on aa.node_id=a.phys_nodeid ".
@@ -326,12 +332,15 @@ if ($widearea) {
 		     "left join node_status as ns on ".
 		     "     a.phys_nodeid=ns.node_id ".
 		     "left join node_types as t on t.type=a.type ".
+		     "left join widearea_nodeinfo as wn on ".
+		     "     wn.node_id=a.phys_nodeid ".
 		     "where  (a.role='virtnode' and t.isremotenode=1 and ".
 		     "        (b.node_id is null and ".
 		     "         !(m.pid='$DEADPID' and m.eid='$DEADEID'))) ".
 		     "group by a.phys_nodeid");
     
-    while (($count,$type,$physnode,$ptype,$status) = $result->fetchrow_array) {
+    while (($count,$type,$physnode,$ptype,$status,$site)
+	    = $result->fetchrow_array) {
 	my @types;
 	my @features;
 	my @flags;
@@ -352,6 +361,13 @@ if ($widearea) {
 	#
 	if ($status && ($status ne 'up')) {
 	    push @features, "down:1";
+	}
+
+	#
+	# Mark which site this node belongs to
+	#
+	if ($site) {
+	    push @features, "*&$site:$site_weight";
 	}
 
 	#
