@@ -38,6 +38,8 @@
  */
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -45,6 +47,7 @@
 #include <netinet/in.h>
 #include <net/ethernet.h>
 #ifdef __FreeBSD__
+#include <err.h>
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
@@ -64,10 +67,9 @@ usage()
 	exit(1);
 }
 
+int
 main(int argc, char **argv)
 {
-	unsigned char	ether_addr[ETHER_ADDR_LEN];
-	
 	if (argc != 2)
 		usage();
 
