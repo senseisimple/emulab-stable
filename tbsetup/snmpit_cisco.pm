@@ -906,12 +906,9 @@ sub setPortVlan($$@) {
 	#
 	# Do the acutal SNMP command
 	#
-	my $RetVal = $self->{SESS}->set([$PortVlanMemb,$port,$vlan_number,
-					 'INTEGER']);
-	if (!$RetVal) {
-	    my $RetValString = defined($RetVal) ? $RetVal : "(undefined)";
-	    print STDERR "ERROR - Failed to put $port on $self->{NAME} into " .
-	    	"VLAN $vlan_number - Error was $RetValString\n";
+	my $snmpvar = [$PortVlanMemb,$port,$vlan_number,'INTEGER'];
+	my $retval = snmpitSetWarn($self->{SESS},$snmpvar);
+	if (!$retval) {
 	    $errors++;
 	    next;
 	} else {
