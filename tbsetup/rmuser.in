@@ -228,7 +228,6 @@ DBQueryFatal("delete from widearea_accounts where uid='$user'");
 #
 # Then some other pidly tables.
 # 
-DBQueryFatal("delete from lastlogin where uid='$user'");
 DBQueryFatal("delete from login where uid='$user'");
 DBQueryFatal("delete from nodeuidlastlogin where uid='$user'");
 DBQueryFatal("delete from uidnodelastlogin where uid='$user'");
