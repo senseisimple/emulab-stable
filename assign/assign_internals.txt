@@ -1,0 +1,313 @@
+
+This document attempts to describe some of the internals of assign.
+Much of the simulated annealing code of assign is not documented here
+as it was not written by this author.  What is covered is a high level
+overview and details of the scoring code.
+
+Overview
+--------
+
+assign attempts to solve a graph to graph mapping problem using
+simulated annealing.  The 'physical' graph consists of nodes (pnodes),
+links (plinks), and switches.  The virtual graph consists of nodes
+(vnodes) and links (vlinks).  As assign runs it matches vnodes to
+pnodes and vlinks to plinks.  An incremental scoring system keeps
+track of the running score, both as a quality (reflected as a low
+score) and a number of violations.  A correct solution is a solution
+with 0 violations.  A good solution is a correct solution with a low
+score.  Assign uses simulated annealing to attempt to minimize both
+violations and score.
+
+Simulated Annealing
+-------------------
+
+Simulate annealing works by randomly shuffling the state of a problem
+around.  In general changes that result in a increase in score are
+ignored while those resulting in a decrease are accepted.  The
+problem with this approach is that it is easy to fall into a local
+minima.  To avoid this in simulated annealing there is a random chance
+of accepting a change with an increase in score.  This chance starts
+rather high and as the algorithm proceeds steadily decreases.  The
+likelihood of accepting a "bad" change is reflected in the
+temperature.  Once the temperature has reach a threshold the algorithm
+exits and prints out the best solution found.  A good visual metaphor
+is to view the solution space as a hilly landscape with the altitude
+reflecting the score.  The current solution is a boulder.  During
+simulated annealing the landscape is shaken causing the boulder to
+bounce about.  As time goes on the landscape shakes less and less.
+
+Changes and Scoring
+-------------------
+
+The simulated annealing loop interfaces with the scoring system and
+the data via two routines, add_node and remove_node.  Both routines
+update the data structures appropriately and modify the score and
+violations count.  add_score takes a vnode and a pnode to map it to
+and returns whether that match is even remotely valid or not.
+remove_node just takes a vnode.  The initial state of the mapping is
+assumed to be the null mapping.  I.e., no vnodes have been mapped and
+thus no physical resources used.  This starts with a violation count
+equal to the number of vnodes as each unmapped vnode causes one
+violation.
+
+The Type System
+---------------
+
+Each vnode has a type and a valid solution must match each vnode to a
+pnode that can support that type.  A vnode has a single type but a
+pnode may be able to support several types and even have multiple
+vnodes in a single vnode.  For example, a standard testbed PC with
+four interfaces can either be a test node or up to two delay nodes.  A
+pnode that has not been matched to a vnode is called virgin and can
+take on any of its types.  Once it has been mapped to a vnode it
+becomes typed and is locked into a certain type (that of the vnode).
+When add_score is called the first thing checked is whether the pnode
+has a suitable type for the vnode.  If it is virgin then all its types
+are checked, otherwise only its current type is checked.  If the types
+can not be matched then add_score returns an invalid condition,
+otherwise it continues on.
+
+Each type of a pnode also has a limit.  This is the number of vnodes
+of that type that can fit in the pnode.  A vnode can not be placed in a pnode unless there is room left.
+
+Under no conditions is a vnode mapped to a switch.
+
+Links
+-----
+
+Each vlink has the amount of bandwidth is uses.  Each plink has its
+bandwidth capacity and two arbitrary strings which are associated with
+each end.  These strings are not used for any scoring purposes and are
+just passed through, they are their for the use of the user.  A
+virtual to physical link mapping comes in one of three types.  DIRECT
+links represent physical wires connecting one node directly to
+another.  INTRASWITCH links are links that go from a node to a switch
+and then from that switch to the destination node.  INTERSWITCH links
+go from a node to a switch, then through one or more interconnects to
+another switch, and finally to the destination node.  DIRECT mappings
+are always one to one, i.e. there is only one plink corresponding to
+the vlink.  In INTRASWITCH maps there are two plinks for the vlink;
+one to the switch, and one from the switch.  In INTERSWITCH maps there
+are at least three (to the switch, at least one interconnect, and from
+the final switch to the destination) and can be any number.
+
+For interswitch plinks (switch to switch links) any number of vlinks
+can use the plink.  For all other plinks only a single vlink is
+allowed to use the plink without violations.  Every vlink beyond the
+first results in a violation.  Violations also occur for every vlink
+that causes the used bandwidth of a plink to exceed the allowed
+bandwidth.
+
+The switches and their interconnects are collectively called the
+switch fabric.  The shortest path between any two switches is
+precomputed.  This means that every interswitch link between the same
+two switches will use the same path.  This also means that any
+switches connected by multiple links will only use a single link.  For
+bandwidth calculating purposes multiple links between switches should
+be collated into a single link.
+
+
+LEDA
+----
+
+Assign makes heavy use of LEDA.  Before getting deeply into the code
+it would be a good idea to become familiar with LEDA's parameterized
+GRAPHs and other basic data structures.
+
+
+Overview of the Code
+--------------------
+
+CC Files:
+
+assign.cc - Contains the simulated annealing loop and all
+initialization code, including main().
+
+score.cc - Contains init_score, add_node, remove_node and all
+associated helper routines.
+
+parse_top.cc - Contains parse_top which parses and sets up the virtual
+topology.
+
+parse_ptop.cc - Contains parse_ptop which parses and sets up the
+physical topology.
+
+
+Header Files:
+
+common.h - Contains all the parameters including all the score
+amounts.
+
+score.h - Defines the datastructure and prototypes for the scoring
+code.
+
+physical.h - Defines the physical elements: pnodes, plinks, and switch
+fabric structures.
+
+virtual.h - Defines the virtual elements: vnodes and vlinks.
+
+
+Important Globals
+-----------------
+
+switch_pred_array - The predecessor array to represent the shortest
+path between any two switches.
+
+PG - The physical topology.
+
+G - The virtual topology.
+
+bestscore, absbest - The bestscore this iteration and the absolute
+best score.
+
+bestnodes, absnodes - Contains the actual best and absolute best
+solution.
+
+unassigned_nodes - Priority queue of nodes to be assigned.
+
+
+Initialization
+--------------
+
+During the initialization process assign reads in the top and ptop
+files, initializes the random number generator, and calculates the
+shortest paths between any two switches.  
+
+This last step deserves some comments.  parse_ptop will fill out both
+the PG, the completely physical topology, and SG, the switch fabric.
+The SG graph contains slinks and snodes which exists in one-to-one
+correspondence to the switches and interswitch links in PG.  Each
+slink and snode has a field, mate, which contains the corresponding
+edge or node in PG.  Assign determines edge costs as 10000 minus the
+bandwidth of the interswitch link and then uses the DIJKSTRA_T
+algorithm from LEDA to compute the shortest paths between all
+switches.  These paths are stored in switch_distances.  For a given
+switch sw, switch_distances[sw] is a node_array (indexed by node) of
+the predecessor node.  This is used by the scoring code to calculate
+interswitch paths.  If SCORE_DEBUG is defined the both edge costs and
+predecessors are output.
+
+
+The Main Loop
+-------------
+
+A strange sequence of calls that exist for historical reasons
+ultimately end up with assign() which is the main simulated annealing
+loop.  This particularly code has had at least three and possibly as
+many as five different authors and none of them quite understand it.
+In essence it randomly chooses an unassigned vnode and then a pnode
+and calls add_node to attempt to map them.  If add_node succeeds it
+then compares scores and decides whether to accept the mapping.  If no
+vnodes are unassigned then it randomly chooses an assign vnode,
+removes it via remove_node and then randomly maps it to a pnode via
+add_node.
+
+
+The Scoring Code
+----------------
+
+init_score()
+
+This initializes the scoring datastructures.  First it sets score and
+violations to 0 and blanks the vinfo structure (vinfo stores counts of
+each type of violations).  It then looks at all vnodes and add the
+cost of an unassigned node to the score and adds a violations.  It
+then goes through all vnodes, vlinks, plinks, and pnodes and sets
+their data members appropriately for being unused and unassigned.
+
+add_node(vnode,pnode)
+
+If pnode is virgin
+	If matching type exists then set type of pnode to T
+   Else fail
+Else if types match and and pnode is not full then we're ok
+Else fail
+
+# At this point we know that we can fit the vnode into the pnode with
+# all types ok.  We now go onto links.
+
+Foreach vlink in vnode
+	If destination is mapped
+		# We assign links when both ends are mapped.  Otherwise we leave
+		# them unassigned.
+		If direct_link exists then map vlink to single direct plink
+		Else if vnode and destination are on same switch then
+			Find links from vnode to switch to destination and map to them.
+		Else
+			If interswitch path exists
+				Map vlink to interswitch path
+			Else
+				Fail
+				# It's possible to score this as a violation instead of
+				# a failure however it was found to do better when we failed.
+
+# We now have all links set up we just need to do the last few things:
+# increment the load, features and desires, count a pnode used if this
+# was virgin, count a switch as used if this is the pnode on the
+# switch, and reduce the penalty and score for a newly assigned vnode.
+Finish setting up pnode
+
+
+remove_node(vnode)
+
+# This is almost the exist reverse of add_node
+Let pnode be what vnode is mapped to.
+
+Foreach vlink in vnode
+	Unassociated all plinks
+	Remove score for link type and plink costs.
+	Remove any violations for bandwidth.
+
+Remove any violations associated with no connections on this node.
+Reduce the load and free up pnode is load is now 0.
+Free the switch if this was the last node on the switch.
+Penalize for an unassigned vnode.
+Undo all features and desires.
+
+
+direct_link(A,B)
+
+This routine looks for a direct link from A to B.  It does this in a
+pretty basic fashion.  It looks at all edges from A and looks for the
+edge going to B with the least users and less bandwidth used.
+
+
+find_link_to_switch(A)
+
+Very similar to direct link except is going from A to the switch A is
+connected to rather than from A to B.
+
+
+find_intraswitch_path(src,dst)
+
+Extremely basic.  Just calls find_link_to_switch on both src and dst.
+
+
+find_interswitch_path(src,dst)
+
+Another very basic routine.  Just reads off the from the switch_preds
+datastructure the shortest path between the src switch and the dst
+switch.
+
+
+score_link(edge,interswitchp)
+
+For non interswitch links this penalizes users beyond the first.  
+
+For all links this keeps track of bandwidth and penalizes going over
+bandwidth allowance.
+
+
+unscore_link(edge,interswitch)
+
+Exact opposite of score_link.
+
+
+
+
+
+      
+      
+
+
+
