@@ -347,6 +347,11 @@ sub DelaySetup
 	close(DEL);
 	chmod(0755, TMDELAY);
 	close(MAP);
+	
+	# Touch this file so that we globally know that the node is a delay
+	# node. See routing setup. Need to avoid fastforwarding whenever we
+	# have link delays.
+	system("touch " . ISDELAYNODE());
 
 	#
 	# Now do kernel configuration. All of the above work is wasted,
