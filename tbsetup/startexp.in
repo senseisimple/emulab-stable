@@ -390,9 +390,11 @@ sub fatal()
     }
 
     #
-    # In batch mode, exit.
+    # In batch mode, exit. Must unlock the experiment since the record
+    # is kept by the batch system until it is finished or canceled.
     #
     if ($batch) {
+	TBUnLockExp($pid, $eid);
 	exit($errorstat);
     }
 
