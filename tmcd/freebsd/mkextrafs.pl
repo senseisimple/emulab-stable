@@ -175,7 +175,10 @@ close(DL);
 mysystem("disklabel -R -r $slicedev $tmpfile");
 unlink($tmpfile);
 
-mysystem("cd /dev; ./MAKEDEV ${slicedev}c");
+# FreeBSD 5 doesn't have MAKEDEV
+mysystem("cd /dev; ./MAKEDEV ${slicedev}c")
+    if (-e "/dev/MAKEDEV");
+
 mysystem("newfs -U -i 25000 $fsdevice");
 mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
