@@ -516,14 +516,26 @@ function SHOWUSER($uid) {
 #
 function SHOWEXP($pid, $eid) {
     global $TBDBNAME, $TBDOCBASE;
+    $nodecounts  = array();
+
+    # Node counts, by class. 
+    $query_result =
+	DBQueryFatal("select nt.class,count(*) from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "where pid='$pid' and eid='$eid' group by nt.class");
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$class = $row[0];
+	$count = $row[1];
+	
+	$nodecounts[$class] = $count;
+    }
 		
     $query_result =
-	DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
-		     "round(minimum_nodes+.1,0) as min_nodes ".
-		     "from experiments as e ".
-		     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-		     "where e.pid='$pid' and e.eid='$eid' ".
-		     "group by e.eid order by eid");
+	DBQueryFatal("select e.*, round(minimum_nodes+.1,0) as min_nodes ".
+		     " from experiments as e ".
+		     "where e.pid='$pid' and e.eid='$eid'");
     
     if (($exprow = mysql_fetch_array($query_result)) == 0) {
 	TBERROR("Experiment $eid in project $pid is gone!\n", 1);
@@ -533,8 +545,8 @@ function SHOWEXP($pid, $eid) {
     #$exp_expires = $exprow[expt_expires];
     $exp_name    = stripslashes($exprow[expt_name]);
     $exp_created = $exprow[expt_created];
-    $exp_start   = $exprow[expt_start];
     $exp_swapped = $exprow[expt_swapped];
+    $exp_swapuid = $exprow[expt_swap_uid];
     $exp_end     = $exprow[expt_end];
     $exp_created = $exprow[expt_created];
     $exp_head    = $exprow[expt_head_uid];
@@ -549,7 +561,6 @@ function SHOWEXP($pid, $eid) {
     $idle_ignore = $exprow[idle_ignore];
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
-    $nodes       = $exprow["nodes"];
     $minnodes    = $exprow["min_nodes"];
 
     if ($swappable)
@@ -608,20 +619,12 @@ function SHOWEXP($pid, $eid) {
             <td class=\"left\">$exp_created</td>
           </tr>\n";
 
-    #echo "<tr>
-    #        <td>Expires: </td>
-    #        <td class=\"left\">$exp_expires</td>
-    #      </tr>\n";
-
-    echo "<tr>
-            <td>Started: </td>
-            <td class=\"left\">$exp_start</td>
-          </tr>\n";
-
-    echo "<tr>
-            <td>Last Swapped (in or out): </td>
-            <td class=\"left\">$exp_swapped</td>
-          </tr>\n";
+    if ($exp_swapped) {
+        echo "<tr>
+                <td>Last Swap/Modify: </td>
+                <td class=\"left\">$exp_swapped ($exp_swapuid)</td>
+              </tr>\n";
+    }
 
     echo "<tr>
             <td><a href='$TBDOCBASE/faq.php3#UTT-Swapping'>Swappable:</a></td>
@@ -664,10 +667,14 @@ function SHOWEXP($pid, $eid) {
             <td class=\"left\">$exp_status</td>
           </tr>\n";
 
-    if ($nodes > 0) {
+    if (count($nodecounts)) {
 	echo "<tr>
             <td>Reserved Nodes: </td>
-            <td class=\"left\">$nodes</td>
+            <td class=\"left\">\n";
+	while (list ($class, $count) = each($nodecounts)) {
+	    echo "$count ($class) &nbsp ";
+	}
+	echo "</td>
           </tr>\n";
     } else {
 	echo "<tr>
