@@ -201,6 +201,12 @@ event_subscription_t event_subscribe(event_handle_t handle,
                                      address_tuple_t tuple, void *data);
 int event_notification_insert_hmac(event_handle_t handle,
 				   event_notification_t notification);
+int event_notification_pack(event_handle_t handle,
+			    event_notification_t notification,
+			    unsigned char *data, int *len);
+int event_notification_unpack(event_handle_t handle,
+			    event_notification_t *notification,
+			    unsigned char *data, int len);
 
 /* util.c */
 void *xmalloc(int size);

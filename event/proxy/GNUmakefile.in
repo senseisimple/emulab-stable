@@ -10,7 +10,7 @@ OBJDIR		= ../..
 SUBDIR		= event/proxy
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest
+PROGRAMS	= evproxy proxytest evproxyclient evproxyserver
 
 include $(OBJDIR)/Makeconf
 
@@ -71,8 +71,6 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 client-install: 
 	$(INSTALL_PROGRAM) evproxy $(DESTDIR)$(CLIENT_BINDIR)/evproxy
-	$(INSTALL_PROGRAM) evproxyclient \
-				$(DESTDIR)$(CLIENT_BINDIR)/evproxyclient
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

@@ -1420,3 +1420,191 @@ event_notification_check_hmac(event_handle_t handle,
     	return 0;
 }
 
+/*
+ * Support for packing and unpacking a notification. Packing a notification
+ * converts it to something the caller can pass around; a set of three arrays, 
+ * types, names, values. Unpacking a notification takes those three arrays
+ * and returns a new notification with those contents. For packing, the
+ * caller provides three static arrays, and gives us the length of then. We
+ * store the contents in those arrays, and return the actual length. The
+ * arrays must be big enough ...
+ */
+struct pack_traverse_arg {
+	int		maxlen;
+	int		len;
+	unsigned char  *data;
+};
+
+struct pack_bin {
+	short		reclen;
+	short		dlen;
+	int		type;
+	char		name[32];
+	unsigned char   data[0];
+};
+
+/*
+ * The traversal function callback.
+ */
+static int
+pack_traverse(void *rock, char *name, elvin_basetypes_t type,
+              elvin_value_t value, elvin_error_t status)
+{
+	struct pack_traverse_arg *packarg = (struct pack_traverse_arg *) rock;
+	struct pack_bin		 *bin;
+	int			  dlen = 0;
+	unsigned char buf[BUFSIZ];
+
+	bin = (struct pack_bin *) (packarg->data + packarg->len);
+
+	switch (type) {
+	case ELVIN_INT32:
+		sprintf(buf, "%d", value.i);
+		break;
+		
+	case ELVIN_INT64:
+		sprintf(buf, "%lld", value.h);
+		break;
+		
+	case ELVIN_REAL64:
+		sprintf(buf, "%f", value.d);
+		break;
+		
+	case ELVIN_STRING:
+		if (strlen(value.s) >= BUFSIZ) {
+			ERROR("pack_traverse: string too big\n");
+			return 0;
+
+		}
+		strcpy(buf, value.s);
+		break;
+		
+	case ELVIN_OPAQUE:
+		if (value.o.length >= BUFSIZ) {
+			ERROR("pack_traverse: opaque too big\n");
+			return 0;
+
+		}
+		memcpy(buf, (unsigned char *)(value.o.data), value.o.length);
+		buf[value.o.length] = (unsigned char) NULL;
+		dlen = value.o.length + 1;
+		break;
+
+	default:
+		ERROR("invalid parameter\n");
+		return 0;
+	}
+	if (!dlen)
+		dlen = strlen(buf) + 1;
+
+	/*
+	 * Watch for too much stuff.
+	 */
+	if (packarg->len + (dlen + sizeof(*bin)) >= packarg->maxlen) {
+		ERROR("pack_traverse: Not enough room at %s!\n", name);
+		return 0;
+	}
+	/*
+	 * XXX Name is bogus. Fix later.
+	 */
+	if (strlen(name) >= sizeof(bin->name)) {
+		ERROR("pack_traverse: Name too long %s!\n", name);
+		return 0;
+	}
+	
+	strcpy(bin->name, name);
+	bin->type   = type;
+	bin->dlen   = dlen;
+	bin->reclen = roundup((dlen + sizeof(*bin)), sizeof(long));
+	memcpy(bin->data, buf, dlen);
+	packarg->len += bin->reclen;
+
+	return 1;
+}
+
+/*
+ * Extract stuff from inside notification and return.
+ */
+int
+event_notification_pack(event_handle_t handle,
+			event_notification_t notification,
+			unsigned char *data, int *len)
+{
+	struct pack_traverse_arg	packarg;
+
+	packarg.maxlen = *len;
+	packarg.len    = 0;
+	packarg.data   = data;
+	
+	if (!elvin_notification_traverse(notification->elvin_notification,
+				 pack_traverse, &packarg, handle->status)) {
+		return 1;
+	}
+	*len = packarg.len;
+	return 0;
+}
+
+/*
+ * Take raw data and stuff it into a notification. 
+ */
+int
+event_notification_unpack(event_handle_t handle,
+			  event_notification_t *notification,
+			  unsigned char *data, int len)
+{
+	event_notification_t newnote = event_notification_alloc(handle, NULL);
+	int		     rval, offset = 0;
+	elvin_value_t	     value;
+	
+	if (! newnote)
+		return -1;
+
+	while (offset < len) {
+		struct pack_bin	*bin = (struct pack_bin *) (data + offset);
+
+		info("type: %d %s %s\n", bin->type, bin->name, bin->data);
+
+		switch (bin->type) {
+		case ELVIN_INT32:
+			sscanf(bin->data, "%d", &(value.i));
+			rval = event_notification_put_int32(handle, newnote,
+						    bin->name, value.i);
+			break;
+		
+		case ELVIN_INT64:
+			sscanf(bin->data, "%lld", &(value.h));
+			rval = event_notification_put_int64(handle, newnote,
+						    bin->name, value.h);
+			break;
+		
+		case ELVIN_REAL64:
+			rval = event_notification_put_double(handle, newnote,
+						    bin->name, value.d);
+			sscanf(bin->data, "%lf", &(value.d));
+			break;
+		
+		case ELVIN_STRING:
+			rval = event_notification_put_string(handle, newnote,
+						     bin->name, bin->data);
+			break;
+		
+		case ELVIN_OPAQUE:
+			rval = event_notification_put_opaque(handle, newnote,
+						     bin->name, bin->data,
+						     bin->dlen);
+			break;
+			
+		default:
+			ERROR("event_notification_unpack: invalid type\n");
+			return 0;
+		}
+		if (!rval) {
+			ERROR("event_notification_unpack: insert failed\n");
+			return 0;
+		}
+		offset += bin->reclen;
+	}
+	*notification = newnote;
+	return 0;
+}
+
