@@ -276,6 +276,7 @@ CREATE TABLE experiments (
   event_sched_pid int(11) default '0',
   uselinkdelays tinyint(4) NOT NULL default '0',
   forcelinkdelays tinyint(4) NOT NULL default '0',
+  multiplex_factor smallint(5) default NULL,
   uselatestwadata tinyint(4) NOT NULL default '0',
   usewatunnels tinyint(4) NOT NULL default '1',
   wa_delay_solverweight float default '0',
@@ -1407,6 +1408,7 @@ CREATE TABLE virt_lans (
   uselinkdelay tinyint(4) default '0',
   nobwshaping tinyint(4) default '0',
   usevethiface tinyint(4) default '0',
+  trivial_ok tinyint(4) default '1',
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 

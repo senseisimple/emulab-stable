@@ -600,3 +600,16 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	ALTER TABLE experiments ADD COLUMN autoswap_timeout int(4) 
 	      NOT NULL default '0' AFTER autoswap;
+
+1.150: Add trivial_ok to virt_lans for (very) crude control of
+       colocation of virtual nodes.
+
+        alter table virt_lans add trivial_ok tinyint(4) default '1'
+		after usevethiface;
+
+       Add multiplex_factor to experiments table to allow user to
+       override the factor in the node_types table. Also very crude.
+
+        alter table experiments add multiplex_factor smallint(5)
+	        default NULL after forcelinkdelays;
+		
