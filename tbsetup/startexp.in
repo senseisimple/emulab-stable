@@ -296,8 +296,11 @@ my $infodir = "$pid-$eid-" . TBDateTimeFSSafe();
 if (mkdir("$TBINFO/$infodir", 0770)) {
     system("cp $nsfile $TBINFO/$infodir");
     system("cp *.ptop *.top $TBINFO/$infodir");
-    system("cp  assign.log wanassign.log $TBINFO/$infodir");
+    system("cp assign.log $TBINFO/$infodir");
     system("cp $logname $TBINFO/$infodir/$eid.log");
+    if (-e "wanassign.log") {
+	system("cp wanassign.log $TBINFO/$infodir");
+    }
 }
 
 print STDOUT "Setup Success\n";
