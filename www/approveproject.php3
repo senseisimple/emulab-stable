@@ -118,49 +118,45 @@ elseif (strcmp($approval, "moreinfo") == 0) {
           </h3>\n";
 }
 elseif ((strcmp($approval, "deny") == 0) ||
+	(strcmp($approval, "annihilate") == 0) ||
 	(strcmp($approval, "destroy") == 0)) {
-    #
-    # Must delete the group_membership and project records since we require a
-    # new application once denied. Send the luser email to let him know.
-    # This order is actually important. Release project record last to
-    # avoid (incredibly unlikely) name collision with another new project.
-    #
-    DBQueryFatal("delete from group_membership ".
-		 "where uid='$headuid' and pid='$pid' and gid='$pid'");
-    DBQueryFatal("delete from groups where pid='$pid' and gid='$pid'");
-    DBQueryFatal("delete from projects where pid='$pid'");
-
-    TBMAIL("$headname '$headuid' <$headuid_email>",
-         "Project '$pid' Denied",
-         "\n".
-         "This message is to notify you that your project application\n".
-         "for $pid has been denied.\n".
-         "\n$message".
-         "\n\n".
-         "Thanks,\n".
-         "Testbed Operations\n",
-         "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_APPROVAL\n".
-         "Errors-To: $TBMAIL_WWW");
+    SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 1);
+    
+    if (strcmp($approval, "annihilate")) {
+	TBMAIL("$headname '$headuid' <$headuid_email>",
+	       "Project '$pid' Denied",
+	       "\n".
+	       "This message is to notify you that your project application\n".
+	       "for $pid has been denied.\n".
+	       "\n$message".
+	       "\n\n".
+	       "Thanks,\n".
+	       "Testbed Operations\n",
+	       "From: $TBMAIL_APPROVAL\n".
+	       "Bcc: $TBMAIL_APPROVAL\n".
+	       "Errors-To: $TBMAIL_WWW");
+    }
 
     #
-    # Well, if the "destroy" option was given, kill the users account
-    # from the database.
+    # Well, if the "destroy" option was given, kill the users account.
     #
-    if (strcmp($approval, "destroy") == 0) {
-	DBQueryFatal("delete from users where uid='$headuid'");
-
-        TBMAIL("$headname '$headuid' <$headuid_email>",
-             "Account '$headuid' Terminated",
-    	     "\n".
-             "This message is to notify you that your account has been \n".
-             "terminated because your project $pid was denied.\n".
-             "\n\n".
-             "Thanks,\n".
-             "Testbed Operations\n",
-             "From: $TBMAIL_APPROVAL\n".
-             "Bcc: $TBMAIL_APPROVAL\n".
-             "Errors-To: $TBMAIL_WWW");
+    if ((strcmp($approval, "annihilate") == 0) ||
+	(strcmp($approval, "destroy") == 0)) {
+	SUEXEC($uid, $TBADMINGROUP, "webrmuser $headuid", 1); 
+	
+	if (strcmp($approval, "annihilate")) {
+	    TBMAIL("$headname '$headuid' <$headuid_email>",
+		   "Account '$headuid' Terminated",
+		   "\n".
+		   "This message is to notify you that your account has \n".
+		   "been terminated because your project $pid was denied.\n".
+		   "\n\n".
+		   "Thanks,\n".
+		   "Testbed Operations\n",
+		   "From: $TBMAIL_APPROVAL\n".
+		   "Bcc: $TBMAIL_APPROVAL\n".
+		   "Errors-To: $TBMAIL_WWW");
+	}
     }
 
     echo "<h3><p>

@@ -405,11 +405,8 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
                   \n";
 	    continue;
 	}
+	SUEXEC($uid, $TBADMINGROUP, "webrmuser -n -p $project $user", 1); 
 
-	DBQueryFatal("delete from users where uid='$user'");
-	DBQueryFatal("delete from user_pubkeys where uid='$user'");
-	DBQueryFatal("delete from user_sfskeys where uid='$user'");
-	
 	echo "<p>
                 User $user was <b>denied</b> membership in $project/$group.
                 <br>

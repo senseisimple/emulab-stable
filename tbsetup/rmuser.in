@@ -9,11 +9,11 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: rmuser [-p <pid>] uid\n" .
+    print STDOUT "Usage: rmuser [-p <pid> [-n]] uid\n" .
 	"Use the -p option to remove user from a specific project\n";
     exit(-1);
 }
-my  $optlist = "p:";
+my  $optlist = "p:n";
 
 #
 # Configure variables
@@ -32,6 +32,7 @@ my $dbuid;
 my $user;
 my $query_result;
 my $pidmode	= 0;
+my $nuke	= 0;
 my $pid;
 
 #
@@ -90,6 +91,12 @@ if (defined($options{"p"})) {
     else {
 	die("Tainted argument $pid!\n");
     }
+}
+if (defined($options{"n"})) {
+    $nuke = 1;
+}
+if ($nuke && !$pidmode) {
+    usage();
 }
 if (@ARGV != 1) {
     usage();
@@ -163,6 +170,32 @@ else {
 }
 
 #
+# If nuke mode is also specified, then the account is being nuked from
+# web page because of a project join denial. Check to make sure user
+# is not an active user (must be newuser or unapproved).
+#
+if ($nuke) {
+    $query_result =
+	DBQueryFatal("select status from users where uid='$user'");
+    my ($status) = $query_result->fetchrow_array();
+
+    if ($status ne USERSTATUS_NEWUSER &&
+	$status ne USERSTATUS_UNAPPROVED) {
+	die("*** $0:\n".
+	    "    $user is not an unapproved user in project $pid!\n");
+    }
+
+    $query_result =
+	DBQueryFatal("select pid from group_membership ".
+		     "where uid='$user' and pid!='$pid'");
+
+    if ($query_result->numrows) {
+	die("*** $0:\n".
+	    "    $user is a member of other projects!\n");
+    }
+}
+
+#
 # This script is always audited. Mail is sent automatically upon exit.
 #
 if (AuditStart(0)) {
@@ -177,7 +210,7 @@ if (AuditStart(0)) {
 # prevents possible race conditions since the user is no longer able
 # to access the web interface and tmcd will no longer return account
 # info for the user. In pidmode, just remove the user from the specific
-# project (tmcd will return the new group membership).
+# project (tmcd will return the new group membership). 
 #
 if ($pidmode) {
     DBQueryFatal("delete from group_membership ".
@@ -198,7 +231,7 @@ TBNodeUpdateAccountsByUID($user);
 # In pidmode, call setgroups to alter the users membership on boss/ops.
 # Thats all that needs to be done.
 #
-if ($pidmode) {
+if ($pidmode && !$nuke) {
     #
     # Drop root for calling setgroups since its setuid.
     #
@@ -236,14 +269,17 @@ DBQueryFatal("delete from userslastlogin where uid='$user'");
 DBQueryFatal("delete from user_stats where uid='$user'");
 
 #
-# Remove user from both local and control node.
+# Remove user from both local and control node. No need to do this in
+# nukemode (not allowed anyway) since the account never existed.
 #
-$EUID = $UID;
+if (! $nuke) {
+    $EUID = $UID;
 
-system("$DELACCT $user") == 0 or
-    fatal("$DELACCT $user failed!");
+    system("$DELACCT $user") == 0 or
+	fatal("$DELACCT $user failed!");
 
-$EUID = 0;
+    $EUID = 0;
+}
 
 #
 # Rename the users home dir if its there.

@@ -56,6 +56,13 @@ echo "<center><h3>You have the following choices:</h3></center>
         </tr>
 
         <tr>
+            <td>Annihilate</td>
+            <td>-</td>
+            <td>Deny project application silently,
+                    and kill the user account silently</td>
+        </tr>
+
+        <tr>
             <td>Approve</td>
             <td>-</td>
             <td>Approve the project</td>
@@ -119,6 +126,7 @@ echo "
                       <option value='moreinfo'>More Info</option>
                       <option value='deny'>Deny</option>
                       <option value='destroy'>Destroy</option>
+                      <option value='annihilate'>Annihilate</option>
               </select>";
 if (!$approvable) {
 	echo "              <br><b>WARNING:</b> Project cannot be approved,";
