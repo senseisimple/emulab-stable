@@ -21,8 +21,9 @@ my $TB		= "@prefix@";
 %allowed = (	"nalloc"	=> "$TB/bin/nalloc",
 		"nfree"		=> "$TB/bin/nfree",
 		"node_reboot"	=> "$TB/bin/node_reboot",
-		"os_load"	=> "$TB/bin/os_load",
-		"snmpit"	=> "$TB/bin/snmpit");
+		"os_load"	=> "$TB/bin/os_load" # ,
+		#"snmpit"	=> "$TB/bin/snmpit"
+	   );
 
 # Need to provide a simple path, because some scripts we call need one
 $ENV{PATH} = "$TB/bin:/bin:/usr/bin:/usr/local/bin";
