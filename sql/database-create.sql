@@ -198,6 +198,7 @@ CREATE TABLE experiments (
   batchstate varchar(12) default NULL,
   event_sched_pid int(11) default '0',
   uselinkdelays tinyint(4) NOT NULL default '0',
+  forcelinkdelays tinyint(4) NOT NULL default '0',
   uselatestwadata tinyint(4) NOT NULL default '0',
   usewatunnels tinyint(4) NOT NULL default '1',
   wa_delay_solverweight float default '0',
