@@ -59,6 +59,16 @@ if ($formerror != "No Error") {
 }
 
 #
+# Database limit; UID must be 8 chars or less.
+#
+# XXX Note CONSTANT in expression!
+#
+if (strlen($uid) > 8) {
+    USERERROR("The name \"$uid\" is too long! ".
+              "Please select another.", 1);
+}
+
+#
 # See if this is a new user or one returning. We have to query the database
 # for the uid, and then do the password thing. For a user returning, the
 # password must be valid. For a new user, the password must pass our tests.
@@ -170,7 +180,7 @@ if (! $returning) {
          "Testbed Ops\n".
          "Utah Network Testbed\n",
          "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_WWW\n".
+         "Cc: $TBMAIL_CONTROL\n".
          "Errors-To: $TBMAIL_WWW");
 
     #
@@ -246,7 +256,7 @@ mail("$group_leader_email",
      "Testbed Ops\n".
      "Utah Network Testbed\n",
      "From: $TBMAIL_CONTROL\n".
-     "Cc: $TBMAIL_WWW\n".
+     "Cc: $TBMAIL_CONTROL\n".
      "Errors-To: $TBMAIL_WWW");
 
 #

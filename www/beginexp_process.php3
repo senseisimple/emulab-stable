@@ -91,12 +91,13 @@ if ($row = mysql_fetch_row($pswd_result)) {
 
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not
-# too long for the database.
+# too long for the database. PID is 12, and the max is 32, so the user
+# cannot have provided one more than 19, since we add a hyphen in there.
 #
 # XXX Note CONSTANT in expression!
 #
 $exp_eid = $exp_pid . $exp_id;
-if (strlen($exp_id) > 22) {
+if (strlen($exp_id) > 19) {
     USERERROR("The experiment name \"$exp_id\" is too long! ".
               "Please select another.", 1);
 }

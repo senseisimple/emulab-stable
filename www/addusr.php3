@@ -74,7 +74,8 @@ if (isset($uid)) {
   echo "</tr>";
 } else {
   echo "<form action=\"usradded.php3\" method=\"post\">\n";
-  echo "<tr><td>*Username:</td><td><input type=\"text\" name=\"uid\"></td>";
+  echo "<tr><td>*Username:</td><td><input type=\"text\" name=\"uid\" ";
+  echo "size=\"8\" maxlength=\"8\"></td>";
   echo "<td>Expiration date:</td>";
   echo "<td><input type=\"text\" name=\"usr_expires\"";
   $time = date("m/d/Y", time() + (86400 * 90)); #add 90 days

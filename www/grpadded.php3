@@ -79,6 +79,21 @@ if ($formerror != "No Error") {
 }
 
 #
+# Database limit; PID must be 12 chars or less.
+#                 UID must be 8 chars or less.
+#
+# XXX Note CONSTANT in expression!
+#
+if (strlen($gid) > 12) {
+    USERERROR("The project name \"$gid\" is too long! ".
+              "Please select another.", 1);
+}
+if (strlen($grp_head_uid) > 8) {
+    USERERROR("The name \"$grp_head_uid\" is too long! ".
+              "Please select another.", 1);
+}
+
+#
 # This is a new project request. Make sure it does not already exist.
 #
 $project_query  = "SELECT gid FROM groups WHERE gid=\"$gid\"";
@@ -183,7 +198,7 @@ if (! $returning) {
          "Testbed Ops\n".
          "Utah Network Testbed\n",
          "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_WWW\n".
+         "Cc: $TBMAIL_CONTROL\n".
          "Errors-To: $TBMAIL_WWW");
 }
 
@@ -246,7 +261,7 @@ mail($TBMAIL_APPROVAL,
      "select the 'Group Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
      "From: $usr_name <$email>\n".
-     "Cc: $TBMAIL_WWW\n".
+     "Cc: $TBMAIL_CONTROL\n".
      "Errors-To: $TBMAIL_WWW");
 
 #

@@ -102,10 +102,12 @@ echo "    </td>
 #
 # Experiment ID and Long Name:
 #
+# XXX Note CONSTANT in expression!
+#
 echo "<tr>
           <td>*Name<br>(will be prefixed by project name):</td>
           <td><input type=\"text\" name=\"exp_id\"
-                     size=\"22\" MAXLENGTH=\"22\">
+                     size=\"19\" maxlength=\"19\">
               </td>
       </tr>\n";
 

@@ -69,7 +69,7 @@ if ($row) {
     echo     "type=\"readonly\" value=\"$row[uid]\">";
 }
 else {
-    echo     "type=\"text\">";
+    echo     "type=\"text\" size=\"8\" maxlength=\"8\">";
 }
 echo "     </td>
       </tr>\n";
@@ -204,7 +204,8 @@ echo "<tr>
 #
 echo "<tr>
           <td>*Name (no blanks):</td>
-          <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"></td>
+          <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"
+                     size=\"12\" MAXLENGTH=\"12\"></td>
       </tr>\n";
 
 #
