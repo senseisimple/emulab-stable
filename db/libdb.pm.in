@@ -3998,7 +3998,7 @@ sub TBFieldData($$;$)
 	}
 	$fielddata = $DBFieldData{"default:default"};
     }
-    # Overwrite final entry with toplevel data.
+    # Return both entries.
     if (defined($toplevel) &&
 	($toplevel->{"min"} || $toplevel->{"max"})) {
 	return ($fielddata, $toplevel);
