@@ -20,5 +20,7 @@ libevent.a:	$(OBJS)
 
 $(OBJS):	event.h
 
+install:
+
 clean:
 	/bin/rm -f *.o libevent.a
