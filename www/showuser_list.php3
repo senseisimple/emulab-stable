@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -28,13 +28,16 @@ if (! $isadmin) {
     USERERROR("You do not have permission to view the user list!", 1);
 }
 
-echo "<b>Show: <a href='showuser_list.php3?showtype=all'>all</a>,
+echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
                <a href='showuser_list.php3?showtype=widearea'>widearea</a>,
-               <a href='showuser_list.php3?showtype=active'>active</a>.
+               <a href='showuser_list.php3?showtype=homeless'>homeless</a>,
+               <a href='showuser_list.php3?showtype=active'>active</a>,
+               <a href='showuser_list.php3?showtype=inactive'>inactive</a>,
+               <a href='showuser_list.php3?showtype=all'>all</a>.
       </b><br><br>\n";
 
 if (!isset($showtype)) {
-    $showtype='active';
+    $showtype='loggedin';
 }
 if (!isset($sortby))
     $sortby = "uid";
@@ -44,15 +47,31 @@ if (! strcmp($showtype, "all")) {
     $clause  = "";
     $showtag = "";
 }
-elseif (! strcmp($showtype, "active")) {
+elseif (! strcmp($showtype, "loggedin")) {
     $clause  = "left join login as l on u.uid=l.uid ";
     $where   = "where l.timeout>=unix_timestamp()";
-    $showtag = "active";
+    $showtag = "logged in";
 }
 elseif (! strcmp($showtype, "widearea")) {
     $clause  = "left join widearea_accounts as w on u.uid=w.uid ";
     $where   = "where w.node_id is not NULL";
     $showtag = "widearea";
+}
+elseif (! strcmp($showtype, "homeless")) {
+    $clause  = "left join group_membership as m on u.uid=m.uid ";
+    $clause .= "left join widearea_accounts as w on u.uid=w.uid ";
+    $where   = "where (m.uid is null and w.node_id is NULL) ";
+    $showtag = "homeless";
+}
+elseif (! strcmp($showtype, "inactive")) {
+    $clause  = "";
+    $where   = "where u.status!='active' ";
+    $showtag = "inactive";
+}
+elseif (! strcmp($showtype, "active")) {
+    $clause  = "";
+    $where   = "where u.status='active' ";
+    $showtag = "active";
 }
 else {
     $clause  = "";
@@ -98,10 +117,10 @@ echo "<center>
 # Grab the project lists and create a hash of lists, per user.
 # One query instead of hundreds.
 #
+$projmemb_array  = array();
 $projmemb_result =
-    DBQueryFatal("select distinct uid,pid from group_membership order by uid");
-
-$projmemb_array = array();
+   DBQueryFatal("select distinct uid,pid from group_membership ".
+		"order by uid");
 
 while ($row = mysql_fetch_array($projmemb_result)) {
     $uid   = $row[0];
@@ -119,19 +138,16 @@ echo "<tr>
                  UID</a></th>
           <th><a href='showuser_list.php3?showactive=$showactive&sortby=name'>
                  Name</a></th>
-          <th>Projects</th>
-          <th><a href='showuser_list.php3?showactive=$showactive&sortby=widle'>
+          <th>Projects</th>\n";
+
+if (! strcmp($showtype, "inactive")) {
+    echo "<th>Status</th>\n";
+}
+
+echo "    <th><a href='showuser_list.php3?showactive=$showactive&sortby=widle'>
                  Web<br>Idle</a></th>
           <th><a href='showuser_list.php3?showactive=$showactive&sortby=uidle'>
                  Users<br>Idle</a></th>\n";
-
-#
-# Admin users get a "delete" and a "modify" option.
-# 
-if ($isadmin) {
-    echo "<th align=center>Modify</th>\n";
-    echo "<th align=center>Delete</th>\n";
-}
 
 echo "</tr>\n";
 
@@ -145,8 +161,7 @@ while ($row = mysql_fetch_array($query_result)) {
 
     echo "<tr>\n";
 
-    if (strcmp($status, "active") == 0 ||
-	strcmp($status, "unverified") == 0) {
+    if (strcmp($status, "active") == 0) {
 	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
     }
     else {
@@ -171,6 +186,10 @@ while ($row = mysql_fetch_array($query_result)) {
 	    echo "<td>--</td>\n";
     }
     
+    if (! strcmp($showtype, "inactive")) {
+	echo "<td>$status</td>\n";
+    }
+
     echo "<td>$webidle</td>\n";
 
     if (! $usersidle)
