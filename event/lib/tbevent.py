@@ -315,8 +315,8 @@ class NotificationWrapper:
         """
         Construct a NotificationWrapper that wraps the given objects.
         
-        handle - The event_handle used to create notification.
-        notification - The event_notification structure to wrap.
+        @param handle The event_handle used to create notification.
+        @param notification The event_notification structure to wrap.
         """
         self.handle = handle
         self.notification = notification
@@ -380,7 +380,7 @@ class CallbackIterator:
         """
         Construct an iterator with the given arguments.
 
-        handle - The event_handle being polled.
+        @param handle The event_handle being polled.
         """
         self.last = None
         self.handle = handle
@@ -427,9 +427,9 @@ class EventClient:
         """
         Construct an EventClient object.
 
-        url - The server name in url'ish form (e.g. elvin://boss)
-        server - The name of the server.
-        port - The server port number.
+        @param url The server name in url'ish form (e.g. elvin://boss)
+        @param server The name of the server.
+        @param port The server port number.
         """
 
         if url:
@@ -472,13 +472,13 @@ class EventClient:
         """
         Subscribe to some events.
 
-        tuple - The address tuple describing the subscription.
+        @param tuple The address tuple describing the subscription.
         """
         return stub_event_subscribe(self.handle, tuple.this)
 
     def create_notification(self, tuple):
         """
-        return a notification that is bound to this client.
+        @return A notification that is bound to this client.
         """
         return NotificationWrapper(self.handle,
                                    event_notification_alloc(self.handle,
