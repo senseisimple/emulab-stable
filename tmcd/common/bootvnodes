@@ -151,9 +151,7 @@ if (defined($action) && !$reconfig) {
     closedir(DIR);
 
     foreach my $file (@files) {
-	if ($file ne "." && $file ne ".." && $file ne "local" &&
-	    $file =~ /^([-\w]*)$/) {
-
+	if ($file =~ /^(pcvm[-\w]*)$/) {
 	    # Assume jailed for now.
 	    bootvnode($1, $action, 1);
 	}
@@ -193,8 +191,7 @@ if ($reconfig) {
     closedir(DIR);
 
     foreach my $file (@files) {
-	if ($file ne "." && $file ne ".." && $file ne "local" &&
-	    $file =~ /^([-\w]*)$/) {
+	if ($file =~ /^(pcvm[-\w]*)$/) {
 	    $curvnodelist{$1} = 1;	# XXX Assume jailed.
 	}
     }
