@@ -64,6 +64,25 @@ else {
     unset($eid);
 }
 
+# THIS is ugly...  Value= is not passed by IE on <input type=image>, so we wrap the
+# scale value into the button name.  Hence we will see coordinates of scale_1_x
+# scale_2_x, etc. when the buttons are pressed.  Decode to just a $scale value here.
+if (isset($scale_1_x) && $scale_1_x != "") {
+    $scale = 1;
+}
+elseif (isset($scale_2_x) && $scale_2_x != "") {
+    $scale = 2;
+}
+elseif (isset($scale_3_x) && $scale_3_x != "") {
+    $scale = 3;
+}
+elseif (isset($scale_4_x) && $scale_4_x != "") {
+    $scale = 4;
+}
+elseif (isset($scale_5_x) && $scale_5_x != "") {
+    $scale = 5;
+}
+
 #
 # Verify numeric scale and centering arguments.
 #
@@ -367,15 +386,16 @@ function zoom_btns($curr_scale) {
 echo "  <table align=\"center\" border=\"2\" cellpadding=\"0\" cellspacing=\"2\">\n";
 echo "    <tbody>\n";
 echo "      <tr>\n";
+# Wrap the scale into the button name.  Value= is not passed by IE.
 echo "        <td><input type=\"image\" src=\"btn_zoom_out.jpg\"\n";
-echo "             name=\"scale\" value=\"" . max($curr_scale-1,1) . "\"><br></td>\n";
+echo "             name=\"scale_" . max($curr_scale-1,1) . "\"><br></td>\n";
 for ($i = 1; $i <= 5; $i++) {
     $img = "btn_scale_" . $i . "_" . ($curr_scale==$i?"brt":"dim") . ".jpg";
     echo "        <td><input type=\"image\" src=\"$img\"\n";
-    echo "             name=\"scale\" value=\"$i\"><br></td>\n";
+    echo "             name=\"scale_$i\"><br></td>\n";
 }
 echo "        <td><input type=\"image\" src=\"btn_zoom_in.jpg\"\n";
-echo "             name=\"scale\" value=\"" . min($curr_scale+1,6) . "\"><br></td>\n";
+echo "             name=\"scale_" . min($curr_scale+1,6) . "\"><br></td>\n";
 echo "      </tr>\n";
 echo "    </tbody>\n";
 echo "  </table>\n";
