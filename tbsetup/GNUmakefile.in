@@ -72,6 +72,11 @@ post-install:
 	chown root $(INSTALL_LIBEXECDIR)/console_setup
 	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
 
+#
+# Control node installation (okay, plastic)
+#
+control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
+
 clean:	subdir-clean
 	rm -f *.o core tbreport
 

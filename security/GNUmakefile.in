@@ -27,12 +27,18 @@ CFLAGS	= -O -g \
 suexec:	suexec.c suexec.h
 	$(CC) $(CFLAGS) -o suexec suexec.c
 
-install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) $(addprefix $(INSTALL_BINDIR)/, paperbag)
+install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) \
+	$(addprefix $(INSTALL_BINDIR)/, paperbag)
 	@echo "Don't forget to do a post-install as root"
 
 post-install:
 	chown root $(INSTALL_LIBEXECDIR)/suexec
 	chmod u+s $(INSTALL_LIBEXECDIR)/suexec
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:	$(addprefix $(INSTALL_BINDIR)/, plasticwrap)
 
 clean:
 	rm -f *.o $(BINS) core
