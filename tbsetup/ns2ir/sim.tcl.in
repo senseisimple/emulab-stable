@@ -928,6 +928,7 @@ Simulator instproc make-simulated {args} {
     uplevel 1 eval $script
 
     append nseconfig $script
+    append nseconfig \n
 
     set simulated 0
 }
