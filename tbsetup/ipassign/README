@@ -1,0 +1,86 @@
+Input
+-----
+
+The input consists of a series of specifications for LANs (a link is just a
+LAN with only two nodes). Each LAN is specified by a number representing the
+weight (this must be integral), followed by a series of integers, each one
+representing a node which the LAN is connected to. The LANs are automatically
+numbered in order of appearance (starting at 0).
+
+Currently, the program assumes IPv4 addresses and a 10.* prefix. However,
+should the need arise, this can easily be changed to an IPv6 address or
+some other prefix.
+
+Output
+------
+
+The first line of the output is a header. It consists of three integers,
+representing the number of bits allocated for the global network, the number
+of bits for the LANs in each network, and the number of bits for the hosts in
+each LAN, respectively. This allows the outside to calculate bitmasks for
+every address.
+
+The bitmask for a global net is 0xFFFFFFFF << (lanBits + hostBits).
+The bitmask for a lan net is (0xFFFFFFFF >> hostBits) << hostBits.
+The bitmask for a host is 0xFFFFFFFF.
+
+Unless I got mixed up somewhere along the line. If so, someone email me. :)
+
+These bitmasks would change if one were using IPv6 addresses (changeable at 
+compile time through some constants).
+
+Each additional line of output is a specification of an IP address. There
+are two numbers and an IP dotted quadruplet. The first number is the LAN
+number (which is the ordinality of that LAN - 1). The second is the number
+of a node.
+
+This means that the node has the IP address on the interface connected with
+the LAN.
+
+Process
+-------
+
+The input is used to populate a graph object. This object contains many
+LANs, each LAN being a node in the graph. It is important to realize that
+the graph the program is interested in is a graph of a bunch of LANs connected
+to each other by nodes. A kind of inverse of the graph we normally think of.
+
+This LAN-graph is then converted into an appropriate form and fed into the
+METIS graph-partitioning algorithm. The result is that each LAN is given
+a partition number from 0 to numPartitions-1. There is a slight inconsistency
+if numPartitions == 1. METIS changes every LAN's partition number to 1 rather
+than 0. This is accounted for and each node is set to 0 in this case.
+
+Then IP addresses are generated. The global-net number of each node is the
+partition number. For each global-net number, successive LANs in that
+global-net are given LAN-net numbers. And for each host in a LAN, successive
+host numbers are given. Host numbers that are all 0s or all 1s are avoided.
+
+Errors
+------
+
+Non-numeric and non-whitespace characters in the input are invalid.
+LANs must have at least two nodes connected to them.
+Right now the size of the bitspace used for hosts and LANs is pretty
+  conservative. The largest network defines the space for LANs and the largest
+  LAN defines the space for hosts. Therefore with large graphs, it is possible
+  to run out of bitspace, which is an error.
+
+Room for Improvement
+--------------------
+
+One could be a lot smarter about how to allocate which bits for which level
+  of the hierarchy. If there are a few large lans, for instance, it is more
+  bit-conservative to assign them multiple blocks rather than increase the
+  block size.
+One could increase the number of levels in the hierarchy. Right now there
+  are only 3. If this were increased, one might be able to create even
+  smaller routing tables.
+
+Bugs
+----
+
+None that I know of.
+
+
+

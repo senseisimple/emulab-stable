@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# make the proper directories
+
+mkdir tmp
+mkdir tmp/result
+mkdir bin
+
+# for now we assume that METIS has been installed and the include and
+# library files are in accessible locations.
+
+g++ -c -o tmp/ipassign.o src/ipassign.cc
+g++ -c -o tmp/Graph.o src/Graph.cc
+g++ -o bin/ipassign tmp/ipassign.o tmp/Graph.o -lmetis -lm
+
+g++ -o bin/top2graph src/top2graph.cc -lm
+
+g++ -o bin/autocheck src/autocheck.cc -lm
+g++ -o bin/boolcmp src/boolcmp.cc -lm
+
+bin/autocheck
+
+

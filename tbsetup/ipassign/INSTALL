@@ -1,0 +1,6 @@
+
+ipassign requires the METIS library.
+
+To compile, simply run the 'build' shell script. This will create ipassign and
+its associated utilities in the bin/ directory. To test, run bin/autocheck
+from the mini-root.
