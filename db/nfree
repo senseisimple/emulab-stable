@@ -13,6 +13,8 @@ my $list= join(" or ",@machines);
 
 my $cmd = "";
 my $sth = "";
+
+$eid = substr($eid,0,10);
  
 foreach my $n (@node_names) { 
     $sth = $dbh->query("select * from reserved where node_id='$n' ".
