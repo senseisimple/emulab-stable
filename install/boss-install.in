@@ -389,6 +389,8 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
 	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
 	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
+	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
+	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log");
     };
 
