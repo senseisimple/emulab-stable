@@ -4881,6 +4881,7 @@ COMMAND_PROTOTYPE(dorusage)
  *			 are noticed)
  *	NTPDRIFT=	how often to report NTP drift values
  *	CVSUP=		how often to check for software updates
+ *	RUSAGE=		how often to collect/report resource usage info
  */
 COMMAND_PROTOTYPE(dodoginfo)
 {
@@ -4889,6 +4890,7 @@ COMMAND_PROTOTYPE(dodoginfo)
 	char		buf[MYBUFSIZE];
 	int		nrows, *iv;
 	int		iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup;
+	int		iv_rusage;
 
 	/*
 	 * XXX sitevar fetching should be a library function
@@ -4903,7 +4905,7 @@ COMMAND_PROTOTYPE(dodoginfo)
 		return 1;
 	}
 
-	iv_interval = iv_isalive = iv_ntpdrift = iv_cvsup = -1;
+	iv_interval = iv_isalive = iv_ntpdrift = iv_cvsup = iv_rusage = -1;
 	while (nrows) {
 		iv = 0;
 		row = mysql_fetch_row(res);
@@ -4913,6 +4915,8 @@ COMMAND_PROTOTYPE(dodoginfo)
 			iv = &iv_ntpdrift;
 		} else if (strcmp(row[0], "watchdog/cvsup") == 0) {
 			iv = &iv_cvsup;
+		} else if (strcmp(row[0], "watchdog/rusage") == 0) {
+			iv = &iv_rusage;
 		} else if (strcmp(row[0], "watchdog/isalive/local") == 0) {
 			if (reqp->islocal && !reqp->isvnode)
 				iv = &iv_isalive;
@@ -4943,8 +4947,8 @@ COMMAND_PROTOTYPE(dodoginfo)
 	mysql_free_result(res);
 
 	OUTPUT(buf, sizeof(buf),
-	       "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d\n",
-	       iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup);
+	       "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d RUSAGE=%d\n",
+	       iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup, iv_rusage);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	return 0;
