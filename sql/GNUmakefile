@@ -1,4 +1,9 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
 # This makefile is different than all the others...
 # 
 # It is intended to be run in place in the cvs tree to update the files,
