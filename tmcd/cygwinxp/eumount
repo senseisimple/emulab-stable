@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
@@ -11,15 +10,18 @@ use Getopt::Std;
 #
 # Emulab NFS unmount command, called by rc.mounts .  See emount for more info.
 #
-# Arg is the local mount points, for example:
-#    eumount /proj/testbed
+# Arg is the local mount point or user name, for example:
+#    eumount /users/russ
+# or:
+#    eumount russ
 # 
 # The Services For Unix (SFU 3.5) NFS client commands are used underneath, and the
 # CygWin symlink pointing to the /cygdrive/driveletter mount are cleaned up.
 
 sub usage()
 {
-    print "Usage: eumount [-v] localpath\n";
+    print "Usage: eumount [-v] /local/path\n";
+    print "   or: eumount [-v] username\n";
     exit(1);
 }
 my $optlist     = "v";
@@ -54,6 +56,9 @@ if (defined($options{"v"})) {
 }
 if (@ARGV == 1) {
     $local = $ARGV[0];
+    if ($local !~ m|/|) {
+	$local = "/users/$local";
+    }
 }
 else {
     usage();

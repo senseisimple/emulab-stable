@@ -4,26 +4,34 @@
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# CygWin user setup for each login.
+# CygWin user setup for each rdesktop login.  This gets run from a Registry key:
+#   HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run\EmulabLogin
+# with value: 
+#   C:\cygwin\bin\bash /usr/local/etc/emulab/rc/rc.cygwinxp-user
 
 PATH=/usr/local/etc/emulab:$PATH
-set -x
 
 # Mounts are local to the Win32 login session context.
 if [ -e /cygdrive/s ]; then /cygdrive/c/SFU/common/umount S: > /dev/null; fi
+echo emount fs.emulab.net:/share /share
 emount fs.emulab.net:/share /share
 
 if [ -e /cygdrive/p ]; then /cygdrive/c/SFU/common/umount P: > /dev/null ; fi
 proj=`tmcc.bin status | sed 's|ALLOCATED=\([^/]*\)/.*|\1|'`
+echo emount fs.emulab.net:/q/proj/$proj /proj/$proj
 emount fs.emulab.net:/q/proj/$proj /proj/$proj
+
+# Where do we find out the group information for an optional Q: mount?
 
 if [ -e /cygdrive/h ]; then /cygdrive/c/SFU/common/umount H: > /dev/null ; fi
 creator=`tmcc.bin creator | sed 's|.*CREATOR=\([^ ]*\).*|\1|'`
+echo emount fs.emulab.net:/users/$creator /users/$creator
 emount fs.emulab.net:/users/$creator /users/$creator
 
 if [ -e /cygdrive/i ]; then /cygdrive/c/SFU/common/umount I: > /dev/null ; fi
 swapper=`tmcc.bin creator | sed 's|.*SWAPPER=\([^ ]*\).*|\1|'`
 if [ $swapper != $creator ]; then
+    echo emount fs.emulab.net:/users/$swapper /users/$swapper
     emount fs.emulab.net:/users/$swapper /users/$swapper
 fi
 
@@ -31,10 +39,16 @@ fi
 if [ -e /cygdrive/j ]; then /cygdrive/c/SFU/common/umount J: > /dev/null ; fi
 user=`id -un`
 if [[ $user != $creator && $user != $swapper && $user != root ]]; then
+    echo emount -d J: fs.emulab.net:/users/$user /users/$user
     emount -d J: fs.emulab.net:/users/$user /users/$user
 fi
 
-set +x
-echo "Hit <Enter> to dismiss."
-sed 1q
+# Run the SSH daemon in the Win32 login session context, so ssh client sessions
+# will see the same set of mounts when they come in AS THIS SAME USER.
+echo ""
+startsshd
+
+echo ""
+echo "Hit <Enter> to dismiss this window."
+read
 

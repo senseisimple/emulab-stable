@@ -1,5 +1,4 @@
 #!/usr/bin/perl -w
-#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
@@ -12,7 +11,13 @@ use Getopt::Std;
 # Emulab NFS mount command, called by rc.mounts .  
 #
 # Args are the remote and local mount points, for example:
-#    eumount fs.emulab.net:/q/proj/testbed /proj/testbed
+#    emount fs.emulab.net:/q/proj/testbed /proj/testbed
+#
+# One arg is just the username, with the rest defaulted in for convenience.
+#    emount russ
+# is equivalent to:
+#    emount fs.emulab.net:/users/russ /users/russ
+#
 # With no args, reports the current mounts with "net use".
 #
 # Since this is Windows, mounts go through drive letters, like this:
@@ -32,6 +37,7 @@ use Getopt::Std;
 sub usage()
 {
     print "Usage: emount [-v] [-d driveletter:] remotehost:path localpath\n";
+    print "   or: emount [-v] [-d driveletter:] username\n";
     print "   or: emount\n";
     exit(1);
 }
@@ -40,6 +46,7 @@ my $verbose     = 0;
 my $driveletter = "";
 my $remote      = "";
 my $local       = "";
+my $username    = "";
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -73,6 +80,11 @@ if (defined($options{"d"})) {
 if (@ARGV == 0 ) {
     system("$NET use");
     exit(0);
+}
+elsif (@ARGV == 1) {
+    $username = $ARGV[0];
+    $local = "/users/$username";
+    $remote = "fs.emulab.net:$local";
 }
 elsif (@ARGV == 2) {
     $remote = $ARGV[0];

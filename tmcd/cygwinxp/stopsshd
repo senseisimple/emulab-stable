@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Stop the current the SSH daemon.
+
+pidfile=/var/run/sshd.pid
+running=
+if [ -e $pidfile ]; then
+    # Check that the process ID actually refers to a running process. 
+    pid=`cat $pidfile`
+    if ( kill -0 $pid >& /dev/null ); then
+	running=yes
+    fi
+fi
+if [ $running ]; then
+    echo "Killing sshd daemon."
+    ps -ef | awk '$2=='$pid'{print}'
+    kill $pid
+fi
+
+# Restore the file permissions needed for sshd to run as a service.
+user=`id -un`
+chown SYSTEM /etc/ssh*key
+chmod o-r /etc/ssh*key
+chown SYSTEM /var/empty
+chmod go-w /var/empty

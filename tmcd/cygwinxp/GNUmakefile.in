@@ -70,6 +70,8 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/emount $(BINDIR)/emount
 	$(INSTALL) -m 755 $(SRCDIR)/eumount $(BINDIR)/eumount
+	$(INSTALL) -m 755 $(SRCDIR)/startsshd $(BINDIR)/startsshd
+	$(INSTALL) -m 755 $(SRCDIR)/stopsshd $(BINDIR)/stopsshd
 
 sfs-install:
 

@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Run the SSH daemon in the Win32 login session context, so ssh client sessions
+# will see the same set of mounts when they come in AS THIS SAME USER.
+# 
+# Other users need to come is as rdesktop first if they want ssh sessions with
+# their remote homedirs mounted.  Doing this disconnects the first rdesktop session
+# after 20 seconds, but reconnecting as the original user gets it right back.
+# Microsoft cripples Citrix/Hydra on XP to only allow one rdesktop session at a time.
+# 
+# Do "ssh pcNNN qwinsta" (Query WINdows STAtion) to show the sessions remotely.
+# Use "ssh pcNNN rwinsta ID" to kill a session by session ID.
+# If you're logged in via rdesktop, see the Users tab in Task Manager.
+
+pidfile=/var/run/sshd.pid
+running=
+if [ -e $pidfile ]; then
+    # Check that the process ID actually refers to a running process. 
+    pid=`cat $pidfile`
+    if ( kill -0 $pid >& /dev/null ); then
+	running=yes
+    fi
+fi
+if [ $running ]; then
+    # Kill a previous copy of sshd, so we can run one as this user.
+    echo "Killing previous sshd daemon."
+    ps -ef | awk '$2=='$pid'{print}'
+    kill $pid
+fi
+
+# Hijack the file permissions needed for sshd to run as this user.
+user=`id -un`
+chown $user /etc/ssh*key
+chmod o-r /etc/ssh*key
+chown $user /var/empty
+chmod go-w /var/empty
+
+# Start sshd in the background, orphaned so it doesn't get SIGINT from here.
+# The pidfile is updated by sshd itself.
+echo "Starting new sshd daemon as $user."
+(CYGWIN="ntsec tty" /usr/sbin/sshd &)
