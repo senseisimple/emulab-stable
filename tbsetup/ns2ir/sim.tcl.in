@@ -297,6 +297,9 @@ Simulator instproc at {time eventstring} {
 		"stop" {
 		    set etype STOP
 		}
+		"reset" {
+		    set etype RESET
+		}
                 "set" {
 		    if {[llength $event] < 4} {
 			perror "Wrong number of arguments: at $time $event"
