@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -88,6 +88,9 @@ virtual_tables = {
     "virt_node_desires"         : { "rows"  : None, 
                                     "tag"   : "node_desires",
                                     "attrs" : [ "vname", "desire" ]},
+    "virt_node_startloc"        : { "rows"  : None,
+                                    "tag"   : "node_startlocs",
+                                    "attrs" : [ "vname", "building" ]},
     "virt_routes"		: { "rows"  : None, 
                                     "tag"   : "routes",
                                     "attrs" : [ "vname", "src", "dst" ]},
@@ -191,7 +194,7 @@ def CheckExptPermission(uid, pid, eid):
                               pid + "/" + eid)
 
     gid = res[0][0]
-        
+    
     res = DBQueryFatal("SELECT trust FROM group_membership "
                        "WHERE uid=%s and pid=%s and gid=%s",
                        (uid, pid, gid))
@@ -201,6 +204,22 @@ def CheckExptPermission(uid, pid, eid):
                               output=("You do not have permission to " +
                                       "access experiment: " + pid + "/" + eid))
     return None
+
+#
+# Check user permission to access a node.
+# 
+def CheckNodePermission(uid, node):
+    res = DBQueryFatal("SELECT e.pid,e.eid FROM reserved AS r "
+                       "left join experiments as e on "
+                       "     e.pid=r.pid and e.eid=r.eid "
+                       "WHERE r.node_id=%s",
+                       (node,))
+    
+    if len(res) == 0:
+        return EmulabResponse(RESPONSE_ERROR,
+                              output="No such node: " + node)
+
+    return CheckExptPermission(uid, res[0][0], res[0][1])
 
 #
 # This is a wrapper class so that you can invoke methods in dotted form.
@@ -324,12 +343,89 @@ class emulab:
             tmp["date"] = xmlrpclib.DateTime(
                 time.strptime(str(res[2]), "%Y-%m-%d %H:%M:%S"))
             tmp["msgid"] = res[3]
+            
             result.append(tmp)
             pass
 
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
+
+    def vision_config(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if not re.match("^[-:\w]*$", str(argdict["area"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed 'area'!")
+
+        table = {
+            "MEB-ROBOTS" : [ { "name" : "camera0",
+                               "host" : "junk.flux.utah.edu",
+                               "port" : 6100 },
+                             { "name" : "camera1",
+                               "host" : "junk.flux.utah.edu",
+                               "port" : 6101 },
+                             { "name" : "camera2",
+                               "host" : "junk.flux.utah.edu",
+                               "port" : 6102 },
+                             { "name" : "camera3",
+                               "host" : "junk.flux.utah.edu",
+                               "port" : 6103 } ]
+            }
+        
+        if not table.has_key(argdict["area"]):
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Unknown area " + argdict["area"])
+
+        result = table[argdict["area"]]
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    def obstacle_config(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if not re.match("^[-:\w]*$", str(argdict["area"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed 'area'!")
+
+        if not argdict.has_key("units"):
+            argdict["units"] = "pixels"
+            pass
+        
+        res = DBQuery("select * from obstacles where building=%s",
+                      (argdict["area"],),
+                      asDict=True)
+
+        ppm = DBQueryFatal("select pixels_per_meter from floorimages "
+                           "where building=%s",
+                           (argdict["area"],))
+        
+        if len(res) == 0 or len(ppm) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such area " + argdict["area"])
+
+        ppm = ppm[0][0]
+
+        for ob in res:
+            if argdict["units"] == "meters":
+                ob["x1"] = ob["x1"] / ppm
+                ob["y1"] = ob["y1"] / ppm
+                ob["z1"] = ob["z1"] / ppm
+                ob["x2"] = ob["x2"] / ppm
+                ob["y2"] = ob["y2"] / ppm
+                ob["z2"] = ob["z2"] / ppm
+                pass
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=res,
+                              output=str(res))
     
     pass
 
@@ -693,11 +789,12 @@ class osid:
 
         # Get the listing that is accessible to this user and
         res = DBQueryFatal("SELECT distinct "
-                           "o.osname,o.pid,o.description,o.OS FROM "
+                           "o.* FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
                            "where g.uid=%s or o.shared=1",
-                           (self.uid,))
+                           (self.uid,),
+                           True)
 
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
@@ -706,15 +803,17 @@ class osid:
         # ... package it up.
         result = {}
         for osid in res:
-            tmp = {
-                "osid" : osid[0],
-                "pid" : osid[1],
-                "description" : osid[2],
-                "OS" : osid[3],
-                }
-            result[osid[0]] = tmp
-            pass
+            # XXX Legacy stuff...
+            osid["fullosid"] = osid["osid"]
+            osid["osid"] = osid["osname"]
 
+            if not osid["OS"] or len(osid["OS"]) == 0:
+                osid["OS"] = "(None)"
+                pass
+
+            result[osid["osid"]] = scrubdict(osid)
+            pass
+        
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
@@ -1217,6 +1316,50 @@ class experiment:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    def metadata(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(self.uid,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        res = DBQueryFatal("SELECT * FROM experiments WHERE pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]),
+                           True)
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment?")
+
+        res = scrubdict(res[0], [
+            "expt_locked",
+            "testdb",
+            "logfile_open",
+            "prerender_pid",
+            "keyhash",
+            "eventkey",
+            "sim_reswap_count",
+            "elab_in_elab"
+            ])
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=res, output=str(res))
+
     #
     # Return the state of an experiment.
     #
@@ -1229,11 +1372,11 @@ class experiment:
             return EmulabResponse(RESPONSE_FORBIDDEN,
                               output="Insufficient privledge to invoke method")
         
-#        try:
-#            checknologins()
-#            pass
-#        except NoLoginsError, e:
-#            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -1273,11 +1416,11 @@ class experiment:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
 
-#        try:
-#            checknologins()
-#            pass
-#        except NoLoginsError, e:
-#            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp", "state"))
         if (argerror):
@@ -1412,10 +1555,6 @@ class experiment:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
 
-        if self.readonly:
-            return EmulabResponse(RESPONSE_FORBIDDEN,
-                              output="Insufficient privledge to invoke method")
-        
         try:
             checknologins()
             pass
@@ -1457,7 +1596,7 @@ class experiment:
                 "(unix_timestamp(now()) - unix_timestamp( "
                 "greatest(na.last_tty_act,na.last_net_act,na.last_cpu_act,"
                 "na.last_ext_act))),ni.load_1min,ni.load_5min,ni.load_15min,"
-                "n.phys_nodeid "
+                "n.phys_nodeid,r.erole "
                 "  from reserved as r "
                 "left join nodes as n on r.node_id=n.node_id "
                 "left join node_status as ns on ns.node_id=n.node_id "
@@ -1473,7 +1612,7 @@ class experiment:
                 tmp["name"] = res[0]
                 tmp["node"] = res[1]
                 tmp["type"] = res[2]
-                tmp["pnode"] = res[10];
+                tmp["pnode"] = res[10]
                 if not osmappings.has_key(res[3]):
                     osres = DBQuery(
                         "SELECT osname from os_info where osid=%s", (res[3],))
@@ -1496,6 +1635,7 @@ class experiment:
                 if res[9]:
                     tmp["load_15min"] = res[9]
                     pass
+                tmp["erole"] = res[11]
                 mapping[res[0]] = tmp
                 pass
             pass
@@ -1543,6 +1683,44 @@ class experiment:
                     result[res[1]]     = tmp
                     pass
                 pass
+            pass
+        elif argdict["aspect"] == "physical":
+            result = {
+                "nodes" : [],
+                "interfaces" : [],
+                }
+            
+            dbres = DBQuery("SELECT * FROM reserved "
+                            "WHERE pid=%s and eid=%s",
+                            (argdict["proj"], argdict["exp"]),
+                            asDict=True)
+            for node in dbres:
+                result["nodes"].append(scrubdict(node, [
+                    "rsrv_time",
+                    "old_pid",
+                    "old_eid"
+                    ]))
+                pass
+            dbres = DBQuery("SELECT i.* FROM reserved as r "
+                            "LEFT JOIN interfaces as i on r.node_id=i.node_id "
+                            "WHERE r.pid=%s and r.eid=%s "
+                            "and i.ip is not NULL and i.ip!=''",
+                            (argdict["proj"], argdict["exp"]),
+                            asDict=True)
+            for intf in dbres:
+                result["interfaces"].append(scrubdict(intf))
+                pass
+            dbres = DBQuery("SELECT i.* FROM reserved as r "
+                            "LEFT JOIN veth_interfaces as i "
+                            " on r.node_id=i.node_id "
+                            "WHERE r.pid=%s and r.eid=%s "
+                            "and i.ip is not NULL and i.ip!=''",
+                            (argdict["proj"], argdict["exp"]),
+                            asDict=True)
+            for intf in dbres:
+                result["interfaces"].append(scrubdict(intf))
+                pass
+
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=result, output="")
@@ -1765,7 +1943,7 @@ class experiment:
                     pass
                 pass
             pass
-
+        
         argstr += " -e "
         argstr += escapeshellarg(argdict["proj"] + "," + argdict["exp"])
         
@@ -1810,6 +1988,11 @@ class experiment:
             if opt == "wait":
                 if not xbool(val):
                     argstr += " -s "
+                    pass
+                pass
+            elif opt == "bootwait":
+                if xbool(val):
+                    argstr += " -w "
                     pass
                 pass
             elif opt == "imageproj":
@@ -1885,6 +2068,7 @@ class experiment:
         # Convert NULL to ""
         #
         for key, val in res[0].items():
+            
             if val == None:
                 res[0][key] = ""
                 pass
@@ -1904,10 +2088,13 @@ class experiment:
         for key, val in virtual_tables.items():
             if key == "experiments":
                 continue
-            
+
             tag  = val["tag"]
             rows = []
 
+            if argdict.has_key("tables") and (tag not in argdict["tables"]):
+                continue
+            
             res = DBQuery("SELECT * FROM " + key + " " +
                           "WHERE pid=%s and eid=%s",
                           (argdict["proj"], argdict["exp"]), asDict=True);
@@ -2490,7 +2677,8 @@ class experiment:
         result = []
 
 	res = DBQuery("select ex.idx,ex.time,ex.vname,"
-                      " ot.type,et.type,ex.arguments from eventlist as ex "
+                      " ot.type,et.type,ex.arguments,ex.parent "
+                      "from eventlist as ex "
                       "left join event_eventtypes as et on "
                       " ex.eventtype=et.idx "
                       "left join event_objecttypes as ot on "
@@ -2501,7 +2689,7 @@ class experiment:
 
         for event in res:
             result.append((str(event[0]), str(event[1]), event[2],
-                           event[3], event[4], event[5]));
+                           event[3], event[4], event[5], event[6]));
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=result)
@@ -2654,7 +2842,87 @@ class node:
                               value=result,
                               output=str(result))
 
+    def sshdescription(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
 
+        argerror = CheckRequiredArgs(argdict, ("node",))
+        if (argerror):
+            return argerror
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        if not re.match("^[-\w]*$", str(argdict["node"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node value!")
+        
+        # XXX Refactor the trust stuff
+        res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
+                           "left join experiments as e on "
+                           "     e.pid=r.pid and e.eid=r.eid "
+                           "WHERE r.node_id=%s",
+                           (argdict["node"],))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        trust = DBQueryFatal("SELECT trust FROM group_membership "
+                             "WHERE uid=%s and pid=%s and gid=%s",
+                             (self.uid, res[0][0], res[0][1]))
+
+        if len(trust) == 0:
+            return EmulabResponse(
+                RESPONSE_FORBIDDEN,
+                output=("You do not have permission to access: "
+                        + argdict["node"]))
+
+        res = DBQueryFatal("select n.jailflag,n.sshdport, "
+                           "       r.vname,r.pid,r.eid, "
+                           "       t.isvirtnode,t.isremotenode,t.isplabdslice "
+                           " from nodes as n "
+                           "left join reserved as r on n.node_id=r.node_id "
+                           "left join node_types as t on t.type=n.type "
+                           "where n.node_id=%s",
+                           (argdict["node"],))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        jailflag = res[0][0]
+        sshdport = res[0][1]
+        vname = res[0][2]
+        pid = res[0][3]
+        eid = res[0][4]
+        isvirt = res[0][5]
+        isremote = res[0][6]
+        isplab = res[0][7]
+        
+        result = {
+            "hostname" : vname + "." + eid + "." + pid + "." + OURDOMAIN,
+            }
+
+        if isvirt:
+            if isremote:
+                if jailflag and isplab:
+                    result["port"] = sshdport
+                    pass
+                pass
+            else:
+                result["gateway"] = USERNODE
+                pass
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+    
     #
     # Get the ssh host keys
     #
@@ -2762,15 +3030,20 @@ class node:
                 pass
             pass
 
-        tokens = argdict["nodes"].split(",")
+        tokens = re.split(r'[ \t\n,]+', argdict["nodes"])
+        
         for token in tokens:
+            #if len(token) > 0:
             argstr += " " + escapeshellarg(token)
+            #pass
             pass
 
         (exitval, output) = runcommand(TBDIR + "/bin/node_reboot " + argstr)
+        output += argstr
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
-        
+
+        # NB: the actual output makes the XML parsers choke and die.
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
@@ -2836,6 +3109,11 @@ class node:
             if opt == "wait":
                 if not xbool(val):
                     argstr += " -s "
+                    pass
+                pass
+            elif opt == "bootwait":
+                if xbool(val):
+                    argstr += " -w "
                     pass
                 pass
             elif opt == "imageproj":
@@ -2943,6 +3221,137 @@ class node:
 
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    def statewait(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("node", "state"))
+        if (argerror):
+            return argerror
+
+        # Check for well formed proj/exp and
+        if not (re.match("^[-\w]*$", argdict["node"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node value!")
+
+        # ... timeout arguments.
+        if (argdict.has_key("timeout") and
+            isinstance(argdict["timeout"], types.StringType) and
+            not re.match("^[\d]*$", argdict["timeout"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed timeout!")
+
+        # Make sure the state argument is a list.
+        if (not isinstance(argdict["state"], types.ListType)):
+            argdict["state"] = [argdict["state"],]
+            pass
+        
+        #
+        # Check permission.
+        #
+        permerror = CheckNodePermission(self.uid, argdict["node"])
+        if (permerror):
+            return permerror
+
+        res = DBQueryFatal(
+            "select ns.status,n.eventstate from node_status as ns "
+            "left join nodes as n on n.node_id=ns.node_id "
+            "where ns.node_id=%s",
+            (argdict["node"],))
+        
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        # First, see if the node is already in the desired state,
+        status = res[0][0]
+        eventstate = res[0][1]
+        if (status == "up" and eventstate in argdict["state"]):
+            return EmulabResponse(RESPONSE_SUCCESS,
+                                  value=eventstate,
+                                  output=eventstate)
+
+        # ... subscribe to the event, and then
+        try:
+            import tbevent
+            pass
+        except ImportError, e:
+            return EmulabResponse(RESPONSE_ERROR, output="System Error")
+
+        at = tbevent.address_tuple()
+        at.objtype = "TBNODESTATE"
+        at.objname = argdict["node"]
+        at.host    = BOSSNODE
+
+        try:
+            mc = tbevent.EventClient(server="localhost", port=BOSSEVENTPORT)
+            mc.subscribe(at)
+            pass
+        except:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Could not connect to Event System")
+
+        # ... check the state again in case it changed between the first
+        # check and the subscription.
+        res = DBQueryFatal(
+            "select ns.status,n.eventstate from node_status as ns "
+            "left join nodes as n on n.node_id=ns.node_id "
+            "where ns.node_id=%s",
+            (argdict["node"],))
+        
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        if (argdict.has_key("timeout")):
+            signal.signal(signal.SIGALRM, TimeoutHandler)
+            signal.alarm(int(argdict["timeout"]))
+            pass
+
+        status = res[0][0]
+        eventstate = res[0][1]
+        if (status == "up" and eventstate in argdict["state"]):
+            return EmulabResponse(RESPONSE_SUCCESS,
+                                  value=eventstate,
+                                  output=eventstate)
+        
+        # Need to wait for an event.
+        try:
+            while True:
+                ev = mc.poll()
+
+                if ev == None:
+                    time.sleep(1) # Slow down the polling.
+                    continue
+
+                # ... check if it is one the user cares about.
+                if ((argdict["state"] == []) or
+                    (ev.getEventType() in argdict["state"])):
+                    retval = ev.getEventType()
+                    break
+
+                pass
+            pass
+        except TimedOutError, e:
+            return EmulabResponse(RESPONSE_TIMEDOUT,
+                                  output=("Timed out waiting for states: "
+                                          + `argdict["state"]`))
+
+        if (argdict.has_key("timeout")):
+            signal.alarm(0)
+            pass
+
+        del(mc)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=retval, output=retval)
+    
     pass
 
 
@@ -3382,4 +3791,25 @@ def nfspath(value):
     if not found:
         raise OSError(errno.EPERM, "Path is not an NFS export", value)
 
+    return retval
+
+##
+# Scrub a dictionary returned by an SQL query so that it can be sent through
+# the XML-RPC marshaller without error.
+#
+# @param retval The dictionary to scrub.
+# @param prunelist A list of keys to prune from the dictionary.
+# @return retval
+#
+def scrubdict(retval, prunelist=[]):
+    for key in retval.keys():
+        if not retval[key] or key in prunelist:
+            del retval[key]
+            pass
+        elif isinstance(retval[key], datetime.datetime):
+            retval[key] = xmlrpclib.DateTime(
+                time.strptime(str(retval[key]), "%Y-%m-%d %H:%M:%S"))
+            pass
+        pass
+    
     return retval

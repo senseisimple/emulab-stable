@@ -3177,6 +3177,7 @@ sub LoadVirtNodes()
     # loop
     #
     my %virt_node_desires = LoadVirtNodeDesires();
+    my %virt_node_startloc = LoadVirtNodeStartLoc();
 
     printdb "Loading virt_nodes.\n";
     my $query_result =
@@ -3352,6 +3353,12 @@ sub LoadVirtNodes()
 	} else {
 	    $rowref->{"__desires"} = {};
 	}
+
+	if ($virt_node_startloc{$vname}) {
+	    $rowref->{"__startloc"} = $virt_node_startloc{$vname};
+	} else {
+	    $rowref->{"__startloc"} = ();
+	}
     }
 }
 
@@ -3378,6 +3385,21 @@ sub LoadVirtNodeDesires()
     return %virt_node_desires;
 }
 
+sub LoadVirtNodeStartLoc()
+{
+    printdb "Loading virt_node_startloc.\n";
+
+    my %virt_node_startloc = ();
+    my $query_result = DBQueryFatal("select vname,building from " .
+	"virt_node_startloc where pid='$pid' and eid='$eid'");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	$virt_node_startloc{$rowref->{"vname"}} = $rowref;
+    }
+
+    return %virt_node_startloc;
+}
+
 #
 # Helper functions to get virt_node info. Because of internally created
 # nodes (tbdelay, vhost, sim), we need a virtnodeisvnode() test to prevent
@@ -3396,6 +3418,7 @@ sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
 sub virtnodeusewan($)   { return $virt_nodes{$_[0]}->{"__usewanassign"}; }
 sub virtnodesetusewan($){ return $virt_nodes{$_[0]}->{"__usewanassign"} = 1;}
 sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
+sub virtnodestartloc($) { return $virt_nodes{$_[0]}->{"__startloc"}; }
 sub virtnodeisremote($) {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isremotenode"};
 }
@@ -3806,6 +3829,12 @@ sub CreateTopFile()
 		#if ($oldmapping) {
 		#    $desirestr .= " $oldmapping:.2";
 		#}
+	    }
+
+	    if (defined(virtnodestartloc($vname))) {
+		$desirestr .= (" area-" .
+			       virtnodestartloc($vname)->{"building"} .
+			       ":1");
 	    }
 
 	    # Require that this vnode be places onto a pnode that supports

@@ -3053,6 +3053,7 @@ sub TBGetSiteVar($;$)
 		   "virt_vtypes",
 		   "virt_programs",
 		   "virt_node_desires",
+		   "virt_node_startloc",
 		   "virt_simnode_attributes",
 		   # vis_nodes is locked during update in prerender, so we
 		   # will get a consistent dataset when we backup.

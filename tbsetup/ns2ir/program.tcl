@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,6 +24,8 @@ Program instproc init {s} {
     $self set sim $s
     $self set node {}
     $self set command {}
+    $self set dir {}
+    $self set timeout 0
 
     # Link simulator to this new object.
     $s add_program $self
@@ -45,14 +47,12 @@ Program instproc updatedb {DB} {
     var_import ::TBCOMPAT::objtypes
     $self instvar node
     $self instvar command
+    $self instvar dir
+    $self instvar timeout
     $self instvar sim
 
     if {$node == {}} {
 	perror "\[updatedb] $self has no node."
-	return
-    }
-    if {$command == {}} {
-	perror "\[updatedb] $self has no command."
 	return
     }
     if { [string first \n $command] != -1 } {

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -69,6 +69,7 @@ my %used_switches = ();
 my %permissions   = ();
 my %typemap       = ();
 my %auxtypemap    = ();
+my %areamap       = ();
 
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
@@ -152,6 +153,12 @@ while (($class,$type,$delaycapacity,
     # Default is permission to use all types,classes. 
     $permissions{$class} = 1;
     $permissions{$type}  = 1;
+}
+
+# Read location_info
+$result = DBQueryFatal("select node_id,building from location_info");
+while (($node,$building) = $result->fetchrow_array) {
+    $areamap{$node} = "area-$building";
 }
 
 #
@@ -327,7 +334,7 @@ $result =
 # the type/class of node.
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved) 
-    = $result->fetchrow_array) {
+       = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -405,6 +412,10 @@ foreach $node (keys(%nodes)) {
 	    $needvirtgoo = 1;
 	}
 	push(@types, $auxinfo);
+    }
+
+    if (defined($areamap{$node})) {
+	push @features, $areamap{$node} . ":0";
     }
 
     my $cpu_ram_features_present = 0;

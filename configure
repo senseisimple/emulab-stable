@@ -1839,6 +1839,45 @@ case "$INSTALL" in
         ;;
 esac
 
+# Extract the first word of "rsync", so it can be a program name with args.
+set dummy rsync; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:1811: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  case "$RSYNC" in
+  /*)
+  ac_cv_path_RSYNC="$RSYNC" # Let the user override the test with a path.
+  ;;
+  ?:/*)			 
+  ac_cv_path_RSYNC="$RSYNC" # Let the user override the test with a dos path.
+  ;;
+  *)
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
+  ac_dummy="${PATH}"
+  for ac_dir in $ac_dummy; do 
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_path_RSYNC="$ac_dir/$ac_word"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+  test -z "$ac_cv_path_RSYNC" && ac_cv_path_RSYNC=""""
+  ;;
+esac
+fi
+RSYNC="$ac_cv_path_RSYNC"
+if test -n "$RSYNC"; then
+  echo "$ac_t""$RSYNC" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
+    { echo "configure: error: Rsync is required to use this software, see www.rsync.org." 1>&2; exit 1; }
+fi
 
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
@@ -1943,7 +1982,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
 	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
-	utils/grabwebcams \
+	utils/grabwebcams utils/loghole \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
@@ -2253,6 +2292,7 @@ s%@TESTMODE@%$TESTMODE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g
+s%@RSYNC@%$RSYNC%g
 s%@DISTCLEAN_FILES@%$DISTCLEAN_FILES%g
 
 CEOF

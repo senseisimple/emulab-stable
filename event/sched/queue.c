@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -113,11 +113,12 @@ sched_event_enqueue(sched_event_t event)
     }
 
     if (debug > 2) {
-	    TRACE("enqueued event (event=(notification=%p, "
-		  "time=(tv_sec=%ld, tv_usec=%ld)))\n",
-		  event.notification,
-		  event.time.tv_sec,
-		  event.time.tv_usec);
+	    fprintf(stderr,
+		    "enqueued event (event=(notification=%p, "
+		    "time=(tv_sec=%ld, tv_usec=%ld)))\n",
+		    event.notification,
+		    event.time.tv_sec,
+		    event.time.tv_usec);
     }
 
     /* Sanity check: Make sure the heap property is satisfied. */
@@ -146,7 +147,7 @@ sched_event_dequeue(sched_event_t *event, int wait)
     assert(initialized);
 
     if (event == NULL) {
-        ERROR("invalid event pointer\n");
+        error("invalid event pointer\n");
         return 0;
     }
 
@@ -158,7 +159,7 @@ sched_event_dequeue(sched_event_t *event, int wait)
         int val;
         sem_getvalue(&event_to_consume, &val);
         if (val == 0) {
-            TRACE("queue empty\n");
+            fprintf(stderr, "queue empty\n");
             return 0;
         }
     }
@@ -181,15 +182,16 @@ sched_event_dequeue(sched_event_t *event, int wait)
 	    TIMEVAL_TO_TIMESPEC(&event->time, &fireme);
 
 	    if (debug > 3) {
-		    TRACE("sleeping until time=(tv_sec=%ld, tv_usec=%ld).\n",
-			  event->time.tv_sec, event->time.tv_usec);
+		    fprintf(stderr,
+			    "sleeping until time=(tv_sec=%ld, tv_usec=%ld).\n",
+			    event->time.tv_sec, event->time.tv_usec);
 	    }
 
 	    if ((err = pthread_cond_timedwait(&event_queue_cond,
 					      &event_queue_mutex, &fireme))
 		!= 0) {
 		    if (err != ETIMEDOUT) {
-			    ERROR("pthread_cond_timedwait failed: %d", err);
+			    error("pthread_cond_timedwait failed: %d", err);
 			    return -1;
 		    }
 		    
@@ -237,11 +239,12 @@ sched_event_dequeue(sched_event_t *event, int wait)
     }
 
     if (debug > 2) {
-	    TRACE("dequeued event (event=(notification=%p, "
-		  "time=(tv_sec=%ld, tv_usec=%ld)))\n",
-		  event->notification,
-		  event->time.tv_sec,
-		  event->time.tv_usec);
+	    fprintf(stderr,
+		    "dequeued event (event=(notification=%p, "
+		    "time=(tv_sec=%ld, tv_usec=%ld)))\n",
+		    event->notification,
+		    event->time.tv_sec,
+		    event->time.tv_usec);
     }
 
     /* Sanity check: Make sure the heap property is satisfied. */
@@ -269,7 +272,7 @@ sched_event_queue_dump_node_and_descendents(FILE *fp, int index, int level)
     int i;
 
     if (index < EVENT_QUEUE_HEAD || index > event_queue_tail) {
-        ERROR("invalid index %d (valid range is %d-%d)\n", index,
+        error("invalid index %d (valid range is %d-%d)\n", index,
               EVENT_QUEUE_HEAD,
               event_queue_tail);
         return;
@@ -319,7 +322,7 @@ sched_event_queue_verify(void)
                 err = 1;
         }
         if (err) {
-            ERROR("node %d violates the heap property:\n", i);
+            error("node %d violates the heap property:\n", i);
             sched_event_queue_dump_node_and_descendents(stderr, i, 2);
             abort();
         }
@@ -358,7 +361,7 @@ main(int argc, char **argv)
         event.time.tv_sec = rand();
         event.time.tv_usec = rand();
         if (sched_event_enqueue(event) == 0) {
-            ERROR("could not enqueue event\n");
+            error("could not enqueue event\n");
             return 1;
         }
     }
@@ -373,7 +376,7 @@ main(int argc, char **argv)
     fflush(stdout);
     for (i = 0; i < events; i++) {
         if (sched_event_dequeue(&event, 0) == 0) {
-            ERROR("could not dequeue event\n");
+            error("could not dequeue event\n");
             return 1;
         }
     }

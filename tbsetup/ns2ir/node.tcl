@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -79,10 +79,12 @@ Node instproc init {s} {
     $self set fixed ""
     $self set nseconfig ""
 
+    $self set topo ""
+
     $self set X_ ""
     $self set Y_ ""
-    $self set Z_ ""
-    $self set orientation_ ""
+    $self set Z_ 0.0
+    $self set orientation_ 0.0
 
     if { ${::GLOBALS::simulated} == 1 } {
 	$self set simulated 1
@@ -138,6 +140,10 @@ Node instproc updatedb {DB} {
     $self instvar desirelist
     $self instvar nseconfig
     $self instvar simulated
+    $self instvar topo
+    $self instvar X_
+    $self instvar Y_
+    $self instvar orientation_
     var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::use_physnaming
     var_import ::TBCOMPAT::physnodes
@@ -233,6 +239,21 @@ Node instproc updatedb {DB} {
     }
 
     $sim spitxml_data "virt_nodes" $fields $values
+
+    if {$topo != ""} {
+	if {$X_ == "" || $Y_ == ""} {
+	    perror "node \"$self\" has no initial position"
+	    return
+	}
+
+	if {! [$topo checkdest $self $X_ $Y_]} {
+	    return
+	}
+
+	$sim spitxml_data "virt_node_startloc" \
+		[list "vname" "building" "floor" "loc_x" "loc_y" "orientation"] \
+		[list $self [$topo set area_name] "" $X_ $Y_ $orientation_]
+    }
     
     # Put in the desires, too
     foreach desire [lsort [array names desirelist]] {
@@ -472,4 +493,44 @@ Node instproc add-desire {desire weight} {
 	perror "\[add-desire] Desire $desire on $self already exists!"
     }
     set desirelist($desire) $weight
+}
+
+Node instproc program-agent {args} {
+    
+    ::GLOBALS::named-args $args { -command {} -dir {} -timeout {} }
+
+    set curprog [new Program [$self set sim]]
+    $curprog set node $self
+    $curprog set command $(-command)
+    $curprog set dir $(-dir)
+    if {$(-timeout) != {}} {
+	set to [::TBCOMPAT::reltime-to-secs $(-timeout)]
+	if {$to == -1} {
+	    perror "-timeout value is not a relative time: $(-timeout)"
+	    return
+	} else {
+	    $curprog set timeout $to
+	}
+    }
+
+    return $curprog
+}
+
+Node instproc topography {topo} {
+    if {$topo == ""} {
+	$self set topo ""
+	return
+    } elseif {$topo != "" && ! [$topo info class Topography]} {
+	perror "\[topography] $topo is not a Topography."
+	return
+    } elseif {! [$topo initialized]} {
+	perror "\[topography] $topo is not initialized."
+	return
+    }
+
+    $self set topo $topo
+
+    if {[$self set type] == "pc"} {
+	$self set type "robot"
+    }
 }

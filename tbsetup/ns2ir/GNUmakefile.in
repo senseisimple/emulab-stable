@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,7 +17,7 @@ include $(OBJDIR)/Makeconf
 LIB_STUFF    = lanlink.tcl node.tcl sim.tcl tb_compat.tcl null.tcl \
 		  nsobject.tcl traffic.tcl vtype.tcl parse.tcl program.tcl \
 		  nsenode.tcl nstb_compat.tcl event.tcl firewall.tcl \
-		  elabinelab.ns fw.ns
+		  elabinelab.ns fw.ns timeline.tcl sequence.tcl topography.tcl
 BOSSLIBEXEC  = parse-ns
 USERLIBEXEC  = parse.proxy
 

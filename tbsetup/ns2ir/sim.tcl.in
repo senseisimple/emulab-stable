@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -72,14 +72,35 @@ Simulator instproc init {args} {
     $self instvar firewall_list;
     array set firewall_list {}
 
+    $self instvar timeline_list;
+    array set timeline_list {}
+
+    $self instvar sequence_list;
+    array set sequence_list {}
+
     var_import ::GLOBALS::last_class
     set last_class $self
+
+    $self instvar new_node_config;
+    array set new_node_config {}
+    $self node-config
 }
 
 # renaming the simulator instance
 # needed to find the name of the instance
 # for use in NSE code
 Simulator instproc rename {old new} {
+}
+
+Simulator instproc node-config {args} {
+    ::GLOBALS::named-args $args {
+	-topography ""
+    }
+
+    $self instvar new_node_config;
+    foreach {key value} [array get ""] {
+	set new_node_config($key) $value
+    }
 }
 
 # node
@@ -108,6 +129,9 @@ Simulator instproc node {args} {
     }
     set node_list($curnode) {}
     set last_class $curnode
+
+    $self instvar new_node_config;
+    $curnode topography $new_node_config(-topography)
 
     return $curnode
 }
@@ -226,6 +250,57 @@ Simulator instproc make-lan {nodelist bw delay args} {
     return $curlan
 }
 
+Simulator instproc event-timeline {args} {
+    $self instvar id_counter
+    $self instvar timeline_list
+
+    set curtl tbtl-tl[incr id_counter]
+
+    EventTimeline $curtl $self
+    set timeline_list($curtl) {}
+
+    return $curtl
+}
+
+Simulator instproc event-sequence {{seq {}} {catch {}} {catch_seq {}}} {
+    $self instvar id_counter
+    $self instvar sequence_list
+
+    if {$catch != {}} {
+	set mainseq tbseq-seq[incr id_counter]
+	set catchseq tbseq-seq[incr id_counter]
+	set curseq tbseq-seq[incr id_counter]
+
+	EventSequence $mainseq $self [uplevel 1 subst [list $seq]]
+	EventSequence $catchseq $self [uplevel 1 subst [list $catch_seq]]
+	EventSequence $curseq $self [subst {
+	    $mainseq run
+	    $catchseq run
+	}] -errorseq 1
+	set sequence_list($mainseq) {}
+	set sequence_list($catchseq) {}
+	set sequence_list($curseq) {}
+    } else {
+	set curseq tbseq-seq[incr id_counter]
+	
+	EventSequence $curseq $self [uplevel 1 subst [list $seq]]
+	set sequence_list($curseq) {}
+    }
+
+    return $curseq
+}
+
+Simulator instproc event-group {args} {
+    set curgrp [new EventGroup $self]
+    if {$args != {}} {
+	foreach obj $args {
+	    $curgrp add $obj
+	}
+    }
+
+    return $curgrp
+}
+
 # run
 # This method causes the fill_ips method to be invoked on all 
 # lanlinks and then, if not running in impotent mode, calls the
@@ -238,6 +313,8 @@ Simulator instproc run {} {
     $self instvar prog_list
     $self instvar eventgroup_list
     $self instvar firewall_list
+    $self instvar timeline_list
+    $self instvar sequence_list
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -414,6 +491,12 @@ Simulator instproc run {} {
     foreach fw [array names firewall_list] {
 	$fw updatedb "sql"
     }
+    foreach tl [array names timeline_list] {
+	$tl updatedb "sql"
+    }
+    foreach seq [array names sequence_list] {
+	$seq updatedb "sql"
+    }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
     set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $veth_encapsulate $fix_current_resources]
@@ -530,6 +613,16 @@ Simulator instproc connect {src dst} {
     if {$error} {return}
     $src connect $dst
     $dst connect $src
+    if {[$src info class Application/Traffic/CBR]} {
+	set event_count [expr $event_count + 1]
+	lappend event_list [list \
+		"0" [$src get_node] $src TRAFGEN MODIFY [$src get_params] ""]
+    }
+    if {[$dst info class Application/Traffic/CBR]} {
+	set event_count [expr $event_count + 1]
+	lappend event_list [list \
+		"0" [$dst get_node] $dst TRAFGEN MODIFY [$dst get_params] ""]
+    }
 }
 
 # at <time> <event>
@@ -541,17 +634,20 @@ Simulator instproc connect {src dst} {
 #   ...
 Simulator instproc at {time eventstring} {
     var_import ::GLOBALS::simulated
+    var_import ::TBCOMPAT::hwtype_class
 
     # ignore at statement for simulated case
     if { $simulated == 1 } {
 	return
     }
 
-    # Check that time is float
-    if {[regexp {(^[0-9]+(\.[0-9]+)?$)|(^\.[0-9]+$)} $time] == 0} {
+    set ptime [::GLOBALS::reltime-to-secs $time]
+    if {$ptime == -1} {
 	perror "Invalid time spec: $time"
 	return
     }
+    set time $ptime
+
     $self instvar event_list
     $self instvar event_count
 
@@ -560,295 +656,15 @@ Simulator instproc at {time eventstring} {
 	exit 1
     }
     set eventlist [split $eventstring ";"]
-
-  foreach event $eventlist {
-    # Check otype/command
-    set obj [lindex $event 0]
-    set cmd [lindex $event 1]
-    set atstring "$event"
-    set args {}
-    set okargs 0
-
-    #
-    # Groups are special. It would be nice to optimize the event groups
-    # so that a single event could be stored in the DB, but some events
-    # take arguments based on the actual object being controlled. For now
-    # I will not try to optimize for when they can be lumped, but rather
-    # will just turn all group events into a list of individual events.
-    #
-    if {[$obj info class] == "EventGroup"} {
-	set cmd [lrange $event 1 end]
-	
-	foreach member [$obj members] {
-	    $self at $time "$member $cmd"
-	}
-	return
-    }
     
-    switch -- [$obj info class] {
-	"Application/Traffic/CBR" {
-	    set otype TRAFGEN
-	    switch -- $cmd {
-		"start" {
-                    set params [$obj get_params]
-		    set etype START
-		    set args  $params
-		}
-		"stop" {
-		    set etype STOP
-		}
-		"reset" {
-		    set etype RESET
-		}
-                "set" {
-		    if {[llength $event] < 4} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-		    set etype MODIFY
-	            set arg [lindex $event 3]
-                    switch -- [lindex $event 2] {
-                        "packetSize_" {
-	                    set args  "PACKETSIZE=$arg"
-                        }
-                        "rate_" {
-			    set bw [parse_bw $arg]
-	                    set args  "RATE=$bw"
-                        }
-                        "interval_" {
-	                    set args  "INTERVAL=$arg"
-                        }
-                        "iptos_" {
-	                    set args  "IPTOS=$arg"
-                        }
-			unknown {
-		            punsup "at $time $event"
-		            return
-			}
-		    }
-                }
-		unknown {
-		    punsup "at $time $event"
-		    return
-		}
-	    }
-	    set vnode [$obj get_node]
-	    set vname $obj
-	}
-	"Agent/TCP/FullTcp" -
-	"Agent/TCP/FullTcp/Reno" -
-	"Agent/TCP/FullTcp/Newreno" -
-	"Agent/TCP/FullTcp/Tahoe" -
-	"Agent/TCP/FullTcp/Sack" - 
-	"Application/FTP" -
-	"Application/Telnet" {
-	    # For events sent to NSE, we don't distinguish
-	    # between START, STOP and MODIFY coz the entire
-	    # string passed to '$ns at' is sent for evaluation to the node
-	    # on which NSE is running: fix needed for the
-	    # case when the above string has syntax errors. Maybe
-	    # just have a way reporting errors back to the
-	    # the user from the NSE that finds the syntax errors
-	    set otype NSE
-	    set etype NSEEVENT
-	    set args "\$$obj $cmd [lrange $event 2 end]"
-	    set vnode [$obj get_node]
-	    set vname $obj
-	}
-	"Link" -
-	"Lan" {
-	    set otype LINK
-	    switch -- $cmd {
-		"up"	    {set etype UP}
-		"down"	    {set etype DOWN}
-		"bandwidth" {
-		    if {[llength $event] < 4} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-                    set arg   [lindex $event 2]
-		    set bw [parse_bw $arg]
-                    set args  "BANDWIDTH=$bw"
-		    set etype MODIFY
-		}
-		"delay" {
-		    if {[llength $event] < 3} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-                    set arg   [lindex $event 2]
-                    set args  "DELAY=$arg"
-		    set etype MODIFY
-		}
-		"plr" {
-		    if {[llength $event] < 3} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-                    if {[scan [lindex $event 2] "%f" plr] != 1 ||
-                        $plr < 0 || $plr > 1} {
-			perror "Improper argument: at $time $event"
-			return
-                    }
-                    set args  "PLR=$plr"
-		    set etype MODIFY
-		}
-		unknown {
-		    punsup "at $time $event"
-		    return
-		}
-	    }
-	    set vnode {}
-	    set vname $obj
-	    $obj mustdelay
-	}
-	"Node" {
-	    set otype NODE
-	    switch -- $cmd {
-		"setdest" {
-		    if {[llength $event] < 5} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-		    set x [lindex $event 2]
-		    set y [lindex $event 3]
-		    set speed [lindex $event 4]
-		    set evargs [lrange $event 5 end]
-		    ::TBCOMPAT::named-args [lrange $event 5 end] {
-			-orientation 0
-		    }
-		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$(-orientation)"
-		    set etype SETDEST
-		}
-		unknown {
-		    punsup "at $time $event"
-		    return
-		}
-	    }
-	    set vnode {}
-	    set vname $obj
-	}
-	"Queue" {
-	    set otype LINK
-	    set node [$obj get_node]
-	    set lanlink [$obj get_link]
-	    $lanlink mustdelay
-	    switch -- $cmd {
-                "set" {
-		    if {[llength $event] < 4} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-		    set etype MODIFY
-	            set arg [lindex $event 3]
-                    switch -- [lindex $event 2] {
-                        "queue-in-bytes_" {
-	                    set args  "QUEUE-IN-BYTES=$arg"
-                        }
-                        "limit_" {
-	                    set args  "LIMIT=$arg"
-                        }
-                        "maxthresh_" {
-	                    set args  "MAXTHRESH=$arg"
-                        }
-                        "thresh_" {
-	                    set args  "THRESH=$arg"
-                        }
-                        "linterm_" {
-	                    set args  "LINTERM=$arg"
-                        }
-                        "q_weight_" {
-			    if {[scan $arg "%f" w] != 1} {
-				perror "Improper argument: at $time $event"
-				return
-			    }
-	                    set args  "Q_WEIGHT=$w"
-                        }
-			unknown {
-		            punsup "at $time $event"
-		            return
-			}
-		    }
-                }
-		unknown {
-		    punsup "at $time $event"
-		    return
-		}
-	    }
-	    set vnode {}
-	    set vname "$lanlink-$node"
-	}
-	"Program" {
-	    set otype PROGRAM
-	    set vname $obj
-	    set vnode [$obj set node]
-    
-	    switch -- $cmd {
-		"start" {
-		    set etype START
-		    # Must leave this here for the benefit of old
-		    # images that expect the command line in the event. 
-		    set arg  [$obj set command]
-		    set args "COMMAND=$arg"
-		}
-		"stop" {
-		    set etype STOP
-		}
-		"kill" {
-		    set etype KILL
-		    if {[llength $event] < 3} {
-			perror "Wrong number of arguments: at $time $event"
-			return
-		    }
-	            set arg [lindex $event 2]
-		    set args "SIGNAL=$arg"
-		}
-		unknown {
-		    punsup "at $time $event"
-		    return
-		}
-	    }
-	    set okargs 1
-	}
-	"Simulator" {
-	    set vnode "*"
-	    set vname $self
-	    
-	    switch -- $cmd {
-		"bandwidth" {
-		    set otype LINK
-		    set etype MODIFY
-		    set vnode {}
-		    set vname {}
-		}
-		"halt" {
-		    set otype SIMULATOR
-		    set etype HALT
-		}
-		"terminate" {
-		    set otype SIMULATOR
-		    set etype HALT
-		}
-		"swapout" {
-		    set otype SIMULATOR
-		    set etype SWAPOUT
-		}
-		unknown {
-		    punsup "at $time $event"
-		    return
-		}
-	    }
-	    set okargs 1
-	}
-	unknown {
-	    punsup "Unknown object type: at $time $event"
-	    return
+    foreach event $eventlist {
+	set rc [$self make_event "sim" $event]
+
+	if {$rc != {}} {
+	    set event_count [expr $event_count + 1]
+	    lappend event_list [linsert $rc 0 $time]
 	}
     }
-
-    set event_count [expr $event_count + 1]
-    lappend event_list [list $time $vnode $vname $otype $etype $args $atstring]
-  }
 }
 
 #
@@ -939,6 +755,18 @@ Simulator instproc rename_firewall {old new} {
     $self instvar firewall_list
     unset firewall_list($old)
     set firewall_list($new) {}
+}
+
+Simulator instproc rename_timeline {old new} {
+    $self instvar timeline_list
+    unset timeline_list($old)
+    set timeline_list($new) {}
+}
+
+Simulator instproc rename_sequence {old new} {
+    $self instvar sequence_list
+    unset sequence_list($old)
+    set sequence_list($new) {}
 }
 
 # find_link <node1> <node2>
@@ -1115,6 +943,422 @@ Simulator instproc add_firewall {fw} {
 
     set firewall_list($fw) {}
     return 0
+}
+
+Simulator instproc make_event {outer event} {
+    var_import ::GLOBALS::simulated
+    var_import ::TBCOMPAT::hwtype_class
+
+    set obj [lindex $event 0]
+    set cmd [lindex $event 1]
+    set evargs [lrange $event 2 end]
+    set vnode "*"
+    set vname ""
+    set otype {}
+    set etype {}
+    set args {}
+    set atstring ""
+
+    if {$obj == "#"} {
+	return {}
+    }
+
+    if {[$obj info class] == "EventGroup"} {
+	set cl [$obj set mytype]
+    } else {
+	set cl [$obj info class]
+    }
+
+    switch -- $cl {
+	"Application/Traffic/CBR" {
+	    set otype TRAFGEN
+	    switch -- $cmd {
+		"start" {
+		    set etype START
+		}
+		"stop" {
+		    set etype STOP
+		}
+		"reset" {
+		    set etype RESET
+		}
+		"set" {
+		    if {[llength $event] < 4} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set etype MODIFY
+		    set arg [lindex $event 3]
+		    switch -- [lindex $event 2] {
+			"packetSize_" {
+			    set args  "PACKETSIZE=$arg"
+			}
+			"rate_" {
+			    set bw [parse_bw $arg]
+			    set args  "RATE=$bw"
+			}
+			"interval_" {
+			    set args  "INTERVAL=$arg"
+			}
+			"iptos_" {
+			    set args  "IPTOS=$arg"
+			}
+			unknown {
+			    punsup "at $time $event"
+			    return
+			}
+		    }
+		}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode [$obj get_node]
+	    set vname $obj
+	}
+	"Agent/TCP/FullTcp" -
+	"Agent/TCP/FullTcp/Reno" -
+	"Agent/TCP/FullTcp/Newreno" -
+	"Agent/TCP/FullTcp/Tahoe" -
+	"Agent/TCP/FullTcp/Sack" - 
+	"Application/FTP" -
+	"Application/Telnet" {
+	    # For events sent to NSE, we don't distinguish
+	    # between START, STOP and MODIFY coz the entire
+	    # string passed to '$ns at' is sent for evaluation to the node
+	    # on which NSE is running: fix needed for the
+	    # case when the above string has syntax errors. Maybe
+	    # just have a way reporting errors back to the
+	    # the user from the NSE that finds the syntax errors
+	    set otype NSE
+	    set etype NSEEVENT
+	    set args "\$$obj $cmd [lrange $event 2 end]"
+	    set vnode [$obj get_node]
+	    set vname $obj
+	}
+	"EventSequence" {
+	    set otype SEQUENCE
+	    switch -- $cmd {
+		"start" {
+		    set etype START
+		}
+		"run" {
+		    set etype START
+		}
+		"reset" {
+		    set etype RESET
+		}
+		unknown {
+		    punsup "$obj $cmd $evargs"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	}
+	"EventTimeline" {
+	    set otype TIMELINE
+	    switch -- $cmd {
+		"start" {
+		    set etype START
+		}
+		"run" {
+		    set etype START
+		}
+		"reset" {
+		    set etype RESET
+		}
+		unknown {
+		    punsup "$obj $cmd $evargs"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	}
+	"Link" -
+	"Lan" {
+	    set otype LINK
+	    switch -- $cmd {
+		"up"	    {set etype UP}
+		"down"	    {set etype DOWN}
+		"bandwidth" {
+		    if {[llength $event] < 4} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set arg   [lindex $event 2]
+		    set bw [parse_bw $arg]
+		    set args  "BANDWIDTH=$bw"
+		    set etype MODIFY
+		}
+		"delay" {
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set arg   [lindex $event 2]
+		    set args  "DELAY=$arg"
+		    set etype MODIFY
+		}
+		"plr" {
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    if {[scan [lindex $event 2] "%f" plr] != 1 ||
+		    $plr < 0 || $plr > 1} {
+			perror "Improper argument: at $time $event"
+			return
+		    }
+		    set args  "PLR=$plr"
+		    set etype MODIFY
+		}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	    $obj mustdelay
+	}
+	"Node" {
+	    set otype NODE
+	    switch -- $cmd {
+		"reboot" {
+		    set etype REBOOT
+		}
+		"snapshot-to" {
+		    set etype SNAPSHOT
+		    if {[llength $evargs] < 1} {
+			perror "Wrong number of arguments: $obj $cmd $evargs"
+			return
+		    }
+		    set image [lindex $evargs 0]
+		    set args "IMAGE=${image}"
+		}
+		"reload" {
+		    set etype RELOAD
+		    ::GLOBALS::named-args $evargs {
+			-image {}
+		    }
+		    if {$(-image) != {}} {
+			set args "IMAGE=$(-image)"
+		    }
+		}
+		"setdest" {
+		    set etype SETDEST
+		    set topo [$obj set topo]
+		    if {$topo == ""} {
+			perror "$obj is not located on a topography"
+			return
+		    }
+		    if {[llength $evargs] < 3} {
+			perror "Wrong number of arguments: $obj $cmd $evargs; expecting - <obj> setdest <x> <y> <speed>"
+			return
+		    }
+		    set x [lindex $evargs 0]
+		    set y [lindex $evargs 1]
+		    if {$x < 0 || $x >= [$topo set width]} {
+			perror "$x is out of bounds for node $obj"
+			return
+		    }
+		    if {$y < 0 || $y >= [$topo set height]} {
+			perror "$x is out of bounds for node $obj"
+			return
+		    }
+		    set speed [lindex $evargs 2]
+		    ::GLOBALS::named-args [lrange $evargs 3 end] {
+			-orientation 0
+		    }
+		    set args "X=$x Y=$y SPEED=$speed ORIENTATION=$(-orientation)"
+		}
+		unknown {
+		    punsup "$obj $cmd $evargs"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	}
+	"Queue" {
+	    set otype LINK
+	    set node [$obj get_node]
+	    set lanlink [$obj get_link]
+	    $lanlink mustdelay
+	    switch -- $cmd {
+		"set" {
+		    if {[llength $event] < 4} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set etype MODIFY
+		    set arg [lindex $event 3]
+		    switch -- [lindex $event 2] {
+			"queue-in-bytes_" {
+			    set args  "QUEUE-IN-BYTES=$arg"
+			}
+			"limit_" {
+			    set args  "LIMIT=$arg"
+			}
+			"maxthresh_" {
+			    set args  "MAXTHRESH=$arg"
+			}
+			"thresh_" {
+			    set args  "THRESH=$arg"
+			}
+			"linterm_" {
+			    set args  "LINTERM=$arg"
+			}
+			"q_weight_" {
+			    if {[scan $arg "%f" w] != 1} {
+				perror "Improper argument: at $time $event"
+				return
+			    }
+			    set args  "Q_WEIGHT=$w"
+			}
+			unknown {
+			    punsup "at $time $event"
+			    return
+			}
+		    }
+		}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname "$lanlink-$node"
+	}
+	"Program" {
+	    set otype PROGRAM
+	    set vname $obj
+	    if {[$obj info class] == "EventGroup"} {
+		set vnode "*"
+	    } else {
+		set vnode [$obj set node]
+	    }
+	    
+	    switch -- $cmd {
+		"run" {
+		    set etype RUN
+		    if {[$obj info class] == "EventGroup"} {
+			set default_command {}
+		    } else {
+			set default_command [$obj set command]
+		    }
+		    ::GLOBALS::named-args $evargs {
+			-command $default_command
+			-dir {}
+			-timeout {}
+		    }
+		    if {$(-dir) != {}} {
+			set args "DIR={$(-dir)} "
+		    }
+		    if {$(-timeout) != {}} {
+			set to [::GLOBALS::reltime-to-secs $(-timeout)]
+			if {$to == -1} {
+			    perror "-timeout value is not a relative time: $(-timeout)"
+			    return
+			} else {
+			    set args "${args}TIMEOUT={$to} "
+			}
+		    }
+		    set args "${args}COMMAND=$(-command)"
+		}
+		"start" {
+		    set etype START
+		    if {[$obj info class] != "EventGroup"} {
+			set args "COMMAND=[$obj set command]"
+		    }
+		}
+		"stop" {
+		    set etype STOP
+		}
+		"kill" {
+		    set etype KILL
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set arg [lindex $event 2]
+		    set args "SIGNAL=$arg"
+		}
+		unknown {
+		    punsup "$obj $cmd $args"
+		    return
+		}
+	    }
+	}
+	"Simulator" {
+	    set vnode "*"
+	    set vname $self
+	    
+	    switch -- $cmd {
+		"bandwidth" {
+		    set otype LINK
+		    set etype MODIFY
+		    set vnode {}
+		    set vname {}
+		}
+		"halt" {
+		    set otype SIMULATOR
+		    set etype HALT
+		}
+		"terminate" {
+		    set otype SIMULATOR
+		    set etype HALT
+		}
+		"swapout" {
+		    set otype SIMULATOR
+		    set etype SWAPOUT
+		}
+		"trace-for" {
+		    set otype SLOTHD
+		    set etype START
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: $obj $cmd $evargs"
+			return
+		    }
+		    set arg [lindex $event 2]
+		    set args "DURATION=$arg"
+		}
+		"stabilize" {
+		    set otype SIMULATOR
+		    set etype MODIFY
+		    set args "mode=stabilize"
+		}
+		"msg" -
+		"message" {
+		    set otype SIMULATOR
+		    set etype MESSAGE
+		    set args "'[lindex $evargs 0]'"
+		}
+		"log" {
+		    set otype SIMULATOR
+		    set etype LOG
+		    set args "'[lindex $evargs 0]'"
+		}
+		"report" {
+		    set otype SIMULATOR
+		    set etype REPORT
+		}
+		unknown {
+		    punsup "$obj $cmd $evargs"
+		    return
+		}
+	    }
+	}
+	unknown {
+	    punsup "Unknown object type: $obj $cmd $evargs"
+	    return
+	}
+    }
+
+    return [list $vnode $vname $otype $etype $args $atstring]
 }
 
 # cost

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -361,13 +361,14 @@ sub GenDefsFile($)
     print TCL "\n";
     
     print TCL "# Node Types\n";
-    $query_result =
-	DBQueryFatal("select type,isremotenode,isvirtnode,osname,issubnode ".
-		     " from node_types as nt ".
-		     "left join os_info as o on nt.osid=o.osid");
-    while (my ($type,$isrem,$isvirt,$osid,$issubnode) =
+    $query_result = DBQueryFatal(
+	"select type,class,isremotenode,isvirtnode,osname,issubnode ".
+	" from node_types as nt ".
+	"left join os_info as o on nt.osid=o.osid");
+    while (my ($type,$class,$isrem,$isvirt,$osid,$issubnode) =
 	   $query_result->fetchrow_array()) {
 	print TCL "set hwtypes($type) 1\n";
+	print TCL "set hwtype_class($type) $class\n";
 	print TCL "set isremote($type) $isrem\n";
 	print TCL "set isvirt($type) $isvirt\n";
 	print TCL "set issubnode($type) $issubnode\n";
@@ -421,6 +422,30 @@ sub GenDefsFile($)
 	my @pids = @{$nodeperms{$type}};
 
 	print TCL "set nodetypeXpid_permissions($type) [list @pids]\n";
+    }
+    print TCL "\n";
+
+    print TCL "# Robot areas\n";
+    $query_result =
+	DBQueryFatal("select distinct building from location_info");
+    while (my ($building,$floor) = $query_result->fetchrow_array()) {
+	print TCL "set areas($building) 1\n";
+    }
+    print TCL "\n";
+
+    print TCL "# Obstacles\n";
+    $query_result = DBQueryFatal(
+	"select o.obstacle_id,o.building,o.x1,o.x2,o.y1,o.y2,o.description, ".
+	" fi.pixels_per_meter ".
+	"from obstacles as o ".
+	"left join floorimages as fi on fi.building=o.building");
+    while (my ($id,$building,$x1,$x2,$y1,$y2,$description,$ppm) = 
+	   $query_result->fetchrow_array()) {
+	print TCL "set obstacles($id,$building,x1) " . $x1 / $ppm . "\n";
+	print TCL "set obstacles($id,$building,x2) " . $x2 / $ppm . "\n";
+	print TCL "set obstacles($id,$building,y1) " . $y1 / $ppm . "\n";
+	print TCL "set obstacles($id,$building,y2) " . $y2 / $ppm . "\n";
+	print TCL "set obstacles($id,$building,description) {$description}\n";
     }
     print TCL "\n";
 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -15,11 +15,16 @@
 #define __EVENT_H__
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <elvin/elvin.h>
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif /* MAXHOSTNAMELEN */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Handle to the event server: */
 struct event_handle {
@@ -27,6 +32,7 @@ struct event_handle {
     elvin_error_t status;
     unsigned char *keydata;
     int keylen;
+    int do_loop;
     /* API function pointers: */
     elvin_error_t (*init)(void);
     int (*connect)(elvin_handle_t handle, elvin_error_t error);
@@ -67,6 +73,7 @@ typedef struct _address_tuple {
         char		*objname;	/* link0, cbr0, cbr1, etc ... */
         char		*eventtype;	/* START, STOP, UP, DOWN, etc ... */
 	int		scheduler;	/* A dynamic event to schedule */
+	char		*timeline;	/* The timeline to schedule under */
 } address_tuple, *address_tuple_t;
 #define ADDRESSTUPLE_ANY	NULL
 #define ADDRESSTUPLE_ALL	"*"
@@ -96,6 +103,8 @@ int		address_tuple_free(address_tuple_t);
         event_notification_get_string(handle, note, "ARGS", buf, len)
 #define event_notification_set_arguments(handle, note, buf) \
         event_notification_put_string(handle, note, "ARGS", buf)
+#define event_notification_get_timeline(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "TIMELINE", buf, len)
 
 /*
  * For dynamic events.
@@ -161,6 +170,7 @@ int event_unregister(event_handle_t handle);
 int event_poll(event_handle_t handle);
 int event_poll_blocking(event_handle_t handle, unsigned int timeout);
 int event_main(event_handle_t handle);
+int event_stop_main(event_handle_t handle);
 int event_notify(event_handle_t handle, event_notification_t notification);
 int event_schedule(event_handle_t handle, event_notification_t notification,
                    struct timeval *time);
@@ -239,5 +249,9 @@ int event_do(event_handle_t handle, ea_tag_t tag, ...);
 /* util.c */
 void *xmalloc(int size);
 void *xrealloc(void *p, int size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __EVENT_H__ */

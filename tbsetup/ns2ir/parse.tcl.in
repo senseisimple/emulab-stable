@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -260,6 +260,80 @@ namespace eval GLOBALS {
 
     # Security level. Defaults to green
     variable security_level 0
+
+    #
+    # Named argument helper function.
+    #
+    # Example:
+    #
+    #  proc replace {s args} {
+    #    named $args {-from 0 -to end -with ""}
+    #    string replace $s $(-from) $(-to) $(-with)
+    #  }
+    #
+    #  % replace suchenwirth -from 4 -to 6 -with xx
+    #  suchxxirth
+    #  % replace suchenwirth -from 4 -to 6 -witha xx
+    #  bad option '-witha', should be one of: -from -to -with
+    #
+    # @param args The optional arguments the caller received.
+    # @param defaults The option list with default values.
+    #
+    # @see http://wiki.tcl.tk/10702
+    #
+    proc named-args {args defaults} {
+	upvar 1 "" ""
+	array set "" $defaults
+	foreach {key value} $args {
+	    if {![info exists ($key)]} {
+		error "bad option '$key', should be one of: [lsort [array names {}]]"
+	    }
+	    set ($key) $value
+	}
+    }
+
+    #
+    # Convert a string that represents a relative time into the corresponding
+    # number of seconds.  The input string can simply be a number or it can
+    # be in a more human readable format.  The only format supported at the
+    # moment is "<hours>h<mins>m<secs>s".
+    #
+    # Examples:
+    #
+    #  % puts "[reltime-to-secs 20]"
+    #  20
+    #  % puts "[reltime-to-secs 2m]"
+    #  120
+    #  % puts "[reltime-to-secs 1h20m3s]"
+    #  4803
+    #
+    # @param reltime A string representing a relative time value.
+    # @return The relative time in seconds or -1 if the string could not be
+    # parsed.
+    #
+    proc reltime-to-secs {reltime} {
+	if {[regexp {(^[0-9]+(\.[0-9]+)?$)|(^\.[0-9]+$)} $reltime]} {
+	    set retval $reltime
+	} elseif {
+	    [regexp {^([0-9]+h)?([0-9]+m)?([0-9]+s)?$} $reltime d hours mins secs]} {
+		if {$hours == ""} {
+		    set hours "0h"
+		}
+		if {$mins == ""} {
+		    set mins "0m"
+		}
+		if {$secs == ""} {
+		    set secs "0s"
+		}
+		set hours [string trim $hours h]
+		set mins [string trim $mins m]
+		set secs [string trim $secs s]
+		set retval [expr ($hours * 60 * 60) + ($mins * 60) + $secs]
+	} else {
+	    set retval -1
+	}
+	return $retval
+    }
 }
 
 # Load all our classes
@@ -273,6 +347,9 @@ source ${GLOBALS::libdir}/vtype.tcl
 source ${GLOBALS::libdir}/program.tcl
 source ${GLOBALS::libdir}/event.tcl
 source ${GLOBALS::libdir}/firewall.tcl
+source ${GLOBALS::libdir}/timeline.tcl
+source ${GLOBALS::libdir}/sequence.tcl
+source ${GLOBALS::libdir}/topography.tcl
 
 ##################################################
 # Redifing Assignment
@@ -408,6 +485,9 @@ proc parse_bw {bspec} {
 	k {set val [expr int($bw)]}
 	kb {set val [expr int($bw)]}
 	kbps {set val [expr int($bw)]}
+	K {set val [expr int($bw)]}
+	Kb {set val [expr int($bw)]}
+	Kbps {set val [expr int($bw)]}
 	M {set val [expr int($bw*1000)]}
 	Mb {set val [expr int($bw*1000)]}
 	Mbps {set val [expr int($bw*1000)]}

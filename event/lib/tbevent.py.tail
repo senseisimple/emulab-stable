@@ -65,6 +65,9 @@ class NotificationWrapper:
                                                 self.notification,
                                                 args)
 
+    def getTimeline(self, args):
+        return event_notification_get_timeline(self.handle, self.notification)
+
     def getSender(self):
         return event_notification_get_sender(self.handle, self.notification)
 

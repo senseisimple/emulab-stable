@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -753,7 +753,7 @@ if ($showevents) {
     }
     
     $result =
-	DBQueryFatal("select time,vnode,vname,ot.type,et.type,arguments ".
+	DBQueryFatal("select time,vnode,vname,ot.type,et.type,arguments,parent ".
 		" from eventlist as ex ".
 		"left join event_eventtypes as et on ex.eventtype=et.idx ".
 		"left join event_objecttypes as ot on ex.objecttype=ot.idx ".
@@ -763,15 +763,16 @@ if ($showevents) {
     if ($result->numrows) {
 	if ($verbose) {
 	    print  "Event List:\n";
-	    printf "%-12s %-12s %-10s %-10s %-10s %s\n",
-	           "Time", "Node", "Agent", "Type", "Event", "Arguments";
+	    printf "%-12s %-12s %-10s %-10s %-10s %-10s %s\n",
+	           "Time", "Node", "Agent", "Type", "Event", "Parent",
+	           "Arguments";
 	    print  "------------ ------------ ---------- ---------- ".
-		   "---------- ------------ \n";
+		   "---------- ---------- ------------ \n";
 
-	    while (($time,$vnode,$vname,$obj,$type,$args) =
+	    while (($time,$vnode,$vname,$obj,$type,$args,$parent) =
 		   $result->fetchrow_array()){
-		printf("%-12s %-12s %-10s %-10s %-10s ",
-		       $time, $vnode, $vname, $obj, $type);
+		printf("%-12s %-12s %-10s %-10s %-10s %-10s ",
+		       $time, $vnode, $vname, $obj, $type, $parent);
 
 		my @arglist = split(" ", $args);
 		my $arg     = shift(@arglist);
@@ -781,7 +782,7 @@ if ($showevents) {
 		}
 		printf("\n");
 		foreach my $arg (@arglist) {
-		    printf("%-58s %s\n", "", $arg);
+		    printf("%-69s %s\n", "", $arg);
 		}
 	    }
 	}

@@ -28,6 +28,8 @@ namespace eval TBCOMPAT {
     # This is the default weight for a hard vtype.
     variable default_hard_vtype_weight 1.0
 
+    variable prefix "@prefix@"
+
     # Substitutions for "/proj",
     variable FSDIR_PROJ "@FSDIR_PROJ@"
 
@@ -58,37 +60,6 @@ namespace eval TBCOMPAT {
 	    return
 	}
 	$node ip $port $ip
-    }
-
-    #
-    # Named argument helper function.
-    #
-    # Example:
-    #
-    #  proc replace {s args} {
-    #    named $args {-from 0 -to end -with ""}
-    #    string replace $s $(-from) $(-to) $(-with)
-    #  }
-    #
-    #  % replace suchenwirth -from 4 -to 6 -with xx
-    #  suchxxirth
-    #  % replace suchenwirth -from 4 -to 6 -witha xx
-    #  bad option '-witha', should be one of: -from -to -with
-    #
-    # @param args The optional arguments the caller received.
-    # @param defaults The option list with default values.
-    #
-    # @see http://wiki.tcl.tk/10702
-    #
-    proc named-args {args defaults} {
-	upvar 1 "" ""
-	array set "" $defaults
-	foreach {key value} $args {
-	    if {![info exists ($key)]} {
-		error "bad option '$key', should be one of: [lsort [array names {}]]"
-	    }
-	    set ($key) $value
-	}
     }
 
     # Let's set up a hwtypes table that contains all valid hardware types.
@@ -164,11 +135,12 @@ namespace eval TBCOMPAT {
     set expdir "${FSDIR_PROJ}/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
 
     # XXX Just for now...
-    global tbxlogfile
+    variable tbxlogfile
     if {[file exists "$expdir"]} {
 	set logname "$expdir/logs/feedback.log"
 	set tbxlogfile [open $logname w 0664];
 	exec chmod 0664 $logname
+	puts $tbxlogfile "BEGIN feedback log"
     }
 
     # Get any Emulab generated feedback data from the experiment directory.
@@ -442,6 +414,9 @@ proc tb-set-node-tarfiles {node args} {
 	    [string match "${::TBCOMPAT::FSDIR_USERS}/*" $dir] ||
 	    [string match "${::TBCOMPAT::FSDIR_SHARE}/*" $dir]} {
 	    perror "\[tb-set-node-tarfiles] '$dir' refers to an NFS directory instead of the node's local disk."
+	    return
+	} elseif {![string match "/*" $dir]} {
+	    perror "\[tb-set-node-tarfiles] '$dir' is not an absolute path."
 	    return
 	}
 
@@ -1147,7 +1122,7 @@ proc tb-use-physnaming {onoff} {
 # @global tbxlogfile The path to the log file, if defined.
 #
 proc tbx-log {msg} {
-    global tbxlogfile;
+    var_import ::TBCOMPAT::tbxlogfile;
 
     if {[info exists tbxlogfile]} {
 	puts $tbxlogfile $msg
@@ -1163,8 +1138,13 @@ proc tb-feedback-vnode {vnode hardware args} {
     var_import ::TBCOMPAT::Reservations;  # The reservations to make for nodes.
     var_import ::TBCOMPAT::BootstrapReservations;  # Bootstrap file.
     var_import ::TBCOMPAT::Alerts;        # Alert indicators
+    var_import ::GLOBALS::fix_current_resources
 
-    ::TBCOMPAT::named-args $args {-scale 1.2 -rclass "" -alertscale 3.0}
+    ::GLOBALS::named-args $args {
+	-scale 1.2 -rclass "" -alertscale 3.0 -initscale 1.0
+    }
+
+    set fix_current_resources 0
 
     # Check our inputs,
     if {[$vnode info class] != "Node"} {
@@ -1185,8 +1165,8 @@ proc tb-feedback-vnode {vnode hardware args} {
     # ... set computed default values, and
     if {[::TBCOMPAT::feedback-defaults $vnode $(-rclass)] == 0} {
 	# No feedback exists yet, so we assume 100%.
-	set Reservations($vnode,cpupercent) 92.0
-	set Reservations($vnode,rampercent) 80.0
+	set Reservations($vnode,cpupercent) [expr 92.0 * $(-initscale)]
+	set Reservations($vnode,rampercent) [expr 80.0 * $(-initscale)]
 	tbx-log "  Initializing node, $vnode, to one-to-one."
     }
 
@@ -1245,7 +1225,7 @@ proc tb-feedback-vlan {vnode lan args} {
     var_import ::TBCOMPAT::Reservations;   # The reservations to make for lans
     var_import ::TBCOMPAT::Alerts;         # Alert indicators
 
-    ::TBCOMPAT::named-args $args {-scale 1.0 -rclass "" -alertscale 3.0}
+    ::GLOBALS::named-args $args {-scale 1.0 -rclass "" -alertscale 3.0}
 
     if {[$vnode info class] != "Node"} {
 	perror "\[tb-feedback-vlan] $vnode is not a node."
@@ -1327,7 +1307,7 @@ proc tb-feedback-vlink {link args} {
     var_import ::TBCOMPAT::Reservations;   # The reservations to make for links
     var_import ::TBCOMPAT::Alerts;         # Alert indicators
 
-    ::TBCOMPAT::named-args $args {-scale 1.2 -rclass "" -alertscale 3.0}
+    ::GLOBALS::named-args $args {-scale 1.2 -rclass "" -alertscale 3.0}
 
     if {[$link info class] != "Link"} {
 	perror "\[tb-feedback-vlink] $link is not a link."

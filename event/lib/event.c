@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -360,8 +360,6 @@ int event_poll_blocking(event_handle_t handle, unsigned int timeout)
 int
 event_main(event_handle_t handle)
 {
-    int loop = 1;
-
     if (!handle) {
         ERROR("invalid parameter\n"); 
         return 0;
@@ -372,14 +370,43 @@ event_main(event_handle_t handle)
         return 0;
     }
 
+    if (handle->do_loop) {
+	ERROR("loop is already running\n");
+	return 0;
+    }
+
     TRACE("entering event loop...\n");
 
-    if (handle->mainloop(&loop, handle->status) == 0) {
+    handle->do_loop = 1;
+    if (handle->mainloop(&handle->do_loop, handle->status) == 0) {
         ERROR("Elvin mainloop failed: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
 
+    return 1;
+}
+
+
+int event_stop_main(event_handle_t handle)
+{
+    if (!handle) {
+	ERROR("invalid parameter\n");
+	return 0;
+    }
+
+    if (!handle->mainloop) {
+	ERROR("multithreaded programs do not have a mainloop\n");
+	return 0;
+    }
+
+    if (!handle->do_loop) {
+	ERROR("mainloop is not running\n");
+	return 0;
+    }
+
+    handle->do_loop = 0;
+    
     return 1;
 }
 
@@ -485,7 +512,6 @@ event_schedule(event_handle_t handle, event_notification_t notification,
     return event_notify(handle, notification);
 }
 
-
 /*
  * Allocate an event notification.  The address TUPLE defines who
  * should receive the notification. Returns a pointer to an event
@@ -534,6 +560,7 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 	!EVPUT("OBJTYPE", objtype) ||
 	!EVPUT("OBJNAME", objname) ||
 	!EVPUT("EVENTTYPE", eventtype) ||
+	!EVPUT("TIMELINE", timeline) ||
 	! event_notification_put_int32(handle, notification, "SCHEDULER", 0)) {
 	ERROR("could not add attributes to notification %p\n", notification);
         return NULL;
@@ -554,7 +581,11 @@ int
 event_notification_free(event_handle_t handle,
                         event_notification_t notification)
 {
-    if (!handle || !notification || !notification->elvin_notification) {
+    if (!notification) {
+	return 1;
+    }
+    
+    if (!handle || !notification->elvin_notification) {
         ERROR("invalid parameter\n");
         return 0;
     }
@@ -984,7 +1015,7 @@ event_notification_remove(event_handle_t handle,
 
     if (elvin_notification_remove(notification->elvin_notification,
 				  name, handle->status) == 0) {
-        ERROR("elvin_notification_remove failed: ");
+        ERROR("elvin_notification_remove of %s failed: ", name);
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
@@ -1135,7 +1166,12 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
 	! addclause("EVENTTYPE", tuple->eventtype,
 		    &expression[index], sizeof(expression) - index, &index))
 	    return NULL;
-	    
+    
+    if (tuple->timeline &&
+	! addclause("TIMELINE", tuple->timeline,
+		    &expression[index], sizeof(expression) - index, &index))
+	    return NULL;
+    
     index += snprintf(&expression[index], sizeof(expression) - index,
 		     "%s SCHEDULER == %d ",
 		     (index ? "&&" : ""),
@@ -1212,6 +1248,7 @@ notify_callback(elvin_handle_t server,
     /* If MAC does not match, throw it away */
     if (handle->keydata &&
 	event_notification_check_hmac(handle, &notification)) {
+	    ERROR("bad hmac\n");
         return;
     }
 

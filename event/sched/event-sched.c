@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -15,63 +15,99 @@
  *      the indicated times.
  *
  */
+
+#include "config.h"
+
 #include <stdio.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/param.h>
 #include <time.h>
 #include <unistd.h>
 #include <math.h>
 #include <ctype.h>
+#include <pwd.h>
+#include <pthread.h>
+#include <assert.h>
+#include <paths.h>
+
 #include "event-sched.h"
+#include "error-record.h"
 #include "log.h"
-#include "config.h"
-#ifdef	RPC
 #include "tbdefs.h"
 #include "rpc.h"
-#define main realmain
-#else
-#include "tbdb.h"
-#endif
+#include "systemf.h"
+
+#include "simulator-agent.h"
+#include "group-agent.h"
+#include "node-agent.h"
+#include "timeline-agent.h"
+
+#define EVENT_SCHED_PATH_ENV \
+	"/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:" BINDIR ":" SBINDIR
 
 static void enqueue(event_handle_t handle,
-		    event_notification_t notification, void *data);
+		    event_notification_t notification,
+		    void *data);
 static void dequeue(event_handle_t handle);
-static int  handle_simevent(event_handle_t handle, sched_event_t *eventp);
-static void waitforactive(char *, char *);
+static int  handle_completeevent(event_handle_t handle, sched_event_t *eventp);
 
 static char	*progname;
-static char	*pid, *eid;
+char	pideid[BUFSIZ];
+char	*pid, *eid;
 static int	get_static_events(event_handle_t handle);
-static int	debug;
+int	debug;
 
-struct agent {
-	char    name[TBDB_FLEN_EVOBJNAME];  /* Agent *or* group name */
-	char    nodeid[TBDB_FLEN_NODEID];
-	char    vnode[TBDB_FLEN_VNAME];
-	char	objname[TBDB_FLEN_EVOBJNAME];
-	char	objtype[TBDB_FLEN_EVOBJTYPE];
-	char	ipaddr[32];
-	struct  agent *next;
-};
-static struct agent	*agents;
+struct lnList agents;
+
+static struct lnList timelines;
+static struct lnList sequences;
+static struct lnList groups;
+
+unsigned long next_token;
+
+simulator_agent_t primary_simulator_agent;
+
+static pid_t emcd_pid;
+static pid_t vmcd_pid;
+static pid_t rmcd_pid;
+
+static void sigpass(int sig)
+{
+	kill(emcd_pid, sig);
+	kill(vmcd_pid, sig);
+	kill(rmcd_pid, sig);
+
+	exit(0);
+}
 
 void
-usage()
+usage(void)
 {
 	fprintf(stderr,
-		"Usage: %s <options> -k keyfile <pid> <eid>\n"
-		"options:\n"
-		"-d         - Turn on debugging\n"
-		"-s server  - Specify location of elvind server\n"
-		"-p port    - Specify port number of elvind server\n"
-		"-l logfile - Specify logfile to direct output\n"
-		"-k keyfile - Specify keyfile name\n",
+		"Usage: %s [-hVd] [OPTIONS] <pid> <eid>\n"
+		"\n"
+		"Optional arguments:\n"
+		"  -h          Print this message\n"
+		"  -V          Print version information\n"
+		"  -d          Turn on debugging\n"
+		"  -s server   Specify location of elvind server. "
+		"(Default: localhost)\n"
+		"  -p port     Specify port number of elvind server\n"
+		"  -l logfile  Specify logfile to direct output\n"
+		"  -k keyfile  Specify keyfile name\n"
+		"\n"
+		"Required arguments:\n"
+		"  pid         The project ID of the experiment\n"
+		"  eid         The experiment ID\n",
 		progname);
 	exit(-1);
 }
 
 int
-main(int argc, char **argv)
+main(int argc, char *argv[])
 {
 	address_tuple_t tuple;
 	event_handle_t handle;
@@ -79,16 +115,32 @@ main(int argc, char **argv)
 	char *port = NULL;
 	char *log = NULL;
 	char *keyfile = NULL;
-	char pideid[BUFSIZ], buf[BUFSIZ];
+	char buf[BUFSIZ];
 	int c;
 
+	// sleep(600);
+
+	setenv("PATH", EVENT_SCHED_PATH_ENV, 1);
+	
 	progname = argv[0];
 
 	/* Initialize event queue semaphores: */
 	sched_event_init();
 
-	while ((c = getopt(argc, argv, "s:p:dl:k:")) != -1) {
+	lnNewList(&agents);
+	lnNewList(&timelines);
+	lnNewList(&sequences);
+	lnNewList(&groups);
+
+	while ((c = getopt(argc, argv, "hVs:p:dl:k:")) != -1) {
 		switch (c) {
+		case 'h':
+			usage();
+			break;
+		case 'V':
+			printf("%s\n", build_info);
+			exit(0);
+			break;
 		case 'd':
 			debug++;
 			break;
@@ -105,19 +157,39 @@ main(int argc, char **argv)
 			keyfile = optarg;
 			break;
 		default:
-			fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
-			return 1;
+			usage();
+			break;
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 2 || !keyfile)
+	if (argc != 2) {
+		fprintf(stderr, "error: required arguments are missing.\n");
 		usage();
+	}
 
+	if (keyfile == NULL)
+		keyfile = "tbdata/eventkey";
+	
 	pid = argv[0];
 	eid = argv[1];
 	sprintf(pideid, "%s/%s", pid, eid);
+
+	if (RPC_init(NULL, BOSSNODE, 0)) {
+		fatal("could not initialize rpc code");
+	}
+
+	if (RPC_grab()) {
+		fatal("could not connect to rpc server");
+	}
+	
+	if (RPC_exppath(pid, eid, buf, sizeof(buf))) {
+		fatal("could not get experiment metadata");
+	}
+	if (chdir(buf) < 0) {
+		fatal("could not chdir to experiment directory: %s", buf);
+	}
 
 	/*
 	 * Okay this is more complicated than it probably needs to be. We do
@@ -138,13 +210,9 @@ main(int argc, char **argv)
 	if (log)
 		loginit(0, log);
 
-#ifdef  DBIFACE
-	/*
-	 * Set up DB state.
-	 */
-	if (!dbinit())
-		return 1;
-#endif
+	signal(SIGTERM, sigpass);
+	signal(SIGINT, sigpass);
+	signal(SIGQUIT, sigpass);
 
 	/*
 	 * Convert server/port to elvin thing.
@@ -153,12 +221,7 @@ main(int argc, char **argv)
 	 */
 	if (!server)
 		server = "localhost";
-#ifdef  RPC
-	if (RPC_init(NULL, BOSSNODE, 3069)) {
-		fatal("could not connect to rpc server");
-	}
-#endif
-	
+
 	snprintf(buf, sizeof(buf), "elvin://%s%s%s",
 		 server,
 		 (port ? ":"  : ""),
@@ -186,7 +249,98 @@ main(int argc, char **argv)
 		fatal("could not subscribe to EVENT_SCHEDULE event");
 	}
 
-	waitforactive(pid, eid);
+	if (RPC_waitforactive(pid, eid))
+		fatal("waitforactive: RPC failed!");
+
+	if (RPC_agentlist(handle, pid, eid))
+		fatal("Could not get agentlist from RPC server\n");
+
+	if (RPC_waitforrobots(pid, eid))
+		fatal("waitforrobots: RPC failed!");
+
+	if (access("tbdata/emcd.config", R_OK) == 0) {
+	    char emc_path[256];
+
+	    snprintf(emc_path,
+		     sizeof(emc_path),
+		     "%s/%s.%s.emcd",
+		     _PATH_TMP,
+		     pid,
+		     eid);
+	    
+		emcd_pid = fork();
+		switch (emcd_pid) {
+		case -1:
+			fatal("could not start emcd");
+			break;
+		case 0:
+			execlp("emcd",
+			       "emcd",
+			       "-d",
+			       "-l",
+			       "logs/emcd.log",
+			       "-c",
+			       "tbdata/emcd.config",
+			       "-e",
+			       pideid,
+			       "-U",
+			       emc_path,
+			       NULL);
+			exit(0);
+			break;
+		default:
+			break;
+		}
+		
+		sleep(2);
+
+#if 1
+		vmcd_pid = fork();
+		switch (vmcd_pid) {
+		case -1:
+			fatal("could not start vmcd");
+			break;
+		case 0:
+			execlp("vmcd",
+			       "vmcd",
+			       "-d",
+			       "-l",
+			       "logs/vmcd.log",
+			       "-U",
+			       emc_path,
+			       NULL);
+			exit(0);
+			break;
+		default:
+			break;
+		}
+#else
+		systemf("vmcd -d -l logs/vmcd.log -e localhost -p 2626 "
+			"-c junk.flux.utah.edu -P 6969 &");
+#endif
+		
+		sleep(2);
+
+		rmcd_pid = fork();
+		switch (rmcd_pid) {
+		case -1:
+			fatal("could not start rmcd");
+			break;
+		case 0:
+			execlp("rmcd",
+			       "rmcd",
+			       "-d",
+			       "-l",
+			       "logs/rmcd.log",
+			       "-U",
+			       emc_path,
+			       NULL);
+			exit(0);
+			break;
+		default:
+			break;
+		}
+	}
 
 	/*
 	 * Read the static events list and schedule.
@@ -195,9 +349,7 @@ main(int argc, char **argv)
 		fatal("could not get static event list");
 	}
 
-#ifdef  RPC
-	RPC_kill();
-#endif
+	RPC_drop();
 
 	/* Dequeue events and process them at the appropriate times: */
 	dequeue(handle);
@@ -211,114 +363,273 @@ main(int argc, char **argv)
 	return 0;
 }
 
+int agent_invariant(struct agent *agent)
+{
+	assert(strlen(agent->name) > 0);
+	assert(strlen(agent->nodeid) > 0);
+	assert(strlen(agent->vnode) > 0);
+	assert(strlen(agent->objtype) > 0);
+	assert(strlen(agent->ipaddr) > 0);
+	if (agent->handler != NULL) // Don't know about this.
+		assert(local_agent_invariant(agent->handler));
+	
+	return 1;
+}
+
+int sends_complete(struct agent *agent, const char *evtype)
+{
+	static char *run_completes[] = {
+		TBDB_EVENTTYPE_RUN,
+		NULL
+	};
+
+	static char *simulator_completes[] = {
+		TBDB_EVENTTYPE_REPORT,
+		NULL
+	};
+
+	static char *node_completes[] = {
+		TBDB_EVENTTYPE_REBOOT,
+		TBDB_EVENTTYPE_RELOAD,
+		TBDB_EVENTTYPE_SETDEST,
+		NULL
+	};
+
+	static struct {
+		char *objtype;
+		char **evtypes;
+	} objtype2complete[] = {
+		{ TBDB_OBJECTTYPE_LINK, NULL },
+		{ TBDB_OBJECTTYPE_TRAFGEN, NULL },
+		{ TBDB_OBJECTTYPE_TIME, NULL },
+		{ TBDB_OBJECTTYPE_PROGRAM, run_completes },
+		{ TBDB_OBJECTTYPE_SIMULATOR, simulator_completes },
+		{ TBDB_OBJECTTYPE_LINKTEST, NULL },
+		{ TBDB_OBJECTTYPE_NSE, NULL },
+		{ TBDB_OBJECTTYPE_CANARYD, NULL },
+		{ TBDB_OBJECTTYPE_NODE, node_completes },
+		{ TBDB_OBJECTTYPE_TIMELINE, run_completes },
+		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
+		{ NULL, NULL }
+	};
+
+	const char *objtype;
+	int lpc, retval = 0;
+	
+	assert(agent != NULL);
+	assert(evtype != NULL);
+
+	if (strcmp(agent->objtype, TBDB_OBJECTTYPE_GROUP) == 0) {
+		group_agent_t ga = (group_agent_t)agent->handler;
+		
+		objtype = ga->ga_agents[1]->objtype;
+	}
+	else {
+		objtype = agent->objtype;
+	}
+	
+	for (lpc = 0; objtype2complete[lpc].objtype != NULL; lpc++ ) {
+		if (strcmp(objtype2complete[lpc].objtype, objtype) == 0) {
+			char **ec;
+			
+			if ((ec = objtype2complete[lpc].evtypes) == NULL) {
+				retval = 0;
+				break;
+			}
+			else {
+				int lpc2;
+
+				retval = 0;
+				for (lpc2 = 0; ec[lpc2] != NULL; lpc2++) {
+					if (strcmp(ec[lpc2], evtype) == 0) {
+						retval = 1;
+						break;
+					}
+				}
+				break;
+			}
+		}
+	}
+
+	if (objtype2complete[lpc].objtype == NULL) {
+		error("Unknown object type %s\n", objtype);
+		assert(0);
+	}
+
+	return retval;
+}
+
+int
+sched_event_prepare(event_handle_t handle, sched_event_t *se)
+{
+	int retval;
+
+	assert(se != NULL);
+	assert(se->agent.s != NULL);
+	assert(se->length == 1);
+
+	if ((se->agent.s->handler != NULL) &&
+	    (se->agent.s->handler->la_expand != NULL)) {
+		local_agent_t la = se->agent.s->handler;
+
+		retval = la->la_expand(la, se);
+	}
+	else {
+		event_notification_clear_objtype(handle, se->notification);
+		event_notification_set_objtype(handle,
+					       se->notification,
+					       se->agent.s->objtype);
+		event_notification_insert_hmac(handle, se->notification);
+
+		retval = 0;
+	}
+	
+	return retval;
+}
+
 /* Enqueue event notifications as they arrive. */
 static void
 enqueue(event_handle_t handle, event_notification_t notification, void *data)
 {
-    sched_event_t	event;
-    char		objname[TBDB_FLEN_EVOBJNAME];
-    int			sent = 0;
-    struct agent       *agentp;
-
-    /* Get the event's firing time: */
-    if (! event_notification_get_int32(handle, notification, "time_usec",
-				       (int *) &event.time.tv_usec) ||
-	! event_notification_get_int32(handle, notification, "time_sec",
-				       (int *) &event.time.tv_sec)) {
-	    error("could not get time from notification %p\n",
-		  notification);
-	    return;
-    }
-
-    /*
-     * Must map the event to the proper agent running on a particular
-     * node. Might be multiple agents if its a group event; send a cloned
-     * event for each one. 
-     */
-    if (! event_notification_get_objname(handle, notification,
-					 objname, sizeof(objname))) {
-	    error("could not get object name from notification %p\n",
-		  notification);
-	    return;
-    }
-
-    agentp = agents;
-    while (agentp) {
-	    if (!strcmp(agentp->name, objname)) {
-		    /*
-		     * Clone the event notification, since we want the
-		     * notification to live beyond the callback function:
-		     */
-		    event.notification =
-			    event_notification_clone(handle, notification);
-		    
-		    if (!event.notification) {
-			    error("event_notification_clone failed!\n");
-			    return;
-		    }
-
-		    /*
-		     * Clear the scheduler flag. Not allowed to do this above
-		     * the loop cause the notification thats comes in is
-		     * "read-only".
-		     */
-		    if (! event_notification_remove(handle,
-					event.notification, "SCHEDULER") ||
-			! event_notification_put_int32(handle,
-					event.notification, "SCHEDULER", 0)) {
-			    error("could not clear scheduler attribute of "
-				  "notification %p\n", event.notification);
-			    return;
-		    }
-
-		    event_notification_clear_host(handle, event.notification);
-		    event_notification_set_host(handle,
+	sched_event_t		event;
+	char			objname[TBDB_FLEN_EVOBJNAME];
+	char			timeline[TBDB_FLEN_EVOBJNAME] = "";
+	char			eventtype[TBDB_FLEN_EVEVENTTYPE];
+	struct agent	       *agentp;
+	timeline_agent_t	ta = NULL;
+	
+	if (! event_notification_get_timeline(handle, notification,
+						   timeline,
+						   sizeof(timeline))) {
+		warning("could not get timeline?\n");
+		/* Not fatal since we have to deal with legacy systems. */
+	}
+	
+	/* Get the event's firing time: */
+	if (! event_notification_get_int32(handle, notification, "time_usec",
+					   (int *) &event.time.tv_usec) ||
+	    ! event_notification_get_int32(handle, notification, "time_sec",
+					   (int *) &event.time.tv_sec)) {
+		error("could not get time from notification %p\n",
+		      notification);
+	}
+	else if (! event_notification_get_objname(handle, notification,
+						  objname, sizeof(objname))) {
+		error("could not get object name from notification %p\n",
+		      notification);
+	}
+	else if (! event_notification_get_eventtype(handle, notification,
+						    eventtype,
+						    sizeof(eventtype))) {
+		error("could not get event type from notification %p\n",
+		      notification);
+	}
+	else  if ((agentp = (struct agent *)
+		   lnFindName(&agents, objname)) == NULL) {
+		error("%s\n", eventtype);
+		error("Could not map object to an agent: %s\n", objname);
+	}
+	else if ((strlen(timeline) > 0) &&
+		 (strcmp(timeline, ADDRESSTUPLE_ALL) != 0) &&
+		 ((ta = (timeline_agent_t)
+		   lnFindName(&timelines, timeline)) == NULL) &&
+		 ((ta = (timeline_agent_t)
+		   lnFindName(&sequences, timeline)) == NULL)) {
+		error("Unknown timeline: %s\n", timeline);
+	}
+	else {
+		event.agent.s = agentp;
+		event.length = 1;
+		event.flags = SEF_SINGLE_HANDLER;
+		
+		/*
+		 * Clone the event notification, since we want the
+		 * notification to live beyond the callback function:
+		 */
+		event.notification =
+			event_notification_clone(handle, notification);
+		
+		if (!event.notification) {
+			error("event_notification_clone failed!\n");
+			return;
+		}
+		
+		/*
+		 * Clear the scheduler flag. Not allowed to do this above
+		 * the loop cause the notification thats comes in is
+		 * "read-only".
+		 */
+		if (! event_notification_remove(handle,
 						event.notification,
-						agentp->ipaddr);
-		    event_notification_clear_objtype(handle,
-						     event.notification);
-		    event_notification_set_objtype(handle,
+						"SCHEDULER") ||
+		    ! event_notification_put_int32(handle,
 						   event.notification,
-						   agentp->objtype);
-		    /*
-		     * Indicates a group event; must change the name of the
-		     * event to the underlying agent.
-		     */
-		    if (strcmp(agentp->objname, agentp->name)) {
-			    event_notification_clear_objname(handle,
-					event.notification);
-			    event_notification_set_objname(handle,
-					event.notification, agentp->objname);
-		    }
+						   "SCHEDULER",
+						   0)) {
+			error("could not clear scheduler attribute of "
+			      "notification %p\n", event.notification);
+			return;
+		}
+		
+		if (debug) {
+			struct timeval now;
+		    
+			gettimeofday(&now, NULL);
+			
+			info("Sched: "
+			     "note:%p at:%ld:%d now:%ld:%d agent:%s %s\n",
+			     event.notification,
+			     event.time.tv_sec, event.time.tv_usec,
+			     now.tv_sec, now.tv_usec, agentp->name,
+			     eventtype);
+		}
+		
+		if (strcmp(eventtype, TBDB_EVENTTYPE_COMPLETE) == 0) {
+			event.flags |= SEF_COMPLETE_EVENT;
+			sched_event_enqueue(event);
+			return;
+		}
+		
+		if (sends_complete(agentp, eventtype))
+			event.flags |= SEF_SENDS_COMPLETE;
+		
+		event_notification_clear_host(handle, event.notification);
+		event_notification_set_host(handle,
+					    event.notification,
+					    agentp->ipaddr);
+		event_notification_put_int32(handle,
+					     event.notification,
+					     "TOKEN",
+					     next_token);
+		next_token += 1;
+		
+		/*
+		 * Enqueue the event notification for resending at the
+		 * indicated time:
+		 */
+		sched_event_prepare(handle, &event);
+		if (ta != NULL)
+			timeline_agent_append(ta, &event);
+		else
+			sched_event_enqueue(event);
+	}
+}
 
-		    event_notification_insert_hmac(handle, event.notification);
-		    event.simevent = !strcmp(agentp->objtype,
-					     TBDB_OBJECTTYPE_SIMULATOR);
+static void
+handle_event(event_handle_t handle, sched_event_t *se)
+{
+	assert(handle != NULL);
+	assert(se != NULL);
+	assert(se->length == 1);
 
-		    if (debug) {
-			    struct timeval now;
-	    
-			    gettimeofday(&now, NULL);
-	    
-			    info("Sched: "
-				 "note:%p at:%ld:%d now:%ld:%d agent:%s\n",
-				 event.notification,
-				 event.time.tv_sec, event.time.tv_usec,
-				 now.tv_sec, now.tv_usec, agentp->objname);
-		    }
-
-		    /*
-		     * Enqueue the event notification for resending at the
-		     * indicated time:
-		     */
-		    sched_event_enqueue(event);
-		    sent++;
-	    }
-	    agentp = agentp->next;
-    }
-    if (!sent) {
-	    error("Could not map object to an agent: %s\n", objname);
-    }
+	if ((se->agent.s != NULL) &&
+	    (se->agent.s->handler != NULL)) {
+		local_agent_queue(se->agent.s->handler, se);
+	}
+	else if (event_notify(handle, se->notification) == 0) {
+		error("could not fire event\n");
+		return;
+	}
 }
 
 /* Dequeue events from the event queue and fire them at the
@@ -326,41 +637,56 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 static void
 dequeue(event_handle_t handle)
 {
-    sched_event_t next_event;
-    struct timeval now;
+	sched_event_t next_event;
+	struct timeval now;
+	
+	while (1) {
+		if (sched_event_dequeue(&next_event, 1) < 0)
+			break;
+		
+		/* Fire event. */
+		if (debug)
+			gettimeofday(&now, NULL);
 
-    while (1) {
-	if (sched_event_dequeue(&next_event, 1) < 0)
-	    break;
+		if (debug) {
+			info("Fire:  note:%p at:%ld:%d now:%ld:%d agent:%s\n",
+			     next_event.notification,
+			     next_event.time.tv_sec, next_event.time.tv_usec,
+			     now.tv_sec,
+			     now.tv_usec,
+			     next_event.agent.s ?
+			     (next_event.length == 1 ?
+			      next_event.agent.s->name :
+			      next_event.agent.m[0]->name) : "*");
+		}
+		
+		if (next_event.flags & SEF_COMPLETE_EVENT) {
+			assert(next_event.length == 1);
+			
+			handle_completeevent(handle, &next_event);
+		}
+		else if (next_event.length == 1) {
+			handle_event(handle, &next_event);
+		}
+		else if ((next_event.flags & SEF_SINGLE_HANDLER) &&
+			 (next_event.agent.m[0]->handler != NULL)) {
+			local_agent_queue(next_event.agent.m[0]->handler,
+					  &next_event);
+		}
+		else {
+			sched_event_t se_tmp;
+			int lpc;
 
-        /* Fire event. */
-	if (debug)
-	    gettimeofday(&now, NULL);
+			se_tmp = next_event;
+			se_tmp.length = 1;
+			for (lpc = 0; lpc < next_event.length; lpc++) {
+				se_tmp.agent.s = next_event.agent.m[lpc];
+				handle_event(handle, &se_tmp);
+			}
+		}
 
-	/*
-	 * Sim events are special right now since we handle them here.
-	 */
-	if (next_event.simevent) {
-		if (! handle_simevent(handle, &next_event))
-			goto bad;
+		sched_event_free(handle, &next_event);
 	}
-	else {
-	    if (event_notify(handle, next_event.notification) == 0) {
-		ERROR("could not fire event\n");
-		return;
-	    }
-	}
-
-	if (debug) {
-	    info("Fire:  note:%p at:%ld:%d now:%ld:%d\n",
-                 next_event.notification,
-		 next_event.time.tv_sec, next_event.time.tv_usec,
-		 now.tv_sec,
-		 now.tv_usec);
-	}
-    bad:
-        event_notification_free(handle, next_event.notification);
-    }
 }
 /*
  * Stuff to get the event list.
@@ -369,18 +695,20 @@ dequeue(event_handle_t handle)
  * Add an agent to the list.
  */
 int
-AddAgent(char *vname, char *vnode, char *nodeid, char *ipaddr, char *type)
+AddAgent(event_handle_t handle,
+	 char *vname, char *vnode, char *nodeid, char *ipaddr, char *type)
 {
 	struct agent *agentp;
-
+		
 	if ((agentp = calloc(sizeof(struct agent), 1)) == NULL) {
 		error("AddAgent: Out of memory\n");
 		return -1;
 	}
 
-	strcpy(agentp->name,    vname);
-	strcpy(agentp->objname, vname);
-	strcpy(agentp->vnode,   vnode);
+	strcpy(agentp->name, vname);
+	agentp->link.ln_Name = agentp->name;
+	
+	strcpy(agentp->vnode, vnode);
 	strcpy(agentp->objtype, type);
 
 	/*
@@ -403,8 +731,64 @@ AddAgent(char *vname, char *vnode, char *nodeid, char *ipaddr, char *type)
 		strcpy(agentp->nodeid, ADDRESSTUPLE_ALL);
 		strcpy(agentp->ipaddr, ADDRESSTUPLE_ALL);
 	}
-	agentp->next = agents;
-	agents       = agentp;
+	
+	if (strcmp(type, TBDB_OBJECTTYPE_SIMULATOR) == 0) {
+		if ((primary_simulator_agent =
+		     create_simulator_agent()) != NULL) {
+			primary_simulator_agent->sa_local_agent.la_link.
+				ln_Name = agentp->name;
+			primary_simulator_agent->sa_local_agent.la_agent =
+			    agentp;
+			agentp->handler = &primary_simulator_agent->
+				sa_local_agent;
+		}
+	}
+	else if ((strcmp(type, TBDB_OBJECTTYPE_TIMELINE) == 0) ||
+		 (strcmp(type, TBDB_OBJECTTYPE_SEQUENCE) == 0)) {
+		timeline_agent_t ta;
+		ta_kind_t tk;
+
+		tk = strcmp(type, TBDB_OBJECTTYPE_TIMELINE) == 0 ?
+			TA_TIMELINE : TA_SEQUENCE;
+		if ((ta = create_timeline_agent(tk)) != NULL) {
+			switch (tk) {
+			case TA_TIMELINE:
+				lnAddTail(&timelines,
+					  &ta->ta_local_agent.la_link);
+				break;
+			case TA_SEQUENCE:
+				lnAddTail(&sequences,
+					  &ta->ta_local_agent.la_link);
+				break;
+			default:
+				assert(0);
+				break;
+			}
+			ta->ta_local_agent.la_link.ln_Name = agentp->name;
+			ta->ta_local_agent.la_agent = agentp;
+			agentp->handler = &ta->ta_local_agent;
+		}
+	}
+	else if (strcmp(type, TBDB_OBJECTTYPE_NODE) == 0) {
+		node_agent_t na;
+		
+		if ((na = create_node_agent()) == NULL) {
+		}
+		else {
+			na->na_local_agent.la_agent = agentp;
+			agentp->handler = &na->na_local_agent;
+		}
+	}
+
+	if (agentp->handler != NULL) {
+		agentp->handler->la_handle = handle;
+	}
+	
+	assert(agent_invariant(agentp));
+	assert(lnFindName(&agents, vname) == NULL);
+	
+	lnAddTail(&agents, &agentp->link);
+
 	return 0;
 }
 
@@ -412,179 +796,101 @@ AddAgent(char *vname, char *vnode, char *nodeid, char *ipaddr, char *type)
  * Add an agent group to the list.
  */
 int
-AddGroup(char *groupname, char *agentname)
+AddGroup(event_handle_t handle, char *groupname, char *agentname)
 {
-	struct agent *agentp, *tmp;
+	struct agent *group = NULL, *agent;
+	int retval = 0;
 
-	if ((agentp = calloc(sizeof(struct agent), 1)) == NULL) {
-		error("AddGroup: Out of memory\n");
-		return -1;
-	}
+	assert(groupname != NULL);
+	assert(strlen(groupname) > 0);
+	assert(agentname != NULL);
+	assert(strlen(agentname) > 0);
 
-	/*
-	 * Find the agent entry.
-	 */
-	tmp = agents;
-	while (tmp) {
-		if (!strcmp(tmp->name, agentname))
-			break;
-
-		tmp = tmp->next;
-	}
-	if (! tmp) {
-		error("AddGroup: Could not find group event %s/%s\n",
-		      groupname, agentname);
-		return -1;
-	}
-
-	/*
-	 * Copy the entry, but rename it to the group name.
-	 */
-	memcpy((void *)agentp, (void *)tmp, sizeof(struct agent));
-	strcpy(agentp->name, groupname);
-
-	agentp->next = agents;
-	agents       = agentp;
-	return 0;
-}
-
-/*
- * Get the agent list and add each agent.
- */
-static int
-AddAgents()
-{
-#ifdef	DBIFACE
-	MYSQL_RES	*res;
-	MYSQL_ROW	row;
-	int		nrows;
-
-	/*
-	 * Build up a table of agents that can receive dynamic events.
-	 * These are stored in the virt_agents table, which we join
-	 * with the reserved table to get the physical node name where
-	 * the agent is running.
-	 *
-	 * That is, we want to be able to quickly map from "cbr0" to
-	 * the node on which it lives (for dynamic events).
-	 */
-	res = mydb_query("select vi.vname,vi.vnode,r.node_id,o.type "
-			 " from virt_agents as vi "
-			 "left join reserved as r on "
-			 " r.vname=vi.vnode and r.pid=vi.pid and "
-			 " r.eid=vi.eid "
-			 "left join event_objecttypes as o on "
-			 " o.idx=vi.objecttype "
-			 "where vi.pid='%s' and vi.eid='%s'",
-			 4, pid, eid);
-
-	if (!res) {
-		error("AddAgents: getting virt_agents list for %s/%s\n",
-		      pid, eid);
-		return -1;
-	}
-
-	nrows = mysql_num_rows(res);
-	while (nrows--) {
-		char	ipaddr[32];
+	if ((agent = (struct agent *)lnFindName(&agents, agentname)) == NULL) {
+		error("unknown agent %s\n", agentname);
 		
-		row = mysql_fetch_row(res);
+		retval = -1;
+	}
+	else if ((group = (struct agent *)lnFindName(&agents,
+						     groupname)) == NULL) {
+		group_agent_t ga;
 
-		if (!row[0] || !row[1] || !row[3])
-			continue;
-
-		if (strcmp("*", row[1])) {
-			if (! row[2]) {
-				error("No node_id for vnode %s\n", row[1]);
-				continue;
-			}
+		if ((group = calloc(sizeof(struct agent), 1)) == NULL) {
+			// XXX delete_group_agent
+			error("out of memory\n");
 			
-			if (! mydb_nodeidtoip(row[2], ipaddr)) {
-				error("No ipaddr for node_id %s\n", row[2]);
-				continue;
-			}
+			retval = -1;
 		}
-		if (AddAgent(row[0], row[1], row[2], ipaddr, row[3]) < 0) {
-		    mysql_free_result(res);
-		    return -1;
+		else if ((ga = create_group_agent(group)) == NULL) {
+			errorc("cannot create group agent\n");
+			
+			free(group);
+			group = NULL;
+			
+			retval = -1;
 		}
-	}
-	mysql_free_result(res);
-
-	/*
-	 * Now get the group list. To make life simple, I just create
-	 * new entries in the agents table, named by the group name, but
-	 * with the info from the underlying agent duplicated, for each
-	 * member of the group. 
-	 */
-	res = mydb_query("select group_name,agent_name from event_groups "
-			 "where pid='%s' and eid='%s'",
-			 2, pid, eid);
-
-	if (!res) {
-		error("AddAgents: getting virt_groups list for %s/%s\n",
-		      pid, eid);
-		return -1;
-	}
-	
-	nrows = mysql_num_rows(res);
-	while (nrows--) {
-		row = mysql_fetch_row(res);
-
-		if (AddGroup(row[0], row[1]) < 0) {
-		    mysql_free_result(res);
-		    return -1;
+		else {
+			ga->ga_local_agent.la_handle = handle;
+			
+			strcpy(group->name, groupname);
+			group->link.ln_Name = group->name;
+			strcpy(group->nodeid, ADDRESSTUPLE_ALL);
+			strcpy(group->vnode, ADDRESSTUPLE_ALL);
+			strcpy(group->objtype, TBDB_OBJECTTYPE_GROUP);
+			strcpy(group->ipaddr, ADDRESSTUPLE_ALL);
+			group->handler = &ga->ga_local_agent;
+			
+			lnAddTail(&agents, &group->link);
+			lnAddTail(&groups, &ga->ga_local_agent.la_link);
+			
+			assert(agent_invariant(group));
 		}
 	}
-	mysql_free_result(res);
-	return 0;
-#else
-	if (RPC_agentlist(pid, eid)) {
-		error("Could not get agentlist from RPC server\n");
-		return -1;
+
+	if (retval == 0) {
+		group_agent_t ga;
+		
+		ga = (group_agent_t)group->handler;
+		if ((retval = group_agent_append(ga, agent)) < 0) {
+			errorc("cannot append agent to group\n");
+		}
 	}
 
-	if (RPC_grouplist(pid, eid)) {
-		error("Could not get grouplist from RPC server\n");
-		return -1;
-	}
-	return 0;
-#endif
+	return retval;
 }
 
 int
 AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 	 char *exidx, char *ftime, char *objname, char *exargs,
-	 char *objtype, char *evttype)
+	 char *objtype, char *evttype, char *parent)
 {
+	timeline_agent_t     ta = NULL;
 	sched_event_t	     event;
 	double		     firetime = atof(ftime);
 	struct agent	    *agentp;
 	struct timeval	     time;
 
-	agentp = agents;
-	while (agentp) {
-		if (!strcmp(agentp->name, objname))
-			break;
-
-		agentp = agentp->next;
-	}
-	if (! agentp) {
+	if ((agentp = (struct agent *)lnFindName(&agents, objname)) == NULL) {
 		error("AddEvent: Could not map event index %s\n", exidx);
 		return -1;
 	}
 
+	if (parent && strlen(parent) > 0) {
+		if (((ta = (timeline_agent_t)lnFindName(&timelines,
+							parent)) == NULL) &&
+		    ((ta = (timeline_agent_t)lnFindName(&sequences,
+							parent)) == NULL)) {
+			error("AddEvent: Could not map parent %s\n", parent);
+			return -1;
+		}
+	}
+	
 	tuple->host      = agentp->ipaddr;
 	tuple->objname   = objname;
 	tuple->objtype   = objtype;
 	tuple->eventtype = evttype;
 
-	if (debug) 
-		info("%8s %10s %10s %10s %10s %10s\n",
-		     ftime, objname, objtype,
-		     evttype, agentp->ipaddr, 
-		     exargs ? exargs : "");
-
+	memset(&event, 0, sizeof(event));
 	event.notification = event_notification_alloc(handle, tuple);
 	if (! event.notification) {
 		error("AddEvent: could not allocate notification\n");
@@ -592,18 +898,43 @@ AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 	}
 	event_notification_set_arguments(handle, event.notification, exargs);
 
-	event_notification_insert_hmac(handle, event.notification);
-	time.tv_sec  = basetime  + (int)firetime;
-	time.tv_usec = (int)((firetime - (floor(firetime))) * 1000000);
+	if (debug) 
+		info("%8s %10s %10s %10s %10s %10s %s %p\n",
+		     ftime, objname, objtype,
+		     evttype, agentp->ipaddr, 
+		     exargs ? exargs : "",
+		     parent,
+		     event.notification);
 
+	event_notification_insert_hmac(handle, event.notification);
+
+	time.tv_sec  = (int)firetime;
+	time.tv_usec = (int)((firetime - (floor(firetime))) * 1000000);
 	if (time.tv_usec >= 1000000) {
 		time.tv_sec  += 1;
 		time.tv_usec -= 1000000;
 	}
-	event.time.tv_sec  = time.tv_sec;
-	event.time.tv_usec = time.tv_usec;
-	event.simevent     = !strcmp(objtype, TBDB_OBJECTTYPE_SIMULATOR);
-	sched_event_enqueue(event);
+	if (ta == NULL) {
+		time.tv_sec  += basetime;
+	}
+	event.time = time;
+	event.agent.s = agentp;
+	event.length = 1;
+	event.flags = SEF_SINGLE_HANDLER;
+	if (sends_complete(agentp, evttype))
+		event.flags |= SEF_SENDS_COMPLETE;
+	event_notification_put_int32(handle,
+				     event.notification,
+				     "TOKEN",
+				     next_token);
+	next_token += 1;
+	
+	sched_event_prepare(handle, &event);
+	if (ta != NULL)
+		timeline_agent_append(ta, &event);
+	else
+		sched_event_enqueue(event);
+	
 	return 0;
 }
 
@@ -620,28 +951,22 @@ get_static_events(event_handle_t handle)
 	char		pideid[BUFSIZ];
 	event_notification_t notification;
 	sched_event_t	event;
-#ifdef	DBIFACE
-	MYSQL_RES	*res;
-	int		nrows;
-#endif
-	if (AddAgents() < 0)
+
+	if (RPC_grouplist(handle, pid, eid)) {
+		error("Could not get grouplist from RPC server\n");
 		return -1;
-
+	}
+	
 	if (debug) {
-		struct agent *agentp = agents;
+		struct agent *agentp = (struct agent *)agents.lh_Head;
 
-		while (agentp) {
-			if (!strcmp(agentp->objname, agentp->name)) {
-				info("Agent: %15s  %10s %10s %8s %16s\n",
-				     agentp->objname, agentp->objtype,
-				     agentp->vnode, agentp->nodeid,
-				     agentp->ipaddr);
-			}
-			else {
-				info("Group: %15s  %10s\n",
-				     agentp->name, agentp->objname);
-			}
-			agentp = agentp->next;
+		while (agentp->link.ln_Succ) {
+			info("Agent: %15s  %10s %10s %8s %16s\n",
+			     agentp->name, agentp->objtype,
+			     agentp->vnode, agentp->nodeid,
+			     agentp->ipaddr);
+
+			agentp = (struct agent *)agentp->link.ln_Succ;
 		}
 	}
 
@@ -658,61 +983,18 @@ get_static_events(event_handle_t handle)
 
 	sprintf(pideid, "%s/%s", pid, eid);
 	gettimeofday(&now, NULL);
-	info("Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
+	info(" Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
 	
-#ifdef	DBIFACE
-	/*
-	 * Now get the eventlist. There should be entries in the
-	 * agents table for anything we find in the list.
-	 */
-	res = mydb_query("select ex.idx,ex.time,ex.vname,"
-			 " ex.arguments,ot.type,et.type from eventlist as ex "
-			 "left join event_eventtypes as et on "
-			 " ex.eventtype=et.idx "
-			 "left join event_objecttypes as ot on "
-			 " ex.objecttype=ot.idx "
-			 "where ex.pid='%s' and ex.eid='%s' "
-			 "order by ex.time ASC",
-			 6, pid, eid);
-#define EXIDX	 row[0]
-#define EXTIME	 row[1]
-#define OBJNAME  row[2]
-#define EXARGS	 row[3]
-#define OBJTYPE	 row[4]
-#define EVTTYPE	 row[5]
-
 	/*
 	 * XXX Pad the start time out a bit to give this code a chance to run.
 	 */
-	basetime = now.tv_sec + 30;
-
-	if (!res) {
-		error("getting static event list for %s/%s\n", pid, eid);
-		return -1;
-	}
-	nrows = (int) mysql_num_rows(res);
-
-	while (nrows--) {
-		MYSQL_ROW	row = mysql_fetch_row(res);
-
-		if (AddEvent(handle, tuple, basetime, EXIDX,
-			     EXTIME, OBJNAME, EXARGS, OBJTYPE, EVTTYPE) < 0) {
-			mysql_free_result(res);
-			return -1;
-		}
-	}
-	mysql_free_result(res);
-#else
-	/*
-	 * XXX Pad the start time out a bit to give this code a chance to run.
-	 */
-	basetime = now.tv_sec + 30;
+	basetime = now.tv_sec + 3;
 	
 	if (RPC_eventlist(pid, eid, handle, tuple, basetime)) {
 		error("Could not get eventlist from RPC server\n");
 		return -1;
 	}
-#endif
+	
 	/*
 	 * Generate a TIME starts message.
 	 */
@@ -727,10 +1009,12 @@ get_static_events(event_handle_t handle)
 		return -1;
 	}
 	event_notification_insert_hmac(handle, notification);
-	event.simevent     = 0;
 	event.notification = notification;
 	event.time.tv_sec  = basetime;
 	event.time.tv_usec = 0;
+	event.agent.s = NULL;
+	event.length = 1;
+	event.flags = 0;
 	sched_event_enqueue(event);
 
 	info("TIME STARTS will be sent at: %lu:%d\n", now.tv_sec, now.tv_usec);
@@ -740,113 +1024,100 @@ get_static_events(event_handle_t handle)
 
 	return 0;
 }
+
+int
+sched_event_enqueue_copy(event_handle_t handle,
+			 sched_event_t *se,
+			 struct timeval *new_time)
+{
+	sched_event_t se_copy = *se;
+	int retval = 0;
+
+	assert(handle != NULL);
+	assert(se != NULL);
+	assert(se->length > 0);
+	assert(new_time != NULL);
+
+	se_copy.notification =
+		event_notification_clone(handle, se->notification);
+	if (new_time != NULL)
+		se_copy.time = *new_time;
+	sched_event_enqueue(se_copy);
 	
+	return retval;
+}
+
+void
+sched_event_free(event_handle_t handle, sched_event_t *se)
+{
+	assert(handle != NULL);
+	assert(se != NULL);
+
+	if (se->length == 0) {
+	}
+	else {
+		event_notification_free(handle, se->notification);
+		se->notification = NULL;
+	}
+}
+
 static int
-handle_simevent(event_handle_t handle, sched_event_t *eventp)
+handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 {
-	char		evtype[TBDB_FLEN_EVEVENTTYPE];
-	int		rcode;
-	char		cmd[BUFSIZ];
-	char		argsbuf[BUFSIZ];
-
-	if (! event_notification_get_eventtype(handle,
-					       eventp->notification,
-					       evtype, sizeof(evtype))) {
-		error("could not get event type from notification %p\n",
-		      eventp->notification);
-		return 0;
-	}
-
-	/*
-	 * All we know about is the "SWAPOUT" and "HALT" event!
-	 * Also NSESWAP event
-	 */
-	if (strcmp(evtype, TBDB_EVENTTYPE_HALT) &&
-	    strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT) &&
-	    strcmp(evtype, TBDB_EVENTTYPE_NSESWAP)) {
-		error("cannot handle SIMULATOR event %s.\n", evtype);
-		return 0;
-	}
-
-	/*
-	 * We are lucky! The event scheduler runs as the user! But just in
-	 * case, check our uid to make sure we are not root.
-	 */
-	if (!getuid() || !geteuid()) {
-		error("Cannot run SIMULATOR %s as root.\n", evtype);
-		return 0;
-	}
-	/*
-	 * Run the command. Output goes ...
-	 */
-	if (!strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT)) {
-	    sprintf(cmd, "swapexp -s out %s %s", pid, eid);
-	}
-	else if (!strcmp(evtype, TBDB_EVENTTYPE_HALT)) {
-	    sprintf(cmd, "endexp %s %s", pid, eid);
-	}
-	else if (!strcmp(evtype, TBDB_EVENTTYPE_NSESWAP)) {
-	    event_notification_get_arguments(handle, eventp->notification,
-					     argsbuf, sizeof(argsbuf));
-	    /* Need to run nseswap as a background process coz it
-	     * sleeps a while before getting done. Also one instance
-	     * waits for a swapmod to complete
-	     */
-	    sprintf(cmd, "nseswap %s %s %s &", pid, eid, argsbuf);
-	}
-	rcode = system(cmd);
+	char *value, argsbuf[BUFSIZ] = "";
+	char objname[TBDB_FLEN_EVOBJNAME];
+	int rc, ctoken = ~0, agerror = 0;
 	
-	/* Should not return, but ... */
-	return (rcode == 0);
-}
+	event_notification_get_objname(handle, eventp->notification,
+				       objname, sizeof(objname));
 
-/*
- * Wait for the experiment to signal active before firing off the events.
- */
-static void
-waitforactive(char *pid, char *eid)
-{
-#ifdef  DBIFACE
-	int	count = 0;
+	event_notification_get_arguments(handle, eventp->notification,
+					 argsbuf, sizeof(argsbuf));
 	
-	/*
-	 * XXX: Looking at experiment state directly; bad bad bad.
-	 */
-	while (1) {
-		MYSQL_RES	*res;
-
-		res = mydb_query("select state from experiments "
-				 "where pid='%s' and eid='%s' and "
-				 "      state='active'",
-				 1, pid, eid);
-
-		if (!res) {
-			fatal("getting current state for %s/%s", pid, eid);
+	if ((rc = event_arg_get(argsbuf, "ERROR", &value)) > 0) {
+		if (sscanf(value, "%d", &agerror) != 1) {
+			error("bad error value for complete: %s\n", argsbuf);
 		}
-		if (mysql_num_rows(res)) {
-			mysql_free_result(res);
-			return;
-		}
-		mysql_free_result(res);
-
-		count++;
-		if ((count % 10) == 0)
-			info("Waiting for nodes in %s/%s to come up ...\n",
-			     pid, eid);
-
-		/*
-		 * Don't want to pound the DB too much.
-		 */
-		sleep(3);
 	}
-#else
-	/*
-	 * We use the RPC server, via the generic client.
-	 */
-	int	status = RPC_waitforactive(pid, eid);
+	else {
+		warning("completion event is missing ERROR argument\n");
+	}
+	
+	if ((rc = event_arg_get(argsbuf, "CTOKEN", &value)) > 0) {
+		if (sscanf(value, "%d", &ctoken) != 1) {
+			error("bad ctoken value for complete: %s\n", argsbuf);
+		}
+	}
+	else {
+		warning("completion event is missing CTOKEN argument\n");
+	}
 
-	if (status) 
-		fatal("waitforactive: RPC failed!");
-#endif
+	if (agerror != 0) {
+		error_record_t er;
+		
+		if ((er = create_error_record()) == NULL) {
+			errorc("could not allocate error record");
+		}
+		else {
+			er->er_agent = eventp->agent.s;
+			er->er_token = ctoken;
+			er->er_error = agerror;
+			lnAddTail(&primary_simulator_agent->sa_error_records,
+				  &er->er_link);
+		}
+	}
+
+	sequence_agent_handle_complete(handle,
+				       &sequences,
+				       eventp->agent.s,
+				       ctoken,
+				       agerror);
+
+	group_agent_handle_complete(handle,
+				    &groups,
+				    eventp->agent.s,
+				    ctoken,
+				    agerror);
+	
+	return 1;
 }
-

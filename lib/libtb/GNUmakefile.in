@@ -24,7 +24,7 @@ control-install: client
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS		= log.o tbdefs.o
+OBJS		= log.o tbdefs.o popenf.o systemf.o
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 
 libtb.a:	$(OBJS) tbdb.o
@@ -38,6 +38,8 @@ libtb-nodb.a:	$(OBJS)
 log.o:		log.h
 tbdb.o:		tbdb.h log.h tbdefs.h
 tbdefs.o:	tbdefs.h
+popenf.o:	popenf.h
+systemf.o:	systemf.h
 
 install:
 

@@ -1,0 +1,1178 @@
+#! /usr/bin/env python
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+import re
+import pwd
+import sys
+import sets
+import stat
+import time
+import getopt
+import socket
+import zipfile
+import cStringIO
+import xmlrpclib
+import os, os.path
+import ConfigParser
+
+prefix = "@prefix@"
+
+TBPATH = os.path.join(prefix, "lib")
+if TBPATH not in sys.path:
+    sys.path.append(TBPATH)
+    pass
+
+PACKAGE_VERSION = 0.1
+
+# Default server
+XMLRPC_SERVER = "@BOSSNODE@"
+XMLRPC_PORT   = 3069
+
+RSYNC = "@RSYNC@"
+
+DIRS = {
+    "proj" : "proj",
+    "groups" : "groups",
+    }
+
+EXPDIR_FMT = os.path.join("/", DIRS["proj"], "%(PID)s", "exp", "%(EID)s")
+
+GLOBAL_LOGS = [ "event-sched.log" ]
+
+PID = None
+EID = None
+
+pw = pwd.getpwuid(os.getuid())
+
+if not pw:
+    sys.stderr.write("error: unknown user id %d" % os.getuid())
+    sys.exit(2)
+    pass
+
+USER = pw[0]
+HOME = pw[5]
+
+CERTIFICATE = os.path.join(HOME, ".ssl", "emulab.pem")
+
+DEBUG = 0
+
+VERBOSITY_MACHINE = 1
+VERBOSITY_HUMAN = 2
+
+VERBOSITY = VERBOSITY_HUMAN
+
+SERVER = None
+
+if len(XMLRPC_SERVER) == 0:
+    sys.stderr.write("internal error: XMLRPC_SERVER is empty\n")
+    sys.exit(2)
+    pass
+
+if len(RSYNC) == 0:
+    sys.stderr.write("internal error: RSYNC is empty\n")
+    sys.exit(2)
+    pass
+
+##
+# Initialize the XML-RPC server proxy, if it has not already been done.  After
+# returning, the SERVER variable will hold the proxy object.
+#
+def init_server():
+    global SERVER
+
+    if not SERVER:
+        if not os.path.exists(CERTIFICATE):
+            sys.stderr.write("error: missing emulab certificate: %s\n" %
+                             CERTIFICATE)
+            sys.exit(2)
+            pass
+        
+        from M2Crypto.m2xmlrpclib import SSL_Transport
+        from M2Crypto import SSL
+        
+        URI = "https://" + XMLRPC_SERVER + ":" + str(XMLRPC_PORT) + prefix
+        
+        ctx = SSL.Context("sslv23")
+        ctx.load_cert(CERTIFICATE, CERTIFICATE)
+        ctx.set_verify(SSL.verify_none, 16)
+        ctx.set_allow_unknown_ca(0)
+        
+        SERVER = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx))
+        pass
+    return
+
+##
+# Download the user's experiment list from the XML-RPC server.
+#
+# @return A list of (pid, eid) pairs for each experiment created by the user.
+#
+def get_explist():
+    global SERVER
+
+    from emulabclient import RESPONSE_SUCCESS
+    
+    retval = []
+    
+    init_server()
+    
+    list_method = getattr(SERVER, "experiment.getlist")
+    elist = list_method(PACKAGE_VERSION, {})
+    
+    if elist["code"] != RESPONSE_SUCCESS:
+        sys.stderr.write("error: " + elist["output"] + "\n")
+        sys.exit(1)
+        pass
+    else:
+        for project in elist["value"]:
+            for group in elist["value"][project]:
+                for exp in elist["value"][project][group]:
+                    retval.append((project, exp))
+                    pass
+                pass
+            pass
+        pass
+    
+    return retval
+
+##
+# Print the top level usage statement for the whole tool.
+#
+def usage():
+    print "Usage: loghole [-hV] [-e pid/eid|-a] [OPTIONS] action [...]"
+    print
+    print "Manage an experiment's log hole."
+    print
+    print "Optional arguments:"
+    print "  -h, --help                Print this message, or the action's"
+    print "                            usage message."
+    print "  -V, --version             Print version information."
+    print "  -d, --debug               Turn on debugging messages."
+    print "  -q, --quiet               Be less verbose."
+    print "  -v, --verbose             Be more verbose."
+    print "  -e, --experiment=PID/EID  Specify the experiment to manage."
+    print "  -a, --all                 Perform the action on all of your "
+    print "                            experiments."
+    print "  -s, --server=SERVER       Specify the XML-RPC server to use."
+    print "                            (Default: %s)" % XMLRPC_SERVER
+    print "  -P, --port=PORT           Specify the XML-RPC server port."
+    print "                            (Default: %d)" % XMLRPC_PORT
+    print
+    print "Actions:"
+    print "  sync      Synchronize the experiment's log holes with the"
+    print "            experiment's log directory."
+    print "  archive   Archive the contents of the experiment's log directory."
+    print "  list      Print a brief listing of the archives in the"
+    print "            experiment's log directory."
+    print "  show      Show a detailed listing of the archive(s) in the"
+    print "            experiment directory."
+    print "  gc        Garbage collect old archives."
+    print
+    print "Environment:"
+    print "  cwd       The project and experiment ID will be inferred from the"
+    print "            current working directory, if it is inside the"
+    print "            experiment's directory (e.g. /proj/foo/exp/bar)."
+    print
+    print "Examples:"
+    print "  $ loghole -e foo/bar sync"
+    print "  $ loghole -e foo/bar list"
+    return
+
+##
+# Print the usage statement for the "sync" action.
+#
+def sync_usage():
+    print "Usage: loghole sync [node1 ...]"
+    print
+    print "Synchronize the experiment's log holes with the experiment's log"
+    print "directory."
+    print
+    print "Optional arguments:"
+    print "  node1 ...    The names of the virtual or physical nodes that "
+    print "               should be synced.  The default behavior is to sync "
+    print "               all of the nodes in an experiment."
+    print
+    print "Files:"
+    print "  /proj/<pid>/exp/<eid>/logs/<node>/<loghole>"
+    print "               The location of the log hole for a particular node."
+    print
+    print "Examples:"
+    print "  $ loghole sync"
+    return
+
+##
+# Print the usage statement for the "archive" action.
+#
+def archive_usage():
+    print ("Usage: loghole archive [-k (i-delete|space-is-needed)] "
+           "[-a days] [-c comment] [-d] [archive-name]")
+    print
+    print "Archive the contents of the experiment's log directory.  The"
+    print "archive will be a zip file containing all of the directories"
+    print "under the experiment's log directory, any extra log files"
+    print "at the top (e.g. event-sched.log), and some metadata."
+    print
+    print "Optional arguments:"
+    print "  -k, --keep-until=(i-delete|space-is-needed)"
+    print "                         Keep the archive until you decide to"
+    print "                         delete it manually or space is needed."
+    print "                         (Default: space-is-needed)"
+    print "  -a, --keep-atleast=N   Keep the archive atleast N days after"
+    print "                         creation.  This value keeps the archive "
+    print "                         from being garbage collected when more "
+    print "                         space is needed. (Default: 3 days)"
+    print "  -c, --comment=COMMENT  Add a comment to the archive. This comment"
+    print "                         will be displayed in the listing generated"
+    print "                         by the 'show' action.  Use a single dash "
+    print "                         (-) to read the comment from standard in."
+    print "  -d, --delete           Delete the files in the log directory"
+    print "                         after producing the archive."
+    print
+    print "Required arguments:"
+    print "  archive-name  The name of the archive to create."
+    print "                (Default: The experiment name)"
+    print
+    print "Files:"
+    print "  /proj/<pid>/exp/<eid>/logs/<archive-name>.<instance>.zip"
+    print
+    print "Examples:"
+    print "  $ loghole archive foobar"
+    return
+
+##
+# Print the usage statement for the "list" action.
+#
+def list_usage():
+    print "Usage: loghole list [-O1!Xo] [-m atmost] [-s megabytes]"
+    print
+    print "Print a brief listing of the archives in the experiment's log"
+    print "directory.  The listing can be helpful in getting an idea of"
+    print "what archives are in your experiment and when they are likely"
+    print "to be garbage collected."
+    print
+    print "Optional arguments:"
+    print "  -O                    Only list archives that are marked as 'keep"
+    print "                        until \"i-delete\"'."
+    print "  -1                    Only list archives that are a day from"
+    print "                        their keep-atleast date."
+    print "  -!                    Only list archives that are past their"
+    print "                        keep-atleast date."
+    print "  -X                    Only list archives that are ready to be"
+    print "                        garbage collected."
+    print "  -o                    List archives that do not match the above"
+    print "                        flags."
+    print "  -m, --keep-atmost=N   Keep at most N archives in the experiment."
+    print "                        (Default: 100)"
+    print "  -s, --keep-size=N     Keep at N megabytes of archives."
+    print "                        (Default: 3.0 MB)"
+    print
+    print "Examples:"
+    print "  $ loghole list"
+    print "  GC  Name             Date"
+    print
+    print "  [ ] foobar.1.zip     10/15"
+    print "  [!] foobar.0.zip     10/13"
+    print "  ..."
+    print
+    print "  $ loghole -q list -!"
+    print "  foobar.0.zip"
+    return
+
+##
+# Print the usage statement for the "show" action.
+#
+def show_usage():
+    print "Usage: loghole show [archive-name]"
+    print
+    print "Show a detailed listing of the archive(s) in the experiment"
+    print "directory.  The listing shows all of the metadata for the archive,"
+    print "comments, and the file listing."
+    print
+    print "Example:"
+    print "  $ loghole show foobar"
+    print "  Archive: foobar.0.zip"
+    print "    Creator:\t\t%s" % USER
+    print "    ..."
+    print "  Archive: foobar.1.zip"
+    print "    ..."
+    return
+
+##
+# Print the usage statement for the "gc" action.
+#
+def gc_usage():
+    print "Usage: loghole gc [-n] [-m atmost] [-s megabytes]"
+    print
+    print "Garbage collect old log archives."
+    print
+    print "Optional arguments:"
+    print "  -n, --dry-run         Perform a dry run, do not delete any files."
+    print "  -m, --keep-atmost=N   Keep at most N archives in the experiment."
+    print "                        (Default: 100)"
+    print "  -s, --keep-size=N     Keep at N megabytes of archives."
+    print "                        (Default: 3.0 MB)"
+    print
+    print "Examples:"
+    print "  $ loghole -n -m 1 gc"
+    print "  Reclaimed 3421 bytes from foo/bar."
+    print "  52434 bytes are still in foo/bar."
+    print
+    print "  $ loghole -q -m 1 gc"
+    print "  3421 52434"
+    return
+
+##
+# Infer the project and experiment IDs from the given list of directories.
+#
+# @param *args The list of directories to check for likely PID/EID values.
+# @return A pair containing the project and experiment IDs, which will be None
+# if the IDs could not be inferred.
+#
+def infer_pid_eid(*args):
+    pid = None
+    eid = None
+    for path in args:
+        dirs = path.split(os.path.sep)
+        if ((len(dirs) < 6) or not
+            ((DIRS["proj"] in dirs and
+              "exp" in dirs[dirs.index(DIRS["proj"]):]) or
+             (len(dirs) >= 6 and
+              (DIRS["groups"] in dirs and
+               "exp" in dirs[dirs.index(DIRS["groups"]):])))):
+            # No match...
+            pass
+        else:
+            if DIRS["proj"] in dirs:
+                pid = dirs[dirs.index(DIRS["proj"]) + 1]
+                pass
+            else:
+                pid = dirs[dirs.index(DIRS["groups"]) + 1]
+                pass
+            eid = dirs[dirs.index("exp") + 1]
+            pass
+        pass
+
+    return pid, eid
+
+##
+# Attempt to open a loghole archive located at the given path.  An archive
+# must be a zip file with a "loghole.cfg" file stored in the root directory.
+#
+# @param path The path to the loghole archive.
+# @return A pair containing the ZipFile object referring to the archive and a
+# ConfigParser object that contains the archive's metadata.
+#
+def open_loghole(path):
+    retval = None, None
+    if zipfile.is_zipfile(path):
+        zf = zipfile.ZipFile(path, 'r')
+        if "loghole.cfg" in zf.namelist():
+            cio = cStringIO.StringIO(zf.read("loghole.cfg"))
+            cp = ConfigParser.ConfigParser()
+            cp.readfp(cio)
+            retval = zf, cp
+            zf = None
+            pass
+        if zf:
+            zf.close()
+            pass
+        pass
+    
+    return retval
+
+##
+# Generate a name that is unique in the context of the given list of entries.
+#
+# @param base The base of the file name.
+# @param ext The file name extension.
+# @param entries An iterable containing any existing file names.
+# @return A string of the form "<base>.<unique #>.<ext>".
+#
+def uniquish_name(base, ext, entries):
+    retval = None
+    lpc = 0
+    while not retval:
+        name = base + "." + str(lpc) + "." + ext
+        if name not in entries:
+            retval = name
+            pass
+        lpc = lpc + 1
+        pass
+    
+    return retval
+
+##
+# Callback for os.walk() that writes files to the ZipFile.
+#
+# @param zf The ZipFile object that files should be added to.
+# @param dirname The current directory name.
+# @param names The list of files in the current directory.
+#
+def file_archiver(zf, dirname, names):
+    for entry in names:
+        entry = os.path.join(dirname, entry)
+        if os.path.isfile(entry):
+            zf.write(entry)
+            pass
+        pass
+
+    return
+
+##
+# Sort the list of log archives in the current directory based on when they
+# should be garbage collected.
+#
+# @param keep_atmost The maximum number of archives that should be kept, any
+# extras are marked as collectable.
+# @param keep_size The number of megabytes of archives to keep.
+# @return A dictionary containing: "del", a list of archives that will be
+# deleted at the next GC; "safe", a list of archives that are marked "keep
+# until 'i-delete'"; "soon", the remaining archives; "reclaimed-size", the
+# amount of data that will be reclaimed at the next GC; and "inuse-size", the
+# amount of data that will remain after the next GC.
+#
+def sort_archives(keep_atmost, keep_size):
+    
+    keep_size = keep_size * 1024 * 1024
+
+    reclaimed_size = 0
+    inuse_size = 0 # In-use size for non-gc'able archives
+    inuse_gc_size = 0 # In-use size for gc'able archives
+    
+    current_time = time.time()
+    
+    retval_del = []
+    retval_safe = []
+    retval_soon = []
+    exp_logholes = []
+
+    # Walk the directory collecting archives and sorting them into "safe" and
+    # to-be-determined lists.
+    for entry in os.listdir(os.curdir):
+        st = os.stat(entry)
+        lh, cp = open_loghole(entry)
+        if lh:
+            keep_until = cp.get("MAIN", "keep-until")
+            if keep_until == "i-delete":
+                if DEBUG:
+                    print "loghole: ignoring - " + entry
+                    pass
+
+                retval_safe.append(entry)
+                inuse_size = inuse_size + st[stat.ST_SIZE]
+                pass
+            else:
+                created = time.mktime(time.strptime(cp.get("MAIN", "created")))
+                keep_atleast = (cp.getint("MAIN", "keep-atleast") *
+                                60 * 60 * 24)
+
+                inuse_gc_size = inuse_gc_size + st[stat.ST_SIZE]
+                exp_logholes.append((entry, st, created + keep_atleast))
+                pass
+            lh.close()
+            pass
+        pass
+
+    # Sort the archives from oldest keep-atleast time to newest, then
+    exp_logholes.sort(lambda x, y: cmp(x[2], y[2]))
+
+    # ... divide them between the del list and the soon list depending on
+    # whether or not space is needed.
+    for entry, st, expiration in exp_logholes:
+        if inuse_gc_size > keep_size:
+            if DEBUG:
+                print "loghole: stale entry - " + entry
+                pass
+
+            retval_del.append(entry)
+            inuse_gc_size = inuse_gc_size - st[stat.ST_SIZE]
+            reclaimed_size = reclaimed_size + st[stat.ST_SIZE]
+            pass
+        else:
+            retval_soon.append(entry)
+            pass
+        pass
+
+    # Resort the list in the reverse direction for keep-atleast time.
+    exp_logholes = [x for x in exp_logholes if x[0] in retval_soon]
+    exp_logholes.sort(lambda x, y: cmp(y[2], x[2]))
+
+    # Update the inuse_size for the archives below the keep-atmost value, then
+    for entry, st, expiration in exp_logholes[0:keep_atmost]:
+        if DEBUG:
+            print ("loghole: keeping '"
+                   + entry
+                   + "' until "
+                   + time.ctime(expiration))
+            pass
+
+        inuse_size = inuse_size + st[stat.ST_SIZE]
+        pass
+
+    # ... move the rest to the "del" list and
+    for entry, st, expiration in exp_logholes[keep_atmost:]:
+        if DEBUG:
+            print "loghole: excess entry - " + entry
+            pass
+
+        retval_soon.remove(entry)
+        retval_del.append(entry)
+        reclaimed_size = reclaimed_size + st[stat.ST_SIZE]
+        pass
+
+    # ... drop the end of the array.
+    del retval_soon[keep_atmost:]
+
+    return {
+        "del" : retval_del,
+        "safe" : retval_safe,
+        "soon" : retval_soon,
+        "reclaimed-size" : reclaimed_size,
+        "inuse-size" : inuse_size,
+        }
+
+##
+# Performs the "archive" action, which involves building a zip file containing
+# all of the logs.
+#
+# @param args Action-specific command line arguments.
+#
+def do_archive(args):
+    retval = 0
+
+    keep_until = "space-is-needed"
+    keep_atleast = 3
+    comments = []
+    delete_dir = False
+
+    # Parse action-specific options and arguments.
+    try:
+        opts, args = getopt.getopt(args, "k:a:c:d", [
+            "keep-until=", "keep-atleast=", "comment=", "delete" ])
+        for opt, val in opts:
+            if opt in ("-k", "--keep-until"):
+                if val == "i-delete" or val == "space-is-needed":
+                    keep_until = val
+                    pass
+                else:
+                    raise getopt.error(
+                        'error: expecting "i-delete" or "space-is-needed" for '
+                        'keep until value, got - ' + val)
+                pass
+            elif opt in ("-a", "--keep-atleast"):
+                try:
+                    keep_atleast = int(val)
+                    pass
+                except:
+                    raise getopt.error(
+                        'error: expecting integer for keep atleast value, '
+                        'got - ' + val)
+                pass
+            elif opt in ("-c", "--comment"):
+                if val == "-":
+                    comments.append(sys.stdin.read())
+                    pass
+                else:
+                    comments.append(val)
+                    pass
+                pass
+            elif opt in ("-d", "--delete"):
+                delete_dir = True
+                pass
+            pass
+        
+        if len(args) > 1:
+            raise getopt.error(
+                'error: too many arguments for "archive" action.')
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        archive_usage()
+        return 2
+
+    if len(args) < 1:
+        archive_base = EID
+        pass
+    else:
+        archive_base = args[0]
+        pass
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    # Figure out a unique name for the archive,
+    archive_name = uniquish_name(archive_base, 'zip', os.listdir(logdir))
+
+    # ... create a new zip file,
+    zf = zipfile.ZipFile(archive_name, 'w', zipfile.ZIP_DEFLATED)
+
+    # ... fill it up with the node log holes, and
+    for entry in os.listdir(logdir):
+        if os.path.isdir(entry):
+            os.path.walk(entry, file_archiver, zf)
+            pass
+        pass
+
+    # ... any global log files (e.g. event-sched.log).
+    for log in GLOBAL_LOGS:
+        if os.path.exists(log):
+            zf.write(log)
+            pass
+        pass
+
+    # Construct the meta-data.
+    cp = ConfigParser.ConfigParser()
+    cp.add_section("MAIN")
+    cp.set("MAIN", "created", time.ctime(time.time()))
+    cp.set("MAIN", "creator", USER)
+    cp.set("MAIN", "project", PID)
+    cp.set("MAIN", "experiment", EID)
+    cp.set("MAIN", "keep-until", keep_until)
+    cp.set("MAIN", "keep-atleast", keep_atleast)
+    
+    cio = cStringIO.StringIO()
+    cp.write(cio)
+
+    loghole_zi = zipfile.ZipInfo()
+    loghole_zi.filename = "loghole.cfg"
+    ct = time.localtime(time.time())
+    loghole_zi.date_time = (ct[0], ct[1], ct[2], ct[3], ct[4], ct[5])
+    loghole_zi.compress_type = zipfile.ZIP_STORED
+    loghole_zi.comment = "Log hole meta-data"
+    
+    zf.writestr(loghole_zi, cio.getvalue())
+
+    # Add any comments.
+    ct = time.localtime(time.time())
+    lpc = 0
+    for comment in comments:
+        loghole_zi = zipfile.ZipInfo()
+        loghole_zi.filename = "loghole-comment.%d.txt" % lpc
+        loghole_zi.date_time = (ct[0], ct[1], ct[2], ct[3], ct[4], ct[5])
+        loghole_zi.compress_type = zipfile.ZIP_DEFLATED
+        loghole_zi.comment = "Loghole comment #%d" % lpc
+
+        zf.writestr(loghole_zi, comment)
+
+        lpc = lpc + 1
+        pass
+    
+    if DEBUG:
+        zf.printdir()
+        pass
+    
+    zf.close()
+
+    if delete_dir:
+        for entry in os.listdir(logdir):
+            if os.path.isdir(entry):
+                os.rmdir(entry)
+                pass
+            pass
+        pass
+
+    if VERBOSITY == VERBOSITY_MACHINE:
+        print archive_name
+        pass
+    elif VERBOSITY >= VERBOSITY_HUMAN:
+        print "Created log hole archive: " + archive_name
+        pass
+    
+    return retval
+
+##
+# Performs the "show" action, which shows a detailed listing of a log archive.
+#
+# @param args Action-specific command line arguments.
+#
+def do_show(args):
+    retval = 0
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+    
+    for entry in os.listdir(logdir):
+        if len(args) == 0 or entry.startswith(args[0]):
+            lh, cp = open_loghole(entry)
+            if lh:
+                print "Archive: " + entry
+                print ("  Project/Experiment:\t%s/%s" %
+                       (cp.get("MAIN", "project"),
+                        cp.get("MAIN", "experiment")))
+                print "  Creator:\t\t%s" % cp.get("MAIN", "creator")
+                print "  Created:\t\t%s" % cp.get("MAIN", "created")
+                print "  Keep-until:\t\t%s" % cp.get("MAIN", "keep-until")
+                print ("  Keep-atleast:\t\t%s days" %
+                       cp.get("MAIN", "keep-atleast"))
+                for name in lh.namelist():
+                    if re.match(r'loghole-comment.*\.txt', name):
+                        before = 38 - (len(name) / 2)
+                        after = 77 - before - len(name)
+                        print "%s %s %s" % ("-" * before, name, "-" * after)
+                        print lh.read(name)
+                        pass
+                    pass
+                print "=" * 79
+                lh.printdir()
+                lh.close()
+                print
+                pass
+            pass
+        pass
+    
+    return retval
+
+##
+# Run rsync for a given host and list of files.
+#
+# @param host The host to sync against.
+# @param base The local directory where the downloaded files should be placed.
+# @param *args The list of directories to sync.
+# @retval The exit status of the rsync command-line.
+#
+def rsync(host, base, *args):
+    global RSYNC, HOME, DEBUG
+    
+    retval = 0
+    for path in args:
+        fullpath = os.path.join("", base, path[1:], "")
+        try:
+            os.makedirs(fullpath)
+            pass
+        except OSError:
+            pass
+        extra_flags = ""
+        if VERBOSITY > VERBOSITY_HUMAN:
+            extra_flags = extra_flags + " -v "
+            pass
+        cmd = (RSYNC
+               + " -rptgoDLz "
+               + extra_flags
+               + " --rsh=\"ssh -o StrictHostKeyChecking=no "
+               + "-o UserKnownHostsFile="
+               + os.path.join(HOME, ".ssh", "emulab_known_hosts")
+               + "\" "
+               + host
+               + ":" + path + " "
+               + fullpath)
+        if DEBUG:
+            print cmd
+            pass
+        else:
+            retval = os.system(cmd)
+            pass
+        pass
+    
+    return retval
+
+##
+# Performs the "sync" action, which synchronizes the logholes for a group of
+# nodes.
+#
+# @param args Action-specific command line arguments.
+#
+def do_sync(args):
+    from emulabclient import RESPONSE_SUCCESS
+    
+    retval = 0
+
+    init_server()
+    
+    state_method = getattr(SERVER, "experiment.state")
+
+    state = state_method(PACKAGE_VERSION, { "proj" : PID, "exp" : EID })
+    if state["code"] != RESPONSE_SUCCESS:
+        sys.stderr.write("error: " + state["output"] + "\n")
+        retval = 1
+        pass
+    elif state["value"] != "active":
+        sys.stderr.write("error: %s/%s is not an active experiment!\n" %
+                         (PID, EID))
+        retval = 2
+        pass
+    else:
+        info_method = getattr(SERVER, "experiment.info")
+        
+        physical = info_method(PACKAGE_VERSION, {
+            "proj" : PID,
+            "exp" : EID,
+            "aspect" : "mapping",
+            })
+        
+        if physical["code"] != RESPONSE_SUCCESS:
+            sys.stderr.write("error: xmlrpc failed - %s\n" %
+                             (physical["output"],))
+            retval = 1
+            pass
+        else:
+            physical = physical["value"]
+
+            hosts = [(x["pnode"], x["name"]) for x in physical.values()
+                     if ((x["erole"] == "virthost" or x["erole"] == "node") and
+                         (x["status"] == "up" and x["eventstatus"] == "ISUP"))]
+
+            phosts = sets.Set([x[0] for x in hosts])
+            vhosts = sets.Set([x[1] for x in hosts])
+            if len(args) == 0:
+                args = vhosts
+                pass
+
+            known_nodes = sets.Set(args) & (phosts | vhosts)
+            unknown_nodes = known_nodes ^ sets.Set(args)
+
+            for phost, vhost in hosts:
+                if (vhost in args) or (phost in args):
+                    rsync(phost,
+                          os.path.join(EXPDIR_FMT % { "PID" : PID,
+                                                      "EID" : EID },
+                                       "logs",
+                                       vhost),
+                          "/var/emulab/logs/",
+                          "/usr/testbed/logs/")
+                    pass
+                pass
+
+            if len(unknown_nodes) > 0:
+                for vhost in unknown_nodes:
+                    sys.stderr.write("error: unknown node - %s\n" % vhost)
+                    pass
+                retval = 2
+                pass
+            pass
+        pass
+
+    return retval
+
+##
+# Performs the "archive" action, which displays a brief summary of the log
+# files in the experiment.
+#
+# @param args Action-specific command line arguments.
+#
+def do_list(args):
+    retval = 0
+
+    keep_atmost = 100
+    keep_size = 3.0
+
+    list_gc = ""
+    
+    try:
+        opts, args = getopt.getopt(args, "O1!Xom:s:", [
+            "keep-atmost=", "keep-size="
+            ])
+        for opt, val in opts:
+            if opt in ("-O", "-1", "-!", "-X"):
+                list_gc = list_gc + opt[1]
+                pass
+            elif opt in ("-o"):
+                list_gc = list_gc + ' '
+                pass
+            elif opt in ("-m", "--keep-atmost"):
+                try:
+                    keep_atmost = int(val)
+                    pass
+                except:
+                    raise getopt.error(
+                        'error: expecting integer for keep atmost value, '
+                        'got - ' + val)
+                pass
+            elif opt in ("-s", "--keep-size"):
+                try:
+                    keep_size = float(val)
+                    pass
+                except:
+                    raise getopt.error(
+                        'error: expecting float for keep size value, '
+                        'got - ' + val)
+                pass
+            pass
+        
+        if len(args) > 0:
+            raise getopt.error(
+                'error: too many arguments passed to "list" action')
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        list_usage()
+        return 2
+
+    if len(list_gc) == 0:
+        list_gc = "O1!X "
+        pass
+    
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    sa = sort_archives(keep_atmost, keep_size)
+
+    exp_logholes = []
+    for entry in os.listdir(logdir):
+        lh, cp = open_loghole(entry)
+        if lh:
+            created = time.mktime(time.strptime(cp.get("MAIN", "created")))
+            exp_logholes.append((entry, cp, created))
+            pass
+        pass
+
+    current_time = time.time()
+    tomorrow_time = current_time + (60 * 60 * 24)
+    
+    if len(exp_logholes) > 0:
+        max_entry_len = max([len(x[0]) for x in exp_logholes])
+
+        if VERBOSITY >= VERBOSITY_HUMAN:
+            print "GC  Name%sDate" % (" " * (max_entry_len - 4 + 5))
+            print
+            pass
+        
+        exp_logholes.sort(lambda x, y: cmp(y[2], x[2]))
+        for entry, cp, created in exp_logholes:
+            keep_until = cp.get("MAIN", "keep-until")
+            keep_atleast = (cp.getint("MAIN", "keep-atleast") * 60 * 60 * 24)
+            created = time.mktime(time.strptime(cp.get("MAIN", "created")))
+            created_str = time.strftime("%m/%d", time.localtime(created))
+            if keep_until == "i-delete":
+                ball = "O"
+                pass
+            elif entry in sa["del"]:
+                ball = "X"
+                pass
+            elif entry in sa["soon"]:
+                if current_time > keep_atleast:
+                    ball = "!"
+                    pass
+                elif (tomorrow_time - created) > keep_atleast:
+                    ball = "1"
+                    pass
+                else:
+                    ball = " "
+                    pass
+                pass
+
+            if ball in list_gc:
+                if VERBOSITY == VERBOSITY_MACHINE:
+                    print entry
+                    pass
+                elif VERBOSITY >= VERBOSITY_HUMAN:
+                    gap = " " * (max_entry_len - len(entry) + 5)
+                    print "[%s] %s%s%s" % (ball, entry, gap, created_str)
+                    pass
+                pass
+            pass
+        if len(exp_logholes) == 0:
+            if VERBOSITY >= VERBOSITY_HUMAN:
+                print "  <No log holes found in %s/%s>" % (PID, EID)
+                pass
+            pass
+
+        if VERBOSITY == VERBOSITY_MACHINE:
+            pass
+        elif VERBOSITY >= VERBOSITY_HUMAN:
+            print
+            print "%d bytes are in use." % (sa["inuse-size"],)
+            print ("%d bytes will be reclaimed at the next gc." %
+                   (sa["reclaimed-size"],))
+            print
+            print "GC Legend:"
+            print "  O - Archive will not be deleted automatically."
+            print "  1 - Archive is one day away from its keep-until date."
+            print "  ! - Archive is past its keep-until date and will be"
+            print "      deleted when space is needed."
+            print "  X - Archive is ready to be garbage collected."
+            pass
+        pass
+    
+    return retval
+
+##
+# Performs the "gc" action, which garbage collects old/extra log files.
+#
+# @param args Action-specific command line arguments.
+#
+def do_gc(args):
+    retval = 0
+
+    keep_atmost = 100
+    keep_size = 3.0
+    dry_run = False
+    
+    try:
+        opts, args = getopt.getopt(args, "nm:s:", [
+            "dry-run", "keep-atmost=", "keep-size="
+            ])
+        for opt, val in opts:
+            if opt in ("-m", "--keep-atmost"):
+                try:
+                    keep_atmost = int(val)
+                    pass
+                except:
+                    raise getopt.error(
+                        'error: expecting integer for keep atmost value, '
+                        'got - ' + val)
+                pass
+            elif opt in ("-s", "--keep-size"):
+                try:
+                    keep_size = float(val)
+                    pass
+                except:
+                    raise getopt.error(
+                        'error: expecting float for keep size value, '
+                        'got - ' + val)
+                pass
+            elif opt in ("-n", "--dry-run"):
+                dry_run = True
+                pass
+            pass
+        
+        if len(args) > 0:
+            raise getopt.error(
+                'error: too many arguments passed to "gc" action')
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        gc_usage()
+        return 2
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    sa = sort_archives(keep_atmost, keep_size)
+
+    if not dry_run:
+        for file in sa["del"]:
+            os.remove(file)
+            pass
+        pass
+
+    if VERBOSITY == VERBOSITY_MACHINE:
+        print "%s %s" % (str(reclaimed_size), str(inuse_size))
+        pass
+    elif VERBOSITY >= VERBOSITY_HUMAN:
+        print ("Reclaimed %d bytes from %s/%s." %
+               (sa["reclaimed-size"], PID, EID))
+        print "%d bytes are still in %s/%s." % (sa["inuse-size"], PID, EID)
+        pass
+    
+    return retval
+
+def notimplemented():
+    raise "loghole: not implemented yet"
+
+ACTIONS = {
+    "get" : (do_sync, sync_usage),
+    "sync" : (do_sync, sync_usage),
+    "archive" : (do_archive, archive_usage),
+    "list" : (do_list, list_usage),
+    "show" : (do_show, show_usage),
+    "clear" : notimplemented,
+    "gc" : (do_gc, gc_usage),
+    }
+
+exp_list = []
+
+try:
+    action = None
+    all_experiments = False
+    
+    opts, req_args = getopt.getopt(sys.argv[1:],
+                                   "hVdqve:aP:s:",
+                                   [ "help",
+                                     "version",
+                                     "debug",
+                                     "quiet",
+                                     "verbose",
+                                     "experiment=",
+                                     "all",
+                                     "port=",
+                                     "server=", ])
+    if len(req_args) > 0:
+        action = req_args[0].lower()
+        pass
+    
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            if action in ACTIONS:
+                ACTIONS[action][1]()
+                pass
+            else:
+                usage()
+                pass
+            sys.exit()
+            pass
+        elif opt in ("-V", "--version"):
+            print PACKAGE_VERSION
+            sys.exit()
+            pass
+        elif opt in ("-d", "--debug"):
+            DEBUG = DEBUG + 1
+            pass
+        elif opt in ("-q", "--quiet"):
+            VERBOSITY = VERBOSITY - 1
+            pass
+        elif opt in ("-v", "--verbose"):
+            VERBOSITY = VERBOSITY + 1
+            pass
+        elif opt in ("-e", "--experiment"):
+            pair = val.split('/')
+            if len(pair) == 2 and len(pair[0]) > 0 and len(pair[1]) > 0:
+                exp_list.append(pair)
+                pass
+            else:
+                raise getopt.error('error: -e argument is of the form pid/eid')
+            pass
+        elif opt in ("-a", "--all"):
+            all_experiments = True
+            pass
+        elif opt in ("-P", "--port"):
+            XMLRPC_PORT = int(val)
+            pass
+        elif opt in ("-s", "--server"):
+            XMLRPC_SERVER = val
+            pass
+        else:
+            assert False
+            pass
+        pass
+
+    if len(req_args) < 1:
+        raise getopt.error('error: too few arguments')
+
+    action = req_args[0].lower()
+    if action not in ACTIONS:
+        raise getopt.error('error: unknown action - ' + req_args[0] + '\n'
+                           'error: action must be one of: '
+                           + str(ACTIONS.keys()))
+
+    if all_experiments:
+        exp_list.extend(get_explist())
+        pass
+    
+    if len(exp_list) == 0:
+        exp_list.append(infer_pid_eid(sys.argv[0], os.getcwd()))
+        if not exp_list[0][0]:
+            raise getopt.error(
+                'error: -e argument was not given and the current directory\n'
+                'error: is not in an experiment directory.')
+        pass
+    pass
+except getopt.error, e:
+    print e.args[0]
+    usage()
+    sys.exit(2)
+    pass
+
+for PID, EID in exp_list:
+    if DEBUG:
+        sys.stderr.write("loghole: pid/eid - " + PID + "/" + EID + "\n")
+        pass
+    
+    rc = ACTIONS[action][0](req_args[1:])
+    if rc != 0:
+        sys.exit(rc)
+        pass
+    pass

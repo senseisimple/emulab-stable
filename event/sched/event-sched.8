@@ -1,0 +1,80 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH EVENT-SCHED 8 "November 11, 2004" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+event-sched \- The testbed event scheduler.
+.SH SYNOPSIS
+.BI event-sched
+[\fB-hVd\fR]
+[\fB-s \fIserver\fR]
+[\fB-p \fIport\fR]
+[\fB-l \fIlogfile\fR]
+[\fB-k \fIkeyfile\fR]
+.I pid
+.I eid
+.SH DESCRIPTION
+The
+.B event-sched
+daemon is responsible for sending events to its experiment at predetermined
+times as well as handling some of the events internally.  For example, if the
+NS file for an experiment contains:
+.P
+.RS
+$ns at 60.0 "$ns swapout"
+.RE
+.P
+The deamon will send a "SWAPOUT" event 60 seconds after the experiment finished
+swapping in.  And, since the daemon also handles this event, it will start the
+swap out.  Events not handled internally are delivered to the appropriate
+"event agents" running on the experimental nodes.  In addition to the NS file,
+events can be sent dynamically using the
+.B tevc\fR(1)
+utility.
+.P
+A separate
+.B event-sched
+daemon is automatically started and stopped when an experiment is swapped in
+and out, or you can manually start/stop/replay the daemon using the
+.B eventsys_control\fR(1)
+utility.
+.P
+Available options:
+.P
+.TP
+.B -h
+Print out a usage message.
+.TP
+.B -V
+Print out version information and exit.
+.TP
+.B -d
+Turn on debugging messages.
+.TP
+.B -s \fIserver
+The host name where the elvind server is running. (Default: localhost)
+.TP
+.B -p \fIport
+The port the elvind server is listening on.
+.TP
+.B -l \fIlogfile
+The path of the log file, if none is specified output will go to standard out.
+.TP
+.B -k \fIkeyfile
+The path of the experiment's private symmetric key used to sign/verify events.
+(Default:
+/proj/\fIpid\fR/exp/\fIeid\fR/tbdata/eventkey)
+.SH FILES
+.TP
+/proj/\fIpid\fR/exp/\fIeid\fR/logs/event-sched.log
+The standard location for the event scheduler's log file.
+.SH SEE ALSO
+tevc(1), eventsys_control(1), program-agent(8)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

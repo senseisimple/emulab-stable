@@ -581,6 +581,10 @@ AC_PROG_INSTALL
         ;;
 esac]
 
+AC_PATH_PROG(RSYNC, rsync, "", [${PATH}])
+if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
+    AC_MSG_ERROR([Rsync is required to use this software, see www.rsync.org.])
+fi
 
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
@@ -685,7 +689,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
 	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
-	utils/grabwebcams \
+	utils/grabwebcams utils/loghole \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \

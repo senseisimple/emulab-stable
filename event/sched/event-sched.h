@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,37 +19,87 @@
 #include <sys/time.h>
 #include "event.h"
 #include "log.h"
+#include "tbdefs.h"
+
+#include "listNode.h"
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
 #endif /* MAXHOSTNAMELEN */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct _local_agent;
+
+struct agent {
+	struct  lnNode link;
+	char    name[TBDB_FLEN_EVOBJNAME];
+	char    nodeid[TBDB_FLEN_NODEID];
+	char    vnode[TBDB_FLEN_VNAME];
+	char	objtype[TBDB_FLEN_EVOBJTYPE];
+	char	ipaddr[32];
+	struct _local_agent *handler;
+};
+
+extern struct lnList agents;
+  
+enum {
+	SEB_COMPLETE_EVENT,
+	SEB_SENDS_COMPLETE,
+	SEB_SINGLE_HANDLER,
+};
+
+enum {
+	/** Flag for events that are COMPLETEs and should not be forwarded. */
+	SEF_COMPLETE_EVENT = (1L << SEB_COMPLETE_EVENT),
+	/** Flag for events that will send back a COMPLETE. */
+	SEF_SENDS_COMPLETE = (1L << SEB_SENDS_COMPLETE),
+	SEF_SINGLE_HANDLER = (1L << SEB_SINGLE_HANDLER),
+};
+
 /* Scheduler-internal representation of an event. */
 typedef struct sched_event {
-    event_notification_t notification; /* event notification */
-    struct timeval time;        /* event firing time */
-    int simevent;		/* A simulator event, dummy */
+	union {
+		struct agent *s;
+		struct agent **m;
+	} agent;
+	event_notification_t notification;
+	struct timeval time;			/* event firing time */
+	unsigned short length;
+	unsigned short flags;
 } sched_event_t;
 
-/*
- * Debugging and tracing definitions:
- */
-#define ERROR(fmt,...) error(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
-#ifdef DEBUG
-#define TRACE(fmt,...) info(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
-#else
-#define TRACE(fmt,...)
-#endif /* DEBUG */
+extern char	pideid[BUFSIZ];
+extern char	*pid, *eid;
+
 extern int debug;
+extern unsigned long next_token;
 
 /*
  * Function prototypes:
  */
+
+int agent_invariant(struct agent *agent);
+int sends_complete(struct agent *agent, const char *evtype);
+
+void sched_event_free(event_handle_t handle, sched_event_t *se);
+int sched_event_prepare(event_handle_t handle, sched_event_t *se);
+int sched_event_enqueue_copy(event_handle_t handle,
+			     sched_event_t *se,
+			     struct timeval *new_time);
 
 /* queue.c */
 void sched_event_init(void);
 int sched_event_enqueue(sched_event_t event);
 int sched_event_dequeue(sched_event_t *event, int wait);
 void sched_event_queue_dump(FILE *fp);
+
+extern char build_info[];
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __SCHED_H__ */

@@ -1,0 +1,348 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2004 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH LOGHOLE 1 "November 11, 2004" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+loghole \- Log management tool for experiments.
+.SH SYNOPSIS
+.BI loghole
+[\fB-hVdqva\fR]
+[\fB-e \fIpid\fR/\fIeid\fR]
+[\fB-s \fIserver\fR]
+[\fB-P \fIport\fR]
+.I action
+[\fI...\fR]
+.P
+.BI loghole
+.BI sync
+[\fInode1 node2 ...\fR]
+.P
+.BI loghole
+.BI archive
+[\fB-k \fR(\fBi-delete\fR|\fBspace-is-needed\fR)]
+[\fB-a \fIdays\fR]
+[\fB-c \fIcomment\fR]
+[\fB-d\fR]
+[\fIarchive-name\fR]
+.P
+.BI loghole
+.BI list
+[\fB-O1!Xo\fR]
+[\fB-m \fIatmost\fR]
+[\fB-s \fImegabytes\fR]
+.P
+.BI loghole
+.BI show
+[\fIarchive-name\fR]
+.P
+.BI loghole
+.BI gc
+[\fB-n\fR]
+[\fB-m \fIatmost\fR]
+[\fB-s \fImegabytes\fR]
+.SH DESCRIPTION
+The
+.B loghole
+utility is used to download log files from the experimental nodes to the Emulab
+users machine and assist in managing archives of these logs.  Using this
+utility to manage an experiment's log files is encouraged because it will
+transfer the logs in a network-friendly manner and is already integrated with
+the rest of the system.  For example, any programs executed using the Emulab
+event-system will have their standard output/error automatically gathered up by
+this tool.  The tool can also be used to preserve multiple runs of an
+experiment by producing and managing zip archives of the logs.
+.P
+The set of logs that are actually downloaded by the tool are those located in
+.I logholes
+on the nodes, where a loghole is simply a well-known directory that acts like a
+blackhole for log files.  Any files found in these directories are downloaded
+to the experiment's log directory and placed under separate directories for
+each node and loghole.  The referent of symbolic links are also downloaded, so
+if you do not want an entire directory downloaded, you can create links in a
+loghole to those files of interest.
+.P
+To perform all of these tasks, the
+.B loghole
+utility is broken up into several sub-actions that you can apply to an
+experiment's log holes or log archives.  As a quick example, to synchronize the
+logholes for the experiment "neptune/myexp" and create an archive of these logs
+you would run:
+.RS
+.P
+.PD 0
+[vmars@users ~] loghole -e neptune/myexp sync
+.PP
+[vmars@users ~] loghole -e neptune/myexp archive
+.PD
+.RE
+.P
+The following listing gives a brief overview of the current set of actions,
+more detail can be found in later sections of this manual:
+.TP
+.B sync
+Synchronize the experiment's log holes on the nodes with the experiment's log
+directory.
+.TP
+.B archive
+Archive the contents of the experiment's log directory into a zip file.
+.TP
+.B list
+Print a brief listing of the archives in the experiment's log directory.
+.TP
+.B show
+Print a detailed listing of the archives in the experiment's log directory.
+.TP
+.B gc
+Garbage collect old archives to free up disk space.
+.P
+Options passed to the utility are split between globally applicable ones that
+are placed before the action and action-specific options that are placed after.
+For example, the
+.B -a
+global option will apply an action to all of your experiments and the
+.B -X
+option for the
+.B list
+action will list only those files that will be deleted at the next garbage
+collection.  To combine these options you would enter:
+.RS
+.P
+[vmars@users ~] loghole -a list -X
+.RE
+.P
+The set of global options is as follows:
+.TP
+\fB-h\fR, \fB--help
+Print the usage message for the
+.B loghole
+utility as a whole or, if an action is given, the usage message for that
+action.
+.TP
+\fB-V\fR, \fB--version
+Print out version information and exit.
+.TP
+\fB-d\fR, \fB--debug
+Output debugging messages.
+.TP
+\fB-q\fR, \fB--quiet
+Decrease the level of verbosity, this is subtractive, so multiple uses of this
+option will make the utility quieter and quieter.  The default level of
+verbosity is human-readable, below that is machine-readable, and below that is
+silent.  For example, the default output from the "list" action looks like:
+.P
+.RS
+.RS
+.PD 0
+[ ] foobar.1.zip   10/15
+.P
+[!] foobar.0.zip   10/13
+.RE
+.PD
+.P
+Using a single "-q" option changes the output to look like:
+.P
+.RS
+.PD 0
+foobar.1.zip
+.P
+foobar.0.zip
+.RE
+.PD
+.RE
+.TP
+\fB-e\fR, \fB--experiment\fR=\fIPID\fR/\fIEID\fR
+Specify the experiment(s) to operate on.  If multiple
+.B -e
+options are given, the action will apply to all of them.  This option overrides
+the default behavior of inferring the experiment from the current directory
+(see the ENVIRONMENT section).
+.TP
+\fB-a\fR, \fB--all
+Perform the action on all existing experiments that you have created.
+.TP
+\fB-s\fR, \fB--server\fR=\fISERVER
+Specify the XML-RPC server to contact for information about the experiment.
+Normal users should not have to use this option.
+.TP
+\fB-P\fR, \fB--port\fR=\fIPORT
+Specify the XML-RPC server port to contact for information about the
+experiment.  Normal users should not have to use this option.
+.P
+.SH SYNC
+The
+.B sync
+action is used to synchronize the logholes on the nodes with the experiment's
+log directory on the Emulab users machine.  The action will iterate through
+each node in the experiment and perform an rsync(1) on the loghole directories
+for that node.  Currently, the only directories synced are "/var/emulab/logs"
+and "/usr/testbed/logs".
+.P
+Optional arguments:
+.TP
+.I node1 ...
+Specify a subset of virtual or physical nodes that should be synchronized,
+otherwise all of the nodes will be synchronized.
+.SH ARCHIVE
+The
+.B archive
+action is used to archive the logs in an experiment's log directory for future
+reference.  The action will produce a standard zip archive with the logs and
+some metadata about the experiment and when it can be garbage collected.
+.P
+Available options:
+.TP
+\fB-k\fR, \fB--keep-until\fR=(\fIi-delete\fR|\fIspace-is-needed\fR)
+Keep the archive until you decide to delete it manually or space is needed.
+See the GC section later in the manual to learn how this option and others
+affect garbage collection.  (Default: space-is-needed)
+.TP
+\fB-a\fR, \fB--keep-atleast\fR=\fIN
+Keep the archive atleast
+.I N
+days after creation.  This value keeps the archive from being garbage collected
+when more space is needed for atleast the given number of days.  (Default: 3
+days)
+.TP
+\fB-c\fR, \fB--comment\fR=\fICOMMENT
+Add a comment to the archive.  This option can be used multiple times to add
+more than one comment to the archive.  The comments will be displayed by the
+.I show
+action and can be useful for storing information about the experiment, for
+example, the input parameters.  If the argument to this option is is a single
+dash (\fB-\fR) the comment will be read from standard in.
+.TP
+\fB-d\fR, \fB--delete
+Delete the files in the log directory after producing the archive.  The default
+action is to leave the files in place until the user is ready to delete them.
+.SH LIST
+The
+.B list
+action is used to get a brief summary of all of the log archives found in an
+experiment's log directory.  The listing displays the archive name, when it was
+created, and its GC status so you can get an idea of when the experiment runs
+were performed and what will be garbage collected.
+.TP
+.B -O
+Only list archives that are marked as 'keep until "i-delete"'.
+.TP
+.B -1
+Only list archives that are a day from their keep-atleast date.
+.TP
+.B -!
+Only list archives that are past their keep-atleast date.
+.TP
+.B -X
+Only list archives that are ready to be garbage collected.
+.TP
+.B -o
+List archives that do not match the above flags.  In other words, archives that
+will not be deleted at the next garbage collection and are more than a day away
+from their keep-atleast dates.
+.TP
+\fB-m\fR, \fB--keep-atmost\fR=\fIN
+Specify how many archives should be kept in the experiment.  This setting
+effects what files will be garbage collected, so you should pass this same
+option to the
+.B gc
+if you use a different value from the default of 100 archives.
+.TP
+\fB-s\fR, \fB--keep-size\fR=\fImegabytes
+Specify the maximum total size, in megabytes, for all of the archives in the
+experiment.  This setting effects what files will be garbage collected, so you
+pass this same option to the
+.B gc
+if you use a different value from the default of 3MB.
+.SH SHOW
+The
+.B show
+action provides a more detailed listing of the log archives for an experiment.
+The listing contains information about when and who created the archive, any
+attributes used when computing the GC status of the archive, comments attached
+to the archive, and a listing of the files in the archive.
+.P
+Optional arguments:
+.TP
+.I archive-name
+The full or partial name of the archive to display.  If a partial name is
+given, any archive names that start with the argument are displayed.  The
+default behavior is to display all of the archives in an experiment.
+.SH GC
+The
+.B gc
+action is used to garbage collect any archives in order to free up space or
+reduce the total number of archives in an experiment.  The process for
+selecting files to be garbage collected is as follows:
+.TP
+1.
+If the total number of archives and their total size are below the values
+specified by the
+.B --keep-atmost
+and
+.B --keep-size
+options then no archives will be deleted, otherwise...
+.TP
+2.
+Any files that are marked as 'keep until "space-is-needed"' and past their
+"keep-atleast" dates, will be deleted until the keep-atmost and keep-size
+conditions are met.  If deleting these files does not meet these conditions
+then...
+.TP
+3.
+The oldest files that are marked 'keep until "space-is-needed"' will be deleted
+until the keep-atmost and keep-size conditions are met or there are no more
+files that can be deleted without user intervention.
+.P
+Available
+.B gc
+options:
+.TP
+\fB-m\fR, \fB--keep-atmost\fR=\fIN
+Specify how many archives should be kept in the experiment.  (Default: 100
+archives)
+.TP
+\fB-s\fR, \fB--keep-size\fR=\fImegabytes
+Specify the maximum total size, in megabytes, for all of the archives in the
+experiment.  (Default: 3.0 MB)
+.SH ENVIRONMENT
+By default, the project and experiment ID will be inferred from the current
+working directory, if it is inside the experiment's directory
+(e.g. /proj/\fIpid\fR/exp/\fIeid\fR).  This behavior can be overridden using
+the
+.B -e
+option.
+.SH RETURN VALUES
+.TP
+2
+If there was an error processing the command line arguments.
+.TP
+0
+If the action was completed successfully.
+.SH EXAMPLES
+.PP
+To synchronize the log directory for experiment "neptune/myexp" with the log
+holes on the experimental nodes.
+.PP
+.RS
+[vmars@users ~] loghole -e neptune/myexp sync
+.RE
+.PP
+To archive the newly recovered logs and print out just the name of the new log
+file:
+.PP
+.RS
+[vmars@users ~] loghole -e neptune/myexp -q archive
+.RE
+.SH FILES
+.TP
+/proj/\fIpid\fR/exp/\fIeid\fR/logs
+The log directory for an experiment.
+.SH SEE ALSO
+event-sched(8), tevc(1), zip(1), rsync(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net
