@@ -58,7 +58,8 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 # Need some DB info.
 #
 $query_result =
-    DBQueryFatal("select e.idx,e.state,e.batchmode,s.rsrcidx,r.wirelesslans ".
+    DBQueryFatal("select e.idx,e.state,e.batchmode,e.linktest_pid,".
+		 "       s.rsrcidx,r.wirelesslans ".
 		 "  from experiments as e ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "left join experiment_resources as r on s.rsrcidx=r.idx ".
@@ -69,6 +70,7 @@ $expstate   = $row["state"];
 $rsrcidx    = $row["rsrcidx"];
 $isbatch    = $row["batchmode"];
 $wireless   = $row["wirelesslans"];
+$linktest_running = $row["linktest_pid"];
 
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
@@ -161,7 +163,8 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
     }
 
     if (STUDLY()) {
-	WRITESUBMENUBUTTON("Run Linktest",
+	WRITESUBMENUBUTTON(($linktest_running ?
+			    "Stop LinkTest" : "Run LinkTest"), 
 			   "linktest.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
