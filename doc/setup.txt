@@ -1,7 +1,14 @@
 #####
 ##### Setting up the Utah Network Testbed software on a boss node
-##### Tested on FreeBSD 4.3, FreeBSD 4.5, FreeBSD 4.6, and FreeBSD 4.7
+##### Tested on FreeBSD 4.9
 #####
+
+##### Important notes
+
+In order to be able to help you debug any problems you run into or answer
+certain questions, we'll need have accounts, preferably with root access if
+allowed by your institution's AUP, on your boss and ops nodes, and will need to
+be able to access the webserver on boss.
 
 ##### Step -1 - Set up "ops"
 
