@@ -448,7 +448,7 @@ CREATE TABLE nodes (
   node_id varchar(10) NOT NULL default '',
   type varchar(30) NOT NULL default '',
   phys_nodeid varchar(10) default NULL,
-  role enum('testnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
+  role enum('testnode','virtnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
   def_boot_osid varchar(35) NOT NULL default '',
   def_boot_path text,
   def_boot_cmd_line text,
