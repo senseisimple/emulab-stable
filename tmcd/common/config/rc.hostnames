@@ -221,11 +221,20 @@ sub fromtopo($)
 	return -1;
     }
 
+    # Special case of experiment with no lans; no hostfile stuff needed.
+    if (! scalar(@{ $topomap->{"lans"} })) {
+	@$rptr = ();
+	return 0;
+    }
+
     # The nodes section tells us the name of each node, and all its links.
     foreach my $noderef (@{ $topomap->{"nodes"} }) {
 	my $vname  = $noderef->{"vname"};
 	my $links  = $noderef->{"links"};
 	my $count  = 0;
+
+	next
+	    if (!defined($links));
 
 	$nodes{$vname} = [];
 

@@ -361,6 +361,12 @@ sub ddijkstra ($)
 	return -1;
     }
 
+    # Special case of experiment with no lans; no routes needed.
+    if (! scalar(@{ $topomap->{"lans"} })) {
+	@$rptr = ();
+	return 0;
+    }
+
     # Gather up all the link info from the topomap
     my %lans     = ();
 
@@ -368,6 +374,9 @@ sub ddijkstra ($)
     foreach my $noderef (@{ $topomap->{"nodes"} }) {
 	my $vname  = $noderef->{"vname"};
 	my $links  = $noderef->{"links"};
+
+	next
+	    if (!defined($links));
 
 	# Links is a string of "$lan1:$ip1 $lan2:$ip2 ..."
 	foreach my $link (split(" ", $links)) {

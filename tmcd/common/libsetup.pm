@@ -629,8 +629,8 @@ sub gettopomap($)
 	my @values = split(",", $_);
 	my $rowref = {};
     
-	for (my $i = 0; $i < scalar(@values); $i++) {
-	    $rowref->{$slots[$i]} = $values[$i];
+	for (my $i = 0; $i < scalar(@slots); $i++) {
+	    $rowref->{$slots[$i]} = (defined($values[$i]) ? $values[$i] : undef);
 	}
 	push(@{ $topomap->{$section} }, $rowref);
     }
