@@ -1,3 +1,37 @@
+stoller     2004/03/09 10:43:54 MST
+
+  Modified files:
+    sql                  database-fill.sql 
+    tbsetup              batchexp.in 
+    www                  beginexp_xml.php3 
+  Log:
+  Clean up of the web to batchexp interface:
+  
+  * Add proper check_slot() calls to all of the user input that is going into
+    the DB (already had taint checking), since batchexp is now available for
+    interactive use from ops.
+  
+  * Remove separate DB insertions of noswap/noidleswap reasons from web
+    script, and pass on the command line from web to batchexp. Now inserted
+    in the backend script so that they can be provided on the command line
+    when batchexp is used interactively.
+  
+  * Change defaults in backend script; experiments now default to swappable
+    and idleswap; previously defaulted to not swappable and no idleswap.
+  
+  * Remove [-s] (swappable) and add [-S <reason>] option. -S sets experiment to
+    not swappable, with supplied reason (text string).
+  
+  * Add [-L <reason>] option. -L sets experiment to no idleswap, with
+    supplied reason (text string).
+  
+  * Add several missing table_regex entries for experiments table.
+  
+  Revision  Changes    Path
+  1.66      +5 -0      testbed/sql/database-fill.sql
+  1.47      +67 -34    testbed/tbsetup/batchexp.in
+  1.8       +7 -20     testbed/www/beginexp_xml.php3
+
 kwebb       2004/03/03 18:41:33 MST
 
   Modified files:
