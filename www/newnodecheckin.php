@@ -116,9 +116,26 @@ if ($use_temp_IP) {
 }
 
 #
-# Make an educated guess as to what type it belongs to
+# Handle the node's type
 #
-if (!$type) {
+if ($type) {
+    #
+    # If they gave us a type, let's see if that type exists or not
+    #
+    if (TBValidNodeType($type)) {
+	#
+	# Great, it already exists, nothin' else to do
+	#
+    } else {
+	#
+	# Okay, it doesn't exist. We'll create it.
+	#
+	make_node_type($type,$cpuspeed,$disksize);
+    }
+} else {
+    #
+    # Make an educated guess as to what type it belongs to
+    #
     $type = guess_node_type($cpuspeed,$disksize);
 }
 

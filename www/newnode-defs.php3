@@ -99,6 +99,22 @@ function guess_node_type($proc,$disk) {
     return $node_type;
 }
 
+#
+# Create a new node type
+# XXX - Right now, this is really only meant for inserting a node_types entry
+# for ops. It misses doing a lot of important things, like setting the class and
+# default OSID for this type.
+#
+function make_node_type($type,$proc,$disk) {
+
+    #
+    # Just insert a stub entry for this type
+    #
+    DBQueryFatal("insert into node_types set type='$type', speed='$speed',
+	HD='$disk';");
+
+}
+
 function guess_IP ($prefix, $number) {
 
     $hostname = $prefix . $number;
