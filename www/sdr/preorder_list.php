@@ -100,7 +100,7 @@ while ($row = mysql_fetch_array($query_result)) {
 
     echo "<tr>
               <td rowspan=2>
-                  <a href=preorder.php?order_id=$order_id&viewonly=1>
+                  <a href=temp-preorder.php?order_id=$order_id&viewonly=1>
                      $order_id</a></td>
               <td rowspan=2>$order_date</td>
               <td rowspan=2>$usr_name</td>
