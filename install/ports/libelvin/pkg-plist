@@ -2,7 +2,6 @@ bin/ec
 bin/elvin-config
 bin/ep
 bin/sha1digest
-etc/ssl_client.pem
 include/elvin/ast.h
 include/elvin/ast_internal.h
 include/elvin/async_api.h
@@ -72,10 +71,6 @@ lib/libvin4.a
 lib/libvin4.la
 lib/libvin4.so
 lib/libvin4.so.2
-lib/libvin4Xt.a
-lib/libvin4Xt.la
-lib/libvin4Xt.so
-lib/libvin4Xt.so.2
 lib/libvin4c.a
 lib/libvin4c.la
 lib/libvin4c.so
