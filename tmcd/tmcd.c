@@ -1713,6 +1713,8 @@ checkdbredirect(struct in_addr ipaddr)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
 	char		newdb[128];
 	
 	/*
@@ -1723,23 +1725,38 @@ checkdbredirect(struct in_addr ipaddr)
 		       inet_ntoa(ipaddr));
 		return 1;
 	}
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_ERR, "CHECKDBREDIRECT: %s: Node is free", nodeid);
+		return 0;
+	}
 
 	/*
 	 * Look for an alternate DB name.
 	 */
-	res = mydb_query("select dbname from tmcd_redirect where node_id='%s'",
-			 1, nodeid);
+	res = mydb_query("select testdb from experiments "
+			 "where eid='%s' and pid='%s'",
+			 1, eid, pid);
 			 
 	if (!res) {
 		syslog(LOG_ERR, "CHECKDBREDIRECT: "
-		       "%s: DB Error getting redirect table!", nodeid);
+		       "%s: DB Error getting testdb from table!", nodeid);
 		return 1;
 	}
 
-	if ((int)mysql_num_rows(res)) {
-		row = mysql_fetch_row(res);
-		strcpy(dbname, row[0]);
+	if (mysql_num_rows(res) == 0) {
+		syslog(LOG_ERR, "CHECKDBREDIRECT: "
+		       "%s: Hmm, experiment not there anymore!", nodeid);
+		mysql_free_result(res);
+		return 0;
 	}
+
+	row = mysql_fetch_row(res);
+	if (!row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	/* This changes the DB we talk to. */
+	strcpy(dbname, row[0]);
 
 	/*
 	 * Okay, lets test to make sure that DB exists. If not, fall back
