@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -588,6 +588,9 @@ int get_counters(char *buf, void *data) {
   if (pkt->ifcnt < MAXNUMIFACES
       && !strstr(buf, "lo")
 #ifdef __FreeBSD__
+#if __FreeBSD__ >= 5
+      && !strstr(buf, "plip")
+#endif
       && !strstr(buf, "*")
       && strstr(buf, "<Link"))
 #endif
