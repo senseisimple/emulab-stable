@@ -407,13 +407,14 @@ CREATE TABLE firewalls (
 CREATE TABLE floorimages (
   building varchar(32) NOT NULL default '',
   floor varchar(32) NOT NULL default '',
+  scale tinyint(4) NOT NULL default '1',
   image_path tinytext,
   thumb_path tinytext,
   x1 int(6) NOT NULL default '0',
   y1 int(6) NOT NULL default '0',
   x2 int(6) NOT NULL default '0',
   y2 int(6) NOT NULL default '0',
-  PRIMARY KEY  (building,floor)
+  PRIMARY KEY  (building,floor,scale)
 ) TYPE=MyISAM;
 
 --
@@ -1681,6 +1682,26 @@ CREATE TABLE userslastlogin (
   date date default NULL,
   time time default NULL,
   PRIMARY KEY  (uid)
+) TYPE=MyISAM;
+
+
+--
+-- Table structure for table `usrp_orders`
+--
+
+CREATE TABLE usrp_orders (
+  order_id varchar(32) NOT NULL default '',
+  email tinytext,
+  name tinytext,
+  phone tinytext,
+  affiliation tinytext,
+  num_mobos int(11) default '0',
+  num_dboards int(11) default '0',
+  intended_use tinytext,
+  comments tinytext,
+  order_date datetime default NULL,
+  modify_date datetime default NULL,
+  PRIMARY KEY  (order_id)
 ) TYPE=MyISAM;
 
 --

@@ -1946,3 +1946,20 @@ last_net_act,last_cpu_act,last_ext_act);
        Please read that. 
 
 1.273: Minor fix to previous revision; skip to next entry ...
+
+1.274: Add usrp_orders table.
+
+	CREATE TABLE usrp_orders (
+	  order_id varchar(32) NOT NULL default '',
+	  email tinytext,
+	  name tinytext,
+	  phone tinytext,
+	  affiliation tinytext,
+	  num_mobos int(11) default '0',
+	  num_dboards int(11) default '0',
+	  intended_use tinytext,
+	  comments tinytext,
+	  order_date datetime default NULL,
+	  modify_date datetime default NULL,
+	  PRIMARY KEY  (order_id)
+	) TYPE=MyISAM;
