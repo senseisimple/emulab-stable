@@ -145,7 +145,8 @@ See the file setup-db.txt in this directory
 
 ##### Step 5 - Directories to create, and other misc. filesystem changes
 
-Logs - Create /usr/testbed/log, and link /var/log/testbed to it
+Logs - Create /usr/testbed/log, and link /var/log/testbed to it . Create
+'tiplogs', 'mysql', and 'exports' subdirectories in this directory.
 
 NFS - Make the machine an NFS server and client with the following in
 /etc/rc.conf:
