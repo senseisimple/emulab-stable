@@ -221,9 +221,10 @@ elseif (strcmp($approval, "approve") == 0) {
     TBMAIL("$headname '$headuid' <$headuid_email>",
          "Project '$pid' Approval",
          "\n".
-	 "This message is to notify you that your project $pid\n".
-	 "has been approved. Please save this link so that you can send it\n".
-	 "to people you wish to have join your project:\n".
+	 "This message is to notify you that your project '$pid'\n".
+	 "has been approved.  We recommend that you save this link so that\n".
+	 "you can send it to people you wish to have join your project.\n".
+	 "Otherwise, tell them to go to ${TBBASE} and join it.\n".
 	 "\n".
 	 "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
          "\n".
