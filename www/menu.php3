@@ -484,11 +484,13 @@ function PAGEHEADER($title) {
     }
     $now = date("D M d g:ia T");
     echo "$title</h2></td>\n";
-    echo "<td class=\"contentheader\" align=right>Generated ";
+    echo "<td class=contentheader align=right>\n";
     if ($login_uid) {
-	echo "for <b>$login_uid</b>,<br>";
+	echo "<font size=-1><b>$login_uid</b> logged in<br>$now</font>\n";
     }
-    echo "$now.";
+    else {
+	echo "$now";
+    }
     echo "</td>";
     echo "</tr>\n";
     echo "<tr><td colspan=3 class=\"contentbody\" width=*>";
