@@ -15,6 +15,9 @@
 
 #include "capdecls.h"
 
+
+#define DEFAULT_PROGRAM "xterm -T TIP -e telnet %s %s"
+
 int debug = 0;
 int allowRemote = 0;
 
@@ -88,6 +91,8 @@ int main( int argc, char ** argv )
 
   if (argc > 1) {
     programToLaunch = strdup( argv[1] );    
+  } else {
+    programToLaunch = DEFAULT_PROGRAM;
   }
 
   loadAcl( argv[0] );
@@ -113,13 +118,29 @@ int main( int argc, char ** argv )
 
   if (programToLaunch) {
     char portString[12];
+    char runString[1024];
+    char * foo;
+
     sprintf( portString, "%i", tunnelPort );
-    if (debug) printf("Launching %s with args localhost, %s.\n",
+
+    /*
+      if (debug) printf("Launching %s with args localhost, %s.\n",
 		      programToLaunch, portString );
+    */
+
+    sprintf(runString, programToLaunch, "localhost", portString);
+    for (foo = runString; *foo; foo++);
+    foo[0] = ' ';
+    foo[1] = '&';
+    foo[2] = '\0';
+    if (debug) printf("Running '%s'\n", runString);
+    system( runString );
+    /*
     if (!fork()) {
       execlp( programToLaunch, 
 	      programToLaunch, "localhost", portString, NULL );
     }
+    */
   }
   doTunnelConnection();
   if (debug) { printf("tiptunnel closing.\n"); }
@@ -133,8 +154,9 @@ void usage()
 	 "-d               turns on more verbose messages\n"
 	 "-r               allows connections to tunnel from non-localhost\n"
 	 "\n"
-	 "[program]        path of program to launch with 'localhost'\n"
-	 "                 and tunnel port as arguments.\n"
+	 "[program]        path of program to launch; default is\n"
+	 "                 \"%s\"\n",
+         DEFAULT_PROGRAM
 	 //"-k keeps accepting connections until killed"
 	 );
   exit(-1);
