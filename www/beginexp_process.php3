@@ -7,7 +7,7 @@
 <?php
 include("defs.php3");
 
-$mydebug = 1;
+$mydebug = 0;
 
 #
 # First off, sanity check the form to make sure all the required fields
