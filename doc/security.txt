@@ -1,7 +1,8 @@
 This file contains notes about the security of the tesbed, and what should
 be done to enhance it.  These notes are fairly old, so if there are
 conflicts with more actively maintained files like setup*.*, believe
-the latter.
+the latter.  For newer info, see the files "security-all.ppt" and
+"build-operate.ppt" in http://www.cs.utah.edu/flux/testbed-docs/internals/
 
 1) Switches/Infrastucture hardware:
   1.1) Rules need to be set up on the control switch to restrict the

@@ -38,10 +38,14 @@ doc/* contains documentation for developers.
 www/*.html and www/doc/*.html contain end-user documentation.
 
 Good places to start would include:
-  - The doc/papers directory, which contains papers published about Nebed
+  - The doc/papers directory, which contains papers published about Netbed
   - The user tutorial (www/tutorial/tutorial.html)
   - The user FAQ (www/faq.html)
   - The user authorization document (www/auth.html)
+  - Some powerpoint slides on Emulab internals, found at:
+      http://www.cs.utah.edu/flux/testbed-doc/internals/
+    These include two files especially useful for setting up your own
+    testbed: "build-operate.ppt" and the first part of "security-all.ppt".
   - Software architecture preliminary diagram (doc/arch-diagram.ps)
   - Notes on the source tree and architecture (doc/arch.txt)
   - Overview of some major systems (doc/overview.txt)
@@ -108,6 +112,6 @@ Don't be shy!
 We are happy to get on the phone with you, too,
 for "big picture" issues and problems.
 
-
 Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285, and the Utah testbed crew.
-April 30, 2003
+February 1, 2004
+]
