@@ -63,7 +63,7 @@ static int doready(int sock, struct in_addr ipaddr, char *rdata,int tcp);
 static int doreadycount(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
-static int doloadaddr(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int doloadinfo(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
@@ -86,7 +86,7 @@ struct command {
 	{ "ready",	doready },
 	{ "log",	dolog },
 	{ "mounts",	domounts },
-	{ "loadaddr",	doloadaddr},
+	{ "loadinfo",	doloadinfo},
 	{ "reset",	doreset},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
@@ -1791,10 +1791,11 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 }
 
 /*
- * Return address from which to load an image
+ * Return address from which to load an image, along with the partition that
+ * it should be written to
  */
 static int
-doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -1804,7 +1805,7 @@ doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "doloadaddr: %s: No such node",
+		syslog(LOG_ERR, "doloadinfo: %s: No such node",
 		       inet_ntoa(ipaddr));
 		return 1;
 	}
@@ -1818,13 +1819,13 @@ doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address from images as i "
+	res = mydb_query("select load_address,loadpart from images as i "
 			"left join current_reloads as r on i.imageid = r.image_id "
 			"where node_id='%s'",
-			 1, nodeid);
+			 2, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "doloadaddr: %s: DB Error getting "
+		syslog(LOG_ERR, "doloadinfo: %s: DB Error getting "
 		       "loading address!",
 		       nodeid);
 		return 1;
@@ -1843,11 +1844,11 @@ doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "ADDR=%s\n", row[0]);
+	sprintf(buf, "ADDR=%s PART=%s\n", row[0], row[1]);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	syslog(LOG_INFO, "doloadaddr: %s", buf);
+	syslog(LOG_INFO, "doloadinfo: %s", buf);
 	
 	return 0;
 }
