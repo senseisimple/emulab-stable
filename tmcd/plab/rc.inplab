@@ -27,17 +27,20 @@ if [ -x $BOOTDIR/rc.tarballs  ]; then
 	$BOOTDIR/rc.tarballs
 fi
 
-if [ -s $BOOTDIR/startupcmd  ]; then
-        echo "Scheduling startup command to run in a little bit ..."
-	$BINDIR/runstartup
-fi
-
 if [ -x $BINDIR/watchdog  ]; then
         echo "Starting update watchdog ..."
 	$BINDIR/watchdog start
 fi
 
-
 echo "Informing the testbed that we're up and running ..."
 # XXX Oogly
 $BINDIR/tmcc -n `cat /var/emulab/boot/plabname` state ISUP
+
+#
+# Run *after* sending ISUP.
+# 
+if [ -s $BOOTDIR/startupcmd  ]; then
+        echo "Running startup command ..."
+	$BINDIR/runstartup
+fi
+
