@@ -1,0 +1,587 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+ 
+#
+# Deal with user accounts. This script does not deal with group stuff.
+# Just add/del/mod/passwd/freeze/thaw/ stuff. We do give users an
+# initial group of course, which will be guest if not in any groups.
+#
+# This script is setuid. We farm stuff out to subscripts though, and need
+# to be wary of what the UID/EUID is when those scripts are invoked. The
+# subscripts are not generally setuid, but of course the web interface
+# allows users to do things on behalf of other users, and we want to track
+# that in the audit log. 
+#
+# This script always does the right thing ...
+# 
+sub usage()
+{
+    print("Usage: tbacct [-f] ".
+	  "<add|del|mod|passwd|freeze|thaw> <user>\n");
+    exit(-1);
+}
+my $optlist = "f";
+my $force   =  0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $CONTROL	= "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $WITHSFS	= @SFSSUPPORT@;
+
+my $HOMEDIR	= "/users";
+my $USERPATH	= "$TB/bin";
+my $ADDKEY	= "$TB/sbin/addpubkey";
+my $USERADD	= "/usr/sbin/pw useradd";
+my $USERDEL	= "/usr/sbin/pw userdel";
+my $USERMOD	= "/usr/sbin/pw usermod";
+my $CHPASS	= "/usr/bin/chpass";
+my $SFSKEYGEN	= "/usr/local/bin/sfskey gen";
+my $SETGROUPS	= "setgroups";
+my $GENELISTS	= "genelists";
+my $SFSUPDATE	= "sfskey_update";
+my $PBAG	= "$TB/sbin/paperbag";
+my $NOLOGIN	= "/sbin/nologin";
+my $SSH		= "sshtb";
+my $SAVEUID	= $UID;
+my $NOSUCHUSER  = 67;
+my $USEREXISTS  = 65;
+
+my $errors      = 0;
+my $sfsupdate   = 0;
+my $user;
+my @row;
+my $query_result;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+$cmd = $ARGV[0];
+$arg = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+if ($user =~ /^([a-z0-9]+)$/i) {
+    $user = $1;
+}
+else {
+    die("Tainted argument: $user\n");
+}
+if ($cmd =~ /^(add|del|mod|freeze|passwd|thaw)$/) {
+    $cmd = $1;
+}
+else {
+    usage();
+}
+
+# Only admins can use force mode.
+if ($force && ! TBAdmin($UID)) {
+    fatal("Only admins can use force mode!");
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Get the user info (the user being operated on).
+#
+$query_result =
+    DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
+		 " u.usr_email,u.status,u.webonly from users as u ".
+		 "where u.uid='$user'");
+
+if ($query_result->numrows == 0) {
+    fatal("$user is not in the DB. This is bad.\n");
+}
+@row            = $query_result->fetchrow_array();
+my $pswd        = $row[0];
+my $user_number = $row[1]; 
+my $fullname    = $row[2];
+my $user_email  = $row[3];
+my $status      = $row[4];
+my $webonly     = $row[5];
+
+#
+# Get the users earliest project membership to use as the default group
+# for the case that the account is being (re)created. We convert that to
+# the unix info.
+#
+my $default_groupname;
+my $default_groupgid;
+
+$query_result =
+    DBQueryFatal("select m.pid from group_membership as m ".
+		 "where m.uid='$user' and m.pid=m.gid and m.trust!='none' ".
+		 "order by date_approved asc limit 1");
+
+if (my ($defpid) = $query_result->fetchrow_array) {
+    if (! TBGroupUnixInfo($defpid, $defpid,
+			  \$default_groupgid, \$default_groupname)) {
+	fatal("No info for default project $defpid!");
+    }
+}
+else {
+    print "No group membership for $user; using the guest group!\n";
+    
+    ($default_groupname,undef,$default_groupgid,undef) = getgrnam("guest");
+}
+
+#
+# Now dispatch operation.
+#
+SWITCH: for ($cmd) {
+    /^add$/ && do {
+	AddUser();
+	last SWITCH;
+    };
+    /^del$/ && do {
+	DelUser();
+	last SWITCH;
+    };
+    /^passwd$/ && do {
+	UpdatePassword();
+	last SWITCH;
+    };
+    /^mod$/ && do {
+	UpdateUser();
+	last SWITCH;
+    };
+    /^freeze$/ && do {
+	FreezeUser();
+	last SWITCH;
+    };
+    /^thaw$/ && do {
+	ThawUser();
+	last SWITCH;
+    };
+}
+
+# Always do this!
+CheckDotFiles();
+
+#
+# Invoke as real user for auditing (and cause of perl).
+#
+if ($sfsupdate) {
+    $EUID = $UID;
+    system($SFSUPDATE) == 0
+	or fatal("$SFSUPDATE failed!");
+    $EUID = 0;
+}
+
+#
+# Now schedule account updates on all the nodes that this person has
+# an account on.
+#
+TBNodeUpdateAccountsByUID($user);
+
+exit(0);
+
+#
+# Add new user.
+#
+sub AddUser()
+{
+    #
+    # Check status. Only active users get accounts built.
+    #
+    if ($webonly || $status ne USERSTATUS_ACTIVE) {
+	if ($webonly) {
+	    return 0;
+	}
+	fatal("$user is not active! Cannot build an account!");
+    }
+    
+    $UID = 0;
+    if (system("egrep -q -s '^${user}:' /etc/passwd")) {
+	print "Adding user $user ($user_number) to local node.\n";
+    
+	if (system("$USERADD $user -u $user_number -c \"$fullname\" ".
+		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
+		   "-g $default_groupname -s $PBAG")) {
+	    fatal("Could not add user $user to local node.");
+	}
+    }
+
+    #
+    # Quote special chars for ssh and the shell on the other side
+    #
+    $fullname =~ s/\"/\'/g;
+    $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+
+    if ($CONTROL ne $BOSSNODE) {
+	print "Adding user $user ($user_number) to $CONTROL.\n";
+
+	if (system("$SSH -host $CONTROL ".
+		   "'$USERADD $user -u $user_number -c \\\"$fullname\\\" ".
+		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
+		   "-g $default_groupname -s /bin/tcsh'")) {
+	    if (($? >> 8) != $USEREXISTS) {	    
+		fatal("Could not add user $user ($user_number) to $CONTROL.");
+	    }
+	}
+    }
+    $UID = $SAVEUID;
+
+    #
+    # Do the ssh thing. Invoke as real user for auditing.
+    #
+    $EUID = $UID;
+    if (system("$ADDKEY -i $user")) {
+	fatal("Could not generate initial ssh key for $user");
+    }
+    $EUID = 0;
+
+    # SFS key.
+    if ($CONTROL ne $BOSSNODE) {
+	GenerateSFSKey();
+    }
+    
+    return UpdatePassword();
+}
+
+#
+# Delete a user.
+#
+sub DelUser()
+{
+    #
+    # Only admin people can do this. 
+    #
+    if (! TBAdmin($UID)) {
+	fatal("You do not have permission to delete user $user.");
+    }
+    #
+    # Check status. Active indicates something is wrong.
+    #
+    if (!$force && $status eq USERSTATUS_ACTIVE) {
+	fatal("$user is still active! Cannot delete the account!");
+    }
+
+    print "Deleting user $user ($user_number) from local node.\n";
+
+    $UID = 0;
+
+    if (system("$USERDEL $user")) {
+	if (($? >> 8) != $NOSUCHUSER) {
+	    fatal("Could not remove user $user from local node.");
+	}
+    }
+
+    if ($CONTROL ne $BOSSNODE) {
+	print "Removing user $user from $CONTROL\n";
+	
+	if (system("$SSH -host $CONTROL '$USERDEL $user'")) {
+	    if (($? >> 8) != $NOSUCHUSER) {
+		fatal("Could not remove user $user from $CONTROL.");
+	    }
+	}
+    }
+    $UID = $SAVEUID;
+    $sfsupdate = 1;
+    return 0;
+}
+
+#
+# Change a password for the user on the control node. The local password
+# is not touched! 
+#
+sub UpdatePassword()
+{
+    # shell escape.
+    $pswd     =~ s/\$/\\\\\\\$/g;
+    
+    #
+    # Check status. Ignore if user is not active.
+    #
+    if ($status ne USERSTATUS_ACTIVE) {
+	print("$user is not active! Not updating the password!\n");
+	return 0;
+    }
+
+    $UID = 0;
+    if ($CONTROL ne $BOSSNODE) {
+	print "Updating user $user password on $CONTROL.\n";
+
+	if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+	    fatal("Could not change password for user $user on $CONTROL!");
+	}
+    }
+    $UID = $SAVEUID;
+    return 0;
+}
+
+#
+# Update user info. Allow for optional shell change for freeze/thaw.
+#
+sub UpdateUser(;$)
+{
+    my ($freezeopt) = @_;
+    my $locshellarg = "";
+    my $remshellarg = "";
+
+    #
+    # Sanity check. 
+    #
+    if ($webonly) {
+	return 0;
+    }
+    if (!defined($freezeopt) && ($status ne USERSTATUS_ACTIVE)) {
+	fatal("$user is not active! Cannot update the account!");	
+    }
+
+    # Shell is different on local vs control node.
+    if (defined($freezeopt)) {
+	if ($freezeopt) {
+	    $locshellarg = "-s $NOLOGIN";
+	    $remshellarg = "-s $NOLOGIN";
+	}
+	else {
+	    $locshellarg = "-s $PBAG";
+	    $remshellarg = "-s /bin/tcsh";
+	}
+    }
+    
+    print "Updating user $user ($user_number) on local node.\n";
+    
+    $UID = 0;
+    if (system("$USERMOD $user $locshellarg -c \"$fullname\" ")) {
+	fatal("Could not modify user $user on local node.");
+    }
+    
+    #
+    # Quote special chars for ssh and the shell on the other side
+    #
+    $fullname =~ s/\"/\'/g;
+    $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+
+    if ($CONTROL ne $BOSSNODE) {
+	print "Updating user $user ($user_number) on $CONTROL\n";
+	
+	if (system("$SSH -host $CONTROL ".
+		   "'$USERMOD $user $remshellarg -c \\\"$fullname\\\"'")) {
+	    fatal("Could not modify user $user record on $CONTROL.");
+	}
+    }
+    $UID = $SAVEUID;
+    return 0;
+}
+
+#
+# Freeze a user.
+#
+sub FreezeUser()
+{
+    #
+    # Only admin people can do this. 
+    #
+    if (! TBAdmin($UID)) {
+	fatal("You do not have permission to freeze user $user.");
+    }
+    #
+    # Check status.
+    #
+    if ($status ne USERSTATUS_FROZEN) {
+	fatal("$user is still active! Cannot freeze the account!");
+    }
+    $sfsupdate = 1;
+    
+    return UpdateUser(1);
+}
+
+#
+# Thaw a user.
+#
+sub ThawUser()
+{
+    #
+    # Only admin people can do this. 
+    #
+    if (! TBAdmin($UID)) {
+	fatal("You do not have permission to thaw user $user.");
+    }
+    #
+    # Check status.
+    #
+    if ($status ne USERSTATUS_ACTIVE) {
+	fatal("$user is not active! Cannot thaw the account!");
+    }
+    $sfsupdate = 1;
+    
+    return UpdateUser(0);
+}
+
+#
+# Check dot files. We do this over and over ...
+#
+sub CheckDotFiles()
+{
+    my $forward = "$HOMEDIR/$user/.forward";
+    my $cshrc   = "$HOMEDIR/$user/.cshrc";
+    my $profile = "$HOMEDIR/$user/.profile";
+
+    if (! -d "$HOMEDIR/$user") {
+	return 0;
+    }
+
+    # As the user.
+    $UID = $user_number;
+
+    #
+    # Set up a .forward file so that any email to them gets forwarded off.
+    #
+    if (! -e $forward) {
+	print "Setting up .forward file for $user.\n";
+
+	if (system("echo \"$user_email\" > $forward")) {
+		fatal("Could not create $forward!");
+	}
+	chmod(0644, "$HOMEDIR/$user/.forward") or
+		fatal("Could not chmod $forward: $!");
+    }
+
+    #
+    # Add testbed path to .cshrc and .profile.
+    #
+    my $cpathstr = "set path = ($USERPATH \$path)";
+    if (-e $cshrc && system("egrep -q -s '$USERPATH' $cshrc")) {
+	system("echo '$cpathstr' >> $cshrc");
+    }
+
+    my $spathstr = "PATH=$USERPATH:\$PATH";
+    if (-e $profile && system("egrep -q -s '$USERPATH' $profile")) {
+	system("echo '$spathstr' >> $profile");
+    }
+    $UID = $SAVEUID;
+
+    return 0;
+}
+
+#
+# Do SFS stuff. Might move this out to its own script at some point.
+#
+sub GenerateSFSKey()
+{
+    my $sfsdir  = "$HOMEDIR/$user/.sfs";
+    
+    #
+    # Set up the sfs key, but only if not done so already.
+    # This has to be done from root because the sfs_users file needs
+    # to be updated (and "sfskey register" won't work because it
+    # prompts for the user's UNIX password if not run from root.)
+    #
+    if ($WITHSFS && ! -e "$sfsdir/identity") {
+	if (! -e "$sfsdir" ) {
+	    print "Setting up sfs configuration for $user.\n";
+
+	    mkdir("$sfsdir", 0700) or
+		fatal("Could not mkdir $sfsdir: $!");
+	    chown($user_number, $default_groupgid, "$sfsdir") or
+		fatal("Could not chown $sfsdir: $!");
+	}
+
+	print "Generating sfs key\n";
+	$UID = 0;
+	if (system("$SSH -host $CONTROL '$SFSKEYGEN -KPn ".
+		   "$user\@ops.emulab.net $sfsdir/identity'")) {
+	    fatal("Failure in sfskey gen!");
+        }
+	$UID = $SAVEUID;
+	
+	chown($user_number, $default_groupgid, "$sfsdir/identity") or
+	    fatal("Could not chown $sfsdir/identity: $!");
+	chmod(0600, "$sfsdir/identity") or
+	    fatal("Could not chmod $sfsdir/identity: $!");
+	
+	#
+	# Grab a copy for the DB. Causes an SFS update key to run so
+	# that key is inserted into the files.
+	#
+	my $ident = `cat $sfsdir/identity`;
+
+	if ($ident =~ /.*,.*,.*,(.*),(.*)/) {
+	    DBQueryFatal("replace into user_sfskeys ".
+			 "values ('$user', '$2', '${user}:${1}:${user}::', ".
+			 "now())");
+	}
+	else {
+	    warn("*** $0:\n".
+		 "    Bad emulab SFS public key\n");
+	}
+	$sfsupdate = 1;
+    }
+    return 0;
+}    
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
