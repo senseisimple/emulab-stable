@@ -61,6 +61,9 @@ $TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 $TBMAILADDR     = "<a href=\"mailto:$TBMAILADDR_OPS\">
                       Testbed Operations ($TBMAILADDR_OPS)</a>";
 
+# So subscripts always know ...
+putenv("HTTP_SCRIPT=1");
+
 #
 # Database constants and the like.
 #
@@ -112,7 +115,7 @@ function TBERROR ($message, $death, $xmp = 0) {
                     $message
 	            <br>	
         	    </font>
-                    <p><p>
+                    <p><p><p>
 		    Could not continue. Please contact $TBMAILADDR\n";
 
 	    PAGEERROR($msg);
@@ -130,8 +133,10 @@ function USERERROR($message, $death) {
             $message
             <br>	
       	    </font>
-            <p><p>
-            Please contact $TBMAILADDR if you feel this message is an error.";
+            <br><br><br><br>
+            <font size=-1>
+            Please contact $TBMAILADDR if you feel this message is an error.
+            </font>\n";
 
     if ($death) {
 	PAGEERROR($msg);
@@ -162,14 +167,17 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
 		   $output, $retval);
 
     if ($retval) {
-	$foo = "";
-        for ($i = 0; $i < count($output); $i++) {
-	    $foo .= "$output[$i]\n";
+	$foo = "SUEXEC failure: '$uid/$gid $cmdandargs'";
+	    
+	if (count($output)) {
+	    $foo = "$foo\nError output:\n\n";
+	    
+	    for ($i = 0; $i < count($output); $i++) {
+		$foo .= "$output[$i]\n";
+	    }
 	}
 	
-	TBERROR("SUEXEC failure: '$uid/$gid $cmdandargs'\n".
-		"Error output:\n\n".
-                "$foo", $die, 1);
+	TBERROR($foo, $die, 1);
     }
     return $retval;
 }
