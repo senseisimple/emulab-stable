@@ -1,0 +1,105 @@
+#!/usr/local/bin/perl -w
+
+BEGIN {
+    use lib '/usr/testbed/lib/perl';
+    use Time::CTime;
+    use Time::ParseDate;
+    use DBI;
+}
+
+my %types = ("powercycle"=>1,"error"=>1,"note"=>1,"critical"=>1);
+
+if ($#ARGV<0) {
+  die(" Usage: tblog -i|-s [-n <node_id>] [-u <uid>] [-t <type>] ".
+      "-m 'message text'\n\t[-b <time>] [-a <time>]\n".
+      " -i Insert entry\n -s Search log\n -n Node ID\n -u User ID\n".
+      " -t Entry type (".join(", ",sort keys %types).")\n".
+      " -m Message\n -b Before this time\n -a After this time\n");
+}
+
+my $i=0;
+my $s=0;
+my $node  ="";
+my $uid   ="";
+my $type  ="note";
+my $msg   ="";
+my $before="";
+my $after ="";
+
+while (@ARGV != 0) {
+  $_ = shift(@ARGV);
+#  print ">Item=$_*\n";
+#  print " i=$i s=$s n=$node u=$uid t=$type m=$msg b=$before a=$after\n";
+  if    (/^-i(.*)/) {$i = 1;}
+  elsif (/^-s(.*)/) {$s = 1;}
+  elsif (/^-n(.*)/) { $node = ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-u(.*)/) { $uid  = ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-t(.*)/) { $type = ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-m(.*)/) { $msg  = ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-b(.*)/) {$before= ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-a(.*)/) { $after= ($1 ? $1 : shift(@ARGV));}
+  elsif (/^-h(.*)/) { exec "$0";}
+  else  {die("Unknown Option: $_\n");}
+}
+
+
+#print "Got Args:\n";
+#print "i=$i s=$s n=$node u=$uid t='$type' m='$msg' b='$before' a='$after'\n";
+
+if ( $i==$s ) {die("You must select exactly one of '-i' or '-s'.\n");}
+if ( !defined $types{$type} ) {
+  die("Invalid type '$type'. Must be in (".join(" ",sort keys %types).").\n");
+}
+if ( $i && (!defined $msg || !$msg) ) { 
+  die("You must specify a message string.\n"); 
+}
+
+my $dbh = DBI->connect ("DBI:mysql:database=tbdb;host=localhost")
+    || die "Could not connect to TBDB.\n";
+
+# SEARCH THE LOG
+if ($s) { # constructs the where clause of the mysql command
+    my $param = "WHERE log_type='$type'";
+    if ($node ne "") {
+	$param .= " AND node_id='$node'"; 
+    }
+    if ($uid ne "") {
+	$param .= " AND uid='$uid'";
+    }
+    if ($msg ne "") { # right now searching by message is not very useful
+	$param .= " AND message='$msg'";
+    }
+    if ($before ne "") {
+	my $relbef = parsedate($before);
+	$param .= " AND entry_time<='$relbef'";
+    }
+    if ($after ne "") {
+	my $relaft = parsedate($after);
+	$param .= " AND entry_time>='$relaft'";
+    }
+    # now query the database and return matching records
+    my $sth = $dbh->prepare("SELECT * FROM log $param");
+    $sth->execute || die "Could not query database: $sth->errstr.\n";
+    while(@log = $sth->fetchrow_array) {
+	foreach (@log) {
+	    print "$_: ";
+	}
+	print "\n";
+    }
+}
+
+
+# INSERT AN ENTRY
+if ($i) {
+    my $sth = $dbh->prepare
+	("INSERT INTO log VALUES ('', '$node', '$uid', now(), '$type', '$msg')");
+    $sth->execute
+	|| die "Can't insert the entry: $sth->errstr.\n";
+}
+
+$dbh->disconnect;
+# this should happen automatically anyway, but it can't hurt.
+
+
+
+
