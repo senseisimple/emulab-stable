@@ -21,7 +21,8 @@ use English;
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed" .
+               ":/usr/local/etc/emulab";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -43,7 +44,7 @@ my $newfile     = "/tmp/ntp.conf.new";
 my $ntpfile     = "/etc/ntp.conf";
 my $driftfile   = "/etc/ntp.drift";
 my $pidfile	= "/var/run/ntpd.pid";
-my $debug       = 0;
+my $debug       = 1;
 
 #
 # Since this is a wrapper, we have to try to start ntp no matter what.
@@ -61,9 +62,11 @@ sub ntpstart () {
 # Ask for setup. If none then we are done. If provided with a drift value
 # but no servers/peers, then need to leave the config alone and just
 # replace the drift file.
-# 
-my $TM = OPENTMCC("ntpinfo");
-while (<$TM>) {
+#
+open(TM, "tmcc -t 5 ntpinfo |")
+    or fatal("Could not start tmcc: $!");
+
+while (<TM>) {
     chomp();
     if ($_ =~ /^PEER=.*$/ ||
 	$_ =~ /^SERVER=.*$/) {
@@ -71,7 +74,8 @@ while (<$TM>) {
     }
     push(@ntpinfo, $_);
 }
-CLOSETMCC($TM);
+close(TM)
+    or fatal("tmcc error!");
 if (! @ntpinfo) {
     exit(ntpstart());
 }
