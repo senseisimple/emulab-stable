@@ -198,8 +198,6 @@ if (strcmp($mode, "record") == 0) {
 else if (strcmp($mode, "clear") == 0) {
     PAGEHEADER("Clearing feedback");
 
-    echo "foo $clear_last $clear_bootstrap";
-    
     $options = "";
     if (isset($clear_last) && !strcmp($clear_last, "1"))
 	$options .= " -c";
@@ -211,7 +209,7 @@ else if (strcmp($mode, "clear") == 0) {
 			 SUEXEC_ACTION_USERERROR);
     }
     
-    echo "<center><h3><br>Done! $options</h3></center>\n";
+    echo "<center><h3><br>Done!</h3></center>\n";
 
     PAGEFOOTER();
     return;
