@@ -74,12 +74,10 @@ rpc.o:			rpc.cc rpc.h
 rrpc.o:			rpc.cc rpc.h
 	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
-install-dirs:
+install: event-sched_rrpc
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
-	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
-
-install: install-dirs event-sched_rrpc
 	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/event-sched
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
 		$(DESTDIR)$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
 
