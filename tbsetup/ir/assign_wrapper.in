@@ -226,33 +226,39 @@ foreach $link (keys(%links)) {
 	}
 	$nodes{$dst} = $newdstlinks;
 	
-	($Abw,$Adelay,$Aloss) = @{$lans{$src}}[1,2,3];
-	($Bbw,$Bdelay,$Bloss) = @{$lans{$dst}}[1,2,3];
-	# For loss here we have a probability problem.  We know that
-	# our packet will go through a delay node on each lan
-	# with a loss rate of (1-sqrt(1-$[AB]loss)).  We want to set
- 	# the loss rate of this delay node to be the total loss rate
-	# as if the packet passed through a hop of loss rate $Aloss
-	# and a hop of $Bloss and a hop of $loss.
-	# Let A=(1-sqrt(1-Aloss)
-	# Let B=(1-sqrt(1-Bloss)
-	# A, B are fixed along with Aloss, Bloss, and loss.  
-	# Let r be the loss of this delay node.
-	# The loss rate then is: (1-(1-A)*(1-B)*(1-r))
-	# We want this to equal (1-(1-Aloss)*(1-Bloss)*(1-loss))
-	# Solving for r:
-	# r = 1-(1-Aloss)*(1-Bloss)*(1-loss)/((1-A)*(1-B))
-	# The denomenator is 0 if either A or B is 1 which happens if
-	# Aloss or Bloss is 1.  In this case we want r to be 1.
-	if (($Aloss == 1) || ($Bloss == 1)) {
-	    $r = 1;
-	} else {
-	    $r = (1-(1-$Aloss)*(1-$Bloss)*(1-$loss))/
-		(sqrt(1-$Aloss)*sqrt(1-$Bloss));
-	}
-	$delayinfo{$link} = [&min($Abw,$Bbw,$bw),
-			     $Adelay/2+$Bdelay/2+$delay,
-			     $r];
+#  	($Abw,$Adelay,$Aloss) = @{$lans{$src}}[1,2,3];
+#  	($Bbw,$Bdelay,$Bloss) = @{$lans{$dst}}[1,2,3];
+#  	# For loss here we have a probability problem.  We know that
+#  	# our packet will go through a delay node on each lan
+#  	# with a loss rate of (1-sqrt(1-$[AB]loss)).  We want to set
+#   	# the loss rate of this delay node to be the total loss rate
+#  	# as if the packet passed through a hop of loss rate $Aloss
+#  	# and a hop of $Bloss and a hop of $loss.
+#  	# Let A=(1-sqrt(1-Aloss)
+#  	# Let B=(1-sqrt(1-Bloss)
+#  	# A, B are fixed along with Aloss, Bloss, and loss.  
+#  	# Let r be the loss of this delay node.
+#  	# The loss rate then is: (1-(1-A)*(1-B)*(1-r))
+#  	# We want this to equal (1-(1-Aloss)*(1-Bloss)*(1-loss))
+#  	# Solving for r:
+#  	# r = 1-(1-Aloss)*(1-Bloss)*(1-loss)/((1-A)*(1-B))
+#  	# The denomenator is 0 if either A or B is 1 which happens if
+#  	# Aloss or Bloss is 1.  In this case we want r to be 1.
+#  	if (($Aloss == 1) || ($Bloss == 1)) {
+#  	    $r = 1;
+#  	} else {
+#  	    $r = (1-(1-$Aloss)*(1-$Bloss)*(1-$loss))/
+#  		(sqrt(1-$Aloss)*sqrt(1-$Bloss));
+#  	}
+#  	$delayinfo{$link} = [&min($Abw,$Bbw,$bw),
+#  			     $Adelay/2+$Bdelay/2+$delay,
+#  			     $r];
+
+	# The above commented region assumed that a packet traveresed
+	# a node<->hub<->node<->link<->node<->hub<->node
+	# when actually want a traversal of
+	# node<->hub<->link<->hub<->node
+	$delayinfo{$link} = [$bw,$delay,$loss]
 	printdb "delayinfo{$link} = [" . join(",",@{$delayinfo{$link}}) . "]\n";
 	
 	# Remove the original link
