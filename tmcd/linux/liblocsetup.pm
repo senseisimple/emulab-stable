@@ -13,6 +13,7 @@ use Exporter;
 	 os_rpminstall_line enable_ipod
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
+	 os_groupdel
        );
 
 # Must come after package declaration!
@@ -43,6 +44,7 @@ my $USERADD     = "/usr/sbin/useradd";
 my $USERDEL     = "/usr/sbin/userdel";
 my $USERMOD     = "/usr/sbin/usermod";
 my $GROUPADD	= "/usr/sbin/groupadd";
+my $GROUPDEL	= "/usr/sbin/groupdel";
 my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s";
 my $IFC_100MBS  = "100baseTx";
 my $IFC_10MBS   = "10baseT";
@@ -150,6 +152,16 @@ sub os_groupadd($$)
     my($group, $gid) = @_;
 
     return system("$GROUPADD -g $gid $group");
+}
+
+#
+# Delete an old group
+# 
+sub os_groupdel($)
+{
+    my($group) = @_;
+
+    return system("$GROUPDEL $group");
 }
 
 #
@@ -291,7 +303,10 @@ sub os_routing_enable_gated()
 {
     my $cmd;
 
-    $cmd = "$GATED -f $SETUPDIR/gated_`$SETUPDIR/control_interface`.conf";
+    # XXX hack to avoid gated dying mysteriously with TCP/611 already in use
+    $cmd = "sleep 3\n    ";
+    $cmd .= "(ps alxww ; netstat -na) > /tmp/gated.state\n    ";
+    $cmd .= "$GATED -f $SETUPDIR/gated_`$SETUPDIR/control_interface`.conf";
     return $cmd;
 }
 

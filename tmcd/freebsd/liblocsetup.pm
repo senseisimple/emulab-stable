@@ -13,6 +13,7 @@ use Exporter;
 	 os_rpminstall_line update_delays
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
+	 os_groupdel
        );
 
 # Must come after package declaration!
@@ -41,6 +42,7 @@ my $USERADD     = "/usr/sbin/pw useradd";
 my $USERDEL     = "/usr/sbin/pw userdel";
 my $USERMOD     = "/usr/sbin/pw usermod";
 my $GROUPADD	= "/usr/sbin/pw groupadd";
+my $GROUPDEL	= "/usr/sbin/pw groupdel";
 my $CHPASS	= "/usr/bin/chpass -p";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s %s %s";
@@ -158,6 +160,16 @@ sub os_groupadd($$)
     my($group, $gid) = @_;
 
     return system("$GROUPADD $group -g $gid");
+}
+
+#
+# Delete an old group
+# 
+sub os_groupdel($)
+{
+    my($group) = @_;
+
+    return system("$GROUPDEL $group");
 }
 
 #
