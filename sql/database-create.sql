@@ -336,6 +336,7 @@ CREATE TABLE floorimages (
   building varchar(32) NOT NULL default '',
   floor varchar(32) NOT NULL default '',
   image_path tinytext,
+  thumb_path tinytext,
   x1 int(6) NOT NULL default '0',
   y1 int(6) NOT NULL default '0',
   x2 int(6) NOT NULL default '0',
