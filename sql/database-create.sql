@@ -982,7 +982,8 @@ CREATE TABLE widearea_delays (
   node_id1 text,
   iface1 text,
   node_id2 varchar(10) default NULL,
-  iface2 text
+  iface2 text,
+  bandwidth double unsigned default NULL
 ) TYPE=MyISAM;
 
 #
