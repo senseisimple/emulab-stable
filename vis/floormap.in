@@ -574,8 +574,10 @@ sub dofloor($$)
 	    my $y      = int($rowref->{"loc_y"} * $scale - $y_offset);
 	    my $rpid   = $rowref->{"pid"};
 	    my $reid   = $rowref->{"eid"};
+	    my $vname  = $rowref->{"vname"};
 	    my $label  = $nodeid;
 	    my $newid  = ($isnew ? $rowref->{"new_node_id"} : 0);
+	    my $props  = {};
 
             my $color;
 	    if ($isnew) {
@@ -586,12 +588,20 @@ sub dofloor($$)
 		# Without -e option, green means node is free.
 		# With -e option, green means node belongs to experiment. 
 		$color = 'limegreen';
+		if (defined($vname)) {
+		    $props->{'VNAME'} = $vname;
+		}
 	    }
 	    elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
 		$color = 'red';
 	    }
 	    else {
 		$color = 'blue';
+		if (!$mereuser && defined($rpid)) {
+		    $props->{'VNAME'} = $vname;
+		    $props->{'PID'}   = $rpid;
+		    $props->{'EID'}   = $reid;
+		}
 	    }
             my $x2 = $x + $DOT_RAD;
 	    if ($ghost && $rowref->{"floor"} != $floor) { 
@@ -607,13 +617,12 @@ sub dofloor($$)
 					text=>"$label");
             warn "$err" if "$err";            
 
-	    my $tmp = {};
-	    $tmp->{"X1"} = $x - $DOT_RAD;
-	    $tmp->{"Y1"} = $y - $DOT_RAD;
-	    $tmp->{"X2"} = $x + $DOT_RAD;
-	    $tmp->{"Y2"} = $y + $DOT_RAD;
-	    $tmp->{"ISNEW"} = $newid;
-	    $areamap->{$nodeid} = $tmp;
+	    $props->{"X1"} = $x - $DOT_RAD;
+	    $props->{"Y1"} = $y - $DOT_RAD;
+	    $props->{"X2"} = $x + $DOT_RAD;
+	    $props->{"Y2"} = $y + $DOT_RAD;
+	    $props->{"ISNEW"}   = $newid;
+	    $areamap->{$nodeid} = $props;
 	}
     }
 
@@ -788,9 +797,16 @@ sub writefiles($@)
 	    my $link  = ($isnew ?
 			 "newnode_edit.php3?id=${isnew}" :
 			 "shownode.php3?node_id=${nodeid}");
+	    my $title = $nodeid;
+
+	    $title .= " (vname=" . $map{$nodeid}->{'VNAME'} . ")"
+		if (exists($map{$nodeid}->{'VNAME'}));
+	    $title .= " " . $map{$nodeid}->{'PID'} . "/" .
+		$map{$nodeid}->{'EID'} . ""
+		    if (exists($map{$nodeid}->{'PID'}));
 
 	    print MAP "<AREA SHAPE=RECT COORDS=\"$x1,$y1,$x2,$y2\" ".
-		"HREF=\"${link}\">\n\n";
+		      "TITLE=\"$title\" HREF=\"${link}\">\n\n";
 	}
     }
     print MAP "</MAP>\n";
