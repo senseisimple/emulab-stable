@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.1 2000-07-06 17:42:36 kwright Exp $
+ * $Id: forw_requests.c,v 1.2 2000-07-06 22:53:55 kwright Exp $
  */
 
 #include "discvr.h"
@@ -30,7 +30,7 @@
  */
 char recvbuf[BUFSIZ];
 
-char *
+void
 forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo, 
 		 const char *mesg, int mesglen) 
 {
@@ -38,7 +38,6 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 	fd_set                  rset;
         const int               on = 1;
 	char                    ifname[IFNAMSIZ];
-	char                    *reply;
 	struct topd_nborlist    *save;
 	struct sockaddr_in      sin;
 	struct ifi_info         *ifihead;
@@ -146,12 +145,4 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		memcpy((void *)ifi->ifi_nbors->tdnbl_nbors, recvbuf, n);
 		ifi->ifi_nbors->tdnbl_next = save;
 	}
-
-	if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
-	        fprintf(stderr, "Ran out of memory for reply mesg.\n");
-		exit(1);
-	}
-		
-	n = compose_reply(ifihead, reply, BUFSIZ);
-	return reply;
 }
