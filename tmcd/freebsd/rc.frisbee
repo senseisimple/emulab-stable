@@ -13,13 +13,40 @@ fi
 
 $BINDIR/tmcc state RELOADSETUP
 
-DISKDEV=/dev/ad0
+BOSSINFO=`$BINDIR/tmcc bossinfo`
 LOADINFO=`$BINDIR/tmcc loadinfo`
+
+# For testing purposes.
+#BOSSINFO='boss.emulab.net 155.101.128.70'
 #LOADINFO='ADDR=234.5.6.69:4444 PART=0'	# for testing
+
+if [ -x /usr/sbin/ntpdate ]; then
+	BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
+	/usr/sbin/ntpdate $BOSSIP >/dev/null 2>&1
+fi
+
+DISKDEV=/dev/ad0
 ADDRESS=`echo $LOADINFO | awk -F= '{ printf $2 }' | awk -F' ' '{ print $1 }'`
-PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }'`
-if [ x"$PARTITION" != x ] && [ "$PARTITION" != 0 ]; then
+PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }' | awk -F' ' '{ print $1 }'`
+PARTOS=`echo $LOADINFO | awk -F= '{ printf $4 }' | awk -F' ' '{ print $1 }'`
+if [ x"$PARTITION" != x -a "$PARTITION" != "0" ]; then
 	SLICE="-s $PARTITION";
+	case $PARTOS in
+	FreeBSD)
+		SLICE="$SLICE -D 165"
+		PTYPE=165
+		;;
+	OpenBSD)
+		SLICE="$SLICE -D 166"
+		PTYPE=166
+		;;
+	Linux)
+		SLICE="$SLICE -D 131"
+		PTYPE=131
+		;;
+	*)
+		;;
+	esac
 fi
 
 # Enable IPoD
@@ -32,7 +59,7 @@ if [ x"$ADDRESS" != x ]; then
 	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`;
 	MCASTADDR="-m $MCAST -p $PORT";
 
-	echo "Running $BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV ";
+	echo "Running $BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV at `date`";
 	$BINDIR/tmcc state RELOADING;
 
 	$BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV;
@@ -41,6 +68,10 @@ if [ x"$ADDRESS" != x ]; then
 		echo "Frisbee run finished";
 		echo "Resizing final disk partition";
 		$BINDIR/growdisk -vW;
+		if [ x"$SLICE" != x -a x"$PTYPE" != x -a -x $BINDIR/slicefix ]; then
+			echo "Adjusting slice-related files";
+			$BINDIR/slicefix $PARTITION $PTYPE
+		fi
 		echo "Image load complete, rebooting ...";
 		$BINDIR/tmcc state RELOADDONE;
 		/sbin/reboot;
