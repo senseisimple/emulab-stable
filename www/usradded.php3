@@ -160,7 +160,7 @@ if (! $returning) {
          "Please return to $TBWWW and log in using\n".
 	 "the user name and password you gave us when you applied. You will\n".
 	 "then find an option on the menu called 'New User Verification'.\n".
-	 "Select it, and on that page enter your password and your key.\n".
+	 "Select that option, and on that page enter your key.\n".
 	 "You will then be verified as a user. When you have been both\n".
          "verified and approved by the head of the project, you will\n".
 	 "be marked as an active user, and will be granted full access to\n".
@@ -181,7 +181,7 @@ if (! $returning) {
           security purposes, you will receive by e-mail a key. When you
           receive it, come back to the site, and log in. When you do, you
           will see a new menu option called 'New User Verification'. On
-          that page, enter in your username, password, and the key,
+          that page, enter in your key
           exactly as you received it in your e-mail. You will then be
           marked as a verified user.
           <p>Once you have been both verified

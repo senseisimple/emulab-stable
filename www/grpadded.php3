@@ -183,7 +183,7 @@ if (! $returning) {
          "Please return to $TBWWW and log in using\n".
 	 "the user name and password you gave us when you applied. You will\n".
 	 "then find an option on the menu called 'New User Verification'.\n".
-	 "Select it, and on that page enter your password and your key.\n".
+	 "Select that option, and on that page enter your key.\n".
 	 "You will then be verified as a user. When you have been both\n".
          "verified and approved by Testbed Operations, you will\n".
 	 "be marked as an active user, and will be granted full access to\n".
@@ -242,15 +242,20 @@ if (! $newmemb_result) {
 }
 
 mail($TBMAIL_APPROVAL,
-     "TESTBED: New Group", "'$usr_name' wants to start group ".
-     "'$gid'.\nContact Info:\nName:\t\t$usr_name ($grp_head_uid)\n".
-     "Email:\t\t$email\nGroup:\t\t$grp_name\nURL:\t\t$grp_URL\n".
-     "Title:\t$usr_title\n".
-     "Affiliation:\t$usr_affil\nAddress:\t$usr_addr\n".
-     "PCs:\t$grp_pcs\n".
-     "Sharks:\t$grp_sharks\n".
-     "Phone:\t\t$usr_phones\n\n".
-     "Reasons:\n$why\n\nPlease review the application and when you have\n".
+     "TESTBED: New Group", "'$usr_name' wants to start group '$gid'.\n".
+     "Contact Info:\n".
+     "Name:          $usr_name ($grp_head_uid)\n".
+     "Email:         $email\n".
+     "Group:         $grp_name\n".
+     "URL:           $grp_URL\n".
+     "Title:         $usr_title\n".
+     "Affiliation:   $usr_affil\n".
+     "Address:       $usr_addr\n".
+     "Phone:         $usr_phones\n\n".
+     "PCs:           $grp_pcs\n".
+     "Sharks:        $grp_sharks\n".
+     "Reasons:\n$why\n\n".
+     "Please review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
      "select the 'Group Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
@@ -300,7 +305,7 @@ if (! $returning) {
           security purposes, you will receive by e-mail a key. When you
           receive it, come back to the site, and log in. When you do, you
           will see a new menu option called 'New User Verification'. On
-          that page, enter in your password and the key,
+          that page, enter in your key,
           exactly as you received it in your e-mail. You will then be
           marked as a verified user.
           <p>Once you have been both verified
