@@ -78,7 +78,7 @@ if (isset($keymaster) &&
     return;
 }
 else {
-    PAGEHEADER("Active and Recently Swapped Out Experiments");
+    PAGEHEADER("Active and Recently Swapped-out Experiments");
 }
 
 #
@@ -117,7 +117,7 @@ echo "<a NAME=swapped></a>\n";
 if (mysql_num_rows($query_result)) {
     $thumbCount = 0;
     $thumbMax   = 80;
-    GENPLIST("Recently Swapped Out Experiments", $query_result);
+    GENPLIST("Recently Swapped-out Experiments", $query_result);
 }
 
 #
@@ -125,5 +125,3 @@ if (mysql_num_rows($query_result)) {
 # 
 PAGEFOOTER();
 ?>
-
-

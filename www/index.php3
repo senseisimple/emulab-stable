@@ -85,8 +85,9 @@ of the heterogeneity of the three approaches.
 </p>
 
 <p> <em>Wide-area resources</em>: Netbed currently includes
-approximately 32 nodes geographically distributed across approximately
-25 sites, largely the machines in the "MIT distributed testbed."
+50-60 nodes geographically distributed across approximately
+30 sites; the majority are the machines in the "MIT distributed testbed;"
+others were created by people loading our wide-area boot CD.
 Experimenters with a valid research use can get non-root shell access
 to these shared nodes, with ssh keys and other aspects automatically
 managed by Netbed.  Secure shared filesystem access is coming soon via
@@ -104,7 +105,7 @@ to remotely configure and control machines and links down to
 the hardware level.  Packet loss, latency, bandwidth, queue sizes--
 all can be user-defined.  Even the OS disk
 contents can be fully and securely replaced with custom images by any experimenter;
-Netbed can load ten or a hundred disks in 2.5 minutes total. 
+Netbed can load ten or a hundred disks in less than a minute. 
 <?php
 echo "There are currently <a href=explist.php3>$active_expts active
      experiments</a> running on Emulab, and <a
@@ -112,11 +113,12 @@ echo "There are currently <a href=explist.php3>$active_expts active
 ?>
 </p>
 
-<p> Utah's local installation currently features high-speed Cisco
+<p> Utah's local installation features high-speed Cisco
 switches connecting 5 100Mbit interfaces on each of 168 PCs.  The
-<a href = "http://www.uky.emulab.net">University of Kentucky</a>'s installation
-contains 48 similarly networked PCs.
-The PC nodes can be used as
+<a href = "http://www.uky.emulab.net">University of Kentucky</a>'s testbed,
+also open to external users, contains 48 similarly networked PCs, 
+and <a href = "http://www.netlab.cc.gatech.edu">
+Georgia Tech's</a> contains 40.  The PC nodes can be used as
 edge nodes running arbitrary programs, simulated routers,
 traffic-shaping nodes, or traffic generators.  While an "experiment"
 is running, the experiment (and its associated researchers) get
