@@ -721,29 +721,29 @@ if (!isset($formfields[proj_members]) ||
     strcmp($formfields[proj_members], "") == 0) {
     $errors["#of Members"] = "Missing Field";
 }
-elseif (! TBvalid_integer($formfields[proj_members])) {
-    $errors["#of Members"] = "Must be numeric";
+elseif (! TBvalid_num_members($formfields[proj_members])) {
+    $errors["#of Members"] = TBFieldErrorString();
 }
 if (!isset($formfields[proj_pcs]) ||
     strcmp($formfields[proj_pcs], "") == 0) {
     $errors["#of PCs"] = "Missing Field";
 }
-elseif (! TBvalid_integer($formfields[proj_pcs])) {
-    $errors["#of PCs"] = "Must be numeric";
+elseif (! TBvalid_num_pcs($formfields[proj_pcs])) {
+    $errors["#of PCs"] = TBFieldErrorString();
 }
 if (!isset($formfields[proj_plabpcs]) ||
     strcmp($formfields[proj_plabpcs], "") == 0) {
     $errors["#of Planetlab PCs"] = "Missing Field";
 }
-elseif (! TBvalid_integer($formfields[proj_plabpcs])) {
-    $errors["#of Planetlab PCs"] = "Must be numeric";
+elseif (! TBvalid_num_pcplab($formfields[proj_plabpcs])) {
+    $errors["#of Planetlab PCs"] = TBFieldErrorString();
 }
 if (!isset($formfields[proj_ronpcs]) ||
     strcmp($formfields[proj_ronpcs], "") == 0) {
     $errors["#of RON PCs"] = "Missing Field";
 }
-elseif (! TBvalid_integer($formfields[proj_ronpcs])) {
-    $errors["#of RON PCs"] = "Must be numeric";
+elseif (! TBvalid_num_ron($formfields[proj_ronpcs])) {
+    $errors["#of RON PCs"] = TBFieldErrorString();
 }
 if (!isset($formfields[proj_why]) ||
     strcmp($formfields[proj_why], "") == 0) {

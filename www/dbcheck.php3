@@ -153,6 +153,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
 		$DBFieldErrstr = "too small - $min minimum value";
 	    else 
 		$DBFieldErrstr = "too large - $max maximum value";
+	    break;
 	    
         default:
 	    TBERROR("TBcheck_dbslot: Unrecognized column_type $column_type", 1);
@@ -219,5 +220,21 @@ function TBvalid_description($token) {
 }
 function TBvalid_integer($token) {
     return TBcheck_dbslot($token, "default", "int",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_num_members($token) {
+    return TBcheck_dbslot($token, "projects", "num_members",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_num_pcs($token) {
+    return TBcheck_dbslot($token, "projects", "num_pcs",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_num_pcplab($token) {
+    return TBcheck_dbslot($token, "projects", "num_pcplab",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_num_ron($token) {
+    return TBcheck_dbslot($token, "projects", "num_ron",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
