@@ -321,7 +321,7 @@ Simulator instproc run {} {
     }
     set mfactor ""
     if { $multiplex_factor != {} } {
-	set mfactor = "multiplex_factor=$multiplex_factor, "
+	set mfactor "multiplex_factor=$multiplex_factor, "
     }
 
     sql exec $DB "update experiments set $mfactor forcelinkdelays=$forcelinkdelays,uselinkdelays=$uselinkdelays,usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
