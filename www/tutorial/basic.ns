@@ -1,0 +1,23 @@
+# This is a simple ns script. Comments start with #.
+set ns [new Simulator]                  
+
+# define the 4 nodes in the topology. 
+set NodeA [$ns node]
+set NodeB [$ns node]
+set NodeC [$ns node]
+set NodeD [$ns node]                    
+
+# Next define the 3 links between the nodes.
+$ns duplex-link $NodeA $NodeB 100Mb 50ms DropTail
+$ns duplex-link $NodeB $NodeC 100Mb .1ms DropTail
+$ns duplex-link $NodeB $NodeD 100Mb .1ms DropTail
+
+# Set the OS on a couple.
+tb-set-node-os $NodeA FBSD40-STD
+tb-set-node-os $NodeC RHL62-STD         
+
+# Set IP address of node B on the port going to node C
+tb-set-ip-interface $NodeB $NodeC 192.168.42.42 
+
+# Go!
+$ns run                                 
