@@ -622,8 +622,7 @@ sub doSwapin($) {
 	# fixed.
 	#
 	my $exitcode;
-	my $wrapper = (($pid eq "testbed" || $pid eq "tbmeasure") ?
-		       "assign_wrapper-new" : "assign_wrapper");
+	my $wrapper = "assign_wrapper";
 	
 	if (system("$wrapper -u $pid $eid")) {
 	    #
