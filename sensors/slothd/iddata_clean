@@ -1,0 +1,67 @@
+#!/usr/bin/perl
+
+# iddata_clean - script to purge the aged slothd data from the emulab
+# database.
+
+use lib '/usr/testbed/lib';
+
+use libdb;
+use English;
+use Getopt::Long;
+use strict;
+
+my %opts = ();
+
+GetOptions(\%opts,'h','m=i');
+
+sub usage() {
+    print "Usage:\n$0 -h               This message.\n".
+        "$0 -m <maxage>      Maximum idle data age to leave (in seconds).\n";
+}
+
+if ($opts{'h'}) {
+    exit &usage;
+}
+
+# security check.
+
+my @whgrp = getgrnam("wheel");
+my $uname = getpwuid($UID);
+my $maxage = $opts{'m'} ? $opts{'m'} : 129600; # default is 36 hours
+
+if (!TBAdmin($UID) && !($whgrp[3] =~ /$uname/)) {
+    print "You must either be a testbed admin, or in the wheel group\n".
+        "to run this script.\n";
+    exit 1;
+}
+
+print "Idlestats cleaner script started..\n\n";
+
+clean_node_idlestats_table();
+clean_iface_counters_table();    
+
+exit 0;
+
+sub clean_node_idlestats_table() {
+    my $qres;
+    if ($qres = DBQueryFatal("delete from node_idlestats ".
+                             "where unix_timestamp(now()) - ".
+                             "unix_timestamp(tstamp) > $maxage")) {
+        print "Number of rows deleted from node_idlestats: ". 
+            $qres->numrows() ."\n";
+        return 1;
+    }
+    return 0;    
+}
+
+sub clean_iface_counters_table() {
+    my $qres;
+    if ($qres = DBQueryFatal("delete from iface_counters ".
+                             "where unix_timestamp(now()) ". 
+                             "- unix_timestamp(tstamp) > $maxage")) {
+        print "Number of rows deleted from iface_counters: ". 
+            $qres->numrows() ."\n";
+        return 1;
+    }
+    return 0;
+}
