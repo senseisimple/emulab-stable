@@ -34,11 +34,6 @@ name_name_map fixed_nodes;
 // allowed to move these.
 name_name_map node_hints;
 
-// From assign.cc
-#ifdef GNUPLOT_OUTPUT
-extern FILE *scoresout, *tempout, *deltaout;
-#endif
-
 // Determines whether to accept a change of score difference 'change' at
 // temperature 'temperature'.
 inline int accept(double change, double temperature)
@@ -894,13 +889,11 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       if (accepttrans) {
 	bestscore = newscore;
 	bestviolated = violated;
-
 #ifdef GNUPLOT_OUTPUT
 	fprintf(tempout,"%f\n",temp);
 	fprintf(scoresout,"%f\n",newscore);
 	fprintf(deltaout,"%f\n",-scorediff);
 #endif
-
 	avgscore += newscore;
 
 	accepts++;
@@ -1080,9 +1073,8 @@ NOTQUITEDONE:
     );
     if ((tsteps >= mintsteps) &&
 #ifdef ALLOW_NEGATIVE_DELTA
-//	((fabs(deltaavg) < 0.0000001)
-//	 || (fabs((temp / initialavg) * (deltaavg/ deltatemp)) < epsilon))) {
-	((temp / initialavg) * (deltaavg/ deltatemp)) < epsilon) {
+	((fabs(deltaavg) < 0.0000001)
+	 || (fabs((temp / initialavg) * (deltaavg/ deltatemp)) < epsilon))) {
 #else
 	(deltaavg > 0) && ((temp / initialavg) * (deltaavg/ deltatemp) < epsilon)) {
 #endif
