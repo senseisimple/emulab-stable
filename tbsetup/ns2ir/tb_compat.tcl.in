@@ -608,5 +608,5 @@ proc tb-set-endnodeshaping {lanlink onoff} {
 	perror "\[tb-set-endnodeshaping] $lanlink is not a link or a lan."
 	return
     }
-    $link set uselinkdelay $onoff
+    $lanlink set uselinkdelay $onoff
 }
