@@ -1,0 +1,256 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# tbrsync - An emulab frontend to rsync.
+#
+
+use lib '@prefix@/lib';
+my $TB = '@prefix@';
+ 
+use libdb;
+use English;
+use Getopt::Long;
+use File::Basename;
+
+#
+# We have to be setuid root so that we can ssh into stargates as root
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+ 
+use strict;
+
+#
+# Constants
+#
+my $RSYNC  = "/usr/local/bin/rsync";
+my $SSHTB  = "$TB/bin/sshtb";
+my $DEBUG  = 1;
+
+#
+# Handle command-line arguments
+# TODO: Allow a user to specify some of their own arguments to uisp
+#
+sub usage() {
+    warn "Usage: $0 [-p <pid> -e <eid>] [--dry] [--nodelete] <operation> [dirname] <nodes...>\n";
+    warn "Supported operations: upload\n";
+    warn "[dirname] is required with the 'upload' operation\n";
+    return 1;
+}
+
+my %opt = ();
+GetOptions(\%opt, 'p=s','e=s','dry','nodelete');
+
+if (($opt{e} && ! $opt{p}) || (!$opt{e} && $opt{p})) {
+    warn "-e and -p must be used togehter\n";
+    die usage;
+}
+
+my ($eid, $pid);
+if ($opt{e}) {
+    $eid = $opt{e};
+    $pid = $opt{p};
+}
+
+my ($dryrun, $delete) = (0, 1);
+if ($opt{dry}) {
+    $dryrun = 1;
+}
+if ($opt{nodelete}) {
+    $delete = 0;
+}
+
+my $operation = shift @ARGV;
+my $dirname;
+if (!$operation) {
+    exit usage();
+}
+# Check the operation type
+# XXX - support the other operations uisp supports, like downloading code
+SWITCH: for ($operation) {
+    /^upload$/ && do {
+	$dirname = shift @ARGV;
+	if (!$dirname) {
+	    exit usage();
+	}
+	last SWITCH;
+    };
+    
+    # Default
+    warn "Uknown operation $operation\n";
+    exit usage();
+}
+
+# They have to give us at least one node, unless they gave a pid or eid, in
+# which case we take that to mean all nodes in the experiment
+my @nodes = @ARGV;
+if (!@nodes && !$eid) {
+    exit usage();
+}
+
+# Perm check on the eid and pid
+if ($eid) {
+    if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+	die "*** You do not have permission to access nodes in\n" .
+	    "     $pid/$eid\n";
+    }
+}
+
+# If given an eid and a node list, translate the node names to physical ones
+if ($eid && @nodes) {
+    my @tmp;
+    foreach my $node (@nodes) {
+	my $physnode;
+	if (!VnameToNodeid($pid,$eid,$node,\$physnode)) {
+	    die "*** No such node $node in $pid/$eid\n";
+	}
+	push @tmp, $physnode;
+    }
+    @nodes = @tmp;
+}
+
+# If given an eid and no node list, grab all nodes in the experiment
+if (!@nodes && $eid) {
+    @nodes = ExpNodes($pid, $eid);
+    if (!@nodes) {
+	die "*** Unable to get nodes in experiment $pid/$eid\n";
+    }
+}
+
+#
+# Taint check the dirname
+#
+if ($dirname =~ /^([-\w\/.]+)$/) {
+    $dirname = $1;
+} else {
+    die("*** Tainted directory name: $dirname\n");
+}
+
+# Strip trailing slash, if present
+$dirname =~ s/(^.*)\/$/$1/;
+
+#
+# Taint check the node names
+#
+@nodes = map {
+    if (/^([-\w]+)$/) {
+	$1;
+    } else {
+	die("*** Tainted node name: $_\n");
+    }
+} @nodes;
+
+#
+# Permission check
+#
+if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@nodes)) {
+    die "You do not have permission to modify one or more nodes\n";
+}
+
+#
+# Check the file to make sure it's readable - note, we want to make sure it's
+# readable by the real uid, since w'ere setuid root
+#
+if ($dirname) {
+    if (!-R $dirname) {
+	die "$dirname not readable\n";
+    }
+}
+
+#
+# Rsync each node.
+#
+my $errors = 0;
+NODE: foreach my $node (@nodes) {
+
+    #
+    # XXX: Need to check that the node is actually imageable via rsync!
+    #
+
+    #
+    # Figure out the parameters we need to pass to rsync for this node/op.
+    # global/common stuff added here..
+    #
+    my @rsync_args = "-ar";
+
+    # Are we deleting files that only exist at the destination?
+    if ($delete) {
+        push @rsync_args, "--delete";
+    }
+
+    # Are we doing this for real or testing?
+    if ($dryrun) {
+        push @rsync_args, "--dry-run";
+    }
+
+    #
+    # Check for the existence of rsync exclude/include lists
+    #
+    my $nameprefix = basename($dirname);
+    my $exclfile   = $nameprefix . ".exclude";
+    my $inclfile   = $nameprefix . ".include";
+
+    if (-R "$dirname/$exclfile") {
+        push @rsync_args, "--exclude-from=$dirname/$exclfile";
+    }
+
+    if (-R "$dirname/$inclfile") {
+        push @rsync_args, "--include-from=$dirname/$inclfile";
+    }
+
+    push @rsync_args, ("--exclude=$exclfile","--exclude=$inclfile");
+
+    #
+    # The operation we want to perform
+    #
+    my ($source, $dest);
+    OSWITCH: for ($operation) {
+	/^upload$/ && do {
+            $source = $dirname . "/";
+            $dest = "$node:/";
+	    last OSWITCH;
+	};
+
+	# No default, we've checked for a valid operation above
+    }
+
+    #
+    # Actually run rsync
+    # TODO - Squelch output
+    # TODO - Allow for some parallelism
+    #
+    print "Synching $node with $dirname\n";
+    my $commandstr = "$RSYNC " . join(" ",@rsync_args) . " $source $dest";
+
+    # Need to be root for the next part
+    $UID = $EUID;
+
+    dprint("$commandstr\n");
+    if (system($commandstr)) {
+	$errors++;
+	warn "Failed to sync node $node";
+    }
+}
+
+if ($errors) {
+    exit 1;
+} else {
+    exit 0;
+}
+
+sub dprint(@) {
+    if ($DEBUG) {
+	print @_;
+    }
+}
