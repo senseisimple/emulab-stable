@@ -9,13 +9,22 @@ my $net		= "fxp";
 my $pipe	= 1;
 my $DBOSID	= "FBSD40-STD";
 
-my $rsh		= "sshtb -q";
-my $ssh		= "sshtb -q";
-my $rcp		= "scptb -q";
+# Need to make sure we use the right identity file in case we're
+# setuid root and $ENV{HOME} is wrong
+my $identity    = "-i /root/.ssh/identity";
+my $rsh		= "sshtb $identity -q";
+my $ssh		= "sshtb $identity -q";
+my $rcp		= "scptb $identity -q";
 
 # Scrub environment
 $ENV{PATH} = "/usr/testbed/bin:/bin:/usr/bin:/usr/local/bin";
 delete @ENV{qw(IFS CDPATH ENV BASH_ENV)};
+
+# Apparently ssh checks to see if ruid != euid, and sets eduid=ruid
+# if so. So, let's let it see what it wants...
+if ($> == 0) {
+	$< =0;
+}
 
 my %delaynodes  = ();
 my %delaylinks  = ();
