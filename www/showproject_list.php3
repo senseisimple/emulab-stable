@@ -20,30 +20,25 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 
-#
-# Get the project list.
-#
 if ($isadmin) {
-    $query_result = DBQueryFatal("SELECT * FROM projects order by pid");
+    if (! $alternate_view) {
+	echo "<b><a href='showproject_list.php3?alternate_view=1'>
+                    Alternate View</a>
+              </b><br>\n";
+    }
+    else {
+	echo "<b><a href='showproject_list.php3'>
+                    Normal View</a>
+              </b><br>\n";
+    }
 }
 else {
-    $query_result =
-	DBQueryFatal("SELECT * FROM projects as p ".
-		     "left join group_membership as g on ".
-		     "     p.pid=g.pid and g.pid=g.gid ".
-		     "where g.uid='$uid'");
-}
-				   
-if (mysql_num_rows($query_result) == 0) {
-	if ($isadmin) {
-	    USERERROR("There are no projects!", 1);
-	}
-	else {
-	    USERERROR("You are not a leader of any projects!", 1);
-	}
+    $alternate_view = 0;
 }
 
 if ($isadmin) {
+    $query_result = DBQueryFatal("SELECT * FROM projects order by pid");
+    
     #
     # Process the query results for active projects so I can generate a
     # summary block (as per Jays request).
@@ -77,85 +72,138 @@ if ($isadmin) {
       </table>\n";
 }
 
-#
-# Now the project list.
-#
-echo "<table width=\"100%\" border=2 cellpadding=2 cellspacing=0 align=center>
-      <tr>
-          <td>PID</td>
-          <td>Name</td>
-          <td>Leader</td>
-          <td align=center>Days<br>Idle</td>
-          <td align=center>Expts<br>Created</td>
-          <td align=center>Expts<br>Running</td>
-          <td align=center>Nodes</td>
-	  <td align=center>Approved?</td>\n";
+function GENPLIST ($query_result)
+{
+    global $isadmin;
 
-#
-# Admin users get a "delete" option.
-# 
-if ($isadmin) {
-    echo "<td align=center>Delete</td>\n";
-}
-echo "</tr>\n";
-
-while ($projectrow = mysql_fetch_array($query_result)) {
-    $pid        = $projectrow[pid];
-    $headuid    = $projectrow[head_uid];
-    $Pname      = $projectrow[name];
-    $approved   = $projectrow[approved];
-    $created    = $projectrow[created];
-    $expt_count = $projectrow[expt_count];
-    $expt_last  = $projectrow[expt_last];
-
-    echo "<tr>
-              <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-              <td>$Pname</td>
-              <td><A href='showuser.php3?target_uid=$headuid'>
-                     $headuid</A></td>\n";
+    echo "<table width='100%' border=2
+                 cellpadding=2 cellspacing=0 align=center>
+          <tr>
+              <td>PID</td>
+              <td>(Approved?) Description</td>
+              <td>Leader</td>
+              <td align=center>Days<br>Idle</td>
+              <td align=center>Expts<br>Created</td>
+              <td align=center>Expts<br>Running</td>
+              <td align=center>Nodes</td>\n";
 
     #
-    # Sleazy! Use mysql query to convert dates to days and subtract!
-    #
-    if (isset($expt_last)) {
-	$idle_query = mysql_db_query($TBDBNAME,
-		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$expt_last\")");
-	$idle_row   = mysql_fetch_row($idle_query);
-	echo "<td>$idle_row[0]</td>\n";
-    }
-    else {
-	$idle_query = mysql_db_query($TBDBNAME,
-		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$created\")");
-	$idle_row   = mysql_fetch_row($idle_query);
-	echo "<td>$idle_row[0]</td>\n";
-    }
-
-    echo "<td>$expt_count</td>\n";
-
-    $count1 = mysql_db_query($TBDBNAME,
-		"SELECT count(*) FROM experiments where pid='$pid'");
-    $row1   = mysql_fetch_array($count1);
-	
-    $count2 = mysql_db_query($TBDBNAME,
-		"SELECT count(*) FROM reserved where pid='$pid'");
-    $row2   = mysql_fetch_array($count2);
-	
-    echo "<td>$row1[0]</td><td>$row2[0]</td>\n";
-
-    if ($approved) {
-	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
-    }
-    else {
-	echo "<td align=center><img alt=\"N\" src=\"redball.gif\"></td>\n";
-    }
-
+    # Admin users get a "delete" option.
+    # 
     if ($isadmin) {
-	echo "<td align=center><A href='deleteproject.php3?pid=$pid'>
-                     <img alt=\"o\" src=\"redball.gif\"></A></td>\n";
+	echo "<td align=center>Delete</td>\n";
     }
     echo "</tr>\n";
+
+    while ($projectrow = mysql_fetch_array($query_result)) {
+	$pid        = $projectrow[pid];
+	$headuid    = $projectrow[head_uid];
+	$Pname      = $projectrow[name];
+	$approved   = $projectrow[approved];
+	$created    = $projectrow[created];
+	$expt_count = $projectrow[expt_count];
+	$expt_last  = $projectrow[expt_last];
+
+	echo "<tr>
+                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
+                  <td>\n";
+	if ($approved) {
+	    echo "    <img alt='Y' src='greenball.gif'>";
+	}
+	else {
+	    echo "    <img alt='N' src='redball.gif'>\n";
+	}
+	echo "             $Pname</td>
+                  <td><A href='showuser.php3?target_uid=$headuid'>
+                         $headuid</A></td>\n";
+
+        #
+        # Sleazy! Use mysql query to convert dates to days and subtract!
+        #
+	if (isset($expt_last)) {
+	    $idle_query =
+		DBQueryFatal("select TO_DAYS(CURDATE()) - ".
+			     "                    TO_DAYS('$expt_last')");
+	    $idle_row   = mysql_fetch_row($idle_query);
+	    echo "<td>$idle_row[0]</td>\n";
+	}
+	else {
+	    $idle_query =
+		DBQueryFatal("select TO_DAYS(CURDATE()) - ".
+			     "              TO_DAYS('$created')");
+	    $idle_row   = mysql_fetch_row($idle_query);
+	    echo "<td>$idle_row[0]</td>\n";
+	}
+
+	echo "<td>$expt_count</td>\n";
+
+	# Number of Current Experiments.
+	$count1 =
+	    DBQueryFatal("SELECT count(*) FROM experiments where pid='$pid'");
+	$row1   = mysql_fetch_array($count1);
+
+	# Number of nodes reserved.
+	$count2 =
+	    DBQueryFatal("SELECT count(*) FROM reserved where pid='$pid'");
+	$row2   = mysql_fetch_array($count2);
+	
+	echo "<td>$row1[0]</td><td>$row2[0]</td>\n";
+
+	if ($isadmin) {
+	    echo "<td align=center><A href='deleteproject.php3?pid=$pid'>
+                      <img alt='o' src='redball.gif'></A>
+                  </td>\n";
+	}
+	echo "</tr>\n";
+    }
+    echo "</table>\n";
 }
-echo "</table>\n";
+
+#
+# Get the project list for non admins.
+#
+if (! $isadmin) {
+    $query_result =
+	DBQueryFatal("SELECT * FROM projects as p ".
+		     "left join group_membership as g on ".
+		     "     p.pid=g.pid and g.pid=g.gid ".
+		     "where g.uid='$uid'");
+				   
+    if (mysql_num_rows($query_result) == 0) {
+	USERERROR("You are not a member of any projects!", 1);
+    }
+    
+    GENPLIST($query_result);
+}
+else {
+    if ($alternate_view) {
+	$query_result =
+	    DBQueryFatal("select * FROM projects ".
+			 "where expt_count>0 order by name");
+
+	if (mysql_num_rows($query_result)) {
+	    echo "<center>
+                   <h3>Active Projects</h3>
+                  </center>\n";
+	    GENPLIST($query_result);
+	}
+
+	$query_result =
+	    DBQueryFatal("select * FROM projects ".
+			 "where expt_count=0 order by name");
+
+	if (mysql_num_rows($query_result)) {
+	    echo "<br><center>
+                   <h3>Inactive Projects</h3>
+                  </center>\n";
+	    GENPLIST($query_result);
+	}
+
+    }
+    else {
+	GENPLIST($query_result);
+    }
+}
 
 #
 # Standard Testbed Footer

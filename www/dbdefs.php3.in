@@ -775,9 +775,13 @@ function TBProjList($uid, $access_type)
     global $TB_PROJECT_MAKEOSID;
     global $TB_PROJECT_MAKEIMAGEID;
     global $TB_PROJECT_MAKEGROUP;
+    global $TB_PROJECT_READINFO;
     $result = array();
     
-    if ($access_type == $TB_PROJECT_MAKEGROUP) {
+    if ($access_type == $TB_PROJECT_READINFO) {
+	$trust_clause = "trust!='none'";
+    }
+    elseif ($access_type == $TB_PROJECT_MAKEGROUP) {
 	$trust_clause = "trust='project_root'";
     }
     elseif ($access_type == $TB_PROJECT_CREATEEXPT ||
