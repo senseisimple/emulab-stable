@@ -3,7 +3,7 @@
  A Reasonably Effective Algorithm for Genetically Assigning Nodes.
  Chad Barb, May 3, 2002
 
- applies a standard genetic algorithm (with crossover)
+ Applies a standard genetic algorithm (with crossover)
  to solve the problem of mapping a smaller "virtual" graph
  into a larger "physical" graph, such that the actual 
  weights between acquired nodes are similar to desired weights.
@@ -23,6 +23,10 @@
        A good weight seems to be around 7, but the appropriate
        value is pretty much application-dependent.
 
+   -m  Handle multiple virtual->physical mapping.
+       Asks for 'p' lines of input, with the maximum number of virtual
+       nodes allowed on a given physical node, per line (See below)
+
    -r <minrounds>
        Specify the minimum number of rounds to go before stopping.
        Note that the algorithm won't actually stop until
@@ -40,6 +44,8 @@
 
  * One line containing a single number 'p'-- the number of physical nodes.
  * 'p' lines containing the name of each physical node
+ ? 'p' lines containing the maximum number of virtual nodes each 
+       physical node can accommodate. ('-m' switch only)
  * 'p' lines each containing 'p' space-delimited numbers;
        this is a P x P matrix of the _actual_ weight from pnodes to 
        pnodes. For latencies, there are zeros along the diagonal.
@@ -47,7 +53,9 @@
 
 
  * One line containing a single number 'v'-- the number of virtual nodes.
- * 'v' lines containing the name of each virtual node
+ * 'v' lines containing the name of each virtual node.
+       If the name is prefaced with '*', then this node will be permanently
+       mapped ("fix"ed) to the physical node of the same name. 
  * 'v' lines each containing 'v' space delimited numbers;
        this is a V x V matrix of the _desired_ weight between vnodes.
        '-1's indicate "don't care"s.. (e.g. for the weight between two
@@ -110,12 +118,18 @@ using namespace std;
 
 // keep track of user names for nodes.
 static map< int, string > pnodeNames;
+static map< string, int > reversePNodeNames;
 static map< int, string > vnodeNames;
 
 static int pnodes, vnodes;
 
 static int pLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
 static int vDesiredLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
+
+static int maxplex[MAX_NODES];
+static int userSpecifiedMultiplex = 0;
+
+static int fixed[MAX_NODES];
 
 static int dimensions;
 static float d2weight;
@@ -128,6 +142,8 @@ class Solution
 {
 public:
   int pnode_mapping[MAX_NODES]; // -1 means nothin'
+
+  int vnode_mapping[MAX_NODES];
   float error;
 };
 
@@ -164,23 +180,13 @@ static inline void calcError( Solution * t )
     printf("Error listing:\n");
   }
 
-  int vnode_mapping[MAX_NODES];
-
-  {
-    for (int x = 0; x < pnodes; x++) {
-      if (t->pnode_mapping[x] != -1) {
-	vnode_mapping[ t->pnode_mapping[x] ] = x;
-      }
-    }
-  }
-
   {
     for (int z = 0; z < dimensions; z++) {
       for (int x = 0; x < vnodes; x++) {
 	for (int y = 0; y < vnodes; y++) {
 	  int should = vDesiredLatency[z][x][y];
 	  if (should != -1) {
-	    int is     = pLatency[z][ vnode_mapping[x] ][ vnode_mapping[y] ];
+	    int is     = pLatency[z][ t->vnode_mapping[x] ][ t->vnode_mapping[y] ];
 	    if (should != is) { 
 	      float errDelta;
 
@@ -239,11 +245,16 @@ static inline void mutate( Solution * t )
   while(1) {
     // forecast calls for a 1% chance of mutation...
     if ((rand() % 1000) < MUTATE_PROB) { break; }
-    int a = rand() % pnodes;
-    int b = rand() % pnodes;
-    int temp = t->pnode_mapping[a];
-    t->pnode_mapping[a] = t->pnode_mapping[b];
-    t->pnode_mapping[b] = temp;
+    // swap mutation. 
+    int a, b;
+    do {
+      a = rand() % vnodes;
+      b = rand() % vnodes;
+    } while (fixed[a] != -1 || fixed[b] != -1);
+    int temp = t->vnode_mapping[a];
+    t->vnode_mapping[a] = t->vnode_mapping[b];
+    t->vnode_mapping[b] = temp;
+    // XXX add a reassign mutation.
   }
 }
 
@@ -252,21 +263,18 @@ static inline void mutate( Solution * t )
 // (perhaps have a limited retry)
 static inline void splice( Solution * t, Solution * a, Solution * b)
 {
-  int vnode_mapping_a[MAX_NODES];
-  int vnode_mapping_b[MAX_NODES];
-  int vnode_mapping_t[MAX_NODES];
-  int pnode_used[MAX_NODES];
+  // temp storage so we don't clobber t unless the child turns out to be
+  // cromulent.
+  int vnode_mapping_t[MAX_NODES]; 
 
-  bzero( pnode_used, sizeof( pnode_used ) );
+  int pnode_uses[MAX_NODES];
 
-  {
-    for (int x = 0; x < pnodes; x++) {
-      if (a->pnode_mapping[x] != -1) {
-	vnode_mapping_a[ a->pnode_mapping[x] ] = x;
-      }
-      if (b->pnode_mapping[x] != -1) {
-	vnode_mapping_b[ b->pnode_mapping[x] ] = x;
-      }
+  bzero( pnode_uses, sizeof( pnode_uses ) );
+
+  for (int i = 0; i < vnodes; i++) {
+    if (fixed[i] != -1) {
+      vnode_mapping_t[i] = fixed[i];
+      ++pnode_uses[ fixed[i] ];
     }
   }
 
@@ -281,27 +289,28 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
   int pos = rand() % vnodes;
   for (int i = 0; i < vnodes; i++) {
     pos = (pos + 1) % vnodes;
+    if (fixed[pos] != -1) continue;
     if (rand() % 2) {
-      if (!pnode_used[ vnode_mapping_a[pos] ]) {
-	vnode_mapping_t[pos] = vnode_mapping_a[pos];
-	pnode_used[ vnode_mapping_a[pos] ]= 1;
+      if (pnode_uses[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
+	vnode_mapping_t[pos] = a->vnode_mapping[pos];
+	++pnode_uses[ a->vnode_mapping[pos] ];
       } else {
-	if (!pnode_used[ vnode_mapping_b[pos] ]) {
-	  vnode_mapping_t[pos] = vnode_mapping_b[pos];
-	  pnode_used[ vnode_mapping_b[pos] ]= 1;
+	if (pnode_uses[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
+	  vnode_mapping_t[pos] = b->vnode_mapping[pos];
+	  ++pnode_uses[ b->vnode_mapping[pos] ];
 	} else {
 	  // failed mating.
 	  return;
 	}
       }
     } else {
-      if (!pnode_used[ vnode_mapping_b[pos] ]) {
-	vnode_mapping_t[pos] = vnode_mapping_b[pos];
-	pnode_used[ vnode_mapping_b[pos] ]= 1;
+      if (pnode_uses[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
+	vnode_mapping_t[pos] = b->vnode_mapping[pos];
+	++pnode_uses[ b->vnode_mapping[pos] ];
       } else {
-	if (!pnode_used[ vnode_mapping_a[pos] ]) {
-	  vnode_mapping_t[pos] = vnode_mapping_a[pos];
-	  pnode_used[ vnode_mapping_a[pos] ]= 1;
+	if (pnode_uses[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
+	  vnode_mapping_t[pos] = a->vnode_mapping[pos];
+	  ++pnode_uses[ a->vnode_mapping[pos] ];
 	} else {
 	  // failed mating.
 	  return;
@@ -310,14 +319,10 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
     }
   }
 
-  // ok.. good one.
-
-  for(int c = 0; c < pnodes; c++) {
-    t->pnode_mapping[c] = -1;
-  }
-
+  // ok.. good one..
+  // since we have a cromulent child, we now clobber t.
   for(int d = 0; d < vnodes; d++) {
-    t->pnode_mapping[ vnode_mapping_t[d] ] = d;
+    t->vnode_mapping[ d ] = vnode_mapping_t[d];
   }
 
   // Mazeltov!
@@ -330,16 +335,27 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
 // for the initial population.
 static inline void generateRandomSolution( Solution * t )
 {
-  for (int i = 0; i < pnodes; i++) { t->pnode_mapping[i] = -1; }
-  for (int j = 0; j < vnodes; j++) {
-    while(1) {
-      int r = rand() % pnodes;
-      if (t->pnode_mapping[r] == -1) {
-	t->pnode_mapping[r] = j;
-	break;
-      }
+  int pnode_uses[MAX_NODES];
+  bzero( pnode_uses, sizeof( pnode_uses ) );
+
+  for (int i = 0; i < vnodes; i++) {
+    if (fixed[i] != -1) {
+      t->vnode_mapping[i] = fixed[i];
+      ++pnode_uses[ fixed[i] ];
     }
   }
+
+  for (int i = 0; i < vnodes; i++) {
+    if (fixed[i] == -1) {
+      int x;
+      do {
+	x = rand() % pnodes;
+      } while( pnode_uses[x] >= maxplex[x] );
+      ++pnode_uses[x];
+      t->vnode_mapping[i] = x;
+    }
+  }
+
   calcError<false>( t );
 }
 
@@ -369,10 +385,13 @@ int main( int argc, char ** argv )
 
   int ch;
 
-  while ((ch = getopt(argc, argv, "v2:r:R:")) != -1) {
+  while ((ch = getopt(argc, argv, "mv2:r:R:")) != -1) {
     switch (ch) {
     case 'v': 
       verbose++; 
+      break;
+    case 'm':
+      userSpecifiedMultiplex++;
       break;
     case '2': 
       dimensions = 2;
@@ -403,6 +422,22 @@ int main( int argc, char ** argv )
       gets( line );
       sscanf( line, "%s", name );
       pnodeNames[i] = string( name );
+      reversePNodeNames[string(name)] = i;
+    }
+
+    if (userSpecifiedMultiplex) {
+      if (verbose) { printf("Enter %i numbers, one per line, indicating the"
+			    " maximum number of virtual nodes allowed on each"
+			    " physical node.\n", pnodes ); }
+      for (int i = 0; i < pnodes; i++) {
+	char name[1024];
+	gets( line );
+	sscanf( line, "%i", &(maxplex[i]));
+      }
+    } else {
+      for (int i = 0; i < pnodes; i++) {
+	maxplex[i] = 1;
+      }
     }
 
     for (int z = 0; z < dimensions; z++) {
@@ -429,12 +464,28 @@ int main( int argc, char ** argv )
     gets( line );
     sscanf( line, "%i", &vnodes );
 
-    if (verbose) { printf("Okay, enter %i names for the virtual nodes, one per line.\n", vnodes ); }
+    if (verbose) { printf("Okay, enter %i names for the virtual nodes, one per line.\n"
+			  "(Preface name with '*' to fix assignment to pnode of the same name.\n", vnodes ); }
     for (int i = 0; i < vnodes; i++) {
       char name[1024];
+      char *namep = name;
       gets( line );
       sscanf( line, "%s", name );
-      vnodeNames[i] = string( name );
+      if (namep[0] == '*') {
+	namep++;
+	map< string, int >::iterator it = reversePNodeNames.find( string( namep ) );
+	if (it == reversePNodeNames.end()) {
+	  fprintf(stderr,"vnode '%s' does not match any pnode; can't fix.\n", namep );
+	  exit(-1);
+	}
+	if (verbose) { 
+	  printf("Fixing assignment from vnode %s to pnode %s.\n", namep, namep );
+	}
+	fixed[i] = reversePNodeNames[ string( namep ) ];
+      } else {
+	fixed[i] = -1;
+      }
+      vnodeNames[i] = string( namep );
     }
 
     for (int z = 0; z < dimensions; z++) {
@@ -502,13 +553,12 @@ int main( int argc, char ** argv )
 
   {
     if (verbose) { printf("\nYour solution is as follows:\n"); }
-    for (int x = 0; x < pnodes; x++) {
-      if (pool[0].pnode_mapping[x] != -1) {
+    for (int x = 0; x < vnodes; x++) {
 	printf("%s mapsTo %s\n", 
-	       vnodeNames[pool[0].pnode_mapping[x]].c_str(),
-	       pnodeNames[x].c_str() );
-      }
+	       vnodeNames[x].c_str(),
+	       pnodeNames[pool[0].vnode_mapping[x]].c_str() );
     }
+
     printf("\n");
 
     // dump a detailed report of the returned solution's errors.
