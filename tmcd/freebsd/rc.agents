@@ -7,3 +7,7 @@ if [ -x /etc/testbed/rc.delayagent ]; then
         /etc/testbed/rc.delayagent
 fi
 
+if [ -x /etc/testbed/rc.traffic  ]; then
+        echo "Starting traffic generators ..."
+	/etc/testbed/rc.traffic
+fi

@@ -19,7 +19,8 @@ use Exporter;
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
-	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY
+	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
+	 TMCCCMD_BOSSINFO
 
        );
 
@@ -62,6 +63,7 @@ sub FINDIF()		{ "$SETUPDIR/findif"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
 sub TMMOUNTDB()		{ "$SETUPDIR/mountdb"; }
 sub TMROUTECONFIG()     { "$SETUPDIR/router.conf"; }
+sub TMTRAFFICCONFIG()	{ "$SETUPDIR/rc.traffic"; }
 
 #
 # These are the TMCC commands.
@@ -80,6 +82,8 @@ sub TMCCCMD_STARTSTAT()	{ "startstatus"; }
 sub TMCCCMD_READY()	{ "ready"; }
 sub TMCCCMD_MOUNTS()	{ "mounts"; }
 sub TMCCCMD_ROUTING()	{ "routing"; }
+sub TMCCCMD_TRAFFIC()	{ "trafgens"; }
+sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
 
 #
 # Some things never change.
@@ -156,7 +160,7 @@ sub inform_reboot()
 sub cleanup_node () {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
-    unlink TMROUTECONFIG;
+    unlink TMROUTECONFIG, TMTRAFFICCONFIG;
     unlink TMMOUNTDB . ".db";
 
     printf STDOUT "Resetting %s file\n", HOSTSFILE;
@@ -715,6 +719,69 @@ sub dostartupcmd ()
     return 0;
 }
 
+use Socket;
+
+sub dotrafficconfig()
+{
+    my $didopen = 0;
+    my $pat;
+    my $TM;
+    my $boss;
+    
+    $TM = OPENTMCC(TMCCCMD_BOSSINFO);
+    ($boss) = split(" ", <$TM>);
+    close($TM);
+
+    $TM = OPENTMCC(TMCCCMD_TRAFFIC);
+
+    $pat = q(MYNAME=([-\w.]+) MYPORT=(\d+) );
+    $pat .= q(PEERNAME=([-\w.]+) PEERPORT=(\d+) );
+    $pat .= q(PROTO=(\w+) ROLE=(\w+));
+
+    while (<$TM>) {
+	if ($_ =~ /$pat/) {
+	    #
+	    # The following is specific to the modified TG traffic generator:
+	    #  trafgen [-s server] [-p serverport] \
+	    #          [ -T targetip.targetport ] [-P proto] [-R role]
+	    # N.B. serverport is not needed right now
+	    #
+	    my $ownaddr = inet_ntoa(my $ipaddr = gethostbyname($1));
+	    my $ownport = $2;
+	    my $peeraddr = inet_ntoa($ipaddr = gethostbyname($3));
+	    my $peerport = $4;
+	    my $proto = $5;
+	    my $role = $6;
+	    my $target;
+
+	    if ($role eq "sink") {
+		$target = "$ownaddr.$ownport";
+	    }
+	    else {
+		$target = "$peeraddr.$peerport";
+	    }
+
+	    if (! $didopen) {
+		open(RC, ">" . TMTRAFFICCONFIG)
+		    or die("Could not open " . TMTRAFFICCONFIG . ": $!");
+		print RC "#!/bin/sh\n";
+		$didopen = 1;
+	    }
+	    print RC "$SETUPDIR/trafgen -s $boss -T $target -P $proto -R $role &\n";
+	}
+	else {
+	    warn "*** WARNING: Bad traffic line: $_";
+	}
+    }
+    close($TM);
+    if ($didopen) {
+	close(RC);
+	chmod(0755, TMTRAFFICCONFIG);
+    }
+    return 0;
+}
+
+
 #
 # Boot Startup code. This is invoked from the setup OS dependent script,
 # and this fires up all the stuff above.
@@ -775,6 +842,12 @@ sub bootsetup()
     #
     print STDOUT "Checking Testbed routing configuration ... \n";
     dorouterconfig();
+
+    #
+    # Traffic generator Configuration.
+    #
+    print STDOUT "Checking Testbed traffic generation configuration ... \n";
+    dotrafficconfig();
 
     #
     # RPMS
