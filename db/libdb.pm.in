@@ -2628,6 +2628,7 @@ sub TBGetSiteVar($)
 		   "virt_agents",
 		   "virt_routes",
 		   "virt_vtypes",
+		   "virt_node_desires",
 		   "nseconfigs",
 		   "eventlist",
 		   "ipsubnets");
