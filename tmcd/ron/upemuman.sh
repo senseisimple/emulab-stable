@@ -5,6 +5,8 @@ chown root update vnodesetup
 chmod u+s update vnodesetup
 chown root /usr/bin/suidperl
 chmod u+s /usr/bin/suidperl
+chown emulabman client.pem emulab.pem
+chmod 640 client.pem emulab.pem
 
 cp vtund /usr/local/sbin
 /usr/bin/install -c -o root -g wheel -d -m 755 -o root -g 0 /var/log/vtund
