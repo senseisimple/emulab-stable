@@ -1,22 +1,18 @@
 #!/usr/local/bin/perl -w
 #########################################################################
-# SnmpIt! - An SNMP Tool for the Intel 510T Switch                       #
+# SnmpIt! - An SNMP Tool for the Intel 510T Switch                      #
 #                                                                       #
 # Run with -h option to see command line syntax/options.                #
 #                                                                       #
 #      Author: Mac Newbold, Flux Research Group, University of Utah     #
 # Last Change: March 1999                                               #
-#     Version: 0.1b                                                     #
+#     Version: 0.2b                                                     #
 #                                                                       #
 #########################################################################
 
 #
 # INIT SECTION =========================================================
 #
-use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
-use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/arch/auto/SNMP';
-use SNMP;
-#$SNMP::debugging = 1;
 
 my $S = "";  #Switch IP addr.
 my @p = ();  #Port numbers
@@ -25,16 +21,21 @@ my $E = 0;   #Enable (bool)
 my $a = "";  #Auto Negotiation (enable/disable) (two-way switch)
 my $d = "";  #Duplex (half/full)
 my $s = 0;   #Speed (10/100)
+my $A = "";  #AutoVLAN filename
 my $C = "";  #Create VLAN - name
 my @v = ();  #VLAN Members - list of MAC Addresses
 my $B = 0;   #Block (bool) (two-way switch)
 my $V = 1;   #Verify Only (bool) (two-way switch)
 my $L = 0;   #Loud/Verbose (bool) !Must default quiet; switch only turns on!
 
-&ParseArgs(*ARGV,*S,*p,*D,*E,*a,*d,*s,*C,*v,*B,*V,*L);
+&ParseArgs(*ARGV,*S,*p,*D,*E,*a,*d,*s,*A,*C,*v,*B,*V,*L);
 #print "Returned: S=$S p=@p D=$D E=$E a=$a d=$d s=$s C=$C v=@v B=$B\n";
 
-#print "Loading MIBs...\n";
+use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/lib';
+use lib '/n/moab/x/newbold/ucd-snmp-4.1.1/perl/SNMP/blib/arch/auto/SNMP';
+use SNMP;
+#$SNMP::debugging = 1;
+
 &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
 &SNMP::addMibFiles('/usr/local/share/snmp/mibs/RFC1155-SMI.txt',
 		   '/usr/local/share/snmp/mibs/RFC1213-MIB.txt',
@@ -93,6 +94,11 @@ if ($a) {
     }    
 }
 
+if ($C) {
+    #This is to make ONE vlan - for multiple, use -A AutoVLAN
+
+}
+
 #
 # END OF MAIN  =================================================
 #
@@ -107,7 +113,7 @@ if ($a) {
 # SUB PARSEARGS----------------------
 #
 sub ParseArgs {
-    local(*CMDS,*S,*p,*D,*E,*a,*d,*s,*C,*v,*B,*V,*L) = @_;
+    local(*CMDS,*S,*p,*D,*E,*a,*d,*s,*A,*C,*v,*B,*V,*L) = @_;
     my $help=0; 
     if (@CMDS < 3) {$help = 2; }
     while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
@@ -138,7 +144,10 @@ sub ParseArgs {
 	elsif (/^\+a(.*)/) {$a="enable";}
 	elsif (/^-d(.*)/) {$d = ($1 ? $1 : shift(@CMDS));}
 	elsif (/^-s(.*)/) {$s = ($1 ? $1 : shift(@CMDS));}
-	elsif (/^-C(.*)/) {$C = ($1 ? $1 : shift(@CMDS));}
+	elsif (/^-A(.*)/) {$A = ($1 ? $1 : shift(@CMDS));}
+	elsif (/^-C(.*)/) {$C = ( !(@CMDS==0 || $CMDS[0] =~ /^(-|\+)(.*)/) ? 
+				  ($1 ? $1 : shift(@CMDS)) :
+				  "NoName");}
 	elsif (/^-v(.*)/) {
 	    push(@v, ($1 ? $1 : shift(@CMDS)));
 	    while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) { 
@@ -156,10 +165,11 @@ sub ParseArgs {
 	print
 	    "SnmpIt! - An SNMP Tool for the Intel 510T Switch\n",
 	    "Syntax:\n",
-	    "$0 [-h] [-L] -S<switch> [(+|-)B] [(+|-)V]\n",
+	    "$0 [-help] [-L] -S<switch> [(+|-)B] [(+|-)V]\n",
 	    "\t[-p<port> <port> <port>...] [-R <x>..<y>]\n",
 	    "\t[-D|-E] [[+|-]a] [-s<speed>] [-d<duplex>]\n", 
-	    "\t[-C<vlan name> -v<vlan memeber MAC>]\n";
+	    "\t[-C[<vlan name>] -v<vlan memeber MAC>]\n",
+	    "\t[-A<vlan data filename>]";
     }
     if ($help == 1) {
 	print
@@ -176,6 +186,7 @@ sub ParseArgs {
 	    "  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex\n",
 	    "  -s    Port Speed (10 or 100 Mbits)\n",
 	    "  -d    Port Duplex (half or full)\n",
+	    "  -A    AutoVLAN - Automatically set up set of VLANs\n",
 	    "  -C    Create VLAN\n",
 	    "  -v    Add member to VLAN\n";
     }
@@ -207,8 +218,11 @@ sub ParseArgs {
     $n=0;
     while(@v != 0 && $n < @v) {
 	die("Invalid MAC Address ",$v[$n],". Must be 6 byte Hex value.\n")
-	    if (! ( ($v[$n]=~ /^([a-f]|\d)*$/) && (length ($v[$n]) == 12)));
+	    if (! ( ($v[$n]=~ /^([a-f]|\d)*$/i) && (length ($v[$n]) == 12)));
 	$n++;
+    }
+    if ($C eq "NoName") {
+	$C = $v[0];
     }
 }
 
