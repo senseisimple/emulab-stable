@@ -1,0 +1,108 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# usage: webcontrol [-m message] [-l login | nologin]
+#
+sub usage()
+{
+    print STDOUT "Usage: webcontrol [-m message] [-l login | nologin]\n";
+    exit(-1);
+}
+my  $optlist = "m:l:";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 0) {
+    usage();
+}
+my $setmesg = 0;
+my $message = "";
+if (defined($options{"m"})) {
+    $setmesg = 1;
+    $message = $options{"m"};
+}
+my $setlogin = 0;
+my $logins   = 1;
+if (defined($options{"l"})) {
+    $setlogin = 1;
+    if ($options{"l"} eq "login") {
+	$logins = 1;
+    }
+    elsif ($options{"l"} eq "nologin") {
+	$logins = 0;
+    }
+    else {
+	usage();
+    }
+}
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# Only root or admin types!
+# 
+if ($UID != 0) {
+    ($name) = getpwuid($UID)
+	or die "$UID not in passwd file\n";
+
+    $db_result = $DB->query("select admin from users where uid='$name'");
+    @row = $db_result->fetchrow_array();
+    if ($row[0] != 1) {
+	die("Only root or TB administrators can control the web interface.\n");
+    }
+}
+
+if ($setmesg) {
+    if ($message eq "") {
+	print "Clearing Web Message of the Day\n";
+
+    	$db_result = $DB->query("delete from loginmessage");
+    }
+    else {
+	print "Setting Web Message of the Day to $message\n";
+
+	$db_result = $DB->query("replace into loginmessage (valid, message) ".
+				"values(1, '$message')");
+    }
+}
+
+if ($setlogin) {
+    if ($logins) {
+	print "Enabling Web Interface logins\n";
+
+    	$db_result = $DB->query("delete from nologins");
+    }
+    else {
+	print "Disabling Web Interface logins\n";
+
+	$db_result = $DB->query("replace into nologins (nologins) values(1)");
+    }
+}
+

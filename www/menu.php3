@@ -220,17 +220,23 @@ function WRITESIDEBAR() {
               </tr>\n";
     }
     #
-    # Okay, reminder for admin types who won't be turned away when
-    # nologins is set in the DB. The blinking is for Mike, who says
-    # he really likes it. 
+    # MOTD. Set this with the webcontrol script.
     #
-    if ($login_status != $STATUS_NOLOGINS && NOLOGINS()) {
+    # The blinking is for Mike, who says he really likes it. 
+    #
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT message FROM loginmessage");
+    
+    if (mysql_num_rows($query_result)) {
+    	$row = mysql_fetch_row($query_result);
+	$message = $row[0];
+    
 	echo "<tr>
                 <td align=center>
                  <b><blink>
                    <span class=sidebarbutton>
                     <font size=\"+1\" color=RED>
-                      Maintenance Mode.<br>Please GO AWAY!
+                      $message
                     </font>
                    </span>
                  </blink><b>
