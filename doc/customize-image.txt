@@ -1,0 +1,240 @@
+Instructions for creating a site-customized image from a "generic" image
+provided by Utah.  The basic procedure is:
+
+  - load the image on a testbed machine
+  - customize both FreeBSD and Linux filesystems
+
+We will provide you with a generic disk image.  This disk image is one
+which has both a FreeBSD partition and a Linux partition.  You will need
+to customize both.  By convention FreeBSD is in DOS partition #1 and Linux
+in DOS partition #2.
+
+You will need to have the Emulab network-booted, memory-filesystem-based,
+FreeBSD systems (hereafter known as the MFSes).  If you have not done this
+yet, do it now.  If you do not know what I am talking about, contact
+testbed-ops@emulab.net.
+
+In particular, the customization of the disk partitions is done using a
+node booted into the "admin" MFS.  If you have followed the Emulab setup
+directions and have added nodes to your testbed to the point where they
+are now in the "hwdown" experiment, they should already be in the admin MFS.
+At this point you should be able to pick one and slogin as root from your
+boss machine.
+
+If the node does not respond to slogin and you have serial consoles hooked
+up, connect to the console, reboot the node and wait for the Emulab pxeboot
+prompt:
+
+	Type a key for interactive mode (quick, quick!)
+
+So hit the space bar (quick, quick!) and you go into interactive mode
+where you can tell it to boot from the admin MFS:
+
+	loader:/tftpboot/freebsd
+
+Now on with the show.
+
+
+A. Load the image on a testbed machine.
+
+We will assume the machine is called "pc1" in the following directions.
+
+* Put the Utah-provided generic image in /usr/testbed/images on your boss.
+
+* Boot pc1 into the admin MFS as described above
+
+* Copy the frisbee binary to the MFS.
+  Due to a lack of foresight, the frisbee client binary is not in the
+  admin MFS, so you need to copy it over there.  Copy the frisbee binary
+  that was part of this tarball over to the node:
+
+      scp frisbee pc1:/usr/testbed/bin
+
+* Login as root.
+  Either:
+
+      sudo slogin pc1
+
+  from your boss node, or login as root on the console.
+
+* Use frisbee to load the disk.
+  On boss do:
+
+      /usr/testbed/sbin/frisbeed -m 234.5.6.1 -p 3564 \
+	/usr/testbed/images/FBSD47+RHL73-GENERIC.ndz
+
+  On the node do:
+
+      /usr/testbed/bin/frisbee -m 234.5.6.1 -p 3564 /dev/ad0
+
+  (or "/dev/da0" for SCSI).  Image loading should take anywhere from
+  45 seconds, to several minutes.  The client should print '.'s as it
+  makes progress.
+
+Now you can begin customizing the FreeBSD and Linux partitions.
+
+
+B. Customize FreeBSD:
+
+First, mount the FreeBSD filesystems:
+
+      mount /dev/ad0s1a /mnt
+      mount /dev/ad0s1e /mnt/var
+      mount /dev/ad0s1f /mnt/usr
+
+(replacing "ad0" with "da0" if you have a SCSI root disk).
+Now you can update the necessary files as follows.
+	
+The MFS has a much scaled-down set of binaries.  To get access to a more
+full-featured system, you can run binaries from the disk image itself:
+
+     ldconfig /mnt/usr/lib /mnt/usr/X11R6/lib /mnt/usr/local/lib
+     set path=($path /mnt/sbin /mnt/bin /mnt/usr/sbin /mnt/usr/bin)
+
+Now update the following files:
+
+* /mnt/root/.ssh/authorized_keys
+
+  Put in local boss root pub key.  Leave in Utah (Emulab) pub key if
+  acceptable (if you want/need our help debugging).  Otherwise, remove it.
+
+* /mnt/etc/localtime
+
+  Copy the correct file over from /mnt/usr/share/zoneinfo
+
+* /mnt/etc/master.passwd
+
+  Change the root password.  The password needs to be changed in the
+  etc/emulab subdirectory as well:
+
+      chroot /mnt passwd root
+      <set password>
+      cp -p /mnt/etc/master.passwd /mnt/etc/emulab/
+
+* /mnt/etc/ssh/ssh_host*
+
+  We use the same host key for all images and all OSes.  If you have
+  already generate a set of site-specific host keys, copy them to the
+  disk with:
+
+      cp -p /etc/ssh/ssh_host* /mnt/etc/ssh/
+
+  and skip to the next bullet item.  If you have NOT generated appropriate
+  host keys, you can generate them with:
+
+      ssh-keygen -t rsa1 -N "" -f /mnt/etc/ssh/ssh_host_key
+      ssh-keygen -t rsa -N "" -f /mnt/etc/ssh/ssh_host_rsa_key
+      ssh-keygen -t dsa -N "" -f /mnt/etc/ssh/ssh_host_dsa_key
+
+  Note that you will have to go back and install these keys in the sources
+  for your frisbee/freebsd MFSes later using the updating instructions in
+  the README file in the MFS tarball.
+
+* /mnt/etc/emulab/{client,emulab}.pem
+
+  These should have been created on your boss node when you did the boss
+  setup.  So from your boss node do:
+
+      sudo scp -p /usr/testbed/etc/{client,emulab}.pem pc1:/mnt/etc/emulab/
+
+That is it for FreeBSD.  Now remount the filesystems read-only so you
+can still run binaries but don't accidentally clobber anything:
+
+      cd /
+      mount -u -o ro /mnt/usr
+      mount -u -o ro /mnt/var
+      mount -u -o ro /mnt
+
+and move on to updating the Linux partition on the disk.
+
+
+C. Customize Linux:
+
+Mount the Linux filesystems (recall that the FreeBSD filesystems are
+still mounted on /mnt, so we use another directory):
+
+      mkdir /mnt2
+      mount -t ext2fs /dev/ad0s2 /mnt2
+
+(replacing "ad0" with "da0" if you have a SCSI root disk).
+Now you can update the necessary files as follows.
+	
+* /mnt2/root/.ssh/authorized_keys
+
+  Copy over from the FreeBSD partition:
+
+      cp -p /mnt/root/.ssh/authorized_keys /mnt2/root/.ssh/
+
+* /mnt2/etc/shadow
+
+  Copy in the password hash for root from the FreeBSD password file
+  (/mnt/etc/master.passwd) to /mnt2/etc/shadow.  Then copy that file to
+   the emulab subdirectory:
+
+      cp -p /mnt2/etc/shadow /mnt2/etc/emulab/
+
+* /mnt2/etc/localtime
+
+  Copy the correct file over from /mnt2/usr/share/zoneinfo
+
+* /mnt2/etc/ssh/ssh_host*
+
+  Copy the host keys you created for FreeBSD above:
+
+      cp -p /mnt/etc/ssh/ssh_host* /mnt2/etc/ssh/
+
+* /etc/testbed/{client,emulab}.pem
+
+  Copy over from the FreeBSD side:
+
+      cp -p /mnt/etc/emulab/*.pem /mnt2/etc/emulab/
+
+Now unmount the Linux filesystem:
+
+      umount /mnt2
+
+and fsck it for good luck.  Actually, not only good luck but also to reset
+the time stamp that forces a periodic fsck:
+
+      e2fsck /dev/ad0s2
+
+again, replace "ad" with "da" for SCSI.
+
+
+D. Dealing with SCSI disks (or RAID).
+   [ THIS SECTION NEEDS WORK ]
+
+* Since we have IDE disks, it takes a little more work to create an
+  image on IDE disks for a site with SCSI disks.
+
+* For FreeBSD, you need to make sure that the kernel includes support
+  for the host adaptor in question.  You can look at output from the
+  "newnode" (aka GENERIC) kernel if necessary.  If the HA is not already
+  supported in our various TESTBED configs, add it and rebuild and install
+  the kernels in the image.  Then, in the image, you need to change /etc/fstab
+  to refer to "da" disks rather than "ad" disks.
+
+* For Linux, it is even more of a PITA.  As with BSD, you need to configure
+  our kernel with generic SCSI support and support for the HA.  Note that
+  by default, Linux includes SCSI as a module, but to load a module into the
+  Linux kernel at boot time, you need to have a little MFS (initrd) that
+  contains the appropriate modules.  We just build a kernel with the SCSI
+  stuff hardwired instead.  Anyway, once you have a kernel, modify /etc/fstab
+  to talk about "sda" rather than "hda".  Now you also have to modify
+  /etc/lilo.conf, again, to reference "sda" rather than "hda".  But, once
+  you have done that, you cannot rerun lilo as it will complain about not
+  having an sda disk; i.e., lilo looks at the config file to figure out
+  what disk to write the new stuff to, and that file now says "sda" instead
+  of the "hda" that you are constructing the image on!  Go ahead and create
+  the image without re-running lilo.  When you boot Linux from the image for
+  the first time, interrupt lilo (type anything once lilo starts loading the
+  image) and then type:
+
+	 linux root=/dev/sda2
+
+  (assuming Linux is in partition 2 on the disk).  This will boot it up
+  using SCSI as the root disk.  Now, assuming your kernel has the appropriate
+  SCSI support, the machine will come up ok.  Then login as root and run
+  "lilo" to fix things up for good (remember to create a new image afterward).
+
+
