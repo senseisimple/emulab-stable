@@ -113,6 +113,17 @@ echo "</table>\n";
 #
 SHOWNODES($exp_pid, $exp_eid);
 
+if ($expstate &&
+    (strcmp($expstate, $TB_EXPTSTATE_SWAPPING) == 0 ||
+     strcmp($expstate, $TB_EXPTSTATE_ACTIVATING) == 0)) {
+
+    echo "<script language=\"JavaScript\">
+              <!--
+	          doLoad(30000);
+              //-->
+          </script>\n";
+}
+
 #
 # Standard Testbed Footer
 # 

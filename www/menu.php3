@@ -416,21 +416,21 @@ function PAGEHEADER($title) {
           <head>
            <title>Emulab.Net - $title</title>\n";
 
+    $timeo  = ($TBAUTHTIMEOUT + 120) * 1000;
+
     #
     # If logged in, initialize the refresh process.
     # 
     if ($login_status == $STATUS_LOGGEDIN) {
-	$timeo = $TBAUTHTIMEOUT + 120;
 	echo "<noscript>
                 <META HTTP-EQUIV=\"refresh\" CONTENT=\"$timeo\">
               </noscript>\n";
-	$timeo *= 1000;
 	echo "<script language=\"JavaScript\">
                 <!--
-                  var sURL = \"$TBDOCBASE/index.php3\";
+                  var sURL  = \"$TBDOCBASE/index.php3\";
 
-                  function doLoad() {
-                    setTimeout(\"refresh()\", $timeo );
+                  function doLoad(timeo) {
+                    setTimeout(\"refresh()\", timeo );
                   }
                 //-->
               </script>\n";
@@ -451,7 +451,7 @@ function PAGEHEADER($title) {
     # If logged in, start the refresh process.
     # 
     if ($login_status == $STATUS_LOGGEDIN) {
-	echo "<body onload=\"doLoad()\">\n";
+	echo "<body onload='doLoad($timeo)'>\n";
     }
     else {
 	echo "<body>\n";

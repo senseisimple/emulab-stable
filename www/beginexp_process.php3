@@ -307,12 +307,16 @@ if ($retval) {
 
 echo "<br><br>";
 echo "<h3>
-        Experiment `$exp_id' in project `$exp_pid' is configuring!<br><br>
+        Experiment
+        <a href='showexp.php3?pid=$exp_pid&eid=$exp_id'>$exp_id</a>
+        in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
+        is configuring!<br><br>
         You will be notified via email when the experiment has been fully
 	configured and you are able to proceed. This typically takes less
         than 10 minutes, depending on the number of nodes you have requested.
         If you do not receive email notification within a reasonable amount
         of time, please contact $TBMAILADDR.
+        <br>
       </h3>\n";
 
 #

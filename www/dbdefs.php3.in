@@ -91,7 +91,9 @@ $TB_IMAGEID_MIN			= $TB_IMAGEID_READINFO;
 $TB_IMAGEID_MAX			= $TB_IMAGEID_DESTROY;
 
 # Experiment states (that matter to us).
+$TB_EXPTSTATE_SWAPPING		= "swapping";
 $TB_EXPTSTATE_SWAPPED		= "swapped";
+$TB_EXPTSTATE_ACTIVATING	= "activating";
 $TB_EXPTSTATE_ACTIVE		= "active";
 
 #
