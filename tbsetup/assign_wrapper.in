@@ -259,6 +259,15 @@ my %nobwshaping     = ();
 # max_concurrent. 
 my %virtnodeosids   = ();
 
+# Virtual nodes that the user has requested be "fixed" to a specific
+# physical node.
+my %fixed_nodes     = ();
+
+# Support for experiment modify.
+my %alreadyAllocated = ();
+my %reserved_pnodes  = ();
+my %reserved_vnodes  = ();
+
 #
 # This is for stats gathering. It might duplicate other stuff, but
 # thats okay.
@@ -332,23 +341,41 @@ my $remotecount  = 0;
 my $virtcount    = 0;
 my $virtnode_id  = 0;
 
-my %alreadyAllocated = ();
-
+#
+# If updating (modify) find out what nodes need to be fixed in the new
+# run assign run. virtnodes complicate this!
+# 
 if ($updating) {
     printdb "Fixing previously allocated nodes.\n";
-	$result = 
-	    DBQueryFatal("SELECT vname, node_id ".
-			 "FROM reserved ".
-			 "WHERE pid='$pid' AND eid='$eid'");
+    $result = 
+	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid ".
+		     " from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "where r.pid='$pid' and r.eid='$eid'");
     
-    while (($vname,$reserved) = $result->fetchrow_array) {
-	$reserved_nodes{$vname} = $reserved;
-	$fixed_nodes{$vname}    = $reserved;    
-	$alreadyAllocated{$reserved} = "unused";
+    while (($vname,$reserved,$physnode) = $result->fetchrow_array) {
+	#
+	# If a virtnode, we need the underlying physnode, since thats
+	# what we fix it to. But we still need to remember which virtnodes
+	# are allocated for later.
+	#
+	# WIDEAREA nodes are going to break. 
+	#
+	if ($reserved ne $physnode) {
+	    $reserved_vnodes{$vname}     = $reserved;
+	    $reserved_pnodes{$vname}     = $physnode;
+	    $fixed_nodes{$vname}         = $physnode;
+	    $alreadyAllocated{$physnode} = "unused";
+	    $alreadyAllocated{$reserved} = "unused";
+	}
+	else {
+	    $reserved_pnodes{$vname}     = $reserved;
+	    $fixed_nodes{$vname}         = $reserved;    
+	    $alreadyAllocated{$reserved} = "unused";
+	}
     }
     $result->finish;
 }
-
 
 printdb "Loading virt_nodes.\n";
 $result =
@@ -954,7 +981,7 @@ foreach $fixed (keys(%fixed_nodes)) {
     if (!$isremotenode{$fixed} && 
 	(exists $nodes{$fixed} || exists $delaynodes{$fixed}) ) {
 	print TOPFILE "fix-node $fixed $fixed_nodes{$fixed}\n";
-	if ($reserved_nodes{$fixed}) { $reused_count++; }
+	if ($reserved_pnodes{$fixed}) { $reused_count++; }
     }
 }
 
@@ -1097,15 +1124,58 @@ while (1) {
 		#
 		# Look at virtual node being mapped to node;
 		# if it wasn't in the previous map, mark node for reboot.
-		# 
-		if (! exists $reserved_nodes{$virtual} ||
-		    $reserved_nodes{$virtual} ne $physical ||
-		    $alreadyAllocated{$physical} eq "reboot") {
-		    $alreadyAllocated{$physical} = "reboot";
-		} else {
-		    $alreadyAllocated{$physical} = "reused";
+		#
+		if ($alreadyAllocated{$physical} eq "reboot") {
+		    # No changes once it goes into reboot.
+		    ;
 		}
-	    } else {
+		elsif ($isvirtnode{$virtual}) {
+		    #
+		    # A new virt virtual node on an existing physical node
+		    # does not force the physnode to be rebooted; we can
+		    # set up a new virtnode on it without a reboot. If its
+		    # an existing virtual on the same physnode, then mark
+		    # both as reused; no need to reboot either. If the the
+		    # virtnode has moved here from someplace else, no
+		    # reboot of the physnode either, but obviously the
+		    # vnode will be released and a new one allocated.  What
+		    # we cannot determine is if its just a renamed node
+		    # (which would require a reboot of the the virtual
+		    # node). 
+		    # 
+		    if (!exists($reserved_pnodes{$virtual})) {
+			$alreadyAllocated{$physical} = "reused";
+		    }
+		    elsif ($reserved_pnodes{$virtual} eq $physical) {
+			my $reserved = $reserved_vnodes{$virtual};
+
+			$alreadyAllocated{$reserved} = "reused";
+			$alreadyAllocated{$physical} = "reused";
+		    }
+		    else {
+			$alreadyAllocated{$physical} = "reused";
+		    }
+		}
+		else {
+		    #
+		    # If a new virtual node mapped to this physnode (maybe
+		    # even the luser changed the name of the node), or if an
+		    # existing virtual node moved to this physnode, must
+		    # reboot the physnode. Else, the physnode is being
+		    # reused as is, and no need to mess with it. If the
+		    # user requested reboot, that will be handled outside
+		    # of this script.
+		    #
+		    if (!exists($reserved_pnodes{$virtual}) ||
+			$reserved_pnodes{$virtual} ne $physical) {
+			$alreadyAllocated{$physical} = "reboot";
+		    }
+		    else {
+			$alreadyAllocated{$physical} = "reused";
+		    }
+		}
+	    }
+	    else {
 		#
 		# This is a new node; we'll have to reserve it.
 		#
@@ -1206,28 +1276,30 @@ while (1) {
 
 	    TBDebugTimeStamp("reserving finished");
 
-	    my %tolose = ();
+	    #
+	    # Release phys and virt nodes no longer needed. They are marked
+	    # for teardown. They need to be freed by SOMEONE, currently the
+	    # wrapper (tbswap), since this only happens when in update mode
+	    # (swapmod).
+	    #
 	    foreach $node (keys(%alreadyAllocated)) {
 		if ($alreadyAllocated{$node} eq "unused") {
 		    #
 		    # Node was used in previous incarnation, but not any more.
 		    #
-		    $tolose{$node} = 1;
-		} elsif ($alreadyAllocated{$node} eq "reboot") {
+		    TBSetNodeAllocState($node,
+					TBDB_ALLOCSTATE_RES_TEARDOWN());
+		    
+		}
+		elsif ($alreadyAllocated{$node} eq "reboot") {
 		    #
 		    # Node is being reused, but for a different purpose, so
 		    # it should be rebooted.
 		    #
-		    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
+		    TBSetNodeAllocState($node,
+					TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 		}
 	    }
-	    
-	    if ((keys %tolose) > 0) {
-		if (system("nfree $pid $eid " . join(" ", keys(%tolose)))) {
-		    print "Failed to free no-longer-needed nodes!";
-		}
-	    }
-
 	    last;
 	}
     }
@@ -1354,13 +1426,14 @@ if (scalar(keys(%isremotenode))) {
 #
 if ($updating) {
     foreach $node (keys(%alreadyAllocated)) {
-	my $result = DBQueryFatal("select nt.control_net ".
+	my $result = DBQueryFatal("select nt.control_net,nt.isvirtnode ".
 				  "from nodes as n ".
 				  "left join node_types as nt ".
 				  "on nt.type=n.type ".
-				  "where n.node_id='$node'");
+				  "where n.node_id='$node' and ".
+				  "      nt.isvirtnode=0");
 
-	my ($control) = $result->fetchrow_array();
+	my ($control,$isvirtnode) = $result->fetchrow_array();
 
 	my $pred = "1";
 
@@ -1370,9 +1443,11 @@ if ($updating) {
 
 	DBQueryFatal("update interfaces set IP='' " .
 		     "where node_id='$node' and $pred");
+
+	# Clean the veth_interfaces table for this node too.
+	DBQueryFatal("delete from veth_interfaces where node_id='$node'");
     }
 }
-
 
 #
 # VIRTNODES HACK: Local virtnodes have to be mapped now. This is a little
@@ -1382,50 +1457,104 @@ if ($updating) {
 #
 foreach my $pnode (keys(%virtnodes)) {
     my @vlist = @{$virtnodes{$pnode}};
+    my $numvs = @vlist;
     my @plist = ();
+    my @oplist = ();
+    my @ovlist = ();
 
     #
-    # Run avail to get the list of virtnodes on the phys node. We already
-    # know there are enough, since assign knows that.
+    # If updating, need to watch for nodes that are already reserved.
+    # We save that info in oplist/ovlist, and build a new vlist for
+    # avail, of just the nodes we need in this run. 
     #
-    my $num  = @vlist;
+    if ($updating) {
+	my @newvlist = ();
+	my @delvlist = ();
+	
+	foreach my $vnode (@vlist) {
+	    if (!defined($reserved_vnodes{$vnode})) {
+		# A new vnode on pnode to allocate.
+		push(@newvlist, $vnode);
+		next;
+	    }
+	    if ($reserved_pnodes{$vnode} ne $pnode) {
+		# A vnode moved. Its new to this pnode.
+		print "$vnode has moved from $reserved_pnodes{$vnode} ".
+		    "to $pnode!\n";
+		
+		push(@newvlist, $vnode);
+		next;
+	    }
 
-    print "Asking avail for $num vnodes on $pnode\n";
+	    # Push already allocated p/v onto lists for later.
+	    push(@oplist, $reserved_vnodes{$vnode});
+	    push(@ovlist, $vnode);
+	}
+	# These are the new nodes we need to allocate
+	@vlist = @newvlist;
+	$numvs = scalar(@vlist);
+
+	if (@oplist) {
+	    print "Reusing vnodes @oplist\n"; 
+	}
+    }
+
+    #
+    # Still need to allocate some virtnodes?
+    #
+    if ($numvs) {
+	#
+	# Run avail to get the list of virtnodes on the phys node. We
+	# already know there are enough, since assign knows that.
+	#
+	print "Asking avail for $numvs vnodes on $pnode\n";
     
-    open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$num |")
-	or fatal(1, "*** $0:\n".
-		    "    avail failed\n");
+	open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$numvs |")
+	    or fatal(1, "*** $0:\n".
+		        "    avail failed\n");
 
-    while (<AVAIL>) {
-	next
-	    if (! /^\|/);
-	next
-	    if (/node_id/);
+	while (<AVAIL>) {
+	    next
+		if (! /^\|/);
+	    next
+		if (/node_id/);
 
-	if ($_ =~ /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/) {
-	    push(@plist, $1);
+	    if ($_ =~ /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/) {
+		push(@plist, $1);
+	    }
+	    else {
+		fatal(1, "*** $0:\n".
+		      "    Bad line from avail: $_\n");
+	    }
 	}
-	else {
+	close(AVAIL);
+
+	# Sanity check.
+	if (scalar(@vlist) != scalar(@plist)) {
 	    fatal(1, "*** $0:\n".
-		     "    Bad line from avail: $_\n");
+		     "    Could not map some virtual nodes on $pnode\n");
+	}
+
+	#
+	# Try to allocate. Note, if this fails we are done for. Okay for now
+	# since it is never the case that it should fail!
+	#
+	print "Reserving ($pnode) @plist ...\n";
+	if (system("nalloc $pid $eid @plist")) {
+	    fatal(1, "*** $0:\n".
+		     "    Failed to reserve @plist (on $pnode)\n");
 	}
     }
-    close(AVAIL);
 
-    if (scalar(@vlist) != scalar(@plist)) {
-	fatal(1, "*** $0:\n".
-	         "Could not map some virtual nodes on $pnode\n");
+    if ($updating) {
+	#
+	# Append the lists we created above, so that we get all of them
+	# in the loop below.
+	#
+	@plist = (@plist, @oplist);
+	@vlist = (@vlist, @ovlist);
     }
-
-    #
-    # Try to allocate. Note, if this fails we are done for. Okay for now
-    # since it is never the case that it should fail!
-    #
-    print "Reserving ($pnode) @plist ...\n";
-    if (system("nalloc $pid $eid @plist")) {
-	fatal(1, "*** $0:\n".
-	         "Failed to reserve @plist (on $pnode)\n");
-    }
+    
     while (@plist) {
 	my $physical = pop(@plist);
 	my $virtual  = pop(@vlist);
@@ -1439,9 +1568,19 @@ foreach my $pnode (keys(%virtnodes)) {
 	TBIsNodeVirtual($physical, \$jailflag);
 	
 	$jailed{$virtual}  = $jailflag;
-	
-	# Virtual nodes are always clean. Also prevents errors elsewhere.
-	TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
+
+	#
+	# New virtual nodes are always clean. Old ones stay in whatever
+	# state they were in so that os_setup/vnode_setup know they
+	# need to reboot them.
+	#
+	if (!defined($reserved_vnodes{$virtual})) {
+	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
+	}
+	elsif ($reserved_vnodes{$virtual} ne $physical) {
+	    # Node has moved! Nuts!
+	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+	}
     }
 }
 
@@ -2461,8 +2600,7 @@ sub InitPnode($pnode, $vnode)
 	#
 	# A local pnode hosting jails. Set the vname to something useful.
 	#
-	$vname = "vhost-" . $virtnode_id;
-	$virtnode_id++;
+	$vname = newvhostvname($pnode);
 
 	DBQueryFatal("update reserved set vname='$vname' " .
 		     "where node_id='$pnode'");
@@ -2835,4 +2973,37 @@ sub NewVethIface($$;$)
 		     "values ('$pnode', 0, '$mac', '$ip', $pport, $vvnode)");
 
     return "veth" . $query_result->insertid;
+}
+
+#
+# Give me a new name for a pnode hosting jails. We have to watch for names
+# that were made up previously (say, if this is an update).  Not allowed to
+# reuse names of course. We do not mark nodes as hosting, so have to infer
+# this from reserved_pnodes. I'm sure there is a better way to do this. 
+#
+sub newvhostvname($)
+{
+    my ($pnode) = @_;
+
+    #
+    # First check to see if this pnode was already allocated (update)
+    #
+    foreach my $vname (keys(%reserved_pnodes)) {
+	# Skip the v mappings.
+	next
+	    if (exists($reserved_vnodes{$vname}));
+
+	if ($pnode eq $reserved_pnodes{$vname}) {
+	    return $vname;
+	}
+    }
+    
+    while (1) {
+	my $newname = "vhost-" . $virtnode_id;
+	$virtnode_id++;
+
+	if (!defined($reserved_pnodes{$newname})) {
+	    return $newname;
+	}
+    }
 }

@@ -82,6 +82,7 @@ my @row;
 #
 my %reloads     = ();
 my %reboots	= ();
+my %willreboot  = ();
 my $doautoload  = 1;
 my $dolastload  = 1;
     
@@ -426,14 +427,26 @@ foreach my $vnode (keys(%vnodes)) {
 	if (!defined($pnodevcount{$pnode}));
     $pnodevcount{$pnode}++;
     $vnode2pnode{$vnode} = $pnode;
-    
-    if (!defined($nodes{$pnode})) {
+
+    if (!exists($nodes{$pnode})) {
 	#
 	# Typical on remote nodes; we do not allocate the underlying
 	# phys node to the experiment.
 	#
 	next;
     }
+    #
+    # Set the allocstate for the local vnode. Used to by vnode_setup to
+    # determine if a reboot is required. If the underlying physnode is
+    # going to be rebooted, move the node into the RES_READY state, since
+    # by definition, when the node reboots the vnode is going to get
+    # set up, and so vnode_setup should not do anything. Might need an
+    # intermediate state here, but not sure yet.
+    #
+    if (exists($reboots{$pnode})) {
+	TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_READY());
+    }
+    
     # Nothing else to do for local jail nodes at this time ...
 }
 
@@ -445,6 +458,21 @@ if (!$TESTMODE) {
     my %pids  = ();
     my $count = 0;
     my $cmd;
+
+    foreach my $imageid ( keys(%reloads) ) {
+	my @list = @{ $reloads{$imageid} };
+
+	foreach my $node (@list) {
+	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
+	    # No point in rebooting, obviously.
+	    delete $reboots{$node};
+	}
+
+	sleep(5);
+	$pids{"$os_load -m $imageid @list"} =
+	    ForkCmd("$os_load -m $imageid @list");
+    }
 
     if (keys(%reboots)) {
 	foreach my $node (keys(%reboots)) {
@@ -459,19 +487,6 @@ if (!$TESTMODE) {
 
 	$cmd = "$nodereboot " . join(" ", keys(%reboots));
 	$pids{$cmd} = ForkCmd($cmd);
-    }
-
-    foreach my $imageid ( keys(%reloads) ) {
-	my @list = @{ $reloads{$imageid} };
-
-	foreach my $node (@list) {
-	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
-	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
-	}
-
-	sleep(5);
-	$pids{"$os_load -m $imageid @list"} =
-	    ForkCmd("$os_load -m $imageid @list");
     }
 
     foreach $cmd ( keys(%pids) ) {
@@ -637,10 +652,11 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $pnode  = $vnode2pnode{$node};
 	my $wstart = $waitstart{$node};
-	my $maxwait = 90 + (30 * $pnodevcount{$pnode});
+	my $maxwait = 90 + (3000 * $pnodevcount{$pnode});
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
+	    # Might have been set above.
 	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;
@@ -722,7 +738,6 @@ sub SetupReload($$$)
 	else {
 	    push(@{ $reloads{$imageid} }, $node);
 	}
-	delete $reboots{$node};
     }
     else {
 	die_noretry("*** $0:\n".

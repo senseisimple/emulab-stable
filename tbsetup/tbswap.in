@@ -5,7 +5,6 @@
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
 # Returns 0 on success.
@@ -518,7 +517,7 @@ sub doSwapout($) {
 			 "n.node_id = rv.node_id ".
 			 "where rv.pid='$pid' and rv.eid='$eid'");
 
-	while (($node,$allocstate) = $db_result->fetchrow_array) {
+	while (my ($node,$allocstate) = $db_result->fetchrow_array) {
 	    if ($allocstate ne TBDB_ALLOCSTATE_RES_READY()) {
 		push(@failedNodes, $node);
 	    }
@@ -642,6 +641,64 @@ sub doSwapin($) {
 	print "Mapped to physical reality!\n";
     }
 
+    #
+    # Look for any nodes in RES_TEARDOWN. These need to be released,
+    # and if a virtnode, they need to be torn down. We cannot wait for
+    # the virtnodes to go down with the physnode they are hosted on,
+    # so teardown and release the virtnodes first, and then do the
+    # physnodes.
+    #
+    # Errors are fatal; no recovery or retry.
+    #
+    if ($type == UPDATE) {
+	my $allocstate = TBDB_ALLOCSTATE_RES_TEARDOWN();
+	
+	$db_result =
+	    DBQueryFatal("select r.node_id,nt.isvirtnode,nt.isremotenode ".
+			 "  from reserved as r ".
+			 "left join nodes as n on n.node_id=r.node_id ".
+			 "left join node_types as nt on nt.type=n.type ".
+			 "where r.pid='$pid' and r.eid='$eid' and ".
+			 "      n.allocstate='$allocstate'");
+
+	if ($db_result->numrows) {
+	    my @virtnodes = ();
+	    my @physnodes = ();
+	    
+	    print "Tearing down and releasing unused nodes\n";
+
+	    # First teardown/release virtnodes. 
+	    while (my ($node,$isvirt,$isrem) = $db_result->fetchrow_array()) {
+		if ($isvirt) {
+		    push(@virtnodes, $node);
+		}
+		elsif (!$isrem) {
+		    push(@physnodes, $node);
+		}
+	    }
+	    if (@virtnodes) {
+		TBDebugTimeStamp("vnode_setup started");
+		
+		if (system("vnode_setup -f -k $pid $eid @virtnodes")) {
+		    print "Failed to tear down unused virtnodes!\n";
+		    return 1;
+		}
+		TBDebugTimeStamp("vnode_setup finished");
+		
+		if (system("nfree $pid $eid @virtnodes")) {
+		    print "Failed to nfree unused virtnodes!\n";
+		    return 1;
+		}
+	    }
+	    if (@physnodes) {
+		if (system("nfree $pid $eid @physnodes")) {
+		    print "Failed to nfree unused physnodes!\n";
+		    return 1;
+		}
+	    }
+	}
+    }
+
     # Exit here if we are testing.
     if ($TESTMODE) {
 	print "Testing run - Stopping here.\n";
@@ -688,7 +745,7 @@ sub doSwapin($) {
 			 "n.node_id = rv.node_id ".
 			 "where rv.pid='$pid' and rv.eid='$eid'");
 
-	while (($node) = $db_result->fetchrow_array) {
+	while (my ($node) = $db_result->fetchrow_array) {
 	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
 	}
     }
@@ -707,10 +764,11 @@ sub doSwapin($) {
     }
 
     #
-    # XXX: Don't add any steps between here and the waitpid() call below without
-    # verifying that 1) It's OK for nodes to come up before the step has
-    # completed and 2) It's OK for the command to run in parallel with os_setup
-    # (no DB dependencies, etc.)
+    # XXX
+    # Don't add any steps between here and the waitpid() call below
+    # without verifying that 1) It's OK for nodes to come up before
+    # the step has completed and 2) It's OK for the command to run in
+    # parallel with os_setup (no DB dependencies, etc.)
     #
 
     print "Setting up VLANs.\n";

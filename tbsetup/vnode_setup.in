@@ -5,7 +5,6 @@
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 
@@ -19,11 +18,20 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: vnode_setup [-f] [-k] <pid> <eid>\n";
+    print STDOUT "Usage: vnode_setup [-f] [-k] <pid> <eid> [node ...]\n";
     exit(-1);
 }
 my  $optlist = "fdk";
-  
+
+#
+# We don't want to run this script unless its the real version.
+# That is, it must be setuid root. 
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
 #
 # Configure variables
 #
@@ -40,7 +48,6 @@ my $failed      = 0;
 my $killmode    = 0;
 my $mode        = "setup";
 my $dbuid;
-my $exptstate;
 
 #
 # Load the Testbed support stuff. 
@@ -64,7 +71,7 @@ $| = 1;
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 2) {
+if (@ARGV < 2) {
     usage();
 }
 if (defined($options{"f"})) {
@@ -77,8 +84,8 @@ if (defined($options{"k"})) {
     $killmode = 1;
     $mode = "teardown";
 }
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
+my $pid   = shift(@ARGV);
+my $eid   = shift(@ARGV);
 
 #
 # Untaint the arguments.
@@ -94,23 +101,6 @@ if ($eid =~ /^([-\@\w]+)$/) {
 }
 else {
     die("*** Bad data in eid: $eid\n");
-}	
-
-#
-# We don't want to run this script unless its the real version.
-# That is, it must be setuid root. 
-#
-if ($EUID != 0) {
-    die("*** $0:\n".
-	"    Must be root! Maybe its a development version?\n");
-}
-
-#
-# Verify actual user and get his DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
 }
 
 #
@@ -123,19 +113,46 @@ if (!TBAdmin($UID) &&
 }
 
 #
-# Get the list of nodes.
+# Get the list of nodes in this experiment.
 # 
 my @nodes = ExpNodes($pid, $eid);
 if (! @nodes) {
-    warn("*** $0:\n".
-	 "    No allocated nodes in experiment $pid/$eid!\n");
-    exit(0);
+    die("*** $0:\n".
+	"    No allocated nodes in experiment $pid/$eid!\n");
 }
+    
+# Nodes on the command line. Operate only on this set. 
+if (@ARGV) {
+    my %fulllist = ();
+
+    # Temporary hash list for searching.
+    foreach my $node ( @nodes ) {
+	$fulllist{$node} = 1;
+    }
+    @nodes = ();
+
+    foreach my $node ( @ARGV ) {
+	if ($node =~ /^([-\@\w]+)$/) {
+	    $node = $1;
+
+	    if (!defined($fulllist{$node})) {
+		die("*** $0:\n".
+		     "   Node $node is not allocated to $pid/$eid!\n");
+	    }
+	}
+	else {
+	    die("Bad node name: $node.");
+	}
+	push(@nodes, $node);
+    }
+}
+my $exptstate = ExpState($pid, $eid);
 
 # Just the vnodes mam.
 foreach my $node (@nodes) {
     my $pnode;
     my $jailed;
+    my $allocstate;
     
     if (! TBIsNodeVirtual($node, \$jailed)) {
 	next;
@@ -144,19 +161,33 @@ foreach my $node (@nodes) {
 	die("*** $0:\n".
 	    "    No physical node for $node!\n");
     }
-    if (!TBIsNodeRemote($node) && !$force) {
-	#
-	# A local vnode. If the experiment is activating, then the
-	# underlying physnode will setup the vnode as it boots, so
-	# no need to do anything. Ditto for swapping out; the vnode
-	# will get torn down when the node goes down, obviously. 
-	#
-	my $exptstate = ExpState($pid, $eid);
 
-	if ($exptstate eq EXPTSTATE_SWAPPING ||
-	    $exptstate eq EXPTSTATE_ACTIVATING) {
-	    print "$node will automatically $mode with local node $pnode\n";
+    #
+    # On remote nodes, or when forcemode is on, always do the deed.
+    # Otherwise, look at experiment state.
+    # 
+    if (!TBIsNodeRemote($node) && !$force) {
+	if ($exptstate eq EXPTSTATE_SWAPPING) {
+	    #
+	    # When swapping, local vnodes go down with the physnode.
+	    #
+	    print "$node will $mode with local node $pnode\n";
 	    next;
+	}
+	elsif ($exptstate eq EXPTSTATE_ACTIVATING) {
+	    #
+	    # The allocstate determines if the vnode actually needs to be
+	    # setup.  See os_setup and assign_wrapper; the idea is to
+	    # avoid setting up vnodes on machines that are rebooting
+	    # anyway. Complicated by modify which could add a vnode to an
+	    # existing machine, but not reboot the machine. 
+	    #
+	    TBGetNodeAllocState($node, \$allocstate);
+
+	    if ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
+		print "$node will $mode with local node $pnode\n";
+		next;
+	    }
 	}
     }
 
