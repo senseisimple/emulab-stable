@@ -1,90 +1,133 @@
---- dist-ns-allinone-2.1b9/install	Mon Apr 22 18:42:09 2002
-+++ ns-allinone-2.1b9/install	Mon Jan 27 22:54:31 2003
-@@ -39,224 +39,82 @@
- 
+--- dist-ns-allinone-2.26/install	Wed Feb 26 16:07:51 2003
++++ ns-allinone-2.26/install	Thu Jun  5 16:55:16 2003
+@@ -41,301 +41,47 @@
  # Get current path
  CUR_PATH=`pwd`
-+  
+ 
+-# Check if we are using Cygwin, and if so, if it is a bona fide install
+-# Cygwin patches contributed by Nicolas Christin <nicolas@cs.virginia.edu>
 +if [ -x /usr/local/tcl8.3.2/bin/tclsh8.3 ] ; then
 +  V_TCLSH=/usr/local/tcl8.3.2/bin/tclsh8.3 
 +  export V_TCLSH
 +  WITHTCL_PATH=/usr/local/tcl8.3.2
 +  export WITHTCL_PATH
-+
-+else
-+
-+  # Build Tcl8.3.2
-+  
-+  echo "============================================================"
-+  echo "* Build tcl$TCLVER"
-+  echo "============================================================"
-+  
-+  cd ./tcl$TCLVER/unix
-+  if [ -f Makefile ] ; then 
-+	  make distclean
-+  fi
-+  
-+  blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
-+  to see if they have a fix for your platform.'
-+  ./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
-+  if make 
-+  then 
-+	  echo "tcl$TCLVER make succeeded."
-+	  make install || die "tcl$TCLVER installation failed."
-+	  echo "tcl$TCLVER installation succeeded."
-+	  cp ../generic/*.h ../../include
-+  else
-+	  echo "tcl$TCLVER make failed! Exiting ..."
-+	  echo "For problems with Tcl/Tk see http://www.scriptics.com"
-+	  exit
-+  fi
-+
-+  cd ../../
-+
-+  WITHTCL_PATH=$CUR_PATH/tcl$TCLVER
-+
-+fi
-+
-+if [ -d /usr/local/otcl-1.0a8 ] ; then
-+
-+  WITHOTCL_PATH=/usr/local/otcl-1.0a8
-+  export WITHOTCL_PATH
-+
-+else
-+
-+  # Build otcl
-+
-+  echo "============================================================"
-+  echo "* Build OTcl-$OTCLVER"
-+  echo "============================================================"
-+  
-+  cd ./otcl-$OTCLVER
-+  
-+  blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
-+  for common problems and bug fixes.'
-+  ./configure --with-tcl=$WITHTCL_PATH || die "otcl-$OTCLVER configuration failed! Exiting ..."
-+  
-+  if make 
-+  then
-+	  echo "otcl-$OTCLVER has been installed successfully."
-+  else
-+	  echo "otcl-$OTCLVER make failed! Exiting ..."
-+	  echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
-+	  exit
-+  fi
-+  
-+  cd ..
  
+-echo "============================================================"
+-echo "* Testing for Cygwin environment"
+-echo "============================================================"
+-
+-if [ -x /usr/bin/uname ]; then
+-        # it may be a Cygwin install
+-        test_cygwin=`uname | tr [a-z] [A-Z] | sed -e 's|.*CYGWIN.*|true|'`;
+-        if  [ "${test_cygwin}" = "true" ]; then
+-                echo "Cygwin detected";
+-                echo "Note: Cygwin install is still considered EXPERIMENTAL";
+-                echo "";
+-                echo -n "Checking Cygwin version is >=1.3.12... "
+-                cmaj=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\1/'`;
+-                echo $cmaj | grep -v [0-9] >/dev/null 2>&1
+-                if [ "$?" -eq "0" ]; then
+-                        cmaj=0;
+-                fi;
+-                cmin=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\2/'`;
+-                echo $cmin | grep -v [0-9] >/dev/null 2>&1
+-                if [ "$?" -eq "0" ]; then
+-                        cmin=0;
+-                fi;
+-                cpat=` uname -r | sed -e 's/^\([0-9]*\)\.\([0-9]*\).\([0-9]*\).*/\3/'`;
+-                echo $cpat | grep -v [0-9] >/dev/null 2>&1
+-                if [ "$?" -eq "0" ]; then
+-                        cpat=0;
+-                fi;
+-                echo -n "$cmaj.$cmin.$cpat ";
+-                if ([ "$cmaj" -gt "1" ]) || ([ "$cmaj" -eq "1" ] && [ $cmin -gt "3" ]) || ([ "$cmaj" -eq 1 ] && [ $cmin -eq "3" ] && [ "$cpat" -ge "12" ]); then
+-                        echo "should be ok";
+-                else
+-                        echo "*** POSSIBLE PROBLEM ***";
+-                        echo "";
+-                        echo "ns-allinone-${NSVER} has not been tested under versions of Cygwin older than";
+-                        echo "1.3.12. Your version ($cmaj.$cmin.$cpat) appears to be older than that. Success of";
+-                        echo "the install process is therefore NOT GUARANTEED.";
+-                        echo "";
+-                        cygversion="failed";                
+-		fi;
+-                echo -n "Checking filesystems are mounted as UNIX filetype... ";
+-                mount | grep "textmode" >/dev/null 2>&1;
+-                if [ "$?" -eq "0" ]; then
+-                        echo "*** NO! ***";
+-                        mount_test="failed";
+-                        echo "";
+-                        echo "It appears that some of your Cygwin shares are mounted as DOS file";
+-                        echo "type. This has not been tested, but is likely to result in failure of";
+-                        echo "validation tests. Success of the install process is also NOT";
+-                        echo "GUARANTEED.";
+-                        echo "";
+-                        echo "Refer to the Cygwin user guide for how to install Cygwin with the UNIX";
+-                        echo "file text mode.";
+-                        echo "";
+-                else
+-                        echo "yes";
+-                        echo -n "Checking default mode is binmode... ";
+-                        echo ${CYGWIN} | grep "nobinmode" >/dev/null 2>&1;
+-                        if [ "$?" -eq "0" ]; then
+-                                cyg_env_var="failed";
+-                                echo "*** NO! ***";
+-                                echo "";
+-                                echo "Your \$CYGWIN environment variable specifies \"nobinmode\". This is";
+-                                echo "likely to result in failure of validation tests, and (possibly) of";
+-                                echo "the whole install process. You need to have the \$CYGWIN environment";
+-                                echo "variable set to \"binmode\". Please refer to the Cygwin user guide for";
+-                                echo "details on how to change this.";
+-                                echo "";
+-                        else 
+-                                echo "yes";
+-                        fi;
+-                fi;                           
+-                if [ "$cygversion" = "failed" ] || [ "$cyg_env_var" = "failed" ] || [ "$mount_test" = "failed" ]; then
+-                        echo "";
+-                        echo "Tests indicate that your installation of Cygwin may not be suitable for";
+-                        echo "installing ns-2 allinone.";
+-                        echo "";
+-                        echo -n "Do you wish to proceed regardless? [y/n] "
+-                        read answer;
+-                        if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+-                                die "Installation aborted...";
+-                        fi;
+-                fi;
+-                echo "Patching Tcl for Cygwin.";
+-                if [ ! -f ./tcl${TCLVER}/generic/tcl.h.orig ]; then
+-                        cp ./tcl${TCLVER}/generic/tcl.h ./tcl${TCLVER}/generic/tcl.h.orig;
+-                        echo "The original tcl${TCLVER}/generic/tcl.h is backed up as tcl${TCLVER}/generic/tcl.h.orig";
+-                        sed -e 's/\#define _TCL/\#define _TCL\`\`\#ifdef __CYGWIN__\`\#define HAVE_TM_ZONE 1\`\#endif \/\* __CYGWIN__ \*\//g' ./tcl${TCLVER}/generic/tcl.h.orig | tr '\`' '\n' > ./tcl${TCLVER}/generic/tcl.h;
+-                fi;
+-                touch ./tcl${TCLVER}/generic/tclStubInit.c;
+-                echo "Patching sgb for Cygwin.";
+-                cp ./sgb/Makefile ./sgb/Makefile.orig;
+-                echo "The original sgb/Makefile is backed up as sgb/Makefile.orig";
+-                sed -e 's|rm \(.*\)test_io test_graph test_flip test_sample\(.*\)|rm -f \1test_io.exe test_graph.exe test_flip.exe test_sample.exe\2|' ./sgb/Makefile.orig > ./sgb/Makefile;
+-                echo "Setting executable format to .exe...";
+-                EXE=".exe";
+-        else
+-                echo "Cygwin not detected, proceeding with regular install.";
+-                EXE=;
+-        fi;
+-else
+-        echo "Cygwin not detected, proceeding with regular install.";
+-fi;
+-
+-
+-
 -# Compile and install xgraph
-+  WITHOTCL_PATH=`pwd`/otcl-$OTCLVER
-+  export WITHOTCL_PATH
- 
+-
 -echo "============================================================"
 -echo "* Build XGraph-$XGRAPHVER"
 -echo "============================================================"
 -
 -cd ./xgraph-$XGRAPHVER
--./configure
+-./configure --prefix=../
+-if  [ "${test_cygwin}" = "true" ]; then
+-       touch stamp-h;
+-fi;
 -if make
 -then
 -	echo "xgraph has been installed successfully. "
@@ -110,8 +153,8 @@
 -	touch *.c
 -	make all || warn "cweb failed to make, but it's optional"
 -	# xxx: other stuff will fail...
--	chmod 755 cweave
--	chmod 755 ctangle
+-	chmod 755 cweave${EXE}
+-	chmod 755 ctangle${EXE}
 -	cd ..
 -	#echo "cd .."
 -	if [ ! -d bin ]
@@ -119,8 +162,8 @@
 -		mkdir bin
 -	fi
 -	cd bin
--	ln -s $CUR_PATH/cweb/cweave cweave
--	ln -s $CUR_PATH/cweb/ctangle ctangle
+-	ln -s $CUR_PATH/cweb/cweave${EXE} cweave${EXE}
+-	ln -s $CUR_PATH/cweb/ctangle${EXE} ctangle${EXE}
 -fi
 -
 -cd ..
@@ -141,14 +184,13 @@
 -	then
 -                if [ -f libgb.a ] ; then
 -                        rm -f ../gt-itm/lib/libgb.a
--                        cp libgb.a ../gt-itm/lib/libgb.a
+-			cp libgb.a ../gt-itm/lib/libgb.a
 -                else 
--                        echo "* Wierd: sgb said it has been built but we can't find libgb.a!
--"
--                        exit -1
+-		        echo "* Weird: sgb said it has been built but we can't find libgb.a! "
+-			exit -1
 -                fi
 -	else
--		echo "Unable to create sgb library, but it's optional, so continuing..."
+-	        echo "Unable to create sgb library, but it's optional, so continuing..."
 -	fi
 -fi
 -
@@ -191,7 +233,7 @@
 -echo "* Build zlib"
 -echo "============================================================"
 -
--cd ./zlib-1.1.3
+-cd ./zlib-1.1.4
 -
 -if ./configure --exec-prefix=../ --prefix=../
 -then
@@ -202,12 +244,12 @@
 -		warn "Zlib make failed, but it's optional Continue ..."
 -	fi
 -else
--	warn "Zlib-1.1.3 configuration failed, but it's optional, so continuing ..."
+-	warn "Zlib-1.1.4 configuration failed, but it's optional, so continuing ..."
 -fi
 -
 -cd ../
 -
--# Build Tcl8.3.2
+-# Build Tcl8.3.5
 -
 -echo "============================================================"
 -echo "* Build tcl$TCLVER"
@@ -227,25 +269,53 @@
 -	make install || die "tcl$TCLVER installation failed."
 -	echo "tcl$TCLVER installation succeeded."
 -	cp ../generic/*.h ../../include
--else
+ else
 -	echo "tcl$TCLVER make failed! Exiting ..."
 -	echo "For problems with Tcl/Tk see http://www.scriptics.com"
 -	exit
 -fi
--
+ 
 -cd ../../
--
++  # Build Tcl8.3.5
++
++  echo "============================================================"
++  echo "* Build tcl$TCLVER"
++  echo "============================================================"
++
++  cd ./tcl$TCLVER/unix
++  if [ -f Makefile ] ; then 
++	  make distclean
++  fi
++
++  blame='Tcl is not part of the ns project.  Please see www.Scriptics.com
++  to see if they have a fix for your platform.'
++  ./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tcl8.3.2 configuration failed! Exiting ..."
++  if make 
++  then 
++  	  echo "tcl$TCLVER make succeeded."
++	  make install || die "tcl$TCLVER installation failed."
++	  echo "tcl$TCLVER installation succeeded."
++	  cp ../generic/*.h ../../include
++  else
++	  echo "tcl$TCLVER make failed! Exiting ..."
++	  echo "For problems with Tcl/Tk see http://www.scriptics.com"
++	  exit
++  fi
+ 
 -# compile and install tk
--
++  cd ../../
+ 
 -echo "============================================================"
 -echo "* Build Tk$TKVER"
 -echo "============================================================"
--
++  WITHTCL_PATH=$CUR_PATH/tcl$TCLVER
++  export WITHTCL_PATH
+ 
 -cd ./tk$TKVER/unix
 -if [ -f Makefile ] ; then
 -	make distclean
--fi
--
+ fi
+ 
 -blame='Tk is not part of the ns project.  Please see www.Scriptics.com
 -to see if they have a fix for your platform.'
 -./configure --enable-gcc --disable-shared --prefix=$CUR_PATH || die "tk8.3.2 configuration failed! Exiting ..."
@@ -258,31 +328,34 @@
 -	echo "tk$TKVER make failed! Exiting ..."
 -	echo "For problems with Tcl/Tk see http://www.scriptics.com"
 -	exit
- fi
- 
+-fi
+-
 -cd ../../
 -
--#
--# Since our configures search for tclsh in $PATH, the following 
--# is needed. This is necessary for otcl/tclcl/ns/nam
--#
--PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$PATH
--export PATH
--LD_LIBRARY_PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$LD_LIBRARY_PATH
--export LD_LIBRARY_PATH
--
+ #
+ # Since our configures search for tclsh in $PATH, the following 
+ # is needed. This is necessary for otcl/tclcl/ns/nam
+@@ -345,28 +91,40 @@
+ LD_LIBRARY_PATH=$CUR_PATH/tcl$TCLVER/unix:$CUR_PATH/tk$TKVER/unix:$LD_LIBRARY_PATH
+ export LD_LIBRARY_PATH
+ 
 -# Build otcl
--
++if [ -d /usr/local/otcl-1.0a8 ] ; then
+ 
 -echo "============================================================"
 -echo "* Build OTcl-$OTCLVER"
 -echo "============================================================"
--
++  WITHOTCL_PATH=/usr/local/otcl-1.0a8
++  export WITHOTCL_PATH
+ 
 -cd ./otcl-$OTCLVER
--
++else
+ 
 -blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
 -for common problems and bug fixes.'
 -./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
--
++  # Build otcl
+ 
 -if make 
 -then
 -	echo "otcl-$OTCLVER has been installed successfully."
@@ -291,13 +364,36 @@
 -	echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
 -	exit
 -fi
--
++  echo "============================================================"
++  echo "* Build OTcl-$OTCLVER"
++  echo "============================================================"
++
++  cd ./otcl-$OTCLVER
++
++  blame='Please check http://www.isi.edu/nsnam/ns/ns-problems.html
++  for common problems and bug fixes.'
++  ./configure || die "otcl-$OTCLVER configuration failed! Exiting ..."
+ 
 -cd ..
--
++  if make 
++  then
++  	  echo "otcl-$OTCLVER has been installed successfully."
++  else
++	  echo "otcl-$OTCLVER make failed! Exiting ..."
++	  echo "See http://www.isi.edu/nsnam/ns/ns-problems.html for problems"
++	  exit
++  fi
++
++  cd ..
++
++  WITHOTCL_PATH=`pwd`/otcl-$OTCLVER
++  export WITHOTCL_PATH
++
++fi
+ 
  # Build tclcl
  
- echo "============================================================"
-@@ -265,7 +123,7 @@
+@@ -376,7 +134,7 @@
  
  cd ./tclcl-$TCLCLVER
  
@@ -306,16 +402,14 @@
  
  if make
  then
-@@ -286,40 +144,22 @@
+@@ -397,40 +155,20 @@
  echo "============================================================"
  
  cd ./ns-$NSVER
 -./configure || die "Ns configuration failed! Exiting ..."
++./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "Ns configuration failed! Exiting ..."
  
 -if make
-+./configure --enable-static --with-tcl=$WITHTCL_PATH --with-otcl=$WITHOTCL_PATH || die "Ns configuration failed! Exiting ..."
-+
-+
 +if make nse
  then
 -	echo " Ns has been installed successfully." 
@@ -337,7 +431,7 @@
 -
 -cd ./nam-$NAMVER
 -
--./configure || die "Nam configuration failed! Exiting ..."
+-./configure --with-tclcl=$CUR_PATH/tclcl-$TCLCLVER  || die "Nam configuration failed! Exiting ..."
 -
 -if make
 -then 
@@ -350,38 +444,38 @@
 -cd ../
 -
 -# Install nam, ns, xgraph into bin
-+# Install nse
++# Install nse into bin
  
  if [ ! -d bin ] ; then
      mkdir bin
-@@ -327,55 +167,14 @@
+@@ -438,55 +176,14 @@
  
  cd bin
  
--ln -s $CUR_PATH/ns-$NSVER/ns ns
+-ln -s $CUR_PATH/ns-$NSVER/ns${EXE} ns${EXE}
 -
--if test -x $CUR_PATH/nam-$NAMVER/nam
+-if test -x $CUR_PATH/nam-$NAMVER/nam${EXE}
 -then
--    ln -s $CUR_PATH/nam-$NAMVER/nam nam
+-    ln -s $CUR_PATH/nam-$NAMVER/nam${EXE} nam${EXE}
 -else
 -    echo "Please compile your nam separately."
 -fi
 -
--if test -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph
+-if test -x $CUR_PATH/xgraph-$XGRAPHVER/xgraph${EXE}
 -then
--    ln -s $CUR_PATH/xgraph-$XGRAPHVER/xgraph xgraph
+-    ln -s $CUR_PATH/xgraph-$XGRAPHVER/xgraph${EXE} xgraph${EXE}
 -else
 -    echo "Please compile your xgraph separately."
 -fi
 -
--if test -x $CUR_PATH/gt-itm/bin/sgb2ns
+-if test -x $CUR_PATH/gt-itm/bin/sgb2ns${EXE}
 -then 
--    ln -s $CUR_PATH/gt-itm/bin/sgb2ns sgb2ns
--    ln -s $CUR_PATH/gt-itm/bin/sgb2hierns sgb2hierns
--    ln -s $CUR_PATH/gt-itm/bin/sgb2comns sgb2comns
--    ln -s $CUR_PATH/gt-itm/bin/itm itm
--    ln -s $CUR_PATH/gt-itm/bin/sgb2alt sgb2alt
--    ln -s $CUR_PATH/gt-itm/bin/edriver edriver
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2ns${EXE} sgb2ns${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2hierns${EXE} sgb2hierns${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2comns${EXE} sgb2comns${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/itm${EXE} itm${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/sgb2alt${EXE} sgb2alt${EXE}
+-    ln -s $CUR_PATH/gt-itm/bin/edriver${EXE} edriver${EXE}
 -else
 -    echo "Please compile your gt-itm & sgb2ns separately."
 -fi
@@ -412,9 +506,9 @@
  
  echo ""
  echo "----------------------------------------------------------------------------------"
---- dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Mar 18 15:39:26 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Jan 27 22:54:31 2003
-@@ -78,6 +78,14 @@
+--- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Jun  5 17:10:45 2003
+@@ -79,6 +79,14 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
@@ -429,16 +523,15 @@
  # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
  # Also, gcc does not remove the .o before forking 'as', which can be a
  # problem if you don't own the file but can write to the directory.
-@@ -266,6 +274,8 @@
- #	sensor-nets/tags.o sensor-nets/sensor-query.o \
- #	sensor-nets/flood-agent.o \
+@@ -276,6 +284,7 @@
+ 	mcast/lms-sender.o \
+ 	@V_STLOBJ@
  
-+OBJ_CC += ../../tbevent.o 
-+
- # what was here before is now in emulate/
- OBJ_C =
++OBJ_CC += ../../tbevent.o
  
-@@ -285,6 +295,10 @@
+ # don't allow comments to follow continuation lines
+ 
+@@ -303,6 +312,10 @@
  	emulate/nat.o  \
  	emulate/iptap.o \
  	emulate/tcptap.o
@@ -449,8 +542,8 @@
  
  OBJ_EMULATE_C = \
  	emulate/inet.o
---- dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Aug 14 14:09:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/apps/telnet.cc	Wed Feb 26 15:07:16 2003
++++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Thu Jun  5 17:12:02 2003
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -460,19 +553,16 @@
  		/* reschedule the timer */
  		double t = next();
  		timer_.resched(t);
---- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Thu Jan 30 19:34:17 2003
-@@ -41,14 +41,46 @@
- 
- #include <stdlib.h>
- #include <limits.h>
-+#include <math.h>
+--- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Fri Jun  6 18:19:59 2003
+@@ -46,12 +46,42 @@
  #include "config.h"
  #include "scheduler.h"
  #include "packet.h"
 +#ifdef USEEVENTS
 +#include "tbevent.h"
 +#endif
+ 
  
  #ifdef MEMDEBUG_SIMULATIONS
  #include "mem-trace.h"
@@ -505,11 +595,10 @@
 +static Tcl_HashTable newevents;
 +#endif
 +
-+
  Scheduler* Scheduler::instance_;
  scheduler_uid_t Scheduler::uid_ = 1;
  
-@@ -59,6 +91,9 @@
+@@ -62,6 +92,9 @@
  
  Scheduler::Scheduler() : clock_(SCHED_START), halted_(0)
  {
@@ -519,35 +608,7 @@
  }
  
  Scheduler::~Scheduler(){
-@@ -76,11 +111,14 @@
-  * is much harder (because we've lost all context about who did
-  * the scheduling).
-  */
--void Scheduler::schedule(Handler* h, Event* e, double delay)
-+void 
-+Scheduler::schedule(Handler* h, Event* e, double delay)
- {
- 	// handler should ALWAYS be set... if it's not, it's a bug in the caller
- 	if (!h) {
--		printf("Scheduler: attempt to schedule an event with a NULL handler.  Don't DO that.\n");
-+		fprintf(stderr,
-+			"Scheduler: attempt to schedule an event with a NULL handler."
-+			"  Don't DO that.\n");
- 		abort();
- 	};
- 	if (e->uid_ > 0) {
-@@ -91,7 +129,9 @@
- 	if (delay < 0) {
- 		// You probably don't want to do this
- 		// (it probably represents a bug in your simulation).
--		fprintf(stderr, "warning: ns Scheduler::schedule: scheduling event\n\twith negative delay (%f) at time %f.\n", delay, clock_);
-+		fprintf(stderr, 
-+			"warning: ns Scheduler::schedule: scheduling event\n\t"
-+			"with negative delay (%f) at time %f.\n", delay, clock_);
- 	}
- 
- 	if (uid_ < 0) {
-@@ -104,6 +144,17 @@
+@@ -112,6 +145,17 @@
  
  	e->time_ = t;
  	insert(e);
@@ -565,719 +626,63 @@
  }
  
  void
-@@ -117,7 +168,7 @@
- 	 * Patch by Thomas Kaemer <Thomas.Kaemer@eas.iis.fhg.de>.
- 	 */
- 	while (!halted_ && (p = deque())) {
--		dispatch(p);
-+		dispatch(p, p->time_);
- 	}
- }
- 
-@@ -133,6 +184,7 @@
- {
- 	if (t < clock_) {
- 		fprintf(stderr, "ns: scheduler going backwards in time from %f to %f.\n", clock_, t);
-+		abort();
- 	}
- 
- 	clock_ = t;
-@@ -161,7 +213,8 @@
- 	void handle(Event* event);
- } at_handler;
- 
--void AtHandler::handle(Event* e)
-+void 
-+AtHandler::handle(Event* e)
- {
- 	AtEvent* at = (AtEvent*)e;
- 	Tcl::instance().eval(at->proc_);
-@@ -174,7 +227,8 @@
- 	clock_ = SCHED_START;
- }
- 
--int Scheduler::command(int argc, const char*const* argv)
-+int 
-+Scheduler::command(int argc, const char*const* argv)
- {
- 	Tcl& tcl = Tcl::instance();
- 	if (instance_ == 0)
-@@ -220,7 +274,7 @@
- 		if (strcmp(argv[1], "at") == 0 ||
- 		    strcmp(argv[1], "cancel") == 0) {
- 			Event* p = lookup(STRTOUID(argv[2]));
--      if (p != 0) {
-+			if (p != 0) {
- 				/*XXX make sure it really is an atevent*/
- 				cancel(p);
- 				AtEvent* ae = (AtEvent*)p;
-@@ -286,7 +340,8 @@
- 	}
- } class_list_sched;
- 
--void ListScheduler::insert(Event* e)
-+void 
-+ListScheduler::insert(Event* e)
- {
- 	double t = e->time_;
- 	Event** p;
-@@ -303,7 +358,8 @@
-  * must free the event if necessary; this routine only removes
-  * it from the scheduler queue.
-  */
--void ListScheduler::cancel(Event* e)
-+void 
-+ListScheduler::cancel(Event* e)
- {
- 	Event** p;
- 	if (e->uid_ <= 0)	// event not in queue
-@@ -316,7 +372,8 @@
- 	e->uid_ = - e->uid_;
- }
- 
--Event* ListScheduler::lookup(scheduler_uid_t uid)
-+Event* 
-+ListScheduler::lookup(scheduler_uid_t uid)
- {
- 	Event* e;
- 	for (e = queue_; e != 0; e = e->next_)
-@@ -397,9 +454,9 @@
- Heap::heap_delete(void* elem)
- {
- 	int	i;
--		if ((i = heap_member(elem)) == 0)
-+	if ((i = heap_member(elem)) == 0)
- 		return 0;
--		for (--i; i; i = parent(i)) {
-+	for (--i; i; i = parent(i)) {
- 		swap(i, parent(i));
- 	}
- 	(void) heap_extract_min();
-@@ -485,9 +542,10 @@
- 	void*	min;				  /* return value */
- 	unsigned int	i;
- 	unsigned int	l, r, x;
--		if (h_size == 0)
-+
-+	if (h_size == 0)
- 		return 0;
--		min = h_elems[0].he_elem;
-+	min = h_elems[0].he_elem;
- 	h_elems[0] = h_elems[--h_size];
- // Heapify:
- 	i = 0;
-@@ -523,7 +581,8 @@
- 	}
- } class_heap_sched;
- 
--Event* HeapScheduler::lookup(scheduler_uid_t uid)
-+Event* 
-+HeapScheduler::lookup(scheduler_uid_t uid)
- {
- 	Event* e;
- 	
-@@ -553,6 +612,8 @@
-  *  Comm. of ACM, 31(10):1220-1227, Oct 1988
-  */
- 
-+#define CALENDAR_HASH(t) ((int)fmod((t)/width_, nbuckets_))
-+
- static class CalendarSchedulerClass : public TclClass {
- public:
- 	CalendarSchedulerClass() : TclClass("Scheduler/Calendar") {}
-@@ -561,212 +622,312 @@
+@@ -579,7 +623,7 @@
  	}
  } class_calendar_sched;
  
--CalendarScheduler::CalendarScheduler() {
--	reinit(2, 1.0, 0.0);
--	resizeenabled_ = 1;
--	max_ = 0.0;
+-CalendarScheduler::CalendarScheduler() : cal_clock_(clock_) {
 +CalendarScheduler::CalendarScheduler() : cal_clock_(clock_), cached_head_(0) {
-+	reinit(4, 1.0, cal_clock_);
+ 	reinit(4, 1.0, cal_clock_);
  }
  
- CalendarScheduler::~CalendarScheduler() {
-+	// XXX free events?
- 	delete [] buckets_;
- 	qsize_ = 0;
-+	stat_qsize_ = 0;
- }
- 
--void CalendarScheduler::insert(Event* e)
-+void 
-+CalendarScheduler::insert(Event* e)
- {
-+	int i;
-+	if (cal_clock_ > e->time_) {
-+		// may happen in RT scheduler
-+		cal_clock_ = e->time_;
-+		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
+@@ -598,6 +642,7 @@
+ 		// may happen in RT scheduler
+ 		cal_clock_ = e->time_;
+ 		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
 +		cached_head_ = e;
-+	} else
-+		i = CALENDAR_HASH(e->time_);
-+
-+	Event *head = buckets_[i].list_;
-+	Event *before=0;
-+
-+	if (!head) {
-+		buckets_[i].list_ = e;
-+		e->next_ = e->prev_ = e;
-+		++stat_qsize_; 
-+		++buckets_[i].count_;
-+	} else {
-+		bool newhead;
-+		if (e->time_ >= head->prev_->time_) {
-+			// insert at the tail
-+			before = head;
-+			newhead = false;
-+		} else {
-+			// insert event in time sorted order, FIFO for sim-time events
-+			for (before = head; e->time_ >= before->time_; before = before->next_)
-+				;
-+			newhead = (before == head);
-+		}
+ 	} else
+ 		i = CALENDAR_HASH(e->time_);
  
--	/* (e->time_ * oneonwidth) needs to be less than the
--	 * largest integer on the machine for the mapping
--	 * of time to bucket to work properly.  if it is not
--	 * we need to re-calculate the width.
--	 */
--	if (e->time_ > max_) {
--		max_ = e->time_;
--		if (e->time_ * oneonwidth_ > ULONG_MAX) {
--			resize(nbuckets_);
-+		e->next_ = before;
-+		e->prev_ = before->prev_;
-+		before->prev_ = e;
-+		e->prev_->next_ = e;
-+		if (newhead) {
-+			buckets_[i].list_ = e;
-+			//assert(e->time_ <= e->next_->time_);
-+		}
-+		//assert(e->prev_ != e);
-+		if (e->prev_->time_ != e->time_) {
-+			// unique timing
-+			++stat_qsize_; 
-+			++buckets_[i].count_;
- 		}
- 	}
--	// bucket number and address
--	int i = (int)(((long)(e->time_ * oneonwidth_)) & buckbits_); 
--	Event** p = buckets_ + i;
--
--	// insert event in stable time sorted order
--	while ((*p != NULL) && (e->time_ >= (*p)->time_))
--		p = &(*p)->next_;
-+	++qsize_;
-+	//assert(e == buckets_[i].list_ ||  e->prev_->time_ <= e->time_);
-+	//assert(e == buckets_[i].list_->prev_ || e->next_->time_ >= e->time_);
- 
--	e->next_ = *p;
--	*p = e;
-+  	if (stat_qsize_ > top_threshold_) {
-+  		resize(nbuckets_ << 1, cal_clock_);
-+		return;
-+	}
-+}
- 
--	if (++qsize_ > top_threshold_)
--		resize(nbuckets_<<1);
-+void 
-+CalendarScheduler::insert2(Event* e)
-+{
-+	// Same as insert, but for inserts e *before* any same-time-events, if
-+	//   there should be any.  Since it is used only by CalendarScheduler::newwidth(),
-+	//   some important checks present in insert() need not be performed.
-+
-+	int i = CALENDAR_HASH(e->time_);
-+	Event *head = buckets_[i].list_;
-+	Event *before=0;
-+	if (!head) {
-+		buckets_[i].list_ = e;
-+		e->next_ = e->prev_ = e;
-+		++stat_qsize_; 
-+		++buckets_[i].count_;
-+	} else {
-+		bool newhead;
-+		if (e->time_ > head->prev_->time_) { //strict LIFO, so > and not >=
-+			// insert at the tail
-+			before = head;
-+			newhead = false;
-+		} else {
-+			// insert event in time sorted order, LIFO for sim-time events
-+			for (before = head; e->time_ > before->time_; before = before->next_)
-+				;
-+			newhead = (before == head);
-+		}
-+
-+		e->next_ = before;
-+		e->prev_ = before->prev_;
-+		before->prev_ = e;
-+		e->prev_->next_ = e;
-+		if (newhead) {
-+			buckets_[i].list_ = e;
-+			//assert(e->time_ <= e->next_->time_);
-+		}
-+
-+		if (e != e->next_ && e->next_->time_ != e->time_) {
-+			// unique timing
-+			++stat_qsize_; 
-+			++buckets_[i].count_;
-+		}
-+	}
-+	//assert(e == buckets_[i].list_ ||  e->prev_->time_ <= e->time_);
-+	//assert(e == buckets_[i].list_->prev_ || e->next_->time_ >= e->time_);
-+
-+	++qsize_;
-+	// no need to check resizing
- }
- 
--Event*
--CalendarScheduler::deque()
-+const Event*
-+CalendarScheduler::head()
- {
+@@ -703,6 +748,10 @@
  	if (qsize_ == 0)
  		return NULL;
--	for (;;) {
--		int i = lastbucket_;
--		
--		// check for an event this `year'
--		do {
--			Event* e = buckets_[i];
--			if ((e != NULL) && (e->time_ < buckettop_)) {
--				buckets_[i] = e->next_;
--				lastbucket_ = i;
--				last_clock_ = e->time_;
--				if (--qsize_ < bot_threshold_)
--					resize(nbuckets_>>1);
--				return e;
--			} else {
--				if (++i == nbuckets_) {
--					i = 0;
--				/* Brad Karp, karp@eecs.harvard.edu:
--				   at the end of each year, eliminate roundoff
--				   error in buckettop_ */
--					buckettop_ = prevtop_ + nbuckets_ * width_;
--					prevtop_ = buckettop_;
--					
--				} else {
--					buckettop_+= width_;
--				}
--			}
--		} while (i != lastbucket_);
--		
--		// or direct search for the minimum event
--		int pos = 0;
--		Event* min;
--		do {
--			min = buckets_[pos++];
--		} while (min == NULL);
--		pos--;
--		
--		int k;
--		for (k = pos+1; k < nbuckets_; k++) {
--			Event* e = buckets_[k];
--			if ((e != NULL) && (e->time_ < min->time_)) {
--				min = e; pos = k;
--			}
--		}
--		
--		// adjust year and resume
--		lastbucket_ = pos;
--		last_clock_ = min->time_;
--		unsigned long n = (unsigned long)(min->time_ * oneonwidth_);
--		buckettop_ = width_*(n+1.5);
--		prevtop_ = buckettop_ - lastbucket_ * width_;
-+
+ 
 +	if (cached_head_) {
 +	  return cached_head_;	  
 +	}
-+	
-+	int l, i = lastbucket_;
-+	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
-+	double diff;
-+	Event *e, *min_e = NULL;
-+#define CAL_DEQUEUE(x) 						\
-+do { 								\
-+	if ((e = buckets_[i].list_) != NULL) {			\
-+		diff = e->time_ - cal_clock_;			\
-+		if (diff < diff##x##_)	{			\
-+			l = i;					\
-+			goto found_l;				\
-+		}						\
-+		if (min_e == NULL || min_e->time_ > e->time_) {	\
-+			min_e = e;				\
-+			l = i;					\
-+		}						\
-+	}							\
-+	if (++i == nbuckets_) i = 0;				\
-+} while (0)
-+		 
-+	// CAL_DEQUEUE applied successively will find the event to
-+	// dequeue (within one year) and keep track of the
-+	// minimum-priority event seen so far; the argument controls
-+	// the criteria used to decide whether the event should be
-+	// considered `within one year'.  Importantly, the number of
-+	// buckets should not be less than 4.
-+	CAL_DEQUEUE(0); 
-+	CAL_DEQUEUE(1); 
-+	for (; i != lastbucket_dec; ) {
-+		CAL_DEQUEUE(2);
-+	}
-+	// one last bucket is left unchecked - take the minimum
-+	// [could have done CAL_DEQUEUE(3) with diff3_ = bwidth*(nbuck*3/2-1)]
-+	e = buckets_[i].list_;
-+	if (min_e != NULL && 
-+	    (e == NULL || min_e->time_ < e->time_))
-+		e = min_e;
-+	else {
-+		//assert(e);
-+		l = i;
-+	}
-+ found_l:
-+	//assert(buckets_[l].count_ >= 0);
-+	//assert(buckets_[l].list_ == e);
 +
-+	/* l is the index of the bucket to dequeue, e is the event */
-+	/* 
-+	 * still want to advance lastbucket_ and cal_clock_ to save
-+	 * time when deque() follows. 
-+	 */
-+	lastbucket_ = l;
-+ 	cal_clock_  = e->time_;
+ 	int l, i = lastbucket_;
+ 	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
+ 	double diff;
+@@ -755,7 +804,7 @@
+ 	 */
+ 	lastbucket_ = l;
+  	cal_clock_  = e->time_;
+-	
 +	cached_head_ = e;
-+	return e;
-+}
-+
-+Event* 
-+CalendarScheduler::deque()
-+{
-+	Event *e = const_cast<Event *>(head());
-+
-+	if (!e)
-+		return 0;
-+
-+	int l = lastbucket_;
-+
-+	// update stats and unlink
-+	if (e->next_ == e || e->next_->time_ != e->time_) {
-+		--stat_qsize_;
-+		//assert(stat_qsize_ >= 0);
-+		--buckets_[l].count_;
-+		//assert(buckets_[l].count_ >= 0);
-+
+ 	return e;
+ }
+ 
+@@ -797,6 +846,8 @@
+ 		resize(nbuckets_ >> 1, cal_clock_);
  	}
--	//return deque();
-+	--qsize_;
-+
-+	if (e->next_ == e)
-+		buckets_[l].list_ = 0;
-+	else {
-+		e->next_->prev_ = e->prev_;
-+		e->prev_->next_ = e->next_;
-+		buckets_[l].list_ = e->next_;
-+	}
-+
-+	e->next_ = e->prev_ = NULL;
-+
-+
-+	//if (buckets_[l].count_ == 0)
-+	//	assert(buckets_[l].list_ == 0);
-+
-+ 	if (stat_qsize_ < bot_threshold_) {
-+		resize(nbuckets_ >> 1, cal_clock_);
-+	}
-+
+ 
 +	cached_head_ = 0;
-+	
-+	return e;
++
+ 	return e;
  }
  
--void CalendarScheduler::reinit(int nbuck, double bwidth, double start)
-+void 
-+CalendarScheduler::reinit(int nbuck, double bwidth, double start)
- {
--	buckets_ = new Event*[nbuck];
--	memset(buckets_, 0, sizeof(Event*)*nbuck);
-+	buckets_ = new Bucket[nbuck];
-+
-+	memset(buckets_, 0, sizeof(Bucket)*nbuck); //faster than ctor
-+
- 	width_ = bwidth;
--	oneonwidth_ = 1.0 / width_;
- 	nbuckets_ = nbuck;
--	buckbits_ = nbuck-1;
- 	qsize_ = 0;
--	last_clock_ = start;
--	long n = (long)(start * oneonwidth_);
--	lastbucket_ = n & buckbits_;
--	buckettop_ = width_*(n+1.5);
--	prevtop_ = buckettop_ - lastbucket_ * width_;
-+	stat_qsize_ = 0;
-+
-+	lastbucket_ =  CALENDAR_HASH(start);
-+
-+	diff0_ = bwidth*nbuck/2;
-+	diff1_ = diff0_ + bwidth;
-+	diff2_ = bwidth*nbuck;
-+	//diff3_ = bwidth*(nbuck*3/2-1);
-+
- 	bot_threshold_ = (nbuck >> 1) - 2;
- 	top_threshold_ = (nbuck << 1);
- }
+@@ -926,6 +977,9 @@
  
--void CalendarScheduler::resize(int newsize)
-+void 
-+CalendarScheduler::resize(int newsize, double start)
- {
--	if (!resizeenabled_) return;
-+	double bwidth = newwidth(newsize);
+ 	--qsize_;
  
--	double bwidth = newwidth();
--	Event** oldb = buckets_;
-+	if (newsize < 4)
-+		newsize = 4;
-+
-+	Bucket *oldb = buckets_;
- 	int oldn = nbuckets_;
- 
-+	reinit(newsize, bwidth, start);
-+
- 	// copy events to new buckets
--	reinit(newsize, bwidth, clock_);
- 	int i;
--	for (i = oldn-1; i >= 0; i--) {
--		Event* e = oldb[i];
--		while (e != NULL) {
--			Event* en = e->next_;
--			insert(e);
--			e = en;
-+
-+	for (i = 0; i < oldn; ++i) {
-+		// we can do inserts faster, if we use insert2, but to
-+		// preserve FIFO, we have to start from the end of
-+		// each bucket and use insert2
-+		if  (oldb[i].list_) {
-+			Event *tail = oldb[i].list_->prev_;
-+			Event *e = tail; 
-+			do {
-+				Event* ep = e->prev_;
-+				e->next_ = e->prev_ = 0;
-+				insert2(e);
-+				e = ep;
-+			} while (e != tail);
- 		}
- 	}
- 	delete [] oldb;
- }
- 
--#define MIN_WIDTH (1.0e-6)
--#define MAX_HOLD  25
--
-+// take samples from the most populated bucket.
- double
--CalendarScheduler::newwidth()
-+CalendarScheduler::newwidth(int newsize)
- {
--	static Event* hold[MAX_HOLD];
--	int nsamples;
--
--	if (qsize_ < 2) return 1.0;
--	if (qsize_ < 5) nsamples = qsize_;
--	else nsamples = 5 + qsize_ / 10;
--	if (nsamples > MAX_HOLD) nsamples = MAX_HOLD;
--
--	// dequue and requeue sample events to gauge width
--	double olp = clock_;
--	double olt = buckettop_;
--	int olb = lastbucket_;
--	double olbt = prevtop_;
--
--	resizeenabled_ = 0;
--	for (int i = 0; i < nsamples; i++) hold[i] = deque();
--	// insert in the inverse order and using insert2 to take care of same-time events.
--	for (int j = nsamples-1; j >= 0; j--) insert2(hold[j]);
--	resizeenabled_ = 1;
--
--	clock_ = olp;
--	buckettop_ = olt;
--	prevtop_ = olbt;
--	lastbucket_ = olb;
--
--	// try to work out average cluster separation
--	double asep = (hold[nsamples-1]->time_ - hold[0]->time_) / (nsamples-1);
--	double asep2 = 0.0;
--	//double min = (clock_ + 1.0) * MIN_WIDTH; 
--	int count = 0;
--
--	for (int k = 1; k < nsamples; k++) {
--		double diff = hold[k]->time_ - hold[k-1]->time_;
--		if (diff < 2.0*asep) { asep2 += diff; count++; }
--	}
--
--	// but don't let things get too small for numerical stability
--	//double nw = count ? 3.0*(asep2/count) : asep;
--	//if (nw < min) nw = min;
--
--	// if count==0, i.e if all samples are scheduled at the same time, we don't know better than to keep the old estimate
--	double nw;
--	if (count == 0) {
--		nw = width_;
--	} else {
--		nw = 3.0*asep2/count;
-+	int i;
-+	short max_bucket = 0; // index of the fullest bucket
-+	for (i = 1; i < nbuckets_; ++i) {
-+		if (buckets_[i].count_ > buckets_[max_bucket].count_)
-+			max_bucket = i;
- 	}
-+	int nsamples = buckets_[max_bucket].count_;
- 
--	/* need to make sure that time_/width_ can be represented as
--	 * an int.  see the comment at the start of insert().
--	 */
--	/* optimisation suggested by Yuri is to increase value of
--	 * new-width by a factor and leave some space for future events,
--	 * so that we won't be resizing the queue everytime e->time_ 
--	 * > max_. 
--	 */
--	   
--	if (max_/nw > ULONG_MAX) {
--		//nw = max_/ULONG_MAX;
--		nw = max_ * CALENDAR_ALPHA / ULONG_MAX;
--	}
-+	if (nsamples <= 4) return width_;
-+	
-+	double nw = buckets_[max_bucket].list_->prev_->time_ 
-+		- buckets_[max_bucket].list_->time_;
-+	assert(nw > 0);
-+	
-+	nw /= ((newsize < nsamples) ? newsize : nsamples); // min (newsize, nsamples)
-+	nw *= 4.0;
-+	
- 	return nw;
- }
- 
-@@ -776,77 +937,95 @@
-  * must free the event if necessary; this routine only removes
-  * it from the scheduler queue.
-  *
-- * xxx: we may cancel the last event and invalidate the value of max_
-- * xxx: thus using wider buckets than really necessary
-  */
--void CalendarScheduler::cancel(Event* e)
-+void 
-+CalendarScheduler::cancel(Event* e)
- {
--	int i = (int)(((long)(e->time_ * oneonwidth_)) & buckbits_);
--
- 	if (e->uid_ <= 0)	// event not in queue
- 		return;
--	for (Event** p = buckets_ + i; (*p) != NULL; p = &(*p)->next_)
--		if ((*p) == e) {
--			(*p) = (*p)->next_;
--			e->uid_ = - e->uid_;
--			qsize_--;
--			return; 
--		}
--	abort();
--}
- 
--Event* CalendarScheduler::lookup(scheduler_uid_t uid)
--{
--	for (int i = 0; i < nbuckets_; i++)
--		for (Event* p = buckets_[i]; p != NULL; p = p->next_)
--			if (p->uid_== uid) return p;
--	return NULL;
--}
-+	int i = CALENDAR_HASH(e->time_);
- 
--void CalendarScheduler::insert2(Event* e)
--{
--	// Same as insert, but for inserts e *before* any same-time-events, if
--	//   there should be any.  Since it is used only by CalendarScheduler::newwidth(),
--	//   some important checks present in insert() need not be performed.
-+	assert(e->prev_->next_ == e);
-+	assert(e->next_->prev_ == e);
- 
--	// bucket number and address
--	int i = (int)(((long)(e->time_ * oneonwidth_)) & buckbits_); 
--	Event** p = buckets_ + i;
--
--	// insert event in stable time sorted order
--	while ((*p != NULL) && (e->time_ > (*p)->time_)) // > instead of >=!
--		p = &(*p)->next_;
-+	if (e->next_ == e || 
-+	    (e->next_->time_ != e->time_ &&
-+	    (e->prev_->time_ != e->time_))) { 
-+		--stat_qsize_;
-+		assert(stat_qsize_ >= 0);
-+		--buckets_[i].count_;
-+		assert(buckets_[i].count_ >= 0);
-+	}
-+
-+	if (e->next_ == e) {
-+		assert(buckets_[i].list_ == e);
-+		buckets_[i].list_ = 0;
-+	} else {
-+		e->next_->prev_ = e->prev_;
-+		e->prev_->next_ = e->next_;
-+		if (buckets_[i].list_ == e)
-+			buckets_[i].list_ = e->next_;
-+	}
- 
--	e->next_ = *p;
--	*p = e;
--	++qsize_;
-+	if (buckets_[i].count_ == 0)
-+		assert(buckets_[i].list_ == 0);
-+
-+	e->uid_ = -e->uid_;
-+	e->next_ = e->prev_ = NULL;
-+
-+	--qsize_;
-+
 +	if ( e == cached_head_ )
 +	  cached_head_ = 0;
 +
-+	return;
-+}
-+
-+Event * 
-+CalendarScheduler::lookup(scheduler_uid_t uid)
-+{
-+	for (int i = 0; i < nbuckets_; i++) {
-+		Event* head =  buckets_[i].list_;
-+		Event* p = head;
-+		if (p) {
-+			do {
-+				if (p->uid_== uid) 
-+					return p;
-+				p = p->next_;
-+			} while (p != head);
-+		}
-+	}
-+	return NULL;
+ 	return;
  }
  
- #ifndef WIN32
- #include <sys/time.h>
- #endif
- 
--/*
-- * Really should instance the list/calendar/heap discipline
-- * inside a RealTimeScheduler or VirtualTimeScheduler
-- */
--
--#ifdef notyet
- class RealTimeScheduler : public CalendarScheduler {
--#endif
--
--class RealTimeScheduler : public ListScheduler {
- public:
- 	RealTimeScheduler();
+@@ -956,11 +1010,23 @@
  	virtual void run();
  	double start() const { return start_; }
  	virtual void reset();
@@ -1286,7 +691,6 @@
 +#endif
  protected:
  	void sync() { clock_ = tod(); }
--	int rwait(double);	// sleep
 +	virtual void dispatch(Event*, double);	// exec event, set clock_
  	double tod();
  	double slop_;	// allowed drift between real-time and virt time
@@ -1302,7 +706,7 @@
  };
  
  static class RealTimeSchedulerClass : public TclClass {
-@@ -860,16 +1039,85 @@
+@@ -974,16 +1040,85 @@
  RealTimeScheduler::RealTimeScheduler() : start_(0.0)
  {
  	bind("maxslop_", &slop_);
@@ -1388,7 +792,7 @@
  }
  
  void
-@@ -877,81 +1125,93 @@
+@@ -991,20 +1126,42 @@
  {
  	clock_ = SCHED_START;
  	start_ = tod();
@@ -1397,19 +801,16 @@
 +#endif
  }
  
--void RealTimeScheduler::run()
 +#ifdef SCHED_DEBUG
 +int done = 0;
 +#endif
 +
-+void 
-+RealTimeScheduler::run()
+ void 
+ RealTimeScheduler::run()
  { 
--	Event *p;
--	double now;
-+        static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
+ 	static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
 +	static const double delta = 1.0e-4; // should be smaller than above
-+	const Event *p;
+ 	const Event *p;
 +	bool gethead = true;
 +
 +#ifdef USEEVENTS
@@ -1418,103 +819,45 @@
 +	  evsink_->init();
 +	  evsink_->subscribe();
 +	}
- 
++
 +#endif
+ 
  	/*XXX*/
  	instance_ = this;
  
  	while (!halted_) {
--		now = tod();
--		if ((now - clock_) > slop_) {
--			fprintf(stderr,
--			"RealTimeScheduler: warning: slop %f exceeded limit %f [now:%f, clock_:%f]\n",
--				now - clock_, slop_, now, clock_);
 +		if( gethead ) {
 +		  p = head();
 +		  gethead = false;
- 		}
-+		clock_ = tod();
- 
--		//
--		// first handle any "old events"
--		//
--		while ((p = deque()) != NULL && (p->time_ <= now)) {
--			dispatch(p);
--		}
--
--		//
--		// now handle a "future event", if there is one
--		//
--		if (p != NULL) {
--			int rval = rwait(p->time_);
--			if (rval < 0) {
--				fprintf(stderr, "RTScheduler: wait problem\n");
--				abort();
--			} else if (rval == 0) {
--				//
--				// proper time to dispatch sim event... do so
--				//
--				dispatch(p, clock_);
--			} else {
--				//
--				// there was a simulator event which fired, and
--				// may have added something to the queue, which
--				// could cause our event p to not be the next,
--				// so put p back into the event queue and cont
--				//
--				insert(p);
--			}
--			continue;
-+		if (p && (clock_ - p->time_) > slop_) {
-+			fprintf(stderr,
-+				"RealTimeScheduler: warning: slop "
-+				"%f exceeded limit %f [clock_:%f, p->time_:%f]\n",
-+				clock_ - p->time_, slop_, clock_, p->time_);
 +		}
-+		// handle "old events"
-+		while (p && p->time_ <= clock_) {
+ 		clock_ = tod();
+-		p = head();
++
+ 		if (p && (clock_ - p->time_) > slop_) {
+ 			fprintf(stderr,
+ 				"RealTimeScheduler: warning: slop "
+@@ -1014,12 +1171,31 @@
+ 		// handle "old events"
+ 		while (p && p->time_ <= clock_) {
+ 
 +#ifdef DISPATCH_IN_RT
-+			dispatch(deque(), clock_);
+ 			dispatch(deque(), clock_);
 +#else
 +			dispatch(deque(), p->time_);
 +#endif
-+			if (halted_)
-+				return;
-+			p = head();
-+			clock_ = tod();
+ 			if (halted_)
+ 				return;
+ 			p = head();
+ 			clock_ = tod();
  		}
- 
--		//
--		// no sim events to handle at all, check with tcl
--		//
--		sync();
--		Tcl_DoOneEvent(TCL_DONT_WAIT);
--	}
--
--	return;	// we reach here only if halted
--}
--
--/*
-- * wait until the specified amount has elapsed, or a tcl event has happened,
-- * whichever comes first.  Return 1 if a tcl event happened, 0 if the
-- * deadline has been reached, or -1 on error (shouldn't happen).
-- */
++
 +#ifdef USEEVENTS
 +		if( evsink_ && evsink_->poll() == 1 ) {
 +		  gethead = true;
 +		  continue;
 +		}
 +#endif
- 
--int
--RealTimeScheduler::rwait(double deadline)
--{
--	while (1) {
--		sync();
--		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
--			return (1);
--		if (deadline <= tod())
--			return 0;
++
 +#ifdef SCHED_DEBUG
 +		if( clock_ >= 240.0 && done == 0 ) {
 +		  fprintf( stderr, "After 60 secs. Hash Stats for newevents = %s\n",
@@ -1522,58 +865,29 @@
 +		  done = 1;
 +		}
 +#endif
-+		
-+		if (!p) {
-+			// blocking wait for TCL events
-+		        Tcl_WaitForEvent(0); // no sim events, wait forever
-+			clock_ = tod();
-+		} else {
-+			double diff = p->time_ - clock_;
-+			// blocking wait only if there is enough time
-+			if (diff > RTSCHEDULER_MINWAIT) {
-+				Tcl_Time to;
-+				to.sec = long(diff);
+ 		
+ 		if (!p) {
+ 			// blocking wait for TCL events
+@@ -1031,12 +1207,14 @@
+ 			if (diff > RTSCHEDULER_MINWAIT) {
+ 				Tcl_Time to;
+ 				to.sec = long(diff);
+-				to.usec = long(1e6*(diff - to.sec));
 +				to.usec = long(1e6*((diff - delta) - to.sec)); // wait for delta less
-+				Tcl_WaitForEvent(&to);    // block
-+				clock_ = tod();
-+			}
-+		}
+ 				Tcl_WaitForEvent(&to);    // block
+ 				clock_ = tod();
+ 			}
+ 		}
+-		Tcl_DoOneEvent(TCL_DONT_WAIT);
 +		if( Tcl_DoOneEvent(TCL_DONT_WAIT) == 1 ) {
 +		  gethead = true;
 +		}
  	}
--	return -1;
-+	// we reach here only if halted
+ 	// we reach here only if halted
  }
---- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.h	Mon Jan 27 23:33:07 2003
-@@ -56,6 +56,7 @@
- class Event {
- public:
- 	Event* next_;		/* event list */
-+	Event* prev_;
- 	Handler* handler_;	/* handler to call when event ready */
- 	double time_;		/* time at which event is ready */
- 	scheduler_uid_t uid_;	/* unique ID */
-@@ -73,7 +74,6 @@
- };
- 
- #define	SCHED_START	0.0	/* start time (secs) */
--#define CALENDAR_ALPHA  2.0    /* used for resizing bucket width incase of overflow */
- 
- class Scheduler : public TclObject {
- public:
-@@ -86,7 +86,8 @@
- 	virtual void insert(Event*) = 0;	// schedule event
- 	virtual Event* lookup(scheduler_uid_t uid) = 0;	// look for event
- 	virtual Event* deque() = 0;		// next event (removes from q)
--	inline double clock() const {		// simulator virtual time
-+	virtual const Event* head() = 0;	// next event (not removed from q)
-+	double clock() const {			// simulator virtual time
- 		return (clock_);
- 	}
- 	virtual void sync() {};
-@@ -97,7 +98,7 @@
+--- dist-ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Thu Jun  5 18:17:20 2003
+@@ -98,7 +98,7 @@
  protected:
  	void dumpq();	// for debug: remove + print remaining events
  	void dispatch(Event*);	// execute an event
@@ -1582,109 +896,16 @@
  	Scheduler();
  	virtual ~Scheduler();
  	int command(int argc, const char*const* argv);
-@@ -109,11 +110,13 @@
- 
- class ListScheduler : public Scheduler {
- public:
--	inline ListScheduler() : queue_(0) {}
--	virtual void cancel(Event*);
--	virtual void insert(Event*);
--	virtual Event* deque();
--	virtual Event* lookup(scheduler_uid_t uid);
-+	ListScheduler() : queue_(0) {}
-+	void cancel(Event*);
-+	void insert(Event*);
-+	Event* deque();
-+	const Event* head() { return queue_; }
-+	Event* lookup(scheduler_uid_t uid);
-+
- protected:
- 	Event* queue_;
- };
-@@ -122,18 +125,19 @@
- 
- class HeapScheduler : public Scheduler {
- public:
--	inline HeapScheduler() { hp_ = new Heap; } 
--	virtual void cancel(Event* e) {
-+	HeapScheduler() { hp_ = new Heap; } 
-+	void cancel(Event* e) {
- 		if (e->uid_ <= 0)
- 			return;
- 		e->uid_ = - e->uid_;
- 		hp_->heap_delete((void*) e);
- 	}
--	virtual void insert(Event* e) {
-+	void insert(Event* e) {
- 		hp_->heap_insert(e->time_, (void*) e);
- 	}
--	virtual Event* lookup(scheduler_uid_t uid);
--	virtual Event* deque();
-+	Event* lookup(scheduler_uid_t uid);
-+	Event* deque();
-+	const Event* head() { return (const Event *)hp_->heap_min(); }
- protected:
- 	Heap* hp_;
- };
-@@ -141,38 +145,38 @@
- class CalendarScheduler : public Scheduler {
- public:
- 	CalendarScheduler();
--	virtual ~CalendarScheduler();
--	virtual void cancel(Event*);
--	virtual void insert(Event*);
--	virtual Event* lookup(scheduler_uid_t uid);
--	virtual Event* deque();
-+	~CalendarScheduler();
-+	void cancel(Event*);
-+	void insert(Event*);
-+	Event* lookup(scheduler_uid_t uid);
-+	Event* deque();
-+	const Event* head();
- 
- protected:
--	int resizeenabled_;
- 	double width_;
--	double oneonwidth_; /* this variable is always equal 1/width_
--			     * we use it for a speedup (mul is cheaper than div),
--			     * but we may also lose precision with it.
--			     */
--	double buckettop_;
--	double last_clock_;
--	double prevtop_;
-+	double diff0_, diff1_, diff2_; /* wrap-around checks */
-+
-+	int stat_qsize_;		/* # of distinct priorities in queue*/
- 	int nbuckets_;
--	int buckbits_;
- 	int lastbucket_;
- 	int top_threshold_;
- 	int bot_threshold_;
- 
--	Event** buckets_;
-+	struct Bucket {
-+		Event *list_;
-+		int    count_;
-+	} *buckets_;
-+		
- 	int qsize_;
--	double max_;
- 
- 	virtual void reinit(int nbuck, double bwidth, double start);
--	virtual void resize(int newsize);
--	virtual double newwidth();
-+	virtual void resize(int newsize, double start);
-+	virtual double newwidth(int newsize);
- 
+@@ -176,6 +176,7 @@
  private:
  	virtual void insert2(Event*);
-+	double cal_clock_;  // same as clock in sims, may be different in RT-scheduling.
+ 	double cal_clock_;  // same as clock in sims, may be different in RT-scheduling.
 +	const Event *cached_head_;
  
  };
  
---- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Thu Jun  5 18:18:08 2003
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -1701,8 +922,8 @@
  #endif
  
  }
---- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Sep 11 19:32:28 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Thu Jun  5 18:21:36 2003
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -1744,8 +965,8 @@
 +}
 +
 +#endif
---- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Nov  2 15:46:37 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.h	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Thu Jun  5 18:22:38 2003
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -1762,13 +983,12 @@
 +#endif
 +
  #endif /* timer_handler_h */
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue Jan 28 16:38:49 2003
+--- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Jun  6 19:08:41 2003
 @@ -37,21 +37,82 @@
  #endif
  
  #include "iptap.h"
-+#include "net.h"
 +#include <sys/time.h>
 +#include <netinet/in.h>
 +
@@ -1800,11 +1020,12 @@
 +#endif
 +#include        "tbdefs.h"
 +#include        "log.h"
- 
++
 +#ifdef __cplusplus
 +}
 +#endif
 +#endif
+ 
  
  static class IPTapAgentClass : public TclClass {
   public:
@@ -1827,8 +1048,7 @@
  } class_iptap_agent;
  
  
--IPTapAgent::IPTapAgent() 
-+IPTapAgent::IPTapAgent()
+ IPTapAgent::IPTapAgent() 
 +#ifdef MEASURE_DELAYS  
 +                        :  firstpkt_in_burst(false),
 +			   max_delay(0.0), bpf_ts_to_iptap_max_delay(0.0),
@@ -1849,72 +1069,13 @@
    for (; i < MAX_PACKETS ; i++) {
      ident[i] = -1;
      offset[i] = -1;
-@@ -120,20 +181,21 @@
-   
- }
- 
-+void
-+IPTapAgent::pkt_handler(void *clientdata, Packet *p, const struct timeval &ts)
-+{
-+  IPTapAgent *inst = (IPTapAgent *)clientdata;
-+  inst->processpkt(p, ts);
-+}
-+
-+//#define MAX(a,b) ((a)>(b)?(a):(b))
-+
-+
- 
--/*
-- * ns scheduler calls TapAgent::dispatch which calls recvpkt.
-- * 
-- * recvpkt then calls the network (net_) to receive a packet from 
-- * the bpf. Once it has the packet, it populates the ns packet ttl 
-- * value and inject it into the simulator by calling target_->recv
-- * 
-- */
- void
--IPTapAgent::recvpkt()
-+IPTapAgent::processpkt(Packet *p, const struct timeval &ts)
- {
-   struct ip *ipheader;
--  struct tcphdr *tcpheader;
-   unsigned char *buf;
-   
-   /* Ip header information from the grabbed packet. */
-@@ -143,45 +205,53 @@
+@@ -141,6 +202,52 @@
    
    /* TCP header info from the grabbed packet. */
    unsigned char tcphlen;
--  
--  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
--    fprintf(stderr,
--	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
--	    name());
--    return;
--  }
--  
--  if (maxpkt_ <= 0) {
--    fprintf(stderr,
--	    "IPTapAgent(%s): recvpkt: maxpkt_ value too low (%d)\n",
--	    name(), maxpkt_);
--    return;
--  }
--  
- 
--  // allocate packet and a data payload
--  Packet* p = allocpkt(maxpkt_);
++
 +#ifdef MEASURE_DELAYS
- 
--  // fill up payload
--  sockaddr addr;	// not really used (yet)
--  double tstamp;
--  int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
--  if (cc <= 0) {
--    if (cc < 0) {
--      perror("recv");
--    }
--    Packet::free(p);
--    return;
++
 +  double delay ;
 +  // This code keeps some delay data and drops the packet 
 +  if( firstpkt_in_burst ) {
@@ -1927,16 +1088,9 @@
 +    gettimeofday(&tv, 0);
 +    double nowts = tv.tv_sec + (1e-6 * tv.tv_usec);
 +    max_delay = MAX(nowts - ts_firstpkt_in_burst, max_delay);
-   }
--  TDEBUG4("%f: IPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
- 
--  /* 
--     At this point, all I have to do is to grab the ttl value 
--     from the received packet and put it in p's ttl field after
--     decrementing it. It's ok, if we don't recalculate the checksum
--     of the actual packet, because we'll do it at the end anyways.
--  */
- 
++  }
++
++
 +#endif
 +
 +  
@@ -1965,24 +1119,10 @@
 +    firstpacket++;
 +  }
 +#endif
-+  
-   ipheader = (struct ip *) p->accessdata();
-   buf = p->accessdata();
-   iphlen = ipheader->ip_hl * 4;
-@@ -193,12 +263,6 @@
-     return;
-   }
- 
--  /* Discard if duplicate. */
--  if (isDuplicate(ntohs(ipheader->ip_id), ntohs(ipheader->ip_off))) {
--    Packet::free(p);
--    return;
--  }
--  
-   datagramlen = ntohs(ipheader->ip_len);
- 
-   /* Put all the info in the ns headers. */
-@@ -208,13 +272,248 @@
+   
+   /* 
+      At this point, all I have to do is to grab the ttl value 
+@@ -180,15 +287,116 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -2092,55 +1232,38 @@
    return;
  }
  
- 
-+/*
-+ * ns scheduler calls TapAgent::dispatch which calls recvpkt.
-+ * 
-+ * recvpkt then calls the network (net_) to receive a packet from 
-+ * the bpf. Once it has the packet, it populates the ns packet ttl 
-+ * value and inject it into the simulator by calling target_->recv
-+ * 
-+ */
-+void
-+IPTapAgent::recvpkt()
-+{
-+  struct ip *ipheader;
-+  struct tcphdr *tcpheader;
-+  unsigned char *buf;
-+  
-+  /* Ip header information from the grabbed packet. */
-+  int iphlen;  
-+  unsigned short datagramlen;
-+  unsigned char ttl;
-+  
-+  /* TCP header info from the grabbed packet. */
-+  unsigned char tcphlen;
- 
+ /*
+  * ns scheduler calls TapAgent::dispatch which calls recvpkt.
+  * 
+- * recvpkt then calls the network (net_) to receive as many packets
++ * recvpkt then calls the network (net_incoming_) to receive as many packets
+  * as there are from the packet capture facility.
+  * For every packet received through the callback, it populates the ns packet
+  * ttl value and inject it into the simulator by calling target_->recv
+@@ -197,14 +405,17 @@
+ void
+ IPTapAgent::recvpkt()
+ {
+-  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
 +  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
-+    fprintf(stderr,
-+	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
-+	    name());
-+    return;
-+  }
-+  
-+  // Should be Net/Pcap/Live. This calls back pkt_handler
-+  // for every packet it sees in the pcap buffer
+     fprintf(stderr,
+ 	    "IPTapAgent(%s): recvpkt called while in write-only mode!\n",
+ 	    name());
+     return;
+   }
+   
+-  int cc = net_->recv(pkt_handler, this);
 +#ifdef MEASURE_DELAYS
 +  firstpkt_in_burst = true;
 +#endif
 +  int cc = net_incoming_->recv(pkt_handler, this);
-+  if (cc <= 0) {
-+    if (cc < 0) {
-+      perror("recv");
-+    }
-+    return;
-+  }
-+  TDEBUG4("%f: IPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
-+
-+  // nothing to do coz pkt_handler would have called processpkt()
-+  // that would have injected packets into the simulator
-+}
-+
+   if (cc <= 0) {
+     if (cc < 0) {
+       perror("recv");
+@@ -219,13 +430,100 @@
+ }
+ 
+ 
 +#ifdef USEROUTES
 +  
 +int
@@ -2229,88 +1352,63 @@
 +
 +#endif
  
+ 
  /*
   * simulator schedules TapAgent::recv which calls sendpkt
-@@ -231,23 +530,24 @@
+  *
+  * Grabs a ns packet, converts it into real packet 
+- * and injects onto the network using net_->send
++ * and injects onto the network using net_outgoing_->send
+  */
+ int
+ IPTapAgent::sendpkt(Packet* p)
+@@ -236,7 +534,7 @@
    unsigned short dglen;
    struct ip *ipheader;
  
 -  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
-+  if (net_outgoing_ == NULL) {
-     fprintf(stderr,
--	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
-+	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
- 	    name());
-+    drop(p);
-     return (-1);
-   }
--  
--  // send packet into the live network
--  hdr_cmn* hc = HDR_CMN(p);
--  if (net_ == NULL) {
-+
 +  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
      fprintf(stderr,
--	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
-+	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
+ 	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
--    drop(p);
-     return (-1);
-   }
+@@ -245,7 +543,7 @@
    
-+  // send packet into the live network
-+  hdr_cmn* hc = HDR_CMN(p);
-+  
-   /*
-     At this point, we should grab the ttl field from the ns
-     packet, put it in the IP header of the actual packet,
-@@ -277,13 +577,29 @@
+   // send packet into the live network
+   hdr_cmn* hc = HDR_CMN(p);
+-  if (net_ == NULL) {
++  if (net_outgoing_ == NULL) {
+     fprintf(stderr,
+ 	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
+ 	    name());
+@@ -282,7 +580,7 @@
    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
  						sizeof(struct ip));
  
 -  if (net_->send(p->accessdata(), hc->size()) < 0) {
-+  /**** DONT NEED THE FOLLOWING CODE IF WE USE APPROPRIATE PCAP FILTERS
-+	THAT HAVE "not ether src xx:xx:xx:xx:xx:xx" in it           ****/
-+  // we need to store this packet so that we don't pick it up again
-+  //  ident[index % MAX_PACKETS] = ntohs(ipheader->ip_id);
-+  //  offset[index % MAX_PACKETS] = ntohs(ipheader->ip_off);
-+  //  index++;  
-+  
 +  if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
  	    name(), p->accessdata(), hc->size(), strerror(errno));
-+    Packet::free(p); // memory leak fix from 2.1b8a 
+@@ -290,6 +588,11 @@
      return (-1);
      
    }
-+
 +#if 0
 +  if( hc->size() < 50 ) {
 +    fprintf( stderr, "sent pkt %d\n", hc->size());
 +  }
 +#endif
-+  
-+  Packet::free(p); // memory leak fix from 2.1b8a 
+   Packet::free(p);
    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
  	  name(), hc->size());
-   return 0;
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Mon Jan 27 22:54:31 2003
-@@ -38,29 +38,68 @@
- 
- #include "tap.h"
- #include <netinet/in.h>
-+#include <netinet/in_systm.h>
- #include <netinet/ip.h>
- #include <netinet/tcp.h>
- #include <sys/socket.h>
+--- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Fri Jun  6 18:30:53 2003
+@@ -46,18 +46,45 @@
  #include "tcp.h"
  #include "ip.h"
  
 +#ifdef USEROUTES
 +#include <net/if.h>
-+#include "tb_routelookup.h"
 +#endif
 +
  #define MAX_PACKETS 640
@@ -2351,11 +1449,10 @@
  
    unsigned short in_cksum(unsigned short *,int);
    void recvpkt();
-   int sendpkt(Packet*);
-   int isDuplicate(unsigned short, unsigned short);
-+  void processpkt(Packet *, const struct timeval &);
-+  static void pkt_handler(void *, Packet *, const struct timeval &);
-+
+@@ -66,6 +93,13 @@
+   void processpkt(Packet *, const struct timeval &);
+   static void pkt_handler(void *, Packet *, const struct timeval &);
+ 
 +#ifdef MEASURE_DELAYS  
 +  double max_delay;
 +  double bpf_ts_to_iptap_max_delay;
@@ -2366,31 +1463,12 @@
  };
  
  #endif /* iptap_h */
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Mon Jan 27 22:54:31 2003
-@@ -57,92 +57,25 @@
- 
- #ifdef __cplusplus
- extern "C" {
-+#if !defined(__FreeBSD__)
- #include <pcap/pcap.h>
-+#else
-+#include <pcap.h>
-+#endif
- }
- #else
-+#if !defined(__FreeBSD__)
- #include <pcap/pcap.h>
-+#else
-+#include <pcap.h>
-+#endif
- #endif
- 
- #include "config.h"
- #include "scheduler.h"
- #include "net.h"
+--- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Fri Jun  6 14:16:06 2003
+@@ -69,83 +69,6 @@
  #include "tclcl.h"
--
+ #include "packet.h"
+ 
 -/*
 - * observations about pcap library
 - *	device name is in the ifreq struct sense, should be doc'd
@@ -2440,6 +1518,7 @@
 -	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
 -	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
 -	int send(u_char *buf, int len);			// write to net
+-	int recv(netpkt_handler callback, void *clientdata); // get from net
 -	void close();
 -	void reset();
 -
@@ -2452,6 +1531,7 @@
 -
 -protected:
 -	static void phandler(u_char* u, const pcap_pkthdr* h, const u_char* p);
+-	static void phandler_callback(u_char* u, const pcap_pkthdr* h, const u_char* p);
 -	virtual void bindvars() = 0;
 -
 -	char errbuf_[PCAP_ERRBUF_SIZE];		// place to put err msgs
@@ -2466,94 +1546,10 @@
 -
 -	unsigned int local_netmask_;	// seems shouldn't be necessary :(
 -};
-+#include "packet.h"
  
  //
  // PcapLiveNetwork: a live network tap
-@@ -187,7 +120,7 @@
- private:
- 	// XXX somewhat specific to bpf-- this stuff is  a hack until pcap
- 	// can be fixed to allow for opening the bpf r/w
--#ifdef MT_OWN_PCAP
-+#ifdef MY_OWN_PCAP
- 	pcap_t * pcap_open_live(char *, int slen, int prom, int, char *, int);
- 	int bpf_open(pcap_t *p, char *errbuf, int how);
- #endif
-@@ -307,6 +240,12 @@
-         const u_char *pkt;
- };   
- 
-+struct pcap_singleton_callback {
-+        netpkt_handler callback;
-+        void *clientdata;
-+        PcapNetwork *net;
-+};   
-+
- void
- PcapNetwork::phandler(u_char* userdata, const pcap_pkthdr* ph, const u_char* pkt)
- {
-@@ -315,10 +254,50 @@
- 	ps->pkt = (u_char*)pkt;
- }
- 
-+bool small_recd = false;
-+
-+void
-+PcapNetwork::phandler_callback(u_char* userdata, const pcap_pkthdr* ph, const u_char* pkt)
-+{
-+	pcap_singleton_callback *ps = (pcap_singleton_callback*) userdata;	
-+
-+	PcapNetwork *inst = ps->net;
-+	int s = inst->skiphdr();	// go to IP header
-+	Packet *p = Packet::alloc(ph->caplen - s);
-+	
-+	if (++(inst->pcnt_) == 1) {
-+		// mark time stamp of first pkt
-+		inst->t_firstpkt_ = ph->ts.tv_sec + ph->ts.tv_usec * 0.000001;
-+	}
-+
-+	// link layer header will be placed at the beginning from pcap
-+	memcpy(p->accessdata(), pkt + s, ph->caplen - s);
-+
-+	ps->callback(ps->clientdata, p, ph->ts);
-+}
-+
- int
--PcapNetwork::recv(u_char *buf, int len, sockaddr& /*fromaddr*/, double &ts)
-+PcapNetwork::recv(netpkt_handler callback, void *clientdata)
- {
-+	if (state_ != PNET_PSTATE_ACTIVE) {
-+		fprintf(stderr, "warning: net/pcap obj(%s) read-- not active\n",
-+			name());
-+		return -1;
-+	}
-+
-+	int pktcnt = -1;		// all in buffer, or until error
-+	int np;			// counts # of pkts dispatched
-+	pcap_singleton_callback ps = { callback, clientdata, this };
-+	
-+	np = pcap_dispatch(pcap_, pktcnt, phandler_callback, (u_char *)&ps);
-+
-+	//assert( pcap_->cc == 0 );
-+	return np;
-+}
- 
-+int
-+PcapNetwork::recv(u_char *buf, int len, sockaddr& /*fromaddr*/, double &ts)
-+{
- 	if (state_ != PNET_PSTATE_ACTIVE) {
- 		fprintf(stderr, "warning: net/pcap obj(%s) read-- not active\n",
- 			name());
-@@ -356,7 +335,7 @@
- 		// mark time stamp of first pkt
- 		t_firstpkt_ = ph->ts.tv_sec + ph->ts.tv_usec * 0.000001;
- 	}
--
-+	
- 	int n = MIN(ph->caplen, (unsigned)len);
- 	ts = gents(ph);	// mark with timestamp
- 	// link layer header will be placed at the beginning from pcap
-@@ -489,6 +468,19 @@
+@@ -539,6 +462,19 @@
  				"warning: pcap/live (%s) couldn't set immed\n",
  				name());
  			perror("ioctl(BIOCIMMEDIATE)");
@@ -2573,45 +1569,19 @@
  		}
  	}
  #endif
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri May 22 20:44:57 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Mon Jan 27 22:54:31 2003
-@@ -49,12 +49,16 @@
- #undef interface
- #endif
- 
-+class Packet;
-+typedef void (*netpkt_handler)(void *userdata, Packet *p, const struct timeval &ts);
-+
- class Network : public TclObject {
- public:
- 	Network() : mode_(-1) { }
- 	virtual int command(int argc, const char*const* argv);
- 	virtual int send(u_char* buf, int len) = 0;
- 	virtual int recv(u_char* buf, int len, sockaddr& from, double& ts) = 0;
-+	virtual int recv(netpkt_handler callback, void *clientdata) {} // callback called for every packet
- 	virtual int rchannel() = 0;
- 	virtual int schannel() = 0;
- 	int mode() { return mode_; }
-@@ -63,5 +67,105 @@
- 	static char* modename(int);	    // and the reverse
+--- dist-ns-allinone-2.26/ns-2.26/emulate/net.h	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net.h	Fri Jun  6 13:59:46 2003
+@@ -75,4 +75,97 @@
  protected:
  	int mode_;	// read/write bits (from fcntl.h)
-+};
+ };
 +
 +#ifdef __cplusplus
 +extern "C" {
-+#if !defined(__FreeBSD__)
-+#include <pcap/pcap.h>
-+#else
 +#include <pcap.h>
-+#endif
 +}
 +#else
-+#if !defined(__FreeBSD__)
-+#include <pcap/pcap.h>
-+#else
 +#include <pcap.h>
-+#endif
 +#endif
 +
 +#include <sys/param.h>
@@ -2664,8 +1634,8 @@
 +	virtual int skiphdr() = 0;
 +	virtual double gents(pcap_pkthdr*) = 0;		// generate timestamp
 +	int recv(u_char *buf, int len, sockaddr&, double&); // get from net
-+	int recv(netpkt_handler callback, void *clientdata); // get from net
 +	int send(u_char *buf, int len);			// write to net
++	int recv(netpkt_handler callback, void *clientdata); // get from net
 +	void close();
 +	void reset();
 +
@@ -2696,10 +1666,11 @@
 +	struct pcap_stat pcs_;			// status
 +
 +	unsigned int local_netmask_;	// seems shouldn't be necessary :(
- };
++};
++
  #endif
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Tue May 15 15:19:27 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Jun  6 16:42:44 2003
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -2833,8 +1804,8 @@
  		fprintf(stderr,
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Jun  6 16:44:51 2003
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -2847,8 +1818,8 @@
  	double now() { return Scheduler::instance().clock(); }
  };
  
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Jun  6 19:17:24 2003
 @@ -97,6 +97,11 @@
        return (TCL_OK);
      }
@@ -2861,115 +1832,32 @@
      if (strcmp(argv[1], "advertised-window") == 0) {
        adv_window = atoi(argv[2]);
        return (TCL_OK);
-@@ -298,18 +303,15 @@
- 
- }
- 
-+void
-+TCPTapAgent::pkt_handler(void *clientdata, Packet *p, const struct timeval &ts)
-+{
-+  TCPTapAgent *inst = (TCPTapAgent *)clientdata;
-+  inst->processpkt(p, ts);
-+}
- 
--
--/*
-- * ns scheduler calls TapAgent::dispatch which calls recvpkt.
-- * 
-- * recvpkt then calls the network (net_) to receive a packet from 
-- * the bpf. Once it has the packet, it converts to ns FullTCP packet
-- * format and inject it into the simulator by calling target_->recv
-- * 
-- */
- void
--TCPTapAgent::recvpkt()
-+TCPTapAgent::processpkt(Packet *p, const struct timeval &ts)
- {
-   struct ip *ipheader;
-   struct tcphdr *tcpheader;
-@@ -318,36 +320,6 @@
-   /* Ip header information from the grabbed packet. */
-   unsigned char ttl;
-   
--  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
--    fprintf(stderr,
--	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
--	    name());
--    return;
--  }
--  
--  if (maxpkt_ <= 0) {
--    fprintf(stderr,
--	    "TCPTapAgent(%s): recvpkt: maxpkt_ value too low (%d)\n",
--	    name(), maxpkt_);
--    return;
--  }
--  
--  // allocate packet and a data payload
--  Packet* p = allocpkt(maxpkt_);
--
--  // fill up payload
--  sockaddr addr;	// not really used (yet)
--  double tstamp;
--  int cc = net_->recv(p->accessdata(), maxpkt_, addr, tstamp);
--  if (cc <= 0) {
--    if (cc < 0) {
--      perror("recv");
--    }
--    Packet::free(p);
--    return;
--  }
--  TDEBUG4("%f: TCPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
--
-   /* Code to drop packet, if needed 
-   dropp++;
-   if ((dropp % 10) == 0) {
-@@ -461,12 +433,45 @@
-   hdr_cmn *ns_cmnhdr = HDR_CMN(nspacket);
-   ns_cmnhdr->size() = ntohs(ipheader->ip_len);
- 
-+  Packet::free(p);
- 
-   // inject into simulator
-   target_->recv(nspacket);
-   return;
- }
- 
-+/*
-+ * ns scheduler calls TapAgent::dispatch which calls recvpkt.
-+ * 
+@@ -438,7 +443,7 @@
+ /*
+  * ns scheduler calls TapAgent::dispatch which calls recvpkt.
+  * 
+- * recvpkt then calls the network (net_) to receive as many packets
 + * recvpkt then calls the network (net_incoming_) to receive as many packets
-+ * as there are from the packet capture facility.
-+ * For every packet received through the callback, it converts to ns
-+ * FullTcp packet and injects it into the simulator by calling target_->recv
-+ * 
-+ */
-+void
-+TCPTapAgent::recvpkt()
-+{
+  * as there are from the packet capture facility.
+  * For every packet received through the callback, it converts to ns
+  * FullTcp packet and injects it into the simulator by calling target_->recv
+@@ -447,14 +452,14 @@
+ void
+ TCPTapAgent::recvpkt()
+ {
+-  if (net_->mode() != O_RDWR && net_->mode() != O_RDONLY) {
 +  if (net_incoming_->mode() != O_RDWR && net_incoming_->mode() != O_RDONLY) {
-+    fprintf(stderr,
-+	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
-+	    name());
-+    return;
-+  }
-+  
+     fprintf(stderr,
+ 	    "TCPTapAgent(%s): recvpkt called while in write-only mode!\n",
+ 	    name());
+     return;
+   }
+   
+-  int cc = net_->recv(pkt_handler, this);
 +  int cc = net_incoming_->recv(pkt_handler, this);
-+  if (cc <= 0) {
-+    if (cc < 0) {
-+      perror("recv");
-+    }
-+    return;
-+  }
-+  TDEBUG4("%f: TCPTapAgent(%s): recvpkt, cc:%d\n", now(), name(), cc);
-+
-+  // nothing to do coz pkt_handler would have called processpkt()
-+  // that would have injected packets into the simulator
-+}
-+
- 
- 
- 
+   if (cc <= 0) {
+     if (cc < 0) {
+       perror("recv");
 @@ -474,7 +479,7 @@
   * simulator schedules TapAgent::recv which calls sendpkt
   *
@@ -2979,41 +1867,25 @@
   *
   */
  int
-@@ -486,25 +491,24 @@
+@@ -486,7 +491,7 @@
    int hlength = IP_HEADER_LEN + TCP_HEADER_LEN;
    struct tcphdr *tcpheader;
  
 -  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
-+  if (net_outgoing_ == NULL) {
-     fprintf(stderr,
--	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
-+	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
- 	    name());
-+    drop(p);
-     return (-1);
-   }
--  
--  // send packet into the live network
--  hdr_cmn* ns_cmnhdr = HDR_CMN(p);
--  if (net_ == NULL) {
-+
 +  if (net_outgoing_->mode() != O_RDWR && net_outgoing_->mode() != O_WRONLY) {
      fprintf(stderr,
--	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
-+	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
+ 	    "TCPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
--    drop(p);
-     return (-1);
-   }
+@@ -495,7 +500,7 @@
    
-+  // send packet into the live network
-+  hdr_cmn* ns_cmnhdr = HDR_CMN(p);
-   hdr_tcp* ns_tcphdr = HDR_TCP(p);
--
-   hdr_ip * ns_iphdr = HDR_IP(p);
-   received_ttl = ns_iphdr->ttl_;
- 
-@@ -543,16 +547,18 @@
+   // send packet into the live network
+   hdr_cmn* ns_cmnhdr = HDR_CMN(p);
+-  if (net_ == NULL) {
++  if (net_outgoing_ == NULL) {
+     fprintf(stderr,
+ 	    "TCPTapAgent(%s): sendpkt attempted with NULL net\n",
+ 	    name());
+@@ -543,7 +548,7 @@
       Limits the packets going out to only IP + TCP header. 
       ns will act as an ACK machine.
     */
@@ -3022,52 +1894,8 @@
    if (byteswritten < 0) {
      fprintf(stderr,"TCPTapAgent(%s): sendpkt (%p, %d): %s\n",
  	    name(), p->accessdata(), ns_cmnhdr->size(), strerror(errno));
-     Packet::free(p);
-+    free(packet);
-     return (-1);
-     
-   }
-   
--  TDEBUG3("TCPTapAgent(%s): sent packet (sz: %d)\n", name(), hc->size());
-+  free(packet);
-+  TDEBUG3("TCPTapAgent(%s): sent packet (sz: %d)\n", name(), byteswritten);
-   return 0;
- }
- 
---- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Mon Jan 27 22:54:31 2003
-@@ -38,6 +38,7 @@
- 
- #include "tap.h"
- #include <netinet/in.h>
-+#include <netinet/in_systm.h>
- #include <netinet/ip.h>
- #include <netinet/tcp.h>
- #include <sys/socket.h>
-@@ -50,10 +51,10 @@
- #define DEFAULT_ADV_WINDOW    65535 /* Large enough so that min(cong, adv 
- 					window) is cong */
- #define DEFAULT_EXT_PORT       8192
--#define DEFAULT_EXT_ADDR "128.9.160.95"
-+#define DEFAULT_EXT_ADDR "192.168.123.116"
- 
- #define DEFAULT_NS_PORT        16384
--#define DEFAULT_NS_ADDR   "10.0.0.1"
-+#define DEFAULT_NS_ADDR   "192.168.123.253"
- 
- 
- #define TCPIP_BASE_PKTSIZE      40      /* base TCP/IP header in real life */
-@@ -93,6 +94,8 @@
-   void tcp_gen(char *, unsigned short, unsigned short, Packet *);
-   void recvpkt();
-   int sendpkt(Packet*);
-+  void processpkt(Packet *, const struct timeval &);
-+  static void pkt_handler(void *, Packet *, const struct timeval &);
-   
-  public:
-   TCPTapAgent();
---- dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Nov  1 18:03:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/link/delay.h	Wed Feb 26 15:08:54 2003
++++ ns-allinone-2.26/ns-2.26/link/delay.h	Fri Jun  6 16:54:24 2003
 @@ -44,6 +44,10 @@
  #include "ip.h"
  #include "connector.h"
@@ -3091,18 +1919,18 @@
  	}
  	double bandwidth() const { return bandwidth_; }
  	void pktintran(int src, int group);
---- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Mar 20 19:14:56 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Wed Feb 26 15:11:24 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Fri Jun  6 17:14:57 2003
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
   *	this version of TCP will not work correctly if the sequence number
 - *	goes above 2147483648 due to sequence number wrap
-+ *	goes above  due to sequence number wrap
++ *	goes above 1073741824 due to sequence number wrap
   *
   *	this version of TCP by default sends data at the beginning of a
   *	connection in the "typical" way... That is,
-@@ -358,16 +358,16 @@
+@@ -360,16 +360,16 @@
  	case TCPS_CLOSED:
  	case TCPS_LISTEN:
                  reset();
@@ -3122,7 +1950,7 @@
  		break;
  
  	default:
-@@ -433,7 +433,7 @@
+@@ -454,7 +454,7 @@
  void
  FullTcpAgent::usrclosed()
  {
@@ -3131,7 +1959,7 @@
  	infinite_send_ = FALSE;	// stop infinite send
  
  	switch (state_) {
-@@ -715,7 +715,7 @@
+@@ -736,7 +736,7 @@
  int
  FullTcpAgent::rcvseqinit(int seq, int dlen)
  {
@@ -3140,7 +1968,7 @@
  }
  
  /*
-@@ -743,8 +743,8 @@
+@@ -764,8 +764,8 @@
  FullTcpAgent::pack(Packet *pkt)
  {
  	hdr_tcp *tcph = hdr_tcp::access(pkt);
@@ -3151,7 +1979,7 @@
  }
  
  /*
-@@ -801,6 +801,9 @@
+@@ -822,6 +822,9 @@
          tcph->hlen() = tcpip_base_hdr_size_;
  	tcph->hlen() += build_options(tcph);
  
@@ -3161,7 +1989,7 @@
  	/*
  	 * Explicit Congestion Notification (ECN) related:
  	 * Bits in header:
-@@ -909,24 +912,24 @@
+@@ -930,24 +933,24 @@
  	else
  		size_ =  maxseg_ + headersize();
  
@@ -3179,7 +2007,7 @@
 -	int off = seqno - highest_ack_;	// offset of seg in window
 +	int off = SEQ_SUB(seqno, highest_ack_);	// offset of seg in window
  	int datalen;
- 	int amtsent = 0;
+ 	//int amtsent = 0;
  
  	// be careful if we have not received any ACK yet
  	if (highest_ack_ < 0) {
@@ -3191,7 +2019,7 @@
  	}
  
  	if (syn && !data_on_syn_)
-@@ -965,7 +968,7 @@
+@@ -989,7 +992,7 @@
  	// a dataless SYN packet counts also
  	//
  
@@ -3200,7 +2028,7 @@
  	    (syn && datalen == 0))) {
  		emptying_buffer = TRUE;
  		//
-@@ -1069,15 +1072,15 @@
+@@ -1106,15 +1109,15 @@
  	 * around until we actually send a segment
  	 */
  
@@ -3219,7 +2047,7 @@
  		maxseq_ = highest;
  		//
  		// if we are using conventional RTT estimation,
-@@ -1176,10 +1179,11 @@
+@@ -1207,10 +1210,11 @@
          int win = window() * maxseg_;
          int topwin = curseq_; // 1 seq number past the last byte we can send
  
@@ -3234,7 +2062,7 @@
  }
  /*
   * Process an ACK
-@@ -1200,7 +1204,7 @@
+@@ -1231,7 +1235,7 @@
  	hdr_tcp *tcph = hdr_tcp::access(pkt);
  
  	register int ackno = tcph->ackno();
@@ -3243,7 +2071,7 @@
  
  	if (ackno == maxseq_) {
  		cancel_rtx_timer();	// all data ACKd
-@@ -1219,7 +1223,7 @@
+@@ -1250,7 +1254,7 @@
  	// update t_seqno_ here, otherwise we would be doing
  	// go-back-n.
  
@@ -3252,7 +2080,7 @@
  		t_seqno_ = highest_ack_; // seq# to send next
  
          /*
-@@ -1235,7 +1239,7 @@
+@@ -1266,7 +1270,7 @@
  			recent_age_ = now();
  			recent_ = tcph->ts();
  			rtt_update(now() - tcph->ts_echo());
@@ -3261,7 +2089,7 @@
  			// got an RTT sample, record it
  			// "t_backoff_ = 1;" deleted by T. Kelly.
  			rtt_active_ = FALSE;
-@@ -1337,10 +1341,10 @@
+@@ -1368,10 +1372,10 @@
  	if (flags_ & TF_ACKNOW)
  		return TRUE;
  
@@ -3274,7 +2102,7 @@
  }
  
  /*
-@@ -1479,7 +1483,7 @@
+@@ -1510,7 +1514,7 @@
  		 * See RFC1323 (now RFC1323 bis)
                   */
                  if (ts_option_ && !fh->no_ts_ &&
@@ -3283,7 +2111,7 @@
  			/*
  			 * this is the case where the ts value is newer than
  			 * the last one we've seen, and the seq # is the one
-@@ -1517,7 +1521,7 @@
+@@ -1548,7 +1552,7 @@
  			// If we are in fast
  			// recovery, go below so we can remember to deflate
  			// the window if we need to
@@ -3292,7 +2120,7 @@
  			    cwnd_ >= wnd_ && !fastrecov_) {
  				newack(pkt);	// update timers,  highest_ack_
  				send_much(0, REASON_NORMAL, maxburst_);
-@@ -1535,7 +1539,7 @@
+@@ -1566,7 +1570,7 @@
  			//	this routine scans all tcpcb's looking for
  			//	DELACK segments and when it finds them
  			//	changes DELACK to ACKNOW and calls tcp_output()
@@ -3301,7 +2129,7 @@
  			flags_ |= TF_DELACK;
  			recvBytes(datalen); // notify application of "delivery"
  			//
-@@ -1636,7 +1640,7 @@
+@@ -1667,7 +1671,7 @@
  
  		/* drop if it's a SYN+ACK and the ack field is bad */
  		if ((tiflags & TH_ACK) &&
@@ -3310,7 +2138,7 @@
  			// not an ACK for our SYN, discard
  			fprintf(stderr,
  			    "%f: FullTcpAgent::recv(%s): bad ACK for our SYN: ",
-@@ -1730,14 +1734,14 @@
+@@ -1761,14 +1765,14 @@
  			 * SYN+ACK, so t_seqno_ will have been
  			 * advanced to 2... reduce this
  			 */
@@ -3327,7 +2155,7 @@
  
  		if (tiflags & TH_ACK)
  			goto process_ACK;
-@@ -1807,13 +1811,13 @@
+@@ -1838,13 +1842,13 @@
  	// do anything with it.  In particular, would like to
  	// avoid ACKing an incoming FIN+ACK while in CLOSING
  	//
@@ -3343,7 +2171,7 @@
  			th->size()--;	// XXX Must decrease packet size too!!
  					// Q: Why?.. this is only a SYN
  			todrop--;
-@@ -1850,7 +1854,7 @@
+@@ -1881,7 +1885,7 @@
  		 * Trim duplicate data from the front of the packet
  		 */
  
@@ -3352,7 +2180,7 @@
  		th->size() -= todrop;	// XXX Must decrease size too!!
  					// why? [kf]..prob when put in RQ
  		datalen -= todrop;
-@@ -1863,7 +1867,7 @@
+@@ -1894,7 +1898,7 @@
  	 * record the timestamp.
  	 * See RFC1323 (now RFC1323 bis)
  	 */
@@ -3361,7 +2189,7 @@
  		/*
  		 * this is the case where the ts value is newer than
  		 * the last one we've seen, and the seq # is the one we expect
-@@ -1894,7 +1898,7 @@
+@@ -1925,7 +1929,7 @@
  
  	switch (state_) {
  	case TCPS_SYN_RECEIVED:	/* want ACK for our SYN+ACK */
@@ -3370,7 +2198,7 @@
  			// not in useful range
  		    	fprintf(stderr,
  		    		"%f: FullTcpAgent(%s): ack(%d) not in range while in SYN_RECEIVED: ",
-@@ -1968,13 +1972,13 @@
+@@ -1999,13 +2003,13 @@
  		//	try not to be fooled by data
  		//
  
@@ -3386,7 +2214,7 @@
  			// a pure ACK which doesn't advance highest_ack_
  			if (datalen == 0 && (!dupseg_fix_ || !dupseg)) {
  
-@@ -1998,7 +2002,7 @@
+@@ -2029,7 +2033,7 @@
                                   */
  
  				if ((rtx_timer_.status() != TIMER_PENDING) ||
@@ -3395,7 +2223,7 @@
  					// Q: significance of timer not pending?
  					// ACK below highest_ack_
  					oldack();
-@@ -2038,7 +2042,7 @@
+@@ -2069,7 +2073,7 @@
  
  process_ACK:
  
@@ -3404,7 +2232,7 @@
  			// ack more than we sent(!?)
  			fprintf(stderr,
  			    "%f: FullTcpAgent::recv(%s) too-big ACK (maxseq:%d): ",
-@@ -2099,7 +2103,7 @@
+@@ -2130,7 +2134,7 @@
  		 * If no data (only SYN) was ACK'd,
  		 *    skip rest of ACK processing.
  		 */
@@ -3413,7 +2241,7 @@
  			goto step6;
  
  		// if we are delaying initial cwnd growth (probably due to
-@@ -2213,7 +2217,7 @@
+@@ -2244,7 +2248,7 @@
  			// accept the data here as-is (i.e. don't
  			// require being in ESTABLISHED state)
  			flags_ |= TF_DELACK;
@@ -3422,7 +2250,7 @@
  			tiflags = tcph->flags() & TH_FIN;
  
  			// give to "application" here
-@@ -2231,11 +2235,11 @@
+@@ -2262,11 +2266,11 @@
  			// Note that we may have just a FIN here (datalen = 0)
  			int rcv_nxt_old_ = rcv_nxt_; // notify app. if changes
  			tiflags = reass(pkt);
@@ -3436,7 +2264,7 @@
  			}
  			flags_ |= TF_ACKNOW;
  
-@@ -2264,7 +2268,7 @@
+@@ -2295,7 +2299,7 @@
  	if (tiflags & TH_FIN) {
  		if (TCPS_HAVERCVDFIN(state_) == 0) {
  			flags_ |= TF_ACKNOW;
@@ -3445,7 +2273,7 @@
  		}
  		switch (state_) {
                  /*
-@@ -2301,7 +2305,7 @@
+@@ -2332,7 +2336,7 @@
  
  	if (needoutput || (flags_ & TF_ACKNOW))
  		send_much(1, REASON_NORMAL, maxburst_);
@@ -3454,7 +2282,7 @@
  		send_much(0, REASON_NORMAL, maxburst_);
  	// K: which state to return to when nothing left?
  
-@@ -2332,9 +2336,9 @@
+@@ -2363,9 +2367,9 @@
  	if (tiflags & TH_ACK) {
  		sendpacket(ackno, 0, 0x0, 0, REASON_NORMAL);
  	} else {
@@ -3466,7 +2294,7 @@
  		sendpacket(0, ack, TH_ACK, 0, REASON_NORMAL);
  	}
  drop:
-@@ -2362,7 +2366,7 @@
+@@ -2393,7 +2397,7 @@
  FullTcpAgent::dupack_action()
  {   
  
@@ -3475,7 +2303,7 @@
  
  	fastrecov_ = TRUE;
  	rtxbytes_ = 0;
-@@ -2548,7 +2552,7 @@
+@@ -2579,7 +2583,7 @@
  void
  TahoeFullTcpAgent::dupack_action()
  {  
@@ -3484,7 +2312,7 @@
  
  	fastrecov_ = TRUE;
  	rtxbytes_ = 0;
-@@ -2665,11 +2669,11 @@
+@@ -2696,11 +2700,11 @@
  SackFullTcpAgent::dupack_action()
  {
  
@@ -3498,7 +2326,7 @@
  
  //printf("%f: SACK DUPACK-ACTION:pipe_:%d, sq-total:%d, bugfix:%d, cwnd:%d, highest_ack:%d, recover_:%d\n",
  //now(), pipe_, sq_.total(), bug_fix_, int(cwnd_), int(highest_ack_), recover_);
-@@ -2709,7 +2713,7 @@
+@@ -2740,7 +2744,7 @@
  	recover_ = maxseq_;	// where I am when recovery starts
  
  	int amt = fast_retransmit(highest_ack_);
@@ -3507,7 +2335,7 @@
  
  //printf("%f: FAST-RTX seq:%d, h_seqno_ is now:%d, pipe:%d, cwnd:%d, recover:%d\n",
  //now(), int(highest_ack_), h_seqno_, pipe_, int(cwnd_), recover_);
-@@ -2722,12 +2726,12 @@
+@@ -2753,12 +2757,12 @@
  void
  SackFullTcpAgent::pack_action(Packet* p)
  {
@@ -3522,7 +2350,7 @@
  		h_seqno_ = highest_ack_;
  }
  
-@@ -2737,7 +2741,7 @@
+@@ -2768,7 +2772,7 @@
  //printf("%f: EXITING fast recovery, recover:%d\n",
  //now(), recover_);
  	fastrecov_ = pipectrl_ = FALSE;
@@ -3531,7 +2359,7 @@
                  sack_min_ = highest_ack_;
                  sq_.cleartonxt();
          }
-@@ -2823,8 +2827,8 @@
+@@ -2854,8 +2858,8 @@
  		return (FullTcpAgent::send_allowed(seq));
  
  	// don't overshoot receiver's advertised window
@@ -3542,7 +2370,7 @@
  //printf("%f: SEND(%d) NOT ALLOWED DUE TO AWIN:%d, pipe:%d, cwnd:%d\n",
  //now(), seq, topawin, pipe_, int(cwnd_));
  		return FALSE;
-@@ -2846,7 +2850,7 @@
+@@ -2877,7 +2881,7 @@
  SackFullTcpAgent::nxt_tseq()
  {
  
@@ -3551,7 +2379,7 @@
  	int seq = h_seqno_;
  
  	if (!in_recovery) {
-@@ -2885,13 +2889,13 @@
+@@ -2916,13 +2920,13 @@
  			// adjust h_seqno, as we may have
  			// been "jumped ahead" by learning
  			// about a filled hole
@@ -3567,8 +2395,8 @@
  		}
  	}
  //if (int(t_seqno_) > 1)
---- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Dec  2 19:41:16 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Wed Feb 26 15:11:24 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Fri Jun  6 17:18:37 2003
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -3590,7 +2418,7 @@
  class FullTcpAgent;
  class DelAckTimer : public TimerHandler {
  public:
-@@ -187,9 +201,9 @@
+@@ -190,9 +204,9 @@
  	}
  	virtual void sent(int seq, int amt) {
  		if (seq == t_seqno_)
@@ -3602,27 +2430,27 @@
  			rtxbytes_ += amt;
  	}
  	virtual void oldack() {			// what to do on old ack
---- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Mar 29 19:40:43 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Mon Jan 27 22:54:31 2003
-@@ -54,6 +54,8 @@
- 	int ackno_;             /* ACK number for FullTcp */
- 	int hlen_;              /* header len (bytes) for FullTcp */
+--- dist-ns-allinone-2.26/ns-2.26/tcp/tcp.h	Wed Feb 26 15:11:25 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Fri Jun  6 17:22:30 2003
+@@ -56,6 +56,8 @@
  	int tcp_flags_;         /* TCP flags for FullTcp */
+ 	int last_rtt_;		/* more recent RTT measurement in ms, */
+ 				/*   for statistics only */
 +        int maxseg_;            /* MSS for TCPTap to negotiate in the SYN segment
 +				   needed in NSE */
  
  	static int offset_;	// offset for this header
  	inline static int& offset() { return offset_; }
-@@ -72,6 +74,7 @@
- 	int& hlen() { return (hlen_); }
+@@ -75,6 +77,7 @@
  	int& ackno() { return (ackno_); }  
  	int& flags() { return (tcp_flags_); }
+ 	int& last_rtt() { return (last_rtt_); }
 +	int& maxseg() { return (maxseg_); }
  };
  
  /* these are used to mark packets as to why we xmitted them */
---- dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Tue Aug  8 23:51:14 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Mon Jan 27 22:54:31 2003
+--- dist-ns-allinone-2.26/ns-2.26/tools/random.cc	Wed Feb 26 15:11:28 2003
++++ ns-allinone-2.26/ns-2.26/tools/random.cc	Fri Jun  6 17:23:54 2003
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -3637,11 +2465,11 @@
 +#endif
  
  #endif /* !WIN32 */
---- dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Apr  1 16:07:28 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Jan 27 22:54:31 2003
-@@ -826,6 +826,8 @@
- 			break;
+--- dist-ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Wed Feb 26 15:11:29 2003
++++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Fri Jun  6 17:24:39 2003
+@@ -941,6 +941,8 @@
  		case PT_GAF:
+ 		case PT_PING:
  			break;
 +		case PT_LIVE:
 +			break;

@@ -1,10 +1,10 @@
 #!/bin/sh
-if [ ! -d ns-allinone-2.1b9 ]; then
-    echo "Downloading ns2.1b9 source ..."
-    fetch http://www.emulab.net/ns-allinone-2.1b9.tar.gz
-    tar xzf ns-allinone-2.1b9.tar.gz
+if [ ! -d ns-allinone-2.26 ]; then
+    echo "Downloading ns2.26 source ..."
+    fetch http://www.emulab.net/ns-allinone-2.26.tar.gz
+    tar xzf ns-allinone-2.26.tar.gz
     patch -p0 < nse.patch
 fi
-cd ns-allinone-2.1b9
+cd ns-allinone-2.26
 ./install
-cp ns-2.1b9/nse ..
+cp ns-2.26/nse ..
