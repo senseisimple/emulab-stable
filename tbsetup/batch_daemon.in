@@ -140,8 +140,6 @@ sub runexp($)
     my $creator  = $exphash{'creator_uid'};
     my $longname = $exphash{'name'};
     
-    print STDOUT "Trying to start experiment $eid in project $pid\n";
-
     #
     # Start up a child to run the guts. The parent waits. If the
     # experiment configures okay, the parent can return to try something
@@ -150,10 +148,13 @@ sub runexp($)
     #
     $childpid = fork();
     if ($childpid) {
+	print "Trying to start experiment $eid in project $pid. ".
+	      "Child PID is $childpid\n";
 	waitpid($childpid, 0);
-	my $status = $?;
+	my $status = $? >> 8;
 
-	return;
+	print "Child PID $childpid exited with exit status $status\n";
+	return $status;
     }
 
     # global var
@@ -261,6 +262,20 @@ sub runexp($)
 		 "Please consult the Web interface to see how its doing\n");
 
     #
+    # We want to disconnect from the parent so that it can return and
+    # look for another batch experiment to work on. The child will then
+    # continue on, waiting for the batch experiment to end by looking at
+    # status of the nodes.
+    # 
+    $childpid = fork();
+    if ($childpid) {
+	print "$eid/$pid configured okay. Child process $childpid ".
+	    "waiting for it to end.\n";
+
+	exit(0);
+    }
+
+    #
     # Now loop, periodically looking for a change in the status of the
     # nodes, or for a cancelation request. 
     #
@@ -277,20 +292,19 @@ sub runexp($)
 	}
 			    
 	@row = $query_result->fetchrow_array();
-	
 	if ($row[0]) {
 	    cancel_batch(1);
 	    exit(0);
 	}
 
+	#
+	# Look to see if any nodes yet to report status. If so, spin again.
+	#
 	$query_result =
 	    DBquery("SELECT startstatus FROM nodes LEFT JOIN reserved ".
 		    "ON nodes.node_id=reserved.node_id ".
 		    "WHERE reserved.eid='$eid' and reserved.pid='$pid'");
 
-	#
-	# Look to see if any nodes yet to report status. If so, spin again.
-	#
 	my $done = 1;
 	for ($i = 0; $i < $query_result->numrows; $i++) {
 	    @row = $query_result->fetchrow_array();
@@ -336,6 +350,7 @@ sub DBquery($)
 
 #
 # Start up a child, and set its descriptors talking to a log file.
+# The log file already exists, created with mktemp above.
 # 
 sub openlog($)
 {
@@ -343,11 +358,11 @@ sub openlog($)
 	
     #
     # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller (the web server) will
-    # continue to wait even though the parent has exited. 
+    # STDOUT away from the pipe. Otherwise the caller will continue to wait
+    # even though the parent has exited. 
     #
     open(STDIN, "< /dev/null") or
-	fatal("opening /dev/null for STDIN: $!");
+	die("opening /dev/null for STDIN: $!");
 
     open(STDERR, ">> $logname") or
 	fatal("opening $logname for STDERR: $!");
@@ -405,7 +420,7 @@ sub cancel_batch($)
 	
     print MAIL
 	"Your Batch Mode experiment has been canceled. You may now\n".
-	"reuse the experiement name\n\n";
+	"reuse the experiment name\n\n";
 
     if (defined($logname) && open(IN, "$logname")) {
 	print MAIL "\n\n---------\n\n";
