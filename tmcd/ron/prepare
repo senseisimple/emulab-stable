@@ -30,6 +30,8 @@ my $MOUNTINFO	= "/var/db/mounttab";
 my @ETCFILES    = ("rc.conf.local", "resolv.conf", "namedb/localhost.rev",
 		   "emulab.pkey", "emulab-hard.txt", "emulab-soft.txt");
 my $USERS	= "/users";
+my $SSHDIR	= "/etc/ssh";
+my @SSHFILES	= ("ssh_host_dsa_key", "ssh_host_rsa_key", "ssh_host_key");
 
 #
 # Turn off line buffering on output
@@ -171,6 +173,13 @@ if (-f $SFSHOSTKEY) {
     system("rm -f $SFSHOSTKEY");
 }
 
+print "Clearing ssh key files $SSHDIR ...\n";
+foreach my $file (@SSHFILES) {
+    if (-f "${SSHDIR}/$file") {
+	system("rm -f ${SSHDIR}/${file}");
+	system("rm -f ${SSHDIR}/${file}.pub");
+    }
+}
 
 print "Clearing out directories in $VARDIR ...\n";
 foreach my $dir (@VARDIRS) {
@@ -194,4 +203,3 @@ system("$BINDIR/mkemuman.sh");
 
 print "Clearing out old SFS links ... \n";
 system("rm -f /netbed/*");
-

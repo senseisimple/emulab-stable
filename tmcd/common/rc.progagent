@@ -91,7 +91,7 @@ while (<CMD>) {
     }
 }
 
-if (!defined(@agents) || !defined($login)) {
+if (! @agents || !defined($login)) {
     fatal(TMPROGAGENTS . " not in proper format!");
 }
 

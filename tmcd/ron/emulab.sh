@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -23,6 +23,7 @@ stop)
 restart)
 	if [ -f $BINDIR/emulabctl ]; then
 	    $BINDIR/emulabctl stop
+	    echo 'Sleeping a bit before restarting ...'
 	    sleep 10
 	    $BINDIR/emulabctl start
 	fi

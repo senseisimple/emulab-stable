@@ -14,22 +14,32 @@ use Getopt::Std;
 # of /sbin/init, since killing the jail cleanly from outside the jail
 # turns out to be rather difficult, and doing it from inside is very easy!
 #
+# Note though, when the machine is shutdown we can cleanly send this
+# script a signal from mkjail. If reboot is used instead of shutdown,
+# the system broadcasts SIGTERM, and this script will catch that and
+# die. However, thats not good cause the caller (mkjail) wipes out the
+# jail when this script exits of its own accord. So, ignore TERM, and wait
+# for mkjail to send us a USR1, which means to exit.
+#
 my $DEFCONSIX = "/bin/sh /etc/rc";
 
 #
 # Catch TERM.
 # 
 sub handler () {
-    $SIG{TERM} = 'IGNORE';
+    $SIG{USR1} = 'IGNORE';
     system("kill -TERM -1");
     sleep(1);
     system("kill -KILL -1");
     exit(1);
 }
-$SIG{TERM} = \&handler;
+$SIG{TERM} = 'IGNORE';
+$SIG{USR1} = \&handler;
 
 my $childpid = fork();
 if (!$childpid) {
+    $SIG{TERM} = 'DEFAULT';
+    
     if (@ARGV) {
 	exec @ARGV;
     }

@@ -83,7 +83,9 @@ if (@ARGV) {
 
 # Uninstall just looks for the file and runs it.
 if ($uninstall) {
-    system("delaysetup -u " . (defined($vnodeid) ? "-j $vnodeid" : "")); 
+    system("delaysetup -u " . (defined($vnodeid) ? "-j $vnodeid" : ""))
+	if (!REMOTE());
+	
     system(TMIFC . " disable")
 	if (-e TMIFC);
     if (defined($vnodeid) && defined($rtabid)) {
@@ -100,7 +102,8 @@ unlink TMIFC, TMROUTECONFIG, TMTUNNELCONFIG;
 # is run via the ifconfig, so just need to run that one.
 #
 dotunnels($rtabid);
-doifconfig($rtabid);
+doifconfig($rtabid)
+    if (!REMOTE());
 dorouterconfig($rtabid);
 
 if (-e TMTUNNELCONFIG && $install) {
@@ -118,6 +121,8 @@ if (-e TMIFC && $install) {
 # Do the delaysetup stuff.
 system("delaysetup ".
        ($install ? "-i " : "") .
-       (defined($vnodeid) ? "-j $vnodeid " : ""));
+       (defined($vnodeid) ? "-j $vnodeid " : ""))
+    if (!REMOTE());
+   
 exit(0);
 

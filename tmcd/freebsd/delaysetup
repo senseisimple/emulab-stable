@@ -384,7 +384,7 @@ sub LinkDelaySetup()
     my @delays;
     my $kernel;
     my $checkreplace = 0;
-    my $gotjails = 0;
+    my $gotjails = (defined($vnodeid) ? 1 : 0); 
     my $upcmds   = "";
     my $downcmds = "";
 

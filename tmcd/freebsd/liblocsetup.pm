@@ -82,14 +82,11 @@ my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
 
 #
-# OS dependent part of cleanup node state.
+# OS dependent part of cleanup node state. On a remote node, this will
+# only be called from inside a JAIL, or from the prepare script. 
 # 
 sub os_cleanup_node ($) {
     my ($scrub) = @_;
-
-    if (REMOTE() && !JAILED()) {
-	return 0;
-    }
 
     if (! $scrub) {
 	return 0;

@@ -118,19 +118,21 @@ if ( -f "$LOGDIR/pacct" ) {
     unlink("$LOGDIR/pacct");
 }
 
-opendir(VARACCT,$VARACCTDIR) or
-    die("Could not open directory $VARACCTDIR: $!");
+if (-d $VARACCTDIR) {
+    opendir(VARACCT,$VARACCTDIR) or
+	die("Could not open directory $VARACCTDIR: $!");
 
-while ($dirent = readdir(VARACCT)) {
-    my $file = $VARACCTDIR . "/" . $dirent;
-    if (-f $file) {
-	if ($file =~ /acct/) {
-	    unlink($file) or
-		die ("Could not unlink $file: $!");
+    while ($dirent = readdir(VARACCT)) {
+	my $file = $VARACCTDIR . "/" . $dirent;
+	if (-f $file) {
+	    if ($file =~ /acct/) {
+		unlink($file) or
+		    die ("Could not unlink $file: $!");
+	    }
 	}
     }
+    closedir(VARACCT);
 }
-closedir(VARACCT);
 
 print "Removing root's history ...\n";
 if (-f $HISTORY) {

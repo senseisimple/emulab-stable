@@ -241,9 +241,12 @@ else {
 
 #
 # If the jail has its own IP, must insert the control network alias.
+# We use a 255.255.255.255 netmask since there might be multiple
+# virtual nodes from the same subnet on this node. 
 #
 if (defined($IPALIAS)) {
-    mysystem("ifconfig `control_interface` alias $IPALIAS netmask $IPMASK");
+    mysystem("ifconfig `control_interface` alias $IPALIAS ".
+	     "netmask 255.255.255.255");
 }
 
 #
@@ -573,7 +576,6 @@ sub cleanmess($) {
     mysystem("rm -f  $path/root/$ETCDIR/cvsup.auth");
     mysystem("rm -rf $path/root/$ETCDIR/.cvsup");
     mysystem("rm -f  $path/root/$ETCDIR/master.passwd");
-    mysystem("rm -f  $path/root/$ETCDIR/bossnode");
 
     #
     # Copy in emulabman if it exists.
@@ -640,7 +642,7 @@ sub cleanup()
     }
 
     if (defined($jailpid)) {
-	kill('TERM', $jailpid);
+	kill('USR1', $jailpid);
 	waitpid($jailpid, 0);
     }
 
@@ -816,9 +818,6 @@ sub setjailoptions() {
 		    $routetabid   = getnextrtabid();
 		    $jailoptions .= " -r $routetabid";
 		}
-		else {
-		    $jailoptions .= " -o norouting";
-		}
 		last SWITCH;
 	    };
 	    /^DEVMEM$/ && do {
@@ -839,6 +838,10 @@ sub setjailoptions() {
  	    };
 	}
     }
+    #
+    # If there is no IP for the jail, must restrict the port range of
+    # it. Otherwise it has it own IP, and there is no need to.
+    # 
     if (! defined($IPALIAS)) {
 	if (defined($portrange)) {
 	    $jailoptions .= " -p $portrange";
@@ -878,9 +881,9 @@ sub addroutestorc($rc)
     open(RC, ">>$rc") or
 	fatal("Could not open $rc to append static routes");
 
-    my $routerip = `cat $BOOTDIR/routerip`;
+    my $routerip  = `cat $BOOTDIR/routerip`;
     chomp($routerip);
-    my $hostip   = `cat $BOOTDIR/myip`;
+    my $hostip    = `cat $BOOTDIR/myip`;
     chomp($hostip);
 
     #
@@ -891,8 +894,16 @@ sub addroutestorc($rc)
     print RC "route_lo0=\"localhost -interface lo0\"\n";
     print RC "route_host=\"$hostip localhost\"\n";
     if ($IP ne $hostip) {
-	print RC "static_routes=\"\$static_routes jailip\"\n";
-	print RC "route_jailip=\"$IP localhost\"\n";
+	# Setup a route for all jails on this node, to the loopback.
+	print RC "static_routes=\"\$static_routes jailnet\"\n";
+	print RC "route_jailnet=\"-net $IP -interface lo0 255.255.255.0\"\n";
+
+	# Need a route for the private network.
+	my $ctrliface = `control_interface`;
+	chomp($ctrliface);
+	
+	print RC "static_routes=\"\$static_routes privnet\"\n";
+	print RC "route_privnet=\"-net $IP -interface $ctrliface $IPMASK\"\n";
     }
 
     #

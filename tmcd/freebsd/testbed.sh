@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -15,6 +15,8 @@ start)
 	$BINDIR/rc.testbed
 	;;
 stop)
+	# Foreground mode.
+	$BINDIR/bootvnodes -f -h
 	echo "Informing the testbed we're rebooting"
 	$BINDIR/tmcc state SHUTDOWN
 	;;

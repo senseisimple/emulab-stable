@@ -82,6 +82,7 @@ if ($action eq "stop") {
     if (! -e $pidfile) {
 	exit(0);
     }
+    system("bootvnodes -f -h");
     system("kill `cat $pidfile`");
     exit($? >> 8);
 }

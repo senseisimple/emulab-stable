@@ -19,7 +19,7 @@ SUBDIR		= tmcd/common
 
 include $(OBJDIR)/Makeconf
 
-all:
+all:	vnodesetup
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

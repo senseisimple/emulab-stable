@@ -18,10 +18,10 @@ use POSIX qw(strftime);
 #
 sub usage()
 {
-    print "Usage: bootvnodes [-d] [-f]\n";
+    print "Usage: bootvnodes [-d] [-f] [-k | -h]\n";
     exit(1);
 }
-my $optlist = "df";
+my $optlist = "kdfh";
 
 #
 # Turn off line buffering on output
@@ -42,6 +42,8 @@ my $logname = "$LOGDIR/bootvnodes.debug";
 my $vndir   = "/var/emulab/jails";
 my $debug   = 0;
 my $daemon  = 1;
+my $killit  = 0;
+my $haltit  = 0;
 
 #
 # Forward declarations for prototype checking
@@ -61,6 +63,12 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"f"})) {
     $daemon = 0;
+}
+if (defined($options{"k"})) {
+    $killit = 1;
+}
+if (defined($options{"h"})) {
+    $haltit = 1;
 }
 if (@ARGV) {
     usage();
@@ -92,6 +100,28 @@ if ($daemon && TBBackGround($logname)) {
     #
     # Parent exits normally
     #
+    exit(0);
+}
+
+if ($killit | $haltit) {
+    my $opt = ($haltit ? "-h" : "-k");
+    my $act = ($haltit ? "Halting" : "Killing");
+    
+    print "$act vnodes ... please be patient ...\n";
+
+    opendir(DIR, "/var/emulab/jails") or
+	die("Cannot opendir /var/emulab/jails: $!\n");
+    my @files = readdir(DIR);
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	if ($file ne "." && $file ne ".." &&
+	    $file =~ /^([-\w]*)$/) {
+
+	    print "$act vnode $1 ...\n";
+	    system("vnodesetup $opt $1");
+	}
+    }
     exit(0);
 }
 

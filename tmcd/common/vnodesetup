@@ -23,15 +23,16 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 #
 sub usage()
 {
-    print "Usage: vnodesetup [-j [-s]] [-b | -k | -r] [-d] <vnodeid>\n".
+    print "Usage: vnodesetup [-j [-s]] [-b | -k | -r | -h] [-d] <vnodeid>\n".
 	"Use the -k option to kill the virtual node.\n";
     exit(1);
 }
-my $optlist	= "kbdjsr";
+my $optlist	= "kbdjsrh";
 
 # Locals
 my $killit	= 0;
 my $rebootit	= 0;
+my $haltit	= 0;
 my $debug	= 0;
 my $fromboot	= 0;
 my $dojail	= 0;
@@ -92,6 +93,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"k"})) {
     $killit = 1;
 }
+if (defined($options{"h"})) {
+    $haltit = 1;
+}
 if (defined($options{"r"})) {
     $rebootit = 1;
 }
@@ -127,11 +131,9 @@ my $vnodedir = "/var/emulab/jails/$vnodeid";
 my $logname  = "$LOGDIR/tbvnode-${vnodeid}.log";
 
 #
-# If killing the virtual node, then kill the manager process. We use
-# the negative signal number to send to the process group so that all
-# stuff gets killed in one fell swoop.
+# If killing/halting the virtual node, then kill the manager process.
 #
-if ($killit) {
+if ($killit || $haltit) {
     if (! -e $pidfile) {
 	die("*** $0:\n".
 	    "    No pid for $vnodeid manager!\n");
@@ -183,9 +185,11 @@ if (!$debug && !$interactive && TBBackGround($logname)) {
 }
 
 #
-# Change our process group since we are a daemon. Not usually important,
-# but we get called from the watchdog, and we do not want to be in
-# its process group, or it will die when we get killed.
+# Change our process group since we are a daemon; we get called from
+# the watchdog, and we do not want to be in its process group, or it
+# will die when we get killed. In any event, by putting ourselves into
+# another process group, we can more easily kill off all our decendents.
+# when tearing down.
 #
 POSIX::setsid();
 
@@ -251,7 +255,7 @@ if (! -e $vnodedir) {
 # Inform the TMCD we are setting up. 
 #
 REBOOT:
-system("tmcc -n $vnodeid state REBOOTING");
+system("tmcc -n $vnodeid state BOOTING");
 system("tmcc -n $vnodeid state TBSETUP");
 
 #
@@ -274,15 +278,28 @@ if (!defined($pid)) {
 $UID = 0;
 
 #
-# Okay, now startup the scripts.
+# This stuff is done only when the node is not in a jail. The jail setup
+# code does all this, so we avoid duplication of effort.
 #
-if (-e TMTUNNELCONFIG) {
-    print "Starting Tunnels ...\n";
-    TBForkCmd(TMTUNNELCONFIG);
-    sleep(5);
-}
-
 if (!$dojail) {
+    print STDOUT "Checking Testbed tunnel configuration ... \n";
+    dotunnels();
+
+    print STDOUT "Checking Testbed routing configuration ... \n";
+    dorouterconfig();
+
+    print STDOUT "Checking Testbed traffic generation configuration ...\n";
+    dotrafficconfig();
+
+    #
+    # Okay, now run startup the scripts
+    #
+    if (-e TMTUNNELCONFIG) {
+	print "Starting Tunnels ...\n";
+	TBForkCmd(TMTUNNELCONFIG);
+	sleep(5);
+    }
+
     if (-e TMTRAFFICCONFIG) {
 	print "Starting Traffic Generators ...\n";
 	TBForkCmd(TMTRAFFICCONFIG);
@@ -359,8 +376,10 @@ sub killvnode() {
 	die("*** $0:\n".
 	    "    Bad data in pid: $mpid!\n");
     }
-    if (kill('USR1', $mpid) == 0) {
-	print"*** Could not kill(USR1) process $mpid: $!\n";
+    my $sigtosend = ($haltit ? 'TERM' : 'USR1');
+	
+    if (kill($sigtosend, $mpid) == 0) {
+	print"*** Could not kill($sigtosend) process $mpid: $!\n";
 	return -1;
     }
     
@@ -368,11 +387,11 @@ sub killvnode() {
     # Wait for the pidfile to be removed. Do not wait too long though. 
     # 
     for (my $i = 0; $i < 30;) {
-	sleep(5);
+	sleep(2);
 	if (! -e $pidfile) {
 	    return 0;
 	}
-	$i += 5;
+	$i += 2;
     }
     print "*** Not able to kill running vnode manager process $mpid!\n";
     return 0;

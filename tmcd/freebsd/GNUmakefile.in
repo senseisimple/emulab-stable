@@ -112,6 +112,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
 	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
+	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 			$(BINDIR)/control_interface
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(BINDIR)/gated_fxp0.conf
@@ -137,15 +138,18 @@ jail-install:	dir-install
 	$(INSTALL) -m 640 $(SRCDIR)/jail/master.passwd $(JAILDIR)/master.passwd
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.conf $(JAILDIR)/rc.conf
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.local $(JAILDIR)/rc.local
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.injail $(BINDIR)/rc.injail
 	$(INSTALL) -m 755 $(SRCDIR)/jail/injail.pl $(JAILDIR)/injail.pl
 	$(INSTALL) -m 755 $(SRCDIR)/jail/crontab $(JAILDIR)/crontab
-	$(INSTALL) -m 755 $(SRCDIR)/jail/jaildog.pl $(BINDIR)/jaildog.pl
-	$(INSTALL) -m 755 $(SRCDIR)/jail/jailctl $(BINDIR)/jailctl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/jailsetup $(BINDIR)/jailsetup
 	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(BINDIR)/mkjail.pl
 
 # Invoked from ../ron
 remote-install:	jail-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
+	# Does tunnel stuff.
+	$(INSTALL) -m 755 $(SRCDIR)/ifsetup $(BINDIR)/ifsetup
+	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 
 # Invoked from ../ron

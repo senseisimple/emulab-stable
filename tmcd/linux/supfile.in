@@ -1,5 +1,4 @@
 #
-# When the release is bumped, be sure to remove sup/sup/RHL71-STD/checkouts
-# on the client.
+# Bump as needed
 #
-RHL71-STD  base=@CLIENT_VARDIR@ prefix=/ preserve release=newclient
+RHL73-STD  base=@CLIENT_VARDIR@ prefix=/ preserve release=current
