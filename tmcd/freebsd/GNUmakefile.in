@@ -51,6 +51,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(INSTALL_DIR)/rc.agents
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(INSTALL_DIR)/rc.delayagent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(INSTALL_DIR)/rc.delta
+	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(INSTALL_DIR)/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
