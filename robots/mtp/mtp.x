@@ -156,6 +156,16 @@ struct camera_config {
     int port;
 };
 
+struct obstacle_config {
+    int id;
+    float x1;
+    float y1;
+    float z1;
+    float x2;
+    float y2;
+    float z2;
+};
+
 struct global_bound {
     float horizontal;
     float vertical;
@@ -164,6 +174,7 @@ struct global_bound {
 struct mtp_config_rmc {
     robot_config robots<>;
     global_bound box;
+    obstacle_config obstacles<>;
 };
 
 struct mtp_config_vmc {

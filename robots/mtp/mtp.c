@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -223,6 +224,9 @@ int mtp_bind(char *host, int port, char *path)
 		 sizeof(saddr.sin) : sizeof(saddr.sun)) == -1) {
 	    perror("bind");
 	}
+	else if ((family == AF_UNIX) && (chmod(path, S_IRWXU) == -1)) {
+	    perror("fchmod");
+	}
 	else if (listen(fd, 5) == -1) {
 	    perror("listen");
 	}
@@ -355,6 +359,14 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	case MA_CameraVal:
 	    mp->data.mtp_payload_u.config_vmc.cameras.cameras_val =
 		va_arg(args, struct camera_config *);
+	    break;
+	case MA_ObstacleLen:
+	    mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_len =
+		va_arg(args, int);
+	    break;
+	case MA_ObstacleVal:
+	    mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_val =
+		va_arg(args, struct obstacle_config *);
 	    break;
 	case MA_RobotID:
 	    switch (mp->data.opcode) {
@@ -605,6 +617,20 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    lpc,
 		    mcr->robots.robots_val[lpc].id,
 		    mcr->robots.robots_val[lpc].hostname);
+	}
+	for (lpc = 0;
+	     lpc < mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_len;
+	     lpc++) {
+	    struct mtp_config_rmc *mcr = &mp->data.mtp_payload_u.config_rmc;
+	    
+	    fprintf(file,
+		    "  obstacle[%d]:\t%d %f/%f x %f/%f\n",
+		    lpc,
+		    mcr->obstacles.obstacles_val[lpc].id,
+		    mcr->obstacles.obstacles_val[lpc].x1,
+		    mcr->obstacles.obstacles_val[lpc].y1,
+		    mcr->obstacles.obstacles_val[lpc].x2,
+		    mcr->obstacles.obstacles_val[lpc].y2);
 	}
 	break;
     

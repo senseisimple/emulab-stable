@@ -432,8 +432,9 @@ int have_camera_config(char *hostname, int port,
 }
 
 void parse_config_file(char *config_file) {
+  int oc_size = 0, cc_size = 0, line_no = 0;
+  struct obstacle_config *oc = NULL;
   struct camera_config *cc = NULL;
-  int cc_size = 0, line_no = 0;
   char line[BUFSIZ];
   FILE *fp;
 
@@ -461,22 +462,23 @@ void parse_config_file(char *config_file) {
     sscanf(line, "%16s", directive);
 
     if (strcmp(directive, "robot") == 0) {
-      char hostname[MAXHOSTNAMELEN], vname[TBDB_FLEN_EVOBJNAME];
+      char area[32], hostname[MAXHOSTNAMELEN], vname[TBDB_FLEN_EVOBJNAME];
       int id;
       float init_x;
       float init_y;
       float init_theta;
 
       if (sscanf(line,
-		 "%16s %d %" __XSTRING(MAXHOSTNAMELEN) "s %f %f %f "
+		 "%16s %32s %d %" __XSTRING(MAXHOSTNAMELEN) "s %f %f %f "
 		 "%" __XSTRING(TBDB_FLEN_EVOBJNAME) "s",
 		 directive,
+		 area,
 		 &id,
 		 hostname,
 		 &init_x,
 		 &init_y,
 		 &init_theta,
-		 vname) != 7) {
+		 vname) != 8) {
 	fprintf(stderr,
 		"error:%d: syntax error in config file - %s\n",
 		line_no,
@@ -511,14 +513,15 @@ void parse_config_file(char *config_file) {
       }
     }
     else if (strcmp(directive, "camera") == 0) {
-      char hostname[MAXHOSTNAMELEN];
+      char area[32], hostname[MAXHOSTNAMELEN];
       int port;
 
       if (sscanf(line,
-		 "%16s %" __XSTRING(MAXHOSTNAMELEN) "s %d",
+		 "%16s %32s %" __XSTRING(MAXHOSTNAMELEN) "s %d",
 		 directive,
+		 area,
 		 hostname,
-		 &port) != 3) {
+		 &port) != 4) {
 	fprintf(stderr,
 		"error:%d: syntax error in config file - %s\n",
 		line_no,
@@ -535,6 +538,39 @@ void parse_config_file(char *config_file) {
 	cc[cc_size].hostname = strdup(hostname);
 	cc[cc_size].port = port;
 	cc_size += 1;
+      }
+    }
+    else if (strcmp(directive, "obstacle") == 0) {
+      float x1, y1, x2, y2;
+      char area[32];
+      int id;
+
+      if (sscanf(line,
+		 "%16s %32s %d %f %f %f %f",
+		 directive,
+		 area,
+		 &id,
+		 &x1,
+		 &y1,
+		 &x2,
+		 &y2) != 7) {
+	fprintf(stderr,
+		"error:%d: syntax error in config file - %s\n",
+		line_no,
+		line);
+      }
+      else if ((oc = realloc(oc,
+			     (oc_size + 1) *
+			     sizeof(struct camera_config))) == 0) {
+	fatal("cannot allocate memory\n");
+      }
+      else {
+	oc[oc_size].id = id;
+	oc[oc_size].x1 = x1;
+	oc[oc_size].y1 = y1;
+	oc[oc_size].x2 = x2;
+	oc[oc_size].y2 = y2;
+	oc_size += 1;
       }
     }
     // next line!
@@ -559,6 +595,8 @@ void parse_config_file(char *config_file) {
 		      MA_Role, MTP_ROLE_EMC,
 		      MA_RobotLen, hostname_list->item_count,
 		      MA_RobotVal, robot_val,
+		      MA_ObstacleLen, oc_size,
+		      MA_ObstacleVal, oc,
 		      MA_TAG_DONE);
       mtp_init_packet(&config_vmc,
 		      MA_Opcode, MTP_CONFIG_VMC,

@@ -51,6 +51,7 @@ Packet: version 2; role emc
   vert:		0.000000
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
+  obstacle[0]:	1 0.350000/0.400000 x 0.000000/0.000000
 Packet: version 2; role emc
  opcode:	error
   id:		0
@@ -83,6 +84,7 @@ Packet: version 2; role emc
   vert:		0.000000
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
+  obstacle[0]:	1 0.350000/0.400000 x 0.000000/0.000000
 Packet: version 2; role emc
  opcode:	update-position
   id:		1
