@@ -401,7 +401,7 @@ while (my %row = $db_result->fetchhash()) {
     # Set the canfail bit. Currently, sharks are always canfail=1.
     # Will come from DB at some point.
     #
-    if ($row{'type'} eq "dnard") {
+    if ($plabnode) {
 	$canfail{$node} = 1;
     }
     else {
