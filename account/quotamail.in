@@ -24,7 +24,7 @@ do
 cat << MESSAGE
 From: Testbed Operations <@TBOPSEMAIL_NOSLASH@>
 To: $i@@OURDOMAIN@
-Cc: Testbed Operations <@TBOPSEMAIL_NOSLASH@>
+Bcc: @TBAUTOMAILEMAIL_NOSLASH@
 Subject: over disk quota at @THISHOMEBASE@
 
 Hello,

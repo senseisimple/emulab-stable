@@ -14,6 +14,7 @@ TBAPPROVALEMAIL=testbed-approval@flux.cs.utah.edu
 TBAUDITEMAIL=testbed-audit@flux.cs.utah.edu
 TBSTATEDEMAIL=testbed-stated@flux.utah.edu
 TBTESTSUITEEMAIL=testbed-testsuite@flux.utah.edu
+TBAUTOMAILEMAIL=testbed-automail@flux.utah.edu
 TBACTIVEARCHIVE=testbed-active-users-archive@flux.cs.utah.edu
 TBUSERSARCHIVE=testbed-users-archive@flux.cs.utah.edu
 IPBASE=192.168
