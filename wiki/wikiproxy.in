@@ -1,0 +1,707 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+    
+#
+# A wrapper for messing with the wiki support from boss.
+#
+sub usage()
+{
+    print "Usage: wikiproxy adduser <uid> <wikiname> or\n";
+    print "       wikiproxy deluser <uid> <wikiname> or\n";
+    print "       wikiproxy addproject <pid> <wikiname> or\n";
+    print "       wikiproxy setgroups <wikiuser> <wikigroup> ...\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+# Should be configure variables.
+my $WIKIDIR  = "/usr/local/www/data/twiki";
+
+# And other stuff.
+my $USERTEMPLATE = "$TB/lib/wiki/usertemplate";
+my $HOMETEMPLATE = "$TB/lib/wiki/webhometemplate";
+my $WIKIDATADIR  = "$WIKIDIR/data";
+my $WIKIUSERDIR  = "$WIKIDATADIR/Main";
+my $WIKIGROUPDIR = "$WIKIDATADIR/Main";
+my $WIKIARCHIVE  = "$WIKIDATADIR/_archive";
+my $WIKIPASSWD   = "$WIKIDIR/data/.htpasswd";
+my $WIKIUSER     = "nobody";
+my $WIKIGROUP    = "nobody";
+my $CI		 = "ci";
+    
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+
+my $action = shift(@ARGV);
+
+if ($action eq "adduser") {
+    exit(AddWikiUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelWikiUser(@ARGV));
+}
+elsif ($action eq "addproject") {
+    exit(AddWikiProject(@ARGV));
+}
+elsif ($action eq "setgroups") {
+    exit(SetWikiGroups(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Add entry (or update password) for a user.
+#
+sub AddWikiUser(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $wikiname) = @_;
+
+    chdir("$WIKIUSERDIR") or
+	fatal("Could not chdir to $WIKIUSERDIR");
+
+    #
+    # Grab the password hash. 
+    #
+    my ($name,$passwd) = getpwnam($user);
+    fatal("No such user $user in the password file")
+	if (!defined($name));
+
+    #
+    # If the password file does not have the entry, just tack it onto
+    # the end of the file. Otherwise we have to get fancier so we 
+    # change the password atomically. It appears that the TWiki code
+    # does not lock the password file when it makes it own changes! 
+    #
+    if (system("egrep -q -s '^${wikiname}:' $WIKIPASSWD")) {
+	print "Adding $user to $WIKIPASSWD\n"
+	    if ($debug);
+	
+	open(PWD, ">> $WIKIPASSWD") or
+	    fatal("Could not open $WIKIPASSWD for appending");
+	print PWD "${wikiname}:${passwd}\n";
+	close(PWD);
+    }
+    else {
+	#
+	# Open up the file and read it, creating a new version.
+	#
+	my $data = "";
+	
+	print "Updating $wikiname in $WIKIPASSWD\n"
+	    if ($debug);
+	
+	open(PWD, "$WIKIPASSWD") or
+	    fatal("Could not open $WIKIPASSWD for reading");
+	
+	while (<PWD>) {
+	    if ($_ =~ /^${wikiname}:.*$/) {
+		$data .= "${wikiname}:${passwd}\n";
+	    }
+	    else {
+		$data .= $_;
+	    }
+	}
+	close(PWD);
+
+	open(PWD, "> ${WIKIPASSWD}.$$") or
+	    fatal("Could not open ${WIKIPASSWD}.$$ for writing");
+	print PWD $data;
+	close(PWD);
+
+	system("chown ${WIKIUSER}:${WIKIGROUP} ${WIKIPASSWD}.$$") == 0
+	    or fatal("Could not chown ${WIKIPASSWD}.$$");
+
+	rename("${WIKIPASSWD}.$$", $WIKIPASSWD)
+	    or fatal("Could not rename ${WIKIPASSWD}.$$");
+    }
+
+    #
+    # Create the stub topic file for the user if it does not exist.
+    #
+    return 0
+	if (-e "${WIKIUSERDIR}/${wikiname}.txt");
+
+    print "Creating ${WIKIUSERDIR}/${wikiname}.txt\n"
+	if ($debug);
+    
+    system("cp -p ${USERTEMPLATE} ${wikiname}.txt") == 0
+	or fatal("Could not copy ${USERTEMPLATE} to ${wikiname}.txt");
+
+    #
+    # Set the initial groups list to the user.
+    #
+    open(PREFS, "${wikiname}.txt") or
+	fatal("Could not open ${wikiname}.txt for reading");
+
+    while (<PREFS>) {
+	if ($_ =~ /^(.* Set ALLOWTOPIC.*)\r$/ ||
+	    $_ =~ /^(.* Set ALLOWTOPIC.*)$/) {
+	    $data .= $1 . "%MAINWEB%.${wikiname}\n";
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PREFS);
+
+    #
+    # Now write the file out.
+    #
+    open(PREFS, "> ${wikiname}.txt") or
+	fatal("Could not open ${wikiname}.txt for writing");
+    print PREFS $data;
+    close(PREFS);
+    
+    #
+    # Check it in (locked).
+    #
+    CI("${wikiname}.txt", "AddWikiUser $user $wikiname") == 0
+        or fatal("Could not ci ${wikiname}.txt");
+    
+    return 0;
+}
+
+#
+# Delete entry for a user.
+#
+sub DelWikiUser(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $wikiuser) = @_;
+
+    chdir("$WIKIUSERDIR") or
+	fatal("Could not chdir to $WIKIUSERDIR");
+
+    #
+    # First, find groups the user is currently a member of, and remove.
+    #
+    my $currentgroups =
+	`egrep -l -s 'GROUP = .*${wikiuser}.*' *Group.txt`;
+    $currentgroups =~ s/Group.txt//g;
+
+    if (!$?) {
+	my @glist = split(/\s+/, $currentgroups);
+	    
+	print "Current groups for $wikiuser are @glist\n"
+	    if ($debug);
+
+	foreach my $group (@glist) {
+	    my $wikiname = "${group}Group";
+	    my $data     = "";
+
+	    print "Removing $wikiuser from $group\n";
+
+	    open(GRP, "${wikiname}.txt") or
+		fatal("DelWikiUser: ".
+		      "Could not open ${wikiname}.txt (read)\n");
+
+	    while (<GRP>) {
+		if ($_ =~ /^(\s*\*\s*Set\s*GROUP\s*=\s*)(.*)$/) {
+		    my @tokens = split(/,\s*/, $2);
+
+		    # Cut out the user.
+		    @tokens = grep {$_ ne $wikiuser} @tokens;
+
+		    # And reform the group list.
+		    $data .= $1 . join(", ", @tokens) . "\n";
+		}
+		else {
+		    $data .= $_;
+		}
+	    }
+	    close(GRP);
+
+	    #
+	    # Now write the new text back out to the file.
+	    #
+	    open(GRP, ">${wikiname}.txt") or
+		fatal("SetWikiGroups: ".
+		      "Could not open ${wikiname}.txt (write)\n");
+	    print GRP $data;
+	    close(GRP);
+	    
+	    #
+	    # Check it in (locked).
+	    #
+	    CI("${wikiname}.txt", "DelWikiUser $user $wikiuser") == 0
+		or fatal("Could not ci ${wikiname}.txt");
+	}
+    }
+    
+    #
+    # Remove user from the password file.
+    #
+    print "Removing $user from $WIKIPASSWD\n"
+	if ($debug);
+	
+    open(PWD, "$WIKIPASSWD") or
+	fatal("Could not open $WIKIPASSWD for reading");
+	
+    while (<PWD>) {
+	if ($_ =~ /^$user:.*$/) {
+	    next;
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PWD);
+
+    open(PWD, "> ${WIKIPASSWD}.$$") or
+	fatal("Could not open ${WIKIPASSWD}.$$ for writing");
+    print PWD $data;
+    close(PWD);
+
+    system("chown ${WIKIUSER}:${WIKIGROUP} ${WIKIPASSWD}.$$") == 0
+	or fatal("Could not chown ${WIKIPASSWD}.$$");
+
+    rename("${WIKIPASSWD}.$$", $WIKIPASSWD)
+	or fatal("Could not rename ${WIKIPASSWD}.$$");
+
+    #
+    # Archive the user file. Removing users is kinda bogus cause I do not
+    # attempt to remove any other files the user created. We could figure
+    # this out of course, but not bothering right now.
+    #
+    if (! -e $WIKIARCHIVE) {
+	mkdir($WIKIARCHIVE, 0775) or
+	    fatal("Could not mkdir $WIKIDATADIR!");
+
+	system("chown ${WIKIUSER}:${WIKIGROUP} $WIKIARCHIVE") == 0
+	    or fatal("Could not chown $WIKIARCHIVE");
+    }
+    my $wikifile = "${wikiuser}.txt";    
+    my $oldname  = "${wikifile},v";
+    my $newname  = "${oldname}-" . TBDateTimeFSSafe();
+
+    print "Renaming $oldname to $WIKIARCHIVE/$newname\n"
+	if ($debug);
+
+    rename($oldname, "$WIKIARCHIVE/$newname")
+	or fatal("Could not rename $oldname to $WIKIARCHIVE/$newname");
+    unlink($wikifile)
+	or fatal("Could not remove $wikifile");
+
+    return 0;
+}
+
+#
+# Create a "web" for a new project.
+#
+sub AddWikiProject(@)
+{
+    my $data = "";
+    
+    usage()
+	if (@_ != 2);
+
+    my ($pid, $wikiname) = @_;
+
+    chdir("$WIKIDATADIR") or
+	fatal("Could not chdir to $WIKIDATADIR");
+
+    # Skip if already there. 
+    return 0
+	if (-d $wikiname);
+
+    print "Creating ${WIKIDATADIR}/${wikiname}\n"
+	if ($debug);
+
+    #
+    # Copy the _default directory to the new WEB name. This "creates"
+    # the new wiki web. 
+    #
+    system("/usr/site/bin/hier cp _default $wikiname") == 0
+	or fatal("Could not copy _default to $wikiname");
+
+    system("cp -p ${HOMETEMPLATE} ${wikiname}/WebHome.txt") == 0
+	or fatal("Could not copy ${HOMETEMPLATE} to ${wikiname}/WebHome.txt");
+
+    #
+    # We also need a group for this project to restrict who can access it.
+    #
+    AddWikiGroup($pid, "${wikiname}Group");
+
+    #
+    # And another group for the project leaders and group roots, who are
+    # allowed to change the preferences for the web.
+    #
+    AddWikiGroup("${pid}Root", "${wikiname}RootGroup");
+
+    #
+    # Now finish up in the new web directory.
+    # 
+    chdir("$WIKIDATADIR/$wikiname") or
+	fatal("Could not chdir to $WIKIDATADIR/$wikiname");
+
+    #
+    # Remove all the RCS control files. They are old and pointless.
+    # Create new ones instead. 
+    #
+    system("rm -f *.txt,v") == 0 or
+	fatal("Could not remove old RCS control files!");
+
+    system("chown ${WIKIUSER}:${WIKIGROUP} *.txt")
+	== 0 or fatal("Could not chown *.txt to ${WIKIUSER}:${WIKIGROUP}");
+
+    system("sudo -u nobody ci -l '-mInitial Revision by wikiproxy:\n".
+	   "AddWikiProject $pid $wikiname' ".
+	   "      '-t-Initial Revision by wikiproxy' *.txt") == 0
+        or fatal("Could not create new RCS control files.");
+
+    #
+    # Now edit the web preferences file to set who is allowed to access
+    # this web. Basically, only people in the project (wiki group) and
+    # the admin group.
+    #
+    open(PREFS, "WebPreferences.txt") or
+	fatal("Could not open WebPreferences.txt for reading");
+
+    while (<PREFS>) {
+	if ($_ =~ /^.* Set (ALLOWWEB.*) = \r$/ ||
+	    $_ =~ /^.* Set (ALLOWWEB.*) = $/) {
+	    $data .= "\t\t* Set $1 = " . "%MAINWEB%.${wikiname}Group\n";
+	}
+	elsif ($_ =~ /^(.* Set ALLOWTOPIC.*)\r$/ ||
+	       $_ =~ /^(.* Set ALLOWTOPIC.*)$/) {
+	    $data .= $1 . "%MAINWEB%.${wikiname}RootGroup\n";
+	}
+	elsif ($_ =~ /^(.* Set NOSEARCHALL.*)\r$/ ||
+	       $_ =~ /^(.* Set NOSEARCHALL.*)$/) {
+	    $data .= $1 . "on\n";
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PREFS);
+
+    #
+    # Now write the file out and check it in.
+    #
+    open(PREFS, ">WebPreferences.txt") or
+	fatal("Could not open WebPreferences.txt for writing");
+    print PREFS $data;
+    close(PREFS);
+
+    CI("WebPreferences.txt", "AddWikiProject $pid $wikiname") == 0
+        or fatal("Could not ci WebPreferences.txt");
+
+    return 0;
+}
+
+#
+# Create a wiki group. 
+#
+sub AddWikiGroup(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($group, $wikiname) = @_;
+
+    chdir("$WIKIGROUPDIR") or
+	fatal("Could not chdir to $WIKIGROUPDIR");
+
+    # Skip if already there. 
+    return 0
+	if (-d "${wikiname}.txt");
+
+    print "Creating ${WIKIGROUPDIR}/${wikiname}.txt\n"
+	if ($debug);
+
+    open(GRP, "> ${wikiname}.txt") or
+	fatal("Could not open ${WIKIGROUPDIR}/${wikiname}.txt for writing");
+
+    print GRP "*Project/Group Members for ${wikiname}*\n";
+    print GRP "\n";
+    print GRP "\t* Set GROUP = \n";
+    print GRP "\t* Set ALLOWTOPICCHANGE = %MAINWEB%.TWikiAdminGroup\n";
+    print GRP "\t* Set ALLOWTOPICRENAME = %MAINWEB%.TWikiAdminGroup\n";
+    print GRP "\n";
+    print GRP "__Any changes you make to this file will be LOST!__\n";
+    close(GRP);
+
+    #
+    # Check it in (locked).
+    #
+    CI("${wikiname}.txt", "AddWikiGroup $group $wikiname") == 0
+        or fatal("Could not ci ${wikiname}.txt");
+
+    return 0;
+}
+
+#
+# Set the wiki groups for a user.
+#
+sub SetWikiGroups(@)
+{
+    usage()
+	if (@_ < 1);
+
+    my $wikiuser  = shift(@_);
+    my @groups    = @_;
+    my %grouphash = ();
+    
+    foreach my $group (@groups) {
+	$grouphash{$group} = $group;
+    }
+
+    chdir("$WIKIGROUPDIR") or
+	fatal("Could not chdir to $WIKIGROUPDIR");
+
+    #
+    # First, find groups the user is currently a member of, and remove
+    # from those groups not supposed to be in.
+    #
+    my $currentgroups =
+	`egrep -l -s 'GROUP = .*${wikiuser}.*' *Group.txt`;
+    $currentgroups =~ s/Group.txt//g;
+
+    if (!$?) {
+	my @glist = split(/\s+/, $currentgroups);
+	    
+	print "Current groups for $wikiuser are @glist\n"
+	    if ($debug);
+
+	foreach my $group (@glist) {
+	    my $wikiname = "${group}Group";
+	    my $data     = "";
+
+	    next
+		if (exists($grouphash{$group}));
+	    
+	    print "Removing $wikiuser from $group\n";
+
+	    open(GRP, "${wikiname}.txt") or
+		fatal("SetWikiGroups: ".
+		      "Could not open ${wikiname}.txt (read)\n");
+
+	    while (<GRP>) {
+		if ($_ =~ /^(\s*\*\s*Set\s*GROUP\s*=\s*)(.*)$/) {
+		    my @tokens = split(/,\s*/, $2);
+
+		    # Cut out the user.
+		    @tokens = grep {$_ ne $wikiuser} @tokens;
+
+		    # And reform the group list.
+		    $data .= $1 . join(", ", @tokens) . "\n";
+		}
+		else {
+		    $data .= $_;
+		}
+	    }
+	    close(GRP);
+
+	    #
+	    # Now write the new text back out to the file.
+	    #
+	    open(GRP, ">${wikiname}.txt") or
+		fatal("SetWikiGroups: ".
+		      "Could not open ${wikiname}.txt (write)\n");
+	    print GRP $data;
+	    close(GRP);
+	    
+	    #
+	    # Check it in (locked).
+	    #
+	    CI("${wikiname}.txt", "SetWikiGroups $wikiuser @groups") == 0
+		or fatal("Could not ci ${wikiname}.txt");
+	}
+    }
+
+    #
+    # Now add user to other groups.
+    #
+    foreach my $group (@groups) {
+	my $wikiname = "${group}Group";
+	my $data     = "";
+	    
+	# Error if no such wikigroup
+	fatal("No group file for wiki group $wikiname!")
+	    if (! -e "${wikiname}.txt");
+
+	next
+	    if (!system("egrep -q -s 'GROUP = .*${wikiuser}.*' ".
+			"${wikiname}.txt\n"));
+	    
+	print "Adding $wikiuser to wikigroup ${wikiname}.txt\n";
+
+	open(GRP, "${wikiname}.txt") or
+	    fatal("SetWikiGroups: Could not open ${wikiname}.txt (read)\n");
+
+	while (<GRP>) {
+	    if ($_ =~ /^(\s*\*\s*Set\s*GROUP\s*=)\s*$/) {
+		# First name in the group.
+		$data .= $1 . " $wikiuser\n";
+	    }
+	    elsif ($_ =~ /^(\s*\*\s*Set\s*GROUP\s*=\s*)(.*)$/) {
+		$data .= $1 . "${2}, $wikiuser\n";
+	    }
+	    else {
+		$data .= $_;
+	    }
+	}
+	close(GRP);
+
+	#
+	# No write the new text back out to the file.
+	#
+	open(GRP, ">${wikiname}.txt") or
+	    fatal("SetWikiGroups: Could not open ${wikiname}.txt (write)\n");
+	print GRP $data;
+	close(GRP);
+
+	#
+	# Check it in (locked).
+	#
+	CI("${wikiname}.txt", "SetWikiGroups $wikiuser @groups") == 0
+	    or fatal("Could not ci ${wikiname}.txt");
+    }
+
+    #
+    # And finally, change the home page for the user. This is basically
+    # to avoid searching the entire wiki for the membership.
+    #
+    $data = "";
+    
+    open(PREFS, "${wikiuser}.txt") or
+	fatal("Could not open ${wikiuser}.txt for reading");
+
+    while (<PREFS>) {
+	if ($_ =~ /^(\s*\* Projects\/Groups:).*$/) {
+	    $data .= $1 . "\n";
+
+	    #
+	    # Add a list of groups.
+	    #
+	    foreach my $group (@groups) {
+		if (-d "../$group") {
+		    $data .= "\t\t* [[${group}.WebHome][${group}]]\n";
+		}
+		else {
+		    $data .= "\t\t* [[%MAINWEB%.${group}Group][${group}Group]]\n";
+		}
+	    }
+
+	    #
+	    # And skip the current ones.
+	    #
+	    while (<PREFS>) {
+		last
+		    if ($_ =~ /^\s$/);
+	    }
+	    $data .= "\n";
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PREFS);
+
+    #
+    # Now write the file out.
+    #
+    open(PREFS, "> ${wikiuser}.txt") or
+	fatal("Could not open ${wikiuser}.txt for writing");
+    print PREFS $data;
+    close(PREFS);
+    
+    #
+    # Check it in (locked).
+    #
+    CI("${wikiuser}.txt", "SetWikiGroups $wikiuser @groups") == 0 
+        or fatal("Could not ci ${wikiuser}.txt");
+    
+    return 0;
+}
+
+sub CI($$) {
+    my ($file, $comment) = @_;
+
+    system("chown ${WIKIUSER}:${WIKIGROUP} $file")
+	== 0 or fatal("Could not chown $file to ${WIKIUSER}:${WIKIGROUP}");
+
+    my $cmd = "sudo -u nobody ci -l '-mRevision by wikiproxy:\n$comment'".
+	"      '-t-Revision by wikiproxy' $file 2>&1";
+    my $output = `$cmd`;
+    if ($? && $output =~ /no lock set by/ ) {
+	my $cmd = "rcs -u -M $file";
+	my $output = `$cmd`;
+	return -1
+	    if ($?);
+	system("sudo -u nobody rcs -l $file");
+	return -1
+	    if ($?);
+        return system($cmd);	
+    }
+    return $? >> 8;
+}
+     
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

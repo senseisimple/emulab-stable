@@ -1,0 +1,20 @@
+This is your TWiki home page. Feel free to customize it!  If you are
+not familiar with the %WIKITOOLNAME% collaboration platform, please
+visit %TWIKIWEB%.WelcomeGuest first. See the links at your left for
+more information on how to write and create TWiki pages.
+
+__These are your Projects/Groups__
+	* Projects/Groups:
+
+__Personal Preferences (details in %TWIKIWEB%.TWikiVariables)__
+	* Horizontal size of text edit box:
+		* Set EDITBOXWIDTH = 70
+	* Vertical size of text edit box:
+		* Set EDITBOXHEIGHT = 17
+	* Default state of the __link__ check box in the attach file page:
+		* Set ATTACHLINKBOX = 
+
+__Permissions (leave these alone unless you know what you are doing, or ask us)__
+	* Set ALLOWTOPICVIEW = 
+	* Set ALLOWTOPICCHANGE = 
+	* Set ALLOWTOPICRENAME = 

@@ -1,0 +1,150 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Delete a user from the wiki
+#
+sub usage()
+{
+    print STDOUT "Usage: delwikiuser <uid>\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $WIKISUPPORT = @WIKISUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $WIKIPROXY   = "$TB/sbin/wikiproxy";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no wiki support, just exit. 
+#
+if (! $WIKISUPPORT) {
+    print "WIKI support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $user = $ARGV[0];
+
+#
+# Untaint args.
+#
+if ($user =~ /^([-\w]+)$/) {
+    $user = $1;
+}
+else {
+    die("Bad data in user: $user.");
+}
+
+#
+# This script always does the right thing, so no permission checks.
+# In fact, all it does it call over to ops to run a script over there.
+# Note that adduser will just update the password if the user already
+# exist in the wiki. 
+#
+
+#
+# Look in the DB to see if there is already a wikiname defined. If
+# we use that. Otherwise have to form one from the user name. Ick.
+#
+my $query_result =
+    DBQueryFatal("select wikiname ".
+		 "from users where uid='$user'");
+
+if (!$query_result->numrows) {
+    fatal("No such user $user in the DB!");
+}
+my ($wikiname) = $query_result->fetchrow_array();
+
+if (!defined($wikiname)) {
+    print "There is no wikiname defined in the DB. ".
+	"Must not have a wiki account!\n";
+    exit(0);
+}
+
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    my $optarg = ($debug ? "-d" : "");
+	
+    print "Removing user $user from the wiki on $CONTROL.\n";
+
+    if (system("$SSH -host $CONTROL $WIKIPROXY ".
+	       "  $optarg deluser $user $wikiname")) {
+	fatal("$WIKIPROXY failed on $CONTROL!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

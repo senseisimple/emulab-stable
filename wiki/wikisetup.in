@@ -1,0 +1,254 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Initial wiki setup. Create wiki accounts for all users and projects.
+#
+sub usage()
+{
+    print STDOUT "Usage: wikisetup\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+my $impotent = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $WIKISUPPORT = @WIKISUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $WIKIPROXY   = "$TB/sbin/wikiproxy";
+my $ADDWIKIUSER = "$TB/sbin/addwikiuser";
+my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
+my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# If no wiki support, just exit. 
+#
+if (! $WIKISUPPORT) {
+    print "WIKI support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Only testbed admins.
+#
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Must be a testbed admin to run this script\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+my %wikipids   = ();	# Indexed by pid, gives wikiname.
+my %wikinames  = ();	# Indexed by wikiname.
+
+#
+# Attempt to form unique wiki IDs for all users and projects. What a
+# pain in the ass this is going to be.
+#
+# First the projects. Only main group.
+#
+$query_result =
+    DBQueryFatal("select pid from groups where pid=gid ".
+		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
+		 "     pid='utahstud')");
+
+while (my ($pid) = $query_result->fetchrow_array()) {
+    #
+    # The wikirules for web names are slightly easier to deal with.
+    # Note that there will also be a *Group name created from the token.
+    #
+    my $wikiname = ucfirst($pid);
+
+    if ($wikiname =~ /[-_]/) {
+	my @tokens = split(/[-_]/, $wikiname);
+
+	$wikiname = "";
+
+	#
+	# Make sure the first letter of each token is a caps.
+	# 
+	foreach my $token (@tokens) {
+	    $wikiname .= ucfirst($token);
+	}
+    }
+
+    #
+    # Check to make sure the wikiname does not violate the wikirules!
+    # If it does, just skip. User will have to plug in a new name.
+    #
+    if (! ($wikiname =~ /^[A-Z]+[A-Za-z0-9]*$/)) {
+	print "Bad WikiName for Project $pid: $wikiname\n";
+	next;
+    }
+
+    #
+    # We are not likely to get dups for a project name, but make sure
+    # anyway.
+    #
+    if (exists($wikinames{$wikiname})) {
+	my $other_pid   = $wikinames{$wikiname};
+
+	print "Duplicate WikiName for Project: $wikiname $pid $other_pid\n";
+	next;
+    }
+    $wikipids{$pid} = $wikiname;
+}
+#
+# Now we are going to loop over the names, insert them into the DB, and
+# then call addwikiuser to actually do the work over on ops.
+#
+foreach my $pid (keys(%wikipids)) {
+    my $wikiname = $wikipids{$pid};
+
+    print "Creating Wiki for project $pid ($wikiname)\n"
+	if ($debug);
+
+    if (!$impotent) {
+	DBQueryFatal("update groups set wikiname='$wikiname' ".
+		     "where pid='$pid' and pid=gid");
+
+	system("$ADDWIKIPROJ $pid") == 0
+	    or fatal("Could not add wiki web for $pid ($wikiname)");
+    }
+}
+
+#
+# Now the users.
+# 
+$query_result =
+    DBQueryFatal("select distinct g.uid,u.usr_name,u.usr_email ".
+		 "  from group_membership as g ".
+		 "left join users as u on u.uid=g.uid ".
+		 "where u.status='active' and ".
+		 "     (g.pid='testbed' or g.pid='emulab-ops' or ".
+		 "      g.pid='tbres' or g.pid='utahstud')");
+
+my %wikiuids   = ();	# Indexed by user uid, gives wikiname.
+my %emailaddrs = ();	# Indexed by user uid, gives user email address.
+# Clear this for next loop.
+%wikinames = ();
+
+while (my ($uid,$name,$email) = $query_result->fetchrow_array()) {
+    $emailaddrs{$uid} = $email;
+
+    #
+    # Split the user name up into tokens. 
+    #
+    my @tokens = split(/\s+|-/, $name);
+
+    #
+    # Build a wikiname from the tokens. Lowercase each token, then
+    # captialize it, then run them all together. Oh, get rid of any
+    # non alphanum characters.
+    #
+    my $wikiname = "";
+
+    foreach my $token (@tokens) {
+	$token = ucfirst(lc($token));
+	$token =~ s/\.//g;
+	$wikiname .= $token;
+    }
+    #print "$wikiname\n";
+
+    #
+    # Check to make sure the wikiname does not violate the wikirules!
+    # If it does, just skip. User will have to plug in a new name.
+    #
+    if (! ($wikiname =~ /^[A-Z]+[a-z]+[A-Z]+[A-Za-z0-9]*$/)) {
+	print "Bad WikiName: $wikiname \n";
+	next;
+    }
+    #
+    # Look to see if this wikiname exists. If it does, and the email
+    # address is the same, then fine. If the email address is different,
+    # then that is a problem. Skip.
+    #
+    if (exists($wikinames{$wikiname})) {
+	my $other_uid   = $wikinames{$wikiname};
+	my $other_email = $emailaddrs{$other_uid};
+
+	if ($email ne $other_email) {
+	    print "Duplicate WikiName: $wikiname $uid $other_uid\n";
+	    next;
+	}
+    }
+    $wikinames{$wikiname} = $uid;
+    $wikiuids{$uid}       = $wikiname;
+    $emailaddrs{$uid}     = $email;
+}
+
+#
+# Now we are going to loop over the names, insert them into the DB, and
+# then call addwikiuser to actually do the work over on ops.
+#
+foreach my $uid (keys(%wikiuids)) {
+    my $wikiname = $wikiuids{$uid};
+
+    print "Creating Wiki for home page $uid ($wikiname)\n"
+	if ($debug);
+    
+    if (!$impotent) {
+	DBQueryFatal("update users set wikiname='$wikiname' ".
+		     "where uid='$uid'");
+
+	system("$ADDWIKIUSER $uid") == 0
+	    or fatal("Could not add wiki account for $uid ($wikiname)");
+
+	system("$SETWIKIGROUPS $uid") == 0
+	    or fatal("Could not set wiki groups for $uid ($wikiname)");
+    }
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
