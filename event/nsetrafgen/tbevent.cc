@@ -30,7 +30,7 @@ TbEventSink::callback(event_handle_t handle,
   char		buf[7][64];
   int		len = 64;
   char          argsbuf[8192];
-  
+
   buf[0][0] = buf[1][0] = buf[2][0] = buf[3][0] = 0;
   buf[4][0] = buf[5][0] = buf[6][0] = buf[7][0] = 0;
   event_notification_get_site(handle, notification, buf[0], len);
@@ -41,10 +41,10 @@ TbEventSink::callback(event_handle_t handle,
   event_notification_get_objname(handle, notification, buf[5], len);
   event_notification_get_eventtype(handle, notification, buf[6], len);
   event_notification_get_arguments(handle, notification, argsbuf, sizeof(argsbuf));
-  
+
   struct timeval now;
   gettimeofday(&now, NULL);
-  
+
   info("Received Event: %lu:%ld \"%s\"\n", now.tv_sec, now.tv_usec, argsbuf);
 
   // All events coming in to NSE should be NSEEVENT events and we just need to
@@ -52,11 +52,11 @@ TbEventSink::callback(event_handle_t handle,
   // we just print a warning in the log. Also we need a mechanism
   // to report the error back to the experimenter
   // XXX: fix needed
-  
+
   if( Tcl_GlobalEval( Tcl::instance().interp(), argsbuf ) != TCL_OK ) {
     error( "Tcl Eval error in code: \"%s\"\n", argsbuf );
   }
-  
+
 }
 
 
@@ -67,7 +67,7 @@ TbEventSink::~TbEventSink() {
      */
     if (event_unregister(ehandle) == 0) {
       fatal("could not unregister with event system");
-    }    
+    }
   }
 }
 
@@ -81,22 +81,22 @@ TbEventSink::init() {
   } else {
     loginit(1, "Testbed-NSE");
   }
-  
+
   if( server[0] == 0 ) {
     fatal("event system server unknown\n");
   }
-  
+
   /*
    * Get our IP address. Thats how we name ourselves to the
-   * Testbed Event System. 
+   * Testbed Event System.
    */
   struct hostent	*he;
   struct in_addr	myip;
-  
+
   if (gethostname(buf, sizeof(buf)) < 0) {
     fatal("could not get hostname");
   }
-  
+
   if (! (he = gethostbyname(buf))) {
     fatal("could not get IP address from hostname");
   }
@@ -104,7 +104,7 @@ TbEventSink::init() {
   strncpy(ipaddr, inet_ntoa(myip), sizeof(ipaddr));
 
   /*
-   * Register with the event system. 
+   * Register with the event system.
    */
   ehandle = event_register(server, 0);
   if (ehandle == NULL) {
@@ -116,7 +116,7 @@ TbEventSink::init() {
 int
 TbEventSink::poll() {
   int rv;
-  
+
   rv = event_poll(ehandle);
   if (rv)
     fatal("event_poll failed, err=%d\n", rv);
@@ -131,7 +131,7 @@ TbEventSink::poll() {
 
 int TbEventSink::command(int argc, const char*const* argv)
 {
-  
+
   if( argc == 3 ) {
     if(strcmp(argv[1], "event-server") == 0) {
       strncpy(server, argv[2], sizeof(server));
@@ -145,10 +145,14 @@ int TbEventSink::command(int argc, const char*const* argv)
       strncpy(logfile, argv[2], sizeof(logfile));
       return(TCL_OK);
     }
+    if(strcmp(argv[1], "nseswap_cmdline") == 0) {
+      strncpy(nseswap_cmdline, argv[2], sizeof(nseswap_cmdline));
+      return(TCL_OK);
+    }
   }
 
   return (TclObject::command(argc, argv));
-}  
+}
 
 void
 TbEventSink::subscribe() {
@@ -176,12 +180,28 @@ TbEventSink::subscribe() {
   }
   tuple->eventtype = ADDRESSTUPLE_ANY;
 
-  
+
   if (!event_subscribe(ehandle, callback, tuple, this)) {
     fatal("could not subscribe to NSE events for objects %s", tuple->objname );
   }
   address_tuple_free(tuple);
 
+}
+
+void
+TbEventSink::send_nseswap() {
+    if (nseswap_cmdline[0] != '\0') {
+	int ret = system(nseswap_cmdline);
+	if (ret == -1) {
+	    fatal("Could not execute cmd:%s\n",
+		    nseswap_cmdline);
+	} else if (ret != 0) {
+	    fatal("cmd:\"%s\" exited with failure with return code:%d\n",
+		    nseswap_cmdline, ret);
+	}
+	info("Sending NSESWAP event with cmdline: \"%s\"\n",
+		nseswap_cmdline);
+    }
 }
 
 static class TbResolverClass : public TclClass {
@@ -194,7 +214,7 @@ public:
 
 int TbResolver::command(int argc, const char*const* argv)
 {
-  
+
   if( argc == 3 ) {
     if(strcmp(argv[1], "lookup") == 0) {
       struct hostent *he = gethostbyname(argv[2]);
@@ -212,6 +232,6 @@ int TbResolver::command(int argc, const char*const* argv)
       return(TCL_OK);
     }
   }
-    
+
   return (TclObject::command(argc, argv));
-}  
+}

@@ -91,6 +91,10 @@ Simulator instproc node {args} {
     # simulated nodes have type 'sim'
     if { $simulated == 1 } {
         tb-set-hardware $curnode sim
+	# This allows assign to prefer pnodes
+	# that already have FBSD-NSE as the default
+	# boot osid over others
+	$curnode add-desire "FBSD-NSE" 0.9
     } 
     set node_list($curnode) {}
     set last_class $curnode

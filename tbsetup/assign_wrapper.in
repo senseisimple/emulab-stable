@@ -128,7 +128,11 @@ if (defined($options{"n"})) {
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
 my $ptopfile = "$pid-$eid-$$.ptop";
-my $topfile  = "$eid.top";
+# Since the topfile could change across
+# swapins and modifies, it makes sense
+# to store all of them. Helps in
+# degugging.
+my $topfile  = "$pid-$eid-$$.top";
 
 sub fatal ($$)
 {
@@ -296,6 +300,7 @@ my $minimum_nodes;
 my $maximum_nodes;
 my $reserved_pcount  = 0;
 my $reserved_vcount  = 0;
+my $reserved_simcount= 0;
 my $remotecount      = 0;
 my $virtcount        = 0;
 my $plabcount        = 0;
@@ -329,7 +334,9 @@ my %expt_stats = (# pnodes include jailnodes and delaynodes.
 		  maxlinks    => 0,
 );
 
-my $nsenode_id     = 0;
+my $simhost_id     = 0;
+my %pnode2simhostid;
+my %simhostid2pnode;
 
 # Counters for generating IDs.
 my $virtnode_id  = 0;
@@ -398,8 +405,11 @@ LoadExperiment();
 # If updating, load current experiment resources. We have to be careful
 # of how this is merged in with the (new) desired topology. See below.
 #
-LoadCurrent()
-    if ($updating);
+if ($updating) {
+    LoadCurrent();
+    print STDERR "Resetting DB before updating.\n";
+    TBExptRemovePhysicalState( $pid, $eid );
+}
 
 #
 # Check Max Concurrent for OSID violations.
@@ -580,6 +590,11 @@ sub RunAssign ($)
     my $violations = 0;
     my $score = -1;
 
+
+    # Saving up assign.log coz each swapin/modify is
+    # different and it is nice to have every mapping
+    # for debugging and archiving purposes
+    system("/bin/cp assign.log assign-$pid-$eid-$$.log");
     open(ASSIGNFP, "assign.log") or
 	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	      "Could not open assign logfile!");
@@ -2067,7 +2082,7 @@ sub requires_delay {
     my $targetbandwidth = $_[0];
     my $bestbandwidth = getbandwidth($targetbandwidth);
     printdb "Checking $bestbandwidth against $targetbandwidth\n";
-    # XXX temporary hack: && $bestbandwidth < $S100Kbs
+    # XXX temporary hack: && $bestbandwidth >= $S100Kbs
     # A delay node is not being added for the 10Mb 0ms link
     # Permanent fix required
     if ($bestbandwidth == $targetbandwidth && $bestbandwidth >= $S100Kbs) {
@@ -2103,11 +2118,12 @@ sub InitPnode($pnode, $vnode)
     my $vname;
     my $osid;
     my $role;
+    my $simhost_violation;
 
     # XXX NSE hack: if the vnode is simulated, we just
     # choose FBSD-NSE and static routing
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
-	$osid = TBOSID("emulab-ops", "FBSD-NSE" );
+	$osid = TBOSID(TB_OPSPID, "FBSD-NSE" );
 	
 	DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
 		     " startstatus='none'," .
@@ -2121,9 +2137,9 @@ sub InitPnode($pnode, $vnode)
 		     " routertype='" . TBDB_ROUTERTYPE_STATIC() . "'" .
 		     " where node_id='$pnode'");
 
-	$vname = "simhost-${nsenode_id}";
+	$vname = newvname_simhost($pnode);
 	$role  = TBDB_RSRVROLE_SIMHOST;
-	$nsenode_id++;
+	$simhost_violation  = 0;
     }
     elsif (virtnodeisremote($vnode) && $v2vmap{$vnode} ne $pnode) {
 	#
@@ -2209,13 +2225,16 @@ sub InitPnode($pnode, $vnode)
     #
     # Set the vname and role.
     #
-    if (defined($vname) || defined($role)) {
+    if (defined($vname) || defined($role) || defined($simhost_violation)) {
 	my $sets = "";
 
 	$sets .= "vname='$vname' "
 	    if (defined($vname));
 	$sets .= (defined($vname) ? "," : "") . "erole='$role' "
 	    if (defined($role));	
+	$sets .= (defined($role) || defined($vname) ? "," : "") .
+	         "simhost_violation='$simhost_violation' "
+	    if (defined($simhost_violation));
 
 	DBQueryFatal("update reserved set $sets where node_id='$pnode'");
     }
@@ -2641,6 +2660,36 @@ sub newvname($$)
 }
 
 #
+# Give me a new vname for an internally allocated node. We have to
+# watch for names that were made up previously (say, if this is an
+# update).  Not allowed to reuse names of course. We do not mark nodes
+# as hosting, so have to infer this from reserved_pnodes. I'm sure
+# there is a better way to do this.
+#
+sub newvname_simhost($)
+{
+    my ($pnode) = @_;
+
+    #
+    # First check to see if this pnode was already allocated (update)
+    #
+    if (defined($pnode2simhostid{$pnode})) {
+	return $pnode2simhostid{$pnode};
+    }
+    
+    while (1) {
+	my $newvname = "simhost-" . $simhost_id;
+	$simhost_id++;
+
+	if (!defined($simhostid2pnode{$newvname})) {
+	    $simhostid2pnode{$newvname} = $pnode;
+	    $pnode2simhostid{$pnode} = $newvname;
+	    return $newvname;
+	}
+    }
+}
+
+#
 # Load up phys info. Not much to it.
 #
 sub LoadPhysInfo()
@@ -2781,6 +2830,7 @@ sub LoadVirtNodes()
 
 	# Extend the DB info with this stuff:
 	# Easy access ...
+	$rowref->{"__nodeweight"} = undef;
 	$rowref->{"__isremotenode"} = $isremote;
 	$rowref->{"__isvirtnode"}   = $isvirt;
 	$rowref->{"__issubnode"}    = $issub;
@@ -3262,16 +3312,26 @@ sub CreateTopFile()
 		# Yuck
 		$desirestr .= " +load:" . (($cpu_usage - 1) / 5.0);
 	    }
-	    print TOPFILE "node $vname $type $subnodestr $desirestr\n";
+	    my $typestr = $type;
 	    if (virtnodeisvirt($vname)) {
 		$virtnode_count++;
 	    } 
 	    elsif (virtnodeissim($vname)) {
 		$simnode_count++;
+		my $query_result = DBQueryFatal("select nodeweight from ".
+		                                "virt_simnode_attributes ".
+						"where pid='$pid' and ".
+						"eid='$eid' and ".
+						"vname='$vname'");
+		my ($nodeweight) = $query_result->fetchrow_array();
+		if ($nodeweight) {
+		    $typestr = "$type:$nodeweight";
+		}
 	    }
 	    else {
 		$physnode_count++;
 	    }
+	    print TOPFILE "node $vname $typestr $subnodestr $desirestr\n";
 	}
     }
 
@@ -3757,13 +3817,13 @@ sub LoadCurrent()
     
     my $query_result = 
 	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid, ".
-		     "       nt.isvirtnode,nt.isremotenode,nt.isplabdslice ".
-		     " from reserved as r ".
+		     "       nt.isvirtnode,nt.isremotenode,nt.isplabdslice,r.erole,".
+		     "r.simhost_violation from reserved as r ".
 		     "left join nodes as n on n.node_id=r.node_id ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "where r.pid='$pid' and r.eid='$eid'");
     
-    while (($vname,$reserved,$physnode,$isvirt,$isremote,$isplab) =
+    while (my ($vname,$reserved,$physnode,$isvirt,$isremote,$isplab,$erole,$simhost_violation) =
 	   $query_result->fetchrow_array) {
 
 	#
@@ -3791,19 +3851,50 @@ sub LoadCurrent()
 	    $fixed_nodes{$vname} = $physnode
 		if (!defined($fixed_nodes{$vname}));
 	    $reserved_vcount++;
-	}
+	} 
 	else {
-	    $reserved_v2pmap{$vname} = $reserved;
-	    physnodesetreuse($reserved, "unused");
-	    
-	    # Allow for the user to "move" a node. Yuck!
-	    $fixed_nodes{$vname} = $reserved
-		if (!defined($fixed_nodes{$vname}));
-	    $reserved_pcount++;
+	    if ($erole eq TBDB_RSRVROLE_SIMHOST) {
+		printdb "simhost:$reserved has vname:$vname with ".
+		         "simhost_violation:$simhost_violation\n";
+		$pnode2simhostid{$reserved} = $vname;
+		$simhostid2pnode{$vname} = $reserved;
+		physnodesetreuse($reserved, "unused");
+		$reserved_pcount++;
+		# We fix nodes for pnodes that have not reported
+		# a violation (i.e. can't keep up with real-time)
+		if ( ! $simhost_violation ) {
+		    my $query_result2 =
+			DBQueryFatal("select vname from v2pmap".
+				     " where pid='$pid' and eid='$eid'".
+				     " and node_id='$reserved'");
+		    printdb "$vname:$reserved has ";
+		    printdb $query_result2->numrows; 
+		    printdb " simnodes\n";
+		    while (my ($simnode) = $query_result2->fetchrow_array()) {
+			$fixed_nodes{$simnode} = $reserved 
+				if (!defined($fixed_nodes{$simnode})); 
+			$reserved_v2pmap{$simnode} = $reserved;
+			printdb "Fixing simnode:$simnode -> $reserved\n";
+			$reserved_simcount++;
+		    }
+		}
+	    }
+	    else {
+		$reserved_v2pmap{$vname} = $reserved;
+		physnodesetreuse($reserved, "unused");
+		printdb "non simhost:$reserved has vname:$vname\n";
+
+		# Allow for the user to "move" a node. Yuck!
+		$fixed_nodes{$vname} = $reserved
+		    if (!defined($fixed_nodes{$vname}));
+		$reserved_pcount++;
+	    }
 	}
     }
     print "Reserved pnodes = $reserved_pcount\n"
 	if ($reserved_pcount);
     print "Reserved vnodes = $reserved_vcount\n"
 	if ($reserved_vcount);
+    print "Reserved simnodes = $reserved_simcount\n"
+	if ($reserved_simcount);
 }

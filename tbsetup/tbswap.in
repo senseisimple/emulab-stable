@@ -367,7 +367,7 @@ sub doSwapout($) {
 	# Since this is an actual swapout, 
 	# reset our count of swap out nag emails sent.
 	#
-	DBQueryWarn("update experiments set swap_requests='' ".
+	DBQueryWarn("update experiments set swap_requests='',sim_reswap_count='0' ".
 		    "where eid='$eid' and pid='$pid'");
     } else {
 	#
@@ -503,11 +503,14 @@ sub doSwapout($) {
     }
 
     #
-    # Wipe the DB clean.
+    # Wipe the DB clean except during UPDATE or RETRY. In those
+    #    cases, assign_wrapper will reset the DB after reading
+    #    the info.
     #
-
-    print STDERR "Resetting DB.\n";
-    TBExptRemovePhysicalState( $pid, $eid );
+    if ( $type >= CLEANUP ) {
+	print STDERR "Resetting DB.\n";
+	TBExptRemovePhysicalState( $pid, $eid );
+    }
 
     return $swapout_errors;
 }

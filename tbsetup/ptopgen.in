@@ -224,8 +224,8 @@ if (defined($exempt_eid)) {
 }
 
 $result =
-    DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode " .
-		 "from nodes as a ".
+    DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
+		 "a.def_boot_osid from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as np on a.phys_nodeid=np.node_id ".
@@ -239,13 +239,15 @@ $result =
 # to use all nodes), or if there is no entry in the perms table for
 # the type/class of node.
 #
-while (($node,$type,$physnode,$class,$issubnode) = $result->fetchrow_array) {
+while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid) 
+    = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
     if ($issubnode) {
 	$subnode_of{$node} = $physnode;
     }
+    $node_def_boot_osid{$node} = $def_boot_osid;
 }
 
 foreach $node (keys(%nodes)) {
@@ -258,6 +260,16 @@ foreach $node (keys(%nodes)) {
     my @features;
     my @flags;
     my $needvirtgoo = 0;
+
+    # XXX temporary hack until node reboot avoidance 
+    # is available. Nodes running the FBSD-NSE image
+    # will have a feature def-osid-fbsd-nse 0.0
+    # This is used by assign to prefer these pnodes
+    # first before using others.
+    if( $node_def_boot_osid{$node} eq 
+	TBOSID(TB_OPSPID, "FBSD-NSE") ) { 
+	push(@features, "FBSD-NSE:0.0");
+    }
 
     # Might be equal, which assign would sum as two, not one!
     if ($type ne $class) {

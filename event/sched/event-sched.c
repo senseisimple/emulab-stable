@@ -591,6 +591,7 @@ handle_simevent(event_handle_t handle, sched_event_t *eventp)
 	char		evtype[TBDB_FLEN_EVEVENTTYPE];
 	int		rcode;
 	char		cmd[BUFSIZ];
+	char		argsbuf[BUFSIZ];
 
 	if (! event_notification_get_eventtype(handle,
 					       eventp->notification,
@@ -629,7 +630,9 @@ handle_simevent(event_handle_t handle, sched_event_t *eventp)
 	    sprintf(cmd, "endexp %s %s", pid, eid);
 	}
 	else if (!strcmp(evtype, TBDB_EVENTTYPE_NSESWAP)) {
-	    sprintf(cmd, "nseswap %s %s", pid, eid);
+	    event_notification_get_arguments(handle, eventp->notification,
+					     argsbuf, sizeof(argsbuf));
+	    sprintf(cmd, "nseswap %s %s %s", pid, eid, argsbuf);
 	}
 	rcode = system(cmd);
 	

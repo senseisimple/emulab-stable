@@ -31,6 +31,7 @@ public:
 	  bzero(server, sizeof(server));
 	  bzero(objnamelist, sizeof(objnamelist));
 	  bzero(logfile, sizeof(logfile));
+	  bzero(nseswap_cmdline, sizeof(nseswap_cmdline));
 	}
 	~TbEventSink();
 	virtual int command(int argc, const char*const* argv);
@@ -38,6 +39,7 @@ public:
 	void init();
 	void subscribe();
 	int poll();
+	void send_nseswap();
 
 
 private:
@@ -47,6 +49,7 @@ private:
 	char ipaddr[BUFSIZ];
 	char  objnamelist[BUFSIZ];
 	char  logfile[MAXPATHLEN];
+	char  nseswap_cmdline[MAXPATHLEN]; 
 
 	static void
 	  callback(event_handle_t handle,

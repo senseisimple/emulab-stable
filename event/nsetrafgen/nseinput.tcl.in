@@ -353,7 +353,7 @@ if { $simcode_present == 1 } {
     # flushed and we can start cleanly
     exec $CLIENTVARDIR/boot/rc.ifc disable
     exec $CLIENTVARDIR/boot/rc.ifc enable
-
+    
     # Now, we configure IPTaps for links between real and simulated nodes
     set i 0    
     
@@ -461,10 +461,13 @@ set vnode [lindex $pideidlist 0]
 set eid [lindex $pideidlist 1]
 set pid [lindex $pideidlist 2]
 set logpath "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
+set simobjname [$ns set tbname]
+set nseswap_cmdline "$CLIENTBINDIR/tevc -s $boss -e $pid/$eid now $simobjname NSESWAP SIMHOST=$vnode"
 
 # Configuring the Scheduler to monitor the event system
 set evsink [new TbEventSink]
 $evsink event-server "elvin://$boss"
+$evsink nseswap_cmdline $nseswap_cmdline
 #if { $objnamelist != {} } {
 #    $evsink objnamelist [join $objnamelist ","]
 #}
