@@ -408,13 +408,13 @@ CREATE TABLE firewalls (
 CREATE TABLE floorimages (
   building varchar(32) NOT NULL default '',
   floor varchar(32) NOT NULL default '',
-  scale tinyint(4) NOT NULL default '1',
   image_path tinytext,
   thumb_path tinytext,
   x1 int(6) NOT NULL default '0',
   y1 int(6) NOT NULL default '0',
   x2 int(6) NOT NULL default '0',
   y2 int(6) NOT NULL default '0',
+  scale tinyint(4) NOT NULL default '1',
   PRIMARY KEY  (building,floor,scale)
 ) TYPE=MyISAM;
 
@@ -1050,6 +1050,7 @@ CREATE TABLE nodes (
   sfshostid varchar(128) default NULL,
   stated_tag varchar(32) default NULL,
   rtabid smallint(5) unsigned NOT NULL default '0',
+  cd_version varchar(32) default NULL,
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),
@@ -1696,7 +1697,6 @@ CREATE TABLE userslastlogin (
   time time default NULL,
   PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
-
 
 --
 -- Table structure for table `usrp_orders`

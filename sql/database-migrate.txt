@@ -2049,3 +2049,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	      inner_elab_role enum('boss', 'ops', 'node') \
 	      default NULL after fixed;
 
+1.277: Add cd_version to nodes table, only meaningful to CD booted nodes.
+       Returned from nodes via tmcd.
+
+       alter table nodes add cd_version varchar(32) default NULL;
+
