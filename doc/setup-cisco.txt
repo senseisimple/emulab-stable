@@ -74,3 +74,9 @@ For convenience, we've supplied a file (in this directory) called
 used by our software.) Transfer this file to the switch using the:
     copy tftp config
 command.
+
+We also suggest that you do this on your control network as well - part of the
+booting process leaves the nodes sitting dormant at a boot loader for extended
+periods of time, so the switch will tend to forget their MACs.  Turning off
+aging is not critical, but we suggest it, because it will reduce stray traffic
+while the switch re-learns MAC addresses.
