@@ -13,7 +13,7 @@ C                      = @SSLCERT_COUNTRY@
 ST                     = @SSLCERT_STATE@
 L                      = @SSLCERT_LOCALITY@
 O                      = @SSLCERT_ORGNAME@
-OU                     = Server
+OU                     = WebServer
 # The apache server wants the CommonName (CN) to match what we set "ServerName"
 # to in apache/http.conf.in (in the SSL section).
 CN                     = @WWWHOST@
