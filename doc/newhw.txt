@@ -22,6 +22,10 @@ ISP110s:
 			pc51 (often hangs)
 			pc111 (used to boot, lights come on, but no serial/network traffic)
 			pc110's hard drive (I/O errors when doing md5 of whole disk)
+		Re-recieved 10/3:
+			pc48 - put back in service 8/3
+			pc51
+			pc111
 
 Network cables:
 	Status: Received
