@@ -203,7 +203,7 @@ tgevent_init(int argc, char *argv[])
 	tuple->host	 = ADDRESSTUPLE_ANY;
 	tuple->site      = ADDRESSTUPLE_ANY;
 	tuple->group     = ADDRESSTUPLE_ANY;
-	tuple->expt      = ADDRESSTUPLE_ANY;	/* pid/eid */
+	tuple->expt      = myexp ? myexp : ADDRESSTUPLE_ANY;
 	tuple->objtype	 = TBDB_OBJECTTYPE_TIME;
 	tuple->objname   = ADDRESSTUPLE_ANY;
 	tuple->eventtype = ADDRESSTUPLE_ANY;
@@ -323,6 +323,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	char		buf[8][64];
 	int		len = 64;
 	static int	startdone;
+	static int	setupdone;
 	struct timeval	now;
 
 	buf[0][0] = buf[1][0] = buf[2][0] = buf[3][0] = 0;
@@ -358,7 +359,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 			 * for us, assume the event daemon has been restarted
 			 * and just go back to WAITing.
 			 */
-			if (startdone) {
+			if (setupdone) {
 				if (strcmp(buf[1], myexp) == 0)
 					goto dowait;
 				return;
@@ -381,14 +382,23 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 			}
 #ifdef EVENTDEBUG
 			gettimeofday(&now, NULL);
-			fprintf(stderr, "%lu.%03lu: SETUP\n",
-				now.tv_sec, now.tv_usec / 1000);
+			fprintf(stderr, "%lu.%03lu: SETUP, exp=%s\n",
+				now.tv_sec, now.tv_usec / 1000,
+				myexp ? myexp : buf[1]);
 #endif
 			if (tg_first != &actions[0])
 				fatal("global action list corrupted!");
 			actions[0].tg_flags = TG_SETUP;
 			actions[0].next = &actions[1];
 			actions[1].tg_flags = TG_WAIT;
+			setupdone = 1;
+
+			/*
+			 * XXX if they didn't specify an experiment,
+			 * use the value from the first time start we see.
+			 */
+			if (myexp == 0)
+				myexp = strdup(buf[1]);
 		}
 	}
 
@@ -419,13 +429,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 				goto dowait;
 			}
 			startdone = 1;
-
-			/*
-			 * XXX if they didn't specify an experiment,
-			 * use the value of the first start event we see.
-			 */
-			if (myexp == 0)
-				myexp = strdup(buf[1]);
 		}
 #ifdef EVENTDEBUG
 		gettimeofday(&now, NULL);
