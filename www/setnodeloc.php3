@@ -44,44 +44,13 @@ if (!isset($node_id) || $node_id == "" || !TBvalid_node_id($node_id)) {
 }
 
 #
-# If no building/floor specified, throw up a page of images of all the
-# buildings and floors
-#
-if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
-    PAGEHEADER("Set Node Location");
-    
-    echo "<center>
-           <font size=+2>Pick a floor, any floor</font><br><br>\n";
-
-    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=3'>
-             <img src=meb3fl-thumb.png></a>";
-
-    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=4'>
-             <img src=meb4fl-thumb.png></a>";
-
-    echo "</center>\n";
-
-    PAGEFOOTER();
-    exit(0);
-}
-
-#
-# At this point both building and floor are specified. Sanitize for shell.
-#
-if (!preg_match("/^[-\w]+$/", $building)) {
-    PAGEARGERROR("Invalid characters in building");
-}
-if (!preg_match("/^[-\w]+$/", $floor)) {
-    PAGEARGERROR("Invalid characters in floor");
-}
-
-#
 # This routine spits out the selectable image for getting x,y coords plus
 # contact info. We use a form and an input type=image, which acts as a submit
 # button; the browser sends x,y coords when the user clicks in the image. 
 #
 function SPITFORM($errors, $node_id, $building, $floor,
-		  $room, $contact, $phone, $old_x, $old_y)
+		  $room, $contact, $phone, $old_x, $old_y,
+		  $delete = 0)
 {
     # Careful with this local variable
     unset($prefix);
@@ -144,7 +113,8 @@ function SPITFORM($errors, $node_id, $building, $floor,
           </script>\n";
 
     echo "<center>
-          <font size=+2>Enter contact info, then click on location</font><br>
+          <font size=+2>Enter contact info for $node_id,
+                        then click on location</font><br>
           <form action=setnodeloc.php3 method=get>
           <table class=nogrid
                  align=center border=0 cellpadding=6 cellspacing=0>
@@ -173,6 +143,14 @@ function SPITFORM($errors, $node_id, $building, $floor,
 	                       value='Use Existing Location'></b>
                  </td>
              </tr>\n";
+
+	echo "<tr><td colspan=2 align=center>&nbsp</td><tr>\n";
+	echo "<tr>
+                 <td colspan=2 align=center>
+                     <b><input type=submit name=dodelete
+	                       value='Delete Location'></b></font>
+                 </td>
+             </tr>\n";
     }
     echo "</table>
 	  <input type=hidden name=node_id value=$node_id>
@@ -188,7 +166,7 @@ function SPITFORM($errors, $node_id, $building, $floor,
 # Get default values from location info.
 #
 $query_result =
-    DBQueryFatal("select contact,room,phone,loc_x,loc_y from location_info ".
+    DBQueryFatal("select * from location_info ".
 		 "where node_id='$node_id'");
 if (mysql_num_rows($query_result)) {
     $row = mysql_fetch_array($query_result);
@@ -201,6 +179,8 @@ if (mysql_num_rows($query_result)) {
 	$phone = $row["phone"];
     $old_x = $row["loc_x"];
     $old_y = $row["loc_y"];
+    $old_building = $row["building"];
+    $old_floor    = $row["floor"];
 }
 else {
     if (! isset($contact))
@@ -209,6 +189,71 @@ else {
 	$room = "";
     if (! isset($phone))
 	$phone = "";
+}
+
+#
+# Handle deletion.
+#
+if (isset($delete) && $delete == 1) {
+    #
+    # Skip to form with node on it, which includes delete button.
+    #
+    PAGEHEADER("Set Node Location");
+
+    if (! isset($old_building)) {
+	USERERROR("There is no location info for node $node_id!", 1);
+    }
+    SPITFORM(0, $node_id, $old_building, $old_floor, $room, $contact, $phone,
+	     $old_x, $old_y);
+    PAGEFOOTER();
+    exit(0);
+}
+elseif (isset($dodelete) && $dodelete != "") {
+    #
+    # Delete the entry and zap to shownode page. 
+    # 
+    DBQueryFatal("delete from location_info where node_id='$node_id'");
+	
+    header("Location: shownode.php3?node_id=$node_id");
+    exit(0);
+}
+
+#
+# If no building/floor specified, throw up a page of images of all the
+# buildings and floors
+#
+if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
+    PAGEHEADER("Set Node Location");
+
+    echo "<center>\n";
+
+    if (isset($old_building)) {
+	echo "<a href='setnodeloc.php3?node_id=$node_id&delete=1'>
+                 Delete</a> location info or<br>\n";
+    }
+
+    echo "<font size=+2>Pick a floor, any floor</font><br><br>\n";
+
+    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=3'>
+             <img src=meb3fl-thumb.png></a>";
+
+    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=4'>
+             <img src=meb4fl-thumb.png></a>";
+
+    echo "</center>\n";
+
+    PAGEFOOTER();
+    exit(0);
+}
+
+#
+# At this point both building and floor are specified. Sanitize for shell.
+#
+if (!preg_match("/^[-\w]+$/", $building)) {
+    PAGEARGERROR("Invalid characters in building");
+}
+if (!preg_match("/^[-\w]+$/", $floor)) {
+    PAGEARGERROR("Invalid characters in floor");
 }
 
 #
@@ -234,6 +279,8 @@ elseif (isset($submit)) {
     }
     $x = $old_x;
     $y = $old_y;
+    $building = $old_building;
+    $floor    = $old_floor;
 }
 
 #
