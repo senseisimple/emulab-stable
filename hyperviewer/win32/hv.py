@@ -47,7 +47,6 @@ class HypView(_object):
         _swig_setattr(self, HypView, 'this', _hv.new_HypView(*args))
         _swig_setattr(self, HypView, 'thisown', 1)
     def afterRealize(*args): return _hv.HypView_afterRealize(*args)
-    def getWidget(*args): return _hv.HypView_getWidget(*args)
     def __del__(self, destroy=_hv.delete_HypView):
         try:
             if self.thisown: destroy(self)
@@ -90,7 +89,6 @@ class HypView(_object):
     def bindCallback(*args): return _hv.HypView_bindCallback(*args)
     def drawFrame(*args): return _hv.HypView_drawFrame(*args)
     def idle(*args): return _hv.HypView_idle(*args)
-    def idleCB(*args): return _hv.HypView_idleCB(*args)
     def motion(*args): return _hv.HypView_motion(*args)
     def mouse(*args): return _hv.HypView_mouse(*args)
     def passive(*args): return _hv.HypView_passive(*args)

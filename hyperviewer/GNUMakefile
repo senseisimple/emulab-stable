@@ -25,7 +25,7 @@ LDLIBS  = ${HVLIB} ${STATIC} -L/usr/X11R6/lib -lGLU -lGL -lXmu -lXext -lX11 -lm
 
 # Distribute the Python scripts, sources, shared library, sample input files, and user doc.
 PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py hv_win32.py
-SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp _hv_win32.cpp
+SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod win32
 BINFILES = _hv.so 
 DATAFILES = BigLan.hyp ts600.hyp
 SCRIPTFILES = hypview pangorc.local pango.modules.local
@@ -45,15 +45,13 @@ hv.i: hv.mod ${HVINC}/HypView.h
 # Create the wrappers using SWIG.
 hvmain.o: hvmain.cpp
 	g++ -fpic -c ${CFLAGS} ${INCDIRS} hvmain.cpp
-_hv.cpp hv.py: hv.i
+_hv.cpp hv.py win32/_hv.cpp win32/hv.py: hv.i
+	# Maintain the WIN32 version of the SWIG generated files in parallel.
+	swig -c++ -python -DWIN32 -module hv -o win32/_hv.cpp hv.i
+	# The .py file is named by the -module argument, move it after generation.
+	mv hv.py win32
+	# Now the non-WIN32 version.
 	swig -c++ -python -DHYPGLUT -DHYPFREE -module hv -o _hv.cpp hv.i
-# Kluge to maintain the WIN32 version in parallel...
-_hv_win32.cpp hv_win32.py: hv.i
-	mv -f hv.py hv.py.save
-	# The .py file is named by the -module argument...
-	swig -c++ -python -DWIN32 -module hv -o _hv_win32.cpp hv.i
-	mv hv.py hv_win32.py
-	mv -f hv.py.save hv.py
 
 # Put the wrappers in a shared library for import by hv.py .
 _hv.o: _hv.cpp
