@@ -20,10 +20,10 @@ if ($type eq "Node") {
 	# to the left-to-right order we're using for cable numbers, we
 	# use this map to match to reality
 	# FIXME: Placeholder until we get the real thing figured out
-	%cardmap = ( 0 => 0, 1 => 1, 2 => 2, 3 => 3);
+	%cardmap = ( 0 => 3, 1 => 4, 2 => 0, 3 => 1);
 } elsif ($type eq "Control") {
 	$wires_per_node = 1;
-	$card_start = 4;
+	$card_start = 2;
 } else {
 	die "Sorry, $type is not a supported wire type\n";
 }
