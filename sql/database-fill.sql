@@ -531,10 +531,10 @@ REPLACE INTO table_regex VALUES ('virt_nodes','eid','text','redirect','experimen
 REPLACE INTO table_regex VALUES ('virt_nodes','ips','text','regex','^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','cmd_line','text','redirect','default:tinytext',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','rpms','text','regex','^([-\\w\\.\\/\\+:]+;{0,1})*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','rpms','text','regex','^([-\\w\\.\\/\\+:~]+;{0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','deltas','text','regex','^([-\\w\\.\\/\\+]+:{0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','startupcmd','text','redirect','default:tinytext',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','tarfiles','text','regex','^([-\\w\\.\\/\\+]+\\s+[-\\w\\.\\/\\+:]+;{0,1})*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','tarfiles','text','regex','^([-\\w\\.\\/\\+]+\\s+[-\\w\\.\\/\\+:~]+;{0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','vname','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','type','text','regex','^[-\\w]*$',0,12,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(fatal|nonfatal|ignore)$',0,0,NULL);
