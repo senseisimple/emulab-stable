@@ -22,7 +22,7 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $debug = 0;
+my $debug = 1;
 
 #
 # Turn off line buffering on output
@@ -74,11 +74,16 @@ my $query_result =
 		 # Must be allocated to an experiment to be considerd.
 		 "  (nt.isplabdslice=1 && r.pid is not null && ".
 		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
+		 # plab physical nodes
+		 "  (nt.isvirtnode=0 && nt.isremotenode=1 && ".
+		 "     nt.isplabphysnode=1 && ".
+		 "   ((now() - ns.status_timestamp) > $plab_timeout)) || ".
 		 # Local phys nodes 
 		 "  (nt.isvirtnode=0 && nt.isremotenode=0 && ".
 		 "   ((now() - ns.status_timestamp) > $local_timeout)) || ".
-		 # Remote phys nodes 
+		 # Remote phys nodes (but NOT plab nodes, which we got above)
 		 "  (nt.isvirtnode=0 && nt.isremotenode=1 && ".
+		 "     nt.isplabphysnode=0 && ".
 		 "   ((now() - ns.status_timestamp) > $wa_timeout)))");
 		 
 
@@ -87,11 +92,6 @@ while (my ($node,$status,$pid,$remote,$isvirt,$isplab,$timediff) =
     my $newstatus = "down";
 
     if (! $remote) {
-	# This time is hardwired onto the client, which report isalive
-	# every 3 minutes locally, and every 60 seconds remotely. 
-	next
-	    if ($timediff <= 180);
-
 	#
 	# If its reserved and not reporting isalive, then its a user
 	# image not doing what it is supposed to. Mark as possibly
