@@ -2,7 +2,7 @@
  * Disk framework from /dev/ccd/ccd.c
  *
  */
-
+ 
 #include "shd.h"
 #include "trie.h"
 #include "block_alloc.h"
@@ -116,7 +116,7 @@ struct TrieList
 {
     Trie *trie;
     int version;
-    Trie *next;
+    struct TrieList *next;
 } *head_trie;
 
 int init_trie_list (void)
@@ -138,10 +138,28 @@ Trie * get_trie_for_version (int version)
            return current->trie;
        current = current->next; 
    }
-   printf ("Trie for version %d not found\n", version);
+   printf ("Error ! Trie for version %d not found\n", version);
    return 0;
 }
 
+void set_trie_at_pos (int pos, Trie * trie)
+{
+   int pos_count = 0;
+   struct TrieList *current = head_trie;
+   while (current != 0)
+   {
+       pos_count++;
+       if (pos_count == pos)
+       {
+           TrieCleanup (current->trie); 
+           current->trie = trie;
+           return;
+       }
+       current = current->next; 
+   } 
+   printf ("Error ! Position %d not found in list\n", pos);
+}
+ 
 Trie * create_new_trie (int version)
 {
    Trie * new_trie = 0;
@@ -173,6 +191,75 @@ Trie * create_new_trie (int version)
    return new_trie;
 }
 
+void delete_all_tries (void)
+{
+    struct TrieList *current, *prev;
+    current = prev = head_trie;
+    while (current != 0)
+    {
+        prev = current;
+        current = current->next; 
+        TrieCleanup (prev->trie);
+        free (prev, M_DEVBUF);
+        prev = 0;
+    }    
+    init_trie_list ();
+}
+
+void delete_version_trie (int version)
+{
+    struct TrieList *current, *prev;
+    current = prev = head_trie;
+    while (current->version != version)
+    {
+        prev = current;
+        current = current->next; 
+    }
+    if (current->version == version)
+    {
+        if (current == head_trie)
+        {
+            if (current->next == 0)
+            {
+                TrieCleanup (current->trie);
+                free (current, M_DEVBUF);
+                head_trie = 0;
+            }
+            else
+            {
+                head_trie = current->next;
+                TrieCleanup (current->trie);
+                free (current, M_DEVBUF);
+            } 
+        } 
+        else
+        {
+            prev->next = current->next;
+            TrieCleanup (current->trie);
+            free (current, M_DEVBUF);
+        }
+    } 
+}
+
+void reorder_trie_versions ()
+{
+    struct TrieList *current;
+    int ix;
+    current = head_trie;
+    latest_version = ix = 1;
+    if (0 == current)
+    {
+        create_new_trie (1);
+        return;
+    }
+    while (current != 0)
+    {
+        current->version = latest_version = ix;
+        current = current->next;
+        ix++;
+    }
+}
+
 /*
  * Called by main() during pseudo-device attachment.  All we need
  * to do is allocate enough space for devices to be configured later, and
@@ -188,7 +275,7 @@ shd_attach()
 	if (num == 1)
 		num = 16;
 
-	printf("shd[0-%d]: Shadow disk devices\n", num-1);
+	/*printf("shd[0-%d]: Shadow disk devices\n", num-1);*/
 
 	shd_softc = (struct shd_softc *)malloc(num * sizeof(struct shd_softc),
 	    M_DEVBUF, M_NOWAIT);
@@ -250,9 +337,9 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 	int error = 0;
 
 #ifdef SHDDEBUG
-	if (shddebug & (SHDB_FOLLOW|SHDB_INIT))
+	/*if (shddebug & (SHDB_FOLLOW|SHDB_INIT))
 		printf("shd%d: getcinfo: %s disk\n",
-		       shd->shd_unit, issrc ? "source" : "copy");
+		       shd->shd_unit, issrc ? "source" : "copy");*/
 #endif
 
 	ss->sc_size = 0;
@@ -324,11 +411,11 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
         if (!issrc)
             shadow_size = size * (secsize / BLOCK_SIZE); 
 
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & SHDB_INIT)
 		printf(" %s: reqsize=%d, size=%d, secsize=%d\n",
 		       ci->ci_path, reqsize, ci->ci_size, ci->ci_secsize);
-#endif
+#endif*/
 	return (0);
 }
 
@@ -354,11 +441,11 @@ shd_init(shd, p)
 	struct shd_softc *ss = &shd_softc[shd->shd_unit];
 	int error = 0;
 
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & (SHDB_FOLLOW|SHDB_INIT))
 		printf("shd%d: init: flags 0x%x\n",
 		       shd->shd_unit, shd->shd_flags);
-#endif
+#endif*/
 
 	/*
 	 * Verify the source disk and destination disks
@@ -369,7 +456,7 @@ shd_init(shd, p)
 	error = shd_getcinfo(shd, p, 0);
 	if (error)
 		goto bad;
-        printf ("shadow size = %ld\n", shadow_size);
+        /*printf ("shadow size = %ld\n", shadow_size);*/
 
 	/*
 	 * Source sector size must be at least as large as the copy
@@ -460,10 +547,10 @@ shdopen(dev, flags, fmt, p)
 	struct disklabel *lp;
 	int error = 0, part, pmask;
 
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
 		printf("shd%d: open: flags 0x%x\n", unit, flags);
-#endif
+#endif*/
 	if (unit >= numshd)
 		return (ENXIO);
 	ss = &shd_softc[unit];
@@ -508,10 +595,10 @@ shdclose(dev, flags, fmt, p)
 	struct shd_softc *ss;
 	int error = 0, part;
 
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
 		printf("shd%d: close: flags 0x%x\n", unit, flags);
-#endif
+#endif*/
 
 	if (unit >= numshd)
 		return (ENXIO);
@@ -537,12 +624,12 @@ shdstrategy(bp)
 	int wlabel;
 	struct disklabel *lp;
 
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
 		printf("shd%d: strategy: %s bp %p, bn %d, size %lu\n",
 		       unit, (bp->b_flags & B_READ) ? "read" : "write",
 		       bp, bp->b_blkno, (u_long)bp->b_bcount);
-#endif
+#endif*/
 	if ((ss->sc_flags & SHDF_INITED) == 0) {
 		bp->b_error = ENXIO;
 		bp->b_flags |= B_ERROR;
@@ -622,16 +709,30 @@ shdstrategy(bp)
 int delete_checkpoints (int start, int end)
 {
     int ix;
-    Trie * dest_trie = get_trie_for_version (start);
-    for (ix = start+1; ix <= end+1; ix++)
+    Trie * dest_trie, * temp;
+    if (1 >= start)
     {
-        Trie * temp = get_trie_for_version (ix);
-        merge (dest_trie, temp);
-        
-/* What about freeing up blocks???? Delete overlapping blocks */
-
-        TrieCleanup (temp);    
+        TrieInit (&dest_trie, BlockAlloc, BlockFree, block_copy);
+        for (ix = start; ix <= end; ix++)
+        {
+            temp = get_trie_for_version (ix);
+            merge (dest_trie, temp, FREE_OVERLAP);
+            if (ix != 1)
+                delete_version_trie (ix);
+        }
+        set_trie_at_pos (1, dest_trie);
     }
+    else
+    {
+        dest_trie = get_trie_for_version (start - 1);
+        for (ix = start; ix <= end; ix++)
+        {
+            temp = get_trie_for_version (ix);
+            merge (dest_trie, temp, FREE_OVERLAP);
+            delete_version_trie (ix);
+        }
+    }
+    reorder_trie_versions ();
 }
 
 void swapout_modified_blocks (struct shd_softc *ss, struct proc *p)
@@ -644,7 +745,7 @@ void swapout_modified_blocks (struct shd_softc *ss, struct proc *p)
 
     for (ix = latest_version; ix >= 1; ix--)
     {
-        merge (merged_trie, get_trie_for_version (ix));
+        merge (merged_trie, get_trie_for_version (ix), DEFAULT_OVERLAP);
     }
     ok = TrieIteratorInit(merged_trie, &pos);
     if (ok)
@@ -669,7 +770,7 @@ void swapout_checkpoint (int version, struct shd_softc *ss, struct proc *p)
 
     for (ix = latest_version; ix >= version; ix--)
     {
-        merge (merged_trie, get_trie_for_version (ix));
+        merge (merged_trie, get_trie_for_version (ix), DEFAULT_OVERLAP);
     }
     ok = TrieIteratorInit(merged_trie, &pos);
     if (ok)
@@ -695,27 +796,28 @@ void rollback_to_checkpoint (int version, struct shd_softc *ss, struct proc *p)
 
     for (ix = latest_version; ix >= version; ix--)
     {
-        ok = TrieIteratorInit(get_trie_for_version (ix), &pos);
-        for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
-        {
-            printf ("value = %ld, key = %ld, size = %d\n", pos->value, pos->key , depthToSize(pos->maxDepth));
-        }
-        printf ("Next trie\n"); 
-        TrieIteratorCleanup(&pos);
-        merge (merged_trie, get_trie_for_version (ix));
+        merge (merged_trie, get_trie_for_version (ix), DEFAULT_OVERLAP);
     }
     ok = TrieIteratorInit(merged_trie, &pos);
-    printf ("After TrieIteratorInit\n");
     if (ok) 
     {
         for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
         {
-             printf ("value = %ld, key = %ld, size = %d\n", pos->value, pos->key, depthToSize(pos->maxDepth)); 
              block_copy (ss, p, pos->value, pos->key, depthToSize(pos->maxDepth), SHADOW_TO_SRC);    
         }
         TrieIteratorCleanup(&pos);
     }
     TrieCleanup(merged_trie);
+    for (ix = latest_version; ix >= version; ix--)
+    {
+        delete_version_trie (ix);
+    }
+    reorder_trie_versions ();
+    if (1 != latest_version)
+    {
+        if (0 != create_new_trie (latest_version + 1))
+            latest_version++;
+    }
 }
 
 void print_checkpoint_map (int version)
@@ -728,10 +830,11 @@ void print_checkpoint_map (int version)
    {
        for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
        {
-           printf ("\nLbn = %ld, Pbn = %ld, Size = %ld", pos->key, pos->value, depthToSize(pos->maxDepth)); 
+           printf ("\nbn in source = %ld, bn in shadow = %ld, size = %ld", pos->key, pos->value, depthToSize(pos->maxDepth)); 
        }
        TrieIteratorCleanup (&pos);
    } 
+   /*logTrieStructure (trie);*/
 }
 
 void load_checkpoint_map (struct shd_softc *ss, struct proc *p)
@@ -751,6 +854,8 @@ void load_checkpoint_map (struct shd_softc *ss, struct proc *p)
     metadata_block = 2;
     latest_version = 0;
 
+    delete_all_tries ();
+
     for (i = 0; i < 512 / sizeof(long int); i++)
     {
        map[i] = 0;  
@@ -758,22 +863,34 @@ void load_checkpoint_map (struct shd_softc *ss, struct proc *p)
     }   
     
     read_block (ss, p, (char *) temp_addr, metadata_block);        
+    i = 0;
     while (temp_addr[i] != 0)
     {
         read_start = temp_addr[i];
         num_blocks = temp_addr[i+1]; 
+      /*printf ("Reading %ld blocks starting %ld\n", num_blocks, read_start);*/ 
         i+=2;
+        if (0 == create_new_trie (latest_version + 1))
+        {   
+            printf ("Error creating trie for version %d\n", latest_version);
+            return;
+        }
+        else
+            latest_version++;
+
         for (j=0; j<num_blocks; j++)
         {
             read_block (ss, p, (char *) map, read_start);
             for (k=0; k<126; k+=3)
             {
-                /*TrieInsertWeak (map[k], map[k+1], map[k+2]); */
+                if (map[k] == 0)
+                    break;
+/*                printf ("Inserting (%ld, %ld, %ld)\n", map[k], map[k+2], map[k+1]);     */ 
+                TrieInsertStrong (get_trie_for_version (latest_version), map[k], map[k+2], map[k+1], DEFAULT_OVERLAP);
                 /* use non-allocating version of insertweak */
             }
             read_start++;
         } 
-        latest_version++;
     }
 }                    
 
@@ -805,35 +922,41 @@ void save_checkpoint_map (struct shd_softc *ss, struct proc *p)
         array_ix = 0;
         if (ok)
         {
-          current_block = write_start = BlockAlloc (1);
           blocks_used = 0;
           for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
           {
             map [array_ix++] = pos->key; 
             map [array_ix++] = pos->value;
             map [array_ix++] = depthToSize(pos->maxDepth);
-            printf ("Saving (%ld, %ld, %ld)\n", pos->key, pos->value, depthToSize(pos->maxDepth)); 
+      /*      printf ("Saving (%ld, %ld, %ld)\n", pos->key, pos->value, depthToSize(pos->maxDepth)); */
             if (array_ix >= 125)
             {
+                current_block = BlockAlloc (1);
+                if (0 == blocks_used)
+                    write_start = current_block;
                 array_ix = 0;
                 blocks_used++;
                 if (write_block (ss, p, (char *) map, current_block))
                     return;
-                current_block = BlockAlloc (1);
+                 for (i = 0; i < 128; i++)
+                     map[i] = 0;
             } /* end of if */
           } /* end of for */
         } /* end of if */        
         if (array_ix > 0)
         {
+            current_block = BlockAlloc (1);
+            if (0 == blocks_used)
+                write_start = current_block;
             blocks_used++;
             if (write_block (ss, p, (char *) map, current_block))
                 return;
+             for (i = 0; i < 128; i++)
+                 map[i] = 0;
         }
-        for (i = 0; i < 128; i++)
-                    map[i] = 0;
         temp_addr [2*ix - 2] = (long int) write_start;
         temp_addr [2*ix - 1] = (long int) blocks_used;
-        printf ("Saving version %d, %d blocks starting at %d\n", ix, blocks_used, write_start);  
+      /*  printf ("Saving version %d, %d blocks starting at %d\n", ix, blocks_used, write_start); */ 
     }
     if (write_block (ss, p, (char *) temp_addr, metadata_block))
         return;
@@ -907,7 +1030,7 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
         long size;
 
         size = num_blocks * 512; /* convert number of blocks to number of bytes */
-        printf ("Copying %ld bytes from %d to %d \n", size, src_block, dest_block);  
+/*        printf ("Copying %ld bytes from %ld to %ld\n", size, src_block, dest_block);*/
         temp_addr = (char *) malloc (size + 1, M_DEVBUF, M_NOWAIT);
         if (SRC_TO_SHADOW == direction) {
             vp = ss->sc_srcdisk.ci_vp;
@@ -938,7 +1061,6 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
          }
 
 
-         /*Write this to block free_block in dest*/
          if (SRC_TO_SHADOW == direction) {
              vp = ss->sc_copydisk.ci_vp;
          }
@@ -988,10 +1110,10 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	struct iovec aiov;
 	struct vnode *vp = NULL;
         daddr_t free_block;
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
 		printf("shd%d: shdio\n", ss->sc_unit);
-#endif
+#endif*/
 
 	/*
 	 * Translate the partition-relative block number to an absolute.
@@ -1013,9 +1135,7 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
         {
             /* Search in Trie and do a copy on write */
             int failed;
-            printf ("bn = %ld, num of blocks = %ld\n", bn, (bp->b_bcount)/512);
             failed = TrieInsertWeak (get_trie_for_version (latest_version), bn, (bp->b_bcount)/512, ss, bp, p); 
-            printf ("Write size = %d\n", bp->b_bcount);
             if (failed < 0)
             {
                 printf ("No more space on disk! Copy on write failed\n");
@@ -1097,10 +1217,10 @@ shdioctl(dev, cmd, data, flag, p)
         struct shd_readbuf *shread; 
 	struct shddevice shd;
        
-#ifdef SHDDEBUG
+/*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
 		printf("shd%d: shioctl\n", unit);
-#endif
+#endif*/
 
 	if (unit >= numshd)
 		return (ENXIO);
@@ -1112,11 +1232,10 @@ shdioctl(dev, cmd, data, flag, p)
 	switch (cmd) {
         case SHDREADBLOCK:
                 shread = (struct shd_readbuf *) data;
-                printf ("Reading block %ld\n", shread->block_num);
                 read_block (ss, p, shread->buf, shread->block_num);
                 break;
         case SHDROLLBACK:
-                printf ("Attempting to rollback from version %d to version %d\n", latest_version, (int )shio->version);
+                /*printf ("Attempting to rollback from version %d to version %d\n", latest_version, (int )shio->version);*/
                 if (shio->version > latest_version)
                 {
                     printf ("Error! Cannot rollback to version %d because you have only %d previous checkpoints so far\n", (int) shio->version, latest_version);
@@ -1149,7 +1268,9 @@ shdioctl(dev, cmd, data, flag, p)
                     return (EINVAL);
                 break;
         case SHDGETCHECKPOINTS:
-                for (version = 1; version < latest_version; ++version)
+                if (latest_version < 1)
+                    return;
+                for (version = 1; version <= latest_version; ++version)
                 {
                     printf ("Checkpoint version %d is ===>\n", version);
                     print_checkpoint_map (version);
@@ -1157,9 +1278,9 @@ shdioctl(dev, cmd, data, flag, p)
                 }
                 break;
         case SHDDELETECHECKPOINTS:
-                if (shio->delete_start < 1 || shio->delete_end >= latest_version)
+                if (shio->delete_start < 1 || shio->delete_end > latest_version)
                 {
-                    printf ("Please enter valid checkpoint numbers only! The valid range is 1 to %d\n", latest_version - 1); 
+                    printf ("Please enter valid checkpoint numbers only! The valid range is 1 to %d\n", latest_version); 
                     return (EINVAL);
                 } 
                 delete_checkpoints (shio->delete_start, shio->delete_end); 
@@ -1168,7 +1289,6 @@ shdioctl(dev, cmd, data, flag, p)
                 latest_version = 1;
                 bCheckpoint = 0;
                 init_trie_list ();
-                printf ("Creating a new trie\n");
                 if (0 == create_new_trie (1))
                     return (EINVAL);
  
