@@ -1,22 +1,25 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use English;
+use Getopt::Std;
 
+#
 # This function as the main assign loop.  It converts the virtual
 # topology into a top input including LAN and delay translation.  It
 # then snapshots the current testbed physical state and runs assign,
 # looping a couple times if assign fails.  When assign successfully
 # completes it will interpret the results.  Attempt to match any
 # existing portmap entries and then update the delays and vlans table.
-
-# Syntax: assign_wrapper <pid> <eid>
-
 #
-# Return code:
+# XXX: Update does not work with widearea nodes.
+#      Internally created nodes (jailhost,delay,sim) are not treated
+#        consistently. Needs more thought.
+#
+# Return codes:
 #
 # 0  - success
 # 1+ - error (Add other values:)
@@ -28,27 +31,60 @@
 # 64 - Set to indicate 'recoverability'
 #      (E.g., no db or physical state was modified
 #       by the time the error occurred.)
+# -1 - An uncontrolled error (someone called die()). No recovery is possible
+#      so the caller has to check for this explicitly.
 #
+sub usage ()
+{
+    print STDERR "Usage: $0 [-v] [-u | -n] pid eid\n";
+    print STDERR " -v   - enables verbose output\n";
+    print STDERR " -u   - enables update functionality\n";
+    print STDERR " -t   - Create the TOP file and then exit\n";
+    print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
+    exit(-1);
+}
+my $optlist  = "vutn";
+my $verbose  = 0;
+my $updating = 0;
+my $toponly  = 0;
+my $impotent = 0;
 
-# Caveats:
-#  The support for direct and interswitch links has not been tested much.
+#
+# Configure variables
+#
+my $TBROOT	  = "@prefix@";
+my $DELAYCAPACITY = @DELAYCAPACITY@;
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 
-# Settings
-# delaythresh is the maximum delay in ms above which a delay node is needed.
-#  (Note that the DB represents delays as floating point numbers)
-# maxrun is maximum number of times we run assign.
-# delaywithswitch if 1 will use the switch to delay when possible.  Currently
-#  this only works for 10mbit links.
-$delaythresh = 2;
-$maxrun = 20;
-$delaywithswitch=0;
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+require exitonwarn;
+
+#
+# assign_wrapper Settings
+#
+# Maximum delay in ms above which a delay node is needed.
+# (Note that the DB represents delays as floating point numbers)
+my $delaythresh = 2;
+
+# Maximum number of times we run assign.
+my $maxrun = 20;
+
+# Use the switch to delay when possible. Currentlythis only works for 10mbit
+# links (actually, its turned off cause it does not work; auto handshake).
+my $delaywithswitch = 0;
 
 #
 # Some handy constants. Speed in Mbits/sec and Kbits/sec units.
-# The conversion routine is to make explicit that we operate with two
-# different sets of units. One is the topology, which is in Kbps now.
-# The second is the physical description, which has been changed to
-# Kbps in the DB (and in ptopgen).
 #
 # Its probably a good idea to leave portbw (current_speed) in Mbs, since
 # those numbers are used at the switch and the interfaces, which really
@@ -58,75 +94,230 @@ my $S10Mbs  = 10;
 my $S100Mbs = 100;
 my $S10Kbs  = 10000;
 my $S100Kbs = 100000;
-sub BWConvert($) {
-    #
-    # Use this if physical units are in Mbs (used to be).
-    #
-    #my $bw = $_[0] / 1000;
-    
-    my $bw = $_[0];
-    return $bw;
-}
-
-$DELAYCAPACITY = @DELAYCAPACITY@;
-$TBROOT = "@prefix@";
-$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
-
-use lib '@prefix@/lib';
-use libdb;
-use libtestbed;
-require exitonwarn;
 
 #
-# Turn off line buffering on output
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
 #
-$| = 1;
-
-use Getopt::Std;
-
-getopts('vu',\%opt);
-
-sub usage {
-	print "Usage: $0 [-v] pid eid\n";
-	print "		-v enables verbose output\n";
-	print "         -u enables update functionality\n";
-	exit(-1);
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
+if (@ARGV != 2) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (defined($options{"u"})) {
+    $updating = 1;
+}
+if (defined($options{"t"})) {
+    $toponly = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+my $ptopfile = "$pid-$eid-$$.ptop";
+my $topfile  = "$eid.top";
 
-sub fatal($$) {
-    my $exitcode = shift;
-    my $message  = shift;
+sub fatal ($$)
+{
+    my($exitcode, $message) = @_;
+
     $message =~ s/\n$//;
     print STDERR "$message\n";
     exit($exitcode);
 }
 
-my $verbose = 0;
-my $updating = 0;
-
-if ($opt{v}) {
-    $verbose = 1;
-}
-
-if ($opt{u}) {
-    $updating = 1;
-}
-
-if (@ARGV != 2) {
-    usage();
-}
-
-($pid,$eid) = @ARGV;
-
-$ptopfile = "$pid-$eid-$$.ptop";
-
-sub printdb {
+sub printdb ($)
+{
     if ($verbose) {
 	print $_[0];
     }
-};
+}
 
+print "assign_wrapper improved started\n";
 TBDebugTimeStamp("assign_wrapper started");
+
+#
+# The main data structures:
+#
+# virt_nodes: The virtual nodes, indexed by vname. Each entry is a
+# hash reference, initially of just the DB info, but possibly
+# augmented as we proceed through assign.  Do not confuse these
+# virtual nodes with the other virtual nodes! These are the ones from
+# the actual topology, the virt_nodes table in the DB.
+#
+my %virt_nodes = ();
+
+#
+# virt_lans: The equivalent of virt_nodes; the virt_lans table in the DB.
+# Since there are multiple rows per lan (one for each node), this is a
+# multilevel structure. The first slot is another hash, one for each node.
+# The rest of the slots store other random things associated with the lan.
+# So, looks something like:
+#
+#   %virt_lans = (link0 => {members    => member0 => { db row ref },
+#                                         member1 => { db row ref }}
+#                           mustdelay    => 0,
+#                           emulated     => 0,
+#                           uselinkdelay => 0,
+#                           nobwshaping  => 0,
+#                           useveth      => 0,
+#                           trivok       => 0
+#                          }
+#                 link1 => ...
+#                )
+#
+my %virt_lans = ();
+
+#
+# virt_vtypes: The virt_vtypes table in the DB, indexed by the vtype
+# name (user chosen name).
+#
+my %virt_vtypes = ();
+
+#
+# node_types: The node_types table from the DB, indexed by the type name.
+#
+my %node_types = ();
+
+# 
+# interface_types: We need this to find out the bandwidths of the devices
+# we actually have on the testbed. Index by interface type name.
+#
+my %interface_types = ();
+
+#
+# phys_nodes: The equiv of virt_nodes above, except that these are pulled
+# from the DB once the physical resources have been allocated. Indexed
+# by physname, but there is a pointer from the virt_nodes table entry
+# to the the corresponding physnode entry. 
+# 
+my %phys_nodes = ();
+
+#
+# More physical side data structures.
+# v2pmap is indexed by virtual and contains the physical node.
+my %v2pmap = ();
+# p2vmap is indexed by physical and contains one or more virtual nodes.
+my %p2vmap = ();
+# plinks is indexed by virtual name and contains
+#  (pnodeportA,pnodeportB) .  If one is a delay node it is always
+#  the second.
+my %plinks = ();
+# virtnodes is the list of subnodes on physnodes.
+my %virtnodes = ();
+my %v2vmap = ();
+
+#
+# Support for experiment modify. We create v2p and v2v mappings of the
+# current topology so we can figure out how its changed after assign
+# runs. These correspond to v2pmap and v2vmap mentioned above.
+# 
+my %reserved_v2pmap  = ();
+my %reserved_v2vmap  = ();
+
+#
+# Experiment wide options. See below. They come from the experiments table.
+# Defining these will override experiment table setting. 
+#
+# Set this when forcing linkdelays instead of delay nodes. Set in the NS
+# file with a tb-compat directive. The force directive says to set up a
+# link delay, even when no delay would otherwise be inserted.
+# usewatunnels is also set in the NS, and can be used to turn them off. 
+# The multiplex_factor is to override node_types table for virtnode.
+my $uselinkdelays;
+my $forcelinkdelays;
+my $usewatunnels;
+my $multiplex_factor;
+
+######################################################################
+
+# ips is indexed by node:port and contains the IP address for the port.
+my %ips	      = ();
+
+# memberof is indexed by node:port and holds the lan it is a member of.
+my %memberof = ();
+
+# delaylinks stores the actual link delay info, converted from the
+# virt delay params above. It is indexed by link name and contains
+# [delay,bw,loss] for each direction. 
+my %delaylinks = ();
+
+# delaynodes stores the names of delaynodes that we create on the
+# fly using delayid. This is useful for doing isdelay? tests.
+my %delaynodes = ();
+my $delayid    = 0;
+
+# nodedelays and linkdelays are the final (!) representation. Indexed by
+# integer id, they store the physical node info and the delay info. 
+my %nodedelays = ();
+my %linkdelays = ();
+
+# Virtual nodes that the user has requested be "fixed" to a specific
+# physical node.
+my %fixed_nodes     = ();
+
+# portbw is indexed by virtual nodeport and contains the bandwidth of
+# that port. Note that port bandwidth in the interfaces table is left
+# in Mbps units for now. Thats inconsistent, I know. For LANs with
+# other bandwidths the port speed will be 100 and a delay node will be
+# inserted.
+my %portbw = ();
+
+# lannodes is indexed by physical name and is the set of fake lan nodes.
+# lan nodes are named lan/<virtual lan>. We need to know these so that
+# when they come back from assign, we can ignore them.
+my %lannodes = ();
+
+# Node estimates and counts. Avoid running assign if there is no way to
+# satisfy the estimates for physical nodes.
+my $minimum_nodes;
+my $maximum_nodes;
+my $remotecount  = 0;
+my $virtcount    = 0;
+
+#
+# This is for stats gathering. It might duplicate other stuff, but
+# thats okay.
+#
+my %expt_stats = (# pnodes include jailnodes and delaynodes.
+		  # We let the wrapper determine pnodes once the
+		  # experiment is fully swapped in so that the record
+		  # is not "committed" until successful swapin.
+		  jailnodes   => 0,
+		  vnodes      => 0,
+                  # vnodes include wanodes.
+		  wanodes     => 0,
+		  simnodes    => 0,
+		  delaynodes  => 0,
+		  linkdelays  => 0,
+		  links       => 0,
+		  walinks     => 0,
+		  lans        => 0,
+		  shapedlinks => 0,
+		  shapedlans  => 0,
+		  minlinks    => 100000,
+		  # includes emulated links. Maybe thats wrong.
+		  maxlinks    => 0,
+);
+
+# XXX NSE hack: List of simulated nodes. All these will go
+# into one pc850. Needs to change in distributed nse.
+my @simnodelist;
+my %simnode_iplist = ();
+my %iptonodemap    = ();
+my $nsenode_id     = 0;
+# lans that have simulated nodes
+my %simnodelans    = ();
+
+# Counters for generating IDs.
+my $virtnode_id  = 0;
+my $veth_id      = 0;
 
 ######################################################################
 # Step 1 - Setup virtual topology
@@ -157,845 +348,50 @@ TBDebugTimeStamp("assign_wrapper started");
 #        Foreach node N in L
 #           Link N to A
 #
-# Datastructures:
-#  nodes is indexed by virtual node and contains the node type.
-#  isremotenode is indexed by virtual node and says whether the node is
-#    is remote. We let wanassign deal with those nodes.
-#  lannodes is indexed by physical name is the set of lan nodes.
-#  portbw is indexed by virtual nodeport and contains the bandwidth
-#    of that port. Note that port bandwidth in the interfaces table is
-#    left in Mbps units for now. Thats inconsistent, I know. For LANs with
-#    other bandwidths the port speed will be 100 and a delay node will
-#    be inserted.
-#  fixed_nodes is indexed by virtual node name and points to physical node
-#   name.
-#  vtypes is indexed by vtype name and is a list of {weight types}.
-#
 # Delay node names:
 #  delay nodes are named tbdelayXX N > 2
 #   and tbsdelayXX for N == 2.
-# 
-# Lan node nameS:
-#  lan nodes are named lan/<virtual lan>
-######################################################################
+#
+########################################################################
 
 printdb "Generating TOP file.\n";
-TBDebugTimeStamp("top started");
-
-# Shark Hack
-# For each LAN we replace all the sharks in the LAN with a single
-# shark shelf node.  After this goes through assign we pull them
-# all back out.
-#
-# sharkshelves is indexed by virtual shelf name and is a list of
-# the virtual nodes in it.
-# sharkshelfid is used to generate ids for shark shelves.
-$sharkshelfid = 0;
-
-# ips is indexed by node:port and contains the IP address for the port.
-my %ips	      = ();
-
-# lans is indexed by virtual lan and is a list of node:port members.
-# memberof is indexed by node:port and holds the lan it is a member of.
-# emulated is 1 if the link/lan is emulated (virtual). This is
-# controlled by the a variable in the virt_lans table. It also gets
-# set when one of the nodes in the lan is a virtnode (jail).
-# useveth is 1 if the link/lan should us a veth device (virtual only).
-# trivok is 1 if emulated link/lan can by colocated on same node. 
-my %lans     = ();
-my %memberof = ();
-my %emulated = ();
-my %useveth  = ();
-my %trivok   = ();
-
-# delayinfo stores the virt_lans info, and is indexed by virtual
-# lan:node:port and is a list of delay, bandwidth, lossrate, rdelay,
-# rbandwidth, rlossrate.  Where r* indicates switch->node and the
-# others indicate node->switch.
-my %delayinfo = ();
-
-# queueinfo overlaps with delayinfo. It came later, and I added before
-# I understood this stuff. It should be merged into delayinfo above.
-# It holds the q_ stuff from virt_lans. 
-my %queueinfo = ();
-
-# delaylinks stores the actual link delay info, converted from the
-# virt delay params above. It is indexed by link name and contains
-# [delay,bw,loss] for each direction. 
-my %delaylinks = ();
-
-# delaynodes stores the names of delaynodes that we create on the
-# fly using delayid. This is useful for doing isdelay? tests.
-my %delaynodes = ();
-my $delayid    = 0;
-
-# nodedelays and linkdelays are the final (!) representation. Indexed by
-# integer id, they store the physical node info and the delay info. 
-my %nodedelays = ();
-my %linkdelays = ();
-
-# Set this when forcing linkdelays instead of delay nodes. Set in the NS
-# file with a tb-compat directive. The force directive says to set up a
-# link delay, even when no delay would otherwise be inserted.
-# usewatunnels is also set in the NS, and can be used to turn them off. 
-# The multiplex_factor is to override node_types table for virtnode.
-my $uselinkdelays   = 0;
-my $forcelinkdelays = 0;
-my $usewatunnels    = 1;
-my $multiplex_factor;
-
-# And the per-lan controls, based on the above two variables, and
-# per-lan variable in the virt_lans table. Indexed by lan name.
-# The nobwshaping flag is used in conjunction with emulated links
-# to turn off actual bw traffic shaping on an emulated link. This allows
-# assign to match the specified bws, but not force them to be such
-# with delay nodes (leaves it up to the user to moderate the bw). 
-my %uselinkdelay    = ();
-my %nobwshaping     = ();
-
-# OSID for each node in the virt_nodes table. We set this when we read
-# virt_nodes. Eventually, this should be part of a larger data structure
-# of per-vnode info. This allows us to map it early, and bail if over
-# max_concurrent. 
-my %virtnodeosids   = ();
-
-# Virtual nodes that the user has requested be "fixed" to a specific
-# physical node.
-my %fixed_nodes     = ();
-
-# Support for experiment modify.
-my %alreadyAllocated = ();
-my %reserved_pnodes  = ();
-my %reserved_vnodes  = ();
+TBDebugTimeStamp("TOP started");
 
 #
-# This is for stats gathering. It might duplicate other stuff, but
-# thats okay.
+# Load phys info. Interface types, node types, etc. Its any physical stuff
+# we need.
 #
-my %expt_stats = (# pnodes include jailnodes and delaynodes.
-		  # We let the wrapper determine pnodes once the
-		  # experiment is fully swapped in so that the record
-		  # is not "committed" until successful swapin.
-		  jailnodes   => 0,
-		  vnodes      => 0,
-                  # vnodes include wanodes.
-		  wanodes     => 0,
-		  simnodes    => 0,
-		  delaynodes  => 0,
-		  linkdelays  => 0,
-		  links       => 0,
-		  walinks     => 0,
-		  lans        => 0,
-		  shapedlinks => 0,
-		  shapedlans  => 0,
-		  minlinks    => 100000,
-		  # includes emulated links. Maybe thats wrong.
-		  maxlinks    => 0,
-);
-
-my $query_result =
-    DBQueryFatal("SELECT uselinkdelays,forcelinkdelays,".
-		 "       multiplex_factor,usewatunnels ".
-		 " from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-($uselinkdelays,$forcelinkdelays,$multiplex_factor,$usewatunnels) =
-    $query_result->fetchrow_array();
-
-# Figure out what kind of links we have. Indexed by bandwidth and is
-# just a set.
-my %okbandwidths = ();
-
-$query_result =
-    DBQueryFatal("SELECT type,max_speed from interface_types");
-
-while (($type,$bandwidth) = $query_result->fetchrow_array()) {
-    $okbandwidths{$bandwidth} = 1;
-}
-
-# Load delay osids and default osids for types
-my %delayosids   = ();
-my %jailosids    = ();
-my %defaultosids = ();
-
-$query_result =
-    DBQueryFatal("SELECT type,delay_osid,osid,jail_osid from node_types");
-
-while (($type,$delayosid,$defosid,$jailosid) =
-       $query_result->fetchrow_array()) {
-    $delayosids{$type}   = $delayosid;
-    $jailosids{$type}    = $jailosid;
-    $defaultosids{$type} = $defosid;
-}
-
-# XXX NSE hack: List of simulated nodes. All these are gonna go
-# into one pc850. Needs to change in distributed nse
-my @simnodelist;
-my %simnode_iplist = ();
-my %iptonodemap    = ();
-my $nsenode_id     = 0;
-
-# XXX Remote/Virt node hacks. Turns out to be similar to NSE.
-my %isremotenode = ();
-my %isvirtnode   = ();
-my $remotecount  = 0;
-my $virtcount    = 0;
-my $virtnode_id  = 0;
+LoadPhysInfo();
 
 #
-# If updating (modify) find out what nodes need to be fixed in the new
-# run assign run. virtnodes complicate this!
-# 
-if ($updating) {
-    printdb "Fixing previously allocated nodes.\n";
-    $result = 
-	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid ".
-		     " from reserved as r ".
-		     "left join nodes as n on n.node_id=r.node_id ".
-		     "where r.pid='$pid' and r.eid='$eid'");
-    
-    while (($vname,$reserved,$physnode) = $result->fetchrow_array) {
-	#
-	# If a virtnode, we need the underlying physnode, since thats
-	# what we fix it to. But we still need to remember which virtnodes
-	# are allocated for later.
-	#
-	# WIDEAREA nodes are going to break. 
-	#
-	if ($reserved ne $physnode) {
-	    $reserved_vnodes{$vname}     = $reserved;
-	    $reserved_pnodes{$vname}     = $physnode;
-	    $fixed_nodes{$vname}         = $physnode;
-	    $alreadyAllocated{$physnode} = "unused";
-	    $alreadyAllocated{$reserved} = "unused";
-	}
-	else {
-	    $reserved_pnodes{$vname}     = $reserved;
-	    $fixed_nodes{$vname}         = $reserved;    
-	    $alreadyAllocated{$reserved} = "unused";
-	}
-    }
-    $result->finish;
-}
+# Load the Experiment info and virt topology.
+#
+LoadExperiment();
 
-printdb "Loading virt_nodes.\n";
-$result =
-    DBQueryFatal("select distinct vn.vname,vn.ips,vn.type,vn.fixed,vn.osname,".
-		 " nt.isremotenode,nt.isvirtnode ".
-		 " from virt_nodes as vn ".
-		 "left join node_types as nt on ".
-		 " nt.type=vn.type or nt.class=vn.type ".
-		 "where vn.pid='$pid' and vn.eid='$eid' ".
-		 "order by vn.vname");
+#
+# If updating, load current experiment resources. We have to be careful
+# of how this is merged in with the (new) desired topology. See below.
+#
+LoadCurrent()
+    if ($updating);
 
-while (($vname,$ips,$type,$fixed,$osname,$isremote,$isvirt) = 
-        $result->fetchrow_array){
-    if (defined($fixed) && $fixed eq "") {
-	undef($fixed);
-    }
-    
-    # REMOTENODE HACK
-    #
-    # if its a vtype, no entry in node_types. vtypes break remote nodes.
-    # Need to look inside the vtype and make sure no mixing of vnodes and
-    # physnodes. Later ...
-    #
-    if (! defined($isremote)) {$isremote = 0;}
-    if (! defined($isvirt)) {$isvirt = 0;}
-    
-    printdb "  $vname $type $ips";
-    printdb " " . (defined($fixed) ? $fixed : "") . " $isremote\n";
-    
-    # We need to check the names to make sure they won't clash with
-    # our internal delay node names.
-    if (($vname =~ /^tbdelay\d+/) ||
-	($vname =~ /^tbsdelay\d+/)) {
-	print STDERR "Warning: $vname is a reserved name.  Working around.\n";
-	($num) = ($vname =~ /(\d+)/);
-	$delayid = $num + 1;
-    }
-    $nodes{$vname} = $type;
-
-    if( $type eq "sim" ) {
-      push( @simnodelist, $vname );
-      $simnode_iplist{$vname} = [];
-    }    
-    # REMOTENODE HACK
-    # 
-    $isremotenode{$vname} = $isremote;
-    $remotecount++
-	if ($isremote);
-
-    # stats
-    my @iplist  = split(" ", $ips);
-    my $ipcount = scalar(@iplist);
-
-    $expt_stats{"maxlinks"} = $ipcount
-	if ($ipcount > $expt_stats{"maxlinks"});
-    $expt_stats{"minlinks"} = $ipcount
-	if ($ipcount < $expt_stats{"minlinks"});
-
-    foreach $ipinfo (@iplist) {
-	($port,$ip) = split(":",$ipinfo);
-	$ips{"$vname:$port"} = $ip;
-	if( $type eq "sim" ) {
-	  push(@{$simnode_iplist{$vname}}, $ip);
-	}
-	$iptonodemap{$ip} = $vname;
-    }
-    $isvirtnode{$vname} = $isvirt;
-    $virtcount++
-	if ($isvirt);
-
-    if (defined($fixed)) {
-	$fixed_nodes{$vname} = $fixed;
-    }
-
-    #
-    # Map the osname to an OSID now so that we can check max_concurrent.
-    # This also avoids the work and *check* later after we have done 90%
-    # of assign_wrapper. If no osname was specified, we have to wait and
-    # use the default for the type of phys node that assign picks.
-    #
-    if (defined($osname) && $osname ne "") {
-	my $osid;
-
-	if (! ($osid = TBOSID($pid, $osname)) &&
-	    ! ($osid = TBOSID(TB_OPSPID, $osname))) {
-	    fatal(1, "*** $0:\n".
-		     "    Invalid OS $osname in project $pid!\n");
-	}
-	$virtnodeosids{$vname} = $osid;
-    }
-}
-
-# Check Max Concurrent
+#
+# Check Max Concurrent for OSID violations.
+#
 CheckMaxConcurrent();
 
-# Stats
-$expt_stats{"vnodes"}   = $virtcount;
-$expt_stats{"wanodes"}  = $remotecount;
-$expt_stats{"simnodes"} = scalar(@simnodelist);
-
-printdb "Loading virt_lans.\n";
-$result =
-    DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
-		 "rdelay,rbandwidth,rlossrate,widearea, ".
-		 "emulated,uselinkdelay,nobwshaping,usevethiface,trivial_ok " .
-		 "from virt_lans where pid='$pid' and eid='$eid' ".
-                 "order by vname,member");
-
 #
-# REMOTENODE HACK: Remote nodes are special.
+# Create the TOP file.
 #
-# A list of all lans that have remote nodes as members,
-my %rnodelans = ();
-# A list of all the tunnels we need to build. Each list member is a list
-# of the nodes in the tunnel.
-my %tunnels   = ();
+CreateTopFile();
 
-#
-# Process the virt_lans table.
-# 
-while (my ($vname,$member,$delay,$bandwidth,$lossrate,
-	   $rdelay,$rbandwidth,$rlossrate,$widearea,
-	   $isemulated,$uselinkdelay,$nobwshaping,$useveth,$trivial_ok)
-       = $result->fetchrow_array) {
-    my ($node,$port) = split(":",$member);
+TBDebugTimeStamp("TOP finished");
 
-    #
-    # REMOTENODE HACK: 
-    #
-    # If its a duplex link involving a remotenode, skip it. 
-    # We do not want to have assign deal with these. The nodes are
-    # allocated as unconnected by another program, and we deal with
-    # it later by creating tunnels.
-    # 
-    if ($widearea) {
-	#
-	# If the user requested that no tunnels be created, so not bother
-	# with this. wanassign stills does the right thing, but we do not
-	# set up the tunnels (see below). 
-	#
-	if ($usewatunnels) {
-	    if (! defined($tunnels{$vname})) {
-		$tunnels{$vname} = [];
-	    }
-	    push(@{$tunnels{$vname}},$member);
-	    $rnodelans{$vname} = 1;
-	    printdb "    Added $member to tunnels of $vname\n";
-	}
-	$expt_stats{"walinks"} += 1;
-	next;
-    }
-    
-    if (! defined($lans{$vname})) {
-	$lans{$vname} = [];
-    }
-    push(@{$lans{$vname}},$member);
-    $memberof{$member} = $vname;
-    $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate,
-				    $rdelay,$rbandwidth,$rlossrate];
-
-    #
-    # Grab the Q stuff from virt_lans. I'm keeping this separate for
-    # now until I understand whats going on. There are no "r" params
-    # either. I have no idea how do to this stuff for lans, and for
-    # duplex links the "r" params are not necessary. Each virt_lans
-    # entry gives the params towards the switch, which equal the
-    # reverse params for the other member. 
-    #
-    $query_result =
-	DBQueryFatal("select q_limit,q_maxthresh,q_minthresh,q_weight, ".
-		     "       q_linterm,q_qinbytes,q_bytes,q_meanpsize, ".
-		     "       q_wait,q_setbit,q_droptail,q_red,q_gentle ".
-		     "from virt_lans ".
-		     "where pid='$pid' and eid='$eid' and ".
-		     "      vname='$vname' and member='$member'");
-    
-    my ($q_limit,$q_maxthresh,$q_minthresh,$q_weight,$q_linterm,
-	$q_qinbytes,$q_bytes,$q_meanpsize,$q_wait,$q_setbit,
-	$q_droptail,$q_red,$q_gentle) = $query_result->fetchrow_array;
-    
-    $queueinfo{"$vname:$member"} =
-	[$q_limit,$q_maxthresh,$q_minthresh,$q_weight,$q_linterm,
-	 $q_qinbytes,$q_bytes,$q_meanpsize,$q_wait,$q_setbit,
-	 $q_droptail,$q_red,$q_gentle];
-
-    if ($q_red) {
-	$mustdelay{$vname} = 1;
-    }
-    $emulated{$vname} = $isemulated;
-    $uselinkdelay{$vname} = $uselinkdelay;
-    $nobwshaping{$vname} = $nobwshaping;
-    $useveth{$vname} = $useveth;
-    $trivok{$vname} = $trivial_ok;
-
-    #
-    # XXX - Whenever a delay node is inserted, port speeds are set to
-    #       100Mbs, even if they requested exactly 10Mbs. This is a
-    #       simplification. At some point we might want to force all the
-    #       ports along the way to 10Mbs, and have the delay node worry
-    #       about delay only, and not bandwidth. That will be harder to
-    #       to do in this mess. See companion XXX below where the delays
-    #       table is initialized. Initially, we set the speed to 10Mbs,
-    #       if a delay node is insterted below, it resets this to 100Mbs.
-    # 
-    if ($bandwidth == $S10Kbs && $delaywithswitch) {
-	$portbw{$member} = $S10Mbs;
-    } else {
-	$portbw{$member} = $S100Mbs;
-    }
-    printdb "  portbw of $member = $portbw{$member}\n";
-    printdb "  $vname $member - $delay $bandwidth $lossrate $rdelay $rbandwidth $rlossrate\n";
-    printdb "   $port:$vname is a lan of $node\n";
+# Stop here ...
+if ($toponly) {
+    print "Stopping after creating the TOP file, as directed.\n";
+    exit(0);
 }
-$result->finish;
-
-#
-# Check event list. Anytime we find an event to control a link, we need
-# to drop a delay node in. start/stop especially, since thats the easiest
-# way to do that, even if the link has no other traffic shaping in it. 
-# 
-printdb "Checking events for LINK commands.\n";
-$result =
-    DBQueryFatal("select distinct vname from eventlist as ex ".
-		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
-		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
-		 "where ot.type='LINK' and ex.pid='$pid' and ex.eid='$eid'");
-while (($vname) = $result->fetchrow_array) {
-    $mustdelay{$vname} = 1;
-}
-
-# Shark hack
-foreach $lan (keys(%lans)) {
-    $realmembers = [];
-    $sharks = [];
-    $hassharks = 0;
-    foreach $member (@{$lans{$lan}}) {
-	($node) = (split(":",$member))[0];
-	if (($nodes{$node} eq "shark") || ($nodes{$node} eq "dnard")) {
-	    push(@$sharks,$member);
-	    $hassharks = 1;
-	} else {
-	    push(@$realmembers,$member);
-	}
-    }
-    if ($hassharks) {
-	$shelfid = "sharkshelf$sharkshelfid";
-	printdb "  Creating shark shelf: $shelfid (" . 
-	    join(" ",@$sharks) . ")\n";
-	$sharkshelfid++;
-	$sharkshelves{$shelfid} = $sharks;
-	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0,
-					      0,$S100Kbs,0.0];
-	push(@$realmembers,"$shelfid:uplink");
-	$nodes{$shelfid} = "shark-shelf";
-    }
-    $lans{$lan} = $realmembers;
-}
-# End shark hack
-
-# Load virt types
-printdb "Loading virt_vtypes.\n";
-$result = DBQueryFatal("SELECT name,weight,members from virt_vtypes" .
-		       " where pid=\"$pid\" and eid=\"$eid\"");
-while (($name,$weight,$types) = $result->fetchrow_array) {
-    printdb "  $name $weight $types\n";
-    $vtypes{$name} = "$weight $types";
-}
-
-# Open the TOP file
-$topfile = "$eid.top";
-open(TOPFILE,"> $topfile") || do {
-    fatal(65,"*** $0:\n".
-	    "    Could not open $topfile.\n");
-};
-
-# Print out vtypes
-foreach $vtype (keys(%vtypes)) {
-    print TOPFILE "make-vclass $vtype $vtypes{$vtype}\n";
-}
-
-$nodes=0;
-
-foreach $node (keys(%nodes)) {
-    # Shark hack
-    if (($nodes{$node} ne "shark") &&
-	($nodes{$node} ne "dnard") && !$isremotenode{$node}) {
-	print TOPFILE "node $node $nodes{$node}\n";
-	if ($nodes{$node} ne "shark-shelf" && !$isvirtnode{$node}) {
-	    $nodes++;
-	}
-    }
-    # End Shark hack
-}
-
-# lans that have simulated nodes
-my %simnodelans = ();
-
-foreach $lan (keys(%lans)) {
-    @members = @{$lans{$lan}};
-    printdb "$lan - " . join(" ",@members) . "\n";
-    # Shark hack for rvr
-    $sharks = 0;
-    $nonsharks = 0;
-    $simnodes = 0;
-    $realnodes = 0;
-    $virtnodes = 0;
-    my $emulated = $emulated{$lan};
-    my $uselinkdelay = $uselinkdelay{$lan};
-    my $mustdelay = $mustdelay{$lan};
-    my $isdelayed = 0;
-    my $nobwshaping = $nobwshaping{$lan};
-    $trivial_ok = 0;
-    foreach $member (@members) {
-	($node) = (split(":",$member))[0];
-	if ($nodes{$node} eq "shark-shelf") {
-	    $sharks++;
-	} elsif ($nodes{$node} eq "sim") {
-	    $simnodes++;
-	    $simnodelans{$lan} = 1;
-	} else {
-	    # We always use an emulated link when its a virtnode. An emulated
-	    # link can use a trivial link too, if the user wanted it. 
-	    if ($isvirtnode{$node}) {
-		$virtnodes++;
-		$emulated = 1;
-		$emulated{$lan} = 1;
-		$trivial_ok = $trivok{$lan};
-		#
-		# An emulated link/lan between containing any
-		# virtnodes always uses veth devices. Note that remote
-		# virtual nodes never go through this path cause they
-		# get tunnels, so its only local virtual nodes. 
-		#
-		$useveth{$lan} = 1
-		    if ($isvirtnode{$node});
-	    }
-	    $nonsharks++;
-	    $realnodes++;
-	}
-    }
-    if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
-	$trivial_ok = 1;
-    }
-    if ($#members == 1) {
-	$expt_stats{"links"} += 1;
-	($nodeport0,$nodeport1) = @members;
-	$node0 = (split(":",$nodeport0))[0];
-	$node1 = (split(":",$nodeport1))[0];
-	($delay0,$bw0,$loss0,
-	 $rdelay0,$rbw0,$rloss0) = @{$delayinfo{"$lan:$nodeport0"}};
-	($delay1,$bw1,$loss1,
-	 $rdelay1,$rbw1,$rloss1) = @{$delayinfo{"$lan:$nodeport1"}};
-	# Here the r's aregoing to be 1->0 and the others 0->1
-	$delay = $delay0+$rdelay1;
-	$loss = 1-(1-$loss0)*(1-$rloss1);
-	$bw = &min($bw0,$rbw1);
-	$rdelay = $rdelay0+$delay1;
-	$rloss = 1-(1-$rloss0)*(1-$loss1);
-	$rbw = &min($rbw0,$bw1);
-	$bandwidth = &getbandwidth(&min($bw0,$rbw1));
-	$rbandwidth = &getbandwidth(&min($rbw0,$bw1));
-	if (((($delay >= $delaythresh) ||
-	      (!$nobwshaping &&
-	       ((($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
-		(($delaywithswitch == 0) && 
-		 (($bw != $S100Kbs) &&
-		  (($sharks == 0) || ($nonsharks > 1)))))) || 
-	      ($loss != 0)) ||
-	     (($rdelay >= $delaythresh) ||
-	      (!$nobwshaping &&
-	       ((($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
-		(($delaywithswitch == 0) && !$nobwshaping &&
-		 (($rbw != $S100Kbs) &&
-		  (($sharks == 0) || ($nonsharks > 1)))))) || 
-	      ($rloss != 0)) ||
-	     # Link must be shaped for other reasons (q_red).
-	     $mustdelay ||
-	     # Global force, or per-link force. 
-	     $forcelinkdelays || $uselinkdelay) &&
-	    # XXX simulated nodes hack. We don't want to put delay nodes
-	    # between simulated nodes. If there is a link between a
-	    # simulated and a real node, we might need to put in delay
-	    # nodes
-	    ($realnodes != 0)) {
-	    $isdelayed = 1;
-	    #
-	    # We use a linkdelay if the link is emulated, globally forced,
-	    # globally preferred if the link is shaped, or if the per-link
-	    # flag was set (which means to put in a link delay regardless
-	    # of whether the link is shaped).
-	    #
-	    if ($emulated ||
-		$forcelinkdelays || $uselinkdelays || $uselinkdelay) {
-		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
-		
-		print(TOPFILE "link $plink $node0 $node1 ".
-		      max($bw,$rbw) . " 0 0" .
-		      ($emulated ? " emulated" : "") .
-		      ($trivial_ok ? " trivial_ok\n" : "\n"));
-
-		#
-		# We allow users to oversubscribe by letting them turn
-		# off the bandwidth shaping. If however, the link was
-		# shaped for some other reason (like a delay), then
-		# turn off just the bw shaping part by setting them to 0.
-		# This is special; means no limits in ipfw.
-		#
-		if ($nobwshaping) {
-		    $bw = $rbw = 0;
-		}
-		$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-				       $nodeport1,$rdelay,$rbw,$rloss];
-	    
-		printdb "Delay link $plink = " . 
-		    join(" ",@{$delaylinks{$plink}}) . "\n";
-	    }
-	    else {
-		my $delayname = "tbsdelay" . $delayid++;
-		my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
-		
-		$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-				       $nodeport1,$rdelay,$rbw,$rloss];
-
-		print TOPFILE "node $delayname delay\n";
-		print TOPFILE "link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
-		    "$node0 $delayname $bandwidth 0 0\n";
-		print TOPFILE "link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
-		    "$node1 $delayname $bandwidth 0 0\n";
-
-		$delaynodes{$delayname} = $delayname;
-		
-		printdb "Delay node $plink ($delayname) = " . 
-		    join(" ",@{$delaylinks{$plink}}) . "\n";
-	    }
-	    #
-	    # Ports are set to 100Mbs when a link gets a delay node.
-	    # This can override initialization above cause we could not
-	    # tell earlier if the link was going to get a real delay node
-	    # or just a delaywithswitch.
-	    #
-	    $portbw{$nodeport0} = $S100Mbs;	    
-	    $portbw{$nodeport1} = $S100Mbs;	    
-	} else {
-	    print TOPFILE "link linksimple/$lan/$nodeport0,$nodeport1 ".
-		"$node0 $node1";
-	    if ($emulated) {
-		print TOPFILE " " . max($bw,$rbw) . " 0 0 emulated";
-	    }
-	    else {
-		print TOPFILE " $bandwidth 0 0";
-	    }
-	    if ($trivial_ok) {
-		print TOPFILE " trivial_ok";
-	    }
-	    print TOPFILE "\n";
-	}
-	$expt_stats{"shapedlinks"} += $isdelayed;
-    } elsif ($#members != 0) {
-	print TOPFILE "node lan/$lan lan\n";
-	$expt_stats{"lans"} += 1;
-	$lannodes{"lan/$lan"} = 1;
-	foreach $member (@members) {
-	    ($delay,$bw,$loss,
-	     $rdelay,$rbw,$rloss) = @{$delayinfo{"$lan:$member"}};
-	    $bandwidth = &getbandwidth($bw);
-	    $rbandwidth = &getbandwidth($rbw);
-	    ($node) = (split(":",$member))[0];
-# XXX The expression below should be modified for better bandwidth support.
-# Probably needs to happen post assign somehow.
-	    if (((($delay >= $delaythresh) ||
-		  (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
-		  (($delaywithswitch == 0) && 
-		   (($bw != $S100Kbs) && (($sharks == 0) ||
-					  ($nonsharks > 1)))) ||
-		  ($loss != 0)) || 
-		 (($rdelay >= $delaythresh) ||
-		  (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
-		  (($delaywithswitch == 0) && 
-		   (($rbw != $S100Kbs) && (($sharks == 0) ||
-					   ($nonsharks > 1)))) ||
-		  ($rloss != 0)) ||
-		 # Link must be shaped for other reasons (q_red).
-		 $mustdelay ||
-		 # Global force, or per-lan force. 
-		 $forcelinkdelays || $uselinkdelay) &&
-		# if we have 1 real node in the LAN, we may need to create
-		# a lan
-		($realnodes != 0)) {
-		$isdelayed = 1;
-		#
-		# We use a linkdelay if the link is emulated, globally forced,
-		# globally preferred if the link is shaped, or if the per-link
-		# flag was set (which means to put in a link delay regardless
-		# of whether the link is shaped).
-		#
-		# NB: Emulated lans not supported at this time. Caught above.
-		#
-		if ($emulated ||
-		    $forcelinkdelays || $uselinkdelays || $uselinkdelay) {
-		    my $plink = "linklan/$lan/$member";
-		    
-		    $delaylinks{$plink} =
-			[$member,$delay,$bw,$loss,
-			 $member,$rdelay,$rbw,$rloss];
-
-		    print(TOPFILE "link $plink $node lan/$lan " .
-			  max($bw,$rbw) . " 0 0" .
-			  ($emulated ? " emulated" : "") .
-			  ($trivial_ok ? " trivial_ok\n" : "\n"));
-
-		    printdb "Delay link $plink = " .
-			    join(" ", @{$delaylinks{$plink}}) . "\n";
-		}
-		else {
-		    my $delayname = "tbdelay" . $delayid++;
-		    my $plink     = "linkdelaysrc/$lan/$member";
-
-		    $delaylinks{$plink} =
-			[$member,$delay,$bw,$loss,
-			 $member,$rdelay,$rbw,$rloss];
-		    
-		    print TOPFILE "node $delayname delay\n";
-		    print TOPFILE "link linkdelaysrc/$lan/$member" .
-			" $node $delayname $bandwidth 0 0\n";
-		    print TOPFILE "link linkdelaydst/$lan/$member" .
-			" lan/$lan $delayname $bandwidth 0 0\n";
-		    
-		    $delaynodes{$delayname} = $delayname;
-
-		    printdb "Delay node $plink ($delayname) = " .
-			    join(" ", @{$delaylinks{$plink}}) . "\n";
-		}
-		#
-		# Port is set to 100Mbs when the link gets a delay node.
-		# This can override initialization above cause we could not
-		# tell earlier if the link was going to get a real delay node
-		# or just a delaywithswitch.
-		#
-		$portbw{$member} = $S100Mbs;	    
-	    } else {
-		print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
-		    " $bandwidth 0 0";
-		if ($emulated) {
-		    print TOPFILE " emulated";
-		}
-		if ($trivial_ok) {
-		    print TOPFILE " trivial_ok";
-		}
-		print TOPFILE "\n";
-	    }
-	}
-	$expt_stats{"shapedlans"} += $isdelayed;
-    }
-    # If a LAN has only one member we don't do anything.
-}
-
-# XXX NSE hack
-# Will find a free randomly chosen pc850 and fix sim nodes to it
-# Assign's scoring needs to be fixed so that the solution has
-# as many sim nodes on a phy node as possible while maxing out
-# its interfaces. Currently having sim:N where N is a large
-# number in the ptop file does not guarantee that all these
-# get mapped to a single phy node even when that mapping has no
-# violations and a low score. distributed nse will fix this
-#$result =
-#  DBQueryFatal("select a.node_id,a.type from nodes as a ".
-#	   "left join reserved as b on a.node_id=b.node_id ".
-#	   "left join reserved as m on a.phys_nodeid=m.node_id ".
-#	   "where b.node_id is null and (a.role='testnode' and ".
-#	   "      a.type='pc850' and ".
-#	   "       (m.node_id is null or ".
-#	   "        m.pid!='$DEADPID' or m.eid!='$DEADEID'))");
-if( scalar(@simnodelist) > 0 ) {
-  open(AVAIL,"$TBROOT/sbin/avail type=pc rand |")
-    or fatal(65, "*** $0:\n".
-                "    avail failed\n");
-
-  my $num = 0;
-  while (<AVAIL>) {
-    if (! /^\|/) {next};
-    if (/node_id/) {next;}
-    ($fixednode,$type) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;    
-    $num++;
-    last;
-  }
-  close(AVAIL);
-  
-  if( $num == 0 ) {
-    fatal(65, "$0: *** Insufficient PCs available.\n");
-  }
-
-  foreach $simnode (@simnodelist) {
-    print TOPFILE "fix-node $simnode $fixednode\n";
-  }
-}
-
-# Print out fixed nodes
-# But _not_ nodes which aren't in the experiment any more.
-# CRB you can only fix nodes and delaynodes, right?
-$reused_count = 0;
-
-foreach $fixed (keys(%fixed_nodes)) {
-    if (!$isremotenode{$fixed} && 
-	(exists $nodes{$fixed} || exists $delaynodes{$fixed}) ) {
-	print TOPFILE "fix-node $fixed $fixed_nodes{$fixed}\n";
-	if ($reserved_pnodes{$fixed}) { $reused_count++; }
-    }
-}
-
-close TOPFILE;
-
-# Set estimations
-$minimum_nodes = $nodes + keys(%delaynodes)/$DELAYCAPACITY - $reused_count;
-$maximum_nodes = $nodes + keys(%delaynodes) - $reused_count;
-DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
-	 "minimum_nodes=$minimum_nodes where pid=\"$pid\" and eid=\"$eid\"");
-print "Minimum nodes = $minimum_nodes\n";
-print "Maximum nodes = $maximum_nodes\n";
-
-TBDebugTimeStamp("top finished");
 
 ######################################################################
 # Step 2 - Assign Loop
@@ -1005,12 +401,9 @@ TBDebugTimeStamp("top finished");
 # assign succeeds we attempt to reserve the resources.  If that works
 # we're done with step 2 otherwise we loop again.
 #
-# v2pmap is indexed by virtual and contains the physical node.
-# p2vmap is indexed by physical and contains one or more virtual nodes
-# plinks is indexed by virtual name and contains 
-#  (pnodeportA,pnodeportB) .  If one is a delay node it is always
-#  the second.
 #######################################################################
+
+
 
 TBDebugTimeStamp("assign_loop started");
 $currentrun = 1;
@@ -1026,6 +419,7 @@ while (1) {
     # Clear v2pmap, p2vmap, and plinks
     undef %v2pmap;
     undef %p2vmap;
+    undef %v2vmap;
     undef %plinks;
     undef %toreserve;
     undef %virtnodes;
@@ -1057,7 +451,8 @@ while (1) {
     $numnodes = $numnodes_result->numrows;
     
     if ($numnodes < $minimum_nodes) {
-	fatal(65, "$0: *** Insufficient nodes available.\n");
+	fatal(65, "*** $0:\n".
+	          "    Insufficient nodes available.\n");
     }
 
     TBDebugTimeStamp("assign started");
@@ -1067,16 +462,18 @@ while (1) {
     $cmdargs = "-Pod $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
-    if (-1 == system "assign $cmdargs > assign.log") {
-	fatal(65, "*** Couldn't run assign!");
+    if (system("assign $cmdargs > assign.log") < 0) {
+	fatal(65, "*** $0:\n".
+	          "    Could not start assign!");
     }
     
     $violations = 0;
     $score = -1;
     $assignexitcode = $? >> 8;
 
-    open(ASSIGNFP, "assign.log")
-	or fatal(65, "*** Couldn't open assign logfile!");
+    open(ASSIGNFP, "assign.log") or
+	fatal(65, "*** $0:\n".
+	          "    Could not open assign logfile!");
 
     if ($assignexitcode == 0)
     {
@@ -1102,7 +499,7 @@ while (1) {
 	printdb "Found score $score, violations $violations.\n";
     }
 
-    # We don't bother reading anything else if violations occured.
+    # We do not bother reading anything else if violations occured.
     if (($violations == 0) && ($score != -1)) {
 	# read nodes section
 	while (<ASSIGNFP> !~ /^Nodes:/) {}
@@ -1118,24 +515,24 @@ while (1) {
 		next;
 	    }
 
-	    if ($alreadyAllocated{$physical}) {
+	    if (physnodeallocated($physical)) {
 		#
 		# Mark node as being reused.
 		#
 		# Look at virtual node being mapped to node;
 		# if it wasn't in the previous map, mark node for reboot.
 		#
-		if ($alreadyAllocated{$physical} eq "reboot") {
+		if (physnodereuse($physical) eq "reboot") {
 		    # No changes once it goes into reboot.
 		    ;
 		}
-		elsif ($isvirtnode{$virtual}) {
+		elsif (virtnodeisvirt($virtual)) {
 		    #
 		    # A new virt virtual node on an existing physical node
 		    # does not force the physnode to be rebooted; we can
 		    # set up a new virtnode on it without a reboot. If its
 		    # an existing virtual on the same physnode, then mark
-		    # both as reused; no need to reboot either. If the the
+		    # both as reused; no need to reboot either. If the 
 		    # virtnode has moved here from someplace else, no
 		    # reboot of the physnode either, but obviously the
 		    # vnode will be released and a new one allocated.  What
@@ -1143,17 +540,17 @@ while (1) {
 		    # (which would require a reboot of the the virtual
 		    # node). 
 		    # 
-		    if (!exists($reserved_pnodes{$virtual})) {
-			$alreadyAllocated{$physical} = "reused";
+		    if (!exists($reserved_v2pmap{$virtual})) {
+			physnodesetreuse($physical, "reused");
 		    }
-		    elsif ($reserved_pnodes{$virtual} eq $physical) {
-			my $reserved = $reserved_vnodes{$virtual};
+		    elsif ($reserved_v2pmap{$virtual} eq $physical) {
+			my $reserved = $reserved_v2vmap{$virtual};
 
-			$alreadyAllocated{$reserved} = "reused";
-			$alreadyAllocated{$physical} = "reused";
+			physnodesetreuse($reserved, "reused");
+			physnodesetreuse($physical, "reused");
 		    }
 		    else {
-			$alreadyAllocated{$physical} = "reused";
+			physnodesetreuse($physical, "reused");
 		    }
 		}
 		else {
@@ -1166,12 +563,12 @@ while (1) {
 		    # user requested reboot, that will be handled outside
 		    # of this script.
 		    #
-		    if (!exists($reserved_pnodes{$virtual}) ||
-			$reserved_pnodes{$virtual} ne $physical) {
-			$alreadyAllocated{$physical} = "reboot";
+		    if (!exists($reserved_v2pmap{$virtual}) ||
+			$reserved_v2pmap{$virtual} ne $physical) {
+			physnodesetreuse($physical, "reboot");
 		    }
 		    else {
-			$alreadyAllocated{$physical} = "reused";
+			physnodesetreuse($physical, "reboot");
 		    }
 		}
 	    }
@@ -1182,7 +579,7 @@ while (1) {
 		$toreserve{$physical} = 1;	    
 	    }
 	    
-	    if ($isvirtnode{$virtual}) {
+	    if (virtnodeisvirt($virtual)) {
 		#
 		# If mapping a virtual node, then record that, since we need
 		# to allocate the virtnodes on that physnode, later.
@@ -1192,6 +589,7 @@ while (1) {
 		}
 		push(@{$virtnodes{$physical}}, $virtual);
 	    }
+	    
 	    $v2pmap{$virtual} = $physical;
 	    if( ! defined($p2vmap{$physical}) ) {
 		$p2vmap{$physical} = [];
@@ -1262,11 +660,16 @@ while (1) {
 
     # Reserve resources
     if (!$fail) {
+	if ($impotent) {
+	    print "Skipping physical reservation, as directed.\n";
+	    last;
+	}
 	TBDebugTimeStamp("reserving started");
 
 	if (system("nalloc $pid $eid " . join(" ", keys(%toreserve)))) {
 	    print "Failed to reserve nodes. Trying again.\n";
-	} else {
+	}
+	else {
 	    print "Successfully reserved physical nodes\n";
 
 	    foreach $node (keys(%toreserve)) {
@@ -1282,21 +685,23 @@ while (1) {
 	    # wrapper (tbswap), since this only happens when in update mode
 	    # (swapmod).
 	    #
-	    foreach $node (keys(%alreadyAllocated)) {
-		if ($alreadyAllocated{$node} eq "unused") {
+	    foreach my $pnode (keys(%phys_nodes)) {
+		my $reuse = physnodereuse($pnode);
+		
+		if ($reuse eq "unused") {
 		    #
 		    # Node was used in previous incarnation, but not any more.
 		    #
-		    TBSetNodeAllocState($node,
+		    TBSetNodeAllocState($pnode,
 					TBDB_ALLOCSTATE_RES_TEARDOWN());
 		    
 		}
-		elsif ($alreadyAllocated{$node} eq "reboot") {
+		elsif ($reuse eq "reboot") {
 		    #
 		    # Node is being reused, but for a different purpose, so
 		    # it should be rebooted.
 		    #
-		    TBSetNodeAllocState($node,
+		    TBSetNodeAllocState($pnode,
 					TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 		}
 	    }
@@ -1333,7 +738,6 @@ while (1) {
 
     $currentrun++;
 }
-
 TBDebugTimeStamp("assign_loop finished");
 
 ###########################################################################
@@ -1347,113 +751,68 @@ TBDebugTimeStamp("assign_loop finished");
 ###########################################################################
 
 #
-# VIRTNODES HACK: physical nodes (from the nodes table) might really
-# be a virtual node :-) Must record the underlying phys_nodeid and an
-# indicator for jail.
+# VIRTNODES HACK: Allocate the remote virtual nodes.
 #
-my %jailed = ();
-
-# Now allocate the remote nodes. 
-if (scalar(keys(%isremotenode))) {
+if ($remotecount) {
     my $success  = 0;
-    my $doremote = 0;
-    
-    foreach my $value (values(%isremotenode)) {
-	if ($value) {
-	    $doremote = 1;
-	}
-    }
-    
-    if ($doremote) {
-	print "Running 'wanassign -d $pid $eid'\n";
-	open(WANFP,"wanassign -d $pid $eid 2>&1 | tee wanassign.log |") or
-	    fatal(65, "*** $0:\n".
-		     "    Failed to start wanassign: $!\n");
+    my $wanargs  = ($impotent ? "-n" : "");
 
-	printdb "Reading wanassign results.\n";
-	while (<WANFP>) {
-	    chop;
-	    if ($_ =~ /(\S+) mapsto (\S+)/) {
-		$v2vmap{$1} = $2;
-		printdb "  $1 $2\n";
-	    }
-	    if ($_ =~ /^Success/) {
-		$success = 1;
-	    }
-	    # Skip other output. Usually its debugging output.
+    print "Running 'wanassign -d $wanargs $pid $eid'\n";
+    open(WANFP,"wanassign -d $wanargs $pid $eid 2>&1 | tee wanassign.log |") or
+	fatal(65, "*** $0:\n".
+	          "    Failed to start wanassign: $!\n");
+
+    printdb "Reading wanassign results.\n";
+    while (<WANFP>) {
+	chop;
+	if ($_ =~ /(\S+) mapsto (\S+)/) {
+	    $v2vmap{$1} = $2;
+	    printdb "  $1 $2\n";
 	}
-	close(WANFP) or
-	    fatal(65, "*** $0:\n".
-		     "    wanassign: " . $? ? "exited with status: $?.\n" :
+	if ($_ =~ /^Success/) {
+	    $success = 1;
+	}
+	# Skip other output. Usually its debugging output.
+    }
+    close(WANFP) or
+	fatal(65, "*** $0:\n".
+	          "    wanassign: " . $? ? "exited with status: $?.\n" :
 		                         "error closing pipe: $!\n");
 
-	if (!$success) {
-	    fatal(65,"*** $0:\n".
-		    "    wanassign could not find a solution!\n");
-	}
-	foreach my $virtual (keys(%v2vmap)) {
-	    my $physical = $v2vmap{$virtual};
-	    my $jailflag;
-	    my $phys_nodeid;
+    if (!$success) {
+	fatal(65,"*** $0:\n".
+	         "    wanassign could not find a solution!\n");
+    }
+    foreach my $virtual (keys(%v2vmap)) {
+	my $physical = $v2vmap{$virtual};
+	my $phys_nodeid;
 
-	    TBIsNodeVirtual($physical, \$jailflag);
-	    TBPhysNodeID($physical, \$phys_nodeid);
+	TBPhysNodeID($physical, \$phys_nodeid);
 	    
-	    $v2pmap{$virtual} = $phys_nodeid;
-	    if ( !defined($p2vmap{$phys_nodeid})) {
-		$p2vmap{$phys_nodeid} = [];
-	    }
-	    push(@{$p2vmap{$phys_nodeid}}, $virtual);
+	$v2pmap{$virtual} = $phys_nodeid;
+	if ( !defined($p2vmap{$phys_nodeid})) {
+	    $p2vmap{$phys_nodeid} = [];
+	}
+	push(@{$p2vmap{$phys_nodeid}}, $virtual);
 
-	    $jailed{$virtual}  = $jailflag;
-
-	    # Virtual nodes are always clean. Also prevents errors elsewhere.
+	# Virtual nodes are always clean. Also prevents errors elsewhere.
+	if (!$impotent) {
 	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
 	}
-	TBDebugTimeStamp("wanassign finished");
     }
+    TBDebugTimeStamp("wanassign finished");
 }
 
 #
 # Recoverability ends.
-# (All fatal() calls from this point do not have
-# the recoverable '64' bit set.)
+# All fatal() calls from this point do not have the recoverable '64' bit set.
 #
-
-#
-# For update, wipe old interfaces in DB (normally done by nfree.)
-# These will get rebuilt soon.
-#
-if ($updating) {
-    foreach $node (keys(%alreadyAllocated)) {
-	my $result = DBQueryFatal("select nt.control_net,nt.isvirtnode ".
-				  "from nodes as n ".
-				  "left join node_types as nt ".
-				  "on nt.type=n.type ".
-				  "where n.node_id='$node' and ".
-				  "      nt.isvirtnode=0");
-
-	my ($control,$isvirtnode) = $result->fetchrow_array();
-
-	my $pred = "1";
-
-	if (defined $control) {
-	    $pred = "(card != '$control')";
-	}
-
-	DBQueryFatal("update interfaces set IP='' " .
-		     "where node_id='$node' and $pred");
-
-	# Clean the veth_interfaces table for this node too.
-	DBQueryFatal("delete from veth_interfaces where node_id='$node'");
-    }
-}
 
 #
 # VIRTNODES HACK: Local virtnodes have to be mapped now. This is a little
 # hokey in that the virtnodes just need to be allocated from the pool that
 # is on the real node. We know they are free, but we should go through
-# nalloc anyway.
+# nalloc anyway. If anything fails, no point in retry.
 #
 foreach my $pnode (keys(%virtnodes)) {
     my @vlist = @{$virtnodes{$pnode}};
@@ -1472,14 +831,14 @@ foreach my $pnode (keys(%virtnodes)) {
 	my @delvlist = ();
 	
 	foreach my $vnode (@vlist) {
-	    if (!defined($reserved_vnodes{$vnode})) {
+	    if (!defined($reserved_v2vmap{$vnode})) {
 		# A new vnode on pnode to allocate.
 		push(@newvlist, $vnode);
 		next;
 	    }
-	    if ($reserved_pnodes{$vnode} ne $pnode) {
+	    if ($reserved_v2pmap{$vnode} ne $pnode) {
 		# A vnode moved. Its new to this pnode.
-		print "$vnode has moved from $reserved_pnodes{$vnode} ".
+		print "$vnode has moved from $reserved_v2pmap{$vnode} ".
 		    "to $pnode!\n";
 		
 		push(@newvlist, $vnode);
@@ -1487,7 +846,7 @@ foreach my $pnode (keys(%virtnodes)) {
 	    }
 
 	    # Push already allocated p/v onto lists for later.
-	    push(@oplist, $reserved_vnodes{$vnode});
+	    push(@oplist, $reserved_v2vmap{$vnode});
 	    push(@ovlist, $vnode);
 	}
 	# These are the new nodes we need to allocate
@@ -1539,10 +898,16 @@ foreach my $pnode (keys(%virtnodes)) {
 	# Try to allocate. Note, if this fails we are done for. Okay for now
 	# since it is never the case that it should fail!
 	#
-	print "Reserving ($pnode) @plist ...\n";
-	if (system("nalloc $pid $eid @plist")) {
-	    fatal(1, "*** $0:\n".
-		     "    Failed to reserve @plist (on $pnode)\n");
+	if ($impotent) {
+	    print "Selected ($pnode) @plist\n";
+	    print "Skipping physical reservation, as directed.\n";
+	}
+	else {
+	    print "Reserving ($pnode) @plist ...\n";
+	    if (system("nalloc $pid $eid @plist")) {
+		fatal(1, "*** $0:\n".
+		         "    Failed to reserve @plist (on $pnode)\n");
+	    }
 	}
     }
 
@@ -1562,29 +927,65 @@ foreach my $pnode (keys(%virtnodes)) {
 	$v2vmap{$virtual}  = $physical;
 	printdb "  Mapping $virtual to $physical on $pnode\n";
 
-	my $jailflag;
-	my $phys_nodeid;
-
-	TBIsNodeVirtual($physical, \$jailflag);
-	
-	$jailed{$virtual}  = $jailflag;
-
 	#
 	# New virtual nodes are always clean. Old ones stay in whatever
 	# state they were in so that os_setup/vnode_setup know they
 	# need to reboot them.
 	#
-	if (!defined($reserved_vnodes{$virtual})) {
-	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
-	}
-	elsif ($reserved_vnodes{$virtual} ne $physical) {
-	    # Node has moved! Nuts!
-	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+	if (!$impotent) {
+	    if (!defined($reserved_v2vmap{$virtual})) {
+		TBSetNodeAllocState($physical,
+				    TBDB_ALLOCSTATE_RES_INIT_CLEAN());
+	    }
+	    elsif ($reserved_v2vmap{$virtual} ne $physical) {
+		# Node has moved! Nuts!
+		TBSetNodeAllocState($physical,
+				    TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+	    }
 	}
     }
 }
 
+# Set port range (see below for how we deal with update).
 TBExptSetPortRange();
+
+# Load the current physical resources. This avoids lots of repeated
+# queries to the DB.
+LoadPhysResources();
+
+#
+# For update, wipe old interfaces in DB (normally done by nfree.)
+# These will get rebuilt soon. 
+#
+if ($updating && !$impotent) {
+    foreach my $pnode (keys(%phys_nodes)) {
+	#
+	# Do not need to do this for phys nodes that are to be
+	# released, or for virtnodes since they do not have interfaces
+	# associated with them directly. This is probably a bad assumption
+	# though, and perhaps this entire function should be moved to the
+	# library. 
+	#
+	next
+	    if (physnodeisvirtnode($pnode) ||
+		physnodereuse($pnode) eq "unused");
+
+	my $controlnet  = physnodecontrolnet($pnode);
+	my $controltest = "";
+
+	# Is it ever the case that the control net will be null?
+	# for a real node?
+	if (defined $controlnet) {
+	    $controltest = "and (card != '$controlnet')";
+	}
+
+	DBQueryFatal("update interfaces set IP='',IPaliases='' " .
+		     "where node_id='$pnode' $controltest");
+
+	# Clean the veth_interfaces table for this node too.
+	DBQueryFatal("delete from veth_interfaces where node_id='$pnode'");
+    }
+}
 
 ######################################################################
 # Step 3 - Convert to vlans, delays, and portmap
@@ -1598,8 +999,6 @@ TBExptSetPortRange();
 #  [pnode, int0, int1, vname, delay, bandwidth, lossrate]
 # portmap is indexed by <virtual node>:<virtual port> and contains
 #  the physical port.
-# vethmap is indexed by <virtual node>:<virtual port> and contains
-#  the veth physical port if the portmap entry is a veth device.
 #
 # vlan ids
 #  vlan ids are increasing integers in the case of node<->delay connections.
@@ -1724,7 +1123,7 @@ foreach $plink (keys(%plinks)) {
 	if (! $trivial) {
 	    AddVlan("link", $lan, $nodeportA, $nodeportB);
 
-	    if ($useveth{$lan}) {
+	    if (virtlanuseveth($lan)) {
 		#
 		# Create some new veth devices.
 		# 
@@ -1783,7 +1182,7 @@ foreach $plink (keys(%plinks)) {
 	if (! $trivial) {
 	    AddVlan("lan", $lan, $nodeportA);
 
-	    if ($useveth{$lan}) {
+	    if (virtlanuseveth($lan)) {
 		#
 		# Create some new veth devices, and store the mapping
 		# in vethmap so we know the veth->iface mapping later.
@@ -1826,6 +1225,10 @@ foreach $plink (keys(%plinks)) {
 }
 TBDebugTimeStamp("interpreting finished");
 
+# Stop here ...
+exit(0)
+    if ($impotent);
+
 ######################################################################
 # Step 4 - Upload to DB
 #
@@ -1852,8 +1255,6 @@ while (my ($vname,$vnode) = $virt_agents->fetchrow_array()) {
 		 " vname='$vname' and vnode='$vnode'");
 }
 
-my $pipeid = 100;
-
 foreach $delayid (keys(%nodedelays)) {
     # So r* indicates int1->int0 and others are int0->int1
     my ($pnode,$int0,$int1,$vname,
@@ -1861,9 +1262,8 @@ foreach $delayid (keys(%nodedelays)) {
 	$member1,$rdelay,$rbandwidth,$rlossrate) = @{$nodedelays{$delayid}};
 
     # ipfw pipe number so we can control it remotely.
-    my $pipe0 = $pipeid;
-    my $pipe1 = $pipeid + 10;
-    $pipeid += 100;
+    my $pipe0 = physnodenextpipe($pnode);
+    my $pipe1 = physnodenextpipe($pnode);
 
     my ($vnode0) = split(":", $member0);
     my ($vnode1) = split(":", $member1);
@@ -1873,17 +1273,17 @@ foreach $delayid (keys(%nodedelays)) {
     # is just one queue, towards the lan. A duplex link has two queues,
     # one for each member (outgoing side).
     #
-    my @members = @{$lans{$vname}};
+    my @members = virtlanmembers($vname);
     if (@members == 2) {
 	my ($q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,
 	    $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,
 	    $q0_droptail,$q0_red,$q0_gentle) =
-		@{$queueinfo{"$vname:$member0"}};
+		virtlanqueueinfo($vname, $member0);
 
 	my ($q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm,
 	    $q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit,
 	    $q1_droptail,$q1_red,$q1_gentle) =
-		          @{$queueinfo{"$vname:$member1"}};
+		virtlanqueueinfo($vname, $member1);
     
 	DBQueryFatal("insert into delays " .
 	     " (pid,eid,node_id,vname,iface0,iface1" .
@@ -1909,7 +1309,7 @@ foreach $delayid (keys(%nodedelays)) {
 	my ($q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,
 	    $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,
 	    $q0_droptail,$q0_red,$q0_gentle) =
-		@{$queueinfo{"$vname:$member0"}};
+		virtlanqueueinfo($vname, $member0);
 
 	#
 	# Obviously, its implied that the q0 params are towards the lan,
@@ -2006,9 +1406,8 @@ foreach $delayid (keys(%linkdelays)) {
 	$rdelay,$rbandwidth,$rlossrate,$islan) = @{$linkdelays{$delayid}};
 
     # ipfw pipe numbers so we can control it remotely.
-    my $pipe  = $pipeid;
-    my $rpipe = $pipeid + 10;
-    $pipeid += 100;
+    my $pipe  = physnodenextpipe($pnode);
+    my $rpipe = physnodenextpipe($pnode);
 
     my $ip      = $ips{$member};
     my ($vnode) = split(":", $member);
@@ -2021,7 +1420,7 @@ foreach $delayid (keys(%linkdelays)) {
     my ($q_limit,$q_maxthresh,$q_minthresh,$q_weight,$q_linterm,
 	$q_qinbytes,$q_bytes,$q_meanpsize,$q_wait,$q_setbit,
 	$q_droptail,$q_red,$q_gentle) =
-	    @{$queueinfo{"$lan:$member"}};
+	    virtlanqueueinfo($lan, $member);
 
     printdb("linkdelay ($vnode,$iface): lan = $lan, member = $member\n");
 
@@ -2095,18 +1494,7 @@ foreach $vnodeport (keys(%portmap)) {
     my $pport = $portmap{$vnodeport};
     my $lan   = $memberof{$vnodeport};
     
-    if ($nodes{$vnode} eq "shark-shelf") {
-	# Shark Hack
-	$shelf = $v2pmap{$vnode};
-	$i = 1;
-	foreach $shark (@{$sharkshelves{$vnode}}) {
-	    DBQueryFatal("update interfaces set IPalias=\"$ips{$shark}\" " .
-		    "where node_id = \"$shelf-$i\"");
-	    $i++;
-	}
-	# End Shark Hack
-    }
-    if ($useveth{$lan}) {
+    if (virtlanuseveth($lan)) {
 	#
 	# Emulated links on local virtual nodes use the new veth device.
 	# This is still fuzzy. What about connections to non-bsd nodes?
@@ -2141,7 +1529,7 @@ foreach $vnodeport (keys(%portmap)) {
 	    # XXX This appears to mean that in a sim node, the IP
 	    # address in the interface table is constantly overwritten?
 	    #
-	    if ($nodes{$vnode} eq "sim") {
+	    if (virtnodetype($vnode) eq "sim") {
 		if (! defined( $simnode_extips{$vnode})) {
 		    $simnode_extips{$vnode} = [];
 		}
@@ -2199,9 +1587,9 @@ foreach $simnode (keys(%simnode_extips)) {
     my $nhopnode = $iptonodemap{$nhopip};
     while( 1 ) {
 
-      if( $nodes{$nhopnode} ne "sim" ) {
-	push( @{$modified_simroutes{$simnode}}, [$dstip, $dst_mask, $nhopip]);
-	last;
+      if (virtnodetype($nhopnode) ne "sim") {
+	  push(@{$modified_simroutes{$simnode}}, [$dstip, $dst_mask, $nhopip]);
+	  last;
       }
 
       # store prev values
@@ -2270,25 +1658,17 @@ if( $nseconfigs ne "" ) {
 # Init each pnode.
 # 
 foreach $pnode (keys(%p2vmap)) {
-    if (defined($sharkshelves{$p2vmap{$pnode}[0]})) {
-	$i = 1;
-	foreach $sharknodeport (@{$sharkshelves{$p2vmap{$pnode}[0]}}) {
-	    $shark = (split(":",$sharknodeport))[0];
-	    InitPnode("$pnode-$i", $shark);
-	    $i++;
-	}
-    }
-    else {
-	# XXX NSE hack.
-	#
-	# For pnodes that have sim nodes, we just take the first. We
-	# can decide the osid etc. based on the fact that the vnode is
-	# a sim node For all other pnodes, there is a one-to-one
-	# mapping between pnode and vnode. [0]th element is therefore
-	# the vnode.
-	InitPnode($pnode,$p2vmap{$pnode}[0]);
-    }
+    #
+    # XXX NSE hack.
+    #
+    # For pnodes that have sim nodes, we just take the first. We
+    # can decide the osid etc. based on the fact that the vnode is
+    # a sim node For all other pnodes, there is a one-to-one
+    # mapping between pnode and vnode. [0]th element is therefore
+    # the vnode.
+    InitPnode($pnode,$p2vmap{$pnode}[0]);
 }
+
 #
 # Ditto for the virtnodes that were allocated.
 #
@@ -2298,6 +1678,9 @@ foreach $vnode (keys(%v2vmap)) {
     InitPnode($pnode, $vnode);
 }
 
+#
+# Upload the port bw to the interfaces table for each iface.
+# 
 foreach $vnodeport (keys(%portbw)) {
     my ($vnode) = split(":",$vnodeport);
     # SHARK HACK
@@ -2324,7 +1707,7 @@ foreach my $vnode (keys(%v2pmap)) {
     my $pnode  = $v2pmap{$vnode};
     my $vvnode = $v2vmap{$vnode};
 
-    if ($isvirtnode{$vnode} && $jailed{$vnode}) {
+    if (virtnodeisjailed($vnode)) {
 	my $sshdport = nextipportnum($pnode);
 
 	printdb("sshdport: $vnode $pnode $vvnode $sshdport\n");
@@ -2348,17 +1731,20 @@ my %lantotunnelserver = ();
 my %rnodetotunnelport = ();
 my $secretkey;
 
-foreach $lan (keys(%rnodelans)) {
+foreach $lan (keys(%virt_lans)) {
     my $server;
     my ($vnode,$vport);
+
+    next
+	if (!virtlantunnel($lan));
 
     #
     # Pick one of the members to be the server.
     # 
-    foreach $member (@{$tunnels{$lan}}) {
-	($vnode,$vport) = split(":",$member);
+    foreach $member (virtlanmembers($lan)) {
+	($vnode,$vport) = split(":", $member);
 
-	if (! $isremotenode{$vnode} &&
+	if (! virtnodeisremote($vnode) &&
 	    ! defined($lantotunnelserver{$lan})) {
 	    $server = $vnode;
 	}
@@ -2375,11 +1761,13 @@ foreach $lan (keys(%rnodelans)) {
     }
 }
 
-printdb "Tunnels\n";
-foreach $lan (keys(%rnodelans)) {
+foreach $lan (keys(%virt_lans)) {
+    next
+	if (!virtlantunnel($lan));
+
     printdb " LAN: $lan\n";
 
-    my @members = @{$tunnels{$lan}};
+    my @members = virtlanmembers($lan);
     if (@members != 2) {
 	fatal(1, "*** $0:\n".
 	         "    Too many members for a tunnel!\n");
@@ -2406,13 +1794,13 @@ foreach $lan (keys(%rnodelans)) {
 	# to a local virtual node (say, a jail). Obviously, both sides
 	# cannot be local. This is of course inconsistent.
 	#
-	if ($isremotenode{$vnode}) {
+	if (virtnodeisremote($vnode)) {
 	    $vvnode= $v2vmap{$vnode};
 	}
 	else {
 	    $vvnode= $v2pmap{$vnode};
 	}
-	if ($isremotenode{$peervnode}) {
+	if (virtnodeisremote($peervnode)) {
 	    $peervvnode= $v2vmap{$peervnode};
 	}
 	else {
@@ -2428,7 +1816,8 @@ foreach $lan (keys(%rnodelans)) {
 		     "    No Control Network IP for $peervvnode!\n");
 	}
 	
-        printdb "  vnode:$vnode port:$ipport isserver:$isserver peer_ip:$ip ".
+        printdb "Tunnel: ".
+	        "vnode:$vnode port:$ipport isserver:$isserver peer_ip:$ip ".
 	        "inet:$ips{$member}\n";
 
 	if (!defined($secretkey)) {
@@ -2479,7 +1868,7 @@ foreach my $vnode (keys(%v2pmap)) {
     # dohosts() in tmcd.c, which gets the host table wrong inside a jail
     # cause the pnode is not set properly.
     #
-    if ($isvirtnode{$vnode}) {
+    if (virtnodeisvirt($vnode)) {
 	$pnode = $v2vmap{$vnode};
     }
     else {
@@ -2503,16 +1892,19 @@ exit 0;
 # Returns the lowest ok bandwidth that is greater than or equal to
 # the one passed.
 sub getbandwidth {
-    my $targetbandwidth= BWConvert($_[0]);
+    my $targetbandwidth= $_[0];
     my $bandwidth;
     my $best = 10000000000;
-    foreach $bandwidth (keys(%okbandwidths)) {
+
+    foreach my $itype (keys(%interface_types)) {
+	my $bandwidth = interfacespeed($itype);
+    
 	if (($bandwidth >= $targetbandwidth) && ($bandwidth < $best)) {
 	    $best = $bandwidth;
 	}
     }
     return $best;
-};
+}
 
 # getnodeport(s)
 # Takes a ports result from assign (mac0,mac1) and returns the
@@ -2530,22 +1922,13 @@ sub getnodeport {
 sub InitPnode($pnode, $vnode)
 {
     my ($pnode,$vnode) = @_;
-    my $vname = $vnode;
+    my $vname;
     my $osid;
-    
-    my $query_result =
-	DBQueryFatal("SELECT type from nodes where node_id='$pnode'");
-    my ($type) = $query_result->fetchrow_array();
-
-    $query_result =
-	DBQueryFatal("SELECT cmd_line,rpms,deltas, " .
-		     " startupcmd,tarfiles,failureaction,routertype " .
-		     "from virt_nodes where pid='$pid'" .
-		     " and eid='$eid' and vname='$vnode'");
+    my $role;
 
     # XXX NSE hack: if the vnode is simulated, we just
     # choose FBSD-STD and static routing
-    if (defined($nodes{$vnode}) && $nodes{$vnode} eq "sim") {
+    if (virtnodeisvnode($vnode) && virtnodetype($vnode) eq "sim") {
 	$osid = TBOSID("emulab-ops", "FBSD45-NSE" );
 	
 	DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
@@ -2561,8 +1944,7 @@ sub InitPnode($pnode, $vnode)
 		     " where node_id='$pnode'");
 
 	$vname = "nsenode${nsenode_id}";
-	DBQueryFatal("update reserved set vname='$vname',erole='simnode' " .
-		     "where node_id='$pnode'");
+	$role  = TBDB_RSRVROLE_SIMNODE;
 	$nsenode_id++;
 
 	# Right now, we have only one row for nseconfigs per experiment.
@@ -2581,87 +1963,102 @@ sub InitPnode($pnode, $vnode)
 			 "      vname='$vname'");
 	}
     }
-    elsif ($isremotenode{$vnode} && $v2vmap{$vnode} ne $pnode) {
+    elsif (virtnodeisremote($vnode) && $v2vmap{$vnode} ne $pnode) {
 	#
 	# We never allocate remote pnodes (always allocated), so skip.
 	#
 	return;
     }
-    elsif (defined($virtnodes{$pnode})) {
-	# A pnode hosting jails. At the moment, we force these to a
-	# hardwired osid.
-	$osid = $jailosids{$type};
+    elsif (exists($virtnodes{$pnode}) || exists($delaynodes{$vnode})) {
+	#
+	# One of our internally created nodes, which can be treated
+	# almost the same whether a delay node or a jailhost node.
+	#
+	if (exists($delaynodes{$vnode})) {
+	    #
+	    # A delay node.
+	    #
+	    $osid = nodedelayosid(physnodetype($pnode));
+	    $expt_stats{"delaynodes"} += 1;
+	    $vname = $vnode;
+	    $role  = TBDB_RSRVROLE_DELAYNODE;
+	}
+	else {
+	    #
+	    # A node hosting jails
+	    #
+	    $osid = nodejailosid(physnodetype($pnode));
+	    $expt_stats{"jailnodes"} += 1;
+	    #
+	    # Set the vname to something useful.
+	    #
+	    $vname = newvhostvname($pnode);
+	    $role  = TBDB_RSRVROLE_VIRTHOST;
+	}
+	fatal(1, "*** $0:\n".
+	         "    No OSID is defined for internal node $vname!")
+	    if (!defined($osid));
 	
-	DBQueryFatal("UPDATE nodes set startstatus=\"none\"," .
-		     " bootstatus=\"unknown\"," .
-		     " ready=0" .
-		     " where node_id=\"$pnode\"");
-
-	#
-	# A local pnode hosting jails. Set the vname to something useful.
-	#
-	$vname = newvhostvname($pnode);
-
-	DBQueryFatal("update reserved set vname='$vname',erole='virthost' " .
-		     "where node_id='$pnode'");
-
-	$expt_stats{"jailnodes"} += 1;
+	DBQueryFatal("UPDATE nodes set ".
+		     " startstatus='none', ".
+		     " bootstatus='unknown', ".
+		     " ready=0 " .
+		     " where node_id='$pnode'");
     }
     else {
 	#
-	# We want to skip nodes that belong to the experiment but aren't
-	# user defined nodes. I.e. delay nodes.
+	# A normal user node. 
 	#
-	if (($cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
-	     $failureaction,$routertype) = $query_result->fetchrow_array()) {
+	my ($cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
+	    $failureaction,$routertype) = virtnodesettings($vnode);
 
-	    # If no OSID defined, then use type-default.
-	    if (defined($virtnodeosids{$vnode})) {
-		$osid = $virtnodeosids{$vnode};
-	    }
-	    else {
-		$osid = $defaultosids{$type};
-	    }
-
-	    DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
-			 " startstatus='none'," .
-			 " bootstatus='unknown'," .
-			 " ready=0," .
-			 " rpms='$rpms'," .
-			 " deltas='$deltas'," .
-			 " tarballs='$tarfiles'," .
-			 " startupcmd='$startupcmd'," .
-			 " failureaction='$failureaction'," .
-			 " routertype='$routertype'" .
-			 " where node_id='$pnode'");
-
-	    DBQueryFatal("update reserved set vname='$vname' " .
-			 "where node_id='$pnode'");
+	# If no OSID defined, then use type-default.
+	if (defined(virtnodeosid($vnode))) {
+	    $osid = virtnodeosid($vnode);
 	}
-	elsif (! defined($lannodes{$p2vmap{$pnode}[0]})) {
-	    # Delay node
-	    $osid = $delayosids{$type};
-	    
-	    DBQueryFatal("UPDATE nodes set startstatus=\"none\"," .
-			 " bootstatus=\"unknown\"," .
-			 " ready=0" .
-			 " where node_id=\"$pnode\"");
-
-	    DBQueryFatal("update reserved set ".
-			 "       vname='$vname',erole='delaynode' " .
-			 "where node_id='$pnode'");
-
-	    $expt_stats{"delaynodes"} += 1;
+	else {
+	    $osid = nodedefaultosid(physnodetype($pnode));
 	}
+	$vname = $vnode;
+	$role  = TBDB_RSRVROLE_NODE;
+
+	DBQueryFatal("UPDATE nodes set ".
+		     " def_boot_cmd_line='$cmdline'," .
+		     " startstatus='none'," .
+		     " bootstatus='unknown'," .
+		     " ready=0," .
+		     " rpms='$rpms'," .
+		     " deltas='$deltas'," .
+		     " tarballs='$tarfiles'," .
+		     " startupcmd='$startupcmd'," .
+		     " failureaction='$failureaction'," .
+		     " routertype='$routertype'" .
+		     " where node_id='$pnode'");
     }
     printdb("reserved vname: $pnode $vname\n");
+
+    #
+    # Set the vname and role.
+    #
+    if (defined($vname) || defined($role)) {
+	my $sets = "";
+
+	$sets .= "vname='$vname' "
+	    if (defined($vname));
+	$sets .= (defined($vname) ? "," : "") . "erole='$role' "
+	    if (defined($role));	
+
+	DBQueryFatal("update reserved set $sets where node_id='$pnode'");
+    }
     
     #
     # Now call os_select.
     #
     if (defined($osid)) {
 	printdb("os_select $osid $pnode\n");
-	system("os_select $osid $pnode");
+	system("os_select $osid $pnode") == 0 or
+	    fatal(1, "*** $0:\n".
+		     "    os_select $osid $pnode failed!\n");
     }
     return 0;
 }
@@ -2680,6 +2077,10 @@ my %porthigh    = ();
 
 sub TBExptSetPortRange {
     my @nodelist = ();
+    my $newlow;
+    my $newhigh;
+    my $lastlow;
+    my $lasthigh;
     
     #
     # See if any virtual nodes. If not, no need to do anything since
@@ -2688,7 +2089,7 @@ sub TBExptSetPortRange {
     foreach my $vnode (keys(%v2pmap)) {
 	my $pnode  = $v2pmap{$vnode};
 
-	if ($isvirtnode{$vnode}) {
+	if (virtnodeisvirt($vnode)) {
 	    push(@nodelist, $pnode);
 	}
 	else {
@@ -2709,11 +2110,6 @@ sub TBExptSetPortRange {
     my $range_result =
 	DBQueryFatal("select low,high from ipport_ranges order by low");
 
-    my $newlow;
-    my $newhigh;
-    my $lastlow;
-    my $lasthigh;
-    
     if (!$range_result->num_rows) {
 	$newlow = TBDB_LOWVPORT;
     }
@@ -2745,10 +2141,12 @@ sub TBExptSetPortRange {
 	return -1;
     }
     $newhigh = $newlow + TBDB_PORTRANGE - 1;
-	
-    DBQueryFatal("insert into ipport_ranges ".
-		 " (pid, eid, low, high) ".
-		 "values ('$pid', '$eid', $newlow, $newhigh)");
+
+    if (! $impotent) {
+	DBQueryFatal("insert into ipport_ranges ".
+		     " (pid, eid, low, high) ".
+		     "values ('$pid', '$eid', $newlow, $newhigh)");
+    }
     DBQueryFatal("unlock tables");
     printdb "Setting ipport range to $newlow,$newhigh\n";
 
@@ -2762,10 +2160,15 @@ sub TBExptSetPortRange {
     foreach my $pnode (@nodelist) {
 	$portnext{$pnode} = $newlow + 10;
 	$porthigh{$pnode} = $newhigh;
-
-	DBQueryFatal("update nodes set ipport_low=$newlow, ".
-		     " ipport_next=ipport_low+1, ipport_high=$newhigh ".
-		     "where node_id='$pnode'");
+    }
+    if (! $impotent) {
+	foreach my $vnode (keys(%v2vmap)) {
+	    my $pnode = $v2vmap{$vnode};
+	
+	    DBQueryFatal("update nodes set ipport_low=$newlow, ".
+			 " ipport_next=ipport_low+1, ipport_high=$newhigh ".
+			 "where node_id='$pnode'");
+	}
     }
     return 0;
 }
@@ -2821,7 +2224,7 @@ sub AddVlan($$$;$)
 	}
 	printdb "  $lan, \[" . join(" ",@{$vlantable{$lan}}) . "\]\n";
     }
-    elsif ($emulated{$lan}) {
+    elsif (virtlanemulated($lan)) {
 	#
 	# Like above, except that in this case, its a bunch of vlinks
 	# sharing a smaller set of physical links. Just mark is differently
@@ -2907,7 +2310,12 @@ sub CheckMaxConcurrent()
     my %counts	= ();
 
     # First get counts of each usage.
-    foreach my $osid (values(%virtnodeosids)) {
+    foreach my $node (keys(%virt_nodes)) {
+	my $osid = virtnodeosid($node);
+
+	next
+	    if (!defined($osid));
+
 	$counts{$osid} = 0
 	    if (!defined($counts{$osid}));
 	$counts{$osid}++;
@@ -2936,7 +2344,7 @@ sub UploadStats()
 
 #
 # Create a new veth interface. This sets up the entire veth slot,
-# including IP and mac.
+# including IP and mac. The veth_id is used in impotent mode only.
 #
 sub NewVethIface($$;$)
 {
@@ -2944,6 +2352,7 @@ sub NewVethIface($$;$)
     my ($vnode) = split(":", $vnodeport);
     my $ip      = $ips{$vnodeport};
     my $vvnode  = "NULL";
+    my $newid;
 
     # Null pport means no phys port.
     if (!defined($pport)) {
@@ -2955,7 +2364,7 @@ sub NewVethIface($$;$)
 
     # Mark as being a jail interface be establishing a connection
     # to the nodes table entry for the virtnode. 
-    if ($isvirtnode{$vnode} && $jailed{$vnode}) {
+    if (virtnodeisjailed($vnode)) {
 	$vvnode = "'$v2vmap{$vnode}'";
     }
 
@@ -2965,15 +2374,23 @@ sub NewVethIface($$;$)
     # 
     my $mac   = sprintf "0000%.2x%.2x%.2x%.2x", split(/\./, $ip);
 
-    #
-    # Insert, and then get the id so we can form the name of the veth device. 
-    # 
-    my $query_result = 
-	DBQueryFatal("insert into veth_interfaces ".
-		     "(node_id, veth_id, mac, IP, iface, vnode_id) ".
-		     "values ('$pnode', 0, '$mac', '$ip', $pport, $vvnode)");
-
-    return "veth" . $query_result->insertid;
+    if ($impotent) {
+	# Make up one; its never used anyplace.
+	$newid = $veth_id++;
+    }
+    else {
+	#
+	# Insert, and then get the id so we can form the name of
+	# the veth device. 
+	#
+	my $query_result = 
+	    DBQueryFatal("insert into veth_interfaces ".
+			 "(node_id, veth_id, mac, IP, iface, vnode_id) ".
+			 "values ('$pnode', 0, '$mac', '$ip', ".
+			 "        $pport, $vvnode)");
+	$newid = $query_result->insertid;
+    }
+    return "veth" . $newid;
 }
 
 #
@@ -2989,12 +2406,12 @@ sub newvhostvname($)
     #
     # First check to see if this pnode was already allocated (update)
     #
-    foreach my $vname (keys(%reserved_pnodes)) {
+    foreach my $vname (keys(%reserved_v2pmap)) {
 	# Skip the v mappings.
 	next
-	    if (exists($reserved_vnodes{$vname}));
+	    if (exists($reserved_v2vmap{$vname}));
 
-	if ($pnode eq $reserved_pnodes{$vname}) {
+	if ($pnode eq $reserved_v2pmap{$vname}) {
 	    return $vname;
 	}
     }
@@ -3003,8 +2420,963 @@ sub newvhostvname($)
 	my $newname = "vhost-" . $virtnode_id;
 	$virtnode_id++;
 
-	if (!defined($reserved_pnodes{$newname})) {
+	if (!defined($reserved_v2pmap{$newname})) {
 	    return $newname;
 	}
     }
+}
+
+#
+# Load up phys info. Not much to it.
+#
+sub LoadPhysInfo()
+{
+    # Interface types. We could get by without this, using the phys_nodes
+    # table info we load later, but for the naming conflicts between some
+    # of the fields in the nodes table and node_types.
+    my $query_result =
+	DBQueryFatal("select * from interface_types");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $type = $rowref->{"type"};
+
+	#
+	# Stash the entire DB row reference.
+	#
+	$interface_types{$type} = $rowref;
+    }
+
+    # Node types table.
+    $query_result =
+	DBQueryFatal("select * from node_types");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $type = $rowref->{"type"};
+
+	#
+	# Stash the entire DB row reference.
+	#
+	$node_types{$type} = $rowref;
+    }
+}
+sub interfacespeed($)	{ return $interface_types{$_[0]}->{"max_speed"}; }
+sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
+sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
+sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
+
+#
+# Load up the virt_nodes info, which includes the type info for each
+# node. Since the user can define vtypes, it is possible that there
+# will not be anything in the node_types table.
+#
+sub LoadVirtNodes()
+{
+    printdb "Loading virt_nodes.\n";
+
+    my $query_result =
+	DBQueryFatal("select distinct vn.*,nt.isremotenode,nt.isvirtnode ".
+		     " from virt_nodes as vn ".
+		     "left join node_types as nt on ".
+		     "     nt.type=vn.type or nt.class=vn.type ".
+		     "where vn.pid='$pid' and vn.eid='$eid' ".
+		     "order by vn.vname");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $vname   = $rowref->{"vname"};
+
+	#
+	# Stash the entire DB row reference into the virt_nodes hash. We will
+	# extend this as needed.
+	#
+	$virt_nodes{$vname} = $rowref;
+
+	# Other fields we need.
+	my $ips     = $rowref->{"ips"};
+	my $type    = $rowref->{"type"};
+	my $fixed   = $rowref->{"fixed"};
+	my $osname  = $rowref->{"osname"};
+	my $isremote= $rowref->{"isremotenode"};
+	my $isvirt  = $rowref->{"isvirtnode"};
+
+	# Extend the DB info with this stuff:
+	# The mapped osname to actual osid. 
+	$rowref->{"__osid"} = undef;
+	# Eventual physical mapping. 
+	$rowref->{"__physnode"} = undef;
+	# Handy to combine these now.
+	$rowref->{"__settings"} = [ $rowref->{"cmd_line"},
+				    $rowref->{"rpms"},
+				    $rowref->{"deltas"},
+				    $rowref->{"startupcmd"},
+				    $rowref->{"tarfiles"},
+				    $rowref->{"failureaction"},
+				    $rowref->{"routertype"} ];
+
+	# Can fixed really get set to ""?
+	if (defined($fixed) && $fixed ne "") {
+	    $fixed_nodes{$vname} = $fixed;
+	}
+
+	# XXX
+	# If its a vtype, there will not be any node_type data. This
+	# can break things, if one were to mix a virt/remote type with
+	# a nonvirt/local type! Need to actually verify the vtypes
+	# for consistency. 
+	#
+	$isremote = 0
+	    if (! defined($isremote));
+	$isvirt   = 0
+	    if (! defined($isvirt));
+
+	printdb "  $vname $type $ips\n";
+	printdb "         isrem:$isremote isvirt:$isvirt ";
+	printdb "fixed:" . (defined($fixed) ? $fixed : "");
+	printdb "\n";
+    
+	# We need to check the names to make sure they do not clash with
+	# our internal delay node names.
+	if (($vname =~ /^tbdelay\d+/) ||
+	    ($vname =~ /^tbsdelay\d+/)) {
+	    print "Warning: $vname is a reserved name. Working around it.\n";
+	    ($num) = ($vname =~ /(\d+)/);
+	    $delayid = $num + 1;
+	}
+
+	# SIM HACK
+	if ($type eq "sim") {
+	    push(@simnodelist, $vname);
+	    $simnode_iplist{$vname} = [];
+	}
+
+	# REMOTE HACK
+	$remotecount++
+	    if ($isremote);
+
+	# VIRT HACK
+	$virtcount++
+	    if ($isvirt);
+
+	# stats
+	my @iplist  = split(" ", $ips);
+	my $ipcount = scalar(@iplist);
+
+	$expt_stats{"maxlinks"} = $ipcount
+	    if ($ipcount > $expt_stats{"maxlinks"});
+	$expt_stats{"minlinks"} = $ipcount
+	    if ($ipcount < $expt_stats{"minlinks"});
+
+	# Take apart the IP list.
+	foreach $ipinfo (@iplist) {
+	    my ($port,$ip) = split(":",$ipinfo);
+	    
+	    $ips{"$vname:$port"} = $ip;
+	    
+	    if ($type eq "sim") {
+		push(@{$simnode_iplist{$vname}}, $ip);
+	    }
+	    $iptonodemap{$ip} = $vname;
+	}
+
+	#
+	# Map the osname to an OSID now so that we can check max_concurrent.
+	# This also avoids the work and *check* later after we have done 90%
+	# of assign_wrapper. If no osname was specified, we have to wait and
+	# use the default for the type of phys node that assign picks.
+	#
+	if (defined($osname) && $osname ne "") {
+	    my $osid;
+
+	    if (! ($osid = TBOSID($pid, $osname)) &&
+		! ($osid = TBOSID(TB_OPSPID, $osname))) {
+		fatal(1, "*** $0:\n".
+		         "    Invalid OS $osname in project $pid!\n");
+	    }
+	    # Stash this in the virt_nodes data structure.
+	    $rowref->{"__osid"}	= $osid;
+	}
+    }
+}
+
+#
+# Helper functions to get virt_node info. Because of internally created
+# nodes (tbdelay, vhost, sim), we need a virtnodeisvnode() test to prevent
+# entries getting stuck into $virt_nodes when calling, say, virtnodeisvirt.
+# Should we create entries for these nodes instead?
+#
+sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
+sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
+sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
+sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
+sub virtnodepnode($)    { return $virt_nodes{$_[0]}->{"__physnode"}; }
+sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
+sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
+sub virtnodeisremote($) {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isremotenode"};
+}
+sub virtnodeisvirt($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isvirtnode"};
+}
+sub virtnodeisjailed($) {
+    return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
+}
+
+#
+# Load up the virt_nodes info, which includes the type info for each
+# node. Since the user can define vtypes, it is possible that there
+# will not be anything in the node_types table.
+#
+sub LoadVirtLans()
+{
+    printdb "Loading virt_lans.\n";
+    
+    my $query_result =
+	DBQueryFatal("select * from virt_lans ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vname,member");
+    
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $vname  = $rowref->{"vname"};
+	my $member = $rowref->{"member"};
+	my ($node, $port) = split(":",$member);
+
+	#
+	# Create a row for this lan, if we have not seen it already.
+	#
+	if (!exists($virt_lans{$vname})) {
+	    my $rec = {};
+	    $rec->{"MEMBERS"}    = {};
+	    $rec->{"MEMBERLIST"} = [];
+	    $rec->{"VNAME"}      = $vname;
+	    $virt_lans{$vname}   = $rec;
+	}
+	$virt_lans{$vname}->{"MEMBERS"}->{$member} = $rowref;
+	# The list of member names for easy access.
+	push(@{$virt_lans{$vname}->{"MEMBERLIST"}}, $member);
+	$memberof{$member} = $vname;
+
+	# Other fields we need below
+	my $delay        = $rowref->{"delay"};
+	my $bandwidth    = $rowref->{"bandwidth"};
+	my $lossrate     = $rowref->{"lossrate"};
+	my $rdelay       = $rowref->{"rdelay"};
+	my $rbandwidth   = $rowref->{"rbandwidth"};
+	my $rlossrate    = $rowref->{"rlossrate"};
+	my $widearea     = $rowref->{"widearea"};
+	my $isemulated   = $rowref->{"emulated"};
+	my $uselinkdelay = $rowref->{"uselinkdelay"};
+	my $nobwshaping  = $rowref->{"nobwshaping"};
+	my $useveth      = $rowref->{"usevethiface"};
+	my $trivial_ok   = $rowref->{"trivial_ok"};
+
+	# Extend the DB info with this stuff:
+	#
+	# If RED, must insert traffic shapping.
+	$virt_lans{$vname}->{"MUSTDELAY"}    = $rowref->{"q_red"};
+	# User has requested the link/lan be emulated. Not typical.
+	$virt_lans{$vname}->{"EMULATED"}     = $isemulated;
+	# User has requested "endnodeshaping" (dummynet on end nodes).
+	$virt_lans{$vname}->{"USELINKDELAY"} = $uselinkdelay;
+        # The nobwshaping flag is used in conjunction with emulated
+        # links to turn off actual bw traffic shaping on an emulated
+        # link. This allows assign to match the specified bws, but not
+        # force them to be such with delay nodes (leaves it up to the
+        # user to moderate the bw).
+	$virt_lans{$vname}->{"NOBWSHAPING"}  = $nobwshaping;
+	# User has requested veth devices. Not typical.
+	$virt_lans{$vname}->{"USEVETH"}      = $useveth;
+	# User has said that colocating is okay. Not typical.
+	$virt_lans{$vname}->{"TRIVIAL_OK"}   = $trivial_ok;
+	# Link is connected to a remote node, and gets a tunnel.
+	$virt_lans{$vname}->{"TUNNEL"}       = 0;
+
+	#
+	# REMOTE VIRTNODE HACK: 
+	#
+	# If its a duplex link involving a remotenode, skip it. 
+	# We do not want to have assign deal with these. The nodes are
+	# allocated as unconnected by another program, and we deal with
+	# it later by creating tunnels between the nodes in the links.
+	# 
+	if ($widearea) {
+	    #
+	    # If the user requested that no tunnels be created, do not bother
+	    # with this. wanassign stills does the right thing, but we do not
+	    # set up the tunnels (see below). 
+	    #
+	    if ($usewatunnels) {
+		$virt_lans{$vname}->{"TUNNEL"} = 1;
+		printdb "    Added $member to tunnels of $vname\n";
+	    }
+	    $expt_stats{"walinks"} += 1;
+	    next;
+	}
+
+	# Store this stuff as a unit to make it easier to grab later.
+	$virt_lans{$vname}->{"DELAYINFO"}->{$member} =
+	    [ $delay,
+	      $bandwidth,
+	      $lossrate,
+	      $rdelay,
+	      $rbandwidth,
+	      $rlossrate ];
+
+	#
+	# Ditto for the Q stuff, which is not needed until the delay
+	# links are created. There are no "r" params either; Queue
+	# stuff is handled in just the to-switch direction.
+	#
+	$virt_lans{$vname}->{"QUEUEINFO"}->{$member} =
+	    [ $rowref->{"q_limit"},
+	      $rowref->{"q_maxthresh"},
+	      $rowref->{"q_minthresh"},
+	      $rowref->{"q_weight"},
+	      $rowref->{"q_linterm"},
+	      $rowref->{"q_qinbytes"},
+	      $rowref->{"q_bytes"},
+	      $rowref->{"q_meanpsize"},
+	      $rowref->{"q_wait"},
+	      $rowref->{"q_setbit"},
+	      $rowref->{"q_droptail"},
+	      $rowref->{"q_red"},
+	      $rowref->{"q_gentle"} ];
+
+	#
+	# XXX - Whenever a delay node is inserted, port speeds are set to
+	#       100Mbs, even if they requested exactly 10Mbs. This is a
+	#       simplification. At some point we might want to force all the
+	#       ports along the way to 10Mbs, and have the delay node worry
+	#       about delay only, and not bandwidth. That will be harder to
+	#       to do in this mess. See companion XXX below where the delays
+	#       table is initialized. Initially, we set the speed to 10Mbs,
+	#       if a delay node is insterted below, it resets this to 100Mbs.
+	# 
+	if ($bandwidth == $S10Kbs && $delaywithswitch) {
+	    $portbw{$member} = $S10Mbs;
+	} else {
+	    $portbw{$member} = $S100Mbs;
+	}
+	
+	printdb "  portbw of $member = $portbw{$member}\n";
+	printdb "  $vname $member - $delay $bandwidth $lossrate ".
+	    "$rdelay $rbandwidth $rlossrate\n";
+	printdb "   $port:$vname is a lan of $node\n";
+    }
+
+    #
+    # Check event list. Anytime we find an event to control a link, we need
+    # to drop a delay node in. start/stop especially, since thats the easiest
+    # way to do that, even if the link has no other traffic shaping in it. 
+    # 
+    printdb "Checking events for LINK commands.\n";
+    $result =
+	DBQueryFatal("select distinct vname from eventlist as ex ".
+		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
+		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
+		 "where ot.type='LINK' and ex.pid='$pid' and ex.eid='$eid'");
+    while (($vname) = $result->fetchrow_array) {
+	$virt_lans{$vname}->{"MUSTDELAY"} = 1;
+    }
+}
+sub virtlanname($)	{ return $virt_lans{$_[0]}->{"VNAME"}; }
+sub virtlanmembers($)	{ return @{$virt_lans{$_[0]}->{"MEMBERLIST"}}; }
+sub virtlanmustdelay($)	{ return $virt_lans{$_[0]}->{"MUSTDELAY"}; }
+sub virtlanemulated($)	{ return $virt_lans{$_[0]}->{"ISEMULATED"}; }
+sub virtlanlinkdelay($) { return $virt_lans{$_[0]}->{"USELINKDELAY"}; }
+sub virtlannobwshape($)	{ return $virt_lans{$_[0]}->{"NOBWSHAPING"}; }
+sub virtlantrivok($)	{ return $virt_lans{$_[0]}->{"TRIVIAL_OK"}; }
+sub virtlanuseveth($)	{ return $virt_lans{$_[0]}->{"USEVETH"}; }
+sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
+sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
+sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
+
+#
+# Ditto for virt_vtypes.
+#
+sub LoadVirtTypes()
+{
+    printdb "Loading virt_vtypes.\n";
+    
+    my $query_result =
+	DBQueryFatal("select * from virt_vtypes " .
+		     "where pid='$pid' and eid='$eid'");
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $typename = $rowref->{"name"};
+
+	#
+	# Stash the entire DB row reference. We will extend this as
+	# needed.
+	#
+	$virt_vtypes{$typename} = $rowref;
+    }
+}
+sub virttypename($)	{ return $virt_vtypes{$_[0]}->{"name"}; }
+sub virttypeweight($)	{ return $virt_vtypes{$_[0]}->{"weight"}; }
+sub virttypemembers($)	{ return $virt_vtypes{$_[0]}->{"members"}; }
+
+#
+# Load the experiment and the virtual topology.
+# 
+sub LoadExperiment()
+{
+    # Load experiment settings.
+    my $query_result =
+	DBQueryFatal("select uselinkdelays,forcelinkdelays,".
+		     "       multiplex_factor,usewatunnels ".
+		     " from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    
+    my ($o1,$o2,$o3,$o4) = $query_result->fetchrow_array();
+
+    # Do not override settings if already defined above. 
+    $uselinkdelays = $o1
+	if (!defined($uselinkdelays));
+    $forcelinkdelays = $o2
+	if (!defined($forcelinkdelays));
+    $multiplex_factor = $o3
+	if (!defined($multiplex_factor));
+    $usewatunnels = $o4
+	if (!defined($usewatunnels));
+    
+    LoadVirtTypes();
+    LoadVirtNodes();
+    LoadVirtLans();
+
+    # Stats
+    $expt_stats{"vnodes"}   = $virtcount;
+    $expt_stats{"wanodes"}  = $remotecount;
+    $expt_stats{"simnodes"} = scalar(@simnodelist);
+}
+
+#
+# Create the TOP file.
+#
+sub CreateTopFile()
+{
+    my $physnode_count = 0;
+    my $virtnode_count = 0;
+    
+    # Open the TOP file
+    open(TOPFILE,"> $topfile") or
+	fatal(65, "*** $0:\n".
+	          "    Could not open $topfile.\n");
+
+    # Print out vtypes
+    foreach my $vtype (keys(%virt_vtypes)) {
+	my $name   = virttypename($vtype);
+	my $weight = virttypeweight($vtype);
+	my $members= virttypemembers($vtype);
+	
+	print TOPFILE "make-vclass $name $weight $members\n";
+    }
+
+    # Dump the node list to the topfile. 
+    foreach my $node (keys(%virt_nodes)) {
+	my $vname = virtnodename($node);
+	my $type  = virtnodetype($node);
+
+	if (!virtnodeisremote($vname)) {
+	    print TOPFILE "node $vname $type\n";
+	    if (virtnodeisvirt($vname)) {
+		$virtnode_count++;
+	    }
+	    else {
+		$physnode_count++;
+	    }
+	}
+    }
+
+    foreach $lan (keys(%virt_lans)) {
+	@members = virtlanmembers($lan);
+	printdb "$lan - " . join(" ",@members) . "\n";
+	# Shark hack for rvr
+	$sharks = 0;
+	$nonsharks = 0;
+	$simnodes = 0;
+	$realnodes = 0;
+	$virtnodes = 0;
+	my $emulated = virtlanemulated($lan);
+	my $uselinkdelay = virtlanlinkdelay($lan);
+	my $mustdelay = virtlanmustdelay($lan);
+	my $nobwshaping = virtlannobwshape($lan);
+	$trivial_ok = 0;
+	foreach $member (@members) {
+	    ($node) = (split(":",$member))[0];
+	    if (virtnodetype($node) eq "shark-shelf") {
+		$sharks++;
+	    } elsif (virtnodetype($node) eq "sim") {
+		$simnodes++;
+		$simnodelans{$lan} = 1;
+	    } else {
+		# We always use an emulated link when its a
+		# virtnode. An emulated link can use a trivial link
+		# too, if the user wanted it.
+		if (virtnodeisvirt($node)) {
+		    $virtnodes++;
+		    $emulated = 1;
+		    $virt_lans{$lan}->{"EMULATED"} = 1;
+		    $trivial_ok = virtlantrivok($lan);
+		    #
+		    # An emulated link/lan between containing any
+		    # virtnodes always uses veth devices. Note that remote
+		    # virtual nodes never go through this path cause they
+		    # get tunnels, so its only local virtual nodes. 
+		    #
+		    $virt_lans{$lan}->{"USEVETH"} = 1
+			if (virtnodeisvirt($node));
+		}
+		$nonsharks++;
+		$realnodes++;
+	    }
+	}
+	if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
+	    $trivial_ok = 1;
+	}
+	if ($#members == 1) {
+	    $expt_stats{"links"} += 1;
+	    ($nodeport0,$nodeport1) = @members;
+	    $node0 = (split(":",$nodeport0))[0];
+	    $node1 = (split(":",$nodeport1))[0];
+	    ($delay0,$bw0,$loss0,
+	     $rdelay0,$rbw0,$rloss0) = virtlandelayinfo($lan, $nodeport0);
+	    ($delay1,$bw1,$loss1,
+	     $rdelay1,$rbw1,$rloss1) = virtlandelayinfo($lan, $nodeport1);
+	    # Here the r's aregoing to be 1->0 and the others 0->1
+	    $delay = $delay0+$rdelay1;
+	    $loss = 1-(1-$loss0)*(1-$rloss1);
+	    $bw = &min($bw0,$rbw1);
+	    $rdelay = $rdelay0+$delay1;
+	    $rloss = 1-(1-$rloss0)*(1-$loss1);
+	    $rbw = &min($rbw0,$bw1);
+	    $bandwidth = &getbandwidth(&min($bw0,$rbw1));
+	    $rbandwidth = &getbandwidth(&min($rbw0,$bw1));
+	    if (((($delay >= $delaythresh) ||
+		  (!$nobwshaping &&
+		   ((($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
+		    (($delaywithswitch == 0) && 
+		     (($bw != $S100Kbs) &&
+		      (($sharks == 0) || ($nonsharks > 1)))))) || 
+		  ($loss != 0)) ||
+		 (($rdelay >= $delaythresh) ||
+		  (!$nobwshaping &&
+		   ((($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
+		    (($delaywithswitch == 0) && !$nobwshaping &&
+		     (($rbw != $S100Kbs) &&
+		      (($sharks == 0) || ($nonsharks > 1)))))) || 
+		  ($rloss != 0)) ||
+		 # Link must be shaped for other reasons (q_red).
+		 $mustdelay ||
+		 # Global force, or per-link force. 
+		 $forcelinkdelays || $uselinkdelay) &&
+		# XXX simulated nodes hack. We don't want to put delay nodes
+		# between simulated nodes. If there is a link between a
+		# simulated and a real node, we might need to put in delay
+		# nodes
+		($realnodes != 0)) {
+		$expt_stats{"shapedlinks"} += 1;
+		#
+		# We use a linkdelay if the link is emulated, globally forced,
+		# globally preferred if the link is shaped, or if the per-link
+		# flag was set (which means to put in a link delay regardless
+		# of whether the link is shaped).
+		#
+		if ($emulated ||
+		    $forcelinkdelays || $uselinkdelays || $uselinkdelay) {
+		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
+		    
+		    print(TOPFILE "link $plink $node0 $node1 ".
+			  max($bw,$rbw) . " 0 0" .
+			  ($emulated ? " emulated" : "") .
+			  ($trivial_ok ? " trivial_ok\n" : "\n"));
+
+		    #
+		    # We allow users to oversubscribe by letting them turn
+		    # off the bandwidth shaping. If however, the link was
+		    # shaped for some other reason (like a delay), then
+		    # turn off just the bw shaping part by setting them to 0.
+		    # This is special; means no limits in ipfw.
+		    #
+		    if ($nobwshaping) {
+			$bw = $rbw = 0;
+		    }
+		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
+					   $nodeport1,$rdelay,$rbw,$rloss];
+		    
+		    printdb "Delay link $plink = " . 
+			join(" ",@{$delaylinks{$plink}}) . "\n";
+		}
+		else {
+		    my $delayname = "tbsdelay" . $delayid++;
+		    my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
+		    
+		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
+					   $nodeport1,$rdelay,$rbw,$rloss];
+
+		    print TOPFILE "node $delayname delay\n";
+		    print TOPFILE
+			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
+			"$node0 $delayname $bandwidth 0 0\n";
+		    print TOPFILE
+			"link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
+			"$node1 $delayname $bandwidth 0 0\n";
+
+		    $delaynodes{$delayname} = $delayname;
+		    
+		    printdb "Delay node $plink ($delayname) = " . 
+			join(" ",@{$delaylinks{$plink}}) . "\n";
+		}
+		#
+		# Ports are set to 100Mbs when a link gets a delay node.
+		# This can override initialization above cause we could not
+		# tell earlier if the link was going to get a real delay node
+		# or just a delaywithswitch.
+		#
+		$portbw{$nodeport0} = $S100Mbs;	    
+		$portbw{$nodeport1} = $S100Mbs;	    
+	    } else {
+		print TOPFILE "link linksimple/$lan/$nodeport0,$nodeport1 ".
+		    "$node0 $node1";
+		if ($emulated) {
+		    print TOPFILE " " . max($bw,$rbw) . " 0 0 emulated";
+		}
+		else {
+		    print TOPFILE " $bandwidth 0 0";
+		}
+		if ($trivial_ok) {
+		    print TOPFILE " trivial_ok";
+		}
+		print TOPFILE "\n";
+	    }
+	} elsif ($#members != 0) {
+	    print TOPFILE "node lan/$lan lan\n";
+	    $expt_stats{"lans"} += 1;
+	    $lannodes{"lan/$lan"} = 1;
+	    foreach $member (@members) {
+		($delay,$bw,$loss,
+		 $rdelay,$rbw,$rloss) = virtlandelayinfo($lan, $member);
+		$bandwidth = &getbandwidth($bw);
+		$rbandwidth = &getbandwidth($rbw);
+		($node) = (split(":",$member))[0];
+                # XXX The expression below should be modified for
+                # better bandwidth support.  Probably needs to happen
+                # post assign somehow.
+		if (((($delay >= $delaythresh) ||
+		      (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
+		      (($delaywithswitch == 0) && 
+		       (($bw != $S100Kbs) && (($sharks == 0) ||
+					      ($nonsharks > 1)))) ||
+		      ($loss != 0)) || 
+		     (($rdelay >= $delaythresh) ||
+		      (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
+		      (($delaywithswitch == 0) && 
+		       (($rbw != $S100Kbs) && (($sharks == 0) ||
+					       ($nonsharks > 1)))) ||
+		      ($rloss != 0)) ||
+		     # Link must be shaped for other reasons (q_red).
+		     $mustdelay ||
+		     # Global force, or per-lan force. 
+		     $forcelinkdelays || $uselinkdelay) &&
+		    # if we have 1 real node in the LAN, we may need to create
+		    # a lan
+		    ($realnodes != 0)) {
+		    $expt_stats{"shapedlans"} += 1;
+		    #
+		    # We use a linkdelay if the link is emulated,
+		    # globally forced, globally preferred if the link
+		    # is shaped, or if the per-link flag was set
+		    # (which means to put in a link delay regardless
+		    # of whether the link is shaped).
+		    #
+		    if ($emulated ||
+			$forcelinkdelays || $uselinkdelays || $uselinkdelay) {
+			my $plink = "linklan/$lan/$member";
+			
+			$delaylinks{$plink} =
+			    [$member,$delay,$bw,$loss,
+			     $member,$rdelay,$rbw,$rloss];
+
+			print(TOPFILE "link $plink $node lan/$lan " .
+			      max($bw,$rbw) . " 0 0" .
+			      ($emulated ? " emulated" : "") .
+			      ($trivial_ok ? " trivial_ok\n" : "\n"));
+
+			printdb "Delay link $plink = " .
+			    join(" ", @{$delaylinks{$plink}}) . "\n";
+		    }
+		    else {
+			my $delayname = "tbdelay" . $delayid++;
+			my $plink     = "linkdelaysrc/$lan/$member";
+
+			$delaylinks{$plink} =
+			    [$member,$delay,$bw,$loss,
+			     $member,$rdelay,$rbw,$rloss];
+			
+			print TOPFILE "node $delayname delay\n";
+			print TOPFILE "link linkdelaysrc/$lan/$member" .
+			    " $node $delayname $bandwidth 0 0\n";
+			print TOPFILE "link linkdelaydst/$lan/$member" .
+			    " lan/$lan $delayname $bandwidth 0 0\n";
+			
+			$delaynodes{$delayname} = $delayname;
+
+			printdb "Delay node $plink ($delayname) = " .
+			    join(" ", @{$delaylinks{$plink}}) . "\n";
+		    }
+		    #
+		    # Port is set to 100Mbs when the link gets a delay
+		    # node.  This can override initialization above
+		    # cause we could not tell earlier if the link was
+		    # going to get a real delay node or just a
+		    # delaywithswitch.
+		    #
+		    $portbw{$member} = $S100Mbs;	    
+		} else {
+		    print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
+			" $bandwidth 0 0";
+		    if ($emulated) {
+			print TOPFILE " emulated";
+		    }
+		    if ($trivial_ok) {
+			print TOPFILE " trivial_ok";
+		    }
+		    print TOPFILE "\n";
+		}
+	    }
+	}
+	# If a LAN has only one member we don't do anything.
+    }
+
+    # XXX NSE hack
+    #
+    # Will find a free randomly chosen pc850 and fix sim nodes to it
+    # Assign's scoring needs to be fixed so that the solution has
+    # as many sim nodes on a phy node as possible while maxing out
+    # its interfaces. Currently having sim:N where N is a large
+    # number in the ptop file does not guarantee that all these
+    # get mapped to a single phy node even when that mapping has no
+    # violations and a low score. distributed nse will fix this
+    #
+    if (scalar(@simnodelist)) {
+	my $fixednode;
+	my $type;
+	
+	open(AVAIL,"$TBROOT/sbin/avail type=pc rand |")
+	    or fatal(65, "*** $0:\n".
+		         "    Failed to start avail for NSE");
+
+	while (<AVAIL>) {
+	    if (! /^\|/) {next};
+	    if (/node_id/) {next;}
+	    ($fixednode,$type) =
+		/^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;    
+	    last;
+	}
+	close(AVAIL);
+  
+	if (!defined($fixednode)) {
+	    fatal(65, "*** $0:\n".
+		      "    Insufficient PCs available.");
+	}
+
+	foreach $simnode (@simnodelist) {
+	    print TOPFILE "fix-node $simnode $fixednode\n";
+	}
+    }
+
+    #
+    # Print out fixed nodes.  But _not_ nodes which aren't in the
+    # experiment any more.
+    # NB: This must be done last since we create internal nodes above.
+    #
+    foreach my $node (keys(%fixed_nodes)) {
+	if (!virtnodeisremote($node) &&
+	    (virtnodeisvnode($node) || exists $delaynodes{$node})) {
+	    my $pnode = $fixed_nodes{$node};
+
+	    print TOPFILE "fix-node $node $pnode\n";
+	}
+    }
+
+    close(TOPFILE);
+
+    # Set estimations
+    $minimum_nodes = $physnode_count + keys(%delaynodes)/$DELAYCAPACITY;
+    $maximum_nodes = $physnode_count + keys(%delaynodes);
+
+    if (! $impotent) {
+	DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
+		     "                       minimum_nodes=$minimum_nodes ".
+		     "where pid='$pid' and eid='$eid'");
+    }
+
+    print "Minimum nodes   = $minimum_nodes\n";
+    print "Maximum nodes   = $maximum_nodes\n";
+    if ($virtnode_count) {
+	print "Virtual nodes   = $virtnode_count\n";
+    }
+}
+
+#
+# Load the phys resources. These are the entries from the nodes table,
+# plus a few other items from the node_types table. We stash pointers
+# from the virt_nodes table to these entries for easy access. I think
+# this data structure should be defined outside this module, as more
+# generally usable.
+#
+sub LoadPhysNode($)
+{
+    my ($pnode) = @_;
+    
+    if (! exists($phys_nodes{$pnode})) {
+	my $query_result =
+	    DBQueryFatal("select n.*,nt.* from nodes as n ".
+			 "left join node_types as nt on nt.type=n.type ".
+			 "where n.node_id='$pnode'");
+
+	fatal(1, "*** $0:\n".
+		 "    No such pnode $pnode in nodes table")
+	    if (!$query_result->num_rows);
+
+	my $rowref = $query_result->fetchrow_hashref();
+
+	#
+	# Stash the entire DB row reference. 
+	#
+	$phys_nodes{$pnode} = $rowref;
+
+	#
+	# Pnodes start in "reboot" state.
+	#
+	$rowref->{"__reuse"} = "reboot";
+	$rowref->{"__pipeno"} = "100";
+    }
+    return $phys_nodes{$pnode};
+}
+
+sub LoadPhysResources()
+{
+    foreach my $pnode (keys(%p2vmap)) {
+	my @vnodes = @{$p2vmap{$pnode}};
+
+	# Load the physical node. 
+	LoadPhysNode($pnode);
+
+	#
+	# Typically, its one-to-one, unless its a physnode hosting
+	# virtnodes, in which case the mapping is one-to-many.
+	#
+	# XXX What about sim nodes?
+	#
+	foreach my $vnode (@vnodes) {
+	    #
+	    # Open question: Nodes that we create in assign_wrapper, like
+	    # delays nodes (tbdelayXX) and jail hosts (vhost-XX) do not have
+	    # entries in the virt_nodes table. Should we form one, so that we
+	    # can refer to all nodes consistently?
+	    #
+	    next
+		if (!virtnodeisvnode($vnode));
+	    
+	    #
+	    # The vnode is plain (not virtual).
+	    #
+	    if (!virtnodeisvirt($vnode)) {
+		virtnodesetpnode($vnode, $pnode);
+		physnodesetvnode($pnode, $vnode);
+		next;
+	    }
+	    my $vpnode = $v2vmap{$vnode};
+
+	    #
+	    # Its a virtual node, so the phys node is really another
+	    # virtual node, and its physnode is ...
+	    #
+	    LoadPhysNode($vpnode);
+		
+	    virtnodesetpnode($vnode, $vpnode);
+	    physnodesetvnode($vpnode, $vnode);
+	}
+    }
+}
+sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
+sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
+sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailflag"}; }
+sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{"phys_nodeid"}; }
+sub physnodecontrolnet($){ return $phys_nodes{$_[0]}->{"control_net"}; }
+sub physnodetype($)      { return $phys_nodes{$_[0]}->{"type"}; }
+sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
+sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
+sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
+sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
+sub physnodenextpipe($)  {
+    my $pipeno = $phys_nodes{$_[0]}->{"__pipeno"} += 10;
+
+    fatal(1, "*** $0:\n".
+	     "    Too many ipfw pipes on node $pnode!")
+	if ($pipeno >= 65535);
+    
+    return $pipeno;
+}
+
+#
+# Load current resources. We pull in the phys node entries now.
+# 
+sub LoadCurrent()
+{
+    my $reserved_pcount  = 0;
+    my $reserved_vcount  = 0;
+
+    printdb "Fixing previously allocated nodes.\n";
+    
+    my $query_result = 
+	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid, ".
+		     "       nt.isvirtnode,nt.isremotenode ".
+		     " from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "where r.pid='$pid' and r.eid='$eid'");
+    
+    while (($vname,$reserved,$physnode,$isvirt,$isremote) =
+	   $query_result->fetchrow_array) {
+
+	#
+	# WIDEAREA nodes are going to break. Hmm, so are "sim" nodes.
+	#
+	fatal(1, "*** $0:\n".
+		 "    Cannot update widearea nodes yet!")
+	    if ($isremote);
+	
+	LoadPhysNode($reserved);
+	
+	#
+	# If a virtnode, we need the underlying physnode, since thats
+	# what we fix it to. But we still need to remember which virtnodes
+	# are allocated for later.
+	#
+	if ($isvirt) {
+	    LoadPhysNode($physnode);
+	    physnodesetreuse($reserved, "unused");
+	    physnodesetreuse($physnode, "unused");
+	    $reserved_v2vmap{$vname} = $reserved;
+	    $reserved_v2pmap{$vname} = $physnode;
+
+	    # Allow for the user to "move" a node. Yuck!
+	    $fixed_nodes{$vname} = $physnode
+		if (!defined($fixed_nodes{$vname}));
+	    $reserved_vcount++;
+	}
+	else {
+	    $reserved_v2pmap{$vname} = $reserved;
+	    physnodesetreuse($reserved, "unused");
+	    
+	    # Allow for the user to "move" a node. Yuck!
+	    $fixed_nodes{$vname} = $reserved
+		if (!defined($fixed_nodes{$vname}));
+	    $reserved_pcount++;
+	}
+    }
+    print "Reserved pnodes = $reserved_pcount\n"
+	if ($reserved_pcount);
+    print "Reserved vnodes = $reserved_vcount\n"
+	if ($reserved_vcount);
 }
