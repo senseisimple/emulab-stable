@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -454,7 +454,7 @@ sub reboot()
     kill('TERM', -$pgrp);
     print "Waiting 10 seconds for process group to die off ...\n";
     sleep(10);
-    $SIG{TERM} = '\&handler';
+    $SIG{TERM} = \&handler;
 }
 
 #
