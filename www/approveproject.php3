@@ -40,6 +40,17 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 $headuid = $row[0];
 
 #
+# If the user wanted to change the head uid, do that now (we change both
+# the head_uid and the leader of the default project)
+#
+if (isset($head_uid) && strcmp($head_uid,"")) {
+    $headuid = $head_uid;
+    DBQueryFatal("UPDATE projects set head_uid='$headuid' where pid='$pid'");
+    DBQueryFatal("UPDATE groups set leader='$headuid' where pid='$pid' and " .
+	    "gid='$pid'");
+}
+
+#
 # Get the current status for the headuid, which we might need to change
 # anyway, and to verify that the user is a valid user. We also need
 # the email address to let the user know what happened.

@@ -110,6 +110,27 @@ echo "<tr>
        </tr>\n";
 
 #
+# Allow the approver to change the project's head UID - gotta find everyone in
+# the default group, first
+#
+echo "<tr>
+          <td align=center>
+	      Head UID:
+              <select name=head_uid>
+                      <option value=''>(Unchanged)</option>";
+$query_result =
+    DBQueryFatal("select uid from group_membership where pid='$pid' and " .
+	    "gid='$pid'");
+while ($row = mysql_fetch_array($query_result)) {
+    $thisuid = $row[uid];
+    echo "                      <option value='$thisuid'>$thisuid</option>\n";
+}
+echo "        </select>
+          </td>
+       </tr>\n";
+
+
+#
 # XXX
 # Temporary Plab hack.
 # See if remote nodes requested and put up checkboxes to allow override.
