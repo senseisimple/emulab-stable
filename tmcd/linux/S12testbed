@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# testbed       Do some testbed stuff,
+#
+# description: Installs deltas and reboots.
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+if [ ! -f /etc/sysconfig/network ]; then
+    exit 0
+fi
+
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ ${NETWORKING} = "no" ] && exit 0
+
+RETVAL=0
+
+# See how we were called.
+case "$1" in
+  start)
+	if [ -r /etc/rc.d/testbed/rc.delta ]; then
+		echo "Doing Testbed Delta Thing ..."
+		/etc/rc.d/testbed/rc.delta
+		RETVAL=$?
+	fi
+	;;
+  stop)
+	echo "Done"
+	;;
+  status)
+	echo "Peachy"
+	;;
+  restart)
+	echo "Done"
+	;;
+  reload)
+	echo "Done"
+	;;
+  *)
+	echo "Usage: testbed {start|stop|restart|reload|status}"
+	exit 1
+esac
+
+exit $RETVAL
