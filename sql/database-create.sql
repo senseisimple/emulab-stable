@@ -35,7 +35,7 @@ CREATE TABLE comments (
 --
 
 CREATE TABLE current_reloads (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   image_id varchar(45) NOT NULL default '',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
@@ -45,7 +45,7 @@ CREATE TABLE current_reloads (
 --
 
 CREATE TABLE delays (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   pipe0 smallint(5) unsigned NOT NULL default '0',
   delay0 float(10,2) NOT NULL default '0.00',
   bandwidth0 int(10) unsigned NOT NULL default '100',
@@ -98,7 +98,7 @@ CREATE TABLE delays (
 --
 
 CREATE TABLE delta_inst (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   partition tinyint(4) NOT NULL default '0',
   delta_id varchar(10) NOT NULL default '',
   PRIMARY KEY  (node_id,partition,delta_id)
@@ -392,7 +392,7 @@ CREATE TABLE groups (
 --
 
 CREATE TABLE iface_counters (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   tstamp datetime NOT NULL default '0000-00-00 00:00:00',
   mac varchar(12) NOT NULL default '0',
   ipkts int(11) NOT NULL default '0',
@@ -455,7 +455,7 @@ CREATE TABLE interface_types (
 --
 
 CREATE TABLE interfaces (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   card tinyint(3) unsigned NOT NULL default '0',
   port tinyint(3) unsigned NOT NULL default '0',
   mac varchar(12) NOT NULL default '000000000000',
@@ -503,7 +503,7 @@ CREATE TABLE ipsubnets (
 --
 
 CREATE TABLE last_reservation (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   PRIMARY KEY  (node_id,pid)
 ) TYPE=MyISAM;
@@ -513,7 +513,7 @@ CREATE TABLE last_reservation (
 --
 
 CREATE TABLE linkdelays (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   iface varchar(8) NOT NULL default '',
   ip varchar(15) NOT NULL default '',
   netmask varchar(15) NOT NULL default '255.255.255.0',
@@ -603,7 +603,7 @@ CREATE TABLE new_interfaces (
   card int(11) NOT NULL default '0',
   mac varchar(12) NOT NULL default '',
   interface_type varchar(15) default NULL,
-  switch_id varchar(10) default NULL,
+  switch_id varchar(32) default NULL,
   switch_card tinyint(3) default NULL,
   switch_port tinyint(3) default NULL,
   cable smallint(6) default NULL,
@@ -617,7 +617,7 @@ CREATE TABLE new_interfaces (
 
 CREATE TABLE new_nodes (
   new_node_id int(11) NOT NULL auto_increment,
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   type varchar(30) default NULL,
   IP varchar(15) default NULL,
   temporary_IP varchar(15) default NULL,
@@ -631,7 +631,7 @@ CREATE TABLE new_nodes (
 --
 
 CREATE TABLE newdelays (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   pipe0 smallint(5) unsigned NOT NULL default '0',
   delay0 int(10) unsigned NOT NULL default '0',
   bandwidth0 int(10) unsigned NOT NULL default '100',
@@ -655,7 +655,7 @@ CREATE TABLE newdelays (
 --
 
 CREATE TABLE next_reserve (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   PRIMARY KEY  (node_id)
@@ -677,7 +677,7 @@ CREATE TABLE nextfreenode (
 --
 
 CREATE TABLE node_activity (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   last_tty_act datetime NOT NULL default '0000-00-00 00:00:00',
   last_net_act datetime NOT NULL default '0000-00-00 00:00:00',
   last_cpu_act datetime NOT NULL default '0000-00-00 00:00:00',
@@ -691,7 +691,7 @@ CREATE TABLE node_activity (
 --
 
 CREATE TABLE node_auxtypes (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   type varchar(30) NOT NULL default '',
   count int(11) default '1',
   PRIMARY KEY  (node_id,type)
@@ -702,7 +702,7 @@ CREATE TABLE node_auxtypes (
 --
 
 CREATE TABLE node_features (
-  node_id varchar(30) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   feature varchar(30) NOT NULL default '',
   weight float NOT NULL default '0',
   PRIMARY KEY  (node_id,feature)
@@ -713,7 +713,7 @@ CREATE TABLE node_features (
 --
 
 CREATE TABLE node_idlestats (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   tstamp datetime NOT NULL default '0000-00-00 00:00:00',
   last_tty datetime NOT NULL default '0000-00-00 00:00:00',
   load_1min float NOT NULL default '0',
@@ -727,7 +727,7 @@ CREATE TABLE node_idlestats (
 --
 
 CREATE TABLE node_rusage (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   load_1min float NOT NULL default '0',
   load_5min float NOT NULL default '0',
   load_15min float NOT NULL default '0',
@@ -741,7 +741,7 @@ CREATE TABLE node_rusage (
 --
 
 CREATE TABLE node_status (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   status enum('up','possibly down','down','unpingable') default NULL,
   status_timestamp datetime default NULL,
   PRIMARY KEY  (node_id)
@@ -806,7 +806,7 @@ CREATE TABLE node_types_auxtypes (
 --
 
 CREATE TABLE nodeipportnum (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   port smallint(5) unsigned NOT NULL default '11000',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
@@ -816,7 +816,7 @@ CREATE TABLE nodeipportnum (
 --
 
 CREATE TABLE nodelog (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   log_id smallint(5) unsigned NOT NULL auto_increment,
   type enum('misc') NOT NULL default 'misc',
   reporting_uid varchar(8) NOT NULL default '',
@@ -830,9 +830,9 @@ CREATE TABLE nodelog (
 --
 
 CREATE TABLE nodes (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   type varchar(30) NOT NULL default '',
-  phys_nodeid varchar(10) default NULL,
+  phys_nodeid varchar(32) default NULL,
   role enum('testnode','virtnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
   def_boot_osid varchar(35) NOT NULL default '',
   def_boot_path text,
@@ -898,7 +898,7 @@ CREATE TABLE nodetypeXpid_permissions (
 --
 
 CREATE TABLE nodeuidlastlogin (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   uid varchar(10) NOT NULL default '',
   date date default NULL,
   time time default NULL,
@@ -942,7 +942,7 @@ CREATE TABLE nsfiles (
 --
 
 CREATE TABLE ntpinfo (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   IP varchar(64) NOT NULL default '',
   type enum('server','peer') NOT NULL default 'peer',
   PRIMARY KEY  (node_id,IP,type)
@@ -994,8 +994,8 @@ CREATE TABLE osidtoimageid (
 --
 
 CREATE TABLE outlets (
-  node_id varchar(10) NOT NULL default '',
-  power_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
+  power_id varchar(32) NOT NULL default '',
   outlet tinyint(1) unsigned NOT NULL default '0',
   last_power timestamp(14) NOT NULL,
   PRIMARY KEY  (node_id)
@@ -1006,7 +1006,7 @@ CREATE TABLE outlets (
 --
 
 CREATE TABLE partitions (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   partition tinyint(4) NOT NULL default '0',
   osid varchar(35) default NULL,
   PRIMARY KEY  (node_id,partition)
@@ -1020,7 +1020,7 @@ CREATE TABLE plab_slice_nodes (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   slicename varchar(64) NOT NULL default '',
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   leaseend datetime default NULL,
   nodemeta text,
   PRIMARY KEY  (node_id)
@@ -1043,7 +1043,7 @@ CREATE TABLE plab_slices (
 --
 
 CREATE TABLE port_counters (
-  node_id char(10) NOT NULL default '',
+  node_id char(32) NOT NULL default '',
   card tinyint(3) unsigned NOT NULL default '0',
   port tinyint(3) unsigned NOT NULL default '0',
   ifInOctets int(10) unsigned NOT NULL default '0',
@@ -1151,7 +1151,7 @@ CREATE TABLE projects (
 --
 
 CREATE TABLE reserved (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   rsrv_time timestamp(14) NOT NULL,
@@ -1170,7 +1170,7 @@ CREATE TABLE reserved (
 --
 
 CREATE TABLE scheduled_reloads (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   image_id varchar(45) NOT NULL default '',
   reload_type enum('netdisk','frisbee') default NULL,
   PRIMARY KEY  (node_id)
@@ -1217,7 +1217,7 @@ CREATE TABLE state_transitions (
 --
 
 CREATE TABLE state_triggers (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   op_mode varchar(20) NOT NULL default '',
   state varchar(20) NOT NULL default '',
   trigger tinytext NOT NULL,
@@ -1232,8 +1232,8 @@ CREATE TABLE switch_paths (
   pid varchar(12) default NULL,
   eid varchar(32) default NULL,
   vname varchar(32) default NULL,
-  node_id1 varchar(10) default NULL,
-  node_id2 varchar(10) default NULL
+  node_id1 varchar(32) default NULL,
+  node_id2 varchar(32) default NULL
 ) TYPE=MyISAM;
 
 --
@@ -1241,7 +1241,7 @@ CREATE TABLE switch_paths (
 --
 
 CREATE TABLE switch_stack_types (
-  stack_id varchar(10) NOT NULL default '',
+  stack_id varchar(32) NOT NULL default '',
   stack_type varchar(10) default NULL,
   supports_private tinyint(1) NOT NULL default '0',
   single_domain tinyint(1) NOT NULL default '1',
@@ -1256,8 +1256,8 @@ CREATE TABLE switch_stack_types (
 --
 
 CREATE TABLE switch_stacks (
-  node_id varchar(10) NOT NULL default '',
-  stack_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
+  stack_id varchar(32) NOT NULL default '',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -1311,7 +1311,7 @@ CREATE TABLE testsuite_preentables (
 
 CREATE TABLE tiplines (
   tipname varchar(32) NOT NULL default '',
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   server varchar(64) NOT NULL default '',
   portnum int(11) NOT NULL default '0',
   keylen smallint(6) NOT NULL default '0',
@@ -1334,7 +1334,7 @@ CREATE TABLE tipservers (
 --
 
 CREATE TABLE tmcd_redirect (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   dbname tinytext NOT NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
@@ -1346,7 +1346,7 @@ CREATE TABLE tmcd_redirect (
 CREATE TABLE tunnels (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
   isserver tinyint(3) unsigned NOT NULL default '0',
   port int(11) NOT NULL default '0',
@@ -1367,7 +1367,7 @@ CREATE TABLE tunnels (
 
 CREATE TABLE uidnodelastlogin (
   uid varchar(10) NOT NULL default '',
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   date date default NULL,
   time time default NULL,
   PRIMARY KEY  (uid)
@@ -1503,7 +1503,7 @@ CREATE TABLE v2pmap (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
@@ -1512,7 +1512,7 @@ CREATE TABLE v2pmap (
 --
 
 CREATE TABLE veth_interfaces (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   veth_id int(10) unsigned NOT NULL auto_increment,
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
@@ -1750,7 +1750,7 @@ CREATE TABLE webnews (
 
 CREATE TABLE widearea_accounts (
   uid varchar(8) NOT NULL default '',
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   trust enum('none','user','local_root') default NULL,
   date_applied date default NULL,
   date_approved datetime default NULL,
@@ -1763,9 +1763,9 @@ CREATE TABLE widearea_accounts (
 
 CREATE TABLE widearea_delays (
   time double default NULL,
-  node_id1 varchar(10) NOT NULL default '',
+  node_id1 varchar(32) NOT NULL default '',
   iface1 varchar(10) NOT NULL default '',
-  node_id2 varchar(10) NOT NULL default '',
+  node_id2 varchar(32) NOT NULL default '',
   iface2 varchar(10) NOT NULL default '',
   bandwidth double default NULL,
   time_stddev float NOT NULL default '0',
@@ -1780,7 +1780,7 @@ CREATE TABLE widearea_delays (
 --
 
 CREATE TABLE widearea_nodeinfo (
-  node_id varchar(10) NOT NULL default '',
+  node_id varchar(32) NOT NULL default '',
   machine_type varchar(40) default NULL,
   contact_uid varchar(8) NOT NULL default '',
   connect_type varchar(20) default NULL,
@@ -1819,9 +1819,9 @@ CREATE TABLE widearea_privkeys (
 
 CREATE TABLE widearea_recent (
   time double default NULL,
-  node_id1 varchar(10) NOT NULL default '',
+  node_id1 varchar(32) NOT NULL default '',
   iface1 varchar(10) NOT NULL default '',
-  node_id2 varchar(10) NOT NULL default '',
+  node_id2 varchar(32) NOT NULL default '',
   iface2 varchar(10) NOT NULL default '',
   bandwidth double default NULL,
   time_stddev float NOT NULL default '0',
@@ -1851,10 +1851,10 @@ CREATE TABLE wires (
   cable smallint(3) unsigned default NULL,
   len tinyint(3) unsigned NOT NULL default '0',
   type enum('Node','Serial','Power','Dnard','Control','Trunk') NOT NULL default 'Node',
-  node_id1 char(10) NOT NULL default '',
+  node_id1 char(32) NOT NULL default '',
   card1 tinyint(3) unsigned NOT NULL default '0',
   port1 tinyint(3) unsigned NOT NULL default '0',
-  node_id2 char(10) NOT NULL default '',
+  node_id2 char(32) NOT NULL default '',
   card2 tinyint(3) unsigned NOT NULL default '0',
   port2 tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id1,card1,port1),

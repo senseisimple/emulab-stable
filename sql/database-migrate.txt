@@ -1332,3 +1332,56 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table plab_slice_nodes drop column ticketdata, \
            drop column leasedata, \
            add column nodemeta text default NULL
+
+1.230: Change all node_id-type columns to be 32 characters long
+
+       alter table current_reloads modify node_id varchar(32) NOT NULL default '';
+       alter table delays modify node_id varchar(32) NOT NULL default '';
+       alter table delta_inst modify node_id varchar(32) NOT NULL default '';
+       alter table iface_counters modify node_id varchar(32) NOT NULL default '';
+       alter table interfaces modify node_id varchar(32) NOT NULL default '';
+       alter table last_reservation modify node_id varchar(32) NOT NULL default '';
+       alter table linkdelays modify node_id varchar(32) NOT NULL default '';
+       alter table new_interfaces modify switch_id varchar(32) default NULL;
+       alter table new_nodes modify node_id varchar(32) NOT NULL default '';
+       alter table newdelays modify node_id varchar(32) NOT NULL default '';
+       alter table next_reserve modify node_id varchar(32) NOT NULL default '';
+       alter table node_activity modify node_id varchar(32) NOT NULL default '';
+       alter table node_auxtypes modify node_id varchar(32) NOT NULL default '';
+       alter table node_features modify node_id varchar(32) NOT NULL default '';
+       alter table node_idlestats modify node_id varchar(32) NOT NULL default '';
+       alter table node_rusage modify node_id varchar(32) NOT NULL default '';
+       alter table node_status modify node_id varchar(32) NOT NULL default '';
+       alter table nodeipportnum modify node_id varchar(32) NOT NULL default '';
+       alter table nodelog modify node_id varchar(32) NOT NULL default '';
+       alter table nodes modify node_id varchar(32) NOT NULL default '';
+       alter table nodes modify phys_nodeid varchar(32) default NULL;
+       alter table nodeuidlastlogin modify node_id varchar(32) NOT NULL default '';
+       alter table ntpinfo modify node_id varchar(32) NOT NULL default '';
+       alter table outlets modify node_id varchar(32) NOT NULL default '';
+       alter table outlets modify power_id varchar(32) NOT NULL default '';
+       alter table partitions modify node_id varchar(32) NOT NULL default '';
+       alter table plab_slice_nodes modify node_id varchar(32) NOT NULL default '';
+       alter table port_counters modify node_id char(32) NOT NULL default '';
+       alter table reserved modify node_id varchar(32) NOT NULL default '';
+       alter table scheduled_reloads modify node_id varchar(32) NOT NULL default '';
+       alter table state_triggers modify node_id varchar(32) NOT NULL default '';
+       alter table switch_paths modify node_id1 varchar(32) default NULL;
+       alter table switch_paths modify node_id2 varchar(32) default NULL;
+       alter table switch_stack_types modify stack_id varchar(32) NOT NULL default '';
+       alter table switch_stacks modify node_id varchar(32) NOT NULL default '';
+       alter table switch_stacks modify stack_id varchar(32) NOT NULL default '';
+       alter table tiplines modify node_id varchar(32) NOT NULL default '';
+       alter table tmcd_redirect modify node_id varchar(32) NOT NULL default '';
+       alter table tunnels modify node_id varchar(32) NOT NULL default '';
+       alter table uidnodelastlogin modify node_id varchar(32) NOT NULL default '';
+       alter table v2pmap modify node_id varchar(32) NOT NULL default '';
+       alter table veth_interfaces modify node_id varchar(32) NOT NULL default '';
+       alter table widearea_accounts modify node_id varchar(32) NOT NULL default '';
+       alter table widearea_delays modify node_id1 varchar(32) NOT NULL default '';
+       alter table widearea_delays modify node_id2 varchar(32) NOT NULL default '';
+       alter table widearea_nodeinfo modify node_id varchar(32) NOT NULL default '';
+       alter table widearea_recent modify node_id1 varchar(32) NOT NULL default '';
+       alter table widearea_recent modify node_id2 varchar(32) NOT NULL default '';
+       alter table wires modify node_id1 char(32) NOT NULL default '';
+       alter table wires modify node_id2 char(32) NOT NULL default '';
