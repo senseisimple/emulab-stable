@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -382,7 +382,7 @@ proc tb-set-node-failure-action {node type} {
 
 proc tb-fix-node {vnode pnode} {
     if {[$vnode info class] != "Node"} {
-	perror "\[tb-fix-node] $node is not a node."
+	perror "\[tb-fix-node] $vnode is not a node."
 	return
     }
     $vnode set_fixed $pnode

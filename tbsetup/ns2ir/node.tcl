@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -131,9 +131,13 @@ Node instproc updatedb {DB} {
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
     if {$osid == {}} {
-	sql query $DB "select osid from node_types where type = \"$type\""
-	set osid [sql fetchrow $DB]
-	sql endquery $DB
+	if {$virthost} {
+	    set osid "FBSD-STD"
+	} else {
+	    sql query $DB "select osid from node_types where type = \"$type\""
+	    set osid [sql fetchrow $DB]
+	    sql endquery $DB
+	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
 	if {$isvirt} {
