@@ -47,5 +47,12 @@ open(FH,"$mysqldump -t $DBNAME $table_names |") or
 #
 while (<FH>) {
     s/^INSERT/REPLACE/g;
+    #
+    # Kinda hackish, but gets the job done...
+    #
+    # Don't put any temporary entries from state_triggers out
+    if (/INTO state_triggers VALUES \(\'([^\']*)\',/i &&
+	$1 ne '*') { next; }
+
     print;
 }
