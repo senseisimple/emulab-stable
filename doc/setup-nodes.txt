@@ -196,8 +196,9 @@ got this sorted out, the 'Control MAC' column should be correct.
 Now, we're going to figure out where the interfaces are plugged into your
 switches - you should have entered your switches into the database as part of
 setup-db.txt . If they're not already, enable all of the ports on your
-experimental network that have experimental interfaces connected to them. Under
-IOS, you'll also need to put them into a VLAN other than VLAN1. If you just now
+experimental network that have experimental interfaces connected to them. Also,
+in order to work around some strange behavior (possibly a bug?), you'll need
+to place these ports in some VLAN other than VLAN #1. If you just now
 enabled these interfaces, wait a few minutes to give the switches time to learn
 the nodes' MAC addresses. Now, select all the nodes, and click the 'search
 switch ports' button. This will grab the MAC tables from all switches you put
