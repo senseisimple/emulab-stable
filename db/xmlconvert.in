@@ -114,7 +114,16 @@ my %virtual_tables =
      "event_groups"		=> { rows  => undef, 
 				     tag   => "event_groups",
 				     row   => "event_group",
-				     attrs => [ "group_name", "agent-name" ]});
+				     attrs => [ "group_name", "agent-name" ]},
+     "firewalls"		=> { rows  => undef, 
+				     tag   => "firewalls",
+				     row   => "firewall",
+				     attrs => [ "fwname", "type", "style" ]},
+     "firewall_rules"		=> { rows  => undef, 
+				     tag   => "firewall_rules",
+				     row   => "firewall_rule",
+				     attrs => [ "fwname", "ruleno", "rule" ]}
+     );
 
 # XXX
 # The experiment table is special. Only certain fields are allowed to

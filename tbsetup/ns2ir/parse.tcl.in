@@ -265,6 +265,7 @@ source ${GLOBALS::libdir}/traffic.tcl
 source ${GLOBALS::libdir}/vtype.tcl
 source ${GLOBALS::libdir}/program.tcl
 source ${GLOBALS::libdir}/event.tcl
+source ${GLOBALS::libdir}/firewall.tcl
 
 ##################################################
 # Redifing Assignment

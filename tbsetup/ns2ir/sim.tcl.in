@@ -24,6 +24,7 @@
 Class Simulator
 Class Program -superclass NSObject
 Class EventGroup -superclass NSObject
+Class Firewall -superclass NSObject
 
 Simulator instproc init {args} {
     # A counter for internal ids
@@ -66,6 +67,10 @@ Simulator instproc init {args} {
     # EventGroup list.
     $self instvar eventgroup_list;
     array set eventgroup_list {}
+
+    # Firewall.
+    $self instvar firewall_list;
+    array set firewall_list {}
 
     var_import ::GLOBALS::last_class
     set last_class $self
@@ -232,6 +237,7 @@ Simulator instproc run {} {
     $self instvar event_list
     $self instvar prog_list
     $self instvar eventgroup_list
+    $self instvar firewall_list
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -389,6 +395,9 @@ Simulator instproc run {} {
     }
     foreach egroup [array names eventgroup_list] {
 	$egroup updatedb "sql"
+    }
+    foreach fw [array names firewall_list] {
+	$fw updatedb "sql"
     }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
@@ -870,6 +879,12 @@ Simulator instproc rename_eventgroup {old new} {
     set eventgroup_list($new) {}
 }
 
+Simulator instproc rename_firewall {old new} {
+    $self instvar firewall_list
+    unset firewall_list($old)
+    set firewall_list($new) {}
+}
+
 # find_link <node1> <node2>
 # This is just an accesor to the link_map datastructure.  If no
 # link is known between <node1> and <node2> the empty list is returned.
@@ -1030,6 +1045,20 @@ Simulator instproc add_program {prog} {
 Simulator instproc add_eventgroup {group} {
     $self instvar eventgroup_list
     set eventgroup_list($group) {}
+}
+
+# add_firewall
+# Link to a Firewall object.
+Simulator instproc add_firewall {fw} {
+    $self instvar firewall_list
+
+    if {[array size firewall_list] > 0} {
+	perror "\[add_firewall]: only one firewall per experiment right now"
+	return -1
+    }
+
+    set firewall_list($fw) {}
+    return 0
 }
 
 # cost

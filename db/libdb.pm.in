@@ -2874,6 +2874,8 @@ sub TBGetSiteVar($;$)
 		   "nseconfigs",
 		   "eventlist",
 		   "event_groups",
+		   "firewalls",
+		   "firewall_rules",
 		   "ipsubnets",
 		   "nsfiles");
 
