@@ -7,7 +7,7 @@
 package emulabpaths;
 use Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( $BINDIR $ETCDIR $VARDIR $BOOTDIR $LOGDIR $LOCKDIR );
+@EXPORT = qw( $BINDIR $ETCDIR $VARDIR $BOOTDIR $DBDIR $LOGDIR $LOCKDIR );
 
 #
 # This path stuff will go away when the world is consistent. Until then
