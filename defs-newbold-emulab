@@ -3,9 +3,9 @@
 #
 TBDBNAME=tbdb
 WWWDEFS=newbold-emulab
-TBOPSEMAIL=newbold@cs.utah.edu
-TBLOGSEMAIL=newbold@cs.utah.edu
-TBAUDITEMAIL=newbold@cs.utah.edu
+TBOPSEMAIL=newbold@flux.utah.edu
+TBLOGSEMAIL=newbold@flux.utah.edu
+TBAUDITEMAIL=newbold@flux.utah.edu
 IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
@@ -15,5 +15,5 @@ OURDOMAIN=emulab.net
 FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
-TBSTATEDEMAIL=newbold@cs.utah.edu
-TBTESTSUITEEMAIL=newbold@cs.utah.edu
+TBSTATEDEMAIL=newbold@flux.utah.edu
+TBTESTSUITEEMAIL=newbold@flux.utah.edu
