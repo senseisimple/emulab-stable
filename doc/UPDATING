@@ -6,7 +6,19 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
-20041029:
+After each date, you will find one of the following, which tells you
+when the action needs to be performed.
+
+Before build - before doing a 'gmake' in your testbed object tree on
+	boss and/or ops	
+After install - after doing a 'gmake boss-install' on boss or
+    'gmake ops-install' on ops
+
+Note that some instructions may have steps that need to occur at a few
+different points in the install process - these are marked with the
+earliest time one of the steps needs to occur.
+
+20041029: Before build
 	The ulsshxmlrpcpp package was updated to version 0.1.1:
 
 	     http://boss.emulab.net/downloads/ulsshxmlrpcpp-0.1.1.tar.gz
@@ -18,7 +30,7 @@ in YYYYMMDD format.
 	     gmake
 	     sudo gmake install
 
-20041025:
+20041025: After install
 
 	Run sql/fixstats_swapmod.pl to fix up stats records.
 
@@ -27,7 +39,7 @@ in YYYYMMDD format.
 	however, it can save you from greedy users that consume too
 	much CPU and cause experiment swapin to fail.
 
-20040901:
+20040901: Before build
 	New SSL version of the XMLRPC server.
 
 	* Install this port on both boss and ops:
@@ -71,7 +83,7 @@ in YYYYMMDD format.
 		sudo /usr/testbed/sbin/sslxmlrpc_server.py
 
 
-20040816:
+20040816: Before build
 	The event system has moved to users.emulab.net.
 
 	* Install the elvin libraries and daemon on users.emulab.net.
@@ -195,14 +207,14 @@ in YYYYMMDD format.
 		sudo cat /etc/ssh/*.pub |
 			ssh myops '(cat > /etc/ssh/ssh_known_hosts)'
 
-20040815:
+20040815: After install
 	After some changes to ptopgen, you'll need to run the following SQL
 	command to keep vnodes working properly:
 
 	update os_info set nextosid='FBSD-STD' \
 	    where osid='emulab-ops-FBSD-JAIL';
 
-20040809:
+20040809: After install
 	New syslog file for logging requests to the XMLRPC server.
 
 		sudo touch /usr/testbed/log/xmlrpcbag.log
@@ -216,18 +228,18 @@ in YYYYMMDD format.
 
 		/usr/testbed/log/xmlrpcbag.log      640  7     1000 *     Z
 
-20040805:
+20040805: After install
 	Add a new CNAME for boss to /etc/namedb/<OURDMAIN>.db.head -
 	event-server . Re-run named_setup on boss to make this change
 	take place. In the future, we may move this CNAME to ops.
 
-20040713:
+20040713: After install
 	For new distributed routing support, must first run this script as
         root to generate a data file for each existing experiment.
 
 		sudo sql/gentopmaps.pl
 
-20040625:
+20040625: After install
 	After updating to revision 1.257 of sql/database-migrate.txt,
         run sql/devlnodes.pl to clear out all of the non reserved
         pcvm nodes. Be sure to do a current install of the software, and
@@ -235,7 +247,7 @@ in YYYYMMDD format.
 
 		update node_types set isdynamic=1 where type='pcvm';
 
-20040615:
+20040615: Before build
 	If you update the ports on your boss node, you'll need to take
 	into accout that FreeBSD is in the process of changing how its
 	rc.d scripts work - add the following two lines to the bottom
@@ -243,15 +255,15 @@ in YYYYMMDD format.
 	  dhcpd_enable="YES"
 	  apache_enable="YES"
 
-20040601:
+20040601: Before build
 	The p5-Time-HiRes port is now required on both boss and ops -
 	install it from /usr/ports/devel/p5-Time-HiRes .
 
-20040420:
+20040420: Before build
 	Switched web search button backend from webglimpse to swish-e.
         Just need to go to /usr/ports/www/swish-e and install the port.
 
-20040303:
+20040303: Before build
 	Fixed the way we handle the certificate for capture with tiptunnel.
 	We no longer hard-code the certificate digest in nodetipacl.php3 .
 	However, as a result, we must place this fingerprint in a publically-
@@ -263,13 +275,13 @@ in YYYYMMDD format.
 	-fingerprint -in capture.pem > capture.fingerprint', and make this
 	file world-readable.
 
-20040302:
+20040302: Before build
 	Changed the length of the node_id columns from 10 to 32. Make sure
 	you re-compile and restart all daemons written in C (such as
 	tmcd, tevd, and the event schedulers) before putting any nodes in
 	the database with names longer than 10 characters.
 
-20040226:
+20040226: After install
 	Re-worked the way named_setup handles virtual nodes and unroutable
 	IP addresses - no point in handling the two differently. Thus, the
 	'vnodes.<OURDOMAIN>.db' DNS zone file is no longer generated.
@@ -278,12 +290,12 @@ in YYYYMMDD format.
 	file - see Step 6 of doc/setup.txt for instructions on setting up
 	this file.
 
-20040121:
+20040121: After install
 	Changed the 3.testbed.sh rc.d script to handle 'start' and 'stop'
 	arguments properly. Install a fresh copy of rc.d/3.testbed.sh into
 	/usr/local/etc/rc.d .
 
-20040120:
+20040120: After install
 	Bumped up the sizes on some buffers to help network performance.
 	Add the following two lines to /etc/sysctl.conf:
 
@@ -291,7 +303,7 @@ in YYYYMMDD format.
 	net.local.dgram.recvspace=65536
 
 
-20040112:
+20040112: After install
        Big change to bootinfo sequence.
 
        * Update DB with new contents of sql/database-fill.sql *and
@@ -310,7 +322,7 @@ in YYYYMMDD format.
        * Restart stated.
        * Reboot all non allocated nodes so that they go into pxewait mode.
 
-20031215:
+20031215: Before build
 	The mod_php4 port on boss should be recompiled with the
 	'xmlrpc' option, in addition to the 'mhash' option already
 	used. Apache on boss will need to be restarted after the new
