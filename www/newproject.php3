@@ -16,36 +16,36 @@ include("defs.php3");
 # eventually figure out that fields marked with * mean something!
 #
 $formerror="No Error";
-if (!isset($gid) ||
-    strcmp($gid, "ucb-omcast") == 0) {
+if (!isset($pid) ||
+    strcmp($pid, "ucb-omcast") == 0) {
   $formerror = "Name";
 }
-if (!isset($grp_head_uid) ||
-    strcmp($grp_head_uid, "") == 0) {
+if (!isset($proj_head_uid) ||
+    strcmp($proj_head_uid, "") == 0) {
   $formerror = "Username";
 }
-if (!isset($grp_name) ||
-    strcmp($grp_name, "UCB Overlay Multicast") == 0) {
+if (!isset($proj_name) ||
+    strcmp($proj_name, "UCB Overlay Multicast") == 0) {
   $formerror = "Long Name";
 }
-if (!isset($grp_pcs) ||
-    strcmp($grp_pcs, "") == 0) {
+if (!isset($proj_pcs) ||
+    strcmp($proj_pcs, "") == 0) {
   $formerror = "Estimated #of PCs";
 }
-if (!isset($grp_sharks) ||
-    strcmp($grp_sharks, "") == 0) {
+if (!isset($proj_sharks) ||
+    strcmp($proj_sharks, "") == 0) {
   $formerror = "Estimated #of Sharks";
 }
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   $formerror = "Full Name";
 }
-if (!isset($grp_URL) ||
-    strcmp($grp_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
+if (!isset($proj_URL) ||
+    strcmp($proj_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
   $formerror = "URL";
 }
-if (!isset($email) ||
-    strcmp($email, "") == 0) {
+if (!isset($usr_email) ||
+    strcmp($usr_email, "") == 0) {
   $formerror = "Email Address";
 }
 if (!isset($usr_addr) ||
@@ -76,34 +76,34 @@ if ($formerror != "No Error") {
 #
 # XXX Note CONSTANT in expression!
 #
-if (strlen($gid) > 12) {
-    USERERROR("The project name \"$gid\" is too long! ".
+if (strlen($pid) > 12) {
+    USERERROR("The project name \"$pid\" is too long! ".
               "Please select another.", 1);
 }
-if (strlen($grp_head_uid) > 8) {
-    USERERROR("The name \"$grp_head_uid\" is too long! ".
+if (strlen($proj_head_uid) > 8) {
+    USERERROR("The name \"$proj_head_uid\" is too long! ".
               "Please select another.", 1);
 }
 
 #
 # This is a new project request. Make sure it does not already exist.
 #
-$project_query  = "SELECT gid FROM groups WHERE gid=\"$gid\"";
+$project_query  = "SELECT pid FROM projects WHERE pid=\"$pid\"";
 $project_result = mysql_db_query($TBDBNAME, $project_query);
 
 if ($row = mysql_fetch_row($project_result)) {
-  USERERROR("The project name \"$gid\" you have chosen is already in use. ".
+  USERERROR("The project name \"$pid\" you have chosen is already in use. ".
             "Please select another.", 1);
 }
 
 #
 # See if this is a new user or one returning.
 #
-$pswd_query  = "SELECT usr_pswd FROM users WHERE uid=\"$grp_head_uid\"";
+$pswd_query  = "SELECT usr_pswd FROM users WHERE uid=\"$proj_head_uid\"";
 $pswd_result = mysql_db_query($TBDBNAME, $pswd_query);
 if (!$pswd_result) {
     $err = mysql_error();
-    TBERROR("Database Error retrieving info for $grp_head_uid: $err\n", 1);
+    TBERROR("Database Error retrieving info for $proj_head_uid: $err\n", 1);
 }
 if ($row = mysql_fetch_row($pswd_result)) {
     $returning = 1;
@@ -117,7 +117,7 @@ else {
 # For a new user, the password must pass our tests.
 #
 if ($returning) {
-    if (CHECKLOGIN($grp_head_uid) != 1) {
+    if (CHECKLOGIN($proj_head_uid) != 1) {
         USERERROR("You are not logged in. Please log in and try again.", 1);
     }
 }
@@ -128,7 +128,7 @@ else {
                   1);
     }
     $mypipe = popen(escapeshellcmd(
-    "/usr/testbed/bin/checkpass $password1 $grp_head_uid '$usr_name:$email'"),
+    "/usr/testbed/bin/checkpass $password1 $proj_head_uid '$usr_name:$usr_email'"),
     "w+");
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);
@@ -139,7 +139,7 @@ else {
     }
     else {
         TBERROR("TESTBED: checkpass failure\n".
-                "\n$usr_name ($grp_head_uid) just tried to set up a testbed ".
+                "\n$usr_name ($proj_head_uid) just tried to set up a testbed ".
                 "account,\n".
                 "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
@@ -162,19 +162,19 @@ if (! $returning) {
     $newuser_command = "INSERT INTO users ".
         "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
         "usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,status) ".
-        "VALUES ('$grp_head_uid', now(), '$grp_expires', '$usr_name', ".
-        "'$email', '$usr_addr', '$usr_title', '$usr_affil', ".
+        "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
+        "'$usr_email', '$usr_addr', '$usr_title', '$usr_affil', ".
         "'$usr_phones', '$encoding', ".
         "'$unix_uid', 'newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {
         $err = mysql_error();
-        TBERROR("Database Error adding adding new user $grp_head_uid: $err\n",
+        TBERROR("Database Error adding adding new user $proj_head_uid: $err\n",
                 1);
     }
-    $key = GENKEY($grp_head_uid);
+    $key = GENKEY($proj_head_uid);
 
-    mail("$email", "TESTBED: Your New User Key",
+    mail("$usr_email", "TESTBED: Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
          "    Here is your key to verify your account on the ".
@@ -199,67 +199,53 @@ if (! $returning) {
 #
 # Now for the new Project
 # * Bump the unix GID.
-# * Create a new group in the database.
-# * Create a new group_membership entry in the database, default trust=none.
+# * Create a new project in the database.
+# * Create a new project_membership entry in the database, default trust=none.
 # * Generate a mail message to testbed ops.
 #
-$unixgid_query  = "SELECT unix_gid FROM groups ORDER BY unix_gid DESC";
+$unixgid_query  = "SELECT unix_gid FROM projects ORDER BY unix_gid DESC";
 $unixgid_result = mysql_db_query($TBDBNAME, $unixgid_query);
 $row = mysql_fetch_row($unixgid_result);
 $unix_gid = $row[0];
 $unix_gid++;
 
-#
-# The whole group vs. project issue needs to be fixed! For now insert into
-# both.
-# 
-$newgroup_command = "INSERT INTO groups ".
-     "(gid,grp_created,grp_expires,grp_name,".
-     "grp_URL,grp_head_uid,cntrl_node,unix_gid)".
-     "VALUES ('$gid',now(), '$grp_expires','$grp_name','$grp_URL',".
-     "'$grp_head_uid', '','$unix_gid')";
-$newgroup_result  = mysql_db_query($TBDBNAME, $newgroup_command);
-if (! $newgroup_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding new group $gid: $err\n", 1);
-}
-
 $newproj_command = "INSERT INTO projects ".
-     "(pid, proj_created, proj_expires, proj_name, proj_head_uid) ".
-     "VALUES ('$gid', now(), '$grp_expires', '$grp_name', '$grp_head_uid')";
+     "(pid, created, expires, name, URL, head_uid, unix_gid)".
+     "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
+     "'$proj_head_uid', '$unix_gid')";
 $newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
 if (! $newproj_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding new project $gid: $err\n", 1);
+    TBERROR("Database Error adding new project $pid: $err\n", 1);
 }
 
 $newmemb_result = mysql_db_query($TBDBNAME,
-			"insert into grp_memb (uid,gid,trust)".
-			"values ('$grp_head_uid','$gid','none');");
+			"insert into proj_memb (uid,pid,trust)".
+			"values ('$proj_head_uid','$pid','none');");
 if (! $newmemb_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding new group membership: $gid: $err\n", 1);
+    TBERROR("Database Error adding new project membership: $pid: $err\n", 1);
 }
 
 mail($TBMAIL_APPROVAL,
-     "TESTBED: New Group", "'$usr_name' wants to start group '$gid'.\n".
+     "TESTBED: New Project", "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
-     "Name:          $usr_name ($grp_head_uid)\n".
-     "Email:         $email\n".
-     "Group:         $grp_name\n".
-     "URL:           $grp_URL\n".
+     "Name:          $usr_name ($proj_head_uid)\n".
+     "Email:         $usr_email\n".
+     "Project:       $proj_name\n".
+     "URL:           $proj_URL\n".
      "Title:         $usr_title\n".
      "Affiliation:   $usr_affil\n".
      "Address:       $usr_addr\n".
      "Phone:         $usr_phones\n\n".
-     "PCs:           $grp_pcs\n".
-     "Sharks:        $grp_sharks\n".
+     "PCs:           $proj_pcs\n".
+     "Sharks:        $proj_sharks\n".
      "Reasons:\n$why\n\n".
      "Please review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
-     "select the 'Group Approval' page.\n\nThey are expecting a result ".
+     "select the 'Project Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
-     "From: $usr_name <$email>\n".
+     "From: $usr_name <$usr_email>\n".
      "Cc: $TBMAIL_CONTROL\n".
      "Errors-To: $TBMAIL_WWW");
 
@@ -277,7 +263,7 @@ if (! $returning) {
         TBERROR("Could not open $TBLIST_LEADERS to add new project leader", 0);
     }
     else {
-        fwrite($fp, "$email\n");
+        fwrite($fp, "$usr_email\n");
         fclose($fp);
     }
 
@@ -286,7 +272,7 @@ if (! $returning) {
         TBERROR("Could not open $TBLIST_USERS to add new project leader", 0);
     }
     else {
-        fwrite($fp, "$email\n");
+        fwrite($fp, "$usr_email\n");
         fclose($fp);
     }
 }
@@ -294,11 +280,11 @@ if (! $returning) {
 #
 # Now give the user some warm fuzzies
 #
-echo "<center><h1>Project '$gid' successfully added.</h1></center>
+echo "<center><h1>Project '$pid' successfully added.</h1></center>
       Testbed Operations has been notified of your application.
       Most applications are reviewed within one week. We will notify
-      you by e-mail at '$usr_name&nbsp;&lt;$email>' of their decision
-      regarding your proposed project '$gid'.\n";
+      you by e-mail at '$usr_name&nbsp;&lt;$usr_email>' of their decision
+      regarding your proposed project '$pid'.\n";
 
 if (! $returning) {
     echo "<p>In the meantime, for

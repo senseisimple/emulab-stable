@@ -56,7 +56,7 @@ $expiretime = date("m/d/Y", time() + (86400 * 90));
     </td>
 </tr>
 
-<form action=grpadded.php3 method="post">
+<form action=newproject.php3 method="post">
 <tr></tr>
 <tr></tr>
 <?php
@@ -76,7 +76,7 @@ echo "<tr>
 echo "<tr>
           <td>*Username:</td>
           <td class=\"left\">
-              <input name=\"grp_head_uid\"";
+              <input name=\"proj_head_uid\"";
 if ($row) {
     echo     "type=\"readonly\" value=\"$row[uid]\">";
 }
@@ -140,7 +140,7 @@ echo "     </td>
 echo "<tr>
          <td>*Email<br>Address:</td>
          <td class=\"left\">
-             <input name=\"email\"";
+             <input name=\"usr_email\"";
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_email]\">";
 } else {
@@ -212,7 +212,7 @@ echo "<tr>
 #
 echo "<tr>
           <td>*Name (no blanks):</td>
-          <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"
+          <td><input type=\"text\" name=\"pid\" value=\"ucb-omcast\"
                      size=\"12\" MAXLENGTH=\"12\"></td>
       </tr>\n";
 
@@ -221,7 +221,7 @@ echo "<tr>
 #
 echo "<tr>
           <td>*Long name:</td>
-          <td><input type=\"text\" name=\"grp_name\"
+          <td><input type=\"text\" name=\"proj_name\"
                      value=\"UCB Overlay Multicast\" size=\"40\"></td>
       </tr>\n";
 
@@ -230,7 +230,7 @@ echo "<tr>
 #
 echo "<tr>
          <td>+URL:</td>
-         <td><input type=\"text\" name=\"grp_URL\" size=\"45\"
+         <td><input type=\"text\" name=\"proj_URL\" size=\"45\"
                     value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
       </tr>\n";
 
@@ -239,12 +239,12 @@ echo "<tr>
 # 
 echo "<tr>
          <td>*Estimated #of PCs:</td>
-         <td><input type=\"text\" name=\"grp_pcs\" size=\"4\"></td>
+         <td><input type=\"text\" name=\"proj_pcs\" size=\"4\"></td>
       </tr>\n";
 
 echo "<tr>
          <td>*Estimated #of Sharks:</td>
-         <td><input type=\"text\" name=\"grp_sharks\" size=\"4\"
+         <td><input type=\"text\" name=\"proj_sharks\" size=\"4\"
                     value=\"0\"></td>
       </tr>\n";
 
@@ -253,7 +253,7 @@ echo "<tr>
 #
 echo "<tr>
           <td>When do you expect to be<br>done using the testbed</td>
-          <td><input type=\"text\" name=\"grp_expires\"
+          <td><input type=\"text\" name=\"proj_expires\"
                      value=\"$expiretime\"></td>
       </tr>\n";
 
