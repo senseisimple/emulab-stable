@@ -48,6 +48,9 @@ echo "<tr>
 echo "</form>\n";
 echo "</table>\n";
 
+echo "<center><h2>
+     <a href='password.php3'>Forgot your password?</a>
+     </h2></center>\n";
 #
 # Standard Testbed Footer
 # 
