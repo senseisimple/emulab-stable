@@ -29,11 +29,12 @@ LOGGEDINORDIE($uid);
 # (type & value are required, others are optional and vary by type)
 
 # List of valid toggles
-$toggles = array("adminoff", "swappable");
+$toggles = array("adminoff", "swappable", "idle_ignore");
 
 # list of valid values for each toggle
-$values  = array("adminoff"  => array(0,1),
-		 "swappable" => array(0,1) );
+$values  = array("adminoff"    => array(0,1),
+		 "swappable"   => array(0,1),
+		 "idle_ignore" => array(0,1) );
 
 if (! in_array($type, $toggles)) {
     USERERROR("There is no toggle for $type!", 1);
@@ -68,6 +69,20 @@ if ($type=="adminoff") {
     }
     
     DBQueryFatal("update experiments set swappable=$value ".
+		 "where pid='$pid' and eid='$eid'");
+
+} elseif ($type=="idle_ignore") {
+    # must be admin 
+    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN)) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    # require pid/eid
+    if (!isset($pid) || !isset($eid) ||
+	!TBValidExperiment($pid, $eid)) {
+	USERERROR("Experiment '$pid/$eid' is not valid!", 1);
+    }
+    
+    DBQueryFatal("update experiments set idle_ignore=$value ".
 		 "where pid='$pid' and eid='$eid'");
 
 #} elseif ($type=="foo") {

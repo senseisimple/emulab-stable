@@ -544,6 +544,7 @@ function SHOWEXP($pid, $eid) {
     $batchstate  = $exprow[batchstate];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
+    $idle_ignore = $exprow[idle_ignore];
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
     $nodes       = $exprow["count(r.node_id)"];
@@ -555,6 +556,15 @@ function SHOWEXP($pid, $eid) {
     else
 	$swappable = "No
 <a href=\"toggle.php?type=swappable&value=1&pid=$pid&eid=$eid\">
+<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a>";
+
+    if ($idle_ignore)
+	$idle_ignore = "Yes
+<a href=\"toggle.php?type=idle_ignore&value=0&pid=$pid&eid=$eid\">
+<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a>";
+    else
+	$idle_ignore = "No
+<a href=\"toggle.php?type=idle_ignore&value=1&pid=$pid&eid=$eid\">
 <img src=\"redball.gif\" border=0 alt=\"Toggle\"></a>";
 
     #
@@ -615,6 +625,15 @@ function SHOWEXP($pid, $eid) {
             <td class=\"left\">$swappable</td>
           </tr>\n";
 
+    # XXX: isadmin doesn't use the uid you give it, and we don't have a real
+    # uid to send here. so just make something up to match the prototype.
+    if (isadmin(123)) {
+	echo "<tr>
+            <td>Idle Ignore:</td>
+            <td class=\"left\">$idle_ignore</td>
+          </tr>\n";
+    }
+    
     echo "<tr>
             <td>Priority: (0 is highest) </td>
             <td class=\"left\">$priority</td>
