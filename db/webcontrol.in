@@ -86,6 +86,20 @@ if ($setlogin) {
 	print "Disabling Web Interface logins\n";
 
 	DBQueryFatal("replace into nologins (nologins) values(1)");
+
+	#
+	# Find all non admins and log them out.
+	# 
+	my $query_result =
+	    DBQueryFatal("select users.uid from login ".
+			 "left join users on login.uid=users.uid ".
+			 "where users.admin=0");
+	
+	while (my @row = $query_result->fetchrow_array()) {
+	    my $uid = $row[0];
+
+	    DBQueryFatal("delete from login where uid='$uid'");
+	}
     }
 }
 
