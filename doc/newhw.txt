@@ -14,7 +14,7 @@ ISP110s:
 	Status: Received
 	Responsible: Rob
 	RMAs: 1 returned, replacement recieved
-	To be RMA'ed: pc83 (NMI errors)
+	To be RMA'ed: pc83 (NMI errors) pc48 (simply dead, though it worked at first)
 
 Network cables:
 	Status: Received
@@ -38,8 +38,8 @@ Additional RPCs:
 Additional APCs:
 	Status: Not ordered
 	Responsible: ??
-	Note: We need 2 more 8-port controllers to handle 128 machines +
-		serial server + cyclades. Can steal from the sharks for now
+	Note: We've stolen 1 APC from the sharks, which will need to be
+		replaced if we decide to reconnect them
 
 Cyclades:
 	Status: Recieved
@@ -79,17 +79,17 @@ snmpit:
 tip/capture:
 	Get it working over the network and on multiple serial servers
 	Responsible: Leigh
-	Status: Done?
+	Status: Done
 
 power:
 	Extend it to talk to RPC (serial) power controllers
 	Responsible: Mac
-	Status: Done?
+	Status: Done
 	
 Disk image:
 	Build a disk image that has any changes required for ISPs
 	Responsible: Rob
-	Status: Nearly done (waiting for imagezip fixes)
+	Status: Done
 
 **********************************************************************
 ***** Problems to resolve
@@ -148,45 +148,45 @@ New machine type:
 Wires table:
 	Using a consistent wiring scheme, this can be filled by a script
 	Responsible: Rob
-	Status: Script created/checked in, first rack done
+	Status: Script created/checked in, first two racks done
 
 Interfaces table:
 	Toughest part here is the MAC addresses - See "MAC Address gathering"
 		procedure below
 	Responsible: Rob
-	Status: First rack done
+	Status: First two racks done
 
 Nodes table:
 	The only information in this table this is unique per-node is node_id,
 		ip, and precedence - should be easy to populate with a script
 	Responsible: Rob
-	Status: First rack done
+	Status: First two racks done
 
 dhcpd.conf:
 	There's already a script (db/dhcpd_makeconf) to generate this once
 		the nodes and interfaces tables are populated
 	Responsible: Rob
-	Status: First rack done
+	Status: First two racks done
 
 Outlets table:
 	Using a consistent wiring scheme, this can be filled by a script
 	Responsible: Rob
-	Status: First rack done
+	Status: First two racks done
 
 DNS zone files on paper:
 	Need to add DNS entries for all new nodes
 	Responsible: Mac/Rob
-	Status: First rack done
+	Status: First two racks done
 
 Information about the RPCs:
 	Will probably need entires in the nodes table
 	Responsible: Mac
-	Status: First rack done
+	Status: First two racks done
 	
 tip/capture state:
 	Not sure what needs to be done for the new tip/capture
 	Responsible: Leigh
-	Status: First rack done
+	Status: First two racks done
 	
 **********************************************************************
 ***** Procedures
