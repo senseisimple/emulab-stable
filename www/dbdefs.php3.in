@@ -131,6 +131,13 @@ $TB_EXPTSTATE_SWAPPED		= "swapped";
 $TB_EXPTSTATE_ACTIVATING	= "activating";
 $TB_EXPTSTATE_ACTIVE		= "active";
 
+# Interfaces roles.
+define("TBDB_IFACEROLE_CONTROL",	"ctrl");
+define("TBDB_IFACEROLE_EXPERIMENT",	"expt");
+define("TBDB_IFACEROLE_JAIL",		"jail");
+define("TBDB_IFACEROLE_FAKE",		"fake");
+define("TBDB_IFACEROLE_OTHER",		"other");
+
 #
 # Convert a trust string to the above numeric values.
 #
