@@ -397,7 +397,7 @@ Simulator instproc at {time eventstring} {
 				perror "Improper argument: at $time $event"
 				return
 			    }
-	                    set args  "Q_WEIGHT=$f"
+	                    set args  "Q_WEIGHT=$w"
                         }
 			unknown {
 		            punsup "at $time $event"
