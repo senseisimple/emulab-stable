@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -104,7 +104,7 @@ $user = $ARGV[0];
 #
 # Untaint the arguments.
 #
-if ($user =~ /^([a-z0-9]+)$/i) {
+if ($user =~ /^([-\w]+)$/i) {
     $user = $1;
 }
 else {
