@@ -116,7 +116,7 @@ else {
 # If a user returning, then the login must be valid to continue any further.
 # For a new user, the password must pass our tests.
 #
-if (returning) {
+if ($returning) {
     if (CHECKLOGIN($grp_head_uid) != 1) {
         USERERROR("You are not logged in. Please log in and try again.", 1);
     }
