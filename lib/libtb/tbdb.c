@@ -177,15 +177,74 @@ mydb_checkexptnodeeventstate(char *pid, char *eid,
 /*
  * Set (or clear) event scheduler process ID. A zero is treated as
  * a request to clear it.
+ *
+ * NOTE: We want to fail if there is already a non-zero value in the DB
+ * (although its okay to set it to zero no matter what). 
  */
 int
 mydb_seteventschedulerpid(char *pid, char *eid, int processid)
 {
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		retval = 1;
+
+	if (! processid) {
+		if (! mydb_update("update experiments set event_sched_pid=0 "
+				  "where pid='%s' and eid='%s'",
+				  pid, eid)) {
+			error("seteventschedulerpid: DB Error(0): %s/%s!",
+			      pid, eid);
+			return 0;
+		}
+		return 1;
+	}
+
+	if (! mydb_update("lock tables experiments write")) {
+		error("seteventschedulerpid: DB Error: locking table!");
+		return 0;
+	}
+
+	res = mydb_query("select event_sched_pid from experiments "
+			 "where pid='%s' and eid='%s'",
+			 1, pid, eid);
+	
+	if (!res) {
+		error("seteventschedulerpid: DB Error(1): %s/%s", pid, eid);
+		return 0;
+	}
+	if (! mysql_num_rows(res)) {
+		error("seteventschedulerpid: No such experiment: %s/%s",
+		      pid, eid);
+		retval = 0;
+		goto done;
+	}
+	row = mysql_fetch_row(res);
+	
+	if (!row[0] || !row[0][0]) {
+		error("seteventschedulerpid: Bad value for procid: %s/%s",
+		      pid, eid);
+		retval = 0;
+		goto done;
+	}
+	if (atoi(row[0]) != 0) {
+		info("seteventschedulerpid: A scheduler is running: %s/%s",
+		     pid, eid);
+		retval = 0;
+		goto done;
+	}
 	if (! mydb_update("update experiments set event_sched_pid=%d "
 			  "where pid='%s' and eid='%s'",
 			  processid, pid, eid)) {
-		error("seteventschedulerpid: DB Error: %s/%s!", pid, eid);
+		error("seteventschedulerpid: DB Error(2): %s/%s!", pid, eid);
+		retval = 0;
+		goto done;
+	}
+	retval = 1;
+  done:	
+	if (! mydb_update("unlock tables")) {
+		error("seteventschedulerpid: DB Error: unlocking table!");
 		return 0;
 	}
-	return 1;
+	mysql_free_result(res);
+	return retval;
 }
