@@ -27,7 +27,6 @@ my $optlist   = "kna";
 my $iskey     = 0;
 my $verify    = 0;
 my $auditmode = 0;
-my $anonmode  = 0;
 
 #
 # Configure variables
@@ -126,47 +125,55 @@ else {
 }
 
 #
-# Check user and get his DB uid and email stuff, unless only verfying
-# the format of the key, or if its a new user and the caller is "nobody".
-# In that case, the user better not exist.
+# Check user and get his DB uid and email stuff. If invoked as "nobody" its
+# for a user with no actual account. While we do not do anything to the
+# account (other than inserting the new key into the DB) either way, we do
+# lose the ability to fully audit what is happening (we will not know the
+# invoker of the script from the web interface).
 #
-if (getpwuid($UID) eq "nobody") {
-    if (getpwnam($user) ||
-	UserDBInfo($user, \$user_name, \$user_email)) {
-	fatal("*** $0:\n".
-	      "    Attempt to insert first key for existing user!\n");
-    }
-    # Make sure we do not mess with user table.
-    $anonmode = 1;
+if ($verify) {
+    #
+    # Silly, and complicates things.
+    # 
+    $auditmode = 0;
 }
-elsif (! $verify) {
-    if (! UNIX2DBUID($UID, \$db_uid)) {
-	fatal("*** $0:\n".
-	      "    You do not exist in the Emulab Database.\n");
-    }
-    if (! UserDBInfo($db_uid, \$db_name, \$db_email)) {
-	fatal("*** $0:\n".
-	      "    Cannot determine your name and email address.\n");
-    }
-    if ($user ne $db_uid) {
-	#
-	# Only admins can set pubkeys for another user.
-	#
-	if (!TBAdmin($UID)) {
-	    fatal("*** $0:\n".
-		  "    You are not allowed to set pubkeys for $user.\n");
-	}
-    
-	if (! UserDBInfo($user, \$user_name, \$user_email)) {
-	    fatal("*** $0:\n".
-		  "    Cannot determine name and email address for $user.\n");
-	}
-	# Always audit when setting other people's keys.
+else {
+    if (getpwuid($UID) eq "nobody") {
 	$auditmode = 1;
+	$db_uid    = $user;
     }
     else {
-	$user_name  = $db_name;
-	$user_email = $db_email;
+	if (! UNIX2DBUID($UID, \$db_uid)) {
+	    fatal("*** $0:\n".
+		  "    You do not exist in the Emulab Database.\n");
+	}
+	if ($user ne $db_uid) {
+	    #
+	    # Only admins can set pubkeys for another user.
+	    #
+	    if (!TBAdmin($UID)) {
+		fatal("*** $0:\n".
+		      "    You are not allowed to set pubkeys for $user.\n");
+	    }
+    
+	    # Always audit when setting other people's keys.
+	    $auditmode = 1;
+	}
+    }
+}
+
+#
+# Okay, if the user record does not exist yet, then send the audit message
+# to tbops only.
+# 
+if ($auditmode) {
+    if (! UserDBInfo($user, \$user_name, \$user_email)) {
+	$user_name  = "Testbed Operations";
+	$user_email = $TBOPS;
+    }
+    if (! UserDBInfo($db_uid, \$db_name, \$db_email)) {
+	$db_name  = "Testbed Audit";
+	$db_email = $TBAUDIT;
     }
 }
 
@@ -251,9 +258,8 @@ sub ParseKey($) {
     #
     # Mark user record as modified so nodes are updated.
     #
-    if (!$anonmode) {
-	DBQueryFatal("update users set usr_modified=now() where uid='$user'");
-    }
+    DBQueryFatal("update users set usr_modified=now() where uid='$user'");
+    TBNodeUpdateAccountsByUID($user);
 
     return 1;
 }
@@ -274,7 +280,8 @@ sub audit()
 	     "SSH Public Key for '$user' added by '$db_uid'.\n".
 	     "\n".
 	     "$chunked\n",
-	     "$db_name <$db_email>", "Bcc: $TBAUDIT");
+	     "$db_name <$db_email>",
+	     "Bcc: $TBAUDIT");
 }
 
 sub fatal($)
