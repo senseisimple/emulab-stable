@@ -412,7 +412,7 @@ else {
 	echo "slice1_image=slice1.ndz\n";
 	echo "slice1_sig=slice1.ndz.sig\n";
 	# Still return this for the root tag. Might change later.
-	echo "slice1_md5=d326a1f604489c43b488fa80a88221f4\n";
+	echo "slice1_md5=0cec709b70a53ce9fd0d90f5ae386aea\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
