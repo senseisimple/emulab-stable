@@ -19,19 +19,21 @@ if {[file dirname [info script]] == "."} {
 } else {
     set updir [file dirname [file dirname [info script]]]
 }
-set testbed "[file dirname [info script]]/testbed.ptop"
 set assign "$updir/assign_hw/assign"
 
 set maxrun 5
 set delaythresh .25
 
-if {[llength $argv] != 1} {
-    puts stderr "Syntax: assign <ir>"
+if {[llength $argv] != 2} {
+    puts stderr "Syntax: assign <ir> <ptop>"
     exit 1
 }
 
+set testbed [lindex $argv 1]
+set irfile [lindex $argv 0]
+
 # Generate top file.
-set fp [open $argv "r"]
+set fp [open $irfile "r"]
 
 proc readto {fp s} {
     while {[gets $fp line] >= 0} {
@@ -113,10 +115,10 @@ close $topfp
 
 # run assign on the topfile and $testbed
 puts "Running assign ($assign -b -t $testbed $tmpfile)"
-puts "  Log in [file dirname $argv]/assign.log"
+puts "  Log in [file dirname $irfile]/assign.log"
 set run 0
 while {$run < $maxrun} {
-    set assignfp [open "|$assign -b -t $testbed $tmpfile | tee -a [file dirname $argv]/assign.log" r]
+    set assignfp [open "|$assign -b -t $testbed $tmpfile | tee -a [file dirname $irfile]/assign.log" r]
     set problem 0
     set score -1
     set seed 0
@@ -162,7 +164,7 @@ if {$run > $maxrun} {
 close $assignfp
 
 # append virtual section to ir
-set fp [open $argv a]
+set fp [open $irfile a]
 
 puts "Adding virtual section"
 # XXX: we don't do links or lans yet
