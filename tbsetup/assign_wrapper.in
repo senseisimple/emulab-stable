@@ -95,10 +95,12 @@ my $delaywithswitch = 0;
 # those numbers are used at the switch and the interfaces, which really
 # only think in Mbps.
 #
-my $S10Mbs  = 10;
-my $S100Mbs = 100;
-my $S10Kbs  = 10000;
-my $S100Kbs = 100000;
+my $S10Mbs   = 10;
+my $S100Mbs  = 100;
+my $S1000Mbs = 1000;
+my $S10Kbs   = 10000;
+my $S100Kbs  = 100000;
+my $S1000Kbs = 1000000;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -1612,7 +1614,7 @@ foreach $delayid (keys(%nodedelays)) {
 
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
-    #       100Mbs on the delay node ports. This is to ensure that
+    #       their maximum speed on the delay node ports. This is to ensure that
     #       they get a valid number instead of something left over, but
     #       also because this is a simplification.
     #       At some point we might want to force all the
@@ -1621,10 +1623,18 @@ foreach $delayid (keys(%nodedelays)) {
     #       to do in this mess. See companion XXX above where portbw hash
     #       is set.
     #
+
+    my $speed0 = interfacespeedmbps(physinterfacetype($pnode,$int0));
     DBQueryFatal("update interfaces set " .
-		 "current_speed='$S100Mbs' " .
+		 "current_speed='$speed0' " .
 		 "where node_id='$pnode' and ".
-		 "(iface='$int0' or iface='$int1')");
+		 "iface='$int0'");
+
+    my $speed1 = interfacespeedmbps(physinterfacetype($pnode,$int1));
+    DBQueryFatal("update interfaces set " .
+		 "current_speed='$speed1' " .
+		 "where node_id='$pnode' and ".
+		 "iface='$int1'");
 }
 
 #
@@ -2146,6 +2156,32 @@ sub getbandwidth {
 	}
     }
     return $best;
+}
+
+# requires_delay(bw)
+# Returns 1 if the given bandwidth requires that a delay node be inserted, 0
+# if it can be handled by some interface in the testbed
+#
+# XXX - This is not totally correct. Just because such an interface exists does
+# not necessarily mean we can use it, for a variety of reasons. Eventually,
+# assign needs to handle delay nodes, because, really, only it knows what
+# interfaces it can use.
+sub requires_delay {
+    my $targetbandwidth = $_[0];
+    my $bestbandwidth = getbandwidth($targetbandwidth);
+    printdb "Checking $bestbandwidth against $targetbandwidth\n";
+    if ($bestbandwidth == $targetbandwidth) {
+	return 0;
+    }
+
+    # XXX - This assumes that all interfaces/switch ports can be slowed down,
+    # which is not true
+    if ($delaywithswitch && (($targetbandwidth == $S100Kbs) ||
+	    ($targetbandwidth == $S10Kbs))) {
+	return 0;
+    }
+
+    return 1;
 }
 
 # getnodeport(s)
@@ -2774,6 +2810,9 @@ sub LoadPhysInfo()
     }
 }
 sub interfacespeed($)	{ return $interface_types{$_[0]}->{"max_speed"}; }
+sub interfacespeedmbps($) {
+    return $interface_types{$_[0]}->{"max_speed"} / 1000.0;
+}
 sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
 sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
 sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
@@ -3181,18 +3220,27 @@ sub LoadVirtLans()
 
 	#
 	# XXX - Whenever a delay node is inserted, port speeds are set to
-	#       100Mbs, even if they requested exactly 10Mbs. This is a
-	#       simplification. At some point we might want to force all the
-	#       ports along the way to 10Mbs, and have the delay node worry
-	#       about delay only, and not bandwidth. That will be harder to
-	#       to do in this mess. See companion XXX below where the delays
-	#       table is initialized. Initially, we set the speed to 10Mbs,
-	#       if a delay node is insterted below, it resets this to 100Mbs.
+	#       the next fastest interface type we have, even if they requested
+	#       exactly some speed that can be done without a delay node such
+	#       as 10Mbs or 100Mbs. This is a simplification. At some point we
+	#       might want to force all the ports along the way to 10Mbs, and
+	#       have the delay node worry about delay only, and not bandwidth.
+	#       That will be harder to to do in this mess. See companion XXX
+	#       below where the delays table is initialized. Initially, we set
+	#       the speed to 10Mbs, if a delay node is insterted below, it
+	#       resets this to 100Mbs.
 	# 
-	if ($bandwidth == $S10Kbs && $delaywithswitch) {
-	    $portbw{$member} = $S10Mbs;
+	# XXX - Whenever a delay node is inserted, we round the port speed up
+	#       to the next fastest interface we type we have
+	if ($delaywithswitch) {
+	    if ($bandwidth == $S10Kbs) {
+		$portbw{$member} = $S10Mbs;
+	    }
+	    if ($bandwidth == $S100Kbs) {
+		$portbw{$member} = $S100Mbs;
+	    }
 	} else {
-	    $portbw{$member} = $S100Mbs;
+	    $portbw{$member} = &getbandwidth($bandwidth);
 	}
 	
 	printdb "  portbw of $member = $portbw{$member}\n";
@@ -3433,16 +3481,10 @@ sub CreateTopFile()
 	    $bandwidth = &getbandwidth(&min($bw0,$rbw1));
 	    $rbandwidth = &getbandwidth(&min($rbw0,$bw1));
 	    if (((($delay >= $delaythresh) ||
-		  (!$nobwshaping &&
-		   ((($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
-		    (($delaywithswitch == 0) && 
-		     (($bw != $S100Kbs))))) || 
+		  (!$nobwshaping && &requires_delay($bw)) ||
 		  ($loss != 0)) ||
 		 (($rdelay >= $delaythresh) ||
-		  (!$nobwshaping &&
-		   ((($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
-		    (($delaywithswitch == 0) && !$nobwshaping &&
-		     (($rbw != $S100Kbs))))) ||
+		  (!$nobwshaping && &requires_delay($rbw)) ||
 		  ($rloss != 0)) ||
 		 # Link must be shaped for other reasons (q_red).
 		 $mustdelay ||
@@ -3506,13 +3548,13 @@ sub CreateTopFile()
 			join(" ",@{$delaylinks{$plink}}) . "\n";
 		}
 		#
-		# Ports are set to 100Mbs when a link gets a delay node.
-		# This can override initialization above cause we could not
-		# tell earlier if the link was going to get a real delay node
-		# or just a delaywithswitch.
+		# Ports are set to the next-fastest speed when a link gets a
+		# delay node.  This can override initialization above cause we
+		# could not tell earlier if the link was going to get a real
+		# delay node or just a delaywithswitch.
 		#
-		$portbw{$nodeport0} = $S100Mbs;	    
-		$portbw{$nodeport1} = $S100Mbs;	    
+		$portbw{$nodeport0} = getbandwidth($bandwidth);
+		$portbw{$nodeport1} = getbandwidth($rbandwidth);
 	    } else {
 		print TOPFILE "link linksimple/$lan/$nodeport0,$nodeport1 ".
 		    "$node0 $node1";
@@ -3541,14 +3583,10 @@ sub CreateTopFile()
                 # better bandwidth support.  Probably needs to happen
                 # post assign somehow.
 		if (((($delay >= $delaythresh) ||
-		      (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
-		      (($delaywithswitch == 0) && 
-		       (($bw != $S100Kbs))) ||
+		      &requires_delay($bw) ||
 		      ($loss != 0)) || 
 		     (($rdelay >= $delaythresh) ||
-		      (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
-		      (($delaywithswitch == 0) && 
-		       (($rbw != $S100Kbs))) ||
+		      &requires_delay($rbw) ||
 		      ($rloss != 0)) ||
 		     # Link must be shaped for other reasons (q_red).
 		     $mustdelay ||
@@ -3601,13 +3639,12 @@ sub CreateTopFile()
 			    join(" ", @{$delaylinks{$plink}}) . "\n";
 		    }
 		    #
-		    # Port is set to 100Mbs when the link gets a delay
-		    # node.  This can override initialization above
-		    # cause we could not tell earlier if the link was
-		    # going to get a real delay node or just a
-		    # delaywithswitch.
+		    # Port is set to the next-fastes speed when the link gets a
+		    # delay node.  This can override initialization above cause
+		    # we could not tell earlier if the link was going to get a
+		    # real delay node or just a delaywithswitch.
 		    #
-		    $portbw{$member} = $S100Mbs;	    
+		    $portbw{$member} = $bandwidth;	    
 		} else {
 		    print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
 			" $bandwidth 0 0";
@@ -3734,6 +3771,38 @@ sub LoadPhysNode($)
     return $phys_nodes{$pnode};
 }
 
+#
+# Load the a phys node's interfaces. These are the entries from the interfaces
+# table.
+#
+sub LoadPhysNodeInterfaces($)
+{
+    my ($pnode) = @_;
+    
+    if (! exists($phys_node_interfaces{$pnode})) {
+	$phys_node_interfaces{$pnode} = {};
+	my $query_result =
+	    DBQueryFatal("select * from interfaces as i ".
+			 "where i.node_id='$pnode'");
+
+	while (my $rowref = $query_result->fetchrow_hashref()) {
+
+	    my $iface = $rowref->{iface};
+
+	    #
+	    # Stash the entire DB row reference. 
+	    #
+	    $phys_node_interfaces{$pnode}{$iface} = $rowref;
+	}
+
+    }
+    return $phys_node_interfaces{$pnode};
+}
+sub physnodeinterface($$) { return $phys_node_interfaces{$_[0]}{$_[1]}; }
+sub physinterfacetype($$) {
+    return $phys_node_interfaces{$_[0]}{$_[1]}{"interface_type"};
+}
+
 sub LoadPhysResources()
 {
     foreach my $pnode (keys(%p2vmap)) {
@@ -3741,6 +3810,9 @@ sub LoadPhysResources()
 
 	# Load the physical node. 
 	LoadPhysNode($pnode);
+
+	# Load the physical node's interfaces
+	LoadPhysNodeInterfaces($pnode);
 
 	#
 	# Typically, its one-to-one, unless its a physnode hosting
