@@ -13,6 +13,8 @@ use Socket;
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
+use libsetup qw(JailedNFSMounts REMOTE);
+
 #
 # Questions:
 #
@@ -94,7 +96,7 @@ my $tmccpid;
 my $interactive = 0;
 my %jailconfig  = ();
 my $jailoptions;
-my $sshdport	= 50000;
+my $sshdport;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -269,7 +271,10 @@ sub mkrootfs($)
     # Find a free vndevice.
     #
     for (my $i = 0; $i < $MAXVNDEVS; $i++) {
-	system("vnconfig -e -s labels vn${i} root.vnode");
+	# Make sure the dev entries exist!
+	mysystem("(cd /dev; ./MAKEDEV vn${i})");
+	
+	system("vnconfig -c vn${i} root.vnode");
 	if (! $?) {
 	    $vndevice = $i;
 	    last;
@@ -277,7 +282,10 @@ sub mkrootfs($)
     }
     fatal("Could not find a free vn device!") 
 	if (!defined($vndevice));
+    print("Using vn${vndevice}\n")
+ 	if ($debug);
 
+    mysystem("vnconfig -s labels vn${vndevice} root.vnode");
     mysystem("disklabel -r -w vn${vndevice} auto");
     mysystem("newfs -b 8192 -f 1024 -i 4096 -c 15 /dev/vn${vndevice}c");
     mysystem("tunefs -m 2 -o space /dev/vn${vndevice}c");
@@ -396,6 +404,17 @@ sub mkrootfs($)
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
     }
 
+    #
+    # Ug. Until we have SFS working the way I want it, NFS mount the
+    # usual directories inside the jail. This duplicates a lot of mounts,
+    # but not sure what to do about that. 
+    #
+    if (! REMOTE()) {
+	foreach my $dir ( JailedNFSMounts($HOST, "$path/root") ) {
+	    push(@mntpoints, "$path/root/$dir");
+	}
+    }
+
     cleanmess($path);
     return 0;
 }
@@ -414,7 +433,10 @@ sub restorerootfs($)
     # Find a free vndevice.
     #
     for (my $i = 0; $i < $MAXVNDEVS; $i++) {
-	system("vnconfig -e -s labels vn${i} root.vnode");
+	# Make sure the dev entries exist!
+	mysystem("(cd /dev; ./MAKEDEV vn${i})");
+	
+	system("vnconfig -c vn${i} root.vnode");
 	if (! $?) {
 	    $vndevice = $i;
 	    last;
@@ -422,7 +444,10 @@ sub restorerootfs($)
     }
     fatal("Could not find a free vn device!") 
 	if (!defined($vndevice));
+    print("Using vn${vndevice}\n")
+ 	if ($debug);
 
+    mysystem("vnconfig -s labels vn${vndevice} root.vnode");
     mysystem("fsck -y /dev/vn${vndevice}c");
     mysystem("mount /dev/vn${vndevice}c root");
     push(@mntpoints, "$path/root");
@@ -449,6 +474,17 @@ sub restorerootfs($)
 	mysystem("mkdir -p $path/root/$LOCALMNTPNT/$PID");
 	mysystem("mount localhost:$LOCALFS/$PID $path/root/$LOCALMNTPNT/$PID");
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
+    }
+
+    #
+    # Ug. Until we have SFS working the way I want it, NFS mount the
+    # usual directories inside the jail. This duplicates a lot of mounts,
+    # but not sure what to do about that. 
+    #
+    if (! REMOTE()) {
+	foreach my $dir ( JailedNFSMounts($HOST, "$path/root") ) {
+	    push(@mntpoints, "$path/root/$dir");
+	}
     }
     return 0;
 }
@@ -630,6 +666,11 @@ sub setjailoptions() {
 	    /^PORTRANGE$/ && do {
 		if ($val =~ /(\d+),(\d+)/) {
 		    $jailoptions .= " -p $1:$2";
+		}
+		last SWITCH;
+	    };
+	    /^SSHDPORT$/ && do {
+		if ($val =~ /(\d+)/) {
 		    $sshdport     = $1;
 		}
 		last SWITCH;
@@ -674,6 +715,9 @@ sub setjailoptions() {
  		last SWITCH;
  	    };
 	}
+    }
+    if (!defined($sshdport)) {
+	$sshdport = 50000;
     }
     print("SSHD port is $sshdport\n");
 
