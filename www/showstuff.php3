@@ -992,7 +992,7 @@ function SHOWNODELOG($node_id)
 	$log_id     = $row[log_id];
 	$reporter   = $row[reporting_uid];
 	$date       = $row[reported];
-	$entry      = $row[entry];
+	$entry      = stripslashes($row[entry]);
 
 	echo "<tr>
  	         <td align=center>
@@ -1029,7 +1029,7 @@ function SHOWNODELOGENTRY($node_id, $log_id)
     $log_id     = $row[log_id];
     $reporter   = $row[reporting_uid];
     $date       = $row[reported];
-    $entry      = $row[entry];
+    $entry      = stripslashes($row[entry]);
 
     echo "<tr>
              <td>$date</td>
