@@ -80,6 +80,10 @@ if (! mkdir("$PROJROOT/$pid", 0770)) {
     die("Could not make directory $PROJROOT/$pid: $!\n");
 }
 
+if (! chmod(0770, "$PROJROOT/$pid")) {
+    die("Could not chmod directory $PROJROOT/$pid: $!\n");
+}
+
 if (! chown($uid, $gid, "$PROJROOT/$pid")) {
     die("Could not chown $PROJROOT/$pid to $uid/$gid: $!\n");
 }
@@ -89,6 +93,9 @@ if (! chown($uid, $gid, "$PROJROOT/$pid")) {
 # 
 if (! mkdir("$PROJROOT/$pid/exp", 0770)) {
     die("Could not make directory $PROJROOT/$pid/exp: $!\n");
+}
+if (! chmod(0770, "$PROJROOT/$pid/exp")) {
+    die("Could not chmod directory $PROJROOT/$pid/exp: $!\n");
 }
 if (! chown($uid, $gid, "$PROJROOT/$pid/exp")) {
     die("Could not chown $PROJROOT/$pid/exp to $uid/$gid: $!\n");
