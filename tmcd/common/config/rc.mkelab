@@ -92,7 +92,7 @@ my ($bossname, $bossip) = tmccbossinfo();
 
 # Cert stuff to give the inner emulab
 my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
-my $RPCPORT = 7778;
+#my $RPCPORT = 7778;
 
 #
 # Find out our domain name, so that we can qualify the localhost entry
@@ -194,7 +194,7 @@ sub doboot()
     # XXX To avoid NFS errors while copying goo from outer boss.
     # 
     system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");    
-    system("sysctl vfs.nfs.eacces_retry_count=5 >/dev/null 2>&1");    
+    system("sysctl vfs.nfs.eacces_retry_count=20 >/dev/null 2>&1");    
 
     if ($emulabconfig{"ROLE"} eq "ops") {
 	SetupOpsNode();
@@ -229,12 +229,64 @@ sub SetupOpsNode()
     mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src");
 
     #
+    # The mirror tree is copied to temp storage, and then copied into
+    # place later.
+    #
+    if (-e "/proj/$pid/mirror") {
+	print "Copying over mirror tree from /proj/$pid/mirror\n";
+	mysystem("rsync -a --delete /proj/$pid/mirror ${TBDIR}");
+    }
+
+    #
     # Stash the IP of the outer emulab for tmcc (and script above).
     # We use an IP to avoid DNS issues (there will be a DNS running inside).
     # Ditto for the current router. Need that for later (rc.inelab).
     # 
     mysystem("echo '${bossip}' > $ETCDIR/outer_bossnode");
     mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
+
+    #
+    # Need outer ip and netmask and iface for hardwired config below.
+    #
+    if (! -e "$BOOTDIR/myip") {
+	SetupFatal("$BOOTDIR/myip does not exist!");
+    }
+    my $outer_ip = `cat $BOOTDIR/myip`;
+    chomp($outer_ip);
+    
+    if (! -e "$BOOTDIR/mynetmask") {
+	SetupFatal("$BOOTDIR/mynetmask does not exist!");
+    }
+    my $outer_netmask = `cat $BOOTDIR/mynetmask`;
+    chomp($outer_netmask);
+
+    if (! -e "$BOOTDIR/controlif") {
+	SetupFatal("$BOOTDIR/controlif does not exist!");
+    }
+    my $outer_controlif = `cat $BOOTDIR/controlif`;
+    chomp($outer_controlif);
+
+    #
+    # Need outer control router IP below too.
+    #
+    if (! -e "$BOOTDIR/routerip") {
+	SetupFatal("$BOOTDIR/routerip does not exist!");
+    }
+    my $outer_routerip = `cat $BOOTDIR/routerip`;
+    chomp($outer_routerip);
+
+    #
+    # We also need the hardwired config for the inner control network.
+    # Major kludge; should get it from tmcd data.
+    #
+    my @ifacelist;
+    
+    if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
+	SetupFatal("Could not get ifconfig from libsetup!");
+    }
+    my $inner_controlif = $ifacelist[0]->{IFACE};
+    my $inner_ip        = $ifacelist[0]->{IPADDR};
+    my $inner_netmask   = $ifacelist[0]->{IPMASK};
 
     #
     # Run the prepare script to clear out the current accounts and such.
@@ -316,9 +368,14 @@ sub SetupOpsNode()
 
     print RC "syslogd_flags=\"-a $control_network\"\n";
 
-    print RC "network_interfaces=\"lo0\"\n";
-    print RC "ifconfig_lo0=\"DHCP\"\n";
-    print RC "dhcp_program=\"$BINDIR/dhclient\"\n";
+    print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
+    print RC "ifconfig_${outer_controlif}=".
+	"\"inet $outer_ip netmask $outer_netmask\"\n";
+    print RC "ifconfig_${inner_controlif}=".
+	"\"inet $inner_ip netmask $inner_netmask ".
+	"media 100baseTX mediaopt full-duplex\"\n";
+    print RC "static_routes=\"outerboss\"\n";
+    print RC "route_outerboss=\"$bossip $outer_routerip\"\n";
 
     print RC "defaultrouter=\"$bossnode_ip\"\n";
     print RC "hostname=\"" . $emulabconfig{"OPSNODE"} . "." . $domain . "\"\n";
@@ -384,6 +441,20 @@ sub SetupOpsNode()
     print RC "search $domain\n";
     print RC "nameserver $bossnode_ip\n";
     close(RC);
+
+    #
+    # Hmm, need to run this at startup though.
+    # 
+    mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
+	     "   >> /etc/rc.local");
+
+    #
+    # Copy the mirror tree into place. Do not use rsync.
+    #
+    if (0 && -e "${TBDIR}/mirror") {
+	print "Copying mirror tree into place\n";
+	mysystem("cp -Rfp ${TBDIR}/mirror/ /");
+    }
 }
 
 sub SetupBossNode()
@@ -423,6 +494,21 @@ sub SetupBossNode()
     mysystem("cp -p $BOOTDIR/myip $ETCDIR/outer_ipaddr");
 
     #
+    # Need outer ip and netmask for hardwired config below.
+    #
+    if (! -e "$BOOTDIR/myip") {
+	SetupFatal("$BOOTDIR/myip does not exist!");
+    }
+    my $outer_ip = `cat $BOOTDIR/myip`;
+    chomp($outer_ip);
+    
+    if (! -e "$BOOTDIR/mynetmask") {
+	SetupFatal("$BOOTDIR/mynetmask does not exist!");
+    }
+    my $outer_netmask = `cat $BOOTDIR/mynetmask`;
+    chomp($outer_netmask);
+
+    #
     # Need outer control router IP below too.
     #
     if (! -e "$BOOTDIR/routerip") {
@@ -439,6 +525,19 @@ sub SetupBossNode()
     }
     my $outer_controlif = `cat $BOOTDIR/controlif`;
     chomp($outer_controlif);
+
+    #
+    # We also need the hardwired config for the inner control network.
+    # Major kludge; should get it from tmcd data.
+    #
+    my @ifacelist;
+    
+    if (getifconfig(\@ifacelist) != 0 || !@ifacelist) {
+	SetupFatal("Could not get ifconfig from libsetup!");
+    }
+    my $inner_controlif = $ifacelist[0]->{IFACE};
+    my $inner_ip        = $ifacelist[0]->{IPADDR};
+    my $inner_netmask   = $ifacelist[0]->{IPMASK};
 
     #
     # Run the prepare script to clear out the current accounts and such.
@@ -502,9 +601,14 @@ sub SetupBossNode()
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
 
-    print RC "network_interfaces=\"lo0\"\n";
-    print RC "ifconfig_lo0=\"DHCP\"\n";
-    print RC "dhcp_program=\"$BINDIR/dhclient\"\n";
+    print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
+    print RC "ifconfig_${outer_controlif}=".
+	"\"inet $outer_ip netmask $outer_netmask\"\n";
+    print RC "ifconfig_${inner_controlif}=".
+	"\"inet $inner_ip netmask $inner_netmask ".
+	"media 100baseTX mediaopt full-duplex\"\n";
+    print RC "static_routes=\"outerboss\"\n";
+    print RC "route_outerboss=\"$bossip $outer_routerip\"\n";
 
     #
     # Use natd so that internal control network can talk to outside world.
@@ -618,7 +722,12 @@ sub SetupBossNode()
     #
     mysystem("echo 'ipfw add 10 allow udp from any to 224.0.0.0/4' ".
 	     "   >> /etc/rc.local");
-    
+
+    #
+    # Hmm, need to run this at startup though.
+    #
+    mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
+	     "   >> /etc/rc.local");
 }
 
 #
@@ -680,7 +789,9 @@ sub CreateDefsFile($)
 		    print OUTDEFS "OUTERBOSS_NODENAME=${bossname}\n";
 		    print OUTDEFS "OUTERBOSS_SSLCERTNAME=$RPCCERT\n";
 		    # Debugging
-		    print OUTDEFS "OUTERBOSS_XMLRPCPORT=$RPCPORT\n";
+		    if (defined($RPCPORT)) {
+			print OUTDEFS "OUTERBOSS_XMLRPCPORT=$RPCPORT\n";
+		    }
 		    last SWITCH;
 		};
 		/^USERNODE$/ && do {
@@ -765,6 +876,7 @@ sub CreateDefsFile($)
 		};
 		/^FRISEBEEMCASTADDR$/ && do {
 		    print OUTDEFS "FRISEBEEMCASTADDR=\"$frismcastaddr\"\n";
+		    print OUTDEFS "FRISEBEEMCASTPORT=\"6000\"\n";
 		    last SWITCH;
 		};
 		
@@ -839,9 +951,11 @@ sub mysystem($)
     my ($command) = @_;
 
     print "Command: '$command\'\n";
+    print "Started at:  " . libsetup::TBTimeStamp() . "\n";
 
     system($command);
     if ($?) {
 	SetupFatal("Command failed: $? - $command");
     }
+    print "Finished at: " . libsetup::TBTimeStamp() . "\n";
 }
