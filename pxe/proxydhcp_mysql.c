@@ -36,9 +36,8 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 	MYSQL_RES *res;
 	MYSQL_ROW row;
 	char dbquery[] =
-		"select pxe_boot_path, next_pxe_boot_path from nodes as n "
-		"left join interfaces as i on "
-		"i.node_id=n.node_id "
+		"select pxe_boot_path,next_pxe_boot_path from interfaces as i "
+		"left join nodes as n on i.node_id=n.node_id "
 	        "where i.IP = '%s'";
 
 #define PXEBOOT_PATH		0
