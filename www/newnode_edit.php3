@@ -50,9 +50,12 @@ foreach ($HTTP_GET_VARS as $key => $value) {
     	$switch_id   = $HTTP_GET_VARS["iface${card}_switch_id"];
     	$switch_card = $HTTP_GET_VARS["iface${card}_switch_card"];
     	$switch_port = $HTTP_GET_VARS["iface${card}_switch_port"];
+    	$cable       = $HTTP_GET_VARS["iface${card}_cable"];
+    	$len         = $HTTP_GET_VARS["iface${card}_len"];
     	DBQueryFatal("UPDATE new_interfaces SET mac='$mac', " .
 	    "interface_type='$type', switch_id='$switch_id', " .
-	    "switch_card='$switch_card', switch_port='$switch_port' " .
+	    "switch_card='$switch_card', switch_port='$switch_port', " .
+	    "cable='$cable', len=$len " .
 	    "WHERE new_node_id=$id AND card='$card'");
     }
 }
@@ -115,6 +118,8 @@ $row = mysql_fetch_array($query_result)
 
 <h3 align="center">Interfaces</h3>
 
+<em>Note:</em>Cable and Length are for informational use only, and are optional.
+
 <table align="center">
 <tr>
     <th>Interface</th>
@@ -123,12 +128,15 @@ $row = mysql_fetch_array($query_result)
     <th>Switch</th>
     <th>Card</th>
     <th>Port</th>
+    <th>Cable</th>
+    <th>Length</th>
 </tr>
 
 <?
 
 $query_result = DBQueryFatal("SELECT card, mac, interface_type, switch_id, " .
-	"switch_card, switch_port FROM new_interfaces where new_node_id=$id");
+	"switch_card, switch_port, cable, len FROM new_interfaces " .
+	"where new_node_id=$id");
 while ($row = mysql_fetch_array($query_result)) {
     $card        = $row['card'];
     $mac         = $row['mac'];
@@ -136,6 +144,8 @@ while ($row = mysql_fetch_array($query_result)) {
     $switch_id   = $row['switch_id'];
     $switch_card = $row['switch_card'];
     $switch_port = $row['switch_port'];
+    $cable       = $row['cable'];
+    $len         = $row['len'];
     echo "<tr>\n";
     echo "<td>$card</td>\n";
     echo "<td><input type='text' name='iface${card}_mac' size=12 " .
@@ -148,6 +158,10 @@ while ($row = mysql_fetch_array($query_result)) {
 	"value='$switch_card'></td>\n";
     echo "<td><input type='text' name='iface${card}_switch_port' size=3 " .
 	"value='$switch_port'></td>\n";
+    echo "<td><input type='text' name='iface${card}_cable' size=5 " .
+	"value='$cable'></td>\n";
+    echo "<td><input type='text' name='iface${card}_len' size=3 " .
+	"value='$len'></td>\n";
     echo "</tr>\n";
 }
 
