@@ -9,6 +9,7 @@
 use English;
 use Getopt::Std;
 use Digest::MD5  qw(md5 md5_hex md5_base64);
+use Errno qw(ESRCH);
 use BSD::Resource;
 
 # Need this module to use mktemp (commented out below)
@@ -557,15 +558,21 @@ sub KillOldRender()
 
     if ($procid > 0 &&
 	! kill('TERM', $procid)) {
-	DBQueryWarn("update experiments set ".
-		    "prerender_pid=-prerender_pid ".
-		    "where pid='$pid' and eid='$eid'");
-	
-	SENDMAIL($TBOPS,
-		 "Failed to stop prerender for $pid/$eid",
-		 "Could not kill(TERM) process $procid: $? $!");
+	my $err = $!;
 
-	die("*** $0:\n".
-	    "Failed to stop prerender for $pid/$eid!\n");
+	if ($err == ESRCH) {
+	    warn "Prerender process $procid for $pid/$eid already dead";
+	} else {
+	    DBQueryWarn("update experiments set ".
+			"prerender_pid=-prerender_pid ".
+			"where pid='$pid' and eid='$eid'");
+	
+	    SENDMAIL($TBOPS,
+		     "Failed to stop prerender for $pid/$eid",
+		     "Could not kill(TERM) process $procid: $? $err");
+
+	    die("*** $0:\n".
+		"Failed to stop prerender for $pid/$eid!\n");
+	}
     }
 }
