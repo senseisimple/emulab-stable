@@ -249,22 +249,31 @@ function CHECKLOGIN($uid) {
 # conditions. 
 #
 function LOGGEDINORDIE($uid, $modifier = 0) {
+    global $TBBASE, $BASEPATH;
+    
+    $link = "\n<blockquote><blockquote>\n".
+	"<table class=\"menu\" cellpadding=10 cellspacing=0 align=center>\n".
+	"<tr>\n<td class=\"menufooter\" align=center valign=center>\n".
+	"<a href=\"$TBBASE/login.php3?refer=1\">".
+	"<img alt=\"logon\" border=0 src=\"$BASEPATH/logon.gif\"></a>\n".
+	"</td></tr></table>\n</blockquote></blockquote>\n";
+
     if ($uid == FALSE)
-        USERERROR("You do not appear to be logged in!", 1);
+        USERERROR("You do not appear to be logged in! $link", 1);
     
     $status = CHECKLOGIN($uid);
 
     switch ($status & CHECKLOGIN_STATUSMASK) {
     case CHECKLOGIN_NOTLOGGEDIN:
-        USERERROR("You do not appear to be logged in!", 1);
+        USERERROR("You do not appear to be logged in! $link", 1);
         break;
     case CHECKLOGIN_TIMEDOUT:
-        USERERROR("Your login has timed out! Please log in again.", 1);
+        USERERROR("Your login has timed out! Please log in again. $link", 1);
         break;
     case CHECKLOGIN_MAYBEVALID:
         USERERROR("Your login cannot be verified. Are cookies turned on? ".
 		  "Are you using https? Are you logged in using another ".
-		  "browser or another machine?", 1);
+		  "browser or another machine? $link", 1);
         break;
     case CHECKLOGIN_LOGGEDIN:
 	break;
