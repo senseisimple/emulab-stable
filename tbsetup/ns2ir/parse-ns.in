@@ -38,6 +38,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Testbed Support libraries
 #
 use lib "@prefix@/lib";
+use libdb;
 use libtestbed;
 
 #
@@ -75,8 +76,24 @@ waitpid($pid, 0);
 #
 if (($? >> 8) == SIGKILL) {
     my $msg = "Overran its CPU limit on 'parse.tcl @ARGV'";
+    my $user_name;
+    my $user_email;
+    my $dbuid;
+    my $to;
 
-    SENDMAIL($TBOPS, "Parser Exceeded CPU Limit", $msg);
+    #
+    # Get email info for user.
+    #
+    if (UNIX2DBUID($UID, \$dbuid) &&
+	UserDBInfo($dbuid, \$user_name, \$user_email)) {
+	$to = "$user_name <$user_email>";
+    }
+    else {
+	$to = $TBOPS;
+    }
+
+    SENDMAIL($to, "Parser Exceeded CPU Limit", $msg,
+	     undef, "CC: $TBOPS", ($ARGV[$#ARGV]));
     print STDERR "Parser Exceeded CPU Limit: 'parse.tcl @ARGV'\n";
     exit(15);
 }

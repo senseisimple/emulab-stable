@@ -26,7 +26,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $parser   = "$TB/libexec/ns2ir/parse.tcl";
+my $parser   = "$TB/libexec/ns2ir/parse-ns";
 my $mkexpdir = "$TB/libexec/mkexpdir";
 my $startexp = "$TB/bin/startexp";
 my $tbdata   = "tbdata";
