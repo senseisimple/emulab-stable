@@ -57,7 +57,7 @@ never compromised. Okay, lets get serious.
 
 
 Okay, enough about security. Lets talk about building and installing
-testbed software. I'll describe how I operate; other in the group almost
+testbed software. I'll describe how I operate; others in the group almost
 certainly do things very differently.
 
 * Each developer uses their own devel tree in /usr/testbed/devel/user in
@@ -67,8 +67,11 @@ certainly do things very differently.
   well. The exception are the long running daemons, which are harder to
   debug in a devel tree environment.
 
-  Typically, your devel tree uses the same database as the main tree, so
-  you want to be careful about making changes that could screw up the DB.
+* Typically, your devel tree uses the same database as the main tree, so
+  you want to be careful about making changes that could screw up the
+  DB. Note that we have the ability to run from your own copy of the
+  DB, but that requires another section in this document. If you want
+  to do this, send email and ask!
 
 * To create a devel tree:
 
@@ -76,6 +79,23 @@ certainly do things very differently.
 	cd ~/testbed
 	mkdir obj-devel
 	cvs checkout testbed
+
+  Also:
+	# Links your web tree into the main tree so you get to it.
+	ln -s /usr/testbed/www/dev/kwebb /usr/testbed/devel/kwebb/www
+
+	# Need these certs for various parts of the system to work
+	# properly, and they need to be be identical to the installed
+	# versions.
+	mkdir -p /usr/testbed/devel/USER/etc
+	cd /usr/testbed/devel/USER/etc
+	ln -s /usr/testbed/etc/emulab.pem .
+	ln -s /usr/testbed/etc/server.pem .
+
+	# There is an install tree on ops, via NFS that is used.
+	mkdir /usr/testbed/opsdir/devel/USER
+	cd /usr/testbed/devel/USER
+	ln -s /usr/testbed/opsdir/devel/USER opsdir
 
 * You need to have a "defs" file for configure to run. Each developer has
   their own defs file. Take a look at defs-stoller-emulab. It should be
