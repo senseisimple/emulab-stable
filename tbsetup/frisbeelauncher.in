@@ -8,6 +8,7 @@ my $TB		= "@prefix@";
 
 use lib "@prefix@/lib";
 use libdb;
+use libtestbed;
 
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
@@ -50,7 +51,9 @@ if (!$address) {
 my $filename = &get_filename($imageid);
 
 # Run in the background
-&daemonize;
+if (TBBackGround($LOGFILE)) {
+    exit(0);
+}
 
 # Set up a signal handler that will clean up in case we get killed
 $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
@@ -211,16 +214,4 @@ sub clear_address {
 	my $address_clear = "UPDATE images SET load_address='' " .
 		"WHERE imageid='$imageid'";
 	DBQueryFatal($address_clear);
-}
-
-# Stolen shamlessly from the perlipc manpage
-sub daemonize {
-	chdir '/' or die "Can't chdir to /: $!";
-	open STDIN, '/dev/null' or die "Can't read /dev/null: $!";
-
-	open STDOUT, ">>$LOGFILE" or die "Can't write to $LOGFILE: $!";
-	defined(my $pid = fork) or die "Can't fork: $!";
-	exit if $pid;
-	setsid or die "Can't start a new session: $!";
-	open STDERR, '>&STDOUT' or die "Can't dup stdout: $!";
 }
