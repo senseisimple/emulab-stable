@@ -1173,7 +1173,7 @@ class swapexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "we:s:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1187,6 +1187,9 @@ class swapexp:
                 return 0
             elif opt == "-w":
                 params["wait"] = "yes"
+                pass
+            elif opt == "-s":
+                params["direction"] = val
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -1204,11 +1207,12 @@ class swapexp:
                 self.usage();
                 return -1;
             
-            params["proj"]      = req_args[0];
-            params["exp"]       = req_args[1];
-            params["direction"] = req_args[2];
+            params["proj"] = req_args[0];
+            params["exp"]  = req_args[1];
+            req_args       = req_args[2:];
             pass
-        elif len(req_args) != 1:
+
+        if not params.has_key("direction") && len(req_args) != 1:
             self.usage();
             return -1;
         else:
