@@ -837,7 +837,7 @@ sub doifconfig (;$)
 		    
 		$upcmds   .= "$upline\n    "
 		    if (defined($upline));
-		$upcmds   .= TMROUTECONFIG . " $inet up\n";
+		$upcmds   .= TMROUTECONFIG . " $inet up\n    ";
 		
 		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
 		$downcmds .= "$downline\n    "
@@ -845,8 +845,8 @@ sub doifconfig (;$)
 
 		# There could be routes for each alias.
 		foreach my $alias (split(',', $aliases)) {
-		    $upcmds   .= TMROUTECONFIG . " $alias up\n";
-		    $downcmds .= TMROUTECONFIG . " $alias down\n";
+		    $upcmds   .= TMROUTECONFIG . " $alias up\n    ";
+		    $downcmds .= TMROUTECONFIG . " $alias down\n    ";
 		}
 	    }
 	    else {
@@ -877,7 +877,7 @@ sub doifconfig (;$)
 		    os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,$rtabid);
 		    
 		$upcmds   .= "$upline\n    ";
-		$upcmds   .= TMROUTECONFIG . " $inet up\n";
+		$upcmds   .= TMROUTECONFIG . " $inet up\n    ";
 		
 		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
 		$downcmds .= "$downline\n    "

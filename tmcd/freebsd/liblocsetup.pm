@@ -73,7 +73,7 @@ my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $IFCONFIGBIN = "/sbin/ifconfig";
 my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s %s %s";
 my $IFALIAS     = "$IFCONFIGBIN %s alias %s netmask 0xffffff00";
-my $IFC_1000MBS = "media 1000baseSX";
+my $IFC_1000MBS = "media 1000baseTX";
 my $IFC_100MBS  = "media 100baseTX";
 my $IFC_10MBS   = "media 10baseT/UTP";
 my $IFC_FDUPLEX = "mediaopt full-duplex";
@@ -162,7 +162,7 @@ sub os_ifconfig_line($$$$$$;$)
 
     if ($aliases ne "") {
 	# Must do this first to avoid lo0 routes.
-	$uplines .= "\n".
+	$uplines .= "\n    ".
 	            "sysctl -w net.link.ether.inet.useloopback=0\n";
 
 	foreach my $alias (split(',', $aliases)) {
