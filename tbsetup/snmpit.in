@@ -792,7 +792,7 @@ sub doRecreateVlans($) {
     #
 
     if (!TBAdmin()) {
-	warn "Sorry, only admins get to use this functions\n";
+	warn "Sorry, only admins get to use this function\n";
 	return 0;
     }
 
@@ -820,7 +820,13 @@ sub doRecreateVlans($) {
 	my @stackVlans = $stack->listVlans();
 	foreach my $vlan (@stackVlans) {
 	    my $id = $$vlan[0];
-	    push (@vlansToNuke,$id);
+	    #
+	    # Special case - don't try to delete the 'switch-control' VLAN,
+	    # because that's the one we're talking to the switches on.
+	    #
+	    if ($id ne 'switch-control') {
+		push (@vlansToNuke,$id);
+	    }
 	}
     }
 
