@@ -57,12 +57,12 @@
  * How close does the angle have to be before it is considered at the intended
  * angle.
  */
-#define RADIAN_TOLERANCE 0.01
+#define RADIAN_TOLERANCE 0.09
 
 /**
  * Maximum number of times to try and refine the position before giving up.
  */
-#define MAX_REFINE_RETRIES 5
+#define MAX_REFINE_RETRIES 3
 
 /**
  * Do a fuzzy comparison of two values.
