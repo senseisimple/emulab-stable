@@ -18,12 +18,13 @@
  *
  * ---------------------------
  *
- * $Id: reply.c,v 1.1 2000-07-06 17:42:38 kwright Exp $
+ * $Id: reply.c,v 1.2 2000-07-06 22:51:47 kwright Exp $
  */
 
 
 #include "discvr.h"
 #include "packet.h"
+#include "util.h"
 
 extern u_char myNodeID[ETHADDRSIZ];
 extern topd_inqid_t inqid_current;
@@ -36,8 +37,8 @@ u_int32_t
 compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen) 
 {
 	struct ifi_info    *ifihead;
-        u_char              *nw;
-	u_char              *nid;
+        char               *nw;
+	char               *nid;
 
 	nw = (u_char *) mesg;
 	
@@ -78,5 +79,6 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen)
 		        /* We have neighbors */
 		}
 	}
-	return 1;
+
+	return (nw - mesg);
 }
