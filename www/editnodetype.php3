@@ -246,6 +246,16 @@ function SPITFORM($node_type, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
+             <td>Boot Disk Unit (0-255):</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[bootdisk_unit]\"
+                        value=\"" . $formfields[bootdisk_unit] . "\"
+	                size=6>
+             </td>
+          </tr>\n";
+
+    echo "<tr>
              <td>isvirtnode:</td>
              <td class=left>
                  <input type=text
@@ -317,12 +327,12 @@ function SPITFORM($node_type, $formfields, $errors)
 
 if ($new_type) {
     #
-    # We've starting a new node type - let's give some reasonable defaults
+    # Starting a new node type - let's give some reasonable defaults
     #
     $defaults = array("class" => "pc", "power_time" => 60, "imageable" => 1,
 	"delay_capacity" => 2, "disktype" => "ad", "isvirtnode" => 0,
 	"isremotenode" => 0, "issubnode" => 0, "isplabdslice" => 0,
-	"issimnode" => 0, "simnode_capacity" => 20);
+	"issimnode" => 0, "simnode_capacity" => 20, "bootdisk_unit" => 0);
 } else {
     #
     # We're editing an existing type - suck the current info out of the
@@ -563,6 +573,16 @@ if (isset($formfields[disktype]) && $formfields[disktype] != "") {
     }
     else {
 	$inserts["disktype"] = $formfields[disktype];
+    }
+}
+
+# bootdisk_unit
+if (isset($formfields[bootdisk_unit]) && $formfields[bootdisk_unit] != "") {
+    if (! TBvalid_tinyint($formfields[bootdisk_unit])) {
+	$errors["bootdisk_unit"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["bootdisk_unit"] = $formfields[bootdisk_unit];
     }
 }
 

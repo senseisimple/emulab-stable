@@ -834,6 +834,7 @@ CREATE TABLE node_types (
   virtnode_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
   disktype enum('ad','da','ar') default NULL,
+  bootdisk_unit tinyint(3) unsigned NOT NULL default '0',
   delay_osid varchar(35) default NULL,
   jail_osid varchar(35) default NULL,
   pxe_boot_path text,
