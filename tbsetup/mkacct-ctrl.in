@@ -121,6 +121,7 @@ my $user_email  = $db_row[3];
 my @groupnames;
 my %groupnumbers;
 my @grouplist;
+my @tipservers;
 
 #
 # Form a list of project (group) membership names. We do this in two
@@ -153,6 +154,17 @@ while (@db_row = $query_result->fetchrow_array() ) {
 # Note hardwired control node. 
 # 
 my $control_node = $CONTROL;
+
+#
+# We need a list of tipservers to build groups on so that the console
+# lines can get the appropriate group permissions. 
+#
+$query_result =
+    DBQueryFatal("select * from tipservers");
+
+while (@db_row = $query_result->fetchrow_array() ) {
+    push(@tipservers, $db_row[0]);
+}
 
 #
 # Create groups on both the control and operations nodes. We assume
@@ -196,6 +208,19 @@ foreach my $group ( @groupnames ) {
 
 	if (system("$SSH $control_node $GROUPADD $group -g $group_number")) {
 	    fatal("Could not add $group ($group_number) to $control_node!\n");
+	}
+    }
+
+    #
+    # On tipservers too.
+    #
+    foreach my $tipserver ( @tipservers ) {
+	if (system("$SSH $tipserver egrep -q -s '^${group}:' /etc/group")) {
+	    print "Adding group $group to $tipserver\n";
+
+	    if (system("$SSH $tipserver $GROUPADD $group -g $group_number")) {
+		fatal("Could not add $group ($group_number) to $tipserver!\n");
+	    }
 	}
     }
 }

@@ -21,6 +21,7 @@ my $CONTROL  = "@USERNODE@";
 my $PROJROOT = "/proj";
 my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
+my $errors   = 0;
 
 #
 # Untaint the path
@@ -67,13 +68,13 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 #
-# Ensure that the project is not in the database!
+# Unix info for the group
 #
-my $query_result =
-    DBQueryFatal("select head_uid from projects where pid='$pid'");
+my $unix_gid;
+my $unix_name;
 
-if ($query_result->numrows) {
-    die("*** Project '$pid' is still in the database!\n");
+if (! TBGroupUnixInfo($pid, $pid, \$unix_gid, \$unix_name)) {
+    die("*** No info for project $pid!");
 }
 
 #
@@ -107,8 +108,10 @@ if (! chown(0, 0, $newname)) {
 #
 # Now remove the group from the group file on both plastic and paper.
 #
-if (system("$GROUPDEL $pid")) {
-    die("*** Could not remove group $pid fron operatons node (paper)\n");
+if (system("$GROUPDEL $unix_name")) {
+    warn("*** WARNING: ".
+	 "Could not remove group $pid from operations node!\n");
+    $errors++;
 }
 
 #
@@ -116,9 +119,30 @@ if (system("$GROUPDEL $pid")) {
 # 
 $UID = 0;
 
-if (system("$SSH $CONTROL $GROUPDEL $pid")) {
-    die("*** Could not remove group $pid fron control node ($CONTROL)\n");
+if (system("$SSH $CONTROL $GROUPDEL $unix_name")) {
+    warn("*** WARNING: ".
+	 "Could not remove group $pid from from $CONTROL!\n");
 }
 
-exit(0);
+#
+# Remove group on the tip servers. 
+#
+my @tipservers;
+
+$query_result =
+    DBQueryFatal("select * from tipservers");
+
+while (@db_row = $query_result->fetchrow_array() ) {
+    push(@tipservers, $db_row[0]);
+}
+
+foreach my $tipserver ( @tipservers ) {
+    if (system("$SSH $tipserver $GROUPDEL $unix_name")) {
+	warn("*** WARNING: ".
+	     "Could not remove group $pid from $tipserver!\n");
+	$errors++;
+    }
+}
+
+exit($errors);
 

@@ -107,15 +107,15 @@ $query_result =
     DBQueryFatal("delete FROM group_membership where pid='$pid'");
 
 #
+# Remove the project directory and the group.
+#
+SUEXEC($uid, "flux", "rmproj $pid", 0);
+
+#
 # Then the project table itself.
 # 
 $query_result =
     DBQueryFatal("delete FROM projects where pid='$pid'");
-
-#
-# Remove the project directory. 
-#
-SUEXEC($uid, "flux", "rmproj $pid", 0);
 
 #
 # Warm fuzzies.

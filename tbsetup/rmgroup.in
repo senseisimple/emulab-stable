@@ -138,5 +138,25 @@ if (system("$SSH $CONTROL $GROUPDEL $unix_name")) {
     $errors++;
 }
 
-exit(errors);
+#
+# Remove group on the tip servers. 
+#
+my @tipservers;
+
+$query_result =
+    DBQueryFatal("select * from tipservers");
+
+while (@db_row = $query_result->fetchrow_array() ) {
+    push(@tipservers, $db_row[0]);
+}
+
+foreach my $tipserver ( @tipservers ) {
+    if (system("$SSH $tipserver $GROUPDEL $unix_name")) {
+	warn("*** WARNING: ".
+	     "Could not remove group $unix_name from $tipserver!\n");
+	$errors++;
+    }
+}
+
+exit($errors);
 
