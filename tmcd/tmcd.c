@@ -1143,20 +1143,16 @@ COMMAND_PROTOTYPE(doifconfig)
 	 */
 	res = mydb_query("select i.card,i.IP,i.IPalias,i.MAC,i.current_speed,"
 			 "       i.duplex,i.IPaliases,i.iface,i.role,i.mask,"
-			 "       i.rtabid,i.interface_type,v.vname "
+			 "       i.rtabid,i.interface_type,vl.vname "
 			 "  from interfaces as i "
-			 "left join reserved as r on "
-			 "     r.node_id=IFNULL(i.vnode_id,i.node_id) "
-			 "left join virt_nodes as n on n.pid=r.pid and "
-			 "     n.eid=r.eid and n.vname=r.vname "
-			 "left join virt_lans as v on "
-			 "     v.member=CONCAT(r.vname, ':', "
-			 "          SUBSTRING(n.ips,"
-			 "                    POSITION(i.IP in n.ips)-2,1)) "
-			 "     and v.pid=r.pid and v.eid=r.eid "
+			 "left join virt_lans as vl on "
+			 "  vl.pid='%s' and vl.eid='%s' and "
+			 "  vl.vnode='%s' and vl.ip=i.IP "
 			 "where i.node_id='%s' and %s",
-			 13, reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
+			 13, reqp->pid, reqp->eid, reqp->nickname,
+			 reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
 			 clause);
+
 	/*
 	 * We need pnodeid in the query. But error reporting is done
 	 * by nodeid. For vnodes, nodeid is pcvmXX-XX and for the rest
@@ -1355,17 +1351,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "  from veth_interfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
-			 "left join reserved as r on "
-			 "     r.node_id=IFNULL(v.vnode_id,v.node_id) "
-			 "left join virt_nodes as n on n.pid=r.pid and "
-			 "     n.eid=r.eid and n.vname=r.vname "
 			 "left join virt_lans as vl on "
-			 "     vl.member=CONCAT(r.vname, ':', "
-			 "          SUBSTRING(n.ips,"
-			 "                    POSITION(v.IP in n.ips)-2,1)) "
-			 "     and vl.pid=r.pid and vl.eid=r.eid "
+			 "  vl.pid='%s' and vl.eid='%s' and "
+			 "  vl.vnode='%s' and vl.ip=v.IP "
 			 "where v.node_id='%s' and %s",
-			 7, reqp->pnodeid, buf);
+			 7, reqp->pid, reqp->eid, reqp->nickname,
+			 reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -2153,6 +2144,7 @@ COMMAND_PROTOTYPE(dohosts)
 	char		buf[MYBUFSIZE];
 	int		hostcount, nrows;
 	int		rv = 0;
+	char		*thisvnode = (char *) NULL;
 
 	/*
 	 * We build up a canonical host table using this data structure.
@@ -2164,6 +2156,8 @@ COMMAND_PROTOTYPE(dohosts)
 		char	*firstvlan;	/* The first vlan to another node */
 		int	is_me;          /* 1 if this node is the tmcc client */
 	};
+	struct shareditem *shareditem = (struct shareditem *) NULL;
+	
 	struct hostentry {
 		char	nodeid[TBDB_FLEN_NODEID];
 		char	vname[TBDB_FLEN_VNAME];
@@ -2192,17 +2186,18 @@ COMMAND_PROTOTYPE(dohosts)
 	  reserved table contains a vname which is generated in the case of
 	  nse
 	 */
-	res = mydb_query("select v.vname,v.ips,v2p.node_id from virt_nodes as v "
+	res = mydb_query("select v.vname,v.vnode,v.ip,v.vport,v2p.node_id "
+			 "    from virt_lans as v "
 			 "left join v2pmap as v2p on "
-			 "     v.vname=v2p.vname and v.pid=v2p.pid and "
+			 "     v.vnode=v2p.vname and v.pid=v2p.pid and "
 			 "     v.eid=v2p.eid "
 			 "where v.pid='%s' and v.eid='%s' and "
 			 "      v2p.node_id is not null "
-			 "      order by v2p.node_id",
-			 3, reqp->pid, reqp->eid);
+			 "      order by v.vnode",
+			 5, reqp->pid, reqp->eid);
 
 	if (!res) {
-		error("HOSTNAMES: %s: DB Error getting virt_nodes!\n",
+		error("HOSTNAMES: %s: DB Error getting virt_lans!\n",
 		      reqp->nodeid);
 		return 1;
 	}
@@ -2215,102 +2210,44 @@ COMMAND_PROTOTYPE(dohosts)
 	 * Parse the list, creating an entry for each node/IP pair.
 	 */
 	while (nrows--) {
-		char		  *bp, *ip, *cp;
-		struct shareditem *shareditem;
-		
 		row = mysql_fetch_row(res);
 		if (!row[0] || !row[0][0] ||
 		    !row[1] || !row[1][0])
 			continue;
 
-		if (! (shareditem = (struct shareditem *)
-		       calloc(1, sizeof(*shareditem)))) {
-			error("HOSTNAMES: Out of memory for shareditem!\n");
-			exit(1);
+		if (!thisvnode || strcmp(thisvnode, row[1])) {
+			if (! (shareditem = (struct shareditem *)
+			       calloc(1, sizeof(*shareditem)))) {
+				error("HOSTNAMES: "
+				      "Out of memory for shareditem!\n");
+				exit(1);
+			}
+			thisvnode = row[1];
 		}
 
 		/*
 		 * Check to see if this is the node we're talking to
 		 */
-		if (!strcmp(row[0],reqp->nickname)) {
+		if (!strcmp(row[1], reqp->nickname)) {
 		    shareditem->is_me = 1;
 		}
 
-		bp = row[1];
-		while (bp) {
-			/*
-			 * Note that the ips column is a space separated list
-			 * of X:IP where X is a logical interface number.
-			 */
-			cp = strsep(&bp, ":");
-			ip = strsep(&bp, " ");
-
-			if (! (host = (struct hostentry *)
-			              calloc(1, sizeof(*host)))) {
-				error("HOSTNAMES: Out of memory!\n");
-				exit(1);
-			}
-
-			strcpy(host->vname, row[0]);
-			strcpy(host->nodeid, row[2]);
-			host->virtiface = atoi(cp);
-			host->shared = shareditem;
-			inet_aton(ip, &host->ipaddr);
-			host->next = hosts;
-			hosts = host;
-		}
-	}
-	mysql_free_result(res);
-
-	/*
-	 * Now we need to find the virtual lan name for each interface on
-	 * each node. This is the user or system generated vlan name, and is
-	 * in the virt_lans table. We use the virtiface number we got above
-	 * to match on the member slot.
-	 */
-	res = mydb_query("select vname,member from virt_lans "
-			 " where pid='%s' and eid='%s'",
-			 2, reqp->pid, reqp->eid);
-
-	if (!res) {
-		error("HOSTNAMES: %s: DB Error getting virt_lans!\n",
-		      reqp->nodeid);
-		rv = 1;
-		goto cleanup;
-	}
-	if (! (nrows = mysql_num_rows(res))) {
-		mysql_free_result(res);
-		rv = 1;
-		goto cleanup;
-	}
-
-	while (nrows--) {
-		char	*bp, *cp;
-		int	virtiface;
-		
-		row = mysql_fetch_row(res);
-		if (!row[0] || !row[0][0] ||
-		    !row[1] || !row[1][0])
-			continue;
-
 		/*
-		 * Note that the members column looks like vname:X
-		 * where X is a logical interface number we got above.
-		 * Loop through and find the entry and stash the vlan
-		 * name.
+		 * Alloc the per-link struct and fill in.
 		 */
-		bp = row[1];
-		cp = strsep(&bp, ":");
-		virtiface = atoi(bp);
-
-		host = hosts;
-		while (host) {
-			if (host->virtiface == virtiface &&
-			    strcmp(cp, host->vname) == 0) {
-				strcpy(host->vlan, row[0]);
-			}
-			host = host->next;
+		if (! (host = (struct hostentry *) calloc(1, sizeof(*host)))) {
+			error("HOSTNAMES: Out of memory!\n");
+			exit(1);
 		}
+
+		strcpy(host->vlan, row[0]);
+		strcpy(host->vname, row[1]);
+		strcpy(host->nodeid, row[4]);
+		host->virtiface = atoi(row[3]);
+		host->shared = shareditem;
+		inet_aton(row[2], &host->ipaddr);
+		host->next = hosts;
+		hosts = host;
 	}
 	mysql_free_result(res);
 
@@ -2434,7 +2371,6 @@ COMMAND_PROTOTYPE(dohosts)
 	}
 #endif
 	info("HOSTNAMES: %d hosts in list\n", hostcount);
- cleanup:
 	host = hosts;
 	while (host) {
 		struct hostentry *tmphost = host->next;
@@ -4493,40 +4429,33 @@ COMMAND_PROTOTYPE(dojailconfig)
 	/*
 	 * Now return the IP interface list that this jail has access to.
 	 * These are tunnels or ip aliases on the real interfaces, but
-	 * its easier just to consult the virt_nodes table. That table has
-	 * a funky format, but thats okay.
+	 * its easier just to consult the virt_lans table for all the
+	 * ip addresses for this vnode.
 	 */
 	bufp  = buf;
 	bufp += OUTPUT(bufp, ebufp - bufp, "IPADDRS=\"");
 
-	res = mydb_query("select ips from virt_nodes "
-			 "where vname='%s' and pid='%s' and eid='%s'",
+	res = mydb_query("select ip from virt_lans "
+			 "where vnode='%s' and pid='%s' and eid='%s'",
 			 1, reqp->nickname, reqp->pid, reqp->eid);
 
 	if (!res) {
-		error("JAILCONFIG: %s: DB Error getting virt_nodes table\n",
+		error("JAILCONFIG: %s: DB Error getting virt_lans table\n",
 		      reqp->nodeid);
 		return 1;
 	}
 	if (mysql_num_rows(res)) {
-		char *bp, *cp, *ip;
-			
-		row = mysql_fetch_row(res);
+		int nrows = mysql_num_rows(res);
 
-		if (row[0] && row[0][0]) {
-			bp = row[0];
-			while (bp) {
-				/*
-				 * Note that the ips column is a space
-				 * separated list of X:IP where X is a
-				 * logical interface number.
-				 */
-				cp = strsep(&bp, ":");
-				ip = strsep(&bp, " ");
+		while (nrows) {
+			nrows--;
+			row = mysql_fetch_row(res);
 
-				bufp += OUTPUT(bufp, ebufp - bufp, "%s", ip);
-				if (bp)
+			if (row[0] && row[0][0]) {
+				bufp += OUTPUT(bufp, ebufp - bufp, "%s", row[0]);
+				if (nrows)
 					bufp += OUTPUT(bufp, ebufp - bufp, ",");
+				
 			}
 		}
 	}
