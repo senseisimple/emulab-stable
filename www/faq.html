@@ -506,21 +506,32 @@
     <p>
     You can use command mentioned above (<tt>tb-set-node-startup</tt>)
     in your NS file to specify a simple script in your home directory
-    that will do this. For instance, if I had a node called router,
-    and wanted to turn on routing in it, I would add these two lines
+    that will do this.
+    </p>
+
+    <h4>Simple Topologies</h4>
+    <p>
+    For instance, if I had a node called router,
+    and wanted to turn on routing in it, I would add this line
     to my NS file:
 <pre>
-tb-set-node-os $router FBSD-STD
 tb-set-node-startup $router /users/myname/router-startup
 </pre>
-    That would cause router to boot FreeBSD, and call my
-    router-startup script, which should look like this:
+    That would cause router to run my
+    router-startup script, which should look like this for FreeBSD:
 <pre>
 #!/bin/sh
 sudo sysctl -w net.inet.ip.forwarding=1
 sudo sysctl -w net.inet.ip.fastforwarding=1
 exit 0
 </pre>
+
+    Or this, for Linux:
+<pre>
+#!/bin/sh
+sudo sysctl -w net.ipv4.conf.all.forwarding=1
+</pre>
+
     That will make sure that routing gets turned on when my router
     node boots. Now say I have a client on one side of the router,
     and a server on the other side, and I want to establish a route
@@ -539,6 +550,14 @@ tb-set-node-startup $server /users/myname/serverroutecmd
 sudo route add server-0 router
 exit 0
 </pre>
+
+    Or, for Linux:
+<pre>
+#!/bin/sh
+sudo route add server-0 gw router
+exit 0
+</pre>
+
     Similarly, to add a route (on server) to interface 0 of the client
     through router, I would use this serverroutecmd script:
 <pre>
@@ -550,6 +569,43 @@ exit 0
     routes and forwards packets, and a client and a server that know
     how to talk to each other through a gateway router.
     </p>
+
+    <h4>Complex Topologies</h4>
+    <p>
+    In complex topologies with multiple routers, each end node will need
+    a route to the entire experimental network, through its local router.
+    For FreeBSD, this is done with:
+<pre>
+#!/bin/sh
+sudo route add -net 192.168.0.0 -netmask 255.255.0.0 myrouter
+exit 0
+</pre>
+    Or, for Linux,
+<pre>
+#!/bin/sh
+sudo route add -net 192.168.0.0 netmask 255.255.0.0 gw myrouter
+exit 0
+</pre>
+    </p>
+
+    <p>
+    You can make a single script that will handle all end nodes, by replacing
+    "myrouter" in the above commands with "$1", and specifying the router in
+    your NS file:
+<pre>
+tb-set-node-startup $clientA {/users/myname/router-startup router0}
+tb-set-node-startup $clientB {/users/myname/router-startup router1}
+</pre>
+    </p>
+
+    <p>
+    For multiple routers, the startup script for each router will need to
+    contain a set of routes for all subnets it is not directly connected
+    to. This will differ, depending on the toplogy you are using. To make
+    this task easier, you can use the <tt>tb-set-ip</tt> command in your NS
+    file, so that you know which subnets will be assigned to which nodes.
+    </p>
+
     <p>
     Please see the
     <a href="tutorial/docwrapper.php3?docname=nscommands.html">Extensions</a>
