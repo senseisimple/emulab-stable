@@ -1,0 +1,195 @@
+#!/usr/bin/perl -wT
+use English;
+   
+#
+# XXX Paper and plastic IP addresses wired into the kernel choice.
+#     Paths to the images are wired in.
+#     Path to netdisk is wired in.
+#     Need to reset the partitions when reloading the entire disk.
+# 
+
+#
+# Schedule the reloading of a disk partition on a node. If the node is
+# currently not reserved, start the loading now after reserving it to 
+# testbed:reloading. Otherwise, put the right info into the database, and 
+# nfree will do it when the node gets freed.
+# 
+# usage: sched_reload <imageid> <imagepart> <imagepath> <node> [node ...]
+#
+my $rsh		= "sshtb -q";
+my $ssh		= "sshtb -q";
+my $TB		= "/usr/testbed/bin";
+my $NETDISK     = "/tftpboot/netdisk";
+my $PAPERADDR	= "155.99.214.70";
+my $PLASTICADDR	= "155.99.214.74";
+my $power	= "$TB/power";
+my $osload      = "$TB/os_load";
+my $ping	= "/sbin/ping";
+my $dbg		= 1;
+my %waitfor     = ();
+my $SAVEUID	= $UID;
+my @row;
+my $name        = "";
+my $mereuser    = 0;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+
+if ( $#ARGV < 3) {
+    die("Usage: sched_reload <imageid> <imagepart> <imagepath> <node> [node ...]\n".
+	"Schedules the loading of an OS image to a node partition.\n");
+}
+my $imageid   = shift;
+my $imagepart = shift;
+my $imagepath = shift;
+my @nodes     = @ARGV;
+
+#
+# Figure out who called us. Root and admin types can do whatever they
+# want. Normal users can only change nodes in experiments in their
+# own projects.
+#
+if ($UID != 0) {
+    ($name) = getpwuid($UID)
+	or die "$UID not in passwd file";
+
+    $db_result = $DB->query("select admin from users where uid='$name'");
+    @row = $db_result->fetchrow_array();
+    if ($row[0] != 1) {
+	$mereuser = 1;
+    }
+}
+
+#
+# Mere Users cannot schedule reloads.
+#
+if ($mereuser) {
+    die("Only root or TB administrators can schedule disk reloads.\n");
+}
+
+#
+# Check to make sure that mere user is allowed to muck with nodes
+#
+#if ($mereuser) {
+#    foreach my $node (@nodes) {
+#	$db_result = $DB->query("select reserved.node_id from reserved ".
+#				"left join proj_memb on ".
+#				"reserved.pid=proj_memb.pid and ".
+#				"reserved.node_id='$node' ".
+#				"where proj_memb.uid='$name'");
+#	if ($db_result->numrows < 1) {
+#	    die("You do not have permission to load images on $node\n");
+#	}
+#    }
+#}
+
+#
+# We only support 0 or 4 right now.
+#
+if ($imagepart != 0 && $imagepart != 4) {
+    die("Only the entire disk or partition 4 can be loaded.");
+}
+
+#
+# The image has to be accessible, and it must reside in the right places.
+#
+if (! -e $imagepath) {
+    die("Cannot access $imagepath.");
+}
+if (! -f $imagepath) {
+    die("$imagepath is not a plain file.");
+}
+
+#
+# 0 means load the entire disk. 
+#
+my $diskpart = "";
+if ($imagepart) {
+    $diskpart = "wd0 s${imagepart}";
+}
+else {
+    $diskpart = "wd0";
+}
+
+#
+# Do the best we can
+# 
+my @load_list=();
+foreach my $node (@nodes) {
+    my $pc = $node;
+
+    # Untaint the arguments. Sheer idiocy.
+    #
+    if ($pc =~ /^([-\@\w.]+)$/) {
+	$pc = $1;
+    }
+    if ($imageid =~ /^([-\@\w.]+)$/) {
+	$imageid = $1;
+    } else {
+        print STDERR "Imageid contains invalid characters. Skipping $pc.\n";
+	next;
+    }
+    if ($imagepart =~ /^([-\@\w.]+)$/) {
+	$imagepart = $1;
+    } else {
+        print STDERR "Imagepart contains invalid characters. Skipping $pc.\n";
+	next;
+    }
+    if ($imagepath =~ /^([-\@\w.\/]+)$/) {
+	$imagepath = $1;
+    } else {
+        print STDERR "Imagepath contains invalid characters. Skipping $pc.\n";
+	next;
+    }
+
+    # Always put it in the reloads table so TMCD knows to free it.
+    print STDERR "Scheduling reload for $pc:\n".
+      "Load OS $imageid to partition $imagepart from $imagepath\n";
+    $sth = $DB->query("replace into reloads ".
+		      "(node_id, partition, image_id, path)".
+		      "values ('$pc', '$imagepart',".
+		      "'$imageid', '$imagepath')");
+    if ($sth == 0) {
+      die("Database update failed (reloads). Aborted...\n");
+    }
+
+    print STDERR "Checking if $pc is reserved...";
+    $sth = $DB->query("select * from reserved ".
+		      "where node_id='$pc'");
+    if ($sth == 0) {
+	die("Database lookup failed (reserved). Aborted...\n");
+    }
+    
+    if ( ($sth->num_rows()) < 1) {
+        print STDERR "Available.\nReserving and adding to list.\n";
+	my $cmd = "$TB/nalloc testbed reloading $pc";
+        if ( system($cmd) != 0 ) {
+	    print STDERR "WARNING: Could not reserve $pc!\n";
+	} else {
+	    push (@load_list,$pc);
+	}
+    } else {
+        print STDERR "Reserved.\n";      
+    }
+}
+
+if (@load_list > 0) {
+  print STDERR "Running os_load on ",join(", ",@load_list),":\n";
+  $cmd = "$osload $imageid $imagepart $imagepath @load_list";
+  print STDERR "Calling '$cmd'\n";
+  if ( system($cmd) != 0 ) {
+    print STDERR "WARNING: OS_LOAD FAILED ON @load_list!\n";
+  }
+}
+
+print STDOUT "Reload Scheduling Done!\n";
+exit 0;
