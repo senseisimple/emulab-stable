@@ -12,11 +12,11 @@ foreach my $mac ( @ARGV ) {
   if ( $mac =~ /^(sh\d+)(-\d)?(:\d)?$/ ) {
     my $node = $1. (defined $2 ? $2 : "-" );
     $list[$n] .= "(node_id like '$node%')";
-  } elsif ( $mac =~ /^(\w+\d+):(\d+)$/ ) {
+  } elsif ( $mac =~ /^([a-zA-Z]+\d+):(\d+)$/ ) {
     my $node=$1;
     my $if=$2;
     $list[$n] .= "(node_id='$node' and card='$if')";
-  } elsif ( $mac =~ /^(\w+\d+)$/ ) {
+  } elsif ( $mac =~ /^([a-zA-Z]+\d+)$/ ) {
     my $node=$1;
     $list[$n] .= "(node_id='$node')";
   } else {
