@@ -275,7 +275,8 @@ if ($showlinks) {
 	}
     }
 
-    if (keys %links) {
+    if (keys %links &&
+	    (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
 	#
 	# First, show using recent widearea data
 	#
@@ -289,12 +290,12 @@ if ($showlinks) {
 	while (my ($node_id1, $node_id2, $time, $bandwidth,
 		$lossrate) = $result->fetchrow) {
 	    $delaymap{"$node_id1 $node_id2"} = 
-	    	[$time * 1000, $bandwidth * 8, $lossrate];
+	    	[$time * 1000 / 2, $bandwidth * 8, $lossrate];
 	}
 
 	print  "Wide-Area Lan/Link Info: Recent Data\n";
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-		"ID", "Source", "Destination", "Delay", "BW (Kbs)", "Loss Rate";
+		"ID", "Source", "Destination", "Delay/2", "BW (Kbs)", "Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 		"--------- ---------\n";
 
