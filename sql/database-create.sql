@@ -709,6 +709,7 @@ CREATE TABLE node_types (
   control_iface text,
   disktype enum('ad','da','ar') default NULL,
   delay_osid varchar(35) default NULL,
+  jail_osid varchar(35) default NULL,
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   isremotenode tinyint(4) NOT NULL default '0',
