@@ -16,7 +16,6 @@ LOGGEDINORDIE($uid);
 <table align="center" border="1"> 
 <tr>
     <td align="center" colspan="2">
-        <h1>Syntax check an NS file</h1>
         <font size="+1">
                Use this page to syntax check your NS file before
                submitting it.

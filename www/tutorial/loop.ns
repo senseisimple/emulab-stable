@@ -1,0 +1,19 @@
+# This is a simple ns script that demonstrates loops.
+set ns [new Simulator]                  
+source tb_compat.tcl
+
+set maxnodes 3
+
+for {set i 1} {$i <= $maxnodes} {incr i} {
+    set node($i) [$ns node]
+    tb-set-node-os $node($i) FBSD40-STD
+}
+
+for {set i 1} {$i < $maxnodes} {incr i} {
+	set next $i;
+	incr next;
+	$ns duplex-link $node($i) $node($next) 100Mb 0ms DropTail
+}
+
+# Go!
+$ns run                                 

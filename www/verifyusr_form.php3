@@ -14,7 +14,6 @@ LOGGEDINORDIE($uid);
 
 ?>
 
-<h1>New User Verification</h1>
 <p>
 The purpose of this page is to verify, for security purposes, that
 information given in your application is correct. If you never

@@ -6,10 +6,6 @@ include("defs.php3");
 #
 PAGEHEADER("Utah Testbed Machine Status");
 
-echo "<center>
-     <h1>Utah Testbed Machine Status</h1>
-     </center>\n";
-
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT n.node_id, n.type, j.eid FROM nodes ".
 	"AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".

@@ -51,10 +51,6 @@ if (! $isadmin) {
     }
 }
 
-echo "<center><h1>
-      Node Control Center: $node_id
-      </h1></center>";
-
 $node_id            = $row[node_id]; 
 $type               = $row[type];
 $def_boot_image_id  = $row[def_boot_image_id];

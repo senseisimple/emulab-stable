@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Start a New Project");
+PAGEHEADER("Start a New Testbed Project");
 
 #
 # First off, sanity check the form to make sure all the required fields

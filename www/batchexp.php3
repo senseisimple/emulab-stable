@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Create a Batch Mode Experiment");
+PAGEHEADER("Creating a Batch Mode Experiment");
 
 $mydebug = 0;
 

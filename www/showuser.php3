@@ -54,9 +54,6 @@ if (!$isadmin) {
     }
 }
 
-echo "<center>
-      <h3>User Information</h3>
-      </center>\n";
 SHOWUSER($target_uid);
 
 echo "</center>\n";

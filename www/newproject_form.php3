@@ -1,7 +1,7 @@
 <?php
 include("defs.php3");
 
-PAGEHEADER("Start a New Project");
+PAGEHEADER("Start a New Testbed Project");
 
 #
 # Get current user.

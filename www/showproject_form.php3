@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show Experiment Information Form");
+PAGEHEADER("Show Project Information Form");
 
 #
 # Only known and logged in users can end experiments.

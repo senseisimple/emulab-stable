@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Terminate Project and Remove all Trace");
+PAGEHEADER("Terminating Project and Remove all Trace");
 
 #
 # Only known and logged in users can end experiments.

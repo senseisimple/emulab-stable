@@ -28,8 +28,6 @@ if (!isset($pid) ||
     USERERROR("You must provide a project ID.", 1);
 }
 
-echo "<center><h1>Approve a Project</h1></center>\n";
-
 #
 # Check to make sure thats this is a valid PID.
 #

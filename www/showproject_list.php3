@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show Experiment Information List");
+PAGEHEADER("Project Information List");
 
 #
 # Only known and logged in users can end experiments.
@@ -47,10 +47,6 @@ if (mysql_num_rows($query_result) == 0) {
 	    USERERROR("You are not a leader of any projects!", 1);
 	}
 }
-
-echo "<center><h3>
-      Project List
-      </h3></center>\n";
 
 echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
        align='center'>\n";

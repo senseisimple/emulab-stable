@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Confirming Verification");
+PAGEHEADER("Confirm Verification");
 
 #
 # Only known and logged in users can be verified. UID came in as a post var.
@@ -18,8 +18,6 @@ if (!isset($key) || strcmp($key, "") == 0) {
     USERERROR("Missing field; ".
               "Please go back and fill out the \"key\" field!", 1);
 }
-
-echo "<h1>Confirming Verification</h1><p>";
 
 #
 # The user is logged in, so all we need to do is confirm the key.

@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show User Information List");
+PAGEHEADER("User List");
 
 #
 #
@@ -46,10 +46,6 @@ if (mysql_num_rows($query_result) == 0) {
 	    USERERROR("There are no users in any of your projects!", 1);
 	}
 }
-
-echo "<center><h3>
-      User List
-      </h3></center>\n";
 
 echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
        align='center'>\n";

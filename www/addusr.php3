@@ -1,7 +1,7 @@
 <?php
 include("defs.php3");
 
-PAGEHEADER("New User");
+PAGEHEADER("Apply for Project Membership");
 
 #
 # Get current user.
@@ -44,11 +44,6 @@ else {
 ?>
 
 <table align="center" border="1"> 
-<tr>
-    <td colspan="2">
-        <h1 align="center">Apply for Project Membership</h1></td>
-</tr>
-
 <tr>
     <td align="center" colspan="2">
         Fields marked with * are required.</td>

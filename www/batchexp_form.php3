@@ -31,12 +31,6 @@ if (mysql_num_rows($query_result) == 0) {
 ?>
 <table align="center" border="1"> 
 <tr>
-    <td align="center" colspan="2">
-        <h1>Create a new Batch Mode Experiment on the Testbed</h1>
-    </td>
-</tr>
-
-<tr>
     <td align="center" colspan="3">
         <em>(Fields marked with * are required)</em>
     </td>

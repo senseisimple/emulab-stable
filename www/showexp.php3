@@ -58,9 +58,6 @@ if (!$isadmin) {
 #
 # Dump experiment record.
 # 
-echo "<center>
-      <h1>Experiment Information</h1>
-      </center>\n";
 SHOWEXP($exp_pid, $exp_eid);
 
 # Terminate option.

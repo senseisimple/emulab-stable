@@ -12,10 +12,6 @@ PAGEHEADER("New Users Approved");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-echo "<center><h1>
-      Project Membership Results
-      </h1></center>";
-
 #
 # Walk the list of post variables, looking for the special post format.
 # See approveuser_form.php3:

@@ -15,10 +15,6 @@ if (!isset($nid) ||
 }
 $pid = addslashes($pid);
 
-echo "<center>
-     <h1>Utah Testbed Machine Bandwidth Monitoring</h1>
-     </center>\n";
-
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * from wires where node_id1='$nid'");
 if (! $query_result) {

@@ -12,8 +12,6 @@ PAGEHEADER("New Project Approval List");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-echo "<center><h1>Approve New Projects List</h1></center>\n";
-
 #
 # Of course verify that this uid has admin privs!
 #

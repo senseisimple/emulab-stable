@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Cancel Batch Mode Experiment");
+PAGEHEADER("Cancel a Batch Mode Experiment");
 
 #
 # Only known and logged in users can end experiments.
@@ -48,12 +48,22 @@ $row = mysql_fetch_array($query_result);
 if (! $isadmin) {
     $query_result =
 	mysql_db_query($TBDBNAME,
-		       "SELECT pid FROM proj_memb ".
+		       "SELECT pid,trust FROM proj_memb ".
 		       "WHERE uid=\"$uid\" and pid=\"$exp_pid\"");
     
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("You are not a member of Project $exp_pid for ".
 		  "Experiment: $exp_eid.", 1);
+    }
+    
+    if (($row = mysql_fetch_row($query_result)) == 0) {
+	TBERROR("Database Error: Getting trust for uid $uid.", 1);
+    }
+    $trust = $row[1];
+    
+    if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
+	USERERROR("You are not group or local root in Project $exp_pid, ".
+		  "so you cannot end batch experiments", 1);
     }
 }
 

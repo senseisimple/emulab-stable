@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show Experiment Information Form");
+PAGEHEADER("Experiment Information Listing");
 
 #
 # Only known and logged in users can end experiments.
@@ -31,13 +31,13 @@ else {
     $experiments_result = mysql_db_query($TBDBNAME,
 	"select e.pid,eid,expt_name from experiments as e ".
 	"left join proj_memb as p on p.pid=e.pid ".
-	"where p.uid='$uid' and (trust='local_root' or trust='group_root') ".
+	"where p.uid='$uid' ".
 	"order by e.pid,eid,expt_name");
 
     $batch_result = mysql_db_query($TBDBNAME,
 	"select e.pid,eid,name from batch_experiments as e ".
 	"left join proj_memb as p on p.pid=e.pid ".
-	"where p.uid='$uid' and (trust='local_root' or trust='group_root') ".
+	"where p.uid='$uid' ".
 	"order by e.pid,eid,name");
 }
 if (mysql_num_rows($experiments_result) == 0 &&
@@ -45,10 +45,6 @@ if (mysql_num_rows($experiments_result) == 0 &&
     USERERROR("There are no experiments running in any of the projects ".
               "you are a member of.", 1);
 }
-
-echo "<center>
-       <h1>Experiment Information Listing</h1>
-      </center>\n";
 
 if (mysql_num_rows($experiments_result)) {
     echo "<center>

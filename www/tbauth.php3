@@ -123,7 +123,7 @@ function LOGGEDINORDIE($uid) {
     $status = CHECKLOGIN($uid);
     switch ($status) {
     case 0:
-        USERERROR("You do not appear to be logged in!", 1);
+        USERERROR("You $uid do not appear to be logged in!", 1);
         break;
     case 1:
         return $uid;

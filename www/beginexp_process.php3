@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Begin an Experiment");
+PAGEHEADER("Beginning a Testbed Experiment");
 
 $mydebug = 0;
 

@@ -1,7 +1,7 @@
 <html>
 <head>
 	<title>Emulab Tutorial</title>
-	<link rel='stylesheet' href='../tbstyle-doc.css' type='text/css'>
+	<link rel='stylesheet' href='../tbstyle.css' type='text/css'>
 </head>
 <body>
 <basefont size=4>
@@ -12,49 +12,621 @@
 
 <h2>Contents</h2>
 <ul>
-<li> <a href="basic.html">Getting Started</a>
+<li> <a href="#GettingStarted">Getting Started</a>
     <ul>
-    <li> <a href="basic.html#LoggingIn">Logging into the Web Interface</a>
-    <li> <a href="basic.html#Designing">Designing a Network Topology</a>
-    <li> <a href="basic.html#Beginning">Beginning the Experiment</a>
-    <li> <a href="basic.html#UsingNodes">Using your Nodes</a>
-    <li> <a href="basic.html#RootAccess">I need <b>root</b> access!</a>
-    <li> <a href="basic.html#Wedged">My node is wedged!</a>
-    <li> <a href="basic.html#Finished">I've finished my experiment</a>
-    <li> <a href="basic.html#Help">Getting Help!</a>
+    <li> <a href="#LoggingIn">Logging into the Web Interface</a>
+    <li> <a href="#Designing">Designing a Network Topology</a>
+    <li> <a href="#Beginning">Beginning the Experiment</a>
+    <li> <a href="#UsingNodes">Using your Nodes</a>
+    <li> <a href="#RootAccess">I need <b>root</b> access!</a>
+    <li> <a href="#Wedged">My node is wedged!</a>
+    <li> <a href="#Finished">I've finished my experiment</a>
+    <li> <a href="#Help">Getting Help!</a>
     </ul>
-<li> <a href="advanced.html">Advanced Topics</a>
+<li> <a href="#Advanced">Advanced Topics</a>
     <ul>
-    <li> <a href="advanced.html#RPMS">Installing RPMS automatically</a>
-    <li> <a href="advanced.html#Startupcmd">
+    <li> <a href="#RPMS">Installing RPMS automatically</a>
+    <li> <a href="#Startupcmd">
             Starting your application automatically</a>
-    <li> <a href="advanced.html#ReadyBits">
+    <li> <a href="#ReadyBits">
             How do I know when all my nodes are ready?</a>
-    <li> <a href="advanced.html#Delta">
+    <li> <a href="#Delta">
             Customizing an OS (How to create a <i>delta</i>)</a>
     </ul>
-<li> <a href="batchmode.html">Batch Mode Experiments</a>
-<li> <a href="image.html">Creating your own disk image</a>
+<li> <a href="#BatchMode">Batch Mode Experiments</a>
+<li> <a href="#CustomOS">Creating your own disk image</a>
 </ul>
 
-<hr size=2 noshade>
+
+<hr>
+<a NAME="GettingStarted"></a>
 <center>
-<!-- Force full window! -->
-<base target=_top>
-[<a href="https://www.emulab.net/">Emulab.Net Home</a>]<br>
-[<a href="http://www.cs.utah.edu/flux/testbed/">Utah Network Testbed</a>]
-[<a href="http://www.cs.utah.edu/flux/">Flux Research Group</a>]
-[<a href="http://www.cs.utah.edu/">School of Computing</a>]
-[<a href="http://www.utah.edu/">University of Utah</a>]
-</center>  
-<p align=right>
-<font size="-1">
-<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
-   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
-<br>
-Last modified on Mar 14, 2001
-</font>
+<h2>Getting Started</h2>
+</center>
+
+<p>
+This section of the tutorial describes how to run your first Testbed
+experiment. We cover basic NS syntax and various operational issues
+that you will need to know in order conduct experiments to completion.
+Later sections of the tutorial will cover more advanced topics such as
+loading your own RPMs automatically, running programs automatically,
+running batch jobs, creating your own disk images and loading those
+images on your nodes. 
 </p>
 
-</body>
-</html>
+<h2>Contents</h2>
+<ul>
+<li> <a href="#LoggingIn">Logging into the Web Interface</a>
+<li> <a href="#Designing">Designing a Network Topology</a>
+<li> <a href="#Beginning">Beginning the Experiment</a>
+<li> <a href="#UsingNodes">Using your Nodes</a>
+<li> <a href="#RootAccess">I need <b>root</b> access!</a>
+<li> <a href="#Wedged">My node is wedged!</a>
+<li> <a href="#Finished">I've finished my experiment</a>
+<li> <a href="#Help">Getting Help!</a>
+</ul>
+
+<ul>
+<li> <a NAME="LoggingIn"></a>
+     <h3>Logging Into the Web Interface</h3>
+
+<p>
+If you already have an account on the Testbed, all you need to do is
+go to <a href="https://www.emulab.net"> Emulab Home
+Page</a>, enter your login name and your password, and then click on
+the "Login" button. If you don't have an account, click on the "Join
+Project" or "Start Project" links. For an overiew of how you go about
+getting an Emulab account, go to the <b><a href =
+"http://www.emulab.net/auth.html"> "How To Get Started"</a></b> page.
+
+<p>
+<li> <a NAME="Designing"></a>
+     <h3>Designing a Network Topology</h3>
+<p>
+The Testbed's power lies in its ability to assume many different
+topologies; the description of a such a topology is a necessary part
+of an experiment.
+
+<p>
+Emulab uses the "NS" ("Network Simulator") format to describe network
+topologies.  This is substantially the same <a
+href="http://www.scriptics.com/software/tcltk/">Tcl</a>-based format
+used by <a href="http://www.isi.edu/nsnam/ns/">ns-2</a>.  Since the
+Testbed offers emulation, rather than simulation, these files are
+interpreted in a somewhat different manner than ns-2.  Therefore, some
+ns-2 functionality may work differently than you expect, or may not be
+implemented.  If you feel there is useful functionality missing,
+please let us know.  Also, some
+<a href="../docwrapper.php3?docname=tutorial/nscommands.html">
+testbed-specific syntax</a> has been added, which with the inclusion
+of compatibility module (<a href="tb_compat.tcl">tb_compat.tcl</a>),
+will be ignored by the NS simulator. This
+allows the same NS file to work on both the Testbed and ns-2, most of
+the time.
+
+<p>
+For those unfamiliar with the NS format, here is an example.
+Let's say we are trying to create a test network which looks like
+the following:
+  <br>
+  <center>
+    <img src="simple.jpg"><br><br>
+    (A is connected to B, B to C, and B to D.)
+  </center>
+  <br>
+
+<p>
+An NS file which would describe such a topology is as follows. First
+off, all NS files start with a simple prolog, declaring a simulator 
+and including a file that allow you to use the special 
+<code>tb-</code> commands:
+	<code><pre>
+	# This is a simple ns script. Comments start with #.
+	set ns [new Simulator]			
+        source tb_compat.tcl                   </code></pre>
+
+<p>
+Then define the 4 nodes in the topology.
+	<code><pre>
+	set NodeA [$ns node]
+	set NodeB [$ns node]
+	set NodeC [$ns node]
+	set NodeD [$ns node]			</code></pre>
+</p>
+
+<p>
+Next define the 3 links between the nodes. NS syntax permits you to
+specify the bandwidth, latency, and queue type. For our example, we
+will define full speed links between B and C,D and a delayed link
+from node A to B.
+	<code><pre>
+	$ns duplex-link $NodeA $NodeB 100Mb 50ms DropTail
+	$ns duplex-link $NodeB $NodeC 100Mb .1ms DropTail
+	$ns duplex-link $NodeB $NodeD 100Mb .1ms DropTail</code></pre>
+
+<p>
+In addition to the standard NS syntax above, a number of
+<a href="../docwrapper.php3?docname=tutorial/nscommands.html">
+extensions</a> have been added that allow you
+to better control your experiment. For example, you may specify what
+Operating System is booted on your nodes. We currently support FreeBSD
+4.0 and Linux RedHat 6.2, as well as
+<a href="http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels on the
+testbed PCs. By default, Linux RedHat 6.2 is selected.
+
+	<code><pre>
+	tb-set-node-os $NodeA FBSD40-STD
+	tb-set-node-os $NodeC RHL62-STD		</code></pre>
+
+<p>
+You may also control what IP addresses are assigned to the
+experimental interfaces on your nodes. The experiment configuration
+software will select IP addresses for you, but if your experiment
+depends on particular IP addresses, you may specify them at each
+link. The following example sets the IP address of node B on the port
+going to node C:
+
+	<code><pre>
+	tb-set-ip-interface $NodeB $NodeC 192.168.42.42	</code></pre>
+
+<p>
+Lastly, all NS files end with an epilog that instructs the simulator
+to start.
+
+	<code><pre>
+	# Go!
+	$ns run					</code></pre>
+
+<p>
+If you would like to try the above example, the completed <a
+href="basic.ns" target=stuff>NS file</a> can be run as an experiment in your
+project. Another example ns script that shows off using the power of
+Tcl to generate topologies is <a href="loop.ns" target=stuff>here</a>.
+
+<p>
+<li> <a NAME="Beginning"></a>
+     <h3>Beginning the Experiment</h3>
+
+<p>
+After logging on to the Testbed Web Interface, choose the "Begin
+Experiment" option from the menu. First select which project you want
+the experiment to be configured in. Most people will be a member of just
+one project, and will not have a choice. If you are a member of
+multiple projects, be sure to select the correct project from the
+menu.
+
+<p>
+Next fill in the `Name' and `Long Name' fields. The Name should be a
+single word (no spaces) identifier, while the Long Name is a multi
+word description of your experiment. In the "Your NS file" field,
+place the <i>local path</i> of a NS file which you have created to
+describe your network topology. This file will be uploaded through
+your browser when you choose "Submit."
+
+<p>
+After submission, the Testbed interface will begin processing your
+request. This will likely take several minutes, depending on how large
+your topology is, and what other features (such as delay nodes and
+bandwidth limits) you are using. Assuming all goes well, you will
+receive an email message indicating success or failure, and if
+successful, a listing of the nodes and IP address that were allocated
+to your experiment. 
+
+<p>
+For the NS file described above, you would receive a listing that looks
+similar to this:
+
+	<code><pre>
+	Node Mapping:
+	Virtual         Physical        Qualified Name
+	--------------- --------------- --------------------
+	nodeA           pc12            nodeA.myproj.myexp.emulab.net
+	nodeB           pc14            nodeB.myproj.myexp.emulab.net
+	nodeC           pc16            nodeC.myproj.myexp.emulab.net
+	nodeD           pc18            nodeD.myproj.myexp.emulab.net
+	delay0          pc7             delay0.myproj.myexp.emulab.net
+	
+	IP Addresses:
+	Node            IFC   Destination          IP                  
+	--------------- -------------------- --------------------
+	nodeB           eth0  nodeC                192.168.42.42       
+	nodeB           eth2  nodeA                192.168.2.2         
+	nodeA           eth0  nodeB                192.168.2.3         
+	nodeC           eth0  nodeB                192.168.42.2        
+	nodeD           eth0  nodeB                192.168.3.2         
+	nodeB           eth1  nodeD                192.168.3.3	</code></pre>
+
+<p>
+A few points should be noted:
+<ul>
+<li> A single delay node was allocated and inserted into the link
+     between NodeA and NodeB. This link is invisible from your
+     perspective, except for the fact that it adds latency, error,
+     or reduced bandwidth.
+<p>
+<li> The names in the "Qualified Name" column refer to the control
+     network interfaces for each of your allocated nodes. These names
+     are added to the Emulab nameserver map on the fly, and are
+     immediately available for you to use so that you do not have to
+     worry about the actual physical node names that were choosen. In
+     the names listed above, `myproj' is the name of the project that
+     you chose to work in, and `myexp' is the name of the experiment
+     that you provided in the "Begin Experiment" page.
+<p>
+<li> Since the IP address for the link from NodeB to NodeC was set in
+     the NS file, the system selected an appropriate IP address for
+     the other end of the link. All of the other links were configured
+     by the system to use 192.168.XXX.XXX subnets.
+</ul>
+
+
+<p>
+<li> <a NAME="UsingNodes"></a>
+     <h3>Using your Nodes</h3>
+
+<p>
+By the time you receive the email message listing your nodes, the
+Testbed configuration system will have ensured that your nodes are
+fully configured and ready to use. If you have selected one of the
+Testbed supported operating system images (FreeBSD, Linux, NetBSD),
+this configuration process includes:
+
+<ul>
+<li> loading fresh disk images so that each node is in a known clean
+     state;
+<li> rebooting each node so that it is running the OS specified in the
+     NS script;
+<li> configuring each of the network interfaces so that each one is
+     "up" and talking to its virtual LAN (VLAN);
+<li> creating user accounts for each of the project members;
+<li> mounting the projects NFS directory in /proj so that project
+     files are easily shared amongst all the nodes in the experiment;
+<li> creating a /etc/hosts file on each node so that you may refer to the
+     experimental interfaces of other nodes by name instead of IP number;
+<li> configuring all of the delay parameters;
+<li> configuring the tip lines so that project members may access the
+     console ports from users.emulab.net.
+</ul>
+
+<p>
+As this point you may log into any of the nodes in your experiment.
+You will need to use Secure Shell (ssh), and you should use the
+`qualified name' from the nodes mapping table so that you do not form
+dependencies on any particular physical node. Your login name and
+password will be the same as your Web Interface login and password.
+
+<p>
+The /etc/hosts file on each node will provide a local name mapping for
+the other nodes in your experiments. You should take care to use these
+names (or IP numbers) and <b>not</b> the .emulab.net names listed in
+the node mapping, since the emulab names refer to the control network
+LAN that is shared amongst all nodes in all experiments. It is only
+the experimental interfaces that are entirely private to your
+experiment.
+
+<p>
+<b> NOTE:</b> The configuration process just described occurs only on
+Emulab constructed operating system images. If you are using an OSKit
+kernel, or your own disk image with your own operating system, you
+will be responsible for all of the configuration. At some point we
+hope to provide tools to assist in the configuration, but for now you
+are on your own.
+
+
+<p>
+<li> <a NAME="RootAccess"></a>
+     <h3>I need <b>root</b> access!</h3>
+
+<p>
+If you need to customize the configuration, or perhaps reboot nodes,
+you can use the "sudo" command, located in <code>/usr/local/bin</code>
+on FreeBSD and Linux, and <code>/usr/pkg/bin</code> on NetBSD. Our
+policy is very liberal; you can customize the configuration in any way
+you like, provided it does not violate Emulab's
+<a href="../docwrapper.php3?docname=policies.html">
+administrative policies</a>. As as example, to reboot a node that is
+running FreeBSD:
+
+	<code><pre>
+	/usr/local/bin/sudo reboot			</code></pre>
+
+	
+<p>
+<li> <a NAME="Wedged"></a>
+     <h3>My node is wedged!</h3>
+
+<p>
+This is bound to happen when running experimental software and/or
+experimental operating systems. Fortunately we have an easy way for
+you to power cycle nodes without requiring Testbed Operations to get
+involved. If you must power cycle a node, log on to users.emulab.net
+and use the "node_reboot" command:
+
+	<code><pre><xmp>
+	node_reboot <node> [node ... ]			</xmp></code></pre>
+
+where `node' is the physical name, as listed in the node mapping
+table. You may provide more than one node on the command line. Be
+aware that you may power cycle only nodes in projects that you are
+member of. Also, <tt>node_reboot</tt> does its very best to perform a
+clean reboot before resorting to cycling the power to the node. This
+is to prevent the damage that can occur from constant power cycling
+over a long period of time.  For this reason, <tt>node_reboot</tt> may
+delay a minute or two if it detects that the machine is still
+responsive to network transmission.  In any event, please try to
+reboot your nodes first (see above).
+
+<p>
+<li> <a NAME="Finished"></a>
+     <h3>I've finished my experiment</h3>
+
+When your experiment is completed, and you no longer need the
+resources that have been allocated to it, you will need to terminate
+the experiment via the Emulab Web Interface. Click on the "End An
+Experiment" link. You will be presented with a list of all of the
+experiments in all of the projects for which you have the
+authorization to terminate experiments. Select the experiment you want
+to terminate by clicking on the button in the "Terminate" column on
+the right hand side. You will be asked to <b>confirm</b> your choice.
+The Testbed configuration system will then tear down your experiment,
+and send you an email message when the process is complete. At this
+point you are allowed to reuse the experiment name (say, if you wanted
+to create a similar experiment with different parameters).
+
+<p>
+<li> <a NAME="Help"></a>
+     <h3>Getting Help!</h3>
+
+If you have any questions or problems, or just want to comment on
+Emulab's operation (maybe you want to suggest an improvement to one of
+the Web pages), feel free to contact us by sending email to
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\">Testbed
+Operations (testbed-ops@flux.cs.utah.edu)</a>. Also note that much of
+the software is in development, and occasionally things might break or
+not work as you expect. Again, please feel free to contact us.
+
+<hr>
+<a NAME="Advanced"></a>
+<center>
+<h2>Advanced Topics</h2>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#RPMS">Installing RPMS automatically</a>
+<li> <a href="#Startupcmd">Starting your application automatically</a>
+<li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
+<li> <a href="#Delta">Customizing an OS (How to create a <i>delta</i>)</a>
+</ul>
+<p>
+
+<ul>
+<li> <a NAME="RPMS"></a>
+     <h3>Installing RPMS automatically</h3>
+<p>
+
+The Testbed NS extension <tt>tb-set-node-rpms</tt> allows you to
+specify a (space separated) list of RPMs to install on each of your
+nodes when it boots:
+
+<code><pre>
+tb-set-node-rpms $nodeA /proj/pid/rpms/silly-freebsd.rpm
+tb-set-node-rpms $nodeB /proj/pid/rpms/silly-linux.rpm	</code></pre>
+
+The above NS code says to install the <tt>silly-freebsd.rpm</tt> file
+on <tt>nodeA</tt>, and the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>.
+RPMs are installed as root when the node first boots, and must reside
+on the node's local filesystem, or in a directory that can be reached
+via NFS. This is either the project's <tt>/proj</tt> directory, or a
+project member's home directory in <tt>/users</tt>.
+
+</p>
+
+<li> <a NAME="Startupcmd"></a>
+     <h3>Starting your application automatically</h3>
+<p>
+
+You can start your application automatically when your nodes boot by
+using the <tt>tb-set-node-startup</tt> NS extenstion. The argument is
+the pathname of a script or program that is run as the <tt>UID</tt> of
+the experiment creator, after the node has reached multiuser mode. You
+can specify the same program for each node, or a different program.
+For example:
+
+<code><pre>
+tb-set-node-startup $nodeA /proj/pid/runme.nodeA
+tb-set-node-startup $nodeB /proj/pid/runme.nodeB	</code></pre>
+
+will run <tt>/proj/pid/runme.nodeA</tt> on nodeA and
+<tt>/proj/pid/runme.nodeA</tt> on nodeB. The programs must reside on
+the node's local filesystem, or in a directory that can be reached via
+NFS. This is either the project's <tt>/proj</tt> directory, or a
+project member's home directory in <tt>/users</tt>.
+
+</p>
+
+<li> <a NAME="ReadyBits"></a>
+     <h3>How do I know when all my nodes are ready?</h3>
+<p>
+
+It is often necessary for your startup program to determine when all
+of the other nodes in the experiment have started, and are ready to
+proceed. Sometimes called a <i>barrier</i>, this allows programs to
+wait at a specific point, and then all proceed at once. Emulab
+provides a primitive form of this mechanism using experiment <i>ready
+bits</i>, which are set and read using the
+<a href="../docwrapper.php3?docname=doc/tmcd.html">
+TMCD/TMCC</a>. When an experiment is first configured, the ready bit
+for each node is cleared. As each node starts its application and
+reaches the point where it must be sure that all other nodes have
+started up, it issues a TMCC <tt>ready</tt> command:
+
+<code><pre>
+tmcc ready				</code></pre>
+
+which tells Emulab's configuration system that the node is ready to
+proceed. The node can then poll for the <i>ready count</i> to
+determine how many nodes are ready (have issued a tmcc ready command):
+
+<code><pre>
+tmcc readycount				</code></pre>
+
+which will return the ready count as a string:
+
+<code><pre>
+READY=N TOTAL=M				</code></pre>
+
+where <tt>N</tt> is the number of nodes that are ready, and <tt>M</tt>
+is the total number of nodes in the experiment. An application can
+poll the ready count with a simple script, or it can encode the ready
+bits check directly into its program. For example, here is a simple
+Perl fragment that issues the ready command, and then polls for the
+ready count, being sure to delay a small amount between each poll.
+
+<code><pre>
+system("tmcc ready");
+while (1) {
+    my $bits = `tmcc readycount`;
+    if ($bits ~= /READY=(\d*) TOTAL=(\d*)/) {
+        if ($1 == $2) {
+            last;
+	}
+    }
+    #
+    # Please sleep to avoid swamping the TMCD!
+    # 
+    sleep(1);
+}					</code></pre>
+
+<i>Note that the ready count is essentially a use-once feature; The
+ready count cannot be reinitialized to zero since there is no actual
+synchronization happening.  If in the future it appears that a
+generalized barrier synchronization would be more useful, we will
+investigate the implementation of such a feature.</i>
+
+</p>
+
+<li> <a NAME="Delta"></a>
+     <h3>Customizing an OS (How to create a <i>delta</i>)</h3>
+<p>
+
+If your set of operating system customizations cannot be easily
+contained within an RPM (or multiple RPMs), or if you are just not
+familiar with the RPM mechanism, then you can create your own
+operating system <i>delta</i>. A delta is like an RPM or Tar file in
+that it contains a bunch of files to be unpacked onto the node.  The
+difference is that with a delta you do not have to figure what files
+you changed, and how to automate the installation process.  Instead,
+you just allocate a node, change it anyway you like, and then issue
+the <tt>create-delta</tt> command. The resulting delta file can then
+be specified in your NS file using the Testbed NS extension
+<tt>tb-set-node-deltas</tt>. You can create one delta to install on
+all of your nodes, or several different deltas for various nodes in
+your experiment. When the nodes in your new experiment boot for the
+first time, the delta will be installed (all of the files unpacked)
+very early in the boot phase, and the node rebooted again (in case you
+have installed daemons that need to be started during initialization).
+Your experiment can then proceed. 
+
+<p>
+The key point is that the Testbed configuration software deals with
+figuring out what files you changed, installing the delta on your
+nodes, rebooting the nodes that have new software installed, and
+ensuring that any particular delta is installed only once on each
+node.
+
+<p>
+Lets step through an example. The first thing you need to do is
+create an experiment with a single node in it. The following NS file
+can be submitted to the "Begin Experiment" page. 
+
+<code><pre>
+set ns [new Simulator]			
+source tb_compat.tcl
+set nodeA [$ns node]
+tb-set-node-os $nodeA FBSD40-STD
+$ns run					</code></pre>
+
+When you have received email notification that the experiment has
+configured, log into the node with <tt>ssh</tt>. Install whatever
+software you like, making sure to update the necessary files if you
+have installed daemons that need to be started automatically at boot
+time. After all of your software is installed, create the delta file
+with:
+
+<code><pre>
+sudo /usr/local/bin/create-delta /proj/testbed/foo.delta	</code></pre>
+
+The argument to the <tt>create-delta</tt> command is a complete
+pathname, which <b>must</b> reside someplace in your /proj directory
+(a subdirectory is fine).  You cannot write the delta file to any
+other filesystem. It should be noted that a delta created on one OS
+cannot be installed on another. In other words, a delta created on a
+FreeBSD machine can only be installed on a FreeBSD machine. If you
+need the same software installed on a Linux machine as well, you will
+need to repeat this process with a node running Linux. See the section
+on <a href="../docwrapper.php3?docname=tutorial/nscommands.html#OS">
+<tt>tb-set-node-os</tt></a> in the
+<a href="../docwrapper.php3?docname=tutorial/nscommands.html">
+Extensions</a> reference.
+
+<p>
+After you have created your delta, you can then use it in subsequent
+experiments by using the Testbed NS extension
+<tt>tb-set-node-deltas</tt>.  For example, here is an NS file that
+creates a two node experiment, installs a different delta on each
+node, and then runs a program automatically on each node. Presumably,
+the startup program is installed by the delta, and encapsulates the
+experiment being performed.
+
+<code><pre>
+set ns [new Simulator]			
+source tb_compat.tcl
+set nodeA [$ns node]
+set nodeB [$ns node]
+tb-set-node-os $nodeA FBSD40-STD
+tb-set-node-os $nodeB RHL62-STD
+tb-set-node-deltas $nodeA /proj/testbed/deltas/silly-freebsd.delta
+tb-set-node-deltas $nodeB /proj/testbed/deltas/silly-linux.delta
+tb-set-node-startup $nodeA /usr/site/bin/run-my-experiment
+tb-set-node-startup $nodeB /usr/site/bin/run-my-experiment
+$ns run					</code></pre>
+
+<i>Implementation Notes:</i>
+<ul>
+<li> Deltas are created and installed with the unix filesystem backup
+     utilities <tt>dump</tt> and <tt>restore</tt>.
+<li> Beware of changing too many critical systems and/or too many
+     changes to the <tt>/etc/rc</tt> scripts.
+<li> If you find that your customizations are too much for the Delta
+     mechanism, feel free to contact us so that we can arrange to
+     create a complete snapshot of your system.
+</ul>
+
+</ul>
+
+
+<!-- Batch Mode -->
+
+<hr>
+<a NAME="BatchMode"></a>
+<center>
+<h2>Batch Mode</h2>
+</center>
+
+<h3>
+Please check back again later!
+</h3>
+
+<!-- Custom OS Images -->
+
+<hr>
+<a NAME="CustomOS"></a>
+<center>
+<h2>Custom OS Images</h2>
+</center>
+
+<h3>
+Please check back again later!
+</h3>
+

@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Node Control List");
+PAGEHEADER("Node Control Center");
 
 #
 # Only known and logged in users can do this.
@@ -19,10 +19,6 @@ $isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have admin privledges!", 1);
 }
-
-echo "<center><h1>
-      Node Control Center
-      </h1></center>";
 
 #
 # Suck out info for all the nodes.

@@ -52,9 +52,6 @@ if (!$isadmin) {
     }
 }
 
-echo "<center>
-      <h3>Project Information</h3>
-      </center>\n";
 SHOWPROJECT($pid, $uid);
 
 #

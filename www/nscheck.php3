@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Syntax Check and NS File");
+PAGEHEADER("Syntax Check an NS File");
 
 #
 # Only known and logged in users can begin experiments.
@@ -60,7 +60,6 @@ if ($retval) {
 }
 
 echo "<center><br>";
-echo "<img alt=\"Yippie!\" src=\"burstx.gif\">\n";
 echo "<br>";
 echo "<h2>Your NS file looks good!</h2>";
 echo "</center>\n";

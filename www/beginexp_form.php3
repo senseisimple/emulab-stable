@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Begin an Experiment Form");
+PAGEHEADER("Begin a new Testbed Experiment");
 
 #
 # Only known and logged in users can begin experiments.
@@ -30,11 +30,6 @@ if (mysql_num_rows($query_result) == 0) {
 
 ?>
 <table align="center" border="1"> 
-<tr>
-    <td align="center" colspan="2">
-        <h1>Begin a new Experiment on the Testbed</h1>
-    </td>
-</tr>
 
 <tr>
     <td align="center" colspan="3">

@@ -4,13 +4,13 @@
 # 
 require("defs.php3");
 
-$STATUS_LOGGEDIN  = 1;
-$STATUS_LOGGEDOUT = 2;
-$STATUS_LOGINFAIL = 3;
-$STATUS_TIMEDOUT  = 4;
-$login_status     = 0;
-$login_message    = "";
-
+#
+# This page gets loaded either as the result of a login/logout click,
+# or as a regular page cause its the base. We deal with login and
+# logout right here. Once that is done, we can move onto writing the
+# actual page contents. The current login status is checked when the
+# menu bar is written, and by the pages themselves when they care.
+# 
 if (isset($login)) {
     #
     # Login button pressed. 
@@ -48,249 +48,70 @@ elseif (isset($logout)) {
     $login_status = $STATUS_LOGGEDOUT;
     unset($uid);
 }
-elseif ($uid = GETUID()) {
-    #
-    # Check to make sure the UID is logged in (not timed out).
-    #
-    $status = CHECKLOGIN($uid);
-    switch ($status) {
-    case 0:
-        unset($uid);
-        break;
-    case 1:
-        $login_status = $STATUS_LOGGEDIN;
-        break;
-    case -1:
-        $login_status = $STATUS_TIMEDOUT;
-        unset($uid);
-        break;
-    }
-}
-switch ($login_status) {
- case $STATUS_LOGGEDIN:
-     $login_message = "$uid Logged In";
-     break;
- case $STATUS_LOGGEDOUT:
-     $login_message = "$uid Logged Out";
-     break;
- case $STATUS_LOGINFAIL:
-     $login_message = "Login Failed";
-     break;
- case $STATUS_TIMEDOUT:
-     $login_message = "Login Timed Out";
-     break;
-}
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Home");
+
 ?>
 
-<html>
-<head>
-<title>Emulab.Net</title>
+<img src="pix/front-left-med.jpg" align="right" >
 
-<script language="JavaScript">
-   <!--
-   var sURL = unescape(window.location.pathname);
+<p>
+Welcome to Emulab. Emulab (sometimes called the Utah Network Testbed)
+is a new and unique type of experimental environment: a
+universally-available "Internet in a room" which will provide a new,
+much anticipated balance between control and realism. Several hundred
+PCs, combined with secure, user-friendly web-based tools, allow you
+to remotely reserve, configure and control machines and links down to
+the hardware level: error models, latency, bandwidth, packet ordering,
+buffer space all can be user-defined. Even the operating system disk
+contents can be securely and fully replaced with custom images.
 
-   function refresh()
-   {
-       //  This version of the refresh function will cause a new
-       //  entry in the visitor's history.  It is provided for
-       //  those browsers that only support JavaScript 1.0.
-       //
-       window.location.href = sURL;
-   }
-   //-->
-</script>
+<p>
+The Testbed currently features high-speed Cisco switches connecting,
+with over 2 miles of cabling, 160 end nodes
+<a href = "http://www.research.digital.com/SRC/iag/">
+(Compaq DNARD Sharks)</a> and 40 core nodes (PCs). The core nodes can be
+used as end nodes, simulated routers or traffic-shaping nodes, or
+traffic generators. During an experiment's time slots, the experiment
+(and associated researchers) get exclusive use of the assigned
+machines, including root access if desired.  Until we finish designing
+and building smarter scheduling and state-saving software, and obtain
+the disk space, scheduling is manual and done at coarse granularity
+(days).
 
-<script language="JavaScript1.1">
-   <!--
-   function refresh()
-   {
-       //  This version does NOT cause an entry in the browser's
-       //  page view history.  Most browsers will always retrieve
-       //  the document from the web-server whether it is already
-       //  in the browsers page-cache or not.
-       //  
-       window.location.replace( sURL );
-   }
-   //-->
-</script>
+<p>
+We provide some default software (e.g. Linux and FreeBSD on the PCs,
+NetBSD on the Sharks) that many users may want. The basic software
+configuration on your nodes includes accounts for project members,
+root access, DNS service, compilers and linkers. But fundamentally,
+the software you run on it, including all bits on the disks, is
+replaceable and up to you.  The same applies to the network's
+characteristics, including its topology: configurable by users.
 
-<script language="JavaScript1.2">
-   <!--
-   function refresh()
-   {
-       //  This version of the refresh function will be invoked
-       //  for browsers that support JavaScript version 1.2
-       //
-       
-       //  The argument to the location.reload function determines
-       //  if the browser should retrieve the document from the
-       //  web-server.  In our example all we need to do is cause
-       //  the JavaScript block in the document body to be
-       //  re-evaluated.  If we needed to pull the document from
-       //  the web-server again (such as where the document contents
-       //  change dynamically) we would pass the argument as 'true'.
-       //  
-       window.location.reload( false );
-   }
-   //-->
-</script>
+<h3>Links to help you get started:</h3>
+<ul>
+<li><b><a href = "docwrapper.php3?docname=auth.html">
+          Authorization Scheme, Policy, and "How To Get Started"</a></b>
+<li><b><a href = "docwrapper.php3?docname=hardware.html">
+          Hardware Overview</a></b>
+<li><b><a href = "docwrapper.php3?docname=software.html">
+          Software Overview</a></b>
+<li><b><a href = "docwrapper.php3?docname=security.html">
+          Security Issues</a></b>
+<li><b><a href = "docwrapper.php3?docname=policies.html">
+          Administrative Policies and Disclaimer</a></b>
+<li><b><a href = "docwrapper.php3?docname=sponsors.html">
+          Emulab Sponsors</a></b>
+</ul>
 
 <?php
 #
-# So that the user knows the login timed out.
-#
-if ($login_status == $STATUS_LOGGEDIN) {
-    $timeo = $TBAUTHTIMEOUT + 120;
-    echo "<noscript>
-            <META HTTP-EQUIV=\"refresh\" CONTENT=\"$timeo\">
-          </noscript>\n";
-    $timeo *= 1000;
-    echo "<script language=\"JavaScript\">
-            <!--
-            function doLoad() {
-                setTimeout(\"refresh()\", $timeo );
-            }
-            //-->
-          </script>\n";
-}
-
-#
-# So I can test on my home machine easily. This *is* required to make the
-# the frames work correctly.
+# Standard Testbed Footer
 # 
-echo "<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-      <base href=\"$TBBASE/\" target=\"dynamic\">
-      </head>\n";
+PAGEFOOTER();
 
-#
-# If logged in, start the refresh process.
-# 
-if ($login_status == $STATUS_LOGGEDIN) {
-    echo "<body onload=\"doLoad()\">\n";
-}
-else {
-    echo "<body>\n";
-}
-
-echo "<basefont size=5>
-      <a href=\"$TBBASE/welcome.html\"><b>Emulab.Net Home</b></a>
-      <basefont size=4>\n";
-
-if (isset($uid)) {
-    echo "<hr>";
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT status,admin,stud FROM users WHERE uid='$uid'");
-    $row = mysql_fetch_row($query_result);
-    $status = $row[0];
-    $admin  = $row[1];
-    $stud   = $row[1];
-
-    #
-    # See if group_root in any projects, not just the last one in the DB!
-    #
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT trust FROM proj_memb WHERE uid='$uid' and trust='group_root'");
-    if (mysql_num_rows($query_result)) {
-        $trusted = 1;
-    }
-    else {
-        $trusted = 0;
-    }
-
-    if ($status == "active") {
-        if ($admin) {
-            echo "<A href='approveproject_list.php3'>
-                     New Project Approval</A><p>\n";
-            echo "<A href='nodecontrol_list.php3'>
-                     Node Control</A><p>\n";
-	    echo "<A href='showuser_list.php3'>
-		     User List</A>\n";
-	    echo "<hr>\n";
-        }
-        if ($trusted) {
-            # Only group leaders can do these options
-            echo "<A href='approveuser_form.php3'>
-                     New User Approval</A><p>\n";
-        }
-        # Since a user can be a member of more than one project,
-        # display this option, and let the form decide if the user is
-        # allowed to do this.
-        echo "<A href='showproject_list.php3'>
-                    Project Information</A><p>\n";
-        echo "<A href='beginexp_form.php3'>
-                    Begin an Experiment</A><p>\n";
-        echo "<A href='showexp_list.php3'>
-                    Experiment Information</A><p>\n";
-	if ($stud) {
-	    echo "<A href='batchexp_form.php3'>
-                    Create a Batch Experiment</A><p>\n";
-	}
-        echo "<A href='modusr_form.php3'>
-                    Update user information</A><p>\n";
-        echo "<A href='reserved.php3'>
-                    Node Reservation Status</A><p>\n";
-        echo "<A href='http://www.cs.utah.edu/~danderse/dnard/status.html'>
-                    Node Up/Down Status</A><p>\n";
-    }
-    elseif ($status == "unapproved") {
-        USERERROR("Your account has not been approved yet. ".
-                  "Please try back later", 1);
-    }
-    elseif (($status == "newuser") || ($status == "unverified")) {
-        echo "<A href='verifyusr_form.php3'>New User Verification</A>\n";
-    }
-    elseif (($status == "frozen") || ($status == "other")) {
-        USERERROR("Your account has been changed to status $status, and is ".
-                  "currently unusable. Please contact your project leader ".
-                  "to find out why.", 1);
-    }
-}
-
-#
-# Standard options for anyone.
-# 
-echo "<p><A href=\"newproject_form.php3\">Start Project</A>\n";
-echo "<p><A href=\"addusr.php3\">Join Project</A>\n";
-
-echo "<hr>";
-echo "<table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">";
-echo "<form action=\"index.php3\" method=\"post\" target=\"fixed\">";
-
-echo "<b>$login_message</b>";
-#
-# Present either a login box, or a logout box
-# 
-if (isset($uid)) {
-    echo "<tr>
-              <td><input type='hidden' name='uid' value='$uid'</td>
-              <td align='center'>
-                  <b><input type='submit' value='Logout' name='logout'></b>
-              </td>
-          </tr>\n";
-}
-else {
-    #
-    # Get the UID that came back in the cookie so that we can present a
-    # default login name to the user.
-    #
-    if (($uid = GETUID()) == FALSE)
-	$uid = "";
-
-    echo "<tr>
-              <td>Username:<input type='text' value='$uid'
-                                  name='uid' size=8></td>
-          </tr>
-          <tr>
-              <td>Password:<input type='password' name='password' size=12></td>
-          </tr>
-          <tr>
-              <td align='center'>
-                  <b><input type='submit' value='Login' name='login'></b></td>
-          </tr>\n";
-}
 ?>
-</form>
-</table>
-</body>
-</html>
+

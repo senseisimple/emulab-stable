@@ -31,7 +31,6 @@ if ($uid != $target_uid) {
 ?>
 
 <center>
-<h1>Modify User Information</h1>
 <table align="center" border="1">
   <tr><td align="center" colspan="4">
           Only fields marked with * are required
