@@ -186,6 +186,16 @@ while (@row = $nodes_result->fetchrow_array) {
     my @dirlist = ();
 
     #
+    # Sanity check - don't try this if any of the above are not defined - we
+    # may end up with a bad line in exports
+    #
+    if ((!defined($node_id)) || (!defined($pid)) || (!defined($eid)) ||
+        (!defined($gid)) || (!defined($ip))) {
+        print "WARNING: exports_setup: Skipping database row with undefined values\n";
+	next;
+    }
+
+    #
     # Construct a list of directories accessible from this node.
     # First the project and group directories.
     # XXX needs to be fixed for shared experiments?
