@@ -9,13 +9,22 @@ all:	event-sched
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS	 += -O -g -Wall -pthread -DDEBUG
+CFLAGS   += -pthread
+CFLAGS	 += -O -g -Wall -DDEBUG
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4mt`
 
-LDFLAGS  += -pthread -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb -lcipher -L/usr/local/lib/mysql -lmysqlclient
-LIBS     += `elvin-config --libs vin4mt`
+LDFLAGS  += -pthread -static
+LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LIBS     += -levent -ltb -lcipher -L/usr/local/lib/mysql -lmysqlclient -lz
+
+#
+# XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
+#     build on freebsd. I made a vain attempt to filter it out, but
+#     gave up quickly. Deal with it later. 
+#
+#LIBS     += `elvin-config --libs vin4mt`
+LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
 
 OBJS	  = event-sched.o queue.o
 
