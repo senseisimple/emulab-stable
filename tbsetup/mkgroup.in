@@ -36,6 +36,7 @@ my $PROJROOT    = "/proj";
 my $GRPROOT     = "/groups";
 my $SSH         = "$TB/bin/sshtb";
 my $GROUPADD    = "/usr/sbin/pw groupadd";
+my @DIRLIST     = ("exp", "images", "logs", "tarfiles", "rpms", "tiplogs");
 
 my $dbuid;
 my @db_row;
@@ -240,8 +241,25 @@ if ($pid ne $gid) {
 	symlink($groupdir, $grouplink) or
 	    fatal("Could not symlink($groupdir, $grouplink): $!");
     }
-}
 
+    #
+    # Make group subdirs.
+    #
+    foreach my $dir (@DIRLIST) {
+	if (! -e "$groupdir/$dir") {
+	    if (! mkdir("$groupdir/$dir", 0770)) {
+		fatal("Could not make directory $groupdir/$dir: $!");
+	    }
+	    if (! chmod(0770, "$groupdir/$dir")) {
+		fatal("Could not chmod directory $groupdir/$dir: $!");
+	    }
+	    if (! chown($unix_uid, $unix_gid, "$groupdir/$dir")) {
+		fatal("Could not chown $groupdir/$dir: $!");
+	    }
+	}
+    }
+}
+    
 print "Group Creation Completed!\n";
 exit(0);
 
