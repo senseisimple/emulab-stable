@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -177,6 +177,22 @@ if ($use_ipassign) {
 	die("*** $0:\n".
 	    "    Static route calculation failed!\n");
     }
+}
+
+#
+# Generate a linkmap for new router calculation. This is done as an option
+# to staticroutes, and is really fast, so we can do it all the time. We
+# of course have to run it after ipassign_wrapper runs so that the IPs are
+# set. Note the routertype slot in the DB indicates to not generate static
+# routes now, when we are using the new distributed Dijkstra setup.
+#
+# Eventually staticroutes and ipassign_wrapper should look at routertype
+# slot and generate this map when it equals 'static-ddijk'.
+#
+if (system("staticroutes -j -f $pid $eid")) {
+    cleanup();
+    die("*** $0:\n".
+	"    staticroutes linkmap generation failed!\n");
 }
 
 TBDebugTimeStamp("routes finished");
