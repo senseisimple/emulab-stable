@@ -116,8 +116,6 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
-	$(INSTALL_DATA) $(TESTBED_SRCDIR)/doc/ChangeLog \
-			$(INSTALL_WWWDIR)/doc/ChangeLog.txt
 	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
