@@ -22,7 +22,7 @@ my $ROOTBALL       = '@PLAB_ROOTBALL@';
 #
 # Username that we'll use to ssh into planetlab nodes
 #
-my $PLAB_USER = "utah1";
+my $PLAB_USER = "utah_elab_svc";
 
 #
 # Directory to sync with the plab nodes

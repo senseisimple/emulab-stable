@@ -20,7 +20,7 @@ use libdb;
 #
 # Username that we'll use to ssh into planetlab nodes
 #
-my $PLAB_USER = "utah1";
+my $PLAB_USER = "utah_elab_svc";
 
 #
 # Script to run on the plab nodes to start the webserver
