@@ -22,10 +22,15 @@ sub usage {
 #
 # Configure variables
 #
-my $TESTBED_NETWORK    = "@TESTBED_NETWORK@";
-my $TESTBED_NETMASK    = "@TESTBED_NETMASK@";
-my $BOSSNODE_IP        = "@BOSSNODE_IP@";
-my $USERNODE_IP        = "@USERNODE_IP@";
+my $TESTBED_NETWORK          = "@TESTBED_NETWORK@";
+my $TESTBED_NETMASK          = "@TESTBED_NETMASK@";
+my $EXTERNAL_TESTBED_NETWORK = "@EXTERNAL_TESTBED_NETWORK@";
+my $EXTERNAL_TESTBED_NETMASK = "@EXTERNAL_TESTBED_NETMASK@";
+my $BOSSNODE_IP              = "@BOSSNODE_IP@";
+my $USERNODE_IP              = "@USERNODE_IP@";
+my $EXTERNAL_BOSSNODE_IP     = "@EXTERNAL_BOSSNODE_IP@";
+my $EXTERNAL_USERNODE_IP     = "@EXTERNAL_USERNODE_IP@";
+
 my $CONTROL_ROUTER_IP  = "@CONTROL_ROUTER_IP@";
 my $CONTROL_NETWORK    = "@CONTROL_NETWORK@";
 my $CONTROL_NETMASK    = "@CONTROL_NETMASK@";
@@ -63,10 +68,22 @@ for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
 	last;
     }
 }
+my $EXTERNAL_TESTBED_SLASH_NETMASK = "24";
+for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
+    my $foo = pack("N", $NETMASKS[$i]);
+
+    if ($EXTERNAL_TESTBED_NETMASK eq inet_ntoa($foo)) {
+	$EXTERNAL_TESTBED_SLASH_NETMASK = "$i";
+	last;
+    }
+}
 
 # This is for the dotted and reverse dotted notation needed for the
 # reverse maps. This is probably all wrong ... 
-my ($a, $b, $c, $d) = ($TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+my ($ia, $ib, $ic, $id) =
+    ($TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+my ($ea, $eb, $ec, $ed) =
+    ($EXTERNAL_TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
 
 $infile = shift @ARGV || exit &usage;
 
@@ -79,10 +96,16 @@ while (<IF>) {
 		print $1 . "${TESTBED_NETWORK}/${TESTBED_SLASH_NETMASK}" ."$3\n";
 	    }
 	    elsif ($2 eq "internal_network_dotted") {
-		print $1 . "${a}.${b}.${c}" . "$3\n";
+		print $1 . "${ia}.${ib}.${ic}" . "$3\n";
 	    }
 	    elsif ($2 eq "internal_network_dotted_reverse") {
-		print $1 . "${c}.${b}.${a}" . "$3\n";
+		print $1 . "${ic}.${ib}.${ia}" . "$3\n";
+	    }
+	    elsif ($2 eq "external_network_dotted") {
+		print $1 . "${ea}.${eb}.${ec}" . "$3\n";
+	    }
+	    elsif ($2 eq "external_network_dotted_reverse") {
+		print $1 . "${ec}.${eb}.${ea}" . "$3\n";
 	    }
 	    elsif ($2 eq "forwarders") {
 		if ($NAMED_FORWARDERS eq "") {

@@ -1,0 +1,164 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use Socket;
+
+#
+# named_makeconf - helper script to create named.conf file. The template
+# looks like standard file, only with %token% strings that need to be
+# replaced. See below.
+#
+sub usage {
+	print "Usage: $0 <templatefile>\n";
+}
+
+#
+# Configure variables
+#
+my $OURDOMAIN                = "@OURDOMAIN@";
+my ($BOSSTOKEN)              = ("@BOSSNODE@" =~ /^([-\w]+).*$/);
+my ($USERTOKEN)              = ("@USERNODE@" =~ /^([-\w]+).*$/);
+my $TESTBED_NETWORK          = "@TESTBED_NETWORK@";
+my $TESTBED_NETMASK          = "@TESTBED_NETMASK@";
+my $EXTERNAL_TESTBED_NETWORK = "@EXTERNAL_TESTBED_NETWORK@";
+my $EXTERNAL_TESTBED_NETMASK = "@EXTERNAL_TESTBED_NETMASK@";
+my $BOSSNODE_IP              = "@BOSSNODE_IP@";
+my $USERNODE_IP              = "@USERNODE_IP@";
+my $EXTERNAL_BOSSNODE_IP     = "@EXTERNAL_BOSSNODE_IP@";
+my $EXTERNAL_USERNODE_IP     = "@EXTERNAL_USERNODE_IP@";
+
+my $CONTROL_ROUTER_IP  = "@CONTROL_ROUTER_IP@";
+my $CONTROL_NETWORK    = "@CONTROL_NETWORK@";
+my $CONTROL_NETMASK    = "@CONTROL_NETMASK@";
+my $PRIVATE_NETWORK    = "@PRIVATE_NETWORK@";
+my $PRIVATE_ROUTER     = "@PRIVATE_ROUTER@";
+my $PRIVATE_NETMASK    = "@PRIVATE_NETMASK@";
+my $PUBLIC_NETWORK     = "@PUBLIC_NETWORK@";
+my $PUBLIC_ROUTER      = "@PUBLIC_ROUTER@";
+my $PUBLIC_NETMASK     = "@PUBLIC_NETMASK@";
+my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
+
+# Testbed libraries.
+use lib "@prefix@/lib";
+use libdb;
+
+sub isroutable($);
+
+# This is for the dotted and reverse dotted notation needed for the
+# reverse maps. This is probably all wrong ... 
+my ($ia, $ib, $ic, $id) =
+    ($TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+my ($ea, $eb, $ec, $ed) =
+    ($EXTERNAL_TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+
+my $internal_forwfile = "${ia}.${ib}.${ic}.db.head";
+my $external_forwfile = "${ea}.${eb}.${ec}.db.head";
+my $internal_strings  = "";
+my $external_strings  = "";
+
+usage()
+    if (@ARGV != 2);
+
+my $which  = $ARGV[0];
+my $infile = $ARGV[1];
+
+open(IF,"<$infile") or
+    die("Unable to open $infile for reading\n");
+
+while (<IF>) {
+	if (/^(.*)\%([-\w]*)\%(.*)$/) {
+	    if ($2 eq "bossnode_ip") {
+		$internal_strings .= $1 . "$BOSSNODE_IP" . $3 . "\n";
+		$external_strings .= $1 . "$EXTERNAL_BOSSNODE_IP" . $3 . "\n";
+	    }
+	    elsif ($2 eq "usernode_ip") {
+		$internal_strings .= $1 . "$USERNODE_IP" . $3 . "\n";
+		$external_strings .= $1 . "$EXTERNAL_USERNODE_IP" . $3 . "\n";
+	    }
+	    elsif ($2 eq "usernode_ina") {
+                $internal_strings .=
+                          "${USERTOKEN}\t\tIN\tA\t\t${USERNODE_IP}\n";
+                $external_strings .=
+                          "${USERTOKEN}\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
+	    }
+	    elsif ($2 eq "bossnode_ina") {
+                $internal_strings .=
+                          "${BOSSTOKEN}\t\tIN\tA\t\t${BOSSNODE_IP}\n";
+                $external_strings .=
+                          "${BOSSTOKEN}\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n";
+	    }
+	    elsif ($2 eq "private-router") {
+                my $foo = "private-router\tIN\tA\t${PRIVATE_ROUTER}\n";
+
+		$internal_strings .= $foo;
+		$external_strings .= $foo
+                    if (isroutable($PRIVATE_ROUTER));
+	    }
+	    elsif ($2 eq "public-router") {
+                my $foo = "public-router\tIN\tA\t${PUBLIC_ROUTER}\n";
+
+		$internal_strings .= $foo;
+		$external_strings .= $foo
+                    if (isroutable($PUBLIC_ROUTER));
+	    }
+	    elsif ($2 eq "control-router") {
+                my $foo = "control-router\tIN\tA\t${CONTROL_ROUTER_IP}\n";
+
+		$internal_strings .= $foo;
+		$external_strings .= $foo
+                    if (isroutable($CONTROL_ROUTER_IP));
+	    }
+	    else {
+		die("*** $0:\n".
+		    "    Unknown special tag in named template file!\n");
+	    }
+	}
+	else {
+	    # A regular line
+	    $internal_strings .= $_;
+	    $external_strings .= $_;
+	}
+}
+close(IF);
+
+if ($which eq "-internal") {
+    print $internal_strings;
+}
+else {
+    print $external_strings;
+}
+
+exit(0);
+
+#
+# Is an IP routable?
+#
+sub isroutable($)
+{
+    my ($IP)  = @_;
+    my ($a,$b,$c,$d) = ($IP =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+
+    #
+    # These are unroutable:
+    # 10.0.0.0        -   10.255.255.255  (10/8 prefix)
+    # 172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+    # 192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+    #
+
+    # Easy tests.
+    return 0
+	if (($a eq "10") ||
+	    ($a eq "192" && $b eq "168"));
+
+    # Lastly
+    return 0
+	if (inet_ntoa((inet_aton($IP) & inet_aton("255.240.0.0"))) eq
+	    "172.16.0.0");
+
+    return 1;
+}

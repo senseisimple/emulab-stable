@@ -66,9 +66,9 @@ view "external" {
 	      file "named.root";
 	  };
 
-    zone "%internal_network_dotted_reverse%.in-addr.arpa" in {
+    zone "%external_network_dotted_reverse%.in-addr.arpa" in {
         type master;
-        file "reverse/%internal_network_dotted%.db";
+        file "reverse/%external_network_dotted%.db";
     };
 };
 

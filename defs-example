@@ -103,10 +103,26 @@ BOSSNODE_IP=155.98.32.70
 USERNODE_IP=155.98.33.74
 
 #
+# If your boss/ops nodes are multihomed (and typically, one of the
+# networks is a public routable network, and the other is an internal
+# unroutable network), then define the the external addresses here (and
+# the internal addresses above).
+#
+EXTERNAL_BOSSNODE_IP=$BOSSNODE_IP
+EXTERNAL_USERNODE_IP=$USERNODE_IP
+
+#
 # The overall control network range
 #
 TESTBED_NETWORK=155.98.32.0
 TESTBED_NETMASK=255.255.240.0
+
+#
+# As above, if you have internal and external networks, define the
+# external network here, and the internal network above.
+# 
+EXTERNAL_TESTBED_NETWORK=$TESTBED_NETWORK
+EXTERNAL_TESTBED_NETMASK=$TESTBED_NETMASK
 
 #
 # The node control network segment.

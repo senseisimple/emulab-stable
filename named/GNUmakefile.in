@@ -12,18 +12,24 @@ SUBDIR		= named
 ETCDIR          = /etc
 NAMEDB_DIR	= $(ETCDIR)/namedb
 OURDOMAIN       = @OURDOMAIN@
-FORWARDERS      = @NAMED_FORWARDERS@
 
 # This is silly. Needs to be done properly.
-TESTBED_NETWORK = @TESTBED_NETWORK@
-REVERSE_MAPNAME = $(subst .0,,$(TESTBED_NETWORK))
+TESTBED_NETWORK          = @TESTBED_NETWORK@
+EXTERNAL_TESTBED_NETWORK = @EXTERNAL_TESTBED_NETWORK@
+REVERSE_MAPNAME          = $(subst .0,,$(TESTBED_NETWORK))
+EXTERNAL_REVERSE_MAPNAME = $(subst .0,,$(EXTERNAL_TESTBED_NETWORK))
+REVFILES                 = $(REVERSE_MAPNAME).db.head
+ifneq ($(REVERSE_MAPNAME), $(EXTERNAL_REVERSE_MAPNAME))
+    REVFILES            .= $(REVFILES) $(EXTERNAL_REVERSE_MAPNAME).db.head
+endif
+
 BOSSTOKEN       = $(shell echo @BOSSNODE@ | sed -e 's/\..*//')
 USERTOKEN       = $(shell echo @USERNODE@ | sed -e 's/\..*//')
 
-NAMED_FILES	= named.conf.template named_makeconf \
-		  reverse.head resolv.conf localhost.rev forward.head \
-		  $(REVERSE_MAPNAME).db.head $(OURDOMAIN).db.head \
-		  named.conf
+NAMED_FILES	= named.conf.template named_makeconf named_makerev reverse.head \
+		 resolv.conf localhost.rev forward.head named_makeforw \
+		 $(REVFILES) $(OURDOMAIN).db.head $(OURDOMAIN).internal.db.head \
+		 named.conf
 
 include $(OBJDIR)/Makeconf
 
@@ -35,15 +41,17 @@ all: $(NAMED_FILES)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-# This file is just a copy for now. Ick.
-$(REVERSE_MAPNAME).db.head:	reverse.head
-	cat reverse.head | sed -e 's/$(REVERSE_MAPNAME)\.//' > $(REVERSE_MAPNAME).db.head
+$(OURDOMAIN).db.head: forward.head named_makeforw
+	perl named_makeforw -external forward.head > $@
 
-$(OURDOMAIN).db.head:		forward.head
-	cat forward.head | sed -e 's/BOSSTOKEN/$(BOSSTOKEN)/' -e 's/USERTOKEN/$(USERTOKEN)/' > $(OURDOMAIN).db.head
+$(OURDOMAIN).internal.db.head: forward.head named_makeforw
+	perl named_makeforw -internal forward.head > $@
 
 named.conf:	named.conf.template named_makeconf
 	perl named_makeconf named.conf.template > named.conf
+
+$(REVFILES):	reverse.head named_makerev
+	perl named_makerev reverse.head
 
 # This is not a safe install target after initial install!
 install:
@@ -53,10 +61,9 @@ install-real:	resolv.conf \
 		$(NAMEDB_DIR)/named.conf \
 		$(NAMEDB_DIR)/localhost.rev \
 		$(NAMEDB_DIR)/$(OURDOMAIN).db.head \
-		$(NAMEDB_DIR)/reverse/$(REVERSE_MAPNAME).db.head
+		$(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head \
+		$(addprefix $(NAMEDB_DIR)/reverse/, $(REVFILES))
 	$(INSTALL_DATA) resolv.conf $(ETCDIR)/resolv.conf
-	-rm -rf $(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head
-	ln -s $(OURDOMAIN).db.head $(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head
 
 clean: 
 	rm -f $(NAMED_FILES)

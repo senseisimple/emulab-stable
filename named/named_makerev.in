@@ -1,0 +1,94 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use Socket;
+
+#
+# named_makeconf - helper script to create named.conf file. The template
+# looks like standard file, only with %token% strings that need to be
+# replaced. See below.
+#
+sub usage {
+	print "Usage: $0 <templatefile>\n";
+}
+
+#
+# Configure variables
+#
+my $OURDOMAIN                = "@OURDOMAIN@";
+my $TESTBED_NETWORK          = "@TESTBED_NETWORK@";
+my $TESTBED_NETMASK          = "@TESTBED_NETMASK@";
+my $EXTERNAL_TESTBED_NETWORK = "@EXTERNAL_TESTBED_NETWORK@";
+my $EXTERNAL_TESTBED_NETMASK = "@EXTERNAL_TESTBED_NETMASK@";
+my $BOSSNODE_IP              = "@BOSSNODE_IP@";
+my $USERNODE_IP              = "@USERNODE_IP@";
+my $EXTERNAL_BOSSNODE_IP     = "@EXTERNAL_BOSSNODE_IP@";
+my $EXTERNAL_USERNODE_IP     = "@EXTERNAL_USERNODE_IP@";
+
+my $CONTROL_ROUTER_IP  = "@CONTROL_ROUTER_IP@";
+my $CONTROL_NETWORK    = "@CONTROL_NETWORK@";
+my $CONTROL_NETMASK    = "@CONTROL_NETMASK@";
+my $PRIVATE_NETWORK    = "@PRIVATE_NETWORK@";
+my $PRIVATE_ROUTER     = "@PRIVATE_ROUTER@";
+my $PRIVATE_NETMASK    = "@PRIVATE_NETMASK@";
+my $PUBLIC_NETWORK     = "@PUBLIC_NETWORK@";
+my $PUBLIC_ROUTER      = "@PUBLIC_ROUTER@";
+my $PUBLIC_NETMASK     = "@PUBLIC_NETMASK@";
+my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
+
+# Testbed libraries.
+use lib "@prefix@/lib";
+use libdb;
+
+# This is for the dotted and reverse dotted notation needed for the
+# reverse maps. This is probably all wrong ... 
+my ($ia, $ib, $ic, $id) =
+    ($TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+my ($ea, $eb, $ec, $ed) =
+    ($EXTERNAL_TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+
+$infile = shift @ARGV || exit &usage;
+
+my $internal_revfile = "${ia}.${ib}.${ic}.db.head";
+my $external_revfile = "${ea}.${eb}.${ec}.db.head";
+
+#
+# Create internal version.
+#
+print "Generating internal reverse lookup file ...\n";
+system("cp -f reverse.head $internal_revfile") == 0 or
+    die("Unable to copy $infile to $internal_revfile\n");
+
+open(REV, ">>$internal_revfile")
+    or die("Unable to open $internal_revfile for appending!\n");
+
+print REV "\n";
+print REV "${BOSSNODE_IP}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
+print REV "${USERNODE_IP}\tIN\tPTR\tops.${OURDOMAIN}.\n";
+close(REV);
+
+# No need is just one big IP space.
+exit(0)
+    if ($TESTBED_NETWORK eq $EXTERNAL_TESTBED_NETWORK);
+
+#
+# Create external version.
+#
+print "Generating external reverse lookup file ...\n";
+system("cp -f reverse.head $external_revfile") == 0 or
+    die("Unable to copy $infile to $external_revfile\n");
+
+open(REV, ">>$external_revfile")
+    or die("Unable to open $external_revfile for appending!\n");
+
+print REV "\n";
+print REV "${EXTERNAL_BOSSNODE_IP}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
+print REV "${EXTERNAL_USERNODE_IP}\tIN\tPTR\tops.${OURDOMAIN}.\n";
+close(REV);
+    
+exit(0);
