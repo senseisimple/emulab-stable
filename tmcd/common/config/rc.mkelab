@@ -88,7 +88,7 @@ chomp($creator);
 
 my $hostname = `hostname`;
 chomp($hostname);
-my ($bossname, $bossip) = tmccbossinfo();
+my ($bossname, $outer_bossip) = tmccbossinfo();
 
 # Cert stuff to give the inner emulab
 my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
@@ -133,7 +133,7 @@ exit(0);
 
 # More protos
 sub SetupFatal($);
-sub mysystem($);
+sub mysystem($;$);
 sub SetupOpsNode();
 sub SetupBossNode();
 sub CreateDefsFile($);
@@ -194,7 +194,14 @@ sub doboot()
     # XXX To avoid NFS errors while copying goo from outer boss.
     # 
     system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");    
-    system("sysctl vfs.nfs.eacces_retry_count=20 >/dev/null 2>&1");    
+    system("sysctl vfs.nfs.eacces_retry_count=20 >/dev/null 2>&1");
+
+    #
+    # Temp hack; make sure control iface in full duplex mode! pc2000 problem.
+    #
+#    my $outer_controlif = `cat $BOOTDIR/controlif`;
+#    chomp($outer_controlif);
+#    mysystem("ifconfig $outer_controlif media 100baseTX mediaopt full-duplex");
 
     if ($emulabconfig{"ROLE"} eq "ops") {
 	SetupOpsNode();
@@ -226,7 +233,7 @@ sub SetupOpsNode()
 
     print "Copying over current testbed software from /proj\n";
     mysystem("mkdir ${TBDIR}/testbed/src/testbed");
-    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src");
+    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src", 3);
 
     #
     # The mirror tree is copied to temp storage, and then copied into
@@ -234,7 +241,7 @@ sub SetupOpsNode()
     #
     if (-e "/proj/$pid/mirror") {
 	print "Copying over mirror tree from /proj/$pid/mirror\n";
-	mysystem("rsync -a --delete /proj/$pid/mirror ${TBDIR}");
+	mysystem("rsync -a --delete /proj/$pid/mirror ${TBDIR}", 3);
     }
 
     #
@@ -242,7 +249,7 @@ sub SetupOpsNode()
     # We use an IP to avoid DNS issues (there will be a DNS running inside).
     # Ditto for the current router. Need that for later (rc.inelab).
     # 
-    mysystem("echo '${bossip}' > $ETCDIR/outer_bossnode");
+    mysystem("echo '${outer_bossip}' > $ETCDIR/outer_bossnode");
     mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
 
     #
@@ -370,12 +377,12 @@ sub SetupOpsNode()
 
     print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
     print RC "ifconfig_${outer_controlif}=".
-	"\"inet $outer_ip netmask $outer_netmask\"\n";
+	"\"inet $outer_ip netmask $outer_netmask\n";
     print RC "ifconfig_${inner_controlif}=".
 	"\"inet $inner_ip netmask $inner_netmask ".
 	"media 100baseTX mediaopt full-duplex\"\n";
     print RC "static_routes=\"outerboss\"\n";
-    print RC "route_outerboss=\"$bossip $outer_routerip\"\n";
+    print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
 
     print RC "defaultrouter=\"$bossnode_ip\"\n";
     print RC "hostname=\"" . $emulabconfig{"OPSNODE"} . "." . $domain . "\"\n";
@@ -473,14 +480,15 @@ sub SetupBossNode()
 
     print "Copying over current testbed software from /proj\n";
     mysystem("mkdir ${TBDIR}/testbed/src/testbed");
-    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src");
+    mysystem("rsync -a --delete /proj/$pid/src/testbed ${TBDIR}/testbed/src", 3);
 
     print "Copying over initial dbstate from /proj\n";
     mysystem("mkdir ${TBDIR}/testbed/stuff");
-    mysystem("cp -p /proj/$pid/exp/$eid/dbstate.tar.gz ${TBDIR}/testbed/stuff");
+    mysystem("cp -fp /proj/$pid/exp/$eid/dbstate.tar.gz ${TBDIR}/testbed/stuff",
+	     3);
 
     # Copy over creators ssl certificate for XMLRPC. See below.
-    mysystem("cp -p ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff");
+    mysystem("cp -fp ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff", 3);
 
     # Still waiting for Rob to fix packages. This is some extra goo.
 #    mysystem("cp -p /proj/$pid/exp/$eid/extras.tar.gz ${TBDIR}/testbed/stuff");
@@ -489,7 +497,7 @@ sub SetupBossNode()
     # Stash the IP of the outer emulab for tmcc (and script above).
     # We use an IP to avoid DNS issues (there will be a DNS running inside).
     # 
-    mysystem("echo '${bossip}' > $ETCDIR/outer_bossnode");
+    mysystem("echo '${outer_bossip}' > $ETCDIR/outer_bossnode");
     mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
     mysystem("cp -p $BOOTDIR/myip $ETCDIR/outer_ipaddr");
 
@@ -593,7 +601,7 @@ sub SetupBossNode()
 
     print RC "ntpdate_enable=\"YES\"\n";
     # Points to outer boss
-    print RC "ntpdate_flags=\"${bossip}\"\n";
+    print RC "ntpdate_flags=\"${outer_bossip}\"\n";
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 
@@ -603,12 +611,12 @@ sub SetupBossNode()
 
     print RC "network_interfaces=\"$outer_controlif $inner_controlif lo0\"\n";
     print RC "ifconfig_${outer_controlif}=".
-	"\"inet $outer_ip netmask $outer_netmask\"\n";
+	"\"inet $outer_ip netmask $outer_netmask\n";
     print RC "ifconfig_${inner_controlif}=".
 	"\"inet $inner_ip netmask $inner_netmask ".
 	"media 100baseTX mediaopt full-duplex\"\n";
     print RC "static_routes=\"outerboss\"\n";
-    print RC "route_outerboss=\"$bossip $outer_routerip\"\n";
+    print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
 
     #
     # Use natd so that internal control network can talk to outside world.
@@ -669,7 +677,7 @@ sub SetupBossNode()
 
     # Its the generic stuff; must localize.
     mysystem("cd /tftpboot; mv pxeboot.emu-sio pxeboot.emu; ".
-	     "              mv freebsd410 freebsd ; mv frisbee410 frisbee");
+	     "              mv freebsd47 freebsd ; mv frisbee47 frisbee");
 
     #
     # Copy the creators ssl certificate into place. This allows the
@@ -869,6 +877,10 @@ sub CreateDefsFile($)
 		    print OUTDEFS "PUBLIC_NETMASK=255.255.255.0\n";
 		    last SWITCH;
 		};
+		/^NAMED_FORWARDERS$/ && do {
+		    print OUTDEFS "NAMED_FORWARDERS=\"${outer_bossip}\"\n";
+		    last SWITCH;
+		};
 		/^DHCPD_DYNRANGE$/ && do {
 		    print OUTDEFS "DHCPD_DYNRANGE=".
 			"\"$dynrange_low $dynrange_high\"\n";
@@ -946,14 +958,23 @@ sub SetupSendMail($$)
 #
 # Run a command string.
 #
-sub mysystem($)
+sub mysystem($;$)
 {
-    my ($command) = @_;
+    my ($command, $retrycount) = @_;
 
-    print "Command: '$command\'\n";
-    print "Started at:  " . libsetup::TBTimeStamp() . "\n";
+    $retrycount = 1
+	if (!defined($retrycount));
 
-    system($command);
+    while ($retrycount--) {
+	print "Command: '$command\'\n";
+	print "Started at:  " . libsetup::TBTimeStamp() . "\n";
+	
+	system($command);
+	last
+	    if ($? == 0 || $retrycount == 0);
+	
+	sleep(1);
+    }
     if ($?) {
 	SetupFatal("Command failed: $? - $command");
     }
