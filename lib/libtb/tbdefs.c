@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,6 +19,7 @@ char *tbdb_objecttypes[] = {
 	TBDB_OBJECTTYPE_TIME,
 	TBDB_OBJECTTYPE_PROGRAM,
 	TBDB_OBJECTTYPE_FRISBEE,
+	TBDB_OBJECTTYPE_SIMULATOR,
 	0,
 };
 
@@ -33,6 +34,8 @@ char *tbdb_eventtypes[] = {
 	TBDB_EVENTTYPE_MODIFY,
 	TBDB_EVENTTYPE_SET,
 	TBDB_EVENTTYPE_RESET,
+	TBDB_EVENTTYPE_HALT,
+	TBDB_EVENTTYPE_SWAPOUT,
         TBDB_NODESTATE_ISUP, 
         TBDB_NODESTATE_REBOOTED, 
         TBDB_NODESTATE_REBOOTING, 

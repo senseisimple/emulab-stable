@@ -32,6 +32,7 @@
 static void enqueue(event_handle_t handle,
 		    event_notification_t notification, void *data);
 static void dequeue(event_handle_t handle);
+static int  handle_simevent(event_handle_t handle, sched_event_t *eventp);
 
 static char	*progname;
 static char	*pid, *eid;
@@ -298,10 +299,19 @@ dequeue(event_handle_t handle)
 	if (debug > 1)
 	    gettimeofday(&now, NULL);
 
-        if (event_notify(handle, next_event.notification) == 0) {
-            ERROR("could not fire event\n");
-            return;
-        }
+	/*
+	 * Sim events are special right now since we handle them here.
+	 */
+	if (next_event.simevent) {
+		if (! handle_simevent(handle, &next_event))
+			goto bad;
+	}
+	else {
+	    if (event_notify(handle, next_event.notification) == 0) {
+		ERROR("could not fire event\n");
+		return;
+	    }
+	}
 
 	if (debug > 1) {
 	    info("Fire:  note:%p at:%ld:%d now:%ld:%d\n",
@@ -310,6 +320,7 @@ dequeue(event_handle_t handle)
 		 now.tv_sec,
 		 now.tv_usec);
 	}
+    bad:
         event_notification_free(handle, next_event.notification);
     }
 }
@@ -501,6 +512,8 @@ get_static_events(event_handle_t handle)
 		}
 		event.time.tv_sec  = time.tv_sec;
 		event.time.tv_usec = time.tv_usec;
+		event.simevent     = !strcmp(OBJTYPE,
+					     TBDB_OBJECTTYPE_SIMULATOR);
 		sched_event_enqueue(event);
 		nrows--;
 	}
@@ -520,6 +533,7 @@ get_static_events(event_handle_t handle)
 		error("could not allocate notification");
 		return 0;
 	}
+	event.simevent     = 0;
 	event.notification = notification;
 	event.time.tv_sec  = now.tv_sec;
 	event.time.tv_usec = now.tv_usec;
@@ -549,4 +563,51 @@ quit(int sig)
 
 	/* cleanup() will be called from atexit() */
 	exit(0);
+}
+
+static int
+handle_simevent(event_handle_t handle, sched_event_t *eventp)
+{
+	char		evtype[TBDB_FLEN_EVEVENTTYPE];
+	int		rcode;
+	char		cmd[BUFSIZ];
+
+	if (! event_notification_get_eventtype(handle,
+					       eventp->notification,
+					       evtype, sizeof(evtype))) {
+		error("could not get event type from notification %p\n",
+		      eventp->notification);
+		return 0;
+	}
+
+	/*
+	 * All we know about is the "SWAPOUT" and "HALT" event!
+	 */
+	if (strcmp(evtype, TBDB_EVENTTYPE_HALT) &&
+	    strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT)) {
+		error("cannot handle SIMULATOR event %s.\n", evtype);
+		return 0;
+	}
+
+	/*
+	 * We are lucky! The event scheduler runs as the user! But just in
+	 * case, check our uid to make sure we are not root.
+	 */
+	if (!getuid() || !geteuid()) {
+		error("Cannot run SIMULATOR %s as root.\n", evtype);
+		return 0;
+	}
+	/*
+	 * Run the command. Redirect the output so we can see it.
+	 */
+	if (!strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT)) {
+	    sprintf(cmd, "swapexp -s out %s %s", pid, eid);
+	}
+	else if (!strcmp(evtype, TBDB_EVENTTYPE_HALT)) {
+	    sprintf(cmd, "endexp %s %s", pid, eid);
+	}
+	rcode = system(cmd);
+	
+	/* Should not return, but ... */
+	return (rcode == 0);
 }

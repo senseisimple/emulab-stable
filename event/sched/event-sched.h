@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -28,6 +28,7 @@
 typedef struct sched_event {
     event_notification_t notification; /* event notification */
     struct timeval time;        /* event firing time */
+    int simevent;		/* A simulator event, dummy */
 } sched_event_t;
 
 /*

@@ -321,7 +321,12 @@ Simulator instproc run {} {
 
     sql exec $DB "update experiments set forcelinkdelays=$forcelinkdelays,uselinkdelays=$uselinkdelays,usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
     sql endquery $DB
+
+    # This could probably be elsewhere.
+    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','*','$self','$objtypes(SIMULATOR)')";    
     
+    sql endquery $DB
+
     foreach event $event_list {
 	sql exec $DB "insert into eventlist (pid,eid,time,vnode,vname,objecttype,eventtype,arguments,atstring) values (\"$pid\",\"$eid\",[lindex $event 0],\"[lindex $event 1]\",\"[lindex $event 2]\",$objtypes([lindex $event 3]),$eventtypes([lindex $event 4]),\"[lindex $event 5]\",\"[lindex $event 6]\")"
     }
@@ -602,18 +607,29 @@ Simulator instproc at {time eventstring} {
 	    set okargs 1
 	}
 	"Simulator" {
+	    set vnode "*"
+	    set vname $self
+	    
 	    switch -- $cmd {
 		"bandwidth" {
 		    set otype LINK
 		    set etype MODIFY
+		    set vnode {}
+		    set vname {}
+		}
+		"halt" {
+		    set otype SIMULATOR
+		    set etype HALT
+		}
+		"swapout" {
+		    set otype SIMULATOR
+		    set etype SWAPOUT
 		}
 		unknown {
 		    punsup "at $time $event"
 		    return
 		}
 	    }
-	    set vnode {}
-	    set vname {}
 	    set okargs 1
 	}
 	unknown {

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -32,6 +32,7 @@
 #define TBDB_OBJECTTYPE_TIME	"TIME"
 #define TBDB_OBJECTTYPE_PROGRAM	"PROGRAM"
 #define TBDB_OBJECTTYPE_FRISBEE	"FRISBEE"
+#define TBDB_OBJECTTYPE_SIMULATOR "SIMULATOR"
 
 #define TBDB_EVENTTYPE_START	"START"
 #define TBDB_EVENTTYPE_STOP	"STOP"
@@ -43,6 +44,8 @@
 #define TBDB_EVENTTYPE_MODIFY	"MODIFY"
 #define TBDB_EVENTTYPE_SET	"SET"
 #define TBDB_EVENTTYPE_RESET	"RESET"
+#define TBDB_EVENTTYPE_HALT	"HALT"
+#define TBDB_EVENTTYPE_SWAPOUT	"SWAPOUT"
 
 #define TBDB_NODESTATE_ISUP       "ISUP"
 #define TBDB_NODESTATE_REBOOTED   "REBOOTED"

@@ -62,7 +62,7 @@ use libtestbed;
 $| = 1;
 
 # un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $evsched	= "$TB/sbin/event-sched";

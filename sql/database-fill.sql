@@ -122,6 +122,9 @@ REPLACE INTO event_eventtypes VALUES (6,'MODIFY');
 REPLACE INTO event_eventtypes VALUES (7,'SET');
 REPLACE INTO event_eventtypes VALUES (8,'TIME');
 REPLACE INTO event_eventtypes VALUES (9,'RESET');
+REPLACE INTO event_eventtypes VALUES (10,'KILL');
+REPLACE INTO event_eventtypes VALUES (11,'HALT');
+REPLACE INTO event_eventtypes VALUES (12,'SWAPOUT');
 
 --
 -- Dumping data for table 'event_objecttypes'
@@ -134,6 +137,7 @@ REPLACE INTO event_objecttypes VALUES (2,'TRAFGEN');
 REPLACE INTO event_objecttypes VALUES (3,'TIME');
 REPLACE INTO event_objecttypes VALUES (4,'PROGRAM');
 REPLACE INTO event_objecttypes VALUES (5,'FRISBEE');
+REPLACE INTO event_objecttypes VALUES (6,'SIMULATOR');
 
 --
 -- Dumping data for table 'exported_tables'
