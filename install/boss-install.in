@@ -53,6 +53,8 @@ my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
 
 my $GMAKE      = "/usr/local/bin/gmake";
 
+my $RNDC_CONFGEN = "/usr/local/bin/rndc-confgen";
+
 #
 # Some files we edit/create
 #
@@ -76,6 +78,8 @@ my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
 my $BOOST_PATCH     = "$TOP_SRCDIR/patches/boost.patch";
 
 my $SSH_CONFIG      = "/etc/ssh/ssh_config";
+
+my $RNDC_KEY        = "/usr/local/etc/rndc.key";
 
 #
 # Some directories we care about
@@ -313,7 +317,7 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 	qq|nfs_client_enable="YES"|,
 	qq|inetd_enable="YES"|,
 	qq|inetd_flags="-wW -R 0"|,
-	qq|named_enable="YES"|,
+	qq|named_enable="NO"|,
 	qq|xntpd_enable="YES"|,
 	qq|syslogd_flags=""|,
 	qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|);
@@ -475,6 +479,11 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	    "   StrictHostKeyChecking no",
 	    "   Protocol 1,2");
     };
+};
+
+Phase "rndc", "Setting up rndc for control of nameserver", sub {
+    DoneIfExists($RNDC_KEY);
+    ExecQuietFatal("$RNDC_CONFGEN -a -r /dev/urandom");
 };
 
 print "----------------------------------------------------------------------\n";

@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-boss
-PORTVERSION=	1.2
+PORTVERSION=	1.3
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -44,7 +44,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	tftp-hpa:${PORTSDIR}/misc/tftp-hpa \
 	elvind:${PORTSDIR}/misc/elvind \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
-	sudo:${PORTSDIR}/security/sudo
+	sudo:${PORTSDIR}/security/sudo \
+	${LOCALBASE}/sbin/named:${PORTSDIR}/net/bind9
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
