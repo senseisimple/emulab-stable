@@ -419,7 +419,7 @@ public class RoboTrack extends JApplet {
 	 */
 	int OBSTACLE_BUFFER = 23;
 	
-	public boolean CheckforCollisions() {
+	public boolean CheckforObstacles() {
 	    Enumeration robot_enum = robots.elements();
 
 	    while (robot_enum.hasMoreElements()) {
@@ -468,6 +468,9 @@ public class RoboTrack extends JApplet {
 	 * all the robots that are dragging, and popup a dialog box if
 	 * we find one. The user then has to fix it.
 	 *
+	 * According to Tim, the center point of the robot needs to be
+	 * within view, not the entire robot. 
+	 *
 	 * XXX I am treating the robot as a square! Easier to calculate.
 	 */
 	public boolean CheckOutOfBounds() {
@@ -480,10 +483,10 @@ public class RoboTrack extends JApplet {
 		if (!robbie.dragging)
 		    continue;
 
-		int rx1 = robbie.drag_x - ((DOT_RAD/2));
-		int ry1 = robbie.drag_y - ((DOT_RAD/2));
-		int rx2 = robbie.drag_x + ((DOT_RAD/2));
-		int ry2 = robbie.drag_y + ((DOT_RAD/2));
+		int rx1 = robbie.drag_x;
+		int ry1 = robbie.drag_y;
+		int rx2 = robbie.drag_x;
+		int ry2 = robbie.drag_y;
 
 		//System.out.println("CheckOutOfBounds: " + rx1 + "," +
 		//                   ry1 + "," + rx2 + "," + ry2);
@@ -502,10 +505,10 @@ public class RoboTrack extends JApplet {
 		    //System.out.println("  " + cx1 + "," +
 		    //		       cy1 + "," + cx2 + "," + cy2);
 
-		    if ((rx1 >= cx1 &&
-			 ry1 >= cy1 &&
-			 rx2 <= cx2 &&
-			 ry2 <= cy2))
+		    if ((rx1 > cx1 &&
+			 ry1 > cy1 &&
+			 rx2 < cx2 &&
+			 ry2 < cy2))
 			break;
 		}
 		if (index == Cameras.size()) {
@@ -1190,7 +1193,7 @@ public class RoboTrack extends JApplet {
 		/*
 		 * Check for collisions before submitting.
 		 */
-		if (! map.CheckforCollisions() &&
+		if (! map.CheckforObstacles() &&
 		    ! map.CheckOutOfBounds()) 
 		    SendInDestinations();
 	    }
