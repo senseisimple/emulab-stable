@@ -49,6 +49,10 @@ tmcc: tmcc.c decls.h $(SSLOBJ)
 	$(CC) $(CFLAGS) $(SSLFLAGS) -static -g -o tmcc $< $(SSLOBJ) \
 		$(LFLAGS) $(TMLIBS)
 
+tmcc-shared: tmcc.c decls.h $(SSLOBJ)
+	$(CC) $(CFLAGS) $(SSLFLAGS) -g -o tmcc $< $(SSLOBJ) \
+		$(LFLAGS) $(TMLIBS)
+
 tmcc-nossl: tmcc.c decls.h
 	$(CC) $(CFLAGS) -static -g -o tmcc-nossl $< $(LFLAGS)
 

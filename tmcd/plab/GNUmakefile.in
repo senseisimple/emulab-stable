@@ -11,15 +11,14 @@ SUBDIR		= tmcd/plab
 #
 COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
 		    paths.sh paths.pm runstartup vnodesetup update watchdog \
-                    libtmcc.pm)
+                    libtmcc.pm libsetup.pm)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
-TMCDSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/libsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
                     plabsetup rc.inplab rusaged)
 OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
 		    install-tarfile install-rpm)
 EESCRIPTS	= $(TESTBED_SRCDIR)/tmcd/plab/rc.vinit
-ULEESCRIPTS	= $(COMSCRIPTS) $(LINSCRIPTS) $(TMCDSCRIPTS) $(PLABSCRIPTS)
+ULEESCRIPTS	= $(COMSCRIPTS) $(LINSCRIPTS) $(PLABSCRIPTS)
 ALLSCRIPTS	= $(ULEESCRIPTS) $(OSSCRIPTS) $(EESCRIPTS)
 
 #
