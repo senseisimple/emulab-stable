@@ -116,6 +116,9 @@ static float LINK_RESOLVE_DIRECT = 4.0;
 static float LINK_RESOLVE_INTRASWITCH = 2.0;
 static float LINK_RESOLVE_INTERSWITCH = 1.0;
 
+// The amount that each violation contributes to the total score
+static float VIOLATION_SCORE = 1.0;
+
 static struct config_param options[] = {
   { "IT",	CONFIG_INT,	&init_temp,			0 },
   { "OP",	CONFIG_INT,	&USE_OPTIMAL,			0 },

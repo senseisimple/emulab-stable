@@ -90,6 +90,9 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
 	if ((pn->current_type_record->current_load + vn->typecount) >
 	    pn->current_type_record->max_load) {
 	  // This would put us over its max load
+	  //if (allow_overload && (tr->max_load > 1) &&
+	  //    ((pn->current_type_record->current_load + vn->typecount) <
+	  //    (pn->current_type_record->max_load + 2))) {
 	  if (allow_overload && (tr->max_load > 1)) {
 	    // That's okay, we're allowing overload
 	    matched = true;
@@ -802,7 +805,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       } else if (melting) {
 	  accepttrans = true;
 	  RDEBUG(cout << "accept: melting" << endl;)
-      } else
+      } else {
 #ifdef NO_VIOLATIONS
 	  if (newscore < bestscore) {
 	      accepttrans = true;
@@ -815,6 +818,23 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 		      << ")" << endl;)
 	  }
 #else
+#ifdef SPECIAL_VIOLATION_TREATMENT
+	  /*
+	   * In this ifdef, we always accept new solutions that have fewer
+	   * violations than the old solution, and when we're trying to
+	   * determine whether or not to accept a new solution with a higher
+	   * score, we don't take violations into the account.
+	   *
+	   * The problem with this shows up at low temperatures. What can often
+	   * happen is that we accept a solution with worse violations but a
+	   * better (or similar) score. Then, if we were to try, say the first
+	   * solution (or a score-equivalent one) again, we'd accept it again.
+	   *
+	   * What this leads to is 'thrashing', where we have a whole lot of
+	   * variation of scores over time, but are not making any real
+	   * progress. This prevents the cooling schedule from converging for
+	   * much, much longer than it should really take.
+	   */
           if ((violated == bestviolated) && (newscore < bestscore)) {
 	      accepttrans = true;
 	      RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
@@ -832,6 +852,31 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 		      << bestscore << "," << expf(scorediff/(temp*sensitivity))
 		      << ")" << endl;)
 	  }
+#else // no SPECIAL_VIOLATION_TREATMENT
+	  /*
+	   * In this branch of the ifdef, we give violations no special
+	   * treatment when it comes to accepting new solution - we just add
+	   * them into the score. This makes assign behave in a more 'classic'
+	   * simulated annealing manner.
+	   *
+	   * One consequence, though, is that we have to be more careful with
+	   * scores. We do not want to be able to get into a situation where
+	   * adding a violation results in a _lower_ score than a solution with
+	   * fewer violations.
+	   */
+          double adjusted_new_score = newscore + violated * VIOLATION_SCORE;
+	  double adjusted_old_score = bestscore + bestviolated *
+	      VIOLATION_SCORE;
+
+	  if (adjusted_new_score < adjusted_old_score) {
+	    accepttrans = true;
+	  } else if (accept(adjusted_old_score - adjusted_new_score,temp)) {
+	    accepttrans = true;
+	  }
+
+#endif // SPECIAL_VIOLATION_TREATMENT
+
+      }
 #endif
 
       if (accepttrans) {
@@ -985,11 +1030,9 @@ NOTQUITEDONE:
 #endif
 #endif
     
-    // Revert to best found so far - do link/lan migration as well
-#ifdef SCORE_DEBUG
-    cerr << "Reverting to best known solution." << endl;
-#endif
-
+    RDEBUG(
+    printf("temp_end: temp: %f ratio: %f stddev: %f\n",temp,temp * avgscore / initialavg,stddev);
+    );
 
     // Add this to the history, and computed a smoothed average
     smoothedavg = avgscore / (nhist + 1);
@@ -1020,7 +1063,7 @@ NOTQUITEDONE:
        printf("avgs: real: %f, smoothed %f, initial: %f\n",avgscore,smoothedavg,initialavg);
        printf("epsilon: (%f) %f / %f * %f / %f < %f (%f)\n", fabs(deltaavg), temp, initialavg,
 	   deltaavg, deltatemp, epsilon,(temp / initialavg) * (deltaavg/ deltatemp));
-    )
+    );
     if ((tsteps >= mintsteps) &&
 #ifdef ALLOW_NEGATIVE_DELTA
 	((fabs(deltaavg) < 0.0000001)

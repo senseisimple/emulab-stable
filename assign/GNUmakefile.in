@@ -52,6 +52,8 @@ CXXFLAGS += -DPER_VNODE_TT
 CXXFLAGS += -DFIX_PLINK_ENDPOINTS
 # Allow pnodes to cap the amount of trivial link bandwidth they can handle
 CXXFLAGS += -DTRIVIAL_LINK_BW
+# Use the old acceptance criteria, which gives special treatment to violations
+#CXXFLAGS += -DSPECIAL_VIOLATION_TREATMENT
 
 # If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
 # option. Use OP={0,1} on the command line at run time... :)
