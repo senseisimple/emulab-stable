@@ -225,7 +225,7 @@ if (system("$SSH -host $control_node egrep -q -s '^${user}:' /etc/passwd")) {
     print "Adding user $user ($user_number) to $control_node.\n";
 
     if (system("$SSH -host $control_node ".
-	       "'$USERADD $user -u $user_number -c \"$fullname\" ".
+	       "'$USERADD $user -u $user_number -c \\\"$fullname\\\" ".
 	       "-k /usr/share/skel -m -d $HOMEDIR/$user ".
 	       "-g $default_groupname -s /bin/tcsh'")) {
 	fatal("Could not add user $user ($user_number) to $control_node.\n");
@@ -238,7 +238,7 @@ else {
     # MAKE SURE not to update anything else!
     #
     if (system("$SSH -host $control_node ".
-	       "'$USERMOD $user -c \"$fullname\"'")) {
+	       "'$USERMOD $user -c \\\"$fullname\\\"'")) {
 	fatal("Could not modify user $user record on $control_node.");
     }
 }
