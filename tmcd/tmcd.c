@@ -950,8 +950,9 @@ COMMAND_PROTOTYPE(doaccounts)
 
 	/*
 	 * Each time a node picks up accounts, decrement the update
-	 * counter. This is a very poor approach. See node_update and
-	 * doisalive below.
+	 * counter. This ensures that if someone kicks off another
+	 * update after this point, the node will end up getting to
+	 * do it again in case it missed something.
 	 */
 	if (mydb_update("update nodes set update_accounts=update_accounts-1 "
 			"where node_id='%s' and update_accounts!=0",
