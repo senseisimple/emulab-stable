@@ -1,0 +1,59 @@
+#!/usr/bin/perl
+#
+# This is a sample event generator to send TBEXAMPLE events to all nodes
+# in an experiment. Perl equivalent of tbsend.c
+#
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+
+use event;
+package event; # Laziness so that we don't have to specify package name
+use Getopt::Std;
+use strict;
+
+sub usage {
+    warn "Usage: $0 [-s server] [-p port] <event>\n";
+    return 1;
+}
+
+my %opt = ();
+getopt(\%opt,"s:p:h");
+
+if ($opt{h}) { exit &usage; }
+if (@ARGV != 1) { exit &usage; }
+
+my ($server,$port);
+if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+if ($opt{p}) { $port = $opt{p}; }
+
+my $URL = "elvin://$server";
+if ($port) { $URL .= ":$port"; }
+
+my $handle = event_register($URL,0);
+if (!$handle) { die "Unable to register with event system\n"; }
+
+my $tuple = address_tuple_alloc();
+if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+%$tuple = ( objtype => "TBEXAMPLE",
+	    eventtype => $ARGV[0],
+	    host => "*");
+
+my $notification = event_notification_alloc($handle,$tuple);
+if (!$notification) { die "Could not allocate notification\n"; }
+print "Sent at time " . time() . "\n";
+
+if (!event_notify($handle, $notification)) {
+    die("could not send test event notification");
+}
+
+event_notification_free($handle, $notification);
+
+if (event_unregister($handle) == 0) {
+    die("could not unregister with event system");
+}
+
+exit(0);

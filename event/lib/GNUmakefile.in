@@ -5,13 +5,15 @@ SUBDIR		= event/lib
 
 include $(OBJDIR)/Makeconf
 
-all:	libevent.a libevent_r.a
+all:	libevent.a libevent_r.a event.so
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 #CFLAGS += -DDEBUG
 CFLAGS += -O -g -static -I. -Wall -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS += `elvin-config --cflags vin4mt`
+
+LDFLAGS += -L${OBJDIR}/lib/libtb
 
 OBJS	= event.o util.o
 POBJS	= event_r.o util.o
@@ -30,7 +32,24 @@ $(POBJS):	event.h
 event_r.o:	event.c
 	$(CC) $(CFLAGS) -DTHREADED -c -o event_r.o $<
 
-install:
+#
+# These three targets are for the perl binding to the event system
+# 
+event_wrap.c:	event.i	event.c event.pm.tail
+	swig -dnone -perl5 -shadow -I$(SRCDIR) $(SRCDIR)/event.i
+	cat $(SRCDIR)/event.pm.tail >> event.pm
+
+event_wrap.o:	$(SRCDIR)/event_wrap.c
+	$(CC) -c $(CFLAGS) -I/usr/libdata/perl/5.00503/mach/CORE $<
+
+event.so:	event.o event_wrap.o util.o
+	ld -shared $^ $(OBJDIR)/lib/libtb/libtb.a \
+		`elvin-config --libs vin4c` -o event.so
+	
+LIB_STUFF       = event.pm event.so
+
+install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+
 
 clean:
-	/bin/rm -f *.o libevent.a
+	/bin/rm -f *.o libevent.a *.so *.pm
