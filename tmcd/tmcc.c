@@ -25,7 +25,9 @@
 #else
 #define DEFAULT_BOSSNODE NULL
 #endif
-#define BOSSNODEFILE	 "/usr/local/etc/bossnode"
+#ifndef BOSSNODEFILE
+#define BOSSNODEFILE	 "/usr/local/etc/testbed/bossnode"
+#endif
 
 void		sigcatcher(int foo);
 char		*getbossnode(void);
