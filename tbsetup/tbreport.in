@@ -821,12 +821,12 @@ if ($showfwinfo) {
 		     "where pid='$pid' and eid='$eid' ");
     if ($result_fw->numrows) {
 	print "Firewall information:\n";
-	printf("%-15s %-8s %-8s %-5s %s\n",
+	printf("%-15s %-10s %-8s %-5s %s\n",
 	       "ID", "Type", "Style", "Rule#", "Rule");
-	print("--------------- -------- -------- ----- ".
+	print("--------------- ---------- -------- ----- ".
 	      "-----------------------------------\n");
 	while (my ($fwname,$fwtype,$fwstyle) = $result_fw->fetchrow_array()) {
-	    printf("%-15s %-8s %-8s", $fwname, $fwtype, $fwstyle);
+	    printf("%-15s %-10s %-8s", $fwname, $fwtype, $fwstyle);
 	    my $result =
 		DBQueryFatal("select ruleno,rule from firewall_rules ".
 			     "where pid='$pid' and eid='$eid' ".
@@ -847,9 +847,9 @@ if ($showfwinfo) {
 		}
 	    }
 	    my $leader=" ";
-	    foreach my $ruleno (sort keys(%rules)) {
+	    foreach my $ruleno (sort { $a <=> $b } keys(%rules)) {
 		printf("%s%5d %s\n", $leader, $ruleno, $rules{$ruleno});
-		$leader="                                  ";
+		$leader="                                    ";
 	    }
 	    print "\n";
 	}
