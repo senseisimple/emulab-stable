@@ -73,11 +73,17 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Projects Using Emulab.Net", $TBDOCBASE,
 		       "projectlist.php3");
 
+    $freepcs = TBFreePCs();
+
     echo "<tr>
             <td height=30 valign=center align=center nowrap>
              <b><span class=sidebarbutton>
-                  Web Interface Options
-                </span>
+                  Web Interface Options\n";
+
+    if ($login_status == $STATUS_LOGGEDIN) {
+	echo "    <br>($freepcs Free PCs)\n";
+    }
+    echo "      </span>
              </b>
             </td>
           </tr>\n";
@@ -274,7 +280,7 @@ function WRITEBANNER($title) {
     global $BANNERCOLOR, $THISPROJECT, $THISHOMEBASE;
 
     echo "<!-- This is the page Banner -->\n";
-    echo "<table cellpadding=0 cellspacing=0 border=0 bgcolor=$BANNERCOLOR>";
+    echo "<table cellpadding=0 cellspacing=0 border=0>";
     echo "<tr>
             <td align=left width=\"0%\">
              <table cellpadding=5 cellspacing=0 border=0 bgcolor=\"#880000\">

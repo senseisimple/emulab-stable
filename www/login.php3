@@ -41,7 +41,10 @@ else {
 }
 
 if ($login_status == $STATUS_LOGGEDIN) {
-    header("Location: " . "index.php3");
+    #
+    # Zap back to front page in secure mode.
+    # 
+    header("Location: $TBBASE/");
     return;
 }
 
