@@ -183,11 +183,10 @@ if (0 == strcmp($effuid, "unknown")) {
 }
 
 echo "<p>";
-echo "We are planning to grow Emulab.
-      Since we need to know what's most important to you,
-      please take a few moments to give us some feedback.
-      Please answer at least the multiple choice section;
-      it's quick!";
+echo "We are planning to grow the Emulab cluster and need you to tell us what's
+    important to you-- or why it still won't be much good for your research or
+    teaching.  Please answer at least the multiple choice section; it's quick!
+    If you've never used Emulab, be sure to tell us why, in a text box below.";
   
 echo "</p>";
 
