@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -169,7 +169,7 @@ chdir("$workdir") or
 if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
     fatal("Could not copy $tempnsfile to $workdir/$nsfile");
 }
-chmod(0770, "$nsfile");
+chmod(0664, "$nsfile");
 
 #
 # Run parse in impotent mode on the NS file.  This has no effect but
