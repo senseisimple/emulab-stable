@@ -802,6 +802,7 @@ CREATE TABLE node_types (
   isremotenode tinyint(4) NOT NULL default '0',
   issubnode tinyint(4) NOT NULL default '0',
   isplabdslice tinyint(4) NOT NULL default '0',
+  isplabphysnode tinyint(4) NOT NULL default '0',
   issimnode tinyint(4) NOT NULL default '0',
   simnode_capacity smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (type)

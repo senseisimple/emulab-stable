@@ -1408,3 +1408,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (node_id)
 	) TYPE=MyISAM;
 
+1.234: Add a column to node_types identifying plab physical nodes.
+
+       alter table node_types add column isplabphysnode tinyint(4) not null \
+	   default 0 after isplabdslice;
