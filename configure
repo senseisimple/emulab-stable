@@ -893,6 +893,7 @@ fi
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -932,6 +933,7 @@ JAILIPBASE=172.17.0.0
 JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
+ELABINELAB=0
 PLABSUPPORT=0
 PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
@@ -1393,7 +1395,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1397: checking for a BSD compatible install" >&5
+echo "configure:1399: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1543,7 +1545,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
-        tmcd/cygwinxp/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables utils/eventping \
@@ -1770,6 +1771,7 @@ s%@TBAUTHDOMAIN@%$TBAUTHDOMAIN%g
 s%@TBAUTHTIMEOUT@%$TBAUTHTIMEOUT%g
 s%@TBMAINSITE@%$TBMAINSITE%g
 s%@SFSSUPPORT@%$SFSSUPPORT%g
+s%@ELABINELAB@%$ELABINELAB%g
 s%@PLABSUPPORT@%$PLABSUPPORT%g
 s%@TBLOGFACIL@%$TBLOGFACIL%g
 s%@PLAB_ROOTBALL@%$PLAB_ROOTBALL%g

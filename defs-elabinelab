@@ -33,6 +33,8 @@ THISHOMEBASE=changeme
 PLABSUPPORT=0
 SFSSUPPORT=0
 DISABLE_NSE=1
+# This means it is an inner elab!
+ELABINELAB=1
 #
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
