@@ -526,4 +526,58 @@ function PAGEERROR($msg) {
     PAGEFOOTER();
     die("");
 }
+
+#
+# Sub Page/Menu Stuff
+#
+function WRITESUBMENUBUTTON($text, $link) {
+    echo "<!-- Table row for button $text -->
+          <tr>
+            <td valign=center align=left nowrap>
+                <b>
+         	 <a class=sidebarbutton href='$link'>$text</a>\n";
+    #
+    # XXX these blanks look bad in lynx, but add required
+    #     spacing between menu and body
+    #
+    echo "       &nbsp;&nbsp;\n";
+
+    echo "      </b>
+            </td>
+          </tr>\n";
+}
+
+#
+# Start/End a page within a page. 
+#
+function SUBPAGESTART() {
+    echo "<table cellspacing=2 cellpadding=2 width='85%' border=0>\n
+            <tr>\n
+              <td valign=top>\n";
+}
+
+function SUBPAGEEND() {
+    echo "    </td>\n
+            </tr>\n
+          </table>\n";
+}
+
+#
+# Start/End a sub menu, located in the upper left of the main frame.
+# Note that these cannot be used outside of the SUBPAGE macros above.
+#
+function SUBMENUSTART($title) {
+    echo "      <table cellspacing=2 cellpadding=2 border=0 width=200>\n
+                  <tr>\n
+                    <td align=center><b>$title</b></td>\n
+                  </tr>\n
+                  <tr></tr>\n";
+}
+
+function SUBMENUEND() {
+    echo "      </table>\n
+              </td>\n
+              <td valign=top align=left width='85%'>\n";
+}
+
 ?>

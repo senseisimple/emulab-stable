@@ -18,8 +18,11 @@ function SHOWPROJECT($pid, $thisuid) {
     }
     $row = mysql_fetch_array($query_result);
 
-    echo "<table align=center border=1>\n";
-
+    echo "<center>
+          <h3>Project Profile</h3>
+          </center>
+          <table align=center border=1>\n";
+    
     $proj_created	= $row[created];
     $proj_expires	= $row[expires];
     $proj_name		= $row[name];

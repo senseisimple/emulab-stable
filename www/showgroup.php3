@@ -57,9 +57,23 @@ if (!$isadmin) {
     }
 }
 
-SHOWGROUP($pid, $gid);
+SUBPAGESTART();
+SUBMENUSTART("Group Options");
+WRITESUBMENUBUTTON("Edit this Group",
+		   "editgroup_form.php3?pid=$pid&gid=$gid");
 
+#
+# A delete option, but not for the default group!
+#
+if (strcmp($gid, $pid)) {
+    WRITESUBMENUBUTTON("Delete this Group",
+		       "deletegroup.php3?pid=$pid&gid=$gid");
+}
+SUBMENUEND();
+
+SHOWGROUP($pid, $gid);
 SHOWGROUPMEMBERS($pid, $gid);
+SUBPAGEEND();
 
 #
 # A list of Group experiments.
@@ -86,23 +100,6 @@ if (mysql_num_rows($query_result)) {
               </tr>\n";
     }
     echo "</table>\n";
-}
-
-#
-# An edit option.
-# 
-echo "<br>
-      <center>
-       <A href='editgroup_form.php3?pid=$pid&gid=$gid'>Edit</a> this Group?
-      </center>\n";
-
-#
-# A delete option, but not for the default group!
-#
-if (strcmp($gid, $pid)) {
-    echo "<p>
-           <A href='deletegroup.php3?pid=$pid&gid=$gid'>Delete</a> this Group?
-          \n";
 }
 
 #
