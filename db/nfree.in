@@ -143,11 +143,13 @@ foreach my $n (@node_names) {
 
   # Find the control net interface for this node type
   $sth = 
-    $dbh->query("select control_net,osid from node_types left join ".
-		"nodes on nodes.type=node_types.type where node_id='$n'");
+    $dbh->query("select control_net,osid,node_types.pxe_boot_path " .
+		"from node_types left join nodes on nodes.type=node_types.type " .
+		"where node_id='$n'");
   my @row= $sth->fetchrow_array();
   my $control= $row[0];
   my $osid= $row[1];
+  my $pxe_boot_path = $row[2];
   if (! ($n =~ /sh\d+/)) { #If its not a shark
     # Clean out all IPs except the control net
     $cmd = 
@@ -172,8 +174,8 @@ foreach my $n (@node_names) {
 
   # And clean out various tidbits from the nodes table.
   $cmd = "update nodes set def_boot_osid='$osid', def_boot_cmd_line='',".
-      "def_boot_path='',startupcmd='',rpms='',deltas='',tarballs=''".
-      " where node_id='$n'";
+      "def_boot_path='',startupcmd='',rpms='',deltas='',tarballs='',".
+	  "pxe_boot_path='$pxe_boot_path' where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
