@@ -19,17 +19,30 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 
+if (! isset($sortby))
+    $sortby = "normal";
+
+if (! strcmp($sortby, "normal") ||
+    ! strcmp($sortby, "name"))
+    $order = "i.imagename";
+elseif (! strcmp($sortby, "pid"))
+    $order = "i.pid";
+elseif (! strcmp($sortby, "desc"))
+    $order = "i.description";
+else 
+    $order = "i.imagename";
+
 #
 # Get the list.
 #
 if ($isadmin) {
-    $query_result = DBQueryFatal("SELECT * FROM images order by imageid");
+    $query_result = DBQueryFatal("SELECT * FROM images as i order by $order");
 }
 else {
     $query_result =
 	DBQueryFatal("select distinct i.* from images as i ".
 		     "left join group_membership as g on g.pid=i.pid ".
-		     "where g.uid='$uid' or i.shared order by i.imageid");
+		     "where g.uid='$uid' or i.shared order by $order");
 }
 
 if (mysql_num_rows($query_result) == 0) {
@@ -56,9 +69,12 @@ echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td>Image</td>
-          <td>PID</td>
-          <td>Description</td>
+          <td><a href='showimageid_list.php3?&sortby=name'>
+              Image</td>
+          <td><a href='showimageid_list.php3?&sortby=pid'>
+              PID</td>
+          <td><a href='showimageid_list.php3?&sortby=desc'>
+              Description</td>
       </tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {

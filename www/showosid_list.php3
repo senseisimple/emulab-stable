@@ -19,19 +19,32 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 
+if (! isset($sortby))
+    $sortby = "normal";
+
+if (! strcmp($sortby, "normal") ||
+    ! strcmp($sortby, "name"))
+    $order = "o.osname";
+elseif (! strcmp($sortby, "pid"))
+    $order = "o.pid";
+elseif (! strcmp($sortby, "desc"))
+    $order = "o.description";
+else 
+    $order = "o.osname";
+
 #
 # Get the project list.
 #
 if ($isadmin) {
     $query_result =
-	DBQueryFatal("SELECT * FROM os_info order by pid,osname");
+	DBQueryFatal("SELECT * FROM os_info as o order by $order");
 }
 else {
     $query_result =
 	DBQueryFatal("select distinct o.* from os_info as o ".
 		     "left join group_membership as g on g.pid=o.pid ".
 		     "where g.uid='$uid' or o.shared=1 ".
-		     "order by o.pid,o.osname");
+		     "order by $order");
 }
 
 if (mysql_num_rows($query_result) == 0) {
@@ -70,9 +83,12 @@ echo "<br>
       <table border=2 cellpadding=0 cellspacing=2 align='center'>\n";
 
 echo "<tr>
-          <td>Name</td>
-          <td>PID</td>
-          <td>Description</td>
+          <td><a href='showosid_list.php3?&sortby=name'>
+              Name</td>
+          <td><a href='showosid_list.php3?&sortby=pid'>
+              PID</td>
+          <td><a href='showosid_list.php3?&sortby=desc'>
+              Description</td>
       </tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {

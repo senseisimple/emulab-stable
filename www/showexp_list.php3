@@ -14,37 +14,52 @@ LOGGEDINORDIE($uid);
 
 $isadmin     = ISADMIN($uid);
 $altclause   = "";
-$altview     = 0;
 
-if (isset($alternate_view) && $alternate_view) {
-    echo "<b><a href='showexp_list.php3'>
+if (! isset($showactive))
+    $showactive = 0;
+if (! isset($sortby))
+    $sortby = "normal";
+
+if ($showactive) {
+    echo "<b><a href='showexp_list.php3?showactive=0&sortby=$sortby'>
                 Show All Experiments</a>
           </b><br><br>\n";
     $altclause = "e.state='$TB_EXPTSTATE_ACTIVE'";
-    $altview   = 1;
 }
 else {
-    echo "<b><a href='showexp_list.php3?alternate_view=1'>
+    echo "<b><a href='showexp_list.php3?showactive=1&sortby=$sortby'>
                 Show Active Experiments Only</a>
           </b><br><br>\n";
 }
+
+if (! strcmp($sortby, "normal") ||
+    ! strcmp($sortby, "pid"))
+    $order = "e.pid,e.eid";
+elseif (! strcmp($sortby, "eid"))
+    $order = "e.eid,e.expt_head_uid";
+elseif (! strcmp($sortby, "uid"))
+    $order = "e.expt_head_uid,e.pid,e.eid";
+elseif (! strcmp($sortby, "name"))
+    $order = "e.expt_name";
+else 
+    $order = "e.pid,e.eid";
 
 #
 # Show a menu of all experiments for all projects that this uid
 # is a member of. Or, if an admin type person, show them all!
 #
 if ($isadmin) {
-    if ($altview)
+    if ($showactive)
 	$altclause = "where ($altclause)";
     
     $experiments_result =
 	DBQueryFatal("select pid,eid,expt_head_uid,expt_name, ".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
 		     "from experiments as e $altclause ".
-		     "order by pid,eid,expt_name");
+		     "order by $order");
 }
 else {
-    if ($altview)
+    if ($showactive)
 	$altclause = "and ($altclause)";
     
     $experiments_result =
@@ -53,7 +68,7 @@ else {
 		     "from experiments as e ".
 		     "left join group_membership as g on g.pid=e.pid ".
 		     "where g.uid='$uid' $altclause ".
-		     "order by e.pid,eid,expt_name");
+		     "order by $order");
 }
 if (! mysql_num_rows($experiments_result)) {
     USERERROR("There are no experiments running in any of the projects ".
@@ -68,15 +83,23 @@ if (mysql_num_rows($experiments_result)) {
     echo "<table border=2 cols=0
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
-              <td width=8%>PID</td>
-              <td width=8%>EID</td>
+              <td width=8%>
+               <a href='showexp_list.php3?showactive=$showactive&sortby=pid'>
+                  PID</td>
+              <td width=8%>
+               <a href='showexp_list.php3?showactive=$showactive&sortby=eid'>
+                  EID</td>
               <td width=3%>PCs</td>\n";
 
     if ($isadmin)
 	echo "<td width=17% align=center>Last Login</td>\n";
 
-    echo "    <td width=60%>Name</td>
-              <td width=4%>Head UID</td>
+    echo "    <td width=60%>
+               <a href='showexp_list.php3?showactive=$showactive&sortby=name'>
+                  Name</td>
+              <td width=4%>
+               <a href='showexp_list.php3?showactive=$showactive&sortby=uid'>
+                  Head UID</td>
             </tr>\n";
 
     $total_pcs = 0;

@@ -22,30 +22,39 @@ $isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have permission to view the user list!", 1);
 }
-
-if (isset($alternate_view) && $alternate_view) {
-    echo "<b><a href='showuser_list.php3'>
-                Show All Users</a>
+if (!isset($showactive))
+    $showactive = 0;
+if (!isset($sortbyname))
+    $sortbyname = 0;
+    
+if (!$showactive) {
+    echo "<b><a href='showuser_list.php3?showactive=1&sortbyname=$sortbyname'>
+                Show Logged in Users</a>
           </b><br><br>\n";
 }
 else {
-    echo "<b><a href='showuser_list.php3?alternate_view=1'>
-                Show Logged in Users</a>
+    echo "<b><a href='showuser_list.php3?showactive=0&sortbyname=$sortbyname'>
+                Show All Users</a>
           </b><br><br>\n";
-
-    $alternate_view = 0;
+}
+if (!$sortbyname) {
+    $order = "u.uid";
+    $sortbyname = 0;
+}
+else {
+    $order = "u.usr_name";
 }
 
-if ($alternate_view) {
+if ($showactive) {
     $query_result =
 	DBQueryFatal("select u.* from login as l ".
 		     "left join users as u on u.uid=l.uid ".
 		     "where timeout>=unix_timestamp() ".
-		     "order by u.uid");
+		     "order by $order");
 }
 else {
     $query_result =
-	DBQueryFatal("SELECT u.* FROM users as u order by u.uid");
+	DBQueryFatal("SELECT u.* FROM users as u order by $order");
 }
 
 if (mysql_num_rows($query_result) == 0) {
@@ -63,8 +72,10 @@ echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=0
 
 echo "<tr>
           <td>&nbsp</td>
-          <td>UID</td>
-          <td>Name</td>
+          <td><a href='showuser_list.php3?showactive=$showactive&sortbyname=0'>
+                 UID</td>
+          <td><a href='showuser_list.php3?showactive=$showactive&sortbyname=1'>
+                 Name</td>
           <td>Projects</td>
           <td>Web<br>Idle</td>
           <td>Users<br>Idle</td>\n";
@@ -76,6 +87,7 @@ if ($isadmin) {
     echo "<td align=center>Modify</td>\n";
     echo "<td align=center>Delete</td>\n";
 }
+
 echo "</tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {

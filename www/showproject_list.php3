@@ -20,24 +20,36 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 
+if (!isset($splitview) || !$isadmin)
+    $splitview = 0;
+if (!isset($sortby))
+    $sortby = "name";
+
 if ($isadmin) {
-    if (! $alternate_view) {
-	echo "<b><a href='showproject_list.php3?alternate_view=1'>
-                    Alternate View</a>
+    if (! $splitview) {
+	echo "<b><a href='showproject_list.php3?splitview=1&sortby=$sortby'>
+                    Split View</a>
               </b><br>\n";
     }
     else {
-	echo "<b><a href='showproject_list.php3'>
+	echo "<b><a href='showproject_list.php3?sortby=$sortby'>
                     Normal View</a>
               </b><br>\n";
     }
 }
-else {
-    $alternate_view = 0;
-}
+
+if (! strcmp($sortby, "name"))
+    $order = "p.name";
+elseif (! strcmp($sortby, "pid"))
+    $order = "p.pid";
+elseif (! strcmp($sortby, "uid"))
+    $order = "p.head_uid";
+else 
+    $order = "p.name";
 
 if ($isadmin) {
-    $query_result = DBQueryFatal("SELECT * FROM projects order by pid");
+    $query_result =
+	DBQueryFatal("SELECT * FROM projects as p order by $order");
     
     #
     # Process the query results for active projects so I can generate a
@@ -74,17 +86,21 @@ if ($isadmin) {
 
 function GENPLIST ($query_result)
 {
-    global $isadmin;
+    global $isadmin, $splitview;
 
     echo "<table width='100%' border=2
                  cellpadding=2 cellspacing=0 align=center>
           <tr>
-              <td>PID</td>
-              <td>(Approved?) Description</td>
-              <td>Leader</td>
-              <td align=center>Days<br>Idle</td>
-              <td align=center colspan=2>Expts<br>Cr, Run</td>
-              <td align=center>Nodes</td>\n";
+           <td><a href='showproject_list.php3?splitview=$splitview&sortby=pid'>
+               PID</td>
+           <td>(Approved?)
+              <a href='showproject_list.php3?splitview=$splitview&sortby=name'>
+               Description</td>
+           <td><a href='showproject_list.php3?splitview=$splitview&sortby=uid'>
+               Leader</td>
+           <td align=center>Days<br>Idle</td>
+           <td align=center colspan=2>Expts<br>Cr, Run</td>
+           <td align=center>Nodes</td>\n";
 
     #
     # Admin users get other fields.
@@ -170,7 +186,7 @@ if (! $isadmin) {
 	DBQueryFatal("SELECT * FROM projects as p ".
 		     "left join group_membership as g on ".
 		     "     p.pid=g.pid and g.pid=g.gid ".
-		     "where g.uid='$uid' and g.trust!='none'");
+		     "where g.uid='$uid' and g.trust!='none' order by $order");
 				   
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("You are not a member of any projects!", 1);
@@ -179,10 +195,10 @@ if (! $isadmin) {
     GENPLIST($query_result);
 }
 else {
-    if ($alternate_view) {
+    if ($splitview) {
 	$query_result =
-	    DBQueryFatal("select * FROM projects ".
-			 "where expt_count>0 order by name");
+	    DBQueryFatal("select * FROM projects as p ".
+			 "where expt_count>0 order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<center>
@@ -192,8 +208,8 @@ else {
 	}
 
 	$query_result =
-	    DBQueryFatal("select * FROM projects ".
-			 "where expt_count=0 order by name");
+	    DBQueryFatal("select * FROM projects as p ".
+			 "where expt_count=0 order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<br><center>
