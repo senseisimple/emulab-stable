@@ -21,7 +21,7 @@ sub usage()
     print STDERR "Usage: $0 [-force] pid eid nsfile\n";
     exit(-1);
 }
-my $force = 0;
+my $force  = 0;
 my $state;
 
 #
@@ -94,14 +94,13 @@ if (!$force &&
 #
 sub cleanup {
     print STDERR "Cleaning up after errors.\n";
-    # Must kill the prerender process before we remove virt state.
-    system("prerender -r $pid $eid");
-
-    # When doing a modify, this is handled elsewhere. 
     if ($state eq EXPTSTATE_PRERUN) {
-	print "Removing experiment state ... " . TBTimeStamp() . "\n";
-	TBExptRemoveVirtualState($pid, $eid );
+	# Must kill the prerender process before we remove virt state.
+	print "Killing the renderer.\n";
+	system("prerender -r $pid $eid");
     }
+    print "Removing experiment state.\n";
+    TBExptRemoveVirtualState($pid, $eid );
 }
 
 # Must kill any prerender process first!
@@ -144,9 +143,15 @@ if ($nsfile_string) {
     }
 }
 
-TBDebugTimeStamp("prerender started in background");
-print "Precomputing visualization ...\n";
-system("prerender -t $pid $eid");
+#
+# In update mode, do not start the renderer until later. If update fails we
+# want to try to restore old render info rather then rerunning. 
+# 
+if ($state eq EXPTSTATE_PRERUN) {
+    TBDebugTimeStamp("prerender started in background");
+    print "Precomputing visualization ...\n";
+    system("prerender -t $pid $eid");
+}
 
 #
 # See if using the new ipassign.

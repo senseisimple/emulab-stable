@@ -83,8 +83,13 @@ my $user_name;
 my $user_email;
 my $dbuid;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+# Be careful not to exit on transient error; 0 means infinite retry.
+$libdb::DBQUERY_MAXTRIES = 0;
+
+# For the END block below.
+my $cleaning = 0;
+my $justexit = 1;
+my $signaled = 0;
 
 #
 # Turn off line buffering on output
@@ -335,6 +340,12 @@ if (! DBQueryWarn("unlock tables")) {
 }
 
 #
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
+#
 # Create a directory structure for the experiment.
 #
 if (system("$mkexpdir $pid $gid $eid") != 0) {
@@ -419,8 +430,11 @@ TBExptOpenLogFile($pid, $eid);
     
 if (my $childpid = TBBackGround($logname)) {
     #
-    # Parent exits normally, unless in waitmode.
+    # Parent exits normally, unless in waitmode. We have to set
+    # justexit to make sure the END block below does not run.
     #
+    $justexit = 1;
+    
     if (!$waitmode) {
 	print("Experiment $pid/$eid is now configuring\n".
  	      "You will be notified via email when the experiment is ".
@@ -471,6 +485,26 @@ if ($waitmode) {
 }
 
 #
+# We need to catch TERM cause sometimes shit happens and we have to kill
+# an experiment setup that is hung or otherwise scrogged. Rather then 
+# trying to kill off the children one by one, lets arrange to catch it
+# here and send a killpg to the children. This is not to be done lightly,
+# cause it can leave things worse then they were before!
+#
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    $signaled = 1;
+    fatal("Caught SIG${signame}! Killing experiment setup ...");
+}
+$SIG{TERM} = \&handler;
+$SIG{QUIT} = 'DEFAULT';
+
+#
 # The guts of starting an experiment!
 #
 # A batch experiment is essentially preloaded (frontend mode) and then
@@ -478,29 +512,33 @@ if ($waitmode) {
 #
 
 #
-# Run the various scripts. We want to propogate the error from tbprerun
+# Run the various scripts. We want to propagate the error from tbprerun
 # and tbrun back out, hence the bogus looking errorstat variable.
 #
-SetExpState($pid, $eid, EXPTSTATE_PRERUN);
+SetExpState($pid, $eid, EXPTSTATE_PRERUN)
+    or fatal("Failed to set experiment state to " . EXPTSTATE_PRERUN());
 print "Running 'tbprerun $pid $eid $nsfile'\n";
 if (system("$tbbindir/tbprerun $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbprerun failed!");
 }
-SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
+    or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
 
 #
 # If not in frontend mode (preload only) continue to swapping exp in.
 # 
 if (! ($frontend || $batchmode)) {
-    SetExpState($pid, $eid, EXPTSTATE_ACTIVATING);
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVATING)
+	or fatal("Failed to set experiment state to ". EXPTSTATE_ACTIVATING());
 
     print "Running 'tbswap in $pid $eid'\n";
     if (system("$tbbindir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
     }
-    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVE)
+	or fatal("Failed to set experiment state to " . EXPTSTATE_ACTIVE());
 
     #
     # Look for the unsual case of more than 2 nodes and no vlans. Send a
@@ -672,14 +710,8 @@ exit(0);
 #
 #
 #
-sub fatal($)
+sub cleanup()
 {
-    my($mesg) = $_[0];
-
-    print "*** $0:\n";
-    print "    $mesg\n";
-    print "Cleaning up and exiting with status $errorstat ...\n";
-
     #
     # Failed early (say, in parsing). No point in keeping any of the
     # stats or resource records. Just a waste of space since the
@@ -705,7 +737,7 @@ sub fatal($)
 	DBQueryWarn("DELETE from experiment_stats ".
 		    "WHERE eid='$eid' and pid='$pid' and exptidx=$exptidx");
 
-	exit($errorstat);
+	return;
     }
 
     #
@@ -722,18 +754,27 @@ sub fatal($)
     # Must clean up the experiment if it made it our of NEW state.
     #
     my $estate = ExpState($pid, $eid);
-    if ($estate ne EXPTSTATE_NEW) {    
-	if ($estate eq EXPTSTATE_ACTIVE) {
+    if ($estate ne EXPTSTATE_NEW) {
+	#
+	# We do not know exactly where things stopped, so if the
+	# experiment was activating when the signal was delivered,
+	# run tbswap on it. 
+	# 
+	if ($estate eq EXPTSTATE_ACTIVE ||
+	    ($estate eq EXPTSTATE_ACTIVATING && $signaled)) {
 	    print "Running 'tbswap out -force $pid $eid'\n";
 	    if (system("$tbbindir/tbswap out -force $pid $eid") != 0) {
 		print "tbswap out failed!\n";
 	    }
+	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 	}
+	
 	print "Running 'tbend -force $pid $eid'\n";
 	if (system("$tbbindir/tbend -force $pid $eid") != 0) {
 	    print "tbend failed!\n";
 	}
     }
+    SetExpState($pid, $eid, EXPTSTATE_TERMINATED);
 
     #
     # Okay, we *are* going to terminate the experiment.
@@ -748,7 +789,6 @@ sub fatal($)
     #
     SENDMAIL("$user_name <$user_email>",
 	 "Experiment Configure Failure: $pid/$eid",
-	 $mesg . "\n\n" .
 	 "Please look at the log below to see what happened. If the error\n".
 	 "resulted from a lack of free nodes, you can use this web page to\n".
 	 "get a summary of free nodes:\n\n".
@@ -773,7 +813,6 @@ sub fatal($)
     # Clear the record and cleanup.
     # 
     TBExptDestroy($pid, $eid);    
-    exit($errorstat);
 }
 
 #
@@ -932,3 +971,46 @@ sub ParseArgs()
 	$waitmode = 1;
     }
 }
+
+#
+# We need this END block to make sure that we clean up after a fatal
+# exit in the library. This is problematic, cause we could be exiting
+# cause the mysql server has gone whacky again. 
+#
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print "*** $0:\n";
+    print "    $mesg\n";
+    print "Cleaning up and exiting with status $errorstat ...\n";
+
+    #
+    # This exit will drop into the END block below.
+    # 
+    exit($errorstat);
+}
+
+END {
+    # Normal exit, nothing to do.
+    if (!$? || $justexit) {
+	return;
+    }
+    my $saved_exitcode = $?;
+    
+    if ($cleaning) {
+	#
+	# We are screwed; a recursive error. Someone will have to clean
+	# up by hand. 
+	#
+	SENDMAIL(TBOPS, 
+		 "Experiment Configure Failure: $pid/$eid",
+		 "Recursive error in cleanup! This is very bad.");
+	$? = $saved_exitcode;
+	return;
+    }
+    $cleaning = 1;
+    cleanup();
+    $? = $saved_exitcode;
+}
+

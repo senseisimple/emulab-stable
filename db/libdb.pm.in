@@ -2745,6 +2745,9 @@ sub TBGetSiteVar($)
 		   "virt_programs",
 		   "virt_node_desires",
 		   "virt_simnode_attributes",
+		   # vis_nodes is locked during update in prerender, so we
+		   # will get a consistent dataset when we backup.
+		   "vis_nodes",
 		   "nseconfigs",
 		   "eventlist",
 		   "event_groups",

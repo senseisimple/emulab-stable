@@ -202,26 +202,38 @@ elsif ($swapop eq "update") {
 	    #
 	    # There were errors; see if we can recover.
 	    #
-	    my $NoRecover = 0;
+	    my $CanRecover = 1;
 
 	    if ($errors != 7) {
 		print STDERR "Update failure occurred _after_ assign phase; ";
-		$NoRecover = 1;
+		$CanRecover = 0;
 	    }
 
-	    if (! $NoRecover) {
-		print STDERR "Recovering physical state.\n";
-		if (($NoRecover = TBExptRestorePhysicalState($pid,$eid))) {
-		    print STDERR "Could not restore backed-up physical state; ";
+	    if ($CanRecover) {
+		print STDERR "Recovering virtual and physical state.\n";
+
+		if (TBExptRemoveVirtualState($pid, $eid) ||
+		    TBExptRestoreVirtualState($pid, $eid) ||
+		    TBExptRestorePhysicalState($pid,$eid)) {
+		    print STDERR "Could not restore backed-up state; ";
+		    $CanRecover = 0;
+		}
+		else {
+		    print STDERR "Doing a recovery swap-in of old state.\n";
+
+		    if (doSwapin(UPDATE_RECOVER)) {
+			print STDERR "Could not swap in old physical state; ";
+			$CanRecover = 0;
+		    }
 		}
 	    }
-	    if (! $NoRecover) {
-		print STDERR "Doing a recovery swap-in of old state.\n";
-		if (($NoRecover = doSwapin(UPDATE_RECOVER))) {
-		    print STDERR "Could not swap in old physical state; ";
-		}
-	    }
-	    if ($NoRecover) {
+
+	    #
+	    # Some part of the recovery failed; must swap it out. swapexp
+	    # (caller) will then have to do more clean up, hence the special
+	    # exit status indicated by $updatehosed.
+	    # 
+	    if (! $CanRecover) {
 		print STDERR "Recovery aborted! Swapping experiment out.\n";
 		doSwapout(CLEANUP);
 		$updatehosed = 1;

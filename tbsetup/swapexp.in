@@ -75,7 +75,15 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $tbdir    = "$TB/bin/";
+# Be careful not to exit on transient error; 0 means infinite retry.
+$libdb::DBQUERY_MAXTRIES = 0;
+
+# For the END block below.
+my $cleaning = 0;
+my $justexit = 1;
+my $signaled = 0;
+
+my $tbdir    = "$TB/bin";
 my $tbdata   = "tbdata";
 my $batch    = 0;
 my $idleswap = 0;
@@ -321,6 +329,7 @@ my $noswap      = $hashrow{'noswap_reason'};
 my $noidleswap  = $hashrow{'noidleswap_reason'};
 my $idleswaptime= $hashrow{'idleswap_timeout'} / 60.0;
 my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
+my $rendering   = $hashrow{'prerender_pid'};
 
 if ($inout ne "out") {
     # I'm going to update this below, so fix the value before I use it.
@@ -557,7 +566,16 @@ if ($inout ne "out") {
 $termswapstate = $estate;
 
 # Lock the record, set the nextstate, and unlock the table.
-TBLockExp($pid, $eid, $nextswapstate);
+TBLockExp($pid, $eid, $nextswapstate)
+    or die("*** $0:\n".
+	   "Failed to set experiment state to $nextswapstate\n");
+
+#
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
 DBQueryFatal("unlock tables");
 
 #
@@ -602,8 +620,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 if ($inout eq "modify" && defined($modnsfile)) {
     unlink($modnsfile);
     if (system("/bin/cp", "$tempnsfile", "$modnsfile")) {
-	die("*** $0:\n".
-	    "    Could not copy $tempnsfile to $modnsfile");
+	fatal("Could not copy $tempnsfile to $modnsfile");
     }
     chmod(0664, "$modnsfile");
 }
@@ -618,8 +635,11 @@ if (! $batch) {
 
     if (my $childpid = TBBackGround($logname)) {
 	#
-	# Parent exits normally, except if in waitmode. 
+	# Parent exits normally, unless in waitmode. We have to set
+	# justexit to make sure the END block below does not run.
 	#
+	$justexit = 1;
+
 	if (!$waitmode) {
 	    print("Experiment $pid/$eid is now being $action.\n".
 		  "You will be notified via email when the this is done.\n")
@@ -667,6 +687,26 @@ if ($waitmode) {
 }
 
 #
+# We need to catch TERM cause sometimes shit happens and we have to kill
+# an experiment swap that is hung or otherwise scrogged. Rather then 
+# trying to kill off the children one by one, lets arrange to catch it
+# here and send a killpg to the children. This is not to be done lightly,
+# cause it can leave things worse then they were before!
+#
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    $signaled = 1;
+    fatal("Caught SIG${signame}! Killing experiment setup ...");
+}
+$SIG{TERM} = \&handler;
+$SIG{QUIT} = 'DEFAULT';
+
+#
 # Gather stats; start clock ticking
 #
 if ($inout eq "in") {
@@ -700,7 +740,8 @@ if ($inout eq "out") {
 	$errorstat = $? >> 8;
 	fatal("tbswap out failed!");
     }
-    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+    SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
+	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
 }
 elsif ($inout eq "in") {
     print STDOUT "Running 'tbswap in $pid $eid'\n";
@@ -708,13 +749,13 @@ elsif ($inout eq "in") {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
     }
-    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVE)
+	or fatal("Failed to set experiment state to " . EXPTSTATE_ACTIVE());
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
 }
 elsif ($inout eq "modify") {
-    my $modifyError = "";
-    my $oldstate    = $estate;
+    my $modifyError;
 
     GatherSwapStats($pid, $eid, $dbuid,
 		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
@@ -726,81 +767,100 @@ elsif ($inout eq "modify") {
 
     #
     # Rerun tbprerun if modifying, but only if new NS file provided.
-    # Yep, we allow reswap without changing the NS file. For Shashi and SIM. 
+    # Yep, we allow reswap without changing the NS file. For Shashi and SIM.
+    # Note that tbprerun kills the renderer if its running.
     #
     if (defined($modnsfile)) {
 	print STDOUT "Running 'tbprerun $pid $eid $modnsfile'\n";
 	if (system("$tbdir/tbprerun $pid $eid $modnsfile") != 0) {
-	    $modifyError = "tbprerun failed!";
+	    print STDOUT "Modify Error: tbprerun failed.\n";
+	    print STDOUT "Recovering experiment state...\n";
+
+	    if (TBExptRemoveVirtualState($pid, $eid) ||
+		TBExptRestoreVirtualState($pid, $eid)) {
+		$modifyHosed = 1;
+		fatal("Experiment state could not be restored!");
+		# Never returns;
+	    }
+	    #
+	    # If the renderer was running when we started the swapmod, then we
+	    # want to restart it. If it was stopped, then the renderer info
+	    # was captured with the rest of the virtual state (restored above).
+	    #
+	    system("prerender -t $pid $eid")
+		if ($rendering);
+
+	    fatal("Update aborted; old virtual state restored.");
+	    # Never returns;
 	}
     }
 
     #
     # Our next state depends on whether the experiment was active or swapped.
     #
-    if (! $modifyError) {
-	if ($estate eq EXPTSTATE_SWAPPED) {
-	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+    if ($estate eq EXPTSTATE_SWAPPED) {
+	SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+    }
+    else {
+	SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
+	    
+	my $optarg = ($reboot ? "-reboot" : "");
+	$optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
+
+	print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
+	if (system("$tbdir/tbswap update $optarg $pid $eid") == 0) {
+	    #
+	    # Success. Set the state back to active cause thats where it started.
+	    # 
+	    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+	    $estate = EXPTSTATE_ACTIVE;
 	}
 	else {
-	    SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
-	    
-	    my $optarg = ($reboot ? "-reboot" : "");
-	    $optarg .= ($eventsys_restart ? " -eventsys_restart" : "");
-
-	    print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
-	    if (system("$tbdir/tbswap update $optarg $pid $eid") != 0) {
-		$errorstat = $? >> 8;
-		$modifyError = "tbswap update failed!";
-	    }
+	    $modifyError = $errorstat = $? >> 8;
+	    print STDOUT "Modify Error: tbswap update failed.\n";
 
 	    #
-	    # See what tbswap did. It might have swapped it out if there
-	    # was an error. 
+	    # tbswap either restored the experiment to the way it was,
+	    # or it swapped it out completely. In either case, it has
+	    # also restored the virtual state. 
 	    # 
-	    if (! $modifyError) {
-		SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
-		$estate = EXPTSTATE_ACTIVE;
-	    }
-	    elsif ($errorstat & 0x40) {
-		#
-		# Icky. Magic return code that says tbswap swapped it out.
-		# We do not want tbswap to muck with states anymore, so
-		# need to know what it did. At some point we should clean
-		# up the exit reporting! Anyway, fatal() needs to know the
-		# the right state to go back to (no longer ACTIVE).
-		#
-		# XXX This errorstat (0x40) is important to testbed_stats!
-		# We should probably put in a swapout record instead.
-		#
+	    # Icky. Magic return code that says tbswap swapped it out.
+	    # We do not want tbswap to muck with states anymore, so
+	    # need to know what it did. At some point we should clean
+	    # up the exit reporting! Anyway, fatal() needs to know the
+	    # the right state to go back to (no longer ACTIVE).
+	    #
+	    if ($errorstat & 0x40) {
 		$estate = EXPTSTATE_SWAPPED;
 		$termswapstate = EXPTSTATE_SWAPPED;
 		$modifySwapped = 1;
                 # Old accounting info.
 		TBSetExpSwapTime($pid, $eid);
+		$modifyError = "Update aborted; experiment swapped out.";
+	    }
+	    else {
+		$modifyError = "Update aborted; old state restored.";
 	    }
 	}
     }
 
-    if ($modifyError) {
-	print STDOUT "Modify Error: $modifyError\n";
-	print STDOUT "Recovering experiment state...\n";
-	
-	# Must deal with the prerender explicitly since it runs background.
-	system("prerender -r $pid $eid");
-	TBExptRemoveVirtualState($pid, $eid);
-	
-	if (TBExptRestoreVirtualState($pid, $eid) == 0) {
-	    # Must deal with the prerender explicitly since it runs background.
-	    system("prerender -t $pid $eid");
-	    fatal("Update aborted; old state restored.");
-	}
-	else {
-	    $modifyHosed = 1;
-	    fatal("Experiment state could not be restored!");
-	}
+    #
+    # We need to rerender only if the NS file was changed (ran tbprerun),
+    # If the swapmod succeeded, then unconditionally run the renderer. If
+    # swap failed, then need to run the renderer only if we stopped one in
+    # progress.
+    #
+    if (defined($modnsfile)) {
+	system("prerender -t $pid $eid")	
+	    if (!defined($modifyError) || $rendering)
     }
-    
+
+    #
+    # Swapmod failed ...
+    #
+    fatal($modifyError)
+	if (defined($modifyError));
+
     TBExptClearBackupState($pid, $eid);
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
 }
@@ -950,15 +1010,10 @@ SENDMAIL("$user_name <$user_email>",
 	 (($inout eq "restart") ? ($logname) :
 	  (($repfile, $logname), (defined($modnsfile) ? ($modnsfile) : ()))));
 
-exit 0;
+exit(0);
 
-sub fatal($)
+sub cleanup()
 {
-    my($mesg) = $_[0];
-
-    print STDOUT "*** $0:\n".
-	         "    $mesg\n";
-
     #
     # Gather stats. 
     #
@@ -1004,6 +1059,7 @@ sub fatal($)
 		print "tbswap out failed!\n";
 		$stat = $? >> 8;
 	    }
+	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 	    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $stat);
 	}
 
@@ -1022,19 +1078,18 @@ sub fatal($)
 	# Must override since we are so badly hosed. 
 	$termswapstate = EXPTSTATE_TERMINATED;
     }
+    # Set proper state, which is typically the way we came in.
+    SetExpState($pid, $eid, $termswapstate);
 
     # Copy over the log files so the user can see them.
     system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
-
-    # Set proper state, which is typically the way we came in.
-    SetExpState($pid, $eid, $termswapstate);
 
     #
     # In batch mode, exit without sending the email or unlocking. The
     # batch daemon will take care of that.
     #
     if ($batch) {
-	exit($errorstat);
+	return;
     }
 
     #
@@ -1058,7 +1113,6 @@ sub fatal($)
     #
     SENDMAIL("$user_name <$user_email>",
 	 "Swap ${inout} Failure: $pid/$eid",
-	 $mesg . "\n\n" .
 	 "Please look at the log below to see what happened. If the error\n".
 	 "resulted from a lack of free nodes, you can use this web page to\n".
 	 "get a summary of free nodes:\n\n".
@@ -1086,6 +1140,48 @@ sub fatal($)
 	system("/bin/mv -f   $userdir ${userdir}-failed");
 	TBExptDestroy($pid, $eid);
     }
+    return;
+}
 
+#
+# We need this END block to make sure that we clean up after a fatal
+# exit in the library. This is problematic, cause we could be exiting
+# cause the mysql server has gone whacky again. 
+#
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print "*** $0:\n";
+    print "    $mesg\n";
+    print "Cleaning up and exiting with status $errorstat ...\n";
+
+    #
+    # This exit will drop into the END block below.
+    # 
     exit($errorstat);
 }
+
+END {
+    # Normal exit, nothing to do.
+    if (!$? || $justexit) {
+	return;
+    }
+    my $saved_exitcode = $?;
+    
+    if ($cleaning) {
+	#
+	# We are screwed; a recursive error. Someone will have to clean
+	# up by hand. 
+	#
+	SENDMAIL(TBOPS,
+		 "Swap ${inout} Failure: $pid/$eid",
+		 "Recursive error in cleanup! This is very bad.");
+	$? = $saved_exitcode;
+	return;
+    }
+    $cleaning = 1;
+    cleanup();
+    $? = $saved_exitcode;
+}
+
