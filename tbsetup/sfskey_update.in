@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -144,10 +144,14 @@ else {
 # Grab all the keys from the DB and stick into the file.
 #
 my $query_result =
-    DBQueryFatal("select pubkey from user_sfskeys");
+    DBQueryFatal("select sfs.pubkey from users as u ".
+		 "left join user_sfskeys as sfs on sfs.uid=u.uid ".
+		 "where u.status='active' and u.webonly=0");
 
 while (my ($pubkey) = $query_result->fetchrow_array()) {
-    print KEYS "$pubkey\n";
+    if (defined($pubkey)) {
+	print KEYS "$pubkey\n";
+    }
 }
 close(KEYS);
 
