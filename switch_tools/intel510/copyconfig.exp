@@ -1,0 +1,165 @@
+#!/usr/local/bin/expect
+######################################################################
+# copyconfig.exp
+#
+# Syntax: 
+#  copyconfig.exp <switch>:<password> save <file>
+#  copyconfig.exp <switch>:<password> load <file>
+# Environment:
+#  CC_SERVER is the ip address of the tftp server
+#  CC_PATH is the path to a directory on the tftp server accessable by
+#    the user.
+#  CC_LOCAL_PATH path to CC_PATH from the ftp server
+#  This connects to <switch> an Intel 510T switch running vs 2.42 and
+# loads or saves a file.
+#
+# HOW:
+#  Saving: access switch, create world writable file on tftp server, copy to
+# given path.
+#  Loading: access switch, copy file to tftp server, make wordl readable.
+# Delete all created files/directories.
+######################################################################
+
+# DEFAULTS (Flux Group)
+set CC_SERVER 155.99.214.88
+set CC_PATH /n/moab/export/dnard/copyconfig
+set CC_LOCAL_PATH /export/dnard/copyconfig
+# parse argv
+if {[llength $argv] != 3} {
+    puts "Syntax: $argv0 <switch>:<password> <save|load> <file>"
+    exit 1
+}
+
+set Delete {}
+
+set sinfo [lindex $argv 0]
+set mode [lindex $argv 1]
+set file [lindex $argv 2]
+set t [split $sinfo :]
+set switch [lindex $t 0]
+set pw [lindex $t 1]
+
+if {$mode != "save" && $mode != "load"} {
+    puts stderr "Mode must be save or load"
+    exit 1
+}
+
+proc dotimeout {s} {
+    puts stderr "Timeout: $s"
+    exit 1
+}
+
+puts "Connecting to switch..."
+spawn telnet $switch
+log_user 0
+
+set timeout 10
+expect {
+    "Login" {}
+    timeout {dotimeout "Waiting for Login prompt"}
+}
+set timeout 10
+puts "Logging in..."
+send "a"
+expect {
+    "password:" {}
+    timeout {dotimeout "Waiting for Password prompt"}
+}
+send "$pw\n"
+expect {
+    "Local Management" {}
+    timeout {dotimeout "Waiting for Management Menu"}
+}
+puts "Manipulating..."
+send "c"
+expect {
+    "Configuration" {}
+    timeout {dotimeout "Waiting for Configuration Menu"}
+}
+if {$mode == "save"}  {
+    send "a"
+    expect {
+	"Save to server" {}
+	timeout {dotimeout "Waiting for Save to server"}
+    }
+    for {set i 0} {$i < 20} {incr i} {
+	send "$Delete"
+    }
+    send "$CC_SERVER\n"
+    expect {
+	"Configuration file path" {}
+	timeout {dotimeout "Waiting for Configuration file path"}
+    }
+    for {set i 0} {$i < 60} {incr i} {
+	send "$Delete"
+    }
+    send "$CC_LOCAL_PATH\n"
+    expect {
+	-re {Will save file:[ 	]*([/a-zA-Z0-9]+\.p)} {
+	    set fpath $expect_out(1,string)
+	    puts "File path: $fpath"
+	}
+	timeout {dotimeout "Waiting for file path"}
+    }
+    set lpath $CC_PATH/[file tail $fpath]
+    close [open $lpath "w"]
+    file attributes $lpath -permissions "00666"
+    expect {
+	"Confirm save to server?" {}
+	timeout {dotimeout "Waiting for confirm"}
+    }
+    send "y"
+    expect {
+	"press any key" {}
+	timeout {dotimeout "Waiting for status"}
+    }
+    file copy $lpath $file
+} else {
+    send "o"
+    expect {
+	"Load from server" {}
+	timeout {dotimeout "Waiting for Load from server"}
+    }
+    for {set i 0} {$i < 20} {incr i} {
+	send "$Delete"
+    }
+    send "$CC_SERVER\n"
+    expect {
+	"Configuration file path" {}
+	timeout {dotimeout "Waiting for Configuration file path"}
+    }
+    for {set i 0} {$i < 60} {incr i} {
+	send "$Delete"
+    }
+    send "$CC_LOCAL_PATH\n"
+    expect {
+	-re {Will load file:[ 	]*([/a-zA-Z0-9]+\.p)} {
+	    set fpath $expect_out(1,string)
+	    puts "File path: $fpath"
+	}
+	timeout {dotimeout "Waiting for file path"}
+    }
+    set lpath $CC_PATH/[file tail $fpath]
+    puts "! $lpath"
+    file copy $file $lpath
+    file attributes $lpath -permissions "00644"
+    expect {
+	"Confirm load from server?" {}
+	timeout {dotimeout "Waiting for confirm"}
+    }
+    send "y"
+    expect {
+	"File does not exist" {
+	    puts stderr "Error: Could not load file"
+	    exit 1
+	}
+	"press any key" {}
+	timeout {dotimeout "Waiting for status"}
+    }
+}
+send " qqql"
+#file delete $lpath
+puts "Transfer finished."
+close
+
+	
