@@ -8,8 +8,8 @@
 # querydb <node> - Returns a node_state (see below)
 # querynode <node> - Returns a node_state (see below)
 # listbases
-# listsdeltas <base> - Returns list of deltas
-# querybase <base> - Returns {os, ver, extra, desc}
+# listdeltas <base> - Returns list of deltas
+# querybase <base> - Returns {os, ver, extra, desc, path}
 # querydelta <delta> - Returns {name, desc, path}
 # db - Returns sql connection.
 #
@@ -29,7 +29,7 @@ namespace export os;
 variable commands {
     init end 
     querydb querynode 
-    listbases 
+    listbases listdeltas
     querybase querydelta
     db
 }
@@ -144,7 +144,7 @@ proc listdeltas {base} {
 proc querybase {base} {
     variable DB
 
-    sql query $DB "select OS, ver, extras, img_desc from disk_images where image_id=\"$base\""
+    sql query $DB "select OS, ver, extras, img_desc, img_path from disk_images where image_id=\"$base\""
     set ret [sql fetchrow $DB]
     sql endquery $DB
     return $ret
