@@ -19,3 +19,12 @@ if [ -x /etc/testbed/rc.delay ]; then
         /etc/testbed/rc.delay
 fi
 
+if [ -x /etc/testbed/rc.rpm  ]; then
+        echo "Installing RPMS"
+	/etc/testbed/rc.rpm
+fi
+
+if [ -x /etc/testbed/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit"
+	echo "/etc/testbed/runstartup" | at 'now + 5 minutes'
+fi

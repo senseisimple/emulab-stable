@@ -7,19 +7,25 @@ use English;
 my $TMCC	= "/etc/testbed/tmcc";
 my $TMIFC       = "/etc/testbed/rc.ifc";
 my $TMDELAY	= "/etc/testbed/rc.delay";
+my $TMRPM       = "/etc/testbed/rc.rpm";
+my $TMSTARTUPCMD= "/etc/testbed/startupcmd";
 my $TMGROUP     = "/etc/testbed/group";
 my $TMPASSWD    = "/etc/testbed/master.passwd";
 my $TMHOSTS     = "/etc/testbed/hosts";
 my $HOSTSFILE   = "/etc/hosts";
-my @CONFIGS	= ($TMIFC, $TMDELAY);
+my $TMNICKNAME  = "/etc/testbed/nickname";
+my @CONFIGS	= ($TMIFC, $TMDELAY, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME);
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
 my $ACCTCMD     = "accounts";
 my $DELAYCMD    = "delay";
 my $HOSTSCMD    = "hostnames";
+my $RPMCMD      = "rpms";
+my $STARTUPCMD  = "startupcmd";
 my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s ".
 		  "media 100baseTX mediaopt full-duplex\n";
+my $RPMINSTALL  = "/usr/local/bin/rpm -i %s\n";
 my $CP		= "/bin/cp -f";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $PW		= "/usr/sbin/pw";
@@ -28,6 +34,8 @@ my $IFACE	= "fxp";
 my $CTLIFACENUM = "4";
 my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $project     = "";
+my $eid         = "";
+my $vname       = "";
 my $PROJDIR     = "/proj";
 my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
 my $HOSTNAME    = "%s\t%s-%s %s\n";
@@ -73,14 +81,25 @@ if ($_ =~ /^FREE/) {
     print STDOUT "  Free!\n";
     exit(0);
 }
-if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*)/) {
-    print STDOUT "  Allocated: $1/$2!\n";
+if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*) NICKNAME=([-\@\w.]*)/) {
     $project = $1;
+    $eid     = $2;
+    $vname   = $3;
+    $nickname= "$vname.$eid.$project";
+    print STDOUT "  Allocated! PID: $1, EID: $2, NickName: $nickname\n";
 }
 else {
     die("Error getting reservation status\n");
 }
 
+#
+# Stick our nickname in a file in case someone wants it.
+#
+open(NICK, ">$TMNICKNAME")
+    or die("Could not open $TMNICKNAME");
+print NICK "$nickname\n";
+close(NICK);
+    
 #
 # Mount the project directory.
 # 
@@ -331,6 +350,48 @@ while (<TM>) {
     }
 }
 close(TM);
+
+#
+# RPM configuration. Done after account stuff!
+# 
+print STDOUT "Checking Testbed RPM configuration ... \n";
+
+open(TM,  "$TMCC $NODE $RPMCMD |")
+    or die "Cannot start $TMCC: $!";
+open(RPM, ">$TMRPM")
+    or die("Could not open $TMRPM");
+print RPM "#!/bin/sh\n";
+    
+while (<TM>) {
+    if ($_ =~ /RPM=([-\@\w.\/]+)/) {
+	printf STDOUT "  $RPMINSTALL", $1;
+	printf RPM    "echo \"Installing RPM $1\"\n", $1;
+	printf RPM    "$RPMINSTALL", $1;
+    }
+}
+close(TM);
+close(RPM);
+chmod(0755, "$TMRPM");
+
+#
+# Experiment startup Command.
+#
+print STDOUT "Checking Testbed Experiment Run Command configuration ... \n";
+
+open(TM,  "$TMCC $NODE $STARTUPCMD |")
+    or die "Cannot start $TMCC: $!";
+open(RUN, ">$TMSTARTUPCMD")
+    or die("Could not open $TMSTARTUPCMD");
+    
+while (<TM>) {
+    if ($_ =~ /CMD=([-\@\w.\/ ]+) UID=([0-9a-z]+)/) {
+	print  STDOUT "  Will run $1 as $2\n";
+	print  RUN    "$_\n";
+    }
+}
+close(TM);
+close(RUN);
+chmod(0755, "$TMSTARTUPCMD");
 
 #
 # If node is free, reset to a moderately clean state.
