@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -50,13 +50,4 @@ if (!($cwd =~ qr|/users|) &&
 $sshcmd = "$ssh $identity $nopass $nokeycheck $host 'cd $cwd \; $0 @ARGV'";
 #print "About to run $sshcmd\n";
 $rv = system $sshcmd;
-
-if ($rv > 256) {
-	print "**********\n";
-	print "SSH failed. You may need to run the following commands:\n\n";
-	print "mkdir -m 0755 $ENV{HOME}/.ssh\n";
-	print "ssh-keygen -P '' -t rsa1 -f $ENV{HOME}/.ssh/identity\n";
-	print "cp $ENV{HOME}/.ssh/identity.pub $ENV{HOME}/.ssh/authorized_keys\n";
-	print "chmod 600 $ENV{HOME}/.ssh/authorized_keys\n";
-	print "**********\n";
-}
+exit($rv >> 8);
