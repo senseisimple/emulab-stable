@@ -656,6 +656,15 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 	    }
 	}
 	break;
+
+    case PS_REFINING_ORIENTATION:
+	if (pc->pc_flags & PCF_CONTACT) {
+	    ps = PS_ARRIVED;
+	}
+	else {
+	    assert(0);
+	}
+	break;
 	
     default:
 	fprintf(stderr, "bad state %s\n", state_strings[ps]);
@@ -789,21 +798,23 @@ static void pc_handle_update(struct pilot_connection *pc,
 	break;
     case MTP_POSITION_STATUS_COMPLETE:
 	info("pilot finished %d\n", pc->pc_state);
-	
+
 	pc->pc_flags &= ~PCF_VISION_POSITION;
 
 	switch (pc->pc_state) {
 	case PS_PENDING_POSITION:
-	    
 	case PS_REFINING_POSITION:
-	    pc_change_state(pc, PS_REFINING_POSITION);
+	    if (mup->command_id == 1)
+		pc_change_state(pc, PS_REFINING_POSITION);
 	    break;
 	case PS_REFINING_ORIENTATION:
-	    pc_change_state(pc, PS_ARRIVED);
+	    if (mup->command_id == 1)
+		pc_change_state(pc, PS_ARRIVED);
 	    break;
 
 	case PS_WIGGLING:
-	    pc_change_state(pc, PS_PENDING_POSITION);
+	    if (mup->command_id == 2)
+		pc_change_state(pc, PS_PENDING_POSITION);
 	    break;
 	    
 
