@@ -1,0 +1,243 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <meta http-equiv="content-type"
+ content="text/html; charset=ISO-8859-1">
+  <title>HyperViewer in Emulab</title>
+</head>
+<body>
+<h2>Using HyperViewer in Emulab</h2>
+<h3>Table of Contents:</h3>
+<ol>
+  <li><a href="#intro">Introduction</a></li>
+  <li><a href="#install">Installing hypview</a></li>
+  <li><a href="#run">Running hypview as a script</a></li>
+  <li><a href="#gui">The hypview Graphical User Interface</a><br>
+  </li>
+</ol>
+<h3><a name="intro"></a>Introduction</h3>
+We have wrapped HyperViewer in a wxGlade Python graphical user
+interface, and connected it to the Emulab database via XML-RPC to read
+network
+topologies.<br>
+<br>
+The <a href="http://graphics.stanford.edu/papers/h3cga/">HyperViewer</a>
+software was developed by Tamara Munzner at Stanford.&nbsp; It is
+useful for
+visualizing relationships within large graphs such as network
+topologies, and is freely distributed as a <a
+ href="http://graphics.stanford.edu/%7Emunzner/software.html">C++ class
+library</a> which calls OpenGL for drawing.&nbsp; See her short <a
+ href="http://graphics.stanford.edu/papers/h3cga/html/">paper</a> for
+further description, particularly <a
+ href="http://graphics.stanford.edu/papers/h3cga/html/cga.html#hypmotionfig">Figure
+3</a> which shows Hyperbolic motion over a 30,000 element
+Unix file system.<br>
+&nbsp;<a
+ href="http://graphics.stanford.edu/papers/h3cga/html/cga.html#hypmotionfig"><img
+ src="image1.jpg" title="Hyperbolic Motion - Figure 3"
+ alt="Hyperbolic Motion - Figure 3"
+ style="border: 2px solid ; width: 149px; height: 150px;"></a><br>
+<br>
+The basic idea is that a graph is presented within a sphere that
+resembles a fish-eye lens: objects in the center of the sphere appear
+full-size, but objects get smaller as they approach the surface of the
+sphere.&nbsp; A hyperbolic projection is used, which actually maps an
+infinite 3D space onto the finite sphere.&nbsp; M.C. Esher did likewise
+in 2D with <a href="http://mathworld.wolfram.com/HyperbolicTiling.html">hyperbolic
+tilings</a>.<br>
+<a href="http://www.mcescher.com/Gallery/recogn-bmp/LW436.jpg"><img
+ src="LW436-thumb.jpg" title="Click for full-size image" alt=""
+ style="border: 2px solid ; width: 106px; height: 106px;"></a><br>
+<h3><a name="install"></a>Installing hypview</h3>
+Getting and unpacking the tarball:<br>
+<ul>
+  <li>It's in ~fish/flux/testbed/hyperviewer/hyperviewer.tgz on BAS for
+now.</li>
+  <li>There is a top-level hyperviewer directory in the tarball, so
+just unpack with:<br>
+  </li>
+</ul>
+<div style="margin-left: 80px;">
+<pre><big>tar xvzf ~fish/flux/testbed/hyperviewer/hyperviewer.tgz</big><br></pre>
+</div>
+<ul>
+  <li>There are a couple of example files included:</li>
+</ul>
+<div style="margin-left: 80px;">
+<pre><big>cd hyperviewer<br>./hypview.py BigLan.hyp</big>
+<br></pre>
+</div>
+Supported platforms:<br>
+<ul>
+  <li>FreeBSD</li>
+  <ul>
+    <li>Run it on the old machines and ignore the Radeon text bug for
+now.</li>
+    <li>Building it on the new machines has revealed a bug:
+glPolygonOffsetEXT is missing.</li>
+    <li>If you want to rebuild, checkout testbed/hyperviewer and see
+the ROADMAP.</li>
+  </ul>
+</ul>
+<pre style="margin-left: 80px;"><big>cvs co testbed/hyperviewer</big><big><br>cd testbed/hyperviewer<br>gmake -f GNUMakefile</big></pre>
+<ul>
+  <li>Linux and Windows as needed later.<br>
+  </li>
+</ul>
+Package dependencies: <br>
+<div style="margin-left: 40px;">It needs wxPython, gtk, glX,
+OpenGL...&nbsp; and wxGlade on top if you want to modify the GUI.<br>
+</div>
+<h3><a name="run"></a>Running hypview as a script<br>
+</h3>
+Running hypview with any dash argument such as -h produces the
+following usage
+summary:<br>
+<pre style="margin-left: 40px;"><big>Hyperviewer usage:</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp; No args - Starts up the GUI.&nbsp; Use the File/Open menu item to read a topology.</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp; One arg - A .hyp file name.&nbsp; Read it in and start the GUI, e.g.:</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview.py BigLan.hyp</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp; Two args - Project and experiment names in the database.</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Get the topology from XMLRPC, make a .hyp file, start as above.</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview.py testbed BigLan</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp; Three args - Project and experiment names, plus an optional root node name.</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview.py testbed BigLan clan</big></pre>
+<h3><a name="gui"></a>The hypview Graphical User Interface</h3>
+Getting out: pick the File/Exit menu item, or type Ctrl-Q, or close the
+window.<br>
+<br>
+Here's an example of the appearance of hypview once it is running:<br>
+<ul style="margin-left: 120px;">
+  <li>Note: there should be text labels on the nodes.&nbsp; They are
+only
+partially showing due to a bug in the Radeon DRI driver for OpenGL.</li>
+  <li>Note: the window comes up split down the middle now.&nbsp; Drag
+the
+divider to the right so it looks like the picture above.&nbsp; Also,
+resizing the window mis-aligns the OpenGL picking, so don't do that
+yet...</li>
+</ul>
+<div style="margin-left: 40px;"><a href="gui_top.jpg"><img
+ style="border: 2px solid ; width: 380px; height: 326px;" alt=""
+ title="Click for full-size image." src="gui_top_small.jpg"></a><br>
+</div>
+<br>
+The pane on the left contains the HyperViewer.&nbsp; The pane on the
+right is the control panel.<br>
+<br>
+<ul style="margin-left: 40px;">
+  <li>Pressing the "Help" button, or selecting Help/Usage from the menu
+at
+the top of the window, or typing Ctrl-H, pops up a window describing
+the HyperViewer mouse controls which apply to the left pane:</li>
+</ul>
+<div style="margin-left: 80px;"><img
+ style="width: 354px; height: 261px;" alt="" src="mouse_usage.jpg"></div>
+<div style="margin-left: 40px;"><br>
+<ul>
+  <li>One way to navigate is to drag the view.&nbsp; Here is a picture
+just like the one above, but dragged to the left a bit with the left
+mouse button.&nbsp; Notice how the mid-level branching is more
+visible.&nbsp; <br>
+  </li>
+  <li>You can walk through the graph this way, dragging from top-level
+details to lower levels.&nbsp; The right mouse button rotates what is
+behind to the front so you can better see it.</li>
+</ul>
+<div style="margin-left: 40px;"><a href="gui_top2.jpg"><img
+ src="gui_top_small2.jpg" alt=""
+ style="border: 2px solid ; width: 380px; height: 326px;" align="top"></a></div>
+<ul>
+  <li>As you move the mouse over the boxes representing nodes (hosts or
+lans), they turn bright green.&nbsp; Clicking on a bright green box
+selects it to move to the center of the sphere.&nbsp; Its bright yellow
+color denotes its selected status.&nbsp; So you can walk through a tree
+that way as well.</li>
+</ul>
+<div style="margin-left: 40px;"><a href="gui_top3.jpg"><img
+ src="gui_top_small3.jpg" alt=""
+ style="border: 2px solid ; width: 380px; height: 326px;" align="top"></a><br>
+</div>
+<br>
+The control panel at the right is divided into two sections.&nbsp; The
+one on the top gives information about the last-selected node, and the
+one in the middle controls modes of HyperViewer.<br>
+<br>
+The node controls include:<br>
+<ul>
+  <li>A "go to top" button to re-center the root node,</li>
+  <li>The name of the last-selected node,</li>
+  <li>The count of children in the spanning tree,</li>
+  <li>And for inbound and outbound graph links that are not part of the
+spanning tree,</li>
+  <ul>
+    <li>The count of the Non-tree links connecting to the node,</li>
+    <li>"show" and "hide" buttons to make the links visible or
+invisible, <br>
+    </li>
+    <li>A "descend" check-box which determines whether showing or
+hiding apply just to the selected node, or to the sub-tree under the
+node.<br>
+    </li>
+  </ul>
+</ul>
+<div style="margin-left: 40px;"><img src="gui_node.jpg" alt=""
+ style="width: 215px; height: 235px;"><br>
+</div>
+<br>
+These controls are used to explore networks with many
+cross-links.&nbsp; The cross-links are not visible at first.&nbsp; Here
+is an example (ts600.hyp) where the links are then turned on:<br>
+<br>
+<a href="ts600_hide_small.jpg"><img src="ts600_hide_small.jpg" alt=""
+ style="border: 2px solid ; width: 380px; height: 326px;"></a><a
+ href="ts600_show.jpg"><img src="ts600_show_small.jpg" alt=""
+ style="border: 2px solid ; width: 380px; height: 326px;"></a><br>
+<div style="margin-left: 40px;"><br>
+</div>
+<br>
+The mode controls are still changing.&nbsp; There are a lot of modes in
+HyperViewer to control the drawing and layout of graphs.&nbsp; (There
+are no layout controls visible yet.)<br>
+<ul>
+  <li>Draw {sphere,nodes,links} - Turn off to cut down on clutter.</li>
+  <li>Keep aspect - Whether to keep the sphere round as the window is
+resized.&nbsp; (Not working yet.)<br>
+  </li>
+  <li>Label to right - Changes the positioning of the text labels.</li>
+  <li>Labels: Long, Short, None - How much of the label strings are
+shown.</li>
+  <li>{Node,Link} depth - Allows showing only a few levels down from
+the selected node in very cluttered graphs.</li>
+  <li>Animation frames - Controls how many steps are taken to animate
+the change of view when a node is picked as the new center.&nbsp; (Not
+working yet.)<br>
+  </li>
+</ul>
+<div style="margin-left: 40px;"><img src="gui_modes.jpg" alt=""
+ style="width: 211px; height: 275px;"><br>
+</div>
+<br>
+</div>
+There is one more dialog panel which pops up when you select the
+File/Open menu item, or type Ctrl-O.&nbsp; You can read a .hyp file, or
+load an experiment from the database via XML-RPC.<br>
+<ul>
+  <li>There is no browser option yet.&nbsp; Ya just gotta type or
+cut-and-paste.&nbsp; (This is Alpha software!)</li>
+  <li>For experiments, the optional root node is the host or lan from
+which the tree layout starts.&nbsp; If you know it, put it in.&nbsp;
+Otherwise the first lan in the database links list is chosen, or the
+first host if there are no lans.</li>
+  <li>Since HyperViewer is set up to load a file, the experiment option
+actually writes a temp .hyp file.&nbsp; You will see the file name on
+the window title if you want to save the file.<br>
+  </li>
+</ul>
+<div style="margin-left: 40px;"><img src="open_dialog.jpg" alt=""
+ style="width: 416px; height: 327px;"><br>
+</div>
+<br>
+</body>
+</html>
