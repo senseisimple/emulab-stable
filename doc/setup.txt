@@ -10,6 +10,42 @@ certain questions, we'll need have accounts, preferably with root access if
 allowed by your institution's AUP, on your boss and ops nodes, and will need to
 be able to access the webserver on boss.
 
+Supported environment:
+This software does make some assumptions about the environment in which it is
+run. Some of the most basic ones are listed below. In general, we don't have
+the resources to adapt it to every possible environment. So, you will need to
+either work out a way to match the environment outlined below, or be willing to
+invest some work in adapting the software.
+
+(1) You will need at least two network interfaces on each node - one for the
+control network, and one for the experimental network. The experimental network
+needs to be one on which we can make VLANs with SNMP. Currently, we support
+Cisco 6500 and 4000 series switches (though not all switches in these lines
+have been tested). The control net must have full multicast support, including
+IGMP snooping. Nodes' control network interfaces must support PXE.
+
+(2) We highly, highly recommend that boss, ops, and all the nodes be in
+publicly routed IP space. If this is not possible, then boss and ops should be
+given two interfaces: One in the nodes' control network, and one in public IP
+space. If you must use private IP space for the nodes' control net, we suggest
+using the 192.168/16 subnet, which leaves the larger 10/8 subnet available for
+the experimental network.
+
+(3) If you have a firewall, you will need to be able to get certain standard
+ports through to boss and ops, such as the ports for http, https, ssh, named
+(domain), and smtp. Any other strange network setup (such as NAT) between the
+boss/ops and the outside world will cause really big headaches.
+
+(4) The whole testbed should be in a domain or subdomain for which boss can be
+the name server.
+
+(5) The nodes must be able to reach boss with DHCP requests on the control
+network - this means either being in the same broadcast domain (ie. LAN), or,
+if there is a router in between, the router must be capable of forwarding
+DHCP/BOOTP packets. Since the nodes will DHCP from boss, it is important that
+there not be another DHCP server (ie. one for another part of your lab)
+answering their requests.
+
 ##### Step -1 - Set up "ops"
 
 Follow the instructions in the setup-ops.txt file before the ones in this file!
@@ -31,13 +67,19 @@ stored. The /var partition will need to be large enough to hold the database -
 and installing a lot of software from the ports tree, you'll want to make sure
 that /usr is at least 2 GB.
 
-Make sure that you have the network correctly configured, and make sure that it
-has a hostname that resolves. The silly mysql-server port requires this.
-
 If you want, you can go ahead and create an account for yourself on boss. For
 now, just stick the home directory somewhere local, and move it to /users/ once
 you've got it mounted from ops (the boss-install script will set this up). In
 general, it's probably simpler to just use 'root' for now.
+
+We occasionally run into problems with certain FreeBSD ports. Also, you're going
+to want the latest security updates. So, you should at the very least bring
+your ports collection up to date using:
+http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/cvsup.html
+
+It is also a good idea to bring your base system up to date with the -STABLE
+branch.  Instructions for doing this can be found at:
+http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/cutting-edge.html
 
 ##### Step 1 - Create a defs file
 
