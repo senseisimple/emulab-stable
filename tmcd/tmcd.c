@@ -1519,7 +1519,7 @@ COMMAND_PROTOTYPE(dohosts)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		nrows;
+	int		hostcount, nrows;
 	int		rv = 0;
 	int		nroutes, i;
 
@@ -1774,6 +1774,7 @@ COMMAND_PROTOTYPE(dohosts)
 	/*
 	 * Okay, spit the entries out!
 	 */
+	hostcount = 0;
 	host = hosts;
 	while (host) {
 		char	*alias = " ";
@@ -1824,10 +1825,10 @@ COMMAND_PROTOTYPE(dohosts)
 				host->vname, host->virtiface, alias);
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("HOSTNAMES: %s", buf);
-
 		host = host->next;
+		hostcount++;
 	}
+	info("HOSTNAMES: %d hosts in list\n", hostcount);
  cleanup:
 	host = hosts;
 	while (host) {
@@ -2568,7 +2569,7 @@ COMMAND_PROTOTYPE(dorouting)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		nrows;
+	int		n, nrows;
 
 	/*
 	 * Now check reserved table
@@ -2631,8 +2632,9 @@ COMMAND_PROTOTYPE(dorouting)
 		mysql_free_result(res);
 		return 0;
 	}
+	n = nrows;
 
-	while (nrows) {
+	while (n) {
 		char dstip[32];
 
 		row = mysql_fetch_row(res);
@@ -2660,10 +2662,10 @@ COMMAND_PROTOTYPE(dorouting)
 			dstip, row[1], row[2], row[3], row[4]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
-		nrows--;
-		info("ROUTES: %s", buf);
+		n--;
 	}
 	mysql_free_result(res);
+	info("ROUTES: %d routes in list\n", nrows);
 
 	return 0;
 }
@@ -4078,7 +4080,7 @@ COMMAND_PROTOTYPE(doroutelist)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		nrows;
+	int		n, nrows;
 
 	/*
 	 * Now check reserved table
@@ -4137,8 +4139,9 @@ COMMAND_PROTOTYPE(doroutelist)
 		mysql_free_result(res);
 		return 0;
 	}
+	n = nrows;
 
-	while (nrows) {
+	while (n) {
 		char dstip[32];
 
 		row = mysql_fetch_row(res);
@@ -4166,10 +4169,10 @@ COMMAND_PROTOTYPE(doroutelist)
 			row[0], row[1], dstip, row[3], row[4], row[5], row[6]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
-		nrows--;
-		info("ROUTES: %s", buf);
+		n--;
 	}
 	mysql_free_result(res);
+	info("ROUTES: %s routes in list\n", nrows);
 
 	return 0;
 }
