@@ -95,6 +95,9 @@ if ($expstate) {
 WRITESUBMENUBUTTON("Terminate this Experiment",
 		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
+WRITESUBMENUBUTTON("Edit Experiment Meta-Data",
+		   "showexp.php3?pid=$exp_pid&eid=$exp_eid&edit=1");
+
 #
 # Admin and project/experiment leader get this option.
 #
@@ -146,10 +149,25 @@ echo "<br>
 
 SUBMENUEND_2B();
 
-#
-# Dump experiment record.
-# 
-SHOWEXP($exp_pid, $exp_eid);
+# if we got a submission of changes, update the db now...
+if ($submit) {
+    # exp name is always sent...
+    $str = "expt_name=\"$exp_name\"";
+    if (isset($noswap) && $noswap !="") {
+	$str .= ",noswap_reason=\"$noswap\"";
+    }
+    if (isset($noidleswap) && $noidleswap !="") {
+	$str .= ",noidleswap_reason=\"$noidleswap\"";
+    }
+    if (isset($autoswap) && $autoswap !="" && $autoswap>0) {
+	$str .= ",autoswap_timeout=\"".(60*$autoswap)."\"";
+    }
+    DBQueryWarn("update experiments set $str where pid='$pid' and eid='$eid'");
+}
+
+# Dump (possibly updated) experiment record.
+if (!isset($edit)) { $edit=0; }
+SHOWEXP($exp_pid, $exp_eid, $edit);
 
 SUBPAGEEND();
 

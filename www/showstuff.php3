@@ -520,7 +520,7 @@ function SHOWUSER($uid) {
 #
 # Show an experiment.
 #
-function SHOWEXP($pid, $eid) {
+function SHOWEXP($pid, $eid, $edit=0) {
     global $TBDBNAME, $TBDOCBASE;
     $nodecounts  = array();
 
@@ -575,6 +575,24 @@ function SHOWEXP($pid, $eid) {
     $lastswapreq = $exprow[last_swap_req];
     $minnodes    = $exprow["min_nodes"];
 
+    $autoswap_hrs= ($autoswap_timeout/60.0);
+    $idleswap_hrs= ($idleswap_timeout/60.0);
+    $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "" : "s");
+    if ($edit) {
+	# make this a form too
+	echo "<form action=\"showexp.php3?pid=$pid&eid=$eid\" method=POST>\n";
+	$noswap = "Why: <input type=text ".
+	    "name=noswap value=\"$noswap_reason\" size=30>";
+	$noidleswap = "Why: <input type=text ".
+	    "name=noidleswap value=\"$noidleswap_reason\" size=30>";
+	$autoswap_str= "<input type=text size=2 name=autoswap ".
+	    "value=\"$autoswap_hrs\"> hour".($autoswap_hrs==1 ? "" : "s");
+    } else {
+	$noswap = "(\"$noswap_reason\")";
+	$noidleswap = "(\"$noidleswap_reason\")";
+	$autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
+    }
+    
     if ($swappable)
 	$swappable = "Yes
 <a href=\"toggle.php?type=swappable&value=0&pid=$pid&eid=$eid\">
@@ -582,10 +600,8 @@ function SHOWEXP($pid, $eid) {
     else
 	$swappable = "No
 <a href=\"toggle.php?type=swappable&value=1&pid=$pid&eid=$eid\">
-<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> (\"$noswap_reason\")";
+<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> $noswap";
 
-    $idleswap_hrs= ($idleswap_timeout/60.0);
-    $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "" : "s");
     if ($idleswap)
 	$idleswap = "Yes
 <a href=\"toggle.php?type=idleswap&value=0&pid=$pid&eid=$eid\">
@@ -593,11 +609,8 @@ function SHOWEXP($pid, $eid) {
     else
 	$idleswap = "No
 <a href=\"toggle.php?type=idleswap&value=1&pid=$pid&eid=$eid\">
-<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> ".
-	    "(\"$noidleswap_reason\")";
+<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> $noidleswap";
 
-    $autoswap_hrs= ($autoswap_timeout/60.0);
-    $autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
     if ($autoswap)
 	$autoswap = "Yes
 <a href=\"toggle.php?type=autoswap&value=0&pid=$pid&eid=$eid\">
@@ -626,9 +639,14 @@ function SHOWEXP($pid, $eid) {
             <td class=left>$eid</td>
           </tr>\n";
 
+    if ($edit) {
+	$exp_name_str = "<input type=text name=exp_name value=\"$exp_name\">";
+    } else {
+	$exp_name_str = $exp_name;
+    }
     echo "<tr>
             <td>Long Name: </td>
-            <td class=\"left\">$exp_name</td>
+            <td class=\"left\">$exp_name_str</td>
           </tr>\n";
 
     echo "<tr>
@@ -785,7 +803,16 @@ function SHOWEXP($pid, $eid) {
                   </tr>\n";
     }
 
+    if ($edit) {
+	echo "<tr><td colspan=2 align=center>
+		<input type=submit name=submit value=\"Submit Changes\">
+		<input type=submit name=reset value=\"Reset\">
+	      </td></tr>\n";
+    }
+
     echo "</table>\n";
+
+    if ($edit) { echo "</form>\n"; }
 }
 
 #

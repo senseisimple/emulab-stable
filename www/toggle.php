@@ -74,6 +74,20 @@ if ($type=="adminoff") {
     DBQueryFatal("update experiments set $type=$value ".
 		 "where pid='$pid' and eid='$eid'");
 
+    # Send mail on these changes...
+    if ($type!="autoswap" && $value=="0") {
+	TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
+	       "\nThe swap settings for $pid/$eid have changed.\n".
+	       "\nThe $type bit has been cleared.\n".
+	       "\nPlease check the reason they give, and change it ".
+	       "if needed, by going to:\n\n".
+	       "$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n".
+	       "Thanks,\nTestbed WWW\n",
+	       "From: $TBMAIL_OPS\n".
+	       "Errors-To: $TBMAIL_WWW");
+    }
+	
+    
 } elseif ($type=="idle_ignore") {
     # must be admin 
     if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN)) {
