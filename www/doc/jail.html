@@ -1,47 +1,107 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
-<h2>Jails</h2>
+<h2>FreeBSD Jail-based Virtual Node Implementation</h2>
 </center>
 
-A long long long time ago I started working on better Jail support.
-What follows is the story of my incredible journey (of woe).
+This page describes the changes we made to FreeBSD jails to support Emulab
+virtual nodes and describes the boot time setup process for those jails.
 
-<br>
-<br>
+<h3>Jail Changes</h3>
 
-Initially, we started out with some small changes to jail. Mike made
-these changes around October of 2002.
+Following is a list of the features we added, and bugs we fixed in FreeBSD
+jails.  All of the new features are optional, controlled by sysctl MIBs
+and per-jail flags.  This new jail implementation is backward compatible
+with the original implementation, meaning all new features are disabled
+by default.
 
 <ul>
-<li> Optionally allow access to raw sockets. The jail is allowed to
+<li> Allow a jailed process to bind to multiple IP addresses.
+     The default implementation of jail allows processes inside of a jail
+     to bind to just one IP, the IP that was specified to the jail command.
+     In that implementation, if a process specifies INADDR_ANY,
+     the kernel silently changes it to the jail IP. If however there
+     are other interfaces on the node, or if tunnels are being used to
+     construct an overlay for the experiment, it is necessary to allow
+     processes inside the jail to bind to those interfaces. In our
+     modified implementation, when the
+     jail is created, a list of auxiliary IPs can be specified on the
+     command line, telling the kernel to allow processes inside
+     the jail to bind to any of those IPs (including the jail IP).
+     When the bind happens, the kernel checks the jails list of IPs;
+     this applies to sockets bound for outgoing traffic, as well as
+     incoming traffic.  Further, the set of accessible IPs determine
+     the list of interfaces that a jail can see so that, for example,
+     ifconfig inside a jail will only list the interfaces and IPs
+     available to the jail.
+     
+<li> Allow jails to bind to INADDR_ANY. The default behavior (and original
+     implementation) of jail maps INADDR_ANY to the jail's main IP address.
+     However, when a jail is allowed to access other IPs,
+     then INADDR_ANY actually means a subset of all the interfaces on
+     the node that the jail is allowed to use (which might also be
+     tunnels). There are two situations in which this matters:
+
+     <ul>
+     <li> A process is connecting to another address, and has
+     specified its local address as INADDR_ANY (which is typical).
+     Instead of binding the local address of packets to the jail IP,
+     the local address is set to the actual address of the interface
+     that the packet is routed out of. If there are IP aliases on the
+     interface, the list of aliases is searched for a match against
+     one of the allowed prison IPs. If there is a match, the local
+     address is set to that IP. Otherwise the address is set to the
+     main address of the interface (this is not correct; it should be
+     an error). This is to support multiplexing links using IP
+     aliases. If we were to use IP tunnels or some other form of
+     virtual interface, there would be no need to search the list of
+     aliases. 
+
+     <li> A process is binding a local socket for an incoming
+     connection. In this case, any of the prison IPs can be the local
+     target of the connection, but it is not until the connection is
+     actually made that the address can be checked. This is done in
+     the pcb lookup routine. For each pcb, if the port matches and the
+     local address is INADDR_ANY, and the pcb was created within a
+     jail, then the list of the prison IPs is searched, looking for a
+     match. If no match is found, the pcb is skipped.  This behavior
+     improves compatibility with existing server applications which
+     typically specify INADDR_ANY.  If the kernel were to continue
+     binding INADDR_ANY sockets to the main IP address of the jail,
+     such applications would only be able to receive packets on the
+     primary jail interface.
+     </ul>
+
+<li> Allow access to raw sockets. The jail is allowed to
      both read and write, but is restricted from accessing the
      firewall, dummynet, route, and RSVP interfaces. We also ensure
-     that the packet header reflects the IP address of the jail.  This
-     option is enabled globally with a MIB entry, and then on a
-     per-jail basis via a command line option to the jail command.
-     TODO: Allow header to reflect any of the IPs to which the jail
-     has access to.
+     that the packet header reflects a source IP address appropriate
+     for the jail: INADDR_ANY is mapped to an appropriate address for
+     the outgoing interface and fixed addresses that are not part of
+     the jail set are rejected.  This feature allows ping, traceroute
+     and gated to work in jails.
 
-<li> Optionally allow access to BPF devices. The jail is only allowed to
-     read packets. The interface is not put into promiscuous mode, so
+<li> Allow read-only access to BPF devices.
+     The interface is not put into promiscuous mode, so
      the jail is not able to see all of the packets on the wire, but
      only those addressed to the node. However, if the interface is
-     already in promiscuous mode (say, cause someone outside the jail
-     is using tcpdump), then the jail will also be able to any packet
-     that goes by. This option is enabled globally with a MIB entry,
-     and then on a per-jail basis via a command line option to the
-     jail command.  TODO: Allow header to reflect any of the IPs to
-     which the jail has access to. TODO: Limit packets to those
-     addressed to the IPs or interfaces (tunnels) that the jail is
-     allowed to access.
+     already in promiscuous mode (say, because someone outside the jail
+     is using tcpdump), then the jail will also be able to see any packet
+     that goes by. Even when not in promiscuous mode, a jail will see
+     all packets destined for the interface whether targeted to a
+     valid jail IP address or not.  This could be fixed, and the
+     promiscuous-mode problem avoided, by augmenting the filter given
+     when the bpf device is setup.  Allowing BPF access enables use
+     of tcpdump and other packet trace tools within jails.
      
-<li> Restrict the port range to which a jail can bind to. This allows
+<li> Restrict the port range to which a jail can bind. This allows
      multiple jails on the same node to safely share the port space
-     without stepping on each other. Since the ultimate goal to allow
+     without stepping on each other in environments where jails
+     cannot be assigned their own IP addresses.
+     Since the ultimate goal is to allow
      different experiments to coexist in jails on the same node, the
      port space has to be allocated globally, with the same port space
      assigned to all jails across an experiment, so as not to conflict
@@ -49,51 +109,51 @@ these changes around October of 2002.
      experiment is swapped in so that swapped experiments are not
      holding ranges (16 bits of port space does not go very far).
 
-<li> Allow a jailed process to optionally bind to IPs other than the
-     jail IP (the ip that is specified to the jail command). The
-     default implementation of jail allows processes inside of a jail
-     to bind to just the one IP. If a process specifies INADDR_ANY,
-     the kernel silently changes it to the jail IP. If however there
-     are other interfaces on the node, or if tunnels are being used to
-     construct an overlay for the experiment, it is necessary to allow
-     processes inside the jail to bind to those interfaces. When the
-     jail is created, a list of aux IPs can be specified on the
-     command line, which tells the kernel to allow processes inside
-     the jail to bind to any of those IPs (including the jail IP).
-     When the bind happens, the kernel checks the jails list of IPs;
-     this applies to sockets bound for outgoing traffic, as well as
-     incoming traffic. 
-     
 <li> Disallow FS unmounts inside a jail unless the mount was created
-     in the jail. This was more of a bug fix that a feature addition.
+     in the jail. This is a bug fix that prevents a jail from unmounting
+     a filesystem and exposing the underlying mount point to which it
+     likely shouldn't have access.
+
+<li> Added per-jail flags to control various existing and new jail features.
+     These are in addition to sysctls which control
+     the global availability of a given feature.  Existing features thus
+     controlled are: access to SYSV IPC facilities, access to routing
+     sockets and ability to turn on and off filesystem quotas.  New
+     features controlled are: access to raw sockets, access to read-only
+     BPF and the ability to use INADDR_ANY.  Additionally, there is a
+     new global sysctl to allow jails to be configured with multiple
+     IP addresses.
 </ul>
 
-The other part of this first phase was creating a jailed environment
-on the node that looked as much like the standard Emulab environment
-as possible.  The goal was to make a jail look so close that user did
-not mind (he was certainly going to notice!). Also note that the
-intent was to use jails both locally and remotely, where there are
-going to be different security considerations (hence the need for
-per-jail permissions bits as mentioned above). Setting up the jail is
+<h3>Starting a FreeBSD Virtual Node</h3>
+
+The goal for Emulab jail-based virtual nodes (hence forth known just as
+"jails") is to set up an environment that is as much like the standard
+Emulab node environment as possible. This makes it easy for the Emulab
+infrastructure as well as for the Emulab user.
+Also note that the intent is to use jails both locally (Emulab cluster
+nodes) and remotely (wide-area, RON nodes), where there are
+going to be different security considerations. Hence the need for
+per-jail permissions bits as mentioned above. Setting up the jail is
 broken into two parts; the stuff that needs to be done outside the
 jail (creating the jail filesystem, setting up interfaces, tunnels,
-routes, mounting user/proj filesystems) cause the jail does not have
+routes, mounting shared filesystems) because the jail does not have
 enough permission, and the stuff that can be done inside the jail
 (creating accounts, installing software, starting programs and traffic
-generators).
+generators).  Following is a description of those two phases.
 
 <br>
 <br>
 
-<h3>Setting up the jail, phase one:</h3>
+<h4>Setting up the jail, phase one:</h4>
 
 To set up the outer environment it is necessary to:
 
 <ul>
 <li> Create the tunnels if the experiment requested tunnels. This applies
-     only to widearea nodes, not to local nodes. At the same time,
+     only to wide-area nodes, not to local nodes. At the same time,
      routes are setup if the user requested them (static and manual
-     only; we do not run gated on widearea nodes!). At present, the
+     only; we do not run gated on wide-area nodes!). At present, the
      routing setup is done via the vtun config file, which specifies
      external commands to run as each tap interface is configured and
      torn down. 
@@ -138,7 +198,7 @@ Setting up the filesystem for the jail is a long arduous process:
      it. 
 
 <li> Create a pristine /var filesystem. Create stub entries for
-     several files in /etc including the passsword and group file.
+     several files in /etc including the passwd and group file.
      Create a resolv.conf file that points to the outer host.
 
 <li> Create an sshd config file and make sure X11 forwarding is off.
@@ -154,7 +214,7 @@ Setting up the filesystem for the jail is a long arduous process:
 </ul>
 
 The other complication in setting up the jailed environment involves
-access to TMCD. Widearea testbed nodes are not allowed to contact tmcd
+access to TMCD. Wide-area testbed nodes are not allowed to contact tmcd
 without an ssl certificate, but we do not want to hand out per-jail
 certificates that could be easily copied. My approach was to not allow
 a jail to contact tmcd directly, but to instead go through a proxy
@@ -174,14 +234,14 @@ alternatives for accomplishing this, but this was fairly easy to do.
 <br>
 <br>
 
-<h3>Setting up the jail, phase two:</h3>
+<h4>Setting up the jail, phase two:</h4>
 
 Once the jail system call has been issued, it is up to the inner
 environment to finish getting it set up. Inside the jail, the first
-program to run is a little perl script (injail.pl) that is intended to
+program to run is a little program (injail) that is intended to
 act like "init" in that it starts the initial shell and then waits
 until it receives a signal to terminate. The easiest way to ensure
-that all processes inside the jail are terminated is for injail.pl to
+that all processes inside the jail are terminated is for injail to
 send a TERM to the entire process group, and then a KILL to pick up
 any stragglers. This is because kill all of the processes from outside
 the jail is difficult (hard to see inside the jail), and because the
@@ -199,47 +259,3 @@ for the jail; see above). The last part of configuration run is the
 standard testbed setup, although again in a somewhat restricted
 manner.  Currently the following testbed mechanisms are supported
 <em>within</em> the jailed environment:
-
-<ul>
-<li> 
-</ul>
-
-<br>
-<br>
-
-In March of 2003 Mike and Leigh added another option to jails:
-
-<ul>
-<li> Optionally allow jails to bind to INADDRY_ANY. The default
-     implementation of jail is to map INADDRY_ANY to the jail's main
-     IP address (that which is specified to the jail command).
-     However, if the jail is allowed to access other IPs (see above),
-     then INADDRY_ANY actually means a subset of all the interfaces on
-     the node that the jail is allowed to us (which might also be
-     tunnels). There are two situations in which this matters:
-
-     <ul>
-     <li> A process is connecting to another address, and has
-     specified its local address as INADDR_ANY (which is typical).
-     Instead of binding the local address of packets to the jail IP,
-     the local address is set to the actual address of the interface
-     that the packet is routed out of. If there are IP aliases on the
-     interface, the list of aliases is searched for a match against
-     one of the allowed prison IPs. If there is a match, the local
-     address is set to that IP. Otherwise the address is set to the
-     main address of the interface (this is not correct; it should be
-     an error). This is to support multiplexing links using IP
-     aliases. If we were to use IP tunnels or some other form of
-     virtual interface, there would be no need to search the list of
-     aliases. 
-
-     <li> A process is binding a local socket for an incoming
-     connection. In this case, any of the prison IPs can be the local
-     target of the connection, but it is not until the connection is
-     actually made that the address can be checked. This is done in
-     the pcb lookup routine. For each pcb, if the port matches and the
-     local address is INADDR_ANY, and the pcb was created within a
-     jail, then the list of the prison IPs is searched, looking for a
-     match. If no match is found, the pcb is skipped.
-</ul>
-
