@@ -77,7 +77,15 @@ $query_result = DBQueryFatal("select pid,eid,expt_head_uid,gid ".
 while (($pid, $eid, $uid, $gid) = $query_result->fetchrow_array()) {
     my $unix_uid;
     my $group;
-    my $unix_gid;
+    my $unix_egid;
+    my $unix_pgid;
+
+    #
+    # Ignore "special" experiments
+    #
+    if ($pid eq TB_OPSPID) {
+	next;
+    }
 
     #
     # Figure out the unix uid/gid
@@ -87,16 +95,25 @@ while (($pid, $eid, $uid, $gid) = $query_result->fetchrow_array()) {
 	failed("no unix uid for DB uid $uid", $pid, $eid);
 	next;
     }
-    if (!TBGroupUnixInfo($pid, $gid, \$unix_gid, \$group)) {
+    $unix_pgid = getgrnam($pid);
+    if (!defined($unix_pgid)) {
+	failed("no unix gid for project", $pid, $eid);
+	next;
+    }
+    if (!TBGroupUnixInfo($pid, $gid, \$unix_egid, \$group)) {
 	failed("no unix gid for DB gid $gid", $pid, $eid);
 	next;
     }
 
     #
-    # Set real uid/gid to that of the user.
+    # Set uid/gid to that of the user.  We need to be in both the
+    # project's unix group and the experiments's unix group in order
+    # for the scheduler to write its logfile (in eventsys_control).
+    #
     # Set some environment too.
     #
-    $EGID = $GID = $unix_gid;
+    $GID = $unix_pgid;
+    $EGID = "$unix_pgid $unix_pgid $unix_egid";
     $EUID = $UID = $unix_uid;
     $ENV{'USER'} = $uid;
 

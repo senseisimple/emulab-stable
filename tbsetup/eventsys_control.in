@@ -217,6 +217,15 @@ if ($procid != 0) {
 }
 
 #
+# Do not start an event system for experiments with no nodes
+#
+if (! ExpNodes($pid, $eid)) {
+    print("*** There are no nodes in $pid/$eid. ".
+	  "Not starting a scheduler.\n");
+    exit(0);
+}
+
+#
 # For now, lets not start an event system if there are no events.
 #
 if (0) {
