@@ -5,6 +5,17 @@
 -- Server version	3.23.58-log
 
 --
+-- Table structure for table `buildings`
+--
+
+CREATE TABLE buildings (
+  building varchar(32) NOT NULL default '',,
+  image_path tinytext,
+  title tinytext NOT NULL,
+  PRIMARY KEY  (building)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `cdroms`
 --
 
@@ -315,6 +326,21 @@ CREATE TABLE exppid_access (
   exp_pid varchar(12) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   PRIMARY KEY  (exp_eid,exp_pid,pid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `floorimages`
+--
+
+CREATE TABLE floorimages (
+  building varchar(32) NOT NULL default '',
+  floor varchar(32) NOT NULL default '',
+  image_path tinytext,
+  x1 int(6) NOT NULL default '0',
+  y1 int(6) NOT NULL default '0',
+  x2 int(6) NOT NULL default '0',
+  y2 int(6) NOT NULL default '0',
+  PRIMARY KEY  (building, floor)
 ) TYPE=MyISAM;
 
 --

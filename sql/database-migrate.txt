@@ -1602,3 +1602,42 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table virt_lans add index vnode (pid,eid,vnode);
 
+
+1.251: Add floorimages and buildings tables for wireless floormap
+       support. This is rather primitive still; We just need a place to
+       define buildings and floors in buildings, so that we do not hardwire
+       them into the code. This can get arbitrarily complicated, but not
+       until we need it.
+
+	CREATE TABLE buildings (
+	  building varchar(32) NOT NULL default '',
+	  image_path tinytext,
+	  title tinytext NOT NULL,
+	  PRIMARY KEY  (building)
+	) TYPE=MyISAM;
+
+       The image_path is optional for buildings. The title is a string to
+       print along with the images (Merril Engineering Building).
+       
+	CREATE TABLE floorimages (
+	  building varchar(32) NOT NULL default '',
+	  floor varchar(32) NOT NULL default '',
+	  image_path tinytext,
+	  thumb_path tinytext,
+	  x1 int(6) NOT NULL default '0',
+	  y1 int(6) NOT NULL default '0',
+	  x2 int(6) NOT NULL default '0',
+	  y2 int(6) NOT NULL default '0',
+	  PRIMARY KEY  (building, floor)
+	) TYPE=MyISAM;
+
+       The image_path is not optional; it is either an absolute path or a
+       filename in $TB/www. The thumb_path is for a tiny view of it. Floor
+       is something like 1, 2, 3 but could also be basement, lobby,
+       penthouse, etc. The x,y coordinates are intended to be bounding box
+       coords of the "interesting" part of the image so that it is easier
+       to scale specific entries from the location_info table. But, not
+       really sure about this yet; needs more thought and some
+       investigation about appropriate ways to store coordinate values like
+       this.
+
