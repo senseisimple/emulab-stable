@@ -78,7 +78,7 @@ install-dirs:
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 
-install: install-dirs mevent-sched_rrpc
+install: install-dirs event-sched_rrpc
 	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/event-sched
 	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
 		$(DESTDIR)$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
