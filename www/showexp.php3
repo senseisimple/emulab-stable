@@ -48,6 +48,11 @@ SUBPAGESTART();
 SUBMENUSTART("Experiment Options");
 
 if ($expstate) {
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVATING)==0) {
+	WRITESUBMENUBUTTON("View Activation Logfile",
+			   "spewlogfile.php3?pid=$exp_pid&eid=$exp_eid");
+    }
+      
     if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Visualization, NS File, Mapping",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
