@@ -234,12 +234,19 @@ activemin+$warnmin<=autoswap_timeout+$window order by pid,eid
 EOT
     $q = DBQueryFatal($sql);
     if ($d) { print $q->as_string; $q->dataseek(0); }
+    # enable for extra debugging
+    if (1 && $q->numrows()>0) {
+	# SENDMAIL(To, Subject, Message, [From], [More Headers],...)
+	SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
+		 $q->as_string);
+	$q->dataseek(0);
+    }
     while (%r = $q->fetchhash()) {
 	# These get an autowarn message
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
 	# all options ignored but autoswap and warnmin and ids
-	SendMessage($pid,$pid,$eid,0,0,0,0,0,1,$warnmin);
+	SendMessage($pid,$pid,$eid,0,0,0,0,0,0,1,$warnmin);
     }
 
 } else {
@@ -319,8 +326,17 @@ EOT
 exit(0);
 
 sub SendMessage {
-    my ($pid,$gid,$eid,$swappable,$swapreqs,$c,$time,$lastact,
+    my ($pid,$gid,$eid,$swappable,$swapreqs,$c,$time,$lastact,$stale,
 	$autowarn,$warnmin) = @_;
+    # enable extra debugging...
+    if (0) {
+	SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
+		 "idlemail: send message(".join(",",@_)."\n".
+		 "pid=$pid,gid=$gid,eid=$eid\nswappable=$swappable,".
+		 "swapreqs=$swapreqs,c=$c,time=$time,lastact=$lastact,".
+		 "stale=$stale\nautowarn=$autowarn,warnmin=$warnmin\n".
+		 "Date: ".`date`);
+    }
     if (!defined($autowarn)) { $autowarn=0; }
     $idlehrs = int($time);
     $idlemin = int(($time-$idlehrs)*60);
@@ -338,6 +354,7 @@ sub SendMessage {
     my $expleader_email;
     my $uid = ExpSwapper($pid,$eid);
     my $uid2 = ExpLeader($pid,$eid);
+    if ($uid eq "") { $uid=$uid2; }
     UserDBInfo($uid,\$expleader_name,\$expleader_email);
     if ($uid ne $uid2) {
 	UserDBInfo($uid2,\$expcreator_name,\$expcreator_email);
