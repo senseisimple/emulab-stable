@@ -1,0 +1,63 @@
+
+netpull and tools
+
+----------------------------------------------------------------------
+
+netpull.tcl
+	This script uses trace route to analyze a network and produce
+output on the topology and RTT mean and variance.  As argument it
+takes the name of a file containing a list of IP addresses.  These are
+the nodes it runs trace routes to to look at the network.  Traceroutes
+are run in parallel (default 4 at a time) and each address is traced
+to multiple times (default 4).  
+
+	Output is to standard out and contains two types of lines:
+
+NODE <ip> <state>
+	Indicates a node exists at <ip> and what the state of the node
+is.  Either UNKNOWN, UP, or UP? .  UP? indicates that although it is
+probably UP there were some problems in the trace.
+
+LINK <src> <dst> <state> <rtt mean> <rtt variance> <rtt n> <finals>
+	Indicates a link from <src> to <dst>.  <state> is OK?, DOWN,
+BAD, DENIED, ERROR-#, or UP.  OK? indicates that although everything
+worked traceroute reported !'s in it's output.  On
+host/network/protocol errors the state is DOWN.  Routing errors result
+in a state of BAD and a DENIED indicates a administrative prohibition.
+Finally, UNKNOWN results with impolite hosts (see below).  ERROR-# is
+ICMP unreachable codes.  <rtt mean> and <rtt variance> are the mean
+and variance of the RTT, measured over <rtt n> samples.  <finals> is
+the list of traceroutes (as destination IP addresses) that the link
+showed up in.
+
+	In the case of a node that does not reply to expired packets
+(impolite) (* * * in traceroute) netpull assigns a bogus ip address
+of 0.0.0.#.  Links to these nodes will have the state of UNKNOWN.
+
+Options:
+   -n #   - # is how many traceroutes to have running at once
+   -r #   - This is how many times to trace to each IP
+   -v     - If present progress information will be sent to stderr.
+
+----------------------------------------------------------------------
+
+dnsconv.tcl
+	This is a quick script to change large numbers of hostnames to
+IP addresses.  Any hostname sent to stdin will result in the IP
+address being sent to stdout.
+
+Example:
+	tclsh ./dnsconv.tcl < test > test.ip
+
+----------------------------------------------------------------------
+
+test
+	A list of local machines for netpull demo purposes.  Use
+test.ip as the argument to netpull.
+
+----------------------------------------------------------------------
+
+test.ip
+	The 'test' file run through dnsconv.tcl.
+
+
