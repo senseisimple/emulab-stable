@@ -4,7 +4,6 @@ use Getopt::Std;
    
 #
 # XXX boss.emulab.net and users.emulab.net wired in. 
-#     Path to netdisk is wired in (should come from os_info table).
 #     wd0 wired in. Should come from node_types table in DB
 # 
 
@@ -18,36 +17,48 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: os_load [-s] <imageid> <node> [node ...]\n".
+    print STDOUT "Usage: os_load [-sw] <imageid> <node> [node ...]\n".
 	"Use -s to setup reload only, but do not issue a reboot\n".
+	"Use -w to block waiting for nodes to finish reloading\n".
+	"    (-s and -w are mutually exclusive)\n".
 	"Use -l to get a list of images you are permitted to load\n";
     exit(-1);
 }
-my  $optlist = "sld";
+my  $optlist = "sldw";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Max number of simultaneous loads. Will be better with Frisbee.
+# 
+my $MAXLOADS	= 2;
 
 #
 # Load the Testbed support stuff. 
 #
 push(@INC, "$TB/lib");
 require libdb;
+require libtestbed;
 
 my $BOSSADDR	= "boss.emulab.net";
 my $USERADDR	= "users.emulab.net";
 my $NETDISKOSID = "NETDISK-STD";
 my $nodereboot	= "$TB/bin/node_reboot";
+my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my @row;
 my %imageid_row = ();
 my @nodes       = ();
 my $mereuser    = 0;
 my $setuponly   = 0;
+my $waitmode    = 0;
 my $failures    = 0;
+my $startwait   = 0;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -72,6 +83,12 @@ if (@ARGV < 2) {
 }
 if (defined($options{"s"})) {
     $setuponly = 1;
+}
+if (defined($options{"w"})) {
+    $waitmode = 1;
+}
+if ($waitmode && $setuponly) {
+    usage();
 }
 my $imageid = shift;
 
@@ -219,15 +236,59 @@ foreach my $node (@nodes) {
 }
 
 #
-# Fire off a reboot.
+# Exit if not doing about actual reload.
 #
-if (! $setuponly && ! $TESTMODE ) {
-    system("$nodereboot @nodes");
-    $failures = $? >> 8;
+if ($setuponly || $TESTMODE) {
+    print STDOUT "OS Reload (Setup/Testmode) Done!\n";
+    exit 0;
 }
 
-print STDOUT "OS Reload Done!\n";
-exit $failures;
+#
+# Fire off a mass reboot if not in waitmode.
+#
+if (! $waitmode) {
+    system("$nodereboot @nodes");
+    $failures = $? >> 8;
+
+    print STDOUT "OS Reload (no waiting) Done!\n";
+    exit $failures;
+}
+
+#
+# Okay, in waitmode we do a couple at a time and wait for them to come
+# back alive before proceeding to the next one.
+#
+while (@nodes) {
+    my @batch = ();
+    my $i;
+
+    for ($i = 0; $i < $MAXLOADS && @nodes > 0; $i++) {
+	push(@batch, shift(@nodes));
+    }
+    
+    print "Issuing reload/reboot for @batch and then waiting ...\n";
+
+    system("$nodereboot @batch");
+    $failures = $? >> 8;
+    if ($failures) {
+	print "Reboot failed for (some of) @batch. Quitting!\n";
+	exit $failures;
+    }
+
+    #
+    # Now wait for them.
+    #
+    $startwait = time;
+    foreach my $node (@batch) {
+	if (WaitTillReloadDone($node) == 0) {
+	    print "$node appears have reloaded okay.\n";
+	    next;
+	}
+
+	print "$node may be down.\n".
+	      "Please contact $TBOPS for assistance.\n";
+    }
+}
 
 #
 # Print a listing of imageids.
@@ -258,3 +319,52 @@ sub dolisting()
 	printf "%-20s %s\n", $id, $desc;
     }
 }
+
+#
+# Wait for a reload to finish. We do this in a rather kludgey manner,
+# by waiting for bootinfo to clear the DB state (next_boot_osid).
+# 
+sub WaitTillReloadDone {
+    my ($pc) = @_;
+
+    print STDERR "Waiting for $pc to finish reloading\n" if $dbg;
+    
+    #
+    # Seven minutes seems like a long time to wait, but it ain't!
+    # 
+    my $maxwait = (60 * 7);
+
+    #
+    # Start a counter going, relative to the time we rebooted the first
+    # node. 
+    # 
+    my $waittime  = 0;
+    my $minutes   = 0;
+
+    while (1) {
+	my ($query_result, @row);
+
+	$query_result =
+	    DBQueryFatal("SELECT next_boot_osid FROM nodes ".
+			 "where node_id='$pc'");
+
+        @row = $query_result->fetchrow_array();
+	if (! $row[0]) {
+	    print STDERR "$pc alive and well\n" if $dbg;
+	    return 0;
+	}
+	
+	$waittime = time - $startwait;
+	if ($waittime > $maxwait) {
+	    print "$pc appears unresponsive; its been ",
+	    (int ($waittime / 60))," minutes since reload started.\n";
+	    return 1;
+	}
+	if (int($waittime / 60) > $minutes) {
+	    $minutes = int($waittime / 60);
+	    print "Still waiting for $pc - its been $minutes minute(s)\n";
+	}
+	sleep(5);
+    }
+}
+
