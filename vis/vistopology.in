@@ -3,7 +3,7 @@ use English;
 use Getopt::Std;
 
 #
-# Generate a GIF image of the topology for an experiment.
+# Generate a PNG image of the topology for an experiment.
 #
 sub usage()
 {
@@ -25,7 +25,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-my $top2gif  = "$TB/libexec/vis/top2gif";
+my $top2png  = "$TB/libexec/vis/top2png";
 my $tbdata   = "tbdata";
 my $output;
 
@@ -161,7 +161,7 @@ else {
     $args = "$args 2> /dev/null";
 }
 
-if (system("$top2gif $args") != 0) {
+if (system("$top2png $args") != 0) {
     exit(1);
 }
 exit(0);
