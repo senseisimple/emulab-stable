@@ -4,7 +4,9 @@ require("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Emulab Documentation");
+if (!$printable) {
+    PAGEHEADER("Emulab Documentation");
+}
 
 #
 # Need to sanity check the path! For now, just make sure the path
@@ -22,11 +24,16 @@ if (strstr($docname, "../")) {
     USERERROR("Invalid document name: $docname!");
 }
 
+if (!$printable) {
+	echo("<b><a href=$REQUEST_URI&printable=1>Printable version of this document</a></b><br>");
+}
 readfile("$docname");
 
 #
 # Standard Testbed Footer
 # 
-PAGEFOOTER();
+if (!$printable) {
+    PAGEFOOTER();
+}
 ?>
 

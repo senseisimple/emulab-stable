@@ -60,7 +60,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
     WRITESIDEBARBUTTON("Publications", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
-    WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
+    WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "docwrapper.php3?docname=faq.html");
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
     WRITESIDEBARBUTTON("Projects Using Emulab.Net", $TBDOCBASE, "projectlist.php3");
