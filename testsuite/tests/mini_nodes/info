@@ -1,0 +1,8 @@
+Six nodes:
+
+	node2 - node0 - node1
+                 |
+        node4  node3 - node4
+           
+node0 to node3 is delayed.
+

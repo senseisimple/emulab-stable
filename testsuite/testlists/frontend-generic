@@ -5,11 +5,12 @@ delaylan1
 delaylink
 lan1
 negprerun
-nodes
-set-ip
+mini_nodes
+mini_set-ip
 simplelink
 singlenode
 tbcmd
 trivial
 fixed
 simplex
+mini_multilink
