@@ -32,6 +32,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/socket.h>
+#include <limits.h>
 #include "divert.h"
 
 struct msockinfo *msock, *outsock;
@@ -41,6 +42,8 @@ struct msockinfo *msock, *outsock;
 #else
 #define DPRINTF(args...)
 #endif
+
+long timediff(struct timeval *time_now, struct timeval *time_prev);
 
 /*
  * I'm lazy, but want to see if an allocation fails...
@@ -61,7 +64,7 @@ int sniffsock;
 struct packet {
 	char *data;
 	int datalen;
-	long usecs;
+	struct timeval exptime;
 	struct sockaddr_in from;
 	int fromlen;
 	struct packet *next;
@@ -80,15 +83,11 @@ struct packet {
  * Or just use the TCP timeout counters from the kernel. :)
  */
 
-int packet_enq(char *data, int datalen, int usecs, struct sockaddr_in from,
-	       int fromlen)
+int packet_enq(char *data, int datalen, struct timeval exptime,
+	       struct sockaddr_in from, int fromlen)
 {
 	struct packet *tmp;
 
-	/* XXX:  This is probably not good enough long term */
-	usecs -= DELAY_COMPENSATION;
-	if (usecs < 0) usecs = 0;  /* XXX.  Barf.  XXX. :-) */
-	
 	tmp = C_MALLOC(sizeof(*tmp));
 	if (ptail) {
 		ptail->next = tmp;
@@ -98,7 +97,7 @@ int packet_enq(char *data, int datalen, int usecs, struct sockaddr_in from,
 	}
 	ptail->data = data;
         ptail->datalen = datalen;
-        ptail->usecs = usecs;
+        ptail->exptime = exptime;
 	ptail->from = from;
 	ptail->fromlen = fromlen;
 	ptail->next = NULL;
@@ -136,7 +135,7 @@ void packet_forw(struct packet *packet)
  * forwarding, and removing them from the queue.
  */
 
-int pq_run(int usecs) {
+int pq_run(struct timeval *curtime) {
 	struct packet *tmp;
 	struct packet *prev = NULL;
 	struct packet *next = NULL;
@@ -145,8 +144,7 @@ int pq_run(int usecs) {
 
 	while (tmp != NULL) {
 		next = tmp->next;
-		tmp->usecs -= usecs;
-		if (tmp->usecs <= 0) {
+		if (timediff(&tmp->exptime, curtime) <= 0) {
 			packet_forw(tmp);
 			if (prev) {
 				prev->next = next;
@@ -162,7 +160,9 @@ int pq_run(int usecs) {
 			free(tmp);
 			tmp = NULL;
 		} else {
-			prev = tmp;
+			/* No more packets to check... if the head
+			 * isn't ready, nothing is */
+			return 0;
 		}
 		if (!prev && !next) {
 			phead = ptail = NULL;
@@ -233,7 +233,7 @@ int main(int argc, char **argv) {
 	char *packetbuf = NULL;
 	unsigned long granularity; /* Kind of */
 	unsigned long delay = 1000000;
-	struct timeval mytv, time_prev, time_now;
+	struct timeval mytv, time_prev, time_now, exptime;
 	int rc;
 	int proto = IPPROTO_UDP;
 
@@ -349,6 +349,7 @@ int main(int argc, char **argv) {
 		int fromlen;
 		int len;
 		int rc;
+		long addusec;
 
 		if (!packetbuf) {
 			packetbuf = (char *)malloc(MAXPACKET);
@@ -383,14 +384,25 @@ int main(int argc, char **argv) {
 		}
 		gettimeofday(&time_now, NULL);
 		
-		pq_run(timediff(&time_now, &time_prev));
+		pq_run(&time_now);
 
 		time_prev = time_now;
 		if (len <= 0) {
 			continue;
 		}
 
-		packet_enq(packetbuf, len, delay, from, fromlen);
+		exptime = time_now;
+		addusec = delay - DELAY_COMPENSATION;
+		exptime.tv_sec += addusec / 1000000;
+		addusec %= 1000000;
+		if ((LONG_MAX - addusec) < exptime.tv_usec) {
+			exptime.tv_sec++;
+			exptime.tv_usec = exptime.tv_usec - LONG_MAX + addusec;
+		} else {
+			exptime.tv_usec += addusec;
+		}
+
+		packet_enq(packetbuf, len, exptime, from, fromlen);
 		packetbuf = NULL;
 
 	}
