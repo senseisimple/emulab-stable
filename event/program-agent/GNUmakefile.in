@@ -1,0 +1,34 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/program-agent
+
+PROGRAMS	= program-agent
+
+include $(OBJDIR)/Makeconf
+
+all:	$(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O -g -static -Wall
+CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += `elvin-config --cflags vin4c`
+
+LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LIBS     += -levent -ltb
+LIBS     += `elvin-config --libs vin4c`
+
+program-agent:		program-agent.o
+	$(CC) $(LDFLAGS) -o $@ program-agent.o $(LIBS)
+
+$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+
+install:
+
+client-install: 
+	$(INSTALL_PROGRAM) program-agent /etc/testbed/program-agent
+
+clean:
+	/bin/rm -f *.o $(PROGRAMS)

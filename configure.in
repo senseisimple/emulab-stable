@@ -211,7 +211,8 @@ else
 		    event/sched/GNUmakefile event/test/GNUmakefile \
                     event/tbgen/GNUmakefile event/tbgen/tevd.restart \
                     event/example/GNUmakefile event/trafgen/GNUmakefile \
-                    event/delay-agent/GNUmakefile";
+                    event/delay-agent/GNUmakefile \
+		    event/program-agent/GNUmakefile";
 	optional_subdirs="$optional_subdirs event";
         EVENTSYS=1;
 fi
