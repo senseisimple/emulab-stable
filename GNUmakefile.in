@@ -52,6 +52,8 @@ ops-install:
 install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/locks
 	-mkdir -p $(INSTALL_TOPDIR)/log
+	-mkdir -p $(INSTALL_TOPDIR)/log/mysql
+	-mkdir -p $(INSTALL_TOPDIR)/log/exports
 	-mkdir -p $(INSTALL_TOPDIR)/lists
 	-mkdir -p $(INSTALL_TOPDIR)/backup
 	-mkdir -p $(INSTALL_TOPDIR)/batch
