@@ -92,6 +92,17 @@ called "swapping in" and "swapping out" respectively. See also
 the <A href="docwrapper.php3?docname=faq.html#UTT-Swapping">
 What is Swapping?</a> question on our FAQ.
 </p>
+<p>
+When you create your experiment, you can mark your experiment as
+swappable or unswappable. When marking it unswappable, you must
+specify the reason, which will be reviewed by Testbed Ops. If it is
+judged unacceptable or insufficient, your experiment will be marked
+swappable. If an experiment is unswappable, our system will not
+automatically swap it out, and testbed administrators will attempt to
+contact you in the event a swapout becomes necessary. You can edit the
+swap settings (unswappable, idle-swap, auto-swap, and corresponding
+reasons and timeouts) on the experiment page for your experiment.
+</p>
 
 <a name="idleswap"></a>
 <h3>What is an "Idle-Swap"?</h3>
@@ -104,6 +115,20 @@ idle for several hours. We try to contact the experiment creator
 before swapping, unless they've already given us permission to 
 swap the experiment when idle.
 </p>
+<p>
+There are two ways that your experiment may be idle-swapped. The most
+common is the automatic Idle-Swap. This happens when your experiment
+is marked swappable and Idle-Swap is enabled for your experiment. When
+your experiment has been idle for several hours, and reaches the
+Idle-Swap time that was set at creation/swapin time, it is
+automatically idle-swapped by the Emulab software. The other way to
+get idle-swapped is through a manual idleswap by an Emulab
+administrator. This typically happens only after several hours of
+idleness, and may happen whether or not your experiment is marked
+swappable or idle-swappable. We will usually make every effort to
+contact you, since it may cause you to lose data stored on the nodes.
+</p>
+      
 
 <a name="autoswap"></a>
 <h3>What is an "Auto-Swap"?</h3>
