@@ -149,7 +149,7 @@ my $db_result =
 		 "  from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.node_id=i.node_id and ".
-		 "     nt.control_net=i.card ".
+		 "     nt.control_iface=i.iface ".
 		 "where nt.isvirtnode=0 and nt.issubnode=0 and ".
 		 "      n.role='testnode' and i.IP is not null ".
 		 "order by nt.type,n.node_id");
@@ -330,7 +330,7 @@ $db_result =
 		 "left join nodes as n on r.node_id=n.node_id ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.node_id=i.node_id and ".
-		 "     nt.control_net=i.card ".
+		 "     nt.control_iface=i.iface ".
 		 "where nt.issubnode=1 and ".
 		 "      n.role='testnode' and i.IP is not null ".
 		 "order by nt.type,n.node_id");
