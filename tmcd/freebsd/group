@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/group,v 1.19 1999/08/27 23:23:41 peter Exp $
+# $FreeBSD: src/etc/group,v 1.19.2.3 2002/06/30 17:57:17 des Exp $
 #
 wheel:*:0:root,toor
 daemon:*:1:daemon
@@ -12,15 +12,16 @@ news:*:8:
 man:*:9:
 games:*:13:
 staff:*:20:root,toor
-guest:*:31:root,toor
 sshd:*:22:
 smmsp:*:25:
 mailnull:*:26:
+guest:*:31:root,toor
 bind:*:53:
 uucp:*:66:
 xten:*:67:xten
 dialer:*:68:
 network:*:69:
 sfs:*:77:
+www:*:80:
 nogroup:*:65533:
 nobody:*:65534:
