@@ -18,5 +18,5 @@ from emulabserver import emulabserver
 # Construct and wrap our object.
 wrapper = sshxmlrpc.SSHServerWrapper(emulabserver())
 # Handle the request on stdin and send the response to stdout.
-wrapper.handle_request((sys.stdin, sys.stdout))
+wrapper.serve_forever((sys.stdin, sys.stdout))
 sys.exit(0)

@@ -58,6 +58,61 @@ def usage():
            + " -s boss.emulab.net echo \"Hello World!\"")
     return
 
+#
+# Process a single command line
+#
+def do_method(server, method_and_args):
+    # Get a pointer to the function we want to invoke.
+    meth = getattr(server, method_and_args[0])
+
+    # Pop off the method, and then convert the rest of the arguments.
+    # Be sure to add the version.
+    method_and_args.pop(0)
+
+    #
+    # Convert all params (name=value) into a Dictionary. 
+    # 
+    params = {}
+    for param in method_and_args:
+        plist = string.split(param, "=")
+        if len(plist) != 2:
+            print "Parameters are of the form: param=value!"
+            return -1
+    
+        params[plist[0]] = plist[1]
+        pass
+    meth_args = [ PACKAGE_VERSION, params ]
+
+    #
+    # Make the call. 
+    #
+    response = apply(meth, meth_args)
+
+    #
+    # Parse the Response, which is a Dictionary. See ResponseBlock in the
+    # emulabclient.py module. The XML standard converts classes to a plain
+    # Dictionary, hence the code below. 
+    # 
+    if len(response["output"]):
+        print response["output"]
+        pass
+
+    rval = response["code"]
+
+    #
+    # If the code indicates failure, look for a "value". Use that as the
+    # return value instead of the code. 
+    # 
+    if rval != RESPONSE_SUCCESS:
+        if response["value"]:
+            rval = response["value"]
+            pass
+        pass
+    return rval
+
+#
+# Process program arguments.
+# 
 try:
     # Parse the options,
     opts, req_args = getopt.getopt(sys.argv[1:],
@@ -86,9 +141,6 @@ try:
 	    debug = 1
             pass
         pass
-    # ... make sure the required arguments are there.
-    if len(req_args) < 1:
-        raise getopt.error("Required arguments not given", "")
     pass
 except getopt.error, e:
     print e.args[0]
@@ -100,43 +152,27 @@ except getopt.error, e:
 server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
                         "/xmlrpc/" + module)
 
-# Get a pointer to the function we want to invoke.
-meth = getattr(server, req_args[0])
-
-# Pop off the method, and then convert the rest of the arguments. Be sure to
-# add the version.
-req_args.pop(0)
-
-params = {}
-for param in req_args:
-    plist = string.split(param, "=")
-    if len(plist) != 2:
-        print "Parameters are of the form: param=value!"
-        sys.exit(-1)
-    
-    params[plist[0]] = plist[1]
+if len(req_args):
+    # Method and args are on the command line.
+    sys.exit(do_method(server, req_args))
+else:
+    # Prompt the user for input.
+    try:
+        while True:
+            line = raw_input("$ ")
+            tokens = line.split(" ", 1)
+            if len(tokens) >= 1 and len(tokens[0]) > 0:
+                try:
+                    print str(do_method(server, tokens))
+                    pass
+                except xmlrpclib.Fault, e:
+                    print e.faultString
+                    pass
+                pass
+            pass
+        pass
+    except EOFError:
+        pass
+    print
     pass
-meth_args = [ PACKAGE_VERSION, params ]
-
-#
-# Make the call. 
-#
-response = apply(meth, meth_args)
-
-#
-# Parse the Response, which is a Dictionary. See ResponseBlock in the
-# emulabclient.py module. The XML standard converts classes to a plain
-# Dictionary, hence the code below. 
-# 
-if len(response["output"]):
-    print response["output"]
-    pass
-
-if response["code"] != RESPONSE_SUCCESS:
-    if response["value"]:
-        sys.exit(response["value"])
-    else:
-        sys.exit(response["code"])
-    pass
-sys.exit(RESPONSE_SUCCESS)
 

@@ -3,22 +3,171 @@
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+import os
 import sys
 import types
 import urllib
 import popen2
+import rfc822
 import xmlrpclib
+
+##
+# Base class for exceptions in this module.
+#
+class SSHException(Exception):
+    pass
+
+##
+# Indicates a poorly formatted response from the server.
+#
+class BadResponse(SSHException):
+
+    ##
+    # @param host The server host name.
+    # @param handler The handler being accessed on the server.
+    # @param arg Description of the problem.
+    #
+    def __init__(self, host, handler, msg):
+        self.args = host, handler, msg,
+        return
+    
+    pass
+
+##
+# Class used to decode headers.
+#
+class SSHMessage(rfc822.Message):
+    pass
+
+##
+# An SSH based connection class.
+#
+class SSHConnection:
+
+    ##
+    # @param host The peer host name.
+    # @param handler The handler being accessed.
+    # @param streams A pair containing the input and output files respectively.
+    # If this value is not given, ssh will be used to connect to the host.
+    # @param ssh_config The ssh config file to use when initiating a new
+    # connection.
+    # 
+    def __init__(self, host, handler, streams=None, ssh_config=None):
+        # Store information about the peer and
+        self.handler = handler
+        self.host = host
+
+        # ... initialize the read and write file objects.
+        if streams:
+            self.myChild = None
+            self.rfile = streams[0]
+            self.wfile = streams[1]
+            pass
+        else:
+            self.user, self.host = urllib.splituser(self.host)
+            print self.user + " " + self.host + " " + handler
+            
+            flags = ""
+            if self.user:
+                flags = flags + " -l " + self.user
+                pass
+            if ssh_config:
+                flags = flags + " -F " + ssh_config
+                pass
+            self.myChild = popen2.Popen3("ssh -x "
+                                         + flags
+                                         + " "
+                                         + self.host
+                                         + " "
+                                         + handler,
+                                         1)
+            self.rfile = self.myChild.fromchild
+            self.wfile = self.myChild.tochild
+            pass
+        return
+
+    ##
+    # @param len The amount of data to read. (Default: 1024)
+    # @return The amount of data read.
+    #
+    def read(self, len=1024):
+        return self.rfile.read(len)
+
+    ##
+    # @return A line of data or None if there is no more input.
+    #
+    def readline(self):
+        return self.rfile.readline()
+
+    ##
+    # @param stuff The data to send to the other side.
+    # @return The amount of data written.
+    #
+    def write(self, stuff):
+        return self.wfile.write(stuff)
+
+    ##
+    # Flush any write buffers.
+    #
+    def flush(self):
+        self.wfile.flush()
+        return
+
+    ##
+    # Close the connection.
+    #
+    def close(self):
+        self.rfile.close()
+        self.wfile.close()
+        if self.myChild:
+            self.myChild.wait()
+            self.myChild = None
+            pass
+        return
+
+    ##
+    # Send an rfc822 style header to the other side.
+    #
+    # @param key The header key.
+    # @param value The value paired with the given key.
+    #
+    def putheader(self, key, value):
+        self.write("%s: %s\r\n" % (key, str(value)))
+        return
+
+    ##
+    # Terminate the list of headers so the body can follow.
+    #
+    def endheaders(self):
+        self.write("\r\n")
+        self.flush()
+        return
+
+    def __repr__(self):
+        return "<SSHConnection %s%s>" % (self.host, self.handler)
+
+    __str__ = __repr__
+
+    pass
 
 ##
 # Use SSH to transport XML-RPC requests/responses
 #
 class SSHTransport:
+
+    ##
+    # @param ssh_config The ssh config file to use when making new connections.
+    #
+    def __init__(self, ssh_config=None):
+        self.connections = {}
+        self.ssh_config = ssh_config
+        return
     
     ##
     # Send a request to the destination.
     #
     # @param host The host name on which to execute the request
-    # @param handler The python module that will handle the request.
+    # @param handler The python file that will handle the request.
     # @param request_body The XML-RPC encoded request.
     # @param verbose unused.
     # @return The value returned 
@@ -29,25 +178,22 @@ class SSHTransport:
             handler = handler[1:]
             pass
 
-	self.user, self.realhost = urllib.splituser(host)
+        # Try to get a new connection,
+        if not self.connections.has_key((host,handler)):
+            sys.stderr.write("New connection for %s %s\n" %
+                             (host, handler))
+            self.connections[(host,handler)] = SSHConnection(host, handler)
+            pass
+        connection = self.connections[(host,handler)]
 
-        print self.user + " " + self.realhost + " " + handler
-        
-        # SSH to the host and call python on the handler.
-        self.myChild = popen2.Popen3("ssh -x -l " + self.user + " "
-                                     + self.realhost + " "
-                                     + handler)
+        # ... send our request, and
+        connection.putheader("content-length", len(request_body))
+        connection.endheaders()
+        connection.write(request_body)
+        connection.flush()
 
-        # Send the request over SSH's stdin,
-        self.myChild.tochild.write(request_body)
-        # ... close to signal the end of the request,
-        self.myChild.tochild.close() # XXX Do something smarter here.
-
-        # ... parse the response, and
-        retval = self.parse_response()
-
-        # ... wait for SSH to terminate.
-        self.myChild.wait()
+        # ... parse the response.
+        retval = self.parse_response(connection)
 
         return retval
 
@@ -62,15 +208,25 @@ class SSHTransport:
     #
     # @return The python value returned by the server method.
     #
-    def parse_response(self):
+    def parse_response(self, connection):
         parser, unmarshaller = self.getparser()
 
-        while True:
-            response = self.myChild.fromchild.read(1024)
-            if not response:
-                break
-            parser.feed(response)
+        try:
+            # Get the headers,
+            headers = SSHMessage(connection, False)
+            # ... the length of the body, and
+            length = int(headers['content-length'])
+            # ... read in the body.
+            response = connection.read(length)
             pass
+        except KeyError, e:
+            # Bad header, drop the connection, and
+            del self.connections[(connection.host,connection.handler)]
+            connection.close()
+            # ... tell the user.
+            raise BadResponse(connection.host, connection.handler, e.args)
+        
+        parser.feed(response)
 
         return unmarshaller.close()
     
@@ -90,6 +246,7 @@ class SSHServerWrapper:
     # @param object The object to wrap.
     #
     def __init__(self, object):
+        self.ssh_connection = os.environ['SSH_CONNECTION'].split()
         self.myObject = object
         return
 
@@ -98,50 +255,86 @@ class SSHServerWrapper:
     # from the client, dispatch the method, and write the response back to the
     # client.
     #
-    # @param streams A pair containing the input and output streams.
+    # @param connection An initialized SSHConnection object.
     #
-    def handle_request(self, streams):
+    def handle_request(self, connection):
+        retval = False
         try:
             # Read the request,
-            params, method = xmlrpclib.loads(streams[0].read())
-            # ... find the corresponding method in the wrapped object,
-            meth = getattr(self.myObject, method)
-            # ... dispatch the method, and
-            if type(meth) == type(self.handle_request):
-                response = apply(meth, params) # It is really a method.
+            hdrs = SSHMessage(connection, False)
+            length = int(hdrs['content-length'])
+            params, method = xmlrpclib.loads(connection.read(length))
+            try:
+                # ... find the corresponding method in the wrapped object,
+                meth = getattr(self.myObject, method)
+                # ... dispatch the method, and
+                if type(meth) == type(self.handle_request):
+                    response = apply(meth, params) # It is really a method.
+                    pass
+                else:
+                    response = str(meth) # Is is just a plain variable.
+                    pass
+                # ... ensure there was a valid response.
+                if type(response) != type((  )):
+                    response = (response,)
+                    pass
+                pass
+            except:
+                # Some other exception happened, convert it to an XML-RPC fault
+                response = xmlrpclib.dumps(
+                    xmlrpclib.Fault(1,
+                                    "%s:%s" % (sys.exc_type, sys.exc_value)))
                 pass
             else:
-                response = str(meth) # Is is just a plain variable.
-                pass
-            # ... ensure there was a valid response.
-            if type(response) != type((  )):
-                response = (response,)
+                # Everything worked, encode the real response.
+                response = xmlrpclib.dumps(response, methodresponse=1)
                 pass
             pass
         except xmlrpclib.Fault, faultobj:
             # An XML-RPC related fault occurred, just encode the response.
             response = xmlrpclib.dumps(faultobj)
+            retval = True
             pass
         except:
             # Some other exception happened, convert it to an XML-RPC fault.
             response = xmlrpclib.dumps(
                 xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value)))
-            pass
-        else:
-            # Everything worked, encode the real response.
-            response = xmlrpclib.dumps(response, methodresponse=1)
+            retval = True
             pass
 
         # Finally, send the reply to the client.
-        streams[1].write(response)
+        connection.putheader("content-length", len(response))
+        connection.endheaders()
+        connection.write(response)
+        connection.flush()
 
+        return retval
+
+    ##
+    # Handle all of the user requests.
+    #
+    # @param streams A pair containing the input and output streams.
+    #
+    def serve_forever(self, streams):
+        # Make a new connection from the streams and handle requests until the
+        # streams are closed or there is a protocol error.
+        connection = SSHConnection(self.ssh_connection[0], '', streams=streams)
+        try:
+            done = False
+            while not done:
+                done = self.handle_request(connection)
+                pass
+            pass
+        finally:
+            connection.close()
+            pass
         return
-
+    
     pass
 
 
 ##
-# A proxy for XML-RPC servers that are accessible via SSH.
+# A client-side proxy for XML-RPC servers that are accessible via SSH.
 #
 class SSHServerProxy:
 
@@ -208,3 +401,4 @@ class SSHServerProxy:
         # magic method dispatcher
         return xmlrpclib._Method(self.__request, name)
 
+    pass
