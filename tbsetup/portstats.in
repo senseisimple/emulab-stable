@@ -26,6 +26,9 @@ Usage: $0 [-h] <pid> <eid> [vname ...] [vname:port ...]
 -h    This message
 -e    Show only error counters
 -a    Show all stats
+-z    Zero out counts for selected counters, after printing
+-q    Quiet: don't actually print counts - useful with -z
+-c    Print absolute, rather than relative, counts
 
 If only pid and eid are given, prints out information about all ports in the
 experiment. Otherwise, output is limited to the nodes and/or ports given.
@@ -35,7 +38,7 @@ NOTE: Statistics are reported from the switch's perspective. This means that
 sent TO the node.
 
 In the output, packets described as 'NUnicast' or 'NUcast' are non-unicast
-(broadcast or multicast) packets.
+(broadcast or multicast) packets.'
 END
 
     return 1;
@@ -45,7 +48,7 @@ END
 # Process command-line arguments
 #
 my %opt = ();
-GetOptions(\%opt,'h','a','e','p','b');
+GetOptions(\%opt,'h','a','e','p','b','z','q','c');
 
 if ($opt{h}) {
     exit &usage;
@@ -178,6 +181,68 @@ foreach my $name (keys %portMap) {
 	my $port = shift @ports;
 
 	#
+	# Figure out which port on which switch this corresponds to
+	#
+	my $switchport = portnum($port);
+	if (!($switchport && ($switchport =~ /(.+):(\d+)\.(\d+)/))) {
+	    warn "WARNING: No switch port found for $port\n";
+	} else {
+	    my ($switch_id,$switch_card,$switch_port) = ($1, $2, $3);
+	    my $dbresult = DBQueryFatal("select * from port_counters where ".
+	    		"node_id='$switch_id' and card=$switch_card and ".
+			"port=$switch_port");
+
+	    my $oldresult = [@$result];
+
+	    #
+	    # Unless they want absolute counters, go through and subtract
+	    # out the values stored in the database
+	    #
+	    if (!$opt{c}) {
+		if ($dbresult && $dbresult->num_rows()) {
+		    my %oldvals = $dbresult->fetchhash();
+		    for (my $i = 0; $i < @oids; $i++) {
+			if ($oldvals{$oids[$i]}) {
+			    $result->[$i] -= $oldvals{$oids[$i]};
+			}
+		    }
+		}
+	    }
+
+	    #
+	    # If requested, update the counters in the database
+	    #
+	    if ($opt{z}) {
+		#
+		# What we do to the DB depends on whether or not there is
+		# already an entry for this port
+		#
+		my $query;
+		if ($dbresult->num_rows()) {
+		    $query = "update port_counters set ";
+		} else {
+		    $query = "insert into port_counters set ";
+		}
+
+		my @query_terms = ();
+		for (my $i = 0; $i < @oids; $i++) {
+		    push @query_terms, " $oids[$i]=$oldresult->[$i] ";
+		}
+		$query .= join(",",@query_terms);
+
+		if ($dbresult->num_rows()) {
+		    $query .= " where node_id='$switch_id' and " .
+			    "card=$switch_card and port=$switch_port";
+		} else {
+		    $query .= ", node_id='$switch_id', card=$switch_card, " .
+			    "port=$switch_port ";
+		}
+
+		DBQueryFatal($query);
+	    }
+	}
+
+	#
 	# Try to translate the port name to the node's vname
 	#
 	$port =~ /^(.+):(\d+)/;
@@ -193,6 +258,13 @@ foreach my $name (keys %portMap) {
 	#
 	push @stats, [$port,@$result];
     }
+}
+
+#
+# Exit now if they wanted quiet operation
+#
+if ($opt{q}) {
+    exit(0);
 }
 
 #
