@@ -60,6 +60,7 @@ TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.png)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.php3)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.php)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.ns)
+TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.txt)
 TUTFILES += $(SRCDIR)/tutorial/tb_compat.tcl
 
 BUIFILES  = $(wildcard $(SRCDIR)/buildui/*.html)
