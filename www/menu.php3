@@ -362,7 +362,7 @@ function WRITESIDEBAR() {
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
       echo "<tr>";
       echo "<td class=\"menufooter\" align=center valign=center>";
-      echo "<a href=\"$TBBASE/logout.php3?uid=$login_uid\">";
+      echo "<a href=\"$TBBASE/logout.php3?target_uid=$login_uid\">";
       echo "<img alt=\"logoff\" border=0 ";
       echo "src=\"$BASEPATH/logoff.gif\"></a>\n";
       echo "</td></tr>\n";

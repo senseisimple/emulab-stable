@@ -494,6 +494,11 @@ function VERIFYPASSWD($uid, $password) {
 function DOLOGOUT($uid) {
     global $TBDBNAME, $TBSECURECOOKIES, $CHECKLOGIN_STATUS;
 
+    # Pedantic check.
+    if (!TBvalid_uid($uid)) {
+	return 1;
+    }
+
     $CHECKLOGIN_STATUS = CHECKLOGIN_NOTLOGGEDIN;
 
     $query_result =
@@ -501,7 +506,7 @@ function DOLOGOUT($uid) {
 
     # Not logged in.
     if (($row = mysql_fetch_array($query_result)) == 0) {
-	return 0;
+	return 1;
     }
 
     $hashkey = $row[hashkey];

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -12,28 +12,43 @@ require("defs.php3");
 #
 # This page gets loaded as the result of a logout click.
 #
-# $uid comes in as a variable.
+# $uid optionally comes in as a variable so admins can logout other users.
 #
-if (isset($uid) && strcmp($uid, "")) {
-    DOLOGOUT($uid);
-    unset($uid);
+$target_uid = $_GET['target_uid'];
 
-    #
-    # Zap the user back to the front page, in nonsecure mode.
-    # 
-    header("Location: $TBBASE/");
+# Pedantic page argument checking. Good practice!
+if (isset($target_uid) && $target_uid == "") {
+    PAGEARGERROR();
+}
+
+# Get current login.
+# Only admin users can logout someone other then themself.
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
+
+if (!isset($target_uid))
+    $target_uid = $uid;
+
+if ($target_uid != $uid && !ISADMIN($uid)) {
+    PAGEHEADER("Logout");
+    echo "<center>
+          <h3>You do not have permission to logout '$target_uid'
+          </h3></center>\n";
+    PAGEFOOTER();
+    return;
+}
+
+if (DOLOGOUT($target_uid) != 0) {
+    PAGEHEADER("Logout");
+    echo "<center><h3>Logout '$target_uid' failed!</h3></center>\n";
+    PAGEFOOTER();
     return;
 }
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Logout");
-
-echo "<center><h3>Logout attempt failed!</h3></center>\n";
-
-#
-# Standard Testbed Footer
+# Success. Zap the user back to the front page, in nonsecure mode.
 # 
-PAGEFOOTER();
+header("Location: $TBBASE/");
 ?>
+
+

@@ -73,8 +73,8 @@ freezeuser.php3
 index.php3
 joinproject.php3
 loadimage.php3
-login.php3
-logout.php3
+login.php3		X
+logout.php3		X
 menu.php3
 menu.php3.java
 modifyexp.php3
@@ -146,7 +146,7 @@ start.php3
 survey.php3
 swapexp.php3
 tbauth.php3
-toggle.php
+toggle.php			X
 top2image.php3
 tutorial/docwrapper.php3	X
 tutorial/tutorial.php3		X
