@@ -342,7 +342,7 @@ exit $failed;
 # 
 sub RebootNode {
     my ($pc) = @_;
-    my ($status, $syspid, $mypid);
+    my ($status, $syspid, $mypid, $didipod);
 
     print STDOUT "Rebooting $pc ...\n";
 
@@ -417,8 +417,10 @@ sub RebootNode {
 	    print STDERR "Trying Ping-of-Death on $pc ...\n" if $debug;
 
 	    system("$ipod $pc");
+	    $didipod = 1;
 	} else {
 	    info("$pc: ssh reboot ($?)");
+	    $didipod = 0;
 	}
     }
     else {
@@ -444,6 +446,25 @@ sub RebootNode {
 	exit(0);
     }
 	
+    #
+    # Haven't yet tried an ipod, try that and wait again.
+    # This further slows down reboot but is probably worth it
+    # since this should be a rare case (reboot says it worked but
+    # node doesn't reboot) and is vital if the nodes have no
+    # power cycle capability to fall back on.
+    #
+    if (! $didipod) {
+	info("$pc: reboot failed ... sending ipod");
+	$UID = 0;
+	system("$ipod $pc");
+	$UID = $oldUID;
+	if (WaitTillDead($pc) == 0) {
+	    my $state = TBDB_NODESTATE_SHUTDOWN;
+	    TBSetNodeEventState($pc,$state);
+	    exit(0);
+	}
+    }
+
     info("$pc: ipod failed ... power cycle");
     print STDERR "$pc is still running. Power cycling ...\n" if $debug;
     if (PowerCycle($pc)) {
