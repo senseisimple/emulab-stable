@@ -36,15 +36,6 @@ if (isset($exp_swappable)) {
     }
 }
 
-if (isset($exp_batched)) {
-    if (strcmp($exp_batched, "")) {
-	unset($exp_batched);
-    }
-    elseif (strcmp($exp_batched, "Yep")) {
-	USERERROR("Invalid argument for Batched", 1);
-    }
-}
-
 if (isset($exp_priority) &&
     strcmp($exp_priority, "low") && strcmp($exp_priority, "high")) {
   USERERROR("Invalid argument for Priority.", 1);
@@ -167,7 +158,7 @@ if (!TBValidGroup($exp_pid, $exp_gid)) {
 }
 
 #
-# Convert Priority and Swappable params to arguments to script.
+# Convert Priority, Swappable, Batched params to arguments to script.
 #
 if (isset($exp_swappable)) {
     $exp_swappable = "-s";
@@ -180,6 +171,15 @@ if (!isset($exp_priority) || strcmp($exp_priority, "high") == 0) {
 }
 else {
     $exp_priority  = "-n low";
+}
+
+if (isset($exp_batched) && strcmp($exp_batched, "Yep") == 0) {
+    $exp_batched   = 1;
+    $batcharg      = "";
+}
+else {
+    $exp_batched   = 0;
+    $batcharg      = "-i";
 }
 
 #
@@ -287,10 +287,6 @@ flush();
 $output = array();
 $retval = 0;
 $last   = time();
-$batch  = "-i";
-if (isset($exp_batched)) {
-    $batch = "";
-}
 
 #
 # Avoid SIGPROF in child.
@@ -298,7 +294,7 @@ if (isset($exp_batched)) {
 set_time_limit(0);
 
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-	       "webbatchexp $batch -x \"$exp_expires\" -E \"$exp_name\" ".
+	       "webbatchexp $batcharg -x \"$exp_expires\" -E \"$exp_name\" ".
 	       "$exp_priority $exp_swappable ".
 	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
  	       $output, $retval);
@@ -325,7 +321,7 @@ echo "<h3>
         in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
         is configuring!<br><br>\n";
 
-if (isset($exp_batched)) {
+if ($exp_batched) {
     echo "Batch Mode experiments will be run when enough resources become
           available. This might happen immediately, or it may take hours
 	  or days. You will be notified via email when the experiment has
