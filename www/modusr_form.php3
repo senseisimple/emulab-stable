@@ -50,8 +50,7 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 # Suck the current info out of the database and break it apart.
 #
 $info_result = mysql_db_query($TBDBNAME,
-	"select usr_expires,usr_email,usr_addr,usr_name,usr_phone,usr_pswd ".
-        "from users where uid='$uid'");
+	"select * from users where uid='$uid'");
 if (! $info_result) {
     $err = mysql_error();
     TBERROR("Database Error getting user info for user $uid: $err\n", 1);
