@@ -482,8 +482,8 @@ sub LinkDelaySetup()
 	    print DEL "ifconfig $iface media 100baseTX mediaopt full-duplex";
 	    print DEL "\n";
 
-	    print DEL "ipfw add $ruleno pipe $pipeno ip from $inet to ".
-		      "any out xmit $iface\n";
+	    print DEL "ipfw add $ruleno pipe $pipeno ip from any to ".
+		      "any out xmit $iface nexthop $inet\n";
 
 	    print DEL "ipfw pipe $pipeno config delay ${delay}ms ";
 	    print DEL "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
@@ -493,10 +493,11 @@ sub LinkDelaySetup()
 		
 		#
 		# Want to force the reverse side to 1 queue slot to enforce
-		# the proper bandwidth. Not ideal. 
+		# the proper bandwidth. Not ideal, especially since at 1000HZ
+		# 1 queue slot is not enough. Make it 4 instead. 
 		# 
 		print DEL "ipfw add $dupruleno pipe $rpipeno ip from any ".
-		    "to $inet in recv $iface\n";
+		    "to any in recv $iface\n";
 
 		print DEL "ipfw pipe $rpipeno config delay ${rdelay}ms ".
 		    "bw ${rbandw}Kbit/s plr $rplr queue 4\n";
