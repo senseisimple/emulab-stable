@@ -1,0 +1,178 @@
+#!/usr/local/bin/expect
+######################################################################
+# setport.exp
+#
+# Syntax: setport.exp <switch>:<password> <port> <duplex> <speed>
+#  This connects to <switch> an Intel 510T switch running vs 2.42 and
+# adjusts the port settnigs.
+######################################################################
+
+#!!! Add checking to make sure states actually toggled
+
+# parse argv
+if {[llength $argv] != 4} {
+    puts "Syntax: $argv0 <switch>:<password> <port> <duplex> <speed>"
+    exit 1
+}
+
+#???
+set KeyDown {[B}
+
+set sinfo [lindex $argv 0]
+set port [lindex $argv 1]
+set duplex [lindex $argv 2]
+set speed [lindex $argv 3]
+set t [split $sinfo :]
+set switch [lindex $t 0]
+set pw [lindex $t 1]
+
+if {$duplex != "Half" && $duplex != "Full"} {
+    puts stderr "Error: <duplex> must be Half or Full"
+    exit 1
+}
+if {$speed != "10" && $speed != "100"} {
+    puts stderr "Error: <speed> must be 10 or 100"
+    exit 1
+}
+if {! [regexp {[0-9]+} $port]} {
+    puts stderr "Error: <port> must be a positive number"
+    exit 1
+}
+
+proc dotimeout {s} {
+    puts stderr "Timeout: $s"
+    exit 1
+}
+
+puts "Connecting to switch..."
+spawn telnet $switch
+log_user 0
+
+set timeout 10
+expect {
+    "Login" {}
+    timeout {dotimeout "Waiting for Login prompt"}
+}
+set timeout 10
+puts "Logging in..."
+send "a"
+expect {
+    "password:" {}
+    timeout {dotimeout "Waiting for Password prompt"}
+}
+send "$pw\n"
+expect {
+    "Local Management" {}
+    timeout {dotimeout "Waiting for Management Menu"}
+}
+puts "Configuring..."
+send "c"
+expect {
+    "Configuration" {}
+    timeout {dotimeout "Waiting for Configuration Menu"}
+}
+send "u"
+expect {
+    "Quick Setup" {}
+    timeout {dotimeout "Waiting for Quick Setup"}
+}
+send "p" 
+expect {
+    "Port Parameter Setup" {}
+    timeout {dotimeout "Waiting for Port Parameter Setup"}
+}
+for {set i 1} {$i < $port} {incr i} {
+    send $KeyDown
+}
+send "s"
+expect {
+    -re {Configure Port ([0-9]+)} {
+	set cport $expect_out(1,string)
+	if {$cport != $port} {
+	    puts stderr "Error: Somehow configuring port $cport instead!"
+	    exit 1
+	}
+    }
+    timeout {dotimeout "Waiting for Configure Port $port"}
+}
+# !!! Add check to make sure enabled
+expect {
+    -re {Port state[^:]*:[ 	]+([A-Za-z]+)} {
+	if {$expect_out(1,string) != "Enabled"} {
+	    puts stderr "Warning: Port disabled. Configuring anyways."
+	}
+    }
+    timeout {dotimeout "Waiting for Port state"}
+}
+send "\n\r"
+expect {
+    -re {Auto-negotiation[^:]*:[	 ]+([A-Za-z]+)} {
+	set state $expect_out(1,string)
+	if {$state != "Enabled" && $state != "Disabled"} {
+	    puts stderr "Error: Invalid Auto-Negotiation State ($state)"
+	    exit 1
+	}
+	if {$state == "Enabled"} {
+	    send " "
+	}
+    }
+    timeout {dotimeout "Waiting for Auto-Negotiation State"}
+}
+send "\n\r"
+expect {
+    -re {Duplex[^:]*:[	 ]+([A-Za-z]+)} {
+	set pduplex $expect_out(1,string)
+	if {$pduplex != "Half" && $pduplex != "Full"} {
+	    puts stderr "Error: Invalid Duplex State ($pduplex)"
+	    exit 1
+	}
+	if {$pduplex != $duplex} {
+	    send " "
+	} 
+    }
+    timeout {dotimeout "Waiting for Duplex State"}
+}
+send "\n\r"
+expect {
+    -re {Speed[^:]*:[ 	]+([0-9]+)Mbps} {
+	set pspeed $expect_out(1,string)
+	if {$pspeed != "10" && $pspeed != "100"} {
+	    puts stderr "Error: Invalid Speed ($pspeed)"
+	    exit 1
+	}
+	if {$pspeed != $speed} {
+	    send " "
+	}
+    }
+    timeout {dotimeout "Waiting for Speed State"}
+}
+send "\n\r"
+expect {
+    "Forwarding mode" {}
+    timeout {dotimeout "Waiting for Forwarding Mode"}
+}
+send "\n\r"
+expect {
+    "Flow control" {}
+    timeout {dotimeout "Waiting for Flow control"}
+}
+send "\n\r"
+expect {
+    "Copy these settings" {}
+    timeout {dotimeout "Waiting for Copy these settings"}
+}
+send "\n\r"
+expect {
+    "Confirm these settings?" {}
+    timeout {dotimeout "Waiting for Confirm these settings"}
+}
+send "y"
+expect {
+    "Port Parameter Setup" {}
+    timeout {dotimeout "Waiting for return of Port Parameter Setup"}
+}
+send "qqqql"
+puts "Changed ($pduplex, $pspeed) to ($duplex, $speed)"
+close
+
+	
