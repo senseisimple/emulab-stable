@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -166,7 +166,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td>&nbsp;$phone&nbsp;</td>
           </tr>\n";
     echo "<tr>
-              <td colspan=5>&nbsp;$addr&nbsp;"
+              <td colspan=5>&nbsp;$addr&nbsp;";
     if (strcmp($addr2,"")) { 
 	echo "&nbsp;$addr2&nbsp;"; 
     }
