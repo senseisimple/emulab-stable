@@ -10,7 +10,6 @@
 use lib '@prefix@/lib';
 
 use event;
-package event; # Laziness so that we don't have to specify package name
 use Getopt::Std;
 use strict;
 

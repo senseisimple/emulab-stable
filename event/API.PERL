@@ -7,11 +7,6 @@ grok macros -- some have been 'translated' into regular functions, but not all.
 Note that you don't get any magic perl garbage collection, etc, for C objects.
 So, you still have to call address_tuple_alloc/address_tuple_free, etc.
 
-Also, SWIG modules do not export functions. This means that you have to either
-prefix everthing with 'event::' (cumbersome, since most event system stuff
-starts with 'event_' already), or cheat, by putting yourself in the module's
-namespace with the line 'package event;'
-
 Examples of the use of the perl event system are in the examples/ directory,
 and mirror the C examples.
 

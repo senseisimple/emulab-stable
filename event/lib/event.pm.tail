@@ -41,6 +41,6 @@ sub event_poll($) {
 	return 0;
 }
 
-
+push @EXPORT, qw(event_subscribe event_poll);
 1;
 

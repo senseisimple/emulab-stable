@@ -36,7 +36,7 @@ event_r.o:	event.c
 # These three targets are for the perl binding to the event system
 # 
 $(SRCDIR)/event_wrap.c:	event.i	event.c event.pm.tail
-	swig -dnone -perl5 -shadow -I$(SRCDIR) $(SRCDIR)/event.i
+	swig -exportall -dnone -perl5 -shadow -I$(SRCDIR) $(SRCDIR)/event.i
 	cat $(SRCDIR)/event.pm.tail >> event.pm
 
 event_wrap.o:	$(SRCDIR)/event_wrap.c

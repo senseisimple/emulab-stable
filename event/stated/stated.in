@@ -21,8 +21,6 @@ my $TBOPS = "@TBOPSEMAIL@";
 $| = 1;
 
 use event;
-package event; 
-
 use libdb;
 use libtestbed;
 use Getopt::Std;
