@@ -26,8 +26,20 @@ echo "<applet code=\"Netbuild.class\" width=800 height=600>
       </applet>\n";
 ?>
 <hr>
+<h2>Basic usage:</h2>
+<list>
+<li>
+  <p>Drag Nodes and LANs from the <i>Palette</i> on the left into the <i>Workarea</i> in the middle.</p>
+</li>
+<li>
+  <p>To link a Node to a Node (or to a LAN,) select the node (by clicking it,) then hold "ctrl" and click on the node (or LAN) you wish to link it to.</p> 
+</li>
+<li>
+  <p>Clicking the "create experiment" button will send you to the Emulab "create experiment" web page, automatically generating and sending an NS file for your designed topology along. From that page, you may create the experiment and/or view the generated NS file.</p>
+</li>
+</list>
 <p>
-<a href="../doc/docwrapper.php3?docname=netbuilddoc.html">How to use Netbuild</a>
+<a href="../doc/docwrapper.php3?docname=netbuilddoc.html">Netbuild Full Reference</a>
 </p>
 
 <?php
