@@ -187,7 +187,10 @@ sub vlanSetup {
 	    $table->Frame(-relief=>'flat',
 			 -bg=>$main_bg,-fg=>$main_fg
 			 )->pack(-side=>'top',-expand=>"1",-fill=>'x');
-	if ($ID != 25) {
+
+#EDIT HERE IF SYSTEM VLAN CHANGES
+
+	if ($ID != 24) {
 	    $row->Checkbutton
 		(-variable=>\$vlans{$ID},-relief=>'sunken',
 		 -width=>5,-anchor=>'center',
