@@ -173,6 +173,7 @@ CREATE TABLE experiments (
   minimum_nodes tinyint(4) default NULL,
   testdb tinytext,
   path tinytext,
+  logfile tinytext,
   attempts smallint(5) unsigned NOT NULL default '0',
   canceled tinyint(4) NOT NULL default '0',
   batchstate varchar(12) default NULL,

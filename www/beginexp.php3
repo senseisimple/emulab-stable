@@ -702,7 +702,11 @@ else {
 	  configured and you are able to proceed. This typically takes less
           than 10 minutes, depending on the number of nodes you have requested.
           If you do not receive email notification within a reasonable amount
-          of time, please contact $TBMAILADDR.\n";
+          of time, please contact $TBMAILADDR.<br>
+          <br>
+          While you are waiting, you can watch the log of experiment creation
+          in <a target=logfile href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
+           realtime</a>.\n";
 }
 echo "<br>
       </font>\n";

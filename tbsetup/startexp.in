@@ -209,6 +209,8 @@ TBLockExp($pid, $eid);
 # is actually torn down.
 #
 if (! $batch) {
+    TBExptSetLogFile($pid, $eid, $logname);
+    
     if (TBBackGround($logname)) {
 	#
 	# Parent exits normally
@@ -338,6 +340,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 ($repfile, $logname, $nsfile));
 
+TBExptClearLogFile($pid, $eid);
 unlink($logname);
 exit 0;
 
@@ -396,6 +399,7 @@ sub fatal()
 	system("/bin/mv", "-f", "${expt_path}", "${expt_path}-TBfailed");
     }
 
+    TBExptClearLogFile($pid, $eid);
     unlink($logname);
     exit($errorstat);
 }

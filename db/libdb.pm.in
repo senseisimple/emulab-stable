@@ -79,7 +79,7 @@ use Exporter;
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid TBExpLocked
-	 TBIsNodeRemote
+	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 );
 
 # Must come after package declaration!
@@ -1441,6 +1441,54 @@ sub TBIsNodeRemote($)
     
     my @row = $query_result->fetchrow_array();
     if ($row[0] =~ /pcRemote/i) {
+	return 1;
+    }
+    return 0;
+}
+
+#
+# Set/Clear the current logfile for an experiment. The idea is to provide
+# a way to look at what is going on from the web interface!
+#
+# usage TBExptSetLogFile(char *pid, char *eid, char *logname)
+#
+sub TBExptSetLogFile($$$)
+{
+    my ($pid, $eid, $logname) = @_;
+    
+    DBQueryFatal("update experiments set logfile='$logname' ".
+		 "where pid='$pid' and eid='$eid'");
+}
+
+sub TBExptClearLogFile($$)
+{
+    my ($pid, $eid) = @_;
+    
+    DBQueryFatal("update experiments set logfile=NULL ".
+		 "where pid='$pid' and eid='$eid'");
+}
+
+#
+# Get the current logfile for an experiment. 
+#
+# usage TBExptGetLogFile(char *pid, char *eid, char \*logname)
+#	Return 1 if there is a valid logname, and sets logname.
+#	Return 0 if no logfile or error.
+#
+sub TBExptGetLogFile($$$)
+{
+    my ($pid, $eid, $logname) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select logfile from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    if (defined($row[0])) {
+	$$logname = $row[0];
 	return 1;
     }
     return 0;

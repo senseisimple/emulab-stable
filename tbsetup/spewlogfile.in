@@ -1,0 +1,118 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Spew the current log file for an experiment to stdout. This is for
+# use by the web interface, so it can send the lofgile to the user in
+# a web page.
+#
+# The wrinkle is that the logfile only exists while the experiment is
+# in transition, and we have to quit when the experiment is no longer in
+# transition so that the web page can finish.
+#
+
+sub usage()
+{
+    print STDOUT "Usage: spewlogfile <pid> <eid>\n".
+	"Spew the logfile for an experiment.\n";
+    exit(-1);
+}
+my  $optlist = "";
+  
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+
+my $logname;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid\n");
+}	
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid\n");
+}	
+
+#
+# Verify that this person is allowed to do this. 
+#
+if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+    die("*** $0:\n".
+	"    You do not have permission to view log files for $pid/$eid!\n");
+}
+
+#
+# Get the logfile name.
+#
+if (! TBExptGetLogFile($pid, $eid, \$logname)) {
+    die("*** $0:\n".
+	"    There is no logfile to view for $pid/$eid!\n");
+}
+
+use Fcntl;
+use IO::Handle;
+STDOUT->autoflush(1);
+
+sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
+    die("*** $0:\n".
+	"    Could not open $logname. Must no longer be in transition!");
+
+#
+# Loop reading the file in nonblocking mode. Sleep between loops, and
+# check for a change in status. For now, this is simply accomplished
+# by checking to make sure the name of the logfile has not changed!
+#
+while (1) {
+    my $tmp;
+    
+    while (sysread(LOG, $buf, 2048)) {
+	print STDOUT "$buf";
+    }
+    if (! TBExptGetLogFile($pid, $eid, \$tmp) || $tmp ne $logname) {
+	last;
+    }
+    sleep(3);
+}
+close(LOG);
+exit(0);
+
