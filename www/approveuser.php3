@@ -211,9 +211,6 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	# 4. For the while loop which does the actual work
 	$POST_VARS_COPY[ $foo ] = $approval;
 	$$bar = "user";
-
-#	USERERROR("You must specify an action for $user in the default group ".
-#		  "as well as the subgroup!", 1);
     }
     if (strcmp($approval, "approve") == 0 &&
 	strcmp($default_approval, "approve")) {
