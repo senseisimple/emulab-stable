@@ -9,8 +9,8 @@
 	        PlanetLab node, and attempt to find the least-loaded nodes for
 		you. The resource estimates on the advanced form are used to
 		determine if each node has the resources necessary to run
-		your experiment. We also filter out PlanetLab nodes with
-		excessively high load averages.</li>
+		your experiment.  We always exclude PlanetLab nodes that have
+		extremely high load averages.</li>
 	    <li><b>Sites</b> - We will attempt to spread your nodes over as
 	        many distinct sites as possible.</li>
 	    <li><b>Up</b> - We only consider PlanetLab nodes that appear to be
@@ -18,9 +18,11 @@
 	    <li><b>Disk space</b> - We only consider PlanetLab nodes that have
 		at least 5% of their disk space free, so that your experiment
 		will have some room to write local files.</li>
+<!-- Replace with text about direct NM access when it exists.
 	    <li><b>dslice</b> - At the moment, we only have authority to create
 	    	slivers on nodes running the dslice service, which is a subset
 		of all PlanetLab nodes.</li>
+-->
 	</ul>
 	<p>The 'All available nodes' and 'One node at each site' buttons 
 	(on the 'More options' page) will attempt to get you as many nodes as
