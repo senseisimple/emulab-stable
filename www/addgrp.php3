@@ -203,7 +203,7 @@ echo "    </td>
     <td colspan="4">
         *Please describe how and why you'd like
         to use the testbed, including an estimate of the number of nodes
-        and their type.<br> If the research is sponsored (funded),
+        and their type.  If the research is sponsored (funded),
         list the sponsors.</td>
 </tr>
 
