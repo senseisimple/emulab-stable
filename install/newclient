@@ -1,0 +1,186 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Client-side script to report a new node into a testbed
+#
+#
+my $prefix = "/etc/testbed";
+
+my $tmcc = "$prefix/tmcc";
+my $cpuspeed = "$prefix/cpuspeed.awk";
+my $fetch = "/usr/bin/fetch";
+
+my $formURL = "~ricci/www/newnodecheckin.php";
+
+my $ifconfig = "/sbin/ifconfig";
+my $dmesg = "/var/run/dmesg.boot";
+my $teachswitch = "/etc/testbed/teachswitch";
+
+#
+# Find out what our boss node was, so we don't have to hardcode it here
+#
+my $bossinfo = `$tmcc bossinfo`;
+$bossinfo =~ /^([\w-.]+)/;
+my $bossnode = $1;
+if (!$bossnode) {
+    die "Unable to parse boss name from '$bossinfo'\n";
+}
+
+#
+# Grab this node's MAC addresses - we'll just parse them from the output of
+# ifconfig for now.
+#
+my @ifconfig_lines = `$ifconfig`;
+my @ifaces;
+my $iface = "";
+my $mac;
+my $status;
+foreach my $line (@ifconfig_lines) {
+    chomp $line;
+    SWITCH: for ($line) {
+	#
+	# A line beginning a new interface
+	#
+	(/^(\w+):/) && do {
+	    if ($iface) {
+		#
+		# We have an old interface to save away, but only if it's
+		# Ethernet
+		#
+		if ($mac) {
+		    push @ifaces, [$iface, $mac, $status];
+		}
+	    }
+
+	    $iface = $1;
+	    $mac = $status = "";
+	    last SWITCH;
+	};
+
+	#
+	# A line containing a MAC address
+	#
+	(/\s+ether ([0-9a-f:]+)/) && do {
+	    $mac = $1;
+	    $mac =~ s/://g;
+	    if (length($mac) != 12) {
+		die "Malformed MAC $mac\n";
+	    }
+	    last SWITCH;
+	};
+	
+	#
+	# A line containing the interface status
+	#
+	(/^\s+status: (.*)/) && do {
+	    $status = $1;
+	    last SWITCH;
+	};
+    }
+
+}
+
+#
+# Get the last one
+#
+if ($iface && $mac) {
+    push @ifaces, [$iface, $mac, $status];
+}
+
+#
+# Warn about any that don't have carrier
+#
+foreach my $aref (@ifaces) {
+    my ($iface, $mac, $status) = @$aref;
+    if ($status ne "active") {
+	message("WARNING: $iface has no carrier!\n");
+    }
+}
+
+#
+# Figure out the disk drive size
+#
+open(DMESG,"<$dmesg") or die "Unable to open $dmesg\n";
+my ($diskdev, $disksize);
+while (<DMESG>) {
+    chomp;
+    #
+    # Take the first of ad or da, whichever we find first
+    #
+    if (/^((ad|da|ar|aacd)\d): (\d+)MB/) {
+	$diskdev = $1;
+	$disksize = $3;
+	last;
+    }
+}
+
+if (!$diskdev) {
+    message("WARNING: Unable to find disk drive\n");
+    $diskdev = "unknown";
+    $disksize = 0;
+}
+
+#
+# Find this node's CPU speed
+#
+my $speed = `$cpuspeed < $dmesg`;
+chomp $speed;
+
+#
+# Start the program that will annouce us to the switch, so that it learns
+# MAC addresses, etc.
+#
+system "$teachswitch &" and message("Unable to start teachswitch: $!\n");
+
+#
+# Report this stuff back to the web script on boss - build up a URL to do so
+#
+my $URL = "http://$bossnode/$formURL?";
+$URL .= "cpuspeed=" . urlencode($speed);
+$URL .= "&diskdev=" . urlencode($diskdev);
+$URL .= "&disksize=" . urlencode($disksize);
+
+my $ifaceindex = 0;
+foreach my $aref (@ifaces) {
+    my ($iface, $mac, $status) = @$aref;
+    $URL .= "&ifacename$ifaceindex=" . urlencode($iface);
+    $URL .= "&ifacemac$ifaceindex=" . urlencode($mac);
+    $ifaceindex++;
+}
+
+$URL .= "&messages=" . urlencode(join "", @::messages);
+
+print "URL is $URL\n";
+print "URL size is " . length($URL) . "\n";
+system "$fetch -o - '$URL'";
+
+
+sub message($) {
+    my ($message) = @_;
+    print $message;
+    push @::messages, $message;
+}
+
+#
+# Little subroutine to URL encode data we're sending through the web interface
+#
+sub urlencode($) {
+    my ($string) = @_;
+    my @chars = split //, $string;
+    my $encoded = "";
+    foreach my $char (@chars) {
+	if ($char =~ /[0-9a-zA-Z]/) {
+	    $encoded .= $char;
+	} else {
+	    $encoded .= sprintf "%%%02X", ord($char);
+	}
+    }
+
+    return $encoded;
+}
