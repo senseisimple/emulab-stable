@@ -138,10 +138,17 @@ foreach my $hit (@order) {
     my ($rank, $path, $size, $mod) = @{ $hits{$hit} };
     $dir  = dirname($path);
     $file = basename($path);
+    my $url;
+
+    if ($file =~ /^.*(\.php\d{0,1})$/) {
+	$url = $path;
+    }
+    else {
+	$url = "$dir/docwrapper.php3?docname=$file";
+    }
 
     print "<hr>\n";
-    print "$rank - <b><a href=$dir/docwrapper.php3?docname=$file>".
-	"$path</a></b>, $mod<br>\n";
+    print "$rank - <b><a href=$url>$path</a></b>, $mod<br>\n";
     print "<ul>\n";
     foreach my $line (@{ $lines{$hit} }) {
 	$line =~ s/<li>//ig;
