@@ -431,11 +431,11 @@ function PAGEFOOTER() {
 		[&nbsp;<a href="http://www.cs.utah.edu/"
                 >School&nbsp;of&nbsp;Computing</a>&nbsp;]
 		[&nbsp;<a href="http://www.utah.edu/"
-                >The&nbsp;University&nbsp;of&nbsp;Utah</a>&nbsp;]</font>
-                </center>
+                >The&nbsp;University&nbsp;of&nbsp;Utah</a>&nbsp;]
+		</font>
+		<br>
                 <!-- begin copyright -->
-                <p align=right>
-                  <font size=-2>
+                <font size=-2>
                     &copy; 2000-2002 
                     <a href="http://www.utah.edu/">University of Utah</a>
                     and the 
@@ -444,6 +444,8 @@ function PAGEFOOTER() {
                     All rights reserved.</a>
                   </font>
                   <br />
+		</center>
+                <p align=right>
 		  <font size=-2>
                     Problems?
 	            Contact <?php echo "$TBMAILADDR\n"; ?>
