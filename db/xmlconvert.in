@@ -324,8 +324,22 @@ sub readXML($$$) {
 		}
 		push(@fields, $key);
 	    }
-	    $query = "insert into $table (" . join(",", @fields) . ") ".
-		     "values (" . join(",", @values) . ") ";
+	    # If we are called after an nseparse, we need to
+	    # use replace coz some of the tables such as 
+	    # virt_agents and eventlist are not truly
+	    # virtual tables. That is coz they contain the
+	    # vnode field which is the same as the vname
+	    # field in the reserved table. For simulated
+	    # nodes, the mapping may change across swapins
+	    # and the event may have to be delivered to a
+	    # different simhost
+	    if ( $simparse ) {
+		$query = "replace into $table (" . join(",", @fields) . ") ".
+		"values (" . join(",", @values) . ") ";
+	    } else {
+		$query = "insert into $table (" . join(",", @fields) . ") ".
+		"values (" . join(",", @values) . ") ";
+	    }
 
 	    print "$query\n"
 		if ($debug);
