@@ -26,6 +26,7 @@ if (!isset($nodeid) ||
     strcmp($nodeid, "") == 0) {
     SPITERROR(400, "You must provide a node ID.");
 }
+$nodeid = addslashes($nodeid);
 if (!isset($file) ||
     strcmp($file, "") == 0) {
     SPITERROR(400, "You must provide an filename.");
@@ -80,6 +81,12 @@ function SPEWCLEANUP()
 }
 ignore_user_abort(1);
 register_shutdown_function("SPEWCLEANUP");
+
+#
+# MUST DO THIS!
+#
+$nodeid = escapeshellarg($nodeid);
+$file   = escapeshellarg($file);
 
 #
 # Run once with just the verify option to see if the file exists.
