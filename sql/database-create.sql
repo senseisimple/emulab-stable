@@ -5,6 +5,21 @@
 # Server version	3.23.49-log
 
 #
+# Table structure for table 'cdroms'
+#
+
+CREATE TABLE cdroms (
+  cdkey varchar(64) NOT NULL default '',
+  user_name tinytext NOT NULL,
+  user_email tinytext NOT NULL,
+  ready tinyint(4) NOT NULL default '0',
+  requested datetime NOT NULL default '0000-00-00 00:00:00',
+  created datetime NOT NULL default '0000-00-00 00:00:00',
+  version int(10) unsigned NOT NULL default '1',
+  PRIMARY KEY  (cdkey)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'comments'
 #
 
@@ -433,6 +448,17 @@ CREATE TABLE next_reserve (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'nextfreenode'
+#
+
+CREATE TABLE nextfreenode (
+  nodetype varchar(30) NOT NULL default '',
+  nextid int(10) unsigned NOT NULL default '1',
+  nextpri int(10) unsigned NOT NULL default '1',
+  PRIMARY KEY  (nodetype)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'node_idlestats'
 #
 
@@ -470,7 +496,6 @@ CREATE TABLE node_types (
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   isremotenode tinyint(4) NOT NULL default '0',
-  named_root varchar(10) default NULL,
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -724,7 +749,7 @@ CREATE TABLE projects (
   public_whynot tinytext,
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
-  pcremote_ok set('pcplab','pcron') default NULL,
+  pcremote_ok set('pcplab','pcron','pcwa') default NULL,
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid)
 ) TYPE=MyISAM;
@@ -1108,6 +1133,22 @@ CREATE TABLE widearea_delays (
   start_time int(10) unsigned default NULL,
   end_time int(10) unsigned default NULL,
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'widearea_privkeys'
+#
+
+CREATE TABLE widearea_privkeys (
+  privkey varchar(64) NOT NULL default '',
+  IP varchar(15) NOT NULL default '1.1.1.1',
+  user_name tinytext NOT NULL,
+  user_email tinytext NOT NULL,
+  cdkey varchar(64) default NULL,
+  nextprivkey varchar(64) default NULL,
+  requested datetime NOT NULL default '0000-00-00 00:00:00',
+  updated datetime NOT NULL default '0000-00-00 00:00:00',
+  PRIMARY KEY  (privkey,IP)
 ) TYPE=MyISAM;
 
 #
