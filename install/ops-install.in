@@ -103,8 +103,6 @@ my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
 my $CRONTAB         = "/etc/crontab";
 
-my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
-
 #
 # Some directories we care about
 #
@@ -112,6 +110,7 @@ my $LIST_DIR   = "/etc/mail/lists";
 my $TIPLOG_DIR = "/var/log/tiplogs";
 my $PORTSDIR   = "/usr/ports/misc";
 my $SRCDIR     = '@srcdir@';
+my $TOP_SRCDIR = "@top_srcdir@";
 my $RCDIR      = "/usr/local/etc/rc.d";
 
 #
@@ -131,6 +130,7 @@ my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
 #
 my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
 my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
+my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
 
 #
 # The meta-port (name and version) that drags in all the dependancies for
