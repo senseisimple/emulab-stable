@@ -133,7 +133,8 @@ $db_result =
 		 "where r.pid='$pid' and r.eid='$eid'");
 
 if ($db_result->numrows < 1) {	
-    die("There are no nodes assigned to experiment '$eid' in project '$pid'.");
+    print "There are no nodes in experiment '$eid' in project '$pid'.\n";
+    exit;
 }
 
 while (my %row = $db_result->fetchhash()) {
