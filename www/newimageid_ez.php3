@@ -25,11 +25,20 @@ if ($nodetype == "mote") {
 		  'hide_opmode' => 1, 'hide_footnotes' => 1);
     $nodeclass = "mote";
     $title = "Mote Form";
+    $help_message = 
+          "See the
+          <a href=doc/docwrapper.php3?docname=emotes.html#PROGRAMMING>
+          mote documentation</a> for more info on creating/using custom
+          mote images.";
 } else {
     # Defaults to PC view
     $view = array('hide_upload' => 1);
     $nodeclass = "pc";
     $title = "EZ Form";
+    $help_message = 
+          "See the
+          <a href=tutorial/docwrapper.php3?docname=tutorial.html#CustomOS>
+          tutorial</a> for more info on creating/using custom Images.";
 }
 
 #
@@ -74,7 +83,7 @@ $types_result = DBQueryFatal($types_querystring);
 function SPITFORM($formfields, $errors)
 {
     global $uid, $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
-      $osid_featurelist, $nodetype, $filename_extension;
+      $osid_featurelist, $nodetype, $filename_extension, $help_message;
     global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
     global $TBDB_OSID_VERSLEN, $TBBASE;
 
@@ -87,11 +96,9 @@ function SPITFORM($formfields, $errors)
     # field from $formfields
     #
 
-    echo "<center><b>
-          See the
-          <a href=tutorial/docwrapper.php3?docname=tutorial.html#CustomOS>
-          tutorial</a> for more info on creating/using custom Images.
-          </b></center>\n";
+    if ($help_message) {
+        echo "<center><b>$help_message</b></center>\n";
+    }
 
     if ($isadmin) {
 	echo "<center>
