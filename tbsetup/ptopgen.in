@@ -371,6 +371,7 @@ foreach $node (keys(%nodes)) {
 
     if ($delay_capacity > 0) {
 	push @types, "delay:$delay_capacity";
+	push @types, "delay-${type}:$delay_capacity";
     }
 
     #
