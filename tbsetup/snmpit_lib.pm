@@ -171,6 +171,7 @@ sub tableVlans {
     my @list = split(" ",$row[1]);
     foreach $port (@list) {
       my ($node,$card) = split(":",$port);
+      if ($node =~ /^(sh\d+)/) { $node = "$1-1"; }
       if ($card =~ /[a-zA-Z]/) {
 	# specified ala ethX
 	my $sth2 = $dbh->
