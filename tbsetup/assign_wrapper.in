@@ -143,6 +143,8 @@ my $ptopfile = "$pid-$eid-$$.ptop";
 # degugging.
 my $topfile  = "$pid-$eid-$$.top";
 
+TBDebugTimeStampsOn();
+
 #
 # All exits happen via this function!
 #
