@@ -220,7 +220,8 @@ sub handleEvent($$$) {
 		      "about\n");
 	}
 	if ($oldstate && !$valid{$oldstate}{$eventtype}) {
-		notify("Invalid transition from $oldstate to $eventtype\n");
+		notify("Invalid transition for node $objname from $oldstate " .
+		       " to $eventtype\n");
 	}
 
 	my $now = time();
