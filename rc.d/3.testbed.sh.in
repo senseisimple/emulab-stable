@@ -27,11 +27,6 @@ if [ -x @prefix@/sbin/tevd.restart  ]; then
         @prefix@/sbin/tevd.restart
 fi
 
-if [ -x @prefix@/sbin/proxydhcp.restart  ]; then
-	echo -n " proxydhcp"
-	@prefix@/sbin/proxydhcp.restart
-fi
-
 if [ -x @prefix@/sbin/capserver  ]; then
         echo -n " capd"
         @prefix@/sbin/capserver
