@@ -139,6 +139,7 @@ typedef struct {
 	char		swapper[TBDB_FLEN_UID];
 	char		syncserver[TBDB_FLEN_VNAME];	/* The vname */
 	char		keyhash[TBDB_FLEN_PRIVKEY];
+	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[256];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
@@ -224,7 +225,7 @@ struct command {
 	{ "readycount",   0, doreadycount },
 	{ "ready",	  0, doready },
 	{ "log",	  0, dolog },
-	{ "mounts",	  0, domounts },
+	{ "mounts",	  1, domounts },
 	{ "sfshostid",	  0, dosfshostid },
 	{ "loadinfo",	  0, doloadinfo},
 	{ "reset",	  0, doreset},
@@ -242,8 +243,8 @@ struct command {
 	{ "ntpdrift",	  0, dontpdrift},
 	{ "tarball",	  0, doatarball},
 	{ "rpm",	  0, doanrpm},
-	{ "jailconfig",	  0, dojailconfig},
-	{ "plabconfig",	  0, doplabconfig},
+	{ "jailconfig",	  1, dojailconfig},
+	{ "plabconfig",	  1, doplabconfig},
 	{ "subconfig",	  0, dosubconfig},
         { "sdparams",     1, doslothdparams},
         { "programs",     1, doprogagents},
@@ -2586,7 +2587,6 @@ COMMAND_PROTOTYPE(domounts)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 	int		usesfs;
-	char		*bp;
 
 	/*
 	 * Now check reserved table
@@ -2599,16 +2599,17 @@ COMMAND_PROTOTYPE(domounts)
 	/*
 	 * Should SFS mounts be served?
 	 */
+	printf("foo %s\n", rdata);
 	usesfs = 0;
 	if (vers >= 6 && strlen(fshostid)) {
-		while ((bp = strsep(&rdata, " ")) != NULL) {
-			if (sscanf(bp, "USESFS=%d", &usesfs) == 1) {
-				continue;
-			}
+		if (strlen(reqp->sfshostid))
+			usesfs = 1;
+		else {
+			while (*rdata && isspace(*rdata))
+				rdata++;
 
-			error("Unknown parameter to domounts: %s\n",
-			      bp);
-			break;
+			if (!strncmp(rdata, "USESFS=1", strlen("USESFS=1")))
+				usesfs = 1;
 		}
 
 		if (verbose) {
@@ -2911,6 +2912,16 @@ COMMAND_PROTOTYPE(dosfshostid)
 		reqp->nickname, reqp->eid, reqp->pid);
 	
 	if (safesymlink(sfspath, dspath) < 0) {
+		return 1;
+	}
+
+	/*
+	 * Stash into the DB too.
+	 */
+	if (mydb_update("update nodes set sfshostid='%s' "
+			"where node_id='%s'", nodehostid, reqp->nodeid)) {
+		error("SFSHOSTID: %s: DB Error setting sfshostid!\n",
+		      reqp->nodeid);
 		return 1;
 	}
 	return 0;
@@ -3629,7 +3640,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.gid,e.testdb,nv.update_accounts, "
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,pt.class,pt.type, "
-				 " pt.isremotenode,vt.issubnode,e.keyhash "
+				 " pt.isremotenode,vt.issubnode,e.keyhash, "
+				 " nv.sfshostid "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3645,7 +3657,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as vt on "
 				 " vt.type=nv.type "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 19, reqp->vnodeid, inet_ntoa(ipaddr));
+				 20, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -3653,7 +3665,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " n.update_accounts,n.role, "
 				 " e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,t.class,t.type, "
-				 " t.isremotenode,t.issubnode,e.keyhash "
+				 " t.isremotenode,t.issubnode,e.keyhash, "
+				 " n.sfshostid "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3663,7 +3676,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.iface=t.control_iface "
 				 "where i.IP='%s'",
-				 19, inet_ntoa(ipaddr));
+				 20, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3733,6 +3746,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	else
 		reqp->update_accounts = 0;
 
+	/* SFS hostid for the node */
+	if (row[19]) 
+		strcpy(reqp->sfshostid, row[19]);
+	
 	reqp->iscontrol = (! strcasecmp(row[10], "ctrlnode") ? 1 : 0);
 
 	/* If a vnode, copy into the nodeid. Eventually split this properly */
@@ -4557,8 +4574,8 @@ COMMAND_PROTOTYPE(dojailconfig)
 	 * Only vnodes get a jailconfig of course, and only allocated ones.
 	 */
 	if (!reqp->isvnode) {
-		error("JAILCONFIG: %s: Not a vnode\n", reqp->nodeid);
-		return 1;
+		/* Silent error is fine */
+		return 0;
 	}
 	if (!reqp->allocated) {
 		error("JAILCONFIG: %s: Node is free\n", reqp->nodeid);
@@ -4651,19 +4668,21 @@ COMMAND_PROTOTYPE(dojailconfig)
 			
 		row = mysql_fetch_row(res);
 
-		bp = row[0];
-		while (bp) {
-			/*
-			 * Note that the ips column is a space separated
-			 * list of X:IP where X is a logical interface number.
-			 */
-			cp = strsep(&bp, ":");
-			ip = strsep(&bp, " ");
+		if (row[0] && row[0][0]) {
+			bp = row[0];
+			while (bp) {
+				/*
+				 * Note that the ips column is a space
+				 * separated list of X:IP where X is a
+				 * logical interface number.
+				 */
+				cp = strsep(&bp, ":");
+				ip = strsep(&bp, " ");
 
-			strcat(buf, ip);
-			if (bp)
-				strcat(buf, ",");
-				
+				strcat(buf, ip);
+				if (bp)
+					strcat(buf, ",");
+			}
 		}
 	}
 	mysql_free_result(res);
@@ -4683,8 +4702,8 @@ COMMAND_PROTOTYPE(doplabconfig)
 	char		buf[MYBUFSIZE];
 
 	if (!reqp->isvnode) {
-		error("PLABCONFIG: %s: Not a vnode\n", reqp->nodeid);
-		return 1;
+		/* Silent error is fine */
+		return 0;
 	}
 	if (!reqp->allocated) {
 		error("PLABCONFIG: %s: Node is free\n", reqp->nodeid);
@@ -4945,7 +4964,8 @@ COMMAND_PROTOTYPE(dofullconfig)
 	int		i;
 
 	/*
-	 * Now check reserved table
+	 * Now check reserved table. If free, give it a minimal status
+	 * section so that stuff works as normal. 
 	 */
 	if (!reqp->allocated) {
 		error("FULLCONFIG: %s: Node is free\n", reqp->nodeid);
@@ -4956,8 +4976,8 @@ COMMAND_PROTOTYPE(dofullconfig)
 		if (command_array[i].full) {
 			sprintf(buf, "*** %s\n", command_array[i].cmdname);
 			client_writeback(sock, buf, strlen(buf), tcp);
-
 			command_array[i].func(sock, reqp, rdata, tcp, vers);
+			client_writeback(sock, buf, strlen(buf), tcp);
 		}
 	}
 	return 0;
