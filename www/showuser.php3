@@ -35,7 +35,7 @@ if (!isset($target_uid) ||
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * FROM users WHERE uid=\"$target_uid\"");
 if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The project $pid is not a valid user", 1);
+  USERERROR("The user $target_uid is not a valid user", 1);
 }
 
 #
