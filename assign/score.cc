@@ -392,7 +392,11 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"  trivial link\n");
 #endif SCORE_DEBUG
-	er->type = tb_vlink::LINK_TRIVIAL;
+	if (allow_trivial_links) {
+	  er->type = tb_vlink::LINK_TRIVIAL;
+	} else {
+	  goto CLEANUP;
+	}
       } else if ((pedge=direct_link(dpnode,pnode)) != NULL) {
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"   found direct link = %p\n",pedge);
@@ -441,6 +445,7 @@ int add_node(node n,int ploc)
 	  fprintf(stderr,"   could not find path - no connection\n");
 #endif
 
+CLEANUP:
 	  // Need to free up all links already made and abort
 	  forall_inout_edges(e,n) {
 	    tb_vlink &vlink = G[e];

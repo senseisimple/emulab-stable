@@ -101,6 +101,8 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
 list<string> vtypes;
 list<string> ptypes;
 
+int allow_trivial_links;
+
 // Makes LEDA happy
 
 int compare(tb_pnode *const &a, tb_pnode *const &b)
@@ -500,7 +502,7 @@ void batch()
 
 void usage() {
   fprintf(stderr,
-	  "usage:  assign [-h] [-bao] [-s <switches>] [-n nodes/switch] [-c cap] [file]\n"
+	  "usage:  assign [-h] [-baor] [-s <switches>] [-n nodes/switch] [-c cap] [file]\n"
 	  "           -h ...... brief help listing\n"
 	  //	  "           -s #  ... number of switches in cluster\n"
 	  //	  "           -n #  ... number of nodes per switch\n"
@@ -508,6 +510,7 @@ void usage() {
 	  "           -o ...... Update on-line (vs batch, default)\n"
 	  "           -t <file> Input topology desc. from <file>\n"
 	  "           -b ...... batch mode (no gui)\n"
+	  "           -r ...... don't allow trivial links\n"
 	  );
 }
 
@@ -581,17 +584,19 @@ void print_solution()
   cout << "End solution" << endl;
 }
 
+
 int main(int argc, char **argv)
 {
   extern char *optarg;
   extern int optind;
   char *topofile = NULL;
+  allow_trivial_links = 1;
     
   int ch;
 
   partition_mechanism = PARTITION_BY_ANNEALING;
 
-  while ((ch = getopt(argc, argv, "boas:n:t:h")) != -1)
+  while ((ch = getopt(argc, argv, "boas:n:t:hr")) != -1)
     switch(ch) {
     case 'h': usage(); exit(0);
       //		case 's': nparts = atoi(optarg); break;
@@ -599,6 +604,7 @@ int main(int argc, char **argv)
     case 'o': on_line = 1; break;
     case 't': topofile = optarg; break;
     case 'b': batch_mode = 1; break;
+    case 'r': allow_trivial_links = 0; break;
     default: usage(); exit(-1);
     }
 

@@ -22,6 +22,7 @@ typedef struct {
 extern float score;
 extern int violated;
 extern violated_info vinfo;
+extern int allow_trivial_links;
 
 void init_score();
 void remove_node(node n);
