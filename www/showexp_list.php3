@@ -188,13 +188,8 @@ if (mysql_num_rows($experiments_result)) {
 	$class = $row[2];
 	$count = $row[3];
 	
-	if (!isset($total_usage[$class]))
-	    $total_usage[$class] = 0;
-			
-	$total_usage[$class] += $count;
 	$perexp_usage["$pid:$eid"][$class] = $count;
     }
-    ksort($total_usage);
 
     #
     # Now shove out the column headers.
@@ -309,6 +304,13 @@ idle,stale,unswap=";
 		$nodes += $count;
 		if (strcmp($class, "pc"))
 		    $special = 1;
+
+		# Summary counts for just the experiments in the projects
+		# the user is a member of.
+		if (!isset($total_usage[$class]))
+		    $total_usage[$class] = 0;
+			
+		$total_usage[$class] += $count;
 	    }
 	}
 
@@ -347,6 +349,7 @@ idle,stale,unswap=";
     echo "<table border=0
                  cellpadding=1 cellspacing=1 align=center>\n";
     $total = 0;
+    ksort($total_usage);
     while (list($type, $count) = each($total_usage)) {
 	    $total += $count;
 	    echo "<tr>
