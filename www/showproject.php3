@@ -75,6 +75,8 @@ SUBPAGESTART();
 SUBMENUSTART("Project Options");
 WRITESUBMENUBUTTON("Create Subgroup",
 		   "newgroup_form.php3?pid=$pid");
+WRITESUBMENUBUTTON("Edit User Privs",
+		   "editgroup_form.php3?pid=$pid&gid=$pid");
 WRITESUBMENUBUTTON("Show Project History",
 		   "showstats.php3?showby=project&which=$pid");
 SUBMENUEND();
