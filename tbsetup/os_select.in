@@ -94,7 +94,9 @@ if ($mfs) {
 	my $q = DBQueryFatal($cmd);
 	if ($q->numrows() > 0) {
 	    my @r = $q->fetchrow_array();
+	    debug("Path '$osid' => OSID '$r[0]'\n");
 	    $osid=$r[0];
+	    $pathmode=0;
 	} else { $pathmode=1; }
     } else {
 	my $cmd = "select path from os_info where osid='$osid';";
