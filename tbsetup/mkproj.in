@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -259,9 +259,13 @@ if ($query_result->num_rows) {
 		fatal("Unknown remote type $type!");
 	    }
 	    print "$type\n";
-	    
+
+	    $EUID = $UID;
+
 	    system("$GRANTTYPE -p $pid $type") == 0 or
 		fatal("Could not grant permission to use type $type!");
+
+	    $EUID = 0;
 	}
     }
 }

@@ -69,4 +69,7 @@ usage()
 #
 # Its all in the library ...
 #
-exit(TBUpdateNodeTypeXpidPermissions());
+exit(0)
+    if (TBUpdateNodeTypeXpidPermissions());
+exit(1);
+

@@ -32,7 +32,7 @@ my $pid;
 #
 if ($UID == 0) {
     die("*** $0:\n".
-	"    Please do not run this as root! Its already setuid!\n");
+	"    Please do not run this as root!\n");
 }
 
 #
