@@ -55,6 +55,7 @@ my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
+my $retry_time   = 10; # in minutes
 my $warn_time   = 30; # in minutes
 
 #
@@ -101,8 +102,26 @@ while (1) {
     sleep(10);
 
     #
-    # Check for nodes in the reloading experiment. Notify the admins if
-    # any node stays in the reloading experiment for longer than $warn_time
+    # First, look for nodes that have been in the reloading experiment for
+    # longer than $retry_time, and try rebooting them
+    #
+    $query_result =
+	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
+		    "and eid='$RELOADEID' and " .
+		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time MINUTE) > rsrv_time");
+    while (($node) = $query_result->fetchrow){ 
+	if (!$retried{$node}) {
+	    if (system("$reboot -f $node")) {
+		fatal("$node was wedged, but could not be power cycled.");
+	    }
+	    print "\nReload appears wedged. Power cycling and trying once more!\n";
+	    $retried{$node} = 1;
+	}
+    }
+
+    #
+    # Next, we do the same thing for nodes in the reloading experiment for
+    # longer than $warn_time, and warn the admins.
     #
     $query_result =
 	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
