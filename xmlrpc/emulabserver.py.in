@@ -2373,7 +2373,7 @@ class experiment:
                 if not ipres or len(ipres) == 0:
                     continue
 
-                ipaddr = res[0][0];
+                ipaddr = ipres[0][0];
                 nodeid = agent[2]
                 pass 
             
