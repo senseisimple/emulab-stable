@@ -68,8 +68,6 @@ echo "         <tr><td align=center><b>Experiment Options</b></td></tr>\n";
 echo "         <tr></tr>\n";
 WRITESIDEBARSUBBUTTON("View NS File and Node Assignment",
 		      "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
-WRITESIDEBARSUBBUTTON("Graphic Visualization of Topology",
-		      "vistopology.php3?pid=$exp_pid&eid=$exp_eid");
 WRITESIDEBARSUBBUTTON("Terminate this experiment",
 		      "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
@@ -79,10 +77,14 @@ if ($expstate) {
     if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
 	WRITESIDEBARSUBBUTTON("Swap this Experiment in",
 		      "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+	WRITESIDEBARSUBBUTTON("Graphic Visualization of Topology",
+		      "vistopology.php3?pid=$exp_pid&eid=$exp_eid");
     }
     elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESIDEBARSUBBUTTON("Swap this Experiment out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	WRITESIDEBARSUBBUTTON("Graphic Visualization of Topology",
+		      "vistopology.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
 
