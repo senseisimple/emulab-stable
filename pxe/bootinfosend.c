@@ -14,6 +14,7 @@
 #include <string.h>
 #include <signal.h>
 #include <netdb.h>
+#include "config.h"
 #include "log.h"
 #include "tbdefs.h"
 #include "bootwhat.h"

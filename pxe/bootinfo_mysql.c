@@ -12,7 +12,7 @@
 #include <syslog.h>
 #include <arpa/inet.h>
 #include <string.h>
-
+#include "config.h"
 #include "log.h"
 #include "tbdb.h"
 #include "bootwhat.h"
