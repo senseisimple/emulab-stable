@@ -451,7 +451,7 @@ REPLACE INTO table_regex VALUES ('eventlist','pid','text','redirect','projects:p
 REPLACE INTO table_regex VALUES ('eventlist','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','time','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','vnode','text','redirect','virt_agents:vnode',0,0,NULL);
-REPLACE INTO table_regex VALUES ('eventlist','vname','text','regex','^[-\\w]+$',1,20,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','vname','text','regex','^[-\\w\\(\\)]+$',1,20,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:tinytext',0,0,NULL);
