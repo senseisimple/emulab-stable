@@ -145,10 +145,11 @@ a user's dbedit bit like so:
 
 Add entries to the node_types table for each type of switch you'll be using.
 The class column should be 'switch'. The type for Cisco switches should be
-something like 'cisco6509', or 'catalyst2950'.  Most of the other columns
-aren't important for switches (so you can leave them blank), but putting in
-max_cards (if the switch is expandable) and max_ports can be useful for your
-own information.
+something like 'cisco6509', or 'catalyst2950'. If the switch is running IOS
+(rather than CatOS), then append '-ios' to the switch's type. Most of the other
+columns aren't important for switches (so you can leave them blank), but
+putting in max_cards (if the switch is expandable) and max_ports can be useful
+for your own information.
 
 2) Create interface types for switch interconnects (if any)
 
