@@ -5,7 +5,7 @@
 # The full path of the test case
 test_file=$1
 # The base name of the test case
-test_file_base="test_vmcd.sh"
+test_file_base="test_vmcd2.sh"
 # The current test number for shell based tests.
 test_num=0
 
@@ -37,12 +37,12 @@ check_output() {
     -i `pwd`/test_emcd.pid \
     -p ${EMC_PORT} \
     -s ops \
-    -c `realpath ${SRCDIR}/test_emcd.config`
+    -c `realpath ${SRCDIR}/test_emcd2.config`
 
 vmc-client -l `pwd`/test_vmc-client1.log \
     -i `pwd`/test_vmc-client1.pid \
     -p ${VMC1_PORT} \
-    -f ${SRCDIR}/test_vmcd.pos \
+    -f ${SRCDIR}/test_vmcd2.pos \
     foobar
 
 # Start vmcd:
@@ -73,6 +73,8 @@ sleep 1
 
 newframe
 
+sleep 1
+
 run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
     -r emulab -i 1 -c 0 -m "empty" init -- \
     -w -i 1 request-position
@@ -84,6 +86,21 @@ Packet: length 36; version 1; role 0
   x:		5.040000
   y:		6.000000
   theta:	0.380000
+  status:	-1
+  timestamp:	20.000000
+EOF
+
+run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
+    -r emulab -i 1 -c 0 -m "empty" init -- \
+    -w -i 2 request-position
+
+check_output "no update?" <<EOF
+Packet: length 36; version 1; role 0
+ opcode:	update-position
+  id:		2
+  x:		20.000000
+  y:		20.000000
+  theta:	0.000000
   status:	-1
   timestamp:	20.000000
 EOF

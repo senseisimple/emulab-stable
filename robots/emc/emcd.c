@@ -1248,19 +1248,27 @@ int vmc_callback(elvin_io_handler_t handler,
 
             dx = rid->position.x - p->x;
             dy = rid->position.y - p->y;
-            ddist = sqrt(dx*dx + dy*dy);
+	    if (dx == 0 && dy == 0)
+		ddist = 0;
+	    else
+		ddist = sqrt(dx*dx + dy*dy);
             dtheta = rid->position.theta - p->theta;
 
+	    info("dx %f %f %f %f\n", dx, dy, ddist, dtheta);
             if (fabsf(ddist) > best_dist_delta) {
+		info("pass ? %f %f\n", ddist, best_dist_delta);
 	      i = i->next;
               continue;
             }
 
-            if (fabsf(dtheta) > best_pose_delta) {
-	      i = i->next;
-              continue;
-            }
+	    if (0) {
+		if (fabsf(dtheta) > best_pose_delta) {
+		    i = i->next;
+		    continue;
+		}
+	    }
 
+	    info("match %d\n", id);
             best_dist_delta = ddist;
             best_pose_delta = dtheta;
             robot_id = id;
@@ -1272,6 +1280,8 @@ int vmc_callback(elvin_io_handler_t handler,
           // now send whatever we got to the caller as we fall through:
         }
         
+	info("match %f %f -> %d\n",
+	     rid->position.x, rid->position.y, robot_id);
         // we want to return whichever robot id immediately to the caller:
         
         uid.request_id = rid->request_id;

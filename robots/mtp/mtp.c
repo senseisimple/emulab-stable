@@ -882,10 +882,10 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
   case MTP_UPDATE_ID:
     fprintf(file,
 	    " opcode:\tupdate-id\n"
-        "  request_id:\t%d\n"
+	    "  request_id:\t%d\n"
 	    "  id:\t%d\n",
-        mp->data.request_id->request_id,
-	    mp->data.update_position->robot_id);
+	    mp->data.update_id->request_id,
+	    mp->data.update_id->robot_id);
     break;
     
   case MTP_COMMAND_GOTO:
@@ -902,7 +902,7 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    mp->data.command_goto->position.x,
 	    mp->data.command_goto->position.y,
 	    mp->data.command_goto->position.theta,
-	    mp->data.update_position->position.timestamp);
+	    mp->data.command_goto->position.timestamp);
     break;
     
   case MTP_COMMAND_STOP:

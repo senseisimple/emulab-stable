@@ -505,14 +505,16 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             float my_dist_delta;
             float my_pose_delta;
 
-            dx = p->data.update_position->position.x - vc->tracks[i].position.x;
-            dy = p->data.update_position->position.y - vc->tracks[i].position.y;
+            dx = fabsf(p->data.update_position->position.x -
+		       vc->tracks[i].position.x);
+            dy = fabsf(p->data.update_position->position.y -
+		       vc->tracks[i].position.y);
             my_dist_delta = sqrt(dx*dx + dy*dy);
             my_pose_delta = p->data.update_position->position.theta - 
                 vc->tracks[i].position.theta;
 
-            if (fabsf(my_dist_delta) < DIST_THRESHOLD || 
-                fabsf(my_dist_delta) < best_dist_delta) {
+            if (fabsf(my_dist_delta) > DIST_THRESHOLD || 
+                fabsf(my_dist_delta) > best_dist_delta) {
                 continue;
             }
             if (fabsf(my_pose_delta) > POSE_THRESHOLD ||
@@ -534,15 +536,18 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     // now check to see if we found a match.
     // if we did, update the track:
     if (best_track_idx > -1) {
-      info("got a match\n");
-        vc->tracks[best_track_idx].position = p->data.update_position->position;
+	info("got a match\n");
+	
+        vc->tracks[best_track_idx].position =
+	    p->data.update_position->position;
         // now we try to update real_robots
         if (vc->tracks[best_track_idx].robot_id != -1) {
             // we want to update the real_robots list!
             for (j = 0; j < MAX_TRACKED_OBJECTS; ++j) {
-                if (real_robots[j].robot_id == 
-                    vc->tracks[best_track_idx].robot_id) {
-                    real_robots[j].position = vc->tracks[best_track_idx].position;
+                if (real_robots[j].robot_id ==
+		    vc->tracks[best_track_idx].robot_id) {
+                    real_robots[j].position =
+			vc->tracks[best_track_idx].position;
                 }
             }
         }
@@ -556,10 +561,11 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             printf("OUT OF TRACKING ROOM IN VMCD!\n");
         }
         else {
-          int retval;
+	    int retval;
 	    
             vc->tracks[first_invalid_track].valid = 1;
-            vc->tracks[first_invalid_track].position = p->data.update_position->position;
+            vc->tracks[first_invalid_track].position =
+		p->data.update_position->position;
             vc->tracks[first_invalid_track].robot_id = -1;
             vc->tracks[first_invalid_track].request_id = -1;
 
@@ -577,8 +583,9 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
                 mp = mtp_make_packet(MTP_REQUEST_ID, MTP_ROLE_VMC, &rid);
                 retval = mtp_send_packet(emc_fd,mp);
                 if (retval == MTP_PP_SUCCESS) {
-		  info("sent request %d\n", rid.request_id);
-                    vc->tracks[first_invalid_track].request_id = rid.request_id;
+		    info("sent request %d\n", rid.request_id);
+                    vc->tracks[first_invalid_track].request_id =
+			rid.request_id;
                 }
                 else {
                     vc->tracks[first_invalid_track].valid = 0;
@@ -586,8 +593,10 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             }
             else {
                 // we can update the real_robots list!
-                real_robots[retval].position = p->data.update_position->position;
-                vc->tracks[first_invalid_track].robot_id = real_robots[retval].robot_id;
+                real_robots[retval].position =
+		    p->data.update_position->position;
+                vc->tracks[first_invalid_track].robot_id =
+		    real_robots[retval].robot_id;
             }
 
             vc->tracks[first_invalid_track].updated = 1;
@@ -608,7 +617,11 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
                 vc->tracks[i].valid = -1;
             }
 	    else if (vc->tracks[i].valid && vc->tracks[i].robot_id != -1) {
-	      info("sending update for %d\n",vc->tracks[i].robot_id);
+		info("sending update for %d -> %f %f\n",
+		     vc->tracks[i].robot_id,
+		     vc->tracks[i].position.x,
+		     vc->tracks[i].position.y);
+		
 		mup.robot_id = vc->tracks[i].robot_id;
 		mup.position = vc->tracks[i].position;
 		mup.status = MTP_POSITION_STATUS_UNKNOWN;
