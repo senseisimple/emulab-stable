@@ -834,3 +834,11 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add prerender_pid int(11) default '0' \
 		after event_sched_pid;
 
+1.170: Add a sync_server slot, which is the "vname" of the node
+       hosting the sync server. When non-null (set by parser) that
+       node will start a sync server and other nodes will know to use
+       it. Returned by tmcd of course.
+
+       alter table experiments add sync_server varchar(32) \
+		default NULL after idle_ignore;
+
