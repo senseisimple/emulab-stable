@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+
+# This extracts any old style TB commands from the NS file and appends them
+# to the tbcmds file.
+
+if ($#ARGV != 1) {
+    print STDERR "Syntax: $0 ns_file tbcmd_file\n";
+    exit 1;
+}
+($nsfile,$tbcmdfile) = @ARGV;
+
+open(NSFILE,$nsfile) || do {
+    print STDERR "Could not open $nsfile.\n";
+    exit(1);
+};
+open(TBCMD,">> $tbcmdfile") || do {
+    print STDERR "Could not open $tbcmdfile.\n";
+    exit(1);
+};
+
+while (<NSFILE>) {
+    chop;
+    /^\#TB (.+)$/ || next;
+    print TBCMD "tb-" . $1 . "\n";
+}
+
+close(NSFILE);
+close(TBCMD);
+

@@ -37,11 +37,11 @@ $dbh = DBI->connect("DBI:$driver:database=$DBNAME;host=localhost") || do {
 };
 
 if ($#ARGV != 1) {
-    print STDERR "Syntax: $0 irfile nsfile\n";
+    print STDERR "Syntax: $0 irfile tbcmdfile\n";
     exit(1);
 }
 
-($irfile,$nsfile) = @ARGV;
+($irfile,$tbcmdfile) = @ARGV;
 
 # read IR file
 eval {&ir_read($irfile)};
@@ -50,9 +50,9 @@ if ($@) {
     exit(1);
 }
 
-# open NS file
-open(NSFILE,$nsfile) || do {
-    print STDERR "Could not open $nsfile\n";
+# open tbcmd file
+open(TBCMD,$tbcmdfile) || do {
+    print STDERR "Could not open $tbcmdfile\n";
     exit(1);
 };
 
@@ -127,56 +127,56 @@ $sth->finish;
 
 # Read NS file
 # IP is indexed either by src or by src:dst and contains the IP address.
-while (<NSFILE>) {
-    if (/^#TB/) {
-	chop;
-	@line = split;
-	$_ = $line[1];
-      SWITCH1: {
-	  /^set-ip$/ && do {
-	      # set-ip <node> <ip>
-	      if ($#line != 3) {
-		  push(@ERRORS,"Syntax: set-ip node ip\n");
-		  last SWITCH1;
-	      } 
-	      ($node,$ip) = @line[2..3];
-	      if (!defined($vnodemap{$node})) {
-		  push(@ERRORS,"$node is not a valid node.\n");
-		  last SWITCH1;
-	      }
-	      # This actually matches a valid IP address
-	      if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
-		  push(@ERRORS,"$ip is not a valid ip address.\n");
-		  last SWITCH1;
-	      }
-	      $IP{$node} = $ip;
+while (<TBCMD>) {
+    chop;
+    @line = split;
+    $_ = $line[0];
+  SWITCH1: {
+      /^tb-set-ip$/ && do {
+	  # tb-set-ip <node> <ip>
+	  if ($#line != 2) {
+	      push(@ERRORS,"Syntax: tb-set-ip node ip\n");
 	      last SWITCH1;
-	  };
-	  /^set-ip-interface$/ && do {
-	      # set-ip-interface <node> <dst> <ip>
-	      if ($#line != 4) {
-		  push(@ERRORS,"Syntax: set-ip-interface node dst ip\n");
-		  last SWITCH1;
-	      } 
-	      ($node,$dst,$ip) = @line[2..4];
-	      if (! defined($vnodemap{$node})) {
-		  push(@ERRORS,"$node is not a valid node.\n");
-		  last SWITCH1;
-	      }
-	      if (! defined($vnodemap{$dst})) {
-		  push(@ERRORS,"$dst is not a valid node.\n");
-		  last SWITCH1;
-	      } 
-	      if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
-		  push(@ERRORS,"$ip is not a valid ip address.\n");
-		  last SWITCH1;
-	      }
-	      $IP{"$node:$dst"} = $ip;
+	  } 
+	  ($node,$ip) = @line[1..2];
+	  if (!defined($vnodemap{$node})) {
+	      push(@ERRORS,"$node is not a valid node.\n");
 	      last SWITCH1;
 	  }
+	  # This actually matches a valid IP address
+	  if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
+	      push(@ERRORS,"$ip is not a valid ip address.\n");
+	      last SWITCH1;
+	  }
+	  $IP{$node} = $ip;
+	  last SWITCH1;
+      };
+      /^tb-set-ip-interface$/ && do {
+	  # tb-set-ip-interface <node> <dst> <ip>
+	  if ($#line != 3) {
+	      push(@ERRORS,"Syntax: tb-set-ip-interface node dst ip\n");
+	      last SWITCH1;
+	  } 
+	  ($node,$dst,$ip) = @line[1..3];
+	  if (! defined($vnodemap{$node})) {
+	      push(@ERRORS,"$node is not a valid node.\n");
+	      last SWITCH1;
+	  }
+	  if (! defined($vnodemap{$dst})) {
+	      push(@ERRORS,"$dst is not a valid node.\n");
+	      last SWITCH1;
+	  } 
+	  if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
+	      push(@ERRORS,"$ip is not a valid ip address.\n");
+	      last SWITCH1;
+	  }
+	  $IP{"$node:$dst"} = $ip;
+	  last SWITCH1;
       }
-    }
+  }
 }
+
+close(TBCMD);
 
 
 # At this point we have most of the data we need.  We now loop through all
