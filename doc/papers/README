@@ -1,22 +1,27 @@
 This directory contains various papers that have been written about
-Netbed and Emulab. Its current contents are:
+Netbed/Emulab.  Its current contents are:
 
 netbed-osdi02.pdf
-     An Integrated Experimental Environment for Distributed Systems and
-     Networks, by White, Lepreau, Stoller, Ricci, Guruprasad, Newbold, Hibler,
-     Barb, and Joglekar, appeared at OSDI 2002, December 2002.
+     "An Integrated Experimental Environment for Distributed Systems and Networks"
+     White, Lepreau, Stoller, Ricci, Guruprasad, Newbold, Hibler, Barb, Joglekar.
+     OSDI 2002, December 2002.
+
+assign-ccr03.pdf
+    "A Solver for the Network Testbed Mapping Problem"
+    Robert Ricci, Chris Alfeld, Jay Lepreau.
+    SIGCOMM Computer Communications Review (CCR), volume 33 number 2, April 2003.
 
 frisbee-usenix03.pdf
-    Fast, Scalable Disk Imaging with Frisbee, by Mike Hibler, Leigh Stoller,
-    Jay Lepreau, Robert Ricci, and Chad Barb, appeared at USENIX 2003, June
-    2003.
-
-assign-tr.pdf
-    A Solver for the Network Testbed Mapping Problem, by Robert Ricci, Chris
-    Alfeld, and Jay Lepreau. University of Utah Flux Group Technical Note
-    2002-05. Revised version to appear in SIGCOMM Computer Communications
-    Review (CCR), issue dated April 2003.
+    "Fast, Scalable Disk Imaging with Frisbee"
+    Mike Hibler, Leigh Stoller, Jay Lepreau, Robert Ricci, Chad Barb.
+    USENIX 2003, June 2003.
 
 barrier-hotnets1.pdf
-    Lowering the Barrier to Wireless and Mobile Experimentation, by Brian
-    White, Jay Lepreau, Shashi Guruprasad; appeared at HotNets-I, October 2002.
+    "Lowering the Barrier to Wireless and Mobile Experimentation"
+    Brian White, Jay Lepreau, Shashi Guruprasad
+    HotNets-I, October 2002.
+
+multiplex-posterabs-sigcomm03.pdf
+    "Scaling Network Emulation with Multiplexed Virtual Resources"
+    Shashi Guruprasad, Leigh Stoller, Mike Hibler, Jay Lepreau.
+    SIGCOMM 2003 Poster Abstract, August 2003.
