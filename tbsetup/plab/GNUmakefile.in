@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,7 +17,7 @@ SUBDIRS		= libdslice etc
 SBIN_STUFF	= plabslice plabnode plabrenewd plabmetrics plabstats \
 		  plabmonitord plablinkdata plabdist plabhttpd plabdiscover
 
-LIB_STUFF       = libplab.py libtestbed.py libdb.py mod_dslice.py mod_PLC.py
+LIB_STUFF       = libplab.py libtestbed.py mod_dslice.py mod_PLC.py
 
 LIBEXEC_STUFF	= webplabstats
 

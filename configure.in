@@ -449,7 +449,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/sitevarscheck db/dbfillcheck \
 	db/grabron db/webnfree db/stategraph db/readycount \
 	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
-	db/webnewwanode \
+	db/webnewwanode db/libdb.py \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
@@ -505,7 +505,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
-        tbsetup/plab/libtestbed.py tbsetup/plab/libdb.py \
+        tbsetup/plab/libtestbed.py \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
