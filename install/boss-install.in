@@ -267,7 +267,7 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
     };
     Phase "dhcpd", "Moving $RCDIR/dhcpd.sh", sub {
 	DoneIfExists("$RCDIR/2.dhcpd.sh");
-	ExecQuietFatal("mv $RCDIR/isc-dhcpd.sh.sample $RCDIR/2.dhcpd.sh");
+	ExecQuietFatal("mv $RCDIR/isc-dhcpd.sh $RCDIR/2.dhcpd.sh");
     };
     Phase "snmpd", "Removing snmpd starup script",  sub {
 	DoneIfDoesntExist("$RCDIR/snmpd.sh");
