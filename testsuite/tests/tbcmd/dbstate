@@ -1,2 +1,2 @@
 delete from os_info where osid = "MYOS";
-insert into os_info (osid,description,version,pid) values ("MYOS","Test OS","0","testbed");
+insert into os_info (osname,osid,description,version,pid) values ("MYOS","testbed-MYOS","Test OS","0","testbed");
