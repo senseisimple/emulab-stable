@@ -1,6 +1,12 @@
 #!/usr/bin/perl -w
 use strict;
 
+# biosgrabber.pl, a new script to harvest BIOS version numbers (for BIOSen that
+# print their version number to the serial console) from cature logs. It prints
+# out SQL commands to update the database stdout. You'll want to change the
+# parseVersion function, especially the regular expression in it, to match the
+# BIOS version string printed by your machines' BIOS
+
 if (@ARGV != 3) {
 	die "Usage: $0 <start_node> <end_node> <start_file>\n";
 }

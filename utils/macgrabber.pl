@@ -1,6 +1,11 @@
 #!/usr/bin/perl -w
 use strict;
 
+# macgrabber.pl, a new script to harvest MAC address (as printed out by Mike's
+# 'showmac' kernel) from cature logs. It prints out SQL commands to insert the
+# addresses to stdout. Change the values in the '#defines' section below
+# depeding on the nodes you're harvesting info for.
+
 if (@ARGV != 3) {
 	die "Usage: $0 <start_node> <end_node> <start_file>\n";
 }
@@ -17,10 +22,18 @@ my $IPalias = "NULL";
 my $currentSpeed = 100;
 my $duplex = "full";
 
+# Which of the interfaces (as printed by showmac) is the control net
 my $controlInterface = 0;
+# Subnet for the control net
 my $subnet = "155.101.132.";
 
+
+# Mapping of interface numbers, as printed by the showmac kernel, to 
+# cannonical database order. For example, on Utah's pc850's, what
+# showmac reports as eth0 is saved as eth2 in the database (since this
+# is its name under Linux 2.4.x
 my %cardmap = ( 0 => 2, 1 => 3, 2 => 4, 3 => 0, 4 => 1);
+# end of '#defines'
 
 $startNode =~ /^(\D+)(\d+)$/;
 my ($nodeType,$startNum) = ($1,$2);
