@@ -54,6 +54,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
+my $friskiller  = "$TB/sbin/frisbeelauncher";
 my $osselect    = "$TB/bin/os_select";
 my $devtype	= "ad";
 my $devnum	= 0;
@@ -205,6 +206,16 @@ if ($filename =~ /^([-\w\.\/\+]+)$/) {
 else {
     die("*** $0:\n".
 	"    Bad filename: $filename!\n");
+}
+
+#
+# Be sure to kill off running frisbee. If a node is trying to load that
+# image, well tough. 
+#
+system("$friskiller -k $imageid");
+if ($?) {
+    die("*** $0:\n".
+	"    Could not kill running frisbee for $imageid!\n");
 }
 
 open(FILE, "> $filename") or

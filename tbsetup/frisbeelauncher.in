@@ -1,15 +1,27 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use Getopt::Std;
 use POSIX 'setsid'; # For &daemonize
 use Sys::Syslog;
 use English;
+
+#
+# This also kills a running frisbee.
+#
+sub usage()
+{
+    print "Usage: $0 [-d] [-k] <imageid>\n";
+    print "-k:	Kill running frisbee.\n";
+    print "-d:	Print debugging output.\n";
+    exit(1);
+}
+my $optlist  = "dk";
+my $debug    = 0;
+my $killmode = 0;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -36,10 +48,19 @@ my $BASEADDR	= "234.5.6";
 my $BASEPORT	= "3564";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 
-# Process command line options
-getopts('d',\%opt);
-if (@ARGV != 1) {
-	exit &usage();
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
 }
 $imageid = shift @ARGV;
 
@@ -47,41 +68,131 @@ $imageid = shift @ARGV;
 # Untaint the argument.
 #
 if ($imageid =~ /^([-\@\w\+.]+)$/) {
-	$imageid = $1;
-} else {
-	die("Invalid image '$imageid' contains illegal characters.\n");
+    $imageid = $1;
 }
-
+else {
+    die("Invalid image '$imageid' contains illegal characters.\n");
+}
 
 # Grab the filename to give to frisbee
 my $filename = &get_filename($imageid);
 
 #
-# Make sure that the user has sufficient permissions, and read the image file
-# or bomb out right now.
+# Make sure that the user has sufficient permissions.
 #
-if (!TBImageIDAccessCheck($UID,$imageid,TB_IMAGEID_READINFO)) {
-	die("*** You do not have pemssion to load $imageid on nodes\n");
+if (!TBImageIDAccessCheck($UID, $imageid,
+			  ($killmode ? TB_IMAGEID_DESTROY :
+			   TB_IMAGEID_READINFO))) {
+    die("*** $0:\n".
+	"    Not enough permission!\n");
 }
 
-if (! -R $filename) {
-	die("*** You do not have permission to read the image file for\n".
-	    "imageid $imageid: $filename\n");
+if (!$killmode && ! -R $filename) {
+    die("*** You do not have permission to read the image file for\n".
+	"imageid $imageid: $filename\n");
 }
 
 #
-# Need to lock the tables here, since we are going to mess with the
-# busy indicator.
+# Need to lock the tables here, so we can lock out anyone else from
+# messing with the image (and so we can pick an address atomically). 
 #
 &lock_tables;
 
 # Try to discover if some other process is handling this address
-$address = &get_address($imageid);
+($address, $pid) = get_address($imageid);
+
+if ($killmode) {
+    #
+    # Killmode. We do some sanity checking cause there is a small race 
+    # inherent in trying to use the pid via the DB without locking (below).
+    #
+    # No point in leaving table locked; not going to modify it.
+    #
+    unlock_tables();
+
+    # Nothing running.
+    exit(0)
+	if (!$address && !$pid);
+
+    if (!$address && $pid) {
+	#
+	# This makes no sense. Just send email.
+	#
+	my $mesg = "Inconsistent DB state. PID ($pid) but no load address!";
+	
+	SENDMAIL($TBOPS,
+		 "Frisbee Killer Failed!",
+		 "Imageid: $imageid\n".
+		 $mesg);
+	
+	die("*** $0:\n".
+	    "    $mesg\n");
+    }
+    if ($address && !$pid) {
+	#
+	# Okay, minor problem. It is possible we caught the launcher between
+	# setting the address and setting the pid. Wait a moment, and then
+	# try again. If still no pid, bail.
+	#
+	sleep(1);
+	($address, $pid) = get_address($imageid);
+
+	# Okay, situation resolved itself; other frisbeelauncher bailed.
+	exit(0)
+	    if (!$address && !$pid);
+
+	#
+	# Still inconsistent so bail.
+	# 
+	if ($address && !$pid) {
+	    my $mesg = "Inconsistent DB state. Load address but no PID!";
+	
+	    SENDMAIL($TBOPS,
+		     "Frisbee Killer Failed!",
+		     "Imageid: $imageid\n".
+		     $mesg);
+	
+	    die("*** $0:\n".
+		"    $mesg\n");
+	}
+    }
+
+    #
+    # Okay, address and pid. We could clear the pid from the DB,
+    # preventing another killer from thinking it is running, but not
+    # much point since it is not likely to happen. If it turns out to
+    # be a problem we can change the way this works.
+    #
+    unlock_tables();
+    if (! kill('TERM', $pid)) {
+	SENDMAIL($TBOPS,
+		 "Frisbee Killer Failed!",
+		 "Failed to stop frisbee daemon for $imageid\n".
+		 "Could not kill(TERM) process $pid: $? $!");
+
+	die("*** $0:\n".
+	    "    Failed to stop frisbee daemon for $imageid!\n");
+    }
+    exit(0);
+}
 
 if ($address && &keepbusy($imageid)) {
         &unlock_tables;
 	&debug("A server ($address) is already running for image $imageid\n");
 	exit (0);
+}
+
+# This would be inconsistent.
+if ($pid) {
+    my $mesg = "Inconsistent DB state. No load address but PID ($pid) set!";
+	
+    SENDMAIL($TBOPS,
+	     "Frisbee Startup Failed!",
+	     "Imageid: $imageid\n".
+	     $mesg);
+	
+    die("*** $0:\n".
+	"    $mesg\n");
 }
 
 # Pick an address: Die if unsucessful, set address and unlock if sucessful
@@ -101,16 +212,19 @@ if (TBBackGround($LOGFILE)) {
     exit(0);
 }
 
+# Set up a signal handler that will clean up in case we get killed
+$SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
+
+# Set our pid. This happens outside the lock which could lead to races,
+# but that is unlikely. Look for it above though.
+set_pid($imageid, $PID);
+
 #
 # Drop root permissions, if we have them
 #
 if ($EUID == 0) {
 	$EUID = $UID;
 }
-
-# Set up a signal handler that will clean up in case we get killed
-$SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
-# XXX: Any others we should catch?
 
 # Now, we actually launch Frisbee
 while (1) {
@@ -140,7 +254,8 @@ while (1) {
 			# Dump early. This will leave the address in
 			# in the DB, so that another one will not start
 			# until the matter is resolved by someone. 
-			# 
+			#
+			set_pid($imageid, 0);
 			exit(1);
 		}
 	}
@@ -148,7 +263,6 @@ while (1) {
 		# Child branch
 		# The database format for address is host:port - however,
 		# we need to give them as seperate arguments to frisbeed.
-
 		if ($address =~ /(.*):(.*)/) {
 			my $addr = $1;
 			my $port = $2;
@@ -169,16 +283,10 @@ exit(0);
 # Subroutines
 ######################################################################
 
-# Print out a usage mesage
-sub usage {
-	print "Usage: $0 [-d] IMAGEID\n";
-	print "-d:	Print debugging output\n";
-}
-
 # Only print if -d option was given. Also add $$ on the beginning of the
 # string, to ease debugging
 sub debug {
-	if ($opt{d}) { print "$$: ", @_ };
+	if ($debug) { print "$$: ", @_ };
 }
 
 # Grab the address for the passed-in imageid
@@ -186,7 +294,7 @@ sub get_address {
 	my ($imageid) = @_;
 
 	my $sth =
-	    DBQueryFatal("SELECT imageid,load_address ".
+	    DBQueryFatal("SELECT load_address,frisbee_pid ".
 			 "FROM images WHERE imageid='$imageid'");
 
 	my @row = $sth->fetchrow;
@@ -194,7 +302,7 @@ sub get_address {
 		die "No such imageid: $imageid\n";
 	}
 
-	return $row[1];
+	return ($row[0], $row[1]);
 }
 
 # Grab the filename for the passed-in imageid
@@ -270,6 +378,22 @@ sub set_address {
 		     "WHERE imageid='$imageid'");
 }
 
+# Pass in an imageid and a pid.
+sub set_pid {
+	my ($imageid,$pid) = @_;
+
+	DBQueryFatal("UPDATE images SET frisbee_pid=$pid " .
+		     "WHERE imageid='$imageid'");
+}
+
+# Pass in an imageid and a pid.
+sub clear_pid {
+	my ($imageid) = @_;
+
+	DBQueryFatal("UPDATE images SET frisbee_pid=0 " .
+		     "WHERE imageid='$imageid'");
+}
+
 # Bump the busy indicator to keep the frisbeed going.
 sub keepbusy($imageid) {
 	my ($imageid) = @_;
@@ -313,9 +437,9 @@ sub cleanup {
 
 # Clear out the address (and pid) registered to this process
 sub clear_address {
-	&debug("Clearing out registered load_address\n");
+	&debug("Clearing out registered load_address and pid\n");
 	# Now, clear out the load_address we had set up
-	my $address_clear = "UPDATE images SET load_address='',load_busy=0 " .
-		"WHERE imageid='$imageid'";
-	DBQueryFatal($address_clear);
+	DBQueryFatal("update images set ".
+		     "load_address='',load_busy=0,frisbee_pid=0 ".
+		     "where imageid='$imageid'");
 }

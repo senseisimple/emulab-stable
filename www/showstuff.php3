@@ -1268,6 +1268,7 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
     $default_osid= $row[default_osid];
     $path 	 = $row[path];
     $loadaddr	 = $row[load_address];
+    $frisbee_pid = $row[frisbee_pid];
     $shared	 = $row[shared];
     $globalid	 = $row["global"];
     $creator     = $row[creator];
@@ -1280,6 +1281,8 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 	    $path = "";
 	if (!$loadaddr)
 	    $loadaddr = "";
+	if (!$frisbee_pid)
+	    $frisbee_pid = "";
     }
     else {
 	if (!$description)
@@ -1288,6 +1291,8 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 	    $path = "&nbsp";
 	if (!$loadaddr)
 	    $loadaddr = "&nbsp";
+	if (!$frisbee_pid)
+	    $frisbee_pid = "&nbsp";
 	if (!$created)
 	    $created = "N/A";
     }
@@ -1475,6 +1480,20 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
     }
     else {
 	echo "$loadaddr";
+    }
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Frisbee pid: </td>
+            <td class=left>\n";
+
+    if ($edit && $isadmin) {
+	echo "<input type=text name=frisbee_pid size=6
+                     maxlength=10 value='$frisbee_pid'>";
+    }
+    else {
+	echo "$frisbee_pid";
     }
     echo "  </td>
           </tr>\n";

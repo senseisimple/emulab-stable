@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -42,7 +42,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  webmkgroup websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
 		  webnodereboot webrmuser webidleswap switchmac \
-		  spewrpmtar webtarfiles_setup
+		  spewrpmtar webtarfiles_setup webfrisbeekiller
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \

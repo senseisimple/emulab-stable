@@ -474,7 +474,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tbsetup/newnode_reboot \
 	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
-	tbsetup/fetchtar.proxy \
+	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabdaemon \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \

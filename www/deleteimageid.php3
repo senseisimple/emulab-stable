@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -112,6 +112,12 @@ if (!$confirmed) {
     PAGEFOOTER();
     return;
 }
+
+#
+# Need to make sure that there is no frisbee process running before
+# we kill it.
+#
+$retval = SUEXEC($uid, $pid, "webfrisbeekiller $imageid", SUEXEC_ACTION_DIE);
 
 DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 
