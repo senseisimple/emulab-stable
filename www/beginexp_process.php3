@@ -7,6 +7,8 @@
 <?php
 include("defs.php3");
 
+$mydebug = 1;
+
 #
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
@@ -123,6 +125,27 @@ if (! copy($exp_nsfile, "$nsname")) {
     TBERROR("Copying NS file for experiment into $dirname.", 1);
 }
 
+#
+# So, that went okay. At this point enter the exp_id into the database
+# so that it shows up as valid when the tb scripts run. We need to remove
+# the entry if any of this fails!
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"INSERT INTO experiments ".
+        "(eid, pid, expt_created, expt_expires, expt_name, ".
+        "expt_head_uid, expt_start, expt_end) ".
+        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
+        "'$exp_name', '$uid', '$exp_start', '$exp_end')");
+if (! $query_result) {
+    if (! $mydebug) {
+        unlink("$nsname");
+        rmdir("$dirname");
+    }
+
+    $err = mysql_error();
+    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
+}
+
 echo "<center><br>";
 echo "<h3>Setting up experiment. This may take a few minutes ...</h3>";
 echo "</center>";
@@ -149,25 +172,29 @@ if ($retval) {
           }
     echo "</XMP>\n";
 
-    unlink("$nsname");
-    if (file_exists($irname))
-        unlink("$irname");
-    if (file_exists($repname))
-        unlink("$repname");
-    if (file_exists($logname))
-        unlink("$logname");
-    if (file_exists($assname))
-        unlink("$assname");
-    if (file_exists($dirname))
-        rmdir("$dirname");
+    $query_result = mysql_db_query($TBDBNAME,
+	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
 
+    if (! $mydebug) {
+        unlink("$nsname");
+        if (file_exists($irname))
+            unlink("$irname");
+        if (file_exists($repname))
+            unlink("$repname");
+        if (file_exists($logname))
+            unlink("$logname");
+        if (file_exists($assname))
+            unlink("$assname");
+        if (file_exists($dirname))
+            rmdir("$dirname");
+    }
     die("");
 }
 
 #
 # Debugging!
 # 
-if (0) {
+if ($mydebug) {
     echo "<XMP>\n";
     for ($i = 0; $i < count($output); $i++) {
         echo "$output[$i]\n";
@@ -179,32 +206,22 @@ if (0) {
 # Make sure the report file exists, just to be safe!
 # 
 if (! file_exists($repname)) {
-    if (file_exists($nsname))
-        unlink("$nsname");
-    if (file_exists($irname))
-        unlink("$irname");
-    if (file_exists($logname))
-        unlink("$logname");
-    if (file_exists($assname))
-        unlink("$assname");
-    if (file_exists($dirname))
-        rmdir("$dirname");
-    TBERROR("Report file for new experiment does not exist!\n", 1);
-}
+    $query_result = mysql_db_query($TBDBNAME,
+	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
 
-#
-# So, that went okay. At this point enter the exp_id into the database
-# so that it shows up as valid.
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"INSERT INTO experiments ".
-        "(eid, pid, expt_created, expt_expires, expt_name, ".
-        "expt_head_uid, expt_start, expt_end) ".
-        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
-        "'$exp_name', '$uid', '$exp_start', '$exp_end')");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
+    if (! $mydebug) {
+        if (file_exists($nsname))
+            unlink("$nsname");
+        if (file_exists($irname))
+            unlink("$irname");
+        if (file_exists($logname))
+            unlink("$logname");
+        if (file_exists($assname))
+            unlink("$assname");
+        if (file_exists($dirname))
+            rmdir("$dirname");
+    }
+    TBERROR("Report file for new experiment does not exist!\n", 1);
 }
 
 echo "<center><br>";
