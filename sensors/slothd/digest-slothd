@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -31,7 +31,7 @@ BEGIN {
 #   The maximum number of pageouts allowed.  XXX I don't know the semantics...
     SWAPOUT_OVERLOAD = 2;
 
-    DISK_OVERLOAD = 50;
+    DISK_OVERLOAD = 95;
     
     error = 0;
     if( ARGC < 3 )
