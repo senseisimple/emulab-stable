@@ -318,7 +318,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/batch_daemon \
-	tbsetup/webdelay_config \
+	tbsetup/webdelay_config tbsetup/tbresize \
 	tbsetup/webbatchexp tbsetup/webreport \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/webswapexp tbsetup/swapexp \

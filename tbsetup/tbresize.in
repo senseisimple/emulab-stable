@@ -1,0 +1,379 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+sub usage() {
+    print STDOUT <<EOF;
+Usage: tbresize [-d] -a -e pid,eid -n num -t type [-p prefix]
+       tbresize [-d] -r -e pid,eid <node> [<node> ...]
+       tbresize -h
+Use -h to show this usage message.
+Use -d to enable extra debugging output.
+Use -a to add nodes to an experiment.
+Use -r to remove nodes from an experiment.
+Use -e pid,eid to specify the experiment to resize.
+Use -n to specify the number of nodes to add.
+Use -t to specify the type of the nodes to be added (pc, pc850, pc600, etc).
+Use -p to specify a prefix for vnames (i.e. "node" => node0 .. nodeN).
+With -r, specify a list of one or more nodes to be removed (i.e. pcXX).
+EOF
+    exit(-1);
+}
+my  $optlist = "hdare:n:t:p:";
+
+# Configure variables
+my $TB          = "@prefix@";
+my $TESTMODE    = @TESTMODE@;
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Define some "constants" for the op type
+sub NONE()   { 0; }
+sub ADD()    { 1; }
+sub REMOVE() { 2; }
+
+my $exportssetup = "$TB/sbin/exports_setup";
+my $namedsetup   = "$TB/sbin/named_setup";
+my $nodereboot   = "$TB/bin/node_reboot";
+my $snmpit       = "$TB/bin/snmpit";
+my $avail        = "$TB/sbin/avail";
+my $nalloc       = "$TB/bin/nalloc";
+my $nfree        = "$TB/bin/nfree";
+my $op = NONE;
+my $pid = "";
+my $eid = "";
+my $num = 0;
+my $type = "";
+my $prefix = "";
+my @nodes = ();
+my %v2p = (); # vname to phys node_id
+my %p2v = (); # phys node_id to vname
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+my %options = ();
+if (!@ARGV) { usage(); }
+if (! getopts($optlist, \%options)) { usage(); }
+if (defined($options{"h"})) { usage(); }
+if (defined($options{"d"})) { $d++; }
+if (defined($options{"a"})) {
+    if (defined($options{"r"})) {
+        die("Only one of -a or -r should be given\n");
+    }
+    $op = ADD;
+}
+if (defined($options{"r"})) { $op = REMOVE; }
+if (defined($options{"n"})) { $num = untaint($options{"n"}); }
+if (defined($options{"t"})) { $type = untaint($options{"t"}); }
+if (defined($options{"p"})) { $prefix = untaint($options{"p"}); }
+if (defined($options{"e"})) {
+    my $pideid = $options{"e"};
+    if ($pideid =~ /([-\w]*),([-\w]*)/) {
+	$pid=$1;
+	$eid=$2;
+    } else {
+        die("Invalid argument to -e option: $pideid\n");
+        usage();
+    }
+}
+
+# Untaint nodes.
+foreach my $node ( @ARGV ) {
+    if ($node =~ /^([-\@\w]+)$/ && TBValidNodeName($1)) { $node = $1; }
+    else { die("*** Bad node name: $node\n"); }
+    if ( ! NodeidToExp($node,\$npid,\$neid) ||
+	 $npid ne $pid || $neid ne $eid) {
+	die("*** Node $node is not in $pid/$eid!\n");
+    }
+    push(@nodes, $node);
+}
+
+if ($op==ADD) {
+    if ((! ($num=~ /^\d+$/)) || $num==0) { 
+	die("*** Missing number of nodes to add.\n"); 
+    }
+    if ($prefix eq "") { $prefix = "node"; }
+    if ($type eq "") { die("*** Missing type of nodes to add.\n"); }
+} elsif ($op==REMOVE) {
+    if ( (@nodes+0)==0 ) { die("*** No nodes given for removal.\n"); }
+} else {
+    die("*** You must select an operation (add or remove).\n");
+}
+
+
+# Figure out who called us. Root and admin types can do whatever they
+# want. Normal users can only change expts they can MODIFY (local_root)
+if ($UID && !TBAdmin($UID) && 
+    !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
+    die("*** $0:\n    You do not have permission to resize $pid/$eid\n");
+}
+
+if (ExpState($pid,$eid) ne EXPTSTATE_ACTIVE) {
+    die("*** $0:\n    Experiment $pid/$eid is not active.\n");
+}
+
+# By now we've got all the info and we've checked permissions, so
+# go ahead and carry out the operation
+
+if ($d) {
+    print "OP   = ".($op==ADD?"ADD":"REMOVE")."\n";
+    print "EXPT = $pid/$eid\n";
+    if ($op==ADD) {
+	print "NUM  = $num\n";
+	print "TYPE = $type\n";
+	print "PRFX = $prefix\n";
+    } else {
+	print "NODES= ".join(" ",@nodes)."\n";
+    }
+}
+
+if ($op == ADD) {
+    # To add:
+    # pick some nodes (for now randomly from free nodes of the type they want)
+    # nalloc them
+    # set up db with new state for the nodes (esp. change the lan)
+    # rerun snmpit (delete and readd the vlan from the new db state)
+
+    # 1. Find random nodes of the right type:
+    @nodes = ();
+    open(AVAIL,"/usr/testbed/sbin/avail type=$type rand |");
+    while (<AVAIL>) {
+	if (! /^\|/) {next};
+	if (/node_id/) {next;}
+	($node,$type) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;
+	push(@nodes,$node);
+	if (@nodes == $num) { last; }
+    }
+    close(AVAIL);
+    if (@nodes < $num) {
+	die("*** Cannot resize $pid/$eid:\n".
+	    "    Less than $num free nodes of type $type.\n");
+    } elsif (@nodes > $num) {
+	die("*** Aargh! Got too many nodes:\n".
+	    "    Wanted $num of type $type, got this:\n".
+	    join(" ",@nodes)."\n");
+    } else { print "Found $num nodes: ".join(" ",@nodes)."\n" if $d; }
+
+    # 2. Reserve them, and set vnames
+    fatal("$nalloc $pid $eid ".join(" ",@nodes));
+    my $n = 0;
+    my @nlist = @nodes;
+    while (@nlist) {
+	my $vname = $prefix.$n;
+	my $node="";
+	if (! VnameToNodeid($pid,$eid,$vname,\$node)) {
+	    $node = shift @nlist;
+	    $v2p{$vname}=$node;
+	    $p2v{$node}=$vname;
+	    print "Reserving $node as $vname.\n";
+	    DBQueryWarn("update reserved set vname='$vname' ".
+			"where node_id='$node'");
+	}
+	$n++;
+    }
+
+    # 3. Add new state to the db as needed:
+    #    - add entries to virt_nodes
+    #    - check if there's one vlan
+    #      - if one: update virt_lans, vlans, IPs in virt_nodes and interfaces
+    #      - otherwise, leave new ones unconnected
+
+    # 3a. Add virt_nodes entries
+    foreach $p (@nodes) {
+	print "  virt_nodes: $p = $pid/$eid/$p2v{$p},$type\n" if $d;
+	DBQueryWarn("insert into virt_nodes ".
+		    "(pid, eid, vname, type, ips, osname, cmd_line, rpms, ".
+		    "deltas, startupcmd, tarfiles, fixed) values ".
+		    "('$pid','$eid','$p2v{$p}','$type',".
+		    "'','','','','','','','')");
+    }
+
+    # 3b. Check vlans
+    my $q = DBQueryWarn("select count(*) from vlans ".
+			"where eid='$eid' and pid='$pid'");
+    my @r = $q->fetchrow_array();
+    my $c = $r[0];
+    if ($c==1) {
+	print "Adding network connection information to database...\n";
+	# XXX Hack: always use eth1 since it isn't control anywhere
+	my $ifc = "eth1";
+	my $port= 1;
+	# We need to add entries for it in virt_lans
+	my $q = DBQueryWarn("select virtual from vlans ".
+			    "where eid='$eid' and pid='$pid'");
+	my @r = $q->fetchrow_array();
+	my $vlink = $r[0];
+	foreach $p (@nodes) {
+	    DBQueryWarn("insert into virt_lans ".
+			"(pid,eid,vname,delay,bandwidth,lossrate,".
+			"rdelay,rbandwidth,rlossrate,member) values ".
+			"('$pid','$eid','$vlink',0,100000,0,0,100000,0,".
+			"'$p2v{$p}:$port')");
+	}
+
+	# Then update vlans
+	my $newmemb = join(" ",map("$_:$ifc",@nodes));
+	DBQueryWarn("update vlans set members = ".
+		    "ltrim(concat(members,' $newmemb')) ".
+		    "where pid='$pid' and eid='$eid'");
+
+	# Now figure out what IPs to use
+	$q = DBQueryWarn("select ips from virt_nodes ".
+			 "where eid='$eid' and pid='$pid' ".
+			 "and ips!='' and ips is not null");
+	my %ips = ();
+	my $subnet = "";
+	while (@r = $q->fetchrow_array()) {
+	    my ($port,$ip) = split(":",$r[0]);
+	    print "  Found IP '$ip'\n" if $d;
+	    $ip =~ /^(\d+\.\d+\.\d+)\.(\d+)$/ ||
+	      warn("Bad IP! '$ip' \n") && next;
+	    if ($subnet eq "") { $subnet=$1; }
+	    $ips{$2}=1;
+	}
+	print "  Subnet is $subnet\n" if $d;
+	if ($subnet eq "") { $subnet="192.168.1"; } # default, just in case
+	
+	# now throw them in the db
+	my $i=2;
+	foreach $p (@nodes) {
+	    while (defined($ips{$i})) { $i++; }
+	    if ($i>254) { die("Too many nodes in subnet!\n"); }
+	    print "  $p => $p2v{$p} gets IP $subnet.$i\n" if $d;
+	    $ips{$i}=1;
+	    DBQueryWarn("update virt_nodes set ips='$port:$subnet.$i' ".
+			"where pid='$pid' and eid='$eid' ".
+			"and vname='$p2v{$p}'");
+	    DBQueryWarn("update interfaces set IP='$subnet.$i' where ".
+			"node_id='$p' and iface='$ifc'");
+	}
+	
+    } # else do nothing - leave it unconnected
+
+    # 4. Run snmpit to update the vlans
+    updateVLANs();
+
+    # All done for adding
+
+} elsif ($op == REMOVE) {
+    # To remove:
+    # tweak the db state (remove the nodes from the links, etc)
+    # rerun snmpit (delete and readd the vlan from the new db state)
+    # nfree them (they'll get reloaded after this)
+
+    # 1. Change the db state as needed:
+    #    - Clean nodes out of vlans carefully
+    #    - Delete any rows for the nodes from virt_*
+
+    print "Removing ",@nodes+0," nodes from $pid/$eid:\n".
+      join(" ",@nodes)."\n";
+    foreach $p (@nodes) {
+	print "  Clearing node $p\n" if $d;
+	# 1a. Get the nodes out of vlans
+	my $q = DBQueryWarn("select id, members from vlans ".
+			    "where eid='$eid' and pid='$pid' ".
+			    "and members like '%$p:%'");
+	while (my @r = $q->fetchrow_array()) {
+	    my $id = $r[0];
+	    print "    VLAN $id: \t$r[1]\n" if $d;
+	    my (@ports)= split(" ",$r[1]);
+	    my @newports=();
+	    foreach (@ports) {
+		if (/$p:/) { next; }
+		push(@newports,$_);
+	    }
+	    print "    New vlan: \t".join(" ",@newports)."\n" if $d;
+	    DBQueryWarn("update vlans set members='".join(" ",@newports).
+			"' where id='$id'");
+	}
+	
+	$q = DBQueryWarn("select vname from reserved where node_id='$p'");
+	@r = $q->fetchrow_array();
+	my $vname=$r[0];
+
+	print "    Clearing virt_* for vname '$vname'\n" if $d;
+	# 1b. Delete any rows for the nodes from virt_*
+	my @virt_tables = ("virt_agents", "virt_lans", "virt_nodes",
+			   "virt_routes", "virt_trafgens");
+	foreach $t (@virt_tables) {
+	    if ($t eq "virt_lans") {
+		DBQueryWarn("delete from $t where pid='$pid' and eid='$eid' ".
+			    "and member like '$vname:%'");
+	    } else {
+		DBQueryWarn("delete from $t where pid='$pid' and eid='$eid' ".
+			    "and vname='$vname'");
+	    }
+	}
+    }
+
+    # 2. Run snmpit to update the vlans
+    updateVLANs();
+
+    # 3. Free up the nodes
+    my $nlist = join(" ",@nodes);
+    if (length($nlist)==0) { warn("*** Found no nodes to free!\n"); }
+    else { run("$nfree $pid $eid $nlist"); }
+
+    # All done for removing
+
+} else { die("Aaah! I'm extremely confused"); }
+
+
+
+# Now reboot the nodes in the expt so they all pick up new values
+run("$nodereboot ".($d?"-d ":"")."-e $pid,$eid");
+#print "Not rebooting nodes... [rebooting disabled]\n";
+
+# Before we're done we need to rerun a few things:
+run("$exportssetup");
+run("$namedsetup");
+
+
+exit();
+
+sub updateVLANs() {
+    # Here we just need to delete the vlan for the expt and 
+    # recreate it from the db.
+    print "Updating VLANs...\n";
+    run("$snmpit -r $pid $eid");
+    run("$snmpit -t $pid $eid");
+}
+
+sub fatal($) {
+    my $cmd = shift;
+    if (run($cmd)) {
+	die("*** tbresize aborted!\n");
+    }
+}
+
+sub run($) {
+    my $cmd = shift;
+    my $rv = system($cmd);
+    if ($rv) {
+	warn("*** WARNING: $cmd failed!\n");
+    }
+    return $rv;
+}
+
+sub untaint($) {
+    my $str = shift;
+    if ($str =~ /^([-\@\w_]+)$/) { return $1; }
+    else { die("*** Invalid value: $str\n"); }
+}
