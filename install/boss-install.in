@@ -444,7 +444,9 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 	qq|named_enable="NO"|,
 	qq|xntpd_enable="YES"|,
 	qq|syslogd_flags=""|,
-	qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|);
+	qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|,
+	qq|dhcpd_enable="YES"|,
+    	qq|apache_enable="YES"|);
 };
 
 Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
