@@ -277,6 +277,12 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/snmpd.sh: $!");
 	}
     };
+    Phase "dhcpd", "Removing isc-dhcpd starup script",  sub {
+	DoneIfDoesntExist("$RCDIR/isc-dhcpd.sh");
+	if (!unlink "$RCDIR/isc-dhcpd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/isc-dhcpd.sh: $!");
+	}
+    };
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
 	DoneIfExists("$RCDIR/3.testbed.sh");
 	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
