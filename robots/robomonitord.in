@@ -1,0 +1,337 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX;
+
+#
+# Robot Lab Monitor Daemon.
+#
+#	usage: robomonitord [-d]
+#
+sub usage()
+{
+    print STDOUT "Usage: robomonitord [-d]\n" .
+	"Use the -d option to prevent daemonization\n";
+    exit(-1);
+}
+my $optlist     = "d";
+my $debug	= 0;
+my $impotent    = 1;
+
+#
+# Must be runs as root, from boot.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $idleswap = "$TB/sbin/idleswap";
+
+# Testbed Support library
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+#
+# Locals
+# 
+my $TBOPSPID	= TBOPSPID();
+my $logfile	= "$TB/log/robolab.log";
+
+#
+# Turn off line buffering on output (dots ...).
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 0) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "Robot Lab Monitor Daemon Died!", $msg, $TBOPS);
+    die($msg);
+}
+
+sub notify($)
+{
+    my ($msg) = @_;
+
+    print "$msg\n";
+    
+    SENDMAIL($TBOPS, "Robot Lab Monitor Daemon Message", $msg, $TBOPS);
+}
+
+print "Robot Lab Monitor Daemon starting... pid $$, at ".`date`;
+
+#
+# These are sitevars.
+# 
+my ($override, $opentime, $closetime, $open);
+my $sentemail = 0;
+
+#
+# Just loop, waking up and looking at the sitevars, the current time and
+# date, and doing something reasonable! Just a hack ...
+#
+while (1) {
+    my ($pid, $eid);
+    
+    #
+    # Grab various sitevars.
+    #
+    if (!TBGetSiteVar("robotlab/override", \$override) ||
+	!TBGetSiteVar("robotlab/open", \$open)) {
+	print "Error getting sitevars; pausing for a little while ...\n";
+	goto skip;
+    }
+    #
+    # See if we are forcing the lab open or closed.
+    # 
+    if ($override && $override ne "") {
+	#
+	# Force close?
+	# 
+	if (($override eq "close" || $override eq "off") && $open) {
+	    print "Robot lab was closed forcibly at ".
+		TBDateTimeFSSafe() . "\n";
+
+	    # Close the lab.
+	    TBSetSiteVar("robotlab/open", 0);
+	    $sentemail = 0;
+
+	    #
+	    # Swap out running experiments.
+	    #
+	    if (TBRobotLabExpt(\$pid, \$eid)) {
+		SwapIt($pid, $eid, 1);
+	    }
+	}
+	#
+	# Force open?
+	# 
+	elsif (($override eq "open" || $override eq "on") && !$open) {
+	    print "Robot lab was opened forcibly at ".
+		TBDateTimeFSSafe() . "\n";
+
+	    # Open the lab.
+	    TBSetSiteVar("robotlab/open", 1);
+	    $sentemail = 0;
+	}
+
+	# In override, the rest of this is skipped
+	goto skip;
+    }
+
+    #
+    # Get the current open/close times.
+    # 
+    if (!TBGetSiteVar("robotlab/closetime", \$closetime) ||
+	!TBGetSiteVar("robotlab/opentime",  \$opentime)) {
+	print "Error getting sitevars; pausing for a little while ...\n";
+	goto skip;
+    }
+
+    #
+    # Get current day/date info. We want to know the time of day, and the
+    # day of the week. 
+    #
+    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+
+    # 
+    # Convert open/close time strings (HH:MM) above to unix time using
+    # above goo.
+    #
+    if ($opentime =~ /^(\d*):(\d*)/) {
+	$opentime_unix =
+	    mktime(0,$2,$1,$mday,$mon,$year,$wday,$yday,$isdst);
+    }
+    else {
+	fatal("Bad format for opentime: $opentime");
+    }
+    if ($closetime =~ /^(\d*):(\d*)/) {
+	$closetime_unix =
+	    mktime(0,$2,$1,$mday,$mon,$year,$wday,$yday,$isdst);
+    }
+    else {
+	fatal("Bad format for closetime: $closetime");
+    }
+    if ($debug) {
+	print "$opentime,$opentime_unix $closetime,$closetime_unix " .
+	    time() . "\n";
+    }
+
+    #
+    # See if we need to make a change.
+    #
+    if (time() >= $opentime_unix && time() <= $closetime_unix &&
+	$wday >= 1 && $wday <= 5) {
+	#
+	# Robot lab should be open; make it so if not.
+	#
+	if (!$open) {
+	    print "Robot is now open for business at " .
+		TBDateTimeFSSafe() . "\n";
+
+	    # Open the lab.
+	    TBSetSiteVar("robotlab/open", 1);
+	    $sentemail = 0;
+	}
+
+	#
+	# See if getting close to closing the lab. If so, want to send
+	# an email warning that an autoswap is going to happen. Only send
+	# once though. Hmm, someone could swap in right at the end. Oh
+	# well, not going to worry about that. 
+	#
+	if ($open && $closetime_unix - time() < 60 * 15 && !$sentemail &&
+	    TBRobotLabExpt(\$pid, \$eid)) {
+	    SwapWarn($pid, $eid, $closetime_unix - time());
+	    $sentemail = 1;
+	}
+    }
+    else {
+	#
+	# Robot lab should be closed; make it so if not.
+	#
+	if ($open) {
+	    print "Robot is now closed for business at " .
+		TBDateTimeFSSafe() . "\n";
+
+	    # Open the lab.
+	    TBSetSiteVar("robotlab/open", 0);
+	    $sentemail = 0;
+	}
+
+	#
+	# Swap out running experiments.
+	#
+	if (TBRobotLabExpt(\$pid, \$eid)) {
+	    SwapIt($pid, $eid, 1);
+	}
+    }
+
+  skip:
+    sleep(10);
+}
+exit(0);
+
+#
+# Get pid,eid of current experiment using the robot lab. This is just
+# plain silly for now.
+#
+sub TBRobotLabExpt($$)
+{
+    my ($ppid, $peid) = @_;
+    
+    my $query_result =
+	DBQueryWarn("select r.pid,r.eid from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where nt.class='robot' and r.pid!='$TBOPSPID'");
+
+    return 0
+	if (!$query_result || !$query_result->numrows);
+
+    my ($pid, $eid) = $query_result->fetchrow_array();
+    $$ppid = $pid;
+    $$peid = $eid;
+    return 1;
+}
+
+#
+# Notify current user of the robot lab that they are going to get swapped.
+# 
+sub SwapWarn($$$)
+{
+    my ($pid, $eid, $timeleft) = @_;
+    my ($user_name, $user_email);
+
+    my $query_result =
+	DBQueryWarn("select expt_swap_uid from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+    return -1
+	if (!$query_result);
+    
+    my ($swapper) = $query_result->fetchrow_array();
+
+    return -1
+	if (!UserDBInfo($swapper, \$user_name, \$user_email));
+
+    print "Sending swap warning email to $swapper at ".
+	TBDateTimeFSSafe() . "\n";
+
+    SENDMAIL("$user_name <stoller>",
+	     "Robot Lab Monitor Daemon Message",
+	     "Your experiment running on the robot testbed, $pid/$eid, \n".
+	     "will soon be swapped out when the robot testbed closes for \n".
+	     "for the night.\n".
+	     "\n".
+	     "You have " . $timeleft / 60 . " minutes befor that happens!\n".
+	     "\n",
+	     $TBOPS,
+	     "Cc: $TBOPS");
+
+    return 0;
+}
+
+#
+# Swap a currently running experiment.
+#
+sub SwapIt($$$)
+{
+    my ($pid, $eid, $force) = @_;
+
+    print "Starting swapout of $pid/$eid at ".
+	TBDateTimeFSSafe() . "\n";
+
+    return 0
+	if ($impotent);
+
+    #
+    # Use idleswap with special options
+    #
+    my $optarg = ($force ? "-f" : "-a");
+    
+    return(system("$idleswap $optarg -r $pid, $eid"));
+}
