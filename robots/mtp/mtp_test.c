@@ -49,24 +49,24 @@ int main(int argc, char *argv[])
   
   static struct mtp_update_position mup = {
     3,
-    { 5, 25, 0.44 },
-    MTP_POSITION_STATUS_IDLE,
-    56
+    { 5, 25, 0.44, 20.5 },
+    MTP_POSITION_STATUS_IDLE
   };
   
   static struct mtp_request_id mri = {
-    { 3.1, 20.2, 69.5 },
-    169
+    169,
+    { 3.1, 20.2, 69.5, 20.5 }
   };
   
   static struct mtp_update_id mui = {
-    30
+    30,
+    2
   };
   
   static struct mtp_command_goto mcg = {
     5,
     3,
-    { 2.2, 13.3, 73.4 },
+    { 2.2, 13.3, 73.4, 500.04 },
   };
   
   static struct mtp_command_goto mcs = {
@@ -158,8 +158,9 @@ int main(int argc, char *argv[])
     assert(mp->data.update_position->position.x == mup.position.x);
     assert(mp->data.update_position->position.y == mup.position.y);
     assert(mp->data.update_position->position.theta == mup.position.theta);
+    assert(mp->data.update_position->position.timestamp ==
+	   mup.position.timestamp);
     assert(mp->data.update_position->status == mup.status);
-    assert(mp->data.update_position->timestamp == mup.timestamp);
 
     assert(mtp_receive_packet(fd,&mp) == MTP_PP_SUCCESS);
     assert(mp->opcode == MTP_REQUEST_ID);
@@ -168,7 +169,7 @@ int main(int argc, char *argv[])
     assert(mp->data.request_id->position.x == mri.position.x);
     assert(mp->data.request_id->position.y == mri.position.y);
     assert(mp->data.request_id->position.theta == mri.position.theta);
-    assert(mp->data.request_id->timestamp == mri.timestamp);
+    assert(mp->data.request_id->position.timestamp == mri.position.timestamp);
     
     assert(mtp_receive_packet(fd,&mp) == MTP_PP_SUCCESS);
     assert(mp->opcode == MTP_UPDATE_ID);
@@ -185,6 +186,8 @@ int main(int argc, char *argv[])
     assert(mp->data.command_goto->position.x == mcg.position.x);
     assert(mp->data.command_goto->position.y == mcg.position.y);
     assert(mp->data.command_goto->position.theta == mcg.position.theta);
+    assert(mp->data.command_goto->position.timestamp ==
+	   mcg.position.timestamp);
     
     assert(mtp_receive_packet(fd,&mp) == MTP_PP_SUCCESS);
     assert(mp->opcode == MTP_COMMAND_STOP);

@@ -22,6 +22,7 @@
 
 typedef struct {
     int class[2];       // Color class for the two blobs
+    int valid;
     double max_disp;    // Maximum inter-frame displacement
     double max_sep;     // Maximum blob separation
     int max_missed;     // Max frames before looking for a new match
@@ -204,10 +205,12 @@ int main(int argc, char *argv[])
         mezzmap->time = 20.0;
         mezzmap->objectlist.count = 2;
         
+        mezzmap->objectlist.objects[0].valid = 1;
         mezzmap->objectlist.objects[0].px = 2.5;
         mezzmap->objectlist.objects[0].py = 5.5;
         mezzmap->objectlist.objects[0].pa = 0.48;
         
+        mezzmap->objectlist.objects[1].valid = 1;
         mezzmap->objectlist.objects[1].px = 4.5;
         mezzmap->objectlist.objects[1].py = 6.5;
         mezzmap->objectlist.objects[1].pa = 0.54;

@@ -1,4 +1,5 @@
 
+#include <math.h>
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
@@ -340,10 +341,11 @@ int main(int argc, char *argv[])
             pfatal("connect");
         }
         else {
+            int i;
+	    
             FD_SET(vc->vc_fd, &readfds);
 
             // we now init the robot_track list for this struct:
-            int i;
             vc->updating = 0;
             for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
                 vc->tracks[i].updated = 0;
@@ -421,11 +423,13 @@ void vmc_handle_update_id(struct mtp_packet *p) {
 
     // now check through all the possible tracks:
     for (i = 0; i < MAX_VMC_CLIENTS; ++i) {
-        if (vmc_clients[i].fd > -1) {
+        if (vmc_clients[i].vc_fd > -1) {
             struct vmc_client *vc = &(vmc_clients[i]);
             for (j = 0; j < MAX_TRACKED_OBJECTS; ++j) {
                 if (vc->tracks[j].valid &&
                     vc->tracks[j].request_id == p->data.update_id->request_id) {
+                    int first_invalid_idx = -1;
+		    
                     vc->tracks[j].robot_id = p->data.update_id->robot_id;
 
                     // before we return, we should also try to update
@@ -435,7 +439,6 @@ void vmc_handle_update_id(struct mtp_packet *p) {
                     // this id in the list, or we would've found it... but
                     // not everything happens in perfect sync, so we have to
                     // check for this possibility
-                    int first_invalid_idx = -1;
                     for (k = 0; k < MAX_TRACKED_OBJECTS; ++k) {
                         if (real_robots[k].valid == 1) {
                             if (real_robots[k].robot_id == vc->tracks[j].robot_id) {
@@ -470,15 +473,15 @@ void vmc_handle_update_id(struct mtp_packet *p) {
 void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     int i,j;
 
-    if (p == NULL || vc == NULL) {
-        return;
-    }
-
     // first we run through the current track list for this vmc_client:
     float best_dist_delta = DIST_THRESHOLD;
     float best_pose_delta = POSE_THRESHOLD;
     int best_track_idx = -1;
     int first_invalid_track = -1;
+
+    if (p == NULL || vc == NULL) {
+        return;
+    }
 
     for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
         if (vc->tracks[i].valid) {
@@ -536,6 +539,8 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             printf("OUT OF TRACKING ROOM IN VMCD!\n");
         }
         else {
+	    int retval;
+	    
             vc->tracks[first_invalid_track].valid = 1;
             vc->tracks[first_invalid_track].position = p->data.update_position->position;
             vc->tracks[first_invalid_track].robot_id = -1;
@@ -544,16 +549,15 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             // now, if we can find a match for this track close enough to
             // a track in the real_robots list, we can steal the robot_id from
             // there!
-            int retval = find_real_robot_id(&(vc->tracks[i].position));
+	    retval = find_real_robot_id(&(vc->tracks[i].position));
             if (retval == -1) {
                 // we have to send our request_id packet, now:
                 struct mtp_request_id rid;
+		struct mtp_packet *mp;
                 rid.position = vc->tracks[i].position;
                 rid.request_id = get_next_request_id();
-                struct mtp_packet *mp = mtp_make_packet(MTP_REQUEST_ID,
-                                                        MTP_ROLE_VMC,
-                                                        &rid);
-                retval = mtp_write_packet(emc_fd,mp);
+                mp = mtp_make_packet(MTP_REQUEST_ID, MTP_ROLE_VMC, &rid);
+                retval = mtp_send_packet(emc_fd,mp);
                 if (retval == MTP_PP_SUCCESS) {
                     vc->request_id = rid.request_id;
                 }
@@ -575,7 +579,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     // now, if the update_position.status field is MTP_POSITION_STATUS_CYCLE_
     // COMPLETE, we want to go though and weed out any valid tracks that
     // were not updated:
-    if (mp->data.update_position->status == MTP_POSITION_STATUS_CYCLE_COMPLETE) {
+    if (p->data.update_position->status == MTP_POSITION_STATUS_CYCLE_COMPLETE) {
         for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
             if (vc->tracks[i].valid && !(vc->tracks[i].updated)) {
                 vc->tracks[i].valid = -1;
@@ -591,14 +595,14 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
 int find_real_robot_id(struct position *p) {
     int i;
 
-    if (p == NULL) {
-        return -1;
-    }
-
     // we look through real_robots:
     float best_dist_delta = DIST_THRESHOLD;
     float best_pose_delta = POSE_THRESHOLD;
     int best_track_idx = -1;
+
+    if (p == NULL) {
+        return -1;
+    }
 
     for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
         if (real_robots[i].valid) {

@@ -431,7 +431,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	payload.request_id.position.x = args.x;
 	payload.request_id.position.y = args.y;
 	payload.request_id.position.theta = args.orientation;
-	payload.request_id.timestamp = args.timestamp;
+	payload.request_id.position.timestamp = args.timestamp;
 
 	m_payload.request_id = &payload.request_id;
 	break;
@@ -454,8 +454,8 @@ static int interpret_options(int *argcp, char ***argvp)
 	payload.update_position.position.x = args.x;
 	payload.update_position.position.y = args.y;
 	payload.update_position.position.theta = args.orientation;
+	payload.update_position.position.timestamp = args.timestamp;
 	payload.update_position.status = args.status;
-	payload.update_position.timestamp = args.timestamp;
 
 	m_payload.update_position = &payload.update_position;
 	break;

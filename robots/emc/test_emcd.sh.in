@@ -72,12 +72,12 @@ Packet: length 71; version 1; role 0
   vert:		2.438400
   robot[0]:	1, garcia1.flux.utah.edu
   robot[1]:	2, garcia2.flux.utah.edu
-Packet: length 31; version 1; role 0
+Packet: length 35; version 1; role 0
  opcode:	update-position
   id:		1
   x:		6.000000
   y:		7.000000
   theta:	0.440000
   status:	-1
-  timestamp:	1
+  timestamp:	1.000000
 EOF
