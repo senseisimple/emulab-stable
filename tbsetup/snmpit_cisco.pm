@@ -90,7 +90,6 @@ sub new($$;$) {
     &SNMP::addMibDirs($mibpath);
     &SNMP::addMibFiles("$mibpath/CISCO-STACK-MIB.txt",
 	"$mibpath/CISCO-VTP-MIB.txt",
-	"$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt",
 	"$mibpath/CISCO-PAGP-MIB.txt",
 	"$mibpath/RMON-MIB.txt");
     
@@ -529,7 +528,7 @@ sub setPortVlan($$@) {
     my $vlan_id = shift;
     my @ports = @_;
 
-    my $PortVlanMemb = "vmVlan"; #index is ifIndex
+    my $PortVlanMemb = "vlanPortVlan"; #index is ifIndex
 
     my $errors = 0;
 
@@ -546,7 +545,7 @@ sub setPortVlan($$@) {
     #
     # Convert ports from the format the were passed in to IfIndex format
     #
-    my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
+    my @portlist = $self->convertPortFormat($PORT_FORMAT_MODPORT,@ports);
 
     #
     # We'll keep track of which ports suceeded, so that we don't try to
