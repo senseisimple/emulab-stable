@@ -746,7 +746,7 @@ NAMESPACEHACK
 extern HypView *hvMain(int,char *[],int,int,int);
 extern void hvKill(HypView *);
 extern int hvReadFile(char *,int,int);
-extern char *getSelected();
+extern char const *getSelected();
 extern char *getGraphCenter();
 
 #define  SWIG_MemoryError    1

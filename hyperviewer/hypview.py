@@ -165,6 +165,14 @@ class hvFrame(hvFrameUI):
 	EVT_SCROLL_ENDSCROLL(self.AnimStepCount, self.OnAnimStepCount)	  # Windows
 	EVT_SLIDER(self.AnimStepCount, -1, self.OnAnimStepCount)	  # GTK
 	
+	# Mouse-generated events.
+	EVT_LEFT_DOWN(self.hypView, self.OnClick)
+	EVT_LEFT_UP(self.hypView, self.OnClick)
+	EVT_MIDDLE_DOWN(self.hypView, self.OnClick)
+	EVT_MIDDLE_UP(self.hypView, self.OnClick)
+	EVT_MOTION(self.hypView, self.OnMove)
+	EVT_SIZE(self.hypView, self.OnResizeCanvas)
+
 	# Other events.
 	EVT_SIZE(self.window_1, self.OnResizeWindow)
 	EVT_SPLITTER_SASH_POS_CHANGED(self.window_1, -1, self.OnSashChanged)
@@ -224,14 +232,6 @@ class hvFrame(hvFrameUI):
 			     window, width, height)  # Win32 needs the window info.
 	if self.vwr is None:			     # Must have been a problem....
 	    return False
-
-	# Don't connect up the mouse events before the HyperView data is loaded!
-	EVT_LEFT_DOWN(self.hypView, self.OnClick)
-	EVT_LEFT_UP(self.hypView, self.OnClick)
-	EVT_MIDDLE_DOWN(self.hypView, self.OnClick)
-	EVT_MIDDLE_UP(self.hypView, self.OnClick)
-	EVT_MOTION(self.hypView, self.OnMove)
-	EVT_SIZE(self.hypView, self.OnResizeCanvas)
 
 	self.OnGoToTop(None)			     # Show info for the top node.
 	
@@ -447,6 +447,9 @@ class hvFrame(hvFrameUI):
     ##
     # Mouse click events.
     def OnClick(self, mouseEvent):
+	if self.vwr is None:
+	    return
+
 	# Encode mouse button events for HypView.
 	btnNum = -1
 	
@@ -487,6 +490,9 @@ class hvFrame(hvFrameUI):
     ##
     # Mouse motion events in the HyperViewer canvas.
     def OnMove(self, mouseEvent):
+	if self.vwr is None:
+	    return
+
 	# Hyperviewer calls motion when a mouse button is clicked "active"
 	if mouseEvent.LeftIsDown() or mouseEvent.MiddleIsDown():
 	    self.vwr.motion(mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
@@ -520,7 +526,8 @@ class hvFrame(hvFrameUI):
 	    self.hypView.SetSize(size)
 
 	    # Tell HyperViewer about the change.
-	    self.vwr.reshape(size.width, size.height)
+	    if self.vwr:
+		self.vwr.reshape(size.width, size.height)
 	pass
     
     ##

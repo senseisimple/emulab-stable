@@ -21,7 +21,7 @@
 #include <iostream>
 NAMESPACEHACK
 
-#if 1
+#ifndef WIN32
 #include "wx/setup.h"
 #include "wx/glcanvas.h"
 #endif
@@ -55,8 +55,12 @@ extern "C" {
 
 //char prevsel[1024];
 string prevsel;
+#ifndef WIN32
 auto_ptr<HypView> hv;  // We own this; make sure the pointed-to HypView will be deleted.
 wxGLCanvas *glcanvas;  // We don't own this, so don't wrap it in an auto_ptr.
+#else
+HypView *hv = NULL;    // VC++6 doesn't support the reset operation to change an auto_ptr.
+#endif
 
 char const *getSelected(){
   return prevsel.c_str();
@@ -79,8 +83,10 @@ void selectCB(const string & id, int shift, int control) {
 }
 
 void frameEndCB(int) {
+#ifndef WIN32
   //printf("frameEndCB glcanvas=0x%x\n", glcanvas);
   glcanvas->SwapBuffers();
+#endif
 }
 
 void display() { hv->drawFrame(); }
@@ -136,7 +142,11 @@ void PrintAllocations()
 {
 //  if (hv)
 //    delete(hv);
+#ifndef WIN32
   hv.reset(NULL);
+#else
+  hv = NULL;
+#endif
   cerr << "HypNode objects not destroyed: " << HypNode::NumObjects() << endl;
   cerr << "HypLink objects not destroyed: " << HypLink::NumObjects() << endl;
   return;
@@ -145,7 +155,13 @@ void PrintAllocations()
 #if 0
 int main(int argc, char *argv[]) {
 #else
+
+#ifndef WIN32
 HypView *hvMain(int argc, char *argv[], void * window, int width, int height) {
+#else
+HypView *hvMain(int argc, char *argv[], int window, int width, int height) {
+#endif
+
 #endif
   char *fname;
   if (argc > 1) 
@@ -182,7 +198,7 @@ HypView *hvMain(int argc, char *argv[], void * window, int width, int height) {
 #else
   HWND hWnd = (HWND)window;
   HDC hdc = ::GetDC(hWnd);
-  hv.reset(new HypView(hdc, hWnd));
+  hv = new HypView(hdc, hWnd);
   HGLRC ctx = wglCreateContext(hdc);
   if (!ctx) {
     printf("wglCreateContext Failed\n");
@@ -275,12 +291,22 @@ HypView *hvMain(int argc, char *argv[], void * window, int width, int height) {
   
   // free(fname);
 #else
+
+#ifndef WIN32
   return hv.get();
+#else
+  return hv;
+#endif
+
 #endif
 }
 
 void hvKill(HypView * /*hv*/) {
+#ifndef WIN32
   delete hv.get();
+#else
+  delete hv;
+#endif
 }
 
 int hvReadFile(char *fname, int width, int height) {

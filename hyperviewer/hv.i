@@ -69,7 +69,7 @@ extern void hvKill(HypView *hv);
 extern int hvReadFile(char *fname, int width, int height);
 
 // Get the node id string last selected by the selectCB function.
-extern char *getSelected();
+extern char const *getSelected();
 
 // Get the node id string at the graph center.
 extern char *getGraphCenter();
