@@ -4,7 +4,7 @@ set ns [new Simulator]
 set myixp   [$ns node]
 set ixphost [$ns node]
 
-tb-set-hardware $myixp ixp-bveil
+tb-set-hardware $myixp ixp-bv
 tb-fix-node $myixp $ixphost
 
 tb-set-node-os $ixphost RHL73-IXPHOST
