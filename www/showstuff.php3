@@ -34,8 +34,8 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_head_uid	= $row[head_uid];
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
-    $proj_ronpcs        = $row[num_pcplab];
-    $proj_plabpcs       = $row[num_ron];
+    $proj_ronpcs        = $row[num_ron];
+    $proj_plabpcs       = $row[num_pcplab];
     $proj_why           = nl2br($row[why]);
     $control_node	= $row[control_node];
     $approved           = $row[approved];
