@@ -67,7 +67,8 @@ my $last_reload = time;
 my $dbtag = "";
 my $debug = 0;
 my $nolog = 0;
-my ($server,$port);
+my $server = "localhost";
+my $port   = @BOSSEVENTPORT@;
 my $lockfile;
 my $pidfile;
 
@@ -106,8 +107,6 @@ if (@ARGV) {
 
 if ($opt{s}) {
     $server = $opt{s};
-} else {
-    $server = $BOSSNODE;
 }
 if ($opt{p}) {
     $port = $opt{p};

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2003 University of Utah and the Flux Group.
+# Copyright (c) 2003-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -52,7 +52,7 @@ use libdb;
 # by the caller
 # Don't my them, or it won't work!
 $server = "";
-$port   = "";
+$port   = TB_BOSSEVENTPORT();
 $URL    = "";
 $debug  = 0;
 
@@ -81,7 +81,7 @@ sub initStateWait( $@ ) {
 	print "initStateWait: states=(".join(",",@$states).
 	  ") nodes=(".join(",",@nodes).")\n";
     }
-    if ($server eq "") { $server = TB_BOSSNODE; }
+    if ($server eq "") { $server = "localhost"; }
     if ($URL eq "") { $URL = "elvin://$server"; }
     if ($port ne "") { $URL .= ":$port"; }
 
