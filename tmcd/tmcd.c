@@ -3766,15 +3766,15 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join experiments as e on "
 				 "  e.pid=r.pid and e.eid=r.eid "
 				 "left join node_types as pt on "
-				 " pt.type=np.type and "
-				 " i.iface=pt.control_iface "
+				 " pt.type=np.type "
 				 "left join node_types as vt on "
 				 " vt.type=nv.type "
 				 "left join plab_slices as ps on "
 				 " ps.pid=e.pid and ps.eid=e.eid "
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=nv.node_id "
-				 "where nv.node_id='%s' and i.IP='%s'",
+				 "where nv.node_id='%s' and "
+				 " (i.IP='%s' and i.role='ctrl') ",
 				 25, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
@@ -3793,10 +3793,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join experiments as e on "
 				 " e.pid=r.pid and e.eid=r.eid "
 				 "left join node_types as t on "
-				 " t.type=n.type and i.iface=t.control_iface "
+				 " t.type=n.type "
 				 "left join node_hostkeys as nk on "
 				 " nk.node_id=n.node_id "
-				 "where i.IP='%s'",
+				 "where i.IP='%s' and i.role='ctrl'", /*XXX*/
 				 25, inet_ntoa(ipaddr));
 	}
 
