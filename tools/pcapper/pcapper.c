@@ -63,9 +63,9 @@
 #endif
 
 #define PORT 4242
-#define MAX_INTERFACES 10
-#define MAX_CLIENTS 10
-#define MAX_FILES 10
+#define MAX_INTERFACES 16
+#define MAX_FILES 16
+#define MAX_CLIENTS 8
 
 /*
  * Program run to determine the control interface.
@@ -88,6 +88,30 @@ struct sniff_ethernet {
 	u_char ether_shost[ETHER_ADDR_LEN]; /* Source host address */
 	u_short ether_type; /* IP? ARP? RARP? etc */
 };
+
+#ifdef __linux__
+#undef VETH
+#endif
+
+#ifdef VETH
+
+#ifndef ETHERTYPE_VETH
+#define ETHERTYPE_VETH	0x80FF
+#endif
+
+/* Encapsulated ethernet header */
+struct sniff_veth {
+	/* physical info */
+	u_char ether_dhost[ETHER_ADDR_LEN]; /* Destination host address */
+	u_char ether_shost[ETHER_ADDR_LEN]; /* Source host address */
+	u_short ether_type; /* VETH */
+	/* virtual info */
+	u_short veth_tag;
+	u_char veth_dhost[ETHER_ADDR_LEN]; /* Destination host address */
+	u_char veth_shost[ETHER_ADDR_LEN]; /* Source host address */
+	u_short veth_type; /* IP? ARP? RARP? etc */
+};
+#endif
 
 /*
  * Arguments to the readpackets function - passed in a struct since
@@ -114,11 +138,17 @@ struct counter {
 	unsigned int icmp_bytes;
 	unsigned int tcp_bytes;
 	unsigned int udp_bytes;
+#ifdef VETH
+	unsigned int veth_bytes;
+#endif
 	unsigned int other_bytes;
 
 	unsigned int icmp_packets;
 	unsigned int tcp_packets;
 	unsigned int udp_packets;
+#ifdef VETH
+	unsigned int veth_packets;
+#endif
 	unsigned int other_packets;
 };
 
@@ -479,10 +509,16 @@ int main (int argc, char **argv) {
 			MAX(sizeof(struct sockaddr),ifr->ifr_addr.sa_len);
 #endif
 
+		/*
+		 * Only care about INET4 interfaces
+		 */
+		if (ifr->ifr_addr.sa_family != AF_INET)
+			continue;
+
 		name = ifr->ifr_name;
 		if (!strcmp(name,lastname)) {
 			/*
-			 * If we get duplicates, skip them
+			 * If we get duplicates (IP aliases), skip them
 			 */
 			continue;
 		} else {
@@ -512,15 +548,21 @@ int main (int argc, char **argv) {
 			printf("loopback\n");
 		} else if (flag_ifr.ifr_flags & IFF_UP) {
 			struct readpackets_args *args;
+			struct sockaddr_in *sin;
 
 			/*
 			 * Get theIP address for the interface.
 			 */
+#if 1
+			sin = (struct sockaddr_in *) &ifr->ifr_addr;
+			ifaddr = sin->sin_addr;
+#else
 			if (getaddr(name,&ifaddr)) {
 				/* Has carrier, but no IP */
 				printf("down (with carrier)\n");
 				continue;
 			}
+#endif
 
 			/*
 			 * Grab the 'hostname' for the interface, but fallback
@@ -543,7 +585,7 @@ int main (int argc, char **argv) {
 			if (limit_interfaces) {
 				int j;
 				for (j = 0; j < argc; j++) {
-					if ((strstr(name,argv[j])) ||
+					if (!(strcmp(name,argv[j])) ||
 					    (strstr(hostname,argv[j]))) {
 					    break;
 					}
@@ -552,6 +594,11 @@ int main (int argc, char **argv) {
 					printf("skipped\n");
 					continue;
 				}
+			}
+
+			if (interfaces >= MAX_INTERFACES) {
+				printf("up, ignored (too many interfaces)\n");
+				continue;
 			}
 
 			printf("up\n");
@@ -747,7 +794,9 @@ int main (int argc, char **argv) {
 				}
 				if (++active == 1)
 					pthread_cond_broadcast(&cond);
-				/* printf("Now have %d clients\n", active); */
+#if 0
+				printf("Now have %d clients\n", active);
+#endif
 				break;
 			}
 		}
@@ -907,7 +956,11 @@ void *feedclient(void *args) {
 		pthread_mutex_lock(&lock);
 		for (i  = 0; i < interfaces; i++) {
 			used += sprintf((outbuf +used),
+#ifdef VETH
+				"(icmp:%i,%i tcp:%i,%i udp:%i,%i other:%i,%i veth:%i,%i) ",
+#else
 				"(icmp:%i,%i tcp:%i,%i udp:%i,%i other:%i,%i) ",
+#endif
 				counters[cli][i].this_interval.icmp_bytes,
 				counters[cli][i].this_interval.icmp_packets,
 				counters[cli][i].this_interval.tcp_bytes,
@@ -915,7 +968,12 @@ void *feedclient(void *args) {
 				counters[cli][i].this_interval.udp_bytes,
 				counters[cli][i].this_interval.udp_packets,
 				counters[cli][i].this_interval.other_bytes,
-				counters[cli][i].this_interval.other_packets);
+				counters[cli][i].this_interval.other_packets
+#ifdef VETH
+				,counters[cli][i].this_interval.veth_bytes
+				,counters[cli][i].this_interval.veth_packets
+#endif
+					);
 		}
 		pthread_mutex_unlock(&lock);
 
@@ -986,10 +1044,15 @@ void *readpackets(void *args) {
 #endif
 
 	/*
-	 * How much of the packet we want to grab. For some reason 
+	 * How much of the packet we want to grab.
 	 */
-	size = sizeof(struct sniff_ethernet) + sizeof(struct ip) +
-	    sizeof(struct tcphdr);
+#ifdef VETH
+	size = sizeof(struct sniff_veth);
+#else
+	size = sizeof(struct sniff_ethernet);
+#endif
+	size += sizeof(struct ip) + sizeof(struct tcphdr);
+	    
 	sargs = (struct readpackets_args*)args;
 
  again:
@@ -1053,19 +1116,34 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 	struct sniff_ethernet *ether_pkt;
 	struct ip *ip_pkt; 
 	int length;
-	int type;
+	int type = 0;
 	int index;
 	int i;
+	int hdrsize;
 
 	/*
 	 * We only care about IP packets
 	 */
 	ether_pkt = (struct sniff_ethernet*)packet;
-	if (ether_pkt->ether_type != 8) {
+	switch (ntohs(ether_pkt->ether_type)) {
+	case ETHERTYPE_IP:
+		hdrsize = sizeof(struct sniff_ethernet);
+		break;
+#ifdef VETH
+	case ETHERTYPE_VETH:
+		/* XXX one level only */
+		if (ntohs(((struct sniff_veth *)packet)->veth_type) !=
+		    ETHERTYPE_IP)
+			return;
+		hdrsize = sizeof(struct sniff_veth);
+		type = -1;
+		break;
+#endif
+	default:
 		return;
 	}
 
-	ip_pkt = (struct ip*)(packet + sizeof(struct sniff_ethernet));
+	ip_pkt = (struct ip*)(packet + hdrsize);
 
 	/*
 	 * Add this packet length to the appropriate total
@@ -1073,14 +1151,18 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 	if (!add_ethernet) {
 		length = ntohs(ip_pkt->ip_len);
 	} else {
-		length = ntohs(ip_pkt->ip_len) + sizeof (struct sniff_ethernet);
+		length = ntohs(ip_pkt->ip_len) + hdrsize;
 		if (add_all_ethernet) {
 			length += INVISIBLE_ETHSIZE;
 		}
 	}
-	type = ip_pkt->ip_p;
+	if (type == 0)
+		type = ip_pkt->ip_p;
 
-	/* printf("got type %d, len=%d(0x%x)\n", type, length, length); */
+#if 0
+	printf("got type %d(0x%x), len=%d(0x%x)\n",
+	       type, type, length, length);
+#endif
 
 	index = *args;
 
@@ -1177,6 +1259,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 					count->udp_packets++;
 				    }
 				    break;
+#ifdef VETH
+				case -1:
+					count->veth_bytes += length;
+					count->veth_packets++;
+					break;
+#endif
 				default: count->other_bytes += length;
 					 count->other_packets++;
 					 break;
@@ -1203,6 +1291,7 @@ int getaddr(char *dev, struct in_addr *addr) {
 		return (1);
 	}
 
+	bzero(&ifr.ifr_addr,sizeof(ifr.ifr_addr));
 	strcpy(ifr.ifr_name,dev);
 
 	/*
