@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h> 
 
+#define EVENTDEBUG
 //#define TESTING
 
 /* tg stuff */
@@ -23,6 +24,7 @@ static char		*progname;
 static event_handle_t	ehandle;
 static tg_action	actions[2]; /* large enough for setup/wait sequence */
 static char 		*logfile;
+static char		*myexp;
 
 extern int		gotevent;
 extern protocol		prot;
@@ -36,8 +38,9 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"Usage: %s [-s serverip] [-p serverport] [-l logfile]"
-		"[ -N name ] [ -T targetip.targetport ] [-P proto] [-R role]\n",
+		"Usage: %s [-s serverip] [-p serverport] [-l logfile] "
+		"[ -N name ] [ -T targetip.targetport ] [-P proto] [-R role] "
+		"[ -E pid/eid ]\n",
 		progname);
 	exit(-1);
 }
@@ -74,7 +77,7 @@ tgevent_init(int argc, char *argv[])
 	progname = argv[0];
 	memset(&tmp, 0, sizeof(tmp));
 	
-	while ((c = getopt(argc, argv, "s:p:T:P:R:N:l:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:T:P:R:N:l:E:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -96,6 +99,9 @@ tgevent_init(int argc, char *argv[])
 			break;
 		case 'N':
 			myname = optarg;
+			break;
+		case 'E':
+			myexp = optarg;
 			break;
 		case 'l':
 			logfile = optarg;
@@ -165,7 +171,7 @@ tgevent_init(int argc, char *argv[])
 	tuple->host	 = ipaddr;
 	tuple->site      = ADDRESSTUPLE_ANY;
 	tuple->group     = ADDRESSTUPLE_ANY;
-	tuple->expt      = ADDRESSTUPLE_ANY;	/* pid/eid */
+	tuple->expt      = myexp ? myexp : ADDRESSTUPLE_ANY;
 	tuple->objtype   = TBDB_OBJECTTYPE_TRAFGEN;
 	tuple->objname   = myname ? myname : ADDRESSTUPLE_ANY;
 	tuple->eventtype = ADDRESSTUPLE_ANY;
@@ -317,6 +323,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	char		buf[8][64];
 	int		len = 64;
 	static int	startdone;
+	struct timeval	now;
 
 	buf[0][0] = buf[1][0] = buf[2][0] = buf[3][0] = 0;
 	buf[4][0] = buf[5][0] = buf[6][0] = buf[7][0] = 0;
@@ -329,38 +336,54 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	event_notification_get_eventtype(handle, notification, buf[6], len);
 	event_notification_get_arguments(handle, notification, buf[7], len);
 
-#if 1
-	{
-		struct timeval	now;
-		gettimeofday(&now, NULL);
-		fprintf(stderr,
-			"Event: %lu %s %s %s %s %s %s %s %s\n", now.tv_sec,
-			buf[0], buf[1], buf[2], 
-			buf[3], buf[4], buf[5], buf[6], buf[7]);
-	}
+#ifdef EVENTDEBUG
+	gettimeofday(&now, NULL);
+	fprintf(stderr, "Event: %lu.%03lu %s %s %s %s %s %s %s %s\n",
+		now.tv_sec, now.tv_usec / 1000,
+		buf[0], buf[1], buf[2], 
+		buf[3], buf[4], buf[5], buf[6], buf[7]);
 #endif
 
 	/*
 	 * Perform a setup when we get the "start of time" event.
-	 * XXX setup sink slightly ahead of source?
 	 */
 	if (strcmp(buf[4], TBDB_OBJECTTYPE_TIME) == 0) {
 		if (strcmp(buf[6], TIMESTARTS) == 0) {
 			/*
-			 * XXX event daemon may have been restarted,
-			 * avoid redoing setup, just go back to waiting.
+			 * We may receive TIME START events for any experiment
+			 * (if an experiment ID was not specified on the
+			 * command line).  If we get a redundant start event,
+			 * check the experiment ID.  If the start is for some
+			 * other experiment, ignore it.  If it is another start
+			 * for us, assume the event daemon has been restarted
+			 * and just go back to WAITing.
 			 */
-			if (startdone)
-				goto dowait;
+			if (startdone) {
+				if (strcmp(buf[1], myexp) == 0)
+					goto dowait;
+				return;
+			}
 
 			if (logfile) {
-				struct timeval now;
 				extern int FlushOutput;
 				FlushOutput = 1;
 				gettimeofday(&now, NULL);
 				start_log(now, NULL);
 			}
 
+			/*
+			 * Delay startup of source relative to sink
+			 */
+			if ((prot.qos & QOS_SERVER) == 0) {
+				now.tv_sec = 0;
+				now.tv_usec = 10000;
+				select(0, NULL, NULL, NULL, &now);
+			}
+#ifdef EVENTDEBUG
+			gettimeofday(&now, NULL);
+			fprintf(stderr, "%lu.%03lu: SETUP\n",
+				now.tv_sec, now.tv_usec / 1000);
+#endif
 			if (tg_first != &actions[0])
 				fatal("global action list corrupted!");
 			actions[0].tg_flags = TG_SETUP;
@@ -374,6 +397,11 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	 */
 	else if (strcmp(buf[6], STOPEVENT) == 0) {
 	dowait:
+#ifdef EVENTDEBUG
+		gettimeofday(&now, NULL);
+		fprintf(stderr, "%lu.%03lu: WAIT\n",
+			now.tv_sec, now.tv_usec / 1000);
+#endif
 		tg_first->tg_flags &= ~TG_SETUP;
 		tg_first->tg_flags |= TG_WAIT;
 	}
@@ -391,7 +419,19 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 				goto dowait;
 			}
 			startdone = 1;
+
+			/*
+			 * XXX if they didn't specify an experiment,
+			 * use the value of the first start event we see.
+			 */
+			if (myexp == 0)
+				myexp = strdup(buf[1]);
 		}
+#ifdef EVENTDEBUG
+		gettimeofday(&now, NULL);
+		fprintf(stderr, "%lu.%03lu: START\n",
+			now.tv_sec, now.tv_usec / 1000);
+#endif
 		tg_first->tg_flags &= ~(TG_SETUP|TG_WAIT);
 	}
 
@@ -404,6 +444,11 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 			fprintf(stderr, "MODIFY without START event\n");
 		else if (parse_args(buf[7], tg_first) != 0)
 			fprintf(stderr, "MODIFY invalid params\n");
+#ifdef EVENTDEBUG
+		gettimeofday(&now, NULL);
+		fprintf(stderr, "%lu.%03lu: MODIFY\n",
+			now.tv_sec, now.tv_usec / 1000);
+#endif
 	}
 	gotevent = 1;
 }
@@ -416,8 +461,9 @@ tgevent_loop(void)
 	struct timeval now;
 
 	gettimeofday(&now, NULL);
-#if 1
-	fprintf(stderr, "trafgen: %lu: started\n", now.tv_sec);
+#ifdef EVENTDEBUG
+	fprintf(stderr, "%lu.%03lu: trafgen started\n",
+		now.tv_sec, now.tv_usec / 1000);
 #endif
 
 	/*
@@ -438,7 +484,7 @@ tgevent_loop(void)
 			strcpy(suffix, cp);
 		else
 			strcpy(suffix, "log");
-#if 1
+#ifdef EVENTDEBUG
 		fprintf(stderr, "trafgen: logfile=%s.%s\n", prefix, suffix);
 #endif
 	}
