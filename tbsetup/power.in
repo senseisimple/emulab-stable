@@ -27,6 +27,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libxmlrpc;
 use power_rpc27;
+use power_sgmote;
 use snmpit_apc;
 use libtestbed;
 use strict;
@@ -242,8 +243,10 @@ foreach my $power_id (keys %outlets) {
     #
     # Find out some information about this power controller
     #
-    my $result = DBQueryFatal("select n.type, i.IP ". 
-	"from nodes as n left join interfaces as i on n.node_id=i.node_id " .
+    my $result = DBQueryFatal("select n.type, i.IP, t.class ". 
+	"from nodes as n " .
+	"left join interfaces as i on n.node_id=i.node_id " .
+	"left join node_types as t on n.type=t.type " .
 	"where n.node_id='$power_id'");
     if ($result->num_rows() == 0) {
 	warn "No entry found for power controller $power_id. Skipping " .
@@ -251,7 +254,7 @@ foreach my $power_id (keys %outlets) {
 	$exitval++;
 	next;
     }
-    my ($type, $IP) = $result->fetchrow();
+    my ($type, $IP, $class) = $result->fetchrow();
 
     #
     # Finally, we look at the controller type and construct the proper type
@@ -274,6 +277,13 @@ foreach my $power_id (keys %outlets) {
     } elsif ($type eq "RPC27") {
 	if (rpc27ctrl($op,$power_id,@outlets)) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
+	}
+    } elsif (($class eq "sg") || ($type eq "garcia")) {
+	# XXX: 'garcia' is temporary until stargates are subnodes of
+	# garcias
+	if (sgmotectrl($op,@nodes)) {
+	    print "Control of $nodestr failed.\n"; $exitval++;
+	    $errors++;
 	}
     } else {
 	print "power: Unknown power type '$type'\n";

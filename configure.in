@@ -522,7 +522,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	account/addsfskey account/webaddsfskey \
 	account/quotamail account/mkusercert account/webmkusercert  \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
-	tbsetup/spewrpmtar tbsetup/gentopofile \
+	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
 	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \

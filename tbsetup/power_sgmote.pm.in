@@ -1,0 +1,47 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# A little perl module to power cycle a mote attached to a stargate -
+# basically just a wrapper for the tbsgmotepower script
+
+package power_sgmote;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( sgmotectrl );
+
+#
+# Commands we run
+#
+my $TBROOT = '@prefix@';
+my $TBSGMOTEPOWER = "$TBROOT/bin/tbsgmotepower";
+
+# Turn off line buffering on output
+$| = 1;
+
+# usage: sgmotectrl(cmd, motes)
+# cmd = { "cycle" | "on" | "off" }
+# motes = list of one or more physcial mote names
+#
+# Returns 0 on success. Non-zero on failure.
+# 
+sub sgmotectrl($@) {
+    my ($cmd, @motes) = @_;
+
+    #
+    # All we have to do is call tbsmotepower
+    #
+    print "Running $TBSGMOTEPOWER $cmd " . join(" ",@motes) . "\n";
+    if (system("$TBSGMOTEPOWER $cmd " . join(" ",@motes))) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+1;
