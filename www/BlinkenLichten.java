@@ -34,7 +34,9 @@ public class BlinkenLichten
     /**
      * The current status of the light, just on/off for now.
      */
-    private boolean on;
+    private boolean red_on;
+    private boolean green_on;
+    private boolean yellow_on;
     
     public BlinkenLichten()
     {
@@ -79,15 +81,19 @@ public class BlinkenLichten
     
     public void run()
     {
-	byte buffer[] = new byte[1];
+	byte buffer[] = new byte[6];
 	
 	try
 	{
 	    /* Just read a character at a time from the other side. */
-	    while( this.is.read(buffer) > 0 )
+	    // Bad, bad, bad
+	    //while( this.is.read(buffer) > 0 )
+	    while( this.is.read(buffer,0,6) > 0 )
 	    {
 		/* 1 == on, 0 == off */
-		this.on = (buffer[0] == '1');
+		this.red_on = (buffer[0] == '1');
+		this.green_on = (buffer[2] == '1');
+		this.yellow_on = (buffer[4] == '1');
 		
 		repaint();
 	    }
@@ -108,16 +114,29 @@ public class BlinkenLichten
     public void paint(Graphics g)
     {
 	Dimension size = getSize();
+	int width = size.width / 3;
+	int height = size.height;
 
 	/*
-	 * Just paint the entire canvas provided to the applet, no need to get
-	 * fancy.
+	 * Paint each of the three LED values
 	 */
-	if( this.on )
+	if (this.red_on)
 	    g.setColor(Color.red);
 	else
-	    g.setColor(Color.black);
-	g.fillRect(0, 0, size.width, size.height);
+	    g.setColor(Color.red.darker().darker());
+	g.fillRect(0, 0, width, height);
+
+	if (this.green_on)
+	    g.setColor(Color.green);
+	else
+	    g.setColor(Color.green.darker().darker());
+	g.fillRect(width, 0, width, height);
+
+	if (this.yellow_on)
+	    g.setColor(Color.yellow);
+	else
+	    g.setColor(Color.yellow.darker().darker());
+	g.fillRect(width *2, 0, width, height);
     }
     
     public void destroy()

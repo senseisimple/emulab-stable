@@ -7,12 +7,7 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-#PAGEHEADER("Watch Experiment Log");
-
-#
-# Only known and logged in users can end experiments.
+# Only known and logged in users can watch LEDs
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
@@ -42,11 +37,48 @@ header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
 flush();
 
-for ($lpc = 0; $lpc < 30; $lpc++) {
-	sleep(1);
-	$on_off = $lpc % 2;
-	echo "$on_off";
-	flush();
+#for ($lpc = 0; $lpc < 30; $lpc++) {
+    #	sleep(1);
+    #	$on_off = $lpc % 2;
+    #	echo "$on_off";
+    #	flush();
+    #}
+
+#
+# Silly, I can't get php to get the buffering behavior I want with a socket, so
+# we'll open a pipe to a perl process
+#
+$socket = popen("$TBSUEXEC_PATH $uid nobody spewleds $node","r");
+if (!$socket) {
+    USERERROR("Error opening $node - $errstr",1);
 }
+
+#
+# Clean up when the remote user disconnects
+#
+function SPEWCLEANUP()
+{
+    global $socket;
+
+    if (!$socket || !connection_aborted()) {
+	exit();
+    }
+    pclose($socket);
+    exit();
+}
+ignore_user_abort(1);
+register_shutdown_function("SPEWCLEANUP");
+
+#
+# Just loop forver reading from the socket
+#
+while(!feof($socket)) {
+
+    # Bad rob! No biscuit!
+    $onoff = fread($socket,6);
+    echo "$onoff";
+    flush();
+}
+fclose($socket);
 
 ?>

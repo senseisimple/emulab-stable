@@ -72,6 +72,20 @@ $isbatch    = $row["batchmode"];
 $wireless   = $row["wirelesslans"];
 $linktest_running = $row["linktest_pid"];
 
+#
+# Get a list of node types and classes in this experiment
+#
+$query_result =
+    DBQueryFatal("select distinct t.type,t.class from reserved as r " .
+		 "       left join nodes as n on r.node_id=n.node_id ".
+		 "       left join node_types as t on n.type=t.type ".
+		 "where r.eid='$eid' and r.pid='$pid'");
+while ($row = mysql_fetch_array($query_result)) {
+    $classes[$row['class']] = 1;
+    $types[$row['type']] = 1;
+}
+
+
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
@@ -193,6 +207,13 @@ if ($wireless) {
 # History
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
+
+# Blinky lights - but only if they have nodes of the correct type in their
+# experiment
+if ($types['garcia'] || $classes['sg']) {
+    WRITESUBMENUBUTTON("Show Blinky Lights",
+		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid");
+}
 
 if (ISADMIN($uid)) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {

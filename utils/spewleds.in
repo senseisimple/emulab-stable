@@ -1,0 +1,79 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Simple script to connect to the LED status port on a stargate and spew the LED status
+# to stdout
+#
+
+use English;
+use Getopt::Std;
+use IO::Socket;
+
+use lib '@prefix@/lib';
+use libdb;
+
+my $LED_STATUS_PORT = 1812;
+
+# Make output unbuffered
+$| = 1;
+
+#
+# Args
+#
+if (@ARGV != 1) {
+    die "Usage: spewleds mote\n";
+}
+
+my ($mote) = @ARGV;
+
+#
+# Untaint the argument. 
+#
+if ($mote =~ /^([-\w.]+)$/) {
+	$mote = $1;
+} else {
+    die("Tainted node name: $mote");
+}
+
+#
+# Make sure they have permissions to see this node
+#
+if (! TBNodeAccessCheck($UID, TB_NODEACCESS_READINFO, $mote)) {
+    print STDERR
+    "*** osload: Not enough permission to view that node!\n";
+    exit 1;
+}
+
+#
+# Make sure it's a stargate or garcia (XXX garcia should be temporary)
+#
+my ($type, $class) = TBNodeType($mote);
+if ($type ne "garcia" && $class ne "sg") {
+    die "Node $mote is not of the correct type ($type,$class)\n";
+}
+
+#
+# Connect to the LED status port
+#
+my $sock = new IO::Socket::INET (
+                                  PeerAddr => "$mote",
+                                  PeerPort => "$LED_STATUS_PORT",
+                                  Proto => 'tcp',
+                                 );
+die "Could not create socket: $!\n" unless $sock;
+
+#
+# Okie, just loop on this guy forever
+#
+while (my $string = <$sock>) {
+    print "$string"
+}
+
+close $sock;
+exit 0;
