@@ -25,6 +25,15 @@ Windows</a><br>
   </ol>
   <li><a href="#run">Running hypview as a script</a></li>
   <li><a href="#gui">Using the hypview Graphical User Interface</a></li>
+  <ol style="list-style-type: lower-alpha;">
+    <li><a href="#gui">Overview</a></li>
+    <li><a href="#mouse">Mouse: dragging, rotation, and picking</a></li>
+    <li><a href="#node_controls">Control panel: node controls</a></li>
+    <li><a href="#mode_controls">Control panel: mode controls</a></li>
+    <li><a href="#opening">File and Experiment opening</a></li>
+  </ol>
+  <li><a href="#example">An example</a><br>
+  </li>
 </ol>
 <hr style="width: 100%; height: 2px;">
 <h3><a name="intro"></a>Introduction</h3>
@@ -88,10 +97,10 @@ first, and hence scales to 100,000-node graphs.<br>
  title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
 The basic idea is that a graph is presented within a sphere that
 resembles a fish-eye lens: objects in the center of the sphere appear
-full-size, but objects get smaller as they approach the surface of the
+full-sized, but objects get smaller as they approach the surface of the
 sphere.&nbsp; A hyperbolic projection is used, which actually maps an
-infinite 3D space onto the finite sphere.&nbsp; M.C. Escher did
-likewise
+infinite 3D space onto the volume of the finite sphere.&nbsp; M.C.
+Escher did likewise
 in 2D with <a href="http://mathworld.wolfram.com/HyperbolicTiling.html">hyperbolic
 tilings</a>.<br>
 <br>
@@ -486,7 +495,8 @@ in Windows cmd shells.)<br>
 <br>
 <hr style="width: 100%; height: 2px;">
 <h3><a name="gui"></a>Using the hypview Graphical User Interface</h3>
-<span style="font-weight: bold;">Getting out: </span>pick the
+<span style="font-weight: bold;">Getting out: </span>When you want to
+leave <span style="font-weight: bold;">hypview</span>, pick the
 File/Exit menu item, or type Ctrl-Q, or just
 close the
 window.<br>
@@ -513,7 +523,8 @@ yet...</li>
 </div>
 <br>
 </div>
-<br>
+<h4><a name="mouse">Mouse: dragging, rotation, and picking</a></h4>
+<span style="font-weight: bold;"></span>
 <ul style="margin-left: 40px;">
   <li>Pressing the "Help" button, or selecting Help/Usage from the menu
 at
@@ -521,8 +532,10 @@ the top of the window, or typing Ctrl-H, pops up a window describing
 the HyperViewer mouse controls which apply to the left pane:</li>
 </ul>
 <div style="margin-left: 80px;"><img src="mouse_usage.jpg" alt=""
- style="width: 354px; height: 261px;"></div>
-<div style="margin-left: 40px;"><br>
+ style="width: 354px; height: 261px;"><br>
+</div>
+<br>
+<div style="margin-left: 40px;">
 <ul>
   <li><span style="font-weight: bold;">Dragging:</span> One way to
 navigate is to drag the view.&nbsp; Here is a picture
@@ -535,7 +548,7 @@ details to lower levels. <br>
   </li>
 </ul>
 <ul>
-  <li><span style="font-weight: bold;">Rotating: </span>The middle
+  <li><span style="font-weight: bold;">Rotation: </span>The middle
 mouse button (or holding down
 a control or shift key while clicking the left mouse button) rotates
 what is
@@ -558,12 +571,23 @@ lans), they turn bright green.&nbsp; Clicking on a bright green box
 selects it to move to the center of the sphere.&nbsp; Its bright yellow
 color denotes its selected status.&nbsp; So you can walk through a tree
 that way as well.</li>
+  <li>Note: Depending on your OpenGL graphics card driver, after
+dragging in the same direction a few times, you may find the drawing of
+the graph within the sphere becoming "jumpy".&nbsp; This is due to
+accumulating error in the OpenGL viewing matrix.&nbsp; Picking a node
+resets the matrix and fixes the problem.<br>
+  </li>
 </ul>
 <div style="margin-left: 40px;"><a href="gui_top3.jpg"><img align="top"
  style="border: 2px solid ; width: 380px; height: 326px;" alt=""
  src="gui_top_small3.jpg" title="Click for full-size image."></a><br>
 </div>
+</div>
 <br>
+<h4><a name="node_controls"></a>Control panel: node controls<br>
+</h4>
+<div style="margin-left: 40px;">
+<div style="margin-left: 40px;"></div>
 The <span style="font-weight: bold;">control panel</span> at the right
 is divided into two sections.&nbsp; The
 one on the top gives information about the last-selected node, and the
@@ -605,9 +629,10 @@ from the root):<br>
  src="ts600_show_small.jpg" title="Click for full-size image."></a><br>
 <div style="margin-left: 40px;"><br>
 </div>
-<br>
-The <span style="font-weight: bold;">mode controls</span> are still
-changing.&nbsp; There are a lot of modes in
+</div>
+<h4><a name="mode_controls"></a>Control panel: mode controls</h4>
+<div style="margin-left: 40px;">The <span style="font-weight: bold;">mode
+controls</span> are still changing.&nbsp; There are a lot of modes in
 HyperViewer to control the drawing and layout of graphs.&nbsp; (There
 are no layout controls visible yet.)<br>
 <ul>
@@ -628,8 +653,10 @@ working yet.)<br>
 <div style="margin-left: 40px;"><img
  style="width: 211px; height: 275px;" alt="" src="gui_modes.jpg"><br>
 </div>
-<br>
 </div>
+<h4><a name="opening"></a>File and Experiment opening
+<br>
+</h4>
 There is one more dialog panel which pops up when you select the
 <span style="font-weight: bold;">File/Open</span> menu item, or type
 Ctrl-O.&nbsp; You can read a .hyp file, or
@@ -646,7 +673,8 @@ first host if there are no lans.&nbsp; <br>
 <div style="margin-left: 40px;">The root node name may optionally be a <span
  style="font-style: italic;">glob</span> expression, with *, ?, and []
 wildcards.&nbsp; In that case we make up a root node name and put the
-matching nodes under it.<br>
+matching nodes under it.&nbsp; There is an example of why you would
+want to do this below.<br>
 </div>
 <ul>
   <li>Since HyperViewer is set up to load a file, the experiment option
@@ -661,6 +689,87 @@ hyperviewer directory.<br>
 <div style="margin-left: 40px;"><img
  style="width: 416px; height: 327px;" alt="" src="open_dialog.jpg"><br>
 </div>
+<br>
+<hr style="width: 100%; height: 2px;">
+<h4><a name="example"></a>An example</h4>
+Here's an example of exploring a largish Emulab experiment topology
+using <span style="font-weight: bold;">hypview</span>.<br>
+<br>
+<a href="2440-a.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-a_tiny.jpg"></a><br>
+When we first open experiment testbed/2440 (which has 2,611 nodes), the
+view starts at the first node returned from the Emulab experiment
+database, <span style="font-style: italic;">leaf-17-2040-1768.</span>&nbsp;
+The rest of the topology trails off in the distance to the right.<br>
+<br clear="all">
+<a href="2440-a2.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-a2_tiny.jpg"></a><a
+ href="2440-a3.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-a3_tiny.jpg"></a><br>
+Looking to the right (dragging the view to the left), we pass nodes
+named <span style="font-style: italic;">border-17-1949</span> with
+many leaf nodes fanning out from it, and <span
+ style="font-style: italic;">border-17-1937</span> with many other
+border nodes fanning out.&nbsp; Clearly we're climbing up a tree
+branch, although it's upside-down because the HyperViewer spanning tree
+didn't start us at the center.&nbsp; <br>
+<br clear="all">
+<a href="2440-a4.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-a4_tiny.jpg"></a><a
+ href="2440-a5.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-a5_tiny.jpg"></a><br>
+Then we reach a node named <span style="font-style: italic;">interior-16</span>
+which is linked to <span style="font-style: italic;">border-17-1936</span>
+and <span style="font-style: italic;">interior-19.</span>&nbsp; <span
+ style="font-style: italic;">interior-19</span> is linked to other
+interior nodes.&nbsp; This could be a mesh at the middle of the
+tree.&nbsp; (The region we came from is now in the distance in the
+upper left corner.)<br>
+<br clear="all">
+<a href="2440-b.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-b_tiny.jpg"></a><a
+ href="2440-b-links.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-b-links_tiny.jpg"></a><br>
+To see the linkage of the central mesh, we pick node <span
+ style="font-style: italic;">interior-19</span> and click on the "show"
+node control buttons.&nbsp; Now we're seeing the "non-tree links",
+not&nbsp; just the minimal spanning tree, and have learned that the
+names of the nodes in the mesh which is really at the root of the tree
+all start with "interior-".<br>
+<br clear="all">
+<a href="2440-c-interior-root.jpg"><img vspace="5" hspace="10"
+ align="left" style="border: 2px solid ; width: 190px; height: 155px;"
+ alt="" title="Click for full-size image."
+ src="2440-c-interior-root_tiny.jpg"></a><a
+ href="2440-c-interior-root2.jpg"><img vspace="5" hspace="10"
+ align="left" style="border: 2px solid ; width: 190px; height: 155px;"
+ alt="" title="Click for full-size image."
+ src="2440-c-interior-root2_tiny.jpg"></a><br>
+So we open the experiment again, this time giving the optional root
+name with a wildcard asterisk: <span style="font-weight: bold;">interior-*</span>.&nbsp;
+A <span style="font-style: italic;">root</span> node is inserted and
+the interior nodes fanned out from it.<br>
+<br clear="all">
+<a href="2440-c-interior.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-c-interior_tiny.jpg"></a><a
+ href="2440-d-interior.jpg"><img vspace="5" hspace="10" align="left"
+ style="border: 2px solid ; width: 190px; height: 155px;" alt=""
+ title="Click for full-size image." src="2440-d-interior_tiny.jpg"></a><br>
+Now we can see the overall structure of the experiment network.&nbsp;
+Interior nodes fan out from the root, with a pair of upper border nodes
+fanning out from each interior node, and many lower border nodes
+fanning out to the many leaf nodes below.<br>
+<br clear="all">
+<br>
+<hr style="width: 100%; height: 2px;"><br>
 <br>
 </body>
 </html>
