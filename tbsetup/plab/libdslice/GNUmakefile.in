@@ -1,0 +1,51 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= tbsetup/plab/libdslice
+
+include $(OBJDIR)/Makeconf
+
+#
+# Force dependencies to make sure configure regenerates if the .in file
+# is changed.
+# 
+all: 
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+#
+# Generate a list of all the files we want to install from the current
+# directory and the source directory. 
+#
+FILES	= $(wildcard *.py)
+FILES  += $(wildcard $(SRCDIR)/*.py)
+
+DSLICEFILES  = $(wildcard dslice/*.py)
+DSLICEFILES += $(wildcard $(SRCDIR)/dslice/*.py)
+
+HTMLGENFILES  = $(wildcard HTMLgen/*.py)
+HTMLGENFILES += $(wildcard $(SRCDIR)/HTMLgen/*.py)
+
+#
+# Kill the directory part of the names. The vpath rule will do the rest.
+#
+ALLFILES   = $(notdir $(FILES))
+ALLDSLICE  = $(notdir $(DSLICEFILES))
+ALLHTMLGEN = $(notdir $(HTMLGENFILES))
+
+install: $(addprefix $(INSTALL_LIBDIR)/dslice/, $(ALLFILES)) \
+	$(addprefix $(INSTALL_LIBDIR)/dslice/dslice/, $(ALLDSLICE)) \
+	$(addprefix $(INSTALL_LIBDIR)/dslice/HTMLgen/, $(ALLHTMLGEN))
+
+post-install:
+
+
+$(INSTALL_LIBDIR)/dslice/%: %
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(INSTALL) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 

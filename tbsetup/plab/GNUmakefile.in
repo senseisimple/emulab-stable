@@ -1,0 +1,69 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/plab
+UNIFIED         = @UNIFIED_BOSS_AND_OPS@
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS		= libdslice etc
+
+SBIN_STUFF	= plabslice plabnode plabdaemon
+
+LIB_STUFF       = libplab.py
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_STUFF) $(LIB_STUFF) $(SUBDIRS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+.PHONY:	libdslice etc
+libdslice:
+	@$(MAKE) -C libdslice all
+
+etc:
+	@$(MAKE) -C etc all
+
+install: all script-install subdir-install
+
+#
+# Automate this part at some point.
+# 
+subdir-install:
+	@$(MAKE) -C libdslice install
+	@$(MAKE) -C etc install
+
+script-install:	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+
+post-install: 
+	@$(MAKE) -C etc post-install
+	chmod 775 $(INSTALL_SBINDIR)
+	chmod 775 $(INSTALL_LIBDIR)
+	chown root $(INSTALL_SBINDIR)/plabslice
+	chmod u+s $(INSTALL_SBINDIR)/plabslice
+	chown root $(INSTALL_SBINDIR)/plabnode
+	chmod u+s $(INSTALL_SBINDIR)/plabnode
+	chown root $(INSTALL_SBINDIR)/plabdaemon
+	chmod u+s $(INSTALL_SBINDIR)/plabdaemon
+
+clean:	subdir-clean
+
+subdir-clean:
+	@$(MAKE) -C libdslice clean
+	@$(MAKE) -C etc clean
+
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C libdslice distclean
+	@$(MAKE) -C etc distclean

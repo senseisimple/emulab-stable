@@ -1,0 +1,46 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= tbsetup/plab/etc
+UNIFIED         = @UNIFIED_BOSS_AND_OPS@
+
+include $(OBJDIR)/Makeconf
+
+ETC_STUFF       = cacert.pem cert.pem identity identity.pub key.pem \
+		  plabroot.tgz pubkey.pem req.pem
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(ETC_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: all data-install
+
+#
+# Automate this part at some point.
+# 
+data-install:	 $(addprefix $(INSTALL_ETCDIR)/plab/, $(ETC_STUFF))
+
+post-install: 
+	chmod 775 $(INSTALL_ETCDIR)
+	chmod 775 $(INSTALL_ETCDIR)/plab
+	chown root $(INSTALL_ETCDIR)/plab/identity
+	chmod 600 $(INSTALL_ETCDIR)/plab/identity
+	chown root $(INSTALL_ETCDIR)/plab/identity.pub
+	chmod 600 $(INSTALL_ETCDIR)/plab/identity.pub
+
+clean:
+
+$(INSTALL_ETCDIR)/plab/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_ETCDIR)/plab
+	$(INSTALL_DATA) $< $@
