@@ -102,27 +102,7 @@ if (!$confirmed) {
 }
 
 #
-# Pass it off to the script.
-#
-$retval = 0;
-header("Content-Type: text/plain");
-ignore_user_abort(1);
-
-if ($nodemode) {
-    $result = system("$TBSUEXEC_PATH $uid nobody webnodereboot $node_id",
-		     $retval);
-}
-else {
-    $result = system("$TBSUEXEC_PATH $uid nobody webnodereboot -e $pid,$eid",
-		     $retval);
-}
-
-if ($retval) {
-    USERERROR("Reboot failed!", 1);
-}
-
-#
-# And send an audit message.
+# For the audit message.
 #
 TBUserInfo($uid, $uid_name, $uid_email);
 
@@ -136,18 +116,53 @@ else {
     $subject = "Nodes Rebooted: $pid/$eid";
 }
 
+#
+# A cleanup function to keep the child from becoming a zombie, since
+# the script is terminated, but the children are left to roam.
+#
+$fp = 0;
+
+function SPEWCLEANUP()
+{
+    global $fp;
+
+    if (connection_aborted() && $fp) {
+	pclose($fp);
+    }
+    exit();
+}
+register_shutdown_function("SPEWCLEANUP");
+ignore_user_abort(1);
+
+if ($nodemode) {
+    $fp = popen("$TBSUEXEC_PATH $uid nobody webnodereboot -w $node_id",
+		"r");
+}
+else {
+    $fp = popen("$TBSUEXEC_PATH $uid nobody webnodereboot -w -e $pid,$eid",
+		"r");
+}
+if (! $fp) {
+    USERERROR("Reboot failed!", 1);
+}
+
 TBMAIL($TBMAIL_AUDIT,
        $subject, $message,
        "From: $uid_name <$uid_email>\n".
        "Errors-To: $TBMAIL_WWW");
 
-#
-# Spit out a redirect so that the history does not include a post
-# in it. 
-#
-#if ($nodemode)
-#    header("Location: shownode.php3?node_id=$node_id");
-#else
-#    header("Location: showexp.php3?exp_pid=$pid&exp_eid=$eid");
+header("Content-Type: text/plain");
+header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+header("Cache-Control: no-cache, must-revalidate");
+header("Pragma: no-cache");
+flush();
+
+while (!feof($fp)) {
+    $string = fgets($fp, 1024);
+    echo "$string";
+    flush();
+}
+pclose($fp);
+$fp = 0;
 
 ?>
