@@ -109,6 +109,11 @@ if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
 		       "boot.php3?node_id=$node_id");
 }
 
+if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_LOADIMAGE)) {
+    WRITESUBMENUBUTTON("Create a Disk Image",
+		       "newimageid_ez.php3?formfields[node]=$node_id");
+}
+
 if ($isadmin) {
     WRITESUBMENUBUTTON("Show Node Log",
 		       "shownodelog.php3?node_id=$node_id");

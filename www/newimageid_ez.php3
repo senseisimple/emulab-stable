@@ -606,6 +606,16 @@ if (! $submit) {
 	}
 	reset($projlist);
     }
+
+    #
+    # Allow formfields that are already set to override defaults
+    #
+    if (isset($formfields)) {
+	while (list ($field, $value) = each ($formfields)) {
+	    $defaults[$field] = $formfields[$field];
+	}
+    }
+
     
     SPITFORM($defaults, 0);
     PAGEFOOTER();
