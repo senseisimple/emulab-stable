@@ -15,7 +15,8 @@ include $(OBJDIR)/Makeconf
 all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	keys mksig
 
-remote-site:	emulab.pem capture.pem server.pem localnode.pem
+remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
+	localnode.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -84,6 +85,16 @@ capture.pem:	dirsmade capture.cnf ca.cnf
 	cat capture_key.pem capture_cert.pem > capture.pem
 	rm -f newreq.pem
 
+
+#
+# Generate the fingerprint of the capture certificate
+# NOTE: I'd rather use SHA1 than SHA, but we've widely distributed the
+# tiptunnel binary, and it needs SHA
+#
+capture.fingerprint:	capture.pem
+	openssl x509 -sha -noout -fingerprint -in capture.pem \
+	    > capture.fingerprint
+
 localnode.pem:	dirsmade localnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh localnode
 
@@ -147,10 +158,13 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 640 $(INSTALL_ETCDIR)/emulab_privkey.pem
 
 remote-site-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
-		$(INSTALL_ETCDIR)/capture.pem $(INSTALL_ETCDIR)/server.pem
+		$(INSTALL_ETCDIR)/capture.pem \
+		$(INSTALL_ETCDIR)/capture.fingerprint \
+		$(INSTALL_ETCDIR)/server.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
+	chmod 644 $(INSTALL_ETCDIR)/capture.fingerprint
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 

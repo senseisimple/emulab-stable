@@ -43,6 +43,22 @@ if (mysql_num_rows($query_result) == 0) {
   USERERROR("The node $node_id does not exist, or seem to have a tipline!", 1);
 }
 
+#
+# Read in the fingerprint of capture's certificate
+#
+$capfile = "$TBETC_DIR/capture.fingerprint";
+$lines = file($capfile,"r");
+if (!$lines) {
+    TBERROR("Unable to open $capfile!",1);
+}
+
+$fingerline = rtrim($lines[0]);
+if (!preg_match("/Fingerprint=([\w:]+)$/",$fingerline,$matches)) {
+    TBERROR("Unable to find fingerprint in string $fingerline!",1);
+}
+
+$certhash = str_replace(":","",strtolower($matches[1]));
+
 $filename = $node_id . ".tbacl"; 
 
 header("Content-Type: text/x-testbed-acl");
@@ -57,10 +73,6 @@ $server  = $row[server];
 $portnum = $row[portnum];
 $keylen  = $row[keylen];
 $keydata = $row[keydata];
-
-# XXX fix me!!!
-# $certhash = "7161bb44818e7be5a5bcd58506163e1583e6aa1c";
-$certhash = "0bc864551de711a3d46ac173dbd67cde75c36734";
 
 echo "host:   $server\n";	
 echo "port:   $portnum\n";

@@ -6,6 +6,18 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040303:
+	Fixed the way we handle the certificate for capture with tiptunnel.
+	We no longer hard-code the certificate digest in nodetipacl.php3 .
+	However, as a result, we must place this fingerprint in a publically-
+	readable file on boss. So, if you have serial lines that you're
+	running with capture:
+	1) Copy your /usr/testbed/etc/capture.pem file from your tipserver to
+	boss, if it isn't there already.
+	2) In /usr/testbed/etc/ on boss, run: 'openssl x509 -sha -noout
+	-fingerprint -in capture.pem > capture.fingerprint', and make this
+	file world-readable.
+
 20040302:
 	Changed the length of the node_id columns from 10 to 32. Make sure
 	you re-compile and restart all daemons written in C (such as
