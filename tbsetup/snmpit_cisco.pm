@@ -532,10 +532,11 @@ sub findVlan($$;$) {
 
 #
 # Create a VLAN on this switch, with the given identifier (which comes from
-# the database.) Picks its own switch-specific VLAN number to use.
+# the database.) If $vlan_number is given, attempts to use it when creating
+# the vlan - otherwise, picks its own Cisco-specific VLAN number.
 #
-# usage: createVlan($self, $vlan_id [,$private_type [,$private_primary,
-# 		$private_port]])
+# usage: createVlan($self, $vlan_id, $vlan_number, [,$private_type
+# 		[,$private_primary, $private_port]])
 #        returns the new VLAN number on success
 #        returns 0 on failure
 #        if $private_type is given, creates a private VLAN - if private_type
@@ -545,6 +546,7 @@ sub findVlan($$;$) {
 sub createVlan($$;$$$) {
     my $self = shift;
     my $vlan_id = shift;
+    my $vlan_number = shift;
 
     my ($private_type,$private_primary,$private_port);
     if (@_) {
@@ -566,6 +568,16 @@ sub createVlan($$;$$$) {
     my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan # is index
 
     #
+    # If they gave a VLAN number, make sure it exists
+    #
+    if ($vlan_number) {
+	if ($self->vlanNumberExists($vlan_number)) {
+	    print STDERR "ERROR: VLAN $vlan_number already exists\n";
+	    return 0;
+	}
+    }
+    
+    #
     # We may have to do this multiple times - a few times, we've had the
     # Cisco give no errors, but fail to actually create the VLAN. So, we'll
     # make sure it gets created, and retry if it did not. Of course, we don't
@@ -573,7 +585,6 @@ sub createVlan($$;$$$) {
     #
     my $max_tries = 3;
     my $tries_remaining = $max_tries;
-    my $vlan_number;
     while ($tries_remaining) {
 	#
 	# Try to wait out transient failures
@@ -589,27 +600,29 @@ sub createVlan($$;$$$) {
 	    next;
 	}
 
-	#
-	# Find a free VLAN number to use. Since 1 is the default VLAN on
-	# Ciscos, we start with number 2.
-	# XXX: The maximum VLAN number is hardcoded at 1000
-	#
-	$vlan_number = 2; # We need to start at 2
-	my $RetVal = snmpitGetFatal($self->{SESS},
-		[$VlanRowStatus,"1.$vlan_number"]);
-	$self->debug("Row $vlan_number got '$RetVal'\n",2);
-	while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
-	    $vlan_number += 1;
-	    $RetVal = snmpitGetFatal($self->{SESS},
+	if (!$vlan_number) {
+	    #
+	    # Find a free VLAN number to use. Since 1 is the default VLAN on
+	    # Ciscos, we start with number 2.
+	    # XXX: The maximum VLAN number is hardcoded at 1000
+	    #
+	    $vlan_number = 2; # We need to start at 2
+	    my $RetVal = snmpitGetFatal($self->{SESS},
 		[$VlanRowStatus,"1.$vlan_number"]);
 	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
-	}
-	if ($vlan_number > 1000) {
-	    #
-	    # We must have failed to find one
-	    #
-	    print STDERR "ERROR: Failed to find a free VLAN number\n";
-	    next;
+	    while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
+		$vlan_number += 1;
+		$RetVal = snmpitGetFatal($self->{SESS},
+		    [$VlanRowStatus,"1.$vlan_number"]);
+		$self->debug("Row $vlan_number got '$RetVal'\n",2);
+	    }
+	    if ($vlan_number > 1000) {
+		#
+		# We must have failed to find one
+		#
+		print STDERR "ERROR: Failed to find a free VLAN number\n";
+		next;
+	    }
 	}
 
 	$self->debug("Using Row $vlan_number\n");
@@ -626,7 +639,7 @@ sub createVlan($$;$$$) {
 	# Perform the actual creation. Yes, this next line MUST happen all in
 	# one set command....
 	#
-	$RetVal = $self->{SESS}->set([[$VlanRowStatus,"1.$vlan_number",
+	my $RetVal = $self->{SESS}->set([[$VlanRowStatus,"1.$vlan_number",
 			"createAndGo","INTEGER"],
 		[$VlanType,"1.$vlan_number","ethernet","INTEGER"],
 		[$VlanName,"1.$vlan_number",$vlan_id,"OCTETSTR"],

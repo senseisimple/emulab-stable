@@ -894,6 +894,7 @@ CREATE TABLE switch_stack_types (
   stack_id varchar(10) NOT NULL default '',
   stack_type varchar(10) default NULL,
   supports_private tinyint(1) NOT NULL default '0',
+  single_domain tinyint(1) NOT NULL default '1',
   PRIMARY KEY  (stack_id)
 ) TYPE=MyISAM;
 

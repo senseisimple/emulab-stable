@@ -407,7 +407,8 @@ foreach my $command (@commands) {
     #
     my @stacks;
     foreach my $stack_id (keys %stacks) {
-	my ($stack_type, $supports_private) = getStackType($stack_id);
+	my ($stack_type, $supports_private, $single_domain)
+		= getStackType($stack_id);
 	#
 	# Safety check - make sure the stack supports private VLANs if -y was
 	# given
@@ -421,7 +422,7 @@ foreach my $command (@commands) {
 	    /cisco/ && do {
 		require snmpit_cisco_stack;
 		$stack = new snmpit_cisco_stack($stack_id,$debug,$COMMUNITY,
-		    $supports_private, @{$stacks{$stack_id}});
+		    $supports_private, $single_domain, @{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {

@@ -45,6 +45,7 @@ sub new($$$#@) {
     my $debuglevel = shift;
     my $community = shift;
     my $supports_private = shift;
+    my $uses_vtp = shift;
     my @devicenames = @_;
 
     #
@@ -70,6 +71,11 @@ sub new($$$#@) {
     # Store the list of devices we're supposed to operate on
     #
     @{$self->{DEVICENAMES}} = @devicenames;
+
+    #
+    # Whether or not this stack uses VTP to keep the VLANs synchronized
+    #
+    $self->{VTP} = $uses_vtp;
 
     #
     # Make a device-dependant object for each switch
@@ -269,10 +275,40 @@ sub createVlan($$$;$$$) {
     my @otherargs = @_;
 
     #
-    # We just need to create the VLAN on the stack leader
+    # What we do here depends on whether this stack uses VTP to synchronize
+    # VLANs or not
     #
-    my $vlan_number = $self->{LEADER}->createVlan($vlan_id,@otherargs);
-    my $okay = ($vlan_number != 0);
+    my $okay;
+    if ($self->{VTP}) {
+	#
+	# We just need to create the VLAN on the stack leader
+	#
+	#
+	my $vlan_number = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
+	$okay = ($vlan_number != 0);
+    } else {
+	#
+	# We need to create the VLAN on all devices
+	# XXX - should we do the leader first?
+	#
+	my $vlan_number = undef;
+	foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
+	    my $device = $self->{DEVICES}{$devicename};
+	    my $res = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
+	    if (!$res) {
+		#
+		# Ooops, failed. Don't try any more
+		#
+		$okay = 0;
+		last;
+	    } else {
+		#
+		# Use the VLAN number we just got back for the other switches
+		#
+		$vlan_number = $res;
+	    }
+	}
+    }
 
     #
     # We need to add the ports to VLANs at the stack level, since they are
@@ -422,27 +458,39 @@ sub removeVlan($@) {
 	}
 
 	$errors += $device->removePortsFromVlan(@existant_vlans);
+
+	#
+	# If this stack doesn't use VTP, delete the VLAN, too, while
+	# we're at it. If it does, we remove all VLANs down below (we can't
+	# do it until the ports have been cleared from all switches.)
+	#
+	if (!$self->{VTP}) {
+	    my $ok = $device->removeVlan(@existant_vlans);
+	    if (!$ok) { $errors++; }
+	}
     }
 
-    #
-    # For efficiency, we remove all VLANs from the leader in one function
-    # call. This can save a _lot_ of locking and unlocking.
-    #
-    if (!$errors) {
+    if ($self->{VTP}) {
 	#
-	# Make a list of all the VLANs that really did exist
+	# For efficiency, we remove all VLANs from the leader in one function
+	# call. This can save a _lot_ of locking and unlocking.
 	#
-	my @vlan_numbers;
-	my ($key, $value);
-	while (($key, $value) = each %vlan_numbers) {
-	    if ($value) {
-		push @vlan_numbers, $value;
+	if (!$errors) {
+	    #
+	    # Make a list of all the VLANs that really did exist
+	    #
+	    my @vlan_numbers;
+	    my ($key, $value);
+	    while (($key, $value) = each %vlan_numbers) {
+		if ($value) {
+		    push @vlan_numbers, $value;
+		}
 	    }
-	}
 
-	my $ok = $self->{LEADER}->removeVlan(@vlan_numbers);
-	if (!$ok) {
-	    $errors++;
+	    my $ok = $self->{LEADER}->removeVlan(@vlan_numbers);
+	    if (!$ok) {
+		$errors++;
+	    }
 	}
     }
 

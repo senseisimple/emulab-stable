@@ -332,19 +332,20 @@ sub getSwitchStack($) {
 
 #
 # Returns the type of the given stack_id. If called in list context, also
-# returns whether or not the stack supports private VLANs
+# returns whether or not the stack supports private VLANs, and whether it
+# uses a single VLAN domain
 #
 sub getStackType($) {
     my $stack = shift;
-    my $result = DBQueryFatal("SELECT stack_type, supports_private " .
-	"FROM switch_stack_types WHERE stack_id='$stack'");
+    my $result = DBQueryFatal("SELECT stack_type, supports_private, " .
+	" single_domain FROM switch_stack_types WHERE stack_id='$stack'");
     if (!$result->numrows()) {
 	print STDERR "No stack found called $stack\n";
 	return undef;
     } else {
-	my ($stack_type,$supports_private) = ($result->fetchrow());
+	my ($stack_type,$supports_private,$single_domain) = ($result->fetchrow());
 	if (defined wantarray) {
-	    return ($stack_type,$supports_private);
+	    return ($stack_type,$supports_private,$single_domain);
 	} else {
 	    return $stack_type;
 	}
