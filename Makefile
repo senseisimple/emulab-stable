@@ -1,6 +1,6 @@
 # Testbed wide makefile.
 
-SUBDIRS = lib assign discvr tbsetup db os security tmcd
+SUBDIRS = assign capture db discvr lib os pxe security tbsetup tip tmcd www
 
 all:		all-subdirs
 install:	all
