@@ -22,18 +22,21 @@ LIBEXEC_STUFF	= ipassign rcalc
 
 BIN_STUFF	= difference add-x inet2graph brite2graph top2graph routestat
 
-IPASSIGN_OBJECTS = bitmath.o ipassign.o Assigner.o ConservativeAssigner.o \
-                   Framework.o HostRouter.o Router.o \
-		   LanRouter.o NetRouter.o coprocess.o
+IPASSIGN_OBJECTS = Assigner.o ConservativeAssigner.o Framework.o \
+                   HierarchicalAssigner.o NetRouter.o Router.o bitmath.o \
+                   coprocess.o ipassign.o
+
+# LanRouter.o HostRouter.o
 
 ROUTECALC_OBJECTS = routecalc.o
 
 BIN_OBJECTS	= $(addsuffix .o, $(BIN_STUFF))
 
-HEADERS 	= Exception.h lib.h Assigner.h ConservativeAssigner.h \
-                   Framework.h HostRouter.h Router.h \
-		   LanRouter.h NetRouter.h coprocess.h \
-                   bitmath.h
+HEADERS 	= Assigner.h ConservativeAssigner.h Exception.h \
+                  FixedPartition.h Framework.h GraphConverter.h \
+                  HierarchicalAssigner.h NetRouter.h \
+                  PTree.h Partition.h Router.h SearchPartition.h \
+                  SquareRootPartition.h bitmath.h coprocess.h lib.h
 
 #
 # Force dependencies on the scripts so that they will be rerun through

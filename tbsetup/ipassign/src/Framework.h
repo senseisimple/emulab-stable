@@ -46,7 +46,7 @@ private:
     // modules themselves are created according to the specification.
     enum AssignType
     {
-        Conservative, Adaptive, Binary, Greedy
+        Conservative, Adaptive, Binary, Greedy, Hierarchical
     };
     enum PartitionType
     {

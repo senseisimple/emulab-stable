@@ -19,7 +19,8 @@ class FixedPartition : public Partition
 public:
     // The number of partitions is set in the constructor.
     FixedPartition(int newCount = 0)
-        : m_partitionCount(newCount)
+        : m_originalPartitionCount(newCount)
+        , m_partitionCount(newCount)
     {
     }
 
@@ -35,10 +36,14 @@ public:
                            std::vector<int> & weights,
                            std::vector<int> & partitions)
     {
+        m_partitionCount = m_originalPartitionCount;
         partitions.resize(indexes.size() - 1);
         fill(partitions.begin(), partitions.end(), 0);
         Partition::partitionN(m_partitionCount, indexes, neighbors, weights,
                               partitions);
+        m_partitionCount = Partition::makeConnectedGraph(m_partitionCount,
+                                                         indexes, neighbors,
+                                                         weights, partitions);
     }
 
     virtual std::auto_ptr<Partition> clone(void)
@@ -51,6 +56,7 @@ public:
         return m_partitionCount;
     }
 private:
+    int m_originalPartitionCount;
     int m_partitionCount;
 };
 

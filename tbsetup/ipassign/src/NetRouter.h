@@ -12,7 +12,13 @@
 // approximation to get an approximate solution at the next higher level and
 // so on until I reach the top.
 
-// TODO: Change this so that disconnected graphs are accepted.
+// Each partition is a node on a tree. This tree represents the
+// hierarchical relationships between partitions. Each partition has
+// sub-partitions (children) which join together to form that
+// partition. Each partition also has co-partitions (siblings) which,
+// when joined to it form a super-partition (parent). Each partition
+// is made up of LANs which are the quanta of partition.
+
 
 #ifndef NET_ROUTER_H_IP_ASSIGN_2
 #define NET_ROUTER_H_IP_ASSIGN_2
@@ -22,13 +28,28 @@
 class NetRouter : public Router
 {
 public:
+// inherited from ptree::Visitor
+    virtual void visitBranch(ptree::Branch & target);
+    virtual void visitLeaf(ptree::Leaf & target);
+
+// inherited from Router
     NetRouter();
     virtual ~NetRouter();
     virtual std::auto_ptr<Router> clone(void) const;
 
     virtual void calculateRoutes(void);
     virtual void print(std::ostream & output) const;
+    virtual std::auto_ptr<ptree::Node> & getTree(void);
+    virtual std::vector<ptree::LeafLan> & getLans(void);
+    virtual void setHosts(Assigner::NodeLookup & source);
 private:
+    struct Host
+    {
+        Host() : internalHost(false) {}
+        std::vector<size_t> lans;
+        bool internalHost;
+    };
+
     struct RouteInfo
     {
         // The source in RouteInfo is always a host.
@@ -62,52 +83,108 @@ private:
     // calculate the routes on each higher level in turn.
     void setup(void);
 
-    // Is this LAN a border LAN at a particular level? A LAN may be a border
-    // LAN at some level, but be an internal LAN at higher level. At the very
-    // bottom level, each LAN is its own partition and therefore every LAN is
-    // a border LAN.
-    bool isBorderLan(size_t level, size_t lan) const;
+    // Every host is adjascent to a set of LANs. Each LAN belongs to a
+    // Leaf partition. This function calculates the least common
+    // ancestor of all those LANs in the partition hierarchy. This is
+    // used to determine at which point in the hierarchy a host stops
+    // being on some border.
+    void setupLeastCommonAncestors(void);
 
-    // We have a partition on a certain level. That partition is made
-    // up of sub-partitions on the level below. Each sub-partition has
-    // borders to other sub-partitions within the partition. This
-    // method calculates the paths between all-pairs of borders on a
-    // particular sub-partition.
-    void calculateBorderToBorderPaths(size_t level, size_t partition);
-    void calculateNodeToBorderPaths(size_t level, size_t partition);
+    // This is a helper function for setupLeastCommonAncestors(). It
+    // runs a given visitor on the Leaf partition for a particular
+    // LAN.
+    int runParentVisitor(size_t lanIndex, ptree::ParentVisitor & visit);
+
+    // Find out which LANs are on the borders of a particular
+    // partition.  This is defined in terms of LANs and
+    // partitions. See the comment for 'isBorderLan()' below for a
+    // definition of what a border is. obsoleteLans is an output
+    // variable. All of the LANs which were border LANs of the
+    // sub-partitions but are no longer border LANS of the target
+    // partition are put here. subPartitionList is also an output
+    // variable. It yields a list of handles to the sub-partitions of
+    // the target partition (direct children).
+    void calculateBorders(ptree::Branch & target,
+                          std::list<size_t> & obsoleteLans,
+                          std::list<ptree::Node *> & subPartitionList);
+
+    // Given a partition, flag as internal those hosts whose least
+    // common ancestor is that partition.
+    void setInternalHosts(ptree::Node & target);
+
+
+    // Is this LAN a border LAN in a particular partition?  Borders
+    // between partitions are quantified in terms of which LANs from
+    // which partition are adjascent to which LANs of other
+    // partitions. A LAN may be a border LAN in some partition, but be
+    // an internal LAN in a super-partition. At the very bottom of the
+    // partition hierarchy, every Leaf partition contains one and only
+    // one LAN. Therefore, a LAN can be thought of as the quanta of
+    // the partition space.
+    bool isBorderLan(ptree::LeafLan & currentLan) const;
+
+    // Calculate the shortest-path between all-pairs of vertices on a
+    // graph. The vertices of this graph are the border LANs of the
+    // sub-partitions of a given partition. Think of the partition as
+    // a boundary on the size of the algorithm and the sub-partitions
+    // inside the partition as what we are actually interested in
+    // thinking about.
+    void calculateBorderToBorderPaths(ptree::Node & target,
+                                      list<size_t> const & obsoleteLans);
+
+    void calculateNodeToBorderPaths(ptree::Node & target,
+                                    list<ptree::Node *> & subPartitionList);
     void findNodeToBorder(NodeBorderMap::iterator searchPos,
                           NodeBorderMap::iterator searchLimit,
-                          size_t sourceNode, size_t newPartition,
+                          size_t sourceNode, ptree::Node & superPartition,
                           size_t destinationLan);
-    void calculateBorders(size_t level, size_t partition,
-                          std::list<size_t> & obsoleteLans);
-    void calculatePartitionRoutes(size_t level, size_t partition);
+    void calculatePartitionRoutes(ptree::Node & target,
+                                  list<ptree::Node *> & subPartitionList);
+
     void findRouteToPartition(NodeBorderMap::iterator searchPos,
                               NodeBorderMap::iterator searchLimit,
-                              size_t sourceNode, size_t sourcePartition,
-                              size_t destPartition, size_t level);
+                              size_t sourceNode,
+                              ptree::Node * sourcePartition,
+                              ptree::Node * destPartition);
+
     // given a list of LANs which we no longer care about, remove all
     // connections that involve them from the ConnectionMap.
-    void removeObsoleteConnections(std::list<size_t> const & obsoleteLans);
+    void cleanupBorderLans(list<size_t> const & obsoleteLans,
+                           list<ptree::Node *> const & subPartitionList);
     void calculateInterBorders(void);
+
 private:
+    // The structure to hold all the data we need is public so that the
+    // Visitors can all be passed a handle to it if they need to look at it
+    // or change it.
+    std::auto_ptr<ptree::Node> tree;
+    std::vector<ptree::LeafLan> lans;
+    std::vector<Host> hosts;
+
     // partition< borderList >
-    std::vector< std::vector<size_t> > oldBorderLans;
-    std::vector< std::vector<size_t> > newBorderLans;
+/*    std::vector< std::vector<size_t> > oldBorderLans;
+      std::vector< std::vector<size_t> > newBorderLans;*/
+    // The pointer represents the partition to which these borderLans belong
+    // The vector is the border LANs which belong to that partition
+    std::map<ptree::Node *, std::vector<size_t> > borderLans;
 
     // route from each node to each border LAN in its partition.
     // Contains all that we
     // need to route to that border.
     // Each element in the vector is the border routing for a
     // partition
-    std::vector<NodeBorderMap> oldNodeToBorder;
-    std::vector<NodeBorderMap> newNodeToBorder;
+//        std::vector<NodeBorderMap> oldNodeToBorder;
+//        std::vector<NodeBorderMap> newNodeToBorder;
+    std::map<ptree::Node *, NodeBorderMap> nodeToBorder;
 
-    std::vector<size_t> lanToPartition;
+//        std::vector<size_t> lanToPartition;
 
     // in each level, for each node, there are partitions that we route
     // to directly.
-    std::vector< std::vector< std::map<size_t, RouteInfo> > > nodeToPartition;
+//        std::vector< std::vector< std::map<size_t, RouteInfo> > > nodeToPartition;
+
+    // Every node has a set of partitions which it routes to directly.
+    std::vector< std::map<ptree::Node *, RouteInfo> > nodeToPartition;
 
     // lanLanNode data structure takes two Lans and returns the node which
     // connects them. If there are more than one nodes connecting the LANs,

@@ -42,63 +42,23 @@ public:
 
         for (int i = 2; i < limit; ++i)
         {
-            Partition::partitionN(i, indexes, neighbors, weights, current);
-            currentScore = score(i, indexes, neighbors, current);
+            int partitionCount = i;
+            Partition::partitionN(partitionCount, indexes, neighbors, weights,
+                                  current);
+            currentScore = score(partitionCount, indexes, neighbors, current);
+            partitionCount = Partition::makeConnectedGraph(partitionCount,
+                                                           indexes, neighbors,
+                                                           weights,
+                                                           current);
             if (currentScore < bestScore)
             {
-                bestCount = i;
+                bestCount = partitionCount;
                 bestScore = currentScore;
                 partitions = current;
-                cerr << "NewBest: " << i << endl;
+                cerr << "NewBest: " << i << ":" << partitionCount << endl;
             }
         }
         m_finalCount = bestCount;
-
-/*        int lowerCount = 1;
-        std::vector<int> lowerPartitions = partitions;
-        long long lowerScore = cube(indexes.size() - 1);
-        int upperCount = static_cast<int>(sqrt(m_lanCount));
-        // This way we have a 50% chance of not having to do a copy at the end
-        std::vector<int> & upperPartitions = partitions;
-        Partition::partitionN(upperCount, indexes, neighbors, weights,
-                              upperPartitions);
-        long long upperScore = score(upperCount, indexes, neighbors,
-                               upperPartitions);
-        int middleCount = ((upperCount - lowerCount)/2) + lowerCount;
-
-        while (middleCount != upperCount && middleCount != lowerCount)
-        {
-            cerr << "Upper: count " << upperCount << " score " << upperScore << endl;
-            cerr << "Lower: count " << lowerCount << " score " << lowerScore << endl;
-            if (lowerScore < upperScore)
-            {
-                // Replace upper with the middle
-                upperCount = middleCount;
-                Partition::partitionN(upperCount, indexes, neighbors, weights,
-                                      upperPartitions);
-                upperScore = score(upperCount, indexes, neighbors,
-                                   upperPartitions);
-            }
-            else
-            {
-                // Replace lower with the middle
-                lowerCount = middleCount;
-                Partition::partitionN(lowerCount, indexes, neighbors, weights,
-                                      lowerPartitions);
-                lowerScore = score(lowerCount, indexes, neighbors,
-                                   lowerPartitions);
-            }
-            middleCount = ((upperCount - lowerCount)/2) + lowerCount;
-        }
-        if (lowerScore < upperScore)
-        {
-            partitions = lowerPartitions;
-            m_finalCount = lowerCount;
-        }
-        else
-        {
-            m_finalCount = upperCount;
-            }*/
     }
 
     long long score(int partitionCount,

@@ -17,6 +17,7 @@
 #ifndef ASSIGNER_H_IP_ASSIGN_2
 #define ASSIGNER_H_IP_ASSIGN_2
 
+#include "PTree.h"
 #include "Partition.h"
 
 class Assigner
@@ -72,23 +73,53 @@ public:
 
     // This is called repeatedly to form the graph. Raw parsing
     // of the command line is done outside.
-    virtual void addLan(int, int, std::vector<size_t>)=0;
+    virtual void addLan(int bits, int weight, std::vector<size_t> nodes)=0;
 
     // The main processing function. After the graph has been populated,
     // assign IP addresses to the nodes.
     virtual void ipAssign(void)=0;
 
     // Output the network and associated IP addresses to the specified stream.
-    virtual void print(std::ostream &) const=0;
+    virtual void print(std::ostream & output) const=0;
+
+    virtual void getGraph(std::auto_ptr<ptree::Node> & tree,
+                          std::vector<ptree::LeafLan> & lans)=0;
+
+    virtual NodeLookup & getHosts(void)=0;
+
+/* TODO: Remove this when the changes are debugged
 
     // Populate the argument vectors with our state so that routes can
-    // be calculated.
-    // for the explanation of these arguments, see Router.h
+    // be calculated.  For the explanation of these arguments, see
+    // Router.h
     virtual void graph(std::vector<NodeLookup> & nodeToLevel,
                        std::vector<MaskTable> & levelMaskSize,
                        std::vector<PrefixTable> & levelPrefix,
                        std::vector<LevelLookup> & levelMakeup,
                        std::vector<int> & lanWeights) const=0;
+
+*/
+
+public:
+    struct Lan
+    {
+        Lan()
+            : weight(0), partition(0), number(0), ip(0)
+        {
+        }
+        // The partition number associated with this LAN. This is the index
+        // of the LAN in m_lanList. Not to be confused with 'partition'.
+        size_t number;
+        // The weight of this LAN.
+        int weight;
+        // The partition number of the super-partition this LAN is a part of.
+        int partition;
+        // The IP Address prefix that this LAN provides. Note that with
+        // conservative IP assignment, every LAN has the same netmask.
+        IPAddress ip;
+        // The list of nodes which have interfaces in this LAN.
+        std::vector<size_t> nodes;
+    };
 private:
 };
 

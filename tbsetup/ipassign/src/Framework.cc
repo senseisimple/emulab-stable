@@ -11,9 +11,10 @@
 #include "Framework.h"
 #include "Assigner.h"
 #include "ConservativeAssigner.h"
+#include "HierarchicalAssigner.h"
 #include "Router.h"
-#include "HostRouter.h"
-#include "LanRouter.h"
+//#include "HostRouter.h"
+//#include "LanRouter.h"
 #include "NetRouter.h"
 #include "Partition.h"
 #include "FixedPartition.h"
@@ -139,7 +140,8 @@ void Framework::ipAssign(void)
 
 void Framework::route(void)
 {
-    m_route->reset(*m_assign);
+    m_assign->getGraph(m_route->getTree(), m_route->getLans());
+    m_route->setHosts(m_assign->getHosts());
     m_route->calculateRoutes();
 }
 
@@ -155,7 +157,7 @@ void Framework::printRoute(ostream & output) const
 
 void Framework::parseCommandLine(int argCount, char ** argArray)
 {
-    AssignType assignChoice = Conservative;
+    AssignType assignChoice = Hierarchical;
     RouteType routeChoice = HostNet;
     m_partition.reset(new SquareRootPartition());
     for (int i = 1; i < argCount; ++i)
@@ -175,6 +177,9 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
     case Conservative:
         m_assign.reset(new ConservativeAssigner(*m_partition));
         break;
+    case Hierarchical:
+        m_assign.reset(new HierarchicalAssigner(*m_partition));
+        break;
 /*    case Binary:
         m_assign.reset(new BinaryAssigner(*m_partition));
         break;
@@ -189,10 +194,10 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
     switch (routeChoice)
     {
     case HostHost:
-        m_route.reset(new HostRouter());
+//        m_route.reset(new HostRouter());
         break;
     case HostLan:
-        m_route.reset(new LanRouter());
+//        m_route.reset(new LanRouter());
         break;
     case HostNet:
         m_route.reset(new NetRouter());

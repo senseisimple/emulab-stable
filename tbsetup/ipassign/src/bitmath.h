@@ -54,4 +54,6 @@ int countToBlockBit(unsigned int count);
 // Cannot throw
 unsigned int blockBitToBlock(int blockBit);
 
+IPAddress maskSizeToMask(int maskSize);
+
 #endif

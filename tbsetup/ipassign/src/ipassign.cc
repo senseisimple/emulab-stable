@@ -35,8 +35,8 @@ int main(int argc, char * argv[])
         Framework frame(argc, argv);
         frame.input(cin);
         frame.ipAssign();
-        frame.route();
         frame.printIP(std::cout);
+        frame.route();
         frame.printRoute(std::cout);
     }
     catch (InvalidArgumentException const & error)

@@ -17,26 +17,6 @@
 
 class ConservativeAssigner : public Assigner
 {
-private:
-    struct Lan
-    {
-        Lan()
-            : weight(0), partition(0), number(0), ip(0)
-        {
-        }
-        // The partition number associated with this LAN. This is the index
-        // of the LAN in m_lanList. Not to be confused with 'partition'.
-        size_t number;
-        // The weight of this LAN.
-        int weight;
-        // The partition number of the super-partition this LAN is a part of.
-        int partition;
-        // The IP Address prefix that this LAN provides. Note that with
-        // conservative IP assignment, every LAN has the same netmask.
-        IPAddress ip;
-        // The list of nodes which have interfaces in this LAN.
-        std::vector<size_t> nodes;
-    };
 public:
     ConservativeAssigner(Partition & newPartition);
     virtual ~ConservativeAssigner();
@@ -49,12 +29,29 @@ public:
     virtual void addLan(int bits, int weight, std::vector<size_t> nodes);
     virtual void ipAssign(void);
     virtual void print(std::ostream & output) const;
+
+    virtual void getGraph(std::auto_ptr<ptree::Node> & tree,
+                          std::vector<ptree::LeafLan> & lans);
+    virtual NodeLookup & getHosts(void);
+
+/* TODO: Remove this when changes are debugged
     virtual void graph(std::vector<NodeLookup> & nodeToLevel,
                        std::vector<MaskTable> & levelMaskSize,
                        std::vector<PrefixTable> & levelPrefix,
                        std::vector<LevelLookup> & levelMakeup,
                        std::vector<int> & lanWeights) const;
+
+*/
+
 private:
+    void populateSuperPartitionTree(size_t superPartition,
+                                    ptree::Branch * tree,
+                                    std::vector<ptree::LeafLan> & outLan);
+
+    void populatePartitionTree(size_t partition,
+                               ptree::Branch * tree,
+                               std::vector<ptree::LeafLan> & outLan);
+/*
     // populate arguments with the METIS graph format
     void convert(std::vector<int> & indexes, std::vector<int> & neighbors,
                  std::vector<int> & weights) const;
@@ -68,6 +65,9 @@ private:
     void convertAddNode(Lan const & info, int currentNode,
                         std::vector<int> & neighbors,
                         std::vector<int> & weights) const;
+
+*/
+
     // Given a number, how many bits are required to represent up to and
     // including that number?
     static int getBits(int num);
@@ -119,4 +119,5 @@ private:
 };
 
 #endif
+
 

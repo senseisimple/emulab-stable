@@ -14,15 +14,17 @@ using namespace std;
 Router::~Router()
 {
 }
-
+/*
 void Router::reset(Assigner const & newAssign)
 {
     newAssign.graph(m_nodeToLevel, m_levelMaskSize, m_levelPrefix,
                     m_levelMakeup, m_lanWeights);
 }
-
+*/
 bool Router::isValidNode(size_t node) const
 {
+    return true;
+/*
     if (node < m_nodeToLevel[0].size())
     {
         // [0] is the LAN level and [node] is which LAN that node belongs to.
@@ -31,5 +33,5 @@ bool Router::isValidNode(size_t node) const
     else
     {
         return false;
-    }
+        }*/
 }

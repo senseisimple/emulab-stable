@@ -10,6 +10,7 @@
 #include "Exception.h"
 #include "ConservativeAssigner.h"
 #include "bitmath.h"
+#include "GraphConverter.h"
 
 using namespace std;
 
@@ -62,50 +63,107 @@ void ConservativeAssigner::addLan(int bits, int weight, vector<size_t> nodes)
     }
 }
 
+namespace
+{
+    // This is an adapter which presents data to the graph converter algorithm
+    // This is constructed in accordance with the specification for
+    // the GraphData representation. See GraphConverter.h
+    class ConservativeGraphData
+    {
+    public:
+        typedef std::vector<Assigner::Lan>::const_iterator LanIterator;
+        typedef std::vector<size_t>::const_iterator HostInsideLanIterator;
+        typedef std::vector<size_t>::const_iterator LanInsideHostIterator;
+    public:
+        ConservativeGraphData(std::vector<Assigner::Lan> const & newLans,
+                              Assigner::NodeLookup const & newHosts)
+            : lans(newLans)
+            , hosts(newHosts)
+        {
+        }
+
+        ~ConservativeGraphData()
+        {
+        }
+
+        LanIterator getLanBegin(void)
+        {
+            return lans.begin();
+        }
+
+        LanIterator getLanEnd(void)
+        {
+            return lans.end();
+        }
+
+        int getLanNumber(LanIterator & currentLan)
+        {
+            return static_cast<int>(currentLan->number);
+        }
+
+        int getLanNumber(LanInsideHostIterator & currentLan)
+        {
+            return static_cast<int>(lans[*currentLan].number);
+        }
+
+        int getLanWeight(LanIterator & currentLan)
+        {
+            return currentLan->weight;
+        }
+
+        int getLanWeight(LanInsideHostIterator & currentLan)
+        {
+            return static_cast<int>(lans[*currentLan].weight);
+        }
+
+        HostInsideLanIterator getHostInsideLanBegin(LanIterator & currentLan)
+        {
+            return currentLan->nodes.begin();
+        }
+
+        HostInsideLanIterator getHostInsideLanEnd(LanIterator & currentLan)
+        {
+            return currentLan->nodes.end();
+        }
+
+        LanInsideHostIterator getLanInsideHostBegin(
+                                           HostInsideLanIterator & currentHost)
+        {
+            return hosts[*currentHost].begin();
+        }
+
+        LanInsideHostIterator getLanInsideHostEnd(
+                                           HostInsideLanIterator & currentHost)
+        {
+            return hosts[*currentHost].end();
+        }
+    private:
+        ConservativeGraphData(ConservativeGraphData const &);
+        ConservativeGraphData & operator=(ConservativeGraphData const &)
+            { return *this; }
+    private:
+        std::vector<Assigner::Lan> const & lans;
+        Assigner::NodeLookup const & hosts;
+    };
+}
+
 void ConservativeAssigner::ipAssign(void)
 {
     // These hold a METIS-ready conversion of the LAN-graph data.
     std::vector<int> partitionArray;
-    std::vector<int> graphIndexArray;
-    std::vector<int> graphNeighborArray;
-    std::vector<int> weightArray;
 
     // convert to METIS graph
-    convert(graphIndexArray, graphNeighborArray, weightArray);
+    ConservativeGraphData convertGraphData(m_lanList, m_nodeToLan);
+    GraphConverter<ConservativeGraphData, ConservativeGraphData::LanIterator,
+                   ConservativeGraphData::HostInsideLanIterator,
+                   ConservativeGraphData::LanInsideHostIterator>
+        convert;
+    convert.reset(convertGraphData);
 
     // partition the graph
-    m_partition->partition(graphIndexArray, graphNeighborArray, weightArray,
-                          partitionArray);
+    m_partition->partition(convert.getIndexes(), convert.getNeighbors(),
+                           convert.getWeights(), partitionArray);
     m_partitionCount = m_partition->getPartitionCount();
-
-// This is the code for calling METIS and changing its tolerances.
-/*    if (numPartitions > 1)
-    {
-        int numConstraints = 2;
-        weightOption = 1;
-        vector<int> vertexWeights;
-        vertexWeights.resize(numConstraints*numVertices);
-        fill(vertexWeights.begin(), vertexWeights.end(), 1);
-        vector<float> tolerances;
-        tolerances.resize(numConstraints);
-        fill(tolerances.begin(), tolerances.end(), static_cast<float>(1.5));
-        options[0] = 0;
-        METIS_mCPartGraphKway(
-            &numVertices,              // # of vertices in graph
-            &numConstraints,           // Number of constraints
-            &(graphIndexArray[0]),     // xadj
-            &(graphNeighborArray[0]),  // adjncy
-            &(vertexWeights[0]),       // vertex weights
-            &(weightArray[0]),         // edge weights
-            &weightOption,             // Weights on edges only
-            &indexOption,              // 0-based index
-            &numPartitions,
-            &(tolerances[0]),
-            options,                   // set options to nonrandom
-            &edgesCut,                 // return the # of edges cut
-            &(partitionArray[0]));     // return the partition of each vertex
-    }
-*/
 
     // Each number in the partitions vector is the partition that
     // the associated Lan in m_lanList belongs too.
@@ -118,6 +176,8 @@ void ConservativeAssigner::ipAssign(void)
         pos->partition = *partPos;
     }
 
+
+/* TODO: Remove this once the new code has been debugged
     // If there are disconnected partitions, turn them into different
     // partitions.
     // m_partitionCount may increase during this loop
@@ -131,6 +191,8 @@ void ConservativeAssigner::ipAssign(void)
         makeConnected(loop);
         ++loop;
     }
+
+*/
 
     // Calculate the list of super-partitions. These are the
     // fully-connected subgraphs in the possibly disconnected
@@ -178,6 +240,103 @@ void ConservativeAssigner::print(ostream & output) const
         }
     }
 }
+
+void ConservativeAssigner::getGraph(auto_ptr<ptree::Node> & tree,
+                                    vector<ptree::LeafLan> & lans)
+{
+    using namespace ptree;
+    auto_ptr<Branch> newBranch;
+
+    // outLan is an output reference. We reset it before we do anything else.
+    lans.clear();
+    lans.resize(m_lanList.size());
+
+    // This auto_ptr represents the entire tree. There is always at least
+    // one super-partition.
+    newBranch.reset(new Branch());
+    populateSuperPartitionTree(0, newBranch.get(), lans);
+    tree.reset(newBranch.release());
+
+    // If there are any other superPartitions, add them as siblings and
+    // populate their trees as well.
+    for (size_t i = 1; i < m_superPartitionList.size(); ++i)
+    {
+        // Create a new top-level branch.
+        newBranch.reset(new Branch());
+        populateSuperPartitionTree(i, newBranch.get(), lans);
+
+        // Top-level partitions do not route to one another. They represent
+        // sub-graphs. which are disconnected from one another. Therefore
+        // the routing information about such domains doesn't matter.
+        // Nonetheless, we set the information to a sane state.
+        newBranch->setNetworkEntry(prefix, prefixBits);
+
+        // Add the current partition to the tree as a sibling of the original
+        // tree.
+        auto_ptr<ptree::Node> tempAutoPtr(newBranch.release());
+        tree->addSibling(tempAutoPtr);
+    }
+}
+
+void ConservativeAssigner::populateSuperPartitionTree(size_t superPartition,
+                                                      ptree::Branch * tree,
+                                               vector<ptree::LeafLan> & outLan)
+{
+    using namespace ptree;
+
+    if (   superPartition < m_superPartitionList.size()
+        && superPartition >= 0 && tree != NULL)
+    {
+        for (size_t i = 0; i < m_superPartitionList[superPartition].size();
+             ++i)
+        {
+            auto_ptr<Branch> newBranch(new Branch());
+            newBranch->setParent(tree);
+            size_t partition = m_superPartitionList[superPartition][i];
+            populatePartitionTree(partition, newBranch.get(), outLan);
+            newBranch->setNetworkEntry(m_partitionIPList[partition],
+                                       m_netMaskSize);
+            auto_ptr<ptree::Node> tempAutoPtr(newBranch.release());
+            tree->addChild(tempAutoPtr);
+        }
+    }
+}
+
+void ConservativeAssigner::populatePartitionTree(size_t partition,
+                                                 ptree::Branch * tree,
+                                               vector<ptree::LeafLan> & outLan)
+{
+    using namespace ptree;
+
+    cerr << "Partition: " << partition << endl;
+
+    if (partition < m_partitionCount && partition >= 0 && tree != NULL)
+    {
+        for (size_t i = 0; i < m_lanList.size(); ++i)
+        {
+            if (m_lanList[i].partition == partition)
+            {
+                auto_ptr<Leaf> newLeaf(new Leaf());
+                newLeaf->setParent(tree);
+                newLeaf->setLanIndex(i);
+                newLeaf->setNetworkEntry(m_lanList[i].ip, m_lanMaskSize);
+                outLan[i].number = m_lanList[i].number;
+                outLan[i].weight = m_lanList[i].weight;
+                outLan[i].partition = newLeaf.get();
+                outLan[i].hosts = m_lanList[i].nodes;
+                auto_ptr<ptree::Node> tempAutoPtr(newLeaf.release());
+                tree->addChild(tempAutoPtr);
+            }
+        }
+    }
+}
+
+Assigner::NodeLookup & ConservativeAssigner::getHosts(void)
+{
+    return m_nodeToLan;
+}
+
+/* TODO: Remove this when changes are debugged
 
 void ConservativeAssigner::graph(vector<Assigner::NodeLookup> & nodeToLevel,
                            vector<Assigner::MaskTable> & levelMaskSize,
@@ -279,10 +438,16 @@ void ConservativeAssigner::graph(vector<Assigner::NodeLookup> & nodeToLevel,
     }
 }
 
+*/
+
+/*
+
 void ConservativeAssigner::convert(std::vector<int> & indexes,
                                    std::vector<int> & neighbors,
                                    std::vector<int> & weights) const
 {
+
+
     // ensure that there is no garbage in the output references.
     indexes.clear();
     neighbors.clear();
@@ -331,6 +496,8 @@ void ConservativeAssigner::convertAddNode(Lan const & info, int currentNode,
         }
     }
 }
+
+*/
 
 int ConservativeAssigner::getBits(int num)
 {
@@ -482,6 +649,8 @@ bool ConservativeAssigner::isConnected(int whichPartition)
     return num == numInPartition;
 }
 
+/* TODO: Remove this when new code is debugged.
+
 void ConservativeAssigner::makeConnected(int whichPartition)
 {
     // breadth first search.
@@ -551,6 +720,9 @@ void ConservativeAssigner::makeConnected(int whichPartition)
         ++m_partitionCount;
     }
 }
+
+*/
+
 namespace
 {
     enum TouchedT
@@ -641,3 +813,5 @@ void ConservativeAssigner::calculateSuperPartitions(void)
         }
     }
 }
+
+

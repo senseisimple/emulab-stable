@@ -95,6 +95,10 @@ unsigned int blockBitToBlock(int blockBit)
     }
 }
 
+IPAddress maskSizeToMask(int maskSize)
+{
+    return 0xFFFFFFFF << (32 - maskSize);
+}
 
 
 

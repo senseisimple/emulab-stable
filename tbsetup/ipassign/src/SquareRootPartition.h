@@ -35,6 +35,9 @@ public:
         m_partitionCount = static_cast<int>(sqrt(m_lanCount));
         Partition::partitionN(m_partitionCount, indexes, neighbors, weights,
                               partitions);
+        m_partitionCount = Partition::makeConnectedGraph(m_partitionCount,
+                                                         indexes, neighbors,
+                                                         weights, partitions);
     }
 
     virtual std::auto_ptr<Partition> clone(void)
