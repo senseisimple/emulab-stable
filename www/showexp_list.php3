@@ -30,15 +30,45 @@ if (! isset($sortby))
 if (! isset($thumb)) 
     $thumb = 0;
 
-echo "<b>Show:
-         <a href='showexp_list.php3?showtype=active&sortby=$sortby&thumb=$thumb'>active</a>,
-         <a href='showexp_list.php3?showtype=batch&sortby=$sortby&thumb=$thumb'>batch</a>,";
-if ($isadmin) 
-     echo "\n<a href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb'".
-       ">idle</a>,";
+echo "<b>Show: ";
 
-echo "\n       <a href='showexp_list.php3?showtype=all&sortby=$sortby&thumb=$thumb'>all</a>.
-      </b><br />\n";
+if ($showtype != "active") {
+    echo "<a class='static' href='showexp_list.php3?showtype=active&sortby=$sortby&thumb=$thumb'>Active</a>, ";
+} else {
+    echo "Active, ";
+}
+
+if ($showtype != "batch") {
+    echo "<a class='static' href='showexp_list.php3?showtype=batch&sortby=$sortby&thumb=$thumb'>Batch</a>, ";
+} else {
+    echo "Batch, ";
+}
+
+if ($isadmin) {
+    if ($showtype != "idle") {
+	echo "<a class='static' href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb'>Idle</a>, ";
+    } else {
+	echo "Idle, ";
+    }
+}
+
+if ($showtype != "all") {
+    echo "<a class='static' href='showexp_list.php3?showtype=all&sortby=$sortby&thumb=$thumb'>All</a>";
+} else {
+    echo "All";
+}
+
+echo "</b><br />\n";
+
+#echo "<b>Show:
+#         <a class='static' href='showexp_list.php3?showtype=active&sortby=$sortby&thumb=$thumb'>active</a>,
+#         <a class='static' href='showexp_list.php3?showtype=batch&sortby=$sortby&thumb=$thumb'>batch</a>,";
+#if ($isadmin) 
+#     echo "\n<a class='static' href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb'".
+#       ">idle</a>,";
+#
+#echo "\n       <a class='static' href='showexp_list.php3?showtype=all&sortby=$sortby&thumb=$thumb'>all</a>.
+#      </b><br />\n";
 
 
 #
@@ -78,7 +108,7 @@ if (!$idle) {
     echo "<b>View: ";
 
     if ($thumb != 0) {
-	echo "<a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=0'>";
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=0'>";
 	echo "List";
         echo "</a>";
     } else {
@@ -87,7 +117,7 @@ if (!$idle) {
     echo ", ";
 
     if ($thumb != 1) {
-	echo "<a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=1'>";
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=1'>";
 	echo "Detailed Thumbnails";
         echo "</a>";
     } else {
@@ -96,20 +126,61 @@ if (!$idle) {
     echo ", ";
 
     if ($thumb != 2) {
-	echo "<a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=2'>";
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=2'>";
 	echo "Brief Thumbnails";
         echo "</a>";
     } else {
         echo "Brief Thumbnails";
     }
     echo "</b><br />\n";
+
+if ($thumb && !$idle) {
+    echo "<b>Sort by: ";
+    if (isset($sortby) && $sortby != "normal" && $sortby != "pid") {
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=$thumb'>";
+	echo "Project";
+        echo "</a>, ";
+    } else {
+        echo "Project, ";
+    }	
+    if ($sortby != "eid") {
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=eid&thumb=$thumb'>";
+	echo "Experiment ID";
+        echo "</a>, ";
+    } else {
+        echo "Experiment ID, ";
+    }
+    if ($sortby != "pcs") {
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs&thumb=$thumb'>";
+	echo "Node Usage";
+        echo "</a>, ";
+    } else {
+        echo "Node Usage, ";
+    }	
+    if ($sortby != "name") {
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name&thumb=$thumb'>";
+	echo "Experiment Description";
+        echo "</a>, ";
+    } else {
+        echo "Experiment Description, ";
+    }	
+    if ($sortby != "uid") {
+	echo "<a class='static' href='showexp_list.php3?showtype=$showtype&sortby=uid&thumb=$thumb'>";
+	echo "Creator";
+        echo "</a>";
+    } else {
+        echo "Creator";
+    }
+
+    echo "</b><br />\n";
+}
  
 #    if (!$thumb) {
-#	echo "<b><a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=1'>".
+#	echo "<b><a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=1'>".
 #             "Switch to Thumbnail view".
 #	     "</a></b><br />";
 #    } else {
-#	echo "<b><a href='showexp_list.php3?showtype=$showtype&sortby=pid&thumb=0'>".
+#	echo "<b><a class='static' href='showexp_list.php3?showtype=$showtype&sortby=$sortby&thumb=0'>".
 #             "Switch to List view".
 #	     "</a></b><br />";
 #    }
@@ -130,7 +201,7 @@ elseif (! strcmp($sortby, "uid"))
 elseif (! strcmp($sortby, "name"))
     $order = "e.expt_name";
 elseif (! strcmp($sortby, "pcs"))
-    $order = "ncount DESC";
+    $order = "ncount DESC,e.pid,e.eid";
 else 
     $order = "e.pid,e.eid";
 
@@ -262,7 +333,6 @@ if (mysql_num_rows($experiments_result)) {
     # Now shove out the column headers.
     #
 if ($thumb && !$idle) {
-
     if ($thumb == 2) {
 	echo "<table border=2 cols=4 cellpadding=2 cellspacing=2 align=center><tr>";
     } else {
@@ -325,7 +395,6 @@ if ($thumb && !$idle) {
 	         "<b><font size=-1>$name</font></b>".
                  "<br />\n";
 
-	# echo "<font size=-2>Using 69 PCs</font>\n";
 
 	    if ($isadmin) {
 		$swappable= $row["swappable"];
@@ -352,6 +421,28 @@ if ($thumb && !$idle) {
 		 "<a href='showuser.php3?target_uid=$huid'>$huid</a>".
 		 "</font><br />\n";
 
+	    $special = 0;
+	    $pcs     = 0;
+	    reset($perexp_usage);
+	    if (isset($perexp_usage["$pid:$eid"])) {
+		while (list ($class, $count) = each($perexp_usage["$pid:$eid"])) {
+		    if (strcmp($class, "pc")) {
+			$special += $count;
+		    } else {
+			$pcs += $count;
+		    }
+		}
+	    }
+
+	    if ($pcs) {
+		if ($pcs == 1) { $plural = ""; } else { $plural = "s"; }  
+		echo "<font size=-1><b>Using <font color=red>$pcs PC</font> Node$plural</b></font><br />\n";
+	    }
+	    if ($special) {
+		if ($special == 1) { $plural = ""; } else { $plural = "s"; }  
+		echo "<font size=-1><b>Using <font color=red>$special Special</font> Node$plural</b></font><br />\n";
+	    }
+
 	    echo "</td></tr></table> \n";
 	    echo "</td>";
 
@@ -366,13 +457,13 @@ if ($thumb && !$idle) {
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
               <th width=8%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=pid'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pid'>
                   PID</a></th>
               <th width=8%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=eid'>
                   EID</a></th>
               <th align=center width=3%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
                   PCs</a><br>[<b>1</b>]</th>\n";
     
     if ($isadmin && !$idle)
@@ -383,10 +474,10 @@ if ($thumb && !$idle) {
               <th width=4% align=center colspan=2>Swap Request</th>\n";
 
     echo "    <th width=60%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name'>
                   Name</a></th>
               <th width=4%>
-               <a href='showexp_list.php3?showtype=$showtype&sortby=uid'>
+               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=uid'>
                   Head UID</a></th>
             </tr>\n";
 
