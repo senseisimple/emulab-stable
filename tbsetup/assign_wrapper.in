@@ -1036,7 +1036,7 @@ while (1) {
     # Run assign
     $fail = 0;
     my $cmdargs = "$ptopfile $topfile";
-    $cmdargs = "-p $cmdargs"
+    $cmdargs = "-dP $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
     if (-1 == system "assign $cmdargs > assign.log") {
