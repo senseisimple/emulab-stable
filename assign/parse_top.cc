@@ -115,9 +115,9 @@ int parse_top(tb_vgraph &VG, istream& i)
 	  v->type=type;
 	  v->vclass=NULL;
 	  if (vtypes.find(v->type) == vtypes.end()) {
-	      vtypes[v->type] = 1;
+	      vtypes[v->type] = typecount;
 	  } else {
-	      vtypes[v->type]++;
+	      vtypes[v->type] += typecount;
 	  }
 	}
 	v->typecount = typecount;
