@@ -251,8 +251,14 @@ foreach my $uid (@userlist) {
 		     "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
 		     "where m.uid='$uid' and m.pid=m.gid and m.trust!='none'");
 
-    $query_result->numrows ||
-	fatal("$uid is not in any groups!\n");
+    if (!$query_result->numrows) {
+	#
+	# Non fatal error since there can be group members not approved,
+	# and this is called from the editgroups web page.
+	# 
+	print "Skipping $uid; not in any groups!\n";
+	next;
+    }
     
     while (@db_row = $query_result->fetchrow_array() ) {
 	push(@groupnames, $db_row[0]);
