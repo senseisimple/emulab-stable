@@ -237,7 +237,8 @@ function edaycmp ($a, $b) {
 }
 
 function showrange ($showby, $sortby, $range) {
-    global $TBOPSPID;
+    global $TBOPSPID, $TB_EXPTSTATE_ACTIVE;
+    $debug = 0;
     
     switch ($range) {
         case "day":
@@ -262,19 +263,20 @@ function showrange ($showby, $sortby, $range) {
     $uid_summary = array();
 
     #
-    # First get current swapped in experiments.
+    # First get current swapped in experiments. Instead of using reserved
+    # table, use the experiment_stats record so we can more easily separate
+    # pnodes from vnodes (although ignoring vnodes at the moment).
     #
     $query_result =
-	DBQueryFatal("select r.pid,r.eid,e.expt_swap_uid as swapper, ".
+	DBQueryFatal("select e.pid,e.eid,e.expt_swap_uid as swapper, ".
 		     "  UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped) ".
-		     "   as swapseconds, ".
-		     "  count(*) as pnodes ".
-		     " from reserved as r ".
-		     "left join experiments as e on ".
-		     "     e.pid=r.pid and e.eid=r.eid ".
-		     "where r.pid!='$TBOPSPID' and ".
-		     "      (r.pid!='ron' and r.eid!='all') ".
-		     "group by r.pid,r.eid");
+		     "   as swapseconds, r.pnodes,r.vnodes ".
+		     " from experiments as e ".
+		     "left join experiment_stats as s on s.exptidx=e.idx ".
+		     "left join experiment_resources as r on s.rsrcidx=r.idx ".
+		     "where e.state='" . $TB_EXPTSTATE_ACTIVE . "'" .
+		     "  and e.pid!='$TBOPSPID' and ".
+		     "      (e.pid!='ron' and e.eid!='all') ");
 
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pid         = $row["pid"];
@@ -282,20 +284,38 @@ function showrange ($showby, $sortby, $range) {
 	$uid         = $row["swapper"];
 	$swapseconds = $row["swapseconds"];
 	$pnodes      = $row["pnodes"];
+	$vnodes      = $row["vnodes"];
 
-	#echo "$pid $eid $uid $swapseconds $pnodes<br>\n";
+	if ($pnodes == 0)
+	    continue;
 
-	if ($swapseconds > $span)
+	if ($debug)
+	    echo "$pid $eid $uid $swapseconds $pnodes $vnodes<br>\n";
+
+	if ($swapseconds > $span) {
 	    $swapseconds = $span;
+	    if ($debug)
+		echo "Span to $swapseconds<br>\n";
+	}
 
-	$pid_summary[$pid] = array('pnodes'   => $pnodes,
-				   'pseconds' => $pnodes * $swapseconds,
-				   'eseconds' => $swapseconds,
-				   'current'  => 1);
-	$uid_summary[$uid] = array('pnodes'   => $pnodes,
-				   'pseconds' => $pnodes * $swapseconds,
-				   'eseconds' => $swapseconds,
-				   'current'  => 1);
+	if (!isset($pid_summary[$pid])) {
+	    $pid_summary[$pid] = array('pnodes'   => 0,
+				       'pseconds' => 0,
+				       'eseconds' => 0,
+				       'current'  => 1);
+	}
+	if (!isset($uid_summary[$uid])) {
+	    $uid_summary[$uid] = array('pnodes'   => 0,
+				       'pseconds' => 0,
+				       'eseconds' => 0,
+				       'current'  => 1);
+	}
+	$pid_summary[$pid]["pnodes"]   += $pnodes;
+	$pid_summary[$pid]["pseconds"] += $pnodes * $swapseconds;
+	$pid_summary[$pid]["eseconds"] += $swapseconds;
+	$uid_summary[$uid]["pnodes"]   += $pnodes;
+	$uid_summary[$uid]["pseconds"] += $pnodes * $swapseconds;
+	$uid_summary[$uid]["eseconds"] += $swapseconds;
     }
 
     $query_result =
@@ -334,13 +354,16 @@ function showrange ($showby, $sortby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 0);
+	}
+	if (!isset($uid_summary[$uid])) {
 	    $uid_summary[$uid] = array('pnodes'   => 0,
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 0);
 	}
 
-	#echo "$pid $eid $uid $tstamp $action $pnodes<br>\n";
+	if ($debug) 
+	    echo "$pid $eid $uid $tstamp $action $pnodes<br>\n";
 
 	switch ($action) {
         case "start":
@@ -355,7 +378,8 @@ function showrange ($showby, $sortby, $range) {
 	    if (isset($expt_start["$pid:$eid"])) {
 		# Use the original data, especially pnodes since if this
 		# was a swapmod, the nodes are for the new config, not
-		# the old config. 
+		# the old config. Besides, we want to credit the original
+		# swapper (in), not the current swapper/modder. 
 		$uid    = $expt_start["$pid:$eid"]["uid"];
 		$pnodes = $expt_start["$pid:$eid"]["pnodes"];
 		$diff = $tstamp - $expt_start["$pid:$eid"]["stamp"];
@@ -366,7 +390,8 @@ function showrange ($showby, $sortby, $range) {
                 # no start/swapin event was returned. Add a record for it.
 	        #
 		$diff = $tstamp - $spanstart;
-		#echo "F $pid $eid $uid $action $diff $pnodes $pnodes2<br>\n";
+		if ($debug)
+		    echo "M $pid $eid $uid $action $diff $pnodes $pnodes2<br>";
 		if ($action == "swapmod") {
                     # A pain. We need the number of pnodes for the original
 		    # version of the experiment, not the new version.
@@ -403,7 +428,7 @@ function showrange ($showby, $sortby, $range) {
 
     #
     # Anything still in the expt_start array is obviously still running,
-    # but we caught those in the first query above.
+    # but we caught those in the first query above, so we ignore them.
     #
     
     switch ($showby) {
@@ -452,6 +477,9 @@ function showrange ($showby, $sortby, $range) {
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
+	if ($debug)
+	    echo "$key $value[pseconds] $value[eseconds]<br>\n";
+	
 	$pnode_total  += $pnodes;
 	$pdays_total  += $pdays;
 	$edays_total  += $edays;
