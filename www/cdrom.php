@@ -54,8 +54,8 @@ echo "<br>
       <font color=red>
         <b>WARNING:</b></font>
         The netbed installation CDROM will <font color=red> wipe your
-        hard disk</font> and install <a href=www.freebsd.org>FreeBSD 4.6</a>
-        on it. 
+        hard disk</font> and install <a href=http://www.freebsd.org>FreeBSD
+	4.6</a> on it. 
       </font>
 
       <h3>Details</h3>
