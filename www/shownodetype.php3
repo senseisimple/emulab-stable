@@ -107,7 +107,7 @@ echo "<tr>
 
 echo "<tr>
       <td>Disk Size:</td>
-      <td class=left>$HD MB</td>
+      <td class=left>$HD GB</td>
           </tr>\n";
 
 echo "<tr>
