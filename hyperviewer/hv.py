@@ -38,6 +38,8 @@ hvReadFile = _hv.hvReadFile
 getSelected = _hv.getSelected
 
 getGraphCenter = _hv.getGraphCenter
+
+selectCB = _hv.selectCB
 class HypView(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, HypView, name, value)

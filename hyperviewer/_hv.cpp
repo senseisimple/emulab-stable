@@ -800,6 +800,7 @@ static void SWIG_exception_(int code, const char *msg) {
 
 #include <string>
 
+extern void selectCB(std::string const &,int,int);
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -884,6 +885,33 @@ static PyObject *_wrap_getGraphCenter(PyObject *self, PyObject *args) {
     result = (char *)getGraphCenter();
     
     resultobj = result ? PyString_FromString(result) : Py_BuildValue((char*)"");
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_selectCB(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    std::string *arg1 = 0 ;
+    int arg2 ;
+    int arg3 ;
+    std::string temp1 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Oii:selectCB",&obj0,&arg2,&arg3)) goto fail;
+    {
+        if (PyString_Check(obj0)) {
+            temp1 = std::string(PyString_AsString(obj0),
+            PyString_Size(obj0));
+            arg1 = &temp1;
+        } else {
+            SWIG_exception(SWIG_TypeError, "string expected");
+        }
+    }
+    selectCB((std::string const &)*arg1,arg2,arg3);
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
     return resultobj;
     fail:
     return NULL;
@@ -3196,6 +3224,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"hvReadFile", _wrap_hvReadFile, METH_VARARGS },
 	 { (char *)"getSelected", _wrap_getSelected, METH_VARARGS },
 	 { (char *)"getGraphCenter", _wrap_getGraphCenter, METH_VARARGS },
+	 { (char *)"selectCB", _wrap_selectCB, METH_VARARGS },
 	 { (char *)"new_HypView", _wrap_new_HypView, METH_VARARGS },
 	 { (char *)"HypView_afterRealize", _wrap_HypView_afterRealize, METH_VARARGS },
 	 { (char *)"delete_HypView", _wrap_delete_HypView, METH_VARARGS },

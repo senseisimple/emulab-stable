@@ -239,24 +239,44 @@ class hvFrame(hvFrameUI):
 	    return
 	node = self.NodeName.GetValue()
 	self.vwr.gotoNode(node, HV_ANIMATE)
-	self.vwr.setSelected(node, True)
+
+	# Simulate picking the node as well.
+	hv.selectCB(node, 0, 0);
 	self.SelectedNode(node)
+
+	self.DrawGL()
+	pass
     # Check boxes control boolean state.
     def OnDrawSphere(self, cmdEvent):
+	if self.vwr is None:
+	    return
 	self.vwr.setSphere(self.DrawSphere.IsChecked())
 	self.DrawGL()
+	pass
     def OnDrawNodes(self, cmdEvent):
+	if self.vwr is None:
+	    return
 	self.vwr.setDrawNodes(self.DrawNodes.IsChecked())
 	self.DrawGL()
+	pass
     def OnDrawLinks(self, cmdEvent):
+	if self.vwr is None:
+	    return
 	self.vwr.setDrawLinks(self.DrawLinks.IsChecked())
 	self.DrawGL()
+	pass
     def OnKeepAspect(self, cmdEvent):
+	if self.vwr is None:
+	    return
 	self.vwr.setKeepAspect(self.KeepAspect.IsChecked())
 	self.DrawGL()
+	pass
     def OnLabelToRight(self, cmdEvent):
+	if self.vwr is None:
+	    return
 	self.vwr.setLabelToRight(self.LabelToRight.IsChecked())
 	self.DrawGL()
+	pass
     
     ##
     # Buttons issue commands.
@@ -267,15 +287,13 @@ class hvFrame(hvFrameUI):
 	# Tell the HypView to reset.
 	self.vwr.gotoCenterNode(HV_ANIMATE)
 
-	# Unselect a previously picked node.
-	prevsel = hv.getSelected()
-	if prevsel != "":
-	    self.vwr.setSelected(prevsel, 0);
-
-	# Update the node info and draw.
+	# Simulate picking the top node.
 	##ctr = self.vwr.getGraphCenter()
 	ctr = hv.getGraphCenter()
-	#print "center node", ctr
+	##print "center node", ctr
+	hv.selectCB(ctr, 0, 0);
+
+	# Update the node info and draw.
 	self.SelectedNode(ctr)
 	self.DrawGL()
 	pass
@@ -300,6 +318,8 @@ class hvFrame(hvFrameUI):
     ##
     # Combo boxes select between alternatives.
     def OnLabelsMode(self, cmdEvent):
+	if self.vwr is None:
+	    return
 	which = self.LabelsMode.GetSelection()
 	if which != -1:
 	    self.vwr.setLabels(which)

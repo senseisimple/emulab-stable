@@ -73,6 +73,9 @@ extern char *getGraphCenter();
 //%apply const std::string & INPUT { const string & id };
 ///}
 
+// This callback is used in picking.  Call it to simulate picking.
+extern void selectCB(const std::string & INPUT, int shift, int control);
+
 //================================================================
 
 // Copyright 1998, Silicon Graphics, Inc. -- ALL RIGHTS RESERVED 
