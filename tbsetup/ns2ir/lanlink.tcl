@@ -189,7 +189,7 @@ LanLink instproc init {s nodes bw d type} {
     # Make sure BW is reasonable. 
     # XXX: Should come from DB instead of hardwired max.
     # Measured in kbps
-    set maxbw 100000
+    set maxbw 1000000
 
     # XXX skip this check for a simulated lanlink even if it
     # causes nse to not keep up with real time. The actual max
