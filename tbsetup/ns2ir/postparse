@@ -7,21 +7,36 @@
 # set-link-loss
 
 push(@INC,"./ir");
-#/usr/testbed/lib/tbsetup/ir");
 require libir;
 
 if ($#ARGV != 1) {
-    die	"Syntax: $0 ns_file ir_file";
+    print STDERR "Syntax: $0 ns_file ir_file\n";
+    exit(1);
 }
 
 ($nsfile,$irfile) = @ARGV;
 
-&ir_read($irfile);
+# This contains a list of error messages
+@ERRORS = ();
+
+eval {&ir_read($irfile)};
+if ($@) {
+    print STDERR "Could not read $irfile ($@)\n";
+    exit(1);
+}
 
 # Read in nodes from ir file.
-@nodes = split("\n",&ir_get("/topology/nodes"));
+$raw=eval {&ir_get("/topology/nodes")};
+if ($@) {
+    print STDERR "Incomplete IR - No /topology/nodes ($@)\n";
+    exit(1);
+}
+@nodes = split("\n",$raw);
 
-open(NSFILE,$nsfile) || die "Could not open $nsfile\n";
+open(NSFILE,$nsfile) || do {
+    print STDERR "Could not open $nsfile\n";
+    exit(1);
+};
 
 # hwtype is indexed by node and contains the type
 # linkloss is indexed by src:dst and contains the loss rate
@@ -30,15 +45,35 @@ while (<NSFILE>) {
     chop;
     @line = split;
     if ($line[1] eq "set-hardware") {
-	# hwtype(node) = type
-	$hwtype{$line[2]} = $line[3];
+	if ($#line != 3) {
+	    push(@ERRORS,"Syntax: set-hardware node type");
+	} else {
+	    # hwtype(node) = type
+	    $hwtype{$line[2]} = $line[3];
+	}
     } elsif ($line[1] eq "set-link-loss") {
-	# linkloss(src:dst) = loss
-	$linkloss{"$line[2]:$line[3]"} = $line[4];
+	if ($#line != 4) {
+	    push(@ERRORS,"Syntax: set-link-loss src dst loss_rate");
+	} else {
+	    # linkloss(src:dst) = loss
+	    if ( (! ($line[4] =~ /[0-9]*(\.[0-9]+)?/)) ||
+		 ($line[4] < 0) || ($line[4] > 1)) {
+		push(@ERRORS,"$line[4] must be between 0.0 and 1.0");
+	    } else {
+		$linkloss{"$line[2]:$line[3]"} = $line[4];
+	    }
+	}
     }
 }
 
 close(NSFILE);
+
+if ($#ERRORS != -1) {
+    foreach (@ERRORS) {
+	print STDERR $_ . "\n";
+    }
+    exit(1);
+}
 
 # Set hardware types
 @newnodes = ();
@@ -52,7 +87,12 @@ foreach (@nodes) {
 &ir_set("/topology/nodes",join("\n",@newnodes) . "\n");
 
 # Set link loss
-@links = split("\n",&ir_get("/topology/links"));
+$raw = eval{&ir_get("/topology/links")};
+if ($@) {
+    print STDERR "Incomplete IR - Could not find /topology/links\n";
+    exit(1);
+}
+@links = split("\n",$raw);
 @newlinks = ();
 foreach (@links) {
     @info = split;
