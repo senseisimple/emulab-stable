@@ -165,8 +165,9 @@ picking the node the edge leads to.</li>
 </ul>
 <ul>
   <ul>
-    <li><a name="windows_ssh"></a>You connect to XMLRPC on
-boss.emulab.net via SSH to retrieve
+    <li><a name="windows_ssh"></a><span style="font-weight: bold;">SSH
+setup</span> - You connect to XMLRPC on boss.emulab.net via SSH to
+retrieve
 experiments from the database.&nbsp; On Windows, you can use either the
       <a href="http://www.chiark.greenend.org.uk/%7Esgtatham/putty/">PuTTY</a>
 "plink" command line program or the <a href="http://www.cygwin.com/">Cygwin</a>
@@ -181,7 +182,8 @@ SSH key generated and loaded:</div>
 <ul>
   <ul>
     <ul>
-      <li>For PuTTY: generate a dsa key for SSH 2 in putty-keygen; load
+      <li><span style="font-weight: bold;">For PuTTY</span>: generate a
+dsa key for SSH 2 in putty-keygen; load
 it into pageant; and paste the ssh-dss string into Insert Key under
 Edit SSH Keys on your "My Emulab" page after logging in at <a
  href="https://www.emulab.net">https://www.emulab.net</a>.&nbsp; (PuTTY
@@ -189,10 +191,14 @@ includes a good online manual.)</li>
     </ul>
   </ul>
 </ul>
+<div style="margin-left: 120px;">Test that everything is set up with:<br>
+</div>
+<pre style="margin-left: 160px;">plink boss.emulab.net</pre>
 <ul>
   <ul>
     <ul>
-      <li>For OpenSSH: use ssh-keygen if necessary; start an ssh-agent
+      <li><span style="font-weight: bold;">For OpenSSH</span>: use
+ssh-keygen if necessary; start an ssh-agent
 and load the key with:</li>
     </ul>
   </ul>
@@ -202,7 +208,13 @@ and load the key with:</li>
 page as above, and do the following once to get boss.emulab.net put
 into your .ssh/known_hosts file:<br>
 </div>
-<pre style="margin-left: 160px;">ssh boss.emulab.net</pre>
+<pre style="margin-left: 160px;">ssh boss.emulab.net<br></pre>
+<div style="margin-left: 80px;"><span style="font-weight: bold;">Emulab
+user name:</span> If your Emulab user name is different from your login
+name, set the EMULAB_USER environment variable to your Emulab user
+name.&nbsp; hypview will use that in preference to the USER or USERNAME
+variables, and default to "guest" if none of them are set.<br>
+</div>
 <ul>
 </ul>
 <ul>
@@ -304,7 +316,8 @@ next section on rebuilding hypview from sources.<br>
 Windows:<br>
 </h4>
 <ul>
-  <li>You first need Python, wxWindows, and PyOpenGL.&nbsp; The easy
+  <li><span style="text-decoration: underline;">You first need Python,
+wxWindows, and PyOpenGL.</span>&nbsp; The easy
 way is to get it all packaged together in <a
  href="http://www.emulab.net/downloads/Python22-wxWindows-PyOpenGL.exe">one
 exe file</a>, and unpack to the location of your choice.&nbsp; <br>
@@ -312,15 +325,28 @@ exe file</a>, and unpack to the location of your choice.&nbsp; <br>
 </ul>
 <ul>
   <ul>
-    <li>The download size is 25 meg and when installed it becomes 56
-meg.&nbsp; <br>
+    <li>The <span style="text-decoration: underline;">download</span>
+size is 25 meg and when installed it becomes 56
+meg.</li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>Check that there isn't already <span
+ style="text-decoration: underline;">another version of Python 2.2
+installed</span> and on the PATH environment variable.&nbsp; No worries
+if there is a version other than Python 2.2, they will co-exist fine
+because they will be in different directories.&nbsp; If there is
+already a Python 2.2 installed, you may just want to install wxWindows
+and PyOpenGL in it (below.)<br>
     </li>
   </ul>
 </ul>
 <ul>
   <ul>
-    <li>Everything goes under a Python22 directory.&nbsp; The default
-unpack location for Python22 is C:\, in which case you can also
+    <li>Everything goes under a Python22 directory.&nbsp; <span
+ style="text-decoration: underline;">The default unpack location for
+Python22 is C:\</span>, in which case you can also
 unpack <a
  href="http://www.emulab.net/downloads/Python22-wxWindows-shortcuts.exe">these
 shortcuts</a> into a Start Menu/Programs folder for the effect of a
@@ -330,22 +356,29 @@ normal installation.&nbsp; <br>
 </ul>
 <ul>
   <ul>
-    <li>The default unpack location for the shortcuts is C:\Documents
-and Settings\All Users\Start Menu\Programs, so change the "All Users"
-to your login name if you are doing a User install instead of All
-Users, which requires Administrators group privileges.</li>
+    <li>The <span style="text-decoration: underline;">default unpack
+location for the shortcuts</span> is C:\Documents and Settings\All
+Users\Start Menu\Programs, so change the "All Users" to your login name
+if you are doing a User install instead of All Users, which requires
+Administrators group privileges.</li>
   </ul>
 </ul>
 <ul>
   <ul>
-    <li>Add the Python install directory, C:\Python22 by default,
-following a semi-colon, to the end of your PATH environment
-variable in Control Panel/System/Advanced/Environment Variables.<br>
+    <li>Add the <span style="text-decoration: underline;">Python
+install directory</span>, C:\Python22 by default, <span
+ style="font-weight: bold;">following a semi-colon</span>, to the end
+of your PATH environment
+variable in Control Panel/System/Advanced/Environment Variables.&nbsp;
+If there is already a different version of Python installed, you will
+need to put the full path to python.exe into the hypview or hypview.bat
+scripts mentioned below.<br>
     </li>
   </ul>
 </ul>
 <ul>
-  <li>Another approach is to download and install the official Windows
+  <li><span style="text-decoration: underline;">Another approach</span>
+is to download and install the official Windows
 versions of
 the following components:</li>
   <ul>
@@ -367,7 +400,8 @@ home page)</a>, 1.5 -&gt; 5 meg, Admin install only.<br>
   </ul>
 </ul>
 <ul>
-  <li>Verify that it's all working by running
+  <li><span style="text-decoration: underline;">Verify that it's all
+working</span> by running
 Start/Programs/wxPython 2.4/wxPython DEMO.&nbsp; Click the [+] to open
 the "Objects using an external library" branch, click wxGLCanvas, then
 the Cube and/or Cone buttons on the Demo tab.&nbsp; An OpenGL canvas
@@ -376,25 +410,31 @@ rotates the object.<br>
   </li>
 </ul>
 <ul>
-  <li>For hyperviewer, there is a self-extracting WinZip exe for <a
- href="http://www.emulab.net/downloads/hyperviewer-Win32.exe">Windows
+  <li>For hyperviewer, there is a <span
+ style="text-decoration: underline;">self-extracting WinZip exe</span>
+for <a href="http://www.emulab.net/downloads/hyperviewer-Win32.exe">Windows
 2000 and XP</a>.&nbsp; There is a top-level hyperviewer directory in
 the exe, so
 just unpack into the directory of your choice.<br>
   </li>
 </ul>
 <ul>
-  <li>Test by running hypview.bat in the hyperviewer directory and
+  <li><span style="text-decoration: underline;">Test</span> by running
+hypview.bat in the hyperviewer directory and
 feeding it BigLan.hyp or ts600.hyp.&nbsp; You can double-click it and
-use the File/Open menu command, or do this in a command shell:<br>
+use the File/Open menu command, or do this in a command shell:&nbsp;
+(In a CygWin BASH shell, you could use the hypview script
+instead.)&nbsp;
     <pre style="margin-left: 40px;"><big>cd hyperviewer</big></pre>
   </li>
 </ul>
 <pre style="margin-left: 80px;"><big>hypview.bat ts600.hyp<span
  style="font-weight: bold;"></span></big></pre>
-<div style="margin-left: 40px;">Notice that hypview runs <span
- style="font-weight: bold;">only</span> in the hyperviewer directory
-for now.<br>
+<div style="margin-left: 40px;"><span style="font-style: italic;">Notice
+that hypview runs </span><span
+ style="font-weight: bold; font-style: italic;">only</span><span
+ style="font-style: italic;"> in the hyperviewer directory
+for now.</span><br>
 </div>
 <ul>
   <li>To enable retrieving experiments from the Emulab database, see
