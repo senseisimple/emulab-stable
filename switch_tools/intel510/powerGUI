@@ -23,10 +23,10 @@ $main->configure(-background => $main_bg );
 #add some frames
 my $msg_frm = 
     $main->Frame( -relief=>'sunken', -borderwidth=>2, -background=>$main_bg
-		   )->pack(-side=>'bottom', -fill=>'x');
+		   )->pack(-side=>'bottom',-expand=>'1', -fill=>'x');
 my $msg_area = 
-    $msg_frm->Label(-background=>$main_bg, -anchor=>'nw', -width=>'30') 
-    ->pack(-side=>'left', -anchor=>'nw');
+    $msg_frm->Label(-background=>$main_bg, -anchor=>'nw') 
+    ->pack(-side=>'left',-expand=>'1',-fill=>'x',-anchor=>'nw');
 
 my $frm = 
     $main->Frame( -relief=>'flat', -background=>$main_bg
