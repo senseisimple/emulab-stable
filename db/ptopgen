@@ -17,7 +17,7 @@ while (<>) {
   if ( /^\|node_id/) {next;}
   /^\|([a-zA-Z0-9]*).*\|/;
   $node=$1;
-  if ($node =~/^(tbpc|sh)/) {
+  if ($node =~/^((tb){0,1}pc|sh)/) {
     print STDERR "Got '$node' \t" if $d && !defined ($nodes{$node});
     $nodes{$node} = 1;
   }
@@ -57,7 +57,7 @@ print "node cisco switch\n";
 
 # Give the nodes:
 foreach $node (sort keys %nodes) {
-  if ($node =~ /tbpc/) {
+  if ($node =~ /pc/) {
     print "node $node pc:1 delay:2\n";
     print "link $node-0 $node:$links{$node.'-0'} cisco 100 1\n";
     print "link $node-1 $node:$links{$node.'-1'} cisco 100 1\n";
