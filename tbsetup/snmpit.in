@@ -1475,9 +1475,6 @@ sub ReadIRFile {
   } elsif ( -e "$f" ) {
     open(IR,"$f") 
       || die("Couldn't open $f\n");
-  } elsif ( -e "/home/newbold/switch/$f" ) {
-    open(IR,"/home/newbold/switch/$f") 
-      || die("Couldn't open /home/newbold/switch/$f\n");
   } else {
     die("Couldn't locate $f for VLAN setup.\n");
   }
