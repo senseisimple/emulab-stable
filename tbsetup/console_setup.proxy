@@ -122,6 +122,15 @@ foreach my $node ( keys %nodepid ) {
 	die("Could not chmod(0640) $filename: $!");
 
     #
+    # Remove group access from the tty device.  This renders the device
+    # inaccessible to both old and new users while we revoke access from
+    # any current tip user.
+    #
+    $tipdevname = "$TIPDEVDIR/$node";
+    chmod(0600, $tipdevname) or
+	die("Could not chmod(0600) $tipdevname: $!");
+
+    #
     # Now send a USR2 signal to the capture process so that it closes down
     # any tip thats attached to it.
     #
@@ -129,11 +138,10 @@ foreach my $node ( keys %nodepid ) {
 	die("Could not signal(USR2) process $procid for log $filename");
 
     #
-    # Set the mode and group for the tty that tip is going to use. This
-    # allows the user to access the tip line using a non-setuid version
-    # of tip.
+    # Set the mode and group on the tty that tip is going to use. This
+    # allows the new group to access the tip line using a non-setuid/gid
+    # program.
     #
-    $tipdevname = "$TIPDEVDIR/$node";
     chown(0, $gid, $tipdevname) or
 	die("Could not chown(0, $gid) $tipdevname: $!");
     chmod(0660, $tipdevname) or
