@@ -95,6 +95,13 @@ is done, run $(BUILD_DIR)/tbsetup/exports_setup on the boss node, which will
 create an /etc/exports file by concatenating this with dynamically-generated
 exports of directories to nodes that need them.
 
+Here's an example exports.head file from one of our ops nodes:
+/z 155.101.143.2 -maproot=root -alldirs
+/var 155.101.143.2 -maproot=root -alldirs
+(Note, on this machine, /users, /proj, and /groups are all on the /z
+filesystem. You'll need a line for each filesystem that contains these
+three directories.)
+
 ##### Step 6 - Capture setup
 
 If you don't have serial lines for all the nodes, you can skip this step.
