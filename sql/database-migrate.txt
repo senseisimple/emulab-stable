@@ -1063,3 +1063,20 @@ last_net_act,last_cpu_act,last_ext_act);
 	    select pid,eid,vnode,vname,SUBSTRING(arguments,9) \
 	    from eventlist where objecttype=4 and eventtype=1;
 
+1.197: Add login failure stuff to users table, and add new table to
+       track login failures from specific IP addresses.
+
+       alter table users add weblogin_frozen tinyint unsigned \
+			NOT NULL default '0';
+       alter table users add weblogin_failcount smallint unsigned \
+			NOT NULL default '0';
+       alter table users add weblogin_failstamp int unsigned \
+			NOT NULL default '0';
+			    			
+       CREATE TABLE login_failures (
+	  IP varchar(15) NOT NULL default '1.1.1.1',
+	  frozen tinyint unsigned NOT NULL default '0',
+	  failcount smallint unsigned NOT NULL default '0',
+	  failstamp int unsigned NOT NULL default '0',
+	  PRIMARY KEY  (IP)
+       ) TYPE=MyISAM;

@@ -548,6 +548,18 @@ CREATE TABLE login (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `login_failures`
+--
+
+CREATE TABLE login_failures (
+  IP varchar(15) NOT NULL default '1.1.1.1',
+  frozen tinyint(3) unsigned NOT NULL default '0',
+  failcount smallint(5) unsigned NOT NULL default '0',
+  failstamp int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (IP)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `loginmessage`
 --
 
@@ -1407,6 +1419,9 @@ CREATE TABLE users (
   widearearoot tinyint(4) default '0',
   wideareajailroot tinyint(4) default '0',
   notes text,
+  weblogin_frozen tinyint(3) unsigned NOT NULL default '0',
+  weblogin_failcount smallint(5) unsigned NOT NULL default '0',
+  weblogin_failstamp int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)
