@@ -201,7 +201,6 @@ sub TMCCCMD_VNODELIST() { "vnodelist"; }
 sub TMCCCMD_ISALIVE()   { "isalive"; }
 sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
-sub TMCCCMD_ROUTELIST()	{ "routelist"; }
 sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
 
 #
@@ -1499,13 +1498,6 @@ sub dotrafficconfig()
 	    die "Cannot open file $BOOTDIR/tmcc.ifconfig: $!";
 	print IFCFG <$TM>;
 	close(IFCFG);
-	CLOSETMCC($TM);
-
-	$TM = OPENTMCC(TMCCCMD_ROUTELIST);
-	open(ROUTELIST, ">$BOOTDIR/tmcc.routelist") or
-	    die "Cannot open file $BOOTDIR/tmcc.routelist: $!";
-        print ROUTELIST <$TM>;
-	close(ROUTELIST);
 	CLOSETMCC($TM);
 	$/ = $record_sep;
 	
