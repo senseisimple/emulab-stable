@@ -125,7 +125,7 @@ my $idleswap      = 1;
 my $idleignore    = 0;
 # Must do this before lock tables!
 # idleswap is in minutes, threshold is in hours
-my $idleswap_time = $idleswap_time = 60 * TBGetSiteVar("idle/threshold");
+my $idleswap_time = 60 * TBGetSiteVar("idle/threshold");
 
 #
 # If no NS file, then override swap/idle stuff. Again, might change
