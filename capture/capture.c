@@ -260,13 +260,18 @@ main(int argc, char **argv)
 	/*
 	 * Verify the bossnode and stash the address info
 	 */
-	he = gethostbyname(Bossnode);
-	if (he == 0) {
-		die("gethostbyname(%s): %s", Bossnode, hstrerror(h_errno));
+	{
+		struct hostent *he;
+
+		he = gethostbyname(Bossnode);
+		if (he == 0) {
+			die("gethostbyname(%s): %s",
+			    Bossnode, hstrerror(h_errno));
+		}
+		memcpy ((char *)&Bossaddr.sin_addr, he->h_addr, he->h_length);
+		Bossaddr.sin_family = AF_INET;
+		Bossaddr.sin_port   = htons(serverport);
 	}
-	memcpy ((char *)&Bossaddr.sin_addr, he->h_addr, he->h_length);
-	Bossaddr.sin_family = AF_INET;
-	Bossaddr.sin_port   = htons(serverport);
 
 	(void) sprintf(strbuf, ACLNAME, ACLPATH, Machine);
 	Aclname = newstr(strbuf);
@@ -1359,7 +1364,6 @@ int
 handshake(void)
 {
 	int			sock, cc, err = 0;
-	struct hostent	       *he;
 	whoami_t		whoami;
 	tipowner_t		tipown;
 
