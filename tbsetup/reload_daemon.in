@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,7 +15,8 @@ use Getopt::Std;
 # limited for anyone else)
 #
 if ($UID != 0) {
-    die "This should only be run as root!\n";
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
 }
 
 #
@@ -44,6 +45,9 @@ my $TBOPS    = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 10;
 
 #
 # These come from the library.
