@@ -713,9 +713,9 @@ elsif (@vnodelist) {
 }
 
 print "OS Setup Done.\n";
-print " *** There were $failed failed nodes\n"
+print "*** There were $failed failed nodes\n"
     if ($failed);
-print " *** There were $failed failed virtual nodes\n"
+print "*** There were $failedvnodes failed virtual nodes\n"
     if ($failedvnodes);
 
 TBDebugTimeStamp("os_setup finished");
