@@ -4094,7 +4094,8 @@ int
 event_connect()
 {
 	if (!event_handle) {
-		event_handle = event_register("elvin://" BOSSNODE,0);
+		event_handle =
+		  event_register("elvin://localhost:" BOSSEVENTPORT, 0);
 	}
 
 	if (event_handle) {
