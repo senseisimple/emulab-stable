@@ -104,6 +104,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
+	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 			$(BINDIR)/control_interface
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(BINDIR)/gated_fxp0.conf

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -39,7 +39,7 @@ if (JAILED()) {
     $logtemplate = "$VARDIR/logs/runlog.XXXXXX";
 }
 else {
-    my ($pid, $eid, $vname) = check_status();
+    my ($pid, $eid, $vname) = check_nickname();
 
     if (!defined($eid)) {
 	fatal("Could not determine pid/eid");

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -23,7 +23,13 @@ my $MAPFILE = $libsetup::TMDELMAP;
 if (! -s $MAPFILE) {
     exit(0);
 }
+
 print "Starting Delay Agent ...\n";
+
+#
+# Need the pid/eid. 
+# 
+my ($pid, $eid, $vname) = check_nickname();
 
 #
 # We use the tmcc to figure out where the Testbed Event Daemon is running.
@@ -31,5 +37,5 @@ print "Starting Delay Agent ...\n";
 #
 my ($bossname) = split(" ", `tmcc bossinfo`);
 
-system("delay-agent -s $bossname -d -f $MAPFILE &");
+system("delay-agent -s $bossname -d -E $pid/$eid -f $MAPFILE &");
 exit($? >> 0);
