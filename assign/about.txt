@@ -1,0 +1,137 @@
+Interesting things about Assign
+
+This document is not meant to be a cohesive whole.  Rather a brain
+dump of text, thoughts, and information.
+
+	Solutions in assign are measured by two criteria.  The first
+	is a measure of basic quality, very similar to the cost
+	functions you would find in traditional SA.  The second is a
+	measure of validity.  It is an integer recording the number of
+	violations, or broken constraints.  By allowing invalid states
+	the SA algorithm can traverse non-solution space to find other
+	solutions.  Having two separate measures allows find tuning of
+	the SA algorithm.  In particular it allows us to control the
+	tendency to wander into non-solution space.  A secondary
+	advantage is that by tracking the source of each violation it
+	is easy to understand the cases where assign fails to find a
+	valid solution.
+
+	The basic problem is to map one graph to another.  It is not,
+	however, simply a matter of connecting up vnodes and pnodes
+	and vlinks and plinks.  Multiple vnodes may map to a single
+	pnodes, as is the case with delay nodes.  Links are even more
+	complicated.  Certain plinks, such as interswitch trunks, may
+	have multiple vlinks mapped to them.  On the other hand, each
+	vlink will probably traverse multiple plinks.  It is quite
+	often that a vlink will map to multiple plinks, some of which
+	have other vlinks mapped to them.  These many-to-one and
+	one-to-many relationships complicate scoring and
+	understanding.
+
+	Further complications arise from the many criteria that
+	solutions are judged by.  How well vnodes and pnodes match,
+	the feasibility of emulating vlinks, the "cheapness" of all
+	resources used, are some of the basic criteria.  In addition a
+	solution is based on how well it satisfies specific requests,
+	such as that a node already have the correct disk image
+	installed.  The "cheapness" of nods is not straight forward, a
+	node with specialized hardware should be more expensive than
+	its non specialized counterparts, yet that expense should only
+	be considered if the hardware would not be used.  Assign also
+	optimizes for node homogeneity, both at a general physical
+	level, and according to logical classification of vnodes by
+	the user.  All of these criteria have various priorities and
+	interact with each other during the algorithm.
+
+	Given the complexity of the scoring and the vast number of
+	times the score will be recalculated during a run it is
+	infeasible to calculate the score from scratch at each
+	modification.  Instead, the change in the score needs to be
+	rapidly calculated.
+
+	The two basic operations in assign are mapping a vnode to a
+	pnode and unmapping a vnode from its pnode.  At each operation
+	the change in score (both quality and violations) is
+	calculated and applied.  The change in score is non-trivial
+	and highly depends on the state of the other nodes and links.
+	Mapping a vnode requires an evaluation of how well it maps to
+	the chosen pnode; the choice and evaluation of any links the
+	vnode might have that connect to mapped vnodes (vlinks are
+	only evaluated when both ends are mapped), possibly involving
+	the allocation of one or more switches; the new physical
+	homogeneity of pnode usage; and the consistency of any vclass
+	the vnode might be in.  All of these need to be evaluated,
+	even under conditions in which the current state is invalid.
+	For example, mapping a node may require over utilizing a link.
+	The score still needs to be updated, and needs be updated to
+	reflect the over-utilization (an increase in the number of
+	violations).
+
+	The mapping of a vnode and the later unmapping of a vnode will
+	not necessarily result in opposite effects on the score (in
+	fact, it is very rare that they do so).  For between map and
+	unmap a number of other changes have been applied, each of
+	which depended on the fact the vnode was mapped.  Unmapping
+	the vnode needs to reflect those dependencies and modify the
+	score and state appropriately.  As an example, a vnode may be
+	mapped, and later on one of its neighbors mapped.  Mapping
+	that neighbor in will cause the link between them to be
+	evaluated.  When the original node is unmapped the effect of
+	that evaluation must be undone. 
+
+	Assign has a detailed resource availability and use model.
+	Each pnode has a number of resources along with their values.
+	The value reflects the cost of the resource in the case that
+	the resource is allocated but unused.  For example, a pnode
+	may have specialized hardware.  If that pnode is allocated as
+	part of a solution but the vnode will not use that hardware,
+	then the cost is included in the score.  Vnodes have resource
+	requests along with the cost of having that request
+	unfulfilled.  Besides a quality modification, an unfulfilled
+	request can, at the users discretion, result in an increase in
+	violations.  This basic mechanism of features and desires
+	allows a wide range of control over the nature of any
+	solution.
+
+	Assign has a notion of physical equivalence classes.  Pnodes
+	are grouped together in cases where the choice of either pnode
+	will have no effect on the score.  The simulated annealing
+	then chooses among pclasses instead of pnodes, dramatically
+	reducing the scaling properties.  The idea and tracking a
+	pnodes is still very important, as even within a pclass,
+	pnodes may differ in the vnodes mapped to them, specifically
+	as multiple vnodes can map to a single pnode.  Thus not only
+	must assign look at pclasses but also within, at what
+	partially full pnodes are available.  By using simulated
+	annealing on pclasses and heuristics to choose among the
+	members of a pclass, assign finds middle ground between nodes
+	and equivalence classes.
+
+	Assign must be able to handle partial solutions specified as
+	input.  This is important in cases where users require a
+	specific machine for reasons outside the knowledge of assign.
+	It also provides opportunities to strongly influence a
+	solution.  For example in a distributed testbed, a local node
+	could be fixed causing solutions to tend to utilize nearby
+	nodes.  Without, the pnodes could very well be on the far end
+	of a continent or beyond.
+
+	Often the user will be aware of relations among their vnodes
+	that assign does not otherwise have the knowledge to be aware
+	of.  For example, a user may put great important on the
+	homogeneity of internal nodes vs. leaf nodes, but care little
+	as to whether leaf and internal are similar.  Vtypes allows
+	the user to specify these relationships to assign.  The
+	challenge to assign is to deal with these vnodes that are not
+	restricted to a single type but are requested to match in type
+	to other vnodes.  The user is allowed to specify the
+	importance of the consistency, anywhere from negligible to
+	invalidating any solution with inconsistency within a vtype.
+	Even in the latter case, however, assign allows for
+	inconsistent solutions, keeping track of the violations.
+
+	Before beginning simulated annealing assign performs a number
+	of checks and computations to improve performance and avoid
+	pathological cases that are obvious to heuristics but not SA.
+
+
