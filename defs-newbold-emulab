@@ -1,0 +1,9 @@
+#
+# This is the definitions file for Mac on Emulab.Net.
+#
+TBDBNAME=tbdb
+WWWDEFS=newbold-emulab
+TBOPSEMAIL=newbold@cs.utah.edu
+TBLOGSEMAIL=newbold@cs.utah.edu
+
+
