@@ -1313,6 +1313,7 @@ sub dotunnels()
 	}
     }
 
+    close(CONF);
     close(RC);
     chmod(0755, TMTUNNELCONFIG);
     return 0;
