@@ -1800,7 +1800,7 @@ sub TBOSCountInstances ($;@)
 {
     my($osid,@exclude) = @_;
 
-    my $nodelist = join(" or ",map("node_id='$_'",@exclude));
+    my $nodelist = join(" or ",map("p.node_id='$_'",@exclude));
     if (!@exclude) {
 	$nodelist = "0";
     }
