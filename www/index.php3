@@ -33,7 +33,7 @@ if (isset($login)) {
 	$c="insert into login (uid,timeout) values ('$auth_usr','$timeout')";
 	mysql_db_query("tbdb", $c);
       }
-      echo "$auth_usr Logged in!";  
+      echo "$auth_usr logged in";  
     } else {
       echo "Login Failed\n";
       unset($auth_usr);
@@ -93,8 +93,6 @@ if (isset($auth_usr)) {
       echo "<A href='approval.php3?$auth_usr'>New User Approval</A>\n";
       echo "<p>Add a New User";
       #echo "<p><A href='addusr.php3?$auth_usr'>Add a New User</A>";
-      echo "<p>Begin a Project";
-      #echo "<p><A href='addproj.php3?$auth_usr'>Begin a Project</A>\n";
       echo "</p>";
     }
     if (($trust == "group_root") || ($trust == "local_root")) {
@@ -116,7 +114,7 @@ if (isset($auth_usr)) {
     echo "<A href='verify.php3?$auth_usr'>New User Verification</A>\n";
   } elseif (($status == "frozen") || ($status == "other")) {
     echo "Your account has been changed to status $status, and is ";
-    echo "currently unusable. Please contact your group leader to find out ";
+    echo "currently unusable. Please contact your project leader to find out ";
     echo "why. If you need further help, contact ";
     echo "<a href=\"mailto:testbed-ops@flux.cs.utah.edu\">";
     echo "Testbed Ops (testbed-ops@flux.cs.utah.edu)</a>.";
@@ -146,6 +144,3 @@ if (!isset($auth_usr)) {
 </table>
 </body>
 </html>
-
-
-
