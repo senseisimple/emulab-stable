@@ -28,7 +28,7 @@ echo "<center><h1>
 # Suck out info for all the nodes.
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * from nodes where type='pc' or type='shark'");
+	"SELECT * FROM nodes WHERE type='pc' OR type='shark' ORDER BY type,node_id");
 if (! $query_result) {
     TBERROR("Database Error retrieving node information", 1);
 }

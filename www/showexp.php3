@@ -146,7 +146,8 @@ if (mysql_num_rows($reserved_result)) {
 	"SELECT nodes.* ".
         "FROM nodes LEFT JOIN reserved ".
         "ON nodes.node_id=reserved.node_id ".
-        "WHERE reserved.eid=\"$exp_eid\" and reserved.pid=\"$exp_pid\"");
+        "WHERE reserved.eid=\"$exp_eid\" and reserved.pid=\"$exp_pid\" ".
+        "ORDER BY type,node_id");
 
     while ($row = mysql_fetch_array($query_result)) {
         $node_id = $row[node_id];

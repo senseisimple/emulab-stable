@@ -4,15 +4,16 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Utah Testbed Machine Statu");
+PAGEHEADER("Utah Testbed Machine Status");
 
 echo "<center>
      <h1>Utah Testbed Machine Status</h1>
      </center>\n";
 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT n.node_id, n.type, j.eid from nodes ".
-	"as n left join reserved AS j ON n.node_id = j.node_id");
+	"SELECT n.node_id, n.type, j.eid FROM nodes ".
+	"AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
+	"WHERE type='pc' OR type='shark' ORDER BY type,node_id");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error getting node reservation status: $err\n", 1);
