@@ -14,7 +14,7 @@ package libsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( libsetup_init libsetup_setvnodeid cleanup_node check_status
+    qw ( libsetup_init libsetup_setvnodeid cleanup_node 
 	 doifconfig dohostnames domounts dotunnels check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
@@ -391,7 +391,7 @@ sub cleanup_node ($) {
     my ($scrub) = @_;
     
     print STDOUT "Cleaning node; removing configuration files ...\n";
-    unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
+    unlink TMIFC, TMRPM, TMSTARTUPCMD, TMTARBALLS;
     unlink TMROUTECONFIG, TMTRAFFICCONFIG, TMTUNNELCONFIG;
     unlink TMDELAY, TMLINKDELAY, TMPROGAGENTS, TMSYNCSERVER, TMRCSYNCSERVER;
     unlink TMMOUNTDB . ".db";
@@ -403,6 +403,7 @@ sub cleanup_node ($) {
     # to base set.
     # 
     if ($scrub) {
+	unlink TMNICKNAME;
 	unlink TMPASSDB . ".db";
 	unlink TMGROUPDB . ".db";
     }
@@ -447,10 +448,13 @@ sub check_status ()
     
     #
     # Stick our nickname in a file in case someone wants it.
+    # Do not overwrite; we want to save the original info until later.
+    # See bootsetup; indicates project change!
     #
-    if (! -e TMNICKNAME) {
+    if (! -e TMNICKNAME()) {
 	system("echo '$vname.$eid.$pid' > " . TMNICKNAME());
     }
+    
     return ($pid, $eid, $vname);
 }
 
@@ -2245,21 +2249,43 @@ sub doplabconfig()
 #
 sub bootsetup()
 {
+    my $oldpid;
+    
+    print STDOUT "Checking Testbed reservation status ... \n";
+
+    #
+    # Watch for a change in project membership. This is not supposed to
+    # happen, but it turns out that it does when reloading. Its good to
+    # check for this anyway just in case. A little tricky though.
+    #
+    if (-e TMNICKNAME) {
+	($oldpid) = check_nickname();
+    }
+    
     #
     # Check allocation. Exit now if not allocated.
     #
-    print STDOUT "Checking Testbed reservation status ... \n";
     if (! check_status()) {
 	print STDOUT "  Free!\n";
 	cleanup_node(1);
 	return 0;
     }
-    print STDOUT "  Allocated! $pid/$eid/$vname\n";
-
     #
-    # Cleanup node. Flag indicates to gently clean ...
-    # 
-    cleanup_node(0);
+    # Project Change? 
+    #
+    if (defined($oldpid) && ($oldpid ne $pid)) {
+	print STDOUT "  Old Project: $oldpid\n";
+	# This removes the nickname file, so do it again.
+	cleanup_node(1);
+	check_status();
+    }
+    else {
+	#
+	# Cleanup node. Flag indicates to gently clean ...
+	# 
+	cleanup_node(0);
+    }
+    print STDOUT "  Allocated! $pid/$eid/$vname\n";
 
     #
     # Mount the project and user directories and symlink SFS "mounted"
