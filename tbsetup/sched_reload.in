@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,15 +21,17 @@ sub usage()
 	         "[[-p <pid>] -i <imagename>] <node> [node ...]\n".
 		 "       sched_reload <options> -e pid,eid\n".
 		 "       sched_reload <options> -t type [type ...]\n".
+		 "       sched_reload <options> -c class\n".
 	"Use -i to specify an image name. Use node default otherwise.\n".
 	"Use -m to specify an image ID (internal name, TB admins only!).\n".
 	"Use -f to force reload. Fail if node cannot be reserved.\n".
 	"Use -n to pend reload for the reload daemon.\n".
         "Use -e to schedule a reload for all nodes in an experiment.\n".
-        "Use -t to schedule a reload for all nodes of a particular type.\n";
+        "Use -t to schedule a reload for all nodes of a particular type.\n".
+        "Use -c to schedule a reload for all nodes of a particular class.\n";
     exit(-1);
 }
-my  $optlist = "fnp:i:e:m:t";
+my  $optlist = "fnp:i:e:m:tc:";
 
 #
 # Configure variables
@@ -66,7 +68,9 @@ my %imagenodes  = ();
 my @row;
 my $eidmode     = 0;
 my $typemode    = 0;
+my $classmode   = 0;
 my @types	= ();
+my $class;
 my $pid;
 my $eid;
 
@@ -165,6 +169,17 @@ elsif (defined($options{"t"})) {
 	push(@types, $type);
     }
 }
+elsif (defined($options{"c"})) {
+    $classmode = 1;
+    $class     = $options{"c"};
+
+    if ($class =~ /^([-\w]+)$/) {
+	$class = $1;
+    }
+    else {
+	die("*** Bad data in $class\n");
+    }
+}
 else {
     if (@ARGV < 1) {
 	usage();
@@ -186,6 +201,16 @@ elsif ($typemode) {
 	while (my ($node) = $query_result->fetchrow_array()) {
 	    push(@nodes, $node);
 	}
+    }
+}
+elsif ($classmode) {
+    my $query_result =
+	    DBQueryFatal("select n.node_id from nodes as n ".
+			 "left join node_types as nt on n.type=nt.type ".
+			 "where nt.class='$class' and n.role='testnode'");
+
+    while (my ($node) = $query_result->fetchrow_array()) {
+	push(@nodes, $node);
     }
 }
 else {
