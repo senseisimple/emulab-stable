@@ -525,20 +525,34 @@ sub WaitTillReloadDone($$@)
 sub SetupReload($$)
 {
     my ($node, $imageid) = @_;
+    my $osid = $FRISBEEOSID;
+
+    #
+    # XXX I mean XXXX I really mean XXXXXXXXX
+    #
+    my $query_result =
+	DBQueryWarn("select type from nodes where node_id='$node'");
+    return -1
+	if (!$query_result);
+
+    my ($type) = $query_result->fetchrow_array();
+    if ($type eq "pc3000") {
+	$osid = "emulab-ops-FRISBEE-MFS-NEW";
+    }
 
     #
     # Put it in the current_reloads table so that nodes can find out which
     # OS to load. See tmcd. 
     #
-    my $query_result = 
+    $query_result = 
 	DBQueryWarn("replace into current_reloads ".
 		    "(node_id, image_id) values ('$node', '$imageid')");
     return -1
 	if (!$query_result);
 
-    system("$osselect -1 $FRISBEEOSID $node");
+    system("$osselect -1 $osid $node");
     if ($?) {
-	print STDERR "*** osload ($node): os_select $FRISBEEOSID failed!\n";
+	print STDERR "*** osload ($node): os_select $osid failed!\n";
 	return -1;
     }
     system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
