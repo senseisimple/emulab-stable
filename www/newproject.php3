@@ -78,11 +78,12 @@ if (!isset($usr_phones) ||
 # Check uid and pid for sillyness.
 #
 if (! ereg("^[-_a-zA-Z0-9]+$", $pid)) {
-    USERERROR("The project name must be alphanumeric characters only!", 1);
+    USERERROR("The project name ($pid) must be alphanumeric characters only!",
+	       1);
 }
-if (! ereg("^[a-z0-9]+$", $uid)) {
-    USERERROR("Your username name must be lowercase alphanumeric characters ".
-	      "only!", 1);
+if (! ereg("^[a-z0-9]+$", $proj_head_uid)) {
+    USERERROR("Your username ($proj_head_uid) name must be lowercase ".
+	      "alphanumeric characters only!", 1);
 }
 
 #
