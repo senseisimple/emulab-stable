@@ -624,6 +624,17 @@ ServerSignature On
     </Directory>
 
     #
+    # Widearea distributions.
+    #
+    Alias /images/ "/z/testbed/distributions/"
+    <Directory /z/testbed/distributions>
+        Options Indexes
+        AllowOverride All
+        Order allow,deny
+        Allow from all
+    </Directory>
+
+    #
     # ScriptAlias: This controls which directories contain server scripts.
     # ScriptAliases are essentially the same as Aliases, except that
     # documents in the realname directory are treated as applications and
