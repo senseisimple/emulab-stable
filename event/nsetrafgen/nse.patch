@@ -1089,9 +1089,33 @@
  };
  
  #endif
+--- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-port.h	Wed Feb 26 15:07:33 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.h	Mon Feb 16 22:53:42 2004
+@@ -29,12 +29,21 @@
+ #include "classifier.h"
+ 
+ class PortClassifier : public Classifier {
++#ifdef STORE_PKTS    
++public:
++    	PortClassifier();
++#endif
+ protected:
+ 	int classify(Packet *p);
+ // 	void clear(int slot);
+ // 	int getnxt(NsObject *);
+ //	int command(int argc, const char*const* argv);
+ // 	int reserved_;
++#ifdef STORE_PKTS
++	Tcl_HashTable pktsonport;
++	int command(int argc, const char*const* argv);
++	void print_pkts();
++#endif
+ };
+ 
+ class ReservePortClassifier : public PortClassifier {
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Wed Feb 26 15:07:33 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Fri Jan 16 17:27:47 2004
-@@ -26,9 +26,17 @@
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Sat Feb 21 20:25:03 2004
+@@ -26,15 +26,108 @@
  #endif
  
  #include "classifier-port.h"
@@ -1100,15 +1124,106 @@
 +#ifdef PACKET_DECAPSULATE
 +extern bool PacketDecapsulateIfNeeded(Packet *p);
 +#endif
++
++#ifdef STORE_PKTS
++
++#ifndef NUM_PKTS
++#define NUM_PKTS 100000
++#endif
++
++struct pkt_data {
++    double ts;
++    unsigned int size;
++    double clock;
++};
++
++struct pkt_dump {
++    pkt_dump() : num_pkts(0) {}
++    int num_pkts;
++    pkt_data pkts[NUM_PKTS];
++};
++
++PortClassifier::PortClassifier()
++{
++    	Tcl_InitHashTable( &pktsonport, TCL_ONE_WORD_KEYS );
++}
++#endif
  
  int PortClassifier::classify(Packet *p) 
  {
++#ifdef STORE_PKTS
++	// We need to store the packet timestamp before decapsulation
++	// since after that the packet will have meaningless values
++	// from a different instance of nse
++	double packet_ts = p->time_;
++#endif
 +#ifdef PACKET_DECAPSULATE
 +	::PacketDecapsulateIfNeeded(p);
 +#endif
  	// Port classifier returns the destination port.  No shifting
  	// or masking is required since in the 32-bit addressing,
  	// ports are stored in a seperate variable.
+ 	hdr_ip* iph = hdr_ip::access(p);
++#ifdef STORE_PKTS
++	int newentry = 0;
++	Tcl_HashEntry *he = Tcl_CreateHashEntry( &pktsonport,
++						 (char *)(iph->dport()),
++						 &newentry );
++
++	pkt_dump *dump = 0;
++	if( newentry == 0 ) {
++	    dump = (pkt_dump *)Tcl_GetHashValue(he);
++	} else {
++	    dump = new pkt_dump;
++	    Tcl_SetHashValue( he, (char *)dump );
++	}
++	if ( dump->num_pkts < NUM_PKTS ) {
++	    hdr_cmn *hc = HDR_CMN(p);
++	    dump->pkts[dump->num_pkts].size = hc->size();
++	    dump->pkts[dump->num_pkts].ts = packet_ts; 
++	    dump->pkts[dump->num_pkts].clock = Scheduler::instance().clock(); 
++	    dump->num_pkts += 1;
++	}
++#endif
+ 	return iph->dport();
+ };
++
++#ifdef STORE_PKTS
++
++int PortClassifier::command(int argc, const char*const* argv)
++{
++        if (argc == 2 && strcmp(argv[1],"print-pkts") == 0) {
++	    	print_pkts();
++                return(TCL_OK);
++        }
++        return (Classifier::command(argc, argv));
++}
++
++void PortClassifier::print_pkts()
++{
++    	Tcl_HashSearch search;
++	Tcl_HashEntry *he = 0;
++
++	for( he = Tcl_FirstHashEntry(&pktsonport, &search) ; he != 0 ;
++	     he = Tcl_NextHashEntry(&search) ) {
++	    u_int32_t port = (u_int32_t)Tcl_GetHashKey( &pktsonport, he );
++	    pkt_dump *dump = (pkt_dump *)Tcl_GetHashValue( he );
++	    if( dump->num_pkts == 0 ) 
++		continue;
++
++	    printf("*************** port:%d ***************\n");
++	    for( unsigned int i=0 ; i<dump->num_pkts ; i++ ) {
++		printf("%lf %d %lf\n", dump->pkts[i].ts, dump->pkts[i].size,
++		       dump->pkts[i].clock );
++	    }
++	    printf("---------------------------------------\n");
++	}
++}
++
++#endif 
+ 
+ static class PortClassifierClass : public TclClass {
+ public:
 --- dist-ns-allinone-2.26/ns-2.26/common/ip.h	Wed Feb 26 15:07:39 2003
 +++ ns-allinone-2.26/ns-2.26/common/ip.h	Fri Nov 28 16:55:25 2003
 @@ -76,11 +76,11 @@
@@ -1239,7 +1354,7 @@
  
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Tue Jan  6 17:17:48 2004
++++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Thu Mar 11 18:53:04 2004
 @@ -46,12 +46,42 @@
  #include "config.h"
  #include "scheduler.h"
@@ -1367,37 +1482,31 @@
  	return;
  }
  
-@@ -956,11 +1010,29 @@
- 	virtual void run();
- 	double start() const { return start_; }
- 	virtual void reset();
-+#ifdef USEEVENTS
-+	int command(int argc, const char*const* argv);
-+#endif
- protected:
- 	void sync() { clock_ = tod(); }
-+	virtual void dispatch(Event*, double);	// exec event, set clock_
- 	double tod();
- 	double slop_;	// allowed drift between real-time and virt time
- 	double start_;	// starting time
-+	int    num_violation_; /* Number of times the clock has drifted by
-+	                        * slop between real-time and virtual time
-+			        */
-+	double clock_first_violation_; /* Value of clock when the first
-+				        * violation is detected
-+				        */
-+#ifdef USEEVENTS
-+        TbEventSink *evsink_;
-+#endif
-+#ifdef GETTIME_TSC
-+        unsigned long long basetsc_ ;
-+        double  oneontscfreq_;
-+        double  tscfreq_;
-+#endif
- };
+@@ -946,23 +1000,6 @@
+ 	return NULL;
+ }
  
+-#ifndef WIN32
+-#include <sys/time.h>
+-#endif
+-
+-class RealTimeScheduler : public CalendarScheduler {
+-public:
+-	RealTimeScheduler();
+-	virtual void run();
+-	double start() const { return start_; }
+-	virtual void reset();
+-protected:
+-	void sync() { clock_ = tod(); }
+-	double tod();
+-	double slop_;	// allowed drift between real-time and virt time
+-	double start_;	// starting time
+-};
+-
  static class RealTimeSchedulerClass : public TclClass {
-@@ -971,19 +1043,89 @@
+ public:
+ 	RealTimeSchedulerClass() : TclClass("Scheduler/RealTime") {}
+@@ -971,72 +1008,220 @@
  	}
  } class_realtime_sched;
  
@@ -1420,7 +1529,6 @@
 +  
 +int RealTimeScheduler::command(int argc, const char*const* argv)
 +{
-+  Tcl& tcl = Tcl::instance();
 +  if (instance_ == 0)
 +    instance_ = this;
 +  
@@ -1488,12 +1596,16 @@
  }
  
  void
-@@ -991,39 +1133,99 @@
+ RealTimeScheduler::reset()
  {
  	clock_ = SCHED_START;
- 	start_ = tod();
 +#ifdef GETTIME_TSC   
++	timeval tv;
++	gettimeofday(&tv, 0);
++	start_ = tv.tv_sec + (1e-6 * tv.tv_usec);
 +        basetsc_ = read_tsc();
++#else
+ 	start_ = tod();
 +#endif
  }
  
@@ -1504,8 +1616,10 @@
  void 
  RealTimeScheduler::run()
  { 
++#ifdef SELECT_TIMEOUT
  	static const double RTSCHEDULER_MINWAIT = 1.0e-3; // don't wait for less
 +	static const double delta = 1.0e-4; // should be smaller than above
++#endif
 +	static const int VIOLATION_THRESHOLD = 5;
 +	static const double VIOLATION_TIME_THRESHOLD = 1.0;
  	const Event *p;
@@ -1542,18 +1656,24 @@
 +		    } else if(num_violation_ == VIOLATION_THRESHOLD) {
 +			double diff = clock_ - clock_first_violation_;
 +			if (diff < VIOLATION_TIME_THRESHOLD) {
++#ifdef USEEVENTS
 +			    if (evsink_) {
++#ifdef RESWAP
 +				evsink_->send_nseswap();
++#endif
 +			    }
++#endif
 +			} else {
 +			    clock_first_violation_ = clock_;
 +			    num_violation_ = 1;
 +			}
 +		    }
++#ifdef PRINT_SLOP
 +		    fprintf(stderr,
 +			    "RealTimeScheduler: warning: slop "
 +			    "%f exceeded limit %f [clock_:%f, p->time_:%f]\n",
 +			    clock_ - p->time_, slop_, clock_, p->time_);
++#endif
 +		    clock_ = tod();
  		}
  		// handle "old events"
@@ -1569,6 +1689,7 @@
  			p = head();
  			clock_ = tod();
  		}
+-		
 +
 +#ifdef USEEVENTS
 +		if( evsink_ && evsink_->poll() == 1 ) {
@@ -1584,7 +1705,8 @@
 +		  done = 1;
 +		}
 +#endif
- 		
++
++#ifdef SELECT_TIMEOUT
  		if (!p) {
  			// blocking wait for TCL events
 -			Tcl_WaitForEvent(0); // no sim events, wait forever
@@ -1592,9 +1714,10 @@
 +			// XXX: But we can't afford to wait forever coz testbed
 +			// events are not being polled here and we might miss them
  			clock_ = tod();
++			Tcl_WaitForEvent(0); // no sim events, wait forever
  		} else {
  			double diff = p->time_ - clock_;
-@@ -1031,12 +1233,14 @@
+ 			// blocking wait only if there is enough time
  			if (diff > RTSCHEDULER_MINWAIT) {
  				Tcl_Time to;
  				to.sec = long(diff);
@@ -1605,6 +1728,9 @@
  			}
  		}
 -		Tcl_DoOneEvent(TCL_DONT_WAIT);
++#else
++		clock_ = tod();
++#endif
 +		if( Tcl_DoOneEvent(TCL_DONT_WAIT) == 1 ) {
 +		  gethead = true;
 +		}
@@ -1612,7 +1738,7 @@
  	// we reach here only if halted
  }
 --- dist-ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Thu Mar 11 19:01:17 2004
 @@ -98,7 +98,7 @@
  protected:
  	void dumpq();	// for debug: remove + print remaining events
@@ -1630,6 +1756,50 @@
  
  };
  
+@@ -206,5 +207,43 @@
+ 	int validate(Event *);
+ };
+ 
++#ifndef WIN32
++#include <sys/time.h>
++#endif
++
++#ifdef USEEVENTS
++class TbEventSink;
++#endif
++
++class RealTimeScheduler : public CalendarScheduler {
++public:
++	RealTimeScheduler();
++	virtual void run();
++	virtual double start() const { return start_; }
++	virtual void reset();
++#ifdef USEEVENTS
++	int command(int argc, const char*const* argv);
++#endif
++protected:
++	void sync() { clock_ = tod(); }
++	virtual void dispatch(Event*, double);	// exec event, set clock_
++	double tod();
++	double slop_;	// allowed drift between real-time and virt time
++	double start_;	// starting time
++	int    num_violation_; /* Number of times the clock has drifted by
++	                        * slop between real-time and virtual time
++			        */
++	double clock_first_violation_; /* Value of clock when the first
++				        * violation is detected
++				        */
++#ifdef USEEVENTS
++        TbEventSink *evsink_;
++#endif
++#ifdef GETTIME_TSC
++        unsigned long long basetsc_ ;
++        double  oneontscfreq_;
++        double  tscfreq_;
++#endif
++};
+ 
+ #endif
 --- dist-ns-allinone-2.26/ns-2.26/common/simulator.cc	Wed Feb 26 15:07:41 2003
 +++ ns-allinone-2.26/ns-2.26/common/simulator.cc	Fri Nov 28 16:55:25 2003
 @@ -23,6 +23,7 @@
@@ -1837,7 +2007,7 @@
   protected:
  	int command(int argc, const char*const* argv);
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Jan 16 16:39:32 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Thu Mar 11 14:47:36 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -1845,7 +2015,7 @@
   * All rights reserved.
   * 
   * Redistribution and use in source and binary forms, with or without
-@@ -37,28 +37,79 @@
+@@ -37,28 +37,80 @@
  #endif
  
  #include "iptap.h"
@@ -1916,6 +2086,7 @@
 +  mtu = 1500; /* just assume default */
 +  icmpagent = 0;
 +  memset( &srcnodeipaddr, 0, sizeof(srcnodeipaddr) );
++  send_count = recv_count = 0;
  }
  
 +IPTapAgent::~IPTapAgent()
@@ -1926,7 +2097,7 @@
  
  /*
   * Checking for duplicate packets.  Need to do this, if running
-@@ -131,17 +182,61 @@
+@@ -131,17 +183,63 @@
  IPTapAgent::processpkt(Packet *p, const struct timeval &ts)
  {
    struct ip *ipheader;
@@ -1937,9 +2108,9 @@
 -  int iphlen;  
    unsigned short datagramlen;
    unsigned char ttl;
-   
--  /* TCP header info from the grabbed packet. */
--  unsigned char tcphlen;
++
++  recv_count++;
++  
 +#ifdef MEASURE_DELAYS
 +
 +  double delay ;
@@ -1959,7 +2130,9 @@
 +
 +#endif
 +
-+  
+   
+-  /* TCP header info from the grabbed packet. */
+-  unsigned char tcphlen;
 +#if 0
 +  timeval tv;
 +  gettimeofday(&tv, 0);
@@ -1993,7 +2166,7 @@
    /* 
       At this point, all I have to do is to grab the ttl value 
       from the received packet and put it in p's ttl field after
-@@ -150,8 +245,6 @@
+@@ -150,8 +248,6 @@
    */
  
    ipheader = (struct ip *) p->accessdata();
@@ -2002,7 +2175,7 @@
    ttl = ipheader->ip_ttl;
    if (!(--ttl)) {
      fprintf(stderr,
-@@ -180,15 +273,29 @@
+@@ -180,15 +276,29 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -2033,7 +2206,7 @@
   * as there are from the packet capture facility.
   * For every packet received through the callback, it populates the ns packet
   * ttl value and inject it into the simulator by calling target_->recv
-@@ -197,14 +304,17 @@
+@@ -197,14 +307,17 @@
  void
  IPTapAgent::recvpkt()
  {
@@ -2053,7 +2226,7 @@
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -219,13 +329,64 @@
+@@ -219,13 +332,71 @@
  }
  
  
@@ -2074,8 +2247,15 @@
 +	      printf("%.10f ", bpf_ts_to_iptap[i]);
 +	    printf("\n");
 +	    return (TCL_OK);
-+	  }
++	  } 
 +#endif
++	  if(strcmp(argv[1], "sendcount") == 0 ) {
++	      fprintf( stderr, "sendcount:%d\n", send_count );
++	      return (TCL_OK);
++	  } else if(strcmp(argv[1], "recvcount") == 0 ) {
++	      fprintf( stderr, "recvcount:%d\n", recv_count );
++	      return (TCL_OK);
++	  }
 +	} else if (argc == 3) {
 +		if (strcmp(argv[1], "network-incoming") == 0) {
 +			PcapNetwork *net_in_ = (PcapNetwork *)TclObject::lookup(argv[2]);
@@ -2119,7 +2299,7 @@
   */
  int
  IPTapAgent::sendpkt(Packet* p)
-@@ -233,10 +394,11 @@
+@@ -233,10 +404,11 @@
    int byteswritten;
    unsigned char *packet;
    unsigned char received_ttl;
@@ -2133,7 +2313,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
-@@ -245,7 +407,7 @@
+@@ -245,7 +417,7 @@
    
    // send packet into the live network
    hdr_cmn* hc = HDR_CMN(p);
@@ -2142,7 +2322,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -273,27 +435,110 @@
+@@ -273,27 +445,118 @@
      return(-1);
    }
  
@@ -2209,7 +2389,7 @@
 +  
 +    ipheader->ip_hl = (IP_HEADER_LEN / 4);
 +    ipheader->ip_v = IPVERSION;
-+    
+     
 +    ipheader->ip_id = 0;
 +    ipheader->ip_ttl = received_ttl;
 +    ipheader->ip_p = IPPROTO_ENCAP;
@@ -2231,7 +2411,7 @@
 +
 +    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
 +						 sizeof(struct ip));
-     
++    
 +
 +    if (net_outgoing_->send(sendbuf, sendlen) < 0) {
 +      fprintf(stderr,
@@ -2240,6 +2420,7 @@
 +      drop(p);
 +      return (-1);    
 +    }
++    send_count++;
 +    Packet::free(p);
 +    TDEBUG3("IPTapAgent(%s): sent compressed packet (sz: %d)\n",
 +	    name(), size);
@@ -2251,6 +2432,13 @@
 +    return 0;
  }
  
++struct pkt_dump_t {
++    double ts;
++    int size;
++};
++
++pkt_dump_t pktdump[100000];
++
 +bool PacketDecapsulateIfNeeded(Packet *p) {
 +    hdr_cmn *hc = HDR_CMN(p);
 +    if ( hc->ptype_ != PT_LIVE )
@@ -2271,7 +2459,7 @@
 +    return true;
 +}
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Sun Dec 14 20:48:23 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Fri Mar  5 18:15:03 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -2314,7 +2502,7 @@
  
    unsigned short in_cksum(unsigned short *,int);
    void recvpkt();
-@@ -66,6 +81,20 @@
+@@ -66,6 +81,22 @@
    void processpkt(Packet *, const struct timeval &);
    static void pkt_handler(void *, Packet *, const struct timeval &);
  
@@ -2332,6 +2520,8 @@
 +  u_int16_t  mtu;
 +  IcmpAgent *icmpagent;
 +  struct in_addr  srcnodeipaddr;
++  unsigned int send_count;
++  unsigned int recv_count;
  };
  
  #endif /* iptap_h */
@@ -2434,7 +2624,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Fri Jan 16 18:05:42 2004
+--- /dev/null	Thu Mar 11 19:40:11 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
@@ -2511,7 +2701,7 @@
  	return (Network::command(argc, argv));
  }
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Sat Dec 13 21:57:03 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Thu Mar 11 19:13:02 2004
 @@ -1,5 +1,5 @@
  /*-
 - * Copyright (c) 1998 The Regents of the University of California.
@@ -2603,7 +2793,47 @@
  
  //
  // PcapLiveNetwork: a live network tap
-@@ -498,6 +421,7 @@
+@@ -285,6 +208,8 @@
+ 	if (pcap_stats(pcap_, &pcs_) < 0)
+ 		return (-1);
+ 
++	fprintf( stderr, "%s : pkts:%d drops:%d\n", name(), pcs_.ps_recv, 
++		 pcs_.ps_drop );
+ 	return (pcs_.ps_recv);
+ }
+ 
+@@ -340,6 +265,19 @@
+ 	// link layer header will be placed at the beginning from pcap
+ 	int s = inst->skiphdr();	// go to IP header
+ 	memcpy(p->accessdata(), pkt + s, ph->caplen - s);
++#ifdef BPF_BASED_PACKET_TIME
++	// Store the bpf timestamp in the packet's time_ variable.
++	// If the packet is scheduled in the scheduler again, that
++	// will update the packet's time_ variable accordingly. But
++	// untill that happens, it is useful to carry the bpf
++	// timestamp for debugging reasons
++	p->time_ = ph->ts.tv_sec;
++	p->time_ += (1e-6 * ph->ts.tv_usec);
++	// Not sure why the virtual start() method is not correctly invoked
++	// without casting the reference to the subclass type
++	static double start = ((RealTimeScheduler &)Scheduler::instance()).start();
++	p->time_ -= start;
++#endif
+ 
+ 	ps->callback(ps->clientdata, p, ph->ts);
+ }
+@@ -490,6 +428,10 @@
+ 			name(), devname, errbuf_);
+ 		return -1;
+ 	}
++	if ( pcap_setnonblock(pcap_, 1, errbuf_) == -1 ) {
++	    fprintf( stderr, "pcap/live object (%s) couldn't set non-blocking mode:%s\n",
++		     name(), errbuf_ );
++	}
+ 	mode_ = mode;
+ 	dlink_type_ = pcap_datalink(pcap_);
+ 	pfd_ = pcap_fileno(pcap_);
+@@ -498,6 +440,7 @@
  		// use SIOCGIFADDR hook in bpf to get link addr
  		struct ifreq ifr;
  		struct sockaddr *sa = &ifr.ifr_addr;
@@ -2611,7 +2841,7 @@
  #ifdef HAVE_SIOCGIFHWADDR
  		memset(&ifr, 0, sizeof(struct ifreq));
  		strcpy(ifr.ifr_name, devname);
-@@ -513,6 +437,19 @@
+@@ -513,6 +456,19 @@
  			  name(), pfd_);
  		}
  #endif
@@ -2631,7 +2861,7 @@
  		if (dlink_type_ != DLT_EN10MB) {
  			fprintf(stderr,
  				"sorry, only ethernet supported\n");
-@@ -539,6 +476,19 @@
+@@ -539,6 +495,12 @@
  				"warning: pcap/live (%s) couldn't set immed\n",
  				name());
  			perror("ioctl(BIOCIMMEDIATE)");
@@ -2641,13 +2871,6 @@
 +				"warning: pcap/live (%s) couldn't flush bpf buffer\n",
 +				name());
 +			perror("ioctl(BIOCFLUSH)");
-+		}
-+		int seesent = 0;
-+		if (ioctl(pfd_, BIOCSSEESENT, &seesent) < 0) {
-+			fprintf(stderr,
-+				"warning: pcap/live (%s) couldn't reset BIOCGSEESENT\n",
-+				name());
-+			perror("ioctl(BIOCGSEESENT)");
  		}
  	}
  #endif
@@ -3052,15 +3275,21 @@
      int	       	lo_, hi_;	// range of lost packets
      double     	ts_;		// timestamp for RTT estimation
 --- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Fri Jan 16 16:33:49 2004
-@@ -79,6 +79,15 @@
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Mar 11 18:33:31 2004
+@@ -79,6 +79,21 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
-+#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE
-+CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE
++# The following commented CFLAGS represent all flags that can be used when building even
++# though many of them are not turned on by default. Some of the options need to be used
++# together. e.g. STORE_PKTS and NUM_PKTS, USEEVENTS and RESWAP
++#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE -DSTORE_PKTS
++#CFLAGS += -DNUM_PKTS=20000 -DBPF_BASED_PACKET_TIME -DRESWAP -DPRINT_SLOP -DDISPATCH_IN_RT
++#CFLAGS += -DSELECT_TIMEOUT -SCHED_DEBUG -DMEASURE_EVENT_RATE -DMEASURE_DELAYS
++CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE -DSTORE_PKTS 
++CFLAGS += -DRESWAP -DBPF_BASED_PACKET_TIME
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
 +LIB += `elvin-config --libs vin4c`
 +STATIC += -static
@@ -3069,7 +3298,7 @@
  # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
  # Also, gcc does not remove the .o before forking 'as', which can be a
  # problem if you don't own the file but can write to the directory.
-@@ -276,6 +285,7 @@
+@@ -276,6 +291,7 @@
  	mcast/lms-sender.o \
  	@V_STLOBJ@
  
@@ -3077,7 +3306,7 @@
  
  # don't allow comments to follow continuation lines
  
-@@ -303,6 +313,10 @@
+@@ -303,6 +319,10 @@
  	emulate/nat.o  \
  	emulate/iptap.o \
  	emulate/tcptap.o
