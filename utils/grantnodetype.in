@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -38,9 +38,8 @@ if ($UID == 0) {
 #
 # Configure variables
 #
-my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSADDR	= "@BOSSNODE@";
+my $TB		 = "@prefix@";
+my $update_perms = "$TB/sbin/update_permissions";
 
 #
 # Testbed Support libraries
@@ -48,6 +47,9 @@ my $BOSSADDR	= "@BOSSNODE@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
 
 #
 # Turn off line buffering on output
@@ -153,10 +155,38 @@ while (my ($nodetype,$nodeclass) = $query_result->fetchrow_array()) {
 foreach my $newtype (keys(%newtypes)) {
     print STDERR "Granting permission to use type $newtype\n"
 	if ($debug);
-    DBQueryFatal("replace into nodetypeXpid_permissions ".
-		 "(pid, type) ".
-		 "values ('$pid', '$newtype')")
+
+    #
+    # Make sure there is a minus policy in the group_policies table;
+    # If not, then granting permission to use this type is silly, and
+    # probably means that the group_policies table needs updating.
+    #
+    $query_result =
+	DBQueryFatal("select * from group_policies ".
+		     "where pid='-' and policy='type' and auxdata='$newtype'");
+    
+    exit(0)
+	if (!$query_result);
+
+    if (!$query_result->num_rows) {
+	die("*** $0:\n".
+	    "    There is no '-' policy for node type $newtype! Stopping.\n");
+    }
+
+    #
+    # Add generic rules that say the project is allowed to use "infinite"
+    # number of nodes of each type. 
+    # 
+    DBQueryFatal("replace into group_policies ".
+		 "(pid, gid, policy, auxdata, count) ".
+		 "values ('$pid', '$pid', 'type', '$newtype', 999999)")
 	if (!$impotent);
 }
 
+#
+# Now update the permissions table. 
+#
+system($update_perms);
+exit($? >> 8)
+    if ($?);
 exit(0);

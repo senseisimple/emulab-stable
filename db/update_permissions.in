@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Update the nodetypeXpid_permissions table, which is now just a cache
+# of info in the policy tables.
+#
+sub usage()
+{
+    print STDERR "Usage: update_permissions [-h]\n";
+    print STDERR "	-h   This message\n";
+    exit(-1);
+}
+my $optlist  = "h";
+
+#
+# Please do not run as root. Hard to track what has happened.
+#
+if ($EUID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSADDR	= "@BOSSNODE@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libadminctrl;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{h})) {
+    usage();
+}
+usage()
+    if (scalar(@ARGV));
+
+#
+# Its all in the library ...
+#
+exit(TBUpdateNodeTypeXpidPermissions());

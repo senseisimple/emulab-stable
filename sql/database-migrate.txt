@@ -2395,6 +2395,15 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (uid,policy,auxdata)
 	) TYPE=MyISAM;
 
+       Populating the tables from the existing nodetypeXpid_permissions.
+
+       insert into group_policies (pid, gid, policy, auxdata, count) \
+          select distinct '-','-','type',type,0 from nodetypeXpid_permissions;
+
+       insert into group_policies (pid, gid, policy, auxdata, count) \
+          select distinct pid,pid,'type',type,9999999 from \
+	       nodetypeXpid_permissions;
+
 1.308: Add a table for the robot tracking cameras.
 
 	CREATE TABLE cameras (

@@ -132,16 +132,51 @@
 #
 # NOTES:
 #
-#  1) Admission control is skipped in admin mode; returns okay.
-#  2) Admission control is skipped when the pid is emulab-ops; returns okay.
-#  3) When calculating current usage, nodes reserved to emulab-ops are
-#     ignored.
-#  4) The sitevar "swap/use_admission_control" controls the use of admission
-#     control; defaults to 1 (on).
-#  5) The current policies can be viewed in the web interface. See
-#     https://www.emulab.net/showpolicies.php3
-#  6) The global policy stuff is weak. I plan to step back and think about it
-#     some more before redoing it, but it will tide us over for now. 
+#  * The system is not hierarchical; it is flat. That is, user rules do not
+#    override group rules and group rules do not override project rules, etc.
+#  * Admission control is skipped in admin mode; returns okay.
+#  * Admission control is skipped when the pid is emulab-ops; returns okay.
+#  * When calculating current usage, nodes reserved to emulab-ops are
+#    ignored.
+#  * The sitevar "swap/use_admission_control" controls the use of admission
+#    control; defaults to 1 (on).
+#  * The current policies can be viewed in the web interface. See
+#    https://www.emulab.net/showpolicies.php3
+#  * The global policy stuff is weak. I plan to step back and think about it
+#    some more before redoing it, but it will tide us over for now.
+#
+#####
+# Regarding the nodetypeXpid_permissions table ...
+#
+# My original thought when I started this was that I would be able to replace
+# the existing nodetypeXpid_permissions table with this new stuff. Well, it
+# turns out that this was not a good thing to do, for a couple of reasons:
+#
+#  * Engineering: We access the nodetypeXpid_permissions table from three
+#    different languages, and no way I wanted to rewrite this library in
+#    in python and php!
+#
+#  * Performance: We access the nodetypeXpid_permissions from the web
+#    interface, on every single page load. In fact, we access it twice if
+#    if you count the FreePCs() count that we put at the top of the menu.
+#    Going through this library on each page load would be a serious drag.
+#
+# So, rather then actually get rid of the nodetypeXpid_permissions table, I
+# decided to keep it as a "cache" of permissions stored in the group
+# policies table. Each time you update the policy tables, we need to run
+# the update_permissions script which will call into this library (see the
+# TBUpdateNodeTypeXpidPermissions() routine) to reconstruct the permissions
+# table. I have whacked the grantnodetype script to do exactly that.
+#
+# Note that we could proably do the same thing for users by creating an
+# equivalent nodetypeXuid_permissions table, mapping users to types they
+# are allowed to use. That would be a lot rows, but the amount of data in
+# the table is small. That would give us very fine grained control of what
+# we show people in the web interface. Not sure it is worth it though.
+#
+# Bottom line: Do not update the nodetypeXpid_permissions table by hand
+# anymore! Update the group_policies table and then run the script to
+# update the permissions table (sbin/update_permissions). 
 #
 
 package libadminctrl;
@@ -150,7 +185,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT =
-    qw ( TBAdmissionControlCheck );
+    qw ( TBAdmissionControlCheck TBUpdateNodeTypeXpidPermissions );
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
@@ -163,6 +198,7 @@ my $TB		= "@prefix@";
 
 # Locals
 my $debug         = 0;
+my $impotent      = 1;
 my $expt_min;
 my $expt_max;
 my %virt_types    = ();  # Indexed by virt type, gives number desired
@@ -285,7 +321,7 @@ sub TestUserPolicy($$$$$)
 	
 	if ($assignflag) {
 	    UpdateForAssign($auxdata, $count - $current);
-#	    return 1;
+	    return 1;
 	}
 	
 	#
@@ -317,7 +353,7 @@ sub TestUserPolicy($$$$$)
 
 	if ($assignflag) {
 	    UpdateForAssign($auxdata, $count - $current);
-#	    return 1;
+	    return 1;
 	}
 	
 	#
@@ -410,7 +446,7 @@ sub TestGroupPolicy($$$$$$)
 	
 	if ($assignflag) {
 	    UpdateForAssign($auxdata, $count - $current);
-#	    return 1;
+	    return 1;
 	}
 	
 	#
@@ -445,7 +481,7 @@ sub TestGroupPolicy($$$$$$)
 	
 	if ($assignflag) {
 	    UpdateForAssign($auxdata, $count - $current);
-#	    return 1;
+	    return 1;
 	}
 	
 	#
@@ -568,7 +604,7 @@ sub TestGlobalPolicy($$$$)
 	
 	if ($assignflag) {
 	    UpdateForAssign($auxdata, $count - $current);
-#	    return 1;
+	    return 1;
 	}
 	
 	#
@@ -613,7 +649,7 @@ sub TestGlobalPolicy($$$$)
 	
 	if ($assignflag) {
 	    UpdateForAssign($auxdata, $count - $current);
-#	    return 1;
+	    return 1;
 	}
 	
 	#
@@ -647,9 +683,9 @@ sub TestGlobalPolicy($$$$)
 #
 # Test policies that apply.
 #
-sub TestPolicies($$$$)
+sub TestPolicies($$$)
 {
-    my ($uid, $pid, $gid, $eid) = @_;
+    my ($uid, $pid, $gid) = @_;
     my $failcount       = 0;
     my %user_policies   = ();
     my %group_policies  = ();
@@ -754,11 +790,20 @@ sub TestPolicies($$$$)
 	my $auxdata = $pref->{'auxdata'};
 
 	my $result = TestGlobalPolicy($policy, $test, $count, $auxdata);
-
+	    
 	$failcount++
 	    if (!$result);
     }
-    
+
+    #
+    # For node type permission checks, want to do project based checks
+    # first so that user restrictions can override project based restrictions.
+    # This is cause people can be in multiple projects and trying to get
+    # permission checks in this case is totally bogus to begin with, but
+    # we like to tell people how many nodes are available and they have
+    # permission to use, across all projects they are members of, which is a
+    # silly and meaningless number if you are in multiple projects.
+    # 
     foreach my $key (keys(%group_policies)) {
 	my $pref    = $group_policies{$key};
 	my $ppid    = $pref->{'pid'};
@@ -767,10 +812,11 @@ sub TestPolicies($$$$)
 	my $count   = $pref->{'count'};
 	my $auxdata = $pref->{'auxdata'};
 	my $global  = ($ppid eq $pid ? 0 : 1);
+	my $result;
 
-	my $result = TestGroupPolicy($pid, $gid,
-				     $policy, $count, $auxdata, $global);
-
+	$result = TestGroupPolicy($pid, $gid,
+				  $policy, $count, $auxdata, $global);
+	
 	$failcount++
 	    if (!$result);
     }
@@ -782,8 +828,10 @@ sub TestPolicies($$$$)
 	my $count   = $pref->{'count'};
 	my $auxdata = $pref->{'auxdata'};
 	my $global  = ($puid eq $uid ? 0 : 1);
+	my $result;
 
-	my $result = TestUserPolicy($uid, $policy, $count, $auxdata, $global);
+	$result = TestUserPolicy($uid, $policy,
+				 $count, $auxdata, $global);
 
 	$failcount++
 	    if (!$result);
@@ -791,6 +839,123 @@ sub TestPolicies($$$$)
 
     return 0
 	if ($failcount);
+    return 1;
+}
+
+#
+# Update nodetypeXpid_permissions table.
+#
+sub UpdateNodeTypeXpidPermissions()
+{
+    my %minus_policies  = ();
+    my %plus_policies   = ();
+    my %permissions     = ();
+
+    #
+    # Get global policies
+    # 
+    my $query_result =
+	DBQueryWarn("select * from group_policies ".
+		    "where pid='+' or pid='-' ".
+		    "order by pid,gid desc");
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $ppid    = $rowref->{'pid'};
+	my $pgid    = $rowref->{'gid'};
+	my $policy  = $rowref->{'policy'};
+	my $auxdata = $rowref->{'auxdata'};
+	my $count   = $rowref->{'count'};
+
+	next
+	    if (! ($policy eq TBADMINCTRL_POLICY_TYPE()));
+
+	if ($debug) {
+	    print "Type Perm: $ppid, $pgid, $count, $auxdata\n";
+	}
+	
+	if ($ppid eq "+") {
+	    $plus_policies{$auxdata} = $count;
+	}
+	elsif ($ppid eq "-") {
+	    $minus_policies{$auxdata} = $count;
+	}
+    }
+
+    #
+    # Get all group specific policies. 
+    #
+    $query_result =
+	DBQueryWarn("select * from group_policies ".
+		    "where pid!='+' and pid!='-' ".
+		    "order by pid,gid desc");
+    return -1
+	if (!$query_result);
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $ppid    = $rowref->{'pid'};
+	my $pgid    = $rowref->{'gid'};
+	my $policy  = $rowref->{'policy'};
+	my $auxdata = $rowref->{'auxdata'};
+	my $count   = $rowref->{'count'};
+
+	if ($debug) {
+	    print "Type Perm: $ppid, $pgid, $count, $auxdata\n";
+	}
+
+	next
+	    if ($count == 0);
+
+	next
+	    if (exists($plus_policies{$auxdata}) &&
+		plus_policies{$auxdata} == 0);
+
+	$permissions{"$ppid"} = {}
+	    if (!exists($permissions{"$ppid"}));
+	
+	$permissions{"$ppid"}->{$auxdata} = 1;
+    }
+
+    #
+    # Generate the nodetypeXpid_permissions table (pid, type). We want to
+    # do this atomically though, so create a temporary table and load that.
+    # Then do a rename to swap the tables around.
+    #
+    return -1
+	if (! (DBQueryWarn("select get_lock('libadminctrl', 999999)") &&
+	       DBQueryWarn("drop table if exists libadminctrl_backup") &&
+	       DBQueryWarn("drop table if exists libadminctrl_table")));
+
+    $query_result = DBQueryWarn("show CREATE TABLE nodetypeXpid_permissions");
+    return -1
+	if (!$query_result);
+
+    my $create_def = ($query_result->fetchrow_array())[1];
+    $create_def =~ s/nodetypeXpid_permissions/libadminctrl_table/ig;
+
+    return -1
+	if (!DBQueryWarn($create_def));
+    
+    foreach my $pid (keys(%permissions)) {
+	my @typelist = keys(%{ $permissions{$pid} });
+
+	foreach my $type (@typelist) {
+	    return -1
+		if (! DBQueryWarn("insert into libadminctrl_table (pid, type)".
+				  "  values ('$pid', '$type')"));
+	}
+    }
+    $query_result = 
+	DBQueryWarn("rename table ".
+		    "  nodetypeXpid_permissions TO libadminctrl_backup, ".
+		    "  libadminctrl_table TO nodetypeXpid_permissions ");
+
+    DBQueryWarn("drop table if exists libadminctrl_table");
+    DBQueryWarn("select release_lock('libadminctrl')");
+    return -1
+	if (!$query_result);
+    
     return 1;
 }
 
@@ -832,7 +997,7 @@ sub TBAdmissionControlCheck($$$$)
     LoadVirtNodeTypes($pid, $eid);
     LoadCurrent($uid, $pid, $gid);
 
-    my $rval = TestPolicies($uid, $pid, $gid, $eid);
+    my $rval = TestPolicies($uid, $pid, $gid);
     
     if ($debug && $assignflag) {
 	print "Assign type/class max counts:\n";
@@ -848,6 +1013,20 @@ sub TBAdmissionControlCheck($$$$)
     return $rval;
 }
 
+#
+# This is the secondary interface; this just gets a type restriction table.
+# For each project the user is a member of, list the node types the user is
+# not allowed to use. No mention in this table implies the user is allowed
+# to use the type. No mention in a list for a specific project means the
+# user is allowed to use the node type in that project (but might be
+# restricted in another project). So silly. Once we figure out the project
+# restrictions, apply the user restrictions to the table. 
+# 
+sub TBUpdateNodeTypeXpidPermissions()
+{
+    return UpdateNodeTypeXpidPermissions();
+}
+   
 #
 # Load the real types.
 # 
