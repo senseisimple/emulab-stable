@@ -14,12 +14,16 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 LEDA=@LEDA@
 
-OBJS=score.o parse_top.o parse_ptop.o
+OBJS=score.o parse_top.o parse_ptop.o config.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
 LDFLAGS+= -O3 -fomit-frame-pointer -m486
 CXXFLAGS = -I${LEDA}/incl
 # Pick one of the two below.
-CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486 -DUSE_OPTIMAL
+#CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
+#CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486 -DUSE_OPTIMAL
+CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG
+#CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG -DUSE_OPTIMAL
+#CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE
 #CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE -DUSE_OPTIMAL
 DEPLIBS=$(OBJS)
 

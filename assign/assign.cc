@@ -19,13 +19,18 @@
 #include "virtual.h"
 #include "score.h"
 
+void parse_options(char **argv, struct config_param options[], int nopt);
+int config_parse(char **args, struct config_param cparams[], int nparams);
+void dump_options(const char *str, struct config_param cparams[], int nparams);
+
 // Purely heuristic
+
 #ifdef USE_OPTIMAL
 #define OPTIMAL_SCORE(edges,nodes) (nodes*SCORE_PNODE + \
-                                    nodes/5.0*SCORE_SWITCH + \
+                                    nodes/opt_nodes_per_sw*SCORE_SWITCH + \
                                     edges*((SCORE_INTRASWITCH_LINK+ \
                                     SCORE_DIRECT_LINK*2)*4+\
-                                           SCORE_INTERSWITCH_LINK)/5.0)
+                                    SCORE_INTERSWITCH_LINK)/opt_nodes_per_sw)
 #else
 #define OPTIMAL_SCORE(edges,nodes) 0
 #endif
@@ -47,9 +52,6 @@ int cycles_to_best = 0;
 int batch_mode = 0;
 
 float sensitivity = .1;
-
-static const int initial_temperature = 100;
-static const int temp_prob = 130;
 
 int refreshed = 0;
 
@@ -115,7 +117,7 @@ int assign()
 
   nnodes = G.number_of_nodes();
  
-  float cycles = 120.0*(float)(nnodes + G.number_of_edges());
+  float cycles = CYCLES*(float)(nnodes + G.number_of_edges());
 
   float optimal = OPTIMAL_SCORE(G.number_of_edges(),nnodes);
 #ifdef STATS
@@ -131,7 +133,7 @@ int assign()
   int bestviolated;
   int absbestv;
   
-  float temp = initial_temperature;
+  float temp = init_temp;
   
   /* Set up the initial counts */
   init_score();
@@ -153,7 +155,7 @@ int assign()
     goto DONE;
   }
   
-  while (temp >= 2) {
+  while (temp >= temp_stop) {
 #ifdef VERBOSE
     cout << "Temperature:  " << temp << endl;
 #endif
@@ -244,7 +246,7 @@ int assign()
       }
     }
       
-    temp *= .9;
+    temp *= temp_rate;
   }
 
  DONE:
@@ -432,6 +434,16 @@ int main(int argc, char **argv)
 
   argc -= optind;
   argv += optind;
+
+  /* newbold@cs
+     These relate to the globals defined in common.h
+     It reads in all the parameters for the program that were formerly
+     all hardcoded constants.
+  */
+  parse_options(argv, options, noptions);
+#ifdef SCORE_DEBUG
+  dump_options("Send options", options, noptions);
+#endif
 
   int seed = time(NULL)+getpid();
   if (getenv("ASSIGN_SEED") != NULL) {
