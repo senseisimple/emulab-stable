@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -103,6 +103,15 @@ print "Getting our Emulab configuration ...\n";
 if (! ($vnodeid = jailedsetup())) {
     die("*** $0:\n".
 	"    Did not get our jailname!\n");
+}
+
+if (-x TMIFC) {
+    print "Setting up Interfaces ...\n";
+    system(TMIFC());
+    if ($? < 0) {
+	die("*** $0:\n".
+	    "    Failed to set up interfaces!\n");
+    }
 }
 
 if (-x TMTARBALLS()) {
