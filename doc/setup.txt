@@ -15,6 +15,7 @@ FreeBSD ports:
 
 apache+mod_ssl-1.3.19+2.8.2 The Apache 1.3 webserver with SSL/TLS functionality
 cvsupd-bin-16.1     A general network file distribution system optimized for CV
+fping-2.2b1         Quickly ping N hosts w/o flooding the network
 gmake-3.79.1        GNU version of 'make' utility
 isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server c
 mod_php3-3.0.18     PHP3 module for Apache
@@ -114,3 +115,18 @@ process.  boot process. You can ensure this by changing directories to
 /usr/local/etc/rc.d and renaming 'mysql-client.sh' to '1.mysql-client.sh' and
 'mysql-server.sh' to '2.mysql-server.sh'. You will also need to install the
 '3.testbed.sh' script (in the rc.d directory of the testbed tree)
+
+Logs - To avoid filling up /var, link /var/log/testbed to /usr/testbed/log
+
+CVSUPD - Minor changes to images can be distributed at boot time with cvsup. See
+doc/newimage.txt for an overview of setting up a sup tree. Make sure to copy over
+the old one (if it exists), and make sure cvsupd is running (there's an example
+rc.d script in the rc.d/ directory of the testbed CVS tree)
+
+##### Last-minute synching
+Right before bringing the new boss node online (if copying from an old boss node),
+make sure to have copy over the latest versions of:
+* The database
+* The sup tree
+* The dhcpd.conf file
+* The DNS records
