@@ -18,9 +18,10 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.8 2001-07-19 19:55:57 ikumar Exp $
+ * $Id: serv_listen.c,v 1.9 2001-07-19 20:02:37 ikumar Exp $
  */
 
+#include <math.h>
 #include "discvr.h"
 #include "packet.h"
 #include "util.h"
@@ -41,7 +42,7 @@ extern topd_inqid_t inqid_current;
  * as the nodeID. 
  */
 u_char myNodeID[ETHADDRSIZ];
-u_char parent_nodeIF[ETHADDRSIZ];
+u_char sendingIF[ETHADDRSIZ];
 u_char receivingIF[ETHADDRSIZ];
 
 /*
@@ -81,18 +82,29 @@ int is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead)
 }
 
 void
-get_recvIFADDR(char *name,struct ifi_info * ifihead)
+get_recvIFADDR(u_char* recvIF,char *name,struct ifi_info * ifihead)
 {
 	struct ifi_info * ifi=NULL;
-
+	//u_char * ptrRecvIF = (u_char*)malloc(sizeof(u_char)*ETHADDRSIZ);
 	for (ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) 
 	{
 		if(strcmp(name,ifi->ifi_name)==0) 
-			//Will do this once know the conversion from MAC address to hostname
-			//-ik
-			//memcpy(&receivingIF,&(ifi->ifi_haddr),ETHADDRSIZ);	
-			memcpy(&receivingIF,&myNodeID,ETHADDRSIZ);	
+		{
+			//Will do this copying of actual interface address once I know the conversion from 
+			//MAC address to hostname -ik
+			//memcpy(ptrRecvIF,&(ifi->ifi_haddr),ETHADDRSIZ);	
+			memcpy(recvIF,&(ifi->ifi_haddr),ETHADDRSIZ);	
+			
+			// Below, I am just copying nodeID just to identify nodes easily.
+			//memcpy(&receivingIF,&myNodeID,ETHADDRSIZ);	
+			//return ptrRecvIF;
+			return ;
+		}
 	}
+	fprintf(stderr,"ERROR: Could not locate the name of receiving interface in i/f list\n");
+	//return myNodeID;
+	memcpy(recvIF,myNodeID,ETHADDRSIZ);
+	return ;
 }
 
 
@@ -102,7 +114,6 @@ get_recvIFADDR(char *name,struct ifi_info * ifihead)
 int 
 inqid_cmp(struct topd_inqid *tid1, struct topd_inqid *tid2)
 {
-        //return( bcmp((void *)tid1, (void*)tid2, sizeof(struct topd_inqid)));
 	if((tid1->tdi_tv.tv_sec==tid2->tdi_tv.tv_sec) && (tid1->tdi_tv.tv_usec==tid2->tdi_tv.tv_usec)
 		 && (strcmp(tid1->tdi_nodeID,tid2->tdi_nodeID)==0))
 		return 1;
@@ -138,191 +149,335 @@ print_ifi_info(struct ifi_info *ifihead)
 
 
 void
-serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
+serv_listen(int servSockFd, struct sockaddr *pcliaddr, socklen_t clilen)
 {
-	int			flags, class=NEW;
+	int				flags=0, class=NEW, i=0, ttl=0, factor=0, selectReturn=0 ;
+	int 			sock_num=0, *sock_list = NULL, state=Q_LISTEN;
 	const int		on = 1;
    	socklen_t		len;
 	ssize_t			n;
 	char			mesg[MAXLINE], str[INET6_ADDRSTRLEN], ifname[IFNAMSIZ];
-	char                    *reply;
-	u_char                  *myNodeIDtmp = 0;
-	struct in_addr		in_zero;
+	char            *reply;
+	u_char          *myNodeIDtmp = 0;
+	struct in_addr			in_zero;
 	struct ifi_info         *ifi, *ifihead;
-	struct in_pktinfo	pktinfo;
-	struct topd_inqnode     *inqn, *inqhead = 0;
-	int i=0,j=0;
-	struct topd_inqid *temp_inqid;
-	int t_int;
+	struct in_pktinfo		pktinfo;
+	//struct topd_inqnode     *inqn;
+	struct topd_inqid 		*temp_inqid, *inqhead=NULL;
 
-	/* 
-	 * Use this option to specify that the receiving interface
-	 * be returned in the control message structure passed to
-	 * sendto().
-	 * 
-	 * Note: We're assuming that we can set IP_RECVIF here, but
-	 * it's not necessarily supported on all systems. It 
-	 * is supported on FreeBSD. -lkw
-	 */
-	if (setsockopt(sockfd, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0) {
+	fd_set readFd,tempReadFd;
+	struct timeval timeLimit;
+	struct timeval *ptrTimeLimit;
+	struct topd_nborlist    *saveNbr;
+	char	recvbuf[BUFSIZ];
+	double elapsed=0.0,begin=0.0,end=0.0,deadline=0.0,start=0.0;
+	struct sockaddr sender_addr;
+	u_char senderIF[ETHADDRSIZ];
+	u_char recverIF[ETHADDRSIZ];
+	u_char *ptrTempRecvIF;
+	/*
+	struct sockaddr     name;
+    int             namelen=sizeof(name);
+	*/
+
+	if (setsockopt(servSockFd, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0) 
+	{
 		fprintf(stderr,"setsockopt of IP_RECVIF");
 		return;
-		
 	}
 
-	bzero(&in_zero, sizeof(struct in_addr));	/* all 0 IPv4 address */
+	bzero(&in_zero, sizeof(struct in_addr)); // All 0 IPv4 address
 
-	/* 
-	 * Find and set our node ID 
-	 */
-
-	//ik: get the list of interfaces using the function "get_ifi_info" into the
+	// Print the interfaces and my Node ID:
+	
+	//Get the list of interfaces using the function "get_ifi_info" into the
 	//link list "ifi" and the max hardware address of all the i/fs is the Node ID
-	for (ifihead = ifi = get_ifi_info(AF_INET, 0); 
-		 ifi != NULL; ifi = ifi->ifi_next) {
-		if ( ifi->ifi_hlen > 0) {
+	for (ifihead = ifi = get_ifi_info(AF_INET, 0); ifi != NULL; ifi = ifi->ifi_next) 
+	{
+		if ( ifi->ifi_hlen > 0) 
+		{
 		        myNodeIDtmp = max_haddr(myNodeIDtmp, ifi->ifi_haddr);
 		}
 	}
 	memcpy(&myNodeID, myNodeIDtmp, ETHADDRSIZ);
-	printf("My node id:");
-	print_nodeID(myNodeID);
+	//printf("My node id:");
+	//print_nodeID(myNodeID);
 
 	print_ifi_info(ifihead);
 	free_ifi_info(ifihead);
 
-	/*
-	 * Wait for requests. When a request comes in, send the request
-	 * on to each interface. 
-	 */
-	i=0;
-	for ( ; ; ) {
-		//printf("**********for==>%d\n",i++);
-		len = clilen;
-		flags = 0;
-		n = recvfrom_flags(sockfd, mesg, MAXLINE, &flags,
-						   pcliaddr, &len, &pktinfo);
-		printf("%d-byte datagram from %s", n, sock_ntop(pcliaddr, len));
-		if (memcmp(&pktinfo.ipi_addr, &in_zero, sizeof(in_zero)) != 0)
-			// came to my "below" IP address... -ik
-			printf(", to %s", inet_ntop(AF_INET, &pktinfo.ipi_addr,
-			        str, sizeof(str)));
-		if (pktinfo.ipi_ifindex > 0)
-			printf(", recv i/f = %s",
-				   if_indextoname(pktinfo.ipi_ifindex, ifname));
-		if (flags & MSG_TRUNC)	printf(" (datagram truncated)");
-		if (flags & MSG_CTRUNC)	printf(" (control info truncated)");
-#ifdef	MSG_BCAST
-		if (flags & MSG_BCAST)	printf(" (broadcast)");
-#endif
-		printf("\n");
+	// Reset the set of Fds to be used in select
+	FD_ZERO(&readFd);
+	FD_ZERO(&tempReadFd);
+	
+	//timeout := 0
+	timeLimit.tv_sec  = 0;
+	timeLimit.tv_usec = 0;
+	ptrTimeLimit = NULL;
+	
+	ifihead = get_ifi_info(AF_INET,0);
 
-		//printf("The message received is: ==>\n%s\n====\n",*mesg);
-		// -ik: just to check what was recevied:
-		print_tdinq(mesg);
-
-		/* 
-		 * There are 3 possible classifications for this inquiry.
-		 * Our response to the inquiry depends upon its classification:
-		 * 
-		 * - New inquiry -> forward and reply (NEW)
-		 * - Duplicate inquiry
-		 *       - From us -> ignore (DUP)
-		 *       - From another -> reply with interface list. (DUP_NBOR)
-		 * 
-		 * We now classify each inquiry.
-		 */ 
-		ifihead = get_ifi_info(AF_INET, 0); 
-		
-		if(inqhead==NULL) class = NEW;
-		j=0;
-		for ( inqn = inqhead; inqn != NULL; inqn = inqn->inqn_next ) {
-			//printf("inquiry loop ##### %d\n",j++);
-			//printf("Comparing #### ==>\n\"");
-			//print_tdinq((char*)inqn->inqn_inq);
-			//printf("\"and\n\"");
-			//print_tdinq(mesg);
-			//printf("\"\n");
-		          if (inqid_cmp(inqn->inqn_inq, (struct topd_inqid *)mesg)) {
-		                  /* Duplicate inquiry */
-		                  //if (from_us(&pktinfo, ifihead))... 
-				  if(is_my_packet(pcliaddr, ifihead)) {
-					  printf("Duplicate inquiry from me\n");
-			                  class = DUP;
-					  break;
-				  } else {
-					  printf("Duplicate inquiry from others\n");
-				          class = DUP_NBOR;
-					  break;
-				  }
-			  } else {
-		                  /* New inquiry */
-			          class = NEW;
-			  }
+	FD_SET(servSockFd,&readFd);
+	
+	start = tod();
+	state = Q_LISTEN;
+	while(1)
+	{
+		tempReadFd = readFd;
+		/*
+		 * Not necessary to set begin here. I am setting it after
+		 * calculating elapsed time.
+		   if(state == QR_LISTEN)
+			begin = tod();
+		*/
+    	//Do select untill timeout. When ptrTimeLimit is NULL then it blocks
+		if((selectReturn = select(FD_SETSIZE, &tempReadFd, NULL, NULL,
+								  ptrTimeLimit)) < 0)
+		{
+			perror("Select returned less than 0");
 		}
-
-		if (class == DUP) continue;
-		if (class == NEW)
-			printf("Got a new inquiry\n");
-
-		/* 
-		 * Save the inquiry ID into inqid_current.
-		 */
-		get_recvIFADDR(if_indextoname(pktinfo.ipi_ifindex, ifname),ifihead);
-		//printf(">>>>>>>The receiving interface is:");
-		//print_nodeID(receivingIF);
-		memcpy(&inqid_current, mesg, sizeof(topd_inqid_t));
-
-		/* Send string to all interfaces. forward_request() will 
-		 * stuff reply into ifi_info. 
-		 */
- 
-		//ifihead = get_ifi_info(AF_INET, 0); 
-		temp_inqid = (struct topd_inqid *)mesg;
-
-		memcpy(&parent_nodeIF, &(temp_inqid->tdi_p_nodeIF), ETHADDRSIZ);
-		//printf("Parents interface:");
-		//print_nodeID(parent_nodeIF);
-		
-		t_int = ntohs(temp_inqid->tdi_ttl);
-		if(t_int==0)
-			printf("The TTL is zero so i will not forward!!\n");
-		if ((class == NEW) && (t_int!=0)) {
-		        struct topd_inqnode *save = inqhead;
-		        //struct topd_inqid *temp;
-			//int t_int;
-		        inqhead = (struct topd_inqnode *)malloc(sizeof(struct topd_inqnode));
-		        inqhead->inqn_inq = (struct topd_inqid *)malloc(sizeof(struct topd_inqid));
-			if (inqhead == NULL || inqhead->inqn_inq == NULL ) {
-			        fprintf(stderr, "Ran out of room while expanding inquiry list.\n");
+		else if(selectReturn == 0)
+		{
+			printf("Select timed out\n");
+			// Send Reply
+			if( (reply=(char *)malloc(BUFSIZ)) == NULL) 
+			{
+		        fprintf(stderr, "Ran out of memory for reply mesg.\n");
 				exit(1);
 			}
-			memcpy(inqhead->inqn_inq, mesg, sizeof(struct topd_inqid));
-			inqhead->inqn_next = save;
-				
-			//temp = (struct topd_inqid *)mesg;
-			//t_int = ntohs(temp->tdi_ttl);
-			//t_int=t_int-2;
-			//temp->tdi_ttl = htons(t_int);
-			
-		        ifihead=forward_request(ifihead, &pktinfo, mesg, n );
-			//printf("printing after forward===>\n");
-			//print_tdifinbrs(ifihead);
-
-		}
-
-		if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
-		        fprintf(stderr, "Ran out of memory for reply mesg.\n");
-			exit(1);
-		}
-		n = compose_reply(ifihead, reply, BUFSIZ, class == NEW);
-		printf("replying: ");
-		print_tdreply(reply, n);
-		printf("done!\n");
-		free_ifi_info(ifihead);
+			n = compose_reply(ifihead, reply, BUFSIZ, 1,sendingIF,receivingIF);
+			printf("replying: ");
+			print_tdreply(reply, n);
+			printf("done!\n");
 		
-		printf("Sending response to: %s\n",sock_ntop(pcliaddr,sizeof(struct sockaddr)));
-		/* send response back to original sender */
-		sendto(sockfd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));
+			printf("Sending response to: %s\n",sock_ntop(&sender_addr,sizeof(struct sockaddr)));
+			sendto(servSockFd, reply, n, 0, &sender_addr, sizeof(struct sockaddr));
+
+			free_ifi_info(ifihead);
+			ifihead = get_ifi_info(AF_INET,0);
+			timeLimit.tv_sec  = 0;
+		    timeLimit.tv_usec = 0;
+			ptrTimeLimit = NULL;
+			printf("Listen for any query\n");
+
+			// Clear the temp sockets returned by the "forward_request" function
+			// from the readFd set
+			for(i=0;i<sock_num;i++)
+			{
+				FD_CLR(sock_list[i], &readFd);
+				close(sock_list[i]);
+			}
+			sock_num=0;
+			free(sock_list);
+
+			state = Q_LISTEN;
+			free(inqhead);
+			inqhead=NULL;
+			
+			continue;
+		}
+
+    	//If(Query)
+		if(FD_ISSET(servSockFd,&tempReadFd))
+		{
+			len = clilen;
+			flags = 0;
+			n = recvfrom_flags(servSockFd, mesg, MAXLINE, &flags,
+						   pcliaddr, &len, &pktinfo);
+			printf("%d-byte datagram from %s", n, sock_ntop(pcliaddr, len));
+			if (memcmp(&pktinfo.ipi_addr, &in_zero, sizeof(in_zero)) != 0)
+				printf(", to %s", inet_ntop(AF_INET, &pktinfo.ipi_addr,str, sizeof(str)));
+			if (pktinfo.ipi_ifindex > 0)
+				printf(", recv i/f = %s",if_indextoname(pktinfo.ipi_ifindex, ifname));
+			if (flags & MSG_TRUNC)	printf(" (datagram truncated)");
+			if (flags & MSG_CTRUNC)	printf(" (control info truncated)");
+			#ifdef	MSG_BCAST
+			if (flags & MSG_BCAST)	printf(" (broadcast)");
+			#endif
+			printf("\n");
+
+			//Print the received inquiry
+			print_tdinq(mesg);
+			if(inqhead==NULL) class = NEW;
+			else if (inqid_cmp(inqhead, (struct topd_inqid *)mesg))
+			{
+				if(is_my_packet(pcliaddr, ifihead)) 
+				{
+					printf("Duplicate inquiry from me\n");
+					class = DUP;
+				} 
+				else 
+				{
+					printf("Duplicate inquiry from others\n");
+					class = DUP_NBOR;
+				}
+			} 
+			else
+			{
+				printf("Error: Stray packet... earlier enquiry.\n");
+			}
+			if(class == NEW)
+				printf("Received a new query packet!\n");
+
+			//ptrTempRecvIF = 
+			get_recvIFADDR(recverIF,if_indextoname(pktinfo.ipi_ifindex, ifname),ifihead);
+			printf("The query receiving interface is:==>\n");
+			print_haddr(recverIF,ETHADDRSIZ);
+			/*
+			print_haddr(ptrTempRecvIF,ETHADDRSIZ);
+			memcpy(&recverIF,ptrTempRecvIF,ETHADDRSIZ);
+			free(ptrTempRecvIF);
+			*/
+			memcpy(&inqid_current, mesg, sizeof(topd_inqid_t));
+			temp_inqid = (struct topd_inqid *)mesg;
+			memcpy(&senderIF, &(temp_inqid->tdi_p_nodeIF), ETHADDRSIZ);
+			ttl = ntohs(temp_inqid->tdi_ttl);
+			factor = ntohs(temp_inqid->tdi_factor);
+			
+			if(ttl==0)
+                printf("The TTL is zero so i will not forward!!\n");
+			
+			switch(class)
+			{
+				case DUP: break;
+				case DUP_NBOR: 
+					if((reply=(char *)malloc(BUFSIZ)) == NULL) 
+					{
+						fprintf(stderr, "Ran out of memory for reply mesg.\n");
+						exit(1);
+					}
+					n = compose_reply(ifihead, reply, BUFSIZ, 0,senderIF,recverIF);
+					sendto(servSockFd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));
+					printf("replying: ");
+					print_tdreply(reply, n);
+					printf("done!\n");
+					break;
+				case NEW:
+					if(state == QR_LISTEN)
+					{
+						printf("Received another new query, cannt handle it\n");
+						break;
+					}
+					if(ttl!=0)
+					{
+						/*
+						struct topd_inqnode *save = inqhead;
+						inqhead = (struct topd_inqnode *)malloc(sizeof(struct topd_inqnode));
+                		inqhead->inqn_inq = (struct topd_inqid *)malloc(sizeof(struct topd_inqid));
+						if (inqhead == NULL || inqhead->inqn_inq == NULL ) 
+						{
+							fprintf(stderr, "Ran out of room while expanding inquiry list.\n");
+							exit(1);
+						}
+						memcpy(inqhead->inqn_inq, mesg, sizeof(struct topd_inqid));
+						inqhead->inqn_next = save;
+						*/
+						inqhead = (struct topd_inqid *)malloc(sizeof(struct topd_inqid));
+						if(inqhead == NULL)
+						{
+							fprintf(stderr, "Ran out of room while copying
+									inquiry.\n");
+							exit(1);
+						}
+						memcpy(inqhead, mesg, sizeof(struct topd_inqid));
+						sock_list=forward_request(ifihead, &pktinfo, mesg, n, &sock_num );
+						// Do FD_SET on all these opened sockets
+						for(i=0;i<sock_num;i++)
+						{
+							FD_SET(sock_list[i],&readFd);
+						}
+						timeLimit.tv_sec = ttl * factor;
+						timeLimit.tv_usec = 0;
+						ptrTimeLimit = &timeLimit;
+						printf("Setting select timer to: %d\n",ttl * factor);
+						deadline = timeLimit.tv_sec + (timeLimit.tv_usec * 1e-6);
+						state = QR_LISTEN;
+						sender_addr = *pcliaddr;
+						memcpy(&sendingIF,&senderIF,ETHADDRSIZ);
+						memcpy(&receivingIF,&recverIF,ETHADDRSIZ);
+						begin = tod();
+					}
+					break;
+				default:
+					break;
+			}
+			
+		}
+
+		for(i=0;i<sock_num;i++)
+		{
+			/*
+			if(getsockname(sock_list[i], (struct sockaddr *)&name, &namelen)<0)
+    		{
+        		perror("getsockname\n");
+    		}
+    		printf("I am listening on: \"%s\" num:%d\n",sock_ntop(&name,name.sa_len),sock_num);
+			*/
+			if (FD_ISSET(sock_list[i], &tempReadFd)) 
+			{
+				n = recvfrom(sock_list[i], recvbuf, BUFSIZ, 0, NULL, NULL);
+				printf ("received:==>\n");
+				print_tdreply(recvbuf,n);
+
+				if((ifi=get_ifi_struct(sock_list[i],ifihead)) == NULL)
+				{
+					fprintf(stderr,"Socket \"%d\" is not in any ifi struct\n",sock_list[i]);
+				}
+
+				saveNbr = ifi->ifi_nbors;
+				ifi->ifi_nbors = (struct topd_nborlist *)malloc(sizeof(struct topd_nborlist)); 
+				if ( ifi->ifi_nbors == NULL ) 
+				{
+					perror("Not enough memory for neighbor list.");
+					exit(1);
+				}
+				// skip inquiry ID
+				ifi->ifi_nbors->tdnbl_nbors = (u_char *)malloc(n-sizeof(topd_inqid_t));
+				if ( ifi->ifi_nbors->tdnbl_nbors == NULL ) 
+				{
+					perror("Not enough memory for neighbor list.");
+					exit(1);
+				}
+				memcpy((void *)ifi->ifi_nbors->tdnbl_nbors, recvbuf +
+				   sizeof(topd_inqid_t), (n-sizeof(topd_inqid_t)));
+
+				// The "tdnbl_n" contains the number of neighbors that the node, along this
+				// interface, has
+				ifi->ifi_nbors->tdnbl_n = (n-sizeof(topd_inqid_t)) / sizeof(struct topd_nbor);
+				ifi->ifi_nbors->tdnbl_next = saveNbr;
+			}
+		}
+				
+		if(state == QR_LISTEN)
+		{
+			end=tod();
+			/* Since I have come out of the select so lets calculate how much time
+			 * I spent listening for query replies. If its greater than the
+			 * deadline I have then i will have to send reply otherwise keep
+			 * waiting for the reply by setting new deadline
+			 */
+
+			elapsed = end - begin;
+			if(elapsed >= deadline)
+			{
+				/* This i am doing so that select times out and and i send a
+				 * reply from there
+				 */
+				printf("Select crossed deadline. Set timer to 0 sec\n");
+				timeLimit.tv_sec = 0;
+				timeLimit.tv_usec = 0;
+				ptrTimeLimit = &timeLimit;
+			}
+			else if(elapsed < deadline)
+			{
+				deadline -=elapsed;
+				begin=end;
+				timeLimit.tv_sec = floor(deadline);
+				timeLimit.tv_usec = (deadline - timeLimit.tv_sec) * 1e+6;
+				ptrTimeLimit = &timeLimit;
+				printf("Deadline still not met. Set timer to %ld\n", timeLimit.tv_sec);
+			}
+		}
+			
 	}
 }

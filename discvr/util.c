@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.c,v 1.5 2001-07-19 19:55:57 ikumar Exp $
+ * $Id: util.c,v 1.7 2001-08-02 21:21:05 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -39,6 +39,28 @@ println_haddr(u_char *haddr, u_short hlen)
 	}
 	printf("\n");
 }
+
+void
+get_mac_addr(u_char *haddr, u_short hlen, char* addr)
+{
+    int     i;
+	u_char    *ptr;
+	char temp_str[10];
+	int len=0;
+	
+	if ((i = hlen) > 0) {
+		ptr = haddr;
+		do {
+		        //sprintf(temp_str,"%s%x", (i == hlen) ? "  " : ":", *ptr++);
+		        sprintf(temp_str,"%1x%1x", (0xf0 & *ptr)>>4, (0x0f & *ptr));
+				ptr++;
+				strncpy(addr+len,temp_str,strlen(temp_str));
+				len+=strlen(temp_str);
+		} while (--i > 0);
+	}
+	sprintf(addr+len,"\0");
+}
+
 
 void 
 print_haddr(u_char *haddr, u_short hlen)

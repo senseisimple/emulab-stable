@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.h,v 1.3 2001-06-14 23:19:23 ikumar Exp $
+ * $Id: util.h,v 1.6 2001-08-04 22:58:30 ikumar Exp $
  */
 
 void 
@@ -44,6 +44,9 @@ print_tdpairs(const char *mesg, size_t nbytes);
 
 void
 print_tdifinbrs(struct ifi_info *ifihead);
+
+void
+get_mac_addr(u_char *haddr, u_short hlen, char* addr);
 
 
 

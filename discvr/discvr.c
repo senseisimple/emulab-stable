@@ -8,7 +8,7 @@ error_exit(char *fmt, ...)
 	char *msg;
 
 	va_start(ap, fmt);
-	printf(
+	printf();
 	perror("Unable to get time-of-day.");
 	exit(1);
 }

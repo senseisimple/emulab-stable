@@ -18,12 +18,16 @@
  *
  * ---------------------------
  *
- * $Id: cli.c,v 1.5 2001-07-19 19:55:57 ikumar Exp $
+ * $Id: cli.c,v 1.7 2001-08-02 21:21:05 ikumar Exp $
  */
 
 #include "discvr.h"
 #include "packet.h"
 #include "util.h"
+
+extern u_char *mac_list[MAX_NODES];
+extern int num_nodes;
+
 
 u_char *
 find_nodeID(void)
@@ -63,7 +67,6 @@ find_nodeID(void)
 		 * compiled out eventually. -lkw
 		 */
 		 
-		 // Why max is being talken ?! -ik
 		if ( ifi->ifi_hlen > 0) {
 		        myNodeIDtmp = max_haddr(myNodeIDtmp, ifi->ifi_haddr);
 		}
@@ -119,11 +122,13 @@ cli(int sockfd, const struct sockaddr *pservaddr, socklen_t servlen,
 
 	printf("sending query to server:\n");
 	sendto(sockfd, &ti, TOPD_INQ_SIZ, 0, pservaddr, servlen);
-	//print_tdinq((char *)&ti);
+	print_tdinq((char *)&ti);
 	n = recvfrom(sockfd, recvline, MAXLINE, 0, NULL, NULL);
 	fflush(stdin);
-	//printf("Receiving in client:==>\n");
-	//print_tdreply(recvline, n);
+	printf("Receiving in client:==>\n");
+	print_tdreply(recvline, n);
+	gen_nam_file(recvline, n,"td1.nam");
+	printf("Done!\n");
 }
 
 /*
@@ -149,7 +154,7 @@ main(int argc, char **argv)
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-	printf("calling client\n");
+	//printf("calling client\n");
 	cli(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr), atoi(argv[2]), atoi(argv[3]));
 
 	exit(0);

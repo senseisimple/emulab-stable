@@ -1,0 +1,122 @@
+
+Client:
+=======
+Initiate Topology Discovery by sending Query to the server on 
+   the same machine. The Query packet format is:
+	1) Unique ID: Basically its the value returned by "gettimeofday()"
+   			which serves two purpose:
+			a) Query initiated by different clients running simulatenously
+			b) Identifying that its the query packet which was already 
+				seen earlier and processed.
+	2) TTL: In a sense its the estimate of the diameter of the network.
+	3) Factor: "TTL * Factor" is the time till any node waits for its 
+			neighbors to respond.
+	4) SourceNodeID: The greatest of the MAC Addresses of the machine
+			from where the query was initiated.
+	5) ImmediateSenderID: Its the ID of the immediate sender of the query.
+
+After sending this query the client waits for the server to respond.
+
+Server:
+=======
+In an "infinite loop" the server does the following:
+1. Listen to any query packet on the SERV_PORT
+2. We can determine if the latest query packet was already processed earlier 
+   or not  based on a list of query that we maintain. We keep adding every new
+   query that we encounter in this "Query List".
+   (a)If the "query packet" was already processed (as by above) and it is now sent
+   by this server then we discard the packet. We can determine who has sent this
+   packet by the information returned by "recvfrom" function for UDP receive.
+
+   (b)If the "query packet" was already processed earlier and it is now sent 
+   by some other node (neighbors) then the server replies them with its interface
+   list. (No neighbor information was supplied in the reply). The fact that the
+   packet has come back again tells the possibility of a cycle in the network so
+   just telling this node's information is enough to make the cycle complete.
+
+3. If the "query packet is a NEW packet then the server needs to gather its
+   neighbors' information and will have to send this back to the node which has
+   sent the query.
+   To gather this neighbors' information the server broadcasts this query to all
+   its interfaces after decrementing the TTL using the broadcast addresses.
+   Then the server goes in "select mode" to listen for all replies. It opens sockets
+   corresponding to each interface and binds to temperory ports. 
+   Based on the replies from all the different interfaces the server makes a list
+   of replies (ReplyList). 
+   		 The server cann't wait for replies for ever! So, it has a time limit
+   after that it stops listening to any reply and sends the current ReplyList back
+   to the node which as sent the Query. The "time limit" is determined by "ttl *
+   factor" in the query packet.  From this it can be understood that TTL is in
+   sense corresponds to the diameter of the network. Factor helps in getting a
+   reasonable time out value.
+
+4. After the ReplyList was formed send this to the node which had sent the query.
+
+5. Jump to step 1.
+   
+Problems removed from Kristine's Code to follow the above algorithm:
+--------------------------------------------------------------------
+1. TTL was not decremented before forwarding the Query
+2. Duplicate Query was not checked in the code correctly
+	- TTL was also compared to be equal
+3. Before doing select "fd_set" was not saved so it was
+   modified after select
+4. ResponseList was not returned by the forw_requests funstion
+5. It was forwarding the Query on one interface and was blocking
+   till it receives the response. Because of this
+   		(i)  Timeout was occuring by listening on just one 
+		 	 interface
+		(ii) It resulted in deadlock in case of cycles.
+6. Caculation of the size of reply list was wrong
+		(i) There were memory problems because size of Query 
+			structure was not decremented from the received 
+			response before forming the ResponseList
+7. Other small small problems like server was not listening on 
+	the specific ports where neighbors were sending the response
+
+
+But apart from this, the algo has an inherent problem:
+The server listens to query only after it has received all the replies from the 
+neighbors. Because of this the algorithm results in a lock when two nodes are each
+waiting for the other to reply and they both time out simulatenously resulting in
+missing links. This situation occurs in a cycle of 5 nodes as was discovered while
+experimentation.
+
+
+
+
+New Server Algo:
+================
+
+This algorithm is slight modification of the above server algorithm. The main
+difference is in the fact that we listen to the query as well as the replies 
+at the same point in the algorithm. We do the select on Query socket as well as
+the Response socket and process each of them depending on which socket the packet
+was received. 
+	After receiving a new query the server sets a timeout for the select. After
+the timeout occurs server stops waiting for response and then it sends its own
+response back to the node which sent the query.
+
+The algorithm is very similar to the above except the fact that we are doing
+select on the query socket too.
+
+Set timeout= 0. This blocks the select to listen for the queries.
+Run the following steps infinitely:
+1. select on socket corresponding to SERV_PORT for listening to any query as well
+as any socket open for listening to responses from the neighbors.
+
+2. If there is any query packet on the query socket then process it as done in 
+step 2 of the above algorithm. In case of a new query set "timeout" to
+"ttl*factor" and goto select statement again.
+
+3. If there are any response packets then make a list of it. Goto select again.
+
+4. If there is "timeout" in select then send the response back and set "timeout"
+to 0 again so that it can wait infinitely for any query.
+
+So, as clear from the algorithm the server can respond to any query also while
+waiting for replies. This was the drawback in the above algorithm which went in
+lock in this scenario.
+
+PS: I have avoided minute details in the algorithm for high level understanding of
+the algorithm. Feel free to raise any problem in the above algorithm.

@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.6 2001-07-19 19:55:57 ikumar Exp $*/
+/*$Id: discvr.h,v 1.8 2001-08-02 21:21:05 ikumar Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -29,6 +29,10 @@
 				 * needed until true packets are generated.  -lkw
 				 */
 
+
+#define Q_LISTEN 			1
+#define QR_LISTEN			2
+
 #define print_nodeID(x) println_haddr((x), ETHADDRSIZ)
 
 #define INCR_ALIGN(x,y)   ((x) += (y); ALIGN(x);)
@@ -57,14 +61,25 @@ struct ifi_info {
   int 	 sock; 			/* socket associated with this interface */
 };
 
+#define MAX_INTERFACES 5
+#define MAC_ADDR_LEN   20
+
+typedef struct db_elem 
+{
+	char *hostname;
+	char addrs[MAX_INTERFACES][MAC_ADDR_LEN];
+}db_type;
+
+#define MAX_NODES 100
+
 /* Prototypes */
 
 void 
 serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen);
 
-struct ifi_info  *
+int *
 forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
-		     const char *mesg, const int mesglen);
+		     const char *mesg, const int mesglen, int *ptrSockNum);
 struct ifi_info	*
 get_ifi_info(int, int);
 
@@ -88,7 +103,8 @@ void
 get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
 u_int32_t
-compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors);
+compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors,
+			  u_char [], u_char []);
 
 int
 is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead) ;
@@ -100,7 +116,13 @@ void
 addMyID(char* mesg, int size);
 
 void
-get_recvIFADDR(char *name,struct ifi_info * ifihead);
+get_recvIFADDR(u_char* recvIF,char *name,struct ifi_info * ifihead);
 
+double
+tod(void);
+
+
+void
+gen_nam_file(const char *mesg, size_t nbytes, char *);
 
 #endif /* _TOPD_DISCVR_H_ */
