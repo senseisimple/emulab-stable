@@ -160,7 +160,7 @@ public class WorkArea {
 		    Enumeration ce = v.elements();
 		    while (ce.hasMoreElements()) {
 			Thingee cet = (Thingee)ce.nextElement();
-			r += cet.getName() + " ";
+			r += "$" + cet.getName() + " ";
 		    }
 		    String bandwidth = t.getProperty( "bandwidth", "100" ) 
 			+ "Mb";
