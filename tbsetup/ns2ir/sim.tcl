@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.3 2000-12-26 20:10:09 calfeld Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.4 2000-12-26 23:54:15 calfeld Exp $
 
 #
 
@@ -191,16 +191,18 @@ Simulator instproc run {} {
     foreach link $linkslist {
 	$link print $IRfile
     }
-    puts $IRfile "END links\nEND topology\nSTART events"
-    foreach event $eventlist {
-	$event print $IRfile
-    }
-    puts $IRfile "END  events"
+    puts $IRfile "END links"
     puts $IRfile "START lans"
     foreach lan $lanlist {
 	$lan print $IRfile
     }
     puts $IRfile "END lans"
+    puts $IRfile "END topology"
+    puts $IRfile "START events"
+    foreach event $eventlist {
+	$event print $IRfile
+    }
+    puts $IRfile "END events"
 
     close $IRfile
 }
