@@ -118,6 +118,17 @@ TBMAIL("$expleader_name <$expleader_email>",
      "Bcc: $TBMAIL_OPS\n".
      "Errors-To: $TBMAIL_WWW");
 
+#
+# And log a copy so we know who sent it. 
+#
+TBUserInfo($uid, $uid_name, $uid_email);
+
+TBMAIL($TBMAIL_LOGS,
+       "Swap or Terminate Request: $pid/$eid",
+       "A swap/terminate $pid/$eid request was sent by $uid ($uid_name).\n",
+       "From: $uid_name <$uid_email>\n".
+       "Errors-To: $TBMAIL_WWW");
+
 echo "<p><center>
          Message successfully sent!
          </center>\n";
