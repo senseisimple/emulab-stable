@@ -83,6 +83,7 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     struct mtp_packet mp;
     int lpc, retval;
     char *cursor;
+    int last_idx_set;
     struct mtp_packet *hack_decl = NULL;
     
     assert(buffer != NULL);
@@ -116,7 +117,7 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     mp.data.update_position = &mup;
     
     cursor = buffer;
-    int last_idx_set = 0;
+    last_idx_set = 0;
     for (lpc = 0; lpc < mol->count; ++lpc) {
         if (mol->objects[lpc].valid) {
             last_idx_set = lpc;
