@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
-my $rsh = "ssh";
-my $rcp = "scp";
+my $rsh = "sshtb";
+my $rcp = "scptb";
 
 $| = 1; #Turn off line buffering on output
 
 if ( $#ARGV < 0) {
-    die("Usage: ifc_boot <ifc_file>\n". 	
+    die("Usage: ifc_setup <ifc_file>\n". 	
 	"Sets network interface configurations, both with ifconfig, and\n".
 	"in the boot configuration files.\n");
 }
@@ -90,11 +90,17 @@ while (<IN>) {
   } elsif ($OS eq "FreeBSD") {
     my $exists = 0;
     print "Setting $IP $ifstr$IF to $newIP in boot configurations...\n";
+    # Wait a second - Quick hack fix... 
+    sleep(1);
+    # 
     open(EXISTS, "$rsh $IP ls /etc/rc.conf.local 2>&1 |");
     while ( <EXISTS> ) { if ( ! /No such file/ ) { $exists = 1; } }
     close(EXISTS);
     open(TEMP,">/tmp/ifc_boot_file");
     if ($exists) {
+      # Wait a second - Quick hack fix... 
+      sleep(1);
+      #
       open(COPY, "$rcp $IP:/etc/rc.conf.local /etc/ifc_boot_input 2>&1 |");
       while ( <COPY> ) { print "COPY>> $_"; }
       close(COPY);
@@ -123,6 +129,9 @@ while (<IN>) {
     } else { print TEMP "network_interfaces=\"fxp$IF lo0\"\n"; }
     print TEMP "ifconfig_fxp$IF=\"inet $newIP netmask 255.255.255.0\"\n";
     close(TEMP);
+    # Wait a second - Quick hack fix... 
+    sleep(1);
+    #
     open(IFC,"$rcp /tmp/ifc_boot_file $IP:/etc/rc.conf.local 2>&1 |");
   } else { 
     print STDERR "Can't configure OS '$OS' on $IP. Skipping interface $IF.\n";
@@ -135,6 +144,9 @@ while (<IN>) {
   close(IFC);
 
   print "Setting $IP $ifstr$IF to $newIP with ifconfig...\n";
+  # Wait a second - Quick hack fix... 
+  sleep(1);
+  #
   open(IFC,
        "$rsh $IP /sbin/ifconfig $ifstr$IF inet $newIP ".
        "netmask 255.255.255.0 2>&1 |"
