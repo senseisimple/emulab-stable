@@ -39,6 +39,8 @@
 #include <string.h>
 #include <sys/socket.h>
 
+#include <math.h>
+
 #include "log.h"
 #include "mtp.h"
 #include "rmcd.h"
