@@ -199,6 +199,7 @@ if (!defined($nodevtype)) {
 #
 # Enter the records
 #
+print "Creating widearea node $nodename ...\n";
 DBQueryFatal("insert into nodes ".
 	     "(node_id, type, phys_nodeid, role, priority, ".
 	     " status, op_mode, def_boot_osid) ".
@@ -209,12 +210,13 @@ for ($i = 1; $i < 9; $i++) {
     my $priority  = ($nextpri * 100) + $i;
     $nodevname = "v${nodename}-${i}";
 	
+    print "Creating widearea virtual node $nodevname ...\n";
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".
-		 " status, op_mode, def_boot_osid) ".
+		 " status, op_mode, def_boot_osid, update_accounts) ".
 		 "values ('$nodevname', '$nodevtype', '$nodename', ".
 		 "        'virtnode', $priority, 'down', 'NORMAL', ".
-		 "        '$defosid') ");
+		 "        '$defosid', 1) ");
 }
 
 DBQueryFatal("insert into interfaces ".
@@ -242,23 +244,22 @@ DBQueryFatal("insert into reserved ".
 #
 # Lets log it.
 #
-if ($fromweb) {
-    SENDMAIL($TBLOGS, "New WA node created",
-	     "New Wide Area node has been created.\n".
-	     "\n".
-	     "Type:      $nodetype\n".
-	     "Name:      $nodename\n".
-	     "IP:        $nodeip\n".
-	     "Vtype:     $nodevtype\n".
-	     "Vname:     $nodevname (actually the last vnode)\n".
-	     "Nickname:  $nickname\n",
-	     $TBOPS);
-}
+SENDMAIL($TBLOGS, "New WA node created",
+	 "New Wide Area node has been created.\n".
+	 "\n".
+	 "Type:      $nodetype\n".
+	 "Name:      $nodename\n".
+	 "IP:        $nodeip\n".
+	 "Vtype:     $nodevtype\n".
+	 "Vname:     $nodevname (actually the last vnode)\n".
+	 "Nickname:  $nickname\n",
+	 $TBOPS);
 
 #
 # update the named maps. Do it in the background since we do not
 # want to hold up the caller.
 #
+print "Forcing a named map update ...\n";
 my $logname = TBMakeLogname("newwanode");
 if (TBBackGround($logname)) {
     #
