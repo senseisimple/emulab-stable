@@ -1239,3 +1239,9 @@ last_net_act,last_cpu_act,last_ext_act);
       
 	alter table nodes add stated_tag varchar(32) default NULL \
 			after sfshostid;
+
+1.218: Add nse_reswap_count in the experiments table to count how many
+       times we tried re-mapping a sim experiment.
+
+       alter table experiments add column sim_reswap_count \
+             smallint(5) unsigned NOT NULL default '0';
