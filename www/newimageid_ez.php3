@@ -169,7 +169,7 @@ function SPITFORM($formfields, $errors)
               <td><select name=\"formfields[loadpart]\">
                           <option value=X>Please Select </option>\n";
 
-    for ($i = 0; $i <= 4; $i++) {
+    for ($i = 1; $i <= 4; $i++) {
 	$selected = "";
 
 	if (strcmp($formfields[loadpart], "$i") == 0)
@@ -416,7 +416,7 @@ if (!isset($formfields[loadpart]) ||
     $errors["DOS Partition"] = "Not Selected";
 }
 elseif (! ereg("^[0-9]+$", $formfields[loadpart]) ||
-	$formfields[loadpart] < 0 || $formfields[loadpart] > 4) {
+	$formfields[loadpart] <= 0 || $formfields[loadpart] > 4) {
     $errors["DOS Partition"] = "Must be 1,2,3, or 4!";
 }
 
