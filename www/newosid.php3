@@ -53,7 +53,7 @@ if (! ereg("^[-_a-zA-Z0-9]+$", $osid)) {
 }
 
 if (isset($os_path)) {
-    if (strcmp($os_version, "") == 0) {
+    if (strcmp($os_path, "") == 0) {
 	unset($os_path);
     }
     else {
