@@ -115,6 +115,39 @@ if ($TESTMODE) {
 
 # Everything from now on sets up switch and node state.
 
+#
+# These things need to get started before the nodes come up, so we'll
+# do them before the os_setup. Everything else can done in parallel with
+# os_setup. (Actually, these probably can too, since they should finish
+# long before the nodes reboot, but better safe than sorry)
+#
+print "Setting up mountpoints.\n";
+if (system("exports_setup")) {
+    print STDERR "*** Failed to setup mountpoints.\n";
+    cleanup();
+    exit(1);
+}
+
+print "Starting the event system.\n";
+if (system("eventsys_control start $pid $eid")) {
+    print STDERR "*** Failed to start the event system.\n";
+    cleanup;
+    exit(1);
+}
+
+#
+# Since it'll take a while for the nodes to reboot, we'll start now, and
+# wait for the os_setup to finish, down below
+#
+print "Resetting OS and rebooting.\n";
+if (!($os_setup_pid = fork())) { 
+    exec("os_setup $pid $eid") or exit(1);
+} elsif ($os_setup_pid == -1) {
+    print STDERR "*** Fork failed.\n";
+    cleanup();
+    exit(1);
+}
+
 print "Setting up VLANs.\n";
 if (system("snmpit -t $pid $eid")) {
     print STDERR "*** Failed to set up VLANs.\n";
@@ -127,13 +160,6 @@ if (system("snmpit -t $pid $eid")) {
 #
 $cleanvlans = 1;
 
-print "Setting up mountpoints.\n";
-if (system("exports_setup")) {
-    print STDERR "*** Failed to setup mountpoints.\n";
-    cleanup();
-    exit(1);
-}
-
 print "Setting up named maps.\n";
 if (system("named_setup")) {
     print STDERR "*** WARNING: Failed to add node names to named map.\n";
@@ -142,26 +168,28 @@ if (system("named_setup")) {
     # 
 }
 
-print "Resetting OS and rebooting.\n";
-if (system("os_setup $pid $eid")) {
-    print STDERR "*** Failed to reset OS and reboot nodes.\n";
-    cleanup;
-    exit(1);
-}
-
-print "Starting the event system.\n";
-if (system("eventsys_control start $pid $eid")) {
-    print STDERR "*** Failed to start the event system.\n";
-    cleanup;
-    exit(1);
-}
-
 print "Setting up email lists.\n";
 if (system("genelists")) {
     print STDERR "*** WARNING: Failed to update email lists.\n";
     #
     # This is a non-fatal error.
     # 
+}
+
+#
+# OK, let's see how that os_setup did
+#
+$kid = waitpid($os_setup_pid,0);
+if ($kid == $os_setup_pid) {
+    if ($CHILD_ERROR) {
+	print STDERR "*** Failed to reset OS and reboot nodes.\n";
+	cleanup;
+	exit(1);
+    }
+} else {
+    print STDERR "*** Error waiting for os_setup to finish.\n";
+    cleanup;
+    exit(1);
 }
 
 # Accounting info.
