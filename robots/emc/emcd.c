@@ -1079,6 +1079,25 @@ int rmc_callback(elvin_io_handler_t handler,
 	retval = 1;
       }
       break;
+
+    case MTP_WIGGLE_STATUS:
+      {
+	  /* simply forward this to vmc */
+	  /* actually, we'll also ack it back to rmc */
+	  mp->role = MTP_ROLE_EMC;
+	  
+	  if (mtp_send_packet(vmc_data.handle,mp) != MTP_PP_SUCCESS) {
+	      error("vmc unavailable; cannot forward wiggle-status\n");
+	  }
+	  if (mtp_send_packet(rmc_data.handle,mp) != MTP_PP_SUCCESS) {
+	      error("could not ack the wiggle-status packet from rmc;"
+		    " this is a serious problem!\n"
+		    );
+	  }
+	  
+	  retval = 1;
+      }
+      break;
       
     default:
       {
@@ -1414,6 +1433,21 @@ int vmc_callback(elvin_io_handler_t handler,
         my_retval = mtp_send_packet(vmc->handle, &mp_reply);
         if (my_retval != MTP_PP_SUCCESS) {
           fprintf(stdout,"Could not send update_id packet!\n");
+        }
+
+	retval = 1;
+      }
+      break;
+
+    case MTP_WIGGLE_REQUEST:
+      {
+        /* simply forward this to rmc */
+        if (rmc_data.handle != NULL) {
+          mp->role = MTP_ROLE_EMC;
+          mtp_send_packet(rmc_data.handle,mp);
+        }
+        else {
+          error("rmc unavailable; cannot forward wiggle-request\n");
         }
 
 	retval = 1;

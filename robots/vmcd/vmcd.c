@@ -33,12 +33,29 @@ static mtp_handle_t emc_handle;
 #define MAX_VMC_CLIENTS 10
 #define MAX_TRACKED_OBJECTS 10
 
-struct robot_track {
+struct vmc_client_track {
     int updated;
     int valid;
     int robot_id;
     struct robot_position position;
+    struct robot_position wiggle_expected_position;
+    /* wiggle_valid indicates that the data in wiggle_expected_position 
+     * actually means something -- this might not have otherwise always
+     * been the case... (suppose a new vmc track is added after the wiggle
+     * is started -- then the robot_id is -1, and we would consider this new
+     * track as a potential wiggled object, when in fact, it is not eligible,
+     * since there is no valid wiggle_expected_position)
+     */
+    int wiggle_valid;
     int request_id;
+};
+
+struct real_track {
+    int updated;
+    int valid;
+    int robot_id;
+    struct robot_position position;
+    int vmc_client_ids[MAX_VMC_CLIENTS];
 };
 
 struct vmc_client {
@@ -46,8 +63,13 @@ struct vmc_client {
     char *vc_hostname;
     int vc_port;
     int vc_fd;
+    /* this is bad: this is the index into the vmc_clients global array
+     * we need it so that vmc_handle_update_position can figure out
+     * which vmc_client is talking to it.
+     */
+    int vc_idx;
     /* we store object positions from individual vmc-clients in this array */
-    struct robot_track tracks[MAX_TRACKED_OBJECTS];
+    struct vmc_client_track tracks[MAX_TRACKED_OBJECTS];
 };
 
 static unsigned int vmc_client_count = 0;
@@ -64,11 +86,20 @@ int get_next_request_id() {
 
 /* we store actual robot positions in this array */
 /* these are made from updates to the individual vmc_clients' arrays */
-static struct robot_track real_robots[MAX_TRACKED_OBJECTS];
+static struct real_track real_robots[MAX_TRACKED_OBJECTS];
 
 void vmc_handle_update_id(struct mtp_packet *p);
 void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p);
+void vmc_handle_wiggle_status(struct mtp_packet *p);
 int find_real_robot_id(struct robot_position *p);
+int match_position(struct robot_position *target,
+		   struct robot_position *actual,
+		   float max_disp,
+		   float *actual_disp);
+int match_orientation(struct robot_position *target,
+		      struct robot_position *actual,
+		      float max_disp,
+		      float *actual_disp);
 
 
 /**
@@ -216,6 +247,8 @@ static int parse_client_options(int *argcp, char **argvp[])
 	    break;
         case 'c':
             vmc_clients[vmc_client_count].vc_hostname = optarg;
+	    /* this sucks */
+	    vmc_clients[vmc_client_count].vc_idx = vmc_client_count;
             break;
         case 'P':
             if (sscanf(optarg,
@@ -251,7 +284,7 @@ static int parse_client_options(int *argcp, char **argvp[])
 
 int main(int argc, char *argv[])
 {
-    int lpc, i , retval = EXIT_SUCCESS;
+    int lpc, i, j, retval = EXIT_SUCCESS;
     struct sockaddr_in sin;
     fd_set readfds;
     
@@ -322,6 +355,10 @@ int main(int argc, char *argv[])
                      lpc,
                      vmc_config.robots.robots_val[lpc].id,
                      vmc_config.robots.robots_val[lpc].hostname);
+
+		real_robots[lpc].robot_id = 
+		    vmc_config.robots.robots_val[lpc].id;
+
             }
             for (lpc = 0; lpc < vmc_config.cameras.cameras_len; lpc++) {
 		vmc_clients[vmc_client_count].vc_hostname =
@@ -344,6 +381,10 @@ int main(int argc, char *argv[])
     for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
         real_robots[i].valid = 0;
         real_robots[i].updated = 0;
+
+        for (j = 0; j < MAX_VMC_CLIENTS; ++j) {
+	    real_robots[i].vmc_client_ids[0] = 0;
+        }
     }
     
     /* connect to all specified clients */
@@ -374,7 +415,7 @@ int main(int argc, char *argv[])
                 vc->tracks[i].updated = 0;
                 vc->tracks[i].valid = 0;
                 vc->tracks[i].robot_id = -1;
-                vc->tracks[i].request_id = -1;
+		vc->tracks[i].request_id = -1;
             }
         }
     }
@@ -399,8 +440,18 @@ int main(int argc, char *argv[])
 		    else {
 			/* XXX Need to handle update_id msgs here. */
 			mtp_print_packet(stdout, &mp);
-			
-			vmc_handle_update_id(&mp);
+
+			switch (mp.data.opcode) {
+			case MTP_UPDATE_ID:			
+			    vmc_handle_update_id(&mp);
+			    break;
+			case MTP_WIGGLE_STATUS:
+			    vmc_handle_wiggle_status(&mp);
+			    break;
+			default:
+			    error("bogus packet from emc\n");
+			    break;
+			}
 		    }
 		    
 		    mtp_free_packet(&mp);
@@ -429,7 +480,7 @@ int main(int argc, char *argv[])
 			
 			mtp_free_packet(&mp);
 		    } while (vc->vc_handle->mh_remaining > 0);
-		    info("done reading\n");
+		    //info("done reading\n");
 		}
             }
         }
@@ -503,6 +554,220 @@ void vmc_handle_update_id(struct mtp_packet *p) {
     }
 
 }
+
+int wiggle_robot_id = -1;
+int wiggle_type = -1;
+#define MAX_WIGGLE_POSIT_DISP    0.05f    // 5 cm
+#define MAX_WIGGLE_ORIENT_DISP   M_PI/10  // 8 deg
+
+/* called by vmc_handle_update_position, each time a vmc_client spews data */
+/* checks to see if we need to wiggle, or if we're already wiggling, etc */
+void wiggle_manager() {
+    int i;
+    struct mtp_packet mp;
+
+    if (wiggle_robot_id > -1) {
+	/* already wiggling */
+	return;
+    }
+
+    for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
+	// find the first one that needs wiggling
+	if (real_robots[i].valid != 1) {
+	    wiggle_robot_id = real_robots[i].robot_id;
+	    break;
+	}
+    }
+
+    if (wiggle_robot_id == -1) {
+	// nobody needs wiggling...
+	return;
+    }
+
+    /* otherwise, we wiggle wiggle_robot_id */
+
+    /* to do this, we must first stop the current motion of robot X, wait
+     * for rmcd to tell us that it's stopped.  Only then may we issue the 
+     * wiggle command; this ensures that we use a valid, stopped position
+     * as the base of detecting a wiggle.
+     */
+
+    mtp_init_packet( &mp,
+		     MA_Opcode, MTP_WIGGLE_REQUEST,
+		     MA_Role, MTP_ROLE_VMC,
+		     MA_RobotID, wiggle_robot_id,
+		     MA_WiggleType, MTP_WIGGLE_180_R,
+		     MA_TAG_DONE
+		    );
+
+    mtp_send_packet(emc_handle,&mp);
+
+    mtp_free_packet(&mp);
+
+    wiggle_type = MTP_WIGGLE_180_R;
+
+    info("sent wiggle request for robot id %d\n",wiggle_robot_id);
+
+}
+
+void vmc_handle_wiggle_status(struct mtp_packet *p) {
+    int i,j;
+    
+    if (p == NULL) {
+	return;
+    }
+
+    switch (p->data.mtp_payload_u.wiggle_status.status) {
+    /* if we have a current wiggle, and this is an MTP_POSITION_STATUS_IDLE
+     * status msg, we can copy the latest positions for any candidate tracks,
+     * then use these tracks as the baseline to determine which track wiggled.
+     */
+    /* candidate tracks are those who are not currently mapped to a robotid */
+    case MTP_POSITION_STATUS_IDLE:
+	{
+	    info("wiggle starting for robot id %d\n",wiggle_robot_id);
+	    
+	    for (i = 0; i < MAX_VMC_CLIENTS; ++i) {
+		for (j = 0; j < MAX_TRACKED_OBJECTS; ++j) {
+		    if (vmc_clients[i].tracks[j].valid &&
+			vmc_clients[i].tracks[j].robot_id == -1) {
+
+			vmc_clients[i].tracks[j].wiggle_valid = 1;
+			vmc_clients[i].tracks[j].wiggle_expected_position = 
+			    vmc_clients[i].tracks[j].position;
+			
+			info("recorded init posit for vmc-client %d, "
+			     "track %d\n",
+			     i,j);
+
+			if (wiggle_type == MTP_WIGGLE_180_R) {
+			    info("client%d/track%d theta BEFORE ADD = %f\n",
+				 i,j,
+				 vmc_clients[i].tracks[j].position.theta
+				 );
+			    vmc_clients[i].tracks[j].position.theta += M_PI;
+			    if (vmc_clients[i].tracks[j].position.theta >
+				2*M_PI) {
+				vmc_clients[i].tracks[j].position.theta -=
+				    2*M_PI;
+			    }
+			    info("wiggle was single 180\n");
+			}
+			else {
+			    // XXX fix for other wiggle types later...
+			    error("unrecognized wiggle type, can't calc new"
+				  " posit\n"
+				  );
+			}
+
+		    }
+		    else {
+			vmc_clients[i].tracks[j].wiggle_valid = 0;
+		    }
+		}
+	    }
+	}
+	break;
+    /* if we have a current wiggle, and this is a MTP_POSITION_STATUS_COMPLETE
+     * status msg,
+     * we grab the current state of the positions for eligible tracks, and
+     * determine who wiggled.  if it's equivocal in one vmc_client only,
+     * we'll have to re-wiggle.  if it's equivocal between multiple 
+     * vmc_clients, if the positions of the tracks indicate a match, there is
+     * really no equivocation; both tracks are the ID of the robot that we 
+     * wiggled.  otherwise there is equivocation and we have to re-wiggle.
+     */
+    case MTP_POSITION_STATUS_COMPLETE:
+	{
+	    int pos_val,orient_val;
+	    int real_robot_idx = -1;
+	    float pd,ad;
+	    int single_vmc_track_match = -1;
+
+	    for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
+		if (real_robots[i].robot_id == wiggle_robot_id) {
+		    real_robot_idx = i;
+		    break;
+		}
+	    }
+
+	    info("checking to see who wiggled for robot id %d\n",
+		 wiggle_robot_id
+		 );
+
+	    /* of the tracks whose wiggle_valid bit is set, and who still
+	     * have robot_id == -1, check if they underwent the wiggle
+	     */
+	    for (i = 0; i < MAX_VMC_CLIENTS; ++i) {
+		single_vmc_track_match = -1;
+		for (j = 0; j < MAX_TRACKED_OBJECTS; ++j) {
+		    if (vmc_clients[i].tracks[j].valid &&
+			vmc_clients[i].tracks[j].wiggle_valid &&
+			vmc_clients[i].tracks[j].robot_id == -1) {
+
+			info ("trying to match client%d/track%d\n",i,j);
+			
+			pos_val =
+			    match_position(&(vmc_clients[i].tracks[j].wiggle_expected_position),
+					   &(vmc_clients[i].tracks[j].position),
+					   MAX_WIGGLE_POSIT_DISP,
+					   &pd);
+			orient_val = match_orientation(&(vmc_clients[i].tracks[j].wiggle_expected_position),
+						       &(vmc_clients[i].tracks[j].position),
+						       MAX_WIGGLE_POSIT_DISP,
+						       &ad);
+			
+			info("pos_disp = %f; orient_disp = %f\n",
+			     pd,ad
+			     );
+			info("pos_val = %d; orient_val = %d\n",
+			     pos_val,orient_val
+			     );
+
+			if (pos_val && orient_val) {
+			    if (single_vmc_track_match == -1) {
+				single_vmc_track_match = j;
+			    }
+			    else {
+				error("multiple internal vmc-client wiggle"
+				      " match; must re-wiggle\n"
+				      );
+				single_vmc_track_match = -1;
+				break;
+			    }
+			}
+
+		    }
+		    else {
+			//info("client%d/track%d invalid\n",i,j);
+			vmc_clients[i].tracks[j].wiggle_valid = 0;
+		    }
+		}
+		if (single_vmc_track_match != -1) {
+		    info("wiggle match for id %d\n",wiggle_robot_id);
+		    // so we have a match...
+		    // XXX make intra-vmc-client equivocation fixes later.
+		    vmc_clients[i].tracks[single_vmc_track_match].wiggle_valid = 0;
+		    vmc_clients[i].tracks[single_vmc_track_match].robot_id =
+			wiggle_robot_id;
+		    real_robots[real_robot_idx].vmc_client_ids[i] = 1;
+		    real_robots[real_robot_idx].position =
+			vmc_clients[i].tracks[single_vmc_track_match].position;
+		    real_robots[real_robot_idx].valid = 1;
+		}
+	    }
+
+	}
+	break;
+    default:
+	error("bogus MTP_POSITION_STATUS_* while handling wiggle status "
+	      "packet\n");
+	break;
+    }
+    
+
+}
+
 /* we allow a track to be continued if there is a match within 5 cm */
 #define DIST_THRESHOLD 0.10
 /* and if pose difference is less than 45 degress */
@@ -511,7 +776,6 @@ void vmc_handle_update_id(struct mtp_packet *p) {
 void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     int i,j;
 
-    // first we run through the current track list for this vmc_client:
     float best_dist_delta = DIST_THRESHOLD;
     float best_pose_delta = POSE_THRESHOLD;
     int best_track_idx = -1;
@@ -521,6 +785,11 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         return;
     }
 
+    info("THETA WAS %f\n",
+	 p->data.mtp_payload_u.update_position.position.theta
+	 );
+
+    // first we run through the current track list for this vmc_client:
     for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
         if (vc->tracks[i].valid) {
             float dx,dy;
@@ -556,7 +825,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     // now check to see if we found a match.
     // if we did, update the track:
     if (best_track_idx > -1) {
-        info("got a match\n");
+        //info("got a match\n");
         
         vc->tracks[best_track_idx].position =
             p->data.mtp_payload_u.update_position.position;
@@ -576,7 +845,7 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         vc->tracks[best_track_idx].updated = 1;
     }
     else {
-        // need to start a new track and possibly issue a request_id request:
+        // need to start a new track
         if (first_invalid_track == -1) {
             // no more room to store tracks!
             printf("OUT OF VC TRACKING ROOM IN VMCD!\n");
@@ -595,34 +864,61 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             // there!
             retval = find_real_robot_id(&(vc->tracks[first_invalid_track].position));
             if (retval == -1) {
-                // we have to send our request_id packet, now:
-                struct mtp_packet mp;
-		int request_id;
+              /* now, instead of sending request_id packets, we can simply
+               * send wiggle packets...
+               */
+              /* as soon as the wiggle request is received in rmcd, it will
+               * terminate whatever behavior that robot is currently undergoing
+               * so that I can assume that the wiggle will start right away.
+               * this way, rmcd doesn't have to notify me to start watching
+               * for a wiggle -- I'll just start looking.
+               */
 
-		request_id = get_next_request_id();
-		mtp_init_packet(&mp,
-				MA_Opcode, MTP_REQUEST_ID,
-				MA_Role, MTP_ROLE_VMC,
-				MA_Position, &vc->tracks[first_invalid_track].
-				position,
-				MA_RequestID, request_id,
-				MA_TAG_DONE);
-                retval = mtp_send_packet(emc_handle, &mp);
-                if (retval == MTP_PP_SUCCESS) {
-                    info("sent request %d\n", request_id);
-                    vc->tracks[first_invalid_track].request_id = request_id;
-                }
-                else {
-                    vc->tracks[first_invalid_track].valid = 0;
-                }
+              /* actually, we don't send a wiggle; we just mark this track
+               * as unidentified
+               */
+
+		vc->tracks[first_invalid_track].robot_id = -1;
+		vc->tracks[first_invalid_track].wiggle_valid = -1;
+
+/*                struct mtp_packet mp; */
+/*                mtp_init_packet(&mp, */
+/*                                MA_Opcode, MTP_WIGGLE_REQUEST, */
+/*                                MA_Role, MTP_ROLE_VMC, */
+/*                                MA_RobotID, "vmcd init", */
+/*                                MA_TAG_DONE); */
+              
+
+
+/*                  // we have to send our request_id packet, now: */
+/*                  struct mtp_packet mp; */
+/*                  int request_id; */
+                
+/*                  request_id = get_next_request_id(); */
+/*                  mtp_init_packet(&mp, */
+/*                                  MA_Opcode, MTP_REQUEST_ID, */
+/*                                  MA_Role, MTP_ROLE_VMC, */
+/*                                  MA_Position, &vc->tracks[first_invalid_track]. */
+/*                                  position, */
+/*                                  MA_RequestID, request_id, */
+/*                                  MA_TAG_DONE); */
+/*                  retval = mtp_send_packet(emc_handle, &mp); */
+/*                  if (retval == MTP_PP_SUCCESS) { */
+/*                    info("sent request %d\n", request_id); */
+/*                    vc->tracks[first_invalid_track].request_id = request_id; */
+/*                  } */
+/*                  else { */
+/*                    vc->tracks[first_invalid_track].valid = 0; */
+/*                  } */
             }
             else {
-                // we can update the real_robots list!
-                real_robots[retval].position =
-                    p->data.mtp_payload_u.update_position.position;
-                real_robots[retval].updated = 1;
-                vc->tracks[first_invalid_track].robot_id =
-                    real_robots[retval].robot_id;
+              // we can update the real_robots list!
+              real_robots[retval].position =
+                p->data.mtp_payload_u.update_position.position;
+              real_robots[retval].updated = 1;
+              vc->tracks[first_invalid_track].robot_id =
+                real_robots[retval].robot_id;
+	      real_robots[retval].vmc_client_ids[vc->vc_idx] = 1;
             }
             
             vc->tracks[first_invalid_track].updated = 1;
@@ -637,6 +933,20 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
             if (vc->tracks[i].valid && !(vc->tracks[i].updated)) {
                 vc->tracks[i].valid = -1;
+		if (vc->tracks[i].robot_id > -1) {
+		    int rr_idx = -1;
+		    for (j = 0; j < MAX_TRACKED_OBJECTS; ++j) {
+			if (real_robots[j].robot_id ==
+			    vc->tracks[i].robot_id) {
+			    rr_idx = j;
+			    break;
+			}
+		    }
+		    if (rr_idx > -1) {
+			real_robots[rr_idx].vmc_client_ids[vc->vc_idx] = 0;
+		    }
+		    vc->tracks[i].robot_id = -1;
+		}
             }
             else if (vc->tracks[i].valid && vc->tracks[i].robot_id != -1) {
 		struct mtp_packet mp;
@@ -668,8 +978,46 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     }
     
     // finis!
-                                                        
-            
+
+    // now we call wiggle_manager to do some housekeeping and see
+    // if we need to wiggle any of the robots (i.e., if no vmc_clients can
+    // see one of the real_robots
+    wiggle_manager();
+
+}
+
+int match_position(struct robot_position *target,
+		   struct robot_position *actual,
+		   float max_disp,
+		   float *actual_disp) {
+    float dx,dy,disp;
+    
+    dx = actual->x - target->x;
+    dy = actual->y - target->y;
+    
+    disp = sqrt(dx*dx + dy*dy);
+    *actual_disp = disp;
+
+    if (fabsf(disp) <= max_disp)
+	return 1;
+    else
+	return 0;
+}
+
+int match_orientation(struct robot_position *target,
+		      struct robot_position *actual,
+		      float max_disp,
+		      float *actual_disp) {
+
+    info("actual_theta = %f; target_theta  = %f\n",
+	 actual->theta,target->theta
+	 );
+    *actual_disp = actual->theta - target->theta;
+
+    if (fabsf(*actual_disp) <= max_disp)
+	return 1;
+    else
+	return 0;
 }
 
 int find_real_robot_id(struct robot_position *p) {
@@ -713,5 +1061,3 @@ int find_real_robot_id(struct robot_position *p) {
 
     return best_track_idx;
 }
-
-        

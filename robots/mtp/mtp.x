@@ -104,6 +104,16 @@ enum mtp_opcode_t {
      * Telemetry from a robot.
      */
     MTP_TELEMETRY		= 60,
+
+    /**
+     * vmcd tells emcd to wiggle a robot (for id purposes).
+     */
+    MTP_WIGGLE_REQUEST      = 70,
+
+    /**
+     * the result of a wiggle.
+     */
+    MTP_WIGGLE_STATUS       = 71,
     
 
     MTP_OPCODE_MAX
@@ -258,6 +268,27 @@ struct mtp_garcia_telemetry {
     int user_led;
 };
 
+enum mtp_wiggle_t {
+    /* turn 180deg from current pos */
+    MTP_WIGGLE_180_R      = 1,
+    /* turn 180deg from current pos, then 180deg in opposite direction */
+    MTP_WIGGLE_180_R_L    = 2,
+    /* turn 360deg from current pos */
+    MTP_WIGGLE_360_R      = 3,
+    /* turn 360deg from current pos, then 360deg in opposite direction */
+    MTP_WIGGLE_360_R_L    = 4
+};
+
+struct mtp_wiggle_request {
+    int robot_id;
+    mtp_wiggle_t wiggle_type;
+};
+
+struct mtp_wiggle_status {
+    int robot_id;
+    mtp_status_t status;
+};
+
 union mtp_telemetry switch (mtp_robot_type_t type) {
  case MTP_ROBOT_GARCIA:		mtp_garcia_telemetry	garcia;
 };
@@ -276,6 +307,8 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_COMMAND_GOTO:		mtp_command_goto	command_goto;
  case MTP_COMMAND_STOP:		mtp_command_stop	command_stop;
  case MTP_TELEMETRY:		mtp_telemetry		telemetry;
+ case MTP_WIGGLE_REQUEST:   mtp_wiggle_request  wiggle_request;
+ case MTP_WIGGLE_STATUS:    mtp_wiggle_status   wiggle_status;
 };
 
 /**

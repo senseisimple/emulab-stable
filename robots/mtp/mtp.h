@@ -146,6 +146,7 @@ typedef enum {
     MA_RequestID,	 /*< (int) */
     MA_CommandID,	 /*< (int) */
     MA_GarciaTelemetry,	 /*< (mtp_garcia_telemetry *) */
+    MA_WiggleType, /*< (mtp_wiggle_t) */
 
     MA_TAG_MAX
 } mtp_tag_t;

@@ -108,6 +108,9 @@ struct gorobot_conn {
     int gc_tries_remaining;
     struct robot_position gc_actual_pos;
     struct robot_position gc_intended_pos;
+    int goto_waiting;
+    int wiggle;
+    struct robot_position wiggle_pos;
 };
 
 static struct gorobot_conn gorobot_connections[128];
@@ -300,6 +303,8 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 	struct mtp_command_stop *mcs = &mp.data.mtp_payload_u.command_stop;
 	struct mtp_update_position *mup =
 	    &mp.data.mtp_payload_u.update_position;
+	struct mtp_wiggle_request *mwr = &mp.data.mtp_payload_u.wiggle_request;
+	struct mtp_wiggle_status *mws = &mp.data.mtp_payload_u.wiggle_status;
 	struct gorobot_conn *gc;
 	
 	if (debug) {
@@ -338,27 +343,149 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 	    else {
 		struct mtp_packet smp;
 		
-		info("gonna move\n");
-
-		/*
-		 * There is a new position, send a stop to gorobot so that it
-		 * will send back an IDLE update and we can do more processing.
-		 */
-		gc->gc_intended_pos = mcg->position;
-		gc->gc_state = PS_PENDING_POSITION;
-		gc->gc_tries_remaining = 0;
+		if (!gc->wiggle) {
+		    info("gonna move\n");
+		    
+		    /*
+		     * There is a new position, send a stop to gorobot so that
+		     * it will send back an IDLE update and we can do more 
+		     * processing.
+		     */
+		    gc->gc_intended_pos = mcg->position;
+		    gc->gc_state = PS_PENDING_POSITION;
+		    gc->gc_tries_remaining = 0;
 		
-		mtp_init_packet(&smp,
-				MA_Opcode, MTP_COMMAND_STOP,
-				MA_Role, MTP_ROLE_RMC,
-				MA_RobotID, gc->gc_robot->id,
-				MA_CommandID, 1,
-				MA_TAG_DONE);
-		if (mtp_send_packet(gc->gc_handle, &smp) != MTP_PP_SUCCESS) {
+		    mtp_init_packet(&smp,
+				    MA_Opcode, MTP_COMMAND_STOP,
+				    MA_Role, MTP_ROLE_RMC,
+				    MA_RobotID, gc->gc_robot->id,
+				    MA_CommandID, 1,
+				    MA_TAG_DONE);
+		    if (mtp_send_packet(gc->gc_handle, &smp) 
+			!= MTP_PP_SUCCESS) {
+			error("cannot send reply packet\n");
+		    }
+		    
+		    mtp_free_packet(&smp);
+		}
+		else {
+		    // queue up the requested posit
+		    gc->goto_waiting = 1;
+		    gc->gc_intended_pos = mcg->position;
+		}
+	    }
+	    break;
+
+	case MTP_WIGGLE_REQUEST:
+	    if ((gc = find_gorobot(mwr->robot_id)) == NULL) {
+		error ("unknown robot %d\n",mwr->robot_id);
+		// also need to send crap back to VMCD so that it doesn't
+		// wait for a valid wiggle complete msg
+		
+		mtp_init_packet(&mp,
+				MA_Opcode,MTP_WIGGLE_STATUS,
+				MA_Role,MTP_ROLE_RMC,
+				MA_RobotID,mwr->robot_id,
+				MA_Status,MTP_POSITION_STATUS_ERROR,
+				MA_TAG_DONE
+				);
+		if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
 		    error("cannot send reply packet\n");
 		}
+	    }
+	    else if (gc->wiggle) {
+		error("RECEIVED A WIGGLE when one is already in progess -- "
+		      "there is no way to tell vmc what's going on!!!\n"
+		      );
+		// XXX: try to do something better here, maybe add more
+		// more descriptive msgs... or maybe cut off the current
+		// wiggle and do the next one?
+	    }
+	    else {
+		// we're not already wiggling, so we send a stop to the robot
+		// and add some processing code in the gc handler.
 		
-		mtp_free_packet(&smp);
+		gc->wiggle = 1;
+		if (mwr->wiggle_type == MTP_WIGGLE_180_R) {
+		    gc->wiggle_pos.x = 0.0f;
+		    gc->wiggle_pos.y = 0.0f;
+		    gc->wiggle_pos.theta = M_PI;
+
+		    // send a command stop to the robot, then handle
+		    // in the gc_handle IDLE section
+
+		    gc->gc_state = PS_PENDING_POSITION;
+		    gc->gc_tries_remaining = 0;
+
+		    mtp_init_packet(&mp,
+				    MA_Opcode, MTP_COMMAND_STOP,
+				    MA_Role, MTP_ROLE_RMC,
+				    MA_RobotID, gc->gc_robot->id,
+				    MA_CommandID, 1,
+				    MA_TAG_DONE
+				    );
+		    if (mtp_send_packet(gc->gc_handle, &mp) != MTP_PP_SUCCESS)
+		    {
+			error("cannot send stop packet to gc for wiggle\n");
+
+			// XXX: need more here, need to set gc->wiggle = 0; and
+			// notify vmc that its wiggle failed!
+
+		    }
+
+		    mtp_free_packet(&mp);
+
+		}
+		else {
+		    // XXX: handle other wiggle types later!
+		    error ("unknown wiggle type %d\n",mwr->wiggle_type);
+		    mtp_init_packet(&mp,
+				    MA_Opcode,MTP_WIGGLE_STATUS,
+				    MA_Role,MTP_ROLE_RMC,
+				    MA_RobotID,mwr->robot_id,
+				    MA_Status,MTP_POSITION_STATUS_ERROR,
+				    MA_TAG_DONE
+				    );
+		    if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
+			error("cannot send reply packet\n");
+		    }
+		    mtp_free_packet(&mp);
+		}
+	    }
+	    break;
+	case MTP_WIGGLE_STATUS:
+	    // if valid id and this gc is getting its wiggle on, we send the 
+	    // goto to gc->grobot, and wait for the call from grobot telling
+	    // us that the goto finished.
+	    if ((gc = find_gorobot(mws->robot_id)) == NULL) {
+                error("unknown robot %d in emc ack of wiggle-statusn",
+		      mws->robot_id
+		      );
+	    }
+	    else {
+		// send the gc->wiggle_pos as the goto data, to the correct
+		// robot
+		struct mtp_packet gmp;
+
+		info("actually starting wiggle for robot %d\n",
+		     gc->gc_robot->id
+		     );
+
+		mtp_init_packet(&gmp,
+				MA_Opcode, MTP_COMMAND_GOTO,
+				MA_Role, MTP_ROLE_RMC,
+				MA_Position, &(gc->wiggle_pos),
+				MA_RobotID, gc->gc_robot->id,
+				MA_CommandID, 1,
+				MA_TAG_DONE
+				);
+		if (mtp_send_packet(gc->gc_handle, &gmp) !=
+		    MTP_PP_SUCCESS) {
+		    fatal("could not send actual wiggle to robot!");
+
+		    // XXX: need to tell vmc about the problem!
+
+		}
 	    }
 	    break;
 	case MTP_COMMAND_STOP:
@@ -371,6 +498,7 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 		/* Just stop the robot in its tracks and clear out any state */
 		gc->gc_state = PS_ARRIVED;
 		gc->gc_tries_remaining = 0;
+		gc->wiggle = 0;
 		
 		mtp_init_packet(&smp,
 				MA_Opcode, MTP_COMMAND_STOP,
@@ -490,9 +618,11 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 	    mtp_print_packet(stderr, &mp);
 	}
 
-	if ((mup->position.x != 0.0f) ||
-	    (mup->position.y != 0.0f) ||
-	    (mup->position.theta != 0.0f)) {
+	/* NOTE: we don't want to refine a wiggle! */
+	if (!(gc->wiggle) && 
+	    ((mup->position.x != 0.0f) ||
+	     (mup->position.y != 0.0f) ||
+	     (mup->position.theta != 0.0f))) {
 	    struct robot_position new_pos;
 	    struct mtp_packet ump;
 	    
@@ -518,7 +648,31 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 	switch (mup->status) {
 	case MTP_POSITION_STATUS_IDLE:
 	    /* Response to a COMMAND_STOP. */
-	    if (gc->gc_state == PS_PENDING_POSITION) {
+	    if (gc->wiggle) {
+		// if we're gonna wiggle, we don't do the usual posit request
+		// here -- we just notify the vision system via emc that the
+		// robot is idle (i.e., is starting the wiggle)
+		struct mtp_packet vsn;
+
+		mtp_init_packet(&vsn,
+				MA_Opcode,MTP_WIGGLE_STATUS,
+				MA_Role,MTP_ROLE_RMC,
+				MA_RobotID,gc->gc_robot->id,
+				MA_Status,MTP_POSITION_STATUS_IDLE,
+				MA_TAG_DONE
+				);
+		if (mtp_send_packet(emc_handle,&vsn) != MTP_PP_SUCCESS) {
+		    error("could not tell vmc that wiggle is starting...\n");
+		}
+		mtp_free_packet(&vsn);
+
+		// so now, we wait for emc to 'ack' our status msg after it 
+		// notifies vmc.  this will be our cue to get our wiggle on.
+
+		//(  :-)
+
+	    }
+	    else if (gc->gc_state == PS_PENDING_POSITION) {
 		struct mtp_packet rmp;
 		
 		info("starting move\n");
@@ -560,13 +714,80 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 		
 		mtp_free_packet(&ump);
 
+		// XXX:  ALSO NEED TO SEND A MSG TO VMC if this was a wiggle!!
+		mtp_init_packet(&ump,
+				MA_Opcode,MTP_WIGGLE_STATUS,
+				MA_Role,MTP_ROLE_RMC,
+				MA_RobotID,gc->gc_robot->id,
+				MA_Status,MTP_POSITION_STATUS_ERROR,
+				MA_TAG_DONE
+				);
+		if (mtp_send_packet(emc_handle, &ump) != MTP_PP_SUCCESS) {
+                    fatal("wiggle-status error msg failed");
+                }
+
+		mtp_free_packet(&ump);
+
+		gc->wiggle = 0;
 		gc->gc_state = PS_ARRIVED;
 	    }
 	    break;
 	case MTP_POSITION_STATUS_COMPLETE:
 	    info("gorobot finished\n");
-	    
-	    if (gc->gc_state == PS_REFINING_POSITION) {
+
+	    if (gc->wiggle) {
+		// if we're done getting our wiggles on, tell vmc, and if
+		// we had interrupted a previous move to do the wiggle,
+		// or if another one has arrived, restart/start it.
+		
+		struct mtp_packet vsn;
+
+		mtp_init_packet(&vsn,
+				MA_Opcode,MTP_WIGGLE_STATUS,
+				MA_Role,MTP_ROLE_RMC,
+				MA_RobotID,gc->gc_robot->id,
+				MA_Status,MTP_POSITION_STATUS_COMPLETE,
+				MA_TAG_DONE
+				);
+		if (mtp_send_packet(emc_handle,&vsn) != MTP_PP_SUCCESS) {
+		    error("could not send wiggle-status (complete) to emc!");
+		}
+
+		mtp_free_packet(&vsn);
+
+		gc->wiggle = 0;
+
+		if (gc->goto_waiting) {
+		    // do the exact same thing as if we'd received a cmd_goto
+
+		    struct mtp_packet smp;
+
+		    info("gonna move (restoring pre-wiggle posit)\n");
+
+                    /*
+                     * There is a new position, send a stop to gorobot so that
+                     * it will send back an IDLE update and we can do more
+                     * processing.
+                     */
+                    gc->gc_state = PS_PENDING_POSITION;
+                    gc->gc_tries_remaining = 0;
+
+                    mtp_init_packet(&smp,
+                                    MA_Opcode, MTP_COMMAND_STOP,
+                                    MA_Role, MTP_ROLE_RMC,
+                                    MA_RobotID, gc->gc_robot->id,
+                                    MA_CommandID, 1,
+                                    MA_TAG_DONE);
+                    if (mtp_send_packet(gc->gc_handle, &smp)
+                        != MTP_PP_SUCCESS) {
+                        error("cannot send stop to grobot while restoring!\n");
+                    }
+
+                    mtp_free_packet(&smp);
+
+		}
+	    }
+	    else if (gc->gc_state == PS_REFINING_POSITION) {
 		struct mtp_packet rmp;
 		
 		info("requesting position %d\n", gc->gc_robot->id);
@@ -746,7 +967,7 @@ int main(int argc, char *argv[])
 		else {
 		    FD_SET(fd, &readfds);
 		}
-
+#if 0
 		/* Get the robots initial position. */
 		mtp_init_packet(&qmp,
 				MA_Opcode, MTP_REQUEST_POSITION,
@@ -778,6 +999,7 @@ int main(int argc, char *argv[])
 
 		mtp_free_packet(&qrmp);
 		mtp_free_packet(&qmp);
+#endif
 	    }
 	}
     }

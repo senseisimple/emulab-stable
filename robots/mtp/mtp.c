@@ -390,6 +390,14 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		mp->data.mtp_payload_u.command_stop.robot_id =
 		    va_arg(args, int);
 		break;
+        case MTP_WIGGLE_REQUEST:
+        mp->data.mtp_payload_u.wiggle_request.robot_id = 
+            va_arg(args, int);
+        break;
+        case MTP_WIGGLE_STATUS:
+        mp->data.mtp_payload_u.wiggle_status.robot_id = 
+            va_arg(args, int);
+        break;
 	    default:
 		assert(0);
 		break;
@@ -491,8 +499,19 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	    }
 	    break;
 	case MA_Status:
-	    mp->data.mtp_payload_u.update_position.status =
-		va_arg(args, mtp_status_t);
+        switch (mp->data.opcode) {
+	    case MTP_UPDATE_POSITION:
+		mp->data.mtp_payload_u.update_position.status =
+          va_arg(args, mtp_status_t);
+		break;
+        case MTP_WIGGLE_STATUS:
+        mp->data.mtp_payload_u.wiggle_status.status = 
+            va_arg(args, mtp_status_t);
+        break;
+	    default:
+		assert(0);
+		break;
+	    }
 	    break;
 	case MA_RequestID:
 	    mp->data.mtp_payload_u.request_id.request_id =
@@ -507,6 +526,10 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	    mp->data.mtp_payload_u.telemetry.mtp_telemetry_u.garcia =
 		*(va_arg(args, struct mtp_garcia_telemetry *));
 	    break;
+    case MA_WiggleType:
+        mp->data.mtp_payload_u.wiggle_request.wiggle_type =
+          va_arg(args, mtp_wiggle_t);
+		break;
 	}
 
 	tag = va_arg(args, mtp_tag_t);
@@ -771,6 +794,48 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    break;
 	}
 	break;
+
+    case MTP_WIGGLE_REQUEST:
+      fprintf(file,
+              " opcode:\twiggle-request\n"
+              "  id:\t%d\n",
+              mp->data.mtp_payload_u.wiggle_request.robot_id
+              );
+      switch (mp->data.mtp_payload_u.wiggle_request.wiggle_type) {
+      case MTP_WIGGLE_180_R:
+        fprintf(file,
+                "  wiggle_type:\t180deg right\n"
+                );
+        break;
+      case MTP_WIGGLE_180_R_L:
+        fprintf(file,
+                "  wiggle_type:\t180deg right, 180deg left\n"
+                );
+        break;
+      case MTP_WIGGLE_360_R:
+        fprintf(file,
+                "  wiggle_type:\t360deg right\n"
+                );
+        break;
+      case MTP_WIGGLE_360_R_L:
+        fprintf(file,
+                "  wiggle_type:\t360deg right, 360deg left\n"
+                );
+        break;
+      default:
+        assert(0);
+	    break;
+      }
+      break;
+    case MTP_WIGGLE_STATUS:
+      fprintf(file,
+              " opcode:\twiggle-status\n"
+              "  id:\t%d\n"
+              "  status:\t%d\n",
+              mp->data.mtp_payload_u.wiggle_status.robot_id,
+              mp->data.mtp_payload_u.wiggle_status.status
+              );
+      break;
 
     default:
 	printf("%p %d\n", &mp->data.opcode, mp->data.opcode);

@@ -73,6 +73,16 @@ int main(int argc, char *argv[])
     4,
     2,
   };
+
+  static struct mtp_wiggle_request mwr = {
+    4,
+    1,
+  };
+
+  static struct mtp_wiggle_status mws = {
+    4,
+    4,
+  };
   
   int fd, retval = EXIT_SUCCESS;
 
@@ -108,6 +118,12 @@ int main(int argc, char *argv[])
     assert(mtp_send_packet(fd,mp) == MTP_PP_SUCCESS);
 
     assert(mp = mtp_make_packet(MTP_COMMAND_STOP, MTP_ROLE_VMC, &mcs));
+    assert(mtp_send_packet(fd,mp) == MTP_PP_SUCCESS);
+
+    assert(mp = mtp_make_packet(MTP_WIGGLE_REQUEST, MTP_ROLE_VMC, &mwr));
+    assert(mtp_send_packet(fd,mp) == MTP_PP_SUCCESS);
+
+    assert(mp = mtp_make_packet(MTP_WIGGLE_REQUEST, MTP_ROLE_VMC, &mws));
     assert(mtp_send_packet(fd,mp) == MTP_PP_SUCCESS);
 
     lseek(fd,0,SEEK_SET);

@@ -40,6 +40,7 @@ static void usage(void)
 	    "Commands:\n"
 	    "  error notify init close request-position request-id\n"
 	    "  update-position update-id command-goto command-stop\n"
+        "  wiggle-request wiggle-status\n"
 	    "\n"
 	    "Options:\n"
 	    "  -h\t\tPrint this message\n"
@@ -61,6 +62,8 @@ static void usage(void)
 	    "  -r vmc|emc|rmc|emulab\n"
 	    "      \t\tThe role (Default: rmc)\n"
 	    "  -P #\t\tThe port the peer listening on\n"
+        "  -W 180r|180rl|360r|360rl\n"
+        "      \t\tThe wiggle type\n"
 	    "\n"
 	    "Example:\n"
 	    "  $ mtp_send -n garcia1 -P 3000 -i 1 -c 2 -m \"FooBar\" error\n");
@@ -113,6 +116,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	int role;
 
 	int port;
+      int wiggle_type;
     } args = {
 	-1,		/* id */
 	-1,		/* code */
@@ -129,6 +133,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	NULL,		/* message */
 	MTP_ROLE_RMC,	/* role */
 	-1,		/* port */
+    -1,     /* wiggle type */
     };
 
     int argc = *argcp;
@@ -141,7 +146,7 @@ static int interpret_options(int *argcp, char ***argvp)
     /* Loop through the current set of command-line flags. */
     while ((c = getopt(argc,
 		       argv,
-		       "hdwi:c:C:n:U:x:y:o:H:V:t:s:m:r:P:")) != -1) {
+		       "hdwi:c:C:n:U:x:y:o:H:V:t:s:m:r:P:W:")) != -1) {
 	switch (c) {
 	case 'h':
 	    usage();
@@ -303,6 +308,27 @@ static int interpret_options(int *argcp, char ***argvp)
 		exit(1);
 	    }
 	    break;
+    case 'W':
+      if (strcasecmp(optarg,"180r") == 0) {
+        args.wiggle_type = MTP_WIGGLE_180_R;
+      }
+      else if (strcasecmp(optarg,"180rl") == 0) {
+        args.wiggle_type = MTP_WIGGLE_180_R_L;
+      }
+      else if (strcasecmp(optarg,"360r") == 0) {
+        args.wiggle_type = MTP_WIGGLE_360_R;
+      }
+      else if (strcasecmp(optarg,"360rl") == 0) {
+        args.wiggle_type = MTP_WIGGLE_360_R_L;
+      }
+      else {
+        fprintf(stderr,
+                "error: W option must be one of: 180r, 180rl, 360r, 360rl\n"
+                );
+        usage();
+        exit(1);
+      }
+      break;
 	default:
 	    usage();
 	    exit(1);
@@ -353,6 +379,10 @@ static int interpret_options(int *argcp, char ***argvp)
 	opcode = MTP_COMMAND_GOTO;
     else if (strcasecmp(argv[0], "command-stop") == 0)
 	opcode = MTP_COMMAND_STOP;
+    else if (strcasecmp(argv[0], "wiggle-request") == 0)
+      opcode = MTP_WIGGLE_REQUEST;
+    else if (strcasecmp(argv[0], "wiggle-status") == 0)
+      opcode = MTP_WIGGLE_STATUS;
     else {
 	fprintf(stderr, "error: unknown command: %s\n", argv[0]);
 	usage();
@@ -373,7 +403,8 @@ static int interpret_options(int *argcp, char ***argvp)
 		"  timestamp:\t%f\n"
 		"  status:\t%d\n"
 		"  message:\t%s\n"
-		"  port:\t\t%d\n",
+		"  port:\t\t%d\n"
+        "  wiggle-type:\t\t%d\n",
 		opcode,
 		args.id,
 		args.code,
@@ -386,7 +417,8 @@ static int interpret_options(int *argcp, char ***argvp)
 		args.timestamp,
 		args.status,
 		args.message,
-		args.port);
+        args.port,
+        args.wiggle_type);
     }
 
     switch (opcode) {
@@ -518,6 +550,36 @@ static int interpret_options(int *argcp, char ***argvp)
 			MA_RobotID, args.id,
 			MA_TAG_DONE);
 	break;
+
+    case MTP_WIGGLE_REQUEST:
+      if (args.wiggle_type == -1)
+	    required_option("W");
+      if (args.id == -1)
+        required_option("i");
+
+      mtp_init_packet(&mp,
+                      MA_Opcode, opcode,
+                      MA_Role, args.role,
+                      MA_RobotID, args.id,
+                      MA_WiggleType, args.wiggle_type,
+                      MA_TAG_DONE
+                      );
+      break;
+
+    case MTP_WIGGLE_STATUS:
+      if (args.status == -1)
+        required_option("s");
+      if (args.id == -1)
+        required_option("i");
+
+      mtp_init_packet(&mp,
+                      MA_Opcode, opcode,
+                      MA_Role, args.role,
+                      MA_RobotID, args.id,
+                      MA_Status, args.status,
+                      MA_TAG_DONE
+                      );
+      break;
 
     default:
 	fprintf(stderr,
