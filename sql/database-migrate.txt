@@ -1259,5 +1259,19 @@ last_net_act,last_cpu_act,last_ext_act);
 		NOT NULL default '1' after sim_reswap_count;
 
         alter table experiments add allowfixnode tinyint(4) \ 
-	       not null default 1 after veth_encapsulate;
+	       not null default 0 after veth_encapsulate;
 
+1.221: Fixed allowfixnode to default to 1 instead of 0
+
+        alter table experiments change allowfixnode allowfixnode tinyint(4) \ 
+	       not null default 1;
+
+1.222: Added old_pid and old_eid in reserved table. This allows the moving of
+       current reservations into a holding experiment with old_pid/old_eid
+       suitably filled during assign_wrapper. Eventually, any unused
+       entries will first be torn down and entries in the DB deleted.
+
+       alter table reserved add column old_pid varchar(12) NOT NULL default '', \
+             add column old_eid varchar(32) NOT NULL default '';
+
+       alter table reserved add KEY old_pid (old_pid,old_eid);

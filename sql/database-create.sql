@@ -1153,8 +1153,11 @@ CREATE TABLE reserved (
   vname varchar(32) default NULL,
   erole enum('node','virthost','delaynode','simhost') NOT NULL default 'node',
   simhost_violation tinyint(3) unsigned NOT NULL default '0',
+  old_pid varchar(12) NOT NULL default '',
+  old_eid varchar(32) NOT NULL default '',
   PRIMARY KEY  (node_id),
-  UNIQUE KEY vname (pid,eid,vname)
+  UNIQUE KEY vname (pid,eid,vname),
+  KEY old_pid (old_pid,old_eid)
 ) TYPE=MyISAM;
 
 --
