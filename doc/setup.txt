@@ -175,9 +175,13 @@ FreeBSD ports) - don't forget to get it set up! Our strategy on boss was to
 give everyone in the weel group unrestricted sudo access with:
 %wheel  ALL=(ALL) NOPASSWD: ALL
 
-checkpass - Need to get a copy of the dictionary that checkpass uses to check
-for bad passwords when creating a new account. I'll fill out this section
-soon when I figure out the best way to handle this...
+checkpass - in the testbed software:
+    cd tbsetup/checkpass/cracklib,2.7
+    make all
+    make install
+  Note that these steps depend on having the dictionaries 
+  /usr/share/dict/{propernames,words} available (standard for FreeBSD).
+  If they're in different places, edit the obvious makefile vars.
 
 syslogd - Normally, sylogd on FreeBSD is run with the '-s' flag to prevent
 logging to it over the network. We use network logging, so we need this
