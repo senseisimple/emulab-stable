@@ -124,6 +124,18 @@ if (mysql_num_rows($query_result)) {
 echo "</center>\n";
 
 #
+# Edit option.
+#
+if ($isadmin ||
+    TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
+
+    echo "<p><p><center>
+           <A href='modusr_form.php3?target_uid=$target_uid'>
+              Edit User Info?</a>
+         </center>\n";
+}
+    
+#
 # Standard Testbed Footer
 # 
 PAGEFOOTER();
