@@ -999,7 +999,7 @@ sub swapok {
     my ($control_iface) = $result->fetchrow_array;
     $result->finish;
 
-    return (($portA != $control_iface) && ($portB != $control_iface));
+    return (($portA ne $control_iface) && ($portB ne $control_iface));
 	
 };
 
