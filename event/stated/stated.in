@@ -272,8 +272,17 @@ sub stateTransition($$) {
 		$oldstate = $nodes{$node}{state};
 		$mode = $nodes{$node}{mode};
 	} else {
-		notify("Got an event for a node ($node) I don't know ".
-		      "about\n");
+		#
+		# Try reloading the cache once before we give up on this node
+		#
+		reload();
+		if ($nodes{$node}) {
+				$oldstate = $nodes{$node}{state};
+				$mode = $nodes{$node}{mode};
+		} else {
+			notify("Got an event for a node ($node) I don't know ".
+					"about\n");
+		}
 	}
 	if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
 			!$valid{$mode}{$oldstate}{$newstate}) {
