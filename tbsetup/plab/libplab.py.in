@@ -742,6 +742,7 @@ class Slice:
                  self.plab.agent.createSlice(self)
 
             DBQueryFatal("insert into plab_slices"
+                         " (pid, eid, slicename, slicemeta, leaseend)"
                          " values (%s, %s, %s, %s, FROM_UNIXTIME(%s))",
                          (self.pid, self.eid, self.slicename,
                           self.slicemeta, self.leaseend))
@@ -786,6 +787,7 @@ class Slice:
                  self.plab.agent.renewSlice(self)
             
             DBQueryFatal("replace into plab_slices"
+                         " (pid, eid, slicename, slicemeta, leaseend)"
                          " values (%s, %s, %s, %s, FROM_UNIXTIME(%s))",
                          (self.pid, self.eid, self.slicename,
                           self.slicemeta, self.leaseend))

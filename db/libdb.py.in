@@ -101,6 +101,6 @@ def DBQuery(queryPat, querySub = (), asDict = False):
 
 def DBQueryFatal(*args):
     ret = DBQuery(*args)
-    if ret:
-        return ret
-    raise RuntimeError, "DBQueryFatal failed"
+    if ret == None:
+        raise RuntimeError, "DBQueryFatal failed"
+    return ret
