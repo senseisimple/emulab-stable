@@ -224,10 +224,11 @@ void handle_link_modify(char * linkname, int l_index,
    */
   int p_which = -1;
   int n_pipes = 0;
+//  char argstring[50];
 
   info("==========================================\n");
   info("recd. MODIFY event for link = %s\n", linkname);
-
+  
   /* if the link is up, then get the params from dummynet,
      get the params from the notification and then merge
      and write back to dummynet
@@ -238,7 +239,7 @@ void handle_link_modify(char * linkname, int l_index,
 			     &n_pipes,&p_which) == 1)
 	/* 0 => dont blackhole, get the plr
 	 * from the link map table*/
-	info(" n_pipes = %d p_which = %d\n", n_pipes, p_which);
+	/*info(" n_pipes = %d p_which = %d\n", n_pipes, p_which);*/
 	set_link_params(l_index, 0, n_pipes, p_which);
     
 				    
@@ -634,30 +635,48 @@ int get_new_link_params(int l_index, event_handle_t handle,
     argtype = strsep(&temp,"=");
     
     while((argvalue = strsep(&temp," \n"))){
-       if(strcmp(argtype,"BANDWIDTH")== 0){
-	 link_map[l_index].params[0].bw =
+
+      if(strcmp(argtype,"BANDWIDTH")== 0){
+	info("Bandwidth = %d\n", atoi(argvalue) * 1000);
+	 if(p_num == -1){
+	   /* this is for both pipes*/
+	   link_map[l_index].params[0].bw =
 	   link_map[l_index].params[1].bw =
 	     atoi(argvalue) * 1000;
-	 info("Bandwidth = %d\n", link_map[l_index].params[0].bw);
+	 }
+	 else /* do only for the specific pipe*/
+	     link_map[l_index].params[p_num].bw = atoi(argvalue) * 1000;
+      }
 
-       }else if (strcmp(argtype,"DELAY")== 0){
-	 link_map[l_index].params[0].delay =
+      else if (strcmp(argtype,"DELAY")== 0){
+	 info("Delay = %d\n", atoi(argvalue));
+	  if(p_num == -1){
+	   /* this is for both pipes*/
+	   link_map[l_index].params[0].delay =
 	   link_map[l_index].params[1].delay =
 	     atoi(argvalue);
-	 info("Delay = %d\n", link_map[l_index].params[0].delay);
+	 }
+	 else
+	   link_map[l_index].params[p_num].delay = atoi(argvalue);
        }
 
        else if (strcmp(argtype,"PLR")== 0){
+	 info("Plr = %f\n", atof(argvalue));
+	 if(p_num == -1){
+	   /* this is for both pipes*/
 	 link_map[l_index].params[0].plr =
 	   link_map[l_index].params[1].plr =
 	     atof(argvalue);
-	 info("Plr = %f\n", link_map[l_index].params[0].plr);
+
+	 }
+	 else /* do only for the specific pipe*/
+	   link_map[l_index].params[p_num].plr = atof(argvalue);
        }
 
        /* Queue parameters */
        
        else if (strcmp(argtype,"LIMIT")== 0){
-
+	 info("QSize/Limit = %d\n", atoi(argvalue));
 	 if(p_num == -1){
 	   /* this is for both pipes*/
 	   link_map[l_index].params[0].q_size =
@@ -676,12 +695,12 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	     link_map[l_index].params[p_num].q_size = atoi(argvalue);
 	     link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
 	   }
-	   info("QSize/Limit = %d\n", link_map[l_index].params[0].q_size);
        }
 
        else if (strcmp(argtype,"QUEUE-IN-BYTES")== 0){
 	 int qsztype = atoi(argvalue);
 	 if(qsztype == 0){
+	   info("QSize in slots/packets");
 	   /* queue size is in slots/packets*/
 	   if(p_num == -1){
 	     /* this is for both pipes*/
@@ -695,6 +714,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	 }
 	 else if(qsztype == 1)
 	   {
+	     info("QSize in bytes\n");
 	      if(p_num == -1){
 		/* this is for both pipes*/
 		/* queue size is in bytes*/
@@ -705,6 +725,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	   }
        }
        else if(strcmp(argtype,"MAXTHRESH")== 0){
+	 info("Maxthresh = %d \n", atoi(argvalue));
 	 if(p_num == -1){
 	   link_map[l_index].params[0].red_gred_params.max_th
 	     = link_map[l_index].params[1].red_gred_params.max_th
@@ -714,6 +735,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	       = atoi(argvalue);
        }
        else if(strcmp(argtype,"THRESH")== 0){
+	 info("Thresh = %d \n", atoi(argvalue));
 	 if(p_num == -1){
 	   link_map[l_index].params[0].red_gred_params.min_th
 	     = link_map[l_index].params[1].red_gred_params.min_th
@@ -723,6 +745,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	       = atoi(argvalue);
        }
        else if(strcmp(argtype,"LINTERM")== 0){
+	 info("Linterm = %f\n", 1.0 / atof(argvalue));
 	 if(p_num == -1){
 	   link_map[l_index].params[0].red_gred_params.max_p
 	     = link_map[l_index].params[1].red_gred_params.max_p
@@ -732,6 +755,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	       = 1.0 / atof(argvalue);
        }
        else if(strcmp(argtype,"Q_WEIGHT")== 0){
+	 info("Qweight = %f\n", atof(argvalue));
 	 if(p_num == -1){
 	   link_map[l_index].params[0].red_gred_params.w_q
 	     = link_map[l_index].params[1].red_gred_params.w_q
@@ -757,8 +781,10 @@ int get_new_link_params(int l_index, event_handle_t handle,
        argtype = strsep(&temp,"=");
      }
   }
+  
   info("In func. get_new \n");
-  printf("tot_pips = %d p_num = %d \n", tot_pipes, p_num);
+  info("tot_pips = %d p_num = %d \n", tot_pipes, p_num);
+  
   *p_pipes = tot_pipes;
   *pipe_which = p_num;
   return 1;
