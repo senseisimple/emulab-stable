@@ -673,9 +673,9 @@ foreach $lan (keys(%lans)) {
 	    $portbw{$nodeport1} = $S100Mbs;	    
 	} else {
 	    print TOPFILE "link linksimple/$lan/$nodeport0,$nodeport1 ".
-		"$node0 $node1 ";
+		"$node0 $node1";
 	    if ($emulated) {
-		print TOPFILE max($bw,$rbw) . " 0 0 emulated";
+		print TOPFILE " " . max($bw,$rbw) . " 0 0 emulated";
 	    }
 	    else {
 		print TOPFILE " $bandwidth 0 0";
