@@ -3562,20 +3562,12 @@ sub GatherSwapStats($$$$$;$)
   logit:
     my $starttime = (!defined($TBDB_STATS_STARTCLOCK) ? "NULL" :
 		     "FROM_UNIXTIME($TBDB_STATS_STARTCLOCK)");
-    if ("@OURDOMAIN@" eq "ballmoss.com") {
-      DBQueryWarn("insert into testbed_stats ".
+
+    DBQueryWarn("insert into testbed_stats ".
 		"(idx, uid, start_time, end_time, exptidx, rsrcidx, ".
 		" action, exitcode) ".
 		"values (0, '$uid', $starttime, now(), $exptidx, $rsrcidx, ".
 		"        '$mode', $ecode)");
-    }
-    else {
-      DBQueryWarn("insert into testbed_stats ".
-		"(idx, uid, tstamp, exptidx, rsrcidx, ".
-		" action, exitcode) ".
-		"values (0, '$uid', now(), $exptidx, $rsrcidx, ".
-		"        '$mode', $ecode)");
-    }
 }
 
 #
