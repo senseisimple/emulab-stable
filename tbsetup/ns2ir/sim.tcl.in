@@ -284,7 +284,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::DB
     var_import ::GLOBALS::impotent
     var_import ::GLOBALS::vtypes
-    var_import ::TBCOMPAT::uselatestwadata
+    var_import ::GLOBALS::uselatestwadata
 
     # Fill out IPs
     foreach obj [concat [array names lanlink_list]] {

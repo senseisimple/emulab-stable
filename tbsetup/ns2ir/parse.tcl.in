@@ -176,6 +176,9 @@ namespace eval GLOBALS {
     # These are going to be default values within the NS file.
     variable default_ip_routing_type "none"
 
+    # For remote nodes. Use latest widearea data.
+    variable uselatestwadata 0
+
     # This is the file handler for the warnings file
     variable WARN_FILE [open "$eid.warnings" w]
 
