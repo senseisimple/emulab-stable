@@ -87,6 +87,8 @@ my $LOADER_CONF	    = "/boot/loader.conf";
 
 my $SYSCTL_CONF	    = "/etc/sysctl.conf";
 
+my $EMULAB_PEM	    = "emulab.pem";
+
 #
 # Some directories we care about
 #
@@ -554,6 +556,17 @@ Phase "sysctl.conf", "Setting up $SYSCTL_CONF", sub {
 	"net.local.dgram.maxdgram=65536",
 	"net.local.dgram.recvspace=65536"
     );
+};
+
+Phase "sslcerts", "Setting up SSL certificates", sub {
+    Phase "sslgen", "Generating SSL certificates", sub {
+	DoneIfExists("$TOP_OBJDIR/ssl/$EMULAB_PEM");
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl remote-site");
+    };
+    Phase "sslinstall", "Installing SSL certificates", sub {
+	DoneIfExists("$PREFIX/etc/$EMULAB_PEM");
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl remote-site-boss-install");
+    };
 };
 
 print "----------------------------------------------------------------------\n";
