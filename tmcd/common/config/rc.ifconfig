@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -72,7 +72,8 @@ if (@ARGV) {
 
 # Local goo
 # After libsetup include; ifconfig is run outside vnode setup.
-my $TMIFC  = CONFDIR() . "/rc.ifc";
+my $TMIFC   = CONFDIR() . "/rc.ifc";
+my $TMIFMAP = CONFDIR() . "/ifmap";
 
 # Execute the action.
 SWITCH: for ($action) {
@@ -106,6 +107,7 @@ sub doboot()
     my $upcmds       = "";
     my $downcmds     = "";
     my @ifacelist    = ();
+    my @ifacemap     = ();
 
     print STDOUT "Checking Testbed interface configuration ... \n";
 
@@ -165,6 +167,10 @@ sub doboot()
 		$upcmds   .= TMROUTECONFIG . " $alias up\n    ";
 		$downcmds .= TMROUTECONFIG . " $alias down\n    ";
 	    }
+
+	    # Trivially parsable map for users, which associate an IP
+	    # with a local interface. 
+	    push(@ifacemap, "$iface $inet $mac");
 	}
 	else {
 	    my $inet     = $ifconfig->{IPADDR};
@@ -209,6 +215,17 @@ sub doboot()
 	    $downcmds .= "$downline\n    "
 		if (defined($downline));
 	}
+    }
+
+    #
+    # The map file.
+    #
+    unlink $TMIFMAP;
+    if (open(IFMAP, ">$TMIFMAP")) {
+	foreach my $iface (@ifacemap) {
+	    print IFMAP "$iface\n";
+	}
+	close(IFMAP);
     }
     
     #
@@ -270,4 +287,5 @@ sub doreconfig()
 sub docleanup()
 {
     unlink $TMIFC;
+    unlink $TMIFMAP;
 }
