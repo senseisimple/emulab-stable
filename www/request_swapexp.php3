@@ -174,7 +174,6 @@ TBMAIL("$expleader_name <$expleader_email>",
        ? "Cc: $leaders\n"
        : "") .
      "Bcc: $TBMAIL_OPS\n".
-     "X-NetBed: request_swapexp.php3\n".
      "Errors-To: $TBMAIL_WWW");
 
 #
