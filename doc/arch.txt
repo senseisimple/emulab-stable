@@ -11,6 +11,9 @@ like that.
 
 [This file maintained by testbed-ops@emulab.net]
 
+For big picture and some details, read the OSDI'02 paper, in
+doc/papers/netbed-osdi02* and on the Web.
+
 Accounts
  - unix accounts
    - unix group management (per-proj and per-group)
@@ -25,7 +28,7 @@ Accounts
    - trust models and their security impact
 
 Assign (resource allocation algorithms)
- - the Testbed Mapping Problem
+ - the Testbed Mapping Problem: read draft of our upcoming CCR paper in doc/papers
    - NP Hard
    - in some ways, constraint satisfaction problem
      - but more, because not all satisfactory solutions are equal
@@ -79,7 +82,7 @@ Database (centralized store for persistent shared system state)
  - sw engineering issues
    - db schema must match sw build
 
-IXP (special hw resources)
+IXP (special hw resources) [not released due to Intel license restrictions]
  - use as testbed infrastructure
    - traffic shaping
  - use for experimentation
@@ -87,7 +90,7 @@ IXP (special hw resources)
    - emulab is good environment w/many tools
 
 Event system (distributed event coordination/communication)
- - publish/subscribe system (written by someone else)
+ - "Elvin" publish/subscribe system underneath (imported from elsewhere)
  - used in several directions
    - emulab to nodes/programs
    - nodes to emulab
@@ -142,7 +145,7 @@ OS tools (disk images, etc)
      - lots of cool tricks here - read the frisbee paper
  - image distribution/installation
    - frisbee
-     - lots to say here... read the paper in USENIX'03
+     - lots to say here... read the paper in USENIX'03 and doc/papers
    - growdisk - partition management on heterogeneous nodes
  - deltas
    - deprecated - dump/restore
