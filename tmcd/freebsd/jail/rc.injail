@@ -82,6 +82,8 @@ exit(0);
 #
 sub doboot()
 {
+    TBDebugTimeStamp("rc.injail starting up");
+    
     print("Checking Testbed reservation status\n");
     my ($pid, $eid, $vname) = jailsetup();
 
@@ -99,6 +101,7 @@ sub doboot()
     # setup to proceed in parallel (okay, at most two are going to partially
     # overlap, but that is better then nothing at all!
     # 
+    TBDebugTimeStamp("rc.injail starting watchdog");
     if (-x "$BINDIR/watchdog") {
         print("Starting testbed watchdog daemon\n");
 	system("$BINDIR/watchdog start");
@@ -111,11 +114,13 @@ sub doboot()
     # This is where we run all of the config scripts. These talk to the
     # DB and setup the node the way it is supposed to be. 
     # 
+    TBDebugTimeStamp("rc.injail running config scripts");
     print("Running config scripts\n");
     system("$RCDIR/rc.config boot");
     if ($?) {
 	fatal("Error running $RCDIR/rc.config");
     }
+    TBDebugTimeStamp("rc.injail done running config scripts");
 
     print("Informing the testbed that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {

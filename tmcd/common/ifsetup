@@ -114,27 +114,32 @@ sub doboot()
 
     # Yuck! We need the eventkey in the outer environment so that agents
     # can get it.
+    TBDebugTimeStamp("ifsetup running $KEYCONFIG");    
     if (defined($vnodeid)) {
 	system("$KEYCONFIG -j $vnodeid boot");
     }
 
     # Routes will be done when the interfaces go up, but must set
     # things up and do generic boot.
+    TBDebugTimeStamp("ifsetup running $ROUTECONFIG");    
     system("$ROUTECONFIG $optarg boot");
     if ($?) {
 	fatal("Could not boot routing!");
     }
 
+    TBDebugTimeStamp("ifsetup running $TUNCONFIG");
     system("$TUNCONFIG $optarg boot");
     if ($?) {
 	fatal("Could not boot tunnels!");
     }
 
+    TBDebugTimeStamp("ifsetup running $IFCONFIG");
     system("$IFCONFIG $optarg boot");
     if ($?) {
 	fatal("Could not boot interfaces!");
     }
 
+    TBDebugTimeStamp("ifsetup running $DELAYCONFIG");
     system("$DELAYCONFIG $optarg boot");
     if ($?) {
 	fatal("Could not boot delays!");
