@@ -213,7 +213,7 @@ if ($showmap &&
     printf "%-15s %-12s %-15s %-12s\n", "ID", "Type", "OS", "Physical";
     print  "--------------- ------------ --------------- ------------\n";
 
-    foreach $v (keys(%v2pmap)) {
+    foreach $v (sort keys(%v2pmap)) {
 	my $p = $v2pmap{$v}->{PNODE};
 	my $t = $v2pmap{$v}->{TYPE};
 	my $o = $v2pmap{$v}->{OSID};
