@@ -96,7 +96,7 @@ swig-pywrappers: event.i event.h event.c tbevent.py.tail
 
 # $(SRCDIR)/event_wrap_py.c: swig-pywrappers
 
-event_wrap_py.o: $(SRCDIR)/event_wrap_py.c
+event_wrap_py.o: $(SRCDIR)/event_wrap_py.c event.h
 	$(CC) -c $(CFLAGS_NOWARN) $(PYCORE) $<
 
 event.so:	event.o event_wrap.o util.o
