@@ -44,6 +44,52 @@ NFS_EXPORTS = [
     USERSROOT,
     ]
 
+#
+# XXX
+# This mirrors db/xmlconvert. Be sure to keep this table in sync with that table.
+#
+virtual_tables = {
+    "experiments"		: { "rows"  : None, 
+                                    "tag"   : "experiment",
+                                    "attrs" : [ ] },
+    "virt_nodes"		: { "rows"  : None, 
+                                    "tag"   : "nodes",
+                                    "attrs" : [ "vname" ]},
+    "virt_lans"                 : { "rows"  : None, 
+                                    "tag"   : "lans",
+                                    "attrs" : [ "vname" ]},
+    "virt_lan_settings"         : { "rows"  : None, 
+                                    "tag"   : "lan_settings",
+                                    "attrs" : [ "vname", "capkey" ]},
+    "virt_lan_member_settings"  : { "rows"  : None, 
+                                    "tag"   : "lan_member_settings",
+                                    "attrs" : [ "vname", "member", "capkey" ]},
+    "virt_trafgens"		: { "rows"  : None, 
+                                    "tag"   : "trafgens",
+                                    "attrs" : [ "vname", "vnode" ]},
+    "virt_agents"		: { "rows"  : None, 
+                                    "tag"   : "agents",
+                                    "attrs" : [ "vname", "vnode" ]},
+    "virt_node_desires"         : { "rows"  : None, 
+                                    "tag"   : "node_desires",
+                                    "attrs" : [ "vname", "desire" ]},
+    "virt_routes"		: { "rows"  : None, 
+                                    "tag"   : "routes",
+                                    "attrs" : [ "vname", "src", "dst" ]},
+    "virt_vtypes"		: { "rows"  : None, 
+                                    "tag"   : "vtypes",
+                                    "attrs" : [ "name" ]},
+    "virt_programs"		: { "rows"  : None, 
+                                    "tag"   : "programs",
+                                    "attrs" : [ "vname", "vnode" ]},
+    "nseconfigs"		: { "rows"  : None, 
+                                    "tag"   : "nseconfigs",
+                                    "attrs" : [ "vname" ]},
+    "eventlist"                 : { "rows"  : None, 
+                                    "tag"   : "events",
+                                    "attrs" : [ "vname" ]}
+    }
+    
 # Base class for emulab specific exceptions.
 class EmulabError(exceptions.Exception):
     pass
@@ -1307,7 +1353,7 @@ class experiment:
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
-    # Reload all nodes in an experiment.
+    # Download experiment topology.
     #
     def virtual_topology(self, version, argdict):
         if version != self.VERSION:
@@ -1354,20 +1400,59 @@ class experiment:
                 output=("You do not have permission to access experiment: "
                         + argdict["proj"] + "/" + argdict["exp"]))
 
-        argstr  = escapeshellarg(argdict["proj"])
-        argstr += " " + escapeshellarg(argdict["exp"])
 
-        (exitval, output) = runcommand(TBDIR + "/libexec/xmlconvert " + argstr)
-
-        if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        res = DBQuery("SELECT * FROM experiments "
+                      "WHERE pid=%s and eid=%s",
+                      (argdict["proj"], argdict["exp"]), asDict=True);
 
         #
-        # Convert the output into python datatypes. Yes, this gets converted
-        # back again, but such is life!
+        # Convert NULL to ""
         #
-        params, method = xmlrpclib.loads(output);
-        return EmulabResponse(RESPONSE_SUCCESS, value=params, output=output)
+        for key, val in res[0].items():
+            if val == None:
+                res[0][key] = ""
+                pass
+            pass
+
+        result   = {}
+        result["experiments"] = {}
+        result["experiments"]["settings"] = res[0];
+
+        #
+        # Get the rest of the virtual tables.
+        # 
+        for key, val in virtual_tables.items():
+            if key == "experiments":
+                continue
+            
+            tag  = val["tag"]
+            rows = []
+
+            res = DBQuery("SELECT * FROM " + key + " " +
+                          "WHERE pid=%s and eid=%s",
+                          (argdict["proj"], argdict["exp"]), asDict=True);
+
+            if len(res) > 0:
+                for row in res:
+                    #
+                    # Convert NULL to ""
+                    #
+                    for key2, val2 in row.items():
+                        if val2 == None:
+                            row[key2] = ""
+                            pass
+                        pass
+
+                    rows.append(row)
+                    pass
+                pass
+            
+            result["experiments"][tag] = rows
+            pass
+
+        result = (result,)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output="bar")
     
     #
     # Return the visualization data for the experiment.

@@ -116,7 +116,7 @@ class SSHConnection:
             if ssh_config:
                 flags = flags + " -F " + ssh_config
                 pass
-            self.myChild = popen2.Popen3("ssh -x "
+            self.myChild = popen2.Popen3("ssh -x -C -o 'CompressionLevel 5' "
                                          + flags
                                          + " "
                                          + self.host
