@@ -613,3 +613,9 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table experiments add multiplex_factor smallint(5)
 	        default NULL after forcelinkdelays;
 		
+1.151: Allow iface in the veth_interfaces table to be null to allow
+       for trivial links between veth devices (on the same node, so no
+       iface mapping).
+
+	alter table veth_interfaces change iface iface varchar(10)
+		 default NULL;

@@ -1355,7 +1355,7 @@ CREATE TABLE veth_interfaces (
   veth_id int(10) unsigned NOT NULL auto_increment,
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
-  iface varchar(10) NOT NULL default '',
+  iface varchar(10) default NULL,
   vnode_id varchar(32) default NULL,
   PRIMARY KEY  (node_id,veth_id),
   KEY IP (IP)
