@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -81,6 +81,7 @@ function WRITESIDEBAR() {
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON_NEW("Papers", $TBDOCBASE, "pubs.php3");
+    WRITESIDEBARBUTTON_NEW("Software", $TBDOCBASE, "software.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
     WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
