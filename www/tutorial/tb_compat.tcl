@@ -13,7 +13,4 @@ proc tb-set-lan-loss {lan rate} {}
 
 # The following commands are not clearly defined and probably will be
 # changed or removed
-proc tb-set-dnard-ip {shelf number ip} {}
-proc tb-set-dnard-os {shelf number os} {}
 proc tb-set-node-deltas {node deltas} {}
-proc tb-set-dnard-deltas {shelf number deltas} {}

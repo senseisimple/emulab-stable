@@ -1,0 +1,83 @@
+<html>
+<head>
+  <title>Utah Network Testbed - Testbed Specific ns Commands</title>
+  <link rel='stylesheet' href='../tbstyle-doc.css' type='text/css'>
+</head>
+<body>
+
+<center>
+<h1>Emulab - NS Testbed Commands</h1>
+</center>
+
+<p>There are a large number of sharks available for use in Testbed
+experiments.  Unfortunately, the sharks are greatly limited in their
+topology.  Sharks can only be used in groups of up to 8, connected to
+each other via a 10Mb, no delay, no loss LAN, with a single link to
+the rest of the topology.
+
+<p>To use sharks in your experiment just set them up as normal nodes.
+Use <code>tb-set-hardware</code> to set them to type
+<code>shark</code> and make sure their topology adheres to the
+conditions below.
+
+<p>Any deviation from these conditions will result in an error.
+
+<ul>
+  <li>Any LAN containing sharks must be 10 MB, 0 latency, no loss.
+  <li>At most 8 sharks per LAN.
+  <li>No non-sharks directly in any LAN containing sharks.
+  <li>At most one link to any LAN containing sharks.
+  <li>No shark outside of a LAN.
+  <li>No shark with any links.
+</ul>
+
+<p>Example:
+
+<pre>
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set s1 [$ns node]
+set s2 [$ns node]
+set s3 [$ns node]
+set s4 [$ns node]
+set n1 [$ns node]
+
+tb-set-hardware $s1 shark
+tb-set-hardware $s2 shark
+tb-set-hardware $s3 shark
+tb-set-hardware $s4 shark
+
+set slan [$ns make-lan "$s1 $s2 $s3 $s4" 10Mb 0ms]
+
+tb-set-ip-lan $s1 $slan 1.2.3.100
+tb-set-ip-lan $s2 $slan 1.2.3.101
+
+$ns duplex-link $slan $n1 100Mb .5ms DropTail
+
+$ns run
+</pre>
+
+<p>Note especially that <code>n1</code> is not in the LAN but linked
+to it.
+
+<hr size=2 noshade>
+<center>
+[<a href="https://www.emulab.net/">Emulab.Net Home</a>]<br>
+[<a href="http://www.cs.utah.edu/flux/">Flux Research Group</a>]
+[<a href="http://www.cs.utah.edu/">School of Computing</a>]
+[<a href="http://www.utah.edu/">University of Utah</a>]
+</center>  
+<p align=right>
+<font size="-1">
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+Last modified on Mar 14, 2001
+</font>
+</p>
+
+</body>
+</html>
+      

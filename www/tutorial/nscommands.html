@@ -123,7 +123,7 @@ tb-set-ip-link $node0 $link1 192.0.0.128
 tb-set-hardware <i>node</i> <i>type</i> [<i>args</i>].
 
 tb-set-hardware $node3 pc
-tb-set-hardware $node4 shark-shelf
+tb-set-hardware $node4 shark
 </pre>
 
 <dl>
@@ -134,11 +134,8 @@ tb-set-hardware $node4 shark-shelf
 <p>Notes:
 
 <ul>
-  <li>Currently only <code>pc</code> and <code>shark-shelf</code> are
+  <li>Currently only <code>pc</code> and <code>shark</code> are
 supported types.  <code>pc</code> is the default type.
-<code>shark-shelf</code> refers to a shelf of 8 sharks.  In the near
-future <code>shark-shelf</code> will be replaced with
-<code>shark</code> which specifies that the node is a single shark.
   <li>No current types have any additional arguments.
 </dl>
 
@@ -294,36 +291,6 @@ tb-set-node-os $node1 MY_OS
       operating systems over the network.
 </ul>
 
-<h4>tb-set-dnard-os</h4>
-
-<pre>
-tb-set-dnard-os <i>shelf</i> <i>number</i> <i>os</i>
-
-tb-set-dnard-os $shelf1 1 MY-SHARK-OS
-</pre>
-
-<dl>
-  <dt><i>shelf</i> - The shelf containing the shark.
-  <dt><i>number</i> - A number between 1 and 8 describing which shark.
-  <dt><i>os</i> - The id of the OS to set.
-</dl>
-
-<p>Notes:
-
-<ul>
-  <li>This command applies to nodes of type <code>shark-shelf</code>
-      (see <code>tb-set-hardware</code> above).  It will create an
-      error on a node of any other type.
-  <li>In the near future this command will vanish along with
-      shark-shelf's when we make ns node to shark a one to one rather
-      than one to eight mapping.
-  <li>The OS ID can either be one of the standard OS's or a custom OS
-      ID described by <code>tb-create-os</code>(see
-      below).  In the latter case the <code>tb-create-os</code> command
-      must come before the <code>tb-set-node-os</code> command.
-  <li>The default OS for sharks is NBSD14-STD.
-</ul>
-
 <h4>tb-create-os</h4>
 
 <pre>
@@ -420,26 +387,14 @@ tb-set-lan-loss $lan1 0.3
 
 <p>The following commands will parse but do not do anything as yet.
 
-<h4>tb-set-dnard-ip</h4>
-
-<pre>
-tb-set-dnard-ip <i>shelf</i> <i>number</i> <i>ip</i>
-</pre>
-
-<p>This command will probably vanish soon without ever having been
-implemented.
-
-<h4>tb-set-*-deltas</h4>
+<h4>tb-set-node-deltas</h4>
 
 <pre>
 tb-set-node-deltas <i>node</i> <i>deltas</i>
-tb-set-dnard-deltas <i>shelf</i> <i>number</i> <i>deltas</i>
 </pre>
 
-<p>The second command will probably vanish like all the other dnard
-commands in the near future.  The first command will likely go through
-some change and accompany a few other commands once we get delta
-support going.
+<p>This command will likely go through some change and accompany a
+few other commands once we get delta support going.
 
 
 <hr size=2 noshade>
