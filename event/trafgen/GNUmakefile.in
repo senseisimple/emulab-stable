@@ -103,7 +103,7 @@ install:
 
 client: $(PROGRAMS)
 client-install: client
-	$(INSTALL_PROGRAM) -s trafgen $(DESTDIR)$(CLIENT_BINDIR)/trafgen
+	$(INSTALL_PROGRAM) -s trafgen$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/trafgen$(EXE)
 
 clean:
 	/bin/rm -f lex.yy.c y.* *.o $(PROGRAMS)

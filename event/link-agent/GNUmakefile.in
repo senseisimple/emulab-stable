@@ -44,7 +44,7 @@ install:
 
 client: $(PROGRAMS)
 client-install: client
-	$(INSTALL_PROGRAM) -s link-agent $(DESTDIR)$(CLIENT_BINDIR)/link-agent
+	$(INSTALL_PROGRAM) -s link-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/link-agent$(EXE)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

@@ -27,7 +27,7 @@ install:	$(INSTALL_LIBEXECDIR)/genhostsfile
 
 client: genhostsfile
 client-install: client
-	$(INSTALL_PROGRAM) -s genhostsfile $(DESTDIR)$(CLIENT_BINDIR)/genhostsfile
+	$(INSTALL_PROGRAM) -s genhostsfile$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/genhostsfile$(EXE)
 
 clean:
 	rm -f *.o genhostsfile genfromtopo genfromdb

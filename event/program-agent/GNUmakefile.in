@@ -44,7 +44,7 @@ install:
 
 client: $(PROGRAMS)
 client-install: client
-	$(INSTALL_PROGRAM) -s program-agent $(DESTDIR)$(CLIENT_BINDIR)/program-agent
+	$(INSTALL_PROGRAM) -s program-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/program-agent$(EXE)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

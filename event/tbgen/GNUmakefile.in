@@ -61,7 +61,7 @@ control-install:	$(INSTALL_BINDIR)/tevc
 
 client: tevc
 client-install: client
-	$(INSTALL_PROGRAM) -s tevc $(DESTDIR)$(CLIENT_BINDIR)/tevc
+	$(INSTALL_PROGRAM) -s tevc$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/tevc$(EXE)
 
 clean:
 	rm -f *.o $(PROGRAMS)
