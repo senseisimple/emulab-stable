@@ -8,6 +8,7 @@
 
 use English;
 use Getopt::Std;
+use POSIX qw(isatty setsid);
 
 #
 # This gets invoked from the Web interface. Terminate an experiment.
@@ -23,16 +24,18 @@ use Getopt::Std;
 sub usage()
 {
     print(STDERR
-	  "Usage: endexp [-b | -w] <pid> <eid>\n".
+	  "Usage: endexp [-q] [-b | -w] <pid> <eid>\n".
 	  "switches and arguments:\n".
 	  "-w       - wait for non-batchmode experiment terminate\n".
+	  "-q       - be less chatty\n".
 	  "<pid>    - The project the experiment belongs to\n".
 	  "<eid>    - The experiment name (id)\n");
     exit(-1);
 }
-my $optlist = "bw";
+my $optlist = "bwq";
 my $waitmode = 0;
 my $batch    = 0;
+my $quiet    = 0;
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -115,6 +118,9 @@ if (defined($options{"b"})) {
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
 }
 usage()
     if ($waitmode && $batch);
@@ -352,14 +358,20 @@ if (! $batch) {
 	# Parent exits normally, except if in waitmode. 
 	#
 	if (!$waitmode) {
-	    ExitWithStatus(0,
-		"Experiment $pid/$eid is now terminating.\n".
-		"You will be notified via email when the experiment has been\n".
-		"torn down, and you can reuse the experiment name.\n");
+	    print("Experiment $pid/$eid is now terminating.\n".
+		  "You will be notified via email when termination is ".
+		  "complete.\n")
+		if (! $quiet);
+	    exit(0);
 	}
-	print("Waiting for experiment $eid to finish terminating.\n");
-	print("You may type ^C at anytime; you will be notified via email;\n".
-	      "later; you will not actually interrupt the experiment itself.\n");
+	print("Waiting for experiment $eid to finish terminating.\n")
+		if (! $quiet);
+	
+	if (isatty(STDIN) && !$quiet) {
+	    print("You may type ^C at anytime; you will be notified via email.".
+		  "\n".
+		  "You will not actually interrupt the experiment itself.\n");
+	}
 	
 	# Give child a chance to run.
 	select(undef, undef, undef, 0.25);
@@ -377,7 +389,8 @@ if (! $batch) {
 	#
 	waitpid($childpid, 0);
 	
-	print("Done. Exited with status: $?\n");
+	print("Done. Exited with status: $?\n")
+	    if (! $quiet);
 	exit($? >> 8);
     }
 }

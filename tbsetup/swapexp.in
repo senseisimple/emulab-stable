@@ -8,7 +8,7 @@
 
 use English;
 use Getopt::Std;
-use POSIX qw(setsid);
+use POSIX qw(isatty setsid);
 
 #
 # This gets invoked from the Web interface.
@@ -18,11 +18,12 @@ use POSIX qw(setsid);
 sub usage()
 {
     print(STDERR
-	  "Usage: swapexp [-b | -w] [-i | -a | -f] [-r] [-e]\n".
+	  "Usage: swapexp [-q] [-b | -w] [-i | -a | -f] [-r] [-e]\n".
 	  "               <-s in | out | restart | modify | pause>\n".
 	  "               <pid> <eid> [<nsfile>]\n".
 	  "switches and arguments:\n".
 	  "-w       - wait for non-batchmode experiment swap/modify\n".
+	  "-q       - be less chatty\n".
 	  "-r       - reboot nodes when doing a modify experiment\n".
 	  "-e       - restart event scheduler when doing a modify experiment\n".
 	  "-s <op>  - Operation to perform; one of those listed above\n".
@@ -31,7 +32,7 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-my  $optlist = "biafres:w";
+my  $optlist = "biafres:wq";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -81,6 +82,7 @@ my $autoswap = 0;
 my $force    = 0;
 my $reboot   = 0;
 my $waitmode = 0;
+my $quiet    = 0;
 my $eventsys_restart   = 0;
 my $errorstat= -1;
 my $modifyHosed = 0;
@@ -142,6 +144,9 @@ if (defined($options{"r"})) {
 }
 if (defined($options{"e"})) {
     $eventsys_restart = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
 }
 if (defined($options{"s"})) {
     $inout = $options{"s"};
@@ -613,13 +618,19 @@ if (! $batch) {
 	# Parent exits normally, except if in waitmode. 
 	#
 	if (!$waitmode) {
-	    print "Experiment $pid/$eid is now being $action.\n".
-		"You will be notified via email when the this is done.\n";
+	    print("Experiment $pid/$eid is now being $action.\n".
+		  "You will be notified via email when the this is done.\n")
+		if (! $quiet);
 	    exit(0);
 	}
-	print("Waiting for experiment $eid to finish its swap${action}\n");
-	print("You may type ^C at anytime; you will be notified via email;\n".
-	      "later; you will not actually interrupt the experiment itself.\n");
+	print("Waiting for experiment $eid to finish its swap${action}\n")
+	    if (! $quiet);
+	    
+	if (isatty(STDIN) && !$quiet) {
+	    print("You may type ^C at anytime; you will be notified via email.".
+		  "\n".
+		  "You will not actually interrupt the experiment itself.\n");
+	}
 	
 	# Give child a chance to run.
 	select(undef, undef, undef, 0.25);
@@ -637,7 +648,8 @@ if (! $batch) {
 	#
 	waitpid($childpid, 0);
 	
-	print("Done. Exited with status: $?\n");
+	print("Done. Exited with status: $?\n")
+	    if (! $quiet);
 	exit($? >> 8);
     }
 }
