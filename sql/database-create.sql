@@ -643,7 +643,7 @@ CREATE TABLE nsfiles (
 
 CREATE TABLE ntpinfo (
   node_id varchar(10) NOT NULL default '',
-  IP varchar(15) NOT NULL default '',
+  IP varchar(64) NOT NULL default '',
   type enum('server','peer') NOT NULL default 'peer',
   PRIMARY KEY  (node_id,IP,type)
 ) TYPE=MyISAM;
