@@ -23,6 +23,7 @@ use Fcntl ':flock';
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $USERS	= "@USERNODE@";
+my $DISABLED    = "@DISABLE_NAMED_SETUP@";
 
 my $mapdir      = "/etc/namedb";
 my $mapfile	= "$mapdir/@OURDOMAIN@.db";
@@ -32,6 +33,11 @@ my $mapfiletail = "$mapfile.tail";
 my $lockfile    = "/var/tmp/testbed_named_lockfile";
 my $dbg		= 0;
 my @row;
+
+# If we're disabled, just quietly exit
+if ($DISABLED) {
+    exit 0;
+}
 
 # We don't want to run this script unless its the real version.
 if ($EUID != 0) {
