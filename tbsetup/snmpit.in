@@ -291,13 +291,6 @@ foreach my $stack_id (keys %stacks) {
     push @stacks, $stack;
 }
 
-#
-# This should not be possible, but we'll perform a sanity check to be safe
-#
-if (!@stacks) {
-    die "Found no stacks to operate on\n";
-}
-
 ######################################################################
 # Step 3 - Actually perfrom the operation
 #
