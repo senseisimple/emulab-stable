@@ -125,13 +125,13 @@ if (defined($nickname)) {
 # Must be a valid type.
 #
 my $query_result =
-    DBQueryFatal("select osid,control_net from node_types ".
+    DBQueryFatal("select osid,control_iface from node_types ".
 		 "where type='$nodetype'");
 if (! $query_result->numrows) {
     fatal("*** $0:\n".
 	  "    No such nodetype $nodetype is defined in the DB!\n");
 }
-my ($defosid,$control_net) = $query_result->fetchrow_array();
+my ($defosid,$control_iface) = $query_result->fetchrow_array();
 
 #
 # For now, just pcwa/pcron is allowed until we have more DB state that says
@@ -247,12 +247,14 @@ else {
 		 "(node_id, status, status_timestamp) ".
 		 "values ('$nodename', 'down', now()) ");
 
+    # Note that card/port are arbitrary for remote nodes since they are
+    # not connected to local switches! 
     my $ifacerole = TBDB_IFACEROLE_CONTROL();
-    
+        
     DBQueryFatal("insert into interfaces ".
 		 "(node_id, card, port, IP, interface_type, iface, role) ".
-		 "values ('$nodename', $control_net, 1, '$nodeip', ".
-		 "        'fxp', 'eth0', '$ifacerole')");
+		 "values ('$nodename', 0, 1, '$nodeip', ".
+		 "        'fxp', '$control_iface', '$ifacerole')");
 
     DBQueryFatal("insert into reserved ".
 		 "(node_id, pid, eid, rsrv_time, vname) ".

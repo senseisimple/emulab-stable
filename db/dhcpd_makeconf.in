@@ -63,7 +63,7 @@ while (<IF>) {
 			$query .= "LEFT JOIN reserved AS r ON n.node_id = r.node_id ";
 		}
 		$query .= "WHERE (n.type='$nodetype' OR t.class='$nodetype') ";
-		$query .= "AND i.card = t.control_net ";
+		$query .= "AND i.iface = t.control_iface ";
 		$query .= "ORDER BY n.priority";
 
 		my $result = DBQueryFatal($query);
