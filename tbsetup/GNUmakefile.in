@@ -78,6 +78,7 @@ post-install:
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
 	cd $(INSTALL_BINDIR) && \
 		list='$(BIN_STUFF)'; for file in $$list; do \
+			rm -f $$file; \
 			ln -s plasticwrap $$file; \
 		done;
 

@@ -30,6 +30,7 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 control-install:
 	cd $(INSTALL_BINDIR) && \
 		list='$(BIN_SCRIPTS)'; for file in $$list; do \
+			rm -f $$file; \
 			ln -s plasticwrap $$file; \
 		done;
 
