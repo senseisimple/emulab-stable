@@ -887,7 +887,7 @@ sub getStats ($) {
 	$i++;
     }
 
-    return map [$_,@{$stats{$_}}], sort alphanum keys %stats;
+    return map [$_,@{$stats{$_}}], sort {tbsort($a,$b)} keys %stats;
 
 }
 
