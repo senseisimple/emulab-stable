@@ -992,7 +992,7 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 }
 
 #
-# Add a LED'ish applet that turn's on/off based on the output of a URL.
+# Add a LED like applet that turns on/off based on the output of a URL.
 #
 # @param uid The logged-in user ID.
 # @param auth The value of the user's authentication cookie.
@@ -1805,6 +1805,9 @@ function SHOWNODE($node_id, $flags = 0) {
     $last_report        = $row[last_report];
     $rsrvrole           = $row[rsrvrole];
     $phys_IP		= $row[phys_IP];
+    $battery_voltage    = $row[battery_voltage];
+    $battery_percentage = $row[battery_percentage];
+    $battery_timestamp  = $row[battery_timestamp];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -2100,6 +2103,23 @@ function SHOWNODE($node_id, $flags = 0) {
                       <td class=left>$bios</td>
                   </tr>\n";
 	}
+	
+	#
+	# Show battery stuff
+	#
+	if (isset($battery_voltage) && isset($battery_percentage)) {
+	    echo "<tr>
+    	              <td>Battery Volts/Percent</td>
+		      <td class=left>";
+	    printf("%.2f/%.2f ", $battery_voltage, $battery_percentage);
+
+	    if (isset($battery_timestamp)) {
+		echo "(" . date("m/d/y H:i:s", $battery_timestamp) . ")";
+	    }
+
+	    echo "    </td>
+		  </tr>\n";
+	}
 
         if ($isplabdslice) {
           $query_result = 
@@ -2151,7 +2171,7 @@ function SHOWNODE($node_id, $flags = 0) {
 	    }
 	}
     }
-
+    
     if (!$short) {
         #
         # Get interface info.
