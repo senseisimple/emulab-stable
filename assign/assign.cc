@@ -122,7 +122,7 @@ float score()
 		int maxnodes = topo->switches[i]->numnodes();
 		int j = 0;
 		while (numdelays > 0 && j < maxnodes) {
-			if (topo->switches[i]->nodes[j].used) { continue; }
+			if (topo->switches[i]->nodes[j].used) { j++; continue; }
 			numdelays -= topo->switches[i]->nodes[j].ints/2;
 			topo->switches[i]->nodes[j].used = 1;
 			j++;
@@ -206,7 +206,7 @@ void violated()
 		int maxnodes = topo->switches[i]->numnodes();
 		int j = 0;
 		while (numdelays > 0 && j < maxnodes) {
-			if (topo->switches[i]->nodes[j].used) { continue; }
+			if (topo->switches[i]->nodes[j].used) { j++; continue; }
 			numdelays -= topo->switches[i]->nodes[j].ints/2;
 			topo->switches[i]->nodes[j].used = 1;
 			j++;
