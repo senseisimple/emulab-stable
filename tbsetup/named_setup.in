@@ -328,10 +328,17 @@ if ($db_result->numrows > 0) {
 close(MAP);
 
 #
-# This is better than HUPing the nameserver.
-# 
-system("named.reload > /dev/null") == 0 or
-    fatal("named.reload failed!\n");
+# This is better than HUPing the nameserver directly. Notet that we look
+# for a local port of named first.
+#
+if (-x "/usr/local/sbin/rndc") {
+    system("/usr/local/sbin/rndc reload > /dev/null") == 0 or
+	fatal("/usr/local/sbin/rndc reload failed!\n");
+}
+else {
+    system("named.reload > /dev/null") == 0 or
+	fatal("named.reload failed!\n");
+}
 
 exit(0);
 
