@@ -552,7 +552,13 @@ if (! &ir_exists("/ip")) {
     print IRFILE "START mac\n";
     foreach (@ip_mac_section) {
 	($mac,$ip) = @$_;
-	$sth = $dbh->prepare("UPDATE interfaces set IP = \"$ip\" where MAC = \"$mac\"");
+	if ( $mac =~ /^08002b81/ ) { #It's a shark
+	  $sth = $dbh->
+	    prepare("UPDATE interfaces set IPalias = '$ip' where MAC = '$mac'");
+	} else {
+	  $sth = $dbh->
+	    prepare("UPDATE interfaces set IP = '$ip' where MAC = '$mac'");
+	}
 	$sth->execute;
 	print IRFILE "$mac $ip\n";
     }
@@ -566,7 +572,13 @@ if (! &ir_exists("/ip")) {
     $ip_mac_raw = "";
     foreach (@ip_mac_section) {
 	($mac,$ip) = @$_;
-	$sth = $dbh->prepare("UPDATE interfaces set IP = \"$ip\" where MAC = \"$mac\"");
+	if ( $mac =~ /^08002b81/ ) { #It's a shark
+	  $sth = $dbh->
+	    prepare("UPDATE interfaces set IPalias = '$ip' where MAC = '$mac'");
+	} else {
+	  $sth = $dbh->
+	    prepare("UPDATE interfaces set IP = '$ip' where MAC = '$mac'");
+	}
 	$sth->execute;
 	$ip_mac_raw .= "$mac $ip\n";
     }
