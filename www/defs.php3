@@ -45,7 +45,7 @@ function GENKEY ($name) {
 function TBERROR ($message, $death) {
     global $TBMAIL_WWW;
 
-    if (0) {
+    if (1) {
     mail($TBMAIL_WWW,
          "TESTBED ERROR REPORT",
          "\n".
