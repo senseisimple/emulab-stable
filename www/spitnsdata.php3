@@ -31,8 +31,10 @@ if (isset($nsdata) && strcmp($nsdata, "") != 0) {
 
     if (! file_exists($nsfile)) {
 	PAGEHEADER("View Generated NS File");
-	USERERROR("Could not find temporary file \"$nsfile\"<br>" . 
-	          "(Did you copy and paste an URL incorrectly?)", 1);
+	USERERROR("Could not find temporary file for user \"$uid\" with id \"$nsref\".<br>\n" . 
+	          "You likely copy-and-pasted an URL incorrectly,<br>\n" .
+ 		  "or you've already used the file to create an experiment (thus erasing it),<br>\n" .
+		  "or the file has expired.\n", 1 );
 	PAGEFOOTER();
     } else {
 	$fp = fopen($nsfile, "r");
