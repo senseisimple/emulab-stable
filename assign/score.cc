@@ -402,13 +402,20 @@ void remove_node(vvertex vv)
       }
   }
 
-
+  /*
+   * Score the fact that we now have one more unassigned vnode
+   */
+  vnode->assigned = false;
+  SADD(SCORE_UNASSIGNED);
+  vinfo.unassigned++;
+  violated++;
   
   /*
    * Now, take care of the virtual links that are attached to the vnode
    */
   voedge_iterator vedge_it,end_vedge_it;
   tie(vedge_it,end_vedge_it) = out_edges(vv,VG);
+  hash_set<void*> seen_loopback_links;
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink = get(vedge_pmap,*vedge_it);
 
@@ -419,6 +426,17 @@ void remove_node(vvertex vv)
       dest_vv = source(*vedge_it,VG);
     tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
     SDEBUG(cerr << "  edge to " << dest_vnode->name << endl);
+
+    if (dest_vv == vv) {
+      // We have to be careful with 'loopback' links, because we can see them
+      // twice - bail out if this is the second time
+      if (seen_loopback_links.find(vlink) != seen_loopback_links.end()) {
+	SDEBUG(cerr << "    seen before - skipping" << endl);
+	continue;
+      } else {
+	seen_loopback_links.insert(vlink);
+      }
+    }
 
     // A 'not-connected' vlink only counts as a violation if both of its
     // endpoints are assigned
@@ -459,7 +477,7 @@ void remove_node(vvertex vv)
   SSUB(SCORE_PNODE * (powf(1+ ((pnode->current_load+1) * 1.0)/pnode->max_load,2)));
   SADD(SCORE_PNODE * (powf(1+ pnode->current_load * 1.0/pnode->max_load,2)));
 #endif
-
+  pnode->remove_current_type();
   if (pnode->total_load == 0) {
     // If the pnode is now free, we need to do some cleanup
     SDEBUG(cerr << "  releasing pnode" << endl);
@@ -475,14 +493,6 @@ void remove_node(vvertex vv)
     vinfo.pnode_load--;
     violated--;
   }
-
-  /*
-   * Score the fact that we now have one more unassigned vnode
-   */
-  vnode->assigned = false;
-  SADD(SCORE_UNASSIGNED);
-  vinfo.unassigned++;
-  violated++;
 
   /*
    * Scoring for features and desires
@@ -752,6 +762,13 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 #ifdef SMART_UNMAP
   pnode->assigned_nodes.insert(vnode);
 #endif
+
+  /*
+   * Record the node's assignment. Need to do this now so that 'loopback' links
+   * work below.
+   */
+  vnode->assignment = pv;
+  vnode->assigned = true;
  
   /*
    * Assign any links on the vnode that can now be assigned (due to the other
@@ -759,6 +776,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
    */
   voedge_iterator vedge_it,end_vedge_it;
   tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
+  hash_set<void*> seen_loopback_links;
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink = get(vedge_pmap,*vedge_it);
     vvertex dest_vv = target(*vedge_it,VG);
@@ -789,6 +807,14 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 
       if (dest_pv == pv) {
 	SDEBUG(cerr << "  trivial link" << endl);
+	// We have to be careful with 'loopback' links, because we can see them
+	// twice - bail out if this is the second time
+	if (seen_loopback_links.find(vlink) != seen_loopback_links.end()) {
+	    SDEBUG(cerr << "    seen before - skipping" << endl);
+	    continue;
+	} else {
+	    seen_loopback_links.insert(vlink);
+	}
 	if (allow_trivial_links && vlink->allow_trivial) {
 	    vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
 	    // XXX - okay, this is really bad, but score_link_info doesn't
@@ -1046,8 +1072,6 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
   SADD((pnode->total_interfaces - pnode->used_interfaces) * SCORE_UNUSED_INTERFACE);
 #endif
 
-  vnode->assignment = pv;
-  vnode->assigned = true;
   if (tr->current_load > tr->max_load) {
     SDEBUG(cerr << "  load too high - penalty (" <<
 	pnode->current_type_record->current_load << ")" << endl);
