@@ -310,6 +310,7 @@ get_static_events(event_handle_t handle)
 	struct timeval	now, time;
 	address_tuple_t tuple;
 	char		pideid[BUFSIZ];
+	event_notification_t notification;
 
 	res = mydb_query("select ex.time,ex.vnode,ex.vname,ex.arguments,"
 			 " ot.type,et.type,i.IP from eventlist as ex "
@@ -350,7 +351,7 @@ get_static_events(event_handle_t handle)
 	tuple = address_tuple_alloc();
 	if (tuple == NULL) {
 		error("could not allocate an address tuple");
-		return 1;
+		return 0;
 	}
 
 	sprintf(pideid, "%s/%s", pid, eid);
@@ -380,7 +381,7 @@ get_static_events(event_handle_t handle)
 		if (! event.notification) {
 			error("could not allocate notification");
 			mysql_free_result(res);
-			return 1;
+			return 0;
 		}
 		event_notification_set_arguments(handle,
 						 event.notification, EXARGS);
@@ -399,6 +400,32 @@ get_static_events(event_handle_t handle)
 		nrows--;
 	}
 	mysql_free_result(res);
+
+	/*
+	 * Generate a TIME starts message.
+	 */
+	tuple->expt      = pideid;
+	tuple->host      = ADDRESSTUPLE_ALL;
+	tuple->objname   = ADDRESSTUPLE_ANY;
+	tuple->objtype   = TBDB_OBJECTTYPE_TIME;
+	tuple->eventtype = TBDB_EVENTTYPE_START;
+	
+	notification = event_notification_alloc(handle, tuple);
+	if (! notification) {
+		error("could not allocate notification");
+		return 0;
+	}
+	
+	gettimeofday(&now, NULL);
+	if (! event_notify(handle, notification)) {
+		error("Could not send TIME STARTS notification");
+		return 0;
+	}
+	info("TIME STARTS for %s at: %lu:%d\n",
+	     pideid, now.tv_sec, now.tv_usec);
+
+	event_notification_free(handle, notification);
+
 	return 1;
 }
 	
