@@ -26,12 +26,8 @@ if (! $isadmin) {
     USERERROR("You do not have permission to edit node types!", 1);
 }
 
-#
-# Verify page arguments.
-# 
-if (!isset($node_type) ||
-    strcmp($node_type, "") == 0) {
-    PAGEARGERROR("You must provide a node type.");
+if (!$new_type && (!isset($node_type) || !strcmp($node_type,""))) {
+    USERERROR("No type given!", 1);
 }
 
 #
@@ -39,7 +35,7 @@ if (!isset($node_type) ||
 #
 function SPITFORM($node_type, $formfields, $errors)
 {
-    global $osid_result, $imageid_result;
+    global $osid_result, $imageid_result, $new_type;
 
     #
     # Standard Testbed Header
@@ -73,21 +69,46 @@ function SPITFORM($node_type, $formfields, $errors)
 	echo "</table><br>\n";
     }
 
+
+    $formargs = "node_type=$node_type";
+    if ($new_type) {
+	$formargs .= "&new_type=1";
+    }
+
     echo "<table align=center border=1>
-          <form action=editnodetype.php3?node_type=$node_type method=post>\n";
+          <form action=editnodetype.php3?$formargs method=post " .
+	  " name=typeform>\n";
 
     echo "<tr>
-              <td>Type:</td>
-              <td class=left>$node_type</td>
+              <td>Type:</td>\n";
+    if ($new_type) {
+        echo "<td class=left>
+                 <input type=text
+                        name=\"node_type\"
+                        value=\"" . $node_type . "\"
+	                size=10>
+             </td>\n";
+    } else {
+         echo "<td class=left>$node_type</td>
           </tr>\n";
+    }
 
     echo "<tr>
-              <td>Class:</td>
-              <td class=left>$formfields[class]</td>
+              <td>Class:</td>\n";
+    if ($new_type) {
+        echo "<td class=left>
+                 <input type=text
+                        name=\"formfields[class]\"
+                        value=\"" . $formfields['class'] . "\"
+	                size=10>
+             </td>\n";
+    } else {
+	echo "<td class=left>$formfields[class]</td>
           </tr>\n";
+    }
 
     echo "<tr>
-             <td>Processor:</td>
+             <td>Processor (eg. 'Pentium IV'):</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[proc]\"
@@ -102,7 +123,7 @@ function SPITFORM($node_type, $formfields, $errors)
                  <input type=text
                         name=\"formfields[speed]\"
                         value=\"" . $formfields[speed] . "\"
-	                size=5> MHZ
+	                size=5> MHz
              </td>
           </tr>\n";
 
@@ -136,18 +157,52 @@ function SPITFORM($node_type, $formfields, $errors)
              </td>
           </tr>\n";
 
-    WRITEOSIDMENU("Default OSID", "formfields[osid]",
-		  $osid_result, $formfields[osid]);
+    #
+    # Function to set iface based on the control net
+    #
+    echo "<SCRIPT LANGUAGE=JavaScript>
+              function SetIface(theform) 
+              {
+                  var control_net = theform['formfields[control_net]'].value;
+		  theform['formfields[control_iface]'].value =
+			  'eth' + control_net;
+	      }
+	  </SCRIPT>\n";
+
 
     echo "<tr>
-             <td>Control Network:</td>
+             <td>*Control Network:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[control_net]\"
                         value=\"" . $formfields[control_net] . "\"
-	                size=3>
+	                size=3 onChange='SetIface(typeform);'>
              </td>
           </tr>\n";
+
+    echo "<tr>
+             <td>*Control Network Iface (eg. 'eth0'):</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[control_iface]\"
+                        value=\"" . $formfields[control_iface] . "\"
+	                size=6>
+             </td>
+          </tr>\n";
+
+
+    WRITEOSIDMENU("Default OSID", "formfields[osid]",
+		  $osid_result, $formfields[osid]);
+
+    WRITEIMAGEIDMENU("Default ImageID", "formfields[imageid]",
+		  $imageid_result, $formfields[imageid]);
+
+    WRITEOSIDMENU("Delay OSID", "formfields[delay_osid]",
+		  $osid_result, $formfields[delay_osid]);
+
+    WRITEOSIDMENU("Jailbird OSID", "formfields[jail_osid]",
+		  $osid_result, $formfields[jail_osid]);
+
 
     echo "<tr>
              <td>Power Cycle Time:</td>
@@ -159,8 +214,6 @@ function SPITFORM($node_type, $formfields, $errors)
              </td>
           </tr>\n";
 
-    WRITEIMAGEIDMENU("Default ImageID", "formfields[imageid]",
-		  $imageid_result, $formfields[imageid]);
 
     echo "<tr>
              <td>Imageable?:</td>
@@ -183,16 +236,6 @@ function SPITFORM($node_type, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
-             <td>Control Network Iface:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[control_iface]\"
-                        value=\"" . $formfields[control_iface] . "\"
-	                size=6>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
              <td>Disktype (ad,da,ar):</td>
              <td class=left>
                  <input type=text
@@ -201,13 +244,6 @@ function SPITFORM($node_type, $formfields, $errors)
 	                size=6>
              </td>
           </tr>\n";
-
-
-    WRITEOSIDMENU("Delay OSID", "formfields[delay_osid]",
-		  $osid_result, $formfields[delay_osid]);
-
-    WRITEOSIDMENU("Jailbird OSID", "formfields[jail_osid]",
-		  $osid_result, $formfields[jail_osid]);
 
     echo "<tr>
              <td>isvirtnode:</td>
@@ -279,18 +315,31 @@ function SPITFORM($node_type, $formfields, $errors)
           </table>\n";
 }
 
-#
-# Suck the current info out of the database.
-#
-if (!preg_match("/^[-\w]+$/", $node_type)) {
-    USERERROR("$node_type contains illegal characters!", 1);    
-}
-$query_result =
-    DBQueryFatal("select * from node_types where type='$node_type'");
+if ($new_type) {
+    #
+    # We've starting a new node type - let's give some reasonable defaults
+    #
+    $defaults = array("class" => "pc", "power_time" => 60, "imageable" => 1,
+	"delay_capacity" => 2, "disktype" => "ad", "isvirtnode" => 0,
+	"isremotenode" => 0, "issubnode" => 0, "isplabdslice" => 0,
+	"issimnode" => 0, "simnode_capacity" => 20);
+} else {
+    #
+    # We're editing an existing type - suck the current info out of the
+    # database.
+    #
+    if (!preg_match("/^[-\w]+$/", $node_type)) {
+	USERERROR("$node_type contains illegal characters!", 1);    
+    }
+    $query_result =
+	DBQueryFatal("select * from node_types where type='$node_type'");
 
-if (($defaults = mysql_fetch_array($query_result)) == 0) {
-    USERERROR("$node_type is not a valid node type!", 1);
+    if (($defaults = mysql_fetch_array($query_result)) == 0) {
+	USERERROR("$node_type is not a valid node type!", 1);
+    }
 }
+
+
 
 #
 # We need a list of osids and imageids.
@@ -316,7 +365,9 @@ if (! isset($submit)) {
 #
 # We do not allow these to be changed.
 #
-$formfields["class"]       = $defaults["class"];
+if (!$new_type) {
+    $formfields["class"] = $defaults["class"];
+}
 
 #
 # Otherwise, must validate and redisplay if errors. Build up a DB insert
@@ -324,6 +375,16 @@ $formfields["class"]       = $defaults["class"];
 #
 $errors  = array();
 $inserts = array();
+
+# Class (only for new types)
+if ($new_type && isset($formfields['class']) && $formfields['class'] != "") {
+    if (! TBvalid_description($formfields['class'])) {
+	$errors["Class"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["class"] = addslashes($formfields["class"]);
+    }
+}
 
 # Processor
 if (isset($formfields[proc]) && $formfields[proc] != "") {
@@ -375,6 +436,30 @@ if (isset($formfields[max_interfaces]) && $formfields[max_interfaces] != "") {
     }
 }
 
+# control_net
+if (isset($formfields[control_net]) && $formfields[control_net] != "") {
+    if (! TBvalid_tinyint($formfields[control_net])) {
+	$errors["control_net"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["control_net"] = $formfields[control_net];
+    }
+} else {
+    $errors["control_net"] = "Field is required";
+}
+
+# control_iface
+if (isset($formfields[control_iface]) && $formfields[control_iface] != "") {
+    if (! TBvalid_userdata($formfields[control_iface])) {
+	$errors["control_iface"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["control_iface"] = addslashes($formfields[control_iface]);
+    }
+} else {
+    $errors["control_iface"] = "Field is required";
+}
+
 # OSID
 if (isset($formfields[osid]) && $formfields[osid] != "") {
     if ($formfields[osid] == "none") {
@@ -391,26 +476,6 @@ if (isset($formfields[osid]) && $formfields[osid] != "") {
     }
 }
 
-# control_net
-if (isset($formfields[control_net]) && $formfields[control_net] != "") {
-    if (! TBvalid_tinyint($formfields[control_net])) {
-	$errors["control_net"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["control_net"] = $formfields[control_net];
-    }
-}
-
-# power_time
-if (isset($formfields[power_time]) && $formfields[power_time] != "") {
-    if (! TBvalid_tinyint($formfields[power_time])) {
-	$errors["power_time"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["power_time"] = $formfields[power_time];
-    }
-}
-
 # ImageID
 if (isset($formfields[imageid]) && $formfields[imageid] != "") {
     if ($formfields[imageid] == "none") {
@@ -424,48 +489,6 @@ if (isset($formfields[imageid]) && $formfields[imageid] != "") {
     }
     else {
 	$inserts["imageid"] = $formfields[imageid];
-    }
-}
-
-# imageable
-if (isset($formfields[imageable]) && $formfields[imageable] != "") {
-    if (! TBvalid_boolean($formfields[imageable])) {
-	$errors["imageable"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["imageable"] = $formfields[imageable];
-    }
-}
-
-# delay_capacity
-if (isset($formfields[delay_capacity]) && $formfields[delay_capacity] != "") {
-    if (! TBvalid_tinyint($formfields[delay_capacity])) {
-	$errors["delay_capacity"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["delay_capacity"] = $formfields[delay_capacity];
-    }
-}
-
-# control_iface
-if (isset($formfields[control_iface]) && $formfields[control_iface] != "") {
-    if (! TBvalid_userdata($formfields[control_iface])) {
-	$errors["control_iface"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["control_iface"] = addslashes($formfields[control_iface]);
-    }
-}
-
-# disktype
-if (isset($formfields[disktype]) && $formfields[disktype] != "") {
-    if ($formfields[disktype] != "ad" &&
-	$formfields[disktype] != "da" &&
-	$formfields[disktype] != "ar") {
-	$errors["disktype"] = "Must be one of ad, da, ar";
-    }
-    else {
-	$inserts["disktype"] = $formfields[disktype];
     }
 }
 
@@ -498,6 +521,48 @@ if (isset($formfields[jail_osid]) && $formfields[jail_osid] != "") {
     }
     else {
 	$inserts["jail_osid"] = $formfields[jail_osid];
+    }
+}
+
+# power_time
+if (isset($formfields[power_time]) && $formfields[power_time] != "") {
+    if (! TBvalid_tinyint($formfields[power_time])) {
+	$errors["power_time"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["power_time"] = $formfields[power_time];
+    }
+}
+
+# imageable
+if (isset($formfields[imageable]) && $formfields[imageable] != "") {
+    if (! TBvalid_boolean($formfields[imageable])) {
+	$errors["imageable"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["imageable"] = $formfields[imageable];
+    }
+}
+
+# delay_capacity
+if (isset($formfields[delay_capacity]) && $formfields[delay_capacity] != "") {
+    if (! TBvalid_tinyint($formfields[delay_capacity])) {
+	$errors["delay_capacity"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["delay_capacity"] = $formfields[delay_capacity];
+    }
+}
+
+# disktype
+if (isset($formfields[disktype]) && $formfields[disktype] != "") {
+    if ($formfields[disktype] != "ad" &&
+	$formfields[disktype] != "da" &&
+	$formfields[disktype] != "ar") {
+	$errors["disktype"] = "Must be one of ad, da, ar";
+    }
+    else {
+	$inserts["disktype"] = $formfields[disktype];
     }
 }
 
@@ -579,9 +644,14 @@ foreach ($inserts as $name => $value) {
     $insert_data[] = "$name='$value'";
 }
 
-DBQueryFatal("update node_types set ".
-	     implode(",", $insert_data) . " ".
-	     "where type='$node_type'");
+if ($new_type) {
+    DBQueryFatal("insert into node_types set type='$node_type', ".
+		 implode(",", $insert_data));
+} else {
+    DBQueryFatal("update node_types set ".
+		 implode(",", $insert_data) . " ".
+		 "where type='$node_type'");
+}
 
 #
 # Spit out a redirect so that the history does not include a post
