@@ -145,7 +145,7 @@ install-dirs:
 	-mkdir -p $(INSTALL_DIR)/ssl/newcerts
 	-chmod 775 $(INSTALL_DIR)/ssl/newcerts
 	-mkdir -p $(INSTALL_DIR)/ssl/crl
-        -mkdir -p $(INSTALL_LIBDIR)/ssl
+	-mkdir -p $(INSTALL_LIBDIR)/ssl
 	echo "01" > $(INSTALL_DIR)/ssl/serial
 	touch $(INSTALL_DIR)/ssl/index.txt
 	touch install-dirs
