@@ -571,14 +571,17 @@ sub ChangeVirtLans() {
 	}
 	DBQueryFatal($query_string);
 
-	$query_string = "update virt_lans set ".
-	    join(",", @query_clauses2) .
-	    " where pid='$pid' and eid='$eid' and ".
-	    "      vname='$link' and member not like '${srcvnode}:%'";
+	if (@query_clauses2) {
+	    $query_string =
+		"update virt_lans set ".
+		join(",", @query_clauses2) .
+		" where pid='$pid' and eid='$eid' and ".
+		"      vname='$link' and member not like '${srcvnode}:%'";
 	
-	if ($debug) {
-	    print "$query_string\n";
+	    if ($debug) {
+		print "$query_string\n";
+	    }
+	    DBQueryFatal($query_string);
 	}
-	DBQueryFatal($query_string);
     }
 }
