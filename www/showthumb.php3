@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -18,6 +18,9 @@ include("defs.php3");
 if (!isset($idx) ||
     strcmp($idx, "") == 0) {
     USERERROR("You must provide an ID.", 1);
+}
+if (!preg_match("/^\d+$/", $idx)) {
+    PAGEARGERROR("Invalid ID argument.");
 }
 
 #
