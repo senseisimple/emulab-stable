@@ -6,6 +6,9 @@
  * All rights reserved.
  */
 
+// This data structure represents a graph and single-source
+// shortest-path information for a particular source.
+
 #ifndef SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 #define SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 
@@ -66,13 +69,23 @@ public:
     SingleSource(int size);
     ~SingleSource();
 
+    // Add an edge to the graph. Every edge should be inserted before
+    // running route().
     void insertEdge(int edgeSource, int edgeDest, int cost);
+    // Calculate shortest path info from a particular source.
     void route(int newSource);
 
+    // Find out what the first hop is from the source to a particular
+    // host.
     int getFirstHop(int index) const;
+    // Find out what the predecessor is in the tree extending from
+    // source.
     int getPred(int index) const;
+    // Find out the distance between source and a particular host.
     int getDistance(int index) const;
+    // How many vertices are in the graph?
     int getVertexCount(void) const;
+    // What is the index of the source host?
     int getSource(void) const;
 private:
     // Use an adjacency_list graph instead of an adjacency_matrix
