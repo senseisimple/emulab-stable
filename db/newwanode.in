@@ -25,6 +25,8 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $named_setup = "$TB/sbin/named_setup";
+my $FIRSTIPPORT = 40000;
+my $PERNODEPORTS= 256;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -209,14 +211,19 @@ DBQueryFatal("insert into nodes ".
 for ($i = 1; $i < 9; $i++) {
     my $priority  = ($nextpri * 100) + $i;
     $nodevname = "v${nodename}-${i}";
+
+    # Per vnode ports.
+    my $portlow  = $FIRSTIPPORT + (($i - 1) * $PERNODEPORTS);
+    my $porthigh = $portlow + $PERNODEPORTS - 1;
 	
     print "Creating widearea virtual node $nodevname ...\n";
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".
-		 " status, op_mode, def_boot_osid, update_accounts) ".
+		 " status, op_mode, def_boot_osid, update_accounts, ".
+		 " ipport_low, ipport_high) ".
 		 "values ('$nodevname', '$nodevtype', '$nodename', ".
 		 "        'virtnode', $priority, 'down', 'NORMAL', ".
-		 "        '$defosid', 1) ");
+		 "        '$defosid', 1, $portlow, $porthigh) ");
 }
 
 DBQueryFatal("insert into interfaces ".

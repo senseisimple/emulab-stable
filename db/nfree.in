@@ -296,6 +296,11 @@ foreach my $n (@freed_nodes) {
     DBQueryWarn("delete from current_reloads where node_id='$n'") || $error++;
 
     #
+    # Reset its port allocation stuff.
+    #
+    DBQueryWarn("delete from nodeipportnum where node_id='$n'") || $error++;
+
+    #
     # Now its safe to change the reservation.
     #
     #

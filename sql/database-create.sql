@@ -564,6 +564,8 @@ CREATE TABLE nodes (
   ipodhash varchar(64) default NULL,
   osid varchar(35) NOT NULL default '',
   ntpdrift float default NULL,
+  ipport_low int(11) NOT NULL default '11000',
+  ipport_high int(11) NOT NULL default '20000',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
