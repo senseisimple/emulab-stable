@@ -759,8 +759,7 @@ $leader_name = $row[0];
 $leader_email = $row[1];
 $leader_uid = $row[2];
 
-if (($allleaders = TBLeaderMailList($pid,$gid)) == 0)
-    $allleaders = "";
+$allleaders = TBLeaderMailList($pid,$gid);
 
 #
 # The mail message to the leader. We send this for returning users

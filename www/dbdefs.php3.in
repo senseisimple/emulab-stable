@@ -1123,7 +1123,7 @@ function TBValidNodeType($type)
 # usage TBLeaderMailList($pid, $gid)
 #       Uses default group (pid=gid) if gid not given.
 #       returns string like "Leader Name (uid) <email>[, ...]"
-#       returns 0 if not valid
+#       returns the empty string if not valid
 function TBLeaderMailList($pid, $gid)
 {
   # No group, then use the default group.
@@ -1138,7 +1138,7 @@ function TBLeaderMailList($pid, $gid)
 		 "order by trust DESC, usr_name");
   
   if (mysql_num_rows($query_result) == 0) {
-    return 0;
+    return "";
   }
   $mailstr="";
   while ($row = mysql_fetch_array($query_result)) {
