@@ -12,10 +12,26 @@ PAGEHEADER("Modify User Information Form");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
+#
+# The target uid and the current uid will generally be the same, unless
+# its an admin user modifying someone elses data. Must verify this case.
+#
+if (! isset($target_uid)) {
+    $target_uid = $uid;
+}
+
+if ($uid != $target_uid) {
+    $isadmin = ISADMIN($uid);
+    if (! $isadmin) {
+	USERERROR("You do not have permission to modify user information ".
+		  "for other users", 1);
+    }
+}
+
 ?>
 
 <center>
-<h1>Modify Your User Information</h1>
+<h1>Modify User Information</h1>
 <table align="center" border="1">
   <tr><td align="center" colspan="4">
           Only fields marked with * are required
@@ -28,10 +44,10 @@ LOGGEDINORDIE($uid);
 # Suck the current info out of the database and break it apart.
 #
 $info_result = mysql_db_query($TBDBNAME,
-	"select * from users where uid='$uid'");
+	"select * from users where uid='$target_uid'");
 if (! $info_result) {
     $err = mysql_error();
-    TBERROR("Database Error getting user info for user $uid: $err\n", 1);
+    TBERROR("Database Error getting user info for $target_uid: $err\n", 1);
 }
 
 $row = mysql_fetch_array($info_result);
@@ -52,7 +68,8 @@ echo "<form action=\"modusr_process.php3\" method=\"post\">\n";
 echo "<tr>
           <td>Username:</td>
           <td class=\"left\"> 
-              <input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
+              <input type=\"readonly\" name=\"target_uid\"
+                     value=\"$target_uid\"></td>
       </tr>\n";
 
 echo "<tr>

@@ -60,9 +60,10 @@ echo "<tr>
           <td>Projects</td>\n";
 
 #
-# Admin users get a "delete" option.
+# Admin users get a "delete" and a "modify" option.
 # 
 if ($isadmin) {
+    echo "<td align=center>Modify?</td>\n";
     echo "<td align=center>Delete?</td>\n";
 }
 echo "</tr>\n";
@@ -97,8 +98,10 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     if ($isadmin) {
+	echo "<td align=center><A href='modusr_form.php3?target_uid=$thisuid'>
+                     <img alt=\"O\" src=\"blueball.gif\"></A></td>\n";
 	echo "<td align=center><A href='deleteuser.php3?target_uid=$thisuid'>
-                     <img alt=\"o\" src=\"redball.gif\"></A></td>\n";
+                     <img alt=\"X\" src=\"redball.gif\"></A></td>\n";
     }
     echo "</tr>\n";
 }

@@ -7,17 +7,36 @@ include("defs.php3");
 PAGEHEADER("Modify User Information");
 
 #
-# First off, sanity check the form to make sure all the required fields
+# Only known and logged in users can modify info.
+#
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
+
+#
+# The target_uid comes in as a POST var. It must be set. We allow
+# admin users to modify other user info, so must check for that.
+# 
+if (!isset($target_uid) ||
+    strcmp($target_uid, "") == 0) {
+  FORMERROR("Username");
+}
+
+if ($uid != $target_uid) {
+    $isadmin = ISADMIN($uid);
+    if (! $isadmin) {
+	USERERROR("You do not have permission to modify user information ".
+		  "for other users", 1);
+    }
+}
+
+#
+# Now sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be
 # informative. Be sure to correlate these checks with any changes made to
 # the project form. Note that this sequence of  statements results in
 # only the last bad field being displayed, but thats okay. The user will
 # eventually figure out that fields marked with * mean something!
 #
-if (!isset($uid) ||
-    strcmp($uid, "") == 0) {
-  FORMERROR("Username");
-}
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   FORMERROR("Full Name");
@@ -44,11 +63,6 @@ if (!isset($usr_affil) ||
 }
 
 #
-# Only known and logged in users can modify info. uid came in as a POST var.
-#
-LOGGEDINORDIE($uid);
-
-#
 # Now see if the user is requesting to change the password. We do the usual
 # checks to make sure the two fields agree and that it passes our tests for
 # safe passwords.
@@ -60,7 +74,7 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
     }
 
     $mypipe = popen(escapeshellcmd(
-    "$TBCHKPASS_PATH $new_password1 $uid '$usr_name:$usr_email'"),
+    "$TBCHKPASS_PATH $new_password1 $target_uid '$usr_name:$usr_email'"),
     "w+");
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);
@@ -71,7 +85,7 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
     }
     else {
 	TBERROR("TESTBED: checkpass failure\n".
-               "$usr_name ($uid) just tried change his password\n".
+               "$usr_name ($target_uid) just tried change his password\n".
                "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
 
@@ -80,11 +94,12 @@ if (isset($new_password1) && strcmp($new_password2, "")) {
     #
     $encoding = crypt("$new_password1");
     $insert_result  = mysql_db_query($TBDBNAME, 
-		"UPDATE users SET usr_pswd=\"$encoding\" WHERE uid=\"$uid\"");
+		"UPDATE users SET usr_pswd=\"$encoding\" ".
+		"WHERE uid=\"$target_uid\"");
 
     if (! $insert_result) {
         $err = mysql_error();
-        TBERROR("Database Error changing password for $uid: $err", 1);
+        TBERROR("Database Error changing password for $target_uid: $err", 1);
     }
 }
 
@@ -103,11 +118,11 @@ $insert_result = mysql_db_query($TBDBNAME,
 	"usr_expires=\"$usr_expires\", ".
 	"usr_title=\"$usr_title\",     ".
 	"usr_affil=\"$usr_affil\"      ".
-	"WHERE uid=\"$uid\"");
+	"WHERE uid=\"$target_uid\"");
 
 if (! $insert_result) {
     $err = mysql_error();
-    TBERROR("Database Error changing user info for $uid: $err", 1);
+    TBERROR("Database Error changing user info for $target_uid: $err", 1);
 }
 
 ?>
