@@ -1,0 +1,923 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# node reboot library. Basically the backend to the node_reboot script, but
+# also used where we need finer control of rebooting nodes (and failure).
+#
+# XXX Only suitable for scripts that are already setuid and have not
+# dropped privs by the time they call into nodereboot(). I think this
+# makes the library somewhat useless.
+#
+package libreboot;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( nodereboot nodereboot_wait );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use English;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $CLIENT_BIN  = "@CLIENT_BINDIR@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+#
+# The number of nodes we reboot at a time. Degree of parallelism ...
+#
+my $BATCHCOUNT  = 12;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use event;
+use POSIX qw(strftime);
+use IO::Handle;
+use Fcntl;
+
+# External Programs
+my $ssh		= "$TB/bin/sshtb -n";
+my $power	= "$TB/bin/power";
+my $ipod	= "$TB/sbin/apod";
+my $vnodesetup	= "$TB/sbin/vnode_setup";
+my $bisend      = "$TB/sbin/bootinfosend";
+my $logfile	= "$TB/log/power.log";
+my $ping	= "/sbin/ping";
+my $reboot      = "$TB/bin/node_reboot";
+
+# Locals
+my $debug       = 0;
+my %children    = ();
+
+#
+# The actual library function. 
+#
+sub nodereboot($$)
+{
+    my ($args, $result) = @_;
+
+    $debug = $args->{'debug'}
+        if (exists($args->{'debug'}));
+
+    if ($EUID != 0) {
+	#
+	# Use the exec version, but only if we do not already have
+	# a pipeno in the environment, which would indicate a loop
+	# caused by installing improperly.
+	#
+	if (exists($ENV{'REBOOTPIPENO'})) {
+	    print STDERR "*** reboot: Must be root when using library!\n";
+	    return -1;
+	}
+	print STDERR "reboot: no privs; invoking real nodereboot script!\n"
+	    if ($debug);
+	return nodereboot_exec($args, $result);
+    }
+
+    if (!defined($args->{'nodelist'})) {
+	print STDERR "*** reboot: Must supply a node list!\n";
+	return -1;
+    }
+    my @nodes       = @{ $args->{'nodelist'}};
+    my $powercycle  = 0;
+    my $waitmode    = 0;
+    my $realmode    = 1;
+    my $killmode    = 0;
+    my $freemode    = 0;
+    my $reconfig    = 0;
+    my $asyncmode   = 0;
+    my $pipemode    = 0;
+
+    $powercycle  = $args->{'powercycle'} if (exists($args->{'powercycle'}));
+    $waitmode    = $args->{'waitmode'}   if (exists($args->{'waitmode'}));
+    $realmode    = $args->{'realmode'}   if (exists($args->{'realmode'}));
+    $killmode    = $args->{'killmode'}   if (exists($args->{'killmode'}));
+    $freemode    = $args->{'freemode'}   if (exists($args->{'freemode'}));
+    $reconfig    = $args->{'reconfig'}   if (exists($args->{'reconfig'}));
+    $asyncmode   = $args->{'asyncmode'}  if (exists($args->{'asyncmode'}));
+
+    #
+    # If pipeno is specified in the environment, we write the results to
+    # that pipe.
+    # 
+    if (exists($ENV{'REBOOTPIPENO'})) {
+	$pipemode = $ENV{'REBOOTPIPENO'};
+
+	if ($pipemode =~ /^(\d+)$/) {
+	    $pipemode = $1;
+	}
+	else {
+	    print STDERR "*** reboot: Bad pipeno in environment: $pipemode!\n";
+	    return -1;
+	}
+    }
+
+    #
+    # Verify permission to reboot these nodes.
+    #
+    if ($UID && !TBAdmin($UID) &&
+	! TBNodeAccessCheck($UID, TB_NODEACCESS_REBOOT, @nodes)) {
+	print STDERR "*** reboot: ".
+	    "You do not have permission to reboot some of the nodes!\n";
+	return -1;
+    }
+
+    # Locals.
+    my %pids	 = ();
+    my $failed   = 0;
+
+    #
+    # VIRTNODE HACK: Virtual nodes are special. We can reboot jailed
+    # vnodes, but not old style (non-jail). Also, if we are going to
+    # reboot the physical node that a vnode is on, do not bother with
+    # rebooting the vnode since it will certainly get rebooted anyway!
+    #
+    my %realnodes = ();
+    my %virtnodes = ();
+
+    foreach my $node (@nodes) {
+	my ($jailed, $plab);
+
+	# All nodes start out as being successful; altered later as needed.
+	$result->{$node} = 0;
+
+	if (TBIsNodeVirtual($node, \$jailed, \$plab)) {
+	    if (! $jailed && ! $plab) {
+		print "reboot ($node): Skipping old style virtual node\n";
+		next;
+	    }
+	    my $pnode;
+
+	    if (! TBPhysNodeID($node, \$pnode)) {
+		print STDERR "*** reboot ($node): No physical node!\n";
+		return -1;
+	    }
+	    $virtnodes{$node} = $pnode;
+	}
+	else {
+	    $realnodes{$node} = $node;
+	}
+    }
+    for my $node ( keys(%virtnodes) ) {
+	my $pnode = $virtnodes{$node};
+
+	if (defined($realnodes{$pnode})) {
+	    print "reboot ($node): Dropping since its host $pnode will reboot\n";
+	    delete($virtnodes{$node});
+	}
+    }
+    if (! keys(%realnodes) && ! keys(%virtnodes)) {
+	print "reboot: No nodes to reboot.\n";
+	return 0;
+    }
+    my @sortednodes = sort(keys(%realnodes));
+
+    #
+    # This stuff is incomplete and non-functional.
+    # 
+    if (!$realmode) {
+	EventSendFatal(host      => $BOSSNODE ,
+		       objtype   => TBDB_TBEVENT_COMMAND ,
+		       eventtype => TBDB_COMMAND_REBOOT ,
+		       objname   => join(",", @sortednodes));
+	# In here we can do some output to tell the user what's going on.
+	if ($waitmode) {
+	    # Wait for [SHUTDOWN,ISUP]
+	}
+	else {
+	    # Wait for [SHUTDOWN]
+	}
+	return 0;
+    }
+
+    #
+    # This is somewhat hackish. To promote parallelism, we want to fork off
+    # the reboot from the parent so it can do other things.  The problem is
+    # how to return status via the results vector. Well, lets do it with
+    # some simple IPC. Since the results vector is simply a hash of node
+    # name to an integer value, its easy to pass that back.
+    #
+    # We return the pid to the caller, which it can wait on either directly
+    # or by calling back into this library if it wants to actually get the
+    # results from the child!
+    #
+    if ($asyncmode) {
+	#
+	# Create a pipe to read back results from the child we will create.
+	#
+	if (! pipe(PARENT_READER, CHILD_WRITER)) {
+	    print STDERR "*** reboot: creating pipe: $!\n";
+	    return -1;
+	}
+	CHILD_WRITER->autoflush(1);
+
+	if (my $childpid = fork()) {
+	    close(CHILD_WRITER);
+	    $children{$childpid} = [ *PARENT_READER, $result ];
+	    return $childpid;
+	}
+	#
+	# Child keeps going. 
+	#
+	close(PARENT_READER);
+	TBdbfork();
+
+	print STDERR "reboot: Running in asyncmode.\n"
+	    if ($debug);
+    }
+    elsif ($pipemode) {
+	#
+	# We were invoked with an FD already opened to write the results to.
+	# See nodereboot_exec() below. The operation from here is basically
+	# the same as in asyncmode, but we do not need to create the pipe,
+	# but rather just write the results to the pipe we got. 
+	#
+	if (! open(CHILD_WRITER, ">>&=${pipemode}")) {
+	    print STDERR "*** reboot: reopening pipe: $!\n";
+	    return -1;
+	}
+	CHILD_WRITER->autoflush(1);
+
+	print STDERR "reboot: Running in pipemode ($pipemode).\n"
+	    if ($debug);
+    }
+
+    #
+    # We do not want 50 nodes all rebooting at the same time.  Lets order
+    # them so that the shelves are grouped together at least, and issue the
+    # reboots in batches.
+    #
+    while (@sortednodes) {
+	my @batch     = ();
+	my $i         = 0;
+	my $lastshelf = 0;
+
+	while ($i < $BATCHCOUNT && @sortednodes > 0) {
+	    my $node = shift(@sortednodes);
+	    my $shelf;
+	    my $unit;
+
+	    #
+	    # The point of this sillyness is stop at each shark shelf transition.
+	    # Whats a shark you ask?
+	    #
+	    if (IsShelved($node, \$shelf, \$unit)) {
+		if ($lastshelf && $lastshelf ne $shelf) {
+		    unshift(@sortednodes, $node);
+		    last;
+		}
+		$lastshelf = $shelf;
+	    }
+	    push(@batch, $node);
+	    $i++;
+	}
+
+	if ($powercycle) {
+	    #
+	    # In powercyle mode, call the power program for the whole
+	    # batch, and continue on. We do not wait for them to go down or
+	    # reboot.
+	    #
+	    info("*** reboot: Powercyle mode: power cycle ".join(" ",@batch));
+	    if (PowerCycle(@batch)) {
+		print STDERR
+		    "*** reboot: Powercyle failed for " . join(" ",@batch) ."\n";
+		foreach my $node (@batch) {
+		    $result->{$node} = -1;
+		    $failed++;
+		}
+	    }
+	}
+	else {
+	    #
+	    # Fire off a reboot process so that we can overlap them all.
+	    # We need the pid so we can wait for them all before preceeding.
+	    #
+	    foreach my $node ( @batch ) {
+		$pids{$node} = RebootNode($node, $reconfig, $killmode);
+	    }
+	}
+
+	#
+	# If there are more nodes to go, then lets pause a bit so that we
+	# do not get a flood of machines coming up all at the same exact
+	# moment.
+	#
+	if (@sortednodes) {
+	    print "reboot: Pausing to give some nodes time to reboot\n"
+		if ($debug);
+	    
+	    if ($lastshelf) {
+		sleep(10);
+	    }
+	    else {
+		sleep(5);
+	    }
+	}
+    }
+
+    #
+    # Wait for all the reboot children to exit before continuing.
+    #
+    my @needPowercycle = ();
+    if (scalar(keys(%pids))) {
+	foreach my $node (sort(keys(%realnodes))) {
+	    my $mypid     = $pids{$node};
+	    my $status;
+
+	    #
+	    # Child may have avoided the fork, and returned status directly.
+	    # Flip it and apply the same test.
+	    #
+	    if ($mypid <= 0) {
+		$status = -$mypid;
+	    }
+	    else {
+		waitpid($mypid, 0);
+		$status = $? >> 8;
+	    }
+
+	    if ($status == 2) {
+		# Child signaled to us that this node needs a power cycle
+		push(@needPowercycle, $node);
+	    }
+	    elsif ($?) {
+		$failed++;
+		$result->{$node} = -1;
+		print STDERR "*** reboot ($node): Failed!\n";
+	    }
+	    else {
+		print STDOUT "reboot ($node): Successful!\n";
+	    }
+	}
+    }
+
+    #
+    # Power cycle nodes that couldn't be brought down any other way
+    #
+    if (@needPowercycle) {
+	if (PowerCycle(@needPowercycle)) {
+	    print STDERR
+		"*** reboot: Powercyle failed for " .
+		    join(" ",@needPowercycle) ."\n";
+	    foreach my $node (@needPowercycle) {
+		$result->{$node} = -1;
+		$failed++;
+	    }
+	}
+    }
+
+    #
+    # Now do vnodes. Do these serially for now (simple).
+    #
+    for my $node ( sort(keys(%virtnodes)) ) {
+	my $pnode = $virtnodes{$node};
+
+	if (RebootVNode($node, $pnode)) {
+	    $failed++;
+	    $result->{$node} = -1;
+	    print STDERR "*** reboot ($node): failed (on $pnode).\n";
+	}
+	else {
+	    print STDOUT "reboot ($node): rebooting (on $pnode).\n";
+	}
+    }
+
+    #
+    # Wait for nodes to reboot. We wait only once, no reboots.
+    #
+    if ($waitmode) {
+	my $waitstart = time;
+
+	print STDOUT "reboot: Waiting for nodes to come up.\n";
+
+	# Wait for events to filter through stated! If we do not wait, then we
+	# could see nodes still in ISUP.
+	sleep(2);
+
+	foreach my $node (sort(@nodes)) {
+	    #
+	    # Skip if something failed earlier.
+	    #
+	    next
+		if ($result->{node});
+	    
+	    if (!TBNodeStateWait($node,
+				 TBDB_NODESTATE_ISUP, $waitstart, (60*6))) {
+		print STDOUT "reboot ($node): alive and well.\n";
+		SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+		next;
+	    }
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	    $result->{$node} = -1;
+	    $failed++;
+	}
+    }
+ done:    
+    print "reboot: Done. There were $failed failures.\n";
+
+    if ($asyncmode || $pipemode) {
+	#
+	# We are a child. Send back the results to the parent side
+	# and *exit* with status instead of returning it.
+	# 
+	foreach my $node (keys(%{ $result })) {
+	    my $status = $result->{$node};
+
+	    print CHILD_WRITER "$node,$status\n";
+	}
+	close(CHILD_WRITER);
+	exit($failed);
+    }
+    return $failed;
+}
+
+#
+# Reboot a node in a child process. Return the pid to the parent so
+# that it can wait on all the children later.
+#
+sub RebootNode {
+    my ($pc, $reconfig, $killmode) = @_;
+    my ($status, $syspid, $mypid, $didipod, $nodestate);
+
+    if ($reconfig) {
+	print "reboot ($pc): Attempting to reconfigure ...\n";
+    }
+    else {
+	print "reboot ($pc): Attempting to reboot ...\n";
+    }
+
+    # Report some activity into last_ext_act
+    TBActivityReport($pc);
+
+    #
+    # Is the node in PXEWAIT? If so we want to wake it up so that it can
+    # query bootinfo and do what it is supposed to do, without a real reboot.
+    # We send the initial wakeup from here, but let stated deal with it
+    # failing (timeout) and resending it. That means we could be called
+    # with the node in PXEWAKEUP, so send it another wakeup. The point is that
+    # stated is controlling the timeouts. Eventually stated gives up and uses
+    # the -k option to force a power cycle.
+    #
+    if (! TBGetNodeEventState($pc, \$nodestate)) {
+	info("$pc has no event state: power cycle");
+	print STDERR "*** reboot ($pc): no event state; will power cycle.\n"
+	    if $debug;
+	
+	# Signal to the called that the node needs to be power cycled
+	return -2;
+    }
+    if ($nodestate eq TBDB_NODESTATE_PXEWAIT() ||
+	$nodestate eq TBDB_NODESTATE_PXEWAKEUP()) {
+	#
+	# In killmode, we do not want to bother with sending a wakeup event.
+	# Just do the power cycle. This is used to unstick a machine that
+	# is in waitmode, but not responding to the wakeups.
+	#
+	if ($killmode) {
+	    info("$pc: in $nodestate: but power cycling in killmode");
+	    print STDERR "reboot ($pc): in $nodestate, ".
+		"but power cycling in killmode.\n" if $debug;
+	    
+	    # Signal to the caller that the node needs to be power cycled
+	    return -2;
+	}
+
+	#
+	# The aux program sends the event to stated ...
+	#
+	my $optarg = ($debug ? "-dd" : "");
+
+	print STDERR "reboot ($pc): in $nodestate: sending wakeup command.\n"
+	    if $debug;
+	system("$bisend $optarg -q $pc");
+	if ($?) {
+	    info("$pc: PXEWAKEUP failed ... power cycle");
+	    print STDERR
+		"*** reboot ($pc): PXEWAKEUP failed; will power cycle.\n";
+	    
+	    # Signal to the caller that the node needs to be power cycled
+	    return -2;
+	}
+	return 0;
+    }
+
+    #
+    # Do the rest in a child process. After the fork, we do the ping test
+    # before we reconnect to the DB. This cuts down on the flurry of connects
+    # by a bunch of children (ping will take a moment to run).
+    #
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    #
+    # See if the machine is pingable. If its not pingable, then we just
+    # power cycle the machine rather than wait for ssh to time out.
+    #
+    if (! DoesPing($pc)) {
+	info("$pc appears dead: power cycle");
+	print STDERR "*** reboot ($pc): appears dead; will power cycle.\n";
+	
+	# Signal to the parent that the node needs to be power cycled
+	exit(2);
+    }
+    TBdbfork();
+
+    #
+    # Machine is pingable at least. Try to reboot it gracefully,
+    # or power cycle anyway if that does not work.
+    #
+    print STDERR "reboot ($pc): Trying ssh.\n" if $debug;
+
+    #
+    # Must change our real UID to root so that ssh will work. We save the old
+    # UID so that we can restore it after we finish the ssh
+    #
+    my $oldUID = $UID;
+    $UID = 0;
+
+    #
+    # If doing a reconfig, first try that in a child.
+    #
+    if ($reconfig) {
+	TBSetNodeEventState($pc, "RECONFIG");
+	$syspid = fork();
+
+	if ($syspid) {
+	    local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	    alarm 20;
+	    waitpid($syspid, 0);
+	    alarm 0;
+
+	    #
+	    # The ssh can return non-zero exit status, but still have worked.
+	    # FreeBSD for example.
+	    #
+	    print "reboot ($pc): reconfig returned $?.\n" if $debug;
+
+	    #
+	    # Any failure, revert to plain reboot below.
+	    #
+	    if (! $?) {
+		$UID = $oldUID;
+		exit(0);
+	    }
+	}
+	else {
+	    exec("$ssh -host $pc ".
+		 "/usr/local/etc/emulab/rc/rc.bootsetup -b reconfig");
+	    exit(0);
+	}
+    }
+
+    #
+    # Run an ssh command in a child process, protected by an alarm to
+    # ensure that the ssh is not hung up forever if the machine is in
+    # some funky state.
+    #
+    $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 20;
+	waitpid($syspid, 0);
+	alarm 0;
+
+	#
+	# The ssh can return non-zero exit status, but still have worked.
+	# FreeBSD for example.
+	#
+	print STDERR "reboot ($pc): reboot returned $?.\n" if $debug;
+
+	#
+	# If either ssh is not running or it timed out,
+	# send it a ping of death.
+	#
+	if ($? == 256 || $? == 15) {
+	    if ($? == 256) {
+		print STDERR "*** reboot ($pc): not running sshd.\n" if $debug;
+	    } else {
+		print STDERR "*** reboot ($pc): wedged.\n" if $debug;
+	    }
+	    info("$pc: ssh reboot failed ... sending ipod");
+	    print STDERR "*** reboot ($pc): Trying Ping-of-Death.\n" if $debug;
+
+	    system("$ipod $pc");
+	    $didipod = 1;
+	}
+	else {
+	    info("$pc: ssh reboot ($?)");
+	    $didipod = 0;
+	}
+    }
+    else {
+	exec("$ssh -host $pc /sbin/reboot");
+	exit(0);
+    }
+
+    #
+    # Restore the old UID so that scripts run from this point on get the
+    # user's real UID
+    #
+    $UID = $oldUID;
+
+    #
+    # Okay, before we power cycle lets really make sure. We wait a while
+    # for it to stop responding to pings, and if it never goes silent,
+    # punch the power button.
+    #
+    if (WaitTillDead($pc) == 0) {
+	my $state = TBDB_NODESTATE_SHUTDOWN;
+	TBSetNodeEventState($pc,$state);
+	exit(0);
+    }
+
+    #
+    # Haven't yet tried an ipod, try that and wait again.
+    # This further slows down reboot but is probably worth it
+    # since this should be a rare case (reboot says it worked but
+    # node doesn't reboot) and is vital if the nodes have no
+    # power cycle capability to fall back on.
+    #
+    if (! $didipod) {
+	info("$pc: reboot failed ... sending ipod");
+	$UID = 0;
+	system("$ipod $pc");
+	$UID = $oldUID;
+	if (WaitTillDead($pc) == 0) {
+	    my $state = TBDB_NODESTATE_SHUTDOWN;
+	    TBSetNodeEventState($pc,$state);
+	    exit(0);
+	}
+    }
+
+    info("$pc: ipod failed ... power cycle");
+    print STDERR "*** reboot ($pc): Still running; will power cycle.\n"
+	if $debug;
+    exit(2);
+}
+
+#
+# Reboot a vnode in a child process, and wait for it.
+#
+sub RebootVNode($$) {
+    my ($vnode, $pnode) = @_;
+    my $syspid;
+
+    print STDOUT "reboot ($vnode): Rebooting (on $pnode).\n";
+
+    #
+    # Run an ssh command in a child process, protected by an alarm to
+    # ensure that the ssh is not hung up forever if the machine is in
+    # some funky state.
+    #
+    $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 20;
+	waitpid($syspid, 0);
+	alarm 0;
+	my $exitstatus = $?;
+
+	#
+	# The ssh can return non-zero exit status, but still have worked.
+	# FreeBSD for example.
+	#
+	print STDERR "*** reboot ($vnode): returned $exitstatus.\n" if $debug;
+
+	#
+	# Look for setup failure, reported back through ssh.
+	#
+	if ($exitstatus) {
+	    if ($exitstatus == 256) {
+		print STDERR "*** reboot ($vnode): $pnode is not running sshd.\n"
+		    if $debug;
+	    }
+	    elsif ($exitstatus == 15) {
+		print STDERR "*** reboot ($vnode): $pnode is wedged.\n"
+		    if $debug;
+	    }
+	}
+	return($exitstatus);
+    }
+    #
+    # Must change our real UID to root so that ssh will work.
+    #
+    $UID = 0;
+
+    exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup -r -j $vnode");
+    exit(0);
+}
+
+#
+# Power cycle a PC using the testbed power program.
+#
+sub PowerCycle {
+    my @pcs = @_;
+
+    my $pcstring = join(" ",@pcs);
+
+    system("$power cycle $pcstring");
+    return $? >> 8;
+}
+
+#
+# Wait until a machine stops returning ping packets.
+#
+sub WaitTillDead {
+    my ($pc) = @_;
+
+    print STDERR "reboot ($pc): Waiting to die off.\n" if $debug;
+
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for (my $i = 0; $i < 30; $i++) {
+	if (! DoesPing($pc)) {
+	    print STDERR "reboot ($pc): Died off.\n" if $debug;
+	    return 0;
+	}
+    }
+    print STDERR "reboot ($pc): still alive.\n" if $debug;
+    return 1;
+}
+
+#
+# Returns 1 if host is responding to pings, 0 otherwise
+# This routine is NOT allowed to do any DB queries!
+#
+sub DoesPing {
+    my ($pc) = @_;
+    my $status;
+    my $saveuid;
+
+    $saveuid = $UID;
+    $UID = 0;
+    system("$ping -q -i 0.25 -c 8 -t 2 $pc >/dev/null 2>&1");
+    $UID = $saveuid;
+    $status = $? >> 8;
+
+    #
+    # Ping returns 0 if any packets are returned. Returns 2 if pingable
+    # but no packets are returned. Other non-zero error codes indicate
+    # other problems.  Any non-zero return indicates "not pingable" to us.
+    #
+    print STDERR "reboot ($pc): $ping returned $status\n" if $debug;
+    if ($status) {
+	return 0;
+    }
+    return 1;
+}
+
+
+sub info($) {
+    my $message = shift;
+    # Print out log entries like this:
+    # Sep 20 09:36:00 $message
+    open(LOG,">> $logfile");
+    print LOG strftime("%b %e %H:%M:%S",localtime)." $message\n";
+    close(LOG);
+}
+
+#
+# This gets called in the parent, to wait for an async reboot that was
+# launched earlier (asyncmode). The child will print the results back
+# on the the pipe that was opened between the parent and child. They
+# are stuffed into the original results array.
+#
+sub nodereboot_wait($)
+{
+    my ($childpid) = @_;
+
+    if (!exists($children{$childpid})) {
+	print STDERR "*** reboot: No such child pid $childpid!\n";
+	return -1;
+    }
+    my ($PARENT_READER, $result) = @{ $children{$childpid}};
+
+    #
+    # Read back the results.
+    # 
+    while (<$PARENT_READER>) {
+	chomp($_);
+
+	if ($_ =~ /^([-\w]+),([-\d])+$/) {
+	    $result->{$1} = $2;
+	    print STDERR "reboot ($1): child returned $2 status.\n";
+	}
+	else {
+	    print STDERR "*** reboot: Improper response from child: $_\n";
+	}
+    }
+    
+    #
+    # And get the actual exit status.
+    # 
+    waitpid($childpid, 0);
+    return $? >> 8;
+}
+
+#
+# Okay, this is horrible! We cannot include this library into non-setuid
+# scripts cause a lot of this stuff needs to be run as root. So provide an
+# interface that is equiv to the library interface above, but which execs
+# an instance of node_reboot and waits for the results.
+#
+sub nodereboot_exec($$)
+{
+    my ($args, $result) = @_;
+    my $asyncmode = 0;
+
+    #
+    # Create a suitable command line from arg hash.
+    #
+    my $cmdline = "";
+
+    $cmdline .= "-d"
+	if (exists($args->{'debug'}) && $args->{'debug'});
+    $cmdline .= " -f"
+	if (exists($args->{'powercycle'}) && $args->{'powercycle'});
+    $cmdline .= " -w"
+	if (exists($args->{'waitmode'}) && $args->{'waitmode'});
+    $cmdline .= " -r"
+	if (exists($args->{'realmode'}) && $args->{'realmode'});
+    $cmdline .= " -k"
+	if (exists($args->{'killmode'}) && $args->{'killmode'});
+    $cmdline .= " -a"
+	if (exists($args->{'freemode'}) && $args->{'freemode'});
+    $cmdline .= " -c"
+	if (exists($args->{'reconfig'}) && $args->{'reconfig'});
+    $cmdline .= " @{ $args->{'nodelist'}}";
+    
+    $asyncmode = $args->{'asyncmode'} if (exists($args->{'asyncmode'}));
+	    
+    #
+    # Create a pipe to read back results from the child we will create.
+    #
+    if (! pipe(PARENT_READER, CHILD_WRITER)) {
+	print STDERR "*** reboot: creating pipe: $!\n";
+	return -1;
+    }
+    CHILD_WRITER->autoflush(1);
+
+    #
+    # ACK! Perl defaults to close-on-exec? Why is that?
+    # 
+    fcntl(CHILD_WRITER, F_SETFD, 0);
+
+    if (my $childpid = fork()) {
+	close(CHILD_WRITER);
+
+	#
+	# Save the info we need for calling nodereboot_wait() above.
+	# 
+	$children{$childpid} = [ *PARENT_READER, $result ];
+
+	#
+	# If asyncmode we return right away. The caller will need to
+	# use the nodereboot_wait() routine above.
+	#
+	if ($asyncmode) {
+	    return $childpid;
+	}
+
+	#
+	# Block waiting.
+	#
+	return nodereboot_wait($childpid);
+    }
+    close(PARENT_READER);
+
+    #
+    # Pass the fd number to the child.
+    # 
+    $ENV{'REBOOTPIPENO'} = fileno(CHILD_WRITER);
+   
+    #
+    # Child execs the instance of node_reboot, with an extra open fd.
+    #
+    exec("$reboot $cmdline");
+    die("Could not exec $reboot!");
+    
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

@@ -1,0 +1,590 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Osload library. Basically the backend to the osload script, but also used
+# where we need finer control of loading of nodes.
+#
+package libosload;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( osload osload_wait );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libreboot;
+use English;
+use File::stat;
+use IO::Handle;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TESTMODE    = @TESTMODE@;
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Max number of retries (per node) before its deemed fatal. This allows
+# for the occasional pxeboot failure.
+my $MAXRETRIES  = 1;
+
+my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
+my $osselect	    = "$TB/bin/os_select";
+my $FRISBEEOSID     = TB_OSID_FRISBEE_MFS();
+
+# Locals
+my %imageinfo       = ();	# Per imageid DB info.
+my %maxwaits        = ();	# Per imageid max wait time.
+my $debug           = 0;
+my %children        = ();	# Child pids in when asyncmode=1
+
+sub osload ($$) {
+    my ($args, $result) = @_;
+
+    # These come in from the caller.
+    my $imageid;
+    my $waitmode    = 1;
+    my @nodes       = ();
+    my $noreboot    = 0;
+    my $asyncmode   = 0;
+
+    # Locals
+    my %imageids    = ();
+    my %retries	    = ();
+    my $failures    = 0;
+    my $usedefault  = 1;
+    my $mereuser    = 0;
+    my $rowref;
+
+    if (!defined($args->{'nodelist'})) {
+	print STDERR "*** osload: Must supply a node list!\n";
+	return -1;
+    }
+    @nodes = sort(@{ $args->{'nodelist'} });
+    
+    if (defined($args->{'waitmode'})) {
+	$waitmode = $args->{'waitmode'};
+    }
+    if (defined($args->{'noreboot'})) {
+	$noreboot = $args->{'noreboot'};
+    }
+    if (defined($args->{'debug'})) {
+	$debug = $args->{'debug'};
+    }
+    if (defined($args->{'imageid'})) {
+	$imageid    = $args->{'imageid'};
+	$usedefault = 0;
+    }
+    if (defined($args->{'asyncmode'})) {
+	$asyncmode = $args->{'asyncmode'};
+    }
+    
+    #
+    # Figure out who called us. Root and admin types can do whatever they
+    # want. Normal users can only change nodes in experiments in their
+    # own projects.
+    #
+    if ($UID && !TBAdmin($UID)) {
+	$mereuser = 1;
+
+	if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
+	    print STDERR
+		"*** osload: Not enough permission to load images on one or ".
+		    "more nodes!\n";
+	    return -1;
+	}
+    }
+
+    #
+    # Check permission to use the imageid.
+    # 
+    if (defined($imageid) && $mereuser &&
+	! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
+	print STDERR
+	    "*** osload: You do not have permission to load '$imageid'!\n";
+	return -1;
+    }
+
+    #
+    # This is somewhat hackish. To promote parallelism during os_setup, we
+    # want to fork off the osload from the parent so it can do other things.
+    # The problem is how to return status via the results vector. Well,
+    # lets do it with some simple IPC. Since the results vector is simply
+    # a hash of node name to an integer value, its easy to pass that back.
+    #
+    # We return the pid to the caller, which it can wait on either directly
+    # or by calling back into this library if it wants to actually get the
+    # results from the child!
+    # 
+    if ($asyncmode) {
+	#
+	# Create a pipe to read back results from the child we will create.
+	#
+	if (! pipe(PARENT_READER, CHILD_WRITER)) {
+	    print STDERR "*** osload: creating pipe: $!\n";
+	    return -1;
+	}
+	CHILD_WRITER->autoflush(1);
+
+	if (my $childpid = fork()) {
+	    close(CHILD_WRITER);
+	    $children{$childpid} = [ *PARENT_READER, $result ];
+	    return $childpid;
+	}
+	#
+	# Child keeps going. 
+	#
+	close(PARENT_READER);
+	TBdbfork();
+    }
+
+    # Loop for each node.
+    foreach my $node (@nodes) {
+	# All nodes start out as being successful; altered later as needed.
+	$result->{$node} = 0;
+	
+	# Get default imageid for this node.
+	my $default_imageid;
+	if (! ($default_imageid = DefaultImageID($node))) {
+	    print STDERR "*** osload ($node): No default imageid defined!\n";
+	    goto failednode;
+	}
+
+	if ($usedefault) {
+	    $imageid = $default_imageid;
+	}
+
+	print STDERR "osload: Using $imageid for $node\n"
+	    if $debug;
+	$imageids{$node} = $imageid;
+
+	#
+	# Try to avoid repeated queries to DB for info that does not change!
+	# 
+	if (exists($imageinfo{$imageid})) {
+	    $rowref = $imageinfo{$imageid};
+	}
+	else {
+	    my $query_result =
+		DBQueryWarn("select * from images where imageid='$imageid'");
+
+	    if (! $query_result || $query_result->numrows < 1) {
+		print STDERR
+		    "*** osload ($node): Imageid $imageid is not defined!\n";
+		goto failednode;
+	    }
+	    $rowref = $query_result->fetchrow_hashref();
+	}
+	
+	my $loadpart       = $rowref->{'loadpart'};
+	my $loadlen        = $rowref->{'loadlength'};
+	my $imagepath      = $rowref->{'path'};
+	my $defosid        = $rowref->{'default_osid'};
+
+	# Check for a few errors early!
+	if (!defined($imagepath)) {
+	    print STDERR 
+		"*** osload ($node): No filename associated with $imageid!\n";
+	    goto failednode;
+	}
+	if (! -R $imagepath) {
+	    print STDERR 
+		"*** osload ($node): ".
+		    "$imagepath does not exists or cannot be read!\n";
+	    goto failednode;
+	}
+
+	#
+	# If there's a maxiumum number of concurrent loads listed, check to
+	# see if we'll go over the limit, by checking to see how many other
+	# nodes are currently booting thie image's default_osid. This is NOT
+	# intended to be strong enforcement of license restrictions, just a way
+	# to catch mistakes.
+	# XXX This could go outside the @nodes loop, but so could most of this
+	# stuff
+	#
+	if (!TBImageLoadMaxOkay($imageid, scalar(@nodes), @nodes)) {
+	    print STDERR
+		"*** osload ($node): Exceeded maxiumum concurrent instances\n";
+	    goto failednode;
+	}
+
+	#
+	# Compute a maxwait time based on the image size plus a constant
+	# factor for the reboot cycle. We store this globally for later in
+	# WaitTillReloadDone(), and so we do not recompute each time
+	# through the loop!
+	#
+	if (!exists($maxwaits{$imageid})) {
+	    my $sb      = stat($imagepath);
+	    my $chunks  = $sb->size / (1024 * 1024);
+
+	    $maxwaits{$imageid} = int((($chunks / 100.0) * 30) + (5 * 60));
+	}
+
+	# 0 means load the entire disk.
+	my $diskpart = "";
+	if ($loadpart) {
+	    $diskpart = "wd0:s${loadpart}";
+	}
+	else {
+	    $diskpart = "wd0";
+	}
+
+	print "osload ($node): Changing default OS to $defosid\n";
+	if (!$TESTMODE) {
+	    system("$osselect $defosid $node");
+	    if ($?) {
+		print STDERR "*** osload ($node): os_select $defosid failed!\n";
+		goto failednode;
+	    }
+	}
+
+	#
+	# If loading an image (which is not the default) then schedule
+	# a reload for it so that when the experiment is terminated it
+	# will get a fresh default image before getting reallocated to
+	# another experiment.
+	#
+	if ($imageid ne $default_imageid &&
+	    !TBSetSchedReload($node, $default_imageid)) {
+	    print STDERR
+		"*** osload ($node): Could not schedule default reload\n";
+	    goto failednode;
+	}
+
+	#
+	# Assign partition table entries for each partition in the image.
+	# This is complicated by the fact that an image that covers only
+	# part of the slices, should only change the partition table entries
+	# for the subset of slices that are written to disk.
+	#
+	my $startpart = $loadpart == 0 ? 1 : $loadpart;
+	my $endpart   = $startpart + $loadlen;
+	
+	for (my $i = $startpart; $i < $endpart; $i++) {
+	    my $partname = "part${i}_osid";
+	    my $dbresult;
+	    
+	    if (defined($rowref->{$partname})) {
+		my $osid = $rowref->{$partname};
+		
+		$dbresult =
+		    DBQueryWarn("replace into partitions ".
+				"(partition, osid, node_id) ".
+				"values('$i', '$osid', '$node')");
+	    }
+	    else {
+		$dbresult =
+		    DBQueryWarn("delete from partitions ".
+				"where node_id='$node' and partition='$i'");
+	    }
+	    if (!$dbresult) {
+		print STDERR
+		    "*** osload ($node): Could not update partition table\n";
+		goto failednode;
+	    }
+	}
+
+	print "Setting up reload for $node\n";
+	if (!$TESTMODE) {
+	    if (SetupReload($node, $imageid) < 0) {
+		print STDERR
+		    "*** osload ($node): Could not set up reload. Skipping.\n";
+		goto failednode;
+	    }
+	}
+	next;
+	
+      failednode:
+	$result->{$node} = -1;
+	$failures++;
+    }
+
+    #
+    # Remove any failed nodes from the list we are going to operate on.
+    #
+    my @temp = ();
+    foreach my $node (@nodes) {
+	push(@temp, $node)
+	    if (! $result->{$node});
+    }
+    @nodes = @temp;
+
+    # Exit if not doing an actual reload.
+    if ($TESTMODE) {
+	print "osload: Stopping in Testmode!\n";
+	goto done;
+    }
+
+    if (! @nodes) {
+	print STDERR "*** osload: Stopping because of previous failures!\n";
+	goto done;
+    }
+
+    # Fire off a mass reboot and quit if not in waitmode.
+    if (! $waitmode) {
+	if (! $noreboot) {
+	    print "osload: Rebooting nodes.\n";
+
+	    my %reboot_args     = ();
+	    my %reboot_failures = ();
+
+	    $reboot_args{'debug'}    = $debug;
+	    $reboot_args{'waitmode'} = 0;
+	    $reboot_args{'nodelist'} = [ @nodes ];
+
+	    if (nodereboot(\%reboot_args, \%reboot_failures)) {
+		foreach my $node (@nodes) {
+		    if ($reboot_failures{$node}) {
+			$result->{$node} = $reboot_failures{$node};
+			$failures++;
+		    }
+		}
+	    }
+	}
+	goto done;
+    }
+
+    #
+    # The retry vector is initialized to the number of retries we allow per
+    # node, afterwhich its a fatal error.
+    #
+    foreach my $node (@nodes) {
+	$retries{$node} = $MAXRETRIES;
+    }
+    
+    while (@nodes) {
+	if (! $noreboot) {
+	    # Reboot them all.
+	    print "osload: Issuing reboot for @nodes and then waiting ...\n";
+	    
+	    my %reboot_args     = ();
+	    my %reboot_failures = ();
+
+	    $reboot_args{'debug'}    = $debug;
+	    $reboot_args{'waitmode'} = 0;
+	    $reboot_args{'nodelist'} = [ @nodes ];
+
+	    if (nodereboot(\%reboot_args, \%reboot_failures)) {
+		#
+		# If we get any failures in the reboot, we want to
+		# alter the list of nodes accordingly for the next phase.
+		# 
+		my @temp = ();
+		
+		foreach my $node (@nodes) {
+		    if ($reboot_failures{$node}) {
+			$result->{$node} = $reboot_failures{$node};
+			$failures++;
+		    }
+		    else {
+			push(@temp, $node);
+		    }
+		}
+		@nodes = @temp;
+	    }
+	}
+
+	# Now wait for them.
+	my $startwait   = time;
+	my @failednodes = WaitTillReloadDone($startwait, \%imageids, @nodes);
+	@nodes=();
+    
+	while (@failednodes) {
+	    my $node = shift(@failednodes);
+
+	    if ($retries{$node}) {
+		print "*** osload ($node): Trying again ...\n";
+
+		# Possible race with reboot?
+		if (SetupReload($node, $imageids{$node}) < 0) {
+		    print(STDERR
+			  "*** osload ($node): ".
+			  "Could not set up reload. Skipping.\n");
+		    
+		    $result->{$node} = -1;
+		    $failures++;
+		    next;
+		}
+		push(@nodes, $node);
+
+		# Retry until count hits zero.
+		$retries{$node} -= 1;
+	    }
+	    else {
+		print "*** osload ($node): failed too many times. Skipping!\n";
+		$result->{$node} = -1;
+		$failures++;
+	    }
+	}
+    }
+  done:
+    print "osload: Done! There were $failures failures.\n";
+
+    if ($asyncmode) {
+	#
+	# We are a child. Send back the results to the parent side
+	# and *exit* with status instead of returning it.
+	# 
+	foreach my $node (keys(%{ $result })) {
+	    my $status = $result->{$node};
+	    
+	    print CHILD_WRITER "$node,$status\n";
+	}
+	close(CHILD_WRITER);
+	exit($failures);
+    }
+    
+    return $failures;
+}
+
+# Wait for a reload to finish by watching its state
+sub WaitTillReloadDone($$@)
+{
+    my ($startwait, $imageids, @nodes) = @_;
+    my %done	= ();
+    my $count   = @nodes;
+    my @failed  = ();
+
+    foreach my $node ( @nodes ) { $done{$node}  = 0; }
+
+    print STDERR "Waiting for @nodes to finish reloading\n".`date` if $debug;
+
+    # Start a counter going, relative to the time we rebooted the first
+    # node.
+    my $waittime  = 0;
+    my $minutes   = 0;
+
+    while ($count) {
+	# Wait first to make sure reboot is done, and so that we don't
+	# wait one more time after everyone is up.
+	sleep(5);
+	foreach my $node (@nodes) {
+	    if (! $done{$node}) {
+		my $maxwait = $maxwaits{$imageids->{$node}};
+		
+		my $query_result =
+		    DBQueryWarn("select * from current_reloads ".
+				"where node_id='$node'");
+
+		#
+		# There is no point in quitting if this query fails. Just
+		# try again in a little bit.
+		# 
+		if (!$query_result) {
+		    print STDERR
+			"*** osload ($node): Query failed; waiting a bit.\n";
+		    next;
+		}
+
+		#
+		# We simply wait for stated to clear the current_reloads entry.
+		#
+		if (!$query_result->numrows) {
+		    print STDERR "osload ($node): left reloading mode at ".`date`
+			if ($debug);
+		    
+		    $count--;
+		    $done{$node} = 1;
+		    next;
+		}
+	
+		# Soon we will have stated's timeouts take care of
+		# rebooting once or twice if we get stuck during
+		# reloading.
+		$waittime = time - $startwait;
+		if ($waittime > $maxwait) {
+		    my $t = (int ($waittime / 60));
+		    print STDERR "*** osload ($node): appears wedged; ".
+			"it has been $t minutes since it was rebooted.\n";
+
+		    $count--;
+		    $done{$node} = 1;
+		    push(@failed, $node);
+		    next;
+		}
+		if (int($waittime / 60) > $minutes) {
+		    $minutes = int($waittime / 60);
+		    print STDERR "osload ($node): still waiting; ".
+			"it has been $minutes minute(s)\n";
+		}
+	    }
+	}
+    }
+    return @failed;
+}
+
+# Setup a reload. 
+sub SetupReload($$)
+{
+    my ($node, $imageid) = @_;
+
+    #
+    # Put it in the current_reloads table so that nodes can find out which
+    # OS to load. See tmcd. 
+    #
+    my $query_result = 
+	DBQueryWarn("replace into current_reloads ".
+		    "(node_id, image_id) values ('$node', '$imageid')");
+    return -1
+	if (!$query_result);
+
+    system("$osselect -1 $FRISBEEOSID $node");
+    if ($?) {
+	print STDERR "*** osload ($node): os_select $FRISBEEOSID failed!\n";
+	return -1;
+    }
+    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
+    if ($?) {
+	print STDERR "*** osload ($node): Frisbee Launcher ($imageid) failed!\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# This gets called in the parent, to wait for an async osload that was
+# launched earlier (asyncmode). The child will print the results back
+# on the the pipe that was opened between the parent and child. They
+# are stuffed into the original results array.
+# 
+sub osload_wait($)
+{
+    my ($childpid) = @_;
+
+    if (!exists($children{$childpid})) {
+	print STDERR "*** osload: No such child pid $childpid!\n";
+	return -1;
+    }
+    my ($PARENT_READER, $result) = @{ $children{$childpid}};
+
+    #
+    # Read back the results.
+    # 
+    while (<$PARENT_READER>) {
+	chomp($_);
+
+	if ($_ =~ /^([-\w]+),([-\d])+$/) {
+	    $result->{$1} = $2;
+	    print STDERR "reload ($1): child returned $2 status.\n";
+	}
+	else {
+	    print STDERR "*** osload: Improper response from child: $_\n";
+	}
+    }
+    
+    #
+    # And get the actual exit status.
+    # 
+    waitpid($childpid, 0);
+    return $? >> 8;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

@@ -5,7 +5,6 @@
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 require 'ctime.pl';
@@ -57,14 +56,15 @@ my $TFTP	= "/tftpboot";
 #
 use lib "@prefix@/lib";
 use libdb;
+use libreboot;
+use libosload;
 use libtestbed;
 
-my $nodereboot	= "$TB/bin/node_reboot";
-my $os_load	= "$TB/bin/os_load";
 my $vnode_setup = "$TB/sbin/vnode_setup";
 my $osselect    = "$TB/bin/os_select";
 my $dbg		= 0;
 my $failed      = 0;
+my $noretry     = 0;
 my $failedvnodes= 0;
 my $failedplab  = 0;
 my $canceled    = 0;
@@ -76,8 +76,6 @@ my %pnodevcount = ();
 my %plabvnodes  = ();
 my %osids       = ();
 my %canfail     = ();
-my $db_result;
-my @row;
 
 #
 # Ah, Frisbee works so lets do auto reloading for nodes that do not have
@@ -166,7 +164,7 @@ TBDebugTimeStamp("os_setup started");
 #
 # Get the set of nodes, as well as the nodes table information for them.
 #
-$db_result =
+my $db_result =
     DBQueryFatal("select n.*,l.pid,nt.* from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join last_reservation as l on n.node_id=l.node_id ".
@@ -464,14 +462,12 @@ foreach my $vnode (keys(%vnodes)) {
 #
 TBDebugTimeStamp("rebooting/reloading started");
 if (!$TESTMODE) {
-    my %pids  = ();
-    my $count = 0;
-    my $cmd;
+    my @children = ();
 
     foreach my $imageid ( keys(%reloads) ) {
-	my @list = @{ $reloads{$imageid} };
+	my @nodelist = @{ $reloads{$imageid} };
 
-	foreach my $node (@list) {
+	foreach my $node (@nodelist) {
 	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
 	    # No point in reboot/reconfig obviously, since node will reboot!
@@ -480,9 +476,18 @@ if (!$TESTMODE) {
 	    $rebooted{$node} = 1;
 	}
 
+	my %reload_args     = ();
+	my $reload_failures = {};
+
+	$reload_args{'debug'}     = $dbg;
+	$reload_args{'asyncmode'} = 1;
+	$reload_args{'imageid'}   = $imageid;
+	$reload_args{'nodelist'}  = [ @nodelist ];
+
+	my $pid = osload(\%reload_args, $reload_failures);
+	push(@children, [ $pid, \&osload_wait,
+			  [ @nodelist ], $reload_failures ]);
 	sleep(5);
-	$pids{"$os_load -m $imageid @list"} =
-	    ForkCmd("$os_load -m $imageid @list");
     }
 
     #
@@ -501,61 +506,101 @@ if (!$TESTMODE) {
 	    $rebooted{$node} = 1;
 	}
 
-	$cmd = "$nodereboot " . join(" ", keys(%reboots));
-	$pids{$cmd} = ForkCmd($cmd);
+	my @nodelist        = keys(%reboots);
+	my %reboot_args     = ();
+	my $reboot_failures = {};
+
+	$reboot_args{'debug'}     = $dbg;
+	$reboot_args{'waitmode'}  = 0;
+	$reboot_args{'asyncmode'} = 1;
+	$reboot_args{'nodelist'}  = [ @nodelist ];
+
+	my $pid = nodereboot(\%reboot_args, $reboot_failures);
+	push(@children, [ $pid, \&nodereboot_wait,
+			  [ @nodelist ], $reboot_failures ]);
+	sleep(2);
     }
 
     #
     # Fire off the reconfigs.
     #
     if (keys(%reconfigs)) {
-	$cmd = "$nodereboot -c " . join(" ", keys(%reconfigs));
-	$pids{$cmd} = ForkCmd($cmd);
+	my @nodelist        = keys(%reconfigs);
+	my %reboot_args     = ();
+	my $reboot_failures = {};
+
+	$reboot_args{'debug'}     = $dbg;
+	$reboot_args{'waitmode'}  = 0;
+	$reboot_args{'asyncmode'} = 1;
+	$reboot_args{'reconfig'}  = 1;
+	$reboot_args{'nodelist'}  = [ @nodelist ];
+
+	my $pid = nodereboot(\%reboot_args, $reboot_failures);
+	push(@children, [ $pid, \&nodereboot_wait,
+			  [ @nodelist ], $reboot_failures ]);
     }
 
-    foreach $cmd ( keys(%pids) ) {
-	my $pid = $pids{$cmd};
+    #
+    # Wait for all of the children to exit. We look at the $pid to know if
+    # command failed/ended immediately; otherwise we need to wait on it.
+    # For any failures, record the node failures for later so that we do
+    # not wait for them needlessly.
+    #
+    while (@children) {
+	my ($pid, $waitfunc, $listref, $hashref) = @{ pop(@children) };
 
-	waitpid($pid, 0);
-	if ($?) {
+	# This is not likely to happen.
+	next
+	    if ($pid == 0);
+
+	if ($pid > 0) {
+	    next
+		if (! &$waitfunc($pid));
+	}
+	
+	#
+	# Failure. Record the failures for later. If the $pid<0 then the
+	# entire list failed. Otherwise, have to scan the return hash to
+	# find the failures.
+	#
+	my @nodelist = ();
+	
+	if ($pid < 0) {
+	    @nodelist = @{ $listref };
+	}
+	else {
+	    foreach my $node (keys(%{ $hashref })) {
+		push(@nodelist, $node)
+		    if ($hashref->{$node});
+	    }
+	}
+
+	#
+	# These errors are unusal enough that we do not want to retry
+	# or keep going even if canfail is set. Better to stop and let
+	# someone look at what happened.
+	#
+	$noretry = 1;
+
+	foreach my $node (@nodelist) {
+	    print "*** Not waiting for $node since its reload/reboot failed!\n";
 	    $failed++;
-	    print "*** Failed: $cmd\n";
+	    delete($nodes{$node});
+
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_DOWN());
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 	}
     }
 }
 TBDebugTimeStamp("rebooting/reloading finished");
-sleep(2);
 
 #
-# XXX What happens if something above fails? We could exit, but some nodes
-# that *are* rebooting would be caught in the middle. For the nodes that
-# were reloaded, we can check the state right away (and avoid the wait
-# below as well); they should be in the ISUP state when os_load is
-# finished.  If not, thats a failure and we can save some time below.  For
-# plain reboot failures, nothing to do but find out below after the wait.
-# I do not want to exit right away cause we might end up with a lot more
-# power cycles since the nodes are very likely to be in a non responsive
-# state if just rebooted!
+# Remaining nodes we need to wait for. Why do we wait in the face of errors
+# above? So that they enter a reasonably known state before we try to tear
+# things down. Otherwise we could end up power cycling nodes a lot more often.
+# This should probably be handled in other ways, say via stated or the alloc
+# state machine. 
 #
-foreach my $imageid ( keys(%reloads) ) {
-    my @list = @{ $reloads{$imageid} };
-
-    foreach my $node ( @list ) {
-	my $mode;
-
-	if (!TBGetNodeOpMode($node, \$mode)) {
-	    print "*** Error getting operational mode for $node!\n";
-	    $failed++;
-	    delete($nodes{$node});
-	}
-	if ($mode eq TBDB_NODEOPMODE_RELOAD) {
-	    print "*** Not waiting for $node since its reload failed!\n";
-	    $failed++;
-	    delete($nodes{$node});
-	}
-    }
-}
-# Remaining nodes we need to wait for.
 my @nodelist = keys(%nodes);
 
 #
@@ -599,7 +644,7 @@ while ( @nodelist ) {
 	}
     }
 
-    if ($retries{$node} && !$canceled) {
+    if ($retries{$node} && !($canceled || $noretry)) {
 	$retries{$node} -= 1;
 
 	print "*** Rebooting $node and waiting again ...\n";
@@ -617,7 +662,7 @@ while ( @nodelist ) {
     print "*** WARNING: $node may be down.\n".
 	  "    This has been reported to testbed-ops.\n";
 
-    if ($canfail{$node}) {
+    if ($canfail{$node} && !($canceled || $noretry)) {
 	# Send mail to testbed-ops and to the user about it.
 	my ($user) = getpwuid($UID);
 
@@ -803,7 +848,7 @@ TBDebugTimeStamp("os_setup finished");
 
 # No retry if vnodes failed. Indicates a fatal problem.
 exit(-1)
-    if ($failedvnodes || $canceled);
+    if ($failedvnodes || $canceled || $noretry);
 exit(1)
     if ($failed || $failedplab);
 exit 0;

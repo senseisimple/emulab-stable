@@ -1,25 +1,17 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
-use File::stat;
 
-# Be careful not to exit on transient error - this script is in the 'critical
-# path' for reload_daemon, so we want to give it the same retries as the daemon
-$libdb::DBQUERY_MAXTRIES = 30;
-
-# XXX boss.emulab.net and users.emulab.net wired in.
-#     wd0 wired in. Should come from node_types table in DB
-
+#
 # Load an image onto a disk. The image must be in the DB images table,
 # which defines how/where to load, and what partitions are affected.
 # The nodes and partitions tables are updated appropriately.
+#
 sub usage()
 {
     print STDOUT
@@ -27,91 +19,127 @@ sub usage()
 	"       os_load [-s] [[-p <pid>] -i <imagename>] -e pid,eid\n".
 	"       os_load -l\n".
 	"Use -i to specify an image name. Use node default otherwise.\n".
-	"Use -m to specify an image ID (internal name, TB admins only!).\n".
+	"Use -m to specify an image ID (internal name).\n".
 	"Use -s to start reload, but do not wait for it to complete.\n".
 	"Use -r to supress rebooting nodes - you'll need to to it yourself\n".
 	"Use -e to reload all the nodes in an experiment.\n" .
         "Use -l to get a list of images you are permitted to load.\n";
     exit(-1);
 }
-my  $optlist = "sldi:e:p:m:r";
+my $optlist   = "sldi:e:p:m:r";
+my $waitmode  = 1;
+my $listonly  = 0;
+my $debug     = 0;
+my $noreboot  = 0;
+my @nodes     = ();
+my $imagepid  = TB_OPSPID;	# Default to looking for ID in emulab-ops proj.
+my $imagename;
+my $imageid;
 
 # Configure variables
 my $TB		= "@prefix@";
-my $TESTMODE    = @TESTMODE@;
-my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSADDR	= "@BOSSNODE@";
-my $USERADDR	= "@USERNODE@";
-
-# Max number of retries (per node) before its deemed fatal. This allows
-# for the occasional pxeboot failure.
-my $MAXRETRIES  = 1;
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libdb;
+use libosload;
 use libtestbed;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
 
-my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
-my $nodereboot	= "$TB/bin/node_reboot";
-my $schedreload	= "$TB/bin/sched_reload";
-my $osselect	= "$TB/bin/os_select";
-my $ping	= "/sbin/ping";
-my $dbg		= 0;
-my @row;
-my $usedefault  = 1;
-my $imagename;
-my $imageid;
-my $imagepid    = TB_OPSPID;
-my $FRISBEEOSID = TB_OSID_FRISBEE_MFS();
-my %imageid_row;
-my @nodes       = ();
-my %retries	= ();
-my $mereuser    = 0;
-my $waitmode    = 1;
-my $failures    = 0;
-my $startwait   = 0;
-my $maxwait	= 0;
-my $reboot      = 1;
-
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-$| = 1; #Turn off line buffering on output
+# Turn off line buffering on output
+$| = 1;
 
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
-%options = ();
-if (! getopts($optlist, \%options)) { usage(); }
-if (defined($options{"d"})) { $dbg++; }
-if (defined($options{"l"})) { dolisting(); exit(0); }
-if (defined($options{"s"})) { $waitmode = 0; }
-if (defined($options{"r"})) { $reboot = 0; }
-if (defined($options{"i"}) && defined($options{"m"})) { usage(); }
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+$debug = 1
+    if (defined($options{"d"}));
+
+# List only mode. No need to do anymore argument processing.
+if (defined($options{"l"})) {
+    dolisting();
+    exit(0);
+}
+
+$waitmode = 0
+    if (defined($options{"s"}));
+$noreboot = 1
+    if (defined($options{"r"}));
+
+#
+# Image name (user visible name, not the internal ID). User is allowed
+# to specify the pid the belongs to, but this is mostly broken cause
+# images are stored in proj trees and created via NFS, so not really
+# possibly to share images between projects; must be a member of the
+# project. Could be fixed.
+# 
 if (defined($options{"i"})) {
-    $imagename  = $options{"i"};
-    $usedefault = 0;
-    if ($imagename =~ /^([-\w\.\+]+)$/) { $imagename = $1; }
-    else { die("*** Bad data in $imagename.\n"); }
+    usage()
+	if (defined($options{"m"}));
+    
+    $imagename = $options{"i"};
+    
+    if ($imagename =~ /^([-\w\.\+]+)$/) {
+	$imagename = $1;
+    }
+    else {
+	die("*** Bad data in imagename: $imagename.\n");
+    }
 
     if (defined($options{"p"})) {
 	$imagepid = $options{"p"};
-	if ($imagepid =~ /^([-\w\.\+]+)$/) { $imagepid = $1; }
-	else { die("*** Bad data in $imagepid.\n"); }
+	
+	if ($imagepid =~ /^([-\w\.\+]+)$/) {
+	    $imagepid = $1;
+	}
+	else {
+	    die("*** Bad data in imagepid: $imagepid.\n");
+	}
+    }
+
+    # Convert external name to internal.
+    if (! ($imageid = TBImageID($imagepid, $imagename))) {
+	die("*** $0:\n".
+	    "    No such image $imagename in project $imagepid!\n");
     }
 }
+
+#
+# Or an internal imageID. Sometimes easier.
+# 
 if (defined($options{"m"})) {
+    usage()
+	if (defined($options{"i"}));
+
     $imageid = $options{"m"};
-    $usedefault = 0;
-    if ($imageid =~ /^([-\w\.\+]+)$/) { $imageid = $1; }
-    else { die("*** Bad data in $imageid\n"); }
+    
+    if ($imageid =~ /^([-\w\.\+]+)$/) {
+	$imageid = $1;
+    }
+    else {
+	die("*** Bad data in imageid: $imageid\n");
+    }
 }
+
+#
+# Figure out which nodes. Choice of nodes on command line, or all nodes in an
+# experiment. To get all free nodes, must use sched_reload. 
+# 
 if (defined($options{"e"})) {
-    if (@ARGV) { usage(); }
+    usage()
+	if (@ARGV);
+    
     my $pideid = $options{"e"};
 
     if ($pideid =~ /([-\w]*),([-\w]*)/) {
@@ -122,313 +150,60 @@ if (defined($options{"e"})) {
 	$imagepid = $1;
     }
     else {
-	die("Invalid argument to -e option: $pideid\n");
+	die("*** $0:\n".
+	    "    Invalid argument to -e option: $pideid\n");
 	usage();
     }
 }
 else {
-    if (! @ARGV) { usage(); }
+    usage()
+	if (! @ARGV);
+    
     # Untaint nodes.
-    foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\@\w]+)$/) { $node = $1; }
-	else { die("*** Bad node name: $node.\n"); }
+    foreach my $node (@ARGV) {
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Bad node name: $node.\n");
+	}
 	push(@nodes, $node);
     }
 }
 
-# VIRTNODE HACK: Virtual nodes are special. Do not reload!
+# VIRTNODE HACK: Virtual nodes are special. Do not reload! 
 my @temp = ();
 foreach my $node ( @nodes ) {
     if (TBIsNodeVirtual($node)) {
-	print "*** Skipping virtual node $node ...\n";
+	print "*** reload ($node): Skipping virtual node.\n";
 	next;
     }
     push(@temp, $node);
 }
 @nodes = @temp;
 if (! @nodes) {
-    print "No nodes to load. Exiting ...\n";
+    print "*** reload: No nodes to load. Exiting.\n";
     exit(0);
 }
 
-# Figure out who called us. Root and admin types can do whatever they
-# want. Normal users can only change nodes in experiments in their
-# own projects.
-if ($UID && !TBAdmin($UID)) {
-    $mereuser = 1;
+#
+# Okay, call into the library using a hash of arguments. Pass a reference
+# to the args array, and to a return parameter for the list of failed nodes.
+#
+# NB: Permission checking is done in the library. Maybe that is wrong?
+#
+my %osloadargs  = ();
+my %failednodes = ();
 
-    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
-	die("*** $0:\n".
-            "    You do not have permission to load images on one (or more) ".
-	    "nodes!\n");
-    }
-}
+$osloadargs{'debug'}    = $debug;
+$osloadargs{'waitmode'} = $waitmode;
+$osloadargs{'noreboot'} = $noreboot;
+$osloadargs{'nodelist'} = [ @nodes ];
+# No imageid means to load the default image.
+$osloadargs{'imageid'}  = $imageid
+    if (defined($imageid));
 
-# Convert external name to internal (imageid), and check permission.
-if (defined($imagename)) {
-    if (! ($imageid = TBImageID($imagepid, $imagename))) {
-	die("*** $0:\n".
-	    "    No such image $imagename in project $imagepid!\n");
-    }
-}
-
-if (defined($imageid) && $mereuser &&
-    ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
-    die("*** $0:\n".
-	"    You do not have permission to load this image!\n");
-}
-
-# Loop for each node.
-foreach my $node (@nodes) {
-    # Oh, I suppose it would be nice to do this just once per imageid,
-    # but that would be a pain. Not in the mood.
-
-    # Get default imageid for this node.
-    my $default_imageid;
-    if (! ($default_imageid = DefaultImageID($node))) {
-	die("*** $0:\n".
-	    "    No default imageid is defined for $node!\n");
-    }
-    if ($usedefault) {
-	$imageid = $default_imageid;
-    }
-
-    print STDERR "Using $imageid for for $node\n" if $dbg;
-
-    my $db_result =
-	DBQueryFatal("select * from images where imageid='$imageid'");
-
-    if ($db_result->numrows < 1) {
-	die("*** $0:\n".
-	    "    No such imageid $imageid is defined in the DB!\n");
-    }
-    %imageid_row = $db_result->fetchhash();
-
-    my $loadpart       = $imageid_row{'loadpart'};
-    my $loadlen        = $imageid_row{'loadlength'};
-    my $imagepath      = $imageid_row{'path'};
-    my $defosid        = $imageid_row{'default_osid'};
-
-    # Check for a few errors early!
-    if (!defined($imagepath)) {
-	die("*** $0:\n".
-	    "    There is no filename associated with $imageid!\n");
-    }
-    if (! -R $imagepath) {
-	die("*** $0:\n".
-	    "    $imagepath does not exists or cannot be read!\n");
-    }
-
-    #
-    # If there's a maxiumum number of concurrent loads listed, check to
-    # see if we'll go over the limit, by checking to see how many other
-    # nodes are currently booting thie image's default_osid. This is NOT
-    # intended to be strong enforcement of license restrictions, just a way
-    # to catch mistakes.
-    # XXX This could go outside the @nodes loop, but so could most of this
-    # stuff
-    #
-    if (!TBImageLoadMaxOkay($imageid,scalar(@nodes),@nodes)) {
-	die("*** $0:\n".
-	    "    This image has a limited number of maximum concurrent " .
-	    "instances\n");
-    }
-
-    #
-    # Compute a maxwait time based on the image size plus a constant
-    # factor for the reboot cycle. 
-    #
-    my $sb     = stat($imagepath);
-    my $chunks = $sb->size / (1024 * 1024);
-    $maxwait   = int((($chunks / 100.0) * 30) + (5 * 60));
-
-    # 0 means load the entire disk.
-    my $diskpart = "";
-    if ($loadpart) { $diskpart = "wd0:s${loadpart}"; }
-    else  {$diskpart = "wd0"; }
-
-    print STDOUT "Changing default OS for $node to $defosid\n";
-    if (!$TESTMODE) {
-        system("$osselect $defosid $node");
-    }
-
-    # If loading an image (which is not the default) then
-    # schedule a reload for it so that when the experiment is terminated
-    # it will get a fresh default image before getting reallocated to
-    # another experiment.
-    if ($imageid ne $default_imageid) {
-	if (! TBSetSchedReload($node, $default_imageid)) {
-	    print "*** $0:\n".
-		  "    WARNING: Could not schedule default reload for $node!";
-	}
-    }
-
-    # Assign partition table entries for each partition in the image.
-    # This is complicated by the fact that an image that covers only
-    # part of the slices, should only change the partition table entries
-    # for the subset of slices that are written to disk.
-    my $startpart = $loadpart == 0 ? 1 : $loadpart;
-    my $endpart   = $startpart + $loadlen;
-	
-    for ($i = $startpart; $i < $endpart; $i++) {
-	my $partname = "part${i}_osid";
-	if (defined($imageid_row{$partname})) {
-	    my $osid = $imageid_row{$partname};
-	    DBQueryFatal("replace into partitions ".
-			 "(partition, osid, node_id) ".
-			 "values('$i', '$osid', '$node')");
-	} else {
-	    DBQueryFatal("delete from partitions ".
-			 "where node_id='$node' and partition='$i'");
-	}
-    }
-
-    print STDOUT "Setting up reload for $node\n";
-    if (!$TESTMODE) {
-        SetupReload($node);
-    }
-}
-
-# Exit if not doing about actual reload.
-if ($TESTMODE) {
-    print STDOUT "OS Reload (Testmode) Done!\n";
-    exit 0;
-}
-
-# Fire off a mass reboot and quit if not in waitmode.
-if (! $waitmode) {
-    if ($reboot) {
-	print STDOUT "Reload ready. Rebooting nodes at ".`date`;
-	system("$nodereboot @nodes");
-	$failures = $? >> 8;
-    } else {
-	$failures = 0;
-    }
-
-    print STDOUT "OS Reload (no waiting) Done!\n";
-    exit $failures;
-}
-
-# The retry vector is initialized to the number of retries we allow per
-# node, afterwhich its a fatal error.
-foreach my $node (@nodes) {
-    $retries{$node} = $MAXRETRIES;
-}
-
-my @failed=();
-while (@nodes) {
-  # Reboot them all.
-  print "Issuing reboot for @nodes and then waiting ...\n";
-
-  if ($reboot) {
-      system("$nodereboot @nodes");
-      if ($?) {
-	  print "Reboot failed for (some of) @nodes. Quitting!\n";
-	  exit ($? >> 8);
-      }
-  }
-
-  # Now wait for them.
-  $startwait = time;
-  @failed = WaitTillReloadDone(@nodes);
-  @nodes=();
-  while (@failed) {
-    my $node = shift(@failed);
-
-    if ($retries{$node}) {
-      print "*** Trying $node again (resetting/rebooting) ...\n";
-      push(@nodes, $node);
-
-      # Possible race with reboot?
-      SetupReload($node);
-
-      # Retry until count hits zero.
-      $retries{$node} -= 1;
-    } else {
-      print "*** $node failed too many times. Skipping!\n";
-      $failures++;
-    }
-  }
-}
-
-print "OS Reload Done! There were $failures failures!\n";
-exit($failures);
-
-# Wait for a reload to finish by watching its state
-sub WaitTillReloadDone {
-    my (@nodes) = @_;
-    my %done	= ();
-    my $count   = @nodes;
-    my @failed  = ();
-
-    foreach my $node ( @nodes ) { $done{$node}  = 0; }
-
-    print STDERR "Waiting for @nodes to finish reloading\n".`date` if $dbg;
-
-    # Start a counter going, relative to the time we rebooted the first
-    # node.
-    my $waittime  = 0;
-    my $minutes   = 0;
-
-    while ($count) {
-	# Wait first to make sure reboot is done, and so that we don't
-	# wait one more time after everyone is up.
-	sleep(5);
-	foreach my $node ( @nodes ) {
-	    if (! $done{$node}) {
-		my ($query_result, @row);
-		$query_result =
-		    DBQueryFatal("SELECT op_mode FROM nodes ".
-				 "where node_id='$node'");
-		@row = $query_result->fetchrow_array();
-
-		# We simply wait for the node to leave the reloading opmode
-		if ($row[0] ne TBDB_NODEOPMODE_RELOAD) {
-		    print STDERR "$node has left reloading mode\n".`date` if $dbg;
-		    $count--;
-		    $done{$node} = 1;
-		    next;
-		}
-	
-		# Soon we will have stated's timeouts take care of
-		# rebooting once or twice if we get stuck during
-		# reloading.
-		$waittime = time - $startwait;
-		if ($waittime > $maxwait) {
-		    my $t = (int ($waittime / 60));
-		    print "*** $node appears wedged; ".
-			"its been $t minutes since it was rebooted.\n";
-
-		    $count--;
-		    $done{$node} = 1;
-		    push(@failed, $node);
-		    next;
-		}
-		if (int($waittime / 60) > $minutes) {
-		    $minutes = int($waittime / 60);
-		    print "Still waiting for $node to reload - ".
-			"its been $minutes minute(s)\n";
-		}
-	    }
-	}
-    }
-    return @failed;
-}
-
-# Setup a reload. Note that imageid is global.
-sub SetupReload($) {
-    my ($node) = @_;
-
-    # Put it in the current_reloads table so that nodes can find out which
-    # OS to load
-    DBQueryFatal("replace into current_reloads ".
-		 "(node_id, image_id) values ('$node', '$imageid')");
-
-    system "$osselect -1 $FRISBEEOSID $node" and
-      die "*** Unable to select frisbee OS\n";
-    system "$FRISBEELAUNCHER ".($dbg? "-d ":"")."$imageid" and
-      die "*** Unable to launch frisbee daemon\n";
-}
+exit(osload(\%osloadargs, \%failednodes));
 
 # Print a listing of imageids.
 sub dolisting() {
