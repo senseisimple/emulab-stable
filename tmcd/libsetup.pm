@@ -21,8 +21,9 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
+	 ixpsetup
 
-	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED PLAB LOCALROOTFS
+	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED PLAB LOCALROOTFS IXP
 
 	 CONFDIR TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
@@ -32,7 +33,8 @@ use Exporter;
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
 	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
 	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE TMCCCMD_LINKDELAYS
-	 TMCCCMD_PROGRAMS
+	 TMCCCMD_PROGRAMS TMCCCMD_SUBNODELIST TMCCCMD_SUBCONFIG
+	 TMCCCMD_STATE
        );
 
 # Must come after package declaration!
@@ -41,6 +43,7 @@ use English;
 #
 # For virtual (multiplexed nodes). If defined, tack onto tmcc command.
 # and use in pathnames. Used in conjunction with jailed virtual nodes.
+# I am also using this for subnodes; eventually everything will be subnodes.
 #
 my $vnodeid;
 sub libsetup_setvnodeid($)
@@ -61,6 +64,12 @@ my $injail;
 # True if running in a Plab vserver.
 #
 my $inplab;
+
+#
+# Ditto for IXP, although currently there is no "in" IXP setup; it
+# is all done from outside.
+#
+my $inixp;
 
 # Load up the paths. Its conditionalized to be compatabile with older images.
 # Note this file has probably already been loaded by the caller.
@@ -157,7 +166,7 @@ sub LOCALROOTFS()	{ (REMOTE() ? "/users/local" : "$VARDIR/jails/local");}
 # Okay, here is the path mess. There are three environments.
 # 1. A local node where everything goes in one place ($VARDIR/boot).
 # 2. A virtual node inside a jail or a Plab vserver ($VARDIR/boot).
-# 3. A virtual node outside a jail (JAILDIR()).
+# 3. A virtual (or sub) node, from the outside. 
 #
 # As for #3, whether setting up a old-style virtual node or a new style
 # jailed node, the code that sets it up needs a different per-vnode path.
@@ -216,13 +225,14 @@ my $USESFS		= 1;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 10; };
+sub TMCD_VERSION()	{ 11; };
 
 #
 # These are the TMCC commands. 
 #
 sub TMCCCMD_REBOOT()	{ "reboot"; }
 sub TMCCCMD_STATUS()	{ "status"; }
+sub TMCCCMD_STATE()	{ "state"; }
 sub TMCCCMD_IFC()	{ "ifconfig"; }
 sub TMCCCMD_ACCT()	{ "accounts"; }
 sub TMCCCMD_DELAY()	{ "delay"; }
@@ -240,11 +250,13 @@ sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
 sub TMCCCMD_TUNNEL()	{ "tunnels"; }
 sub TMCCCMD_NSECONFIGS(){ "nseconfigs"; }
 sub TMCCCMD_VNODELIST() { "vnodelist"; }
+sub TMCCCMD_SUBNODELIST(){ "subnodelist"; }
 sub TMCCCMD_ISALIVE()   { "isalive"; }
 sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
 sub TMCCCMD_PLABCONFIG(){ "plabconfig"; }
+sub TMCCCMD_SUBCONFIG() { "subconfig"; }
 sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
 sub TMCCCMD_PROGRAMS()  { "programs"; }
 sub TMCCCMD_SYNCSERVER(){ "syncserver"; }
@@ -257,10 +269,16 @@ my $VTUND       = "/usr/local/sbin/vtund";
 
 #
 # This is a debugging thing for my home network.
-# 
-#my $NODE	= "-p 7778 REDIRECT=192.168.100.1";
-my $NODE	= "-p 7778";
-$NODE		= "";
+#
+my $NODE = "";
+if (defined($ENV{'TMCCARGS'})) {
+    if ($ENV{'TMCCARGS'} =~ /^([-\w\s]*)$/) {
+	$NODE .= " $1";
+    }
+    else {
+	die("Tainted TMCCARGS from environment: $ENV{'TMCCARGS'}!\n");
+    }
+}
 
 # Locals
 my $pid		= "";
@@ -296,6 +314,11 @@ sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }
 # Are we on plab?
 #
 sub PLAB()	{ if ($inplab) { return $vnodeid; } else { return 0; } }
+
+#
+# Are we on an IXP
+#
+sub IXP()	{ if ($inixp) { return $vnodeid; } else { return 0; } }
 
 #
 # Do not try this on the MFS since it has such a wimpy perl installation.
@@ -817,9 +840,10 @@ sub dosfshostid ()
 sub doifconfig (;$)
 {
     my ($rtabid) = @_;
-    my @ifaces = ();
+    my @ifaces   = ();
     my $upcmds   = "";
     my $downcmds = "";
+    my @ifacelist= ();
 
     #
     # Kinda ugly, but there is too much perl goo included by Socket to put it
@@ -850,7 +874,7 @@ sub doifconfig (;$)
     }
 
     my $ethpat  = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
-    $ethpat    .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)");
+    $ethpat    .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)" IFACE=(\w*));
 
     my $vethpat = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) ID=(\d*) );
     $vethpat   .= q(VMAC=(\w*) PMAC=(\w*));
@@ -863,20 +887,43 @@ sub doifconfig (;$)
 	    my $speed    = $5; 
 	    my $duplex   = $6;
 	    my $aliases  = $7;
+	    my $iface    = $8;
 	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
 
-	    if (my $iface = findiface($mac)) {
-
-		print XIFS "$iface\n";
+	    if (($iface ne "") ||
+		($iface = findiface($mac))) {
 		if (JAILED()) {
+		    next;
+		}
+		print XIFS "$iface\n";
+
+		#
+		# Rather than try to wedge the IXP in, I am going with
+		# a new approach. Parse the results from tmcd into a
+		# simple data structure, and return that for the caller
+		# to use. Might want to use a perl module at some point.
+		#
+		my $ifconfig = {};
+		    
+		$ifconfig->{"IPADDR"}   = $inet;
+		$ifconfig->{"IPMASK"}   = $mask;
+		$ifconfig->{"MAC"}      = $mac;
+		$ifconfig->{"SPEED"}    = $speed;
+		$ifconfig->{"DUPLEX"}   = $duplex;
+		$ifconfig->{"ALIASES"}  = $aliases;
+		$ifconfig->{"IFACE"}    = $iface;
+		push(@ifacelist, $ifconfig);
+
+		if (IXP()) {
 		    next;
 		}
 
 		my ($upline, $downline) =
-		    os_ifconfig_line($iface, $inet,
-				     $mask, $speed, $duplex, $aliases,$rtabid);
+		    os_ifconfig_line($iface, $inet, $mask,
+				     $speed, $duplex, $aliases,$rtabid);
 		    
-		$upcmds   .= "$upline\n    ";
+		$upcmds   .= "$upline\n    "
+		    if (defined($upline));
 		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
 		
 		$downcmds .= TMROUTECONFIG . " $routearg down\n    ";
@@ -936,15 +983,18 @@ sub doifconfig (;$)
 	}
     }
     close(XIFS);
-    if (JAILED()) {
-	return 0;
-    }
+    # Done when jailed or an IXP
+    return @ifacelist
+	if (JAILED() || IXP());
 
     #
     # Local file into which we write ifconfig commands (as a shell script).
     # 
     open(IFC, ">" . TMIFC)
 	or die("Could not open " . TMIFC . ": $!");
+
+    print IFC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
+    print IFC "$upcmds\n";
     print IFC "#!/bin/sh\n";
     print IFC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
     print IFC "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
@@ -994,6 +1044,7 @@ sub dorouterconfig (;$)
     my $routing  = 0;
     my %upmap    = ();
     my %downmap  = ();
+    my @routes   = ();
     my $TM;
 
     $TM = OPENTMCC(TMCCCMD_ROUTING);
@@ -1057,7 +1108,20 @@ sub dorouterconfig (;$)
 	    my $dmask = $3;
 	    my $gate  = $4;
 	    my $cost  = $5;
+	    my $rcline;
 	    my $routearg = inet_ntoa(inet_aton($gate) & inet_aton($dmask));
+
+	    #
+	    # For IXP.
+	    #
+	    my $rconfig = {};
+		    
+	    $rconfig->{"IPADDR"}   = $dip;
+	    $rconfig->{"TYPE"}     = $rtype;
+	    $rconfig->{"IPMASK"}   = $dmask;
+	    $rconfig->{"GATEWAY"}  = $gate;
+	    $rconfig->{"COST"}     = $cost;
+	    push(@routes, $rconfig);
 
 	    if (! defined($upmap{$routearg})) {
 		$upmap{$routearg} = [];
@@ -1096,8 +1160,7 @@ sub dorouterconfig (;$)
     #
     # Turn on IP forwarding
     #
-    my $rcline = os_routing_enable_forward();
-    print RC "    $rcline\n";
+    print RC "    " . os_routing_enable_forward() . "\n";
 
     #
     # Finally, enable gated if desired.
@@ -1111,8 +1174,26 @@ sub dorouterconfig (;$)
     # case, it will be run inside the jail.
     #
     if ($usegated && !defined($rtabid)) {
-	$rcline = gatedsetup();
-	print RC "    $rcline\n";
+	print RC "    " . gatedsetup() . "\n";
+    }
+    print RC "  ;;\n";
+
+    #
+    # For convenience, allup and alldown.
+    #
+    print RC "  enable-routes)\n";
+    foreach my $arg (keys(%upmap)) {
+	foreach my $rcline (@{$upmap{$arg}}) {
+	    print RC "    $rcline\n";
+	}
+    }
+    print RC "  ;;\n";
+    
+    print RC "  disable-routes)\n";
+    foreach my $arg (keys(%downmap)) {
+	foreach my $rcline (@{$downmap{$arg}}) {
+	    print RC "    $rcline\n";
+	}
     }
     print RC "  ;;\n";
     print RC "esac\n";
@@ -1121,7 +1202,7 @@ sub dorouterconfig (;$)
     close(RC);
     chmod(0755, TMROUTECONFIG);
 
-    return 0;
+    return @routes;
 }
 
 sub gatedsetup ()
@@ -2631,6 +2712,42 @@ sub vnodeplabsetup($)
     
     # XXX Anything else to do?
     
+    return ($pid, $eid, $vname);
+}
+
+#
+# IXP config. This happens on the outside since there is currently no
+# inside setup (until there is a reasonable complete environment).
+#
+sub ixpsetup($)
+{
+    my ($vid) = @_;
+
+    #
+    # Set global vnodeid for tmcc commands.
+    #
+    $vnodeid  = $vid;
+
+    #
+    # Config files go here. 
+    #
+    if (! -e CONFDIR()) {
+	die("*** $0:\n".
+	    "    No such directory: " . CONFDIR() . "\n");
+    }
+
+    # Do not bother if somehow got released.
+    if (! check_status()) {
+	print "Node is free!\n";
+	return undef;
+    }
+    $inixp    = 1;
+
+    #
+    # Different approach for IXPs. The ixp setup code will call the routines
+    # directly. 
+    # 
+
     return ($pid, $eid, $vname);
 }
 

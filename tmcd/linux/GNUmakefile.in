@@ -106,6 +106,8 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc.ixp
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk

@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# A totally bogus hack. This is run on the card.
+
+BOOTDIR="/nfs/config"
+armdir="/nfs/ixasdk/bin/arm-be"
+ixconfig="ixsys.l3fwdr"
+
+cd $armdir
+
+if [ -x ixstart -a -e $BOOTDIR/$ixconfig ]; then
+    echo "Setting up interfaces ..."
+    ./ixstart $BOOTDIR/$ixconfig
+fi

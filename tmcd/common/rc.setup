@@ -132,3 +132,10 @@ if [ -x $BINDIR/bootvnodes  ]; then
 	$BINDIR/bootvnodes -f
 fi
 
+# Subnodes. Will everntually merge with vnodes above.
+if [ -x $BINDIR/bootsubnodes  ]; then
+        echo "Booting up subnodes ..."
+	# Foreground mode.
+	$BINDIR/bootsubnodes -f
+fi
+
