@@ -8,11 +8,6 @@ changing which nodes are in a slice.
 
 This requires an already obtained dslice certficate and key.  By default
 it expects to find these in the @prefix@/etc/plab/ subdirectory.
-
-XXX This is a somewhat awkward mix of non-Emulab-specific and very
-Emulab-specific stuff (notably Plab.getFree).  Since the Emulab-specific
-stuff is rather hard to remove, it might be better to move some of the
-Emulab-specific stuff from the plab* scripts into here.
 """
 
 import sys
@@ -30,21 +25,21 @@ import lease
 # Constants
 #
 
-LEASELEN = 1209600  # Two weeks (maximum lease length)
+LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
 AGENTIP = "dslice.planet-lab.org"
+RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
 RESERVED_PID = "emulab-ops"
 RESERVED_EID = "plab-nodes"
-
-NUM_VNODES = 8
 
 MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
 MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
 LOCAL_PLAB_LINKTYPE = "inet2"
-ALLOWED_NODES = ("155.98.35.", )
+ALLOWED_NODES = ("155.98.35.3", "155.98.35.4")
 
 DEFAULT_DATA_PATH = "@prefix@/etc/plab"
+SSH = "@prefix@/bin/sshtb"
 
 verbose = 0
 debug = 0
@@ -134,18 +129,19 @@ def DBQuery(*args):
 
 def handleArgs(args):
     """
-    Takes a list of command-line arguments, interprets those meant for
-    libplab (-vd), and returns a list with those removed
+    Takes a list of command-line arguments, interprets those at the
+    beginning that are meant for libplab (-vd), and returns the remainder
+    of the arguments.
     """
     global verbose, debug
-    args = list(args)
-    
-    if "-v" in args:
-        verbose = 1
-        args.remove("-v")
-    if "-d" in args:
-        debug = 1
-        args.remove("-d")
+    import getopt
+    opts, args = getopt.getopt(args, "vd")
+
+    for o, a in opts:
+        if o == "-v":
+            verbose = 1
+        if o == "-d":
+            debug = 1
     return args
 
 #
@@ -244,11 +240,13 @@ class Plab:
                 print "There are %d new Plab nodes" % len(toadd)
                 for ip in toadd:
                     if len(ALLOWED_NODES) and not ip in ALLOWED_NODES:
+                        print "Skipping %s because it's not in the allowed" \
+                              " list" % ip
                         continue
                     linktype = self.__findLinkType(ip)
                     if debug:
                         print "Found linktype %s for node %s" % (linktype, ip)
-                    self.__addNode(ip, self.__findLinkType(ip))
+                    self.__addNode(ip, linktype)
 
     def __getKnownPnodes(self):
         """
@@ -266,15 +264,27 @@ class Plab:
 
     def __setVnodesStatus(self, pnodeids, status):
         """
-        getFree helper function.  Sets the status of all vnodes with a
-        phys_nodeid in the given list.
+        getFree helper function.  Sets the status of all vnodes that are
+        in state SHUTDOWN with a phys_nodeid from the given list.  Those
+        that are not in state SHUTDOWN should have a watchdog running, so
+        they don't need to be propped up.
         """
         if not len(pnodeids):
             return
-        # XXX This is wrong
+        # Unfortunately, this query has to join nodes and node_status,
+        # which means it can't all be done with a single update (until
+        # we upgrade to MySQL 4.0.4 at least :)
         clause = " or ".join(["phys_nodeid = %s"] * len(pnodeids))
-        DBQueryFatal("update nodes set status = %s where " + clause,
-                     [status] + list(pnodeids))
+        res = DBQueryFatal("select node_id from nodes"
+                           " where eventstate = 'SHUTDOWN'"
+                           " and (" + clause + ")",
+                           pnodeids)
+        if len(res):
+            for nodeid, in res:
+                DBQueryFatal("replace into node_status"
+                             " (node_id, status, status_timestamp)"
+                             " values (%s, %s, now())",
+                             (nodeid, status))
 
     def __setPnodesStatus(self, pnodeids, status):
         """
@@ -344,19 +354,19 @@ class Plab:
         Note that, very unlike newwanode, the node is initially up,
         since it had to be up to be added in the first place.
         """
-        print "Not adding node %s as %s" % (ip, linktype)
-        return
-
-        defosid, controlnet = self.__getNodetypeInfo()
-        nodeid, priority = self.__nextFreeNodeid()
+        defosid, controlnet, numvnodes = self.__getNodetypeInfo()
+        id, priority = self.__nextFreeNodeid()
+        nodeid = "pcplab%d" % id
         print "Creating pnode %s as %s, priority %d" % (ip, nodeid, priority)
+        print "XXX Just kidding"
+        return
 
         DBQueryFatal("insert into nodes"
                      " (node_id, type, phys_nodeid, role, priority,"
                      "  op_mode, def_boot_osid)"
                      " values (%s, %s, %s, %s, %s, %s, %s)",
-                     (nodeid, 'pcplabphys', nodeid, 'testnode', priority,
-                      'NORMAL', defosid))
+                     (nodeid, 'pcplabphys', nodeid, 'testnode', priority*100,
+                      'ALWAYSUP', defosid))
 
         DBQueryFatal("replace into node_status"
                      " (node_id, status, status_timestamp)"
@@ -374,8 +384,8 @@ class Plab:
                      (nodeid, RESERVED_PID, RESERVED_EID, nodeid))
 
         vnodetype = "pcplab%s" % linktype
-        for n in range(NUM_VNODES):
-            vprio = (priority * 100) + n
+        for n in range(numvnodes):
+            vprio = (priority * 100) + (n+1)
             vnodeid = "v%s-%d" % (nodeid, n+1)
             if verbose:
                 print "Creating vnode %s, priority %d" % (vnodeid, vprio)
@@ -385,7 +395,7 @@ class Plab:
                          "  op_mode, def_boot_osid, update_accounts)"
                          " values (%s, %s, %s, %s, %s, %s, %s, %s)",
                          (vnodeid, vnodetype, nodeid, 'virtnode', vprio,
-                          'NORMAL', defosid, 1))
+                          'PCVM', defosid, 1))
 
             DBQueryFatal("insert into node_status"
                          " (node_id, status, status_timestamp)"
@@ -394,14 +404,15 @@ class Plab:
 
     def __getNodetypeInfo(self):
         """
-        addNode helper function.  Returns a (defosid, controlnet) tuple
-        for the Plab pnode type.  Caches the result since it doesn't
-        change.
+        addNode helper function.  Returns a (defosid, controlnet,
+        numvnodes) tuple for the Plab pnode type.  Caches the result since
+        it doesn't change.
         """
         if not hasattr(self, "__getNodetypeInfoCache"):
             if debug:
                 print "Getting node type info"
-            res = DBQueryFatal("select osid, control_net from node_types"
+            res = DBQueryFatal("select osid, control_net, virtnode_capacity"
+                               " from node_types"
                                " where type = 'pcplabphys'")
             assert (len(res) == 1), "Failed to get node type info"
             (self.__getNodetypeInfoCache, ) = res
@@ -429,7 +440,25 @@ class Plab:
         return nodeid, priority
 
     def renew(self):
-        raise NotImplementedError()
+        """
+        Renews all of the Plab leases that are going to expire soon.
+        """
+        # Ugh, MySQL doesn't know UTC until v4.1.1, and unix_timestamp()
+        # returns the local time
+        import time
+        endtime = int(time.mktime(time.gmtime())) + RENEW_TIME
+        res = DBQueryFatal("select pid, eid, node_id from plab_slice_nodes"
+                           " where %s > unix_timestamp(leaseend)",
+                           (endtime, ))
+        loadedSlices = {}
+        for pid, eid, nodeid in res:
+            try:
+                slice = loadedSlices[(pid, eid)]
+            except KeyError:
+                slice = self.loadSlice(pid, eid)
+                loadedSlices[(pid, eid)] = slice
+            node = slice.loadNode(nodeid)
+            node.renew()
 
     def _createAgentProxy(self, insecure = False):
         """
@@ -480,6 +509,9 @@ class Slice:
         """
         Loads an already allocated slice from the DB.  Don't call this
         directly, use Plab.loadSlice instead.
+
+        XXX This should probably be made lazy, since not all operations
+        really need it
         """
         if verbose:
             print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
@@ -576,7 +608,6 @@ class Node:
         self.slice, self.plab = slice, slice.plab
         self.nodeid = nodeid
         self.ip = self.__findIP()
-        self.identityfile = None
         self.__nodemgrProxy = None
 
     def _create(self):
@@ -596,16 +627,16 @@ class Node:
             print "Obtained ticket:"
             print self.ticketdata
         nodemgr = self._createNodemgrProxy()
-        self.leasedata = nodemgr.newleasevm(self.ticketdata,
-                                            self.slice.privkey,
-                                            self.slice.pubkey)
-        if debug:
-            print "Obtained lease/vm:"
-            print self.leasedata
-        self.lease = lease.lease(self.leasedata)
-        # Note that the lease's end_time happens to be formatted the
-        # same as a SQL DATETIME (how conspicuously convenient...)
         try:
+            self.leasedata = nodemgr.newleasevm(self.ticketdata,
+                                                self.slice.privkey,
+                                                self.slice.pubkey)
+            if debug:
+                print "Obtained lease/vm:"
+                print self.leasedata
+            self.lease = lease.lease(self.leasedata)
+            # Note that the lease's end_time happens to be formatted the
+            # same as a SQL DATETIME (how conspicuously convenient...)
             DBQueryFatal("insert into plab_slice_nodes"
                          " (pid, eid, slicename, node_id,"
                          " ticketdata, leasedata, leaseend)"
@@ -644,14 +675,10 @@ class Node:
         and kills the VM.
         """
         print "Freeing node %s" % self.nodeid
-        # XXX Won't work on loaded nodes
-        if self.identityfile:
-            try:
-                self.__perform("sudo /etc/rc.vinit stop")
-            except RuntimeError:
-                print "WARNING: Skipping node shutdown on %s" % self.nodeid
-        else:
-            print "WARNING: Skipping node shutdown on %s" % self.nodeid
+        #try:
+        #    self.__perform("sudo /etc/rc.vinit stop")
+        #except RuntimeError:
+        #    print "WARNING: Skipping node shutdown on %s" % self.nodeid
         # XXX Should this wait a bit before nuking the VM?
         nodemgr = self._createNodemgrProxy()
         ret = nodemgr.deletelease(self.slice.slicename)
@@ -664,27 +691,55 @@ class Node:
     def addKey(self, identityfile):
         """
         Adds an ssh public key to the node.  Note that identityfile must
-        be the path of the private key.  This must be done before any
-        calls to unpackTgz, putConfig, or boot, because those commands
-        need a key in order to ssh into the node.
-
-        XXX Currently this information doesn't persist over a DB load of
-        a node, so those three functions will fail on a loaded node
-
-        XXX Because this is the first point at which the slice user can
-        be added to the root group via ssh, it's done here
+        be the path of the public key.  This must be done before any
+        calls to becomeEmulba, addtoGroup, or unpackTgz, because those
+        commands rely on ssh'ing into the node.  Note also that this
+        should be one of the keys that ssh naturally knows about, or
+        those commands will fail.
         """
         if verbose:
             print "Adding pubkey to node %s" % self.nodeid
-        self.identityfile = identityfile
-        pubkey = file(self.identityfile + ".pub", "rb").read().strip()
+        if not identityfile.endswith(".pub"):
+            raise RuntimeError, "File %s doesn't look like a pubkey" % \
+                  identityfile
+        pubkey = file(identityfile, "rb").read().strip()
         nodemgr = self._createNodemgrProxy()
         ret = nodemgr.addkey(self.slice.slicename, pubkey)
         if debug:
             print "Added key: %s" % `ret`
-        self.__perform("sudo /usr/sbin/usermod -G root %s" %
-                       self.slice.slicename)
         return ret
+
+    def renew(self):
+        print "Renewing lease on node %s" % self.nodeid
+        nodemgr = self._createNodemgrProxy()
+        self.leasedata = nodemgr.renewlease(self.slice.slicename)
+        if debug:
+            print "Obtained new lease:"
+            print self.leasedata
+        self.lease = lease.lease(self.leasedata)
+        DBQueryFatal("update plab_slice_nodes"
+                     " set leasedata = %s, leaseend = %s",
+                     (self.leasedata, self.lease.end_time))
+
+    def emulabify(self, rootball = DEFAULT_DATA_PATH + "/plabroot.tgz"):
+        """
+        Performs the necessary steps to turn this node into an
+        Emulab/Plab node.  Primarily, this unpacks the magic files on to
+        the node.
+        """
+        print "Overlaying Emulab files on %s" % self.nodeid
+        self.addToGroup(self.slice.slicename, "root")
+        self.unpackTgz(rootball)
+        # Ugh
+        if verbose:
+            print "Installing suidperl RPM"
+        self.__perform("sudo rpm -U /tmp/perl-suidperl-*.rpm")
+
+    def addToGroup(self, user, group):
+        if verbose:
+            print "Adding %s to group %s on node %s" % \
+                  (user, group, self.nodeid)
+        self.__perform("sudo /usr/sbin/usermod -G %s %s" % (group, user))
 
     def unpackTgz(self, tgzpath, destpath = "/"):
         """
@@ -697,48 +752,29 @@ class Node:
         self.__copy(tgzpath, "/tmp/sliceinit.tgz")
         self.__perform("sudo tar -xzf /tmp/sliceinit.tgz -C %s" % destpath)
 
-    def putConfig(self, filename, val):
-        """
-        Creates the specified file on the remote node and sticks some
-        text into it.  Currently, this is done with 'echo', so don't try
-        anything fancy.
-        """
-        if verbose:
-            print "Putting config value %s into %s on %s" % \
-                  (val, filename, self.nodeid)
-        self.__perform("sudo sh -c \"echo '%s' > %s\"" % (val, filename))
-
-    def boot(self):
-        """
-        Boots the remote node by calling /etc/rc.vinit
-        """
-        print "Booting node %s" % self.nodeid
-        self.__perform("sudo /etc/rc.vinit start")
-
     def __perform(self, command):
         """
-        Executes the given command on the remote node via ssh
+        Executes the given command on the remote node via sshtb
         """
         if debug:
             print "Performing '%s' on %s" % (command, self.nodeid)
-        assert self.identityfile, "SSH key must be added before perform"
-        if os.spawnlp(os.P_WAIT, "ssh", "ssh", "-i", self.identityfile,
-                      "-l", self.slice.slicename, self.ip, command):
-            raise RuntimeError, "'ssh %s' failed" % command
+        if os.spawnl(os.P_WAIT, SSH, SSH, "-host", self.nodeid, command):
+            raise RuntimeError, "ssh '%s' failed" % command
 
     def __copy(self, localfile, remotefile):
         """
-        Copies a file from the local system to the remote node.  Uses a
-        horrible combination of ssh, sudo, cat, and pipes to be able to
-        write the file as root remotely.  Ugh
+        Copies a file from the local system to the remote node, doing so
+        as root.
         """
         if debug:
             print "Copying %s to %s on %s" % \
                   (localfile, remotefile, self.nodeid)
-        assert self.identityfile, "SSH key must be added before perform"
-        if os.system("ssh -i %s -l %s %s 'sudo cat > %s' < '%s'" %
-                     (self.identityfile, self.slice.slicename, self.ip,
-                      remotefile, localfile)):
+        # dd is a bit overbearing for this job, but I can't do something
+        # simply like an scp (because the I can't get remote root), or a
+        # cat with a redirect (because sshtb munges the redirect and
+        # winds up evaluating it in a local shell)
+        if os.system("%s -host %s 'sudo dd of=%s' < '%s' > /dev/null 2>&1" %
+                     (SSH, self.nodeid, remotefile, localfile)):
             raise RuntimeError, "Copying %s to %s failed" % \
                   (localfile, remotefile)
 
