@@ -2483,3 +2483,8 @@ last_net_act,last_cpu_act,last_ext_act);
         update os_info set reboot_waittime=150 where OS='Linux' or
 	  OS='FreeBSD' or OS='NetBSD';
         update os_info set reboot_waittime=180 where OS=Windows';
+
+1.317: Add loc_z to location_info table.
+
+	alter table location_info add loc_z float default NULL after loc_y;
+

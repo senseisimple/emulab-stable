@@ -125,6 +125,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $node_id   = $row["node_id"];
     $loc_x     = $row["loc_x"];
     $loc_y     = $row["loc_y"];
+    $loc_z     = $row["loc_z"];
     $orient    = $row["orientation"];
 
     if ((isset($pid) && $pid == $row["pid"]) &&
@@ -141,6 +142,9 @@ while ($row = mysql_fetch_array($query_result)) {
     }
     else {
 	$locations[$node_id] = "x=$loc_x, y=$loc_y pixels";
+    }
+    if (isset($loc_z)) {
+	$locations[$node_id] .= ", z=" . sprintf("%.2f", $loc_z) . " meters";
     }
     if (isset($orient)) {
 	$locations[$node_id] .= ", o=" . sprintf("%.1f", $orient) . "&#176;";

@@ -41,14 +41,16 @@ if (isset($fake)) {
     #
     $x1 = 100;
     $y1 = 100;
+    $z1 = 0.5;
 
     $x2 = 700;
     $y2 = 200;
+    $z2 = 1.5;
 
     $i = 0;
     do {
-	echo "garcia1, robbie, $x1, $y1, 90.0, 700, 300, -90.0, 10, 20\n";
-	echo "garcia2, mary,   $x2, $y2, 0.0,  200, 100, 90.0, 50, 60\n";
+	echo "garcia1, robbie, $x1, $y1, $z1, 90.0, 700, 300, -90.0, 10, 20\n";
+	echo "garcia2, mary,   $x2, $y2, $z2, 0.0,  200, 100, 90.0, 50, 60\n";
 	flush();
 
 	sleep(1);
@@ -89,6 +91,7 @@ while (1) {
 	$vname = $row["vname"];
 	$x     = $row["loc_x"];
 	$y     = $row["loc_y"];
+	$z     = $row["loc_z"];
 	$or    = $row["orientation"];
 	$dx    = $row["destination_x"];
 	$dy    = $row["destination_y"];
@@ -102,6 +105,8 @@ while (1) {
 
 	if (!isset($vname))
 	    $vname = $pname;
+	if (!isset($z))
+	    $z = "";
 	if (!isset($or))
 	    $or = "";
 	if (!isset($dx)) {
@@ -114,7 +119,7 @@ while (1) {
 	if (!isset($bper))
 	    $bper = "";
 	    
-	echo "$pname, $vname, $x, $y, $or, $dx, $dy, $dor, $bper, $bvolts\n";
+	echo "$pname, $vname, $x, $y, $z, $or, $dx, $dy, $dor, $bper, $bvolts\n";
     }
     flush();
     sleep(1);

@@ -179,6 +179,7 @@ public class RoboTrack extends JApplet {
      */
     static class Robot {
         int x, y;			// Current x,y coords in pixels
+	double z;			// Current z in meters
 	double or = 500.0;		// Current orientation 
 	int dx, dy;			// Destination x,y coords in pixels
 	double dor = 500.0;		// Destination orientation
@@ -192,6 +193,7 @@ public class RoboTrack extends JApplet {
 	String battery_percentage = "";
 	String x_meters           = "";
 	String y_meters           = "";
+	String z_meters           = "";
 	String or_string          = "";
 	String dx_meters          = "";
 	String dy_meters          = "";
@@ -286,6 +288,16 @@ public class RoboTrack extends JApplet {
 	    robbie.y     = Integer.parseInt(tokens.nextToken().trim());
 	    robbie.x_meters = FORMATTER.format(robbie.x / pixels_per_meter);
 	    robbie.y_meters = FORMATTER.format(robbie.y / pixels_per_meter);
+
+	    str = tokens.nextToken().trim();
+	    if (str.length() > 0) {
+		robbie.z = Double.parseDouble(str);
+		robbie.z_meters = FORMATTER.format(robbie.z);
+	    }
+	    else {
+		robbie.z        = 0.0;
+		robbie.z_meters = "";
+	    }
 
 	    str = tokens.nextToken().trim();
 	    if (str.length() > 0) {
@@ -537,6 +549,7 @@ public class RoboTrack extends JApplet {
     static class MyTableModel extends AbstractTableModel {
         private String[] columnNames = {"Pname", "Vname",
 	                                "X (meters)", "Y (meters)",
+					"Z (meters)",
 					"O (degrees)",
 	                                "Dest-X", "Dest-Y", "Dest-O",
 					"Battery %", "Voltage", "Updated"
@@ -575,13 +588,14 @@ public class RoboTrack extends JApplet {
 	    case 1: return robbie.vname;
 	    case 2: return robbie.x_meters;
 	    case 3: return robbie.y_meters;
-	    case 4: return robbie.or_string;
-	    case 5: return robbie.dx_meters;
-	    case 6: return robbie.dy_meters;
-	    case 7: return robbie.dor_string;
-	    case 8: return robbie.battery_percentage;
-	    case 9: return robbie.battery_voltage;
-	    case 10: return robbie.update_string;
+	    case 4: return robbie.z_meters;
+	    case 5: return robbie.or_string;
+	    case 6: return robbie.dx_meters;
+	    case 7: return robbie.dy_meters;
+	    case 8: return robbie.dor_string;
+	    case 9: return robbie.battery_percentage;
+	    case 10: return robbie.battery_voltage;
+	    case 11: return robbie.update_string;
 	    }
 	    return "Foo";
         }
