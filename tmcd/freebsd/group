@@ -13,6 +13,9 @@ man:*:9:
 games:*:13:
 staff:*:20:root,toor
 guest:*:31:root,toor
+sshd:*:22:
+smmsp:*:25:
+mailnull:*:26:
 bind:*:53:
 uucp:*:66:
 xten:*:67:xten
