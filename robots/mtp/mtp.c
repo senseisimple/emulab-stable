@@ -277,6 +277,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
 
     // now write the specific data:
     i = MTP_PACKET_HEADER_LEN;
+	*((int *)(buf+i)) = htonl(data->request_id);
+    i += 4;
     encode_float32(buf, i, data->position.x);
     encode_float32(buf, i, data->position.y);
     encode_float32(buf, i, data->position.theta);
@@ -314,6 +316,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
 
     // now write the specific data:
     i = MTP_PACKET_HEADER_LEN;
+	*((int *)(buf+i)) = htonl(data->request_id);
+    i += 4;
     *((int *)(buf+i)) = htonl(data->robot_id);
     i += 4;
 
@@ -471,6 +475,9 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       return MTP_PP_ERROR_MALLOC;
     }
     packet->data.request_id = data;
+
+	data->request_id = ntohl(*((int *)(buf+i)));
+    i += 4;
     decode_float32(buf, i, data->position.x);
     decode_float32(buf, i, data->position.y);
     decode_float32(buf, i, data->position.theta);
@@ -499,6 +506,9 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       return MTP_PP_ERROR_MALLOC;
     }
     packet->data.update_id = data;
+
+	data->request_id = ntohl(*((int *)(buf+i)));
+    i += 4;
     data->robot_id = ntohl(*((int *)(buf+i)));
     i += 4;
 
@@ -709,7 +719,7 @@ int mtp_calc_size(int opcode,void *data) {
   }
   else if (opcode == MTP_REQUEST_ID) {
     struct mtp_request_id *c = (struct mtp_request_id *)data;
-    retval += 20;
+    retval += 4 + 20;
   }
   else if (opcode == MTP_UPDATE_POSITION) {
     struct mtp_update_position *c = (struct mtp_update_position *)data;
@@ -717,7 +727,7 @@ int mtp_calc_size(int opcode,void *data) {
   }
   else if (opcode == MTP_UPDATE_ID) {
     struct mtp_update_id *c = (struct mtp_update_id *)data;
-    retval += 4;
+    retval += 4 + 4;
   }
   else if (opcode == MTP_COMMAND_GOTO) {
     struct mtp_command_goto *c = (struct mtp_command_goto *)data;
@@ -819,10 +829,12 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
   case MTP_REQUEST_ID:
     fprintf(file,
 	    " opcode:\trequest-id\n"
+		"  request_id:\t\t%d\n"
 	    "  x:\t\t%f\n"
 	    "  y:\t\t%f\n"
 	    "  theta:\t%f\n"
-	    "  timestamp:\t%f\n",
+	    "  timestamp:\t\t%f\n",
+		mp->data.request_id->request_id,
 	    mp->data.request_id->position.x,
 	    mp->data.request_id->position.y,
 	    mp->data.request_id->position.theta,
@@ -849,7 +861,9 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
   case MTP_UPDATE_ID:
     fprintf(file,
 	    " opcode:\tupdate-id\n"
+        "  request_id:\t%d\n"
 	    "  id:\t%d\n",
+        mp->data.request_id->request_id,
 	    mp->data.update_position->robot_id);
     break;
     

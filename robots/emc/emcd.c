@@ -574,7 +574,7 @@ void ev_callback(event_handle_t handle,
   struct in_addr ia;
   
   event_notification_get_host(handle, notification, host, sizeof(host));
-
+  
   if (!inet_aton(host, &ia)) {
     error("event's host value is not an IP address: %s\n", host);
   }
@@ -586,11 +586,11 @@ void ev_callback(event_handle_t handle,
       struct emc_robot_config *erc = rli->data;
       
       if (erc->ia.s_addr == ia.s_addr) {
-	match = erc;
-	break;
+        match = erc;
+        break;
       }
     }
-
+    
     if (match == NULL) {
       error("no match for IP: %s\n", host);
     }
@@ -599,27 +599,30 @@ void ev_callback(event_handle_t handle,
       float x, y, orientation;
       
       event_notification_get_arguments(handle,
-				       notification, args, sizeof(args));
+                                       notification, args, sizeof(args));
       
       if (event_arg_get(args, "X", &value) > 0) {
-	if (sscanf(value, "%f", &x) != 1) {
-	  error("X argument in event is not a float: %s\n", value);
-	}
+        if (sscanf(value, "%f", &x) != 1) {
+          error("X argument in event is not a float: %s\n", value);
+        }
       }
       
       if (event_arg_get(args, "Y", &value) > 0) {
-	if (sscanf(value, "%f", &y) != 1) {
-	  error("Y argument in event is not a float: %s\n", value);
-	}
+        if (sscanf(value, "%f", &y) != 1) {
+          error("Y argument in event is not a float: %s\n", value);
+        }
       }
       
       if (event_arg_get(args, "ORIENTATION", &value) > 0) {
-	if (sscanf(value, "%f", &orientation) != 1) {
-	  error("ORIENTATION argument in event is not a float: %s\n", value);
-	}
+        if (sscanf(value, "%f", &orientation) != 1) {
+          error("ORIENTATION argument in event is not a float: %s\n", value);
+        }
       }
-
+      
       // XXX What to do with the data?
+
+      // construct a COMMAND_GOTO packet and send to rmc.
+
     }
   }
 }

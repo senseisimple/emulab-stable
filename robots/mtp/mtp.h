@@ -49,10 +49,17 @@
 #define MTP_ROLE_EMULAB 5
 
 /* These are used in the status fields in MTP_UPDATE_POSITION packets */
+#define MTP_POSITION_STATUS_UNKNOWN -1
 #define MTP_POSITION_STATUS_IDLE     1
 #define MTP_POSITION_STATUS_MOVING   2
 #define MTP_POSITION_STATUS_ERROR    3
 #define MTP_POSITION_STATUS_COMPLETE 4
+/* this is used when vmc-client sends update_position packets to vmc;
+ * if this status is set for a packet, we KNOW that it was teh last
+ * packet generated for object position updates in the current mezzanine
+ * cycle of processing the current frame.
+ */
+#define MTP_POSITION_STATUS_CYCLE_COMPLETE 32
 
 /* we set this so that an application can only receive 32KB packets at once;
  * just a little measure to prevent denial-of-service on the server (because
@@ -141,10 +148,12 @@ struct mtp_update_position {
 };
 
 struct mtp_request_id {
+  int request_id;
   struct position position;
 };
 
 struct mtp_update_id {
+  int request_id;
   int robot_id;
 };
 
