@@ -86,11 +86,12 @@ if (mysql_num_rows($query_result)) {
           <table align=center border=1 cellpadding=2 cellspacing=2>\n";
 
     echo "<tr>
-              <th align=center>PID</td>
-              <th align=center>EID</td>
-              <th align=center>State</td>
-              <th align=center>Nodes</td>
-              <th align=center>Description</td>
+              <th>PID</th>
+              <th>EID</th>
+              <th>State</th>
+              <th align=center>Nodes</th>
+              <th align=center>Hours Idle</th>
+              <th>Description</th>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
@@ -98,6 +99,8 @@ if (mysql_num_rows($query_result)) {
 	$eid  = $projrow[eid];
 	$state= $projrow[state];
 	$nodes= $projrow["count(r.node_id)"];
+	$idlehours = TBGetExptIdleTime($pid,$eid);
+	if ($idlehours == -1) { $idlehours = "&nbsp;"; }
 	$name = stripslashes($projrow[expt_name]);
 	if ($projrow[swap_requests] > 0) {
 	  $state .= "&nbsp;(idle)";
@@ -107,7 +110,8 @@ if (mysql_num_rows($query_result)) {
                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
 		 <td>$state</td>
-                 <td>$nodes</td>
+                 <td align=center>$nodes</td>
+                 <td align=center>$idlehours</td>
                  <td>$name</td>
              </tr>\n";
     }
