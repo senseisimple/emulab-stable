@@ -13,7 +13,6 @@ use English;
 #
 my $TIPLOGDIR   = "/var/log/tiplogs";
 my $TIPDEVDIR   = "/dev/tip";
-my $TBPID	= "flux";
 my $dbg		= 1;
 my %tipgroup    = ();
 my $failures    = 0;
