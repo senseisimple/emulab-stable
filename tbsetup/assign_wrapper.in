@@ -536,9 +536,9 @@ foreach $lan (keys(%lans)) {
 	    print TOPFILE "node $delayname delay\n";
 	    $delaynodes++;
 	    print TOPFILE "link linksdelaysrc/$lan $node0 $delayname"
-		. " $bandwidth 0 0\n";
+		. " $bandwidth\n";
 	    print TOPFILE "link linksdelaydst/$lan $node1 $delayname"
-		. " $bandwidth 0 0\n";
+		. " $bandwidth\n";
 	    #
 	    # Ports are set to 100Mbs when a link gets a delay node.
 	    # This can override initialization above cause we could not
@@ -548,7 +548,7 @@ foreach $lan (keys(%lans)) {
 	    $portbw{$nodeport0} = $S100Mbs;	    
 	    $portbw{$nodeport1} = $S100Mbs;	    
 	} else {
-	    print TOPFILE "link linksimple/$lan $node0 $node1 $bandwidth 0 0\n";
+	    print TOPFILE "link linksimple/$lan $node0 $node1 $bandwidth\n";
 	}
     } elsif ($#members != 0) {
 	print TOPFILE "node lan/$lan lan\n";
@@ -586,9 +586,9 @@ foreach $lan (keys(%lans)) {
 		print TOPFILE "node $delayname delay\n";
 		$delaynodes++;
 		print TOPFILE "link linkdelaysrc/$lan/$member" .
-		    " $node $delayname $bandwidth 0 0\n";
+		    " $node $delayname $bandwidth\n";
 		print TOPFILE "link linkdelaydst/$lan/$member" .
-		    " lan/$lan $delayname $bandwidth 0 0\n";
+		    " lan/$lan $delayname $bandwidth\n";
 		#
 		# Port is set to 100Mbs when the link gets a delay node.
 		# This can override initialization above cause we could not
@@ -598,7 +598,7 @@ foreach $lan (keys(%lans)) {
 		$portbw{$member} = $S100Mbs;	    
 	    } else {
 		print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
-		    " $bandwidth 0 0\n";
+		    " $bandwidth\n";
 	    }
 	}
     }
@@ -720,7 +720,7 @@ while (1) {
     # Run assign
     $fail = 0;
     print "assign -b -t $ptopfile $topfile\n";
-    open(ASSIGNFP,"assign $ptopfile $topfile | tee assign.log |");
+    open(ASSIGNFP,"assign -b -t $ptopfile $topfile | tee assign.log |");
     $violations = 0;
     $score = -1;
 
@@ -737,7 +737,7 @@ while (1) {
 	    $violations = $1;
 	    last;
 	};
-	/^[ \t]+BEST SCORE: [ \t]+([0-9]+(\.[0-9]+)?)/ && ($score=$1);
+	/^[ \t]+BEST SCORE: [ \t]+([0-9]+\.[0-9]+)/ && ($score=$1);
     }
     if ($score == -2) {
 	# Type error
@@ -755,7 +755,7 @@ while (1) {
 	    chop;
 	    /^End Nodes$/ && last;
 	    @info = split;
-	    ($virtual,$physical) = @info[0,1];
+	    ($virtual,$physical) = @info[0,2];
 	    $v2pmap{$virtual} = $physical;
 	    if( ! defined($p2vmap{$physical}) ) {
 	      $p2vmap{$physical} = [];

@@ -1,10 +1,18 @@
 #
-# Insert Copyright Here.
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
 #
+
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= assign
+
+#
+# Support for optional assign binary to avoid LEDA restrictions
+#
+ASSIGNBINARY	= @ASSIGN@
 
 include $(OBJDIR)/Makeconf
 
@@ -12,46 +20,35 @@ all: assign
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o config.o score.o \
-     parser.o
-LIBS+= -lm
-LDFLAGS+= -pipe -O3
-CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-30
+LEDA=@LEDA@
 
-# Pick either this
-CXXFLAGS += -O3 
-# or this
+OBJS=score.o parse_top.o parse_ptop.o config.o pclass.o vclass.o
+LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
+LDFLAGS+= -O3
+CXXFLAGS = -I${LEDA}/incl
+
+# Pick one of the following:
+CXXFLAGS += -Wall -O3 
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
-# and then zero or more of these
-#CXXFLAGS += -DSCORE_DEBUG
-#CXXFLAGS += -DSCORE_DEBUG_MORE
-#CXXFLAGS += -DPCLASS_DEBUG
-#CXXFLAGS += -DDUMP_GRAPH
-#CXXFLAGS += -DSCORE_DEBUG_LOTS
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DPCLASS_DEBUG
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DPCLASS_DEBUG -DPCLASS_DEBUG_MORE
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DSCORE_DEBUG_MORE -DPCLASS_DEBUG -DPCLASS_DEBUG_MORE
 
-# And then, regardless, you can also have this
 #CXXFLAGS += -DSTATS
-
-# assign now supports a dizzing array of defines, which are as-yet undocumented
-# Here are the ones used for a typical build:
-# Pick cooling schedule
-CXXFLAGS += -DMELT -DEPSILON_TERMINATE -DCHILL -DNEIGHBOR_LENGTH \
-    -DLOCAL_DERIVATIVE -DALLOW_NEGATIVE_DELTA
-# Bug/scoring fixes
-CXXFLAGS += -DINTERSWITCH_LENGTH -DPNODE_SWITCH_LOAD -DFIX_SHARED_INTERFACES 
-# Various tweaks to the simulated annealing behavior
-CXXFLAGS += -DFIND_PNODE_SEARCH -DNO_REVERT
-# This should be enabled, for better mapping, but has to be disabled
-# for now because it breaks vclasses
-#CXXFLAGS += -DPER_VNODE_TT -DSMART_UNMAP
 
 # If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
 # option. Use OP={0,1} on the command line at run time... :)
 
 DEPLIBS=$(OBJS)
 
-assign: ${DEPLIBS} ${OBJS} 
-	${CXX} -o assign ${LIBS} $(OBJS) ${LDFLAGS}
+ifdef ASSIGNBINARY
+assign:	${ASSIGNBINARY}
+	rm -f assign
+	cp $< assign
+else
+assign: ${DEPLIBS} ${OBJS} assign.o
+	${CXX} assign.o -o assign ${LIBS} $(OBJS) ${LDFLAGS}
+endif
 
 install: $(INSTALL_LIBEXECDIR)/assign 
 

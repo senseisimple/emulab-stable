@@ -1,190 +1,163 @@
-#include "port.h"
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
+
+#include <LEDA/graph_alg.h>
+#include <LEDA/graphwin.h>
+#include <LEDA/ugraph.h>
+#include <LEDA/dictionary.h>
+#include <LEDA/map.h>
+#include <LEDA/graph_iterator.h>
+#include <LEDA/node_pq.h>
+#include <LEDA/sortseq.h>
+#include <iostream.h>
+#include <stdio.h>
 #include <stdlib.h>
-
-#include <hash_map>
-#include <rope>
-#include <queue>
-#include <slist>
-#include <algorithm>
-
-#include <boost/config.hpp>
-#include <boost/utility.hpp>
-#include <boost/property_map.hpp>
-#include <boost/graph/graph_traits.hpp>
-#include <boost/graph/adjacency_list.hpp>
-
-using namespace boost;
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <string.h>
+#include <assert.h>
 
 #include "common.h"
-#include "delay.h"
 #include "physical.h"
+#include "vclass.h"
 #include "virtual.h"
 #include "pclass.h"
 
-
-// The purpose of the code in s this file is to generate the physical
-// equivalence classes and then maintain them during the simulated
-// annealing process.  A function generate_pclasses is provided to
-// fill out the pclass structure.  Then two routines pclass_set, and
-// pclass_unset are used to maintaing the structure during annealing.
-
-
-extern pnode_pvertex_map pnode2vertex;
-
-// pclasses - A list of all pclasses.
+extern node pnodes[MAX_PNODES];
+extern dictionary<tb_pnode*,node> pnode2node;
 extern pclass_list pclasses;
-
-// type_table - Maps a type (crope) to a tt_entry.  A tt_entry
-// consists of an array of pclasses that satisfy that type, and the
-// length of the array.
 extern pclass_types type_table;
 
-typedef pair<pvertex,int> link_info; // dst, bw
-
-struct hashlinkinfo {
-  size_t operator()(link_info const &A) const {
-    hashptr<void *> ptrhash;
-    return ptrhash(A.first)/2+A.second;
-  }
-};
+typedef two_tuple<node,int> link_info; // dst, bw
 
 // returns 1 if a and b are equivalent.  They are equivalent if the
 // type and features information match and if there is a one-to-one
 // mapping between links that preserves bw, and destination.
 int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 {
-  // We disable pclasses by simply never considering any two nodes to be
-  // equivalent
-  if (!use_pclasses) {
-    return 0;
-  }
-  
-  typedef hash_multiset<link_info,hashlinkinfo> link_set;
-  
   // check type information
-  for (tb_pnode::types_map::iterator it=a->types.begin();
-       it!=a->types.end();++it) {
-    const crope &a_type = (*it).first;
-    const int a_max_nodes = (*it).second;
-    
-    tb_pnode::types_map::iterator bit = b->types.find(a_type);
-    if ((bit == b->types.end()) ||((*bit).second != a_max_nodes))
+  dic_item it;
+  forall_items(it,a->types) {
+    dic_item bit;
+    bit = b->types.lookup(a->types.key(it));
+    if (bit == nil)
+      return 0;
+    if (b->types[bit] != a->types.inf(it))
       return 0;
   }
 
   // check features
-  for (tb_pnode::features_map::iterator it=a->features.begin();
-       it != a->features.end();++it) {
-    const crope &a_feature = (*it).first;
-    const double a_weight = (*it).second;
-    
-    tb_pnode::features_map::iterator bit;
-    bit = b->features.find(a_feature);
-    if ((bit == b->features.end()) || ((*bit).second != a_weight)) 
+  seq_item sit;
+  forall_items(sit,a->features) {
+    seq_item bit;
+    bit = b->features.lookup(a->features.key(sit));
+    if (bit == nil)
+      return 0;
+    if (b->features[bit] != a->features.inf(sit))
       return 0;
   }
 
   // check links - to do this we first create sets of every link in b.
   // we then loop through every link in a, find a match in the set, and
   // remove it from the set.
-  pvertex an = pnode2vertex[a];
-  pvertex bn = pnode2vertex[b];
+  node an = pnode2node.access(a);
+  node bn = pnode2node.access(b);
 
-  link_set b_links;
-
-  poedge_iterator eit,eendit;
-  tie(eit,eendit) = out_edges(bn,PG);
-  for (;eit != eendit;++eit) {
-    pvertex dst = target(*eit,PG);
+  // yet another place where we'd like to use sets <sigh>
+  list<link_info> b_links;
+  
+  edge e;
+  forall_inout_edges(e,bn) {
+    node dst=PG.target(e);
     if (dst == bn)
-      dst = source(*eit,PG);
-    b_links.insert(link_info(dst,get(pedge_pmap,*eit)->delay_info.bandwidth));
+      dst = PG.source(e);
+    b_links.push_front(link_info(dst,PG[e].bandwidth));
   }
-  tie(eit,eendit) = out_edges(an,PG);
-  for (;eit != eendit;++eit) {
-    pvertex dst = target(*eit,PG);
+  forall_inout_edges(e,an) {
+    link_info link;
+    node dst=PG.target(e);
     if (dst == an)
-      dst = source(*eit,PG);
-    int bw = get(pedge_pmap,*eit)->delay_info.bandwidth;
-    link_info tomatch = link_info(dst,bw);
-    link_set::iterator found = b_links.find(tomatch);
-    if (found == b_links.end()) return 0;
-    else b_links.erase(found);
+      dst = PG.source(e);
+    int bw = PG[e].bandwidth;
+    bool found = 0;
+    list_item lit;
+    forall_items(lit,b_links) {
+      link=b_links.inf(lit);
+      if ((dst == link.first()) && (bw == link.second())) {
+	found = 1;
+	b_links.del(lit);
+	break;
+      }
+    }
+    if (found == 0) return 0;
   }
-  if (b_links.size() != 0) return 0;
   return 1;
 }
 
-/* This function takes a physical graph and generates the set of
+/* This function takes a physical graph and generates an set of
    equivalence classes of physical nodes.  The globals pclasses (a
    list of all equivalence classes) and type_table (and table of
    physical type to list of classes that can satisfy that type) are
    set by this routine. */
 int generate_pclasses(tb_pgraph &PG) {
-  typedef hash_map<tb_pclass*,tb_pnode*,hashptr<tb_pclass*> > pclass_pnode_map;
-  typedef hash_map<crope,pclass_list*> name_pclass_list_map;
-
-  pvertex cur;
-  pclass_pnode_map canonical_members;
-
-  pvertex_iterator vit,vendit;
-  tie(vit,vendit) = vertices(PG);
-  for (;vit != vendit;++vit) {
-    cur = *vit;
+  node cur;
+  dictionary<tb_pclass*,tb_pnode*> canonical_members;
+  
+  forall_nodes(cur, PG) {
     tb_pclass *curclass;
     bool found_class = 0;
-    tb_pnode *curP = get(pvertex_pmap,cur);
-    pclass_pnode_map::iterator dit;
-    for (dit=canonical_members.begin();dit!=canonical_members.end();
-	 ++dit) {
-      curclass=(*dit).first;
-      if (pclass_equiv(PG,curP,(*dit).second)) {
+    tb_pnode *curP = &PG[cur];
+    dic_item dit;
+    forall_items(dit,canonical_members) {
+      curclass=canonical_members.key(dit);
+      if (pclass_equiv(PG,curP,canonical_members[dit])) {
 	// found the right class
 	found_class=1;
 	curclass->add_member(curP);
 	break;
-      } 
+      }
     }
     if (found_class == 0) {
       // new class
       tb_pclass *n = new tb_pclass;
       pclasses.push_back(n);
-      canonical_members[n]=curP;
+      canonical_members.insert(n,curP);
       n->name = curP->name;
       n->add_member(curP);
     }
   }
 
-  name_pclass_list_map pre_type_table;
-
-  pclass_list::iterator it;
-  for (it=pclasses.begin();it!=pclasses.end();++it) {
-    tb_pclass *cur = *it;
-    tb_pclass::pclass_members_map::iterator dit;
-    for (dit=cur->members.begin();dit!=cur->members.end();
-	 ++dit) {
-      if (pre_type_table.find((*dit).first) == pre_type_table.end()) {
-	pre_type_table[(*dit).first]=new pclass_list;
+  dictionary<string,pclass_list*> pre_type_table;
+  
+  list_item it;
+  forall_items(it,pclasses) {
+    tb_pclass *cur = pclasses[it];
+    dic_item dit;
+    forall_items(dit,cur->members) {
+      if (pre_type_table.lookup(cur->members.key(dit)) == nil) {
+	pre_type_table.insert(cur->members.key(dit),new pclass_list);
       }
-      pre_type_table[(*dit).first]->push_back(cur);
+      pre_type_table.access(cur->members.key(dit))->push_back(cur);
     }
   }
 
   // now we convert the lists in pre_type_table into arrays for
   // faster access.
-  name_pclass_list_map::iterator dit;
-  for (dit=pre_type_table.begin();dit!=pre_type_table.end();
-       ++dit) {
-    pclass_list *L = (*dit).second;
-    pclass_vector *A = new pclass_vector(L->size());
+  dic_item dit;
+  forall_items(dit,pre_type_table) {
+    pclass_list *L = pre_type_table.inf(dit);
+    pclass_array *A = new pclass_array(L->length());
     int i=0;
     
-    type_table[(*dit).first]=tt_entry(L->size(),A);
-
-    pclass_list::iterator it;
-    for (it=L->begin();it!=L->end();++it) {
-      (*A)[i++] = *it;
+    type_table.insert(pre_type_table.key(dit),tt_entry(L->length(),A));
+    
+    forall_items(it,*L) {
+      (*A)[i++] = L->inf(it);
     }
     delete L;
   }
@@ -193,13 +166,13 @@ int generate_pclasses(tb_pgraph &PG) {
 
 int tb_pclass::add_member(tb_pnode *p)
 {
-  tb_pnode::types_map::iterator it;
-  for (it=p->types.begin();it!=p->types.end();++it) {
-    crope type = (*it).first;
-    if (members.find(type) == members.end()) {
-      members[type]=new tb_pnodelist;
+  dic_item it;
+  forall_items(it,p->types) {
+    string type = p->types.key(it);
+    if (members.lookup(type) == nil) {
+      members.insert(type,new tb_pnodelist);
     }
-    members[type]->push_back(p);
+    members.access(type)->push_back(p);
   }
   size++;
   p->my_class=this;
@@ -207,89 +180,54 @@ int tb_pclass::add_member(tb_pnode *p)
 }
 
 // should be called after add_node
-int pclass_set(tb_vnode *v,tb_pnode *p)
+int pclass_set(tb_vnode &v,tb_pnode &p)
 {
-  tb_pclass *c = p->my_class;
+  tb_pclass *c = p.my_class;
   
   // remove p node from correct lists in equivalence class.
-  tb_pclass::pclass_members_map::iterator dit;
-  for (dit=c->members.begin();dit!=c->members.end();dit++) {
-    if ((*dit).first == p->current_type) {
+  dic_item dit;
+  forall_items(dit,c->members) {
+    if (c->members.key(dit) == p.current_type) {
       // same class - only remove if node is full
-      if (p->current_load == p->max_load) {
-	(*dit).second->remove(p);
-//#ifdef SMART_UNMAP
-//	c->used_members[(*dit).first]->push_back(p);
-//#endif
+      if (p.current_load == p.max_load) {
+	(c->members.inf(dit))->remove(&p);
       }
     } else {
       // If it's not in the list then this fails quietly.
-      (*dit).second->remove(p);
+      (c->members.inf(dit))->remove(&p);
     }
-#ifdef SMART_UNMAP
-    if (c->used_members.find((*dit).first) == c->used_members.end()) {
-	c->used_members[(*dit).first] = new tb_pclass::tb_pnodeset;
-    }
-
-    // XXX: bogus? Maybe we're only supposed to insert if it was in the
-    // other list?
-    //if (find((*dit).second->L.begin(),(*dit).second->L.end(),p) != (*dit).second->L.end()) {
-    c->used_members[(*dit).first]->insert(p);
-    //}
-#endif
   }
-
   
-  c->used += 1.0/(p->max_load);
+  c->used += 1.0/(p.max_load);
   
   return 0;
 }
 
-int pclass_unset(tb_pnode *p)
+int pclass_unset(tb_pnode &p)
 {
   // add pnode to all lists in equivalence class.
-  tb_pclass *c = p->my_class;
+  tb_pclass *c = p.my_class;
+  dic_item dit;
 
-  //cout << "Unassigning " << p->name << ": ";
-
-  tb_pclass::pclass_members_map::iterator dit;
-  for (dit=c->members.begin();dit!=c->members.end();++dit) {
-    //cout << " Type " << dit->first << ": ";
-    if ((*dit).first == p->current_type) {
+  forall_items(dit,c->members) {
+    if (c->members.key(dit) == p.current_type) {
       // If it's not in the list then we need to add it to the back if it's
       // empty and the front if it's not.  Since unset is called before
       // remove_node empty means only one user.
-      if (! (*dit).second->exists(p)) {
-	assert(p->current_load > 0);
-#ifdef PNODE_ALWAYS_FRONT
-	(*dit).second->push_front(p);
-#else
-#ifdef PNODE_SWITCH_LOAD
-	if (p->current_load == 0) {
-#else
-	if (p->current_load == 1) {
-#endif
-	  //cout << "Pushing back: " << p->current_load << " ";
-	  (*dit).second->push_back(p);
+      if (! (c->members.inf(dit))->exists(&p)) {
+	assert(p.current_load > 0);
+	if (p.current_load == 1) {
+	  (c->members.inf(dit))->push_back(&p);
 	} else {
-	  //cout << "Pushing front: " << p->current_load << " ";
-	  (*dit).second->push_front(p);
+	  (c->members.inf(dit))->push_front(&p);
 	}
-#endif
       }
     } else {
-      //cout << "Pushing back (2) ";
-      (*dit).second->push_back(p);
+      (c->members.inf(dit))->push_back(&p);
     }
-
-#ifdef SMART_UNMAP
-      c->used_members[(*dit).first]->erase(p);
-#endif
   }
 
-  //cout << endl;
-
-  c->used -= 1.0/(p->max_load);
+  c->used -= 1.0/(p.max_load);
   
   return 0;
 }
@@ -297,18 +235,29 @@ int pclass_unset(tb_pnode *p)
 void pclass_debug()
 {
   cout << "PClasses:\n";
-  pclass_list::iterator it;
-  for (it=pclasses.begin();it != pclasses.end();++it) {
-    cout << *(*it);
+  list_item it;
+  forall_items(it,pclasses) {
+    tb_pclass *p = pclasses[it];
+    cout << p->name << ": size = " << p->size << "\n";
+    dic_item dit;
+    forall_items(dit,p->members) {
+      cout << "  " << p->members.key(dit) << ":\n";
+      list_item lit;
+      const list<tb_pnode*> L = p->members.inf(dit)->L;
+      forall_items(lit,L) {
+	cout << "    " << L.inf(lit)->name << "\n";
+      }
+    }
+    cout << "\n";
   }
 
   cout << "\n";
   cout << "Type Table:\n";
-  pclass_types::iterator dit;
-  for (dit=type_table.begin();dit!=type_table.end();++dit) {
-    cout << (*dit).first << ":";
-    int n = (*dit).second.first;
-    pclass_vector &A = *((*dit).second.second);
+  dic_item dit;
+  forall_items(dit,type_table) {
+    cout << type_table.key(dit) << ":";
+    int n = type_table.inf(dit).first();
+    pclass_array &A = *(type_table.inf(dit).second());
     for (int i = 0; i < n ; ++i) {
       cout << " " << A[i]->name;
     }
@@ -316,3 +265,9 @@ void pclass_debug()
   }
 }
 
+int compare(tb_pclass *const &a, tb_pclass *const &b)
+{
+  if (a==b) return 0;
+  if (a < b) return -1;
+  return 1;
+}

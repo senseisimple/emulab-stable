@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 1999-2001 The University of Utah and the Flux Group.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -24,7 +25,7 @@ struct config_param {
 /* types */
 #define CONFIG_INT	0
 #define CONFIG_FLOAT	1
-  
+
 void parse_options(char **argv, struct config_param options[], int nopt);
 int config_parse(char **args, struct config_param cparams[], int nparams);
 void dump_options(const char *str, struct config_param cparams[], int nparams);
