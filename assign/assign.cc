@@ -461,6 +461,14 @@ int mapping_precheck() {
 		this_type = v->type;
 	    }
 
+            // Check to make sure there are actually nodes of this type in the
+            // physical topology
+            if (type_table.find(this_type) == type_table.end()) {
+                // Yes, I know, goto is evil. But I'm not gonna indent the next
+                // 100 lines of code for this error case
+                goto nosuchtype;
+            }
+
 	    for (pclass_vector::iterator it = type_table[this_type].second->begin();
 		    it != type_table[this_type].second->end(); it++) {
 
@@ -559,6 +567,7 @@ int mapping_precheck() {
 		}
 	    }
 
+nosuchtype:
 	    if (vclass) { 
 		mit++;
 		if (mit == vclass->members.end()) {
