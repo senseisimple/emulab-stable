@@ -30,7 +30,7 @@ if (! $isadmin) {
 if (!isset($showactive))
     $showactive = 0;
 if (!isset($sortby))
-    $sortby = "name";
+    $sortby = "uid";
     
 if (!$showactive) {
     echo "<b><a href='showuser_list.php3?showactive=1&sortby=$sortby'>
@@ -52,7 +52,7 @@ elseif (! strcmp($sortby, "widle"))
 elseif (! strcmp($sortby, "uidle"))
     $order = "usersidle DESC";
 else {
-    $order = "u.usr_name";
+    $order = "u.uid";
 }
 
 if ($showactive) {
