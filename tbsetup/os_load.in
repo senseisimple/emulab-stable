@@ -308,6 +308,7 @@ if ($TESTMODE) {
 
 # Fire off a mass reboot and quit if not in waitmode.
 if (! $waitmode) {
+    print STDOUT "Reload ready. Rebooting nodes at ".`date`;
     system("$nodereboot @nodes");
     $failures = $? >> 8;
 

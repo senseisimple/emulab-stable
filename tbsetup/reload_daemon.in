@@ -95,7 +95,7 @@ if (! $debug) {
     daemonize();
 }
 
-print "Reload Daemon starting... pid $$\n";
+print "Reload Daemon starting... pid $$, at ".`date`;
 
 #
 # Loop, looking for nodes to reload.
@@ -238,7 +238,7 @@ while (1) {
     }
 
     my $nodes = join(" ",@node_list);
-    print "Trying to reload $nodes ... \n";
+    print "Trying to reload $nodes at ".`date`;
 
     #
     # What we do depends on whether its a free node or a node reserved
@@ -291,8 +291,10 @@ while (1) {
 	    print "Could not update EID for ".join(" ",@pending_list).
 	      ". Waiting a bit.\n";
 	    next;
+	} else {
+	    print "Pending nodes moved to $RELOADEID at ".`date`;
 	}
-	
+
 	# Now run an os_load for each image
 	
 	foreach $imageid (keys %imagenodes) {
@@ -309,7 +311,7 @@ while (1) {
 		$os_load_flags .= " -m $imageid ";
 	    }
 
-	    print "Running '$os_load $os_load_flags $nodelist'\n";
+	    print "Running '$os_load $os_load_flags $nodelist' at ".`date`;
 
 	    if (system("$os_load $os_load_flags $nodelist")) {
 		#
@@ -320,6 +322,7 @@ while (1) {
 		      "Please check the reload daemon log ".
 		      "before restarting!\n");
 	    }
+	    print "os_load done at ".`date`;
 	}
     }
 	
@@ -351,10 +354,9 @@ while (1) {
     # For Frisbee reloads, we don't wait for the node to finish reloading,
     # since the whole point is to let many nodes load at once.
     #
-    #if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
-	print "Not waiting for frisbee reload of $nodes.\n";
-	next;
-    #}
+    print "Not waiting for frisbee reload of $nodes.\n";
+    next;
+
 
 }
 
