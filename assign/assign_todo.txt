@@ -39,12 +39,6 @@ This is the current TODO list for assign (not in order by priority):
    A lot of the 'classes' are just used like structs. They really should have
    proper constructors, etc.
 
-3.   add the 'one interface per LAN' restriction
-
-   For jails/vlinks, we need to be able ensure that only one interface on a
-   node is in a given LAN - this is because you cannot put more than one 
-   interface in the same subnet. Shouldn't be too hard.
-
 4.   clean up top/ptop parsers, change output format
 
    The parsers are currently very sensitive to syntax and ordering errors. The
@@ -57,26 +51,6 @@ This is the current TODO list for assign (not in order by priority):
 5.   add delay node support
 
    Merge back in Chris's delay node support.
-
-10.  add some sort of global allocation strategy
-
-   The idea here is to include other, already mapped, experiments in the top and
-   ptop files, and give assign the option to unmap existing experiments to fit
-   a new one in. The idea is that we'll somehow communicate the idle time and 
-   priority of experiments to assign, so that it can try to do the 'least
-   damage' in decided who to kick out - and, of course, not kick out anyone if
-   not necessary.
-
-   There are two possible ways to do this. The first (and probably easiest) is
-   to use features. Give already-mapped nodes a feature with a weight
-   corresponding to how much we'd like to keep them swapped in. Then, modify
-   assign to only penalize for the feature once - because, as soon as you've
-   deprived an experiment of one node, you might as well swap the whole thing
-   out.
-
-   The second (and possibly more correct) way is to use pclasses - this requires
-   the specification of pclasses in the ptop file, but the 'only penalize once'
-   tactic falls out naturally, since that's how we already do pclasses.
 
 11.  put link mappings into stored solutions
 
@@ -95,4 +69,17 @@ This is the current TODO list for assign (not in order by priority):
    up a mapping for an unassignable vnode. Doesn't seem to hurt anything, so is
    low priority
 
-(next free #:15)
+15.  add a 'move an entire pnode' operation
+
+   It can be very hard to get out of some situations in which a mapping is
+   split across two switches, because doing so involes many transitions which
+   may not improve the score, adn you can get into a 'tug of war' where vnodes
+   get dragged back and forth without any progress being made. To combat this,
+   I'm thinking of adding a new way to generate a new state: Rather than just
+   move one vnode, move all vnodes on one pnode to a pnode in another pclass.
+   We would do this with some random (low) probability. However, there is a
+   fair amount of work to do to get this to work, since there is more
+   bookkeeping necessary to be able to reject the transition.
+
+(next free #:16)
+
