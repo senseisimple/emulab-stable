@@ -105,6 +105,7 @@ REPLACE INTO event_objecttypes VALUES (9,'SLOTHD');
 REPLACE INTO event_objecttypes VALUES (10,'NODE');
 REPLACE INTO event_objecttypes VALUES (11,'SEQUENCE');
 REPLACE INTO event_objecttypes VALUES (12,'TIMELINE');
+REPLACE INTO event_objecttypes VALUES (13,'CONSOLE');
 
 --
 -- Dumping data for table `exported_tables`
@@ -530,7 +531,6 @@ REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_node
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][-\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_name','text','regex','^[-\\w\\. ]+$',4,64,NULL);
-REPLACE INTO table_regex VALUES ('users','wikiname','text','regex','^[A-Z]+[a-z]+[A-Z]+[A-Za-z0-9]*$',4,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\\.]+)\\@([-\\w\\.]+)$',3,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);
@@ -715,6 +715,7 @@ REPLACE INTO table_regex VALUES ('virt_user_environment','value','text','redirec
 REPLACE INTO table_regex VALUES ('virt_programs','dir','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','timeout','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','expected_exit_code','int','redirect','default:tinyint',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','wikiname','text','regex','^[A-Z]+[a-z]+[A-Z]+[A-Za-z0-9]*$',4,64,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
