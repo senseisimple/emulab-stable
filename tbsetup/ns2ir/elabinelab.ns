@@ -6,7 +6,7 @@ set myboss [$ns node]
 set myops  [$ns node]
 
 tb-set-hardware $myboss pc2000
-tb-set-hardware $myops  pc850
+tb-set-hardware $myops  pc2000
 
 tb-set-node-inner-elab-role $myboss boss
 tb-set-node-inner-elab-role $myops  ops
@@ -29,6 +29,7 @@ for {set i 1} {$i <= $maxpcs} {incr i} {
 	append lanstr "[set $name] "
 	tb-set-node-os [set $name] FBSD-STD
 	tb-set-node-inner-elab-role [set $name] node
+        tb-set-hardware [set $name] pc2000
 }
 set publiclan [$ns make-lan $lanstr 100Mb 0ms]
 
