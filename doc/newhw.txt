@@ -14,6 +14,7 @@ ISP110s:
 	Status: Received
 	Responsible: Rob
 	RMAs: 1 returned, replacement recieved
+	To be RMA'ed: pc83 (NMI errors), pc93 (Won't boot, status light flashes)
 
 Network cables:
 	Status: Received
