@@ -516,3 +516,31 @@ last_net_act,last_cpu_act,last_ext_act);
 	    DBQueryFatal("update experiment_stats set rsrcidx=$idx ".
 			 "where exptidx=$exptidx");
 	}
+
+1.144: Add link from testbed_stats to the experiment_resources record
+       that was active at the time of the operation. This makes it
+       possible for showstats.php3 to act like a log file, since we
+       have the info that corresponds at that time (rather than just
+       the most recent). Also a minor bug fix for exitcode, which
+       should not be unsigned.
+       
+        alter table testbed_stats change exitcode exitcode
+		tinyint(3) default '0';
+
+        alter table testbed_stats add rsrcidx 
+		int(10) unsigned NOT NULL default '0' after exptidx;
+
+	my $query_result =
+	    DBQueryFatal("select t.idx,t.exptidx,s.rsrcidx ".
+			 " from testbed_stats as t ".
+			 "left join experiment_stats as s ".
+			 " on s.exptidx=t.exptidx");
+
+	while (($idx,$exptidx,$rsrcidx) = $query_result->fetchrow_array()) {
+	    if (!defined($rsrcidx)) {
+		print STDERR "No rsrcidx for $idx ($exptidx)\n";
+		next;
+	    }
+	    print "update testbed_stats set rsrcidx=$rsrcidx ".
+		  	"where idx=$idx;\n";
+	}			

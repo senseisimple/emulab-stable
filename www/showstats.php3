@@ -151,7 +151,7 @@ $query_result =
     DBQueryFatal("select s.*,t.*,r.*,t.idx as statno,t.tstamp as ttstamp ".
 		 "  from testbed_stats as t ".
 		 "left join experiment_stats as s on s.exptidx=t.exptidx ".
-		 "left join experiment_resources as r on r.idx=s.rsrcidx ".
+		 "left join experiment_resources as r on r.idx=t.rsrcidx ".
 		 "$wclause ".
 		 "order by t.tstamp desc,t.idx desc limit $records");
 

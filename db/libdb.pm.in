@@ -3345,8 +3345,8 @@ sub GatherSwapStats($$$$$;$)
     #
   logit:
     DBQueryWarn("insert into testbed_stats ".
-		"(idx, tstamp, exptidx, action, exitcode) ".
-		"values (0, now(), $exptidx, '$mode', $ecode)");
+		"(idx, tstamp, exptidx, rsrcidx, action, exitcode) ".
+		"values (0, now(), $exptidx, $rsrcidx, '$mode', $ecode)");
 }
 
 #
