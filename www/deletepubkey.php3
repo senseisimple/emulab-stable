@@ -135,7 +135,7 @@ DBQueryFatal("delete from user_pubkeys ".
 #
 # update authkeys files and nodes.
 #
-ADDPUBKEY($uid, "webaddpubkey -w $addpubkeyargs");
+ADDPUBKEY($uid, "webaddpubkey -w $target_uid");
 
 header("Location: showpubkeys.php3?target_uid=$target_uid");
 
