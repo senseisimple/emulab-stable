@@ -25,9 +25,16 @@ if (($UID != 0) && (!TBAdmin())) {
 	die "Only root and admins are allowed to use this script\n";
 }
 
-############################## Get node list
-my $query = "SELECT nodes.node_id, nodes.status, os_info.osfeatures " .
-            "FROM nodes LEFT JOIN os_info ON nodes.def_boot_osid = os_info.osid ";
+#
+# Node list. We only care about local, non virtual nodes.
+# Remote nodes handled below.
+#
+my $query =
+    "select n.node_id, n.status, os_info.osfeatures FROM nodes as n ".
+    "left join node_types as nt on n.type=nt.type ".
+    "left join os_info ON n.def_boot_osid = os_info.osid ".
+    "where nt.isvirtnode=0 and nt.isremotenode=0 and nt.class!='shark'";
+
 my $result = DBQueryFatal($query);
 
 ############################## Determine pingable/unpingable nodes
@@ -85,4 +92,28 @@ foreach (['down', @newlyDown], ['up', @newlyUp],
 			join " OR ", map("node_id='$_'",@nodes);
 		DBQueryFatal($query);
 	}
+}
+
+#
+# Now look at widearea nodes. The idea is simple; any nodes that have
+# not reported in (isalive in tmcd) within the last 90 seconds are moved
+# to the down category. 
+#
+$result =
+    DBQueryFatal("SELECT n.node_id,n.status, ".
+		 "  UNIX_TIMESTAMP(n.status_timestamp) ".
+		 "from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "where nt.isvirtnode=0 and nt.isremotenode=1 and ".
+		 "(UNIX_TIMESTAMP(now()) - ".
+		 " UNIX_TIMESTAMP(n.status_timestamp)) > 90");
+
+while (my ($node, $status, $stamp) = $result->fetchrow_array) {
+    #
+    # Repeat the time check to avoid dropping a node that just came up.
+    # 
+    DBQueryFatal("update nodes set status='down' ".
+		 "where node_id='$node' and ".
+		 "(UNIX_TIMESTAMP(now()) - ".
+		 " UNIX_TIMESTAMP(status_timestamp)) > 90");
 }
