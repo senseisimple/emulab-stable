@@ -72,23 +72,9 @@ elsif ($bossname =~ /^([\w\.]+):(\d+)$/) {
 libtmcc::configtmcc("nossl", 1);
 $ENV{'TMCCNOSSL'} = "1";
 
-#
-# More brutal hackery. We need to establish a route to boss, but DHCP
-# static-routes option is broken! Do it here so that tmcc to outer boss
-# can find it way.
-#
-if (! -e "$ETCDIR/outer_router") {
-    die("*** $0:\n".
-	"    $ETCDIR/outer_router does not exist!\n");
-}
-my $routerip = `cat $ETCDIR/outer_router`;
-chomp($routerip);
-
-system("route add $bossname $routerip");
-if ($?) {
-    die("*** $0:\n".
-	"    Could not establish route to outer boss ($bossname)!\n");
-}
+# Add a timeout since in the firewall case, we will not be able to
+# reach outer boss.
+libtmcc::configtmcc("timeout", 5);
 
 # Protos.
 sub doboot();
@@ -168,34 +154,9 @@ sub doboot()
 	fatal("Error sending TBSETUP to Emulab Control!");
     }
 
-    # Now we get into the real work.
-    print("Checking Testbed reservation status\n");
-    my ($pid, $eid, $vname) = bootsetup();
+    # We do not do anything.
+    sleep(2);
 
-    if (!defined($pid)) {
-	goto isfree;
-    }
-    
-    #
-    # We run just two scripts. This sets up the interfaces for the inner
-    # boss and ops since they will not get it from DHCP, and it is not
-    # possible to hardwire the info in /etc/rc.conf since assign can pick
-    # any node, any interface, etc. 
-    #
-    my @scripts = ("rc.route", "rc.ifconfig");
-    
-    foreach my $script (@scripts) {
-	next
-	    if (!-x "$BINDIR/rc/$script");
-
-	TBDebugTimeStamp("running $BINDIR/rc/$script");
-	system("$BINDIR/rc/$script boot");
-	if ($?) {
-	    fatal("Failed running $BINDIR/rc/$script");
-	}
-    }
-
-  isfree:
     # Now send ISUP
     print("Informing Emulab Control that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
