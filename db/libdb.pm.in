@@ -1040,8 +1040,8 @@ sub MarkNodeDown($)
 
     my $query_result =
 	DBQueryFatal("replace into next_reserve " .
-		     "(node_id, pid, eid, rsrv_time) " .
-		     "values ('$node', '$pid', '$eid', now())");    
+		     "(node_id, pid, eid) " .
+		     "values ('$node', '$pid', '$eid')");    
 
     if ($query_result->num_rows < 1) {
 	DBWarn("WARNING: Could not mark $node down");
@@ -1545,7 +1545,7 @@ sub TBIsNodeRemote($)
     my ($nodeid) = @_;
 
     my $query_result =
-	DBQueryFatal("select class from node_types as t ".
+	DBQueryFatal("select isremotenode from node_types as t ".
 		     "left join nodes as n on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
 
@@ -1554,10 +1554,7 @@ sub TBIsNodeRemote($)
     }
     
     my @row = $query_result->fetchrow_array();
-    if ($row[0] =~ /pcRemote/i) {
-	return 1;
-    }
-    return 0;
+    return($row[0]);
 }
 
 #
