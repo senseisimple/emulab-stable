@@ -204,6 +204,15 @@ CDROM changes (dhcp, signing).
 
 *** Minor:
 
+* Allow users to set default group and default shell via web page and
+  pass out to nodes when creating accounts.
+
+* > Mapping RHL-STD on pc92 to emulab-ops-RHL73-STD.
+  > *** Tarfile /usr/local for node pc96 does not exist!
+
+  Can't we check the validity of these paths during the parse phase
+  and fail a lot sooner?
+
 * Frisbee work. Mike/Rob reported that Frisbee "rocks" up to about
   50-60 nodes, and then goes south in a hurry. I reported a couple of
   optimizations in email that we could apply.
