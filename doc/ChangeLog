@@ -1,3 +1,116 @@
+stoller     2004/01/12 09:18:41 MST
+
+  Modified files:
+    pxe                  GNUmakefile.in bootinfo.c 
+                         bootinfo_cfile.c bootinfo_mysql.c 
+                         bootinfo_null.c bootwhat.h 
+    sql                  database-fill-supplemental.sql 
+    tbsetup              node_control.in node_reboot.in os_load.in 
+                         os_select.in 
+    utils                create_image.in newnode.in node_admin.in 
+    www                  nodecontrol.php3 nodecontrol_form.php3 
+                         showstuff.php3 
+  Added files:
+    pxe                  bootinfo.h bootinfosend.c event-support.c 
+  Log:
+  Death to proxydhcp; one less specialized daemon. DHCP will return the
+  filename to boot, and all local nodes will boot the same pxeboot kernel,
+  which has been extended to allow for jumping directly into a specific MFS
+  (in addition to the usual testbed boot into a partition or multiboot
+  kernel).
+  
+  Bootinfo and the bootwhat protocol extended to tell the client node what
+  MFS to jump into directly, without a reboot. pxe_boot_path and
+  next_pxe_boot_path are now deprecated, with bootinfo used to control which
+  MFS to boot. Nodes now boot a single pxeboot kernel, and bootinfo tells
+  them what to do next.
+  
+  Bootinfo greatly simplifed. temp_boot_osid has been added to allow for
+  temporary booting of different kernels (such as with ndoe_admin or
+  create_image). Unlike next_boot_osid which is a one-shot boot,
+  temp_boot_osid causes the node to boot that OS until told not too.
+  
+  next_boot_path and def_boot_path in the nodes table are now ignored.
+  Bootinfo gets path info strictly from the os_info table entry for the osid
+  given in one of def_boot_osid, temp_boot_osid, or next_boot_osid.  This
+  makes the selection of what to do in bootinfo a lot simpler (and for
+  TBBootWhat in libdb). The os_info table also modified to include an MFS
+  flag so that bootinfo knows to tell the client that the path refers to an
+  MFS and not a multiboot kernel.
+  
+  Change to boot sequence; free nodes no longer boot into the default OSID.
+  Instead, they are told to wait in pxeboot until told what to do, which
+  will typically be when the node is allocated and a specific OSID
+  picked. If the node needs to be reloaded, then the node is told to jump
+  directly into the Frisbee MFS, which saves one complete reboot cycle
+  whether the node has the requested OS installed, or not.  New program
+  added called "bootinfosend" that is used by node_reboot to "wake up" up
+  nodes sitting in pxewait mode, so that they query bootinfo again and boot.
+  
+  node_reboot changed to look at the event state of a node, and use
+  bootinfosend to wake up nodes, rather then power cycle, since pxeboot does
+  not repsond to pings. Retry (if the UDP packet is lost) is handled by
+  stated.
+  
+  Event support added to bootinfo, to replace the event generation that was
+  in proxydhcp. I have not included the caching that Mac had in proxydhcp
+  since it does not appear that bootinfo packets are lost very
+  often. Cleaned up all of the event and DB queury code to use lib/libtb for
+  DB access, and moved all of the event code into a separate file.  The
+  event sequence when a node boots now looks like this:
+  
+  	'SHUTDOWN'    --> 'PXEBOOTING'  (BootInfo)
+  	'PXEBOOTING', --> 'PXEBOOTING'  (BootInfo Retry)
+  	'PXEBOOTING', --> 'BOOTING'     (Node Not Free)
+  	'PXEBOOTING', --> 'PXEWAIT'     (Node is Free)
+  	'PXEWAIT',    --> 'PXEWAKEUP'   (Node Allocated)
+  	'PXEWAKEUP',  --> 'PXEWAKEUP'   (Bootinfo Retry)
+  	'PXEWAKEUP',  --> 'PXEBOOTING'  (Node Woke Up)
+  
+  Change stated to support resending PXEWAKEUP events when node times out.
+  After 3 tries, node is power cycled. Other minor cleanup in stated.
+  
+  Clean up and simplify os_select, while adding support for temp_next_boot
+  and removing all trace of def_boot_path and next_boot_path processing.
+  Remove all pxe_boot_path and next_pxe_boot_path processing.  Changed
+  command line interface to support "clearing" fields. For example,
+  node_admin changed to call os_select like this to have the node
+  temporarily boot the FreeBSD MFS:
+  
+  	os_select -t FREEBSD-MFS pcXXX
+  
+  which sets temp_boot_osid. To turn admin mode off:
+  
+  	os_select -c -t pcXXX
+  
+  which says to clear temp_boot_osid.
+  
+  sql/database-fill-supplemental.sql modifed to add os_info table
+  entries for the FreeBSD, Frisbee, and newnode MFS's.
+  
+  Be sure to change dhcpd config, restart dhcp, kill proxydhcp, restart
+  bootinfo,
+  
+  Revision  Changes    Path
+  1.13      +29 -10    testbed/pxe/GNUmakefile.in
+  1.9       +131 -37   testbed/pxe/bootinfo.c
+  1.6       +9 -18     testbed/pxe/bootinfo_cfile.c
+  1.18      +219 -151  testbed/pxe/bootinfo_mysql.c
+  1.5       +7 -4      testbed/pxe/bootinfo_null.c
+  1.4       +43 -10    testbed/pxe/bootwhat.h
+  1.2       +3 -3      testbed/sql/database-fill-supplemental.sql
+  1.10      +28 -27    testbed/tbsetup/node_control.in
+  1.45      +55 -5     testbed/tbsetup/node_reboot.in
+  1.57      +3 -3      testbed/tbsetup/os_load.in
+  1.16      +186 -200  testbed/tbsetup/os_select.in
+  1.20      +5 -4      testbed/utils/create_image.in
+  1.10      +2 -2      testbed/utils/newnode.in
+  1.6       +6 -13     testbed/utils/node_admin.in
+  1.19      +31 -19    testbed/www/nodecontrol.php3
+  1.25      +44 -21    testbed/www/nodecontrol_form.php3
+  1.123     +13 -16    testbed/www/showstuff.php3
+  1.56      +158 -114  testbed/event/stated/stated.in
+
 stoller     2003/12/18 9:30:36 MST
 	    
   Modified files:
