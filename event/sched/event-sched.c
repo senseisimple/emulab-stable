@@ -319,6 +319,7 @@ get_static_events(event_handle_t handle)
 	char		pideid[BUFSIZ];
 	event_notification_t notification;
 	int		adx = 0;
+	sched_event_t	event;
 
 	/*
 	 * Build up a table of agents that can receive dynamic events.
@@ -381,7 +382,8 @@ get_static_events(event_handle_t handle)
 			 " ex.eventtype=et.idx "
 			 "left join event_objecttypes as ot on "
 			 " ex.objecttype=ot.idx "
-			 "where ex.pid='%s' and ex.eid='%s'",
+			 "where ex.pid='%s' and ex.eid='%s' "
+			 "order by ex.time ASC",
 			 7, pid, eid);
 #define EXIDX	 row[0]
 #define EXTIME	 row[1]
@@ -413,9 +415,15 @@ get_static_events(event_handle_t handle)
 
 	sprintf(pideid, "%s/%s", pid, eid);
 	gettimeofday(&now, NULL);
+
+	info("Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
+
+	/*
+	 * Pad the start time out a bit to give this code a chance to run.
+	 */
+	now.tv_sec += 10;
 	
 	while (nrows) {
-		sched_event_t	event;
 		double		firetime;
 
 		row = mysql_fetch_row(res);
@@ -480,16 +488,15 @@ get_static_events(event_handle_t handle)
 		error("could not allocate notification");
 		return 0;
 	}
-	
-	gettimeofday(&now, NULL);
-	if (! event_notify(handle, notification)) {
-		error("Could not send TIME STARTS notification");
-		return 0;
-	}
-	info("TIME STARTS for %s at: %lu:%d\n",
-	     pideid, now.tv_sec, now.tv_usec);
+	event.notification = notification;
+	event.time.tv_sec  = now.tv_sec;
+	event.time.tv_usec = now.tv_usec;
+	sched_event_enqueue(event);
 
-	event_notification_free(handle, notification);
+	info("TIME STARTS will be sent at: %lu:%d\n", now.tv_sec, now.tv_usec);
+
+	gettimeofday(&now, NULL);
+	info("The time is now: %lu:%d\n", now.tv_sec, now.tv_usec);
 
 	return 1;
 }
