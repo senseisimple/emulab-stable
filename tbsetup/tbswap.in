@@ -184,7 +184,7 @@ if (! $errors) {
 
 	$errors = doSwapin();
 
-	my $retries = 2;
+	my $retries = 0;
 
 	#
 	# Attempt a retry if: 
