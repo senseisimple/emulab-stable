@@ -139,6 +139,7 @@ BEGIN
 	$inplab = 1;
     }
 
+    $role = "";
     # Get our role. 
     if (-e "$BOOTDIR/role") {
 	open(VN, "$BOOTDIR/role");
