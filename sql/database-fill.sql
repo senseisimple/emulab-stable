@@ -206,6 +206,30 @@ REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','MINIMAL','SHUTDOWN','
 REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NETBOOT','SHUTDOWN','');
 REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMAL','REBOOTING','');
 REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','NORMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('PXEFBSD','SHUTDOWN','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','PXEFBSD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','PXEFBSD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','PXEFBSD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','PXEFBSD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','PXEFBSD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','PXEFBSD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NORMALv2','SHUTDOWN','');
 
 --
 -- Dumping data for table `state_timeouts`
@@ -253,6 +277,14 @@ REPLACE INTO state_timeouts VALUES ('PCVM','BOOTING',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('PCVM','SHUTDOWN',0,'');
 REPLACE INTO state_timeouts VALUES ('PCVM','ISUP',0,'');
 REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
+REPLACE INTO state_timeouts VALUES ('PXEFBSD','REBOOTING',120,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('PXEFBSD','REBOOTED',60,'NOTIFY');
+REPLACE INTO state_timeouts VALUES ('PXEFBSD','ISUP',0,'');
+REPLACE INTO state_timeouts VALUES ('NORMALv2','SHUTDOWN',120,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('PXEFBSD','BOOTING',180,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('NORMALv2','BOOTING',180,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('NORMALv2','ISUP',0,'');
+REPLACE INTO state_timeouts VALUES ('NORMALv2','TBSETUP',600,'NOTIFY');
 
 --
 -- Dumping data for table `state_transitions`
@@ -261,6 +293,7 @@ REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
 
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('PXEFBSD','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','TERMINATING','SWAPPED','Error');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','TERMINATING','ENDED','NoError');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','MODIFY_RESWAP','SWAPPING','Nonrecover Error');
@@ -342,7 +375,9 @@ REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','POSTED','ACTIVATING','SwapIn');
+REPLACE INTO state_transitions VALUES ('PXEFBSD','BOOTING','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
+REPLACE INTO state_transitions VALUES ('PXEFBSD','BOOTING','BOOTING','DHCPRetry');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','UNAPPROVED','Verify');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','UNVERIFIED','Approve');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','UNVERIFIED','READY','Verify');
@@ -381,6 +416,17 @@ REPLACE INTO state_transitions VALUES ('EXPTSTATE','SWAPPED','ACTIVATING','SwapI
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','MODIFY_PARSE','MODIFY_RESWAP','NoError');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','ACTIVE','MODIFY_PARSE','Modify');
 REPLACE INTO state_transitions VALUES ('EXPTSTATE','MODIFY_RESWAP','ACTIVE','(No)Error');
+REPLACE INTO state_transitions VALUES ('PXEFBSD','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('PXEFBSD','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','BOOTING','DHCPRetry');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','TBSETUP','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','BOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','SHUTDOWN','Error');
 
 --
 -- Dumping data for table `state_triggers`
@@ -393,6 +439,8 @@ REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADDONE','RESET, RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
 REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('*','PXEFBSD','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('*','NORMALv2','ISUP','RESET');
 
 --
 -- Dumping data for table `table_regex`
@@ -428,11 +476,6 @@ REPLACE INTO table_regex VALUES ('nseconfigs','vname','text','redirect','virt_no
 REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\015]*$',0,65535,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.]+$',2,20,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
-REPLACE INTO table_regex VALUES ('projects','num_members','int','redirect','default:int',0,256,NULL);
-REPLACE INTO table_regex VALUES ('projects','num_pcs','int','redirect','default:int',0,2048,NULL);
-REPLACE INTO table_regex VALUES ('projects','num_pcplab','int','redirect','default:int',0,2048,NULL);
-REPLACE INTO table_regex VALUES ('projects','num_ron','int','redirect','default:int',0,1024,NULL);
-REPLACE INTO table_regex VALUES ('projects','why','text','regex','^[\\040-\\176\\012\\015]*$',0,65535,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][-\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
@@ -525,14 +568,19 @@ REPLACE INTO table_regex VALUES ('virt_vtypes','eid','text','redirect','experime
 REPLACE INTO table_regex VALUES ('virt_vtypes','name','text','regex','^[-\\w]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','weight','float','redirect','default:float',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','members','text','regex','^([-\\w]+ ?)+$',0,1024,NULL);
-REPLACE INTO table_regex VALUES ('default','tinytext','text','regex','^[\\040-\\176]*$',0,256,'Default regex for tiny text fields. Allow any standard ascii character, but no binary data');
-REPLACE INTO table_regex VALUES ('default','text','text','regex','^[\\040-\\176]*$',0,65535,'Default regex for text fields. Allow any standard ascii character, but no binary data');
+REPLACE INTO table_regex VALUES ('default','tinytext','text','regex','^[\\040-\\176]*$',0,256,NULL);
+REPLACE INTO table_regex VALUES ('default','text','text','regex','^[\\040-\\176]*$',0,65535,NULL);
+REPLACE INTO table_regex VALUES ('projects','why','text','regex','^[\\040-\\176\\012\\015]*$',0,4096,NULL);
 REPLACE INTO table_regex VALUES ('default','tinyint','int','regex','^[\\d]+$',-128,127,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','boolean','int','regex','0|1',0,1,'Default regex for tiny int fields that are int booleans. Allow any 0 or 1');
 REPLACE INTO table_regex VALUES ('default','tinyuint','int','regex','^[\\d]+$',0,255,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','int','int','regex','^[\\d]+$',-2147483648,2147483647,'Default regex for int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','float','float','regex','^[\\d\\.]+$',0,0,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','default','text','regex','^[\\040-\\176]*$',0,256,'Default regex if one is not defined for a table/slot. Allow any standard ascii character, but no binary data');
+REPLACE INTO table_regex VALUES ('projects','num_members','int','redirect','default:int',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','num_pcs','int','redirect','default:int',0,2048,NULL);
+REPLACE INTO table_regex VALUES ('projects','num_pcplab','int','redirect','default:int',0,2048,NULL);
+REPLACE INTO table_regex VALUES ('projects','num_ron','int','redirect','default:int',0,1024,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
