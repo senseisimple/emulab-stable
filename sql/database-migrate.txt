@@ -1255,5 +1255,9 @@ last_net_act,last_cpu_act,last_ext_act);
        This is useful when a user changes the vnode resources (such as cpu) 
        for a vnode and then does a swapmod.
 
-         alter table experiments add allowfixnode tinyint(4) \ 
-	       not null default 1;
+	alter table experiments add veth_encapsulate tinyint(4) \
+		NOT NULL default '1' after sim_reswap_count;
+
+        alter table experiments add allowfixnode tinyint(4) \ 
+	       not null default 1 after veth_encapsulate;
+
