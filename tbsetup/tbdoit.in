@@ -77,7 +77,7 @@ my $repfile = "$eid.report";
 #
 # Create a directory structure for the experiment in the project directory.
 #
-if (system("$tbdir/mkexpdir $project $eid") != 0) {
+if (system("$TB/libexec/mkexpdir $project $eid") != 0) {
     print STDOUT "$tbdir/mkexpdir failed\n";
     exit(1);
 }
