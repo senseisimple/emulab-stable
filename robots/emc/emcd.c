@@ -1059,6 +1059,11 @@ int emulab_callback(elvin_io_handler_t handler,
   return retval;
 }
 
+/* we allow a track to be continued if there is a match within 5 cm */
+#define DIST_THRESHOLD 0.05
+/* and if pose difference is less than 45 degress */
+#define POSE_THRESHOLD 0.785
+
 int vmc_callback(elvin_io_handler_t handler,
 		 int fd,
 		 void *rock,
@@ -1076,50 +1081,147 @@ int vmc_callback(elvin_io_handler_t handler,
     switch (mp->opcode) {
     case MTP_UPDATE_POSITION:
       {
-	// store the latest data in teh robot position/status list
-	// in vmc_data
-	int my_id = mp->data.update_position->robot_id;
-	struct mtp_update_position *up = (struct mtp_update_position *)
-	  robot_list_remove_by_id(vmc->position_list, my_id);
-	struct mtp_update_position *up_copy;
-
-	free(up);
-	up = NULL;
-
-	up_copy = (struct mtp_update_position *)
-	  malloc(sizeof(struct mtp_update_position));
-	*up_copy = *(mp->data.update_position);
-	robot_list_append(vmc->position_list, my_id, up_copy);
-
-	info("update for %d %p\n",
-	     my_id,
-	     robot_list_search(vmc_data.position_list, my_id));
-	
-	// also, if status is MTP_POSITION_STATUS_COMPLETE || 
-	// MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
-	// command to vmc from the movement list.
-
-	// later ....
-
-	retval = 1;
+        // store the latest data in teh robot position/status list
+        // in vmc_data
+        int my_id = mp->data.update_position->robot_id;
+        struct mtp_update_position *up = (struct mtp_update_position *)
+          robot_list_remove_by_id(vmc->position_list, my_id);
+        struct mtp_update_position *up_copy;
+        
+        free(up);
+        up = NULL;
+        
+        up_copy = (struct mtp_update_position *)
+          malloc(sizeof(struct mtp_update_position));
+        *up_copy = *(mp->data.update_position);
+        robot_list_append(vmc->position_list, my_id, up_copy);
+        
+        info("update for %d %p\n",
+             my_id,
+             robot_list_search(vmc_data.position_list, my_id));
+        
+        // also, if status is MTP_POSITION_STATUS_COMPLETE || 
+        // MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
+        // command to vmc from the movement list.
+        
+        // later ....
+        
+        retval = 1;
       }
       break;
-      
+    case MTP_REQUEST_ID:
+      {
+        struct mtp_request_id *rid = (struct mtp_request_id *)
+          mp->data.request_id;
+        // we need to search all the positions in the rmc_data.position_list
+        // and find the closest match.  if this match is within the threshold,
+        // we return it immediately.  if not, we search the initial_position
+        // list and return the closest match, whatever it may be...
+        // later we will want to change this to give an operator the chance 
+        // to associate ids with unknown positions themselves, if we can't
+        // do it automatically.
+
+        double best_dist_delta = DIST_THRESHOLD;
+        double best_pose_delta = POSE_THRESHOLD;
+        int robot_id = -1;
+
+        double dx,dy,dtheta,ddist;
+
+        int id = -1;
+        struct position *p;
+        struct robot_list_item *i = rmc_data.position_list->head;
+        while (i != NULL) {
+          p = (struct position *)(i->data);
+          id = i->id;
+          
+          dx = rid->position.x - p->x;
+          dy = rid->position.y - p->y;
+          ddist = sqrt(dx*dx + dy*dy);
+          dtheta = rid->position.theta - p->theta;
+          
+          if (fabsf(ddist) > best_dist_delta) {
+            continue;
+          }
+          
+          if (fabsf(dtheta) > best_pose_delta) {
+            continue;
+          }
+          
+          best_dist_delta = ddist;
+          best_pose_delta = dtheta;
+          robot_id = id;
+        }
+
+        // we really ought to not search teh initial posit list AFTER vmc has
+        // initialized completely (that is, associated IDs for all objects
+        // it found).  I'll hack this in later if there's time.
+
+        if (robot_id == -1) {
+          // need to search the initial posit list -- only this time, we
+          // take the closest match without regard for threshold and pose
+          // -- just distance!
+          id = -1;
+          p = NULL;
+          i = initial_position_list->head;
+          best_dist_delta = 10000000000.0;
+          best_pose_delta = 100000000000.0;
+
+          while (i != NULL) {
+            p = (struct position *)(i->data);
+            id = i->id;
+
+            dx = rid->position.x - p->x;
+            dy = rid->position.y - p->y;
+            ddist = sqrt(dx*dx + dy*dy);
+            dtheta = rid->position.theta - p->theta;
+
+            if (fabsf(ddist) > best_dist_delta) {
+              continue;
+            }
+
+            if (fabsf(dtheta) > best_pose_delta) {
+              continue;
+            }
+
+            best_dist_delta = ddist;
+            best_pose_delta = dtheta;
+            robot_id = id;
+          }
+
+          // now send whatever we got to the caller as we fall through:
+        }
+        
+        // we want to return whichever robot id immediately to the caller:
+        struct mtp_packet *mp;
+        struct mtp_update_id uid;
+        
+        uid.request_id = rid->request_id;
+        uid.robot_id = robot_id;
+        
+        mp = mtp_make_packet(MTP_UPDATE_ID,MTP_ROLE_EMC,&uid);
+        int my_retval = mtp_send_packet(fd,mp);
+        mtp_free_packet(mtp);
+        if (my_retval != MTP_PP_SUCCESS) {
+          fprintf(stdout,"Could not send update_id packet!\n");
+        }
+
+      }
+      break;
     default:
       {
-	struct mtp_packet *wb;
-	struct mtp_control c;
-	
-	error("received bogus opcode from VMC: %d\n", mp->opcode);
-	
-	c.id = -1;
-	c.code = -1;
-	c.msg = "protocol error: bad opcode";
-	wb = mtp_make_packet(MTP_CONTROL_ERROR, MTP_ROLE_EMC, &c);
-	mtp_send_packet(vmc->sock_fd,wb);
-
-	free(wb);
-	wb = NULL;
+        struct mtp_packet *wb;
+        struct mtp_control c;
+        
+        error("received bogus opcode from VMC: %d\n", mp->opcode);
+        
+        c.id = -1;
+        c.code = -1;
+        c.msg = "protocol error: bad opcode";
+        wb = mtp_make_packet(MTP_CONTROL_ERROR, MTP_ROLE_EMC, &c);
+        mtp_send_packet(vmc->sock_fd,wb);
+        
+        free(wb);
+        wb = NULL;
       }
       break;
     }
@@ -1127,12 +1229,12 @@ int vmc_callback(elvin_io_handler_t handler,
   
   mtp_free_packet(mp);
   mp = NULL;
-
+  
   if (!retval) {
     info("dropping vmc connection %d\n", fd);
-
+    
     elvin_sync_remove_io_handler(handler, eerror);
-
+    
     vmc->sock_fd = -1;
     
     close(fd);
