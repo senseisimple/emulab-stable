@@ -1,0 +1,299 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print STDOUT "Usage: rmuser [-p <pid>] uid\n" .
+	"Use the -p option to remove user from a specific project\n";
+    exit(-1);
+}
+my  $optlist = "p:";
+
+#
+# Configure variables
+#
+my $TB      = "@prefix@";
+my $TBOPS   = "@TBOPSEMAIL@";
+my $TBLOGS  = "@TBLOGSEMAIL@";
+my $CONTROL = "@USERNODE@";
+my $BOSSNODE= "@BOSSNODE@";
+
+my $HOMEDIR	= "/users";
+my $SSH		= "$TB/bin/sshtb";
+my $SETGROUPS	= "$TB/sbin/setgroups";
+my $USERDEL	= "/usr/sbin/pw userdel";
+
+my $dbuid;
+my $user;
+my $query_result;
+my $pidmode	= 0;
+my $pid;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Load the Testbed support stuff. 
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
+# Check args.
+#
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"p"})) {
+    $pid     = $options{"p"};
+    $pidmode = 1;
+
+    # untaint;
+    if ($pid =~ /^([-\@\w.]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Tainted argument $pid!\n");
+    }
+}
+if (@ARGV != 1) {
+    usage();
+}
+$user = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($user =~ /^([a-z0-9]+)$/i) {
+    $user = $1;
+}
+else {
+    die("Tainted argument $user!\n");
+}
+
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You are not a valid emulab user!\n");
+}
+
+#
+# Only TB admins are allowed to do this. At some point permit project
+# leaders to delete accounts in their projects, but for now lets not.
+# There are issues of people in multiple projects.
+#
+if (!TBAdmin($UID)) {
+    if (! defined($pid) ||
+	! TBProjAccessCheck($UID, $pid, $pid, TB_PROJECT_DELUSER)) {
+	die("*** $0:\n".
+	    "    You do not have enough permission to remove user $user!\n");
+    }
+}
+
+#
+# Note hardwired control node. 
+# 
+my $control_node = $CONTROL;
+
+#
+# Sanity check. Must not be the head of any experiments (in the project).
+#
+$query_result =
+    DBQueryFatal("select * from experiments ".
+		 "where expt_head_uid='$user' ".
+		 (defined($pid) ? "and pid='$pid'" : ""));
+
+if ($query_result->numrows) {
+    die("*** $0:\n".
+	"    $user is still heading up experiments! Please terminate them.\n");
+}
+
+#
+# Must not be the head of the project being removed from, or any projects
+# if being completely removed.
+#
+if ($pidmode) {
+    if (ProjLeader($pid) eq $user) {
+	die("*** $0:\n".
+	    "    $user is the leader of project $pid!\n");
+    }
+}
+else {
+    $query_result =
+	DBQueryFatal("select pid from projects where head_uid='$user'");
+
+    if ($query_result->numrows) {
+	die("*** $0:\n".
+	    "    $user is still heading up projects! Please fix that.\n");
+    }
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Set the status to frozen if user being removed completely. This
+# prevents possible race conditions since the user is no longer able
+# to access the web interface and tmcd will no longer return account
+# info for the user. In pidmode, just remove the user from the specific
+# project (tmcd will return the new group membership).
+#
+if ($pidmode) {
+    DBQueryFatal("delete from group_membership ".
+		 "where uid='$user' and pid='$pid'");
+}
+else {
+    DBQueryFatal("update users set status='" . TBDB_USERSTATUS_FROZEN . "'" .
+		 "where uid='$user'");
+}
+
+#
+# Now schedule account updates on all the nodes that this person has
+# an account on (remaining project/group membership).
+#
+TBNodeUpdateAccountsByUID($user);
+
+#
+# In pidmode, call setgroups to alter the users membership on boss/ops.
+# Thats all that needs to be done.
+#
+if ($pidmode) {
+    #
+    # Drop root for calling setgroups since its setuid.
+    #
+    $EUID = $UID;
+
+    system("$SETGROUPS $user");
+    exit($? >> 8);
+}
+
+#
+# Not in pidmode. Kill the user's entire group membership.
+# Must be done *after* the account update!
+# 
+DBQueryFatal("delete from group_membership where uid='$user'");
+
+#
+# Then the pubkey tables.
+# 
+DBQueryFatal("delete from user_pubkeys where uid='$user'");
+DBQueryFatal("delete from user_sfskeys where uid='$user'");
+
+#
+# Must do widearea_accounts too!
+#
+DBQueryFatal("delete from widearea_accounts where uid='$user'");
+
+#
+# Then some other pidly tables.
+# 
+DBQueryFatal("delete from lastlogin where uid='$user'");
+DBQueryFatal("delete from login where uid='$user'");
+DBQueryFatal("delete from nodeuidlastlogin where uid='$user'");
+DBQueryFatal("delete from uidnodelastlogin where uid='$user'");
+DBQueryFatal("delete from unixgroup_membership where uid='$user'");
+DBQueryFatal("delete from userslastlogin where uid='$user'");
+
+#
+# Remove user from both local and control node.
+#
+# All this stuff must be done as root (ssh).
+#
+$UID = $EUID;
+
+print "Removing user $user from local node.\n";
+if (system("$USERDEL $user")) {
+    if (($? >> 8) != 67) {
+	fatal("Could not remove user $user from local node.");
+    }
+}
+
+if ($control_node ne $BOSSNODE) {
+    print "Removing user $user from $control_node.\n";
+    if (system("$SSH -host $control_node '$USERDEL $user'")) {
+	if (($? >> 8) != 67) {
+	    fatal("Could not remove user $user from $control_node.");
+	}
+    }
+}
+
+#
+# Rename the users home dir if its there.
+#
+if (-d "$HOMEDIR/$user") {
+    my $newname = "HOMEDIR/$user-" . TBDateTimeFSSafe();
+
+    if (rename("$HOMEDIR/$user", $newname)) {
+	#
+	# Chown the owner/group to root and set the permissions so no
+	# one is allowed to look inside.
+	#
+	if (! chmod(0700, $newname)) {
+	    fatal("Could not chmod directory $newname to 0700: $!");
+	}
+	if (! chown(0, 0, $newname)) {
+	    fatal("Could not chown directory $newname to 0/0: $!");
+	}
+    }
+    else {
+	fatal("Could not rename user directory to $newname: $!");
+    }
+}
+
+#
+# Then the users table. This is the very last step, since if there were
+# any failures above, we can still rerun the script without it barfing.
+# 
+DBQueryFatal("delete from users where uid='$user'");
+
+print "User removal Complete!\n";
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
