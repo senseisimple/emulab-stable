@@ -115,6 +115,13 @@ struct dn_flow_queue {
     int hash_slot ;	/* debugging/diagnostic */
 } ;
 
+#define DN_DIST_CONST_TIME	0x01
+#define DN_DIST_CONST_RATE	0x02
+#define DN_DIST_UNIFORM		0x04
+#define DN_DIST_POISSON		0x08
+#define DN_DIST_TABLE_RANDOM	0x10
+#define DN_DIST_TABLE_DETERM	0x20
+
 /*
  * Pipe descriptor. Contains global parameters, delay-line queue,
  * and the hash array of the per-flow queues.
@@ -129,8 +136,22 @@ struct dn_pipe {			/* a pipe */
 	int	queue_size ;
 	int	queue_size_bytes ;
 	int	delay ;			/* really, ticks	*/
+	int	delaydist;		/* distribution type */
+	int	delaymean;
+	int	delayvar;		/* variance */
+	int    *delaytable;		/* table of possible values */
+	int	delayentries;	/* entries in table */ 
+	int	delaytablepos;	/* current pos in table for deterministic */
 	int	plr ;		/* pkt loss rate (2^31-1 means 100%) */
-
+	int	lossdist;		/* distribution type */
+	int	nextdroptime;	/* time to drop pkt at head of queue */
+	int	lossmean;
+	int	lossvar;
+	int	lossquantum;	/* how frequently to recalc loss rate */
+	int	lossquantum_expire;	/* its expiration date	*/
+	int    *losstable;		/* table of possible values */
+	int	lossentries;	/* entries in table */
+	int	losstablepos;	/* current pos in table for deterministic */
         struct	dn_queue p ;
 	struct ipfw_flow_id flow_mask ;
 	int rq_size ;
