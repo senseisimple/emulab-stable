@@ -13,6 +13,7 @@ $osid_oslist["Linux"]		= 1;
 $osid_oslist["FreeBSD"]		= 1;
 $osid_oslist["NetBSD"]		= 1;
 $osid_oslist["Windows"]		= 1;
+$osid_oslist["TinyOS"]		= 1;
 $osid_oslist["Oskit"]		= 0;
 $osid_oslist["Other"]		= 1;
 
@@ -33,6 +34,7 @@ $osid_opmodes["MINIMAL"]	= 1;
 $osid_opmodes["NORMAL"]		= 1;
 
 define("TBDB_DEFAULT_OSID_OPMODE",	"NORMALv2");
+define("TBDB_MINIMAL_OPMODE",		"MINIMAL");
 
 #
 # Helper function to write out a menu.
