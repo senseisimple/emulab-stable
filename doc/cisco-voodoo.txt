@@ -203,3 +203,7 @@ ID  Name                            Members of VLAN
    and then:
       ifconfig fxp1 down
    when I am done.
+
+10. Good reference for making nodes boot quickly (ensuring that port spanning,
+   trunking, etc. are off on the switch port):
+   http://www.cisco.com/warp/public/473/12.html
