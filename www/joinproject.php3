@@ -12,11 +12,12 @@ $uid = GETLOGIN();
 
 #
 # If a uid came in, then we check to see if the login is valid.
-# If the login is not valid. We require that the user be logged in
-# to start a second project.
+# We require that the user be logged in to start a second project.
 #
 if ($uid) {
-    LOGGEDINORDIE($uid);
+    # Allow unapproved users to join multiple groups ...
+    # Must be verified though.
+    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED);
     $joining_uid = $uid;
     $returning = 1;
 }
@@ -555,25 +556,25 @@ if (! $returning) {
     $key = GENKEY($joining_uid);
 
     TBMAIL("$usr_name '$joining_uid' <$usr_email>",
-	 "Your New User Key",
-	 "\n".
-         "Dear $usr_name ($joining_uid):\n\n".
-         "This is your account verification key: $key\n\n".
-         "Please return to:\n\n".
-	 "         $TBWWW\n\n".
-	 "and log in using the user name and password you gave us when you\n".
-	 "applied. You will then find an option on the menu called\n".
-	 "'New User Verification'. Select this option, and on the page\n".
-	 "enter your key. You will then be verified as a user. When you \n".
-	 "have been both verified and approved by the project leader, you \n".
-	 "will be marked as an active user, and will be granted full access\n".
-	 "to your user account.\n\n".
-         "Thanks,\n".
-         "Testbed Ops\n".
-         "Utah Network Testbed\n",
-         "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_AUDIT\n".
-         "Errors-To: $TBMAIL_WWW");
+      "Your New User Key",
+      "\n".
+      "Dear $usr_name ($joining_uid):\n\n".
+      "This is your account verification key: $key\n\n".
+      "Please use this link to verify your user account:\n".
+      "\n".
+      "    ${TBBASE}/login.php3?vuid=$joining_uid&key=$key\n".
+      "\n".
+      "Once you have verified your account, the project leader will be\n".
+      "able to approve you. You MUST verify your account before the project\n".
+      "leader can approve you. After project approval, you will be\n".
+      "marked as an active user, and will be granted full access to your\n".
+      "user account.\n\n".
+      "Thanks,\n".
+      "Testbed Ops\n".
+      "Utah Network Testbed\n",
+      "From: $TBMAIL_APPROVAL\n".
+      "Bcc: $TBMAIL_AUDIT\n".
+      "Errors-To: $TBMAIL_WWW");
 }
 
 #

@@ -276,9 +276,12 @@ function SHOWGROUPMEMBERS($pid, $gid) {
 # A list of groups for a user.
 #
 function SHOWGROUPMEMBERSHIP($uid) {
+    $none = TBDB_TRUSTSTRING_NONE;
+    
     $query_result =
 	DBQueryFatal("SELECT * FROM group_membership ".
-		     "WHERE uid='$uid' order by pid");
+		     "WHERE uid='$uid' and trust!='$none' ".
+		     "order by pid");
     
     if (! mysql_num_rows($query_result)) {
 	return;

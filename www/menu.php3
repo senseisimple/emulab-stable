@@ -1,18 +1,8 @@
 <?php
 
-$STATUS_NOSTATUS  = 0;
-$STATUS_LOGGEDIN  = 1;
-$STATUS_LOGGEDOUT = 2;
-$STATUS_LOGINFAIL = 3;
-$STATUS_TIMEDOUT  = 4;
-$STATUS_NOLOGINS  = 5;
-$login_status     = $STATUS_NOSTATUS;
-$pswd_expired     = 0;
-$login_message    = "";
-$error_message    = 0;
+$login_status     = CHECKLOGIN_NOTLOGGEDIN;
 $login_uid        = 0;
 $drewheader       = 0;
-$javacode         = file("java.html");
 
 #
 # This has to be set so we can spit out http or https paths properly!
@@ -49,16 +39,13 @@ function WRITESIDEBARBUTTON($text, $base, $link) {
 # sees depends on the login status and the DB status.
 #
 function WRITESIDEBAR() {
-    global $login_status, $login_message, $error_message, $login_uid;
-    global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
-    global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
-    global $TBBASE, $TBDOCBASE, $TBDBNAME, $BASEPATH, $pswd_expired;
+    global $login_status, $login_uid;
+    global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
 
     #
     # The document base cannot be a mix of secure and nonsecure.
-    # 
-
+    #
     echo "<table cellspacing=2 cellpadding=2 border=0 width=150>\n";
 
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
@@ -76,14 +63,14 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Projects Using $THISHOMEBASE", $TBDOCBASE,
 		       "projectlist.php3");
 
-    $freepcs = TBFreePCs();
-
     echo "<tr>
             <td height=30 valign=center align=center nowrap>
              <b><span class=sidebarbutton>
                   Web Interface Options\n";
 
-    if ($login_status == $STATUS_LOGGEDIN) {
+    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+	$freepcs = TBFreePCs();
+	
 	echo "    <br>($freepcs Free PCs)\n";
     }
     echo "      </span>
@@ -91,124 +78,116 @@ function WRITESIDEBAR() {
             </td>
           </tr>\n";
 
-    if ($login_status == $STATUS_NOLOGINS) {
-        WRITESIDEBARBUTTON("Web Interface Temporarily Unavailable",
+    #
+    # Basically, we want to let admin people continue to use
+    # the web interface even when nologins set. But, we want to make
+    # it clear its disabled.
+    # 
+    if (NOLOGINS()) {
+        WRITESIDEBARBUTTON("<font color=red> ".
+			   "Web Interface Temporarily Unavailable</font>",
 			   $TBDOCBASE, "nologins.php3");
 
-	echo "<tr>
-               <td height=30 valign=center align=center nowrap>
-                  <b><span class=sidebarbutton>
-                       Please Try Again Later
-                     </span>
-                  </b>
-               </td>
-              </tr>\n";
+	if (!$login_uid || !ISADMIN($login_uid)) {	
+	    echo "<tr>
+                    <td height=30 valign=center align=center nowrap>
+                    <b><span class=sidebarbutton>
+                         Please Try Again Later
+                       </span>
+                    </b>
+                 </td>
+                </tr>\n";
+	}
     }
-    elseif ($login_status == $STATUS_LOGGEDIN) {
-	$query_result =
-	    DBQueryFatal("SELECT status,admin ".
-			 "FROM users WHERE uid='$login_uid'");
-	$row = mysql_fetch_row($query_result);
-	$status = $row[0];
-	$admin  = $row[1];
-
-        #
-        # See if group_root in any projects, not just the last one in the DB!
-        #
-	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT trust FROM group_membership ".
-		"WHERE uid='$login_uid' and ".
-		"      (trust='group_root' or trust='project_root')");
-	if (mysql_num_rows($query_result)) {
-	    $trusted = 1;
-	}
-	else {
-	    $trusted = 0;
-	}
-
-	if ($status == "active" && $pswd_expired) {
-	    WRITESIDEBARBUTTON("Change your Password",
-			       $TBBASE, "moduserinfo.php3");
-	}
-	elseif ($status == "active") {
-	    WRITESIDEBARBUTTON("My $THISHOMEBASE",
-			       $TBBASE,
-			       "showuser.php3?target_uid=$login_uid");
+    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+	if ($login_status & CHECKLOGIN_ACTIVE) {
+	    if ($login_status & CHECKLOGIN_PSWDEXPIRED) {
+		WRITESIDEBARBUTTON("Change your Password",
+				   $TBBASE, "moduserinfo.php3");
+	    }
+	    else {
+		WRITESIDEBARBUTTON("My $THISHOMEBASE",
+				   $TBBASE,
+				   "showuser.php3?target_uid=$login_uid");
 	    
-	    if ($admin) {
-		WRITESIDEBARBUTTON("New Project Approval",
-				   $TBBASE, "approveproject_list.php3");
-	    }
-	    if ($trusted) {
-                # Only project leaders can do these options
-		WRITESIDEBARBUTTON("New User Approval",
-				   $TBBASE, "approveuser_form.php3");
-	    }
-	    #
-            # Since a user can be a member of more than one project,
-            # display this option, and let the form decide if the user is
-            # allowed to do this.
-	    #
-	    WRITESIDEBARBUTTON("Project Information",
-			       $TBBASE, "showproject_list.php3");
+		if ($login_status & CHECKLOGIN_ISADMIN) {
+		    WRITESIDEBARBUTTON("New Project Approval",
+				       $TBBASE, "approveproject_list.php3");
+		}
+		if ($login_status & CHECKLOGIN_TRUSTED) {
+                    # Only project/group leaders can do these options
+		    WRITESIDEBARBUTTON("New User Approval",
+				       $TBBASE, "approveuser_form.php3");
+		}
+		
+                #
+                # Since a user can be a member of more than one project,
+                # display this option, and let the form decide if the user is
+                # allowed to do this.
+                #
+		WRITESIDEBARBUTTON("Project Information",
+				   $TBBASE, "showproject_list.php3");
 	    
-	    if ($admin) {
-		WRITESIDEBARBUTTON("User List",
-				   $TBBASE, "showuser_list.php3");
-		WRITESIDEBARBUTTON("Node Control",
-				   $TBBASE, "nodecontrol_list.php3");
-	    }
+		if ($login_status & CHECKLOGIN_ISADMIN) {
+		    WRITESIDEBARBUTTON("User List",
+				       $TBBASE, "showuser_list.php3");
+		    WRITESIDEBARBUTTON("Node Control",
+				       $TBBASE, "nodecontrol_list.php3");
+		}
 	    
-	    WRITESIDEBARBUTTON("Begin an Experiment",
-			       $TBBASE, "beginexp.php3");
-	    WRITESIDEBARBUTTON("Experiment Information",
-			       $TBBASE, "showexp_list.php3");
-	    WRITESIDEBARBUTTON("Update user information",
-			       $TBBASE, "moduserinfo.php3");
-	    WRITESIDEBARBUTTON("Node Reservation Status",
-			       $TBBASE, "reserved.php3");
-	    WRITESIDEBARBUTTON("Node Up/Down Status",
-			       $TBDOCBASE, "updown.php3");
-
-	    if (TBCvswebAllowed($login_uid)) {
-		WRITESIDEBARBUTTON("CVS Repository",
-				   $TBBASE, "cvsweb/cvsweb.php3");
+		WRITESIDEBARBUTTON("Begin an Experiment",
+				   $TBBASE, "beginexp.php3");
+		WRITESIDEBARBUTTON("Experiment Information",
+				   $TBBASE, "showexp_list.php3");
+		WRITESIDEBARBUTTON("Update user information",
+				   $TBBASE, "moduserinfo.php3");
+		WRITESIDEBARBUTTON("Node Reservation Status",
+				   $TBBASE, "reserved.php3");
+		WRITESIDEBARBUTTON("Node Up/Down Status",
+				   $TBDOCBASE, "updown.php3");
+		
+		if ($login_status & CHECKLOGIN_CVSWEB) {
+		    WRITESIDEBARBUTTON("CVS Repository",
+				       $TBBASE, "cvsweb/cvsweb.php3");
+		}
 	    }
 	}
-	elseif (($status == "newuser") || ($status == "unverified")) {
+	elseif ($login_status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER)) {
 	    WRITESIDEBARBUTTON("New User Verification",
 			       $TBBASE, "verifyusr_form.php3");
+	    WRITESIDEBARBUTTON("Update user information",
+			       $TBBASE, "moduserinfo.php3");
 	}
-	elseif ($status == "unapproved") {
-	    $error_message = "Your account has not been approved yet. ".
-		             "Please try back later";
+	elseif ($login_status & (CHECKLOGIN_UNAPPROVED)) {
+	    WRITESIDEBARBUTTON("Update user information",
+			       $TBBASE, "moduserinfo.php3");
 	}
     }
     #
     # Standard options for anyone.
     #
-    if ($login_status != $STATUS_NOLOGINS) {
+    if (! NOLOGINS()) {
 	WRITESIDEBARBUTTON("Start Project", $TBBASE, "newproject.php3");
 	WRITESIDEBARBUTTON("Join Project",  $TBBASE, "joinproject.php3");
     }
 
-    switch ($login_status) {
-    case $STATUS_LOGGEDIN:
+    #
+    # Cons up a nice message.
+    # 
+    switch ($login_status & CHECKLOGIN_STATUSMASK) {
+    case CHECKLOGIN_LOGGEDIN:
 	$login_message = "$login_uid Logged In";
-	if ($pswd_expired)
+	    
+	if ($login_status & CHECKLOGIN_PSWDEXPIRED)
 	    $login_message = "$login_message<br>(Password Expired!)";
+	elseif ($login_status & CHECKLOGIN_UNAPPROVED)
+	    $login_message = "$login_message<br>(Unapproved!)";
 	break;
-    case $STATUS_LOGGEDOUT:
-	$login_message = "Logged Out";
-	break;
-    case $STATUS_LOGINFAIL:
-	$login_message = "Login Failed";
-	break;
-    case $STATUS_TIMEDOUT:
+    case CHECKLOGIN_TIMEDOUT:
 	$login_message = "Login Timed Out";
 	break;
-    case $STATUS_NOLOGINS:
-	$login_message = "Please Try Again Later";
+    default:
+	$login_message = 0;
 	break;
     }
 
@@ -219,7 +198,7 @@ function WRITESIDEBAR() {
     # http or https, since we do not want to mix them, since they
     # cause warnings.
     # 
-    if ($login_status == $STATUS_LOGGEDIN) {
+    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
 	echo "<tr>
                <td align=center height=50 valign=center>
                 <a href=\"$TBBASE/logout.php3?uid=$login_uid\">
@@ -228,7 +207,7 @@ function WRITESIDEBAR() {
                </td>
               </tr>\n";
     }
-    else {
+    elseif (!NOLOGINS()) {
 	echo "<tr>
                <td align=center height=50 valign=center>
                 <a href=\"$TBBASE/login.php3\">
@@ -249,13 +228,12 @@ function WRITESIDEBAR() {
                 </td>
               </tr>\n";
     }
+
     #
     # MOTD. Set this with the webcontrol script.
     #
-    # The blinking is for Mike, who says he really likes it. 
-    #
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT message FROM loginmessage");
+    $query_result =
+	DBQueryFatal("SELECT message FROM loginmessage");
     
     if (mysql_num_rows($query_result)) {
     	$row = mysql_fetch_row($query_result);
@@ -286,12 +264,6 @@ function WRITEBANNER($title) {
 
     echo "<!-- This is the page Banner -->\n";
 
-#    echo "
-#                <a href='$BASEPATH/pix/merge-med.jpg'>
-#                   <img src='$BASEPATH/pix/merge-mini.jpg'
-#                        border=2 align=right></a>
-#            \n";
-    
     echo "<table cellpadding=0 cellspacing=0 border=0 width=50%>";
     echo "<tr>
             <td align=left valign=top width=\"0%\">
@@ -351,14 +323,8 @@ function WRITETITLE($title) {
 # Spit out a vanilla page header.
 #
 function PAGEHEADER($title) {
-    global $login_status, $TBAUTHTIMEOUT, $login_uid;
-    global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
-    global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
-    global $TBBASE, $TBDOCBASE, $TBDBNAME;
-    global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
-    global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
-    global $CHECKLOGIN_PSWDEXPIRED, $THISHOMEBASE
-    global $BASEPATH, $SSL_PROTOCOL, $javacode, $drewheader, $pswd_expired;
+    global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
+    global $BASEPATH, $SSL_PROTOCOL, $drewheader;
     global $TBMAINSITE;
 
     $drewheader = 1;
@@ -386,46 +352,23 @@ function PAGEHEADER($title) {
         #
         # Check to make sure the UID is logged in (not timed out).
         #
-        $status = CHECKLOGIN($known_uid);
-	switch ($status) {
-	case $CHECKLOGIN_NOTLOGGEDIN:
-	    $login_status = $STATUS_NOSTATUS;
-	    $login_uid    = 0;
-	    break;
-	case $CHECKLOGIN_PSWDEXPIRED:
-	    $pswd_expired = 1;
-	case $CHECKLOGIN_LOGGEDIN:
-	case $CHECKLOGIN_MAYBEVALID:
-	    $login_status = $STATUS_LOGGEDIN;
-	    $login_uid    = $known_uid;
-	    break;
-	case $CHECKLOGIN_TIMEDOUT:
-	    $login_status = $STATUS_TIMEDOUT;
-	    $login_uid    = 0;
-	    break;
+        $login_status = CHECKLOGIN($known_uid);
+	if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+	    $login_uid = $known_uid;
 	}
     }
 
     #
-    # Check for NOLOGINS. This is complicated by the fact that we
-    # want to allow admin types to continue using the web interface,
+    # Check for NOLOGINS. 
+    # We want to allow admin types to continue using the web interface,
     # and logout anyone else that is currently logged in!
     #
-    if ($login_status == $STATUS_LOGGEDIN && NOLOGINS()) {
-	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT admin FROM users WHERE uid='$login_uid'");
-	$row = mysql_fetch_row($query_result);
-	$admin  = $row[0];
-
-	if (!$admin) {
-	    DOLOGOUT($login_uid);
-	    $login_status = $STATUS_NOLOGINS;
-	}
+    if (NOLOGINS() && $login_uid && !ISADMIN($login_uid)) {
+	DOLOGOUT($login_uid);
+	$login_status = CHECKLOGIN_NOTLOGGEDIN;
+	$login_uid    = 0;
     }
-    elseif (NOLOGINS()) {
-	$login_status = $STATUS_NOLOGINS;
-    }
-
+    
     header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
     
     if (1) {
@@ -441,54 +384,16 @@ function PAGEHEADER($title) {
           <head>
            <title>$THISHOMEBASE - $title</title>\n";
 
-    $timeo  = ($TBAUTHTIMEOUT + 120) * 1000;
-
-    #
-    # If logged in, initialize the refresh process.
-    # 
-    if ($login_status == $STATUS_LOGGEDIN) {
-	echo "<noscript>
-                <META HTTP-EQUIV=\"refresh\" CONTENT=\"$timeo\">
-              </noscript>\n";
-	echo "<script language=\"JavaScript\">
-                <!--
-                  var sURL  = \"$TBDOCBASE/index.php3\";
-
-                  function doLoad(timeo) {
-                    setTimeout(\"refresh()\", timeo );
-                  }
-                //-->
-              </script>\n";
-        #
-        # Shove the rest of the Java code through to the output. 
-        #
-	for ($i = 0; $i < count($javacode); $i++) {
-	    echo "$javacode[$i]";
-	}
-    }
-
     if ($TBMAINSITE) {
 	echo "  <meta NAME=\"keywords\"
                       CONTENT=\"network, emulation, internet, emulator\">
                 <meta NAME=\"ROBOTS\" CONTENT=\"NOARCHIVE\">\n";
     }
     
-#    echo " <meta HTTP-EQUIV=\"Cache-Control\"
-#                 CONTENT=\"post-check=30,pre-check=60\">\n";
-
     echo " <link rel=\"stylesheet\" href=\"$BASEPATH/tbstyle.css\"
                  type=\"text/css\">
           </head>\n";
-
-    #
-    # If logged in, start the refresh process.
-    # 
-    if ($login_status == $STATUS_LOGGEDIN) {
-	echo "<body onload='doLoad($timeo)'>\n";
-    }
-    else {
-	echo "<body>\n";
-    }
+    echo "<body>\n";
 
     WRITEBANNER($title);
     WRITETITLE($title);
@@ -501,7 +406,7 @@ function PAGEHEADER($title) {
 
            <!-- MENU -->
            <td valign=top>\n";
-    
+
     WRITESIDEBAR();
 
     echo " </td>

@@ -20,12 +20,12 @@
 require("defs.php3");
 
 if (($uid = GETUID())) {
-    $check_status = CHECKLOGIN($uid);
+    $check_status = CHECKLOGIN($uid) & CHECKLOGIN_STATUSMASK;
 
-    if ($check_status == $CHECKLOGIN_LOGGEDIN) {
+    if ($check_status == CHECKLOGIN_LOGGEDIN) {
 	$LOC = "$TBBASE/showuser.php3?target_uid=$uid";
     }
-    elseif ($check_status == $CHECKLOGIN_MAYBEVALID) {
+    elseif ($check_status == CHECKLOGIN_MAYBEVALID) {
 	$LOC = "$TBBASE/start.php3";
     }
     elseif (isset($SSL_PROTOCOL)) {

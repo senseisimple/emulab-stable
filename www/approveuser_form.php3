@@ -118,7 +118,9 @@ $query_result =
 		 "LEFT JOIN group_membership as authed ".
 		 "ON g.pid=authed.pid and g.gid=authed.gid and ".
 		 "   g.uid!='$auth_usr' and g.trust='none' ".
-		 "WHERE authed.uid='$auth_usr' and ".
+		 "left join users as u on u.uid=g.uid ".
+		 "WHERE u.status='" . TBDB_USERSTATUS_UNAPPROVED . "' and ".
+		 "      authed.uid='$auth_usr' and ".
 		 "      (authed.trust='group_root' or ".
 		 "       authed.trust='project_root') ".
 		 "ORDER BY g.uid,g.pid,g.gid");

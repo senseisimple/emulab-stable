@@ -6,7 +6,7 @@ include("showstuff.php3");
 # Only known and logged in users can do this.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED);
 
 $isadmin = ISADMIN($uid);
 
@@ -116,7 +116,9 @@ $query_result =
     DBQueryFatal("select distinct g.pid,g.trust,p.name ".
 		 " from group_membership as g ".
 		 "left join projects as p on p.pid=g.pid ".
-		 "where uid='$target_uid' and g.pid=g.gid order by pid");
+		 "where uid='$target_uid' and g.pid=g.gid and ".
+		 "trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
+		 "order by pid");
 
 if (mysql_num_rows($query_result)) {
     echo "<center>
@@ -168,7 +170,7 @@ if ($isadmin ||
     TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
 
     echo "<br><br><center>
-           <A href='modusr_form.php3?target_uid=$target_uid'>
+           <A href='moduserinfo.php3?target_uid=$target_uid'>
               Edit Profile?</a>
          </center>\n";
 }

@@ -5,10 +5,28 @@
 require("defs.php3");
 
 #
+# These two for verification.
+# 
+if (!isset($key) || !strcmp($key, "")) {
+    $key = 0;
+}
+if (!isset($vuid) || !strcmp($vuid, "")) {
+    $vuid = 0;
+}
+
+#
 # Must not be logged in already!
 # 
 if (($known_uid = GETUID()) != FALSE) {
-    if (CHECKLOGIN($known_uid) == $CHECKLOGIN_LOGGEDIN) {
+    if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
+	#
+	# If doing a verification, zap to that page.
+	#
+	if ($key && (!$vuid || !strcmp($vuid, $known_uid))) {
+	    header("Location: $TBBASE/verifyusr.php3?key=$key");
+	    return;
+	}
+
 	PAGEHEADER("Login");
 
 	echo "<h3>
@@ -24,7 +42,7 @@ if (($known_uid = GETUID()) != FALSE) {
 #
 # Spit out the form.
 # 
-function SPITFORM($uid, $failed)
+function SPITFORM($uid, $key, $failed)
 {
     global $TBDB_UIDLEN, $TBBASE;
     
@@ -45,8 +63,12 @@ function SPITFORM($uid, $failed)
           </font>
           </center>\n";
 
+    $keyarg = "";
+    if ($key)
+	$keyarg = "?key=$key";
+
     echo "<table align=center border=1>
-          <form action='${TBBASE}/login.php3' method=post>
+          <form action='${TBBASE}/login.php3${keyarg}' method=post>
           <tr>
               <td>Username:</td>
               <td><input type=text
@@ -70,17 +92,39 @@ function SPITFORM($uid, $failed)
 }
 
 #
+# Do not bother if NOLOGINS!
+#
+if (NOLOGINS()) {
+    PAGEHEADER("Login");
+	    
+    echo "<center>
+          <font size=+1 color=red>
+	   Logins are temporarily disabled. Please try again later.
+          </font>
+          </center><br>\n";
+
+    PAGEFOOTER();
+    die("");
+}
+
+#
 # If not clicked, then put up a form.
 #
 if (! isset($login)) {
-    SPITFORM($known_uid, 0);
+    if ($vuid)
+	$known_uid = $vuid;
+    SPITFORM($known_uid, $key, 0);
     PAGEFOOTER();
     return;
 }
 
 #
 # Login clicked.
-# 
+#
+$STATUS_LOGGEDIN  = 1;
+$STATUS_LOGINFAIL = 2;
+$login_status     = 0;
+
 if (!isset($uid) ||
     strcmp($uid, "") == 0) {
     $login_status = $STATUS_LOGINFAIL;
@@ -98,15 +142,23 @@ else {
 # Failed, then try again with an error message.
 # 
 if ($login_status == $STATUS_LOGINFAIL) {
-    SPITFORM($uid, 1);
+    SPITFORM($uid, $key, 1);
     PAGEFOOTER();
     return;
 }
 
-#
-# Zap back to front page in secure mode.
-# 
-header("Location: $TBBASE/");
+if ($key) {
+    #
+    # If doing a verification, zap to that page.
+    #
+    header("Location: $TBBASE/verifyusr.php3?key=$key");
+}
+else {
+    #
+    # Zap back to front page in secure mode.
+    # 
+    header("Location: $TBBASE/");
+}
 return;
 
 ?>

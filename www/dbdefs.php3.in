@@ -28,11 +28,11 @@ $TBDB_IMAGEID_IMAGENAMELEN = 30;
 #
 # User status field.
 #
-$TBDB_USERSTATUS_ACTIVE		= "active";
-$TBDB_USERSTATUS_NEWUSER	= "newuser";
-$TBDB_USERSTATUS_UNAPPROVED	= "unapproved";
-$TBDB_USERSTATUS_UNVERIFIED	= "unverified";
-$TBDB_USERSTATUS_FROZEN		= "frozen";
+define("TBDB_USERSTATUS_ACTIVE",	"active");
+define("TBDB_USERSTATUS_NEWUSER",	"newuser");
+define("TBDB_USERSTATUS_UNAPPROVED",	"unapproved");
+define("TBDB_USERSTATUS_UNVERIFIED",	"unverified");
+define("TBDB_USERSTATUS_FROZEN",	"frozen");
 
 #
 # Trust. Define the trust level as an increasing value. Then define a
@@ -44,6 +44,15 @@ $TBDB_TRUST_LOCALROOT		= 2;
 $TBDB_TRUST_GROUPROOT		= 3;
 $TBDB_TRUST_PROJROOT		= 4;
 $TBDB_TRUST_ADMIN		= 5;
+
+#
+# Text strings in the DB for above.
+# 
+define("TBDB_TRUSTSTRING_NONE",		"none");
+define("TBDB_TRUSTSTRING_USER",		"user");
+define("TBDB_TRUSTSTRING_LOCALROOT",	"local_root");
+define("TBDB_TRUSTSTRING_GROUPROOT",	"group_root");
+define("TBDB_TRUSTSTRING_PROJROOT",	"project_root");
 
 #
 # These are the permission types. Different operations for the varying
