@@ -22,6 +22,7 @@
 	oslist <what> - Lists from the DB.  <what> can be "" which indicates
 		to list base images or it can be an image id which will
 		mean it should list the deltas available for that image.
+	oslist -v <what> - Like above but with file info.
 
 General usage:
 
