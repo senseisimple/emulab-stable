@@ -19,7 +19,8 @@ if ($OSTYPE == "FreeBSD") then
 	ln -s liblocsetup-freebsd.pm liblocsetup.pm
 	rm -f /usr/local/etc/rc.d/testbed.sh
 	rm -f /usr/local/etc/rc.d/emulab.sh
-	cp -f rc.testbed /usr/local/etc/rc.d/emulab.sh
+	rm -f /usr/local/etc/rc.d/Z.emulab.sh
+	cp -f rc.testbed /usr/local/etc/rc.d/Z.emulab.sh
 else
 	ln -s liblocsetup-linux.pm liblocsetup.pm
 	rm -f /etc/init.d/emulab
