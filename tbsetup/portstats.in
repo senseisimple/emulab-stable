@@ -22,14 +22,23 @@ use Getopt::Long;
 use strict;
 
 sub usage {
-    print "Usage: $0 [-h] <pid> <eid> [vname ...] [vname:port ...]\n\n";
-    print "If only pid and eid are given, prints out information about all\n";
-    print "ports in the experiment. Otherwise, output is limited to the\n";
-    print "nodes and/or ports given.\n";
-    print "\n";
-    print "-h    This message\n";
-    print "-e    Show only error counters\n";
-    print "-a    Show all stats\n";
+    print << "END";
+Usage: $0 [-h] <pid> <eid> [vname ...] [vname:port ...]
+-h    This message
+-e    Show only error counters
+-a    Show all stats
+
+If only pid and eid are given, prints out information about all ports in the
+experiment. Otherwise, output is limited to the nodes and/or ports given.
+
+NOTE: Statistics are reported from the switch's perspective. This means that
+'In' packets are those sent FROM the node, and 'Out' packets are those
+sent TO the node.
+
+In the output, packets described as 'NUnicast' or 'NUcast' are non-unicast
+(broadcast or multicast) packets.
+END
+
     return 1;
 }
 
