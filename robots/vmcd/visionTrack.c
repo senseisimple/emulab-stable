@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 #include "config.h"
 
@@ -26,6 +31,7 @@ static float curvy(float x)
  * will continue the search until it reaches the end of the list.
  * @param distance_out Reference to a float where the minimum distance found
  * should be stored.
+ * @return The closest track found to the given track.
  */
 static struct vision_track *vtFindMin(struct vision_track *vt,
 				      struct vision_track *curr,
@@ -46,14 +52,6 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
 
 	distance = hypotf(vt->vt_position.x - curr->vt_position.x,
 			  vt->vt_position.y - curr->vt_position.y);
-#if 0
-	printf("  min %f %f - %f %f = %f\n",
-	       vt->vt_position.x,
-	       vt->vt_position.y,
-	       curr->vt_position.x,
-	       curr->vt_position.y,
-	       distance);
-#endif
 	if (distance < *distance_out) {
 	    retval = curr;
 	    *distance_out = distance;
@@ -61,31 +59,85 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
 	
 	curr = (struct vision_track *)curr->vt_link.ln_Succ;
     }
+
+    assert((retval == NULL) || (*distance_out != FLT_MAX));
     
     return retval;
 }
 
+/**
+ * Extract tracks from a frame that are near the given track.
+ *
+ * @param list_out The list of tracks found to be within the distance
+ * tolerance.
+ * @param vt The track to compare other tracks against.
+ * @param curr The track in a list where the search should start.  The function
+ * will continue the search until it reaches the end of the list.
+ * @param tolerance The maximum distance that other tracks have to be within
+ * before they are considered "near."
+ * @return The number of tracks in "list_out."
+ */
+static int vtExtractNear(struct lnMinList *list_out,
+			 struct vision_track *vt,
+			 struct vision_track *curr,
+			 float tolerance)
+{
+    int retval = 0;
+    
+    assert(list_out != NULL);
+    assert(vt != NULL);
+    assert(tolerance > 0.0);
+
+    if (curr == NULL)
+	return retval;
+
+    while (curr->vt_link.ln_Succ != NULL) {
+	struct vision_track *vt_next;
+	float distance;
+	
+	vt_next = (struct vision_track *)curr->vt_link.ln_Succ;
+
+	distance = hypotf(vt->vt_position.x - curr->vt_position.x,
+			  vt->vt_position.y - curr->vt_position.y);
+	if (distance <= tolerance) {
+	    lnRemove(&curr->vt_link);
+	    lnAddTail(list_out, &curr->vt_link);
+	    retval += 1;
+	}
+	
+	curr = vt_next;
+    }
+
+    assert(lnEmptyList(list_out) || (retval > 0));
+
+    return retval;
+}
+
+/**
+ * Scan a frame for the next set of tracks that are in a different camera.
+ *
+ * @param vt The track in a list where the search should start.
+ * @return The first vision track in the remainder of the list that was
+ * detected by a different camera than the given track or NULL if there are no
+ * more tracks in different cameras.
+ */
 static struct vision_track *vtNextCamera(struct vision_track *vt)
 {
     struct vision_track *retval = NULL;
     struct vmc_client *vc;
 
+    assert(vt != NULL);
+
     vc = vt->vt_client;
-    while (vt->vt_link.ln_Succ != NULL && vt->vt_client == vc) {
+    while ((vt->vt_link.ln_Succ != NULL) && (vt->vt_client == vc)) {
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;
     }
 
-    if (vt->vt_link.ln_Succ != NULL) {
+    if (vt->vt_link.ln_Succ != NULL)
 	retval = vt;
-    }
 
     return retval;
 }
-
-#ifdef RECORD_FRAMES
-static FILE *xdat_file, *ydat_file, *tdat_file;
-static unsigned int frame_count;
-#endif
 
 int vtUpdate(struct lnMinList *now,
 	     struct vmc_client *vc,
@@ -97,21 +149,8 @@ int vtUpdate(struct lnMinList *now,
     assert(now != NULL);
     assert(mp != NULL);
 
-#ifdef RECORD_FRAMES
-    if (xdat_file == NULL) {
-	xdat_file = fopen("xframes.dat", "w");
-	ydat_file = fopen("yframes.dat", "w");
-	tdat_file = fopen("tframes.dat", "w");
-    }
-#endif
-
     switch (mp->data.opcode) {
     case MTP_CONTROL_ERROR:
-#if 0
-	fprintf(dat_file,
-		"# vc %d -- empty\n",
-		vc->vc_port);
-#endif
 	retval = 1;
 	break;
     case MTP_UPDATE_POSITION:
@@ -129,7 +168,6 @@ int vtUpdate(struct lnMinList *now,
 	    vt->vt_userdata = NULL;
 	    lnAddTail(now, &vt->vt_link);
 
-#if 1
 	    /* Adjust the cameras viewable area based on this track. */
 	    if (mup->position.x < vc->vc_left)
 		vc->vc_left = mup->position.x;
@@ -139,15 +177,7 @@ int vtUpdate(struct lnMinList *now,
 		vc->vc_top = mup->position.y;
 	    if (mup->position.y > vc->vc_bottom)
 		vc->vc_bottom = mup->position.y;
-#endif
 
-#if 0
-	    fprintf(dat_file,
-		    "# vc %d -- %.2f %.2f\n",
-		    vc->vc_port,
-		    mup->position.x,
-		    mup->position.y);
-#endif
 	    retval = (mup->status == MTP_POSITION_STATUS_CYCLE_COMPLETE);
 	}
 	break;
@@ -169,13 +199,13 @@ void vtAgeTracks(struct lnMinList *now,
     assert(old != NULL);
 
     while ((vt = (struct vision_track *)lnRemHead(old)) != NULL) {
-	if (vt->vt_age < 5) {
+	if (vt->vt_age < MAX_TRACK_AGE) {
 	    float distance;
 	    
 	    if ((vtFindMin(vt,
 			   (struct vision_track *)now->lh_Head,
 			   &distance) == NULL) ||
-		(distance > 0.02)) {
+		(distance > MERGE_TOLERANCE)) {
 		vt->vt_age += 1;
 		lnAddHead(now, &vt->vt_link);
 		vt = NULL;
@@ -219,12 +249,6 @@ void vtCoalesce(struct lnMinList *extra,
     assert(vc != NULL);
     assert(vc_len > 0);
 
-    // fprintf(dat_file, "# coalesce -- %d\n", lnEmptyList(now));
-
-#ifdef RECORD_FRAMES
-    frame_count += 1;
-#endif
-    
     vt = (struct vision_track *)now->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
 	int in_camera_count = 0, lpc;
@@ -234,15 +258,6 @@ void vtCoalesce(struct lnMinList *extra,
 	 * can coalesce them.
 	 */
 	for (lpc = 0; lpc < vc_len; lpc++) {
-#if 0
-	    printf("vc2 %f %f -- %f %f %f %f\n",
-		   vt->vt_position.x,
-		   vt->vt_position.y,
-		   vc[lpc].vc_left,
-		   vc[lpc].vc_right,
-		   vc[lpc].vc_top,
-		   vc[lpc].vc_bottom);
-#endif
 	    if ((vt->vt_position.x >= vc[lpc].vc_left) &&
 		(vt->vt_position.x <= vc[lpc].vc_right) &&
 		(vt->vt_position.y >= vc[lpc].vc_top) &&
@@ -276,160 +291,44 @@ void vtCoalesce(struct lnMinList *extra,
 	 */
 
 	if (in_camera_count > 1) {
-	    struct vision_track *vt_extra;
-	    float distance;
-
-	    while ((in_camera_count > 1) &&
-		   ((vt_extra = vtFindMin(vt,
-					  (struct vision_track *)
-					  vtNextCamera(vt),
-					  &distance)) != NULL) &&
-		   (distance < 0.35)) {
-		float curcam_dx, nextcam_dx, overlap, curweight, nextweight;
-		struct robot_position rp;
+	    struct lnMinList near;
+	    int rc;
+	    
+	    lnNewList(&near);
+	    if ((rc = vtExtractNear(&near,
+				    vt,
+				    vtNextCamera(vt),
+				    COALESCE_TOLERANCE)) > 0) {
+		struct robot_position rp = vt->vt_position;
+		struct vision_track *vt_near;
 		
-		if (debug > 1) {
-		    info("coalesce %.2f %.2f %.2f %d -- %.2f %.2f %.2f %d\n",
-			 vt->vt_position.x, vt->vt_position.y,
-			 vt->vt_position.theta, vt->vt_client->vc_port,
-			 vt_extra->vt_position.x, vt_extra->vt_position.y,
-			 vt->vt_position.theta, vt_extra->vt_client->vc_port);
+		if (debug > 2) {
+		    printf("start %.2f %.2f\n", vt->vt_position.x,
+			   vt->vt_position.y);
 		}
+		vt_near = (struct vision_track *)near.lh_Head;
+		while (vt_near->vt_link.ln_Succ != NULL) {
+		    if (debug > 2) {
+			printf("merge %.2f %.2f\n", vt_near->vt_position.x,
+			       vt_near->vt_position.y);
+		    }
+		    rp.x += vt_near->vt_position.x;
+		    rp.y += vt_near->vt_position.y;
+		    // rp.theta += vt_near->vt_position.theta;
+		    vt->vt_age = min(vt->vt_age, vt_near->vt_age);
+		    
+		    vt_near = (struct vision_track *)vt_near->vt_link.ln_Succ;
+		}
+		lnAppendList(extra, &near);
 
-		//midpoint = (vt->vt_client->vc_right + 
-		//    vt_extra->vt_client->vc_left) / 2.0f;
-
-		//curcam_dx = midpoint - vt->vt_position.x;
-		//nextcam_dx = vt_extra->vt_position.x - midpoint;
-
-		overlap = vt->vt_client->vc_right -
-		    vt_extra->vt_client->vc_left;
-		curcam_dx = vt->vt_client->vc_right - vt->vt_position.x;
-		nextcam_dx = vt_extra->vt_position.x - 
-		    vt_extra->vt_client->vc_left;
-
-		curweight = curvy(1.0 - curcam_dx / overlap);
-		nextweight = curvy(1.0 - nextcam_dx / overlap);
-
-#if 0
-		info("  cwt %.2f / %.2f -> %.2f ~ %.2f  --  %d\n",
-		     curcam_dx, overlap, curcam_dx / overlap, curweight,
-		     vt->vt_client->vc_port);
-		info("  nwt %.2f / %.2f -> %.2f ~ %.2f  --  %d\n",
-		     nextcam_dx, overlap, nextcam_dx / overlap, nextweight,
-		     vt_extra->vt_client->vc_port);
-#endif
-		
-		rp = vt->vt_position;
-		rp.x = ((curweight * vt->vt_position.x) +
-			(nextweight * vt_extra->vt_position.x)) /
-		    (curweight + nextweight);
-		rp.y = ((curweight * vt->vt_position.y) +
-			(nextweight * vt_extra->vt_position.y)) /
-		    (curweight + nextweight);
-		rp.theta = ((curweight * vt->vt_position.theta) +
-			    (nextweight * vt_extra->vt_position.theta)) /
-		    (curweight + nextweight);
-
-#if 0
-		info("  wa %.2f %.2f -> %.2f  --  %.2f %.2f -> %.2f\n",
-		     vt->vt_position.x,
-		     vt_extra->vt_position.x,
-		     rp.x,
-		     vt->vt_position.y,
-		     vt_extra->vt_position.y,
-		     rp.y);
-#endif
-
-		
-#ifdef RECORD_FRAMES
-		fprintf(xdat_file,
-			"%d %.2f %.2f # coalesce  --  %.2f %.2f -- %d %d\n",
-			frame_count,
-			rp.x,
-			(nextcam_dx > curcam_dx) ?
-			vt_extra->vt_position.x : vt->vt_position.x,
-			vt->vt_position.x,
-			vt_extra->vt_position.x,
-			vt->vt_client->vc_port,
-			vt_extra->vt_client->vc_port);
-		
-		fprintf(ydat_file,
-			"%d %.2f %.2f # coalesce  --  %.2f %.2f -- %d %d\n",
-			frame_count,
-			rp.y,
-			(nextcam_dx > curcam_dx) ?
-			vt_extra->vt_position.y : vt->vt_position.y,
-			vt->vt_position.y,
-			vt_extra->vt_position.y,
-			vt->vt_client->vc_port,
-			vt_extra->vt_client->vc_port);
-		
-		fprintf(tdat_file,
-			"%d %.2f %.2f # coalesce  --  %.2f %.2f -- %d %d\n",
-			frame_count,
-			rp.theta,
-			(nextcam_dx > curcam_dx) ?
-			vt_extra->vt_position.theta : vt->vt_position.theta,
-			vt->vt_position.theta,
-			vt_extra->vt_position.theta,
-			vt->vt_client->vc_port,
-			vt_extra->vt_client->vc_port);
-#endif
-		
+		rp.x /= rc + 1;
+		rp.y /= rc + 1;
+		if (debug > 2) {
+		    printf("final %.2f %.2f\n", rp.x, rp.y);
+		}
+		// rp.theta /= rc;
 		vt->vt_position = rp;
-		vt->vt_age = min(vt->vt_age, vt_extra->vt_age);
-		
-		lnRemove(&vt_extra->vt_link);
-		lnAddHead(extra, &vt_extra->vt_link);
-		
-		in_camera_count -= 1;
 	    }
-
-	    if (in_camera_count > 1) {
-#ifdef RECORD_FRAMES
-		fprintf(xdat_file,
-			"%d %.2f %.2f # 2 cam %d\n",
-			frame_count,
-			vt->vt_position.x,
-			vt->vt_position.x,
-			vt->vt_client->vc_port);
-		fprintf(ydat_file,
-			"%d %.2f %.2f # 2 cam %d\n",
-			frame_count,
-			vt->vt_position.y,
-			vt->vt_position.y,
-			vt->vt_client->vc_port);
-		fprintf(tdat_file,
-			"%d %.2f %.2f # 2 cam %d\n",
-			frame_count,
-			vt->vt_position.theta,
-			vt->vt_position.theta,
-			vt->vt_client->vc_port);
-#endif
-	    }
-	}
-	else {
-#ifdef RECORD_FRAMES
-	    fprintf(xdat_file,
-		    "%d %.2f %.2f # %d\n",
-		    frame_count,
-		    vt->vt_position.x,
-		    vt->vt_position.x,
-		    vt->vt_client->vc_port);
-	    fprintf(ydat_file,
-		    "%d %.2f %.2f # %d\n",
-		    frame_count,
-		    vt->vt_position.y,
-		    vt->vt_position.y,
-		    vt->vt_client->vc_port);
-	    fprintf(tdat_file,
-		    "%d %.2f %.2f # %d\n",
-		    frame_count,
-		    vt->vt_position.theta,
-		    vt->vt_position.theta,
-		    vt->vt_client->vc_port);
-#endif
 	}
 	
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;
@@ -454,15 +353,29 @@ void vtMatch(struct lnMinList *pool,
     while (vt->vt_link.ln_Succ != NULL) {
 	struct vision_track *vt_prev;
 	float distance;
+	void dump_vision_list(struct lnMinList *list);
 	
 	if ((vt_prev = vtFindMin(vt,
 				 (struct vision_track *)prev->lh_Head,
 				 &distance)) != NULL) {
-	    if (distance < 0.30) {
+	    if (distance <= 0.06) {
 		vt->vt_userdata = vt_prev->vt_userdata;
 		lnRemove(&vt_prev->vt_link);
 		lnAddHead(pool, &vt_prev->vt_link);
 	    }
+	    else {
+#if 0
+		info("too far %.2f\n", distance);
+#endif
+	    }
+	}
+	else {
+#if 0
+	    info("no match %.2f %.2f\n", vt->vt_position.x, vt->vt_position.y);
+	    dump_vision_list(now);
+	    info("==\n");
+	    dump_vision_list(prev);
+#endif
 	}
 	
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;

@@ -64,6 +64,11 @@ enum mtp_opcode_t {
      */
     MTP_CONFIG_RMC		= 21,
 
+    /**
+     * VMC client configuration packet.
+     */
+    MTP_CONFIG_VMC_CLIENT	= 22,
+
     
     /**
      * Request the current position of a given robot.
@@ -172,6 +177,8 @@ struct camera_config {
     float y;
     float width;
     float height;
+    float fixed_x;
+    float fixed_y;
 };
 
 struct obstacle_config {
@@ -200,6 +207,11 @@ struct mtp_config_rmc {
 struct mtp_config_vmc {
     robot_config robots<>;
     camera_config cameras<>;
+};
+
+struct mtp_config_vmc_client {
+    float fixed_x;
+    float fixed_y;
 };
 
 struct mtp_request_position {
@@ -234,6 +246,7 @@ struct mtp_command_goto {
     int command_id;
     int robot_id;
     robot_position position;
+    float speed;
 };
 
 struct mtp_command_stop {
@@ -324,6 +337,7 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_CONTROL_CLOSE:	mtp_control		close;
  case MTP_CONFIG_RMC:		mtp_config_rmc		config_rmc;
  case MTP_CONFIG_VMC:		mtp_config_vmc		config_vmc;
+ case MTP_CONFIG_VMC_CLIENT:	mtp_config_vmc_client	config_vmc_client;
  case MTP_REQUEST_POSITION:	mtp_request_position	request_position;
  case MTP_REQUEST_ID:		mtp_request_id		request_id;
  case MTP_UPDATE_POSITION:	mtp_update_position	update_position;

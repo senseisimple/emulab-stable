@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 #ifndef _vision_track_h
 #define _vision_track_h
@@ -7,17 +12,39 @@
 
 #include "vmcd.h"
 
+/**
+ * The maximum distance in meters for which tracks from different cameras will
+ * be considered the same and coalesced.
+ */
+#define COALESCE_TOLERANCE 0.075
+
+/**
+ * The maximum distance in meters for which a track is considered the same from
+ * one frame to the next.
+ */
+#define MERGE_TOLERANCE 0.03
+
+/**
+ * The maximum number of frames that a track can miss before it is considered
+ * lost.
+ */
+#define MAX_TRACK_AGE 5
+
+/**
+ * Structure used to manage fiducials detected by the vision system.
+ */
 struct vision_track {
-    struct lnMinNode vt_link;
-    struct robot_position vt_position;
-    struct vmc_client *vt_client;
-    int vt_age;
-    void *vt_userdata;
+    struct lnMinNode vt_link;		/*< Linked list header. */
+    struct robot_position vt_position;	/*< Fiducial position/orientation. */
+    struct vmc_client *vt_client;	/*< Camera that detected the track. */
+    int vt_age;				/*< Age of the track (lower=younger) */
+    void *vt_userdata;			/*< Data attached to the track. */
 };
 
 /**
  * Update the list of tracks for the current frame with the tracks from a given
- * vmc-client.
+ * vmc-client.  The dimensions of the camera will also be adjusted to ensure
+ * the track's position falls within the bounds.
  *
  * @param now The track list for the current frame, any new tracks will be
  * added to this.
@@ -32,15 +59,33 @@ int vtUpdate(struct lnMinList *now,
 	     struct mtp_packet *mp,
 	     struct lnMinList *pool);
 
+/**
+ * Move tracks from previous frames into the current frame if they are still
+ * young and missing from the current frame.  Tracks that are too old or match
+ * a track in the current frame are returned to the pool.
+ *
+ * @param now The list of tracks in the current frame.
+ * @param old The list of tracks from the previous frame.
+ * @param pool The list to return dead tracks to.
+ */
 void vtAgeTracks(struct lnMinList *now,
 		 struct lnMinList *old,
 		 struct lnMinList *pool);
+
+/**
+ * Copy tracks in the source frame to the destination frame.
+ *
+ * @param dst The list to add new tracks to.
+ * @param src The list of tracks to duplicate.
+ * @param pool The list of free nodes to draw from.
+ */
 void vtCopyTracks(struct lnMinList *dst,
 		  struct lnMinList *src,
 		  struct lnMinList *pool);
 
 /**
- * Coalesce tracks that are in an area where cameras are overlapping.
+ * Coalesce tracks that are in an area where cameras are overlapping.  This
+ * function will produce a frame with the canonical set of tracks.
  *
  * @param extra The list to add any duplicate tracks found in the current
  * frame.

@@ -75,7 +75,6 @@ static char *progname;
 static int debug;
 
 static int port = EMC_SERVER_PORT;
-static int command_seq_no = 0;
 
 /* initial data pulled from the config file */
 /* it's somewhat non-intuitive to use lists here -- since we're doing maps,
@@ -202,7 +201,6 @@ static void dump_info(void)
     while ((mup = (struct mtp_update_position *)
 	    robot_list_enum_next_element(e)) != NULL) {
       struct emc_robot_config *erc;
-      struct mtp_packet mp;
       
       erc = robot_list_search(hostname_list, mup->robot_id);
       info("  %s: %.2f %.2f %.2f\n",
@@ -631,11 +629,13 @@ void parse_config_file(char *config_file) {
     }
     else if (strcmp(directive, "camera") == 0) {
       char area[32], hostname[MAXHOSTNAMELEN];
-      float x, y, width, height;
+      float x, y, width, height, fixed_x, fixed_y;
       int port;
 
       if (sscanf(line,
-		 "%16s %32s %" __XSTRING(MAXHOSTNAMELEN) "s %d %f %f %f %f",
+		 "%16s %32s %"
+		 __XSTRING(MAXHOSTNAMELEN)
+		 "s %d %f %f %f %f %f %f",
 		 directive,
 		 area,
 		 hostname,
@@ -643,7 +643,9 @@ void parse_config_file(char *config_file) {
 		 &x,
 		 &y,
 		 &width,
-		 &height) != 8) {
+		 &height,
+		 &fixed_x,
+		 &fixed_y) != 10) {
 	fprintf(stderr,
 		"error:%d: syntax error in config file - %s\n",
 		line_no,
@@ -663,6 +665,8 @@ void parse_config_file(char *config_file) {
 	cc[cc_size].y = y;
 	cc[cc_size].width = width;
 	cc[cc_size].height = height;
+	cc[cc_size].fixed_x = fixed_x;
+	cc[cc_size].fixed_y = fixed_y;
 	cc_size += 1;
       }
     }
@@ -873,8 +877,8 @@ void ev_callback(event_handle_t handle,
     error("no match for host\n");
   }
   else {
+    float x, y, orientation = 0.0, speed = 0.1;
     char *value, args[BUFSIZ];
-    float x, y, orientation;
     struct mtp_packet mp;
     
     event_notification_get_arguments(handle, notification, args, sizeof(args));
@@ -901,6 +905,13 @@ void ev_callback(event_handle_t handle,
       }
     }
     
+    if (event_arg_get(args, "SPEED", &value) > 0) {
+      if (sscanf(value, "%f", &speed) != 1) {
+	error("SPEED argument in event is not a float: %s\n", value);
+	return;
+      }
+    }
+    
     event_notification_get_int32(handle, notification,
 				 "TOKEN", (int32_t *)&match->token);
 
@@ -922,6 +933,7 @@ void ev_callback(event_handle_t handle,
 			MA_X, x,
 			MA_Y, y,
 			MA_Theta, orientation,
+			MA_Speed, speed,
 			MA_TAG_DONE);
 
 	if (rmc_data.handle != NULL) {
@@ -1559,7 +1571,7 @@ int vmc_callback(elvin_io_handler_t handler,
         double best_pose_delta = POSE_THRESHOLD;
         int robot_id = -1;
 
-        double dx,dy,dtheta,ddist;
+        double dx = 0.0, dy = 0.0, dtheta, ddist;
 
 	struct mtp_packet mp_reply;
 

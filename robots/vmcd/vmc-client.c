@@ -24,6 +24,8 @@
 #include "mtp.h"
 #include <math.h>
 
+#define MAX_CLIENT_COUNT 10
+
 #if defined(HAVE_MEZZANINE)
 #  include "mezz.h"
 #else
@@ -81,13 +83,9 @@ static volatile unsigned int mezz_frame_count = 0;
 
 /**
  * X offset from the real world X == 0 to our local camera X == 0.
- */
-static double x_offset = 0.0;
-
-/**
  * Y offset from the real world Y == 0 to our local camera Y == 0.
  */
-static double y_offset = 0.0;
+static struct robot_position offsets;
 
 static double z_offset = 0.0;
 
@@ -112,6 +110,7 @@ static void usage(void)
             "  -x offset\tx offset from real world x = 0 to our local x = 0\n"
             "  -y offset\ty offset from real world y = 0 to our local y = 0\n"
 	    "  -z offset\tz offset from\n"
+	    "  -o orientation\tcamera orientation\n"
 #if !defined(HAVE_MEZZANINE)
 	    "  -f file\tFile to read simulated positions from.\n"
 #endif
@@ -180,13 +179,17 @@ void radial_trans(struct robot_position *p_inout)
  */
 void local2global_posit_trans(struct robot_position *p_inout)
 {
-    float old_x = p_inout->x;
+    struct robot_position rp;
+    float ct, st;
     
     assert(p_inout != NULL);
-    
-    p_inout->x = p_inout->y + x_offset;
-    p_inout->y = old_x + y_offset;
-    //p_inout->theta -= M_PI_2;
+
+    ct = cosf(offsets.theta);
+    st = sinf(offsets.theta);
+    rp.x = ct * p_inout->x + st * -p_inout->y + offsets.x;
+    rp.y = ct * -p_inout->y + st * -p_inout->x + offsets.y;
+    rp.theta = mtp_theta(p_inout->theta + offsets.theta + M_PI_2);
+    *p_inout = rp;
 }
 
 /**
@@ -341,7 +344,7 @@ int main(int argc, char *argv[])
 
     xdrrec_create(&xdr, 0, 0, NULL, NULL, mem_write);
     
-    while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:z:")) != -1) {
+    while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:z:o:")) != -1) {
         switch (c) {
         case 'h':
             usage();
@@ -373,14 +376,14 @@ int main(int argc, char *argv[])
 #endif
             break;
         case 'x':
-	    if (sscanf(optarg, "%lf", &x_offset) != 1) {
+	    if (sscanf(optarg, "%f", &offsets.x) != 1) {
                 error("error: -x option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
 	    }
             break;
         case 'y':
-	    if (sscanf(optarg, "%lf", &y_offset) != 1) {
+	    if (sscanf(optarg, "%f", &offsets.y) != 1) {
                 error("error: -y option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
@@ -389,6 +392,13 @@ int main(int argc, char *argv[])
 	case 'z':
 	    if (sscanf(optarg, "%lf", &z_offset) != 1) {
                 error("error: -z option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+	    }
+	    break;
+	case 'o':
+	    if (sscanf(optarg, "%f", &offsets.theta) != 1) {
+                error("error: -o option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
 	    }
@@ -499,6 +509,7 @@ int main(int argc, char *argv[])
         errorc("listen");
     }
     else {
+	mtp_handle_t mh[MAX_CLIENT_COUNT];
         fd_set readfds, clientfds;
         int last_mezz_frame = 0;
         
@@ -535,7 +546,13 @@ int main(int argc, char *argv[])
                                      &slen)) == -1) {
                         errorc("accept");
                     }
-                    else {
+                    else if (fd >= MAX_CLIENT_COUNT) {
+			error("too many clients connected\n");
+		    }
+		    else if ((mh[fd] = mtp_create_handle(fd)) == NULL) {
+			error("unable to allocate handle\n");
+		    }
+		    else {
 			if (debug) {
 			    info("vmc-client: connect from %s:%d (fd=%d)\n",
 				 inet_ntoa(peer_sin.sin_addr),
@@ -552,35 +569,44 @@ int main(int argc, char *argv[])
 			}
                         FD_SET(fd, &readfds);
                         FD_SET(fd, &clientfds);
+
+			fd = -1;
                     }
+
+		    if (fd != -1)
+			close(fd);
                 }
                 
                 /*
 		 * We assume that if somebody connected to us tries to write
                  * us some data, they're screwing up; we're just a data source.
                  */
-                for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+                for (lpc = 0; lpc < MAX_CLIENT_COUNT; lpc++) {
                     if ((lpc != serv_sock) && FD_ISSET(lpc, &rreadyfds)) {
-			if (debug) {
-			    char buffer[512];
-			    int rc;
-
-			    rc = read(lpc, buffer, sizeof(buffer));
-			    if (rc == 0) {
-				info("vmc-client: fd %d disconnected\n", lpc);
-			    }
-			    else {
-				info("vmc-client: fd %d send %d bytes -- "
-				     "disconnecting\n",
-				     lpc,
-				     rc);
-			    }
-			}
+			struct mtp_packet mp;
+			int good = 0;
 			
-                        close(lpc);
-                        FD_CLR(lpc, &readfds);
-                        FD_CLR(lpc, &clientfds);
-                    }
+			if (((rc = mtp_receive_packet(mh[lpc], &mp)) !=
+			     MTP_PP_SUCCESS) ||
+			    (mp.vers != MTP_VERSION)) {
+			    error("invalid client %d %p\n", rc, mp);
+			}
+			else {
+			    if (mp.data.opcode == MTP_CONFIG_VMC_CLIENT) {
+				offsets.x = mp.data.mtp_payload_u.
+				    config_vmc_client.fixed_x;
+				offsets.y = mp.data.mtp_payload_u.
+				    config_vmc_client.fixed_y;
+			    }
+			    good = 1;
+			}
+
+			if (!good) {
+			    close(lpc);
+			    FD_CLR(lpc, &readfds);
+			    FD_CLR(lpc, &clientfds);
+			}
+		    }
                 }
             }
             else if (rc == -1) {

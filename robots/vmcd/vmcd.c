@@ -1,3 +1,10 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+#include "config.h"
 
 #include <math.h>
 #include <float.h>
@@ -178,7 +185,7 @@ static void dump_vision_track(struct vision_track *vt)
 	 ((struct robot_object *)vt->vt_userdata)->ro_name);
 }
 
-static void dump_vision_list(struct lnMinList *list)
+ void dump_vision_list(struct lnMinList *list)
 {
     struct vision_track *vt;
 
@@ -462,6 +469,18 @@ int main(int argc, char *argv[])
 						NULL)) == NULL) {
 	    pfatal("mtp_create_handle");
 	}
+	else {
+	    struct mtp_packet mp;
+
+	    mtp_init_packet(&mp,
+			    MA_Opcode, MTP_CONFIG_VMC_CLIENT,
+			    MA_Role, MTP_ROLE_VMC,
+			    MA_X, vmc_config.cameras.cameras_val[lpc].fixed_x,
+			    MA_Y, vmc_config.cameras.cameras_val[lpc].fixed_y,
+			    MA_TAG_DONE);
+	    if (mtp_send_packet(vc->vc_handle, &mp) != MTP_PP_SUCCESS)
+		pfatal("could not configure vmc-client");
+	}
     }
 
     /*
@@ -511,8 +530,7 @@ int main(int argc, char *argv[])
 #endif
 
 	if (current_client == vmc_client_count) {
-	    struct vision_track *vt, *vt_unknown = NULL;
-	    int unknown_track_count = 0;
+	    struct vision_track *vt;
 	    struct robot_object *ro;
 
 	    /* We've got all of the camera tracks, start processing. */
@@ -523,10 +541,14 @@ int main(int argc, char *argv[])
 		       vmc_clients,
 		       vmc_client_count); // Get rid of duplicates
 
-	    /*
-	     * Match the current frame to the last frame and throw any old
-	     * frames (vt_age > 5) in the pool.
+	    /**
+	     * Remove any unknown tracks before doing the match so that they
+	     * are not candidates for matching against tracks in the current
+	     * frame.
 	     */
+	    vtUnknownTracks(&vt_pool, &last_frame);
+
+	    /* Match the current frame to the last frame. */
 	    vtMatch(&vt_pool, &last_frame, &current_frame);
 
 	    /* Reset the list of known/unknown bots. */
@@ -552,10 +574,6 @@ int main(int argc, char *argv[])
 				    MA_Status, MTP_POSITION_STATUS_UNKNOWN,
 				    MA_TAG_DONE);
 		    mtp_send_packet(emc_handle, &ump);
-		}
-		else {
-		    unknown_track_count += 1;
-		    vt_unknown = vt;
 		}
 		
 		if (debug > 2) {
@@ -731,6 +749,11 @@ int main(int argc, char *argv[])
 				 */
 				if ((vt = vtFindWiggle(&wiggle_frame,
 						       &last_frame)) == NULL) {
+				    if (wiggle_bot == NULL) {
+					lnAppendList(&vt_pool, &wiggle_frame);
+					break;
+				    }
+				    
 				    /*
 				     * Couldn't locate the robot, add him to
 				     * the list of "lost" robots which we'll

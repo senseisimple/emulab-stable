@@ -149,6 +149,7 @@ typedef enum {
     MA_WiggleType,	 /*< (mtp_wiggle_t) */
     MA_ContactPointCount,	 /*< (int) */
     MA_ContactPoints,	 /*< (contact_point *) */
+    MA_Speed,		 /*< (float) */
 
     MA_TAG_MAX
 } mtp_tag_t;

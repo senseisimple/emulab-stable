@@ -474,6 +474,10 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		mp->data.mtp_payload_u.command_goto.position.x =
 		    va_arg(args, double);
 		break;
+	    case MTP_CONFIG_VMC_CLIENT:
+		mp->data.mtp_payload_u.config_vmc_client.fixed_x =
+		    va_arg(args, double);
+		break;
 	    default:
 		assert(0);
 		break;
@@ -491,6 +495,10 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		break;
 	    case MTP_COMMAND_GOTO:
 		mp->data.mtp_payload_u.command_goto.position.y =
+		    va_arg(args, double);
+		break;
+	    case MTP_CONFIG_VMC_CLIENT:
+		mp->data.mtp_payload_u.config_vmc_client.fixed_y =
 		    va_arg(args, double);
 		break;
 	    default:
@@ -589,6 +597,17 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		 lpc < mp->data.mtp_payload_u.contact_report.count;
 		 lpc++) {
 		mp->data.mtp_payload_u.contact_report.points[lpc] = cp[lpc];
+	    }
+	    break;
+	case MA_Speed:
+	    switch (mp->data.opcode) {
+	    case MTP_COMMAND_GOTO:
+		mp->data.mtp_payload_u.command_goto.speed =
+		    va_arg(args, double);
+		break;
+	    default:
+		assert(0);
+		break;
 	    }
 	    break;
 	}
@@ -905,11 +924,26 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    struct mtp_config_vmc *mcv = &mp->data.mtp_payload_u.config_vmc;
 	    
 	    fprintf(file,
-		    "  camera[%d]:\t%s:%d\n",
+		    "  camera[%d]:\t%s:%d %.2f %.2f %.2f %.2f -- %.2f %.2f\n",
 		    lpc,
 		    mcv->cameras.cameras_val[lpc].hostname,
-		    mcv->cameras.cameras_val[lpc].port);
+		    mcv->cameras.cameras_val[lpc].port,
+		    mcv->cameras.cameras_val[lpc].x,
+		    mcv->cameras.cameras_val[lpc].y,
+		    mcv->cameras.cameras_val[lpc].width,
+		    mcv->cameras.cameras_val[lpc].height,
+		    mcv->cameras.cameras_val[lpc].fixed_x,
+		    mcv->cameras.cameras_val[lpc].fixed_y);
 	}
+	break;
+    
+    case MTP_CONFIG_VMC_CLIENT:
+	fprintf(file,
+		" opcode:\tconfig-vmc-client\n"
+		"  fixed_x:\t\t%.2f\n"
+		"  fixed_y:\t\t%.2f\n",
+		mp->data.mtp_payload_u.config_vmc_client.fixed_x,
+		mp->data.mtp_payload_u.config_vmc_client.fixed_y);
 	break;
     
     case MTP_CONFIG_RMC:
@@ -1019,13 +1053,15 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		"  x:\t\t%f\n"
 		"  y:\t\t%f\n"
 		"  theta:\t%f\n"
-		"  timestamp:\t%f\n",
+		"  timestamp:\t%f\n"
+		"  speed:\t%.2f\n",
 		mp->data.mtp_payload_u.command_goto.command_id,
 		mp->data.mtp_payload_u.command_goto.robot_id,
 		mp->data.mtp_payload_u.command_goto.position.x,
 		mp->data.mtp_payload_u.command_goto.position.y,
 		mp->data.mtp_payload_u.command_goto.position.theta,
-		mp->data.mtp_payload_u.command_goto.position.timestamp);
+		mp->data.mtp_payload_u.command_goto.position.timestamp,
+		mp->data.mtp_payload_u.command_goto.speed);
 	break;
     
     case MTP_COMMAND_STOP:
@@ -1070,7 +1106,8 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    "  speed:\t\t%f\n"
 		    "  status:\t\t%d\n"
 		    "  user_button:\t\t%d\n"
-		    "  user_led:\t\t%d\n",
+		    "  user_led:\t\t%d\n"
+		    "  stall_contact:\t\t%d\n",
 		    mgt->battery_level,
 		    mgt->battery_voltage,
 		    mgt->battery_misses,
@@ -1096,7 +1133,8 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    mgt->speed,
 		    mgt->status,
 		    mgt->user_button,
-		    mgt->user_led);
+		    mgt->user_led,
+		    mgt->stall_contact);
 	    break;
 	}
 	break;

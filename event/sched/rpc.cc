@@ -375,14 +375,16 @@ RPC_cameralist(FILE *emcd_config, char *area)
 		tmp = attr.getMember("hostname");
 		port = ((ulxr::Integer)attr.getMember("port")).getInteger();
 		fprintf(emcd_config,
-			"camera %s %s %d %f %f %f %f\n",
+			"camera %s %s %d %f %f %f %f %f %f\n",
 			area,
 			tmp.getString().c_str(),
 			port,
 			((ulxr::Double)attr.getMember("loc_x")).getDouble(),
 			((ulxr::Double)attr.getMember("loc_y")).getDouble(),
 			((ulxr::Double)attr.getMember("width")).getDouble(),
-			((ulxr::Double)attr.getMember("height")).getDouble());
+			((ulxr::Double)attr.getMember("height")).getDouble(),
+			((ulxr::Double)attr.getMember("fixed_x")).getDouble(),
+			((ulxr::Double)attr.getMember("fixed_y")).getDouble());
 	}
 	
 	return 0;
@@ -459,7 +461,8 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 	info("info: waiting for robots\n");
 	
 	if ((emcd_config = fopen("tbdata/emcd.config", "w")) == NULL) {
-		fprintf(stderr, "Cannot create emcd.config!\n");
+		error("Cannot create emcd.config!\n");
+		return -1;
 	}
 	
 	for (lpc = 0; lpc < locs.size(); lpc++) {
