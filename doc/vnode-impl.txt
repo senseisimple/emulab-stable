@@ -73,6 +73,11 @@ fabric (encapsulation).
 
 Why virtual routing tables?
 
+   - cannot have multiple veths in the same subnet without this
+   - needed to route packets correctly through a topo when endpoints
+     are on the same host (ow, gets short-circuited).
+   - needed to support multiple vnodes with different routes to same
+     destination
 
 B. Implementation
 
@@ -206,6 +211,20 @@ The route table ID effectively identifies a virtual node: all interfaces
 associated with a virtual node have the same ID, every virtual node has
 its own unique ID.  The route table ID is a local-node only value, different
 physical nodes can use the same ID for different purposes.
+
+More about the startup pieces:
+
+vnodesetup hangs around so that you can signal it and easily
+ reboot the vnode.  I guess the idea is that it is also jail/vserver
+ independent as opposed to...
+
+mkjail.pl is jail specific and hangs around so that it can clean up
+ jail specific things when the jail exits.
+
+injail.pl is the jail's init process.  This is the single point of
+ contact for killing the jail.
+
+/bin/sleep is just an artifact.
 
 
 D. Examples
