@@ -4,7 +4,7 @@
 #
 case "$1" in
 	start)
-		if [ -x @prefix@/sbin/cvsupd.pl -a -x /usr/local/sbin/cvsupd ]; then
+		if [ -x @prefix@/sbin/cvsupd.pl -a -x /usr/local/sbin/cvsupd -a -d @prefix@/sup ]; then
 			echo -n " cvsupd"
 			@prefix@/sbin/cvsupd.pl
 		fi
