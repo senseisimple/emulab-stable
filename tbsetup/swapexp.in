@@ -895,7 +895,7 @@ if ($linktest_level && ExpState($pid, $eid) eq EXPTSTATE_ACTIVE) {
     #
     # Run it. No worries about failures.
     #
-    my $output = "linktest.$$";
+    my $output = "$userdir/logs/linktest.log";
     my $optarg = "-l $linktest_level -o $output";
     
     print STDOUT "Running 'linktest_control $optarg $pid $eid'\n";

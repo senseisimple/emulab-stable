@@ -590,7 +590,7 @@ if ($linktest && ExpState($pid, $eid) eq EXPTSTATE_ACTIVE) {
     #
     # Run it. No worries about failures.
     #
-    my $output = "linktest.$$";
+    my $output = "$userdir/logs/linktest.log";
     my $optarg = "-o $output";
 
     if ($linktest =~ /^(\d)$/) {
