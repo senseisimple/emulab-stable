@@ -566,7 +566,7 @@ sub doSwapout($) {
 	    if (!$db_result->numrows) {
 		print "Destroying Planetlab slice.\n";
 		TBDebugTimeStamp("plabslice destroy started");
-		if (system("plabslice -v destroy $pid $eid")) {
+		if (system("plabslice destroy $pid $eid")) {
 		    print STDERR "*** Failed to destroy Plab dslice\n";
 		    $swapout_errors = 1;
 		}
@@ -776,7 +776,7 @@ sub doSwapin($) {
 		
 		print "Creating Planetlab slice.\n";
 		TBDebugTimeStamp("plabslice create started");
-		if (system("plabslice -v create $pid $eid")) {
+		if (system("plabslice create $pid $eid")) {
 		    print STDERR "*** Failed to create Plab dslice\n";
 		    return 3;
 		}

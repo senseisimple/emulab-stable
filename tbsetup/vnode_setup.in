@@ -279,7 +279,7 @@ foreach my $node (@nodes) {
 	}
 
 	if ($plab && $killmode) {
-	    if (system("$TB/sbin/plabnode -v -d free $pid $eid $node")) {
+	    if (system("$TB/sbin/plabnode free $pid $eid $node")) {
 		warn("*** $0:\n".
 		     "    Plab node free failed");
 	    }
@@ -295,7 +295,7 @@ foreach my $node (@nodes) {
 	$UID = 0;
 
 	if ($plab && !$killmode) {
-	    if (system("$TB/sbin/plabnode -v -d alloc $pid $eid $node")) {
+	    if (system("$TB/sbin/plabnode alloc $pid $eid $node")) {
 		die("*** $0:\n".
 		    "    Plab node allocation failed");
 	    }
