@@ -21,7 +21,7 @@
  * Desc: Assign identities to blobs
  * Author: Andrew Howard
  * Date: 21 Apr 2002
- * CVS: $Id: ident.c,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ * CVS: $Id: ident.c,v 1.2 2004-12-15 07:28:29 johnsond Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -126,6 +126,10 @@ mezz_objectlist_t *ident_update(mezz_bloblist_t *bloblist)
     object->px = mx;
     object->py = my;
     object->pa = atan2(dy, dx);
+    // we're seeing 0 to 180 and -1 to -179: fix:
+    if (object->pa < 0.0) {
+        object->pa += 2.0*M_PI;
+    }
 
     // Assign the blobs to this object
     ablob->object = i;
