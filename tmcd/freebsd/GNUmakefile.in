@@ -71,6 +71,7 @@ mfs-install:	destdircheck common-install etc-install \
 frisbee-mfs-install:	destdircheck
 	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.local $(SYSETCDIR)/rc.local
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient.conf $(SYSETCDIR)/dhclient.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
@@ -170,6 +171,7 @@ etc-install:	dir-install sysetc-install
 
 sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient.conf $(SYSETCDIR)/dhclient.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \

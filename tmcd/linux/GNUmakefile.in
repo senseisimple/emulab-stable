@@ -86,6 +86,7 @@ etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(ETCDIR)/hosts
 
 sysetc-install:	dir-install ifcfgs
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient.conf $(SYSETCDIR)/dhclient.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks $(SYSETCDIR)/dhclient-enter-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks $(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(SYSETCDIR)/modules.conf
