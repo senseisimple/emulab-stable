@@ -14,8 +14,9 @@ all:	tmcd tmcc tmcd.restart findif
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -DUDP -I${OBJDIR} -I/usr/local/include
+
 ifeq ($(EVENTSYS),1)
-	TMCDCFLAGS = $(CFLAGS) `elvin-config --cflags vin4c` \
+	TMCDCFLAGS = `elvin-config --cflags vin4c` \
 		     -I$(TESTBED_SRCDIR)/event/lib -DEVENTSYS
 	TMCDLIBS    = ${OBJDIR}/event/lib/libevent.a \
                           ${OBJDIR}/lib/libtb/libtb.a
@@ -24,7 +25,7 @@ endif
 
 
 tmcd: tmcd.c ${TMCDLIBS} decls.h
-	$(CC) $(TMCDCFLAGS) -o tmcd $< \
+	$(CC) $(CFLAGS) $(TMCDCFLAGS) -o tmcd $< \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS)
 
