@@ -29,8 +29,14 @@ while {![catch "file readlink $file" newfile]} {
 set scriptdir [file dirname $file]
 if {$scriptdir == "."} {set scriptdir [pwd]}
 ###
-
-set updir [file dirname $scriptdir]
+if {[file exists $scriptdir/ns2ir]} {
+    # development tree
+    set updir [file dirname $scriptdir]
+} else {
+    # install tree
+    set updir [file dirname $scriptdir]/lib
+    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+}
 
 set snmpit "$scriptdir/snmpit"
 set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"

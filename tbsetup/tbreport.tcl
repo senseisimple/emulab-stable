@@ -10,8 +10,15 @@ while {![catch "file readlink $file" newfile]} {
 set scriptdir [file dirname $file]
 if {$scriptdir == "."} {set scriptdir [pwd]}
 ###
+if {[file exists $scriptdir/ns2ir]} {
+    # development tree
+    set updir [file dirname $scriptdir]
+} else {
+    # install tree
+    set updir [file dirname $scriptdir]/lib
+    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+}
 
-set updir [file dirname $scriptdir]
 
 source $scriptdir/ir/libir.tcl
 load $updir/lib/sql.so

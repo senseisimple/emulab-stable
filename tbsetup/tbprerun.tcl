@@ -26,7 +26,6 @@ proc unlock {} {
     }
 }
 
-
 ### Bootstrapping code.  The whole purpose of this is to find the
 # directory containing the script.
 set file [info script]
@@ -36,8 +35,14 @@ while {![catch "file readlink $file" newfile]} {
 set scriptdir [file dirname $file]
 if {$scriptdir == "."} {set scriptdir [pwd]}
 ###
-
-set updir [file dirname $scriptdir]
+if {[file exists $scriptdir/ns2ir]} {
+    # development tree
+    set updir [file dirname $scriptdir]
+} else {
+    # install tree
+    set updir [file dirname $scriptdir]/lib
+    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+}
 
 set lockfile "/usr/testbed/locks/tblock"
 set ns2ir "$scriptdir/ns2ir/parse.tcl"

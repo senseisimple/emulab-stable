@@ -23,9 +23,14 @@ while {![catch "file readlink $file" newfile]} {
 set scriptdir [file dirname $file]
 if {$scriptdir == "."} {set scriptdir [pwd]}
 ###
-
-set updir [file dirname $scriptdir]
-
+if {[file exists $scriptdir/ns2ir]} {
+    # development tree
+    set updir [file dirname $scriptdir]
+} else {
+    # install tree
+    set updir [file dirname $scriptdir]/lib
+    set scriptdir [file dirname $scriptdir]/lib/tbsetup
+}
 
 set nfree "$updir/db/nfree"
 set libir "$scriptdir/ir/libir.tcl"
