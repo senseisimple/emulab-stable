@@ -412,6 +412,15 @@ sub endexp($)
     my(%exphash)  = @_;
     
     system("$endexp -b $pid $eid");
+    my $exit_status = $? >> 8;
+
+    if ($exit_status) {
+	#
+	# TB admin is going to have to clean up. 
+	# 
+	fatal("Terminating Batch Mode experiment $pid/$eid");
+    }
+    
     DBQueryWarn("DELETE from batch_experiments ".
 		"WHERE eid='$eid' and pid='$pid'");
     email_status("Batch Mode experiment $pid/$eid has finished!\n");
