@@ -315,17 +315,19 @@ sub step_init {
 
 	open(AVAIL,"/usr/testbed/sbin/avail includevirt rand |");
 	while (<AVAIL>) {
-	    if (! /^\|/) {next};
-	    if (/node_id/) {next;}
-	    ($node,$type,$class) =
-	      /^\|([-a-zA-Z0-9]+)\s*\|([-[:word:]]+)\s*\|(\w+)\s*\|$/;
-	    if (defined($want{$type}) && $want{$type} > 0) {
-		push(@{$have{$type}},$node);
-		$want{$type}--;
-	    } elsif (defined($want{$class}) && $want{$class} > 0) {
-		push(@{$have{$class}},$node);
-		$want{$class}--;
-	    }
+	    chomp;
+	    if (! /^\|/) { next; }
+	    if (/^\|node_id\s*\|/) { next; }
+	    if ( ($node,$type,$class) =
+		 /^\|([-a-z0-9]+)\s*\|([-a-z0-9]+)\s*\|(\w+)\s*\|$/i ) {
+		if (defined($want{$type}) && $want{$type} > 0) {
+		    push(@{$have{$type}},$node);
+		    $want{$type}--;
+		} elsif (defined($want{$class}) && $want{$class} > 0) {
+		    push(@{$have{$class}},$node);
+		    $want{$class}--;
+		}
+	    } else { print "Couldn't parse avail line '$_'\n"; }
 	}
 	close(AVAIL);
 
