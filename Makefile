@@ -49,12 +49,9 @@ install: all
 	install -c tbsetup/tbrun.tcl /usr/testbed/bin/tbrun
 	install -c tbsetup/vpower /usr/testbed/bin
 	install -c tbsetup/vsnmpit /usr/testbed/bin
-	install -c tbsetup/ir/assign.tcl /usr/testbed/bin/assign
-	install -c tbsetup/ir/extract_tb.tcl /usr/testbed/bin/extract_tb
-	install -c tbsetup/ir/handle_ip.tcl /usr/testbed/bin/handle_ip
-	install -c tbsetup/ns2ir/parse.tcl /usr/testbed/bin/parse
 	cp -r tbsetup /usr/testbed/lib/tbsetup
 	cp -r db /usr/testbed/lib/db
+	install -c assign/assign /usr/testbed/lib/assign
 	@$(MAKE) -C tbsetup/checkpass install
 
 
