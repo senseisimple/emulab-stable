@@ -47,16 +47,20 @@ use Getopt::Std;
 # Handle command-line options
 #
 sub usage {
-    print "Usage: ops-install [-p packagedir]\n";
+    print "Usage: ops-install [-b] [-p packagedir]\n";
     exit(1);
 }
 
 my $packagedir = "";
+my $batchmode  = 0;
 my %opts;
-getopt("p:",%opts);
+getopt("p:b",%opts);
 
 if ($opt{p}) {
     $packagedir = $opt{p};
+}
+if ($opt{b}) {
+    $batchmode = 1;
 }
 
 if (@ARGV) {
@@ -141,10 +145,14 @@ my $OPS_PORT = "emulab-ops-1.4";
 #
 # Make sure they know what they're getting into...
 #
-print STDERR "WARNING: This script is ONLY intended to be run on a machine\n";
-print STDERR "that is being set up as a dedicated ops node. Continue? [y/N] ";
-my $response = <>;
-die "Installation aborted!\n" unless ($response =~ /^y/i);
+if (! $batchmode) {
+    print STDERR
+	"WARNING: This script is ONLY intended to be run on a machine\n";
+    print STDERR
+	"that is being set up as a dedicated ops node. Continue? [y/N] ";
+    my $response = <>;
+    die "Installation aborted!\n" unless ($response =~ /^y/i);
+}
 
 if ($UID != 0) {
     die "This script must be run as root.\n";
@@ -461,6 +469,12 @@ Phase "event", "Setting up event system", sub {
 };
 
 Phase "rc.d", "Setting up rc.d scripts", sub {
+    Phase "rsyncd", "Removing rsyncd startup script",  sub {
+	DoneIfDoesntExist("$RCDIR/rsyncd.sh");
+	if (!unlink "$RCDIR/rsyncd.sh") {
+	    PhaseFail("Unable to remove $RCDIR/rsyncd.sh: $!");
+	}
+    };
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
         Phase "elvind.sh", "Removing port version of elvind.sh", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");
