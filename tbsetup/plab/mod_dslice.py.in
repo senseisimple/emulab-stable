@@ -34,12 +34,6 @@ class mod_dslice:
         self.__nodemgrProxies = {}
         self.modname = "mod_dslice"
         pass
-
-    def getFree(self):
-
-        agent = self.__createAgentProxy(insecure = True)
-        avail = tryXmlrpcCmd(agent.getads)
-        return avail
     
     def createSlice(self, slicename):
         privkey, pubkey = self.__genKeypair()

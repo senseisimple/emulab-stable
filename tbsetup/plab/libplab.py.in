@@ -17,6 +17,9 @@ import os, time
 import string
 import traceback
 import socket
+import httplib
+import xml.parsers.expat
+import re
 
 from warnings import warn
 
@@ -71,13 +74,17 @@ PLABNODE = "@prefix@/sbin/plabnode"
 SSH = "@prefix@/bin/sshtb"
 NAMED_SETUP = "@prefix@/sbin/named_setup"
 
-HTTPD_SITE = "http://localhost:"
-HTTPD_PORT = "1492"
-HTTP_PATH = "/" # ensure this ends in a slash
-ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
+ROOTBALL_URL = "http://localhost:1492/" # ensure this ends in a slash
+
+DEF_PLAB_URL = "www.planet-lab.org"
+DEF_SITE_XML = "/xml/sites.xml"
 
 DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
 SLICEPREFIX = "@PLAB_SLICEPREFIX@"
+NODEPREFIX  = "plab"
+
+BADSITECHARS = re.compile(r"\W+")
+PLABBASEPRIO = 20000
 
 #
 # var to track failed renewals
@@ -98,6 +105,65 @@ signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 #
 # Plab abstraction
 #
+
+class siteParser:
+
+    def __init__(self):
+        self.parser = xml.parsers.expat.ParserCreate()
+        self.parser.StartElementHandler = self.__site_start_elt
+        self.parser.EndElementHandler = self.__site_end_elt
+        self.__hosts = []
+        self.__sitename = ""
+        
+    def getPlabNodeInfo(self):
+                
+        conn = httplib.HTTPSConnection(DEF_PLAB_URL)
+        conn.request("GET", DEF_SITE_XML)
+        res = conn.getresponse()
+        if res.status != 200:
+            raise RuntimeError, "HTTP Error getting site list:\n" \
+                  "Code: %d Reason: %s" % \
+                  (res.status, res.reason)
+        try:
+            self.parser.ParseFile(res)
+            pass
+        except xml.parsers.expat.ExpatError, e:
+            print "Error parsing XML file, lineno: %d, offset: %d:\n%s" % \
+                  (e.lineno, e.offset, xml.parsers.expat.ErrorString(e.code))
+            raise
+
+        return self.__hosts
+
+    def __site_start_elt(self, name, attrs):
+        
+        if name == "PLANETLAB_SITES":
+            pass
+        
+        elif name == "SITE":
+            self.__sitename = attrs['SHORT_SITE_NAME']
+            pass
+        
+        elif name == "HOST":
+            self.__hosts.append({'HNAME' : attrs['NAME'],
+                                 'IP'    : attrs['IP'],
+                                 'NODEID': attrs['NODE_ID'],
+                                 'SITE'  : self.__sitename})
+            pass
+        
+        else:
+            print "Unknown element in site file: %s: %s" % (name, attrs)
+            pass
+        
+        return
+
+    def __site_end_elt(self, name):
+        
+        if name == "SITE":
+            self.__sitename = "Unknown"
+            pass
+        return
+
+        
 class Plab:
     def __init__(self, agent = None):
         if not agent:
@@ -124,33 +190,34 @@ class Plab:
         slice._load()
         return slice
 
-    def getFree(self, ignorenew = False):
+    def updateNodeEntries(self, ignorenew = False):
         """
-        Finds out which Plab nodes are free (advertised by agent), and
+        Finds out which Plab nodes are available, and
         update the DB accordingly.  If ignorenew is True, this will only
         make sure that the data in the DB is correct, and not complete.
         If ignorenew is False (the default), this will do a complete
         update of the DB.  However, this can take some time, as
         information about new nodes (such as link type) must be
-        discovered.  Plab nodes that are in the DB but are not available
-        are marked as status down.
+        discovered.
 
         Note that this seemingly innocent funciton actually does a lot of
         magic.  This is the main/only way that Plab nodes get into the
         nodes DB, and this list is updated dynamically.  It also gathers
         static data about new nodes.
 
-        Deleting nodes that are no longer available may not be the best
-        approach, due to the overhead of adding new nodes (ie, if the
-        node disappears for a while, then comes back), but the agent's
-        advertisement list doesn't change very dynamically (basically,
-        it's a list of the nodes reporting to ganglia that they support
-        dslices)
+        Deleting nodes that are no longer available may not be the
+        best approach due to the overhead of adding new nodes (ie, if
+        the node disappears for a while, then comes back). Therefore,
+        this is not currently done.
         """
-        print "Getting free Plab nodes ..."
+        
+        print "Getting available Plab nodes ..."
+
         avail = []
         try:
-            avail = self.agent.getFree()
+            parser = siteParser()
+            avail = parser.getPlabNodeInfo()
+            pass
         # XXX: rewrite to use more elegant exception info gathering.
         except:
             extype, exval, extrace = sys.exc_info()
@@ -163,95 +230,115 @@ class Plab:
         if debug:
             print "Got advertisement list:"
             print avail
-
-# pinging disabled for now since many sites block ICMP
-#        if debug:
-#            print "Pinging nodes in advertisement list"
-#        avail = self.__getPingStatus(avail)
-#        if debug:
-#            print "Refined node list after ping verification:"
-#            print avail
+            pass
 
         # Enforce allowed nodes limitation, if any.
         if len(ALLOWED_NODES):
             ravail = []
-            for ip in avail:
-                if ip in ALLOWED_NODES:
-                    ravail.append(ip)
+            for nodeent in avail:
+                if nodeent['IP'] in ALLOWED_NODES:
+                    ravail.append(nodeent)
+                    pass
+                pass
             print "Advertisements in allowed nodes list:\n%s" % ravail
             avail = ravail
+            pass
 
         # Get node info we already have.
         known = self.__getKnownPnodes()
         if debug:
             print "Got known pnodes:"
             print known
+            pass
 
         # Add new nodes
-        toadd = []  # List of IP's
-        for ip in avail:
-            if not known.has_key(ip) and ip not in toadd:
-                toadd.append(ip)
+        toadd = []  # List of node entries to add to DB
+        toupdate = [] # List of node entries to update in the DB
+        for nodeent in avail:
+            nid = nodeent['NODEID']
+            if not known.has_key(nid):
+                toadd.append((nodeent, False))
+                pass
+            else:
+                kent = known[nid]
+                if kent['HNAME'] != nodeent['HNAME'] or \
+                   kent['IP']    != nodeent['IP'] or \
+                   kent['SITE']  != nodeent['SITE']:
+                    toadd.append((nodeent, True))
+                    pass
+                pass
+            pass
                 
         if len(toadd):
             if ignorenew:
                 if verbose:
                     print "%d new Plab nodes, but ignored for now" % len(toadd)
+                    pass
+                pass
             else:
                 addstr = ""
-                print "There are %d new Plab nodes." % len(toadd)
-                for ip in toadd:
-                    linktype, hostname = self.__findLinkType(ip)
+                updstr = ""
+                print "There are %d new/changed Plab nodes." % len(toadd)
+                for nodeent, update in toadd:
+                    self.__findLinkType(nodeent)
                     if debug:
-                        print "Found linktype %s for node %s" % (linktype, ip)
-                    self.__addNode(ip, linktype, hostname)
-                    addstr += "%s\t\t%s\t\t%s\n" % (ip, hostname, linktype)
+                        print "Found linktype %s for node %s" % \
+                              (nodeent['LINKTYPE'], nodeent['IP'])
+                        pass
+                    self.__addNode(nodeent, update)                    
+                    nodestr = "%s\t\t%s\t\t%s\t\t%s\t\t%s\n" % \
+                              (nodeent['NODEID'],
+                               nodeent['IP'],
+                               nodeent['HNAME'],
+                               nodeent['SITE'],
+                               nodeent['LINKTYPE'])
+                    if update:
+                        updstr += nodestr
+                        pass
+                    else:
+                        addstr += nodestr
+                        pass
+                    pass
 
                 print "Forcing a named map update ..."
                 os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
-                SENDMAIL(TBOPS, "New plab nodes have been added to the DB.",
+                SENDMAIL(TBOPS,
+                         "Plab nodes have been added/updated in the DB.",
                          "The following plab nodes have been added to the DB:\n"
-                         "Hostname\t\tIP\t\tLinktype\n\n"
-                         "%s" % addstr, TBOPS)
+                         "NodeID\t\tHostname\t\tIP\t\tSite\t\tLinktype\n\n"
+                         "%s\n\n"
+                         "The following plab nodes have been updated in the DB:\n"
+                         "NodeID\t\tHostname\t\tIP\t\tSite\n\n"
+                         "%s\n\n" % \
+                         (addstr, updstr),
+                         TBOPS)
                 print "Done adding new Plab nodes."
+                pass
+            pass
+        return
 
     def __getKnownPnodes(self):
         """
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
         """
-        res = DBQueryFatal("select i.node_id, i.IP from interfaces as i"
+        res = DBQueryFatal("select i.node_id, i.IP, w.hostname, w.site"
+                           " from interfaces as i"
                            " left join nodes as np on"
                            "  np.node_id = i.node_id"
+                           " left join widearea_nodeinfo as w on"
+                           "  i.node_id = w.node_id"
                            " where np.type = 'pcplabphys'")
         ret = {}
-        for nodeid, ip in res:
-            ret[ip] = nodeid
+        for nodeid, ip, hname, site in res:
+            nid = nodeid.replace(NODEPREFIX, "")
+            ret[nid] = {'HNAME' : hname,
+                        'IP'    : ip,
+                        'SITE'  : site}
+            pass
         return ret
-
-    def __getPingStatus(self, ips):
-        """
-        getFree helper function.  Uses fping to test the reachability of
-        the PLAB nodes returned from the dslice agent.  If a node doesn't
-        respond, it is not returned (i.e., not available)
-        """
-        from socket import inet_aton
-        fpin, fpout = os.popen2("fping -aA")
-        fpin.write("\n".join(ips))
-        fpin.close()
-        results = fpout.read().split()
-        # Get rid of potential junk in output
-        for ip in results:
-            try:
-                inet_aton(ip)
-            except:
-                if verbose:
-                    print "Removing junk from fping output:"
-                    print "\t%s" % ip
-                results.remove(ip)
-        return results
         
-    def __findLinkType(self, ip):
+    def __findLinkType(self, nodeent):
         """
         getFree helper function.  Figures out the link type of the given
         host.  This first performs a traceroute and checks for the U of
@@ -259,47 +346,53 @@ class Plab:
         it checks if the hostname is international.  If this test fails,
         this simply specifies an inet link type.
 
-        This can't detect DSL links, but those are probably rare for
-        Plab nodes.
+        This can't detect DSL links..
         """
         # Is host international (or flux/emulab local)?
         from socket import gethostbyaddr, getfqdn, herror
-        hostname = ip
-        try:
-            hostname, aliaslist, ipaddrlist = gethostbyaddr(ip)
-            hostname = getfqdn(hostname)
-            tld = hostname.split(".")[-1].lower()
-            if not tld in ("edu", "org", "net", "com", "gov", "us", "ca"):
-                return "pcplabintl", hostname
-            
-            # Is it us?
-            if hostname.endswith(LOCAL_PLAB_DOMAIN):
-                return LOCAL_PLAB_LINKTYPE, hostname
-            
-        except herror:
-            hostname = ip
-            print "WARNING: Failed to get hostname for %s" % ip
-
+        
+        if not nodeent.has_key('HNAME'):
+            try:
+                (hname, ) = gethostbyaddr(ip)
+                nodeent['HNAME'] = getfqdn(hname)
+                pass
+            except herror:
+                nodeent['HNAME'] = nodeent['IP']
+                print "WARNING: Failed to get hostname for %s" % nodeent['IP']
+                pass
+            pass
+        
+        tld = nodeent['HNAME'].split(".")[-1].lower()
+        if not tld in ("edu", "org", "net", "com", "gov", "us", "ca"):
+            nodeent['LINKTYPE'] = "pcplabintl"
+            return
+        
+        # Is it us?
+        if nodeent['HNAME'].endswith(LOCAL_PLAB_DOMAIN):
+            nodeent['LINKTYPE'] = LOCAL_PLAB_LINKTYPE
+            return
+        
         # Is host on I2?
-        traceroute = os.popen("traceroute -nm 10 -q 1 %s" % ip)
+        traceroute = os.popen("traceroute -nm 10 -q 1 %s" % nodeent['IP'])
         trace = traceroute.read()
         traceroute.close()
 
         for gw in MAGIC_INET2_GATEWAYS:
             if trace.find(gw) != -1:
-                return "pcplabinet2", hostname
+                nodeent['LINKTYPE'] = "pcplabinet2"
+                return
 
         for gw in MAGIC_INET_GATEWAYS:
             if trace.find(gw) != -1:
                 break
         else:
-            print "WARNING: Unknown gateway for host %s" % ip
+            print "WARNING: Unknown gateway for host %s" % nodeent['IP']
 
         # Must be plain 'ole Internet
-        return "pcplabinet", hostname
+        nodeent['LINKTYPE'] = "pcplabinet"
+        return
 
-    # XXX: review - make more robust
-    def __addNode(self, ip, linktype, hostname):
+    def __addNode(self, nodeent, update = False):
         """
         getFree helper function.  Adds a new Plab pnode and associated
         vnodes to the DB.  linktype should be one of (inet2, inet, intl,
@@ -314,15 +407,16 @@ class Plab:
         # block out common termination signals while adding a node
         osigs = disable_sigs(TERMSIGS)
         defosid, controliface = self.__getNodetypeInfo()
-        id, priority = self.__nextFreeNodeid()
-        nodeid = "plab%d" % id
-        hostonly = hostname.replace(".", "-")
-        site = hostname[(hostname.find(".")+1):]
+        nodeid = NODEPREFIX + nodeent['NODEID']
+        priority = PLABBASEPRIO + int(nodeid)
+        hostonly = nodeent['HNAME'].replace(".", "-")
+        site = BADSITECHARS.sub("-", nodeent['SITE'])
         
-        print "Creating pnode %s as %s, priority %d." % (ip, nodeid, priority)
+        print "Creating pnode %s as %s, priority %d." % \
+              (nodeent['IP'], nodeid, priority)
 
         try:
-            DBQueryFatal("insert into nodes"
+            DBQueryFatal("replace into nodes"
                          " (node_id, type, phys_nodeid, role, priority,"
                          "  op_mode, def_boot_osid,"
                          "  allocstate, allocstate_timestamp,"
@@ -335,36 +429,42 @@ class Plab:
                           'FREE_CLEAN',
                           'ISUP'))
 
-            DBQueryFatal("insert into widearea_nodeinfo"
+            DBQueryFatal("replace into widearea_nodeinfo"
                          " (node_id, contact_uid, hostname, site)"
                          " values (%s, %s, %s, %s)",
-                         (nodeid, 'bnc', hostname, site))
+                         (nodeid, 'bnc', nodeent['HNAME'], site))
 
-            DBQueryFatal("insert into interfaces"
+            DBQueryFatal("replace into interfaces"
                          " (node_id, card, port, IP, interface_type,"
                          " iface, role)"
                          " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (nodeid, 0, 1, ip, 'fxp', controliface, 'ctrl'))
+                         (nodeid, 0, 1, nodeent['IP'], 'fxp',
+                          controliface, 'ctrl'))
 
-            DBQueryFatal("insert into reserved"
+            DBQueryFatal("replace into reserved"
                          " (node_id, pid, eid, rsrv_time, vname)"
                          " values (%s, %s, %s, now(), %s)",
                          (nodeid, RESERVED_PID, RESERVED_EID, hostonly))
 
-            DBQueryFatal("insert into node_auxtypes"
+            DBQueryFatal("replace into node_auxtypes"
                          " (node_id, type, count)"
                          " values (%s, %s, %s)",
-                         (nodeid, linktype, 1))
+                         (nodeid, nodeent['LINKTYPE'], 1))
             
-            DBQueryFatal("insert into node_auxtypes"
+            DBQueryFatal("replace into node_auxtypes"
                          " (node_id, type, count)"
                          " values (%s, %s, %s)",
                          (nodeid, 'pcplab', 1))
             
-            DBQueryFatal("insert into node_status"
+            DBQueryFatal("replace into node_status"
                          " (node_id, status, status_timestamp)"
                          " values (%s, %s, now())",
                          (nodeid, 'down'))
+
+            # Don't do any vnode additions if we are just updating.
+            if update:
+                enable_sigs(osigs)
+                return
 
             vnodetype = "pcplab"
             vnodeid = ""
@@ -374,6 +474,7 @@ class Plab:
                 vnodeid = "%s-%d" % (nodeid, n+1)
                 if verbose:
                     print "Creating vnode %s, priority %d" % (vnodeid, vprio)
+                    pass
                     
                 DBQueryFatal("insert into nodes"
                              " (node_id, type, phys_nodeid, role, priority,"
@@ -392,12 +493,15 @@ class Plab:
                              " values (%s, %s, now())",
                              (vnodeid, 'up'))
                 
-            # Now, put the last vnode created into the special monitoring expt.
+                pass
+                
+            # Put the last vnode created into the special monitoring expt.
             DBQueryFatal("insert into reserved"
                          " (node_id, pid, eid, rsrv_time, vname)"
                          " values (%s, %s, %s, now(), %s)",
                          (vnodeid, MONITOR_PID, MONITOR_EID, vnodeid))
-            
+            pass
+        
         except:
             print "Error adding PLAB node to DB: someone needs to clean up!"
             tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
@@ -410,6 +514,7 @@ class Plab:
 
         # last but not least, unblock signals
         enable_sigs(osigs)
+        return
 
     def __getNodetypeInfo(self):
         """
@@ -420,14 +525,17 @@ class Plab:
         if not hasattr(self, "__getNodetypeInfoCache"):
             if debug:
                 print "Getting node type info"
+                pass
             res = DBQueryFatal("select osid, control_iface"
                                " from node_types"
                                " where type = 'pcplabphys'")
             assert (len(res) == 1), "Failed to get node type info"
             (self.__getNodetypeInfoCache, ) = res
-
+            pass
+        
         return self.__getNodetypeInfoCache
 
+    # XXX: deprecated - should probably just be removed
     def __nextFreeNodeid(self):
         """
         addNode helper function.  Returns a (nodeid, priority) tuple of
@@ -444,9 +552,11 @@ class Plab:
                          " set nextid = nextid + 1, nextpri = nextpri + 1"
                          " where nodetype = 'pcplab'")
             ((nodeid, priority), ) = res
+            pass
         finally:
-            print "Getting/updating next free nodeid for plab failed!"
             DBQueryFatal("unlock tables")
+            pass
+        
         return nodeid, priority
 
     # XXX: Review..
@@ -800,7 +910,7 @@ class Node:
             if debug:
                 print "Trying to grab rootball through loopback service"
             self.__perform("sudo wget -q -nH -P /tmp " +
-                           ROOTBALL_HTTP_URLPATH + tgzname)
+                           ROOTBALL_URL + tgzname)
         except RuntimeError:
             print "Warning: couldn't get tarball via local service on %s: " \
                   "Falling back to remote transfer." % self.nodeid
