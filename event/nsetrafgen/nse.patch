@@ -600,7 +600,7 @@
  
  Classifier/Hash set default_ -1; # none
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Thu Dec  4 17:19:59 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Mon Jan 12 00:36:16 2004
 @@ -1,6 +1,6 @@
  # -*-	Mode:tcl; tcl-indent-level:8; tab-width:8; indent-tabs-mode:t -*-
  #
@@ -630,7 +630,7 @@
  	# $agent set nodeid_ [$node id]
  }
  
-@@ -2045,3 +2048,177 @@
+@@ -2045,3 +2048,167 @@
  	}
  }
      
@@ -787,26 +787,16 @@
 +}
 +
 +Simulator instproc ip-connect { agent ip port } {
-+    set localnode [$self ip-to-node $ip]
-+    if { $localnode != {} } {
-+	set localagent [$localnode agent $port]
-+	if { $localagent != {} } {
-+	    $self connect $agent $localagent
-+	} else {
-+	    
-+	}
-+    } else {
-+	set ipaton [$self inet-aton $ip]
-+	$agent set dst_addr_ $ipaton
-+	$agent set dst_port_ $port
++    set ipaton [$self inet-aton $ip]
++    $agent set dst_addr_ $ipaton
++    $agent set dst_port_ $port
 +
-+	$agent instvar node_
-+	$node_ instvar nodeiplist_
-+	# We just use one of the IP addresses of src node
-+	# as the agent's src address
-+	set srcipaton [$self inet-aton [lindex $nodeiplist_ 0]]
-+	$agent set agent_addr_ $srcipaton
-+    }
++    $agent instvar node_
++    $node_ instvar nodeiplist_
++    # We just use one of the IP addresses of src node
++    # as the agent's src address
++    set srcipaton [$self inet-aton [lindex $nodeiplist_ 0]]
++    $agent set agent_addr_ $srcipaton
 +}
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Wed Feb 26 15:09:37 2003
 +++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Tue Dec  2 00:57:03 2003
@@ -2395,7 +2385,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Wed Jan  7 01:55:37 2004
+--- /dev/null	Mon Jan 12 00:37:15 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
