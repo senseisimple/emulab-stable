@@ -1807,6 +1807,21 @@ function SHOWNODE($node_id, $short = 0) {
                   </tr>\n";
 	}
 
+        if ($isplabdslice) {
+          $query_result = 
+            DBQueryFatal("select leaseend from plab_slice_nodes ".
+                         "where node_id='$node_id'");
+          
+          if (mysql_num_rows($query_result) != 0) {
+            $row = mysql_fetch_array($query_result);
+            $leaseend = $row[leaseend];
+            echo"<tr>
+                     <td>Lease Expiration:</td>
+                     <td class=left>$leaseend</td>
+                 </tr>\n";
+          }
+        }
+
 	if ($isremotenode) {
 	    if ($isvirtnode) {
 		SHOWWIDEAREANODE($phys_nodeid, 1);
