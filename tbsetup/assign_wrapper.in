@@ -1063,13 +1063,7 @@ foreach $plink (keys(%plinks)) {
 	printdb "plink $plink - trivial\n";
     }
 
-    if ($plink =~ m|^fakelink,(.+),(.+)$|) {
-	#
-	# A fakelink created for subnode sillyness. Ignore.
-	#
-	print "Skipping fakelink $plink\n";
-    }
-    elsif (($lan,$virtA,$virtC) =
+    if (($lan,$virtA,$virtC) =
 	   ($plink =~ m|^linksdelaysrc/(.+)/(.+),(.+)$|)) {
 	# trivial links do not have physical links, so no delay nodes.
 	if ($trivial) {
@@ -3009,7 +3003,12 @@ sub CreateTopFile()
 	my $type  = virtnodetype($node);
 
 	if (!virtnodeisremote($vname)) {
-	    print TOPFILE "node $vname $type\n";
+	    my $subnodestr = "";
+	    if (virtnodeissubnode($vname)) {
+		my $parent = virtnodeparent($vname);
+		$subnodestr = "subnode_of:$parent";
+	    }
+	    print TOPFILE "node $vname $type $subnodestr\n";
 	    if (virtnodeisvirt($vname)) {
 		$virtnode_count++;
 	    }
@@ -3019,28 +3018,12 @@ sub CreateTopFile()
 	}
     }
 
-    # Now that the node list is out, spit out fakelinks for subnodes.
+    # Now that the node list is out, set OSID for nodes
     foreach my $node (keys(%virt_nodes)) {
 	my $vname = virtnodename($node);
+	my $parent = virtnodeparent($vname);
 
 	if (virtnodeissubnode($vname)) {
-	    #
-	    # XXX: assign does not yet deal with subnodes. We have to
-	    # a link from the subnode to the parent so that assign grabs
-	    # the host too (or assign might use the host for something
-	    # else, like a delay node!).
-	    #
-	    # At some point assign will handle this properly.
-	    # XXX: Only one subnode works for now.
-	    # XXX: Hardwire the speed to 2GB so that a regular link
-	    #      will not statisfy it. Sigh, needed a special
-	    #      interface_type and interfaces table entries. 
-	    #
-	    my $parent = virtnodeparent($vname);
-	    
-	    print TOPFILE "link fakelink,$vname,$parent ".
-		"$vname $parent 2000000 0 0\n";
-
 	    #
 	    # XXX Set the OSID until I figure out something.
 	    #
