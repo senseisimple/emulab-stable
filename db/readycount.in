@@ -1,8 +1,8 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -54,8 +54,39 @@ if (($opt{p} && (@ARGV < 1)) || (!$opt{p} && (@ARGV < 2))) {
 my ($pid, $eid);
 if (!$opt{p}) {
     ($pid, $eid) = (shift @ARGV, shift @ARGV);
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+        $pid = $1;
+    }
+    else {
+        die("*** Bad data in pid: $pid.\n");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+        $eid = $1;
+    }
+    else {
+        die("*** Bad data in eid: $eid.\n");
+    }
 }
-my @nodes = @ARGV;
+
+#
+# Scan the rest of the arguments, doing a generic taint check. More
+# specific patterns are below.
+# 
+my @nodes = ();
+
+foreach my $arg (@ARGV) {
+    if ($arg =~ /^([-\w\.]+)$/) {
+        $arg = $1;
+    }
+    else {
+        die("*** Bad data in arg: $arg.\n");
+    }
+    push(@nodes, $arg);
+}
 
 if ($opt{h}) {
     exit &usage;

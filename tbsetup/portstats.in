@@ -1,8 +1,8 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -T
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -83,9 +83,38 @@ if (!$opt{p}) {
 	exit &usage;
     }
     ($pid,$eid) = (shift,shift);
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\w]+)$/) {
+        $pid = $1;
+    }
+    else {
+        die("*** Bad data in pid: $pid.\n");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+        $eid = $1;
+    }
+    else {
+        die("*** Bad data in eid: $eid.\n");
+    }
 }
 
-my @passedPorts = @ARGV;
+#
+# Scan the rest of the arguments, doing a generic taint check. More
+# specific patterns are below.
+# 
+my @passedPorts = ();
+foreach my $arg (@ARGV) {
+    if ($arg =~ /^([-\w\.]+)$/) {
+        $arg = $1;
+    }
+    else {
+        die("*** Bad data in arg: $arg.\n");
+    }
+    push(@passedPorts, $arg);
+}
 
 #
 # This hash is used to create colmn headers and the format string

@@ -1,8 +1,8 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -wT
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,11 +32,34 @@ use libtestbed;
 #
 $| = 1;
 
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
 if (@ARGV != 2) {
 	&usage;
 }
 
 my ($pid,$eid) = @ARGV;
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid.\n");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid.\n");
+}
+
 
 # XXX: This may need to be changed for use outside Utah
 my $logdir =	"/n/plastic/var/log/tiplogs";
