@@ -245,7 +245,17 @@ foreach my $name (keys %portMap) {
 		    my %oldvals = $dbresult->fetchhash();
 		    for (my $i = 0; $i < @oids; $i++) {
 			if ($oldvals{$oids[$i]}) {
-			    $result->[$i] -= $oldvals{$oids[$i]};
+			    #
+			    # Check for wraparound - of course, we can't tell
+			    # how many times it wrapped, but we can at least
+			    # not print a negative number.
+			    # XXX - we harcode the size of the counter here
+			    #
+			    if ($result->[$i] >= $oldvals{$oids[$i]}) {
+				$result->[$i] -= $oldvals{$oids[$i]};
+			    } else {
+				$result->[$i] += (2**32 - $oldvals{$oids[$i]});
+			    }
 			}
 		    }
 		}
