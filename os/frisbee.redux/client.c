@@ -1,5 +1,9 @@
 /*
  * Frisbee client.
+ *
+ * TODO: Deal with a dead server. Its possible that too many clients
+ * could swamp the boss with unanswerable requests. Might need some 
+ * backoff code.
  */
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -52,6 +56,22 @@ int		*ChunkRequestList;	/* Randomized chunk request order */
 int		LastReceiveChunk;	/* Chunk of last data packet received*/
 int		TotalChunkCount;	/* Total number of chunks in file */
 int		IdleCounter;		/* Countdown to request more data */
+
+#ifdef STATS
+/*
+ * Stats gathering.
+ */
+struct {
+	unsigned long	nochunksready;
+	unsigned long	nofreechunks;
+	unsigned long	dupchunk;
+	unsigned long	dupblock;
+	unsigned long	lostblocks;
+} Stats;
+#define DOSTAT(x)	(Stats.x)
+#else
+#define DOSTAT(x)
+#endif
 
 char *usagestr = 
  "usage: frisbee [-d] [-s #] <-p #> <-m mcastaddr> <output filename>\n"
@@ -245,6 +265,7 @@ ChunkerStartup(void)
 		 */
 		if (i == MAXCHUNKBUFS) {
 			log("No chunks ready to write!");
+			DOSTAT(nochunksready++);
 			fsleep(100000);
 			continue;
 		}
@@ -308,6 +329,7 @@ GotBlock(Packet_t *p)
 		 * packet if there is no free chunk.
 		 */
 		if (free == -1) {
+			DOSTAT(nofreechunks++);
 			if (debug)
 				log("No more free buffer slots for chunk %d!",
 				    chunk);
@@ -318,6 +340,7 @@ GotBlock(Packet_t *p)
 		 * Was this chunk already processed? 
 		 */
 		if (ChunkBitmap[chunk]) {
+			DOSTAT(dupchunk++);
 			if (0)
 				log("Duplicate chunk %d ignored!", chunk);
 			return;
@@ -343,6 +366,7 @@ GotBlock(Packet_t *p)
 	 * we do not need it (cause of broadcast/multicast).
 	 */
 	if (ChunkBuffer[i].bitmap[block]) {
+		DOSTAT(dupblock++);
 		if (0)
 			log("Duplicate block %d in chunk %d", block, chunk);
 		return;
@@ -435,6 +459,7 @@ RequestChunk(int timedout)
 					if (ChunkBuffer[i].bitmap[k])
 						break;
 				}
+				DOSTAT(lostblocks++);
 				RequestRange(ChunkBuffer[i].thischunk,
 					     j, k - j);
 				j = k;
@@ -510,7 +535,7 @@ PlayFrisbee(void)
 			p->hdr.datalen    = sizeof(p->msg.join);
 			p->msg.join.clientid = myid;
 			PacketSend(p);
-			countdown = 3;
+			countdown = 10;
 		}
 
 		/*
@@ -551,6 +576,14 @@ PlayFrisbee(void)
 	PacketSend(p);
 
 	log("Left the team after %ld seconds on the field!", estamp.tv_sec);
+#ifdef  STATS
+	log("Stats:");
+	log("  nochunksready:    %d", Stats.nochunksready);
+	log("  nofreechunks:     %d", Stats.nofreechunks);
+	log("  dupchunk:         %d", Stats.dupchunk);
+	log("  dupblock:         %d", Stats.dupblock);
+	log("  lostblocks:       %d", Stats.lostblocks);
+#endif
 }
 
 /*
