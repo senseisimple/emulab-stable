@@ -35,7 +35,7 @@ are a limited number of nodes available, and node reservations are
 exclusive, so it is important to free nodes that will be idle so that
 others may use them. By way of summary, our policy is that experiments
 should be swapped out when they are not in use. In general, if they
-are idle for 24 hours or more, we will send you mail about it and/or
+are idle for several hours, we will send you mail about it and/or
 swap out the experiment for you. The actual grace period will differ
 depending on the size of the experiment and other factors. If you mark
 your experiment "unswappable" at creation time, we will contact you
@@ -46,6 +46,7 @@ swapout. Please see full details below.
 <a name="active"></a>
 <h3>What is "active use"?</h3>
 
+<p>
 A node or experiment that is being actively used will be doing
 something related to your experiment. In almost all cases, someone
 will either be logged into it using it interactively, or some program
@@ -59,17 +60,15 @@ operations necessary to carry out the experiment.
 <p>
 Ideally, an experiment should be used nearly continuously from start
 to finish of the experiment, then swapped out or terminated. However,
-this isn't always possible. In general, the 24-hour rule is
-appropriate. If your experiment will most likely be idle for 24 hours
-or more, it should be swapped out. This is especially true on
-weekends. If you finish at the end of the day Friday, and are planning
-to come back Monday morning to use the nodes again, swap out before
-you leave for the day. Experimenters who need many nodes take
-advantage of lower usage on weekends to run their large-scale (50-100
-node) tests. If your experiment is larger than 10 nodes, it is even
-more important to release your nodes as soon as possible. Swapin and
-swapout only take a few minutes (typically 3-5 for swapin, and less
-than 1 for swapout), so you won't lose much time by doing it.
+this isn't always possible. In general, if your experiment will most
+likely be idle for 2 hours or more, it should be swapped out. This is
+especially true at night (in U.S. timezones) and on weekends. Many
+experimenters take advantage of lower demand during evenings and
+weekends to run their large-scale (50-150 node) tests. If your
+experiment uses 10 nodes or more, it is even more important to release
+your nodes as soon as possible. Swapin and swapout only take a few
+minutes (typically 3-5 for swapin, and less than 1 for swapout), so
+you won't lose much time by doing it.
 </p>
 
 <a name="state"></a>
