@@ -179,10 +179,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
     $zip	= $row[usr_zip];
     $phone	= $row[usr_phone];
 
-    echo "<tr>
-              <td colspan=10> </td>
-          </tr>
-          <tr>
+     echo "<tr>
               <td rowspan=2>$newuid</td>
               <td rowspan=2>$pid</td>
               <td rowspan=2>$gid</td>

@@ -33,9 +33,19 @@ ignore_user_abort(1);
 # that we can bail out without doing anything. This allows the user to
 # back up and make changes without worrying about some stuff being done and
 # other stuff not. 
-# 
+#
+
+#
+# copy of HTTP_POST_VARS we use to do actual work.
+# this is so I can insert an implicit default-group approval
+# while iterating over HTTP_POST_VARS. 
+# A bit kludgey, indeed.
+#
+$POST_VARS_COPY = array();
+ 
 while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #echo "$header: $value<br>\n";
+    $POST_VARS_COPY[$header] = $value; 
 
     $approval_string = strstr($header, "\$\$approval-");
     if (! $approval_string) {
@@ -181,11 +191,29 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     # Create and indirect through post var for project approval value.
     #
     $foo = "$user\$\$approval-$project/$project";
+    $bar = "$user\$\$trust-$project/$project";
     $default_approval = $$foo;
     
     if (!$default_approval || strcmp($default_approval, "") == 0) {
-	USERERROR("You must specify an action for $user in the default group ".
-		  "as well as the subgroup!", 1);
+	# Implicit group approval as user.
+	# Short circuit all the perms-checking, and squeeze it in
+	# all the appropriate places.
+	
+	# 1. For our benefit
+	$$foo = $approval;
+	
+	# 2. For the strcmp below's benefit
+	$default_approval = $approval;
+
+	# 3. For the sanity check
+	$projectchecks[$user][] = array($project, $project, "user");	
+
+	# 4. For the while loop which does the actual work
+	$POST_VARS_COPY[ $foo ] = $approval;
+	$$bar = "user";
+
+#	USERERROR("You must specify an action for $user in the default group ".
+#		  "as well as the subgroup!", 1);
     }
     if (strcmp($approval, "approve") == 0 &&
 	strcmp($default_approval, "approve")) {
@@ -245,7 +273,7 @@ reset($HTTP_POST_VARS);
 #
 # Okay, all sanity tests passed for all post vars. Now do the actual work.
 # 
-while (list ($header, $value) = each ($HTTP_POST_VARS)) {
+while (list ($header, $value) = each ($POST_VARS_COPY)) {
     #echo "$header: $value<br>\n";
 
     $approval_string = strstr($header, "\$\$approval-");
