@@ -1744,3 +1744,19 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.263: I fixed typo in previous revision; nothing to do, skip to next
        entry.
+
+1.264: Add some new roles for modelnet nodes, not currently used. Drop
+       node_types:isphantom which I added in 1.256 since I decided not
+       to use it; just use isdynamic instead. Add an isjailed slot to
+       node_types rather then hardwiring that fact to "pcvm" node type.
+
+	alter table reserved change erole erole\
+             enum('node','virthost','delaynode','simhost', \
+                  'modelnet-core','modelnet-edge') \
+              NOT NULL default 'node';
+	alter table node_types drop isphantom;
+	alter table node_types add isjailed tinyint(1) NOT NULL \
+		default '0' after ismodelnet;
+
+        update node_types set isjailed=1 where type='pcvm';
+        update node_types set isjailed=1 where type='modelnet-edge';
