@@ -133,7 +133,7 @@ foreach my $node ( @nodes ) {
 	if (! $jailed) {
 	    next;
 	}
-	if (! TBIsNodeRemote($node) {
+	if (! TBIsNodeRemote($node)) {
 	    next;
 	}
     }
