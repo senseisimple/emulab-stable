@@ -256,25 +256,8 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
     # uid to hcecklogin, so we can give the right error message.
     if ($uid=="") { $uid=$HTTP_COOKIE_VARS[$TBNAMECOOKIE]; }
 
-    # If I was reddot adminmode before I had problems, the login link
-    # should put me back in reddot immediately.
-    $adminstr="";
-    $q = DBQueryFatal("select admin,adminoff from users ".
-		      "where uid='$uid'");
-    if (mysql_num_rows($q)>0) {
-	$r = mysql_fetch_array($q);
-	if (($r["admin"]==1) &&
-	    ($r["adminoff"]==0)) {
-	    $adminstr = "&adminmode=1";
-	}
-    }
-    
-    $link = "\n<blockquote><blockquote>\n".
-	"<table class=\"menu\" cellpadding=10 cellspacing=0 align=center>\n".
-	"<tr>\n<td class=\"menufooter\" align=center valign=center>\n".
-	"<a href=\"$TBBASE/login.php3?refer=1$adminstr\">".
-	"<img alt=\"logon\" border=0 src=\"$BASEPATH/logon.gif\"></a>\n".
-	"</td></tr></table>\n</blockquote></blockquote>\n";
+    $link = "\n<a href=\"$TBBASE/login.php3?refer=1\">Please ".
+	"log in again.</a>\n";
 
     if ($uid == FALSE)
         USERERROR("You do not appear to be logged in! $link", 1);
@@ -286,7 +269,7 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
         USERERROR("You do not appear to be logged in! $link", 1);
         break;
     case CHECKLOGIN_TIMEDOUT:
-        USERERROR("Your login has timed out! Please log in again. $link", 1);
+        USERERROR("Your login has timed out! $link", 1);
         break;
     case CHECKLOGIN_MAYBEVALID:
         USERERROR("Your login cannot be verified. Are cookies turned on? ".
