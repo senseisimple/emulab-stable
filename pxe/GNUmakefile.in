@@ -16,7 +16,7 @@ include $(OBJDIR)/Makeconf
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all: bootinfo bootinfosend bootinfo.restart
+all: bootinfo bootinfosend bootinfo.restart bootinfoclient
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -56,6 +56,10 @@ bootinfosend: bootinfosend.o bootinfo.h bootinfo_version.o bootwhat.h $(BI_DBOBJ
 		-o bootinfosend bootinfosend.o bootinfo_version.o $(BI_DBOBJ) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
+bootinfoclient: bootinfoclient.o bootinfo.h bootinfo_version.o bootwhat.h
+	cc -static $(CFLAGS) $(DBFLAG) $(INCS) \
+		-o bootinfoclient bootinfoclient.o bootinfo_version.o
+
 bootinfo_mysql.o:	bootinfo.h bootwhat.h
 
 testbootinfo_mysql: bootinfo_mysql.c
@@ -76,6 +80,9 @@ install:	$(INSTALL_SBINDIR)/bootinfo \
 		$(INSTALL_SBINDIR)/bootinfo.restart \
 		$(INSTALL_SBINDIR)/bootinfosend \
 		$(INSTALL_ETCDIR)/bootinfo.conf
+
+client-install: bootinfoclient
+	$(INSTALL_PROGRAM) bootinfoclient $(DESTDIR)$(CLIENT_BINDIR)
 
 clean: 
 	rm -f *.o core bootinfo bootinfosend testmysql bootinfo_version.c
