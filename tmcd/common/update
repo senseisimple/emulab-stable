@@ -165,7 +165,7 @@ $tmcctimeout = 30;
 #
 # Order matters!
 #
-if (($mounts || $doall) && !JAILED()) {
+if (($mounts || $doall) && !JAILED() && !PLAB()) {
     print "Updating project and home directories ... \n";
 
     if (domounts()) {
@@ -174,7 +174,8 @@ if (($mounts || $doall) && !JAILED()) {
     }
 }
 
-if (($hostsfile || $doall) && !REMOTE()) {
+if (($hostsfile || $doall) && (!REMOTE() || PLAB())) {
+    # Yes, the || PLAB() is intentional, since hostnames work on Plab
     print "Updating Testbed hostnames configuration ... \n";
 
     if (dohostnames()) {

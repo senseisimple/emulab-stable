@@ -130,7 +130,7 @@ $SIG{INT}  = \&handler;
 #
 # If jailed, get our jailname. 
 #
-if (JAILED()) {
+if (JAILED() || PLAB()) {
     $vnodeid = libsetup_getvnodeid();
 }
 
@@ -168,7 +168,7 @@ while (1) {
 
     # Skip all this stuff in jail. 
     next
-	if (JAILED());
+	if (JAILED() || PLAB());
 
     #
     # Send back ntpdrift info. Should move elsewhere.
