@@ -84,6 +84,7 @@ if (mysql_num_rows($query_result)) {
     echo "<tr>
               <td align=center>PID</td>
               <td align=center>EID</td>
+              <td align=center>State</td>
               <td align=center>Nodes</td>
               <td align=center>Description</td>
           </tr>\n";
@@ -91,12 +92,14 @@ if (mysql_num_rows($query_result)) {
     while ($projrow = mysql_fetch_array($query_result)) {
 	$pid  = $projrow[pid];
 	$eid  = $projrow[eid];
+	$state= $projrow[state];
 	$nodes= $projrow["count(r.node_id)"];
 	$name = $projrow[expt_name];
 
         echo "<tr>
                  <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+		 <td>$state</td>
                  <td>$nodes</td>
                  <td>$name</td>
              </tr>\n";
