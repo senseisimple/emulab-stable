@@ -1,0 +1,66 @@
+For Elab interface to Plab
+
+==BUGS
+-Need more randomness in plab node selection, or keeps allocing
+ the bad ones with low loadavgs.  Mike/Rob's idea is to add to load
+ a little bit if fails or is alloced, but every 5 mins that will get
+ wiped out: not good enough.
+ THIS IS A BIG PRACTICAL PROBLEM!  When "fatal" is set, the retry gets
+ the same physnodes every time, therefore never succeeding.  And
+ growing an expt to its full size via modify often fails because of this,
+ too. 
+
+-vnodesetup on a failed node not releasing the lease
+
+-vnode setup on 122-4 in 'chknodes' expt 9/20: it thinks it succeeded,
+but it didn't.  Get permission denied when try to ssh in.  Not checking
+return code on the close's? 
+In teardown portion of chknodes it discovers this:
+	vnode plab122-4 teardown on plab122 returned 65280.
+	*** /usr/testbed/sbin/vnode_setup:
+	    Virtual node plab122-4 teardown failure!
+	Node plab122-4 wasn't really allocated
+This appears really to be a DB consistency problem.
+It alloc'ed, then freed the node.  Never did full setup.
+
+==FEATURES
+-Ask for "all nodes"
+
+-Shrink the virtnodes table when a node fails?
+	Problem: It's unintuitive
+	that swapping out and swapping back in won't bring back the failed nodes.
+	Note that "modify" will bring them back.
+
+-First class or good support for 'site'
+	- Ability to spread the nodes around
+	- Intuit when new nodes join
+	- Sortable Web page displaying them hierarchically
+	- Interaction with load metrics if not .99, and UI to it?
+   and probably the other criteria that Brent mentioned in his mail of 9/9
+
+-Early abort if "cannot fail" is set and get a failed node
+
+-Merge ron/pcwas/plab as much as possible and makes sense (eg showsites).
+
+(-Modify when no nodes change?
+	fix-node ok hack may not be good idea in long run)
+
+-When can't map because of fix-nodes not available, tell the user
+why. (maybe won't occur if the modify fix is done).
+
+
+==MAINTENANCE
+-Document all the installation/maintenance issues.
+	Formalize the log of hostname/aux_type manual overrides.
+	...
+
+
+==TESTING
+-Build (regression) tests
+
+
+==DOCUMENTATION
+-Document Plab support.  A few things aren't in the email and proto file,
+e.g. how to queue, what cpu-usage and admission control map to.
+
+-Describe/outline the internals of plab support, eg the process involved.
