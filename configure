@@ -17,6 +17,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-LEDA		Specify LEDA path (/usr/testbed default)"
 ac_help="$ac_help
+  --with-assign	Specify assign binary (overrides LEDA, default off)"
+ac_help="$ac_help
   --with-ssh-args	Specify ssh arguments when running from testbed scripts "
 ac_help="$ac_help
   --with-rcdir		Specify path to install rc.d scripts (/usr/local/etc/rc.d default)"
@@ -570,7 +572,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:574: checking host system type" >&5
+echo "configure:576: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -591,7 +593,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:595: checking build system type" >&5
+echo "configure:597: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -617,7 +619,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:621: checking for $ac_word" >&5
+echo "configure:623: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -649,7 +651,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:653: checking for $ac_word" >&5
+echo "configure:655: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -681,7 +683,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:685: checking for $ac_word" >&5
+echo "configure:687: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -713,7 +715,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:717: checking for $ac_word" >&5
+echo "configure:719: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -745,7 +747,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:749: checking for $ac_word" >&5
+echo "configure:751: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -777,7 +779,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:781: checking for $ac_word" >&5
+echo "configure:783: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -950,6 +952,29 @@ fi
 
 
 #
+# Override LEDA with assign binary.
+#
+# Check whether --with-assign or --without-assign was given.
+if test "${with_assign+set}" = set; then
+  withval="$with_assign"
+  
+    if test "$withval" = "yes"; then
+        ASSIGN="assign.bin"
+        LEDA=""
+    else
+        ASSIGN="$withval"
+        LEDA=""
+    fi
+
+else
+  
+    ASSIGN=""
+
+fi
+
+
+
+#
 # Arguments to ssh to disable strict host key checking, etc
 #
 # Check whether --with-SSH_ARGS or --without-SSH_ARGS was given.
@@ -1036,12 +1061,15 @@ fi
 if test "$enable_events" = "yes"; then
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
-                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart \
+                    event/tbgen/GNUmakefile event/tbgen/tevd.restart \
                     event/example/GNUmakefile";
 	optional_subdirs="$optional_subdirs event";
+        EVENTSYS=1;
 else
 	eventfiles="";
+        EVENTSYS=0;
 fi
+
 
 #
 # Testing mode.  In testing mode scripts should not effect hardware state.
@@ -1077,7 +1105,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1080: checking for a BSD compatible install" >&5
+echo "configure:1109: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1174,7 +1202,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup \
-	tbsetup/webmkacct tbsetup/mkacct \
+	tbsetup/webmkacct tbsetup/mkacct tbsetup/eventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
@@ -1362,10 +1390,12 @@ s%@FSDIR_PROJ@%$FSDIR_PROJ%g
 s%@FSDIR_GROUPS@%$FSDIR_GROUPS%g
 s%@FSDIR_USERS@%$FSDIR_USERS%g
 s%@LEDA@%$LEDA%g
+s%@ASSIGN@%$ASSIGN%g
 s%@SSH_ARGS@%$SSH_ARGS%g
 s%@INSTALL_RCDIR@%$INSTALL_RCDIR%g
 s%@INSTALL_APACHE_CONFIG@%$INSTALL_APACHE_CONFIG%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
+s%@EVENTSYS@%$EVENTSYS%g
 s%@TESTMODE@%$TESTMODE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g

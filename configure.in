@@ -116,6 +116,24 @@ AC_ARG_WITH(LEDA,
 AC_SUBST(LEDA)
 
 #
+# Override LEDA with assign binary.
+#
+AC_ARG_WITH(assign,
+[  --with-assign	Specify assign binary (overrides LEDA, default off)],
+[
+    if test "$withval" = "yes"; then
+        ASSIGN="assign.bin"
+        LEDA=""
+    else
+        ASSIGN="$withval"
+        LEDA=""
+    fi
+],[
+    ASSIGN=""
+])
+AC_SUBST(ASSIGN)
+
+#
 # Arguments to ssh to disable strict host key checking, etc
 #
 AC_ARG_WITH(SSH_ARGS,
@@ -181,12 +199,15 @@ AC_ARG_ENABLE(events,
 if test "$enable_events" = "yes"; then
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
-                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart \
+                    event/tbgen/GNUmakefile event/tbgen/tevd.restart \
                     event/example/GNUmakefile";
 	optional_subdirs="$optional_subdirs event";
+        EVENTSYS=1;
 else
 	eventfiles="";
+        EVENTSYS=0;
 fi
+AC_SUBST(EVENTSYS)
 
 #
 # Testing mode.  In testing mode scripts should not effect hardware state.
@@ -253,7 +274,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup \
-	tbsetup/webmkacct tbsetup/mkacct \
+	tbsetup/webmkacct tbsetup/mkacct tbsetup/eventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \

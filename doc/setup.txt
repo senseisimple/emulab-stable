@@ -50,9 +50,14 @@ boot-time problems that we've had with 3.23.36 .
 We rely on a software package call LEDA which we are not allowed to
 distribute (source *or* binary), and is currently not being
 distributed by the authors. As a result, we will distribute a binary
-for the one program that requires linking with the LEDA library. In
-the meantime we will be working on removing our dependence on the LEDA
-library. 
+for the one program (assign) that requires linking with the LEDA
+library. In the meantime we will be working on removing our dependence
+on the LEDA library.
+
+The program in question is assign (see the assign subdir). Please
+contact us if you need to replace it. When you configure your
+testbed tree, be sure to add the --with-assign=/path/to/assign/binary.
+See below.
 
 ##### Step 3 - Testbed tree configuration/installation
 
@@ -109,7 +114,8 @@ Now, build and install the software. For example, I have the testbed source in
 defs-ricci-emulab defs file in my home directory, I would do:
 
 cd ~/tbobj
-~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci-emulab
+~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci-emulab \
+	--with-assign=/users/ricci/testbed/assign_binary
 gmake
 gmake boss-install
 sudo gmake post-install

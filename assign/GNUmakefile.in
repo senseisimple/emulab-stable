@@ -6,6 +6,11 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= assign
 
+#
+# Support for optional assign binary to avoid LEDA restrictions
+#
+ASSIGNBINARY	= @ASSIGN@
+
 include $(OBJDIR)/Makeconf
 
 all: assign 
@@ -33,8 +38,14 @@ CXXFLAGS += -Wall -O3
 
 DEPLIBS=$(OBJS)
 
+ifdef ASSIGNBINARY
+assign:	${ASSIGNBINARY}
+	rm -f assign
+	cp $< assign
+else
 assign: ${DEPLIBS} ${OBJS} assign.o
 	${CXX} assign.o -o assign ${LIBS} $(OBJS) ${LDFLAGS}
+endif
 
 install: $(INSTALL_LIBEXECDIR)/assign 
 
