@@ -11,8 +11,8 @@ SUBDIR		= os/imagezip
 
 DISTFILES	= ext2_fs.h imagehdr.h linux_types.h queue.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
-		  imageunzip.c imageunzip.8
-EXPANDCOPYRIGHT	= /n/fast/usr/lsrc/flux/doc/copyright/expand-copyr
+		  imageunzip.c crc.c imageunzip.8
+EXPANDCOPYRIGHT	= /flux/doc/copyright/expand-copyr
 
 WITH_NTFS	= @WINSUPPORT@
 
@@ -84,12 +84,14 @@ clean:
 imagezip.tar.gz: imagezip.tar
 	gzip -c imagezip.tar > imagezip.tar.gz
 
-imagezip.tar: Makefile.sa $(DISTFILES)
+imagezip.tar: Makefile.sa Makefile-linux.sa $(DISTFILES)
 	rm -rf imagezip-dist; mkdir imagezip-dist
-	(cd $(SRCDIR); tar cf - Makefile.sa $(DISTFILES)) | \
+	(cd $(SRCDIR); tar cf - Makefile.sa Makefile-linux.sa $(DISTFILES)) | \
 		(cd imagezip-dist; tar xf -)
 	mv imagezip-dist/Makefile.sa imagezip-dist/Makefile
-	(cd imagezip-dist; $(EXPANDCOPYRIGHT) Makefile $(DISTFILES))
+	mv imagezip-dist/Makefile-linux.sa imagezip-dist/Makefile-linux
+	(cd imagezip-dist; \
+		$(EXPANDCOPYRIGHT) Makefile Makefile-linux $(DISTFILES))
 	tar cf imagezip.tar imagezip-dist
 	rm -rf imagezip-dist
 

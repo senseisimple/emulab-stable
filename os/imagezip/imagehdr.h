@@ -4,7 +4,7 @@
  * All rights reserved.
  */
 
-#include <sys/types.h>
+#include <inttypes.h>
 
 /*
  * Magic number when image is compressed

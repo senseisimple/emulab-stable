@@ -246,7 +246,7 @@ dumpfile(char *name, int fd)
 		       franges, SECTOBYTES(sectfree)/franges,
 		       SECTOBYTES(fmin), SECTOBYTES(fmax));
 	if (aranges) {
-		int minsz, maxsz, i;
+		int maxsz, i;
 
 		printf("  %d allocated ranges: %qu/%qu/%qu ave/min/max size\n",
 		       aranges, SECTOBYTES(sectinuse)/aranges,

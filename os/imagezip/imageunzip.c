@@ -8,10 +8,6 @@
  * Usage: imageunzip <input file>
  *
  * Writes the uncompressed data to stdout.
- *
- * XXX: Be nice to use pwrite. That would simplify the code a alot, but
- * you cannot pwrite to a device that does not support seek (stdout),
- * and I want to retain that capability.
  */
 
 #include <stdio.h>
@@ -23,7 +19,9 @@
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#ifndef linux
 #include <sys/disklabel.h>
+#endif
 #include "imagehdr.h"
 #include "queue.h"
 #ifndef NOTHREADS
@@ -51,7 +49,6 @@ long long totalrdata = 0;
  */
 static long		outputminsec	= 0;
 static long		outputmaxsec	= 0;
-static long long	outputmaxsize	= 0;	/* Sanity check */
 
 /* Why is this not defined in a public header file? */
 #define BOOT_MAGIC	0xAA55
@@ -123,6 +120,12 @@ unsigned long writeridles;
 #define		threadinit()
 #define		threadwait()
 #define		threadquit()
+
+/* XXX keep the code simple */
+#define pthread_mutex_lock(l)
+#define pthread_mutex_unlock(l)
+#define pthread_testcancel()
+#undef CONDVARS_WORK
 #else
 static void	 threadinit(void);
 static void	 threadwait(void);
@@ -134,6 +137,7 @@ static pthread_t child_pid;
 static pthread_mutex_t	writequeue_mutex;	
 #ifdef CONDVARS_WORK
 static pthread_cond_t	writequeue_cond;	
+#endif
 #endif
 
 /*
@@ -153,12 +157,14 @@ typedef struct {
 	char		*data;
 } writebuf_t;
 
-static queue_head_t	writequeue;
 static unsigned long	maxwritebufmem = MAXWRITEBUFMEM;
 static volatile unsigned long	curwritebufmem, curwritebufs;
+#ifndef NOTHREADS
+static queue_head_t	writequeue;
 static pthread_mutex_t	writebuf_mutex;
 #ifdef CONDVARS_WORK
 static pthread_cond_t	writebuf_cond;
+#endif
 #endif
 static volatile int	writebufwanted;
 
@@ -226,8 +232,6 @@ alloc_writebuf(off_t offset, off_t size, int allocbuf, int dowait)
 #endif
 					pthread_testcancel();
 				} while (writebufwanted);
-
-//fprintf(stderr, "alloc BLOCKDONE: cur=%lu max=%lu\n", curwritebufmem, maxwritebufmem);
 			}
 		} while (buf == NULL);
 		buf->refs = 1;
@@ -239,7 +243,6 @@ alloc_writebuf(off_t offset, off_t size, int allocbuf, int dowait)
 		maxbufsalloced = curwritebufs;
 	if (curwritebufmem > maxmemalloced)
 		maxmemalloced = curwritebufmem;
-//fprintf(stderr, "alloc %p: off=%qu size=%qu, doalloc=%d, buf=%p\n", wbuf, offset, size, allocbuf, buf);
 	pthread_mutex_unlock(&writebuf_mutex);
 
 	queue_init(&wbuf->chain);
@@ -258,7 +261,7 @@ split_writebuf(writebuf_t *wbuf, off_t doff, int dowait)
 	off_t size;
 
 	assert(wbuf->buf != NULL);
-//fprintf(stderr, "split %p: doff=%qu, buf=%p, data=%p, refs=%d\n", wbuf, doff, wbuf->buf, wbuf->data, wbuf->buf->refs);
+
 	splits++;
 	assert(doff < wbuf->size);
 	size = wbuf->size - doff;
@@ -280,7 +283,6 @@ free_writebuf(writebuf_t *wbuf)
 	assert(wbuf != NULL);
 
 	pthread_mutex_lock(&writebuf_mutex);
-//fprintf(stderr, "free %p: buf=%p, refs=%d\n", wbuf, wbuf->buf, wbuf->buf ? wbuf->buf->refs : -1);
 	if (wbuf->buf && --wbuf->buf->refs == 0) {
 		curwritebufs--;
 		curwritebufmem -= wbuf->buf->size;
@@ -296,7 +298,6 @@ free_writebuf(writebuf_t *wbuf)
 	free(wbuf);
 	pthread_mutex_unlock(&writebuf_mutex);
 }
-#endif
 
 static void
 dowrite_request(writebuf_t *wbuf)
@@ -440,8 +441,13 @@ main(int argc, char **argv)
 			break;
 
 		case 's':
+#ifndef linux
 			slice = atoi(optarg);
 			break;
+#else
+			fprintf(stderr, "slice mode not supported in Linux\n"); 
+			exit(1);
+#endif
 
 		case 'D':
 			dostype = atoi(optarg);
@@ -534,6 +540,7 @@ main(int argc, char **argv)
 		seekable = 1;
 
 	if (slice) {
+#ifndef linux
 		off_t	minseek;
 		
 		if (readmbr(slice)) {
@@ -546,6 +553,10 @@ main(int argc, char **argv)
 			perror("Setting seek pointer to slice");
 			exit(1);
 		}
+#else
+		fprintf(stderr, "Slice mode in Linux!\n");
+		exit(1);
+#endif
 	}
 
 	threadinit();
@@ -569,7 +580,7 @@ main(int argc, char **argv)
 			chunklist[i] = i;
 		chunklist[i] = -1;
 
-		srandomdev();
+		srandom((long)(stamp.tv_usec^stamp.tv_sec));
 		for (i = 0; i < 50 * numchunks; i++) {
 			int c1 = random() % numchunks;
 			int c2 = random() % numchunks;
@@ -625,9 +636,11 @@ main(int argc, char **argv)
 	/* This causes the output queue to drain */
 	threadquit();
 	
+#ifndef linux
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
+#endif
 
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
@@ -649,7 +662,7 @@ main(int argc, char **argv)
 			decompblocks, writeridles, rdycount);
 	if (docrconly)
 		fprintf(stderr, "%s: CRC=%u\n", argv[0], ~crc);
-dump_writebufs();
+	dump_writebufs();
 	return 0;
 }
 #else
@@ -697,6 +710,7 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 		seekable = 1;
 
 	if (slice) {
+#ifndef linux
 		off_t	minseek;
 		
 		if (readmbr(slice)) {
@@ -709,6 +723,10 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 			perror("Setting seek pointer to slice");
 			exit(1);
 		}
+#else
+		fprintf(stderr, "Slice mode in Linux!\n");
+		exit(1);
+#endif
 	}
 	threadinit();
 	return 0;
@@ -739,9 +757,11 @@ ImageUnzipQuit(void)
 {
 	threadquit();
 
+#ifndef linux
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
+#endif
 
 	fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
 		totaledata, totalrdata);
@@ -1223,6 +1243,7 @@ writedata(off_t offset, size_t size, void *buf)
 	totalrdata += cc;
 }
 
+#ifndef linux
 /*
  * DOS partition table handling
  */
@@ -1234,6 +1255,8 @@ struct doslabel {
 };
 #define DOSPARTSIZE \
 	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
+
+static long long outputmaxsize = 0;
 
 /*
  * Parse the DOS partition table to set the bounds of the slice we
@@ -1314,10 +1337,13 @@ fixmbr(int slice, int dtype)
 	}
 	return 0;
 }
+#endif
 
 static struct blockreloc *reloctable;
 static int numrelocs;
+#ifndef linux
 static void reloc_bsdlabel(struct disklabel *label, int reloctype);
+#endif
 
 static void
 getrelocinfo(blockhdr_t *hdr)
@@ -1372,12 +1398,14 @@ applyrelocs(off_t offset, size_t size, void *buf)
 			switch (reloc->type) {
 			case RELOC_NONE:
 				break;
+#ifndef linux
 			case RELOC_FBSDDISKLABEL:
 			case RELOC_OBSDDISKLABEL:
 				assert(reloc->size >= sizeof(struct disklabel));
 				reloc_bsdlabel((struct disklabel *)(buf+coff),
 					       reloc->type);
 				break;
+#endif
 			default:
 				fprintf(stderr,
 					"Ignoring unknown relocation type %d\n",
@@ -1388,6 +1416,7 @@ applyrelocs(off_t offset, size_t size, void *buf)
 	}
 }
 
+#ifndef linux
 static void
 reloc_bsdlabel(struct disklabel *label, int reloctype)
 {
@@ -1456,6 +1485,7 @@ reloc_bsdlabel(struct disklabel *label, int reloctype)
 	label->d_checksum = 0;
 	label->d_checksum = dkcksum(label);
 }
+#endif
 
 #if !defined(CONDVARS_WORK) && !defined(FRISBEE)
 #include <errno.h>

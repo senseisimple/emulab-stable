@@ -10,19 +10,16 @@
 #
 BINDIR=	/usr/local/bin
 
-.if defined(NOTHREADS)
-PTHREADCFLAGS	= -DNOTHREADS
-PTHREADLIBS	=
-.else
-PTHREADCFLAGS	= -D_THREAD_SAFE \
-		  -I/usr/local/include/pthread/linuxthreads
-PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
-.endif
+PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
+#PTHREADLIBS	= -L/usr/local/lib -llgcc_r
 
-CFLAGS		= -Wall -O2 -g -static
+# get 64-bit off_t and pread/pwrite protos
+LINUXOPTS	= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
+
+CFLAGS		= -Wall -O2 -g -static $(PTHREADCFLAGS) $(LINUXOPTS)
 LIBS 		= -lz $(PTHREADLIBS)
-UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
-UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
+UNZIPCFLAGS	= $(CFLAGS) -Wall
+UNZIPLIBS	= $(LIBS)
 
 all:	imagezip imageunzip imagedump
 
@@ -48,5 +45,3 @@ install:
 
 clean:
 	rm -f *.o imagezip imageunzip imagedump version.c
-
-.include <bsd.prog.mk>

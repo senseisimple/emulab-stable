@@ -27,8 +27,8 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <zlib.h>
-#define DKTYPENAMES
 #ifndef linux
+#define DKTYPENAMES
 #include <sys/disklabel.h>
 #include <ufs/ffs/fs.h>
 #endif
@@ -60,6 +60,10 @@
 #endif
 #ifndef DOSPTYP_OPENBSD
 #define DOSPTYP_OPENBSD 0xa6
+#endif
+
+#ifndef NDOSPART
+#define NDOSPART	4
 #endif
 
 char	*infilename;
@@ -630,6 +634,9 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size, int bsdtype)
 		}
 
 		if (debug) {
+			/* XXX silence gcc about dktypenames */
+			rval = DKMAXTYPES;
+
 			fprintf(stderr, "    %c ", BSDPARTNAME(i));
 
 			fprintf(stderr, "  start %9d, size %9d\t(%s)\n",
@@ -952,7 +959,7 @@ read_linuxgroup(struct ext2_super_block *super,
 	offset += (off_t)EXT2_BLOCK_SIZE(super) * group->bg_block_bitmap;
 	if (devlseek(infd, offset, SEEK_SET) < 0) {
 		warn("Linux Group %d: "
-		     "Could not seek to Group bitmap %ld",
+		     "Could not seek to Group bitmap %d",
 		     index, group->bg_block_bitmap);
 		return 1;
 	}
@@ -2194,7 +2201,7 @@ static z_stream		d_stream;	/* Compression stream */
 static off_t
 compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 {
-	int		cc, count, err, eof, finish, outsize;
+	int		cc, count, err, tileof, finish, outsize;
 	off_t		total = 0;
 
 	/*
@@ -2217,10 +2224,10 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 	 * (and report back how much).
 	 */
 	if (!size) {
-		eof  = 1;
-		size = QUAD_MAX;
+		tileof  = 1;
+		size	= BSIZE + 1;
 	} else
-		eof  = 0;
+		tileof  = 0;
 
 	while (size > 0) {
 		if (size > BSIZE)
@@ -2261,9 +2268,10 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 			break;
 		}
 
-		if (cc != count && !eof) {
+		if (cc != count && !tileof) {
 			fprintf(stderr, "Bad count in read, %d != %d at %qu\n",
-				cc, count, off+total);
+				cc, count,
+				off+total);
 			exit(1);
 		}
 
@@ -2273,7 +2281,8 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		if (fixups != NULL)
 			applyfixups(off+total, count, inbuf);
 
-		size  -= cc;
+		if (!tileof)
+			size -= cc;
 		total += cc;
 
 		outsize = SUBBLOCKSIZE - buffer_offset;
