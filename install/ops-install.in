@@ -62,13 +62,14 @@ my $EXPORTS_HEAD    = "$EXPORTS_FILE.head";
 my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $SUDOERS         = "/usr/local/etc/sudoers";
-my $PORTSDIR        = "/usr/ports/misc";
+my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
 
 #
 # Some directories we care about
 #
 my $LIST_DIR   = "/etc/mail/lists";
 my $TIPLOG_DIR = "/var/log/tiplogs";
+my $PORTSDIR   = "/usr/ports/misc";
 my $SRCDIR     = '@srcdir@';
 
 #
@@ -78,7 +79,7 @@ my @LOCAL_HOSTS       = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
 my @LOGFILES          = ("/var/log/logins","/var/log/tiplogs/capture.log",
     "/var/log/mountd.log");
 my @MAILING_LIST_NAMES = map { /^([\w-]+)\@/ } @MAILING_LISTS;
-my @TESTBED_DIRS       = ($PREFIX,"/users","/proj","/groups");
+my @TESTBED_DIRS       = ($PREFIX,"/users","/proj","/groups","/share");
 
 #
 # Make sure they know what they're getting into...
@@ -302,6 +303,11 @@ Phase "syslog", "Setting up syslog", sub {
 Phase "sudoers", "Editing $SUDOERS", sub {
     DoneIfEdited($SUDOERS);
     AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
+};
+
+Phase "ssh", "Allowing root ssh from boss", sub {
+    DoneIfEdited($SSHD_CONFIG);
+    AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin Yes");
 };
 
 print "----------------------------------------------------------------------\n";
