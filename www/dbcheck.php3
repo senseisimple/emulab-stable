@@ -76,13 +76,12 @@ function TBFieldData($table, $column, $flag = 0)
 	}
 	$fielddata = $DBFieldData["default:default"];
     }
-    # Overwrite final entry with toplevel data.
+    # Return both values.
     if (isset($toplevel) &&
 	($toplevel["min"] || $toplevel["max"])) {
-	$fielddata["min"] = $toplevel["min"];
-	$fielddata["max"] = $toplevel["max"];
+	return array($fielddata, $toplevel);
     }
-    return $fielddata;
+    return array($fielddata, NULL);
 }
 
 #
@@ -93,7 +92,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
 {
     global $DBFieldErrstr;
 
-    $fielddata   = TBFieldData($table, $column, $flag);
+    list ($fielddata, $toplevel) = TBFieldData($table, $column, $flag);
 
     if (! $fielddata) {
 	return 0;
@@ -102,8 +101,10 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
     $check       = $fielddata["check"];
     $check_type  = $fielddata["check_type"];
     $column_type = $fielddata["column_type"];
-    $min         = $fielddata["min"];
-    $max         = $fielddata["max"];
+    $min         = (empty($toplevel) ? $fielddata["min"] : $toplevel["min"]);
+    $max         = (empty($toplevel) ? $fielddata["max"] : $toplevel["max"]);
+    $min = intval($min);
+    $max = intval($max);
 
     #
     # Functional checks not implemented yet. 
@@ -150,7 +151,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
         case "int":
         case "float":
 	    if ($token < $min)
-		$DBFieldErrstr = "too small - $min minimum value";
+		$DBFieldErrstr = "$token too small - $min minimum value";
 	    else 
 		$DBFieldErrstr = "too large - $max maximum value";
 	    break;
@@ -224,6 +225,18 @@ function TBvalid_why($token) {
 }
 function TBvalid_integer($token) {
     return TBcheck_dbslot($token, "default", "int",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_tinyint($token) {
+    return TBcheck_dbslot($token, "default", "tinyint",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_boolean($token) {
+    return TBcheck_dbslot($token, "default", "boolean",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_float($token) {
+    return TBcheck_dbslot($token, "default", "float",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
 function TBvalid_num_members($token) {

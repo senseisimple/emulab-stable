@@ -188,8 +188,12 @@ if (! strcmp($showtype, "summary")) {
 	if (isset($perms[$key]) && !$perms[$key])
 	    continue;
 	
-	echo "<tr>
-              <td><a href=shownodetype.php3?node_type=$key>$key</a></td>
+	echo "<tr>\n";
+	if ($isadmin)
+	    echo "<td><a href=editnodetype.php3?node_type=$key>\n";
+	else
+	    echo "<td><a href=shownodetype.php3?node_type=$key>\n";
+	echo "           $key</a></td>
               <td align=center>$freecount</td>
               <td align=center>$value</td>
               </tr>\n";

@@ -66,3 +66,33 @@ function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
           </tr>\n";
 }
 
+function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous)
+{
+    echo "<tr>
+            <td>*$caption:</td>";
+    echo "  <td><select name=\"$value\">
+                <option value=X>Please Select </option>\n";
+
+    mysql_data_seek($imageid_result, 0);
+
+    while ($row = mysql_fetch_array($imageid_result)) {
+	$imageid   = $row[imageid];
+	$imagename = $row[imagename];
+	$pid       = $row[pid];
+	$selected  = "";
+
+	if (strcmp($previous, "$imageid") == 0)
+	    $selected = "selected";
+
+	echo "<option $selected value='$imageid'>$pid - $imagename</option>\n";
+    }
+    $selected = "";
+    if (strcmp($previous, "none") == 0)
+	$selected = "selected";
+	
+    echo "         <option $selected value=none>No ImageID</option>\n";
+    echo "       </select>";
+    echo "    </td>
+          </tr>\n";
+}
+
