@@ -78,7 +78,9 @@ print MAP "\$TTL\t1\n";
 # that have a vname in the reserved table. 
 #
 $db_result =
-    DBQueryFatal("select node_id,pid,eid,vname from reserved");
+    DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid ".
+		 " from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id");
 
 if ($db_result->numrows > 0) {
     #
@@ -92,6 +94,13 @@ if ($db_result->numrows > 0) {
 
 	if (defined($row[3])) {
 	    $vname = $row[3];
+	}
+
+        #
+        # VIRTNODE HACK: Map cname to underlying physnode.
+        #
+	if (defined($row[4]) && $row[4] ne $node_id) {
+	    $node_id = $row[4];
 	}
 	    
 	my $cname   = sprintf("%-40s", "$vname.$eid.$pid");
