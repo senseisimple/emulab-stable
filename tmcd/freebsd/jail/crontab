@@ -1,0 +1,14 @@
+# /etc/crontab - root's crontab for FreeBSD
+#
+# $FreeBSD: src/etc/crontab,v 1.21.2.3 2000/12/08 10:56:07 obrien Exp $
+#
+SHELL=/bin/sh
+PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin
+HOME=/var/log
+#
+#minute	hour	mday	month	wday	who	command
+#
+*/5	*	*	*	*	root	/usr/libexec/atrun
+#
+# rotate log files every hour, if necessary
+0	*	*	*	*	root	newsyslog

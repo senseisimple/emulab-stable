@@ -99,10 +99,10 @@ my $interactive = 0;
 # This stuff is passed from tmcd, which we parse into a config string
 # and an option set.
 my %jailconfig  = ();
-my $jailoptions = " -o inaddrany -o routing -r -1";
+my $jailoptions = "";
 my $sshdport    = 50000;	# Bogus default, good for testing.
 my $routetabid  = 0;		# Default to main routing table.
-my $jailflags   = 3;
+my $jailflags   = 0;
 my @jailips     = ();		# List of jail IPs (for routing table).
 my $ipfwrules	= ();		# List of IPFW rules to clean.
 my $JAIL_DEVMEM = 0x01;		# We need to know if these options given.
@@ -391,6 +391,7 @@ sub mkrootfs($)
     mysystem("cp -p $ETCJAIL/rc.conf $path/root/etc");
     mysystem("rm -f $path/root/etc/rc.conf.local");
     mysystem("cp -p $ETCJAIL/rc.local $path/root/etc");
+    mysystem("cp -p $ETCJAIL/crontab $path/root/etc");
     mysystem("cp -p $ETCJAIL/group $path/root/etc");
     mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
@@ -744,6 +745,7 @@ sub setjailoptions() {
 		last SWITCH;
 	    };
 	    /^ROUTING$/ && do {
+	       if (0) {
 		if ($val) {
 		    $jailoptions .= " -o routing";
 
@@ -759,6 +761,7 @@ sub setjailoptions() {
 		else {
 		    $jailoptions .= " -o norouting";
 		}
+  	       }
 		last SWITCH;
 	    };
 	    /^DEVMEM$/ && do {
