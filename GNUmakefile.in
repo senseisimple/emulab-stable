@@ -185,6 +185,11 @@ distclean:	distclean-subdirs
 	rm -f Makeconf GNUmakefile config.h config.status config.cache config.log
 	rm -f $(DISTCLEAN_FILES)
 
+elabinelab:
+	-mkdir -p $(INSTALL_TOPDIR)/src
+	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
+	tar czf $(INSTALL_TOPDIR)/src/emulab-src.tar.gz -C $(SRCDIR) .
+
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
 %.MAKE:
