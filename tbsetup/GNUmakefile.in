@@ -19,7 +19,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load startexp endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
-		  tbswap
+		  tbswap nseswap
 
 # Stuff that mere users get on plastic.
 USERBINS        = os_load node_reboot nscheck node_update savelogs \
