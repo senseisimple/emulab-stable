@@ -35,21 +35,22 @@ if (!isset($webcamid) ||
     MyError("You must provide a WebCam ID.");
 }
 
-#
-# The ID is really just a filename. Make sure it looks okay.
-#
 if (! preg_match("/^[\d]+$/", $webcamid)) {
     MyError("Invalid characters in WebCam ID.");
 }
 
 #
-# And check for the filename in the webcam directory.
+# And check for entry in webcams table, which tells us the server name
+# where we open the connection to. 
 #
-$filename = "$TBDIR/webcams/camera-${webcamid}.jpg";
+$query_result =
+    DBQueryFatal("select * from webcams where id='$webcamid'");
 
-if (!file_exists($filename)) {
-    MyError("Camera image file is missing!");
+if (!$query_result || !mysql_num_rows($query_result)) {
+    MyError("No such webcam ID: '$webcamid'");
 }
+$row = mysql_fetch_array($query_result);
+$URL = $row["URL"];
 
 #
 # Check sitevar to make sure mere users are allowed to peek at us.
@@ -58,7 +59,7 @@ $anyone_can_view = TBGetSiteVar("webcam/anyone_can_view");
 $admins_can_view = TBGetSiteVar("webcam/admins_can_view");
 
 if (!$admins_can_view || (!$anyone_can_view && !$isadmin)) {
-    USERERROR("Webcam Views are currently disabled!", 1);
+    MyError("Webcam Views are currently disabled!");
 }
 
 #
@@ -68,9 +69,45 @@ if (!$isadmin && !TBWebCamAllowed($uid)) {
     MyError("Not enough permission to view the robot cameras!");
 }
 
-# Spit back the image
-header("Content-type: image/gif");
-readfile("$filename");
+$socket = fopen($URL, "r");
+if (!$socket) {
+    TBERROR("Error opening URL $URL", 0);
+    MyError("Error opening URL");
+}
+
+#
+# So, the webcam spits out its own HTTP headers, which includes this
+# content-type line, but all those headers are basically lost cause
+# of the interface we are using (fopen). No biggie, but we have to
+# spit them out ourselves so the client knows what to do.
+#
+header("Content-type: multipart/x-mixed-replace; boundary=--myboundary");
+header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+header("Cache-Control: no-cache, must-revalidate");
+header("Pragma: no-cache");
+
+#
+# Clean up when the remote user disconnects
+#
+function SPEWCLEANUP()
+{
+    global $socket;
+
+    if (!$socket || !connection_aborted()) {
+	exit();
+    }
+    fclose($socket);
+    exit();
+}
+# ignore_user_abort(1);
+register_shutdown_function("SPEWCLEANUP");
+
+#
+# Spit back the image. The webcams include all the necessary headers,
+# so do not spit any headers here.
+#
+fpassthru($socket);
+fclose($socket);
 
 #
 # No Footer!

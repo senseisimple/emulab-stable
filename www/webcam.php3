@@ -57,9 +57,8 @@ echo "<table cellpadding='0' cellspacing='0' border='0' class='stealth'>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
     $id      = $row["id"];
-    $updated = $row["last_update"];
 
-    echo "<tr><td align=center>Web Cam $id. Last Update: $updated</td></tr>
+    echo "<tr><td align=center>Web Cam $id</td></tr>
           <tr><td align=center class='stealth'>
                 <img src='webcamimg.php3?webcamid=$id' align=center></td></tr>
           <tr><tr>\n";
