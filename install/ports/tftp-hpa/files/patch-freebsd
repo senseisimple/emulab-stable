@@ -1,0 +1,483 @@
+diff -rcN tftp-hpa-0.33.orig/MCONFIG.in tftp-hpa-0.33/MCONFIG.in
+*** tftp-hpa-0.33.orig/MCONFIG.in	Tue Nov 27 03:18:11 2001
+--- tftp-hpa-0.33/MCONFIG.in	Wed Feb  5 14:03:10 2003
+***************
+*** 27,32 ****
+--- 27,36 ----
+  
+  # System binaries
+  SBINDIR = @sbindir@
++ LIBEXECDIR = @libexecdir@
++ 
++ # Config info
++ ETCDIR = @sysconfdir@
+  
+  # Binary suffixes
+  O = @OBJEXT@
+diff -rcN tftp-hpa-0.33.orig/configure tftp-hpa-0.33/configure
+*** tftp-hpa-0.33.orig/configure	Sun Feb  2 18:33:26 2003
+--- tftp-hpa-0.33/configure	Wed Feb  5 14:03:10 2003
+***************
+*** 9652,9658 ****
+  fi
+  
+  if $LIBXTRA; then
+! 	LIBS="../lib/libxtra.a $LIBS"
+  fi
+  
+  
+--- 9652,9658 ----
+  fi
+  
+  if $LIBXTRA; then
+! 	LIBSXTRA=../lib/libxtra.a
+  fi
+  
+  
+***************
+*** 10647,10653 ****
+  fi
+  fi;
+  
+! TFTPD_LIBS="$LIBS"
+  LIBS="$common_libs"
+  
+  
+--- 10647,10653 ----
+  fi
+  fi;
+  
+! TFTPD_LIBS="$LIBSXTRA $LIBS"
+  LIBS="$common_libs"
+  
+  
+***************
+*** 11559,11565 ****
+  fi
+  fi;
+  
+! TFTP_LIBS="$LIBS"
+  LIBS="$common_libs"
+  
+  
+--- 11559,11565 ----
+  fi
+  fi;
+  
+! TFTP_LIBS="$LIBSXTRA $LIBS"
+  LIBS="$common_libs"
+  
+  
+diff -rcN tftp-hpa-0.33.orig/configure.in tftp-hpa-0.33/configure.in
+*** tftp-hpa-0.33.orig/configure.in	Thu Jan 30 19:17:01 2003
+--- tftp-hpa-0.33/configure.in	Wed Feb  5 14:03:10 2003
+***************
+*** 124,130 ****
+  AC_SEARCH_LIBS(xstrdup, iberty, , LIBXTRA=true AC_LIBOBJ(xstrdup))
+  AC_SEARCH_LIBS(bsd_signal, bsd, , LIBXTRA=true AC_LIBOBJ(bsdsignal))
+  if $LIBXTRA; then
+! 	LIBS="../lib/libxtra.a $LIBS"
+  fi
+  
+  dnl
+--- 124,130 ----
+  AC_SEARCH_LIBS(xstrdup, iberty, , LIBXTRA=true AC_LIBOBJ(xstrdup))
+  AC_SEARCH_LIBS(bsd_signal, bsd, , LIBXTRA=true AC_LIBOBJ(bsdsignal))
+  if $LIBXTRA; then
+! 	LIBSXTRA=../lib/libxtra.a
+  fi
+  
+  dnl
+***************
+*** 159,165 ****
+  	])
+  ],:)
+  
+! TFTPD_LIBS="$LIBS"
+  LIBS="$common_libs"
+  
+  dnl
+--- 159,165 ----
+  	])
+  ],:)
+  
+! TFTPD_LIBS="$LIBSXTRA $LIBS"
+  LIBS="$common_libs"
+  
+  dnl
+***************
+*** 187,193 ****
+  	])
+  ],:)
+  
+! TFTP_LIBS="$LIBS"
+  LIBS="$common_libs"
+  
+  AC_SUBST(TFTP_LIBS)
+--- 187,193 ----
+  	])
+  ],:)
+  
+! TFTP_LIBS="$LIBSXTRA $LIBS"
+  LIBS="$common_libs"
+  
+  AC_SUBST(TFTP_LIBS)
+diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
+*** tftp-hpa-0.33.orig/tftpd/Makefile	Tue Nov 27 03:18:11 2001
+--- tftp-hpa-0.33/tftpd/Makefile	Wed Feb  5 14:34:52 2003
+***************
+*** 23,32 ****
+  	sed -e 's/@@VERSION@@/$(VERSION)/g' < $< > $@
+  
+  install: all
+! 	mkdir -p $(INSTALLROOT)$(SBINDIR) $(INSTALLROOT)$(MANDIR)/man8
+! 	$(INSTALL_PROGRAM) tftpd$(X) $(INSTALLROOT)$(SBINDIR)/in.tftpd
+! 	$(INSTALL_DATA)    tftpd.8 $(INSTALLROOT)$(MANDIR)/man8/in.tftpd.8
+! 	cd $(INSTALLROOT)$(MANDIR)/man8 && $(LN_S) -f in.tftpd.8 tftpd.8
+  
+  clean:
+  	rm -f *.o *.obj *.exe tftpd tftpsubs.c tftpsubs.h tftpd.8
+--- 23,33 ----
+  	sed -e 's/@@VERSION@@/$(VERSION)/g' < $< > $@
+  
+  install: all
+! 	mkdir -p $(INSTALLROOT)$(LIBEXECDIR) $(INSTALLROOT)$(MANDIR)/man8
+! 	$(INSTALL_PROGRAM) tftpd$(X) $(INSTALLROOT)$(LIBEXECDIR)/tftpd
+! 	$(INSTALL_DATA)    tftpd.8 $(INSTALLROOT)$(MANDIR)/man8/tftpd.8
+! 	$(INSTALL_PROGRAM) tftpd-hpa.sh $(INSTALLROOT)$(ETCDIR)/rc.d/
+! 	$(INSTALL_DATA)    tftpd.rules $(INSTALLROOT)$(ETCDIR)/
+  
+  clean:
+  	rm -f *.o *.obj *.exe tftpd tftpsubs.c tftpsubs.h tftpd.8
+diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh tftp-hpa-0.33/tftpd/tftpd-hpa.sh
+*** tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh	Wed Dec 31 17:00:00 1969
+--- tftp-hpa-0.33/tftpd/tftpd-hpa.sh	Wed Feb  5 14:28:33 2003
+***************
+*** 0 ****
+--- 1,43 ----
++ #!/bin/sh
++ #
++ 
++ if ! PREFIX=$(expr $0 : "\(/.*\)/etc/rc\.d/$(basename $0)\$"); then
++     echo "$0: Cannot determine the PREFIX" >&2
++     exit 1
++ fi
++ 
++ tftpd_flags="-l"
++ 
++ if [ -z "${source_rc_confs_defined}" ]; then
++ 	if [ -r /etc/defaults/rc.conf ]; then
++ 		. /etc/defaults/rc.conf
++ 		source_rc_confs
++ 	elif [ -r /etc/rc.conf ]; then
++ 		. /etc/rc.conf
++ 	fi
++ fi
++ 
++ if [ -r ${PREFIX}/etc/tftpd.rules ]; then
++ 	tftpd_flags="-m ${PREFIX}/etc/tftpd.rules $tftpd_flags"
++ fi
++ 
++ case "$1" in
++ start)
++ 	if [ -x ${PREFIX}/libexec/tftpd ]; then
++ 		echo -n ' tftpd'
++ 		if [ `grep -c -E '^tftp' /etc/inetd.conf` -ne 0 ]; then
++ 			echo ": enabled in inetd.conf, not starting daemon"
++ 		else
++ 			${PREFIX}/libexec/tftpd $tftpd_flags
++ 		fi
++ 	fi
++ 	;;
++ stop)
++ 	killall tftpd && echo -n ' tftpd'
++ 	;;
++ *)
++ 	echo "Usage: `basename $0` {start|stop}" >&2
++ 	;;
++ esac
++ 
++ exit 0
+diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
+*** tftp-hpa-0.33.orig/tftpd/tftpd.c	Thu Jan 30 19:22:33 2003
+--- tftp-hpa-0.33/tftpd/tftpd.c	Wed Feb  5 14:03:10 2003
+***************
+*** 61,66 ****
+--- 61,67 ----
+  #include <pwd.h>
+  #include <limits.h>
+  #include <syslog.h>
++ #include <sys/wait.h>
+  
+  #include "tftpsubs.h"
+  #include "recvfrom.h"
+***************
+*** 107,112 ****
+--- 108,115 ----
+  int	unixperms = 0;
+  
+  int verbosity = 0;
++ int maxchildren = 0;
++ int numchildren;
+  
+  struct formats;
+  #ifdef WITH_REGEX
+***************
+*** 152,159 ****
+  {
+    (void)sig;			/* Suppress unused warning */
+    timeout <<= 1;
+!   if (timeout >= maxtimeout || timeout_quit)
+      exit(0);
+    siglongjmp(timeoutbuf, 1);
+  }
+  
+--- 155,165 ----
+  {
+    (void)sig;			/* Suppress unused warning */
+    timeout <<= 1;
+!   if (timeout >= maxtimeout || timeout_quit) {
+!     if ( verbosity >= 3 && !timeout_quit )
+!       syslog(LOG_WARNING, "no response from %s\n", inet_ntoa(from.sin_addr));
+      exit(0);
++   }
+    siglongjmp(timeoutbuf, 1);
+  }
+  
+***************
+*** 247,252 ****
+--- 253,277 ----
+    }
+  }
+  
++ static void
++ reapchild(int sig)
++ {
++   pid_t pid;
++   int status;
++  
++   sig = SIGCHLD;
++ 
++   while ( 1 ) {
++     pid = waitpid(-1, &status, WNOHANG);
++     if ( pid <= 0 )
++       break;
++     numchildren--;
++     if ( verbosity >= 3 )
++       syslog(LOG_INFO, "pid %d exits, numchildren=%d",
++ 	     pid, numchildren);
++   }
++ }
++ 
+  int
+  main(int argc, char **argv)
+  {
+***************
+*** 270,275 ****
+--- 295,301 ----
+  #ifdef WITH_REGEX
+    char *rewrite_file = NULL;
+  #endif
++   sigset_t childmask;
+  
+    /* basename() is way too much of a pain from a portability standpoint */
+  
+***************
+*** 278,284 ****
+    
+    openlog(__progname, LOG_PID|LOG_NDELAY, LOG_DAEMON);
+    
+!   while ((c = getopt(argc, argv, "cspvVla:u:U:r:t:T:m:")) != -1)
+      switch (c) {
+      case 'c':
+        cancreate = 1;
+--- 304,310 ----
+    
+    openlog(__progname, LOG_PID|LOG_NDELAY, LOG_DAEMON);
+    
+!   while ((c = getopt(argc, argv, "cC:spvVla:u:U:r:t:T:m:")) != -1)
+      switch (c) {
+      case 'c':
+        cancreate = 1;
+***************
+*** 350,355 ****
+--- 376,386 ----
+        printf("%s\n", TFTPD_CONFIG_STR);
+        exit(0);
+        break;
++     case 'C':
++       maxchildren = atoi(optarg);
++       if (maxchildren < 0)
++ 	maxchildren = 0;
++       break;
+      default:
+        usage();
+        break;
+***************
+*** 481,494 ****
+    } else {
+      /* 0 is our socket descriptor */
+      close(1); close(2);
+    }
+  
+!   /* This means we don't want to wait() for children */
+  #ifdef SA_NOCLDWAIT
+!   set_signal(SIGCHLD, SIG_IGN, SA_NOCLDSTOP|SA_NOCLDWAIT);
+  #else
+!   set_signal(SIGCHLD, SIG_IGN, SA_NOCLDSTOP);
+  #endif
+  
+    /* Take SIGHUP and use it to set a variable.  This
+       is polled synchronously to make sure we don't
+--- 512,535 ----
+    } else {
+      /* 0 is our socket descriptor */
+      close(1); close(2);
++ 
++     /* child max only applies to standalone server */
++     maxchildren = 0;
+    }
+  
+!   if ( maxchildren == 0 ) {
+!     /* This means we don't want to wait() for children */
+  #ifdef SA_NOCLDWAIT
+!     set_signal(SIGCHLD, SIG_IGN, SA_NOCLDSTOP|SA_NOCLDWAIT);
+  #else
+!     set_signal(SIGCHLD, SIG_IGN, SA_NOCLDSTOP);
+  #endif
++   } else {
++     set_signal(SIGCHLD, reapchild, SA_NOCLDSTOP);
++     sigemptyset(&childmask);
++     sigaddset(&childmask, SIGCHLD);
++   }
++   numchildren = 0;
+  
+    /* Take SIGHUP and use it to set a variable.  This
+       is polled synchronously to make sure we don't
+***************
+*** 526,535 ****
+      set_socket_nonblock(fd, 0);
+  #endif    
+  
+      /* Never time out if we're in standalone mode */
+      rv = select(fd+1, &readset, NULL, NULL, standalone ? NULL : &tv_waittime);
+!     if ( rv == -1 && errno == EINTR )
+        continue;		/* Signal caught, reloop */
+      if ( rv == -1 ) {
+        syslog(LOG_ERR, "select loop: %m");
+        exit(EX_IOERR);
+--- 567,582 ----
+      set_socket_nonblock(fd, 0);
+  #endif    
+  
++     if ( maxchildren )
++       sigprocmask(SIG_UNBLOCK, &childmask, 0);
++ 
+      /* Never time out if we're in standalone mode */
+      rv = select(fd+1, &readset, NULL, NULL, standalone ? NULL : &tv_waittime);
+!     if ( rv == -1 && errno == EINTR ) {
+!       if ( maxchildren )
+! 	sigprocmask(SIG_BLOCK, &childmask, 0);
+        continue;		/* Signal caught, reloop */
++     }
+      if ( rv == -1 ) {
+        syslog(LOG_ERR, "select loop: %m");
+        exit(EX_IOERR);
+***************
+*** 537,542 ****
+--- 584,601 ----
+        exit(0);		/* Timeout, return to inetd */
+      }
+  
++     if ( maxchildren ) {
++       sigset_t oldmask;
++       sigprocmask(SIG_BLOCK, &childmask, &oldmask);
++       if ( numchildren == maxchildren ) {
++ 	if ( verbosity >= 4 )
++ 	  syslog(LOG_INFO, "request delayed");
++ 	while ( numchildren == maxchildren )
++ 	  sigsuspend(&oldmask);
++ 	continue;
++       }
++     }
++ 
+  #ifdef __CYGWIN__
+      set_socket_nonblock(fd, 1);
+  #endif    
+***************
+*** 576,581 ****
+--- 635,642 ----
+        exit(EX_OSERR);	/* Return to inetd, just in case */
+      } else if ( pid == 0 )
+        break;			/* Child exit, parent loop */
++ 
++     numchildren++;
+    }
+    
+    /* Child process: handle the actual request here */
+***************
+*** 606,612 ****
+  
+    /* Close file descriptors we don't need */
+    close(fd);
+!   
+    /* Get a socket.  This has to be done before the chroot(), since
+       some systems require access to /dev to create a socket. */
+    
+--- 667,673 ----
+  
+    /* Close file descriptors we don't need */
+    close(fd);
+! 
+    /* Get a socket.  This has to be done before the chroot(), since
+       some systems require access to /dev to create a socket. */
+    
+***************
+*** 793,798 ****
+--- 854,866 ----
+      else
+        (*pf->f_send)(pf, NULL, 0);
+    }
++ 
++   if ( verbosity >= 3 ) {
++     syslog(LOG_NOTICE, "%s from %s done (segsize==%d)\n",
++ 	   tp->th_opcode == WRQ ? "WRQ" : "RRQ",
++ 	   inet_ntoa(from.sin_addr), segsize);
++   }
++ 
+    exit(0);			/* Request completed */
+  }
+  
+diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.rules tftp-hpa-0.33/tftpd/tftpd.rules
+*** tftp-hpa-0.33.orig/tftpd/tftpd.rules	Wed Dec 31 17:00:00 1969
+--- tftp-hpa-0.33/tftpd/tftpd.rules	Wed Feb  5 14:03:10 2003
+***************
+*** 0 ****
+--- 1,27 ----
++ #
++ # Rules for chroot /tftpboot setup.  Just strip off the /tftpboot.
++ #
++ # This file has three fields: operation, regex, remapping
++ #
++ # The operation is a combination of the following letters:
++ #
++ # r - rewrite the matched string with the remapping pattern
++ # i - case-insensitive matching
++ # g - repeat until no match (used with "r")
++ # e - exit (with success) if we match this pattern, do not process
++ #     subsequent rules
++ # s - start over from the first rule if we match this pattern
++ # a - abort (refuse the request) if we match this rule
++ # G - this rule applies to TFTP GET requests only
++ # P - this rule applies to TFTP PUT requests only
++ #
++ # The regex is a regular expression in the style of egrep(1).
++ #
++ # The remapping is a pattern, all characters are verbatim except \
++ # \0 copies the full string that matched the regex
++ # \1..\9 copies the 9 first (..) expressions in the regex
++ # \\ is an escaped \
++ #
++ # "#" begins a comment, unless \-escaped
++ #
++ r	^/tftpboot			# Remove prefix since we chroot
