@@ -112,9 +112,9 @@ my %row		= $query_result->fetchhash();
 my $estate	= $row{'state'};
 my $expt_path   = $row{'path'};
 
-if ($estate ne EXPTSTATE_ACTIVE) {
+if ($estate ne EXPTSTATE_ACTIVE && $estate ne EXPTSTATE_SWAPPED) {
     die("*** $0:\n".
-	"    Experiment $pid/$eid is not active!\n");
+	"    Experiment $pid/$eid is not active or swapped!\n");
 }
 
 if (! chdir("$expt_path/$tbdata")) {
