@@ -5,13 +5,35 @@
 set myboss [$ns node]
 set myops  [$ns node]
 
-tb-set-hardware $myboss pc2000
-tb-set-hardware $myops  pc850
-
 tb-set-node-inner-elab-role $myboss boss
 tb-set-node-inner-elab-role $myops  ops
 
-tb-fix-node $myboss pc171
+if {[info exists ::TBCOMPAT::elabinelab_hardware("boss")]} {
+    namespace eval TBCOMPAT {
+        tb-set-hardware $myboss $elabinelab_hardware("boss")
+    }
+} else {
+    tb-set-hardware $myboss pc850
+}
+if {[info exists ::TBCOMPAT::elabinelab_hardware("ops")]} {
+    namespace eval TBCOMPAT {
+        tb-set-hardware $myops $elabinelab_hardware("ops")
+    }
+} else {
+    tb-set-hardware $myops pc850
+}
+
+if {[info exists ::TBCOMPAT::elabinelab_fixnodes("boss")]} {
+    namespace eval TBCOMPAT {
+        tb-fix-node $myboss $elabinelab_fixnodes("boss")
+    }
+}
+if {[info exists ::TBCOMPAT::elabinelab_fixnodes("ops")]} {
+    namespace eval TBCOMPAT {
+        tb-fix-node $myops $elabinelab_fixnodes("ops")
+    }
+}
+
 tb-make-soft-vtype pcslow {pc600 pc850}
 
 #

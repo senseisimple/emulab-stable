@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -141,6 +141,8 @@ namespace eval TBCOMPAT {
 
     # ElabInElab stuff. Do not initialize.
     variable elabinelab_maxpcs
+    variable elabinelab_hardware
+    variable elabinelab_fixnodes
 
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
