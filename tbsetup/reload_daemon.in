@@ -103,7 +103,7 @@ while (1) {
     #
     # Partial delay between loops in case of an error.
     # 
-    sleep(2);
+    sleep(1);
 
     #
     # We use this to figure out when to delete nodes from the retried and
@@ -261,7 +261,7 @@ while (1) {
 	    #
 	    # This should not fail! 
 	    #
-	    fatal("$os_load failed on $node. Thats not supposed to happen.\n".
+	    fatal("$os_load failed on $node. That's not supposed to happen.\n".
 		  "Please check the reload daemon log before restarting!\n");
 	}
     }
@@ -297,6 +297,10 @@ while (1) {
 	print "Not waiting for frisbee reload of $node.\n";
 	next;
     #}
+
+    #
+    # START OBSOLETE SECTION
+    #
 
     #
     # Reload was started. We want to wait until its finished.
@@ -347,6 +351,9 @@ while (1) {
 	goto again;
     }
     sleep(10);
+    #
+    # END OBSOLETE SECTION
+    #
 }
 
 sub fatal($)
