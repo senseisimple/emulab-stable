@@ -21,7 +21,7 @@ use libtestbed;
 my $WWW      = "@WWW@";
 my $TBOPS      = "@TBOPSEMAIL@";
 my $default_tries = 10;
-my $time_tolerance = 250;
+my $time_tolerance = 2 * 60;
 
 # Turn off line buffering on output
 $| = 1;
@@ -41,8 +41,8 @@ sub mailctrl($@) {
     foreach my $node (@nodes) {
 
 	my $dbres = DBQueryFatal(
-		"select (CURRENT_TIMESTAMP - last_power) < $time_tolerance " .
-		"from outlets where node_id='$node'");
+		"select (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_power)) ".
+		" < $time_tolerance from outlets where node_id='$node'");
 	
 	if ($dbres->num_rows() == 0) {
 	    print "Unknown node $node";
@@ -75,7 +75,8 @@ sub mailctrl($@) {
 	    
 	    while (!$ok) {
 		my $dbres = DBQueryFatal(
-			"select (CURRENT_TIMESTAMP - last_power) < $time_tolerance " .
+			"select (UNIX_TIMESTAMP(NOW()) - " .
+			"UNIX_TIMESTAMP(last_power)) < $time_tolerance " .
 			"from outlets where node_id='$node'");
 		
 		if ($dbres->num_rows() == 0) {
