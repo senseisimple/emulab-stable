@@ -112,12 +112,14 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/server.pem \
 		$(INSTALL_ETCDIR)/pcplab.pem \
 		$(INSTALL_ETCDIR)/pcwa.pem \
+		$(INSTALL_ETCDIR)/ronnode.pem \
 		$(INSTALL_ETCDIR)/capture.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcplab.pem
+	chmod 640 $(INSTALL_ETCDIR)/ronnode.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcwa.pem
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 
