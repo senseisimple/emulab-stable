@@ -130,6 +130,26 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     $osid{$node} = $row{'def_boot_osid'};
 
     #
+    # XXX - Check for existence of the delta files. We do this here
+    # cause its easier than looking for a failure later, when the node
+    # tries to install the delta. Not a general solution though. Needs
+    # more thought.
+    #
+    foreach my $delta (split(":", $row{'deltas'})) {
+	if (! -e $delta) {
+	    die("Delta file $delta for node $node does not exist!");
+	}
+    }
+    #
+    # XXX - Ditto for RPMs.
+    #
+    foreach my $rpm (split(":", $row{'rpms'})) {
+	if (! -e $rpm) {
+	    die("RPM $rpm for node $node does not exist!");
+	}
+    }
+    
+    #
     # If pingable, then the node is "waitable".
     #
     if (OSFeatureSupported($osid{$node}, "ping")) {
