@@ -190,7 +190,7 @@ int main( int argc, char ** argv )
 
   clientCount = 0;
 
-  openlog("frisbeed", LOG_PERROR | LOG_PID, LOG_USER );
+  openlog("frisbeed", LOG_PID, LOG_USER );
   atexit( closelog );
 
   memset( clientList, 0, sizeof( clientList ) );
