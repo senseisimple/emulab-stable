@@ -77,7 +77,7 @@ while (@row = $sth->fetchrow) {
 	print "Copying $runfile to $savefile ...\n";
 	# Test to make sure the .run file exists
 	if (! (-e $runfile && -r $runfile) ) {
-		warn "Warning: $savefile does not exist or is not " .
+		warn "Warning: $runfile does not exist or is not " .
 			"readable, skipping.\n";
 		next;
 	}
