@@ -35,7 +35,7 @@ INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55340,'allow 
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55330,'allow udp from any to boss 6969 keep-state');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55322,'allow udp from any to fs 900 keep-state');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55321,'allow udp from any not 0-700 to fs keep-state');
-INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55320,'allow udp from any to fs 111 keep-state');
+INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55320,'allow ip from any to fs 111 keep-state');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55312,'allow udp from any not 0-1023 to 155.98.32.0/23 not 0-1023');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55311,'allow udp from any to 155.98.32.0/23 69');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55310,'allow udp from 155.98.32.0/23 not 0-1023 to any');
@@ -57,7 +57,7 @@ INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55001,'deny a
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,55000,'allow all from me to me');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','closed',1,65534,'deny all from any to any');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','basic',1,55321,'allow udp from any not 0-700 to fs keep-state');
-INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','basic',1,55320,'allow udp from any to fs 111 keep-state');
+INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','basic',1,55320,'allow ip from any to fs 111 keep-state');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','basic',1,55312,'allow udp from any not 0-1023 to 155.98.32.0/23 not 0-1023');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','basic',1,55311,'allow udp from any to 155.98.32.0/23 69');
 INSERT INTO default_firewall_rules VALUES ('ipfw2-vlan','basic',1,55310,'allow udp from 155.98.32.0/23 not 0-1023 to any');
