@@ -187,7 +187,9 @@ Finally, when the experiment is configured, startexp sends the user
 email.
 
 If the user swaps the experiment in and out during its lifetime,
-'tbswapin' and 'tbswapout' are called to do the job.
+'tbswap' is called to do the job - since a failed swapin requires a
+lot of the same cleanup as a swapout, one script handles both, called
+with 'in' or 'out' as its first argument.
 
 When the user terminates the experiment, endexp gets called. It calls
 tbswapout to free hardware resources, then calls tbend, which cleans
@@ -209,10 +211,32 @@ generator, etc.
 
 We run an event scheduler for each experiment. It's this sheduler's
 job to keep track of future evnets for the experiment, and send them
-at the appropriate time. The most basic exampel of this are events
+at the appropriate time. The most basic example of this are events
 specified through the NS file, but tevc can also be used to schedule
-events for some future time.
+events for some future time. eventys_control can be used to control
+the scheduler, stooping it, starting it, or replaying all events
+listed in the NS file.
 
-We also
+We also use the event system to communicate information about the
+state of nodes. At several times during the node boot process, they
+contact tmcd informing it of their current state. State changes are
+also inferred from some external event, such as a node DHCPing, or
+running 'power' to power cycle a stuck node. All of these state
+changes are received by a daemon on boss, 'stated'. In addition to
+receiving state transition events, stated can generate them for nodes
+than cannot do so themselves - for example, it can ping nodes that are
+running OSes that do no report in, to detect when they come up. stated
+reads state machines from the database, and can detect nodes that time
+out in specific states (ie., they begin to boot, but then hang), or
+that somehow make invalid state transitions. During experiment swapin,
+when all nodes have reached the ISUP state, a 'time start' event is
+send, so that all agents will have a similar idea of when the
+experiment began.
 
-
+On the nodes, the main things that interact with the event system are
+delay nodes, traffic generators, and the program agent. Delay nodes
+subscribe to events for their link, so that the delay can be changed,
+the link brought down, etc. Traffic generators can be turned on and
+off, and have their paramters changed through this method. And, if the
+user specified any 'Program' objects in the NS file, agents are
+started so that they can be dynamically started and stopped.
