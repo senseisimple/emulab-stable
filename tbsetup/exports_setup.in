@@ -35,7 +35,7 @@ my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
 my $PROG	= "/usr/testbed/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $lockfile    = "/var/tmp/testbed_exports_lockfile";
-my $dbg		= 1;
+my $dbg		= 0;
 my @row; 
 
 #
@@ -282,8 +282,10 @@ if (!$TESTMODE) {
   #
   # Temp Hack! Save a copy of the exports file for debugging.
   #
-  my $backup = "$TB/log/exports/" . TBDateTimeFSSafe();
-  system("cp $exportstail $backup");
+  if ($dbg) {
+      my $backup = "$TB/log/exports/" . TBDateTimeFSSafe();
+      system("cp $exportstail $backup");
+  }
   
   system("$SSH $PROG < $exportstail") == 0 or
     fatal("Failed: $SSH $PROG < $exportstail: $?");
