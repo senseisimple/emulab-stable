@@ -19,7 +19,7 @@ void parse_top(tbgraph &G, istream& i)
 	node no1;
 	string s1, s2;
 	char inbuf[255];
-	char n1[32], n2[32];
+	char n1[32], n2[32], type[32];
 	
 	while (!i.eof()) {
 	    char *ret;
@@ -29,12 +29,27 @@ void parse_top(tbgraph &G, istream& i)
 	    if (strlen(inbuf) == 0) { continue; }
 	    
 	    if (!strncmp(inbuf, "node", 4)) {
-		if (sscanf(inbuf, "node %s", n1) != 1) {
+		if (sscanf(inbuf, "node %s %s", n1, type) < 1) {
 		    fprintf(stderr, "bad node line: %s\n", inbuf);
 		} else {
 		    string s1(n1);
 		    no1 = G.new_node();
 		    nmap.insert(s1, no1);
+		    if (!strcmp(type, "delay")) {
+			    G[no1].type(testnode::TYPE_DELAY);
+		    }
+		    else if (!strcmp(type, "pc")) {
+			    G[no1].type(testnode::TYPE_PC);
+		    }
+		    else if (!strcmp(type, "switch")) {
+			    G[no1].type(testnode::TYPE_SWITCH);
+		    }
+		    else if (!strcmp(type, "dnard")) {
+			    G[no1].type(testnode::TYPE_DNARD);
+		    }
+		    else {
+			    G[no1].type(testnode::TYPE_UNSPECIFIED);
+		    }
 		}
 	    }
 	    else if (!strncmp(inbuf, "link", 4)) {
