@@ -16,7 +16,7 @@ SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
 		  idletimes idlemail setsitevar
-LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail
+LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
 LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic.

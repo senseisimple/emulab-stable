@@ -1,0 +1,485 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+    
+#
+# Convert between XML and DB representation of a virtual experiment.
+# Very simple, no DTDs, DOMs, XSLs, etc. Just the facts ...
+#
+sub usage()
+{
+    print STDOUT "Usage: xmlconvert [-x <xmlfile> [-n]] [-d] pid eid\n";
+ 
+    exit(-1);
+}
+my $optlist  = "x:vd";
+my $fromxml  = 0;
+my $nowrite  = 0;
+my $debug    = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+# Locals
+my $xmlfile;
+my $pid;
+my $eid;
+
+# This goes at the beginning of the output.
+my $XMLHEADER = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>";
+
+#
+# These are the virtual tables that make up an experiment.
+# Each one could have multiple rows, each of which will be a
+# hash table. 
+my %virtual_tables = ("experiments"	=> undef,
+		      "virt_nodes"	=> undef,
+		      "virt_lans"	=> undef,
+		      "virt_trafgens"	=> undef,
+		      "virt_agents"	=> undef,
+		      "virt_routes"	=> undef,
+		      "virt_vtypes"	=> undef,
+		      "nseconfigs"	=> undef,
+		      "eventlist"	=> undef);
+
+# XXX
+# The experiment table is special. Only certain fields are allowed to
+# be updated. Not sure what the right approach for this is.
+#
+my %experiment_fields = ("multiplex_factor"	=> 1,
+			 forcelinkdelays	=> 1,
+			 uselinkdelays		=> 1,
+			 usewatunnels		=> 1,
+			 uselatestwadata	=> 1,
+			 wa_delay_solverweight	=> 1,
+			 wa_bw_solverweight	=> 1,
+			 wa_plr_solverweight	=> 1);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"x"})) {
+    $fromxml = 1;
+    $xmlfile = $options{"x"};
+
+    if ($xmlfile =~ /^([-\w\/\.]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in argument: $xmlfile.");
+    }
+    if (defined($options{"n"})) {
+	$nowrite = 1;
+    }    
+}
+if (@ARGV != 2) {
+    usage();
+}
+$pid   = $ARGV[0];
+$eid   = $ARGV[1];
+
+# Taint Check.
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    fatal("Bad data in argument: $pid.");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    fatal("Bad data in argument: $eid.");
+}
+
+# Do it
+if ($fromxml) {
+    readXML($pid, $eid, $xmlfile);
+}
+else {
+    writeXML($pid, $eid);
+}
+exit(0);
+
+#
+# Read in XML and convert to DB representation, doing lots of checks!
+# This code is silly. Overly stylized (one tag per line!). Should
+# use the XML::Parser package instead. But this was easy and fun for a
+# first cut. 
+# 
+sub readXML($$$) {
+    my ($pid, $eid, $xmlfile) = @_;
+    my %experiment;
+    my $line;
+    my $tablename;
+
+    if ($xmlfile ne "-") {
+	open(STDIN, "< $xmlfile")
+	    or fatal("opening $xmlfile for STDIN: $!");
+    }
+
+    #
+    # Check the header.
+    #
+    $line = <STDIN>;
+    chomp($line);
+    if ($line ne $XMLHEADER) {
+	fatal("Improper XML header line: $line");
+    }
+
+    #
+    # The next line should be the virtual_experiment line, with the
+    # pid/eid. We check that, but otherwise ignore the pid/eid.
+    #
+    $line = <STDIN>;
+    if ($line =~ /^<virtual_experiment pid='([-\w]+)' eid='([-\w]+)'>$/) {
+	if ($pid ne $1 || $eid ne $2) {
+	    fatal("pid/eid mismatch: $line");
+	}
+    }
+    else {
+	fatal("Improper virtual_experiment line: $line");
+    }
+
+    #
+    # Now read in each table, and its rows (which could be more than 1).
+    # There can be only one experiments row, of course.
+    #
+    while (<STDIN>) {
+	if ($_ =~ /^\s*<\/virtual_experiment>$/) {
+	    last;
+	}
+	
+	# Each loop is a new table.
+	if (defined($tablename)) {
+	    fatal("Parser out of sync at tablename: $_");
+	}
+	
+	# Table name.
+	if ($_ =~ /^\s*<([-\w]+)>/) {
+	    $tablename = $1;
+
+	    if (! exists($virtual_tables{$tablename})) {
+		fatal("Unknown virtual table: $_");
+	    }
+	    # New table. Define a list.
+	    if (defined($virtual_tables{$tablename})) {
+		fatal("Duplicate virtual table: $_");
+	    }
+	    $virtual_tables{$tablename} = [];
+	    print "Starting new table: $tablename\n"
+		if ($debug);
+
+	    #
+	    # Next is either the table terminator, or the start of a new
+	    # row in the current table.
+	    #
+	    my $row;
+	    while (<STDIN>) {
+		if ($_ =~ /^\s*(<[-\w\/]+>)$/) {
+		    if ($1 eq "</$tablename>") {
+			undef($tablename);
+			goto newtable;
+		    }
+		    elsif ($1 eq "<row>") {
+			fatal("Parser out of sync at row: $_")
+			    if (defined($row));
+			print "  Starting new row\n"
+			    if ($debug);
+			$row = {};
+		    }
+		    elsif ($1 eq "</row>") {
+			fatal("Parser out of sync at /row: $_")
+			    if (!defined($row));
+			push(@{$virtual_tables{$tablename}}, $row);
+			undef($row);
+		    }
+		}
+		elsif ($_ =~ /^\s*\<([-\w]+)\>(.*)\<\/([-\w]+)\>/) {
+		    fatal("Parser out of sync at entity: $_")
+			if (!defined($row));
+		    fatal("Malformed (mismatch) entity: $1/$2/$3")
+			if ($1 ne $3);
+		    #
+		    # Always toss out pid/eid, since we insert our own!
+		    #
+		    if ($1 ne "pid" && $1 ne "eid") {
+			$row->{$1} = xmldecode($2);
+			print "    Entering new element: $1/$row->{$1}\n"
+			    if ($debug);
+		    }
+		}
+		else {
+		    fatal("Malformed entity: $_");
+		}
+	    }
+	}
+	else {
+	    fatal("Malformed table name: $_");
+	}
+      newtable:
+    }
+    #
+    # Verify. 
+    #
+    # Must be exactly one experiments table row, and we prune out lots
+    # of stuff that is not allowed. Note that we never insert a new
+    # experiment, but only allow updates of certain values. 
+    #
+    if (scalar(@{$virtual_tables{"experiments"}}) != 1) {
+	fatal("Must be exactly one experiments table row!");
+    }
+    my %experiments_table = %{@{$virtual_tables{"experiments"}}[0]};
+    foreach my $key (keys(%experiments_table)) {
+	delete($experiments_table{$key})
+	    if (!exists($experiment_fields{$key}));
+    }
+
+    #
+    # Okay, a hokey DoS check. Do not allow more than 10000 total rows!
+    # Why so many? Well, Rob likes to generate lots of events!
+    #
+    my $count = 0;
+    foreach my $table (keys(%virtual_tables)) {
+	$count += scalar(@{$virtual_tables{$table}})
+	    if (defined($virtual_tables{$table}));
+    }
+    if ($count > 10000) {
+	fatal("Too many rows of data!");
+    }
+
+    #
+    # Okay, thats all the checking we do! There is not much that can
+    # screw up the DB, by inserting rows into the allowed set of tables.
+    #
+    # First the experiments table, which gets an update.
+    #
+    my @setlist = ();
+    foreach my $key (keys(%experiments_table)) {
+	$val = $experiments_table{$key};
+	if ($val eq "NULL") {
+	    push(@setlist, "$key=NULL");
+	}
+	else {
+	    push(@setlist, "$key='$val'");
+	}	    
+    }
+    my $query = "update experiments ".
+	        "set " . join(",", @setlist) . " " .
+		"where eid='$eid' and pid='$pid'";
+
+    print "$query\n"
+	if ($debug);
+    DBQueryFatal($query)
+	if (!$nowrite);
+
+    #
+    # Now all the other tables, which get inserts. Need to delete all the
+    # old info too.
+    #
+    foreach my $table (keys(%virtual_tables)) {
+	DBQueryFatal("delete from $table ".
+		     "where eid='$eid' and pid='$pid'")
+	    if (!$nowrite);
+	next
+	    if (!defined($virtual_tables{$table}));
+	next
+	    if ($table eq "experiments");
+
+	foreach my $rowref (@{$virtual_tables{$table}}) {
+	    my %rowhash = %{ $rowref };
+	    my @fields  = ("pid", "eid");
+	    my @values  = ("'$pid'", "'$eid'");
+
+	    foreach my $key (keys(%rowhash)) {
+		$val = $rowhash{$key};
+
+		if ($val eq "NULL") {
+		    push(@values, "NULL");
+		}
+		else {
+		    push(@values, "'$val'");
+		}	    
+		push(@fields, $key);
+	    }
+	    $query = "insert into $table (" . join(",", @fields) . ") ".
+		     "values (" . join(",", @values) . ") ";
+
+	    print "$query\n"
+		if ($debug);
+	    DBQueryFatal($query)
+		if (!$nowrite);
+	}
+    }
+    return 0;
+}
+
+#
+# Convert a virtual experiment representation into XML and spit it out.
+# The DB holds the data of course.
+#
+sub writeXML($$) {
+    my ($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select * from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result->numrows) {
+	fatal("No such experiment $pid/$eid exists!");
+    }
+
+    spitxml_header();
+    spitxml_opentag("virtual_experiment pid='$pid' eid='$eid'", 0);
+
+    # Spit out all of the tables.
+    foreach my $table (keys(%virtual_tables)) {
+	spitxml_dbrows($table, 1, 
+		       "select * from $table ".
+		       "where eid='$eid' and pid='$pid'");
+    }
+    spitxml_closetag("virtual_experiment", 0);
+
+    return 0;
+}
+
+#
+# Utility functions to pretty print XML output, with specified indentation.
+#
+sub spitxml_opentag($$)
+{
+    my ($tag, $level) = @_;
+
+    my $spaces = $level * 2;
+
+    printf("%${spaces}s<%s>\n", "", $tag);
+}
+
+sub spitxml_closetag($$)
+{
+    my ($tag, $level) = @_;
+
+    my $spaces = $level * 2;
+
+    printf("%${spaces}s</%s>\n", "", $tag);
+}
+
+sub spitxml_header()
+{
+    print "$XMLHEADER\n";
+}
+
+sub spitxml_entity($$$)
+{
+    my ($tag, $data, $level) = @_;
+    my $spaces = $level * 2;
+
+    $data = "NULL"
+	if (!defined($data));
+
+    printf("%${spaces}s<%s>%s</%s>\n", "", $tag, xmlencode($data), $tag);
+}
+
+sub spitxml_dbrow($%)
+{
+    my($level, %dbrow) = @_;
+
+    spitxml_opentag("row", $level);
+    
+    foreach my $tag (keys(%dbrow)) {
+	my $data = $dbrow{$tag};
+	spitxml_entity($tag, $data, $level + 1);
+
+    }
+    spitxml_closetag("row", $level);
+}
+
+sub spitxml_dbrows($$$)
+{
+    my($tag, $level, $query) = @_;
+    my $query_result = DBQueryFatal($query);
+    
+    if ($query_result->numrows) {
+	spitxml_opentag($tag, $level);
+	while (my %hashrow = $query_result->fetchhash()) {
+	    spitxml_dbrow($level + 1, %hashrow);
+	}
+	spitxml_closetag($tag, $level);
+    }
+}
+
+#
+# Convert from/to XML special chars. Not many of them ...
+# 
+sub xmlencode($)
+{
+    my ($string) = @_;
+
+    my %specialchars = ('&' => '&amp;',
+			'<' => '&lt;',
+			'>' => '&gt;',
+			"'" => '&apos;',
+			'"' => '&quot;');
+
+    $string =~ s/([&<>"'])/$specialchars{$1}/ge;
+    return $string;
+}
+
+sub xmldecode($)
+{
+    my ($string) = @_;
+
+    my %specialchars = ('&amp;'  => '&',
+			'&lt;'   => '<',
+			'&gt;'   => '>',
+			'&apos;' => "'",
+			'&quot;' => '"');
+
+    $string =~ s/(&\w+;)/$specialchars{$1}/ge;
+    return $string;
+}
+
+# Die
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
