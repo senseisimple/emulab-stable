@@ -4,7 +4,7 @@
 # This just provides the necessary information from the IR file.
 
 my $TBROOT = "@prefix@";
-my $DBNAME = "tbdb";
+my $DBNAME = "@TBDBNAME@";
 
 #
 # Turn off line buffering on output
@@ -44,7 +44,7 @@ print "Experiment: $eid\n";
 print "State: $state\n";
 print "\n";
 
-if (($state ne "swapped") && ($state ne "active")) {
+if (($state ne "swapped") && ($state ne "active") && ($state ne "testing")) {
     # nothing to do
     print "No more information available.\n";
     exit(0);
@@ -93,18 +93,21 @@ if ($state eq "swapped") {
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     $sth->execute();
     print "Lan/Link Info:\n";
-    printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", "ID", "Member", "IP", "Delay", "Bandwidth", "Loss Rate";
-    print "--------------- ---------- --------------- ---------- ---------- ----------\n";
+    printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", "ID", "Member",
+    "IP", "Delay", "Bandwidth", "Loss Rate";
+    print "--------------- --------------- --------------- ----------"
+	. " ---------- ----------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
 	   = $sth->fetchrow_array()) {
-	printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", $vname, $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
+	$member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
     $sth->finish();
     print "\n";
 }
 
 # Mapping
-if ($state eq "active") {
+if (($state eq "active") || ($state eq "testing")) {
     print "Node Mapping:\n";
     printf "%-15s %-15s %s\n", "Virtual", "Physical", "Qualified Name";
     print "--------------- --------------- --------------------\n";
@@ -117,15 +120,28 @@ if ($state eq "active") {
     $sth->finish();
     print "\n";
 
+    $sth=$dbh->prepare("SELECT vnode,vport,pport from portmap" .
+		       " where pid=\"$pid\" and eid=\"$eid\"");
+    $sth->execute;
+    while (($vnode,$vport,$pport) = $sth->fetchrow_array) {
+	$portmap{"$vnode:$vport"} = $pport;
+    }
+    $sth->finish;
+
     $sth=$dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     $sth->execute();
     print "Lan/Link Info:\n";
-    printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", "ID", "Member", "IP", "Delay", "Bandwidth", "Loss Rate";
-    print "--------------- ---------- --------------- ---------- ---------- ----------\n";
+    printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", "ID", "Member", 
+    "IP", "Delay", "Bandwidth", "Loss Rate";
+    print "--------------- --------------- --------------- ----------"
+	. " ---------- ----------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
 	   = $sth->fetchrow_array()) {
-	printf "%-15s %-10s %-15s %-10s %-10s %-10s\n", $vname, $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+	($vnode,$vport) = split(":",$member);
+	$pport = $portmap{$member};
+	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
+	"$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
     $sth->finish();
 }
