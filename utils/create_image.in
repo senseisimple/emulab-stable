@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -56,7 +56,8 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
 my $osselect    = "$TB/bin/os_select";
-my $device      = "/dev/rad0";
+my $devtype	= "ad";
+my $devnum	= 0;
 my $mereuser    = 0;
 my %imageid_row = ();
 my $debug       = 0;
@@ -190,6 +191,18 @@ open(FILE, "> $filename") or
     fatal("Could not create $filename: $!");
 close(FILE) or
     fatal("Could not truncate $filename: $!");
+
+#
+# Get the disktype for this node
+#
+$db_result =
+    DBQueryFatal("select disktype from nodes ".
+		 "left join node_types on nodes.type=node_types.type ".
+		 "where node_id='$node'");
+if ($db_result->numrows == 1) {
+    ($devtype) = $db_result->fetchrow_array;
+}
+my $device = "/dev/${devtype}${devnum}";
 
 #
 # Record when this image was updated, so that we can figure out which
