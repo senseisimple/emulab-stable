@@ -353,6 +353,16 @@ REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','UNAPPROVED','Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','UNVERIFIED','Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','UNVERIFIED','READY','Verify');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','UNAPPROVED','READY','Approve');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','FROZEN','READY','Thaw');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','FROZEN','Freeze');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','LOCKED','READY','Unlock');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','READY','LOCKED','Lock');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','FROZEN','LOCKED','Lock');
+REPLACE INTO state_transitions VALUES ('EXAMPLE','LOCKED','FROZEN','Freeze');
 
 --
 -- Dumping data for table `state_triggers`
