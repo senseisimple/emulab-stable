@@ -55,7 +55,7 @@ foreach node [lsort [array names vnodemap]] {
 
 puts ""
 puts "Links"
-puts "Source               IP               Destionation         IP"
+puts "Source               IP               Destination         IP"
 puts "-------------------- --------------- -------------------- ----------------"
 foreach link [array names ipmap] {
     set t [split $link :]
