@@ -400,6 +400,11 @@ function WRITESIDEBAR() {
 				   $TBBASE, "showexp_list.php3");
 		WRITESIDEBARBUTTON("Begin an Experiment",
 				   $TBBASE, "beginexp.php3");
+
+		if (NODETYPE_ALLOWED("pcplab")) {
+		    WRITESIDEBARBUTTON_NEW("Create a PlanetLab Slice",
+				       $TBBASE, "plab_ez.php3");
+		}
 		WRITESIDEBARBUTTON("ImageIDs and OSIDs",
 				   $TBBASE, "showimageid_list.php3");
 		WRITESIDEBARBUTTON("Update User Information",
