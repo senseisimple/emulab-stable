@@ -69,6 +69,7 @@ namespace eval GLOBALS {
 variable verbose 1
 variable impotent 0
 variable anonymous 0
+variable vtype_list {}
 }
 
 while {$argv != {}} {
@@ -155,6 +156,7 @@ source ${GLOBALS::libdir}/lanlink.tcl
 source ${GLOBALS::libdir}/node.tcl
 source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl
+source ${GLOBALS::libdir}/vtype.tcl
 
 ##################################################
 # Redifing Assignment

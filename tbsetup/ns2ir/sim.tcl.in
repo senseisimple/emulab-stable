@@ -148,6 +148,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::ran
     var_import ::GLOBALS::DB
     var_import ::GLOBALS::impotent
+    var_import ::GLOBALS::vtypes
 
     # Fill out IPs
     foreach obj [concat [array names lanlink_list]] {
@@ -188,6 +189,9 @@ Simulator instproc run {} {
     }
     foreach lan [concat [array names lanlink_list]] {
 	$lan updatedb $DB
+    }
+    foreach vtype [array names vtypes] {
+	$vtype updatedb $DB
     }
 }
 

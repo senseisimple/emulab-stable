@@ -14,7 +14,13 @@ namespace eval TBCOMPAT {
 
     # This is an RE to match a floating point number.
     variable FLOAT {(^[0-9]+(\.[0-9]+)?$)|(^\.[0-9]+$)}
-    
+
+    # This is the default weight for a soft vtype.
+    variable default_soft_vtype_weight 0.5
+
+    # This is the default weight for a hard vtype.
+    variable default_hard_vtype_weight 1.0
+
     # This is a general procedure that takes a node, an object (lan or link)
     # it is connected to, and an IP address, and sets the IP address
     # for the node on that object.  It checks both the validity of the
@@ -99,7 +105,9 @@ proc tb-set-ip-link {src link ip} {
 # Node state routines.
 proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes
-    if {! [info exists hwtypes($type)]} {
+    var_import ::GLOBALS::vtypes
+    if {(! [info exists hwtypes($type)]) &&
+	(! [info exists vtypes($type)])} {
 	perror "\[tb-set-hardware] Invalid hardware type $type."
 	return
     }
@@ -292,3 +300,45 @@ proc tb-fix-node {vnode pnode} {
     $vnode set fixed $pnode
 }
 
+proc tb-make-soft-vtype {name types} {
+    var_import ::TBCOMPAT::hwtypes
+    var_import ::GLOBALS::vtypes
+    var_import ::TBCOMPAT::default_soft_vtype_weight
+
+    foreach type $types {
+	if {! [info exists hwtypes($type)]} {
+	    perror "\[tb-make-soft-vtype] Invalid hardware type $type."
+	}
+    }
+    set vtypes($name) [Vtype $name $default_soft_vtype_weight $types]
+}
+
+proc tb-make-hard-vtype {name types} {
+    var_import ::TBCOMPAT::hwtypes
+    var_import ::GLOBALS::vtypes
+    var_import ::TBCOMPAT::default_hard_vtype_weight
+
+    foreach type $types {
+	if {! [info exists hwtypes($type)]} {
+	    perror "\[tb-make-hard-vtype] Invalid hardware type $type."
+	}
+    }
+    set vtypes($name) [Vtype $name $default_hard_vtype_weight $types]
+}
+
+proc tb-make-weighted-vtype {name weight types} {
+    var_import ::TBCOMPAT::hwtypes
+    var_import ::GLOBALS::vtypes
+    var_import ::TBCOMPAT::FLOAT
+
+    foreach type $types {
+	if {! [info exists hwtypes($type)]} {
+	    perror "\[tb-make-hard-vtype] Invalid hardware type $type."
+	}
+    }
+    if {([regexp $FLOAT $weight] == 0) ||
+	($weight <= 0) || ($weight >= 1.0)} {
+	perror "\[tb-make-weighted-vtype] $weight is not a valid weight. (0 < weight < 1)."
+    }
+    set vtypes($name) [Vtype $name $weight $types]
+}
