@@ -302,9 +302,13 @@ if (! readfile("${prefix}.map")) {
 
 echo "<font size=+1>For more info on using wireless nodes, see the
      <a href='tutorial/docwrapper.php3?docname=wireless.html'>
-     wireless tutorial.</a></font><br><br>\n";
+     wireless tutorial.</a></font>\n";
 
 echo "<center>\n";
+
+# Consolidate layout by pulling the info and control tables into a horizontal row.
+echo "<table style=\"border-width: 0; background-color: transparent\">
+      <tr> <td>\n";
 
 # Legend
 if (isset($pid)) {
@@ -331,8 +335,7 @@ if (isset($pid)) {
                 <b>Dead</b></td>
             <td align=left> &nbsp; " . $nodecounts["dead"] . "</td>
           </tr>
-          </table>
-          Click on the dots below to see information about the node\n";
+          </table>\n";
 }
 else {
     echo "<table align=center border=2 cellpadding=5 cellspacing=2>
@@ -354,29 +357,12 @@ else {
                 <b>Dead</b></td>
             <td align=left> &nbsp; " . $nodecounts["dead"] . "</td>
           </tr>
-          </table>
-          Click on the dots below to see information about the node\n";
+          </table>\n";
 }
 
-if (count($channels)) {
-    echo "<br><br>
-          <table align=center border=2 cellpadding=0 cellspacing=2>
- 	  <tr><th>Floor</th><th>Channels in Use</th></tr>\n";
-    
-    while (list($floor, $chanlist) = each($channels)) {
-	echo "<tr><td>$floor</td>\n";
-	echo "    <td>";
-
-	echo implode(",", array_keys($chanlist));
-
-	echo "    </td>
-              </tr>\n";
-    }
-    echo "</table>\n";
-}
+echo "</td> <td style=\" background-color: transparent\"> &nbsp; &nbsp; </td> <td>\n";
 
 # Wrap the image and zoom controls together in an input form.
-echo "<br>\n";
 echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
 
 # Zoom controls may be clicked to set a new scale.
@@ -400,15 +386,36 @@ echo "      </tr>\n";
 echo "    </tbody>\n";
 echo "  </table>\n";
 }
+zoom_btns($curr_scale);  # Two copies of the zoom buttons bracket the image.
+
+echo "</td> <td style=\" background-color: transparent\"> &nbsp; &nbsp; </td> <td>\n";
+
+if (count($channels)) {
+    echo "<table align=center border=2 cellpadding=0 cellspacing=2>
+ 	  <tr><th>Floor</th><th>Channels in Use</th></tr>\n";
+    
+    while (list($floor, $chanlist) = each($channels)) {
+	echo "<tr><td>$floor</td>\n";
+	echo "    <td>";
+
+	echo implode(",", array_keys($chanlist));
+
+	echo "    </td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+echo "</td> </tr> </table>\n";
 
 # The image may be clicked to set a new center-point.
-zoom_btns($curr_scale);  # Two copies of the zoom buttons bracket the image.
-echo "  Click on the map below to set the center point for a zoomed-in view.\n";
+echo "  Click on the dots below to see information about the node.\n";
+echo "  <br>\n";
+echo "  Clicks elsewhere on the map set the center point for a zoomed-in view.\n";
 echo "  <br>\n";
 echo "  <input name=\"map\" type=\"image\" style=\"border: 2px solid\" ";
 echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">\n";
 echo "  <br>\n";
-echo "  Click on the map above to set the center point for a zoomed-in view.\n";
 zoom_btns($curr_scale);
 
 # Hidden items are all returned as page arguments when any input control is clicked.
