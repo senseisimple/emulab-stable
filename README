@@ -1,14 +1,25 @@
 This is a snapshot of the current source code for the software that runs
-Netbed (Emulab++) at the University of Utah:
+Netbed (Emulab++) at the University of Utah, as well as testbeds at other
+sites:
    http://www.emulab.net/
+
+This is a snapshot of a rapidly-evolving system, rather than an engineered
+release. It contains all Netbed source required to build a running testbed, but
+interaction with Utah will almost certainly be required to get things up and
+running.
+
+Netbed is being actively developed, so there will be features on deployed
+Netbeds that are not included in this snapshot. Contact us (contact info at the
+bottom of this file) if you are interested in receiving an updated version of
+this source.
 
 NOTE: See the file RESTRICTED-RIGHTS for restrictions on this interim
 snapshot.  In summary, for now you can't redistribute it or use it for
 commercial purposes.
 
 HOW TO
-Copy and localize the 'defs-default' file for your environment
-and run ./configure.
+Copy and localize the 'defs-example' file for your environment
+and run ./configure - see doc/setup.txt for details.
 
 DOCUMENTATION
 This is a snapshot, not a formal distribution, so don't expect
@@ -16,7 +27,15 @@ great documentation.
 
 doc/* contains documentation for developers.
 www/*.html and www/doc/*.html contain end-user documentation.
-(www/faq.html will be especially valuable to those unfamiliar with the system.)
+
+Good places to start would include:
+  - The user tutorial (www/tutorial/tutorial.html)
+  - The user FAQ (www/faq.html)
+  - The user authorization document (www/auth.html)
+  - The software architecture diagram (doc/arch.ps) and notes (doc/arch.txt)
+  - The overview of some major systems (doc/overview.txt)
+  - Diagrams of the state machines used in the system (doc/state*.ps)
+  - The instructions for making a running system (doc/setup*.txt)
 
 QUICK TOUR
  - The Database maintains most testbed state.
@@ -44,10 +63,8 @@ capture   -  Node serial line server software
 cdrom     -  Configuration files for remote nodes
 db        -  Variety of interfaces to testbed state 
 dhcpd     -  DHCPD configuration
-discvr    -  Topology discovery software
 doc       -  Documentation (mainly internal)
 event     -  Event System
-hw_config -  Configuration for network hardware
 install   -  Site installation scripts
 ipod      -  "Ping of Death" software
 ir        -  NS-to-database interpreter (in TCL)
@@ -69,7 +86,7 @@ utils     -  Testbed configuration and maintenence tools
 vis       -  Experiment visualization
 www       -  Web Interface / User Documentation
 
-HELP
+HELP/CONTACT INFORMATION
 For help and to report bugs and problems, mail
     testbed-ops@flux.cs.utah.edu
 
@@ -79,5 +96,5 @@ for "big picture" issues and problems.
 
 
 Jay Lepreau, lepreau@cs.utah.edu, 801-581-4285
-December 2, 2002
+April 29, 2003
 
