@@ -1,12 +1,4 @@
-#
-# This is the defaults definitions file for configure.
-#
-# Use the --with-TBDEFS=filename to specify your own. If you add a variable,
-# be sure to go and update configure.in.
-#
 TBDBNAME=tbdb
-WWWDEFS=mini
-WWWDEFS=newbold-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=newbold+mini-ops@flux.utah.edu
 TBLOGSEMAIL=newbold+mini-log@flux.utah.edu
@@ -26,3 +18,8 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 TBSTATEDEMAIL=newbold+mini-stated@flux.utah.edu
 TBTESTSUITEEMAIL=newbold+mini-testsuite@flux.utah.edu
+WWWHOST=www.mini.emulab.net
+WWW=www.mini.emulab.net/~newbold/www
+TBCOOKIESUFFIX=-mini
+THISHOMEBASE=Mini.Emulab.Net
+TBAUTHTIMEOUT=216000

@@ -5,7 +5,6 @@
 # be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=ricci-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu
@@ -25,3 +24,7 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 TBSTATEDEMAIL=ricci@cs.utah.edu
 TBTESTSUITEEMAIL=ricci@cs.utah.edu
+WWWHOST=www.mini.emulab.net
+WWW=www.mini.emulab.net/~ricci/www
+TBCOOKIESUFFIX=-mini
+THISHOMEBASE=Mini.Emulab.Net

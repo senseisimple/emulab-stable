@@ -2,7 +2,6 @@
 # This is the definitions file for Mac^D^D^DChad on Emulab.Net.
 #
 TBDBNAME=tbdb
-WWWDEFS=barb-emulab
 TBOPSEMAIL=barb@cs.utah.edu
 TBLOGSEMAIL=barb@cs.utah.edu
 TBWWWEMAIL=barb@cs.utah.edu
@@ -19,3 +18,5 @@ FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=barb@cs.utah.edu
 TBTESTSUITEEMAIL=barb@cs.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~barb/www

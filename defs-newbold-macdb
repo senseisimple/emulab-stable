@@ -2,7 +2,6 @@
 # This is the definitions file for Mac when he uses his own db.
 #
 TBDBNAME=macdb
-WWWDEFS=newbold-emulab
 TBOPSEMAIL=newbold@flux.utah.edu
 TBLOGSEMAIL=newbold@flux.utah.edu
 TBWWWEMAIL=newbold+www@cs.utah.edu
@@ -15,3 +14,6 @@ USERNODE=users.emulab.net
 OURDOMAIN=emulab.net
 TBSTATEDEMAIL=newbold@flux.utah.edu
 TBTESTSUITEEMAIL=newbold@flux.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~newbold/www
+THISHOMEBASE=Mac.Emulab.Net

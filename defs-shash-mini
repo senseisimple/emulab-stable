@@ -5,8 +5,6 @@
 # be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=mini
-WWWDEFS=shash-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=shash+mini-ops@cs.utah.edu
 TBLOGSEMAIL=shash+mini-log@cs.utah.edu
@@ -26,3 +24,7 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 TBSTATEDEMAIL=shash+mini-stated@cs.utah.edu
 TBTESTSUITEEMAIL=shash+mini-testsuite@cs.utah.edu
+WWWHOST=www.mini.emulab.net
+WWW=www.mini.emulab.net/~shash/www
+TBCOOKIESUFFIX=-mini
+THISHOMEBASE=Mini-Shash@Emulab.Net

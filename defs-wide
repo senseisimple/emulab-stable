@@ -6,7 +6,6 @@
 # If you add a variable, be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=wide
 TBADMINGROUP=tbadmin
 TBOPSEMAIL=widetestbed-ops@flux.cs.utah.edu
 TBLOGSEMAIL=widetestbed-logs@flux.cs.utah.edu
@@ -28,3 +27,5 @@ UNIFIED_BOSS_AND_OPS=1
 DISABLE_NSE=1
 TBSTATEDEMAIL=widetestbed-stated@flux.cs.utah.edu
 TBTESTSUITEEMAIL=widetestbed-testsuite@flux.cs.utah.edu
+WWWHOST=www.wide.emulab.net
+THISHOMEBASE="Wide.Emulab.Net"

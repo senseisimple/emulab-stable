@@ -2,7 +2,6 @@
 # This is the definitions file for Leigh on Emulab.Net.
 #
 TBDBNAME=tbdb
-WWWDEFS=stoller-emulab
 TBOPSEMAIL=stoller@flux.utah.edu
 TBLOGSEMAIL=stoller@flux.utah.edu
 TBWWWEMAIL=stoller@flux.utah.edu
@@ -19,3 +18,6 @@ FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=stoller@fast.cs.utah.edu
 TBTESTSUITEEMAIL=stoller@fast.cs.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~stoller/www
+THISHOMEBASE=Stoller.Emulab.Net

@@ -2,7 +2,6 @@
 # This is the definitions file for Chad on Mini.
 #
 TBDBNAME=tbdb
-WWWDEFS=barb-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=barb@cs.utah.edu
 TBLOGSEMAIL=barb@cs.utah.edu
@@ -22,3 +21,7 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 TBSTATEDEMAIL=barb@cs.utah.edu
 TBTESTSUITEEMAIL=barb@cs.utah.edu
+WWWHOST=www.mini.emulab.net
+WWW=www.mini.emulab.net/~barb/www
+TBCOOKIESUFFIX=-mini
+THISHOMEBASE=Mini.Emulab.Net

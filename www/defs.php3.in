@@ -3,10 +3,16 @@
 # Standard definitions! 
 #
 $TBDIR          = "@prefix@/";
-$WWWDEFS        = "@WWWDEFS@";
 $OURDOMAIN      = "@OURDOMAIN@";
 $BOSSNODE       = "@BOSSNODE@";
 $TBADMINGROUP   = "@TBADMINGROUP@";
+$WWWHOST	= "@WWWHOST@";
+$WWW		= "@WWW@";
+$TBAUTHDOMAIN	= "@TBAUTHDOMAIN@";
+$TBBASE		= "@TBBASE@";
+$TBDOCBASE	= "@TBDOCBASE@";
+$TBWWW		= "@TBWWW@";
+$THISHOMEBASE	= "@THISHOMEBASE@";
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
@@ -14,16 +20,11 @@ $TBMAILADDR_APPROVAL	= "@TBAPPROVALEMAIL_NOSLASH@";
 $TBMAILADDR_LOGS	= "@TBLOGSEMAIL_NOSLASH@";
 $TBMAILADDR_AUDIT	= "@TBAUDITEMAIL_NOSLASH@";
 
-# Can override this in the -defs file. 
-$TBAUTHTIMEOUT  = 21600;
-
-# Overridden by the defs file!
-$TBMAINSITE     = 0;
-
-#
-# Include configure selected definitions.
-#
-include("$WWWDEFS"."-defs.php3");
+# Can override this in the defs file. 
+$TBAUTHTIMEOUT  = "@TBAUTHTIMEOUT@";
+$TBMAINSITE     = "@TBMAINSITE@";
+$TBSECURECOOKIES= "@TBSECURECOOKIES@";
+$TBCOOKIESUFFIX = "@TBCOOKIESUFFIX@";
 
 $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";

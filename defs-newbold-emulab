@@ -2,7 +2,6 @@
 # This is the definitions file for Mac on Emulab.Net.
 #
 TBDBNAME=tbdb
-WWWDEFS=newbold-emulab
 TBOPSEMAIL=newbold@flux.utah.edu
 TBLOGSEMAIL=newbold@flux.utah.edu
 TBWWWEMAIL=newbold+www@cs.utah.edu
@@ -19,3 +18,7 @@ FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=newbold@flux.utah.edu
 TBTESTSUITEEMAIL=newbold@flux.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~newbold/www
+THISHOMEBASE=Mac.Emulab.Net
+TBAUTHTIMEOUT=216000

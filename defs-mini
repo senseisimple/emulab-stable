@@ -5,7 +5,6 @@
 # be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=mini
 TBADMINGROUP=flux
 TBOPSEMAIL=minitestbed-ops@flux.cs.utah.edu
 TBLOGSEMAIL=minitestbed-logs@flux.cs.utah.edu
@@ -26,3 +25,6 @@ FSDIR_USERS=/z/users
 TBSTATEDEMAIL=minitestbed-stated@flux.cs.utah.edu
 TBTESTSUITEEMAIL=minitestbed-testsuite@flux.cs.utah.edu
 SFSSUPPORT=0
+WWWHOST=www.mini.emulab.net
+TBCOOKIESUFFIX=-mini
+THISHOMEBASE=Mini.Emulab.Net

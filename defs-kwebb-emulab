@@ -2,7 +2,6 @@
 # This is the definitions file for Kirk on Emulab.Net.
 #
 TBDBNAME=tbdb
-WWWDEFS=kwebb-emulab
 TBOPSEMAIL=kwebb@cs.utah.edu
 TBLOGSEMAIL=kwebb@cs.utah.edu
 TBWWWEMAIL=kwebb@cs.utah.edu
@@ -18,3 +17,5 @@ FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=kwebb@cs.utah.edu
 TBTESTSUITEEMAIL=kwebb@cs.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~kwebb/www

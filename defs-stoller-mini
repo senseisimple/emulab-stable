@@ -5,8 +5,6 @@
 # be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=mini
-WWWDEFS=stoller-mini
 TBADMINGROUP=flux
 TBOPSEMAIL=stoller@fast.cs.utah.edu
 TBLOGSEMAIL=stoller@fast.cs.utah.edu
@@ -24,3 +22,7 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 TBSTATEDEMAIL=stoller@fast.cs.utah.edu
 TBTESTSUITEEMAIL=stoller@fast.cs.utah.edu
+WWWHOST=www.mini.emulab.net
+WWW=www.mini.emulab.net/~stoller/www
+TBCOOKIESUFFIX=-mini
+THISHOMEBASE=Stoller.Mini.Emulab.Net

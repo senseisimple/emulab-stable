@@ -5,11 +5,8 @@
 # If you add a variable, be sure to go and update configure.in.
 #
 
-#
-# The name of the defs file for the web interface - you'll create a file
-# called www/<name>-defs.php3
-#
-WWWDEFS=example
+# The name of this installation
+THISHOMEBASE=Example.Emulab.Net
 
 #
 # Various domain and host names
@@ -17,6 +14,9 @@ WWWDEFS=example
 
 # Domain this testbed resides in
 OURDOMAIN=example.emulab.net
+
+# Host name of our web server (or host:port)
+WWWHOST=www.example.emulab.net
 
 # Fully-quailified hostname of the boss node
 BOSSNODE=boss.example.emulab.net
@@ -89,3 +89,7 @@ IPBASE=192.168
 DELAYCAPACITY=2
 SFSSUPPORT=0
 DISABLE_NSE=1
+
+# Sometimes the main page is down in a directory on WWWHOST
+# No trailing '/'!
+#WWW=www.example.emulab.net/emulab-www

@@ -21,7 +21,6 @@ AC_SUBST(optional_subdirs)
 # to appear in config.h.
 # 
 AC_SUBST(TBDBNAME)
-AC_SUBST(WWWDEFS)
 AC_SUBST(TBADMINGROUP)
 AC_SUBST(DELAYCAPACITY)
 AC_SUBST(IPBASE)
@@ -42,6 +41,17 @@ AC_SUBST(CLIENT_ETCDIR)
 AC_SUBST(CLIENT_BINDIR)
 AC_SUBST(CLIENT_VARDIR)
 AC_SUBST(SNMP_RW_COMMUNITY)
+AC_SUBST(WWWHOST)
+AC_SUBST(WWW)
+AC_SUBST(TBBASE)
+AC_SUBST(TBDOCBASE)
+AC_SUBST(TBWWW)
+AC_SUBST(THISHOMEBASE)
+AC_SUBST(TBSECURECOOKIES)
+AC_SUBST(TBCOOKIESUFFIX)
+AC_SUBST(TBAUTHDOMAIN)
+AC_SUBST(TBAUTHTIMEOUT)
+AC_SUBST(TBMAINSITE)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -73,6 +83,8 @@ TBADMINGROUP="flux"
 CLIENT_ETCDIR="/etc/emulab"
 CLIENT_BINDIR="/usr/local/etc/emulab"
 CLIENT_VARDIR="/var/emulab"
+TBSECURECOOKIES=1
+TBMAINSITE=0
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -149,6 +161,28 @@ if test -n "$TBUSERSARCHIVE"; then
 else
     TBUSERSARCHIVE_NOSLASH="$TBOPSEMAIL_NOSLASH"
     TBUSERSARCHIVE="$TBOPSEMAIL"
+fi
+
+if test -z "$TBAUTHDOMAIN"; then
+    TBAUTHDOMAIN=".$OURDOMAIN"
+fi
+if test -z "$TBAUTHTIMEOUT"; then
+    TBAUTHTIMEOUT="21600"
+fi
+if test -z "$WWW"; then
+    WWW="$WWWHOST"
+fi
+if test -z "$TBBASE"; then
+    TBBASE="https://$WWW"
+fi
+if test -z "$TBDOCBASE"; then
+    TBDOCBASE="http://$WWW"
+fi
+if test -z "$TBWWW"; then
+    TBWWW="<$TBBASE/>"
+fi
+if test -z "$THISHOMEBASE"; then
+    THISHOMEBASE="Emulab.Net"
 fi
 
 #

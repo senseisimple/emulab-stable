@@ -6,7 +6,6 @@
 # If you add a variable, be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=default
 TBADMINGROUP=flux
 TBOPSEMAIL=testbed-ops@flux.cs.utah.edu
 TBLOGSEMAIL=testbed-logs@flux.cs.utah.edu
@@ -27,3 +26,6 @@ FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 FSDIR_SHARE=/share
+WWWHOST=www.emulab.net
+TBMAINSITE=1
+THISHOMEBASE=Emulab.Net

@@ -2,7 +2,6 @@
 # This is the definitions file for Rob on Emulab.Net.
 #
 TBDBNAME=tbdb
-WWWDEFS=ricci-emulab
 
 TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu
@@ -23,3 +22,5 @@ FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~ricci/www

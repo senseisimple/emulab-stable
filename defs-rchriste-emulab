@@ -2,7 +2,6 @@
 # This is the definitions file for Mac^D^D^DChad^D^D^D^Druss on Emulab.Net.
 #
 TBDBNAME=tbdb
-WWWDEFS=rchriste-emulab
 TBOPSEMAIL=rchriste@cs.utah.edu
 TBLOGSEMAIL=rchriste@cs.utah.edu
 TBWWWEMAIL=rchriste@cs.utah.edu
@@ -19,3 +18,5 @@ FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=rchriste@cs.utah.edu
 TBTESTSUITEEMAIL=rchriste@cs.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/~ricci/www

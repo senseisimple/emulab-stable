@@ -853,6 +853,16 @@ fi
 
 
 
+
+
+
+
+
+
+
+
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -883,6 +893,8 @@ TBADMINGROUP="flux"
 CLIENT_ETCDIR="/etc/emulab"
 CLIENT_BINDIR="/usr/local/etc/emulab"
 CLIENT_VARDIR="/var/emulab"
+TBSECURECOOKIES=1
+TBMAINSITE=0
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -997,6 +1009,28 @@ if test -n "$TBUSERSARCHIVE"; then
 else
     TBUSERSARCHIVE_NOSLASH="$TBOPSEMAIL_NOSLASH"
     TBUSERSARCHIVE="$TBOPSEMAIL"
+fi
+
+if test -z "$TBAUTHDOMAIN"; then
+    TBAUTHDOMAIN=".$OURDOMAIN"
+fi
+if test -z "$TBAUTHTIMEOUT"; then
+    TBAUTHTIMEOUT="21600"
+fi
+if test -z "$WWW"; then
+    WWW="$WWWHOST"
+fi
+if test -z "$TBBASE"; then
+    TBBASE="https://$WWW"
+fi
+if test -z "$TBDOCBASE"; then
+    TBDOCBASE="http://$WWW"
+fi
+if test -z "$TBWWW"; then
+    TBWWW="<$TBBASE/>"
+fi
+if test -z "$THISHOMEBASE"; then
+    THISHOMEBASE="Emulab.Net"
 fi
 
 #
@@ -1236,7 +1270,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1240: checking for a BSD compatible install" >&5
+echo "configure:1274: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1527,7 +1561,6 @@ s%@STRIP@%$STRIP%g
 s%@SSH@%$SSH%g
 s%@optional_subdirs@%$optional_subdirs%g
 s%@TBDBNAME@%$TBDBNAME%g
-s%@WWWDEFS@%$WWWDEFS%g
 s%@TBADMINGROUP@%$TBADMINGROUP%g
 s%@DELAYCAPACITY@%$DELAYCAPACITY%g
 s%@IPBASE@%$IPBASE%g
@@ -1548,6 +1581,17 @@ s%@CLIENT_ETCDIR@%$CLIENT_ETCDIR%g
 s%@CLIENT_BINDIR@%$CLIENT_BINDIR%g
 s%@CLIENT_VARDIR@%$CLIENT_VARDIR%g
 s%@SNMP_RW_COMMUNITY@%$SNMP_RW_COMMUNITY%g
+s%@WWWHOST@%$WWWHOST%g
+s%@WWW@%$WWW%g
+s%@TBBASE@%$TBBASE%g
+s%@TBDOCBASE@%$TBDOCBASE%g
+s%@TBWWW@%$TBWWW%g
+s%@THISHOMEBASE@%$THISHOMEBASE%g
+s%@TBSECURECOOKIES@%$TBSECURECOOKIES%g
+s%@TBCOOKIESUFFIX@%$TBCOOKIESUFFIX%g
+s%@TBAUTHDOMAIN@%$TBAUTHDOMAIN%g
+s%@TBAUTHTIMEOUT@%$TBAUTHTIMEOUT%g
+s%@TBMAINSITE@%$TBMAINSITE%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g

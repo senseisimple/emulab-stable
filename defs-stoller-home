@@ -2,7 +2,6 @@
 # This is the definitions file for Leigh at home.
 #
 TBDBNAME=tbdb
-WWWDEFS=stoller-home
 TBOPSEMAIL=stoller@stoller.casco.net
 TBLOGSEMAIL=stoller@stoller.casco.net
 TBWWWEMAIL=stoller@stoller.casco.net
@@ -19,3 +18,9 @@ FSDIR_PROJ=/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=stoller@stoller.casco.net
 TBTESTSUITEEMAIL=stoller@stoller.casco.net
+WWWHOST=golden-gw.ballmoss.com:9876
+WWW=golden-gw.ballmoss.com:9876/~stoller/testbed
+TBBASE=http://golden-gw.ballmoss.com:9876/~stoller/testbed
+TBSECURECOOKIES=0
+TBAUTHTIMEOUT=216000
+THISHOMEBASE=Stoller.Emulab.Net

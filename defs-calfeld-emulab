@@ -5,7 +5,6 @@
 # be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-WWWDEFS=default
 TBOPSEMAIL=calfeld@flux.cs.utah.edu
 TBLOGSEMAIL=calfeld@flux.cs.utah.edu
 TBWWWEMAIL=calfeld@flux.cs.utah.edu
@@ -22,3 +21,5 @@ FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 TBSTATEDEMAIL=calfeld@flux.cs.utah.edu
 TBTESTSUITEEMAIL=calfeld@flux.cs.utah.edu
+WWWHOST=www.emulab.net
+THISHOMEBASE=Emulab.Net
