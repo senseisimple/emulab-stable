@@ -757,7 +757,8 @@ be unpacked in, all separated by spaces.
      <h3>Starting your application automatically</h3>
 <p>
 
-You can start your application automatically when your nodes boot by
+You can start your application automatically when your nodes boot for
+the first time (experiment is started or swapped in) by
 using the <tt>tb-set-node-startcmd</tt> NS extension. The argument is
 a command string (pathname of a script or program, plus arguments)
 that is run as the <tt>UID</tt> of the experiment creator, after the
@@ -799,7 +800,16 @@ The start command is implemented using
 <a href="docwrapper.php3?docname=advanced.html#ProgramObjects">
 Program Objects</a>, which are described in more detail in the
 <a href="docwrapper.php3?docname=advanced.html">
-Advanced Tutorial.</a>
+Advanced Tutorial.</a> Note that the start command is run only when
+the experiment is swapped in. If you want to rerun the experiment, you
+can swap the experiment out and back in, or you can reboot all of the
+nodes in your experiment. If rebooting, you must fire off the program
+object yourself by restarting the 
+<a href="docwrapper.php3?docname=advanced.html">Event System</a> 
+on <tt>users.emulab.net</tt>:
+
+<code><pre>
+eventsys_control replay &lt;pid&gt &lt;eid&gt </code></pre>
 
 <p>
 <li> <a NAME="SyncServer"></a>
