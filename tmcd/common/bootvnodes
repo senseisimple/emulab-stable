@@ -246,6 +246,16 @@ for (my $i = 0;
 system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
 system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
 
+#
+# XXX grossed out yet?  Try this one: the mount command will HUP mountd
+# after every successful mount.  Thus if mounts in one jail overlap NFS
+# activity in another, the latter may be randomly killed off.
+#
+# Elegant solution: rename the mountd.pid file so mount cannot find it!
+#
+rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
+    if (-e "/var/run/mountd.pid");
+
 foreach my $vnode (sort(keys(%newvnodelist))) {
     # Blocks until mostly setup. 
     bootvnode($vnode, "boot", $newvnodelist{$vnode});
