@@ -134,7 +134,7 @@ my $rawbootdisk = $ARGV[0];
 my $IP = $ARGV[1];
 
 #
-# Untaint the arguments.
+# Untaint stuff.
 #
 if ($rawbootdisk =~ /^([\w\/]+)$/) {
     $rawbootdisk = $1;
@@ -142,16 +142,9 @@ if ($rawbootdisk =~ /^([\w\/]+)$/) {
 else {
     fatal("Tainted argument $rawbootdisk!");
 }
-if ($IP =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) {
-    $IP = $1;
-}
-else {
-    fatal("Tainted argument $IP!");
-}
 
 #
 # Grab hostname for passing back to website so it can cons up a nickname.
-# Strictly optional, but is nice for the web page display.
 #
 my $hostname = `hostname`;
 if ($hostname =~ /^([-\w\.\@]*)$/) {
@@ -159,6 +152,24 @@ if ($hostname =~ /^([-\w\.\@]*)$/) {
 }
 else {
     fatal("Tainted hostname $hostname!");
+}
+
+#
+# If DHCP mode, must get our IP from the hostname first. Perhaps we
+# should do that all the time, as a check on the nameserver, which had
+# better be correct and working!
+#
+if ($IP eq "DHCP") {
+    my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
+    $IP = inet_ntoa($ipaddrs[0]);
+}
+
+# Now taint check IP.
+if ($IP =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) {
+    $IP = $1;
+}
+else {
+    fatal("Tainted value $IP!");
 }
 
 #

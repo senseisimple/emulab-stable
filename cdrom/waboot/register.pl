@@ -98,6 +98,23 @@ if (! -s $cdkeyfile) {
 }
 $cdkey = `cat $cdkeyfile`;
 chomp($cdkey);
+
+#
+# If our IP came via DHCP, we need to figure out what it is. 
+#
+if ($IP eq "DHCP") {
+    my $hostname = `hostname`;
+
+    if ($hostname =~ /^([-\w\.]+)$/) {
+	$hostname = $1;
+
+	my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
+	$IP = inet_ntoa($ipaddrs[0]);
+    }
+    else {
+
+    }
+}
 	
 #
 # Get the script from netbed central. We have to be able to get it,
