@@ -19,24 +19,3 @@ lDE D -1 E -1
 lDF D -1 F -1
 END links
 END topology
-START virtual
-START nodes
-D node_3_0
-d node_3_1
-E node_3_6
-A node_3_5
-F node_3_4
-B node_3_3
-C node_3_2
-END nodes
-END virtual
-START vlan
-switch switch_3
-MAC3.0 MAC3.1
-MAC3.5 MAC3.2
-MAC3.0 MAC3.6
-MAC3.3 MAC3.2
-MAC3.0 MAC3.4
-MAC3.2 MAC3.1
-end
-END vlan
