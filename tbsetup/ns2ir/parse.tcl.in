@@ -109,7 +109,7 @@ proc punsup {msg} {
 # perror which does the right thing
 #
 proc unknown {args} {
-    perror "Unknown: $args"
+    error "Unknown: $args"
 }
 
 # Parse Arguments
