@@ -385,7 +385,8 @@ function WRITESIDEBAR() {
 				       $TBBASE, "beginexp.php3");
                 }
 
-		WRITESIDEBARBUTTON_NEW("Create a PlanetLab Slice",
+		# Put _NEW back when Plab is working again.
+		WRITESIDEBARBUTTON("Create a PlanetLab Slice",
 				       $TBBASE, "plab_ez.php3");
 
 		WRITESIDEBARBUTTON("Experiment List",
