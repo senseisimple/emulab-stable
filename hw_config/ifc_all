@@ -3,7 +3,9 @@
 my $rsh = "ssh";
 
 if ( $#ARGV < 0) {
-    die("Usage: ifc_all <ifc_file>\n");
+    die("Usage: ifc_all <ifc_file>\n".
+        "Sets current network configurations.\n".
+	"(Changes lost when rebooted. See also ifc_boot.)\n");
 }
 open(WHO,"/usr/bin/whoami 2>&1 |");
 $_ = <WHO>;
@@ -19,7 +21,7 @@ if (-e "$ARGV[$0]" ) {
     die ("Couldn't locate $ARGV[$0]\n");
 }
 my $last = "";
-my $OS = "";
+my $OS = "Unknown";
 my $IP = "";
 my $IF = 0;
 my $ifstr = "";
@@ -27,7 +29,9 @@ my $newIP = "";
 print "Reading input file...\n";
 while (<IN>) {
     chop;
-    s/\#(.*)//;
+    s/\s*\#(.*)//;
+    s/^\s+$//;
+    s/\s+/ /g;
     if ($_ eq "") {next;}
     #print "Got $_\n";
     ($IP,$IF,$newIP)= split(" ",$_);
@@ -47,19 +51,17 @@ while (<IN>) {
 	    $_ = <UNAME>;
 	    #print $_;
 	    if ($_ ) { @temp = split(" ",$_); $OS = $temp[$0]; }
-	} else {
-	    $ifstr="";
-	}
+	} 
 	print "OS for $IP is $OS   \t";
 	if ($OS eq "Linux") { $ifstr="eth"; }
 	elsif ($OS eq "FreeBSD") { $ifstr="fxp"; }
 	else { $ifstr = ""; }
-	if ($ifstr) { print "Using interface string \"$ifstr\"\n"; }
+	if ($ifstr) { print "Using interface string '$ifstr'\n"; }
     }
     
     #Set up the interface
     if ( $ifstr eq "" ) { 
-	print "Unknown OS $OS on $IP. Skipping interface $IF.\n";
+	print "Can't configure OS '$OS' on $IP. Skipping interface $IF.\n";
 	next;
     }
     print "Setting $IP $ifstr$IF to $newIP...\n";
