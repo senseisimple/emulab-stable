@@ -14,7 +14,10 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= imagezip frisbee.redux growdisk syncd dijkstra genhostsfile
+SUBDIRS	= imagezip frisbee.redux syncd dijkstra genhostsfile
+ifeq ($(SYSTEM),FreeBSD)
+SUBDIRS += growdisk 
+endif
 
 all:	all-subdirs split-image.sh
 
