@@ -35,7 +35,6 @@ function GENPLIST ($which, $query_result)
 	$state      = $row["state"];
 
 	if ($pid == $TBOPSPID || $pnodes == 0 ||
-	    ($pid == "ron" && $eid == "all") ||
 	    !isset($thumb_hash)) {
 	    continue;
 	}
@@ -71,8 +70,10 @@ $query_result =
 		 "     ve.pid=e.pid and ve.eid=e.eid ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "left join experiment_resources as rs on rs.idx=s.rsrcidx ".
-		 "where rs.pnodes!=0 and ".
-		 "      e.state='" . $TB_EXPTSTATE_ACTIVE . "' " .
+		 "where rs.pnodes>0 and ".
+		 "      e.state='" . $TB_EXPTSTATE_ACTIVE . "' and " .
+		 "      e.pid!='emulab-ops' and ".
+		 "      (e.pid!='ron' and e.eid!='all') ".
 		 "order by s.swapin_last desc ");
 
 echo "<a NAME=active></a>\n";
