@@ -1,11 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+include("osiddefs.php3");
 
 #
 # XXX
@@ -25,32 +26,6 @@ PAGEHEADER("Create a new Image Descriptor (EZ Form)");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
-
-#
-# Default features. Needs to move someplace else!
-# 
-$featurelist         = array();
-$featurelist["ping"] = "ping";
-$featurelist["ssh"]  = "ssh";
-$featurelist["ipod"]  = "ipod";
-$featurelist["isup"]  = "isup";
-
-#
-# Default OS strings. Needs to move someplace else!
-#
-$oslist            = array();
-$oslist["Linux"]   = "Linux";
-$oslist["FreeBSD"] = "FreeBSD";
-$oslist["NetBSD"]  = "NetBSD";
-$oslist["Other"]   = "Other";
-
-#
-# Default op modes. Needs to move someplace else!
-#
-$opmodes             = array();
-$opmodes["NORMALv1"] = "NORMALv1";
-$opmodes["MINIMAL"]  = "MINIMAL";
-$opmodes["NORMAL"]   = "NORMAL";
 
 #
 # See what projects the uid can do this in.
@@ -77,8 +52,8 @@ $types_result =
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $uid, $projlist, $isadmin, $types_result, $oslist, $opmodes,
-      $featurelist;
+    global $uid, $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
+      $osid_featurelist;
     global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
     global $TBDB_OSID_VERSLEN, $TBBASE;
 
@@ -292,8 +267,11 @@ function SPITFORM($formfields, $errors)
              <td><select name=\"formfields[os_name]\">
                    <option value=none>Please Select </option>\n";
 
-    while (list ($os, $value) = each($oslist)) {
+    while (list ($os, $userokay) = each($osid_oslist)) {
 	$selected = "";
+
+	if (!$userokay && !$isadmin)
+	    continue;
 
 	if (isset($formfields[os_name]) &&
 	    strcmp($formfields[os_name], $os) == 0)
@@ -353,10 +331,13 @@ function SPITFORM($formfields, $errors)
               <td>OS Features[<b>3</b>]:</td>
               <td>";
 
-    reset($featurelist);
-    while (list ($feature, $value) = each($featurelist)) {
+    reset($osid_featurelist);
+    while (list ($feature, $userokay) = each($osid_featurelist)) {
 	$checked = "";
 	
+	if (!$userokay && !$isadmin)
+	    continue;
+
 	if (isset($formfields["os_feature_$feature"]) &&
 	    ! strcmp($formfields["os_feature_$feature"], "checked"))
 	    $checked = "checked";
@@ -376,8 +357,11 @@ function SPITFORM($formfields, $errors)
              <td><select name=\"formfields[op_mode]\">
                    <option value=none>Please Select </option>\n";
 
-    while (list ($mode, $value) = each($opmodes)) {
+    while (list ($mode, $userokay) = each($osid_opmodes)) {
 	$selected = "";
+
+	if (!$userokay && !$isadmin)
+	    continue;
 
 	if (isset($formfields[op_mode]) &&
 	    strcmp($formfields[op_mode], $mode) == 0)
@@ -532,12 +516,11 @@ function SPITFORM($formfields, $errors)
                 </ul>
 	     </li>
              <li> Guidelines for setting Operational Mode for your OS:
-                  (Most images should use NORMALv1.)
+                  (Most images should use " . TBDB_DEFAULT_OSID_OPMODE . ")
                 <ul>
                   <li> If it is based on a testbed image (one of our
                        RedHat Linux or FreeBSD images)  use the same
-                       op_mode as that image (should be NORMALv1,
-                       or NORMAL for old images. Select it from the
+                       op_mode as that image. Select it from the
                        <a href=\"$TBBASE/showosid_list.php3\"
                        >OS Descriptor List</a> to find out).
 		  </li>
@@ -572,7 +555,7 @@ if (! $submit) {
     $defaults = array();
     $defaults[loadpart] = "X";
     $defaults[path]     = "/proj/";
-    $defaults[op_mode]  = "NORMALv1";
+    $defaults[op_mode]  = TBDB_DEFAULT_OSID_OPMODE;
     $defaults[os_feature_ping] = "checked";
     $defaults[os_feature_ssh]  = "checked";
     $defaults[os_feature_ipod] = "checked";
@@ -663,7 +646,7 @@ if (!isset($formfields[imagename]) ||
 else {
     if (! ereg("^[a-zA-Z0-9][-_a-zA-Z0-9\.\+]+$", $formfields[imagename])) {
 	$errors["Descriptor Name"] =
-	    "Must be alphanumeric (includes _, -, +, and .)<br>".
+	    "Must be alphanumeric (includes _, -, +, and .)<br>" .
 	    "and must begin with an alphanumeric";
     }
     elseif (strlen($formfields[imagename]) > $TBDB_OSID_OSNAMELEN) {
@@ -702,8 +685,14 @@ if (!isset($formfields[os_name]) ||
     strcmp($formfields[os_name], "none") == 0) {
     $errors["OS"] = "Not Selected";
 }
-elseif (! isset($oslist[$formfields[os_name]])) {
+elseif (! preg_match("/^[-\w]+$/", $formfields[os_name])) {
+    $errors["OS"] = "Illegal Characters";
+}
+elseif (! array_key_exists($formfields[os_name], $osid_oslist)) {
     $errors["OS"] = "Invalid OS";
+}
+elseif (! $osid_oslist[$formfields[os_name]] && !$isadmin) {
+    $errors["OS"] = "No enough permission";
 }
 
 #
@@ -778,10 +767,15 @@ elseif (! $isadmin) {
 #
 $os_features_array = array();
 
-while (list ($feature, $value) = each($featurelist)) {
+while (list ($feature, $userokay) = each($osid_featurelist)) {
     if (isset($formfields["os_feature_$feature"]) &&
 	strcmp($formfields["os_feature_$feature"], "checked") == 0) {
-	$os_features_array[] = $feature;
+	if (!$userokay && !$isadmin) {
+	    $errors["Feature - $feature"] = "Not enough permission";
+	}
+	else {
+	    $os_features_array[] = $feature;
+	}
     }
 }
 $os_features = join(",", $os_features_array);
@@ -794,8 +788,14 @@ if (!isset($formfields[op_mode]) ||
     strcmp($formfields[op_mode], "none") == 0) {
     $errors["Op. Mode"] = "Not Selected";
 }
-elseif (! isset($opmodes[$formfields[op_mode]])) {
-    $errors["Op. Mode"] = "Invalid Op. Mode";
+elseif (! preg_match("/^[-\w]+$/", $formfields[op_mode])) {
+    $errors["Op. Mode"] = "Illegal Characters";
+}
+elseif (! array_key_exists($formfields[op_mode], $osid_opmodes)) {
+    $errors["Op. Mode"] = "Invalid Operation Mode";
+}
+elseif (! $osid_opmodes[$formfields[os_mode]] && !$isadmin) {
+    $errors["Op. Mode"] = "No enough permission";
 }
 
 #

@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include("osiddefs.php3");
 
 #
 # Standard Testbed Header
@@ -86,14 +87,15 @@ echo "<tr>
 # 
 echo "<tr>
           <td>*Select OS:</td>
-          <td><select name=OS>
-               <option value=none>Please Select &nbsp;</option>
-               <option value=Linux>Linux </option>
-               <option value=FreeBSD>FreeBSD </option>
-               <option value=NetBSD>NetBSD </option>
-               <option value=OSKit>OSKit </option>
-               <option value=Unknown>Other </option>
-              </select>
+          <td><select name=OS>\n";
+
+while (list ($os, $userokay) = each($osid_oslist)) {
+    if (!$userokay && !$isadmin)
+	continue;
+
+    echo "<option value=$os>$os &nbsp </option>\n";
+}
+echo "       </select>
           </td>
       </tr>\n";
 
@@ -127,18 +129,22 @@ echo "<tr>
 
 echo "<tr>
           <td>OS Features:</td>
-          <td><input checked type=checkbox name=\"os_feature_ping\">ping &nbsp
-              <input checked type=checkbox name=\"os_feature_ssh\">ssh  &nbsp
-              <input checked type=checkbox name=\"os_feature_ipod\">ipod  &nbsp
-              <input checked type=checkbox name=\"os_feature_isup\">isup  &nbsp
-              <p>
-              Guidelines for setting os_features for your OS:
+          <td>";
+
+while (list ($feature, $userokay) = each($osid_featurelist)) {
+    if (!$userokay && !$isadmin)
+	continue;
+
+    echo "<input checked type=checkbox value=checked
+                 name=\"os_feature_$feature\">$feature &nbsp\n";
+}
+echo "<p>Guidelines for setting os_features for your OS:
               <ol>
                 <li> Mark ping and/or ssh if they are supported.
                 <li> If you use a testbed kernel, or are based on a
                      testbed kernel config, mark the ipod box.
                 <li> If it is based on a testbed image or sends its own
-                     isup, mark isup.
+                     isup, mark isup. 
               </ol>
           </td>
       </tr>\n";
@@ -149,18 +155,25 @@ echo "<tr>
 
 echo "<tr>
           <td>*Operational Mode (op_mode):</td>
-          <td><select name=op_mode>
-               <option selected value=NORMALv1>NORMALv1 </option>
-               <option value=MINIMAL>MINIMAL &nbsp;</option>
-               <option value=NORMAL>NORMAL </option>
-              </select>
-              <p>
+          <td><select name=op_mode>\n";
+while (list ($op_mode, $userokay) = each($osid_opmodes)) {
+    if (!$userokay && !$isadmin)
+	continue;
+
+    $selected = "";
+    if ($op_mode == TBDB_DEFAULT_OSID_OPMODE) {
+	$selected = "selected";
+    }
+
+    echo "<option $selected value=$op_mode>$op_mode &nbsp </option>\n";
+}
+echo "       </select>
+             <p>
               Guidelines for setting op_mode for your OS:
               <ol>
                 <li> If it is based on a testbed image (one of our
-                     RedHat Linux or FreeBSD images)  use the same
-                     op_mode as that image (should be NORMALv1,
-                     or NORMAL for old images. Select it from the
+                     RedHat Linux or FreeBSD images) use the same
+                     op_mode as that image. Select it from the
                      <a href=\"$TBBASE/showosid_list.php3\"
                      >OS Descriptor List</a> to find out).
                 <li> If not, use MINIMAL.

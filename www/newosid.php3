@@ -1,11 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+include("osiddefs.php3");
 
 #
 # Standard Testbed Header
@@ -37,16 +38,6 @@ if (!isset($description) ||
     strcmp($description, "") == 0) {
   FORMERROR("Description");
 }
-if (!isset($OS) ||
-    strcmp($OS, "") == 0 ||
-    (strcmp($OS, "Linux") &&
-     strcmp($OS, "FreeBSD") &&
-     strcmp($OS, "NetBSD") &&
-     strcmp($OS, "OSKit") &&
-     strcmp($OS, "Unknown"))) {
-    FORMERROR("Operating System (OS)");
-}
-
 if (isset($os_path) &&
     strcmp($os_path, "") == 0) {
     unset($os_path);
@@ -57,8 +48,24 @@ if (isset($os_version) &&
 }
 
 #
-# Check osname for sillyness.
+# Check OS.
 #
+if (!isset($OS) ||
+    strcmp($OS, "") == 0 ||
+    strcmp($OS, "none") == 0) {
+    FORMERROR("Operating System (OS)");
+}
+elseif (! preg_match("/^[-\w]+$/", $OS)) {
+    USERERROR("Operating System (OS) - Illegal Characters", 1);
+}
+elseif (! array_key_exists($OS, $osid_oslist)) {
+    USERERROR("Operating System (OS) - Invalid OS", 1);
+}
+elseif (! $osid_oslist[$OS] && !$isadmin) {
+    USERERROR("Operating System (OS) - Not enough permission", 1);
+}
+
+# Check OSid.
 if (! ereg("^[-_a-zA-Z0-9\.]+$", $osname)) {
     USERERROR("The Descriptor name must consist of alphanumeric characters ".
 	      "and dash, dot, or underscore!", 1);
@@ -141,31 +148,41 @@ else {
 }
 
 #
-# Form the os features set.
+# OS Features.
+# 
+# As a side effect of validating, form the os features set as a string
+# for the insertion below. 
 #
 $os_features_array = array();
-if (isset($os_feature_ping)) {
-    $os_features_array[] = "ping";
-}
-if (isset($os_feature_ssh)) {
-    $os_features_array[] = "ssh";
-}
-if (isset($os_feature_ipod)) {
-    $os_features_array[] = "ipod";
-}
-if (isset($os_feature_ipod)) {
-    $os_features_array[] = "isup";
+
+while (list ($feature, $userokay) = each($osid_featurelist)) {
+    $foo = "os_feature_$feature";
+    
+    if (isset($$foo) && strcmp($$foo, "checked") == 0) {
+	if (!$userokay && !$isadmin) {
+	    USERERROR("Feature '$feature' requires admin mode!", 1);
+	}
+	else {
+	    $os_features_array[] = $feature;
+	}
+    }
 }
 $os_features = join(",", $os_features_array);
 
 # Check op_mode
 if (!isset($op_mode) ||
     strcmp($op_mode, "") == 0 ||
-    (strcmp($op_mode, "MINIMAL") &&
-     strcmp($op_mode, "NORMAL") &&
-     strcmp($op_mode, "NORMALv1") &&
-     strcmp($op_mode, "Unknown"))) {
+    strcmp($op_mode, "none") == 0) {
     FORMERROR("Operational Mode (op_mode)");
+}
+elseif (! preg_match("/^[-\w]+$/", $op_mode)) {
+    USERERROR("Operational Mode (op_mode) - Illegal Characters", 1);
+}
+elseif (! array_key_exists($op_mode, $osid_opmodes)) {
+    USERERROR("Operational Mode (op_mode) - Invalid op_mode", 1);
+}
+elseif (! $osid_opmodes[$OS] && !$isadmin) {
+    USERERROR("Operational Mode (o_mode) - Not enough permission", 1);
 }
 
 #
