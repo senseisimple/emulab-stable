@@ -276,6 +276,19 @@ sub readXML($$$) {
 	    DBQueryFatal("delete from $table ".
 			 "where eid='$eid' and pid='$pid'")
 		if (!$impotent);
+	} else {
+	    # The nseconfigs table is special. During a
+	    # simparse, we need delete all rows for the
+	    # experiment except the one with the vname
+	    # 'fullsim'. This row is essentially virtual
+	    # info and does not change across swapins
+	    # where as the other rows depend on the
+	    # mapping
+	    if ( !$impotent && ($table eq "nseconfigs") ) {
+		DBQueryFatal("delete from $table ". 
+		             "where eid='$eid' and pid='$pid' and ".
+			     "vname!='fullsim'")
+	    }
 	}
 	next
 	    if (!defined($virtual_tables{$table}));
