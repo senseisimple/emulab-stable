@@ -189,7 +189,7 @@ function SHOWGROUP($pid, $gid) {
     echo "<tr>
               <td>GID: </td>
               <td class=\"left\">
-                <a href='showgroup.php3pid=$pid&gid=$gid'>$gid</a></td>
+                <a href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
           </tr>\n";
     
     echo "<tr>
