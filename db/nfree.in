@@ -301,6 +301,11 @@ foreach my $n (@freed_nodes) {
     TBSetNodeEventState($n, TBDB_NODESTATE_SHUTDOWN)
 	if ($isvirt && $estate ne TBDB_NODESTATE_SHUTDOWN());
 
+    # Clean out the SFS hostid. What about the other keys?
+    DBQueryWarn("update node_hostkeys set ".
+		"  sfshostid=NULL ".
+		"where node_id='$n'") || $error++;
+
     # Clean out the current_reloads table (a just in case measure).
     DBQueryWarn("delete from current_reloads where node_id='$n'") || $error++;
 
