@@ -270,13 +270,17 @@ sub ParseArgs {
       }
     }
     elsif (/^-r(.*)/) {
+      my @tmp = ();
       @r = ();
-      push(@r, ($1 ? $1 : shift(@CMDS)));
+      push(@tmp, ($1 ? $1 : shift(@CMDS)));
       while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) {
-	push(@r, shift(@CMDS));
+	push(@tmp, shift(@CMDS));
+      }
+      foreach $n (@tmp) {
+	if ($n =~ /^[0-9]+$/) { push(@r, $n); }
       }
       print "remove: '@r' ($#r)\n" if $debug;
-      if ($#r == 0) { die("Which VLANs should I remove?\n"); }
+      if ($#r < 0) { die("Which VLANs should I remove?\n"); }
       if (join(" ",@r) =~ /[^0-9 ]/) { die("Removal list '@r' invalid.\n"); }
     }
     elsif (/^-v(.*)/) {$v = 1;}
