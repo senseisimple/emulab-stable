@@ -32,7 +32,7 @@ ServerLogInit(void)
 		return 1;
 	}
 
-	openlog("frisbee", LOG_PID, LOG_USER);
+	openlog("frisbeed", LOG_PID, LOG_USER);
 
 	return 0;
 }
