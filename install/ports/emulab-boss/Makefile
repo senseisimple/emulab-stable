@@ -2,10 +2,8 @@
 # Date created:         28 January 2003
 # Whom:                 ricci@cs.utah.edu
 
-# XXX: Need to get isc-dhcpd2, somehow!
-
 PORTNAME=	emulab-boss
-PORTVERSION=	1.0
+PORTVERSION=	1.1
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -33,11 +31,13 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net/p5-SNMP \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP_Session.pm:${PORTSDIR}/net/p5-SNMP_Session \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/MD5.pm:${PORTSDIR}/security/p5-MD5 \
 	rpm:${PORTSDIR}/archivers/rpm \
 	${LOCALBASE}/lib/tcl8.3/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
 	xvcg:${PORTSDIR}/graphics/vcg \
 	tftp-hpa:${PORTSDIR}/misc/tftp-hpa \
-	elvind:${PORTSDIR}/misc/elvind
+	elvind:${PORTSDIR}/misc/elvind \
+	dhcpd:${PORTSDIR}/net/isc-dhcp3
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
