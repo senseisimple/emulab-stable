@@ -30,6 +30,7 @@ use strict;
 # Defaults
 #
 my $debug = 0;
+my $quiet = 0;
 
 ######################################################################
 # Step 1 - Process command-line arguments
@@ -40,7 +41,7 @@ my $debug = 0;
 ######################################################################
 sub usage {
     print << "END";
-Usage: $0 [-h] [-v] [-n] [-i device] [-S stack]
+Usage: $0 [-h] [-v] [-q] [-n] [-i device] [-S stack]
 	  [-l] [-s] [-g]
 	  [-m name [ports]]
 	  [-T port name]
@@ -54,6 +55,7 @@ Usage: $0 [-h] [-v] [-n] [-i device] [-S stack]
 General:
   -h          Display this help message
   -v          Verbose mode
+  -q          Quiet mode
   -n          Test mode - don't actually make any changes
   -i <device> Operate on <device>, overriding default device list. Can be
                   given multiple times
@@ -105,8 +107,8 @@ END
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n','o=s@',
-    'p=s','r','s', 'S=s@', 't','T=s','u=s','U','v','w','y=s','x=s','z=s');
-# Unused: f,j,q
+    'p=s','q','r','s', 'S=s@', 't','T=s','u=s','U','v','w','y=s','x=s','z=s');
+# Unused: f,j
 
 if ($opt{h}) {
     exit &usage;
@@ -115,6 +117,10 @@ if ($opt{h}) {
 if ($opt{v}) {
     $debug = $opt{v};
     print "Debug level is $debug\n";
+}
+
+if ($opt{q}) {
+    $quiet = 1;
 }
 
 #
@@ -1042,7 +1048,8 @@ sub doVlansFromTables($@) {
     foreach my $vlan (@vlans) {
 	my @ports = getVlanPorts($vlan);
 	if ($stack->vlanExists($vlan)) {
-	    print "  VLAN $vlan already exists\n";
+	    print "  VLAN $vlan already exists\n"
+		if (!$quiet);
 	    $errors += $stack->setPortVlan($vlan,@ports);
 	} else {
 	    if (!$stack->createVlan($vlan,\@ports)) {
@@ -1137,23 +1144,30 @@ sub doMakeVlan($$@) {
     # Create it if it doesn't already exist
     #
     if ($stack->vlanExists($vlan_name)) {
-	print "VLAN $vlan_name already exists\n";
+	print "VLAN $vlan_name already exists\n"
+	    if (!$quiet);
 	#
 	# Put requested ports into the VLAN
 	#
 	if (@ports) {
-	    print "Putting ports in VLAN ...\n";
+	    print "Putting ports in VLAN ...\n"
+		if (!$quiet);
 	    my $perrors = $stack->setPortVlan($vlan_name,@ports);
-	    print "VLAN change ";
-	    print $perrors? "failed":"succeeded",".\n";
+	    if (!$quiet) {
+		print "VLAN change ";
+		print $perrors? "failed":"succeeded",".\n";
+	    }
 	    $errors += $perrors;
 
 	}
     } else {
-	print "Creating VLAN $vlan_name ...\n";
+	print "Creating VLAN $vlan_name ...\n"
+	    if (!$quiet);
 	my $ok = $stack->createVlan($vlan_name,\@ports,@pvlanArgs);
-	print "VLAN creation ";
-	print $ok? "succeeded":"failed",".\n";
+	if (!$quiet) {
+	    print "VLAN creation ";
+	    print $ok? "succeeded":"failed",".\n";
+	}
 	if (!$ok) {
 	    $errors++;
 	}
@@ -1181,10 +1195,13 @@ sub doDeleteVlan($@) {
 	    }
 	}
 	if (@existant_vlans) {
-	    print "Deleting VLAN(s) " . join(",",@existant_vlans) . " ...\n";
+	    print "Deleting VLAN(s) " . join(",",@existant_vlans) . " ...\n"
+		if (!$quiet);
 	    my $ok = $stack->removeVlan(@existant_vlans);
-	    print "VLAN deletion ";
-	    print $ok? "succeeded":"failed",".\n";
+	    if (!$quiet) {
+		print "VLAN deletion ";
+		print $ok? "succeeded":"failed",".\n";
+	    }
 	    if (!$ok) {
 		$errors++;
 	    }
@@ -1216,10 +1233,13 @@ sub doPortControl($$@) {
     }
     my ($stack) = @$stacks;
 
-    print "Applying command '$command' to ports " . join(",",@ports) . " ...\n";
+    print "Applying command '$command' to ports " . join(",",@ports) . " ...\n"
+	if (!$quiet);
     my $errors = $stack->portControl($command,@ports);
-    print "Port command ";
-    print $errors? "failed":"succeeded",".\n";
+    if (!$quiet) {
+	print "Port command ";
+	print $errors? "failed":"succeeded",".\n";
+    }
 
     return $errors;
 
@@ -1314,7 +1334,8 @@ sub doTrunkEnable($$@) {
     # Simple, just call the right function on the stack
     #
     my $stack = $$stacks[0];
-    print "Enabling trunking on $port ...\n";
+    print "Enabling trunking on $port ...\n"
+	if (!$quiet);
     return !($stack->enableTrunking($port,@vlans));
 }
 
@@ -1339,7 +1360,8 @@ sub doTrunkDisable($$) {
     my $stack = $$stacks[0];
     my $errors = 0;
     foreach my $port (@ports) {
-	print "Disabling trunking on port $port ...\n";
+	print "Disabling trunking on port $port ...\n"
+	    if (!$quiet);
 	if (!$stack->disableTrunking($port)) {
 	    $errors++;
 	}
