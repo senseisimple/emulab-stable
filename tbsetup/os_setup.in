@@ -678,9 +678,9 @@ elsif (@vnodelist) {
 	# MarkNodeDown($node);
 
 	# Send mail to testbed-ops about it
-	SENDMAIL($TBOPS, "Virtual Node $node is down",
-		 "Virtual node $node in pid/eid $pid/$eid appears to be ".
-		 "unresponsive.\n\n");
+#	SENDMAIL($TBOPS, "Virtual Node $node is down",
+#		 "Virtual node $node in pid/eid $pid/$eid appears to be ".
+#		 "unresponsive.\n\n");
 
 	print "*** Experiment will be terminated automatically.\n";
 	$failed++;
