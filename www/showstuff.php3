@@ -587,8 +587,10 @@ function SHOWEXP($pid, $eid, $short = 0) {
     }
 		
     $query_result =
-	DBQueryFatal("select e.*, round(minimum_nodes+.1,0) as min_nodes ".
-		     " from experiments as e ".
+	DBQueryFatal("select e.*, pl.slicename, ". 
+                     "round(e.minimum_nodes+.1,0) as min_nodes ".
+		     " from experiments as e left join plab_slices as pl".
+                     " on e.pid = pl.pid and e.eid = pl.eid ".
 		     "where e.pid='$pid' and e.eid='$eid'");
     
     if (($exprow = mysql_fetch_array($query_result)) == 0) {
@@ -624,6 +626,7 @@ function SHOWEXP($pid, $eid, $short = 0) {
     $syncserver  = $exprow["sync_server"];
     $mem_usage   = $exprow["mem_usage"];
     $cpu_usage   = $exprow["cpu_usage"];
+    $exp_slice   = $exprow[slicename];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -685,6 +688,13 @@ function SHOWEXP($pid, $eid, $short = 0) {
                   <a href='showgroup.php3?pid=$pid&gid=$exp_gid'>$exp_gid</a>
                 </td>
               </tr>\n";
+
+        if (isset($exp_slice)) {
+          echo "<tr>
+                  <td>Planetlab Slice: </td>
+                  <td class=\"left\">$exp_slice</td>
+                </tr>\n";
+        }
     }
 
     echo "<tr>
