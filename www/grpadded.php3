@@ -64,14 +64,6 @@ if (!isset($usr_phones) ||
     strcmp($usr_phones, "") == 0) {
   $formerror = "Phone #";
 }
-#
-# The first password field must always be filled in. The second only
-# if a new user, and we will catch that later.
-#
-if (!isset($password1) ||
-    strcmp($password1, "") == 0) {
-  $formerror = "Password";
-}
 
 if ($formerror != "No Error") {
   USERERROR("Missing field; ".
@@ -105,26 +97,29 @@ if ($row = mysql_fetch_row($project_result)) {
 }
 
 #
-# See if this is a new user or one returning. We have to query the database
-# for the uid, and then do the password thing. For a user returning, the
-# password must be valid. For a new user, the password must pass our tests.
+# See if this is a new user or one returning.
 #
 $pswd_query  = "SELECT usr_pswd FROM users WHERE uid=\"$grp_head_uid\"";
 $pswd_result = mysql_db_query($TBDBNAME, $pswd_query);
 if (!$pswd_result) {
     $err = mysql_error();
-    TBERROR("Database Error retrieving password for $grp_head_uid: $err\n", 1);
+    TBERROR("Database Error retrieving info for $grp_head_uid: $err\n", 1);
 }
 if ($row = mysql_fetch_row($pswd_result)) {
-    $db_encoding = $row[0];
-    $salt = substr($db_encoding,0,2);
-    if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
-    $encoding = crypt("$password1", $salt);
-    if (strcmp($encoding, $db_encoding)) {
-        USERERROR("The password provided was incorrect. ".
-                  "Please go back and retype the password.", 1);
-    }
     $returning = 1;
+}
+else {
+    $returning = 0;
+}
+
+#
+# If a user returning, then the login must be valid to continue any further.
+# For a new user, the password must pass our tests.
+#
+if (returning) {
+    if (CHECKLOGIN($grp_head_uid) != 1) {
+        USERERROR("You are not logged in. Please log in and try again.", 1);
+    }
 }
 else {
     if (strcmp($password1, $password2)) {
@@ -148,7 +143,6 @@ else {
                 "account,\n".
                 "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
-    $returning = 0;
 }
 
 array_walk($HTTP_POST_VARS, 'addslashes');

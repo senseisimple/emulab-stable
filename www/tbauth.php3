@@ -30,8 +30,10 @@ function GENHASH() {
 #          1 if logged in okay
 #         -1 if login timed out
 #
-function CHECKLOGIN($uid, $curhash) {
-    global $TBDBNAME;
+function CHECKLOGIN($uid) {
+    global $TBDBNAME, $TBAUTHCOOKIE, $HTTP_COOKIE_VARS;
+
+    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
 
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT hashkey, timeout FROM login WHERE uid=\"$uid\"");
@@ -72,12 +74,8 @@ function CHECKLOGIN($uid, $curhash) {
 # message.
 #
 function LOGGEDINORDIE($uid) {
-    global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
-    global $HTTP_COOKIE_VARS;
 
-    $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
-
-    $status = CHECKLOGIN($uid, $curhash);
+    $status = CHECKLOGIN($uid);
     switch ($status) {
     case 0:
         USERERROR("You do not appear to be logged in!", 1);

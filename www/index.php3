@@ -41,7 +41,7 @@ elseif (isset($uid)) {
     #
     # Check to make sure the UID is logged in (not timed out).
     #
-    $status = CHECKLOGIN($uid, $HTTP_COOKIE_VARS[$TBAUTHCOOKIE]);
+    $status = CHECKLOGIN($uid);
     switch ($status) {
     case 0:
         $login_status = "$uid Not Logged In";

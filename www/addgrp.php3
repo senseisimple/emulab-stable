@@ -7,17 +7,23 @@
 <?php
 include("defs.php3");
 
-$auth_usr = "";
+$uid = "";
 if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-  $auth_usr=$Vals[1];
-  addslashes($auth_usr);
+  $uid=$Vals[1];
+  addslashes($uid);
 } else {
-  unset($auth_usr);
+  unset($uid);
 }
 
-$row = 0;
-if (isset($auth_usr)) {
-    $uid = addslashes($auth_usr);
+#
+# If a uid came in, then we check to see if the login is valid.
+# If the login is not valid, then quit cause we don't want to display the
+# personal information for some random ?uid argument.
+#
+if (isset($uid)) {
+    if (CHECKLOGIN($uid) != 1) {
+        USERERROR("You are not logged in. Please log in and try again.", 1);
+    }
     $query_result = mysql_db_query($TBDBNAME,
 		"SELECT * FROM users WHERE uid=\"$uid\"");
     if (! $query_result) {
@@ -25,6 +31,12 @@ if (isset($auth_usr)) {
 	TBERROR("Database Error getting info for $uid: $err\n", 1);
     }
     $row = mysql_fetch_array($query_result);
+}
+else {
+    #
+    # No uid, so must be new.
+    #
+    $row = 0;
 }
 
 $expiretime = date("m/d/Y", time() + (86400 * 90));
@@ -168,25 +180,21 @@ echo "    </td>
       </tr>\n";
 
 #
-# Password
-#
-echo "<tr>
-         <td>*Password:</td>
-         <td><input type=\"password\" name=\"password1\" size=\"8\"></td>
-      </tr>\n";
-
-#
 # If a new usr, then provide a second password confirmation field.
 # Otherwise, a blank spot.
 #
 if (! $row) {
 echo "<tr>
-          <td>*Retype<br>New Password:</td>
+         <td>*Password:</td>
+         <td><input type=\"password\" name=\"password1\" size=\"8\"></td>
+      </tr>\n";
+
+echo "<tr>
+          <td>*Retype Password:</td>
           <td class=\"left\">
               <input type=\"password\" name=\"password2\" size=\"8\"></td>
       </tr>\n";
 }
-
 
 #
 # Project information
