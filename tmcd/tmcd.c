@@ -5000,6 +5000,9 @@ COMMAND_PROTOTYPE(dodoginfo)
 	       iv_rusage, iv_hkeys);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
+	if (verbose)
+		info("%s", buf);
+
 	return 0;
 }
 
