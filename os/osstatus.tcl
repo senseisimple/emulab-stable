@@ -27,7 +27,7 @@ if {[llength $argv] == 2} {
 
 set state [os querydb $node]
 set bstate [os querybase [lindex $state 0]]
-puts "base: [lindex $bstate 3]"
+puts "base: [lindex $state 0] ([lindex $bstate 3])"
 if {$verbose > 0} {
     puts "os: [lindex $bstate 0]"
     puts "ver: [lindex $bstate 1]"

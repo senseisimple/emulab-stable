@@ -11,6 +11,7 @@
 # listsdeltas <base> - Returns list of deltas
 # querybase <base> - Returns {os, ver, extra, desc}
 # querydelta <delta> - Returns {name, desc, path}
+# db - Returns sql connection.
 #
 # node_state = {base {deltas}}
 ######################################################################
@@ -30,6 +31,7 @@ variable commands {
     querydb querynode 
     listbases 
     querybase querydelta
+    db
 }
 variable DB {}
 
@@ -160,4 +162,14 @@ proc querydelta {delta} {
     sql endquery $DB
     return $ret
 }
+
+##################################################
+# db
+# Plain accesor function to the DB variable.
+##################################################
+proc db {} {
+    variable DB
+    return $DB
+}
+
 }
