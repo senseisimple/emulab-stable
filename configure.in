@@ -515,7 +515,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
-	utils/link_config utils/import_commitlog utils/dhcp_wrapper \
+	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
