@@ -1,0 +1,110 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# readycount - Command-line tool to get at the ready bits in the database
+#
+
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+
+use libdb;
+
+use English;
+use Getopt::Long;
+use strict;
+
+sub usage {
+    print << "END";
+Usage: $0 [-h] [-c] [-l] <pid> <eid> [node ...]
+-h    This message
+-c    Clear, rather than set, ready bits. If no node is given, clear ready
+      bits for all nodes
+-l    List ready status for each node in the experiment
+
+If no nodes are given, gives a summary of the nodes that have reported ready.
+If nodes are given, reports them as being ready (or clears their ready bits
+if -c is given)
+END
+
+    return 1;
+}
+
+#
+# Process command-line arguments
+#
+my %opt = ();
+GetOptions(\%opt,'l','h','c');
+if (@ARGV < 2) {
+    exit &usage;
+}
+my ($pid, $eid) = (shift @ARGV, shift @ARGV);
+my @nodes = @ARGV;
+
+if ($opt{h}) {
+    exit &usage;
+}
+
+if ($opt{l} && ($opt{c} || @nodes)) {
+    exit &usage;
+}
+
+# Make sure that the experiment actually exists
+if (!ExpState($pid,$eid)) {
+    die("There is no experiment '$eid' in project '$pid'.\n");
+}
+
+# Make sure the user has the ability to modify this experiment
+if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("You do not have permission to modify '$eid' in project '$pid'.\n");
+}
+
+if ($opt{c} || @nodes) {
+    my @pnodes;
+    if (!@nodes) {
+	@pnodes = ExpNodes($pid,$eid);
+    } else {
+	foreach my $vnode (@nodes) {
+	    my $pnode;
+	    if (VnameToNodeid($pid, $eid, $vnode, \$pnode)) {
+		push @pnodes, $pnode;
+	    } else {
+		die "No such node $vnode in $pid/$eid!\n";
+	    }
+	}
+    }
+    my $newbit = 1;
+    if ($opt{c}) {
+	$newbit = 0;
+    }
+    foreach my $pnode (@pnodes) {
+	DBQueryFatal("update nodes set ready=$newbit where node_id='$pnode'");
+    }
+} else {
+    my $result = DBQueryFatal("select ready, vname " .
+	"from reserved left join nodes on nodes.node_id=reserved.node_id " . 
+	"where reserved.eid='$eid' and reserved.pid='$pid'");
+    my $ready = 0;
+    my $total = 0;
+    while (my @row = $result->fetchrow()) {
+	my ($isready, $vname) = @row;
+	if ($opt{l}) {
+	    print "$vname\t$isready\n";
+	}
+	if ($isready) {
+	    $ready++;
+	}
+	$total++;
+    }
+    print "READY=$ready TOTAL=$total\n";
+}
+
+exit(0);
