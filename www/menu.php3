@@ -485,8 +485,14 @@ function PAGEHEADER($title) {
     }
     $now = date("D M d g:ia T");
     echo "$title</h2></td>\n";
-    echo "<td class=\"contentheader\" align=right>$now</td></tr>\n";
-    echo "<tr><td colspan=2 class=\"contentbody\" width=*>";
+    echo "<td class=\"contentheader\" align=right>Generated ";
+    if ($login_uid) {
+	echo "for <b>$login_uid</b>, ";
+    }
+    echo "$now.";
+    echo "</td>";
+    echo "</tr>\n";
+    echo "<tr><td colspan=3 class=\"contentbody\" width=*>";
     echo "<!-- begin content -->\n";
 }
 
