@@ -301,7 +301,7 @@ foreach $lan (keys(%lans)) {
 	    join(" ",@$sharks) . ")\n";
 	$sharkshelfid++;
 	$sharkshelves{$shelfid} = $sharks;
-	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0,0,
+	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0,
 					      0,$S100Kbs,0.0];
 	push(@$realmembers,"$shelfid:uplink");
 	$nodes{$shelfid} = "shark-shelf";
@@ -848,7 +848,7 @@ foreach $delay (keys(%delays)) {
 	my ($q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,
 	    $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,
 	    $q0_droptail,$q0_red,$q0_gentle) =
-		          @{$queueinfo{"$vname:$nodeport0"}};
+		@{$queueinfo{"$vname:$nodeport0"}};
 
 	my ($q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm,
 	    $q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit,
