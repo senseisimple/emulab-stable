@@ -32,11 +32,6 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-#
-# Ug, exit value from startexp when not enough nodes.
-# 
-my $TOOFEWNODES = 2;
-
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
 my $startexp = "$TB/bin/startexp";
@@ -118,23 +113,32 @@ while (1) {
     # So, now you're wondering what my selection criteria is? Well, its
     # damn simplistic. I set the "started" datetime field each attempt,
     # and I pick the batch_experiment with the oldest time, thereby cycling
-    # through in a "least recently attempted" manner. 
+    # through in a "least recently attempted" manner. In addition, we want
+    # to throttle the number simultaneous batches that one person can
+    # can have running at a time (curently to just one batch), so check to
+    # to see if the person has another batch active (thats e2 below).
     #
     $query_result =
-	DBQuery("lock tables experiments write");
+	DBQuery("lock tables experiments write, experiments as e1 write, ".
+		"experiments as e2 write");
     if (! $query_result) {
 	print "DB Error locking tables. Waiting a bit ...\n";
 	goto pause;
     }
     
     $pending_result =
-	DBQueryWarn("SELECT * FROM experiments ".
-		    "WHERE batchmode=1 and canceled=0 and ".
-		    "      batchstate='$BSTATE_POSTED' and ".
-		    "      (attempts=0 or ".
-		    "       ((UNIX_TIMESTAMP() - ".
-		    "         UNIX_TIMESTAMP(expt_start) > (60 * 15)))) ".
-		    "ORDER BY expt_start LIMIT 1");
+	DBQueryWarn("SELECT e1.* FROM experiments as e1 ".
+		    "left join experiments as e2 on ".
+		    " e2.expt_head_uid=e1.expt_head_uid and ".
+		    " e2.batchmode=1 and e2.batchstate='$BSTATE_RUNNING' and ".
+		    " e1.pid=e2.pid and e1.eid!=e2.eid ".
+		    "WHERE e2.eid is null and ".
+		    " e1.batchmode=1 and e1.canceled=0 and ".
+		    " e1.batchstate='$BSTATE_POSTED' and ".
+		    "  (e1.attempts=0 or ".
+		    "    ((UNIX_TIMESTAMP() - ".
+		    "      UNIX_TIMESTAMP(e1.expt_start) > (60 * 15)))) ".
+		    "ORDER BY e1.expt_start LIMIT 1");
 
     $running_result =
 	DBQuery("select * from experiments ".
@@ -364,34 +368,44 @@ sub startexp($)
 	    DBQueryWarn("update experiments set attempts=attempts+1 ".
 			"where eid='$eid' and pid='$pid'");
 
-	if ($exit_status == $TOOFEWNODES) {
-	    if ($attempts && (($attempts % 30) == 0)) {
-		$attempts++;
-		
-		my $msg =
-		    "Could not configure Batch Mode experiment $pid/$eid.\n".
-		    "\n". 
-		    "There are not enough free nodes at this time.\n".
-		    "Another attempt will be made in a little while.\n".
-		    "\n". 
-		    "There have been $attempts attempts to start this batch.";
-	    
-		email_status($msg);
-	    }
-
-	    #
-	    # There is some state that needs to be reset so that another
-	    # attempt can be made.
-	    # 
-	    SetExpState($pid, $eid, EXPTSTATE_NEW);
-	    TBSetBatchState($pid, $eid, $BSTATE_POSTED);
-	    
+	#
+	# The exit value is important. If its -1 or 1, thats bad. Kill the
+	# batch off. Anything else implies an assign violation that is
+	# (hopefully) transient. We leave it up the user to kill cancel the
+	# batch if it looks like its never going to work.
+	#
+	if ($exit_status == 1 || $exit_status == -1) {
+	    email_status("Experiment startup has failed with a fatal error!\n".
+			 "Batch has been removed from the system.");
+	    ExptCleanup();
 	    exit($exit_status);
 	}
-	email_status("Experiment startup exited with error code $exit_status.".
-		     "\n".
-		     "Batch has been removed from the system.");
-	ExptCleanup();
+	
+	if (($attempts % 30) == 0) {
+	    $attempts++;
+
+	    my $msg =
+		"Could not configure Batch Mode experiment $pid/$eid.\n".
+		"\n".
+		"There was an assignment violation (please check the log)\n".
+		"that prevented it from being scheduled. The violation\n".
+		"might result from not enough nodes or not enough link\n".
+		"bandwidth. If you feel that the violation is in error,\n".
+		"please cancel the batch and notify $TBOPS\n".
+		"Otherwise, another attempt will be made in a little while.\n".
+		"\n". 
+		"There have been $attempts attempts to start this batch.";
+
+	    email_status($msg);
+	}
+
+	#
+	# There is some state that needs to be reset so that another
+	# attempt can be made.
+	# 
+	SetExpState($pid, $eid, EXPTSTATE_NEW);
+	TBSetBatchState($pid, $eid, $BSTATE_POSTED);
+	    
 	exit($exit_status);
     }
 
