@@ -209,3 +209,53 @@ Things that could be done:
 
 	Of course, the most important thing to do is determine whether
 	we really have a problem and what components suck the most power.
+
+8. Get ARM/Linux running on the DNARDs (mike)
+
+	I spent a couple of days on this, long enough to get a diskless
+	system basically working, figured out how to build a kernel, and
+	discover all the problems that we need to fix.  For the complete
+	lowdown on my long, strange trip into DNARD/Linux, see
+	~mike/flux/doc/linux-dnard.txt.
+
+	Here are some of the things we still need to do:
+
+	1. Linux is not well setup for operating a large number
+	of diskless clients.  It has provisions for booting each node
+	with a root of /tftpboot/<ip-addr> and then all mounting a
+	common /usr, but the root filesystem is still on the order
+	of 40MB.  10MB of this is /lib, which has lots of shared
+	libraries (glibc alone is 4MB) needed for binaries in /sbin.
+	14MB is /var, most of which is the RPM database (since this
+	disk images was loaded with about every package known to man).
+	Even if we go with the 40MB roots, I still had to hack some
+	startup files to deal with the NFS root.  In particular, /
+	must be in the fstab but fsck will fail if / is an NFS
+	filesystem (duh!)  Made a gross hack to deal with that
+	(look for .I_am_an_NFS_rootfilesystem) in rc.sysinit.
+	Also make sure ONBOOT=no in ifcfg-eth0 else it will hang
+	trying to initialize eth0 (which was already inited because
+	of NFS root).
+
+	2. There is a known NFS bug in pre-2.4 kernels which cause
+	much grief with diskless systems.  Has to do with the old
+	open-and-unlink-a-file-but-still-have-access semantic.
+	We need a newer kernel.
+
+	3. Apparently you cannot use the PIT to get a periodic
+	interrupt on the DNARDs.  Thought this was a Linux problem
+	but NetBSD doesn't use it either.  Both use the RTC at 64Hz.
+	However, the Netwinder application base we are using doesn't
+	recognize 64Hz as a valid value and defaults to 100Hz.
+	Probably throwing lots of timing related things off.
+	We need to rebuild the appropriate shared library and
+	affected static binaries.
+
+	4. Related to #3 is just the general problem that the Linux
+	setup relies on mish-mash of kernel/binary releases.
+	We should build our own system from the sources.  The
+	kernel may always be a problem since the Shark code is
+	bit-rotting in the ARM linux tree.
+
+	5. Reboot doesn't work, it just hangs.
+
