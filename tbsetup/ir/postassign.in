@@ -41,6 +41,7 @@ if ($@) {
 foreach (split("\n",$raw)) {
     ($vnode,$pnode) = split;
     $sth = $dbh->prepare("UPDATE reserved SET vname = \"$vnode\" WHERE node_id = \"$pnode\"");
+    $sth->execute;
     $sth->finish;
 }
 
