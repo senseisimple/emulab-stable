@@ -128,7 +128,7 @@ my $VTUND       = "/usr/local/sbin/vtund";
 #
 # This is a debugging thing for my home network.
 # 
-#my $NODE	= "REDIRECT=155.101.132.101";
+#my $NODE	= "-p 7778 REDIRECT=192.168.100.1";
 $NODE		= "";
 
 # Locals

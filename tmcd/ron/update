@@ -26,14 +26,14 @@ my $immediate = 0;
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/etc/testbed';
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/etc/emulab';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/usr/local/etc/testbed";
+use lib "/usr/local/etc/emulab";
 use libsetup;
 
 #

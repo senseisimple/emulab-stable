@@ -23,10 +23,14 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "decls.h"
-#include "config.h"
 #include "ssl.h"
+#ifndef STANDALONE
+#include "config.h"
+#endif
 
+#ifndef STANDALONE
 #undef BOSSNODE
+#endif
 #ifdef BOSSNODE
 #define DEFAULT_BOSSNODE BOSSNODE
 #else

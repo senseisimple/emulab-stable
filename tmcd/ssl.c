@@ -30,8 +30,12 @@
 #include <openssl/err.h>
 #include "decls.h"
 #include "ssl.h"
+#ifndef STANDALONE
 #include "log.h"
 #include "config.h"
+#else
+#define error		printf
+#endif
 
 /* Passed in from the makefile */
 #ifndef ETCDIR

@@ -36,7 +36,7 @@ $| = 1;
 #
 # Untaint path
 #
-$ENV{'PATH'} = "/usr/local/etc/testbed:/bin:/sbin:/usr/bin:/usr/local/bin:" .
+$ENV{'PATH'} = "/usr/local/etc/emulab:/bin:/sbin:/usr/bin:/usr/local/bin:" .
     "/usr/local/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
@@ -44,7 +44,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/usr/local/etc/testbed";
+use lib "/usr/local/etc/emulab";
 use libsetup;
 
 #
@@ -80,7 +80,7 @@ else {
 # 
 my $logname  = "/tmp/tbvnode-${vnodeid}.debug";
 my $pidfile  = "/var/run/tbvnode-${vnodeid}.pid";
-my $vnodedir = "/var/testbed/$vnodeid";
+my $vnodedir = "/var/emulab/$vnodeid";
 
 #
 # If killing the virtual node, then kill the manager process. We use

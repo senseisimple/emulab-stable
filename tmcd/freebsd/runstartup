@@ -54,7 +54,7 @@ my $runcmd;
 my $login;
 
 while (<CMD>) {
-    if ($_ =~ /CMD=\'([-\@\w.\/ ]+)\' UID=([0-9a-z]+)/) {
+    if ($_ =~ /CMD=\'([-\@\w.\/\+ ]+)\' UID=([0-9a-z]+)/) {
 	$runcmd = $1;
 	$login  = $2;
     }

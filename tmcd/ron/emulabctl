@@ -10,14 +10,10 @@
 #
 case "$1" in
 start)
-	if [ -f /usr/local/etc/emulab/emulabctl ]; then
-	    /usr/local/etc/emulab/emulabctl start
-	fi
+	/usr/local/etc/emulab/watchdog > /dev/null 2>&1 && echo -n ' Emulab'
 	;;
 stop)
-	if [ -f /usr/local/etc/emulab/emulabctl ]; then
-	    /usr/local/etc/emulab/emulabctl stop
-	fi
+	(killall watchdog; sleep 5) > /dev/null 2>&1 && echo -n ' Emulab'
 	;;
 *)
 	echo "Usage: `basename $0` {start|stop}" >&2

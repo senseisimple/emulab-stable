@@ -23,7 +23,7 @@ all:	bossnode
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 DESTDIR		=
-INSTALL_DIR	= $(DESTDIR)/usr/local/etc/testbed
+INSTALL_DIR	= $(DESTDIR)/usr/local/etc/emulab
 INSTALL		= /usr/bin/install -c 
 INSTALL_PROG	= /usr/bin/install -c -m 755
 
@@ -44,11 +44,14 @@ script-install:	dir-install
 	$(INSTALL_PROG) $(SRCDIR)/vnodesetup $(INSTALL_DIR)/vnodesetup
 	$(INSTALL_PROG) $(SRCDIR)/watchdog $(INSTALL_DIR)/watchdog
 	$(INSTALL_PROG) $(SRCDIR)/../libsetup.pm $(INSTALL_DIR)/libsetup.pm
-	$(INSTALL_PROG) $(SRCDIR)/liblocsetup.pm $(INSTALL_DIR)/liblocsetup.pm
+	$(INSTALL_PROG) $(SRCDIR)/liblocsetup-freebsd.pm \
+			$(INSTALL_DIR)/liblocsetup-freebsd.pm
+	$(INSTALL_PROG) $(SRCDIR)/liblocsetup-linux.pm \
+			$(INSTALL_DIR)/liblocsetup-linux.pm
 	$(INSTALL_PROG) $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
-	$(INSTALL_PROG) $(SRCDIR)/rc.setup $(INSTALL_DIR)/rc.setup
-	$(INSTALL_PROG) $(SRCDIR)/mkemuman.sh $(INSTALL_DIR)/mkemuman.sh
-	$(INSTALL_PROG) $(SRCDIR)/upemuman.sh $(INSTALL_DIR)/upemuman.sh
+	$(INSTALL_PROG) $(SRCDIR)/emulabctl $(INSTALL_DIR)/emulabctl
+	$(INSTALL_PROG) $(SRCDIR)/install.sh $(INSTALL_DIR)/install.sh
+	$(INSTALL_PROG) $(SRCDIR)/reinstall $(INSTALL_DIR)/reinstall.sh
 
 post-install:
 	chown root $(INSTALL_DIR)/update

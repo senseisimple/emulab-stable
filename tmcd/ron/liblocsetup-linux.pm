@@ -25,7 +25,7 @@ use English;
 #
 # This is the Linux dependent part of the setup library. 
 # 
-my $SETUPDIR = "/usr/local/etc/testbed";
+my $SETUPDIR = "/usr/local/etc/emulab";
 libsetup::libsetup_init($SETUPDIR);
 
 #

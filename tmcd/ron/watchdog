@@ -31,7 +31,7 @@ $| = 1;
 #
 # Untaint path
 #
-$ENV{'PATH'} = "/usr/local/etc/testbed:/bin:/sbin:/usr/bin:/usr/local/bin:" .
+$ENV{'PATH'} = "/usr/local/etc/emulab:/bin:/sbin:/usr/bin:/usr/local/bin:" .
     "/usr/local/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
@@ -39,13 +39,13 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/usr/local/etc/testbed";
+use lib "/usr/local/etc/emulab";
 use libsetup;
 
 # Locals
 my $timeout = (60 * 30);	# In seconds of course. 
 my $logname = "/tmp/emulab-watchdog.debug";
-my $vndir   = "/var/testbed";
+my $vndir   = "/var/emulab";
 my $pidfile = "/var/run/emulab-watchdog.pid";
 my $noboot  = 0;
 
@@ -70,6 +70,24 @@ if (defined($options{"n"})) {
 }
 if (@ARGV) {
     usage();
+}
+
+#
+# Must be setuid root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# XXX
+# Do not run the vnode startup on Linux nodes yet.
+#
+my $sysname = `uname -s`;
+chomp($sysname);
+if ($sysname eq "Linux") {
+    $noboot = 1;
 }
 
 #
@@ -147,6 +165,7 @@ if (! $mypid) {
 	my $retries = 3;
 
 	while ($retries) {
+#	    my $options = "-p 7778 REDIRECT=192.168.100.1";
 	    my $options = "";
 	    if (REMOTE()) {
 		$options .= " -u -t 3";

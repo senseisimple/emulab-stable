@@ -1,0 +1,9 @@
+The installation process is quite simplistic at the moment. After you
+unpack the tar file:
+
+	make
+	make install
+	/usr/local/etc/emulab/install.sh
+
+Then you should reboot the node.
+
