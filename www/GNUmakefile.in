@@ -33,6 +33,7 @@ ALLFILES = $(notdir $(FILES))
 ALLPIXES = $(notdir $(PIXFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
+	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLPIXES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES))
 
 $(INSTALL_WWWDIR)/%: %
