@@ -24,6 +24,7 @@
 
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid);
 static int	iptonodeid(struct in_addr ipaddr, char *bufp);
+static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
 int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
@@ -40,20 +41,22 @@ static int doaccounts(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dodelay(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dohosts(int sock, struct in_addr ipaddr, char *request, int tcp);
 static int dorpms(int sock, struct in_addr ipaddr, char *request, int tcp);
-static int doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp);
+static int dostartstat(int sock, struct in_addr ipaddr, char *request,int tcp);
 
 struct command {
 	char	*cmdname;
 	int    (*func)(int sock, struct in_addr ipaddr, char *request, int tcp);
 } command_array[] = {
-	{ "reboot",    doreboot },
-	{ "status",    dostatus },
-	{ "ifconfig",  doifconfig },
-	{ "accounts",  doaccounts },
-	{ "delay",     dodelay },
-	{ "hostnames", dohosts },
-	{ "rpms",      dorpms },
-	{ "runcmd",    doruncmd },
+	{ "reboot",	doreboot },
+	{ "status",	dostatus },
+	{ "ifconfig",	doifconfig },
+	{ "accounts",	doaccounts },
+	{ "delay",	dodelay },
+	{ "hostnames",	dohosts },
+	{ "rpms",	dorpms },
+	{ "startupcmd",	dostartcmd },
+	{ "startstat",	dostartstat },
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -344,7 +347,8 @@ dostatus(int sock, struct in_addr ipaddr, char *request, int tcp)
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
-	char		answer[128];
+	char		nickname[128];
+	char		buf[BUFSIZ];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "STATUS: %s: No such node", inet_ntoa(ipaddr));
@@ -356,16 +360,21 @@ dostatus(int sock, struct in_addr ipaddr, char *request, int tcp)
 	 */
 	if (nodeidtoexp(nodeid, pid, eid)) {
 		syslog(LOG_INFO, "STATUS: %s: Node is free", nodeid);
-		strcpy(answer, "FREE\n");
+		strcpy(buf, "FREE\n");
+		client_writeback(sock, buf, strlen(buf), tcp);
+		return 0;
 	}
-	else {
-		syslog(LOG_INFO, "STATUS: %s: Node is in experiment %s/%s",
-		       nodeid, pid, eid);
-		snprintf(answer, sizeof(answer), "ALLOCATED=%s/%s\n",
-			 pid, eid);
-	}
-	client_writeback(sock, answer, strlen(answer), tcp);
 
+	/*
+	 * Need the nickname too.
+	 */
+	if (nodeidtonickname(nodeid, nickname))
+		strcpy(nickname, nodeid);
+
+	sprintf(buf, "ALLOCATED=%s/%s NICKNAME=%s\n", pid, eid, nickname);
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	syslog(LOG_INFO, "STATUS: %s: %s", nodeid, buf);
 	return 0;
 }
 
@@ -858,12 +867,10 @@ dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
 		return 0;
 
 	/*
-	 * Get RPM list for the experiment. Might be per-machine at
-	 * some point.
+	 * Get RPM list for the node.
 	 */
-	res = mydb_query("select rpms from experiments "
-			 "where pid='%s' and eid='%s'",
-			 1, pid, eid);
+	res = mydb_query("select rpms from nodes where node_id='%s' ",
+			 1, nodeid);
 
 	if (!res) {
 		syslog(LOG_ERR, "RPMS: %s: DB Error getting RPMS!",
@@ -905,7 +912,7 @@ dorpms(int sock, struct in_addr ipaddr, char *request, int tcp)
  * of the experiment creator to run it as!
  */
 static int
-doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
+dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
@@ -915,7 +922,7 @@ doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 	char		buf[BUFSIZ], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
-		syslog(LOG_ERR, "DELAY: %s: No such node",
+		syslog(LOG_ERR, "STARTUPCMD: %s: No such node",
 		       inet_ntoa(ipaddr));
 		return 1;
 	}
@@ -927,15 +934,14 @@ doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 		return 0;
 
 	/*
-	 * Get run command for the experiment. Might be per-machine at
-	 * some point.
+	 * Get run command for the node.
 	 */
-	res = mydb_query("select runcmd,expt_head_uid from experiments "
-			 "where pid='%s' and eid='%s'",
-			 2, pid, eid);
+	res = mydb_query("select startupcmd from nodes where node_id='%s'",
+			 1, nodeid);
 
 	if (!res) {
-		syslog(LOG_ERR, "RPMS: %s: DB Error getting run command!",
+		syslog(LOG_ERR, "STARTUPCMD: %s: DB Error getting "
+		       "startup command!",
 		       nodeid);
 		return 1;
 	}
@@ -953,12 +959,91 @@ doruncmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 		mysql_free_result(res);
 		return 0;
 	}
-	
-	sprintf(buf, "RUNCMD=%s UID=%s\n", row[0], row[1]);
-	client_writeback(sock, buf, strlen(buf), tcp);
-	syslog(LOG_INFO, "RUNCMD: %s", buf);
-	
+	sprintf(buf, "CMD=%s UID=", row[0]);
 	mysql_free_result(res);
+
+	/*
+	 * Now get the UID from the experiments table and tack that onto
+	 * the string just created.
+	 */
+	res = mydb_query("select expt_head_uid from experiments "
+			 "where eid='%s' and pid='%s'",
+			 1, eid, pid);
+
+	if (!res) {
+		syslog(LOG_ERR, "STARTUPCMD: %s: DB Error getting UID!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row = mysql_fetch_row(res);
+	strcat(buf, row[0]);
+	strcat(buf, "\n");
+	mysql_free_result(res);
+	
+	client_writeback(sock, buf, strlen(buf), tcp);
+	syslog(LOG_INFO, "STARTUPCMD: %s", buf);
+	
+	return 0;
+}
+
+/*
+ * Accept notification of start command exit status. 
+ */
+static int
+dostartstat(int sock, struct in_addr ipaddr, char *request, int tcp)
+{
+	MYSQL_RES	*res;	
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		*exitstatus;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "STARTSTAT: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Dig out the exit status, which is after the request.
+	 */
+	while (isalpha(*request))
+		request++;
+	while (isspace(*request))
+		request++;
+	exitstatus = request;
+
+	syslog(LOG_INFO, "STARTSTAT: "
+	       "%s is reporting startup command exit status: %s",
+	       nodeid, exitstatus);
+
+	/*
+	 * Make sure currently allocated to an experiment!
+	 */
+	if (nodeidtoexp(nodeid, pid, eid)) {
+		syslog(LOG_INFO, "STARTSTAT: %s: Node is free", nodeid);
+		return 0;
+	}
+
+	syslog(LOG_INFO, "STARTSTAT: %s: Node is in experiment %s/%s",
+	       nodeid, pid, eid);
+
+	/*
+	 * Update the node table record with the exit status. Setting the
+	 * field to a non-null string value is enough to tell whoever is
+	 * watching it that the node is done.
+	 */
+	if (mydb_update("update nodes set startstatus='%s' "
+			"where node_id='%s'", exitstatus, nodeid)) {
+		syslog(LOG_ERR, "STARTSTAT: %s: DB Error setting exit status!",
+		       nodeid);
+		return 1;
+	}
 	return 0;
 }
 
@@ -1103,6 +1188,38 @@ nodeidtoexp(char *nodeid, char *pid, char *eid)
 	strcpy(pid, row[0]);
 	strcpy(eid, row[1]);
 
+	return 0;
+}
+ 
+/*
+ * Map nodeid to its nickname.
+ */
+static int
+nodeidtonickname(char *nodeid, char *nickname)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+
+	res = mydb_query("select vname from reserved "
+			 "where node_id='%s'",
+			 1, nodeid);
+	if (!res) {
+		syslog(LOG_ERR, "nodeidtonickname: %s: "
+		       "DB Error getting reserved!",
+		       nodeid);
+		return 1;
+	}
+
+	if (! (int)mysql_num_rows(res)) {
+		mysql_free_result(res);
+		return 1;
+	}
+	row = mysql_fetch_row(res);
+	mysql_free_result(res);
+	if (! row[0])
+		return 1;
+		
+	strcpy(nickname, row[0]);
 	return 0;
 }
  

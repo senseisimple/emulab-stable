@@ -47,7 +47,7 @@ main(int argc, char **argv)
 	}
 #endif
 
-	if (argc < 2 || argc > 3) {
+	if (argc < 2 || argc > 4) {
 		fprintf(stderr, "usage: %s <command>\n", argv[0]);
 		exit(1);
 	}
@@ -115,10 +115,22 @@ main(int argc, char **argv)
 	}
 #endif
 #endif
-	if (argc == 2)
+	switch(argc - 1) {
+	case 1:
 		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[1]);
-	else
+		break;
+	case 2:
 		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[1], argv[2]);
+		break;
+	case 3:
+		n = snprintf(buf, sizeof(buf) - 1, "%s %s %s",
+			     argv[1], argv[2], argv[3]);
+		break;
+	default:
+		fprintf(stderr, "Too many command arguments!\n");
+		exit(1);
+	}
+		
 	if (n >= sizeof(buf)) {
 		fprintf(stderr, "Command too large!\n");
 		exit(1);
