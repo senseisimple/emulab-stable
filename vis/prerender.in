@@ -149,25 +149,29 @@ my $fixednodes = ();
 # all virt_nodes are visualizer nodes of type "node"
 while (my ($vname,$fixed) = $result->fetchrow) {
     dprint "node $vname $fixed\t";
-    if (!defined($fixednodes{$vname})) {
-	# This node is not a parent node, so we can add it
-	$nodes{$vname}{"type"} = "node";
-	dprint "added nodes($vname)\t";
-    } else {
-	dprint "$vname is a fixed host!\t";
-    }
+    $nodes{$vname}{"type"} = "node";
+    dprint "added nodes($vname)\t";
     if (defined($fixed) && $fixed ne "") {
 	# $vname is a subnode of $fixed, so we don't want
 	# to viz any vnames named $fixed
 	dprint "adding fixed($fixed)\t";
-	$fixednodes{$fixed} = $vname;
-	if (defined($nodes{$fixed})) {
-	    # Remove the node if it is already there
-	    delete $nodes{$fixed};
-	    dprint "rm nodes($fixed)\t";
-	}
+	$fixednodes{$vname} = $fixed;
     }
     dprint "\n";
+}
+
+# make another pass, removing parent nodes of subnodes
+foreach my $fixednode (keys %fixednodes) {
+    my $fixedto = $fixednodes{$fixednode};
+    if ($fixedto eq $fixednode) {
+	# ignore nodes that are fixed in place to themselves
+	next;
+    }
+     # if $fixednode is $fixedto some other node in the topology, don't
+     # vis the partent
+     if (exists $nodes{$fixedto}) {
+	 delete $nodes{$fixedto};
+     }
 }
 
 # read lans
@@ -455,6 +459,7 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
     # the render finishes, which is quite possible on giant experiments.
     #
     if (!defined $bestOverlaps || $overlaps < $bestOverlaps) {
+	dprint "Saving config\n";
 	$bestOverlaps = $overlaps;
 
         # We have to lock the table so as not to cause grief to someone
