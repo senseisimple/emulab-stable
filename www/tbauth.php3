@@ -40,6 +40,7 @@ define("CHECKLOGIN_ISADMIN",		0x04000);
 define("CHECKLOGIN_TRUSTED",		0x08000);
 define("CHECKLOGIN_CVSWEB",		0x10000);
 define("CHECKLOGIN_ADMINOFF",		0x20000);
+define("CHECKLOGIN_WEBONLY",		0x40000);
 
 #
 # Generate a hash value suitable for authorization. We use the results of
@@ -117,7 +118,7 @@ function CHECKLOGIN($uid) {
     # 
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
-		     "       status,admin,cvsweb,g.trust,adminoff ".
+		     "       status,admin,cvsweb,g.trust,adminoff,webonly ".
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -146,7 +147,8 @@ function CHECKLOGIN($uid) {
 	    ! strcmp($row[6], "group_root")) {
 	    $trusted = 1;
 	}
-	$adminoff= $row[7];
+	$adminoff = $row[7];
+	$webonly  = $row[8];
     }
 
     #
@@ -214,6 +216,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ISADMIN;
     if ($adminoff)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ADMINOFF;
+    if ($webonly)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_WEBONLY;
     if ($trusted)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_TRUSTED;
     if ($cvsweb)
@@ -230,7 +234,7 @@ function CHECKLOGIN($uid) {
     #
     # Set the magic enviroment variable, if appropriate, for the sake of
     # any processes we might spawn. We prepend an HTTP_ on the front of
-	# the variable name, so that it'll get through suexec.
+	# the variable name, so that it will get through suexec.
     #
     if ($admin && !$adminoff) {
     	putenv("HTTP_WITH_TB_ADMIN_PRIVS=1");
@@ -343,9 +347,7 @@ function DOLOGIN($uid, $password) {
     #
     if ($row = mysql_fetch_row($query_result)) {
         $db_encoding = $row[0];
-        $salt = substr($db_encoding, 0, 2);
-        if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
-        $encoding = crypt("$password", $salt);
+        $encoding = crypt("$password", $db_encoding);
         if (strcmp($encoding, $db_encoding)) {
             return -1;
         }
@@ -432,12 +434,7 @@ function VERIFYPASSWD($uid, $password) {
     #
     if ($row = mysql_fetch_row($query_result)) {
         $db_encoding = $row[0];
-        $salt = substr($db_encoding, 0, 2);
-	
-        if ($salt[0] == $salt[1]) {
-	    $salt = $salt[0];
-	}
-        $encoding = crypt("$password", $salt);
+        $encoding = crypt("$password", $db_encoding);
 	
         if (strcmp($encoding, $db_encoding)) {
             return -1;
@@ -513,6 +510,23 @@ function LASTWEBLOGIN($uid) {
 	return $lastrow[time];
     }
     return 0;
+}
+
+function HASREALACCOUNT($uid) {
+    $query_result =
+	DBQueryFatal("select status,webonly from users where uid='$uid'");
+
+    if (!mysql_num_rows($query_result)) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $status  = $row[0];
+    $webonly = $row[1];
+
+    if ($webonly || strcmp($status, TBDB_USERSTATUS_ACTIVE)) {
+	return 0;
+    }
+    return 1;
 }
 
 #
