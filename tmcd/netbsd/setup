@@ -259,18 +259,19 @@ print STDOUT "Checking Testbed Experiment Run Command configuration ... \n";
 
 open(TM,  "$TMCC $NODE $STARTUPCMD |")
     or die "Cannot start $TMCC: $!";
-$_ = <TM>;
-close(TM);
-if ($_ =~ /CMD=(\'[-\@\w.\/ ]+\') UID=([0-9a-z]+)/) {
-    open(RUN, ">$TMSTARTUPCMD")
-	or die("Could not open $TMSTARTUPCMD");
+while (<TM>) {
+    if ($_ =~ /CMD=(\'[-\@\w.\/ ]+\') UID=([0-9a-z]+)/) {
+	open(RUN, ">$TMSTARTUPCMD")
+	    or die("Could not open $TMSTARTUPCMD");
     
-    print  STDOUT "  Will run $1 as $2\n";
-    print  RUN    "$_\n";
+	print  STDOUT "  Will run $1 as $2\n";
+	print  RUN    "$_\n";
 
-    close(RUN);
-    chmod(0755, "$TMSTARTUPCMD");
+	close(RUN);
+	chmod(0755, "$TMSTARTUPCMD");
+    }
 }
+close(TM);
 
 #
 # If node is free, reset to a moderately clean state.
