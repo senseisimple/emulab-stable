@@ -1,0 +1,21 @@
+Physical topology:
+
+4 switches
+
+All links 100 MBs
+
+Switch 0,1: 8 nodes with 4 links each
+Switch 2: 12 nodes with 3 links each
+Switch 3: 4 nodes with 2 links each
+
+All switches connected at 500 Mbs except switch 3 which is connected
+at 200 Mbs.
+
+Tests:
+
+A: Basic test >-<
+B: Can fit in one switch.  8 interconnected nodes.
+C: Can fit in three switches. 25 interconnected nodes.
+D: Can barely work. 32 nodes no delays.
+E: Can barely work.
+F: Can't work.

@@ -65,6 +65,6 @@ node 32
 node 33
 node 34
 link 31 33
-node 32 34
-node 34 33
-node 31 32
+link 32 34
+link 34 33
+link 31 32
