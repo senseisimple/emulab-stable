@@ -82,14 +82,17 @@ else {
 #    account.
 #
 # 3) Called from command line as user with group_root for project 
-#    to create a user account. 
-# 
-# 4) Called from command line as root.
+#    to create a user account.
 #
-if ($UID && !TBAdmin($UID)) {
-    my ($me) = getpwuid($UID) or
-	fatal("$UID not in passwd file");
+# 4  Called from web UI as some random user trying to change his own
+#    account info or password.
+# 
+# 5) Called from command line as root.
+#
+my ($me) = getpwuid($UID) or
+    fatal("$UID not in passwd file");
 
+if ($UID && !TBAdmin($UID) && ($me ne $user)) {
     #
     # Check if group_root for the project.
     #
