@@ -25,6 +25,8 @@ Agent instproc init {} {
     $self set node {}
     $self set application {}
     $self set destination {}
+    global ::GLOBALS::last_class
+    set ::GLOBALS::last_class $self
 }
 Agent instproc set_node {node} {
     $self set node $node
@@ -43,6 +45,13 @@ Agent instproc connect {dst} {
 	return
     }
     set destination $dst
+}
+Agent instproc rename {old new} {
+    $self instvar application
+    # In normal conditions this will never occur.
+    if {$application != {}} {
+	$application set agent $new
+    }
 }
 
 # Agent/UDP 
@@ -140,6 +149,8 @@ Agent/Null instproc connect {dst} {
 # Application
 Application instproc init {} {
     $self set agent {}
+    global ::GLOBALS::last_class
+    set ::GLOBALS::last_class $self
 }
 Application instproc attach-agent {agent} {
     $self set agent $agent
@@ -148,6 +159,13 @@ Application instproc attach-agent {agent} {
 Application instproc get_node {} {
     $self instvar agent
     return [$agent get_node]
+}
+Application instproc rename {old new} {
+    $self instvar agent
+    # In normal condition sthis will never occur.
+    if {$agent != {}} {
+	$agent set_application $self
+    }
 }
 
 # Application/Traffic/CBR
