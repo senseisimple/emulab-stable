@@ -21,6 +21,7 @@
      <li> <a href="#REF-STATUS">status</a>
      <li> <a href="#REF-IFCONFIG">ifconfig</a>
      <li> <a href="#REF-ACCOUNTS">accounts</a>
+     <li> <a href="#REF-MOUNTS">mounts</a>
      <li> <a href="#REF-DELAY">delay</a>
      <li> <a href="#REF-HOSTNAMES">hostnames</a>
      <li> <a href="#REF-RPMS">rpms</a>
@@ -146,14 +147,21 @@ following format (in the unlikely case that the topology describes a
 node with no network links, the response to this request will be null):
 
 <code><pre>
-INTERFACE=Z INET=X.X.X.X MASK=Y.Y.Y.Y	</code></pre>
+INTERFACE=Z INET=X.X.X.X MASK=Y.Y.Y.Y MAC=AA:BB:CC:DD:EE:FF </code></pre>
 
-Which says that network interface "Z" is assigned to IP address
-"X.X.X.X" with netmask "Y.Y.Y.Y". On Redhat 7.1, the setup script
-would take this information and issue the following ifconfig command:
+Which says that the network interface with MAC address "AA:BB:CC:DD:EE:FF"
+is assigned to IP address "X.X.X.X" with netmask "Y.Y.Y.Y". <em>The
+INTERFACE specification is currently invalid, since there no way to achieve
+a consistent ordering of interfaces between various operating systems.</em>
+Rather, the MAC address is used to determine which interface to configure.
+A utility program called <tt>/etc/testbed/findif</tt> is provided to map
+the MAC address to an interface name suitable for use with the
+<tt>ifconfig</tt> program. On Redhat 7.1, the setup script would take this
+information and issue the following shell commands. 
 
 <code><pre>
-/sbin/ifconfig ethZ inet X.X.X.X netmask Y.Y.Y.Y	</code></pre>
+iface=`/etc/testbed/findif AA:BB:CC:DD:EE:FF`
+/sbin/ifconfig $iface inet X.X.X.X netmask Y.Y.Y.Y	</code></pre>
 
 <p>
 <li> <a NAME="REF-ACCOUNTS"></a>
@@ -166,14 +174,14 @@ on each of the nodes in an experiment. The Emulab versions of FreeBSD,
 Linux, and Netbsd all have stub password/group files that do not
 contain any user accounts or groups. When a node first boots after
 being allocated to an experiment, this command is used to find out
-what accounts to build, and what directories in <tt>/users</tt> need
-to be NFS mounted. The reply to this request is one or more lines of
+what accounts to build. The reply to this request is one or more lines of
 group information, followed by one or more lines of login account
 information:
 
 <code><pre>
 ADDGROUP NAME=pid GID=XXXX
-ADDUSER  LOGIN=joe PSWD=ABCD UID=YYYY GID=XXXX ROOT=N NAME="Joe User"
+ADDUSER  LOGIN=joe PSWD=ABCD UID=YYYY GID=XXXX ROOT=N NAME="Joe User" \
+             HOMEDIR=/users/joe GLIST=ZZZ0,ZZZ1
 </code></pre>
 
 The <tt>ADDGROUP</tt> reply gives the name of the group and the
@@ -201,7 +209,7 @@ the following fields:
 <tr>
  <td><font size=4><tt>GID</tt></td>
  <td>&nbsp&nbsp&nbsp</td>
- <td><font size=4>The numeric gid.</td>
+ <td><font size=4>The primary group for the user, as a numeric gid.</td>
 </tr>
 <tr>
  <td><font size=4><tt>ROOT</tt></td>
@@ -216,6 +224,17 @@ the following fields:
  <td><font size=4>The full name of the user, suitable for
  insertion into the <i>gecos</i> field of the user's password entry.</td>
 </tr>
+<tr>
+ <td><font size=4><tt>HOMEDIR</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>The absolute path to be used for the home directory.</td>
+</tr>
+<tr>
+ <td><font size=4><tt>GLIST</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>A (possibly null) comma separated list of auxiliary
+ group ids, as numeric gids.</td>
+</tr>
 </table>
 </blockquote>
 
@@ -224,10 +243,31 @@ commands:
 
 <code><pre>
 groupadd -g XXXX pid
-mkdir /users/joe
-mount fs.emulab.net:/users/joe /users/joe";
-useradd -u YYYY -g XXXX -p ABCD -G root -d /users/joe -c "Joe User" joe
+useradd -u YYYY -g XXXX -p ABCD -G root,ZZZ0,ZZZ1 -d /users/joe -c "Joe User" joe
 </code></pre>
+
+
+<p>
+<li> <a NAME="REF-MOUNTS"></a>
+     <h3>mounts</h3>
+
+Request the list of remote directories that need to be NFS mounted on
+the node when it boots. The reply to this request is one or more lines
+in the following format:
+
+<code><pre>
+REMOTE=fs.emulab.net:/users/joe LOCAL=/users/joe
+REMOTE=fs.emulab.net:/proj/testbed LOCAL=/proj/myproj		</code></pre>
+
+On Linux, this information would be converted into the following
+commands:
+
+<code><pre>
+mkdir /users/joe
+/sbin/mount fs.emulab.net:/users/joe /users/joe
+mkdir /proj/myproj
+/sbin/mount fs.emulab.net:/proj/myproj /proj/myproj		</code></pre>
+
 
 <p>
 <li> <a NAME="REF-RPMS"></a>
