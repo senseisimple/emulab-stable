@@ -1516,7 +1516,7 @@ function SHOWNODE($node_id) {
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join node_activity as na on n.node_id=na.node_id ".
 		     "left join node_types as t on t.type=n.type ".
-		     "left join interfaces as i on i.card=t.control_net ".
+		     "left join interfaces as i on i.iface=t.control_iface ".
 		     " and i.node_id=n.node_id ".
 		     "left join interfaces as pi on pi.card=t.control_net ".
 		     " and pi.node_id=n.phys_nodeid ".

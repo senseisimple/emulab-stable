@@ -125,7 +125,7 @@ function guess_IP ($prefix, $number) {
         $query_result = DBQueryFatal("select IP from interfaces as i " .
 		"left join nodes as n on i.node_id = n.node_id left join " .
 		"node_types as nt on n.type = nt.type " .
-		"where n.node_id='$prefix$i' and i.card = nt.control_net");
+		"where n.node_id='$prefix$i' and i.iface = nt.control_iface");
         if (mysql_num_rows($query_result)) {
 	    $row = mysql_fetch_array($query_result);
 	    $IP = $row[IP];
