@@ -12,6 +12,20 @@ then
 fi
 
 #
+# ElabinElab support
+#
+if [ "$new_host_name" = "" ]; then
+    #
+    # If no hostname provided, it means that its an outer emulab
+    # returning DHCPD info, in which case all we want to do is configure the
+    # interface, but not allow dhclient to think it has finished its job.
+    # So, exit with non-zero status and dhclient will keep trying to configure
+    # another interface (the inner control network).
+    #
+    exit 1
+fi
+
+#
 # Remember our server IP, real hostname, router IP, etc.
 #
 echo $new_dhcp_server_identifier > $BOOTDIR/bossip

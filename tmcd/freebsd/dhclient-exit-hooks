@@ -12,6 +12,35 @@ then
 fi
 
 #
+# ElabinElab support
+#
+if [ -e "$ETCDIR/outer_bossnode" ]; then
+    #
+    # Inner boss or ops. The outer network has now been configured.
+    # Call rc.inelab to get the inner control network configured (we
+    # have to ask outer boss in the usual manner).
+    #
+    $BINDIR/rc/rc.inelab >$LOGDIR/dhclient.log 2>&1
+
+    # Then kill as we normally do.
+    killall dhclient >>$LOGDIR/dhclient.log 2>&1
+    exit 0
+    
+elif [ "$new_host_name" = "" ]; then
+    #
+    # Otherwise, if no hostname provided, it means that its an outer emulab
+    # returning DHCPD info, in which case all we want to do is configure the
+    # interface, but not allow dhclient to think it has finished its job.
+    # So, exit with non-zero status and dhclient will keep trying to configure
+    # another interface (the inner control network). This assumes this
+    # was the first interface to respond. If the inner control interface
+    # came up first, then dhclient is already in the background. See below;
+    # we are going to let dhclient keep running. 
+    #
+    exit 1
+fi
+
+#
 # Remember our server IP, real hostname, router IP, etc.
 #
 echo $new_dhcp_server_identifier > $BOOTDIR/bossip
@@ -35,7 +64,7 @@ fi
 
 #
 # Once we have an IP address, we can stop dhclient so that it doesn't get
-# in the way 
+# in the way.
 #
 # I'd love to use the dhclient.pid file, but it helpfully has not been
 # created at this point

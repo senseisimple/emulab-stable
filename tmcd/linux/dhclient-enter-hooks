@@ -4,6 +4,7 @@
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
 #
 # Sweet! dhclient on linux wants to DHCP on the loopback interface
@@ -11,4 +12,31 @@
 #
 if [ xxx$interface = xxxlo ]; then
     exit_status=1
+    return
+fi
+
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
+then
+    return
+fi
+
+#
+# ElabinElab support.
+#
+if [ "$new_host_name" = "" ]; then
+    #
+    # If no hostname provided, it means that its an outer emulab returning
+    # DHCPD info, in which case we want to again ignore most of the
+    # info since all we want to do is configure the interface. 
+    #
+    new_static_routes="$new_dhcp_server_identifier $new_routers"
+    unset new_domain_name_servers
+    unset new_domain_name
+    unset new_routers
+    #
+    # Ack, changed my mind. This is a pain in the ass. For now do not
+    # configure the outer interface; worry about it later.
+    # 
+    exit_status=1
+    return
 fi

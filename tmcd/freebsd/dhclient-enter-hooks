@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW ]
+then
+    return 0
+fi
+
+#
+# ElabinElab support.
+#
+if [ -e "$ETCDIR/outer_bossnode" ]; then
+    #
+    # On inner boss/ops, we do not accept the following from the DHCPD
+    # server on outer boss. This stuff has been setup in /etc/rc.conf
+    # when the inner boss/ops was created. 
+    #
+    unset new_host_name
+    unset new_domain_name_servers
+    unset new_domain_name
+    unset new_routers
+elif [ "$new_host_name" = "" ]; then
+    #
+    # Otherwise, if no hostname provided, it means that its an outer emulab
+    # returning DHCPD info, in which case we want to again ignore most of the
+    # info since all we want to do is configure the interface. 
+    #
+    new_static_routes="$new_dhcp_server_identifier $new_routers"
+    unset new_domain_name_servers
+    unset new_domain_name
+    unset new_routers
+    new_subnet_mask="255.255.255.0"
+
+    #
+    # Ack, changed my mind. This is a pain in the ass. For now do not
+    # configure the outer interface; worry about it later.
+    # 
+    exit_status=1
+    return
+fi
+
+return 0

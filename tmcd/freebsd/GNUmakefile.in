@@ -137,6 +137,8 @@ sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
+			$(SYSETCDIR)/dhclient-enter-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/periodic.conf $(SYSETCDIR)/periodic.conf
 	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh $(RCDIR)/testbed.sh
 	$(INSTALL) -m 755 $(SRCDIR)/elvind.sh $(RCDIR)/elvind.sh
