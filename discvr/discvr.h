@@ -1,4 +1,10 @@
-/*$Id: discvr.h,v 1.9 2001-08-04 22:58:30 ikumar Exp $*/
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*$Id: discvr.h,v 1.10 2002-07-04 14:10:55 stoller Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_

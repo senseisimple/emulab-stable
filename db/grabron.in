@@ -1,4 +1,10 @@
 #!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
 #
 # grabron - Grab data from Dave Andersen's DBSYNC program, and upload it into
 # the testbed database

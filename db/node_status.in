@@ -1,6 +1,12 @@
 #!/usr/bin/perl -w
 
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # node_status - Updates the 'status' column in the nodes table to indicate
 # whether nodes are pingable, etc.
 # Intended to be run as a cronjob

@@ -1,6 +1,12 @@
 #!/usr/bin/perl -w
 
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # nodeip - Given a node, interface, or MAC address, print the interface
 # information for that interface. If a node is given, all interfaces for
 # that node are printed.
