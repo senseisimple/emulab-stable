@@ -26,7 +26,7 @@ causing the DHCP to take much longer than necessary.
 
 ##### Reducing stray traffic
 
-Disable spanning tree (STP.) If on, STP sends out pakcets approximately every
+Disable spanning tree (STP.) If on, STP sends out packets approximately every
 two seconds on every port. You can disable it on all VLANs with the command
     set spantree disable all
 There are two major consequences (for our purposes) of disabling STP:
@@ -80,3 +80,25 @@ booting process leaves the nodes sitting dormant at a boot loader for extended
 periods of time, so the switch will tend to forget their MACs.  Turning off
 aging is not critical, but we suggest it, because it will reduce stray traffic
 while the switch re-learns MAC addresses.
+
+##### Setting up multicast between multiple switches
+
+If you have more than one switch on the experimental or control networks, you
+may need to do a little setup to get multicast between them. The symptom of
+this problem is that multicast doesn't work between two nodes on different
+switches, and if you run 'show multicast groups' on each switch, some will show
+the group as existing, and others will not.
+
+Run the following command for both sides (ie. on both switches) of every trunk
+link:
+set multicast router 1/1
+(assuming that port 1/1 is your trunk link). If you are using EtherChannel to
+bond together multiple links to form a single trunk, you only need to run this
+command for the first port in the channel.
+
+We had some problems running this command on the trunk on one of our switches:
+it failed with the error:
+Failed to add port 2/1 to multicast router port list.
+What I finally did to resolve this was to tear down the trunk link and
+EtherChannel that port was a part of, run the command on it (which succeeded
+this time), and then build the EtherChannel and trunk back up.
