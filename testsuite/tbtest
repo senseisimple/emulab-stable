@@ -10,9 +10,19 @@
 # IMPORTANT: This command should be come from a tree configured 
 # for the real DB.
 
-# tbtest [options] <db> <testdir> 
+# tbtest [options] <mode stuff>
 # Options:
 #   -path <path> - Path to test tree, otherwise uses cwd.
+#   -full - Do full testing.
+#   -frontend - Do frontend only testing.#
+#   -leavedb - Avoids removing the DB on exit.
+#
+# <mode> is one of:
+#    run <db> <testdir> [<pid> <eid> <num>] - Do everything.
+#    init <db> [<pid> <eid> <num> - Initiatlize.  
+#    test <testdir> - Run tests
+#    single <testdir> <tests> - Run only <tests>
+#    finish - Finish run.
 
 use DBI;
 use POSIX;
@@ -45,42 +55,92 @@ if ($0 =~ m|/|) {
 $path = $pwd;
 
 $ENV{'PATH'} = "/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/site/bin:$basedir";
+$basepath = $ENV{'PATH'};
+
+$type = "frontend";
 
 # Parse argv
-while ($#ARGV > 1) {
+sub show_help {
+    print STDERR "Syntax: $0 [-leavedb] [-path <path>] [-frontend] [-full] <mode>\n";
+    print STDERR "Options:\n";
+    print STDERR "  -leavedb - Do not drop the test database on exit.\n";
+    print STDERR "  -path <path> - Path to directory to store test files.\n";
+    print STDERR "  -frontend - Run in frontend mode.\n";
+    print STDERR "  -full - Run in full mode (Not yet implemented).\n";
+    print STDERR "Mode:\n";
+    print STDERR "  run <db> <testdir> [<pid> <eid> <num>]\n";
+    print STDERR "  init <db> [<pid> <eid> <num>]\n";
+    print STDERR "  test <testdir>\n";
+    print STDERR "  single <testdir> <tests>\n";
+    print STDERR "  finish\n";
+    exit(1);
+};
+
+$mode = "";
+$leavedb = 0;
+
+while (($#ARGV > -1) && ($mode eq "")) {
     $arg = shift;
     if ($arg eq "-path") {
+	if ($#ARGV == -1) {show_help;}
 	$path = shift;
+    } elsif ($arg eq "-frontend") {
+	$type = "frontend";
+    } elsif ($arg eq "-full") {
+	$type = "full";
+    } elsif ($arg eq "-leavedb") {
+	$leavedb = 1;
     } else {
-	print STDERR "Unknown argument: $arg\n";
-	exit(1);
+	$mode = $arg;
     }
 }
 
 chdir $path;
 
-if ($#ARGV != 1) {
-    print STDERR "Syntax: $0 [-path <path>] <db> <testdir>\n";
-    exit(1);
+if ($mode eq "run") {
+    if ($type eq "frontend") {
+	if ($#ARGV != 1) {show_help;}
+	($TBDB,$testdir) = @ARGV;
+    } else {
+	if ($#ARGV != 4) {show_help;}
+	($TBDB,$testdir,$rpid,$reid,$num) = @ARGV;
+    }
+} elsif ($mode eq "init") {
+    if ($type eq "frontend") {
+	if ($#ARGV != 0) {show_help;}
+	($TBDB) = @ARGV;
+    } else {
+	if ($#ARGV != 3) {show_help;}
+	($TBDB,$rpid,$reid,$num) = @ARGV;
+    }
+} elsif ($mode eq "test") {
+    if ($#ARGV != 0) {show_help;}
+    ($testdir) = @ARGV;
+} elsif ($mode eq "single") {
+    if ($#ARGV <= 0) {show_help;}
+    ($testdir,@tests) = @ARGV;
+} elsif ($mode eq "finish") {
+    if ($#ARGV != -1) {show_help;}
+} else {
+    print STDERR "Unknown mode: $mode\n";
+    show_help;
 }
 
-($TBDB,$testdir) = @ARGV;
-
-if (! ($testdir =~ m|^/|)) {
-    $testdir = "$basedir/tests/$testdir";
+if (($mode eq "run") || ($mode eq "test") || ($mode eq "single")) {
+    if (! ($testdir =~ m|^/|)) {
+	$testdir = "$basedir/tests/$testdir";
+    }
 }
-
-# Initialize DB
-$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
-    die "Could not connect to DB.\n";
-# Having made sure we can, we now disconnect so as not to harm DB.
-$dbh->disconnect;
 
 $user=`whoami`;
 chop $user;
 $testdb = "tbdb_$user";
 $logfile = "test.log";
-open(LOG,"> $logfile");
+
+# Test counts
+$pass = 0;
+$fail = 0;
+$unknown = 0;
 
 # prints sends the string to stdout and the logfile.
 sub prints {
@@ -131,209 +191,261 @@ sub doexit {
     printf LOG "Total Tests: %-5d  Pass: %-5d  Fail: %-5d  Unknown: %-5d\n", $pass+$fail+$unknown, $pass, $fail, $unknown;
     printf "Total Tests: %-5d  Pass: %-5d  Fail: %-5d  Unknown: %-5d\n", $pass+$fail+$unknown, $pass, $fail, $unknown;
     # Try to do the necessary cleanup
-    system("echo \"drop database if exists $testdb\" | mysql");
+    if ($leavedb == 0) {
+	system("echo \"drop database if exists $testdb\" | mysql");
+    }
+    close(LOG);
     exit($_[0]);
 };
 
-# Test counts
-$pass = 0;
-$fail = 0;
-$unknown = 0;
+sub step_init {
+    open(LOG,"> $logfile");
 
-prints "User:    $user\n";
-prints "Testdir: $testdir\n";
-prints "Logfile: $logfile\n";
-prints "\n";
-prints "Beginning test run. " . ctime(time) . "\n";
-
-# Set up object tree
-prints "Setting up object tree.\n";
-if (! -d $path) {
-    mkdir $path,0755;
-}
-mkdir "tbobj",0755;
-mkdir "install",0755;
-chdir "tbobj";
-system("cp -f $basedir/test-defs $path/defs");
-open(DEFS,">>$path/defs");
-print DEFS "TBDBNAME=$testdb\n";
-print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
-print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
-close(DEFS);
-
-prints "  Configuring ";
-tbexec("$basedir/../configure --prefix=$path/install --enable-testmode ".
-       "--with-TBDEFS=$path/defs --with-LEDA=/usr/testbed/LEDA/LEDA-4.0",
-       "$path/configure.log");
-
-prints "  Building ";
-tbexec("gmake","$path/build.log");
-
-prints "  Installing ";
-tbexec("gmake boss-install","$path/install.log");
-
-prints "  Post-Installing ";
-tbexec("su1 gmake post-install","$path/postinstall.log");
-
-# Let's add some stuff to our path
-$ENV{'PATH'} .= ":$path/install/bin:$path/install/sbin";
-
-chdir $path;
-
-# Setup test database
-prints "Setting up test database.\n";
-prints "  Dumping Current ";
-tbexec("mysqldump $TBDB","$path/dbdump.txt");
-
-prints "  Creating DB ";
-tbexec("echo \"create database $testdb\" | mysql","createdb.log");
-
-prints "  Filling DB ";
-tbexec("cat $path/dbdump.txt | mysql $testdb","fill.log");
-
-# Clear out experiments and set up test experiment.
-$dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || do {
-    prints "ERROR: Could not connect to new DB.\n";
-    doexit(1);
-};
-
-prints "  Clearing out existing experiments ";
-open(CLEARLOG,"> clear.log");
-$sth = $dbh->prepare("SELECT pid,eid from experiments");
-$sth->execute;
-while (($pid,$eid) = $sth->fetchrow_array) {
-    print CLEARLOG "$pid $eid\n";
-    print CLEARLOG "tbswapout -nologfile -force $pid $eid\n";
-    open(EXEC,"tbswapout -nologfile -force $pid $eid 2>&1 |");
-    while (<EXEC>) {
-	print CLEARLOG $_;
-    }
-    close(EXEC);
-    if (($? >> 8) != 0) {
-	prints "FAIL - For $pid $eid - On tbswapout - See clear.log\n";
-	$fail++;
-	doexit(1);
-    } 
-    print CLEARLOG "tbend -nologfile $pid $eid\n";
-    open(EXEC,"tbend $pid $eid 2>&1 |");
-    while (<EXEC>) {
-	print CLEARLOG $_;
-    }
-    close(EXEC);
-    if (($? >> 8) != 0) {
-	prints " FAIL - For $pid $eid - On tbend - See clear.log\n";
-	$fail++;
-	doexit(1);
-    }   
-}
-prints "PASS\n";
-$pass++;
-
-close(CLEARLOG);
-
-prints "  Setting up test experiment ";
-$dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"test\"");
-$dbh->do("INSERT into experiments (pid,eid) "
-	 . "values (\"testbed\",\"test\")") || do {
-	     prints "FAIL\n";
-	     $fail++;
-	     doexit(1);
-	 };
-print "PASS\n";
-$pass++;
-
-
-prints "  Snapshotting clean state ";
-tbexec("mysqldump $testdb","clean.txt");
-
-# Time to run tests!
-prints "Running Tests\n";
-
-opendir(TESTDIR,$testdir);
-@tests = readdir(TESTDIR);
-closedir(TESTDIR);
-
-mkdir "tests",0755;
-foreach $test (@tests) {
-    if (($test eq ".") || ($test eq "..") || ($test eq "CVS")) {
-	next;
-    }
-    prints "  $test ";
-
-    mkdir "tests/$test",0755;
-    chdir "tests/$test";
-    open(TESTLOG,"> test.log");
-
-    # Set up DB state
-    if (tbexect("echo \"drop database $testdb\" | mysql",TESTLOG)) {
-	prints "FAIL - Could not drop test DB.\n";
-	prints "Failure was FATAL - Exiting.\n";
-	$fail++;
-	doexit(1);
-    }
-    if (tbexect("echo \"create database $testdb\" | mysql",TESTLOG)) {
-	prints "FAIL - Could not recreate test DB.\n";
-	prints "Failure was FATAL - Exiting.\n";
-	$fail++;
-	doexit(1);
-    }
-    if (tbexect("cat $path/clean.txt | mysql $testdb",TESTLOG)) {
-	prints "FAIL - Could not populate test DB.\n";
-	prints "Failure was FATAL - Exiting.\n";
-	$fail++;
-	doexit(1);
-    }
+    prints "START INIT\n";
+    prints "User:     $user\n";
+    prints "Logfile:  $logfile\n";
+    prints "Database: $TBDB\n";
+    prints "\n";
+    prints "Beginning test run. " . ctime(time) . "\n";
     
-    if (-f "$testdir/$test/dbstate") {
-	if (tbexect("cat $testdir/$test/dbstate | mysql $testdb",TESTLOG)) {
-	    prints "FAIL - Could not evaluate dbstate.\n";
+    # Initialize DB
+    $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+	die "Could not connect to DB.\n";
+    # Having made sure we can, we now disconnect so as not to harm DB.
+    $dbh->disconnect;
+
+    # Set up object tree
+    prints "Setting up object tree.\n";
+    if (! -d $path) {
+	mkdir $path,0755;
+    }
+    mkdir "tbobj",0755;
+    mkdir "install",0755;
+    chdir "tbobj";
+    system("cp -f $basedir/test-defs $path/defs");
+    open(DEFS,">>$path/defs");
+    print DEFS "TBDBNAME=$testdb\n";
+    print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
+    print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
+    close(DEFS);
+    
+    prints "  Configuring ";
+    tbexec("$basedir/../configure --prefix=$path/install --enable-testmode ".
+	   "--with-TBDEFS=$path/defs --with-LEDA=/usr/testbed/LEDA/LEDA-4.0",
+	   "$path/configure.log");
+    
+    prints "  Building ";
+    tbexec("gmake","$path/build.log");
+    
+    prints "  Installing ";
+    tbexec("gmake boss-install","$path/install.log");
+    
+    prints "  Post-Installing ";
+    tbexec("su1 gmake post-install","$path/postinstall.log");
+        
+    chdir $path;
+    
+    # Setup test database
+    prints "Setting up test database.\n";
+    prints "  Dumping Current ";
+    tbexec("mysqldump $TBDB","$path/dbdump.txt");
+    
+    prints "  Creating DB ";
+    tbexec("echo \"create database $testdb\" | mysql","createdb.log");
+    
+    prints "  Filling DB ";
+    tbexec("cat $path/dbdump.txt | mysql $testdb","fill.log");
+    
+    # Clear out experiments and set up test experiment.
+    $dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || do {
+	prints "ERROR: Could not connect to new DB.\n";
+	doexit(1);
+    };
+
+    $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";    
+    prints "  Clearing out existing experiments ";
+    open(CLEARLOG,"> clear.log");
+    $sth = $dbh->prepare("SELECT pid,eid from experiments");
+    $sth->execute;
+    while (($pid,$eid) = $sth->fetchrow_array) {
+	print CLEARLOG "$pid $eid\n";
+	print CLEARLOG "tbswapout -nologfile -force $pid $eid\n";
+	open(EXEC,"tbswapout -nologfile -force $pid $eid 2>&1 |");
+	while (<EXEC>) {
+	    print CLEARLOG $_;
+	}
+	close(EXEC);
+	if (($? >> 8) != 0) {
+	    prints "FAIL - For $pid $eid - On tbswapout - See clear.log\n";
 	    $fail++;
+	    doexit(1);
+	} 
+	print CLEARLOG "tbend -nologfile $pid $eid\n";
+	open(EXEC,"tbend $pid $eid 2>&1 |");
+	while (<EXEC>) {
+	    print CLEARLOG $_;
+	}
+	close(EXEC);
+	if (($? >> 8) != 0) {
+	    prints " FAIL - For $pid $eid - On tbend - See clear.log\n";
+	    $fail++;
+	    doexit(1);
+	}   
+    }
+    prints "PASS\n";
+    $pass++;
+
+    close(CLEARLOG);
+
+    prints "  Setting up test experiment ";
+    $dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"test\"");
+    $dbh->do("INSERT into experiments (pid,eid) "
+	     . "values (\"testbed\",\"test\")") || do {
+		 prints "FAIL\n";
+		 $fail++;
+		 doexit(1);
+	     };
+    print "PASS\n";
+    $pass++;
+    
+    
+    prints "  Snapshotting clean state ";
+    tbexec("mysqldump $testdb","clean.txt");
+    prints "END INIT\n";
+    close(LOG);
+}
+
+sub step_test {
+    open(LOG,">> $logfile");
+    
+    prints "START TEST\n";
+    
+    # Time to run tests!
+    prints "Running Tests\n";
+    prints "Testdir: $testdir\n";
+
+    # Let's add some stuff to our path
+    $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";
+    
+    my @tests;
+    my $testmode;
+    my $dir;
+
+    if ($#_ == -1) {
+	opendir(TESTDIR,$testdir);
+	@tests = readdir(TESTDIR);
+	closedir(TESTDIR);
+    } else {
+	@tests = @_;
+    }
+
+    mkdir "tests",0755;
+    foreach $test (@tests) {
+	if (($test eq ".") || ($test eq "..") || ($test eq "CVS")) {
 	    next;
 	}
-    }
-
-    # We're now ready to run the test.
-
-    # The last line of this command will be either PASS
-    # or FAIL <msg>, all output before that should be sent 
-    # to the log file.
-    open(TESTFP,"tbstub $testdb testbed test $test $testdir/$test |");
-    while (<TESTFP>) {
-	print TESTLOG $_;
-	$status = $_;
-    }
-    chop $status;
-    close(TESTFP);
-    if (($? >> 8) != 0) {
-	prints "UNKNOWN - Test exited with non-0 code.\n";
-	$unknown++;
-    } else {
-	if ($status =~ /^PASS/) {
-	    $pass++;
-	} elsif ($status =~ /^FAIL/) {
+	prints "  $test ";
+	
+	mkdir "tests/$test",0755;
+	chdir "tests/$test";
+	open(TESTLOG,"> test.log");
+	
+	# Set up DB state
+	if (tbexect("echo \"drop database if exists $testdb\" | mysql",TESTLOG)) {
+	    prints "FAIL - Could not drop test DB.\n";
+	    prints "Failure was FATAL - Exiting.\n";
 	    $fail++;
-	    # grab copy of testbed
-	    system("mysqldump $testdb > db.txt");
-	    if (($? >> 8) != 0) {
-		prints "ERROR: Could not grab copy of database.\n";
-		doexit(1);
-	    }
-	} else {
-	    $unknown++;
-	    $status = "UKNONW";
+	    doexit(1);
 	}
-	prints "$status\n";
+	if (tbexect("echo \"create database $testdb\" | mysql",TESTLOG)) {
+	    prints "FAIL - Could not recreate test DB.\n";
+	    prints "Failure was FATAL - Exiting.\n";
+	    $fail++;
+	    doexit(1);
+	}
+	if (tbexect("cat $path/clean.txt | mysql $testdb",TESTLOG)) {
+	    prints "FAIL - Could not populate test DB.\n";
+	    prints "Failure was FATAL - Exiting.\n";
+	    $fail++;
+	    doexit(1);
+	}
+	
+	if (-f "$testdir/$test/dbstate") {
+	    if (tbexect("cat $testdir/$test/dbstate | mysql $testdb",TESTLOG)) {
+		prints "FAIL - Could not evaluate dbstate.\n";
+		$fail++;
+		next;
+	    }
+	}
+	
+	# We're now ready to run the test.
+	
+	# The last line of this command will be either PASS
+	# or FAIL <msg>, all output before that should be sent 
+	# to the log file.
+	open(TESTFP,"tbstub $testdb testbed test $test $testdir/$test |");
+	while (<TESTFP>) {
+	    print TESTLOG $_;
+	    $status = $_;
+	}
+	chop $status;
+	close(TESTFP);
+	if (($? >> 8) != 0) {
+	    prints "UNKNOWN - Test exited with non-0 code.\n";
+	    $unknown++;
+	} else {
+	    if ($status =~ /^PASS/) {
+		$pass++;
+	    } elsif ($status =~ /^FAIL/) {
+		$fail++;
+		# grab copy of testbed
+		system("mysqldump $testdb > db.txt");
+		if (($? >> 8) != 0) {
+		    prints "ERROR: Could not grab copy of database.\n";
+		    doexit(1);
+		}
+	    } else {
+		$unknown++;
+		$status = "UKNONW";
+	    }
+	    prints "$status\n";
+	}
+	
+	close(TESTLOG);
+	
+	chdir $path;
     }
-
-    close(TESTLOG);
-
-    chdir $path;
+    prints "END TEST\n";
+    close(LOG);
 }
 
-prints "Cleaning up\n";
-prints "  Dropping test DB ";
-tbexec("echo \"drop database $testdb\" | mysql","cleanup.log");
+sub step_cleanup {
+    open(LOG,">> $logfile");
 
-prints "End test run. " . ctime(time) . "\n";
+    prints "START CLEANUP\n";
+    prints "Cleaning up\n";
+    prints "  Dropping test DB ";
+    tbexec("echo \"drop database $testdb\" | mysql","cleanup.log");
+    
+    prints "End test run. " . ctime(time) . "\n";
+    prints "END CLEANUP\n";
+    close(LOG);
+}
+    
+if ($mode eq "run") {
+    step_init;
+    step_test;
+    step_cleanup;
+} elsif ($mode eq "init") {
+    step_init;
+} elsif ($mode eq "test") {
+    step_test;
+} elsif ($mode eq "single") {
+    step_test @tests;
+} elsif ($mode eq "finish") {
+    step_cleanup;
+}
 
+open(LOG,">> $logfile");
 doexit(0);
+

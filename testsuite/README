@@ -18,7 +18,7 @@ To run the tests, follow these steps:
 
 3. Run tbtest with the appropriate arguments.  For frontend tests this
 would be:
-	~/testbed/testsuite/tbtest tbdb frontend
+	~/testbed/testsuite/tbtest run tbdb frontend
 
 4. Sit back and wait.
 
@@ -95,16 +95,46 @@ tbtest runs all the tests.  It is designed to do an entire testing run
 from start to finish leaving a large collection of log files in its
 wake.
 
-Syntax:
 
-tbtest [-path <path>] <db> <testdir>
+Syntax: tbtest [-leavedb] [-path <path>] [-frontend] [-full] <mode>
+Options:
+  -leavedb - Do not drop the test database on exit.
+  -path <path> - Path to directory to store test files.
+  -frontend - Run in frontend mode.
+  -full - Run in full mode (Not yet implemented).
+Mode:
+  run <db> <testdir> [<pid> <eid> <num>]
+  init <db> [<pid> <eid> <num>]
+  test <testdir>
+  single <testdir> <tests>
+  finish
+tbtest [-leavedb] [-path <path>] <db> <testdir>
 
--path <path> - Specify a path to store test files in, otherwise uses
-	       the current directory.
-<db>         - What DB to base on.  Usually you want 'tbdb'.
-<testdir>    - What set of tests to run.  Usually "frontend" or "full".
-               Refers to a subdirectory of testdir/test.  Could also
-               be used with an absolute path to run custom test sets.
+Notes:
+
+Generally tbtest is invoked in 'run' mode that does everything.  For
+an more interactive approach a you can invoke 'tbtest init ...' and
+then any number of 'tbtest test' and 'tbtest single' commands to run
+tests.  When finished do 'tbtest finish'.
+
+Everything is keyed to your username.  There currently is no way to
+have multiple test runs in progress under the same username without
+collision.
+
+-leavedb is really only useful when running in single mode with only
+one test.  Since the database is reset at the beginning of every test
+if you use this mode with multiple tests you'll only get the DB state
+of the last one.  You recreate the database state of any test by 
+creating a new database and then loading tests/<test>/db.txt into it.
+
+If -path is not present the current working directory is used.
+
+In full mode you must provide a <pid>, <eid>, and the number of nodes
+to reserve.  tbtest will attempt to reserve that many nodes from the
+testbed under the given experiment and then use those nodes to run the
+tests.
+
+-single can take a list of tests.
 
 
 Test Format
