@@ -146,8 +146,8 @@ echo "<tr>
 
 WRITEOSIDMENU("Slice 1 OSID", "part1_osid", $osid_result);
 WRITEOSIDMENU("Slice 2 OSID", "part2_osid", $osid_result);
-WRITEOSIDMENU("Slice 2 OSID", "part3_osid", $osid_result);
 WRITEOSIDMENU("Slice 3 OSID", "part3_osid", $osid_result);
+WRITEOSIDMENU("Slice 4 OSID", "part4_osid", $osid_result);
 WRITEOSIDMENU("Default OSID[<b>1</b>]", "default_osid", $osid_result);
 
 #
