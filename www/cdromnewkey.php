@@ -176,8 +176,9 @@ $chunked   = chunk_split($newkey, 4, " ");
 
 $query_result =
     DBQueryFatal("insert into widearea_privkeys ".
-		 " (privkey, user_name, user_email, requested) ".
-		 " values ('$newkey', '$user_name', '$user_email', now())");
+		 " (privkey, lockkey, user_name, user_email, requested) ".
+		 " values ('$newkey', '$newkey', '$user_name', ".
+		 "         '$user_email', now())");
 
 TBMAIL("$user_name <$user_email>",
        "Your CD key",
