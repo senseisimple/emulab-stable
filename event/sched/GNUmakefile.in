@@ -62,16 +62,16 @@ event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
 	$(CXX) $(CFLAGS) -static $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
 
 queue.o:		event-sched.h
-listNode.o:		listNode.h
-error-record.o:		error-record.h
-local-agent.o:		local-agent.h
-group-agent.o:		group-agent.h
-event-sched_rpc.o:	event-sched.c event-sched.h rpc.h listNode.h
+listNode.o:		listNode.h event-sched.h
+error-record.o:		error-record.h event-sched.h rpc.h listNode.h ../lib/event.h
+local-agent.o:		local-agent.h event-sched.h rpc.h listNode.h ../lib/event.h
+group-agent.o:		group-agent.h local-agent.h event-sched.h rpc.h listNode.h ../lib/event.h
+event-sched_rpc.o:	event-sched.c local-agent.h event-sched.h rpc.h listNode.h ../lib/event.h
 	$(CC) $(CFLAGS) -DRPC -c -o $@ $<
-rpc.o:			rpc.cc rpc.h
+rpc.o:			rpc.cc rpc.h event-sched.h
 	$(CXX) $(CXXFLAGS) -DSSHRPC $(ULXRINC) -c $<
 
-rrpc.o:			rpc.cc rpc.h
+rrpc.o:			rpc.cc rpc.h event-sched.h
 	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
 install: event-sched_rrpc
