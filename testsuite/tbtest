@@ -22,7 +22,7 @@
 #    init <db> [<pid> <eid> <num>] - Initiatlize.  
 #    test <testdir> - Run tests
 #    single <testdir> <tests> - Run only <tests>
-#    finish [<pid> <eid>] - Finish run.
+#    finish [<db> <pid> <eid>] - Finish run.
 # <num> is "X <type> ...", for example "10 pc 16 shark"
 
 use DBI;
@@ -73,7 +73,7 @@ sub show_help {
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
     print STDERR "  test <testdir>\n";
     print STDERR "  single <testdir> <tests>\n";
-    print STDERR "  finish <pid> <eid>\n";
+    print STDERR "  finish [<db> <pid> <eid>]\n";
     print STDERR "<num>: Must be even lengthed list of <number> <type>.\n";
     print STDERR "   Ex: \"4 pc 16 shark\"\n";
     print STDERR "Examples:\n";
@@ -130,8 +130,8 @@ if ($mode eq "run") {
     if ($type eq "frontend") {
 	if ($#ARGV != -1) {show_help;}
     } else {
-	if ($#ARGV != 1) {show_help;}
-	($pid,$eid) = @ARGV;
+	if ($#ARGV != 2) {show_help;}
+	($TBDB,$pid,$eid) = @ARGV;
     }
 } else {
     print STDERR "Unknown mode: $mode\n";
@@ -209,12 +209,8 @@ sub tbexect {
 sub doexit {
     printf LOG "Total Tests: %-5d  Pass: %-5d  Fail: %-5d  Unknown: %-5d\n", $pass+$fail+$unknown, $pass, $fail, $unknown;
     printf "Total Tests: %-5d  Pass: %-5d  Fail: %-5d  Unknown: %-5d\n", $pass+$fail+$unknown, $pass, $fail, $unknown;
-    # Try to do the necessary cleanup
-    if ($leavedb == 0) {
-	system("echo \"drop database if exists $testdb\" | mysql");
-    }
-    if (($type eq "full") && (($mode eq "run")  || ($mode eq "init"))) {
-	system("/usr/testbed/bin/nfree $pid $eid > /dev/null");
+    if ($_[0] != 0) {
+	prints "Run in finish mode to clean up any residual state.\n";
     }
     close(LOG);
     exit($_[0]);
@@ -229,7 +225,7 @@ sub step_init {
     prints "Database: $TBDB\n";
     prints "Type:     $type\n";
     prints "\n";
-    prints "Beginning test run. " . ctime(time) . "\n";
+    prints "Beginning test run. " . ctime(time);
     
     # Initialize DB
     $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
@@ -282,6 +278,28 @@ sub step_init {
 	}
 	prints "  Reserving ";
 	tbexec("/usr/testbed/bin/nalloc $pid $eid $raw","$path/reserve.log");
+
+	prints "  Setting up tmcc redirect ";
+	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
+	    die "Could not connect to DB.\n";
+	foreach $type (keys(%have)) {
+	    foreach $node (@{$have{$type}}) {
+		$dbh->do("DELETE from tmcd_redirect" .
+			 " where node_id=\"$node\"") || do {
+			     $fail++;
+			     prints "FAIL - $node\n";
+			     doexit(1);
+			 };
+		$dbh->do("INSERT into tmcd_redirect (node_id,dbname) values" .
+			 " (\"$node\",\"$testdb\")") || do {
+			     $fail++;
+			     prints "FAIL - $node\n";
+			     doexit(1);
+			 };
+	    }
+	}
+	prints "PASS\n";
+	$dbh->disconnect;
     }
 
     # Set up object tree
@@ -382,7 +400,7 @@ sub step_init {
     } else {
 	# Free nodes we allocated for the experiment and allocate all
 	# others.
-	prints "  Creating testbed/unavailable in test DB.\n";
+	prints "  Creating testbed/unavailable in test DB ";
 	open(AVAIL,"avail |");
 	$raw = "";
 	while (<AVAIL>) {
@@ -391,7 +409,6 @@ sub step_init {
 	    ($node) = /^\|([-a-zA-Z0-9]+)/;
 	    $raw .= " $node";
 	}
-	print "DEBUG: $raw\n";
 	close(AVAIL);
 	
 	$dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"unavailable\"");
@@ -425,7 +442,6 @@ sub step_init {
     prints "  Snapshotting clean state ";
     tbexec("mysqldump $testdb","clean.txt");
     prints "END INIT\n";
-    close(LOG);
 }
 
 sub step_test {
@@ -529,25 +545,69 @@ sub step_test {
 	chdir $path;
     }
     prints "END TEST\n";
-    close(LOG);
 }
-
+   
 sub step_cleanup {
     open(LOG,">> $logfile");
+    
+    prints "START cleanup\n";
 
-    prints "START CLEANUP\n";
-    prints "Cleaning up\n";
-
-    if ($type eq "full") {
-	prints "  Freeing reserved nodes ";
-	tbexec("/usr/testbed/bin/nfree $pid $eid","cleanup.log");
+    # Try to do the necessary cleanup
+    if ($leavedb == 0) {
+	prints "  Dropping test DB ";
+	system("echo \"drop database if exists $testdb\" | mysql");
+	if (($? >> 8) != 0) {
+	    prints "FAIL\n";
+	    $fail++;
+	} else {
+	    prints "PASS\n";
+	    $pass++;
+	}
     }
-    
-    prints "End test run. " . ctime(time) . "\n";
+    if (($type eq "full")) { 	
+	prints "  Clearing redirects ";
+	$ok = 1;
+	$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || do {
+	    $ok = 0;
+	};
+	if (! $ok) {
+	    prints "FAIL - Could not connect to db\n";
+	    $fail++;
+	} else {
+	    $sth=$dbh->prepare("SELECT node_id from reserved" .
+			       " where pid=\"$pid\" and eid=\"$eid\"");
+	    $sth->execute;
+	    $ok = 1;
+	    while (($node) = $sth->fetchrow_array) {
+		$dbh->do("DELETE from tmcd_redirect" .
+			 " where node_id=\"$node\"") || do {
+			     prints "FAIL - $node\n";
+			     $fail++;
+			     $ok = 0;
+			     last;
+			 }
+	    }
+	    if ($ok) {
+		prints "PASS\n";
+	    }
+	    $dbh->disconnect;
+	}
+
+	prints "  Freeing nodes ";
+	system("/usr/testbed/bin/nfree $pid $eid > /dev/null");
+	if (($? >> 8) != 0) {
+	    prints "FAIL\n";
+	    $fail++;
+	} else {
+	    prints "PASS\n";
+	    $pass++;
+	}
+    }
+    prints "End test run. " . ctime(time);
     prints "END CLEANUP\n";
-    close(LOG);
 }
-    
+
+	     
 if ($mode eq "run") {
     step_init;
     step_test;
@@ -563,5 +623,6 @@ if ($mode eq "run") {
 }
 
 open(LOG,">> $logfile");
-doexit(0);
 
+# Do exit does all cleanup.
+doexit(0);
