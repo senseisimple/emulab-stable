@@ -61,13 +61,16 @@ $curmembers_result =
 
 #
 # Grab the user list from the project. These are the people who can be
-# added. Do not include people in the above list, obviously!
+# added. Do not include people in the above list, obviously! Do not
+# include members that have not been approved to main group either! This
+# will force them to go through the approval page first.
 # 
 $nonmembers_result =
     DBQueryFatal("select m.uid from group_membership as m ".
 		 "left join group_membership as a on ".
 		 "     a.uid=m.uid and a.pid=m.pid and a.gid='$gid' ".
-		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL");
+		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL ".
+		 "      and m.trust!='none'");
 
 function TBCheckTrustConsistency($user, $pid, $gid, $newtrust)
 {

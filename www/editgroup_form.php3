@@ -60,18 +60,27 @@ $curmembers_result =
 
 #
 # Grab the user list from the project. These are the people who can be
-# added. Do not include people in the above list, obviously!
+# added. Do not include people in the above list, obviously! Do not
+# include members that have not been approved to main group either! This
+# will force them to go through the approval page first.
 # 
 $nonmembers_result =
     DBQueryFatal("select m.uid from group_membership as m ".
 		 "left join group_membership as a on ".
 		 "     a.uid=m.uid and a.pid=m.pid and a.gid='$gid' ".
-		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL");
+		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL ".
+		 "      and m.trust!='none'");
 
 #
 # We do not allow the actual group info to be edited. Just the membership.
 #
 SHOWGROUP($pid, $gid);
+
+echo "<br><center>
+       Important <a href='docwrapper.php3?docname=groups.html#SECURITY'>
+       security issues</a> are discussed in the
+       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+      </center>\n";
 
 echo "<br>
       <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
@@ -146,7 +155,7 @@ if (mysql_num_rows($curmembers_result)) {
 if (mysql_num_rows($nonmembers_result)) {
     echo "<tr><td align=center colspan=2 nowrap=1>
           <br>
-          <font size=+1><b>Add Group Members.</b></font>
+          <font size=+1><b>Add Group Members</b></font>[<b>1</b>].
              <br>
              Select the ones you would like to add.<br>
              Be sure to select the appropriate trust level.
@@ -183,11 +192,17 @@ echo "<tr>
 echo "</table>
       </form>\n";
 
-echo "<br><center>
-       Important <a href='docwrapper.php3?docname=groups.html#SECURITY'>
-       security issues</a> are discussed in the
-       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
-      </center>\n";
+echo "<h4><blockquote><blockquote><blockquote>
+      <ol>
+       <li> Only members who have already been approved to the main
+            project will be listed. If a project member is missing, please
+            go to <a href=approveuser_form.php3>New User Approval</a>
+            and approve the user to the main project group. Then you can
+            reload this page and add those members to other groups in your
+            project.\n";
+echo "</ol>
+      </blockquote></blockquote></blockquote>
+      </h4>\n";
 
 #
 # Standard Testbed Footer
