@@ -39,7 +39,7 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 
 set updir [file dirname $scriptdir]
 
-set lockfile "/usr/testbed/etc/tblock"
+set lockfile "/usr/testbed/locks/tblock"
 set ns2ir "$updir/ir/ns2ir/parse.tcl"
 set assign "$updir/ir/assign.tcl"
 set handle_ip "$updir/ir/handle_ip.tcl"
