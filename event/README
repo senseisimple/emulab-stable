@@ -37,4 +37,4 @@ point in the future we may adopt a different system for event
 notification transport or write our own.  If you find that you can't
 do something with the event library, then it very well could be a
 limitation in the event library API; please contact
-testbed-ops@fast.cs.utah.edu to let us know about it.
+testbed-ops@flux.utah.edu to let us know about it.
