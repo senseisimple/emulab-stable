@@ -84,8 +84,13 @@ function INFORMLEADERS($uid) {
 
 	 TBGroupLeader($pid, $gid, $leader_uid);
 	 TBUserInfo($leader_uid, $leader_name, $leader_email);
-	 
-	 TBMAIL("$leader_name '$leader_uid' <$leader_email>",
+
+	 if (strcmp($leader_uid, $uid)) {
+	     #
+	     # Send email only if this is not the group leader verifying
+	     # his account!
+	     # 
+	     TBMAIL("$leader_name '$leader_uid' <$leader_email>",
 		"$uid $pid Project Join Request",
 		"$usr_name is trying to join your group $gid in project $pid.".
 		"\n".
@@ -110,6 +115,7 @@ function INFORMLEADERS($uid) {
 		"From: $TBMAIL_APPROVAL\n".
 		"Bcc: $TBMAIL_AUDIT\n".
 		"Errors-To: $TBMAIL_WWW");
+	 }
      }
 }
 
