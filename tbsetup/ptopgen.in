@@ -58,7 +58,7 @@ $sharklinks = "";
 foreach $node (keys(%nodes)) {
     if ($node =~ /^sh/) {
 	print "node $node shark-shelf:1\n";
-	$sharklinks .= "link link-$node $node:$node/eth0 cisco 100 1\n";
+	$sharklinks .= "link link-$node $node:$node/eth0 cisco1 100 1\n";
     } else {
 	$text = "node $node $nodes{$node}:1 $classes{$nodes{$node}}:1";
 	$delay_capacity = $nodetypes{$nodes{$node}};
