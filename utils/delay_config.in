@@ -1,8 +1,8 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,7 +25,6 @@ sub usage()
 	  "Options:\n".
 	  "   -d = turn on debugging\n".
 	  "   -s = Select the source of the link to determine which pipe\n".
-	  "        This is easier than using the -p option!\n".
 	  "   -m = Modify the base experiment in addition to current state.\n".
 	  "Parameters:\n".
 	  " BANDWIDTH=NNN    - N=bandwidth (10-100000 Kbits per second)\n",
@@ -98,6 +97,34 @@ if (defined($options{"m"})) {
 }
 if (defined($options{"s"})) {
     $srcvnode = $options{"s"};
+
+    if ($srcvnode =~ /^([-\w]+)$/) {
+	$srcnode = $1;
+    }
+    else {
+	die("*** Bad srcvnode name: $srcvnode.\n");
+    }
+}
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid.\n");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid.\n");
+}
+if ($link =~ /^([-\w]+)$/) {
+    $link = $1;
+}
+else {
+    die("*** Bad data in link: $link.\n");
 }
 
 #
