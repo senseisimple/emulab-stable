@@ -31,7 +31,7 @@ my $debug       = 0;
 my $routecalc   = "$TB/libexec/routecalc";
 my $impotent    = 0;
 my $force	= 0;
-my $optimize    = 0;
+my $optimize    = 1;
 my $format      = "";
 
 #
@@ -71,7 +71,7 @@ if (defined($options{"f"})) {
     $force = 1;
 }
 if (defined($options{"t"})) {
-    $optimize = 1;
+    $optimize = 0;
 }
 if (defined($options{"s"})) {
     $format = "ns";
