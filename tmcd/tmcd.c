@@ -380,7 +380,11 @@ main(int argc, char **argv)
 			errorc("waitpid failed");
 			continue;
 		}
-		error("server %d exited with status 0x%x!\n", pid, status);
+		if( WIFSIGNALED(status) ) {
+		  error("server %d exited with signal %d!\n", pid, WTERMSIG(status));
+		} else if( WIFEXITED(status) ) {
+		  error("server %d exited with status %d!\n", pid, WEXITSTATUS(status));	  
+		}
 		numchildren--;
 		for (i = 0; i < (sizeof(foo)/sizeof(int)); i++) {
 			if (foo[i] == pid)
