@@ -28,8 +28,9 @@ import java.text.DecimalFormat;
 public class RoboTrack extends JApplet {
     Map map;
     JTable maptable;
-    JPopupMenu MenuPopup;
-    JMenuItem CancelMenuItem, SubmitMenuItem;
+    JPopupMenu LeftMenuPopup, RightMenuPopup;
+    JMenuItem CancelMovesMenuItem, SubmitMenuItem;
+    JMenuItem CancelDragMenuItem, ShowNodeMenuItem, SetOrientationMenuItem;
     Image floorimage;
     double pixels_per_meter = 1.0;
     boolean frozen = false;
@@ -93,13 +94,6 @@ public class RoboTrack extends JApplet {
 	}
 
 	/*
-	 * Mouse listener. See below.
-	 */
-	MyMouseAdaptor mymouser = new MyMouseAdaptor();
-	addMouseListener(mymouser);
-	addMouseMotionListener(mymouser);
-
-	/*
 	 * Make sure the redraw stops when the window is iconified.
 	 * Hmm, not sure how to do this yet. How do I get a handle
 	 * on the current frame?
@@ -108,6 +102,9 @@ public class RoboTrack extends JApplet {
 		public void windowDeiconified(WindowEvent e) { start(); }
 	    });	
 	 */
+
+	// This is used below for the listeners. 
+	MyMouseAdaptor mymouser = new MyMouseAdaptor();
 	
 	/*
 	 * Vertical placement of Components in the pane. 
@@ -128,20 +125,47 @@ public class RoboTrack extends JApplet {
 	 * Create the popup menu that will be used to fire off
 	 * robot moves. We use the mouseadaptor for this too. 
 	 */
-        MenuPopup = new JPopupMenu("Tracker");
+        LeftMenuPopup = new JPopupMenu("Tracker");
         JMenuItem menuitem = new JMenuItem("   Motion Menu   ");
-        menuitem.addActionListener(mymouser);
-        MenuPopup.add(menuitem);
+        LeftMenuPopup.add(menuitem);
+	LeftMenuPopup.addSeparator();
         SubmitMenuItem = new JMenuItem("Submit All Moves");
         SubmitMenuItem.addActionListener(mymouser);
-        MenuPopup.add(SubmitMenuItem);
-        CancelMenuItem = new JMenuItem("Cancel All Moves");
-        CancelMenuItem.addActionListener(mymouser);
-        MenuPopup.add(CancelMenuItem);
+        LeftMenuPopup.add(SubmitMenuItem);
+        CancelMovesMenuItem = new JMenuItem("Cancel All Moves");
+        CancelMovesMenuItem.addActionListener(mymouser);
+        LeftMenuPopup.add(CancelMovesMenuItem);
         menuitem = new JMenuItem("Close This Menu");
         menuitem.addActionListener(mymouser);
-        MenuPopup.add(menuitem);
-	MenuPopup.setBorder(BorderFactory.createLineBorder(Color.black));
+        LeftMenuPopup.add(menuitem);
+	LeftMenuPopup.setBorder(BorderFactory.createLineBorder(Color.black));
+
+	/*
+	 * And a right button popup that is active over a node.
+	 */
+        RightMenuPopup = new JPopupMenu("Tracker");
+        menuitem = new JMenuItem("   Context Menu   ");
+        RightMenuPopup.add(menuitem);
+	RightMenuPopup.addSeparator();
+        ShowNodeMenuItem = new JMenuItem("Emulab ShowNode");
+        ShowNodeMenuItem.addActionListener(mymouser);
+        RightMenuPopup.add(ShowNodeMenuItem);
+        CancelDragMenuItem = new JMenuItem("Cancel Drag");
+        CancelDragMenuItem.addActionListener(mymouser);
+        RightMenuPopup.add(CancelDragMenuItem);
+        SetOrientationMenuItem = new JMenuItem("Set Orientation");
+        SetOrientationMenuItem.addActionListener(mymouser);
+        RightMenuPopup.add(SetOrientationMenuItem);
+        menuitem = new JMenuItem("Close This Menu");
+        menuitem.addActionListener(mymouser);
+        RightMenuPopup.add(menuitem);
+	RightMenuPopup.setBorder(BorderFactory.createLineBorder(Color.black));
+
+	/*
+	 * Mouse listener. See below.
+	 */
+	addMouseListener(mymouser);
+	addMouseMotionListener(mymouser);
     }
 
     public void start() {
@@ -412,9 +436,6 @@ public class RoboTrack extends JApplet {
 	    while (e.hasMoreElements()) {
 		Robot robbie  = (Robot)e.nextElement();
 
-		if (! robbie.mobile)
-		    continue;
-
 		if ((Math.abs(robbie.y - y) < robbie.size/2 &&
 		     Math.abs(robbie.x - x) < robbie.size/2) ||
 		    (robbie.dragging &&
@@ -447,6 +468,7 @@ public class RoboTrack extends JApplet {
 		if (!robbie.dragging)
 		    continue;
 
+		// Bounding box.
 		int rx1 = robbie.drag_x - (robbie.radius);
 		int ry1 = robbie.drag_y - (robbie.radius);
 		int rx2 = robbie.drag_x + (robbie.radius);
@@ -555,6 +577,7 @@ public class RoboTrack extends JApplet {
 		if (!robbie.dragging)
 		    continue;
 
+		// Bounding box.
 		int rx1 = robbie.drag_x - (robbie.radius + OBSTACLE_BUFFER);
 		int ry1 = robbie.drag_y - (robbie.radius + OBSTACLE_BUFFER);
 		int rx2 = robbie.drag_x + (robbie.radius + OBSTACLE_BUFFER);
@@ -774,7 +797,6 @@ public class RoboTrack extends JApplet {
     
         public void run() {
             Thread me = Thread.currentThread();
-	    byte buffer[] = new byte[6];
 	    BufferedReader input
 		= new BufferedReader(new InputStreamReader(is));
 	    String str;
@@ -845,7 +867,7 @@ public class RoboTrack extends JApplet {
 	    //	    System.out.println("foo");
 	    /*
 	     * Hmm, if I return 0 (as before there are any robots) the
-	     * table is never resized up. I ma sure there is a way to
+	     * table is never resized up. I am sure there is a way to
 	     * deal with this ... not sure what it is yet. So hardwire
 	     * table size for now.
 	     */
@@ -906,8 +928,7 @@ public class RoboTrack extends JApplet {
 	    
 	    Robot robbie = (Robot) robotmap.elementAt(row);
 
-	    if ((robbie.dragging && (col >= 6 && col <= 8)) ||
-		(!robbie.gotdest && col == 8))
+	    if (robbie.dragging && (col >= 6 && col <= 8))
 		return true;
 	    return false;
         }
@@ -921,8 +942,7 @@ public class RoboTrack extends JApplet {
 	    
 	    Robot robbie = (Robot) robotmap.elementAt(row);
 
-	    if ((robbie.dragging && (col >= 6 && col <= 8)) ||
-		(!robbie.gotdest && col == 8)) {
+	    if (robbie.dragging && (col >= 6 && col <= 8)) {
 		String stmp = value.toString().trim();
 		double dtmp;
 
@@ -970,18 +990,6 @@ public class RoboTrack extends JApplet {
 		    robbie.drag_or == robbie.or) {
 		    robbie.dragging = false;
 		}
-		else if (!robbie.dragging) {
-		    /*
-		     * User changed the orientation, but the robot was not
-		     * currenly being dragged, so make sure things are
-		     * initialized properly for a drag.
-		     */
-		    robbie.drag_x   = robbie.x;
-		    robbie.drag_y   = robbie.y;
-		    robbie.dragx_meters = robbie.x_meters;
-		    robbie.dragy_meters = robbie.y_meters;
-		    robbie.dragging = true;
-		}
 		fireTableCellUpdated(row, col);
 		repaint();
 		return;
@@ -990,14 +998,28 @@ public class RoboTrack extends JApplet {
     }
 
     /*
+     * Utility function. When canceling a drag operation, we need to
+     * clear the values in the table for that row. If we do not do this,
+     * the next time the user tries to drag that node, the old value in
+     * cell that was being edited is picked up (and I do not know how
+     * to turn off editing of the cell being edited). 
+     */
+    private void cancelDrag(Robot robbie) {
+	int row = robbie.index;
+	
+	robbie.dragging = false;
+	maptable.clearSelection();
+	// Just force the editor out of the cell, if any. This will end up
+	maptable.editCellAt(100, 100);
+	maptable.repaint();
+    }
+
+    /*
      * Mouse button event handler.
      */
     public class MyMouseAdaptor implements MouseInputListener, ActionListener {
 	String node_id   = null;
-	int click_x      = 0;
-	int click_y      = 0;
 	boolean dragging = false;
-	boolean clicked  = false;
 	
 	public void mousePressed(MouseEvent e) {
 	    int button = e.getButton();
@@ -1006,15 +1028,32 @@ public class RoboTrack extends JApplet {
 		/*
 		 * Left button pressed. This starts a drag operation.
 		 */
-		if (!dragging && !clicked) {
+		if (!dragging) {
 		    node_id = map.pickRobot(e.getX(), e.getY());
 
 		    if (node_id == "") {
 			node_id = null;
-			MaybeShowMenu(e);
+			MaybeLeftShowMenu(e);
 			return;
 		    }
 		    Robot robbie = (Robot) robots.get(node_id);
+
+		    /*
+		     * Fixed nodes cannot be dragged.
+		     */
+		    if (! robbie.mobile) {
+			node_id = null;
+			return;
+		    }
+
+		    /*
+		     * Do not allow robots with current destinations
+		     * to be dragged. Not yet, maybe later.
+		     */
+		    if (robbie.gotdest) {
+			node_id = null;
+			return;
+		    }
 		    
 		    robbie.drag_x   = e.getX();
 		    robbie.drag_y   = e.getY();
@@ -1042,7 +1081,6 @@ public class RoboTrack extends JApplet {
 
 		    maptable.setRowSelectionInterval(robbie.index,
 						     robbie.index);
-		    maptable.editCellAt(robbie.index, 8);
 		}
 	    }
 	    else if (button == e.BUTTON2) {
@@ -1062,8 +1100,7 @@ public class RoboTrack extends JApplet {
 	    }
 	    else if (button == e.BUTTON3) {
 		/*
-		 * Right mouse button will bring up a showpage on release.
-		 * Eventually this will be a context menu.
+		 * Right mouse button will bring up a context menu.
 		 */
 		if (! dragging) {
 		    node_id = map.pickRobot(e.getX(), e.getY());
@@ -1072,12 +1109,25 @@ public class RoboTrack extends JApplet {
 			node_id = null;
 			return;
 		    }
-		    
 		    Robot robbie = (Robot) robots.get(node_id);
+		    
+		    /*
+		     * Set whether the cancel move button is enabled.
+		     */
+		    if (robbie.dragging)
+			CancelDragMenuItem.setEnabled(true);
+		    else
+			CancelDragMenuItem.setEnabled(false);
 
-		    click_x = e.getX();
-		    click_y = e.getY();
-		    clicked = true;
+		    /*
+		     * And set whether the orientation option is enabled.
+		     */
+		    if (robbie.mobile)
+			SetOrientationMenuItem.setEnabled(true);
+		    else
+			SetOrientationMenuItem.setEnabled(false);
+
+		    RightMenuPopup.show(map, e.getX(), e.getY());
 		}
 	    }
 	}
@@ -1093,7 +1143,7 @@ public class RoboTrack extends JApplet {
 		     */
 		    // Make sure we received the down event.
 		    if (node_id == null) {
-			clicked = false;
+			dragging = false;
 			return;
 		    }
 		    System.out.println("Drag finished: " + node_id);
@@ -1121,49 +1171,22 @@ public class RoboTrack extends JApplet {
 		    if (Math.abs(e.getX() - robbie.x) <= 2 &&
 			Math.abs(e.getY() - robbie.y) <= 2 &&
 			robbie.drag_or == robbie.or) {
-			robbie.dragging = false;
+			cancelDrag(robbie);
 		    }
 		    repaint();
 		}
 	    }
 	    else if (button == e.BUTTON3) {
 		/*
-		 * Right mouse button release brings up a showpage.
-		 * Eventually this will be a context menu.
+		 * Right mouse button brought up the context menu.
+		 * It seems that this event will fire before the menu popup
+		 * event fires, so nothing to do since we need to maintain
+		 * the state (the selected node) for the popup event below.
 		 */
-		if (clicked) {
-		    // Make sure we received the down event.
-		    if (node_id == null) {
-			clicked = false;
-			return;
-		    }
-		    System.out.println("Click finished: " + node_id);
-
-		    Robot robbie = (Robot) robots.get(node_id);
-		    node_id      = null;
-
-		    if (! shelled) {
-			// This will fail when I run it from the shell
-			try
-			{
-			    URL url = new URL(getCodeBase(),
-					      "/shownode.php3?node_id=" +
-					        robbie.pname
-					      + "&nocookieuid="
-					      + URLEncoder.encode(uid)
-					      + "&nocookieauth="
-					      + URLEncoder.encode(auth));
-			    System.out.println(url.toString());
-			    getAppletContext().showDocument(url, "_robbie");
-			}
-			catch(Throwable th)
-			{
-			    th.printStackTrace();
-			}
-		    }
+		if (node_id == null) {
+		    return;
 		}
-		// Clear the click.
-		clicked = false;
+		System.out.println("Click finished: " + node_id);
 	    }
 	}
 
@@ -1181,10 +1204,9 @@ public class RoboTrack extends JApplet {
 	    if (dragging) {
 		Robot robbie = (Robot) robots.get(node_id);
 
-		clicked = dragging = false;
-		robbie.dragging    = false;
+		cancelDrag(robbie);
+		robbie.dragging = false;
 		repaint();
-		maptable.repaint(10);
 	    }
 	}
 
@@ -1238,7 +1260,7 @@ public class RoboTrack extends JApplet {
 	 * Decide if we want to actually show the popupmenu; only if
 	 * there are robots involved in a drag. Scan the list.
 	 */
-	public void MaybeShowMenu(MouseEvent e) {
+	public void MaybeLeftShowMenu(MouseEvent e) {
 	    Enumeration enum = robots.elements();
 
 	    while (enum.hasMoreElements()) {
@@ -1251,7 +1273,7 @@ public class RoboTrack extends JApplet {
 		     * the "Java Applet Window" warning so that tells people
 		     * a window has just been popped up.
 		     */
-		    MenuPopup.show(map, e.getX(), e.getY());
+		    LeftMenuPopup.show(map, e.getX(), e.getY());
 		    return;
 		}
 	    }
@@ -1269,18 +1291,15 @@ public class RoboTrack extends JApplet {
 	    /*
 	     * Figuring out which item was selected is silly.
 	     */
-	    if (source == CancelMenuItem) {
+	    if (source == CancelMovesMenuItem) {
 		/*
 		 * Clear all the dragging bits.
 		 */
 		Enumeration enum = robots.elements();
 
 		while (enum.hasMoreElements()) {
-		    Robot robbie  = (Robot)enum.nextElement();
-
-		    robbie.dragging = false;
+		    cancelDrag((Robot) enum.nextElement());
 		}
-		maptable.clearSelection();
 	    }
 	    else if (source == SubmitMenuItem) {
 		/*
@@ -1290,6 +1309,73 @@ public class RoboTrack extends JApplet {
 		    ! map.CheckforCollisions() &&
 		    ! map.CheckOutOfBounds())
 		    SendInDestinations();
+	    }
+	    else if (source == ShowNodeMenuItem && node_id != null) {
+		if (! shelled) {
+		    Robot robbie = (Robot) robots.get(node_id);
+		    
+		    // This will fail when I run it from the shell
+		    try
+		    {
+			URL url = new URL(getCodeBase(),
+					  "/shownode.php3?node_id=" +
+					  robbie.pname
+					  + "&nocookieuid="
+					  + URLEncoder.encode(uid)
+					  + "&nocookieauth="
+					  + URLEncoder.encode(auth));
+			System.out.println(url.toString());
+			getAppletContext().showDocument(url, "_robbie");
+		    }
+		    catch(Throwable th)
+		    {
+			th.printStackTrace();
+		    }
+		}
+	    }
+	    else if (source == CancelDragMenuItem && node_id != null) {
+		cancelDrag((Robot) robots.get(node_id));
+	    }
+	    else if (source == SetOrientationMenuItem && node_id != null) {
+		String saved_node_id = node_id;
+		String str = (String)
+		    JOptionPane.showInputDialog(map,
+						"Enter new Orientation for "
+						+ node_id,
+						null,
+						JOptionPane.PLAIN_MESSAGE);
+		str = str.trim();
+		System.out.println("Orientation: " + str);
+
+		if (str.length() > 0) {
+		    double dtmp;
+
+		    try
+		    {
+			dtmp = Double.parseDouble(str);
+		    }
+		    catch(Throwable th)
+		    {
+			// Must not be a float.
+			repaint();
+			return;
+		    }
+		    Robot robbie = (Robot) robots.get(saved_node_id);
+
+		    robbie.drag_or = dtmp;
+		    robbie.dragor_string = str;
+		    
+		    /*
+		     * Set things up so that the robot is now being dragged.
+		     */
+		    if (! robbie.dragging) {
+			robbie.drag_x   = robbie.x;
+			robbie.drag_y   = robbie.y;
+			robbie.dragx_meters = robbie.x_meters;
+			robbie.dragy_meters = robbie.y_meters;
+			robbie.dragging = true;
+		    }
+		}
 	    }
 	    repaint();
 	    maptable.repaint(10);
