@@ -148,16 +148,6 @@ CREATE TABLE event_eventtypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table `event_objecttypes`
---
-
-CREATE TABLE event_objecttypes (
-  idx smallint(5) unsigned NOT NULL default '0',
-  type tinytext NOT NULL,
-  PRIMARY KEY  (idx)
-) TYPE=MyISAM;
-
---
 -- Table structure for table `event_groups`
 --
 
@@ -170,6 +160,16 @@ CREATE TABLE event_groups (
   PRIMARY KEY  (pid,eid,idx),
   KEY group_name (group_name),
   KEY agent_name (agent_name)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `event_objecttypes`
+--
+
+CREATE TABLE event_objecttypes (
+  idx smallint(5) unsigned NOT NULL default '0',
+  type tinytext NOT NULL,
+  PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
 --
@@ -723,6 +723,7 @@ CREATE TABLE new_nodes (
   contact tinytext,
   phone tinytext,
   room varchar(32) default NULL,
+  role varchar(32) NOT NULL default 'testnode',
   PRIMARY KEY  (new_node_id)
 ) TYPE=MyISAM;
 
@@ -1667,7 +1668,7 @@ CREATE TABLE virt_agents (
 CREATE TABLE virt_lan_lans (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
-  idx int(11) NOT NULL auto_increment,  
+  idx int(11) NOT NULL auto_increment,
   vname varchar(32) NOT NULL default '',
   PRIMARY KEY  (pid,eid,idx),
   UNIQUE KEY vname (pid,eid,vname)
@@ -1699,7 +1700,6 @@ CREATE TABLE virt_lan_settings (
   capval varchar(64) NOT NULL default '',
   PRIMARY KEY  (pid,eid,vname,capkey)
 ) TYPE=MyISAM;
-
 
 --
 -- Table structure for table `virt_lans`
