@@ -38,6 +38,12 @@ dbinit(void)
 	return 1;
 }
 
+void
+dbclose(void)
+{
+	mysql_close(&db);
+}
+
 MYSQL_RES *
 mydb_query(char *query, int ncols, ...)
 {
