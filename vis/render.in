@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -670,12 +670,6 @@ sub gendesc {
 sub combineloss {
     my ($a, $b) = @_;
     return (1.0 - ((1.0 - $a) * (1.0 - $b)));
-}
-
-sub min {
-    my ($a, $b) = @_;
-    if ($a < $b) { return $a; }
-    return $b;
 }
 
 sub ceil {

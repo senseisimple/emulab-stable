@@ -2351,20 +2351,6 @@ exit 0;
 # Subroutines
 ######################################################################
 
-# min(a,b)
-# Returns the minimum of a and b.
-sub min {
-    my ($a,$b) = @_;
-    return ($a < $b ? $a : $b);
-};
-
-# max(a,b)
-# Returns the minimum of a and b.
-sub max {
-    my ($a,$b) = @_;
-    return ($a > $b ? $a : $b);
-};
-
 # getbandwidth(bw)
 # Returns the lowest ok bandwidth that is greater than or equal to
 # the one passed.
