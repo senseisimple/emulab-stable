@@ -11,8 +11,6 @@ negprerun
 nodes
 ping
 set-ip
-sharkshelf
-dnardshelf
 simplelink
 singlenode
 trafgen
