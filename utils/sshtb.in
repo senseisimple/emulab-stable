@@ -96,4 +96,8 @@ if ($debug) {
 }
 system("$cmd");
 
+if ($debug) {
+    print "Exited with $CHILD_ERROR\n";
+}
+
 exit($CHILD_ERROR >> 8);
