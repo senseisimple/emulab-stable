@@ -306,11 +306,8 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
 	}
       }
     } else {
-      // XXX - should be made faster
-      if (!p->types[dit->first]->is_static) {
-	  // If it's not in the list then this fails quietly.
-	  (*dit).second->remove(p);
-      }
+      // If it's not in the list then this fails quietly.
+      (*dit).second->remove(p);
     }
 #ifdef SMART_UNMAP
     if (c->used_members.find((*dit).first) == c->used_members.end()) {
