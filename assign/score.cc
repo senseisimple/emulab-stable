@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "vclass.h"
 #include "virtual.h"
 #include "physical.h"
 #include "pclass.h"
@@ -143,9 +144,23 @@ void remove_node(node n)
   // pclass
   if (pnoder.my_class->used == 0) {
 #ifdef SCORE_DEBUG
-    cerr << "    freeing pclass\n";
+    cerr << "  freeing pclass\n";
 #endif
     SSUB(SCORE_PCLASS);
+  }
+
+  // vclass
+  if (vnoder.vclass != NULL) {
+    double score_delta = vnoder.vclass->unassign_node(vnoder.type);
+#ifdef SCORE_DEBUG
+    cerr << "  vclass unassign " << score_delta << endl;
+#endif
+    
+    if (score_delta <= -1) {
+      violated--;
+      vinfo.vclass--;
+    }
+    SSUB(-score_delta*SCORE_VCLASS);
   }
   
   edge e;
@@ -510,11 +525,24 @@ int add_node(node n,int ploc)
   // pclass
   if (pnoder.my_class->used == 0) {
 #ifdef SCORE_DEBUG
-    cerr << "    new pclass\n";
+    cerr << "  new pclass\n";
 #endif
     SADD(SCORE_PCLASS);
   }
-  
+
+  // vclass
+  if (vnoder.vclass != NULL) {
+    double score_delta = vnoder.vclass->assign_node(vnoder.type);
+#ifdef SCORE_DEBUG
+    cerr << "  vclass assign " << score_delta << endl;
+#endif
+    SADD(score_delta*SCORE_VCLASS);
+    if (score_delta >= 1) {
+      violated++;
+      vinfo.vclass++;
+    }
+  }
+
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  posistion = %d\n",vnoder.posistion);
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);

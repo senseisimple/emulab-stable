@@ -18,6 +18,7 @@
 
 #include "common.h"
 #include "physical.h"
+#include "vclass.h"
 #include "virtual.h"
 #include "pclass.h"
 
@@ -252,7 +253,7 @@ void pclass_debug()
     int n = type_table.inf(dit).first();
     pclass_array &A = *(type_table.inf(dit).second());
     for (int i = 0; i < n ; ++i) {
-      cout << " " << A[i];
+      cout << " " << A[i]->name;
     }
     cout << "\n";
   }

@@ -32,7 +32,8 @@ static float SCORE_OVER_BANDWIDTH = 0.5;/* Cost of going over bandwidth*/
 static float SCORE_DESIRE = 1;/* Multiplier for desire costs*/
 static float SCORE_FEATURE = 1;/* Multiplier for feature weights*/
 static float SCORE_PCLASS = 0.5; /* Cost of each pclass */
-
+static float SCORE_VCLASS = 1;	/* vclass score multiplier */
+				  
 static struct config_param options[] = {
   { "IT",	CONFIG_INT,	&init_temp,			0 },
   { "OP",	CONFIG_INT,	&USE_OPTIMAL,			0 },
@@ -51,6 +52,7 @@ static struct config_param options[] = {
   { "PN",	CONFIG_FLOAT,	&SCORE_PNODE,			0 },
   { "PP",	CONFIG_FLOAT,	&SCORE_PNODE_PENALTY,		0 },
   { "PC",	CONFIG_FLOAT,	&SCORE_PCLASS,		        0 },
+  { "VC",       CONFIG_FLOAT,   &SCORE_VCLASS,                  0 },
   { "SW",	CONFIG_FLOAT,	&SCORE_SWITCH,			0 },
   { "ON",	CONFIG_FLOAT,	&opt_nodes_per_sw,		0 },
   { "TR",	CONFIG_FLOAT,	&temp_rate,			0 }

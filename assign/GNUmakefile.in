@@ -14,7 +14,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 LEDA=@LEDA@
 
-OBJS=score.o parse_top.o parse_ptop.o config.o pclass.o
+OBJS=score.o parse_top.o parse_ptop.o config.o pclass.o vclass.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
 LDFLAGS+= -O3
 CXXFLAGS = -I${LEDA}/incl

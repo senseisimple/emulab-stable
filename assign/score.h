@@ -10,6 +10,7 @@ typedef struct {
   int link_users;
   int bandwidth;
   int desires;
+  int vclass;
 } violated_info;
 
 extern float score;

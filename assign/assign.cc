@@ -17,6 +17,7 @@
 
 #include "common.h"
 #include "physical.h"
+#include "vclass.h"
 #include "virtual.h"
 #include "score.h"
 #include "pclass.h"
@@ -72,7 +73,8 @@ float sensitivity = .1;
 
 int refreshed = 0;
 
-node_array<int> bestnodes, absnodes;
+node_array<int> absnodes;
+node_array<string> abstypes;
 float bestscore, absbest;
 
 extern node pnodes[MAX_PNODES];
@@ -229,6 +231,10 @@ int assign()
     }
     node pn = pname2node.access(fixed_nodes.inf(fixed_it));
     int ppos = pnode2posistion.access(&PG[pn]);
+    if (G[n].vclass != NULL) {
+      cerr << "Can not have fixed nodes be in a vclass!\n";
+      exit(1);
+    }
     if (add_node(vn,ppos) == 1) {
       cerr << "Fixed node: Could not map " << fixed_nodes.key(fixed_it)
 	   << " to " << fixed_nodes.inf(fixed_it) << ".\n";
@@ -251,14 +257,6 @@ int assign()
     absnodes[n3] = G[n3].posistion;
   }
 
-  //  if (bestscore < 0.11f) {
-  if (bestscore < optimal) {
-#ifdef VERBOSE
-    cout << "Problem started optimal\n";
-#endif
-    goto DONE;
-  }
-  
   while (temp >= temp_stop) {
 #ifdef VERBOSE
     cout << "Temperature:  " << temp << " AbsBest: " << absbest << " (" << absbestv << ")" << endl;
@@ -292,15 +290,19 @@ int assign()
       }
 
       tb_vnode &vn=G[n];
+
+      if (vn.vclass != NULL) {
+	vn.type = vn.vclass->choose_type();
+#ifdef SCORE_DEBUG
+	cerr << "vclass " << vn.vclass->name  << ": choose type = "
+	     << vn.type << " dominant = " << vn.vclass->dominant << endl;
+#endif
+      }
+      
       tt_entry tt = type_table.access(vn.type);
       int num_types = tt.first();
       pclass_array &acceptable_types = *(tt.second());
-      
-      ////
-      // We've now calculated the weights and the total weight.  We
-      // will loop through all the classes until we find an acceptable
-      // one.
-      ////
+
       // Loop will break eventually.
       tb_pnode *newpnode;
       int i = random()%num_types;
@@ -353,7 +355,6 @@ int assign()
       if ((newscore < optimal) || (violated < bestviolated) ||
 	  ((violated == bestviolated) && (newscore < bestscore)) ||
 	  accept(scorediff*((bestviolated - violated)/2), temp)) {
-	bestnodes[n] = G[n].posistion;
 	bestscore = newscore;
 	bestviolated = violated;
 	accepts++;
@@ -363,6 +364,7 @@ int assign()
 	  node n2;
 	  forall_nodes(n2, G) {
 	    absnodes[n2] = G[n2].posistion;
+	    abstypes[n2] = G[n2].type;
 	  }
 	  absbest = newscore;
 	  absbestv = violated;
@@ -389,9 +391,6 @@ int assign()
   cout << "Done.\n";
   
  DONE:
-  forall_nodes(n, G) {
-    bestnodes[n] = absnodes[n];
-  }
   bestscore = absbest;
 
   forall_nodes(n, G) {
@@ -401,6 +400,10 @@ int assign()
 	
   forall_nodes(n, G) {
     if (absnodes[n] != 0) {
+      if (G[n].vclass != NULL) {
+	G[n].type = abstypes[n];
+      }
+      assert(G[n].type == abstypes[n]);
       if (add_node(n,absnodes[n]) != 0) {
 	cerr << "Invalid assumption.  Tell calfeld that reseting to best configuration doesn't work" << endl;
       }
@@ -441,8 +444,8 @@ void loopassign()
   float totaltime;
 
   nodestorage.init(G, 0);
-  bestnodes.init(G, 0);
   absnodes.init(G, 0);
+  abstypes.init(G, "");
     
   nnodes = G.number_of_nodes();
   optimal = assign();
@@ -473,8 +476,8 @@ void chopgraph() {
 
 void batch()
 {
-  bestnodes.init(G, 0);
   absnodes.init(G, 0);
+  abstypes.init(G, "");
   chopgraph();
 }
 

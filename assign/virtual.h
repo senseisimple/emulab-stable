@@ -18,7 +18,8 @@ public:
   sortseq<string,double> desires; // contains weight of each desire
   int posistion;		// index into pnode array
   int no_connections;		// how many unfulfilled connections from this node
-  string type;
+  string type;			// the current type of the node
+  tb_vclass *vclass;		// the virtual class of the node, if any
   string name;			// string name of the node
   bool fixed;			// is this node fixed
 };
