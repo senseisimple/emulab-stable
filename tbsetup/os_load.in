@@ -533,9 +533,9 @@ sub dolisting()
 	
 	$query_result =
 	    DBQueryFatal("select distinct i.* from images as i ".
-			 "left join group_membership as p on ".
-			 " i.pid IS NULL or (p.pid=i.pid and p.gid=p.pid) ".
-			 "where p.uid='$me' order by i.pid,i.imageid");
+			 "left join group_membership as g on g.pid=i.pid ".
+			 "where g.uid='$me' or i.shared ".
+			 "order by i.pid,i.imageid");
     }
     else {
 	$query_result =
