@@ -8,15 +8,16 @@ use Getopt::Std;
 # testbed:reloading. Otherwise, put the right info into the database, and 
 # nfree will do it when the node gets freed.
 # 
-# usage: sched_reload [-f] <imageid> <node> [node ...]
+# usage: sched_reload [-f | -p] <imageid> <node> [node ...]
 #
 sub usage()
 {
-    print STDOUT "Usage: sched_reload [-f] <imageid> <node> [node ...]\n".
-	"Use the -f to force reload. Fail if node cannot be reserved.\n";
+    print STDOUT "Usage: sched_reload [-f | -p] <imageid> <node> [node ...]\n".
+	"Use the -f to force reload. Fail if node cannot be reserved.\n".
+	"Use the -p to pend reload for the reload daemon.\n";
     exit(-1);
 }
-my  $optlist = "f";
+my  $optlist = "fp";
 
 #
 # Configure variables
@@ -30,10 +31,12 @@ use lib "@prefix@/lib";
 use libdb;
 
 #
-# This stuff should not be hardwired in.
+# XXX This stuff should not be hardwired in. If you change these, be sure
+# to update the test in doreboot() in tmcd/tmcd.c.
 # 
 my $RELOADPID	= "emulab-ops";
 my $RELOADEID	= "reloading";
+my $PENDINGEID	= "reloadpending";
 
 my $osload      = "$TB/bin/os_load";
 my $nalloc      = "$TB/bin/nalloc";
@@ -41,6 +44,7 @@ my $name        = "";
 my $error       = 0;
 my $debug       = 0;
 my $force	= 0;
+my $pend	= 0;
 my @nodes       = ();
 my @row;
 
@@ -63,6 +67,12 @@ if (@ARGV < 2) {
 }
 if (defined($options{"f"})) {
     $force = $options{"f"};
+}
+if (defined($options{"p"})) {
+    $pend = $options{"p"};
+}
+if ($pend and $force) {
+    usage();
 }
 my $imageid   = shift;
 
@@ -114,11 +124,15 @@ foreach my $node (@nodes) {
    
     if ( ($sth->num_rows()) < 1) {
         print STDERR "Available.\nReserving and adding to list.\n";
-	#
-	# XXX If you change testbed/reloading, be sure to update the
-	#     test in doreboot() in tmcd/tmcd.c.
-	# 
-	my $cmd = "$nalloc $RELOADPID $RELOADEID $pc";
+	my $eid;
+	if ($pend) {
+	    $eid = $PENDINGEID;
+	}
+	else {
+	    $eid = $RELOADEID;
+	}
+	my $cmd = "$nalloc $RELOADPID $eid $pc";
+
         if ( system($cmd) != 0 ) {
 	    print STDERR "WARNING: Could not reserve $pc!\n";
 	} else {
@@ -146,6 +160,11 @@ foreach my $node (@nodes) {
     print STDERR "Scheduling reload of $imageid for $pc:\n";
     DBQueryFatal("replace into reloads ".
 		 "(node_id, image_id) values ('$pc', '$imageid')");
+}
+
+if ($pend) {
+    print STDOUT "Reload Scheduling Done!\n";
+    exit $error;
 }
 
 if (@load_list > 0) {
