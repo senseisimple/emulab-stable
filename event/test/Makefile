@@ -1,6 +1,6 @@
 # Makefile for building event system tests
 #
-# $Id: Makefile,v 1.1 2001-11-02 04:47:14 imurdock Exp $
+# $Id: Makefile,v 1.2 2001-11-02 05:42:02 imurdock Exp $
 
 CC		= gcc
 CFLAGS		= -g -I. -I../lib -Wall -DDEBUG
@@ -16,16 +16,24 @@ RM		= rm -f
 tests		= test-consume \
 	 	  test-produce \
 		  test-attr-consume \
-		  test-attr-produce
+		  test-attr-produce \
+		  test-queue \
+		  test-sched
 
 %: %.c
 	$(CC) $(LDFLAGS) -o $@ $(CFLAGS) $< $(LIBS) $(LIBS)
 
 default: $(tests)
 
-clean:
-	$(RM) $(tests) $(addsuffix .o,$(tests))
+test-queue: ../sched/queue.c
+	$(CC) $(LDFLAGS) -o $@ $(CFLAGS) -DTEST_EVENT_QUEUES -I../sched \
+	  $< $(LIBS) $(LIBS)
 
-distclean: clean
+test-sched: ../sched/sched.c
+	$(CC) $(LDFLAGS) -o $@ $(CFLAGS) -DTEST_SCHED -I../sched \
+	  $< ../sched/queue.o $(LIBS) $(LIBS)
 
 $(tests): ../lib/libevent.a
+
+clean:
+	$(RM) $(tests)
