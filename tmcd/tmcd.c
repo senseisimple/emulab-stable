@@ -82,6 +82,7 @@ static int dorouting(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dotrafgens(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int donseconfigs(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dostate(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int docreator(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -109,6 +110,7 @@ struct command {
 	{ "routing",	dorouting},
 	{ "trafgens",	dotrafgens},
 	{ "nseconfigs",	donseconfigs},
+	{ "creator",	docreator},
 	{ "state",	dostate},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
@@ -2308,6 +2310,58 @@ dostate(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 }
 
+/*
+ * Return creator of experiment. Total hack. Must kill this.
+ */
+static int
+docreator(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE], *bp, *sp;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "CREATOR: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid))
+		return 0;
+
+	/*
+	 * Now get the UID from the experiments table.
+	 */
+	res = mydb_query("select expt_head_uid from experiments "
+			 "where eid='%s' and pid='%s'",
+			 1, eid, pid);
+
+	if (!res) {
+		syslog(LOG_ERR, "CREATOR: %s: DB Error getting UID!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row = mysql_fetch_row(res);
+	sprintf(buf, "CREATOR=%s\n", row[0]);
+	mysql_free_result(res);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	syslog(LOG_INFO, "CREATOR: %s", buf);
+
+	return 0;
+}
 
 /*
  * DB stuff
