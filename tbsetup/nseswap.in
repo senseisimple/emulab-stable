@@ -1,0 +1,67 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Socket;
+    
+#
+# In an experiment with simulated nodes, if some instance of the
+# simulator (nse) on a physical node is unable to track real time, the
+# node requests that the experiment be re-mapped and run with a more
+# conservative co-location factor. This script implements the above
+# functionality.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: nseswap pid eid\n";
+ 
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
+my $TESTMODE = @TESTMODE@;
+
+# Locals
+my $pid;
+my $eid;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if (@ARGV != 2) {
+    usage();
+}
+
+$pid   = $ARGV[0];
+$eid   = $ARGV[1];
+
+# Nothing to do right now. Code will be added when rest of the
+# infrastructure is in place
+exit(0);
