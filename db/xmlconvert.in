@@ -307,7 +307,25 @@ sub readXML($$$$) {
     # is anything to update.
     #
     if ( (! $simparse) && scalar(keys(%experiments_table))) {
-	my @setlist = ();
+	my @setlist  = ();
+
+	my $describe_result =
+	    DBQueryFatal("describe experiments");
+
+	#
+	# Need to find the default values for slots that are not sent to
+	# us in the xml so that we can set them properly.
+	#
+	while (my $rowref = $describe_result->fetchrow_hashref()) {
+	    my $slot  = $rowref->{"Field"};
+	    my $value = $rowref->{"Default"};
+
+	    if (exists($experiment_fields{$slot}) &&
+		! exists($experiments_table{$slot})) {
+		$experiments_table{$slot} =
+		    (defined($value) ? $value : "NULL");
+	    }
+	}
 
 	foreach my $key (keys(%experiments_table)) {
 	    my $val = $experiments_table{$key};
@@ -318,7 +336,7 @@ sub readXML($$$$) {
 	    else {
 		# Sanity check the fields.
 		if (TBcheck_dbslot($val, "experiments", $key,
-				TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 		    push(@setlist, "$key='$val'");
 		}
 		else {
