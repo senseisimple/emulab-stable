@@ -60,8 +60,6 @@ $created   = $exprow[created];
 $expires   = $exprow[expires];
 $longname  = $exprow[name];
 $creator   = $exprow[creator_uid];
-$numpcs    = $exprow[numpcs];
-$numsharks = $exprow[numsharks];
 $status    = $exprow[status];
 $attempts  = $exprow[attempts];
 
@@ -101,16 +99,6 @@ echo "<tr>
 echo "<tr>
           <td>Expires: </td>
           <td class=\"left\">$expires</td>
-      </tr>\n";
-
-echo  "<tr>
-          <td>Estimated #PCs: </td>
-          <td class=\"left\">$numpcs</td>
-      </tr>\n";
-
-echo  "<tr>
-          <td>Estimated #Sharks: </td>
-          <td class=\"left\">$numsharks</td>
       </tr>\n";
 
 echo "<tr>

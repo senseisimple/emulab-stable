@@ -146,7 +146,8 @@ if ($retval && $retval != 1) {
     die("");
 }
 
-echo "<br><br><h2>
+echo "<br><br><h2>\n";
+
 #
 # Exit status 0 means cancelation was immediate.
 # Exit status 1 means the experiment was running, and will terminate later.

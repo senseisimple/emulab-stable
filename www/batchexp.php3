@@ -47,15 +47,62 @@ if (strlen($exp_id) > $TBDB_EIDLEN) {
 $exp_name = addslashes($exp_name);
 
 #
-# Must provide an NS file!
-# 
-$nonsfile = 0;
-if (!isset($exp_nsfile) ||
-    strcmp($exp_nsfile, "") == 0 ||
-    strcmp($exp_nsfile, "none") == 0) {
+# Not allowed to specify both a local and an upload!
+#
+$speclocal  = 0;
+$specupload = 0;
 
+if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
+    $speclocal = 1;
+}
+if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
+    strcmp($exp_nsfile, "none")) {
+    $specupload = 1;
+}
+
+if (!$speclocal && !$specupload) {
+    USERERROR("You must supply either NS file name (local or remote)", 1);
+}
+if ($speclocal && $specupload) {
+    USERERROR("You may not specify both an uploaded NS file and an ".
+	      "NS file that is located on the Emulab server", 1);
+}
+if (!$specupload && strcmp($exp_nsfile_name, "")) {
+    #
+    # Catch an invalid filename.
+    #
     USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
 	      "valid filename. Please go back and try again.", 1);
+}
+
+if ($speclocal) {
+    #
+    # No way to tell from here if this file actually exists, since
+    # the web server runs as user nobody. The startexp script checks
+    # for the file before going to ground, so the user will get immediate
+    # feedback if the filename is bogus.
+    #
+    # Do not allow anything outside of /users or /proj. I do not think there
+    # is a security worry, but good to enforce it anyway.
+    #
+    if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
+        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile)) {
+	USERERROR("You must specify a server resident in file in either ".
+                  "$TBUSER_DIR/ or $TBPROJ_DIR/", 1);
+    }
+    
+    $nsfile = $exp_localnsfile;
+}
+elseif ($specupload) {
+    #
+    # XXX
+    # Set the permissions on the NS file so that the scripts can get to it.
+    # It is owned by nobody, and most likely protected. This leaves the
+    # script open for a short time. A potential security hazard we should
+    # deal with at some point.
+    #
+    chmod($exp_nsfile, 0666);
+    $nsfile = $exp_nsfile;
 }
 
 #
@@ -122,19 +169,18 @@ fputs($fp, "EID:	$exp_id\n");
 fputs($fp, "PID:	$exp_pid\n");
 fputs($fp, "name:       $exp_name\n");
 fputs($fp, "expires:    $exp_expires\n");
-fputs($fp, "nsfile:	$exp_nsfile\n");
+fputs($fp, "nsfile:	$nsfile\n");
 fclose($fp);
 
 #
 # XXX
-# Set the permissions on the files so that the scripts can get to them.
-# It is owned by nobody, and most likely protected. This leaves the
-# script open for a short time. A potential security hazard we should
+# Set the permissions on the batch file so that the scripts can get to it.
+# It is owned by nobody, and most likely protected. This leaves the 
+# file open for a short time. A potential security hazard we should
 # deal with at some point, but since the files are on paper:/tmp, its
 # a minor problem. 
 #
 chmod($tmpfname, 0666);
-chmod($exp_nsfile, 0666);
 
 echo "<center><br>";
 echo "<h2>Starting batch experiment setup. Please wait a moment ...

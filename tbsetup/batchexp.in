@@ -20,8 +20,16 @@ my  $optlist = "";
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
+my $parser   = "/usr/testbed/libexec/ns2ir/parse.tcl";
 my $projroot = "/proj";
 my $dirname;
 
@@ -33,13 +41,9 @@ $| = 1;
 #
 # Untaint the path
 # 
-$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/libexec/ir".
-    ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-$TBIRLIB = "$TB/lib/ir";
-push(@INC,$TBIRLIB);
-require libir;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -66,12 +70,6 @@ else {
 }
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
-#
 # Parse the batchfile.
 #
 my $eid;
@@ -91,7 +89,6 @@ if (!defined($eid) || !defined($pid) || !defined($longname) ||
     fatal("Batchfile is incomplete!");
 }
 $nsfile = "$eid.ns";
-$irfile = "$eid.ir";
 
 #
 # Create a subdir in the batch directory to work in.
@@ -99,10 +96,10 @@ $irfile = "$eid.ir";
 $dirname = "$batchdir/$pid-$eid";
 
 mkdir($dirname, 0775) or
-    fatal("Could not mkdir $dirname");
+    fatal("Could not mkdir $dirname: $!");
 
 chdir($dirname) or
-    fatal("Could not chdir to $dirname");
+    fatal("Could not chdir to $dirname: $!");
 
 #
 # Copy in the batch file. Web script is responsible for removing the
@@ -118,8 +115,7 @@ if (system("/bin/cp", "$tempfile", "batchfile")) {
 # First off, get some user information. 
 #
 $query_result =
-    DBquery("SELECT uid,usr_name,usr_email from users ".
-	     "WHERE unix_uid='$EUID'");
+    DBQuery("SELECT uid from users WHERE unix_uid='$EUID'");
 
 if ($query_result->numrows < 1) {
     fatal("Go Away! You do not exist in the Emulab Database.");
@@ -127,14 +123,12 @@ if ($query_result->numrows < 1) {
 
 @row = $query_result->fetchrow_array();
 $uid        = $row[0];
-$user_name  = $row[1];
-$user_email = $row[2];
 
 #
 # Make sure UID is allowed to create experiments in this project.
 #
 $query_result =
-    DBquery("SELECT trust from proj_memb WHERE uid='$uid' and pid='$pid'");
+    DBQuery("SELECT trust from proj_memb WHERE uid='$uid' and pid='$pid'");
 
 if ($query_result->numrows == 0) {
     fatal("Go Away! You are not a member of project $pid!");
@@ -152,14 +146,16 @@ if ($trust ne "local_root" &&
 # The pid/eid pair has to be unique. LOCKING!
 # 
 $query_result =
-    DBquery("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
+    DBQueryFatal("SELECT * FROM experiments ".
+		 "WHERE eid='$eid' and pid='$pid'");
 
 if ($query_result->numrows) {
     fatal("Experiment $eid in project $pid already exists!");
 }
 
 $query_result =
-    DBquery("SELECT * FROM batch_experiments WHERE eid='$eid' and pid='$pid'");
+    DBQueryFatal("SELECT * FROM batch_experiments ".
+		 "WHERE eid='$eid' and pid='$pid'");
 
 if ($query_result->numrows) {
     fatal("Batch experiment $eid in project $pid already exists!");
@@ -172,43 +168,11 @@ if (system("/bin/cp", "$webnsfile", "$nsfile")) {
     fatal("Could not copy $webnsfile to $dirname/$nsfile");
 }
 
-#
-# Do a firstcut parse on the NS file, converting it to IR format. This
-# operates as a syntax check on the NS file, so we can kick back bad NS
-# files now instead of later. It also means we don't need the NS file after
-# this.
-#
-# XXX This is copied from tbprerun.
-#
-$tbcmdfile = "tbcmds";
-$id        = "$pid-$eid";
+# Run parse in impotent mode on the NS file.  This has no effect but
+# will display any errors.
 
-if (system("parse.tcl $id $nsfile $irfile") != 0) {
+if (system("$parser -n -a $nsfile") != 0) {
     fatal("NS Parse failed!");
-}
-if (system("extract_tb $nsfile $tbcmdfile") != 0) {
-    fatal("NS extract_tb pass failed!");
-}
-if (system("postparse $tbcmdfile $irfile") != 0) {
-    fatal("NS postparse pass failed!");
-}
-
-#
-# Figure out what resources are needed so the batch daemon can make an
-# informed decision about whether to even try.
-#
-$pcs    = 0;
-$sharks = 0;
-
-&ir_read($irfile);
-foreach my $foo (split("\n", &ir_get("/topology/nodes"))) {
-    ($node,$type) = split(' ', $foo);
-    if ($type eq "pc") {
-	$pcs++;
-    }
-    if ($type eq "sh") {
-	$sharks++;
-    }
 }
 
 #
@@ -220,11 +184,11 @@ $created = `date '+%Y:%m:%d %H:%M:%S'`;
 # Insert the record. We leave this to very last cause the batch daemon
 # is looking for batch experiments to run. Easy race avoidance.
 #
-DBquery("INSERT INTO batch_experiments ".
-        "(eid, pid, created, started, expires, ".
-	" name, creator_uid, numpcs, numsharks, status) ".
-        "VALUES ('$eid', '$pid', '$created', '$created', '$expires', ".
-	"'$longname', '$uid', $pcs, $sharks, 'new')");
+DBQueryFatal("INSERT INTO batch_experiments ".
+	     "(eid, pid, created, started, expires, ".
+	     " name, creator_uid, status) ".
+	     "VALUES ('$eid', '$pid', '$created', '$created', '$expires', ".
+	     "'$longname', '$uid', 'new')");
 
 exit 0;
 
@@ -275,18 +239,4 @@ sub parse_batchfile()
     }
     close(BATCH);
     return 1;
-}
-
-sub DBquery()
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB->query($query);
-
-    if (! $result) {
-	fatal("DB Error: $query");
-    }
-
-    return $result;
 }

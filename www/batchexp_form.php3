@@ -49,7 +49,7 @@ echo "<form enctype=\"multipart/form-data\"
 # Select Project
 #
 echo "<tr>
-          <td>*Select Project:</td>";
+          <td colspan=2>*Select Project:</td>";
 echo "    <td><select name=\"exp_pid\">";
                while ($row = mysql_fetch_array($query_result)) {
                   $project = $row[pid];
@@ -65,14 +65,14 @@ echo "    </td>
 # Note DB max length.
 #
 echo "<tr>
-          <td>*Name (no blanks):</td>
+          <td colspan=2>*Name (no blanks):</td>
           <td><input type=\"text\" name=\"exp_id\"
                      size=$TBDB_EIDLEN maxlength=$TBDB_EIDLEN>
               </td>
       </tr>\n";
 
 echo "<tr>
-          <td>*Long Name:</td>
+          <td colspan=2>*Long Name:</td>
           <td><input type=\"text\" name=\"exp_name\" size=\"40\">
               </td>
       </tr>\n";
@@ -82,13 +82,23 @@ echo "<tr>
 # NS file upload.
 # 
 echo "<tr>
-          <td>*Your NS file:<br>
-              &nbsp(20K max)</td>
-          <td><input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
+          <td rowspan>*Your NS file: &nbsp</td>
+
+          <td rowspan><center>Upload (20K max)<br>
+                                   <br>
+                                   Or<br>
+                                   <br>
+                              On Server (/proj or /users)
+                      </center></td>
+
+          <td rowspan>
+              <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
+              <br>
+              <br>
+              <input type=\"text\" name=\"exp_localnsfile\" size=\"40\">
               </td>
       </tr>\n";
-
 
 #
 # Expires, Starts, Ends. Also the hidden Created field.
@@ -104,7 +114,7 @@ if ($month > 12) {
 $rest = date("d H:i:s", $utime);
 
 echo "<tr>
-          <td>Expiration date:</td>
+          <td colspan=2>Expiration date:</td>
           <td><input type=\"text\" value=\"$year:$month:$rest\"
                      name=\"exp_expires\"></td>
      </tr>\n";
@@ -112,7 +122,7 @@ echo "<tr>
 ?>
 
 <tr>
-    <td align="center" colspan="2">
+    <td align="center" colspan="3">
         <b><input type="submit" value="Submit"></b></td>
 </tr>
 </form>

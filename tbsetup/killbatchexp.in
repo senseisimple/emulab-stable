@@ -19,6 +19,13 @@ my  $optlist = "";
 #
 my $TB       = "@prefix@";
 
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
 my $projroot = "/proj";
@@ -33,13 +40,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
-
-#
-# Testbed Support libraries
-# 
-push(@INC, "$TB/lib");
-require libtestbed;
-require libdb;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
