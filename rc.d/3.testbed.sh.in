@@ -56,3 +56,8 @@ if [ -x @prefix@/sbin/hmcd  ]; then
 	echo -n " hmcd"
 	@prefix@/sbin/hmcd
 fi
+
+if [ -x @prefix@/sbin/stated  ]; then
+	echo -n " stated"
+	@prefix@/sbin/stated
+fi
