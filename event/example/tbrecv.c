@@ -1,6 +1,6 @@
 /*
- * This is a sample client to run on a testbed node to capture all
- * testbed events for the node. Modify as needed of course.
+ * This is a sample client to run on a testbed node to capture TBEXAMPLE
+ * events for the node. Modify as needed of course.
  */
 
 #include <stdio.h>
@@ -72,7 +72,7 @@ main(int argc, char **argv)
 	    }
 
 	    if (! (he = gethostbyname(buf))) {
-		fatal("could not get IP address from hostname");
+		fatal("could not get IP address from hostname: %s", buf);
 	    }
 	    memcpy((char *)&myip, he->h_addr, he->h_length);
 	    strcpy(ipbuf, inet_ntoa(myip));
@@ -103,11 +103,11 @@ main(int argc, char **argv)
 	/*
 	 * Change this stuff as needed. 
 	 */
-	tuple->host	 = ipaddr;
+	tuple->host	 = ADDRESSTUPLE_ALL;
 	tuple->site      = ADDRESSTUPLE_ANY;
 	tuple->group     = ADDRESSTUPLE_ANY;
 	tuple->expt      = ADDRESSTUPLE_ANY;	/* pid/eid */
-	tuple->objtype   = ADDRESSTUPLE_ANY;
+	tuple->objtype   = "TBEXAMPLE";
 	tuple->objname   = ADDRESSTUPLE_ANY;
 	tuple->eventtype = ADDRESSTUPLE_ANY;
 
@@ -161,7 +161,9 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	event_notification_get_objname(handle, notification, buf[5], len);
 	event_notification_get_eventtype(handle, notification, buf[6], len);
 
-	info("Event: %lu %s %s %s %s %s %s %s\n", now.tv_sec,
+	info("Event: %lu:%d %s %s %s %s %s %s %s\n", now.tv_sec, now.tv_usec,
 	     buf[0], buf[1], buf[2], 
 	     buf[3], buf[4], buf[5], buf[6]);
+
+	exit(0);
 }

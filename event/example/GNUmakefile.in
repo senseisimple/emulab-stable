@@ -3,7 +3,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/example
 
-PROGRAMS	= example
+PROGRAMS	= tbrecv tbsend
 
 include $(OBJDIR)/Makeconf
 
@@ -16,7 +16,7 @@ CFLAGS	 += -O -g -static -Wall -pthread
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4mt`
 
-LDFLAGS  += -pthread -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -pthread -static -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
 LIBS     += -lcipher -lc_r
 
@@ -28,8 +28,11 @@ LIBS     += -lcipher -lc_r
 #LIBS     += `elvin-config --libs vin4mt`
 LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
 
-example:	example.o
-	$(CC) $(LDFLAGS) -static -o $@ example.o $(LIBS)
+tbrecv:		tbrecv.o
+	$(CC) $(LDFLAGS) -o $@ tbrecv.o $(LIBS)
+
+tbsend:		tbsend.o
+	$(CC) $(LDFLAGS) -o $@ tbsend.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
