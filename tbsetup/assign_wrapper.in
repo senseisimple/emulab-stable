@@ -493,6 +493,7 @@ foreach $lan (keys(%lans)) {
     $simnodes = 0;
     $realnodes = 0;
     $emulated = 0;
+    $trivial_ok = 0;
     foreach $member (@members) {
 	($node) = (split(":",$member))[0];
 	if ($nodes{$node} eq "shark-shelf") {
@@ -507,6 +508,9 @@ foreach $lan (keys(%lans)) {
 	    $nonsharks++;
 	    $realnodes++;
 	}
+    }
+    if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
+	$trivial_ok = 1;
     }
     if ($#members == 1) {
 	($nodeport0,$nodeport1) = @members;
@@ -592,6 +596,9 @@ foreach $lan (keys(%lans)) {
 	    if ($emulated) {
 		print TOPFILE " emulated";
 	    }
+	    if ($trivial_ok) {
+		print TOPFILE " trivial_ok";
+	    }
 	    print TOPFILE "\n";
 	}
     } elsif ($#members != 0) {
@@ -672,6 +679,9 @@ foreach $lan (keys(%lans)) {
 		    " $bandwidth 0 0";
 		if ($emulated) {
 		    print TOPFILE " emulated";
+		}
+		if ($trivial_ok) {
+		    print TOPFILE " trivial_ok";
 		}
 		print TOPFILE "\n";
 	    }
