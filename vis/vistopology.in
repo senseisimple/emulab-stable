@@ -123,11 +123,42 @@ if (! chdir("$expt_path/$tbdata")) {
 }
 
 #
-# Run the vis script and be done with it.
+# XXX Temp Hack! Find a top file. 
 #
-my $args = "$eid.top";
+my $topfile = "$eid.top";
+if (! -e $topfile) {
+    opendir(DIR, ".");
+    my @tops = grep { /^.*\.top/ && -f "$_" } readdir(DIR);
+    closedir DIR;
+
+    if (defined($tops[0])) {
+	$topfile = $tops[0];
+
+	# Must taint check!
+	if ($topfile =~ /^([-\@\w.\/]+)$/) {
+	    $topfile = $1;
+	}
+	else {
+	    die("*** $0:\n".
+		"    Bad data in topfile name: $topfile");
+	}
+    }
+    else {
+	die("*** $0:\n".
+	    "    No topfile to graph!\n");
+    }
+}
+
+#
+# Run the vis script and be done with it. We don't want stderr to go
+# out with the gif file, so just kill that off if redirecting. 
+#
+my $args = $topfile;
 if (defined($output)) {
     $args = "-o $output $args";
+}
+else {
+    $args = "$args 2> /dev/null";
 }
 
 if (system("$top2gif $args") != 0) {
