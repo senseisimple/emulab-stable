@@ -1,6 +1,5 @@
-##### Setting up the Utah Network Testbed software
-##### Robert Ricci
-##### Last updated June 5, 2001
+##### Setting up the Utah Network Testbed software on a boss node
+##### Last updated  January 18, 2001
 ##### Tested on FreeBSD 4.3
 
 ##### Step 0
@@ -33,11 +32,11 @@ tcl-8.2.3           Tool Command Language
 tcl-sql-20000114_1  TCL module for accessing MySQL databases
 ucd-snmp-4.2        An extendable SNMP implimentation
 
-Note on TCL: Do NOT install tcl83 - otcl, which is used by some testbed scripts,
-requires tcl82. When you install the tcl-sql package, it will be put in the library
-directory for the latest version of tcl you have installed, so if you have tcl83
-installed at the time, you will have tcl-sql support under 8.3.X, but not under
-8.2.X (which testbed scripts use)
+Note on TCL: Do NOT install tcl83 - otcl, which is used by some testbed
+scripts, requires tcl82. When you install the tcl-sql package, it will be put
+in the library directory for the latest version of tcl you have installed, so
+if you have tcl83 installed at the time, you will have tcl-sql support under
+8.3.X, but not under 8.2.X (which testbed scripts use)
 
 ##### Step 2 - LEDA
 
@@ -67,15 +66,11 @@ gmake boss-install
 gmake post-install
 
 The 'post-install' target needs to be done as root, because certain scripts
-needs to be setuid root.
+need to be setuid root.
 
 ##### Step 4 - Database Creation
 
-Create the database. Use a dump of an old database, or use the SQL commands in
-testbed/sql/database-create.sql to create an empty one with the right tables.
-(Sorry, no help on filling them in yet). You'll also need to create some special
-users. do with by running:
-mysql mysql < testbed/aql/users-create.sql
+See the file setup-db.txt in this directory 
 
 ##### Step 5 - Misc. Files and Services
 
@@ -125,12 +120,14 @@ inetd_flags="-wW -R 0"
 
 SSH - If possible, grab the old machine's SSH host keys (from
 /etc/ssh/ssh_host*) and HUP sshd. Also, get the root identity and known_hosts
-files from the old machine (/root/.ssh/{identity,identity.pub,known_hosts}) - Make
-sure to preserve file and directory permissions. You'll probably also want to add
+files from the old machine (/root/.ssh/{identity,identity.pub,known_hosts}) -
+Make sure to preserve file and directory permissions. You'll probably also want
+to add
 PermitRootLogin yes
 to /etc/ssh/sshd_config (and HUP sshd) so that you can log in as root remotely
 
-Grab the old /etc/master.passwd file, and run 'cd /etc && pwd_mkdb -p master.passwd'
+Grab the old /etc/master.passwd file, and run
+'cd /etc && pwd_mkdb -p master.passwd'
 Also grab the old /etc/groups file
 
 /etc/syslog.conf needs entries for some of our own services. Example:
@@ -142,8 +139,8 @@ Also grab the old /etc/groups file
 *.*                     /usr/testbed/log/tiplogs/capture.log
 !dhcpd
 *.*                     /usr/testbed/log/dhcpd.log
-All of these logs should be created before you HUP syslogd or reboot - All of them
-can be world-readable
+All of these logs should be created before you HUP syslogd or reboot - All of
+them can be world-readable
 
 DHCP - Need to install the dhcpd config file. The old (deprecated) location was
 /usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
@@ -236,8 +233,8 @@ and trees you'll want to make sure to copy over:
 /usr/site/
 
 ##### Last-minute synching
-Right before bringing the new boss node online (if copying from an old boss node),
-make sure to have copy over the latest versions of:
+Right before bringing the new boss node online (if copying from an old boss
+node), make sure to have copy over the latest versions of:
 * The database
 * The sup tree
 * The dhcpd.conf file
