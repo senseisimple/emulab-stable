@@ -1131,6 +1131,7 @@ sub ReadTranslationTable {
   my $mac="";
   my $switchport="";
 
+  print "FILLING %Interfaces\n" if $debug;
   $sth = $dbh->query("select * from interfaces;");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
@@ -1140,17 +1141,23 @@ sub ReadTranslationTable {
     $Table{$mac} = $name;
     print "Got $mac <==> $name\n" if $debug > 1;
   }
+
+  print "FILLING %Ports\n" if $debug;
   $sth = $dbh->query("select node_id1,card1,port1,node_id2,card2,port2 ".
 		     "from wires where node_id2 like 'cisco%';");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
+    print "Name='$name'\t" if $debug > 2;
     if (defined ($Dev{$_[3]}) ) { $_[3] = $Dev{$_[3]}; }
     else { 
       print STDERR "SNMPIT: Warning: Device '$_[3]' from database unknown\n";
       $_[3] = $Dev{"cisco"}; 
     }
+    print "Dev='$_[3]'\t" if $debug > 2;
     $switchport = join(":",($_[3],$_[4]));
+    print "switchport='$switchport'\t" if $debug > 2;
     if ($device eq "Cisco" ) { $switchport .=".$_[5]"; }
+    print "switchport='$switchport'\n" if $debug > 2;
     $PortTable{$name} = $switchport;
     $PortTable{$switchport} = $name;
     print "READ: '$name' <==> '$switchport'\n" if $debug > 1;
@@ -1453,7 +1460,7 @@ sub ParseArgs {
   while(@vlan != 0 && $n < @vlan) {
     $vlan[$n] = lc $vlan[$n];
     print "Checking node $vlan[$n]\n" if $debug;
-    if ($vlan[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $vlan[$n] = "$1-1:1"; }
+    if ($vlan[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $vlan[$n] = "$1-1:0"; }
     if (defined $Interfaces{$vlan[$n]}) { $vlan[$n]=$Interfaces{$vlan[$n]}; }
     # Allow people to specify addresses with colons or dots
     $vlan[$n] =~ s/[:\.]//g;
@@ -1506,7 +1513,7 @@ sub ReadIRFile {
     while(@v != 0 && $n < @v) {
       #Lowercase it all, but leave in : for tbpcx:y syntax
       $v[$n] = "\L$v[$n]\E";
-      if ($v[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $v[$n] = "$1-1:1"; }
+      if ($v[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $v[$n] = "$1-1:0"; }
       if ((!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)))
 	  && (defined $Interfaces{$v[$n]})) {
 	$v[$n] = $Interfaces{$v[$n]};
