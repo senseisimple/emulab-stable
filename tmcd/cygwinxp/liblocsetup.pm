@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -477,37 +477,12 @@ sub os_setup()
 #
 sub os_routing_enable_forward()
 {
-    my $cmd;
-
-    ###$cmd = "sysctl -w net.ipv4.conf.all.forwarding=1";
-    $cmd = "";
-    return $cmd;
+    return "";
 }
 
 sub os_routing_enable_gated($)
 {
-    my ($conffile) = @_;
-    my $cmd;
-
-    #
-    # XXX hack to avoid gated dying with TCP/616 already in use.
-    #
-    # Apparently the port is used by something contacting ops's
-    # portmapper (i.e., NFS mounts) and probably only happens when
-    # there are a bazillion NFS mounts (i.e., an experiment in the
-    # testbed project).
-    #
-    $cmd  = "for try in 1 2 3 4 5 6; do\n";
-    $cmd .= "\tif `cat /proc/net/tcp | ".
-	"grep -E -e '[0-9A-Z]{8}:0268 ' >/dev/null`; then\n";
-    $cmd .= "\t\techo 'gated GII port in use, sleeping...';\n";
-    $cmd .= "\t\tsleep 10;\n";
-    $cmd .= "\telse\n";
-    $cmd .= "\t\tbreak;\n";
-    $cmd .= "\tfi\n";
-    $cmd .= "    done\n";
-    $cmd .= "    $GATED -f $conffile";
-    return $cmd;
+    return "";
 }
 
 sub os_routing_add_manual($$$$$;$)
@@ -516,11 +491,11 @@ sub os_routing_add_manual($$$$$;$)
     my $cmd;
 
     if ($routetype eq "host") {
-	$cmd = "$ROUTE add -host $destip gw $gate";
+	$cmd = "$ROUTE add $destip $gate";
     } elsif ($routetype eq "net") {
-	$cmd = "$ROUTE add -net $destip netmask $destmask gw $gate";
+	$cmd = "$ROUTE add $destip mask $destmask $gate";
     } elsif ($routetype eq "default") {
-	$cmd = "$ROUTE add default gw $gate";
+	$cmd = "$ROUTE add 0.0.0.0 $gate";
     } else {
 	warning("Bad routing entry type: $routetype\n");
 	$cmd = "";
@@ -535,11 +510,11 @@ sub os_routing_del_manual($$$$$;$)
     my $cmd;
 
     if ($routetype eq "host") {
-	$cmd = "$ROUTE delete -host $destip";
+	$cmd = "$ROUTE delete $destip";
     } elsif ($routetype eq "net") {
-	$cmd = "$ROUTE delete -net $destip netmask $destmask gw $gate";
+	$cmd = "$ROUTE delete $destip";
     } elsif ($routetype eq "default") {
-	$cmd = "$ROUTE delete default";
+	$cmd = "$ROUTE delete 0.0.0.0";
     } else {
 	warning("Bad routing entry type: $routetype\n");
 	$cmd = "";
