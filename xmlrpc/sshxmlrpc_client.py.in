@@ -99,7 +99,9 @@ def do_method(server, method_and_args):
     for param in method_and_args:
         plist = string.split(param, "=", 1)
         if len(plist) != 2:
-            print "Parameters are of the form: param=value!"
+            print ("error: Parameter, '"
+                   + param
+                   + "', is not of the form: param=value!")
             return -1
         value = plist[1]
 
@@ -121,6 +123,11 @@ def do_method(server, method_and_args):
     try:
         response = apply(meth, meth_args)
         pass
+    except BadResponse, e:
+        print ("error: bad reponse from host, " + e.args[0]
+               + ", and handler: " + e.args[1])
+        print "error: " + e.args[2]
+        return -1
     except xmlrpclib.Fault, e:
         print e.faultString
         return -1
@@ -210,7 +217,9 @@ if admin:
 
 # Get a handle on the server,
 server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
-                        "/xmlrpc/" + module, path=path)
+                        "/xmlrpc/" + module,
+                        path=path,
+                        user_agent="sshxmlrpc_client-v0.1")
 
 if len(req_args):
     # Method and args are on the command line.
