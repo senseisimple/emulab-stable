@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -232,13 +232,6 @@ proc tb-set-node-tarfiles {node args} {
 	set args [lrange $args 2 end]
     }
     $node set tarfiles [join $tarfiles ";"]
-}
-proc tb-set-node-deltas {node args} {
-    if {$args == {}} {
-	perror "\[tb-set-node-deltas] No deltas given."
-	return
-    }
-    $node set deltas [join $args :]
 }
 proc tb-set-ip-routing {type} {
     var_import ::GLOBALS::default_ip_routing_type

@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -73,7 +73,6 @@ Node instproc init {s} {
     $self set cmdline ""
     $self set rpms ""
     $self set startup ""
-    $self set deltas ""
     $self set tarfiles ""
     $self set failureaction "fatal"
     $self set fixed ""
@@ -121,7 +120,6 @@ Node instproc updatedb {DB} {
     $self instvar cmdline
     $self instvar rpms
     $self instvar startup
-    $self instvar deltas
     $self instvar iplist
     $self instvar tarfiles
     $self instvar failureaction
@@ -167,7 +165,7 @@ Node instproc updatedb {DB} {
     # create one on the fly and set the type properly. 
     # 
     if {$issubnode && $fixed == ""} {
-	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" "" ]
+	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" ]
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list "host-$self" "hosts-$type" 1.0]
 	set fixed "host-$self"
     }
@@ -187,7 +185,7 @@ Node instproc updatedb {DB} {
     $self add_routes_to_DB $DB
 
     # Update the DB
-    $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "failureaction" "routertype" "fixed" ] [list $self $type $ipraw $osid $cmdline $rpms $deltas $startup $tarfiles $failureaction $default_ip_routing_type $fixed ]
+    $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "failureaction" "routertype" "fixed" ] [list $self $type $ipraw $osid $cmdline $rpms $startup $tarfiles $failureaction $default_ip_routing_type $fixed ]
 
     # Put in the desires, too
     foreach desire [lsort [array names desirelist]] {

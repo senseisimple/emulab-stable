@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,7 +19,6 @@ proc tb-set-lan-loss {lan rate} {}
 proc tb-set-node-rpms {node args} {}
 proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
-proc tb-set-node-deltas {node args} {}
 proc tb-set-node-tarfiles {node args} {}
 proc tb-set-node-lan-delay {node lan delay} {}
 proc tb-set-node-lan-bandwidth {node lan bw} {}
