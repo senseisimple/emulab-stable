@@ -16,10 +16,10 @@ use Socket;
 #
 sub usage()
 {
-    print("Usage: mkextrafs.pl [-f] <mountpoint>\n");
+    print("Usage: mkextrafs.pl [-f] [-s slice] <mountpoint>\n");
     exit(-1);
 }
-my  $optlist = "f";
+my  $optlist = "fs:";
 
 #
 # Yep, hardwired for now.  Should be options or queried via TMCC.
@@ -27,7 +27,6 @@ my  $optlist = "f";
 my $disk       = "ad0";
 my $slice      = "4";
 my $partition  = "e";
-
 my $forceit    = 0;
 
 sub mysystem($);
@@ -56,6 +55,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"f"})) {
     $forceit = 1;
 }
+if (defined($options{"s"})) {
+    $slice = $options{"s"};
+}
 if (@ARGV != 1) {
     usage();
 }
@@ -82,8 +84,14 @@ my $fsdevice   = "/dev/${slicedev}${partition}";
 # XXX override with forceit?  Would require unmounting and removing from fstab.
 #
 if (!system("egrep -q -s '^${fsdevice}' /etc/fstab")) {
+    if ($checkit) {
+	exit(-1);
+    }
     die("*** $0:\n".
 	"    There is already an entry in /etc/fstab for $fsdevice\n");
+}
+elsif ($checkit) {
+    exit(0);
 }
 
 #
@@ -95,12 +103,12 @@ if ($mounted =~ /^${fsdevice} on (\S*)/) {
 	"    $fsdevice is already mounted on $1\n");
 }
 
-my $slice4setup= `fdisk -s $disk | grep '^[ ]*${slice}:'`;
+my $slicesetup= `fdisk -s $disk | grep '^[ ]*${slice}:'`;
 my $sstart;
 my $ssize;
 my $stype;
 
-if ($slice4setup =~ /^[ ]*${slice}:\s*(\d*)\s*(\d*)\s*(0x\S\S)\s*/) {
+if ($slicesetup =~ /^[ ]*${slice}:\s*(\d*)\s*(\d*)\s*(0x\S\S)\s*/) {
     $sstart = $1;
     $ssize = $2;
     $stype = hex($3);
@@ -167,6 +175,7 @@ close(DL);
 mysystem("disklabel -R -r $slicedev $tmpfile");
 unlink($tmpfile);
 
+mysystem("cd /dev; ./MAKEDEV ${slicedev}c");
 mysystem("newfs -U -i 25000 $fsdevice");
 mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
