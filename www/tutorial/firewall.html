@@ -38,6 +38,12 @@ infrastructure or Internet hosts in general) must pass through the firewall
 node.  The firewall is setup as a filtering layer2 bridge using IPFW2
 on FreeBSD and can be configured in a number
 of ways to block or allow certain types of traffic.
+</p><p>
+When a firewalled experiment is swapped in, the firewall is setup and
+activated before any experiment nodes are allowed to setup.
+When a firewalled experiment is swapped out, extra precautions are taken
+to ensure that the nodes are decontaminated before the firewall is taken
+down.
 </p>
 <a NAME="Use"></a><h2>Use</h2>
 <p>
@@ -57,6 +63,7 @@ and should not be used.
 In the future, there may be additional types for different firewall
 implementations (e.g., Linux with ipchains).
 The "style" of the firewall is one of:
+<a NAME="Styles"></a>
 <ul>
 <li><code>open</code>: A completely open firewall allowing all traffic.
 This gives you a hook for setting up custom firewall rules (below).
