@@ -284,6 +284,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	      vlink->delay_info.bandwidth << endl);
       if (src_pnode->trivial_bw) {
 	int old_over_bw;
+	int old_bw = src_pnode->trivial_bw_used;
 	if (src_pnode->trivial_bw_used > src_pnode->trivial_bw) {
 	  old_over_bw = src_pnode->trivial_bw_used - src_pnode->trivial_bw;
 	} else {
@@ -300,10 +301,11 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	}
 
 	if (old_over_bw) {
-	  if (!new_over_bw) {
-	    violated--;
-	    vinfo.bandwidth--;
-	  }
+	  // Count how many multiples of the maximum bandwidth we're at
+	  int num_violations = (int)(floor((old_bw -1)/src_pnode->trivial_bw)
+	      - floor((src_pnode->trivial_bw_used -1) / src_pnode->trivial_bw));
+	  violated -= num_violations;
+	  vinfo.bandwidth -= num_violations;
 	  double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /
 	    src_pnode->trivial_bw;
 	  SSUB(SCORE_TRIVIAL_PENALTY * removed_bandwidth_percent);
@@ -601,6 +603,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	    << endl);
     if (src_pnode->trivial_bw) {
       int old_over_bw;
+      int old_bw = src_pnode->trivial_bw_used;
       if (src_pnode->trivial_bw_used > src_pnode->trivial_bw) {
 	old_over_bw = src_pnode->trivial_bw_used - src_pnode->trivial_bw;
       } else {
@@ -617,10 +620,13 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       }
 	
       if (new_over_bw) {
-	if (!old_over_bw) {
-	  violated++;
-	  vinfo.bandwidth++;
-	}
+	// Count how many multiples of the maximum bandwidth we're at
+	int num_violations =
+	  (int)(floor((src_pnode->trivial_bw_used -1) / src_pnode->trivial_bw)
+		- floor((old_bw -1)/src_pnode->trivial_bw));
+	violated += num_violations;
+	vinfo.bandwidth += num_violations;
+
 	double added_bandwidth_percent = (new_over_bw - old_over_bw) * 1.0 /
 	  src_pnode->trivial_bw;
 	SADD(SCORE_TRIVIAL_PENALTY * added_bandwidth_percent);
@@ -1375,37 +1381,44 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
 #endif
 
   if (plink->is_type != tb_plink::PLINK_LAN) {
-    tb_delay_info physical_delay;
-    physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
-    physical_delay.delay = plink->delay_info.delay;
-    physical_delay.loss = plink->delay_info.loss;
-    
-    double distance = vlink->delay_info.distance(physical_delay);
 
     // Handle being over bandwidth
-    int old_bw_used = plink->bw_used;
+    // NOTE - this will have to change substantially when we can handle
+    // asymmetric bandwidths on links.
+    int old_over_bw;
+    int old_bw = plink->bw_used;
+    if (plink->bw_used > plink->delay_info.bandwidth) {
+      old_over_bw = plink->bw_used - plink->delay_info.bandwidth;
+    } else {
+      old_over_bw = 0;
+    }
+
     plink->bw_used += vlink->delay_info.bandwidth;
-    int max_bw = plink->delay_info.bandwidth;
-    if ((old_bw_used <= max_bw) && (plink->bw_used > max_bw)) {
-      violated++;
-      vinfo.bandwidth++;
+
+    int new_over_bw;
+    if (plink->bw_used > plink->delay_info.bandwidth) {
+      new_over_bw = plink->bw_used - plink->delay_info.bandwidth;
+    } else {
+      new_over_bw = 0;
     }
-    if (plink->bw_used > max_bw) {
-      SADD(SCORE_OUTSIDE_DELAY * (plink->bw_used - MAX(old_bw_used,max_bw)) * 1.0 / max_bw);
+    
+    if (new_over_bw) {
+      // Count how many multiples of the maximum bandwidth we're at
+      int num_violations =
+	(int)(floor((plink->bw_used -1) / plink->delay_info.bandwidth)
+	      - floor((old_bw -1)/plink->delay_info.bandwidth));
+      violated += num_violations;
+      vinfo.bandwidth += num_violations;
+
+      double added_bandwidth_percent = (new_over_bw - old_over_bw) * 1.0 /
+	plink->delay_info.bandwidth;
+      SADD(SCORE_OUTSIDE_DELAY * added_bandwidth_percent);
     }
+
 #ifdef PENALIZE_BANDWIDTH
     SADD(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
 #endif
 
-    if (distance == -1) {
-      // violation
-      SDEBUG(cerr << "    outside delay requirements." << endl);
-      violated++;
-      vinfo.delay++;
-      SADD(SCORE_OUTSIDE_DELAY);
-    } else {
-      SADD(distance * SCORE_DELAY);
-    }
   }
 }
 
@@ -1520,32 +1533,33 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
     SSUB(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
 #endif
 
-    tb_delay_info physical_delay;
-    physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
-    physical_delay.delay = plink->delay_info.delay;
-    physical_delay.loss = plink->delay_info.loss;
-    double distance = vlink->delay_info.distance(physical_delay);
-    
     // Handle being over bandwidth
-    int old_bw_used = plink->bw_used;
-    plink->bw_used -= vlink->delay_info.bandwidth;
-    int max_bw = plink->delay_info.bandwidth;
-    if ((old_bw_used > max_bw) && (plink->bw_used <= max_bw)) {
-      violated--;
-      vinfo.bandwidth--;
-    }
-    if (old_bw_used > max_bw) {
-      SSUB(SCORE_OUTSIDE_DELAY * (old_bw_used - MAX(plink->bw_used,max_bw)) * 1.0 / max_bw);
+    int old_over_bw;
+    int old_bw = plink->bw_used;
+    if (plink->bw_used > plink->delay_info.bandwidth) {
+      old_over_bw = plink->bw_used - plink->delay_info.bandwidth;
+    } else {
+      old_over_bw = 0;
     }
 
-    if (distance == -1) {
-      // violation
-      SDEBUG(cerr << "    removing delay violation." << endl);
-      violated--;
-      vinfo.delay--;
-      SSUB(SCORE_OUTSIDE_DELAY);
+    plink->bw_used -= vlink->delay_info.bandwidth;
+
+    int new_over_bw;
+    if (plink->bw_used > plink->delay_info.bandwidth) {
+      new_over_bw = plink->bw_used - plink->delay_info.bandwidth;
     } else {
-      SSUB(distance * SCORE_DELAY);
+      new_over_bw = 0;
+    }
+
+    if (old_over_bw) {
+      // Count how many multiples of the maximum bandwidth we're at
+      int num_violations = (int)(floor((old_bw -1)/plink->delay_info.bandwidth)
+	  - floor((plink->bw_used -1) / plink->delay_info.bandwidth));
+      violated -= num_violations;
+      vinfo.bandwidth -= num_violations;
+      double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /
+	plink->delay_info.bandwidth;
+      SSUB(SCORE_OUTSIDE_DELAY * removed_bandwidth_percent);
     }
   }
 
