@@ -1,3 +1,60 @@
+newbold     2003/10/10 08:44:15 MDT
+
+  Modified files:
+    db                   libdb.pm.in 
+    event/stated         StateWait.pm stated.in waitForState.in 
+    tbsetup              node_reboot.in os_load.in os_setup.in 
+                         tbrestart.in 
+  Log:
+  New StateWait changes - the main point of all this is to move to our new
+  model of waiting for state changes. Before we were watching the database
+  (which means we can only watch for terminal/stable/long-lived states, and
+  have to poll the db). Now things that are waiting for states to change
+  become event listeners, and watch the stream of events flow by, and don't
+  have to do any polling. They can now watch for any state, and even
+  sequences of states (ie a Shutdown followed by an Isup).
+  
+  To do this, there is now a cool StateWait.pm library that encapsulates the
+  functionality needed. To use it, you call initStateWait before you start
+  the chain of events (ie before you call node reboot). Then do your stuff,
+  and call waitForState() when you're ready to wait. It can be told to
+  return periodically with the results so far, and you can cancel waiting
+  for things. An example program called waitForState is in
+  testbed/event/stated/ , and can also be used nicely as a command line tool
+  that wraps up the library functionality.
+  
+  This also required the introduction of a TBFAILED event that can be sent
+  when a node isn't going to make it to the state that someone may be
+  waiting for. Ie if it gets wedged coming up, and stated retries, but
+  eventually gives up on it, it sends this to let things know that the node
+  is hozed and won't ever come up.
+  
+  Another thing that is part of this is that node_reboot moves (back) to the
+  fully-event-driven model, where users call node reboot, and it does some
+  checks and sends some events. Then stated calls node_reboot in "real mode"
+  to actually do the work, and handles doing the appropriate retries until
+  the node either comes up or is deemed "failed" and stated gives up on it.
+  This means stated is also the gatekeeper of when you can and cannot reboot
+  a node. (See mail archives for extensive discussions of the details.)
+
+  A big part of the motivation for this was to get uninformed timeouts and
+  retries out of os_load/os_setup and put them in stated where we can make a
+  wiser choice. So os_load and os_setup now use this new stuff and don't
+  have to worry about timing out on nodes and rebooting. Stated makes sure
+  that they either come up, get retried, or fail to boot. tbrestart also
+  underwent a similar change.
+  
+  Revision  Changes    Path
+  1.135     +159 -208  testbed/db/libdb.pm.in
+  1.5       +37 -14    testbed/event/stated/StateWait.pm
+  1.52      +41 -18    testbed/event/stated/stated.in
+  1.4       +4 -3      testbed/event/stated/waitForState.in
+  1.43      +42 -11    testbed/tbsetup/node_reboot.in
+  1.54      +22 -97    testbed/tbsetup/os_load.in
+  1.81      +212 -157  testbed/tbsetup/os_setup.in
+  1.5       +63 -19    testbed/tbsetup/tbrestart.in
+
+
 stoller     2003/10/09 14:03:10 MDT
 
   Modified files:
