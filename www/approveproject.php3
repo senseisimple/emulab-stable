@@ -226,6 +226,11 @@ elseif (strcmp($approval, "approve") == 0) {
          "From: $TBMAIL_CONTROL\n".
          "Cc: $TBMAIL_CONTROL\n".
          "Errors-To: $TBMAIL_WWW");
+
+    #
+    # Create the project directory. If it fails, we will find out about it.
+    #
+    SUEXEC($uid, "flux", "mkprojdir_wrapper $pid", 0);
 	
     echo "<h3><p>
               Project $pid (User: $headuid) has been approved.
