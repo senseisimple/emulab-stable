@@ -382,6 +382,9 @@ sub step_init {
     prints "Setting up test database.\n";
     prints "  Dumping Current ";
     tbexec("mysqldump $TBDB","$path/dbdump.txt");
+    # Now add a line to the dumped database that sets flest as an admin
+    tbexec("echo \"update users set admin=1 where uid='flest';\"".
+	   " >> $path/dbdump.txt");
     
     prints "  Creating DB ";
     system("echo \"drop database if exists $testdb\" | mysql");
