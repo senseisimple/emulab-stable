@@ -50,9 +50,10 @@ struct diskinfo {
 } diskinfo;
 
 char optionstr[] =
-"[-hvW] [disk]\n"
+"[-fhvW] [disk]\n"
 "	-h print usage message\n"
 "	-v verbose output\n"
+"	-f output fdisk style partition entry (slice type=FreeBSD)\n"
 "	-W actually change the partition table\n"
 "	   (default is to just show what would be done)\n"
 "	[disk] is the disk special file to operate on\n"
@@ -66,7 +67,7 @@ int tweakdiskinfo(char *disk);
 int showdiskinfo(char *disk);
 
 char *progname;
-int list = 1, verbose;
+int list = 1, verbose, fdisk;
 
 main(int argc, char *argv[])
 {
@@ -74,10 +75,13 @@ main(int argc, char *argv[])
 	char *disk = "/dev/ad0";
 
 	progname = argv[0];
-	while ((ch = getopt(argc, argv, "vhW")) != -1)
+	while ((ch = getopt(argc, argv, "fvhW")) != -1)
 		switch(ch) {
 		case 'v':
 			verbose++;
+			break;
+		case 'f':
+			fdisk++;
 			break;
 		case 'W':
 			list = 0;
@@ -93,7 +97,7 @@ main(int argc, char *argv[])
 		disk = argv[0];
 
 	getdiskinfo(disk);
-	exit(list ? showdiskinfo(disk) : setdiskinfo(disk));
+	exit((list || fdisk) ? showdiskinfo(disk) : setdiskinfo(disk));
 }
 
 void
@@ -192,6 +196,13 @@ tweakdiskinfo(char *disk)
 		return 0;
 
 	dp = &diskinfo.parts[last+1];
+	if (fdisk) {
+		printf("p %d %d %d %d\n",
+		       last+2, DOSPTYP_386BSD,
+		       dp->dp_start ? dp->dp_size : firstfree,
+		       diskinfo.disksize-firstfree);
+		return 1;
+	}
 	if (verbose || list) {
 		if (dp->dp_start)
 			printf("%s: %s size of partition %d "
@@ -217,14 +228,18 @@ showdiskinfo(char *disk)
 	int i;
 	struct dos_partition *dp;
 
-	printf("%s: %lu sectors (%dx%dx%d CHS)\n", disk,
-	       diskinfo.disksize, diskinfo.cpu, diskinfo.tpc, diskinfo.spt);
-	for (i = 0; i < NDOSPART; i++) {
-		dp = &diskinfo.parts[i];
-		printf("  %d: start=%9lu, size=%9lu, type=0x%02x\n", i+1,
-		       dp->dp_start, dp->dp_size, dp->dp_typ);
+	if (!fdisk) {
+		printf("%s: %lu sectors (%dx%dx%d CHS)\n", disk,
+		       diskinfo.disksize,
+		       diskinfo.cpu, diskinfo.tpc, diskinfo.spt);
+		for (i = 0; i < NDOSPART; i++) {
+			dp = &diskinfo.parts[i];
+			printf("  %d: start=%9lu, size=%9lu, type=0x%02x\n",
+			       i+1, dp->dp_start, dp->dp_size, dp->dp_typ);
+		}
 	}
-	tweakdiskinfo(disk);
+	if (!tweakdiskinfo(disk))
+		return 1;
 	return 0;
 }
 
