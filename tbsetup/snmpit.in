@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -531,7 +531,7 @@ foreach my $command (@commands) {
     # If we were given ports, make sure that the stack(s) that got created
     # cover all of them
     #
-    if (@ports) {
+    if (@ports && !$ELABINELAB) {
 	my %devicemap = mapPortsToDevices(@ports);
 	my @devices = keys %devicemap;
 	foreach my $device (@devices) {
