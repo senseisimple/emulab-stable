@@ -861,6 +861,7 @@ sub getfwconfig($$)
     my $fwpat  = q(TYPE=([\w-]+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*) IN_VLAN=(\d+) OUT_VLAN=(\d+));
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
 
+    $fwinfo->{"TYPE"} = "none";
     foreach my $line (@tmccresults) {
 	if ($line =~ /TYPE=([\w-]+)/) {
 	    my $type = $1;
