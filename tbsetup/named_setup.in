@@ -150,8 +150,8 @@ my $db_result =
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on n.node_id=i.node_id and ".
 		 "     nt.control_net=i.card ".
-		 "where nt.isvirtnode=0 and n.role='testnode' and ".
-		 "      i.IP is not null ".
+		 "where nt.isvirtnode=0 and nt.issubnode=0 and ".
+		 "      n.role='testnode' and i.IP is not null ".
 		 "order by nt.type,n.node_id");
 
 my %reverse;
@@ -201,7 +201,9 @@ print MAP "\$TTL\t1\n\n";
 $db_result =
     DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid,n.jailip ".
 		 " from reserved as r ".
-		 "left join nodes as n on n.node_id=r.node_id");
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "left join node_types as nt on nt.type=n.type ".
+		 "where nt.issubnode=0");
 
 if ($db_result->numrows > 0) {
     #
@@ -288,7 +290,7 @@ $db_result =
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join node_types as nt on nt.type=n.type ".
 		 "where nt.isvirtnode=1 and nt.isremotenode=0 and ".
-		 "      n.jailip is not null");
+		 "      nt.issubnode=0 and n.jailip is not null");
 
 if ($db_result->numrows > 0) {
     #
@@ -299,6 +301,49 @@ if ($db_result->numrows > 0) {
 	my $pid     = $row{"pid"};
 	my $eid     = $row{"eid"};
 	my $IP      = $row{"jailip"};
+	my $vname   = $node_id;
+
+	if (defined($row{"vname"})) {
+	    $vname = $row{"vname"};
+	}
+
+	# Spit an A record for the node.
+	print MAP "$node_id\tIN\tA\t$IP\n";
+
+	# Then a CNAME.
+	my $cname = sprintf("%-40s", "$vname.$eid.$pid");
+	printf MAP "$cname IN\tCNAME\t$node_id\n";
+    }
+}
+
+#
+# Other unroutable addresses.
+# 
+print MAP
+    ";\n".
+    "; Other unroutable IPs (allocated subnodes only).\n" .
+    ";\n";
+    
+$db_result =
+    DBQueryFatal("select r.node_id,r.pid,r.eid,r.vname,i.IP ".
+		 "  from reserved as r ".
+		 "left join nodes as n on r.node_id=n.node_id ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join interfaces as i on n.node_id=i.node_id and ".
+		 "     nt.control_net=i.card ".
+		 "where nt.issubnode=1 and ".
+		 "      n.role='testnode' and i.IP is not null ".
+		 "order by nt.type,n.node_id");
+
+if ($db_result->numrows > 0) {
+    #
+    # Create a CNAME for each reserved node.
+    #
+    while (my %row = $db_result->fetchhash) {
+	my $node_id = $row{"node_id"};
+	my $pid     = $row{"pid"};
+	my $eid     = $row{"eid"};
+	my $IP      = $row{"IP"};
 	my $vname   = $node_id;
 
 	if (defined($row{"vname"})) {
