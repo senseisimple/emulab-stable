@@ -15,6 +15,10 @@ include $(OBJDIR)/Makeconf
 
 PROGS = vmc-client vmcd
 
+ifeq ($(HAVE_MEZZANINE),yes)
+PROGS += file_dumper
+endif
+
 TESTS =
 
 ifeq ($(HAVE_MEZZANINE),no)
@@ -53,6 +57,9 @@ vmc-client: vmc-client.o
 
 vmcd: vmcd.o visionTrack.o robotObject.o ../mtp/libmtp.a
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ vmcd.o visionTrack.o robotObject.o $(LIBS)
+
+file_dumper: file_dumper.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
 install: all
 ifeq ($(HAVE_MEZZANINE),yes)
