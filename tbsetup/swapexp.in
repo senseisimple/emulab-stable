@@ -541,7 +541,6 @@ my $message =
     "Experiment $eid in project $pid has been ";
 
 if ($idleswap || $autoswap || $force) {
-    $link="";
     $message .= "forcibly swapped out by\nTestbed Operations";
     if ($idleswap) {
 	$message .= " because it was idle for too long (Idle-Swap).\n".
