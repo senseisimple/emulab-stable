@@ -745,6 +745,12 @@ elsif (@vnodelist) {
 	    next;
 	}
 	if ($plabvnodes{$node}) {
+	    #
+	    # We move the pnode into hwdown so that it will not be considered
+	    # again, until the plab monitor daemon determines that it is
+	    # really working again. 
+	    #
+	    MarkPhysNodeDown($pnode);
 	    $failedplab++;
 	}
 	else {

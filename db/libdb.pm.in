@@ -25,6 +25,8 @@ use Exporter;
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT
 
+	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
+
 	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust
 
 	 TB_NODEACCESS_READINFO TB_NODEACCESS_MODIFYINFO
@@ -147,7 +149,7 @@ use Exporter;
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
-	 TBNodeAllocCheck TBPlabNodeUsername
+	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState 
 	 TBExptRestoreVirtualState
@@ -264,11 +266,15 @@ sub TBDB_EXPT_WORKDIR()		{ "/usr/testbed/expwork"; }
 # that look like constants cause you do not need to call a perl subroutine
 # with parens. That is, FOO and FOO() are the same thing.
 #
-sub NODERELOADING_PID()		{ "emulab-ops"; }
+sub NODERELOADING_PID()		{ $TBOPSPID; }
 sub NODERELOADING_EID()		{ "reloading"; }
 sub NODERELOADPENDING_EID()	{ "reloadpending"; }
-sub NODEDEAD_PID()		{ "emulab-ops"; }
+sub NODEDEAD_PID()		{ $TBOPSPID; }
 sub NODEDEAD_EID()		{ "hwdown"; }
+sub PLABMOND_PID()		{ $TBOPSPID; }
+sub PLABMOND_EID()		{ "plab-monitor"; }
+sub PLABHOLDING_PID()		{ $TBOPSPID; }
+sub PLABHOLDING_EID()		{ "plabnodes"; }
 
 sub NODEBOOTSTATUS_OKAY()	{ "okay" ; }
 sub NODEBOOTSTATUS_FAILED()	{ "failed"; }
@@ -2342,6 +2348,29 @@ sub TBPlabNodeUsername($$)
 	return 1;
     }
     return 0;
+}
+
+#
+# Mark a Phys node as down. Cannot use next reserve since the pnode is not
+# going to go through the free path.
+#
+# usage: MarkPhysNodeDown(char *nodeid)
+#
+sub MarkPhysNodeDown($)
+{
+    my($pnode) = $_[0];
+    my($pid, $eid);
+
+    $pid = NODEDEAD_PID;
+    $eid = NODEDEAD_EID;
+
+    DBQueryFatal("lock tables reserved write");
+
+    DBQueryFatal("update reserved set " .
+		 "  pid='$pid',eid='$eid' ".
+		 "where node_id='$pnode'");
+
+    DBQueryFatal("unlock tables");
 }
 
 #
