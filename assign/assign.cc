@@ -20,8 +20,8 @@ topology *topo = NULL;
 #define PARTITION_BY_ANNEALING 0
 
 int nparts = 3;     /* DEFAULTS */
-int nodecap   = 4;
 int intercap = 2;
+int *nodecap = NULL;
 int better_heuristic = 0;
 int accepts = 0;
 int nnodes = 0;
@@ -73,17 +73,26 @@ float score()
 
 	float sc = 0;
 
-	/* Then rank our score by them */
-
 	for (int i = 0; i < nparts; i++) {
+		/* Have we violated bandwidth between switches? */
 		if (interlinks[i] > intercap) {
 			sc += (interlinks[i]-intercap);
 		}
-		if (numnodes[i] > nodecap) {
-			sc += (numnodes[i] - nodecap);
+		/* Do we have too many nodes per switch? */
+		if (numnodes[i] > nodecap[i]) {
+			sc += (numnodes[i] - nodecap[i]);
+		}
+		/* Try to minimize the number of switches used */
+		/* This is likely NOT an effective way to do it! */
+		if (numnodes[i] > 0) {
+			sc += .1;
+		}
+		/* Try to minimize the bandwidth used... also probably
+		   not effective */
+		if (interlinks[i] > 0) {
+			sc += .1 * interlinks[i];
 		}
 	}
-
 	return sc;
 }
 
@@ -246,7 +255,7 @@ int assign()
 	     << iters << " iters and " << timeend << " seconds" << endl;
 	cout << "With " << accepts << " accepts of increases\n";
 	for (int i = 0; i < nparts; i++) {
-		if (numnodes[i] > nodecap) {
+		if (numnodes[i] > nodecap[i]) {
 			cout << "node " << i << " has "
 			     << numnodes[i] << " nodes" << endl;
 		}
@@ -276,78 +285,7 @@ void loopassign()
 	absnodes.init(G, 0);
     
 	nnodes = G.number_of_nodes();
-    
-	int reqnodes = (int) ceilf((float)nnodes / (float)nodecap);
-	cout << "Reqnodes:  " << reqnodes;
-
-	orig_nparts = nparts;
-	orig_cap    = intercap;
-    
-	if (nnodes < 1) return;
-	/* XXX:  Should make this a binary search instead */
-	/* Maybe.  It probably won't matter much */
 	optimal = assign();
-	if (!optimal) return;
-	nparts--;
-	while (optimal && nparts >= reqnodes) {
-		node tmpnode;
-		forall_nodes(tmpnode, G) {
-			nodestorage[tmpnode] = G[tmpnode].partition();
-			G[tmpnode].partition(0);
-		}
-		bestnodes.init(G, 0);
-		absnodes.init(G, 0);
-		optimal = assign();
-		if (!optimal) { break; }
-		if (optimal) {
-			cout << "Found new optimal with " << nparts
-			     << " switches\n";
-		}
-		nparts--;
-	}
-	nparts++;
-	if (!optimal) {
-		node tmpnode;
-		forall_nodes(tmpnode, G) {
-			G[tmpnode].partition(nodestorage[tmpnode]);
-		}
-	}
-
-	optimal = 1;
-	/* And now search for the minimum link capacity */
-	intercap--;
-	while (optimal && intercap > 0) {
-		node tmpnode;
-		forall_nodes(tmpnode, G) {
-			nodestorage[tmpnode] = G[tmpnode].partition();
-			G[tmpnode].partition(0);
-		}
-		bestnodes.init(G, 0);
-		absnodes.init(G, 0);
-		cout << "Searching with " << nparts << " switches and "
-		     << intercap << " edge capacity" << endl;
-		optimal = assign();
-		if (optimal) {
-			cout << "Found new optimal with "
-			     << nparts << " switches\n";
-		} else {
-			break;
-		}
-		intercap--;
-	}
-	intercap++;
-	if (!optimal) {
-		node tmpnode;
-		forall_nodes(tmpnode, G) {
-			G[tmpnode].partition(nodestorage[tmpnode]);
-		}
-		cout << "Reverting to optimal solution, "
-		     << nparts << " switches "
-		     << intercap << " capacity" << endl;
-		intercap++;
-	}
-	nparts = orig_nparts;
-	intercap = orig_cap;
 	totaltime = used_time(timestart);
 	cout << "Total time to find solution "
 	     << totaltime << " seconds" << endl;
@@ -484,7 +422,6 @@ int main(int argc, char **argv)
 	while ((ch = getopt(argc, argv, "oas:n:c:t:h")) != -1)
 		switch(ch) {
 		case 'h': usage(); exit(0);
-		case 'n': nodecap = atoi(optarg); break;
 		case 's': nparts = atoi(optarg); break;
 		case 'c': intercap = atoi(optarg); break;
 		case 'a': partition_mechanism = PARTITION_BY_ANNEALING; break;
@@ -527,6 +464,9 @@ int main(int argc, char **argv)
 		gw.update_graph();
 		node n;
 		forall_nodes(n, G) {
+			if (G[n].name() == NULL) {
+				G[n].name("");
+			}
 			gw.set_label(n, G[n].name());
 			gw.set_position(n,
 					point(random() % 200, random() % 200));
@@ -534,6 +474,7 @@ int main(int argc, char **argv)
 	}
 
 	if (topofile != NULL) {
+		cout << "Parsing phys\n";
 		topo = parse_phys(topofile);
 		if (!topo) {
 			cerr << "Could not read in topofile "
@@ -541,6 +482,11 @@ int main(int argc, char **argv)
 			exit(-1);
 		}
 		nparts = topo->switchcount;
+		cout << "Nparts: " << nparts << endl;
+		nodecap = new int[nparts];
+		for (int i = 0; i < nparts; i++) {
+			nodecap[i] = topo->switches[i]->numnodes();
+		}
 	}
     
 	gw.display();
