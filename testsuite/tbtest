@@ -409,8 +409,8 @@ sub step_init {
     prints "  Dumping Current ";
     tbexec("mysqldump -e -a $TBDB","$path/dbdump.txt");
     # Now add a line to the dumped database that sets flest as an admin
-    prints "  Setting up flest admin account ";
-    tbexec("echo \"update users set admin=1 where uid='flest';\"".
+    prints "  Setting up admin account for $user in test database ";
+    tbexec("echo \"update users set admin=1 where uid='$user';\"".
 	   " >> $path/dbdump.txt", "dbdump.log");
     
     prints "  Creating DB ";
