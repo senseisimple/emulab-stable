@@ -234,6 +234,9 @@ REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NORMALv2','SHUTDOWN'
 REPLACE INTO mode_transitions VALUES ('NORMALv2','SHUTDOWN','NORMAL','REBOOTING','');
 REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NORMALv2','SHUTDOWN','');
 REPLACE INTO mode_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','ALWAYSUP','SHUTDOWN','ReloadDone');
+REPLACE INTO mode_transitions VALUES ('ALWAYSUP','SHUTDOWN','RELOAD-MOTE','SHUTDOWN','ReloadStart');
+REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','SHUTDOWN','ReloadStart');
+REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','ISUP','ReloadStart');
 
 --
 -- Dumping data for table `state_timeouts`
