@@ -88,6 +88,7 @@ use Exporter;
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
+	 TBIsNodeVirtual
 	 );
 
 # Must come after package declaration!
@@ -1547,6 +1548,30 @@ sub TBIsNodeRemote($)
 	return 1;
     }
     return 0;
+}
+
+#
+# Is a node virtual (or "multiplexed"). 
+#
+# usage TBIsNodeVirtual(char *node)
+#        Returns 1 if yes.
+#        Returns 0 if no.
+#
+sub TBIsNodeVirtual($)
+{
+    my ($nodeid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select isvirtnode from node_types as t ".
+		     "left join nodes as n on t.type=n.type ".
+		     "where n.node_id='$nodeid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    return($row[0]);
 }
 
 #
