@@ -1299,6 +1299,14 @@ function SHOWNODE($node_id) {
              </tr>\n";
     }
 
+    if ($isremotenode) {
+	if ($isvirtnode) {
+	    SHOWWIDEAREANODE($phys_nodeid, 1);
+	}
+	else {
+	    SHOWWIDEAREANODE($node_id, 1);
+	}
+    }
     echo "</table>\n";
 }
 
@@ -1441,6 +1449,82 @@ function SHOWWIDEAREAACCOUNTS($uid) {
 	}
     }
     echo "</table>\n";
+}
+
+#
+# Show widearea node record. Just the widearea stuff, not the other.
+#
+function SHOWWIDEAREANODE($node_id, $embedded = 0) {
+    $query_result =
+	DBQueryFatal("select * from widearea_nodeinfo ".
+		     "where node_id='$node_id'");
+
+    $row = mysql_fetch_array($query_result);
+
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+
+    $contact_uid	= $row[contact_uid];
+    $machine_type       = $row[machine_type];
+    $connect_type	= $row[connect_type];
+    $city		= $row[city];
+    $state		= $row[state];
+    $country		= $row[country];
+    $zip		= $row[zip];
+
+    if (! $embedded) {
+	echo "<table border=2 cellpadding=0 cellspacing=2
+                     align=center>\n";
+    }
+    else {
+	echo "<tr>
+               <td align=center colspan=2>
+                   Widearea Info
+               </td>
+             </tr>\n";
+    }
+
+    echo "<tr>
+              <td>Contact UID:</td>
+              <td class=left>
+                  <A href='showuser.php3?target_uid=$contact_uid'>
+		     $contact_uid</A></td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Machine Type:</td>
+              <td class=left>$machine_type</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>connect Type:</td>
+              <td class=left>$connect_type</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>City:</td>
+              <td class=left>$city</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>State:</td>
+              <td class=left>$state</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Country:</td>
+              <td class=left>$country</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Zip:</td>
+              <td class=left>$zip</td>
+          </tr>\n";
+
+    if (! $embedded) {
+        echo "</table>\n";
+    }
 }
 
 #
