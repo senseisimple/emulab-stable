@@ -54,9 +54,16 @@ $message = "This is a restricted shell, and will only allow you to run
 a limited set of commands. For an unrestrictive shell, log into
 ops.emulab.net\n";
 
+# Whether or not to allow interactive sessions
+$allow_interactive = 0;
+
 $debug = 0;
 $| = 1; # No line buffering, so that we can see the prompt
-$interactive = 1;
+if ($allow_interactive) {
+    $interactive = 1;
+} else {
+    $interactive = 0;
+}
 
 if (@ARGV && ($ARGV[0] eq "-c")) { # We were called by sshd - transform args into a useful form
 	my $bigarg = pop @ARGV;
