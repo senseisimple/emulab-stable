@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-use Getopt::Long;
+use Getopt::Std;
 
 #
 # dhcpd_makeconf - helper script to create dhcpd.conf files from the database.
@@ -33,7 +33,7 @@ use lib "@prefix@/lib";
 use libdb;
 
 my %opt = ();
-GetOptions(\%opt,"h","v");
+getopts("hv",\%opt);
 if ($opt{h}) { exit &usage; }
 
 $infile = shift @ARGV; # || exit &usage;

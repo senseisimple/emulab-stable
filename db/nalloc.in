@@ -1,19 +1,33 @@
 #!/usr/local/bin/perl -w
-use Mysql;
 use English;
+use Getopt::Std;
 
-# debug
-my $d = 0;
+#
+# nalloc - allocate nodes to an experiment. Takes a pid, and eid, and
+# a list of nodes. Only nodes that are free can be allocated, and a
+# special hack for sharks is included - allocating 'sh*' expands to
+# allocation of the entire rack.
+#
 
 #
 # Configure variables
 #
 my $TB       = "@prefix@";
-my $DBNAME   = "@TBDBNAME@";
+use lib '@prefix@/lib';
+use libdb;
 
-my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
+my %opt = ();
+getopts(\%opt,'v');
 
-if ($#ARGV < 1) {die("Usage: nalloc <pid> <eid> <node> <node> <...>\n");}
+my $debug = 0;
+if ($opt{v}) {
+    $debug = 1;
+}
+
+if (@ARGV < 2) {
+    die("Usage: nalloc [-v] <pid> <eid> <node> <node> <...>\n".
+	 "		-v enables debugging output\n");
+}
 
 my $consetup="$TB/libexec/console_setup";
 my $exportsetup="$TB/sbin/exports_setup";
@@ -24,82 +38,94 @@ my @node_names=@ARGV;
 my @vals = ();
 my @nodes= ();
 
-my $cmd = "";
-my $sth = "";
+if ($debug) { print "Expt '$eid', proj '$pid'\n"; }
 
-my $self = (getpwuid($UID))[0]
-  || die "Cannot figure out who you are!\n";
-
-if ($d) { print "You are '$self', expt '$eid', proj '$pid'\n"; }
-
-$cmd = "select uid from proj_memb as pm left join experiments as e on ".
-  "e.pid=pm.pid where e.eid='$eid' and uid='$self' and e.pid='$pid'";
-$sth = $dbh->query($cmd);
-if ( ($sth->numrows < 1) && ($UID != 0) && ($EUID != 0)) {	
-  die("You are not a member of experiment '$eid' in project '$pid'.\n");
+#
+# Make sure the user is a member of the correct project, and that the
+# experiment exists
+#
+if (!ProjMember($pid)) {
+    die "You are not a member of project $pid\n";
+}
+if (!ExpState($pid,$eid)) {
+    die "There is no experiment $eid in project $pid\n";
 }
 
-$cmd = "lock tables nodes read, reserved write";
-$sth = $dbh->query($cmd) 
-  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+######################################################################
+# Step 1 - Make a list of nodes to reserve
+#
+# We prune nodes that are already reserved, etc., from the list, and
+# do expansion of shark shelves
+######################################################################
+
+DBQueryFatal("lock tables nodes read, reserved write");
 
 foreach my $n (@node_names) {
-  if ($n =~ /(sh\d+)/ ) { $n = $1."-1"; }
-  $sth = $dbh->query("select * from reserved where node_id='$n'");
-  if ($sth->numrows > 0) {
-    $cmd="select * from reserved where node_id='$n' and eid='$eid' and pid='$pid'";
-    $sth = $dbh->query($cmd);
-    if ($sth->numrows > 0) {	
-      print "You have already reserved node '$n'.\n";
-      # Do not increment error code since that throws off tbprerun.
-    } else {
-      print "Someone else has already reserved node '$n'.\n";
-      $error++;
+    # Shark hack
+    if ($n =~ /(sh\d+)/ ) { $n = $1."-1"; }
+    # End shark hack
+
+    my ($r_pid, $r_eid);
+    if (NodeidToExp($n,\$r_pid,\$r_eid)) {
+	# Someone has already reserved this node
+	if (($r_pid eq $pid) && ($r_eid eq $eid)) {
+	    print "You have already reserved node '$n'.\n";
+	    # Do not increment error code since that throws off tbprerun.
+	} else {
+	    print "Someone else has already reserved node '$n'.\n";
+	    $error++;
+	}
+	next; # Go on to the next node if this one is reserved
     }
-    next;
-  } else {
-    $sth = $dbh->query("select * from nodes where node_id='$n'");
-    if ($sth->numrows < 1) {	
+
+    my $result = DBQueryFatal("select * from nodes where node_id='$n'");
+    if ($result->numrows() < 1) {
       print "Node '$n' does not exist.\n";
       $error++;
       next;
     } else {
-      # No one has reserved it, and it exists, so add it to my list
-      if ($n =~ /(sh\d+)/ ) {
-	# its a shark - do the whole shelf if its not done already.
-	my $shelf = $1;
-	if ( ! (join(",",@nodes) =~ /,$shelf-\d,/)) {
-	  # Shelf hasn't been done yet...
-	  foreach my $n ( 1 .. 8 ) {
-	    push(@vals,"('$shelf-$n','$pid','$eid')");
-	    push(@nodes,"$shelf-$n");
-	  }
+	# No one has reserved it, and it exists, so add it to my list
+	# Shark hack
+	if ($n =~ /(sh\d+)/ ) {
+	    # its a shark - do the whole shelf if its not done already.
+	    my $shelf = $1;
+	    if ( ! (join(",",@nodes) =~ /,$shelf-\d,/)) {
+		# Shelf hasn't been done yet...
+		foreach my $n ( 1 .. 8 ) {
+		    push(@vals,"('$shelf-$n','$pid','$eid')");
+		    push(@nodes,"$shelf-$n");
+		}
+	    }
+	    # End shark hack
+	} else {
+	    # its not a shark - just add it in...
+	    push(@vals,"('$n','$pid','$eid')");
+	    push(@nodes,"$n");
 	}
-      } else {
-	# its not a shark - just add it in...
-	push(@vals,"('$n','$pid','$eid')");
-	push(@nodes,"$n");
-      }
     }
-  }
 }
 
-print "List Ready: @vals\nError=$error\n" if $d;
+if ($debug) { print "List Ready: @vals\nError=$error\n"; }
+
+######################################################################
+# Step 2 - Make the reservations in the database
+#
+# Uses the list built in step 1
+######################################################################
 
 if (!$error && @vals) {
   print "Reserving nodes...";
-  $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
-  if ($sth = $dbh->query($cmd)) {
-    print "Succeeded.\n";    
-  } else { 
-    print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-    $error++;
-  }
+  my $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
+  if (!DBQueryWarn($cmd)) { $error++; }
 }
 
-$cmd = "unlock tables";
-$sth = $dbh->query($cmd) 
-  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+DBQueryFatal("unlock tables");
+
+######################################################################
+# Step 3 - Setup consoles
+#
+# Uses the list built in step 1
+######################################################################
 
 if (!$error && @nodes) {
     my @conlist=();
@@ -118,10 +144,11 @@ if (!$error && @nodes) {
 	    push(@conlist,$n);
 	}
     }
-    print "Console setup list: @conlist\n" if $d;
+    if ($debug) { print "Console setup list: @conlist\n"; }
 
     system("$consetup @conlist") == 0 or
 	print STDERR "WARNING: $consetup @conlist failed!\n";
 }
 
+if ($debug) { print "Returning with value $error\n"; }
 exit($error);
