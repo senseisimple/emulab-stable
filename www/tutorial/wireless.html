@@ -4,13 +4,8 @@
    All rights reserved.
   -->
 <center>
-<h2>Emulab Tutorial - Using Wireless Nodes</h2>
+<h2>Emulab Tutorial - Using Wireless Networking</h2>
 </center>
-
-<font size=+1>
-Creating an Experiment with Wireless-Capable Nodes:</font>
-<br>
-<br>
 
 Some Emulab nodes may contain wireless interfaces, and those nodes may
 be scattered around at various locations. To find out where those
@@ -22,7 +17,8 @@ in it.
 
 <br>
 <br>
-Before using wireless nodes in an experiment, please read the following
+Before using a wireless network interface in an experiment,
+please read the following
 <b>Acceptable Use Policy</b> (AUP) regarding wireless interfaces.
 By using our wireless nodes, you agree to be bound by this AUP.
 
@@ -44,20 +40,31 @@ By using our wireless nodes, you agree to be bound by this AUP.
      </li><p>
 
 <li> <b>Transmitting (2): </b>
-     You may not send "large" amounts of traffic on the following
-     channels, and may send only low rates of non-responsive traffic.
-     They are "production networks" used by others at this location.
+     Do not flood a wireless network with non-responsive traffic for
+     any significant period of time.  The following channels are
+     "production networks" used by others at this location, so are
+     more restricted. You may not send "large" amounts of traffic on
+     them, and may send only low rates of non-responsive traffic.
      
      <table align=center border=2 cellpadding=0 cellspacing=2>
      <tr><th>Protocol</th><th>Channels</th></tr>
      <tr><td>A</td><td>36, 38, 45, 52, 56, 60, 64</td></tr>
      <tr><td>B/G</td><td>1, 3, 5, 6, 7, 9, 11</td></tr>
      </table>
+     <p>
+
+<li> <b>Question and Exceptions:</b> send to
+     <a href="mailto:testbed-ops@flux.utah.edu">Testbed Ops</a>
+     if you're not sure, or want an exception.
 
 </ul>
 
+<font size=+1>
+Creating an Experiment with Wireless-Capable Nodes:</font>
 <br>
-To use wireless nodes in an experiment, you must provide a few Emulab
+<br>
+
+To use a wireless network in an experiment, you must provide a few Emulab
 specific NS directives in your NS file, which are illustrated in the
 following small example:
 
@@ -104,6 +111,7 @@ A few points should be noted:
      directive, but with a bandwidth that reflects the typical speed of a
      wireless link (54Mb for 80211a and 80211g, 11Mb for 80211b). Note that
      you may not use duplex links of wireless interfaces; just lans.
+     We assign each lan a unique ssid.
 
 <li> After you create the lan, choose the <em>protocol</em> for the lan
      with the <tt>tb-set-lan-protocol</tt> directive. Currently, you can
