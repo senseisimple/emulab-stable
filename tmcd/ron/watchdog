@@ -44,6 +44,11 @@ my $pidfile = "/var/run/emulab-watchdog.pid";
 my $noboot  = 0;
 
 #
+# Forward declarations for prototype checking
+#
+sub bootvnodes();
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
