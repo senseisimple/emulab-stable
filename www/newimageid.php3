@@ -157,7 +157,7 @@ function SPITFORM($formfields, $errors)
                       }
                       else {
     	                  theform['formfields[path]'].value =
-                                  '/groups/' + pid + '/' + gid + '/';
+                                  '/groups/' + pid + '/' + gid + '/images/';
                       }
                   }
                   else if (theform['formfields[imagename]'].value != '') {
@@ -174,7 +174,7 @@ function SPITFORM($formfields, $errors)
                       }
                       else {
     	                  theform['formfields[path]'].value =
-                                  '/groups/' + pid + '/' + gid + '/' +
+                                  '/groups/' + pid + '/' + gid + '/images/' +
                                   filename;
                       }
                   }
@@ -501,7 +501,7 @@ if (! $submit) {
 	    if (!strcmp($project, $group))
 		$defaults[path]     = "/proj/$project/images/";
 	    else
-		$defaults[path]     = "/groups/$project/$group/";
+		$defaults[path]     = "/groups/$project/$group/images/";
 	}
 	reset($projlist);
     }
