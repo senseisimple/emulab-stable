@@ -705,6 +705,10 @@ sub SetupBossNode()
     mysystem("cd /tftpboot; mv pxeboot.emu-sio pxeboot.emu; ".
 	     "              mv freebsd47 freebsd ; mv frisbee47 frisbee");
 
+    # Create the compressed versions of the files
+    mysystem("cd /tftpboot/frisbee/boot; ./prepare; ".
+	     "cd /tftpboot/freebsd/boot; ./prepare");
+
     #
     # Copy the creators ssl certificate into place. This allows the
     # inner boss to invoke the XMLRPC server on the outer boss for
