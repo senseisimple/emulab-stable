@@ -41,32 +41,19 @@ $op = '-'.$op;
 #print out args
 #print "do \"$op\" to ",@machines,"\n";
 
-#Read in power.conf
-if ( -e "/usr/testbed/etc/power.conf") {
-    open(CONF,"/usr/testbed/etc/power.conf") 
-	|| die("Couldn't open /usr/testbed/power.conf\n");
-} elsif ( -e "power.conf" ) {
-    open(CONF,"power.conf") 
-	|| die("Couldn't open power.conf\n");
-} elsif ( -e "/home/newbold/switch/power.conf" ) {
-    open(CONF,"/home/newbold/switch/power.conf") 
-	|| die("Couldn't open /home/newbold/switch/power.conf\n");
-} else {
-    die("Couldn't locate power.conf configuration file.\n");
-}
-my @line = ();
-while ( <CONF> ) {
-    if ( ! /^(\#.*)*$/ ) { #if its not blank or commented with #
-	chop;
-	#print "Got '$_':\t";
-	@line = split(/\t/);
-	#print "Split to ",join("*",@line),"\n";
-	$IPList{$line[0]}= $line[1];
-	$OutletList{$line[0]}= '-'.$line[2];
-    }
-}
+use Mysql;
 
-close (CONF);
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+my $sth ="";
+
+$sth = $dbh->query("select o.node_id,i.IP,o.outlet from ".
+		   "outlets as o left join interfaces as i ".
+		   "on o.power_id = i.node_id");
+while ( @_ = $sth->fetchrow_array()) {
+  #print "Got '",join("\t",@_),"\n";
+  $IPList{$_[0]}= $_[1];
+  $OutletList{$_[0]}= '-'.$_[2];
+}
 
 #foreach $item (sort keys(%IPList)) {
 #    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
