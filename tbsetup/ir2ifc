@@ -46,10 +46,10 @@ while ( <MAC2IF> ) {
     if ( /^\|node_id/ ) {next;}
     s/ *|\t*//g;
     s/^\|//;
-    my ($node,$ifc,$mac) = split(/\|/,$_);
-    print STDERR "Read $node:$ifc <==> $mac\n" if $d;
+    my ($node,$card,$port,$mac) = split(/\|/,$_);
+    print STDERR "Read $node:$card <==> $mac\n" if $d;
     $nodes{$mac} = $node;
-    $ifs{$mac} = $ifc;
+    $ifs{$mac} = $card;
 }
 
 if ( -x "/usr/testbed/bin/nodeip" ) { $path="/usr/testbed/bin/" }
@@ -65,9 +65,15 @@ while ( <NODEIP> ) {
     if ( /^\|node_id/ ) {next;}
     s/ *|\t*//g;
     s/^\|//;
-    my ($node,$ifc,$ip) = split(/\|/,$_);
-    if ($node =~ /^tbpc/) { if ($ifc==4) { $nodeip{$node} = $ip; } }
-    else { if ($ifc==1) { $nodeip{$node} = $ip; } }
+    my ($node,$card,$port,$mac,$ip) = split(/\|/,$_);
+    #print "Got $node,$card,$port,$mac,$ip\n";
+    if ($node =~ /^tbpc/) { 
+      if ($card==4) { $nodeip{$node} = $ip; } 
+    } else { 
+      if (defined($ifs{$mac}) && $card==$ifs{$mac}) { 
+	$nodeip{$node} = $ip; 
+      } 
+    }
     print STDERR "Read $node <==> $nodeip{$node}\n" if $d;
 }
 

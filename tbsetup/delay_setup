@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
 
-my $rsh		= "su1 sshtb";
-my $ssh		= "su1 sshtb";
+my $rsh		= "su1 sshtb -q";
+my $ssh		= "su1 sshtb -q";
 my $rcp		= "su1 scptb -q";
 my $ping	= "/sbin/ping";
 my $TB		= "/usr/testbed/bin";
 my $power	= "$TB/power";
-my $me		= "stoller";
+my $me		= "root";
 my $dbg		= 1;
 my $net		= "fxp";
 my $pipe	= 1;
@@ -296,7 +296,15 @@ foreach my $link ( keys %delayparams ) {
     # have been rebooted above, run a short ping waiting for it come alive.
     # The most you want to wait is 60 seconds, I think, before throwing
     # in the towl.
+
+    # Wait a few seconds to make sure the node has gone down for the reboot
+    # already. Then start pinging it...
     #
+    # Constant in here should be big enough for a reboot cmd to take effect,
+    # but not so big that the node could have already come all the way back up
+
+    sleep(10); 
+    
     # Sigh, a 60 second ping results in the script waiting until all the
     # packets are sent from all the pings, before it will exit. So,
     # loop doing a bunch of shorter pings
@@ -324,7 +332,19 @@ foreach my $link ( keys %delayparams ) {
     #
     # Copy the file over to the target machine.
     #
-    if (system("$rcp $fname $pc:/etc/rc.delayconfig")) {
+    my $tries=0;
+    my $max_tries=5;
+    my $interval=5;
+    while (system("$rcp $fname $pc:/etc/rc.delayconfig") && 
+	   ($tries < $max_tries)) {
+        $tries++;
+        print STDERR "Remote Copy to $pc failed... Waiting and retrying...\n";
+	# Sleep $interval seconds longer each time
+	# Waits in total ($max_tries)! * $interval
+	# seconds after its pingable before giving up
+	sleep ($interval*$tries); 
+    }
+    if ($tries>=$max_tries) {
 	die("Error copying delay config file to $pc\n");
     }
     unlink($fname);
