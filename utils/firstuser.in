@@ -64,7 +64,7 @@ print "meta-project.\n\n";
 # Get a password for the user
 if (!defined($password)) {
     print "Pick a password for $protouser (warning, will be echoed): ";
-    my $password = <>;
+    $password = <>;
     chomp($password);
 }
 my @salt_chars = ('a'..'z','A'..'Z','0'..'9');
