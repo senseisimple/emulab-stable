@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: mkacct,v 1.18 2000-11-14 06:35:12 kwright Exp $
+### $Id: mkacct,v 1.19 2000-11-20 19:16:35 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -248,7 +248,11 @@ foreach $IP (@nodes) {
 	    while ( <SCP> ) { print $_; }
 	    close SCP;
 
-	    my $addon = "";
+	    my $addon   = "";
+	    $chpassf = "/tmp/chpasstmp";
+	    open (TMPCHPASS, ">$chpassf") or die "Couldn't open $chpassf for writing.\n";
+	    print TMPCHPASS "#!/bin/sh\n";
+
 	    foreach my $user (keys %passwd) {
 
 		## Check if the user account already exists.
@@ -262,25 +266,19 @@ foreach $IP (@nodes) {
 		}
 		close MPWD;
 
+		### LKW: I initially created the account by using 'ssh chpass',
+		### but that stopped working for some reason unknown to me.
+		### I replaced it with the script-creation, scp it, source it 
+		### seen below. 
+
 		if ( $prev == 0 ) {
 		    print "Adding $user to $IP\n";
 		    $addon = "$user:$passwd{$user}:$unix_uid{$user}:" .
 			     "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
 			     "/bin/tcsh";
-		    $chpassf = "/tmp/chpasstmp";
-		    open (TMPCHPASS, ">$chpassf") or die "Couldn't open $chpassf for writing.\n";
-		    print TMPCHPASS "#!/bin/sh\n";
-		    print TMPCHPASS "/usr/bin/chpass -a '$addon'\n";
-		    close TMPCHPASS;
-		
-		    open(SCP, "/usr/local/bin/scp -pq $chpassf $IP:$chpassf 2>&1 |");
-		    while ( <SCP> ) { print $_; }
-		    close SCP;
 
-		    open (CHPASS, "/usr/local/bin/sshtb $IP source $chpassf 2>&1 |");
-		    while ( <CHPASS> ) {print "$_"; }
-		    close(CHPASS)
-		}
+		    print TMPCHPASS "/usr/bin/chpass -a '$addon'\n";
+		}		
 
 		## Create home directory
 		if ( -e "/users/$user" ) {
@@ -303,6 +301,20 @@ foreach $IP (@nodes) {
 		    }
 		}
 	    }
+	    close TMPCHPASS;
+	    open(SCP, "/usr/local/bin/scp -pq $chpassf $IP:$chpassf 2>&1 |");
+	    while ( <SCP> ) { print $_; }
+	    close SCP;
+
+	    print "Before chpass.\n";
+	    open (CHPASS, "/usr/local/bin/sshtb $IP source $chpassf 2>&1 |");
+	    print "After chpass open.\n";
+	    while ( <CHPASS> ) {print "$_"; }
+	    print "After print.\n";
+	    close(CHPASS);
+	    print "After close.\n";
+	    sleep 2;
+
 	} else {
 	    print "$IP is unreachable or has an unknown OS ($OS).\n";
 	}
