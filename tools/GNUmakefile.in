@@ -1,0 +1,23 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= utils
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS = pcapper
+
+all:            all-subdirs
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+clean:
