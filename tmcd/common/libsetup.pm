@@ -1158,21 +1158,28 @@ sub dotrafficconfig()
     }
     CLOSETMCC($TM);
 
+    #
+    # XXX hack: workaround for tmcc cmd failure inside TCL
+    #     storing the output of a few tmcc commands in
+    #     $SETUPDIR files for use by NSE
+    #    
     open( NSECFG, ">$SETUPDIR/tmcc.nseconfigs" ) or die "Cannot open file $SETUPDIR/tmcc.nseconfigs: $!";
+    $TM = OPENTMCC(TMCCCMD_NSECONFIGS);
+    $record_sep = $/;
+    undef($/);
+    my $nseconfig = <$TM>;
+    $/ = $record_sep;
+    print NSECFG $nseconfig;
+    CLOSETMCC($TM);
+    close(NSECFG);
+	    
     # XXX hack: need a separate section for starting up NSE when we
     #           support simulated nodes
     if( ! $startnse ) {
-
-	# start NSE if 'tmcc nseconfigs' is not empty
-	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
-	$record_sep = $/;
-	undef($/);
-	my $nseconfig = <$TM>;
-	$/ = $record_sep;
 	
 	if( $nseconfig ) {
 
-	    print NSECFG $nseconfig;
+	    # start NSE if 'tmcc nseconfigs' is not empty
 	    if ( ! $didopen ) {
 		open(RC, ">" . TMTRAFFICCONFIG)
 		    or die("Could not open " . TMTRAFFICCONFIG . ": $!");
@@ -1181,9 +1188,7 @@ sub dotrafficconfig()
 	    }
 	    print RC "$SETUPDIR/startnse &\n";
 	}
-	CLOSETMCC($TM)
     }
-    close(NSECFG);
     
     if ($didopen) {
 	printf RC "%s %s\n", TMCC(), TMCCCMD_READY();
