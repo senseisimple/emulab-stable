@@ -1,0 +1,57 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/proxy
+
+SYSTEM	       := $(shell uname -s)
+PROGRAMS	= evproxy proxytest
+
+include $(OBJDIR)/Makeconf
+
+all:	$(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+LIBTBDIR    = $(OBJDIR)/lib/libtb
+LIBEVENTDIR = ../lib
+
+# Rules to make sure that some libraries we need from other directories get
+# built first
+$(LIBTBDIR)/%.o:
+	@$(MAKE) -C $(LIBTBDIR) $(@F)
+
+$(LIBEVENTDIR)/%.a:
+	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O -g -static -Wall
+CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += `elvin-config --cflags vin4c`
+
+LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
+LIBS     += -levent
+LIBS     += `elvin-config --libs vin4c`
+
+evproxy:	evproxy.o $(LIBTBDIR)/log.o
+	# Link against some of the object files from libtb, instead of the
+	# whole library, since the latter cannot be built on ops
+	$(CC) $(LDFLAGS) -static -o $@ evproxy.o $(LIBTBDIR)/log.o $(LIBS)
+
+proxytest:	proxytest.o $(LIBTBDIR)/log.o
+	# Link against some of the object files from libtb, instead of the
+	# whole library, since the latter cannot be built on ops
+	$(CC) $(LDFLAGS) -static -o $@ proxytest.o $(LIBTBDIR)/log.o $(LIBS)
+
+$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+
+client-install: 
+	$(INSTALL_PROGRAM) evproxy $(DESTDIR)$(CLIENT_BINDIR)/evproxy
+
+clean:
+	/bin/rm -f *.o $(PROGRAMS)
