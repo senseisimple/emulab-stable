@@ -93,7 +93,8 @@ function SPITFORM($formfields, $errors)
              <td class=left>
                  <input type=text
                         name=\"formfields[description]\"
-                        value=\"" . $formfields[description] . "\"
+                        value='" . htmlspecialchars($formfields[description],
+						    ENT_QUOTES) . "'
 	                size=30>
              </td>
           </tr>\n";
@@ -316,14 +317,14 @@ $doemail = 0;
 # form, and to determine if any changes were made and to send email.
 #
 $defaults                    = array();
-$defaults[description]       = stripslashes($row[expt_name]);
+$defaults[description]       = $row[expt_name];
 $defaults[idle_ignore]       = $row[idle_ignore];
 $defaults[batchmode]         = $row[batchmode];
 $defaults[swappable]         = $row[swappable];
-$defaults[noswap_reason]     = stripslashes($row[noswap_reason]);
+$defaults[noswap_reason]     = $row[noswap_reason];
 $defaults[idleswap]          = $row[idleswap];
 $defaults[idleswap_timeout]  = $row[idleswap_timeout] / 60.0;
-$defaults[noidleswap_reason] = stripslashes($row[noidleswap_reason]);
+$defaults[noidleswap_reason] = $row[noidleswap_reason];
 $defaults[autoswap]          = $row[autoswap];
 $defaults[autoswap_timeout]  = $row[autoswap_timeout] / 60.0;
 $defaults[idle_ignore]       = $row[idle_ignore];
