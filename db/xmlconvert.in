@@ -145,6 +145,12 @@ else {
     fatal("Bad data in argument: $eid.");
 }
 
+my %event_objtypes;
+my $query_result = DBQueryFatal("select idx,type from event_objecttypes");
+while (my ($idx,$type) = $query_result->fetchrow_array()) {
+    $event_objtypes{$type} = $idx;
+}
+
 # Do it
 if ($fromxml) {
     readXML($pid, $eid, $xmlfile);
@@ -288,7 +294,16 @@ sub readXML($$$) {
 		DBQueryFatal("delete from $table ". 
 		             "where eid='$eid' and pid='$pid' and ".
 			     "vname!='fullsim'")
-	    }
+	    } elsif ( !$impotent && (($table eq "eventlist") ||
+				       ($table eq "virt_agents")) ) {
+	        # Both eventlist and virt_agents need to be cleared
+		# for NSE event objecttype since entries in this
+		# table depend on the particular mapping
+		my $nse_objtype = $event_objtypes{"NSE"};
+		DBQueryFatal("delete from $table ". 
+		             "where pid='$pid' and eid='$eid' and ".
+			     "objecttype='$nse_objtype'");
+	    } 
 	}
 	next
 	    if (!defined($virtual_tables{$table}));
