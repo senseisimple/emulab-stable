@@ -96,12 +96,12 @@ $baseurl = "../floormap_aux.php3?prefix=$uniqueid";
 if (isset($fake))
      $pipeurl .= "&fake=yes";
      
-echo "<applet code='RoboTrack.class'
+echo "<applet name='tracker' code='RoboTrack.class'
               archive='tracker.jar'
               width='900' height='600'
               alt='You need java to run this applet'>
             <param name='pipeurl' value='$pipeurl'>
-            <param name='baseurl' value='$baseurl'>
+            <param name='floorurl' value='$baseurl'>
             <param name='uid' value='$uid'>
             <param name='auth' value='$auth'>
             <param name='ppm' value='$ppm'>
