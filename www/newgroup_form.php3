@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -63,7 +63,7 @@ if (isset($pid)) {
 else {
     echo "<tr>
               <td>*Select Project:</td>";
-    echo "    <td><select name=pid>";
+    echo "    <td><select name=group_pid>";
 
     while (list($project) = each($projlist)) {
 	echo "<option value='$project'>$project </option>\n";
