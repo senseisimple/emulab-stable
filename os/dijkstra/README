@@ -1,0 +1,75 @@
+------------
+Introduction
+------------
+
+Distributed Dijkstra is the new and improved route generation program
+for Emulab. Each virtual host is responsible for generating its own
+routing table by running this program. Since routes are no longer
+generated on boss, the routes don't have to be transfered over the
+network. Additionally, the operation is run in parallel across all
+physical nodes at the same time, reducing calculation time.
+
+-----
+Usage
+-----
+
+The following command line arguments are supported:
+
+'--all' -- Output routes for every source, not just one. This takes
+           much longer and outputs a slightly different format. Used for
+           debugging.
+
+'--source=' -- Output routes from just the source . should be one of
+               the symbolic names in the input.
+
+'--compress' -- Compress routes. This uses subnetting to reduce the
+                size of the routing table(s). Routes are optimized even
+                with this option.
+
+'--strong' -- Strong interface names. This ensures that the route to
+              each interface routes only to that interface and not
+              another on the same host. Not implemented.
+
+'--weak' -- Weak interface names. This ensures that the routes to all
+            interfaces of a host are the same. With one minor
+            exception. Not implemented.
+
+-----
+Input
+-----
+
+<start> := <lineList>
+
+<lineList> := <line> | <line> <lineList>
+
+<line> := <name1> " " <ip1> " " <name2> " " <ip2> " " <weight> "\n"
+
+Where <name1> and <name2> are labels representing hosts in a topology
+which are linked, <ip1> and <ip2> are the IP addresses of the
+interfaces in that link and <weight> is the weight of that link. For
+the purposes of distributed dijkstra, break up any LAN with a degree
+greater than 2 (link) into (n*(n-1))/2 links which connect every pair.
+
+------
+Output
+------
+
+The output is the same as tmcd's route output. testbed/tmcd/tmcd.c
+
+Note that if the '--all' option is used, the routes from every source
+are printed. Each source section is headed by a line containing the
+name of that source and tailed by a line containing just the
+characters "%%".
+
+------------------------
+Route compression issues
+------------------------
+
+Unless care is taken, bad things happen when real world ip addresses
+are used in the same topology as generated ones. Among them, real
+internet addresses may then be mis-routed. This is currently solved.
+
+If an adjascent interface has an IP that is routed in a different
+direction, circular/bad routes become possible. In theory, the
+adjascent interface has a more specific route and so this is not a
+problem. This will have to be tested empirically.
