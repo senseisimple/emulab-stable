@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: mkacct,v 1.29 2000-12-07 06:51:41 kwright Exp $
+# $Id: mkacct,v 1.30 2000-12-15 18:10:52 stoller Exp $
 
 use English;
 use Mysql;
@@ -185,7 +185,8 @@ sub dowork() {
 	    print "Creating group $group_number on $node.\n";
 	    open(GROUPADD, "/usr/local/bin/sshtb $node /usr/sbin/groupadd -g $group_number $group_name 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
-	    close(GROUPADD); 
+	    close(GROUPADD);
+	    sleep(2);
 
 	    foreach my $name (keys %epasswd) {
 
@@ -194,6 +195,7 @@ sub dowork() {
 		open(USERADD, $cmd);
 		while (<USERADD>) { print "$_"; }
 		close(USERADD);
+		sleep(2);
 	    }
 
 	} elsif ($OS =~ /FreeBSD/) { 
@@ -205,6 +207,7 @@ sub dowork() {
 	    open(ADDGROUP, "/usr/local/bin/sshtb $node /usr/sbin/pw groupadd $group_name -g $group_number 2>&1 |");
 	    while (<ADDGROUP>) { print "$_"; }
 	    close(ADDGROUP);
+	    sleep(2);
 
 	    foreach my $name (keys %epasswd) {
 		make_user($name, $node); 
@@ -328,6 +331,7 @@ sub get_os() {
 	}
     }
     close(UNAME);
+    sleep(2);
  	
     return $match;
 
@@ -349,11 +353,13 @@ sub make_user() {
     open(PWADD, "$cmd 2>&1 |") or die "$0: Could not open pw useradd on $node.";
     while (<PWADD>) { print "$_"; }
     close(PWADD);
+    sleep(2);
     
     open(CHPASS, "/usr/local/bin/sshtb $node " .
 	 "/usr/bin/chpass -p $epasswd{$name} $name 2>&1 |"); 
     while (<CHPASS>) { print "$_"; }
     close(CHPASS);
+    sleep(2);
 
     # Need to warn if /users/$user doesn't exist. It should have been
     # created when the user was added to the database. 
