@@ -86,7 +86,7 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Loop, looking for batch experiments that want to run.
 # 
 while (1) {
-    my($count);
+    my($count, $i);
     my(%row, %pending_row);
     
     #
@@ -255,9 +255,9 @@ sub dosomething($$)
     my $creator  = $exphash{'creator_uid'};
     my $longname = $exphash{'name'};
     
-    # Global var
+    # Global vars
     $dirname  = "$batchdir/$pid-$eid";
-    $nsfile  = "$dirname/$eid.ns";
+    $nsfile   = "$dirname/$eid.ns";
 
     #
     # Get some user information. 
@@ -472,7 +472,7 @@ sub cancelexp($$)
 sub isexpdone($)
 {
     my(%exphash)  = @_;
-    my($row, $done);
+    my($row, $done, $i);
     
     # Global vars
     $eid = $exphash{'eid'};
