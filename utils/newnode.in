@@ -51,6 +51,11 @@ my $INITIAL_STATE = TBDB_NODESTATE_SHUTDOWN;
 #
 my $NUM_VNODES = 50;
 
+#
+# Default number of vnodes that can be hosted on any pnode
+#
+my $DEFAULT_PCVM_COUNT = 20;
+
 # Turn off line buffering on output
 $| = 1;
 
@@ -268,6 +273,10 @@ NODE: foreach my $node_id (@node_ids) {
 	if (!($vtype =~ s/pc/pcvm/)) {
 	    $vtype = "$vtype-vm";
 	}
+	DBQueryFatal("INSERT INTO node_auxtypes set node_id='$node_id', " .
+	    "type='pcvm', count=$DEFAULT_PCVM_COUNT");
+	DBQueryFatal("INSERT INTO node_auxtypes set node_id='$node_id', " .
+	    "type='$vtype', count=$DEFAULT_PCVM_COUNT");
 	for (my $i = 1; $i <= $NUM_VNODES; $i++) {
 	    my $vpriority = 10000000 + ($nodenum * 1000) + $i;
 	    my $nodename = $node_id;
@@ -278,7 +287,7 @@ NODE: foreach my $node_id (@node_ids) {
 	    my $jailip = "${IPBASE}.${nodenum}.${i}";
 
 	    DBQueryFatal("INSERT INTO nodes SET node_id='$nodename', " .
-		"type='$vtype', phys_nodeid='$node_id', role='virtnode', " .
+		"type='$type', phys_nodeid='$node_id', role='virtnode', " .
 		"priority='$vpriority', op_mode='PCVM', " .
 		"eventstate='SHUTDOWN', " .
 		"def_boot_osid='emulab-ops-FBSD-JAIL', " .
