@@ -519,8 +519,8 @@ if ($linktest && ExpState($pid, $eid) eq EXPTSTATE_ACTIVE) {
 	$optarg .= " -l 1";
     }
     
-    print "Running 'run_linktest.pl $optarg -e $pid/$eid'\n";
-    if (system("$tbbindir/run_linktest.pl $optarg -e $pid/$eid") != 0) {
+    print "Running 'linktest_control $optarg $pid $eid'\n";
+    if (system("$TB/sbin/linktest_control $optarg $pid $eid") != 0) {
 	system("cat $output")
 	    if (-r $output);
 	

@@ -832,8 +832,8 @@ if ($linktest_level && ExpState($pid, $eid) eq EXPTSTATE_ACTIVE) {
     my $output = "linktest.$$";
     my $optarg = "-l $linktest_level -o $output";
     
-    print STDOUT "Running 'run_linktest.pl $optarg -e $pid/$eid'\n";
-    if (system("$tbdir/run_linktest.pl $optarg -e $pid/$eid") != 0) {
+    print STDOUT "Running 'linktest_control $optarg $pid $eid'\n";
+    if (system("$TB/sbin/linktest_control $optarg $pid $eid") != 0) {
 	system("cat $output")
 	    if (-r $output);
 	
