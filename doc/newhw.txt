@@ -1,0 +1,226 @@
+**********************************************************************
+***** Overall responsiblities
+**********************************************************************
+Maintenance of this file: Rob
+ISP network card installation: Rob
+Rack assembly: Mac/Rob
+Wiring: Mac
+Temp. worker co-ordination: Mac
+
+**********************************************************************
+***** Hardware
+**********************************************************************
+ISP110s:
+	Status: Ordered, 30 recived
+	Next shipment: 14, afternoon 8/13 or morning 8/14
+	Responsible: Rob
+	Note: Rails are currently backordered, should be in next week 
+
+Network cables:
+	Status: Ordered
+	First shipment: Friday, 8/10
+	Responsible: Mac
+
+Rackmount nuts/screws:
+	Status: Ordered
+	Shipped: ??
+	Responsible: Mac or Leigh
+
+3ft Power cables from ValCom:
+	Status: Ordered
+	Shipped: With next ISPs
+	Responsible: Rob
+
+Short power cables from Standard:
+	Status: Ordered
+	Shipped: ??
+	Responsible: Rob or Leigh
+
+Additional RPCs:
+	Status: Recieved
+
+Additional APCs:
+	Status: Not ordered
+	Responsible: ??
+	Note: We need 2 more 8-port controllers to handle 128 machines +
+		serial server + cyclades. Can steal from the sharks for now
+
+Cyclades:
+	Status: Recieved
+	Responsible: ??
+	Note: One host adapter installed in plastic, expanders need to be
+		hooked up. The other needs to be installed in the serial
+		server
+
+Labels:
+	Avery labels for cables - pick them up at OfficeMax, etc.
+	Responsible: Rob
+	 
+Cable ties:
+	Pick them up at Home Depot
+	Responsible: Mike
+
+**********************************************************************
+***** Testbed Software
+**********************************************************************
+snmpit:
+	Correctly handle multiple switches
+	Responsible: Mac
+
+tip/capture:
+	Get it working over the network and on multiple serial servers
+	Responsible: Leigh
+
+power:
+	Extend it to talk to RPC (serial) power controllers
+	Responsible: Mac?
+	
+Disk image:
+	Build a disk image that has any changes required for ISPs
+	Responsible: Rob
+
+**********************************************************************
+***** Problems to resolve
+**********************************************************************
+Pick control net ineterface:
+	Will depend on PXE capability and IRQ sharing
+	Responsible: Mike
+
+Decide on machine numbering scheme:
+	Responsible: ??
+	Start at pc42?
+
+**********************************************************************
+***** Misc
+**********************************************************************
+Cable labels:
+	Responsible: Rob
+	Note:
+
+PC labels:
+	Responsible: Rob
+	Note: Will depend somewhat on our chosen numbering scheme
+
+**********************************************************************
+***** Testbed state to update
+**********************************************************************
+New machine type:
+	Status: Done, but may need to be updated
+	Responsible: Mac
+
+Wires table:
+	Using a consistent wiring scheme, this can be filled by a script
+	Responsible: Rob
+
+Interfaces table:
+	Toughest part here is the MAC addresses - See "MAC Address gathering"
+		procedure below
+	Responsible: Rob
+
+Nodes table:
+	The only information in this table this is unique per-node is node_id,
+		ip, and precedence - should be easy to populate with a script
+	Responsible: Mac
+
+dhcpd.conf:
+	There's already a script (db/dhcpd_makeconf) to generate this once
+		the nodes and interfaces tables are populated
+	Responsible: Rob
+
+Outlets table:
+	Using a consistent wiring scheme, this can be filled by a script
+	Responsible: Rob
+
+DNS zone files on paper:
+	Need to add DNS entries for all new nodes
+	Responsible: Mac/Rob
+
+Information about the RPCs:
+	Will probably need entires in the nodes table
+	Responsible: Mac
+	
+tip/capture state:
+	Not sure what needs to be done for the new tip/capture
+	Responsible: Leigh
+	
+**********************************************************************
+***** Procedures
+**********************************************************************
+Serial/BIOS setup: (not complete)
+	1. Set the PXE boot order
+	2. Set serial speed to 115.2k baud, no flow control
+	3. Set the power-on boot action to "always on"
+	4. Password protection:
+	Note: Possibly scriptable
+
+MAC Address gathering: (Rob and Mike will set up)
+	1. Set up a pool of dynamic DHCP addresses - unknown (aka new) machines
+		will get put in this pool, which will refer them to a
+		specially hacked proxydhcp, which will cause them to boot a
+		different PXE kernel than the other machines
+	2. New machines will boot Mike's MAC-printing kernel, and the output
+		will be saved by capture
+	3. A script will search through capture logs, harvesting MACs and 
+		putting them in the database
+
+Wiring: (Note: Mac has a file with some additional tips)
+	1. Start from the bottom of the rack
+	2. Hook up experimental network interfaces:
+		2.1 Affix labels - number sequentially starting from the left
+		2.2 Tape labels to secure them to the cable
+		2.3 Bundle as you go up the rack 
+		2.4 Keep them out of the way of air vents
+		2.5 Plug them into sequential (NOT HORIZONTALLY) ports on the
+			switch
+	3. Hook up the control network
+		3.1 Sequential going up the rack, sequential on the switch
+		3.2 Same procedure as experimental network
+	4. Hook up serial lines
+		4.1 Sequential going up the rack, sequential on the Cyclades
+		4.2 Same procedure as experimental network
+	5. Hook up power cables
+		5.1 Bottom machine goes on the outside power controller, second
+			machine goes on the inside one, third goes on the
+			outside, etc.
+	Need to keep track of:
+		Ranges of cables for the experimental network on machines:
+			eg. pc85 starts with cable 500, pc65 ends with cable 600
+		Ranges of experimental cables on the switch:
+			eg. ports 3/1 - 3/24 = cables 500 - 523
+		Ranges of cables on the control network
+			eg. pc85 - pc41 = cables 600 - 645
+			    ports 5/1 - 5/48 = cables 600 - 647
+		Ranges of serial cables:
+			eg. pc85 - pc41 = cables 700-800
+			    1st. serial expander ports 1 - 16 = cables 700 -715
+		Which serial ports the power controllers are on
+
+**********************************************************************
+***** Schedule
+**********************************************************************
+To get the first rack set up, we need:
+	44 ISPs w/ rails
+	At least 1/3 of the network/serial cables
+	At least 1/3 of the power cables
+	'power' that can talk to RPCs
+	Working disk image
+	Automation tools
+	2 power outlets (we should have them now)
+
+The second rack requires:
+	44 more ISPs
+	ALL rails (third rack must be built, as we're running serial cables to
+		it)
+	Multi-switch snmpit
+	Network tip/capture
+	Serial line server
+	1/3 more network/serial cables
+	1/3 more power cables
+	2 more power outlets
+
+The third rack requires:
+	The rest of the ISPs
+	The rest of the network/serial cables
+	The rest of the power cables
+	Nuts/screws
+	2 more power outlets
