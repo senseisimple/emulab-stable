@@ -237,7 +237,7 @@ if ($estate eq EXPTSTATE_SWAPPED) {
     }
 }
 
-if ($estate ne EXPTSTATE_TERMINATED && $estate ne $EXPTSTATE_NEW) {
+if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {
     fatal("Experiment is in the wrong state: $estate\n");
 }
 
