@@ -123,6 +123,7 @@ while ($row = mysql_fetch_array($query_result)) {
     $node_id   = $row["node_id"];
     $loc_x     = $row["loc_x"];
     $loc_y     = $row["loc_y"];
+    $orient    = $row["orientation"];
 
     if (isset($pixels_per_meter) && $pixels_per_meter) {
 	$meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
@@ -132,6 +133,9 @@ while ($row = mysql_fetch_array($query_result)) {
     }
     else {
 	$locations[$node_id] = "x=$loc_x, y=$loc_y pixels";
+    }
+    if (isset($orient)) {
+	$locations[$node_id] .= ", o=" . sprintf("%.2f", $orient);
     }
 }
 

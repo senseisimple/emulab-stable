@@ -1819,6 +1819,7 @@ function SHOWNODE($node_id, $flags = 0) {
 	    $building = $row["building"];
 	    $loc_x    = $row["loc_x"];
 	    $loc_y    = $row["loc_y"];
+	    $orient   = $row["orientation"];
 	
 	    $query_result =
 		DBQueryFatal("select * from floorimages ".
@@ -1833,6 +1834,10 @@ function SHOWNODE($node_id, $flags = 0) {
 		
 		    $meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
 		    $meters_y = sprintf("%.3f", $loc_y / $pixels_per_meter);
+
+		    if (isset($orient)) {
+			$orientation = sprintf("%.3f", $orient);
+		    }
 		}
 	    }
 	}
@@ -1925,7 +1930,11 @@ function SHOWNODE($node_id, $flags = 0) {
 	if (isset($meters_x) && isset($meters_y)) {
 	    echo "<tr>
                       <td>Location:</td>
-                      <td class=left>x=$meters_x, y=$meters_y meters</td>
+                      <td class=left>x=$meters_x, y=$meters_y meters";
+	    if (isset($orientation)) {
+		echo " (o=$orientation degrees)";
+	    }
+	    echo      "</td>
                   </tr>\n";
 	}
     }

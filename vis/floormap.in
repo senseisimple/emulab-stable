@@ -453,7 +453,8 @@ sub dofloor($$)
     # their allocation status so we know what colors to use.
     #
     my $query = "select loc.*,r.pid,r.eid,r.vname, ".
-                "  n.battery_voltage,n.battery_percentage ".
+                "  n.battery_voltage,n.battery_percentage, ".
+		"  n.destination_x,n.destination_y,n.destination_orientation ".
 		"  from location_info as loc ".
 		"left join reserved as r on r.node_id=loc.node_id ".
 		"left join nodes as n on n.node_id=loc.node_id ".
@@ -582,6 +583,10 @@ sub dofloor($$)
 	    my $nodeid = $rowref->{"node_id"};
 	    my $x      = int($rowref->{"loc_x"} * $scale - $x_offset);
 	    my $y      = int($rowref->{"loc_y"} * $scale - $y_offset);
+	    my $o      = $rowref->{"orientation"};
+	    my $dx     = $rowref->{"destination_x"};
+	    my $dy     = $rowref->{"destination_y"};
+	    my $do     = $rowref->{"destination_orientation"};
 	    my $rpid   = $rowref->{"pid"};
 	    my $reid   = $rowref->{"eid"};
 	    my $vname  = $rowref->{"vname"};
@@ -637,7 +642,71 @@ sub dofloor($$)
 					primitive=>'circle', points=>"$x,$y $x2,$y");
 	    }
             warn "$err" if "$err";
-            $err = $baseimage->Annotate(fill=>'black', x=>$x+$LX, y=>$y+$LY, 
+	    if (defined($o)) {
+		my ($ox2, $oy2);
+		ComputeOrientationLine($x, $y, 15.0, $o, \$ox2, \$oy2);
+
+		$err = $baseimage->Draw(stroke=>$color, 
+					primitive=>'line',
+					points=>"$x,$y $ox2,$oy2");
+		warn "$err" if "$err";
+	    }
+	    #
+	    # Draw hollow circle for the destination (of the robot).
+	    # Add an oritentation stick as well, if defined.
+	    # 
+	    if (defined($dx) && defined($dy)) {
+		$dx = int($dx * $scale - $x_offset);
+		$dy = int($dy * $scale - $x_offset);
+		my $dlx  = $dx+$LX;
+		my $dly  = $dy+$LY;
+		my $dx2 = $dx + $DOT_RAD;
+
+		$err = $baseimage->Draw(stroke=>$color,
+					strokewidth=>'1.5',
+					primitive=>'circle',
+					points=>"$dx,$dy $dx2,$dy");
+		warn "$err" if "$err";
+
+		if (defined($do)) {
+		    my ($ox2, $oy2);
+		    ComputeOrientationLine($dx, $dy, 15.0, $do, \$ox2, \$oy2);
+
+		    $err = $baseimage->Draw(stroke=>$color, 
+					    primitive=>'line',
+					    points=>"$dx,$dy $ox2,$oy2");
+		    warn "$err" if "$err";
+
+		    # Shift the label above of the orientation line would go
+		    # through it.
+		    $ly = $dy - ($DOT_RAD + 2)
+			if ($do > 90.0 && $do < 270.0);
+		}
+		$err = $baseimage->Annotate(fill=>'black',
+					    x=>$dlx, y=>$dly,
+					    text=>"$label");
+		warn "$err" if "$err";
+
+		#
+		# And, draw a light grey line from source to destination
+		# to make it very clear.
+		#
+		$err = $baseimage->Draw(stroke=>'Grey',
+					strokewidth=>'1.0',
+					primitive=>'line',
+					points=>"$x,$y $dx,$dy");
+		warn "$err" if "$err";
+	    }
+	    # Label location;
+	    my $lx = $x+$LX;
+	    my $ly = $y+$LY;
+
+	    # Shift the label above of the orientation line would go
+	    # through it.
+	    $ly = $y - ($DOT_RAD + 2)
+		if (defined($o) && $o > 90.0 && $o < 270.0);
+	    
+            $err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
 					text=>"$label");
             warn "$err" if "$err";            
 
@@ -902,3 +971,18 @@ sub writefiles($@)
     
     close(STATE);
 }
+
+#
+# Compute a line segment given a point and a compass heading of a robot.
+#
+sub ComputeOrientationLine($$$$$$)
+{
+    my ($x1, $y1, $distance, $angle, $px2, $py2) = @_;
+
+    my $x2 = $x1 + $distance * cos(($angle - 90) * 3.1415926536 / 180.0);
+    my $y2 = $y1 + $distance * sin(($angle - 90) * 3.1415926536 / 180.0);
+
+    $$px2 = $x2;
+    $$py2 = $y2;
+}
+
