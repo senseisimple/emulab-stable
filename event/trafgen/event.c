@@ -290,15 +290,17 @@ parse_args(char *buf, tg_action *tg)
 	 * Parse out any new values
 	 */
 	cp = buf;
-	while ((cp = strsep(&buf, " ")) != NULL) {
-		if (sscanf(cp, "PACKETSIZE=%d", &psize) == 1)
-			continue; 
+	if (cp != NULL) {
+		while ((cp = strsep(&buf, " ")) != NULL) {
+			if (sscanf(cp, "PACKETSIZE=%d", &psize) == 1)
+				continue; 
 
-		if (sscanf(cp, "INTERVAL=%lf", &interval) == 1)
-			continue; 
+			if (sscanf(cp, "INTERVAL=%lf", &interval) == 1)
+				continue; 
 
-		if (sscanf(cp, "RATE=%d", &rate) == 1)
-			continue; 
+			if (sscanf(cp, "RATE=%d", &rate) == 1)
+				continue; 
+		}
 	}
 
 	/*
