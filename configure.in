@@ -760,7 +760,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
-	install/newnode_sshkeys/GNUmakefile install/smb.conf \
+	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
 	robots/mtp/GNUmakefile robots/emc/GNUmakefile \

@@ -124,7 +124,8 @@ my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
 my $CRONTAB         = "/etc/crontab";
 my $AUTHKEYS	    = "/root/.ssh/authorized_keys";
-my $SMBCONF         = "/usr/local/etc/smb.conf";
+my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
+my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
 
 #
 # Some directories we care about
@@ -477,11 +478,12 @@ Phase "sudoers", "Editing $SUDOERS", sub {
 
 if ($WINSUPPORT) {
     Phase "samba", "Setting up Samba", sub {
-	Phase "smb.conf", "Installing smb.conf", sub {
-	    DoneIfEdited($SMBCONF);
-	    ExecQuietFatal("$CP -pf $TOP_OBJDIR/install/smb.conf $SMBCONF");
-	    AppendToFileFatal($SMBCONF,
+	Phase "smb.conf", "Installing smb.conf[.head]", sub {
+	    DoneIfEdited($SMBCONF_HEAD);
+	    ExecQuietFatal("$CP -pf $TOP_OBJDIR/install/smb.conf.head $SMBCONF_HEAD");
+	    AppendToFileFatal($SMBCONF_HEAD,
 			      "# This file created by Emulab Control");
+            ExecQuietFatal("$CP -pf $SMBCONF_HEAD $SMBCONF_FILE");
 	};
 	Phase "samba.sh", "Installing samba.sh", sub {
 	    DoneIfExists("$RCDIR/samba.sh");

@@ -18,7 +18,9 @@
 [global]
 
 # workgroup = NT-Domain-Name or Workgroup-Name, eg: REDHAT4
-   workgroup = @OURDOMAIN@
+# XXX: This really ought to be the real elab domain, but we don't (yet)
+#      know how to change the workgroup programatically on a Windoze box.
+   workgroup = EMULAB
 
 # server string is the equivalent of the NT Description field
    server string = Emulab Samba Server
