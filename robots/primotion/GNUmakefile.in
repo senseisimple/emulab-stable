@@ -35,6 +35,8 @@ gorobot: gorobot.o ../mtp/libmtp.a dgrobot/libdgrobot.a
 clean: clean-subdirs
 	rm -f *.o
 
+install:
+
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
 %.MAKE:

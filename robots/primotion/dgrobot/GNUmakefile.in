@@ -26,5 +26,7 @@ libdgrobot.a: $(OBJS)
 	$(AR) crv $@ $^
 	$(RANLIB) $@
 
+install:
+
 clean:
 	/bin/rm -f *.o *.a $(MTPPROGS)
