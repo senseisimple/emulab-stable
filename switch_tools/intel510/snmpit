@@ -397,7 +397,7 @@ sub ParseArgs {
     if ( !($device =~ /^(Intel)|(Cisco)$/)  && 
 	 ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
   die("$i is not a power controller.\n") 
-    if ( $device eq "APC" && ($on||$off||$cyc) );
+    if ( $device ne "APC" && ($on||$off||$cyc) );
   die("Can't enable and disable at the same time.\n") if ($d && $e);
   die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd));
   my $n=0;
