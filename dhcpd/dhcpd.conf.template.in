@@ -61,6 +61,10 @@ shared-network emulab {
  
  subnet @CONTROL_NETWORK@ netmask @CONTROL_NETMASK@ {
 	option subnet-mask		@CONTROL_NETMASK@;
+	option routers                  @CONTROL_ROUTER_IP@;
+	option domain-name-servers      @BOSSNODE_IP@;
+	option domain-name              "@OURDOMAIN@";
+	next-server			@BOSSNODE_IP@;
 
 	# Example of a dynamic range. If you uncomment the following line 
 	# (after changing the IP addresses to suitable ones, of course)
@@ -69,11 +73,6 @@ shared-network emulab {
 
 	# testbed PCs
 	group {
-		next-server			@BOSSNODE_IP@;
-		option routers                  @CONTROL_ROUTER_IP@;
-		option  domain-name-servers     @BOSSNODE_IP@;
-		option  domain-name             "@OURDOMAIN@";
-
 		#
 		# For every PC nodetype, include a line like the one below.
 		# These lines will be replaced with auto-generated entries for
@@ -85,11 +84,6 @@ shared-network emulab {
 
 	# stargates
 	group {
-		next-server			@BOSSNODE_IP@;
-		option routers                  @CONTROL_ROUTER_IP@;
-		option  domain-name-servers     @BOSSNODE_IP@;
-		option  domain-name             "@OURDOMAIN@";
-
 		%%nodetype=sg
 	}
  }
