@@ -22,38 +22,11 @@ max-lease-time                  36000;                  # 10 hours
 
 ddns-update-style               none;                   # req'd vers 3 directive
 
-# NOTE: You should not need to change any of the PXE options below
-# Define the PXE option space
-# Code 1: Multicast IP address of bootfile
-# Code 2: UDP port that client should monitor for MTFTP responses
-# Code 3: UDP port that MTFTP servers are using to listen for MTFTP requests
-# Code 4: Number of secondes a client must listen for activity before trying
-#         to start a new MTFTP transfer
-# Code 5: Number of secondes a client must listen before trying to restart
-#         a MTFTP transfer
-option space PXE;
-option PXE.mtftp-ip code 1 = ip-address;
-option PXE.mtftp-cport code 2 = unsigned integer 16;
-option PXE.mtftp-sport code 3 = unsigned integer 16;
-option PXE.mtftp-tmout code 4 = unsigned integer 8;
-option PXE.mtftp-delay code 5 = unsigned integer 8;
-option PXE.discovery-control code 6 = unsigned integer 8;
-option PXE.discovery-mcast-addr code 7 = ip-address;
-
-# Place clients in the PXE class when booting from the PXE ROM. For some PXE
-# clients, We have to set at least one option - if they fail to dchp, try
-# uncommenting the two lines below.
-class "PXE" {
-	match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
-	option vendor-class-identifier "PXEClient";
-#	vendor-option-space     PXE;
-#	option PXE.mtftp-ip     0.0.0.0;
-}
- 
 subnet 155.101.132.0 netmask 255.255.252.0 {
 
 	option subnet-mask		255.255.252.0;
 	option routers                  155.101.132.1;
+	filename			"/tftpboot/pxeboot.emu";
 
 	# Example of a dynamic range. If you uncomment the following line 
 	# (after changing the IP addresses to suitable ones, of course)
