@@ -50,25 +50,6 @@ diff -rcN /usr/local/include/boost.orig/graph/dijkstra_shortest_paths.hpp /usr/l
         template <class Edge, class Graph>
         void black_target(Edge, Graph&) { }
         template <class Vertex, class Graph>
-***************
-*** 200,207 ****
-      }
-      put(distance, s, zero);
-  
-!     dijkstra_shortest_paths(g, s, predecessor, distance, weight,
-! 			    index_map, compare, combine, inf, zero, vis);
-    }
-  
-    namespace detail {
---- 206,213 ----
-      }
-      put(distance, s, zero);
-  
-!     dijkstra_shortest_paths_no_init(g, s, predecessor, distance, weight,
-!                             index_map, compare, combine, inf, zero, vis);
-    }
-  
-    namespace detail {
 diff -rcN /usr/local/include/boost.orig/graph/exception.hpp /usr/local/include/boost/graph/exception.hpp
 *** /usr/local/include/boost.orig/graph/exception.hpp	Wed Dec 31 17:00:00 1969
 --- /usr/local/include/boost/graph/exception.hpp	Thu Jun  6 11:04:09 2002
