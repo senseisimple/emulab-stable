@@ -458,7 +458,7 @@ REPLACE INTO table_regex VALUES ('virt_lans','q_droptail','int','redirect','defa
 REPLACE INTO table_regex VALUES ('virt_lans','q_red','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','q_gentle','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','member','text','regex','^[-\\w]+:[\\d]+$',0,128,NULL);
-REPLACE INTO table_regex VALUES ('virt_lans','mask','text','regex','^[\\d]+.[\\d]+.[\\d]+.[\\d]+$',0,15,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','mask','text','regex','^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rdelay','float','redirect','virt_lans:delay',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rbandwidth','int','redirect','virt_lans:bandwidth',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rlossrate','float','redirect','virt_lans:lossrate',0,0,NULL);
