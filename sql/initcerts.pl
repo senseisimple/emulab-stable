@@ -27,5 +27,5 @@ $ENV{'TBAUDITON'} = 1;
 
 while (($uid) = $query_result->fetchrow_array()) {
     system("/usr/local/bin/sudo -u $uid /usr/testbed/sbin/mkusercert $uid") == 0
-	or die("Failed to create SSL cert for user $uid\n");
+	or warn("Failed to create SSL cert for user $uid\n");
 }
