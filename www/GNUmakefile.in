@@ -46,6 +46,8 @@ TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.php3)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.ns)
 TUTFILES += $(SRCDIR)/tutorial/tb_compat.tcl
 
+WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
+
 #
 # Kill the directory part of the names. The vpath rule will do the rest.
 #
@@ -54,11 +56,13 @@ ALLPIXES = $(notdir $(PIXFILES))
 ALLDOCS  = $(notdir $(DOCFILES))
 ALLTUTS  = $(notdir $(TUTFILES))
 ALLICONS = $(notdir $(AUTOICONS))
+ALLWEBDB = $(notdir $(WEBDBFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
 	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \
+	$(addprefix $(INSTALL_WWWDIR)/webdb/, $(ALLWEBDB)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS))
 	cd $(INSTALL_WWWDIR) && \
 		if test -d ../webglimpse; \
