@@ -11,7 +11,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= nalloc nfree nodeip node_list readycount 
+BIN_SCRIPTS	= nalloc nfree nodeip readycount 
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
@@ -20,7 +20,6 @@ LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm
 
 # Stuff installed on plastic.
-USERBINS	= node_list readycount
 USERSBINS	= genelists.proxy
 
 #
@@ -43,13 +42,6 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-ifneq ($(UNIFIED),1)
-LINKS=	cd $(INSTALL_BINDIR) && \
-		list='$(USERBINS)'; for file in $$list; do \
-			rm -f $$file; \
-			ln -s plasticwrap $$file; \
-		done;
-endif	
 control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS))
-	$(LINKS)
+
 clean:
