@@ -425,7 +425,7 @@ DocumentRoot "@prefix@/www"
     deny from all
     allow from 155.99.212.
     allow from 155.98.60.
-    allow from 204.119.59.136
+    allow from 69.59.212.104
     allow from 18.31.0.114
     allow from 18.31.0.144
     allow from 24.254.69.120
