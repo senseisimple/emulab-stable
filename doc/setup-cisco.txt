@@ -3,7 +3,7 @@
 #####
 
 This file contains some configuration guidelines that we (Utah) have found
-useful to improve the performance of our Cisco swtiches.
+useful to improve the performance of our Cisco switches.
 
 All commands given are to be typed at the (enable) prompt on your cisco
 switches. They are for CatOS - switches that run IOS may not have these
@@ -19,7 +19,7 @@ This one is useful on both the experimental and control nets:
 Use this on all ports that are directly connected to nodes, servers, power
 controllers - anything that is not another switch. Normally, the switch waits
 a while (several seconds) when a port first comes up before forwarding traffic
-from this port - it does so to prevent loops in the switch topolgy. The main
+from this port - it does so to prevent loops in the switch topology. The main
 place you will see the benefit of this is on the control net - with portfast
 disabled, the first few DHCP packets sent by booting nodes will get dropped,
 causing the DHCP to take much longer than necessary.
@@ -30,10 +30,10 @@ Disable spanning tree (STP.) If on, STP sends out pakcets approximately every
 two seconds on every port. You can disable it on all VLANs with the command
     set spantree disable all
 There are two major consequences (for our purposes) of disabling STP:
-    1) You cannot have _any_ loops in your switch toplogy, or bad things will
+    1) You cannot have _any_ loops in your switch topology, or bad things will
 	happen.
     2) VLAN pruning on trunks won't work, causing broadcast traffic to be
-	forwarded accross trunks that it does not need to cross. We've added
+	forwarded across trunks that it does not need to cross. We've added
 	features to snmpit to manually do STP's job in this case, so this
 	problem is taken care of.
 You must have STP disabled on _all_ switches that are trunked together! If it
@@ -55,3 +55,22 @@ Switch ports will, by default, try to negotiate trunking and channeling.
 Cisco provides a handy macro:
     set port host <ports>
 to disable both of these. Also enables portfast on the ports.
+
+##### Setting MAC address aging time
+
+We have found that some experimenters use applications, kernels, etc. that only
+receive traffic, not send it. This presents a problem, because it prevents the
+switch from learning which port the node is on, and thus broadcasting traffic
+for it to every port in the VLAN. This can be solved by 'priming' - ie. having
+the receive-only node send some traffic (like an ARP response) at the beginning
+of the experiment. However, the default aging time of 300 seconds makes this
+impractical. So, we have disabled this aging, making learned MACs permanent
+(until the VLAN is torn down.)
+
+You must do this for each VLAN, with the command:
+    set cam agingtime <vlan> 0
+For convenience, we've supplied a file (in this directory) called
+'no-cam-aging.cfg' that disables aging on VLANs 2-999 (the ones potentially
+used by our software.) Transfer this file to the switch using the:
+    copy tftp config
+command.
