@@ -21,6 +21,7 @@ $maxrun = 5;
 
 use DBI;
 
+$DELAYCAPACITY = @DELAYCAPACITY@;
 $TBROOT = "@prefix@";
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 $TBDB = "@TBDBNAME@";
@@ -45,13 +46,6 @@ sub printdb {
 	print $_[0];
     }
 };
-
-# Let's read the minimum requirements for this experiment.
-$sth = $dbh->prepare("SELECT minimum_nodes from experiments" .
-		     " where pid=\"$pid\" and eid=\"$eid\"");
-$sth->execute;
-($minimum_nodes) = $sth->fetchrow_array;
-$sth->finish;
 
 ######################################################################
 # Step 1 - Setup virtual topology
@@ -226,10 +220,15 @@ open(TOPFILE,"> $topfile") || do {
     exit(1);
 };
 
+
+$nodes=0;
+$delaynodes=0;
+
 foreach $node (keys(%nodes)) {
     # Shark hack
     if ($nodes{$node} ne "shark") {
 	print TOPFILE "node $node $nodes{$node}\n";
+	$nodes++;
     }
     # End Shark hack
 }
@@ -256,6 +255,7 @@ foreach $lan (keys(%lans)) {
 		join(" ",@{$delaynodes{"linksdelaysrc/$lan"}}) . "\n";
 	    $delayid++;
 	    print TOPFILE "node $delayname delay\n";
+	    $delaynodes++;
 	    print TOPFILE "link linksdelaysrc/$lan $node0 $delayname"
 		. " $bandwidth\n";
 	    print TOPFILE "link linksdelaydst/$lan $node1 $delayname"
@@ -281,6 +281,7 @@ foreach $lan (keys(%lans)) {
 		    " = " . join(" ",@{$delaynodes{"linkdelaysrc/$lan/$member"}}) . "\n";
 		$delayid++;
 		print TOPFILE "node $delayname delay\n";
+		$delaynodes++;
 		print TOPFILE "link linkdelaysrc/$lan/$member" .
 		    " $node $delayname $bandwidth\n";
 		print TOPFILE "link linkdelaydst/$lan/$member" .
@@ -294,6 +295,14 @@ foreach $lan (keys(%lans)) {
 }
 
 close TOPFILE;
+
+# Set estimations
+$minimum_nodes = $nodes + $delaynodes/$DELAYCAPACITY;
+$maximum_nodes = $nodes + $delaynodes;
+$dbh->do("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
+	 "minimum_nodes=$minimum_nodes where pid=\"$pid\" and eid=\"$eid\"");
+print "Minumum nodes = $minimum_nodes\n";
+print "Maximum nodes = $maximum_nodes\n";
 
 ######################################################################
 # Step 2 - Assign Loop

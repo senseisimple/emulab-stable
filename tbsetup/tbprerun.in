@@ -18,12 +18,6 @@ $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" .
     ":$TBROOT/sbin:$TBROOT/bin";
 push(@INC,$TBSETUPLIB);
 
-# This is the average number of delay links that can go through a
-# delay node.  To calculate this number take 1/2 the interfaces
-# rounded down on every node capable node in the testbed and average
-# them.
-$DELAYCAPACITY = @DELAYCAPACITY@;
-
 # Turn off line buffering.
 $| = 1; 
 
@@ -111,51 +105,6 @@ if (&tbs_exec("parse.tcl $pid $eid $nsfile")) {
     &tbs_out("Parsing failed.\n");
     exit(1);
 }
-
-
-&tbs_out("Estimating resource usage.\n");
-$numnodes = $dbh->do("SELECT * from virt_nodes where pid=\"$pid\"" .
-		     " and eid=\"$eid\"");
-$min = $max = $numnodes;
-# XXX - Need to fix this.
-# XXX - Need to adjust estimations.  Basically -1 delay for every
-# delayed LAN that has only two nodes.  Probably want to add all of
-# this to parser.
-#$bw_query = "";
-#$sth = $dbh->prepare("SELECT max_speed from interface_types");
-#$sth->execute();
-#($speed) = $sth->fetchrow_array();
-#$bw_query .= "bandwidth != $speed";
-#while (($speed) = $sth->fetchrow_array()) {
-#    $bw_query .= " and bandwidth != $speed";
-#}
-$bw_query = "bandwidth != 100";
-
-$numdelays = $dbh->do("SELECT * from virt_lans where (delay != 0" . 
-		      " or lossrate != 0 or ($bw_query))" .
-		      " and pid=\"$pid\" and eid=\"$eid\"");
-$min += $numdelays/$DELAYCAPACITY;
-$max += $numdelays;
-$min = ceil($min);
-$max = ceil($max);
-
-# Shark hack
-$numsharks = $dbh->do("SELECT * from virt_nodes where type = \"shark\"" .
-		      " and pid=\"$pid\" and eid=\"$eid\"");
-$min -= $numsharks;
-$max -= $numsharks;
-# End Shark Hack
-
-&tbs_out("  Minimum $min  Maximum $max\n");
-$sth = $dbh->prepare("UPDATE experiments set minimum_nodes = $min," . 
-		     "maximum_nodes = $max where pid = \"$pid\"" . 
-		     "and eid = \"$eid\"");
-if (! $sth->execute()) {
-    &tbs_out("Failed to set estimates.\n");
-    cleanup;
-    exit(1);
-}
-$sth->finish(); 
 
 &tbs_out("Marking as prerunned.\n");
 $sth = $dbh->prepare("UPDATE experiments set state = \"swapped\"" . 
