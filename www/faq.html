@@ -61,9 +61,6 @@
                            parameters on my links?</a>
      <li> <a href="#HDS-7">Are there other traffic shaping parameters
                            besides latency, bandwidth, and PLR?</a>
-     <li> <a href="#HDS-8">I asked for traffic shaping, but everything
-			   seems to be going at full LAN speeds. 
-			   What's wrong?</a>
      </ul>
 
 <li> <a href="#SWS">Software setup</a>
@@ -91,7 +88,14 @@
 <li> <a href="#TR">Troubleshooting</a>
      <ul>
      <li> <a href="#TR-1">My experiment is setup, but I cannot
-     			  send packets between some of the nodes, why?</a>
+     			  send packets between some of the nodes. Why?</a>
+     <li> <a href="#TR-2">I asked for traffic shaping, but everything
+			  seems to be going at full LAN speeds. 
+			  What's wrong?</a>
+     <li> <a href="#TR-3">I set a non-zero packet-loss (or delay) but 'ping'
+                          shows no packet-loss (or delay). Why?</a>
+     <li> <a href="#TR-4">I set a non-zero packet-loss (or delay) but 'ping'
+                          shows a different packet-loss (or delay). Why?</a>
      </ul>
 </ul>
 
@@ -788,37 +792,6 @@
     sudo</a> command.
     </p>    
 
-<li><a NAME="HDS-8"></a>
-    <h3>I asked for traffic shaping, but everything seems to be going at
-    full LAN speeds.  What's wrong?</h3>
-    <p>
-    The most likely problem is that it is using the unshaped control
-    network for the traffic you're looking at. This occurs when it
-    tries to contact a node using a "pcXXX" address, like pc76 or
-    pc76.emulab.net, or when it tries to ping a fully-qualified name,
-    like NodeA.myexpt.myproj.emulab.net , which also resolves to a
-    control network address. On one of your nodes, take a look at the
-    file /etc/hosts . It shows the IP addresses and aliases that refer
-    to the different experimental interfaces. These are the names/IPs
-    you can use to see the delays.
-    </p>
-
-    <p>
-    For instance, let's say I have an experiment that had NodeA and
-    NodeB connected with a shaped link. The file /etc/hosts on NodeA
-    would have a line for NodeB, with an address like 192.168.1.3, and
-    on NodeB there would be an entry for NodeA with the address
-    192.168.1.2. These addresses correspond to the delayed link
-    between them. Any address outside the 192.168.*.* range that you
-    didn't configure manually corresponds to an unshaped link.
-    </p>
-
-    <p>
-    For a discussion of the way to 'name' interfaces on the control
-    and experimental networks, see the the <a href="#UTT-Naming">naming
-    section</a> of this document.
-    </p>
-
 </ul>
 
 <hr>
@@ -1082,7 +1055,7 @@
 <ul>
 <li><a NAME="TR-1"></a>
     <h3>My experiment is setup, but I cannot
-	send packets between some of the nodes, why?</h3>
+	send packets between some of the nodes. Why?</h3>
     <p>
     The most common reason is that your topology
     includes nodes which are not directly connected, and you have
@@ -1094,5 +1067,51 @@
     either the nodes did not properly negotiate their speed and
     duplex with the Cisco switch, or the physical wire is loose
     or bad.  In these cases, you should contact us for help.
+    </p>
+
+<li><a NAME="TR-2"></a>
+    <h3>I asked for traffic shaping, but everything seems to be going at
+    full LAN speeds.  What's wrong?</h3>
+    <p>
+    The most likely problem is that it is using the unshaped control
+    network for the traffic you're looking at. This occurs when it
+    tries to contact a node using a "pcXXX" address, like pc76 or
+    pc76.emulab.net, or when it tries to ping a fully-qualified name,
+    like NodeA.myexpt.myproj.emulab.net , which also resolves to a
+    control network address. On one of your nodes, take a look at the
+    file /etc/hosts . It shows the IP addresses and aliases that refer
+    to the different experimental interfaces. These are the names/IPs
+    you can use to see the delays.
+    </p>
+
+    <p>
+    For instance, let's say I have an experiment that had NodeA and
+    NodeB connected with a shaped link. The file /etc/hosts on NodeA
+    would have a line for NodeB, with an address like 192.168.1.3, and
+    on NodeB there would be an entry for NodeA with the address
+    192.168.1.2. These addresses correspond to the delayed link
+    between them. Any address outside the 192.168.*.* range that you
+    didn't configure manually corresponds to an unshaped link.
+    </p>
+
+    <p>
+    For a discussion of the way to 'name' interfaces on the control
+    and experimental networks, see the the <a href="#UTT-Naming">naming
+    section</a> of this document.
+    </p>
+
+<li><a NAME="TR-3"></a>
+    <h3>I set a non-zero packet-loss (or delay) but 'ping'
+        shows no packet-loss (or delay). Why?</h3>
+    <p>
+    You are probably pinging through the control net interface. See this
+    Troubleshooting <a href="#TR-2">FAQ entry</a>.
+    </p>
+    
+<li><a NAME="TR-4"></a>
+    <h3>I set a non-zero packet-loss (or delay) but 'ping'
+        shows a different packet-loss (or delay). Why?</h3>
+    <p>
+    Ping is round trip, PLR and delay are "one way".
     </p>
 </ul>
