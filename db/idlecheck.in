@@ -73,8 +73,8 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 
 # Configurable parameters
 my $idlehours = $t || 12;
-my $minpph = $p || 1; # Min packets per hour that an idle interface sends/rcvs
-my $stalemin = $f || 120; # Max minutes of staleness for latest report
+my $minpph = $p || 1; # Min packets per hour a non-idle interface sends/rcvs
+my $stalemin = $f || 65; # Max minutes of staleness for latest report
 
 # Derived params
 my $minpkts = $idlehours * $minpph;
@@ -159,18 +159,24 @@ order by pid,eid,last_tty,tstamp;") {
     print $result->as_string() if ($d>1);
 }
 
-# This query finds all experiments that have had at least one report
-# from one of their nodes in the last $stalesec seconds.
+# These queries find all experiments that have had all of their nodes
+# report in the last $stalesec seconds.
 
-$cmd = "select pid,eid,max(tstamp) as t from reserved as r
+my $result="";
+foreach $cmd ("drop table if exists idletemp2",
+	      "create temporary table idletemp2
+select pid,eid,n.node_id,max(tstamp) as t from reserved as r
 left join node_idlestats as n on r.node_id=n.node_id
-where r.node_id not like \"sh%\" and r.node_id not like \"wireless%\" 
-and r.node_id not like \"%ron%\" 
-group by pid,eid
-having t is not null and (unix_timestamp(now())-unix_timestamp(t)<=$stalesec) 
-order by pid,eid";
-print "Sending cmd:\n$cmd\n" if $d>1;
-my $result = DBQueryFatal($cmd);
+where r.node_id not like 'sh%' and r.node_id not like 'wireless%'
+and r.node_id not like '%ron%'
+group by n.node_id order by pid,eid,t;",
+	      "select pid,eid,min(t) as oldest from idletemp2
+where t is not null group by pid,eid
+having (unix_timestamp(now())-unix_timestamp(oldest)<=$stalesec)
+order by pid,eid;") {
+    print "Sending cmd:\n$cmd\n" if $d>1;
+    $result = DBQueryFatal($cmd);
+}
 while(@r=$result->fetchrow()) {
     $pid=$r[0];
     $eid=$r[1];
