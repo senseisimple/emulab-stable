@@ -25,18 +25,10 @@ echo "<applet code=\"Netbuild.class\" width=640 height=480>
        </pre>
       </applet>\n";
 ?>
-<pre>
-Helpful Hints:
-
-To create nodes, drag them from the bar on the left into the work area
-in the middle.
-
-To link all currently selected node(s)/lan(s) to another node/lan, hold
-ctrl and click on that node/lan.
-
-To select multiple items, use a sweeping rectangle or hold shift (or
-both.) Use this to change parameters for a large group of things at once.
-</pre>
+<hr>
+<p>
+<a href="../doc/docwrapper.php3?docname=netbuilddoc.html">How to use Netbuild</a>
+</p>
 
 <?php
 #
