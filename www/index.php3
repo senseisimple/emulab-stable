@@ -11,7 +11,49 @@ require("defs.php3");
 #
 PAGEHEADER("Home");
 
+# Get some stats about current experiments
+
+$query_result = DBQueryFatal("select count(*) from experiments where ".
+	"state='active'");
+if (mysql_num_rows($query_result) != 1) {
+    $active_expts = "ERR";
+} else {
+    $row = mysql_fetch_array($query_result);
+    $active_expts = $row[0];
+}
+
+$query_result = DBQueryFatal("select count(*) from experiments where ".
+	"state='swapped'");
+if (mysql_num_rows($query_result) != 1) {
+    $swapped_expts = "ERR";
+} else {
+    $row = mysql_fetch_array($query_result);
+    $swapped_expts = $row[0];
+}
+
+$query_result = DBQueryFatal("select count(*) from experiments where ".
+	"swap_requests > 0");
+if (mysql_num_rows($query_result) != 1) {
+    $idle_expts = "ERR";
+} else {
+    $row = mysql_fetch_array($query_result);
+    $idle_expts = $row[0];
+}
+
 ?>
+
+<center>
+<table align="right">
+<tr><th colspan=2" class="contentheader" align="center">
+	Current Experiments</th></tr>
+<tr><td align="right" class="menuopt"><?php echo $active_expts ?></td> 
+    <td align="left" class="menuopt">Active</td></tr>
+<tr><td align="right" class="menuopt"><?php echo $idle_expts ?></td>
+    <td align="left" class="menuopt">Idle</td></tr>
+<tr><td align="right" class="menuopt"><?php echo $swapped_expts ?></td>
+    <td align="left" class="menuopt">Swapped</td></tr>
+</table>
+</center>
 
 <p><em>Netbed</em>, an outgrowth of <em>Emulab</em>, provides
 integrated access to three disparate experimental environments:
