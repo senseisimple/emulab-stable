@@ -88,22 +88,6 @@ CREATE TABLE deltas (
 ) TYPE=MyISAM;
 
 #
-# Table structure for table 'disk_images'
-#
-
-CREATE TABLE disk_images (
-  image_id varchar(30) NOT NULL default '',
-  img_desc text,
-  OS varchar(10) default NULL,
-  ver varchar(10) default NULL,
-  img_path text NOT NULL,
-  magic text,
-  type enum('pc','shark') NOT NULL default 'pc',
-  osfeatures set('ping','ifconfig','mkacct') default NULL,
-  PRIMARY KEY  (image_id)
-) TYPE=MyISAM;
-
-#
 # Table structure for table 'experiments'
 #
 
