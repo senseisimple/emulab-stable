@@ -278,7 +278,12 @@ sub RebootNode {
     #
     print STDERR "Trying ssh reboot of $pc ...\n" if $debug;
 
-    # Must change our real UID to root so that ssh will work.
+    #
+    # Must change our real UID to root so that ssh will work. We save the old
+    # UID so that we can restore it after we finish the ssh
+    #
+    my $oldUID = $UID;
+    print STDERR "Saved UID: $oldUID\n" if $debug;
     $UID = 0;
     
     #
@@ -319,6 +324,13 @@ sub RebootNode {
 	exec("$ssh $pc /sbin/reboot");
 	exit(0);
     }
+
+    #
+    # Restore the old UID so that scripts run from this point on get the 
+    # user's real UID
+    #
+    $UID = $oldUID;
+    print STDERR "Restored UID: $UID\n" if $debug;
 
     #
     # Okay, before we power cycle lets really make sure. We wait a while
