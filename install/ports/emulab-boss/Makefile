@@ -40,6 +40,7 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	cvsup:${PORTSDIR}/net/cvsup-without-gui \
 	fping:${PORTSDIR}/net/fping \
 	neato:${PORTSDIR}/graphics/graphviz \
+        swish-e:${PORTSDIR}/www/swish-e \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql323-server \
 	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/www/mod_php4 \
 	anytopnm:${PORTSDIR}/graphics/netpbm \
