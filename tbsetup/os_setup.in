@@ -164,6 +164,7 @@ while (my %row = $db_result->fetchhash()) {
     my $virtnode = $row{'isvirtnode'};
     my $jailnode = $row{'jailflag'};
     my $plabnode = $row{'isplabdslice'};
+    my $failmode = $row{'failureaction'};
     my $bootpath = 0;
 
     #
@@ -398,15 +399,9 @@ while (my %row = $db_result->fetchhash()) {
     }
     
     #
-    # Set the canfail bit. Currently, sharks are always canfail=1.
-    # Will come from DB at some point.
+    # Set the canfail bit.
     #
-    if ($plabnode) {
-	$canfail{$node} = 1;
-    }
-    else {
-	$canfail{$node} = 0;
-    }
+    $canfail{$node} = (($failmode eq NODEFAILMODE_FATAL()) ? 0 : 1);
     
     print STDERR "$node - $osids{$node} - $canfail{$node}\n"
 	if $dbg;
