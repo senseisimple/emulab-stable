@@ -1150,8 +1150,7 @@ while (1) {
 	      };
 	      /^direct$/ && do {
 		  ($vlink,$rawA,$rawB) = @info[0,3,5];
-		  #fatal(65, "*** $0:\n".
-		  #	   "    Unsupported link type: direct.\n");
+		  last SWITCH1;
 	      };
 	      /^trivial$/ && do {
 		  # we don't have plinks for trivial links
