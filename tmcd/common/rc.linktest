@@ -28,11 +28,15 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 use libsetup;
 use libtmcc;
 
+# XXX this only works if called after linkdelay setup as is the case here
+sub LINKDELAYHOST() { if (-e TMLINKDELAY()) { return 1; } else { return 0; } }
+
 #
 # Exit if not a valid node to run linktest on.
 # 
 exit(0)
-    if (MFS() || REMOTE() || SIMHOST() || JAILHOST() || ISDELAYNODE());
+    if (MFS() || REMOTE() || SIMHOST() || JAILHOST() ||
+	(DELAYHOST() && !LINKDELAYHOST()));
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

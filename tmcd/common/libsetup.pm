@@ -24,7 +24,7 @@ use Exporter;
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE CONTROL JAILED PLAB LOCALROOTFS IXP USESFS 
-	 SIMTRAFGEN SIMHOST ISDELAYNODE JAILHOST
+	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST
 
 	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
@@ -164,8 +164,8 @@ use liblocsetup;
 sub TMCC()		{ "$BINDIR/tmcc"; }
 sub FINDIF()		{ "$BINDIR/findif"; }
 sub TMUSESFS()		{ "$BOOTDIR/usesfs"; }
-sub ISSIMTRAFGEN()	{ "$BOOTDIR/simtrafgen"; }
-sub ISDELAYNODE()	{ "$BOOTDIR/isdelaynode"; }
+sub ISSIMTRAFGENPATH()	{ "$BOOTDIR/simtrafgen"; }
+sub ISDELAYNODEPATH()	{ "$BOOTDIR/isdelaynode"; }
 sub TMTOPOMAP()		{ "$BOOTDIR/topomap";}
 
 #
@@ -274,10 +274,13 @@ sub IXP()	{ if ($inixp) { return $vnodeid; } else { return 0; } }
 # Are we hosting a simulator or maybe just a NSE based trafgen.
 #
 sub SIMHOST()   { if ($role eq "simhost") { return 1; } else { return 0; } }
-sub SIMTRAFGEN(){ if (-e ISSIMTRAFGEN())  { return 1; } else { return 0; } }
+sub SIMTRAFGEN(){ if (-e ISSIMTRAFGENPATH())  { return 1; } else { return 0; } }
 
 # A jail host?
 sub JAILHOST()  { if ($role eq "virthost") { return 1; } else { return 0; } }
+
+# A delay host?  Either a delay node or a node using linkdelays
+sub DELAYHOST()	{ if (-e ISDELAYNODEPATH()) { return 1; } else { return 0; } }
 
 #
 # Is this node using SFS. Several scripts need to know this.
@@ -291,7 +294,7 @@ sub cleanup_node ($) {
     my ($scrub) = @_;
     
     print STDOUT "Cleaning node; removing configuration files\n";
-    unlink TMUSESFS, TMROLE, ISSIMTRAFGEN;
+    unlink TMUSESFS, TMROLE, ISSIMTRAFGENPATH;
 
     #
     # If scrubbing, also remove the password/group files and DBs so
@@ -779,7 +782,7 @@ sub gettrafgenconfig($)
 	    # Flag node as doing NSE trafgens for other scripts.
 	    #
 	    if ($trafgen->{"GENERATOR"} eq "NSE") {
-		system("touch " . ISSIMTRAFGEN);
+		system("touch " . ISSIMTRAFGENPATH);
 		next;
 	    }
 	}

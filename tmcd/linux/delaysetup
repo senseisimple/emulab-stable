@@ -62,12 +62,21 @@ if (@ARGV) {
 #
 # Delay node configuration goop.
 #
-my $KERNEL100	= "2.4.18-27.7.x";
-my $KERNELJAIL  = "";
-my $KERNELLDELAY= "2.4.18-LINKDELAY";	# Link delay kernel. 
+# The kernel identifiers are just tags to differentiate kernels.
+# These tags should be the LILO identifiers (labels) and the tag should
+# appear somewher in the kernel name returned via osversion.
+# XXX however because we gave no thought to kernel naming in 7.x, the
+# default kernel doesn't adhere to this convention.  So all we can do
+# for sure is recognize that we are not running a linkdelay kernel and
+# switch to it.
+#
+my $KERNEL100	= "emulab";
+my $KERNELJAIL  = "jail";
+my $KERNELLDELAY= "linkdelay";
+
 my $TMDELMAP	= TMDELMAP;	# Really comes from libloc.
-my $TC          = "/usr/local/bin/tc";
-my $IPTABLES    = "/usr/local/bin/iptables";
+my $TC          = "tc";		# May be in /usr/local/{sbin,bin}
+my $IPTABLES    = "iptables";	# May be in /usr/local/{sbin,bin}
 
 # This should never happen!
 if (REMOTE() || MFS()) {
@@ -327,7 +336,7 @@ sub LinkDelaySetup()
     
 	# Touch this file so that we globally know that the node is a delay
 	# node.
-	system("touch " . ISDELAYNODE());
+	system("touch " . ISDELAYNODEPATH());
 
 	#
 	# Now do kernel configuration. All of the above work is wasted,
@@ -351,31 +360,25 @@ sub checkkernel($)
 {
     my $kernel = shift;
 
-    my $VMLINUZ = "/boot/vmlinuz";
-
-    print STDOUT "Making sure node is running $kernel ... \n";
+    print STDOUT "Making sure node is running $kernel kernel... \n";
 
     my $kernvers = `cat /proc/sys/kernel/osrelease`;
     chomp $kernvers;
 
     if (!$kernvers) {
         print STDERR "Unable to determine running kernel version.\n";
-        return 1;
+        return;
     }
 
-    if (! ($kernvers =~ /$kernel/)) {
-        if (-e "$VMLINUZ-$kernel") {
-            unlink($VMLINUZ) &&
-                symlink("$VMLINUZ-$kernel", $VMLINUZ) ||
-                    do {
-                        print STDERR "Error linking to new kernel\n";
-                        return 1;
-                    };
+    if (!($kernvers =~ /$kernel/i)) {
 
-            if (system ("/sbin/lilo")) {
-                print STDERR "Error running lilo.\n";
-                return 1;
-            }
+	# XXX only works for linkdelay right now
+	return if ($kernel ne $KERNELLDELAY);
+
+	my $lilocmd = "/sbin/lilo -D $kernel";
+	if (system ($lilocmd)) {
+	    print STDERR "Error ($?) running '$lilocmd'\n";
+	    return 1;
         }
 
         system("sync");

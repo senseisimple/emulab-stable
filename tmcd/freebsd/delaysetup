@@ -352,7 +352,7 @@ sub DelaySetup
 	# Touch this file so that we globally know that the node is a delay
 	# node. See routing setup. Need to avoid fastforwarding whenever we
 	# have link delays.
-	system("touch " . ISDELAYNODE());
+	system("touch " . ISDELAYNODEPATH());
 
 	#
 	# Now do kernel configuration. All of the above work is wasted,
@@ -581,7 +581,7 @@ sub LinkDelaySetup
 	# Touch this file so that we globally know that the node is a delay
 	# node. See routing setup. Need to avoid fastforwarding whenever we
 	# have link delays.
-	system("touch " . ISDELAYNODE());
+	system("touch " . ISDELAYNODEPATH());
 
 	#
 	# Now do kernel configuration. All of the above work is wasted,

@@ -390,7 +390,7 @@ sub os_setup()
 sub os_routing_enable_forward()
 {
     my $cmd;
-    my $fname = libsetup::ISDELAYNODE();
+    my $fname = libsetup::ISDELAYNODEPATH();
 
     if (REMOTE()) {
 	$cmd = "echo 'IP forwarding not turned on!'";
