@@ -76,8 +76,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+# Be careful not to exit on transient error; 0 means infinite retry.
+$libdb::DBQUERY_MAXTRIES = 0;
 
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
