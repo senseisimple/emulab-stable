@@ -393,8 +393,6 @@ if (!$TESTMODE) {
 }
 
 TBDebugTimeStamp("rebooting/reloading finished");
-print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
-
 sleep(2);
 
 #
@@ -402,6 +400,10 @@ sleep(2);
 # so that we can give each node at least 1 second chance. Avoids pointless
 # experiment failures.
 #
+if (@nodes) {
+    print "Waiting for local testbed nodes to finish rebooting ...\n";
+}
+
 my %retries;
 my %waitstart;
 foreach my $node ( @nodes ) {
@@ -409,7 +411,7 @@ foreach my $node ( @nodes ) {
     $waitstart{$node} = time;
 }
 
-TBDebugTimeStamp("waiting started");
+TBDebugTimeStamp("Local node waiting started");
 while ( @nodes ) {
     my $node = shift(@nodes);
 
@@ -481,7 +483,7 @@ while ( @nodes ) {
     print "*** Experiment will be terminated automatically.\n";
     $failed++;
 }
-TBDebugTimeStamp("waiting finished");
+TBDebugTimeStamp("Local node waiting finished");
 
 #
 # Now deal with virtual nodes.
@@ -490,12 +492,68 @@ TBDebugTimeStamp("waiting finished");
 # and so must be setuid root so that ssh will work.
 #
 if ( @vnodes ) {
-    system("$vnode_setup $pid $eid");
+    system("$vnode_setup -f $pid $eid");
     
     if ($?) {
-	$failed++;
-	print STDERR "*** Vnode setup failed!\n";
+	die("*** $0:\n".
+	    "    Vnode setup failed!\n");
     }
+
+    foreach my $node ( @vnodes ) {
+	$waitstart{$node} = time;
+    }
+
+    print "Waiting for widearea testbed nodes to finish rebooting ...\n";
+
+    TBDebugTimeStamp("Widearea node waiting started");
+    while ( @vnodes ) {
+	my $node = shift(@vnodes);
+
+	if (WaitTillAlive($node) == 0) {
+	    print STDOUT "$node is alive and well\n";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    next;
+	}
+
+	SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	
+	print "*** WARNING: $node may be down.\n".
+	      "    This has been reported to testbed-ops.\n";
+	
+	if ($canfail{$node}) {
+	    # Send mail to testbed-ops and to the user about it.
+	    my ($user) = getpwuid($UID);
+	
+	    SENDMAIL($user, "Widearea Node $node is down",
+		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
+		 "Your experiment will continue to run since this failure\n".
+		 "is nonfatal, although you might encounter other problems\n".
+		 "if your experiment depends explicitly on this node.\n".
+		 "You should terminate this experiment if it cannot ".
+		 "tolerate this failure.\n\n".
+		 "Testbed Operations has also been notified so they can ".
+		 "investigate.\n\n".
+		 "Thanks\n".
+		 "Testbed Operations\n",
+		 0,
+		 "Cc: $TBOPS");
+
+	    print "*** Continuing with experiment setup anyway ...\n";
+	    next;
+	}
+
+	# Reserve it to down experiment. 
+	# MarkNodeDown($node);
+
+	# Send mail to testbed-ops about it
+	SENDMAIL($TBOPS, "Widearea Node $node is down",
+		 "Widearea node $node in pid/eid $pid/$eid appears to be ".
+		 "unresponsive.\n\n");
+
+	print "*** Experiment will be terminated automatically.\n";
+	$failed++;
+    }
+    TBDebugTimeStamp("Widearea node waiting finished");
 }
 
 print STDOUT "OS Setup Done!\n";
