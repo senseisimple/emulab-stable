@@ -379,5 +379,10 @@ typedef	struct queue_entry	*queue_entry_t;
 	     !queue_end((head), (queue_entry_t)(elt));		\
 	     (elt) = (type) queue_next(&(elt)->field))
 
+#define queue_riterate(head, elt, type, field)			\
+	for ((elt) = (type) queue_last(head);			\
+	     !queue_end((head), (queue_entry_t)(elt));		\
+	     (elt) = (type) queue_prev(&(elt)->field))
+
 
 #endif	/* _KERN_QUEUE_H_ */

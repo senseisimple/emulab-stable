@@ -79,6 +79,22 @@ warning(const char *fmt, ...)
 }
 
 void
+error(const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	if (!usesyslog) {
+		vfprintf(stderr, fmt, args);
+		fflush(stderr);
+	}
+	else
+		vsyslog(LOG_ERR, fmt, args);
+	       
+	va_end(args);
+}
+
+void
 fatal(const char *fmt, ...)
 {
 	va_list args;

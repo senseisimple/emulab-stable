@@ -29,18 +29,36 @@
 /* Globals */
 int		debug = 0;
 int		tracing = 0;
+int		dynburst = 0;
+int		timeout = SERVER_INACTIVE_SECONDS;
+int		readsize = SERVER_READ_SIZE;
+volatile int	burstsize = SERVER_BURST_SIZE;
+int		gapsize = SERVER_BURST_GAP;
 int		portnum;
+int		killme;
+int		blockslost;
+int		sendretries;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
 char	       *filename;
 struct timeval  IdleTimeStamp;
 
+#ifdef DOLOSSRATE
+int		lossrate;
+#endif
+
 /* Forward decls */
 void		quit(int);
 void		reinit(int);
 static ssize_t	mypread(int fd, void *buf, size_t nbytes, off_t offset);
+static int	calcburst(void);
 
 #ifdef STATS
+/*
+ * Track duplicates for stats gathering
+ */
+char		*chunkmap;
+
 /*
  * Stats gathering.
  */
@@ -49,11 +67,16 @@ struct {
 	unsigned long	joins;
 	unsigned long	leaves;
 	unsigned long	requests;
-	unsigned long	duprequests;
 	unsigned long	joinrep;
 	unsigned long	blockssent;
 	unsigned long	filereads;
 	unsigned long	filebytes;
+	unsigned long	partialreq;
+	unsigned long   dupsent;
+	unsigned long	qmerges;
+	unsigned long	badpackets;
+	unsigned long   blockslost;
+	unsigned long	goesidle;
 } Stats;
 #define DOSTAT(x)	(Stats.x)
 #else
@@ -81,6 +104,11 @@ typedef struct {
 } WQelem_t;
 static queue_head_t     WorkQ;
 static pthread_mutex_t	WorkQLock;
+static int		WorkQDelay = -1;
+static int		WorkQSize = 0;
+#ifdef STATS
+static int		WorkQMax = 0;
+#endif
 
 /*
  * Work queue routines. The work queue is a time ordered list of chunk/blocks
@@ -103,22 +131,48 @@ WorkQueueInit(void)
 {
 	pthread_mutex_init(&WorkQLock, NULL);
 	queue_init(&WorkQ);
+
+	if (WorkQDelay < 0)
+		WorkQDelay = sleeptime(1000, "workQ check delay");
+
+#ifdef DOSTATS
+	chunkmap = calloc(Fileinfo.blocks, 1);
+#endif
 }
 
 static int
 WorkQueueEnqueue(int chunk, int block, int blockcount)
 {
 	WQelem_t	*wqel;
-	
+	int		elt;
+
 	pthread_mutex_lock(&WorkQLock);
 
+	elt = 0;
 	queue_iterate(&WorkQ, wqel, WQelem_t *, chain) {
-		if (wqel->chunk == chunk &&
-		    wqel->block == block &&
-		    wqel->count == blockcount) {
-			pthread_mutex_unlock(&WorkQLock);
-			return 0;
+		if (wqel->chunk == chunk) {
+			/*
+			 * Look for overlaps with existing requests and
+			 * extend the already queued request accordingly.
+			 */
+			if (block < wqel->block + wqel->count &&
+			    block + blockcount > wqel->block) {
+				EVENT(1, EV_WORKOVERLAP, mcastaddr,
+				      wqel->block, wqel->count,
+				      block, blockcount);
+				if (block < wqel->block)
+					wqel->block = block;
+				if (block + blockcount >
+				    wqel->block + wqel->count)
+					wqel->count = block + blockcount
+						- wqel->block;
+				pthread_mutex_unlock(&WorkQLock);
+				EVENT(1, EV_WORKMERGE, mcastaddr,
+				      chunk, wqel->block, wqel->count, elt);
+				return 0;
+			}
 		}
+		elt++;
 	}
 
 	if ((wqel = (WQelem_t *) calloc(1, sizeof(WQelem_t))) == NULL)
@@ -128,10 +182,15 @@ WorkQueueEnqueue(int chunk, int block, int blockcount)
 	wqel->block = block;
 	wqel->count = blockcount;
 	queue_enter(&WorkQ, wqel, WQelem_t *, chain);
+	WorkQSize++;
+#ifdef STATS
+	if (WorkQSize > WorkQMax)
+		WorkQMax = WorkQSize;
+#endif
 
 	pthread_mutex_unlock(&WorkQLock);
 
-	EVENT(1, EV_WORKENQ, mcastaddr, chunk, block, blockcount, 0);
+	EVENT(1, EV_WORKENQ, mcastaddr, chunk, block, blockcount, WorkQSize);
 	return 1;
 }
 
@@ -148,7 +207,7 @@ WorkQueueDequeue(int *chunk, int *block, int *blockcount)
 	 */
 	if (queue_empty(&WorkQ)) {
 		pthread_mutex_unlock(&WorkQLock);
-		fsleep(5000);
+		fsleep(WorkQDelay);
 		return 0;
 	}
 	
@@ -157,10 +216,12 @@ WorkQueueDequeue(int *chunk, int *block, int *blockcount)
 	*block = wqel->block;
 	*blockcount = wqel->count;
 	free(wqel);
+	WorkQSize--;
 
 	pthread_mutex_unlock(&WorkQLock);
 
-	EVENT(1, EV_WORKDEQ, mcastaddr, *chunk, *block, *blockcount, 0);
+	EVENT(1, EV_WORKDEQ, mcastaddr,
+	      *chunk, *block, *blockcount, WorkQSize);
 	return 1;
 }
 
@@ -211,9 +272,30 @@ ClientLeave(Packet_t *p)
 	EVENT(1, EV_LEAVEMSG, ipaddr,
 	      p->msg.leave.clientid, p->msg.leave.elapsed, 0, 0);
 
-	log("%s (id %u) leaves at %s! Reports %d elapsed seconds.",
+	log("%s (id %u): leaves at %s, ran for %d seconds.",
 	    inet_ntoa(ipaddr), p->msg.leave.clientid, CurrentTimeString(),
 	    p->msg.leave.elapsed);
+}
+
+/*
+ * A client leaves. Not much to it. All we do is print out a log statement
+ * about it so that we can see the time. If the packet is lost, no big deal.
+ */
+static void
+ClientLeave2(Packet_t *p)
+{
+	struct in_addr	ipaddr = { p->hdr.srcip };
+
+	EVENT(1, EV_LEAVEMSG, ipaddr,
+	      p->msg.leave2.clientid, p->msg.leave2.elapsed, 0, 0);
+
+	log("%s (id %u): leaves at %s, ran for %d seconds.",
+	    inet_ntoa(ipaddr), p->msg.leave2.clientid, CurrentTimeString(),
+	    p->msg.leave2.elapsed);
+
+#ifdef STATS
+	ClientStatsDump(p->msg.leave2.clientid, &p->msg.leave2.stats);
+#endif
 }
 
 /*
@@ -234,10 +316,26 @@ ClientRequest(Packet_t *p)
 	if (block + count > CHUNKSIZE)
 		fatal("Bad request from %s - chunk:%d block:%d size:%d", 
 		      inet_ntoa(ipaddr), chunk, block, count);
-	
+
+	if (count != CHUNKSIZE) {
+		DOSTAT(partialreq++);
+		DOSTAT(blockslost+=count);
+		blockslost += count;
+	}
+
 	enqueued = WorkQueueEnqueue(chunk, block, count);
 	if (!enqueued)
-		DOSTAT(duprequests++);
+		DOSTAT(qmerges++);
+#ifdef DOSTATS
+	else if (chunkmap != 0 && count == CHUNKSIZE) {
+		if (chunkmap[chunk]) {
+			if (debug)
+				log("Duplicate chunk request: %d", chunk);
+			DOSTAT(dupsent++);
+		} else
+			chunkmap[chunk] = 1;
+	}
+#endif
 
 	if (debug > 1) {
 		log("Client %s requests chunk:%d block:%d size:%d new:%d",
@@ -258,10 +356,18 @@ ServerRecvThread(void *arg)
 		log("Server pthread starting up ...");
 	
 	while (1) {
+		pthread_testcancel();
 		if (PacketReceive(p) < 0) {
 			continue;
 		}
 		DOSTAT(msgin++);
+
+		if (! PacketValid(p, FileInfo.chunks)) {
+			DOSTAT(badpackets++);
+			log("received bad packet %d/%d, ignored",
+			    p->hdr.type, p->hdr.subtype);
+			continue;
+		}
 
 		switch (p->hdr.subtype) {
 		case PKTSUBTYPE_JOIN:
@@ -272,15 +378,13 @@ ServerRecvThread(void *arg)
 			DOSTAT(leaves++);
 			ClientLeave(p);
 			break;
+		case PKTSUBTYPE_LEAVE2:
+			DOSTAT(leaves++);
+			ClientLeave2(p);
+			break;
 		case PKTSUBTYPE_REQUEST:
 			DOSTAT(requests++);
 			ClientRequest(p);
-			break;
-		case PKTSUBTYPE_BLOCK:
-			break;
-		default:
-			fatal("ServerRecvThread: Bad packet type: %d/%d!",
-			      p->hdr.type, p->hdr.subtype);
 			break;
 		}
 	}
@@ -295,12 +399,18 @@ static void
 PlayFrisbee(void)
 {
 	int		chunk, block, blockcount, cc, j, idlelastloop = 0;
-	int		startblock, lastblock, throttle;
+	int		startblock, lastblock, throttle = 0;
 	Packet_t	packet, *p = &packet;
-	static char	databuf[MAXREADBLOCKS * BLOCKSIZE];
+	char		*databuf;
 	off_t		offset;
 
+	if ((databuf = malloc(readsize * BLOCKSIZE)) == NULL)
+		fatal("could not allocate read buffer");
+
 	while (1) {
+		if (killme)
+			return;
+		
 		/*
 		 * Look for a WorkQ item to process. When there is nothing
 		 * to process, check for being idle too long, and exit if
@@ -309,8 +419,10 @@ PlayFrisbee(void)
 		 * spin.
 		 */
 		if (! WorkQueueDequeue(&chunk, &startblock, &blockcount)) {
+			throttle = 0;
+
 			/* If zero, never exit */
-			if (! SERVER_INACTIVE_SECONDS)
+			if (timeout == 0)
 				continue;
 			
 			if (idlelastloop) {
@@ -319,12 +431,14 @@ PlayFrisbee(void)
 				gettimeofday(&estamp, 0);
 
 				if ((estamp.tv_sec - IdleTimeStamp.tv_sec) >
-				    SERVER_INACTIVE_SECONDS) {
-					log("No requests for too long!");
-					return;
+				    timeout) {
+					log("No requests for %d seconds!",
+					    timeout);
+					break;
 				}
 			}
 			else {
+				DOSTAT(goesidle++);
 				gettimeofday(&IdleTimeStamp, 0);
 				idlelastloop = 1;
 			}
@@ -333,7 +447,6 @@ PlayFrisbee(void)
 		idlelastloop = 0;
 		
 		lastblock = startblock + blockcount;
-		throttle  = 0;
 
 		/* Offset within the file */
 		offset = (((off_t) BLOCKSIZE * chunk * CHUNKSIZE) +
@@ -341,19 +454,20 @@ PlayFrisbee(void)
 
 		for (block = startblock; block < lastblock; ) {
 			int	readcount;
-			int	readsize;
+			int	readbytes;
+			int	resends;
 			
 			/*
 			 * Read blocks of data from disk.
 			 */
-			if (lastblock - block > MAXREADBLOCKS)
-				readcount = MAXREADBLOCKS;
+			if (lastblock - block > readsize)
+				readcount = readsize;
 			else
 				readcount = lastblock - block;
-			readsize = readcount * BLOCKSIZE;
+			readbytes = readcount * BLOCKSIZE;
 
 			if ((cc = mypread(FileInfo.fd, databuf,
-					  readsize, offset)) <= 0) {
+					  readbytes, offset)) <= 0) {
 				if (cc < 0)
 					pfatal("Reading File");
 				fatal("EOF on file");
@@ -361,9 +475,9 @@ PlayFrisbee(void)
 			DOSTAT(filereads++);
 			DOSTAT(filebytes += cc);
 			EVENT(2, EV_READFILE, mcastaddr,
-			      offset, readsize, cc, 0);
-			if (cc != readsize)
-				fatal("Short read: %d!=%d", cc, readsize);
+			      offset, readbytes, cc, 0);
+			if (cc != readbytes)
+				fatal("Short read: %d!=%d", cc, readbytes);
 
 			for (j = 0; j < readcount; j++) {
 				p->hdr.type    = PKTTYPE_REQUEST;
@@ -375,21 +489,30 @@ PlayFrisbee(void)
 				       &databuf[j * BLOCKSIZE],
 				       BLOCKSIZE);
 
-				PacketSend(p);
+				PacketSend(p, &resends);
+				sendretries += resends;
 				DOSTAT(blockssent++);
 				EVENT(3, EV_BLOCKMSG, mcastaddr,
 				      chunk, block+j, 0, 0);
 			}
-			offset   += readsize;
+			offset   += readbytes;
 			block    += readcount;
 			throttle += readcount;
 
-			if (throttle > 64) {
-				fsleep(10000);
+			/*
+			 * Dynamically adjust the burst size if necessary
+			 */
+			if (dynburst)
+				calcburst();
+
+			if (throttle >= burstsize) {
+				if (gapsize > 0)
+					fsleep(gapsize);
 				throttle = 0;
 			}
 		}
 	}
+	free(databuf);
 }
 
 char *usagestr = 
@@ -414,8 +537,9 @@ main(int argc, char **argv)
 	int		ch, fd;
 	pthread_t	child_pid;
 	off_t		fsize;
+	void		*ignored;
 
-	while ((ch = getopt(argc, argv, "dhp:m:i:tb")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:i:tbDT:R:B:G:L:")) != -1)
 		switch(ch) {
 		case 'b':
 			broadcast++;
@@ -439,6 +563,32 @@ main(int argc, char **argv)
 		case 't':
 			tracing++;
 			break;
+		case 'D':
+			dynburst = 1;
+			break;
+		case 'T':
+			timeout = atoi(optarg);
+			break;
+		case 'R':
+			readsize = atoi(optarg);
+			break;
+		case 'B':
+			burstsize = atoi(optarg);
+			break;
+		case 'G':
+			gapsize = atoi(optarg);
+			break;
+#ifdef DOLOSSRATE
+		/* XXX this is not the emulab way! */
+		case 'L':
+		{
+			double plr = atof(optarg);
+			if (plr < 0 || plr > 1)
+				fatal("bad loss rate: %f", plr);
+			lossrate = (int)(plr * 0x7fffffff);
+			break;
+		}
+#endif
 		case 'h':
 		case '?':
 		default:
@@ -446,9 +596,34 @@ main(int argc, char **argv)
 		}
 	argc -= optind;
 	argv += optind;
-
 	if (argc != 1)
 		usage();
+
+	gapsize = sleeptime(gapsize, "inter-burst delay");
+
+	/*
+	 * For the dynamic rate throttle, we need to increase the maximum
+	 * burstsize to induce loss at the start.  Also need the gapsize
+	 * to be the min possible.
+	 */
+	if (dynburst) {
+		int ngap;
+
+		if (burstsize != SERVER_DYNBURST_SIZE) {
+			warning("adjusting burstsize for dynamic throttle");
+			burstsize = SERVER_DYNBURST_SIZE;
+		}
+		ngap = sleeptime(1000, 0);
+		if (gapsize != ngap) {
+			warning("adjusting gapsize for dynamic throttle");
+			gapsize = ngap;
+		}
+	}
+
+	if (readsize > burstsize ||
+	    ((burstsize / readsize) * readsize != burstsize))
+		fatal("readsize (%d) not at even divisor of burstsize (%d)",
+		      readsize, burstsize);
 
 	if (!portnum || ! mcastaddr.s_addr)
 		usage();
@@ -458,7 +633,6 @@ main(int argc, char **argv)
 	signal(SIGHUP, reinit);
 
 	ServerLogInit();
-	WorkQueueInit();
 	
 	filename = argv[0];
 	if (access(filename, R_OK) < 0)
@@ -479,6 +653,8 @@ main(int argc, char **argv)
 	FileInfo.chunks = FileInfo.blocks / CHUNKSIZE;
 	log("Opened %s: %d blocks", filename, FileInfo.blocks);
 
+	WorkQueueInit();
+
 	/*
 	 * Everything else done, now init the network.
 	 */
@@ -498,6 +674,8 @@ main(int argc, char **argv)
 	gettimeofday(&IdleTimeStamp, 0);
 	
 	PlayFrisbee();
+	pthread_cancel(child_pid);
+	pthread_join(child_pid, &ignored);
 
 	if (tracing) {
 		TraceStop();
@@ -505,17 +683,42 @@ main(int argc, char **argv)
 	}
 
 #ifdef  STATS
-	log("Stats:");
-	log("  msgs in/out:      %d/%d",
-	    Stats.msgin, Stats.joinrep + Stats.blockssent);
-	log("  joins/leaves:     %d/%d", Stats.joins, Stats.leaves);
-	log("  block requests:   %d (%d duplicates ignored)",
-	    Stats.requests, Stats.duprequests);
-	log("  1k blocks sent:   %d (%d repeated)",
-	    Stats.blockssent, Stats.blockssent - FileInfo.blocks);
-	log("  file reads:       %d (%d bytes, %d repeated)",
-	    Stats.filereads, Stats.filebytes,
-	    Stats.filebytes - FileInfo.blocks * BLOCKSIZE);
+	{
+		extern unsigned long nonetbufs;
+
+		log("Params:");
+		log("  chunk/block size  %d/%d", CHUNKSIZE, BLOCKSIZE);
+		log("  burst size/gap    %d/%d", burstsize, gapsize);
+		log("  file read size    %d", readsize);
+		log("  file:size         %s:%qd",
+		    filename, (long long)fsize);
+		log("Stats:");
+		log("  msgs in/out:      %d/%d",
+		    Stats.msgin, Stats.joinrep + Stats.blockssent);
+		log("  joins/leaves:     %d/%d", Stats.joins, Stats.leaves);
+		log("  requests:         %d (%d merged in queue)",
+		    Stats.requests, Stats.qmerges);
+		log("  partial/dup req:  %d/%d",
+		    Stats.partialreq, Stats.dupsent);
+		log("  1k blocks sent:   %d (%d repeated)",
+		    Stats.blockssent, Stats.blockssent - FileInfo.blocks);
+		log("  file reads:       %d (%d bytes, %d repeated)",
+		    Stats.filereads, Stats.filebytes,
+		    Stats.filebytes - FileInfo.blocks * BLOCKSIZE);
+		log("  net idle/blocked: %d/%d", Stats.goesidle, nonetbufs);
+		log("  max workq size:   %d", WorkQMax);
+#ifdef DOLOSSRATE
+		{
+			extern unsigned long spackets, spacketslost;
+			extern unsigned long rpackets, rpacketslost;
+
+			log("  send total/lost:  %d/%d",
+			    spackets, spacketslost);
+			log("  recv total/lost:  %d/%d",
+			    rpackets, rpacketslost);
+		}
+#endif
+	}
 #endif
 
 	/*
@@ -532,8 +735,7 @@ main(int argc, char **argv)
 void
 quit(int sig)
 {
-	log("Caught signal %d. Exiting ...", sig);
-	exit(0);
+	killme = 1;
 }
 
 /*
@@ -545,6 +747,8 @@ reinit(int sig)
 	log("Caught signal %d. Exiting ...", sig);
 	exit(1);
 }
+
+#define NFS_READ_DELAY	100000
 
 /*
  * Wrap up pread with a retry mechanism to help protect against
@@ -574,11 +778,95 @@ mypread(int fd, void *buf, size_t nbytes, off_t offset)
 			if (i == 0)
 				pwarning("read error: will retry");
 
-			fsleep(100000);
+			fsleep(NFS_READ_DELAY);
 		}
 		pfatal("read error: busted for too long");
 		return -1;
 	again:
 	}
 	return count;
+}
+
+#define LOSS_THRESHOLD	30
+
+/*
+ * Should we consider PacketSend retries?   They indicated that we are over
+ * driving the socket?  Even though they have a builtin delay between retries,
+ * we might be better off detecting the case and avoiding the delays.
+ *
+ * From Dave:
+ *
+ * A smoother one that is still fair with TCP is:
+ *    W_{next} = W_{cur} - sqrt( W_{cur} ) if loss
+ *    W_{next} = W_{cur} + 1 / sqrt( W_{cur} )  if no loss
+ */
+static int
+calcburst(void)
+{
+	static int		lastblockslost, lastsendretries;
+	static struct timeval	laststamp;
+	struct timeval		estamp;
+	long			msdiff;
+	int			lost, tweaked = 0;
+
+	if (! laststamp.tv_sec)
+		gettimeofday(&laststamp, 0);
+	gettimeofday(&estamp, 0);
+
+	msdiff  = (estamp.tv_sec  - laststamp.tv_sec)  * 1000;
+	msdiff += (estamp.tv_usec - laststamp.tv_usec) / 1000;
+	lost    = blockslost - lastblockslost;
+
+#if 0
+	/* XXX experiment: for send socket overflows as a decrement event */
+	if (sendretries - lastsendretries > 2) {
+		if (burstsize <= 20)
+			burstsize -= 1;
+		else {
+			burstsize -= (burstsize / 20);
+		}
+		tweaked = 1;
+		if (debug)
+			log("Decrement burstsize to %d (%ld), "
+			    "sendretries up by %d",
+			    burstsize, msdiff, sendretries - lastsendretries);
+	} else
+#endif
+	if (lost) {
+		/*
+		 * Decrement the burstsize slowly.
+		 */
+		if (lost > LOSS_THRESHOLD && msdiff > 150 && burstsize > 1) {
+			if (burstsize <= 20)
+				burstsize -= 1;
+			else {
+				burstsize -= (burstsize / 20);
+			}
+			tweaked = 1;
+			fsleep(gapsize);
+			if (debug)
+				log("Decrement burstsize to %d (%ld), "
+				    "blockslost up by %d",
+				    burstsize, msdiff, lost);
+		}
+	}
+	else if (burstsize < SERVER_DYNBURST_SIZE) {
+		/*
+		 * Increment the burstsize even more slowly.
+		 */
+		if (msdiff > 500) {
+			burstsize++;
+			tweaked = 1;
+			if (debug)
+				log("Increment burstsize to %d (%ld)",
+				    burstsize, msdiff);
+		}
+	}
+
+	if (tweaked) {
+		laststamp = estamp;
+		lastblockslost = blockslost;
+		lastsendretries = sendretries;
+	}
+	return 0;
 }

@@ -31,6 +31,19 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= -static
 
+# Define this to a non-zero value to enable recording of trace data
+#CFLAGS		+= -DNEVENTS=20000
+
+# Turn on server packet loss rate ability
+#CFLAGS		+= -DDOLOSSRATE
+
+# Turn on client event handling
+#CFLAGS		+= -DDOEVENTS
+#CLIENTOBJS	+= event.o $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o
+#CLIENTLIBS	+= `elvin-config --libs vin4c`
+#EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` \
+		-I$(TESTBED_SRCDIR)
+
 frisbee: $(CLIENTOBJS) ../imagezip/frisbee.o
 	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
 	cp frisbee frisbee.debug
@@ -40,6 +53,10 @@ frisbeed: $(SERVEROBJS)
 	$(CC) $(LDFLAGS) $(SERVERFLAGS) $(SERVEROBJS) $(SERVERLIBS) -o frisbeed
 	cp frisbeed frisbeed.debug
 	strip frisbeed
+
+
+event.o:	$(SRCDIR)/event.c decls.h log.h event.h
+	$(CC) $(EVENTFLAGS) -c $(SRCDIR)/event.c
 
 client.o:	decls.h log.h trace.h
 server.o:	decls.h log.h trace.h

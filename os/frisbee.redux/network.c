@@ -21,6 +21,24 @@
 #include <errno.h>
 #include "decls.h"
 
+#ifdef DOLOSSRATE
+extern int lossrate;
+#endif
+
+#ifdef STATS
+#ifdef DOLOSSRATE
+unsigned long spackets, spacketslost;
+unsigned long rpackets, rpacketslost;
+#endif
+unsigned long nonetbufs;
+#define DOSTAT(x)	(x)
+#else
+#define DOSTAT(x)
+#endif
+
+/* Time in usec to delay waiting for more buffer space on sends */
+#define NOBUF_DELAY	1000
+
 /* Max number of times to attempt bind to port before failing. */
 #define MAXBINDATTEMPTS		10
 
@@ -29,6 +47,7 @@
 
 static int		sock;
 struct in_addr		myipaddr;
+static int		nobufdelay = -1;
 int			broadcast = 0;
 
 static void
@@ -43,10 +62,10 @@ CommonInit(void)
 	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		pfatal("Could not allocate a socket");
 
-	i = (128 * 1024);
+	i = SOCKBUFSIZE;
 	setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &i, sizeof(i));
     
-	i = (128 * 1024);
+	i = SOCKBUFSIZE;
 	setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &i, sizeof(i));
 
 	name.sin_family      = AF_INET;
@@ -144,6 +163,13 @@ CommonInit(void)
 
 		memcpy((char *)&myipaddr, he->h_addr, sizeof(myipaddr));
 	}
+
+	/*
+	 * Compute the out of buffer space delay
+	 */
+	if (nobufdelay < 0)
+		nobufdelay = sleeptime(NOBUF_DELAY,
+				       "out of socket buffer space delay");
 }
 
 int
@@ -174,16 +200,47 @@ int
 PacketReceive(Packet_t *p)
 {
 	struct sockaddr_in from;
-	int		   mlen, alen = sizeof(from);
+	int		   mlen, alen;
 
-	bzero(&from, sizeof(from));
+#ifdef DOLOSSRATE
+	struct timeval	   now, then;
 
+	if (lossrate) {
+		/*
+		 * XXX cannot rely on socket timeout value since we need to
+		 * treat received and dropped packets as though they never
+		 * arrived.  This is still not correct as a receive timeout
+		 * could still be up to twice as long as it should be, but
+		 * I don't want to mess with the socket timeout on every
+		 * recv call.
+		 */
+		gettimeofday(&then, 0);
+		if ((then.tv_usec += PKTRCV_TIMEOUT) >= 1000000) {
+			then.tv_sec++;
+			then.tv_usec -= 1000000;
+		}
+	again:
+		gettimeofday(&now, 0);
+		if (timercmp(&now, &then, >=))
+			return -1;
+	}
+#endif
+	alen = sizeof(from);
+	bzero(&from, alen);
 	if ((mlen = recvfrom(sock, p, sizeof(*p), 0,
 			     (struct sockaddr *)&from, &alen)) < 0) {
 		if (errno == EWOULDBLOCK)
 			return -1;
 		pfatal("PacketReceive(recvfrom)");
 	}
+#ifdef DOLOSSRATE
+	DOSTAT(rpackets++);
+	if (lossrate && random() < lossrate) {
+		DOSTAT(rpacketslost++);
+		goto again;
+	}
+#endif
+
 	if (mlen != sizeof(p->hdr) + p->hdr.datalen)
 		fatal("PacketReceive: Bad message length %d!=%d",
 		      mlen, p->hdr.datalen);
@@ -198,11 +255,19 @@ PacketReceive(Packet_t *p)
  * The amount of data sent is determined from the datalen of the packet hdr.
  * All packets are actually the same size/structure. 
  */
-int
-PacketSend(Packet_t *p)
+void
+PacketSend(Packet_t *p, int *resends)
 {
 	struct sockaddr_in to;
-	int		   len;
+	int		   len, delays;
+
+#ifdef DOLOSSRATE
+	DOSTAT(spackets++);
+	if (lossrate && random() < lossrate) {
+		DOSTAT(spacketslost++);
+		return;
+	}
+#endif
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
 	p->hdr.srcip = myipaddr.s_addr;
@@ -211,6 +276,7 @@ PacketSend(Packet_t *p)
 	to.sin_port        = htons(portnum);
 	to.sin_addr.s_addr = mcastaddr.s_addr;
 
+	delays = 0;
 	while (sendto(sock, (void *)p, len, 0, 
 		      (struct sockaddr *)&to, sizeof(to)) < 0) {
 		if (errno != ENOBUFS)
@@ -220,10 +286,13 @@ PacketSend(Packet_t *p)
 		 * ENOBUFS means we ran out of mbufs. Okay to sleep a bit
 		 * to let things drain.
 		 */
-		fsleep(10000);
+		delays++;
+		fsleep(nobufdelay);
 	}
 
-	return p->hdr.datalen;
+	DOSTAT(nonetbufs += delays);
+	if (resends != 0)
+		*resends = delays;
 }
 
 /*
@@ -232,11 +301,19 @@ PacketSend(Packet_t *p)
  * the logic in a number of places, by avoiding having to deal with
  * multicast packets that are not destined for us, but for someone else.
  */
-int
+void
 PacketReply(Packet_t *p)
 {
 	struct sockaddr_in to;
 	int		   len;
+
+#ifdef DOLOSSRATE
+	DOSTAT(spackets++);
+	if (lossrate && random() < lossrate) {
+		DOSTAT(spacketslost++);
+		return;
+	}
+#endif
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
 
@@ -254,8 +331,58 @@ PacketReply(Packet_t *p)
 		 * ENOBUFS means we ran out of mbufs. Okay to sleep a bit
 		 * to let things drain.
 		 */
-		fsleep(10000);
+		DOSTAT(nonetbufs++);
+		fsleep(nobufdelay);
+	}
+}
+
+int
+PacketValid(Packet_t *p, int nchunks)
+{
+	switch (p->hdr.type) {
+	case PKTTYPE_REQUEST:
+	case PKTTYPE_REPLY:
+		break;
+	default:
+		return 0;
 	}
 
-	return p->hdr.datalen;
+	switch (p->hdr.subtype) {
+	case PKTSUBTYPE_BLOCK:
+		if (p->hdr.datalen < sizeof(p->msg.block))
+			return 0;
+		if (p->msg.block.chunk < 0 ||
+		    p->msg.block.chunk >= nchunks ||
+		    p->msg.block.block < 0 ||
+		    p->msg.block.block >= CHUNKSIZE)
+			return 0;
+		break;
+	case PKTSUBTYPE_REQUEST:
+		if (p->hdr.datalen < sizeof(p->msg.request))
+			return 0;
+		if (p->msg.request.chunk < 0 ||
+		    p->msg.request.chunk >= nchunks ||
+		    p->msg.request.block < 0 ||
+		    p->msg.request.block >= CHUNKSIZE ||
+		    p->msg.request.count < 0 ||
+		    p->msg.request.block+p->msg.request.count > CHUNKSIZE)
+			return 0;
+		break;
+	case PKTSUBTYPE_JOIN:
+		if (p->hdr.datalen < sizeof(p->msg.join))
+			return 0;
+		break;
+	case PKTSUBTYPE_LEAVE:
+		if (p->hdr.datalen < sizeof(p->msg.leave))
+			return 0;
+		break;
+	case PKTSUBTYPE_LEAVE2:
+		if (p->hdr.datalen < sizeof(p->msg.leave2))
+			return 0;
+		break;
+	default:
+		return 0;
+	}
+
+	return 1;
 }
