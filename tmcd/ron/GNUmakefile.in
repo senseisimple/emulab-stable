@@ -17,7 +17,7 @@ all:	bossnode
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 DESTDIR		=
-INSTALL_DIR	= $(DESTDIR)/etc/local/etc/testbed
+INSTALL_DIR	= $(DESTDIR)/usr/local/etc/testbed
 INSTALL		= /usr/bin/install -c 
 INSTALL_PROG	= /usr/bin/install -c -m 755
 
