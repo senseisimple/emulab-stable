@@ -9,6 +9,7 @@ import java.awt.event.*;
 import java.awt.image.ImageObserver;
 import java.awt.image.BufferedImage;
 import javax.swing.*;
+import javax.swing.event.*;
 import javax.swing.table.AbstractTableModel;
 import java.net.URL;
 import java.lang.Math;
@@ -26,11 +27,14 @@ import java.text.DecimalFormat;
 public class RoboTrack extends JApplet {
     static Map map;
     static JTable maptable;
+    static JPopupMenu MenuPopup;
+    static JMenuItem CancelMenuItem, SubmitMenuItem;
     static Image floorimage;
     static double pixels_per_meter = 1.0;
     boolean frozen = false;
     static final DecimalFormat FORMATTER = new DecimalFormat("0.00");
     String uid, auth;
+    boolean shelled = false;
     
     /*
      * The connection to boss that will provide robot location info.
@@ -60,6 +64,9 @@ public class RoboTrack extends JApplet {
 			       + "&nocookieauth="
 			       + URLEncoder.encode(auth));
 
+	    // System.out.println(urlServer.toString());
+	    // System.out.println(floorurl.toString());
+
 	    // and then get it.
 	    floorimage = getImage(floorurl);
 
@@ -82,50 +89,11 @@ public class RoboTrack extends JApplet {
 	}
 
 	/*
-	 * Middle mouse button will stop/start the display.
+	 * Mouse listener. See below.
 	 */
-	addMouseListener(new MouseAdapter() {
-	    public void mousePressed(MouseEvent e) {
-	        int button = e.getButton();
-
-		if (button == e.BUTTON1) {
-		    try
-		    {
-			String node_id = map.pickRobot(e.getX(), e.getY());
-
-			if (node_id == "")
-			    return;
-
-			URL url = new URL(getCodeBase(),
-					  "/shownode.php3?node_id=" + node_id
-					  + "&nocookieuid="
-					  + URLEncoder.encode(uid)
-					  + "&nocookieauth="
-					  + URLEncoder.encode(auth));
-
-			System.out.println(url.toString());
-
-			getAppletContext().showDocument(url, "_robbie");
-		    }
-		    catch(Throwable th)
-		    {
-			th.printStackTrace();
-		    }
-		}
-		else if (button == e.BUTTON2) {
-		  if (frozen) {
-		    frozen = false;
-		    System.out.println("Restarting applet ...");
-		    start();
-		  }
-		  else {
-		    frozen = true;
-		    System.out.println("Stopping applet ...");
-		    stop();
-		  }
-		}
-	    }
-	});
+	MyMouseAdaptor mymouser = new MyMouseAdaptor();
+	addMouseListener(mymouser);
+	addMouseMotionListener(mymouser);
 
 	/*
 	 * Make sure the redraw stops when the window is iconified.
@@ -151,6 +119,22 @@ public class RoboTrack extends JApplet {
 	maptable = new JTable(new MyTableModel());
 	getContentPane().add(maptable.getTableHeader(), BorderLayout.NORTH);
 	getContentPane().add(maptable, BorderLayout.CENTER);
+
+	/*
+	 * Create the popup menu that will be used to fire off
+	 * robot moves. We use the mouseadaptor for this too. 
+	 */
+        MenuPopup = new JPopupMenu("dd");
+        SubmitMenuItem = new JMenuItem("Submit All Moves");
+        SubmitMenuItem.addActionListener(mymouser);
+        MenuPopup.add(SubmitMenuItem);
+        CancelMenuItem = new JMenuItem("Cancel All Moves");
+        CancelMenuItem.addActionListener(mymouser);
+        MenuPopup.add(CancelMenuItem);
+        JMenuItem menuitem = new JMenuItem("Close This Menu");
+        menuitem.addActionListener(mymouser);
+        MenuPopup.add(menuitem);
+	MenuPopup.setBorder(BorderFactory.createLineBorder(Color.black));
     }
 
     public void start() {
@@ -184,6 +168,10 @@ public class RoboTrack extends JApplet {
 	int dx, dy;			// Destination x,y coords in pixels
 	double dor = 500.0;		// Destination orientation
 	boolean gotdest = false;	// We have a valid destination
+	boolean dragging = false;	// Drag and Drop in progress.
+	int drag_x, drag_y;		// Current drag x,y coords.
+	double drag_or = 500.0;		// Drag orientation
+	
 	/*
 	 * These are formatted as strings to avoid doing conversons
 	 * on the fly when the table is redrawn. Note, we have to
@@ -198,6 +186,9 @@ public class RoboTrack extends JApplet {
 	String dx_meters          = "";
 	String dy_meters          = "";
 	String dor_string         = "";
+	String dragx_meters       = "";
+	String dragy_meters       = "";
+	String dragor_string      = "";
 	String pname, vname;
 	long last_update          = 0;	// Unix time of last update.
 	String update_string      = "";
@@ -215,12 +206,12 @@ public class RoboTrack extends JApplet {
 	private Graphics2D G2 = null;
 
 	// The DOT radius.
-	int DOT_RAD   = 14;
+	int DOT_RAD   = 20;
 	// The length of the orientation stick, from the center of the circle.
-	int STICK_LEN = 15;
+	int STICK_LEN = 20;
 	// The distance from center of dot to the label x,y.
-	int LABEL_X   = -15;
-	int LABEL_Y   = 18;
+	int LABEL_X   = -20;
+	int LABEL_Y   = 20;
 	
         public Map() {
         }
@@ -366,30 +357,51 @@ public class RoboTrack extends JApplet {
 	    while (e.hasMoreElements()) {
 		Robot robbie  = (Robot)e.nextElement();
 
-		if (Math.abs(robbie.y - y) < 10 &&
-		    Math.abs(robbie.x - x) < 10)
+		if ((Math.abs(robbie.y - y) < 10 &&
+		     Math.abs(robbie.x - x) < 10) ||
+		    (robbie.dragging &&
+		     Math.abs(robbie.drag_y - y) < 10 &&
+		     Math.abs(robbie.drag_x - x) < 10)) {
 		    return robbie.pname;
+		}
 	    }
 	    return "";
 	}
 
 	/*
-	 * Draw a robot, which is either the real one or a destination one.
+	 * Draw some buttons.
 	 */
+
+	/*
+	 * Draw a robot, which is either the real one, a destination one,
+	 * or a shadow one being dragged around.
+	 */
+	static int DRAWROBOT_LOC  = 1;
+	static int DRAWROBOT_DST  = 2;
+	static int DRAWROBOT_DRAG = 3;
+	
 	public void drawRobot(Graphics2D g2,
 			      int x, int y, double or,
-			      String label, boolean dest) {
+			      String label, int which) {
 	    /*
 	     * An allocated robot is a filled circle.
+	     * A destination is an unfilled circle. So is a dragging robot.
 	     */
-	    g2.setColor(Color.green);
-
-	    if (!dest)
+	    if (which == DRAWROBOT_LOC) {
+		g2.setColor(Color.green);
 		g2.fillOval(x - (DOT_RAD/2), y - (DOT_RAD/2),
 			    DOT_RAD, DOT_RAD);
-	    else 
+	    }
+	    else if (which == DRAWROBOT_DST) {
+		g2.setColor(Color.green);
 		g2.drawOval(x - (DOT_RAD/2), y - (DOT_RAD/2),
 			    DOT_RAD, DOT_RAD);
+	    }
+	    else if (which == DRAWROBOT_DRAG) {
+		g2.setColor(Color.red);
+		g2.drawOval(x - (DOT_RAD/2), y - (DOT_RAD/2),
+			    DOT_RAD, DOT_RAD);
+	    }
 	    
 	    /*
 	     * If there is a orientation, add an orientation stick
@@ -408,15 +420,30 @@ public class RoboTrack extends JApplet {
 	     * Draw a label for the robot, either above or below,
 	     * depending on where the orientation stick was.
 	     */
-	    int lx = x + LABEL_X;
-	    int ly = y + LABEL_Y;
+	    int lx  = x + LABEL_X;
+	    int ly  = y + LABEL_Y;
+	    int dlx = x + LABEL_X - 15;
+	    int dly = ly + 12;
 
 	    if ((or > 180.0 && or < 360.0) ||
-		(or < 0.0   && or > -180.0))
-		ly = y - (LABEL_Y/2);
+		(or < 0.0   && or > -180.0)) {
+		ly  = y - (LABEL_Y/2);
+		dly = ly - (LABEL_Y/2);
+	    }
 
 	    g2.setColor(Color.black);
 	    g2.drawString(label, lx, ly);
+
+	    /*
+	     * If dragging, then put in the drag coordinates (in meters).
+	     */
+	    if (which == DRAWROBOT_DRAG) {
+		String text =
+		    "(" + FORMATTER.format(x / pixels_per_meter) + ","
+		        + FORMATTER.format(y / pixels_per_meter) + ")";
+
+		g2.drawString(text, dlx, dly);
+	    }
 	}
 
 	public void drawMap(int w, int h, Graphics2D g2) {
@@ -441,7 +468,7 @@ public class RoboTrack extends JApplet {
 		int x = robbie.x;
 		int y = robbie.y;
 
-		drawRobot(g2, x, y, robbie.or, robbie.pname, false);
+		drawRobot(g2, x, y, robbie.or, robbie.pname, DRAWROBOT_LOC);
 
 		/*
 		 * Okay, if the robot has a destination, draw that too
@@ -451,12 +478,26 @@ public class RoboTrack extends JApplet {
 		    int dx = robbie.dx;
 		    int dy = robbie.dy;
 		    
-		    drawRobot(g2, dx, dy, robbie.dor, robbie.pname, true);
+		    drawRobot(g2, dx, dy, robbie.dor, robbie.pname,
+			      DRAWROBOT_DST);
 
 		    /*
 		     * And draw a light grey line from source to dest.
 		     */
 		    g2.setColor(Color.gray);
+		    g2.drawLine(x, y, dx, dy);
+		}
+		else if (robbie.dragging) {
+		    int dx = robbie.drag_x;
+		    int dy = robbie.drag_y;
+		    
+		    drawRobot(g2, dx, dy, robbie.drag_or, robbie.pname,
+			      DRAWROBOT_DRAG);
+
+		    /*
+		     * And draw a red line from source to drag.
+		     */
+		    g2.setColor(Color.red);
 		    g2.drawLine(x, y, dx, dy);
 		}
 	    }
@@ -546,7 +587,7 @@ public class RoboTrack extends JApplet {
 	}
     }
     
-    static class MyTableModel extends AbstractTableModel {
+    public class MyTableModel extends AbstractTableModel {
         private String[] columnNames = {"Pname", "Vname",
 	                                "X (meters)", "Y (meters)",
 					"Z (meters)",
@@ -590,9 +631,12 @@ public class RoboTrack extends JApplet {
 	    case 3: return robbie.y_meters;
 	    case 4: return robbie.z_meters;
 	    case 5: return robbie.or_string;
-	    case 6: return robbie.dx_meters;
-	    case 7: return robbie.dy_meters;
-	    case 8: return robbie.dor_string;
+	    case 6: return (robbie.dragging ?
+			    robbie.dragx_meters : robbie.dx_meters);
+	    case 7: return (robbie.dragging ?
+			    robbie.dragy_meters : robbie.dy_meters);
+	    case 8: return (robbie.dragging ?
+			    robbie.dragor_string : robbie.dor_string);
 	    case 9: return robbie.battery_percentage;
 	    case 10: return robbie.battery_voltage;
 	    case 11: return robbie.update_string;
@@ -606,17 +650,433 @@ public class RoboTrack extends JApplet {
 	* then the last column would contain text ("true"/"false"),
 	* rather than a check box.
 	*/
-        public Class getColumnClass(int c) {
-            return getValueAt(0, c).getClass();
+        public Class getColumnClass(int col) {
+	    return String.class;
         }
 
         /*
-         * Don't need to implement this method unless your table's
-         * editable.
+         * Certain cells are editable only when the robot is being dragged.
+	 * User can edit the new destinations in the table. 
          */
         public boolean isCellEditable(int row, int col) {
+	    if (robots.size() == 0 || row >= robots.size())
+		return false;
+	    
+	    Robot robbie = (Robot) robotmap.elementAt(row);
+
+	    if (robbie.dragging && (col >= 6 && col <= 8))
+		return true;
 	    return false;
         }
+
+	/*
+	 * As above, allow changes for a dragging robot. 
+	 */
+	public void setValueAt(Object value, int row, int col) {
+	    if (robots.size() == 0 || row >= robots.size())
+		return;
+	    
+	    Robot robbie = (Robot) robotmap.elementAt(row);
+
+	    if (robbie.dragging && (col >= 6 && col <= 8)) {
+		String stmp = value.toString().trim();
+		double dtmp = Double.parseDouble(stmp);
+		
+		switch (col) {
+		case 6:
+		    robbie.drag_x = (int) (dtmp * pixels_per_meter);
+		    robbie.dragx_meters = stmp;
+		    break;
+		    
+		case 7:
+		    robbie.drag_y = (int) (dtmp * pixels_per_meter);
+		    robbie.dragy_meters = stmp;
+		    break;
+		    
+		case 8: 
+		    robbie.drag_or = dtmp;
+		    robbie.dragor_string = stmp;
+		    break;
+		}
+		fireTableCellUpdated(row, col);
+		repaint();
+		return;
+	    }
+	}
+    }
+
+    /*
+     * Mouse button event handler.
+     */
+    public class MyMouseAdaptor implements MouseInputListener, ActionListener {
+	String node_id   = null;
+	int click_x      = 0;
+	int click_y      = 0;
+	boolean dragging = false;
+	boolean clicked  = false;
+	
+	public void mousePressed(MouseEvent e) {
+	    int button = e.getButton();
+
+	    if (button == e.BUTTON1) {
+		/*
+		 * Left button pressed. This starts a drag operation.
+		 */
+		if (!dragging && !clicked) {
+		    node_id = map.pickRobot(e.getX(), e.getY());
+
+		    if (node_id == "") {
+			node_id = null;
+			MaybeShowMenu(e);
+			return;
+		    }
+		    Robot robbie = (Robot) robots.get(node_id);
+		    
+		    robbie.drag_x   = e.getX();
+		    robbie.drag_y   = e.getY();
+		    robbie.drag_or  = robbie.dor;
+		    robbie.dragging = true;
+
+		    // For the table.
+		    robbie.dragor_string = robbie.or_string;
+		    robbie.dragx_meters =
+			FORMATTER.format(robbie.drag_x / pixels_per_meter);
+		    robbie.dragy_meters =
+			FORMATTER.format(robbie.drag_y / pixels_per_meter);
+		    
+		    dragging        = true;
+		    repaint();
+
+		    maptable.setRowSelectionInterval(robbie.index,
+						     robbie.index);
+		    maptable.editCellAt(robbie.index, 8);
+		}
+	    }
+	    else if (button == e.BUTTON2) {
+		/*
+		 * Middle mouse button starts and stop the applet.
+		 */
+		if (frozen) {
+		    frozen = false;
+		    System.out.println("Restarting applet ...");
+		    start();
+		}
+		else {
+		    frozen = true;
+		    System.out.println("Stopping applet ...");
+		    stop();
+		}
+	    }
+	    else if (button == e.BUTTON3) {
+		/*
+		 * Right mouse button will bring up a showpage on release.
+		 * Eventually this will be a context menu.
+		 */
+		if (! dragging) {
+		    node_id = map.pickRobot(e.getX(), e.getY());
+
+		    if (node_id == "") {
+			node_id = null;
+			return;
+		    }
+		    
+		    Robot robbie = (Robot) robots.get(node_id);
+
+		    click_x = e.getX();
+		    click_y = e.getY();
+		    clicked = true;
+		}
+	    }
+	}
+	
+	public void mouseReleased(MouseEvent e) {
+	    int button = e.getButton();
+
+	    if (button == e.BUTTON1) {
+		if (dragging) {
+		    /*
+		     * Left button released. This terminates the dragging
+		     * operation. The robot is left with the final coords.
+		     */
+		    // Make sure we received the down event.
+		    if (node_id == null) {
+			clicked = false;
+			return;
+		    }
+		    System.out.println("Drag finished: " + node_id);
+		    
+		    Robot robbie = (Robot) robots.get(node_id);
+
+		    robbie.drag_x = e.getX();
+		    robbie.drag_y = e.getY();
+		    
+		    // For the table.
+		    robbie.dragx_meters =
+			FORMATTER.format(robbie.drag_x / pixels_per_meter);
+		    robbie.dragy_meters =
+			FORMATTER.format(robbie.drag_y / pixels_per_meter);
+		    
+		    dragging      = false;
+		    node_id       = null;
+
+		    /*
+		     * If the release left the robot within a couple of
+		     * pixels of its current location, then cancel this
+		     * drag operation. There is a probably a better UI
+		     * for this. Let me know ...
+		     */
+		    if (Math.abs(e.getX() - robbie.x) <= 2 &&
+			Math.abs(e.getY() - robbie.y) <= 2) {
+			robbie.dragging = false;
+		    }
+		    repaint();
+		}
+	    }
+	    else if (button == e.BUTTON3) {
+		/*
+		 * Right mouse button release brings up a showpage.
+		 * Eventually this will be a context menu.
+		 */
+		if (clicked) {
+		    // Make sure we received the down event.
+		    if (node_id == null) {
+			clicked = false;
+			return;
+		    }
+		    System.out.println("Click finished: " + node_id);
+
+		    Robot robbie = (Robot) robots.get(node_id);
+		    node_id      = null;
+
+		    if (! shelled) {
+			// This will fail when I run it from the shell
+			try
+			{
+			    URL url = new URL(getCodeBase(),
+					      "/shownode.php3?node_id=" +
+					        robbie.pname
+					      + "&nocookieuid="
+					      + URLEncoder.encode(uid)
+					      + "&nocookieauth="
+					      + URLEncoder.encode(auth));
+			    System.out.println(url.toString());
+			    getAppletContext().showDocument(url, "_robbie");
+			}
+			catch(Throwable th)
+			{
+			    th.printStackTrace();
+			}
+		    }
+		}
+		// Clear the click.
+		clicked = false;
+	    }
+	}
+
+	public void mouseEntered(MouseEvent e) {
+	}
+
+	/*
+	 * If we leave the component, cancel the whole operation.
+	 */
+	public void mouseExited(MouseEvent e) {
+	    // Make sure we are actually dragging/clicking a robot.
+	    if (node_id == null) {
+		return;
+	    }
+	    if (dragging) {
+		Robot robbie = (Robot) robots.get(node_id);
+
+		clicked = dragging = false;
+		robbie.dragging    = false;
+		repaint();
+		maptable.repaint(10);
+	    }
+	}
+
+	public void mouseClicked(MouseEvent e) {
+	}
+
+	/*
+	 * Moving the mouse while clicked is a "drag" event.
+	 */
+	public void mouseDragged(MouseEvent e) {
+	    // Make sure we are actually dragging/clicking a robot.
+	    if (node_id == null) {
+		return;
+	    }
+
+	    if (dragging) {
+		Robot robbie = (Robot) robots.get(node_id);
+
+		/*
+		 * Update the current drag location. If the robot has moved
+		 * more then a few pixels, update its location and force the
+		 * map to be redrawn.
+		 */
+		int old_x = robbie.drag_x;
+		int old_y = robbie.drag_y;
+		int new_x = e.getX();
+		int new_y = e.getY();
+
+		if (Math.abs(new_x - old_x) >= 3 ||
+		    Math.abs(new_y - old_y) >= 3) {
+		    robbie.drag_x = new_x;
+		    robbie.drag_y = new_y;
+		    
+		    // For the table.
+		    robbie.dragx_meters =
+			FORMATTER.format(new_x / pixels_per_meter);
+		    robbie.dragy_meters =
+			FORMATTER.format(new_y / pixels_per_meter);
+		    
+		    repaint();
+		    maptable.repaint(10);
+		}
+	    }
+	}
+
+	public void mouseMoved(MouseEvent e) {
+	}
+
+
+	/*
+	 * Decide if we want to actually show the popupmenu; only if
+	 * there are robots involved in a drag. Scan the list.
+	 */
+	public void MaybeShowMenu(MouseEvent e) {
+	    Enumeration enum = robots.elements();
+
+	    while (enum.hasMoreElements()) {
+		Robot robbie  = (Robot)enum.nextElement();
+
+		if (robbie.dragging) {
+		    /*
+		     * Use "map" (us) as the invoking component so that the 
+		     * menu is fully contained within the applet; this avoids
+		     * the "Java Applet Window" warning so that tells people
+		     * a window has just been popped up.
+		     */
+		    MenuPopup.show(map, e.getX(), e.getY());
+		    return;
+		}
+	    }
+	}
+
+	/*
+	 * This is for the popup menu.
+	 */
+	public void actionPerformed(ActionEvent e) {
+	    JMenuItem source = (JMenuItem)(e.getSource());
+	    String    choice = source.getText();
+	    
+	    System.out.println("Popup select: " + choice + "\n");
+
+	    /*
+	     * Figuring out which item was selected is silly.
+	     */
+	    if (source == CancelMenuItem) {
+		/*
+		 * Clear all the dragging bits.
+		 */
+		Enumeration enum = robots.elements();
+
+		while (enum.hasMoreElements()) {
+		    Robot robbie  = (Robot)enum.nextElement();
+
+		    robbie.dragging = false;
+		}
+		maptable.clearSelection();
+	    }
+	    else if (source == SubmitMenuItem) {
+		SendInDestinations();
+	    }
+	    repaint();
+	    maptable.repaint(10);
+	}
+    }
+
+    /*
+     * Send all destinations into the web server.
+     */
+    public boolean SendInDestinations() {
+	Enumeration e = robots.elements();
+
+	// Its a POST, so no leading "?" for the URL arguments.
+ 	String urlstring = "fromapplet=1"
+	    + "nocookieuid="
+	    + URLEncoder.encode(uid)
+	    + "&nocookieauth="
+	    + URLEncoder.encode(auth);
+
+	while (e.hasMoreElements()) {
+	    Robot robbie  = (Robot)e.nextElement();
+
+	    if (robbie.dragging) {
+		urlstring = urlstring +
+		    "&nodeidlist[" + robbie.pname + "]=\"" +
+		    robbie.drag_x / pixels_per_meter + "," +
+		    robbie.drag_y / pixels_per_meter + "," +
+		    robbie.or + "\"";
+
+		// Clear it in the map (when it repaints).
+		robbie.dragging = false;
+	    }
+	}
+	if (shelled) {
+	    System.out.println(urlstring);
+	    return true;
+	}
+
+	// This will fail when I run it from the shell
+	try
+	{
+	    URL			url = new URL(getCodeBase(), "setdest.php3");
+	    URLConnection	urlConn;
+	    DataOutputStream    printout;
+	    BufferedReader      input;
+	    String		str = "", tmp;
+	    
+	    System.out.println(url.toString());
+	    System.out.println(urlstring);
+
+	    /*
+	     * All of this copied from Chads Netbuild code.
+	     */
+	    // URL connection channel.
+	    urlConn = url.openConnection();
+	    // Let the run-time system (RTS) know that we want input.
+	    urlConn.setDoInput(true);
+	    // Let the RTS know that we want to do output.
+	    urlConn.setDoOutput(true);
+	    // No caching, we want the real thing.
+	    urlConn.setUseCaches(false);
+	    // Specify the content type.
+	    urlConn.setRequestProperty("Content-Type", 
+				       "application/x-www-form-urlencoded");
+	    // Send POST output.
+	    printout = new DataOutputStream(urlConn.getOutputStream ());
+	    printout.writeBytes(urlstring);
+	    printout.flush();
+	    printout.close();
+	    // Get response data.
+	    input = new BufferedReader(new
+		InputStreamReader(urlConn.getInputStream()));
+	    while (null != ((tmp = input.readLine()))) {
+		str = str + "\n" + tmp;
+	    }
+	    input.close();
+	    System.out.println(str);
+
+	    JOptionPane.showMessageDialog(getContentPane(),
+					  str, "Submit Failed",
+					  JOptionPane.ERROR_MESSAGE);
+	}
+	catch(Throwable th)
+	{
+	    th.printStackTrace();
+	}
+	return true;
     }
 
     public static void main(String argv[]) {
@@ -627,6 +1087,9 @@ public class RoboTrack extends JApplet {
 	    robomap.init();
 	    robomap.is = System.in;
 	    robomap.floorimage = robomap.getImage(url);
+	    robomap.shelled = true;
+	    robomap.uid = "stoller";
+	    robomap.auth = "xyz";
 	}
 	catch(Throwable th)
 	{

@@ -50,7 +50,8 @@ if (isset($fake)) {
     $i = 0;
     do {
 	echo "garcia1, robbie, $x1, $y1, $z1, 90.0, 700, 300, -90.0, 10, 20\n";
-	echo "garcia2, mary,   $x2, $y2, $z2, 0.0,  200, 100, 90.0, 50, 60\n";
+	echo "garcia2, mary,   $x2, $y2, $z2, 0.0,  , , , 50, 60\n";
+	echo "garcia3, robin,  300, 300, 0.2, 0.0, , , , 90, 95\n";
 	flush();
 
 	sleep(1);
@@ -64,10 +65,16 @@ if (isset($fake)) {
 }
 
 $last_stamp   = 0;
+$loop_count   = 0;
 
 # Loop forever.
 while (1) {
-    if ($last_stamp) 
+    if ($loop_count == 30) {
+	# The point is to update everything every 30 seconds.
+	$stamp_clause = "";
+	$loop_count   = 0;
+    }
+    elseif ($last_stamp) 
 	$stamp_clause = " and stamp>$last_stamp ";
     else
 	$stamp_clause = "";
@@ -121,6 +128,7 @@ while (1) {
 	    
 	echo "$pname, $vname, $x, $y, $z, $or, $dx, $dy, $dor, $bper, $bvolts\n";
     }
+    $loop_count++;
     flush();
     sleep(1);
 }

@@ -49,13 +49,16 @@ echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
          </table>
        </td>
        <td class=stealth>This applet allows you to view the robots
-                         as they move around. The table at the bottom
+                         as they move around, as well as move the robots
+                         with drag and drop. The table at the bottom
                          shows the current position (x, y, orientation),
                          the destination position,
                          and the battery level (percentage and voltage).
                          The shaded areas (blue border) are <em>exclusion</em>
                          zones where robots are not allowed to go. You can
-                         <b>click</b> on a robot to bring up its info page.
+                         <b>right click</b> on a robot to bring up its
+                         info page. See below for instructions on how to
+                         use the <b>drag and drop</b> features.
         </td>
       </tr>
       </table><hr>\n";
@@ -103,6 +106,20 @@ echo "<applet code='RoboTrack.class'
             <param name='auth' value='$auth'>
             <param name='ppm' value='$ppm'>
           </applet>\n";
+
+<br>
+<center>
+<h3>Using the Robot Tracker Applet</h3>
+<ul>
+<li> Right Click over a robot or mote will pop up a browser window showing
+     information about the robot/mote.
+<li> Left click and drag over a (stationary) robot allows you to setup a
+     move to a new position. Remember to edit the orientation in the table,
+     if needed. Cancel by moving back to its original position. 
+<li> Left click over the background image brings up a menu to submit your 
+     moves (start the robots on their way), or cancel the moves.
+<li> Only one move per robot at a time. 
+</ul>
 
 PAGEFOOTER();
 ?>
