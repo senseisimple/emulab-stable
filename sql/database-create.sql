@@ -470,6 +470,7 @@ CREATE TABLE node_types (
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   isremotenode tinyint(4) NOT NULL default '0',
+  named_root varchar(10) default NULL,
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -533,6 +534,7 @@ CREATE TABLE nodes (
   op_mode_timestamp int(10) unsigned default NULL,
   update_accounts smallint(6) default '0',
   next_op_mode varchar(20) default NULL,
+  ipodhash varchar(64) default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
