@@ -1,3 +1,102 @@
+  Modified files:
+    db                   libdb.pm.in xmlconvert.in 
+    www                  dbdefs.php3.in joinproject.php3 
+                         moduserinfo.php3 newproject.php3 
+  Added files:
+    www                  dbcheck.php3 
+  Log:
+  First try at solving the problem of validating user input for the
+  zillions of DB fields that we have to set. My solution was to add a
+  meta table that describes what is a legal value for each table/slot
+  for which we take from user input. The table looks like this right
+  now, but is likely to adapt as we get more experience with this
+  approach (or it might get tossed if it turns out to be a pain in the
+  ass!).
+  
+  	CREATE TABLE table_regex (
+  	  table_name varchar(64) NOT NULL default '',
+  	  column_name varchar(64) NOT NULL default '',
+  	  column_type enum('text','int','float') default NULL,
+  	  check_type enum('regex','function','redirect') default NULL,
+  	  check tinytext NOT NULL,
+  	  min int(11) NOT NULL default '0',
+  	  max int(11) NOT NULL default '0',
+  	  comment tinytext,
+  	  UNIQUE KEY table_name (table_name,column_name)
+  	) TYPE=MyISAM;
+  
+  Entries in this table look like this:
+  
+  	('virt_nodes','vname','text','regex','^[-\\w]+$',1,32,NULL);
+  
+  Which says that the vname slot of the virt_nodes table (which we trust the
+  user to give us in some form) is a text field to be checked with the given
+  regex (perlre of course), and that the min/max length of the text field is
+  1 and 32 chars respectively.
+  
+  Now, you wouldn't want to write the same regex over and over, and since we
+  use the same fields in many tables (like pid, eid, vname, etc) there is an
+  option to redirect to another entry (recursively). So, for "PID" I do this:
+  
+          ('eventlist','pid','text','redirect','projects:pid',0,0,NULL);
+  
+  which redirects to:
+  
+  	('projects','pid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
+  
+  And, for many fields you just want to describe generically what could go
+  into it. For that I have defined some default fields. For example, a user
+  description:
+  
+          ('experiment,'usr_name','text','redirect','default:tinytext',0,0,NULL);
+  
+  which redirects to:
+  
+  	('default','tinytext','text','regex','^[\\040-\\176]*$',0,256,NULL);
+  
+  and this says that a tinytext (in our little corner of the database
+  universe) field can have printable characters (but not a newline), and
+  since its a tinytext field, its maxlen is 256 chars.
+  
+  You also have integer fields, but these are little more irksome in the
+  details.
+  
+  	('default','tinyint,'int,'regex','^[\\d]+$',-128,127,NULL);
+  
+  and you would use this anyplace you do not care about the min/max values
+  being something specific in the tinyint range. The range for a float is of
+  course stated as an integer, and thats kinda bogus, but we do not have many
+  floats, and they generally do not take on specific values anyway.
+  
+  A note about the min/max fields and redirecting. If the initial entry has
+  non-zero min/max fields, those are the min mac fields used. Otherwise they
+  come from the default. So for example, you can do this:
+  
+      ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
+  
+  So, you can redirect to the standard "tinyint" regular expression, but you
+  still get to define min/max for the specific field.
+  
+  Isn't this is really neat and really obtuse too? Sure, you can say it.
+  
+  Anyway, xmlconvert now sends all of its input through these checks (its
+  all wrapped up in library calls), and if a slot does not have an entry, it
+  throws an error so that we are forced to define entries for new slots as we
+  add them.
+  
+  In the web page, I have changed all of the public pages (login, join
+  project, new project, and a couple of others) to also use these checks.
+  As with the perl code, its all wrapped up in a library. Lots more code
+  needs to be changed of course, but this is a start.
+  
+  Revision  Changes    Path
+  1.143     +151 -1    testbed/db/libdb.pm.in
+  1.12      +19 -7     testbed/db/xmlconvert.in
+  1.70      +8 -66     testbed/www/dbdefs.php3.in
+  1.36      +33 -19    testbed/www/joinproject.php3
+  1.37      +36 -5     testbed/www/moduserinfo.php3
+  1.83      +48 -27    testbed/www/newproject.php3
+
 stoller     2003/12/17 11:29:36 MST
 
   Modified files:
