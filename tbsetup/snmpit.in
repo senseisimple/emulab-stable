@@ -45,7 +45,7 @@ if (!$COMMUNITY) {
 ######################################################################
 sub usage {
     print << "END";
-Usage: $0 [-h] [-v] [-i device] 
+Usage: $0 [-h] [-v] [-n] [-i device]
 	  [-l] [-s] [-g]
 	  [-m name [ports]]
 	  [-o name]
@@ -57,6 +57,7 @@ Usage: $0 [-h] [-v] [-i device]
 General:
   -h          Display this help message
   -v          Verbose mode
+  -n          Test mode - don't actually make any changes
   -i <device> Operate on <device>, overriding default device list. Can be
                   given multiple times
 
@@ -66,6 +67,12 @@ VLAN Control:
   -l                List all VLANs
   -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
                         and put [ports] in it
+  -y <type>         When used with -m, the new VLAN becomes a private VLAN
+                        of type <type>
+  -x <primary>      When used with -y, assocates the new private VLAN with
+                        the primary VLAN named <primary>
+  -z <port>         Used with -y and -x, to specify which port is to be used
+                        with the private VLAN
   -o <name>         Delete the VLAN with name <name>
   -c                Delete ALL VLANs, and recreate from the database. ** USE
                         WITH EXTREME CAUTION **
@@ -89,8 +96,9 @@ END
 
 
 my %opt = ();
-GetOptions(\%opt,'h','l','v','s','t','r','i=s@','m=s@','o=s@','p=s','u=s','d',
-    'e','a','g','c');
+GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','n','o=s@','p=s',
+    'r','s','t','u=s','v','y=s','x=s','z=s');
+# Unused: b,f,j,q,w
 
 if ($opt{h}) {
     exit &usage;
@@ -208,6 +216,45 @@ if (!@commands) {
     die "No operation given\n";
 }
 
+#
+# Options that affect other commands
+#
+
+#
+# Arguments for making private VLANs
+#
+# Build up a list of extra arguments to be passed to createVlan()
+my @pvlanArgs = ();
+if ($opt{y}) {
+    #
+    # Make sure the private VLAN type they gave is valid, and make sure they
+    # gave the other required arugments for certain types
+    #
+    if ($opt{y} ne "primary" && $opt{y} ne "isolated" &&
+	$opt{y} ne "community") {
+	die "Unknown private VLAN type $opt{y}\n";
+    }
+    @pvlanArgs = $opt{y};
+    if ($opt{y} ne "primary") {
+	if (!$opt{x} || !$opt{z}) {
+	    warn "**** -x and -z must be given when -y is $opt{y}!\n";
+	    exit &usage;
+	}
+	#
+	# Fix up ports given in the module/port format, like we do below for
+	# ports from @ARGV
+	#
+	if ($opt{z} =~ /^\d+\/\d+?$/) {
+	    if ($opt{i} && @{$opt{i}} == 1) {
+		$opt{z} = $opt{i}->[0] . "." . $opt{z};
+	    } else {
+		die "The module/port format is only legal if exactly one -i " .
+		    "argument has been given\n";
+	    }
+	}
+	push @pvlanArgs,$opt{x},$opt{z};
+    }
+}
 
 ######################################################################
 # Step 3 - Set up the stack objects
@@ -238,10 +285,36 @@ if ($pid && $eid) {
 #
 
 if (@ports) {
-    my @nodes = map /^([^:]+)/, @ports;
+    #
+    # Allow ports to be given in one of two forms: node:port, or switch.port.
+    # Only admins can do the latter, of course...
+    #
+    my (@nodes, @switchports);
+    foreach my $port (@ports) {
+	if ($port =~ /^([^:]+):\d+$/) {
+	    push @nodes, $1;
+	} elsif ($port =~ /^([^.]+)\.\d+(\/\d+)?$/) {
+	    push @switchports, $port;
+	} elsif ($port =~ /^\d+\/\d+?$/) {
+	    if ($opt{i} && @{$opt{i}} == 1) {
+		$port = $opt{i}->[0] . "." . $port;
+		push @switchports, $port;
+	    } else {
+		die "The module/port format is only legal if exactly one -i " .
+		    "argument has been given\n";
+	    }
+	} else {
+	    die "Bad format for port $port\n"
+	}
+    }
+
     if (!TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
 	die "You do not have permission to modify some or all of the nodes\n" .
 		"that will be affected by the operation you requested\n";
+    }
+
+    if (@switchports && !TBAdmin()) {
+	die "Only admins are allowed to modify switch ports directly\n";
     }
 }
 
@@ -256,7 +329,7 @@ if ($TESTMODE) {
 #
 snmpit_lib::init($debug);
 
-my $exitval;
+my $exitval = 0;
 foreach my $command (@commands) {
 
     #
@@ -333,14 +406,21 @@ foreach my $command (@commands) {
     #
     my @stacks;
     foreach my $stack_id (keys %stacks) {
-	my $stack_type = getStackType($stack_id);
+	my ($stack_type, $supports_private) = getStackType($stack_id);
+	#
+	# Safety check - make sure the stack supports private VLANs if -y was
+	# given
+	#
+	if ($opt{y} && !$supports_private) {
+	    die "Switch stack $stack_id does not support private VLANs\n";
+	}
 	my $stack;
 	debug("Stack $stack_id has type $stack_type\n");
 	SWITCH: for ($stack_type) {
 	    /cisco/ && do {
 		require snmpit_cisco_stack;
 		$stack = new snmpit_cisco_stack($stack_id,$debug,$COMMUNITY,
-		    @{$stacks{$stack_id}});
+		    $supports_private, @{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {
@@ -370,6 +450,10 @@ foreach my $command (@commands) {
 # Finally, we just call the helper function for the operation that
 # is to be performed.
 ######################################################################
+    if ($opt{n}) {
+	print "Test mode, skipping operation\n";
+	next;
+    }
 
     SWITCH: for ($operation) {
 	/listvlans/ && do {
@@ -623,7 +707,7 @@ sub doVlansFromTables($@) {
 	    print "  VLAN $vlan already exists\n";
 	    $errors += $stack->setPortVlan($vlan,@ports);
 	} else {
-	    if (!$stack->createVlan($vlan,@ports)) {
+	    if (!$stack->createVlan($vlan,\@ports)) {
 		warn "ERROR: Failed to create VLAN with id $vlan\n";
 		#
 		# Don't try to put ports in a VLAN if it couldn't be created
@@ -719,7 +803,7 @@ sub doMakeVlan($$@) {
 	}
     } else {
 	print "Creating VLAN $vlan_name ...\n";
-	my $ok = $stack->createVlan($vlan_name,@ports);
+	my $ok = $stack->createVlan($vlan_name,\@ports,@pvlanArgs);
 	print "VLAN creation ";
 	print $ok? "succeeded":"failed",".\n";
 	if (!$ok) {
@@ -733,18 +817,24 @@ sub doMakeVlan($$@) {
 #
 # Delete the given VLAN, if it exists
 #
-sub doDeleteVlan($$) {
+sub doDeleteVlan($@) {
     my $stacks = shift;
-    my $vlan_name = shift;
+    my @vlan_names = @_;
 
     my $errors = 0;
 
-    my $exists = 0;
+    my %exists = ();
     foreach my $stack (@$stacks) {
-	if ($stack->vlanExists($vlan_name)) {
-	    $exists = 1;
-	    print "Deleting VLAN $vlan_name ...\n";
-	    my $ok = $stack->removeVlan($vlan_name);
+	my @existant_vlans;
+	foreach my $vlan_name (@vlan_names) {
+	    if ($stack->vlanExists($vlan_name)) {
+		$exists{$vlan_name} = 1;
+		push @existant_vlans, $vlan_name;
+	    }
+	}
+	if (@existant_vlans) {
+	    print "Deleting VLAN(s) " . join(",",@existant_vlans) . " ...\n";
+	    my $ok = $stack->removeVlan(@existant_vlans);
 	    print "VLAN deletion ";
 	    print $ok? "succeeded":"failed",".\n";
 	    if (!$ok) {
@@ -753,9 +843,11 @@ sub doDeleteVlan($$) {
 	}
     }
 
-    if (!$exists) {
-	print "VLAN $vlan_name does not exist\n";
-	$errors++;
+    foreach my $vlan_name (@vlan_names) {
+	if (!$exists{$vlan_name}) {
+	    print "VLAN $vlan_name does not exist\n";
+	    $errors++;
+	}
     }
 
     return $errors;
@@ -837,9 +929,7 @@ sub doRecreateVlans($) {
 
     debug("Going to nuke " . join(',',@vlansToNuke) . "\n");
 
-    foreach my $vlan (@vlansToNuke) {
-	doDeleteVlan($stacks,$vlan);
-    }
+    doDeleteVlan($stacks,@vlansToNuke);
 
     #
     # Get a list of all experiments, so that we can re-create their VLANs

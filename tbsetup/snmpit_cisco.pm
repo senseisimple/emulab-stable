@@ -59,7 +59,7 @@ my $PORT_FORMAT_NODEPORT = 3;
 # usage: new($classname,$devicename,$debuglevel)
 #        returns a new object, blessed into the snmpit_cisco class.
 #
-sub new($$$$;$) {
+sub new($$$$$$) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -69,6 +69,7 @@ sub new($$$$;$) {
     my $debugLevel = shift;
     my $switchtype = shift;
     my $community = shift;
+    my $supportsPrivate = shift;
 
     #
     # Create the actual object
@@ -87,6 +88,7 @@ sub new($$$$;$) {
     $self->{BULK} = 1;
     $self->{NAME} = $name;
     $self->{COMMUNITY} = $community;
+    $self->{SUPPORTS_PRIVATE} = $supportsPrivate;
 
     # Figure out some stuff about this switch
     $switchtype =~ /^(\w+)(-ios)?$/;
@@ -112,7 +114,8 @@ sub new($$$$;$) {
 	    "$mibpath/SNMPv2-MIB.txt", "$mibpath/IANAifType-MIB.txt",
 	    "$mibpath/IF-MIB.txt", "$mibpath/RMON-MIB.txt",
 	    "$mibpath/CISCO-SMI.txt", "$mibpath/CISCO-TC.txt",
-	    "$mibpath/CISCO-VTP-MIB.txt", "$mibpath/CISCO-PAGP-MIB.txt");
+	    "$mibpath/CISCO-VTP-MIB.txt", "$mibpath/CISCO-PAGP-MIB.txt",
+	    "$mibpath/CISCO-PRIVATE-VLAN-MIB.txt");
 	    
     if ($self->{OSTYPE} eq "CatOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt";
@@ -245,6 +248,8 @@ sub convertPortFormat($$@) {
     SWITCH: for ($sample) {
 	(/^\d+$/) && do { $input = $PORT_FORMAT_IFINDEX; last; };
 	(/^\d+\.\d+$/) && do { $input = $PORT_FORMAT_MODPORT; last; };
+	(/^$self->{NAME}\.\d+\/\d+$/) && do { $input = $PORT_FORMAT_MODPORT;
+		@ports = map {/^$self->{NAME}\.(\d+)\/(\d+)$/; "$1.$2";} @ports; last; };
 	$input = $PORT_FORMAT_NODEPORT; last;
     }
 
@@ -470,25 +475,36 @@ sub findVlan($$;$) {
 # Create a VLAN on this switch, with the given identifier (which comes from
 # the database.) Picks its own switch-specific VLAN number to use.
 #
-# usage: createVlan($self, $vlan_id)
+# usage: createVlan($self, $vlan_id [,$private_type [,$private_primary,
+# 		$private_port]])
 #        returns 1 on success
 #        returns 0 on failure
+#        if $private_type is given, creates a private VLAN - if private_type
+#        is 'community' or 'isolated', then the assocated primary VLAN and
+#        promiscous port must also be given
 #
-sub createVlan($$) {
+sub createVlan($$;$$$) {
     my $self = shift;
     my $vlan_id = shift;
 
-    my $okay = 0;
+    my ($private_type,$private_primary,$private_port);
+    if (@_) {
+	$private_type = shift;
+	if ($private_type ne "primary") {
+	    $private_primary = shift;
+	    $private_port = shift;
+	}
+    } else {
+	$private_type = "normal";
+    }
 
-    #
-    # NOTE: I'm not sure why I have to give these as numeric OIDs rather
-    # than using the names.
-    # TODO: Figure this out
-    #
-    my $VlanType = '.1.3.6.1.4.1.9.9.46.1.4.2.1.3.1'; # vlan # is index
-    my $VlanName = '.1.3.6.1.4.1.9.9.46.1.4.2.1.4.1'; # vlan # is index
-    my $VlanSAID = '.1.3.6.1.4.1.9.9.46.1.4.2.1.6.1'; # vlan # is index
-    my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
+
+    my $okay = 1;
+
+    my $VlanType = 'vtpVlanEditType'; # vlan # is index
+    my $VlanName = 'vtpVlanEditName'; # vlan # is index
+    my $VlanSAID = 'vtpVlanEditDot10Said'; # vlan # is index
+    my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan # is index
 
     #
     # We may have to do this multiple times - a few times, we've had the
@@ -520,12 +536,12 @@ sub createVlan($$) {
 	#
 	my $vlan_number = 2; # We need to start at 2
 	my $RetVal = snmpitGetFatal($self->{SESS},
-		[$VlanRowStatus,$vlan_number]);
+		[$VlanRowStatus,"1.$vlan_number"]);
 	$self->debug("Row $vlan_number got '$RetVal'\n",2);
 	while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
 	    $vlan_number += 1;
 	    $RetVal = snmpitGetFatal($self->{SESS},
-		[$VlanRowStatus,$vlan_number]);
+		[$VlanRowStatus,"1.$vlan_number"]);
 	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
 	}
 	if ($vlan_number > 1000) {
@@ -550,11 +566,11 @@ sub createVlan($$) {
 	# Perform the actual creation. Yes, this next line MUST happen all in
 	# one set command....
 	#
-	$RetVal = $self->{SESS}->set([[$VlanRowStatus,$vlan_number,
+	$RetVal = $self->{SESS}->set([[$VlanRowStatus,"1.$vlan_number",
 			"createAndGo","INTEGER"],
-		[$VlanType,$vlan_number,"ethernet","INTEGER"],
-		[$VlanName,$vlan_number,$vlan_id,"OCTETSTR"],
-		[$VlanSAID,$vlan_number,$SAID,"OCTETSTR"]]);
+		[$VlanType,"1.$vlan_number","ethernet","INTEGER"],
+		[$VlanName,"1.$vlan_number",$vlan_id,"OCTETSTR"],
+		[$VlanSAID,"1.$vlan_number",$SAID,"OCTETSTR"]]);
 	print "",($RetVal? "Succeeded":"Failed"), ".\n";
 
 	#
@@ -563,8 +579,50 @@ sub createVlan($$) {
 	if (!$RetVal) {
 	    print STDERR "VLAN Create '$vlan_id' as VLAN $vlan_number " .
 		    "failed.\n";
+	    $self->vlanUnlock();
 	    next;
 	} else {
+	    #
+	    # Handle private VLANs - Part I: Stuff that has to be done while we
+	    # have the edit buffer locked
+	    #
+	    if ($self->{SUPPORTS_PRIVATE} && $private_type ne "normal") {
+		#
+		# First, set the private VLAN type
+		#
+		my $PVlanType = "cpvlanVlanEditPrivateVlanType";
+		print "    Setting private VLAN type to $private_type ... ";
+		$RetVal = $self->{SESS}->set([$PVlanType,"1.$vlan_number",$private_type,
+		    'INTEGER']);
+		print "",($RetVal? "Succeeded":"Failed"), ".\n";
+		if (!$RetVal) {
+		    $okay = 0;
+		}
+		if ($okay) {
+		    #
+		    # Now, if this isn't a primary VLAN, associate it with its
+		    # primary VLAN
+		    #
+		    if ($private_type ne "primary") {
+			my $PVlanAssoc = "cpvlanVlanEditAssocPrimaryVlan";
+			my $primary_number = $self->findVlan($private_primary);
+			if (!$primary_number) {
+			    print "    **** Error - Primary VLAN " .
+			    	"$private_primary could not be found\n";
+			    $okay = 0;
+			} else {
+			    print "    Associating with $private_primary (#$primary_number) ... ";
+			    $RetVal = $self->{SESS}->set([[$PVlanAssoc,"1.$vlan_number",
+				$primary_number,"INTEGER"]]);
+			    print "", ($RetVal? "Succeeded":"Failed"), ".\n";
+			    if (!$RetVal) {
+				$okay = 0;
+			    }
+			}
+		    }
+		}
+	    }
+
 	    $RetVal = $self->vlanUnlock();
 	    $self->debug("Got $RetVal from vlanUnlock\n");
 
@@ -578,7 +636,62 @@ sub createVlan($$) {
 			     "get created - trying again\n";
 		next;	     
 	    }
-	    return 1;
+	    if ($self->{SUPPORTS_PRIVATE} && $private_type ne "normal" &&
+		$private_type ne "primary") {
+
+		#
+		# Handle private VLANs - Part II: Set up the promiscuous port -
+		# this has to be done after we release the edit buffer
+		#
+
+		my $SecondaryPort = 'cpvlanPromPortSecondaryRemap';
+
+		my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,
+		    $private_port);
+
+		if (!$ifIndex) {
+		    print STDERR "    **** ERROR - unable to find promiscous " .
+			"port $private_port!\n";
+		    $okay = 0;
+		}
+
+		if ($okay) {
+		    print "    Setting promiscuous port to $private_port ... ";
+
+		    #
+		    # Get the existing bitfield used to maintain the mapping
+		    # for the port
+		    #
+		    my $bitfield = $self->{SESS}->get([$SecondaryPort,$ifIndex]);
+		    my $unpacked = unpack("B*",$bitfield);
+
+		    #
+		    # Put this into an array of 1s and 0s for easy manipulation
+		    # We have to pad this out to 128 bits, because it's given
+		    # back as the empty string if no bits are set yet.
+		    #
+		    my @bits = split //,$unpacked;
+		    foreach my $bit (0 .. 127) {
+			if (!defined $bits[$bit]) {
+			    $bits[$bit] = 0;
+			}
+		    }
+
+		    $bits[$vlan_number] = 1;
+
+		    # Pack it back up...
+		    $unpacked = join('',@bits);
+
+		    $bitfield = pack("B*",$unpacked);
+
+		    # And save it back...
+		    $RetVal = $self->{SESS}->set([$SecondaryPort,$ifIndex,$bitfield,
+			"OCTETSTR"]);
+		    print "", ($RetVal? "Succeeded":"Failed"), ".\n";
+
+		}
+	    }
+	    return $okay;
 	}
     }
 
@@ -600,13 +713,6 @@ sub setPortVlan($$@) {
     my $vlan_id = shift;
     my @ports = @_;
 
-    my $PortVlanMemb;
-    if ($self->{OSTYPE} eq "CatOS") {
-	$PortVlanMemb = "vlanPortVlan"; #index is ifIndex
-    } elsif ($self->{OSTYPE} eq "IOS") {
-	$PortVlanMemb = "vmVlan"; #index is ifIndex
-    }
-
     my $errors = 0;
 
     #
@@ -620,15 +726,41 @@ sub setPortVlan($$@) {
     $self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
 
     #
-    # Convert ports from the format the were passed in to the correct format
+    # If this switch supports private VLANs, check to see if the VLAN we're
+    # putting it into is a secondary private VLAN
     #
+    my $privateVlan = 0;
+    if ($self->{SUPPORTS_PRIVATE}) {
+	$self->debug("Checking to see if vlan is private ... ");
+	my $PrivateType = "cpvlanVlanPrivateVlanType";
+	my $type = snmpitGetFatal($self->{SESS},[$PrivateType,"1.$vlan_number"]);
+	$self->debug("type is $type ... ");
+	if ($type eq "community" ||  $type eq "isolated") {
+	    $self->debug("It is\n");
+	    $privateVlan = 1;
+	} else {
+	    $self->debug("It isn't\n");
+	}
+    }
+
+    my $PortVlanMemb;
     my $format;
     if ($self->{OSTYPE} eq "CatOS") {
-	$format = $PORT_FORMAT_MODPORT;
+	if (!$privateVlan) {
+	    $PortVlanMemb = "vlanPortVlan"; #index is ifIndex
+	    $format = $PORT_FORMAT_MODPORT;
+	} else {
+	    $PortVlanMemb = "cpvlanPrivatePortSecondaryVlan";
+	    $format = $PORT_FORMAT_IFINDEX;
+	}
     } elsif ($self->{OSTYPE} eq "IOS") {
+	$PortVlanMemb = "vmVlan"; #index is ifIndex
 	$format = $PORT_FORMAT_IFINDEX;
     }
 
+    #
+    # Convert ports from the format the were passed in to the correct format
+    #
     my @portlist = $self->convertPortFormat($format,@ports);
 
     #
@@ -778,10 +910,10 @@ sub removeVlan($@) {
 	#
 	# Perform the actual removal
 	#
-	my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan is index
+	my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan is index
 
 	print "  Removing VLAN #$vlan_number ... ";
-	my $RetVal = $self->{SESS}->set([$VlanRowStatus,$vlan_number,
+	my $RetVal = $self->{SESS}->set([$VlanRowStatus,"1.$vlan_number",
 					 "destroy","INTEGER"]);
 	if ($RetVal) {
 	    print "Succeeded.\n";
@@ -815,15 +947,9 @@ sub UpdateField($$$@) {
     my $Status = 0;
     my $err = 0;
     foreach my $port (@ports) {
-	my $trans = $self->{IFINDEX}{$port};
-	if (defined $trans) {
-	    if (defined (portnum("$self->{NAME}:$trans"))) {
-		$trans = "$trans,".portnum("$self->{NAME}:$trans");
-	    } else {
-		$trans = "$trans,".portnum("$self->{NAME}:$port");
-	    }
-	} else {
-	    $trans = "???";
+	my ($trans) = convertPortFormat($PORT_FORMAT_NODEPORT,$port);
+	if (!defined $trans) {
+	    $trans = ""; # Guard against some uninitialized value warnings
 	}
 	$self->debug("Checking port $port ($trans) for $val...");
 	$Status = snmpitGetFatal($self->{SESS},[$OID,$port]);
@@ -911,7 +1037,8 @@ sub listVlans($) {
 	$self->debug("Got $name $modport $vlan_number\n",3);
 	my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$modport);
 	if (!$node) {
-	    $node = "port$modport";
+	    $modport =~ s/\./\//;
+	    $node = $self->{NAME} . ".$modport";
 	}
 	push @{$Members{$vlan_number}}, $node;
     }

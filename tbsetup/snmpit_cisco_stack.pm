@@ -44,6 +44,7 @@ sub new($$$#@) {
     my $stack_id = shift;
     my $debuglevel = shift;
     my $community = shift;
+    my $supports_private = shift;
     my @devicenames = @_;
 
     #
@@ -95,7 +96,7 @@ sub new($$$#@) {
 	    (/cisco6509/ || /cisco4006/) && do {
 		use snmpit_cisco;
 		$device = new snmpit_cisco($devicename,$self->{DEBUG},$type,
-			$community);
+			$community,$supports_private);
 		if (!$device) {
 		    die "Failed to create a device object for $devicename\n";
 		} else {
@@ -253,15 +254,16 @@ sub setPortVlan($$@) {
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub createVlan($$;@) {
+sub createVlan($$$;$$$) {
     my $self = shift;
     my $vlan_id = shift;
-    my @ports = @_;
+    my @ports = @{shift()};
+    my @otherargs = @_;
 
     #
     # We just need to create the VLAN on the stack leader
     #
-    my $okay = $self->{LEADER}->createVlan($vlan_id);
+    my $okay = $self->{LEADER}->createVlan($vlan_id,@otherargs);
 
     #
     # We need to add the ports to VLANs at the stack level, since they are

@@ -206,25 +206,35 @@ sub getExperimentPorts ($$) {
 sub getDeviceNames(@) {
     my @ports = @_;
     my %devices = ();
-    print "getDeviceNames: Passed in " . join(",",@ports) . "\n" if $debug;
     foreach my $port (@ports) {
-	$port =~ /^(.+):(.+)$/;
-	my ($node,$card) = ($1,$2);
-	if (!defined($node) || !defined($card)) { # Oops, $card can be 0
-	    die "Bad port given: $port\n";
-	}
-	my $result = DBQueryFatal("SELECT node_id2 FROM wires " .
-	    "WHERE node_id1='$node' AND card1=$card");
-	if (!$result->num_rows()) {
-	    warn "No database entry found for port $port - Skipping\n";
+	#
+	# Accept either node:port or switch.port
+	#
+	my $device;
+	if ($port =~ /^([^:]+):(.+)$/) {
+	    my ($node,$card) = ($1,$2);
+	    if (!defined($node) || !defined($card)) { # Oops, $card can be 0
+		die "Bad port given: $port\n";
+	    }
+	    my $result = DBQueryFatal("SELECT node_id2 FROM wires " .
+		"WHERE node_id1='$node' AND card1=$card");
+	    if (!$result->num_rows()) {
+		warn "No database entry found for port $port - Skipping\n";
+		next;
+	    }
+	    # This is a loop, on the off chance chance that a single port on a
+	    # node can be connected to multiple ports on the switch.
+	    while (my @row = $result->fetchrow()) {
+		$device = $row[0];
+	    }
+	} elsif ($port =~ /^([^.]+)\.\d+(\/\d+)?$/) {
+		$device = $1;
+	} else {
+	    warn "Invalid format for port $port - Skipping\n";
 	    next;
 	}
-	# This is a loop, on the off chance chance that a single port on a
-	# node can be connected to multiple ports on the switch.
-	while (my @row = $result->fetchrow()) {
-	    my $device = $row[0];
-	    $devices{$device} = 1;
-	}
+
+	$devices{$device} = 1;
     }
     return (sort {tbsort($a,$b)} keys %devices);
 }
@@ -321,18 +331,23 @@ sub getSwitchStack($) {
 }
 
 #
-# Returns the type of the given stack_id
+# Returns the type of the given stack_id. If called in list context, also
+# returns whether or not the stack supports private VLANs
 #
 sub getStackType($) {
     my $stack = shift;
-    my $result = DBQueryFatal("SELECT stack_type FROM switch_stack_types WHERE " .
-    		"stack_id='$stack'");
+    my $result = DBQueryFatal("SELECT stack_type, supports_private " .
+	"FROM switch_stack_types WHERE stack_id='$stack'");
     if (!$result->numrows()) {
 	print STDERR "No stack found called $stack\n";
 	return undef;
     } else {
-	my ($stack_type) = ($result->fetchrow());
-	return $stack_type;
+	my ($stack_type,$supports_private) = ($result->fetchrow());
+	if (defined wantarray) {
+	    return ($stack_type,$supports_private);
+	} else {
+	    return $stack_type;
+	}
     }
 }
 
