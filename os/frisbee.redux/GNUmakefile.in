@@ -13,6 +13,17 @@ DISTFILES	= TODO client.c decls.h event.c event.h log.c log.h \
 		  network.c queue.h server.c trace.c trace.h utils.c utils.h
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
+SYSTEM	:= $(shell uname -s)
+ifeq ($(SYSTEM),FreeBSD)
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+# XXX 5.3 and linuxthreads don't see to get along
+ifeq ($(FBSDREL),5.3)
+WITH_LTHREADS	= 0
+else
+WITH_LTHREADS	= 1
+endif
+endif
+
 include $(OBJDIR)/Makeconf
 
 all:	frisbee frisbeed
@@ -22,9 +33,18 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 FRISBEEDIR	= $(OBJDIR)/os/imagezip
 
 SHAREDOBJS	= log.o network.o trace.o utils.o
-PTHREADCFLAGS	= -D_THREAD_SAFE \
-		  -I/usr/local/include/pthread/linuxthreads
+
+ifeq ($(SYSTEM),Linux)
+PTHREADCFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -D_THREAD_SAFE -pthread
+else
+ifeq ($(WITH_LTHREADS),1)
+PTHREADCFLAGS	= -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
+else
+PTHREADCFLAGS	= -DCONDVARS_WORK
+PTHREADLIBS	= -lpthread
+endif
+endif
 
 CLIENTFLAGS	= $(CFLAGS)
 CLIENTLIBS	= -lz $(PTHREADLIBS)

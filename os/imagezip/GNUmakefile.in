@@ -15,6 +15,17 @@ DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
+SYSTEM	:= $(shell uname -s)
+ifeq ($(SYSTEM),FreeBSD)
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+# XXX 5.3 and linuxthreads don't see to get along
+ifeq ($(FBSDREL),5.3)
+WITH_LTHREADS	= 0
+else
+WITH_LTHREADS	= 1
+endif
+endif
+
 WITH_FFS	= 1
 WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
@@ -22,14 +33,18 @@ WITH_FAT	= @WINSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRCFLAGS	= -Wall -O2 -g
-ifdef LINUX
+SUBDIRCFLAGS	= -Wall -O2 -g # -ansi -pedantic
+ifeq ($(SYSTEM),Linux)
 SUBDIRCFLAGS	+= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -D_THREAD_SAFE -pthread
 else
-PTHREADCFLAGS	= -D_THREAD_SAFE \
-		  -I/usr/local/include/pthread/linuxthreads
-SUBDIRCFLAGS	+= 
+ifeq ($(WITH_LTHREADS),1)
+PTHREADCFLAGS	= -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
+else
+PTHREADCFLAGS	= -DCONDVARS_WORK
+PTHREADLIBS	= -lpthread
+endif
+SUBDIRCFLAGS	+= 
 endif
 
 # Define this if you implementation of cond_vars works well
