@@ -23,18 +23,19 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "<center>
           <h3>Project Profile</h3>
           </center>
-          <table align=center border=1>\n";
+          <table align=center cellpadding=2 border=1>\n";
     
     $proj_created	= $row[created];
     $proj_expires	= $row[expires];
     $proj_name		= stripslashes($row[name]);
     $proj_URL		= $row[URL];
     $proj_public        = $row[public];
-    $proj_funders	= $row[funders];
+    $proj_funders	= stripslashes($row[funders]);;
     $proj_head_uid	= $row[head_uid];
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
-    $proj_sharks        = $row[num_sharks];
+    $proj_ronpcs        = $row[num_pcplab];
+    $proj_plabpcs       = $row[num_ron];
     $proj_why           = nl2br($row[why]);
     $control_node	= $row[control_node];
     $approved           = $row[approved];
@@ -99,8 +100,13 @@ function SHOWPROJECT($pid, $thisuid) {
           </tr>\n";
     
     echo "<tr>
-              <td>#Sharks: </td>
-              <td class=\"left\">$proj_sharks</td>
+              <td>#Planetlab PCs: </td>
+              <td class=\"left\">$proj_plabpcs</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>#RON PCs: </td>
+              <td class=\"left\">$proj_ronpcs</td>
           </tr>\n";
     
     echo "<tr>

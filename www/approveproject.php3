@@ -171,6 +171,25 @@ elseif (strcmp($approval, "approve") == 0) {
     DBQueryFatal("UPDATE projects set approved='1' WHERE pid='$pid'");
 
     #
+    # XXX
+    # Temporary Plab hack.
+    #
+    $pcremote_ok = array();
+    if (isset($pcplab_okay) &&
+	!strcmp($pcplab_okay, "Yep")) {
+	    $pcremote_ok[] = "pcplab";
+    }
+    if (isset($ron_okay) &&
+	!strcmp($ron_okay, "Yep")) {
+	    $pcremote_ok[] = "pcron";
+    }
+    if (count($pcremote_ok)) {
+	    $foo = implode(",", $pcremote_ok);
+	    DBQueryFatal("UPDATE projects set pcremote_ok='$foo' ".
+			 "WHERE pid='$pid'");
+    }
+
+    #
     # Change the status if necessary. This only happens for new users
     # being approved in their first project. After this, the status is
     # going to be "active", and we just leave it that way.

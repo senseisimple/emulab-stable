@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
+include("showstuff.php3");
 
 #
 # Standard Testbed Header
@@ -36,10 +37,8 @@ if (!isset($pid) ||
 #
 # Check to make sure thats this is a valid PID.
 #
-$query_result =
-    DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The project $pid is not a valid project.", 1);
+if (! TBValidProject($pid)) {
+    USERERROR("The project $pid is not a valid project.", 1);
 }
 
 echo "<center><h3>You have the following choices:</h3></center>
@@ -76,9 +75,18 @@ echo "<center><h3>You have the following choices:</h3></center>
       </table>\n";
 
 #
-# This will spit out the info.
+# Show stuff
 #
-include("showproject_dump.php3");
+SHOWPROJECT($pid, $uid);
+
+TBProjLeader($pid, $projleader);
+
+echo "<center>
+      <h3>Project Leader Information</h3>
+      </center>
+      <table align=center border=0>\n";
+
+SHOWUSER($projleader);
 
 #
 # Now put up the menu choice along with a text box for an email message.
@@ -101,6 +109,34 @@ echo "<tr>
           </td>
        </tr>\n";
 
+#
+# XXX
+# Temporary Plab hack.
+# See if remote nodes requested and put up checkboxes to allow override.
+#
+$query_result =
+    DBQueryFatal("select num_pcplab,num_ron from projects where pid='$pid'");
+
+$row = mysql_fetch_array($query_result);
+$num_pcplab = $row[num_pcplab];
+$num_ron    = $row[num_ron];
+
+if ($num_ron || $num_pcplab) {
+	echo "<tr>
+                 <td align=center>\n";
+	if ($num_pcplab) {
+		echo "<input type=checkbox value=Yep checked
+                                 name=pcplab_okay>
+                                 Allow Plab &nbsp\n";
+	}
+	if ($num_ron) {
+		echo "<input type=checkbox value=Yep checked
+                                 name=ron_okay>
+                                 Allow RON &nbsp\n";
+	}
+	echo "   </td>
+              </tr>\n";
+}
 
 echo "<tr>
           <td>Use the text box (70 columns wide) to add a message to the

@@ -372,12 +372,24 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>*Estimated #of
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbshark\">
-                             Sharks</a>:</td>
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
+                             Planetlab PCs</a>:</td>
               <td class=left>
                   <input type=text
-                         name=\"formfields[proj_sharks]\"
-                         value=\"" . $formfields[proj_sharks] . "\"
+                         name=\"formfields[proj_plabpcs]\"
+                         value=\"" . $formfields[proj_plabpcs] . "\"
+                         size=4>
+              </td>
+          </tr>\n";
+
+    echo "<tr>
+              <td colspan=2>*Estimated #of
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
+                             RON PCs</a>:</td>
+              <td class=left>
+                  <input type=text
+                         name=\"formfields[proj_ronpcs]\"
+                         value=\"" . $formfields[proj_ronpcs] . "\"
                          size=4>
               </td>
           </tr>\n";
@@ -461,7 +473,8 @@ if (! isset($submit)) {
     $defaults = array();
     $defaults[proj_URL] = "$HTTPTAG";
     $defaults[usr_URL] = "$HTTPTAG";
-    $defaults[proj_sharks] = "0";
+    $defaults[proj_ronpcs]  = "0";
+    $defaults[proj_plabpcs] = "0";
     $defaults[proj_public] = "checked";
     $defaults[proj_linked] = "checked";
     
@@ -615,12 +628,19 @@ if (!isset($formfields[proj_pcs]) ||
 elseif (! ereg("^[0-9]+$", $formfields[proj_pcs])) {
     $errors["#of PCs"] = "Must be numeric";
 }
-if (!isset($formfields[proj_sharks]) ||
-    strcmp($formfields[proj_sharks], "") == 0) {
-    $errors["#of Sharks"] = "Missing Field";
+if (!isset($formfields[proj_plabpcs]) ||
+    strcmp($formfields[proj_plabpcs], "") == 0) {
+    $errors["#of Planetlab PCs"] = "Missing Field";
 }
-elseif (! ereg("^[0-9]+$", $formfields[proj_sharks])) {
-    $errors["#of Sharks"] = "Must be numeric";
+elseif (! ereg("^[0-9]+$", $formfields[proj_plabpcs])) {
+    $errors["#of Planetlab PCs"] = "Must be numeric";
+}
+if (!isset($formfields[proj_ronpcs]) ||
+    strcmp($formfields[proj_ronpcs], "") == 0) {
+    $errors["#of RON PCs"] = "Missing Field";
+}
+elseif (! ereg("^[0-9]+$", $formfields[proj_ronpcs])) {
+    $errors["#of RON PCs"] = "Must be numeric";
 }
 if (!isset($formfields[proj_why]) ||
     strcmp($formfields[proj_why], "") == 0) {
@@ -728,7 +748,8 @@ $proj_funders      = addslashes($formfields[proj_funders]);
 $proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
 $proj_members      = $formfields[proj_members];
 $proj_pcs          = $formfields[proj_pcs];
-$proj_sharks       = $formfields[proj_sharks];
+$proj_plabpcs      = $formfields[proj_plabpcs];
+$proj_ronpcs       = $formfields[proj_ronpcs];
 $proj_why	   = addslashes($formfields[proj_why]);
 $proj_expires      = date("Y:m:d", time() + (86400 * 120));
 
@@ -831,12 +852,13 @@ if (! $returning) {
 #
 DBQueryFatal("INSERT INTO projects ".
 	     "(pid, created, expires, name, URL, head_uid, ".
-	     " num_members, num_pcs, num_sharks, why, funders, unix_gid, ".
-	     " public, public_whynot)".
+	     " num_members, num_pcs, why, funders, unix_gid, ".
+	     " num_pcplab, num_ron, public, public_whynot)".
 	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
 	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
-	     "        '$proj_pcs', '$proj_sharks', '$proj_why', ".
-	     "        '$proj_funders', NULL, $public, '$proj_whynotpublic')");
+	     "        '$proj_pcs', '$proj_why', ".
+	     "        '$proj_funders', NULL, $proj_plabpcs, $proj_ronpcs, ".
+	     "         $public, '$proj_whynotpublic')");
 
 DBQueryFatal("INSERT INTO groups ".
 	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
@@ -876,7 +898,8 @@ TBMAIL($TBMAIL_APPROVAL,
      "Phone:           $usr_phone\n".
      "Members:         $proj_members\n".
      "PCs:             $proj_pcs\n".
-     "Sharks:          $proj_sharks\n".
+     "Planetlab PCs:   $proj_plabpcs\n".
+     "RON PCs:         $proj_ronpcs\n".
      "Unix GID:        $unix_name ($unix_gid)\n".
      "Reasons:\n$proj_why\n\n".
      "Please review the application and when you have made a decision,\n".
