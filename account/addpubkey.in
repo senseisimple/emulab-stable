@@ -104,7 +104,6 @@ if ($iskey) {
 	fatal("Tainted key: $keyfile");
     }
     $keyline = $keyfile;
-    print "$keyline\n";
 }
 else {
     if ($keyfile =~ /^([-\w\.\/]+)$/) {
@@ -234,6 +233,7 @@ sub ParseKey($) {
     }
     # Do not enter into DB if in verify mode.
     if ($verify) {
+	print "Key was good: $type\n";
 	return 1;
     }
 
