@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    XML NS template based on planetlab.ns - For making PlanetLab experiments
+-->
+<nstemplate>
+    <variable name="Count" default="10" />
+    <variable name="ResUsage" default="3" />
+    <variable name="HWType" default="pcplab" />
+    <variable name="FailOK" />
+    <variable name="Tarballs" default="/somedir /proj/yourproj/tarfiles/yourtarball.tar.gz" />
+    <variable name="RPMs" default="/proj/yourproj/rpms/yourrpm.rpm" />
+    <variable name="Startup" default="/somepath/yourstartupcmd" />
+    <nstext>
+	<section><![CDATA[
+# planetlab.ns - NS script to allocate PlanetLab nodes on Emulab/Netbed
+#
+# September 17, 2003
+#
+# Questions and comments to testbed-ops@emulab.net
+
+#
+# Boilerplate
+#
+source tb_compat.tcl
+set ns [new Simulator]
+tb-set-colocate-factor 1
+
+#
+# Estimated resource use on each node by this experiment, used to determine
+# if there are enough available resources on PlanetLab for this experiment.
+# The scale is from 1 to 5, with 1 being negligible usage on a node,
+# and 5 an experiment that, ideally, should have nodes to itself.
+# If omitted, defaults to 3.
+#
+tb-set-cpu-usage <ResUsage>
+tb-set-mem-usage <ResUsage>
+
+#
+# How many nodes to ask for
+#
+set num_nodes <Count>
+
+#
+# Type of PlanetLab nodes to request.  Current choices, with counts:
+#    pcplab      Any PlanetLab node (127)
+# The following are mutually exclusive sets:
+#    pcplabdsl   Plab nodes on DSL lines (3)
+#    pcplabinet  Plab nodes on the commodity Internet, in North America (12)
+#    pcplabintl  Plab nodes outside North America (24)
+#    pcplabinet2 Plab end-hosts (not colo sites) on Internet2 (88)
+#
+# Can mix and match these types all you want with, say, multiple loops below.
+#
+# Instead of by type, you could also request specific nodes; for example:
+#   tb-fix-node $nodeA plab15
+#   tb-fix-node $nodeB plab33
+#
+set hwtype "<HWType>"
+
+#
+# Select the N approximately least-loaded nodes of the given type.  Fails if
+# insufficient nodes are found due to excessive loads or inadequate disk space.
+#
+for {set i 1} {$i <= $num_nodes} {incr i} {
+    set node($i) [$ns node]
+    tb-set-hardware $node($i) $hwtype
+
+	]]></section>
+    <section depends_on="FailOK" action="comment"><![CDATA[
+    # Allow experiment setup to succeed even if setup of some vnodes fails.
+    # Your choice, but currently recommended due to flaky Plab nodes.
+    tb-set-node-failure-action $node($i) "nonfatal"
+
+	]]></section>
+	<section><![CDATA[
+    # Entirely optional stuff; see comments below.
+	]]></section>
+	<section depends_on="Tarballs" action="comment"><![CDATA[
+    tb-set-node-tarfiles $node($i) <Tarballs>
+	]]></section>
+	<section depends_on="RPMs" action="comment"><![CDATA[
+    tb-set-node-rpms     $node($i) <RPMs>
+	]]></section>
+	<section depends_on="Startup" action="comment"><![CDATA[
+    tb-set-node-startup  $node($i) <Startup>
+	]]></section>
+	<section><![CDATA[
+}
+
+# The above loop includes three optional features:
+# 1) install tarballs,  2) install rpms,  3) Command execution at boot time.
+#
+# You can specify tarfiles and/or RPMs to install on the vnodes.
+# These files must exist in your /proj directory on ops.emulab.net.
+# 1) "tarfiles" syntax is an alternating space-separated list of the
+#     dir from which that untar should start, and the path to the tarball.
+# 2) "rpms" syntax is simply a space-separated list of paths to RPMs.
+# 3) The "startup" command will be executed every time the vnode boots:
+#    at experiment startup, swapin, and vnode reboot.  Of course, it needs
+#    to exist on the vnode, probably from a tarball or RPM you installed.
+
+#
+# Boilerplate
+#
+$ns run
+	]]></section>
+    </nstext>
+</nstemplate>

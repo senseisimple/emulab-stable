@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    XML NS template file for making a simple
+-->
+<nstemplate>
+    <variable name="Count" default="10" />
+    <variable name="OS" default="RHL-STD" />
+    <variable name="HWType" default="pc" />
+    <nstext>
+	<section><![CDATA[
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set num_pcs <Count>
+set lan_string ""
+
+# Setup PCs
+for {set i 1} {$i <= $num_pcs} {incr i} {
+    set pc($i) [$ns node]
+    tb-set-node-os $pc($i) <OS>
+    tb-set-hardware $pc($i) <HWType>
+    append lan_string "$pc(${i}) "
+}
+
+set lan0 [$ns make-lan "$lan_string" 100Mb 0ms]
+
+$ns run
+	]]></section>
+    </nstext>
+</nstemplate>

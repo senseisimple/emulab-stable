@@ -1,0 +1,260 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
+
+#
+# nsgen - Generate an NS file from some supplied values and a template
+#
+
+use Getopt::Long;
+use XML::Parser;
+
+sub usage() {
+    print "Usage: $0 [-dh] [-o outputfile] [-v var=value ...] template\n";
+    print "    -d             Turn on debugging output\n";
+    print "    -h             This message\n";
+    print "    -v var=value   Set <var> to <value> in the template\n";
+    print "    -o outputfile  Put output in <outputfile> instead of stdout\n";
+    return 1;
+}
+
+#
+# Process command-line args
+#
+my $debug = 0;
+my $help  = 0;
+my @vars  = ();
+my $outfile;
+if (! GetOptions("d" => \$debug, "h" => \$help, "v=s" => \@vars, "o=s" =>
+	\$outfile)) {
+    exit usage();
+}
+
+if ($help) {
+    exit usage();
+}
+
+if (@ARGV != 1) {
+    exit usage();
+}
+
+my $template_file = shift @ARGV;
+
+#
+# Body
+#
+my ($template,$variables) = readTemplate($template_file);
+processOptions($variables,@vars);
+my $nsfile = substitute($template,$variables);
+
+#
+# Read the template XML file
+#
+sub readTemplate($) {
+    my ($template_file) = @_;
+    open TF,"<$template_file" or fatal("Unable to open $template_file: $!");
+
+    #
+    # Create a parser.
+    #
+    my $parser = new XML::Parser(Style => 'Tree');
+    $parser->setHandlers('Start'   => \&startElement,
+			 'End'     => \&endElement,
+			 'Char'    => \&processElement);
+    #
+    # Do the actual parsing
+    #
+    local ($vars,@nssections);
+    fatal($@) if (eval { $parser->parse(*TF); return 1; } != 1);
+
+    return (\@nssections,$vars);
+}
+
+#
+# Handle the variables the user gave on the command line
+#
+sub processOptions($@) {
+    my ($variables,@options) = @_;
+    return unless @options;
+    foreach my $option (@options) {
+	#
+	# Parse values
+	#
+	@optparts = split /=/, $option;
+	if (@optparts != 2) {
+	    fatal("Bad variable: $option");
+	}
+	my ($var, $value) = @optparts;
+	
+	#
+	# Make sure they gave a real variable
+	#
+	if (!defined($variables->{$var})) {
+	    fatal("Unknown variable $var");
+	}
+	$variables->{$var}{value} = $value;
+    }
+}
+
+#
+# Replace variables embedded in the template
+#
+sub substitute($template,$variables) {
+    #
+    # Loop through each section of the template
+    #
+    foreach my $section (@$template) {
+	my $lines = $section->{lines};
+	my $depends_on = $section->{depends_on};
+	my $action = $section->{action};
+
+	#
+	# Handle sections that depend on a variable that was not given - either
+	# skip the section entirely, or comment it out.
+	#
+	if ($depends_on && !defined($variables->{$depends_on}{value})) {
+	    if ($action eq "skip") {
+		next;
+	    } elsif ($action eq "comment") {
+		$lines =~ s/^(\s*)([^\s#])/$1#$2/mg;
+	    }
+	}
+
+	#
+	# Replace all variables, which look like <Foo>
+	#
+        while ($lines =~ /<(\w+)>/) {
+            if (!defined($variables->{$1})) {
+                fatal("Unknown variable: $1");
+            }
+
+	    #
+	    # Take the user value if given, default otherwise
+	    #
+	    my $value;
+	    if (defined($variables->{$1}{value})) {
+		$value = $variables->{$1}{value};
+	    } else {
+		$value = $variables->{$1}{default};
+	    }
+            $lines =~ s/<(\w+)>/$value/;
+        }
+        print $lines;
+    }
+}
+
+#
+# XML parsing callbacks
+#
+
+#
+# The beginning of an XML element
+#
+sub startElement() {
+    debug("startElement called with: ", join(",",@_), "\n");
+    my ($expat, $element, %attrs) = @_;
+    if ($element eq "nstemplate") {
+	# Nothing to do
+    } elsif ($element eq "variable") {
+	#
+	# Got a variable - grab the default
+	#
+	$vars->{$attrs{name}} = {};
+
+	if (defined($attrs{default})){
+	    $vars->{$attrs{name}}->{default} = $attrs{default};
+	} else {
+	    $vars->{$attrs{name}}->{default} = undef;
+	}
+    } elsif ($element eq "nstext") {
+	# Nothing to do
+    } elsif ($element eq "section") {
+	#
+	# Start a fresh array of section lines, and grab a few optional
+	# attributes
+	#
+	$current_section = [];
+	$current_section_depends = undef;
+	$current_section_action = undef;
+	if ($attrs{depends_on}) {
+	    $current_section_depends = $attrs{'depends_on'};
+	}
+	if ($attrs{action}) {
+	    $current_section_action = $attrs{'action'};
+	}
+    }
+}
+
+#
+# End of an XML element
+#
+sub endElement() {
+    debug("endElement called with: ", join(",",@_), "\n");
+    my ($expat, $element) = @_;
+    if ($element eq "nstemplate") {
+	# Nothing to do
+    } elsif ($element eq "variable") {
+	# Nothing to do
+    } elsif ($element eq "nstext") {
+	# Nothing to do
+    } elsif ($element eq "section") {
+	#
+	# Eat blank lines off $current_section at the beginning and end, due to
+	# the way that XML preserves whitespace. Lets us do more natural layout
+	# in the XML file.
+	#
+	if ($$current_section[0] =~ /^\s*$/) {
+	    shift @$current_section;
+	}
+	if ($$current_section[$#{$current_section}] =~ /^\s*$/) {
+	    pop @$current_section;
+	}
+
+	#
+	# Push into the global list of sections
+	#
+	push @nssections, {depends_on => $current_section_depends, action =>
+	    $current_section_action, lines => join("",@$current_section)};
+    }
+}
+
+#
+# Process text in an XML element
+#
+sub processElement() {
+    debug("processElement called with: ", join(",",@_), "\n");
+    my ($expat, $string) = @_;
+    
+    #
+    # Right now, we only have to do anything in the sections
+    #
+    SWITCH: for ($expat->current_element()) {
+	(/^section$/) && do {
+	    push @$current_section, $string;
+	};
+    }
+}
+
+#
+# Die           
+#
+sub fatal($)
+{     
+     my ($msg) = @_;
+
+     die("*** $0:\n".
+	 "    $msg\n");
+}       
+
+#
+# Debug
+#
+sub debug(@_) {
+    if ($debug) {
+	print STDERR @_;
+    }
+}
