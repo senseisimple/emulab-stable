@@ -545,6 +545,12 @@ sub dodelays ()
 		    else {
 			system("sync");
 			system("reboot");
+			#
+			# Make sure that, even if the reboot command returns
+			# before the node is totally down, this process doesn't
+			# exit (otherwise, we would proceed with testbed setup)
+			#
+			sleep(10000);
 		    }
 		}
 	    }
