@@ -1,6 +1,6 @@
 # Testbed wide makefile.
 
-SUBDIRS = lib assign discvr tbsetup db os security
+SUBDIRS = lib assign discvr tbsetup db os security tmcd
 
 all:		all-subdirs
 install:	all
@@ -22,6 +22,7 @@ clean:
 	@$(MAKE) -C assign clean
 	@$(MAKE) -C discvr clean
 	@$(MAKE) -C os  clean
+	@$(MAKE) -C tmcd  clean
 	@$(MAKE) -C os/imagezip clean
 	@$(MAKE) -C tbsetup/checkpass clean
 
