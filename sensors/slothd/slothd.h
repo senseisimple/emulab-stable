@@ -30,7 +30,6 @@
 #include <netdb.h>
 #include <signal.h>
 #include <syslog.h>
-#include <varargs.h>
 #include <utmp.h>
 #ifdef __linux__
 #include <net/if.h>

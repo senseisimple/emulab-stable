@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -305,7 +305,7 @@ main(int argc, char **argv)
 			format += strlen(format) - len;
 
 			gettimeofday(&when, NULL);
-			localtime_r(&when.tv_sec, &tm);
+			localtime_r((time_t *)&when.tv_sec, &tm);
 			if (!strptime(evtime, format, &tm))
 				usage(progname);
 

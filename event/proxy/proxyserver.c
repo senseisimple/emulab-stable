@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -382,6 +382,7 @@ ServerLoop(void)
 			client_records   = crecord;
 			info("Connected: %s\n", inet_ntoa(client.sin_addr));
 		next:
+			;
 		}
 
 		/*

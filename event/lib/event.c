@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,10 +23,13 @@
 #include <time.h>
 #include "event.h"
 
-#define ERROR(fmt,...) fprintf(stderr,__FUNCTION__ ": " fmt, ## __VA_ARGS__)
-#define INFO(fmt,...) fprintf(stderr,__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#define ERROR(fmt,...) \
+ { fputs(__FUNCTION__,stderr); fprintf(stderr,": " fmt, ## __VA_ARGS__); }
+#define INFO(fmt,...) \
+ { fputs(__FUNCTION__,stderr); fprintf(stderr,": " fmt, ## __VA_ARGS__); }
 #ifdef  DEBUG
-#define TRACE(fmt,...) frintf(stderr,__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#define TRACE(fmt,...) \
+ { fputs(__FUNCTION__,stderr); fprintf(stderr,": " fmt, ## __VA_ARGS__); }
 #else
 #define TRACE(fmt,...)
 #endif
