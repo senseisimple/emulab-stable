@@ -222,24 +222,37 @@ For the NS file described above, you would receive a listing that looks
 similar to this:
 
 	<code><pre>
-	Node Mapping:
-	Virtual         Physical        Qualified Name
-	--------------- --------------- --------------------
-	nodeA           pc12            nodeA.myproj.myexp.emulab.net
-	nodeB           pc14            nodeB.myproj.myexp.emulab.net
-	nodeC           pc16            nodeC.myproj.myexp.emulab.net
-	nodeD           pc18            nodeD.myproj.myexp.emulab.net
-	delay0          pc7             delay0.myproj.myexp.emulab.net
-	
-	IP Addresses:
-	Node            IFC   Destination          IP                  
-	--------------- -------------------- --------------------
-	nodeB           eth0  nodeC                192.168.42.42       
-	nodeB           eth2  nodeA                192.168.2.2         
-	nodeA           eth0  nodeB                192.168.2.3         
-	nodeC           eth0  nodeB                192.168.42.2        
-	nodeD           eth0  nodeB                192.168.3.2         
-	nodeB           eth1  nodeD                192.168.3.3	</code></pre>
+        Node Info:
+        ID              Type       OSID           
+        --------------- ---------- ---------------
+        NodeA           pc         FBSD-STD       
+        NodeB           pc                        
+        NodeC           pc         RHL-STD        
+        NodeD           pc                        
+
+        Node Mapping:
+        Virtual         Physical        Qualified Name
+        --------------- --------------- --------------------
+        NodeA           pc18            NodeA.myexp.myproj.emulab.net
+        NodeB           pc29            NodeB.myexp.myproj.emulab.net
+        NodeC           pc28            NodeC.myexp.myproj.emulab.net
+        NodeD           pc35            NodeD.myexp.myproj.emulab.net
+        tbsdelay0       pc15            tbsdelay0.myexp.myproj.emulab.net
+
+        Lan/Link Info:
+        ID              Member          IP              Delay     BW (Kbs)  Loss Rate
+        --------------- --------------- --------------- --------- --------- ---------
+        l6              NodeB:eth0      192.168.42.42   0.00      100000    0.000    
+        l5              NodeB:eth2      192.168.1.3     25.00     100000    0.000    
+        l5              NodeA:eth0      192.168.1.2     25.00     100000    0.000    
+        l6              NodeC:eth0      192.168.42.2    0.00      100000    0.000    
+        l7              NodeB:eth1      192.168.2.2     0.00      100000    0.000    
+        l7              NodeD:eth0      192.168.2.3     0.00      100000    0.000    
+
+        Delay Node Info:
+        LinkID          Virtual         Physical        Pipe Numbers   
+        --------------- --------------- --------------- --------------- 
+        l5              tbsdelay0       pc15            100,110		</code></pre>
 
 <p>
 A few points should be noted:
@@ -247,9 +260,12 @@ A few points should be noted:
 <li> A single delay node was allocated and inserted into the link
      between NodeA and NodeB. This link is invisible from your
      perspective, except for the fact that it adds latency, error,
-     or reduced bandwidth.
+     or reduced bandwidth. However, the information for the delay links
+     are included so that you can
+     <a href="../faq.php3?#HDS-6">modify the delay parameters</a>
+     after the experiment has been created. 
 <p>
-<li> Delays of less than 3ms (per trip) are too small to be
+<li> Delays of less than 2ms (per trip) are too small to be
      accurately modeled at this time, and will be silently ignored.
      Please see the
      <a href="docwrapper.php3?docname=nscommands.html#LOSS">
