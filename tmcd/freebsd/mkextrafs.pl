@@ -97,6 +97,7 @@ mysystem("newfs -U ${rawdevice}s${slice}${partition}");
 mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
 mysystem("mount $mountpoint");
+mysystem("mkdir $mountpoint/local");
 
 sub mysystem($)
 {
