@@ -467,7 +467,7 @@ Link instproc updatedb {DB} {
     $self instvar netmask
     $self instvar protocol
 
-    if {protocol != "ethernet"} {
+    if {$protocol != "ethernet"} {
 	perror "Link must be an ethernet only, not a $protocol"
 	return
     }
