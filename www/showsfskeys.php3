@@ -275,9 +275,6 @@ if (count($errors)) {
 DBQueryFatal("replace into user_sfskeys ".
 	     "values ('$target_uid', '$comment', '$usr_key', now())");
 
-DBQueryFatal("update users set usr_modified=now() ".
-	     "where uid='$target_uid'");
-
 #
 # Audit
 #
@@ -295,13 +292,18 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Thanks,\n".
      "Testbed Operations\n",
      "From: $uid_name <$uid_email>\n".
-     "Cc: $TBMAIL_AUDIT\n".
+     "Bcc: $TBMAIL_AUDIT\n".
      "Errors-To: $TBMAIL_WWW");
 
 #
-# mkacct arranges for nodes to be updated.
+# update sfs_users files and nodes if appropriate.
 #
-MKACCT($uid, "webmkacct -f $target_uid");
+if (HASREALACCOUNT($uid)) {
+    SUEXEC($uid, "nobody", "webaddsfskey -w $target_uid", 0);
+}
+else {
+    SUEXEC("nobody", "nobody", "webaddsfskey -w $target_uid", 0);
+}
 
 header("Location: showsfskeys.php3?target_uid=$target_uid&finished=1");
 ?>

@@ -126,19 +126,16 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Thanks,\n".
      "Testbed Operations\n",
      "From: $uid_name <$uid_email>\n".
-     "Cc: $TBMAIL_AUDIT\n".
+     "Bcc: $TBMAIL_AUDIT\n".
      "Errors-To: $TBMAIL_WWW");
 
 DBQueryFatal("delete from user_pubkeys ".
 	     "where uid='$target_uid' and comment='$key'");
 
-DBQueryFatal("update users set usr_modified=now() ".
-	     "where uid='$target_uid'");
-
 #
-# mkacct updates the user pubkeys.
-# 
-MKACCT($uid, "webmkacct $target_uid");
+# update authkeys files and nodes.
+#
+ADDPUBKEY($uid, "webaddpubkey -w $addpubkeyargs");
 
 header("Location: showpubkeys.php3?target_uid=$target_uid");
 

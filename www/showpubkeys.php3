@@ -298,12 +298,10 @@ if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
     PAGEFOOTER();
     return;
 }
+#
+# Insert key, update authkeys files and nodes if appropriate.
+#
 ADDPUBKEY($uid, "webaddpubkey $addpubkeyargs");
-
-#
-# mkacct updates the user pubkeys in ~ssh/authorized_keys.
-#
-MKACCT($uid, "webmkacct $target_uid");
 
 header("Location: showpubkeys.php3?target_uid=$target_uid&finished=1");
 ?>
