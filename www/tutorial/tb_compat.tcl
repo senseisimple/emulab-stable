@@ -20,3 +20,4 @@ proc tb-set-node-lan-loss {node lan loss} {}
 proc tb-set-node-lan-params {node lan delay bw loss} {}
 proc tb-set-node-failure-action {node type} {}
 proc tb-set-ip-routing {type} {}
+proc tb-fix-node {v p} {}

@@ -21,6 +21,7 @@
   <li><a href="#ROUTE">IP Routing Commands</a>
   <li><a href="#OS">OS Commands</a>
   <li><a href="#LOSS">Link Loss Commands</a>
+  <li><a href="#MISC">Misc. Commands</a>
 </ul>
 
 <hr>
@@ -585,4 +586,26 @@ tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
   <li>This command is exactly equivalent to calling each of the above
       three commands appropriately.  See above for more information.
   </li>
+</ul>
+
+<a name="MISC"></a><h3>Misc. Commands</h3>
+
+<h4>tb-fix-node</h4>
+
+<pre>
+tb-fix-node <i>vnode</i> <i>pnode</i>
+
+tb-fix-node $node0 pc42
+</pre>
+
+<dl>
+  <dt><i>vnode</i> - The node we are fixing.
+  <dt><i>pnode</i> - The physical node we want used.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>This command forces the virtual node to be mapped to the
+      specified physical node.  Swap in will fail if this can not be
+      done.
 </ul>
