@@ -1,0 +1,142 @@
+Version 0.1
+
+Conventions:
+
+Any line beginning with # should be ignored as a comment.
+
+Lists are always space separated.
+
+A labelvalue is either:
+
+label: value
+
+OR
+
+label=
+multi-line value
+.
+.
+.
+=
+
+----------------------------------------------------------------------
+
+Basic Layout:
+
+The file is divided into a hierarchical array of sections bracketed with:
+
+START <section>
+END <section>
+
+Sections can be within sections and no order is imposed.
+
+----------------------------------------------------------------------
+
+Sections:
+
+Topology: describes the base physical topology of the network.  
+
+START topology
+START nodes
+# <node> <links>
+# <node> refers to a string name that should be easily mappable
+# to a physical machine (IP address, hostname, etc.)
+# <links> is a space separated list of link ids
+END nodes
+START links
+# <link> <src> <srcport> <dst> <dstport>
+# <link> is a unique link identifier.
+# <src> and <dst> are node identifiers (or lans).
+# <srcport> and <dstport> are integers.  A port of -1 indicates that
+# this information is N/A or unknown.
+END links
+START lans
+# <lan> <switch> <links>
+# <lan> is a lan identifier and also acts as a node identifier for the
+# purposes of links.
+# <switch> is a string that maps to a physical switch.
+# <links> is a space separated list of links that attach to the lan.
+END lans
+END topology
+
+
+Virtual: Describes the mapping of virtual objects to physical objects
+
+START virtual
+START nodes
+# <virtual node> <physical node>
+# <virtual node> is a string identifying a node in the virtual network.
+# <physical node> is a node identifier
+END nodes
+START links
+# <virtual link> <physical links>
+# <physical links> is a space separated list of physical links making
+# up the virtual link.
+END links
+START lans
+# <virtual lan> <physical lan>
+END lans
+END virtual
+
+NodeInfo: Describes each physical node in more detail. 
+
+START nodeinfo
+# This is a number of records of the form:
+# node <node>
+# labelvalue
+# . 
+# . 
+# .
+# end
+# 
+# Existing labels are:
+# type - the type of the node
+# events - a multi-line field describing events in the form
+#    <time> <type> <parameters>
+# links - redundant with topology
+# delays - multiline spec of delay forwarding of the format:
+#   <port1> <port2> <bandwidth> <delay> <drop>
+#
+# Existing events are:
+# down
+# up
+# reboot
+# downinterface
+# upinterface
+END nodeinfo
+
+LinkInfo: Describes each physical link in more detail.
+
+START linkinfo
+# Similar to nodeinfo.
+# link <link>
+# ...
+# end
+#
+# Labels:
+# src, dst, srcport, dstport - redundant with topology
+END linkinfo
+
+VLAN: Describes the vlan configuration for each switches
+
+START vlan
+# Records of the form:
+# switch <switch>
+# ...
+# end
+#
+# The contents are one vlan to each line.  Each line being a list
+# of ports in that vlan.
+END vlan
+
+----------------------------------------------------------------------
+
+Other possible sections:
+
+software - describes what software to install on what nodes
+data - describes data collection
+control - describes control
+events - central repository of events
+user - describes basic information of user (contact, etc.)
+traffic - describes traffic generation
+agents - describes agents
