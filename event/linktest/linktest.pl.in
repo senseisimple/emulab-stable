@@ -366,6 +366,7 @@ if(&dotest(TEST_LOSS)) {
     &debug("\n$msg\n\n");
     &loss_test; 
 }
+
 if(&dotest(TEST_BW)){
     my $msg = "Testing Bandwidth...";
     &post_event(EVENT_REPORT,$msg);
@@ -617,8 +618,8 @@ sub latency_test {
 		    if(!$pid) {
 
 			# call ping_node with ttl=1
-			my ($result_cnt, $sample_avg, $sample_dev) = &ping_node($edge->dst,1);
-
+			my ($result_cnt, $sample_avg, $sample_dev) =
+			    &ping_node($edge->dst,1);
 
 			my $n = PING_SEND_COUNT;
 
@@ -713,6 +714,8 @@ sub latency_test {
     }
 
     &wait_all(\@waitlist);
+    # wait for completion before next test.
+    &barrier();
 }
 
 
@@ -858,6 +861,8 @@ sub static_rt_test {
 	}
     }
     &wait_all(\@waitlist);
+    # wait for completion before next test.
+    &barrier();
 }
 
 
