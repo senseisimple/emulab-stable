@@ -173,6 +173,10 @@ earliest time one of the steps needs to occur.
 	     gmake
 	     sudo gmake install
 
+	* Install this port (might already be install).
+
+		/usr/ports/databases/py-MySQLdb
+
 	* Reconfig, rebuild, and reinstall the testbed software on your
 	  boss node.
 
@@ -338,6 +342,12 @@ earliest time one of the steps needs to occur.
 20040420: Before build
 	Switched web search button backend from webglimpse to swish-e.
         Just need to go to /usr/ports/www/swish-e and install the port.
+
+20040315: Before build
+
+	XMLRPC Server. Install this port:
+
+		/usr/ports/databases/py-MySQLdb
 
 20040303: Before build
 	Fixed the way we handle the certificate for capture with tiptunnel.
