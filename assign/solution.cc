@@ -152,7 +152,7 @@ void print_solution_summary()
 	}
 
 	// Ignore links we aren't using
-	if (plink->bw_used == 0) {
+	if ((plink->emulated == 0) && (plink->nonemulated == 0)) {
 	  continue;
 	}
 
