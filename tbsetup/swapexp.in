@@ -17,7 +17,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT "Usage: swapexp [-b] [-i | -a | -f] [-r] ".
-	"<-s in | out | restart | modify> <pid> <eid> [<nsfile>]\n";
+	"<-s in | out | restart | modify | pause> <pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
 my  $optlist = "biafrs:";
@@ -103,6 +103,7 @@ if (defined($options{"s"})) {
     if ($inout ne "out"     &&
 	$inout ne "in"      &&
 	$inout ne "restart" &&
+	$inout ne "pause"   &&
 	$inout ne "modify") {
 	usage();
     }
@@ -287,10 +288,14 @@ if ($isbatchexpt) {
 		"    Currently $ebatchstate. Must be RUNNING to swap out.\n")
 		if ($ebatchstate ne BATCHSTATE_RUNNING);
 
-	    my $flag = BATCHMODE_CANCELSWAP;
-	
-	    DBQueryFatal("UPDATE experiments set canceled=$flag ".
-			 "WHERE eid='$eid' and pid='$pid'");
+	    TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELSWAP);
+	}
+	elsif ($inout eq "pause") {
+	    die("*** $0:\n".
+		"    Batch experiment $pid/$eid is not in the proper state!\n".
+		"    Currently $ebatchstate. Must be POSTED to pause.\n")
+		if ($ebatchstate ne BATCHSTATE_POSTED);
+	    TBSetBatchState($pid, $eid, BATCHSTATE_PAUSED);
 	}
 	elsif ($inout eq "modify") {
 	    die("*** $0:\n".

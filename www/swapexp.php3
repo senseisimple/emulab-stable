@@ -7,11 +7,6 @@
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Swap/Restart an Experiment");
-
-#
 # Only known and logged in users can end experiments.
 #
 $uid = GETLOGIN();
@@ -32,9 +27,20 @@ if (!isset($eid) ||
 
 if (!isset($inout) ||
     (strcmp($inout, "in") && strcmp($inout, "out") &&
-     strcmp($inout, "restart"))) {
+     strcmp($inout, "pause") && strcmp($inout, "restart"))) {
     USERERROR("The argument must be either in, out, or restart!", 1);
 }
+
+# Canceled operation redirects back to showexp page. See below.
+if ($canceled) {
+    header("Location: showexp.php3?pid=$pid&eid=$eid");
+    return;
+}
+
+#
+# Standard Testbed Header, after cancel above.
+#
+PAGEHEADER("Swap Control");
 
 #
 # Only admins can issue a force swapout
@@ -59,16 +65,6 @@ else {
 $exp_eid = $eid;
 $exp_pid = $pid;
 
-if (!strcmp($inout, "in")) {
-    $action = "swapin";
-}
-elseif (!strcmp($inout, "out")) {
-    $action = "swapout";
-}
-elseif (!strcmp($inout, "restart")) {
-    $action = "restart";
-}
-
 #
 # Check to make sure thats this is a valid PID/EID tuple.
 #
@@ -79,14 +75,13 @@ if (mysql_num_rows($query_result) == 0) {
     USERERROR("The experiment $exp_eid is not a valid experiment ".
 	      "in project $exp_pid.", 1);
 }
-$row = mysql_fetch_array($query_result);
-$exp_gid = $row[gid];
-$batch   = $row[batchmode];
-$swappable=$row[swappable];
-$idleswap_bit=$row[idleswap];
-$idleswap_time=$row[idleswap_timeout];
-
-$idlethresh=min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
+$row           = mysql_fetch_array($query_result);
+$exp_gid       = $row[gid];
+$isbatch       = $row[batchmode];
+$swappable     = $row[swappable];
+$idleswap_bit  = $row[idleswap];
+$idleswap_time = $row[idleswap_timeout];
+$idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
 
 #
 # Look for transition in progress and exit with error. 
@@ -108,23 +103,34 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission for $exp_eid!", 1);
 }
 
+# Convert inout to informative text.
+if (!strcmp($inout, "in")) {
+    if ($isbatch) 
+	$action = "queue";
+    else
+	$action = "swapin";
+}
+elseif (!strcmp($inout, "out")) {
+    if ($isbatch) 
+	$action = "swapout";
+    else
+	$action = "swapout";
+}
+elseif (!strcmp($inout, "pause")) {
+    if (!$isbatch)
+	USERERROR("Only batch experiments can be 'paused!'", 1);
+    $action = "pause";
+}
+elseif (!strcmp($inout, "restart")) {
+    $action = "restart";
+}
+
 #
 # We run this twice. The first time we are checking for a confirmation
 # by putting up a form. The next time through the confirmation will be
-# set. Or, the user can hit the cancel button, in which case we should
-# probably redirect the browser back up a level.
+# set. Or, the user can hit the cancel button, in which case we 
+# redirect the browser back to the experiment page (see above).
 #
-if ($canceled) {
-    echo "<center><h2><br>
-          Experiment $action canceled <br> for experiment
-          <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>/<a
-             href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>!
-          </h2></center>\n";
-    
-    PAGEFOOTER();
-    return;
-}
-
 if (!$confirmed) {
     echo "<center><h2><br>
           Are you sure you want to ";
@@ -132,7 +138,7 @@ if (!$confirmed) {
 	echo "<font color=red><br>forcibly</br></font> ";
     }
     echo "$action ";
-    if ($batch) {
+    if ($isbatch) {
 	echo "batch mode ";
     }
     echo "experiment '$exp_eid?'
@@ -191,14 +197,19 @@ if (!$confirmed) {
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
+echo "<font size=+2>Experiment <b>".
+     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo "<br><br>\n";
+
 #
 # We run a wrapper script that does all the work of terminating the
 # experiment. 
 #
 #   tbstopit <pid> <eid>
 #
-echo "<center><br>";
-echo "<h2>Starting experiment $action. Please wait a moment ...
+echo "<center>";
+echo "<h2>Starting experiment state change. Please wait a moment ...
       </h2></center>";
 
 flush();
@@ -228,7 +239,7 @@ $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 
 if ($retval) {
     echo "<br><br><h2>
-          $action failure($retval): Output as follows:
+          State change failure($retval): Output as follows:
           </h2>
           <br>
           <XMP>\n";
@@ -246,14 +257,29 @@ if ($retval) {
 #
 echo "<br><h3>\n";
 if ($retval == 0) {
-    if ($batch &&
-	strcmp($inout, "in") == 0) {
-	echo "Batch Mode experiments will be run when enough resources
-              become available. This might happen immediately, or it
-              may take hours or days. You will be notified via email
-              when the experiment has been run. If you do not receive
-              email notification within a reasonable amount of time,
-              please contact $TBMAILADDR.\n";
+    if ($isbatch) {
+	if (strcmp($inout, "in") == 0) {
+	    echo "Batch Mode experiments will be run when enough resources
+                  become available. This might happen immediately, or it
+                  may take hours or days. You will be notified via email
+                  when the experiment has been run. In the meantime, you can
+                  check the web page to see how many attempts have been made,
+                  and when the last attempt was.\n";
+	}
+	elseif (strcmp($inout, "out") == 0) {
+	    echo "Batch mode experiments take a few moments to stop. Once
+                  it does, the experiment will enter the 'paused' state.
+                  You can requeue the batch experiment at that time.\n";
+
+	    echo "<br><br>
+                  If you do not receive
+                  email notification within a reasonable amount of time,
+                  please contact $TBMAILADDR.\n";
+	}
+	elseif (strcmp($inout, "pause") == 0) {
+	    echo "Your experiment has been paused. You may requeue your
+		  experiment at any time.\n";
+	}
     }
     else {
 	if (strcmp($inout, "in") == 0)
@@ -261,20 +287,17 @@ if ($retval == 0) {
 	else
 	    $howlong = "less than two";
     
-	echo "Experiment
-	  <a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>
-          in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
-          has started its $action.
-          <br><br>
-          You will be notified via email when the operation is complete.
-          This typically takes $howlong minutes, depending on the
-          number of nodes in the experiment. 
-          If you do not receive email notification within a reasonable amount
-          of time, please contact $TBMAILADDR.
-          <br><br>
-          While you are waiting, you can watch the log
-          in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
-          realtime</a>.\n";
+	echo "Your experiment has started its $action.
+             You will be notified via email when the operation is complete.
+             This typically takes $howlong minutes, depending on the
+             number of nodes in the experiment.
+             <br><br>
+             If you do not receive email notification within a reasonable
+             amount of time, please contact $TBMAILADDR.
+             <br><br>
+             While you are waiting, you can watch the log in
+             <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
+                realtime</a>.\n";
     }
 }
 echo "</h3>\n";

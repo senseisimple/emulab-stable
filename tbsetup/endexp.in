@@ -188,10 +188,7 @@ if ($isbatchexpt) {
 	# already be running, but we deal with that by looking at the
 	# batch state.
 	#
-	my $flag = BATCHMODE_CANCELTERM;
-	
-	DBQueryFatal("UPDATE experiments set canceled=$flag ".
-		     "WHERE eid='$eid' and pid='$pid'");
+	TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELTERM);
 
 	#
 	# If the state is POSTED or PAUSED, we can do it right away.

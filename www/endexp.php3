@@ -149,12 +149,12 @@ if ($retval < 0) {
 #
 echo "<br><br><h3>\n";
 if ($retval) {
-    echo "Experiment `$exp_eid' in project `$exp_pid' has been terminated!
+    echo "Your experiment has been terminated!
           <br><br>
           You may now reuse the experiment name.\n";         
 }
 else {
-    echo "Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
+    echo "Your experiment is terminating!<br><br>
           You will be notified via email when the experiment has been torn
 	  down, and you can reuse the experiment name.
           This typically takes less than two minutes, depending on the

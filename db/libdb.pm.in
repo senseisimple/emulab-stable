@@ -64,8 +64,8 @@ use Exporter;
 
 	 BATCHSTATE_POSTED BATCHSTATE_RUNNING BATCHSTATE_TERMINATING
 	 BATCHSTATE_ACTIVATING BATCHSTATE_PAUSED
-	 BATCHMODE_CANCELTERM BATCHMODE_CANCELSWAP
-	 TBBatchState TBSetBatchState
+	 BATCHMODE_CANCELTERM BATCHMODE_CANCELSWAP BATCHMODE_CANCELCLEAR
+	 TBBatchState TBSetBatchState TBSetBatchCancelFlag
 
 	 TB_NODELOGTYPE_MISC TB_NODELOGTYPES TB_DEFAULT_NODELOGTYPE 
 
@@ -284,6 +284,7 @@ sub BATCHSTATE_RUNNING()	{ "active"; }
 sub BATCHSTATE_PAUSED()		{ "paused"; }
 sub BATCHSTATE_TERMINATING()	{ "terminating"; }
 # Cancel flags
+sub BATCHMODE_CANCELCLEAR	{ 0 ;}
 sub BATCHMODE_CANCELTERM	{ 1 ;}
 sub BATCHMODE_CANCELSWAP	{ 2 ;}
 
@@ -1337,7 +1338,7 @@ sub TBBatchState($$)
 }
 
 #
-# Set BatctMode state.
+# Set BatchMode state.
 #
 # usage: SetBatchState(char *pid, char *eid, char *state)
 #        returns 1 if okay.
@@ -1349,6 +1350,28 @@ sub TBSetBatchState($$$)
 
     my $query_result =
 	DBQueryWarn("update experiments set batchstate='$state',batchmode=1 ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Set BatchMode cancel flag,
+#
+# usage: SetBatchCancel(char *pid, char *eid, char *flag)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBSetBatchCancelFlag($$$)
+{
+    my($pid, $eid, $flag) = @_;
+
+    my $query_result =
+	DBQueryWarn("update experiments set canceled='$flag' ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||

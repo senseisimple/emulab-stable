@@ -482,8 +482,9 @@ sub swapexp($)
     # Set the state to paused to ensure that it is not run again until
     # the user wants to.
     # 
+    TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELCLEAR);
     TBSetBatchState($pid, $eid, $BSTATE_PAUSED);
-
+    
     if ($canceled) {
 	email_status("Batch Mode experiment $pid/$eid has been stopped!");
     }

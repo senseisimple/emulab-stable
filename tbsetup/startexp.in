@@ -342,7 +342,7 @@ my $message;
 
 if ($frontend) {
     $message =
-	"Your experiment `$eid' in project `$pid' is now preloaded.\n" .
+	"Your experiment `$eid' in project `$pid' has been created.\n" .
 	"You can check the web interface to see if it looks the way\n" .
 	"you expected it to. If so, you may swap the experiment in,\n" .
 	"or terminate it, at any time.\n" .
@@ -350,7 +350,7 @@ if ($frontend) {
 }
 else {
     $message =
-	"Your experiment `$eid' in project `$pid' is now configured.\n" .
+	"Your experiment `$eid' in project `$pid' has been started.\n" .
 	"Here is the experiment summary detailing the nodes that were\n" .
 	"allocated to you. You may use the `Qualified Name' to log on\n" .
 	"to your nodes. See /etc/hosts on your nodes (when running\n" .
@@ -372,7 +372,7 @@ $message .=
     "in your message to $TBOPS";
 
 SENDMAIL("$user_name <$user_email>",
-	 "New Experiment " . (($frontend == 0) ? "Created" : "Preloaded") .
+	 "New Experiment " . (($frontend == 0) ? "Started" : "Created") .
 	 ": $pid/$eid",
 	 $message,
 	 "$user_name <$user_email>",

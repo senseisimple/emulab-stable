@@ -50,6 +50,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 
 $expindex = TBExptIndex($exp_pid, $exp_eid);
 $expstate = TBExptState($exp_pid, $exp_eid);
+$isbatch  = TBExptBatchState($exp_pid, $exp_eid, $batchstate);
 
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
@@ -61,16 +62,12 @@ SUBMENUSTART("Experiment Options");
 
 if ($expstate) {
     if (TBExptLogFile($exp_pid, $exp_eid)) {
-	WRITESUBMENUBUTTON("View Activation Logfile",
+	WRITESUBMENUBUTTON("View Activity Logfile",
 			   "spewlogfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
       
     if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Visualization, NS File, Mapping",
-			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
-    }
-    elseif (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
-	WRITESUBMENUBUTTON("Visualization and NS File",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
     else {
@@ -81,21 +78,38 @@ if ($expstate) {
 		       "spitnsdata.php3?pid=$exp_pid&eid=$exp_eid");
 
     # Swap option.
-    if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
-	WRITESUBMENUBUTTON("Swap this Experiment In",
-		      "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+    if ($isbatch) {
+	if (strcmp($batchstate, TBDB_BATCHSTATE_PAUSED) == 0) {
+	    WRITESUBMENUBUTTON("Queue Batch Experiment",
+			"swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+	}
+	elseif (strcmp($batchstate, TBDB_BATCHSTATE_RUNNING) == 0) {
+	    WRITESUBMENUBUTTON("Stop Batch Experiment",
+			"swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	}
+	elseif (strcmp($batchstate, TBDB_BATCHSTATE_POSTED) == 0) {
+	    WRITESUBMENUBUTTON("Pause Batch Experiment",
+			"swapexp.php3?inout=pause&pid=$exp_pid&eid=$exp_eid");
+	}
     }
-    elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
-	WRITESUBMENUBUTTON("Swap this Experiment Out",
-		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
-
+    else {
+	if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
+	    WRITESUBMENUBUTTON("Swap Experiment In",
+			"swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
+	}
+	elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+	    WRITESUBMENUBUTTON("Swap Experiment Out",
+			"swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
+	}
+    }
+    WRITESUBMENUBUTTON("Terminate Experiment",
+		       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
+    
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Modify Traffic Shaping",
 			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
-
-WRITESUBMENUBUTTON("Terminate this Experiment",
-		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 $editflip = ($edit ? 0 : 1);
 WRITESUBMENUBUTTON("Edit Experiment Metadata",
@@ -113,9 +127,11 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATEACCOUNTS)) {
 if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
     WRITESUBMENUBUTTON("Reboot All Nodes",
 		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
-    WRITESUBMENUBUTTON("Modify this Experiment",
-		       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
-
+    # Batch experiments can be modifed only when paused.
+    if (! ($isbatch && strcmp($batchstate, TBDB_BATCHSTATE_PAUSED))) {
+	WRITESUBMENUBUTTON("Modify Experiment",
+			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+    }
 }
 
 # History
@@ -125,7 +141,7 @@ WRITESUBMENUBUTTON("Show History",
 if (ISADMIN($uid)) {
     if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {		
 	SUBMENUSECTION("Beta-Test Options");
-	WRITESUBMENUBUTTON("Restart this Experiment",
+	WRITESUBMENUBUTTON("Restart Experiment",
 			   "swapexp.php3?inout=restart&pid=$exp_pid".
 			   "&eid=$exp_eid");
 
