@@ -1,0 +1,130 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+$| = 1;
+
+my $MAX_COPY_TRIES = 5;
+my $LOCAL_TEST_DIR      = "/usr/scratch";
+my $LOCAL_DATABASE_DUMP = "$LOCAL_TEST_DIR/tbdb.sql";
+my $LOCAL_SRC_DIR       = "$LOCAL_TEST_DIR/testbed";
+my $LOCAL_TESTSUITE_DIR = "$LOCAL_TEST_DIR/testsuite";
+
+my @CREATE_DIRS = ($LOCAL_TEST_DIR, $LOCAL_TESTSUITE_DIR);
+
+my $basedir;
+if (@ARGV == 2) {
+    my ($pid, $eid) = @ARGV;
+    $basedir = "/proj/$pid/exp/$eid/testsuite";
+} elsif (@ARGV == 1) {
+    $basedir = $ARGV[0];
+} else {
+    die "Usage: $0 <[pid eid] | dir>\n";
+}
+
+my $source_location = $basedir . "/testbed";
+my $database_dump = $basedir . "/tbdb.sql";
+my $logfile = $basedir . "/testsuite.log";
+my $logdir = $basedir . "/logs";
+
+#
+# Safety check - this script WILL drop tbdb, so we want to make sure nobody
+# runs it on anything other than the clone of boss!
+#
+my $hostname = `hostname -s`;
+chomp $hostname;
+if ($hostname ne "dolly") {
+    die "Sorry, you're only supposed to run this on the clone of boss!";
+}
+
+$ENV{PATH} = "/usr/local/bin:/usr/local/sbin:$ENV{PATH}";
+
+#
+# Log our output
+#
+open STDOUT, ">$logfile" or die "Unable to open $logfile for writing: $!\n";
+open STDERR, ">&STDOUT";
+
+#
+# The basic step we have to go through - all functions die() if they fail
+#
+CreateDirectories();
+CopySource($source_location);
+FillDatabase($database_dump);
+RunTestsuite();
+CopyResults($logdir);
+
+sub CreateDirectories() {
+    print "##### Creating directories\n";
+    foreach my $dir (@CREATE_DIRS) {
+	system "sudo mkdir -p $dir" and die "Unable to create $dir\n";
+	system "sudo chown $< $dir" and die "Unable to set ownership on $dir\n";
+    }
+}
+
+sub CopySource($$) {
+    print "##### Copying source code\n";
+    my ($source_location) = @_;
+    ReliableCopy("$source_location/*",$LOCAL_SRC_DIR);
+}
+
+sub FillDatabase($) {
+    my ($database_dump) = @_;
+    print "##### Copying database dump\n";
+    ReliableCopy($database_dump,$LOCAL_DATABASE_DUMP);
+    print "##### Creating database\n";
+    system "yes | mysqladmin drop tbdb" and die "Failed to drop database\n";
+    system "mysqladmin create tbdb" and die "Failed to create database\n";
+    print "##### Filling database\n";
+    system "mysql tbdb < $LOCAL_DATABASE_DUMP"
+	and die "Failed to fill database\n";
+}
+
+sub RunTestsuite() {
+    print "##### Running testsuite\n";
+    chdir $LOCAL_TESTSUITE_DIR
+	or die "Unable to change to $LOCAL_TESTSUITE_DIR: $!\n";
+    # We accept failure here, because we want to still copy the logs out
+    system "$LOCAL_SRC_DIR/testsuite/tbtest -flest run tbdb frontend";
+}
+
+sub CopyResults($) {
+    print "##### Copying back results\n";
+    my ($logdir) = @_;
+    system "mkdir -p $logdir" and die "Unable to create $logdir\n";
+    #
+    # Copy everything but the .txt files, which contain database dumps
+    #
+    ReliableCopy($LOCAL_TESTSUITE_DIR,"$logdir/*","*.txt");
+}
+
+#
+# Copy a directory heirarchy, retrying if there are failurese, to avoid
+# transient NFS problems. Returns nothing - dies if it fails
+#
+sub ReliableCopy($$;$) {
+    my ($src, $dst, $exclude) = @_;
+    #
+    # We use rsync so that if something fails halfway through a big copy, we
+    # will basically start where we left off rather than doing the whole thing
+    # again. Bound the number of tries in case there are other, non-NFS related
+    # problems (like permissions)
+    #
+    my $success = 0;
+    my $excludestr = "";
+    if ($exclude) {
+	$excludestr = "--exclude '$exclude'";
+    }
+    foreach my $attempt (1 .. $MAX_COPY_TRIES) {
+	if (!system "rsync $excludestr -a $src $dst") {
+	    $success = 1;
+	    last;
+	}
+    }
+
+    if ($success) {
+	return;
+    } else {
+	die "Failed to copy $src to $dst after $MAX_COPY_TRIES attempts";
+    }
+}
