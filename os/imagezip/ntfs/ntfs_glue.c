@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -314,8 +314,8 @@ read_ntfsslice(int slice, int stype, u_int32_t start, u_int32_t size,
 	void           *buf;
 	struct ntfs_cluster *cfree;
   	struct ntfs_cluster *tmp;
-	char           *name;
 	ntfs_volume    *vol;
+	s64	       offset;
 
 	/* Check to make sure the types the NTFS lib defines are what they
 	   claim*/
@@ -327,20 +327,15 @@ read_ntfsslice(int slice, int stype, u_int32_t start, u_int32_t size,
 	 * The NTFS library needs the /dev name of the partition to examine.
 	 */
 	if (slice < 0)
-		name = openname;
+		offset = 0LL;
 	else
-		name = slicename(slice, start, size, DOSPTYP_NTFS);
-	if (name == NULL) {
-		fprintf(stderr,
-			"Could not locate special file for NTFS slice %d\n",
-			slice+1);
-		return 1;
-	}
+		offset = sectobytes(start);
 	if (debug)
-		fprintf(stderr, "Using %s for NTFS slice %d\n", name, slice+1);
+		fprintf(stderr, "Using %s at offset %qu for NTFS slice %d\n",
+			openname, offset, slice+1);
 	/*The volume must be mounted to find out what clusters are free*/
-	if(!(vol = ntfs_mount(name, MS_RDONLY))) {
-		perror(name);
+	if(!(vol = ntfs_mount_with_offset(openname, MS_RDONLY, offset))) {
+		perror(openname);
 		fprintf(stderr, "Failed to read superblock information.  "
 			"Not a valid NTFS partition\n");
 		return 1;
@@ -363,7 +358,7 @@ read_ntfsslice(int slice, int stype, u_int32_t start, u_int32_t size,
 		fprintf(stderr, "  P%d (NTFS v%u.%u)\n",
 			slice + 1 /* DOS Numbering */,
 			vol->major_ver,vol->minor_ver);
-		fprintf(stderr, "        %s",name);
+		fprintf(stderr, "        %s",openname);
 		fprintf(stderr, "      start %10d, size %10d\n", start, size);
 		fprintf(stderr, "        Sector size: %u, Cluster size: %u\n",
 			vol->sector_size, vol->cluster_size);

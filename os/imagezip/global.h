@@ -12,7 +12,6 @@ extern int secsize;
 extern int slicemode;
 extern int dorelocs;
 
-extern char *slicename(int slice, u_int32_t offset, u_int32_t size, int type);
 extern off_t devlseek(int fd, off_t off, int whence);
 extern ssize_t devread(int fd, void *buf, size_t nbytes);
 extern void addskip(uint32_t start, uint32_t size);

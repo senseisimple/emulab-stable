@@ -98,8 +98,6 @@ int	read_raw(void);
 int	compress_image(void);
 void	usage(void);
 
-static void getsliceinfo(char *disk, int diskfd);
-
 static SLICEMAP_PROCESS_PROTO(read_slice);
 
 struct slicemap fsmap[] = {
@@ -436,7 +434,6 @@ main(argc, argv)
 		perror(infilename);
 		exit(1);
 	}
-	getsliceinfo(infilename, infd);
 
 	if (slicetype != 0) {
 		rval = read_slice(-1, slicetype, 0, 0, infilename, infd);
@@ -556,13 +553,8 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			else
 				start += bbstart;
 #endif
-			fprintf(stderr, "  start %9d, size %9d",
+			fprintf(stderr, "  start %9d, size %9d\n",
 				start, doslabel.parts[i].dp_size);
-			fprintf(stderr, ", slicedev %s\n",
-				slicename(bsdix,
-					  bbstart + doslabel.parts[i].dp_start,
-					  doslabel.parts[i].dp_size,
-					  doslabel.parts[i].dp_typ)?:"<none>");
 		}
 		fprintf(stderr, "\n");
 	}
@@ -654,103 +646,6 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 	}
 
 	return rval;
-}
-
-/*
- * Read the kernel slice information to get a mapping of special file
- * to slice.  This is currently only used for NTFS.
- */
-static struct dsinfo {
-	u_int32_t offset;
-	u_int32_t size;
-	int type;
-	char name[20];
-} sliceinfo[MAXSLICES];
-static int sliceinfosize = 0;
-
-#if defined(__FreeBSD__) && __FreeBSD__ < 5
-#include <sys/diskslice.h>
-#endif
-
-static void
-getsliceinfo(char *disk, int diskfd)
-{
-	int si, gotit = 0;
-
-#ifdef DIOCGSLICEINFO
-	struct diskslices dsinfo;
-	int i;
-
-	if (ioctl(diskfd, DIOCGSLICEINFO, &dsinfo) == 0) {
-		for (si = 0, i = BASE_SLICE; i < dsinfo.dss_nslices; si++,i++) {
-			sliceinfo[si].offset = dsinfo.dss_slices[i].ds_offset;
-			sliceinfo[si].size = dsinfo.dss_slices[i].ds_size;
-			sliceinfo[si].type = dsinfo.dss_slices[i].ds_type;
-			snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
-				 "%ss%d", disk, si+1);
-			sliceinfosize++;
-		}
-		gotit++;
-	}
-#endif
-	/*
-	 * XXX If we didn't get it above, guess the name for primary partitions.
-	 * It is only extended partitions where the naming isn't obvious.
-	 */
-	if (!gotit) {
-		fprintf(stderr,
-			"WARNING: Could not acquire slice device names "
-			"from kernel, guessing...\n");
-		for (si = 0; si < 4; si++) {
-			sliceinfo[si].offset = 0;
-			sliceinfo[si].size = 0;
-			sliceinfo[si].type = 0;
-			snprintf(sliceinfo[si].name, sizeof(sliceinfo[si].name),
-#ifdef linux
-				 "%s%d",
-#else
-				 "%ss%d",
-#endif
-				 disk, si+1);
-			sliceinfosize++;
-		}
-	}
-
-	if (debug > 1) {
-		fprintf(stderr, "Slice special files:\n");
-		for (si = 0; si < sliceinfosize; si++)
-			fprintf(stderr, "  %s: off=%9u size=%9u type=%02d\n",
-				sliceinfo[si].name,
-				sliceinfo[si].offset,
-				sliceinfo[si].size,
-				sliceinfo[si].type);
-		fprintf(stderr, "\n");
-	}
-}
-
-/*
- * Find a disk special with the indicated parameters
- */
-char *
-slicename(int slice, u_int32_t offset, u_int32_t size, int type)
-{
-	int si;
-
-	for (si = 0; si < sliceinfosize; si++)
-		if (sliceinfo[si].offset == offset &&
-		    sliceinfo[si].size == size &&
-		    sliceinfo[si].type == type)
-			return sliceinfo[si].name;
-
-	/*
-	 * XXX use the slice number to pick
-	 */
-	if (slice < 4 && sliceinfo[slice].type == 0 &&
-	    sliceinfo[slice].offset == 0 && sliceinfo[slice].size == 0 &&
-	    sliceinfo[slice].name != 0)
-		return sliceinfo[slice].name;
-
-	return 0;
 }
 
 
