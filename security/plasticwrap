@@ -16,7 +16,7 @@ $host = "boss.emulab.net";
 $nopass = "-o 'BatchMode yes'";
 
 # Turn off host key checking.... for now.
-$nokeycheck = "-o 'StrictHostKeyChecking No'";
+$nokeycheck = "-o 'StrictHostKeyChecking no'";
 
 # Make sure we use the right identity file
 $identity = "-i $ENV{HOME}/.ssh/identity";
