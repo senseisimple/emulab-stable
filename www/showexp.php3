@@ -66,7 +66,7 @@ echo "   <td valign=top>\n";
 echo "       <table cellspacing=2 cellpadding=2 border=0 width=200>\n";
 echo "         <tr><td align=center><b>Experiment Options</b></td></tr>\n";
 echo "         <tr></tr>\n";
-WRITESIDEBARSUBBUTTON("View NS File and Assignment",
+WRITESIDEBARSUBBUTTON("View NS File and Node Assignment",
 		      "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
 WRITESIDEBARSUBBUTTON("Terminate this experiment",
 		      "endexp.php3?pid=$exp_pid&eid=$exp_eid");
