@@ -107,3 +107,9 @@ addresses you set up in the defs file, in /etc/mail/lists . If you want to run
 these mailing lists off your ops node, you can put some people in them now.
 These are just standard sendmail list files - a list of addresses and/or
 archive files, one per line.
+
+##### Step 5 - Other miscellaneous things to set up
+
+hosts file - It's a good idea to put boss' name/IP address in /etc/hosts - ops
+is usually booted before boss (since the latter NFS mounts the former), so this
+will help things that want to look up boss' name before it boots.
