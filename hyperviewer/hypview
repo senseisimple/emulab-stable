@@ -1,0 +1,21 @@
+#! /bin/sh
+#
+# hypview - Wrapper script for the hyperviewer application.
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# Optionally use shared libs under the local directory.
+if [ -d libs ]; then
+    LD_LIBRARY_PATH=./libs;        export LD_LIBRARY_PATH
+fi
+
+# Optionally use Pango loadable modules under the local directory.
+if [ -d libs/pango ]; then
+    PANGO_RC_FILE=./pangorc.local; export PANGO_RC_FILE
+fi
+
+# If the wxPython or OpenGL directories are local, they will be used.
+python hypview.py $*

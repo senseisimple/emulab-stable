@@ -1,0 +1,11 @@
+#
+# pangorc file for uninstalled operation. If pango-viewer is run with
+# this file in the current directory it will set it as PANGO_RC_FILE
+#
+
+[Pango]
+# Use this when the pango modules are in a subdirectory.
+ModuleFiles = ./pango.modules.local
+
+[PangoX]
+AliasFiles = ./pangox.aliases

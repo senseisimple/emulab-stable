@@ -6,14 +6,14 @@
 # All rights reserved.
 #
 from wxPython.wx import *
-from wxPython import glcanvas
+from wxPython.glcanvas import wxGLCanvas
 
 class UsageDialogUI(wxDialog):
     def __init__(self, *args, **kwds):
         # begin wxGlade: UsageDialogUI.__init__
         kwds["style"] = wxDEFAULT_DIALOG_STYLE
         wxDialog.__init__(self, *args, **kwds)
-        self.Usage = wxStaticText(self, -1, "\n  HyperViewer usage:\n  -------------------------\n\n  Objects close to the center of the sphere are largest.  \n\n  Left mouse drag: X,Y movement in hyperbolic space.  \n\n  Middle mouse drag: Rotate the hyperbolic space.  \n\n  Pickable nodes under the cursor turn green.    \n  Left-click to bring them to the center.  \n\n")
+        self.Usage = wxStaticText(self, -1, "\n  HyperViewer mouse usage:\n  -----------------------------------\n\n  Objects close to the center of the sphere are largest.  \n\n  Left mouse drag: X,Y movement in hyperbolic space.  \n\n  Control- or Shift- Left mouse, or Middle mouse, drag:\n  Rotate the hyperbolic space.  \n\n  Pickable nodes under the cursor turn bright  green.    \n  Left-click to bring them to the center.  \n\n")
 
         self.__set_properties()
         self.__do_layout()
@@ -46,6 +46,7 @@ class OpenDialogUI(wxDialog):
         wxDialog.__init__(self, *args, **kwds)
         self.FileToOpen = wxTextCtrl(self, -1, "")
         self.OpenFile = wxButton(self, -1, "Open Data File")
+        self.FileMsg = wxStaticText(self, -1, "")
         self.label_2 = wxStaticText(self, -1, "Project name:", style=wxALIGN_RIGHT)
         self.ProjectName = wxTextCtrl(self, -1, "")
         self.label_7 = wxStaticText(self, -1, "Experiment name:")
@@ -53,6 +54,7 @@ class OpenDialogUI(wxDialog):
         self.label_8 = wxStaticText(self, -1, "Root (optional):")
         self.ExperimentRoot = wxTextCtrl(self, -1, "")
         self.OpenExperiment = wxButton(self, -1, "Retrieve experiment")
+        self.ExperimentMsg = wxStaticText(self, -1, "")
 
         self.__set_properties()
         self.__do_layout()
@@ -77,7 +79,7 @@ class OpenDialogUI(wxDialog):
         FileOpening.Add(self.FileToOpen, 0, 0, 0)
         FileOpening.Add(20, 10, 0, 0, 0)
         FileOpening.Add(self.OpenFile, 0, wxALIGN_CENTER_HORIZONTAL, 0)
-        FileOpening.Add(20, 20, 0, 0, 0)
+        FileOpening.Add(self.FileMsg, 0, 0, 0)
         sizer_4.Add(FileOpening, 0, wxALL, 0)
         sizer_4.Add(20, 10, 0, 0, 0)
         grid_sizer_1.Add(self.label_2, 0, 0, 0)
@@ -90,6 +92,7 @@ class OpenDialogUI(wxDialog):
         grid_sizer_1.Add(20, 1, 0, 0, 0)
         ExperimentOpening.Add(grid_sizer_1, 0, wxEXPAND, 0)
         ExperimentOpening.Add(self.OpenExperiment, 0, wxALIGN_CENTER_HORIZONTAL, 0)
+        ExperimentOpening.Add(self.ExperimentMsg, 0, 0, 0)
         ExperimentOpening.Add(20, 10, 0, 0, 0)
         sizer_4.Add(ExperimentOpening, 1, wxALL, 0)
         self.SetAutoLayout(1)
@@ -120,7 +123,7 @@ class hvFrameUI(wxFrame):
         wxglade_tmp_menu.Append(3, "&Usage\tCtrl+H", "", wxITEM_NORMAL)
         self.Menu.Append(wxglade_tmp_menu, "&Help")
         # Menu Bar end
-        self.hypView = glcanvas.wxGLCanvas(self.panel_1, -1)
+        self.hypView = wxGLCanvas(self.panel_1, -1)
         self.GoToTop = wxButton(self.Controls, -1, "go to top")
         self.LabelNodeName = wxStaticText(self.Controls, -1, "    Node name    ")
         self.NodeName = wxTextCtrl(self.Controls, -1, "")

@@ -18,7 +18,7 @@ from hvFrameUI import *
 from OpenGL.GL import * 
 
 from wxPython.wx import *
-from wxPython import glcanvas
+from wxPython.glcanvas import wxGLCanvas
 
 # A wxPython application.
 class hvApp(wxApp):
@@ -37,42 +37,58 @@ class hvApp(wxApp):
 	self.SetTopWindow(self.frame)
 	
 	# Given command-line argument(s), attempt to read in a topology.
-	if len(sys.argv) == 2 and sys.argv[1][0] == '-': # Any dash arg gives usage message.
+        filename = project = None
+        # Any dash argument prints a usage message and exits.
+	if len(sys.argv) == 2 and sys.argv[1][0] == '-': 
 	    print '''Hyperviewer usage:
   No args - Starts up the GUI.  Use the File/Open menu item to read a topology.
   One arg - A .hyp file name.  Read it in and start the GUI, e.g.:
-      ./hypview.py BigLan.hyp
+      ./hypview BigLan.hyp
   Two args - Project and experiment names in the database.
       Get the topology from XMLRPC, make a .hyp file, start as above.
-      ./hypview.py testbed BigLan
+      ./hypview testbed BigLan
   Three args - Project and experiment names, plus an optional root node name.
-      ./hypview.py testbed BigLan clan'''
+      ./hypview testbed BigLan clan'''
 	    sys.exit()
-	elif len(sys.argv) == 2:	# Read from a file.
-	    print "Reading file:", sys.argv[1]
-	    self.frame.ReadTopFile("wxHyperViewer", sys.argv[1])
+            pass
+        
+        # One command-line argument: read from a .hyp file.
+	elif len(sys.argv) == 2:
+            filename = sys.argv[1]
+	    print "Reading file:", filename
 	    pass
-	elif len(sys.argv) == 3:	# Read from the database via XML-RPC, make a file.
-	    print "Getting project:", sys.argv[1] + ", experiment:", sys.argv[2]
-	    filename = exptToHv.getExperiment(sys.argv[1], sys.argv[2])
-	    if filename:
-		self.frame.ReadTopFile("wxHyperViewer", filename)
-		pass
-	    else:
-		print "Failed to get experiment from database."
-		pass
+        
+        # Two args: read an experiment from the DB via XML-RPC, and make a .hyp file.
+	elif len(sys.argv) == 3:
+            project = sys.argv[1]
+            experiment = sys.argv[2]
+	    print "Getting project:", project + ", experiment:", experiment
+	    filename = exptToHv.getExperiment(project, experiment)
 	    pass
-	elif len(sys.argv) == 4:	# From database, with optional graph root node.
-	    print "Getting project:", sys.argv[1] + ", experiment:", sys.argv[2] \
-		  + ", root node:", sys.argv[3]
-	    filename = exptToHv.getExperiment(sys.argv[1], sys.argv[2], sys.argv[3])
-	    if filename:
-		self.frame.ReadTopFile("wxHyperViewer", filename)
-		pass
-	    else:
-		print "Failed to get experiment from database."
-		pass
-	    pass
+
+        # Three args: experiment from database, with optional graph root node.
+	elif len(sys.argv) == 4:
+            project = sys.argv[1]
+            experiment = sys.argv[2]
+            root = sys.argv[3]
+	    print "Getting project:", project + ", experiment:", experiment \
+		  + ", root node:", root
+	    filename = exptToHv.getExperiment(project, experiment, root)
+            pass
+
+        if filename:
+            if filename == 2:
+                exptError = "There is no experiment " + project + "/" + experiment
+                print exptError
+                pass
+            else:
+                self.frame.ReadTopFile("wxHyperViewer", filename)
+                pass
+            pass
+        elif project:
+            print "Failed to get experiment from database."
+            pass
+
 	return True
     pass
 
@@ -224,8 +240,11 @@ class hvFrame(hvFrameUI):
     ##
     # Mouse click events.
     def OnClick(self, mouseEvent):
+	# Encode mouse button events for HypView.
 	btnNum = -1
-	if mouseEvent.LeftDown():	# Encode mouse button events.
+        
+        # Left mouse button for X-Y motion of the hyperbolic center.
+	if mouseEvent.LeftDown():
 	    btnNum = 0
 	    btnState = 0
 	    pass
@@ -233,6 +252,8 @@ class hvFrame(hvFrameUI):
 	    btnNum = 0
 	    btnState = 1
 	    pass
+        
+        # Middle button for rotation of the hyperbolic space.
 	elif mouseEvent.MiddleDown():
 	    btnNum = 1
 	    btnState = 0
@@ -242,7 +263,12 @@ class hvFrame(hvFrameUI):
 	    btnState = 1
 	    pass
 	
-	# Pass mouse clicks on to HypView.
+        # Left button with control or shift held down is also rotation.
+        if btnNum == 0 and ( mouseEvent.ControlDown() or mouseEvent.ShiftDown() ):
+            btnNum = 1
+            pass
+        
+	# Handle mouse clicks in HypView.
 	if btnNum != -1:
 	    self.vwr.mouse(btnNum, btnState, mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
 	    self.vwr.redraw()
@@ -315,7 +341,14 @@ class hvOpen(OpenDialogUI):
 	root = self.ExperimentRoot.GetLineText(0)
 	hypfile = exptToHv.getExperiment(project, experiment, root)
 	if hypfile:
+            if hypfile == 2:
+                exptError = "There is no experiment " + project + "/" + experiment
+                self.ExperimentMsg.SetLabel(exptError)
+                print exptError
+                return
+            
 	    self.app.frame.ReadTopFile("wxHyperViewer", hypfile)
+            self.ExperimentMsg.SetLabel(" ")
 	    self.Hide();
 	pass
     

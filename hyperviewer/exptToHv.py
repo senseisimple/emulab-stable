@@ -7,6 +7,7 @@
 # exptToHv - Get an experiment topology via xmlrpc, and write a HyperViewer .hyp file.
 import sets
 import string
+import fnmatch
 
 from sshxmlrpc import *
 from emulabclient import *
@@ -51,7 +52,7 @@ def addConnection(graph, h1, h2):
     else:
         graph[h2] = sets.Set([h1])
 
-## exptToHv - Make the request from the server.  Reconstitute a topology graph
+## getExperiment - Make the request from the server.  Reconstitute a topology graph
 ## from the host interface list, and traverse it to write HyperViewer .hyp file.
 #
 # Args are the project and experiment names, and optionally the root of the topology.
@@ -75,7 +76,7 @@ def getExperiment(project, experiment, root=""):
 
     if response["code"] != RESPONSE_SUCCESS:
         print "XMLRPC failure, code", response["code"]
-        pass
+        return response["code"]
     links = response["value"]
 
     # Figure out the nodes from the experiment links (interfaces) from the virt_lans table.
@@ -87,7 +88,8 @@ def getExperiment(project, experiment, root=""):
         if not linksByName.has_key(linkName):
             linksByName[linkName] = sets.Set()
         linksByName[linkName].add(member)	# Each link/lan connects a set of interfaces.
-
+        pass
+    
     # Build the connection graph as a dictionary of nodes with sets of connected nodes.
     hosts = sets.Set()	# Collect unique node names (hosts and lans.)
     lans = sets.Set()
@@ -99,19 +101,46 @@ def getExperiment(project, experiment, root=""):
             hosts.add(h1)
             hosts.add(h2)
             addConnection(graph, h1, h2)
+            pass
         else:
             # Lan nodes are are links with more than two interfaces as members.
             lans.add(link)
             for intfc in intfcs:
                 addConnection(graph, link, intfcHost(intfc))
+                pass
+            pass
+        pass
 
     # Use the first lan or the first host as the default root node.
     if root == "":
         if len(lans) > 0:
             root = lans.copy().pop()
+            pass
         else:
             root = hosts.copy().pop()
+            pass
+        pass
 
+    # The root may be a glob expression, in which case we make up a root node and put
+    # the matching nodes under it.  We could add a regexp option as well...
+    rootNodes = []
+    if '*' in root or '?' in root or '[' in root:
+        glob = root
+        rootNodes = fnmatch.filter(hosts, glob) + fnmatch.filter(lans, glob)
+        if len(rootNodes) > 1:
+            # Find a new root name that isn't already in the hosts or lans lists.
+            for newroot in ['root','Root','ROOT','RoOt']:
+                if not newroot in hosts and not newroot in lans:
+                    root = newroot
+                    ##print "Connecting", root, "to", rootNodes
+                    for node in rootNodes:
+                        addConnection(graph, root, node)
+                        pass
+                    pass
+                    break
+                pass
+        pass
+    
     # Walk the graph structure in depth-first order to generate the .hyp file.
     # Make a second copy of the graph as we go to avoid repeating nodes due to back-links.
     def walkNodes(graph, graph2, node, level, outfile):
@@ -120,12 +149,15 @@ def getExperiment(project, experiment, root=""):
 
         # Recursively traverse the nodes connected to this one.
         for conn in graph[node]:
-            if not (node in graph2 and conn in graph2[node]):
+            if (not (node in graph2 and conn in graph2[node])
+                # rootNodes are fanned-out from the root only.
+                and (level == 0 or not conn in rootNodes)):
                 addConnection(graph2, node, conn)
                 walkNodes(graph, graph2, conn, level+1, outfile)
                 pass
             pass
         pass
+    
     hypfile = "/tmp/"+experiment+'.hyp'
     outfile = file(hypfile,'w')
     graph2 = {}

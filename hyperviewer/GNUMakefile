@@ -28,7 +28,8 @@ PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py
 SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp
 BINFILES = _hv.so 
 DATAFILES = BigLan.hyp ts600.hyp
-DISTFILES = ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${HVROOT}
+SCRIPTFILES = hypview pangorc.local pango.modules.local
+DISTFILES = ${SCRIPTFILES} ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${HVROOT}
 
 # Finally, make something.
 default: _hv.so
