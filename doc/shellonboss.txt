@@ -20,6 +20,10 @@ never compromised. Okay, lets get serious.
 * NEVER use your Emulab generated key on boss; it is not passphrase
   protected!
 
+* You should use a different password on boss then ops! Also, when you
+  update your passwd via the web page, only your ops passwd is
+  changed; your boss password is never changed this way.
+
 * Technically, you should have a separate key for boss, and not use your
   private key from Flux/CS since your homedirs are also kept on NFS
   exported filesystems. But this turns out to be difficult to do for most
