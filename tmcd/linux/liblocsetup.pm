@@ -64,6 +64,7 @@ my $USERMOD     = "/usr/sbin/usermod";
 my $GROUPADD	= "/usr/sbin/groupadd";
 my $GROUPDEL	= "/usr/sbin/groupdel";
 my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s";
+my $IFC_1000MBS  = "1000baseTx";
 my $IFC_100MBS  = "100baseTx";
 my $IFC_10MBS   = "10baseT";
 my $IFC_FDUPLEX = "FD";
@@ -121,17 +122,21 @@ sub os_ifconfig_line($$$$$$;$)
 	    $speed = $1 / 1000;
 	}
 	else {
-	    warn("*** Bad speed units in ifconfig!\n");
+	    warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
 	    $speed = 100;
 	}
-	if ($speed == 100) {
+	if ($speed == 1000) {
+	    $media = $IFC_1000MBS;
+	}
+	elsif ($speed == 100) {
 	    $media = $IFC_100MBS;
 	}
 	elsif ($speed == 10) {
 	    $media = $IFC_10MBS;
 	}
 	else {
-	    warn("*** Bad Speed in ifconfig!\n");
+	    warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
+	    $speed = 100;
 	    $media = $IFC_100MBS;
 	}
     }
@@ -142,12 +147,29 @@ sub os_ifconfig_line($$$$$$;$)
 	$media = "$media-$IFC_HDUPLEX";
     }
     else {
-	warn("*** Bad duplex in ifconfig!\n");
+	warn("*** Bad duplex $duplex in ifconfig, default to full\n");
+	$duplex = "full";
 	$media = "$media-$IFC_FDUPLEX";
     }
 
-    $ifc = "/sbin/mii-tool --force=$media $iface\n" .
-	   sprintf($IFCONFIG, $iface, $inet, $mask);
+    #
+    # Linux is apparently changing from mii-tool to ethtool but some drivers
+    # don't support the new interface (3c59x), some don't support the old
+    # interface (e1000), and some (eepro100) support the new interface just
+    # enough that they can report success but not actually do anything. Sweet!
+    #
+    if (-e "/usr/sbin/ethtool") {
+	# this seems to work for returning an error on eepro100
+	$ifc = "if /usr/sbin/ethtool $iface >/dev/null 2>&1; then\n    " .
+	       "  /usr/sbin/ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
+	       "else\n    " .
+	       "  /sbin/mii-tool --force=$media $iface\n    " .
+		   "fi\n    ";
+    } else {
+	$ifc = "/sbin/mii-tool --force=$media $iface\n    ";
+    }
+
+    $ifc .= sprintf($IFCONFIG, $iface, $inet, $mask);
     
     return "$ifc";
 }
