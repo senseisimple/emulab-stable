@@ -418,6 +418,7 @@ CREATE TABLE images (
   path tinytext,
   magic tinytext,
   load_address text,
+  frisbee_pid int(11) default '0',
   load_busy tinyint(4) NOT NULL default '0',
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',

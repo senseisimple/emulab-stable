@@ -1245,3 +1245,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table experiments add column sim_reswap_count \
              smallint(5) unsigned NOT NULL default '0';
+
+1.219: Add pid to images table so we can kill frisbee for an image.
+
+	alter table images add frisbee_pid int(11) default '0' \
+		after load_address;
+
