@@ -121,10 +121,13 @@ Agent instproc updatedb {DB} {
     if {$role == "sink"} {
 	set application $self
 	set proto [$destination set proto]
+	set target_vname [$destination set application]
+    } else {
+	set target_vname $destination
     }
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_port,target_ip,generator) values ('$pid','$eid','$node','$application','$role','$proto',$port,'$ip','$target_vnode',$target_port,'$target_ip','$generator')";
+    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_vname,target_port,target_ip,generator) values ('$pid','$eid','$node','$application','$role','$proto',$port,'$ip','$target_vnode','$target_vname',$target_port,'$target_ip','$generator')";
 
     sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$application','$objtypes(TRAFGEN)')";
 }
@@ -268,9 +271,10 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     set target_ip [$target_vnode ip 0]
 
     set vname $self
+    set target_vname $destination
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_port,target_ip,generator) values ('$pid','$eid','$node','$vname','$role','$proto',$port,'$ip','$target_vnode',$target_port,'$target_ip','$generator')";
+    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_vname,target_port,target_ip,generator) values ('$pid','$eid','$node','$vname','$role','$proto',$port,'$ip','$target_vnode','$target_vname',$target_port,'$target_ip','$generator')";
 
     sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$vname','$objtypes(TRAFGEN)')";
 
