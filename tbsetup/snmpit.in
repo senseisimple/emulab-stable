@@ -1223,15 +1223,25 @@ sub NodeCheck {
     print "(Root!) Okay.\n" if $debug;
     return 1;
   }
-  
+
+  my $cmd =
+    "select uid,admin from users where uid='$self' and admin=1;";
+  $sth = $dbh->query($cmd);
+  print "$cmd\n" if $debug > 1;
+
+  if ($sth->numrows > 0) {
+    print "(Admin!) Okay.\n" if $debug;
+    return 1;
+  }
+
   if ( $node =~ /^([^:]*)/ ) { $node=$1; }
   if ( $node =~ /(sh\d+)/ ) { $node= $1."-1"; }
 
-  my $cmd =
+  $cmd =
     "select uid, node_id from reserved as r left join proj_memb as pm ".
     "on pm.pid=r.pid where node_id='$node' and uid='$self';";
   $sth = $dbh->query($cmd);
-  #print "$cmd\n";
+  print "$cmd\n" if $debug > 1;
 
   if ($sth->numrows > 0) {
     print "Okay.\n" if $debug;
