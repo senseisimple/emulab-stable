@@ -117,6 +117,10 @@ destdircheck:
 	    echo "You must define DESTDIR for this target!"; \
 	    false; \
 	fi
+	@if [ "$(DESTDIR)" = "/" ]; then \
+	    echo "DESTDIR is '/', really really bad idea!"; \
+	    false; \
+	fi
 
 mfsoscheck:
 	@if [ `uname -s` != "FreeBSD" ]; then \
