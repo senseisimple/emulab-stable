@@ -1,5 +1,8 @@
 #!/usr/local/bin/perl -wT
 
+### 
+### $ID$
+###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
 ### need some of the same things for the removal script.
@@ -289,34 +292,4 @@ foreach $IP (@nodes) {
 	}
     }
 }
-
-
-
-
-
-
-
-
-__END__
-
-
- 141 plastic:testbed/tbsetup> !107
-su1 ssh 155.99.214.129 uname
-Host key not found from the list of known hosts.
-Are you sure you want to continue connecting (yes/no)? yes
-Host '155.99.214.129' added to the list of known hosts.
-FreeBSD
-
-106 plastic:testbed/tbsetup> su1 ssh 155.99.214.129 uname  
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@       WARNING: HOST IDENTIFICATION HAS CHANGED!         @
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
-Someone could be eavesdropping on you right now (man-in-the-middle attack)!
-It is also possible that the host key has just been changed.
-Please contact your system administrator.
-Add correct host key in /root/.ssh/known_hosts to get rid of this message.
-Are you sure you want to continue connecting (yes/no)? yes
-FreeBSD
-
 
