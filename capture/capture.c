@@ -100,6 +100,8 @@ char	*Devname;
 char	*Machine;
 int	logfd, runfd, devfd, ptyfd;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
+sigset_t actionsigmask;
+sigset_t allsigmask;
 #ifdef  USESOCKETS
 char		  *Bossnode = BOSSNODE;
 char		  *Aclname;
@@ -132,6 +134,7 @@ main(argc, argv)
 {
 	char strbuf[MAXPATHLEN], *newstr();
 	int flags, op, i;
+	struct sigaction sa;
 	extern int optind;
 	extern char *optarg;
 #ifdef  USESOCKETS
@@ -204,12 +207,32 @@ main(argc, argv)
 	openlog(Progname, LOG_PID, LOG_USER);
 	dolog(LOG_NOTICE, "starting");
 
-	signal(SIGINT, quit);
-	signal(SIGTERM, quit);
-	signal(SIGHUP, reinit);
-	if (runfile)
-		signal(SIGUSR1, newrun);
-	signal(SIGUSR2, terminate);
+	/*
+	 * We process the "action" signals sequentially, there are just
+	 * too many interdependencies.  We block em while we shut down too.
+	 */
+	sigemptyset(&actionsigmask);
+	sigaddset(&actionsigmask, SIGHUP);
+	sigaddset(&actionsigmask, SIGUSR1);
+	sigaddset(&actionsigmask, SIGUSR2);
+	allsigmask = actionsigmask;
+	sigaddset(&allsigmask, SIGINT);
+	sigaddset(&allsigmask, SIGTERM);
+	memset(&sa, 0, sizeof sa);
+	sa.sa_handler = quit;
+	sa.sa_mask = allsigmask;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
+	sa.sa_handler = reinit;
+	sa.sa_mask = actionsigmask;
+	sigaction(SIGHUP, &sa, NULL);
+	if (runfile) {
+		sa.sa_handler = newrun;
+		sigaction(SIGUSR1, &sa, NULL);
+	}
+	sa.sa_handler = terminate;
+	sigaction(SIGUSR2, &sa, NULL);
+
 	srandomdev();
 	
 	/*
@@ -306,7 +329,8 @@ capture()
 in()
 {
 	char buf[BUFSIZE];
-	int cc, omask;
+	int cc;
+	sigset_t omask;
 	
 	while (1) {
 		if ((cc = read(devfd, buf, BUFSIZE)) < 0) {
@@ -315,8 +339,7 @@ in()
 			else
 				die("%s: read: %s", Devname, geterr(errno));
 		}
-		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
-				 sigmask(SIGUSR1)|sigmask(SIGUSR2));
+		sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 
 		if (write(logfd, buf, cc) < 0)
 			die("%s: write: %s", Logname, geterr(errno));
@@ -330,7 +353,7 @@ in()
 			if ((errno != EIO) && (errno != EWOULDBLOCK))
 				die("%s: write: %s", Ptyname, geterr(errno));
 		}
-		(void) sigsetmask(omask);
+		sigprocmask(SIG_SETMASK, &omask, NULL);
 	}
 }
 
@@ -340,16 +363,17 @@ in()
 out()
 {
 	char buf[BUFSIZE];
-	int cc, omask;
+	int cc;
+	sigset_t omask;
 	struct timeval timeout;
 
 	timeout.tv_sec  = 0;
 	timeout.tv_usec = 100000;
 	
 	while (1) {
-		omask = sigblock(SIGUSR2);
+		sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 		if ((cc = read(ptyfd, buf, BUFSIZE)) < 0) {
-			(void) sigsetmask(omask);
+			sigprocmask(SIG_SETMASK, &omask, NULL);
 			if ((errno == EIO) || (errno == EWOULDBLOCK) ||
 			    (errno == EINTR)) {
 				select(0, 0, 0, 0, &timeout);
@@ -358,15 +382,11 @@ out()
 			else
 				die("%s: read: %s", Ptyname, geterr(errno));
 		}
-		(void) sigsetmask(omask);
-
-		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
-				 sigmask(SIGUSR1)|sigmask(SIGUSR2));
 
 		if (write(devfd, buf, cc) < 0)
 			die("%s: write: %s", Devname, geterr(errno));
 		
-		(void) sigsetmask(omask);
+		sigprocmask(SIG_SETMASK, &omask, NULL);
 	}
 }
 #else
@@ -376,7 +396,8 @@ void
 capture()
 {
 	fd_set fds;
-	int i, cc, lcc, omask;
+	int i, cc, lcc;
+	sigset_t omask;
 	char buf[BUFSIZE];
 	struct timeval timeout;
 #ifdef LOG_DROPS
@@ -487,8 +508,7 @@ capture()
 				die("%s: read: EOF", Devname);
 			errno = 0;
 
-			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
-					 sigmask(SIGUSR1)|sigmask(SIGUSR2));
+			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 #ifdef	USESOCKETS
 			if (!tipactive)
 				goto dropped;
@@ -542,11 +562,11 @@ dropped:
 				if (i != cc)
 					die("%s: write: incomplete", Runname);
 			}
-			(void) sigsetmask(omask);
+			sigprocmask(SIG_SETMASK, &omask, NULL);
 
 		}
 		if (FD_ISSET(ptyfd, &fds)) {
-			omask = sigblock(sigmask(SIGUSR2));
+			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 			errno = 0;
 #ifdef WITHSSL
 			if (usingSSL) {
@@ -557,7 +577,7 @@ dropped:
 			{
 			        cc = read(ptyfd, buf, sizeof(buf), 0);
 			}
-			(void) sigsetmask(omask);
+			sigprocmask(SIG_SETMASK, &omask, NULL);
 			if (cc < 0) {
 				/* XXX commonly observed */
 				if (errno == EIO || errno == EAGAIN)
@@ -604,8 +624,7 @@ dropped:
 			}
 			errno = 0;
 
-			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
-					 sigmask(SIGUSR1));
+			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 			for (lcc = 0; lcc < cc; lcc += i) {
 				i = write(devfd, &buf[lcc], cc-lcc);
 				if (i < 0) {
@@ -626,8 +645,7 @@ dropped:
 					die("%s: write: zero-length", Devname);
 			}
 dropped2:
-			(void) sigsetmask(omask);
-
+			sigprocmask(SIG_SETMASK, &omask, NULL);
 		}
 	}
 }
