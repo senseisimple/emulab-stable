@@ -45,8 +45,8 @@ define("CHECKLOGIN_WEBONLY",		0x40000);
 #
 # Constants for tracking possible login attacks.
 #
-define("DOLOGIN_MAXUSERATTEMPTS",	4);
-define("DOLOGIN_MAXUSERWAITTIME",	60);	# Seconds
+define("DOLOGIN_MAXUSERATTEMPTS",	8);
+define("DOLOGIN_MAXUSERWAITTIME",	100);	# Seconds
 define("DOLOGIN_MAXIPATTEMPTS",		8);
 define("DOLOGIN_MAXIPWAITTIME",		120);	# Seconds
 
