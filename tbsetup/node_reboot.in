@@ -33,7 +33,6 @@ my $TB		= "@prefix@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-use event;
 
 my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power -e";
@@ -340,10 +339,7 @@ sub RebootNode {
     # punch the power button.
     #
     if (WaitTillDead($pc) == 0) {
-	EventSendFatal(objtype   => "TBNODESTATE",
-	    	       objname   => $pc,
-		       eventtype => "REBOOTING",
-		       host      => TB_BOSSNODE);
+	TBSetNodeEventState($pc,TBDB_NODESTATE_REBOOTING);
 	exit(0);
     }
 	

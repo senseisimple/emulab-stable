@@ -66,9 +66,17 @@ use Exporter;
 
 	 TB_ASSIGN_TOOFEWNODES TB_OPSPID
 
-	 TBDB_TBEVENT_ISUP TBDB_TBEVENT_REBOOT
-	 TBDB_NODESTATE_ISUP TBDB_NODESTATE_REBOOT TBDB_NODESTATE_UNKNOWN
+	 TBDB_TBEVENT_NODESTATE TBDB_TBEVENT_NODEOPMODE
+	 TBDB_TBEVENT_ISUP TBDB_TBEVENT_REBOOTING TBDB_TBEVENT_REBOOTED
+	 TBDB_TBEVENT_NORMAL TBDB_TBEVENT_DELAYING TBDB_TBEVENT_UNKNOWNOS
+	 TBDB_TBEVENT_RELOADING
+	 TBDB_NODESTATE_ISUP TBDB_NODESTATE_REBOOTING TBDB_NODESTATE_REBOOTED
+	 TBDB_NODESTATE_UNKNOWN
+	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
+	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
+	 TBDB_NODEOPMODE_UNKNOWN
 	 TBSetNodeEventState TBGetNodeEventState
+	 TBSetNodeOpMode TBGetNodeOpMode
 
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
@@ -91,7 +99,14 @@ require Mysql;
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $EVENTSYS    = "@EVENTSYS@";
+my $BOSSNODE    = "@BOSSNODE@";
 my $TBOPSPID	= "emulab-ops";
+
+if ($EVENTSYS) {
+    require event;
+    import event;
+}
 
 #
 # Set up for querying the database. Note that fork causes a reconnect
@@ -236,17 +251,39 @@ sub TB_ASSIGN_TOOFEWNODES()	{ 2; }
 sub TB_OPSPID()			{ $TBOPSPID; }
 
 #
-# TBCONTROL Events
+# Events we may want to send
+#
+sub TBDB_TBEVENT_NODESTATE	{ "TBNODESTATE"; }
+sub TBDB_TBEVENT_NODEOPMODE	{ "TBNODEOPMODE"; }
+
+#
+# TBNODESTATE Events
 #
 sub TBDB_TBEVENT_ISUP()		{ "ISUP"; }
-sub TBDB_TBEVENT_REBOOT()	{ "REBOOT"; }
+sub TBDB_TBEVENT_REBOOTED()	{ "REBOOTED"; }
+sub TBDB_TBEVENT_REBOOTING()	{ "REBOOTING"; }
+
+#
+# TBNODEOPMODE Events
+#
+sub TBDB_TBEVENT_NORMAL()	{ "NORMAL"; }
+sub TBDB_TBEVENT_DELAYING()	{ "DELAYING"; }
+sub TBDB_TBEVENT_UNKNOWNOS()	{ "UNKNOWNOS"; }
+sub TBDB_TBEVENT_RELOADING()	{ "RELOADING"; }
 
 #
 # For nodes, we use this set of events.
 #
 sub TBDB_NODESTATE_ISUP()	{ TBDB_TBEVENT_ISUP; }
-sub TBDB_NODESTATE_REBOOT()	{ TBDB_TBEVENT_REBOOT; }
+sub TBDB_NODESTATE_REBOOTED()	{ TBDB_TBEVENT_REBOOTED; }
+sub TBDB_NODESTATE_REBOOTING()	{ TBDB_TBEVENT_REBOOTING; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
+
+sub TBDB_NODEOPMODE_NORMAL	{ TBDB_TBEVENT_NORMAL; }
+sub TBDB_NODEOPMODE_DELAYING	{ TBDB_TBEVENT_DELAYING; }
+sub TBDB_NODEOPMODE_UNKNOWNOS	{ TBDB_TBEVENT_UNKNOWNOS; }
+sub TBDB_NODEOPMODE_RELOADING	{ TBDB_TBEVENT_RELOADING; }
+sub TBDB_NODEOPMODE_UNKNOWN	{ "UNKNOWN"; }
 
 #
 # We should list all of the DB limits.
@@ -1388,8 +1425,20 @@ sub TBSetNodeEventState($$)
 {
     my ($node, $state) = @_;
 
-    return DBQueryFatal("update nodes set eventstate='$state' ".
-			"where node_id='$node'");
+    #
+    # If using the event system, we send out an event for the state daemon to
+    # pick up. Otherwise, we just set the state in the database ourselves
+    #
+    if ($EVENTSYS) {
+	return EventSendFatal(objtype   => TBDB_TBEVENT_NODESTATE,
+			      objname   => $node,
+			      eventtype => $state,
+			      host      => $BOSSNODE);
+    } else {
+	my $now = time();
+	return DBQueryFatal("update nodes set eventstate='$state', " .
+			    "state_timestamp=$now where node_id='$node'");
+    }
 }
 
 #
@@ -1415,6 +1464,60 @@ sub TBGetNodeEventState($$)
     }
     else {
 	$$state = TBDB_NODESTATE_UNKNOWN;
+    }
+    return 1;
+}
+
+#
+# Set operational mode for a node.
+#
+# usage: TBSetNodeOpMode(char *node, char *mode)
+#        Returns 1 if okay.
+#        Returns 0 if failed.
+#
+sub TBSetNodeOpMode($$)
+{
+    my ($node, $mode) = @_;
+
+    #
+    # If using the event system, we send out an event for the state daemon to
+    # pick up. Otherwise, we just set the mode in the database ourselves
+    #
+    if ($EVENTSYS) {
+	return EventSendFatal(objtype   => TBDB_TBEVENT_NODEOPMODE,
+			      objname   => $node,
+			      eventtype => $mode,
+			      host      => $BOSSNODE);
+    } else {
+	my $now = time();
+	return DBQueryFatal("update nodes set op_mode='$mode', " .
+			    "op_mode_timestamp=$now where node_id='$node'");
+    }
+}
+
+#
+# Get operational mode for a node.
+#
+# usage: TBGetNodeOpMode(char *node, char \*mode)
+#        Returns 1 if okay (and sets state).
+#        Returns 0 if failed.
+#
+sub TBGetNodeOpMode($$)
+{
+    my ($node, $mode) = @_;
+
+    my $query_result =
+	DBQueryFatal("select eventstate from nodes where node_id='$node'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    if (defined($row[0])) {
+	$$mode = $row[0];
+    }
+    else {
+	$$mode = TBDB_NODEOPMODE_UNKNOWN;
     }
     return 1;
 }
