@@ -1258,10 +1258,15 @@ sub gatedsetup ()
 #
 # Host names configuration (/etc/hosts). 
 #
-sub dohostnames ()
+sub dohostnames (;$)
 {
+    my ($pathname) = @_;
     my $TM;
-    my $HTEMP = HOSTSFILE . ".new";
+    my $HTEMP;
+
+    $pathname = HOSTSFILE()
+	if (!defined($pathname));
+    $HTEMP = "${pathname}.new";
 
     #
     # Note, we no longer start with the 'prototype' file here, because we have
@@ -1312,8 +1317,8 @@ sub dohostnames ()
     }
     CLOSETMCC($TM);
     close(HOSTS);
-    system("mv -f $HTEMP " . HOSTSFILE) == 0 or
-	warn("*** Could not mv $HTEMP to ". HOSTSFILE . "!\n");
+    system("mv -f $HTEMP $pathname") == 0 or
+	warn("*** Could not mv $HTEMP to $pathname!\n");
 
     return 0;
 }

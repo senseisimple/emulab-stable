@@ -11,11 +11,12 @@ BOOTDIR="/opt/config"
 armdir="/opt/ixasdk/bin/arm-be"
 ixconfig="ixsys.l3fwdr"
 
-if [-x $BOOTDIR/bootscript ]; then
+cd $armdir
+
+if [ -x $BOOTDIR/bootscript ]; then
     echo "Running local bootscript ..."
     $BOOTDIR/bootscript
 elif [ -x $armdir/ixstart -a -e $BOOTDIR/$ixconfig ]; then
     echo "Setting up interfaces ..."
-    cd $armdir
     ./ixstart $BOOTDIR/$ixconfig
 fi
