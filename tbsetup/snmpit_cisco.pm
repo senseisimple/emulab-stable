@@ -379,27 +379,40 @@ sub vlanUnlock($;$) {
 sub findVlan($$) { 
     my $self = shift;
     my $vlan_id = shift;
+    my $max_tries = 10;
 
     my $VlanName = "vtpVlanName"; # index by 1.vlan #
 
     #
-    # Walk the tree to find the VLAN names
+    # We try this a few time, with 1 second sleeps, since it can take
+    # a while for VLAN information to propagate
     #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,[$VlanName]);
-    foreach my $rowref (@$rows) {
-	my ($name,$vlan_number,$vlan_name) = @$rowref;
-	#
-	# We get the VLAN number in the form 1.number - we need to strip
-	# off the '1.' to make it useful
-	#
-	$vlan_number =~ s/^1\.//;
+    foreach my $try (1 .. $max_tries) {
 
-	$self->debug("Got $name $vlan_number $vlan_name\n",2);
-	if ($vlan_name eq $vlan_id) {
-	    return $vlan_number;
+	#
+	# Walk the tree to find the VLAN names
+	#
+	my ($rows) = $self->{SESS}->bulkwalk(0,32,[$VlanName]);
+	foreach my $rowref (@$rows) {
+	    my ($name,$vlan_number,$vlan_name) = @$rowref;
+	    #
+	    # We get the VLAN number in the form 1.number - we need to strip
+	    # off the '1.' to make it useful
+	    #
+	    $vlan_number =~ s/^1\.//;
+
+	    $self->debug("Got $name $vlan_number $vlan_name\n",2);
+	    if ($vlan_name eq $vlan_id) {
+		return $vlan_number;
+	    }
 	}
-    }
 
+	#
+	# Wait before we try again
+	#
+	$self->debug("VLAN find failed, trying again\n");
+	sleep 1;
+    }
     #
     # Didn't find it
     #
