@@ -1,8 +1,7 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -10,59 +9,82 @@ use Getopt::Std;
 
 #
 # nalloc - allocate nodes to an experiment. Takes a pid, and eid, and
-# a list of nodes. Only nodes that are free can be allocated, and a
-# special hack for sharks is included - allocating 'sh*' expands to
-# allocation of the entire rack.
+# a list of nodes. Only nodes that are free can be allocated.
 #
 # Exit status is important! Exit with -1 if an error, else the number
 # of nodes that could not be allocated. Otherwise zero.
 #
-#
-# Configure variables
-#
-my $TB       = "@prefix@";
-use lib '@prefix@/lib';
-use libdb;
-
-my %opt = ();
-getopts('vp', \%opt);
-
+sub usage()
+{
+    print("Usage: nalloc [-v] [-p] <pid> <eid> <node> <node> <...>\n".
+	  "		-p enables partial allocation mode\n".
+	  "		-v enables debugging output\n");
+    exit(-1);
+}
+my $optlist = "dp";
 my $debug   = 0;
 my $partial = 0;
 
-if ($opt{v}) {
+#
+# Configure variables
+#
+my $TB          = "@prefix@";
+my $consetup    = "$TB/libexec/console_setup";
+my $exportsetup = "$TB/sbin/exports_setup";
+
+#
+# Testbed Support libraries
+#
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# For perf analysis.
+#TBDebugTimeStampsOn();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
     $debug = 1;
 }
-if ($opt{p}) {
+if (defined($options{"p"})) {
     $partial = 1;
 }
-
 if (@ARGV < 2) {
-    die("Usage: nalloc [-v] [-p] <pid> <eid> <node> <node> <...>\n".
-	 "		-p enables partial allocation mode\n".
-	 "		-v enables debugging output\n");
+    usage();
 }
+my $pid		= shift;
+my $eid		= shift;
+my @node_names	= @ARGV;
 
-my $consetup="$TB/libexec/console_setup";
-my $exportsetup="$TB/sbin/exports_setup";
-my $error = 0;
-my $noalloc = 0;
-my $pid = shift;
-my $eid = shift;
-my @node_names=@ARGV;
-my @vals = ();
-my @nodes= ();
-my $oldreserved_pid = OLDRESERVED_PID;
-my $oldreserved_eid = OLDRESERVED_EID;
+#
+# Locals
+# 
+my $error	  = 0;
+my $noalloc	  = 0;
+my @vals	  = ();
+my @nodes	  = ();
+my @need_consetup = 0;
 
-if ($debug) { print "Expt '$eid', proj '$pid'\n"; }
-
+TBDebugTimeStamp("nalloc started");
 #
 # Experiment must exist.
 # 
 if (!ExpState($pid,$eid)) {
     die "There is no experiment $eid in project $pid\n";
 }
+TBDebugTimeStamp("nalloc checked exp state");
 
 #
 # User must have permission to modify the experiment.
@@ -72,115 +94,112 @@ if ($UID) {
         die("*** You not have permission to allocate nodes in $pid/$eid!\n");
     }
 }
+TBDebugTimeStamp("nalloc checked exp permission");
 
 #
 # Before locking any tables, do a quick check to make sure the project
-# is allowed to allocate the nodes, by type/class. 
+# is allowed to allocate the nodes, by type/class, plus other checks.
 #
 foreach my $n (@node_names) {
+    # Make sure a valid node name first!
+    if (! TBValidNodeName($n)) {
+	die("*** $0:\n".
+	    "    No such node $n!\n");
+    }
+
+    # Project allowed to allocated this node type/class?
     if (! TBNodeAllocCheck($pid, $n)) {
 	die("*** $0:\n".
 	    "    You are not allowed to allocate $n to project $pid!\n");
     }
+
+    # XXX
+    # If the node has a tipline, then indicate that we want to call
+    # console_setup. We want to avoid calling console_setup if all we
+    # got is a zillion virtual nodes on the command line; wasted work.
+    #
+    my $tiplines_result =
+	DBQueryFatal("select tipname,server from tiplines ".
+		     "where node_id='$n'");
+
+    if ($tiplines_result->numrows) {
+	$need_consetup++;
+    }
 }
+TBDebugTimeStamp("nalloc checked node permission ");
 
-######################################################################
-# Step 1 - Make a list of nodes to reserve
-#
-# We prune nodes that are already reserved, etc., from the list, and
-# do expansion of shark shelves
-######################################################################
+# Must lock this table!
+DBQueryFatal("lock tables reserved write");
+TBDebugTimeStamp("nalloc locked tables");
 
-DBQueryFatal("lock tables nodes read, reserved write, node_activity write");
-
+# Make a list of nodes to reserve.
 foreach my $n (@node_names) {
-    # Shark hack
-    if ($n =~ /(sh\d+)/ ) { $n = $1."-1"; }
-    # End shark hack
-
     my ($r_pid, $r_eid);
-    if (NodeidToExp($n,\$r_pid,\$r_eid)) {
+    
+    if (NodeidToExp($n, \$r_pid, \$r_eid)) {
 	# Someone has already reserved this node
 	if (($r_pid eq $pid) && ($r_eid eq $eid)) {
-	    print "You have already reserved node '$n'.\n";
-	    # Do not increment error code since that throws off tbprerun.
+	    print "Already reserved: '$n'\n";
+	    # Do not increment error code since that throws off caller.
 	    next;
-	} elsif(NodeidToExpOldReserved($n, \$r_pid, \$r_eid) &&
-		(($r_pid eq $pid) && ($r_eid eq $eid)) ) {
-	    print "You have already reserved node '$n' which was moved to ".
-	    	   "a holding reservation: $oldreserved_pid/$oldreserved_eid.\n";
-	} else {
+	}
+	elsif (NodeidToExpOldReserved($n, \$r_pid, \$r_eid) &&
+	       (($r_pid eq $pid) && ($r_eid eq $eid))) {
+	    print "Already reserved in holding reservation: '$n'\n";
+	}
+	else {
 	    print "Someone else has already reserved node '$n'.\n";
 	    $noalloc++;
 	    next;
 	}
     }
 
-    my $result = DBQueryFatal("select * from nodes where node_id='$n'");
-    if ($result->numrows() < 1) {
-      print "Node '$n' does not exist.\n";
-      $error++;
-      next;
-    } else {
-	# No one has reserved it, and it exists, so add it to my list
-	# Shark hack
-	if ($n =~ /(sh\d+)/ ) {
-	    # its a shark - do the whole shelf if its not done already.
-	    my $shelf = $1;
-	    if ( ! (join(",",@nodes) =~ /,$shelf-\d,/)) {
-		# Shelf hasn't been done yet...
-		foreach my $n ( 1 .. 8 ) {
-		    push(@vals,"('$shelf-$n','$pid','$eid')");
-		    push(@nodes,"$shelf-$n");
-		}
-	    }
-	    # End shark hack
-	} else {
-	    # its not a shark - just add it in...
-	    push(@vals,"('$n','$pid','$eid','$n','','')");
-	    push(@nodes,"$n");
-	}
-    }
+    #
+    # Add info the list of nodes to reserve; done in a single query below.
+    # 
+    push(@vals,  "('$n','$pid','$eid','$n','','')");
+    push(@nodes, "$n");
+}
+TBDebugTimeStamp("nalloc checked all nodes");
+
+if ($debug) {
+    print "List Ready: @vals\nError=$error\n";
 }
 
-if ($debug) { print "List Ready: @vals\nError=$error\n"; }
+# Now make the reservations in the DB.
+if ((!$noalloc || $partial) && @vals) {
+    print "Reserving nodes...\n"
+	if ($debug);
 
-######################################################################
-# Step 2 - Make the reservations in the database
-#
-# Uses the list built in step 1
-######################################################################
-
-if (!$error && (!$noalloc || $partial) && @vals) {
-    if ($debug) {
-	print "Resetting node activity...\n";
-    }
-    my $cmd = "update node_activity set last_ext_act = now() where ".
-      join(" or ",map("node_id='$_'",@nodes));
-    DBQueryWarn($cmd);
-    # It isn't an error if this fails...
-
-    if ($debug) {
-	print "Reserving nodes...\n";
-    }
-    $cmd = "replace into reserved (node_id,pid,eid,vname,old_pid,old_eid) values ".
-      join(",",@vals);
-    if (!DBQueryWarn($cmd)) {
+    if (! DBQueryWarn("replace into reserved ".
+		      "  (node_id,pid,eid,vname,old_pid,old_eid) ".
+		      "values ". join(",",@vals))) {
 	$error++;
     }
 }
+TBDebugTimeStamp("nalloc allocated all nodes");
 
+# Unlock tables.
 DBQueryFatal("unlock tables");
+TBDebugTimeStamp("nalloc unlocked tables");
 
-######################################################################
-# Step 3 - Setup consoles
-#
-# Uses the list built in step 1
-######################################################################
+# Update node_activity table; no need to do this with tables locked.
+if (!$error && (!$noalloc || $partial) && @nodes) {
+    print "Resetting node activity\n"
+	if ($debug);
 
-if (!$error && @nodes) {
+    # It isn't an error if this fails...
+    DBQueryWarn("update node_activity set last_ext_act=now() ".
+		"where " . join(" or ",map("node_id='$_'", @nodes)));
+
+    TBDebugTimeStamp("nalloc updated node_activity table");
+}
+
+# Now setup consoles if needed.
+if ($need_consetup && !$error && @nodes) {
     system("$consetup @nodes") == 0 or
 	print STDERR "WARNING: $consetup @nodes failed!\n";
+    TBDebugTimeStamp("nalloc finished console setup");
 }
 
 #
