@@ -179,7 +179,7 @@ sub TBDBConnect()
     if (!$name) {
 	$name = "uid$UID";
     }
-    my $dbuser = "$SCRIPTNAME:$name";
+    my $dbuser = "$SCRIPTNAME:$name:$PID";
 
     while ($maxtries) {
 	$DB = Mysql->connect("localhost", $DBNAME, $dbuser, "none");
