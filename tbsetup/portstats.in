@@ -29,13 +29,15 @@ use strict;
 
 sub usage {
     print << "END";
-Usage: $0 [-h] <pid> <eid> [vname ...] [vname:port ...]
+Usage: $0 [-h] <-p | <pid> <eid> > [vname ...] [vname:port ...]
 -h    This message
 -e    Show only error counters
 -a    Show all stats
 -z    Zero out counts for selected counters, after printing
 -q    Quiet: don't actually print counts - useful with -z
 -c    Print absolute, rather than relative, counts
+-p    The machines given are physical, not virtual, node IDs. No pid and
+      eid should be given when using this option.
 
 If only pid and eid are given, prints out information about all ports in the
 experiment. Otherwise, output is limited to the nodes and/or ports given.
@@ -75,10 +77,13 @@ if ($opt{a}) {
 	     'ifOutOctets', 'ifOutUcastPkts', 'ifOutNUcastPkts');
 }
 
-if (@ARGV < 2) {
-    exit &usage;
+my ($pid, $eid);
+if (!$opt{p}) {
+    if (@ARGV < 2) {
+	exit &usage;
+    }
+    ($pid,$eid) = (shift,shift);
 }
-my ($pid,$eid) = (shift,shift);
 
 my @passedPorts = @ARGV;
 
@@ -103,50 +108,80 @@ my %oids = (
 #
 # First, make sure the experiment exists
 #
-if (!ExpState($pid,$eid)) {
-    die "There is no experiment $eid in project $pid\n";
+if (!$opt{p}) {
+    if (!ExpState($pid,$eid)) {
+	die "There is no experiment $eid in project $pid\n";
+    }
 }
 
 #
 # Make sure they have access to it
 #
-if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
-    die "You do not have permission to view experiment $pid/$eid\n";
+if ($opt{p}) {
+    my @nodes = map { /^([^:]+):/; $1; } @passedPorts;
+    if (!TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,@nodes)) {
+	die "You do not have permission to view one or more of the nodes\n";
+    }
+} else {
+    if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+	die "You do not have permission to view experiment $pid/$eid\n";
+    }
 }
 
 snmpit_lib::init(0);
 
 #
-# Get a list of all ports in the experiment
+# If using physical port IDs, just use the list passed on the command line -
+# For an experiment, figure out which one(s) they wanted.
 #
-my @experimentPorts = getExperimentPorts($pid,$eid);
 my @ports;
-if (@passedPorts) {
+if ($opt{p}) {
     #
-    # Handle a set of passed-in ports
+    # If they gave a node:port form, use just that port. Otherwise, try to find
+    # all the node's ports
     #
     foreach my $port (@passedPorts) {
 	$port =~ /^([^:]+)(:(\d+))?$/;
 	my ($hostname,$portnumber) = ($1,$3);
-	my $nodeid;
-	if (!VnameToNodeid($pid,$eid,$hostname,\$nodeid)) {
-	    die "There is no node $hostname in $pid/$eid\n";
-	}
-
-	if (defined($portnumber)) {
-	    # They gave us a specific interface
-	    push @ports, "$nodeid:$portnumber";
+	if (defined $portnumber) {
+	    push @ports, $port;
 	} else {
-	    # We need to find all experimental ports for this node
-	    push @ports, grep(/^$nodeid:(\d+)$/,@experimentPorts);
+	    my $interfaces = DBQueryFatal("select card from interfaces " .
+		"where node_id = '$hostname'");
+	    while (my ($card) = $interfaces->fetchrow()) {
+		push @ports, "$port:$card";
+	    }
 	}
-
     }
 } else {
-    #
-    # They didn't ask for specific ports, so we'll use 'em all
-    #
-    @ports = @experimentPorts;
+    my @experimentPorts = getExperimentPorts($pid,$eid);
+    if (@passedPorts) {
+	#
+	# Handle a set of passed-in ports
+	#
+	foreach my $port (@passedPorts) {
+	    $port =~ /^([^:]+)(:(\d+))?$/;
+	    my ($hostname,$portnumber) = ($1,$3);
+	    my $nodeid;
+	    if (!VnameToNodeid($pid,$eid,$hostname,\$nodeid)) {
+		die "There is no node $hostname in $pid/$eid\n";
+	    }
+
+	    if (defined($portnumber)) {
+		# They gave us a specific interface
+		push @ports, "$nodeid:$portnumber";
+	    } else {
+		# We need to find all experimental ports for this node
+		push @ports, grep(/^$nodeid:(\d+)$/,@experimentPorts);
+	    }
+
+	}
+    } else {
+	#
+	# They didn't ask for specific ports, so we'll use 'em all
+	#
+	@ports = @experimentPorts;
+    }
 }
 
 #
@@ -249,15 +284,17 @@ foreach my $name (keys %portMap) {
 	    }
 	}
 
-	#
-	# Try to translate the port name to the node's vname
-	#
-	$port =~ /^(.+):(\d+)/;
-	if ($1) {
-	    my $portnum = $2;
-	    my ($junk, $vname);
-	    NodeidToExp($1,\$junk,\$junk,\$vname);
-	    $port = "$vname:$portnum";
+	if (!$opt{p}) {
+	    #
+	    # Try to translate the port name to the node's vname
+	    #
+	    $port =~ /^(.+):(\d+)/;
+	    if ($1) {
+		my $portnum = $2;
+		my ($junk, $vname);
+		NodeidToExp($1,\$junk,\$junk,\$vname);
+		$port = "$vname:$portnum";
+	    }
 	}
 
 	#
