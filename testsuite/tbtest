@@ -377,6 +377,8 @@ sub step_init {
     print DEFS "TBDBNAME=$testdb\n";
     print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
     print DEFS "TBLOGSEMAIL=$user\@emulab.net\n";
+    print DEFS "TBSTATEDEMAIL=$user\@emulab.net\n";
+    print DEFS "OURDOMAIN=test.$user.emulab.net\n";
     print DEFS "BOSSNODE=$bossnode\n";
     close(DEFS);
     
@@ -622,14 +624,10 @@ sub step_test {
 	}
 
 	# Start stated
-	my $statedpid;
 	if ($type eq "full") {
-	    # Do the fork ourselves, so that we can remember the pid
-	    $statedpid = fork();
-	    if (!$statedpid) {
-		exec("$path/install/sbin/stated -f") or
-		    die "Error exec()ing $path/sbin/stated: $!\n";
-	    }
+	  # Returns non-zero for failures
+	  system("$path/install/sbin/stated") and 
+	    die "Error running $path/install/sbin/stated: $!\n";
 	}
 	
 	# We're now ready to run the test.
@@ -673,6 +671,9 @@ sub step_test {
 	}
 
 	if ($type eq "full") {
+	    my $statedpidfile = "$path/install/locks/stated.pid";
+	    my $statedpid = `cat $statedpidfile` ||
+	      prints "WARNING: Unable to find stated pid: $!\n";
 	    if (! kill(15, $statedpid) ) {
 		prints "WARNING: Unable to kill stated process ($statedpid)\n";
 	    }
