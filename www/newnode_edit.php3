@@ -36,7 +36,7 @@ if (!$id) {
 #
 if ($node_id) {
     DBQueryFatal("UPDATE new_nodes SET node_id='$node_id', type='$type', " .
-    	"IP='$IP' WHERE new_node_id='$id'");
+    	"IP='$IP', identifier='$identifier' WHERE new_node_id='$id'");
 }
 
 #
@@ -64,7 +64,8 @@ foreach ($HTTP_GET_VARS as $key => $value) {
 # Get the information about the node they asked for
 #
 $query_result = DBQueryFatal("SELECT new_node_id, node_id, type, IP, " .
-	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, dmesg " .
+	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, dmesg, " .
+	"identifier " .
 	"FROM new_nodes WHERE new_node_id='$id'");
 
 if (mysql_num_rows($query_result) != 1) {
@@ -92,6 +93,12 @@ $row = mysql_fetch_array($query_result)
     <th>Node ID</th>
     <td>
     <input type="text" width=10 name="node_id" value="<?=$row['node_id']?>">
+    </td>
+</tr>
+<tr>
+    <th>Identifier</th>
+    <td>
+    <input type="text" width=10 name="identifier" value="<?=$row['identifier']?>">
     </td>
 </tr>
 <tr>

@@ -1552,3 +1552,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	 alter table experiments add column useprepass tinyint(1) \
 		 default 0 not null;
+
+1.248:  Add an 'identifier' column to the new_nodes table to give users a
+        way to figure out which new node is which.
+
+         alter table new_nodes add column identifier varchar(255);

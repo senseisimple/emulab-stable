@@ -568,7 +568,7 @@ function SHOWUSER($uid) {
 #
 # Show an experiment.
 #
-function SHOWEXP($pid, $eid, $short = 0) {
+function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     global $TBDBNAME, $TBDOCBASE;
     $nodecounts  = array();
 

@@ -666,6 +666,7 @@ CREATE TABLE new_nodes (
   temporary_IP varchar(15) default NULL,
   dmesg text,
   created timestamp(14) NOT NULL,
+  identifier varchar(255) default NULL,
   PRIMARY KEY  (new_node_id)
 ) TYPE=MyISAM;
 

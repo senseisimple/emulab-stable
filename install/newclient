@@ -32,6 +32,18 @@ my $dmesg = "/var/run/dmesg.boot";
 my $teachswitch = "$prefix/teachswitch";
 
 #
+# Accept an identifier, an opaque string to report to the web interface
+#
+my $identifier;
+if (@ARGV) {
+    if (@ARGV == 1) {
+	$identifier = shift @ARGV;
+    } else {
+	die "Usage: $0 [identifier]";
+    }
+}
+
+#
 # Find out what our boss node was, so we don't have to hardcode it here
 #
 my $bossinfo = `$tmcc bossinfo`;
@@ -159,6 +171,9 @@ my $URL = "http://$bossnode/$formURL?";
 $URL .= "cpuspeed=" . urlencode($speed);
 $URL .= "&diskdev=" . urlencode($diskdev);
 $URL .= "&disksize=" . urlencode($disksize);
+if ($identifier) {
+    $URL .= "&identifier=". urlencode($identifier);
+}
 
 my $ifaceindex = 0;
 foreach my $aref (@ifaces) {

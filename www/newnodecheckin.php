@@ -112,8 +112,14 @@ $type = guess_node_type($cpuspeed,$disksize);
 #
 # Stash this information in the database
 #
+if ($identifier) {
+    $identifier = "'$identifier'";
+} else {
+    $identifier = "NULL";
+}
 DBQueryFatal("insert into new_nodes set node_id='$hostname', type='$type', " .
-	"IP='$IP', temporary_IP='$tmpIP', dmesg='$messages', created=now()");
+	"IP='$IP', temporary_IP='$tmpIP', dmesg='$messages', created=now(), " .
+	"identifier=$identifier");
 
 $query_result = DBQueryFatal("select last_insert_id()");
 $row = mysql_fetch_array($query_result);

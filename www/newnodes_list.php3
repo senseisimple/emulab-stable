@@ -251,7 +251,8 @@ if ($renumber) {
 #
 $query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
 	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
-	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP, n.dmesg " .
+	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP, n.dmesg, " .
+	"n.identifier " .
 	"FROM new_nodes AS n " .
 	"LEFT JOIN node_types AS t on n.type=t.type " .
 	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
@@ -283,6 +284,7 @@ function deselectAll(form) {
 	    <th></th>
 	    <th>ID</th>
 	    <th>Node ID</th>
+	    <th>Identifier</th>
 	    <th>Type</th>
 	    <th>IP</th>
 	    <th>Control MAC</th>
@@ -304,6 +306,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	$mac        = $row["MAC"];
 	$tempIP     = $row["temporary_IP"];
 	$dmesg      = $row["dmesg"];
+	$identifier = $row["identifier"];
 	if ($row["switch_id"]) {
 	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
 	} else {
@@ -321,6 +324,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	    "value='$id' $checked></td>\n";
 	echo "		<td><a href=\"newnode_edit.php3?id=$id\">$id</a></td>\n";
 	echo "		<td>$node_id</td>\n";
+	echo "          <td>$identifier</td>\n";
 	echo "		<td>$type</td>\n";
 	echo "		<td>$IP</td>\n";
 	echo "          <td>$mac</td>\n";
@@ -339,7 +343,7 @@ while ($row = mysql_fetch_array($query_result)) {
 ?>
 
 <tr>
-    <td align="center" colspan=11>
+    <td align="center" colspan=12>
     <input type="button" name="SelectAll" value="Select All"
 	onClick="selectAll(document.nodeform.elements['selected[]'])">
     &nbsp;
