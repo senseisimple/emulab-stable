@@ -311,7 +311,7 @@ sub CreateVnodes($$)
     #
     foreach my $i (@tocreate) {
 	my $vpriority = 10000000 + ($nodenum * 1000) + $i;
-	my $jailip    = "${IPBASE}.${nodenum}.${i}";
+	my $jailip    = "${IPBASE}." . int(${nodenum}) . ".${i}";
 	my $vnodeid   = $nodeprefix . "vm" . $nodenum . "-" . $i;
 
 	if ($verbose) {
