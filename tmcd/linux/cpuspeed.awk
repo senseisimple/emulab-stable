@@ -1,7 +1,7 @@
 #!/usr/bin/awk -f
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,6 +23,10 @@
 }
 /^cpu MHz.*8[0-9][0-9]\.[0-9]+$/ {
     print "850";
+    exit
+}
+/^cpu MHz.*(72[0-9]|73[0-9])\.[0-9]+$/ {
+    print "733";
     exit
 }
 /^cpu MHz.*6[0-9][0-9]\.[0-9]+$/ {
