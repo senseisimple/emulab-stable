@@ -495,6 +495,17 @@ CREATE TABLE node_idlestats (
 -- Table structure for table 'node_types'
 --
 
+CREATE TABLE node_status (
+  node_id varchar(10) NOT NULL default '',
+  status enum('up','possibly down','down','unpingable') default NULL,
+  status_timestamp datetime default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'node_types'
+--
+
 CREATE TABLE node_types (
   class varchar(10) default NULL,
   type varchar(30) NOT NULL default '',
