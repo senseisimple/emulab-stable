@@ -39,8 +39,13 @@ export USER
 #  3) from HOMEDRIVE/HOMEPATH
 #  4) / (root)
 
+### Use a local dir under sshd for now.
+if [ ! -d "$HOME" ]; then
+	HOME=/home/$USER
+fi
 # If the home directory doesn't exist, create it.
-if [ ! -d "${HOME}" ]; then
+if [ ]; then
+###if [ ! -d "${HOME}" ]; then
 	mkdir -p "${HOME}"
 	echo "Copying skeleton files."
 	echo "These files are for the user to personalise"
