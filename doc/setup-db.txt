@@ -47,7 +47,7 @@ NS file. These experiments are:
 
 hwdown - Nodes that are down due to hardware failure
 reloading - Nodes that are having their disks automatically reloaded
-readpending - Nodes that are awaiting disk reloading
+reloadpending - Nodes that are awaiting disk reloading
 
 Any other 'holding' experiments that you want for operations should be put
 into the emulab-ops project.
