@@ -276,7 +276,7 @@ foreach my $node (@nodes) {
 
     $sth = DBQueryFatal("select node_id from nodes where node_id='$pc'");
     if ($sth->num_rows() != 1) {
-      print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
+      print STDERR "Node $pc does not exist. Skipping $pc.\n";
       next;
     }
 
@@ -284,9 +284,10 @@ foreach my $node (@nodes) {
     # Get default imageid for this node if none specified on comand line.
     #
     if ($usedefault) {
-	if (! ($imageid = DefaultImageID($node))) {
-	    die("*** $0:\n".
-		"    No default imageid is defined for $node!\n");
+	if (! DefaultImageID($node, \$imageid) || !defined($imageid)) {
+	    print STDERR
+		"*** Node $pc does not have a default imageid. Skipping!\n";
+	    next;
 	}
     }
     

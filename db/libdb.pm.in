@@ -1771,12 +1771,13 @@ sub VnameToNodeid ($$$$) {
 #
 # Get the default ImageID for a particular node, from the node_types table.
 #
-# usage: DefaultImageID(char *nodeid)
-#        returns imageid if the node is valid and has a default imageid.
+# usage: DefaultImageID(char *nodeid, \*imageid)
+#        returns 1 if the node is valid and has a default imageid.
+#                  Imageid is returned in reference param
 #        returns 0 if there are problems.
 #
-sub DefaultImageID ($) {
-    my($nodeid) = @_;
+sub DefaultImageID ($$) {
+    my($nodeid,$imageid) = @_;
 
     my $query_result =
 	DBQueryFatal("select imageid from nodes as n ".
@@ -1784,11 +1785,17 @@ sub DefaultImageID ($) {
 		     "where n.node_id='$nodeid'");
 
     if (! $query_result->num_rows) {
+	$$imageid = undef;
 	return 0;
     }
 
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my ($res) = $query_result->fetchrow_array();
+    if (!defined($res) || $res eq "") {
+	$$imageid = undef;
+	return 0;
+    }
+    $$imageid = $res;
+    return 1;
 }
 
 #
@@ -2703,6 +2710,8 @@ sub TBGetSiteVar($)
 #
 @virtualTables  = ("virt_nodes",
 		   "virt_lans",
+		   "virt_lan_settings",
+		   "virt_lan_member_settings",
 		   "virt_trafgens",
 		   "virt_agents",
 		   "virt_routes",

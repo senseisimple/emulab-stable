@@ -150,7 +150,8 @@ sub osload ($$) {
 	
 	# Get default imageid for this node.
 	my $default_imageid;
-	if (! ($default_imageid = DefaultImageID($node))) {
+	if (! DefaultImageID($node, \$default_imageid) ||
+	    ! defined($default_imageid)) {
 	    print STDERR "*** osload ($node): No default imageid defined!\n";
 	    goto failednode;
 	}
