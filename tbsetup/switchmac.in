@@ -59,12 +59,20 @@ if (@ARGV) {
 # have to worry about missing something, and don't have to get the user to
 # guess which switch they're using
 #
-my @switches = getTestSwitches();
+my @test_switches = getTestSwitches();
 
-if (!@switches) {
+if (!@test_switches) {
     die "No experimental switches found - make sure they're in the nodes ".
 	"table!\n";
 }
+
+my @control_switches = getControlSwitches();
+if (!@control_switches) {
+    warn "Warning - No control switches found - you probably want to add them " .
+	"to the nodes table\n";
+}
+
+my @switches = (@test_switches, @control_switches);
 
 my $debug = 0;
 
@@ -77,6 +85,7 @@ sub DEBUG {
 #
 # Loop through each switch indvidually
 #
+SWITCHLOOP:
 foreach my $switch (@switches) {
     DEBUG "Looking at switch $switch\n";
 
@@ -84,9 +93,20 @@ foreach my $switch (@switches) {
     # I have _no_ idea if this will work on other switches!
     #
     my $type = getDeviceType($switch);
-    if ($switch !~ /^cisco/) {
-	die "Sorry, only Cisco switches are supported!\n";
+    my ($snmpversion, $useindexing, $switchtype);
+SWITCH:
+    for ($type) {
+	(/^cisco/) && do { $snmpversion = "2c"; $useindexing = 1;
+	    $switchtype = "cisco"; last;};
+	(/^intel/) && do { $snmpversion = "1"; $useindexing = 0;
+	    $switchtype = "intel"; last;};
+	(/^nortel/) && do { $snmpversion = "1"; $useindexing = 0;
+	    $switchtype = "nortel"; last;};
+
+	warn "WARNING: Switch type $type is not supported for $switch!\n";
+	next SWITCHLOOP;
     }
+
 
     #
     # Get the community string for this switch
@@ -95,6 +115,7 @@ foreach my $switch (@switches) {
     if ($MASTER_COMMUNITY) {
 	$community = $MASTER_COMMUNITY;
     }
+
     my $stack = getSwitchStack($switch);
     if (!$stack) {
 	die "No stack found for switch $switch\n";
@@ -107,10 +128,20 @@ foreach my $switch (@switches) {
     DEBUG "Decided on community $community";
     
     #
-    # Get a list of VLANS from the switch - we'll need them later
+    # Get a list of VLANS from the switch - we'll need them later. But, only
+    # for some types of switches.
     #
-    my $device = new snmpit_cisco($switch,0,$community,0);
-    my @vlanList = $device->listVlans();
+    my @vlanList;
+    my $device;
+    if ($useindexing) {
+	$device = new snmpit_cisco($switch,0,$community,0);
+	@vlanList = $device->listVlans();
+    } else {
+	#
+	# Make up a fake VLAN, just so we get into the loop below
+	#
+	@vlanList = ([0,0,[]]);
+    }
 
     #
     # Loop through all VLANs - we have to start a new session for each one.
@@ -126,20 +157,43 @@ foreach my $switch (@switches) {
 	# is that?! (This abomination, BTW, is called 'Community String
 	# Indexing')
 	#
-	my $session = new SNMP::Session(DestHost => $switch, Version => "2c",
-		    Community => "$community\@$vlan_number");
+	my $thiscommunity;
+	if ($useindexing) {
+	    $thiscommunity = "$community\@$vlan_number";
+	} else {
+	    $thiscommunity = $community;
+	}
+	my $session = new SNMP::Session(DestHost => $switch,
+		Version => "$snmpversion", Community => "$thiscommunity");
 	if (!$session) {
-	    die "Unable to open session to $switch $community\@$vlan_number\n";
+	    die "Unable to open session to $switch $thiscommunity\n";
 	}
 
 	#
 	# Walk the table that contains the MACs for this VLAN
 	#
-	my ($rows) = $session->bulkwalk(0,32,["dot1dTpFdbTable"]);
+	my $rows;
+	if ($snmpversion eq "2c") {
+	    ($rows) = $session->bulkwalk(0,32,["dot1dTpFdbTable"]);
+	} else {
+	    my $oid = ["dot1dTpFdbTable",0];
+	    $session->get($oid);
+	    while ($$oid[0] =~ /^dot1dTpFdb/) {
+		push @$rows, [@$oid];
+		$session->getnext($oid);
+	    }
+	}
+
 	my %MACs;
 	my %interfaces;
 	my %bridgeports;
 	my %status;
+	my $firsttime = 1;
+
+	#
+	# What we loop on here depends on whether we're using bulkwalk with
+	# v2c, or the old, slow, getnext() walking with version 1
+	#
 	foreach my $rowref (@$rows) {
 	    my ($oid, $index, $value) = @$rowref;
 
@@ -186,6 +240,7 @@ foreach my $switch (@switches) {
 		    #
 		    # Just record for later use
 		    #
+		    DEBUG "Got status $value (index $index)\n";
 		    $status{$index} = $value;
 		    last SWITCH;
 		};
@@ -200,7 +255,17 @@ foreach my $switch (@switches) {
 	#
 	my %realports;
 	if (keys %MACs) {
-	    my ($rows) = $session->bulkwalk(0,32,["dot1dBasePortIfIndex"]);
+	    my $rows;
+	    if ($snmpversion eq "2c") {
+		($rows) = $session->bulkwalk(0,32,["dot1dBasePortIfIndex"]);
+	    } else {
+		my $oid = ["dot1dBasePortIfIndex",0];
+		$session->get($oid);
+		while ($$oid[0] =~ /^dot1dBasePortIfIndex/) {
+		    push @$rows, [@$oid];
+		    $session->getnext($oid);
+		}
+	    }
 	    my %ifIndexMap;
 	    foreach my $rowref (@$rows) {
 		my ($oid, $index, $value) = @$rowref;
@@ -216,9 +281,28 @@ foreach my $switch (@switches) {
 		my $bridgeport = $bridgeports{$index};
 		my $ifIndex = $ifIndexMap{$bridgeport};
 		if (!$ifIndex) {
-		    die "ifIndex conversion failed for $bridgeport!\n";
+		    if ($switchtype eq "nortel") {
+			#
+			# Bad hack for Nortel switches
+			#
+			$ifIndex = $bridgeport - 47;
+		    } else  {
+			DEBUG "ifIndex conversion failed for $bridgeport!\n";
+			next;
+		    }
 		}
-		my ($modport) = $device->convertPortFormat(2, $ifIndex);
+
+		#
+		# If the device is a Cisco, we have to convert ifindex to a
+		# module.port number - for now, the other switches we support
+		# have only one module, and require no ifindex conversion.
+		#
+		my $modport;
+		if ($switchtype eq "cisco") {
+		    my ($modport) = $device->convertPortFormat(2, $ifIndex);
+		} else {
+		    $modport = "1.$ifIndex";
+		}
 		my $switchport;
 		if ($modport) {
 		    $switchport = $switch . "/" . $modport;
@@ -241,7 +325,8 @@ foreach my $switch (@switches) {
 	    # off-switch (eg. a trunk port)
 	    #
 	    DEBUG "printing for index $index\n";
-	    next unless ($status{$index} && $status{$index} eq "learned");
+	    next unless ($status{$index} && ($status{$index} eq "learned" || 
+		$status{$index} == 3));
 	    next if ($realports{$index} =~ /ifIndex/);
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
 		"$interfaces{$index}\n";
