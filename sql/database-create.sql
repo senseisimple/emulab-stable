@@ -203,6 +203,7 @@ CREATE TABLE experiment_stats (
   maxlinks tinyint(3) unsigned default '0',
   batch tinyint(3) unsigned default '0',
   PRIMARY KEY  (eid,pid,idx)
+  KEY idx (idx)
 ) TYPE=MyISAM;
 
 --
