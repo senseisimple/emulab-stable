@@ -2000,10 +2000,47 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * DB stuff
  */
+static MYSQL	db;
+static int	db_connected;
+static char     db_dbname[DBNAME_SIZE];
+static void	mydb_disconnect();
+
+static int
+mydb_connect()
+{
+	/*
+	 * Each time we talk to the DB, we check to see if the name
+	 * matches the last connection. If so, nothing more needs to
+	 * be done. If we switched DBs (checkdbredirect()), then drop
+	 * the current connection and form a new one.
+	 */
+	if (db_connected) {
+		if (strcmp(db_dbname, dbname) == 0)
+			return 1;
+		mydb_disconnect();
+	}
+	
+	mysql_init(&db);
+	if (mysql_real_connect(&db, 0, 0, 0,
+			       dbname, 0, 0, CLIENT_INTERACTIVE) == 0) {
+		syslog(LOG_ERR, "%s: connect failed: %s",
+			dbname, mysql_error(&db));
+		return 1;
+	}
+	strcpy(db_dbname, dbname);
+	db_connected = 1;
+}
+
+static void
+mydb_disconnect()
+{
+	mysql_close(&db);
+	db_connected = 0;
+}
+
 MYSQL_RES *
 mydb_query(char *query, int ncols, ...)
 {
-	MYSQL		db;
 	MYSQL_RES	*res;
 	char		querybuf[2*MYBUFSIZE];
 	va_list		ap;
@@ -2016,17 +2053,13 @@ mydb_query(char *query, int ncols, ...)
 		return (MYSQL_RES *) 0;
 	}
 
-	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
-		syslog(LOG_ERR, "%s: connect failed: %s",
-			dbname, mysql_error(&db));
+	if (! mydb_connect())
 		return (MYSQL_RES *) 0;
-	}
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		syslog(LOG_ERR, "%s: query failed: %s",
 			dbname, mysql_error(&db));
-		mysql_close(&db);
+		mydb_disconnect();
 		return (MYSQL_RES *) 0;
 	}
 
@@ -2034,10 +2067,9 @@ mydb_query(char *query, int ncols, ...)
 	if (res == 0) {
 		syslog(LOG_ERR, "%s: store_result failed: %s",
 			dbname, mysql_error(&db));
-		mysql_close(&db);
+		mydb_disconnect();
 		return (MYSQL_RES *) 0;
 	}
-	mysql_close(&db);
 
 	if (ncols && ncols != (int)mysql_num_fields(res)) {
 		syslog(LOG_ERR, "%s: Wrong number of fields returned "
@@ -2052,7 +2084,6 @@ mydb_query(char *query, int ncols, ...)
 int
 mydb_update(char *query, ...)
 {
-	MYSQL		db;
 	char		querybuf[MYBUFSIZE];
 	va_list		ap;
 	int		n;
@@ -2064,20 +2095,15 @@ mydb_update(char *query, ...)
 		return 1;
 	}
 
-	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
-		syslog(LOG_ERR, "%s: connect failed: %s",
-			dbname, mysql_error(&db));
+	if (! mydb_connect())
 		return 1;
-	}
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
 		syslog(LOG_ERR, "%s: query failed: %s",
 			dbname, mysql_error(&db));
-		mysql_close(&db);
+		mydb_disconnect();
 		return 1;
 	}
-	mysql_close(&db);
 	return 0;
 }
 
