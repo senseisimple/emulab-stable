@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@
 # * Figure out where to put directories such as /users /proj - they must
 #   already exist
 # * Fill out mailing list files - presumably, it's easier to just get the
-#   user to edit them himself
+#   User to edit them himself
 #
 
 #
@@ -47,6 +47,9 @@ my $CHGRP      = "/usr/bin/chgrp";
 my $CHMOD      = "/bin/chmod";
 my $PW         = "/usr/sbin/pw";
 my $NEWALIASES = "/usr/bin/newaliases";
+my $SH         = "/bin/sh";
+my $PKG_INFO   = "/usr/sbin/pkg_info";
+my $PWD        = "/bin/pwd";
 
 #
 # Some files we edit/create
@@ -59,12 +62,14 @@ my $EXPORTS_HEAD    = "$EXPORTS_FILE.head";
 my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $SUDOERS         = "/usr/local/etc/sudoers";
+my $PORTSDIR        = "/usr/ports/misc";
 
 #
 # Some directories we care about
 #
 my $LIST_DIR   = "/etc/mail/lists";
 my $TIPLOG_DIR = "/var/log/tiplogs";
+my $SRCDIR     = '@srcdir@';
 
 #
 # And some lists that we use
@@ -114,6 +119,28 @@ Phase "dirs", "Setting directory permissions", sub {
 	    ExecQuietFatal("$CHMOD 0775 $dir");
 	};
     }
+};
+
+Phase "ports", "Installing ports", sub {
+    Phase "pcopy", "Copying ports into place", sub {
+	DoneIfExists("$PORTSDIR/emulab-ops");
+	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
+    };
+    Phase "pinstall", "Installing ports (may take a while)", sub {
+	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.0")) {
+	    PhaseSkip("Ports already installed");
+	}
+
+	#
+	# This port is dead-simple, so it's safe to do it from this script
+	#
+	my $pwd = `$PWD`;
+	chomp $pwd;
+	chdir "$PORTSDIR/emulab-ops" or
+		PhaseFail "Unable to change to $PORTSDIR/emulab-ops: $!";
+	ExecQuietFatal("make install");
+	chdir $pwd;
+    };
 };
 
 Phase "rc.conf", "Adding testbed content to rc.conf", sub {
@@ -191,6 +218,7 @@ Phase "exports", "Setting up exports", sub {
 	ExecQuietFatal("cp $EXPORTS_HEAD $EXPORTS_FILE");
     };
 
+    # XXX Newhup
     Phase "mountd", "HUPing mountd", sub {
 	PhaseSkip("No new exports file") if PhaseWasSkipped("ex.head");
 	PhaseSkip("mountd not running") unless `ps -auxw | grep mountd | grep -v grep`;
@@ -256,6 +284,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    Phase $logfile, $logfile, sub {
 		DoneIfExists($logfile);
 		CreateFileFatal($logfile);
+		ExecQuietFatal("$CHGRP tbadmin $logfile");
 		ExecQuietFatal("$CHMOD 640 $logfile");
 	    };
 	}
