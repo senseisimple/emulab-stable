@@ -84,7 +84,7 @@ ServerRoot "/usr/local"
 # PidFile: The file in which the server should record its process
 # identification number when it starts.
 #
-PidFile /var/run/apache.pid
+#PidFile /var/run/apache.pid
 
 #
 # ScoreBoardFile: File used to store internal server process information.
