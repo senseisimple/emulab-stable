@@ -5492,11 +5492,14 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	nrows = (int)mysql_num_rows(res);
 	while (nrows--) {
 		row = mysql_fetch_row(res);
-		if (strcmp(row[0], "elabinelab/pkg_path") == 0) {
-			bufp += OUTPUT(bufp, ebufp - bufp, "PKG_PATH=%s\n",
+		if (strcmp(row[0], "elabinelab/boss_pkg_dir") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "BOSS_PKG_DIR=%s\n",
 				       row[1]);
 		} else if (strcmp(row[0], "elabinelab/boss_pkg") == 0) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "BOSS_PKG=%s\n",
+				       row[1]);
+		} else if (strcmp(row[0], "elabinelab/ops_pkg_dir") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "OPS_PKG_DIR=%s\n",
 				       row[1]);
 		} else if (strcmp(row[0], "elabinelab/ops_pkg") == 0) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPS_PKG=%s\n",
