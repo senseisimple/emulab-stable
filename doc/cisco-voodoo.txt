@@ -192,6 +192,9 @@ ID  Name                            Members of VLAN
       Console> (enable) set span <vlan #> <monitor>
    NOTE: You might want to append 'rx' or 'tx' to the VLAN command line, or
       you'll get doubles of everything (incoming and outgoing both)
+   NOTE2: If you want to be able to send traffic from the monitor port,
+      you'll need to append 'inpkts enable' ala:
+      Console> (enable) set span 18 3/9 rx inpkts enable
    To stop cloning:
       Console> (enable) set span disable <monitor>
 
