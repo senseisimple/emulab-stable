@@ -203,16 +203,16 @@ my $estate          = $hashrow{'state'};
 my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $ebatchstate     = $hashrow{'batchstate'};
-my $swappablebit= $row{'swappable'};
-my $idleswapbit = $row{'idleswap'};
-my $autoswapbit = $row{'autoswap'};
-my $swappablestr= ( $row{'swappable'} ? "Yes" : "No" );
-my $idleswapstr = ( $row{'idleswap'} ? "Yes" : "No" );
-my $autoswapstr = ( $row{'autoswap'} ? "Yes" : "No" );
-my $noswap      = $row{'noswap_reason'};
-my $noidleswap  = $row{'noidleswap_reason'};
-my $idleswaptime= $row{'idleswap_timeout'} / 60.0;
-my $autoswaptime= $row{'autoswap_timeout'} / 60.0;
+my $swappablebit= $hashrow{'swappable'};
+my $idleswapbit = $hashrow{'idleswap'};
+my $autoswapbit = $hashrow{'autoswap'};
+my $swappablestr= ( $swappablebit ? "Yes" : "No" );
+my $idleswapstr = ( $idleswapbit ? "Yes" : "No" );
+my $autoswapstr = ( $autoswapbit ? "Yes" : "No" );
+my $noswap      = $hashrow{'noswap_reason'};
+my $noidleswap  = $hashrow{'noidleswap_reason'};
+my $idleswaptime= $hashrow{'idleswap_timeout'} / 60.0;
+my $autoswaptime= $hashrow{'autoswap_timeout'} / 60.0;
 
 my $swapsettings = 
  #"Name:        $expt_name\n" .
