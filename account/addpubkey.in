@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -258,7 +258,7 @@ sub ParseKey($) {
 	return 0;
     }
     
-    if ($keyline =~ /^(\d*\s\d*\s[0-9a-zA-Z]*) ([-\w\@\.]*)$/) {
+    if ($keyline =~ /^(\d*\s\d*\s[0-9a-zA-Z]*) ([-\w\@\.\ ]*)$/) {
         # Protocol 1
 	$type    = "ssh-rsa1";
 	$key     = $1;
@@ -270,7 +270,7 @@ sub ParseKey($) {
 	$key     = $1;
     }
     elsif ($keyline =~
-	   /^(ssh-rsa|ssh-dss) ([-\w\.\@\+\/\=]*) ([-\w\@\.]*)$/) {
+	   /^(ssh-rsa|ssh-dss) ([-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
         # Protocol 2
 	$type    = $1;
 	$key     = "$1 $2";
