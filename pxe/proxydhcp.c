@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -18,11 +18,14 @@
  * Thanks guys!
  */
 
+#undef DEBUG_EC
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <string.h>
+#include <syslog.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -93,6 +96,7 @@ int	query_db(struct in_addr, struct in_addr *, char *, int);
 int	close_db(void);
 
 int	binlmode = 0;
+int	debug = 0;
 
 /*
  * Event System interface
@@ -161,7 +165,9 @@ ec_elt* ec_find(uint addr) {
 }
 
 ec_elt* ec_insert(ec_elt elt) {
-    printf("head=%d\ttail=%d\n",ec_head,ec_tail);
+#ifdef DEBUG_EC
+    syslog(LOG_DEBUG, "head=%d\ttail=%d",ec_head,ec_tail);
+#endif
     if (ec_next(ec_tail)==ec_head) {
 	/* cache is full, make a victim */
 	ec_tail = ec_prev(ec_tail);
@@ -170,7 +176,9 @@ ec_elt* ec_insert(ec_elt elt) {
 	/* still have room, don't victimize anything */
 	ec_head = ec_prev(ec_head);
     }
-    printf("head=%d\ttail=%d\n",ec_head,ec_tail);
+#ifdef DEBUG_EC
+    syslog(LOG_DEBUG, "head=%d\ttail=%d",ec_head,ec_tail);
+#endif
     ec_head->in_addr = elt.in_addr;
     ec_head->lastmsg = elt.lastmsg;
     return ec_head;
@@ -190,17 +198,19 @@ ec_elt* ec_reinsert(ec_elt* elt) {
     return ec_insert(ec_tmp);
 }
 
+#ifdef DEBUG_EC
 void ec_print() {
     int count = 0;
     ec_ptr = ec_head;
-    printf("Event cache:\n");
+    syslog(LOG_DEBUG, "Event cache:");
     while (ec_ptr != ec_tail) {
-	printf("%d:\t%u\t%d\n",count,ec_ptr->in_addr,ec_ptr->lastmsg);
+	syslog(LOG_DEBUG, "%d:\t%u\t%d",count,ec_ptr->in_addr,ec_ptr->lastmsg);
 	ec_ptr = ec_next(ec_ptr);
 	count++;
     }
-    printf("---\n");
+    syslog(LOG_DEBUG, "---");
 }
+#endif
 
 /*
  * The big kahuna. If it's already there, update its time and reinsert
@@ -211,26 +221,34 @@ int ec_check(uint addr) {
     int newtime,oldtime;
     rv = gettimeofday(&now,0);
     newtime = now.tv_sec;
-    printf("Checking %u at %d\n",addr,newtime);
+#ifdef DEBUG_EC
+    syslog(LOG_DEBUG, "Checking %u at %d",addr,newtime);
     ec_print();
+#endif
     ec_ptr = ec_find(addr);
-    printf("find returned %d\n",ec_ptr);
+#ifdef DEBUG_EC
+    syslog(LOG_DEBUG, "find returned %d",ec_ptr);
+#endif
     if (ec_ptr) {
 	/* Found it. Update time, reinsert. */
 	oldtime = ec_ptr->lastmsg;
 	ec_ptr->lastmsg = newtime;
 	ec_reinsert(ec_ptr);
+#ifdef DEBUG_EC
 	ec_print();
-	printf("Time difference: %d (limit=%d)\n",
+	syslog(LOG_DEBUG, "Time difference: %d (limit=%d)",
 	       newtime-oldtime,min_interval);
+#endif
 	if (oldtime + min_interval < newtime) { return 0; } else { return 1; }
     } else {
 	/* Not found. Insert it and return 0. */
 	ec_new.in_addr = addr;
 	ec_new.lastmsg = newtime;
-	printf("Inserting %u,%d\n",addr,newtime);
 	ec_insert(ec_new);
+#ifdef DEBUG_EC
+	syslog(LOG_DEBUG, "Inserted %u,%d",addr,newtime);
 	ec_print();
+#endif
 	return 0;
     }
 }
@@ -291,7 +309,9 @@ int findiface(struct sockaddr_in *client) {
 		ifr++;
 #endif
 
-		printf("IF: %s",ifr->ifr_name);
+#if 0
+		syslog(LOG_DEBUG, "IF: %s",ifr->ifr_name);
+#endif
 		if (ifr->ifr_addr.sa_family==AF_INET) {
 			u_long network, clientnet, netmask;
 			iftemp = (struct sockaddr_in *)&ifr->ifr_addr;
@@ -333,14 +353,20 @@ main(int argc, char *argv[])
 		argn=2;
 	}
 	
+	openlog("proxydhcp", LOG_PID, LOG_USER);
+	syslog(LOG_NOTICE,
+	       "Minimal PXE Proxy DHCP daemon, for use with BpBatch");
+	syslog(LOG_NOTICE, "By David Clerc & Marc Vuilleumier Stuckelberg"
+	       ", CUI, University of Geneva");
+	syslog(LOG_NOTICE, "with mods for Emulab.net");
+
 	if (open_db()) {
-		fprintf(stderr, "Error opening database\n");
+		syslog(LOG_ERR, "Error opening database");
 		exit(1);
 	}
 	
-	printf("Minimal PXE Proxy DHCP daemon, for use with BpBatch\n");
-	printf("By David Clerc & Marc Vuilleumier Stuckelberg"
-		", CUI, University of Geneva\n");
+	if (!debug)
+		(void)daemon(0, 0);
 
 	servsock=socket(PF_INET,SOCK_DGRAM,IPPROTO_UDP);
 	if (servsock<=0) {
@@ -356,13 +382,13 @@ main(int argc, char *argv[])
 	server.sin_addr.s_addr=htonl(INADDR_ANY);
 	server.sin_port=htons(BOOTPS_PORT);
 	if (bind(servsock,(struct sockaddr *)&server,sizeof(server))<0) {
-		printf("BOOTP/DHCP port in use, trying BINL mode\n");
-		printf("(do not forget to set tag 60 to PXEClient"
-			" on your DHCP server)\n");
+		syslog(LOG_WARNING, "BOOTP/DHCP port in use, trying BINL mode");
+		syslog(LOG_WARNING, "(do not forget to set tag 60 to PXEClient"
+			" on your DHCP server)");
 		binlmode = 1;
 		server.sin_port=htons(BINL_PORT);
 		if(bind(servsock,(struct sockaddr *)&server,sizeof(server))<0) {
-			fprintf(stderr, "Cannot bind to any port !\n");
+			syslog(LOG_ERR, "Cannot bind to any port !");
 			perror("bind"); exit(1);
 		}
 	}
@@ -376,7 +402,7 @@ main(int argc, char *argv[])
 		struct hostent	*he;
 
 		if ((he = gethostbyname(DEFAULT_HOST)) == 0) {
-			fprintf(stderr, "Cannot map %s!\n", DEFAULT_HOST);
+			syslog(LOG_ERR, "Cannot map %s!", DEFAULT_HOST);
 			exit(1);
 		}
 		memcpy((char *)&default_sip, he->h_addr, sizeof(default_sip));
@@ -387,12 +413,14 @@ main(int argc, char *argv[])
 	ec_back=&(evcache[EVENTCACHESIZE]);
 	ec_head=ec_front;
 	ec_tail=ec_front;
-	printf("event_cache_front: %u\nevent_cache_back: %u\nhead:      %u\nhead-next: %u\nhead-prev: %u\n",
+#ifdef DEBUG_EC
+	syslog(LOG_DEBUG, "event_cache_front: %u\nevent_cache_back: %u\nhead:      %u\nhead-next: %u\nhead-prev: %u",
 	       ec_front, ec_back, ec_head, ec_next(ec_head),
 	       ec_prev(ec_head));
 #endif
+#endif
 		
-	printf("Server started on port %d\n\n", ntohs(server.sin_port));
+	syslog(LOG_NOTICE, "Server started on port %d", ntohs(server.sin_port));
 	while (1) {
 		int rb;
 		uchar data[128];
@@ -417,7 +445,7 @@ main(int argc, char *argv[])
 		if (setsockopt(servsock, IPPROTO_IP, IP_RECVDSTADDR, &on,
 			       sizeof(on)) < 0)
 #endif			
-			printf("can't set IP_RECVDSTADDR\n");
+			syslog(LOG_WARNING, "can't set IP_RECVDSTADDR");
 
 		/* Set up msg struct. */
 		msg.msg_control = (caddr_t)&cm;
@@ -439,19 +467,18 @@ main(int argc, char *argv[])
 
 		pend = (uchar *)&dhcppak+rb-1; /*pointer to last valid byte*/
 
-		printf("Datagram of %d bytes received from %s\n",
-			rb,inet_ntoa(client.sin_addr));
+		syslog(LOG_INFO, "Request from %s", inet_ntoa(client.sin_addr));
 
 		if (dhcppak.op != BOOTP_REQUEST) {
-			printf("Not a BOOTP request\n");
+			syslog(LOG_INFO, "  not a BOOTP request");
 			continue;
 		}
 		if (p > pend) {
-			printf("truncated message\n");
+			syslog(LOG_INFO, "  truncated message");
 			continue;
 		}
 		if (!gettag(p,53,data,pend)) {
-			printf("Not a DHCP packet\n");
+			syslog(LOG_INFO, "  not a DHCP packet");
 			continue;
 		}
 		if (!binlmode && data[0] != DHCPDISCOVER) {
@@ -475,9 +502,10 @@ main(int argc, char *argv[])
 		 * So we send out a change to state BOOTING if we
 		 * haven't sent one recently.
 		 */
-		printf("Searching for %s in cache\n",
-		       inet_ntoa((*((struct in_addr*)
-				    &client.sin_addr))));
+#ifdef DEBUG_EC
+		syslog(LOG_DEBUG, "Searching for %s in cache",
+		       inet_ntoa(*((struct in_addr*)&client.sin_addr)));
+#endif
 		if (!ec_check((int)(client.sin_addr.s_addr))) {
 		    tuple = address_tuple_alloc();
 		    if (tuple != NULL &&
@@ -489,33 +517,37 @@ main(int argc, char *argv[])
 			tuple->eventtype = "BOOTING";
 			
 			if (myevent_send(tuple)) {
-			    fprintf(stderr, "Couldn't send state "
-				    "event for %s\n",nodeid);
+			    syslog(LOG_WARNING,
+				   "Couldn't send state event for %s",nodeid);
 			}
-			printf("Successfully sent state event for %s\n",
-			       nodeid);
+#ifdef DEBUG_EC
+			else {
+			    syslog(LOG_DEBUG,
+				   "Sent sent state event for %s",nodeid);
+			}
+#endif
 			address_tuple_free(tuple);
 		    } else {
-		        fprintf(stderr, "Couldn't lookup nodeid for %s\n",
-				inet_ntoa((*((struct in_addr*)
-					     &client.sin_addr))));
+		        syslog(LOG_WARNING, "Couldn't lookup nodeid for %s",
+			       inet_ntoa(*((struct in_addr*)&client.sin_addr)));
 		    }
 		} else {
-		    printf("Quenching duplicate event for %s\n",
-				inet_ntoa((*((struct in_addr*)
-					     &client.sin_addr))));
+		    syslog(LOG_INFO, "Quenching duplicate event for %s",
+			   inet_ntoa(*((struct in_addr*)&client.sin_addr)));
 		}
 #endif /* EVENTSYS */
 		
 		if (query_db(client.sin_addr,
 			     &sip, bootprog, sizeof(bootprog))) {
 #ifdef FALLBACK_HOST
-			fprintf(stderr, "No matching record! "
-				"Falling back to default.\n");
+			syslog(LOG_WARNING, "No record for %s in DB!",
+			       "  Using default.",
+			       inet_ntoa(*((struct in_addr*)&client.sin_addr)));
 			sip = default_sip;
 			strcpy(bootprog, DEFAULT_PATH);
 #else
-			fprintf(stderr, "No matching record!\n");
+			syslog(LOG_WARNING, "No record for %s in DB!",
+			       inet_ntoa(*((struct in_addr*)&client.sin_addr)));
 			continue;
 #endif
 		}
@@ -525,7 +557,7 @@ main(int argc, char *argv[])
 		*((int *)dhcppak.gip)=0;
 		strcpy(dhcppak.bootfile, bootprog);
 
-		/* Add DHCP message type optopn (53) */
+		/* Add DHCP message type option (53) */
 		data[0]=(binlmode ? DHCPACK : DHCPOFFER);
 		p=inserttag(p,53,1,data);
 
@@ -533,7 +565,8 @@ main(int argc, char *argv[])
 #ifdef USE_RECVMSG
 		if (msg.msg_controllen < sizeof(struct cmsghdr) ||
 		    (msg.msg_flags & MSG_CTRUNC))
-			printf("Aaargh!  No auxiliary information.\n");
+			syslog(LOG_WARNING,
+			       "Aaargh!  No auxiliary information.");
 
 		for (cmptr = CMSG_FIRSTHDR(&msg); cmptr != NULL;
 		     cmptr = CMSG_NXTHDR(&msg, cmptr)) {
@@ -541,9 +574,10 @@ main(int argc, char *argv[])
 			if (cmptr->cmsg_level == IPPROTO_IP &&
 			    cmptr->cmsg_type == IP_RECVDSTADDR) {
 				*(int *)data=(*((struct in_addr*)CMSG_DATA(cmptr))).s_addr;
-				printf("message directed to %s\n",
-				       inet_ntoa((*((struct in_addr*)data))));
-					
+				if (debug)
+					syslog(LOG_INFO,
+					       "message directed to %s",
+					       inet_ntoa(*((struct in_addr*)data)));
 			}
 		}
 #else
@@ -575,7 +609,10 @@ main(int argc, char *argv[])
 	  	  if (setsockopt(servsock,SOL_SOCKET,SO_BROADCAST,
 			(void *)&optval,sizeof(optval))<0) perror("setsockopt");
 		}
-		printf("Sending %d bytes\n",rb);
+
+		syslog(LOG_INFO, "Reply to %s, bootfile=%s",
+		       inet_ntoa(client.sin_addr), bootprog);
+
 		if (sendto(servsock,(char *)&dhcppak,rb,0,
 			(struct sockaddr *)&client,sizeof(client))<0)
 			perror("sendto");
@@ -602,8 +639,8 @@ event_connect()
 	if (event_handle) {
 		return 0;
 	} else {
-		fprintf(stderr,"event_connect: "
-		      "Unable to register with event system!\n");
+		syslog(LOG_WARNING,
+		       "event_connect: Unable to register with event system!");
 		return 1;
 	}
 }
@@ -621,21 +658,23 @@ int myevent_send(address_tuple_t tuple) {
 
 	notification = event_notification_alloc(event_handle,tuple);
 	if (notification == NULL) {
-		fprintf(stderr,"myevent_send: Unable to allocate notification!");
+		syslog(LOG_WARNING,
+		       "myevent_send: Unable to allocate notification!");
 		return 1;
 	}
 
 	if (event_notify(event_handle, notification) == NULL) {
 		event_notification_free(event_handle, notification);
 
-		fprintf(stderr,"myevent_send: Unable to send notification!");
+		syslog(LOG_WARNING,
+		       "myevent_send: Unable to send notification!");
 		/*
 		 * Let's try to disconnect from the event system, so that
 		 * we'll reconnect next time around.
 		 */
 		if (!event_unregister(event_handle)) {
-			fprintf(stderr,"myevent_send: "
-			      "Unable to unregister with event system!");
+			syslog(LOG_WARNING,
+			       "myevent_send: Unable to unregister from event system!");
 		}
 		event_handle = NULL;
 		return 1;
@@ -645,3 +684,16 @@ int myevent_send(address_tuple_t tuple) {
 	}
 }
 #endif /* EVENTSYS */
+
+/* syslog hacks follow */
+void
+perror(const char *str)
+{
+	char errbuf[128];
+
+	snprintf(errbuf, sizeof errbuf, "%s: %s", str, strerror(errno));
+	syslog(LOG_ERR, "%s", errbuf);
+
+	if (debug)
+		fprintf(stderr, "%s\n", errbuf);
+}

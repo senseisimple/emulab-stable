@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,16 +19,6 @@ static int parse_pathspec(char *path, struct in_addr *sip, char **filename);
 static int clear_next_pxeboot(char *node);
 
 #include <stdarg.h>
-void
-syslog(int prio, const char *msg, ...)
-{
-	va_list ap;
-
-	va_start(ap, msg);
-	vfprintf(stderr, msg, ap);
-	va_end(ap);
-	fprintf(stderr, "\n");
-}
 
 int
 open_db(void)
