@@ -324,55 +324,41 @@ foreach my $route (keys(%routes)) {
     my $hop  = $routes{$route};
     my $type = 'host';
 
-    # XXX NSE hack: We need all routes
-    # Installing the route in the directly connected case is harmless
     #
     # If directly connected, skip.
     #
-    #if ($dst eq $hop) {
-    #  next;
-    #}
+    if ($dst eq $hop) {
+	next;
+    }
 
     #
     # This is the lan that contains the src and hop. (the link). 
     #
     my $srclan = $rlans{"$src:$hop"};
-    my $dstlan;
-    
-    # XXX NSE hack: We need all the routes
-    if ($dst eq $hop) {
 
-      $dstlan = $srclan;
-
-      if ($debug) {
-	print "$src --> $dst : $hop:$dst\n";
-      }
-      
-    } else {
-      #
-      # Now we need to find the destination lan (link) by stepping through
-      # each hop till we get to it.
-      #
-      my $nhop = $hop;
-      while (1) {
+    #
+    # Now we need to find the destination lan (link) by stepping through
+    # each hop till we get to it.
+    #
+    my $nhop = $hop;
+    while (1) {
 	# Next hop to destination.
 	if (!defined($routes{"$nhop:$dst"})) {
-	  die("*** $0:\n".
-	      "    Failed to find route: $nhop:$dst!\n");
+	    die("*** $0:\n".
+		"    Failed to find route: $nhop:$dst!\n");
 	}
 	my $nnhop = $routes{"$nhop:$dst"};
-	
+
 	# Last hop to destination.
 	if ($nnhop eq $dst) {
-	  last;
+	    last;
 	}
 	$nhop = $nnhop;
-      }    
-      $dstlan = $rlans{"$nhop:$dst"};
-      
-      if ($debug) {
+    }
+    my $dstlan = $rlans{"$nhop:$dst"};
+
+    if ($debug) {
 	print "$src --> $dst : $nhop:$dst\n";
-      }
     }
     
     #
