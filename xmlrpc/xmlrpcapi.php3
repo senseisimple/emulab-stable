@@ -701,6 +701,52 @@ experiments.
   </table>
   
   <br>
+  <li><tt><b>statewait</b></tt>: Wait for an experiment to reach a particular
+  state. State is one of swapped, active, swapping, activating, etc. If the
+  experiment is already in desired state, returns immediately, otherwise
+  blocks indefinitely until the experiment reaches the state. Use the timeout
+  option below to terminate the wait early. The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>state</tt></td>
+    <td>string</td>
+    <td>The experiment state to wait for</td>
+  </tr>
+  </table>
+    
+  <br>
+  The optional arguments are:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>timeout</tt></td>
+    <td>integer</td>
+    <td>1-999999</td>
+    <td>Timeout after this many <b>seconds</b>. The return code is
+        is <tt>RESPONSE_SUCCESS</tt> if the state is reached or
+	<tt>RESPONSE_TIMEDOUT</tt> if the timer expires.
+    </td>
+   </tr>
+  </table>
+
+  <br>
   <li><tt><b>info</b></tt>: Get information about an experiment. The
   return value is a hash table (Dictionary) of hash tables. For example,
   the <tt>mapping</tt> request will return a hash indexed by node name, where

@@ -19,6 +19,8 @@ import grp
 import errno
 import exceptions
 import xmlrpclib
+import signal
+import syslog
 sys.path.append("@prefix@/lib")
 from libdb        import *
 from libtestbed   import SENDMAIL, TBOPS
@@ -26,6 +28,7 @@ from emulabclient import *
 
 # Configure variables
 TBDIR = "@prefix@"
+BOSSNODE = "@BOSSNODE@"
 
 # Version
 VERSION = 0.1
@@ -101,6 +104,13 @@ class NoLoginsError(EmulabError):
 # Exception thrown an unknown user tries to import this module.
 class UnknownUserError(EmulabError):
     pass
+
+# Exception thrown when a timer expires.
+class TimedOutError(EmulabError):
+    pass
+
+def TimeoutHandler(signum, frame):
+    raise TimedOutError, 'Timer Expired'
 
 # User info from the passwd file
 UID = pwd.getpwuid(os.getuid())[0]
@@ -1001,6 +1011,123 @@ class experiment:
         state = res[0][0]
         return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
 
+    #
+    # Wait for an experiment to reach a state; this is especially useful
+    # with batch experiments. There are probably race conditions inherent
+    # in this stuff, but typical usage should not encounter them, I hope.
+    #
+    def statewait(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp", "state"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        if (argdict.has_key("timeout") and
+            not re.match("^[\d]*$", argdict["timeout"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed timeout!")
+        
+        res = DBQueryFatal("select state,gid from experiments "
+                           "where pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment: " +
+                                  argdict["proj"] + "/" + argdict["exp"])
+
+        #
+        # Check permission. This needs to be a lib routine!
+        #
+        state = res[0][0]
+        gid   = res[0][1]
+        res   = DBQueryFatal("SELECT trust FROM group_membership "
+                             "WHERE uid=%s and pid=%s and gid=%s",
+                             (UID, argdict["proj"], gid))
+
+        if len(res) == 0:
+            return EmulabResponse(
+                RESPONSE_ERROR,
+                output=("You do not have permission to access experiment: "
+                        + argdict["proj"] + "/" + argdict["exp"]))
+
+        #
+        # See if experiment already in the desired state.
+        #
+        if (state == argdict["state"]):
+            return EmulabResponse(RESPONSE_SUCCESS, value=state, output=state)
+
+        try:
+            import tbevent
+            pass
+        except ImportError, e:
+            return EmulabResponse(RESPONSE_ERROR, output="System Error")
+
+        at = tbevent.address_tuple()
+        at.objtype = "TBEXPTSTATE"
+        at.objname = argdict["proj"] + "/" + argdict["exp"]
+        at.expt    = argdict["proj"] + "/" + argdict["exp"]
+        at.host    = BOSSNODE
+
+        try:
+            mc = tbevent.EventClient(server="localhost")
+            mc.subscribe(at)
+        except:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Could not connect to Event System")
+
+        if (argdict.has_key("timeout")):
+            signal.signal(signal.SIGALRM, TimeoutHandler)
+            signal.alarm(int(argdict["timeout"]))
+            pass
+
+        try:
+            while True:
+                ev = mc.poll()
+
+                if ev == None:
+                    time.sleep(1)
+                    continue
+
+                syslog.syslog(syslog.LOG_INFO,
+                              "statewait: " + ev.getObjType() + ", " +
+                              ev.getEventType());
+
+                if ev.getEventType() == argdict["state"]:
+                    break
+                pass
+            
+        except TimedOutError, e:
+            return EmulabResponse(RESPONSE_TIMEDOUT,
+                                  output="Operation Timed Out")
+        except:
+            if (argdict.has_key("timeout")):
+                signal.alarm(0)
+                pass
+            return EmulabResponse(RESPONSE_ERROR, output="System Failure")
+
+        if (argdict.has_key("timeout")):
+            signal.alarm(0)
+            pass
+        del(mc);
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=argdict["state"],
+                              output=argdict["state"])
+        
     #
     # Return the node/link mappings for an experiment.
     #
