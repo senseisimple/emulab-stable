@@ -303,7 +303,7 @@ ADDPUBKEY($uid, "webaddpubkey $addpubkeyargs");
 #
 # mkacct updates the user pubkeys in ~ssh/authorized_keys.
 #
-MKACCT($uid, "webmkacct -a $target_uid");
+MKACCT($uid, "webmkacct $target_uid");
 
 header("Location: showpubkeys.php3?target_uid=$target_uid&finished=1");
 ?>
