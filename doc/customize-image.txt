@@ -41,7 +41,7 @@ A. Load the image on a testbed machine.
 We will assume the machine is called "pc1" in the following directions.
 
 * Put the Utah-provided generic image in /usr/testbed/images on your
-  file server machine.  The generic image will be loaded, and the custom
+  boss machine.  The generic image will be loaded, and the custom
   image saved, using this directory.
 
 * Boot pc1 into the admin MFS as described above
