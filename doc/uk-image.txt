@@ -30,7 +30,7 @@ A. FreeBSD (while running single user):
 
 * /etc/emulab/{client,emulab}.pem
   Generate new ones.  This needs to be done on the site's boss node.
-  Go into the build tree "ssl" subdirectory and edit the *.cnf.in files
+  Go into the source tree "ssl" subdirectory and edit the *.cnf.in files
   to update the "[ req_distinguished_name ]" section with the appropriate
   country, state, city, etc.  Then do a "gmake boss-installX" which generates
   the certs and installs the server-side.  Grab the emulab.pem and client.pem
@@ -85,3 +85,39 @@ B. While running Linux (single user):
 D. Frisbee MFS (boss:/tftpboot/frisbee/boot/mfsroot):
 
 E. FreeBSD MFS (boss:/tftpboot/boot/mfsroot):
+
+F. Dealing with SCSI disks (or RAID).
+
+* Since we have IDE disks, it takes a little more work to create an
+  image on IDE disks for a site with SCSI disks.
+
+* For FreeBSD, you need to make sure that the kernel includes support
+  for the host adaptor in question.  You can look at output from the
+  "newnode" (aka GENERIC) kernel if necessary.  If the HA is not already
+  supported in our various TESTBED configs, add it and rebuild and install
+  the kernels in the image.  Then, in the image, you need to change /etc/fstab
+  to refer to "da" disks rather than "ad" disks.
+
+* For Linux, it is even more of a PITA.  As with BSD, you need to configure
+  our kernel with generic SCSI support and support for the HA.  Note that
+  by default, Linux includes SCSI as a module, but to load a module into the
+  Linux kernel at boot time, you need to have a little MFS (initrd) that
+  contains the appropriate modules.  We just build a kernel with the SCSI
+  stuff hardwired instead.  Anyway, once you have a kernel, modify /etc/fstab
+  to talk about "sda" rather than "hda".  Now you also have to modify
+  /etc/lilo.conf, again, to reference "sda" rather than "hda".  But, once
+  you have done that, you cannot rerun lilo as it will complain about not
+  having an sda disk; i.e., lilo looks at the config file to figure out
+  what disk to write the new stuff to, and that file now says "sda" instead
+  of the "hda" that you are constructing the image on!  Go ahead and create
+  the image without re-running lilo.  When you boot Linux from the image for
+  the first time, interrupt lilo (type anything once lilo starts loading the
+  image) and then type:
+
+	 linux root=/dev/sda2
+
+  (assuming Linux is in partition 2 on the disk).  This will boot it up
+  using SCSI as the root disk.  Now, assuming your kernel has the appropriate
+  SCSI support, the machine will come up ok.  Then login as root and run
+  "lilo" to fix things up for good (remember to create a new image afterward).
+
