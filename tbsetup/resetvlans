@@ -6,7 +6,8 @@
 $snmpit = "/usr/testbed/bin/snmpit";
 
 if ($#ARGV < 0) {
-    die "Syntax: $0 machines\n";
+  #  die "Syntax: $0 machines\n";
+	exit(0);
 }
 open(SNMPIT,"$snmpit -l |") || die "Error running $snmpit -l\n";
 
