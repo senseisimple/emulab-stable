@@ -588,7 +588,8 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 		
     $query_result =
 	DBQueryFatal("select e.*, pl.slicename, ". 
-                     "round(e.minimum_nodes+.1,0) as min_nodes ".
+                     "round(e.minimum_nodes+.1,0) as min_nodes, ".
+		     "round(e.maximum_nodes+.1,0) as max_nodes ".
 		     " from experiments as e left join plab_slices as pl".
                      " on e.pid = pl.pid and e.eid = pl.eid ".
 		     "where e.pid='$pid' and e.eid='$eid'");
@@ -623,6 +624,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
     $minnodes    = $exprow["min_nodes"];
+    $maxnodes    = $exprow["max_nodes"];
     $syncserver  = $exprow["sync_server"];
     $mem_usage   = $exprow["mem_usage"];
     $cpu_usage   = $exprow["cpu_usage"];
@@ -771,9 +773,9 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     elseif (!$short) {
 	if ($minnodes!="") {
 	    echo "<tr>
-                      <td>Minumum Nodes: </td>
+                      <td>Min/Max Nodes: </td>
                       <td class=\"left\"><font color=green>
-                          $minnodes (estimate)</font></td>
+                          $minnodes/$maxnodes (estimates)</font></td>
                   </tr>\n";
 	}
 	else {
