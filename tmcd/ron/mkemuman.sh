@@ -1,9 +1,21 @@
 #!/bin/csh
 
-pw useradd emulabman -u 65520 -g bin -m -s /bin/tcsh -c \"Emulab Man\"
+setenv OSTYPE `uname -s`
+if ($OSTYPE == "FreeBSD") then
+	setenv USERADD "pw useradd";
+else if ($OSTYPE == "Linux") then
+	setenv USERADD "useradd";
+else
+	echo "Unsupported OS: $OSTYPE";
+	exit 1;
+endif
+
+$USERADD emulabman -u 65520 -g bin -m -s /bin/tcsh -c "Emulab Man"
 
 cd /usr/local/etc/testbed
-cp rc.testbed /usr/local/etc/rc.d/testbed.sh
+if ($OSTYPE == "FreeBSD") then
+	cp rc.testbed /usr/local/etc/rc.d/testbed.sh
+endif
 chown emulabman . *
 chgrp bin . *
 chown root update vnodesetup
