@@ -7,6 +7,8 @@ EVENTSYS	= @EVENTSYS@
 OBJDIR		= ..
 SUBDIR		= tmcd
 
+SYSTEM	       := $(shell uname -s)
+
 include $(OBJDIR)/Makeconf
 
 all:	server client
@@ -26,6 +28,9 @@ CFLAGS	+= -DETCDIR='"$(INSTALL_ETCDIR)"'
 SSLFLAGS = -DWITHSSL 
 TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
+ifeq ($(SYSTEM),Linux)
+TMLIBS  += -ldl
+endif
 
 ifeq ($(EVENTSYS),1)
 	TMCDCFLAGS = `elvin-config --cflags vin4c` \
