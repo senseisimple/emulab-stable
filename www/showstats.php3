@@ -30,7 +30,7 @@ if (! isset($which))
     $which = 0;
 # Show just the last N records unless request is different.
 if (!isset($records) || !strcmp($records, "")) {
-    $records = 200;
+    $records = 100;
 }
 
 echo "<b>Show: <a class='static' href='showexpstats.php3'>
@@ -77,7 +77,7 @@ if ($showby == "user") {
     else
 	$which = $uid;
     $wclause = "where s.creator='$which'";
-    $records = 400;
+    $records = 100;
 }
 elseif ($showby == "project") {
     if (! $which) {
@@ -88,7 +88,7 @@ elseif ($showby == "project") {
 		      "project $which!", 1);
     }
     $wclause = "where s.pid='$which'";
-    $records = 400;
+    $records = 100;
 }
 elseif ($showby == "expt") {
     if (!$which) {
@@ -141,7 +141,7 @@ elseif ($showby == "all") {
 	}
 	$wclause = "where $wclause 0";
     }
-    $records = 400;
+    $records = 100;
 }
 else {
     USERERROR("Bad page arguments!", 1);
