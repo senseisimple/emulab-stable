@@ -65,6 +65,7 @@ my $imagepid    = TB_OPSPID;
 my $logname;
 my @row;
 my $dbuid;
+my $needcleanup = 0;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -260,10 +261,20 @@ my $saved_pxebootpath = $row[0];
 my $saved_startupcmd  = $row[1];
 
 my $result   = 0;
-my $maxwait  = (60 * 20); # 20 minutes in seconds.
-my $sleepwait= 10;	  # seconds.
+my $maxwait  = (60 * 5); # 5 minutes - in seconds.
+my $sleepwait= 10;	  # seconds (must be a multiple of the above)
 my $maxloops = ($maxwait / $sleepwait);
 my $tries    = 2;
+my $maximagesize = (4 * 1024**3); # 4 GB maximum
+my $cursize  = 0;
+my $repfreq  = 2; # wait report frequency.
+my $maxslack = (3 * 60) / $sleepwait; # NFS cache slop factor
+
+#
+# From here on out, we should take care to clean up the DB, and
+# reboot the source node.
+#
+$needcleanup = 1;
 
 while ($tries) {
     system("$osselect -m PXEFBSD $node") and
@@ -282,7 +293,6 @@ while ($tries) {
     # second time.
     #
     if (system("$nodereboot", "$node")) {
-	cleanup();
 	fatal("Failed to reboot $node!");
     }
 
@@ -291,14 +301,21 @@ while ($tries) {
     # course. 
     #
     my $count = $maxloops;
-    
+    my $prevsize = 0;
+    my $starttime = time();
+    my $curtdiff = 0;
+    my $prevtdiff = 0;
+    my $slack = 0;
+ 
     while ($count) {
+
+	sleep($sleepwait);
+
 	$query_result =
 	    DBQueryWarn("select startstatus from nodes where node_id='$node'");
 
 	if (!$query_result ||
 	    $query_result->numrows < 1) {
-	    cleanup();
 	    fatal("DB error getting startstatus for $node");
 	}
  
@@ -308,36 +325,62 @@ while ($tries) {
 	if ("$result" ne "none") {
 	    last;
 	}
-	if ($count && (($count % (60 / $sleepwait)) == 0)) {
-	    print "Still waiting ...\n";
-	}
 
-	sleep($sleepwait);
-	$count--;
+        #
+        # See if imagezip on the node is making progress.  If not, we need to
+        # decrement our timeout counter.  If so, be sure to reset the counter.
+        #
+        # Also, check to see if the (somewhat arbitrary) maximum filesize has 
+        # been exceeded.
+        #
+        $cursize = (stat($filename))[7];
+        if ($cursize > $maximagesize) {
+            last;
+        }
+        if ( ($cursize == $prevsize) && (++$slack >= $maxslack) ) {
+            if ($count*$sleepwait % 60 == 0) {
+                print "Timeout in ". int($count*$sleepwait/60) ." minutes.\n";
+            }
+            $count--;
+        }
+        else {
+            if ($count != $maxloops) {
+                print "Timeout aborted - image size increased.\n";
+                $count = $maxloops;
+            }
+            $slack = 0;
+        }
+        $prevsize = $cursize;
+
+        $curtdiff = int((time() - $starttime)/60);
+        if ( ($curtdiff != $prevtdiff) && ($curtdiff % $repfreq == 0) ) {
+            print "Still waiting ... its been ". $curtdiff ." minutes.".
+                " Current image size: $cursize bytes.\n";
+        }
+        $prevtdiff = $curtdiff;
     }
     if ("$result" ne "none") {
 	last;
     }
     $tries--;
 }
-cleanup();
 
-#
-# Need to reboot the node so that it comes out of the pxebooted kernel and
-# returns to its normal self. Its okay if this fails, although it should not.
-#
-if (system("$nodereboot", "$node")) {
-    print "*** Failed to reboot $node after zipper completed!\n";
+if (! cleanup()) {
+    fatal("Problem encountered while cleaning up!\n");
 }
 
 #
-# If we timed out or if the result code was bad.
+# If we timed out, if the result code was bad, or if the image size
+# grew too large.
 #
 if (! $tries) {
     fatal("FAILED: Timed out generating image ... \n");
 }
 if ($result) {
     fatal("FAILED: Returned error code $result generating image ... \n");
+}
+if ($cursize > $maximagesize) {
+    fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
 
 SENDMAIL("$user_name <$user_email>",
@@ -356,10 +399,33 @@ exit 0;
 
 sub cleanup ()
 {
-    system("$osselect -m $saved_pxebootpath $node") and
-	fatal("*** Failed to reset PXE boot path to $saved_pxebootpath!\n");
-    DBQueryWarn("update nodes set startupcmd='$saved_startupcmd' ".
-		"where node_id='$node'");
+    my $retval = 1;
+
+    $needcleanup = 0;
+
+    #
+    # Reset node (DB) state
+    #
+
+    if (system("$osselect -m $saved_pxebootpath $node")) {
+	print("*** Failed to reset PXE boot path to $saved_pxebootpath!\n");
+        $retval = 0;
+    }
+
+    if (!DBQueryWarn("update nodes set startupcmd='$saved_startupcmd' ".
+                      "where node_id='$node'")) {
+        print("*** Failed to reset node statup command!\n");
+        $retval = 0;
+    }
+
+    #
+    # Leave the node alone if we couldn't reset its DB state.
+    #
+    if ($retval && system("$nodereboot", "$node")) {
+        print("*** Failed to reboot node on cleanup!\n");
+    }
+
+    return $retval;
 }
 
 sub fatal($)
@@ -367,6 +433,10 @@ sub fatal($)
     my($mesg) = $_[0];
 
     print "$mesg\n";
+
+    if ($needcleanup && !cleanup()) {
+        print "Encountered problems cleaning up!\n";
+    }
     
     #
     # Send a message to the testbed list. 
