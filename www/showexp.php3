@@ -77,6 +77,8 @@ if ($expstate) {
 	WRITESUBMENUBUTTON("Visualization and NS File",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
+    WRITESUBMENUBUTTON("Download NS File",
+		       "spitnsdata.php3?pid=$exp_pid&eid=$exp_eid");
 
     # Swap option.
     if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {

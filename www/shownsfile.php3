@@ -192,7 +192,7 @@ if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
 }
 
 echo "<br>
-      <a href=spitnsdata.php3?pid=$pid&eid=$eid><h3>NS File:</h3><a>\n";
+      <a href=spitnsdata.php3?pid=$pid&eid=$eid><h3>NS File:</h3></a>\n";
 
 $query_result =
     DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
