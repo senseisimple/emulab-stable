@@ -45,7 +45,7 @@ determine the following information about your machine and your network:
 
 <ul>
 <li> device name of the boot disk, which is typically 'ad0' (IDE),
-     'da0' (SCSI), or 'aacd0' (RAID). *
+     'da0' (SCSI), 'ar0' (IDE RAID) or 'aacd0' (SCSI RAID). *
 <li> device name of the external network interface, which is
      typically one of 'fxp0', 'de0', etc. *
 <li> the hostname of your node.
@@ -58,6 +58,9 @@ determine the following information about your machine and your network:
 <blockquote><blockquote>
 <b>*</b> The installation script attempts to guess the most
 appropriate boot device and network interface.
+For the complete list of supported devices see the
+<a href=http://www.freebsd.org/releases/4.6R/hardware-i386.html>
+FreeBSD hardware compatibility list.</a>
 </blockquote></blockquote>
 
 <p>
