@@ -53,6 +53,9 @@ public:
 };
 
 typedef list<tb_pclass*> pclass_list;
+typedef array<tb_pclass*> pclass_array;
+typedef two_tuple<int,pclass_array*> tt_entry;
+typedef dictionary<string,tt_entry> pclass_types;
 
 /* Constants */
 #define PCLASS_BASE_WEIGHT 1

@@ -24,7 +24,7 @@
 extern node pnodes[MAX_PNODES];
 extern dictionary<tb_pnode*,node> pnode2node;
 extern pclass_list pclasses;
-extern dictionary<string,pclass_list*> type_table;
+extern pclass_types type_table;
 
 typedef two_tuple<node,int> link_info; // dst, bw
 
@@ -125,16 +125,34 @@ int generate_pclasses(tb_pgraph &PG) {
     }
   }
 
+  dictionary<string,pclass_list*> pre_type_table;
+  
   list_item it;
   forall_items(it,pclasses) {
     tb_pclass *cur = pclasses[it];
     dic_item dit;
     forall_items(dit,cur->members) {
-      if (type_table.lookup(cur->members.key(dit)) == nil) {
-	type_table.insert(cur->members.key(dit),new pclass_list);
+      if (pre_type_table.lookup(cur->members.key(dit)) == nil) {
+	pre_type_table.insert(cur->members.key(dit),new pclass_list);
       }
-      type_table.access(cur->members.key(dit))->push_back(cur);
+      pre_type_table.access(cur->members.key(dit))->push_back(cur);
     }
+  }
+
+  // now we convert the lists in pre_type_table into arrays for
+  // faster access.
+  dic_item dit;
+  forall_items(dit,pre_type_table) {
+    pclass_list *L = pre_type_table.inf(dit);
+    pclass_array *A = new pclass_array(L->length());
+    int i=0;
+    
+    type_table.insert(pre_type_table.key(dit),tt_entry(L->length(),A));
+    
+    forall_items(it,*L) {
+      (*A)[i++] = L->inf(it);
+    }
+    delete L;
   }
   return 0;
 }
@@ -231,10 +249,10 @@ void pclass_debug()
   dic_item dit;
   forall_items(dit,type_table) {
     cout << type_table.key(dit) << ":";
-    list_item lit;
-    pclass_list *L = type_table.inf(dit);
-    forall_items(lit,*L) {
-      cout << " " << (L->inf(lit))->name;
+    int n = type_table.inf(dit).first();
+    pclass_array &A = *(type_table.inf(dit).second());
+    for (int i = 0; i < n ; ++i) {
+      cout << " " << A[i];
     }
     cout << "\n";
   }

@@ -49,7 +49,7 @@ tb_vgraph G;
 dictionary<tb_pnode*,node> pnode2node;
 dictionary<tb_pnode*,int> pnode2posistion;
 pclass_list pclasses;
-dictionary<string,pclass_list*> type_table;
+pclass_types type_table;
 
 dictionary<string,node> pname2node;
 dictionary<string,node> vname2node;
@@ -272,7 +272,7 @@ int assign()
 	" violated:" << violated << " trans:" << trans <<
 	" accepts:" << accepts << endl;
 #endif STATS
-      int newpos;
+      int newpos=0;
       trans++;
       iters++;
 
@@ -291,93 +291,10 @@ int assign()
 	unassigned_nodes.insert(n,random());
       }
 
-      //////////////////////////////////////////////////////////////////////
-      // Lots of code to calculate the relative weights of the pclasses.
-      // The weights are stored in the weights dictionary which is indexed
-      // by pclass* and contains the weight.
-      //////////////////////////////////////////////////////////////////////
-      dictionary<tb_pclass*,double> weights;
-      list_item lit;
-      dic_item dit;
-      
-      // find acceptable pclasses
       tb_vnode &vn=G[n];
-      pclass_list *L = type_table.access(vn.type);
-      forall_items(lit,*L) {
-	tb_pclass *c = L->inf(lit);
-	if (c->used != c->size) {
-	  if (c->members.access(vn.type)->front() != NULL) {
-	    weights.insert(c,PCLASS_BASE_WEIGHT);
-	  }
-	}
-      }
-      
-      // adjust weight by neighbors
-      edge e;
-      forall_inout_edges(e,n) {
-	node dst = G.target(e);
-	if (dst == n) dst = G.source(e);
-	tb_vnode &vdst = G[dst];
-	if (vdst.posistion != 0) {
-	  tb_pnode &pdst = PG[pnodes[vdst.posistion]];
-	  tb_pclass *c = pdst.my_class;
-	  dit = weights.lookup(c);
-	  if (dit != nil) {
-	    weights.change_inf(dit,weights.inf(dit)+PCLASS_NEIGHBOR_WEIGHT);
-	  }
-	}
-      }
-      
-      // Adjust classes by utilizaiton
-      forall_items(lit,pclasses) {
-	tb_pclass *c = pclasses.inf(lit);
-	dit = weights.lookup(c);
-	if (dit != nil) {
-	  if (c->used > 0) {
-	    weights.change_inf(dit,weights.inf(dit)+
-			       PCLASS_UTIL_WEIGHT);
-	  }
-	}
-      }
-
-      // Adjust classes by features/desires
-      // We calculate the fd score for all possible classes and normalize
-      // to 1 and then multiply by PCLASS_FD_WEIGHT
-      dictionary<tb_pclass*,double> fdscores;
-      double max_afds=0;
-      forall_items(dit,weights) {
-	tb_pclass *c = weights.key(dit);
-	tb_pnode *p = c->members.access(vn.type)->front();
-	int v;
-	double score = fd_score(vn,*p,&v);
-	fdscores.insert(c,score);
-	if (fabs(score) > max_afds) max_afds=fabs(score);
-      }
-      if (max_afds == 0) max_afds=1;
-      
-      forall_items(dit,weights) {
-	tb_pclass *c = weights.key(dit);
-	double fds = fdscores.access(c);
-	weights.change_inf(dit,
-			   weights.inf(dit)+PCLASS_FDS_WEIGHT*fds/max_afds);
-      }
-      
-      // Calculate total weight.
-      double total=0;
-      forall_items(dit,weights) {
-	total += weights.inf(dit);
-      }
-      
-#ifdef PCLASS_DEBUG_MORE
-      cerr << "Finding pclass for " << vn.name << endl;
-      {
-	dic_item pit;
-	forall_items(pit,weights) {
-	  tb_pclass *p = weights.key(pit);
-	  cout << "  " << p->name << " " << weights.inf(pit) << endl;
-	}
-      }
-#endif
+      tt_entry tt = type_table.access(vn.type);
+      int num_types = tt.first();
+      pclass_array &acceptable_types = *(tt.second());
       
       ////
       // We've now calculated the weights and the total weight.  We
@@ -386,9 +303,23 @@ int assign()
       ////
       // Loop will break eventually.
       tb_pnode *newpnode;
-      do {
-	newpnode = choose_pnode(weights,total,vn.type);
-	if (newpnode == NULL) {
+      int i = random()%num_types;
+      int first = i;
+      bool found_pclass = true;
+      for (;;) {		// breaks loop in a number of places
+	i = (i+1)%num_types;
+	newpnode = acceptable_types[i]->members.access(vn.type)->front();
+#ifdef PCLASS_DEBUG
+	cerr << "Found pclass: " <<
+	  acceptable_types[i]->name << " and node " <<
+	  (newpnode == NULL ? string("NULL") : newpnode->name) << "\n";
+#endif	
+	if (newpnode != NULL) {
+	  newpos = pnode2posistion.access(newpnode);
+	  if (add_node(n,newpos) == 0) break; // main exit condition
+	}
+	
+	if (i == first) {
 	  // no available nodes
 	  // need to free up a node and recalculate weights.
 	  int pos = 0;
@@ -403,13 +334,13 @@ int assign()
 	  }
 	  remove_node(ntor);
 	  unassigned_nodes.insert(ntor,random());
+	  found_pclass = false;
 	  break;
 	}
-	newpos = pnode2posistion.access(newpnode);
-      } while (add_node(n,newpos) == 1);
+      } 
 
       // This occurs when no pclass could be found.
-      if (newpnode == NULL) continue;
+      if (found_pclass == false) continue;
 
       unassigned_nodes.del(n);
       
