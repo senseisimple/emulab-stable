@@ -106,7 +106,7 @@ if (@ARGV != 0) {
     usage();
 }
 if (defined($options{"d"})) {
-    $debug = $options{"d"};
+    $debug = 1;
 }
 
 # Go to ground.
@@ -172,7 +172,7 @@ while (1) {
     $running_result =
 	DBQuery("select * from experiments ".
 		"where batchmode=1 and state='$BSTATE_RUNNING' ".
-		"ORDER BY expt_start LIMIT 1");
+		"ORDER BY expt_start");
 
     if (!$pending_result || !$running_result) {
 	print "DB Error getting batch info. Waiting a bit ...\n";
@@ -218,29 +218,47 @@ while (1) {
     #
     # If you are wondering why I check for finished experiments in the main
     # loop instead of in the child that started the experiment, its so that
-    # we fire up again and look for them in the event that paper goes down.
+    # we fire up again and look for them in the event that boss goes down.
     #
     if (!$running_result->numrows) {
 	DBQueryWarn("unlock tables");
     }
     else {
-	my %running_row = $running_result->fetchhash();
-	my $canceled    = $running_row{'canceled'};
-	# Local vars!
-	my $eid         = $running_row{'eid'};
-	my $pid         = $running_row{'pid'};
+	my %canterm = ();
+	
+	while (my %running_row = $running_result->fetchhash()) {
+	    # Local vars!
+	    my $eid         = $running_row{'eid'};
+	    my $pid         = $running_row{'pid'};
 
-	#
-	# Lock so user cannot mess with it.
-	# 
-	$query_result = 
-	    DBQuery("update experiments set ".
-		    "       expt_locked=now(), ".
-		    "       batchstate='$BSTATE_LOCKED' ".
-		    "where eid='$eid' and pid='$pid'");
+	    #
+	    # Lock so user cannot mess with it.
+	    # 
+	    $query_result = 
+		DBQuery("update experiments set ".
+			"       expt_locked=now(), ".
+			"       batchstate='$BSTATE_LOCKED' ".
+			"where eid='$eid' and pid='$pid'");
+
+	    $canterm{"$pid:$eid"} = ($query_result ? 1 : 0);
+	}
 	DBQueryWarn("unlock tables");
 
-	if ($query_result) {
+	#
+	# Reset and go through again.
+	#
+	$running_result->dataseek(0);
+	
+	while (my %running_row = $running_result->fetchhash()) {
+	    my $canceled    = $running_row{'canceled'};
+	    # Local vars!
+	    my $eid         = $running_row{'eid'};
+	    my $pid         = $running_row{'pid'};
+	    my $canterm     = $canterm{"$pid:$eid"};
+
+	    next
+		if (!$canterm);
+
 	    if ($canceled) {
 		# Look at the cancel flag.
 		if ($canceled == EXPTCANCEL_TERM) {
