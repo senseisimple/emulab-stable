@@ -57,7 +57,7 @@ my %p2type;
 my %p2osid;
 my %vv2pmap;
 
-getopts('hnmdlevb',\%opt);
+getopts('hnmdlevbr',\%opt);
 
 if ($opt{h}) {
     exit &usage;
@@ -386,25 +386,25 @@ if ($showdelays &&
 #
 if ($showroutes) {
     my $result =
-	DBQueryFatal("select vname,dst,dst_type,dst_mask,nexthop,cost ".
+	DBQueryFatal("select vname,src,dst,dst_type,dst_mask,nexthop,cost ".
 		     " from virt_routes where ".
 		     "pid='$pid' and eid='$eid' order by vname");
 
     if ($result->numrows) {
 	print  "Route List:\n";
-	printf "%-15s %-15s %-15s %-15s %-8s \n",
-	       "Node", "Dest", "Type/Mask", "Nexthop", "Cost";
+	printf "%-15s %-15s %-15s %-15s %-5s %-4s \n",
+	       "Node", "Interface", "Dest", "Nexthop", "Type", "Cost";
 	print  "--------------- --------------- --------------- ".
-	       "--------------- --------\n";
+	       "--------------- ----- ----\n";
 	
-	while (($vname,$dst,$dst_type,$dst_mask,$nexthop,$cost) =
+	while (($vname,$src,$dst,$dst_type,$dst_mask,$nexthop,$cost) =
 	       $result->fetchrow_array()) {
 
 	    if ($dst_type eq "host") {
 		$dst_mask = "host";
 	    }
-	    printf "%-15s %-15s %-15s %-15s %-10s \n",
-	           $vname, $dst, $dst_mask, $nexthop, $cost;
+	    printf "%-15s %-15s %-15s %-15s %-5s %-4s \n",
+	           $vname, $src, $dst, $nexthop, $dst_type, $cost;
 	}
 	print "\n";
     }

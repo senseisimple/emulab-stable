@@ -304,6 +304,12 @@ foreach my $result (@results) {
 }
 
 #
+# Clean the routes.
+#
+DBQueryFatal("delete from virt_routes where ".
+	     "pid='$pid' and eid='$eid'");
+
+#
 # Now it gets fun. We have to go through each src:dst pair in the route
 # list. The problem is that the dst could be multihomed and multiple hops
 # away, and so we have no idea what interface (IP) we are actually routing
@@ -448,8 +454,8 @@ foreach my $route (keys(%routes)) {
     }
     else {
 	DBQueryFatal("insert into virt_routes ".
-		     " (pid,eid,vname,dst,nexthop,dst_type) ".
-		     " values ('$pid', '$eid', '$src', '$dstip', ".
+		     " (pid,eid,vname,src,dst,nexthop,dst_type) ".
+		     " values ('$pid', '$eid', '$src', '$srcip', '$dstip', ".
 		     "         '$hopip', '$type')");
     }
 }
