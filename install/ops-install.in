@@ -56,6 +56,12 @@ sub usage {
     exit(1);
 }
 
+#
+# The default meta-port (name and version) that drags in all the dependancies
+# for an ops node
+#
+my $OPS_PORT = "emulab-ops-1.5";
+
 my $packagedir = "";
 my $batchmode  = 0;
 my %opts;
@@ -149,12 +155,6 @@ my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
 my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
 my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
-
-#
-# The meta-port (name and version) that drags in all the dependancies for
-# an ops node
-#
-my $OPS_PORT = "emulab-ops-1.5";
 
 #
 # List of names that goes into $HOSTS and which must resolve.
