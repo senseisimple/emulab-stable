@@ -1325,7 +1325,7 @@ foreach $plink (keys(%plinks)) {
 	printdb "LAN delay src: other end = $nodeportC $nodeportD\n";
 
 	printdb "  VLANS:\n";
-	AddVlan("link", $lan, $nodeportA, $nodeportB);
+	AddVlan("link", $lan . "-delay" . $nodeA, $nodeportA, $nodeportB);
 	AddVlan("lan",  $lan, $nodeportD);
 	
 	my ($member0,$delay,$bandwidth,$loss,
