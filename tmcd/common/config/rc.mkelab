@@ -320,9 +320,12 @@ sub SetupOpsNode()
     # Do this as a separate step cause we need the NFS mounts, but
     # must do the unmounts before running ops-install. 
     # 
+    if (!$emulabconfig{OPS_PKG_DIR} || !$emulabconfig{OPS_PKG}) {
+	SetupFatal("Could not get package info from Emulab!");
+    }
     print "Installing the ops metaport.\n";
-    $ENV{"PKG_PATH"} = "/share/freebsd/packages/FreeBSD-4.10-20050126";
-    mysystem("pkg_add emulab-ops-1.5 >/tmp/perrs 2>&1");
+    $ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
+    mysystem("pkg_add $emulabconfig{OPS_PKG} >/tmp/perrs 2>&1");
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
@@ -577,9 +580,12 @@ sub SetupBossNode()
     # Do this as a separate step cause we need the NFS mounts, but
     # must do the unmounts before running ops-install. 
     # 
+    if (!$emulabconfig{BOSS_PKG_DIR} || !$emulabconfig{BOSS_PKG}) {
+	SetupFatal("Could not get package info from Emulab!");
+    }
     print "Installing the boss metaport.\n";
-    $ENV{"PKG_PATH"} = "/share/freebsd/packages/FreeBSD-4.10-20041102";
-    mysystem("pkg_add -f -v emulab-boss-1.7 >/tmp/perrs 2>&1");
+    $ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
+    mysystem("pkg_add -f -v $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
 
     #
     # Extra stuff to fix up php package stuff. Ask Rob!
