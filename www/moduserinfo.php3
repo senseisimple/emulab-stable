@@ -459,7 +459,7 @@ if ((isset($password1) && strcmp($password1, "")) &&
 #
 DBQueryFatal("UPDATE users SET ".
 	     "usr_name=\"$usr_name\",       ".
-	     "usr_URL=\"$usr_url\",         ".
+	     "usr_URL=\"$usr_URL\",         ".
 	     "usr_addr=\"$usr_addr\",       ".
 	     "usr_phone=\"$usr_phone\",     ".
 	     "usr_title=\"$usr_title\",     ".
@@ -479,7 +479,7 @@ TBMAIL("$usr_name <$usr_email>",
      "\n".
      "Name:              $usr_name\n".
      "Email:             $usr_email\n".
-     "URL:               $usr_url\n".
+     "URL:               $usr_URL\n".
      "Affiliation:       $usr_affil\n".
      "Address:           $usr_addr\n".
      "Phone:             $usr_phone\n".
