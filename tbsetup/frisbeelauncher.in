@@ -38,7 +38,7 @@ $imageid = shift @ARGV;
 #
 # Untaint the argument.
 #
-if ($imageid =~ /^([-\@\w\+]+)$/) {
+if ($imageid =~ /^([-\@\w\+.]+)$/) {
 	$imageid = $1;
 } else {
 	die("Invalid image '$imageid' contains illegal characters.\n");
