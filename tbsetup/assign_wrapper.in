@@ -600,7 +600,7 @@ sub RunAssign ()
     # Run assign
     my $cmdargs = "$ptopfile $topfile";
     $cmdargs = "-uPod -c .75 $cmdargs"
-	if ($virtcount);
+	if ($virtcount || $simcount);
     $cmdargs = "-n $cmdargs"
     	if ($precheck);
 
