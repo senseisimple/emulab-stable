@@ -28,6 +28,7 @@ install:
 	$(INSTALL) -m 644 $(SRCDIR)/passwd $(INSTALL_DIR)/passwd
 	$(INSTALL) -m 600 $(SRCDIR)/shadow $(INSTALL_DIR)/shadow
 	$(INSTALL) -m 600 $(SRCDIR)/gshadow $(INSTALL_DIR)/gshadow
+	$(INSTALL) -m 755 $(SRCDIR)/setuplib.pm $(INSTALL_DIR)/setuplib.pm
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(INSTALL_DIR)/rc.setup
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup

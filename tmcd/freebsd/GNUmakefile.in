@@ -27,6 +27,7 @@ install:
 	$(INSTALL) -m 644 $(SRCDIR)/group $(INSTALL_DIR)/group
 	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(INSTALL_DIR)/master.passwd
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(INSTALL_DIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/setuplib.pm $(INSTALL_DIR)/setuplib.pm
 	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(INSTALL_DIR)/rc.setup
