@@ -31,7 +31,7 @@ set assign "$updir/ir/assign.tcl"
 set handle_ip "$updir/ir/handle_ip.tcl"
 set avail "$updir/db/avail"
 set ptopgen "$updir/db/ptopgen"
-set ptopfile "$updir/ir/testbed.ptop"
+set ptopfile "/tmp/testbed[pid].ptop"
 set reserve "$updir/db/nalloc"
 set libir "$updir/ir/libir.tcl"
 
@@ -82,7 +82,7 @@ if {[catch "exec $avail type=pc ver extras | $ptopgen > $ptopfile 2>@ $logFp" er
 }
 
 outs "Allocating resources - This may take a while."
-if {[catch "exec $assign $irFile >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $assign $irFile $ptopfile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error allocating resources. ($err)"
     exit 1
 }
