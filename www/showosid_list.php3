@@ -38,17 +38,34 @@ else
     $order = "o.osname";
 
 #
+# Allow for creator restriction
+#
+$extraclause = "";
+if (isset($creator) && $creator != "") {
+    if (! TBvalid_uid($creator)) {
+	PAGEARGERROR("Invalid characters in creator");
+    }
+    if ($isadmin) 
+	$extraclause = "where o.creator='$creator' ";
+    else
+	$extraclause = "and o.creator='$creator' ";
+}
+
+#
 # Get the project list.
 #
 if ($isadmin) {
     $query_result =
-	DBQueryFatal("SELECT * FROM os_info as o order by $order");
+	DBQueryFatal("SELECT * FROM os_info as o ".
+		     "$extraclause ".
+		     "order by $order");
 }
 else {
     $query_result =
 	DBQueryFatal("select distinct o.* from os_info as o ".
 		     "left join group_membership as g on g.pid=o.pid ".
-		     "where g.uid='$uid' or o.shared=1 ".
+		     "where (g.uid='$uid' or o.shared=1) ".
+		     "$extraclause ".
 		     "order by $order");
 }
 

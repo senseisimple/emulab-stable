@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -36,12 +36,28 @@ elseif (! strcmp($sortby, "desc"))
     $order = "i.description";
 else 
     $order = "i.imagename";
+$extraclause = "";
+
+#
+# Allow for creator restriction
+#
+if (isset($creator) && $creator != "") {
+    if (! TBvalid_uid($creator)) {
+	PAGEARGERROR("Invalid characters in creator");
+    }
+    if ($isadmin) 
+	$extraclause = "where i.creator='$creator' ";
+    else
+	$extraclause = "and i.creator='$creator' ";
+}
 
 #
 # Get the list.
 #
 if ($isadmin) {
-    $query_result = DBQueryFatal("SELECT * FROM images as i order by $order");
+    $query_result = DBQueryFatal("SELECT * FROM images as i ".
+				 "$extraclause ".
+				 "order by $order");
 }
 else {
     #
@@ -55,7 +71,9 @@ else {
     $query_result =
 	DBQueryFatal("select distinct i.* from images as i ".
 		     "left join group_membership as g on g.pid=i.pid ".
-		     "where g.uid='$uid' or i.global order by $order");
+		     "where (g.uid='$uid' or i.global) ".
+		     "$extraclause ".
+		     "order by $order");
 }
 
 SUBPAGESTART();
