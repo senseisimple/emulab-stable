@@ -905,6 +905,7 @@ function SHOWNODE($node_id) {
     $rpms               = $row[rpms];
     $tarballs           = $row[tarballs];
     $startupcmd         = $row[startupcmd];
+    $routertype         = $row[routertype];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -993,6 +994,11 @@ function SHOWNODE($node_id) {
     echo "<tr>
               <td>Tarballs:</td>
               <td class=left>$tarballs</td>
+      </tr>\n";
+
+    echo "<tr>
+              <td>Router Type:</td>
+              <td class=left>$routertype</td>
       </tr>\n";
 
     #

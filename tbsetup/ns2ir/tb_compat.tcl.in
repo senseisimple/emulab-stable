@@ -151,6 +151,18 @@ proc tb-set-node-deltas {node args} {
     }
     $node set deltas [join $args :]
 }
+proc tb-set-node-routertype {node type} {
+    if {$type == {}} {
+	perror "\[tb-set-node-routertype] No type given."
+	return
+    }
+    if {($type != "none") &&
+	($type != "gated")} {
+	perror "\[tb-set-node-routertype] Type is not one of none|gated"
+	return
+    }
+    $node set routertype $type
+}
 
 # Lan/Link state routines.
 

@@ -19,3 +19,4 @@ proc tb-set-node-lan-bandwidth {node lan bw} {}
 proc tb-set-node-lan-loss {node lan loss} {}
 proc tb-set-node-lan-params {node lan delay bw loss} {}
 proc tb-set-node-failure-action {node type} {}
+proc tb-set-node-routertype {node type} {}

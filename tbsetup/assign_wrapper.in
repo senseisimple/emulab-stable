@@ -877,7 +877,7 @@ foreach $pnode (keys(%p2vmap)) {
 foreach $pair (@nodepairs) {
     ($pnode,$vnode) = @$pair;
     my $result = DBQueryFatal("SELECT osid,cmd_line,rpms,deltas,startupcmd," .
-			 "tarfiles,failureaction from virt_nodes" .
+			 "tarfiles,failureaction,routertype from virt_nodes" .
 			 " where pid=\"$pid\"" .
 			 " and eid=\"$eid\" and vname=\"$vnode\"");
     # The if statement will cause us to skip nodes that belong to
@@ -887,8 +887,8 @@ foreach $pair (@nodepairs) {
 			  " where node_id=\"$pnode\"");
     my ($type) = $result2->fetchrow_array;
     $result2->finish;
-    if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,$failureaction) = 
-	$result->fetchrow_array) {
+    if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
+	 $failureaction,$routertype) = $result->fetchrow_array) {
 	if (!defined($osid) || $osid eq "") {
 	    $osid = $defosids{$type};
 	}
@@ -901,7 +901,8 @@ foreach $pair (@nodepairs) {
 		       " deltas='$deltas'," .
 		       " tarballs='$tarfiles'," .
 		       " startupcmd='$startupcmd'," .
-		       " failureaction='$failureaction'" .
+		       " failureaction='$failureaction'," .
+		       " routertype='$routertype'" .
 		       " where node_id='$pnode'");
     } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
 	# Delay node

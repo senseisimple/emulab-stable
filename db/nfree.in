@@ -243,6 +243,7 @@ foreach my $n (@freed_nodes) {
     DBQueryWarn("update nodes set def_boot_osid='$osid',def_boot_cmd_line='',".
 		"def_boot_path='',startupcmd='',rpms='',deltas='', ".
 		"tarballs='',pxe_boot_path='$pxe_boot_path', ".
+		"failureaction='fatal', routertype='none', ".
 		"next_pxe_boot_path='' where node_id='$n'") || $error++;
 
     #
