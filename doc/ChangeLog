@@ -1,3 +1,8 @@
+stoller     2003/04/08 03:03:01 MDT
+
+  Update Linux image to Redhat 7.3. The old image is still available to
+  users by using the OSID RHL71-STD in their NS files. 
+	    
 newbold     2003/04/08 12:32:01 MDT
 
   Modified files:
