@@ -135,9 +135,10 @@ struct blockreloc	*relocs;
 int			numregions, numrelocs;
 
 void	addskip(uint32_t start, uint32_t size);
-void	dumpskips(void);
+void	dumpskips(int verbose);
 void	sortrange(struct range *head, int domerge);
 void    makeranges(void);
+void	dumpranges(int verbose);
 void	addfixup(off_t offset, off_t poffset, off_t size, void *data,
 		 int reloctype);
 void	addreloc(off_t offset, off_t size, int reloctype);
@@ -477,8 +478,10 @@ main(argc, argv)
 
 	sortrange(skips, 1);
 	if (debug)
-		dumpskips();
+		dumpskips(info || debug > 2);
 	makeranges();
+	if (debug)
+		dumpranges(info || debug > 2);
 	sortrange(fixups, 0);
 	fflush(stderr);
 
@@ -666,6 +669,8 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			rval = read_image(extstart + doslabel.parts[i].dp_start,
 					  pstart + NDOSPART,
 					  extstart ?: start);
+			/* XXX for inputmaxsec calculation below */
+			start = extstart + doslabel.parts[i].dp_start;
 			break;
 
 		case DOSPTYP_UNUSED:
@@ -1769,7 +1774,7 @@ addskip(uint32_t start, uint32_t size)
 }
 
 void
-dumpskips(void)
+dumpskips(int verbose)
 {
 	struct range	*pskip;
 	uint32_t	offset = 0, total = 0;
@@ -1777,21 +1782,19 @@ dumpskips(void)
 	if (!skips)
 		return;
 
-	if (debug > 2)
-		fprintf(stderr, "Skip ranges (start/size) in sectors:\n");
+	if (verbose)
+		fprintf(stderr, "\nSkip ranges (start/size) in sectors:\n");
 	
 	pskip = skips;
 	while (pskip) {
 		assert(pskip->start >= offset);
-		if (debug > 2)
+		if (verbose)
 			fprintf(stderr,
 				"  %12d    %9d\n", pskip->start, pskip->size);
 		offset = pskip->start + pskip->size;
 		total += pskip->size;
 		pskip  = pskip->next;
 	}
-	if (debug > 2)
-		fprintf(stderr, "\n");
 	
 	fprintf(stderr, "Total Number of Free Sectors: %d (bytes %qd)\n",
 		total, sectobytes(total));
@@ -1862,7 +1865,6 @@ makeranges(void)
 {
 	struct range	*pskip, *ptmp, *range, **lastrange;
 	uint32_t	offset;
-	uint32_t	total = 0;
 	
 	offset = inputminsec;
 	lastrange = &ranges;
@@ -1878,7 +1880,6 @@ makeranges(void)
 		range->size  = pskip->start - offset;
 		range->next  = 0;
 		offset       = pskip->start + pskip->size;
-		total	     += range->size;
 		
 		*lastrange = range;
 		lastrange = &range->next;
@@ -1914,26 +1915,31 @@ makeranges(void)
 		else
 			range->size = 0;
 		range->next = 0;
-		total += range->size;
 
 		*lastrange = range;
 		numranges++;
 	}
+}
 
-	if (debug) {
-		if (debug > 2) {
-			range = ranges;
-			while (range) {
-				fprintf(stderr, "  %12d    %9d\n",
-					range->start, range->size);
-				range  = range->next;
-			}
-			fprintf(stderr, "\n");
+void
+dumpranges(int verbose)
+{
+	struct range *range;
+	uint32_t total = 0;
+
+	if (verbose) {
+		fprintf(stderr, "\nAllocated ranges (start/size) in sectors:\n");
+		range = ranges;
+		while (range) {
+			fprintf(stderr, "  %12d    %9d\n",
+				range->start, range->size);
+			total += range->size;
+			range = range->next;
 		}
-		fprintf(stderr,
-			"Total Number of Valid Sectors: %d (bytes %qd)\n",
-			total, sectobytes(total));
 	}
+	fprintf(stderr,
+		"Total Number of Valid Sectors: %d (bytes %qd)\n",
+		total, sectobytes(total));
 }
 
 /*
