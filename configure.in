@@ -208,7 +208,7 @@ if test "$enable_events" = "yes"; then
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
                     event/tbgen/GNUmakefile event/tbgen/tevd.restart \
-                    event/example/GNUmakefile";
+                    event/example/GNUmakefile event/trafgen/GNUmakefile";
 	optional_subdirs="$optional_subdirs event";
         EVENTSYS=1;
 else
