@@ -34,9 +34,9 @@ int main(int argc, char* argv[])
       cout << "\neach type of operation and combines stats from many files.";
       cout << "\nThe -o option means output only. It is used only with the";
       cout << "\n-c and -l options and repeats the statistical calculations";
-      cout << "\non the log files without adding more data to them.";
-      cout << "\nThe current settings are "<<NUMPORTS<<" Ports, ";
-      cout << NUMTESTS <<" tests, and\n"<<REPEAT<<"repetitions."<<endl;
+      cout << "\non the log files without adding more data to them. The ";
+      cout << "\ncurrent settings are "<<NUMPORTS<<" Ports, ";
+      cout << NUMTESTS <<" tests, and "<<REPEAT<<" repetitions."<<endl;
       return -1;
     }
   bool cfile= (strcmp(argv[1],"-c")==0);
@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
       return 0;
     }
   
-  cout << "Port| Operation            | Avg.  | Var.   | Max. | Min. |\n";
+  cout << "Port| Operation            | Avg.  |4*StdDev| Max. | Min. |\n";
   cout << "----+----------------------+-------+--------+------+------+\n";
 
   float max, min, avg, var;
@@ -146,64 +146,24 @@ int main(int argc, char* argv[])
 	cout << setprecision(3);
 	cout << " | " << avg;
 	cout << setprecision(4);
-	cout << " | " << var;
+	cout << " | " << 4*sqrt(var);
 	cout << setprecision(2);
 	cout << " | " << max;
 	cout << " | " << min;
 	cout << " | ";
-	if ( (avg + var > max) && (avg - var <  min) )
-	  cout << "***1Var*** ";
-	if ( (avg + 2*var < max) || (avg - 2*var > min) )
-	  cout << "2*Var ";
-	if ( var < .15 )
-	  cout << "(LowVar) ";
-	if ( var > .6 )
-	  cout << "HighVar ";
-	if ( var > .4 && var <=.6)
-	  cout << "MedVar ";
-	cout << endl;
-	MX[y]+=max;
-	MN[y]+=min;
-	AV[y]+=avg;
-	VR[y]+=var;
+	/*	if ( (avg + var > max) && (avg - var <  min) )
+		cout << "***1Var*** ";
+		if ( (avg + 2*var < max) || (avg - 2*var > min) )
+		cout << "2*Var ";
+		if ( var < .15 )
+		cout << "(LowVar) ";
+		if ( var > .6 )
+		cout << "HighVar ";
+		if ( var > .4 && var <=.6)
+		cout << "MedVar ";*/
+       	cout << endl; 
       }
   
-  cout << "\n"<<endl;
-
-  cout << "Operation            | Avg.  | Var.   | Max. | Min. |\n";
-  cout << "---------------------+-------+--------+------+------+\n";
-  for(int y=0; y<NUMTESTS ; y++)
-    {
-      switch (y)
-	{
-	case 0:
-	  cout << "Disable             ";
-	  break;
-	case 1:
-	  cout << "Enable, Auto-config.";
-	  break;
-	case 2:
-	  cout << "Full Duplex 100MBits";
-	  break;
-	case 3:
-	  cout << "Half Duplex 10MBits ";
-	  break;
-	case 4:
-	    cout << "Auto-configuration  ";
-	    break;
-	default:
-	  cout << "Unknown             ";
-	}
-      cout << setprecision(3);
-      cout << " | " << (AV[y]/NUMPORTS);
-      cout << setprecision(4);
-      cout << " | " << (VR[y]/NUMPORTS);
-      cout << setprecision(2);
-      cout << " | " << (MX[y]/NUMPORTS);
-      cout << " | " << (MN[y]/NUMPORTS);
-      cout <<endl;
-    } 
-
   cout << endl;
 
 }  
@@ -234,6 +194,7 @@ int Stats(float T[], float& Max, float& Min, float& Avg, float& Var)
       temp=Avg-T[n];
       Var+=temp*temp;
     }
+  Var = Var/REPEAT;
   
   return 0;
 }
@@ -366,6 +327,7 @@ void StatLogs()
 	  temp= Mean[port][0] - inval;
 	  Var[port][0]+=(temp*temp);
 	}
+      Var[port][0] /= Num[port][0];
     }
   
   while( ! alog.eof())
@@ -381,6 +343,7 @@ void StatLogs()
 	  temp= Mean[port][1] - inval;
 	  Var[port][1]+=(temp*temp);
 	}
+      Var[port][1] /= Num[port][1];
     }
  
   while( ! elog.eof())
@@ -396,6 +359,7 @@ void StatLogs()
 	  temp= Mean[port][2] - inval;
 	  Var[port][2]+=(temp*temp);
 	}
+      Var[port][2] /= Num[port][2];
     }
 
   dlog.close();
@@ -405,9 +369,9 @@ void StatLogs()
   cout << "Disable:"<<setw(4)<<Num[0][0]<<" Times/port  ";
   cout << "Auto-Config:"<<setw(4)<<Num[0][1]<<" Times/port  ";
   cout << "Explicit:"<<setw(4)<<Num[0][2]<<" Times/port\n";
-  cout << "Port    Mean Variance    ";
-  cout << "Port    Mean Variance        ";
-  cout << "Port    Mean Variance\n";
+  cout << "Port    Mean 4*StdDev    ";
+  cout << "Port    Mean 4*StdDev        ";
+  cout << "Port    Mean 4*StdDev\n";
 
   cout << setiosflags(ios::right | ios::fixed | ios::showpoint);
   cout << setprecision(3);
@@ -416,14 +380,24 @@ void StatLogs()
     {
       cout << setw(3)<<x+1;
       cout << setw(9)<<Mean[x][0];
-      cout << setw(9)<<Var[x][0];
+      cout << setw(9)<<4.0*sqrt(Var[x][0]);
       cout << setw(7)<<x+1;
       cout << setw(9)<<Mean[x][1];
-      cout << setw(9)<<Var[x][1];
+      cout << setw(9)<<4.0*sqrt(Var[x][1]);
       cout << setw(11)<<x+1;
       cout << setw(9)<<Mean[x][2];
-      cout << setw(9)<<Var[x][2];
+      cout << setw(9)<<4.0*sqrt(Var[x][2]);
       cout << "\n";
     }
  
 }
+
+
+
+
+
+
+
+
+
+
