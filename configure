@@ -1502,7 +1502,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webdelay_config tbsetup/webbatchexp tbsetup/webreport \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/webswapexp tbsetup/swapexp \
-	tbsetup/endexp tbsetup/webendexp \
+	tbsetup/endexp tbsetup/webendexp tbsetup/elabinelab \
+	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \

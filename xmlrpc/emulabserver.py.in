@@ -3120,6 +3120,56 @@ class elabinelab:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
     
+    #
+    # Fire up a frisbeed for an image,
+    # 
+    def frisbeelauncher(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+        
+        argstr = escapeshellarg(argdict["imageid"])
+        
+        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        #
+        # Success. Must get the loadinfo out of the DB so we can pass it back.
+        #
+        res = DBQueryFatal("select load_address from images where imageid=%s",
+                           (argdict["imageid"],))
+        
+        # Hmm, something went wrong?
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Imageid is gone: " +
+                                  argdict["imageid"])
+        
+        if (res[0][0] == None or res[0][0] == ""):
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No load_address in DB: " +
+                                  argdict["imageid"])
+        
+        return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
     pass
 
 #

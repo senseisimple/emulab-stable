@@ -29,6 +29,7 @@ my $TBOPS	= "@TBOPSEMAIL@";
 my $BOSSNODE_IP = "@BOSSNODE_IP@";
 my $BASEADDR    = "@FRISEBEEMCASTADDR@";
 my $BASEPORT    = "@FRISEBEEMCASTPORT@";
+my $ELABINELAB  = @ELABINELAB@;
 
 #
 # Untaint the path
@@ -48,6 +49,7 @@ use libtestbed;
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
+my $FRISBEEIMAGE= "$TB/sbin/frisbeeimage";
 
 my $STD_BW	= 72000000; 	# 71.6Mb/sec w/1000HZ kernel
 my $USR_BW	= 54000000;	# 53.7Mb/sec w/1000HZ kernel
@@ -91,7 +93,7 @@ if (!TBImageIDAccessCheck($UID, $imageid,
 	"    Not enough permission!\n");
 }
 
-if (!$killmode && ! -R $filename) {
+if (!$killmode && !$ELABINELAB && ! -R $filename) {
     die("*** You do not have permission to read the image file for\n".
 	"imageid $imageid: $filename\n");
 }
@@ -211,6 +213,21 @@ if (!$address) {
 &set_address($imageid,$address);
 &unlock_tables;
 
+#
+# When running inside an inner Emulab, try to get the image from the
+# outer emulab when it does not exist locally. Of course, it could still
+# be a bogus image.
+#
+if ($ELABINELAB && ! -e $filename) {
+    $EUID = $UID;
+    system("$FRISBEEIMAGE $imageid");
+    if ($?) {
+	die("*** $0:\n".
+	    "    No such image file: $filename\n!");
+    }
+    $EUID = 0;
+}
+
 # Run in the background
 if (TBBackGround($LOGFILE)) {
     exit(0);
@@ -227,7 +244,7 @@ set_pid($imageid, $PID);
 # Drop root permissions, if we have them
 #
 if ($EUID == 0) {
-	$EUID = $UID;
+    $EUID = $UID;
 }
 
 #

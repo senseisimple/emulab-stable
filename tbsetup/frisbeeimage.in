@@ -1,0 +1,155 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Ask outer emulab for an image we do not happen to have locally.
+#
+sub usage()
+{
+    print STDOUT "Usage: frisbeeimage [-d] imageid\n";
+ 
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 1;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
+my $RPCSERVER   = "@OUTERBOSS_NODENAME@";
+my $RPCPORT     = "@OUTERBOSS_XMLRPCPORT@";
+my $RPCCERT     = "@OUTERBOSS_SSLCERTNAME@";
+$RPCPORT        = 7778;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+if (!$ELABINELAB) {
+    die("*** $0:\n".
+	"    This script is for elabinelab systems only!\n");
+}
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libxmlrpc;
+
+# Locals
+my $FRISBEE     = "$TB/sbin/frisbee";
+my $SAVEUID     = $UID;
+my $loadaddr;
+my $loadport;
+my $mcastif;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+my ($imageid) = @ARGV;
+
+#
+# Untaint the arguments.
+#
+if ($imageid =~ /^([-\@\w\+\.]+)$/) {
+    $imageid = $1;
+}
+else {
+    die("Tainted argument $imageid!\n");
+}
+
+#
+# Grab mcastif. This is has been set up for us, and its a serious kludge.
+#
+if (! -e "/etc/emulab/outer_ipaddr") {
+    die("*** $0:\n".
+	"    /etc/emulab/outer_ipaddr does not exist!\n");
+}
+$mcastif = `cat /etc/emulab/outer_ipaddr`;
+chomp($mcastif);
+if ($mcastif =~ /^([\d\.]+)$/) {
+    $mcastif = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Could not parse outer IP: $mcastif\n!");
+}
+
+#
+# Grab image info.
+#
+my $query_result =
+    DBQueryFatal("select path,creator,gid from images where imageid='$imageid'");
+
+my ($filename,$creator,$gid) = $query_result->fetchrow();
+
+#
+# Ask the outer Emulab to lauch a frisbee and return the loadinfo to us.
+#
+ libxmlrpc::Config({"server"  => $RPCSERVER,
+		    "verbose" => 1,
+		    "cert"    => $RPCCERT,
+		    "portnum" => $RPCPORT});
+
+my $rval = libxmlrpc::CallMethod("elabinelab", "frisbeelauncher",
+				 {"imageid" => "$imageid"});
+if (!defined($rval)) {
+    die("*** $0:\n".
+	"    Could not fire up frisbee on outer Emulab!\n");
+}
+
+#
+# The return value is the loadaddr. Parse that into something we
+# can pass to the frisbee client.
+#
+if ($rval =~ /^(.*):(\d*)$/) {
+    $loadaddr = $1;
+    $loadport = $2;
+}
+else {
+    die("*** $0:\n".
+	"    Could not parse loadinfo from server: $rval\n!");
+}
+
+if ($debug) {
+    print "$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename\n";
+}
+
+system("$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename");
+if ($?) {
+    die("*** $0:\n".
+	"    Error downloading image data from outer Emulab!\n");
+}
+exit(0);
