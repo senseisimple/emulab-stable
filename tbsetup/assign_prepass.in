@@ -10,21 +10,38 @@
 #
 
 use strict;
+use POSIX;
 
-#my $TBROOT     = '@prefix@';
-#my $assign_bin = "$TBROOT/libexec/assign";
-my $assign_bin = "/usr/testbed/devel/ricci/libexec/assign";
+my $TBROOT     = '@prefix@';
+my $assign_bin = "$TBROOT/libexec/assign";
 
 $| = 1;
 
-my $MAX_DESIRE_WEIGHT = 0.99;
+my $MAX_DESIRE_WEIGHT       = 0.99;
+my $METIS                   = "/usr/local/bin/kmetis";
+my $AVG_NODES_PER_PARTITION = 10;
 
 #
 # Figure out assign args
 #
 
 my $topfile = pop @ARGV;
-my @assign_args = @ARGV;
+
+#
+# Okay, this is absolutely terrible - look for our own arguments
+#
+my $max_multiplex_factor = undef;
+my @assign_args;
+while (my $arg = shift @ARGV) {
+    if ($arg eq "-m") {
+	# This one's ours
+	$max_multiplex_factor    = shift @ARGV;
+	$AVG_NODES_PER_PARTITION = $max_multiplex_factor;
+    } else {
+	# Not one of ours, must be for assign
+	push @assign_args, $arg;
+    }
+}
 
 # Make up a logfile name, which we'll put assign's output into. Try to extract
 # a filename from the top file.
@@ -92,7 +109,7 @@ sub parse_top($) {
 	my @tokens = split /\s+/,$line;
 	next unless (@tokens); # Skip blank lines
 	SWITCH: for (shift @tokens) {
-	    (/^node/) && do {
+	    (/^node$/) && do {
 		my $name = shift @tokens;
 		my $type = shift @tokens;
 		if ($nodes{$name}) {
@@ -103,7 +120,7 @@ sub parse_top($) {
 		    $count = 1;
 		}
 
-		my (@flags,@desires);
+		my (@flags,%desires);
 		foreach my $token (@tokens) {
 		    my ($desire,$weight) = split /:/, $token;
 		    if (!defined $weight) {
@@ -112,7 +129,7 @@ sub parse_top($) {
 			if ($desire eq "subnode_of") {
 			    die "Subnodes not supported yet\n";
 			}
-			push @desires, [$desire, $weight];
+			$desires{$desire} = $weight;
 		    }
 		}
 
@@ -120,7 +137,7 @@ sub parse_top($) {
 		    'name'    => $name,
 		    'type'    => $realtype,
 		    'count'   => $count,
-		    'desires' => \@desires,
+		    'desires' => \%desires,
 		    'flags'   => \@flags,
 		    'fixed'   => undef,
 		    'slinks'  => [],
@@ -130,7 +147,7 @@ sub parse_top($) {
 
 		last;
 	    };
-	    (/^link/) && do {
+	    (/^link$/) && do {
 		my $name  = shift @tokens;
 		my $src   = shift @tokens;
 		my $dst   = shift @tokens;
@@ -169,26 +186,31 @@ sub parse_top($) {
 		push @{$nodes{$dst}{'dlinks'}}, $links{$name};
 		last;
 	    };
-	    (/make-vclass/) && do {
+	    (/^make-vclass$/) && do {
 		die "Sorry, vclasses are not yet supported\n";
 		last;
 	    };
-	    (/fix-node/) && do {
+	    (/^fix-node$/) && do {
 		my ($vnode, $pnode) = @tokens;;
 		if (!$nodes{$vnode}) {
-		    die "Tried to fix to a non existent node: $line\n";
+		    die "Tried to fix a non existent node: $line\n";
 		}
-		# XXX
-		#$nodes{$vnode}{fixed} = $pnode;
+		$nodes{$vnode}{fixed} = $pnode;
 		last;
 	    };
-	    (/node-hint/) && do {
-		die "Sorry, node-hints are not yet supported\n";
+	    (/^node-hint$/) && do {
+		my ($vnode, $pnode) = @tokens;;
+		if (!$nodes{$vnode}) {
+		    die "Tried to hint for a non existent node: $line\n";
+		}
+		$nodes{$vnode}{hint} = $pnode;
 		last;
 	    };
 	    die "Bad line: $line\n";
 	}
    }
+
+   close TOP;
 
    return (\%nodes, \%links);
 
@@ -206,12 +228,15 @@ sub generate_topfile($;$) {
     while (my ($name,$node) = each %$nodes) {
 	my $topline = "node $name $node->{type}:$node->{count} ";
 	$topline .= join(" ",
-	    map { "$$_[0]:$$_[1]"} @{$node->{desires}},
+	    map { "$_:$node->{desires}{$_}"} keys(%{$node->{desires}}),
 	    @{$node->{flags}});
 	$topline .= "\n";
 	push @topfile, $topline;
 	if ($node->{fixed}) {
 	    push @topfile, "fix-node $name $node->{fixed}\n";
+	}
+	if ($node->{hint}) {
+	    push @topfile, "node-hint $name $node->{hint}\n";
 	}
     }
 
@@ -513,13 +538,13 @@ sub read_metis_partfile($$) {
 	chomp $partno;
 	$partitions[$lineno++] = $partno;
     }
+    close(FH);
 
     my @nodelists;
     while (my ($name, $node) = each %$nodes) {
 	my $partno = $partitions[$node->{'metis_id'}];
 	push @{$nodelists[$partno]}, $node;
     }
-    close(FH);
 
     #print "Gonna return " . scalar(@nodelists) . " node lists\n";
 
@@ -532,8 +557,13 @@ sub read_metis_partfile($$) {
 sub run_metis($$$$) {
     my ($metisfile,$nodes,$metisfilename,$metislogfile) = @_;
 
-    # XXX - should not be hard-coded
-    my $npart = scalar(keys %$nodes) /10;
+    # Pick a number of partitions such that the average parition size
+    # will be $AVG_NODES_PER_PARTITION
+    my $npart = POSIX::ceil(scalar(keys %$nodes) /$AVG_NODES_PER_PARTITION);
+    if ($npart <= 1) {
+	# No point in running METIS, just give the list of nodes back
+	return [values(%$nodes)];
+    }
 
     open (FH,">$metisfilename") or die "Unable to open $metisfilename for " .
 	    "writing\n";
@@ -541,7 +571,8 @@ sub run_metis($$$$) {
     close FH;
 
     print "Partitioning with kmets into $npart partitions\n";
-    if (!system "kmetis $metisfilename $npart > $metislogfile 2>&1") {
+    print "$METIS $metisfilename $npart > $metislogfile 2>&1\n";
+    if (!system "$METIS $metisfilename $npart > $metislogfile 2>&1") {
 	die "kmetis failed!\n";
     }
 
@@ -600,28 +631,26 @@ sub make_conglomerates(@) {
 	    # XXX - for now, we add desires together, but make sure that the
 	    # total doesn't go over 1.0, since that changes the meaning of the
 	    # desire to assign. This is a defciency in assign that should be
-	    # fixed
-	    DESIRE: foreach my $desire (@{$node->{'desires'}}) {
-		my ($name, $weight) = @$desire;
-		foreach my $existing_desire (@{$conglomerate->{'desires'}}) {
-		    my ($existing_name, $existing_weight) = @$existing_desire;
-		    if ($name eq $existing_name) {
-			my $newweight;
-			if (substr($name,0,2) eq "?+") {
-			    # We treat additive local desire specially - we
-			    # don't cap them as we do for other desires
-			    $newweight = $existing_weight + $weight;
-			} else {
-			    $newweight = min($MAX_DESIRE_WEIGHT,
-				$existing_weight + $weight);
-			}
-			$$existing_desire[1] = $newweight;
-			next DESIRE;
+	    # fixed.
+	    DESIRE: while (my ($name, $weight) = each %{$node->{'desires'}}) {
+		if (exists($conglomerate->{'desires'}{$name})) {
+		    # Conglomerate already has this desire, just add to it
+		    my $existing_weight = $conglomerate->{'desires'}{$name};
+		    my $newweight;
+		    if (substr($name,0,2) eq "?+") {
+			# We treat additive local desire specially - we
+			# don't cap them as we do for other desires
+			$newweight = $existing_weight + $weight;
+		    } else {
+			$newweight = min($MAX_DESIRE_WEIGHT,
+			    $existing_weight + $weight);
 		    }
+		    $conglomerate->{'desires'}{$name} = $newweight;
+		} else {
+		    # If we made it here, we must not have found an existing
+		    # desire that matched
+		    $conglomerate->{'desires'}{$name} = $weight;
 		}
-		# If we made it here, we must not have found an existing desire
-		# that matched
-		push @{$conglomerate->{'desires'}}, $desire;
 	    }
 	
 	    # XXX - Handle flags
@@ -638,8 +667,26 @@ sub make_conglomerates(@) {
 
 	    # Add to the nodes list
 	    push @{$conglomerate->{'nodes'}}, $node;
-	}
 
+	    # Handle fixed nodes
+	    if ($conglomerate->{'fixed'}) {
+		if ($node->{'fixed'} && ($node->{'fixed'} ne
+			$conglomerate->{'fixed'})){
+		    die "ERROR - tried to combine two fixed nodes!\n";
+		}
+	    }
+	    if ($node->{'fixed'}) {
+		if (!$conglomerate->{'fixed'}) {
+		    $conglomerate->{'fixed'} = $node->{'fixed'};
+		}
+	    }
+
+	    # Handle node hints - we will not put more than one hint on a
+	    # conglomerate
+	    if ($node->{'hint'} && !$conglomerate->{'hint'}) {
+		$conglomerate->{'hint'} = $node->{'hint'};
+	    }
+	}
     }
 
     return @conglomerates;
@@ -662,17 +709,23 @@ sub node_fits_in_conglomerate($$) {
 	'pc' => 1,
 	'delay' => 2,
 	'pc850' => 1,
-	'pc600' => 1
+	'pc600' => 1,
+	'lan'   => 100
     );
 
     my %additive_features = (
-	'?+mem'        => 512,
+	'?+ram'        => 512,
 	'?+cpu'        => 850,
 	'?virtpercent' => 100
     );
 
-    # Can't conglomerate fixed nodes unless they are fixed to the same place
-    if (($node->{'fixed'} || $conglomerate->{'fixed'}) &&
+    my $max_self_link_bandwidth = 400000;
+
+    # We can conglomerate nodes that are:
+    # 1) Not fixed
+    # 2) One is fixed, but the other is not
+    # 3) Both are fixed to the same place
+    if (($node->{'fixed'} && $conglomerate->{'fixed'}) &&
 	($node->{'fixed'} ne $conglomerate->{'fixed'})) {
 	return 0;
     }
@@ -689,6 +742,9 @@ sub node_fits_in_conglomerate($$) {
     if (!$colocate) {
 	die "Don't know colocate factor for $node->{type}\n";
     }
+    if (defined $max_multiplex_factor && ($colocate > $max_multiplex_factor)) {
+	$colocate = $max_multiplex_factor;
+    }
     if (($node->{'count'} + $conglomerate->{'count'}) > $colocate) {
 	return 0;
     }
@@ -696,22 +752,46 @@ sub node_fits_in_conglomerate($$) {
     #
     # Check to see if we're going over for any additive local features
     #
-    OLD_DESIRE: foreach my $new_desire (@{$node->{'desires'}}) {
-	my ($new_name, $new_weight) = @$new_desire;
-	NEW_DESIRE: foreach my $old_desire (@{$conglomerate->{'desires'}}) {
-	    my ($old_name, $old_weight) = @$old_desire;
-	    next NEW_DESIRE unless ($new_name eq $old_name);
-	    if (exists $additive_features{$new_name} && 
-		(($old_weight + $new_weight) > $additive_features{$new_name})) {
+    
+    # This is some astonishingly bad perl magic - somehow the internal iterator
+    # for this hash isn't getting reset, so sometimes the each() statement
+    # below is starting halfway through the list. Calling keys() resets it.
+    keys %{$node->{'desires'}};
+    while (my ($name, $new_weight) =
+		each %{$node->{'desires'}}) {
+	next unless exists $conglomerate->{'desires'}{$name};
+	my $old_weight = $conglomerate->{'desires'}{$name};
+	if (exists $additive_features{$name} && 
+	    (($old_weight + $new_weight) > $additive_features{$name})) {
 		return 0;
-	    } else {
-		next OLD_DESIRE;
-	    }
 	}
     }
 
-    return 1;
+    #
+    # Check for self-links, to see if this would make us go over a limit
+    #
+    my $self_link_bandwidth = 0;
+    foreach my $link (@{$conglomerate->{'slinks'}}) {
+	print "Checking $link->{'dst'} against $conglomerate->{'name'} and $node->{'name'}\n";
+	if (($link->{'dst'} eq $conglomerate->{'name'}) ||
+	    ($link->{'dst'} eq $node->{'name'})) {
+	    $self_link_bandwidth += $link->{'bw'};
+	}
+    }
+    foreach my $link (@{$node->{'slinks'}}) {
+	print "Checking $link->{'dst'} against $conglomerate->{'name'} and $node->{'name'}\n";
+	if (($link->{'dst'} eq $conglomerate->{'name'}) ||
+	    ($link->{'dst'} eq $node->{'name'})) {
+	    $self_link_bandwidth += $link->{'bw'};
+	}
+    }
 
+    if ($self_link_bandwidth > $max_self_link_bandwidth) {
+	return 0;
+    }
+
+
+    return 1;
 }
 
 #
@@ -729,7 +809,7 @@ sub new_conglomerate($) {
     # Initialize most values from the node
     $conglomerate{'type'}    = $node->{'type'};
     $conglomerate{'count'}   = $node->{'count'};
-    $conglomerate{'desires'} = $node->{'desires'};
+    $conglomerate{'desires'} = \%{$node->{'desires'}};
     $conglomerate{'flags'}   = $node->{'flags'};
 
     $conglomerate{'slinks'}  = [];
@@ -747,6 +827,10 @@ sub new_conglomerate($) {
     $conglomerate{'nodes'} = [$node];
 
     $conglomerate{'fixed'} = $node->{'fixed'};
+
+    if ($node->{'hint'}) {
+	$conglomerate{'hint'} = $node->{'hint'};
+    }
 
     return \%conglomerate;
 
@@ -949,7 +1033,29 @@ sub write_summary($) {
 #
 sub binpack_sort(@) {
     return sort {
-	$b->{'count'} <=> $a->{'count'} 
+	# Sort first by CPU (if it's there)
+	my $rv;
+	if ($b->{'desires'} && $b->{'desires'}{'?+cpu'} &&
+	    $a->{'desires'} && $a->{'desires'}{'?+cpu'}) {
+
+	    $rv = ( $b->{'desires'}{'?+cpu'} <=> $a->{'desires'}{'?+cpu'} );
+	    if ($rv != 0) {
+		return $rv;
+	    }
+	}
+
+	# Then by memory
+	if ($b->{'desires'} && $b->{'desires'}{'?+mem'} &&
+	    $a->{'desires'} && $a->{'desires'}{'?+mem'}) {
+
+	    $rv = ( $b->{'desires'}{'?+mem'} <=> $a->{'desires'}{'?+mem'} );
+	    if ($rv != 0) {
+		return $rv;
+	    }
+	}
+	
+	# Fall back to count if neither of the others were given
+	return $b->{'count'} <=> $a->{'count'};
     } @_;
 }
 
