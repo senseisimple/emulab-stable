@@ -320,13 +320,13 @@ int type_precheck() {
 	// Check to see if there were any pnodes of the type at all
 	name_count_map::iterator ptype_it = ptypes.find(vtype_it->first);
 	if (ptype_it == ptypes.end()) {
-	    cerr << "  *** No physical nodes of type " << vtype_it->first
+	    cout << "  *** No physical nodes of type " << vtype_it->first
 		<< " found" << endl;
 	    ok = false;
 	} else {
 	    // Okay, there are some - are there enough?
 	    if (ptype_it->second < vtype_it->second) {
-		cerr << "  *** " << vtype_it->second << " nodes of type " <<
+		cout << "  *** " << vtype_it->second << " nodes of type " <<
 		    vtype_it->first << " requested, but only "
 		    << ptype_it->second << " found" << endl;
 		ok = false;
@@ -483,21 +483,21 @@ int mapping_precheck() {
 	}
 
 	if (vnode_type_table[v->name].first == 0) {
-	    cerr << "  *** No possible mapping for " << v->name << endl;
+	    cout << "  *** No possible mapping for " << v->name << endl;
 	    // Make an attempt to figure out why it didn't match
 	    if (!matched_links) {
-		cerr << "      Too many links!" << endl;
+		cout << "      Too many links!" << endl;
 	    }
 
 	    if (!matched_bw) {
-		cerr << "      Too much bandwidth on emulated links!" << endl;
+		cout << "      Too much bandwidth on emulated links!" << endl;
 	    }
 
 	    for (tb_vnode::desires_count_map::iterator dit = matched_desires.begin();
 		    dit != matched_desires.end();
 		    dit++) {
 		if (dit->second == 0) {
-		    cerr << "      No physical nodes have feature " << dit->first
+		    cout << "      No physical nodes have feature " << dit->first
 			<< "!" << endl;
 		}
 	    }
