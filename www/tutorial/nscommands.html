@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -633,6 +633,137 @@ tb-set-lan-simplex-params $lan1 $node1 100ms 10Mb 0.1 5ms 100Mb 0
     except that it allows the characteristics in each direction to be
     chosen separately.  See all the notes for
     <code>tb-set-node-lan-params</code>.
+</ul>
+
+<h4>tb-set-endnodeshaping</h4>
+
+<pre>
+tb-set-endnodeshaping <i>link-or-lan</i> <i>enable</i>
+
+tb-set-endnodeshaping $link1 1
+tb-set-endnodeshaping $lan1 1
+</pre>
+
+<dl>
+  <dt><i>link-or-lan</i> - The link or LAN we are modifying.
+  <dt><i>enable</i> - Set to 1 to enable, 0 to disable.
+</dl>
+
+<p>Notes:
+<ul>
+<li>This command specifies whether
+    <a href=/doc/docwrapper.php3?docname=linkdelays.html#LINKDELAYS>
+    end node shaping</a> is used on the specified link or LAN
+    (instead of a delay node).
+<li>Disabled by default for all links and LANs.
+<li>Only available when running the standard Emulab FreeBSD or Linux kernels.
+<li>See
+    <a href=/doc/docwrapper.php3?docname=linkdelays.html#LINKDELAYS>
+    Node Traffic Shaping</a> for more details.
+</ul>
+
+<h4>tb-set-noshaping</h4>
+
+<pre>
+tb-set-noshaping <i>link-or-lan</i> <i>enable</i>
+
+tb-set-noshaping $link1 1
+tb-set-noshaping $lan1 1
+</pre>
+
+<dl>
+  <dt><i>link-or-lan</i> - The link or LAN we are modifying.
+  <dt><i>enable</i> - Set to 1 to disable traffic shaping, 0 to enable.
+</dl>
+
+<p>Notes:
+<ul>
+<li>This command specifies whether link shaping should be enforced
+    on the specified link or LAN.  When enabled, no delay node or
+    end-node delay pipe will be associated with the link or LAN.
+<li>Disabled by default for all links and LANs.  That is, link shaping
+    is enforced on all links and LANs by default.
+<li><b>This command is a hack and may go away at any time!</b>
+    The primary purpose for this command is to subvert the topology
+    mapper, <code>assign</code>).  <code>Assign</code> always observes
+    the physical bandwidth constraints of the testbed.  By using
+    <code>tb-set-noshaping</code>, you can convince <code>assign</code>
+    that links are low-bandwidth and thus get your topology mapped,
+    but then not actually have the links shaped.
+</ul>
+
+<h4>tb-use-endnodeshaping</h4>
+
+<pre>
+tb-use-endnodeshaping <i>enable</i>
+
+tb-use-endnodeshaping 1
+</pre>
+
+<dl>
+  <dt><i>enable</i> - Set to 1 to enable end-node traffic shaping on all
+      links and LANs.
+</dl>
+
+<p>Notes:
+<ul>
+<li>This command allows you to use end-node traffic shaping globally,
+    without having to specify per link or LAN with
+    <code>tb-set-endnodeshaping</code>.
+<li>See
+    <a href=/doc/docwrapper.php3?docname=linkdelays.html#LINKDELAYS>
+    Node Traffic Shaping</a> for more details.
+</ul>
+
+<h4>tb-force-endnodeshaping</h4>
+
+<pre>
+tb-force-endnodeshaping <i>enable</i>
+
+tb-force-endnodeshaping 1
+</pre>
+
+<dl>
+  <dt><i>enable</i> - Set to 1 to force end-node traffic shaping on all
+      links and LANs.
+</dl>
+
+<p>Notes:
+<ul>
+<li>This command allows you to specify non-shaped links and LANs at
+    creation time, but still control the shaping parameters later
+    (e.g., increase delay, decrease bandwidth) after the experiment
+    is swapped in.
+<li>This command forces allocation of end-node shaping infrastructure
+    for all links.  There is no equivalent to force delay node allocation.
+<li>See
+    <a href=/doc/docwrapper.php3?docname=linkdelays.html#LINKDELAYS>
+    Node Traffic Shaping</a> for more details.
+</ul>
+
+<h4>tb-set-multiplexed</h4>
+
+<pre>
+tb-set-multiplexed <i>link</i> <i>allow</i>
+
+tb-set-multiplexed $link1 1
+</pre>
+
+<dl>
+  <dt><i>link</i> - The link we are modifying.
+  <dt><i>allow</i> - Set to 1 to allow multiplexing of the link, 0 to disallow.
+</dl>
+
+<p>Notes:
+<ul>
+<li>This command allows a link to be multiplexed over a physical link along
+    with other links.
+<li>Disabled by default for all links.
+<li>Only available when running the standard Emulab FreeBSD (not Linux)
+    and only for links (not LANs).
+<li>See
+    <a href=/doc/docwrapper.php3?docname=linkdelays.html#EMULINKS>
+    Multiplexed Links</a> for more details.
 </ul>
 
 <hr>
