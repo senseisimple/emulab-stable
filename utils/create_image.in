@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -269,16 +269,16 @@ if (!$debug) {
 }
 
 #
-# We want to save off the old pxeboot/startupcmd and replace them with
-# the special freebsd boot, and the command we created above. Then we
-# reboot the node, and wait for it to come back alive. We also clear the
-# startcommand status, and and use that to wait for the zipper to finish.
-# I think we need a better mechanism for determining when a node is booted
-# since we are basically stuck waiting for this, without knowing if the node
-# even came up okay.
+# We want to save off the old startupcmd and replace with the command
+# we created above. Then we reboot the node, and wait for it to come
+# back alive. We also clear the startcommand status, and and use that
+# to wait for the zipper to finish.  I think we need a better
+# mechanism for determining when a node is booted since we are
+# basically stuck waiting for this, without knowing if the node even
+# came up okay.
 #
 $query_result =
-    DBQueryWarn("select pxe_boot_path,startupcmd from nodes ".
+    DBQueryWarn("select startupcmd from nodes ".
                 "where node_id='$node'");
 
 if (!$query_result ||
@@ -286,8 +286,7 @@ if (!$query_result ||
     fatal("DB error getting node info for $node");
 }
 @row = $query_result->fetchrow_array();
-my $saved_pxebootpath = $row[0];
-my $saved_startupcmd  = $row[1];
+my $saved_startupcmd  = $row[0];
 
 my $result   = 0;
 my $maxwait  = (60 * 5); # 5 minutes - in seconds.
