@@ -28,7 +28,7 @@ Firewall instproc init {s} {
     $self set cmdline ""
     $self set parent  ""
 
-    $self set next_rule 1
+    $self set next_rule 100
     $self instvar rules
     array set rules {}
 
@@ -78,10 +78,16 @@ Firewall instproc set-type {targ} {
 Firewall instproc set-style {starg} {
     $self instvar style
 
-    if {$starg == "open" || $starg == "closed" || $starg == "basic"} {
-	set style $starg
-    } else {
-	perror "\[set-style] unsupported firewall style: $starg"
+    switch -- $starg {
+	"closed" -
+	"basic" -
+	"emulab" -
+	"open" {
+	    set style $starg
+	}
+	default {
+	    perror "\[set-style] unsupported firewall style: $starg"
+	}
     }
 }
 
@@ -102,8 +108,8 @@ Firewall instproc add-rule {rule} {
 Firewall instproc add-numbered-rule {num rule} {
     $self instvar rules
 
-    if {$num >= 50000} {
-	perror "\[add-numbered-rule] rule number must be < 50000!"
+    if {$num < 100 || $num >= 50000} {
+	perror "\[add-numbered-rule] 100 <= rule_number < 50000!"
 	return
     }
     if {[info exists rules($num)]} {
