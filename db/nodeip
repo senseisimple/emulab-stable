@@ -1,0 +1,21 @@
+#!/usr/local/bin/perl -w
+
+if ($#ARGV < 0) {die("Usage: nodeip <node_id> <node_id> <...>\n");}
+
+use Mysql;
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+my @list = "";
+my $n=0;
+foreach my $node ( @ARGV ) { 
+  $list[$n] ="node_id='$node'";
+  $n++;
+}
+
+my $cond = join(" or ",@list);
+
+my $sth = $dbh->
+    query("select * from IP_list where $cond");
+
+print $sth->as_string();
