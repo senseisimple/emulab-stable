@@ -1398,13 +1398,21 @@
  
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Thu Mar 11 18:53:04 2004
-@@ -46,12 +46,42 @@
++++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Tue Mar 30 17:46:34 2004
+@@ -46,12 +46,50 @@
  #include "config.h"
  #include "scheduler.h"
  #include "packet.h"
 +#ifdef USEEVENTS
 +#include "tbevent.h"
++#endif
++
++#ifdef HAVE_POLLER
++
++#include "Poller_kqueue.h"
++
++Poller_kqueue *poller;
++
 +#endif
  
  
@@ -1442,7 +1450,7 @@
  Scheduler* Scheduler::instance_;
  scheduler_uid_t Scheduler::uid_ = 1;
  
-@@ -62,6 +92,9 @@
+@@ -62,6 +100,9 @@
  
  Scheduler::Scheduler() : clock_(SCHED_START), halted_(0)
  {
@@ -1452,7 +1460,7 @@
  }
  
  Scheduler::~Scheduler(){
-@@ -112,6 +145,17 @@
+@@ -112,6 +153,17 @@
  
  	e->time_ = t;
  	insert(e);
@@ -1470,7 +1478,7 @@
  }
  
  void
-@@ -579,7 +623,7 @@
+@@ -579,7 +631,7 @@
  	}
  } class_calendar_sched;
  
@@ -1479,7 +1487,7 @@
  	reinit(4, 1.0, cal_clock_);
  }
  
-@@ -598,6 +642,7 @@
+@@ -598,6 +650,7 @@
  		// may happen in RT scheduler
  		cal_clock_ = e->time_;
  		i = lastbucket_ = CALENDAR_HASH(cal_clock_);
@@ -1487,7 +1495,7 @@
  	} else
  		i = CALENDAR_HASH(e->time_);
  
-@@ -703,6 +748,10 @@
+@@ -703,6 +756,10 @@
  	if (qsize_ == 0)
  		return NULL;
  
@@ -1498,7 +1506,7 @@
  	int l, i = lastbucket_;
  	int lastbucket_dec = (lastbucket_) ? lastbucket_ - 1 : nbuckets_ - 1;
  	double diff;
-@@ -755,7 +804,7 @@
+@@ -755,7 +812,7 @@
  	 */
  	lastbucket_ = l;
   	cal_clock_  = e->time_;
@@ -1507,7 +1515,7 @@
  	return e;
  }
  
-@@ -797,6 +846,8 @@
+@@ -797,6 +854,8 @@
  		resize(nbuckets_ >> 1, cal_clock_);
  	}
  
@@ -1516,7 +1524,7 @@
  	return e;
  }
  
-@@ -926,6 +977,9 @@
+@@ -926,6 +985,9 @@
  
  	--qsize_;
  
@@ -1526,7 +1534,7 @@
  	return;
  }
  
-@@ -946,23 +1000,6 @@
+@@ -946,23 +1008,6 @@
  	return NULL;
  }
  
@@ -1550,7 +1558,7 @@
  static class RealTimeSchedulerClass : public TclClass {
  public:
  	RealTimeSchedulerClass() : TclClass("Scheduler/RealTime") {}
-@@ -971,72 +1008,220 @@
+@@ -971,72 +1016,245 @@
  	}
  } class_realtime_sched;
  
@@ -1566,6 +1574,10 @@
 +        basetsc_ = 0 ;
 +	oneontscfreq_ = 1.0 / (double)TSC_COUNT_PERSEC;
 +	tscfreq_ = TSC_COUNT_PERSEC;
++#endif
++#ifdef HAVE_POLLER
++	poller = new Poller_kqueue;
++	poller->init();
 +#endif
 +}
 +
@@ -1646,8 +1658,8 @@
 +#ifdef GETTIME_TSC   
 +	timeval tv;
 +	gettimeofday(&tv, 0);
-+	start_ = tv.tv_sec + (1e-6 * tv.tv_usec);
 +        basetsc_ = read_tsc();
++	start_ = tv.tv_sec + (1e-6 * tv.tv_usec);
 +#else
  	start_ = tod();
 +#endif
@@ -1750,7 +1762,7 @@
 +		}
 +#endif
 +
-+#ifdef SELECT_TIMEOUT
++#if !defined(HAVE_POLLER) && defined(SELECT_TIMEOUT)
  		if (!p) {
  			// blocking wait for TCL events
 -			Tcl_WaitForEvent(0); // no sim events, wait forever
@@ -1775,9 +1787,30 @@
 +#else
 +		clock_ = tod();
 +#endif
++#ifdef HAVE_POLLER
++		struct Poller::PollEvent pe;
++
++		if(poller->waitForEvents(0) == 0) {
++		    while(poller->getNextEvent(&pe) == 0) {
++			Poller::Client *client = pe.client;
++			if (client) {
++			    client->notifyPollEvent(&pe);
++			    gethead = true;
++			}
++		    }
++		}
++#else
 +		if( Tcl_DoOneEvent(TCL_DONT_WAIT) == 1 ) {
++		  /* If we have more than 1 I/O channel (bpf device typically)
++		   * that we can get packets from, we better service all that
++		   * are ready in one go or some packets will be quite late. The 
++		   * while loop below runs as many times as there are I/O channels
++		   * ready
++		   */
++		  while( Tcl_ServiceEvent(0) == 1 );
 +		  gethead = true;
 +		}
++#endif
  	}
  	// we reach here only if halted
  }
@@ -2051,7 +2084,7 @@
   protected:
  	int command(int argc, const char*const* argv);
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Mar 12 12:41:32 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Sun Mar 28 01:09:09 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -2154,7 +2187,7 @@
    unsigned char ttl;
 +
 +  recv_count++;
-+  
++
 +#ifdef MEASURE_DELAYS
 +
 +  double delay ;
@@ -2219,7 +2252,7 @@
    ttl = ipheader->ip_ttl;
    if (!(--ttl)) {
      fprintf(stderr,
-@@ -180,15 +276,29 @@
+@@ -180,15 +276,34 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
@@ -2232,6 +2265,11 @@
 +
 +  ih->daddr() = ntohl(ipheader->ip_dst.s_addr);
 +  /* Dunno how to take care of ports yet */  
++
++  // syncing the clock to real-time for every packet
++  // so that further packet scheduling uses a reliable
++  // value of clock instead of some old value.
++  Scheduler::instance().sync();
 +
 +#ifdef MEASURE_DELAYS
 +  Scheduler::instance().schedule( target_, p, max_delay );
@@ -2250,7 +2288,7 @@
   * as there are from the packet capture facility.
   * For every packet received through the callback, it populates the ns packet
   * ttl value and inject it into the simulator by calling target_->recv
-@@ -197,14 +307,17 @@
+@@ -197,14 +312,17 @@
  void
  IPTapAgent::recvpkt()
  {
@@ -2270,7 +2308,7 @@
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -219,13 +332,71 @@
+@@ -219,13 +337,71 @@
  }
  
  
@@ -2343,7 +2381,7 @@
   */
  int
  IPTapAgent::sendpkt(Packet* p)
-@@ -233,10 +404,11 @@
+@@ -233,10 +409,11 @@
    int byteswritten;
    unsigned char *packet;
    unsigned char received_ttl;
@@ -2357,7 +2395,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
-@@ -245,7 +417,7 @@
+@@ -245,7 +422,7 @@
    
    // send packet into the live network
    hdr_cmn* hc = HDR_CMN(p);
@@ -2366,7 +2404,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -273,27 +445,111 @@
+@@ -273,27 +450,111 @@
      return(-1);
    }
  
@@ -2661,7 +2699,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Tue Mar 23 15:23:46 2004
+--- /dev/null	Tue Apr 13 16:18:02 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
@@ -2738,7 +2776,7 @@
  	return (Network::command(argc, argv));
  }
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Thu Mar 11 19:13:02 2004
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Thu Apr  1 17:02:04 2004
 @@ -1,5 +1,5 @@
  /*-
 - * Copyright (c) 1998 The Regents of the University of California.
@@ -3042,8 +3080,19 @@
 +
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Nov 28 16:55:25 2003
-@@ -46,7 +46,7 @@
++++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Thu Apr  1 16:16:28 2004
+@@ -38,6 +38,10 @@
+ 
+ #include "tap.h"
+ 
++#ifdef HAVE_POLLER
++    extern Poller_kqueue *poller;
++#endif
++
+ static class TapAgentClass : public TclClass {
+  public:
+ 	TapAgentClass() : TclClass("Agent/Tap") {}
+@@ -46,7 +50,7 @@
  	}
  } class_tap_agent;
  
@@ -3052,7 +3101,7 @@
  {
  	bind("maxpkt_", &maxpkt_);
  }
-@@ -55,11 +55,11 @@
+@@ -55,35 +59,41 @@
  // link in a network to the agent.  Assumes net_ is non-zero
  //
  int
@@ -3066,9 +3115,11 @@
 +	int rchan = net->rchannel();
 +	int wchan = net->schannel();
  
++#ifndef HAVE_POLLER
  	unlink();
++#endif
  	if (mode == O_RDONLY || mode == O_RDWR) {
-@@ -67,7 +67,7 @@
+ 		// reading enabled?
  		if (rchan < 0) {
  			fprintf(stderr,
  		"TapAgent(%s): network %s not open for reading (mode:%d)\n",
@@ -3076,8 +3127,14 @@
 +			    name(), net->name(), mode);
  			return (TCL_ERROR);
  		}
++#ifdef HAVE_POLLER
++		poller->add(rchan, this, POLLIN );
++#else
  		link(rchan, TCL_READABLE);
-@@ -77,13 +77,13 @@
++#endif
+ 		TDEBUG3("TapAgent(%s): linked sock %d as READABLE\n",
+ 			name(), rchan);
+ 	} else if (mode != O_WRONLY) {
  		if (mode == -1) {
  			fprintf(stderr,
  			   "TapAgent(%s): Network(%s) not opened properly.\n",
@@ -3093,7 +3150,7 @@
  		}
  		return (TCL_ERROR);
  	}
-@@ -93,7 +93,7 @@
+@@ -93,7 +103,7 @@
  		if (wchan < 0) {
  			fprintf(stderr,
  			"TapAgent(%s): network %s not open for writing\n",
@@ -3102,7 +3159,7 @@
  			return (TCL_ERROR);
  		}
  	}
-@@ -112,10 +112,25 @@
+@@ -112,10 +122,25 @@
  		} 
  	}
  	if (argc == 3) {
@@ -3132,7 +3189,7 @@
  			} else {
  				fprintf(stderr,
  				"TapAgent(%s): unknown network %s\n",
-@@ -135,7 +150,7 @@
+@@ -135,7 +160,7 @@
  TapAgent::recvpkt()
  {
  
@@ -3141,7 +3198,7 @@
  		fprintf(stderr,
  		  "TapAgent(%s): recvpkt called while in write-only mode!\n",
  		  name());
-@@ -155,7 +170,7 @@
+@@ -155,7 +180,7 @@
  	// fill up payload
  	sockaddr addr;	// not really used (yet)
  	double tstamp;
@@ -3150,7 +3207,24 @@
  	if (cc <= 0) {
  		if (cc < 0) {
  			perror("recv");
-@@ -230,7 +245,7 @@
+@@ -211,6 +236,16 @@
+ 	recvpkt();
+ }
+ 
++#ifdef HAVE_POLLER
++int
++TapAgent::notifyPollEvent(Poller::PollEvent *e)
++{
++        recvpkt();
++	return 0;
++}
++
++#endif
++
+ /*
+  * SIM -> Live
+  *
+@@ -230,7 +265,7 @@
  int
  TapAgent::sendpkt(Packet* p)
  {
@@ -3159,7 +3233,7 @@
  		fprintf(stderr,
  		    "TapAgent(%s): sendpkt called while in read-only mode!\n",
  		    name());
-@@ -239,14 +254,14 @@
+@@ -239,14 +274,14 @@
  
  	// send packet into the live network
  	hdr_cmn* hc = HDR_CMN(p);
@@ -3177,7 +3251,7 @@
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
 --- dist-ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Mon Mar 29 19:37:57 2004
 @@ -43,7 +43,7 @@
  #include "agent.h"
  
@@ -3187,7 +3261,24 @@
  #ifdef TAPDEBUG
  #define	TDEBUG(x) { if (TAPDEBUG) fprintf(stderr, (x)); }
  #define	TDEBUG2(x,y) { if (TAPDEBUG) fprintf(stderr, (x), (y)); }
-@@ -71,8 +71,9 @@
+@@ -60,7 +60,15 @@
+ 
+ #include <errno.h>
+ 
+-class TapAgent : public Agent, public IOHandler {
++#ifdef HAVE_POLLER
++#include "Poller_kqueue.h"
++#endif
++
++class TapAgent : public Agent, public IOHandler
++#ifdef HAVE_POLLER
++,  public Poller::Client
++#endif
++{
+ public:
+         TapAgent();
+ 	int command(int, const char*const*);
+@@ -71,9 +79,13 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
  	void dispatch(int);	/* invoked via scheduler on I/O event */
@@ -3197,7 +3288,11 @@
 +	Network* net_outgoing_;	/* live network object for outgoing packets */
 +	Network* net_incoming_;		/* live network object for incoming packets */
  	double now() { return Scheduler::instance().clock(); }
++#ifdef HAVE_POLLER
++	virtual int notifyPollEvent(Poller::PollEvent *e);
++#endif
  };
+ 
  
 --- dist-ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
 +++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Nov 28 16:55:25 2003
@@ -3312,30 +3407,34 @@
      int	       	lo_, hi_;	// range of lost packets
      double     	ts_;		// timestamp for RTT estimation
 --- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Mar 11 18:33:31 2004
-@@ -79,6 +79,21 @@
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Tue Apr 13 16:16:18 2004
+@@ -79,6 +79,25 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
++INCLUDES += -I../../dkftpbench-0.45
 +# The following commented CFLAGS represent all flags that can be used when building even
 +# though many of them are not turned on by default. Some of the options need to be used
 +# together. e.g. STORE_PKTS and NUM_PKTS, USEEVENTS and RESWAP
 +#CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE -DSTORE_PKTS
 +#CFLAGS += -DNUM_PKTS=20000 -DBPF_BASED_PACKET_TIME -DRESWAP -DPRINT_SLOP -DDISPATCH_IN_RT
 +#CFLAGS += -DSELECT_TIMEOUT -SCHED_DEBUG -DMEASURE_EVENT_RATE -DMEASURE_DELAYS
++#CFLAGS += -DHAVE_POLLER -DHAVE_KQUEUE
 +CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC -DPACKET_DECAPSULATE -DSTORE_PKTS 
-+CFLAGS += -DRESWAP -DBPF_BASED_PACKET_TIME
++CFLAGS += -DRESWAP -DBPF_BASED_PACKET_TIME -DRESWAP -DPRINT_SLOP
++CFLAGS += -DHAVE_POLLER -DHAVE_KQUEUE
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb -lcrypto
 +LIB += `elvin-config --libs vin4c`
++LIB += -L../../dkftpbench-0.45 -lPoller
 +STATIC += -static
 +####
 +
  # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
  # Also, gcc does not remove the .o before forking 'as', which can be a
  # problem if you don't own the file but can write to the directory.
-@@ -276,6 +291,7 @@
+@@ -276,6 +295,7 @@
  	mcast/lms-sender.o \
  	@V_STLOBJ@
  
@@ -3343,7 +3442,7 @@
  
  # don't allow comments to follow continuation lines
  
-@@ -303,6 +319,10 @@
+@@ -303,6 +323,10 @@
  	emulate/nat.o  \
  	emulate/iptap.o \
  	emulate/tcptap.o

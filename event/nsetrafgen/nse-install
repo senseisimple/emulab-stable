@@ -14,6 +14,19 @@ if [ ! -d ns-allinone-2.26 ]; then
          patch -p0 < nse.patch
     fi
 fi
+if [ ! -d dkftpbench-0.45 ]; then
+    fetch http://www.emulab.net/downloads/dkftpbench-0.45.tar.gz
+    if [ $? -ne 0 ]; then
+        echo "Failed..."
+        echo "Downloading Poller library source for kqueue() support from www.kegel.com"
+        fetch http://www.kegel.com/dkftpbench/dkftpbench-0.45.tar.gz
+    fi
+    tar xzf dkftpbench-0.45.tar.gz
+fi
+cd dkftpbench-0.45
+./configure
+make libPoller.a
+cd ..
 cd ns-allinone-2.26
 ./install
 cp ns-2.26/nse ..
