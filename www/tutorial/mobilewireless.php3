@@ -147,7 +147,8 @@ The current features of the mobile wireless testbed are:
 <li>Four <a href="http://www.acroname.com">Acroname Garcia</a> robots
 <li><a href="http://www.xbow.com/Products/XScale.htm">Intel Stargate</a> single
 board computers for each robot.
-<li>Mica2 motes attached to each stargate.
+<li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">Mica2 
+motes</a> attached to each stargate.
 <li>Four cameras for visual tracking of the robots.
 <li>A <a href="https://www.emulab.net/webcam.php3">webcam</a> for viewing the
 robots in their habitat.
