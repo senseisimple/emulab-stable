@@ -1,0 +1,41 @@
+slothd idle detector db table descriptions
+
+* node_idlestats:
+
+column			type
+------			----
+node_id			varchar(10)
+tstamp			datetime  (timestamp?)
+last_tty		datetime
+load_1min		float
+load_5min		float
+load_15min		float
+
+CREATE TABLE node_idlestats 
+	(node_id varchar(10) not null,
+	tstamp datetime not null,
+	last_tty datetime not null,
+	load_1min float not null,
+	load_5min float not null,
+	load_15min float not null,
+	primary key (node_id, tstamp))
+	TYPE = MYISAM;
+
+* iface_counters:
+
+column			type
+------			----
+node_id			varchar(10)
+tstamp			datetime  (timestamp?)
+mac			varchar(12)
+ipkts			int
+opkts			int
+
+CREATE TABLE iface_counters
+	(node_id varchar(10) not null,
+	tstamp datetime not null,
+	mac varchar(12) not null default 000000000000,
+	ipkts int not null,
+	opkts int not null,
+	primary key (node_id, tstamp, mac))
+	TYPE = MYISAM;

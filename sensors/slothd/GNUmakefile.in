@@ -1,0 +1,48 @@
+
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = sensors/slothd
+
+include $(OBJDIR)/Makeconf
+
+CC?=gcc
+CFLAGS+= -Wall -I${OBJDIR} -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb
+LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql
+SDLIBS+= -ltb -lmysqlclient
+LIBS=
+CP= cp -pf
+
+PROGS= slothd sdcollectd
+
+.c.o:
+	$(CC) -g -c $(CFLAGS) $<
+
+all: $(PROGS)
+
+linux: islinux slothd
+	$(CP) slothd linux/slothd
+
+fbsd: isfbsd slothd
+	$(CP) slothd fbsd/slothd
+
+slothd: slothd.o slothd.h
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ slothd.o $(LIBS)
+
+sdcollectd: sdcollectd.o sdcollectd.h $(TESTBED_SRCDIR)/lib/libtb/libtb.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o $(SDLIBS)
+
+islinux:
+	@uname -s | grep linux > /dev/null
+
+isfbsd:
+	@uname -s | grep BSD > /dev/null
+
+install:
+
+distclean: clean
+	rm -f GNUmakefile linux/slothd fbsd/slothd
+
+clean:
+	rm -f *.o $(PROGS) *~ core *.core
+

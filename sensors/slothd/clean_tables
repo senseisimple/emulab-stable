@@ -1,0 +1,4 @@
+#!/bin/sh
+
+mysql --execute="delete from node_idlestats" tbdb && \
+mysql --execute="delete from iface_counters" tbdb
