@@ -51,28 +51,34 @@ namespace eval TBCOMPAT {
     # Let's set up a hwtypes table that contains all valid hardware types.
     variable hwtypes
     variable isremote
-    sql query $DB "select type,isremotenode from node_types"
+    variable isvirt
+    sql query $DB "select type,isremotenode,isvirtnode from node_types"
     while {[set row [sql fetchrow $DB]] != ""} {
 	set type  [lindex $row 0]
 	set isrem [lindex $row 1]
+	set isv   [lindex $row 2]
 
 	set hwtypes($type) 1
 	set isremote($type) $isrem
+	set isvirt($type) $isv
     }
     sql endquery $DB
-    sql query $DB "select class,isremotenode from node_types"
+    sql query $DB "select class,isremotenode,isvirtnode from node_types"
     while {[set row [sql fetchrow $DB]] != ""} {
 	set type  [lindex $row 0]
 	set isrem [lindex $row 1]
+	set isv   [lindex $row 2]
 
 	set hwtypes($type) 1
 	set isremote($type) $isrem
+	set isvirt($type) $isv
     }
     sql endquery $DB
 
     # NSE hack: sim type is not in DB. Just adding it now
     set hwtypes(sim) 1
     set isremote(sim) 0
+    set isvirt(sim) 0
 
     # The permissions table. Entries in this table indicate who is allowed
     # to use nodes of a particular type. No entries means anyone can use it.
@@ -151,6 +157,7 @@ proc tb-set-ip-link {src link ip} {
 proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes
     var_import ::TBCOMPAT::isremote
+    var_import ::TBCOMPAT::isvirt
     var_import ::GLOBALS::vtypes
     if {(! [info exists hwtypes($type)]) &&
 	(! [info exists vtypes($type)])} {
@@ -179,7 +186,11 @@ proc tb-set-hardware {node type args} {
     if {[info exists isremote($type)]} {
 	set remote $isremote($type)
     }
-    $node set_hwtype $type $remote
+    set isv 0
+    if {[info exists isvirt($type)]} {
+	set isv $isvirt($type)
+    }
+    $node set_hwtype $type $remote $isv
 }
 
 proc tb-set-node-os {node os} {
@@ -513,6 +524,17 @@ proc tb-set-uselatestwadata {onoff} {
     }
 
     set uselatestwadata $onoff
+}
+
+proc tb-set-usewatunnels {onoff} {
+    var_import ::GLOBALS::usewatunnels
+
+    if {$onoff != 0 && $onoff != 1} {
+	perror "\[tb-set-usewatunnels] $onoff must be 0/1"
+	return
+    }
+
+    set usewatunnels $onoff
 }
 
 proc tb-set-wasolver-weights {delay bw plr} {

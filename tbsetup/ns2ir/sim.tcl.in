@@ -211,6 +211,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::impotent
     var_import ::GLOBALS::vtypes
     var_import ::GLOBALS::uselatestwadata
+    var_import ::GLOBALS::usewatunnels
     var_import ::GLOBALS::wa_delay_solverweight
     var_import ::GLOBALS::wa_bw_solverweight
     var_import ::GLOBALS::wa_plr_solverweight
@@ -294,7 +295,7 @@ Simulator instproc run {} {
 	$prog updatedb $DB
     }
 
-    sql exec $DB "update experiments set uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
+    sql exec $DB "update experiments set usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
     sql endquery $DB
     
     foreach event $event_list {

@@ -122,8 +122,22 @@ Agent instproc updatedb {DB} {
     set target_port [$destination set port]
 
     # At some point allow users to set link. For now, first link (0).
-    set ip [$node ip 0]
-    set target_ip [$target_vnode ip 0]
+    # XXX Hack for local virtual nodes. Eventually use ipinip tunnels,
+    # but for now just send over the existing link.
+    if { [$node set isvirt] == 1 &&
+         [$node set isremote] == 0 } {
+	set foo [$node set fixed]
+	set ip [$foo ip 0]
+    } else {
+	set ip [$node ip 0]
+    }
+    if { [$target_vnode set isvirt] == 1 &&
+         [$target_vnode set isremote] == 0 } {
+	set foo [$target_vnode set fixed]
+	set target_ip [$foo ip 0]
+    } else {
+	set target_ip [$target_vnode ip 0]
+    }
 
     if {$role == "sink"} {
 	set application $self

@@ -196,6 +196,9 @@ namespace eval GLOBALS {
     # For remote nodes. Use latest widearea data.
     variable uselatestwadata 0
 
+    # For remote nodes. Use tunnels
+    variable usewatunnels 1
+
     # For remote nodes. The solver weights.
     variable wa_delay_solverweight 1
     variable wa_bw_solverweight	   7
