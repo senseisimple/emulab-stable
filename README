@@ -32,9 +32,10 @@ Good places to start would include:
   - The user tutorial (www/tutorial/tutorial.html)
   - The user FAQ (www/faq.html)
   - The user authorization document (www/auth.html)
-  - The software architecture diagram (doc/arch.ps) and notes (doc/arch.txt)
+  - The software architecture notes (doc/arch.txt and doc/arch-diagram.ps)
   - The overview of some major systems (doc/overview.txt)
-  - Diagrams of the state machines used in the system (doc/state*.ps)
+  - Diagrams and brief explanations of the state machines used in the 
+    system (www/doc/states.html and www/doc/*.gif)
   - The instructions for making a running system (doc/setup*.txt)
 
 QUICK TOUR
