@@ -41,6 +41,7 @@ my $USERNODE    = "@USERNODE@";
 		"nscheck"	=> "$TB/bin/nscheck",
 		"swapexp"	=> "$TB/bin/swapexp",
 		"endexp"	=> "$TB/bin/endexp",
+		"tbreport"	=> "$TB/bin/tbreport",
 	   );
 
 #
