@@ -16,6 +16,12 @@ use libtestbed;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+die("This script hasn't been updated to match schema changes yet!\n".
+    "It still uses the lastlogin table, which was replaced by three\n".
+    "different tables:\n".
+    "nodeuidlastlogin, uidnodelastlogin, and userslastlogin\n".
+    "Please fix this before trying to use it!\n");
+
 $query_result =
     DBQueryFatal("select pid,gid from groups");
 
