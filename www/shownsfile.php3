@@ -27,6 +27,11 @@ if (!isset($eid) ||
     USERERROR("You must provide an Experiment ID.", 1);
 }
 
+# if they dont exist, or are non-numeric, use defaults.
+# note: one can use is_numeric in php4 instead of ereg.
+if (!isset($zoom) || !ereg("^[0-9]{1,50}.?[0-9]{0,50}$", $zoom)) { $zoom = 1; }
+if (!isset($detail) || !ereg("^[0-9]{1,50}$", $detail)) { $detail = 0; }
+ 
 #
 # Check to make sure this is a valid PID/EID tuple.
 #
@@ -72,7 +77,28 @@ if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0 ||
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
     echo "<br>
           <center>
-            <img src='top2image.php3?pid=$pid&eid=$eid' align=center>
+            <img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center>
+	    <h5>
+	      zoom:
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.00&detail=$detail'>100%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.12&detail=$detail'>112%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.25&detail=$detail'>125%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.50&detail=$detail'>150%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.00&detail=$detail'>200%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.50&detail=$detail'>250%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=3.00&detail=$detail'>300%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=4.00&detail=$detail'>400%</a>
+	      <br>";
+    if ($detail == 0) {
+	if ($zoom < 1.5) {
+      	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.50&detail=1'>More detail (and zoom)</a>";
+	} else {
+    	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=1'>More detail</a>";
+	}
+    } else {
+    	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=0'>Less detail</a>";
+    }
+    echo "  </h5>
           </center>\n";
 }
 

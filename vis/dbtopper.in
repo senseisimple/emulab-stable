@@ -1,0 +1,131 @@
+#!/usr/bin/perl -w
+
+use English;
+use Getopt::Std;
+use lib '@prefix@/lib';
+use libdb;
+
+my  $optlist = "d:";
+
+%options = ();
+if (! getopts($optlist, \%options)) {
+    printf( "Usage:\ndbtopper [-d <detaillevel>] <pid> <eid>\n" );
+    die;
+}
+
+my $detail;
+
+if (defined($options{"d"})) {
+    $detail = $options{"d"};
+    if ($detail =~ /^([0-9]+)$/) {
+	$detail = $1;
+    }
+    else {
+	die("argument to -d must be integer, not '$detail'.");
+    }
+} else {
+    $detail = "0";
+}
+
+if (@ARGV != 2) {
+    printf( "Usage:\ndbtopper [-d <detaillevel>] <pid> <eid>\n" );
+    die;
+}
+
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+# my $result = DBQueryFatal("SELECT vname FROM delays WHERE pid='$pid' AND eid='$eid""
+
+my $result = DBQueryFatal("SELECT ips, type, vname FROM virt_nodes " .
+			  "WHERE pid='$pid' AND eid='$eid'");
+
+my %nodeip = ();
+
+# I can visualize topologies again, Topper!
+print "graph G {\n";
+
+#my %lanips = ();
+
+while (my ($ips, $type, $vname) = $result->fetchrow) {
+    $ips =~ s/^\d\://g;
+    $ips =~ s/\s\d\:/ /g;
+    $ips =~ s/^192\.168//g;
+    $ips =~ s/\s192\.168/ /g;
+    $nodeip{ $vname } = $ips;
+
+    if ($detail > 0) {
+	print "{node [label = \"$vname($type) $ips\", shape = box, ";
+    } else {
+	print "{node [label = \"$vname\", shape = box, ";
+    }
+
+    print "color = skyblue";
+
+    $vname =~ s/[^\w]/_/g;
+    print "] $vname}\n";
+
+#   $lanips{ $vname } .= 
+}			  
+
+$result = DBQueryFatal("SELECT vname, delay, bandwidth, lossrate, member FROM virt_lans " .
+			  "WHERE pid='$pid' AND eid='$eid'");
+
+my %lansize = ();
+my %lanmap  = ();
+my %landesc = ();
+my %lanput  = ();
+my %singlemap = ();
+
+
+while (my ($vname, $delay, $bandwidth, $lossrate, $member) = $result->fetchrow) {
+    $member =~ /^([^\:]+)\:/;
+    my $fullnodename = $1;
+    my $nodename = $fullnodename;
+    $nodename =~ s/[^\w]/_/g;
+
+    $lanmap{$vname} .= $nodename . ",";
+
+    my $desc;
+    if ($bandwidth >= 1000000) {
+	    $desc = sprintf( "%.0f", ($bandwidth / 1000000) ) . "Gb";
+    } elsif ($bandwidth >= 1000) {
+	    $desc = sprintf( "%.0f", ($bandwidth / 1000) ) . "Mb";
+    } else {
+	    $desc = sprintf( "%.0f", $bandwidth ) . "kb";
+    }
+
+    if ($delay > 0) {
+	$desc .= " " . sprintf( "%1.0f", $delay ) . "msec";
+    }
+
+    if ($lossrate > 0) {
+	$desc .= " " . sprintf( "%1.1f", ($lossrate / 100) ) . "\%loss";
+    }
+
+    if ($detail > 0) {
+	$landesc{ $vname } = $desc;
+    } else {
+	$landesc{ $vname } = "";
+    }
+}
+
+foreach $i (keys %lanmap) {
+    my @foo = split ",", $lanmap{$i};
+    if (scalar( @foo ) == 2) {
+	print "$foo[0] -- $foo[1] [label = \"$landesc{$i}\"];\n";
+    } else {
+	my $lanname = "$i";
+	if (!exists $lanput{$i}) {
+	    $lanput{$i} = 1;
+	    print "{node [label = $lanname, shape = box, ";
+	    print "color = green";
+	    print "] $lanname}\n";
+	}
+	foreach $j (@foo) {
+	    print "$j -- $lanname [label = \"$landesc{$i}\"];\n";
+	}
+    }
+}
+
+print "}\n";

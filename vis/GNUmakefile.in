@@ -8,9 +8,9 @@ SUBDIR		= vis
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= vistopology
+BIN_SCRIPTS	= vistopology dbvistopology
 LIBEXEC_SCRIPTS = webvistopology
-LIBEXEC_VIS	= topper render top2gif top2png
+LIBEXEC_VIS	= topper render top2gif top2png dbtopper
 
 #
 # Force dependencies on the scripts so that they will be rerun through

@@ -27,6 +27,14 @@ if (!isset($eid) ||
 $exp_eid = $eid;
 $exp_pid = $pid;
 
+# if they dont exist, or are non-numeric, use defaults.
+# note: one can use is_numeric in php4 instead of ereg.
+if (!isset($zoom) || !ereg("^[0-9]{1,50}.?[0-9]{0,50}$", $zoom)) { $zoom = 1; }
+if (!isset($detail) || !ereg("^[0-9]{1,50}$", $detail)) { $detail = 0; }
+
+if ($zoom > 8.0) { $zoom = 8.0; }
+if ($zoom <= 0.0) { $zoom = 1.0; }
+
 #
 # Check to make sure this is a valid PID/EID tuple.
 #
@@ -52,10 +60,14 @@ if (ISADMIN($uid)) {
     $gid = $exp_pid;
 }
 
+# note that we've already ensured that $detail is numeric above.
+if ($detail != 0) { $detailstring = "-d $detail"; } else { $detailstring = ""; }
+
 #
 # Spit out the image with a content header.
 #
-if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology $pid $eid", "r")) {
+
+if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology $detailstring -z $zoom $pid $eid", "r")) {
     header("Content-type: image/png");
     fpassthru($fp);
 }
@@ -64,3 +76,6 @@ if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology $pid $eid", "r")) {
 # No Footer!
 # 
 ?>
+
+
+

@@ -15,6 +15,6 @@ my $TB       = "@prefix@";
 #
 # Run the real thing, and never return.
 # 
-exec "$TB/bin/vistopology", @ARGV;
+exec "$TB/bin/dbvistopology", @ARGV;
 
-die("webvistopology: Could not exec vistopology: $!");
+die("webvistopology: Could not exec dbvistopology: $!");

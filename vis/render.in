@@ -8,15 +8,32 @@
 #
 
 use GD;
-
+use Getopt::Std;
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $ICONDIR     = "$TB/www";
 
+my  $optlist = "z:";
+if (! getopts($optlist, \%options)) {
+    die("Usage:\nrender [-z zoomfactor]\n");
+    
+}
+
+my $zoom = 1;
+if ( defined($options{"z"} ) ) {
+    my $zf = $options{"z"};
+    if ($zf =~ /^([\.0-9]+)/) {
+	$zoom = $1;
+    } else {
+	die("Bad argument to -z.. must be float.");
+    }
+}
+
 %props = ();
 %nodes = ();
+%linklabels = ();
 @links = ();
 
 #parse input file
@@ -48,7 +65,12 @@ while (<>) {
   } elsif (/^\s*(\w+)\s\-\-\s(\w+)\s/) {
     # a link.
     ($a, $b) = ($1, $2);
-    push( @links, $a . " " . $b );    
+    push( @links, $a . " " . $b );
+    if (/label\s*\=\s*\"([^\"]*)\"/) {
+	$linklabels{ "$a $b" } = $1;
+    } elsif (/label\s*\=\s*(\w+)/) {
+	$linklabels{ "$a $b" } = $1;
+    }
   }
 }
 
@@ -180,9 +202,17 @@ foreach $i (keys %nodepos) {
   $nodepos{ $i } = [$x,$y];	
 }
 
+# Uhh, Zoom Zip..
+foreach $i (keys %nodepos) {
+  ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
+  $x *= $zoom;
+  $y *= $zoom;
+  $nodepos{ $i } = [$x,$y];	
+}
+
 # start constructing the image
 
-$im = new GD::Image($xbig + 40, $ybig + 50);
+$im = new GD::Image(($xbig + 60) * $zoom, ($ybig + 70) * $zoom);
 
 $nodeicon = GD::Image->newFromPng("$ICONDIR/nodeicon.png") || warn "nodeicon.png not found";
 $lanicon  = GD::Image->newFromPng("$ICONDIR/lanicon.png") || warn "lanicon.png not found";
@@ -190,6 +220,7 @@ $lanicon  = GD::Image->newFromPng("$ICONDIR/lanicon.png") || warn "lanicon.png n
 %colors = ();
 
 $colors{"black"} =  $im->colorAllocate(0,0,0);
+$colors{"darkblue"} =  $im->colorAllocate(0,0,96);
 $colors{"blue"} =  $im->colorAllocate(0,0,192);
 $colors{"paleblue"} =  $im->colorAllocate(127,127,192);
 $colors{"green"} =  $im->colorAllocate(0,96,0);
@@ -258,21 +289,77 @@ foreach $i (keys %nodes) {
 # this is done in a second pass so no text is obscured by
 # boxes.
 
+foreach $i (@links) {
+    if (exists $linklabels{ $i }) {
+	($a, $b) = ($i =~ /(\w+)\s(\w+)/);
+	($x1, $y1) = ($nodepos{ $a }[0], $nodepos{ $a }[1]);
+	($x2, $y2) = ($nodepos{ $b }[0], $nodepos{ $b }[1]);  
+	($x, $y) = ( ($x1 + $x2) / 2, ($y1 + $y2) / 2 );
+	
+	my @lines = split " ", $linklabels{ $i };
+
+	$y -= (0.5 * (@lines * gdTinyFont->height)); 
+
+	my $linenum = 0;
+	foreach $j (@lines) {
+	    $xpos = $x - (((length($j) - 0.5) * $fontw) / 2); 
+	    
+	    $im->string(gdTinyFont, $xpos + 1, $y, 
+			$j, $bgcolor);
+	    $im->string(gdTinyFont, $xpos - 1, $y, 
+			$j, $bgcolor);
+	    $im->string(gdTinyFont, $xpos, $y - 1, 
+			$j, $bgcolor);
+	    $im->string(gdTinyFont, $xpos, $y + 1, 
+			$j, $bgcolor);
+	    $im->string(gdTinyFont, $xpos, $y, 
+			$j, $colors{"darkblue"}); 
+	    $y += gdTinyFont->height; 
+	}
+    }
+}
+    
 foreach $i (keys %nodes) {
   ($x, $y) = ($nodepos{ $i }[0], $nodepos{ $i }[1]);
 
-  $xpos = $x - (((length($i) - 0.5) * $fontw) / 2); 
+# my $nm = $i;
+  my $nm = $nodes{$i}{"label"};
 
-  $im->string(gdSmallFont, $xpos + 1, $y + 20, 
-	$i, $bgcolor);
-  $im->string(gdSmallFont, $xpos - 1, $y + 20, 
-	$i, $bgcolor);
-  $im->string(gdSmallFont, $xpos, $y + 19, 
-	$i, $bgcolor);
-  $im->string(gdSmallFont, $xpos, $y + 21, 
-	$i, $bgcolor);
-  $im->string(gdSmallFont, $xpos, $y + 20, 
-	$i, $colors{"black"});
+  my @lines = split " ", $nm;
+
+  my $linenum = 0;
+  foreach $j (@lines) {
+#     warn "$j $x $y!";
+      if ($linenum++ == 0) {
+	  $xpos = $x - (((length($j) - 0.5) * gdSmallFont->width) / 2); 
+
+	  $im->string(gdSmallFont, $xpos + 1, $y + 20, 
+		      $j, $bgcolor);
+	  $im->string(gdSmallFont, $xpos - 1, $y + 20, 
+		      $j, $bgcolor);
+	  $im->string(gdSmallFont, $xpos, $y + 19, 
+		      $j, $bgcolor);
+	  $im->string(gdSmallFont, $xpos, $y + 21, 
+		      $j, $bgcolor);
+	  $im->string(gdSmallFont, $xpos, $y + 20, 
+		      $j, $colors{"black"}); 
+	  $y += gdSmallFont->height; 
+      } else {
+	  $xpos = $x - (((length($j) - 0.5) * gdTinyFont->width) / 2); 
+
+	  $im->string(gdTinyFont, $xpos + 1, $y + 20, 
+		      $j, $bgcolor);
+	  $im->string(gdTinyFont, $xpos - 1, $y + 20, 
+		      $j, $bgcolor);
+	  $im->string(gdTinyFont, $xpos, $y + 19, 
+		      $j, $bgcolor);
+	  $im->string(gdTinyFont, $xpos, $y + 21, 
+		      $j, $bgcolor);
+	  $im->string(gdTinyFont, $xpos, $y + 20, 
+		      $j, $colors{"black"}); 
+	  $y += gdTinyFont->height; 
+      }
+  }
 } 
 
 #write it to stdout
