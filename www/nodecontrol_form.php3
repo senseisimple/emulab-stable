@@ -69,7 +69,8 @@ $startupcmd         = $row[startupcmd];
 #
 if ($isadmin) {
     $osid_result =
-	DBQueryFatal("select o.*,p.osid from os_info as o ".
+	DBQueryFatal("select o.osname, o.pid, o.osid as oosid, " .
+		     "p.osid as posid from os_info as o ".
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where p.node_id='$node_id' or ".
 		     "(o.path!='' and o.path is not NULL) ".
@@ -77,7 +78,8 @@ if ($isadmin) {
 }
 else {
     $osid_result =
-	DBQueryFatal("select distinct o.*,p.osid from os_info as o ".
+	DBQueryFatal("select distinct o.osname, o.pid, o.osid as oosid," .
+		     "p.osid as posid from os_info as o ".
 		     "left join group_membership as m on m.pid=o.pid ".
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where p.node_id='$node_id' or ".
@@ -130,8 +132,17 @@ if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid)) {
 }
                while ($row = mysql_fetch_array($osid_result)) {
                   $osname = $row[osname];
-                  $osid = $row[osid];
+                  $oosid = $row[oosid];
+		  $posid = $row[posid];
 		  $pid  = $row[pid];
+
+		  # Use the osid that came from the partitions table, if there
+		  # was one - otherwise, go with the os_info table
+		  if ($posid) {
+		  	$osid = $posid;
+		  } else {
+		  	$osid = $oosid;
+		  }
 
 		  if ($def_boot_osid == $osid) {
 		      continue;
