@@ -134,8 +134,7 @@ the dhcpd_makeconf script (installed into /usr/testbed/sbin), which uses the
 template file in the dhcpd directory of the source distribution. Make sure to
 edit the template file to reflect your local IP addresses, and include all node
 types. Place the resulting config file (which dhcpd_makeconf spits to the
-standard output), in /usr/local/etc/dhcpd.conf .  NOTE: This template file is
-for isc-dhcpd 2.x . It needs to be updated to work with isc-dhcpd 3.x .
+standard output), in /usr/local/etc/dhcpd.conf .
 
 tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
 to boot, reload, etc. testbed machines, which live in /tftpboot . For the time
