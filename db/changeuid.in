@@ -162,6 +162,10 @@ print "Updating widearea_accounts table ...\n";
 DBQueryFatal("update widearea_accounts set uid='$newuid' ".
 	     "where uid='$olduid'");
 
+print "Updating groups table ...\n";
+DBQueryFatal("update groups set leader='$newuid' ".
+	     "where leader='$olduid'");
+
 # Auto logout old user. 
 print "Clearing logins table ...\n";
 DBQueryFatal("delete from login where uid='$olduid'");
