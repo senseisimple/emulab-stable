@@ -139,6 +139,11 @@ chomp $speed;
 system "$teachswitch &" and message("Unable to start teachswitch: $!\n");
 
 #
+# Sleep for a few seconds to give teachswitch the chance to do its thing
+#
+sleep(10);
+
+#
 # Report this stuff back to the web script on boss - build up a URL to do so
 #
 my $URL = "http://$bossnode/$formURL?";
