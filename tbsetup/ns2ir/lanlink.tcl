@@ -384,7 +384,6 @@ LanLink instproc rename_node {old new} {
 }
 
 Link instproc updatedb {DB} {
-    $self next $DB
     $self instvar toqueue
     $self instvar fromqueue
     $self instvar nodelist
@@ -392,6 +391,19 @@ Link instproc updatedb {DB} {
     $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    $self instvar bandwidth
+    $self instvar rbandwidth
+    $self instvar delay
+    $self instvar rdelay
+    $self instvar loss
+    $self instvar rloss
+    $self instvar cost
+    $self instvar widearea
+    $self instvar uselinkdelay
+    $self instvar emulated
+    $self instvar nobwshaping
+    $self instvar useveth
+    $self instvar sim
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -435,17 +447,34 @@ Link instproc updatedb {DB} {
 	set droptail_ [$linkqueue set drop-tail_]
 	
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_, trivial_ok=$trivial_ok where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
+
+	set fields [list "vname" "member" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+	
+	set values [list $self $nodeportraw $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+
+	$sim spitxml_data "virt_lans" $fields $values
     }
 }
 
 Lan instproc updatedb {DB} {
-    $self next $DB
     $self instvar nodelist
     $self instvar linkq
     $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    $self instvar bandwidth
+    $self instvar rbandwidth
+    $self instvar delay
+    $self instvar rdelay
+    $self instvar loss
+    $self instvar rloss
+    $self instvar cost
+    $self instvar widearea
+    $self instvar uselinkdelay
+    $self instvar emulated
+    $self instvar nobwshaping
+    $self instvar useveth
+    $self instvar sim
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -490,31 +519,12 @@ Lan instproc updatedb {DB} {
 	set droptail_ [$linkqueue set drop-tail_]
 	
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_, trivial_ok=$trivial_ok where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
+
+	set fields [list "vname" "member" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+	
+	set values [list $self $nodeportraw $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+
+	$sim spitxml_data "virt_lans" $fields $values
     }
 }
 
-# updatedb DB
-# This adds a row to the virt_lans table.
-LanLink instproc updatedb {DB} {
-    $self instvar nodelist
-    $self instvar bandwidth
-    $self instvar rbandwidth
-    $self instvar delay
-    $self instvar rdelay
-    $self instvar loss
-    $self instvar rloss
-    $self instvar cost
-    $self instvar widearea
-    $self instvar uselinkdelay
-    $self instvar emulated
-    $self instvar nobwshaping
-    $self instvar useveth
-    var_import ::GLOBALS::pid
-    var_import ::GLOBALS::eid
-
-    foreach nodeport $nodelist {
-	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost,widearea,emulated,uselinkdelay,nobwshaping,usevethiface) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport),$widearea,$emulated,$uselinkdelay,$nobwshaping,$useveth)"
-    }
-}

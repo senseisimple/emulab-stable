@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,6 +28,6 @@ Vtype instproc updatedb {DB} {
     $self instvar types
     $self instvar weight
 
-    sql exec $DB "insert into virt_vtypes (pid,eid,name,weight,members) values (\"$pid\",\"$eid\",\"$self\",$weight,\"$types\");"
+    spitxml_data "virt_vtypes" [list "name" "weight" "members" ] [list $self $weight $types ]
 }
 

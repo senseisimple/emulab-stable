@@ -25,8 +25,7 @@ my  $optlist = "";
 # Configure variables
 #
 my $TB       = "@prefix@";
-
-my $tbbindir = "$TB/bin/";
+my $parser   = "$TB/libexec/parse-ns";
 
 #
 # Turn off line buffering on output
@@ -36,10 +35,8 @@ $| = 1;
 #
 # Untaint the path
 # 
-$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/libexec/ir".
-    ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -87,7 +84,7 @@ chdir($dirname) or
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
 
-if (system("parse-ns -n -a $nsfile") != 0) {
+if (system("$parser -n -a $nsfile") != 0) {
     fatal("NS Parse failed!");
 }
 

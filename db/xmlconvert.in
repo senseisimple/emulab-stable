@@ -21,7 +21,7 @@ sub usage()
 }
 my $optlist  = "x:vd";
 my $fromxml  = 0;
-my $nowrite  = 0;
+my $impotent = 0;
 my $debug    = 0;
 
 #
@@ -56,14 +56,14 @@ my %virtual_tables = ("experiments"	=> undef,
 # The experiment table is special. Only certain fields are allowed to
 # be updated. Not sure what the right approach for this is.
 #
-my %experiment_fields = ("multiplex_factor"	=> 1,
-			 forcelinkdelays	=> 1,
-			 uselinkdelays		=> 1,
-			 usewatunnels		=> 1,
-			 uselatestwadata	=> 1,
-			 wa_delay_solverweight	=> 1,
-			 wa_bw_solverweight	=> 1,
-			 wa_plr_solverweight	=> 1);
+my %experiment_fields = ("multiplex_factor"		=> 1,
+			 "forcelinkdelays"		=> 1,
+			 "uselinkdelays"		=> 1,
+			 "usewatunnels"			=> 1,
+			 "uselatestwadata"		=> 1,
+			 "wa_delay_solverweight"	=> 1,
+			 "wa_bw_solverweight"		=> 1,
+			 "wa_plr_solverweight"		=> 1);
 
 #
 # Turn off line buffering on output
@@ -105,7 +105,7 @@ if (defined($options{"x"})) {
 	fatal("Bad data in argument: $xmlfile.");
     }
     if (defined($options{"n"})) {
-	$nowrite = 1;
+	$impotent = 1;
     }    
 }
 if (@ARGV != 2) {
@@ -198,11 +198,15 @@ sub readXML($$$) {
 	    if (! exists($virtual_tables{$tablename})) {
 		fatal("Unknown virtual table: $_");
 	    }
-	    # New table. Define a list.
-	    if (defined($virtual_tables{$tablename})) {
-		fatal("Duplicate virtual table: $_");
+	    #
+	    # New table. Define a list. Note that the parser will spit
+	    # out the table start/end tags multiple times, since the
+	    # parser is written in such a way that its not possible to
+	    # flatten it out. Thats okay.
+	    #
+	    if (! defined($virtual_tables{$tablename})) {
+		$virtual_tables{$tablename} = [];
 	    }
-	    $virtual_tables{$tablename} = [];
 	    print "Starting new table: $tablename\n"
 		if ($debug);
 
@@ -241,7 +245,7 @@ sub readXML($$$) {
 		    #
 		    if ($1 ne "pid" && $1 ne "eid") {
 			$row->{$1} = xmldecode($2);
-			print "    Entering new element: $1/$row->{$1}\n"
+			print "    Entering new element: $1: $row->{$1}\n"
 			    if ($debug);
 		    }
 		}
@@ -286,49 +290,62 @@ sub readXML($$$) {
 
     #
     # Okay, thats all the checking we do! There is not much that can
-    # screw up the DB, by inserting rows into the allowed set of tables.
+    # screw up the DB just by inserting rows into the allowed set of
+    # virtual experiment tables, since we ignore the pid/eid in the xml. 
     #
-    # First the experiments table, which gets an update.
+    # First the experiments table, which gets an update statement, if there
+    # is anything to update.
     #
-    my @setlist = ();
-    foreach my $key (keys(%experiments_table)) {
-	$val = $experiments_table{$key};
-	if ($val eq "NULL") {
-	    push(@setlist, "$key=NULL");
+    if (scalar(keys(%experiments_table))) {
+	my @setlist = ();
+	
+	foreach my $key (keys(%experiments_table)) {
+	    my $val = $experiments_table{$key};
+	    
+	    if ($val eq "NULL") {
+		push(@setlist, "$key=NULL");
+	    }
+	    else {
+		push(@setlist, "$key='$val'");
+	    }	    
 	}
-	else {
-	    push(@setlist, "$key='$val'");
-	}	    
-    }
-    my $query = "update experiments ".
-	        "set " . join(",", @setlist) . " " .
-		"where eid='$eid' and pid='$pid'";
+	my $query = "update experiments ".
+	            "set " . join(",", @setlist) . " " .
+		    "where eid='$eid' and pid='$pid'";
 
-    print "$query\n"
-	if ($debug);
-    DBQueryFatal($query)
-	if (!$nowrite);
+	print "$query\n"
+	    if ($debug);
+	DBQueryFatal($query)
+	    if (!$impotent);
+    }
 
     #
     # Now all the other tables, which get inserts. Need to delete all the
     # old info too.
     #
     foreach my $table (keys(%virtual_tables)) {
-	DBQueryFatal("delete from $table ".
-		     "where eid='$eid' and pid='$pid'")
-	    if (!$nowrite);
-	next
-	    if (!defined($virtual_tables{$table}));
+	# Don't want to muck with this table! Done above. 
 	next
 	    if ($table eq "experiments");
+
+	# Delete always.
+	DBQueryFatal("delete from $table ".
+		     "where eid='$eid' and pid='$pid'")
+	    if (!$impotent);
+	next
+	    if (!defined($virtual_tables{$table}));
 
 	foreach my $rowref (@{$virtual_tables{$table}}) {
 	    my %rowhash = %{ $rowref };
 	    my @fields  = ("pid", "eid");
 	    my @values  = ("'$pid'", "'$eid'");
 
+	    # If no actual rows, then skip. Might happen.
+	    last
+		if (! scalar(keys(%rowhash)));
+
 	    foreach my $key (keys(%rowhash)) {
-		$val = $rowhash{$key};
+		my $val = $rowhash{$key};
 
 		if ($val eq "NULL") {
 		    push(@values, "NULL");
@@ -344,7 +361,7 @@ sub readXML($$$) {
 	    print "$query\n"
 		if ($debug);
 	    DBQueryFatal($query)
-		if (!$nowrite);
+		if (!$impotent);
 	}
     }
     return 0;

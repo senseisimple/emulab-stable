@@ -1365,7 +1365,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck \
 	db/grabron db/webnfree db/stategraph db/readycount \
-	db/idletimes db/idlemail db/webidlemail \
+	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
 	discvr/GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
@@ -1394,7 +1394,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
-	tbsetup/ns2ir/parse-ns \
+	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
 	tbsetup/ns2ir/sim.tcl tbsetup/db2ns \
 	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \

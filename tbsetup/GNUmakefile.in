@@ -77,14 +77,20 @@ install: all script-install subdir-install
 # 
 subdir-install:
 	@$(MAKE) -C checkpass install	
+ifneq ($(OURDOMAIN),emulab.net)
 	@$(MAKE) -C ns2ir install
+endif
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
 	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
-	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.pm)
 
 post-install: 
+ifneq ($(OURDOMAIN),emulab.net)
+	@$(MAKE) -C ns2ir post-install
+endif
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
@@ -138,6 +144,7 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, sfskey_update.proxy) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
+	@$(MAKE) -C ns2ir control-install
 	$(LINKS)
 
 #
@@ -164,4 +171,7 @@ subdir-distclean:
 %: %.tcl
 	cp -p $< $@
 
-
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@

@@ -1,0 +1,188 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use BSD::Resource;
+use POSIX qw(:signal_h);
+    
+#
+# Simply a wrapper for the parser. Passes on its arguments to parse.tcl,
+# which spits out some stuff, which the caller reads back. Typically,
+# this is via ssh from boss, since we want to run the parser on ops.
+# The input to this script (on stdin) is the NS file supplied by the user,
+# prepended with some hand crafted TCL code to set up the initial state
+# of the parser (DB state the parser needs in order to run).
+#
+# The first argument option is the user to run this script as, since we
+# gets invoked by a root ssh from boss. This option is not passed onto
+# the parser of course!
+#
+# When run in "impotent" mode, there is no output, just an exit code. 
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: parse.proxy -u user [args ...]\n".
+        "Where options and arguments are those required by parse.tcl\n";
+ 
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $TESTMODE = @TESTMODE@;
+my $parser   = "$TB/lib/ns2ir/parse.tcl";
+
+# Locals
+my $tempdir  = "/tmp/parse-$$";
+my $nsfile   = "$$.ns";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# First option has to be the -u option, the user to run this script as.
+# In testmode, we are not run as root, so run as the current user, and
+# in the current directory (not invoked with ssh in testmode). 
+#
+if (! $TESTMODE) {
+    if ($UID != 0) {
+	die("*** $0:\n".
+	    "    Must be root to run this script!");
+    }
+    if ($ARGV[0] ne "-u") {
+	die("*** $0:\n".
+	    "    Improper first argument. Must be the user name!\n");
+    }
+
+    my $user = $ARGV[1];
+    shift(@ARGV);
+    shift(@ARGV);
+
+    (undef,undef,$unix_uid) = getpwnam($user) or
+	die("*** $0:\n".
+	    "    No such user $user\n");
+
+    #
+    # Need the entire group list for the user, cause of subgroups, and
+    # cause thats the correct thing to do. Too bad perl does not have a
+    # getgrouplist function like the C library.
+    #
+    my $glist = `id -G $user`;
+    if ($glist =~ /^([\d ]*)$/) {
+	$glist = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Unexpected results from 'id -G $user': $glist\n");
+    }
+
+    # Need to split off the first group and create a proper list for $GUID.
+    my @gglist   = split(" ", $glist);
+    my $unix_gid = $gglist[0];
+    $glist       = "$unix_gid $glist";
+
+    # Flip to user and never go back!
+    $GID            = $unix_gid;
+    $EGID           = $glist;
+    $EUID = $UID    = $unix_uid;
+    $ENV{'USER'}    = $user;
+    $ENV{'LOGNAME'} = $user;
+
+    #
+    # Create the tempdir and chmod it to keep people out.
+    #
+    if (! mkdir($tempdir, 0750)) {
+	die("Could not mkdir $tempdir: $!\n");
+    }
+    if (! chmod(0750, $tempdir)) {
+	die("Could not chmod $tempdir to 0750: $!\n");
+    }
+    if (! chdir($tempdir)) {
+	die("Could not chdir to $tempdir: $!\n");
+    }
+}
+
+#
+# Take our input and write it to the temp file. 
+#
+open(TMP, ">$nsfile") ||
+    fatal("Couldn't open $nsfile\n");
+while (<STDIN>) {
+    print TMP $_;
+}
+close(TMP);
+chmod(0644, $nsfile);
+
+#
+# Fork a child process to run the parser in.
+#
+my $pid = fork();
+
+if (!defined($pid)) {
+    die("*** $0:\n".
+	"    Could not fork a new process!");
+}
+
+#
+# Child runs the parser, niced down, and then exits.
+#
+if (! $pid) {
+    # Set the CPU limit for us.
+    setrlimit(RLIMIT_CPU, 60, 60);
+    
+    # Give parent a chance to react.
+    sleep(1);
+
+    system("nice $parser @ARGV $nsfile");
+    exit($? >> 8);
+}
+
+#
+# Parent waits.
+#
+waitpid($pid, 0);
+
+#
+# If the child was KILLed, then it overran its time limit.
+# Send email. Otherwise, exit with result of child.
+#
+if (($? >> 8) == SIGKILL) {
+    my $msg = "Parser Exceeded CPU Limit";
+
+    SENDMAIL($TBOPS, "Parser Exceeded CPU Limit", $msg,
+	     undef, undef, ($nsfile));
+    
+    print STDERR "$msg\n";
+    if (-d $tempdir) {
+	system("/bin/rm -r $tempdir");
+    }
+    exit(15);
+}
+if (-d $tempdir) {
+    system("/bin/rm -r $tempdir");
+}
+exit($? >> 8);

@@ -65,6 +65,7 @@ ops-install:
 	@$(MAKE) -C event control-install
 
 install-mkdirs:
+	-mkdir -p $(INSTALL_TOPDIR)/opsdir
 	-mkdir -p $(INSTALL_TOPDIR)/locks
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/log/mysql

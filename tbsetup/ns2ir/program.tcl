@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -42,9 +42,10 @@ Program instproc rename {old new} {
 Program instproc updatedb {DB} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
-    var_import ::GLOBALS::objtypes
+    var_import ::TBCOMPAT::objtypes
     $self instvar node
     $self instvar command
+    $self instvar sim
 
     if {$node == {}} {
 	perror "\[updatedb] $self has no node."
@@ -62,6 +63,6 @@ Program instproc updatedb {DB} {
 	set progvnode [$node set nsenode]
     }
 
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$progvnode','$self','$objtypes(PROGRAM)')";
+    $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $progvnode $self $objtypes(PROGRAM) ]
 }
 

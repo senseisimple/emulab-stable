@@ -31,6 +31,7 @@ Simulator instproc init {args} {
     # A counter for subnets.  This is the lowest unused subnet
     # suffix.
     $self set subnet_counter 1
+    $self set wa_subnet_counter 1
 
     # This is the prefix used to fill any unassigned IP addresses.
     $self set subnet_base "@IPBASE@"
@@ -229,7 +230,6 @@ Simulator instproc run {} {
     var_import ::GLOBALS::errors
     var_import ::GLOBALS::irfile
     var_import ::GLOBALS::ran
-    var_import ::GLOBALS::DB
     var_import ::GLOBALS::impotent
     var_import ::GLOBALS::vtypes
     var_import ::GLOBALS::uselatestwadata
@@ -240,7 +240,9 @@ Simulator instproc run {} {
     var_import ::GLOBALS::uselinkdelays
     var_import ::GLOBALS::forcelinkdelays
     var_import ::GLOBALS::multiplex_factor
-
+    var_import ::TBCOMPAT::objtypes
+    var_import ::TBCOMPAT::eventtypes
+    
     # Fill out IPs
     foreach obj [concat [array names lanlink_list]] {
 	$obj fill_ips
@@ -268,27 +270,13 @@ Simulator instproc run {} {
 	}
     }
 
-    # Load even indexes
-    sql query $DB "select idx,type from event_objecttypes"
-    while {[set row [sql fetchrow $DB]] != ""} {
-	set idx [lindex $row 0]
-	set type [lindex $row 1]
-	set objtypes($type) $idx
-    }
-    sql endquery $DB
-    sql query $DB "select idx,type from event_eventtypes"
-    while {[set row [sql fetchrow $DB]] != ""} {
-        set idx [lindex $row 0]
-        set type [lindex $row 1]
-        set eventtypes($type) $idx
-    }
-    sql endquery $DB
-
     # If any errors occur stop here.
     if {$errors == 1} {return}
 
     # If we are running in impotent mode we stop here
     if {$impotent == 1} {return}
+
+    $self spitxml_init
 
     # update the global nseconfigs using a bogus vname
     # i.e. instead of the node on which nse is gonna run
@@ -302,39 +290,42 @@ Simulator instproc run {} {
  	append nsecfg_script "set $simu \[new Simulator]\n"
  	append nsecfg_script "\$$simu use-scheduler RealTime\n\n"
  	append nsecfg_script $nseconfig
- 
-        sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid', '$eid', '$self', '$nsecfg_script')"
+
+	$self spitxml_data "nseconfigs" [list "vname" "nseconfig" ] [list $self $nsecfg_script ]
     }
     
     # Update the DB
     foreach node [lsort [array names node_list]] {
-	$node updatedb $DB
+	$node updatedb "sql"
     }
     foreach lan [concat [array names lanlink_list]] {
-	$lan updatedb $DB
+	$lan updatedb "sql"
     }
     foreach vtype [array names vtypes] {
-	$vtype updatedb $DB
+	$vtype updatedb "sql"
     }
     foreach prog [array names prog_list] {
-	$prog updatedb $DB
-    }
-    set mfactor ""
-    if { $multiplex_factor != {} } {
-	set mfactor "multiplex_factor=$multiplex_factor, "
+	$prog updatedb "sql"
     }
 
-    sql exec $DB "update experiments set $mfactor forcelinkdelays=$forcelinkdelays,uselinkdelays=$uselinkdelays,usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
-    sql endquery $DB
+    set fields [list "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" ]
+    set values [list $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight ]
+
+    if { $multiplex_factor != {} } {
+	lappend fields "multiplex_factor"
+	lappend values $multiplex_factor
+    }
+    
+    $self spitxml_data "experiments" $fields $values
 
     # This could probably be elsewhere.
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','*','$self','$objtypes(SIMULATOR)')";    
+    $self spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list "*" $self $objtypes(SIMULATOR) ]
     
-    sql endquery $DB
-
     foreach event $event_list {
-	sql exec $DB "insert into eventlist (pid,eid,time,vnode,vname,objecttype,eventtype,arguments,atstring) values (\"$pid\",\"$eid\",[lindex $event 0],\"[lindex $event 1]\",\"[lindex $event 2]\",$objtypes([lindex $event 3]),$eventtypes([lindex $event 4]),\"[lindex $event 5]\",\"[lindex $event 6]\")"
+	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] ]
     }
+
+    $self spitxml_finish
 }
 
 # attach-agent <node> <agent>
@@ -794,25 +785,12 @@ Simulator instproc get_subnet {} {
 # This is called by lanlinks.  When called get_subnet will find an available
 # IP subnet, mark it as used, and return it to the caller.
 Simulator instproc get_subnet_remote {} {
-    var_import ::GLOBALS::DB
-    var_import ::GLOBALS::pid
-    var_import ::GLOBALS::eid
-    var_import ::GLOBALS::impotent
+    $self instvar wa_subnet_counter
 
-    # If we are running in impotent mode, then no need for unique subnets
-    if {$impotent == 1} {
-	set subnet [$self get_subnet]
-	return $subnet
-    }
-
-    sql exec $DB "insert into ipsubnets values ('$pid','$eid', NULL)"
-    sql endquery $DB
-    sql query $DB "select LAST_INSERT_ID() from ipsubnets"
-    set row [sql fetchrow $DB]
-    sql endquery $DB
-
-    set b [expr [expr $row & 0xff00] >> 8]
-    set c [expr $row & 0xff]
+    set subnet $wa_subnet_counter
+    incr wa_subnet_counter
+    set b [expr [expr $subnet & 0xff00] >> 8]
+    set c [expr $subnet & 0xff]
     return 10.$b.$c
 }
 
@@ -865,4 +843,49 @@ Simulator instproc make-simulated {args} {
     append nseconfig $script
 
     set simulated 0
+}
+
+#
+# Spit out XML
+#
+Simulator instproc spitxml_init {} {
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+
+    puts "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
+    puts "<virtual_experiment pid='$pid' eid='$eid'>"
+}
+
+Simulator instproc spitxml_finish {} {
+    puts "</virtual_experiment>"
+}
+
+Simulator instproc spitxml_data {tag fields values} {
+    puts "  <$tag>"
+    puts "    <row>"
+    foreach field $fields {
+	set value  [lindex $values 0]
+	set values [lrange $values 1 end]
+
+	puts "      <$field>$value</$field>"
+    }
+    puts "    </row>"
+    puts "  </$tag>"
+}
+
+#
+# Global function, cause some objects do not hold a sim pointer.
+# Should fix.
+# 
+proc spitxml_data {tag fields values} {
+    puts "  <$tag>"
+    puts "    <row>"
+    foreach field $fields {
+	set value  [lindex $values 0]
+	set values [lrange $values 1 end]
+
+	puts "      <$field>$value</$field>"
+    }
+    puts "    </row>"
+    puts "  </$tag>"
 }

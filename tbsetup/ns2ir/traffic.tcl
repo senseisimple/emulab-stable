@@ -99,7 +99,7 @@ Agent instproc rename {old new} {
 Agent instproc updatedb {DB} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
-    var_import ::GLOBALS::objtypes
+    var_import ::TBCOMPAT::objtypes
     $self instvar application
     $self instvar destination
     $self instvar node
@@ -141,9 +141,9 @@ Agent instproc updatedb {DB} {
     }
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_vname,target_port,target_ip,generator) values ('$pid','$eid','$node','$application','$role','$proto',$port,'$ip','$target_vnode','$target_vname',$target_port,'$target_ip','$generator')";
+    spitxml_data "virt_trafgens" [list "vnode" "vname" "role" "proto" "port" "ip" "target_vnode" "target_vname" "target_port" "target_ip" "generator" ] [list $node $application $role $proto $port $ip $target_vnode $target_vname $target_port $target_ip $generator ]
 
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$application','$objtypes(TRAFGEN)')";
+    spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $node $application $objtypes(TRAFGEN)]
 }
 
 # get_nseconfig is only defined for subclasses that will be simulated by NSE
@@ -211,7 +211,7 @@ Agent/TCP/FullTcp instproc listen {} {
 Agent/TCP/FullTcp instproc updatedb {DB} {
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
-    var_import ::GLOBALS::objtypes
+    var_import ::TBCOMPAT::objtypes
     $self instvar application
     $self instvar destination
     $self instvar node
@@ -248,12 +248,12 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     set target_vname $destination
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_vname,target_port,target_ip,generator) values ('$pid','$eid','$node','$vname','$role','$proto',$port,'$ip','$target_vnode','$target_vname',$target_port,'$target_ip','$generator')";
-
-    sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$vname','$objtypes(TRAFGEN)')";
+    spitxml_data "virt_trafgens" [list "vnode" "vname" "role" "proto" "port" "ip" "target_vnode" "target_vname" "target_port" "target_ip" "generator" ] [list  $node $vname $role $proto $port $ip $target_vnode $target_vname $target_port $target_ip $generator]
+    
+    spitxml_data "virt_agents" [list "vnode" "vname" "objecttype"] [list $node $vname $objtypes(TRAFGEN) ]
 
     if {$application != {}} {
-	sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$application','$objtypes(TRAFGEN)')";
+	spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $node $application $objtypes(TRAFGEN) ]
     }
 }
 

@@ -124,6 +124,7 @@ Node instproc updatedb {DB} {
     $self instvar realtime
     $self instvar isvirt
     $self instvar virthost
+    var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
@@ -132,12 +133,10 @@ Node instproc updatedb {DB} {
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
     if {$osid == {}} {
-	if {$virthost} {
-	    set osid "FBSD-STD"
-	} else {
-	    sql query $DB "select osid from node_types where type = \"$type\""
-	    set osid [sql fetchrow $DB]
-	    sql endquery $DB
+	if {$virthost == 0} {
+	    if {[info exists default_osids($type)]} {
+		set osid $default_osids($type)
+	    }
 	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
@@ -167,7 +166,7 @@ Node instproc updatedb {DB} {
     $self add_routes_to_DB $DB
 
     # Update the DB
-    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osname,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,routertype,fixed) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\",\"$default_ip_routing_type\",\"$fixed\")";
+    $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "failureaction" "routertype" "fixed" ] [list $self $type $ipraw $osid $cmdline $rpms $deltas $startup $tarfiles $failureaction $default_ip_routing_type $fixed ]
 }
 
 # add_lanlink lanlink
@@ -353,7 +352,6 @@ Node instproc add_routes_to_DB {DB} {
 		return
 	    }
 	}
-	
-	sql exec $DB "insert into virt_routes (pid,eid,vname,dst,nexthop,dst_type) values ('$pid','$eid','$self','$dstip','$hopip','$type')";
+	$sim spitxml_data "virt_routes" [list "vname" "dst" "nexthop" "dst_type" ] [list $self $dstip $hopip $type ]
     }
 }

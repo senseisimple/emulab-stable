@@ -1,33 +1,52 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use English;
 use Getopt::Std;
-use BSD::Resource;
-use POSIX qw(:signal_h);
     
 #
-# Simply a wrapper for the parser. Passes on its arguments to parse.tcl.
+# Parse an ns file. Since the parser runs arbitrary NS file for the user,
+# this cannot be safely done on boss without jumping through huge hoops
+# to secure tcl and the DB. Yuck! So, instead of running the parser on boss,
+# we run it over on ops. This first version operates like this:
+#
+# NB: This script is setuid.
 #
 sub usage()
 {
     print STDOUT
-	"Usage: parse-ns [args ...]\n".
+	"Usage: parse-ns [options] pid gid eid nsfile\n".
         "Where options and arguments are those required by parse.tcl\n";
  
     exit(-1);
 }
+my $optlist  = "nqa";
+my $anonmode = 0;
+my $impotent = 0;
+my $debug    = 0;
 
 #
 # Configure variables
 #
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
+my $TESTMODE = @TESTMODE@;
+
+# Locals
+my $infile   = "parse.input";
+my $outfile  = "parse.output";
+my $SAVEUID  = $UID;
+my $dbuid;
+my $pid;
+my $gid;
+my $eid;
+my $nsfile;
 
 #
 # Turn off line buffering on output
@@ -37,9 +56,25 @@ $| = 1;
 #
 # Untaint the path
 # 
-$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/lib/ns2ir".
-    ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+if ($TESTMODE) {
+    # In testmode, drop privs (my devel tree at home is TESTMODE=1)
+    $EUID = $UID;
+}
+elsif ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
 
 #
 # Testbed Support libraries
@@ -49,59 +84,304 @@ use libdb;
 use libtestbed;
 
 #
-# Fork a child process to run the parser in.
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
 #
-my $pid = fork();
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"a"})) {
+    $anonmode = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (@ARGV != 4 && @ARGV != 1) {
+    usage();
+}
 
-if (!defined($pid)) {
-    die("*** $0:\n".
-	"    Could not fork a new process!");
+if (@ARGV == 1) {
+    $nsfile = $ARGV[0];
+}
+else {
+    $pid   = $ARGV[0];
+    $gid   = $ARGV[1];
+    $eid   = $ARGV[2];
+    $nsfile= $ARGV[3];
 }
 
 #
-# Child runs the parser, niced down, and then exits.
+# Must taint check!
 #
-if (! $pid) {
-    # Set the CPU limit for us.
-    setrlimit(RLIMIT_CPU, 60, 60);
-    
-    # Give parent a chance to react.
-    sleep(1);
-
-    system("nice parse.tcl @ARGV");
-    exit($? >> 8);
+if ($nsfile =~ /^([-\w\/\.]+)$/) {
+    $nsfile = $1;
 }
-
-#
-# Parent waits.
-#
-waitpid($pid, 0);
-
-#
-# If the child was KILLed, then it overran its time limit.
-# Send email. Otherwise, exit with result of child.
-#
-if (($? >> 8) == SIGKILL) {
-    my $msg = "Overran its CPU limit on 'parse.tcl @ARGV'";
-    my $user_name;
-    my $user_email;
-    my $dbuid;
-    my $to;
-
-    #
-    # Get email info for user.
-    #
-    if (UNIX2DBUID($UID, \$dbuid) &&
-	UserDBInfo($dbuid, \$user_name, \$user_email)) {
-	$to = "$user_name <$user_email>";
+else {
+    die("Bad data in argument: $nsfile.");
+}
+   
+if (defined($pid)) {
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
     }
     else {
-	$to = $TBOPS;
+	die("Bad data in argument: $pid.");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die("Bad data in argument: $eid.");
+    }
+    if ($gid =~ /^([-\w]+)$/) {
+	$gid = $1;
+    }
+    else {
+	die("Bad data in argument: $gid.");
+    }
+}
+
+# Remove temps cause of swapin by alternates.
+unlink($infile);
+unlink($outfile);
+
+if (!$TESTMODE) {
+    #
+    # Get DB uid for sending over to ops. In testmode, it runs locally
+    # as the user running the testsuite, obviously.
+    #
+    if (! UNIX2DBUID($UID, \$dbuid)) {
+	die("*** $0:\n".
+	    "    You do not exist in the Emulab Database!\n");
     }
 
-    SENDMAIL($to, "Parser Exceeded CPU Limit", $msg,
-	     undef, "CC: $TBOPS", ($ARGV[$#ARGV]));
-    print STDERR "Parser Exceeded CPU Limit: 'parse.tcl @ARGV'\n";
-    exit(15);
+    # Run as the user for most of this script.
+    $EUID = $UID;
 }
-exit($? >> 8);
+
+# Create the defs files.
+GenDefsFile($infile);
+
+# Now append the NS file to. This part is hokey. Fix later.
+system("cat $nsfile >> $infile") == 0
+    or die("Could not combine TCL defs file and the NS file!\n");
+
+#
+# Build up a new command line to run the parser on ops, writing the
+# result back to a file if not in anonmode. Remember to tack on the
+# user ID to flip to, when not in testmode.
+#
+my $cmdargs = "$TB/libexec/ns2ir/parse.proxy";
+$cmdargs .= " -u $dbuid"
+    if (defined($dbuid));
+$cmdargs .= " -a"
+    if (defined($options{"a"}));
+$cmdargs .= " -n"
+    if (defined($options{"n"}));
+$cmdargs .= " -q"
+    if (defined($options{"q"}));
+$cmdargs .= " $pid $gid $eid"
+    if (!$anonmode);
+
+#
+# Run parser, redirecting stdout to a file to capture the parser results.
+# Must flip to real root to run ssh.
+#
+if ($TESTMODE) {
+    #
+    # In testmode, no ssh. Just run locally.
+    #
+    system("$cmdargs < $infile > $outfile");
+}
+else {
+    #
+    # In non-testmode, must flip to real root for the ssh, and then flip
+    # back afterwards.
+    # 
+    $EUID = $UID = 0;
+    system("sshtb -host $CONTROL $cmdargs < $infile > $outfile");
+    $EUID = $UID = $SAVEUID;
+}
+
+# 
+# Error output went to stderr, so the caller captures that. 
+# 
+if ($?) {
+    my $exit_status = $? >> 8;
+    
+    die("Parser exited with error code $exit_status!\n");
+}
+exit(0)
+    if ($impotent);
+
+#
+# Run the XML converter on the output. 
+#
+system("$TB/libexec/xmlconvert -d -x $outfile $pid $eid");
+
+if ($?) {
+    my $exit_status = $? >> 8;
+    
+    die("XML converter exited with error code $exit_status!\n");
+}
+
+#
+# Now we have to fix up one minor thing; widearea tunnel IPs. These have
+# to be unique, but without the DB to ask, there is no easy way to arrange
+# that. 
+#
+my %subnetmap = ();
+
+my $query_result =
+    DBQueryFatal("select vname,ips from virt_nodes ".
+		 "where pid='$pid' and eid='$eid'");
+while (my ($vname,$ips) = $query_result->fetchrow_array()) {
+    my @newiplist = ();
+    my $newips;
+
+    foreach my $ipinfo (split(" ", $ips)) {
+	my ($port,$ip) = split(":", $ipinfo);
+	my ($a,$b,$c,$d) = ($ip =~ /(\d+).(\d+).(\d+).(\d+)/);
+
+	if ($a eq "10") {
+	    if (! defined($subnetmap{"$a.$b.$c"})) {
+		DBQueryFatal("insert into ipsubnets ".
+			     "values ('$pid','$eid', NULL)");
+		my ($id) =
+		    DBQueryFatal("select LAST_INSERT_ID() ".
+				 "from ipsubnets")->fetchrow_array();
+
+		my $bb = ($id & 0xff00) >> 8;
+		my $cc = ($id & 0xff);
+		$subnetmap{"$a.$b.$c"} = "$a.$bb.$cc";
+	    }
+	    my $newsubnet = $subnetmap{"$a.$b.$c"};
+	    push(@newiplist, "$port:${newsubnet}.$d");
+	}
+	else {
+	    push(@newiplist, $ipinfo);
+	}
+    }
+    $newips = join(" ", @newiplist);
+    
+    if ($newips ne $ips) {
+	DBQueryFatal("update virt_nodes set ips='$newips' ".
+		     "where vname='$vname' and pid='$pid' and eid='$eid'");
+    }
+}
+#
+# So, if we ended up changing any, we have look for corresponding entries
+# in virt_trafgens, and fix them too.
+#
+if (keys(%subnetmap)) {
+    $query_result =
+	DBQueryFatal("select vnode,vname,ip,target_ip from virt_trafgens ".
+		     "where pid='$pid' and eid='$eid'");
+    while (my ($vnode,$vname,$ip,$dstip) = $query_result->fetchrow_array()) {
+	my ($a,$b,$c,$d) = ($ip =~ /(\d+).(\d+).(\d+).(\d+)/);
+	my $newip        = $ip;
+	my $newdstip     = $dstip;
+	
+	if (defined($subnetmap{"$a.$b.$c"})) {
+	    $newip = $subnetmap{"$a.$b.$c"} . ".$d";
+	}
+	($a,$b,$c,$d) = ($dstip =~ /(\d+).(\d+).(\d+).(\d+)/);
+	if (defined($subnetmap{"$a.$b.$c"})) {
+	    $newdstip = $subnetmap{"$a.$b.$c"} . ".$d";
+	}
+	if ($ip ne $newip || $dstip ne $newdstip) {
+	    DBQueryFatal("update virt_trafgens set ".
+			 "       ip='$newip',target_ip='$newdstip' ".
+			 "where pid='$pid' and eid='$eid' and ".
+			 "      vnode='$vnode' and vname='$vname'");
+	}
+    }
+}
+exit(0);
+
+
+#
+# Open up a TCL file and write a bunch of TCL to it!
+#
+sub GenDefsFile($)
+{
+    my($fname) = $_[0];
+
+    open(TCL, "> $fname")
+	or die("Could not open TCL defs file for writing: $!\n");
+
+    print TCL "namespace eval TBCOMPAT {\n";
+
+    print TCL "# Event Object Types\n";
+    my $query_result =
+	DBQueryFatal("select idx,type from event_objecttypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+	print TCL "set objtypes($type) $idx\n";
+    }
+    print TCL "\n";
+
+    print TCL "# Event Event Types\n";
+    $query_result =
+	DBQueryFatal("select idx,type from event_eventtypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+	print TCL "set eventtypes($type) $idx\n";
+    }
+    print TCL "\n";
+    
+    print TCL "# Node Types\n";
+    $query_result =
+	DBQueryFatal("select type,isremotenode,isvirtnode,osname ".
+		     " from node_types as nt ".
+		     "left join os_info as o on nt.osid=o.osid");
+    while (my ($type,$isrem,$isvirt,$osid) = $query_result->fetchrow_array()) {
+	print TCL "set hwtypes($type) 1\n";
+	print TCL "set isremote($type) $isrem\n";
+	print TCL "set isvirt($type) $isvirt\n";
+	print TCL "set default_osids($type) \"$osid\"\n"
+	    if (defined($osid) && $osid ne "");
+    }
+    print TCL "\n";
+    
+    print TCL "# Node Classes\n";
+    $query_result =
+	DBQueryFatal("select class,isremotenode,isvirtnode from node_types");
+    while (my ($class,$isrem,$isvirt) = $query_result->fetchrow_array()) {
+	print TCL "set hwtypes($class) 1\n";
+	print TCL "set isremote($class) $isrem\n";
+	print TCL "set isvirt($class) $isvirt\n";
+    }
+    print TCL "\n";
+
+    print TCL "# Node Permissions\n";
+    my %nodeperms = ();
+    $query_result =
+	DBQueryFatal("select type,pid from nodetypeXpid_permissions");
+    while (my ($type,$pid) = $query_result->fetchrow_array()) {
+	if (! defined($nodeperms{$type})) {
+	    $nodeperms{$type} = [];
+	}
+	push(@{$nodeperms{$type}}, $pid);
+    }
+    foreach my $type (keys(%nodeperms)) {
+	my @pids = @{$nodeperms{$type}};
+
+	print TCL "set nodetypeXpid_permissions($type) [list @pids]\n";
+    }
+    print TCL "\n";
+
+    if (defined($pid)) {
+	print TCL "# OSIDs\n";
+	$query_result =
+	    DBQueryFatal("select osname from os_info ".
+			 "where shared=1 or pid='$pid'");
+		     
+	while (my ($osname) = $query_result->fetchrow_array()) {
+	    print TCL "set osids($osname) 1\n";
+	}
+	print TCL "\n";
+    }
+
+    print TCL "}\n";
+    close(TCL);
+}

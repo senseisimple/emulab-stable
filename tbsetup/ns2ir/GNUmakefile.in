@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,21 +14,32 @@ SUBDIR		= tbsetup/ns2ir
 
 include $(OBJDIR)/Makeconf
 
-LIB_STUFF	= lanlink.tcl node.tcl sim.tcl tb_compat.tcl null.tcl \
+LIB_STUFF    = lanlink.tcl node.tcl sim.tcl tb_compat.tcl null.tcl \
 		  nsobject.tcl traffic.tcl vtype.tcl parse.tcl program.tcl \
 		  nsenode.tcl nstb_compat.tcl
-LIBEXEC_STUFF	= parse-ns
+BOSSLIBEXEC  = parse-ns
+USERLIBEXEC  = parse.proxy
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all: $(LIB_STUFF) $(LIBEXEC_STUFF)
+all: $(LIB_STUFF) $(BOSSLIBEXEC) $(USERLIBEXEC)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_LIBDIR)/ns2ir/, $(LIB_STUFF)) \
-	$(addprefix $(INSTALL_LIBEXECDIR)/ns2ir/, $(LIBEXEC_STUFF))
+install:	control-install \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(BOSSLIBEXEC)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/lib/ns2ir/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/libexec/ns2ir/, $(USERLIBEXEC))
+
+control-install: $(addprefix $(INSTALL_LIBDIR)/ns2ir/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/ns2ir/, $(USERLIBEXEC))
+
+post-install: 
+	chmod 775 $(INSTALL_LIBEXECDIR)
+	chown root $(INSTALL_LIBEXECDIR)/parse-ns
+	chmod u+s $(INSTALL_LIBEXECDIR)/parse-ns
 
 $(INSTALL_LIBDIR)/ns2ir/%: %
 	@echo "Installing $<"
@@ -38,6 +49,16 @@ $(INSTALL_LIBDIR)/ns2ir/%: %
 $(INSTALL_LIBEXECDIR)/ns2ir/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_LIBEXECDIR)/ns2ir
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/ns2ir/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib/ns2ir
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/ns2ir/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec/ns2ir
 	$(INSTALL) $< $@
 
 clean:

@@ -52,28 +52,6 @@ namespace eval TBCOMPAT {
     variable hwtypes
     variable isremote
     variable isvirt
-    sql query $DB "select type,isremotenode,isvirtnode from node_types"
-    while {[set row [sql fetchrow $DB]] != ""} {
-	set type  [lindex $row 0]
-	set isrem [lindex $row 1]
-	set isv   [lindex $row 2]
-
-	set hwtypes($type) 1
-	set isremote($type) $isrem
-	set isvirt($type) $isv
-    }
-    sql endquery $DB
-    sql query $DB "select class,isremotenode,isvirtnode from node_types"
-    while {[set row [sql fetchrow $DB]] != ""} {
-	set type  [lindex $row 0]
-	set isrem [lindex $row 1]
-	set isv   [lindex $row 2]
-
-	set hwtypes($type) 1
-	set isremote($type) $isrem
-	set isvirt($type) $isv
-    }
-    sql endquery $DB
 
     # NSE hack: sim type is not in DB. Just adding it now
     set hwtypes(sim) 1
@@ -85,37 +63,22 @@ namespace eval TBCOMPAT {
     #
     # We omit this check in anonymous mode.
     #
-    if {!${GLOBALS::anonymous}} {
-	variable nodetypeXpid_permissions
+    variable nodetypeXpid_permissions
     
-	sql query $DB "select type,pid from nodetypeXpid_permissions"
-	while {[set row [sql fetchrow $DB]] != ""} {
-	    set type  [lindex $row 0]
-	    set allow [lindex $row 1]
-
-	    if {([info exists nodetypeXpid_permissions($type)])} {
-		lappend nodetypeXpid_permissions($type) $allow
-	    } else {
-		set nodetypeXpid_permissions($type) [list $allow]
-	    }
-	}
-	sql endquery $DB
-    }
-
     # And a os table with valid OS Descriptor names. While we still call
     # them "osids", we are using the user level name not the internal,
     # globally unique name. We leave it to a later phase to deal with it.
     #
     # We omit this check in anonymous mode.
-    if {!${GLOBALS::anonymous}} {
-	variable osids
-	sql query $DB \
-	    "select osname from os_info where shared=1 or pid='$pid'"
-	while {[set row [sql fetchrow $DB]] != ""} {
-	    set osids($row) 1
-	}
-	sql endquery $DB
-    }
+    #
+    variable osids
+
+    # The default OSID for the node type. 
+    variable default_osids
+
+    # A mapping of event objects and types.
+    variable objtypes
+    variable eventtypes
 }
 
 # IP addresses routines.  These all do some checks and convert into set-ip
