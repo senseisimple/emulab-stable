@@ -253,7 +253,7 @@ int parse_top(tb_vgraph &VG, istream& i)
     }
   }
 
-  if (errors > 0) {exit(1);}
+  if (errors > 0) {exit(2);}
   
   return num_nodes;
 }

@@ -232,7 +232,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
     }
   }
 
-  if (errors > 0) {exit(1);}
+  if (errors > 0) {exit(2);}
   
   return num_nodes;
 }
