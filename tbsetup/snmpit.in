@@ -756,12 +756,20 @@ sub doVlansFromTables($@) {
 	    # If either is not set, we do nothing. We could make
 	    # a 0 mean 'auto'
 	    #
+	    # For now, we ignore it if the switch doesn't support the commands.
 	    if ($speed) {
 		my $cmd = $speed . "mbit";
-		$errors += $stack->portControl($cmd, $port);
+		my $rv = $stack->portControl($cmd, $port);
+		if ($rv > 0) {
+		    $errors += $rv;
+		}
+
 	    }
 	    if ($duplex) {
-		$errors += $stack->portControl($duplex, $port);
+		my $rv = $stack->portControl($duplex, $port);
+		if ($rv > 0) {
+		    $errors += $rv;
+		}
 	    }
 	}
     }

@@ -172,6 +172,23 @@ sub portControl ($$@) {
 
     $self->debug("portControl: $cmd -> (@ports)\n");
 
+    $self->debug("portControl: Checking supported for $cmd on " .
+	    "$self->{OSTYPE}\n");
+
+    #
+    # Check right up front for unsupported operations
+    #
+    if ($self->{OSTYPE} eq "IOS" && ($cmd !~ /(en|dis)able/)) {
+	#
+	# XXX - Do we silently exit, in which case the caller doesn't know
+	# we failed, or do we exit with an error, in which case the caller has
+	# to know what we support before calling us? We'll go with the latter
+	# for now.
+	#
+	$self->debug("portControl: unsupported\n");
+	return -1;
+    }
+
     #
     # Find the command in the %cmdOIDs hash (defined at the top of this file)
     #
