@@ -110,7 +110,7 @@ if ($mfs) {
 
 my @temp;
 foreach $n (@nodes) {
-    if ($n =~ /^([\w]+)$/) { push(@temp,$1); }
+    if ($n =~ /^([-\w]+)$/) { push(@temp,$1); }
     else { warn("Ignoring bad data in node_id: '$n'\n"); }
 }
 @nodes=@temp;
