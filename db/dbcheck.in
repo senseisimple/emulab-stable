@@ -34,6 +34,7 @@
 # Configure variables
 #
 use lib '@prefix@/lib';
+use libtestbed;
 use libdb;
 
 use strict;
@@ -105,6 +106,9 @@ while (my ($table1, $column1, $table2, $column2) = $result->fetchrow()) {
     # exist
     #
     my $result = DBQueryWarn("SELECT $column1 FROM $table1");
+    if (!$result) {
+	next;
+    }
     while (my @row = $result->fetchrow()) {
 	#
 	# Skip values with undefined results
