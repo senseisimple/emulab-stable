@@ -1,9 +1,0 @@
-sed -e 's/tbpc07/NODE/' /etc/HOSTNAME >! /tmp/tmpsetup
-cp -f /tmp/tmpsetup /etc/HOSTNAME
-sed -e 's/tbpc07/NODE/' /etc/sysconfig/network >! /tmp/tmpsetup
-cp -f /tmp/tmpsetup /etc/sysconfig/network
-hostname NODE.cs.utah.edu
-rm -f /tmp/tmpsetup
-ssh-keygen -P '' -b 1024 -f /tmp/tmpsetup
-cp -f /tmp/tmpsetup /etc/ssh/ssh_host_key
-reboot
