@@ -52,10 +52,22 @@ sub rpc27ctrl {
     }
 
     #
-    # Make a comma-seperated string of all the outlets to reboot
+    # Make a comma-seperated strings of all the outlets to reboot. The RPCs
+    # have a buffer limit of 31 characters, which limits us to 8 outlets
+    # at a time (assuming the longest command and 2-digit outlet numbers)
     #
-    my $outlet = join(",",@outlets);
-
+    my @outlet_strings = ();
+    while (@outlets) {
+	my @tmp_outlets = ();
+	for (my $i = 0; ($i < 8) && (@outlets); $i++) {
+	    push @tmp_outlets,shift(@outlets);
+	}
+	push @outlet_strings, join(",",@tmp_outlets);
+    }
+    if ($debug) {
+	print "outlet_strings: ", join(" ",map("($_)",@outlet_strings)), "\n";
+    }
+    
     #
     # Form the connection to the controller via a "tip" line to the
     # capture process. Once we have that, we can just talk to the
@@ -65,16 +77,40 @@ sub rpc27ctrl {
 	print STDERR "*** Could not form TIP connection to $controller\n";
 	return 1;
     }
-    
+
+    foreach my $outlet (@outlet_strings) {
+	my $command = "$RPC27_CMD{$cmd} $outlet";
+	if (syncandsend($controller,$TIP,$command)) {
+	    #
+	    # On failure, syncandsend has already closed $TIP
+	    #
+	    return 1;
+	}
+    }
+
+    close($TIP);
+    return 0;
+
+}
+
+#
+# Sync up with the power controller, and set it a command. $controller is the
+# controller name, for error message purposes, $TIP is the connection to
+# the controller opened with tipconnect, and $command is the whole command
+# (ie. 'reboot 20,40') to send.
+#
+sub syncandsend($$) {
+    my ($controller,$TIP,$cmd) = @_;
+
     #
     # Send a couple of newlines to get the command prompt, and then wait
     # for it to print out the command prompt. This loop is set for a small
     # number since if it cannot get the prompt quickly, then something has
     # gone wrong.
     #
-    $insync = 0;
+    my $insync = 0;
 
-    for ($i = 0; $i < 20; $i++) {
+    for (my $i = 0; $i < 20; $i++) {
 	my $line;
 
 	if (syswrite($TIP, "\r\n") == 0) {
@@ -109,17 +145,16 @@ sub rpc27ctrl {
     }
 
     if ($debug) {
-	print "Sending '$RPC27_CMD{$cmd} $outlet' to $controller\n";
+	print "Sending '$cmd' to $controller\n";
     }
 
     # Okay, got a prompt. Send it the string:
-    if (syswrite($TIP, "$RPC27_CMD{$cmd} $outlet\r\n") == 0) {
-	print STDERR "*** Power control write failed ($controller/$outlet)\n";
-	close($TIP);
-	return 1;
+    if (syswrite($TIP, "$cmd\r\n") == 0) {
+    	print STDERR "*** Power control write failed ($controller/$outlet)\n";
+    	close($TIP);
+    	return 1;
     }
 
-    close($TIP);
     return 0;
 }
 
@@ -169,7 +204,7 @@ sub tipconnect($) {
     $paddr    = sockaddr_in($portnum, $inetaddr);
     $proto    = getprotobyname('tcp');
 
-    for ($i = 0; $i < 20; $i++) {
+    for (my $i = 0; $i < 20; $i++) {
 	if (! socket(TIP, PF_INET, SOCK_STREAM, $proto)) {
 	    print STDERR "*** Cannot create socket.\n";
 	    return 0;
