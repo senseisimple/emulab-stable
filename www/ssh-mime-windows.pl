@@ -4,8 +4,8 @@
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-use English;
-use Getopt::Std;
+#use English;
+#use Getopt::Std;
 
 #
 # This is a helper program for your web browser. It allows you to ssh
@@ -48,10 +48,10 @@ open STDERR, '>&STDOUT' or die "Can't dup stdout: $!";
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
-if (! getopts($optlist, \%options)) {
-    usage();
-}
+#%options = ();
+#if (! getopts($optlist, \%options)) {
+#    usage();
+#}
 if (@ARGV != 1) {
     usage();
 }
@@ -67,7 +67,7 @@ while (<CONFIG>) {
     chomp();
     SWITCH1: {
 	/^port:\s*(\d+)$/ && do {
-	    $port = "-p $1";
+	    $port = "-P $1";
 	    last SWITCH1;
 	};
 	/^hostname:\s*([-\w\.]+)$/ && do {
