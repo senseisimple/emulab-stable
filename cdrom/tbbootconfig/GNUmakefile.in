@@ -1,0 +1,26 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+EVENTSYS	= @EVENTSYS@
+OBJDIR		= ../..
+SUBDIR		= cdrom/tbbootconfig
+
+include $(OBJDIR)/Makeconf
+
+all:	tbbootconfig
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	+= -O -g -Wall -I${OBJDIR} 
+LFLAGS  += -lz
+
+tbbootconfig: tbbootconfig.c
+	$(CC) $(CFLAGS) -static -g -o tbbootconfig $< $(LFLAGS)
+
+client-install: tbbootconfig
+	$(INSTALL_PROGRAM) tbbootconfig $(DESTDIR)$(CLIENT_BINDIR)
+
+clean:
+	rm -f *.o core tbbootconfig version.c
