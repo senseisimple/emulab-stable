@@ -70,6 +70,11 @@ if (mysql_num_rows($query_result) != 1) {
     $idle_expts = $row[0];
 }
 
+echo "<center><font color=Red size=+1>\n";
+echo "Please see this important <a href=news.php3#43>news item</a> about
+      upcoming <a href=news.php3#43>Emulab Downtime</a>.\n";
+echo "</font></center><br>\n";
+
 ?>
 
 <center>
