@@ -1386,16 +1386,17 @@ COMMAND_PROTOTYPE(doaccounts)
 		res = mydb_query("select distinct "
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "w.trust,'guest','guest',31,u.admin, "
+				 "u.emulab_pubkey,u.home_pubkey, "
 				 "UNIX_TIMESTAMP(u.usr_modified) "
 				 "from widearea_accounts as w "
 				 "left join users as u on u.uid=w.uid "
 				 "where w.trust!='none' and "
 				 "      u.status='active' and node_id='%s' "
 				 "order by u.uid",
-				 10, nodeid);
+				 12, nodeid);
 
 		if (res) {
-			if (mysql_num_rows(res))
+			if ((nrows = mysql_num_rows(res)))
 				goto again;
 			else
 				mysql_free_result(res);
