@@ -40,9 +40,14 @@ NAMESPACEHACK
 #include <stdio.h>
 
 #ifdef WIN32
-#include <sys/timeb.h>
+#  include <sys/timeb.h>
+#  if 0 && defined(_DEBUG)
+#    include <AFX.H>  // For TRACE.
+#  else
+#    define TRACE printf
+#  endif
 #else
-#include <sys/time.h>
+#  include <sys/time.h>
 #endif
 
 #include <math.h>
@@ -1248,6 +1253,11 @@ void HypViewer::hiliteFunc(int x, int y, int shift, int control)
 {
   HypNode *n;
   int picked = doPick(x,y);
+#ifdef WIN32
+  //TRACE("hiliteFunc %d\n", picked);
+  // Kluge around problems with picking nodes on Windows.
+  if (picked < 0 && picked!= -INT_MAX ) picked = -picked;
+#endif
   if (picked != hiliteNode) {
     n = hg->getNodeFromIndex(hiliteNode);
     glDrawBuffer(GL_FRONT);
@@ -1299,6 +1309,10 @@ void HypViewer::pickFunc(int x, int y, int shift, int control)
     //    fprintf(stderr, "total trans %g %g\n", sdx, sdy);
     if (sdx <= .01 && sdx >= -.01 && sdy <= .01 && sdy >= -.01) {
       int picked = doPick(x,y);
+#ifdef WIN32
+      // Kluge around problems with picking nodes on Windows.
+      if (picked < 0 && picked!= -INT_MAX ) picked = -picked;
+#endif
       if (picked >= 0) {
 	// got a node
 	HypNode *n = hg->getNodeFromIndex(picked);
