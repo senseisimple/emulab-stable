@@ -144,16 +144,18 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode)
   if (vlink->link_info.type == tb_link_info::LINK_DIRECT) {
     // DIRECT LINK
     SDEBUG(cerr << "   direct link" << endl);
+    SSUB(SCORE_DIRECT_LINK);
     unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
     vlink->link_info.plinks.clear();
   } else if (vlink->link_info.type == tb_link_info::LINK_INTERSWITCH) {
     // INTERSWITCH LINK
     SDEBUG(cerr << "  interswitch link" << endl);
     
-    pedge_path &path = vlink->link_info.plinks;
 #ifndef INTERSWITCH_LENGTH
     SSUB(SCORE_INTERSWITCH_LINK);
 #endif
+
+    pedge_path &path = vlink->link_info.plinks;
     // XXX: Potentially bogus;
     int numinterlinks;
     numinterlinks = -2;
@@ -231,11 +233,32 @@ void remove_node(vvertex vv)
 
   assert(pnode != NULL);
 
+  /* 
+   * Find the type on the pnode that this vnode is associated with
+   */
+  tb_pnode::types_map::iterator mit = pnode->types.find(vnode->type);
+  tb_pnode::type_record *tr;
+  if (mit == pnode->types.end()) {
+      // This is kind of a hack - if we don't find the type, then the vnode
+      // must have a vtype. So, we assume it must have been assigned to this
+      // node's dynamic type at some point.
+      // A consequence of this hack is that vtypes can't map to static types,
+      // for now.
+      RDEBUG(cerr << "Failed to find type " << vnode->type << " (for vnode " <<
+	  vnode->name << ") on pnode " << pnode->name << endl;)
+      tr = pnode->current_type_record;
+  } else {
+      tr = mit->second;
+  }
+ 
+
   /*
    * Clean up the pnode's state
    */
-  if (pnode->my_class) {
-    pclass_unset(pnode);
+  if (!tr->is_static) {
+    if (pnode->my_class) {
+      pclass_unset(pnode);
+    }
   }
 
 #ifdef SMART_UNMAP
@@ -288,7 +311,13 @@ void remove_node(vvertex vv)
     
     // Only unscore the link if the vnode on the other end is assigned - this
     // way, only the first end to be unmapped causes unscoring
-    if (! dest_vnode->assigned) continue;
+    if (! dest_vnode->assigned) {
+      //cerr << "Skipping link unassignment, because " << dest_vnode->name
+	//<< " is unassigned " << endl;
+      continue;
+    } else {
+      //cerr << "Unassigning, " << dest_vnode->name << " is assigned " << endl;
+    }
     
     // Find the pnode on the ther end of the link, and unscore it!
     pvertex dest_pv = dest_vnode->assignment;
@@ -305,7 +334,8 @@ void remove_node(vvertex vv)
   /*
    * Adjust scores for the pnode
    */
-  pnode->current_load--;
+  tr->current_load--;
+  pnode->total_load--;
 #ifdef LOAD_BALANCE
   // Use this tricky formula to score based on how 'full' the pnode is, so that
   // we prefer to equally fill the minimum number of pnodes
@@ -313,18 +343,19 @@ void remove_node(vvertex vv)
   SADD(SCORE_PNODE * (powf(1+ pnode->current_load * 1.0/pnode->max_load,2)));
 #endif
 
-  if (pnode->current_load == 0) {
+  if (pnode->total_load == 0) {
     // If the pnode is now free, we need to do some cleanup
     SDEBUG(cerr << "  releasing pnode" << endl);
     SSUB(SCORE_PNODE);
-    pnode->typed=false;
-  } else if (pnode->current_load >= pnode->max_load) {
+    pnode->remove_current_type();
+  } else if (tr->current_load >= tr->max_load) {
     // If the pnode is still over its max load, reduce the penalty to adjust
     // for the new load.
     // XXX - This shouldn't ever happen, right? I don't think we can ever
     // over-assign to a pnode.
-    SDEBUG(cerr << "  reducing penalty, new load=" << pnode->current_load <<
-	   " (>= " << pnode->max_load << ")" << endl);
+    SDEBUG(cerr << "  reducing penalty, new load=" <<
+	pnode->current_type_record->current_load <<
+	   " (>= " << pnode->current_type_record->max_load << ")" << endl);
     SSUB(SCORE_PNODE_PENALTY);
     vinfo.pnode_load--;
     violated--;
@@ -346,14 +377,6 @@ void remove_node(vvertex vv)
   SSUB(fds);
   violated -= fd_violated;
   vinfo.desires -= fd_violated;
-
-  /*
-   * If we just unassigned a LAN node, we can delete the pnode entirely
-   */
-  if (vnode->type.compare("lan") == 0) {
-    SDEBUG(cerr << "Deleting lan node." << endl);
-    delete_lan_node(pv);
-  }
 
   SDEBUG(cerr << "  new score = " << score << " new violated = " << violated << endl);
 }
@@ -453,53 +476,76 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   SDEBUG(cerr << "  vnode type = " << vnode->type << endl);
   
   /*
-   * Set up pnode
+   * Handle types - first, check to see if the node is capable of taking on the
+   * vnode's type. If it can with a static type, just do the bookkeeping for
+   * that static type. Otherwise convert the node to the correct dynamic type,
+   * failing if we can't for some reason (ie. it already has another type.
    */
+  tb_pnode::type_record *tr;
+  tb_pnode::types_map::iterator mit = pnode->types.find(vnode->type);
 
-  // Figure out the pnode's type
-  if (!pnode->typed) {
-    // If this pnode has no type yet, give it one
-    SDEBUG(cerr << "  virgin pnode" << endl);
-    SDEBUG(cerr << "    vtype = " << vnode->type << endl);
+  if (mit == pnode->types.end()) {
+    // This pnode can't take on the vnode's type - we normally shouldn't get
+    // here, due to the way we pick pnodes
+    return 1;
+  }
 
-    // Remove check assuming at higher level?
-    // Remove higher level checks?
-    pnode->max_load=0;
-    if (pnode->types.find(vnode->type) != pnode->types.end()) {
-      pnode->max_load = pnode->types[vnode->type];
-    }
-    if (pnode->max_load == 0) {
-      // didn't find a type
-      SDEBUG(cerr << "  no matching type" << endl);
-      return 1;
-    }
-    
-    pnode->current_type=vnode->type;
-    pnode->typed=true;
-
-    SDEBUG(cerr << "  matching type found (" <<pnode->current_type <<
-	   ", max = " << pnode->max_load << ")" << endl);
-  } else {
-    // The pnode already has a type, let's just make sure it's compatible
-    SDEBUG(cerr << "  pnode already has type" << endl);
-    if (pnode->current_type != vnode->type) {
-      SDEBUG(cerr << "  incompatible types" << endl);
-      return 1;
+  tr = mit->second;
+  if (tr->is_static) {
+    // XXX: Scoring???
+    if (tr->current_load < tr->max_load) {
     } else {
-      SDEBUG(cerr << "  compatible types" << endl);
-      if (pnode->current_load == pnode->max_load) {
-	/* XXX - We could ignore this check and let the code
-	   at the end of the routine penalize for going over
-	   load.  Failing here seems to work better though. */
+      return 1;
+    }
+  } else {
+    // Figure out the pnode's type
+    if (!pnode->typed) {
+      // If this pnode has no type yet, give it one
+      SDEBUG(cerr << "  virgin pnode" << endl);
+      SDEBUG(cerr << "    vtype = " << vnode->type << endl);
 
-	// XXX is this a bug?  do we need to revert the pnode/vnode to
-	// it's initial state.
-	SDEBUG(cerr << "  node is full" << endl);
-	cerr << "  node is full" << endl;
+      // Remove check assuming at higher level?
+      // Remove higher level checks?
+      if (!pnode->set_current_type(vnode->type)) {
+	//    pnode->max_load=0;
+	//   if (pnode->types.find(vnode->type) != pnode->types.end()) {
+	//    pnode->max_load = pnode->types[vnode->type];
+	// }
+	//if (pnode->max_load == 0) {
+	// didn't find a type
+	SDEBUG(cerr << "  no matching type" << endl);
+	//cerr << "Failed due to bad type!" << endl;
 	return 1;
       }
+
+      //    pnode->current_type=vnode->type;
+      //    pnode->typed=true;
+
+      SDEBUG(cerr << "  matching type found (" << pnode->current_type <<
+	  ", max = " << pnode->current_type_record->max_load << ")" << endl);
+      } else {
+	// The pnode already has a type, let's just make sure it's compatible
+	SDEBUG(cerr << "  pnode already has type" << endl);
+	if (pnode->current_type != vnode->type) {
+	  SDEBUG(cerr << "  incompatible types" << endl);
+	  return 1;
+	} else {
+	  SDEBUG(cerr << "  compatible types" << endl);
+	  if (pnode->current_type_record->current_load
+	      == pnode->current_type_record->max_load) {
+	    /* XXX - We could ignore this check and let the code
+	       at the end of the routine penalize for going over
+	       load.  Failing here seems to work better though. */
+
+	    // XXX is this a bug?  do we need to revert the pnode/vnode to
+	    // it's initial state.
+	    SDEBUG(cerr << "  node is full" << endl);
+	    cerr << "  node is full" << endl;
+	    return 1;
+	  }
+	}
+      }
     }
-  }
 
 #ifdef PENALIZE_UNUSED_INTERFACES
   pnode->used_interfaces = 0;
@@ -657,9 +703,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 
 	// check for no link
 	if (resolution_index == 0) {
-	  //cerr << "No resolutions at all" << endl;
-	  SDEBUG(cerr << "  Could not find any resolutions. Trying delay." <<
-		 endl);
+	  SDEBUG(cerr << "  Could not find any resolutions." << endl);
 
 	  SADD(SCORE_NO_CONNECTION);
 	  vlink->no_connection=true;
@@ -667,7 +711,6 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	  vlink->link_info.type = tb_link_info::LINK_UNKNOWN;
 	  violated++;
 	} else {
-	  //cerr << "Some resolutions" << endl;
 	  // Check to see if we are fixing a violation
 	  if (vlink->no_connection) {
 	    SDEBUG(cerr << "  Fixing previous violations." << endl);
@@ -724,20 +767,12 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	  score_link_info(*vedge_it,pnode,dest_pnode);
 	}
       }
-#ifdef AUTO_MIGRATE
-      if (dest_vnode->type.compare("lan") == 0) {
-	  //cout << "Auto-migrating LAN " << dest_vnode->name << " (because of "
-	   //   << vnode->name << ")" << endl;
-	  remove_node(dest_vv);
-	  pvertex lanpv = make_lan_node(dest_vv);
-	  add_node(dest_vv,lanpv,false);
-      }
-#endif
     }
   }
   
   // finish setting up pnode
-  pnode->current_load++;
+  tr->current_load++;
+  pnode->total_load++;
 
 #ifdef PENALIZE_UNUSED_INTERFACES
   assert(pnode->used_interfaces <= pnode->total_interfaces);
@@ -746,16 +781,16 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 
   vnode->assignment = pv;
   vnode->assigned = true;
-  if (pnode->current_load > pnode->max_load) {
-    SDEBUG(cerr << "  load to high - penalty (" << pnode->current_load <<
-	   ")" << endl);
+  if (tr->current_load > tr->max_load) {
+    SDEBUG(cerr << "  load too high - penalty (" <<
+	pnode->current_type_record->current_load << ")" << endl);
     SADD(SCORE_PNODE_PENALTY);
     vinfo.pnode_load++;
     violated++;
   } else {
     SDEBUG(cerr << "  load is fine" << endl);
   }
-  if (pnode->current_load == 1) {
+  if (pnode->total_load == 1) {
     SDEBUG(cerr << "  new pnode" << endl);
     SADD(SCORE_PNODE);
 #ifdef LOAD_BALANCE
@@ -802,8 +837,10 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   SDEBUG(cerr << "  assignment=" << vnode->assignment << endl);
   SDEBUG(cerr << "  new score=" << score << " new violated=" << violated << endl);
 
-  if (pnode->my_class) {
-    pclass_set(vnode,pnode);
+  if (!tr->is_static) {
+    if (pnode->my_class) {
+      pclass_set(vnode,pnode);
+    }
   }
   
   return 0;
@@ -971,7 +1008,7 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
 #endif
   
   if (plink->type == tb_plink::PLINK_NORMAL) {
-    // need too account for three things here, the possiblity of a new plink
+    // need to account for three things here, the possiblity of a new plink
     // the user of a new emulated link, and a possible violation.
     if (vlink->emulated) {
       plink->emulated++;
@@ -994,8 +1031,7 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
       }
 #ifdef FIX_SHARED_INTERFACES
       if ((! vlink->emulated) && (plink->nonemulated > 1)) {
-	  //cerr << "Penalizing overused link" << endl;
-	  assert(false);
+	  //assert(false);
 	  SADD(SCORE_DIRECT_LINK_PENALTY);
 	  vinfo.link_users++;
 	  violated++;
@@ -1250,6 +1286,10 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
  * connect the LAN node to.  Specifically, it connects it to the switch
  * which will maximize the number of intra (rather than inter) links for
  * assigned adjancent nodes of vv.
+ *
+ * NOTE: This function is deprecated, since there are no longer special
+ * physical LAN nodes.
+ *
  */
 pvertex make_lan_node(vvertex vv)
 {
@@ -1295,10 +1335,8 @@ pvertex make_lan_node(vvertex vv)
   pvertex pv = add_vertex(PG);
   tb_pnode *p = new tb_pnode(vnode->name);
   put(pvertex_pmap,pv,p);
-  p->typed = true;
-  p->current_type = "lan";
-  p->max_load = 1;
-  p->types["lan"] = 1;
+  p->types["lan"] = new tb_pnode::type_record(1,false);
+  p->set_current_type("lan");
   
   // If the below is false then we have an orphaned lan node which will
   // quickly be destroyed when add_node fails.
@@ -1333,6 +1371,10 @@ pvertex make_lan_node(vvertex vv)
 /* delete_lan_node(pvertex pv)
  * Removes the physical lan node and the physical lan link.  Assumes that
  * nothing is assigned to it.
+ *
+ * NOTE: This function is deprecated, since there are no longer special
+ * physical LAN nodes.
+ *
  */
 void delete_lan_node(pvertex pv)
 {

@@ -67,8 +67,18 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  if (split_two(parsed_line[i],':',type,load,"1") != 0) {
 	    ptop_error("Bad node line, no load for type: " << type << ".");
 	  }
+
+	  // Check to see if this is a static type
+	  bool is_static = false;
+	  if (type[0] == '*') {
+	    is_static = true;
+	    type.pop_front();
+	  }
 	  int iload;
-	  if (sscanf(load.c_str(),"%d",&iload) != 1) {
+	  if (!load.compare("*")) { // Allow * to mean unlimited
+	                            // (okay, a really big number)
+	    iload = 10000000;
+	  } else if (sscanf(load.c_str(),"%d",&iload) != 1) {
 	    ptop_error("Bad node line, bad load: " << load << ".");
 	    iload = 1;
 	  }
@@ -79,14 +89,14 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  }
 	  if (type.compare("switch") == 0) {
 	    isswitch = true;
-	    p->types["switch"] = 1;
+	    p->types["switch"] = new tb_pnode::type_record(1,false);
 	    svertex sv = add_vertex(SG);
 	    tb_switch *s = new tb_switch();
 	    put(svertex_pmap,sv,s);
 	    s->mate = pv;
 	    p->sgraph_switch = sv;
 	  } else {
-	    p->types[type] = iload;
+	    p->types[type] = new tb_pnode::type_record(iload,is_static);
 	  }
 	}
 	for (i=i+1;(i<parsed_line.size()) && (parsed_line[i].compare("-")) ;++i) {
@@ -103,7 +113,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  p->features[feature] = gcost;
 	}
 	/*
-	 * Parse any other node optios or flags
+	 * Parse any other node options or flags
 	 */
 	for (i=i+1; i < parsed_line.size(); ++i) {
 	    crope flag,value;
@@ -215,10 +225,11 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    pl->type = tb_plink::PLINK_INTERSWITCH;
 	  }
 	}
+	srcnode->total_interfaces++;
+	dstnode->total_interfaces++;
 	if (ISSWITCH(srcnode) &&
 	    ! ISSWITCH(dstnode)) {
 	  dstnode->switches.insert(srcv);
-	  dstnode->total_interfaces++;
 #ifdef PER_VNODE_TT
 	  dstnode->total_bandwidth += ibw;
 #endif
@@ -226,7 +237,6 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	else if (ISSWITCH(dstnode) &&
 		 ! ISSWITCH(srcnode)) {
 	  srcnode->switches.insert(dstv);
-	  srcnode->total_interfaces++;
 #ifdef PER_VNODE_TT
 	  srcnode->total_bandwidth += ibw;
 #endif

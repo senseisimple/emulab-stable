@@ -80,8 +80,6 @@ inline int accept(double change, double temperature);
 tb_pnode *find_pnode(tb_vnode *vn);
 
 /* The big guy! */
-void anneal();
-
-
+void anneal(bool scoring_selftest);
 
 #endif

@@ -90,7 +90,7 @@ $nodetypes{"switch"} = 0;
 
 # Print switches
 if (defined($switchtouse)) {
-    print "node $switchtouse switch:1\n";
+    print "node $switchtouse switch:1 *lan:*\n";
     $switches{$switchtouse} = 1;
 }
 else {
@@ -98,7 +98,7 @@ else {
 	DBQueryFatal("select node_id from nodes where role = \"testswitch\"");
 
     while (($switch) = $result->fetchrow_array) {
-	print "node $switch switch:1\n";
+	print "node $switch switch:1 *lan:*\n";
 	$switches{$switch} = 1;
     }
     $result->finish;

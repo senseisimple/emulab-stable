@@ -66,10 +66,10 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
   for (tb_pnode::types_map::iterator it=a->types.begin();
        it!=a->types.end();++it) {
     const crope &a_type = (*it).first;
-    const int a_max_nodes = (*it).second;
+    tb_pnode::type_record *a_type_record = (*it).second;
     
     tb_pnode::types_map::iterator bit = b->types.find(a_type);
-    if ((bit == b->types.end()) ||((*bit).second != a_max_nodes))
+    if ((bit == b->types.end()) || ! ( *(*bit).second == *a_type_record) )
       return 0;
   }
 
@@ -222,7 +222,8 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
   for (dit=c->members.begin();dit!=c->members.end();dit++) {
     if ((*dit).first == p->current_type) {
       // same class - only remove if node is full
-      if (p->current_load == p->max_load) {
+      if (p->types[p->current_type]->current_load ==
+	      p->types[p->current_type]->max_load) {
 	(*dit).second->remove(p);
 //#ifdef SMART_UNMAP
 //	c->used_members[(*dit).first]->push_back(p);
@@ -246,7 +247,7 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
   }
 
   
-  c->used += 1.0/(p->max_load);
+  c->used += 1.0/(p->current_type_record->max_load);
   
   return 0;
 }
@@ -266,12 +267,12 @@ int pclass_unset(tb_pnode *p)
       // empty and the front if it's not.  Since unset is called before
       // remove_node empty means only one user.
       if (! (*dit).second->exists(p)) {
-	assert(p->current_load > 0);
+	assert(p->types[p->current_type]->current_load > 0);
 #ifdef PNODE_ALWAYS_FRONT
 	(*dit).second->push_front(p);
 #else
 #ifdef PNODE_SWITCH_LOAD
-	if (p->current_load == 0) {
+	if (p->types[p->current_type]->current_load == 0) {
 #else
 	if (p->current_load == 1) {
 #endif
@@ -295,7 +296,7 @@ int pclass_unset(tb_pnode *p)
 
   //cout << endl;
 
-  c->used -= 1.0/(p->max_load);
+  c->used -= 1.0/(p->current_type_record->max_load);
   
   return 0;
 }

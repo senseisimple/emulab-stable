@@ -44,8 +44,10 @@ void print_solution()
 	if (vlink->link_info.type == tb_link_info::LINK_DIRECT) {
 	    // Direct link - just need the source and destination
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
+	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
 	    cout << " direct " << p->name << " (" <<
-		p->srcmac << "," << p->dstmac << ")";
+		p->srcmac << "," << p->dstmac << ") " <<
+		p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
 	} else if (vlink->link_info.type == tb_link_info::LINK_INTRASWITCH) {
 	    // Intraswitch link - need to grab the plinks to both nodes
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());

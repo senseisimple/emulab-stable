@@ -71,13 +71,34 @@ class tb_pnode {
 public:
   tb_pnode() { tb_pnode("(unnamed)"); }
   tb_pnode(crope _name) : types(), features(), name(_name), typed(false),
-			  max_load(0), current_load(0), switches(),
-			  sgraph_switch(), switch_used_links(0),
+  			  current_type_record(NULL), total_load(0),
+			  switches(), sgraph_switch(), switch_used_links(0),
 			  total_interfaces(0), used_interfaces(0),
 			  total_bandwidth(0), my_class(NULL), assigned_nodes(),
 			  trivial_bw(0), trivial_bw_used(0) {;}
 
-  typedef hash_map<crope,int> types_map;
+  class type_record {
+      public:
+	  type_record(int _max_load, bool _is_static) :
+	      max_load(_max_load), current_load(0),
+	      is_static(_is_static) { ; }
+	  int max_load;		// maximum load for this type
+	  int current_load;	// how many vnodes are assigned of this type
+	  bool is_static;	// whether this type is static or dynamic
+
+	  bool operator==(const type_record &b) {
+	      return ((max_load == b.max_load) && (is_static == b.is_static));
+	  }
+
+	  friend ostream &operator<<(ostream &o, const type_record& node)
+	  {
+	      o << "max_load = " << node.max_load <<
+		   " current_load = " << node.current_load <<
+		   " is_static = " << node.is_static;
+	  }
+  };
+
+  typedef hash_map<crope,type_record*> types_map;
   typedef hash_map<crope,double> features_map;
 
   // contains max nodes for each type
@@ -89,8 +110,10 @@ public:
   crope name;			// name of the node
   bool typed;			// has it been typed
   crope current_type;		// type the node is currently being used as
-  int max_load;			// maxmium load for current type
-  int current_load;		// how many vnodes are assigned to this pnode
+  type_record* current_type_record;
+  int total_load;		// total load for all types
+  //int max_load;			// maxmium load for current type
+  //int current_load;		// how many vnodes are assigned to this pnode
   pvertex_set switches;		// what switches the node is attached to
 
   svertex sgraph_switch;	// only for switches, the corresponding
@@ -111,6 +134,22 @@ public:
   int trivial_bw_used;		// the amount of bandwidth currently used by
   				// trivial links
 	
+  bool set_current_type(crope type) {
+      if (types.find(type) == types.end()) {
+	  //cout << "Failed to find type " << type << endl;
+	  return false;
+      }
+      current_type = type;
+      typed = true;
+      current_type_record = types[type];
+      return true;
+  }
+
+  void remove_current_type() {
+      typed = false;
+      current_type_record = NULL;
+  }
+
   // Output operator for debugging
   friend ostream &operator<<(ostream &o, const tb_pnode& node)
     {
@@ -123,8 +162,8 @@ public:
       for (features_map::const_iterator it = node.features.begin();
 	   it!=node.features.end();it++) 
 	cout << "    " << (*it).first << " -> " << (*it).second << endl;
-      o << "  Current Type: " << node.current_type <<
-	" (" << node.current_load << "/" << node.max_load << ")" <<  endl;
+      o << "  Current Type: " << node.current_type << endl; /* <<
+	" (" << node.current_load << "/" << node.max_load << ")" <<  endl; */
       o << "  switches=";
       for (pvertex_set::const_iterator it = node.switches.begin();
 	   it != node.switches.end();++it) {

@@ -48,6 +48,18 @@ inline int accept(double change, double temperature)
   return 0;
 }
 
+// finds a random pnode, of any type at all
+tb_pnode *find_random_pnode() {
+  int choice = std::random() % num_vertices(PG);
+  pvertex_iterator vit, vendit;
+  tie(vit,vendit) = vertices(PG);
+  cout << "Chose pnode " << choice << " of " << num_vertices(PG) << endl;
+  for (int i = 0; i < choice;++vit, ++i) {
+  }
+  tb_pnode *curP = get(pvertex_pmap,*vit);
+  return curP;
+}
+
 tb_pnode *find_pnode(tb_vnode *vn)
 {
 #ifdef PER_VNODE_TT
@@ -67,7 +79,6 @@ tb_pnode *find_pnode(tb_vnode *vn)
 #ifdef PCLASS_SIZE_BALANCE
     int acceptchance = 1000 * (*acceptable_types)[i]->size * 1.0 /
 	npnodes;
-    //cout << "Chance was " << acceptchance << endl;
     if ((std::rand() % 1000) < acceptchance) {
 	continue;
     }
@@ -119,7 +130,8 @@ REDO_SEARCH:
 	}
 #else
 	if ((*it)->typed && ((*it)->current_type.compare(vn->type) ||
-			     ((*it)->current_load >= (*it)->max_load))) {
+		    ((*it)->current_type_record->current_load >=
+		     (*it)->current_type_record->max_load))) {
 	    it++;
 	} else {
 	    break;
@@ -152,7 +164,7 @@ REDO_SEARCH:
       RDEBUG(cout << " to " << newpnode->name << endl;)
       return newpnode;
     }
-    
+
 #ifndef PCLASS_SIZE_BALANCE
     if (i == first) {
 	// couldn't find one
@@ -164,7 +176,7 @@ REDO_SEARCH:
 
 
 /* When this is finished the state will reflect the best solution found. */
-void anneal()
+void anneal(bool scoring_selftest)
 {
   cout << "Annealing." << endl;
 
@@ -212,6 +224,10 @@ void anneal()
 
   /* Set up the initial counts */
   init_score();
+
+  /* We'll check against this later to make sure that whe we've unmapped
+   * everything, the score is the same */
+  double initial_score = get_score();
 
   /* Set up fixed nodes */
   for (name_name_map::iterator fixed_it=fixed_nodes.begin();
@@ -383,12 +399,7 @@ void anneal()
       } else {
 	int start = std::random()%nnodes;
 	int choice = start;
-#if defined(FIX_LAN_NODES) || defined(AUTO_MIGRATE)
-	while (get(vvertex_pmap,virtual_nodes[choice])->fixed ||
-		!get(vvertex_pmap,virtual_nodes[choice])->type.compare("lan")) {
-#else
 	while (get(vvertex_pmap,virtual_nodes[choice])->fixed) {
-#endif
 	  choice = (choice +1) % nnodes;
 	  if (choice == start) {
 	      choice = -1;
@@ -423,192 +434,156 @@ void anneal()
 	    vn->vclass->dominant << endl;
 #endif
       }
-      if (vn->type.compare("lan") == 0) {
-	// LAN node
-	pvertex lanv = make_lan_node(vv);
+      tb_pnode *newpnode = find_pnode(vn);
 #ifndef FREE_IMMEDIATELY
-	if (oldassigned) {
-	  RDEBUG(cout << "removing: lan,oldassigned" << endl;)
+      if (oldassigned) {
+	RDEBUG(cout << "removing: !lan, oldassigned" << endl;)
 	  remove_node(vv);
-	}
+      }
 #endif
-	if (add_node(vv,lanv,false) != 0) {
-	  delete_lan_node(lanv);
-	  unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
-	  continue;
-	}
-      } else {
-	tb_pnode *newpnode = find_pnode(vn);
-#ifndef FREE_IMMEDIATELY
-	if (oldassigned) {
-	  RDEBUG(cout << "removing: !lan, oldassigned" << endl;)
-	  remove_node(vv);
-	}
-#endif
-	if (newpnode == NULL) {
-	  // We're not going to be re-assigning this one
+      if (newpnode == NULL) {
+	// We're not going to be re-assigning this one
 #ifndef SMART_UNMAP
-	  unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
+	unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
 #endif
-	  // need to free up nodes
+	// need to free up nodes
 #ifdef SMART_UNMAP
-     	  // XXX: Should probably randomize this
-	  // XXX: Add support for not using PER_VNODE_TT
-	  // XXX: Not very robust
+	// XXX: Should probably randomize this
+	// XXX: Add support for not using PER_VNODE_TT
+	// XXX: Not very robust
 
-	  freednode = true;
+	freednode = true;
 
-	  tt_entry tt = vnode_type_table[vn->name];
-	  int size = tt.first;
-	  pclass_vector *acceptable_types = tt.second;
-	  // Find a node to kick out
-	  bool foundnode = false;
-	  int offi = std::rand();
-	  int index;
-	  for (int i = 0; i < size; i++) {
-	      index = (i + offi) % size;
-	      if ((*acceptable_types)[index]->used_members.find(vn->type) ==
-		      (*acceptable_types)[index]->used_members.end()) {
-		  continue;
-	      }
-	      if ((*acceptable_types)[index]->used_members[vn->type]->size() == 0) {
-		  continue;
-	      }
-	      foundnode = true;
-	      break;
+	tt_entry tt = vnode_type_table[vn->name];
+	int size = tt.first;
+	pclass_vector *acceptable_types = tt.second;
+	// Find a node to kick out
+	bool foundnode = false;
+	int offi = std::rand();
+	int index;
+	for (int i = 0; i < size; i++) {
+	  index = (i + offi) % size;
+	  if ((*acceptable_types)[index]->used_members.find(vn->type) ==
+	      (*acceptable_types)[index]->used_members.end()) {
+	    continue;
 	  }
-
-	  if (foundnode) {
-	      assert((*acceptable_types)[index]->used_members[vn->type]->size());
-	      tb_pclass::tb_pnodeset::iterator it = (*acceptable_types)[index]->used_members[vn->type]->begin();
-	      int j = std::rand() % (*acceptable_types)[index]->used_members[vn->type]->size();
-	      while (j > 0) {
-		  it++;
-		  j--;
-	      }
-	      tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
-	      int k = std::rand() % (*it)->assigned_nodes.size();
-	      while (k > 0) {
-		  it2++;
-		  k--;
-	      }
-	      tb_vnode *kickout = *it2;
-	      assert(kickout->assigned);
-	      vvertex toremove = vname2vertex[kickout->name];
-	      newpnode = *it;
-	      remove_node(toremove);
-	      unassigned_nodes.push(vvertex_int_pair(toremove,
-			  std::random()));
-	  } else {
-	      cerr << "Failed to find a replacement!" << endl;
+	  if ((*acceptable_types)[index]->used_members[vn->type]->size() == 0) {
+	    continue;
 	  }
+	  foundnode = true;
+	  break;
+	}
+
+	if (foundnode) {
+	  assert((*acceptable_types)[index]->used_members[vn->type]->size());
+	  tb_pclass::tb_pnodeset::iterator it = (*acceptable_types)[index]->used_members[vn->type]->begin();
+	  int j = std::rand() % (*acceptable_types)[index]->used_members[vn->type]->size();
+	  while (j > 0) {
+	    it++;
+	    j--;
+	  }
+	  tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
+	  int k = std::rand() % (*it)->assigned_nodes.size();
+	  while (k > 0) {
+	    it2++;
+	    k--;
+	  }
+	  tb_vnode *kickout = *it2;
+	  assert(kickout->assigned);
+	  vvertex toremove = vname2vertex[kickout->name];
+	  newpnode = *it;
+	  remove_node(toremove);
+	  unassigned_nodes.push(vvertex_int_pair(toremove,
+		std::random()));
+	} else {
+	  cerr << "Failed to find a replacement!" << endl;
+	}
 
 #else
-	  int start = std::random()%nnodes;
-	  int toremove = start;
-#if defined(FIX_LAN_NODES) || defined(AUTO_MIGRATE)
-	  while (get(vvertex_pmap,virtual_nodes[toremove])->fixed ||
-		 (!get(vvertex_pmap,virtual_nodes[toremove])->assigned) ||
-		 (get(vvertex_pmap,virtual_nodes[toremove])->type.compare("lan"))) {
-#else
+	int start = std::random()%nnodes;
+	int toremove = start;
 #ifdef SMART_UNMAP
 
 #ifdef PER_VNODE_TT
-          tt_entry tt = vnode_type_table[vn->name];
+	  tt_entry tt = vnode_type_table[vn->name];
 #else
 	  tt_entry tt = type_table[vn->type];
 #endif
 	  pclass_vector *acceptable_types = tt.second;
 
 	  while (1) {
-	      bool keepgoing = false;
-	      if (get(vvertex_pmap,virtual_nodes[toremove])->fixed) {
-		  keepgoing = true;
-	      } else if (! get(vvertex_pmap,virtual_nodes[toremove])->assigned) {
-		  keepgoing = true;
-	      } else {
-		  pvertex pv = get(vvertex_pmap,virtual_nodes[toremove])->assignment;
-		  tb_pnode *pn = get(pvertex_pmap,pv);
-		  int j;
-		  for (j = 0; j < acceptable_types->size(); j++) {
-		      if ((*acceptable_types)[j] == pn->my_class) {
-			  break;
-		      }
-		  }
-		  if (j == acceptable_types->size()) {
-		      keepgoing = true;
-		  }
-	      }
-
-	      if (!keepgoing) {
+	    bool keepgoing = false;
+	    if (get(vvertex_pmap,virtual_nodes[toremove])->fixed) {
+	      keepgoing = true;
+	    } else if (! get(vvertex_pmap,virtual_nodes[toremove])->assigned) {
+	      keepgoing = true;
+	    } else {
+	      pvertex pv = get(vvertex_pmap,virtual_nodes[toremove])->assignment;
+	      tb_pnode *pn = get(pvertex_pmap,pv);
+	      int j;
+	      for (j = 0; j < acceptable_types->size(); j++) {
+		if ((*acceptable_types)[j] == pn->my_class) {
 		  break;
+		}
 	      }
-		  
+	      if (j == acceptable_types->size()) {
+		keepgoing = true;
+	      }
+	    }
+
+	    if (!keepgoing) {
+	      break;
+	    }
+
 #else
-	  while (get(vvertex_pmap,virtual_nodes[toremove])->fixed ||
-		 (! get(vvertex_pmap,virtual_nodes[toremove])->assigned)) {
-#endif
+	    while (get(vvertex_pmap,virtual_nodes[toremove])->fixed ||
+		(! get(vvertex_pmap,virtual_nodes[toremove])->assigned)) {
 #endif
 	      toremove = (toremove +1) % nnodes;
 	      if (toremove == start) {
-		  toremove = -1;
-		  break;
+		toremove = -1;
+		break;
 	      }
-	  }
-	  if (toremove >= 0) {
+	    }
+	    if (toremove >= 0) {
 	      RDEBUG(cout << "removing: freeing up nodes" << endl;)
-	      remove_node(virtual_nodes[toremove]);
+		remove_node(virtual_nodes[toremove]);
 	      unassigned_nodes.push(vvertex_int_pair(virtual_nodes[toremove],
-						     std::random()));
-	  }
-	  continue;
+		    std::random()));
+	    }
+	    continue;
 #endif /* SMART_UNMAP */
 #ifndef SMART_UNMAP
-	} else {
+	  } else {
 #else
-	}
+	  }
 #endif
 	  if (newpnode != NULL) {
-	      newpos = pnode2vertex[newpnode];
-	      if (add_node(vv,newpos,false) != 0) {
-		  unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
-		  continue;
+	    newpos = pnode2vertex[newpnode];
+	    if (scoring_selftest) {
+	      // Run a little test here - see if the score we get by adding
+	      // this node, then removing it, is the same one we would have
+	      // gotten otherwise
+	      double oldscore = get_score();
+	      if (!add_node(vv,newpos,false)) {
+		remove_node(vv);
 	      }
+	      assert(oldscore == get_score());
+	    }
+	    if (add_node(vv,newpos,false) != 0) {
+	      unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
+	      continue;
+	    }
 	  } else {
 #ifdef SMART_UNMAP
-		  unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
+	    unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
 #endif
-	      if (freednode) {
-		  continue;
-	      }
+	    if (freednode) {
+	      continue;
+	    }
 	  }
 #ifndef SMART_UNMAP
 	}
-#endif
-      }
-
-#ifdef FIX_LAN_NODES
-      // OK, we're going to do something silly here: Migrate LAN nodes!
-      vvertex_iterator lanvertex_it,end_lanvertex_it;
-      vvertex_list migrate_lan_nodes;
-      tie(lanvertex_it,end_lanvertex_it) = vertices(VG);
-      for (;lanvertex_it!=end_lanvertex_it;++lanvertex_it) {
-	  tb_vnode *vnode = get(vvertex_pmap,*lanvertex_it);
-	  if (vnode->assigned) {
-	      if (vnode->type.compare("lan") == 0) {
-		  migrate_lan_nodes.push_front(*lanvertex_it);
-	      }
-	  }
-      }
-      while (migrate_lan_nodes.size() > 0) {
-	  vvertex lanv = migrate_lan_nodes.front();
-	  migrate_lan_nodes.pop_front();
-	  RDEBUG(cout << "removing: migration" << endl;)
-	  remove_node(lanv);
-	  pvertex lanpv = make_lan_node(lanv);
-	  add_node(lanv,lanpv,true);
-      }
-
 #endif
 
       newscore = get_score();
@@ -717,9 +692,6 @@ void anneal()
 	RDEBUG(cout << "removing: rejected change" << endl;)
 	remove_node(vv);
 	if (oldassigned) {
-	  if (vn->type.compare("lan") == 0) {
-	    oldpos = make_lan_node(vv);
-	  }
 	  add_node(vv,oldpos,false);
 	}
       }
@@ -904,18 +876,7 @@ NOTQUITEDONE:
     // Only revert if the best configuration has better violations
     vvertex_list lan_nodes;
     vvertex_iterator vvertex_it,end_vvertex_it;
-    if (!revert) {
-      // Just find LAN nodes, for migration
-      tie(vvertex_it,end_vvertex_it) = vertices(VG);
-      for (;vvertex_it!=end_vvertex_it;++vvertex_it) {
-	tb_vnode *vnode = get(vvertex_pmap,*vvertex_it);
-	if (vnode->assigned) {
-	  if (vnode->type.compare("lan") == 0) {
-	    lan_nodes.push_front(*vvertex_it);
-	  }
-	}
-      } 
-    } else {
+    if (revert) {
       cout << "Reverting to best solution\n";
       // Do a full revert
       tie(vvertex_it,end_vvertex_it) = vertices(VG);
@@ -929,34 +890,26 @@ NOTQUITEDONE:
 	  RDEBUG(cout << "not removing: revert " << vnode->name << endl;)
 	}
       }
+
+      // Check to make sure that our 'clean' solution scores the same as
+      // the initial score - if not, that indicates a bug
+      if (get_score() != initial_score) {
+	  cerr << "*** WARNING: 'Clean' score does not match initial score" <<
+	      endl << "     This indicates a bug - contact the operators" <<
+	      endl << "     (initial score: " << initial_score <<
+	      ", current score: " << get_score() << ")" << endl;
+      }
       tie(vvertex_it,end_vvertex_it) = vertices(VG);
       for (;vvertex_it!=end_vvertex_it;++vvertex_it) {
 	tb_vnode *vnode = get(vvertex_pmap,*vvertex_it);
 	if (vnode->fixed) continue;
 	if (absassigned[*vvertex_it]) {
-	  if (vnode->type.compare("lan") == 0) {
-	    lan_nodes.push_front(*vvertex_it);
-	  } else {
-	    if (vnode->vclass != NULL) {
-	      vnode->type = abstypes[*vvertex_it];
-	    }
-	    assert(!add_node(*vvertex_it,absassignment[*vvertex_it],true));
+	  if (vnode->vclass != NULL) {
+	    vnode->type = abstypes[*vvertex_it];
 	  }
+	  assert(!add_node(*vvertex_it,absassignment[*vvertex_it],true));
 	}
       }
-    }
-
-    // Do LAN migration
-    RDEBUG(cout << "Doing LAN migration" << endl;)
-    while (lan_nodes.size() > 0) {
-      vvertex lanv = lan_nodes.front();
-      lan_nodes.pop_front();
-      if (!revert) { // If reverting, we've already done this
-	  RDEBUG(cout << "removing: migration" << endl;)
-	  remove_node(lanv);
-      }
-      pvertex lanpv = make_lan_node(lanv);
-      add_node(lanv,lanpv,true);
     }
 
     tsteps++;

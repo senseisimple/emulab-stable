@@ -298,6 +298,7 @@ void print_help()
 #ifdef PER_VNODE_TT
   cerr << "  -P          - Prune unusable pclasses." << endl;
 #endif
+  cerr << "  -T          - Doing some scoring self-testing." << endl;
   exit(2);
 }
  
@@ -312,11 +313,6 @@ int type_precheck() {
     for (name_count_map::iterator vtype_it=vtypes.begin();
 	    vtype_it != vtypes.end();++vtype_it) {
     
-	// Ignore LAN vnodes
-	if (vtype_it->first == crope("lan")) {
-	    continue;
-	}
-
 	// Check to see if there were any pnodes of the type at all
 	name_count_map::iterator ptype_it = ptypes.find(vtype_it->first);
 	if (ptype_it == ptypes.end()) {
@@ -366,11 +362,6 @@ int mapping_precheck() {
 
     for (;vit != vendit;vit++) {
 	tb_vnode *v = get(vvertex_pmap,*vit);
-	//
-	// No reason to do this work for LAN nodes!
-	if (!v->type.compare("lan")) {
-	    continue;
-	}
 
 	pclass_vector *vec = new pclass_vector();
 	vnode_type_table[v->name] = tt_entry(0,vec);
@@ -405,8 +396,12 @@ int mapping_precheck() {
 		// Grab the first node of the pclass as a representative sample
 		tb_pnode *pnode = *((*it)->members[this_type]->L.begin());
 
-		// Check the number of interfaces
-		if (pnode->total_interfaces >= v->num_links) {
+		// Check the number of interfaces - if the pnode is a switch,
+		// for now, we don't check this, since it can end up with more
+		// 'interfaces' due to the fact that it can have interswitch
+		// links
+		if ((pnode->total_interfaces >= v->num_links) ||
+			pnode->current_type.compare("switch")) {
 		    matched_links++;
 		} else {
 		    potential_match = false;
@@ -529,6 +524,7 @@ int main(int argc,char **argv)
 {
   int seed = 0;
   crope viz_prefix;
+  bool scoring_selftest = false;
   
   // Handle command line
   char ch;
@@ -566,6 +562,8 @@ int main(int argc,char **argv)
     case 'P':
       prune_pclasses = true; break;
 #endif
+    case 'T':
+      scoring_selftest = true; break;
     default:
       print_help();
     }
@@ -653,8 +651,9 @@ int main(int argc,char **argv)
   }
  
   timestart = used_time();
-  anneal();
+  anneal(scoring_selftest);
   timeend = used_time();
+
 #ifdef GNUPLOT_OUTPUT
   fclose(scoresout);
   fclose(tempout);

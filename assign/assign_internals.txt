@@ -63,20 +63,24 @@ Each vnode has a type and a valid solution must match each vnode to a
 pnode that can support that type.  A vnode has a single type but a
 pnode may be able to support several types and even have multiple
 vnodes in a single vnode.  For example, a standard testbed PC with
-four interfaces can either be a test node or up to two delay nodes.  A
-pnode that has not been matched to a vnode is called virgin and can
-take on any of its types.  Once it has been mapped to a vnode it
-becomes typed and is locked into a certain type (that of the vnode).
-When add_node is called the first thing checked is whether the pnode
-has a suitable type for the vnode.  If it is virgin then all its types
-are checked, otherwise only its current type is checked.  If the types
-can not be matched then add_node returns an invalid condition,
-otherwise it continues on.
+four interfaces can either be a test node or up to two delay nodes.
+The type system is composed of two classes of types: 'dynamic' types,
+and 'static' types. A pnode can always satisfy any of its static
+types, but has only one of its dynamic types 'active' at any time.  A
+pnode that has not been matched to a vnode using one of its dynamic
+types is called virgin and can take on any of its dynamic types.  Once
+it has been mapped to a vnode it becomes typed and is locked into a
+certain type (that of the vnode).  When add_node is called the first
+thing checked is whether the pnode has a suitable type for the vnode.
+If the vnode uses a static type, the pnode must simply have available
+capacity for that type. Otherwise, dynamic types are checked. If it is
+virgin then all its types are checked, otherwise only its current type
+is checked.  If the types can not be matched then add_node returns an
+invalid condition, otherwise it continues on.
 
 Each type of a pnode also has a limit.  This is the number of vnodes
-of that type that can fit in the pnode.  A vnode can not be placed in a pnode unless there is room left.
-
-Under no conditions is a vnode mapped to a switch.
+of that type that can fit in the pnode.  A vnode can not be placed in
+a pnode unless there is room left.
 
 Links
 -----
