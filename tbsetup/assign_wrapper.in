@@ -21,28 +21,33 @@ $delaythresh = 3;
 $maxrun = 5;
 $delaywithswitch=0;
 
-use DBI;
-
 $DELAYCAPACITY = @DELAYCAPACITY@;
 $TBROOT = "@prefix@";
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
-$TBDB = "@TBDBNAME@";
-$TBLIB = "$TBROOT/lib";
-push(@INC,$TBLIB);
 
+use lib '@prefix@/lib';
+use libdb;
 require exitonwarn;
 
-$dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost") || 
-    die "Could not connect to DB.\n";
+use Getopt::Std;
+
+getopts('v',\%opt);
+
+sub usage {
+	print "Usage: $0 [-v] pid eid\n";
+	print "		-v enables verbose output\n";
+	return 1;
+}
 
 $verbose = 0;
-if (($#ARGV == 2) && ($ARGV[0] eq "-v")) {
-    $verbose = 1;
-    shift;
-} elsif ($#ARGV != 1) {
-    print STDERR "Syntax: $0 pid eid\n";
-    exit(1);
+if ($opt{v}) {
+	$verbose = 1;
 }
+
+if (@ARGV != 2) {
+	exit &usage();
+}
+
 ($pid,$eid) = @ARGV;
 
 $ptopfile = "$pid-$eid-$$.ptop";
@@ -124,21 +129,19 @@ printdb "Generating TOP file.\n";
 
 # Let's figure out what kind of links we have.
 printdb "Finding interface speeds:";
-$sth=$dbh->prepare("SELECT type,max_speed from interface_types");
-$sth->execute;
-while (($type,$bandwidth) = $sth->fetchrow_array) {
+my $result = DBQueryFatal("SELECT type,max_speed from interface_types");
+while (($type,$bandwidth) = $result->fetchrow_array) {
     $okbandwidths{$bandwidth} = 1;
     $interfacespeed{$type} = $bandwidth;
     printdb " $bandwidth";
 }
-$sth->finish;
+$result->finish;
 printdb "\n";
 
 printdb "Loading virt_nodes.\n";
-$sth = $dbh->prepare("SELECT vname,ips,type from virt_nodes" .
+$result = DBQueryFatal("SELECT vname,ips,type from virt_nodes" .
 		     " where pid=\"$pid\" and eid=\"$eid\"");
-$sth->execute;
-while (($vname,$ips,$type) = $sth->fetchrow_array) {
+while (($vname,$ips,$type) = $result->fetchrow_array) {
     printdb "  $vname $type $ips\n";
     # We need to check the names to make sure they won't clash with
     # our internal delay node names.
@@ -155,13 +158,12 @@ while (($vname,$ips,$type) = $sth->fetchrow_array) {
 	$ips{"$vname:$port"} = $ip;
     }
 }
-$sth->finish;
+$result->finish;
 
 printdb "Loading virt_lans.\n";
-$sth = $dbh->prepare("SELECT vname,member,delay,bandwidth,lossrate" .
+$result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
 		     " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
-$sth->execute;
-while (($vname,$member,$delay,$bandwidth,$lossrate) = $sth->fetchrow_array) {
+while (($vname,$member,$delay,$bandwidth,$lossrate) = $result->fetchrow_array) {
     if (! defined($lans{$vname})) {
 	$lans{$vname} = [];
     }
@@ -178,7 +180,7 @@ while (($vname,$member,$delay,$bandwidth,$lossrate) = $sth->fetchrow_array) {
     printdb "  $vname $member - $delay $bandwidth $lossrate\n";
     printdb "    Added $port:$vname to nodelans of $node\n";
 }
-$sth->finish;
+$result->finish;
 
 # Shark hack
 foreach $lan (keys(%lans)) {
@@ -207,28 +209,6 @@ foreach $lan (keys(%lans)) {
     $lans{$lan} = $realmembers;
 }
 # End shark hack
-
-# min(a,b)
-# Returns the minimum of a and b.
-sub min {
-    my ($a,$b) = @_;
-    return ($a < $b ? $a : $b);
-};
-
-# getbandwidth(bw)
-# Returns the lowest ok bandwidth that is greater than or equal to
-# the one passed.
-sub getbandwidth {
-    my $targetbandwidth= $_[0];
-    my $bandwidth;
-    my $best = 10000000000;
-    foreach $bandwidth (keys(%okbandwidths)) {
-	if (($bandwidth >= $targetbandwidth) && ($bandwidth < $best)) {
-	    $best = $bandwidth;
-	}
-    }
-    return $best;
-};
 
 # Open the TOP file
 $topfile = "$pid-$eid-$$.top";
@@ -334,7 +314,7 @@ close TOPFILE;
 # Set estimations
 $minimum_nodes = $nodes + $delaynodes/$DELAYCAPACITY;
 $maximum_nodes = $nodes + $delaynodes;
-$dbh->do("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
+DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
 	 "minimum_nodes=$minimum_nodes where pid=\"$pid\" and eid=\"$eid\"");
 print "Minumum nodes = $minimum_nodes\n";
 print "Maximum nodes = $maximum_nodes\n";
@@ -354,32 +334,6 @@ print "Maximum nodes = $maximum_nodes\n";
 #  the second.
 #######################################################################
 
-# getnodeport(s)
-# Takes a ports result from assign (mac0,mac1) and returns the
-# first non-null one.
-sub getnodeport {
-    $macstring=$_[0];
-    ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
-    if ($A ne "(null)") {
-	return $A;
-    } else {
-	return $B;
-    }
-};
-
-# isdelay(pnodeport)
-# Takes a physical nodeport and retruns 1 if the node is a delay node.
-sub isdelay {
-    my $pnodeport = $_[0];
-
-    my $node = (split(":",$pnodeport))[0];
-    if (($p2vmap{$node} =~ m|^delay/|) ||
-	($p2vmap{$node} =~ m|^sdelay.|)) {
-	return 1;
-    } 
-    return 0;
-};
-
 $currentrun = 1;
 while (1) {
     print "Assign Run $currentrun\n";
@@ -398,7 +352,8 @@ while (1) {
     system("ptopgen > $ptopfile");
 
     # Get number of nodes
-    $numnodes = $dbh->do("select a.node_id,a.type from" .
+    # NOTE: The result of a DBQuery, in scalar context, is the number of rows
+    $numnodes = DBQueryFatal("select a.node_id,a.type from" .
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
 		     " where b.node_id is null" .
@@ -573,29 +528,6 @@ while (1) {
 # future changes however.
 ######################################################################
 
-# find_vport vnode virtlan
-# This finds and returns the virtual port of vnode that it is
-# virtlan and not in portmap.
-sub find_vport {
-    my ($vnode,$virtlan) = @_;
-    my $portlan;
-    my $vport;
-    my $lan;
-    # Shark Hack
-    if ($nodes{$vnode} eq "shark-shelf") {
-	return "0";
-    }
-    # End Shark Hack
-    foreach $portlan (@{$nodelans{$vnode}}) {
-	($vport,$lan) = split(":",$portlan);
-	if (($virtlan eq $lan) &&
-	    (! defined($portmap{"$vnode:$vport"}))) {
-	    return $vport;
-	}
-    }
-    return "";
-};
-
 $vlanid = 0;
 $delayid = 0;
 foreach $pnode (keys(%p2vmap)) {
@@ -740,34 +672,15 @@ foreach $plink (keys(%plinks)) {
 # clear the previous portmap out of the DB, display a warning, and
 # skip as if there was no portmap.
 
-# keys_equal A B
-# Returns 1 if hashs A and B have the same keys.
-sub keys_equal {
-    my ($ARef,$BRef) = @_;
-    my @AKeys = sort keys(%$ARef);
-    my @BKeys = sort keys(%$BRef);
-    if ($#AKeys != $#BKeys) {
-	return 0;
-    }
-    my $i;
-    for ($i=0;$i<=$#AKeys;++$i) {
-	if ($AKeys[$i] ne $BKeys[$i]) {
-	    return 0;
-	}
-    }
-    return 1;
-};
-
 printdb "Considering Port Swapping\n";
 
 %prevportmap = ();
-$sth = $dbh->prepare("SELECT vnode,vport,pport from portmap" .
+$result = DBQueryFatal("SELECT vnode,vport,pport from portmap" .
 		     " where pid = \"$pid\" and eid = \"$eid\"");
-$sth->execute;
-while (($vnode,$vport,$pport) = $sth->fetchrow_array) {
+while (($vnode,$vport,$pport) = $result->fetchrow_array) {
     $prevportmap{"$vnode:$vport"} = $pport;
 }
-$sth->finish;
+$result->finish;
 
 # Compare portmaps
 if (keys(%prevportmap) == 0) {
@@ -779,30 +692,6 @@ if (keys(%prevportmap) == 0) {
 } else {
     $portswap = 1;
 }
-
-# swapok(pnode,portA,nodeportB)
-# This returns 1 if it is ok to swap portA and portB on node pnode
-# and 0 otherwise.
-sub swapok {
-    my ($pnode,$portA,$portB) = @_;
-    # For the Utah testbed we just check to make sure they have
-    # the same bandwidth.  In other testbeds we'd also want to make
-    # sure they went to the same destination.
-    my $sth = $dbh->prepare("SELECT interface_type FROM interfaces" .
-			     " where node_id = \"$pnode\"" .
-			     " and iface = \"$portA\"");
-    $sth->execute;
-    my ($Atype) = $sth->fetchrow_array;
-    $sth->finish;
-    $sth = $dbh->prepare("SELECT interface_type FROM interfaces" .
-			     " where node_id = \"$pnode\"" .
-			     " and iface = \"$portB\"");
-    $sth->execute;
-    my ($Btype) = $sth->fetchrow_array;
-    $sth->finish;
-
-    return ($interfacespeed{$Atype} == $interfacespeed{$Btype});
-};
 
 if ($portswap) {
     foreach $vnodeport (keys(%portmap)) {
@@ -848,72 +737,48 @@ if ($portswap) {
 printdb "Uploading to DB\n";
 foreach $vlan (keys(%vlans)) {
     ($lan,$members) = @{$vlans{$vlan}};
-    $dbh->do("insert into vlans (id,pid,eid,virtual,members) values" .
+    DBQueryFatal("insert into vlans (id,pid,eid,virtual,members) values" .
 	     " (0,\"$pid\",\"$eid\",\"$lan\",\"" .
-	     join(" ",@$members) . "\")") || do {
-		 print STDERR "$0: *** Could not update vlans table." .
-		     "  Giving up.\n";
-		 exit(1);
-	     };
+	     join(" ",@$members) . "\")");
 }
 foreach $delay (keys(%delays)) {
     ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate) = 
 	@{$delays{$delay}};
-    $dbh->do("insert into delays" .
+    DBQueryFatal("insert into delays" .
 	     " (pid,eid,node_id,iface0,iface1" .
 	     ",delay,bandwidth,lossrate,vname)" .
 	     " values (\"$pid\",\"$eid\",\"$pnode\",\"$int0\",\"$int1\"".
-	     ",$delay,$bandwidth,$lossrate,\"$vname\")") || do {
-		 print STDERR "$0: *** Could not update delays table." .
-		     "  Giving up.\n";
-		 exit(1);
-	     };
+	     ",$delay,$bandwidth,$lossrate,\"$vname\")");
 }
-$dbh->do("delete from portmap where pid=\"$pid\" and eid=\"$eid\"") || do {
-    print STDERR "Could not clear portmap table.  Giving up.\n";
-    exit(1);
-};
+DBQueryFatal("delete from portmap where pid=\"$pid\" and eid=\"$eid\"");
 foreach $vnodeport (keys(%portmap)) {
     ($vnode,$vport) = split(":",$vnodeport);
     $pport = $portmap{$vnodeport};
-    $dbh->do("insert into portmap (pid,eid,vnode,vport,pport)" .
+    DBQueryFatal("insert into portmap (pid,eid,vnode,vport,pport)" .
 	     " values (\"$pid\",\"$eid\",\"$vnode\"" .
-	     ",\"$vport\",\"$pport\")") || do {
-		 print STDERR "$0: *** Could not update portmap table." .
-		     "  Giving up.\n";
-		 exit(1);
-	     };
+	     ",\"$vport\",\"$pport\")");
     # Shark Hack
     if ($nodes{$vnode} eq "shark-shelf") {
 	$shelf = $v2pmap{$vnode};
 	$i = 1;
 	foreach $shark (@{$sharkshelves{$vnode}}) {
-	    $dbh->do("update interfaces set IPalias=\"$ips{$shark}\" where" .
-		     " node_id = \"$shelf-$i\"") || do {
-			 print STDERR "$0: *** Could not update IPalias" .
-			     " for $shelf-$i.\n";
-			 exit(1);
-		     };
+	    DBQueryFatal("update interfaces set IPalias=\"$ips{$shark}\" " .
+		    "where node_id = \"$shelf-$i\"");
 	    $i++;
 	}
     } else {
-	$dbh->do("update interfaces set IP=\"$ips{$vnodeport}\" where" .
-		 " node_id = \"$v2pmap{$vnode}\" and iface = \"$pport\"") || do {
-		     print STDERR "$0: *** Could not update interfaces" .
-			 " table.  Giving up.\n";
-		     exit(1);
-		 };
+	DBQueryFatal("update interfaces set IP=\"$ips{$vnodeport}\" where" .
+		 " node_id = \"$v2pmap{$vnode}\" and iface = \"$pport\"");
     }
     # End Shark Hack
 }
 # Load delay_osids and default osids for types
-$sth = $dbh->prepare("SELECT type,delay_osid,osid from node_types");
-$sth->execute;
-while (($type,$delayosid,$defosid) = $sth->fetchrow_array) {
+$result = DBQueryFatal("SELECT type,delay_osid,osid from node_types");
+while (($type,$delayosid,$defosid) = $result->fetchrow_array) {
     $delayosids{$type} = $delayosid;
     $defosids{$type} = $defosid;
 }
-$sth->finish;
+$result->finish;
 @nodepairs = ();
 foreach $pnode (keys(%p2vmap)) {
     if (defined($sharkshelves{$p2vmap{$pnode}})) {
@@ -929,25 +794,23 @@ foreach $pnode (keys(%p2vmap)) {
 }
 foreach $pair (@nodepairs) {
     ($pnode,$vnode) = @$pair;
-    $sth = $dbh->prepare("SELECT osid,cmd_line,rpms,deltas,startupcmd," .
+    my $result = DBQueryFatal("SELECT osid,cmd_line,rpms,deltas,startupcmd," .
 			 "tarfiles,failureaction from virt_nodes" .
 			 " where pid=\"$pid\"" .
 			 " and eid=\"$eid\" and vname=\"$vnode\"");
-    $sth->execute;
     # The if statement will cause us to skip nodes that belong to
     # the experiment but aren't virtual.  I.e. delay nodes.
     # Figure out type of pnode
-    $sth2 = $dbh->prepare("SELECT type from nodes" .
+    my $result2 = DBQueryFatal("SELECT type from nodes" .
 			  " where node_id=\"$pnode\"");
-    $sth2->execute;
-    my ($type) = $sth2->fetchrow_array;
-    $sth2->finish;
+    my ($type) = $result2->fetchrow_array;
+    $result2->finish;
     if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,$failureaction) = 
-	$sth->fetchrow_array) {
+	$result->fetchrow_array) {
 	if (!defined($osid) || $osid eq "") {
 	    $osid = $defosids{$type};
 	}
-	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"$osid\"," .
+	DBQueryFatal("UPDATE nodes set def_boot_osid=\"$osid\"," .
 		       " def_boot_cmd_line=\"$cmdline\"," .
 		       " startstatus=\"none\"," .
 		       " bootstatus=\"unknown\"," .
@@ -957,25 +820,17 @@ foreach $pair (@nodepairs) {
 		       " tarballs=\"$tarfiles\"," .
 		       " startupcmd=\"$startupcmd\"," .
 		       " failureaction=\"$failureaction\"" .
-		       " where node_id=\"$pnode\"")) {
-	    print STDERR "$0: *** Could not update nodes table." .
-		"  Giving up.\n";
-	    exit(1);
-	} 
+		       " where node_id=\"$pnode\"");
     } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
 	# Delay node
-	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"" .
+	DBQueryFatal("UPDATE nodes set def_boot_osid=\"" .
 		       $delayosids{$type} . "\"," .
 		       " startstatus=\"none\"," .
 		       " bootstatus=\"unknown\"," .
 		       " ready=0" .
-		       " where node_id=\"$pnode\"")) {
-	    print STDERR "$0: *** Could not update nodes table." .
-		"  Giving up.\n";
-	    exit(1);
-	}
+		       " where node_id=\"$pnode\"");
     }
-    $sth->finish;
+    $result->finish;
 }
 
 foreach $pnode (keys(%p2vmap)) {
@@ -985,21 +840,13 @@ foreach $pnode (keys(%p2vmap)) {
 	($nodes{$vnode} eq "shark-shelf")) {
 	foreach $shark (@{$sharkshelves{$vnode}}) {
 	    $vname = (split(":",$shark))[0];
-	    $dbh->do("update reserved set vname=\"$vname\" where" .
-		     " node_id = \"$pnode-$i\"") || do {
-			 print STDERR "$0: *** Could not update reserved" .
-			     " table.  Giving up.\n";
-			 exit(1);
-		     };
+	    DBQueryFatal("update reserved set vname=\"$vname\" where" .
+		     " node_id = \"$pnode-$i\"");
 	    $i++;
 	}
     } else {
-	$dbh->do("update reserved set vname=\"$vnode\"" .
-		 " where node_id = \"$pnode\"") || do {
-		     print STDERR "$0: *** Could not update reserved" .
-			 " table. Giving up.\n";
-		     exit(1);
-		 };
+	DBQueryFatal("update reserved set vname=\"$vnode\"" .
+		 " where node_id = \"$pnode\"");
     }
 }
 
@@ -1009,11 +856,124 @@ foreach $vnodeport (keys(%portbw)) {
     if (defined($v2pmap{$vnode})) {
 	$pnode = $v2pmap{$vnode};
 	$pport = $portmap{$vnodeport};
-	$dbh->do("update interfaces set current_speed=\"$portbw{$vnodeport}\"" .
-		 " where node_id=\"$pnode\" and iface=\"$pport\"") || do {
-		     print STDERR "$0: *** Could not update current_speed on" .
-			 " interfaces.  Giving up.\n";
-		     exit(1);
-		 }
+	DBQueryFatal("update interfaces set " .
+		" current_speed=\"$portbw{$vnodeport}\"" .
+		" where node_id=\"$pnode\" and iface=\"$pport\"");
     }
 }
+
+######################################################################
+# Subroutines
+######################################################################
+
+# min(a,b)
+# Returns the minimum of a and b.
+sub min {
+    my ($a,$b) = @_;
+    return ($a < $b ? $a : $b);
+};
+
+# getbandwidth(bw)
+# Returns the lowest ok bandwidth that is greater than or equal to
+# the one passed.
+sub getbandwidth {
+    my $targetbandwidth= $_[0];
+    my $bandwidth;
+    my $best = 10000000000;
+    foreach $bandwidth (keys(%okbandwidths)) {
+	if (($bandwidth >= $targetbandwidth) && ($bandwidth < $best)) {
+	    $best = $bandwidth;
+	}
+    }
+    return $best;
+};
+
+# getnodeport(s)
+# Takes a ports result from assign (mac0,mac1) and returns the
+# first non-null one.
+sub getnodeport {
+    $macstring=$_[0];
+    ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
+    if ($A ne "(null)") {
+	return $A;
+    } else {
+	return $B;
+    }
+};
+
+# isdelay(pnodeport)
+# Takes a physical nodeport and retruns 1 if the node is a delay node.
+sub isdelay {
+    my $pnodeport = $_[0];
+
+    my $node = (split(":",$pnodeport))[0];
+    if (($p2vmap{$node} =~ m|^delay/|) ||
+	($p2vmap{$node} =~ m|^sdelay.|)) {
+	return 1;
+    } 
+    return 0;
+};
+
+# find_vport vnode virtlan
+# This finds and returns the virtual port of vnode that it is
+# virtlan and not in portmap.
+sub find_vport {
+    my ($vnode,$virtlan) = @_;
+    my $portlan;
+    my $vport;
+    my $lan;
+    # Shark Hack
+    if ($nodes{$vnode} eq "shark-shelf") {
+	return "0";
+    }
+    # End Shark Hack
+    foreach $portlan (@{$nodelans{$vnode}}) {
+	($vport,$lan) = split(":",$portlan);
+	if (($virtlan eq $lan) &&
+	    (! defined($portmap{"$vnode:$vport"}))) {
+	    return $vport;
+	}
+    }
+    return "";
+};
+
+# keys_equal A B
+# Returns 1 if hashs A and B have the same keys.
+sub keys_equal {
+    my ($ARef,$BRef) = @_;
+    my @AKeys = sort keys(%$ARef);
+    my @BKeys = sort keys(%$BRef);
+    if ($#AKeys != $#BKeys) {
+	return 0;
+    }
+    my $i;
+    for ($i=0;$i<=$#AKeys;++$i) {
+	if ($AKeys[$i] ne $BKeys[$i]) {
+	    return 0;
+	}
+    }
+    return 1;
+};
+
+# swapok(pnode,portA,nodeportB)
+# This returns 1 if it is ok to swap portA and portB on node pnode
+# and 0 otherwise.
+sub swapok {
+    my ($pnode,$portA,$portB) = @_;
+    # For the Utah testbed we just check to make sure they have
+    # the same bandwidth.  In other testbeds we'd also want to make
+    # sure they went to the same destination.
+    my $result = DBQueryFatal("SELECT interface_type FROM interfaces" .
+			     " where node_id = \"$pnode\"" .
+			     " and iface = \"$portA\"");
+    my ($Atype) = $result->fetchrow_array;
+    $result->finish;
+    $result = DBQueryFatal("SELECT interface_type FROM interfaces" .
+			     " where node_id = \"$pnode\"" .
+			     " and iface = \"$portB\"");
+    my ($Btype) = $result->fetchrow_array;
+    $result->finish;
+
+    return ($interfacespeed{$Atype} == $interfacespeed{$Btype});
+};
+
