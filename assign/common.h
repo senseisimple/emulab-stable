@@ -9,7 +9,7 @@
 
 #include "config.h"
 
-const int MAX_PNODES = 1024;	/* maximum # of physical nodes */
+const int MAX_PNODES = 2048;	/* maximum # of physical nodes */
 
 /*
   To use these on the command line, each entry gets a
