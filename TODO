@@ -199,6 +199,9 @@ CDROM changes (dhcp, signing).
 
   LBS: I have been working on this.
 
+* Noswap bit to prevent users from swapping special experiments that
+  have things like SPAN turned on.
+
 *** Minor:
 
 * Frisbee work. Mike/Rob reported that Frisbee "rocks" up to about
