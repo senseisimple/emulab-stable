@@ -525,6 +525,19 @@ CREATE TABLE nextfreenode (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'node_activity'
+--
+
+CREATE TABLE node_activity (
+  node_id varchar(10) NOT NULL default '',
+  last_tty_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_net_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_cpu_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_ext_act datetime NOT NULL default '0000-00-00 00:00:00',
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'node_idlestats'
 --
 
