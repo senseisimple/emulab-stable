@@ -47,7 +47,7 @@ function SHOWPROJECT($pid, $thisuid) {
     echo "<tr>
               <td>Project Head: </td>
               <td class=\"left\">
-                <A href='showuser.php3?uid=$thisuid&target_uid=$proj_head_uid'>
+                <A href='showuser.php3?target_uid=$proj_head_uid'>
                      $proj_head_uid</A></td>
           </tr>\n";
     

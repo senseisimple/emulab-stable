@@ -18,6 +18,7 @@ PAGEHEADER("Show Project Information");
 #
 # Only known and logged in users can end experiments.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 $isadmin = ISADMIN($uid);
@@ -70,7 +71,7 @@ if (mysql_num_rows($query_result)) {
     while ($row = mysql_fetch_row($query_result)) {
         $target_uid = $row[0];
         echo "<tr><td>
-                  <A href='showuser.php3?uid=$uid&target_uid=$target_uid'>
+                  <A href='showuser.php3?target_uid=$target_uid'>
                      $target_uid</A>
                   </td>
               </tr>\n";

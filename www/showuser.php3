@@ -17,6 +17,7 @@ PAGEHEADER("Show User Information");
 #
 # Only known and logged in users can do this.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 $isadmin = ISADMIN($uid);

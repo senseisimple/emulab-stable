@@ -20,6 +20,37 @@ function GENHASH() {
 }
 
 #
+# Return the value of the currently logged in uid, or null if not
+# logged in. Basically, check the browser to see if its sending a UID
+# and HASH back, and then check the DB to see if the useris really
+# logged in.
+# 
+function GETLOGIN() {
+    if (($uid = GETUID()) == FALSE)
+	    return FALSE;
+
+    if (CHECKLOGIN($uid) == 1)
+	    return $uid;
+
+    return FALSE;
+}
+
+#
+# Return the value of the UID cookie. This does not check to see if
+# this person is currently logged in. We just want to know what the
+# browser thinks, if anything.
+# 
+function GETUID() {
+    global $TBNAMECOOKIE, $HTTP_COOKIE_VARS;
+
+    $curname = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
+    if ($curname == NULL)
+	    return FALSE;
+
+    return $curname;
+}
+
+#
 # Verify a login by sucking a UID's current hash value out of the database.
 # If the login has expired, or of the hashkey in the database does not
 # match what came back in the cookie, then the UID is no longer logged in.
@@ -31,7 +62,7 @@ function GENHASH() {
 #         -1 if login timed out
 #
 function CHECKLOGIN($uid) {
-    global $TBDBNAME, $TBAUTHCOOKIE, $HTTP_COOKIE_VARS;
+    global $TBDBNAME, $TBAUTHCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
 
     $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
 
@@ -53,6 +84,20 @@ function CHECKLOGIN($uid) {
     # A match?
     if ($timeout > time() &&
         strcmp($curhash, $hashkey) == 0) {
+	#
+	# We update the time in the database. Basically, each time the
+	# user does something, we bump the logout further into the future.
+	# This avoids timing them out just when they are doing useful work.
+	#
+	$timeout = time() + $TBAUTHTIMEOUT;
+
+	$query_result = mysql_db_query($TBDBNAME,
+		"UPDATE login set timeout='$timeout' ".
+		"WHERE uid=\"$uid\"");
+	if (! $query_result) {
+            $err = mysql_error();
+            TBERROR("Database Error updating login timeout for $uid: $err", 1);
+        }
 	return 1;
     }
 
@@ -95,6 +140,7 @@ function LOGGEDINORDIE($uid) {
 # 
 function DOLOGIN($uid, $password) {
     global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
+    global $TBNAMECOOKIE;
 
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
@@ -119,7 +165,7 @@ function DOLOGIN($uid, $password) {
         # the new hash value. If the user is already logged in, thats
         # okay; just update it in place with a new hash and timeout. 
         #
-	$timeout = time() + 10800;
+	$timeout = time() + $TBAUTHTIMEOUT;
 	$hashkey = GENHASH();
         $query_result = mysql_db_query($TBDBNAME,
 		"SELECT timeout FROM login WHERE uid=\"$uid\"");
@@ -140,10 +186,29 @@ function DOLOGIN($uid, $password) {
         }
 
 	#
-	# Issue the cookie request so that subsequent pages come back
-	# with the hash value embedded.
+	# Issue the cookie requests so that subsequent pages come back
+	# with the hash value and auth usr embedded.
+
 	#
+	# For the hashkey, we give it a longish timeout since we are going
+	# to control the actual timeout via the database. This just avoids
+	# having to update the hash as we update the timeout in the database
+	# each time the user does something. Eventually the cookie will
+	# expire and the user will be forced to log in again anyway. 
+	#
+	$timeout = time() + (60 * 60 * 24);
 	setcookie($TBAUTHCOOKIE, $hashkey, $timeout, "/", $TBAUTHDOMAIN, 0);
+
+	#
+	# We give this a really long timeout. We want to remember who the
+	# the user was each time they load a page, and more importantly,
+	# each time they come back to the main page so we can fill in their
+	# user name. NOTE: This cookie is integral to authorization, since
+	# we do not pass around the UID anymore, but look for it in the
+	# cookie.
+	# 
+	$timeout = time() + (60 * 60 * 24 * 32);
+	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
 
 	return 0;
     }

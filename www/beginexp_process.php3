@@ -36,7 +36,8 @@ if (!isset($exp_created) ||
 }
 
 #
-# Only known and logged in users can begin experiments.
+# Only known and logged in users can begin experiments. Name came in as
+# a POST var.
 #
 LOGGEDINORDIE($uid);
 

@@ -9,14 +9,7 @@ PAGEHEADER("New User Verification");
 #
 # Only known and logged in users can be verified.
 #
-$uid = "";
-if (ereg("php3\?([[:alnum:]]+)", $REQUEST_URI, $Vals)) {
-    $uid=$Vals[1];
-    addslashes($uid);
-}
-else {
-    unset($uid);
-}
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 ?>

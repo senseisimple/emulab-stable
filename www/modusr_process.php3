@@ -44,7 +44,7 @@ if (!isset($usr_affil) ||
 }
 
 #
-# Only known and logged in users can modify info.
+# Only known and logged in users can modify info. uid came in as a POST var.
 #
 LOGGEDINORDIE($uid);
 

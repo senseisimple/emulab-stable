@@ -9,7 +9,16 @@ PAGEHEADER("Node Control Form");
 #
 # Only known and logged in users can do this.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+
+#
+# Verify form arguments.
+# 
+if (!isset($node_id) ||
+    strcmp($node_id, "") == 0) {
+    USERERROR("You must provide a node ID.", 1);
+}
 
 #
 # Check to make sure that this is a valid nodeid
@@ -60,7 +69,7 @@ echo "<table border=2 cellpadding=0 cellspacing=2
 # Generate the form. Note that $refer is set by the caller so we know
 # how we got to the nodecontrol page. 
 # 
-echo "<form action=\"nodecontrol.php3?uid=$uid&refer=$refer\"
+echo "<form action=\"nodecontrol.php3?refer=$refer\"
             method=\"post\">\n";
 
 echo "<tr>

@@ -9,13 +9,7 @@ PAGEHEADER("Show Experiment Information Form");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = "";
-if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-    $uid=$Vals[1];
-    addslashes($uid);
-} else {
-    unset($uid);
-}
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 $isadmin = ISADMIN($uid);
@@ -71,7 +65,7 @@ you are a member of.</h2>
 <table align="center" border="1">
 
 <?php
-echo "<form action=\"showexp.php3?uid=$uid\" method=\"post\">";
+echo "<form action=\"showexp.php3\" method=\"post\">";
 echo "<tr>
           <td align='center'>Project/Experiment</td>
       </tr>\n";

@@ -9,6 +9,7 @@ PAGEHEADER("New Project Approval");
 #
 # Only known and logged in users can do this.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -17,6 +18,14 @@ LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have admin privledges to approve projects!", 1);
+}
+
+#
+# Verify arguments.
+# 
+if (!isset($pid) ||
+    strcmp($pid, "") == 0) {
+    USERERROR("You must provide a project ID.", 1);
 }
 
 echo "<center><h1>Approve a Project</h1></center>\n";
@@ -75,7 +84,7 @@ echo "<center>
       <h3>What would you like to do?</h3>
       </center>
       <table align=center border=1>
-      <form action='approveproject.php3?uid=$uid&pid=$pid' method='post'>\n";
+      <form action='approveproject.php3?pid=$pid' method='post'>\n";
 
 echo "<tr>
           <td align=center>

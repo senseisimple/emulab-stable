@@ -10,6 +10,7 @@ PAGEHEADER("Show Experiment Information");
 #
 # Only known and logged in users can end experiments.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 $isadmin = ISADMIN($uid);
@@ -91,7 +92,7 @@ echo "<tr>
 echo "<tr>
           <td>Experiment Head: </td>
           <td class=\"left\">
-              <A href='showuser.php3?uid=$uid&target_uid=$exp_head'>
+              <A href='showuser.php3?target_uid=$exp_head'>
                  $exp_head</td>
       </tr>\n";
 
@@ -165,7 +166,7 @@ if (mysql_num_rows($reserved_result)) {
 
         echo "<tr>
                   <td align=center>
-                     <A href='nodecontrol_form.php3?uid=$uid&node_id=$node_id&refer=$exp_pideid'>
+                     <A href='nodecontrol_form.php3?node_id=$node_id&refer=$exp_pideid'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
                   <td>$node_id</td>
                   <td>$type</td>

@@ -9,13 +9,7 @@ PAGEHEADER("Terminate Experiment Form");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = "";
-if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-    $uid=$Vals[1];
-    addslashes($uid);
-} else {
-    unset($uid);
-}
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -59,7 +53,7 @@ you are a member of.</h2>
 <table align="center" border="1">
 
 <?php
-echo "<form action=\"endexp.php3?$uid\" method=\"post\">";
+echo "<form action=\"endexp.php3\" method=\"post\">";
 echo "<tr>
           <td align='center'>Project/Experiment</td>
       </tr>\n";

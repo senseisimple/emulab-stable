@@ -7,6 +7,7 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -63,10 +64,10 @@ if (! $insert_result) {
 # Zap back to the referrer. Seems better than a silly "we did it" message.
 #
 if ($refer == "list") {
-    header("Location: nodecontrol_list.php3?uid=$uid");
+    header("Location: nodecontrol_list.php3");
 }
 else {
-    header("Location: showexp.php3?uid=$uid&exp_pideid=$refer");
+    header("Location: showexp.php3?exp_pideid=$refer");
 }
 
 #

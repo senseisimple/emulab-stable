@@ -9,14 +9,7 @@ PAGEHEADER("New Users Approval Form");
 #
 # Only known and logged in users can be verified.
 #
-$auth_usr = "";
-if (ereg("php3\?([[:alnum:]]+)", $REQUEST_URI, $Vals)) {
-    $auth_usr=$Vals[1];
-    addslashes($auth_usr);
-}
-else {
-    unset($auth_usr);
-}
+$auth_usr = GETLOGIN();
 LOGGEDINORDIE($auth_usr);
 
 echo "
@@ -105,7 +98,7 @@ echo "<tr>
           <td>Zip</td>
       </tr>\n";
 
-echo "<form action='approveuser.php3?$auth_usr' method='post'>\n";
+echo "<form action='approveuser.php3' method='post'>\n";
 
 while ($usersrow = mysql_fetch_array($query_result)) {
     $newuid = $usersrow[uid];

@@ -9,13 +9,7 @@ PAGEHEADER("Begin an Experiment Form");
 #
 # Only known and logged in users can begin experiments.
 #
-$uid = "";
-if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-    $uid=$Vals[1];
-    addslashes($uid);
-} else {
-    unset($uid);
-}
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #

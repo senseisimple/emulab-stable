@@ -9,6 +9,7 @@ PAGEHEADER("Node Control List");
 #
 # Only known and logged in users can do this.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -83,7 +84,7 @@ while ($row = mysql_fetch_array($query_result)) {
 
     echo "<tr>
               <td align=center>
-                  <A href='nodecontrol_form.php3?uid=$uid&node_id=$node_id&refer=list'>
+                  <A href='nodecontrol_form.php3?node_id=$node_id&refer=list'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td>$node_id</td>
               <td>$type</td>

@@ -9,14 +9,7 @@ PAGEHEADER("Modify User Information Form");
 #
 # Only known and logged in users can modify info.
 #
-$uid = "";
-if (ereg("php3\?([[:alnum:]]+)", $REQUEST_URI, $Vals)) {
-    $uid=$Vals[1];
-    addslashes($uid);
-}
-else {
-    unset($uid);
-}
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 ?>
@@ -55,7 +48,7 @@ $usr_affil   = $row[usr_affil];
 #
 # Generate the form.
 # 
-echo "<form action=\"modusr_process.php3?$uid\" method=\"post\">\n";
+echo "<form action=\"modusr_process.php3\" method=\"post\">\n";
 echo "<tr>
           <td>Username:</td>
           <td class=\"left\"> 

@@ -10,8 +10,6 @@ if (isset($login)) {
     #
     # Login button pressed. 
     #
-    unset($login);
-
     if (!isset($uid) ||
         strcmp($uid, "") == 0) {
             $login_status = "Login Failed";
@@ -31,20 +29,17 @@ elseif (isset($logout)) {
     #
     # Logout button pressed.
     #
-    unset($logout);
-
     DOLOGOUT($uid);
     $login_status = "$uid Logged Out";
     unset($uid);
 }
-elseif (isset($uid)) {
+elseif ($uid = GETUID()) {
     #
     # Check to make sure the UID is logged in (not timed out).
     #
     $status = CHECKLOGIN($uid);
     switch ($status) {
     case 0:
-        $login_status = "$uid Not Logged In";
         unset($uid);
         break;
     case 1:
@@ -97,28 +92,28 @@ if (isset($uid)) {
 
     if ($status == "active") {
         if ($admin) {
-            echo "<A href='approveproject_list.php3?uid=$uid'>
+            echo "<A href='approveproject_list.php3'>
                      New Project Approval</A><p>\n";
-            echo "<A href='showproject_list.php3?uid=$uid'>
+            echo "<A href='showproject_list.php3'>
                      Project Information</A><p>\n";
-            echo "<A href='nodecontrol_list.php3?uid=$uid'>
+            echo "<A href='nodecontrol_list.php3'>
                      Node Control</A><p>\n";
         }
         if ($trusted) {
             # Only group leaders can do these options
-            echo "<A href='approveuser_form.php3?$uid'>
+            echo "<A href='approveuser_form.php3'>
                      New User Approval</A>\n";
         }
         # Since a user can be a member of more than one project,
         # display this option, and let the form decide if the user is
         # allowed to do this.
-        echo "<p><A href='beginexp_form.php3?$uid'>
+        echo "<p><A href='beginexp_form.php3'>
                     Begin an Experiment</A>\n";
-        echo "<p><A href='endexp_form.php3?$uid'>
+        echo "<p><A href='endexp_form.php3'>
                     End an Experiment</A>\n";
-        echo "<p><A href='showexp_form.php3?$uid'>
+        echo "<p><A href='showexp_form.php3'>
                     Experiment Information</A>\n";
-        echo "<p><A href='modusr_form.php3?$uid'>
+        echo "<p><A href='modusr_form.php3'>
                     Update user information</A>\n";
         echo "<p><A href='reserved.php3'>
                     Node Reservation Status</A>\n";
@@ -131,7 +126,7 @@ if (isset($uid)) {
                   "Please try back later", 1);
     }
     elseif (($status == "newuser") || ($status == "unverified")) {
-        echo "<A href='verifyusr_form.php3?$uid'>New User Verification</A>\n";
+        echo "<A href='verifyusr_form.php3'>New User Verification</A>\n";
     }
     elseif (($status == "frozen") || ($status == "other")) {
         USERERROR("Your account has been changed to status $status, and is ".
@@ -143,14 +138,9 @@ if (isset($uid)) {
 #
 # Standard options for anyone.
 # 
-if (isset($uid)) {
-    echo "<p><A href=\"newproject_form.php3?$uid\">Start a Project</A>\n";
-    echo "<p><A href=\"addusr.php3?$uid\">Join a Project</A>\n";
-}
-else {
-    echo "<p><A href=\"newproject_form.php3\">Start a Project</A>\n";
-    echo "<p><A href=\"addusr.php3\">Join a Project</A>\n";
-}
+echo "<p><A href=\"newproject_form.php3\">Start Project</A>\n";
+echo "<p><A href=\"addusr.php3\">Join Project</A>\n";
+
 echo "<hr>";
 echo "<table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">";
 echo "<form action=\"index.php3\" method=\"post\" target=\"fixed\">";
@@ -168,8 +158,16 @@ if (isset($uid)) {
           </tr>\n";
 }
 else {
+    #
+    # Get the UID that came back in the cookie so that we can present a
+    # default login name to the user.
+    #
+    if (($uid = GETUID()) == FALSE)
+	$uid = "";
+
     echo "<tr>
-              <td>Username:<input type='text' name='uid' size=8></td>
+              <td>Username:<input type='text' value='$uid'
+                                  name='uid' size=8></td>
           </tr>
           <tr>
               <td>Password:<input type='password' name='password' size=12></td>

@@ -3,20 +3,17 @@ include("defs.php3");
 
 PAGEHEADER("New User");
 
-$uid = "";
-if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-  $uid=$Vals[1];
-  addslashes($uid);
-} else {
-  unset($uid);
-}
+#
+# Get current user.
+# 
+$uid = GETLOGIN();
 
 #
 # If a uid came in, then we check to see if the login is valid.
 # If the login is not valid, then quit cause we don't want to display the
 # personal information for some random ?uid argument.
 #
-if (isset($uid)) {
+if ($uid) {
     if (CHECKLOGIN($uid) != 1) {
         USERERROR("You are not logged in. Please log in and try again.", 1);
     }

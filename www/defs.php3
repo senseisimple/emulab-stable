@@ -27,6 +27,7 @@ $TBUSER_DIR	= "/users/";
 $TBNSSUBDIR     = "nsdir";
 
 $TBAUTHCOOKIE   = "HashCookie";
+$TBNAMECOOKIE   = "MyUidCookie";
 $TBAUTHTIMEOUT  = 10800;
 $TBAUTHDOMAIN   = ".emulab.net";
 #$TBAUTHDOMAIN   = "golden-gw.ballmoss.com";

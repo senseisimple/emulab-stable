@@ -9,6 +9,7 @@ PAGEHEADER("New Project Approved");
 #
 # Only known and logged in users can do this.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #

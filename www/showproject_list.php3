@@ -12,6 +12,7 @@ PAGEHEADER("Show Experiment Information List");
 #
 # Only known and logged in users can end experiments.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -56,9 +57,9 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $Paffil   = $projectrow[affil];
 
     echo "<tr>
-              <td><A href='showproject.php3?uid=$uid&pid=$pid'>$pid</A></td>
+              <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
               <td>$Pname</td>
-              <td><A href='showuser.php3?uid=$uid&target_uid=$headuid'>
+              <td><A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>
 	      <td>$Paffil</td>
           </tr>\n";

@@ -9,6 +9,7 @@ PAGEHEADER("New Project Approval List");
 #
 # Only known and logged in users can do this. uid came in with the URI.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 echo "<center><h1>Approve New Projects List</h1></center>\n";
@@ -87,12 +88,12 @@ while ($projectrow = mysql_fetch_array($query_result)) {
           </tr>
           <tr>
               <td align=center rowspan=2>
-                  <A href='approveproject_form.php3?uid=$uid&pid=$pid'>
+                  <A href='approveproject_form.php3?pid=$pid'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td rowspan=2>
-                  <A href='showproject.php3?uid=$uid&pid=$pid'>$pid</A></td>
+                  <A href='showproject.php3?pid=$pid'>$pid</A></td>
               <td rowspan=2>
-                  <A href='showuser.php3?uid=$uid&target_uid=$headuid'>
+                  <A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>
               <td>$name</td>
               <td>$title</td>

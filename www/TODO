@@ -8,9 +8,10 @@ importance should be obvious. Whoever does this work *will* program in the
 dominate style of the existing, newly written, 4500 lines of code! Now, if
 I could just figure out how to add a php mode to emacs ...
 
-* Add password hint for the clueless users who forget their passwords.
+* Add DB connect as authorized user so we can track whats going in
+  the DB log files.
 
-* tbend should work from the database, not the .ir file.
+* Add password hint for the clueless users who forget their passwords.
 
 * Put a limit on the number of new users/projects that can be
   unapproved (to prevent DOS attacks on the database).
@@ -30,11 +31,7 @@ I could just figure out how to add a php mode to emacs ...
   include the uid in the existing cookie (the one I added to send back the
   hash key).
 
-* Look at the 'suexec' program from the Apache distribution and use it
-  as the basis for the "run as a user" program.  Instead of checking
-  the home directory, it'll check the database.
-
-* Fix the email list problem. Right now we add people people to the two
+* Fix the email list problem. Right now we add people to the two
   email list files in /usr/testbed/www/maillist when they apply. We should
   either delay that until they are approved, or make sure they get taken
   back out when denied.
@@ -54,18 +51,11 @@ I could just figure out how to add a php mode to emacs ...
   certificates. I'm not too crazy about this unless its easy to do all of it
   on my home machine (apache server).
 
-* Continue to hook up the backend parts of the system, which right now is a
-  major unfinished piece of business.
-
 * More linking of information in the forms. There are some obvious places
   where stuff should be presented as hypertext links so that navigation is
   easier.
 
 * Backup links in all the pages.
-
-* Change to ?uid=stoller&pid=testbed style arguments in all the pages I
-  have not yet fixed (that is, get rid of that regex thing at the top of
-  the page to find the arguments).
 
 * Admin page to remove a project.
 
@@ -81,8 +71,6 @@ I could just figure out how to add a php mode to emacs ...
   That is, anyplace a user *types* in a username, project name, or an
   experiment name, downcase it. Mac was going to do this, but I don't know
   if he got to it. 
-
-* Get people to go use the pages (including modify user information!).
 
 * Lastly, macrofy the entire thing and get rid the damn frames! I hate
   frames!
