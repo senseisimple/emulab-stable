@@ -266,7 +266,7 @@ exit $failed;
 # 
 sub RebootNode {
     local($pc) = @_;
-    local($status, $syspid, $mypid,$setstate);
+    local($status, $syspid, $mypid);
 
     print STDOUT "Rebooting $pc ...\n";
 
@@ -289,13 +289,6 @@ sub RebootNode {
 	}
 	exit(0);
     }
-
-    #
-    # Keep track of whether or not we need to set the event state for the
-    # node. If we get to ssh and reboot it, the node should report the
-    # reboot, so we don't have to.
-    #
-    $setstate = 1;
 
     #
     # Machine is pingable at least. Try to reboot it gracefully,
@@ -343,14 +336,7 @@ sub RebootNode {
 	    print STDERR "Trying Ping-of-Death on $pc ...\n" if $debug;
 
 	    system("$ipod $pc");
-	} else {
-	    #
-	    # OK, ssh worked, so the node should have reported the state
-	    # transition itself.
-	    #
-	    #$setstate = 0;
 	}
-
     }
     else {
 	exec("$ssh -host $pc /sbin/reboot");
@@ -370,9 +356,7 @@ sub RebootNode {
     # punch the power button.
     #
     if (WaitTillDead($pc) == 0) {
-	if ($setstate) {
-	    TBSetNodeEventState($pc,TBDB_NODESTATE_REBOOTING);
-	}
+	TBSetNodeEventState($pc,TBDB_NODESTATE_REBOOTING);
 	exit(0);
     }
 	
