@@ -76,6 +76,14 @@ putenv("HTTP_SCRIPT=1");
 include("dbdefs.php3");
 
 #
+# Control how error messages are returned to the user. If the session is
+# not actually "interactive" then do not send any output to the browser.
+# Just save it up and let the page deal with it. 
+#
+$session_interactive  = 1;
+$session_errorhandler = 0;
+
+#
 # Wrap up the mail function so we can prepend a tag to the subject
 # line that indicates what testbed. Useful when multiple testbed
 # email to the same list.
@@ -105,8 +113,9 @@ function TBMAIL($to, $subject, $message, $headers = 0)
 # should then terminate if required to do so.
 #
 function TBERROR ($message, $death, $xmp = 0) {
-    global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR;
-    $script = $_SERVER['REQUEST_URI'];
+    global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR, $TBMAILADDR_OPS;
+    global $session_interactive, $session_errorhandler;
+    $script = urldecode($_SERVER['REQUEST_URI']);
 
     TBMAIL($TBMAIL_OPS,
          "WEB ERROR REPORT",
@@ -119,15 +128,13 @@ function TBERROR ($message, $death, $xmp = 0) {
          "Errors-To: $TBMAIL_WWW");
 
     if ($death) {
-	if ($xmp)
-	    $message = "<XMP>$message</XMP>\n";
-	
-	$msg = "<blockquote><pre>
-                $message
-        	</pre></blockquote>
-		Could not continue. Please contact $TBMAILADDR\n";
-
-	PAGEERROR($msg);
+	if ($session_interactive)
+	    PAGEERROR("Could not continue. Please contact $TBMAILADDR");
+	elseif ($session_errorhandler) {
+	    $session_errorhandler("Could not continue. ".
+				  "Please contact $TBMAILADDR_OPS", $death);
+	}
+	exit(1);
     }
     return 0;
 }
@@ -137,6 +144,18 @@ function TBERROR ($message, $death, $xmp = 0) {
 #
 function USERERROR($message, $death) {
     global $TBMAILADDR;
+    global $session_interactive, $session_errorhandler;
+
+    if (! $session_interactive) {
+	if ($session_errorhandler)
+	    $session_errorhandler($message, $death);
+	else
+	    echo "$message";
+
+	if ($death)
+	    exit(1);
+	return;
+    }
 
     $msg = "<font size=+1><br>
             $message

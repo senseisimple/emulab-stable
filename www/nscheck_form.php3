@@ -51,7 +51,8 @@ echo "<tr>
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
               <br>
               <br>
-              <input type=\"text\" name=\"exp_localnsfile\" size=\"40\">
+              <input type=\"text\" name=\"formfields[exp_localnsfile]\"
+                     size=\"40\">
               </td>
       </tr>\n";
 

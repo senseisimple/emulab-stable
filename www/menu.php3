@@ -372,9 +372,15 @@ function WRITESIDEBAR() {
                 #
 
 		WRITESIDEBARDIVIDER();
-	    
-		WRITESIDEBARBUTTON("Begin an Experiment",
-				   $TBBASE, "beginexp.php3");
+
+                if (ISADMINISTRATOR()) {
+ 		    WRITESIDEBARBUTTON("Begin an Experiment",
+				       $TBBASE, "beginexp_html.php3");
+                }
+                else {
+ 		    WRITESIDEBARBUTTON("Begin an Experiment",
+				       $TBBASE, "beginexp.php3");
+                }
 
 		WRITESIDEBARBUTTON_NEW("Create a PlanetLab Slice",
 				       $TBBASE, "plab_ez.php3");
