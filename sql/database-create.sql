@@ -1065,7 +1065,6 @@ CREATE TABLE nodes (
   stated_tag varchar(32) default NULL,
   rtabid smallint(5) unsigned NOT NULL default '0',
   cd_version varchar(32) default NULL,
-  cnet_vlan int(11) default NULL,
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),
@@ -1364,6 +1363,7 @@ CREATE TABLE reserved (
   simhost_violation tinyint(3) unsigned NOT NULL default '0',
   old_pid varchar(12) NOT NULL default '',
   old_eid varchar(32) NOT NULL default '',
+  cnet_vlan int(11) default NULL,
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname),
   KEY old_pid (old_pid,old_eid)
