@@ -124,6 +124,10 @@ flush();
 # to the proper directory and to keep some of these details out
 # of this. 
 #
+# Avoid SIGPROF in child.
+# 
+set_time_limit(0);
+
 $output = array();
 $retval = 0;
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
