@@ -259,7 +259,7 @@ elsif ($swapop eq "in") {
     }
     if ($errors || $canceled) {
 	print STDERR "Cleaning up after " .
-	    ($errors ? "errors" : "cancelation") . ".\n";
+	    ($canceled ? "cancelation" : "errors") . ".\n";
 	doSwapout(CLEANUP);
     }
 }
