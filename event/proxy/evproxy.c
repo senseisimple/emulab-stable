@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -85,7 +85,7 @@ main(int argc, char **argv)
 	if (debug)
 		loginit(0, 0);
 	else {
-		loginit(1, "tevd");
+		loginit(1, "evproxy");
 		/* See below for daemonization */
 	}
 
