@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -29,8 +29,10 @@ my $EXTERNAL_TESTBED_NETWORK = "@EXTERNAL_TESTBED_NETWORK@";
 my $EXTERNAL_TESTBED_NETMASK = "@EXTERNAL_TESTBED_NETMASK@";
 my $BOSSNODE_IP              = "@BOSSNODE_IP@";
 my $USERNODE_IP              = "@USERNODE_IP@";
+my $FSNODE_IP                = "@FSNODE_IP@";
 my $EXTERNAL_BOSSNODE_IP     = "@EXTERNAL_BOSSNODE_IP@";
 my $EXTERNAL_USERNODE_IP     = "@EXTERNAL_USERNODE_IP@";
+my $EXTERNAL_FSNODE_IP       = "@EXTERNAL_FSNODE_IP@";
 
 my $CONTROL_ROUTER_IP  = "@CONTROL_ROUTER_IP@";
 my $CONTROL_NETWORK    = "@CONTROL_NETWORK@";
@@ -85,12 +87,63 @@ while (<IF>) {
                           "${USERTOKEN}\t\tIN\tA\t\t${USERNODE_IP}\n";
                 $external_strings .=
                           "${USERTOKEN}\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
+		#
+		# If name is not "ops", we need an A record for that as well
+		#
+		if ($USERTOKEN ne "ops") {
+		    $internal_strings .=
+			"ops\t\tIN\tA\t\t${USERNODE_IP}\n";
+		    $external_strings .=
+			"ops\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
+		}
+		#
+		# If name is not "users" we need a CNAME for that
+		#
+		elsif ($USERTOKEN ne "users") {
+		    $internal_strings .=
+			"users\t\tIN\tCNAME\t\t${USERTOKEN}\n";
+		    $external_strings .=
+			"users\t\tIN\tCNAME\t\t${USERTOKEN}\n";
+		}
 	    }
 	    elsif ($2 eq "bossnode_ina") {
                 $internal_strings .=
                           "${BOSSTOKEN}\t\tIN\tA\t\t${BOSSNODE_IP}\n";
                 $external_strings .=
                           "${BOSSTOKEN}\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n";
+		#
+		# If name is not "boss", we need an A record for that as well
+		#
+		if ($BOSSTOKEN ne "boss") {
+		    $internal_strings .=
+			"boss\t\tIN\tA\t\t${BOSSNODE_IP}\n";
+		    $external_strings .=
+			"boss\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n";
+		}
+	    }
+	    elsif ($2 eq "fsnode_ina") {
+		if ($USERNODE_IP ne $FSNODE_IP) {
+		    $internal_strings .=
+                          "fs\t\tIN\tA\t\t${FSNODE_IP}\n";
+		    $external_strings .=
+                          "fs\t\tIN\tA\t\t${EXTERNAL_FSNODE_IP}\n";
+		} else {
+		    $internal_strings .=
+                          "fs\t\tIN\tCNAME\tops\n";
+		    $external_strings .=
+                          "fs\t\tIN\tCNAME\tops\n";
+		}
+	    }
+	    elsif ($2 eq "fsnode_mx") {
+		if ("$USERNODE_IP" ne "$FSNODE_IP") {
+		    $internal_strings .=
+			  "\t\tIN\tMX 10\tops\n";
+		    $external_strings .=
+			  "\t\tIN\tMX 10\tops\n";
+		} else {
+		    ;
+		}
+
 	    }
 	    elsif ($2 eq "private-router") {
                 my $foo = "private-router\tIN\tA\t${PRIVATE_ROUTER}\n";

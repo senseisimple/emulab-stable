@@ -22,7 +22,6 @@ $TTL	30
 ; Apparently, CNAME NS records are a bad idea - so, ns.emulab.net
 ; and boss are both A records
 ns		IN	A		%bossnode_ip%
-boss		IN	A		%bossnode_ip%
 %bossnode_ina%
 		IN	MX 10	ops
 
@@ -31,15 +30,16 @@ www		IN	CNAME   boss
 db		IN	CNAME	boss
 cvsup		IN	CNAME	boss
 
-; Plastic and names it is otherwise known as...
-ops		IN	A		%usernode_ip%
+; Ops and names it is otherwise known as...
 %usernode_ina%
 		IN	MX 10	ops
-users		IN	CNAME	ops
-fs		IN	CNAME	ops
 ntp1		IN	CNAME	ops
 ntp2		IN	CNAME	ops
 event-server	IN	CNAME	ops
+
+; Fs (may just be a CNAME for ops)
+%fsnode_ina%
+%fsnode_mx%
 
 ; Routers interfaces in the various subnets
 %private-router%

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -27,8 +27,10 @@ my $EXTERNAL_TESTBED_NETWORK = "@EXTERNAL_TESTBED_NETWORK@";
 my $EXTERNAL_TESTBED_NETMASK = "@EXTERNAL_TESTBED_NETMASK@";
 my $BOSSNODE_IP              = "@BOSSNODE_IP@";
 my $USERNODE_IP              = "@USERNODE_IP@";
+my $FSNODE_IP                = "@FSNODE_IP@";
 my $EXTERNAL_BOSSNODE_IP     = "@EXTERNAL_BOSSNODE_IP@";
 my $EXTERNAL_USERNODE_IP     = "@EXTERNAL_USERNODE_IP@";
+my $EXTERNAL_FSNODE_IP       = "@EXTERNAL_FSNODE_IP@";
 
 my $CONTROL_ROUTER_IP  = "@CONTROL_ROUTER_IP@";
 my $CONTROL_NETWORK    = "@CONTROL_NETWORK@";
@@ -70,6 +72,9 @@ open(REV, ">>$internal_revfile")
 print REV "\n";
 print REV "${BOSSNODE_IP}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
 print REV "${USERNODE_IP}\tIN\tPTR\tops.${OURDOMAIN}.\n";
+if ($FSNODE_IP ne $USERNODE_IP) {
+    print REV "${FSNODE_IP}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
+}
 close(REV);
 
 # No need is just one big IP space.
@@ -89,6 +94,9 @@ open(REV, ">>$external_revfile")
 print REV "\n";
 print REV "${EXTERNAL_BOSSNODE_IP}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
 print REV "${EXTERNAL_USERNODE_IP}\tIN\tPTR\tops.${OURDOMAIN}.\n";
+if ($FSNODE_IP ne $USERNODE_IP) {
+    print REV "${EXTERNAL_FSNODE_IP}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
+}
 close(REV);
     
 exit(0);
