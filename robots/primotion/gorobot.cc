@@ -46,6 +46,64 @@ static void usage(void)
 	    "Usage: gorobot ...\n");
 }
 
+static void handle_client_packet(grobot &bot,
+				 struct mtp_packet *mp,
+				 fd_set *clientfds)
+{
+    assert(mp != NULL);
+    assert(clientfds != NULL);
+    
+    if (debug) {
+	mtp_print_packet(stderr, mp);
+    }
+    
+    switch (mp->opcode) {
+    case MTP_COMMAND_GOTO:
+	/* Record our robot id. */
+	robot_id = mp->data.command_goto->robot_id;
+	bot.dgoto(mp->data.command_goto->position.x,
+		  mp->data.command_goto->position.y,
+		  mp->data.command_goto->position.theta);
+	break;
+    case MTP_COMMAND_STOP:
+	{
+	    struct mtp_update_position mup;
+	    struct mtp_packet *ump;
+	    
+	    bot.estop();
+	    
+	    mup.robot_id = mp->data.command_stop->robot_id;
+	    bot.getDisplacement(mup.position.x, mup.position.y);
+	    mup.position.theta = 0;
+	    mup.status = MTP_POSITION_STATUS_IDLE;
+	    if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
+				       MTP_ROLE_RMC,
+				       &mup)) == NULL) {
+		fprintf(stderr,
+			"error: unable to make update position packet\n");
+	    }
+	    else {
+		char buffer[1024], *buf = buffer;
+		int lpc, len;
+		
+		len = mtp_encode_packet(&buf, ump);
+		for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+		    if (FD_ISSET(lpc, clientfds)) {
+			write(lpc, buffer, len);
+		    }
+		}
+		
+		mtp_free_packet(ump);
+		ump = NULL;
+	    }
+	}
+	break;
+    default:
+	fprintf(stderr, "error: unhandled opcode %d\n", mp->opcode);
+	break;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int c, serv_sock = -1, port = GOR_SERVERPORT, on_off = 1;
@@ -139,6 +197,7 @@ int main(int argc, char *argv[])
     }
     else {
 	fd_set readfds, clientfds;
+	int loop_count = 0;
 	grobot bot;
 	
 	FD_ZERO(&readfds);
@@ -183,56 +242,7 @@ int main(int argc, char *argv[])
 			    FD_CLR(lpc, &readfds);
 			}
 			else {
-			    // XXX handle client request.
-			    switch (mp->opcode) {
-			    case MTP_COMMAND_GOTO:
-				printf("goin\n");
-				
-				robot_id = mp->data.command_goto->robot_id;
-				bot.estop();
-				bot.dgoto(mp->data.command_goto->position.x,
-					  mp->data.command_goto->position.y,
-					  mp->data.command_goto->position.
-					  theta);
-				break;
-			    case MTP_COMMAND_STOP:
-				{
-				    struct mtp_update_position mup;
-				    struct mtp_packet *ump;
-
-				    printf("stoppin\n");
-				    
-				    bot.estop();
-				    
-				    mup.robot_id = robot_id;
-				    bot.getDisplacement(mup.position.x,
-							mup.position.y);
-				    mup.position.theta = 0;
-				    mup.status = MTP_POSITION_STATUS_IDLE;
-				    if ((ump = mtp_make_packet(
-					MTP_UPDATE_POSITION,
-					MTP_ROLE_RMC,
-					&mup)) == NULL) {
-					fprintf(stderr,
-						"error: unable to make update position packet\n");
-				    }
-				    else {
-					char buffer[1024], *buf = buffer;
-					int lpc, len;
-					
-					len = mtp_encode_packet(&buf, ump);
-					for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
-					    if (FD_ISSET(lpc, &clientfds)) {
-						write(lpc, buffer, len);
-					    }
-					}
-					
-					mtp_free_packet(ump);
-					ump = NULL;
-				    }
-				}
-				break;
-			    }
+			    handle_client_packet(bot, mp, &clientfds);
 			}
 			mtp_free_packet(mp);
 			mp = NULL;
@@ -245,6 +255,10 @@ int main(int argc, char *argv[])
 	    if ((rc = bot.getGOTOstatus()) != 0) {
 		struct mtp_update_position mup;
 		struct mtp_packet *mp;
+
+		if (debug) {
+		    fprintf(stderr, "goto status %d\n", rc);
+		}
 
 		mup.robot_id = robot_id;
 		bot.getDisplacement(mup.position.x, mup.position.y);
@@ -276,6 +290,24 @@ int main(int argc, char *argv[])
 		    mp = NULL;
 		}
 	    }
+
+#if !defined(GROBOT_SIM)
+	    if ((loop_count % (10 * 60 * 5)) == 0) {
+		float battLevel, battVoltage;
+
+		battLevel = bot.garcia.getNamedValue("battery-level")->
+		    getFloatVal();
+		battVoltage = bot.garcia.getNamedValue("battery-voltage")->
+		    getFloatVal();
+
+		fprintf(stderr,
+			"notice: battery %f%, %fV\n",
+			battLevel * 100.0,
+			battVoltage);
+	    }
+#endif
+
+	    loop_count += 1;
 	}
     }
 

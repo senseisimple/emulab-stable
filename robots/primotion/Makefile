@@ -88,6 +88,24 @@ gbehaviors:
 simplepath:
 	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/simplepath.cc
 
+ROBOTS = \
+	garcia1.emulab.net \
+	garcia2.emulab.net \
+	garcia3.emulab.net \
+	garcia4.emulab.net \
+	garcia5.emulab.net \
+	garcia6.emulab.net
+
+install: gorobot mtp_send
+	@for host in ${ROBOTS}; do \
+		echo -n "Checking $$host: "; \
+		if ping -W 1 -c 1 $$host > /dev/null 2>&1; then \
+			echo "up"; \
+			scp -o "Protocol 1" $^ root@$$host:apps/; \
+		else \
+			echo "down"; \
+		fi \
+	done
 
 clean : 
 	rm -f *.o
