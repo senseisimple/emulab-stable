@@ -155,7 +155,7 @@ if (AuditStart(0)) {
 #
 $query_result =
     DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,u.webonly,u.usr_shell ".
+		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin ".
 		 "from users as u ".
 		 "where u.uid='$user'");
 
@@ -170,6 +170,7 @@ my $user_email  = $row[3];
 my $status      = $row[4];
 my $webonly     = $row[5];
 my $usr_shell   = $row[6];
+my $usr_admin   = $row[7];
 
 #
 # Get the users earliest project membership to use as the default group
@@ -414,7 +415,9 @@ sub UpdateUser(;$)
 	$remshellarg = "-s $NOLOGIN";
     }
     else {
-	$locshellarg = "-s $PBAG";
+	# Leave local shell alone if an admin.
+	$locshellarg = "-s $PBAG"
+	    if (!$usr_admin);
 
 	if (!defined($usr_shell) ||
 	    !exists($shellpaths{$usr_shell})) {
