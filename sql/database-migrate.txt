@@ -1478,3 +1478,19 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table experiment_resources add
           wirelesslans smallint(5) unsigned default '0' after shapedlans;
+
+1.240: Add node_hostkeys table for recording sfs/ssh keys.
+
+	CREATE TABLE node_hostkeys (
+	  node_id varchar(32) NOT NULL default '',
+	  sshrsa_v1 mediumtext,
+	  sshrsa_v2 mediumtext,
+	  sshdsa_v2 mediumtext,
+	  sfshostid varchar(128) default NULL,
+	  PRIMARY KEY  (node_id)
+	) TYPE=MyISAM;
+
+	insert into node_hostkeys (node_id, sfshostid) \
+		select node_id,sfshostid from nodes;
+	
+	Be sure to restart tmcd after you make these changes.

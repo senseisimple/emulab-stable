@@ -751,6 +751,19 @@ CREATE TABLE node_features (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `node_hostkeys`
+--
+
+CREATE TABLE node_hostkeys (
+  node_id varchar(32) NOT NULL default '',
+  sshrsa_v1 mediumtext,
+  sshrsa_v2 mediumtext,
+  sshdsa_v2 mediumtext,
+  sfshostid varchar(128) default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `node_idlestats`
 --
 
