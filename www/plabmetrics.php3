@@ -85,18 +85,21 @@ function name_cmp ($a, $b) {
 # map from the IP to the node_id. 
 #
 $query_result =
-    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
+    DBQueryFatal("select i.node_id,i.IP,w.hostname from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "left join widearea_nodeinfo as w on n.node_id=w.node_id ".
 		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
     		 "and nt.class='pcplabphys'");
 
 $nodemap = array();
 while ($row = mysql_fetch_array($query_result)) {
-    $nodeid = $row["node_id"];
-    $IP     = $row["IP"];
+    $nodeid   = $row["node_id"];
+    $IP       = $row["IP"];
+    $hostname = $row["hostname"];
 
     $nodemap["$IP"] = $nodeid;
+    $hostnames["$nodeid"] = $hostname;
 }
 
 #
@@ -122,13 +125,15 @@ if ($fp = popen("$TBSUEXEC_PATH nobody nobody webplabstats -i", "r")) {
 	    continue;
 	}
 
+	$hostname = $hostnames[$nodeid];
+
 	$metrics = array();
 	$metrics["load"]  = $results[0];
 	$metrics["cpu"]   = $results[1];
 	$metrics["mem"]   = $results[2];
 	$metrics["disk"]  = $results[3];
 	$metrics["netbw"] = $results[4];
-	$metrics["name"]  = $results[5];
+	$metrics["name"]  = $hostname;
 	$metrics["ip"]    = $results[6];
 	$metrics["nodeid"]= $nodeid;
 	$nodemetrics[]    = $metrics;
