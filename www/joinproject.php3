@@ -49,7 +49,6 @@ $EMAILWARNING =
 function SPITFORM($formfields, $returning, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN;
-    global $usr_keyfile;
     global $ACCOUNTWARNING, $EMAILWARNING;
     
     PAGEHEADER("Apply for Project Membership");
@@ -241,7 +240,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <input type=hidden name=MAX_FILE_SIZE value=1024>
                       <input type=file
                              name=usr_keyfile
-                             value=\"" . $usr_keyfile . "\"
+                             value=\"" . $_FILES['usr_keyfile']['name'] . "\"
 	                     size=50>
                       <br>
                       <br>
@@ -342,7 +341,7 @@ function SPITFORM($formfields, $returning, $errors)
 #
 # The conclusion of a join request. See below.
 # 
-if (isset($finished)) {
+if (isset($_GET['finished'])) {
     PAGEHEADER("Apply for Project Membership");
 
     #
@@ -370,7 +369,7 @@ if (isset($finished)) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($submit)) {
+if (! isset($_POST['submit'])) {
     $defaults = array();
     $defaults[usr_URL] = "$HTTPTAG";
     $defaults[usr_country] = "USA";
@@ -389,6 +388,15 @@ if (! isset($submit)) {
     PAGEFOOTER();
     return;
 }
+else {
+    # Form submitted. Make sure we have a formfields array and a target_uid.
+    if (!isset($_POST['formfields']) ||
+	!is_array($_POST['formfields']) ||
+	!isset($_POST['formfields']['joining_uid'])) {
+	PAGEARGERROR("Invalid form arguments.");
+    }
+    $formfields = $_POST['formfields'];
+}
 
 #
 # Otherwise, must validate and redisplay if errors
@@ -404,7 +412,7 @@ if (! $returning) {
 	$errors["Username"] = "Missing Field";
     }
     else {
-	if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $formfields[joining_uid])) {
+	if (! TBvalid_uid($formfields[joining_uid])) {
 	    $errors["UserName"] =
 		"Must be lowercase alphanumeric only<br>".
 		"and must begin with a lowercase alpha";
@@ -426,7 +434,7 @@ if (! $returning) {
 	strcmp($formfields[usr_name], "") == 0) {
 	$errors["Full Name"] = "Missing Field";
     }
-    elseif (! preg_match("/^[-\w\. ]*$/", $formfields[usr_name])) {
+    elseif (! TBvalid_usrname($formfields[usr_name])) {
 	$errors["Full Name"] = "Invalid characters";
     }
     if (!isset($formfields[usr_affil]) ||
@@ -437,16 +445,8 @@ if (! $returning) {
 	strcmp($formfields[usr_email], "") == 0) {
 	$errors["Email Address"] = "Missing Field";
     }
-    else {
-	$usr_email    = $formfields[usr_email];
-	$email_domain = strstr($usr_email, "@");
-    
-	if (! $email_domain ||
-	    strcmp($usr_email, $email_domain) == 0 ||
-	    strlen($email_domain) <= 1 ||
-	    ! strstr($email_domain, ".")) {
-	    $errors["Email Address"] = "Looks invalid!";
-	}
+    elseif (! CHECKEMAIL($formfields[usr_email])) {
+	$errors["Email Address"] = "Looks invalid!";
     }
     if (isset($formfields[usr_URL]) &&
 	strcmp($formfields[usr_URL], "") &&
@@ -478,7 +478,7 @@ if (! $returning) {
 	strcmp($formfields[usr_phone], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     }
-    elseif (! ereg("^[-0-9ext\(\)\+\. ]+$", $formfields[usr_phone])) {
+    elseif (!TBvalid_phone($formfields[usr_phone])) {
 	$errors["Phone"] = "Invalid characters";
     }
     if (!isset($formfields[password1]) ||
@@ -534,7 +534,7 @@ if (!$returning) {
 	$usr_URL = "";
     }
     else {
-	$usr_URL = $formfields[usr_URL];
+	$usr_URL = addslashes($formfields[usr_URL]);
     }
 
     if (! isset($formfields[usr_addr2])) {
@@ -569,12 +569,18 @@ if (!$returning) {
     #
     # If usr provided a file for the key, it overrides the paste in text.
     #
-    if (isset($usr_keyfile) &&
-	strcmp($usr_keyfile, "") &&
-	strcmp($usr_keyfile, "none")) {
+    if (isset($_FILES['usr_keyfile']) &&
+	$_FILES['usr_keyfile']['name'] != "" &&
+	$_FILES['usr_keyfile']['name'] != "none") {
 
-	if (! stat($usr_keyfile)) {
+	$localfile = $_FILES['usr_keyfile']['tmp_name'];
+
+	if (! stat($localfile)) {
 	    $errors["PubKey File"] = "No such file";
+	}
+        # Taint check shell arguments always! 
+	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+	    $errors["PubKey File"] = "Invalid characters";
 	}
 	else {
 	    $addpubkeyargs = "$joining_uid $usr_keyfile";
@@ -604,23 +610,20 @@ else {
     $usr_phone	= $row[usr_phone];
     $usr_URL    = $row[usr_URL];
 }
-$pid          = $formfields[pid];
 $usr_expires  = date("Y:m:d", time() + (86400 * 120));
+$pid          = $formfields[pid];
 
-if (isset($formfields[gid]) && strcmp($formfields[gid], "")) {
+if (isset($formfields[gid]) && $formfields[gid] != "") {
     $gid = $formfields[gid];
 }
 else {
     $gid = $pid;
 }
 
-if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $pid) ||
-    strlen($pid) > $TBDB_PIDLEN || ! TBValidProject($pid)) {
+if (!TBvalid_pid($pid) || !TBValidProject($pid)) {
     $errors["Project Name"] = "Invalid Project Name";
 }
-elseif (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $gid) ||
-	strlen($gid) > $TBDB_GIDLEN ||
-	!TBValidGroup($pid, $gid)) {
+elseif (!TBvalid_gid($gid) || !TBValidGroup($pid, $gid)) {
     $errors["Group Name"] = "Invalid Group Name";
 }
 elseif (TBGroupMember($joining_uid, $pid, $gid, $approved)) {

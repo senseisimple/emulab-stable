@@ -264,7 +264,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <input type=hidden name=MAX_FILE_SIZE value=1024>
                       <input type=file
                              name=usr_keyfile
-                             value=\"" . $usr_keyfile . "\"
+                             value=\"" . $_FILES['usr_keyfile']['name'] . "\"
 	                     size=50>
                       <br>
                       <br>
@@ -503,7 +503,7 @@ function SPITFORM($formfields, $returning, $errors)
 #
 # The conclusion of a newproject request. See below.
 # 
-if (isset($finished)) {
+if (isset($_GET['finished'])) {
     PAGEHEADER("Start a New Testbed Project");
 
     echo "<center><h2>
@@ -529,7 +529,7 @@ if (isset($finished)) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($submit)) {
+if (! isset($_POST['submit'])) {
     $defaults = array();
     $defaults[proj_URL] = "$HTTPTAG";
     $defaults[usr_URL] = "$HTTPTAG";
@@ -542,6 +542,15 @@ if (! isset($submit)) {
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();
     return;
+}
+else {
+    # Form submitted. Make sure we have a formfields array and a target_uid.
+    if (!isset($_POST['formfields']) ||
+	!is_array($_POST['formfields']) ||
+	!isset($_POST['formfields']['proj_head_uid'])) {
+	PAGEARGERROR("Invalid form arguments.");
+    }
+    $formfields = $_POST['formfields'];
 }
 
 #
@@ -558,7 +567,7 @@ if (! $returning) {
 	$errors["Username"] = "Missing Field";
     }
     else {
-	if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $formfields[proj_head_uid])) {
+	if (! TBvalid_uid($formfields[proj_head_uid])) {
 	    $errors["UserName"] =
 		"Must be lowercase alphanumeric only<br>".
 		"and must begin with a lowercase alpha";
@@ -580,7 +589,7 @@ if (! $returning) {
 	strcmp($formfields[usr_name], "") == 0) {
 	$errors["Full Name"] = "Missing Field";
     }
-    elseif (! preg_match("/^[-\w\. ]*$/", $formfields[usr_name])) {
+    elseif (! TBvalid_usrname($formfields[usr_name])) {
 	$errors["Full Name"] = "Invalid characters";
     }
     if (!isset($formfields[usr_affil]) ||
@@ -591,16 +600,8 @@ if (! $returning) {
 	strcmp($formfields[usr_email], "") == 0) {
 	$errors["Email Address"] = "Missing Field";
     }
-    else {
-	$usr_email    = $formfields[usr_email];
-	$email_domain = strstr($usr_email, "@");
-    
-	if (! $email_domain ||
-	    strcmp($usr_email, $email_domain) == 0 ||
-	    strlen($email_domain) <= 1 ||
-	    ! strstr($email_domain, ".")) {
-	    $errors["Email Address"] = "Looks invalid!";
-	}
+    elseif (! CHECKEMAIL($formfields[usr_email])) {
+	$errors["Email Address"] = "Looks invalid!";
     }
     if (isset($formfields[usr_URL]) &&
 	strcmp($formfields[usr_URL], "") &&
@@ -632,7 +633,7 @@ if (! $returning) {
 	strcmp($formfields[usr_phone], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     }
-    elseif (! ereg("^[-0-9ext\(\)\+\. ]+$", $formfields[usr_phone])) {
+    elseif (!TBvalid_phone($formfields[usr_phone])) {
 	$errors["Phone"] = "Invalid characters";
     }
     if (!isset($formfields[password1]) ||
@@ -659,20 +660,16 @@ if (!isset($formfields[pid]) ||
     $errors["Project Name"] = "Missing Field";
 }
 else {
-    if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $formfields[pid])) {
-	$errors["Project Name"] =
-	    "Must be alphanumeric (includes _ and -)<br>".
-	    "and must begin with an alpha";
-    }
-    elseif (strlen($formfields[pid]) > $TBDB_PIDLEN) {
-	$errors["Project Name"] =
-	    "Too long! Must be less than or equal to $TBDB_PIDLEN";
+    if (!TBvalid_pid($formfields[pid])) {
+	$errors["Project Name"] = "Must be alphanumeric only<br>".
+		"and must begin with an alpha";
     }
     elseif (TBValidProject($formfields[pid])) {
 	$errors["Project Name"] =
 	    "Already in use. Select another";
     }
 }
+
 if (!isset($formfields[proj_name]) ||
     strcmp($formfields[proj_name], "") == 0) {
     $errors["Project Description"] = "Missing Field";
@@ -765,7 +762,7 @@ if (!$returning) {
 	$usr_URL = "";
     }
     else {
-	$usr_URL = $formfields[usr_URL];
+	$usr_URL = addslashes($formfields[usr_URL]);
     }
     
     if (! isset($formfields[usr_addr2])) {
@@ -800,12 +797,18 @@ if (!$returning) {
     #
     # If usr provided a file for the key, it overrides the paste in text.
     #
-    if (isset($usr_keyfile) &&
-	strcmp($usr_keyfile, "") &&
-	strcmp($usr_keyfile, "none")) {
+    if (isset($_FILES['usr_keyfile']) &&
+	$_FILES['usr_keyfile']['name'] != "" &&
+	$_FILES['usr_keyfile']['name'] != "none") {
 
-	if (! stat($usr_keyfile)) {
+	$localfile = $_FILES['usr_keyfile']['tmp_name'];
+
+	if (! stat($localfile)) {
 	    $errors["PubKey File"] = "No such file";
+	}
+        # Taint check shell arguments always! 
+	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+	    $errors["PubKey File"] = "Invalid characters";
 	}
 	else {
 	    $addpubkeyargs = "$proj_head_uid $usr_keyfile";
@@ -851,7 +854,7 @@ else {
 }
 $pid               = $formfields[pid];
 $proj_name	   = addslashes($formfields[proj_name]);
-$proj_URL          = $formfields[proj_URL];
+$proj_URL          = addslashes($formfields[proj_URL]);
 $proj_funders      = addslashes($formfields[proj_funders]);
 $proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
 $proj_members      = $formfields[proj_members];

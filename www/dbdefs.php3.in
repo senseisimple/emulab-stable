@@ -10,6 +10,8 @@ $TBDB_PIDLEN    = 12;
 $TBDB_GIDLEN	= 12;
 $TBDB_UNIXGLEN	= 16;
 $TBDB_NODEIDLEN = 10;
+$TBDB_PHONELEN  = 32;
+$TBDB_USRNAMELEN= 64;
 
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not
@@ -140,8 +142,36 @@ define("TBDB_IFACEROLE_GW",		"gw");
 define("TBDB_IFACEROLE_OTHER",		"other");
 
 # Some regex functions to check various arguments
-function TBvalid_uid($uid)    { return preg_match("/^[a-zA-Z][-\w]+$/", $uid);}
-function TBvalid_phone($ph)   { return preg_match("/^[-\d\(\)\+\.x ]+$/", $ph);}
+function TBvalid_uid($uid) {
+    global $TBDB_UIDLEN;
+    
+    return (strlen($uid) <= $TBDB_UIDLEN) &&
+	preg_match("/^[a-zA-Z][-\w]+$/", $uid);
+}
+function TBvalid_pid($pid) {
+    global $TBDB_PIDLEN;
+    
+    return (strlen($pid) <= $TBDB_PIDLEN) &&
+	preg_match("/^[a-zA-Z][-\w]+$/", $pid);
+}
+function TBvalid_gid($gid) {
+    global $TBDB_GIDLEN;
+    
+    return (strlen($gid) <= $TBDB_GIDLEN) &&
+	preg_match("/^[a-zA-Z][-\w]+$/", $gid);
+}
+function TBvalid_phone($phone) {
+    global $TBDB_PHONELEN;
+    
+    return (strlen($phone) <= $TBDB_PHONELEN) &&
+	preg_match("/^[-\d\(\)\+\.x ]+$/", $phone);
+}
+function TBvalid_usrname($name) {
+    global $TBDB_USRNAMELEN;
+
+    return (strlen($name) <= $TBDB_USRNAMELEN) &&
+	preg_match("/^[-\w\. ]+$/", $name);
+}
 
 #
 # Convert a trust string to the above numeric values.
