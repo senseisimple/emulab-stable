@@ -7,11 +7,10 @@
 <h2>RDP to Node</h2>
 </center>
 
-<p>
+<p>  This is used to connect to a Windows node in your experiment and get a
+remote Windows Desktop using the Remote Desktop Protocol (RDP).  </p>
 
-This is used to contact to a Windows node in your experiment and get a
-remote Windows Desktop using the Remote Desktop Protocol (RDP).
-First, you need an RDP client program installed on your computer:
+<p>First, you need an RDP client program installed on your computer:  </p>
 
 <ul>
 
@@ -26,13 +25,23 @@ First, you need an RDP client program installed on your computer:
 
 </ul>
 
-Clicking "RDP to Node" in the Node Options page will send your browser
-a "text/x-testbed-rdp" ".tbrdp" file. In FreeBSD or Linux, you can save
-the file and pass it as an argument to <code>rdp-mime.pl</code> or
-associate it with <code>rdp-mime.pl</code> in your web browser. You
-can download the <code>rdp-mime.pl </code><a href="rdp-mime.pl">Perl
-program here</a>.
-</p>
+<p>Clicking "RDP to Node" in the Node Options page will send your
+browser a "text/x-testbed-rdp" ".tbrdp" file. In FreeBSD or Linux, you
+can save the file and pass it as an argument to
+<code>rdp-mime.pl</code> or associate it with <code>rdp-mime.pl</code>
+in your web browser. You can download the <code>rdp-mime.pl </code><a
+href="rdp-mime.pl">Perl program here</a>.  </p>
+
+<p>You can specify any display resolution (rdesktop window size) you
+want in the rdp-mime.pl script.  The default is 1280x1024 but it
+doesn't have to be one of the "normal" ones.  And you can switch back
+and forth between sizes by just starting a new rdesktop with different
+arguments and "grabbing" the rlogin session away from the previous
+one.  </p>
+
+<p>But once an rdesktop is started up, its display resolution is
+fixed.  If you make it smaller than the previous one, Windows will
+push your windows around to fit in the smaller space.  </p>
 
 <p>
 <font size='+1'><b>Instructions for Linux/FreeBSD:</b></font>
