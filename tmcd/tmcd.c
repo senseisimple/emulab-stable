@@ -234,6 +234,7 @@ COMMAND_PROTOTYPE(dolocalize);
 COMMAND_PROTOTYPE(dobooterrno);
 COMMAND_PROTOTYPE(dobootlog);
 COMMAND_PROTOTYPE(dobattery);
+COMMAND_PROTOTYPE(dotopomap);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -314,6 +315,7 @@ struct command {
 	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
 	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
+	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5782,6 +5784,43 @@ COMMAND_PROTOTYPE(dobattery)
 	OUTPUT(buf, sizeof(buf), "OK\n");
 	client_writeback(sock, buf, strlen(buf), tcp);
 	
+	return 0;
+}
+
+/*
+ * Spit back the topomap. This is a backup for when NFS fails.
+ * We send back the gzipped version.
+ */
+COMMAND_PROTOTYPE(dotopomap)
+{
+	FILE		*fp;
+	char		buf[MYBUFSIZE];
+	int		cc;
+
+	/*
+	 * Open up the file on boss and spit it back.
+	 */
+	sprintf(buf, "%s/expwork/%s/%s/topomap.gz", TBROOT,
+		reqp->pid, reqp->eid);
+
+	if ((fp = fopen(buf, "r")) == NULL) {
+		errorc("DOTOPOMAP: Could not open topomap for %s:",
+		       reqp->nodeid);
+		return 1;
+	}
+
+	while (1) {
+		cc = fread(buf, sizeof(char), sizeof(buf), fp);
+		if (cc == 0) {
+			if (ferror(fp)) {
+				fclose(fp);
+				return 1;
+			}
+			break;
+		}
+		client_writeback(sock, buf, cc, tcp);
+	}
+	fclose(fp);
 	return 0;
 }
 
