@@ -318,7 +318,9 @@ sub CreateFileFatal($@) {
 
 #
 # Execute a program, hiding its stdout and stderr from the user, but saving
-# them for later use. Returns the exit value of the program.
+# them for later use. Returns the exit value of the program if used in scalar
+# context, or an array composed of the exit status and output if used in array
+# context.
 #
 sub ExecQuiet(@) {
     my @commnads = @_;
@@ -339,7 +341,11 @@ sub ExecQuiet(@) {
     @libinstall::lastExecOutput = @output;
     $libinstall::lastCommand = $commandstr;
 
-    return $exit_value;
+    if (wantarray) {
+	return ($exit_value, @output);
+    } else {
+	return $exit_value;
+    }
 }
 
 #
