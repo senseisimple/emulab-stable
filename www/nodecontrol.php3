@@ -53,7 +53,8 @@ $insert_result = mysql_db_query($TBDBNAME,
 	"def_boot_cmd_line=\"$def_boot_cmd_line\",     ".
 	"next_boot_path=\"$next_boot_path\",           ".
 	"next_boot_cmd_line=\"$next_boot_cmd_line\",   ".
-	"startupcmd='$startupcmd'                      ".
+	"startupcmd='$startupcmd',                     ".
+	"rpms='$rpms'                                  ".
 	"WHERE node_id=\"$node_id\"");
 
 if (! $insert_result) {

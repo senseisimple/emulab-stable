@@ -135,7 +135,7 @@ echo "<tr>
           <td>Startup Command[1]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"startupcmd\" size=\"60\"
-                     value=\"$startupcmd\"></td>
+                     maxlength=\"256\" value=\"$startupcmd\"></td>
       </tr>\n";
 
 
@@ -143,7 +143,7 @@ echo "<tr>
           <td>RPMs[2]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"rpms\" size=\"60\"
-                     value=\"$rpms\"></td>
+                     maxlength=\"1024\" value=\"$rpms\"></td>
       </tr>\n";
 
 echo "<tr>
@@ -160,7 +160,7 @@ echo "<p>
            <dd> Node startup command must be a pathname. You may also include
                 optional arguments.
         <dt> [2]
-           <dd> RPMs must be a comma separated list of pathnames.
+           <dd> RPMs must be a colon separated list of pathnames.
       </dl>\n";
 
 #
