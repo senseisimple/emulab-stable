@@ -277,48 +277,50 @@ void display_scc(GraphWin& gw)
     int switchi;
     if (G[n].posistion) {
       gw.set_label(n,PG[pnodes[G[n].posistion]].name);
-      switchi = switch_index[PG[pnodes[G[n].posistion]].the_switch];
-      switch (switchi) {
-      case 0:
-	gw.set_color(n, black);
-	break;
-      case 1:
-	gw.set_color(n, blue);
-	break;
-      case 2:
-	gw.set_color(n, green);
-	break;
-      case 3:
-	gw.set_color(n, red);
-	break;
-      case 4:
-	gw.set_color(n, yellow);
-	break;
-      case 5:
-	gw.set_color(n, violet);
-	break;
-      case 6:
-	gw.set_color(n, cyan);
-	break;
-      case 7:
-	gw.set_color(n, brown);
-	break;
-      case 8:
-	gw.set_color(n, pink);
-	break;
-      case 9:
-	gw.set_color(n, orange);
-	break;
-      case 10:
-	gw.set_color(n, grey1);
-	break;
-      case 11:
-	gw.set_color(n, grey3);
-	break;
+      if (PG[pnodes[G[n].posistion]].the_switch != NULL) {
+	switchi = switch_index[PG[pnodes[G[n].posistion]].the_switch];
+	switch (switchi) {
+	case 0:
+	  gw.set_color(n, black);
+	  break;
+	case 1:
+	  gw.set_color(n, blue);
+	  break;
+	case 2:
+	  gw.set_color(n, green);
+	  break;
+	case 3:
+	  gw.set_color(n, red);
+	  break;
+	case 4:
+	  gw.set_color(n, yellow);
+	  break;
+	case 5:
+	  gw.set_color(n, violet);
+	  break;
+	case 6:
+	  gw.set_color(n, cyan);
+	  break;
+	case 7:
+	  gw.set_color(n, brown);
+	  break;
+	case 8:
+	  gw.set_color(n, pink);
+	  break;
+	case 9:
+	  gw.set_color(n, orange);
+	  break;
+	case 10:
+	  gw.set_color(n, grey1);
+	  break;
+	case 11:
+	  gw.set_color(n, grey3);
+	  break;
+	}
       }
     }
   }
-	
+  
   forall_edges(e, G) {
     node v = G.source(e);
     node w = G.target(e);

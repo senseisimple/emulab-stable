@@ -21,10 +21,9 @@
 #include "physical.h"
 
 extern node pnodes[MAX_PNODES];	// int -> node map
-extern tb_pgraph PG;		// physical graph
 node_array<int> switch_index;
 
-void parse_ptop(tb_pgraph &G, istream& i)
+void parse_ptop(tb_pgraph &PG, istream& i)
 {
   int switchi=0;
   dictionary<string, node> nmap;
@@ -41,6 +40,7 @@ void parse_ptop(tb_pgraph &G, istream& i)
   char *scur;
   int isswitch;
 
+  switch_index.init(PG,0);
   pnodes[0] = NULL;
   while (!i.eof()) {
     char *ret;
