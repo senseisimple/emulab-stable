@@ -1,7 +1,12 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 #
-# portstats - Get port statistics for all nodes in an experiment
+# portstats - Get port statistics for nodes in an experiment
 #
+#
+# NOTE: no -w, because $::line below is used in the eval, which perl
+# can't pick up on, so it warns about this variable being only used once
+#
+
 
 #
 # Configure variables
@@ -17,11 +22,39 @@ use Getopt::Long;
 use strict;
 
 sub usage {
-    print "Usage: $0 <pid> <eid> [vname ...] [vname:port ...]\n\n";
+    print "Usage: $0 [-h] <pid> <eid> [vname ...] [vname:port ...]\n\n";
     print "If only pid and eid are given, prints out information about all\n";
     print "ports in the experiment. Otherwise, output is limited to the\n";
     print "nodes and/or ports given.\n";
+    print "\n";
+    print "-h    This message\n";
+    print "-e    Show only error counters\n";
+    print "-a    Show all stats\n";
     return 1;
+}
+
+#
+# Process command-line arguments
+#
+my %opt = ();
+GetOptions(\%opt,'h','a','e','p','b');
+
+if ($opt{h}) {
+    exit &usage;
+}
+
+my @oids = (); # The set of OIDs we care about
+
+if ($opt{a}) {
+    @oids = ('ifInOctets', 'ifInUcastPkts', 'ifInNUcastPkts', 'ifInDiscards',
+	     'ifInErrors', 'ifInUnknownProtos', 'ifOutOctets', 'ifOutUcastPkts',
+	     'ifOutNUcastPkts', 'ifOutDiscards', 'ifOutErrors', 'ifOutQLen');
+} elsif ($opt{e}) {
+    @oids = ('ifInDiscards', 'ifInErrors', 'ifInUnknownProtos', 'ifOutDiscards',
+	     'ifOutErrors');
+} else {
+    @oids = ('ifInOctets', 'ifInUcastPkts', 'ifInNUcastPkts',
+	     'ifOutOctets', 'ifOutUcastPkts', 'ifOutNUcastPkts');
 }
 
 if (@ARGV < 2) {
@@ -31,6 +64,23 @@ my ($pid,$eid) = (shift,shift);
 
 my @passedPorts = @ARGV;
 
+#
+# This hash is used to create colmn headers and the format string
+#
+my %oids = (
+    'ifInOctets'        => [['        In','    Octets'], '@>>>>>>>>>'],
+    'ifInUcastPkts'     => [[' InUnicast','   Packets'], '@>>>>>>>>>'],
+    'ifInNUcastPkts'    => [['InNUnicast','   Packets'], '@>>>>>>>>>'],
+    'ifInDiscards'      => [['        In','  Discards'], '@>>>>>>>>>'],
+    'ifInErrors'        => [['        In','    Errors'], '@>>>>>>>>>'],
+    'ifInUnknownProtos' => [['   Unknown','  Protocol'], '@>>>>>>>>>'],
+    'ifOutOctets'       => [['       Out','    Octets'], '@>>>>>>>>>'],
+    'ifOutUcastPkts'    => [['OutUnicast','   Pakcets'], '@>>>>>>>>>'],
+    'ifOutNUcastPkts'   => [[' OutNUcast','   Packets'], '@>>>>>>>>>'],
+    'ifOutDiscards'     => [['       Out','  Discards'], '@>>>>>>>>>'],
+    'ifOutErrors'       => [['       Out','    Errors'], '@>>>>>>>>>'],
+    'ifOutQLen'         => [['  OutQueue','    Length'], '@>>>>>>>>>']
+);
 
 #
 # First, make sure the experiment exists
@@ -84,9 +134,6 @@ if (@passedPorts) {
 #
 # List of OIDs we want to look at for each port
 #
-my @oids = ('ifInOctets','ifInUcastPkts','ifInNUcastPkts','ifInDiscards',
-            'ifInErrors','ifInUnknownProtos','ifOutOctets','ifOutUcastPkts',
-	    'ifOutNUcastPkts','ifOutDiscards','ifOutErrors','ifOutQLen');
 
 #
 # Find out which devices these ports are on
@@ -125,28 +172,38 @@ foreach my $name (keys %portMap) {
 }
 
 #
-# Print out the column headers and define the output format
+# Build up the heading a format strings
 #
-my ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr, $inunk,
-    $outoctets, $outunicast, $outnunicast, $outdiscards, $outerr,$outq);
+my @heading1 = ('              ');
+my @heading2 = ('Port          ');
+my @format   = ('@<<<<<<<<<<<<<');
 
-print << "END";
-                       In  InUnicast InNUnicast         In         In    Unknown        Out OutUnicast  OutNUcast        Out        Out   OutQueue
-Port               Octets    Packets    Packets   Discards     Errors   Protocol     Octets    Packets    Packets   Discards     Errors     Length
----------------------------------------------------------------------------------------------------------------------------------------------
-END
-format stats =
-@<<<<<<<<<<<<< @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> 
-$port,    $inoctets, $inunicast,$innunicast,$indiscards,$inerr,  $inunk,    $outoctets,$outunicast,$outnunicast,$outdiscards,$outerr,$outq
-.
+foreach my $line (@oids{@oids}) {
+    my ($heading,$format) = @$line;
+    push @heading1, $$heading[0];
+    push @heading2, $$heading[1];
+    push @format,   $format;
+}
+
+my $heading1 = join(" ",@heading1);
+my $heading2 = join(" ",@heading2);
+
+my $format = "format stats =\n" . join(" ",@format) . "\n";
+$format .= join(",",map {"\$\$::line[$_]"} (0 .. @oids)) . "\n.\n";
+
+eval $format;
 $FORMAT_NAME = 'stats';
+
+#
+# Print out the heading
+#
+print "$heading1\n";
+print "$heading2\n";
+print "-" x length($heading1),"\n";
 
 #
 # Finally, print out the results
 #
-foreach my $line (sort {$$a[0] cmp $$b[0]} @stats) {
-    ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr, $inunk,
-     $outoctets, $outunicast, $outnunicast, $outdiscards, $outerr, $outq)
-	 = @$line;
+foreach $::line (sort {$$a[0] cmp $$b[0]} @stats) {
     write;
 }
