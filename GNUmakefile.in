@@ -20,7 +20,7 @@ include Makeconf
 #   pxe tbsetup tmcd utils www tip capture vis
 # Then things that depend on stuff we just did:
 #
-SUBDIRS = lib db assign @optional_subdirs@ discvr ipod os security sensors \
+SUBDIRS = lib db assign @optional_subdirs@ discvr ipod security sensors \
 		pxe tbsetup account tmcd utils www tip capture ipod vis \
 		sensors 
 
