@@ -119,11 +119,9 @@ script-install:	dir-install
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
-	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RC_DIR)/init.d/sfs
-	-ln -s $(RC_DIR)/init.d/nfs $(RC_DIR)/rc3.d/S20nfs
-	-ln -s $(RC_DIR)/init.d/sfs $(RC_DIR)/rc3.d/S50sfs
-	-ln -s $(RC_DIR)/init.d/sfs $(RC_DIR)/rc3.d/K19sfs
-	-ln -s $(RC_DIR)/init.d/sfs $(RC_DIR)/rc6.d/K19sfs
+	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/init.d/sfs
+	-ln -s $(RCDIR)/init.d/nfs $(RCDIR)/rc3.d/S20nfs
+	-ln -s $(RCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
 	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
 	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config
 	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config $(ETCDIR)/sfs/sfssd_config
