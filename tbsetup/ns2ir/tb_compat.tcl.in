@@ -41,10 +41,6 @@ proc tb-set-node-os {node os} {
     global TBCMD 
     puts $TBCMD "tb-set-node-os $node $os"
 }
-proc tb-create-os {label path partition} {
-    global TBCMD 
-    puts $TBCMD "tb-create-os $label $path $partition"
-}
 proc tb-set-link-loss {srclink args} {
     global TBCMD 
     global linkmap prefix
