@@ -48,9 +48,19 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
-$expindex = TBExptIndex($exp_pid, $exp_eid);
-$expstate = TBExptState($exp_pid, $exp_eid);
-$isbatch  = TBExptBatchState($exp_pid, $exp_eid, $batchstate);
+#
+# Need some DB info.
+#
+$query_result =
+    DBQueryFatal("select e.idx,e.state,e.batchmode,s.rsrcidx ".
+		 "  from experiments as e ".
+		 "left join experiment_stats as s on s.exptidx=e.idx ".
+		 "where e.eid='$eid' and e.pid='$pid'");
+$row      = mysql_fetch_array($query_result);
+$expindex = $row["idx"];
+$expstate = $row["state"];
+$rsrcidx  = $row["rsrcidx"];
+$isbatch  = $row["batchmode"];
 
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
@@ -163,8 +173,8 @@ SUBMENUEND_2A();
 
 echo "<br>
       <a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>
-         <img width=160 height=160 border=1 alt='experiment vis'
-              src='top2image.php3?pid=$pid&eid=$eid&thumb=160'></a>\n";
+         <img border=1 alt='experiment vis'
+              src='showthumb.php3?idx=$rsrcidx'></a>\n";
 
 SUBMENUEND_2B();
 

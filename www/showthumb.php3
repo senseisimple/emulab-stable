@@ -26,14 +26,21 @@ if (!isset($idx) ||
 $query_result =
     DBQueryFatal("select thumbnail from experiment_resources ".
 		 "where idx='$idx'");
-if (!$query_result || (mysql_num_rows($query_result) == 0)) {
-    USERERROR("No such thumbnail on file!", 1);
+
+if ($query_result && mysql_num_rows($query_result)) {
+    $row  = mysql_fetch_array($query_result);
+    $data = $row[thumbnail];
+
+    if (strlen($data)) {
+	header("Content-type: image/png");
+	echo "$data";
+	return;
+    }
 }
-$row  = mysql_fetch_array($query_result);
-$data = $row[thumbnail];
- 
-header("Content-type: image/png");
-echo "$data";
+
+# No Data. Spit back a stub image.
+header("Content-type: image/gif");
+readfile("coming-soon-thumb.gif");
 
 #
 # No Footer!

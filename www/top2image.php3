@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -59,18 +59,26 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 }
 
 #
-# XXX If an admin type, then use an appropriate gid so that we can get
-# get to the top file. This needs more thought.
+# See if any vis data. If not, then the renderer has not finished yet.
 #
-$gid = "nobody";
+$query_result =
+    DBQueryFatal("select vname from vis_nodes ".
+		 "where pid='$pid' and eid='$eid' limit 1");
 
-if (ISADMIN($uid)) {
-    $gid = $exp_pid;
+if (!$query_result || !mysql_num_rows($query_result)) {
+    # No Data. Spit back a stub image.
+    header("Content-type: image/gif");
+    readfile("coming-soon-thumb.gif");
+    return;
 }
 
+#
+# Run in the project group.
+#
+$gid = $pid;
 $arguments = "";
 
-# note that we've already ensured that $detail and $thumb are numeric above.
+# note that we already ensured that $detail and $thumb are numeric above.
 if ($detail != 0) { $arguments .= " -d $detail"; }
 if ($thumb != 0)  { $arguments .= " -t $thumb";  }
 
@@ -82,6 +90,11 @@ if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology " .
 		"$arguments -z $zoom $pid $eid", "r")) {
     header("Content-type: image/png");
     fpassthru($fp);
+}
+else {
+    # No Data. Spit back a stub image.
+    header("Content-type: image/gif");
+    readfile("coming-soon-thumb.gif");
 }
 
 #

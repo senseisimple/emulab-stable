@@ -1294,6 +1294,21 @@ function TBExptIndex($pid, $eid)
     return $idx;
 }
 
+function TBrsrcIndex($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select s.rsrcidx from experiments as e ".
+		     "left join experiment_stats as s on s.exptidx=e.idx ".
+		     "where e.pid='$pid' and e.eid='$eid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $idx   = $row[rsrcidx];
+    return $idx;
+}
+
 function TBUidNodeLastLogin($uid)
 {
     $query_result =
