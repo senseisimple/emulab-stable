@@ -287,7 +287,7 @@ flush();
 # in the group. This is the same script that gets run when the group
 # is first created.
 #
-SUEXEC($uid, $unix_gid, "websetgroups -a -p $pid $modusers", 1);
+SUEXEC($uid, $unix_gid, "websetgroups -p $pid $modusers", 1);
 
 echo "<br><br>
       <b>Done!</b>
@@ -301,20 +301,10 @@ SHOWGROUP($pid, $gid);
 SHOWGROUPMEMBERS($pid, $gid);
 
 #
-# An edit option.
+# Back to ...
 # 
-echo "<br><center>
-       <A href='editgroup_form.php3?pid=$pid&gid=$gid'>Edit</a> this Group?
-      </center>\n";
-
-#
-# A delete option, but not for the default group!
-#
-if (! $defaultgroup) {
-    echo "<p>
-           <A href='deletegroup.php3?pid=$pid&gid=$gid'>Delete</a> this Group?
-          \n";
-}
+echo "<br>
+       <A href='showgroup.php3?pid=$pid&gid=$gid'>Back to Group page</a>\n";
 
 #
 # Standard Testbed Footer
