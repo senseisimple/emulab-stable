@@ -84,7 +84,15 @@ if (!defined($hostname)) {
 }
 
 # Run rdesktop in its own directory so it finds the keymaps subdirectory.
-my $rd = 'cd ~fish/misc/rdesktop/rdesktop-1.3.1; ./rdesktop -K -g 1200x1024';
+#
+# You can specify any display resolution you want; it doesn't have to be
+# one of the "normal" ones.  And you can switch back and forth by just starting
+# a new rdesktop and "grabbing" the rlogin session away from the previous one.
+# 
+# But once an rdesktop is started up, its display resolution is fixed.  If you make it
+# smaller than the previous one, it will push your windows around to fit.
+#
+my $rd = 'cd ~fish/misc/rdesktop/rdesktop-1.3.1; ./rdesktop -K -g 1280x1024';
 if (!defined($gateway)) {
     exec "$rd $login $hostname &"; ### -p $pswd
 }
