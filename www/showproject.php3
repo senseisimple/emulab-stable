@@ -94,10 +94,13 @@ if (mysql_num_rows($query_result)) {
     while ($row = mysql_fetch_row($query_result)) {
         $eid  = $row[0];
         $name = $row[1];
+	if (!$name)
+	    $name = "--";
         echo "<tr>
                   <td>
-                      <A href='showexp.php3?exp_pideid=$pid\$\$$eid'>$name</a>
+                      <A href='showexp.php3?exp_pideid=$pid\$\$$eid'>$eid</a>
                       </td>
+                  <td>$name</td>
               </tr>\n";
     }
 
