@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.1 2000-07-06 17:42:35 kwright Exp $*/
+/*$Id: discvr.h,v 1.2 2000-07-06 22:50:59 kwright Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -62,7 +62,7 @@ struct ifi_info {
 void 
 serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen);
 
-char *
+void
 forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		     const char *mesg, const int mesglen);
 struct ifi_info	*
