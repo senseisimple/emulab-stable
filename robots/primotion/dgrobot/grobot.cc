@@ -133,7 +133,7 @@ void grobot::pbMove(float mdisplacement) {
   mdisplacement = floor(mdisplacement);
   mdisplacement = mdisplacement/100.0;
   
-  if (mdisplacement > 0.05f) {
+  if (fabs(mdisplacement) > 0.05f) {
     // send the move to the robot
     // if you want to move less than 5 cm, FUCK OFF.
     std::cout << "Move length: " << mdisplacement << std::endl;
@@ -194,7 +194,7 @@ void grobot::pbPivot(float pangle) {
     }
   }
   
-  if (pangle > 0.05f) {
+  if (fabs(pangle) > 0.05f) {
     // send the pivot to the robot
     // If it wants to turn less than 0.05 radians, it gets the hose again
     std::cout << "Pivot angle: " << pangle << std::endl;
