@@ -140,7 +140,7 @@ use Exporter;
 
 	 TBSiteVarExists TBGetSiteVar
 
-	 TBActivityReport GatherSwapStats
+	 TBActivityReport GatherSwapStats GatherAssignStats
 	 );
 
 # Must come after package declaration!
@@ -3182,6 +3182,42 @@ sub GatherSwapStats($$$$$;$)
     DBQueryWarn("insert into testbed_stats ".
 		"(idx, tstamp, exptidx, action, exitcode) ".
 		"values (0, now(), $idx, '$mode', $ecode)");
+}
+
+#
+# Gather Assign stats. Its expected that the hash that comes in
+# will reflect the slot names in the DB.
+#
+# usage: GatherAssignStats(char *pid, char *eid, 
+#			   char *mode, int code, int flags)
+#        Mode is one of preload, start, in, out, modify, end.
+#
+sub GatherAssignStats($$%)
+{
+    my ($pid, $eid, %stats) = @_;
+    my @updates = ();
+
+    local $DBQUERY_MAXTRIES = 5;
+
+    #
+    # Need the exptidx for the insert.
+    #
+    my $result =
+	DBQueryFatal("select idx from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    my ($idx) = $result->fetchrow_array;
+    
+    if (defined($idx) && $idx) {
+	foreach my $key (keys(%stats)) {
+	    $val = $stats{$key};
+	    
+	    push (@updates, "$key=$val");
+	}
+	DBQueryFatal("update experiment_stats ".
+		     "set " . join(",", @updates) . " ".
+		     "where pid='$pid' and eid='$eid' and idx=$idx");
+    }
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
