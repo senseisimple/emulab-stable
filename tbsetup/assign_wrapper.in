@@ -2352,6 +2352,7 @@ sub InitPnode($pnode, $vnode)
     my $osid;
     my $role;
     my $simhost_violation;
+    my $inner_elab_role;
 
     # XXX NSE hack: 
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
@@ -2458,6 +2459,7 @@ sub InitPnode($pnode, $vnode)
 	}
 	$vname = $vnode;
 	$role  = TBDB_RSRVROLE_NODE;
+	$inner_elab_role = virtnodeelabrole($vnode);
 
 	#
 	# NOTE: We no longer include tarballs and RPMs in this update, because
@@ -2477,22 +2479,25 @@ sub InitPnode($pnode, $vnode)
     printdb("reserved vname: $pnode $vname\n");
 
     #
-    # Set the vname and role.
+    # Set various reserved table bits
     #
-    if (defined($vname) || defined($role) || defined($simhost_violation)) {
-	my $sets = "";
+    my @sets = ();
 
-	$sets .= "vname='$vname' "
-	    if (defined($vname));
-	$sets .= (defined($vname) ? "," : "") . "erole='$role' "
-	    if (defined($role));	
-	$sets .= (defined($role) || defined($vname) ? "," : "") .
-	         "simhost_violation='$simhost_violation' "
-	    if (defined($simhost_violation));
+    push(@sets, "vname='$vname'")
+	if (defined($vname));
+    push(@sets, "erole='$role'")
+	if (defined($role));
+    push(@sets, "simhost_violation='$simhost_violation'")
+	if (defined($simhost_violation));
+    push(@sets, "inner_elab_role='$inner_elab_role'")
+	if (defined($inner_elab_role));
 
-	DBQueryFatal("update reserved set $sets where node_id='$pnode'");
+    if (@sets) {
+	my $setstr = join(",", @sets);
+
+	DBQueryFatal("update reserved set $setstr where node_id='$pnode'");
     }
-    
+
     #
     # Now call os_select.
     #
@@ -3382,6 +3387,7 @@ sub LoadVirtNodeDesires()
 sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
 sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
 sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
+sub virtnodeelabrole($) { return $virt_nodes{$_[0]}->{"inner_elab_role"}; }
 sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
 sub virtnodesetosid($$) { return $virt_nodes{$_[0]}->{"__osid"} = $_[1]; }
 sub virtnodeparent($)   { return $virt_nodes{$_[0]}->{"__parent"}; }
