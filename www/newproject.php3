@@ -88,9 +88,9 @@ function SPITFORM($formfields, $returning, $errors)
         # Start user information stuff. Presented for new users only.
         #
 	echo "<tr>
-                  <td colspan=3>
-                      Project Head Information
-                  </td>
+                  <th colspan=3>
+                      Project Head Information:
+                  </th>
               </tr>\n";
 
         #
@@ -252,10 +252,10 @@ function SPITFORM($formfields, $returning, $errors)
     #
     # Project information
     #
-    echo "<tr><td colspan=3><hr></td></tr>
-          <tr><td colspan=3>
-               Project Information <em>(replace the example entries)</em>
-              </td>
+    echo "<tr><th colspan=3>
+               Project Information: 
+               <!-- <em>(replace the example entries)</em> -->
+              </th>
           </tr>\n";
 
     #
