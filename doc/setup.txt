@@ -172,6 +172,19 @@ Stick:
 named_enable="YES"
 in /etc/rc.conf
 
+apache - You should have installed apache with mod_ssl, and php3 (NOTE: Version
+3.0.17 is known to have broken file uploading support. Use 3.0.16 or 3.0.18 -
+newer versions are likely to work as well.) We have an auto-generated config
+file that you can install by changing to the apache subdir of your build tree
+and running 'gmake install'. Some apache installations may expect to find their
+config file at /usr/local/etc/apache/httpd.conf, rather than apache.conf (where
+ours gets installed.) Just symlink apache.conf to httpd.conf if you have
+trouble with this. Also our config file expects to find SSL certificates in:
+/usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
+SSLCertificateKeyFile /usr/local/etc/apache/ssl.key/www.<sitename>.net.key
+(where <sitename> is OURSITE from the configure defs file.) Make sure yours
+go there, or edit the apache.conf file appropriately.
+
 inetd - In FreeBSD, you need to prevent inetd from rate-limiting connections
 (an attempt to defend against DOS attacks, but very annoying in a testbed
 environment). Put the following in /etc/rc.conf:
@@ -259,20 +272,7 @@ install the '3.testbed.sh' and 'cvsupd.sh'  scripts (in the rc.d directory of
 the testbed tree.) Make sure that these scripts are executable (chmod +x),
 so that they'll get executed at system startup time.
 
-Apache - You should have installed apache with mod_ssl, and php3 (NOTE: Version
-3.0.17 is known to have broken file uploading support. Use 3.0.16 or 3.0.18 -
-newer versions are likely to work as well.) We have an auto-generated config
-file that you can install by changing to the apache subdir of your build tree
-and running 'gmake install'. Some apache installations may expect to find their
-config file at /usr/local/etc/apache/httpd.conf, rather than apache.conf (where
-ours gets installed.) Just symlink apache.conf to httpd.conf if you have
-trouble with this. Also our config file expects to find SSL certificates in:
-/usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
-SSLCertificateKeyFile /usr/local/etc/apache/ssl.key/www.<sitename>.net.key
-(where <sitename> is OURSITE from the configure defs file.) Make sure yours
-go there, or edit the apache.conf file appropriately.
-
-Cron jobs: We currently have two cron jobs running for the testbed. Both can be
+cRON JOBS: We currently have two cron jobs running for the testbed. Both can be
 run out of /etc/crontab
 45	1	*	*	*	root	/usr/testbed/sbin/backup
 */5	*	*	*	*	root	/usr/testbed/sbin/node_status
