@@ -80,9 +80,9 @@ C. What to do on boss:
    ("pcN","powerX",Y)
 
 4. Add entries to the nodes table for each node. Try:
-   insert into nodes (node_id,type,phys_nodeid,role,def_boot_osid,priority)
+   insert into nodes (node_id,type,phys_nodeid,role,def_boot_osid,priority,op_mode)
    values
-   ("pcN","pc1u","pcN","testnode","FBSD45-STD",N)
+   ("pcN","pc1u","pcN","testnode","FBSD45-STD",N,'NORMAL')
 
    If the node is a pxebooting node, then you need to set the
    pxe_boot_path in the nodes table. Try:
@@ -140,14 +140,14 @@ C. What to do on boss:
            catostrophic happened.  Finally:
 	      sudo cp Ndhcpd.conf dhcpd.conf
 	      sudo /usr/local/etc/rc.d/2.dhcpd.sh restart 
-   - tip: on ops, edit /etc/remote
+   - tip: on ops or tipserv1, edit /etc/remote
 	  add a line like this:
 	  pcN:dv=/dev/tip/pcN:br#115200:nt:pa=none:
 	  pcN-tty:dv=/dev/cua<port #>:br#115200:nt:pa=none:
 	  then do these:
 	  sudo touch /var/log/tiplogs/pcN.log
 	  sudo touch /var/log/tiplogs/pcN.run
-   - capture: on ops, edit /usr/site/etc/capture.rc:
+   - capture: on ops or tipserv1, edit /usr/site/etc/capture.rc:
 	  add a line like this:
 	  /usr/site/bin/capture -r -s 115200 pcN tty<port#> >/dev/null 2>&1 &
 
