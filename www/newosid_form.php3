@@ -124,7 +124,6 @@ echo "<tr>
           <td>OS Features:</td>
           <td><input type=checkbox name=\"os_feature_ping\">ping &nbsp
               <input type=checkbox name=\"os_feature_ssh\">ssh  &nbsp
-              <input type=checkbox name=\"os_feature_ipod\">ipod &nbsp
           </td>
       </tr>\n";
 
