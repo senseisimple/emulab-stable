@@ -50,26 +50,9 @@ int parse_top(tb_vgraph &G, istream& i)
 	G[no1].posistion = 0;
 	G[no1].no_connections=0;
 	nmap.insert(s1, no1);
-	if (!strcmp(type, "delay")) {
-	  G[no1].type = TYPE_DELAY;
-	}
-	else if (!strcmp(type, "pc")) {
-	  G[no1].type = TYPE_PC;
-	}
-	else if (!strcmp(type, "switch")) {
-	  fprintf(stderr,"Can not have switch's in top file\n");
-	  G[no1].type = TYPE_UNKNOWN;
-	}
-	else if (!strcmp(type, "dnard")) {
-	  G[no1].type = TYPE_DNARD;
-	}
-	else {
-	  fprintf(stderr,"Unknown type in top file: %s\n",type);
-	  G[no1].type = TYPE_UNKNOWN;
-	}
+	G[no1].type=string(type);
       }
-    }
-    else if (!strncmp(inbuf, "link", 4)) {
+    } else if (!strncmp(inbuf, "link", 4)) {
       r=sscanf(inbuf, "link %s %s %s %d", lname, n1, n2,&bw);
       if (r < 2) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);

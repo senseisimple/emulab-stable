@@ -17,7 +17,7 @@ public:
 
   int posistion;		// index into pnode array
   int no_connections;		// how many unfulfilled connections from this node
-  nodeType type;		// type of the node
+  string type;
   char *name;			// string name of the node
 };
 

@@ -36,7 +36,6 @@ int parse_ptop(tb_pgraph &PG, istream& i)
   char n1[32], n2[32];
   int size, num;
   int n=1;
-  int j;
   char *snext;
   char *snode;
   char *scur;
@@ -64,18 +63,15 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	string s(snode);
 	no1 = PG.new_node();
 	PG[no1].name=strdup(snode);
-	PG[no1].current_type = TYPE_UNKNOWN;
+	PG[no1].typed = false;
 	PG[no1].max_load = 0;
 	PG[no1].current_load = 0;
 	PG[no1].pnodes_used=0;
-	for (j = 0 ; j < MAX_TYPES; ++j) {
-	  PG[no1].types[j].name = NULL;
-	  PG[no1].types[j].max = 0;
-	}
 	while ((scur = strsep(&snext," ")) != NULL) {
 	  char *t,*load=scur;
 	  int iload;
 	  t = strsep(&load,":");
+	  string stype(t);
 	  if (load) {
 	    if (sscanf(load,"%d",&iload) != 1) {
 	      fprintf(stderr,"Bad load specifier: %s\n",load);
@@ -84,25 +80,13 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  } else {
 	    iload=1;
 	  }
-	  if (strcmp(t,"pc") == 0) {
-	    PG[no1].types[TYPE_PC].name = "pc";
-	    PG[no1].types[TYPE_PC].max = iload;
-	  } else if (strcmp(t,"dnard") == 0) {
-	    PG[no1].types[TYPE_DNARD].name = "dnard";
-	    PG[no1].types[TYPE_DNARD].max = iload;
-	  } else if (strcmp(t,"delay") == 0) {
-	    PG[no1].types[TYPE_DELAY].name = "delay";
-	    PG[no1].types[TYPE_DELAY].max = iload;
-	  } else if (strcmp(t,"delay_pc") == 0) {
-	    // this is an unsuported type.  Have types of both
-	    // delay and pc.
-	    fprintf(stderr,"Unsupported type: delay_pc\n");
-	  } else if (strcmp(scur,"switch") == 0) {
+	  if (strcmp(t,"switch") == 0) {
 	    isswitch = 1;
-	    PG[no1].types[TYPE_SWITCH].name = "switch";
-	    PG[no1].types[TYPE_SWITCH].max = 1;
+	    PG[no1].types.insert(stype,1);
 	    PG[no1].the_switch = no1;
 	    switch_index[no1] = switchi++;
+	  } else {
+	    PG[no1].types.insert(stype,iload);
 	  }
 	}
 	if (! isswitch)
@@ -148,7 +132,7 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  else
 	    PG[ed1].dstmac = NULL;
 	}
-#define ISSWITCH(n) (PG[n].types[TYPE_SWITCH].max == 1)
+#define ISSWITCH(n) (PG[n].types.lookup("switch") != nil)
 	if (ISSWITCH(node1) &&
 	    ! ISSWITCH(node2))
 	  PG[node2].the_switch = node1;

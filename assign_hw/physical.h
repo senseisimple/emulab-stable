@@ -15,8 +15,9 @@ public:
       return i;
     }
   
-  tb_type types[MAX_TYPES];	// array of types, with counts of max
-  nodeType current_type;	// the current type of the node
+  dictionary<string,int> types;	// contains max nodes for each type
+  string current_type;
+  bool typed;			// has it been typed
   int max_load;			// maxmium load for current type
   int current_load;		// how many vnodes are assigned to this pnode
   char *name;

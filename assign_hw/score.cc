@@ -92,7 +92,7 @@ void init_score()
   }
   forall_nodes(n,PG) {
     tb_pnode &pn=PG[n];
-    pn.current_type=TYPE_UNKNOWN;
+    pn.typed=false;
     pn.current_load=0;
     pn.pnodes_used=0;
   }
@@ -221,7 +221,7 @@ void remove_node(node n)
       }
     }
     // revert pnode type
-    pnoder.current_type=TYPE_UNKNOWN;
+    pnoder.typed=false;
   } else if (pnoder.current_load >= pnoder.max_load) {
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  reducing penalty, new load = %d (>= %d)\n",pnoder.current_load,pnoder.max_load);
@@ -255,14 +255,15 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
   fprintf(stderr,"SCORE: add_node(%s,%s[%d])\n",
 	  vnoder.name,pnoder.name,ploc);
-  fprintf(stderr,"  vnode type = %d pnode switch = %s\n",vnoder.type,
-	  (pnoder.the_switch ? PG[pnoder.the_switch].name : "No switch"));
-  
+  fprintf(stderr,"  vnode type = ");
+  cerr << vnoder.type << " pnode switch = ";
+  cerr << (pnoder.the_switch ? PG[pnoder.the_switch].name : "No switch");
+  cerr << endl;
 #endif
   
   // set up pnode
   // figure out type
-  if (pnoder.current_type == TYPE_UNKNOWN) {
+  if (!pnoder.typed) {
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  virgin pnode\n");
 #endif
@@ -271,7 +272,8 @@ int add_node(node n,int ploc)
     // Remove higher level checks?
     pnoder.max_load=0;
     pnoder.current_type=vnoder.type;
-    pnoder.max_load = pnoder.types[vnoder.type].max;
+    pnoder.typed=true;
+    pnoder.max_load = pnoder.types.access(vnoder.type);
     
     if (pnoder.max_load == 0) {
       // didn't find a type
@@ -281,8 +283,9 @@ int add_node(node n,int ploc)
       return 1;
     }
 #ifdef SCORE_DEBUG
-    fprintf(stderr,"  matching type found (%d, max = %d)\n",
-	    pnoder.current_type,pnoder.max_load);
+    fprintf(stderr,"  matching type found (");
+    cerr << pnoder.current_type << ", max = " << pnoder.max_load;
+    cerr << ")" << endl;
 #endif
   } else {
 #ifdef SCORE_DEBUG
@@ -387,7 +390,7 @@ int add_node(node n,int ploc)
 	  fprintf(stderr,"   could not find path - no connection\n");
 #endif
 	  // XXX - this is a hack for the moment
-	  pnoder.current_type = TYPE_UNKNOWN;
+	  pnoder.typed = false;
 	  return 1;
 	  
 	  // couldn't find path.
