@@ -218,7 +218,7 @@ WRITESUBMENUBUTTON("Show History",
 # experiment
 if ($types['garcia'] || $classes['sg']) {
     WRITESUBMENUBUTTON("Show Blinky Lights",
-		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid");
+		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid","moteleds");
 }
 
 if ($isadmin) {
