@@ -1017,7 +1017,7 @@ public class RoboTrack extends JApplet {
 		    "&nodeidlist[" + robbie.pname + "]=\"" +
 		    robbie.drag_x / pixels_per_meter + "," +
 		    robbie.drag_y / pixels_per_meter + "," +
-		    robbie.or + "\"";
+		    robbie.drag_or + "\"";
 
 		// Clear it in the map (when it repaints).
 		robbie.dragging = false;
@@ -1066,11 +1066,14 @@ public class RoboTrack extends JApplet {
 		str = str + "\n" + tmp;
 	    }
 	    input.close();
-	    System.out.println(str);
 
-	    JOptionPane.showMessageDialog(getContentPane(),
-					  str, "Submit Failed",
-					  JOptionPane.ERROR_MESSAGE);
+	    if (str.length() > 0) {
+		System.out.println(str);
+
+		JOptionPane.showMessageDialog(getContentPane(),
+					      str, "Submit Failed",
+					      JOptionPane.ERROR_MESSAGE);
+	    }
 	}
 	catch(Throwable th)
 	{

@@ -81,12 +81,12 @@ while (list ($node_id, $value) = each ($nodeidlist)) {
     #
     unset($matches);
     
-    if (!preg_match("/^(.*),(.*),(.*)$/", $value, $matches)) {
+    if (!preg_match("/^\"(.*),(.*),(.*)\"$/", $value, $matches)) {
 	USERERROR("Must specify x,y,o coordinates for $node_id!", 1);
     }
-    $x = $matches[0];
-    $y = $matches[1];
-    $o = $matches[2];
+    $x = $matches[1];
+    $y = $matches[2];
+    $o = $matches[3];
 
     if (! (TBvalid_float($x) && TBvalid_float($y) && TBvalid_float($o))) {
 	USERERROR("Must specify proper x,y,o coordinates for $node_id!", 1);
@@ -104,16 +104,22 @@ while (list ($node_id, $value) = each ($nodeidlist)) {
     #
     unset($matches);
     
-    if (!preg_match("/^(.*),(.*),(.*)$/", $value, $matches)) {
+    if (!preg_match("/^\"(.*),(.*),(.*)\"$/", $value, $matches)) {
 	USERERROR("Must specify x,y,o coordinates for $node_id!", 1);
     }
-    $x = $matches[0];
-    $y = $matches[1];
-    $o = $matches[2];
+    $x = $matches[1];
+    $y = $matches[2];
+    $o = $matches[3];
 
-    $retval = SUEXEC($uid, "nobody",
-		     "websetdest -x $x -y $y -o $o $node_id",
+    if (! TBNodeIDtoExpt($node_id, $pid, $eid, $gid)) {
+	USERERROR("$node_id is not reserved to an experiment!", 1);
+    }
+
+    $retval = SUEXEC($uid, "$pid,$gid",
+		     "websetdest -d -x $x -y $y -o $o $node_id",
 		     SUEXEC_ACTION_IGNORE);
+
+    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
 
     #
     # Report fatal errors.

@@ -87,19 +87,19 @@ if ($destx =~ /^([\d.]+)$/) {
     $destx = $1;
 }
 else {
-    die("*** Bad data in pid: $destx.\n");
+    die("*** Bad data in destx: $destx.\n");
 }
 if ($desty =~ /^([\d.]+)$/) {
     $desty = $1;
 }
 else {
-    die("*** Bad data in pid: $desty.\n");
+    die("*** Bad data in desty: $desty.\n");
 }
-if ($desto =~ /^([\d.]+)$/) {
+if ($desto =~ /^([-\d.]+)$/) {
     $desto = $1;
 }
 else {
-    die("*** Bad data in pid: $desto.\n");
+    die("*** Bad data in desto: $desto.\n");
 }
 
 #
