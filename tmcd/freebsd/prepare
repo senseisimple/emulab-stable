@@ -124,10 +124,11 @@ if (-f $MOUNTINFO) {
         die("Could not unlink $MOUNTINFO: $!");
 }    
 
-print "Removing root's history ...\n";
+print "Removing root's history and .saves files...\n";
 if (-f $HISTORY) {
     unlink($HISTORY) or
         die("Could not unlink $HISTORY: $!");
+    system("rm -f /root/.saves-*");
 }
 
 print "Cleaning mail spool files ...\n";
