@@ -106,7 +106,10 @@ function GETUID() {
 	return FALSE;
 
     # Verify valid string (no special chars like single/double quotes!).
-    if (!TBvalid_uid($curname)) {
+    # We do not use the standard check function here, since we want to
+    # avoid a DB access on each page until its required. Thats okay since
+    # since we just need to ensure that we feed to the DB query is safe.
+    if (! preg_match("/^[-\w]+$/", $curname)) {
 	return FALSE;
     }
     return $curname;
@@ -200,8 +203,6 @@ function CHECKLOGIN($uid) {
     # kill the entry anyway so the user is officially logged out.
     #
     if (time() > $timeout) {
-	echo "foo $timeout<br>\n";
-	
 	DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
 	$CHECKLOGIN_STATUS = CHECKLOGIN_TIMEDOUT;
 	return $CHECKLOGIN_STATUS;
