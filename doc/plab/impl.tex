@@ -174,4 +174,34 @@ used for the corresponding slice.
 \subsection{Failure Handling and Recovery}
 
 Given two large distributed systems such as Emulab and \plab, failures
-are a given and have many possible modes.  We approach this by ...
+are a given and have many possible modes.  We apply several mechanisms
+to cope with these.  The \plab backend defines wrapper functions that
+call a requested remote API function and handle error conditions
+encountered.  There are three types of errors the handler can cope
+with: fatal, retryable and continuable.  On detecting a fatal error,
+the backend halts the current operation and reports failure back to
+the caller.  For retryable error types, the wrapper will try the RPC
+again; by default, the RPC wrapper will attempt a remote procedure
+three times before giving up.  Continueable errors are cases where the
+error indicates that the goal has already been acheived (e.g., when a
+node deallocation RPC reports that a node is no longer allocated).
+The classification of these errors is defined in software; there is no
+heuristic to determine when to continue or give up.  The default
+error classification is retryable.
+
+The outer Emulab infrastructure combined with the \plab backend track
+the resources that are in use at any given time (swapin, active,
+swapout).  The \plab backend gaurantees not to leave slices or nodes
+allocated when their allocation ultimately fails.  When a setup fails
+or is canceled further into swapin, the Emulab infrastructure takes
+care to call the appropriate \plab backend commands to free any
+allocated resources.  For example, when a \plab experiment setup fails
+because some nodes fail to allocate or load and run the Emulab
+client-side startup scripts (and setup failure is set to fatal for
+these nodes), a full Emulab experiment termination will be activated.
+This will result in the deallocation of any resources; \plab nodes
+will be freed by whichever backend module is appropriate, and the
+slice will be destroyed.  No resources are leaked, and namespaces are
+cleared so that future setups will not collide.
+
+\xxx{Talk about timeout handling}
