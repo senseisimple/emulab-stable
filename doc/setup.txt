@@ -29,6 +29,7 @@ L isc-dhcp-2.0.5      ISC Dynamic Host Configuration Protocol client and server
   mod_php4-4.1.1      PHP4 module for Apache
   mysql-client-3.23.36 Multithreaded SQL database (client)
   mysql-server-3.23.36 Multithreaded SQL database (server)
+  netpbm-9.12	      A toolkit for conversion of images between different formats
   otcl-1.0a6          MIT Object Tcl
   p5-DBI-1.15         The perl5 Database Interface.  Required for DBD::* modules
   p5-GD-1.32_2        A perl5 interface to Gd Graphics Library
@@ -41,6 +42,7 @@ L p5-SNMP_Session-0.83 A perl5 module for providing rudimentary access to SNMPv1
   tcl-8.2.3           Tool Command Language
   tcl-sql-20000114_1  TCL module for accessing MySQL databases
 L ucd-snmp-4.2        An extendable SNMP implimentation
+  vcg-1.30	      A Visualization Tool for compiler graphs
 
 IMPORTANT: The mhash package should be installed _before_ the mod_php4 port is
 built. When building mod_php4, you will be given a menu to choose the various
