@@ -729,11 +729,13 @@ class Plab:
 
         # Enforce allowed nodes limitation, if any.
         if len(ALLOWED_NODES):
+            ravail = []
             for ip in avail:
-                if ip not in ALLOWED_NODES:
-                    avail.remove(ip)
-            print "Advertisements in allowed nodes list:\n%s" % avail
-            
+                if ip in ALLOWED_NODES:
+                    ravail.append(ip)
+            print "Advertisements in allowed nodes list:\n%s" % ravail
+            avail = ravail
+
         known = self.__getKnownPnodes()
         if debug:
             print "Got known pnodes:"
