@@ -14,7 +14,7 @@ my $TB = '@prefix@';
  
 use libdb;
 use English;
-use Getopt::Std;
+use Getopt::Long;
 
 #
 # We have to be setuid root so that we can ssh into stargates as root
@@ -41,13 +41,26 @@ my $DEBUG  = 1;
 #
 # Handle command-line arguments
 # TODO: Allow a user to specify some of their own arguments to uisp
-# TODO: Allow a user to reprogram all motes in an experiment
 #
 sub usage() {
     warn "Usage: $0 <operation> [filename] <motes...>\n";
     warn "Supported operations: upload\n";
     warn "[filename] is required with the 'upload' operation\n";
     return 1;
+}
+
+my %opt = ();
+GetOptions(\%opt, 'p=s','e=s');
+
+if (($opt{e} && ! $opt{p}) || (!$opt{e} && $opt{p})) {
+    warn "-e and -p must be used togehter\n";
+    die usage;
+}
+
+my ($eid, $pid);
+if ($opt{e}) {
+    $eid = $opt{e};
+    $pid = $opt{p};
 }
 
 my $operation = shift @ARGV;
@@ -71,10 +84,40 @@ SWITCH: for ($operation) {
     exit usage();
 }
 
-# They have to give us at least one mote
+# They have to give us at least one mote, unless they gave a pid or eid, in
+# which case we take that to mean all nodes in the experiment
 my @motes = @ARGV;
-if (!@motes) {
+if (!@motes && !$eid) {
     exit usage();
+}
+
+# Perm check on the eid and pid
+if ($eid) {
+    if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+	die "*** You do not have permission to access nodes in\n" .
+	    "     $pid/$eid\n";
+    }
+}
+
+# If given an eid and a mote list, translate the mote names to physical ones
+if ($eid && @motes) {
+    my @tmp;
+    foreach my $mote (@motes) {
+	my $physmote;
+	if (!VnameToNodeid($pid,$eid,$mote,\$physmote)) {
+	    die "*** No such node $mote in $pid/$eid\n";
+	}
+	push @tmp, $physmote;
+    }
+    @motes = @tmp;
+}
+
+# If given an eid and no mote list, grab all nodes in the experiment
+if (!@motes && $eid) {
+    @motes = ExpNodes($pid, $eid);
+    if (!@motes) {
+	die "*** Unable to get nodes in experiment $pid/$eid\n";
+    }
 }
 
 #
