@@ -45,7 +45,7 @@ my $state;
 
 #
 # Untaint the path
-# 
+#
 # Untaint the path
 $ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:$TB/libexec:$TB/sbin:$TB/bin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
@@ -75,7 +75,7 @@ TBDebugTimeStamp("tbrestart started");
 
 #
 # Must be an active experiment to restart!
-# 
+#
 if (! ($state = ExpState($pid, $eid))) {
     die("*** $0:\n".
 	"    No such experiment $pid/$eid\n");
@@ -86,8 +86,8 @@ if ($state ne EXPTSTATE_ACTIVE) {
 }
 
 #
-# Stop the event system. 
-# 
+# Stop the event system.
+#
 if (!$DISABLE_EVENTS) {
     print "Stopping the event system.\n";
     TBDebugTimeStamp("eventsys_control started");
@@ -100,14 +100,14 @@ if (!$DISABLE_EVENTS) {
 
 #
 # Clearing the portstat counters seems like a good idea.
-# 
+#
 print "Clearing port counters.\n";
 TBDebugTimeStamp("portstats started");
 if (system("portstats -z -a -q $pid $eid")) {
     print STDERR "*** WARNING: Failed to clear port counters.\n";
     #
     # This is a non-fatal error.
-    # 
+    #
 }
 TBDebugTimeStamp("portstats finished");
 
@@ -118,17 +118,21 @@ TBDebugTimeStamp("portstats finished");
 # this point. This is terribly imperfect of course, since there are no
 # guarantees, especially since the events are async (a tbreset and isup
 # could be in the event queue for a node). The ready bits present the worst
-# problem. 
+# problem.
 #
 print "Rebooting all nodes\n";
 TBDebugTimeStamp("node reboot started");
+
+# Start the wait before the node reboot, so we don't miss any events...
+initStateWait([ TBDB_NODESTATE_ISUP ],@nodes);
+
 foreach my $node ( @nodes ) {
     #
     # Must duplicate a check that would be done in node_reboot if we
     # gave it the entire list. No point in rebooting local jails.
     #
     my ($jailed, $plab);
-    
+
     if (TBIsNodeVirtual($node, \$jailed, \$plab)) {
 	if (! $jailed && ! $plab) {
 	    next;
@@ -137,7 +141,7 @@ foreach my $node ( @nodes ) {
 	    next;
 	}
     }
-    
+
     if (system("$nodereboot $node")) {
 	die("*** $0:\n".
 	    "    Failed to reboot node $node!\n");
@@ -147,16 +151,56 @@ foreach my $node ( @nodes ) {
 }
 
 print STDOUT "Waiting for nodes to come up ...\n";
-    
-foreach my $node ( sort(@nodes) ) {
-    if (! TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $waitstart, (60*6))) {
-	print STDOUT "$node is alive and well\n";
-	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
-	next;
+
+my %notified = ();
+foreach $n (@nodes) { $notified{$n} = 0; }
+
+my $maxwait = 60 * 15; # Don't wait more than 15 min.
+my $u = 60; # Update the user every 60 seconds.
+my $total = scalar(@nodes);
+my $done = 0;
+my $start = time();
+my $now = $start;
+my @finished = ();
+my @failed = ();
+while ( ($now - $start) < $maxwait && $done < $total ) {
+    my $wait = min($u,$start + $maxwait - $now);
+    waitForState(\@finished, \@failed, $wait);
+    $now = time();
+    $done = scalar(@finished) + scalar(@failed);
+    foreach $n (@finished) {
+	if (!$notified{$n}) {
+	    print STDOUT "$n is alive and well\n";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    $notified{$n}=1;
+	}
     }
-    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
-    $failed++;
+    foreach $n (@failed) {
+	if (!$notified{$n}) {
+	    print STDOUT "$n failed to come up!\n";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	    $failed++;
+	    $notified{$n}=1;
+	}
+    }
+    my $min = int(($now - $start + 30)/60); # round to nearest min.
+    print "After $min min., $done nodes done...\n";
 }
+
+endStateWait();
+
+my $m = $maxwait/60;
+if ($done != $total) {
+    foreach $n (@nodes) {
+	if (!$notified{$n}) {
+	    print STDOUT "$n failed to come up after $m minutes!\n";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+	    $failed++;
+	    $notified{$n}=1;
+	}
+    }
+}
+
 TBDebugTimeStamp("node reboot finished");
 
 if ($failed) {
@@ -165,8 +209,8 @@ if ($failed) {
 }
 
 #
-# Start the event system. 
-# 
+# Start the event system.
+#
 if (!$DISABLE_EVENTS) {
     print "Starting the event system.\n";
     TBDebugTimeStamp("eventsys_control started");

@@ -45,6 +45,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use event;
+use StateWait;
 use POSIX qw(strftime);
 
 my $ssh		= "$TB/bin/sshtb -n";
@@ -120,10 +121,10 @@ if (defined($options{"e"})) {
 }
 
 # XXX Temporary, until we make event sending the default
-$realmode=1;
-#if ($realmode && $UID && !TBAdmin($UID)) {
-#    die("*** You cannot use real mode!\n");
-#}
+#$realmode=1;
+if ($realmode && $UID && !TBAdmin($UID)) {
+    die("*** You cannot use real mode!\n");
+}
 
 #
 # If eidmode, then get the node list out of the DB instead of the command
@@ -232,21 +233,51 @@ if (! keys(%realnodes) && ! keys(%virtnodes)) {
 my @sortednodes = sort(keys(%realnodes));
 
 if (!$realmode) {
+    $StateWait::debug = $debug;
+    if (!$nowait) {
+	my @states = ();
+	if ($waitmode) {
+	    print "Waiting for nodes to shut down and come up...\n";
+	    @states= ( TBDB_NODESTATE_SHUTDOWN , TBDB_NODESTATE_ISUP );
+	} else {
+	    print "Waiting for nodes to shut down...\n";
+	    @states= ( TBDB_NODESTATE_SHUTDOWN );
+	}
+	initStateWait(\@states, @sortednodes)
+    }
     EventSendFatal(host      => $BOSSNODE ,
 		   objtype   => TBDB_TBEVENT_COMMAND ,
 		   eventtype => TBDB_COMMAND_REBOOT ,
 		   objname   => join(",",@sortednodes) );
+    my $rv = 0;
     if (!$nowait) {
 	# In here we can do some output to tell the user what's going on.
-	if ($waitmode) {
-	    # Wait for [SHUTDOWN,ISUP]
-
-	} else {
-	    # Wait for [SHUTDOWN]
-
+	my $start = time();
+	my $now = $start;
+	my $done = 0;
+	my $total = scalar(@sortednodes);
+	my @finished = ();
+	my @failed = ();
+	while( $done < $total ) {
+	    print "Waiting for ".($total-$done)." nodes...\n";
+	    waitForState(\@finished,\@failed,60);
+	    $now = time();
+	    $done = scalar(@finished) + scalar(@failed);
+	    my $min = int(($now - $start + 30)/60); # round to nearest min.
+	    print "After $min min., $done nodes done...\n";
+	    #print "fin = ".join(",",@finished)." fail = ".join(",",@failed).
+	    #  "  Time=$now (".($now-$start)." elapsed), done=$done\n";
+	    sleep(1);
 	}
+	print "All $total nodes finished.\n";
+	$bad = scalar(@failed);
+	if ($bad) {
+	    print "There were $bad failures: ".join(" ",@failed)."\n";
+	    $rv = 1;
+	}
+	endStateWait();
     }
-    exit(0);
+    exit($rv);
 }
 
 #

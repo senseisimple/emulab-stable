@@ -18,10 +18,11 @@ my @states=('ISUP');
 my $u = 10;
 my $t = 300;
 my %opt = ();
-getopts("hds:u:t:",\%opt);
+getopts("hdv:s:u:t:",\%opt);
 
 if ($opt{h}) { usage(); }
 if ($opt{d}) { $debug++; }
+if ($opt{v}) { $debug+=$opt{v}; }
 if ($opt{u}) { $u = $opt{u}; }
 if ($opt{t}) { $t = $opt{t}; }
 if ($opt{s}) { @states = split(",",$opt{s}); }
@@ -32,7 +33,7 @@ my @nodes = @ARGV;
 sub usage {
     print <<EOF;
 Usage:
-$0 [-h] [-d]
+$0 [-h] [-d] [-v <level>]
 	[-u <update freq.>] [-t <timeout>]
 	[-s state1[,s2]] <node> [<node> ...]
 
@@ -42,7 +43,7 @@ order (non-consecutively).  If no state is supplied, ISUP is
 used. Update frequency is how many seconds apart status updates should
 be (default $u). Timeout is how many seconds we should wait before
 giving up and returning (default $t). The -h option shows this
-message, and -d enables extra debugging output.
+message, and -d and -v enable extra debugging output.
 
 EOF
     exit(1);

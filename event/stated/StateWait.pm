@@ -56,13 +56,13 @@ $port   = "";
 $URL    = "";
 $debug  = 0;
 
-my $handle;
-my $tuple;
+$handle=0;
+$tuple=0;
 
-my @done = ();
-my @failures = ();
-my $nodecount = ();
-my %remain = ();
+my @done;
+my @failures;
+my $nodecount;
+my %remain;
 
 #
 # Exported Sub-Routines / Functions
@@ -71,6 +71,10 @@ my %remain = ();
 sub initStateWait( $@ ) {
     my $states = shift;
     my @nodes = @_;
+    @done=();
+    @failures=();
+    $nodecount=0;
+    %remain=();
     $nodecount = scalar(@nodes);
     # states is an arrayref
     if ($debug) {
@@ -84,24 +88,34 @@ sub initStateWait( $@ ) {
     # Do the subscription for the right stuff, including all the
     # states for all the nodes, and the failure event for all nodes
 
-    $handle = event_register($URL,0);
-    if (!$handle) { die "Unable to register with event system\n"; }
+    if ($handle==0) {
+	if ($debug) { print "Getting handle for $URL - "; }
+	$handle = event_register($URL,0);
+	if ($debug) { print "returned - "; }
+	if (!$handle) { die "Unable to register with event system\n"; }
+	if ($debug) { print "Success: $handle\n"; }
+    }
 
+    if ($debug) { print "Getting tuple - "; }
     $tuple = address_tuple_alloc();
     if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
-    %$tuple = ( objtype   => TBDB_TBEVENT_NODESTATE,
-		eventtype => join(",",@$states),
+    %$tuple = ( objtype   => join(",",TBDB_TBEVENT_NODESTATE,
+				  TBDB_TBEVENT_TBFAILED),
+		eventtype => join(",",@$states, TBDB_COMMAND_REBOOT  ),
 	        objname   => join(",",@nodes) );
 
-    if ($debug > 1) {
+    if ($debug) { print "Success: $tuple\n"; }
+    if ($debug > 0) {
 	print "tuple = ('".join("', '",keys(%$tuple))."') => ('".
 	  join("', '",values(%$tuple))."')\n";
     }
 
+    if ($debug) { print "Subscribing - "; }
     if (!event_subscribe($handle,\&doEvent,$tuple)) {
         die "Could not subscribe to events\n";
     }
+    if ($debug) { print "Success.\n"; }
 
     foreach $n (@nodes) {
 	my @l = @$states;
@@ -131,6 +145,12 @@ sub doEvent( $$$ ) {
 	  "$eventtype\n";
     }
     my $n = $objname;
+    if (defined($remain{$n}) && $objtype eq TBDB_TBEVENT_TBFAILED) {
+	# It is a failed boot... add it to the failures list.
+	if ($debug) { print "Got $eventtype failure for $n... Aborting!\n"; }
+	push(@failures,$n);
+	delete($remain{$n});
+    }
     if (defined($remain{$n}) && @{$remain{$n}}[0] eq $eventtype) {
 	# this is the next state we were waiting for
 	if ($debug) { print "Got $eventtype for $n\n" };
@@ -191,9 +211,7 @@ sub cancelWait( $ ) {
 
 sub endStateWait() {
     %remain = ();
-    if (event_unregister($handle) == 0) {
-        die "Unable to unregister with event system\n";
-    }
+    $tuple = address_tuple_free($tuple);
     if ($debug) { print "endStateWait\n"; }
     return 0;
 }
@@ -201,3 +219,8 @@ sub endStateWait() {
 # Always end a package successfully!
 1;
 
+END {
+    if ($handle && event_unregister($handle) == 0) {
+        die "Unable to unregister with event system\n";
+    }
+}
