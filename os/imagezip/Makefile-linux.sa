@@ -31,7 +31,7 @@ UNZIPCFLAGS	= $(CFLAGS) -Wall
 UNZIPLIBS	= $(LIBS)
 
 ifdef WITH_EXTFS
-FSOBJS		+= extfs/extfs.o
+FSOBJS		+= extfs/extfs.o extfs/reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
 endif
 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -16,6 +16,10 @@
 static int read_linuxgroup(struct ext2_super_block *super,
 			   struct ext2_group_desc *group, int index,
 			   u_int32_t sliceoffset, int infd);
+
+extern int fixup_lilo(int slice, int stype, u_int32_t start, u_int32_t size,
+		      char *sname, int infd, int *found);
+
 
 /*
  * Operate on a linux slice. I actually don't have a clue what a linux
@@ -42,11 +46,20 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 	int			dosslice = slice + 1; /* DOS Numbering */
 	off_t			soff;
 
+	/*
+	 * Check for a LILO boot block and create relocations as necessary
+	 * (if the partition starts at 0, the values are already relative)
+	 */
+	if (dorelocs && start > 0 &&
+	    fixup_lilo(slice, stype, start, size, sname, infd, &rval) != 0)
+		return 1;
+
 	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
 	assert((sizeof(groups) & ~EXT2_MAX_BLOCK_SIZE) == 0);
 
 	if (debug)
-		fprintf(stderr, "  P%d (Linux Slice)\n", dosslice);
+		fprintf(stderr, "  P%d %s Linux Slice)\n",
+			dosslice, rval ? "(Bootable" : "(");
 	
 	/*
 	 * Skip ahead to the superblock.
@@ -106,6 +119,7 @@ read_linuxslice(int slice, int stype, u_int32_t start, u_int32_t size,
 	       == EXT2_BLOCK_SIZE(&fs)); 
 	soff = sectobytes(start) +
 		(fs.s_first_data_block + 1) * EXT2_BLOCK_SIZE(&fs);
+	rval = 0;
 	for (i = 0; i < numgroups; i++) {
 		int gix;
 

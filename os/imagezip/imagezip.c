@@ -49,6 +49,7 @@ int	oldstyle  = 0;
 int	frangesize= 64;	/* 32k */
 int	forcereads= 0;
 int	retrywrites= 1;
+int	dorelocs  = 1;
 off_t	datawritten;
 partmap_t ignore, forceraw;
 
@@ -82,12 +83,14 @@ int			numregions, numrelocs;
 
 void	addskip(uint32_t start, uint32_t size);
 void	dumpskips(int verbose);
-void	sortrange(struct range *head, int domerge);
+void	sortrange(struct range *head, int domerge,
+		  int (*rangecmp)(struct range *, struct range *));
 void    makeranges(void);
 void	dumpranges(int verbose);
 void	addfixup(off_t offset, off_t poffset, off_t size, void *data,
 		 int reloctype);
 void	addreloc(off_t offset, off_t size, int reloctype);
+static int cmpfixups(struct range *r1, struct range *r2);
 
 /* Forward decls */
 int	read_image(u_int32_t start, int pstart, u_int32_t extstart);
@@ -313,7 +316,7 @@ main(argc, argv)
 	int	slicetype = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbnfdihrs:c:z:oI:1F:DR:S:X")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:X")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -332,6 +335,9 @@ main(argc, argv)
 			break;
 		case 'b':
 			slicetype = DOSPTYP_386BSD;
+			break;
+		case 'N':
+			dorelocs = 0;
 			break;
 		case 'n':
 			slicetype = DOSPTYP_NTFS;
@@ -422,6 +428,9 @@ main(argc, argv)
 	if (info && !debug)
 		debug++;
 
+	if (!slicemode && dorelocs)
+		dorelocs = 0;
+
 	infilename = argv[0];
 	if ((infd = open(infilename, O_RDONLY, 0)) < 0) {
 		perror(infilename);
@@ -442,13 +451,13 @@ main(argc, argv)
 		exit(1);
 	}
 
-	sortrange(skips, 1);
+	sortrange(skips, 1, 0);
 	if (debug)
 		dumpskips(info || debug > 2);
 	makeranges();
 	if (debug)
 		dumpranges(info || debug > 2);
-	sortrange(fixups, 0);
+	sortrange(fixups, 0, cmpfixups);
 	fflush(stderr);
 
 	if (info) {
@@ -854,7 +863,8 @@ dumpskips(int verbose)
  * A very dumb bubblesort!
  */
 void
-sortrange(struct range *head, int domerge)
+sortrange(struct range *head, int domerge,
+	  int (*rangecmp)(struct range *, struct range *))
 {
 	struct range	*prange, tmp, *ptmp;
 	int		changed = 1;
@@ -868,14 +878,18 @@ sortrange(struct range *head, int domerge)
 		prange = head;
 		while (prange) {
 			if (prange->next &&
-			    prange->start > prange->next->start) {
+			    (prange->start > prange->next->start ||
+			     (rangecmp && (*rangecmp)(prange, prange->next)))) {
 				tmp.start = prange->start;
 				tmp.size  = prange->size;
+				tmp.data  = prange->data;
 
 				prange->start = prange->next->start;
 				prange->size  = prange->next->size;
+				prange->data  = prange->next->data;
 				prange->next->start = tmp.start;
 				prange->next->size  = tmp.size;
+				prange->next->data  = tmp.data;
 
 				changed = 1;
 			}
@@ -996,8 +1010,7 @@ dumpranges(int verbose)
  * Fixup descriptor handling.
  *
  * Fixups are modifications that need to be made to file data prior
- * to compressing.  The only use right now is to fixup BSD disklabel
- * partition tables so they don't contain absolute offsets.
+ * to compressing.
  */
 struct fixup {
 	off_t offset;	/* disk offset */
@@ -1043,6 +1056,20 @@ addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
 	fixups       = entry;
 }
 
+/*
+ * Return 1 if r1 > r2
+ */
+static int
+cmpfixups(struct range *r1, struct range *r2)
+{
+	if (r1->start > r2->start ||
+	    (r1->start == r2->start &&
+	     ((struct fixup *)r1->data)->offset >
+	     ((struct fixup *)r2->data)->offset))
+		return 1;
+	return 0;
+}
+
 void
 applyfixups(off_t offset, off_t size, void *data)
 {
@@ -1050,7 +1077,8 @@ applyfixups(off_t offset, off_t size, void *data)
 	struct fixup *fp;
 	uint32_t coff, clen;
 
-	for (prev = &fixups; (entry = *prev) != NULL; prev = &entry->next) {
+	prev = &fixups;
+	while ((entry = *prev) != NULL) {
 		fp = entry->data;
 
 		if (offset < fp->offset+fp->size && offset+size > fp->offset) {
@@ -1076,10 +1104,8 @@ applyfixups(off_t offset, off_t size, void *data)
 			*prev = entry->next;
 			free(fp);
 			free(entry);
-
-			/* XXX only one per customer */
-			break;
-		}
+		} else
+			prev = &entry->next;
 	}
 }
 
@@ -1288,8 +1314,8 @@ compress_image(void)
 		 * Go back and stick in the block header and the region
 		 * information.
 		 */
-		blkhdr->magic = oldstyle ?
-			COMPRESSED_V1 : COMPRESSED_MAGIC_CURRENT;
+		blkhdr->magic = oldstyle ? COMPRESSED_V1 :
+			(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
 		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
@@ -1387,8 +1413,8 @@ compress_image(void)
 	if (curregion != regions) {
 		compress_finish(&blkhdr->size);
 		
-		blkhdr->magic =
-			oldstyle ? COMPRESSED_V1 : COMPRESSED_MAGIC_CURRENT;
+		blkhdr->magic = oldstyle ? COMPRESSED_V1 :
+			(!dorelocs ? COMPRESSED_V2 : COMPRESSED_MAGIC_CURRENT);
 		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);

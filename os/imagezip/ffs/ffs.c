@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -146,7 +146,7 @@ read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 	 * Record a fixup for the partition table, adjusting the
 	 * partition offsets to make them slice relative.
 	 */
-	if (slicemode &&
+	if (dorelocs &&
 	    start != 0 && dlabel.label.d_partitions[0].p_offset == start) {
 		for (i = 0; i < npart; i++) {
 			if (dlabel.label.d_partitions[i].p_size == 0)
@@ -166,7 +166,9 @@ read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 		}
 		dlabel.label.d_checksum = 0;
 		dlabel.label.d_checksum = dkcksum(&dlabel.label);
-		addfixup(sectobytes(start+LABELSECTOR), sectobytes(start),
+
+		addfixup(sectobytes(start+LABELSECTOR),
+			 sectobytes(start),
 			 (off_t)sizeof(dlabel.label), &dlabel,
 			 bsdtype == DOSPTYP_OPENBSD ?
 			 RELOC_OBSDDISKLABEL : RELOC_FBSDDISKLABEL);

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -12,12 +12,20 @@
  * This magic number has been commandeered for use as a version number.
  * None of this wimpy start at version 1 stuff either, our first version
  * is 1,768,515,945!
+ *
+ *	V2 introduced the first and last sector fields as well
+ *	as basic relocations.
+ *
+ *	V3 introduced LILO relocations for Linux partition images.
+ *	Since an older imageunzip would still work, but potentially
+ *	lay down an incorrect images, I bumped the version number.
  */
 #define COMPRESSED_MAGIC_BASE		0x69696969
 #define COMPRESSED_V1			(COMPRESSED_MAGIC_BASE+0)
 #define COMPRESSED_V2			(COMPRESSED_MAGIC_BASE+1)
+#define COMPRESSED_V3			(COMPRESSED_MAGIC_BASE+2)
 
-#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V2
+#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V3
 
 /*
  * Each compressed block of the file has this little header on it.
@@ -72,6 +80,9 @@ struct blockreloc {
 #define RELOC_NONE		0
 #define RELOC_FBSDDISKLABEL	1	/* FreeBSD disklabel */
 #define RELOC_OBSDDISKLABEL	2	/* OpenBSD disklabel */
+#define RELOC_LILOSADDR		3	/* LILO sector address */
+#define RELOC_LILOMAPSECT	4	/* LILO map sector */
+#define RELOC_LILOCKSUM		5	/* LILO descriptor block cksum */
 
 /* XXX potential future alternatives to hard-wiring BSD disklabel knowledge */
 #define RELOC_ADDPARTOFFSET	100	/* add partition offset to location */

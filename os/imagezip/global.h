@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -10,6 +10,7 @@
 extern int debug;
 extern int secsize;
 extern int slicemode;
+extern int dorelocs;
 
 extern char *slicename(int slice, u_int32_t offset, u_int32_t size, int type);
 extern off_t devlseek(int fd, off_t off, int whence);

@@ -34,7 +34,7 @@ UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 
 .ifdef WITH_EXTFS
 FSDIRS		+= extfs
-FSOBJS		+= extfs.o
+FSOBJS		+= extfs.o reloc_lilo.o
 CFLAGS		+= -DWITH_EXTFS -Iextfs
 .endif
 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -28,6 +28,8 @@ static int infd = -1;
 static unsigned long long wasted;
 static uint32_t sectinuse;
 static uint32_t sectfree;
+static uint32_t relocs;
+static unsigned long long relocbytes;
 
 static void usage(void);
 static void dumpfile(char *name, int fd);
@@ -242,8 +244,12 @@ dumpfile(char *name, int fd)
 
 	if (detail > 0)
 		printf("\n");
+
 	printf("  %qu bytes of overhead/wasted space (%5.2f%% of image file)\n",
 	       wasted, (double)wasted / filesize * 100);
+	if (relocs)
+		printf("  %d relocations covering %qu bytes\n",
+		       relocs, relocbytes);
 	printf("  %qu bytes of compressed data\n",
 	       cbytes);
 	printf("  %5.2fx compression of allocated data (%qu bytes)\n",
@@ -289,6 +295,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		reg = (struct region *)((struct blockhdr_V1 *)hdr + 1);
 		break;
 	case COMPRESSED_V2:
+	case COMPRESSED_V3:
 		reg = (struct region *)((struct blockhdr_V2 *)hdr + 1);
 		break;
 	default:
@@ -421,6 +428,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 				       reg->start, reg->start + reg->size - 1);
 				break;
 			case COMPRESSED_V2:
+			case COMPRESSED_V3:
 				if (i == 0 && hdr->firstsect < reg->start)
 					printf("F: [%08x-%08x]\n",
 					       hdr->firstsect, reg->start-1);
@@ -446,21 +454,43 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		return 0;
 
 	for (i = 0; i < hdr->reloccount; i++) {
-		struct blockreloc *reloc = (struct blockreloc *)reg;
-		uint32_t offset = SECTOBYTES(reloc->sector) + reloc->sectoff;
+		struct blockreloc *reloc = &((struct blockreloc *)reg)[i];
+
+		relocs++;
+		relocbytes += reloc->size;
 
 		if (reloc->sector < hdr->firstsect ||
 		    reloc->sector >= hdr->lastsect)
 			printf("    WARNING: "
 			       "Reloc %d at %u not in chunk [%u-%u]\n", i,
 			       reloc->sector, hdr->firstsect, hdr->lastsect-1);
-		if (detail > 1)
-			printf("    Reloc %d: %s [%u-%u] (sector %d)\n", i,
-			       reloc->type == RELOC_FBSDDISKLABEL ?
-			       "FBSDDISKLABEL" :
-			       (reloc->type == RELOC_OBSDDISKLABEL ?
-				"OBSDDISKLABEL" : "??"),
-			       offset, offset + reloc->size, reloc->sector);
+		if (detail > 1) {
+			char *relocstr;
+
+			switch (reloc->type) {
+			case RELOC_FBSDDISKLABEL:
+				relocstr = "FBSDDISKLABEL";
+				break;
+			case RELOC_OBSDDISKLABEL:
+				relocstr = "OBSDDISKLABEL";
+				break;
+			case RELOC_LILOSADDR:
+				relocstr = "LILOSADDR";
+				break;
+			case RELOC_LILOMAPSECT:
+				relocstr = "LILOMAPSECT";
+				break;
+			case RELOC_LILOCKSUM:
+				relocstr = "LILOCKSUM";
+				break;
+			default:
+				relocstr = "??";
+				break;
+			}
+			printf("    Reloc %d: %s sector %d, offset %u-%u\n", i,
+			       relocstr, reloc->sector, reloc->sectoff,
+			       reloc->sectoff + reloc->size);
+		}
 	}
 
 	return 0;

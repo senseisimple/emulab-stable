@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -627,11 +627,9 @@ main(int argc, char **argv)
 	/* This causes the output queue to drain */
 	threadquit();
 	
-#ifndef linux
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
-#endif
 
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
@@ -743,11 +741,9 @@ ImageUnzipQuit(void)
 {
 	threadquit();
 
-#ifndef linux
 	/* Set the MBR type if necesary */
 	if (slice && dostype >= 0)
 		fixmbr(slice, dostype);
-#endif
 
 	fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
 		totaledata, totalrdata);
@@ -910,6 +906,7 @@ inflate_subblock(char *chunkbufp)
 	}
 
 	case COMPRESSED_V2:
+	case COMPRESSED_V3:
 		imageversion = 2;
 		curregion = (struct region *)
 			((struct blockhdr_V2 *)blockhdr + 1);
@@ -1318,6 +1315,8 @@ static int numrelocs;
 #ifndef linux
 static void reloc_bsdlabel(struct disklabel *label, int reloctype);
 #endif
+static void reloc_lilo(void *addr, int reloctype, uint32_t size);
+static void reloc_lilocksum(void *addr, uint32_t off, uint32_t size);
 
 static void
 getrelocinfo(blockhdr_t *hdr)
@@ -1380,6 +1379,13 @@ applyrelocs(off_t offset, size_t size, void *buf)
 					       reloc->type);
 				break;
 #endif
+			case RELOC_LILOSADDR:
+			case RELOC_LILOMAPSECT:
+				reloc_lilo(buf+coff, reloc->type, reloc->size);
+				break;
+			case RELOC_LILOCKSUM:
+				reloc_lilocksum(buf, coff, reloc->size);
+				break;
 			default:
 				fprintf(stderr,
 					"Ignoring unknown relocation type %d\n",
@@ -1460,6 +1466,56 @@ reloc_bsdlabel(struct disklabel *label, int reloctype)
 	label->d_checksum = dkcksum(label);
 }
 #endif
+
+#include "extfs/lilo.h"
+
+static void
+reloc_lilo(void *addr, int reloctype, uint32_t size)
+{
+	sectaddr_t *sect = addr;
+	int i, count = 0;
+	u_int32_t sector;
+
+	switch (reloctype) {
+	case RELOC_LILOSADDR:
+		assert(size == 5);
+		count = 1;
+		break;
+	case RELOC_LILOMAPSECT:
+		assert(size == 512);
+		count = MAX_MAP_SECT + 1;
+		break;
+	}
+
+	for (i = 0; i < count; i++) {
+		sector = getsector(sect);
+		if (sector == 0)
+			break;
+		sector += outputminsec;
+		putsector(sect, sector, sect->device, sect->nsect);
+		sect++;
+	}
+}
+
+void
+reloc_lilocksum(void *addr, uint32_t off, uint32_t size)
+{
+	struct idtab *id;
+
+	assert(size == 2);
+	assert(off >= sizeof(struct idtab));
+	addr += off;
+
+	/*
+	 * XXX total hack: reloc entry points to the end of the
+	 * descriptor table.  We back up sizeof(struct idtab)
+	 * and checksum that many bytes.
+	 */
+	id = (struct idtab *)addr - 1;
+	id->sum = 0;
+	id->sum = lilocksum((union idescriptors *)id, LILO_CKSUM);
+}
+
 
 #if !defined(CONDVARS_WORK) && !defined(FRISBEE)
 #include <errno.h>
