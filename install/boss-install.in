@@ -699,6 +699,17 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	DoneIfExists($ROOT_PRIVKEY);
 	ExecQuietFatal("$SSH_KEYGEN -t rsa1 -P '' -f $ROOT_PRIVKEY");
     };
+    #
+    # Stick it into the DB.
+    # WARNING: This sitevar (node/ssh_pubkey) is referenced in tmcd.c
+    #
+    Phase "sitevar", "Inserting pubkey into DB", sub {
+	my $pubkey = `cat $ROOT_PUBKEY`;
+	chomp $pubkey;
+	ExecQuietFatal("echo \"update sitevariables set value='$pubkey' ".
+		       "       where name='node/ssh_pubkey'\" | ".
+		       "$MYSQL $DBNAME");
+    };
     Phase "ssh", "Editing ssh config file", sub {
 	DoneIfEdited($SSH_CONFIG);
 	AppendToFileFatal($SSH_CONFIG,
