@@ -20,20 +20,7 @@ if ($uid) {
   $uidnotes = "Checklogin returned " . CHECKLOGIN($uid) . ".";
 }
 
-#LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-#$isadmin = ISADMIN($uid);
-#$checklogin = CHECKLOGIN($uid);
-
 $intro = "How would adding the following to Emulab affect you, now or in future?";
-
-# $answers = array(
-#   'Don\'t Care',
-#   'Not necessary / Already good enough',
-#   'I wouldn\'t use it',
-#   'Would be nice, but wouldn\'t affect my Netbed use much',
-#   'Would have a definite positive effect on my Netbed use',
-#   'Would let me do experiments I want to do, but can\'t'
-# );
 
 $answers = array(
   'Choose one',
@@ -77,22 +64,6 @@ $followups = array(
 'What are we doing right?<br />Are there things we do well that you
  would like us to continue to focus on?'
 );
-
-# $followups = array(
-# 'Any comments about your ratings above?<br />Anything we left out?',
-# 
-# 'If we were to expand in the directions you indicated above, would this enable
-#  you to perform qualitatively new experiments? What types?',
-# 
-# 'Are there any characteristics of Netbed you were forced to "work around", or
-#  that prevented you from being able to perform an experiment you wanted to?',
-# 
-# 'What are we doing right?<br />Has Netbed helped you to perform experiments that you
-#  wouldn\'t have otherwise been able to do? Are there things we do well that you
-#  would like us to continue to focus on?',
-# 
-# 'Any other comments?'
-# );
 
 PAGEHEADER("Emulab Survey");  
 
