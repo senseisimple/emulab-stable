@@ -167,7 +167,11 @@ function WRITESIDEBAR() {
 			       $TBBASE, "reserved.php3");
 	    WRITESIDEBARBUTTON("Node Up/Down Status",
 			       $TBDOCBASE, "updown.php3");
-                    
+
+	    if (TBCvswebAllowed($login_uid)) {
+		WRITESIDEBARBUTTON("CVS Repository",
+				   $TBBASE, "cvsweb/cvsweb.php3");
+	    }
 	}
 	elseif (($status == "newuser") || ($status == "unverified")) {
 	    WRITESIDEBARBUTTON("New User Verification",
