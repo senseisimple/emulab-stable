@@ -66,7 +66,8 @@ sub cleanup {
     DBQueryWarn("DELETE from virt_nodes    where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from virt_lans     where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from virt_trafgens where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from nseconfigs where pid='$pid' and eid='$eid'");
+    DBQueryWarn("DELETE from virt_agents   where pid='$pid' and eid='$eid'");
+    DBQueryWarn("DELETE from nseconfigs    where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from eventlist     where pid='$pid' and eid='$eid'");
     SetExpState($pid, $eid, EXPTSTATE_NEW);
 }

@@ -168,7 +168,7 @@ main(int argc, char **argv)
 		}
 		count++;
 		if ((count % 10) == 0)
-			info("Waiting for nodes in %s/%s to come up ...");
+			info("Waiting for nodes in %s/%s to come up ...\n");
 
 		sleep(1);
 	}
@@ -355,33 +355,37 @@ get_static_events(event_handle_t handle)
 
 	/*
 	 * Build up a table of agents that can receive dynamic events.
-	 * Currently, these are trafgens and delay nodes. We want to
-	 * be able to quickly map from "cbr0" to the node on which it
-	 * lives (for dynamic events). 
+	 * These are stored in the virt_trafgens table, which we join
+	 * with the reserved table to get the physical node name where
+	 * the agent is running.
+	 *
+	 * That is, we want to be able to quickly map from "cbr0" to
+	 * the node on which it lives (for dynamic events).
 	 */
-	res = mydb_query("select vi.vname,vi.vnode,r.node_id "
-			 " from virt_trafgens as vi "
+	res = mydb_query("select vi.vname,vi.vnode,r.node_id,o.type "
+			 " from virt_agents as vi "
 			 "left join reserved as r on "
 			 " r.vname=vi.vnode and r.pid=vi.pid and r.eid=vi.eid "
-			 "where vi.role='source' and "
-			 " vi.pid='%s' and vi.eid='%s'",
-			 3, pid, eid);
+			 "left join event_objecttypes as o on "
+			 " o.idx=vi.objecttype "
+			 "where vi.pid='%s' and vi.eid='%s'",
+			 4, pid, eid);
 
 	if (!res) {
-		error("getting virt_trafgens list for %s/%s", pid, eid);
+		error("getting virt_agents list for %s/%s", pid, eid);
 		return 0;
 	}
 	nrows = mysql_num_rows(res);
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
-		if (!row[0] || !row[1] || !row[2])
+		if (!row[0] || !row[1] || !row[2] || !row[3])
 			continue;
 
 		strcpy(agents[numagents].objname, row[0]);
 		strcpy(agents[numagents].vnode,   row[1]);
 		strcpy(agents[numagents].nodeid,  row[2]);
-		strcpy(agents[numagents].objtype, TBDB_OBJECTTYPE_TRAFGEN);
+		strcpy(agents[numagents].objtype, row[3]);
 
 		if (! mydb_nodeidtoip(row[2], agents[numagents].ipaddr))
 			continue;
@@ -389,33 +393,6 @@ get_static_events(event_handle_t handle)
 	}
 	mysql_free_result(res);
 	
-	res = mydb_query("select d.vname,r.vname,d.node_id from delays as d "
-			 "left join reserved as r on r.node_id=d.node_id "
-			 "where d.pid='%s' and d.eid='%s'",
-			 3, pid, eid);
-
-	if (!res) {
-		error("getting delays list for %s/%s", pid, eid);
-		return 0;
-	}
-	nrows = mysql_num_rows(res);
-	while (nrows--) {
-		row = mysql_fetch_row(res);
-
-		if (!row[0] || !row[1] || !row[2])
-			continue;
-
-		strcpy(agents[numagents].objname, row[0]);
-		strcpy(agents[numagents].vnode,   row[1]);
-		strcpy(agents[numagents].nodeid,  row[2]);
-		strcpy(agents[numagents].objtype, TBDB_OBJECTTYPE_LINK);
-
-		if (! mydb_nodeidtoip(row[2], agents[numagents].ipaddr))
-			continue;
-		numagents++;
-	}
-	mysql_free_result(res);
-
 	if (debug) {
 		for (adx = 0; adx < numagents; adx++) {
 			info("Agent %d: %10s %10s %10s %8s %16s\n", adx,

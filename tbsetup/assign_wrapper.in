@@ -1024,7 +1024,8 @@ foreach $vnodeport (keys(%portbw)) {
 #
 # Post pass the event list. At present, all LINK operations apply to
 # the delay node that is in the middle of it. Rewrite the vnode in
-# the event list.
+# the event list. This info becomes stale when the experiment is swapped
+# out, but thats okay since it gets redone at swapin.
 #
 $eventlist_result =
     DBQueryFatal("select ex.idx,ex.vname,r.vname ".
@@ -1039,6 +1040,25 @@ while (my ($idx,$vname,$vnode) = $eventlist_result->fetchrow_array) {
     DBQueryFatal("update eventlist set vnode='$vnode' ".
 		 "where idx=$idx and pid='$pid' and eid='$eid'");
 }
+
+#
+# Delay nodes also require that we augment the virt_agents list, since
+# that holds the mapping between a link and the node where it is controlled.
+# This is for the benefit of the event scheduler and dynamic events, which
+# need to map a link name on the fly, instead of from the static list we
+# munged above. 
+#
+foreach $delay (keys(%delays)) {
+    ($pnode,undef,undef,$vname) = @{$delays{$delay}};
+    $vnode = $p2vmap{$pnode};
+
+    DBQueryFatal("replace into virt_agents ".
+		 " (pid, eid, vname, vnode, objecttype) ".
+		 " select '$pid', '$eid', '$vname', '$vnode', ".
+		 "   idx from event_objecttypes where ".
+		 "   event_objecttypes.type='LINK'");
+}
+
 
 ######################################################################
 # Subroutines
