@@ -1981,8 +1981,11 @@ foreach $vnodeport (keys(%portbw)) {
 	defined($portbw{$vnodeport}) ) {
 	$pnode = $v2pmap{$vnode};
 	$pport = $portmap{$vnodeport};
+
+	# XXX - the following converts from bps to Mbps
+	$speed = $portbw{$vnodeport} / 1000;
 	DBQueryFatal("update interfaces set " .
-		" current_speed=\"$portbw{$vnodeport}\"" .
+		" current_speed=\"$speed\"" .
 		" where node_id=\"$pnode\" and iface=\"$pport\"");
     }
 }
