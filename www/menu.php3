@@ -396,6 +396,8 @@ function PAGEBEGINNING( $title ) {
 	<html>
 	  <head>
 	    <title>$THISHOMEBASE - $title</title>
+            <!--<link rel=\"SHORTCUT ICON\" HREF=\"netbed.ico\">-->
+            <link rel=\"SHORTCUT ICON\" HREF=\"netbed.png\" TYPE=\"image/png\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
 	    <link REL='stylesheet' HREF='$BASEPATH/common-style.css' TYPE='text/css' />
     	    <!-- don't import full style sheet into NS47, since it does a bad job

@@ -28,7 +28,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 # Generate a list of all the files we want to install from the current
 # directory and the source directory. 
 #
-FILES	= $(wildcard *.css *.jpg *.gif *.png *.html *.php3 *.php)
+FILES	= $(wildcard *.css *.jpg *.gif *.png *.html *.php3 *.php *.ico)
 FILES  += $(wildcard $(SRCDIR)/*.css)
 FILES  += $(wildcard $(SRCDIR)/*.jpg)
 FILES  += $(wildcard $(SRCDIR)/*.png)
@@ -36,6 +36,7 @@ FILES  += $(wildcard $(SRCDIR)/*.gif)
 FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
 FILES  += $(wildcard $(SRCDIR)/*.php)
+FILES  += $(wildcard $(SRCDIR)/*.ico)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml
 
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)

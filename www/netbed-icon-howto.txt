@@ -1,0 +1,18 @@
+An icon should be 16x16 pixels, and can be monochrome, 8-bit color, 16-bit color, or 
+24-bit color.
+
+The magic in the page:
+
+<link rel=\"SHORTCUT ICON\" HREF=\"netbed.ico\">
+OR
+<link rel=\"SHORTCUT ICON\" HREF=\"netbed.png\" TYPE=\"image/png\">
+
+Some browsers only do .ico, some do .png also. The .ico looks screwy in my mozilla, so 
+we're using the png.
+
+Also, some browsers look for favicon.ico by default. So link that file to the .ico 
+file.
+
+To make a png into an ico :
+
+pngtopnm netbed.png | ppmtowinicon -output netbed.ico
