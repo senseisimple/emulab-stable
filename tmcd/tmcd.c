@@ -3126,7 +3126,7 @@ COMMAND_PROTOTYPE(dorouting)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		n, nrows;
+	int		n, nrows, isstatic = 0;
 
 	/*
 	 * Now check reserved table
@@ -3163,12 +3163,24 @@ COMMAND_PROTOTYPE(dorouting)
 		mysql_free_result(res);
 		return 0;
 	}
+	if (!strcmp(row[0], "static")) {
+		isstatic = 1;
+	}
 	OUTPUT(buf, sizeof(buf), "ROUTERTYPE=%s\n", row[0]);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("ROUTES: %s", buf);
+
+	/*
+	 * New images treat "static" as "static-ddijk", so even if there
+	 * are routes in the DB, we do not want to return them to the node
+	 * since that would be a waste of bandwidth. 
+	 */
+	if (vers >= 19 && isstatic) {
+		return 0;
+	}
 
 	/*
 	 * Get the routing type from the nodes table.

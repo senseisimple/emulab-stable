@@ -47,7 +47,7 @@ use POSIX qw(strftime);
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 18; };
+sub TMCD_VERSION()	{ 19; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
