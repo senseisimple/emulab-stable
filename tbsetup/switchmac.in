@@ -25,6 +25,7 @@ use lib '@prefix@/lib';
 use libdb;
 use snmpit_lib;
 use snmpit_cisco;
+use snmpit_foundry;
 use SNMP;
 
 use strict;
@@ -103,6 +104,8 @@ SWITCH:
 	    $switchtype = "intel"; last;};
 	(/^nortel/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "nortel"; last;};
+	(/^foundry/) && do { $snmpversion = "1"; $useindexing = 0;
+	    $switchtype = "foundry"; last;};
 
 	warn "WARNING: Switch type $type is not supported for $switch!\n";
 	next SWITCHLOOP;
@@ -142,6 +145,9 @@ SWITCH:
 	# Make up a fake VLAN, just so we get into the loop below
 	#
 	@vlanList = ([0,0,[]]);
+	if ($switchtype eq "foundry") {
+	    $device = new snmpit_foundry($switch,$debug,$community);
+	}
     }
 
     #
@@ -299,7 +305,7 @@ SWITCH:
 		# have only one module, and require no ifindex conversion.
 		#
 		my $modport;
-		if ($switchtype eq "cisco") {
+		if (($switchtype eq "cisco") || ($switchtype eq "foundry")) {
 		    ($modport) = $device->convertPortFormat(2, $ifIndex);
 		} else {
 		    $modport = "1.$ifIndex";

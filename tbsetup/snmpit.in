@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,7 +47,7 @@ Usage: $0 [-h] [-v] [-n] [-i device]
           [-r pid eid]
 	  [-t pid eid]
 	  [-d ports] [-e ports] [-a ports]
-	  [-p <10|100> ports] [-u <half|full> ports]
+	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
 General:
   -h          Display this help message
@@ -189,12 +189,14 @@ if ($opt{p}) {
     #
     # We'll put the argument in the form needed by the portControl function
     #
-    if ($opt{p} =~ /^100/) {
+    if ($opt{p} =~ /^1000/) {
+	push @commands, ["portcontrol","1000mbit"];
+    } elsif ($opt{p} =~ /^100/) {
 	push @commands, ["portcontrol","100mbit"];
     } elsif ($opt{p} =~ /^10/) {
 	push @commands, ["portcontrol","10mbit"];
     } else {
-	die "Bad port speed: $opt{p}. Valid values are 10 and 100\n";
+	die "Bad port speed: $opt{p}. Valid values are 10, 100, and 1000\n";
     }
 }
 if ($opt{u}) {
@@ -429,6 +431,12 @@ foreach my $command (@commands) {
 		    @{$stacks{$stack_id}});
 		last;
 	    };
+	    /generic/ && do {
+		require snmpit_stack;
+		$stack = new snmpit_stack($stack_id,$debug,
+		    @{$stacks{$stack_id}});
+		last;
+	    }; # /generic/
 
 	    # 'default' case
 	    die "Unknown stack type $stack_type for stack $stack_id\n";
@@ -789,7 +797,7 @@ sub doReset($@) {
 
     my $errors = 0;
     #
-    # Just remove the VLAN from evey satck on which it exists. We keep a
+    # Just remove the VLAN from evey stack on which it exists. We keep a
     # list and do them all at once for efficiency.
     #
     foreach my $stack (@$stacks) {

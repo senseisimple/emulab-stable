@@ -242,6 +242,11 @@ foreach my $name (keys %portMap) {
 	    $device = new snmpit_intel($name);
 	    last;
 	};
+	/foundry/ && do {
+	    require snmpit_foundry;
+	    $device = new snmpit_foundry($name);
+	    last;
+	};
 
 	# 'default' case
 	die "Unknown switch type ($type) for $name\n";
