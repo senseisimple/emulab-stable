@@ -187,6 +187,7 @@ COMMAND_PROTOTYPE(dosubnodelist);
 COMMAND_PROTOTYPE(doisalive);
 COMMAND_PROTOTYPE(doipodinfo);
 COMMAND_PROTOTYPE(doatarball);
+COMMAND_PROTOTYPE(doanrpm);
 COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
@@ -236,6 +237,7 @@ struct command {
 	{ "ntpinfo",	dontpinfo},
 	{ "ntpdrift",	dontpdrift},
 	{ "tarball",	doatarball},
+	{ "rpm",	doanrpm},
 	{ "jailconfig",	dojailconfig},
 	{ "plabconfig",	doplabconfig},
 	{ "subconfig",	dosubconfig},
@@ -1356,7 +1358,7 @@ COMMAND_PROTOTYPE(doaccounts)
  again:
 	row = mysql_fetch_row(res);
 	while (nrows) {
-		MYSQL_ROW	nextrow;
+		MYSQL_ROW	nextrow = 0;
 		MYSQL_RES	*pubkeys_res;
 		MYSQL_RES	*sfskeys_res;
 		int		pubkeys_nrows, sfskeys_nrows, i, root = 0;
@@ -4161,16 +4163,11 @@ COMMAND_PROTOTYPE(dontpdrift)
 	return 0;
 }
 
-/*
- * Return a tarball. Would work for rpms too. Anyway, it has to be a
- * The tarball being requested has to be in the tarballs list for the
- * node of course. Has to be a tcp connection of course, and all remote
- * tcp connections are required to be ssl'ized.
- */
-static int	safesyscall(int sysnum, ...);
+static int sendafile(int sock, tmcdreq_t *reqp, int tcp, char *filename,
+		     char *filetype, char *cmdname);
 
 /*
- * Return a tarball. Would work for rpms too. Anyway, it has to be a
+ * Return a tarball.
  * The tarball being requested has to be in the tarballs list for the
  * node of course. Has to be a tcp connection of course, and all remote
  * tcp connections are required to be ssl'ized.
@@ -4179,12 +4176,9 @@ COMMAND_PROTOTYPE(doatarball)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		buf[1024 * 32], tarname[1024+1];
-	int		cc, fd, okay = 0;
+	char		tarname[1024+1];
+	int		okay = 0;
 	char		*bp, *sp, *tp;
-	struct stat	statbuf;
-	struct group	*grp;
-	struct passwd   *pwd;
 
 	/*
 	 * Check reserved table
@@ -4254,21 +4248,125 @@ COMMAND_PROTOTYPE(doatarball)
 		return 1;
 	}
 
+	return sendafile(sock, reqp, tcp, tarname, "tarfile", "GETTAR");
+}
+
+/*
+ * Return an RPM file.
+ * The rpm being requested has to be in the rpms list for the
+ * node of course. Has to be a tcp connection of course, and all remote
+ * tcp connections are required to be ssl'ized.
+ */
+COMMAND_PROTOTYPE(doanrpm)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		rpmname[1024+1];
+	int		okay = 0;
+	char		*bp, *sp;
+
+	/*
+	 * Check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("GETRPM: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * Pick up the name from the argument. Limit to usual MAXPATHLEN.
+	 */
+	if (sscanf(rdata, "%1024s", rpmname) != 1) {
+		error("GETRPM: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the rpm list from the DB. The requested path must be
+	 * on the list of rpms for this node.
+	 */
+	res = mydb_query("select rpms from nodes where node_id='%s' ",
+			 1, reqp->nodeid);
+
+	if (!res) {
+		error("GETRPM: %s: DB Error getting rpms!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		error("GETRPM: %s: Invalid RPM: %s!\n",
+		      reqp->nodeid, rpmname);
+		return 1;
+	}
+
+	/*
+	 * Text string is a colon separated list of filenames.
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		error("GETRPM: %s: Invalid RPM: %s!\n",
+		      reqp->nodeid, rpmname);
+		return 1;
+	}
+	
+	bp  = row[0];
+	sp  = bp;
+	do {
+		bp = strsep(&sp, ":");
+		if (strcmp(bp, rpmname) == 0) {
+			okay = 1;
+			break;
+		}
+	} while ((bp = sp));
+	mysql_free_result(res);
+
+	if (!okay) {
+		error("GETRPM: %s: Invalid RPM: %s!\n",
+		      reqp->nodeid, rpmname);
+		return 1;
+	}
+
+	return sendafile(sock, reqp, tcp, rpmname, "rpm", "GETRPM");
+}
+
+static int	safesyscall(int sysnum, ...);
+
+/*
+ * Return a tar or RPM file.  Verifies that the user has access to the file
+ * in question.  If so, the file is sent back on the connection, prefixed by
+ * the file's size.  It is up to the caller to ensure it is a registered tar
+ * or RPM file.
+ */
+static int
+sendafile(int sock, tmcdreq_t *reqp, int tcp, char *filename,
+	  char *filetype, char *cmdname)
+{
+	char		buf[1024 * 32];
+	int		cc, fd;
+	char		*bp;
+	struct stat	statbuf;
+	struct group	*grp;
+	struct passwd   *pwd;
+
 	/*
 	 * Ensure that we do not get tricked into returning a file outside
 	 * of /proj, /users, or /groups. We could put a check in the frontend
-	 * where tarfiles is set, but this is much safer given the potential
-	 * for disaster.
+	 * where tarfiles/rpms is set, but this is much safer given the
+	 * potential for disaster.
 	 *
 	 * XXX I know, realpath is not really a syscall. 
 	 */
-	if (safesyscall(696969, tarname, buf) == NULL) {
-		errorc("GETTAR: %s: realpath failure %s!",
-		       reqp->nodeid, tarname);
+	if (safesyscall(696969, filename, buf) == NULL) {
+		errorc("%s: %s: realpath failure %s!",
+		       cmdname, reqp->nodeid, filename);
 		return 1;
 	}
 	if ((bp = strchr(&buf[1], '/')) == NULL) {
-		errorc("GETTAR: %s: could not parse %s!", reqp->nodeid, buf);
+		errorc("%s: %s: could not parse %s!",
+		       cmdname, reqp->nodeid, buf);
 		return 1;
 	}
 	*bp = NULL;
@@ -4276,8 +4374,8 @@ COMMAND_PROTOTYPE(doatarball)
 	    strcmp(buf, GROUPDIR) &&
 	    strcmp(buf, USERDIR)) {
 		*bp = '/';
-		error("GETTAR: %s: illegal path: %s --> %s!\n",
-		      reqp->nodeid, tarname, buf);
+		error("%s: %s: illegal path: %s --> %s!\n",
+		      cmdname, reqp->nodeid, filename, buf);
 		return 1;
 	}
 	*bp = '/';
@@ -4285,9 +4383,9 @@ COMMAND_PROTOTYPE(doatarball)
 	/*
 	 * Better be readable!
 	 */
-	if ((fd = safesyscall(SYS_open, tarname, O_RDONLY)) < 0) {
-		errorc("GETTAR: %s: Could not open %s!",
-		       reqp->nodeid, tarname);
+	if ((fd = safesyscall(SYS_open, filename, O_RDONLY)) < 0) {
+		errorc("%s: %s: Could not open %s!",
+		       cmdname, reqp->nodeid, filename);
 		return 1;
 	}
 
@@ -4295,8 +4393,8 @@ COMMAND_PROTOTYPE(doatarball)
 	 * Stat the file so we get its size to send over first.
 	 */
 	if (safesyscall(SYS_fstat, fd, &statbuf) < 0) {
-		errorc("GETTAR: %s: Could not fstat %s!",
-		       reqp->nodeid, tarname);
+		errorc("%s: %s: Could not fstat %s!",
+		       cmdname, reqp->nodeid, filename);
 		goto bad;
 	}
 
@@ -4307,22 +4405,19 @@ COMMAND_PROTOTYPE(doatarball)
 	 * by the experiment creator.
 	 */
 	if ((grp = getgrnam(reqp->gid)) == NULL) {
-		error("GETTAR: %s: Could map gid %s!",
-		      reqp->nodeid, reqp->gid);
+		error("%s: %s: Could map gid %s!",
+		      cmdname, reqp->nodeid, reqp->gid);
 		goto bad;
 	}
 	if (grp->gr_gid != statbuf.st_gid) {
 		if ((pwd = getpwnam(reqp->creator)) == NULL) {
-			error("GETTAR: %s: Could map uid %s!",
-			      reqp->nodeid, reqp->creator);
-			mysql_free_result(res);
+			error("%s: %s: Could map uid %s!",
+			      cmdname, reqp->nodeid, reqp->creator);
 			goto bad;
 		}
-		mysql_free_result(res);
 		if (pwd->pw_uid != statbuf.st_uid) {
-			error("GETTAR: %s: "
-			      "tarfile %s has bad uid/gid (%d/%d)\n",
-			      reqp->nodeid, tarname,
+			error("%s: %s: %s %s has bad uid/gid (%d/%d)\n",
+			      cmdname, reqp->nodeid, filetype, filename,
 			      statbuf.st_uid, statbuf.st_gid);
 			goto bad;
 		}
@@ -4332,21 +4427,22 @@ COMMAND_PROTOTYPE(doatarball)
 	client_writeback(sock, &cc, sizeof(cc), tcp);
 
 	/* Leave this logging on all the time for now. */
-	info("GETTAR: %s: Sending tarball (%d): %s\n", reqp->nodeid, cc, buf);
+	info("%s: %s: Sending %s (%d): %s\n",
+	     cmdname, reqp->nodeid, filetype, cc, buf);
 
 	/*
 	 * Now dump the file. 
 	 */
 	while (1) {
 	    if ((cc = safesyscall(SYS_read, fd, buf, sizeof(buf))) < 0) {
-		errorc("Error reading tarfile: %s", tarname);
+		errorc("Error reading %s: %s", filetype, filename);
 		goto bad;
 	    }
 	    if (cc == 0)
 		break;
 	    
 	    if (client_writeback(sock, buf, cc, tcp) < 0) {
-		errorc("Error writing tarfile data: %s", tarname);
+		errorc("Error writing %s data: %s", filetype, filename);
 		goto bad;
 	    }
 	}
