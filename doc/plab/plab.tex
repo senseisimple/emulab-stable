@@ -2,8 +2,8 @@
 
 % Why don't get date out?
 
-\documentclass[twocolumn, 10pt]{article}
-% \documentclass[twocolumn,11pt]{article}
+\documentclass[11pt]{article}
+% \documentclass[twocolumn, 10pt]{article}
 
 %\usepackage{usenix}
 
@@ -42,13 +42,19 @@
 \title{Emulab's PlanetLab Backend}
 % Emulab's Portal to PlanetLab
 
+\author{The Emulab Team\\[1ex]
+	University of Utah
+}
+
+\begin{document}
+
+\maketitle
+
 \input{abs}
 
 \input{intro}
 
-	Motivation
-
-\input{goals}
+\input{goals}		% or Goals and Requirements
 
 \input{features}
 %  Also describe it in terms of ``services''
@@ -57,14 +63,15 @@
 	
 \input{impl}		% Implementation
 
-\input{eval}
-
-	SWE:
-		Integration with rest of Elab's design and code
-	dslice perf
-	PLC/NM perf
+\input{eval}		% Experience and Evaluation
 
 \input{conclusion}
+
+\subsection*{Acknowledgements}
+% Austin Clements (probably will be author),
+Brent Chun, Mic Bowman, Steve Muir, Larry Peterson, other?
+% Culler et al for pushing Plab?
+% David Andersen?
 
 \bibliographystyle{capsabbrv}
 {\footnotesize

@@ -1,4 +1,36 @@
 \section{Features}
+\label{features}
+
+\small{
+\begin{verbatim}
+Also describe it in terms of ``services'', from llp's 10/03 slide
+
+His service taxonomy:
+Slice == Experiment Portal
+    Create expt/slice
+        Resource Discovery [w/ Monitoring Service]
+        Resource Allocation
+        Boot Slice [w/ Environment Service]
+
+    Maintain expt/slice
+        Software Upgrades [w/ Environment Service]
+        Monitor Health [w/ Monitoring Service]
+        Project membership
+
+    *Control expt/slice
+        Node 
+        Expt
+
+* = Not in llp's taxonomy; Elab-only
+
+As of 10/03 Plab people were developing these; did not have anything:
+   Environment Service
+   Monitoring Service
+   Resource allocation
+\end{verbatim}
+}%small
+
+
 
 \subsection{Creating slices}
 
@@ -42,11 +74,11 @@ present time, it attempts to balance the following goals:
 \begin{itemize}
 \item Meeting type constraints mentioned above
 \item Spreading slices out over the maximum possible number of distinct sites
-\itme Choosing nodes with low CPU and memory loads - Emulab can do admission
+\item Choosing nodes with low CPU and memory loads---Emulab can do admission
     control for experiments, if there are not enough planetlab nodes available
     with a specified CPU load or free memory
 \end{itemize}
 
-\subsection{Maintainin slices}
+\subsection{Maintaining slices}
 
 \subsection{Controlling slices}

@@ -1,0 +1,104 @@
+\com{Take some (not all) of this later when need to make it look prettier.
+
+% This first one shrinks the text font size also, no good.
+% Only want headings and space around them shrunk.
+\makeatletter
+%as Latex considers descenders in its calculation of interline spacing,
+%to get 12 point spacing for normalsize text, must set it to 10 points
+%\def\@normalsize{\@setsize\normalsize{12pt}\xpt\@xpt
+%\abovedisplayskip 10pt plus2pt minus5pt\belowdisplayskip \abovedisplayskip
+%\abovedisplayshortskip \z@ plus3pt\belowdisplayshortskip 6pt plus3pt
+%minus3pt\let\@listi\@listI} 
+
+%need an 11 pt font size for subsection and abstract headings
+\def\subsize{\@setsize\subsize{12pt}\xipt\@xipt}
+
+%make part titles bold and 12 point, <2 blank lines before, <1 after
+\def\part{\par
+   \addvspace{4ex}
+   \@afterindentfalse
+   \secdef\@part\@spart}
+
+\def\@part[#1]#2{\ifnum \c@secnumdepth >\m@ne
+        \refstepcounter{part}
+%        \addcontentsline{toc}{part}{\thepart
+%        \hspace{1em}#1}\else
+%      \addcontentsline{toc}{part}{#1}\fi
+	\fi
+   {\parindent \z@ \raggedright
+    \interlinepenalty \@M
+%    \ifnum \c@secnumdepth >\m@ne
+%      \Large \bf \partname~\thepart%   THEN Print '\partname' and
+%      \par\nobreak
+%    \fi
+%   \Large \bf
+%   #2%
+%   \markboth{}{}\par
+   }\nobreak
+   \vskip 3ex
+   \@afterheading
+  }
+
+%make section titles bold and 12 point, <2 blank lines before, <1 after
+\def\section{\@startsection {section}{1}{\z@}{-7pt plus -1pt minus -1pt}
+{2pt plus 1pt minus 1pt}{\large\bf}}
+
+%make subsection titles bold and 11 point, 1 blank line before, 1 after
+\def\subsection{\@startsection {subsection}{2}{\z@}{-4pt plus -1pt minus -1pt}
+{2pt plus 1pt minus 1pt}{\normalsize\bf}}
+
+\def\subsubsection{\@startsection {subsubsection}{3}{\z@}{-4pt plus -1pt minus -1pt}
+{1pt plus 1pt minus 1pt}{\subsize\bf}}
+
+\def\paragraph{\@startsection
+     {paragraph}{4}{\z@}{2pt plus2pt minus2pt}{-2pt}{\reset@font
+     \subsize\bf}}
+\def\subparagraph{\@startsection
+     {subparagraph}{4}{\parindent}{2pt plus2pt minus
+     2pt}{-2pt}{\reset@font\subsize\bf}}
+
+\makeatother
+
+}%com
+
+\com{Don't need space yet.
+%% Every line helps.  The default, BTW, is 10.  I wouldn't go too much higher
+%% than 100 or so.
+%%
+%% I should say that this will increase the average CPI, though, possibly
+%% putting the text out of compliance with the typesetting rules of the NSF's
+%% GPG.  Caveat emptor.
+%%
+\linepenalty=150
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+      \newenvironment{changemargin}[2]{\begin{list}{}{
+         \setlength{\topsep}{0pt}\setlength{\leftmargin}{0pt}
+         \setlength{\rightmargin}{0pt}
+         \setlength{\listparindent}{\parindent}
+         \setlength{\itemindent}{\parindent}
+         \setlength{\parsep}{0pt plus 1pt}
+         \addtolength{\leftmargin}{#1}\addtolength{\rightmargin}{#2}
+         }\item }{\end{list}}
+
+
+% \setlength{\textheight}{8.9in}
+% \setlength{\textwidth}{6.35in}
+% \setlength{\topmargin}{-0.5in}
+% \setlength{\oddsidemargin}{.1in}		
+% \setlength{\evensidemargin}{.1in}	
+
+\itemsep=-10pt
+}%com
+
+\usepackage{fullpage}
+
+% \raggedright
+
+\flushbottom		% optional but recommended
+
+% \parskip .5ex
+
+% \setlength{\marginparwidth}{0in}
+% \setlength{\marginparsep}{0pt}
