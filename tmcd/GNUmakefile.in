@@ -9,7 +9,9 @@ SUBDIR		= tmcd
 
 include $(OBJDIR)/Makeconf
 
-all:	tmcd tmcc tmcd.restart findif
+all:	server client
+client: tmcc tmcc-nossl findif
+server: tmcd tmcd.restart
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
