@@ -20,6 +20,7 @@
 #
 # 0  - success
 # 1+ - error (Add other values:)
+# 2  - max_concurrent violation
 # 4  - bandwidth violation
 # 8  - linkusers violation
 # 16 - desires violation
@@ -246,6 +247,12 @@ my $forcelinkdelays = 0;
 my %uselinkdelay    = ();
 my %nobwshaping     = ();
 
+# OSID for each node in the virt_nodes table. We set this when we read
+# virt_nodes. Eventually, this should be part of a larger data structure
+# of per-vnode info. This allows us to map it early, and bail if over
+# max_concurrent. 
+my %virtnodeosids   = ();
+
 #
 # This is for stats gathering. It might duplicate other stuff, but
 # thats okay.
@@ -335,7 +342,7 @@ if ($updating) {
 
 printdb "Loading virt_nodes.\n";
 $result =
-    DBQueryFatal("select distinct vn.vname,vn.ips,vn.type,vn.fixed, ".
+    DBQueryFatal("select distinct vn.vname,vn.ips,vn.type,vn.fixed,vn.osname,".
 		 " nt.isremotenode,nt.isvirtnode ".
 		 " from virt_nodes as vn ".
 		 "left join node_types as nt on ".
@@ -343,7 +350,7 @@ $result =
 		 "where vn.pid='$pid' and vn.eid='$eid' ".
 		 "order by vn.vname");
 
-while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = 
+while (($vname,$ips,$type,$fixed,$osname,$isremote,$isvirt) = 
         $result->fetchrow_array){
     if (defined($fixed) && $fixed eq "") {
 	undef($fixed);
@@ -405,8 +412,27 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) =
     if (defined($fixed)) {
 	$fixed_nodes{$vname} = $fixed;
     }
+
+    #
+    # Map the osname to an OSID now so that we can check max_concurrent.
+    # This also avoids the work and *check* later after we have done 90%
+    # of assign_wrapper. If no osname was specified, we have to wait and
+    # use the default for the type of phys node that assign picks.
+    #
+    if (defined($osname) && $osname ne "") {
+	my $osid;
+
+	if (! ($osid = TBOSID($pid, $osname)) &&
+	    ! ($osid = TBOSID(TB_OPSPID, $osname))) {
+	    fatal(1, "*** $0:\n".
+		     "    Invalid OS $osname in project $pid!\n");
+	}
+	$virtnodeosids{$vname} = $osid;
+    }
 }
-$result->finish;
+
+# Check Max Concurrent
+CheckMaxConcurrent();
 
 # Stats
 $expt_stats{"vnodes"}   = $virtcount;
@@ -2296,7 +2322,7 @@ sub InitPnode($pnode, $vnode)
     my ($type) = $query_result->fetchrow_array();
 
     $query_result =
-	DBQueryFatal("SELECT osname,cmd_line,rpms,deltas, " .
+	DBQueryFatal("SELECT cmd_line,rpms,deltas, " .
 		     " startupcmd,tarfiles,failureaction,routertype " .
 		     "from virt_nodes where pid='$pid'" .
 		     " and eid='$eid' and vname='$vnode'");
@@ -2371,21 +2397,17 @@ sub InitPnode($pnode, $vnode)
 	# We want to skip nodes that belong to the experiment but aren't
 	# user defined nodes. I.e. delay nodes.
 	#
-	if (($osname,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
+	if (($cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
 	     $failureaction,$routertype) = $query_result->fetchrow_array()) {
 
-	    if (!defined($osname) || $osname eq "") {
+	    # If no OSID defined, then use type-default.
+	    if (defined($virtnodeosids{$vnode})) {
+		$osid = $virtnodeosids{$vnode};
+	    }
+	    else {
 		$osid = $defaultosids{$type};
 	    }
-	    #
-	    # Map the user name into a specific OSID in the project or in
-	    # the OPS project (a default image). 
-	    # 
-	    elsif (! ($osid = TBOSID($pid, $osname)) &&
-		   ! ($osid = TBOSID(TB_OPSPID, $osname))) {
-		fatal(1, "*** $0:\n".
-		         "    Invalid OS $osname in project $pid!\n");
-	    }
+
 	    DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
 			 " startstatus='none'," .
 			 " bootstatus='unknown'," .
@@ -2654,6 +2676,37 @@ sub UploadVlans()
     
 	DBQueryFatal("insert into vlans (id,pid,eid,virtual,members) ".
 		     "values (0, '$pid', '$eid', '$lan', '$memberlist')");
+    }
+}
+
+#
+# Check max concurrent to see if there are already the maximum allowed
+# nodes running each image. This check is fuzzy since there is no
+# atomicity, but there is another check later in os_load which might
+# catch it to. But this will get it most of the time and prevent
+# failures much later in the swapin process.
+#
+sub CheckMaxConcurrent()
+{
+    my %counts	= ();
+
+    # First get counts of each usage.
+    foreach my $osid (values(%virtnodeosids)) {
+	$counts{$osid} = 0
+	    if (!defined($counts{$osid}));
+	$counts{$osid}++;
+    }
+
+    # Now check.
+    foreach my $osid (keys(%counts)) {
+	my $count = $counts{$osid};
+
+	if (!TBOSLoadMaxOkay($osid, $count)) {
+	    fatal(2|1|64,
+		  "*** $0:\n".
+		  "    Cannot load $osid on one or more nodes.\n".
+		  "    Too many nodes are already running this OSID!");
+	}
     }
 }
 
