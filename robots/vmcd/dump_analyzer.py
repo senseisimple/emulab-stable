@@ -33,24 +33,27 @@ def debug(msg):
 # Classes
 class ObjectData:
     
-    def __init__(self,lx,ly,lt,rx,ry,rt,gx,gy,gt):
-        self.lx = lx
-        self.ly = ly
-        self.lt = lt
-        self.rx = rx
-        self.ry = ry
-        self.rt = rt
-        self.gx = gx
-        self.gy = gy
-        self.gt = gt
-        pass
+    def __init__(self,ax,ay,bx,by,wx,wy,wa):
 
+        # Pixel coords of blob centers.
+        self.ax = ax
+        self.ay = ay
+        self.bx = bx
+        self.by = by
+
+        # Apply camera offset to world coords.
+        self.wx = wx + options['camera_x']
+        self.wy = wy + options['camera_y']
+        self.wa = wa
+
+        pass
+    
     def toString(self):
-        return 'ObjectData=(' + \
-               ' lx='+str(self.lx)+',ly='+str(self.ly)+',lt='+str(self.lt)+ \
-               ',rx='+str(self.rx)+',ry='+str(self.ry)+',rt='+str(self.rt)+ \
-               ',gx='+str(self.gx)+',gy='+str(self.gy)+',gt='+str(self.gt)+ \
-               ') '
+        return 'ObjectData=('+\
+               'ax='+str(self.ax)+',ay='+str(self.ay)+\
+               ',bx='+str(self.bx)+',by='+str(self.by)+\
+               ',wx='+str(self.wx)+',wy='+str(self.wy)+',wa='+str(self.wa)+\
+               ')'
     
     pass # end of ObjectData
 
@@ -65,8 +68,10 @@ class FrameData:
     def toString(self):
         s = 'FrameData=(n = '+str(self.id)+', t = '+str(self.timestamp)+ \
             ', objects = {'  # +str(self.objects)
-        for k,v in self.objects.iteritems():
-            s += str(k)+'=>'+str(v.toString())+','
+        l = len(self.objects)
+        for i in range(l):
+            s += str(self.objects[i].toString())
+            if i<l-1: s += ','
             pass
         s += '}'
         return s
@@ -101,7 +106,7 @@ class Section:
 
 # globals
 datafile = 0
-results = dict([])
+results = []
 framedata = []
 line = ""
 options = dict({ 'x_offset': 0.0,
@@ -109,6 +114,8 @@ options = dict({ 'x_offset': 0.0,
                  'z_offset': 0.0,
                  'number of frames': 0,
                  'frame interval': 0,
+                 'camera_x': 0.0,     # Camera offset, in meters.
+                 'camera_y': 0.0,
                  })
 
 def mean(list):
@@ -134,7 +141,11 @@ def stddev(list):
     for n in deviation_list:
         sum_of_squared_deviations += math.pow(n,2)
         pass
-    stddev = math.sqrt(sum_of_squared_deviations / (len(list) - 1))
+    if len(list) == 1:
+        stddev = -1.0
+    else:
+        stddev = math.sqrt(sum_of_squared_deviations / (len(list) - 1))
+        pass
     return stddev
 
 def analyze(section):
@@ -147,81 +158,69 @@ def analyze(section):
     sr['valid_frames'] = 0
     sr['invalid_frames'] = 0
     sr['mult_meas_frames'] = 0
-    #sr['lx_sum'] = 0.0
-
-    # these are the stats we'll be grabbing, but no point to declaring
-    # them here
-    #sr['mean_lx'] = 0.0
-    #sr['stddev_lx'] = 0.0
-    #sr['mean_lx_minus_actual_lx'] = 0.0
-    #sr['stddev_lx_minus_actual_lx'] = 0.0
-    #sr['mean_ly'] = 0.0
-    #sr['stddev_ly'] = 0.0
-    #sr['mean_ly_minus_actual_ly'] = 0.0
-    #sr['stddev_ly_minus_actual_ly'] = 0.0
-    #sr['mean_lt'] = 0.0
-    #sr['stddev_lt'] = 0.0
-    #sr['mean_lt_minus_actual_lt'] = 0.0
-    #sr['stddev_lt_minus_actual_lt'] = 0.0
-
-    #sr['mean_rx'] = 0.0
-    #sr['stddev_rx'] = 0.0
-    #sr['mean_rx_minus_actual_lx'] = 0.0
-    #sr['stddev_rx_minus_actual_lx'] = 0.0
-    #sr['mean_ry'] = 0.0
-    #sr['stddev_ry'] = 0.0
-    #sr['mean_ry_minus_actual_ly'] = 0.0
-    #sr['stddev_ry_minus_actual_ly'] = 0.0
-    #sr['mean_rt'] = 0.0
-    #sr['stddev_rt'] = 0.0
-    #sr['mean_rt_minus_actual_lt'] = 0.0
-    #sr['stddev_rt_minus_actual_lt'] = 0.0
+    sr['bad_data_frames'] = 0
 
     temp = dict([])
-    temp['lx_minus_actual_lx'] = []
-    temp['lx'] = []
-    temp['ly_minus_actual_ly'] = []
-    temp['ly'] = []
-    temp['lt_minus_actual_lt'] = []
-    temp['lt'] = []
+    temp['ax'] = []
+    temp['ay'] = []
+    temp['bx'] = []
+    temp['by'] = []
     
-    temp['rx_minus_actual_lx'] = []
-    temp['rx'] = []
-    temp['ry_minus_actual_ly'] = []
-    temp['ry'] = []
-    temp['rt_minus_actual_lt'] = []
-    temp['rt'] = []
+    temp['wx'] = []
+    temp['wx_offset'] = []
+    temp['wx_error'] = []
+
+    temp['wy'] = []
+    temp['wy_offset'] = []
+    temp['wy_error'] = []
+
+    temp['wxy_error'] = []
+    temp['wa'] = []
     
 
     for f in section.frames:
-        c = len(f.objects.keys())
+        c = len(f.objects)
         if c > 1:
             sr['mult_meas_frames'] += 1
             pass
         elif c == 1:
-            sr['valid_frames'] += 1
-            keys = f.objects.keys()
-            #sr['lx_sum'] += f.objects[keys[0]].lx
-            temp['lx_minus_actual_lx'].append(f.objects[keys[0]].lx - \
-                                              section.lx)
-            temp['lx'].append(f.objects[keys[0]].lx)
-            temp['ly_minus_actual_ly'].append(f.objects[keys[0]].ly - \
-                                              section.ly)
-            temp['ly'].append(f.objects[keys[0]].ly)
-            temp['lt_minus_actual_lt'].append(f.objects[keys[0]].lt - \
-                                              section.lt)
-            temp['lt'].append(f.objects[keys[0]].lt)
-            
-            temp['rx_minus_actual_lx'].append(f.objects[keys[0]].rx - \
-                                              section.lx)
-            temp['rx'].append(f.objects[keys[0]].rx)
-            temp['ry_minus_actual_ly'].append(f.objects[keys[0]].ry - \
-                                              section.ly)
-            temp['ry'].append(f.objects[keys[0]].ry)
-            temp['rt_minus_actual_lt'].append(f.objects[keys[0]].rt - \
-                                              section.lt)
-            temp['rt'].append(f.objects[keys[0]].rt)
-            
+
+            ax = f.objects[0].ax
+            ay = f.objects[0].ay
+            bx = f.objects[0].bx
+            by = f.objects[0].by
+
+            # Filter out bad, glitchy pixel data where the two blobs do not
+            # agree in X and Y.  They have to be within about a
+            # fiducial-diameter of each other.
+            fid = 13                    # Diameter of a fiducial at the center.
+            eps = fid*1.5
+            ##print "ax=%f, ay=%f, bx=%f, by=%f"%(ax, ay, bx, by)
+            if abs(bx-ax) > eps or abs(by-ay) > eps:
+                ##print "bad"
+                sr['bad_data_frames'] += 1
+            else:
+                ##print "good"
+                sr['valid_frames'] += 1
+                temp['ax'].append(ax)
+                temp['ay'].append(ay)
+
+                temp['bx'].append(bx)
+                temp['by'].append(by)
+
+                temp['wx'].append(f.objects[0].wx)
+                xdiff = f.objects[0].wx - section.lx
+                temp['wx_offset'].append(xdiff)
+                temp['wx_error'].append(math.fabs(xdiff))
+
+                temp['wy'].append(f.objects[0].wy)
+                ydiff = f.objects[0].wy - section.ly
+                temp['wy_offset'].append(ydiff)
+                temp['wy_error'].append(math.fabs(ydiff))
+
+                temp['wxy_error'].append(math.hypot(xdiff,ydiff))
+                temp['wa'].append(f.objects[0].wa)
+                pass
             pass
         elif c == 0:
             sr['invalid_frames'] += 1
@@ -229,39 +228,47 @@ def analyze(section):
         pass
 
     # calc the stats
-    sr['mean_lx'] = mean(temp['lx'])
-    sr['stddev_lx'] = stddev(temp['lx'])
-    sr['mean_lx_minus_actual_lx'] = mean(temp['lx_minus_actual_lx'])
-    sr['stddev_lx_minus_actual_lx'] = stddev(temp['lx_minus_actual_lx'])
-    sr['mean_ly'] = mean(temp['ly'])
-    sr['stddev_ly'] = stddev(temp['ly'])
-    sr['mean_ly_minus_actual_ly'] = mean(temp['ly_minus_actual_ly'])
-    sr['stddev_ly_minus_actual_ly'] = stddev(temp['ly_minus_actual_ly'])
-    sr['mean_lt'] = mean(temp['lt'])
-    sr['stddev_lt'] = stddev(temp['lt'])
-    sr['mean_lt_minus_actual_lt'] = mean(temp['lt_minus_actual_lt'])
-    sr['stddev_lt_minus_actual_lt'] = stddev(temp['lt_minus_actual_lt'])
+    sr['mean_ax'] = mean(temp['ax'])
+    sr['stddev_ax'] = stddev(temp['ax'])
+    sr['mean_ay'] = mean(temp['ay'])
+    sr['stddev_ay'] = stddev(temp['ay'])
     
-    sr['mean_rx'] = mean(temp['rx'])
-    sr['stddev_rx'] = stddev(temp['rx'])
-    sr['mean_rx_minus_actual_lx'] = mean(temp['rx_minus_actual_lx'])
-    sr['stddev_rx_minus_actual_lx'] = stddev(temp['rx_minus_actual_lx'])
-    sr['mean_ry'] = mean(temp['ry'])
-    sr['stddev_ry'] = stddev(temp['ry'])
-    sr['mean_ry_minus_actual_ly'] = mean(temp['ry_minus_actual_ly'])
-    sr['stddev_ry_minus_actual_ly'] = stddev(temp['ry_minus_actual_ly'])
-    sr['mean_rt'] = mean(temp['rt'])
-    sr['stddev_rt'] = stddev(temp['rt'])
-    sr['mean_rt_minus_actual_lt'] = mean(temp['rt_minus_actual_lt'])
-    sr['stddev_rt_minus_actual_lt'] = stddev(temp['rt_minus_actual_lt'])
+    sr['mean_bx'] = mean(temp['bx'])
+    sr['stddev_bx'] = stddev(temp['bx'])
+    sr['mean_by'] = mean(temp['by'])
+    sr['stddev_by'] = stddev(temp['by'])
     
+    sr['mean_wx'] = mean(temp['wx'])
+    sr['stddev_wx'] = stddev(temp['wx'])
+    sr['mean_wy'] = mean(temp['wy'])
+    sr['stddev_wy'] = stddev(temp['wy'])
+
+    sr['mean_wx_offset'] = mean(temp['wx_offset'])
+    tr['wx_offsets'].append(sr['mean_wx_offset'])
+    sr['stddev_wx_offset'] = stddev(temp['wx_offset'])
+    sr['mean_wy_offset'] = mean(temp['wy_offset'])
+    tr['wy_offsets'].append(sr['mean_wy_offset'])
+    sr['stddev_wy_offset'] = stddev(temp['wy_offset'])
+
+    sr['mean_wx_error'] = mean(temp['wx_error'])
+    tr['wx_errors'].append(sr['mean_wx_error'])
+    sr['stddev_wx_error'] = stddev(temp['wx_error'])
+    sr['mean_wy_error'] = mean(temp['wy_error'])
+    tr['wy_errors'].append(sr['mean_wy_error'])
+    sr['stddev_wy_error'] = stddev(temp['wy_error'])
+    sr['mean_wxy_error'] = mean(temp['wxy_error'])
+    tr['wxy_errors'].append(sr['mean_wxy_error'])
+    sr['stddev_wxy_error'] = stddev(temp['wxy_error'])
+
+    sr['mean_wa'] = mean(temp['wa'])
+    sr['stddev_wa'] = stddev(temp['wa'])
     
     # store results
-    results["("+str(section.lx)+", "+str(section.ly)+")"] = sr
+    results.append(["("+str(section.lx)+", "+str(section.ly)+")", sr])
     pass
 
 # start reading the file:
-if sys.argv[1] != "":
+if len(sys.argv) == 2:
     datafile = file(sys.argv[1])
     pass
 else:
@@ -275,26 +282,38 @@ in_config = True
 re_config_option_float = re.compile("  \- ([ \w]+): (\-*\d+\.\d+)")
 re_config_option_int = re.compile("  \- ([ \w]+): (\-*\d+)")
 re_config_option_string = re.compile("  \- ([ \w]+): (.*)")
-re_section = re.compile("section:\s*\((\-*\d+\.\d+)\s*,\s*(\-*\d+\.\d+)\s*\)")
+fpnum = "\s*(\-*\d+\.\d+)\s*"
+re_section = re.compile("section:\s*\("+fpnum+","+fpnum+"\)")
 re_section_sep = re.compile("\+\+\+")
-re_frame_title = re.compile("frame (\d+) \(timestamp (\d+\.\d+)\):")
-re_frame_data_line = re.compile("  \- (\w+)\[(\d+)\]:\s*x = (\-*\d+\.\d+), y = (\-*\d+\.\d+), theta = (\-*\d+\.\d+)")
+re_frame_title = re.compile("frame (\d+) \(timestamp"+fpnum+"\):")
+re_frame_data_line = re.compile("a\("+fpnum+","+fpnum+"\)\s*"
+                                "b\("+fpnum+","+fpnum+"\)\s*"
+                                "-- wc\("+fpnum+","+fpnum+","+fpnum+"\)\s*")
 
 # a Section obj
 current_section = None
 # a FrameData obj
 current_frame = None
 # ObjectData objs
-current_objs = dict([])
+current_objs = []
 
 line = datafile.readline()
+
+# Totals over sections handled in analyze().
+tr = dict([])
+tr['wx_offsets'] = []              # Bias.
+tr['wy_offsets'] = []
+tr['wx_errors'] = []               # Deviation.
+tr['wy_errors'] = []
+tr['wxy_errors'] = []
 
 while line != "":
     # chop the newline
     line = line.strip('\n')
     #print "line = "+line
 
-    if line == "":
+    # Ignore null lines and lines commented-out by pound-signs.
+    if line == "" or line[0] == '#':
         in_config = False
         pass
     elif in_config:
@@ -334,38 +353,15 @@ while line != "":
         m2 = re_frame_title.match(line)
         m3 = re_section_sep.match(line)
         if m1 != None:
-            #print "m1.group(2) = "+m1.group(2)
-            if not current_objs.has_key(int(m1.group(2))):
-                current_objs[int(m1.group(2))] = ObjectData(0,0,0,0,0,0,0,0,0)
-                pass
-            if m1.group(1) == 'local':
-                debug("found local: "+str(float(m1.group(3)))+","+ \
-                      str(float(m1.group(4)))+","+str(float(m1.group(5))))
-                current_objs[int(m1.group(2))].lx = float(m1.group(3))
-                current_objs[int(m1.group(2))].ly = float(m1.group(4))
-                current_objs[int(m1.group(2))].lt = float(m1.group(5))
-                pass
-            elif m1.group(1) == 'radial':
-                debug("found radial: "+str(float(m1.group(3)))+","+ \
-                      str(float(m1.group(4)))+","+str(float(m1.group(5))))
-                current_objs[int(m1.group(2))].rx = float(m1.group(3))
-                current_objs[int(m1.group(2))].ry = float(m1.group(4))
-                current_objs[int(m1.group(2))].rt = float(m1.group(5))
-                pass
-            elif m1.group(1) == 'global':
-                debug("found global: "+str(float(m1.group(3)))+","+ \
-                      str(float(m1.group(4)))+","+str(float(m1.group(5))))
-                current_objs[int(m1.group(2))].gx = float(m1.group(3))
-                current_objs[int(m1.group(2))].gy = float(m1.group(4))
-                current_objs[int(m1.group(2))].gt = float(m1.group(5))
-                pass
+            debug("found frame data")
+            current_objs.append(ObjectData( *[float(d) for d in m1.groups()] ))
             pass
         elif m2 != None:
             # new frame; if old frame != 0, add it
             debug("found frame title")
             if current_frame != None:
                 current_frame.objects = current_objs
-                current_objs = dict([])
+                current_objs = []
                 current_section.addFrameData(current_frame)
                 pass
             current_frame = FrameData(int(m2.group(1)),
@@ -379,7 +375,7 @@ while line != "":
             #   add current_objs to frame.objects
             if current_frame != None:
                 current_frame.objects = current_objs
-                current_objs = dict([])
+                current_objs = []
                 current_section.addFrameData(current_frame)
                 current_frame = None
                 pass
@@ -400,35 +396,72 @@ while line != "":
 
 debug(options)
 
-for k,v in results.iteritems():
+for k,v in results:
     print "section "+str(k)+" results:"
     # individual stats:
-    print "  valid_frames = "+v['valid_frames']
-    print "  invalid_frames = "+v['invalid_frames']
-    print "  mult_meas_frames = "+v['mult_meas_frames']
-    print "  mean_lx = "+v['mean_lx']
-    print "  stddev_lx = "+v['stddev_lx']
-    print "  mean_ly = "+v['mean_ly']
-    print "  stddev_ly = "+v['stddev_ly']
-    print "  mean_lt = "+v['mean_lt']
-    print "  stddev_lt = "+v['stddev_lt']
-    print "  mean_lx_minus_actual_lx = "+v['mean_lx_minus_actual_lx']
-    print "  stddev_lx_minus_actual_lx = "+v['stddev_lx_minus_actual_lx']
-    print "  mean_ly_minus_actual_ly = "+v['mean_ly_minus_actual_ly']
-    print "  stddev_ly_minus_actual_ly = "+v['stddev_ly_minus_actual_ly']
-    print "  mean_lt_minus_actual_lt = "+v['mean_lt_minus_actual_lt']
-    print "  stddev_lt_minus_actual_lt = "+v['stddev_lt_minus_actual_lt']
-    print "  mean_rx_minus_actual_lx = "+v['mean_rx_minus_actual_lx']
-    print "  stddev_rx_minus_actual_lx = "+v['stddev_rx_minus_actual_lx']
-    print "  mean_ry_minus_actual_ly = "+v['mean_ry_minus_actual_ly']
-    print "  stddev_ry_minus_actual_ly = "+v['stddev_ry_minus_actual_ly']
-    print "  mean_rt_minus_actual_lt = "+v['mean_rt_minus_actual_lt']
-    print "  stddev_rt_minus_actual_lt = "+v['stddev_rt_minus_actual_lt']
+    print "  valid_frames = "+str(v['valid_frames'])
+    print "  bad_data_frames = "+str(v['bad_data_frames'])
+    print "  invalid_frames = "+str(v['invalid_frames'])
+    print "  mult_meas_frames = "+str(v['mult_meas_frames'])
 
+    print "  mean_ax = "+str(v['mean_ax'])
+    print "  stddev_ax = "+str(v['stddev_ax'])
+    print "  mean_ay = "+str(v['mean_ay'])
+    print "  stddev_ay = "+str(v['stddev_ay'])
 
+    print "  mean_bx = "+str(v['mean_bx'])
+    print "  stddev_bx = "+str(v['stddev_bx'])
+    print "  mean_by = "+str(v['mean_by'])
+    print "  stddev_by = "+str(v['stddev_by'])
+
+    print "  mean_wx = "+str(v['mean_wx'])
+    print "  stddev_wx = "+str(v['stddev_wx'])
+    print "  mean_wy = "+str(v['mean_wy'])
+    print "  stddev_wy = "+str(v['stddev_wy'])
+    print "  mean_wa = "+str(v['mean_wa'])
+    print "  stddev_wa = "+str(v['stddev_wa'])
+
+    print "  mean_wx_offset = "+str(v['mean_wx_offset'])
+    print "  stddev_wx_offset = "+str(v['stddev_wx_offset'])
+    print "  mean_wy_offset = "+str(v['mean_wy_offset'])
+    print "  stddev_wy_offset = "+str(v['stddev_wy_offset'])
+
+    print "  mean_wx_error = "+str(v['mean_wx_error'])
+    print "  stddev_wx_error = "+str(v['stddev_wx_error'])
+    print "  mean_wy_error = "+str(v['mean_wy_error'])
+    print "  stddev_wy_error = "+str(v['stddev_wy_error'])
+    print "  mean_wxy_error = "+str(v['mean_wxy_error'])
+    print "  stddev_wxy_error = "+str(v['stddev_wxy_error'])
     
 #    for k2,v2 in v.iteritems():
 #        print "  "+str(k2)+" = "+str(v2)
 #        pass
-#    pass
 
+    pass
+
+print "\ntotal results:"
+
+print "  max_wx_offset = "+str(max(tr['wx_offsets']))
+print "  min_wx_offset = "+str(min(tr['wx_offsets']))
+print "  mean_wx_offset = "+str(mean(tr['wx_offsets']))
+print "  stddev_wx_offset = "+str(stddev(tr['wx_offsets']))
+print ""
+print "  max_wy_offset = "+str(max(tr['wy_offsets']))
+print "  min_wy_offset = "+str(min(tr['wy_offsets']))
+print "  mean_wy_offset = "+str(mean(tr['wy_offsets']))
+print "  stddev_wy_offset = "+str(stddev(tr['wy_offsets']))
+print ""
+print "  max_wx_error = "+str(max(tr['wx_errors']))
+print "  min_wx_error = "+str(min(tr['wx_errors']))
+print "  mean_wx_error = "+str(mean(tr['wx_errors']))
+print "  stddev_wx_error = "+str(stddev(tr['wx_errors']))
+print ""
+print "  max_wy_error = "+str(max(tr['wy_errors']))
+print "  min_wy_error = "+str(min(tr['wy_errors']))
+print "  mean_wy_error = "+str(mean(tr['wy_errors']))
+print "  stddev_wy_error = "+str(stddev(tr['wy_errors']))
+print ""
+print "  max_wxy_error = "+str(max(tr['wxy_errors']))
+print "  min_wxy_error = "+str(min(tr['wxy_errors']))
+print "  mean_wxy_error = "+str(mean(tr['wxy_errors']))
+print "  stddev_wxy_error = "+str(stddev(tr['wxy_errors']))
