@@ -280,7 +280,7 @@ if (! $returning) {
          "Testbed Ops\n".
          "Utah Network Testbed\n",
          "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_APPROVAL\n".
+         "Bcc: $TBMAIL_AUDIT\n".
          "Errors-To: $TBMAIL_WWW");
 }
 

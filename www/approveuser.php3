@@ -161,7 +161,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Utah Network Testbed\n",
              "From: $uid_name <$uid_email>\n".
              "Cc:  $phead_name <$phead_email>\n".
-             "Bcc: $TBMAIL_APPROVAL\n".
+             "Bcc: $TBMAIL_AUDIT\n".
              "Errors-To: $TBMAIL_WWW");
 
 	echo "<h3><p>
@@ -284,7 +284,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Utah Network Testbed\n",
              "From: $uid_name <$uid_email>\n".
              "Cc:  $phead_name <$phead_email>\n".
-             "Bcc: $TBMAIL_APPROVAL\n".
+             "Bcc: $TBMAIL_AUDIT\n".
              "Errors-To: $TBMAIL_WWW");
 
 	#
