@@ -6,7 +6,7 @@
 #include <netdb.h>
 #include <syslog.h>
 
-#include <oskit/boot/bootwhat.h>
+#include "bootwhat.h"
 
 /*
  * Trivial config file format.

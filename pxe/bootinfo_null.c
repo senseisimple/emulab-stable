@@ -2,7 +2,7 @@
 #include <netinet/in.h>
 #include <stdio.h>
 
-#include <oskit/boot/bootwhat.h>
+#include "bootwhat.h"
 
 #ifdef USE_NULL_DB
 
