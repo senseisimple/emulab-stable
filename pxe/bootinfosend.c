@@ -115,7 +115,7 @@ main(int argc, char **argv)
 		exit(1);
 	}
 	err = 1;
-	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT,
 		       (char *)&err, sizeof(err)) < 0)
 		errorc("setsockopt(SO_REUSEADDR)");
 	
@@ -127,6 +127,8 @@ main(int argc, char **argv)
 		errorc("binding datagram socket");
 		exit(1);
 	}
+
+	sleep(10);
 
 	bzero(&boot_info, sizeof(boot_info));
 	boot_info.version = BIVERSION_CURRENT;
