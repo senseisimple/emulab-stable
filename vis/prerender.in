@@ -34,7 +34,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.001 -Goverlap=scale -Gpack=true -Gsep=4 -Gmclimit=30";
 #my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Goverlap=scale -Gmaxiter=20000 -Gpack=true";
 my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Gmaxiter=20000 -Gpack=true";
-my $THUMB_CMD = "render -t 128";
+my $THUMB_CMD = "render -t 160";
 
 sub dprint($);
 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,8 +22,7 @@ $| = 1;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $PRERENDER_CMD = "@prefix@/libexec/vis/prerender";
-my $THUMBRENDER_CMD = "@prefix@/bin/dbvistopology -t 128";
+my $PRERENDER_CMD = "@prefix@/libexec/vis/prerender -f ";
 
 sub usage {
     die "Usage:\prerender_all [-v] [-t]";
