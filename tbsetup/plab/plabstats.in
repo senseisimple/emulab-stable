@@ -144,19 +144,21 @@ if (!defined($LOADMETRIC)) {
     $LOADMETRIC = "load_fifteen";
 }
 
-$MAXLOAD = 5.0;
 if (TBSiteVarExists("plab/max_load")) {
     $MAXLOAD = TBGetSiteVar("plab/max_load");
+    $MAXLOAD = 0.0 if $MAXLOAD <= 0.0;
+    $MAXLOAD = 1000.0 if $MAXLOAD > 1000.0;
+} else {
+    $MAXLOAD = 5.0;
 }
-$MAXLOAD = 0.0 if $MAXLOAD <= 0.0;
-$MAXLOAD = 1000.0 if $MAXLOAD > 1000.0;
 
-$MINDISK = 10;
 if (TBSiteVarExists("plab/min_disk")) {
     $MINDISK = TBGetSiteVar("plab/min_disk");
+    $MINDISK = 0 if $MINDISK < 0;
+    $MINDISK = 100 if $MINDISK > 100;
+} else {
+    $MINDISK = 10;
 }
-$MINDISK = 0 if $MINDISK < 0;
-$MINDISK = 100 if $MINDISK > 100;
 
 #
 # Download the metrics from the plab site.
@@ -444,7 +446,7 @@ sub ShowMetrics()
 	}
     }
 
-    # XXX so we can detect nodes we got status for but not in the DB
+    # XXX so we can detect nodes in the DB for which we got no status
     undef($nodemap{$IP});
 
     push @nodelist, $line;
