@@ -1069,6 +1069,14 @@ function TBWebdbAllowed($uid) {
     return mysql_num_rows($query_result);
 }
 
+function TBCvswebAllowed($uid) {
+    $query_result =
+        DBQueryFatal("select cvsweb from users ".
+		     "WHERE uid='$uid' and cvsweb=1");
+
+    return mysql_num_rows($query_result);
+}
+
 #
 # DB Interface.
 #

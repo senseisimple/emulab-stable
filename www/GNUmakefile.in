@@ -6,6 +6,12 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= www
 
+#
+# A hack for only installing some things if installing on the main site
+#
+MAINSITE        = emulab.net
+OURDOMAIN       = @OURDOMAIN@
+
 include $(OBJDIR)/Makeconf
 
 #
@@ -56,15 +62,28 @@ BUIFILES += $(wildcard $(SRCDIR)/buildui/*.class)
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
 
 #
+# This stuff only gets installed on the main site
+#
+ifeq ($(OURDOMAIN),$(MAINSITE)) 
+	CVSWEBFILES  = $(wildcard $(SRCDIR)/cvsweb/*.php3)
+	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.conf)
+	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.gif)
+	CVSWEBCGI    = $(wildcard $(SRCDIR)/cvsweb/*.cgi)
+
+	INSTALL_CVSWEBCGI = $(INSTALL_PROGRAM) $(CVSWEBCGI) $(INSTALL_WWWDIR)/cvsweb
+endif
+
+#
 # Kill the directory part of the names. The vpath rule will do the rest.
 #
-ALLFILES = $(notdir $(FILES))
-ALLPIXES = $(notdir $(PIXFILES))
-ALLDOCS  = $(notdir $(DOCFILES))
-ALLTUTS  = $(notdir $(TUTFILES))
-ALLICONS = $(notdir $(AUTOICONS))
-ALLWEBDB = $(notdir $(WEBDBFILES))
-ALLBUI   = $(notdir $(BUIFILES))
+ALLFILES  = $(notdir $(FILES))
+ALLPIXES  = $(notdir $(PIXFILES))
+ALLDOCS   = $(notdir $(DOCFILES))
+ALLTUTS   = $(notdir $(TUTFILES))
+ALLICONS  = $(notdir $(AUTOICONS))
+ALLWEBDB  = $(notdir $(WEBDBFILES))
+ALLCVSWEB = $(notdir $(CVSWEBFILES))
+ALLBUI    = $(notdir $(BUIFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
@@ -72,7 +91,8 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \
 	$(addprefix $(INSTALL_WWWDIR)/webdb/, $(ALLWEBDB)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
-	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS))
+	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
+	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
 	cd $(INSTALL_WWWDIR) && \
 		if test -d ../webglimpse; \
 		then \
@@ -84,7 +104,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 		ln -s index.html tbdb.html; \
 		rm -f icons; \
 		ln -s /usr/local/www/icons icons;
-
+		$(INSTALL_CVSWEBCGI)
 
 $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
