@@ -1212,7 +1212,7 @@ class swapexp:
             req_args       = req_args[2:];
             pass
 
-        if not params.has_key("direction") && len(req_args) != 1:
+        if not params.has_key("direction") and len(req_args) != 1:
             self.usage();
             return -1;
         else:
