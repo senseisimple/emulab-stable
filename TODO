@@ -1,5 +1,38 @@
 [This file is not kept entirely up to date.]
 
+*  From: Robert P Ricci <ricci@cs.utah.edu>
+   Subject: Re: Disabled Web
+   Date: Fri, 8 Aug 2003 11:12:35 -0600
+    
+   > Seems it might be good to have a way to just disable swap in/out/mod
+   > instead of the whole interface, sine most of the time, that's really all
+   > we need to disable.
+    
+   Acutally, it occurs to me that we should have some way to lock tbswap
+   from running at all - for example, if we lock the web interface 'cause
+   things are broken, the batch daemon and/or idleswap can go behind our
+   backs and do potentially harmful things.
+    
+*  From: Jay Lepreau <lepreau@flux.utah.edu>
+   Subject: Re: "Queued" experiments
+   Date: Tue, 05 Aug 2003 19:41:54 MDT
+    
+   Seems to me it's mostly a UI matter, and reporting from assign.
+   As Mac suggests, we would probably just change the "batch" checkbox to, say
+     [ ] Queue and retry if not enough resources.
+    
+   And possibly change the idle-swap time to something low, as I suggested.
+    
+   However, can assign_wrapper be sure it's simply not enough resources,
+   and that they haven't (say) typoed (eg, asking for 1000Mb), or done
+   something more complex wrong?
+    
+   If there is no penalty for doing this auto-retrying, everyone will do it.
+   For example, currently we only allow one concurrent batch job per user.
+    
+*  Fix "auto" problem on CDROM, and allow override of DHCP'ed hostname.
+   Add USB support. (keyboard, mass storage, mouse, hci, ohci, generic) 
+
 *  Fix tmcd/fork problem (events out of order).
 
 *  Supply form args to beginexp page, and allow inline NS files.
