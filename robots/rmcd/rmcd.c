@@ -195,12 +195,14 @@ static void conv_a2r(struct position *rel,
 		     struct position *abs_start,
 		     struct position *abs_finish)
 {
+   float ct, st;
+  
+  
     assert(rel != NULL);
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    float ct, st;
-    
+   
     ct = cos(abs_start->theta);
     st = sin(abs_start->theta);
     
@@ -226,11 +228,15 @@ static void conv_r2a(struct position *abs_finish,
 		     struct position *abs_start,
 		     struct position *rel)
 {
+  
+    float ct, st;
+    
+    
     assert(rel != NULL);
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    float ct, st;
+
     
     ct = cos(abs_start->theta);
     st = sin(abs_start->theta);
