@@ -13,7 +13,7 @@ PAGEHEADER("Start a New Project");
 # the project form. 
 #
 if (!isset($pid) ||
-    strcmp($pid, "ucb-omcast") == 0) {
+    strcmp($pid, "") == 0) {
   FORMERROR("Name");
 }
 if (!isset($proj_head_uid) ||
@@ -21,7 +21,7 @@ if (!isset($proj_head_uid) ||
   FORMERROR("Username");
 }
 if (!isset($proj_name) ||
-    strcmp($proj_name, "UCB Overlay Multicast") == 0) {
+    strcmp($proj_name, "") == 0) {
   FORMERROR("Long Name");
 }
 if (!isset($proj_members) ||
@@ -45,7 +45,7 @@ if (!isset($usr_name) ||
   FORMERROR("Full Name");
 }
 if (!isset($proj_URL) ||
-    strcmp($proj_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
+    strcmp($proj_URL, "") == 0) {
   FORMERROR("Project URL");
 }
 if (!isset($usr_email) ||
@@ -57,11 +57,11 @@ if (!isset($usr_addr) ||
   FORMERROR("Postal Address");
 }
 if (!isset($usr_affil) ||
-    strcmp($usr_affil, "UCB Networks Group") == 0) {
+    strcmp($usr_affil, "") == 0) {
   FORMERROR("Institutional Afilliation");
 }
 if (!isset($usr_title) ||
-    strcmp($usr_title, "Professor Emeritus") == 0) {
+    strcmp($usr_title, "") == 0) {
   FORMERROR("Title/Position");
 }
 if (!isset($usr_phones) ||

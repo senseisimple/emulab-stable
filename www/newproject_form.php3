@@ -107,7 +107,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_title]\">";
 } else {
-    echo "          type=\"text\" value=\"Professor Emeritus\" size=\"30\">";
+    echo "          type=\"text\" size=\"30\">";
 }
 
 echo "     </td>
@@ -123,7 +123,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_affil]\">";
 } else {
-    echo "          type=\"text\" value=\"UCB Networks Group\" size=\"40\">";
+    echo "          type=\"text\" size=\"40\">";
 }
 
 echo "     </td>
@@ -139,9 +139,7 @@ echo "<tr>
 if ($row) {
     echo "          type=\"readonly\" value=\"$row[usr_URL]\">";
 } else {
-    echo "          type=\"text\"
-                    value=\"http://www.cs.berkeley.edu/~jml/\"
-                    size=\"45\">";
+    echo "          type=\"text\" size=\"45\">";
 }
 
 echo "     </td>
@@ -225,7 +223,7 @@ echo "<tr>
 #
 echo "<tr>
           <td>*Name (no blanks):</td>
-          <td><input type=\"text\" name=\"pid\" value=\"ucb-omcast\"
+          <td><input type=\"text\" name=\"pid\"
                      size=$TBDB_PIDLEN maxlength=$TBDB_PIDLEN></td>
       </tr>\n";
 
@@ -235,16 +233,15 @@ echo "<tr>
 echo "<tr>
           <td>*Long name:</td>
           <td><input type=\"text\" name=\"proj_name\"
-                     value=\"UCB Overlay Multicast\" size=\"40\"></td>
+                     size=\"40\"></td>
       </tr>\n";
 
 #
 #  URL
 #
 echo "<tr>
-         <td>+URL:</td>
-         <td><input type=\"text\" name=\"proj_URL\" size=\"45\"
-                    value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
+         <td>*URL:</td>
+         <td><input type=\"text\" name=\"proj_URL\" size=\"45\"></td>
       </tr>\n";
 
 #
