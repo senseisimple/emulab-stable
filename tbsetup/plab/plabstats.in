@@ -40,6 +40,7 @@ my $showhost = 1;
 my $showip = 0;
 my $showstate = 0;
 my $now = time();
+my $header;
 
 my $optlist = "CDLMSdfhin";
 
@@ -279,6 +280,26 @@ sub SortMe
     return $akey <=> $bkey;
 }
 
+#
+# Print header
+#
+my $la;
+for ($LOADMETRIC) {
+    $la = /load_one/	? "1 " :
+	  /load_five/	? "5 " :
+	  /load_fifteen/? "15" :
+	                  "??" ;
+}
+if (!($showload || $showcpu || $showmem || $showdisk)) {
+    print "LOAD$la  CPU%  MEM% DISK% NET(K) ";
+    print "HOST "
+	if $showhost;
+    print "\n";
+}
+
+#
+# Print info
+#
 for $line (sort SortMe @nodelist) {
     print "$line\n";
 }
