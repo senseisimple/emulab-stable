@@ -187,11 +187,15 @@ LanLink instproc fill_ips {} {
 	set isremote [expr $isremote + [$node set isremote]]
 	if {$ip != {}} {
 	    if {$isremote} {
-		perror "Not allowed to specify IP subnet of a remote lan!"
+		perror "Not allowed to specify IP subnet of a remote link!"
 	    }
 	    set subnet [join [lrange [split $ip .] 0 2] .]
 	    set ips($ip) 1
 	}
+    }
+    if {$isremote && [$self info class] != "Link"} {
+	perror "Not allowed to use a remote node in lan $self!"
+	return
     }
     set widearea $isremote
 
