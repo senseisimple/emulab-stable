@@ -206,7 +206,7 @@ main(argc, argv)
 	
 	close(infd);
 	close(outfd);
-	exit(rval);
+	exit(0);
 }
 
 #ifndef linux
@@ -307,8 +307,11 @@ read_image()
 			       i + 1 /* DOS Numbering */);
 			addskip(start, size);
 		}
-		if (rval)
+		if (rval) {
+			warnx("Stopping zip at Slice %d",
+			      i + 1 /* DOS Number */);
 			return rval;
+		}
 		
 		if (!slicemode && !maxmode) {
 			if (start + size > inputmaxsec)
@@ -558,32 +561,35 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	int			cc, i, numgroups, rval = 0;
 	struct ext2_super_block	fs;
 	struct ext2_group_desc	groups[LINUX_GRPSPERBLK];
+	int			dosslice = slice + 1; /* DOS Numbering */
 
 	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
 	assert((sizeof(groups) & ~LINUX_SUPERBLOCK_SIZE) == 0);
 
 	if (debug)
-		printf("  P%d (Linux Slice)\n", slice + 1 /* DOS Numbering */);
+		printf("  P%d (Linux Slice)\n", dosslice);
 	
 	/*
 	 * Skip ahead to the superblock.
 	 */
 	if (devlseek(infd, (((off_t)start) * secsize) +
 		  LINUX_SUPERBLOCK_OFFSET, SEEK_SET) < 0) {
-		warnx("Linux Slice %d: Could not seek to superblock", slice);
+		warnx("Linux Slice %d: Could not seek to superblock",
+		      dosslice);
 		return 1;
 	}
 
 	if ((cc = devread(infd, &fs, LINUX_SUPERBLOCK_SIZE)) < 0) {
-		warn("Linux Slice %d: Could not read superblock", slice);
+		warn("Linux Slice %d: Could not read superblock", dosslice);
 		return 1;
 	}
 	if (cc != LINUX_SUPERBLOCK_SIZE) {
-		warnx("Linux Slice %d: Truncated superblock", slice);
+		warnx("Linux Slice %d: Truncated superblock", dosslice);
 		return 1;
 	}
  	if (fs.s_magic != EXT2_SUPER_MAGIC) {
-		warnx("Linux Slice %d: Bad magic number in superblock", slice);
+		warnx("Linux Slice %d: Bad magic number in superblock",
+		      dosslice);
  		return (1);
  	}
 
@@ -611,25 +617,29 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 					 (i * sizeof(struct ext2_group_desc))));
 			if (devlseek(infd, soff, SEEK_SET) < 0) {
 				warnx("Linux Slice %d: "
-				      "Could not seek to Group %d", slice, i);
+				      "Could not seek to Group %d",
+				      dosslice, i);
 				return 1;
 			}
 
 			if ((cc = devread(infd, groups, sizeof(groups))) < 0) {
 				warn("Linux Slice %d: "
-				     "Could not read Group %d", slice, i);
+				     "Could not read Group %d",
+				     dosslice, i);
 				return 1;
 			}
 			if (cc != sizeof(groups)) {
 				warnx("Linux Slice %d: "
-				      "Truncated Group %d", slice, i);
+				      "Truncated Group %d", dosslice, i);
 				return 1;
 			}
 		}
 
-		printf("        Group:%-2d\tBitmap %9d, bfree %9d\n", i,
-		       groups[gix].bg_block_bitmap,
-		       groups[gix].bg_free_blocks_count);
+		if (debug) {
+			printf("        Group:%-2d\tBitmap %9d, bfree %9d\n",
+			       i, groups[gix].bg_block_bitmap,
+			       groups[gix].bg_free_blocks_count);
+		}
 
 		rval = read_linuxgroup(&fs, &groups[gix], i, start);
 	}
@@ -932,30 +942,34 @@ makeranges(void)
 		free(ptmp);
 	}
 	/*
-	 * Last piece.
+	 * Last piece, but only if there is something to compress.
 	 */
-	if ((range = (struct range *) malloc(sizeof(*range))) == NULL) {
-		fprintf(stderr, "Out of memory!\n");
-		exit(1);
-	}
-	range->start = offset;
+	if (!inputmaxsec || (inputmaxsec - offset)) {
+		if ((range = (struct range *) malloc(sizeof(*range))) == NULL){
+			fprintf(stderr, "Out of memory!\n");
+			exit(1);
+		}
+		range->start = offset;
 	
-	/*
-	 * A bug in FreeBSD causes lseek on a device special file to
-	 * return 0 all the time! Well we want to be able to read
-	 * directly out of a raw disk (/dev/rad0), so we need to
-	 * use the compressor to figure out the actual size when it
-	 * isn't known beforehand.
-	 *
-	 * Mark the last range with 0.
-	 */
-	if (inputmaxsec)
-		range->size = inputmaxsec - offset;
-	else
-		range->size = 0;
-	lastrange->next = range;
-	lastrange = range;
-	numranges++;
+		/*
+		 * A bug in FreeBSD causes lseek on a device special file to
+		 * return 0 all the time! Well we want to be able to read
+		 * directly out of a raw disk (/dev/rad0), so we need to
+		 * use the compressor to figure out the actual size when it
+		 * isn't known beforehand.
+		 *
+		 * Mark the last range with 0 so compression goes to end
+		 * if we don't know where it is.
+		 */
+		if (inputmaxsec) {
+			range->size = inputmaxsec - offset;
+		}
+		else
+			range->size = 0;
+		lastrange->next = range;
+		lastrange = range;
+		numranges++;
+	}
 
 	if (debug) {
 		range = ranges;
@@ -1165,6 +1179,16 @@ compress_image(void)
 			printf("%12qd in %ld seconds\n",
 			       inputoffset + size, estamp.tv_sec);
 		}
+		else {
+			static int pos;
+
+			putchar('.');
+			if (pos++ >= 60) {
+				putchar('\n');
+				pos = 0;
+			}
+			fflush(stdout);
+		}
 
 		/*
 		 * This should never happen!
@@ -1289,6 +1313,8 @@ compress_image(void)
 		estamp.tv_sec -= stamp.tv_sec;
 		printf("Done in %ld seconds!\n", estamp.tv_sec);
 	}
+	else
+		putchar('\n');
 
 	/*
 	 * Get the total filesize, and then number the subblocks.
@@ -1299,7 +1325,7 @@ compress_image(void)
 		exit(1);
 	}
 	count = tmpoffset / SUBBLOCKSIZE;
-	printf("%qd %d\n", tmpoffset, count);
+
 	for (i = 0, outputoffset = 0; i < count;
 	     i++, outputoffset += SUBBLOCKSIZE) {
 		
