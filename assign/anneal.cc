@@ -1078,11 +1078,6 @@ NOTQUITEDONE:
        printf("epsilon: (%f) %f / %f * %f / %f < %f (%f)\n", fabs(deltaavg), temp, initialavg,
 	   deltaavg, deltatemp, epsilon,(temp / initialavg) * (deltaavg/ deltatemp));
     );
-    cerr << "temp is " << temp << endl;
-    cerr << "initialavg is " << initialavg << endl;
-    cerr << "deltaavg is " << deltaavg << endl;
-    cerr << "deltatemp is " << deltatemp << endl;
-    cerr << "term is " << (temp / initialavg) * (deltaavg/ deltatemp) << endl;
     if ((tsteps >= mintsteps) &&
 #ifdef ALLOW_NEGATIVE_DELTA
 	((temp < 0) || isnan(temp) ||
