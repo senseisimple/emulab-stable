@@ -231,8 +231,11 @@ foreach $node ( sort @machines) {
 	print "\n";
       } elsif ($type eq "RPC27") {
 	  if (rpc27ctrl($op,$powerID{$node},$OutletList{$node})) {
+	      print "Control of $node failed.\n"; $exitval++;
+	  }
+	  else {
 	      print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
-	  } else { print "Control of $node failed.\n"; $exitval++; }
+	  }
       } else {
 	print "power: Unknown power type '$type'\n";
 	$exitval++;
