@@ -53,6 +53,9 @@ if [ -x $BINDIR/delaysetup ]; then
 	        echo "Setting up Testbed interface routing ..."
 		$BOOTDIR/rc.route enable
 	fi
+elif [ -x $BOOTDIR/rc.linkdelay ]; then
+	echo "Setting up Testbed link delays ..."
+	$BOOTDIR/rc.linkdelay
 elif [ -x $BOOTDIR/rc.delay ]; then
         # Note: no routing on delay nodes.
         echo "Setting up Testbed delay configuration ..."
