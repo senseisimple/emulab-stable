@@ -172,6 +172,18 @@ system("cat $nsfile >> $infile") == 0
     or die("Could not combine TCL defs file and the NS file!\n");
 
 #
+# Touch the output file, to avoid a root owned, 644 file. 
+#
+if (-e $outfile) {
+    unlink($outfile) or
+	die("*** $0:\n".
+	    "    Could not unlink $outfile\n");
+}
+system("touch $outfile") == 0 or
+    die("*** $0:\n".
+	"    Could not create $outfile\n");
+
+#
 # Build up a new command line to run the parser on ops, writing the
 # result back to a file if not in anonmode. Remember to tack on the
 # user ID to flip to, when not in testmode.
@@ -198,7 +210,7 @@ if ($TESTMODE) {
     #
     # In testmode, no ssh. Just run locally.
     #
-    system("$cmdargs < $infile > $outfile");
+    system("$cmdargs < $infile >> $outfile");
 }
 else {
     #
@@ -206,7 +218,7 @@ else {
     # back afterwards.
     # 
     $EUID = $UID = 0;
-    system("sshtb -host $CONTROL $cmdargs < $infile > $outfile");
+    system("sshtb -host $CONTROL $cmdargs < $infile >> $outfile");
     $EUID = $UID = $SAVEUID;
 }
 
