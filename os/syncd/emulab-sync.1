@@ -1,0 +1,169 @@
+.TH EMULAB-SYNC 1 "April 5, 2004" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+emulab-sync \- Simple distributed synchronization client.
+.SH SYNOPSIS
+.BI emulab-sync
+[\fB-hV\fR]
+[\fB-n \fIname\fR]
+[\fB-d\fR]
+[\fB-s \fIserver\fR]
+[\fB-p \fIport-number\fR]
+[\fB-i \fIcount\fR]
+[\fB-a\fR]
+[\fB-u\fR]
+[\fB-e \fIerror-number\fR]
+.SH DESCRIPTION
+The
+.B emulab-sync
+utility is used to wait for other programs in your experiment to reach some
+specific point before proceeding forward.  This utility and its server,
+.B emulab-syncd\fR,
+implement this synchronization through a simple counter based barrier.  The
+counter is increased by
+.B emulab-sync
+when using the
+.B -i
+option and then decremented by one on each regular use.  Once the counter
+reaches zero, all of the waiters will return and execution can proceed.
+.P
+Multiple synchronizations can take place at the same time by using the
+.B -n
+option to specify a separate name for each barrier.  For example, scripts on
+nodeA and nodeB can be waiting on a barrier named "foo" while (other) scripts
+on nodeA and nodeC can be waiting on a barrier named "bar." You may reuse an
+existing barrier (including the default barrier) once it has been released (all
+clients arrived and woken up).
+.P
+Basic error reporting is also supported using the
+.B -e
+option and the program's exit code.  For example, if a client encountered an
+error and would be unable to continue after crossing the barrier, it can signal
+its peers by using the
+.B -e
+option with a non-zero error code.  Then, when all of the clients have arrived,
+they will wake up and exit with this non-zero error code.  If multiple peers
+encounter errors, the maximum of all of the errors will be returned.
+.P
+Available options:
+.P
+.TP
+\fB-h
+Print out a usage message.
+.TP
+\fB-V
+Print out a version number.
+.TP
+\fB-n \fIname
+The name of the barrier, must be less than 64 bytes long.  (Default: barrier)
+.TP
+\fB-d
+Turn on debugging.
+.TP
+\fB-s \fIserver
+Specify the host where the
+.B emulab-syncd
+server is running.  Normally, you do not need to use this option since Emulab
+will automatically use the experiment's default sync server.  The experiment's
+sync server is picked at random or specified by the
+.B tb-set-sync-server
+NS command when creating the experiment.
+.TP
+\fB-p \fIport-number
+Specify the port number the server is listening on.  (Default: 16534)
+.TP
+\fB-i \fIcount
+Increase the number of waiters by
+.I count
+waiters.
+.B NOTE\fR:
+The number of waiters should not include this call, unless you are using the
+.B -a
+option and intend to do another sync later on.
+.TP
+\fB-a
+Return immediately after increasing the barrier value.  Can only be used 
+with the
+.B -i
+option.
+.TP
+\fB-u
+Use UDP to contact the server.  (Default: TCP)
+.TP
+\fB-e \fIerror-number
+Specify the error code for this client, must be zero (no error) or >= 32.  
+The error codes for all of the clients are collected by the server and 
+the maximum is returned by the clients when they exit.  Note that we 
+reserve error codes [1, 32) so using large numbers is best to avoid 
+interference.  (Default: 0)
+.SH RETURN VALUES
+.TP
+>= 32
+If the barrier was crossed, but atleast one of the clients reported a non-zero
+error code.
+.TP
+10
+If the server received a SIGHUP from a user, causing all of the barriers 
+to be cleared and the clients released.
+.TP
+1
+If there was an invalid command line argument.
+.TP
+0
+If the barrier was successfully crossed without error.
+.SH EXAMPLES
+.PP
+To synchronize one machine with another:
+.PP
+.RS
+[gob@bluth1 ~] emulab-sync -i 1
+.P
+[michael@bluth2 ~] emulab-sync
+.RE
+.PP
+To perform two different synchronizations at the same time using barriers named
+"staircar" and "prison":
+.PP
+.RS
+[marta@bluth1 ~] emulab-sync -i 1 -n staircar
+.P
+[michael@bluth2 ~] emulab-sync -n staircar
+.P
+[gob@bluth1 ~] emulab-sync -i 1 -n prison
+.P
+[george@bluth2 ~] emulab-sync -n prison
+.RE
+.PP
+To report an error 
+.PP
+.RS
+.PD 0
+[buster@bluth1 ~] emulab-sync -i 1 -e 100; echo $?
+.P
+100
+.PD
+.P
+.PD 0
+[annyong@bluth2 ~] emulab-sync -e 0; echo $?
+.P
+100
+.PD
+.RE
+.SH NOTES
+If you terminate a TCP client before it returns, the server will recognize the
+closed socket and adjust the counter so that it appears that the call 
+never occurred.
+.SH BUGS
+Despite the above efforts, it is still possible for a barrier's counter to end
+up with an unknown value.  Typical symptoms of this condition are clients that
+refuse to wakeup despite all of them checking in.  At this point it is probably
+best to use a different barrier name or you can clear all of the barriers by
+sending a SIGHUP to the experiment's
+.B emulab-syncd\fR.
+.SH SEE ALSO
+emulab-syncd(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

@@ -1,0 +1,64 @@
+.TH EMULAB-SYNCD 1 "April 5, 2004" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+emulab-syncd \- Simple distributed synchronization server.
+.SH SYNOPSIS
+.BI emulab-syncd
+[\fB-hV\fR]
+[\fB-v\fR]
+[\fB-l \fIlog-file\fR]
+[\fB-p \fIport-number\fR]
+.SH DESCRIPTION
+The
+.B emulab-syncd
+utility is a central server for
+.B emulab-sync
+synchronization clients.  Normally, the server is automatically started on one
+of the experimental nodes by the Emulab software and all of the clients will
+use this server by default.  The node where the server is started is picked at
+random when the experiment is created or can be specified using the
+.B tb-set-sync-server
+command in the NS file.
+.P
+Available options:
+.P
+.TP
+\fB-h
+Print out a usage message.
+.TP
+\fB-V
+Print out a version number.
+.TP
+\fB-d
+Debugging mode, the server will not fork into the background and will log 
+to standard out.
+.TP
+\fB-v
+Turn on verbose logging.
+.TP
+\fB-l \fIlog-file
+Specify a log file.  (Default: syslog)
+.TP
+\fB-p \fIport-number
+Specify the TCP and UDP port to listen on.  (Default: 16534)
+.SH SIGNALS
+.TP
+SIGUSR1
+Turn on verbose logging.
+.TP
+SIGUSR2
+Turn off verbose logging.
+.TP
+SIGHUP
+Clear all of the barriers and release the clients with an error code of 10.
+.TP
+SIGINFO
+Write a listing of all barriers and their waiters to the log.  Note:  This is
+only available on FreeBSD.
+.SH SEE ALSO
+emulab-sync(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net
