@@ -38,9 +38,20 @@ if (!$isadmin) {
 
 #
 # Check page args. Must always supply a nodeid.
-# 
-if (!isset($node_id) || $node_id == "" || !TBvalid_node_id($node_id)) {
-    PAGEARGERROR("Invalid node_id");
+#
+if (!isset($node_id) || $node_id == "") {
+    PAGEARGERROR("Must supply node_id");
+}
+elseif (isset($isnewid) && $isnewid == 1) {
+    if (!TBvalid_integer($node_id)) {
+	PAGEARGERROR("Must supply new node identifier in node_id");
+    }
+}
+elseif (!TBvalid_node_id($node_id)) {	
+    PAGEARGERROR("Invalid characters in node_id");
+}
+elseif (!TBValidNodeName($node_id)) {
+    PAGEARGERROR("Invalid node_id $node_id");
 }
 
 #
@@ -48,7 +59,7 @@ if (!isset($node_id) || $node_id == "" || !TBvalid_node_id($node_id)) {
 # contact info. We use a form and an input type=image, which acts as a submit
 # button; the browser sends x,y coords when the user clicks in the image. 
 #
-function SPITFORM($errors, $node_id, $building, $floor,
+function SPITFORM($errors, $node_id, $isnewid, $building, $floor,
 		  $room, $contact, $phone, $old_x, $old_y,
 		  $delete = 0)
 {
@@ -136,7 +147,7 @@ function SPITFORM($errors, $node_id, $building, $floor,
                         size=30>
               </td>
           </tr>\n";
-    if (isset($old_x) and isset($old_y)) {
+    if (isset($old_x) && isset($old_y) && $old_x && $old_y) {
 	echo "<tr>
                  <td colspan=2 align=center>
                      <b><input type=submit name=submit
@@ -152,6 +163,9 @@ function SPITFORM($errors, $node_id, $building, $floor,
                  </td>
              </tr>\n";
     }
+    if (isset($isnewid) && $isnewid == 1) {
+	echo "<input type=hidden name=isnewid value=1>\n";
+    }
     echo "</table>
 	  <input type=hidden name=node_id value=$node_id>
 	  <input type=hidden name=building value=$building>
@@ -163,11 +177,18 @@ function SPITFORM($errors, $node_id, $building, $floor,
 }
 
 #
-# Get default values from location info.
+# Get default values from location info or from the new_nodes table.
 #
-$query_result =
-    DBQueryFatal("select * from location_info ".
-		 "where node_id='$node_id'");
+if (isset($isnewid) && $isnewid == 1) {
+    $query_result =
+	DBQueryFatal("select * from new_nodes ".
+		     "where new_node_id='$node_id'");
+}
+else {
+    $query_result =
+	DBQueryFatal("select * from location_info ".
+		     "where node_id='$node_id'");
+}
 if (mysql_num_rows($query_result)) {
     $row = mysql_fetch_array($query_result);
     
@@ -203,18 +224,26 @@ if (isset($delete) && $delete == 1) {
     if (! isset($old_building)) {
 	USERERROR("There is no location info for node $node_id!", 1);
     }
-    SPITFORM(0, $node_id, $old_building, $old_floor, $room, $contact, $phone,
-	     $old_x, $old_y);
+    SPITFORM(0, $node_id, $isnewid, $old_building, $old_floor, $room, $contact,
+	     $phone, $old_x, $old_y);
     PAGEFOOTER();
     exit(0);
 }
 elseif (isset($dodelete) && $dodelete != "") {
     #
     # Delete the entry and zap to shownode page. 
-    # 
-    DBQueryFatal("delete from location_info where node_id='$node_id'");
+    #
+    if (isset($isnewid) && $isnewid == 1) {
+	DBQueryFatal("update new_nodes set " .
+		     "       building=NULL,floor=NULL,loc_x=0,loc_y=0 ".
+		     "where new_node_id='$node_id'");
+	header("Location: newnode_edit.php3?id=$node_id");
+    }
+    else {
+	DBQueryFatal("delete from location_info where node_id='$node_id'");
+	header("Location: shownode.php3?node_id=$node_id");
+    }
 	
-    header("Location: shownode.php3?node_id=$node_id");
     exit(0);
 }
 
@@ -250,7 +279,8 @@ if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
     echo "<center>\n";
 
     if (isset($old_building)) {
-	echo "<a href='setnodeloc.php3?node_id=$node_id&delete=1'>
+	echo "<a href='setnodeloc.php3?node_id=$node_id&delete=1".
+	         "&isnewid=$isnewid'>
                  Delete</a> location info or<br>\n";
     }
 
@@ -289,7 +319,7 @@ if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
 	
 	echo "<td>
                 <a href='setnodeloc.php3?node_id=$node_id".
-	               "&building=$building&floor=$floor'>
+	               "&building=$building&floor=$floor&isnewid=$isnewid'>
                    <img src=$thumb></a>
               </td>\n";
 	$titles[$i] = "$title - " . $floortags[$floor];
@@ -334,7 +364,7 @@ if (!preg_match("/^[-\w]+$/", $floor)) {
 if (!isset($submit) && (!isset($x) || $x == "" || !isset($y) || $y == "")) {
     PAGEHEADER("Set Node Location");
 
-    SPITFORM(0, $node_id, $building, $floor, $room, $contact, $phone,
+    SPITFORM(0, $node_id, $isnewid, $building, $floor, $room, $contact, $phone,
 	     $old_x, $old_y);
     PAGEFOOTER();
     exit(0);
@@ -427,22 +457,29 @@ else {
 #
 if (count($errors)) {
     PAGEHEADER("Set Node Location");
-    SPITFORM($errors, $node_id, $building, $floor, $room, $contact,
+    SPITFORM($errors, $node_id, $isnewid, $building, $floor, $room, $contact,
 	     $phone, $old_x, $old_y);
     PAGEFOOTER();
     return;
 }
 
 #
-# Otherwise, do the inserts.
+# Otherwise, do the inserts or updates
 #
-$inserts["node_id"] = $node_id;
-
 $insert_data = array();
 foreach ($inserts as $name => $value) {
     $insert_data[] = "$name='$value'";
 }
-DBQueryFatal("replace into location_info set " . implode(",", $insert_data));
+
+if (isset($isnewid) && $isnewid == 1) {
+    DBQueryFatal("update new_nodes set " . implode(",", $insert_data) . " ".
+		 "where new_node_id='$node_id'");
+}
+else {
+    $insert_data[] = "node_id='$node_id'";
+
+    DBQueryFatal("replace into location_info set " . implode(",", $insert_data));
+}
 
 #
 # Zap back to floormap for this building/floor.

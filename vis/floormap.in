@@ -22,6 +22,7 @@ my $optlist  = "df:o:e:ta";
 my $debug    = 0;
 my $notitles = 0;
 my $showany  = 0;	# When showing specific floor, showany is turned on.
+my $mereuser = 1;
 my $building;
 my $floor;
 my $image;
@@ -42,6 +43,10 @@ my $ICONDIR     = "$TB/www";
 use lib '@prefix@/lib';
 use libdb;
 use GD;
+
+# Admin people get extra info
+$mereuser = 0
+    if (!TBAdmin($UID));
 
 #
 # Gather image data from DB.
@@ -259,20 +264,31 @@ exit(0);
 sub dofloor($$)
 {
     my ($building, $floor) = @_;
-
+    my $isnew = 0;
 
     #
     # Grab the nodes on this floor in this building. We want to know
     # their allocation status so we know what colors to use.
-    # 
+    #
     my $query_result =
 	DBQueryFatal("select loc.*,r.pid,r.eid,r.vname ".
 		     "  from location_info as loc ".
 		     "left join reserved as r on r.node_id=loc.node_id ".
 		     "where loc.floor='$floor' and loc.building='$building'");
 
-    if (!$query_result->numrows && !$showany) {
-	return (undef, undef);
+    my $newnodes_result =	
+	DBQueryFatal("select * from new_nodes ".
+		     "where floor='$floor' and building='$building'");
+
+    if ($mereuser) {
+	if (!$query_result->numrows && !$showany) {
+	    return (undef, undef);
+	}
+    }
+    else {
+	if (!$query_result->numrows && !$newnodes_result->numrows && !$showany) {
+	    return (undef, undef);
+	}
     }
 
     #
@@ -311,38 +327,59 @@ sub dofloor($$)
     my $red   = $baseimage->colorAllocate(250,0,0);
     my $blue  = $baseimage->colorAllocate(0,0,250);
     my $white = $baseimage->colorAllocate(255,255,255);
+    my $gold  = $baseimage->colorAllocate(255,255,0);
     my $CY    = 10;
     my $CX    = 10;
 
-    while (my $rowref = $query_result->fetchrow_hashref()) {
-	my $nodeid = $rowref->{"node_id"};
-	my $x      = $rowref->{"loc_x"};
-	my $y      = $rowref->{"loc_y"};
-	my $rpid   = $rowref->{"pid"};
-	my $reid   = $rowref->{"eid"};
-	my $label  = $nodeid;
-	my ($x1,$y1,$x2,$y2);
-
-	# Without -e option, green means node is free.
-	# With -e option, green means node belongs to experiment. 
-	if ((!defined($pid) && !(defined($rpid))) ||
-	    (defined($pid) && defined($rpid) && $pid eq $rpid)) {
-	    $baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $green);
-	}
-	elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
-	    $baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $red);
+    foreach my $isnew (0, 1) {
+	my $table;
+	
+	if ($isnew) {
+	    next
+		if ($mereuser);
+	    
+	    $table = $newnodes_result;
 	}
 	else {
-	    $baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $blue);
+	    $table = $query_result;
 	}
-	$baseimage->string(gdTinyFont, $x - 7, $y + ($CY / 2), $label, $black);
+	
+	while (my $rowref = $table->fetchrow_hashref()) {
+	    my $nodeid = $rowref->{"node_id"};
+	    my $x      = $rowref->{"loc_x"};
+	    my $y      = $rowref->{"loc_y"};
+	    my $rpid   = $rowref->{"pid"};
+	    my $reid   = $rowref->{"eid"};
+	    my $label  = $nodeid;
+	    my $newid  = ($isnew ? $rowref->{"new_node_id"} : 0);
+	    my ($x1,$y1,$x2,$y2);
 
-	my $tmp = {};
-	$tmp->{"X1"} = $x - ($CX / 2);
-	$tmp->{"Y1"} = $y - ($CY / 2);
-	$tmp->{"X2"} = $x + ($CX / 2);
-	$tmp->{"Y2"} = $y + ($CY / 2);
-	$areamap->{$nodeid} = $tmp;
+	    if ($isnew) {
+		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $gold)
+		}
+	    elsif ((!defined($pid) && !(defined($rpid))) ||
+		   (defined($pid) && defined($rpid) && $pid eq $rpid)) {
+		# Without -e option, green means node is free.
+		# With -e option, green means node belongs to experiment. 
+		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $green);
+	    }
+	    elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
+		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $red);
+	    }
+	    else {
+		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $blue);
+	    }
+	    $baseimage->string(gdTinyFont, $x - 7, $y + ($CY / 2),
+			       $label, $black);
+
+	    my $tmp = {};
+	    $tmp->{"X1"} = $x - ($CX / 2);
+	    $tmp->{"Y1"} = $y - ($CY / 2);
+	    $tmp->{"X2"} = $x + ($CX / 2);
+	    $tmp->{"Y2"} = $y + ($CY / 2);
+	    $tmp->{"ISNEW"} = $newid;
+	    $areamap->{$nodeid} = $tmp;
+	}
     }
 
     if (!$notitles) {
@@ -416,9 +453,13 @@ sub writefiles($@)
 	    my $y1 = $map{$nodeid}->{"Y1"};
 	    my $x2 = $map{$nodeid}->{"X2"};
 	    my $y2 = $map{$nodeid}->{"Y2"};
+	    my $isnew = $map{$nodeid}->{"ISNEW"};
+	    my $link  = ($isnew ?
+			 "newnode_edit.php3?id=${isnew}" :
+			 "shownode.php3?node_id=${nodeid}");
 
 	    print MAP "<AREA SHAPE=RECT COORDS=\"$x1,$y1,$x2,$y2\" ".
-		"HREF=\"shownode.php3?node_id=${nodeid}\">\n\n";
+		"HREF=\"${link}\">\n\n";
 	}
     }
     print MAP "</MAP>\n";

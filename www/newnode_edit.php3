@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -181,8 +181,9 @@ while ($row = mysql_fetch_array($query_result)) {
 <center>
 <input type="submit" name="submit" value="Update node">
 </center>
-
 <?
+
+echo "<a href=setnodeloc.php3?node_id=$id&isnewid=1>Set Node Location</a>\n";
 
 #
 # Standard Testbed Footer
