@@ -595,7 +595,7 @@ sub dofloor($$)
 		$baseimages{$building}->{"ppm"};
 	    
 	    $err = $baseimage->Draw(stroke=>'orange',
-				    strokewidth=>'1.5',
+				    strokewidth=>'1',
 				    primitive=>'rectangle',
 				    points=>"$xmin,$ymin $xmax,$ymax");
 	    warn "$err" if "$err";
@@ -628,7 +628,7 @@ sub dofloor($$)
 	$areamap->{"$id"} = $props;
 
 	if ($show_exclusion) {
-	    my $obstacle_buffer = 25; # XXX
+	    my $obstacle_buffer = 23; # XXX
 	    my $xmin = $x1 - $obstacle_buffer;
 	    my $ymin = $y1 - $obstacle_buffer;
 	    my $xmax = $x2 + $obstacle_buffer;
