@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,7 +33,7 @@ emulab.pem:	dirsmade emulab.cnf
 	# Create the Certificate Authority.
 	# The certificate (no key!) is installed on both boss and remote nodes.
 	#
-	openssl req -new -x509 -days 1000 -config emulab.cnf \
+	openssl req -new -x509 -days 2000 -config emulab.cnf \
 		    -keyout cakey.pem -out cacert.pem
 	cp cacert.pem emulab.pem
 	cp cakey.pem emulab.key

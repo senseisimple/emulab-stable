@@ -33,8 +33,8 @@ x509_extensions	= usr_cert		# The extentions to add to the cert
 # so this is commented out by default to leave a V1 CRL.
 # crl_extensions	= crl_ext
 
-default_days	= 1000			# how long to certify for
-default_crl_days= 1000			# how long before next CRL
+default_days	= 2000			# how long to certify for
+default_crl_days= 2000			# how long before next CRL
 default_md	= md5			# which md to use.
 preserve	= no			# keep passed DN ordering
 
@@ -65,8 +65,8 @@ crl		= $dir/crl.pem 		# The current CRL
 private_key	= $dir/cakey.pem        # The private key
 RANDFILE	= $dir/.rand		# private random number file
 
-default_days	= 1000			# how long to certify for
-default_crl_days= 1000			# how long before next CRL
+default_days	= 2000			# how long to certify for
+default_crl_days= 2000			# how long before next CRL
 default_md	= md5			# which md to use.
 preserve	= no			# keep passed DN ordering
 
