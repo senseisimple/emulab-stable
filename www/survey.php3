@@ -161,7 +161,7 @@ if ($submit) {
 
 if (0 == strcmp($effuid, "unknown")) {
     echo "<h3>If you have an account, please ";
-    echo "<a href=\"$TBBASE/login.php3\">log in</a>. ";
+    echo "<a href=\"$TBBASE/login.php3?refer=1\">log in</a>. ";
     echo "If you don't have an account, or can't log in, ";
     echo "please fill out this form anyway!</h3>\n";
 }
