@@ -1,0 +1,211 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# The Emulab watchdog. Currently, not really much of a watchdog. Simply
+# contacts tmcd to find out if it needs to do an update.
+#
+sub usage()
+{
+    print "Usage: watchdog [-d] [-t timeout]\n";
+    exit(1);
+}
+my $optlist = "t:d";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+# Locals
+my $timeout	= (60 * 60 * 4);	# In seconds of course. 
+my $logname	= "$LOGDIR/emulab-watchdog.debug";
+my $pidfile	= "/var/run/emulab-watchdog.pid";
+my $debug	= 0;
+my $isalivewait = ((REMOTE() == 1) ? 60 : 180);	# Seconds to wait.
+my $driftfile;
+
+#
+# Forward declarations for prototype checking
+#
+sub startisalive();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if (!$debug && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Setup a handler to catch TERM, and kill our process group.
+#
+my $pgrp = getpgrp(0);
+
+sub handler () {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    kill('TERM', -$pgrp);
+    sleep(5);
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Write our pid into the pid file so we can be killed later (when the
+# experiment is torn down). We must do this first so that we can be
+# killed before we change the sig handlers
+#
+open(PFILE, "> $pidfile")
+    or die("Could not open $pidfile: $!");
+print PFILE "$PID\n";
+close(PFILE);
+
+#
+# Start isalive daemon.
+#
+startisalive();
+
+#
+# For sending back ntpdrift.
+# 
+if (-e "/etc/ntp.drift") {
+    $driftfile = "/etc/ntp.drift";
+}
+elsif (-e "/etc/ntp/drift") {
+    $driftfile = "/etc/ntp/drift";
+}
+
+#
+# Loop!
+# 
+while (1) {
+    sleep($timeout);
+    
+    my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
+
+    print "Dogging it at $date\n";
+    
+    #
+    # Run account update. Use immediate mode so that it exits right away
+    # if the lock is taken (another update already running).
+    #
+    print "Looking for new Emulab accounts ...\n";
+    system("update -i");
+
+    #
+    # Send back ntpdrift info. Should move elsewhere.
+    #
+    if (!REMOTE() && defined($driftfile)) {
+	my $drift = `cat $driftfile`;
+	if ($drift =~ /^([\d\.]*)$/) {
+	    # Server also checks the value for sanity.
+	    system("tmcc -t 3 ntpdrift $1");
+	}
+    }
+    if (REMOTE()) {
+	#
+	# Do a cvsup to get updated software.
+	#
+	print "Looking for software updates ... \n";
+	system("runcvsup.sh");
+    }
+}
+exit(0);
+
+#
+# Fire off a child that does nothing but tell the boss we are alive.
+#
+sub startisalive()
+{
+    my $mypid = fork();
+    if ($mypid) {
+	return;
+    }
+    my $failed  = 0;
+    
+    print "Keep alive starting up ... \n";
+
+    while (1) {
+	#
+	# Run tmcc in UDP mode.
+	# Since its UDP, we try it a couple of times if it fails. 
+	#
+	my $retries = 3;
+
+	while ($retries) {
+#	    my $options = "-p 7778 REDIRECT=192.168.100.1";
+	    my $options = "";
+	    if (REMOTE()) {
+		$options .= " -u -t 3";
+	    }
+	    my $result = `tmcc $options isalive`;
+	    if (! $?) {
+		my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
+		
+		chomp $result;
+		my (undef,$update) = split("=", $result);
+		if ($update || $failed) {
+		    print "Running an update at $date ...\n";
+		    system("update -i");
+		    $failed = $?;
+		}
+		last;
+	    }
+	    $retries--;
+	}
+	if (!$retries) {
+	    print "keep alive returned $?\n";
+	}
+	sleep($isalivewait);
+    }
+    exit(0);
+}
