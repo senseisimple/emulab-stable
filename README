@@ -9,9 +9,18 @@ interaction with Utah will almost certainly be required to get things up and
 running.
 
 Netbed is being actively developed, so there will be features on deployed
-Netbeds that are not included in this snapshot. Contact us (contact info at the
+Netbeds that are not included in this snapshot.  Contact us (contact info at the
 bottom of this file) if you are interested in receiving an updated version of
 this source.
+
+
+IMPORTANT NOTE
+See the file LICENSE for restrictions on this snapshot.
+In summary, you can't redistribute it, use it for commercial
+purposes, must give appropriate credit to Utah and Emulab,
+and return improvements to us.  These terms may become more
+liberal in a future formal release.
+
 
 HOW TO
 Copy and localize the 'defs-example' file for your environment
