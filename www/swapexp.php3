@@ -255,7 +255,7 @@ if ($retval) {
 #
 # Exit status 0 means the experiment is swapping, or will be.
 #
-echo "<br><h3>\n";
+echo "<br><font size=+1>\n";
 if ($retval == 0) {
     if ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
@@ -300,7 +300,7 @@ if ($retval == 0) {
                 realtime</a>.\n";
     }
 }
-echo "</h3>\n";
+echo "</font>\n";
 
 #
 # Standard Testbed Footer

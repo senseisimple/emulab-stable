@@ -15,7 +15,7 @@ $parser   = "$TB/libexec/ns2ir/parse-ns";
 PAGEHEADER("Modify Experiment");
 
 # the following hack is a page for Netbuild to
-# point the user's browser at after a successful modify.
+# point the users browser at after a successful modify.
 # this does no error checking.
 if ($justsuccess) {
     echo "<br /><br />";
@@ -138,11 +138,8 @@ if (! isset($go)) {
 	echo "</form>\n";
     } else {
 	if (! isset($nsdata)) {
-	    USERERROR("NSdata CGI variable missing (How'd that happen?)",1);
+	    USERERROR("NSdata CGI variable missing (How did that happen?)",1);
 	}
-
-#	echo "<pre>$nsdata</pre>\n";
-#	echo "<h1>2</h1>\n";
 
 	$nsfile = tempnam("/tmp", "$pid-$eid.nsfile.");
 	if (! ($fp = fopen($nsfile, "w"))) {
@@ -152,8 +149,6 @@ if (! isset($go)) {
 	fwrite($fp, $nsdata_string);
 	fclose($fp);
 	chmod($nsfile, 0666);	
-
-#	echo "<pre>$nsdata_string</pre>\n";
 
 	if (system("$parser -n -a $nsfile") != 0) {
 	    USERERROR("Modified NS file contains syntax errors; aborting.", 1);
@@ -168,10 +163,19 @@ if (! isset($go)) {
 	# We need the unix gid for the project for running the scripts below.
 	#
 	TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-#	echo "<pre>".
-#	     "$TBSUEXEC_PATH $uid $unix_gid ".
-#	     "webswapexp -s modify $pid $eid $nsfile".
-#	     "</pre>\n";
+
+        # Okay, start.
+	echo "<font size=+2>Experiment <b>".
+	     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+	     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+	echo "<br><br>\n";
+
+	echo "<center>";
+	echo "<h2>Starting experiment modify. Please wait a moment ...
+              </h2></center>";
+
+	flush();
+
  	#	
 	# Avoid SIGPROF in child.
 	# 
@@ -206,28 +210,26 @@ if (! isset($go)) {
 	    # Exit status 0 means the experiment is swapping, or will be.
 	    #
 	    
-	    echo "<br /><br />";
-	    echo "<font size=+1>
-	      <p>Experiment
-              <a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>
-              in project <A href='showproject.php3?pid=$pid'>$pid</A>
-              is being modified!</p><br />
-	      <p>You will be notified via email when the operation is complete.
-              This could take one to ten minutes, depending on
-              whether nodes were added to the experiments, and whether
-              disk images had to be loaded.</p>
-              <p>While you are waiting, you can watch the log 
-              in <a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid>
-              realtime</a>.</p></font>\n";
-	    # the following line is required for Netbuild.
+	    echo "<br>";
+	    echo "<font size=+1>";
+	    echo "Your experiment is being modified!<br><br>";
+
+	    echo "You will be notified via email when the experiment has ".
+		"finished modifying and you are able to proceed. This ".
+		"typically takes less than 10 minutes, depending on the ".
+		"number of nodes in the experiment. ".
+		"If you do not receive email notification within a ".
+		"reasonable amount time, please contact $TBMAILADDR. ".
+		"<br><br>".
+		"While you are waiting, you can watch the log of experiment ".
+		"modification in ".
+		"<a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid> ".
+		"realtime</a>.\n";
+	    echo "</font>";
+	    
+            # the following line is required for Netbuild.
 	    echo "\n\n<!-- Netbuild! success -->\n\n";
 	}
-	
-#	if ($delnsfile) {
-#	    unlink($nsfile);
-#	}
-	
-#	echo "<h1>If this did anything, It would have done it by now.</h1>\n";
     }
 #
 # Standard Testbed Footer

@@ -809,6 +809,12 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 #
 # Okay, time to do it.
 #
+echo "<font size=+2>Experiment <b>".
+     "<a href='showproject.php3?pid=$exp_pid'>$exp_pid</a>/".
+     "<a href='showexp.php3?pid=$exp_pid&eid=$exp_id'>$exp_id</a></b>\n".
+     "</font>\n";
+echo "<br><br>\n";
+
 echo "<center><br>";
 echo "<h2>Starting experiment configuration. Please wait a moment ...
       </h2></center>";
@@ -878,10 +884,7 @@ if ($formfields[exp_noidleswap_reason]) {
 
 echo "<br><br>";
 echo "<font size=+1>
-        Experiment
-        <a href='showexp.php3?pid=$exp_pid&eid=$exp_id'>$exp_id</a>
-        in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
-        is configuring!<br><br>\n";
+        Your experiment is configuring!<br><br>\n";
 
 if ($nonsfile) {
     echo "Since you did not provide an NS script, no nodes have been
