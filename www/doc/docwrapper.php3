@@ -28,18 +28,9 @@ if (!$printable) {
 }
 
 #
-# Need to sanity check the path! For now, just make sure the path
-# does not start with a dot or a slash.
+# Need to sanity check the path! Allow only [word].{html,txt} files
 #
-$first = substr($docname, 0, 1);
-if (strcmp($first, ".") == 0 ||
-    strcmp($first, "/") == 0) {
-    USERERROR("Illegal document name: $docname!", 1);
-}
-#
-# Nothing that looks like a ../ is allowed anywhere in the name
-#
-if (strstr($docname, "../")) {
+if (!preg_match("/^[\w-]+\.(html|txt)$/", $docname)) {
     USERERROR("Illegal document name: $docname!", 1);
 }
 
