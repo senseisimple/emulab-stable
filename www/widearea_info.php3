@@ -23,6 +23,7 @@ echo "<b>Show:
          <a href='widearea_info.php3?showtype=delay'>Delay</a>,
          <a href='widearea_info.php3?showtype=bw'>Bandwidth</a>,
          <a href='widearea_info.php3?showtype=plr'>Lossrate</a>,
+         <a href='widearea_info.php3?showtype=dates'>Dates</a>,
          <a href='widearea_info.php3?showtype=all'>All</a>.
       </b><br><br>\n";
 
@@ -37,6 +38,8 @@ elseif (!strcmp($showtype, "bw"))
     $showtype = 3;
 elseif (!strcmp($showtype, "plr"))
     $showtype = 4;
+elseif (!strcmp($showtype, "dates"))
+    $showtype = 5;
 else
     $showtype = 1;
 
@@ -57,6 +60,8 @@ function SPITDATA($table, $title, $showtype)
 	$time     = $row[time];
 	$bw       = $row[bandwidth];
 	$plr      = $row[lossrate];
+	$start    = $row[start_time];
+	$end      = $row[end_time];
     
 	$glom1    = $node_id1;
 	$glom2    = $node_id2;
@@ -71,6 +76,11 @@ function SPITDATA($table, $title, $showtype)
 	$speeds[ $glom1 . "+" . $glom2 ] = $time * 1000;
 	$bws[ $glom1 . "+" . $glom2 ] = $bw;
 	$plrs[ $glom1 . "+" . $glom2 ] = $plr * 100.0;
+	$dates[ $glom1 . "+" . $glom2 ] =
+	    strftime("%m/%d-%H:%M", $start) . "<br>" .
+	    strftime("%m/%d-%H:%M", $end);
+	
+	
     }
     ksort($nodenamesrow);
     ksort($nodenamescol);
@@ -86,6 +96,8 @@ function SPITDATA($table, $title, $showtype)
 	echo "(BW)\n";
     elseif ($showtype == 4)
 	echo "(PLR)\n";
+    elseif ($showtype == 5)
+	echo "(Time Span of Data)\n";
 
     echo "</center><br>\n";
 
@@ -109,11 +121,14 @@ function SPITDATA($table, $title, $showtype)
 		$s = 0;
 		$b = 0;
 		$p = 0.0;
+		$d = "&nbsp";
+		$glom = $n1 . "+" . $n2;
 
-		if (isset($speeds[ $n1 . "+" . $n2 ])) {
-		    $s = (int) $speeds[ $n1 . "+" . $n2 ];
-		    $b = (int) $bws[ $n1 . "+" . $n2 ];
-		    $p = sprintf("%.2f", $plrs[ $n1 . "+" . $n2 ]);
+		if (isset($speeds[$glom])) {
+		    $s = (int) $speeds[$glom];
+		    $b = (int) $bws[$glom];
+		    $p = sprintf("%.2f", $plrs[$glom]);
+		    $d = $dates[$glom];
 		}
 		if ($showtype == 1)
 		    echo "<td>$s,$b,$p</td>";
@@ -123,6 +138,8 @@ function SPITDATA($table, $title, $showtype)
 		    echo "<td align=center>$b</td>";
 		elseif ($showtype == 4)
 		    echo "<td align=center>$p</td>";
+		elseif ($showtype == 5)
+		    echo "<td align=center nowrap=1>$d</td>";
 	    }
 	    else {
 		echo "<td align=center><img src=blueball.gif alt=0</td>";
