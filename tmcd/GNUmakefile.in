@@ -69,6 +69,19 @@ install:	all
 install:	$(INSTALL_SBINDIR)/tmcd \
 		$(INSTALL_SBINDIR)/tmcd.restart
 
+
+client-install:
+ifeq ($(SYSTEM),FreeBSD)
+	@$(MAKE) -C freebsd install
+else
+ifeq ($(SYSTEM),Linux)
+	@$(MAKE) -C linux install
+else
+	@echo "unknown OS, nothing to install"
+endif
+endif
+#endif
+
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)/tmcd
