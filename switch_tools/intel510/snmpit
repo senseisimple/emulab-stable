@@ -289,7 +289,8 @@ sub ParseArgs {
 	if ( (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^170$|^171$/)) && 
 	     ($on||$off||$cyc) );
     die("Can't remove a Control VLAN.\n") 
-	if ( ($i=~/155\.99\.214\.(.*)/) && ($r) && ($r== $1 - 129) );
+	if ( (($i=~/155\.99\.214\.170/) && ($r) && ($r==38)) || 
+	     (($i=~/155\.99\.214\.171/) && ($r) && ($r==42)));
     #(Control VLAN is 41 on 170, 42 on 171)
     die("Can't enable and disable at the same time.\n") if ($d && $e);
     die("Can't use auto with duplex or speed.\n") if (($a=~/en/)&&($dup||$s));
