@@ -646,33 +646,52 @@ foreach $interconnect (keys(%interconnects)) {
 }
 
 #
-# Fake switches. Hardwired for now. 
+# Fake switch. Hardwired for now. 
 #
-foreach my $switchtype (("80211a", "80211b", "80211g")) {
-    my $switchname = $switchtype;
-    print "node $switchname *${switchtype}:*\n";
+my @wireless_protos = ("80211", "80211a", "80211b", "80211g");
+my $fake_switch = "airswitch";
+print "node $fake_switch ", join(" ",map("*$_:*",@wireless_protos)), "\n";
 
-    foreach my $interface (keys(%interfacetypes)) {
-	my ($node,$card,$port) = split(":", $interface);
+foreach my $interface (keys(%interfacetypes)) {
+    my ($node,$card,$port) = split(":", $interface);
 
-	next
-	    if (!defined($nodes{$node}));
+    next
+    if (!defined($nodes{$node}));
 	
-	my $type    = $interfacetypes{$interface};
-	my @protos  = @{ $interfaceprotocols{$type} };
-	my $iface   = get_iface($node,$card,$port);
+    my $type    = $interfacetypes{$interface};
+    my @protos  = @{ $interfaceprotocols{$type} };
+    my $iface   = get_iface($node,$card,$port);
 
-	foreach my $proto (@protos) {
-	    if ($proto eq $switchtype) {
-		my $ifacebw = get_ifacebw($node,$card,$port,$proto);
+    #
+    # Get the intersection of the protocols supported by this interface, and
+    # the wireless protocols we know about
+    #
+    my (%union, %intersection);
+    foreach $proto (@protos, @wireless_protos) {
+	$union{$proto}++ && $intersection{$proto}++;
+    }
 
-		#print "$node $card $port $type $proto\n";
-		
-		print "link link-$node:$iface-$switchname:(null) ".
-		    "$node:$node/$iface $switchname:(null) $ifacebw 0 0 1 80211\n";
-	    }
+    my @intersection = keys %intersection;
+
+    #
+    # Skip this interface if it speaks no wireless protocols
+    #
+    next unless @intersection;
+
+    #
+    # Find the max bandwidth supported by any of the wireless protocols
+    # supported by this interface
+    #
+    my $max_bw = 0;
+    foreach my $proto (@intersection) {
+	my $ifacebw = get_ifacebw($node,$card,$port,$proto);
+	if ($ifacebw > $max_bw) {
+	    $max_bw = $ifacebw;
 	}
     }
+    print "link link-$node:$iface-$fake_switch:(null) ".
+	"$node:$node/$iface $fake_switch:(null) $max_bw 0 0 1 ".
+	join(" ",@intersection). "\n";
 }
 
 exit(0);
