@@ -35,11 +35,6 @@ $(INSTALL_ETCDIR)/%: %
 	-mkdir -p $(INSTALL_ETCDIR)
 	$(INSTALL_DATA) $< $@
 
-$(INSTALL_WWWDIR)/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_WWWDIR)
-	$(INSTALL_DATA) $< $@
-
 CFLAGS += $(LOCALCFLAGS)
 
 clean:

@@ -35,9 +35,7 @@ ALLPIXES = $(notdir $(PIXFILES))
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES))
 
-$(INSTALL_WWWDIR)/pix/%: %
+$(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
-	-mkdir -p $(INSTALL_WWWDIR)/pix
+	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $< $@
-
-
