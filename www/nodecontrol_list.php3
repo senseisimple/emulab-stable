@@ -31,7 +31,6 @@ $isadmin = ISADMIN($uid);
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
                <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>,
                <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
-               <a href='nodecontrol_list.php3?showtype=sharks'>sharks</a>,
                <a href='nodecontrol_list.php3?showtype=all'>all</a>.
       </b><br><br>\n";
 
@@ -124,15 +123,14 @@ while ($row = mysql_fetch_array($query_result)) {
     $status             = $row[status];
     $type               = $row[type];
 
+    if (! isset($freetypes[$type])) {
+	$freetypes[$type] = 0;
+    }
     switch ($status) {
     case "up":
 	$num_up++;
 	if (!$pid) {
 	    $num_free++;
-
-	    if (! isset($freetypes[$type])) {
-		$freetypes[$type] = 0;
-	    }
 	    $freetypes[$type]++;
 	}
 	break;
@@ -188,7 +186,8 @@ echo "<table>
 
 foreach($freetypes as $key => $value) {
     echo "<tr>
-           <td align=right><b><font color=green>$key</font></b></td>
+           <td align=right><a href=shownodetype.php3?node_type=$type>
+                           $key</a></td>
            <td align=left>$value</td>
           </tr>\n";
 }

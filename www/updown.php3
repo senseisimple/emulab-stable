@@ -51,7 +51,7 @@ if ($output == "xml") {
 PAGEHEADER("Node Up/Down Status");
 
 $query_result =
-    DBQueryFatal("SELECT n.node_id, n.type, ns.status FROM nodes as n ".
+    DBQueryFatal("SELECT n.node_id,n.type,ns.status,nt.class FROM nodes as n ".
 	"left join node_types as nt on nt.type=n.type ".
 	"left join node_status as ns on ns.node_id=n.node_id ".
 	"WHERE nt.class!='shark' and role='testnode'".
@@ -141,13 +141,20 @@ while ($r = mysql_fetch_array($query_result)) {
 	$node_id = $r["node_id"];
 	$type = $r["type"];
 	$status = $r["status"];
+	$class = $r["class"];
 
 	if ($type != $lasttype) {
 		if ($lasttype != "") { # Doesn't  need to happen the first time
 			print("</table>\n\n");
 		}
 
-		print("<h3>$type</h3>\n");
+                if ($class == "pc") {
+  		    print("<a href=shownodetype.php3?node_type=$type>".
+                          "<h4>$type</h4></a>\n");
+                }
+                else {
+		    print("<h4>$type</h4>\n");
+                }
 		print("<table class=\"nogrid\" ".
                       "cellspacing=0 border=0 cellpadding=5>\n");
 
