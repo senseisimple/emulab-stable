@@ -1,5 +1,12 @@
 #!/usr/bin/perl
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
 # The lack of -w is intentional!  Several variables here are only used
 # by the test file and maybe not even there.  Thus -w will cause a lot
 # of warnings of variables being used only once.

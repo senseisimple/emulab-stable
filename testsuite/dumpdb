@@ -1,5 +1,12 @@
 #!/usr/bin/perl -w
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+
 # This scripts takes a DB and a select statement and dumps the
 # results of the table in a format that can easily be inserted into
 # atest script for use with tb_compare.
