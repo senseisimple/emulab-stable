@@ -24,9 +24,27 @@ if (strstr($docname, "../")) {
     USERERROR("Invalid document name: $docname!");
 }
 
-if (!$printable) {
-	echo("<b><a href=$REQUEST_URI&printable=1>Printable version of this document</a></b><br>");
+#
+# Want want to spit out a basepath tag since that mimics typical behaviour
+# wrt relative links in the doc, when the target file is in a subdir.
+#
+if (strrchr($docname, "/")) {
+    $dir     = substr($docname, 0, strrpos($docname, "/"));
+    $docname = substr(strrchr($docname, "/"), 1);
+    if (isset($SSL_PROTOCOL)) {
+	echo "<base href='$TBBASE/$dir/'>\n";
+    }
+    else {
+	echo "<base href='$TBDOCBASE/$dir/'>\n";
+    }
+    chdir($dir);
 }
+
+if (!$printable) {
+	echo "<b><a href=$REQUEST_URI&printable=1>
+                 Printable version of this document</a></b><br>";
+}
+
 readfile("$docname");
 
 #

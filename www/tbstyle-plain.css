@@ -1,0 +1,30 @@
+BODY {background: #FFFFFF; margin-right: 0pt; }
+
+A.sidebarbutton {
+	color:#2F2FFF;
+	font-family:sans-serif;
+}	
+
+SPAN.sidebarbutton {
+	font-family:sans-serif;
+}	
+
+A.currentsidebarbutton {
+	color:#0F0F3F;
+	text-decoration:none;
+	font-family:sans-serif;
+}	
+
+SPAN.currentsidebarbutton {
+	color:#0F0F3F;
+	text-decoration:none;
+	font-family:sans-serif;
+}	
+
+H1 { color: #000000; font-weight: bold; font-size: 18pt; }
+H2 { color: #000000; font-weight: bold; font-size: 16pt; }
+H3 { color: #000000; font-weight: bold; font-size: 14pt; }
+H4 { color: #000000; font-weight: bold; font-size: 12pt; }
+
+PRE { margin-left: 20pt; }
+
