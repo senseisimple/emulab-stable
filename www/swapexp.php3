@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -34,6 +34,19 @@ if (!isset($inout) ||
     (strcmp($inout, "in") && strcmp($inout, "out") &&
      strcmp($inout, "restart"))) {
     USERERROR("The argument must be either in, out, or restart!", 1);
+}
+
+#
+# Only admins can issue a force swapout
+# 
+if (isset($force) && $force == 1) {
+	if (! ISADMIN($uid)) {
+		USERERROR("Only testbed administrators can forcibly swap ".
+			  "an experiment out!", 1);
+	}
+}
+else {
+	$force = 0;
 }
 
 $exp_eid = $eid;
@@ -100,13 +113,22 @@ if ($canceled) {
 
 if (!$confirmed) {
     echo "<center><h2><br>
-          Are you sure you want to $action experiment '$exp_eid?'
+          Are you sure you want to ";
+    if ($force) {
+	    echo "<font color=red><br>forcibly</br></font> ";
+    }
+    echo "$action experiment '$exp_eid?'
           </h2>\n";
     
     echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
                 method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+
+    if ($force) {
+	    echo "<input type=hidden name=force value=$force>\n";
+    }
+    
     echo "</form>\n";
 
     if (!strcmp($inout, "restart")) {
@@ -155,7 +177,9 @@ set_time_limit(0);
 $output = array();
 $retval = 0;
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
-	       "webswapexp -s $inout $exp_pid $exp_eid",
+	       ($force ?
+		"webidleswap $exp_pid $exp_eid" :
+		"webswapexp -s $inout $exp_pid $exp_eid"),
  	       $output, $retval);
 
 if ($retval) {

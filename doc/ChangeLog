@@ -1,3 +1,23 @@
+stoller     2003/04/16 11:41:12 MDT
+
+  Modified files:
+    .                    configure configure.in 
+    tbsetup              GNUmakefile.in swapexp.in 
+    www                  showexp.php3 swapexp.php3 
+  Added files:
+    tbsetup              idleswap.in webidleswap.in 
+  Log:
+  Add support for idleswapping an experiment as the creator of the
+  experiment, rather than as an administrator, which presents group
+  permission problems when the experiment is in a subgroup (requires two
+  additional group, whereas suexec adds only one group). That aside, the
+  correct approach is to run the swap as the creator. To do that, must
+  flip to the user (from the admin person) in the backend using the new
+  idleswap script, and then run the normal swapexp. Add new option to
+  swapexp (-i) which changes the email slightly to make it clear that
+  the experiment was idleswapped, and so that the From: is tbops not the
+  user (again, to make it more clear).
+  
 newbold     2003/04/09 16:07:12 MDT
 
   Modified files:

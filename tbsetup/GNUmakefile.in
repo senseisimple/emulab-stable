@@ -29,7 +29,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  console_reset db2ns bwconfig frisbeelauncher \
 		  rmgroup mkgroup setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
-		  sfskey_update sfskey_update.proxy rmuser
+		  sfskey_update sfskey_update.proxy rmuser idleswap
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -39,7 +39,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
-		  webnodereboot webrmuser
+		  webnodereboot webrmuser webidleswap
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
@@ -101,6 +101,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/frisbeelauncher
 	chown root $(INSTALL_SBINDIR)/rmuser
 	chmod u+s $(INSTALL_SBINDIR)/rmuser
+	chown root $(INSTALL_SBINDIR)/idleswap
+	chmod u+s $(INSTALL_SBINDIR)/idleswap
 	chown root $(INSTALL_SBINDIR)/named_setup
 	chmod u+s $(INSTALL_SBINDIR)/named_setup
 	chown root $(INSTALL_SBINDIR)/exports_setup

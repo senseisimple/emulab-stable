@@ -15,17 +15,16 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: swapexp <-s in | out | restart | modify> ". 
+    print STDOUT "Usage: swapexp [-i] <-s in | out | restart | modify> ". 
 	         "<pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
-my  $optlist = "s:";
+my  $optlist = "s:i";
 
 #
 # Configure variables
 #
 my $TB     = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
 my $TBOPS  = "@TBOPSEMAIL@";
 my $TBLOGS = "@TBLOGSEMAIL@";
 my $TBINFO = "$TB/expinfo";
@@ -40,6 +39,7 @@ use libtestbed;
 my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
 my $batch    = 0;
+my $idleswap = 0;
 my $inout;
 my $logname;
 my $dbuid;
@@ -74,7 +74,9 @@ umask(0002);
 if (! getopts($optlist, \%options)) {
     usage();
 }
-
+if (defined($options{"i"})) {
+    $idleswap = 1;
+}
 if (defined($options{"s"})) {
     $inout = $options{"s"};
 
@@ -411,14 +413,25 @@ if (defined($logname)) {
 # Send email notification to user.
 #
 my $message =
-    "Experiment `$eid' in project `$pid' has been $action.\n\n" .
+    "Experiment $eid in project $pid has been ";
+
+if ($idleswap) {
+    $message .= "forcibly swapped out by\n".
+	"Testbed Operations because it was idle for too long.\n";
+}
+else {
+    $message .= "$action.\n";
+}
+
+$message .=
+    "\n".
     "Appended below is the output. If you have any questions or comments,\n" .
     "please include the output in your message to $TBOPS\n";
 
 SENDMAIL("$user_name <$user_email>",
 	 "Experiment $pid/$eid $action",
 	 $message,
-	 "$user_name <$user_email>",
+	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
 	 "Bcc: $TBLOGS",
 	 (($inout eq "restart") ? ($logname) : ($repfile, $logname)));
@@ -491,7 +504,7 @@ sub fatal($)
     SENDMAIL("$user_name <$user_email>",
 	     "Swap ${inout} Failure: $pid/$eid",
 	     $mesg,
-	     "$user_name <$user_email>",
+	     ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
 	     "Cc:  $TBOPS",
 	     ($logname));
