@@ -225,6 +225,9 @@ if (TBAdmin($user)) {
 if ($grouplist) {
     $groupargument = "-G $grouplist";
 }
+else {
+    $groupargument = "-G \"\"";
+}
 
 #
 # Make user on local. We don't give them a password since they are not
