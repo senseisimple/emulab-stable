@@ -1,0 +1,118 @@
+#!/usr/bin/perl -w
+#
+# tbbuildkernels - a little script for building and installing the
+#
+
+use strict;
+
+my $SRCDIR = "/share/freebsd/4.7/src";
+my $OBJDIR = "/usr/obj";
+my $LOGDIR = "/tmp";
+
+my $MAINKERNEL = "TESTBED";
+my @MAINKERNEL_ALIASES = ("kernel.100HZ");
+my %OTHER_KERNELS = ("TESTBED-DELAY"     => ["kernel.delay", "kernel.10000HZ"],
+                     "TESTBED-JAIL"      => ["kernel.jail"],
+		     "TESTBED-LINKDELAY" => ["kernel.linkdelay",
+			 "kernel.1000HZ"]); 
+
+$| = 1;
+
+#
+# Some safeguards
+#
+if (grep {$_ eq `hostname`} ("boss","ops","cash","credit")) {
+    die "Run this on a node, not this machine!\n";
+}
+
+if ($> != 0) {
+    die "Sorry, gotta run this as root\n";
+}
+
+print "WARNING: You should only run this on a node, NOT on boss,\n";
+print "ops, etc. It will replace kernels, etc. Hit Y to continue..\n";
+die "Cancelled\n" unless (<> =~ /y/i);
+
+chdir($SRCDIR) or die "Unable to change to $SRCDIR: $!\n";
+
+#
+# Build the main kernel (which we'll need modules for, etc.)
+#
+build_kernel($MAINKERNEL,1);
+install_kernel($MAINKERNEL,1,["kernel", @MAINKERNEL_ALIASES]);
+
+#
+# Now, build the rest!
+#
+while (my ($name,$install_locations) = each %OTHER_KERNELS) {
+    build_kernel($name,0);
+    install_kernel($name,0,$install_locations);
+}
+
+#
+# Finally, clean up after ourselves
+#
+print "##### Cleaning up\n";
+system "rm -rf $OBJDIR/$SRCDIR" or die "Unable to clean up $OBJDIR/$SRCDIR\n";
+
+print "##### Done!\n";
+exit 0;
+
+sub build_kernel($;$) {
+    my ($name,$with_modules) = @_;
+
+    my $disable_modules;
+    if ($with_modules) {
+	$disable_modules = "";
+    } else {
+	$disable_modules = "-DNO_MODULES";
+    }
+
+    print "#### Building kernel $name (log in $LOGDIR/$name.build)\n";
+
+    my $rv = system "make $disable_modules buildkernel KERNCONF=$name" .
+    	"> $LOGDIR/$name.build 2>&1";
+    if ($rv) {
+	die "Build died with error $rv\n";
+    }
+}
+
+sub install_kernel($$$) {
+    my ($name, $full_install, $install_locations) = @_;
+
+    my ($realname,@aliases) = @$install_locations;
+
+    #
+    # XXX - full_install only works if first location is /kernel
+    #
+    if ($full_install) {
+	print "#### Installing kernel $name (log in $LOGDIR/$name.install)\n";
+	my $rv = system "make installkernel KERNCONF=$name " .
+	    "> $LOGDIR/$name.install 2>&1";
+	if ($rv) {
+	    die "Install died with error $rv\n";
+	}
+	#
+	# Have to remove the schg  flag, or we can't hard link to it
+	#
+	system "chflags noschg /$realname" and die "Unable to chflags\n";
+
+    } else {
+	print "#### Installing kernel $name as /$realname\n";
+	my $kernfile = "$OBJDIR/$SRCDIR/sys/$name/kernel";
+	system "cp $kernfile /$realname" and die "Unable to copy kernel\n";
+	system "chown root /$realname"
+	    and die "Unable to change ownership to root\n";
+    }
+
+    foreach my $alias (@aliases) {
+	print "#### Linking /$realname to /$alias\n";
+	if (-e "/$alias") {
+	    system "rm -f /$alias" and die "Unable to unlink\n";
+	}
+	system "ln /$realname /$alias" and die "Unable to link\n";
+	system "chown root /$alias"
+	    and die "Unable to change ownership to root\n";
+	system "chmod 755 /$alias" and die "Unable to chmod\n";
+    }
+}
