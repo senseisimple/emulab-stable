@@ -38,6 +38,8 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 post-install: 
 	chown root $(INSTALL_SBINDIR)/genelists
 	chmod u+s $(INSTALL_SBINDIR)/genelists
+	chown root $(INSTALL_SBINDIR)/dhcpd_makeconf
+	chmod u+s $(INSTALL_SBINDIR)/dhcpd_makeconf
 
 #
 # Control node installation (okay, plastic)
