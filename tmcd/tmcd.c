@@ -2701,7 +2701,7 @@ COMMAND_PROTOTYPE(dorouting)
 
 /*
  * Return address from which to load an image, along with the partition that
- * it should be written to
+ * it should be written to and the OS type in that partition.
  */
 COMMAND_PROTOTYPE(doloadinfo)
 {
@@ -2712,10 +2712,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart from images as i "
-			"left join current_reloads as r on i.imageid = r.image_id "
-			"where node_id='%s'",
-			 2, nodeid);
+	res = mydb_query("select load_address,loadpart,OS from images as i "
+			 "left join current_reloads as r on i.imageid = r.image_id "
+			 "left join os_info as o on i.default_osid = o.osid "
+			 "where node_id='%s'",
+			 3, nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -2736,7 +2737,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "ADDR=%s PART=%s\n", row[0], row[1]);
+	sprintf(buf, "ADDR=%s PART=%s PARTOS=%s\n", row[0], row[1], row[2]);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
