@@ -246,8 +246,10 @@ for ($i = 0; $i < count($output); $i++) {
     if (strcmp($output[$i], "Dumping $exp_id.report") == 0)
         break;
 }
+$summary = "";
 echo "<XMP>\n";
 for ($i = $i + 1; $i < count($output); $i++) {
+    $summary = "$summary $output[$i]\n";
     echo "$output[$i]\n";
 }
 echo "</XMP>\n";
