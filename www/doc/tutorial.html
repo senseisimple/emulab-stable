@@ -1,44 +1,61 @@
 <html>
-<head>
-<title>Utah Network Testbed - Tutorial</title>
-</head>
-<body>
-<h1>Utah Network Testbed - Tutorial</h1>
-<h3>First of all</h3>
-<p>
-   First of all, to make sure you have a working account 
-   on the Utah Network Testbed, log in via the 
-   <a href="https://www.emulab.net/tbdb.html">Testbed Web Interface.</a>
-   If you do not have an account, don't worry-- the login page contains 
-   detailed information about obtaining and verifying an account.
-</p>
-<h3>Designing a Network Topology</h3>
-<p>
-   The Utah Network Testbed's power lies in its ability to assume many
-   different topologies; the description of a such a topology is a necessary
-   part of an experiment. 
-</p>
-<p>
-   The Utah Network Testbed uses the "NS" ("Network Simulator")
-   format to describe network topologies. 
-   This is substantially the same format used by 
-   <a href="http://www.isi.edu/nsnam/ns/">ns-2</a>.
-   Since the Utah Network Testbed interface doesn't interpret these
-   files directly with Tcl, some functionality may work differently than
-   you expect, or not at all. Also, 
-   some testbed-specific commands have been added. These begin
-   with "#TB"; they will be ignored as comments 
-   by ns utilities outside of the testbed.
-   In short, most NS files should work on both the Testbed and ns-2, most 
-   of the time. 
-</p>
-<p>
-   For those unfamiliar with the NS format, here is an example.
-   Let's say we are trying to create a test network which looks like
-   the following:
-   <br><img src="vlanpic.png"><br>
-   (A is connected to B, B to C, and B to D.)<br>
-   An NS file which would describe such connectivity is as follows:
+  <head>
+    <title>Utah Network Testbed - Tutorial</title>
+  </head>
+  <body>
+    <h1>Utah Network Testbed - Tutorial</h1>
+    <h3>First of all</h3>
+    <p>
+      First of all, 
+      to make sure you have
+      a working account 
+      on 
+      the Utah Network Testbed, log in 
+      via the 
+      <a href="https://www.emulab.net/tbdb.html">Testbed Web Interface.</a>
+      If you do not have 
+      an account, don't worry-- 
+      the login page 
+      contains 
+      detailed information about obtaining 
+      and 
+      verifying 
+      an account.
+    </p>
+    <h3>Designing a Network Topology</h3>
+    <p>
+      The Utah Network Testbed's power lies in its ability to assume many
+      different topologies; the description of a such a topology is a necessary
+      part of an experiment. 
+    </p>
+    <p>
+      The Utah Network Testbed uses the "NS" ("Network Simulator")
+      format to describe network topologies. 
+      This is substantially the same format used by 
+      <a href="http://www.isi.edu/nsnam/ns/">ns-2</a>.
+      Since the Utah Network Testbed interface doesn't interpret these
+      files directly with
+      <a href="http://www.scriptics.com/software/tcltk/">Tcl</a>,
+      some functionality may work differently than you expect, or not at all.
+      If you feel there is useful functionality missing, please let us know. 
+      Also, some 
+      <a href="tbcommands.html">testbed-specific commands</a> 
+      have been added. These begin with "#TB"; 
+      they will be ignored as comments by ns utilities outside of the testbed.
+      In short, most NS files should work on both the Testbed and ns-2, most 
+      of the time. 
+    </p>
+    <p>
+      For those unfamiliar with the NS format, here is an example.
+      Let's say we are trying to create a test network which looks like
+      the following:
+      <br>
+      <img src="vlanpic.png">
+      <br>
+      (A is connected to B, B to C, and B to D.)
+      <br>
+      An NS file which would describe such connectivity is as follows:
+    </p>
 <pre>
 # begin example.ns
 
@@ -76,26 +93,27 @@ $ns run
 
 # end example.ns
 </pre>
+    </p>    
 
-</p>    
-
-<h3>Beginning the Experiment</h3>
-<p>
-   After logging on and validating to the Testbed Web Interface,
-   choose "Begin an Experiment." Fill in the Name and Long Name fields.
-   In the "Your NS file" field, place the <i>local path</i> of a NS file
-   which you have created to describe your network topology. This file
-   will be uploaded through your browser when you choose "Submit." 
-</p>
-<p>
-   After submission, the testbed interface will begin processing your
-   request. This could take a few minutes, depending on how many nodes you 
-   are using and what other features (such as delay nodes and bandwidth limits)   you are using. Once processing is done, the interface will present you with
-   a list of nodes allocated for the experiment.
-</p>
-<p>
-   If you use the above .NS file, you should get a set of allocated nodes similar
-   to this (physical machine names will likely be different.)
+    <h3>Beginning the Experiment</h3>
+    <p>
+      After logging on and validating to the Testbed Web Interface,
+      choose "Begin an Experiment." Fill in the Name and Long Name fields.
+      In the "Your NS file" field, place the <i>local path</i> of a NS file
+      which you have created to describe your network topology. This file
+      will be uploaded through your browser when you choose "Submit." 
+    </p>
+    <p>
+      After submission, the testbed interface will begin processing your
+      request. This could take a few minutes, depending on how many nodes you 
+      are using and what other features (such as delay nodes and bandwidth limits)
+      you are using. Once processing is done, the interface will present you with
+      a list of nodes allocated for the experiment.
+    </p>
+    <p>
+      If you use the above .NS file, you should get a set of allocated nodes similar
+      to this (physical machine names will likely be different:)
+    </p>
 <pre>
 Node Mapping:
 Virtual              Physical            
@@ -118,60 +136,70 @@ C                    eth0  B                    192.168.42.2
 D                    eth0  B                    192.168.3.2         
 B                    eth1  D                    192.168.3.3         
 </pre>
-<p>
-Notice that three "delay nodes" have been allocated to accomodate the 
-10ms delay time, as specified in the .NS file.   
-</p>
-<h3>So now you have your nodes</h3>
-  /* login, powercycle, reconfigure(delay must be fbsd) */
-   <h4>Logging in</h4>
-   <p>
-   Once nodes have been allocated for an experiment, they are rebooted,
-   and all members of your Project are given login accounts.
-   Your username and password for testbed machines 
-   will be the same as the one you use on the web interface. 
-   Use ssh to log into "ops.emulab.net". If your machine, as configured, supports
-   ssh, you can "ssh <machinename>" into one of your machines 
-   ("tbpc15" is one such machine in the above example.) 
-   If you are concerned about ssh traffic interfering with an experiment, 
-   or if you have configured a machine to run an operating system which does not
-   support incoming ssh connections, an alternative is 
-   "tip <machinename>", which communicates directly with a machine's
-   serial port. The standard FreeBSD and Linux installations listen for logins
-   on this port. 
+    <p>
+      Notice that three "delay nodes" have been allocated to accomodate the 
+      10ms delay time, as specified in the .NS file.   
+    </p>
+
+    <h3>So now you have your nodes...</h3>
+
+    <h4>Logging in</h4>
+    <p>
+      Once nodes have been allocated for an experiment, they are rebooted,
+      and all members of your Project are given login accounts.
+      Your username and password for testbed machines 
+      will be the same as the one you use on the web interface. 
+      Use ssh to log into "ops.emulab.net". If your machine, as configured, supports
+      ssh, you can "ssh <i>machinename</i>" into one of your machines 
+      ("tbpc15" is one such machine in the above example.) 
+      If you are concerned about ssh traffic interfering with an experiment, 
+      or if you have configured a machine to run an operating system which does not
+      support incoming ssh connections, an alternative is 
+      "tip <i>machinename</i>", which communicates directly with a machine's
+      serial port. The standard FreeBSD and Linux installations listen for logins
+      on this port. 
    </p>
    <p>
-   Once you are logged in, use "sudo" to run commands as root.
+      Once you are logged in, use "sudo" to run commands as root.
    </p>
+   
    <h4>Powercycling Nodes</h4>
    <p>
-   Obviously, machines may be rebooted or powered off using local commands on the
-   machine, if available. Also, all machines are connected to a power controller,
-   accessable through "ops.emulab.net". While logged into
-   ops, use the commands "power on <machinename>", "power off <machinename>", and
-   "power cycle <machinename>" to control power to your nodes. 
+     Nodes may be rebooted or powered off using local commands on the
+     machine, if available. In addition, machines are connected to a power controller,
+     accessable through "ops.emulab.net". 
+     While logged into ops, 
+     use the commands "power on <i>machinename</i>", "power off <i>machinename</i>", and
+     "power cycle <i>machinename</i>" to control power to your nodes. 
    </p>
    <h4>Reconfiguring Node Operating Systems</h4>
    <p>
-   Each PC on the test bed has three partitions. One contains Redhat Linux 6.2, 
-   another FreeBSD 4.0, and yet
-   another can be loaded with any suitable operating system. Such an operating system must
-   (obviously) run on an Intel Pentium II processor, but does not need to offer any specific 
-   network support, such as IP, nor does it have to support ssh for logins (since "tip" can be
-   used to communicate through a machine's serial port.) Any PC which has been automatically
-   configured as a delay node by the testbed control system must run FreeBSD to fufill that
-   function. A system which is not a delay node will use Redhat Linux 6.2 by default.
+     Each PC on the testbed has three hard disk partitions. 
+     One partition contains Redhat Linux 6.2, another FreeBSD 4.0, and the last
+     can be loaded with any suitable operating system.
+     Unless specified otherwise in the .NS file, normal nodes will default to Linux, while
+     delay nodes will default to FreeBSD. If a delay node's operating system is changed to 
+     to something other than FreeBSD, it will not function as a delay node.
    </p>
    <p>
-   Nodes can be reconfigured via the "www.emulab.net" web interface. Once logged in, and 
-   assuming an experiment has been started in a project you belong to, go into the 
-   "Experiment Information" section, then click on the Experiment ID (the short name) 
-   you assigned to the project. This will show a page of information relating to that
-   experiment, including a list of the nodes allocated to that experiment. Click on
-   the icon next to the machine you want to reconfigure; this will bring up the Node Control
-   Center. In the box labeled "Def boot image" choose "RHL62-STD" or "FBSD40-STD", or an image
-   of your own devising. To creare such an "Alternative" image,  
+     Node operating systems can be initially configured using the following command 
+     in a .NS file: 
    </p>
-</p>
+     "#TB <a href="nscommands.html#set-node-os">set-node-os</a> <i>nodename</i> <i>imagename</i>"
+     <br>
+     <i>nodename</i> is the machine name you're using in your NS file.
+     <br>
+     <i>imagename</i> is "RHL62-STD", "FBSD40-STD", or an image of your own devising.
+   <p>
+       Node operating systems can also be changed while an experiment is underway,
+       via the www.emulab.net web interface. Go to the 
+       "Experiment Information" page, select your experiment, then select the 
+       name of a machine from the list of those allocated for that experiment.
+       This will bring up the Node Control Center. 
+       In the box labeled "Def boot image" choose "RHL62-STD" or "FBSD40-STD", 
+       or an image of your own devising (this is documented elsewhere.) 
+       Submit the change, and if all goes well, the node will be reconfigured.
+       The changes will take effect next time the machine is rebooted.
+   </p>
 </body>
 </html>
