@@ -526,7 +526,7 @@ sub setintervals($)
     if ($report) {
 	logmsg("setintervals: check=$iv{check}, isalive=$iv{isalive}, ".
 	       "drift=$iv{drift}, cvsup=$iv{cvsup}, rusage=$iv{rusage}, ".
-	       "hostkeys=$iv{hkeys} battery=$iv{batt}\n");
+	       "hostkeys=$iv{hkeys}, battery=$iv{batt}\n");
     }
 
     #
@@ -785,12 +785,11 @@ sub sendbatt($)
     }
 
     if (! -r $battlog) {
-	logmsg("batt: no battery log $battlog\n");
-	$iv{batt} = 0;
-	return;
+	logmsg("batt: no battery log yet $battlog\n");
+	goto resched;
     }
 
-    my $line = `tail -1 /var/log/battery.log`;
+    my $line = `tail -1 $battlog`;
     my $capacity;
     my $voltage;
 
@@ -837,6 +836,7 @@ sub sendbatt($)
 	}
     }
 
+resched:
     #
     # Set up for another interval.
     # Since the tmcc call and update can take awhile, we update curtime
