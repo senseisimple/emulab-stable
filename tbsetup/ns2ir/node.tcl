@@ -142,6 +142,23 @@ Node instproc add_lanlink {lanlink} {
     return [expr [llength $portlist] - 1]
 }
 
+#
+# Find the lan that both nodes are attached to. Very bad. If more than
+# comman lan, returns the first.
+#
+Node instproc find_commonlan {node} {
+    $self instvar portlist
+    set match -1
+
+    foreach ll $portlist {
+	set match [$node find_port $ll]
+	if {$match != -1} {
+	    break
+	}
+    }
+    return $match
+}
+
 # ip port
 # ip port ip
 # In the first form this returns the IP address associated with the port.
@@ -208,12 +225,28 @@ Node instproc add_routes_to_DB {DB} {
 
     foreach dst [lsort [array names routelist]] {
 	set hop $routelist($dst)
+	set port -1
 
 	#
-	# Convert hop IP address.
+	# Convert hop to IP address. Need to find the link between the
+	# the this node and the hop. This is easy if its a link. If its
+	# a lan, then its ugly.
 	#
-	set hopip [$hop ip [$hop find_port [$sim find_link $self $hop]]]
-
+	set hoplink [$sim find_link $self $hop]
+	if {$hoplink == {}} {
+	    set port [$self find_commonlan $hop]
+	} else {
+	    set port [$hop find_port $hoplink]
+	}
+	if {$port == -1} {
+	    perror "\[add-route] Cannot find a link from $self to $hop!"
+	    return
+	}
+	set hopip [$hop ip $port]
+	
+	#
+	# Convert dst to IP address.
+	#
 	switch -- [$dst info class] {
 	    "Node" {
 		if {[llength [$dst set portlist]] != 1} {
@@ -229,6 +262,10 @@ Node instproc add_routes_to_DB {DB} {
 		set type  "net"
 	    }
 	    "Link" {
+		set dstip [$dst get_subnet]
+		set type  "net"
+	    }
+	    "Lan" {
 		set dstip [$dst get_subnet]
 		set type  "net"
 	    }
