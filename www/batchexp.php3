@@ -159,6 +159,11 @@ $last   = time();
 $result = exec("$TBSUEXEC_PATH $uid $gid webbatchexp $tmpfname",
  	       $output, $retval);
 
+#
+# Kill the tempfile since the script will have copied it by now.
+#
+unlink($tmpfname);
+
 if ($retval) {
     echo "<br><br><h2>
           Setup Failure($retval): Output as follows:
