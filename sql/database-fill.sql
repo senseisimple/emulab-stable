@@ -209,7 +209,7 @@ REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv1','SHUTDOWN')
 
 
 REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTING',120,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTED',120,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTED',60,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('NORMAL','ISUP',0,'');
 REPLACE INTO state_timeouts VALUES ('MINIMAL','SHUTDOWN',120,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','SHUTDOWN',120,'REBOOT');
@@ -232,7 +232,7 @@ REPLACE INTO state_timeouts VALUES ('NODEALLOC','RESERVED',0,'');
 REPLACE INTO state_timeouts VALUES ('NORMAL','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','ISUP',0,'');
-REPLACE INTO state_timeouts VALUES ('NORMALv1','TBSETUP',15,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('NORMALv1','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('RELOAD','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('RELOAD','RELOADING',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('RELOAD','RELOADSETUP',60,'NOTIFY');
@@ -241,14 +241,14 @@ REPLACE INTO state_timeouts VALUES ('USERSTATUS','ACTIVE',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,'');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',15,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWEROFF',0,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERON',0,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERCYCLE',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('PCVM','BOOTING',180,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('PCVM','SHUTDOWN',0,'');
 REPLACE INTO state_timeouts VALUES ('PCVM','ISUP',0,'');
 REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',60,'CMDRETRY');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWEROFF',0,'CMDRETRY');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERON',0,'CMDRETRY');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERCYCLE',0,'CMDRETRY');
 
 --
 -- Dumping data for table 'state_transitions'
@@ -369,7 +369,6 @@ REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
 
 REPLACE INTO testsuite_preentables VALUES ('comments','drop');
 REPLACE INTO testsuite_preentables VALUES ('iface_counters','drop');
-REPLACE INTO testsuite_preentables VALUES ('lastlogin','drop');
 REPLACE INTO testsuite_preentables VALUES ('login','drop');
 REPLACE INTO testsuite_preentables VALUES ('loginmessage','drop');
 REPLACE INTO testsuite_preentables VALUES ('node_idlestats','drop');
