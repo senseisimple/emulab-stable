@@ -452,7 +452,9 @@ read_image()
 			continue;
 		
 		if (ignore[i]) {
-			fprintf(stderr, "Slice %d ignored.\n", i+1);
+			fprintf(stderr, "Slice %d ignored, NOT SAVING\n", i+1);
+			if (start != size)
+				addskip(start, size);
 			continue;
 		}
 
