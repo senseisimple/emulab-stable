@@ -360,18 +360,14 @@ foreach my $n (@freed_nodes) {
 	# Make sure we don't schedule a reload if the node is coming out of
 	# the reloading or reloadpending experimenets.
 	#
-	if (!(($pid eq $reloadpid) && (($eid eq $reloadeid) ||
-		($eid eq $pendingeid)))) {
-	    if (system("$sched_reload $n") != 0) {
-		print STDERR "WARNING: $sched_reload $n failed!\n";
-		$error++;
-	    }
+	if (!(($pid eq $reloadpid) &&
+	      (($eid eq $reloadeid) || ($eid eq $pendingeid)))) {
 	    DBQueryWarn("update reserved set ".
 		"pid='$reloadpid',eid='$pendingeid' ".
 		"where node_id='$n'") || $error++;
 	}
-
 	DBQueryWarn("replace into last_reservation values ('$n', '$pid')");
+	next;
     }
     
     print "Releasing node '$n' ... ";
