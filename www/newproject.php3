@@ -212,23 +212,16 @@ if (! $returning) {
 
 #
 # Now for the new Project
-# * Bump the unix GID.
 # * Create a new project in the database.
 # * Create a new project_membership entry in the database, default trust=none.
 # * Generate a mail message to testbed ops.
 #
-$unixgid_query  = "SELECT unix_gid FROM projects ORDER BY unix_gid DESC";
-$unixgid_result = mysql_db_query($TBDBNAME, $unixgid_query);
-$row = mysql_fetch_row($unixgid_result);
-$unix_gid = $row[0];
-$unix_gid++;
-
 $newproj_command = "INSERT INTO projects ".
      "(pid, created, expires, name, URL, head_uid, ".
      " num_members, num_pcs, num_sharks, why, unix_gid)".
      "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
      "'$proj_head_uid', '$proj_members', '$proj_pcs', '$proj_sharks', ".
-     "'$proj_why', '$unix_gid')";
+     "'$proj_why', NULL)";
 $newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
 if (! $newproj_result) {
     $err = mysql_error();
@@ -243,6 +236,17 @@ if (! $newmemb_result) {
     TBERROR("Database Error adding new project membership: $pid: $err\n", 1);
 }
 
+#
+# Grab the unix GID that was assigned.
+# 
+$unixgid_result = mysql_db_query($TBDBNAME,
+	"SELECT unix_gid FROM projects where pid='$pid'");
+$row = mysql_fetch_row($unixgid_result);
+$unix_gid = $row[0];
+
+#
+# The mail message to the approval list.
+# 
 mail($TBMAIL_APPROVAL,
      "TESTBED: New Project", "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
@@ -259,6 +263,7 @@ mail($TBMAIL_APPROVAL,
      "Members:       $proj_members\n".
      "PCs:           $proj_pcs\n".
      "Sharks:        $proj_sharks\n".
+     "Unix GID:      $unix_gid\n".
      "Reasons:\n$proj_why\n\n".
      "Please review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
