@@ -761,6 +761,7 @@ CREATE TABLE tunnels (
   port int(11) NOT NULL default '0',
   peer_ip varchar(32) NOT NULL default '',
   password varchar(32) NOT NULL default '',
+  proto varchar(12) NOT NULL default 'udp',
   encrypt tinyint(3) unsigned NOT NULL default '0',
   compress tinyint(3) unsigned NOT NULL default '0',
   assigned_ip varchar(32) NOT NULL default '',
