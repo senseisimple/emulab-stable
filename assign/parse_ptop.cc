@@ -92,7 +92,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  int iload;
 	  if (!load.compare("*")) { // Allow * to mean unlimited
 	                            // (okay, a really big number)
-	    iload = 10000000;
+	    iload = 10000;
 	  } else if (sscanf(load.c_str(),"%d",&iload) != 1) {
 	    ptop_error("Bad node line, bad load: " << load << ".");
 	    iload = 1;
