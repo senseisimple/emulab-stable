@@ -271,7 +271,7 @@ REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TESTING','SWAPPING','');
 REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','BOOTING','DHCPRetry');
 REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','SHUTDOWN','Error');
-REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','BOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','BOOTING','SilentReboot');
 REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','SHUTDOWN','Retry');
