@@ -151,6 +151,12 @@ exit(0)
     if (!$elabinelab);
 
 #
+# See if the experiment is firewalled
+#
+my $firewall;
+my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
+
+#
 # If we are going to start an inner experiment, grab the stuff we need
 # from the DB and save it. 
 #
@@ -220,10 +226,21 @@ exit(0)
     if ($dbgooonly);
 
 #
-# SSH into the ops node and fire off the script that builds it. We redirect
-# output and email it to TBOPS for debugging. 
+# For SSH below
 #
 $UID = 0;
+
+#
+# If firewalled, turn off the firewall during the setup.
+#
+if ($firewalled) {
+    print "Turning off firewall rules on $firewall\n";
+    system("$SSH -host $firewall ipfw add 1 allow all from any to any");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error turning off firewall rules ($firewall)!\n");
+    }
+}
 
 #
 # This is temporary. I think I will switch this over to grabbing the latest
@@ -364,6 +381,7 @@ if (defined($elabinelab_eid)) {
     # Copy the file over.
     #
     $UID = 0;
+    print "Sending NS file to inner bossnode ($bossnode).\n";
     system("cat /tmp/$$.ns | $SSH -host $bossnode '(cat > $nsfilename)'");
     if ($?) {
 	die("*** $0:\n".
@@ -371,15 +389,34 @@ if (defined($elabinelab_eid)) {
     }
 
     #
-    # No run batchexp on the node as the user. 
+    # Now run batchexp on the node as the user. If firewalled, experiment
+    # must start async (cause we have to turn the firewall back on). 
     #
+    my $optarg = ($firewalled ? "" : "-w");
+	
+    print "Starting experiment $pid/$elabinelab_eid on inner emulab.\n";
+    TBDebugTimeStamp("Starting inner experiment");
     system("$SSH -host $bossnode 'sudo -u $dbuid /usr/testbed/bin/batchexp ".
-	   "  -q -i -w -f -S \"ElabInElab Experiment\" ".
+	   "  -q -i $optarg -f -S \"ElabInElab Experiment\" ".
 	   "  -L \"ElabInElab ElabInElab\" -E \"ElabInElab Experiment\" ".
 	   "  -p $pid -e $elabinelab_eid $nsfilename'");
     
     $UID = $SAVEUID;
     unlink("/tmp/$$.ns");
+}
+
+#
+# Turn the firewall back on. 
+#
+if ($firewalled) {
+    print "Turning firewall back on\n";
+    $UID = 0;
+    system("$SSH -host $firewall ipfw delete 1");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error turning on firewall rules ($firewall)!\n");
+    }
+    $UID = $SAVEUID;
 }
 
 TBDebugTimeStamp("ElabInElab setup done");
@@ -757,8 +794,16 @@ sub TearDownEmulab()
     print "Killing DHCPD on inner boss ($bossnode)\n";
     system("$SSH -host $bossnode /usr/local/etc/rc.d/2.dhcpd.sh stop");
     if ($?) {
-	die("*** $0:\n".
-	    "    Could not stop DHCPD on inner bossnode ($bossnode)!\n");
+	#
+	# This error is non-fatal. If DHCPD cannot be killed, then the inner
+	# boss is scrogged or never set up properly. Just return and let
+	# the nodes get power cycled (if need be). At some point we need a
+	# state machine to control this setup stuff. 
+	# 
+	print STDERR "*** $0:\n".
+	             "    Could not stop DHCPD on inner bossnode ($bossnode)!\n".
+		     "    Continuing anyway; outer boss will use power cycle.\n";
+	return 0;
     }
 
     #
