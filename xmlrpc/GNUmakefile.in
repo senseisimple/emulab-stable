@@ -18,7 +18,7 @@ LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
 DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py
-DEBUG_STUFF     = experiment
+DEBUG_STUFF     = experiment node
 
 #
 # These are the ones installed on plastic (users, control, etc). 
