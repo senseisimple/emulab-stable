@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use libdb;
+
+#
+# Get a list of all VLANs for swapped-in experiments
+#
+my $result = DBQueryFatal("SELECT eid, pid, virtual, members FROM vlans " .
+	"ORDER BY eid,pid,virtual");
+
+while (my ($eid, $pid, $virtual, $members) = $result->fetchrow()) {
+
+    #
+    # Split apart the space-separated list of members
+    #
+    my @members = split /\s+/, $members;
+    my %switches = ();
+    foreach my $member (@members) {
+	my ($node,$if) = split /:/, $member;
+
+	#
+	# Find out which switch this interface is connected to
+	#
+	my $result2 = DBQueryFatal("SELECT node_id2 FROM wires AS w LEFT JOIN ".
+	    "interfaces AS i ON w.node_id1=i.node_id AND w.card1=i.card " .
+	    "WHERE node_id='$node' and iface='$if'");
+	# We assume only one response here!
+	my ($switch) = ($result2->fetchrow());
+	$switches{$switch}++;
+    }
+
+    #
+    # Report if more than one switch was found
+    #
+    if ((keys %switches) > 1) {
+	print "Link/LAN $virtual on $pid/$eid is on ",
+	    join(", ", map { "$_ ($switches{$_} members)" } sort keys %switches),
+	    "\n";
+    }
+}
