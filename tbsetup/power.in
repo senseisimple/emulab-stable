@@ -21,7 +21,7 @@ my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 
 # un-taint path since this gets called from setuid scripts.
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:$TB/bin';
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $user = (getpwuid($<))[0]
@@ -124,10 +124,10 @@ foreach $node ( sort @machines) {
 		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
       open(OUT,$cmd." |");
       while (<OUT>) {
-	if (/was outlet([OnfCycle]*)/) {
+	if (/was outlet([OnfRebot]+)/) {
 	  print "$node was $1";
 	}
-	if (/to outlet([OnfCycle]*)/) {
+	if (/to outlet([OnfRebot]+)/) {
 	  print " ... $node now $1";
 	}
       }
