@@ -102,6 +102,17 @@ $ns duplex-link $lan0 $node3 100Mb 100ms DropTail
 
 <p>(Again, note the <code>$</code>'s)
 
+<p>Links can also be named just like nodes and lans.  The names can
+then be used to set loss rates or IP addresses.  This technique is the
+only way to set such attributes when their are multiple links between
+two nodes.
+
+<pre>
+set link1 [$ns duplex-link $node0 $node1 100Mb .1ms DropTail]
+tb-set-link-loss $link1 0.05
+tb-set-ip-link $node0 $link1 192.0.0.128
+</pre>
+
 <hr>
 
 <a name=HARD></a><h3>Hardware Commands</h3>
@@ -169,11 +180,60 @@ tb-set-ip $node1 142.3.4.5
 
 <ul>
   <li>This command should only be used for nodes that have a single
-      link.  For nodes with multiple links the next command,
-      <code>tb-set-ip-interface</code> should be used.  Mixing
-      <code>tb-set-ip</code>. and <code>tb-set-ip-interface</code> on
+      link.  For nodes with multiple links the next commands should be
+      used.  Mixing <code>tb-set-ip</code> and any other IP command on
       the same node will result in an error.
 </ul>
+
+<hr>
+
+<h4>tb-set-ip-link</h4>
+
+<pre>
+tb-set-ip-link <i>node</i> <i>link</i> <i>ip</i>
+
+tb-set-ip-link $node0 $link0 142.3.4.6
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node to set the IP for.
+  <dt><i>link</i> - The link to set the IP for.
+  <dt><i>ip</i> - The IP address.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>One way to think of the arguments is a link with the node
+      specifying which side of the link to set the IP for.
+  <li>This command can not be mixed with <code>tb-set-ip</code> on the
+      same node.
+</ul>
+
+<hr>
+
+<h4>tb-set-ip-lan</h4>
+
+<pre>
+tb-set-ip-lan <i>node</i> <i>lan</i> <i>ip</i>
+
+tb-set-ip-lan $node1 $lan0 142.3.4.6
+</pre>
+
+<dl>
+  <dt><i>node</i> - The node to set the IP for.
+  <dt><i>lan</i> - The lan the IP is on.
+  <dt><i>ip</i> - The IP address.
+</dl>
+
+<p>Notes:
+<ul>
+  <li>One way to think of the arguments is a node with the LAN
+      specifying which port to set the IP address for.
+  <li>This command can not be mixed with <code>tb-set-ip</code> on the
+same node.
+</ul>
+
+<hr>
 
 <h4>tb-set-ip-interface</h4>
 
@@ -196,6 +256,9 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
   <li>In the case of multiple links between the same pair of nodes
       there is no way to distinguish which link to the set the IP
       for.  This should be fixed soon.
+  <li>This command is converted internally to either tb-set-ip-link or
+      tb-set-ip-lan.  It is possible that error messages will report
+      either of those commands instead of tb-set-ip-interface.
 </ul>
 
 <hr>
@@ -307,21 +370,26 @@ specify link loss rates.
 
 <pre>
 tb-set-link-loss <i>src</i> <i>dst</i> <i>loss</i>
+tb-set-link-loss <i>link</i> <i>loss</i>
 
 tb-set-link-loss $node1 $node2 0.05
+tb-set-link-loss $link1 0.02
 </pre>
 
 <dl>
   <dt><i>src</i>, <i>dst</i> - Two nodes to describe the link.
+  <dt><i>link</i> - The link to set the rate for.
   <dt><i>loss</i> - The loss rate (between 0 and 1).
 </dl>
 
 <p>Notes:
 <ul>
-  <li>In the case of multiple links between two nodes there is no way
-      to specify which link to configure the loss for.  In fact, the
-      behavior of a tb-set-link-loss command in the case of multiple
-      links is undefined.  This will be fixed soon.
+  <li>There are two syntaxs available.  The first specifies a link by
+      a source/destination pair.  The second explicitly specifies the
+      link.
+  <li>The source/destination pair is incapable of describing an
+      individual link in the case of multiple links between two
+      nodes.  Use the second syntax for this case.
 </ul>
 
 <h4>tb-set-lan-loss</h4>
