@@ -52,6 +52,7 @@ if {! [ir exists /virtual/nodes]} {
 set vnodes [ir get /virtual/nodes]
 foreach pair $vnodes {
     set vnodemap([lindex $pair 0]) [lindex $pair 1]
+    set rvnodemap([lindex $pair 1]) [lindex $pair 0]
 }
 
 if {! [ir exists /ip/map]} {
@@ -63,11 +64,11 @@ foreach line $ips {
     set a [lindex $line 0]
     set b [lindex $line 1]
     set ip [lindex $line 2]
-    if {[info exists ipmap($b:$a)]} {
-	lappend ipmap($b:$a) $ip
-    } else {
+#    if {[info exists ipmap($b:$a)]} {
+#	lappend ipmap($b:$a) $ip
+#    } else {
 	set ipmap($a:$b) $ip
-    }
+#    }
 }
 
 set macs [ir get /ip/mac]
@@ -91,21 +92,50 @@ puts ""
 puts "Links"
 puts "Source               IP               Destination         IP"
 puts "-------------------- --------------- -------------------- ----------------"
-foreach link [array names ipmap] {
-    set t [split $link :]
-    puts [format "%-20s %-15s %-20s %-15s" [lindex $t 0] \
-	      [lindex $ipmap($link) 0] \
-	      [lindex $t 1] [lindex $ipmap($link) 1]]
+foreach line [ir get /virtual/links] {
+    set link [lindex $line 0]
+    set nodes [lrange $line 1 end]
+    set t [split [lindex $nodes 0] -]
+    set snode $rvnodemap([lindex $t 0])
+    set sifc [lindex $t 1]
+    if {[llength $nodes] == 2} {
+	set t [lindex $nodes 1]
+	set delay {}
+    } else {
+	set t [lindex $nodes 3]
+	set delay [lrange $nodes 1 2]
+    }
+    set t [split $t -]
+    set dnode $rvnodemap([lindex $t 0])
+    set difc [lindex $t 1]
+    set sip $ipmap($snode:$dnode)
+    set dip $ipmap($dnode:$snode)
+    
+    puts [format "%-20s %-15s %-20s %-15s" $snode $sip $dnode $dip]
+
     if {$verbose == 1} {
-	set smac $macmap([lindex $ipmap($link) 0])
-	set dmac $macmap([lindex $ipmap($link) 1])
-	sql query $DB "select card from interfaces where mac = \"$smac\""
-	set sifc [sql fetchrow $DB]
-	sql endquery $DB
-	sql query $DB "select card from interfaces where mac = \"$dmac\""
-	set difc [sql fetchrow $DB]
-	sql endquery $DB
+	set smac $macmap($sip)
+	set dmac $macmap($dip)
 	puts [format "%20s %-15s %20s %-15s" /dev/eth$sifc $smac /dev/eth$difc $dmac]
+	if {$delay != {}} {
+	    set a [lindex $delay 0]
+	    set b [lindex $delay 1]
+	    set delaynode [lindex [split $a -] 0]
+	    set delayifc1 [lindex [split $a -] 1]
+	    set delayifc2 [lindex [split $b -] 1]
+	    sql query $DB "select delay,bandwidth,lossrate from delays where node_id=\"$delaynode\" and card0=$delayifc1 and card1=$delayifc2"
+	    set delayinfo [sql fetchrow $DB]
+	    sql endquery $DB
+	    if {$delayinfo == {}} {
+		sql query $DB "select delay,bandwidth,lossrate from delays where node_id=\"$delaynode\" and card0=$delayifc2 and card1=$delayifc1"
+		set delayinfo [sql fetchrow $DB]
+		sql endquery $DB
+	    }
+	    set delay [lindex $delayinfo 0]
+	    set bandwidth [lindex $delayinfo 1]
+	    set lossrate [lindex $delayinfo 2]
+	    puts [format "   Delay %-10s /dev/eth$delayifc1 /dev/eth$delayifc2 Delay: %4d BW: %5.1f Loss: %.3f" $rvnodemap($delaynode) $delay $bandwidth $lossrate]
+	}
     }
 }
 
