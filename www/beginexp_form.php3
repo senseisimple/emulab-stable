@@ -56,8 +56,8 @@ function INITFORM($formfields, $projlist)
     $defaults[exp_idleswap]          = "1";
     $defaults[exp_noidleswap_reason] = "";
     $defaults[exp_idleswap_timeout]  = TBGetSiteVar("idle/threshold");
-    $defaults[exp_autoswap]          = "0";
-    $defaults[exp_autoswap_timeout]  = "10";
+    $defaults[exp_autoswap]          = TBGetSiteVar("general/autoswap_mode");
+    $defaults[exp_autoswap_timeout]  = TBGetSiteVar("general/autoswap_threshold");
     $defaults[exp_localnsfile]       = "";
     $defaults[exp_nsfile]            = ""; # Multipart data.
     $defaults[exp_preload]           = "no";
