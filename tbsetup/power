@@ -57,21 +57,24 @@ while ( @_ = $sth->fetchrow_array()) {
 # user is authorized to control the nodes
 #
 
-my @conds = ();
+my @OkNodes = ();
 
-foreach $node (@machines) {
-  push(@conds,"node_id='$node'");
-}
-
-my $cmd = 
-  "select uid, node_id from reserved as r left join experiments as e ".
-  "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
-  join(" or ",@conds).") and uid='$user';";
-
-$sth = $dbh->query($cmd);
-
-while ( @_ = $sth->fetchrow_array()) {
-  #print "Got '",join("\t",@_),"\n";
+if ($user ne "root") {
+  my @conds = ();
+  foreach $node (@machines) {
+    push(@conds,"node_id='$node'");
+  }
+  my $cmd = 
+    "select uid, node_id from reserved as r left join experiments as e ".
+     "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
+     join(" or ",@conds).") and uid='$user';";
+  
+  $sth = $dbh->query($cmd);
+  #print "$cmd\n";  
+  while ( @_ = $sth->fetchrow_array()) {
+    #print "Got '",join("'\t'",@_),"'\n";
+    push(@OkNodes, $_[1]);
+  }
 }
 
 
@@ -82,21 +85,27 @@ while ( @_ = $sth->fetchrow_array()) {
 my $snmpit=(-e '/usr/testbed/bin/snmpit'?'/usr/testbed/bin/snmpit':'snmpit');
 
 foreach $node ( sort @machines) {
+  my $Approved = 0;
+  foreach $ok (sort @OkNodes) { if ($node eq $ok) { $Approved = 1; } }
+  if (!$Approved && ($user ne "root")) { 
+    print "You are not authorized to control $node. Skipping...\n";
+  } else {
     #print $snmpit, '-i',$IPList{$node},$op,$OutletList{$node},"\n";
     if ( ! defined ($IPList{$node}) ) {
-	print "Machine $node not found. Skipping...\n";
+      print "Machine $node not found. Skipping...\n";
     } else {
-	my $cmd=join(" ",
-		  ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
-	open(OUT,$cmd." |");
-	while (<OUT>) {
-	    if (/was outlet(.*)/) {
-		print "$node was $1";
-	    }
-	    if (/to outlet(.*)/) {
-		print " ... $node now $1";
-	    }
+      my $cmd=join(" ",
+		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
+      open(OUT,$cmd." |");
+      while (<OUT>) {
+	if (/was outlet(.*)/) {
+	  print "$node was $1";
 	}
-	print "\n";
+	if (/to outlet(.*)/) {
+	  print " ... $node now $1";
+	}
+      }
+      print "\n";
     }
+  }
 }
