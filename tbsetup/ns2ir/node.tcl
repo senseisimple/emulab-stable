@@ -151,15 +151,6 @@ Node instproc updatedb {DB} {
 	    return
 	}
     }
-    #
-    # For now, restrict local virtnodes to edge nodes, not routers.
-    #
-    if {$type == "pcvm" && $enforce_user_restrictions} {
-	if {[llength $portlist] > 1} {
-	    perror "Virtual node $self must be an edge node (lans/links = 1)"
-	    return
-	}
-    }
 
     # We need to generate the IP column from our iplist.
     set ipraw {}
