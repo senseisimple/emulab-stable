@@ -3387,7 +3387,8 @@ sub CreateTopFile()
 		    # via a user-specific FBSD image. Thats coz there is no
 		    # way of determining if the FBSD image is actually running
 		    # our kernel that can do veths
-		    if (virtnodeosid($node) ne TBOSID(TB_OPSPID, "FBSD-STD")) {
+		    if (defined(virtnodeosid($node)) &&
+			virtnodeosid($node) ne TBOSID(TB_OPSPID, "FBSD-STD")) {
 			$nonbsdnodes++;
 		    }
 		}
