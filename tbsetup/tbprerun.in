@@ -151,16 +151,19 @@ TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
     or fatal("Failed to get ElabInElab attributes!");
 
 #
-# If we are, and there is an inner experiment, rerun the parser so that
-# we can pass in the proper info this time around. This is a side effect
-# of allowing the elabinelab bit, and the elabinelab eid, to be specified
-# in the NS file. If we did this on the command line, then we could skip
-# this step, but I think ease of use is better if it can be in the NS file.
+# If we are, rerun the parser so that we can pass in the proper info
+# this time around. This is a side effect of allowing the elabinelab
+# bit, and the elabinelab eid, to be specified in the NS file. If we
+# did this on the command line, then we could skip this step, but I
+# think ease of use is better if it can be in the NS file. Remember,
+# the user can clear the elabinelab_eid field, so must rerun to clear
+# out the nodes. What if they clear the elabinelab bit too? Ick, not
+# going to worry about that.
 #
-if ($elabinelab && defined($elabinelab_eid)) {
+if ($elabinelab) {
     # Inner experiment better exist.
     fatal("Inner experiment $elabinelab_eid does not exist!")
-	if (! ExpState($pid, $elabinelab_eid));
+	if (defined($elabinelab_eid) && !ExpState($pid, $elabinelab_eid));
     
     # Again, kill virtual state.
     TBExptRemoveVirtualState($pid, $eid);
