@@ -21,7 +21,7 @@ if {[file exists $scriptdir/ns2ir]} {
 
 
 source $scriptdir/ir/libir.tcl
-load $updir/lib/sql.so
+load $updir/sql.so
 set DB [sql connect]
 sql selectdb $DB tbdb
 
