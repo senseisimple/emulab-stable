@@ -1,0 +1,88 @@
+This is a preliminary release of the Frisbee[1] disk imaging tool used in
+the University of Utah's Emulab testbed cluster and described in the
+USENIX '03 paper (a copy of which should be in the doc subdirectory).
+It also includes the associated image creation tool.
+
+What does Frisbee do?
+
+	The Frisbee server uses a custom multicast protocol to distribute
+	highly-compressed disk images to consenting clients.  The Frisbee
+	client is a multi-threaded marvel that receives, decompresses, and
+	smacks data down on your hard drive, really, really fast.  Frisbee
+	can be used to install complete disk images or single partition
+	images.
+
+	Note that installing a disk (partition) image is 100% fatal to the
+	current contents of said disk (partition).  Do not use Frisbee or
+	any tool to install an image unless you really mean it.
+
+What all is included in the box?
+
+	The Frisbee client and server are in the frisbee subdirectory.
+
+	The imagezip subdirectory contains the imagezip application
+	that allows you to create compressed images of whole disks or
+	disk partitions.  Imageunzip decompresses and installs images
+	like Frisbee, but reads the image file directly (i.e. gets the
+	image from a disk not the network).  Imagedump reveals the
+	innermost secrets of the image file.
+
+	What didn't make it in, was the saavy compression code for
+	NTFS.  Well, the glue code is there and the NTFS support
+	library can be downloaded from sourceforge (linux-ntfs),
+	I just didn't get everything put together and tested in time.
+
+How do I build everything?
+
+	cd imagezip; make
+	cd frisbee; make
+
+	We use FreeBSD, you should too.  It should build on any
+	reasonably recent 4.x version.  You will need to install
+	the linuxthreads port, vintage 2.2.3.  You can build single-
+	threaded versions of the imagezip/unzip tools if you don't
+	want to do this, but you gotta have the threads if you
+	want Frisbee.
+
+	For Linux fans who are pissed about that FreeBSD comment,
+	take heart.  The image{zip,unzip,dump} tools work under
+	Linux as does the Frisbee server.  Currently, under Linux
+	the imagezipper only knows about EXT2 filesystems.  Nothing
+	fundamental here, just having rounded up all the necessary
+	BSD headers necessary to do BSD filesystems.  The Frisbee
+	client hasn't yet been ported to Linux and you shouldn't
+	need it in this release because...
+	
+How do I run Frisbee?
+
+	In Emulab we have an integrated environment from which we can
+	automatically boot a memory-based FreeBSD system via PXE.
+	For this release, we provide an ISO image of a bootable
+	FreeBSD system, complete with the frisbee client installed.
+
+	[ We haven't got the ISO image ready yet.  So ignore the
+	  rest of this for now. ]
+
+	Burn this puppy on a CD and boot it up.  It will prompt you
+	for some info about the system and then should come up to a
+	login prompt where you can login as root (no password).
+
+	To create an image using the CD, login to another machine with
+	sufficient disk space (a couple of hundred MB to a few GB,
+	depending on whether you are doing a full disk image and
+	whether you are using FS-aware compression).  Then, as root:
+
+	ssh cd-booted-machine 'imagezip /dev/ad0 -' > imagefile
+
+	To install an image somewhere...
+	
+
+
+
+[1] As I am sure everyone is aware, the *real* Frisbee is a trademark of
+    Wham-o, Inc. makers of the finest flying discs around.  Visit them at
+    http://www.wham-o.com/content/frisbee.html.  Note that while we also
+    do flying disk (images), you should not confuse the two domains.
+    Do not attempt to store your data on a 175g disc (even if you can
+    make it fit in your case) and never, ever play Ultimate with a
+    Seagate or Maxtor disk!
