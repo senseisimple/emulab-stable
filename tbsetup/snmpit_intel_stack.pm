@@ -65,8 +65,8 @@ sub new($$#@) {
     # We only need to create 1 snmpit_intel object, since we only have to
     # talk to one (for now) to do all the setup we need.
     #
-    #use snmpit_intel;
-    #    $self->{LEADER} = new snmpit_intel($stack_id,$self->{DEBUG});
+    use snmpit_intel;
+    $self->{LEADER} = new snmpit_intel($stack_id,$self->{DEBUG});
 
     bless($self,$class);
     return $self;
