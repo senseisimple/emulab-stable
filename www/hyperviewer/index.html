@@ -10,8 +10,13 @@
 <h3>Table of Contents:</h3>
 <ol>
   <li><a href="#intro">Introduction</a></li>
-  <li><a href="#platforms">Supported platforms, release notes<br>
-    </a></li>
+  <li><a href="#platforms">Supported platforms, release notes</a></li>
+  <ol style="list-style-type: lower-alpha;">
+    <li><a href="#freebsd_notes">FreeBSD</a></li>
+    <li><a href="#windows_notes">Windows</a></li>
+    <li><a href="#linux_notes">Linux</a><br>
+    </li>
+  </ol>
   <li><a href="#dependencies">Package dependencies</a></li>
   <li><a href="#install">Installing hypview</a></li>
   <ol style="list-style-type: lower-alpha;">
@@ -108,7 +113,8 @@ tilings</a>.<br>
 <hr style="width: 100%; height: 2px;"><br>
 <h3><a name="platforms"></a>Supported platforms, release notes:</h3>
 <ul>
-  <li><b>FreeBSD</b> - The first target system.</li>
+  <li><b><a name="freebsd_notes"></a>FreeBSD</b> - The first target
+system.</li>
 </ul>
 <ul>
   <ul>
@@ -142,7 +148,7 @@ cards.&nbsp; You will get a normal warning message:<br>
       <pre>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
     </li>
   </ul>
-  <li><b>Windows</b> - Initial version.</li>
+  <li><b><a name="windows_notes"></a>Windows</b> - Initial version.</li>
 </ul>
 <ul>
   <ul>
@@ -159,7 +165,8 @@ picking the node the edge leads to.</li>
 </ul>
 <ul>
   <ul>
-    <li>You connect to XMLRPC on boss.emulab.net via SSH to retrieve
+    <li><a name="windows_ssh"></a>You connect to XMLRPC on
+boss.emulab.net via SSH to retrieve
 experiments from the database.&nbsp; On Windows, you can use either the
       <a href="http://www.chiark.greenend.org.uk/%7Esgtatham/putty/">PuTTY</a>
 "plink" command line program or the <a href="http://www.cygwin.com/">Cygwin</a>
@@ -168,7 +175,8 @@ OpenSSH "ssh" program. <br>
   </ul>
 </ul>
 <div style="margin-left: 80px;">In either case, the proper directory
-has to be on your PATH environment variable, and you have to have an
+for plink.exe or ssh.exe has to be on your PATH environment variable,
+and you have to have an
 SSH key generated and loaded:</div>
 <ul>
   <ul>
@@ -198,7 +206,9 @@ into your .ssh/known_hosts file:<br>
 <ul>
 </ul>
 <ul>
-  <li><b>Linux</b> - Pretty much untested.<br>
+  <li><b><a name="linux_notes"></a>Linux</b> - Pretty much untested,
+but we're interested in which Linux platforms you want to run on.&nbsp;
+Meanwhile, you can build from sources:<br>
   </li>
   <ul>
     <li>Edit the GNUMakefile to select CPU=linux before building,</li>
@@ -386,6 +396,13 @@ use the File/Open menu command, or do this in a command shell:<br>
  style="font-weight: bold;">only</span> in the hyperviewer directory
 for now.<br>
 </div>
+<ul>
+  <li>To enable retrieving experiments from the Emulab database, see
+the notes on <a href="#windows_ssh">setting up SSH or PuTTY/plink for
+Windows</a>.<br>
+  </li>
+</ul>
+<div style="margin-left: 40px;"></div>
 <h4><a name="building_unix"></a>Building hypview on Unix/Linux</h4>
 Full sources for hypview and a version of the hyperviewer library are
 included in the release tarballs.&nbsp; There is also a <a
