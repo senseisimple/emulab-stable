@@ -104,20 +104,26 @@ print STDOUT "Checking Testbed interface configuration ... \n";
 # Open a connection to the TMCD, and then open a local file into which
 # we write ifconfig commands (as a shell script).
 # 
-#open(TM,  "$TMCC $NODE $IFCCMD |")
-#    or die "Cannot start $TMCC: $!";
-#open(IFC, ">$TMIFC")
-#    or die("Could not open $TMIFC");
-#print IFC "#!/bin/sh\n";
+open(TM,  "$TMCC $NODE $IFCCMD |")
+    or die "Cannot start $TMCC: $!";
+open(IFC, ">$TMIFC")
+    or die("Could not open $TMIFC");
+print IFC "#!/bin/sh\n";
     
-#while (<TM>) {
-#    $_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*)/;
-#    printf STDOUT "  $IFCONFIG", $1, $2, $3;
-#    printf IFC $IFCONFIG, $1, $2, $3;
-#}
-#close(TM);
-#close(IFC);
-#chmod(0755, "$TMIFC");
+while (<TM>) {
+    if ($_ =~
+	/INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) IPALIAS=([0-9.]*)/) {
+
+	printf STDOUT "  $IFCONFIG", $1, $4, $3;
+	printf IFC $IFCONFIG, $1, $4, $3;
+    }
+    else {
+	print STDOUT "   WARNING: No IP Alias defined!\n";
+    }
+}
+close(TM);
+close(IFC);
+chmod(0755, "$TMIFC");
 
 #
 # Host names configuration (/etc/hosts). 
@@ -195,8 +201,14 @@ while (<TM>) {
 	    $GLIST = "-G wheel";
 	}
 
+	#
+	# Do not give the -d argument. Breaks on netbsd, leaving the field
+	# empty in the password file. Instead, I changed /etc/usermgmt.conf
+	# on all the nodes so that home dirs default to /users, and that
+	# seems to work okay
+	# 
 	if (system("$USERADD -u $uid -g $gid -p $pswd $GLIST ".
-	           "-d /users/$login -s /bin/tcsh -c \"$name\" $login") != 0) {
+	           "-s /bin/tcsh -c \"$name\" $login") != 0) {
 	    print STDERR "Error adding new user $login\n";
 	    next;
 	}
