@@ -46,18 +46,24 @@ while (@row = $sth->fetchrow_array()) {
 # Get all the vlans from the switch
 
 my $list;
+my $vlan=0;
 open(LIST,"snmpit -l |") || die ("vlandiff: couldn't run snmpit: $!\n");
 while(<LIST>) {
   chop;
   if (/(^ID)|(^--)|(^1 )/) { next; }
   s/[\t ]+/ /g;
-  /(\d+)\s+(\S+)(?:\s+(.*)?)?/;
-  if (!defined $3) { $list = ""; } else { $list = $3; }
-  if ($2 ne "default") {
-    $switch{$2} = join(" ", sort split(" ",$list));
-    $id{$1} = $2;
-    $id{$2} = $1;
-    print "On switch: vlan #$1 $2: $switch{$2}\n" if $debug;
+  if ( /^(\d+)\s+(\S+)(?:\s+(.*))?$/ ) {
+    if (!defined $3) { $list = ""; } else { $list = $3; }
+    if ($2 ne "default") {
+      $switch{$2} = join(" ", sort split(" ",$list));
+      $id{$2} = $1;
+      $vlan = $2;
+      print "On switch: vlan #$1 $2: $switch{$2}\n" if $debug;
+    }
+  } elsif ( /^\s+(.*)?$/ ) {
+    if (!defined $1) { $list = ""; } else { $list = $1; }
+    $switch{$vlan} .= " ".join(" ", sort split(" ",$list));
+    print "On switch: vlan #$id{$vlan} $vlan: $switch{$vlan}\n" if $debug;
   }
 }
 close(LIST);
@@ -89,7 +95,7 @@ if (keys %table) {
 if (keys %switch) {
   print "On switch only:\n";
   foreach $key(sort keys %switch) {
-    print "#$id{$key}: $key\t$switch{$key}\n";
+    print "#",$id{"$key"},": $key\t$switch{$key}\n";
   }
   $rv++;
 }
