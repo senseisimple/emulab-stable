@@ -51,7 +51,7 @@ my $ping	= "/sbin/ping";
 my %pids	= ();
 my @row;
 my @nodes       = ();
-my $debug       = 1;
+my $debug       = 0;
 my $force       = 0;
 my $waitmode    = 0;
 my $failed      = 0;
