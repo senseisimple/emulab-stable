@@ -8,7 +8,7 @@ include ../../GNUmakerules
 # These get installed with .tcl extensions.
 # 
 SCRIPTS		= assign.tcl handle_os.tcl extract_tb.tcl libir.tcl \
-		  handle_ip.tcl
+		  handle_ip.tcl libir.pm
 
 all:
 
