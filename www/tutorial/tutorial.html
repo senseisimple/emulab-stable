@@ -25,6 +25,7 @@
     <ul>
     <li> <a href="#ADVEX">A more advanced example</a>
     <li> <a href="#RPMS">Installing RPMS automatically</a>
+    <li> <a href="#TARBALLS">Installing Tar files automatically</a>
     <li> <a href="#Startupcmd">
             Starting your application automatically</a>
     <li> <a href="#ReadyBits">
@@ -464,6 +465,7 @@ or not work as you expect. Again, please feel free to contact us.
 <ul>
 <li> <a href="#ADVEX">A more advanced example</a>
 <li> <a href="#RPMS">Installing RPMS automatically</a>
+<li> <a href="#TARBALLS">Installing Tar files automatically</a>
 <li> <a href="#Startupcmd">Starting your application automatically</a>
 <li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
 <li> <a href="#Delta">Customizing an OS (How to create a <i>delta</i>)</a>
@@ -499,6 +501,34 @@ RPMs are installed as root when the node first boots, and must reside
 on the node's local filesystem, or in a directory that can be reached
 via NFS. This is either the project's <tt>/proj</tt> directory, or a
 project member's home directory in <tt>/users</tt>.
+
+</p>
+
+<li> <a NAME="TARBALLS"></a>
+     <h3>Installing TAR files automatically</h3>
+<p>
+
+The Testbed NS extension <tt>tb-set-node-tarfiles</tt> allows you to
+specify a set of tarfiles to install on each of your nodes when it
+boots. This command is similar to the <a href="#RPMS">tb-set-node-rpms</a>
+above, and is provided for those people who do not want to spend a month
+trying to figure out how to build an RPM! The format of this command
+is slightly different though in that you must specify a directory in
+which to unpack the tar file. This avoids problems with having to
+specify absolute pathnames in your tarfile, which many modern tar
+programs balk at. 
+
+<code><pre>
+tb-set-node-tarfiles $nodeA /usr/site /proj/pid/tarfiles/silly.tar.gz </code></pre>
+
+The above NS code says to install the <tt>silly.tar.gz</tt> tar file
+on <tt>nodeA</tt> from the working directory <tt>/usr/site</tt> when
+the node first boots. The tarfile must reside on the node's local
+filesystem, or in a directory that can be reached via NFS. This is
+either the project's <tt>/proj</tt> directory, or a project member's
+home directory in <tt>/users</tt>. You may specify as many tarfiles as
+you wish, as long as each one is proceeded by the directory it should
+be unpacked in, all separated by spaces.
 
 </p>
 
