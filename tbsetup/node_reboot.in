@@ -204,9 +204,9 @@ while (@sortednodes) {
 	print STDOUT "Pausing to give some nodes time to reboot ...\n";
 	if ($lastshelf) {
 	    sleep(15);
-	}
+	} else {
 	    sleep(10);
-	else
+	}
     }
 }
 
