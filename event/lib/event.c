@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.1 2001-11-02 04:43:04 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.2 2001-11-02 17:33:34 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -23,8 +23,9 @@ static char rcsid[] = "$Id: event.c,v 1.1 2001-11-02 04:43:04 imurdock Exp $";
 
 static char hostname[MAXHOSTNAMELEN];
 
-/* Register with the event system.  Returns pointer to handle if
-   successful, NULL otherwise. */
+/* Register with the testbed event system.  Returns a pointer to
+   a handle that may be passed to other event system routines if
+   the operation is successful, NULL otherwise. */
 event_handle_t
 event_register(void)
 {
@@ -76,8 +77,8 @@ event_register(void)
     return handle;
 }
 
-/* Unregister with the event system.  Returns non-zero if successful,
-   0 otherwise. */
+/* Unregister with the testbed event system.  Returns non-zero if the
+   operation is successful, 0 otherwise. */
 int
 event_unregister(event_handle_t handle)
 {
@@ -113,8 +114,9 @@ event_unregister(event_handle_t handle)
     return 1;
 }
 
-/* Main event loop for event system.  Returns non-zero if successful,
-   0 otherwise. */
+/* Enter the main loop of the event system, waiting to receive event
+   notifications. Returns non-zero if the operation is successful, 0
+   otherwise. */
 int
 event_main(event_handle_t handle)
 {
@@ -136,8 +138,10 @@ event_main(event_handle_t handle)
     return 1;
 }
 
-/* Send the event notification NOTIFICATION.  Returns non-zero if
-   successful, 0 otherwise. */
+/* Send the event notification NOTIFICATION.  NOTIFICATION is
+   allocated by event_notification_alloc, and may optionally
+   have attributes added to it by event_notification_attr_put.
+   Returns non-zero if the operation is successful, 0 otherwise. */
 int
 event_notify(event_handle_t handle, event_notification_t notification)
 {
@@ -161,9 +165,12 @@ event_notify(event_handle_t handle, event_notification_t notification)
     return 1;
 }
 
-/* Allocate a notification of type TYPE for the host HOST (or,
-   if HOST is EVENT_HOST_ANY, all hosts).  Returns pointer to
-   notification if successful, NULL otherwise. */
+/* Allocate an event notification.  The HOST parameter specifies
+   the hostname of the node that should receive the notification,
+   or EVENT_HOST_ANY if the notification should go to all hosts.
+   The TYPE parameter specifies the event type.  Returns
+   a pointer to an event notification structure if the operation
+   is successful, 0 otherwise. */
 event_notification_t
 event_notification_alloc(event_handle_t handle, char *host, event_type_t type)
 {
@@ -208,8 +215,8 @@ event_notification_alloc(event_handle_t handle, char *host, event_type_t type)
     return notification;
 }
 
-/* Free the notification NOTIFICATION.  Returns non-zero if successful,
-   0 otherwise. */
+/* Free the event notification NOTIFICATION.  Returns non-zero if the
+   operation is successful, 0 otherwise. */
 int
 event_notification_free(event_handle_t handle,
                         event_notification_t notification)
@@ -239,10 +246,10 @@ struct attr_traverse_arg {
 static int attr_traverse(void *rock, char *name, elvin_basetypes_t type,
                          elvin_value_t value, elvin_error_t error);
 
-/* Get the attribute with name NAME and type TYPE from the
-   notification NOTIFICATION.  Writes the value of the
-   attribute to *VALUE and returns non-zero if successful,
-   0 otherwise. */
+/* Get the attribute with name NAME and type TYPE from the event
+   notification NOTIFICATION.
+   Writes the value of the attribute to *VALUE and returns
+   non-zero if the named attribute is found, 0 otherwise. */
 int
 event_notification_attr_get(event_handle_t handle,
                             event_notification_t notification,
@@ -280,9 +287,9 @@ event_notification_attr_get(event_handle_t handle,
     return 0;
 }
 
-/* Put the attribute with name NAME, type TYPE, and value VALUE into
-   the notification NOTIFICATION.  Returns non-zero if successful, 0
-   otherwise. */
+/* Add an attribute with name NAME, type TYPE, and value
+   VALUE to the notification NOTIFICATION.  Returns
+   non-zero if the operation is successful, 0 otherwise. */
 int
 event_notification_attr_put(event_handle_t handle,
                             event_notification_t notification,
@@ -363,10 +370,19 @@ static void notify_callback(elvin_handle_t server,
 
 #define EXPRESSION_LENGTH 1024
 
-/* Subscribe to events of type TYPE.  The callback CALLBACK will
-   be invoked when events of this type fire that are directed at
-   this host (or all hosts).  Returns pointer to subscription if
-   successful, NULL otherwise. */
+/* Subscribe to events of type TYPE.  Event notifications that match
+   TYPE will be passed to the callback function CALLBACK; DATA is
+   an arbitrary pointer that will be passed to the callback function.
+   Callback functions are of the form
+
+       void callback(event_handle_t handle,
+                     event_notification_t notification,
+                     void *data);
+
+   where HANDLE is the handle to the event server, NOTIFICATION is
+   the event notification, and DATA is the arbitrary pointer passed to
+   event_subscribe.  Returns a pointer to an event
+   subscription structure if the operation is successful, 0 otherwise. */
 event_subscription_t
 event_subscribe(event_handle_t handle, event_notify_callback_t callback,
                 event_type_t type, void *data)
