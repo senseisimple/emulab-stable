@@ -59,14 +59,16 @@ set libir "$scriptdir/ir/libir.tcl"
 source $libir
 namespace import TB_LIBIR::ir
 
-if {$argc != 2} {
-    puts stderr "Syntax: $argv0 <id> <ns-file>"
+if {$argc != 3} {
+    puts stderr "Syntax: $argv0 <pid> <eid> <ns-file>"
     exit 1
 }
 
-set nsFile [lindex $argv 1]
+set nsFile [lindex $argv 2]
 set t [split $nsFile .]
-set id [lindex $argv 0]
+set pid [lindex $argv 0]
+set eid [lindex $argv 1]
+set id "$pid-$eid"
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set irFile "$prefix.ir"
 set logFile "$prefix.log"

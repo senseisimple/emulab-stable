@@ -48,11 +48,12 @@ source $libir
 namespace import TB_LIBIR::ir
 
 if {$argc != 1} {
-    puts stderr "Syntax: $argv0 <ir-file>"
+    puts stderr "Syntax: $argv0 <pid> <eid> <ir-file>"
     exit 1
 }
 
-set irFile [lindex $argv 0]
+# ignore pid and eid for the moment.
+set irFile [lindex $argv 2]
 set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set logFile "$prefix.log"

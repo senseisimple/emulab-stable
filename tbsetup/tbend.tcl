@@ -39,13 +39,15 @@ set resetvlans "$scriptdir/resetvlans.tcl"
 source $libir
 namespace import TB_LIBIR::ir
 
-if {$argc != 2} {
-    puts stderr "Syntax: $argv0 <id> <ir-file>"
+if {$argc != 3} {
+    puts stderr "Syntax: $argv0 <pid> <eid> <ir-file>"
     exit 1
 }
 
-set irFile [lindex $argv 1]
-set id [lindex $argv 0]
+set irFile [lindex $argv 2]
+set pid [lindex $argv 0]
+set eid [lindex $argv 1]
+set id "$pid-$eid"
 set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set irFile "$prefix.ir"
