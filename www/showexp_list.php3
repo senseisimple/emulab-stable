@@ -13,7 +13,8 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 $isadmin     = ISADMIN($uid);
-$altclause   = "";
+$clause      = 0;
+$having      = "";
 $active      = 0;
 $idle        = 0;
 
@@ -38,13 +39,11 @@ echo "\n       <a href='showexp_list.php3?showtype=all&sortby=$sortby'>all</a>.
 # Handle showtype
 # 
 if (! strcmp($showtype, "all")) {
-    $clause = 0;
     $title  = "All";
 }
 elseif (! strcmp($showtype, "active")) {
     # Active is now defined as "having nodes reserved" - we just depend on
     # the fact that we skip expts with no nodes further down...
-    $clause = ""; 
     $title  = "Active";
     $active = 1;
 }
@@ -53,14 +52,13 @@ elseif (! strcmp($showtype, "batch")) {
     $title  = "Batch";
 }
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
-    # Don't put active in the clause for same reason as active
-    $clause = "1) having (lastswap>=$minidledays";
+    # Do not put active in the clause for same reason as active
     $title  = "Idle";
+    $having = "having (lastswap>=$minidledays)";
     $idle = 1;
 }
 else {
     # See active above
-    $clause = "";
     $title  = "Active";
     $active = 1;
 }
@@ -77,6 +75,8 @@ elseif (! strcmp($sortby, "uid"))
     $order = "e.expt_head_uid,e.pid,e.eid";
 elseif (! strcmp($sortby, "name"))
     $order = "e.expt_name";
+elseif (! strcmp($sortby, "pcs"))
+    $order = "ncount DESC";
 else 
     $order = "e.pid,e.eid";
 
@@ -86,15 +86,21 @@ else
 #
 if ($isadmin) {
     if ($clause)
-	$clause = "where ($clause)";
+	$clause = "and ($clause)";
     else
         $clause = "";
     
     $experiments_result =
-	DBQueryFatal("select pid,eid,expt_head_uid,expt_name,state,swappable,".
+	DBQueryFatal("select e.*,".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
-		     "(to_days(now())-to_days(expt_swapped)) as lastswap ".
-		     "from experiments as e $clause ".
+		     "(to_days(now())-to_days(expt_swapped)) as lastswap, ".
+                     "count(r.node_id) as ncount ".
+		     "from experiments as e ".
+                     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+                     "left join nodes as n on r.node_id=n.node_id ".
+                     "where (n.type!='dnard' or n.type is null) $clause ".
+                     "group by e.pid,e.eid ".
+		     "$having ".
 		     "order by $order");
 }
 else {
@@ -104,12 +110,19 @@ else {
         $clause = "";
     
     $experiments_result =
-	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name, ".
-		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ,".
-		     "state from experiments as e ".
-		     "left join group_membership as g on g.pid=e.pid ".
-		     "where g.uid='$uid' $clause ".
-		     "order by $order");
+	DBQueryFatal("select distinct e.*, ".
+                     "date_format(expt_swapped,'%Y-%m-%d') as d, ".
+                     "count(r.node_id) as ncount ".
+                     "from group_membership as g ".
+                     "left join experiments as e on ".
+                     "  g.pid=e.pid and g.pid=g.gid ".
+                     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+                     "left join nodes as n on r.node_id=n.node_id ".
+                     "where (n.type!='dnard' or n.type is null) and ".
+                     "      g.uid='$uid' $clause ".
+                     "group by e.pid,e.eid ".
+		     "$having ".
+                     "order by $order");
 }
 if (! mysql_num_rows($experiments_result)) {
     USERERROR("There are no experiments running in any of the projects ".
@@ -141,13 +154,15 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
               <td width=8%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
                   EID</td>
-              <td width=3%>PCs</td>\n";
+              <td width=3%>
+               <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
+                  PCs</td>\n";
 
     if ($isadmin)
 	echo "<td width=17% align=center>Last Login</td>\n";
     if ($idle)
-      echo "<td width=4% align=center>Days Idle</td>
-<td width=4% align=center>Swap Req.</td>\n";
+	echo "<td width=4% align=center>Days Idle</td>
+              <td width=4% align=center>Swap Req.</td>\n";
 
     echo "    <td width=60%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
@@ -157,8 +172,40 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
                   Head UID</td>
             </tr>\n";
 
-    $total_pcs = 0;
-    $total_sharks = 0;
+    #
+    # Okay, I decided to do this as one big query instead of a zillion
+    # per-exp queries in the loop below. No real reason, except my personal
+    # desire not to churn the DB.
+    # 
+    $total_usage  = array();
+    $perexp_usage = array();
+
+    #
+    # Geta all the classes of nodes each experiment is using, and create
+    # a two-D array with their counts.
+    # 
+    $usage_query =
+	DBQueryFatal("select r.pid,r.eid,nt.class, ".
+		     "  count(nt.class) as ncount ".
+		     "from reserved as r ".
+		     "left join nodes as n on r.node_id=n.node_id ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "where n.type!='dnard' ".
+		     "group by r.pid,r.eid,nt.class");
+
+    while ($row = mysql_fetch_array($usage_query)) {
+	$pid   = $row[0];
+	$eid   = $row[1];
+	$class = $row[2];
+	$count = $row[3];
+	
+	if (!isset($total_usage[$class]))
+	    $total_usage[$class] = 0;
+			
+	$total_usage[$class] += $count;
+	$perexp_usage["$pid:$eid"][$class] = $count;
+    }
+    
     while ($row = mysql_fetch_array($experiments_result)) {
 	$pid  = $row[pid];
 	$eid  = $row[eid];
@@ -184,40 +231,30 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	}
 
 	if ($idle) {
-	  $foo .= "</td><td align=center>$daysidle</td>\n";
-	  if ($swappable) {
-	    $foo .="<td align=center valign=center>
-<a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
-<img src=\"redball.gif\"></a>\n";
-	  } else {
-	    $foo .="<td>&nbsp;</td>\n";
-	  }
+	    $foo .= "</td><td align=center>$daysidle</td>\n";
+	    if ($swappable) {
+	        $foo .= "<td align=center valign=center>
+                           <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
+                              <img src=\"redball.gif\"></a>\n";
+	    }
+	    else {
+		$foo .="<td>&nbsp;</td>\n";
+	    }
 	}
-	
-	$usage_query =
-	    DBQueryFatal("select nt.class, count(*) from reserved as r ".
-			 "left join nodes as n on r.node_id=n.node_id ".
-			 "left join node_types as nt on n.type=nt.type ".
-			 "where r.pid='$pid' and r.eid='$eid' ".
-			 "group by nt.class;");
 
-	$usage["pc"]="";
-	$usage["pcRemote"]="";
-	$usage["shark"]="";
-	while ($n = mysql_fetch_array($usage_query)) {
-	  $usage[$n[0]] = $n[1];
+	$nodes = 0;
+	reset($perexp_usage);
+	if (isset($perexp_usage["$pid:$eid"])) {
+	    while (list ($class, $count) = each($perexp_usage["$pid:$eid"])) {
+		$nodes += $count;
+	    }
 	}
-	$nodes = $usage["pc"] + $usage["pcRemote"];
+
+	# in idle or active, skip experiments with no nodes.
+	if (($idle || $active) && $nodes == 0) { continue; }
+
 	if ($nodes==0) { $nodes = "&nbsp;"; }
 	
-	# in idle, skip experiments with no nodes (for now, node==pc)
-	if ($idle && $usage["pc"]==0) { continue; }
-	if ($active && $nodes==0 && $state!=$TB_EXPTSTATE_ACTIVE &&
-	    $state!=$TB_EXPTSTATE_ACTIVATING) { continue; }
-	
-	$total_pcs += $nodes;
-	$total_sharks += $usage["shark"];
-
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
@@ -232,9 +269,31 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
                </tr>\n";
     }
     echo "</table>\n";
-    echo "<center>\n<h2>Total PCs in $title experiments: $total_pcs<br>\n";#</h2>\n";
-    echo "Total Sharks in $title experiments: $total_sharks<br>\n";
-    echo "Total Nodes in $title experiments: ",$total_sharks+$total_pcs,"</h2>\n</center>\n";
+    echo "<br><center><b>Node Totals</b></center>\n";
+    echo "<table border=0
+                 cellpadding=1 cellspacing=1 align=center>\n";
+    $total = 0;
+    ksort($total_usage);
+    while (list($type, $count) = each($total_usage)) {
+	    $total += $count;
+	    echo "<tr>
+                    <td align=right>${type}:</td>
+                    <td>&nbsp &nbsp &nbsp &nbsp</td>
+                    <td align=center>$count</td>
+                  </tr>\n";
+    }
+    echo "<tr>
+             <td align=right><hr></td>
+             <td>&nbsp &nbsp &nbsp &nbsp</td>
+             <td align=center><hr></td>
+          </tr>\n";
+    echo "<tr>
+             <td align=right><b>Total</b>:</td>
+             <td>&nbsp &nbsp &nbsp &nbsp</td>
+             <td align=center>$total</td>
+          </tr>\n";
+    
+    echo "</table>\n";
 }
 
 #
