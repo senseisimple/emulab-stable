@@ -106,7 +106,7 @@ my $state;
 
 #
 # Experiment must exist.
-# 
+#
 if (!($state = ExpState($pid,$eid))) {
     die("There is no experiment $eid in project $pid\n");
 }
@@ -142,7 +142,7 @@ if (($state eq EXPTSTATE_ACTIVE) ||
 		     "left join nodes as n on r.node_id=n.node_id ".
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     "left join node_types as nt on nt.type=n.type ".
-		     "where r.pid='$pid' and r.eid='$eid'");
+		     "where r.pid='$pid' and r.eid='$eid' order by vname");
 
     while (($v,$p,$t,$m,$o,$s,$j,$r) = $query_result->fetchrow_array()) {
 	if (!$v) {
@@ -167,7 +167,7 @@ if (($state eq EXPTSTATE_ACTIVE) ||
 my $virtnodes_result =
     DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms,deltas," .
 		 "startupcmd,tarfiles,type,fixed from virt_nodes ".
-		 "where pid='$pid' and eid='$eid'");
+		 "where pid='$pid' and eid='$eid' order by vname");
 
 if ($shownodes) {
     print "Virtual Node Info:\n";
@@ -205,14 +205,14 @@ if ($shownodes) {
 
 #
 # Physical mapping of virtual topology
-# 
+#
 if ($showmap &&
     (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
 
     print  "Physical Node Mapping:\n";
     printf "%-15s %-12s %-15s %-12s\n", "ID", "Type", "OS", "Physical";
     print  "--------------- ------------ --------------- ------------\n";
-    
+
     foreach $v (keys(%v2pmap)) {
 	my $p = $v2pmap{$v}->{PNODE};
 	my $t = $v2pmap{$v}->{TYPE};
@@ -231,7 +231,7 @@ if ($showmap &&
 		     "where pid='$pid' and eid='$eid'");
     if ($range_result->numrows) {
 	my ($low,$high) = $range_result->fetchrow_array();
-	
+
 	print  "IP Port allocation:\n";
 	printf "%-15s %-12s \n", "Low", "High";
 	print  "--------------- ------------\n";
@@ -260,7 +260,7 @@ if ($showmap &&
 #
 if ($showlinks) {
     my %ipmap;
-    
+
     $virtnodes_result->dataseek(0);
 
     while (($vname,$ips) = $virtnodes_result->fetchrow_array()) {
@@ -274,7 +274,7 @@ if ($showlinks) {
 	DBQueryFatal("select vname,member,delay,bandwidth,lossrate, ".
 		     "rdelay,rbandwidth,rlossrate ".
 		     "from virt_lans where pid='$pid' and eid='$eid'".
-		     "order by vname");
+		     "order by vname,member");
 
     if ($result->numrows) {
 	print  "Virtual Lan/Link Info:\n";
@@ -282,10 +282,10 @@ if ($showlinks) {
 	       "ID", "Member", "IP", "Delay", "BW (Kbs)", "Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 	       "--------- ---------\n";
-    
+
 	while (($vname,$member,$delay,$bandwidth,$lossrate,
 		$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array()) {
-	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
+	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname,
 	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "",
 	           "", "", $rdelay, $rbandwidth, $rlossrate;
@@ -299,7 +299,7 @@ if ($showlinks) {
 		     "q_weight,q_linterm,q_qinbytes,q_red,q_gentle ".
 		     "  from virt_lans ".
 		     "where pid='$pid' and eid='$eid'".
-		     "order by vname");
+		     "order by vname,member");
 
     if ($result->numrows) {
 	print  "Virtual Queue Info:\n";
@@ -308,7 +308,7 @@ if ($showlinks) {
 	       "weight/min_th/max_th/linterm";
 	print  "--------------- --------------- ---------- ".
 	       "------- ----------------------------\n";
-    
+
 	while (($vname,$member,$q_limit,$q_maxthresh,$q_minthresh,
 		$q_weight,$q_linterm,$q_qinbytes,$q_red,$q_gentle)
 	       = $result->fetchrow_array()) {
@@ -333,9 +333,9 @@ if ($showlinks) {
 	$result =
 	    DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
 			 "from virt_lans where pid='$pid' and eid='$eid' and ".
-			 "widearea!=0");
+			 "widearea!=0 order by vname,member");
 	if ($result->numrows) {
-	    while (($vname,$member,$delay,$bandwidth,$lossrate) 
+	    while (($vname,$member,$delay,$bandwidth,$lossrate)
 		       = $result->fetchrow_array()) {
 		$member =~ /(.+):(\d+)/;
 		my ($pname,$card) = ($v2pmap{$1}->{PNODE}, $2);
@@ -363,7 +363,7 @@ if ($showlinks) {
 	    my %delaymap = ();
 	    while (my ($node_id1, $node_id2, $time, $bandwidth,
 		    $lossrate) = $result->fetchrow) {
-		$delaymap{"$node_id1 $node_id2"} = 
+		$delaymap{"$node_id1 $node_id2"} =
 		    [$time * 1000 / 2, $bandwidth, $lossrate];
 	    }
 
@@ -430,16 +430,18 @@ if ($showlinks) {
 #
 if ($showdelays &&
     (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
-    
+
     $result_delays =
 	DBQueryFatal("select d.*,r.vname as delayvname from delays as d ".
 		     "left join reserved as r on d.node_id=r.node_id ".
-		     "where d.pid='$pid' and d.eid='$eid'");
+		     "where d.pid='$pid' and d.eid='$eid' ".
+		     "order by vname,vnode0");
 
     $result_linkdelays =
 	DBQueryFatal("select * from linkdelays ".
-		     "where pid='$pid' and eid='$eid'");
-    
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vlan,vnode,node_id");
+
     if ($result_delays->numrows || $result_linkdelays->numrows) {
 	print  "Physical Lan/Link Info:\n";
 	printf "%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
@@ -466,7 +468,7 @@ if ($showdelays &&
 	}
 	print "\n";
     }
-    
+
     if ($result_linkdelays->numrows) {
 	while (my %row = $result_linkdelays->fetchhash()) {
 	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
@@ -484,7 +486,7 @@ if ($showdelays &&
 	}
 	print "\n";
     }
-	
+
     $result_delays->dataseek(0);
     $result_linkdelays->dataseek(0);
 
@@ -496,7 +498,7 @@ if ($showdelays &&
 	print  "--------------- --------------- ---------- ".
 	       "------- ----------------------------\n";
     }
-    
+
     if ($result_delays->numrows) {
 	while (my %row = $result_delays->fetchhash()) {
 	    printf("%-15s %-15s %-10s %-7s %s\n", $row{vname},
@@ -548,7 +550,7 @@ if ($showroutes) {
     my $result =
 	DBQueryFatal("select vname,src,dst,dst_type,dst_mask,nexthop,cost ".
 		     " from virt_routes where ".
-		     "pid='$pid' and eid='$eid' order by vname");
+		     "pid='$pid' and eid='$eid' order by vname,src,dst");
 
     if ($result->numrows) {
 	print  "Route List:\n";
@@ -556,7 +558,7 @@ if ($showroutes) {
 	       "Node", "Interface", "Dest", "Nexthop", "Type", "Cost";
 	print  "--------------- --------------- --------------- ".
 	       "--------------- ----- ----\n";
-	
+
 	while (($vname,$src,$dst,$dst_type,$dst_mask,$nexthop,$cost) =
 	       $result->fetchrow_array()) {
 
@@ -580,7 +582,7 @@ if ($showevents) {
 		"left join event_eventtypes as et on ex.eventtype=et.idx ".
 		"left join event_objecttypes as ot on ex.objecttype=ot.idx ".
 		"where ex.pid='$pid' and ex.eid='$eid' ".
-		"order by time");
+		"order by time,vnode,vname,idx");
 
     if ($result->numrows) {
 	if ($verbose) {
@@ -589,7 +591,7 @@ if ($showevents) {
 	           "Time", "Node", "Agent", "Type", "Event", "Arguments";
 	    print  "------------ ------------ ---------- ---------- ".
 		   "---------- ------------ \n";
-    
+
 	    while (($time,$vnode,$vname,$obj,$type,$args) =
 		   $result->fetchrow_array()){
 		printf("%-12s %-12s %-10s %-10s %-10s ",
@@ -611,7 +613,7 @@ if ($showevents) {
 	    my $min;
 	    my $max;
 	    my $count = $result->numrows;
-        
+
 	    while (($time,$vnode,$vname,$obj,$type,$args) =
 		   $result->fetchrow_array()) {
 
