@@ -82,7 +82,7 @@ certainly do things very differently.
 	mkdir ~/testbed
 	cd ~/testbed
 	mkdir obj-devel
-	cvs checkout testbed
+	cvs -d cvs.flux.utah.edu:/usr/flux/CVS checkout testbed
 
   Also:
 	# Links your web tree into the main tree so you get to it.
@@ -143,7 +143,7 @@ Okay, to install software into the main tree:
 	mkdir ~/testbed-current
 	cd ~/testbed-current
 	mkdir obj-real
-	cvs checkout testbed
+	cvs -d cvs.flux.utah.edu:/usr/flux/CVS checkout testbed
 
 * You should NEVER install from this tree unless you have updated from the
   repository and rebuilt it.
