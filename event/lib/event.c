@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.3 2001-11-06 17:01:19 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.4 2001-11-06 17:12:39 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -23,11 +23,22 @@ static char rcsid[] = "$Id: event.c,v 1.3 2001-11-06 17:01:19 imurdock Exp $";
 
 static char hostname[MAXHOSTNAMELEN];
 
-/* Register with the testbed event system.  Returns a pointer to
-   a handle that may be passed to other event system routines if
-   the operation is successful, NULL otherwise. */
+/* Register with the testbed event system.  NAME specifies the name of
+   the event server.  Returns a pointer to a handle that may be passed
+   to other event system routines if the operation is successful, NULL
+   otherwise.
+
+   Elvin note: NAME is a URL of the form "elvin:/[protocol
+   stack]/[endpoint]", where a protocol stack names a transport
+   module, a security module, and a marshaling module as a comma
+   separated list (e.g., "http,none,xml"), and the endpoint format
+   is dependent on the transport module used.  If no protocol
+   stack is given, the default stack (tcp, none, xdr) is used.  For the
+   testbed's purposes, "elvin://HOSTNAME" should suffice.  If NAME
+   is NULL, then Elvin's server discovery protocol will be used to find
+   the Elvin server. */
 event_handle_t
-event_register(char *url)
+event_register(char *name)
 {
     event_handle_t handle;
     elvin_handle_t server;
@@ -63,8 +74,8 @@ event_register(char *url)
     }
 
     /* Set the server URL, if we were passed one by the user. */
-    if (url) {
-        if (elvin_handle_append_url(server, url, status) == 0) {
+    if (name) {
+        if (elvin_handle_append_url(server, name, status) == 0) {
             ERROR("elvin_handle_append_url failed: ");
             elvin_error_fprintf(stderr, status);
             return 0;

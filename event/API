@@ -2,11 +2,22 @@
 
       #include <event.h>
 
-      event_handle_t event_register(void);
+      event_handle_t event_register(char *name);
 
-  Register with the testbed event system.  Returns a pointer to
-  a handle that may be passed to other event system routines if
-  the operation is successful, NULL otherwise.
+  Register with the testbed event system.  NAME specifies the name of
+  the event server.  Returns a pointer to a handle that may be passed
+  to other event system routines if the operation is successful, NULL
+  otherwise.
+
+  Elvin note: NAME is a URL of the form "elvin:/[protocol
+  stack]/[endpoint]", where a protocol stack names a transport
+  module, a security module, and a marshaling module as a comma
+  separated list (e.g., "http,none,xml"), and the endpoint format
+  is dependent on the transport module used.  If no protocol
+  stack is given, the default stack (tcp, none, xdr) is used.  For the
+  testbed's purposes, "elvin://HOSTNAME" should suffice.  If NAME
+  is NULL, then Elvin's server discovery protocol will be used to find
+  the Elvin server.
 
 
 * event_unregister: Unregister with the testbed event system

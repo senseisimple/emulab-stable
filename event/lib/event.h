@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.2 2001-11-06 17:01:20 imurdock Exp $
+ * $Id: event.h,v 1.3 2001-11-06 17:12:39 imurdock Exp $
  */
 
 #ifndef __EVENT_H__
@@ -77,7 +77,7 @@ typedef elvin_value_t event_attr_value_t;
  */
 
 /* event.c */
-event_handle_t event_register(char *url);
+event_handle_t event_register(char *name);
 int event_unregister(event_handle_t handle);
 int event_main(event_handle_t handle);
 int event_notify(event_handle_t handle, event_notification_t notification);
