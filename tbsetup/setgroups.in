@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,12 +23,12 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: setgroups [-b | -a] -p <pid> [user ...]\n".
-        "       setgroups [-b | -a] [user ...]\n";
+	"Usage: setgroups -p <pid> [user ...]\n".
+        "       setgroups [user ...]\n";
 	
     exit(-1);
 }
-my  $optlist = "bap:";
+my  $optlist = "p:";
 
 #
 # Configure variables
@@ -43,8 +43,6 @@ my $ADMINGRP= "@TBADMINGROUP@";
 my $SSH     = "$TB/bin/sshtb";
 my $USERMOD = "/usr/sbin/pw usermod";
 
-my $batchmode   = 0;
-my $auditmode   = 0;
 my $dbuid;
 my @userlist;
 my $pid;
@@ -74,6 +72,7 @@ $| = 1;
 # Load the Testbed support stuff. 
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
 
@@ -101,12 +100,6 @@ if ($UID == 0) {
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
-}
-if (defined($options{"b"})) {
-    $batchmode = 1;
-}
-if (defined($options{"a"})) {
-    $auditmode = 1;
 }
 if (defined($options{"p"})) {
     $pid = $options{"p"};
@@ -164,33 +157,14 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 #
 # This script always does the right thing, so it does not matter who
 # calls it.
-# 
-
 #
-# In batch mode, go to background and send email later.
-# 
-if ($batchmode || $auditmode) {
-    my $childpid;
-
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
     #
-    # Create a temporary name for a log file.
+    # Parent exits normally
     #
-    $logname = TBMakeLogname("setgroups");
-    
-    if ($childpid = TBBackGround($logname)) {
-	if ($auditmode) {
-	    waitpid($childpid, 0);
-	    exit($? >> 8);
-	}
-	    
-	#
-	# Parent exits normally
-	#
-	print STDOUT
-	    "Updating groups.\n".
-	    "You will be notified via email when the update is complete.\n";
-	exit(0);
-    }
+    exit(0);
 }
 
 # 
@@ -338,50 +312,11 @@ foreach my $uid (@userlist) {
 }
 
 print "Group Update Completed!\n";
-if ($batchmode || $auditmode) {
-    donotify("Group Update Completed!\n", 0);
-    unlink($logname);
-}
 exit(0);
 
-sub fatal($)
-{
+sub fatal($) {
     my($mesg) = $_[0];
 
-    print STDOUT "$mesg\n";
-
-    if ($batchmode || $auditmode) {
-	donotify($mesg, 1);
-	unlink($logname);
-    }
-    exit(-1);
-}
-
-sub donotify($$)
-{
-    my($mesg, $iserr) = @_;
-    my($subject, $from, $to, $hdrs);
-    my $MAIL;
-
-    $from    = $TBOPS;
-    $hdrs    = "Reply-To: $TBOPS";
-    
-    #
-    # An error goes just to Testbed Operations. Normal status messages go
-    # to the user and to the Testbed Logs address.
-    # 
-    if ($iserr) {
-	$subtext = "Failure";
-	$to      = "$TBOPS";
-    }
-    else {
-	$subtext = "Success";
-	$to      = "$user_name <$user_email>";
-	$hdrs    = "Bcc: $TBLOGS\n" . "$hdrs";
-    }
-
-    SENDMAIL($to,
-	     "Group Update $subtext",
-	     $mesg, $from, $hdrs,
-	     ($logname));
+    die("*** $0:\n".
+	"    $mesg\n");
 }

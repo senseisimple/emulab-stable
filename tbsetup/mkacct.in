@@ -19,10 +19,10 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: mkacct [-a] [-f] <name>\n";
+    print STDOUT "Usage: mkacct [-f] <name>\n";
     exit(-1);
 }
-my  $optlist = "af";
+my  $optlist = "f";
 
 #
 # Configure variables
@@ -50,11 +50,9 @@ my $GENELISTS = "$TB/sbin/genelists";
 my $SFSUPDATE = "$TB/sbin/sfskey_update";
 my $NOLOGIN   = "/sbin/nologin";
 
-my $auditmode = 0;
 my $sfschange = 0;
 my $errors    = 0;
 my $wasfrozen = 0;
-my $logname;
 my $user;
 my @db_row;
 my $query_result;
@@ -96,6 +94,7 @@ $| = 1;
 # Load the Testbed support stuff. 
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
 
@@ -106,9 +105,6 @@ use libtestbed;
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
-}
-if (defined($options{"a"})) {
-    $auditmode = 1;
 }
 if (defined($options{"f"})) {
     $sfschange = 1;
@@ -131,37 +127,8 @@ my $SSHDIR  = "$HOMEDIR/$user/.ssh";
 my $SFSDIR  = "$HOMEDIR/$user/.sfs";
 
 #
-# This script always does the right thing, but if a non admin runs it
-# for someone else, force auditmode. Technically speaking, this should
-# never happen since mere users do not have access to this script ...
+# This script always does the right thing ...
 #
-if (!TBAdmin($UID)) {
-    my $dbuid;
-
-    if (! UNIX2DBUID($UID, \$dbuid)) {
-	die("You are not a valid emulab user!\n");
-    }
-    if ($dbuid ne $user) {
-	$auditmode = 1;
-    }
-}
-
-#
-# In audit mode, go to background and wait so we can send email.
-# 
-if ($auditmode) {
-    my $childpid;
-    
-    #
-    # Create a temporary name for a log file.
-    #
-    $logname = TBMakeLogname("mkacct");
-    
-    if ($childpid = TBBackGround($logname)) {
-	waitpid($childpid, 0);
-	exit($? >> 8);
-    }
-}
 
 #
 # Get the user info (the user being created). This join picks out the
@@ -183,9 +150,20 @@ my $user_email  = $db_row[3];
 my $status      = $db_row[4];
 my $webonly     = $db_row[5];
 
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
 if ($webonly ||
     $status eq USERSTATUS_FROZEN ||
     $status eq USERSTATUS_NEWUSER ||
+    $status eq USERSTATUS_UNVERIFIED ||
     $status eq USERSTATUS_UNAPPROVED) {
 
     print "User $user status indicates he/she should not have an account!\n";
@@ -225,10 +203,6 @@ if ($webonly ||
     }
     if ($errors) {
 	fatal("Error clearing account for $user!");
-    }
-
-    if ($auditmode) {
-	unlink($logname);
     }
     exit(0);
 }
@@ -403,36 +377,7 @@ if ($WITHSFS && $sfschange) {
 	or fatal("$SFSUPDATE failed!");
 }
 
-if ($auditmode) {
-    AUDIT("Account Create Completed!\n", 0);
-    unlink($logname);
-}
 exit(0);
-
-sub fatal {
-    my($msg) = @_;
-
-    my $flist = ();
-    if (defined($logname)) {
-	$flist = ($logname);
-    }
-
-    SENDMAIL($TBOPS, "mkacct $user Failed", $msg, $TBOPS, undef, $flist);
-
-    if (defined($logname)) {
-	unlink($logname);
-    }
-    die("*** $0:\n".
-	"    $msg\n");
-}
-
-sub AUDIT($)
-{
-    my($msg) = @_;
-
-    SENDMAIL($TBLOGS, "mkacct $user Complete", $msg,
-	     $TBOPS, undef, ($logname));
-}
 
 #
 # Do some new account stuff.
@@ -462,7 +407,7 @@ sub FirstTime()
 	print "Generating sfs key\n";
 	if (system("$SSH -host $control_node '$SFSKEYGEN -KPn ".
 		   "$user\@ops.emulab.net $SFSDIR/identity'")) {
-	    fatal("Failure in sfskey gen: $!");
+	    fatal("Failure in sfskey gen!");
         }
 	$sfschange = 1;
 	
@@ -520,6 +465,8 @@ sub FirstTime()
 	}
 	return;
     }
+    # Avoid dups. 
+    AuditFork();
     
     $EUID = $user_number;
     $UID  = $EUID;
@@ -651,4 +598,11 @@ sub NewsshKeyfile($$$$$)
 	warn("*** Could not mv ${keyfile} to ${keyfile}.new: $!\n");
     }
     return 0;
+}
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
 }
