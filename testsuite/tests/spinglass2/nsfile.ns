@@ -15,7 +15,6 @@ set routers {}
 foreach supernet $supernets {
         set router [set router$supernet [$ns node]]
         lappend routers $router
-        tb-set-node-os $router FBSD40-STD
         tb-set-node-startup $router "/proj/Spinglass/router.script $nsupernets
 $j $nnets"
         foreach net $nets {

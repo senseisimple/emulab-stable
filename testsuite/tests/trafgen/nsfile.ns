@@ -28,12 +28,9 @@ set server [$ns node]
 set client-lan [$ns make-lan "$send $router $client" 100Mb 1ms]
 set server-lan [$ns make-lan "$consume $server $router" 100Mb 1ms]
 
-tb-set-node-os $router FBSD40-STD
 tb-set-node-startup $router /users/newbold/trafgen/fbsd-router-startup
 
-tb-set-node-os $client FBSD40-STD
 tb-set-node-startup $client /users/newbold/trafgen/clientroutecmd
-tb-set-node-os $server FBSD40-STD
 tb-set-node-startup $server /users/newbold/trafgen/serverroutecmd
 
 ########## Magic code ###############

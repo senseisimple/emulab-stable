@@ -12,10 +12,6 @@ set echo [$ns node]
 # each direction of 150 ms
 $ns duplex-link $ping $echo 100Mb 150ms DropTail
 
-# Set OSes for the nodes
-tb-set-node-os ping FBSD40-STD
-tb-set-node-os echo MAC-PINGREPLY
-
 tb-set-ip ping 192.168.101.1
 tb-set-ip echo 192.168.101.2
 
