@@ -28,7 +28,7 @@ tip.static: $(OBJS)
 $(OBJS): tipconf.h tip.h
 
 install: all
-	$(INSTALL_PROGRAM) tip.static $(INSTALL_BINDIR)/ntip
+	$(INSTALL_PROGRAM) tip.static $(INSTALL_BINDIR)/tip
 
 clean:
 	rm -f $(OBJS) tip tip.static
