@@ -2493,5 +2493,21 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table webcams add stillimage_URL tinytext;
 
-       
-  
+1.319: Add some more fields to virt_programs.
+
+	alter table virt_programs add dir tinytext;
+	alter table virt_programs add timeout int(10) unsigned default NULL;
+	alter table virt_programs add expected_exit_code tinyint(4) unsigned 
+	  default NULL;
+
+       Add a table for storing user config data that gets turned into
+       environment variables.
+
+	CREATE TABLE virt_user_environment (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  name varchar(255) NOT NULL default '',
+	  value text,
+	  PRIMARY KEY  (pid,eid,idx)
+	) TYPE=MyISAM;

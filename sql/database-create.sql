@@ -2064,6 +2064,9 @@ CREATE TABLE virt_programs (
   vnode varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
   command tinytext,
+  dir tinytext,
+  timeout int(10) unsigned default NULL,
+  expected_exit_code tinyint(4) unsigned default NULL,
   PRIMARY KEY  (pid,eid,vnode,vname),
   KEY vnode (vnode)
 ) TYPE=MyISAM;
@@ -2119,6 +2122,19 @@ CREATE TABLE virt_trafgens (
   generator tinytext NOT NULL,
   PRIMARY KEY  (pid,eid,vnode,vname),
   KEY vnode (vnode)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_user_environment`
+--
+
+CREATE TABLE virt_user_environment (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  idx int(10) unsigned NOT NULL auto_increment,
+  name varchar(255) NOT NULL default '',
+  value text,
+  PRIMARY KEY  (pid,eid,idx)
 ) TYPE=MyISAM;
 
 --
