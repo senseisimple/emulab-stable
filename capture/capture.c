@@ -379,13 +379,13 @@ capture()
 	 * and close the slave again.
 	 */
 #ifdef __FreeBSD__
-	if ((n = open(Ttyname, O_RDONLY)) < 0)
+	if ((i = open(Ttyname, O_RDONLY)) < 0)
 		die("%s: open: %s", Ttyname, geterr(errno));
 #endif
 	if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
 		die("%s: fcntl(O_NONBLOCK): %s", Ptyname, geterr(errno));
 #ifdef __FreeBSD__
-	close(n);
+	close(i);
 #endif
 #endif /* USESOCKETS */
 
@@ -416,6 +416,7 @@ capture()
 		}
 #endif
 		fds = sfds;
+		timeout.tv_usec = 0;
 #ifdef	USESOCKETS
 		if (needshake)
 			timeout.tv_sec  = 15;
@@ -436,9 +437,6 @@ capture()
 				handshake();
 				continue;
 			}
-#else
-			warn("No fds ready!");
-			sleep(1);
 #endif
 			continue;
 		}

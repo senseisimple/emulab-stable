@@ -5,7 +5,7 @@ SUBDIR		= capture
 
 include $(OBJDIR)/Makeconf
 
-all: capture capserver
+all: capture capserver capture-tty
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -17,10 +17,13 @@ DESTDIR=
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
 #
-CFLAGS= -g -O2 -DLOG_DROPS -DUSESOCKETS
+CFLAGS= -g -O2 -DLOG_DROPS
 
 capture: capture.c capdecls.h
-	cc $(CFLAGS) -o capture $<
+	cc $(CFLAGS) -DUSESOCKETS -o capture $<
+
+capture-tty: capture.c capdecls.h
+	cc $(CFLAGS) -o capture-tty $<
 
 capserver:	capserver.c capdecls.h
 	cc $(CFLAGS) $(DBFLAGS) -o capserver $< \
