@@ -392,7 +392,7 @@ sub DelUser()
 sub UpdatePassword()
 {
     # shell escape.
-    $pswd     =~ s/\$/\\\\\\\$/g;
+    $pswd     =~ s/\$/\\\$/g;
 
     #
     # Check status. Ignore if user is not active.
@@ -401,6 +401,8 @@ sub UpdatePassword()
 	print("$user is not active! Not updating the password!\n");
 	return 0;
     }
+
+    print "$pswd\n";
 
     $UID = 0;
     if ($CONTROL ne $BOSSNODE) {
