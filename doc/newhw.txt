@@ -11,14 +11,14 @@ Temp. worker co-ordination: Mac
 ***** Hardware
 **********************************************************************
 ISP110s:
-	Status: Ordered, 44 recived
-	Next shipment: 25-30, Aug 14 between 10:00AM and 11:00AM
+	Status: Ordered, 69 recived, at least 2 need to be returned
+	Next shipment: ??
 	Responsible: Rob
 	Note: Rails are currently backordered, should be in 8/14 or 8/15
 
 Network cables:
-	Status: Ordered
-	First shipment: Most should come Tuesday, 8/14
+	Status: Most have arrived, still waiting for serial cables and hoods
+	Next Shipment: ??
 	Responsible: Mac
 
 Rackmount nuts/screws:
@@ -52,6 +52,7 @@ Cyclades:
 
 Labels:
 	Avery labels for cables - pick them up at OfficeMax, etc.
+	Status: Arrived
 	Responsible: Rob
 	 
 Cable ties:
@@ -79,7 +80,7 @@ tip/capture:
 
 power:
 	Extend it to talk to RPC (serial) power controllers
-	Responsible: Mac?
+	Responsible: Mac
 	
 Disk image:
 	Build a disk image that has any changes required for ISPs
@@ -90,8 +91,9 @@ Disk image:
 ***** Problems to resolve
 **********************************************************************
 Pick control net ineterface:
-	Will depend on PXE capability and IRQ sharing
+	Bottom on-board interface will be control
 	Responsible: Mike
+	Status: Done
 
 Decide on machine numbering scheme:
 	Responsible: ??
@@ -104,12 +106,17 @@ Serial server:
 	Status: Done
 	ASA box has become tipserv1
 
+NIC probe order:
+	We need to determine if FreeBSD and Linux probe the NIC cards in the
+		same order, and if not, make the order consistent
+	Responsible: Rob
+
 **********************************************************************
 ***** Misc
 **********************************************************************
 Cable labels:
 	Responsible: Rob
-	Status: .ps file generated, need to be printed
+	Status: Printed
 
 PC labels:
 	Responsible: Rob
