@@ -29,8 +29,7 @@ while (<SNMPIT>) {
     @line = split;
     $id = $line[0];
     if (! ($id =~ /[0-9]+/)) {next;}
-    if ($line[1] eq "Control") {next;}
-    if ($line[1] eq "System") {next;}
+    if ($id == 1) {next;}
     $remove = 1;
     foreach $member (@line[2..$#line]) {
 	@elements = split(":",$member);
