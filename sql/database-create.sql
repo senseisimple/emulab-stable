@@ -396,9 +396,8 @@ CREATE TABLE node_idlestats (
   load_1min float NOT NULL default '0',
   load_5min float NOT NULL default '0',
   load_15min float NOT NULL default '0',
-  PRIMARY KEY  (node_id, tstamp)
-) TYPE = MyISAM;
-
+  PRIMARY KEY  (node_id,tstamp)
+) TYPE=MyISAM;
 
 #
 # Table structure for table 'node_types'
@@ -423,6 +422,16 @@ CREATE TABLE node_types (
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'nodeipportnum'
+#
+
+CREATE TABLE nodeipportnum (
+  node_id varchar(10) NOT NULL default '',
+  port smallint(5) unsigned NOT NULL default '5000',
+  PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
 #
@@ -739,6 +748,24 @@ CREATE TABLE tmcd_redirect (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'tunnels'
+#
+
+CREATE TABLE tunnels (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  node_id varchar(10) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  isserver tinyint(3) unsigned NOT NULL default '0',
+  port int(11) NOT NULL default '0',
+  peer_ip varchar(32) NOT NULL default '',
+  password varchar(32) NOT NULL default '',
+  encrypt tinyint(3) unsigned NOT NULL default '0',
+  compress tinyint(3) unsigned NOT NULL default '0',
+  PRIMARY KEY  (pid,eid,node_id,vname)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'uidnodelastlogin'
 #
 
@@ -898,6 +925,7 @@ CREATE TABLE virt_trafgens (
   port int(11) NOT NULL default '0',
   ip varchar(15) NOT NULL default '',
   target_vnode varchar(32) NOT NULL default '',
+  target_vname varchar(32) NOT NULL default '',
   target_port int(11) NOT NULL default '0',
   target_ip varchar(15) NOT NULL default '',
   generator tinytext NOT NULL,
@@ -939,6 +967,20 @@ CREATE TABLE webdb_table_permissions (
   allow_row_add_edit tinyint(1) default '0',
   allow_row_delete tinyint(1) default '0',
   PRIMARY KEY  (table_name)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'widearea_delays'
+#
+
+CREATE TABLE widearea_delays (
+  IP1 varchar(15) default NULL,
+  IP2 varchar(15) default NULL,
+  time double unsigned default NULL,
+  node_id1 text,
+  iface1 text,
+  node_id2 varchar(10) default NULL,
+  iface2 text
 ) TYPE=MyISAM;
 
 #
