@@ -162,7 +162,7 @@ class PLCagent:
 
 
 class mod_PLC:
-    def __init__(self, noIS = False):
+    def __init__(self, noIS = True):
         self.modname = "mod_PLC"
         self.noIS = noIS
         self.__PLCagent = None

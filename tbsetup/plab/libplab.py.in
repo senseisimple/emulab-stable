@@ -62,7 +62,7 @@ RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
 RENEW_TIMEOUT = 1*60     # give the node manager a minute to respond to renew
 FREE_TIMEOUT  = 1*60     # give the node manager a minute to respond to free
-NODEPROBEINT  = 10
+NODEPROBEINT  = 30
 
 TBOPS = "@TBOPSEMAIL@".replace("\\","")
 MAILTAG = "@THISHOMEBASE@"
@@ -859,7 +859,7 @@ class Slice:
 #
 
 class Node:
-    def __init__(self, slice, nodeid, pollNode = False):
+    def __init__(self, slice, nodeid, pollNode = True):
         self.slice = slice
         self.nodeid = nodeid
         self.IP = self.__findIP()
