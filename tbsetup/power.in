@@ -29,6 +29,7 @@ use libxmlrpc;
 use power_rpc27;
 use power_sgmote;
 use power_mail;
+use power_whol;
 use snmpit_apc;
 use libtestbed;
 use strict;
@@ -245,8 +246,8 @@ foreach my $power_id (keys %outlets) {
     my $IP;
     my $class;
 
-    if ($power_id eq "mail") {
-	$type = "mail";
+    if ($power_id eq "mail" || $power_id =~ /^whol-/) {
+	$type = $power_id;
 	$IP = "";
 	$class = "";
     }
@@ -294,6 +295,12 @@ foreach my $power_id (keys %outlets) {
 	# XXX: 'garcia' is temporary until stargates are subnodes of
 	# garcias
 	if (sgmotectrl($op,@nodes)) {
+	    print "Control of $nodestr failed.\n"; $exitval++;
+	    $errors++;
+	}
+    } elsif ($type =~ /whol-(\w+)/) {
+	my $iface = $1;
+	if (wholctrl($op,$iface,@nodes)) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
 	    $errors++;
 	}

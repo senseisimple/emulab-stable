@@ -1,0 +1,216 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Handle "Whack on LAN" reset.
+# Currently we serialize the operation, one node at a time.
+# Eventually we could do this in groups by putting multiple node
+# MAC addrs in the magic whol packet.
+#
+
+package power_whol;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( wholctrl );
+
+use lib "@prefix@/lib";
+use libdb;
+
+#
+# Commands we run
+#
+my $TBROOT = '@prefix@';
+my $bossnode = 'boss';
+
+my $TBWHOLPOWER = "$TBROOT/sbin/whol";
+my $SNMPIT = "$TBROOT/bin/snmpit -q";
+my $whollan = "WhOL";
+
+my $whackall = 1;
+my $dowhack = 1;
+my $debug = 0;
+
+# Turn off line buffering on output
+$| = 1;
+
+my %portinfo = ();
+
+# usage: wholctrl(cmd, nodes)
+# cmd = { "cycle" | "on" | "off" }
+# nodes = list of one or more physcial node names
+#
+# Returns 0 on success. Non-zero on failure.
+# 
+sub wholctrl($$@) {
+    my ($cmd, $iface, @nodes) = @_;
+    my $exitval = 0;
+
+    if ($cmd ne "cycle") {
+	warn "WhOL module can only \"cycle\" nodes\n";
+	return 1;
+    }
+
+    print STDERR "WhOL called with iface=$iface ", join(" ", @nodes), "\n"
+	if ($debug);
+
+    #
+    # Locate the whackable interface on each node along with its mac
+    # Find the boss interface while we are at it
+    #
+    for my $node (@nodes) {
+	my $result =
+	    DBQueryFatal("select card,mac from interfaces ".
+		"where role='expt' and whol=1 and node_id='$node'");
+	if ($result->num_rows() == 0) {
+	    warn "No WhOL interface for $node, skipping\n";
+	    $exitval++;
+	    next;
+	}
+	($card, $mac) = $result->fetchrow();
+	$portinfo{$node}{card} = $card;
+	$portinfo{$node}{mac} = $mac;
+	print STDERR "WhOL: $node: $card, $mac\n"
+	    if ($debug);
+    }
+
+    # XXX locking
+
+    if ($whackall) {
+	if (whacksome($iface, @nodes)) {
+	    $exitval++;
+	}
+    }
+    else {
+	for my $node (@nodes) {
+	    my @nodelist = ($node);
+
+	    if (whacksome($iface, @nodelist)) {
+		$exitval++;
+	    }
+	}
+    }
+
+    # XXX unlocking
+
+    return $exitval;
+}
+
+sub whacksome($@) {
+    my ($iface, @nodelist) = @_;
+    my $failed = 0;
+
+    my @portlist = map { "$_:$portinfo{$_}{card}" } @nodelist;
+    my $portstr = join(" ", @portlist);
+
+    if ($debug) {
+	print STDERR "Whackin: ", join(" ", @nodelist), "\n";
+	print STDERR "Ports:   ", $portstr, "\n";
+    }
+
+    #
+    # Save off the state of all ports
+    #
+    if (!open(SNMPIT, "$SNMPIT -b $portstr |")) {
+	warn "WhOL: snmpit -b failed\n";
+	return 1;
+    }
+    while (my $line = <SNMPIT>) {
+	chomp($line);
+
+	my %args = parseStatusString($line);
+	my $port = $args{port};
+	if (!$port) {
+	    warn "WhOL: snmpit returned bogus status string\n";
+	    return 1;
+	}
+	my ($node) = split(":", $port);
+	# untaint
+	if ($line =~ /(.*)/) {
+	    $portinfo{$node}{status} = $1;
+	}
+    }
+    if (!close(SNMPIT) || $?) {
+	warn "WhOL: could not get status for ports\n";
+	return 1;
+    }
+    if ($debug) {
+	print STDERR "Old port status:\n";
+	for my $key (keys(%portinfo)) {
+	    print STDERR "  $key: ", $portinfo{$key}{status}, "\n"
+		if ($portinfo{$key}{status});
+	}
+    }
+
+    #
+    # Put all ports in the WhOL VLAN, snmpit will enable them.
+    #
+    if (system("$SNMPIT -m $whollan $portstr")) {
+	warn "WhOL: could not place ports in WHOL LAN\n";
+	$failed++;
+    }
+    
+    #
+    # Strafe the VLAN with fiery packets of death.
+    #
+    if (!$failed && $dowhack) {
+	my $macstr = join(" ", map { $portinfo{$_}{mac} } @nodelist);
+
+	# XXX leave time for auto-negotiation if port had to be enabled
+	sleep(5);
+
+	if (system("$TBWHOLPOWER $iface $macstr")) {
+	    warn "WhOL: could not send WhOL packets\n";
+	    $failed++;
+	} else {
+	    print STDERR "Whacked ", @nodelist, "\n";
+	}
+    }
+
+    #
+    # Restore all ports to their previous state.
+    # This will move ports back to their original VLANs,
+    # disabling unused ports.
+    #
+    my $statstr = "";
+    for my $node (@nodelist) {
+	$statstr .= " -B '" . $portinfo{$node}{status} . "'";
+    }
+    if (system("$SNMPIT $statstr")) {
+	warn "WhOL: could not restore port state:\n";
+	for my $node (@nodelist) {
+	    print STDERR "  ", $portinfo{$node}{status}, "\n";
+	}
+	$failed++;
+    }
+
+    return $failed;
+}
+
+#
+# Snagged from snmpit.
+# Parse a port status string. Returns a key-value hash pair
+#
+sub parseStatusString($) {
+    my ($string) = @_;
+    chomp $string;
+
+    my %pairs;
+    foreach my $pair (split /;/, $string) {
+        my ($key, $value) = split /=/,$pair,2;
+        if (!$key || !$value) {
+            die "ERROR: Bad port status string: $string\n";
+        } else {
+            $pairs{$key} = $value;
+        }
+    }
+
+    return %pairs;
+}
+
+1;
