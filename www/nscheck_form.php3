@@ -15,7 +15,7 @@ LOGGEDINORDIE($uid);
 ?>
 <table align="center" border="1"> 
 <tr>
-    <td align="center" colspan="2">
+    <td align="center" colspan="3">
         <font size="+1">
                Use this page to syntax check your NS file before
                submitting it.
@@ -27,20 +27,33 @@ LOGGEDINORDIE($uid);
 echo "<form enctype=\"multipart/form-data\"
             action=\"nscheck.php3\" method=\"post\">\n";
 
+
 #
-# NS file upload.
+# NS file upload or on server.
 # 
 echo "<tr>
-          <td>Your NS file (20K max):</td>
-          <td><input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
+          <td rowspan>*Your NS file: &nbsp</td>
+
+          <td rowspan><center>Upload (20K max)<br>
+                                   <br>
+                                   Or<br>
+                                   <br>
+                              On Server (/proj or /users)
+                      </center></td>
+
+          <td rowspan>
+              <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
+              <br>
+              <br>
+              <input type=\"text\" name=\"exp_localnsfile\" size=\"40\">
               </td>
       </tr>\n";
 
 ?>
 
 <tr>
-    <td align="center" colspan="2">
+    <td align="center" colspan="3">
         <b><input type="submit" value="Check"></b></td>
 </tr>
 </form>
