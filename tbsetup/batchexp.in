@@ -256,8 +256,10 @@ sub fatal($)
     # at this point, no point in keeping the record. Just a waste of
     # space.
     #
-    DBQueryWarn("DELETE from experiment_stats ".
-		"WHERE eid='$eid' and pid='$pid'");
+    if (defined($idx) && $idx) {
+	DBQueryWarn("DELETE from experiment_stats ".
+		    "WHERE eid='$eid' and pid='$pid' and idx=$idx");
+    }
     
     exit(-1);
 }
