@@ -97,6 +97,12 @@ if ($mpid =~ /^([-\@\w.]+)$/) {
 kill('HUP', $mpid) or
     fatal("Could not kill(HUP) process $mpid (mountd): $!");
 
+#
+# Allow time to react since HUP'ing mountd causes all mounts to briefly
+# become invalid, and this causes problems for our scripts (and for users).
+#
+sleep(1);
+
 exit(0);
 
 sub fatal {
