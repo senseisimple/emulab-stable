@@ -109,7 +109,7 @@ sub ReadTranslationTable {
     $result = DBQueryFatal("select i.node_id,i.IP,n.type from interfaces as i ".
 	    "left join nodes as n on n.node_id=i.node_id ".
 	    "left join node_types as nt on n.type=nt.type ".
-	    "where n.role!='testnode' and i.card=nt.control_net");
+	    "where n.role!='testnode' and i.iface=nt.control_iface");
     while ( my ($name,$ip,$type) = $result->fetchrow_array()) {
 	$Devices{$name} = $ip;
 	$Devices{$ip} = $name;
