@@ -3895,7 +3895,7 @@ sub TBFieldData($$;$)
 	    }
 
 	    $key = $fielddata->{"check"};
-	    print STDERR "Redirecting to $key for $table/$column!\n";
+#	    print STDERR "Redirecting to $key for $table/$column!\n";
 	    next;
 	}
 	last;
@@ -3940,8 +3940,8 @@ sub TBcheck_dbslot($$$;$)
     my $max         = (defined($toplevel) ?
 		       $toplevel->{"max"} : $fielddata->{"max"});
 
-    print STDERR "Using $check/$check_type/$column_type/$min/$max for ".
-	"$table/$column\n";
+#    print STDERR "Using $check/$check_type/$column_type/$min/$max for ".
+#	"$table/$column\n";
 
     #
     # Functional checks not implemented yet.
