@@ -206,6 +206,12 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
+          <td>URL: </td>
+          <td class=\"left\">
+              <A href='$proj_URL'>$proj_URL</A></td>
+      </tr>\n";
+
+echo "<tr>
           <td>Created: </td>
           <td class=\"left\">$proj_created</td>
       </tr>\n";
