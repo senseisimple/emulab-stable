@@ -35,6 +35,7 @@ if ($opt{h} || @ARGV) {
 my $start_time = time();
 my $constraint_count = 0;
 my $failures = 0;
+my %cached_values;
 
 #
 # Grab all of the foreign key information from the database
@@ -48,20 +49,36 @@ while (my ($table1, $column1, $table2, $column2) = $result->fetchrow()) {
 
     #
     # Grab a list of all values listed in column2
+    # First, check to see if we've already cached the values for this table
     #
     my %valid_values = ();
-    my $result = DBQueryWarn("SELECT $column2 FROM $table2");
-    while (my @row = $result->fetchrow()) {
-	my $value = join(",",@row);
-	debug("Adding $value to valid_values\n");
-	$valid_values{$value} = 1;
+    if ($cached_values{$table2.$column2}) {
+	debug("Using previously cached values for $table2.$column2\n");
+	%valid_values = %{ $cached_values{$table2.$column2} };
+    } else {
+	debug("Getting values from database for $table2.$column2\n");
+
+	#
+	# We have to grab them from the database
+	#
+	my $result = DBQueryWarn("SELECT $column2 FROM $table2");
+	while (my @row = $result->fetchrow()) {
+	    my $value = join(",",@row);
+	    debug("Adding $value to valid_values\n");
+	    $valid_values{$value} = 1;
+	}
+
+	#
+	# Cache it for later
+	#
+	$cached_values{$table2.$column2} = \%valid_values;
     }
 
     #
     # Now, grab all of the values in column1, and make sure that they actually
     # exist
     #
-    $result = DBQueryWarn("SELECT $column1 FROM $table1");
+    my $result = DBQueryWarn("SELECT $column1 FROM $table1");
     while (my @row = $result->fetchrow()) {
 	#
 	# Skip values with undefined results
@@ -73,8 +90,8 @@ while (my ($table1, $column1, $table2, $column2) = $result->fetchrow()) {
 	my $value = join(",",@row);
 	debug("Checking to see if $value is valid\n");
 	if (!$valid_values{$value}) {
-	    print STDERR "ERROR: Found a value in $table1 ($value) that has " .
-	    	"no corresponding row in $table2\n";
+	    print STDERR "ERROR: Found a value in $table1.$column1 ($value) " .
+	    	"that has no corresponding row in $table2.$column2\n";
 	    $failures++;
 	}
     }
