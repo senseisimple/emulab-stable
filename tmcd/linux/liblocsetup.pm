@@ -10,14 +10,14 @@ use Exporter;
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line
+	 os_rpminstall_line enable_ipod
        );
 
 # Must come after package declaration!
 use English;
 
 #
-# This is where the Linux dependent part of the setup library lives.
+# This is the Linux dependent part of the setup library. 
 # 
 my $SETUPDIR = "/etc/rc.d/testbed";
 libsetup::libsetup_init($SETUPDIR);
@@ -223,4 +223,34 @@ sub os_setup()
     return 0;
 }
     
+use Socket;
+
+sub enable_ipod()
+{
+    if (system("sysctl net.ipv4.icmp_ipod_host")) {
+	warn "*** WARNING: IPOD sysctls not supported in the kernel\n";
+	return -1;
+    }
+
+    my ($bname, $bip) = split(/ /, `/etc/rc.d/testbed/tmcc bossinfo`);
+    if (!defined($bip)) {
+	warn "*** WARNING: could not determine boss node, IPOD not enabled\n";
+	return -1;
+    }
+    my $ipuint = unpack("N", inet_aton($bip));
+
+    # XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
+    my $sysctlcmd = sprintf("sysctl -w net.ipv4.icmp_ipod_host=%d", $ipuint);
+
+    if (system($sysctlcmd)) {
+	warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
+	return -1;
+    }
+    if (system("sysctl -w net.ipv4.icmp_ipod_enabled=1")) {
+	warn "*** WARNING: could not enable IPOD\n";
+	return -1;
+    }
+    return 0;
+}
+
 1;
