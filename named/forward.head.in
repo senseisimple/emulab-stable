@@ -23,7 +23,6 @@ $TTL	30
 ; and boss are both A records
 ns		IN	A		%bossnode_ip%
 %bossnode_ina%
-		IN	MX 10	ops
 
 ; CNAMEs for boss
 www		IN	CNAME   boss
@@ -32,7 +31,6 @@ cvsup		IN	CNAME	boss
 
 ; Ops and names it is otherwise known as...
 %usernode_ina%
-		IN	MX 10	ops
 ntp1		IN	CNAME	ops
 ntp2		IN	CNAME	ops
 event-server	IN	CNAME	ops

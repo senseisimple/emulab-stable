@@ -45,6 +45,9 @@ my $PUBLIC_ROUTER      = "@PUBLIC_ROUTER@";
 my $PUBLIC_NETMASK     = "@PUBLIC_NETMASK@";
 my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
 
+my $MXSTR = "\t\tIN\tMX 10\tops\n";
+
+
 # Testbed libraries.
 use lib "@prefix@/lib";
 use libdb;
@@ -84,49 +87,49 @@ while (<IF>) {
 	    }
 	    elsif ($2 eq "usernode_ina") {
                 $internal_strings .=
-                          "${USERTOKEN}\t\tIN\tA\t\t${USERNODE_IP}\n";
+                    "${USERTOKEN}\t\tIN\tA\t\t${USERNODE_IP}\n";
                 $external_strings .=
-                          "${USERTOKEN}\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
+                    "${USERTOKEN}\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
 		#
 		# If name is not "ops", we need an A record for that as well
 		#
 		if ($USERTOKEN ne "ops") {
 		    $internal_strings .=
-			"ops\t\tIN\tA\t\t${USERNODE_IP}\n";
+			"${MXSTR}ops\t\tIN\tA\t\t${USERNODE_IP}\n";
 		    $external_strings .=
-			"ops\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
+			"${MXSTR}ops\t\tIN\tA\t\t${EXTERNAL_USERNODE_IP}\n";
 		}
 		#
 		# If name is not "users" we need a CNAME for that
 		#
-		elsif ($USERTOKEN ne "users") {
+		if ($USERTOKEN ne "users") {
 		    $internal_strings .=
-			"users\t\tIN\tCNAME\t\t${USERTOKEN}\n";
+			"users\t\tIN\tCNAME\tops\n";
 		    $external_strings .=
-			"users\t\tIN\tCNAME\t\t${USERTOKEN}\n";
+			"users\t\tIN\tCNAME\tops\n";
 		}
 	    }
 	    elsif ($2 eq "bossnode_ina") {
                 $internal_strings .=
-                          "${BOSSTOKEN}\t\tIN\tA\t\t${BOSSNODE_IP}\n";
+                    "${BOSSTOKEN}\t\tIN\tA\t\t${BOSSNODE_IP}\n${MXSTR}";
                 $external_strings .=
-                          "${BOSSTOKEN}\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n";
+                    "${BOSSTOKEN}\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n${MXSTR}";
 		#
 		# If name is not "boss", we need an A record for that as well
 		#
 		if ($BOSSTOKEN ne "boss") {
 		    $internal_strings .=
-			"boss\t\tIN\tA\t\t${BOSSNODE_IP}\n";
+			"boss\t\tIN\tA\t\t${BOSSNODE_IP}\n${MXSTR}";
 		    $external_strings .=
-			"boss\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n";
+			"boss\t\tIN\tA\t\t${EXTERNAL_BOSSNODE_IP}\n${MXSTR}";
 		}
 	    }
 	    elsif ($2 eq "fsnode_ina") {
 		if ($USERNODE_IP ne $FSNODE_IP) {
 		    $internal_strings .=
-                          "fs\t\tIN\tA\t\t${FSNODE_IP}\n";
+                          "fs\t\tIN\tA\t\t${FSNODE_IP}\n${MXSTR}";
 		    $external_strings .=
-                          "fs\t\tIN\tA\t\t${EXTERNAL_FSNODE_IP}\n";
+                          "fs\t\tIN\tA\t\t${EXTERNAL_FSNODE_IP}\n${MXSTR}";
 		} else {
 		    $internal_strings .=
                           "fs\t\tIN\tCNAME\tops\n";
@@ -136,10 +139,8 @@ while (<IF>) {
 	    }
 	    elsif ($2 eq "fsnode_mx") {
 		if ("$USERNODE_IP" ne "$FSNODE_IP") {
-		    $internal_strings .=
-			  "\t\tIN\tMX 10\tops\n";
-		    $external_strings .=
-			  "\t\tIN\tMX 10\tops\n";
+		    $internal_strings .= ${MXSTR};
+		    $external_strings .= ${MXSTR};
 		} else {
 		    ;
 		}
