@@ -14,14 +14,17 @@ proc outs {args} {
     puts $logFp $s
 }
 
-if {[file dirname [info script]] == "."} {
+set scriptdir [file dirname [info script]]
+if {$scriptdir == "."} {
     set updir ".."
 } else {
-    set updir [file dirname [file dirname [info script]]]
+    set updir [file dirname $scriptdir]
 }
 set snmpit "$updir/switch_tools/intel510/snmpit"
 set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
 set libir "$updir/ir/libir.tcl"
+set ir2ifc "$scriptdir/ir2ifc"
+set ifcboot "$scriptdir/ifc_boot"
 
 source $libir
 namespace import TB_LIBIR::ir
@@ -69,11 +72,18 @@ if {[catch "exec $snmpit -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
     exit 1
 }
 
-outs "PLACEHOLDER - Verifying virtual network."
+#outs "PLACEHOLDER - Verifying virtual network."
 outs "PLACEHOLDER - Copying disk images."
 outs "PLACEHOLDER - Booting for the first time."
 outs "PLACEHOLDER - Verifying OS functionality."
-outs "PLACEHOLDER - Setting up interfaces."
+
+# XXX - This should only be done for linux/freebsd OSs
+outs "Setting up interfaces."
+if {[catch "exec cat $irFile | $ir2ifc | $ifcboot >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error setting interfaces ($err)"
+    exit 1
+}
+
 outs "PLACEHOLDER - Installing secondary pacakages."
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."

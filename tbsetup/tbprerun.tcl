@@ -22,6 +22,14 @@ if {[file dirname [info script]] == "."} {
 set ns2ir "$updir/ir/ns2ir/parse.tcl"
 set assign "$updir/ir/assign.tcl"
 set handle_ip "$updir/ir/handle_ip.tcl"
+set avail "$updir/db/avail"
+set ptopgen "$updir/db/ptopgen"
+set ptopfile "$updir/ir/testbed.ptop"
+set reserve "$updir/db/nalloc"
+set libir "$updir/ir/libir.tcl"
+
+source $libir
+namespace import TB_LIBIR::ir
 
 if {$argc != 1} {
     puts stderr "Syntax: $argv0 <ns-file>"
@@ -60,7 +68,11 @@ if {! [file exists $irFile]} {
     exit 1
 }
 
-outs "PLACEHOLDER - Determining available resources."
+outs "Determining available resources."
+if {[catch "exec $avail type=pc OS=FreeBSD ver extras | $ptopgen > $ptopfile 2>@ $logFp" err]} {
+    outs stderr "Error determining available resources. ($err)"
+    exit 1
+}
 
 outs "Allocating resources - This may take a while."
 if {[catch "exec $assign $irFile >@ $logFp 2>@ $logFp" err]} {
@@ -68,7 +80,18 @@ if {[catch "exec $assign $irFile >@ $logFp 2>@ $logFp" err]} {
     exit 1
 }
 
-outs "PLACEHODLER - Reserving resources."
+ir read $irFile
+set nodemap [ir get /virtual/nodes]
+set machines {}
+foreach pair $nodemap {
+    lappend machines [lindex $pair 1]
+}
+
+outs "PLACEHOLDER - Reserving resources."
+if {[catch "exec $reserve $prefix $machines >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error reserving resources. ($err)"
+    exit 1
+}
 
 outs "Allocating IP addresses."
 if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
