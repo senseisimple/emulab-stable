@@ -1,0 +1,242 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# newnode - a script for moving nodes from the new_ tables into production.
+#
+
+use lib '/usr/testbed/devel/ricci/lib';
+
+use libdb;
+
+use strict;
+
+my $TB = "/usr/testbed/devel/ricci";
+
+my $switchmac = "$TB/sbin/switchmac";
+my $sched_reload = "$TB/sbin/sched_reload";
+my $nalloc = "$TB/bin/nalloc";
+my $nfree = "$TB/bin/nfree";
+my $dhcpd_makeconf = "$TB/sbin/dhcpd_makeconf";
+
+my $dhcpd_conf = "/usr/local/etc/dhpcd.conf";
+my $dhcpd_template = "/usr/local/etc/dhcpd.conf.template";
+my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
+
+if (!TBAdmin()) {
+    die "Sorry, only testbed administrators can run this script!\n";
+}
+
+if (@ARGV < 1) {
+    die "Usage: $0 <node_id> ...\n";
+}
+
+my @node_ids = @ARGV;
+
+#
+# Start this party by getting MAC addresses from the switches
+#
+print "Getting MAC addresses from the switches (this could take a while!)\n";
+open(MAC,"$switchmac |") or die "Unable to fork: $!\n";
+my %wires;
+while (my $line = pop @switchmac) {
+    chomp $line;
+    my ($MAC,$switchport,$vlan,$iface) = split /,/, $line;
+    if ($switchport !~ /^([\w-]+)\/(\d+)\.(\d+)$/) {
+	die "Bad line from $switchmac: $line\n";
+    }
+    my ($switch, $card, $port) = ($1,$2,$3);
+    $wires{$MAC} = [$switch, $card, $port];
+    print "filling wires{$MAC}\n";
+}
+
+#
+# Now, loop through the nodes given, and add each one
+#
+my @succeeded_nodes;
+NODE: foreach my $node_id (@node_ids) {
+    my $query_result;
+
+    #
+    # Check to make sure said node does not already exist!
+    #
+    $query_result = DBQueryFatal("SELECT node_id FROM nodes WHERE " .
+	"node_id='$node_id'");
+    if ($query_result->num_rows()) {
+	warn "Node $node_id failed: a node with that name already exists!\n";
+	next NODE;
+    }
+
+    #
+    # Grab information about the node from the new_nodes table
+    #
+    $query_result = DBQueryFatal("SELECT type, IP FROM new_nodes " .
+	"WHERE node_id='$node_id'");
+    if (!$query_result->num_rows()) {
+	warn "Node $node_id failed: No pending node with that name exists!\n";
+	next NODE;
+    }
+    my ($type, $IP) = $query_result->fetchrow();
+
+    #
+    # Make sure that the new node is of a valid type, and grab a few other
+    # things to fill in as initial values
+    #
+    $query_result = DBQueryFatal("SELECT control_net FROM node_types " .
+	"WHERE type='$type'");
+    if (!$query_result->num_rows()) {
+	warn "Node $node_id failed: Type $type does not exist!\n";
+	next NODE;
+    }
+    my ($control_net) = $query_result->fetchrow();
+
+    #
+    # Grab the node's MACs from the new_interfaces table
+    #
+    $query_result = DBQueryFatal("SELECT iface, MAC, interface_type " .
+	"FROM new_interfaces WHERE node_id='$node_id'");
+    if (!$query_result->num_rows()) {
+	warn "Node $node_id failed: Must have at least one interface!\n";
+	next NODE;
+    }
+
+    my %interfaces;
+    while (my ($iface, $MAC, $iface_type) = $query_result->fetchrow()) {
+	#
+	# Get some more information about this interface type
+	#
+	my $iface_query = DBQueryFatal("SELECT max_speed, full_duplex " .
+	    "FROM interface_types WHERE type='$iface_type'");
+	if (!$iface_query->num_rows()) {
+	    warn "Node $node_id failed: Interface $iface is of unknown type " .
+	    	"$iface_type";
+	    next NODE;
+	}
+
+	my ($max_speed, $full_duplex) = $iface_query->fetchrow();
+
+	#
+	# Stash it away...
+	#
+	$interfaces{$iface} = [$MAC, $iface_type, $max_speed, $full_duplex];
+
+	#
+	# Check to see if we have wires for all of the interfaces - we can ignore
+	# the control net, it's OK if we don't have that one.
+	#
+	if ($iface eq "eth$control_net") {
+	    next NODE;
+	}
+
+	if (!$wires{$MAC}) {
+	    print "Node $node_id failed: Could not find switch port for ".
+		"$MAC ($iface)\n";
+	    next NODE;
+	}
+    }
+
+    #
+    # Make up a priority (just used for sorting)
+    #
+    $node_id =~ /(\d+)$/;
+    my $priority;
+    if ($1) {
+	$priority = $1;
+    } else {
+	$priority = 1;
+    }
+
+    #
+    # Okay, time to actually add the node!
+    #
+    
+    DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
+	"phys_nodeid='$node_id', role='testnode', priority=$priority");
+
+    while (my ($iface, $aref) = each %interfaces) {
+	my ($MAC, $iface_type, $speed, $duplex) = @$aref;
+	$iface =~ /(\d+)$/;
+	my $card = $1;
+	my $iface_IP = "";
+	my $wire_type = "Node";
+	if ($card == $control_net) {
+	    $iface_IP = $IP;
+	    $wire_type = "Control";
+	}
+	DBQueryFatal("INSERT INTO interfaces SET node_id='$node_id', " .
+	    "card=$card, port=1, mac='$MAC', IP='$iface_IP', " .
+	    "interface_type='$iface_type', iface='$iface', " .
+	    "current_speed='$speed', duplex=$duplex");
+
+	if ($card != $control_net) {
+	    my ($switch, $card2, $port2) = @{$wires{$MAC}};
+	    DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
+		"node_id1='$node_id', card1=$card, port1=1, node_id2='$switch', " .
+		"card2=$card2, port2=$port2");
+	}
+    }
+
+    #
+    # TODO - Do we need to get the nodes into a good state for the event system?
+    #
+
+    #
+    # Put the node into hwdown and schedule a reload for it
+    #
+    system "$nalloc emulab-ops hwdown $node_id";
+    system "$sched_reload $node_id";
+
+    #
+    # Remove the node from the new_ tables
+    #
+    DBQueryFatal("DELETE FROM new_nodes WHERE node_id='$node_id");
+    DBQueryFatal("DELETE FROM new_interfaces WHERE node_id='$node_id'");
+
+    print "$node_id succesfully added!";
+
+    push @succeeded_nodes, $node_id;
+}
+
+#
+# No point in restarting dhcpd, etc. if there are no nodes that succeeded
+#
+if (!@succeeded_nodes) {
+    die "No nodes succeeded, exiting early\n";
+}
+
+#
+# Re-generate dhcpd.conf
+#
+if (! -f $dhcpd_template) {
+    warn "Warning: $dhcpd_template does not exist\n";
+    warn "You'll need to re-run dhcpd_makeconf manually, then free the new\n";
+    warn "nodes from emulab-ops/hwdown\n";
+} else {
+    print "Re-generating dhcpd.conf\n";
+    open(CONF,"$dhcpd_makeconf $dhcpd_template|") or die "Unable to fork: $!\n";
+    my @conf = <CONF>;
+    close CONF or die "Error reading from dhcpd_makeconf: $!\n";
+
+    open(CONF,">$dhcpd_conf") or die "Unable to open $dhcpd_conf for writing\n";
+    print CONF @conf;
+    close CONF;
+
+    print "Restarting dhcpd\n";
+    system "$dhcpd_rc stop";
+    system "$dhcpd_rc start";
+
+    #
+    # Now, free all the nodes we just made from hwdown, so that they can reload
+    #
+    system "$nfree emulab-ops hwdown " . join(" ",@succeeded_nodes);
+
+}
+
+#
+# TODO - add nodes to named?
+#

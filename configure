@@ -1404,7 +1404,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables utils/eventping \
-	utils/cvsupd.pl \
+	utils/cvsupd.pl utils/newnode \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/webvistopology \
 	vis/dbvistopology \
