@@ -138,6 +138,7 @@ typedef struct {
 	char		creator[TBDB_FLEN_UID];
 	char		swapper[TBDB_FLEN_UID];
 	char		syncserver[TBDB_FLEN_VNAME];	/* The vname */
+	char		keyhash[TBDB_FLEN_PRIVKEY];
 	char		testdb[256];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
@@ -197,6 +198,7 @@ COMMAND_PROTOTYPE(doixpconfig);
 COMMAND_PROTOTYPE(doslothdparams);
 COMMAND_PROTOTYPE(doprogagents);
 COMMAND_PROTOTYPE(dosyncserver);
+COMMAND_PROTOTYPE(dokeyhash);
 
 struct command {
 	char	*cmdname;
@@ -244,6 +246,7 @@ struct command {
         { "sdparams",   doslothdparams},
         { "programs",   doprogagents},
         { "syncserver", dosyncserver},
+        { "keyhash",    dokeyhash},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -3623,7 +3626,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.gid,e.testdb,nv.update_accounts, "
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,pt.class,pt.type, "
-				 " pt.isremotenode,vt.issubnode "
+				 " pt.isremotenode,vt.issubnode,e.keyhash "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3639,7 +3642,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as vt on "
 				 " vt.type=nv.type "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 18, reqp->vnodeid, inet_ntoa(ipaddr));
+				 19, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -3647,7 +3650,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " n.update_accounts,n.role, "
 				 " e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,t.class,t.type, "
-				 " t.isremotenode,t.issubnode "
+				 " t.isremotenode,t.issubnode,e.keyhash "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3657,7 +3660,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.iface=t.control_iface "
 				 "where i.IP='%s'",
-				 18, inet_ntoa(ipaddr));
+				 19, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3718,6 +3721,9 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		/* Sync server for the experiment */
 		if (row[13]) 
 			strcpy(reqp->syncserver, row[13]);
+		/* keyhash for the experiment */
+		if (row[18]) 
+			strcpy(reqp->keyhash, row[18]);
 	}
 	if (row[9])
 		reqp->update_accounts = atoi(row[9]);
@@ -4899,6 +4905,32 @@ COMMAND_PROTOTYPE(dosyncserver)
 		reqp->syncserver,
 		reqp->eid, reqp->pid, OURDOMAIN,
 		(strcmp(reqp->syncserver, reqp->nickname) ? 0 : 1));
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	if (verbose)
+		info("%s", buf);
+	
+	return 0;
+}
+
+/*
+ * Return keyhash info
+ */
+COMMAND_PROTOTYPE(dokeyhash)
+{
+	char		buf[MYBUFSIZE];
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("KEYHASH: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+	if (!strlen(reqp->keyhash))
+		return 0;
+
+	sprintf(buf, "KEYHASH HASH='%s'\n", reqp->keyhash);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
