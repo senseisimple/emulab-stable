@@ -10,6 +10,8 @@ case "$1" in
 		fi
 
 		if [ -x @prefix@/sbin/dbboot ]; then
+		        # Delay a moment so that mysqld has started!
+		        sleep 2
 			echo -n " dbboot"
 			@prefix@/sbin/dbboot
 		fi
