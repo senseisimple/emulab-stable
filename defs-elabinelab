@@ -38,6 +38,15 @@ ELABINELAB=1
 # The name of the outer boss for inner boss to request services from.
 OUTERBOSSNODE=changeme
 #
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City Virtual World"
+SSLCERT_ORGNAME="Utah Network ElabInElab"
+#
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
 TESTBED_NETWORK=changeme
