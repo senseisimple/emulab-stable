@@ -1,0 +1,190 @@
+Apache authentication module for MySQL v2.20
+============================================
+
+Maintainer:		Zeev Suraski <bourbon@netvision.net.il>
+
+
+What's New?
+-----------
+
+There were quite a few fixes and changes that warranted jumping from 2.11
+to 2.20.  First, there were a couple of bugs that were fixed - namely,
+with users who belonged to more than one group, and with with the
+scrambled/encrypted passwords directives.
+
+Apart from those fixes, two new directives that correspond to two new
+functionalities were added.  First, it is now possible to instruct the module
+to disconnect from the SQL server after every authentication request.  It is
+still not possible to authenticate using more than one SQL server host, but
+it is possible to prevent all of the SQL links from staying alive all the time.
+Note that as far as I see it, there's no reason to use this option, and there
+are reasons against it - but still, it seemed to bother some people, so I
+added it.
+Second - the code now has a fairly general encryption scheme support.  Right
+now, only the three original encryption types are supported (no encryption,
+DES crypt and MySQL's encryption), but it's now extremely easy and general
+to add support for new encryption types.  Also, it's now possible to instruct
+the module to try more than one encryption method in each authentication job.
+E.g., you may want to allow both plaintext and crypt passwords in the database.
+
+As far as downwards incompatible changes are concerned - there's one major
+downwards incompatible change, which is a total renaming of the directives.
+The 2.0x and 2.1x directive names were based on the original mod_auth_msql
+directive names, and were extremely inconsistent and messed up in my opinion.
+A very simple script is bundled with this distribution, that converts any of
+your old .htaccess files to use the new directive names.  This script requires
+the 'replace' utility, that is bundled with MySQL.  The script name is
+'update_htaccess_files.sh', and will convert any .htaccess files under the
+current directory and its subdirectories.  If your Apache per-directory
+configuration file name isn't '.htaccess', edit this script and change
+the name accordingly.
+
+Last but not least, the package now comes with a configure script that allows
+you to set your MySQL installation directory, as well as your Apache
+installation directory.  It also supports the easy to use Apache 1.3.x module
+configuration, even though it's still 100% Apache 1.2.x compatible.  Thanks
+goes to Rasmus Lerdorf for helping me on this one.
+
+
+General
+-------
+
+This module is originally based on the MySQL-patched mod_auth_msql.c, but the
+truth is, very little (if any) remains from the previous
+mod_auth_msql.c/mod_auth_mysql.c.  Since MySQL can handle lots of simultaneous
+connections easily (unlike mSQL), I've more or less rebuilt the module from
+the bottom up to keep the SQL link alive in between hits.  I've also cleaned
+up the code (mostly be deleting it and writing it in another way), dumped the
+large static query buffers in favour of pool-allocated memory, and possibly
+some other stuff.
+
+
+Who shouldn't use it
+--------------------
+
+Somebody who uses more than one MySQL *server* to authenticate users, from
+within the same apache process.  This isn't possible right now, and as far as
+I'm concerned, wouldn't be possible in the near future (one SQL link per httpd
+is how it works now).
+
+
+Who should use it
+-----------------
+
+Everybody else, and especially on a busy site.
+
+
+Installation notes
+------------------
+
+Run the configure script, and then make, and follow the instructions.
+The configure script defaults to look for MySQL in /usr/local,
+and for Apache in /usr/local/etc/httpd.  If you have a different
+setup, you can override these defaults using --with-mysql-dir
+and --with-apache=dir, respectively.  For example:
+
+./configure --with-mysql=/usr/local/mysql --with-apache=/usr/local/apache
+
+Note that you must have MySQL installed prior to installing mod_auth_mysql.
+You can obtain MySQL from http://www.tcx.se.
+
+
+How do I use it?
+----------------
+
+Read the 'USAGE' file supplied with this package,
+or take a look at http://bourbon.netvision.net.il/mod_auth_mysql/
+
+
+Revision history
+---------------
+
+v2.20 - A user that was a member of more than one group couldn't be
+        authenticated using group authentication.  Fixed. 
+        (thanks to Jonathan Roy for reporting that bug).
+      - Turning scrambled passwords on and then encrypted passwords off, or
+        turning encrypted passwords on and then scrambled passwords off,
+        would result in both scrambled and encrypted passwords being off.
+        Fixed.
+      - Changed all directive names to be nicer and more consistent.  See the
+        USAGE file for specific information.
+      - Added Auth_MySQL_Encryption_Types directive to allow for nicer setting
+        of which encryption types to use, and multiple encryption types.
+      - Added Auth_MySQL_Non_Persistent directive to allow non-persistent
+        links to the MySQL server.
+      - ONLY_ONCE is no longer supported.  This was a compile-time macro that
+        wasn't even documented, and made no much sense anyway.  The
+        user:password SQL table should really have one row per user, and the
+        username should most probably be a primary or otherwise unique key.
+      - The module should now be possible to compile on platform that does
+        not have the crypt() function.  The Crypt_DES encryption type
+        will not be available.
+v2.11 - Fixed a bug in the scrambled password implementation.  It probably had
+        no symptoms whatsoever with just about any C compiler in existence,
+        but still, from a pure C-language-definition point of view, it was
+        incorrect.  Thanks for Marschall Peter for pointing that out.
+      - Fixed a small typo in the string escaping routine, which caused it
+        never to work right.  I guess nobody uses strings that need to be
+        escaped anywhere :)  Thanks to Brent Metz for noticing that.
+v2.10 - Added the necessary include file to make Apache 1.3b6 happy
+      - Added some information to the USAGE file, loosely describing how to
+        go about implementing multiple groups for a single user.
+v2.09 - Made the full error message of the MySQL server appear in case of a
+        failed connect
+      - Added Auth_MYSQL on/off directive, so that it'll be easily possible
+        to turn the MySQL authentication on/off serverwide or for a specific
+        directory.
+      - Fixed the groups authentication code so that it'll work with one
+        query and multiple groups.  For good this time :)
+      - Some code cleanups
+v2.08 - Fixed a checking for NULL password fields (won't work, but won't
+        crash either)
+      - Fixed logic and possible crashes with the new scrambled password
+        initialization routines
+      - Optimized a couple of routines
+      - Changed the query that is used to check user groups - users that belong
+        to multiple groups should have multiple rows in the groups table
+v2.07 - Fixed a bug in the escaping routine - strings that required escaping
+        were not properly detected (thanks to Marschall Peter for noticing
+        the bug!)
+      - Added Auth_MYSQL_ScrambledPassword - boolean flag to instruct the
+        module to assume that passwords are scrambled using MySQL's password()
+        function (by Marschall Peter <Peter.Marschall@gedos.de>).
+v2.06 - Rearranged some code to allow for a successful apache 1.3beta
+        compilation.
+        Please note that this is *untested*, I only got it to compile, I haven't
+        actually tried to run apache 1.3.
+v2.05 - Change the check for 'mysql server has gone away' to be case insenitive
+v2.04 - Added USAGE file that explains how to use this module thoroughly
+v2.03 - Added compilation information :)
+v2.02 - Changed version number from 1.x to 2.x, so that people know that this is
+        really newer than mod_auth_mysql v1.4 :)
+        Added a tiny note at the top of the source file.
+v1.02 - Fixed a bug in the groups code
+v1.01 - Fixed a segmentation fault bug in case of aborted hits
+v1.00 - Initial, unversioned release.
+
+
+Disclaimer
+----------
+
+This comes with no warranty of any kind whatsoever, including but not limited to everything you can think of,
+and everything your lawyers can think of.
+
+
+
+Bugs
+----
+
+If you found a bug in this mod_auth_mysql ("it works for me"), please let me know.  This module has
+been in active use in my former company for quite a while (and still is), and plenty of people
+are using it, including on fairly busy sites, so bugs are not all that likely anymore, but they're
+always possible.
+
+
+Author
+------
+
+Email:  Zeev Suraski <bourbon@bourbon.netvision.net.il>
+
+Please register this module at http://bourbon.netvision.net.il/mod_auth_mysql/
