@@ -1,0 +1,117 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# ElabInElab: This is run on the inner boss to construct a bunch stuff
+# from the db (groups, projects, users, etc).
+#
+sub usage()
+{
+    print STDERR "Usage: $0 [-d] <pid>\n";
+    exit(1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if (!$ELABINELAB) {
+    die("*** $0:\n".
+	"    This script can only run on an inner Emulab!\n");
+}
+# Only admin types!
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Only TB administrators can run this script!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+usage()
+    if (scalar(@ARGV) != 1);
+my $pid = shift();
+
+#
+# Build the project.
+#
+mysystem("$TB/sbin/mkproj $pid");
+
+#
+# Get the list of subgroups in the project and create those groups.
+#
+my $query_result =
+    DBQueryFatal("select gid from groups where pid='$pid' and pid!=gid");
+while (my ($gid) = $query_result->fetchrow_array()) {
+    mysystem("$TB/sbin/mkgroup $pid $gid");
+}
+
+#
+# Get the list of users and admin status. Admin users get a real shell
+# on boss. Create the users, and then set their groups.
+#
+$query_result =
+    DBQueryFatal("select distinct u.uid,u.admin from group_membership as m ".
+		 "left join users as u on u.uid=m.uid ".
+		 "where u.status='" . USERSTATUS_ACTIVE() . "'");
+while (my ($uid,$admin) = $query_result->fetchrow_array()) {
+    mysystem("$TB/sbin/tbacct add $uid");
+    if ($admin) {
+	# Add admin users to group wheel for convenience.
+	DBQueryFatal("insert into unixgroup_membership ".
+		     "values ('$uid','wheel'");
+    }
+    mysystem("$TB/sbin/setgroups $uid");
+    if ($admin) {
+	mysystem("pw usermod -n $uid -s /bin/tcsh");
+    }
+}
+
+#
+# Run a command string.
+#
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    if ($debug) {
+	print "Command: '$command\'\n";
+    }
+
+    system($command);
+    if ($?) {
+	die("*** $0:\n".
+	    "    Command failed: $? - $command\n");
+    }
+}
