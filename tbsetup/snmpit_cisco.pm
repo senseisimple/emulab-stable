@@ -110,7 +110,7 @@ sub new($$$;$) {
     # We have to change our behavior depending on what OS the switch runs
     #
     $options->{'type'} =~ /^(\w+)(-ios)?$/;
-    $self->{SWITHCTYPE} = $1;
+    $self->{SWITCHTYPE} = $1;
 
     if ($2) {
 	$self->{OSTYPE} = "IOS";
