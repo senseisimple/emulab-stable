@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: healthd.c,v 1.3 2002-07-10 00:37:51 kwebb Exp $
+ * $Id: healthd.c,v 1.4 2003-04-04 21:35:29 kwebb Exp $
  */
 /*
  *
@@ -58,11 +58,6 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <netdb.h>
-#ifdef HAVE_LIBWRAP
-#include <tcpd.h>
-int allow_severity = LOG_INFO;
-int deny_severity = LOG_WARNING;
-#endif /* HAVE_LIBWRAP */
 #include "parameters.h"
 #include "healthd.h"
 #include "VERSION.h"
@@ -245,6 +240,7 @@ struct OptionInfo {
 void
 SIGHUP_handler(int sig) {
   ReReadConfigFile = 1;
+  signal(SIGHUP, SIGHUP_handler);
 }
 
 void
@@ -262,7 +258,7 @@ SIGALRM_handler(int sig) {
 
 int
 main(int argc, char *argv[]) {
-  int n, sec;
+  int n;
   int ch;
   int method='I';
   int ConfigRead;
@@ -275,26 +271,20 @@ main(int argc, char *argv[]) {
   int sock;
   int sock6;
   int length;
-#ifdef INET6
-  int ipv6_enable=1;
-  struct sockaddr_in6 server6;
-#endif /* INET6 */
   int ipv4_enable=1;
   struct sockaddr_in server;
   int msgsock;
   char buf[1024];
   char outbuf[1024];
   int rval;
+  int selretval;
+  int syserr;
   fd_set ready;
   struct servent *sp;
-  struct timeval to;
   unsigned long port;
   int psd = -1;
   struct sockaddr_in paddr;
   struct hostent *hent;
-
-  time_t now;
-  time_t tloc;
 
   struct itimerval tmo = {{0,0},{0,0}};
   struct itimerval tmooff = {{0,0},{0,0}};
@@ -349,11 +339,7 @@ main(int argc, char *argv[]) {
   local = 0;
   LocalOnly = 0;
 
-#ifdef INET6
-  while((ch=getopt(argc, argv, "1246BDILSP:Vc:df:t:p:q")) != -1) {
-#else /* !INET6 */
   while((ch=getopt(argc, argv, "12BDILSP:Vc:df:t:p:q")) != -1) {
-#endif /* !INET6 */
     switch(ch){
     case '1':
       MonitorType = W83781D;
@@ -363,15 +349,6 @@ main(int argc, char *argv[]) {
       MonitorType = W83782D;
       break;
 
-#ifdef INET6
-    case '4':
-      ipv4_enable = 0;
-      break;
-
-    case '6':
-      ipv6_enable = 0;
-      break;
-#endif /* INET6 */
 
     case 'B':
       UseVbat = 1;
@@ -455,13 +432,8 @@ main(int argc, char *argv[]) {
       break;
       
     default:
-#ifdef INET6
-      fprintf(stderr, "Usage: %s -[1|2] -[I|S] [-dLV46] [-f configfile] [-c|t count] <seconds for sleep>"\
-	      " (default %d sec)\n", DaemonName, DEFAULT_SEC);
-#else /* !INET6 */
       fprintf(stderr, "Usage: %s -[1|2] -[I|S] [-dLV] [-f configfile] [-c|t count] <seconds for sleep>"\
 	      " (default %d sec)\n", DaemonName, DEFAULT_SEC);
-#endif /* !INET6 */
       exit(1);
     }
   } 
@@ -475,13 +447,8 @@ main(int argc, char *argv[]) {
     if((n = atoi(argv[optind])) > 0) {
       tmo.it_value.tv_sec = n;
     } else {
-#ifdef INET6
-      fprintf(stderr, "Usage: %s -[1|2] -[I|S] [-dLV46] [-f configfile] [-c|t count] <seconds for sleep>"\
-	      " (default %d sec)\n", DaemonName, DEFAULT_SEC);
-#else /* !INET6 */
       fprintf(stderr, "Usage: %s -[1|2] -[I|S] [-dLV] [-f configfile] [-c|t count] <seconds for sleep>"\
 	      " (default %d sec)\n", DaemonName, DEFAULT_SEC);
-#endif /* !INET6 */
       exit(1);
     }
   } else {
@@ -599,37 +566,6 @@ main(int argc, char *argv[]) {
   }
   if (LocalOnly == 0) {
     /* Create name with wildcards. */
-#ifdef INET6
-    if ((ipv4_enable == 0) && (ipv6_enable == 0)) {
-      ipv4_enable = 1;
-    }
-    if (ipv6_enable) {
-      /* Create socket from which to read. */
-      sock6 = socket(AF_INET6, SOCK_STREAM, 0);
-      if (sock6 < 0) {
-        syslog(hdALERT, "opening IPV6 datagram socket: %m");
-	syslog(hdALERT, "Aborting");
-        exit(1);
-      }
-      server6.sin6_family = AF_INET6;
-      server6.sin6_addr = in6addr_any;
-      server6.sin6_port = htons(port);
-      if (bind(sock6, (struct sockaddr *)&server6, sizeof(struct sockaddr_in6))) {
-	close(sock6);
-        syslog(hdALERT, "binding IPv6 datagram socket: %m");
-	syslog(hdALERT, "Aborting");
-        exit(1);
-      }
-      /* Find assigned port value and print it out. */
-      length = sizeof(server6);
-      if (getsockname(sock6, (struct sockaddr *)&server6, &length)) {
-	close(sock6);
-        syslog(hdALERT, "getting socket IPv6 name: %m");
-	syslog(hdALERT, "Aborting");
-        exit(1);
-      }
-    }
-#endif /* INET6 */
     if (ipv4_enable) {
       /* Create socket from which to read. */
       sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -660,82 +596,74 @@ main(int argc, char *argv[]) {
   ReadCurrentValues();
   if (LocalOnly == 0) {
     /* Start accepting connections */
-#ifdef INET6
-    if (sock6 != 0) {
-      listen(sock6, 32);
-    }
-#endif /* INET6 */
     if (sock != 0) {
       listen(sock, 32);
     }
   }
+
+  /* Main daemon loop */
   while ((iter<count) || (count==0)) {
     FD_ZERO(&ready);
     if (LocalOnly == 0) {
-#ifdef INET6
-      if (sock6 != 0) {
-        FD_SET(sock6, &ready);
-      }
-#endif /* INET6 */
       if (sock != 0) {
         FD_SET(sock, &ready);
       }
     }
 
-    /* Replace all this goofy shit with setitimer */
-#ifdef COMMENT
-    to.tv_sec = 0;
-    if (sec <= 3) {
-      /* For quick reading we need quicker timeouts */
-      to.tv_usec = 100;
-    } else if (sec <= 10) {
-      /* Still want reasonable accuracy */
-      to.tv_usec = 500;
-    } else {
-      /* Let us reduce CPU ussage */
-      to.tv_usec = 1000;
-    }
-#endif /* COMMENT */
-
+    /* Wait for connection, or timeout */
     setitimer(ITIMER_REAL,&tmo,0);
-    select(getdtablesize(), &ready, 0, 0, 0);
+    selretval = select(getdtablesize(), &ready, 0, 0, 0);
+    syserr = errno;
     setitimer(ITIMER_REAL,&tmooff,0);
+
     if ( ExitProgram ) {
       break;
     }
-    if (ReReadConfigFile) {
-      /*
-       * If we are updating the config file
-       * then we should clear the error counts.
-       */
-      for (n=0; n<MAX_TYPES; n++) {
-	active[n] = 0;
-	fail_count[n] = 0;
-	warn_level[n] = 2;
-	warn_sent[n] = 0;
-	fail_level[n] = 5;
-	fail_sent[n] = 0;
+
+    switch (selretval) {
+    case -1:
+      if (syserr && syserr != EINTR) {
+        syslog(hdCRITICAL, "OOPS! select returned a weird error, bailing out: %m");
+        exit(1);
       }
-      ReadConfigFile (ConfigFile);
-      ReReadConfigFile = 0;
-      syslog(hdNOTICE, "Restarted");
-      continue;
-    }
-    if (LocalOnly == 0) {
-      if (FD_ISSET(sock, &ready)) {
-	msgsock = accept(sock, 0, 0);
 
-	if (msgsock == -1) {
-	  /* Add error handling here */
-	} else {
-#ifdef HAVE_LIBWRAP
-	  struct request_info req;
+      if (ReReadConfigFile) {
+        /*
+         * If we are updating the config file
+         * then we should clear the error counts.
+         */
+        for (n=0; n<MAX_TYPES; n++) {
+          active[n] = 0;
+          fail_count[n] = 0;
+          warn_level[n] = 2;
+          warn_sent[n] = 0;
+          fail_level[n] = 5;
+          fail_sent[n] = 0;
+        }
+        ReadConfigFile (ConfigFile);
+        ReReadConfigFile = 0;
+        syslog(hdWARNING, "Restarted");
+        break;
+      }
 
-	  request_init(&req, RQ_DAEMON, DaemonName, RQ_FILE, msgsock, NULL);
-	  fromhost(&req);
+      if (count > 0) {
+        iter++;
+      }
+      
+      ReadCurrentValues();
+      if (pushit) {
+        push_stat(psd);
+      }
+      break;
 
-	  if (hosts_access(&req)) {
-#endif /* LIBWRAP */
+    default:
+      if (LocalOnly == 0) {
+        if (FD_ISSET(sock, &ready)) {
+          msgsock = accept(sock, 0, 0);
+
+          if (msgsock == -1) {
+            /* Add error handling here */
+          } else {
 	    do {
 	      bzero(buf, sizeof(buf));
 	      bzero(outbuf, sizeof(outbuf));
@@ -747,67 +675,26 @@ main(int argc, char *argv[]) {
 		break;
 	      }
 	    } while (rval != 0);
-#ifdef HAVE_LIBWRAP
-	  }
-#endif /* HAVE_LIBWRAP */
-	  close(msgsock);
-	}
+            close(msgsock);
+          }
+        }
       }
-#ifdef INET6
-      if (FD_ISSET(sock6, &ready)) {
-	msgsock = accept(sock6, 0, 0);
-
-	if (msgsock == -1) {
-	  /* Add error handling here */
-	} else {
-#ifdef HAVE_LIBWRAP
-	  struct request_info req;
-
-	  request_init(&req, RQ_DAEMON, DaemonName, RQ_FILE, msgsock, NULL);
-	  fromhost(&req);
-
-	  if (hosts_access(&req)) {
-#endif /* HAVE_LIBWRAP */
-	    do {
-	      bzero(buf, sizeof(buf));
-	      bzero(outbuf, sizeof(outbuf));
-	      if ((rval = read(msgsock, buf, 1024)) > 0) {
-		rval = GetAnswer(buf, outbuf);
-		write(msgsock, outbuf, strlen(outbuf));
-	      }
-	      else if (rval < 0) {
-		break;
-	      }
-	    } while (rval != 0);
-#ifdef HAVE_LIBWRAP
-	  }
-#endif /* HAVE_LIBWRAP */
-	  close(msgsock);
-	}
-      }
-#endif /* INET6 */
+      break;
     }
-    if (count > 0) {
-      iter++;
-    }
-    ReadCurrentValues();
-    if (pushit) {
-      push_stat(psd);
-    }
+
     if (ExitProgram) {
       break;
     }
   }
+
   if (LocalOnly == 0) {
     close(sock);
-#ifdef INET6
-    close(sock6);
-#endif /* INET6 */
   }
   if (debug == 0) {
     signal(SIGHUP, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
   }
+  syslog(hdWARNING, "Exiting..");
   exit(0);
 }
 
