@@ -1494,3 +1494,20 @@ last_net_act,last_cpu_act,last_ext_act);
 		select node_id,sfshostid from nodes;
 	
 	Be sure to restart tmcd after you make these changes.
+
+1.241: Change to eventlist table; bump size of vname from 20 to 64. I
+       do not see (or remember) any reason for this slot to be 20
+       chars, when the name of every other vname slot is 32. I looked
+       in the event scheduler and there do not appear to be any
+       problems there with bumping it. Note that I choose 64 cause we
+       tend to construct agent names that might be longer then 32
+       since they are based on real vnames (lan0, node0, etc). 
+
+	alter table eventlist change vname \
+		vname varchar(64) NOT NULL default '';
+
+       Make equiv change in virt_agents table:
+
+	alter table virt_agents change vname \
+		vname varchar(64) NOT NULL default '';
+

@@ -458,7 +458,7 @@ REPLACE INTO table_regex VALUES ('eventlist','pid','text','redirect','projects:p
 REPLACE INTO table_regex VALUES ('eventlist','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','time','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','vnode','text','redirect','virt_agents:vnode',0,0,NULL);
-REPLACE INTO table_regex VALUES ('eventlist','vname','text','regex','^[-\\w\\(\\)]+$',1,20,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','vname','text','regex','^[-\\w\\(\\)]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:text',0,1024,NULL);
@@ -549,7 +549,7 @@ REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','regex','^[-\\w]*$'
 REPLACE INTO table_regex VALUES ('virt_programs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_programs','vname','text','redirect','eventlist:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_programs','vname','text','regex','^[-\\w\\(\\)]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','command','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_routes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_routes','eid','text','redirect','experiments:eid',0,0,NULL);
@@ -563,13 +563,13 @@ REPLACE INTO table_regex VALUES ('virt_routes','cost','float','redirect','defaul
 REPLACE INTO table_regex VALUES ('virt_trafgens','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_trafgens','vname','text','redirect','eventlist:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_trafgens','vname','text','regex','^[-\\w\\(\\)]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','role','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','proto','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','port','text','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','ip','text','regex','^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','target_vnode','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_trafgens','target_vname','text','redirect','eventlist:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_trafgens','target_vname','text','regex','^[-\\w\\(\\)]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','target_port','text','redirect','virt_trafgens:port',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','target_ip','text','redirect','virt_trafgens:ip',0,15,NULL);
 REPLACE INTO table_regex VALUES ('virt_trafgens','generator','text','redirect','default:tinytext',0,0,NULL);

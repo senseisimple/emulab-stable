@@ -156,7 +156,7 @@ CREATE TABLE eventlist (
   idx int(10) unsigned NOT NULL auto_increment,
   time float(10,3) NOT NULL default '0.000',
   vnode varchar(32) NOT NULL default '',
-  vname varchar(20) NOT NULL default '',
+  vname varchar(64) NOT NULL default '',
   objecttype smallint(5) unsigned NOT NULL default '0',
   eventtype smallint(5) unsigned NOT NULL default '0',
   arguments text,
@@ -1589,7 +1589,7 @@ CREATE TABLE veth_interfaces (
 CREATE TABLE virt_agents (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
-  vname varchar(32) NOT NULL default '',
+  vname varchar(64) NOT NULL default '',
   vnode varchar(32) NOT NULL default '',
   objecttype smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (pid,eid,vname,vnode)
