@@ -621,7 +621,12 @@ sub enableTrunking($$@) {
 	    }
 	    push @vlan_numbers, $vlan_number;
 	}
-	$device->setVlansOnTrunk($port,1,@vlan_numbers);
+	print "  add VLANs " . join(",",@vlan_numbers) . " to trunk\n"
+	    if ($self->{DEBUG});
+	if (!$device->setVlansOnTrunk($port,1,@vlan_numbers)) {
+	    warn "ERROR: could not add VLANs " .
+		join(",",@vlan_numbers) . " to trunk";
+	}
     }
 
     return $rv;
