@@ -441,9 +441,13 @@ sub removeVlan($@) {
 
     #
     # Now, we go through each device and remove all ports from the VLAN
-    # on that device
+    # on that device. Note the reverse sort order! This way, we do not
+    # interfere with another snmpit processes, since createVlan tries
+    # in 'forward' order (we will remove the VLAN from the 'last' switch
+    # first, so the other snmpit will not see it free until it's been
+    # removed from all switches)
     #
-    foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
+    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	my @existant_vlans = ();
 	my %vlan_numbers = $device->findVlans(@vlan_ids);
