@@ -165,8 +165,10 @@ the addresses reside (ie. 10.0.0.db).
 
 You'll need to create these .head files yourself. The easiest way to do this
 is to start with the examples we've provided in this directory:
-example.emulab.net.db.head  - the forward zone file
-example-155.101.128.db.head - a reverse zone file
+1) Create /etc/namedb/OURDOMAIN.db.head from example.emulab.net.db.head
+    - the forward zone file
+2) Create /etc/named/reverse/SUBNET.db.head from example-155.101.128.db.head
+    - a reverse zone file
 If you have more than one class-C subnet for your testbed, you'll need a copy
 of the reverse zone file for each one. Follow the examples in these .head
 files, making sure to get boss, ops, and any 'infrastructure' equipment (such
@@ -187,7 +189,10 @@ And one of these for each reverse subnet:
         };
 
 Once you think you've got things set up, run /usr/testbed/sbin/named_setup,
-and make sure that it doesn't give you any error messages.
+and make sure that it doesn't give you any error messages. It will generate
+the following files:
+1) /etc/namedb/OURDOMAIN.db
+2) /etc/namedb/reverse/SUBNET.db
 
 ##### If you are using unroutable private IP addresses for part of the
       testbed:
