@@ -181,7 +181,7 @@ REDO_SEARCH:
 
 
 /* When this is finished the state will reflect the best solution found. */
-void anneal(bool scoring_selftest)
+void anneal(bool scoring_selftest, double scale_neighborhood)
 {
   cout << "Annealing." << endl;
 
@@ -294,6 +294,11 @@ void anneal(bool scoring_selftest)
   if (neighborsize < min_neighborhood_size) {
     neighborsize = min_neighborhood_size;
   }
+
+  // Allow scaling of the neighborhood size, so we can make assign try harder
+  // (or less hard)
+  neighborsize = (int)(neighborsize * scale_neighborhood);
+
 #ifdef CHILL
   double scores[neighborsize];
 #endif

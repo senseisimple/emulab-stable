@@ -83,6 +83,9 @@ switch_dist_map_map switch_dist;
 // Time started, finished, and the time limit
 double timestart, timeend, timelimit, timetarget;
 
+// An amount to scale the neighborhood size by
+double scale_neighborhood = 1.0;
+
 #ifdef GNUPLOT_OUTPUT
 FILE *scoresout, *tempout, *deltaout;
 #endif
@@ -303,6 +306,7 @@ void print_help()
   cerr << "  -P          - Prune unusable pclasses." << endl;
 #endif
   cerr << "  -T          - Doing some scoring self-testing." << endl;
+  cerr << "  -H <float>  - Try <float> times harder." << endl;
   exit(2);
 }
  
@@ -534,7 +538,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTd")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -570,6 +574,11 @@ int main(int argc,char **argv)
       scoring_selftest = true; break;
     case 'd':
       dynamic_pclasses = true; break;
+    case 'H':
+      if (sscanf(optarg,"%lf",&scale_neighborhood) != 1) {
+	print_help();
+      }
+      break;
     default:
       print_help();
     }
@@ -657,7 +666,7 @@ int main(int argc,char **argv)
   }
  
   timestart = used_time();
-  anneal(scoring_selftest);
+  anneal(scoring_selftest, scale_neighborhood);
   timeend = used_time();
 
 #ifdef GNUPLOT_OUTPUT
