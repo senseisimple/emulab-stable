@@ -8,6 +8,12 @@ chdir("..");
 include("defs.php3");
 
 #
+# Prices hardwired for now
+#
+$mobo_price   = 0.69;
+$dboard_price = 5369896.0;
+
+#
 # No PAGEHEADER since we spit out a Location header later. See below.
 #
 
@@ -23,6 +29,8 @@ if (isset($_GET['order_id'])) {
 # 
 function SPITFORM($formfields, $errors, $order_id, $justview)
 {
+    global $mobo_price, $dboard_price;
+    
     if ($errors) {
 	echo "<table class=nogrid
                      align=center border=0 cellpadding=6 cellspacing=0>
@@ -45,12 +53,32 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
 	echo "</table><br>\n";
     }
 
+    echo "<SCRIPT LANGUAGE=JavaScript>
+          <!--
+              function NormalSubmit(theform) {
+                  theform.target='_self';
+                  theform.submit();
+              }
+              function ChangeQuantities(theform) {
+                  theform.target='_self';
+		  theform['quantitychange'].value = 'yep';
+                  theform.submit();
+              }
+          //-->
+          </SCRIPT>\n";
+
     echo "<table align=center border=1>\n";
     if (! $justview) {
 	echo "<form enctype=multipart/form-data
+                    onsubmit=\"return false;\"
+                    name=myform
                     action=preorder.php" .
 	                ($order_id ? "?order_id=$order_id" : "") .
 	                " method=post>\n";
+
+        # Something funky going on ...
+	echo "<input type=hidden name=fakesubmit value=Submit>\n";
+	echo "<input type=hidden name=quantitychange value=no>\n";
     }
 
     #
@@ -143,9 +171,10 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
     else
 	echo "    <input type=text
                          name=\"formfields[num_mobos]\"
+                         onChange='ChangeQuantities(myform);'
                          value=\"" . $formfields[num_mobos] . "\"
 	                 size=3>";
-    echo "        ($0.69 each)";
+    echo "        (\$${mobo_price} each)";
     echo "    </td>
           </tr>\n";
 
@@ -157,10 +186,33 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
     else
 	echo "    <input type=text
                          name=\"formfields[num_dboards]\"
+                         onChange='ChangeQuantities(myform);'
                          value=\"" . $formfields[num_dboards] . "\"
 	                 size=3>";
-    echo "        ($36452832 each)";
+    echo "        (\$${dboard_price} each)";
     echo "    </td>
+          </tr>\n";
+
+    #
+    # A totals field. Silly.
+    #
+    $total_cost = 0.0;
+    if ($formfields[num_mobos])
+	$total_cost += ($formfields[num_mobos] * $mobo_price);
+    if ($formfields[num_dboards])
+	$total_cost += ($formfields[num_dboards] * $dboard_price);
+    
+    echo "<tr>
+              <td height=2 colspan=2></td>
+          </tr>\n";
+
+    echo "<tr>
+              <td colspan=1 align=right><b>Total Cost</b>:</td>
+              <td class=left><b>\$${total_cost}</b></td>
+          </tr>\n";
+
+    echo "<tr>
+              <td height=2 colspan=2></td>
           </tr>\n";
 
     #
@@ -198,16 +250,18 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
     # General Comments
     #
     if ($justview) {
-	echo "<tr>
-                  <td colspan=2 align=center>
-                      Optional Comments
-                  </td>
-              </tr>
-              <tr>
-                  <td colspan=2 class=left>" .
-	                   $formfields[comments] . 
-                  "</td>
-              </tr>\n";
+	if (isset($formfields[comments]) && $formfields[comments] != "") {
+	    echo "<tr>
+                      <td colspan=2 align=center>
+                          Optional Comments
+                      </td>
+                  </tr>
+                  <tr>
+                      <td colspan=2 class=left>" .
+	                       $formfields[comments] . 
+                      "</td>
+                  </tr>\n";
+	}
     }
     else {
 	echo "<tr>
@@ -227,8 +281,9 @@ function SPITFORM($formfields, $errors, $order_id, $justview)
 
     if (! $justview) {
 	echo "<tr>
-                  <td colspan=2 align=center>
-                      <b><input type=submit name=submit value=Submit></b>
+                  <td align=center colspan=2>
+                     <b><input type=button value=Submit name=fakesubmit
+                               onclick=\"NormalSubmit(myform);\"></b>
                   </td>
               </tr>\n";
 	echo "</form>";
@@ -273,7 +328,7 @@ else {
 #
 # The conclusion of a pre-order, or just wanting to view an order.
 # 
-if (isset($_GET['finished']) || isset($_GET['vieworder'])) {
+if (isset($_GET['finished']) || isset($_GET['viewonly'])) {
     PAGEHEADER("Pre-Order USRP Parts");
 
     if (isset($_GET['finished'])) {
@@ -290,8 +345,8 @@ if (isset($_GET['finished']) || isset($_GET['vieworder'])) {
     SPITFORM($defaults, 0, $order_id, 1);
 
     echo "<br><center>
-          Would you like to <a href=preorder.php?order_id=$order_id>edit</a>
-	  this order?</center>\n";
+          Would you like to <a href=preorder.php?order_id=$order_id>
+            <b>edit</b></a> this order?</center>\n";
     PAGEFOOTER();
     return;
 }
@@ -299,7 +354,7 @@ if (isset($_GET['finished']) || isset($_GET['vieworder'])) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($_POST['fakesubmit'])) {
     PAGEHEADER("Pre-Order USRP Parts");
     SPITFORM($defaults, 0, $order_id, 0);
     PAGEFOOTER();
@@ -312,6 +367,17 @@ else {
 	PAGEARGERROR("Invalid form arguments.");
     }
     $formfields = $_POST['formfields'];
+
+    #
+    # If this was quantities change, just redisplay with current info
+    # so that the price is updated.
+    #
+    if (isset($_POST['quantitychange']) && $_POST['quantitychange'] == "yep") {
+	PAGEHEADER("Pre-Order USRP Parts");
+	SPITFORM($formfields, 0, $order_id, 0);
+	PAGEFOOTER();
+	return;
+    }
 }
 
 #
