@@ -11,14 +11,16 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: ptopgen [-s switch] [-e pid/eid] [-m factor]\n" .
+    print STDOUT "Usage: ptopgen [-v] [-s switch] [-e pid/eid] [-m factor]\n" .
                  "       -e include given experiment's resources\n" .
                  "          in the ptopfile (as if they were free)\n" .
+		 "       -v Include stuff for topologies with virtual nodes\n".
 		 "       -m Override multiplex_factor\n";
     exit(-1);
 }
-my $optlist = "s:e:m:";
+my $optlist = "s:e:m:v";
 my $mfactor;
+my $virtstuff = 0;
 
 
 # Settings - Change these to your particular network.
@@ -67,6 +69,9 @@ if (defined($options{"s"})) {
 }
 if (defined($options{"m"})) {
     $mfactor = $options{"m"};
+}
+if (defined($options{"v"})) {
+    $virtstuff = 1;
 }
 
 if (defined($options{"e"})) {
@@ -178,7 +183,7 @@ foreach $node (keys(%nodes)) {
             #################################################################
             $text .= " sim:100000";
 	}
-	if ($virtnode_capacity > 0) {
+	if ($virtstuff && $virtnode_capacity > 0) {
 	    #
 	    # Ditto for jailed nodes
 	    #
@@ -188,6 +193,7 @@ foreach $node (keys(%nodes)) {
 	    else {
 		$text .= " pcvm:$virtnode_capacity";
 	    }
+	    $text .= " *lan:*";
 	    # Add trivial bw spec.
 	    $text .= " - - trivial_bw:400000";
 	}

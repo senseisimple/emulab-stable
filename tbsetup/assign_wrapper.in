@@ -688,13 +688,6 @@ foreach $lan (keys(%lans)) {
 	    $realnodes++;
 	}
     }
-    #
-    # Hmm, no emulated lans for now. 
-    #
-    if ($emulated && (@members > 2) && ($virtnodes != scalar(@members))) {
-	fatal(65,"*** $0:\n".
-	        "    Emulated lans ($lan) not allowed yet! Only links.\n");
-    }
     if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
 	$trivial_ok = 1;
     }
@@ -1020,6 +1013,8 @@ while (1) {
 	if ($updating);
     $ptopargs   .= "-m $multiplex_factor "
 	if (defined($multiplex_factor));
+    $ptopargs   .= "-v "
+	if ($virtcount);
     system("ptopgen $ptopargs > $ptopfile");
 
     TBDebugTimeStamp("ptopgen finished");
