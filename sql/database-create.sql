@@ -762,6 +762,7 @@ CREATE TABLE tunnels (
   password varchar(32) NOT NULL default '',
   encrypt tinyint(3) unsigned NOT NULL default '0',
   compress tinyint(3) unsigned NOT NULL default '0',
+  assigned_ip varchar(32) NOT NULL default '',
   PRIMARY KEY  (pid,eid,node_id,vname)
 ) TYPE=MyISAM;
 
