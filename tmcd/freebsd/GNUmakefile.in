@@ -18,7 +18,7 @@ SUBDIR		= tmcd/freebsd
 
 include $(OBJDIR)/Makeconf
 
-all:	supfile
+all:	supfile injail
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -31,6 +31,9 @@ VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
 RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
 ISMFS		= $(ETCDIR)/ismfs
 INSTALL		= /usr/bin/install -c
+
+injail: $(SRCDIR)/jail/injail.c
+	$(CC) $(CFLAGS) -O2 -o injail $<
 
 install:	common-install etc-install \
 			sup-install script-install bin-install jail-install
@@ -139,10 +142,10 @@ jail-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.conf $(JAILDIR)/rc.conf
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.local $(JAILDIR)/rc.local
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.injail $(BINDIR)/rc.injail
-	$(INSTALL) -m 755 $(SRCDIR)/jail/injail.pl $(JAILDIR)/injail.pl
 	$(INSTALL) -m 755 $(SRCDIR)/jail/crontab $(JAILDIR)/crontab
 	$(INSTALL) -m 755 $(SRCDIR)/jail/jailsetup $(BINDIR)/jailsetup
 	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(BINDIR)/mkjail.pl
+	$(INSTALL) -m 755 ./injail $(JAILDIR)/injail
 
 # Invoked from ../ron
 remote-install:	jail-install
@@ -161,3 +164,6 @@ locrem-install:
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
 			$(BINDIR)/control_interface
+
+clean:
+	/bin/rm -f supfile injail
