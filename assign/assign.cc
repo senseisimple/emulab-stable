@@ -541,7 +541,7 @@ int main(int argc, char **argv)
     cout << "Calculating shortest paths on switch fabric." << endl;
     edge ed;
     forall_edges(ed,SG) {
-      edge_costs[ed] = 10000-PG[SG[ed].mate].bandwidth;
+      edge_costs[ed] = 100000000-PG[SG[ed].mate].bandwidth;
 #ifdef SCORE_DEBUG
       cerr << "  " << PG[SG[ed].mate].name << " " << edge_costs[ed] << endl;
 #endif
