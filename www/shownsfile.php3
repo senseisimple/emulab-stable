@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -192,7 +192,7 @@ if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
 }
 
 echo "<br>
-      <h3>NS File:</h3>\n";
+      <a href=spitnsdata.php3?pid=$pid&eid=$eid><h3>NS File:</h3><a>\n";
 
 $query_result =
     DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
