@@ -123,7 +123,7 @@ function WRITESIDEBAR() {
 
 
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON_NEW("Other Emulabs", $TBDOCBASE,
+	WRITESIDEBARBUTTON("Other Emulabs", $TBDOCBASE,
 			       "docwrapper.php3?docname=otheremulabs.html");
 	WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
 				$TBDOCBASE, "cdrom.php");
@@ -145,7 +145,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
 
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON_NEW("Papers (May 1)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Papers (May 1)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software", $TBDOCBASE, "software.php3");
 	WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
 	WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
