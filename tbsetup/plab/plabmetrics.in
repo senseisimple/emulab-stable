@@ -8,6 +8,26 @@ use English;
 use Getopt::Std;
 use XML::Parser;
 
+#
+# Load average metric to use
+#
+my $LOADMETRIC = "load_fifteen";
+
+#
+# Load average at which we stop considering a node available
+#
+my $MAXLOAD   = 5.0;
+
+#
+# Drift to allow between our clock and the gmond nodes
+#
+my $STALESLOP = 1 * 60;
+
+#
+# Age (in seconds) at which we consider metric data stale
+#
+my $STALEAGE  = 30 * 60;
+
 sub usage()
 {
     print STDOUT
@@ -18,6 +38,7 @@ my $optlist = "dnf:";
 my $debug   = 0;
 my $impotent= 0;
 my $xmlfile;
+my $now     = time();
 
 #
 # Only real root can call this.
@@ -59,6 +80,7 @@ my %nodemap     = ();
 my $cluster;
 my $host;
 my $IP;
+my $metricsage;
 my %metrics;
 
 # Be careful not to exit on transient error
@@ -160,21 +182,26 @@ sub InsertMetrics()
 {
     if (defined($nodemap{$IP})) {
 	my $nodeid   = $nodemap{$IP};
-	my $load_one = $metrics{load_one};
+	my $load     = $metrics{$LOADMETRIC};
 	my $scaled;
 
 	#
-	# Scale load according to Mike. 
+	# Check for stale data.
+	# In the case where metric data appears to be in the future,
+	# it may be clock skew, so allow a little slop.
 	#
-	if ($load_one > 3.0) {
-	    $scaled = 1.0;
+	if ($metricsage < 0) {
+	    if (-$metricsage > $STALESLOP) {
+		$load = 999;
+	    }
+	} elsif ($metricsage > $STALEAGE) {
+	    $load = 999;
 	}
-	else {
-	    $scaled = $load_one / 3.0;
-	}
+
+	$scaled = $load / $MAXLOAD;
 		
 	if ($debug) {
-	    print STDERR "$nodeid ($host) $load_one $scaled\n";
+	    print STDERR "$nodeid ($host) $load $scaled\n";
 	}
 
 	if (!$impotent) {
@@ -212,6 +239,7 @@ sub StartElement ($$$)
 	    
 	    $host = $attrs{"NAME"};
 	    $IP   = $attrs{"IP"};
+	    $metricsage = $now - $attrs{"REPORTED"};
 	    last SWITCH;
 	};
 	/^METRIC/i && do {
