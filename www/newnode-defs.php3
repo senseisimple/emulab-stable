@@ -115,6 +115,17 @@ function guess_IP ($prefix, $number) {
     }
 
     #
+    # We want to be able to handle both numeric and character 'number's - figure
+    # out which we have
+    #
+    if (is_string($number)) {
+	$using_char = 1;
+	$number = ord($number);
+    } else {
+	$using_char = 0;
+    }
+
+    #
     # Okay, no such luck. We'll go backwards through the host list until
     # we find the previous node with an established IP, then add our offset
     # onto that
@@ -122,10 +133,15 @@ function guess_IP ($prefix, $number) {
     $i = $number - 1;
     $IP = "";
     while ($i > 0) {
+        if ($using_char) {
+	    $node = $prefix . chr($i);
+	} else {
+	    $node = $prefix . $i;
+	}
         $query_result = DBQueryFatal("select IP from interfaces as i " .
 		"left join nodes as n on i.node_id = n.node_id left join " .
 		"node_types as nt on n.type = nt.type " .
-		"where n.node_id='$prefix$i' and i.iface = nt.control_iface");
+		"where n.node_id='$node' and i.iface = nt.control_iface");
         if (mysql_num_rows($query_result)) {
 	    $row = mysql_fetch_array($query_result);
 	    $IP = $row[IP];
@@ -134,7 +150,7 @@ function guess_IP ($prefix, $number) {
 
 	# Try new_nodes too
         $query_result = DBQueryFatal("select IP from new_nodes " .
-		"where node_id='$prefix$i'");
+		"where node_id='$node'");
         if (mysql_num_rows($query_result)) {
 	    $row = mysql_fetch_array($query_result);
 	    $IP = $row[IP];

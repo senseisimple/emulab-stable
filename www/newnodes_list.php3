@@ -76,7 +76,8 @@ if ($calc) {
     while ($row = mysql_fetch_array($query_result)) {
         $id   = $row["new_node_id"];
         $name = $row["node_id"];
-	if (preg_match("/^(.*\D)(\d+)$/",$name,$matches)) {
+	if (preg_match("/^(.*\D)(\d+)$/",$name,$matches) ||
+	    preg_match("/^(.*-)([a-zA-Z])$/",$name,$matches)) {
 	    $prefix = $matches[1];
 	    $number = $matches[2];
 	    $newIP = guess_IP($prefix,$number);
@@ -196,11 +197,16 @@ if ($newprefix || $addnumber) {
     while ($row = mysql_fetch_array($query_result)) {
     	$id    = $row['new_node_id'];
 	$name  = $row['node_id'];
-	if (preg_match("/^(.*\D)(\d+)$/",$name,$matches)) {
+	if (preg_match("/^(.*\D)(\d+)$/",$name,$matches) ||
+	    preg_match("/^(.*-)([a-zA-Z])$/",$name,$matches)) {
 	    $prefix = $matches[1];
 	    $number = $matches[2];
 	    if ($addnumber) {
-	        $number = $number + $addnumber;
+	        if (is_string($number)) {
+		    $number = chr(ord($number) + $addnumber);
+		} else {
+		    $number = $number + $addnumber;
+		}
 	    }
 	    if ($newprefix) {
 	        $prefix = $newprefix;
@@ -245,7 +251,7 @@ if ($renumber) {
 #
 $query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
 	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
-	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP " .
+	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP, n.dmesg " .
 	"FROM new_nodes AS n " .
 	"LEFT JOIN node_types AS t on n.type=t.type " .
 	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
@@ -284,6 +290,7 @@ function deselectAll(form) {
 	    <th>Interfaces</th>
 	    <th>Temporary IP</th>
 	    <th>Created</th>
+	    <th>Warnings</th>
 	</tr>
 
 <?
@@ -296,6 +303,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	$created    = $row["created"];
 	$mac        = $row["MAC"];
 	$tempIP     = $row["temporary_IP"];
+	$dmesg      = $row["dmesg"];
 	if ($row["switch_id"]) {
 	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
 	} else {
@@ -320,6 +328,11 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "		<td>$interfaces</td>\n";
 	echo "		<td>$tempIP</td>\n";
 	echo "		<td>$created</td>\n";
+	if ($dmesg) {
+	    echo "		<td><img src=\"redball.gif\"></td>\n";
+	} else {
+	    echo "		<td><img src=\"greenball.gif\"></td>\n";
+	}
 	echo "	</tr>\n";
 }
 
