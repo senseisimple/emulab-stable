@@ -172,9 +172,12 @@ class SSHTransport:
     # @param verbose unused.
     # @return The value returned 
     #
-    def request(self, host, handler, request_body, verbose=0):
+    def request(self, host, handler, request_body, verbose=0, path=None):
         # Strip the leading slash in the handler, if there is one.
-        if handler.startswith('/'):
+        if path:
+            handler = path + handler
+            pass
+        elif handler.startswith('/'):
             handler = handler[1:]
             pass
 
@@ -347,7 +350,7 @@ class SSHServerProxy:
     # @param encoding Content encoding.
     # @param verbose unused.
     #
-    def __init__(self, uri, transport=None, encoding=None, verbose=0):
+    def __init__(self, uri, transport=None, encoding=None, verbose=0, path=None):
         type, uri = urllib.splittype(uri)
         if type not in ("ssh", ):
             raise IOError, "unsupported XML-RPC protocol"
@@ -362,6 +365,7 @@ class SSHServerProxy:
 
         self.__encoding = encoding
         self.__verbose = verbose
+        self.__path = path
         return
 
     ##
@@ -379,7 +383,8 @@ class SSHServerProxy:
             self.__host,
             self.__handler,
             request,
-            verbose=self.__verbose
+            verbose=self.__verbose,
+            path=self.__path
             )
 
         # ... ensure there was a valid reply.

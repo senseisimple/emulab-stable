@@ -1462,7 +1462,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	apache/GNUmakefile apache/httpd.conf \
-        xmlrpc/GNUmakefile \
+        xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
+	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
+	xmlrpc/webxmlrpc \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 

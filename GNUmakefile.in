@@ -22,7 +22,7 @@ include Makeconf
 #
 SUBDIRS = lib db assign @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils www tip capture ipod vis \
-		sensors os install/newnode_sshkeys
+		sensors os xmlrpc install/newnode_sshkeys
 
 all:		all-subdirs 
 
@@ -64,6 +64,7 @@ ops-install:
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
 	@$(MAKE) -C event control-install
+	@$(MAKE) -C xmlrpc control-install
 
 install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/opsdir

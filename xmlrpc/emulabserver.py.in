@@ -41,10 +41,10 @@ class emulabserver:
     #
     def echo(self, version, argdict):
         if not argdict.has_key("str"):
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply a string to echo!");
         
-        return ResponseBlock(RESPONSE_SUCCESS, 0,
+        return EmulabResponse(RESPONSE_SUCCESS, 0,
                              socket.gethostname() + ": " + str(version)
                              + " " + argdict["str"])
 
@@ -54,21 +54,21 @@ class emulabserver:
     #
     def batchexp(self, version, argdict):
         if version != self.VERSION:
-            return ResponseBlock(RESPONSE_BADVERSION,
+            return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
 
         if not (argdict.has_key("pid") and
                 argdict.has_key("eid")):
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply pid and eid!");
 
         nsfilename = None
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("batchmode"):
-                if val == 0:
+            if opt in ("batch"):
+                if val == "false":
                     argstr += " -i"
                     pass
                 pass
@@ -88,8 +88,8 @@ class emulabserver:
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("idleswap"):
-                if opt == 0:
+            elif opt in ("swappable"):
+                if val == "false":
                     argstr += " -S "
                     argstr += argdict["noswap_reason"]
                     pass
@@ -97,7 +97,7 @@ class emulabserver:
             elif opt in ("noswap_reason"):
                 pass
             elif opt in ("idleswap"):
-                if opt == 0:
+                if val == 0:
                     argstr += " -L "
                     argstr += escapeshellarg(argdict["noidleswap_reason"])
                     pass
@@ -112,11 +112,15 @@ class emulabserver:
                 argstr += " -a "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("frontend"):
-                argstr += " -f "
+            elif opt in ("noswapin"):
+                if val == "true":
+                    argstr += " -f "
+                    pass
                 pass
-            elif opt in ("waitmode"):
-                argstr += " -w "
+            elif opt in ("wait"):
+                if val == "true":
+                    argstr += " -w "
+                    pass
                 pass
             elif opt in ("nsfilepath"):
                 # Backend script will verify this local path. 
@@ -126,12 +130,12 @@ class emulabserver:
                 nsfilestr = val
             
                 if len(nsfilestr) > (1024 * 512):
-                    return ResponseBlock(RESPONSE_TOOBIG,
+                    return EmulabResponse(RESPONSE_TOOBIG,
                                          output="NS File way too big!");
         
                 (nsfp, nsfilename) = writensfile(nsfilestr)
                 if not nsfilename:
-                    return ResponseBlock(RESPONSE_SERVERERROR,
+                    return EmulabResponse(RESPONSE_SERVERERROR,
                                          output="Server Error")
                 pass
             pass
@@ -142,9 +146,9 @@ class emulabserver:
 
         (exitval, output) = runcommand(TBDIR + "/bin/batchexp " + argstr)
         if exitval:
-            return ResponseBlock(RESPONSE_ERROR, exitval >> 8, output=output)
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
-        return ResponseBlock(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
     # startexp is an alias for batchexp.
@@ -153,12 +157,47 @@ class emulabserver:
         return self.batchexp(version, argdict)
 
     #
-    # swap an experiment using swapexp. We get the NS file inline, which
-    # we have to write to a temp file first. 
+    # swap an experiment using swapexp. 
     #
     def swapexp(self, version, argdict):
         if version != self.VERSION:
-            return ResponseBlock(RESPONSE_BADVERSION,
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argstr     = ""
+        
+        for opt, val in argdict.items():
+            if opt in ("wait"):
+                if val == "true":
+                    argstr += " -w "
+                    pass
+                pass
+            pass
+
+        if not (argdict.has_key("pid") and
+                argdict.has_key("eid") and
+                argdict.has_key("direction")):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                 output="Must supply pid, eid and direction!");
+
+        argstr += " -s " + escapeshellarg(argdict["direction"])
+        argstr += " " + escapeshellarg(argdict["pid"])
+        argstr += " " + escapeshellarg(argdict["eid"])
+
+        (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # swap an experiment using swapexp. We get the NS file inline, which
+    # we have to write to a temp file first. 
+    #
+    def modify(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
 
@@ -166,18 +205,20 @@ class emulabserver:
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("waitmode"):
-                argstr += " -w "
+            if opt in ("wait"):
+                if val == "true":
+                    argstr += " -w "
+                    pass
                 pass
-            elif opt in ("reboot_nodes"):
-                argstr += " -r "
+            elif opt in ("reboot"):
+                if val == "true":
+                    argstr += " -r "
+                    pass
                 pass
             elif opt in ("restart_eventsys"):
-                argstr += " -e "
-                pass
-            elif opt in ("swapop"):
-                argstr += " -s "
-                argstr += escapeshellarg(val)
+                if val == "true":
+                    argstr += " -e "
+                    pass
                 pass
             elif opt in ("nsfilepath"):
                 # Backend script will verify this local path. 
@@ -187,21 +228,22 @@ class emulabserver:
                 nsfilestr = val
             
                 if len(nsfilestr) > (1024 * 512):
-                    return ResponseBlock(RESPONSE_TOOBIG,
+                    return EmulabResponse(RESPONSE_TOOBIG,
                                          output="NS File way too big!");
         
                 (nsfp, nsfilename) = writensfile(nsfilestr)
                 if not nsfilename:
-                    return ResponseBlock(RESPONSE_SERVERERROR,
+                    return EmulabResponse(RESPONSE_SERVERERROR,
                                          output="Server Error")
                 pass
             pass
 
         if not (argdict.has_key("pid") and
                 argdict.has_key("eid")):
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply pid and eid!");
 
+        argstr += " -s modify"
         argstr += " " + escapeshellarg(argdict["pid"])
         argstr += " " + escapeshellarg(argdict["eid"])
 
@@ -211,30 +253,32 @@ class emulabserver:
 
         (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
         if exitval:
-            return ResponseBlock(RESPONSE_ERROR, exitval >> 8, output=output)
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
-        return ResponseBlock(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
     # end an experiment using endexp.
     #
     def endexp(self, version, argdict):
         if version != self.VERSION:
-            return ResponseBlock(RESPONSE_BADVERSION,
+            return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
 
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("waitmode"):
-                argstr += " -w "
+            if opt in ("wait"):
+                if val == "true":
+                    argstr += " -w "
+                    pass
                 pass
             pass
 
         if not (argdict.has_key("pid") and
                 argdict.has_key("eid")):
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply pid and eid!");
 
         argstr += " " + escapeshellarg(argdict["pid"])
@@ -242,16 +286,16 @@ class emulabserver:
 
         (exitval, output) = runcommand(TBDIR + "/bin/endexp " + argstr)
         if exitval:
-            return ResponseBlock(RESPONSE_ERROR, exitval >> 8, output=output)
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
-        return ResponseBlock(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
     # nscheck an NS file.
     #
     def nscheck(self, version, argdict):
         if version != self.VERSION:
-            return ResponseBlock(RESPONSE_BADVERSION,
+            return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
 
@@ -261,12 +305,12 @@ class emulabserver:
             nsfilestr = argdict["nsfilestr"]
             
             if len(nsfilestr) > (1024 * 512):
-                return ResponseBlock(RESPONSE_TOOBIG,
+                return EmulabResponse(RESPONSE_TOOBIG,
                                      output="NS File way too big!");
         
             (nsfp, nsfilename) = writensfile(nsfilestr)
             if not nsfilename:
-                return ResponseBlock(RESPONSE_SERVERERROR, output="Server Error")
+                return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
 
             argstr += nsfilename
             pass
@@ -275,21 +319,21 @@ class emulabserver:
             argstr += escapeshellarg(argdict["nsfilepath"])
             pass
         else:
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply an NS file to check!");
         
         (exitval, output) = runcommand(TBDIR + "/bin/nscheck " + argstr)
         if exitval:
-            return ResponseBlock(RESPONSE_ERROR, exitval >> 8, output=output)
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
-        return ResponseBlock(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
     # create_image.
     #
     def create_image(self, version, argdict):
         if version != self.VERSION:
-            return ResponseBlock(RESPONSE_BADVERSION,
+            return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
 
@@ -304,7 +348,7 @@ class emulabserver:
 
         if not (argdict.has_key("imageid") and
                 argdict.has_key("nodeid")):
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply imageid and nodeid!");
 
         argstr += " " + escapeshellarg(argdict["imageid"])
@@ -312,16 +356,16 @@ class emulabserver:
 
         (exitval, output) = runcommand(TBDIR + "/bin/create_image " + argstr)
         if exitval:
-            return ResponseBlock(RESPONSE_ERROR, exitval >> 8, output=output)
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
-        return ResponseBlock(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
     # create_image.
     #
     def delay_config(self, version, argdict):
         if version != self.VERSION:
-            return ResponseBlock(RESPONSE_BADVERSION,
+            return EmulabResponse(RESPONSE_BADVERSION,
                                  output="Client version mismatch!");
             pass
 
@@ -329,7 +373,9 @@ class emulabserver:
         
         for opt, val in argdict.items():
             if opt in ("modify_exp"):
-                argstr += " -m "
+                if val == "true":
+                    argstr += " -m "
+                    pass
                 pass
             elif opt in ("srcvnode"):
                 argstr += " -s "
@@ -341,7 +387,7 @@ class emulabserver:
                 argdict.has_key("eid") and
                 argdict.has_key("link") and
                 argdict.has_key("params")):
-            return ResponseBlock(RESPONSE_BADARGS,
+            return EmulabResponse(RESPONSE_BADARGS,
                                  output="Must supply pid, eid, link, params!");
 
         argstr += " " + escapeshellarg(argdict["pid"])
@@ -354,9 +400,9 @@ class emulabserver:
         
         (exitval, output) = runcommand(TBDIR + "/bin/delay_config " + argstr)
         if exitval:
-            return ResponseBlock(RESPONSE_ERROR, exitval >> 8, output=output)
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
-        return ResponseBlock(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     pass
 

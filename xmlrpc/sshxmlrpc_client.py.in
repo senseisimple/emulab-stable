@@ -32,6 +32,10 @@ module          = "experiment"
 # Debugging output.
 debug           = 0
 
+# For admin people.
+SERVER_PATH     = "/usr/testbed/sbin/"
+path            = None
+
 ##
 # Print the usage statement to stdout.
 #
@@ -74,7 +78,7 @@ def do_method(server, method_and_args):
     # 
     params = {}
     for param in method_and_args:
-        plist = string.split(param, "=")
+        plist = string.split(param, "=", 1)
         if len(plist) != 2:
             print "Parameters are of the form: param=value!"
             return -1
@@ -89,7 +93,7 @@ def do_method(server, method_and_args):
     response = apply(meth, meth_args)
 
     #
-    # Parse the Response, which is a Dictionary. See ResponseBlock in the
+    # Parse the Response, which is a Dictionary. See EmulabResponse in the
     # emulabclient.py module. The XML standard converts classes to a plain
     # Dictionary, hence the code below. 
     # 
@@ -116,7 +120,7 @@ def do_method(server, method_and_args):
 try:
     # Parse the options,
     opts, req_args = getopt.getopt(sys.argv[1:],
-                                   "dhVs:l:",
+                                   "dhVs:l:a",
                                    [ "help", "version", "server=", "login=", ])
     # ... act on them appropriately, and
     for opt, val in opts:
@@ -137,8 +141,11 @@ try:
         elif opt in ("-m", "--module"):
 	    module = val
             pass
-        elif opt in ("-d"):
+        elif opt in ("-d", "--debug"):
 	    debug = 1
+            pass
+        elif opt in ("-a", "--admin"):
+	    path = SERVER_PATH
             pass
         pass
     pass
@@ -150,7 +157,7 @@ except getopt.error, e:
 
 # Get a handle on the server,
 server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
-                        "/xmlrpc/" + module)
+                        "/xmlrpc/" + module, path=path)
 
 if len(req_args):
     # Method and args are on the command line.
@@ -160,7 +167,7 @@ else:
     try:
         while True:
             line = raw_input("$ ")
-            tokens = line.split(" ", 1)
+            tokens = line.split(" ")
             if len(tokens) >= 1 and len(tokens[0]) > 0:
                 try:
                     print str(do_method(server, tokens))

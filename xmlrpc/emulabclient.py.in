@@ -15,11 +15,17 @@ MAXNSFILESIZE = (1024 * 512)
 
 #
 # This class defines a simple structure to return back to the caller.
-# It includes the exit status of the command, and any output that it
-# wants to send back. Why not return a tuple? Well, it appears that the
-# python xmlrpc library requires that a singleton be returned from the
-# server, and I do not want to depend on the "Fault" structure that XML
-# defines for return values.
+# It includes a basic response code (success, failure, badargs, etc),
+# as well as a return "value" which can be any valid datatype that can
+# be represented in XML (int, string, hash, float, etc). You can also
+# send back some output (a string with embedded newlines) to print out
+# to the user.
+#
+# Why not return a tuple? Well, it appears that the python xmlrpc
+# library requires that a singleton be returned from the server.
+#
+# Note that XMLRPC does not actually return a "class" to the caller; It gets
+# converted to a hashed array (Python Dictionary).
 #
 RESPONSE_SUCCESS        = 0
 RESPONSE_BADARGS        = 1
@@ -29,11 +35,11 @@ RESPONSE_BADVERSION     = 4
 RESPONSE_SERVERERROR    = 5
 RESPONSE_TOOBIG         = 6
 
-class ResponseBlock:
+class EmulabResponse:
     def __init__(self, code, value=0, output=None):
-        self.code     = code
-        self.value    = value
-        self.output   = output
+        self.code     = code            # A RESPONSE code
+        self.value    = value           # A return value; any valid XML type.
+        self.output   = output          # Pithy output to print
         return
 
 #

@@ -17,24 +17,30 @@ SBIN_SCRIPTS	= sshxmlrpc_server.py
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
+DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py
+DEBUG_STUFF     = experiment
 
 #
 # These are the ones installed on plastic (users, control, etc). 
 # 
-USERBINS        = sshxmlrpc_client.py
+CLIENTBIN       = sshxmlrpc_client.py
+USERLIBS	= sshxmlrpc.py emulabclient.py 
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF) $(LIBEXEC_STUFF)
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF) $(LIBEXEC_STUFF) \
+	$(DOWNLOAD_STUFF) $(DEBUG_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_SBINDIR)/xmlrpc/, $(DEBUG_STUFF)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
 	$(addprefix $(INSTALL_WWWDIR)/, $(WWW_STUFF)) \
+	$(addprefix $(INSTALL_WWWDIR)/downloads/xmlrpc/, $(DOWNLOAD_STUFF)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 $(INSTALL_WWWDIR)/%: %
@@ -42,19 +48,20 @@ $(INSTALL_WWWDIR)/%: %
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 
+$(INSTALL_WWWDIR)/downloads/xmlrpc/%: %
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@)
+
+$(INSTALL_SBINDIR)/xmlrpc/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_SBINDIR)/xmlrpc
+	$(INSTALL_PROGRAM) $< $@
+
 #
 # Control node installation (okay, plastic)
 #
-ifneq ($(UNIFIED),1)
-LINKS=	cd $(INSTALL_BINDIR) && \
-		list='$(USERBINS)'; for file in $$list; do \
-			rm -f $$file; \
-			ln -s plasticwrap $$file; \
-		done;
-
-
-endif
-control-install:
-	$(LINKS)
+control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
+	$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBIN))
 
 clean:
