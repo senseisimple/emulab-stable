@@ -571,7 +571,6 @@ while (1) {
     $currentrun++;
 }
 TBDebugTimeStamp("assign_loop finished");
-die("foo\n");
 
 #
 # Run assign once.
