@@ -33,7 +33,7 @@ if (mysql_num_rows($query_result) != 1) {
 }
 
 $query_result = DBQueryFatal("select count(*) from experiments where ".
-			     "swap_requests > 0 and idle_ignore==0 ".
+			     "swap_requests > 0 and idle_ignore=0 ".
 			     "and pid!='emulab-ops' and pid!='testbed'");
 if (mysql_num_rows($query_result) != 1) {
     $idle_expts = "ERR";
