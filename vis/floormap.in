@@ -75,11 +75,6 @@ my $last_notitles = 0;  # This says there were no titles around the previous ima
 my $out_width  = 792;
 my $out_height = 492;
 
-if ($nozoom) {
-    my $out_width  = 1280;
-    my $out_height = 1024;
-}
-
 # Max x,y of image to go into state file.
 my $max_x = 0;
 my $max_y = 0;
@@ -166,6 +161,10 @@ if (defined($options{"a"})) {
 }
 if (defined($options{"z"})) {
     $nozoom = 1;
+
+    # XXX For the robot maps. Bogus.
+    $out_width  = 1280;
+    $out_height = 1024;
 }
 if (defined($options{"d"})) {
     $debug = 1;
