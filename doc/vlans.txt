@@ -54,6 +54,7 @@ NOTE: ICMP gets to go from anywhere to anywhere
    bootinfo        pxeboot <-> bootinfo daemon                                     
    tmcd            the testbed master control daemon
    nfs             images from netdisk
+   cvsup	   cvsup client talks to cvsupd on paper.
    
 6. Public <-> Control
    ssh             as always
