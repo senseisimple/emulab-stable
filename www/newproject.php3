@@ -109,16 +109,6 @@ if (strlen($proj_head_uid) > $TBDB_UIDLEN) {
 }
 
 #
-# Check early that we can guarantee uniqueness of the unix group name.
-# 
-$query_result =
-    DBQueryFatal("select gid from groups where unix_name='$pid'");
-
-if (mysql_num_rows($query_result)) {
-    TBERROR("Could not form a unique Unix group name for $pid!", 1);
-}
-
-#
 # Check that email address looks reasonable. We need the domain for
 # below anyway.
 #
@@ -172,6 +162,16 @@ $project_result =
 if ($row = mysql_fetch_row($project_result)) {
     USERERROR("The project name \"$pid\" you have chosen is already in use. ".
               "Please select another.", 1);
+}
+
+#
+# Check early that we can guarantee uniqueness of the unix group name.
+# 
+$query_result =
+    DBQueryFatal("select gid from groups where unix_name='$pid'");
+
+if (mysql_num_rows($query_result)) {
+    TBERROR("Could not form a unique Unix group name for $pid!", 1);
 }
 
 #
