@@ -266,10 +266,6 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
 	}
     };
-    Phase "dhcpd", "Moving $RCDIR/dhcpd.sh", sub {
-	DoneIfExists("$RCDIR/2.dhcpd.sh");
-	ExecQuietFatal("mv $RCDIR/isc-dhcpd.sh $RCDIR/2.dhcpd.sh");
-    };
     Phase "snmpd", "Removing snmpd starup script",  sub {
 	DoneIfDoesntExist("$RCDIR/snmpd.sh");
 	if (!unlink "$RCDIR/snmpd.sh") {
@@ -446,7 +442,6 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 	qq|xntpd_enable="YES"|,
 	qq|syslogd_flags=""|,
 	qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|,
-	qq|dhcpd_enable="YES"|,
     	qq|apache_enable="YES"|);
 };
 
