@@ -407,3 +407,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table experiment_stats add index(idx);
 
+1.141: Add usevethiface flag to virt_lans. Mostly a development aid so
+       that we can create emulated links that use the veth device
+       instead of an IP alias. Without linux support, mere users would
+       not get to choose this option since it will only work between
+       FreeBSD boxes with veth support.
+
+       alter table virt_lans add usevethiface tinyint(4) default '0'
+		after nobwshaping;
+
