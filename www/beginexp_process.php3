@@ -6,7 +6,7 @@ include("defs.php3");
 #
 PAGEHEADER("Begin an Experiment");
 
-$mydebug = 1;
+$mydebug = 0;
 
 #
 # First off, sanity check the form to make sure all the required fields
@@ -209,9 +209,29 @@ chmod($exp_nsfile, 0666);
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $gid ".
-               "tbdoit $exp_pid $exp_id $exp_nsfile",
- 	       $output, $retval);
+$last   = time();
+
+if (($pipe = popen("$TBSUEXEC_PATH $uid $gid ".
+                   "tbdoit $exp_pid $exp_id $exp_nsfile", "r")) == 0) {
+    $query_result = mysql_db_query($TBDBNAME,
+	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
+
+    TBERROR("Opening pipe to tbdoit", 1);
+}
+
+$count = 0;
+while (!feof($pipe)) {
+    $line = fgets($pipe, 1024);
+    $output[$count] = $line;
+    $count++;
+
+    if ((($now = time()) - $last) >= 5) {
+        $last = $now;
+        echo "Thinking ... \n<br>";
+        flush();
+    }
+}
+$retval = pclose($pipe);
 
 if ($retval) {
     echo "<br><br><h2>
@@ -220,7 +240,7 @@ if ($retval) {
           <br>
           <XMP>\n";
           for ($i = 0; $i < count($output); $i++) {
-	      echo "$output[$i]\n";
+	      echo "$output[$i]";
           }
     echo "</XMP>\n";
 
@@ -236,7 +256,7 @@ if ($retval) {
 if ($mydebug) {
     echo "<XMP>\n";
     for ($i = 0; $i < count($output); $i++) {
-        echo "$output[$i]\n";
+        echo "$output[$i]";
     }
     echo "</XMP>\n";
 }
@@ -248,19 +268,19 @@ echo "Here is a summary of the nodes that were allocated<br>";
 echo "</h2></center><br>";
 
 #
-# The tbdoit scripts dumps report output to stdout. Look for it in the
+# The tbdoit script dumps report output to stdout. Look for it in the
 # output and send that out to the user. We cannot open the actual file
 # because the project directory is not readable by world.
 #
 for ($i = 0; $i < count($output); $i++) {
-    if (strcmp($output[$i], "Dumping $exp_id.report") == 0)
+    if (strcmp($output[$i], "Dumping $exp_id.report\n") == 0)
         break;
 }
 $summary = "";
 echo "<XMP>\n";
 for ($i = $i + 1; $i < count($output); $i++) {
-    $summary = "$summary $output[$i]\n";
-    echo "$output[$i]\n";
+    $summary = "$summary $output[$i]";
+    echo "$output[$i]";
 }
 echo "</XMP>\n";
 
