@@ -41,9 +41,16 @@ LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 ALLOWED_NODES = ()
 NUMVNODES = 10
 
-DEFAULT_DATA_PATH = "@prefix@/etc/plab"
+DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
 SSH = "@prefix@/bin/sshtb"
-NAMED_SETUP = "@prefix@/sbin/named_setup";
+NAMED_SETUP = "@prefix@/sbin/named_setup"
+
+HTTPD_SITE = "http://localhost:"
+HTTPD_PORT = "1492"
+HTTP_PATH = "/" # ensure this ends in a slash
+ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
+
+DEF_ROOTBALL_NAME = "plabroot-1.tgz"
 
 verbose = 0
 debug = 0
@@ -157,10 +164,10 @@ def handleArgs(args):
 #
 
 class Plab:
-    def __init__(self, keyfile = DEFAULT_DATA_PATH + "/key.pem",
-                 pubkeyfile = DEFAULT_DATA_PATH + "/pubkey.pem",
-                 certfile = DEFAULT_DATA_PATH + "/cert.pem",
-                 cacertfile = DEFAULT_DATA_PATH + "/cacert.pem"):
+    def __init__(self, keyfile = DEFAULT_DATA_PATH + "key.pem",
+                 pubkeyfile = DEFAULT_DATA_PATH + "pubkey.pem",
+                 certfile = DEFAULT_DATA_PATH + "cert.pem",
+                 cacertfile = DEFAULT_DATA_PATH + "cacert.pem"):
         for file in (keyfile, pubkeyfile, certfile, cacertfile):
             if not os.path.exists(file):
                 raise RuntimeError, "Key or cert %s does not exist" % file
@@ -796,21 +803,23 @@ class Node:
                      " set leasedata = %s, leaseend = %s",
                      (self.leasedata, self.lease.end_time))
 
-    def emulabify(self, rootball = DEFAULT_DATA_PATH + "/plabroot.tgz"):
+    def emulabify(self, rootballpath = DEFAULT_DATA_PATH,
+                  rootballname = DEF_ROOTBALL_NAME):
         """
         Performs the necessary steps to turn this node into an
         Emulab/Plab node.  Primarily, this unpacks the magic files on to
         the node.
         """
         print "Overlaying Emulab files on %s ..." % self.nodeid
-        self.__copy(DEFAULT_DATA_PATH + "/fixsudo.sh", "/tmp/fixsudo.sh")
+        self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh")
         self.__perform("-tt sh /tmp/fixsudo.sh")
         self.addToGroup(self.slice.slicename, "root")
-        self.unpackTgz(rootball)
+        self.unpackTgz(rootballpath, rootballname)
+        # No longer needed..
         # Ugh
-        if verbose:
-            print "Installing suidperl RPM"
-        self.__perform("sudo rpm -U /tmp/perl-suidperl-*.rpm")
+        # if verbose:
+        #    print "Installing suidperl RPM"
+        # self.__perform("sudo rpm -U /tmp/perl-suidperl-*.rpm")
 
     def addToGroup(self, user, group):
         if verbose:
@@ -818,7 +827,7 @@ class Node:
                   (user, group, self.nodeid)
         self.__perform("sudo /usr/sbin/usermod -G %s %s" % (group, user))
 
-    def unpackTgz(self, tgzpath, destpath = "/"):
+    def unpackTgz(self, tgzpath, tgzname, destpath = "/"):
         """
         Unpacks a locally stored gzip'd tarball to the specified path
         (default /) on the remote node.  Always done as remote root.
@@ -826,8 +835,17 @@ class Node:
         if verbose:
             print "Unpacking tgz %s to %s on %s" % \
                   (tgzpath, destpath, self.nodeid)
-        self.__copy(tgzpath, "/tmp/sliceinit.tgz")
-        self.__perform("sudo tar -xzf /tmp/sliceinit.tgz -C %s" % destpath)
+        try:
+            if debug:
+                print "Trying to grab rootball through loopback service"
+            self.__perform("sudo wget -q -nH -P /tmp " +
+                           ROOTBALL_HTTP_URLPATH + tgzname)
+        except RuntimeError:
+            print "Warning: couldn't get tarball via local service:"
+            print "\tFalling back to remote transfer."
+            self.__copy(tgzpath + tgzname, "/tmp/" + tgzname)
+            
+        self.__perform("sudo tar -xzf /tmp/" + tgzname + " -C %s" % destpath)
 
     def __perform(self, command):
         """
