@@ -49,6 +49,8 @@ my $killmode    = 0;
 my $mode        = "setup";
 my $dbuid;
 
+my $MAX_CHILDREN = 8;
+
 #
 # Load the Testbed support stuff. 
 #
@@ -238,21 +240,127 @@ foreach my $node (@nodes) {
     if (!$killmode) {
 	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
     }
-    
-    print STDOUT "Doing $mode of vnode $node on $pnode ...\n";
 
     #
-    # Run an ssh command in a child process, protected by an alarm to
-    # ensure that the ssh is not hung up forever if the machine is in
-    # some funky state.
-    # 
-    my $syspid = fork();
+    # Put this into the list of calls we have to make in the next loop
+    #
+    push @vnodes, [$node, $pnode, $mode, $jailed, $plab];
 
-    if ($syspid) {
-	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 120;
-	waitpid($syspid, 0);
+}
+
+my $children = 0;
+my %child_vnodes = ();
+while (1) {
+
+    #
+    # We're done when we've hit the last vnode, and we've outlived all of our
+    # children
+    #
+    if ((!@vnodes) && ($children == 0)) {
+	last;
+    }
+
+    #
+    # There are more free slots
+    #
+    if (($children < $MAX_CHILDREN) && @vnodes) {
+	#
+	# Look for a vnode that is not on a pnode we're already working on
+	# 
+	# XXX - do this!
+	
+	my ($vnode, $pnode, $mode, $jailed, $plab) = @{pop @vnodes};
+    
+	print STDOUT "Doing $mode of vnode $vnode on $pnode ...\n";
+
+	#
+	# Run an ssh command in a child process, protected by an alarm to
+	# ensure that the ssh is not hung up forever if the machine is in some
+	# funky state.
+	# 
+	my $syspid = fork();
+
+	if ($syspid) {
+	    #
+	    # Just keep track of it, we'll wait for it finish down below
+	    #
+	    $child_vnodes{$syspid} =
+		[$vnode, $pnode, $mode, $jailed, $plab, time()];
+	    $children++;
+	} else {
+	    my $args = ($killmode ? "-k " : " ");
+	    $args   .= ($jailed   ? "-j " : " ");
+	    $args   .= ($plab     ? "-p " : " ");
+	    $args   .= "$vnode ";
+	
+	    # Must change our real UID to root so that ssh will work.
+	    $UID = 0;
+
+	    if ($plab && !$killmode) {
+		if (system("$TB/sbin/plabnode alloc $pid $eid $vnode")) {
+		    die("*** $0:\n".
+			"    Plab node allocation failed");
+		}
+	    }
+
+	    exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup $args");
+	    die("*** $0:\n".
+		"    exec failed!\n");
+	}
+    } else {
+	#
+	# We have too many of the little rugrats, wait for one to die
+	#
+
+	#
+	# Set up a timer - we want to kill processes after they hit 120 seconds
+	# old (not much of a life, is it?), so we find the first one marked for
+	# death.
+	#
+	my $oldest = 0;
+	my $oldestpid = 0;
+	while (my ($pid, $aref) = each %child_vnodes) {
+	    my ($vnode, $pnode, $mode, $jailed, $plab, $birthtime) = @$aref;
+	    if ($birthtime > $oldest) {
+		$oldest = $birthtime;
+		$oldestpid = $pid;
+	    }
+	}
+
+	#
+	# Sanity check
+	#
+	if (!$oldest) {
+	    die "*** $0\n".
+	    	"Uh oh, I have no children left, something is wrong!\n";
+	}
+
+	#
+	# Kill of the oldest if he gets too old while we're waiting
+	#
+	local $SIG{ALRM} = sub { kill("TERM", $oldestpid); };
+	alarm(($oldest + 120) - time());
+
+	my $childpid = wait();
 	alarm 0;
+
+	#
+	# Another sanity check
+	#
+	if ($childpid < 0) {
+	    die "*** $0\n".
+	    	"wait() returned <0, something is wrong!\n";
+	}
+
+	#
+	# Look up to see what vnode, etc. this was associated with - if we
+	# don't know about this child, ignore it
+	#
+	my $aref = $child_vnodes{$childpid};
+	next unless @$aref;
+	my ($vnode, $pnode, $mode, $jailed, $plab, $birthtime) = @$aref;
+	$children--;
+	delete $child_vnodes{$childpid};
 
 	#
 	# Look for setup failure, reported back through ssh.
@@ -260,56 +368,37 @@ foreach my $node (@nodes) {
 	if ($?) {
 	    my $exitstatus = $?;
 
-	    print STDERR "vnode $mode on $pnode returned $?.\n" if $debug;
+	    print STDERR "vnode $vnode $mode on $pnode returned $?.\n"
+		if $debug;
 
 	    if ($exitstatus == 256) {
-		print STDERR "$node is not running sshd.\n" if $debug;
+		print STDERR "$vnode is not running sshd.\n" if $debug;
 	    }
 	    elsif ($exitstatus == 15) {
-		print STDERR "$node is wedged.\n" if $debug;
+		print STDERR "$vnode is wedged.\n" if $debug;
 	    }
 	    
 	    # Send mail to testbed-ops about it
-	    SENDMAIL($TBOPS, "Virtual Node $node $mode failure",
-	     "Virtual node $node $mode (on physical node $pnode) in pid/eid\n".
+	    SENDMAIL($TBOPS, "Virtual Node $vnode $mode failure",
+	     "Virtual node $vnode $mode (on physical node $pnode) in pid/eid\n".
 	     "$pid/$eid has failed! Exit status was $exitstatus.\n");
 
 	    if (!$killmode) {
-		die("*** $0:\n".
-		    "    Virtual node $node setup failure!\n");
+		warn("*** $0:\n".
+		    "    Virtual node $vnode setup failure!\n");
 	    }
 	    else {
 		warn("*** $0:\n".
-		    "    Virtual node $node teardown failure!\n");
+		    "    Virtual node $vnode teardown failure!\n");
 	    }
 	}
 
 	if ($plab && $killmode) {
-	    if (system("$TB/sbin/plabnode free $pid $eid $node")) {
+	    if (system("$TB/sbin/plabnode free $pid $eid $vnode")) {
 		warn("*** $0:\n".
-		     "    Plab node free failed");
+		     "    Plab node free of $vnode failed");
 	    }
 	}
-    }
-    else {
-	my $args = ($killmode ? "-k " : " ");
-	$args   .= ($jailed   ? "-j " : " ");
-	$args   .= ($plab     ? "-p " : " ");
-	$args   .= "$node ";
-	
-	# Must change our real UID to root so that ssh will work.
-	$UID = 0;
-
-	if ($plab && !$killmode) {
-	    if (system("$TB/sbin/plabnode alloc $pid $eid $node")) {
-		die("*** $0:\n".
-		    "    Plab node allocation failed");
-	    }
-	}
-
-	exec("$ssh -host $node $CLIENT_BIN/vnodesetup $args");
-	die("*** $0:\n".
-	    "    exec failed!\n");
     }
 }
 
