@@ -108,5 +108,28 @@ you have to be something of an expert. Here is a rough guide to what you
 can currently specify:
 
 <ul>
-<li> 
+<li> <tt>channel</tt> - Set the channel for the lan to either a
+     channel number or a frequency. If you do not set the channel one
+     will be choosen for you, and thats probably just as bad as
+     setting it yourself without knowing what other people are using!
+
+<li> <tt>rate</tt> - Some interfaces support setting a bit rate
+     different then the default. The default is to tell the interface
+     to use "auto" mode (varies the rate according to RF conditions),
+     but you can specify a specific rate for either the entire lan or
+     for just one node. The value should be in bits per second with no
+     units (11000, 54000, etc). See the iwconfig man page for more
+     details on the format of this option. 
+
+<li> <tt>txpower</tt> - Some interfaces support setting the transmit
+     power to something different then the default. The default is to
+     tell the interface to use "auto" mode. See the iwconfig man page
+     for more details on the format of this option. Not all interfaces
+     support this option. 
+     
+<li> <tt>sensitivity</tt> - Some interfaces support setting the sensitivity
+     to something different then the default. The default is to
+     tell the interface to use "auto" mode. See the iwconfig man page
+     for more details on the format of this option. Not all interfaces
+     support this option. 
 </ul>
