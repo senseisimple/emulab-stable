@@ -71,6 +71,7 @@ static int doloadinfo(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dorouting(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dotrafgens(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int donseconfigs(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -97,6 +98,7 @@ struct command {
 	{ "reset",	doreset},
 	{ "routing",	dorouting},
 	{ "trafgens",	dotrafgens},
+	{ "nseconfigs",	donseconfigs},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2158,6 +2160,69 @@ dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		
 		nrows--;
 		syslog(LOG_INFO, "TRAFGENS: %s", buf);
+	}
+	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return nseconfigs info
+ */
+static int
+donseconfigs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE], *bp, *sp;
+	int		nrows;
+
+	if (!tcp) {
+		syslog(LOG_ERR, "NSECONFIGS: %s: Cannot do UDP mode!",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "NSECONFIGS: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		syslog(LOG_ERR, "NSECONFIGS: %s: Node is free", nodeid);
+		return 1;
+	}
+
+	res = mydb_query("select nseconfig from nseconfigs as nse "
+			 "left join reserved as r on r.vname=nse.vname "
+			 "where r.node_id='%s' and "
+			 " nse.pid='%s' and nse.eid='%s'",
+			 1, nodeid, pid, eid);
+
+	if (!res) {
+		syslog(LOG_ERR, "NSECONFIGS: %s: DB Error getting nseconfigs",
+		       nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	row = mysql_fetch_row(res);
+
+	/*
+	 * Just shove the whole thing out.
+	 */
+	if (row[0] && row[0][0]) {
+		client_writeback(sock, row[0], strlen(row[0]), tcp);
 	}
 	mysql_free_result(res);
 	return 0;
