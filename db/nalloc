@@ -3,8 +3,9 @@ use Mysql;
 
 my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
-if ($#ARGV < 1) {die("Usage: nalloc <eid> <node> <node> <...>\n");}
+if ($#ARGV < 1) {die("Usage: nalloc <pid> <eid> <node> <node> <...>\n");}
 
+my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
 my @machines = @node_names;
@@ -13,27 +14,33 @@ my $list= join(" or ",@machines);
 
 my $cmd = "";
 my $sth = "";
+
+$cmd = "select * from experiments where eid='$eid' and pid='$pid'";
+$sth = $dbh->query($cmd);
+if ($sth->numrows < 1) {	
+  die("There is no experiment '$eid' in project '$pid'.\n");
+}
  
 foreach my $n (@node_names) { 
-    $sth = $dbh->query("select * from reserved where node_id='$n'");
-    if ($sth->numrows > 0) {
-	$sth = $dbh->
-	    query("select * from reserved where node_id='$n' and eid='$eid'");
-	if ($sth->numrows > 0) {	
-	    print "You have already reserved node '$n'.\n";
-	} else {
-	    print "Someone else has already reserved node '$n'.\n";
-	}
-	next;
+  $sth = $dbh->query("select * from reserved where node_id='$n'");
+  if ($sth->numrows > 0) {
+    $cmd="select * from reserved where node_id='$n' and eid='$eid' and pid='$pid'";
+    $sth = $dbh->query($cmd);
+    if ($sth->numrows > 0) {	
+      print "You have already reserved node '$n'.\n";
     } else {
-	$sth = $dbh->query("select * from nodes where node_id='$n'");
-	if ($sth->numrows < 1) {	
-	    print "Node '$n' does not exist.\n";
-	    next;
-	}
+      print "Someone else has already reserved node '$n'.\n";
     }
-    print "Reserving node '$n'...";
-    $cmd = "insert into reserved (node_id,eid) values ('$n','$eid')";
-    $sth = $dbh->query($cmd) && print "Succeeded.\n"
-	|| print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+    next;
+  } else {
+    $sth = $dbh->query("select * from nodes where node_id='$n'");
+    if ($sth->numrows < 1) {	
+      print "Node '$n' does not exist.\n";
+      next;
+    }
+  }
+  print "Reserving node '$n'...";
+  $cmd = "insert into reserved (node_id,pid,eid) values ('$n','$pid','$eid')";
+  $sth = $dbh->query($cmd) && print "Succeeded.\n"
+    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
 }

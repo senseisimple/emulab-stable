@@ -3,8 +3,13 @@ use Mysql;
 
 my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
-if ($#ARGV < 1) {die("Usage: nfree <eid> <node> <node> <...>\n");}
+if ($#ARGV < 1) {
+  die("Usage: nfree <pid> <eid> [<node> <node> <...>]\n".
+      "Releases all nodes in the specified experiment. If nodes are listed,\n".
+      "nfree releases only the listed nodes.\n");
+}
 
+my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
 my @machines = @node_names;
@@ -14,11 +19,27 @@ my $list= join(" or ",@machines);
 my $cmd = "";
 my $sth = "";
 
+$cmd = "select * from experiments where eid='$eid' and pid='$pid'";
+$sth = $dbh->query($cmd);
+if ($sth->numrows < 1) {	
+  die("There is no experiment '$eid' in project '$pid'.\n");
+}
+ 
+# If list is empty, put in all the nodes
+if ($#node_names == -1) {
+  print "Releasing all nodes from experiment '$eid' in project '$pid'...\n";
+  $sth = $dbh->
+    query("select node_id from reserved where pid='$pid' and eid='$eid'");
+  while (@row = $sth->fetchrow_array()) {
+    push(@node_names, $row[0]);
+  }
+}
+
 foreach my $n (@node_names) { 
     $sth = $dbh->query("select * from reserved where node_id='$n' ".
 		       "and eid='$eid'");
     if ($sth->numrows == 0) {
-	print "Node '$n' is not reserved by you.\n";
+	print "Node '$n' is not reserved by your experiment.\n";
 	next;
     } 
     print "Releasing node '$n'...";
