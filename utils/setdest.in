@@ -1,0 +1,137 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Change delay params for a link.
+#
+sub usage()
+{
+    print(STDERR
+	  "Usage: setdest -x xpos -y ypos -o orientation node_id\n");
+    # Web interface cares about this return value!
+    exit(-1);
+}
+my $optlist = "dx:y:o:";
+my $debug   = 0;
+my $destx;
+my $desty;
+my $desto;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TEVC        = "$TB/bin/tevc";
+my $nodeid;
+my $pid;
+my $eid;
+my $vname;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"x"})) {
+    $destx = 1;
+}
+if (defined($options{"y"})) {
+    $desty = 1;
+}
+if (defined($options{"o"})) {
+    $desto = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+if (! (defined($destx) && defined($desty) && defined($desto))) {
+    usage();
+}
+$nodeid = $ARGV[0];
+
+#
+# Untaint args.
+#
+if ($destx =~ /^([\d.]+)$/) {
+    $destx = $1;
+}
+else {
+    die("*** Bad data in pid: $destx.\n");
+}
+if ($desty =~ /^([\d.]+)$/) {
+    $desty = $1;
+}
+else {
+    die("*** Bad data in pid: $desty.\n");
+}
+if ($desto =~ /^([\d.]+)$/) {
+    $desto = $1;
+}
+else {
+    die("*** Bad data in pid: $desto.\n");
+}
+
+#
+# Check args and permission
+#
+if (!TBValidNodeName($nodeid)) {
+    die("*** $0:\n".
+	"    Node does not exist: $nodeid\n");
+}
+if (!TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO(), $nodeid)) {
+    die("*** $0:\n".
+	"    Not enough permission: $nodeid\n");
+
+}
+if (!NodeidToExp($nodeid, \$pid, \$eid, \$vname)) {
+    die("*** $0:\n".
+	"    Could not map nodeid to experiment: $nodeid\n");
+}
+
+#
+# Inject an event. 
+#
+my $inject_string = "$TEVC -e $pid/$eid now $vname SETDEST " .
+    "X=" . $destx . " Y=" . $desty . " ORIENTATION=" . $desto;
+
+if ($debug) {
+    print "$inject_string\n";
+}
+
+system($inject_string) &&
+    die("*** $0:\n".
+	"    Failed to inject setdest event!\n");
+    
+exit(0);
+
