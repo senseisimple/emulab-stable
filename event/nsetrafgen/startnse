@@ -1,0 +1,41 @@
+#!/usr/bin/perl -w
+use English;
+
+#
+# Setup the files and environment required for NSE and start it
+#
+# usage: startnse &
+# 
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/testbed";
+use libsetup;
+
+#
+# We use the tmcc to figure out where the Testbed Event Daemon is running.
+# Don't worry about the port for now.
+#
+#my ($bossname, $bossipaddr) = split(" ", `tmcc bossinfo`);
+
+
+# 1. sysctl tcp blackhole to 2. Done in nseinput.tcl
+# 2. create lots of BPF devices
+
+chdir "/etc/testbed";
+$id = `id`;
+if( $id =~ /uid=(\d+)/ ) {
+    if( $1 ne "0" ) {
+        system("sudo nse nseinput.tcl");
+    } else {
+        system("nse nseinput.tcl");
+    }
+}

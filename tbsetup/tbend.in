@@ -83,6 +83,8 @@ DBQueryWarn("DELETE from virt_lans  where pid='$pid' and eid='$eid'") or
     $errors++;
 DBQueryWarn("DELETE from virt_trafgens  where pid='$pid' and eid='$eid'") or
     $errors++;
+DBQueryWarn("DELETE from nseconfigs  where pid='$pid' and eid='$eid'") or
+    $errors++;
 DBQueryWarn("DELETE from eventlist  where pid='$pid' and eid='$eid'") or
     $errors++;
 

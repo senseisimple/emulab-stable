@@ -2,12 +2,12 @@
 #
 # Shashi's definitions. Selected via configure.
 #
-$WWWHOST        = "www.emulab.net";
+$WWWHOST        = "www.mini.emulab.net";
 $WWW            = "$WWWHOST/~shash/www";
 $TBBASE         = "https://$WWW";
 $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
-$TBAUTHDOMAIN   = ".emulab.net";
+$TBAUTHDOMAIN   = ".mini.emulab.net";
 $TBSECURECOOKIES= 1;
 $TBCOOKIESUFFIX = "";
 

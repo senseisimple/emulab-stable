@@ -749,6 +749,7 @@ sub dotrafficconfig()
     my $pat;
     my $TM;
     my $boss;
+    my $startnse = 0;
     
     $TM = OPENTMCC(TMCCCMD_BOSSINFO);
     ($boss) = split(" ", <$TM>);
@@ -781,6 +782,13 @@ sub dotrafficconfig()
 	    # Skip if not specified as a TG generator. At some point
 	    # work in Shashi's NSE work.
 	    if ($generator ne "TG") {
+		$startnse = 1;
+		if (! $didopen) {
+		    open(RC, ">" . TMTRAFFICCONFIG)
+			or die("Could not open " . TMTRAFFICCONFIG . ": $!");
+		    print RC "#!/bin/sh\n";
+		    $didopen = 1;
+		}
 		next;
 	    }
 
@@ -803,6 +811,11 @@ sub dotrafficconfig()
 	    warn "*** WARNING: Bad traffic line: $_";
 	}
     }
+
+    if( $startnse ) {
+	print RC "$SETUPDIR/startnse &\n";
+    }
+    
     close($TM);
     if ($didopen) {
 	close(RC);

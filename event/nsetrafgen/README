@@ -1,0 +1,63 @@
+For NSE based TCP traffic generation, we need the following files
+as part of the FBSD disk image or it should be part of 
+/usr/testbed/sup/sup/FBSD43-STD/root*/etc/testbed on the boss node.
+
+a) nseinput.tcl and startnse present in this directory
+b) NSE executable file. To build it, do a "cvs co ns-2" in this
+   directory or elsewhere. The main branch of the ns-2 cvs tree
+   will contain the latest files to build an NSE suitable for
+   emulab.
+
+   cvs co ns-2
+   cd ns-2
+   ./install
+   cp ns-2.1b8a/nse <sup_directory>
+
+The current NSE trafgen has the following caveats:
+
+0) The Telnet and FTP traffic generators will automatically start
+   30 seconds after "$ns run" in nseinput.tcl has been called. This just 
+   arbitrary and will be fixed in the event system version of NSE.
+1) nseinput.tcl does tmcc ready barrier synchronization which is not
+   sufficient across reboots. Again, this will be fixed
+2) It comes with all the bugs and idiosyncrasies of the FullTcp, FTP and
+   Telnet models in NS.
+
+Here is an example scenario:
+
+source tb_compat.tcl
+set ns [new Simulator]
+
+#Create four nodes
+set nodeA [$ns node]
+set nodeB [$ns node]
+
+$ns duplex-link $nodeA $nodeB 100Mb 0ms DropTail
+
+##### ftp0
+set tcp0 [new Agent/TCP/FullTcp/Tahoe]
+$ns attach-agent $nodeA $tcp0
+set ftp0 [new Application/FTP]
+$ftp0 attach-agent $tcp0
+
+set tcp1 [new Agent/TCP/FullTcp/Sack]
+$ns attach-agent $nodeB $tcp1
+$tcp1 listen
+
+#Connect the traffic sources with the traffic sink
+$ns connect $tcp0 $tcp1  
+
+##### telnet0
+set tcp2 [new Agent/TCP/FullTcp/Newreno]
+$ns attach-agent $nodeB $tcp2
+set telnet0 [new Application/Telnet]
+$telnet0 attach-agent $tcp2
+
+set tcp3 [new Agent/TCP/FullTcp]
+$tcp3 listen
+$ns attach-agent $nodeA $tcp3
+
+$ns connect $tcp2 $tcp3
+
+#Run the simulation
+$ns run
