@@ -3,12 +3,12 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	ulsshxmlrpcpp
-PORTVERSION=	0.1.0
+PORTVERSION=	0.1.1
 CATEGORIES=	misc
 MASTER_SITES=	http://www.emulab.net/distributions/
 
 MAINTAINER=	ricci@cs.utah.edu
-COMMENT=	"Libraries for performing XML-RPC through ssh"
+COMMENT=	"C++ Libraries for performing XML-RPC through ssh"
 
 HAS_CONFIGURE=	yes
 USE_GMAKE=	yes
