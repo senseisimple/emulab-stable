@@ -201,8 +201,8 @@ static int parse_client_options(int *argcp, char **argvp[])
 
 int main(int argc, char *argv[])
 {
+    struct lnMinList known_bots, unknown_bots, wiggling_bots, lost_bots;
     struct lnMinList last_frame, current_frame, wiggle_frame;
-    struct lnMinList known_bots, unknown_bots, wiggling_bots;
     int lpc, current_client = 0, retval = EXIT_SUCCESS;
     struct robot_object *wiggle_bot = NULL;
     fd_set readfds;
@@ -220,6 +220,7 @@ int main(int argc, char *argv[])
     lnNewList(&known_bots);
     lnNewList(&unknown_bots);
     lnNewList(&wiggling_bots);
+    lnNewList(&lost_bots);
     
     do {
         retval = parse_client_options(&argc, &argv);
@@ -324,6 +325,38 @@ int main(int argc, char *argv[])
 	}
     }
 
+    /*
+     * The main loop consists of:
+     *
+     *   1. Gathering all of the tracks from the cameras;
+     *   2. Coalescing the separate tracks into a single "frame" that has all
+     *      of the tracks without any duplicates caused by overlapping cameras.
+     *   3. Matching the tracks in the current frame to those in the last
+     *      frame, and copying the robot references from the old frame into
+     *      the new frame.
+     *   4. Sort the list of robots into known and unknown based on whether
+     *      or not they are referenced in the current frame.
+     *   5. Send MTP_WIGGLE_START to any unknown robots to stop them.
+     *   6. Move the current frame to the last frame and start reading tracks
+     *      from the cameras again.
+     *
+     * Notes:
+     *
+     *   + We will always get a packet from the vmc-clients, if there are no
+     *     tracks, it will send an error.  This behavior allows us to keep all
+     *     of the cameras in sync.
+     *
+     *   + I don't actually sync the cameras to the same frame, so there might
+     *     be a few frames difference between tracks received from one camera
+     *     and another.
+     *
+     *   + We read the tracks from each camera in the same order each time so
+     *     the coalesce operation always picks the same track when merging.
+     *
+     *   + XXX I don't actually do anything with lost_bots at the moment, they
+     *     should be rewiggled after a short timeout.
+     */
+
     FD_SET(vmc_clients[0].vc_handle->mh_fd, &readfds);
     
     /* handle input from emc and vmc */
@@ -336,25 +369,29 @@ int main(int argc, char *argv[])
 	    int unknown_track_count = 0;
 	    struct robot_object *ro;
 
-	    printf("got whole frame\n");
+	    /* We've got all of the camera tracks, start processing. */
 	    
 	    vtCoalesce(&vt_pool,
 		       &current_frame,
 		       vmc_clients,
-		       vmc_client_count);
+		       vmc_client_count); // Get rid of duplicates
 
+	    /*
+	     * Match the current frame to the last frame and throw any old
+	     * frames (vt_age > 5) in the pool.
+	     */
 	    vtMatch(&vt_pool, &last_frame, &current_frame);
 
+	    /* Reset the list of known/unknown bots. */
 	    lnAppendList(&unknown_bots, &known_bots);
-	    
+
+	    /*
+	     * Detect the robots that have references in the current frame and
+	     * send an MTP_UPDATE_POSITION.  All others are left in the
+	     * unknown_bots list.
+	     */
 	    vt = (struct vision_track *)current_frame.lh_Head;
 	    while (vt->vt_link.ln_Succ != NULL) {
-#if 0
-		if (vt->vt_userdata == NULL) {
-		    fake_userdata += 1;
-		    vt->vt_userdata = fake_userdata;
-		}
-#else
 		if ((ro = vt->vt_userdata) != NULL) {
 		    struct mtp_packet ump;
 		    
@@ -373,7 +410,6 @@ int main(int argc, char *argv[])
 		    unknown_track_count += 1;
 		    vt_unknown = vt;
 		}
-#endif
 		
 		if (debug > 1) {
 		    printf("track %f %f %f - %d - %p %s\n",
@@ -398,6 +434,10 @@ int main(int argc, char *argv[])
 	    }
 #endif
 
+	    /*
+	     * Send MTP_WIGGLE_STARTs for any unknown robots, this should stop
+	     * them and cause an IDLE wiggle_status to come back.
+	     */
 	    ro = (struct robot_object *)unknown_bots.lh_Head;
 	    while (ro->ro_link.ln_Succ != NULL) {
 		if (!(ro->ro_flags & RF_WIGGLING)) {
@@ -417,18 +457,32 @@ int main(int argc, char *argv[])
 		}
 		ro = (struct robot_object *)ro->ro_link.ln_Succ;
 	    }
-	    
+
+	    /* Throw any frames left from the last frame in the pool and */
 	    lnAppendList(&vt_pool, &last_frame);
 
+	    /*
+	     * ... move the current frame to the last frame for the next
+	     * iteration.
+	     */
 	    lnMoveList(&last_frame, &current_frame);
 	    
 	    FD_SET(vmc_clients[0].vc_handle->mh_fd, &readfds);
 	    current_client = 0;
 	}
 
+	/*
+	 * Check if we need to identify any bots, assuming we're not in the
+	 * process of finding one.
+	 */
 	if ((wiggle_bot == NULL) && !lnEmptyList(&wiggling_bots)) {
 	    struct mtp_packet wmp;
 
+	    /*
+	     * Take a snapshot of the tracks with no robot attached from the
+	     * last frame so we can compare it against the frame when the robot
+	     * has finished its wiggle.
+	     */
 	    vtUnknownTracks(&wiggle_frame, &last_frame);
 	    wiggle_bot = (struct robot_object *)lnRemHead(&wiggling_bots);
 	    mtp_init_packet(&wmp,
@@ -460,7 +514,6 @@ int main(int argc, char *argv[])
 			struct robot_object *ro;
 			float distance;
 			
-			/* XXX Need to handle update_id msgs here. */
 			if (debug > 0) {
 			    mtp_print_packet(stdout, &mp);
 			}
@@ -471,25 +524,49 @@ int main(int argc, char *argv[])
 
 			    switch (mws->status) {
 			    case MTP_POSITION_STATUS_IDLE:
+				/* Got a response to an MTP_WIGGLE_START. */
 				if ((ro = roFindRobot(&unknown_bots,
 						      mws->robot_id)) == NULL) {
 				    fatal("unknown bot %d\n", mws->robot_id);
 				}
 				else {
+				    /*
+				     * Add him to the list of robots ready
+				     * to be wiggled.
+				     */
 				    lnRemove(&ro->ro_link);
 				    lnAddTail(&wiggling_bots, &ro->ro_link);
 				}
 				break;
 			    case MTP_POSITION_STATUS_COMPLETE:
+				/*
+				 * The robot finished his wiggle, check the
+				 * current frame against the snapshot we took
+				 * to find a robot in the same position, but
+				 * with a 180 degree difference in orientation.
+				 */
 				if ((vt = vtFindWiggle(&wiggle_frame,
 						       &last_frame)) == NULL) {
-				    fatal("no wiggle found!\n");
+				    /*
+				     * Couldn't locate the robot, add him to
+				     * the list of "lost" robots which we'll
+				     * try to rediscover after a short time.
+				     */
+				    lnAddTail(&lost_bots,
+					      &wiggle_bot->ro_link);
+				    wiggle_bot = NULL;
 				}
 				else {
 				    info("found wiggle ! %p\n", vt);
 				    vt->vt_userdata = wiggle_bot;
 				    wiggle_bot->ro_flags &= ~RF_WIGGLING;
+				    lnAddTail(&known_bots,
+					      &wiggle_bot->ro_link);
 				    wiggle_bot = NULL;
+				    /*
+				     * Return the frame we snapshotted awhile
+				     * ago to the pool.
+				     */
 				    lnAppendList(&vt_pool, &wiggle_frame);
 				}
 				break;
@@ -524,8 +601,13 @@ int main(int argc, char *argv[])
 			    printf("got frame from client %s:%d\n",
 				   vc->vc_hostname,
 				   vc->vc_port);
-			    
+
+			    /*
+			     * Got all of the tracks from this client, clear
+			     * his bit and
+			     */
 			    FD_CLR(vc->vc_handle->mh_fd, &readfds);
+			    /* ... try to wait for the next one. */
 			    current_client += 1;
 			    if (current_client < vmc_client_count)
 				FD_SET(vc[1].vc_handle->mh_fd, &readfds);

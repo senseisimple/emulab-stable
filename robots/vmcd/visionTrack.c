@@ -9,46 +9,38 @@
 
 #include "visionTrack.h"
 
-static int vtCompare(struct vision_track *vt1,
-		     struct vision_track *vt2,
-		     float tolerance)
-{
-    float distance;
-    int retval;
-
-    assert(vt1 != NULL);
-    assert(vt2 != NULL);
-
-    distance = hypotf(vt1->vt_position.x - vt2->vt_position.x,
-		      vt1->vt_position.y - vt2->vt_position.y);
-
-    retval = (distance < tolerance);
-
-    if (!retval) {
-	printf("miss %f %f\n", distance, tolerance);
-    }
-    
-    return retval;
-}
-
+/**
+ * Find the track in a list that is the minimum distance from a given track.
+ *
+ * @param vt The track to compare against the other tracks in the list.
+ * @param curr The track in a list where the search should start.  The function
+ * will continue the search until it reaches the end of the list.
+ * @param distance_out Reference to a float where the minimum distance found
+ * should be stored.
+ */
 static struct vision_track *vtFindMin(struct vision_track *vt,
-				      struct lnMinList *list,
+				      struct vision_track *curr,
 				      float *distance_out)
 {
-    struct vision_track *curr, *retval = NULL;
+    struct vision_track *retval = NULL;
 
     assert(vt != NULL);
-    assert(list != NULL);
+    assert(curr != NULL);
     assert(distance_out != NULL);
 
     *distance_out = FLT_MAX;
 
-    curr = (struct vision_track *)list->lh_Head;
     while (curr->vt_link.ln_Succ != NULL) {
 	float distance;
 
 	distance = hypotf(vt->vt_position.x - curr->vt_position.x,
 			  vt->vt_position.y - curr->vt_position.y);
+	printf("  min %f %f - %f %f = %f\n",
+	       vt->vt_position.x,
+	       vt->vt_position.y,
+	       curr->vt_position.x,
+	       curr->vt_position.y,
+	       distance);
 	if (distance < *distance_out) {
 	    retval = curr;
 	    *distance_out = distance;
@@ -95,6 +87,7 @@ int vtUpdate(struct lnMinList *now,
 	    vt->vt_userdata = NULL;
 	    lnAddTail(now, &vt->vt_link);
 
+	    /* Adjust the cameras viewable area based on this track. */
 	    if (mup->position.x < vc->vc_left)
 		vc->vc_left = mup->position.x;
 	    if (mup->position.x > vc->vc_right)
@@ -138,7 +131,11 @@ void vtCoalesce(struct lnMinList *extra,
     vt = (struct vision_track *)now->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
 	int in_camera_count = 0, lpc;
-	
+
+	/*
+	 * Figure out how many cameras this track might be viewable in so we
+	 * can coalesce them.
+	 */
 	for (lpc = 0; lpc < vc_len; lpc++) {
 #if 0
 	    printf("vc2 %f %f -- %f %f %f %f\n",
@@ -160,27 +157,23 @@ void vtCoalesce(struct lnMinList *extra,
 	assert(in_camera_count > 0);
 
 	if (in_camera_count > 1) {
-	    struct vision_track *vt_extra, *vt_succ;
+	    struct vision_track *vt_extra;
+	    float distance;
 	    
-	    vt_extra = (struct vision_track *)vt->vt_link.ln_Succ;
-	    while (vt_extra->vt_link.ln_Succ != NULL) {
-		vt_succ = (struct vision_track *)vt_extra->vt_link.ln_Succ;
-
-		printf("try coalesce %f %f  --  %f %f  %d %d\n",
+	    while ((in_camera_count > 1) &&
+		   ((vt_extra = vtFindMin(vt,
+					  (struct vision_track *)
+					  vt->vt_link.ln_Succ,
+					  &distance)) != NULL) &&
+		   (distance < 0.35)) {
+		printf("coalesce %f %f  --  %f %f\n",
 		       vt->vt_position.x, vt->vt_position.y,
-		       vt_extra->vt_position.x, vt_extra->vt_position.y,
-		       vt->vt_client->vc_port, vt_extra->vt_client->vc_port);
-		if ((vt->vt_client != vt_extra->vt_client) &&
-		    vtCompare(vt, vt_extra, 0.35)) {
-		    printf("coalesce %f %f  --  %f %f\n",
-			   vt->vt_position.x, vt->vt_position.y,
-			   vt_extra->vt_position.x, vt_extra->vt_position.y);
-		    
-		    lnRemove(&vt_extra->vt_link);
-		    lnAddHead(extra, &vt_extra->vt_link);
-		}
+		       vt_extra->vt_position.x, vt_extra->vt_position.y);
 		
-		vt_extra = vt_succ;
+		lnRemove(&vt_extra->vt_link);
+		lnAddHead(extra, &vt_extra->vt_link);
+
+		in_camera_count -= 1;
 	    }
 	}
 
@@ -198,12 +191,18 @@ void vtMatch(struct lnMinList *pool,
     assert(prev != NULL);
     assert(now != NULL);
 
+    /*
+     * Walk through the tracks in the current frame trying to find tracks in
+     * the previous frame, within some threshold.
+     */
     vt = (struct vision_track *)now->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
 	struct vision_track *vt_prev;
 	float distance;
 	
-	if ((vt_prev = vtFindMin(vt, prev, &distance)) != NULL) {
+	if ((vt_prev = vtFindMin(vt,
+				 (struct vision_track *)prev->lh_Head,
+				 &distance)) != NULL) {
 	    if (distance < 0.30) {
 		vt->vt_userdata = vt_prev->vt_userdata;
 		lnRemove(&vt_prev->vt_link);
@@ -214,6 +213,10 @@ void vtMatch(struct lnMinList *pool,
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;
     }
 
+    /*
+     * Walk through the previous frame copying any young tracks to the current
+     * frame.
+     */
     vt = (struct vision_track *)prev->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
 	struct vision_track *vt_next;
@@ -259,12 +262,22 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
     assert(start != NULL);
     assert(now != NULL);
 
+    /*
+     * Walk through the current frame searching for tracks that have a small
+     * displacement from the start frame and large orientation change.
+     */
     vt = (struct vision_track *)now->lh_Head;
     while ((vt->vt_link.ln_Succ != NULL) && (retval == NULL)) {
 	struct vision_track *vt_start;
 	float distance;
-	
-	if ((vt_start = vtFindMin(vt, start, &distance)) == NULL) {
+
+	printf("check %f %f %f\n",
+	       vt->vt_position.x,
+	       vt->vt_position.y,
+	       vt->vt_position.theta);
+	if ((vt_start = vtFindMin(vt,
+				  (struct vision_track *)start->lh_Head,
+				  &distance)) == NULL) {
 	}
 	else if (distance < 0.05) {
 	    float diff;
@@ -285,6 +298,8 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
 		printf(" found it %p\n", retval);
 	    }
 	}
+	printf("dist %p %f\n", vt_start, distance);
+	
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;
     }
     
