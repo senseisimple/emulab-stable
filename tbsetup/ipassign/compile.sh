@@ -20,6 +20,9 @@ g++ -O3 -o bin/routestat -L${EXTRA_LIB_PATH} tmp/routestat.o tmp/bitmath.o -lmet
 
 g++ -O3 -o bin/routecalc src/routecalc.cc
 
+g++ -o bin/difference src/difference.cc
+g++ -o bin/add-x src/add-x.cc
+
 g++ -o bin/inet2graph src/inet2graph.cc -lm
 g++ -o bin/brite2graph src/brite2graph.cc -lm
 g++ -o bin/top2graph src/top2graph.cc -lm
