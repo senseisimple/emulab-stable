@@ -11,7 +11,7 @@ snmpit - The command line tool. Contains most of the database accesses, does
 permissions checking, formats output, and figures out which device-specific
 backends it needs to invoke. Most emulab-specific knowledge is embedded in
 snmpit. If you're going to add another switch backend to snmpit, the only part
-of snmpit itself that use should have to change is the part that loads the
+of snmpit itself that you should have to change is the part that loads the
 device library - search for 'cisco' in the file.
 
 snmpit_lib.pm - functions useful to snmpit and common to multiple device
@@ -81,7 +81,7 @@ choose to exploit this bit of API design is up to you.
 
 snmpit has a concept of stacks of switches. These are a set of switches on
 which we can create a VLAN that spans potentially all switches. Thus, they are
-connected by tunk links. Right now, snmpit does not support creating a VLAN
+connected by trunk links. Right now, snmpit does not support creating a VLAN
 across multiple stacks (that would go against the definition of a stack), and
 it does not support stacks that contain more than one type of switch. This
 latter is something we will probably have to address soon - probably by
@@ -118,7 +118,7 @@ worry about, like 'private VLANs'. This, in particular, leads to some complex
 cases in setPortVlan() and createVlan().
 
 Third, in different MIBs, ports are 'addressed' differently. In standardized
-MIBs, ports tend to be referred to by an 'ifIndex', which is just an integers.
+MIBs, ports tend to be referred to by an 'ifIndex', which is just an integer.
 Cisco likes to refer to ports as a 'module.port' (at least, in CatOS), since
 this is the 'native' way to name ports on their modular switches. So, we have
 to convert back and forth between the two formats. So, keep in mind that
@@ -214,7 +214,7 @@ regardless of which ones actually have ports in it. This way, we do not have
 to deal with issues that come from different switches having differing sets of
 VLANs. Our locking protocol is such that when we create a VLAN, we do so on
 the switches in lexicographically sorted order - when we delete a VLAN, we do
-it in rever lexicographic order. This way, we don't have different concurrent
+it in reverse lexicographic order. This way, we don't have different concurrent
 instances of snmpit pick the same VLAN name because they are getting VLAN
 lists from different switches.
 
@@ -230,7 +230,7 @@ tcpdump-ing them. This can end up being a bit confusing, but it's the most
 reliable source for discoving the switches' quirks.
 
 We've also grabbed all the MIB files from the vendor (Cisco's are at:
-ftp://ftp.cisco.com/pub/mibs/v2), and looking through the OID names and
+ftp://ftp.cisco.com/pub/mibs/v2), and looked through the OID names and
 comments. Luckily, the comments in Cisco MIB files are pretty good.
 
 Finally, some vendors may provide documentation on how to perform some actions.
