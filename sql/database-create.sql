@@ -1267,7 +1267,6 @@ CREATE TABLE reserved (
   simhost_violation tinyint(3) unsigned NOT NULL default '0',
   old_pid varchar(12) NOT NULL default '',
   old_eid varchar(32) NOT NULL default '',
-  modelnet_core varchar(32) default NULL,
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname),
   KEY old_pid (old_pid,old_eid)
