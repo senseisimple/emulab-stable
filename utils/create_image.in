@@ -91,7 +91,7 @@ else {
     die("*** Bad data in $node\n");
 }
 
-if ($imagename =~ /^([-\w\.\+]+)$/) {
+if ($imagename =~ /^([-\w\.]+)$/) {
     $imagename = $1;
 }
 else {
@@ -101,7 +101,7 @@ else {
 if (defined($options{"p"})) {
     $imagepid = $options{"p"};
 	
-    if ($imagepid =~ /^([-\w\.\+]+)$/) {
+    if ($imagepid =~ /^([-\w\.]+)$/) {
 	$imagepid = $1;
     }
     else {
@@ -175,7 +175,7 @@ if ($mereuser &&
 my $filename = $imageid_row{'path'};
 
 # Untaint. Very silly.
-if ($filename =~ /^([-\w\.\/]+)$/) {
+if ($filename =~ /^([-\w\.\/\+]+)$/) {
     $filename = $1;
 }
 else {
