@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -16,6 +16,11 @@ echo "Doing Testbed Setup on an MFS ... "
 #
 echo "Informing the testbed that we've rebooted ..."
 $BINDIR/tmcc state TBSETUP
+
+if [ -x $BINDIR/rc.ipod ]; then
+	echo "Setting up IPOD ... "
+        $BINDIR/rc.ipod
+fi
 
 echo "Doing Testbed setup configuration ..."
 $BINDIR/bootsetup

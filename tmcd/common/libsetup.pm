@@ -2496,7 +2496,7 @@ sub bootsetup()
     #
     # Setup SFS hostid.
     #
-    if ($USESFS && !MFS()) {
+    if ($USESFS) {
 	print STDOUT "Setting up for SFS ... \n";
 	dosfshostid();
     }

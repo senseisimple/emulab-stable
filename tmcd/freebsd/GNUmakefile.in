@@ -41,6 +41,7 @@ install:	common-install etc-install \
 
 mfs-install:	common-install etc-install \
 			script-install bin-install
+	cp $(SRCDIR)/mfs-rc.conf $(SYSETCDIR)/rc.conf
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
 
 control-install:	dir-install
