@@ -183,6 +183,7 @@ while (my %row = $db_result->fetchhash()) {
     my $node     = $row{'node_id'};
     my $osid     = $row{'def_boot_osid'};
     my $type     = $row{'type'};
+    my $class    = $row{'class'};
     my $subnode  = $row{'issubnode'};
     my $virtnode = $row{'isvirtnode'};
     my $jailnode = $row{'jailflag'};
@@ -200,6 +201,11 @@ while (my %row = $db_result->fetchhash()) {
 	if (! $jailnode && ! $plabnode) {
 	    next;
 	}
+    }
+    elsif ($class eq "robot") {
+	print "Skipping os_setup for $node cause its a robot.\n";
+	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
+	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
     }
     elsif ($subnode) {
 	print "Will skip subnode $node ISUP wait.\n";
