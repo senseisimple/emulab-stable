@@ -427,7 +427,8 @@ Phase "syslog", "Setting up syslog", sub {
 	DoneIfEdited($SYSLOG_CONF);
 
 	#
-	# Modify the /var/log/messages line to exclude testbed stuff
+	# Modify the /dev/console and /var/log/messages lines to exclude
+	# testbed stuff
 	#
 	open(SC,"+<$SYSLOG_CONF") or
 	    PhaseFail("Unable to open $SYSLOG_CONF : $!");
@@ -438,9 +439,13 @@ Phase "syslog", "Setting up syslog", sub {
 	seek(SC,0,0);
 	truncate(SC,0);
 	foreach my $line (@sc) {
-	    my $pat = q(\s+/var/log/messages);
-	    if ($line =~ /^[^#].*$pat/) {
-		$line =~ s/($pat)/\;$LOGFACIL.none$1/;
+	    my $cpat = q(\s+/dev/console);
+	    my $mpat = q(\s+/var/log/messages);
+	    if ($line =~ /^[^#].*$cpat/) {
+		$line =~ s/($cpat)/\;$LOGFACIL.none$1/;
+	    }
+	    elsif ($line =~ /^[^#].*$mpat/) {
+		$line =~ s/($mpat)/\;$LOGFACIL.none$1/;
 	    }
 	    print SC $line;
 	}
