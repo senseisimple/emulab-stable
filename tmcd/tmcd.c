@@ -2041,11 +2041,31 @@ COMMAND_PROTOTYPE(dorouting)
 	}
 
 	while (nrows) {
+		char dstip[32];
+
 		row = mysql_fetch_row(res);
 				
+		/*
+		 * OMG, the Linux route command is too stupid to accept a
+		 * host-on-a-subnet as the subnet address, so we gotta mask
+		 * off the bits manually for network routes.
+		 *
+		 * Eventually we'll perform this operation in the NS parser
+		 * so it appears in the DB correctly.
+		 */
+		if (strcmp(row[1], "net") == 0) {
+			struct in_addr tip, tmask;
+
+			inet_aton(row[0], &tip);
+			inet_aton(row[2], &tmask);
+			tip.s_addr &= tmask.s_addr;
+			strncpy(dstip, inet_ntoa(tip), sizeof(dstip));
+		} else
+			strncpy(dstip, row[0], sizeof(dstip));
+
 		sprintf(buf, "ROUTE DEST=%s DESTTYPE=%s DESTMASK=%s "
 			"NEXTHOP=%s COST=%s\n",
-			row[0], row[1], row[2], row[3], row[4]);
+			dstip, row[1], row[2], row[3], row[4]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
