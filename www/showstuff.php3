@@ -1022,16 +1022,62 @@ function SHOWNODES($pid, $eid, $sortby) {
 	$sortclause = "n.type,n.priority";
     }
 
-    $query_result =
-	DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
-		     " ns.status as nodestatus, ".
-		     " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
-		     "from reserved as r ".
-		     "left join nodes as n on n.node_id=r.node_id ".
-		     "left join node_types as nt on nt.type=n.type ".
-		     "left join node_status as ns on ns.node_id=r.node_id ".
+    # XXX
+    if ($pid == "emulab-ops" && $eid == "hwdown") {
+	$showlastlog = 1;
+    }
+    else {
+	$showlastlog = 0;
+    }	
+
+    if ($showlastlog) {
+	#
+	# We need to extract, for each node, just the latest nodelog message.
+	# I could not figure out how to do this in a single select so instead
+	# create a temporary table of node_id and latest log message date
+	# for all reserved nodes to re-join with nodelog to extract the latest
+	# log message.
+	#
+	DBQueryFatal("CREATE TEMPORARY TABLE nodelogtemp ".
+		     "SELECT r.node_id, MAX(reported) AS reported ".
+		     "FROM reserved AS r ".
+		     "LEFT JOIN nodelog AS l ON r.node_id=l.node_id ".
 		     "WHERE r.eid='$eid' and r.pid='$pid' ".
-		     "ORDER BY $sortclause");
+		     "GROUP BY r.node_id");
+	#
+	# Now join this table and nodelog with the standard set of tables
+	# to get all the info we need.  Note the inner join with the temp
+	# table, this is faster and still safe since it has an entry for
+	# every reserved node.
+	#
+	$query_result =
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
+		         " ns.status as nodestatus, ".
+		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime, ".
+		         "nl.reported,nl.entry ".
+		         "from reserved as r ".
+		         "left join nodes as n on n.node_id=r.node_id ".
+		         "left join node_types as nt on nt.type=n.type ".
+		         "left join node_status as ns on ns.node_id=r.node_id ".
+		         "inner join nodelogtemp as t on t.node_id=r.node_id ".
+		         "left join nodelog as nl on nl.node_id=r.node_id and nl.reported=t.reported ".
+
+		         "WHERE r.eid='$eid' and r.pid='$pid' ".
+		         "ORDER BY $sortclause");
+	DBQueryFatal("DROP table nodelogtemp");
+    }
+    else {
+	$query_result =
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
+		         " ns.status as nodestatus, ".
+		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
+		         "from reserved as r ".
+		         "left join nodes as n on n.node_id=r.node_id ".
+		         "left join node_types as nt on nt.type=n.type ".
+		         "left join node_status as ns on ns.node_id=r.node_id ".
+		         "WHERE r.eid='$eid' and r.pid='$pid' ".
+		         "ORDER BY $sortclause");
+    }
     
     if (mysql_num_rows($query_result)) {
 	echo "<center>
@@ -1055,8 +1101,12 @@ function SHOWNODES($pid, $eid, $sortby) {
                 <th>Default OSID</th>
                 <th>Node<br>Status</th>
                 <th>Hours<br>Idle[<b>1</b>]</th>
-                <th>Startup<br>Status[<b>2</b>]</th>
-                <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a>
+                <th>Startup<br>Status[<b>2</b>]</th>\n";
+	if ($showlastlog) {
+	    echo "  <th>Last Log<br>Time</th>
+		    <th>Last Log Message</th>\n";
+	}
+        echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a>
 		    </th>
                 <th><a href=\"faq.php3#UTT-TUNNEL\">Console</a></th>
               </tr>\n";
@@ -1114,6 +1164,11 @@ function SHOWNODES($pid, $eid, $sortby) {
 	    
 	    echo "  <td>$idlestr</td>
                     <td align=center>$startstatus</td>\n";
+
+	    if ($showlastlog) {
+		echo "  <td>$row[reported]</td>\n";
+		echo "  <td>$row[entry] (<a href='shownodelog.php3?node_id=$node_id'>LOG</a>)</td>\n";
+	    }
 
 	    echo "  <td align=center>
                      <A href='nodessh.php3?node_id=$node_id'>
