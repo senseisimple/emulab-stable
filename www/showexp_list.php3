@@ -278,7 +278,7 @@ if (mysql_num_rows($experiments_result)) {
 	    if ($str=="") { $str="&nbsp;"; }
 	    # sanity check
 	    $slothderr=0;
-	    if ($daysidle==0 && $inactive[$expt]==1) {
+	    if ($daysidle==0 && $inactive[$expt]==1 && $stale[$expt]==0) {
 	      $str .= "<b>FAILED SANITY CHECK:</b>
 $pid/$eid has been logged into, but appears inactive. Contact Mac ASAP.
 <pre>
