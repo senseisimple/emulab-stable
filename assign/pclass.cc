@@ -377,8 +377,6 @@ int pclass_unset(tb_pnode *p)
 	}
 #endif
       }
-    } else {
-      (*dit).second->push_back(p);
     }
 
 #ifdef SMART_UNMAP
