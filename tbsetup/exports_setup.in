@@ -149,6 +149,8 @@ print MAP "\n";
 
 #
 # First gather up all the nodes that are reserved and the required info.
+# Order by pid,gid first so that they're all grouped together and we avoid
+# extra db queries.
 #
 # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
 #
@@ -162,11 +164,13 @@ $nodes_result =
 		 " where i.IP!='NULL' and r.node_id not like 'sh%' ".
 		 "       and node_types.isvirtnode=0 ".
 		 "       and node_types.isremotenode=0 ".
-		 "order by r.eid,e.gid,r.pid,nodes.priority");
+		 "order by r.pid,e.gid,r.eid,nodes.priority");
 
 my %ipgroups	= ();
+my %lastfslist  = ();
+my $lastpid     = "";
+my $lastgid     = "";
 
-#
 # For each node:
 #	determine the list of directories accessible
 #	split the list into sublists based on filesystems
@@ -175,7 +179,6 @@ my %ipgroups	= ();
 #
 # Note that we could do this per experiment rather than per node,
 # adding all nodes from an experiment to the sublists created.
-#
 while (@row = $nodes_result->fetchrow_array) {
     my $node_id = $row[0];
     my $pid     = $row[1];
@@ -185,59 +188,63 @@ while (@row = $nodes_result->fetchrow_array) {
     my %fslist = ();
     my @dirlist = ();
 
-    #
     # Sanity check - don't try this if any of the above are not defined - we
     # may end up with a bad line in exports
-    #
     if ((!defined($node_id)) || (!defined($pid)) || (!defined($eid)) ||
         (!defined($gid)) || (!defined($ip))) {
         print "WARNING: exports_setup: Skipping database row with undefined values\n";
 	next;
     }
 
-    #
-    # Construct a list of directories accessible from this node.
-    # First the project and group directories.
-    # XXX needs to be fixed for shared experiments?
-    #
-    push(@dirlist, "$projdir/$pid");
-    if ($gid ne $pid) {
-	push(@dirlist, "$groupdir/$pid/$gid");
-    }
+    if ($lastpid eq $pid && $lastgid eq $gid) {
 
-    #
-    # Determine the users that can access this node, and add those
-    # users' directories to the list.
-    # XXX needs to be fixed for shared experiments?
-    #
-    $users_result =
-	DBQueryFatal("select distinct uid from group_membership ".
-		     "where pid='$pid' and gid='$gid' and trust!='none'");
+	# If this is for the same proj and group again, don't requery the db 
+	# and don't recompute everything.
+	%fslist = %lastfslist;
 
-    while (@usersrow = $users_result->fetchrow_array) {
-	my $uid = $usersrow[0];
+    } else {
 
-	push(@dirlist, "$usersdir/$uid");
-    }
+	$lastpid=$pid;
+	$lastgid=$gid;
 
-    #
-    # Build up filesystem sub-lists.
-    # Iterate through directory list dividing it according to filesystem.
-    #
-    foreach my $dir ( @dirlist ) {
-	my $fs = fsof($dir);
-
-	if (! defined($fslist{$fs})) {
-	    $fslist{$fs} = [ $dir ];
+	# Construct a list of directories accessible from this node.
+	# First the project and group directories.
+	# XXX needs to be fixed for shared experiments?
+	push(@dirlist, "$projdir/$pid");
+	if ($gid ne $pid) {
+	    push(@dirlist, "$groupdir/$pid/$gid");
 	}
-	else {
-	    push(@{ $fslist{$fs} }, $dir);
+
+	# Determine the users that can access this node, and add those
+	# users' directories to the list.
+	# XXX needs to be fixed for shared experiments?
+	$users_result =
+	    DBQueryFatal("select distinct uid from group_membership ".
+			 "where pid='$pid' and gid='$gid' and trust!='none'");
+
+	while (@usersrow = $users_result->fetchrow_array) {
+	    my $uid = $usersrow[0];
+
+	    push(@dirlist, "$usersdir/$uid");
 	}
+
+	# Build up filesystem sub-lists.
+	# Iterate through directory list dividing it according to filesystem.
+	foreach my $dir ( @dirlist ) {
+	    my $fs = fsof($dir);
+
+	    if (! defined($fslist{$fs})) {
+		$fslist{$fs} = [ $dir ];
+	    }
+	    else {
+		push(@{ $fslist{$fs} }, $dir);
+	    }
+	}
+
+	%lastfslist = %fslist;
     }
 
-    #
     # For each FS directory list, create a hash key out of its directory list.
-    #
     foreach my $fs ( keys(%fslist) ) {
 	#
 	# Convert dirlist to a string and use that as a hash index to group
