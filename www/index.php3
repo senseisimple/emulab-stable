@@ -96,30 +96,32 @@ if (isset($uid)) {
                      New Project Approval</A><p>\n";
             echo "<A href='nodecontrol_list.php3'>
                      Node Control</A><p>\n";
+	    echo "<A href='showuser_list.php3'>
+		     User List</A>\n";
+	    echo "<hr>\n";
         }
         if ($trusted) {
             # Only group leaders can do these options
             echo "<A href='approveuser_form.php3'>
-                     New User Approval</A>\n";
+                     New User Approval</A><p>\n";
         }
         # Since a user can be a member of more than one project,
         # display this option, and let the form decide if the user is
         # allowed to do this.
-        echo "<p><A href='showproject_list.php3'>
+        echo "<A href='showproject_list.php3'>
                     Project Information</A><p>\n";
-        echo "<p><A href='beginexp_form.php3'>
-                    Begin an Experiment</A>\n";
-        echo "<p><A href='endexp_list.php3'>
-                    End an Experiment</A>\n";
-        echo "<p><A href='showexp_list.php3'>
-                    Experiment Information</A>\n";
-        echo "<p><A href='modusr_form.php3'>
-                    Update user information</A>\n";
-        echo "<p><A href='reserved.php3'>
-                    Node Reservation Status</A>\n";
-        echo "<p><A href='http://www.cs.utah.edu/~danderse/dnard/status.html'>
-                    Node Up/Down Status</A>\n";
-        echo "</p>\n";
+        echo "<A href='beginexp_form.php3'>
+                    Begin an Experiment</A><p>\n";
+        echo "<A href='endexp_list.php3'>
+                    End an Experiment</A><p>\n";
+        echo "<A href='showexp_list.php3'>
+                    Experiment Information</A><p>\n";
+        echo "<A href='modusr_form.php3'>
+                    Update user information</A><p>\n";
+        echo "<A href='reserved.php3'>
+                    Node Reservation Status</A><p>\n";
+        echo "<A href='http://www.cs.utah.edu/~danderse/dnard/status.html'>
+                    Node Up/Down Status</A><p>\n";
     }
     elseif ($status == "unapproved") {
         USERERROR("Your account has not been approved yet. ".
