@@ -1,0 +1,127 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Testbed Support libraries
+#
+use lib '@prefix@/lib';
+use libdb;
+
+use English;
+use Getopt::Std;
+
+#
+# Print a list of nodes associated with an experiment, one per line.
+#
+# usage: node_list -e pid,eid
+#
+sub usage()
+{
+    print STDOUT "Usage: node_list [-pvh] -e pid,eid\n".
+	" Print the various names of all nodes in the given experiment\n".
+	" -p	print physical (Emulab database) names (default)\n".
+	" -v	print virtual (experiment assigned) names\n".
+	" -h	print physical name of hosting machine for virtual nodes\n";
+    exit(-1);
+}
+my  $optlist = "pvhae:";
+
+my @row;
+my $eidmode     = 0;
+my $pid;
+my $eid;
+my $printvname	= 0;
+my $printpname	= 0;
+my $printhname	= 0;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (!getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"p"})) {
+    $printpname = 1;
+}
+if (defined($options{"v"})) {
+    $printvname = 1;
+}
+if (defined($options{"h"})) {
+    $printhname = 1;
+}
+if (!$printpname && !$printvname && !$printhname) {
+    $printpname = 1;
+}
+
+if (defined($options{"e"})) {
+    if (@ARGV) {
+	usage();
+    }
+    
+    $eidmode = $options{"e"};
+    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
+	$pid = $1;
+	$eid = $2;
+    }
+    else {
+	print STDOUT "Invalid argument to -e option: $eidmode\n";
+	usage();
+    }
+}
+
+if (!$eidmode) {
+    usage();
+}
+
+#
+# Make sure experiment exists
+#
+if (!ExpState($pid,$eid)) {
+    die("There is no experiment '$eid' in project '$pid'.\n");
+}
+
+#
+# Verify permission to muck with this experiment.
+#
+if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+	die("You do not have permission to list nodes in $pid/$eid!\n");
+}
+
+my $query_result;
+if ($printhname) {
+    $query_result =
+	DBQueryFatal("select r.node_id,r.vname,n.phys_nodeid ".
+		     "from reserved as r left join nodes as n ".
+		     "on r.node_id=n.node_id ".
+		     "where pid='$pid' and eid='$eid'");
+} else {
+    $query_result =
+	DBQueryFatal("select node_id,vname from reserved ".
+		     "where pid='$pid' and eid='$eid'");
+}
+while (@row = $query_result->fetchrow_array()) {
+    if ($printpname) {
+	print "$row[0] ";
+    }
+    if ($printvname) {
+	print "$row[1] ";
+    }
+    if ($printhname) {
+	print "$row[2] ";
+    }
+    print "\n";
+}
+exit 0;

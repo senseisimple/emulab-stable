@@ -11,7 +11,7 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= nalloc nfree nodeip readycount 
+BIN_SCRIPTS	= nalloc nfree nodeip node_list readycount 
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
@@ -20,7 +20,7 @@ LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
 LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic.
-USERBINS	= nalloc nfree readycount
+USERBINS	= nalloc nfree node_list readycount
 USERSBINS	= genelists.proxy
 
 #
