@@ -17,10 +17,11 @@ use Mysql;
 sub check_user_data {
     my @row = @_;
     if ( @row > 0 &&
-	 $row[0] =~ /([A-Z]|[a-z]|[0-9]|)+/ &&    # user
-	 $row[1] =~ /[0-9]+/ &&                   # unix UID   
-	 $row[2] =~ /([A-Z]|[a-z]|[0-9]|)+/ &&    # encrypted passwd
-	 $row[3] =~ /([A-Z]|[a-z]|[0-9]|\w)+/ ) { # comment
+	 $row[0] =~ /^([a-z]|\d)+$/ && # user
+	 $row[1] =~ /^\w+$/ &&         # encrypted passwd
+	 $row[2] =~ /^\d+$/ &&         # unix UID   
+	 $row[2] <  32000 &&         # unix UID must be < 32000   
+	 $row[3] =~ /^([^:]+$|^$)/ ) { # comment (fullname)
 	return 1;
     } else {
 	return 0;
@@ -137,15 +138,13 @@ print "\n";
 ## If alive, determine if its FreeBSD or Linux and
 ## create the user accounts. 
 ##
-
 my $last = "";
 my $OS = "";
 my $IP = "";
 foreach $IP (@nodes) {
     ## If this machine is not the same as the last one, get the OS
     ## Check also that the IP address is valid (some interfaces might
-    ## not have an IP address. Do we really have to check that the node
-    ## is not the same node as in last iteration? -lkw
+    ## not have an IP address). 
     if ( $IP ne $last && $IP =~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {
         $last = $IP;
          if (-e "/bin/ping") {
@@ -158,13 +157,17 @@ foreach $IP (@nodes) {
 
         if ( $1 > 0 ) {
 
+	    print "Checking OS on $IP...";
             open(UNAME,"su1 ssh $IP uname 2>&1 |");
             $_ = <UNAME>;
+	    print $_;
 	    close(UNAME);
 
 	    ## FreeBSD says "155.99.214.129: Connection refused"
 	    ##    and can also say "Host key doesn't match..."  
-            if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) ) { 
+	    ##    and can also say "@@@@@@... WARNING HOST ID CHANGED..."
+            if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) 
+		 || ($_ =~/^@+/) ) { 
 		die("Uname failed on $IP:$_\n"); 
 	    } else { 
 		$OS = $_;
@@ -181,6 +184,9 @@ foreach $IP (@nodes) {
 	    ##
 	    ## Rather than use useradd's defaults (which are normally
 	    ## fine), we're explicit.
+	    ##  
+	    ## If either the group or the user exists, groupadd and useradd
+            ## will report it and move on.
 
 	    print "Creating group $unix_gid on $IP.\n";
 	    open(GROUPADD, "ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
@@ -203,11 +209,30 @@ foreach $IP (@nodes) {
 	    ## 3) Create passwd entries
 	    ## 4) Create home directories
 
+ 	    ## Fetch remote login information
+	    open(SCP, "scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
+	    while ( <SCP> ) { print $_; }
+	    close SCP;
+
 	    my $addon = "";
 	    foreach my $user (keys %passwd) {
-		$addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:" .
-		         "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
-			 "/bin/tcsh\n";
+
+		## Check if the user account already exists.
+		my $prev = 0;
+		open(MPWD, "/tmp/master.passwd.$IP");
+		while ( <MPWD> ) {
+		    if ( $_ =~ /^$user:/ ) { 
+			$prev = 1;
+			print "Account $user exists on $IP\n";
+		    }
+		}
+		close MPWD;
+
+		if ( $prev == 0 ) {
+		    $addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:" .
+			     "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
+			     "/bin/tcsh\n";
+		}
 
 		## Create home directory
 		if ( !(-e "/users/$user") ) {
@@ -228,25 +253,26 @@ foreach $IP (@nodes) {
 		}
 	    }
 
-	    ## Append login info to master.passwd
-	    open(SCP, "scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
-	    while ( <SCP> ) { print $_; }
-	    open(OUT, ">>/tmp/master.passwd.$IP");
-	    print OUT $addon;
-	    close(OUT);
-	    open(SCP, "scp -pq /tmp/master.passwd.$IP $IP:/etc/master.passwd |");
-	    while ( <SCP> ) { print $_; }
-	    close(SCP);
- 
-	    ## Create secure and insecure databases (/etc/s?pwd.db)
-	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
-	    while ( <MKDB> ) { print $_; }
-	    close(MKDB);
+	    if ( $addon ne "" )  {
 
-	    ## Update /etc/passwd (this closes above MKDB)
-	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
-	    while ( <MKDB> ) { print $_; }
-	    close(MKDB);
+		print "Adding users to $IP\n";
+		open(OUT, ">>/tmp/master.passwd.$IP");		
+		print OUT $addon;
+		close OUT;
+		open(SCP, "scp -pq /tmp/master.passwd.$IP $IP:/etc/master.passwd |");
+		while ( <SCP> ) { print $_; }
+		close(SCP);
+ 
+		## Create secure and insecure databases (/etc/s?pwd.db)
+		open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
+		while ( <MKDB> ) { print $_; }
+		close(MKDB);
+
+		## Update /etc/passwd (this closes above MKDB)
+		open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
+		while ( <MKDB> ) { print $_; }
+		close(MKDB);
+	    }
 	    
 #/usr/sbin/pwd_mkdb: corrupted entry
 #/usr/sbin/pwd_mkdb: at line #14
@@ -265,6 +291,26 @@ foreach $IP (@nodes) {
 
 
 
+__END__
 
+
+ 141 plastic:testbed/tbsetup> !107
+su1 ssh 155.99.214.129 uname
+Host key not found from the list of known hosts.
+Are you sure you want to continue connecting (yes/no)? yes
+Host '155.99.214.129' added to the list of known hosts.
+FreeBSD
+
+106 plastic:testbed/tbsetup> su1 ssh 155.99.214.129 uname  
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@       WARNING: HOST IDENTIFICATION HAS CHANGED!         @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+It is also possible that the host key has just been changed.
+Please contact your system administrator.
+Add correct host key in /root/.ssh/known_hosts to get rid of this message.
+Are you sure you want to continue connecting (yes/no)? yes
+FreeBSD
 
 
