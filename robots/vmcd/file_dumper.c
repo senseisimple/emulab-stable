@@ -91,6 +91,12 @@ void print_packets(mezz_mmap_t *mm)
     struct robot_position rp;
     mezz_objectlist_t *mol;
     int lpc;
+    int i,j;
+    int done_blobs[100];
+
+    for (i = 0; i < 100; ++i) {
+	done_blobs[i] = 0;
+    }
     
     assert(mm != NULL);
 
@@ -100,6 +106,47 @@ void print_packets(mezz_mmap_t *mm)
 	    mezz_frame_count,mm->time
 	    );
 
+    int found_first_blob = 0;
+
+    for (i = 0; i < mm->bloblist.count; ++i) {
+	if (found_first_blob) {
+	    break;
+	}
+	for (j = 0; j < mm->bloblist.count; ++j) {
+	    if (found_first_blob) {
+		break;
+	    }
+	    if (j != i) {
+		if (!done_blobs[i] && !done_blobs[j] &&
+		    mm->bloblist.blobs[i].object == 
+		      mm->bloblist.blobs[j].object ) {
+
+		    found_first_blob = 1;
+
+		    done_blobs[i] = done_blobs[j] = 1;
+
+		    // print out the blob centroids
+		    fprintf(output_FILE,
+			    "a(%f,%f) b(%f,%f)",
+			    mm->bloblist.blobs[i].ox,
+			    mm->bloblist.blobs[i].oy,
+			    mm->bloblist.blobs[j].ox,
+			    mm->bloblist.blobs[j].oy
+			    );
+
+		    fprintf(output_FILE,
+			    " -- wc(%f,%f,%f)\n",
+			    mol->objects[0].px,
+			    mol->objects[0].py,
+			    mol->objects[0].pa
+			    );
+		    fflush(stdout);
+		}
+	    }
+	}
+    }
+
+#if 0
     for (lpc = 0; lpc < mol->count; ++lpc) {
         if (mol->objects[lpc].valid) { /* Don't send meaningless data. */
 
@@ -126,8 +173,9 @@ void print_packets(mezz_mmap_t *mm)
 		    "  - global[%d]: x = %f, y = %f, theta = %f\n",
 		    lpc,rp.x,rp.y,rp.theta
 		    );
-        }
+         }
     }
+#endif
 }
 
 void usage() {
