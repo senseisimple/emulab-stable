@@ -68,10 +68,11 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	     "</b></p>\n";
     }
 
-    echo "Emulab's Planetlab support has mostly recovered from their transition
-	  to PlanetLab 2.0, although slice creation is about 3x slower.
-	  Please report problems.
-          <br>\n";
+    $message = TBGetSiteVar("plab/message");
+    if (0 != strcmp($message,"")) {
+	echo "<p><h3><center><b>$message</b></center></h3></p><br>\n";
+    }
+
 ### Possible status phrases:
 # largely working.
 
