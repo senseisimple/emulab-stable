@@ -1,252 +1,154 @@
 #!/usr/local/bin/perl -wT
-
-### $Id: rmacct-ctrl.in,v 1.2 2001-02-06 16:46:43 stoller Exp $
-
 use English;
-use Mysql;
+
+#
+# Delete accounts. Note that groups are not deleted until a project is
+# deleted via rmproj script.
+#
+# XXX - The control node is hardwired. Look for $CONTROL.
+#
+# usage: rmacct-ctrl <userid>
+# 
 
 #
 # Configure variables
 #
-my $TB     = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
+my $TB      = "@prefix@";
+my $TBOPS   = "@TBOPSEMAIL@";
 
-my $me;                # alphanumeric username of $UID 
+my $HOMEDIR = "/users";
+my $SSH     = "ssh";
+my $CONTROL = "users.emulab.net";
+my $USERDEL = "/usr/sbin/pw userdel";
 
-my $USERROOT = "/users";
-my $YES      = "YES";
-my $NO       = "NO";
-my $CONTROL  = "users.emulab.net";
+my $user;
+my $query_result;
 
-my $user;              # kwright
-my $project = 0;       # lkwbox
-my $pid;               # 6009
-
-my $dbh;               # database handle 
-my $sth;               # statement handle
-my @db_row;
-my $db_query;
-
-sanitize();
-dbsetup();
-check_credentials();
-dowork();
-exit(0);
-
-sub dbsetup() {
-    $dbh = Mysql->connect("localhost", $DBNAME, "script", "none");
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("Must be root! Maybe its a development version?");
 }
 
 #
-# Figure out who called us. There are 3 possible scenarios:
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
 #
-# 1) Called from web UI as some TB admin user from the database 
-#    to remove a project head's 
-#    account for a deleted project (called from deleteproject.php3). 
+# Turn off line buffering on output
 #
-# 2) Called as user with group_root for project to remove a user
-#    account (from, say, deleteuser.php3).
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+push(@INC, "$TB/lib");
+require libtestbed;
+require libdb;
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: rmacct-ctrl <userid>\n");
+}
+$user = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($user =~ /^([a-z0-9]+)$/i) {
+    $user = $1;
+}
+else {
+    die("Invalid uid '$user' contains illegal characters.\n");
+}
+
+#
+# Figure out who called us. Possible scenarios:
+#
+# 1) Called from web UI as some TB admin user to create a project head's 
+#    account for a new project.
+#
+# 2) Called as user with group_root for project to create a user
+#    account.
 #
 # 3) Called from command line as user with group_root for project 
-#    to delete a user account. 
+#    to create a user account. 
 # 
 # 4) Called from command line as root.
 #
-sub check_credentials() {
-
-    print "Credential check: ";
-
-    #
-    # Make sure the UID is a valid UID in this machine's passwd file
-    #
-    my ($me) = getpwuid($UID) or die "$0: $UID not in passwd file";
+if ($UID && !TBAdmin($UID)) {
+    my ($me) = getpwuid($UID) or
+	fatal("$UID not in passwd file");
 
     #
-    # Check if we're root
+    # Check if group_root for the project.
     #
-    if ($UID == 0) {
-	print "Root user allowed.\n";
-	return;
-    } 
-    
-    #
-    # User could be an admin user.
-    #
-    $sth    = $dbh->query("select admin from users where uid='$me'");
-    @db_row = $sth->fetchrow_array();
-    if ($db_row[0] == 1) {
-	print "Testbed admin user allowed.\n";
-	return;
-    } 
+    $query_result =
+	DBQueryFatal("select p1.trust from proj_memb as p1 ".
+		     "left join proj_memb as p2 on p2.pid=p1.pid ".
+		     "where p1.uid='$me' and ".
+		     "p2.uid='$user' and p1.trust='group_root'");
 
-    #
-    # Last resort: check if group_root for $project.
-    #
-    if ( $project ) {
-	$db_query = "select trust from proj_memb where uid='$me' and pid='$project'";
-	$sth      = $dbh->query($db_query);
-	@db_row   = $sth->fetchrow_array();
-	if ($db_row[0] eq "group_root") {
-	    print "Group_root privileges allowed.\n";
-	    return;
-	}
+    if ($query_result->numrows == 0) {
+	die("$0: $me does not have enough permission in ${user}'s project");
     }
-
-    #
-    # If  we're here, we do not have the correct credentials
-    #
-    print "Not root, a TB admin user, or group_root for project. Failed.\n";   
-    exit(1);
 }
 
+#
+# Note hardwired control node. 
 # 
-# Find the right control node. Create an account for given
-# user with correct user info.
+my $control_node = $CONTROL;
+
+#
+# Remove user from both local and control node. We assume FreeBSD on both.
 # 
-sub dowork() {
+# All this stuff must be done as root (ssh).
+#
+$UID = $EUID;
 
-    my $control_node = 0;
-    my $group_number;         # 601
-
-    #
-    # Find control node.
-    # Note: In the end, I simply assign to 'plastic' as control nodes
-    #       not yet set in the database. 12/14/00 -lkw 
-    #
-    if ( $project ) {
-	$db_query  = "select control_node from projects where pid='$project'";
-	$sth       = $dbh->query($db_query);
-	if ( got_tuples($sth) ) {                 # see note above
-	    @db_row       = $sth->fetchrow_array();
-	    $control_node = $db_row[0];
-	} else {
-	    # print "No control node for project $project in database.\n";
-	}
-    }
-    $control_node = $CONTROL;                     # see note above.
-
-    # I assume FreeBSD. Its 
-    # firmly entrenched as our control node OS. -lkw
-
-    # The following user/group creation commands must be done as root. 
-
-    my $UID_save = $UID;
-    $UID         = $EUID;
-
-    #
-    # Remove user on paper. 
-    #
-    print "Removing user $user from paper.\n";
-    open(PWDELP, "/usr/sbin/pw userdel $user 2>&1 |") or die "$0: Could not open pw userdel on paper.";
-    while (<PWDELP>) { print "$_"; }
-    close(PWDELP);
-
-    #
-    # Delete user on control node. 
-    #
-    if ( $control_node ) {
-	print "Deleting user $user from $control_node.\n";
-	$cmd = "/usr/local/bin/sshtb $control_node " .
-	    "/usr/sbin/pw userdel $user ";
-	open(PWDEL, "$cmd 2>&1 |") or die "$0: Could not open pw userdel.";
-	while (<PWDEL>) { print "$_"; }
-	close(PWDEL);
-    }
-
-    #
-    # Remove group name if the project is being deleted
-    # 
-
-    if ( $project ) {
-
-	print "Removing group $project from paper.\n";
-	open(DELGROUPP, "/usr/sbin/pw groupdel $project 2>&1 |");
-	while (<DELGROUPP>) { print "$_"; }
-	close(DELGROUPP);    
-	
-	print "Removing group $project from $control_node.\n";
-	open(DELGROUP, "/usr/local/bin/sshtb $control_node /usr/sbin/pw groupdel $project 2>&1 |");
-	while (<DELGROUP>) { print "$_"; }
-	close(DELGROUP);    
-    }
-
-    # Problem: root will own this dir, but we have to be root to
-    # rename in $USERROOT and we can't chown to anything reasonalble 
-    # since this user won't be around.
-    #
-    # Run commands below as the user
-    # $EUID = $UID_save;
-    # $UID  = $EUID;
-
-    #
-    # Rename the user directory. These lines stolen from rmprojdir.
-    # 
-
-    my $newname = "$USERROOT/$user-" . `date +20%y%m%d-%H.%M.%S`;
-
-    #
-    # Untaint the new name since it was constructed with date. Dopey.
-    #
-    if ($newname =~ /^($USERROOT\/[-\@\w.]+)$/) {
-	$newname = $1;
-    }
-
-    if ( !(-e "$USERROOT/$user") ) {
-	print STDOUT "User directory '$user' does not exist!\n";
-	exit(-1);
-    }
-
-    if (! rename("$USERROOT/$user", $newname)) {
-	print STDOUT "Could not rename user directory $user to $newname: $!\n";
-	exit(-1);
-    }
-
+print "Removing user $user from local node.\n";
+if (system("$USERDEL $user")) {
+    fatal("Could not remove user $user from local node.");
 }
 
-sub sanitize() {
-
-    ## un-taint path
-    $ENV{'PATH'} = '/bin:/usr/bin';
-    delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-    ## check usage
-    if ($#ARGV < 0) { 
-	die("Usage: rmacct-ctrl <username> [<project>]\n" .
-	    "\tDeletes given user account on appropriate control node.\n" .
-	    "\tIf project given, deletes the project's group.\n");
-    }
-
-    ## sanitize user 
-    if ( $ARGV[0] =~ /^([a-z0-9]+)$/i ) {
-	$user = $1;
-    } else {
-	die "$0: User argument $ARGV[0] has invalid characters.\n";
-    }
-
-    ## sanitize project, if there is one.
-    if ( $#ARGV == 1  ) {
-	if ( $ARGV[1] =~ /^([A-Za-z0-9-]+)$/ ) {
-	    $project = $1;
-	} else {
-	    die "$0: Project argument $ARGV[0] has invalid characters.\n";
-	}
-    }
-
-    ## effective uid must be root
-    if ($> != 0) {
-	die("$0: Must have an EUID of 0 to create an account.\n");
-    }
-
+print "Removing user $user from $control_node.\n";
+if (system("$SSH $control_node '$USERDEL $user'")) {
+    fatal("Could not remove user $user from $control_node.\n");
 }
 
+#
+# Rename the user directory instead of deleting it.
+# 
+my $newname = "$HOMEDIR/$user-" . `date +20%y%m%d-%H.%M.%S`;
 
-###
-### Return non-zero if we got tuples; 0 if not.
-###
-sub got_tuples() {
-
-    my $sth = $_[0];
-    my $db_numrows = $sth->numrows;
-    return $db_numrows;
+#
+# Untaint the new name since it was constructed with date. Dopey.
+#
+if ($newname =~ /^([-\w.\/]+)$/) {
+    $newname = $1;
+}
+else {
+    fatal("Tainted newname $newname");
 }
 
+if (! -e "$HOMEDIR/$user") {
+    fatal("User directory '$HOMEDIR/$user' does not exist!");
+}
+
+if (! rename("$HOMEDIR/$user", $newname)) {
+    fatal("Could not rename user directory $user to $newname: $!");
+}
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    SENDMAIL($TBOPS, "TESTBED: rmacct-ctrl Failed", $msg);
+    die("$0: $msg");
+}
