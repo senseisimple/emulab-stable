@@ -24,6 +24,8 @@
 #include <sys/stat.h>
 #include <paths.h>
 #include <setjmp.h>
+#include <pwd.h>
+#include <grp.h>
 #include <mysql/mysql.h>
 #include "decls.h"
 #include "config.h"
@@ -63,7 +65,8 @@ static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
-static int	iptonodeid(struct in_addr, char *,char *,char *,char *,int *);
+static int	iptonodeid(struct in_addr, char *, char *,
+			   char *, char *, int *, int *);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
 static int	checkdbredirect(char *nodeid);
@@ -96,9 +99,10 @@ static event_handle_t	event_handle = NULL;
 #define COMMAND_PROTOTYPE(x) \
 	static int \
 	x(int sock, char *nodeid, char *rdata, int tcp, \
-	  int islocal, int isvnode, char *nodetype, int vers)
+	  int islocal, int isvnode, char *nodetype, int vers, int jailflag)
 
 COMMAND_PROTOTYPE(doreboot);
+COMMAND_PROTOTYPE(donodeid);
 COMMAND_PROTOTYPE(dostatus);
 COMMAND_PROTOTYPE(doifconfig);
 COMMAND_PROTOTYPE(doaccounts);
@@ -130,12 +134,14 @@ COMMAND_PROTOTYPE(doatarball);
 COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(doroutelist);
+COMMAND_PROTOTYPE(dojailconfig);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int, char *, char *, int, int, int, char *, int);
+	int    (*func)(int, char *, char *, int, int, int, char *, int, int);
 } command_array[] = {
 	{ "reboot",	doreboot },
+	{ "nodeid",	donodeid },
 	{ "status",	dostatus },
 	{ "ifconfig",	doifconfig },
 	{ "accounts",	doaccounts },
@@ -168,6 +174,7 @@ struct command {
 	{ "ntpdrift",	dontpdrift},
 	{ "tarball",	doatarball},
 	{ "routelist",	doroutelist},
+	{ "jailconfig",	dojailconfig},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -548,7 +555,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	char		   class[TBDB_FLEN_NODECLASS];
 	char		   privkey[TBDB_FLEN_PRIVKEY];
 	char		   type[TBDB_FLEN_NODETYPE];
-	int		   i, islocal, err = 0;
+	int		   i, islocal, jailflag, err = 0;
 	int		   version = DEFAULT_VERSION;
 
 	/*
@@ -638,7 +645,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * Map the ip to a nodeid.
 	 */
 	if ((err = iptonodeid(client->sin_addr, (isvnode ? vnodeid : NULL),
-			      nodeid, class, type, &islocal))) {
+			      nodeid, class, type, &islocal, &jailflag))) {
 		if (err == 2) {
 			error("No such node vnode mapping %s on %s\n",
 			      vnodeid, nodeid);
@@ -683,7 +690,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			 * Simple "isalive" support for remote nodes.
 			 */
 			doisalive(sock, nodeid, rdata, istcp,
-				  islocal, isvnode, type, version);
+				  islocal, isvnode, type, version, jailflag);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -700,7 +707,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			 * Simple "isup" daemon support!
 			 */
 			doisalive(sock, nodeid, rdata, istcp,
-				  islocal, isvnode, type, version);
+				  islocal, isvnode, type, version, jailflag);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
@@ -771,7 +778,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		     istcp ? "TCP" : "UDP", cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, nodeid, rdata, istcp,
-				    islocal, isvnode, type, version);
+				    islocal, isvnode, type, version, jailflag);
 
 	if (err)
 		info("%s: %s: returned %d\n",
@@ -789,17 +796,22 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
  */
 COMMAND_PROTOTYPE(doreboot)
 {
-	MYSQL_RES	*res;	
-	char		pid[64];
-	char		eid[64];
-	char		gid[64];
-
 	/*
 	 * This is now a no-op. The things this used to do are now
 	 * done by stated when we hit RELOAD/RELOADDONE state
 	 */
-	info("doreboot: %s: Reboot reported (no-op, deprecated)\n", nodeid);
+	return 0;
+}
 
+/*
+ * Return emulab nodeid (not the experimental name).
+ */
+COMMAND_PROTOTYPE(donodeid)
+{
+	char		buf[MYBUFSIZE];
+
+	sprintf(buf, "%s\n", nodeid);
+	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
 
@@ -985,9 +997,21 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "where pid='%s'",
 				 2, pid);
 	}
+	else if (jailflag) {
+		/*
+		 * A remote node, doing jails. We still want to return
+		 * a group for the admin people who get accounts outside
+		 * the jails. Lets use the same query as above for now,
+		 * but switch over to emulab-ops. 
+		 */
+		res = mydb_query("select unix_name,unix_gid from groups "
+				 "where pid='%s'",
+				 2, RELOADPID);
+	}
 	else {
 		/*
-		 * XXX
+		 * XXX - Old style node, not doing jails.
+		 *
 		 * Temporary hack until we figure out the right model for
 		 * remote nodes. For now, we use the pcremote-ok slot in
 		 * in the project table to determine what remote nodes are
@@ -1085,9 +1109,29 @@ COMMAND_PROTOTYPE(doaccounts)
 			     12, pid);
 		}
 	}
+	else if (jailflag) {
+		/*
+		 * A remote node, doing jails. We still want to return
+		 * accounts for the admin people outside the jails.
+		 */
+		res = mydb_query("select distinct "
+			     "  u.uid,'*',u.unix_uid,u.usr_name, "
+			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+			     "  u.emulab_pubkey,u.home_pubkey, "
+			     "  UNIX_TIMESTAMP(u.usr_modified) "
+			     "from users as u "
+			     "left join group_membership as p on p.uid=u.uid "
+			     "left join groups as g on "
+			     "     p.pid=g.pid and p.gid=g.gid "
+			     "where (p.pid='%s') and p.trust!='none' "
+			     "      and u.status='active' and u.admin=1 "
+			     "      order by u.uid",
+			     12, RELOADPID);
+	}
 	else {
 		/*
-		 * XXX
+		 * XXX - Old style node, not doing jails.
+		 *
 		 * Temporary hack until we figure out the right model for
 		 * remote nodes. For now, we use the pcremote-ok slot in
 		 * in the project table to determine what remote nodes are
@@ -1432,7 +1476,7 @@ COMMAND_PROTOTYPE(dohostsV2)
 	 * This will go away. Ignore version and assume latest.
 	 */
     return(dohosts(sock, nodeid, rdata, tcp, islocal, isvnode,
-		       nodetype, CURRENT_VERSION));
+		       nodetype, CURRENT_VERSION, jailflag));
 }
 
 COMMAND_PROTOTYPE(dohosts)
@@ -2241,6 +2285,12 @@ COMMAND_PROTOTYPE(domounts)
 	 */
 	if (!islocal && !usesfs)
 		return 0;
+
+	/*
+	 * Jail nodes not doing SFS yet.
+	 */
+	if (jailflag)
+		return 0;
 	
 	/*
 	 * If SFS is in use, the project mount is done via SFS.
@@ -2978,11 +3028,11 @@ COMMAND_PROTOTYPE(dovnodelist)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	res = mydb_query("select r.node_id from reserved as r "
+	res = mydb_query("select r.node_id,n.jailflag from reserved as r "
 			 "left join nodes as n on r.node_id=n.node_id "
 			 "left join node_types as nt on nt.type=n.type "
 			 "where nt.isvirtnode=1 and n.phys_nodeid='%s'",
-			 1, nodeid);
+			 2, nodeid);
 
 	if (!res) {
 		error("VNODELIST: %s: DB Error getting vnode list\n", nodeid);
@@ -2996,12 +3046,16 @@ COMMAND_PROTOTYPE(dovnodelist)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "%s\n", row[0]);
-		       
+		if (vers <= 6) {
+			sprintf(buf, "%s\n", row[0]);
+		}
+		else {
+			sprintf(buf, "VNODEID=%s JAILED=%s\n", row[0], row[1]);
+		}
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("VNODELIST: %s\n", row[0]);
+		info("VNODELIST: %s", buf);
 	}
 	mysql_free_result(res);
 	return 0;
@@ -3120,18 +3174,18 @@ mydb_update(char *query, ...)
  */
 static int
 iptonodeid(struct in_addr ipaddr, char *vnodeid,
-	   char *nodeid, char *class, char *type, int *islocal)
+	   char *nodeid, char *class, char *type, int *islocal, int *jailflag)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select t.class,t.type,n.node_id  "
+	res = mydb_query("select t.class,t.type,n.node_id,n.jailflag  "
 			 " from interfaces as i "
 			 "left join nodes as n on n.node_id=i.node_id "
 			 "left join node_types as t on "
 			 "  t.type=n.type and i.card=t.control_net "
 			 "where i.IP='%s'",
-			 3, inet_ntoa(ipaddr));
+			 4, inet_ntoa(ipaddr));
 
 	if (!res) {
 		error("iptonodeid: %s: DB Error getting interfaces!\n",
@@ -3146,7 +3200,7 @@ iptonodeid(struct in_addr ipaddr, char *vnodeid,
 	row = mysql_fetch_row(res);
 	mysql_free_result(res);
 
-	if (!row[0] || !row[1] || !row[2]) {
+	if (!row[0] || !row[1] || !row[2] || !row[3]) {
 		error("iptonodeid: %s: Malformed DB response!\n",
 		      inet_ntoa(ipaddr)); 
 		return 1;
@@ -3154,7 +3208,8 @@ iptonodeid(struct in_addr ipaddr, char *vnodeid,
 	strcpy(nodeid, row[2]);
 	strcpy(class,  row[0]);
 	strcpy(type,   row[1]);
-	*islocal = (! strcasecmp(class, "pcremote") ? 0 : 1);
+	*islocal  = (! strcasecmp(class,  "pcremote") ? 0 : 1);
+	*jailflag = (! strcasecmp(row[3], "0") ? 0 : 1);
 
 	if (! vnodeid)
 		return 0;
@@ -3710,9 +3765,283 @@ COMMAND_PROTOTYPE(dontpdrift)
  * node of course. Has to be a tcp connection of course, and all remote
  * tcp connections are required to be ssl'ized.
  */
+static int	safesyscall(int sysnum, ...);
+
+/*
+ * Return a tarball. Would work for rpms too. Anyway, it has to be a
+ * The tarball being requested has to be in the tarballs list for the
+ * node of course. Has to be a tcp connection of course, and all remote
+ * tcp connections are required to be ssl'ized.
+ */
 COMMAND_PROTOTYPE(doatarball)
 {
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[1024 * 32], tarname[1024+1];
+	int		cc, fd, okay = 0;
+	char		*bp, *sp, *tp;
+	struct stat	statbuf;
+	struct group	*grp;
+	struct passwd   *pwd;
+
+	/*
+	 * Check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		error("GETTAR: %s: Node is free\n", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Pick up the name from the argument. Limit to usual MAXPATHLEN.
+	 */
+	if (sscanf(rdata, "%1024s", tarname) != 1) {
+		error("GETTAR: %s: Bad arguments\n", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the tarball list from the DB. The requested path must be
+	 * on the list of tarballs for this node.
+	 */
+	res = mydb_query("select tarballs from nodes where node_id='%s' ",
+			 1, nodeid);
+
+	if (!res) {
+		error("GETTAR: %s: DB Error getting tarballs!\n", nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		error("GETTAR: %s: Invalid Tarball: %s!\n", nodeid, tarname);
+		return 1;
+	}
+
+	/*
+	 * Text string is a colon separated list of "dir filename". 
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		error("GETTAR: %s: Invalid Tarball: %s!\n", nodeid, tarname);
+		return 1;
+	}
+	
+	bp  = row[0];
+	sp  = bp;
+	do {
+		bp = strsep(&sp, ":");
+		if ((tp = strchr(bp, ' ')) == NULL)
+			continue;
+		*tp++ = '\0';
+
+		if (strcmp(tp, tarname) == 0) {
+			okay = 1;
+			break;
+		}
+	} while ((bp = sp));
+	mysql_free_result(res);
+
+	if (!okay) {
+		error("GETTAR: %s: Invalid Tarball: %s!\n", nodeid, tarname);
+		return 1;
+	}
+
+	/*
+	 * Ensure that we do not get tricked into returning a file outside
+	 * of /proj, /users, or /groups. We could put a check in the frontend
+	 * where tarfiles is set, but this is much safer given the potential
+	 * for disaster.
+	 *
+	 * XXX I know, realpath is not really a syscall. 
+	 */
+	if (safesyscall(696969, tarname, buf) == NULL) {
+		errorc("GETTAR: %s: realpath failure %s!", nodeid, tarname);
+		return 1;
+	}
+	if ((bp = strchr(&buf[1], '/')) == NULL) {
+		errorc("GETTAR: %s: could not parse %s!", nodeid, buf);
+		return 1;
+	}
+	*bp = NULL;
+	if (strcmp(buf, PROJDIR) &&
+	    strcmp(buf, GROUPDIR) &&
+	    strcmp(buf, USERDIR)) {
+		*bp = '/';
+		error("GETTAR: %s: illegal path: %s --> %s!\n",
+		      nodeid, tarname, buf);
+		return 1;
+	}
+	*bp = '/';
+	
+	/*
+	 * Better be readable!
+	 */
+	if ((fd = safesyscall(SYS_open, tarname, O_RDONLY)) < 0) {
+		errorc("GETTAR: %s: Could not open %s!", nodeid, tarname);
+		return 1;
+	}
+
+	/*
+	 * Stat the file so we get its size to send over first.
+	 */
+	if (safesyscall(SYS_fstat, fd, &statbuf) < 0) {
+		errorc("GETTAR: %s: Could not fstat %s!", nodeid, tarname);
+		goto bad;
+	}
+
+	/*
+	 * As long as we did the stat, check the uid/gid to make doubly
+	 * sure that we should hand this file out. Either the file has
+	 * to be in the gid of the experiment, or it has to be owned
+	 * by the experiment creator.
+	 */
+	if ((grp = getgrnam(gid)) == NULL) {
+		error("GETTAR: %s: Could map gid %s!", nodeid, gid);
+		goto bad;
+	}
+	if (grp->gr_gid != statbuf.st_gid) {
+		res = mydb_query("select expt_head_uid from experiments "
+				 "where eid='%s' and pid='%s'",
+				 1, eid, pid);
+
+		if (!res) {
+			error("GETTAR: %s: DB Error getting expt head uid!\n",
+			      nodeid);
+			goto bad;
+		}
+		if ((int)mysql_num_rows(res) == 0) {
+			error("GETTAR: %s: Error getting expt head uid!\n",
+			      nodeid);
+			goto bad;
+		}
+		row = mysql_fetch_row(res);
+		
+		if ((pwd = getpwnam(row[0])) == NULL) {
+			error("GETTAR: %s: Could map uid %s!", nodeid, row[0]);
+			mysql_free_result(res);
+			goto bad;
+		}
+		mysql_free_result(res);
+		if (pwd->pw_uid != statbuf.st_uid) {
+			error("GETTAR: %s: "
+			      "tarfile %s has bad uid/gid (%d/%d)\n",
+			      nodeid, tarname, statbuf.st_uid, statbuf.st_gid);
+			goto bad;
+		}
+	}
+	
+	cc = statbuf.st_size;
+	client_writeback(sock, &cc, sizeof(cc), tcp);
+
+	info("GETTAR: %s: Sending tarball (%d): %s\n", nodeid, cc, buf);
+
+	/*
+	 * Now dump the file. 
+	 */
+	while (1) {
+	    if ((cc = safesyscall(SYS_read, fd, buf, sizeof(buf))) < 0) {
+		errorc("Error reading tarfile: %s", tarname);
+		goto bad;
+	    }
+	    if (cc == 0)
+		break;
+	    
+	    if (client_writeback(sock, buf, cc, tcp) < 0) {
+		errorc("Error writing tarfile data: %s", tarname);
+		goto bad;
+	    }
+	}
+	safesyscall(SYS_close, fd);
 	return 0;
+ bad:
+	safesyscall(SYS_close, fd);
+	return 1;
+}
+
+int nfsdeadfl;
+jmp_buf nfsdeadbuf;
+static void
+nfswentdead()
+{
+	nfsdeadfl = 1;
+	longjmp(nfsdeadbuf, 1);
+}
+
+static int
+safesyscall(int sysnum, ...)
+{
+	volatile int	retval = 0;
+	va_list		ap;
+
+	if (setjmp(nfsdeadbuf) == 0) {
+		va_start(ap, sysnum);
+
+		retval    = 0;
+		nfsdeadfl = 0;
+		signal(SIGALRM, nfswentdead);
+		alarm(2);
+
+		switch (sysnum) {
+		case SYS_open:
+			{
+				char   *path = va_arg(ap, char *);
+				int	flags  = va_arg(ap, int);
+
+				retval = open(path, flags);
+			}
+			break;
+
+		case SYS_read:
+			{
+				int	fd     = va_arg(ap, int);
+				void   *buf    = va_arg(ap, void *);
+				size_t  nbytes = va_arg(ap, size_t);
+
+				retval = read(fd, buf, nbytes);
+			}
+			break;
+
+		case SYS_fstat:
+			{
+				int	     fd = va_arg(ap, int);
+				struct stat *sb = va_arg(ap, struct stat *);
+
+				retval = fstat(fd, sb);
+			}
+			break;
+
+		case SYS_close:
+			{
+				int	fd = va_arg(ap, int);
+
+				retval = close(fd);
+			}
+			break;
+
+		case 696969:
+			{
+				char	*pathname = va_arg(ap, char *);
+				char	*resolved = va_arg(ap, char *);
+
+				retval = (int) realpath(pathname, resolved);
+			}
+			break;
+
+		default:
+			break;
+		}
+	}
+	alarm(0);
+	if (nfsdeadfl) {
+		error("NFS wend dead");
+		return -1;
+	}
+	return retval;
 }
 
 /*
@@ -3820,3 +4149,56 @@ COMMAND_PROTOTYPE(doroutelist)
 	return 0;
 }
 
+/*
+ * Return the config for a virtual (jailed) node.
+ */
+COMMAND_PROTOTYPE(dojailconfig)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE];
+
+	/*
+	 * Only vnodes get a jailconfig of course, and only allocated ones.
+	 */
+	if (!isvnode) {
+		error("JAILCONFIG: %s: Not a vnode\n", nodeid);
+		return 1;
+	}
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		error("JAILCONFIG: %s: Node is free\n", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the portrange for the node. Cons up the other params I
+	 * can think of right now. 
+	 */
+	res = mydb_query("select ipport_low,ipport_high from nodes "
+			 "where node_id='%s'",
+			 2, nodeid);
+	
+	if (!res) {
+		error("JAILCONFIG: %s: DB Error getting config!\n", nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row = mysql_fetch_row(res);
+	
+	sprintf(buf,
+		"PORTRANGE=\"%s,%s\"\n"
+		"SYSVIPC=1\n"
+		"INETRAW=1\n"
+		"BPFRO=1\n", row[0], row[1]);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	mysql_free_result(res);
+	return 0;
+}
