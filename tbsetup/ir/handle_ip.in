@@ -528,7 +528,18 @@ if (! &ir_exists("/ip")) {
 # Clear table
 foreach (split("\n",$ip_section)) {
     ($vsrc,$vdst,$ip) = split;
-    $src = $vnodemap{$vsrc};
+    if (!defined($vnodemap{$vsrc})) {
+	# lan
+	$src = $vsrc;
+    } else {
+	$src = $vnodemap{$vsrc};
+    }
+    if (!defined($vnodemap{$vdst})) {
+	# lan
+	$dst = $vdst;
+    } else {
+	$dst = $vnodemap{$vdst}
+    }
     $dst = $vnodemap{$vdst};
     $sth = $dbh->prepare("DELETE from virt_names where src_node_id = \"$src\"");
     $sth->execute;
@@ -536,8 +547,18 @@ foreach (split("\n",$ip_section)) {
 }
 foreach (split("\n",$ip_section)) {
     ($vsrc,$vdst,$ip) = split;
-    $src = $vnodemap{$vsrc};
-    $dst = $vnodemap{$vdst};
+    if (!defined($vnodemap{$vsrc})) {
+	# lan
+	$src = $vsrc;
+    } else {
+	$src = $vnodemap{$vsrc};
+    }
+    if (!defined($vnodemap{$vdst})) {
+	# lan
+	$dst = $vdst;
+    } else {
+	$dst = $vnodemap{$vdst}
+    }
     $sth = $dbh->prepare("SELECT src_node_id from virt_names where src_node_id = \"$src\" and dest_node_id = \"$dst\"");
     $sth->execute;
     $i = $sth->rows();
