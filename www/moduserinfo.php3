@@ -432,7 +432,7 @@ if (!isset($formfields[usr_email]) ||
     strcmp($formfields[usr_email], "") == 0) {
     $errors["Email Address"] = "Missing Field";
 }
-elseif (! CHECKEMAIL($formfields[usr_email])) {
+elseif (! TBvalid_email($formfields[usr_email])) {
     $errors["Email Address"] = "Looks invalid!";
 }
 if (isset($formfields[usr_URL]) &&

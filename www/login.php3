@@ -103,7 +103,7 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
               <td>Username:</td>
               <td><input type=text
                          value=\"$uid\"
-                         name=uid size=$TBDB_UIDLEN></td>
+                         name=uid size=20></td>
           </tr>
           <tr>
               <td>Password:</td>

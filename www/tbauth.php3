@@ -442,13 +442,14 @@ function ISPLABUSER() {
 #
 # Attempt a login.
 # 
-function DOLOGIN($uid, $password, $adminmode = 0) {
+function DOLOGIN($token, $password, $adminmode = 0) {
     global $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     
     # Caller makes these checks too.
-    if (!TBvalid_uid($uid) || !isset($password) || $password == "") {
+    if ((!TBvalid_uid($token) && !TBvalid_email($token)) ||
+	!isset($password) || $password == "") {
 	return -1;
     }
     $now = time();
@@ -479,16 +480,20 @@ function DOLOGIN($uid, $password, $adminmode = 0) {
     }
 
     $user_result =
-	DBQueryFatal("select usr_pswd,admin,weblogin_frozen,".
+	DBQueryFatal("select uid,usr_pswd,admin,weblogin_frozen,".
 		     "       weblogin_failcount,weblogin_failstamp, ".
 		     "       usr_email,usr_name ".
-		     "from users where uid='$uid'");
+		     "from users where ".
+		     (TBvalid_email($token) ?
+		      "usr_email='$token'" :
+		      "uid='$token'"));
 
     #
     # Check password in the database against provided. 
     #
     do {
       if ($row = mysql_fetch_array($user_result)) {
+	$uid         = $row['uid'];
         $db_encoding = $row['usr_pswd'];
 	$isadmin     = $row['admin'];
 	$frozen      = $row['weblogin_frozen'];
@@ -655,7 +660,7 @@ function DOLOGIN($uid, $password, $adminmode = 0) {
 	TBMAIL($TBMAIL_OPS,
 	       "Web Login Freeze: '$IP'",
 	       "Logins has been frozen because there were too many login\n".
-	       "failures from $IP. Last attempted uid was '$uid'.\n\n",
+	       "failures from $IP. Last attempted uid was '$token'.\n\n",
 	       "From: $TBMAIL_OPS\n".
 	       "Bcc: $TBMAIL_AUDIT\n".
 	       "Errors-To: $TBMAIL_WWW");
