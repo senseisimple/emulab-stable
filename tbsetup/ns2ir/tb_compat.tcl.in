@@ -1055,6 +1055,20 @@ proc tb-set-delay-os {os} {
 }
 
 #
+# Set the delay capacity override. This is not documented cause we
+# do not want people to do this!
+#
+proc tb-set-delay-capacity {cap} {
+    var_import ::GLOBALS::delay_capacity
+
+    if { $cap <= 0 || $cap > @DELAYCAPACITY@ } {
+	perror "\[tb-set-delay-capacity] Must be 0 < X <= @DELAYCAPACITY@"
+	return
+    }
+    set delay_capacity $cap
+}
+
+#
 # Allow type of lans (but not links) to be changed.
 #
 proc tb-set-lan-protocol {lanlink protocol} {

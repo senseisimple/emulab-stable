@@ -246,6 +246,9 @@ namespace eval GLOBALS {
     variable jail_osname {}
     variable delay_osname {}
 
+    # Allow override of delay capacity.
+    variable delay_capacity {}
+
     # Use phys naming
     variable use_physnaming 0
 

@@ -61,7 +61,7 @@ my $warnings = 0;
 # Configure variables
 #
 my $TBROOT	  = "@prefix@";
-my $DELAYCAPACITY = @DELAYCAPACITY@;
+my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user!
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 
 #
@@ -309,6 +309,7 @@ my $usewatunnels;
 my $multiplex_factor;
 my $experiment_idx;
 my $useprepass;
+my $delaycap_override;
 
 # For admission control. Not well defined yet.
 my $cpu_usage;
@@ -606,6 +607,10 @@ sub RunAssign ()
 	if ($simcount);
     $ptopargs	.= "-a "
     	if ($precheck);
+    $ptopargs	.= "-c $delaycap_override "
+    	if (defined($delaycap_override));
+
+    print "ptopargs $ptopargs\n";
     system("ptopgen $ptopargs > $ptopfile");
     TBDebugTimeStamp("ptopgen finished");
 
@@ -3748,12 +3753,12 @@ sub LoadExperiment()
 		     "       multiplex_factor,usewatunnels, ".
 		     "       cpu_usage,mem_usage,allowfixnode, ".
 		     "       jail_osname,delay_osname,idx, " .
-		     "       useprepass " .
+		     "       useprepass,delay_capacity " .
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx,$o8) =
-	$query_result->fetchrow_array();
+    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,
+	$idx,$o8,$delay_capacity) = $query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
     $uselinkdelays = $o1
@@ -3783,6 +3788,12 @@ sub LoadExperiment()
 	    ! ($delay_osid = TBOSID(TB_OPSPID, $delay_osname))) {
 	    fatal("Invalid OS $delay_osname in project $pid!");
 	}
+    }
+    if (defined($delay_capacity)) {
+	$DELAYCAPACITY     = $delay_capacity;
+	$delaycap_override = $delay_capacity;
+	# Stats
+	$expt_stats{"delay_capacity"} = $delay_capacity;
     }
     $experiment_idx = $idx;
 

@@ -282,6 +282,7 @@ CREATE TABLE experiment_resources (
   wirelesslans smallint(5) unsigned default '0',
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
+  delay_capacity tinyint(3) unsigned default NULL,
   thumbnail mediumblob,
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
@@ -399,6 +400,7 @@ CREATE TABLE experiments (
   lockdown tinyint(1) NOT NULL default '0',
   paniced tinyint(1) NOT NULL default '0',
   panic_date datetime default NULL,
+  delay_capacity tinyint(3) unsigned default NULL,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)

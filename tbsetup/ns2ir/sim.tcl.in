@@ -342,6 +342,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::veth_encapsulate
     var_import ::GLOBALS::jail_osname
     var_import ::GLOBALS::delay_osname
+    var_import ::GLOBALS::delay_capacity
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
     var_import ::GLOBALS::modelnet_cores
@@ -529,6 +530,10 @@ Simulator instproc run {} {
     if { $delay_osname != {} } {
 	lappend fields "delay_osname"
 	lappend values $delay_osname
+    }
+    if { $delay_capacity != {} } {
+	lappend fields "delay_capacity"
+	lappend values $delay_capacity
     }
 
     if {$modelnet_cores > 0 && $modelnet_edges > 0} {

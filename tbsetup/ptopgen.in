@@ -21,10 +21,11 @@ sub usage()
 	  "       -s Include stuff for topologies with simulated nodes\n".
 	  "       -a Include even reserved nodes\n".
 	  "       -m Override multiplex_factor\n".
+	  "       -c Delay capacity override\n".
 	  "       -n Add in modelnet core and edge node features\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:rSan:";
+my $optlist = "s:e:m:vp:rSan:c:";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -32,6 +33,7 @@ my $simstuff  = 0;
 my $allnodes  = 0;
 my $mnetcores = 0;
 my $mnetedges = 0;
+my $delaycap_override;
 
 #
 # Turn off line buffering on output
@@ -109,6 +111,9 @@ if (defined($options{"p"})) {
 }
 if (defined($options{"a"})) {
     $allnodes = 1;
+}
+if (defined($options{"c"})) {
+    $delaycap_override = $options{"c"};
 }
 if (defined($options{"n"})) {
     if ($options{"n"} =~ /(\d*),(\d*)/) {
@@ -380,6 +385,12 @@ foreach $node (keys(%nodes)) {
     }
 
     if ($delay_capacity > 0) {
+	# Comes from the NS file;
+	$delay_capacity = $delaycap_override
+	    if (defined($delaycap_override) &&
+		$delaycap_override > 0 &&
+		$delaycap_override < $delay_capacity);
+	
 	push @types, "delay:$delay_capacity";
 	push @types, "delay-${type}:$delay_capacity";
     }
