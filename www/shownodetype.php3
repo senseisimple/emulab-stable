@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -21,6 +21,10 @@ PAGEHEADER("Node Type Information");
 if (!isset($node_type) ||
     strcmp($node_type, "") == 0) {
     USERERROR("You must provide a node type.", 1);
+}
+# Sanitize.
+if (!preg_match("/^[-\w]+$/", $node_type)) {
+    PAGEARGERROR("Invalid characters in arguments.");
 }
 
 #
