@@ -22,7 +22,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	binaries $(SCRIPT) $(SCRIPT_RUN)
+all:	binaries $(SCRIPT) $(SCRIPT_RUN) weblinktest
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -74,6 +74,7 @@ $(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
 # We install just enough to fire off the test from boss and wait. 
 install:
 	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) $(INSTALL_LIBEXECDIR)
+	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(INSTALL_BINDIR)
 
 control-install:	install
