@@ -440,6 +440,10 @@ REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_READY','RELOAD_PENDING',
 REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','BOOTING','DHCPRetry');
 REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','TBSETUP','LongSetup');
+REPLACE INTO state_transitions VALUES ('OPSNODEBSD','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('OPSNODEBSD','SHUTDOWN','TBSETUP','Booting');
+REPLACE INTO state_transitions VALUES ('OPSNODEBSD','TBSETUP','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('OPSNODEBSD','ISUP','TBSETUP','Crash');
 
 --
 -- Dumping data for table `state_triggers`
@@ -452,6 +456,7 @@ REPLACE INTO state_triggers VALUES ('*','*','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','*','PXEBOOTING','PXEBOOT');
 REPLACE INTO state_triggers VALUES ('*','*','BOOTING','BOOTING, CHECKGENISUP');
 REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('ops','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 
 --
 -- Dumping data for table `table_regex`
