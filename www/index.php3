@@ -90,9 +90,10 @@ if (isset($uid)) {
     if ($status == "active") {
         if ($trust == "group_root") {
             # Only group leaders can do these options
-            echo "<A href='approval.php3?$uid'>New User Approval</A>\n";
+            echo "<A href='approveuser_form.php3?$uid'>
+                     New User Approval</A>\n";
         }
-        # Since a user can be a member of more than one project (grp),
+        # Since a user can be a member of more than one project,
         # display this option, and let the form decide if the user is
         # allowed to do this.
         echo "<p><A href='beginexp_form.php3?$uid'>
