@@ -14,11 +14,18 @@ proc outs {args} {
     puts $logFp $s
 }
 
-if {[file dirname [info script]] == "."} {
-    set updir ".."
-} else {
-    set updir [file dirname [file dirname [info script]]]
+### Bootstrapping code.  The whole purpose of this is to find the
+# directory containing the script.
+set file [info script]
+while {![catch "file readlink $file" newfile]} {
+    set file $newfile
 }
+set scriptdir [file dirname $file]
+if {$scriptdir == "."} {set scriptdir [pwd]}
+###
+
+set updir [file dirname $scriptdir]
+
 
 set nfree "$updir/db/nfree"
 set libir "$updir/ir/libir.tcl"

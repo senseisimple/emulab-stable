@@ -14,12 +14,18 @@ proc outs {args} {
     puts $logFp $s
 }
 
-set scriptdir [file dirname [info script]]
-if {$scriptdir == "."} {
-    set updir ".."
-} else {
-    set updir [file dirname $scriptdir]
+### Bootstrapping code.  The whole purpose of this is to find the
+# directory containing the script.
+set file [info script]
+while {![catch "file readlink $file" newfile]} {
+    set file $newfile
 }
+set scriptdir [file dirname $file]
+if {$scriptdir == "."} {set scriptdir [pwd]}
+###
+
+set updir [file dirname $scriptdir]
+
 set snmpit "$updir/switch_tools/intel510/snmpit"
 set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
 set libir "$updir/ir/libir.tcl"
