@@ -93,8 +93,8 @@ while (my ($name, $vis_type, $vis_x, $vis_y, $ips, $virt_type) = $result->fetchr
     dprint "NODE $name $vis_type $vis_x $vis_y\n";
 
     if (defined $ips) {
-	$ips =~ s/^\d\://g;
-	$ips =~ s/\s\d\:/ /g;
+	$ips =~ s/^\d+\://g;
+	$ips =~ s/\s\d+\:/ /g;
 	$ips =~ s/^192\.168//g;
 	$ips =~ s/\s192\.168/ /g;
 
