@@ -648,9 +648,9 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     #
     # mkacct updates the user gecos
     #
-#    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
-#	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
-#    }
+    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
+	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
+    }
 }
 
 #
