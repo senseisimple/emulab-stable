@@ -399,9 +399,6 @@ proc tb-make-soft-vtype {name types} {
 	if {! [info exists hwtypes($type)]} {
 	    perror "\[tb-make-soft-vtype] Invalid hardware type $type."
 	}
-	if {$isremote($type)} {
-	    perror "\[tb-make-soft-vtype] Remote type $type not allowed."
-	}
     }
     set vtypes($name) [Vtype $name $default_soft_vtype_weight $types]
 }
@@ -415,9 +412,6 @@ proc tb-make-hard-vtype {name types} {
     foreach type $types {
 	if {! [info exists hwtypes($type)]} {
 	    perror "\[tb-make-hard-vtype] Invalid hardware type $type."
-	}
-	if {$isremote($type)} {
-	    perror "\[tb-make-hard-vtype] Remote type $type not allowed."
 	}
     }
     set vtypes($name) [Vtype $name $default_hard_vtype_weight $types]
