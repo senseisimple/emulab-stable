@@ -122,6 +122,10 @@ function WRITESIDEBAR() {
 			       $TBBASE, "modusr_form.php3");
 	}
 	elseif ($status == "active") {
+	    WRITESIDEBARBUTTON("My Testbed Account",
+			       $TBBASE,
+			       "showuser.php3?target_uid=$login_uid");
+	    
 	    if ($admin) {
 		WRITESIDEBARBUTTON("New Project Approval",
 				   $TBBASE, "approveproject_list.php3");
