@@ -5,14 +5,29 @@
 #
 use lib '@prefix@/lib';
 use libdb;
+use English;
+
+my ($virtual,$id,$pideid,$members);
+print << "END";
+ID     Project/Experiment Link/LAN   Switches (number of members in parens)
+--------------------------------------------------------------------------------
+END
+format vlanlist =
+@<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$id,   $pideid,           $virtual,  $members
+~~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                     $members
+.
+$FORMAT_NAME = 'vlanlist';
+
 
 #
 # Get a list of all VLANs for swapped-in experiments
 #
-my $result = DBQueryFatal("SELECT eid, pid, virtual, members FROM vlans " .
+my $result = DBQueryFatal("SELECT eid, pid, virtual, members, id FROM vlans " .
 	"ORDER BY eid,pid,virtual");
-
-while (my ($eid, $pid, $virtual, $members) = $result->fetchrow()) {
+my $eid,$pid;
+while (($eid, $pid, $virtual, $members, $id) = $result->fetchrow()) {
 
     #
     # Split apart the space-separated list of members
@@ -37,8 +52,8 @@ while (my ($eid, $pid, $virtual, $members) = $result->fetchrow()) {
     # Report if more than one switch was found
     #
     if ((keys %switches) > 1) {
-	print "Link/LAN $virtual on $pid/$eid is on ",
-	    join(", ", map { "$_ ($switches{$_} members)" } sort keys %switches),
-	    "\n";
+	$pideid = "$pid/$eid";
+	$members = join(" ", map { "$_ ($switches{$_})" } sort keys %switches);
+	write;
     }
 }
