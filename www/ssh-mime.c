@@ -13,7 +13,7 @@ char *usagestr =
  "usage: ssh-mime <control-file>"
  "\n";
 
-char *default_sshcmd = "\"c:\\putty.exe\" -ssh -AX";
+char *default_sshcmd = "\"c:\\putty.exe\" -ssh -1 -A -X";
 char *tempfile = "c:\\windows\\temp\\puttycmd";
 char *logfile = "c:\\windows\\temp\\ssh-mime.log";
 char sshcmd[MAXPATHLEN];
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 	exit(2);
     }
     if( (str = getenv("PUTTY_CMD")) ) {
-	snprintf(sshcmd, sizeof(sshcmd), "\"%s\" -ssh -AX", 
+	snprintf(sshcmd, sizeof(sshcmd), "\"%s\" -ssh -1 -A -X", 
 		 str );
     } else {
 	strncpy( sshcmd, default_sshcmd, sizeof(sshcmd) );
