@@ -1,0 +1,9 @@
+node A pc
+node B pc
+node C pc
+node D pc
+node E pc
+link A C 100
+link B C 100
+link C D 100
+link A E 100
