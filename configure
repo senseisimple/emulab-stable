@@ -891,6 +891,8 @@ fi
 
 
 
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -950,6 +952,8 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 # Network config stuff. Obviously, this needs to be localized, but there are
 # too many defs files too worry about right now.
 #
+TESTBED_NETWORK=155.98.32.0
+TESTBED_NETMASK=255.255.240.0
 BOSSNODE_IP=155.98.32.70
 USERNODE_IP=155.98.33.74
 CONTROL_ROUTER_IP=155.98.36.1
@@ -1389,7 +1393,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1393: checking for a BSD compatible install" >&5
+echo "configure:1397: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1450,6 +1454,7 @@ esac
 
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
+        named/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
@@ -1768,6 +1773,8 @@ s%@TBLOGFACIL@%$TBLOGFACIL%g
 s%@PLAB_ROOTBALL@%$PLAB_ROOTBALL%g
 s%@PLAB_SLICEPREFIX@%$PLAB_SLICEPREFIX%g
 s%@LINKTEST_NSPATH@%$LINKTEST_NSPATH%g
+s%@TESTBED_NETWORK@%$TESTBED_NETWORK%g
+s%@TESTBED_NETMASK@%$TESTBED_NETMASK%g
 s%@BOSSNODE_IP@%$BOSSNODE_IP%g
 s%@USERNODE_IP@%$USERNODE_IP%g
 s%@CONTROL_ROUTER_IP@%$CONTROL_ROUTER_IP%g

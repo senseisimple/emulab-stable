@@ -65,6 +65,8 @@ AC_SUBST(TBLOGFACIL)
 AC_SUBST(PLAB_ROOTBALL)
 AC_SUBST(PLAB_SLICEPREFIX)
 AC_SUBST(LINKTEST_NSPATH)
+AC_SUBST(TESTBED_NETWORK)
+AC_SUBST(TESTBED_NETMASK)
 AC_SUBST(BOSSNODE_IP)
 AC_SUBST(USERNODE_IP)
 AC_SUBST(CONTROL_ROUTER_IP)
@@ -142,6 +144,8 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 # Network config stuff. Obviously, this needs to be localized, but there are
 # too many defs files too worry about right now.
 #
+TESTBED_NETWORK=155.98.32.0
+TESTBED_NETMASK=255.255.240.0
 BOSSNODE_IP=155.98.32.70
 USERNODE_IP=155.98.33.74
 CONTROL_ROUTER_IP=155.98.36.1
@@ -489,6 +493,7 @@ esac]
 
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
+        named/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \

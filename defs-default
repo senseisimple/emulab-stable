@@ -46,6 +46,8 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 #
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
+TESTBED_NETWORK=155.98.32.0
+TESTBED_NETMASK=255.255.240.0
 BOSSNODE_IP=155.98.32.70
 USERNODE_IP=155.98.33.74
 CONTROL_ROUTER_IP=155.98.36.1
