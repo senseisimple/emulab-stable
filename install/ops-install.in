@@ -313,7 +313,7 @@ Phase "cron", "Adding cron jobs", sub {
     Phase "crontab", "Editing $CRONTAB", sub {
 	DoneIfEdited($CRONTAB);
 	AppendToFileFatal($CRONTAB,
-	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamain");
+	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamail");
     };
     Phase "cronhup", "HUPing cron", sub {
 	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
