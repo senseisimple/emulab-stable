@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -71,9 +71,11 @@ CommonInit(void)
 		if (bind(sock, (struct sockaddr *)&name, sizeof(name)) == 0)
 			break;
 
+		if (--i == 0)
+			pfatal("Could not bind to port %d!", portnum);
+
 		pwarning("Bind to port %d failed. Will try %d more times!",
 			 portnum, i);
-		i--;
 		sleep(5);
 	}
 	log("Bound to port %d", portnum);
