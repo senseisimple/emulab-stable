@@ -129,7 +129,7 @@ sub doboot()
     # First just get the current set of groups/accounts from tmcd.
     #
     foreach my $str (@tmccresults) {
-	if ($str =~ /^ADDGROUP NAME=([-\@\w.]+) GID=([0-9]+)/) {
+	if ($str =~ /^ADDGROUP NAME=([-\w]+) GID=([0-9]+)/) {
 	    #
 	    # Group info goes in the hash table.
 	    #
@@ -144,14 +144,14 @@ sub doboot()
 	    }
 	    $newgroups{"$gname"} = $2
 	}
-	elsif ($str =~ /^ADDUSER LOGIN=([0-9A-Za-z]+)/) {
+	elsif ($str =~ /^ADDUSER LOGIN=([-\w]+)/) {
 	    #
 	    # Account info goes in the hash table.
 	    # 
 	    $newaccounts{$1} = $str;
 	    next;
 	}
-	elsif ($str =~ /^PUBKEY LOGIN=([0-9A-Za-z]+) KEY="(.*)"/) {
+	elsif ($str =~ /^PUBKEY LOGIN=([-\w]+) KEY="(.*)"/) {
 	    #
 	    # Keys go into hash as a list of keys.
 	    #
@@ -329,7 +329,7 @@ sub doboot()
 	delete($PWDDB{$login});
     }
 
-    my $pat = q(ADDUSER LOGIN=([0-9A-Za-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
+    my $pat = q(ADDUSER LOGIN=([-\w]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
     $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
     $pat   .= q(SERIAL=(\d+) EMAIL="([-\w\@\.\+]+)" SHELL=([-\w]*));
 
