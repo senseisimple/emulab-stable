@@ -1034,6 +1034,8 @@ CREATE TABLE widearea_delays (
   bandwidth double default NULL,
   time_stddev float NOT NULL default '0',
   lossrate float NOT NULL default '0',
+  start_time int(10) unsigned default NULL,
+  end_time int(10) unsigned default NULL,
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
@@ -1052,6 +1054,8 @@ CREATE TABLE widearea_recent (
   bandwidth double default NULL,
   time_stddev float NOT NULL default '0',
   lossrate float NOT NULL default '0',
+  start_time int(10) unsigned default NULL,
+  end_time int(10) unsigned default NULL,
   PRIMARY KEY  (node_id1,iface1,node_id2,iface2)
 ) TYPE=MyISAM;
 
