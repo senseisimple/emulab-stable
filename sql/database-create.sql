@@ -349,7 +349,7 @@ CREATE TABLE interfaces (
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
   IPalias varchar(15) default NULL,
-  IPaliases text default NULL,
+  IPaliases text,
   interface_type varchar(30) default NULL,
   iface text,
   current_speed enum('100','10','1000') NOT NULL default '100',
