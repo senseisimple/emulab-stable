@@ -1964,6 +1964,31 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (order_id)
 	) TYPE=MyISAM;
 
+       Also added a scale field to the floorimages table.
+
+	ALTER TABLE floorimages ADD COLUMN scale tinyint(4) 
+	  NOT NULL default '1' AFTER floor;
+	ALTER TABLE floorimages DROP PRIMARY KEY;
+	ALTER TABLE floorimages ADD PRIMARY KEY (building,floor,scale);
+
+	REPLACE INTO floorimages (building, floor, scale, image_path, thumb_path)
+	  VALUES ('MEB', 1, 1, 'meb1fl-1.jpg', 'meb1fl-thumb.jpg'),
+	         ('MEB', 1, 2, 'meb1fl-2.jpg', 'meb1fl-thumb.jpg'),
+	         ('MEB', 1, 3, 'meb1fl-3.jpg', 'meb1fl-thumb.jpg'),
+	         ('MEB', 1, 4, 'meb1fl-4.jpg', 'meb1fl-thumb.jpg'),
+	         ('MEB', 2, 1, 'meb2fl-1.jpg', 'meb2fl-thumb.jpg'),
+	         ('MEB', 2, 2, 'meb2fl-2.jpg', 'meb2fl-thumb.jpg'),
+	         ('MEB', 2, 3, 'meb2fl-3.jpg', 'meb2fl-thumb.jpg'),
+	         ('MEB', 2, 4, 'meb2fl-4.jpg', 'meb2fl-thumb.jpg'),
+	         ('MEB', 3, 1, 'meb3fl-1.jpg', 'meb3fl-thumb.jpg'),
+	         ('MEB', 3, 2, 'meb3fl-2.jpg', 'meb3fl-thumb.jpg'),
+	         ('MEB', 3, 3, 'meb3fl-3.jpg', 'meb3fl-thumb.jpg'),
+	         ('MEB', 3, 4, 'meb3fl-4.jpg', 'meb3fl-thumb.jpg'),
+	         ('MEB', 4, 1, 'meb4fl-1.jpg', 'meb4fl-thumb.jpg'),
+	         ('MEB', 4, 2, 'meb4fl-2.jpg', 'meb4fl-thumb.jpg'),
+	         ('MEB', 4, 3, 'meb4fl-3.jpg', 'meb4fl-thumb.jpg'),
+	         ('MEB', 4, 4, 'meb4fl-4.jpg', 'meb4fl-thumb.jpg');
+
 1.275: Add timed-based mapping table for generic OSIDs.  This augments the
        nextosid mechinism of 1.114 making it possible to map a generic *-STD
        OSID based on the time in which an experiment is created.  This
