@@ -1,0 +1,20 @@
+
+MKTHEDIR = if test ! -d $(ARCH); then $(MKDIR) $(ARCH); fi
+OBJS    := $(addprefix $(ARCH)/, $(FILES))
+OBJS    := $(addsuffix $(OBJSUFFIX), $(OBJS))
+LIBNAME := $(addprefix $(ARCH)/, $(LIBPREFIX)$(LIBRARY)$(ARCH)$(LIBSUFFIX))
+INSTLIBNAME := $(addprefix $(INSTLIBDIR)/, $(LIBPREFIX)$(LIBRARY)$(ARCH)$(LIBSUFFIX))
+INSTBINNAME := $(addprefix $(INSTBINDIR)/, $(TARGET))
+
+
+SUFFIXES: .o .cpp
+
+$(ARCH)/%.o: %.cpp
+	@$(MKTHEDIR)
+	$(CC) -o $@ -c $(CFLAGS) $(INCDIRS) $< 
+
+_clean:
+	$(RM) $(ARCH)
+
+_install:
+	$(INSTALL) -c -m 444 $(LIBNAME) $(INSTLIBNAME)

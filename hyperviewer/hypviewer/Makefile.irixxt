@@ -1,0 +1,29 @@
+# SGIs running Irix 6.x 
+# Xt windows
+# tested for SGI CC version 7.3
+
+CPU = irix
+WINSYS = xt
+ARCH = $(CPU)$(WINSYS)
+CFLAGS = -DHYPGLX -DHYPXT -DHYPIRIX -g -ptused -DNAMESPACEHACK='using namespace std;'
+LDLIBS  =  -L../../src/$(ARCH) -l$(LIBRARY)$(ARCH) -lGLw -lGL -lGLU -lXm -lXt -lX11 -lm
+
+SUBDIRS = src examples/vkxt examples/xtsimple
+
+CC = /bin/CC
+LD = /bin/cc
+AR = /bin/ar rv
+MKDIR = /bin/mkdir 
+RM = /bin/rm -rf
+MAKE = /usr/common/bin/gmake
+INSTALL = /usr/common/bin/install
+INSTLIBDIR = /usr/common/lib
+INSTBINDIR = /usr/common/bin
+
+OBJSUFFIX = .o
+LIBSUFFIX = .a
+LIBPREFIX = lib
+
+_library:
+	$(AR) $(LIBNAME) $(OBJS)
+

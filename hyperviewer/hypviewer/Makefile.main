@@ -1,0 +1,50 @@
+# top-level Makefile for hypviewer release
+# uses gmake extensions
+
+# toplevel included makefile for hypviewer libraries
+
+########################################
+# change the line below to the right pathname on your system
+########################################
+
+#ROOTDIR = /udir/tmm/build.linux/hypviewer
+ROOTDIR = /home/fish/h3/hypviewer
+
+
+########################################
+# uncomment the right line for your platform
+########################################
+
+#include $(ROOTDIR)/Makefile.irixxt
+#include $(ROOTDIR)/Makefile.irixglut
+#include $(ROOTDIR)/Makefile.irixvk
+#include $(ROOTDIR)/Makefile.freext
+include $(ROOTDIR)/Makefile.freeglut
+#include $(ROOTDIR)/Makefile.linuxxt
+
+########################################################################
+# if you're not porting to a new platform, ignore everything below here
+########################################################################
+
+# needed all flavors (except of course Windows) 
+include $(ROOTDIR)/Makefile.common
+
+# to construct a Makefile for a new platform:
+# possible defs:
+# HYPXT - Xt (on top of X/Motif) window system
+# HYPVK - ViewKit window system. mainly found on SGI, but is crossplatform
+# HYPGLX is a superset of HYPVK and HYPXT
+# HYPGLUT - Mark Kilgard's window system
+# HYPIRIX - it's an SGI
+# HYPLINUX - it's a Linux box
+# WIN32 - it's a Windoze box
+# HYPFREE - it's a FreeBSD box
+# XPMSNAP - can be enabled for any of the X Windows ones
+#
+# The window system is supposed to be vaguely orthogonal to the CPU,
+# although you can't mix and match every combination. 
+# 
+# Define NAMESPACEHACK to either 'using namespace std;' or '':
+# in some compilers (including SGI CC and Microsoft Visual C++ the
+# former is critical for compiling STL, in others (older version of
+# g++?) apparently the right thing to do is leave it blank.

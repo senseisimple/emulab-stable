@@ -1,0 +1,1187 @@
+<html><head><title>HypView Documentation</title></head>
+<body><h2>
+<a name="topofdoc"><img src="hypviewer.gif">HypView</a></h2>
+<dl>
+<dd>
+ HypView is the main interface class for the HypViewer library, which
+ provides layout and interactive navigation of node-link graphs in 3D
+ hyperbolic space. The library can handle quite large graphs of up to
+ 100,000 edges quickly and with minimal visual clutter. The hyperbolic
+ view allows the user to see a great deal of the context around the
+ current focus node.
+
+
+</dl>
+<hr><p></p>
+<p><strong>[ 
+<a href="././HypViewer.html">HypViewer</a> | 
+<a href="HypView.h">Source</a> | 
+<a href="#aag">Summary</a> | <a href="#parents">Ancestors</a> | <a href="#flat">All Members</a> | <a href="#children">Descendants</a>  ]</strong><p>
+<h3><a name="quickind">Quick Index</a></h3>
+<dl>
+<dd><a href="#OVERVIEW">OVERVIEW</a>
+<dd><a href="#LAYOUT">LAYOUT</a>
+<dd><a href="#DRAWING">DRAWING</a>
+<dd><a href="#INITIALIZATION">INITIALIZATION</a>
+<dd><a href="#INPUT_FILE_FORMAT">INPUT FILE FORMAT</a>
+<dd><a href="#DEPENDENCIES">DEPENDENCIES</a>
+<dd><a href="#MAKEFILES">MAKEFILES</a>
+<dd><a href="#AUTHOR">AUTHOR</a>
+</dl>
+<a name="aag"><hr><p></p></a><h3>Class Summary</h3>
+class HypView <br>
+ {
+<br>
+<table>
+<tr><td align=left><font size=+1><i><b>public:</b></i></font>
+</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  Initialization</strong></td></tr>
+<tr><td align=right valign=top>HDC </td><td><a href="././HypView.html#HDC_getWidget()$">getWidget</a>();</td></tr>
+<tr><td align=right valign=top></td><td><a href="././HypView.html#HypView(Widget_w)$">HypView</a>(Widget w);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_afterRealize(GLXContext_cx)$">afterRealize</a>(GLXContext cx);</td></tr>
+<tr><td align=right valign=top>Widget </td><td><a href="././HypView.html#Widget_getWidget()$">getWidget</a>();</td></tr>
+<tr><td align=right valign=top></td><td><a href="././HypView.html#HypView()$">HypView</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_afterRealize()$">afterRealize</a>();</td></tr>
+<tr><td align=right valign=top></td><td>~<a href="././HypView.html#~HypView()$">HypView</a>();</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypView</strong></td></tr>
+<tr><td align=right valign=top>char** </td><td><a href="././HypView.html#char**_enumerateSubtree(char *id)$">enumerateSubtree(char *id)</a>;</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_flashLink(const_string_&amp_fromid,_const_string_&amp_toid)$">flashLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>string </td><td><a href="././HypView.html#string_getCenter()$">getCenter</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_gotoNode(const_string_&amp_id,_int_animate)$">gotoNode</a>(const string &amp id, int animate);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_gotoCenterNode(int_animate)$">gotoCenterNode</a>(int animate);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_gotoPickPoint(int_animate)$">gotoPickPoint</a>(int animate);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_newLayout(const_string_&amp_id)$">newLayout</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_saveGraph(const_string_&amp_fname)$">saveGraph</a>(const string &amp fname);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setCurrentCenter(const_string_&amp_id)$">setCurrentCenter</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGraphCenter(const_string_&amp_id)$">setGraphCenter</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setGraph(istream_&amp_str)$">setGraph</a>(istream &amp str);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_initGraph(string_&amp_rootId,_int_rootPriority,_string_&amp_rootGroup)$">initGraph</a>(string &amp rootId, int rootPriority, string &amp rootGroup);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDisableGroup(int_groupkey,_const_string_&amp_group,_bool_on)$">setDisableGroup</a>(int groupkey, const string &amp group, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGroupKey(int_i)$">setGroupKey</a>(int i);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setSelected(const_string_&amp_id,_bool_on)$">setSelected</a>(const string &amp id, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setSelectedSubtree(const_string_&amp_id,_bool_on)$">setSelectedSubtree</a>(const string &amp id, bool on);</td></tr>
+<tr><td align=right valign=top>bool </td><td><a href="././HypView.html#bool_XpmSnapshot(const_string_&amp_fileName)$">XpmSnapshot</a>(const string &amp fileName);</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypGraph </strong></td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_addLink(const_string_&amp_fromid,_const_string_&amp_toid)$">addLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_addNode(const_string_&amp_parent,_const_string_&amp_child)$">addNode</a>(const string &amp parent, const string &amp child);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getChildCount(const_string_&amp_id)$">getChildCount</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getDrawLink(const_string_&amp_fromid,_const_string_&amp_toid)$">getDrawLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getDrawNode(const_string_&amp_id)$">getDrawNode</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getIncomingCount(const_string_&amp_id)$">getIncomingCount</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getOutgoingCount(const_string_&amp_id)$">getOutgoingCount</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_resetColorLink(const_string_&amp_fromid,_const_string_&amp_toid)$">resetColorLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLinkPolicy(int_s)$">setLinkPolicy</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>(int i, const string &amp group, float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setColorLink(const_string_&amp_fromid,_const_string_&amp_toid,_float_r,_float_g,_float_b)$">setColorLink</a>(const string &amp fromid, const string &amp toid, float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawBackFrom(const_string_&amp_id,_bool_on,_int_descend)$">setDrawBackFrom</a>(const string &amp id, bool on, int descend);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawBackTo(const_string_&amp_id,_bool_on,_int_descend)$">setDrawBackTo</a>(const string &amp id, bool on, int descend);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawLink(const_string_&amp_fromid,_const_string_&amp_toid,_bool_on)$">setDrawLink</a>(const string &amp fromid, const string &amp toid, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setDrawLinks(bool_on)$">setDrawLinks</a>(bool on);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawNode(const_string_&amp_id,_bool_on)$">setDrawNode</a>(const string &amp id, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setDrawNodes(bool_on)$">setDrawNodes</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setNegativeHide(bool_on)$">setNegativeHide</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setNodeGroup(const_string_&amp_id,_int_groupkey,_const_string_&amp_group)$">setNodeGroup</a>(const string &amp id, int groupkey, const string &amp group);</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypViewer </strong></td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_bindCallback(int_b,_int_c)$">bindCallback</a>(int b, int c);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_drawFrame()$">drawFrame</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_idle(bool_on)$">idle</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_idle()$">idle</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_idleCB()$">idleCB</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_motion(int_x,_int_y,_int_shift,_int_control)$">motion</a>(int x, int y, int shift, int control);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_mouse(int_b,_int_s,_int_x,_int_y,_int_shift,_int_control)$">mouse</a>(int b, int s, int x, int y, int shift, int control);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_passive(int_x,_int_y,_int_shift,_int_control)$">passive</a>(int x, int y, int shift, int control);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_redraw()$">redraw</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_reshape(int_w,_int_h)$">reshape</a>(int w, int h);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setHiliteCallback(void_(*fp)(const_string_&amp,int,int))$">setHiliteCallback</a>(void (*fp)(const string &amp,int,int));</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLabelToRight(bool_on)$">setLabelToRight</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setPickCallback(void_(*fp)(const_string_&amp,int,int))$">setPickCallback</a>(void (*fp)(const string &amp,int,int));</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypData </strong></td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_addSpanPolicy(int_s)$">addSpanPolicy</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_clearSpanPolicy()$">clearSpanPolicy</a>();</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypData get</strong></td></tr>
+<tr><td align=right valign=top>struct timeval </td><td><a href="././HypView.html#struct_timeval_getDynamicFrameTime()$">getDynamicFrameTime</a>();</td></tr>
+<tr><td align=right valign=top>struct timeval </td><td><a href="././HypView.html#struct_timeval_getIdleFrameTime()$">getIdleFrameTime</a>();</td></tr>
+<tr><td align=right valign=top>struct timeval </td><td><a href="././HypView.html#struct_timeval_getPickFrameTime()$">getPickFrameTime</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getAreaFudge()$">getAreaFudge</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getCenterShow()$">getCenterShow</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getCenterLargest()$">getCenterLargest</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getEdgeSize()$">getEdgeSize</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getGenerationNodeLimit()$">getGenerationNodeLimit</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getGenerationLinkLimit()$">getGenerationLinkLimit</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getGotoStepSize()$">getGotoStepSize</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getLabels()$">getLabels</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getLabelSize()$">getLabelSize</a>();</td></tr>
+<tr><td align=right valign=top>char* </td><td><a href="././HypView.html#char*_getLabelFont()$">getLabelFont</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getLeafRad()$">getLeafRad</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getLengthFudge()$">getLengthFudge</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getMaxLength()$">getMaxLength</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getMotionCull()$">getMotionCull</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getNegativeHide()$">getNegativeHide</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getPassiveCull()$">getPassiveCull</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getSphere()$">getSphere</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getSpanPolicy()$">getSpanPolicy</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getTossEvents()$">getTossEvents</a>();</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypData set</strong></td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setCenterLargest(bool_on)$">setCenterLargest</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setCenterShow(bool_on)$">setCenterShow</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setEdgeSize(float_s)$">setEdgeSize</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGenerationNodeLimit(int_s)$">setGenerationNodeLimit</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGenerationLinkLimit(int_s)$">setGenerationLinkLimit</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGotoStepSize(float_s)$">setGotoStepSize</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setKeepAspect(bool_on)$">setKeepAspect</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLabels(int_on)$">setLabels</a>(int on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLabelSize(float_s)$">setLabelSize</a>(float s);</td></tr>
+<tr><td align=right valign=top>ifdef WIN32 void </td><td><a href="././HypView.html#ifdef_WIN32_void_setLabelFont(const_string_&amp_s,_int_sz)$">setLabelFont</a>(const string &amp s, int sz);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLeafRad(float_s)$">setLeafRad</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setMaxLength(float_s)$">setMaxLength</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setMotionCull(int_s)$">setMotionCull</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setPassiveCull(int_s)$">setPassiveCull</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setSphere(bool_on)$">setSphere</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setTossEvents(bool_on)$">setTossEvents</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setDynamicFrameTime(struct_timeval_time)$">setDynamicFrameTime</a>(struct timeval time);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setIdleFrameTime(struct_timeval_time)$">setIdleFrameTime</a>(struct timeval time);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setPickFrameTime(struct_timeval_time)$">setPickFrameTime</a>(struct timeval time);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorBackground(float_r,_float_g,_float_b)$">setColorBackground</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorHilite(float_r,_float_g,_float_b)$">setColorHilite</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorLabel(float_r,_float_g,_float_b)$">setColorLabel</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorLinkFrom(float_r,_float_g,_float_b)$">setColorLinkFrom</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorLinkTo(float_r,_float_g,_float_b)$">setColorLinkTo</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorSelect(float_r,_float_g,_float_b)$">setColorSelect</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorSphere(float_r,_float_g,_float_b)$">setColorSphere</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>HypGraph *</td><td><a href="././HypView.html#HypGraph_*getHypGraph()_$">getHypGraph</a>() ;</td></tr>
+<tr><td align=left><font size=+1><i><b>protected:</b></i></font>
+</td></tr>
+</table>
+}; // HypView <p>
+<a name="OVERVIEW"><hr><p></p></a><h4>OVERVIEW</h4>
+<p>
+ This class is the main interface between the entire library and the
+ application programmer. No get methods are documented - see the
+ corresponding set method.
+<p>
+<p>
+<p>
+<p>
+<a name="LAYOUT"><hr><p></p></a><h4>LAYOUT</h4>
+<p>
+ The HypView layout algorithm finds a spanning tree from an input
+ graph and then computes a layout of that tree. A spanning tree
+ touches every node in a graph, but only a subset of the links. In a
+ graph a node can have many parents, but in a tree a canonical parent
+ is chosen for each child. Links which appear in the graph but not in
+ the spanning tree are called "non-tree links". These links do not
+ affect the layout computation and are only drawn on demand for a
+ selected node or nodes.
+<p>
+ The backbone spanning tree used by the layout and drawing algorithms
+ strongly influences the visual impact on the user. The approach
+ hinges on the idea that there are many graphs for which the right
+ spanning tree can provide a useful mental model of the entire
+ structure. As a fallback, a default spanning tree can always be found
+ using breadth-first search from a root node. However, exploiting a
+ small amount of domain-specific knowledge can allow the library to
+ construct a better spanning tree which provides a more useful mental
+ model. For instance, for a Web site one can use the directory
+ structure encoded in the URL to choose which of the incoming
+ hyperlinks to a site should be chosen as the main parent in the
+ spanning tree. The specific spanning tree policies used by the
+ library are controllable with the <a href="#void_clearSpanPolicy()$">clearSpanPolicy</a>() and
+ <a href="#void_addSpanPolicy(int_s)$">addSpanPolicy</a>() methods. 
+<p>
+<p>
+<a name="DRAWING"><hr><p></p></a><h4>DRAWING</h4>
+<p>
+ The HypView class has a multi layer scheme which preserves window
+ system independence while providing flexibility for the application
+ programmer. First, the <a href="#void_mouse(int_b,_int_s,_int_x,_int_y,_int_shift,_int_control)$">mouse</a>(), <a href="#void_motion(int_x,_int_y,_int_shift,_int_control)$">motion</a>(), and <a href="#void_passive(int_x,_int_y,_int_shift,_int_control)$">passive</a>() methods are a way
+ for a window system layer to pass event loop information about the
+ mouse into the HypView class. Second, the <a href="#void_bindCallback(int_b,_int_c)$">bindCallback</a>() allows the
+ application programmer to bind the main interaction functions to the
+ desired mouse behavior. The <a href="#void_setPickCallback(void_(*fp)(const_string_&amp,int,int))$">setPickCallback</a>() and
+ <a href="#void_setHiliteCallback(void_(*fp)(const_string_&amp,int,int))$">setHiliteCallback</a>() functions can be used to return control to
+ application program callbacks when the user moves the mouse over nodes
+ and links. Finally, methods like <a href="#void_setSelected(const_string_&amp_id,_bool_on)$">setSelected</a>() and <a href="#int_gotoNode(const_string_&amp_id,_int_animate)$">gotoNode</a>() can be
+ used inside the pick or highlight callbacks in the application
+ program. 
+<p>
+ The HypView drawing algorithm depends on the number of visible, not total,
+ number of nodes and edges. The projection from hyperbolic to
+ euclidean space guarantees that nodes sufficiently far from the
+ center will project to less than a single pixel. Thus the visual
+ complexity of the scene has a guaranteed bound - only a local
+ neighborhood of nodes in the graph will be visible at any given time.
+<p>
+ A guaranteed frame rate is extremely important for a fluid
+ interactive user experience. The HypView adaptive drawing algorithm
+ is designed to always maintain a target frame rate even on low-end
+ graphics systems. A high constant frame rate is maintained by drawing
+ only as much of the neighborhood around a center point as is possible
+ in the allotted time. When the user is idle, the system fills in more
+ of the surrounding scene. A slow graphics system will simply show
+ less of the context surrounding the node of interest during
+ interactive manipulation.
+<p>
+ The amount of time devoted to a frame should depend on the activity
+ of the user. The HypView library allows separate control over the
+ drawing frame time, idle frame time, and picking frame time using the
+ <a href="#void_setDynamicFrameTime(struct_timeval_time)$">setDynamicFrameTime</a>(), <a href="#void_setIdleFrameTime(struct_timeval_time)$">setIdleFrameTime</a>(), and <a href="#void_setPickFrameTime(struct_timeval_time)$">setPickFrameTime</a>()
+ methods. The dynamic frame time is simply the time budget in which to
+ draw a single frame during user mouse movement or an animated
+ transition. It is clear that the drawing time should be explicitly
+ bounded instead of increasing as the node/edge count rises. The time
+ spent casting pick rays into the scene must be similarly bounded.
+ When the user and application are idle, the system can fill in more
+ of the surrounding scene. However, the time spent on this, the idle
+ frame time, should still be bounded to eventually free the CPU for
+ other tasks.
+<p>
+<p>
+<a name="INITIALIZATION"><hr><p></p></a><h4>INITIALIZATION</h4>
+<p>
+ Most functions have no effect or return NULL if called after a
+ HypView object is instantiated but before the setGraph member is
+ called. However, the following functions can be successfully called
+ even before the first <a href="#int_setGraph(istream_&amp_str)$">setGraph</a>() call:
+<p>
+<a href="#void_addSpanPolicy(int_s)$">addSpanPolicy</a>(), 
+<a href="#void_bindCallback(int_b,_int_c)$">bindCallback</a>(), 
+<a href="#void_clearSpanPolicy()$">clearSpanPolicy</a>(), 
+<a href="#struct_timeval_getDynamicFrameTime()$">getDynamicFrameTime</a>(),
+<a href="#struct_timeval_getIdleFrameTime()$">getIdleFrameTime</a>(),
+<a href="#struct_timeval_getPickFrameTime()$">getPickFrameTime</a>(),
+<a href="#int_getSphere()$">getSphere</a>(),
+<a href="#float_getEdgeSize()$">getEdgeSize</a>(),
+<a href="#int_getLabels()$">getLabels</a>(),
+<a href="#float_getLabelSize()$">getLabelSize</a>(),
+<a href="#char*_getLabelFont()$">getLabelFont</a>(),
+<a href="#int_getPassiveCull()$">getPassiveCull</a>(),
+<a href="#int_getMotionCull()$">getMotionCull</a>(),
+<a href="#float_getAreaFudge()$">getAreaFudge</a>(),
+<a href="#float_getLengthFudge()$">getLengthFudge</a>(),
+<a href="#float_getLeafRad()$">getLeafRad</a>(),
+<a href="#float_getMaxLength()$">getMaxLength</a>(),
+<a href="#int_getGenerationNodeLimit()$">getGenerationNodeLimit</a>(),
+<a href="#int_getGenerationLinkLimit()$">getGenerationLinkLimit</a>(),
+<a href="#int_getCenterShow()$">getCenterShow</a>(),
+<a href="#int_getCenterLargest()$">getCenterLargest</a>(),
+<a href="#int_getNegativeHide()$">getNegativeHide</a>(),
+<a href="#int_getSpanPolicy()$">getSpanPolicy</a>(),
+<a href="#float_getGotoStepSize()$">getGotoStepSize</a>(),
+<a href="#int_getTossEvents()$">getTossEvents</a>(),
+<a href="#HDC_getWidget()$">getWidget</a>(),
+<a href="#void_setCenterLargest(bool_on)$">setCenterLargest</a>(), 
+<a href="#void_setCenterShow(bool_on)$">setCenterShow</a>(), 
+<a href="#void_setColorHilite(float_r,_float_g,_float_b)$">setColorHilite</a>(), 
+<a href="#void_setColorSelect(float_r,_float_g,_float_b)$">setColorSelect</a>(), 
+<a href="#void_setColorLabel(float_r,_float_g,_float_b)$">setColorLabel</a>(),
+<a href="#void_setColorLinkFrom(float_r,_float_g,_float_b)$">setColorLinkFrom</a>(), 
+<a href="#void_setColorLinkTo(float_r,_float_g,_float_b)$">setColorLinkTo</a>().
+<a href="#void_setEdgeSize(float_s)$">setEdgeSize</a>(),
+<a href="#void_setGenerationNodeLimit(int_s)$">setGenerationNodeLimit</a>(), 
+<a href="#void_setGenerationLinkLimit(int_s)$">setGenerationLinkLimit</a>(), 
+<a href="#void_setGotoStepSize(float_s)$">setGotoStepSize</a>(),
+<a href="#void_setGroupKey(int_i)$">setGroupKey</a>(),
+<a href="#void_setHiliteCallback(void_(*fp)(const_string_&amp,int,int))$">setHiliteCallback</a>(),
+<a href="#void_setKeepAspect(bool_on)$">setKeepAspect</a>(), 
+<a href="#void_setLabels(int_on)$">setLabels</a>(), 
+<a href="#void_setLabelSize(float_s)$">setLabelSize</a>(), 
+<a href="#void_setLabelToRight(bool_on)$">setLabelToRight</a>(), 
+<a href="#void_setLeafRad(float_s)$">setLeafRad</a>(),
+<a href="#void_setLinkPolicy(int_s)$">setLinkPolicy</a>(),
+<a href="#void_setMaxLength(float_s)$">setMaxLength</a>(), 
+<a href="#void_setNegativeHide(bool_on)$">setNegativeHide</a>(), 
+<a href="#void_setMotionCull(int_s)$">setMotionCull</a>(), 
+<a href="#void_setPassiveCull(int_s)$">setPassiveCull</a>(), 
+<a href="#void_setPickCallback(void_(*fp)(const_string_&amp,int,int))$">setPickCallback</a>(), 
+<a href="#void_setSphere(bool_on)$">setSphere</a>(),
+<a href="#void_setTossEvents(bool_on)$">setTossEvents</a>(), 
+<a href="#void_setDynamicFrameTime(struct_timeval_time)$">setDynamicFrameTime</a>(), 
+<a href="#void_setIdleFrameTime(struct_timeval_time)$">setIdleFrameTime</a>(),
+setPassiveFrameTime(), 
+<p>
+ The following functions cannot be called until after the window is shown,
+ since they depend on having a graphics context:
+<a href="#void_drawFrame()$">drawFrame</a>(), 
+<a href="#void_redraw()$">redraw</a>(), 
+<a href="#void_reshape(int_w,_int_h)$">reshape</a>(),
+<p>
+<p>
+<p>
+<a name="INPUT_FILE_FORMAT"><hr><p></p></a><h4>INPUT FILE FORMAT</h4>
+<p>
+ Each line of the input file is of the form
+<p>
+<pre>
+  depth identifier 1 group1 [group2 ... groupN]
+</pre>
+<p>
+with the following types
+<p>
+<pre>
+  int string int string [string ... string]
+</pre>
+<p>
+ Each line corresponds to a node. The order of the lines is
+ meaningful. The integer at the beginning of the line is the depth in
+ the tree. A line with depth one greater than the line above it
+ indicates a link between two nodes from the line above to the line
+ below. The identifier strings are assumed to uniquely specify a node.
+ If an identifier occurs twice that means a node has more than one
+ incoming link, so the file describes a general graph, as opposed to a
+ tree or a directed acyclic graph (DAG). The identifier string is used
+ as an interface between the library and the application program in
+ many methods which have the argument "string & id".
+<p>
+ A file with structure like
+<p>
+<pre>
+
+0       A   [...]
+1       B   [...]
+2       C   [...]
+3       D   [...]
+4       A   [...]
+3       E   [...]
+2       F   [...]
+1       G   [...]
+1       H   [...]
+2       I   [...]
+2       J   [...]
+1       K   [...]
+
+</pre>
+<p>
+corresponds to a graph that looks like:
+<p>
+<pre>
+
+  .-------- A
+ /      ____|_______
+ |     /   |   \    |
+ |    B    G    H   K
+ |   / \       / \
+ |  C   F     I   J
+ \ / \
+  D   E
+
+</pre>
+<p>
+ The very first node is the root, the numbers correspond to the number
+ of layers deep in the hierarchy.
+<p>
+ The software computes a spanning tree to use as the base for layout
+ and display. The <a href="#void_addSpanPolicy(int_s)$">addSpanPolicy</a>() method controls the policies used to
+ create this spanning tree. If the HV_SPANFOREST policy is used, then
+ you can have a forest of distinct subtrees that are not mingled. The
+ other policies, like HV_SPANBFS for breadth-first search, are then
+ applied to each subtree independently. A forest is specified by
+ having a toplevel starting root which has depth < 0. For instance,
+<p>
+<pre>
+-1 top 1 html
+ 0 subtree1/root 1 html
+  1 subtree1/thing1 1 html
+  1 subtree1/thing2 1 html
+[...]
+ 0 subtree2/root 1 html
+  1 subtree2/thing1 1 html
+  1 subtree2/thing2 1 html
+</pre>
+<p>
+ Groups and collections are an organizational mechanism for filtering
+ and coloring nodes. A node can belong to exactly one group per
+ collection. In the input file, the collections correspond to columns
+ and groups correspond to the values which are in the columns. A node
+ can also be associated with a group in a collection with the
+ <a href="#void_setNodeGroup(const_string_&amp_id,_int_groupkey,_const_string_&amp_group)$">setNodeGroup</a>() method. Collections are designated by a number,
+ starting with 0. There must be at least one collection, and there can
+ be up to 16 different ones. Each collection can have any number of
+ groups. Group names are designated by text strings and can be used in
+ different collections. Any group in a collection can be disabled.
+ A node will be drawn if none of its associated groups have been disabled. 
+ Groups are enabled by default and may be explicitly  disabled/reenabled 
+ by the application program using the <a href="#int_setDisableGroup(int_groupkey,_const_string_&amp_group,_bool_on)$">setDisableGroup</a>() method.
+ Each group in each collection can have a color assigned to it with
+ the <a href="#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>() method. The <a href="#void_setGroupKey(int_i)$">setGroupKey</a>() method allows the
+ application program to change which of the collections is used for
+ coloring. 
+<p>
+ For example, the file
+<p>
+<pre>
+
+ 0 http://hyper/ 1 html main
+ 1 http://hyper/index.html html main
+ 1 http://hyper/logo.gif image main
+ 1 http://hyper/old.html html orphan
+
+</pre>
+<p>
+ with the following code in the application 
+<p>
+<pre>
+
+  hv-><a href="#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>(0, "image", .42, 0, .48);
+  hv-><a href="#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>(0, "html", 0, 1, 1);
+  hv-><a href="#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>(1, "main", 1, 1, 1);
+  hv-><a href="#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>(1, "orphan", .2, .2, .2);
+
+  hv->setDisbleGroup(1, "orphan", 0);
+  hv-><a href="#void_setGroupKey(int_i)$">setGroupKey</a>(0);
+
+</pre>
+<p>
+ would result in three visible nodes, colored by collection 0: the
+ logo.gif node would be colored purple and the index.html and
+ top-level hyper nodes would be colored cyan. The old.html node would
+ not be drawn since the orphan group is disabled.
+<p>
+<p>
+ Finally, the third item in the input file line must be an integer,
+ which should be set 1 (for historical reasons).
+<p>
+<p>
+<a name="DEPENDENCIES"><hr><p></p></a><h4>DEPENDENCIES</h4>
+<p>
+ The HypView libraries are written in C++ and use OpenGL/Mesa and STL.
+ There is a small amount of OS/window system dependent code which is
+ segregated by "ifdef"s. The three main flavors are Unix XWindows and
+ Microsoft Windows, and GLUT. The XWindows version is tagged as "GLX"
+ in the Makefiles and has two flavors: Xt and ViewKit. Xt is probably
+ the most useful version. ViewKit is a library built on top of Xt (so
+ the code is quite similar) which is most popular under Irix, but has
+ been ported to other platforms. The libraries were originally written
+ under ViewKit, so there are a lot of historical "vk" tags still lying
+ around despite the fact that Xt is now the main version.
+<p>
+ GLUT is a window-system independent library from Mark Kilgard
+ (formerly of SGI), downloadable from
+ http://reality.sgi.com/opengl/glut3/glut3.html. It should
+ theoretically be able to run under Windows but has only been tested
+ under Irix. The GLUT version is simpler than the Xt one but not as
+ powerful, which unsurprisingly mirrors the relationship of GLUT and
+ Xt/ViewKit.
+<p>
+ The Windows version has been tested on Windows NT under Visual C++.
+ The Borland version has not been tested for a while. 
+<p>
+<a name="MAKEFILES"><hr><p></p></a><h4>MAKEFILES</h4>
+<p>
+ Select the appropriate flavor of OS and window system by uncommenting
+ the relevant line in Makefile.main, then edit the relevant Makefile
+ for your system to make sure all paths are set correctly for your system. 
+<p>
+<a name="AUTHOR"><hr><p></p></a><h4>AUTHOR</h4>
+<p>
+<pre>
+ Tamara Munzner
+ http://graphics.stanford.edu
+ munzner@cs.stanford.edu
+</pre>
+<p>
+<a name="HDC_getWidget()$"><hr><p></p><h4>HDC getWidget();</h4></a>
+    Return the drawing area widget passed in at initialization time.
+<a name="HypView(Widget_w)$"><hr><p></p><h4>HypView(Widget w);</h4></a>
+    GLX version. Creation function for HypView class.
+<a name="void_afterRealize(GLXContext_cx)$"><hr><p></p><h4>void afterRealize(GLXContext cx);</h4></a>
+    GLX version. This function should be called immediately after
+     opening the window and must precede all drawing. It can be called
+     before or after setGraph. We pass in the GL context,
+     which cannot be created until after a window is opened.
+     See the INITIALIZATION section for details on which functions
+     cannot be called before <a href="#void_afterRealize()$">afterRealize</a>(). 
+<a name="Widget_getWidget()$"><hr><p></p><h4>Widget getWidget();</h4></a>
+    GLX version only. Return the drawing area widget passed in at
+     initialization time.  
+<a name="HypView()$"><hr><p></p><h4>HypView();</h4></a>
+    GLUT version. Creation function for HypView class. 
+<a name="void_afterRealize()$"><hr><p></p><h4>void afterRealize();</h4></a>
+    GLUT version. This function should be called immediately after
+     opening the window and must precede all drawing. It can be called
+     before or after setGraph.
+<a name="~HypView()$"><hr><p></p><h4>~HypView();</h4></a>
+    Destructor for HypView class.
+<a name="char**_enumerateSubtree(char *id)$"><hr><p></p><h4>char** enumerateSubtree(char *id);</h4></a>
+    Output: array of node identifier strings, last one set to NULL.
+     Returns every node in the subtree beneath the input node. This
+     could be a large amount of data: in the limit, if the root node is
+     given, it will return every node in the graph.
+<a name="int_flashLink(const_string_&amp_fromid,_const_string_&amp_toid)$"><hr><p></p><h4>int flashLink(const string &amp fromid, const string &amp toid);</h4></a>
+    Briefly flash the link between two nodes.
+<a name="string_getCenter()$"><hr><p></p><h4>string getCenter();</h4></a>
+    Return identifier of node which is currently nearest the center.
+     Do not cache this identifier for later use, since it can change
+     on every redraw.
+<a name="int_gotoNode(const_string_&amp_id,_int_animate)$"><hr><p></p><h4>int gotoNode(const string &amp id, int animate);</h4></a>
+    Move indicated node to the center. The motion includes both a
+     translational and a rotational component, so that the node is in a
+     canonical position with all its ancestors to the left and all its
+     descendants to the right.
+     If animate is HV_ANIMATE, use an animated transition. If animate
+     is HV_JUMP, just jump.  
+<a name="void_gotoCenterNode(int_animate)$"><hr><p></p><h4>void gotoCenterNode(int animate);</h4></a>
+    Reset by moving root node to center. Use root node given by the
+     last <a href="#void_setGraphCenter(const_string_&amp_id)$">setGraphCenter</a>() call, or the top node of the current tree if
+     no <a href="#void_setGraphCenter(const_string_&amp_id)$">setGraphCenter</a>() call was made.
+     If animate is HV_ANIMATE, use an animated transition. If animate
+     is HV_JUMP, just jump.  
+<a name="int_gotoPickPoint(int_animate)$"><hr><p></p><h4>int gotoPickPoint(int animate);</h4></a>
+    Move structure so that the exact point where the user last
+     clicked is at the center. The motion will include only
+     translational components, as opposed to the other goto* commands
+     which include a rotational component.
+     If animate is HV_ANIMATE, use an animated transition. If animate
+     is HV_JUMP, just jump.  
+<a name="void_newLayout(const_string_&amp_id)$"><hr><p></p><h4>void newLayout(const string &amp id);</h4></a>
+    Explicitly trigger new graph layout in viewer. Mainly intended
+     for debugging, since this always happens as a side effect from
+     other calls: always for setEnableGraph(), sometime from <a href="#int_gotoNode(const_string_&amp_id,_int_animate)$">gotoNode</a>() and
+     <a href="#void_gotoCenterNode(int_animate)$">gotoCenterNode</a>().
+<a name="int_saveGraph(const_string_&amp_fname)$"><hr><p></p><h4>int saveGraph(const string &amp fname);</h4></a>
+    Save graph structure into file "fname", in format that can later
+     be read by <a href="#int_setGraph(istream_&amp_str)$">setGraph</a>() call.
+     File format details given elsewhere. 
+<a name="void_setCurrentCenter(const_string_&amp_id)$"><hr><p></p><h4>void setCurrentCenter(const string &amp id);</h4></a>
+    Set the current center node for the drawing algorithm to be the
+     given node identifier. Not recommended for casual use: requires
+     understanding of library internals.
+<a name="void_setGraphCenter(const_string_&amp_id)$"><hr><p></p><h4>void setGraphCenter(const string &amp id);</h4></a>
+    Set the root node for the tree, for use by subsequent calls to
+     the <a href="#void_gotoCenterNode(int_animate)$">gotoCenterNode</a>() reset function.
+<a name="int_setGraph(istream_&amp_str)$"><hr><p></p><h4>int setGraph(istream &amp str);</h4></a>
+    Load a graph into the viewer. The string can either be a
+     filename or the actual data: if the string length is < 256
+     characters and a file by that name exists, assume it is a filename.
+     Input file format details given elsewhere.
+<p>
+     NOTE: we now take an istream reference.  Hence we can accept an
+     ifstream (for data from disk) or an istrstream (for data from
+     memory).     - dwm@caida.org
+<a name="int_initGraph(string_&amp_rootId,_int_rootPriority,_string_&amp_rootGroup)$"><hr><p></p><h4>int initGraph(string &amp rootId, int rootPriority, string &amp rootGroup);</h4></a>
+    Initializes a graph for the viewer.  This does _not_ complete
+      initialization; you still have to call <a href="#int_addNode(const_string_&amp_parent,_const_string_&amp_child)$">addNode</a>() to add nodes,
+      then walk the HypLinkArray in the graph and set parents for
+      each link, then call doLayout() on the HypGraph.
+      This was added by dwm@caida.org to permit loading directly
+      from skitter data files.
+<a name="int_setDisableGroup(int_groupkey,_const_string_&amp_group,_bool_on)$"><hr><p></p><h4>int setDisableGroup(int groupkey, const string &amp group, bool on);</h4></a>
+    Disable or enable a group in a collection. The group name is
+     "group", the collection number is "groupkey". The node will not be
+     drawn if its associated group in any collection is disabled. 
+<a name="void_setGroupKey(int_i)$"><hr><p></p><h4>void setGroupKey(int i);</h4></a>
+    Set the collection to be used for coloring nodes. 
+<a name="void_setSelected(const_string_&amp_id,_bool_on)$"><hr><p></p><h4>void setSelected(const string &amp id, bool on);</h4></a>
+    Use the selected color for this node if on=1, or revert to
+     normal color if on=0.
+<a name="void_setSelectedSubtree(const_string_&amp_id,_bool_on)$"><hr><p></p><h4>void setSelectedSubtree(const string &amp id, bool on);</h4></a>
+    Use the selected color for this node and all nodes in the
+     subtree beneath it in if on=1, or revert them all to normal color
+     if on=0. 
+<a name="bool_XpmSnapshot(const_string_&amp_fileName)$"><hr><p></p><h4>bool XpmSnapshot(const string &amp fileName);</h4></a>
+    Takes a snapshot in XPM format and stores it in the file named
+      by fileName.  Returns true on success, else returns false.
+<a name="int_addLink(const_string_&amp_fromid,_const_string_&amp_toid)$"><hr><p></p><h4>int addLink(const string &amp fromid, const string &amp toid);</h4></a>
+    Add a new link from one node to another. Returns 0 for failure
+     unless both nodes already exist. Returns 1 for success.
+<a name="int_addNode(const_string_&amp_parent,_const_string_&amp_child)$"><hr><p></p><h4>int addNode(const string &amp parent, const string &amp child);</h4></a>
+    Add a new child node. Returns 0 for failure if parent does not
+     exist. Returns 1 for success. A link from the parent to the child
+     is created automatically.
+<a name="int_getChildCount(const_string_&amp_id)$"><hr><p></p><h4>int getChildCount(const string &amp id);</h4></a>
+    Return number of direct children of the node. 
+<a name="int_getDrawLink(const_string_&amp_fromid,_const_string_&amp_toid)$"><hr><p></p><h4>int getDrawLink(const string &amp fromid, const string &amp toid);</h4></a>
+    Return 1 if link is enabled for drawing, 0 if not. 
+<a name="int_getDrawNode(const_string_&amp_id)$"><hr><p></p><h4>int getDrawNode(const string &amp id);</h4></a>
+    Return 1 if node is enabled for drawing, 0 if not. 
+<a name="int_getIncomingCount(const_string_&amp_id)$"><hr><p></p><h4>int getIncomingCount(const string &amp id);</h4></a>
+    Return the number of enabled non-tree incoming links for the
+     node. The count does not include the direct parent.
+<a name="int_getOutgoingCount(const_string_&amp_id)$"><hr><p></p><h4>int getOutgoingCount(const string &amp id);</h4></a>
+    Return the number of enabled non-tree incoming links for the
+     node. The count does not include the direct children.
+<a name="int_resetColorLink(const_string_&amp_fromid,_const_string_&amp_toid)$"><hr><p></p><h4>int resetColorLink(const string &amp fromid, const string &amp toid);</h4></a>
+    Reset the color of the link to the global defaults, which can be
+     set using <a href="#void_setColorLinkTo(float_r,_float_g,_float_b)$">setColorLinkTo</a>() and <a href="#void_setColorLinkFrom(float_r,_float_g,_float_b)$">setColorLinkFrom</a>(). Useful after using
+     setColorLink.
+<a name="void_setLinkPolicy(int_s)$"><hr><p></p><h4>void setLinkPolicy(int s);</h4></a>
+    Change policy used to select link colors. The HV_LINKLOCAL
+     setting uses the colors explicitly set in the link datastructure. 
+     The HV_LINKCENTRAL setting uses the most recently set global link
+     color (as set by setColorLinkTo and setColorLinkFrom). The
+     HV_LINKINHERIT setting makes the link be the color of its
+     parent's node.
+<p>
+     Default: HV_LINKLOCAL
+<a name="void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorGroup(int i, const string &amp group, float r, float g, float b);</h4></a>
+    Set the color of the group associated with collection i to an
+     RGB value. 
+<a name="int_setColorLink(const_string_&amp_fromid,_const_string_&amp_toid,_float_r,_float_g,_float_b)$"><hr><p></p><h4>int setColorLink(const string &amp fromid, const string &amp toid, float r, float g, float b);</h4></a>
+    Set the color of the link between two nodes to an RGB value. 
+<a name="int_setDrawBackFrom(const_string_&amp_id,_bool_on,_int_descend)$"><hr><p></p><h4>int setDrawBackFrom(const string &amp id, bool on, int descend);</h4></a>
+    Turn on or off the outgoing non-tree links for a node. Does not
+     apply to direct children. The descend flag controls whether the
+     command applies to only the node itself or the entire subtree
+     beneath it. If special value "HV_TOPNODE" can be passed in
+     instead of an identifier the command is applied to the root node
+     of the entire tree. Returns 0 if node does not exist, 1 for
+     success on existing enabled or disabled node.
+<a name="int_setDrawBackTo(const_string_&amp_id,_bool_on,_int_descend)$"><hr><p></p><h4>int setDrawBackTo(const string &amp id, bool on, int descend);</h4></a>
+    Turn on or off the incoming non-tree links for a node. Does not
+     apply to the direct parent. The descend flag controls whether the
+     command applies to the node itself or the entire subtree beneath
+     it. If special value "HV_TOPNODE" is passed in instead of an
+     identifier the command is applied to the root node of the entire
+     tree. Returns 0 if node does not exist, 1 for success on existing
+     enabled or disabled node.
+<a name="int_setDrawLink(const_string_&amp_fromid,_const_string_&amp_toid,_bool_on)$"><hr><p></p><h4>int setDrawLink(const string &amp fromid, const string &amp toid, bool on);</h4></a>
+    Enable or disable drawing the link between two nodes.
+<a name="void_setDrawLinks(bool_on)$"><hr><p></p><h4>void setDrawLinks(bool on);</h4></a>
+    Enable or disable drawing all links in the entire graph. 
+<p>
+     Default: 1
+<a name="int_setDrawNode(const_string_&amp_id,_bool_on)$"><hr><p></p><h4>int setDrawNode(const string &amp id, bool on);</h4></a>
+    Enable or disable drawing a particular node.
+<a name="void_setDrawNodes(bool_on)$"><hr><p></p><h4>void setDrawNodes(bool on);</h4></a>
+    Enable or disable drawing all nodes in the entire graph. 
+<p>
+     Default: 1
+<a name="void_setNegativeHide(bool_on)$"><hr><p></p><h4>void setNegativeHide(bool on);</h4></a>
+    Disable drawing parent-child links between nodes which have a
+     negative level number in the input graph when on = 1. This
+     command will have no visible effect if the root node of the graph
+     is at or above level 0. For example, if the root node is at level
+     -1 and its descendants are at level 0, the visual effect of
+     <a href="#void_setNegativeHide(bool_on)$">setNegativeHide</a>() will be a forest of trees which are unconnected
+     at the highest level.
+<p>
+     Default: 0
+<a name="void_setNodeGroup(const_string_&amp_id,_int_groupkey,_const_string_&amp_group)$"><hr><p></p><h4>void setNodeGroup(const string &amp id, int groupkey, const string &amp group);</h4></a>
+    Set the group of a node in a collection. The group name is
+     "group", the collection number is "groupkey".
+<a name="void_bindCallback(int_b,_int_c)$"><hr><p></p><h4>void bindCallback(int b, int c);</h4></a>
+    Initialization routine for binding specific combinations of
+     mouse events to functions. 
+<p>
+     The choices for b (mouse events) are HV_LEFT_CLICK,
+     HV_MIDDLE_CLICK, HV_RIGHT_CLICK, HV_LEFT_DRAG, HV_MIDDLE_DRAG,
+     HV_RIGHT_DRAG, and HV_PASSIVE. Passive is the mode when no mouse
+     button is held down. The other modes are obvious from their
+     names. The choices for c (functions) are HV_PICK, HV_HILITE,
+     HV_TRANS, and HV_ROT.
+<p>
+     The translate and motion functions will move the structure in
+     accordance with the incremental mouse motion as reported by the
+     drag or passive events. 
+     The translate motion function will move the structure in 3D
+     hyperbolic space. The visual effect is to change the center of
+     focus. The rotate motion function will spin the structure around
+     the center of the ball in a familiar 3D euclidean transformation.
+<p>
+     The pick and highlight functions both act on the node in the 3D
+     scene directly underneath the mouse cursor in the 2D window. The
+     highlight function will change the color of the node when the
+     mouse is directly over it. If the <a href="#void_setHiliteCallback(void_(*fp)(const_string_&amp,int,int))$">setHiliteCallback</a>() method has
+     been used to assign a highlight callback function, control will
+     be then passed to the application program along with the name of
+     the node and the status of the shift and control keys. The pick
+     function does not trigger any direct action itself, but if the
+     <a href="#void_setPickCallback(void_(*fp)(const_string_&amp,int,int))$">setPickCallback</a>() function has been used to assign a pick callback
+     control will also be passed to the application along with the
+     node name and shift/control key status.
+<p>
+     Although the application programmer is free to bind the pick and
+     highlight functions to any mouse combination, a common use is
+     binding an explicit click to the pick to trigger selection and
+     using passive mouse motion for lightweight actions with the
+     highlight callback. 
+<a name="void_drawFrame()$"><hr><p></p><h4>void drawFrame();</h4></a>
+    Request a single refresh. Control is immediately returned to the
+     application program after a single frame is drawn. Not usually
+     recommended for application programmer use: requires
+     understanding of library internals. The redraw command is
+     usually more appropriate. 
+<a name="void_idle(bool_on)$"><hr><p></p><h4>void idle(bool on);</h4></a>
+    Set the idle flag which allows the library to continue drawing
+     as much as possible of the scene during the idle times when the
+     user is not moving the mouse and no animated transitions are
+     occurring. Not usually recommended for application programmer
+     use: requires understanding of library internals. The redraw
+     command is usually more appropriate. 
+<a name="void_idle()$"><hr><p></p><h4>void idle();</h4></a>
+    Trigger the actual idle callback in the drawing routines. 
+<p>
+     Mainly intended for debugging, definitely not recommended for
+     application programmer use.
+<a name="int_idleCB()$"><hr><p></p><h4>int idleCB();</h4></a>
+    Trigger the actual idle callback.
+<p>
+     Returns 1 if the idle mode should stay on, 0 if the idle processing
+     is done. Not usually recommended for application programmer
+     use: requires understanding of library internals. The redraw
+     command is usually more appropriate.
+<a name="void_motion(int_x,_int_y,_int_shift,_int_control)$"><hr><p></p><h4>void motion(int x, int y, int shift, int control);</h4></a>
+    Inform the library of the current (x,y) position of the mouse
+     continuously during a drag. 
+<p>
+     The (x,y) position should be given using the X window coordinate
+     system, where the origin is in the upper left corner of the
+     window. The booleans "shift" and "control" are set to 1 if the
+     respective keyboard keys are depressed, or 0 if they are not.
+<p>
+     Intended for use by a window system layer above this class as
+     opposed to the application programmer.
+<a name="void_mouse(int_b,_int_s,_int_x,_int_y,_int_shift,_int_control)$"><hr><p></p><h4>void mouse(int b, int s, int x, int y, int shift, int control);</h4></a>
+    Inform the library of the current (x,y) position of the mouse
+     during mousedown or mouseup: that is, a click. If the user moves
+     the mouse while the button is down the motion function will be
+     called in between the mousedown invocation of this function and
+     the mouseup invocation. 
+<p>
+     The button boolean "b" is set to 0, 1, or 2 to indicate which
+     button is depressed. The state boolean "s" is set to 0 when the
+     button is pressed down and 1 when the button is released.
+     The (x,y) position should be given using the X window coordinate
+     system, where the origin is in the upper left corner of the
+     window. The booleans "shift" and "control" are set to 1 if the
+     respective keyboard keys are depressed, or 0 if they are not.
+<p>
+     Intended for use by a window system layer above this class as
+     opposed to the application programmer.
+<a name="void_passive(int_x,_int_y,_int_shift,_int_control)$"><hr><p></p><h4>void passive(int x, int y, int shift, int control);</h4></a>
+    Inform the library of the current (x,y) position of the mouse
+     while no mouse buttons are being pressed. 
+<p>
+     The (x,y) position should be given using the X window coordinate
+     system, where the origin is in the upper left corner of the
+     window. The booleans "shift" and "control" are set to 1 if the
+     respective keyboard keys are depressed, or 0 if they are not.
+<p>
+     Intended for use by a window system layer above this class as
+     opposed to the application programmer.
+<a name="void_redraw()$"><hr><p></p><h4>void redraw();</h4></a>
+    Request a single refresh and set the idle flag. Control is
+     returned to the application program after a single frame is
+     drawn, but allow the library to continue drawing as much as
+     possible as soon as the user becomes idle. This command is the
+     preferred way to request a redraw and is in fact equivalent to
+     "<a href="#void_drawFrame()$">drawFrame</a>(); <a href="#void_idle()$">idle</a>(1);". 
+<a name="void_reshape(int_w,_int_h)$"><hr><p></p><h4>void reshape(int w, int h);</h4></a>
+    Inform the library that the drawing area has been resized to a
+     new width and height, specified in pixels. Intended for use by a
+     window system layer above this class as opposed to the
+     application programmer.
+<a name="void_setHiliteCallback(void_(*fp)(const_string_&amp,int,int))$"><hr><p></p><h4>void setHiliteCallback(void (*fp)(const string &amp,int,int));</h4></a>
+    Set the highlight callback to a function pointer. Function arguments
+     are the node identifier string and two boolean values indicating
+     whether the shift or control key was held down. See the
+     bindCallback documentation for more details. 
+<a name="void_setLabelToRight(bool_on)$"><hr><p></p><h4>void setLabelToRight(bool on);</h4></a>
+    If on = 1, draw text labels so that they begin at the center of
+     a node and stretch to its right. If on = 0, draw text labels so
+     that they begin to the left of a node and end at its center.
+<p>
+     Default: 0
+<a name="void_setPickCallback(void_(*fp)(const_string_&amp,int,int))$"><hr><p></p><h4>void setPickCallback(void (*fp)(const string &amp,int,int));</h4></a>
+    Set the pick callback to a function pointer. Function arguments
+     are the node identifier string and two boolean values indicating
+     whether the shift or control key was held down. See the
+     <a href="#void_bindCallback(int_b,_int_c)$">bindCallback</a>() documentation for more details. 
+<a name="void_addSpanPolicy(int_s)$"><hr><p></p><h4>void addSpanPolicy(int s);</h4></a>
+    Add a new spanning tree policy. Possible policies, in order of
+     priority: HV_SPANKEEP, change nothing (which means result will be
+     depth-first search tree). HV_SPANFOREST, treat the input graph as
+     a forest of subtrees separated by negative level numbers, and do
+     not move nodes between subtrees (see <a href="#void_setNegativeHide(bool_on)$">setNegativeHide</a>()).
+     HV_SPANHIER, use hierarchical identifiers to guide choice of main
+     parent. HV_SPANBFS, use breadth-first search to guide choice.
+     HV_SPANLEX, use lexicographic (alphabetical) ordering. Policies
+     must be added one by one. The order they are added is irrelevant,
+     since the above ordering is used to establish priority. 
+     There is no deleteSpanPolicy to change individual policies,
+     instead use clearSpanPolicy to reset and then add the desired
+     policies. 
+<a name="void_clearSpanPolicy()$"><hr><p></p><h4>void clearSpanPolicy();</h4></a>
+    Reset the spanning tree policy to change nothing. 
+<a name="struct_timeval_getDynamicFrameTime()$"><hr><p></p><h4>struct timeval getDynamicFrameTime();</h4></a>
+<p>
+<p><pre>
+  struct timeval <a href="#struct_timeval_getDynamicFrameTime()$">getDynamicFrameTime</a>();
+</pre>
+<a name="struct_timeval_getIdleFrameTime()$"><hr><p></p><h4>struct timeval getIdleFrameTime();</h4></a>
+<p>
+<p><pre>
+  struct timeval <a href="#struct_timeval_getIdleFrameTime()$">getIdleFrameTime</a>();
+</pre>
+<a name="struct_timeval_getPickFrameTime()$"><hr><p></p><h4>struct timeval getPickFrameTime();</h4></a>
+<p>
+<p><pre>
+  struct timeval <a href="#struct_timeval_getPickFrameTime()$">getPickFrameTime</a>();
+</pre>
+<a name="float_getAreaFudge()$"><hr><p></p><h4>float getAreaFudge();</h4></a>
+<p>
+<a name="int_getCenterShow()$"><hr><p></p><h4>int getCenterShow();</h4></a>
+<p>
+<a name="int_getCenterLargest()$"><hr><p></p><h4>int getCenterLargest();</h4></a>
+<p>
+<a name="float_getEdgeSize()$"><hr><p></p><h4>float getEdgeSize();</h4></a>
+<p>
+<a name="int_getGenerationNodeLimit()$"><hr><p></p><h4>int getGenerationNodeLimit();</h4></a>
+<p>
+<a name="int_getGenerationLinkLimit()$"><hr><p></p><h4>int getGenerationLinkLimit();</h4></a>
+<p>
+<a name="float_getGotoStepSize()$"><hr><p></p><h4>float getGotoStepSize();</h4></a>
+<p>
+<a name="int_getLabels()$"><hr><p></p><h4>int getLabels();</h4></a>
+<p>
+<a name="float_getLabelSize()$"><hr><p></p><h4>float getLabelSize();</h4></a>
+<p>
+<a name="char*_getLabelFont()$"><hr><p></p><h4>char* getLabelFont();</h4></a>
+<p>
+<a name="float_getLeafRad()$"><hr><p></p><h4>float getLeafRad();</h4></a>
+<p>
+<a name="float_getLengthFudge()$"><hr><p></p><h4>float getLengthFudge();</h4></a>
+<p>
+<a name="float_getMaxLength()$"><hr><p></p><h4>float getMaxLength();</h4></a>
+<p>
+<a name="int_getMotionCull()$"><hr><p></p><h4>int getMotionCull();</h4></a>
+<p>
+<a name="int_getNegativeHide()$"><hr><p></p><h4>int getNegativeHide();</h4></a>
+<p>
+<a name="int_getPassiveCull()$"><hr><p></p><h4>int getPassiveCull();</h4></a>
+<p>
+<a name="int_getSphere()$"><hr><p></p><h4>int getSphere();</h4></a>
+<p>
+<a name="int_getSpanPolicy()$"><hr><p></p><h4>int getSpanPolicy();</h4></a>
+<p>
+<a name="int_getTossEvents()$"><hr><p></p><h4>int getTossEvents();</h4></a>
+<p>
+<a name="void_setCenterLargest(bool_on)$"><hr><p></p><h4>void setCenterLargest(bool on);</h4></a>
+    Set whether to use the largest node on the previous frame as the
+     center node for the next frame. Intended for debugging. Not
+     recommended for casual use: requires understanding of library
+     internals. 
+     Default: 1
+<a name="void_setCenterShow(bool_on)$"><hr><p></p><h4>void setCenterShow(bool on);</h4></a>
+    Set whether to draw the current center node used by the drawing
+     algorithm in red instead of its usual color. Intended for
+     debugging.
+<p>
+     Default: 0
+<a name="void_setEdgeSize(float_s)$"><hr><p></p><h4>void setEdgeSize(float s);</h4></a>
+    Control how many nodes are drawn with edges. Set the minimum
+     size in pixels of the projected screen are of a node which should
+     be drawn with edges. If the black edges are drawn even when nodes are
+     very small, i.e. only a few pixels, then the user will only see
+     black instead of the color coding of the cube. When the cubes are
+     big, then drawing the edges helps them be perceived as cubes
+     instead of amorphous blobs of color. 
+<p>
+     Default: 5
+<a name="void_setGenerationNodeLimit(int_s)$"><hr><p></p><h4>void setGenerationNodeLimit(int s);</h4></a>
+    Control the number of nodes drawn. Nodes which are within the
+     given number of "hops" or "generations" from the current center
+     will be drawn. When this number is set to a small integer value only
+     a small neighborhood of the graph around the current center will
+     be drawn. Expects integer value >= 1. 
+<p>
+     Default: 30 (i.e. draw as much as possible)
+<a name="void_setGenerationLinkLimit(int_s)$"><hr><p></p><h4>void setGenerationLinkLimit(int s);</h4></a>
+    Control the number of links drawn. Links which are within the
+     given number of "hops" or "generations" from the current center
+     will be drawn. When this number is set to a small integer value only
+     a small neighborhood of the graph around the current center will
+     be drawn. Expects integer value >= 1.
+<p>
+     Default: 30 (i.e. draw as much as possible)
+<a name="void_setGotoStepSize(float_s)$"><hr><p></p><h4>void setGotoStepSize(float s);</h4></a>
+    Set the number of steps to take during an animated transition. 
+     Expects float between 0 and 1: 1.0 / s is the number of steps. 
+<p>
+     Default: .05 (20 steps)
+<a name="void_setKeepAspect(bool_on)$"><hr><p></p><h4>void setKeepAspect(bool on);</h4></a>
+    Set whether to keep the aspect ratio of the scene square or
+     allow it to change depending on the shape of the window. 
+<p>
+     Default: 0
+<a name="void_setLabels(int_on)$"><hr><p></p><h4>void setLabels(int on);</h4></a>
+    Set the text label mode to: HV_LABELNONE, draw no labels.
+     HV_LABELSHORT, draw only the last part of a label (everything
+     past the last '\'). HV_LABELLONG, draw the entire label.
+<p>
+     Default: HV_LABELLONG
+<a name="void_setLabelSize(float_s)$"><hr><p></p><h4>void setLabelSize(float s);</h4></a>
+    Control how many nodes are drawn with text labels. Set the
+     minimum size in pixels of the projected screen area of a node
+     which should be drawn with a text label. The size corresponds to
+     a window 1000 pixels wide. The number is internally scaled
+     properly according to the actual window size so the choice of
+     which labels to draw stays relatively constant as the window is
+     resized. Floating point value should be >= 1.0. At this minimum
+     value all visible nodes will have labels drawn. As the value
+     increases, fewer and fewer labels will be drawn. 
+<p>
+     Default: 20
+<a name="ifdef_WIN32_void_setLabelFont(const_string_&amp_s,_int_sz)$"><hr><p></p><h4>ifdef WIN32 void setLabelFont(const string &amp s, int sz);</h4></a>
+    Set the font used for text labels. 
+     X version: expects X font string. 
+     X default: -*-courier-medium-r-normal--12-*
+     GLUT version: not implemented, you get fixed-width 8x13 bitmap fonts.
+     Windows version: expects font name and integer size
+     Windows default: name "Arial" size 12
+<a name="void_setLeafRad(float_s)$"><hr><p></p><h4>void setLeafRad(float s);</h4></a>
+    Set the size allocated to a leaf node during the layout process:
+     specifically, the radius its disk. Size is a floating point value
+     in hyperbolic coordinates. Not recommended for casual use,
+     requires some understanding of library internals and hyperbolic
+     geometry.
+<p>
+     Default: .3
+<a name="void_setMaxLength(float_s)$"><hr><p></p><h4>void setMaxLength(float s);</h4></a>
+    Set maximum hyperbolic length of a link. Not recommended for
+     casual use: requires understanding of library internals and
+     hyperbolic geometry.
+<p>
+     Default: 2.7
+<a name="void_setMotionCull(int_s)$"><hr><p></p><h4>void setMotionCull(int s);</h4></a>
+    Set how many events to throw away for every one that is
+    processed when the mouse is moving with a mouse button down:
+    provides a way for the drawing to "keep up with" the mouse.
+<p>
+     Default: 5
+<a name="void_setPassiveCull(int_s)$"><hr><p></p><h4>void setPassiveCull(int s);</h4></a>
+    Set how many events to throw away for every one that is
+     processed when the mouse is still or moving with no mouse button
+     down: provides a way for the drawing and picking to "keep up
+     with" the mouse.
+<p>
+     Default: 5
+<a name="void_setSphere(bool_on)$"><hr><p></p><h4>void setSphere(bool on);</h4></a>
+    Set whether to draw the "sphere at infinity" which provides
+     a visual boundary of the area in which the structure can be
+     drawn. 
+<p>
+     Default: 0
+<a name="void_setTossEvents(bool_on)$"><hr><p></p><h4>void setTossEvents(bool on);</h4></a>
+    Set whether to throw away user input events which might happen
+     when the library is busy, for instance during animated
+     transitions or when recomputing layouts. If events are not thrown
+     away the user might be confused by a sudden jump when all the
+     mouse events are processed at once.
+<p>
+     Default: 0
+<a name="void_setDynamicFrameTime(struct_timeval_time)$"><hr><p></p><h4>void setDynamicFrameTime(struct timeval time);</h4></a>
+    Set amount of time for a single dynamic frame. Dynamic frames
+     happen during user input or animated transitions. The adaptive
+     drawing algorithm will draw as much as possible and then
+     relinquish control after the allotted time, no matter how large
+     the input graph. If the frame time is set to less than a few
+     frames per second the user experience will not be interactive. 30
+     FPS is more than enough for most applications. Use timeval struct
+     to set seconds and microseconds.
+<p>
+     Default: 0 sec, 50000 usec (20 FPS)
+<a name="void_setIdleFrameTime(struct_timeval_time)$"><hr><p></p><h4>void setIdleFrameTime(struct timeval time);</h4></a>
+    Set total amount of idle time available for use. When the system
+     is in idle mode, control is passed from the application to the
+     library so that it can draw a single frame. The duration of that
+     frame is set with <a href="#void_setDynamicFrameTime(struct_timeval_time)$">setDynamicFrameTime</a>(). Single frames continue
+     to be drawn until their aggregate time is greater than the idle
+     time value. Control then returns to the application program until
+     new user or program input occurs. The system immediately switches
+     from idle to dynamic mode when user or program input occurs, even
+     if the idle time is not yet exhausted. The limit on the total
+     idle time exists so that the amount of CPU time devoted to this
+     library can be strictly bounded, even when handling very large
+     graphs. The idle time is diced into single-frame increments in
+     order to guarantee fast interactive response as soon as user
+     input begins. Use timeval struct to set seconds and
+     microseconds. Setting the seconds to 5 and the microseconds to
+     0 allows 5 seconds of drawing after user input stops. The idle
+     time should usually be an order of magnitude  greater than the
+     dynamic time.  
+<p>
+     Default: 1 sec, 0 usec 
+<a name="void_setPickFrameTime(struct_timeval_time)$"><hr><p></p><h4>void setPickFrameTime(struct timeval time);</h4></a>
+    Set amount of time for a single pick frame. Picking occurs when
+     the user moves the mouse around the window, to discover which
+     node is directly underneath the mouse. Picking must be almost as
+     fast as drawing in order to guarantee interactive performance.
+     The pick time should be the same order of magnitude as the
+     dynamic time, but it is safe to set it a small multiple greater
+     than the dynamic time. Use timeval struct to set seconds and
+     microseconds.
+<p>
+     Default: 0 sec, 100000 usec (10 FPS)
+<a name="void_setColorBackground(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorBackground(float r, float g, float b);</h4></a>
+    Set window background color to red, green, blue values between 0
+     and 1.
+<p>
+     Default: 1,1,1
+<a name="void_setColorHilite(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorHilite(float r, float g, float b);</h4></a>
+    Set highlighted node color to red, green, blue values between 0
+     and 1.
+<p>
+     Default: 0,1,0
+<a name="void_setColorLabel(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorLabel(float r, float g, float b);</h4></a>
+    Set node label text color to red, green, blue values between 0 and 1.
+     This color should contrast with the background color. 
+<p>
+     Default: 0,0,0
+<a name="void_setColorLinkFrom(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorLinkFrom(float r, float g, float b);</h4></a>
+    Set link color on parent end to red, green, blue values between 0 and 1. 
+     If child end color is different, it will be smoothly
+     interpolated along the link. 
+<p>
+     Default: .6, .2, .2
+<a name="void_setColorLinkTo(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorLinkTo(float r, float g, float b);</h4></a>
+    Set link color on child end to red, green, blue values between 0 and 1. 
+     If parent end color is different, it will be smoothly
+     interpolated along the link.
+<p>
+     Default: .2, .2, .6
+<a name="void_setColorSelect(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorSelect(float r, float g, float b);</h4></a>
+    Set selected node color to red, green, blue values between 0 and 1.
+<p>
+     Default: 1,1,0
+<a name="void_setColorSphere(float_r,_float_g,_float_b)$"><hr><p></p><h4>void setColorSphere(float r, float g, float b);</h4></a>
+    Set color of the wireframe sphere at infinity to red, green, blue
+     values between 0 and 1. Usually this color should be slightly, but not
+     overly, different from the background color. The sphere is
+     intended to be much less obtrusive than the nodes and links of
+     the structure. 
+<p>
+     Default: .9, .7, .6
+<a name="HypGraph_*getHypGraph()_$"><hr><p></p><h4>HypGraph *getHypGraph() ;</h4></a>
+    Returns the internal pointer to the HypGraph.  This is currently
+     not very friendly since it breaks encapsulation, but a lot more work
+     needs to be done to make the return const.  You shouldn't use this
+     unless you really know what you're doing.
+<p>
+<p><em>Function is currently defined <strong>inline</strong>.</em></p>
+<a name="flat"><hr><p></p></a>
+<h3>All Members</h3>
+<table>
+<tr><th align="left" colspan=3>public:</th></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  Initialization</strong></td></tr>
+<tr><td align=right valign=top>HDC </td><td><a href="././HypView.html#HDC_getWidget()$">getWidget</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_afterRealize(GLXContext_cx)$">afterRealize</a>(GLXContext cx);</td></tr>
+<tr><td align=right valign=top>Widget </td><td><a href="././HypView.html#Widget_getWidget()$">getWidget</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_afterRealize()$">afterRealize</a>();</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypView</strong></td></tr>
+<tr><td align=right valign=top>char** </td><td><a href="././HypView.html#char**_enumerateSubtree(char *id)$">enumerateSubtree(char *id)</a>;</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_flashLink(const_string_&amp_fromid,_const_string_&amp_toid)$">flashLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>string </td><td><a href="././HypView.html#string_getCenter()$">getCenter</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_gotoNode(const_string_&amp_id,_int_animate)$">gotoNode</a>(const string &amp id, int animate);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_gotoCenterNode(int_animate)$">gotoCenterNode</a>(int animate);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_gotoPickPoint(int_animate)$">gotoPickPoint</a>(int animate);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_newLayout(const_string_&amp_id)$">newLayout</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_saveGraph(const_string_&amp_fname)$">saveGraph</a>(const string &amp fname);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setCurrentCenter(const_string_&amp_id)$">setCurrentCenter</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGraphCenter(const_string_&amp_id)$">setGraphCenter</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setGraph(istream_&amp_str)$">setGraph</a>(istream &amp str);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_initGraph(string_&amp_rootId,_int_rootPriority,_string_&amp_rootGroup)$">initGraph</a>(string &amp rootId, int rootPriority, string &amp rootGroup);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDisableGroup(int_groupkey,_const_string_&amp_group,_bool_on)$">setDisableGroup</a>(int groupkey, const string &amp group, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGroupKey(int_i)$">setGroupKey</a>(int i);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setSelected(const_string_&amp_id,_bool_on)$">setSelected</a>(const string &amp id, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setSelectedSubtree(const_string_&amp_id,_bool_on)$">setSelectedSubtree</a>(const string &amp id, bool on);</td></tr>
+<tr><td align=right valign=top>bool </td><td><a href="././HypView.html#bool_XpmSnapshot(const_string_&amp_fileName)$">XpmSnapshot</a>(const string &amp fileName);</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypGraph </strong></td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_addLink(const_string_&amp_fromid,_const_string_&amp_toid)$">addLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_addNode(const_string_&amp_parent,_const_string_&amp_child)$">addNode</a>(const string &amp parent, const string &amp child);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getChildCount(const_string_&amp_id)$">getChildCount</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getDrawLink(const_string_&amp_fromid,_const_string_&amp_toid)$">getDrawLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getDrawNode(const_string_&amp_id)$">getDrawNode</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getIncomingCount(const_string_&amp_id)$">getIncomingCount</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getOutgoingCount(const_string_&amp_id)$">getOutgoingCount</a>(const string &amp id);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_resetColorLink(const_string_&amp_fromid,_const_string_&amp_toid)$">resetColorLink</a>(const string &amp fromid, const string &amp toid);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLinkPolicy(int_s)$">setLinkPolicy</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorGroup(int_i,_const_string_&amp_group,_float_r,_float_g,_float_b)$">setColorGroup</a>(int i, const string &amp group, float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setColorLink(const_string_&amp_fromid,_const_string_&amp_toid,_float_r,_float_g,_float_b)$">setColorLink</a>(const string &amp fromid, const string &amp toid, float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawBackFrom(const_string_&amp_id,_bool_on,_int_descend)$">setDrawBackFrom</a>(const string &amp id, bool on, int descend);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawBackTo(const_string_&amp_id,_bool_on,_int_descend)$">setDrawBackTo</a>(const string &amp id, bool on, int descend);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawLink(const_string_&amp_fromid,_const_string_&amp_toid,_bool_on)$">setDrawLink</a>(const string &amp fromid, const string &amp toid, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setDrawLinks(bool_on)$">setDrawLinks</a>(bool on);</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_setDrawNode(const_string_&amp_id,_bool_on)$">setDrawNode</a>(const string &amp id, bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setDrawNodes(bool_on)$">setDrawNodes</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setNegativeHide(bool_on)$">setNegativeHide</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setNodeGroup(const_string_&amp_id,_int_groupkey,_const_string_&amp_group)$">setNodeGroup</a>(const string &amp id, int groupkey, const string &amp group);</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypViewer </strong></td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_bindCallback(int_b,_int_c)$">bindCallback</a>(int b, int c);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_drawFrame()$">drawFrame</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_idle(bool_on)$">idle</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_idle()$">idle</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_idleCB()$">idleCB</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_motion(int_x,_int_y,_int_shift,_int_control)$">motion</a>(int x, int y, int shift, int control);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_mouse(int_b,_int_s,_int_x,_int_y,_int_shift,_int_control)$">mouse</a>(int b, int s, int x, int y, int shift, int control);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_passive(int_x,_int_y,_int_shift,_int_control)$">passive</a>(int x, int y, int shift, int control);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_redraw()$">redraw</a>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_reshape(int_w,_int_h)$">reshape</a>(int w, int h);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setHiliteCallback(void_(*fp)(const_string_&amp,int,int))$">setHiliteCallback</a>(void (*fp)(const string &amp,int,int));</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLabelToRight(bool_on)$">setLabelToRight</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setPickCallback(void_(*fp)(const_string_&amp,int,int))$">setPickCallback</a>(void (*fp)(const string &amp,int,int));</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypData </strong></td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_addSpanPolicy(int_s)$">addSpanPolicy</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_clearSpanPolicy()$">clearSpanPolicy</a>();</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypData get</strong></td></tr>
+<tr><td align=right valign=top>struct timeval </td><td><a href="././HypView.html#struct_timeval_getDynamicFrameTime()$">getDynamicFrameTime</a>();</td></tr>
+<tr><td align=right valign=top>struct timeval </td><td><a href="././HypView.html#struct_timeval_getIdleFrameTime()$">getIdleFrameTime</a>();</td></tr>
+<tr><td align=right valign=top>struct timeval </td><td><a href="././HypView.html#struct_timeval_getPickFrameTime()$">getPickFrameTime</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getAreaFudge()$">getAreaFudge</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getCenterShow()$">getCenterShow</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getCenterLargest()$">getCenterLargest</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getEdgeSize()$">getEdgeSize</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getGenerationNodeLimit()$">getGenerationNodeLimit</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getGenerationLinkLimit()$">getGenerationLinkLimit</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getGotoStepSize()$">getGotoStepSize</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getLabels()$">getLabels</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getLabelSize()$">getLabelSize</a>();</td></tr>
+<tr><td align=right valign=top>char* </td><td><a href="././HypView.html#char*_getLabelFont()$">getLabelFont</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getLeafRad()$">getLeafRad</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getLengthFudge()$">getLengthFudge</a>();</td></tr>
+<tr><td align=right valign=top>float </td><td><a href="././HypView.html#float_getMaxLength()$">getMaxLength</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getMotionCull()$">getMotionCull</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getNegativeHide()$">getNegativeHide</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getPassiveCull()$">getPassiveCull</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getSphere()$">getSphere</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getSpanPolicy()$">getSpanPolicy</a>();</td></tr>
+<tr><td align=right valign=top>int </td><td><a href="././HypView.html#int_getTossEvents()$">getTossEvents</a>();</td></tr>
+<tr><td></td></tr><tr><td></td><td><strong>//  HypData set</strong></td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setCenterLargest(bool_on)$">setCenterLargest</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setCenterShow(bool_on)$">setCenterShow</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setEdgeSize(float_s)$">setEdgeSize</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGenerationNodeLimit(int_s)$">setGenerationNodeLimit</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGenerationLinkLimit(int_s)$">setGenerationLinkLimit</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setGotoStepSize(float_s)$">setGotoStepSize</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setKeepAspect(bool_on)$">setKeepAspect</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLabels(int_on)$">setLabels</a>(int on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLabelSize(float_s)$">setLabelSize</a>(float s);</td></tr>
+<tr><td align=right valign=top>ifdef WIN32 void </td><td><a href="././HypView.html#ifdef_WIN32_void_setLabelFont(const_string_&amp_s,_int_sz)$">setLabelFont</a>(const string &amp s, int sz);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setLeafRad(float_s)$">setLeafRad</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setMaxLength(float_s)$">setMaxLength</a>(float s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setMotionCull(int_s)$">setMotionCull</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setPassiveCull(int_s)$">setPassiveCull</a>(int s);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setSphere(bool_on)$">setSphere</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setTossEvents(bool_on)$">setTossEvents</a>(bool on);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setDynamicFrameTime(struct_timeval_time)$">setDynamicFrameTime</a>(struct timeval time);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setIdleFrameTime(struct_timeval_time)$">setIdleFrameTime</a>(struct timeval time);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setPickFrameTime(struct_timeval_time)$">setPickFrameTime</a>(struct timeval time);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorBackground(float_r,_float_g,_float_b)$">setColorBackground</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorHilite(float_r,_float_g,_float_b)$">setColorHilite</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorLabel(float_r,_float_g,_float_b)$">setColorLabel</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorLinkFrom(float_r,_float_g,_float_b)$">setColorLinkFrom</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorLinkTo(float_r,_float_g,_float_b)$">setColorLinkTo</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorSelect(float_r,_float_g,_float_b)$">setColorSelect</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././HypView.html#void_setColorSphere(float_r,_float_g,_float_b)$">setColorSphere</a>(float r, float g, float b);</td></tr>
+<tr><td align=right valign=top>HypGraph *</td><td><a href="././HypView.html#HypGraph_*getHypGraph()_$">getHypGraph</a>() ;</td></tr>
+<tr><th align="left" colspan=3>protected:</th></tr>
+</table>
+<a name="parents"><hr><p></p></a>
+<h3>Ancestors</h3>
+Class does not inherit from any other class.<p>
+<a name="children"><hr><p></p></a>
+<h3>Descendants</h3>
+Class is not inherited by any others.<p>
+<hr><p></p>
+Generated from source by the <i><a href="http://www.cs.umn.edu/~kotula/cocoon/cocoon.htm">Cocoon</a></i> utilities on Thu May  9 18:10:24 2002
+.<p>
+</body></html>

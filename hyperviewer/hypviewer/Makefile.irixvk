@@ -1,0 +1,27 @@
+# SGIs running Irix 6.x 
+# ViewKit windows
+# 10/6/99 not tested lately under 6.5, but used to work
+
+CPU = irix
+WINSYS = vk
+ARCH = $(CPU)$(WINSYS)
+CFLAGS = -I/n/radiance/usr/include -I/n/weevil/usr/include -DHYPGLX -DHYPVK -DHYPIRIX -g -ptused -DNAMESPACEHACK='using namespace std;'
+LDLIBS  = -L../../src/$(ARCH) -l$(LIBRARY)$(ARCH) -L/n/weevil/usr/lib32 -lvk -lGLw -lGL -lGLU -lXm -lXt -lX11 -lm
+
+
+SUBDIRS = src examples/vkxt examples/vksimple
+INSTLIBDIR = /usr/common/lib
+INSTBINDIR = /usr/common/bin
+
+CC = /bin/CC
+LD = /bin/cc
+MKDIR = /bin/mkdir 
+RM = /bin/rm -rf
+MAKE = /usr/common/bin/gmake
+INSTALL = /usr/common/bin/install
+OBJSUFFIX = .o
+LIBSUFFIX = .so
+LIBPREFIX = lib
+
+_library:
+	$(AR) $(LIBNAME) $(OBJS)

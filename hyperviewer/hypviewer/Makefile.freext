@@ -1,0 +1,31 @@
+# FreeBSD
+# Xt windows
+# totally untested, just a guide...
+
+CPU = free
+WINSYS = xt
+ARCH = $(CPU)$(WINSYS)
+#CFLAGS = -DHYPGLX -DHYPXT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=''
+CFLAGS = -DFONTHACK -DHYPGLX -DHYPXT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=''
+LDLIBS  =  -L../../src/$(ARCH) -L/usr/X11R6/lib  -l$(LIBRARY)$(ARCH) -lGLw -lGL -lGLU -lXm -lXt -lX11 -lm
+INCDIRS = -I../include -I../../include -I/usr/X11R6/include 
+
+SUBDIRS = src examples/vkxt examples/xtsimple
+
+CC = /usr/bin/g++
+LD = /usr/bin/cc
+AR = /usr/bin/ar rv
+MKDIR = /bin/mkdir 
+RM = /bin/rm -rf
+MAKE = /usr/local/bin/gmake
+INSTALL = /usr/bin/install
+INSTLIBDIR = /usr/local/lib
+INSTBINDIR = /usr/local/bin
+
+OBJSUFFIX = .o
+LIBSUFFIX = .a
+LIBPREFIX = lib
+
+_library:
+	$(AR) $(LIBNAME) $(OBJS)
+

@@ -1,0 +1,191 @@
+HypViewer version 1.1.2 TMM
+Thu May  9 17:44:27 2002
+
+The HypViewer library provides layout and interactive navigation of
+node-link graphs in 3D hyperbolic space. The library can handle quite
+large graphs of up to 100,000 edges quickly and with minimal visual
+clutter. The hyperbolic view allows the user to see a great deal of
+the context around the current focus node. The guaranteed frame rate
+algorithm is provides fast reponse time on both large data sets with
+high-end machines and medium-sized data sets on low-end machines.
+
+The example viewers are all very bare-bones standalone applications
+which are really just to give some hints about how to use the library.
+I definitely recommend integrating this component with other more
+traditional UI components for the most effective user experience.
+
+Author:
+
+Tamara Munzner
+munzner@cs.stanford.edu
+http://graphics.stanford.edu/~munzner
+650-853-2253
+
+Contributors:
+
+Daniel W. McRobb, CAIDA, dwm@caida.org
+ FreeBSD port, STL conversion, memory footprint reduction, etc.
+Matt Gressek, Agenetics, matt@agenetics.com
+ most of Windows port
+
+----------
+Rights:
+
+See the full COPYRIGHT file. In short, you can use this for free if
+you don't redistribute it for a fee. Contact SGI if you want to
+license it for commercial redistribution. This code was originally
+written at SGI and Stanford.
+
+----------
+More info:
+
+The main URL for H3 is
+ http://graphics.stanford.edu/~munzner/h3
+
+API documentation is on the web at
+ http://graphics.stanford.edu/~munzner/h3/HypViewer.html
+
+Papers with details on the algorithms are on the web at
+ http://graphics.stanford.edu/~munzner/papers.html
+
+See the CHANGES file in this distribution for the changes between
+versions. 
+
+----------
+Dependencies:
+
+Needs OpenGL, C++, STL. Note that the Mesa libraries on Linux will
+work for the OpenGL requirement, and are default-installed under
+RedHat. 
+
+All device-dependent code is supposed to be segregated by ifdef
+statements, but caveat emptor.
+
+----------
+
+SOURCE CONTENTS
+
+src/		library source files
+
+include/	library include files
+
+data/		sample data files
+
+examples/
+ vksimple/	very simple ViewKit app, calls library
+
+ xtsimple/	very simple Xt app, calls library
+
+ vkxt/		more complex Xt or ViewKit app, keystroke callbacks show
+		off more library functionality.
+		see viewer.README for usage details.
+		(Note: if you're wondering why you can't see the cycles
+		in your graph, try hitting the 'u' button!)
+
+ xtnofile/	Xt app showing the use of the addNode/addLink commands
+		instead of reading data from an input file
+
+ mfc/		Windows example app, includes source file directly instead
+		of using libraries properly. someone who knows Windows
+		better could fix this up much more cleanly, I'm sure.
+
+doc/		include/HypView.h and include/XHypViewer.h have
+		internal comments which are automatically turned the
+		HTML documents in here by cocoon, see
+		http://www.stratasys.com/software/cocoon/
+
+Makefile.*	makefiles (ignore for Windows version)
+
+----------
+
+PORTING/COMPILING
+
+You will definitely need to change the ROOTDIR line in Makefile.main
+to set the correct pathname where you unpacked the files. If you're
+not compiling for Linux, then you'll also need to pick the right
+Makefile.<OS> line. 
+
+The file Makefile.main is a shell that calls an OS/window system
+specific Makefile with all the real settings. You'll almost certainly
+have to adapt that specific Makefile.<OS> for your environment by changing
+various paths and so on.
+
+I'm afraid the ifdef conventions aren't very consistent. Sometime it's 
+#ifdef FOO, other times it's #ifndef BAR. I'm sure if people start
+porting this to other platforms there will be a need to clean up the
+logic a bit. 
+
+# to construct a Makefile for a new platform:
+# possible defs:
+# HYPXT - Xt (on top of X/Motif) window system
+# HYPVK - ViewKit window system. mainly found on SGI, but is crossplatform
+# HYPGLX is a superset of HYPVK and HYPXT
+# HYPGLUT - Mark Kilgard's window system
+# HYPIRIX - it's an SGI
+# HYPLINUX - it's a Linux box
+# WIN32 - it's a Windoze box
+# HYPFREE - it's a FreeBSD box
+# XPMSNAP - can be enabled for any of the X Windows ones
+#
+# The window system is supposed to be vaguely orthogonal to the CPU,
+# although you can't mix and match every combination. 
+# 
+# Define NAMESPACEHACK to either 'using namespace std;' or '':
+# in some compilers (including SGI CC and Microsoft Visual C++ the
+# former is critical for compiling STL, in others (older version of
+# g++?) apparently the right thing to do is leave it blank.
+
+The following Makefiles are provided in this distribution:
+
+irixxt: HYPXT HYPGLX HYPIRIX
+irixvk: HYPVK HYPGLX HYPIRIX
+irixglut: HYPGLUT HYPIRIX
+
+freext: HYPXT HYPGLX HYPFREE
+
+linuxxt: HYPXT HYPGLX HYPLINUX
+
+The irixxt is the most tested configuration. The irixglut one has also 
+been tested. The irixvk one used to work but I don't have the ViewKit
+development environment installed on my machine anymore after my
+upgrade to Irix 6.5 so it hasn't been recently tested. The ViewKit
+version is somewhat deprecated anyway compared to the Xt one.
+
+The freext Makefile is just a prelim attempt which is completely
+untested, just wanted to give people the idea of what I had in mind.
+
+The linuxxt Makefile has been tested, albeit not extensively. 
+
+I'm not positive that the Visual C++ project files will work on
+another Windows box without tweaking since they seem to encode
+hardwired path names in their files, but the relevant ifdef is of
+course WIN32. GLUT under Windows is untested but theoretically
+possible.
+
+If you port this software to another system please consider
+contributing the changes (especially the Makefiles) back to me for
+inclusion in the next release. I hope it should be pretty
+straightforward to get another Unix flavor working.
+
+Linux Compilation Notes: 
+
+1. If you see the following error message:
+
+  /tmp/hypviewer/src/VkHypViewer.cpp:95: undefined reference to
+  `glwMDrawingAreaWidgetClass'
+
+the solution is to download
+http://prdownloads.sourceforge.net/mesa3d/libGLw.tar.gz and unpack
+into /usr/lib. It doesn't seem to be included in the standard Mesa
+developer distribution.
+
+
+----------
+
+Possible future changes:
+
+The H3Viewer library supports a guaranteed frame rate, with one
+glaring exception. The mapping from hyperbolic to euclidean space is
+global, not incremental, so occasionally with big data sets everything 
+will just freeze up for a few seconds while the remapping is computed.
+See papers for more details. I have some ideas on how to fix this. 

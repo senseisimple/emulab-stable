@@ -1,0 +1,118 @@
+Thu May  9 17:44:39 2002
+
+Add functions to switch link color policy, so all links can easily be
+set to a single color or to inherit the color of their parent. Bump
+version number to 1.1.2.
+
+----------
+Fri Feb  1 03:52:32 2002
+
+Fix bug with the addNode/addLink routines (used when loading graphs
+from memory instead of disk file). Bump version number to 1.1.1.
+
+Tue Mar 27 16:08:30 2001 TMM
+
+Add Linux Makefiles, bump version number to 1.1, update documentation
+accordingly.
+
+----------
+Sat Oct 23 14:48:46 1999 TMM
+
+Repack up the distribution, somehow Makefile.* files got left out
+
+----------
+
+Wed Oct  6 17:59:28 1999 TMM
+
+Go back to the NAMESPACEHACK approach of using preprocessor defines
+since apparently some compilers aren't happy with "using namespace
+std;"
+
+Add a bit more Makefile documentation, etc.
+
+Convert the Release include file pathname from absolute to relative in
+the Windoze VisualC++ settings.
+
+----------
+Mon Oct  4 22:25:40 1999 TMM
+
+currently tested: Irix Xt, Irix GLUT, Windows VisualC++ (OpenGL)
+conjectured to work: FreeBSD Xt Mesa, Irix ViewKit
+
+more Makefile munging.
+
+Groups are all now enabled by default. The previous policy of forcing
+explicit enabling was a major source of bugs in application programs.
+Now the application programmer can explicitly turn them off at will,
+but no action means that everything is drawn.
+
+Fixed layout bugs which were exposed by certain data sets. Minor startup 
+optimizations. 
+
+Ported to Windows VisualC++.
+
+Contributor:
+Matt Gressek, Agenetics, matt@agenetics.com
+Borland Windows port
+
+Merged dwm's FreeBSD port into Windows Borland port.
+
+----------
+
+Sun Feb 21 02:06:17 1999
+
+Contributor:
+Daniel W. McRobb, CAIDA, dwm@caida.org
+
+This code has been modified by Daniel W. McRobb at CAIDA
+(dwm@caida.org).  The Ok* classes are gone, replaced by STL and standard
+C++ classes (array types replaced by STL <vector>, OkStr replaced by
+<string>).  This eliminated the troublesome large macros, and made thing
+much easier to port to a GNU environment.  Currently the glut interface
+works on Solaris 2.7.  The rest will be fixed and tested soon, except
+ViewKit (since I don't have ViewKit anywhere).  Near-term porting target
+are FreeBSD 3.0 and Linux using X/OGL from Xi Graphics (see
+http://www.xig.com/) and Linux using Mesa/GLIDE.  In all likelihood,
+plain old Mesa (no hardware accelerated 3D) will work on speedy machines
+too since the drawing rate isn't tremendous (hypviewer is mostly optimized
+for interaction and does minimal drawing during user interaction).
+
+----------
+
+Mon Oct 19 15:26:17 1998 TMM
+
+This version of the H3/H3Viewer source has been tested to compile and
+run on SGIs. The main library code should work across multiple
+platforms. Device dependencies are segregated by #ifdef barriers.
+Currently, the flavors that work are GLUT (Mark Kilgard's window
+system independent toolkit) and ViewKit. I've started making an
+Xt-only version, which should be quite similar to the Vk version, but
+that's not ready yet. Both the Vk and the Xt versions use the GLX
+defines.
+
+The example application code has more device dependencies. Both the Vk 
+and Xt versions are in the vk directory. The glut version is in its
+own directory. There's also a simplevk app that's more barebones than
+the vk version. 
+
+Since I haven't tried compiling and running on anything but an SGI
+yet, I'm sure there are a lot of unfound device dependencies. I got
+most of the way through fixing the warnings/errors from using g++
+instead of SGI's CC, but that's not quite finished either.
+
+The GLUT version *should* work on Windows, just download the libraries
+from http://reality.sgi.com/opengl/glut3/glut3.html. I haven't yet
+tried compiling the code using VisualC++. 
+
+----------
+1 Oct 1998 TMM
+pack up source for distribution
+
+* merge hash table and okds utility libraries into main source.
+* completely revamp Makefile and directory structure. 
+* clean up warnings.
+
+The new Makefile structure supports multiple flavors.
+Currently Makefiles will compile and run for the GLUT and ViewKit
+flavors of code. 
+

@@ -1,0 +1,30 @@
+# Linux
+# Xt windows
+# tested under 
+# XFree86 4.0.1a, RedHat 7.0, uniprocessor kernel 2.2.16-22, NVidia GeForce 2 Ultra card, nvidia drivers 0.9-769, openmotif 2.1.30-5_ICS
+
+CPU = linux
+WINSYS = xt
+ARCH = $(CPU)$(WINSYS)
+CFLAGS = -DHYPGLX -DHYPXT -DHYPLINUX -g -DNAMESPACEHACK=''
+LDLIBS  =  -L../../src/$(ARCH) -l$(LIBRARY)$(ARCH) -lGLw -lMesaGLw -lGL -lGLU -L/usr/X11R6/lib -lXm -lXt -lX11 -lm
+
+SUBDIRS = src examples/vkxt examples/xtsimple examples/xtnofile
+
+CC = /usr/bin/g++
+LD = /usr/bin/cc
+AR = /usr/bin/ar rv
+MKDIR = /bin/mkdir 
+RM = /bin/rm -rf
+MAKE = /usr/bin/gmake
+INSTALL = /usr/bin/install
+INSTLIBDIR = /usr/local/lib
+INSTBINDIR = /usr/local/bin
+
+OBJSUFFIX = .o
+LIBSUFFIX = .a
+LIBPREFIX = lib
+
+_library:
+	$(AR) $(LIBNAME) $(OBJS)
+

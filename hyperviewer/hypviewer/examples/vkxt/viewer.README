@@ -1,0 +1,202 @@
+How to run the vktest executable:
+
+vktest is a program that lets you navigate around a node-link graph
+laid out with the H3 algorithm and drawn with the H3Viewer algorithm.
+
+The program is a somewhat minimal shell around the libhypviewer
+libraries. The only controls are single keyboard commands, which make
+vague attempts to be mnemonic.
+
+--------------------
+Usage:
+ vktest <filename> -[flags]
+
+Command-line flags:
+ k keep
+ h hierarchical
+ l lexicographic
+ b breadth-first search
+ f forest
+
+The command-line flags have to do with the spanning tree computed by
+the H3 algorithm. The default, "k", means keep the exact tree
+specified by the input file, which is depth-first. You'll almost
+always want to use "bl" to get a much-better breadth-first tree that
+uses alphabetical ordering to break ties. You should use "h" if you
+have identifiers that have a hierarchical structure, for example URLs.
+The "f" option allows you to use the other commandline options yet keep
+subtrees distinct, so that you can have a forest of subtrees. (See
+below on file format for details on this.)
+
+Windows version:
+ h3.exe <filename>
+ 
+The flags h,l,b as above are hardcoded. No shared library needed.
+--------------------
+
+Controls:
+
+ left mouse click on node -	select it and trigger animated transition
+				to center. node will be oriented so
+				that all ancestors on left and all
+				descendants on right
+ left mouse click on edge -     animated transition moves that point
+				to center (no rotation)
+ left mouse drag - translate
+ middle mouse drag - rotate everything around center
+
+'c' recenter everything
+'u' turn on all outgoing links
+'v' turn on all outgoing links in subtree below below selected node
+'w' turn on outgoing links for selected node
+'i' turn on all incoming links
+'j' turn on all incoming links in subtree below below selected node
+'k' turn on incoming links for selected node
+'s' turn on/off sphere at infinity
+'C' draw current center node as red (mostly for debugging)
+'N' turn off all nodes
+'n' turn off all links
+
+Hitting the 'B' will show less labels, the 'b' key will show more -
+the decision to draw labels is based on the projected screen area of a
+node. B increases this, b decreases it. 
+
+Hitting a single digit will limit the drawing to that number of
+generations around the current center node. The 'r' key toggles
+between affecting the node drawing and the link drawing - so you can
+just draw the links for a few generations near the center but see the
+nodes for many more generations out towards the fringe, like
+snowflakes. Or vice versa, and you'll see a few nodes seemingly jump
+around near the center in big skeleton of links. 
+
+ * hit 't' to enter trail mode. In trail mode, whenever you click on a
+node with the leftmouse it will turn into the current trail color, and
+clicking on subsequent nodes will leave a link trail behind you.
+hitting 't' again will turn off trail mode. the next time you hit 't'
+to turn on trail mode again, the trail color will be a new random
+color. so if you just want to start a new part of a trail hit 'tt'.
+
+ * hit 'R' to cycle between color settings. The first three change the
+background colors to white, gray, and black. The next two change the
+link colors, to either to be all grey instead of the default red-blue
+gradient, or to inherit from the parent node.
+
+ * hit 'L' to flip between labels that stretch to the left vs to the
+right 
+
+Notes: 
+incoming/outgoing links - links in general graph that are not in
+spanning tree. animated transitions will sometimes be a jump 
+cases when it's a long distance.
+ 
+--------------------
+File format
+
+The file format is of the form
+
+<depth> <identifier> 1 <type1> [<type2> ... <typeN>]
+
+The order is meaningful. The number at the beginning of the first line
+is the depth in the tree. The identifiers are assumed to be unique. If
+an identifier occurs twice that means a node has more than one
+incoming link - that the file describes a general graph, not just a
+tree.
+
+A file with structure like
+
+0       A
+1       B
+2       C
+3       D
+4       A
+3       E
+2       F
+1       G
+1       H
+2       I
+2       J
+1       K
+
+corresponds to a graph that looks like:
+
+  .-------- A
+ /      ____|_______
+ |     /   |   \    |
+ |    B    G    H   K
+ |   / \       / \
+ |  C   F     I   J
+ \ / \
+  D   E
+
+
+The very first node is the root, the numbers correspond to the number
+of layers deep in the hierarchy.
+
+The software computes a spanning tree to use as the base for layout
+and display. There are some command line flags that control how the
+spanning tree is found. If the flag "f" (for "forest") is used, then
+you can have a forest of distinct subtrees that are not mingled. The
+other commandline flags, like "b" for breadth-first search, are
+applied to each subtree independently. A forest is specified by having
+a toplevel starting root which has depth < 0. For instance,
+
+-1 top 1 html
+ 0 subtree1/root 1 html
+  1 subtree1/thing1 1 html
+  1 subtree1/thing2 1 html
+[...]
+ 0 subtree2/root 1 html
+  1 subtree2/thing1 1 html
+  1 subtree2/thing2 1 html
+
+
+The type is a tag used for coloring and filtering. There must be at
+least one, there can be more. Interpretation of the tags is up to the
+application program. In the case of vktest, the tags setup is as
+follows: 
+
+group 0:
+  hv->setColorGroup(0, "image", 1.0, 0.0, 1.0); // purple
+  hv->setColorGroup(0, "html", 0, 1, 1);        // cyan
+  hv->setColorGroup(0, "text", .90, .35, .05);  // orange
+  hv->setColorGroup(0, "image", .42, 0, .48);   // purple
+  hv->setColorGroup(0, "application", .99, .64, .25); // tan
+  hv->setColorGroup(0, "audio", .91, .36, .57); // pink
+  hv->setColorGroup(0, "video", .91, .36, .57); // pink
+  hv->setColorGroup(0, "other", 0, .35, .27);   // dark green
+  hv->setColorGroup(0, "vrml", .09, 0, 1);      // blue
+  hv->setColorGroup(0, "host", 1.0, 1.0, 1.0);  // white
+  hv->setColorGroup(0, "invisible", 0, 0, 0);   // black
+
+group 1:
+  hv->setColorGroup(1, "host", 1.0, 1.0, 1.0);  // white
+  hv->setColorGroup(1, "main", 0, 1, 1);        // cyan
+  hv->setColorGroup(1, "orphan", 1.0, 0.0, 1.0); // purple
+  hv->setColorGroup(1, "external", 1.0, 1.0, 1.0); // white
+ 
+'m' turns on/off all nodes that are not "html" or "vrml"
+'e' turns on/off all nodes that are "external"
+'o' turns on/off all nodes that are "orphan"
+
+'g' switches between coloring by group 0 and coloring by group 1. 
+
+
+See also file format details at
+http://graphics.stanford.EDU/~munzner/h3/HypView.html#INPUT_FILE_FORMAT
+
+--------------------
+
+FAQ
+
+Q: Can I display a cyclic graph? When I load my simple test case I
+only see a tree. 
+
+A: Yes - try hitting the 'u' key in the viewer to see the non-tree
+links!
+
+----------
+
+Tamara Munzner
+munzner@cs.stanford.edu
+Fri Feb  1 03:55:14 2002
+

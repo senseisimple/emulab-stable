@@ -1,0 +1,97 @@
+<html><head><title>VkHypViewer Documentation</title></head>
+<body><h2>
+<a name="topofdoc"><img src="hypviewer.gif">VkHypViewer</a></h2>
+<dl>
+<dd>
+ VkHypViewer is the ViewKit/Xt layer on top of the base <a href="././HypView.html">HypView</a> class. 
+
+
+#ifdef HYPXT
+</dl>
+<hr><p></p>
+<p><strong>[ 
+<a href="././HypViewer.html">HypViewer</a> | 
+<a href="VkHypViewer.h">Source</a> | 
+<a href="#aag">Summary</a> | <a href="#parents">Ancestors</a> | <a href="#flat">All Members</a> | <a href="#children">Descendants</a>  ]</strong><p>
+<h3><a name="quickind">Quick Index</a></h3>
+<dl>
+<dd><a href="#OVERVIEW">OVERVIEW</a>
+<dd><a href="#AUTHOR">AUTHOR</a>
+</dl>
+<a name="aag"><hr><p></p></a><h3>Class Summary</h3>
+class VkHypViewer <br>
+ {
+<br>
+<table>
+<tr><td align=left><font size=+1><i><b>public:</b></i></font>
+</td></tr>
+<tr><td align=right valign=top></td><td><a href="././VkHypViewer.html#VkHypViewer(const_char_*name,_Widget_top,_Widget_parent,_XVisualInfo_*vi_)$">VkHypViewer</a>(const char *name, Widget top, Widget parent, XVisualInfo *vi );</td></tr>
+<tr><td align=right valign=top></td><td>~<a href="././VkHypViewer.html#~VkHypViewer()$">VkHypViewer</a>();</td></tr>
+<tr><td align=right valign=top>const char *</td><td><i><a href="././VkHypViewer.html#const_char_*className()$">className</a></i>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././VkHypViewer.html#void_init()$">init</a>();</td></tr>
+<tr><td align=right valign=top><a href="././HypView.html">HypView</a>* </td><td><a href="././VkHypViewer.html#HypView*_getHypView()_const_$">getHypView</a>() const ;</td></tr>
+<tr><td align=right valign=top><strong>static</strong> void </td><td><a href="././VkHypViewer.html#void_eventHandlerCB(Widget_w,_XtPointer_clientData,_XEvent_*event,_Boolean_*flag)$">eventHandlerCB</a>(Widget w, XtPointer clientData, XEvent *event, Boolean *flag);</td></tr>
+<tr><td align=right valign=top><strong>static</strong> void </td><td><a href="././VkHypViewer.html#void_initCallback(Widget_w,_XtPointer_clientData,_XtPointer_callData)$">initCallback</a>(Widget w, XtPointer clientData, XtPointer callData);</td></tr>
+<tr><td align=left><font size=+1><i><b>protected:</b></i></font>
+</td></tr>
+</table>
+}; // VkHypViewer <p>
+<a name="OVERVIEW"><hr><p></p></a><h4>OVERVIEW</h4>
+<p>
+ After initialization, <a href="#HypView*_getHypView()_const_$">getHypView</a>() should be used to get the <a href="././HypView.html">HypView</a>
+ object, which is the main interface to the functionality of the
+ library. Although this class is called VkHypViewer for historical
+ reasons, most people will want to use the Xt flavor as opposed to the 
+ ViewKit flavor. 
+<p>
+<a name="AUTHOR"><hr><p></p></a><h4>AUTHOR</h4>
+<p>
+<pre>
+ Tamara Munzner
+ http://graphics.stanford.edu
+ munzner@cs.stanford.edu
+</pre>
+<p>
+<a name="VkHypViewer(const_char_*name,_Widget_top,_Widget_parent,_XVisualInfo_*vi_)$"><hr><p></p><h4>VkHypViewer(const char *name, Widget top, Widget parent, XVisualInfo *vi );</h4></a>
+    Initialization. Arguments: name string, top-level
+     widget of window, parent widget for drawing area, XVisualInfo for
+     the window. If no XVisualInfo given, fallback is RGBA
+     doublebuffered with maximum possible red, green, blue, and depth
+     buffers. 
+<a name="~VkHypViewer()$"><hr><p></p><h4>~VkHypViewer();</h4></a>
+    Destructor.
+<a name="const_char_*className()$"><hr><p></p><h4>const char *className();</h4></a>
+    Classname method as required by ViewKit.
+<a name="void_init()$"><hr><p></p><h4>void init();</h4></a>
+    Initialization callback used by afterRealizeHook and/or
+     <a href="#void_initCallback(Widget_w,_XtPointer_clientData,_XtPointer_callData)$">initCallback</a>() can also be called directly if necessary. 
+<a name="HypView*_getHypView()_const_$"><hr><p></p><h4>HypView* getHypView() const ;</h4></a>
+    Return the <a href="././HypView.html">HypView</a> object which is the main interface to the
+     functionality of the library. 
+<p><em>Function is currently defined <strong>inline</strong>.</em></p>
+<a name="void_eventHandlerCB(Widget_w,_XtPointer_clientData,_XEvent_*event,_Boolean_*flag)$"><hr><p></p><h4>void eventHandlerCB(Widget w, XtPointer clientData, XEvent *event, Boolean *flag);</h4></a>
+    Handle the Xt events. Calls the <a href="././HypView.html">HypView</a> mouse(), motion(),
+     passive(), reshape(), idle(), drawFrame() callbacks. 
+<a name="void_initCallback(Widget_w,_XtPointer_clientData,_XtPointer_callData)$"><hr><p></p><h4>void initCallback(Widget w, XtPointer clientData, XtPointer callData);</h4></a>
+    Calls the <a href="#void_init()$">init</a>() function. 
+<a name="flat"><hr><p></p></a>
+<h3>All Members</h3>
+<table>
+<tr><th align="left" colspan=3>public:</th></tr>
+<tr><td align=right valign=top>const char *</td><td><i><a href="././VkHypViewer.html#const_char_*className()$">className</a></i>();</td></tr>
+<tr><td align=right valign=top>void </td><td><a href="././VkHypViewer.html#void_init()$">init</a>();</td></tr>
+<tr><td align=right valign=top><a href="././HypView.html">HypView</a>* </td><td><a href="././VkHypViewer.html#HypView*_getHypView()_const_$">getHypView</a>() const ;</td></tr>
+<tr><td align=right valign=top><strong>static</strong> void </td><td><a href="././VkHypViewer.html#void_eventHandlerCB(Widget_w,_XtPointer_clientData,_XEvent_*event,_Boolean_*flag)$">eventHandlerCB</a>(Widget w, XtPointer clientData, XEvent *event, Boolean *flag);</td></tr>
+<tr><td align=right valign=top><strong>static</strong> void </td><td><a href="././VkHypViewer.html#void_initCallback(Widget_w,_XtPointer_clientData,_XtPointer_callData)$">initCallback</a>(Widget w, XtPointer clientData, XtPointer callData);</td></tr>
+<tr><th align="left" colspan=3>protected:</th></tr>
+</table>
+<a name="parents"><hr><p></p></a>
+<h3>Ancestors</h3>
+Class does not inherit from any other class.<p>
+<a name="children"><hr><p></p></a>
+<h3>Descendants</h3>
+Class is not inherited by any others.<p>
+<hr><p></p>
+Generated from source by the <i><a href="http://www.cs.umn.edu/~kotula/cocoon/cocoon.htm">Cocoon</a></i> utilities on Thu May  9 18:10:24 2002
+.<p>
+</body></html>
