@@ -979,6 +979,10 @@ TBWWWEMAIL_NOSLASH="$TBWWWEMAIL"
 TBWWWEMAIL="`echo $TBWWWEMAIL | sed -e 's/@/\\\@/'`"
 TBAPPROVALEMAIL_NOSLASH="$TBAPPROVALEMAIL"
 TBAPPROVALEMAIL="`echo $TBAPPROVALEMAIL | sed -e 's/@/\\\@/'`"
+TBSTATEDEMAIL_NOSLASH="$TBSTATEDEMAIL_NOSLASH"
+TBSTATEDEMAIL="`echo $TBSTATEDEMAIL | sed -e 's/@/\\\@/'`"
+TBTESTSUITEEMAIL_NOSLASH="$TBTESTSUITEEMAIL_NOSLASH"
+TBTESTSUITEEMAIL="`echo $TBTESTSUITEEMAIL | sed -e 's/@/\\\@/'`"
 
 if test -n "$TBACTIVEARCHIVE"; then
     TBACTIVEARCHIVE_NOSLASH="$TBACTIVEARCHIVE"
@@ -1230,7 +1234,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1234: checking for a BSD compatible install" >&5
+echo "configure:1238: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6

@@ -32,7 +32,7 @@ $| = 1; #Turn off line buffering on output
 
 # Configure variables
 my $TB          = "@prefix@";
-my $TBOPS       = '@TBSTATEDEMAIL@';
+my $TBOPS       = "@TBSTATEDEMAIL@";
 
 # Testbed Support libraries
 use lib "@prefix@/lib";
