@@ -3,7 +3,7 @@
 #
 TBDBNAME=tbdb
 WWWDEFS=stoller-emulab
-TBOPSEMAIL=stoller@fast.cs.utah.edu
-TBLOGSEMAIL=stoller@fast.cs.utah.edu
+TBOPSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
+TBLOGSEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
 
 

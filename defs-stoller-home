@@ -3,6 +3,6 @@
 #
 TBDBNAME=tbdb
 WWWDEFS=stoller-home
-TBOPSEMAIL=stoller@stoller.casco.net
-TBLOGSEMAIL=stoller@stoller.casco.net
+TBOPSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
+TBLOGSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
 

@@ -6,5 +6,5 @@
 #
 TBDBNAME=tbdb
 WWWDEFS=default
-TBOPSEMAIL=testbed-ops@flux.cs.utah.edu
+TBOPSEMAIL='Testbed Operations <testbed-ops@flux.cs.utah.edu>'
 TBLOGSEMAIL=testbed-logs@flux.cs.utah.edu
