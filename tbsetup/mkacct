@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: mkacct,v 1.15 2000-09-22 22:06:02 kwright Exp $
+### $Id: mkacct,v 1.16 2000-11-02 17:26:21 newbold Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -151,7 +151,7 @@ $cmd =
   "select IP from interfaces as ip ".
   "left join reserved as r on r.node_id=ip.node_id ".
   "left join experiments as e on r.eid = e.eid ".
-  "where e.eid = '$eid'";
+  "where e.eid = '$eid' and card=4";
 $sth = $dbh->query($cmd);
 my @nodes = ();
 while (@row = $sth->fetchrow_array) {
@@ -192,20 +192,26 @@ foreach $IP (@nodes) {
 	} else {  
 
 	    print "Checking OS on $IP...";
-            open(UNAME,"/usr/local/bin/ssh $IP uname 2>&1 |");
+            open(UNAME,"/usr/local/bin/sshtb $IP uname 2>&1 |");
             $_ = <UNAME>;
 	    print $_;
-	    close(UNAME);
 
 	    ## FreeBSD says "155.99.214.129: Connection refused"
 	    ##    and can also say "Host key doesn't match..."  
 	    ##    and can also say "@@@@@@... WARNING HOST ID CHANGED..."
             if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) 
 		 || ($_ =~/^@+/) ) { 
-		die("Uname failed on $IP:$_\n"); 
+	      
+		print "Uname failed on $IP:$_";
+		while (<UNAME>) {
+		  print;
+		}
+		close(UNAME);
+		die("\n"); 
 	    } else { 
 		$OS = $_;
 	    }
+	    close(UNAME);
 
         } 
 
@@ -221,14 +227,14 @@ foreach $IP (@nodes) {
             ## will report it and move on.
 
 	    print "Creating group $unix_gid on $IP.\n";
-	    open(GROUPADD, "/usr/local/bin/ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
+	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
 	    my $i = 1;
 	    foreach my $user (keys %passwd) {
 
 		print "Creating user $user on $IP.\n";
-		open(USERADD, "/usr/local/bin/ssh $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
+		open(USERADD, "/usr/local/bin/sshtb $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
 		while (<USERADD>) { print "$_"; }
 		close(USERADD);
 	    }
@@ -264,7 +270,7 @@ foreach $IP (@nodes) {
 		    $addon = "$user:$passwd{$user}:$unix_uid{$user}:" .
 			     "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
 			     "/bin/tcsh\n";
-		    open (CHPASS, "/usr/local/bin/ssh $IP /usr/bin/chpass -a '$addon' 2>&1 |");
+		    open (CHPASS, "/usr/local/bin/sshtb $IP /usr/bin/chpass -a '$addon' 2>&1 |");
 		    while ( <CHPASS> ) {print "$_"; }
 		    close(CHPASS)
 		}
