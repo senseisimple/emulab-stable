@@ -69,7 +69,7 @@ tipserv-install:
 # tell, you can't put ifeq()'s inside of targets
 #
 ifeq ($(TBROOT),/usr/testbed)
-SCHEMACHECK= perl $(OBJDIR)/db/schemacheck
+SCHEMACHECK= cd $(OBJDIR)/db && perl schemacheck
 else
 SCHEMACHECK= @echo "Skipping schema check, since prefix isn't /usr/testbed"
 endif
