@@ -23,7 +23,11 @@ if (!isset($usr_email) ||
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   FORMERROR("Full Name");
+} else if (! ereg("^[a-zA-Z0-9 .\-]+$", $usr_name)) {
+    USERERROR("Your Full Name can only contain alphanumeric characters, '-', " .
+			"and '.'", 1);
 }
+
 if (!isset($pid) ||
     strcmp($pid, "") == 0) {
   FORMERROR("Project");
