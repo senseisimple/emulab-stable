@@ -167,12 +167,20 @@ sub doboot()
 	sleep(10000);
     }
     elsif ($bootwhat =~ /^partition:(\d)$/) {
-	print("Bootinfo says to boot slice $1! Checking MBR first ...\n");
-	if (VerifyMBR($bootdev, $1) < 0) {
-	    print("Partition $1 on $bootdev not valid; falling back to MFS\n");
-	    goto mfs;
+	my $bpart = $1;
+	if ($bpart eq "0") {
+	    print("Bootinfo says to boot from MBR ...\n");
+	    $bpart = 255; # XXX
+	} else {
+	    print("Bootinfo says to boot slice $bpart! ".
+		  "Checking MBR first ...\n");
+	    if (VerifyMBR($bootdev, $bpart) < 0) {
+		print("Partition $bpart on $bootdev not valid; ".
+		      "falling back to MFS\n");
+		goto mfs;
+	    }
 	}
-	system("tbbootconfig -d -c 0 -k $1 -m 1 $bootdev");
+	system("tbbootconfig -d -c 0 -k $bpart -m 1 $bootdev");
 	if ($?) {
 	    print("Error running tbbootconfig; falling back to MFS boot\n");
 	    goto mfs;
@@ -197,7 +205,7 @@ sub doboot()
 	    #
 	    return 0;
 	}
-	elsif ($mfs eq "frisbee") {
+	elsif ($mfs eq "frisbee" || $mfs eq "frisbee-new") {
 	    #
 	    # Run the frisbee script. If all goes well it will reboot.
 	    # Any problems we land back here, so go into the MFS so we
@@ -206,7 +214,7 @@ sub doboot()
 	    system("$RCDIR/rc.frisbee");
 	    goto mfs;
 	}
-	elsif ($mfs eq "freebsd") {
+	elsif ($mfs eq "freebsd" || $mfs eq "freebsd-new") {
 	    goto mfs;
 	}
 	else {
