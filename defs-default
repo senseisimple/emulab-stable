@@ -38,7 +38,7 @@ PLAB_ROOTBALL="plabroot-10.tar.bz2"
 # Network config stuff. Used to generate initial named and dhcpd config files.
 #
 BOSSNODE_IP=155.98.32.70
-OPSNODE_IP=155.98.33.74
+USERNODE_IP=155.98.33.74
 CONTROL_ROUTER_IP=155.98.36.1
 CONTROL_NETWORK=155.98.36.0
 CONTROL_NETMASK=255.255.252.0
