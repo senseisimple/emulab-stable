@@ -1,13 +1,9 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= event/tbgen
+SUBDIR		= event/example
 
-SYSTEM	       := $(shell uname -s)
-PROGRAMS	= tbmevc
-ifneq ($(SYSTEM),Linux)
-PROGRAMS       += tbmevd tbmevd.restart
-endif
+PROGRAMS	= example
 
 include $(OBJDIR)/Makeconf
 
@@ -22,9 +18,7 @@ CFLAGS   += `elvin-config --cflags vin4mt`
 
 LDFLAGS  += -pthread -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
-ifneq ($(SYSTEM),Linux)
 LIBS     += -lcipher -lc_r
-endif
 
 #
 # XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
@@ -34,20 +28,12 @@ endif
 #LIBS     += `elvin-config --libs vin4mt`
 LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
 
-tbmevc:	tbmevc.o
-	$(CC) $(LDFLAGS) -static -o $@ tbmevc.o $(LIBS)
-
-tbmevd:	tbmevd.o
-	$(CC) $(LDFLAGS) -o $@ tbmevd.o \
-		-L/usr/local/lib/mysql -lmysqlclient $(LIBS)
+example:	example.o
+	$(CC) $(LDFLAGS) -static -o $@ example.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:	$(INSTALL_SBINDIR)/tbmevd \
-		$(INSTALL_SBINDIR)/tbmevd.restart
-
-client-install: 
-	$(INSTALL_PROGRAM) tbmevc /etc/testbed/tbmevc
+install:
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

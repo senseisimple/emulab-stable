@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include "log.h"
 #include "event.h"
 
 static char	*progname;
@@ -56,6 +57,8 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	loginit("sample", 0);
+
 	/*
 	 * Get our IP address. Thats how we name ourselves to the
 	 * Testbed Event System. 
@@ -65,13 +68,11 @@ main(int argc, char **argv)
 	    struct in_addr	myip;
 	    
 	    if (gethostname(buf, sizeof(buf)) < 0) {
-		ERROR("could not get hostname\n");
-		return 1;
+		fatal("could not get hostname");
 	    }
 
 	    if (! (he = gethostbyname(buf))) {
-		ERROR("could not get IP address from hostname\n");
-		return 1;
+		fatal("could not get IP address from hostname");
 	    }
 	    memcpy((char *)&myip, he->h_addr, he->h_length);
 	    strcpy(ipbuf, inet_ntoa(myip));
@@ -97,8 +98,7 @@ main(int argc, char **argv)
 	 */
 	tuple = address_tuple_alloc();
 	if (tuple == NULL) {
-		ERROR("could not allocate an address tuple\n");
-		return 1;
+		fatal("could not allocate an address tuple");
 	}
 	/*
 	 * Change this stuff as needed. 
@@ -116,16 +116,14 @@ main(int argc, char **argv)
 	 */
 	handle = event_register(server, 0);
 	if (handle == NULL) {
-		ERROR("could not register with event system\n");
-		return 1;
+		fatal("could not register with event system");
 	}
 	
 	/*
 	 * Subscribe to the event we specified above.
 	 */
 	if (! event_subscribe(handle, callback, tuple, NULL)) {
-		ERROR("could not subscribe to event\n");
-		return 1;
+		fatal("could not subscribe to event");
 	}
 	
 	/*
@@ -137,8 +135,7 @@ main(int argc, char **argv)
 	 * Unregister with the event system:
 	 */
 	if (event_unregister(handle) == 0) {
-		ERROR("could not unregister with event system\n");
-		return 1;
+		fatal("could not unregister with event system");
 	}
 
 	return 0;
