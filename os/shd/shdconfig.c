@@ -179,8 +179,14 @@ do_single(argc, argv, action, flags)
             if (do_io(shd, SHDROLLBACK, &shio))
                 return (1);
         }
+        else
+        if (strcmp (cp, "-sm") == 0)
+        {
+            if (do_io(shd, SHDSAVECHECKPOINTMAP, &shio))
+                return (1);
+        }
         else    
-        if (strcmp (cp, "-s") == 0)
+        if (strcmp (cp, "-sv") == 0)
         {       
             version = atoi(*argv++); --argc;
             printf ("Saving version %d\n", version);
@@ -620,82 +626,96 @@ int save_checkpoint (char * shd, int version)
 {
     struct shd_readbuf shread;
     char buffer [MAXBUF];
-    char block [BLOCKSIZE];
+    long block [BLOCKSIZE/4 + 1];
     TrieIterator pos;
     int ok;
+    int i;
+    int ix;
     int fd_read;
     int fd_write_data;
     int fd_write_mdata;
     int size;
+    int read_start;
+    int num_blocks;
     fd_read = open ("/dev/ad0s4", O_RDWR);
-    if (fd_read <= 0)
+    if (fd_read < 0)
     {
-        printf ("Read device open failed\n");
+        perror ("error");
         return;
     }
 
     /* Open the data file to write to */
-
-    fd_write_data = open ("/users/saggarwa/image1.data", O_RDWR);
-    if (fd_write_data <= 0)
+    
+    fd_write_data = open ("/users/saggarwa/image1.data", O_CREAT);
+    if (fd_write_data < 0)
     {
-        printf ("Write data device open failed in O_RDWR\n");
         perror ("error");
         return;
     }
-    else
+    close (fd_write_data);
+    fd_write_data = open ("/users/saggarwa/image1.data", O_WRONLY);
+    if (fd_write_data < 0)
     {
-        close (fd_write_data);
-        fd_write_data = open ("/users/saggarwa/image1.data", O_APPEND);
-        if (fd_write_data <= 0)
-        {
-            printf ("Write data device open failed in O_APPEND\n");
-            perror ("error");
-            return;
-        }
+        perror ("error");
+        return;
     }
 
     /* Open the metadata file to write to */
 
-    fd_write_mdata = open ("/users/saggarwa/image1.mdata", O_RDWR);
-    if (fd_write_mdata <= 0)
+    fd_write_mdata = open ("/users/saggarwa/image1.mdata", O_CREAT);
+    if (fd_write_mdata < 0)
     {
-        printf ("Write metadata device open failed in O_RDWR\n");
+        perror ("error");
         return;
     }
-    else
+    close (fd_write_mdata);
+    fd_write_mdata = open ("/users/saggarwa/image1.mdata", O_WRONLY);
+    if (fd_write_mdata < 0)
     {
-        close (fd_write_mdata);
-        fd_write_mdata = open ("/users/saggarwa/image1.mdata", O_APPEND);
-        if (fd_write_mdata <= 0)
-        {
-            printf ("Write metadata device open failed in O_APPEND\n");
-            return;
-        }
+        perror ("error");
+        return;
     }
+
     shread.block_num = 2;
     shread.buf = &block;
     if (do_io(shd, SHDREADBLOCK, &shread))
-                return (1); 
-
-    /*printf ("Before TrieIteratorInit %x\n", trie);
-    ok = TrieIteratorInit(trie, &pos);
-    printf ("After TrieIteratorInit\n");
-    for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
     {
-        off_t off;
-        printf ("Inside for loop\n");
-        off = lseek (fd_read,  pos->value * BLOCKSIZE, SEEK_SET);
-        size = read (fd_read, &buffer, depthToSize(pos->maxDepth) * BLOCKSIZE);
-        size = write (fd_write_data, &buffer, size);
-        write (fd_write_mdata, &pos->key, sizeof (pos->key));
-        write (fd_write_mdata, &pos->value, sizeof (pos->value));
+        perror ("error");
+        return (1); 
     }
-    TrieIteratorCleanup(&pos);*/
+
+    read_start = (long) block[(2*version - 2)]; 
+    num_blocks = (long) block[(2*version - 1)];
+
+    printf ("read start = %ld, num blocks = %ld\n", read_start, num_blocks); 
+    for (ix = 0; ix < num_blocks; ix++)
+    {
+        shread.block_num = read_start;
+        if (do_io(shd, SHDREADBLOCK, &shread))
+                return (1);
+        for (i = 0; i < 126; i+=3)
+        {
+             off_t off; 
+             if (0 == block [i])
+                 break;
+             printf ("(%ld, %ld, %ld)\n", block[i], block[i+1], block[i+2] * BLOCKSIZE);
+             off = lseek (fd_read,  block[i+1] * BLOCKSIZE, SEEK_SET);
+             size = read (fd_read, &buffer, block[i+2] * BLOCKSIZE);
+             if (size < 0)
+                 perror ("error");
+             size = write (fd_write_data, &buffer, size);
+             if (size < 0)
+                 perror ("error");
+             write (fd_write_mdata, &block[i], sizeof (long));
+             write (fd_write_mdata, &block[i+1], sizeof (long));
+        } 
+        read_start++;
+    }
 
     close (fd_read);
     close (fd_write_data);
     close (fd_write_mdata);
+    printf ("Save operation successful \n");
 
 /* Similarly swap in blocks by changing fd_read, fd_write pointers */
 

@@ -834,80 +834,53 @@ void save_checkpoint_map (struct shd_softc *ss, struct proc *p)
     int current_block;
 
     metadata_block = 2;
-    blocks_used = 0;
-    array_ix = 0;
-    write_start = BlockAlloc (1);
-    current_block = write_start;
  
-
     for (i = 0; i < 512 / sizeof(long int); i++)
+    {
        map[i] = 0; 
+       temp_addr[i] = 0;
+    }
 
     for (ix = 1; ix < latest_version; ix++)    
     {
         Trie * trie = get_trie_for_version (ix);
         TrieIterator pos;
         int ok = TrieIteratorInit(trie, &pos);
+        array_ix = 0;
         if (ok)
         {
-        for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
-        {
-            if (array_ix >= 128)
-            {
-                array_ix = 0;
-                blocks_used++;
-                if (write_block (ss, p, (char *) map, current_block))
-                    return;
-                current_block = BlockAlloc (1);
-                for (i = 0; i < 512 / sizeof(long int); i++)
-                    map[i] = 0;
-            }
+          current_block = write_start = BlockAlloc (1);
+          blocks_used = 0;
+          for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
+          {
             map [array_ix++] = pos->key; 
-            if (array_ix >= 128)
-            {
-                array_ix = 0;
-                blocks_used++;
-                if (write_block (ss, p, (char *) map, current_block))
-                    return;
-                current_block = BlockAlloc (1);
-                for (i = 0; i < 512 / sizeof(long int); i++)
-                    map[i] = 0;
-            }
             map [array_ix++] = pos->value;
-            if (array_ix >= 128)
+            map [array_ix++] = depthToSize(pos->maxDepth);
+            printf ("Saving (%ld, %ld, %ld)\n", pos->key, pos->value, depthToSize(pos->maxDepth)); 
+            if (array_ix >= 125)
             {
                 array_ix = 0;
                 blocks_used++;
                 if (write_block (ss, p, (char *) map, current_block))
                     return;
                 current_block = BlockAlloc (1);
-                for (i = 0; i < 512 / sizeof(long int); i++)
-                    map[i] = 0;
-            }
-            map [array_ix++] = depthToSize(pos->maxDepth);
+            } /* end of if */
+          } /* end of for */
+        } /* end of if */        
+        if (array_ix > 0)
+        {
+            blocks_used++;
+            if (write_block (ss, p, (char *) map, current_block))
+                return;
         }
-        }         
-        map [array_ix++] = 0;
+        for (i = 0; i < 128; i++)
+                    map[i] = 0;
+        temp_addr [2*ix - 2] = (long int) write_start;
+        temp_addr [2*ix - 1] = (long int) blocks_used;
+        printf ("Saving version %d, %d blocks starting at %d\n", ix, blocks_used, write_start);  
     }
-
-    if (array_ix > 0)
-    {
-        blocks_used++;
-        if (write_block (ss, p, (char *) map, current_block))
-            return;
-        current_block = BlockAlloc (1);
-    }
-
-    for (ix = 0; ix < 512 / sizeof (long int); ix++)
-    {
-        map[ix] = 0; 
-        temp_addr[ix] = 0;
-    }
-    temp_addr[0] = (long int ) write_start;
-    temp_addr[1] = (long int ) blocks_used;
     if (write_block (ss, p, (char *) temp_addr, metadata_block))
         return;
-    printf ("Saved %ld blocks starting %ld\n", blocks_used, write_start);
 }
 
 int read_block (struct shd_softc *ss, struct proc *p, char block[512], long int block_num)
@@ -1165,6 +1138,7 @@ shdioctl(dev, cmd, data, flag, p)
 	int part, pmask, s;
 	struct shd_softc *ss;
 	struct shd_ioctl *shio = (struct shd_ioctl *)data;
+        struct shd_readbuf *shread; 
 	struct shddevice shd;
        
 #ifdef SHDDEBUG
@@ -1181,6 +1155,9 @@ shdioctl(dev, cmd, data, flag, p)
 
 	switch (cmd) {
         case SHDREADBLOCK:
+                shread = (struct shd_readbuf *) data;
+                printf ("Reading block %ld\n", shread->block_num);
+                read_block (ss, p, shread->buf, shread->block_num);
                 break;
         case SHDROLLBACK:
                 printf ("Attempting to rollback from version %d to version %d\n", latest_version, (int )shio->version);
@@ -1308,7 +1285,7 @@ shdioctl(dev, cmd, data, flag, p)
 			shdunlock(ss);
 			return (error);
 		}
-                InitBlockAllocator (EXPLICIT_CKPT_DELETE, 2, shadow_size);
+                InitBlockAllocator (EXPLICIT_CKPT_DELETE, 3, shadow_size);
 		/*
 		 * The shd has been successfully initialized, so
 		 * we can place it into the array and read2 the disklabel.
