@@ -91,10 +91,25 @@ if ($range != "month") {
             Month</a>, ";
 }
 else {
-    echo "Month. ";
+    echo "Month, ";
 }
-echo "</b><br><br>\n";
+echo "</b>";
 
+#
+# Spit out a range form!
+#
+$formrange = "mm/dd/yy-mm/dd/yy";
+if (preg_match("/^(\d*)\/(\d*)\/(\d*)-(\d*)\/(\d*)\/(\d*)$/", $range))
+    $formrange = $range;
+
+echo "<form action=showsumstats.php3 method=get>
+      <input type=text
+             name=range
+             value=\"$formrange\">
+      <input type=hidden name=showby value=\"$showby\">
+      <input type=hidden name=sortby value=\"$sortby\">
+      <b><input type=submit name=Get value=Get></b>\n";
+echo "<br><br>\n";
 
 #
 # This version prints out the simple summary info for the entire table.
@@ -135,6 +150,9 @@ function showsummary ($showby, $sortby) {
         case "edays":
 	    $order = "expt_days desc";
 	    break;
+        case "swapins":
+	    $order = "expt_swapins desc";
+	    break;
         default:
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
@@ -142,7 +160,8 @@ function showsummary ($showby, $sortby) {
     $query_result =
 	DBQueryFatal("select $which, allexpt_pnodes, ".
 		     "allexpt_pnode_duration / (24 * 3600) as pnode_days, ".
-		     "allexpt_duration / (24 * 3600) as expt_days ".
+		     "allexpt_duration / (24 * 3600) as expt_days, ".
+		     "exptswapin_count+exptstart_count as expt_swapins ".
 		     "from $table where allexpt_pnodes!=0 ".
 		     "$wclause ".
 		     "order by $order");
@@ -157,14 +176,17 @@ function showsummary ($showby, $sortby) {
     $pnode_total  = 0;
     $pdays_total  = 0;
     $edays_total  = 0;
+    $swapin_total = 0;
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pnodes  = $row["allexpt_pnodes"];
 	$pdays   = $row["pnode_days"];
 	$edays   = $row["expt_days"];
+	$swapins = $row["expt_swapins"];
 	
 	$pnode_total  += $pnodes;
 	$pdays_total  += $pdays;
 	$edays_total  += $edays;
+	$swapin_total += $swapins;
     }
 
     SUBPAGESTART();
@@ -180,6 +202,9 @@ function showsummary ($showby, $sortby) {
            </tr>
            <tr><td nowrap align=right><b>Expt Days</b></td>
                <td align=left>$edays_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>Swapins</b></td>
+               <td align=left>$swapin_total</td>
            </tr>
           </table>\n";
     SUBMENUEND_2B();
@@ -199,6 +224,9 @@ function showsummary ($showby, $sortby) {
              <th><a class='static'
                     href='showsumstats.php3?showby=$showby&sortby=edays'>
                     Expt Days</th>
+             <th><a class='static'
+                    href='showsumstats.php3?showby=$showby&sortby=swapins'>
+                    Swapins</th>
           </tr>\n";
 
     mysql_data_seek($query_result, 0);    
@@ -207,12 +235,14 @@ function showsummary ($showby, $sortby) {
 	$pnodes  = $row["allexpt_pnodes"];
 	$phours  = $row["pnode_days"];
 	$ehours  = $row["expt_days"];
+	$swapins = $row["expt_swapins"];
 
 	echo "<tr>
                 <td><A href='$link${heading}'>$heading</A></td>
                 <td>$pnodes</td>
                 <td>$phours</td>
                 <td>$ehours</td>
+                <td>$swapins</td>
               </tr>\n";
     }
     echo "</table>\n";
@@ -235,10 +265,15 @@ function pdaycmp ($a, $b) {
 function edaycmp ($a, $b) {
     return intcmp($a["eseconds"], $b["eseconds"]);
 }
+function swapincmp ($a, $b) {
+    return intcmp($a["swapins"], $b["swapins"]);
+}
 
 function showrange ($showby, $sortby, $range) {
     global $TBOPSPID, $TB_EXPTSTATE_ACTIVE;
     $debug = 0;
+    $now   = time();
+    unset($rangematches);
     
     switch ($range) {
         case "day":
@@ -251,71 +286,94 @@ function showrange ($showby, $sortby, $range) {
 	    $span = 3600 * 24 * 31;
 	    break;
         default:
-	    USERERROR("Invalid range argument: $range!", 1);
+	    if (!preg_match("/^(\d*)\/(\d*)\/(\d*)-(\d*)\/(\d*)\/(\d*)$/",
+			    $range, $rangematches)) 
+		USERERROR("Invalid range argument: $range!", 1);
     }
-    $wclause   = "($span)";
-    $now       = time();
-    $spanstart = $now - $span;
+    if (isset($rangematches)) {
+	$spanstart = mktime(1,1,1,
+			    $rangematches[1],$rangematches[2],
+			    $rangematches[3]);
+	$spanend = mktime(23,59,59,
+			    $rangematches[4],$rangematches[5],
+			    $rangematches[6]);
+
+	if ($spanend <= $spanstart)
+	    USERERROR("Invalid range: $spanstart to $spanend", 1);
+    }
+    else {
+	$spanend   = $now;
+	$spanstart = $now - $span;
+    }
+    if ($debug)
+	echo "start $spanstart end $spanend<br>\n";
 
     # Summary info, indexed by pid and uid. Each entry is an array of the
     # summary info.
-    $pid_summary = array();
-    $uid_summary = array();
+    $pid_summary  = array();
+    $uid_summary  = array();
 
-    #
-    # First get current swapped in experiments. Instead of using reserved
-    # table, use the experiment_stats record so we can more easily separate
-    # pnodes from vnodes (although ignoring vnodes at the moment).
-    #
-    $query_result =
-	DBQueryFatal("select e.pid,e.eid,e.expt_swap_uid as swapper, ".
-		     "  UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped) ".
-		     "   as swapseconds, r.pnodes,r.vnodes ".
-		     " from experiments as e ".
-		     "left join experiment_stats as s on s.exptidx=e.idx ".
-		     "left join experiment_resources as r on s.rsrcidx=r.idx ".
-		     "where e.state='" . $TB_EXPTSTATE_ACTIVE . "'" .
-		     "  and e.pid!='$TBOPSPID' and ".
-		     "      not (e.pid='ron' and e.eid='all') ");
+    if (!isset($rangematches)) {
+        #
+        # First get current swapped in experiments. Instead of using reserved
+        # table, use the experiment_stats record so we can more easily separate
+        # pnodes from vnodes (although ignoring vnodes at the moment).
+	# We do this because there are no "swapout" events for these. We could
+	# also do this as a post pass below, and I might do that at some point.
+        #
+	$query_result =
+	    DBQueryFatal("select e.pid,e.eid,e.expt_swap_uid as swapper, ".
+			 " UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped)".
+			 "   as swapseconds, r.pnodes,r.vnodes ".
+			 " from experiments as e ".
+			 "left join experiment_stats as s on s.exptidx=e.idx ".
+			 "left join experiment_resources as r on ".
+			 "     s.rsrcidx=r.idx ".
+			 "where e.state='" . $TB_EXPTSTATE_ACTIVE . "'" .
+			 "  and e.pid!='$TBOPSPID' and ".
+			 "      not (e.pid='ron' and e.eid='all') ");
 
-    while ($row = mysql_fetch_assoc($query_result)) {
-	$pid         = $row["pid"];
-	$eid         = $row["eid"];
-	$uid         = $row["swapper"];
-	$swapseconds = $row["swapseconds"];
-	$pnodes      = $row["pnodes"];
-	$vnodes      = $row["vnodes"];
+	while ($row = mysql_fetch_assoc($query_result)) {
+	    $pid         = $row["pid"];
+	    $eid         = $row["eid"];
+	    $uid         = $row["swapper"];
+	    $swapseconds = $row["swapseconds"];
+	    $pnodes      = $row["pnodes"];
+	    $vnodes      = $row["vnodes"];
 
-	if ($pnodes == 0)
-	    continue;
+	    if ($pnodes == 0)
+		continue;
 
-	if ($debug)
-	    echo "$pid $eid $uid $swapseconds $pnodes $vnodes<br>\n";
-
-	if ($swapseconds > $span) {
-	    $swapseconds = $span;
 	    if ($debug)
-		echo "Span to $swapseconds<br>\n";
-	}
+		echo "$pid $eid $uid $swapseconds $pnodes $vnodes<br>\n";
 
-	if (!isset($pid_summary[$pid])) {
-	    $pid_summary[$pid] = array('pnodes'   => 0,
-				       'pseconds' => 0,
-				       'eseconds' => 0,
-				       'current'  => 1);
+	    if ($swapseconds > $span) {
+		$swapseconds = $span;
+		if ($debug)
+		    echo "Span to $swapseconds<br>\n";
+	    }
+
+	    if (!isset($pid_summary[$pid])) {
+		$pid_summary[$pid] = array('pnodes'   => 0,
+					   'pseconds' => 0,
+					   'eseconds' => 0,
+					   'current'  => 1,
+					   'swapins'  => 0);
+	    }
+	    if (!isset($uid_summary[$uid])) {
+		$uid_summary[$uid] = array('pnodes'   => 0,
+					   'pseconds' => 0,
+					   'eseconds' => 0,
+					   'current'  => 1,
+					   'swapins'  => 0);
+	    }
+	    $pid_summary[$pid]["pnodes"]   += $pnodes;
+	    $pid_summary[$pid]["pseconds"] += $pnodes * $swapseconds;
+	    $pid_summary[$pid]["eseconds"] += $swapseconds;
+	    $uid_summary[$uid]["pnodes"]   += $pnodes;
+	    $uid_summary[$uid]["pseconds"] += $pnodes * $swapseconds;
+	    $uid_summary[$uid]["eseconds"] += $swapseconds;
 	}
-	if (!isset($uid_summary[$uid])) {
-	    $uid_summary[$uid] = array('pnodes'   => 0,
-				       'pseconds' => 0,
-				       'eseconds' => 0,
-				       'current'  => 1);
-	}
-	$pid_summary[$pid]["pnodes"]   += $pnodes;
-	$pid_summary[$pid]["pseconds"] += $pnodes * $swapseconds;
-	$pid_summary[$pid]["eseconds"] += $swapseconds;
-	$uid_summary[$uid]["pnodes"]   += $pnodes;
-	$uid_summary[$uid]["pseconds"] += $pnodes * $swapseconds;
-	$uid_summary[$uid]["eseconds"] += $swapseconds;
     }
 
     $query_result =
@@ -330,8 +388,8 @@ function showrange ($showby, $sortby, $range) {
 		     "left join experiment_resources as r2 on ".
 		     "  r2.idx=r1.lastidx and r1.lastidx is not null ".
 		     "where t.exitcode = 0 && ".
-		     "    ((UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(t.end_time))".
-		     "     < $wclause) ".
+		     "    (UNIX_TIMESTAMP(t.end_time) <= $spanend && ".
+		     "     UNIX_TIMESTAMP(t.end_time) >= $spanstart) ".
 		     "order by t.end_time");
 
     # Experiment start time, indexed by pid:eid.
@@ -383,13 +441,15 @@ function showrange ($showby, $sortby, $range) {
 	    $pid_summary[$pid] = array('pnodes'   => 0,
 				       'pseconds' => 0,
 				       'eseconds' => 0,
-				       'current'  => 0);
+				       'current'  => 0,
+				       'swapins'  => 0);
 	}
 	if (!isset($uid_summary[$uid])) {
 	    $uid_summary[$uid] = array('pnodes'   => 0,
 				       'pseconds' => 0,
 				       'eseconds' => 0,
-				       'current'  => 0);
+				       'current'  => 0,
+				       'swapins'  => 0);
 	}
 
 	if ($debug) 
@@ -402,6 +462,8 @@ function showrange ($showby, $sortby, $range) {
 					     'uid'    => $uid,
 					     'pid'    => $pid,
 					     'stamp'  => $tstamp);
+	    $pid_summary[$pid]["swapins"]++;
+	    $uid_summary[$uid]["swapins"]++;
 	    break;
         case "swapout":
         case "swapmod":
@@ -424,6 +486,10 @@ function showrange ($showby, $sortby, $range) {
                     # A pain. We need the number of pnodes for the original
 		    # version of the experiment, not the new version.
 		    $pnodes = $pnodes2;
+		}
+		else {
+		    $pid_summary[$pid]["swapins"]++;
+		    $uid_summary[$uid]["swapins"]++;
 		}
 	    }
 	    if ($debug) 
@@ -457,9 +523,31 @@ function showrange ($showby, $sortby, $range) {
     }
 
     #
-    # Anything still in the expt_start array is obviously still running,
-    # but we caught those in the first query above, so we ignore them.
+    # Anything still in the expt_start array is still running at the end
+    # of the date range. We want to add that extra time in.
     #
+    # Note that we caught "current" experiments in the first query above,
+    # so we ignore them. I think we can roll that into this at some point.
+    #
+    if (isset($rangematches)) {
+	foreach ($expt_start as $key => $value) {
+	    $pnodes  = $value["pnodes"];
+	    $pid     = $value["pid"];
+	    $uid     = $value["uid"];
+	    $stamp   = $value["stamp"];
+	    $diff    = $now - $stamp;
+
+	    if ($debug)
+		echo "$pnodes, $pid, $uid, $stamp, $diff<br>\n";
+
+	    $pid_summary[$pid]["pnodes"]   += $pnodes;
+	    $pid_summary[$pid]["pseconds"] += $pnodes * $diff;
+	    $pid_summary[$pid]["eseconds"] += $diff;
+	    $uid_summary[$uid]["pnodes"]   += $pnodes;
+	    $uid_summary[$uid]["pseconds"] += $pnodes * $diff;
+	    $uid_summary[$uid]["eseconds"] += $diff;
+	}
+    }
     
     switch ($showby) {
         case "projects":
@@ -491,6 +579,9 @@ function showrange ($showby, $sortby, $range) {
         case "edays":
 	    uasort($table, "edaycmp");
 	    break;
+        case "swapins":
+	    uasort($table, "swapincmp");
+	    break;
         default:
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
@@ -501,9 +592,11 @@ function showrange ($showby, $sortby, $range) {
     $pnode_total  = 0;
     $pdays_total  = 0;
     $edays_total  = 0;
+    $swapin_total = 0;
 
     foreach ($table as $key => $value) {
 	$pnodes  = $value["pnodes"];
+	$swapins = $value["swapins"];
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
@@ -513,6 +606,7 @@ function showrange ($showby, $sortby, $range) {
 	$pnode_total  += $pnodes;
 	$pdays_total  += $pdays;
 	$edays_total  += $edays;
+	$swapin_total += $swapins;
     }
 
     SUBPAGESTART();
@@ -528,6 +622,9 @@ function showrange ($showby, $sortby, $range) {
            </tr>
            <tr><td nowrap align=right><b>Expt Days</b></td>
                <td align=left>$edays_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>Swapins</b></td>
+               <td align=left>$swapin_total</td>
            </tr>
           </table>\n";
     SUBMENUEND_2B();
@@ -550,11 +647,15 @@ function showrange ($showby, $sortby, $range) {
              <th><a class='static'
                     href='showsumstats.php3?showby=$showby&sortby=edays&range=$range'>
                     Expt Days</th>
+             <th><a class='static'
+                    href='showsumstats.php3?showby=$showby&sortby=swapins&range=$range'>
+                    Swapins</th>
           </tr>\n";
 
     foreach ($table as $key => $value) {
 	$heading = $key;
 	$pnodes  = $value["pnodes"];
+	$swapins = $value["swapins"];
 	$current = $value["current"];
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
@@ -574,6 +675,7 @@ function showrange ($showby, $sortby, $range) {
                 <td>$pnodes</td>
                 <td>$pdays</td>
                 <td>$edays</td>
+                <td>$swapins</td>
               </tr>\n";
     }
     echo "</table>\n";
