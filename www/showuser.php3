@@ -119,49 +119,63 @@ if (mysql_num_rows($query_result)) {
 }
 
 #
-# Lets show projects.
+# Lets show project and group membership.
 #
 $query_result =
-    DBQueryFatal("select distinct g.pid,g.trust,p.name ".
+    DBQueryFatal("select distinct g.pid,g.gid,g.trust,p.name,gr.description ".
 		 " from group_membership as g ".
 		 "left join projects as p on p.pid=g.pid ".
-		 "where uid='$target_uid' and g.pid=g.gid and ".
+		 "left join groups as gr on gr.pid=g.pid and gr.gid=g.gid ".
+		 "where uid='$target_uid' and ".
 		 "trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
-		 "order by pid");
+		 "order by g.pid,gr.created");
 
 if (mysql_num_rows($query_result)) {
     echo "<center>
-          <h3>Project Membership</h3>
+          <h3>Project and Group Membership</h3>
           </center>
           <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
-              <th>PID</td>
-              <th>Name</td>
-              <th>MailTo</td>
+              <th>PID</th>
+              <th>GID</th>
+              <th>Name/Description</th>
+              <th>Trust</th>
+              <th>MailTo</th>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
 	$pid   = $projrow[pid];
+	$gid   = $projrow[gid];
 	$name  = $projrow[name];
+	$desc  = $projrow[description];
 	$trust = $projrow[trust];
-	$mail  = $pid . "-users@" . $OURDOMAIN;
-
+	
 	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
 	    echo "<tr>
-                     <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                     <td>$name</td>
-                     <td><a href=mailto:$mail>$mail</a></td>
+                     <td><A href='showproject.php3?pid=$pid'>
+                            $pid</A></td>
+                     <td><A href='showgroup.php3?pid=$pid&gid=$gid'>
+                            $gid</A></td>\n";
+	    if (strcmp($pid,$gid)) {
+		echo "<td>$desc</td>\n";
+		$mail  = $pid . "-" . $gid . "-users@" . $OURDOMAIN;
+	    }
+	    else {
+		echo "<td>$name</td>\n";
+		$mail  = $pid . "-users@" . $OURDOMAIN;
+	    }
+	    echo "<td>$trust</td>
+                  <td nowrap><a href=mailto:$mail>$mail</a></td>
                  </tr>\n";
         }
     }
     echo "</table>\n";
-}
 
-#
-# Sub group membership too.
-# 
-SHOWGROUPMEMBERSHIP($target_uid);
+    echo "<center>
+          Click on the GID to view/edit group membership and trust levels.
+          </center>\n";
+}
 
 #
 # Widearea Accounts
