@@ -12,7 +12,7 @@ SUBDIR		= ssl
 
 include $(OBJDIR)/Makeconf
 
-all:	emulab.pem server.pem localnode.pem ronnode.pem
+all:	emulab.pem server.pem localnode.pem ronnode.pem wanode.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -87,6 +87,9 @@ localnode.pem:	dirsmade localnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 ronnode.pem:	dirsmade ronnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh ronnode
 
+pcplab.pem:		dirsmade pcplab.cnf ca.cnf $(SRCDIR)/mkclient.sh
+	$(SRCDIR)/mkclient.sh pcplab
+
 dirsmade:
 	-mkdir -p certs
 	-mkdir -p newcerts
@@ -102,10 +105,16 @@ dirsmade:
 install:
 	@echo "BE VERY CAREFUL! INSTALLING NEW CERTS CAN CAUSE DISASTER!"
 
-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
+boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/server.pem \
+		$(INSTALL_ETCDIR)/pcplab.pem \
 		$(INSTALL_ETCDIR)/capture.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
+	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+	chmod 640 $(INSTALL_ETCDIR)/server.pem
+	chmod 640 $(INSTALL_ETCDIR)/client.pem
+	chmod 640 $(INSTALL_ETCDIR)/pcplab.pem
+	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 
 client-install:
 	$(INSTALL_DATA) localnode.pem /etc/testbed/client.pem
