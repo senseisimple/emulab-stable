@@ -163,13 +163,13 @@ LanLink instproc init {s nodes bw d type} {
     # Both lans and links can get linkdelays.     
     $self set uselinkdelay 0
 
-    # Allow user to control if link is emulated. Only links, not lans.
+    # Allow user to control if link is emulated.
     $self set emulated 0
 
-    # Allow user to turn off actual bw shaping on emulated links. Not lans.
+    # Allow user to turn off actual bw shaping on emulated links.
     $self set nobwshaping 0
 
-    # Allow user to turn on veth devices on emulated links. Not lans.
+    # Allow user to turn on veth devices on emulated links.
     $self set useveth 0
 
     # A simulated lanlink unless we find otherwise
