@@ -6,9 +6,8 @@ set nodeA [$ns node]
 set nodeB [$ns node]
 
 #
-# Only one Queue associated with a Duplex Link; Changing its params
-# change both pipes. Hope to support asymmetric queues soon!
-# 
+# A queue in each direction. 
+#
 set link0  [$ns duplex-link $nodeA $nodeB 100Mb 0ms RED]
 set queue0 [[$ns link $nodeA $nodeB] queue]
 $queue0 set gentle_ 1
@@ -18,5 +17,22 @@ $queue0 set maxthresh_ 20
 $queue0 set thresh_ 7
 $queue0 set linterm_ 11
 $queue0 set q_weight_ 0.004
+
+set queue1 [[$ns link $nodeB $nodeA] queue]
+$queue1 set gentle_ 0
+$queue1 set queue-in-bytes_ 1
+$queue1 set limit_ 60
+$queue1 set maxthresh_ 18
+$queue1 set thresh_ 9
+$queue1 set linterm_ 13
+$queue1 set q_weight_ 0.033
+
+# Some events.
+$ns at 1.0  "$queue0 set thresh_ 8"
+$ns at 2.0  "$queue1 set thresh_ 10"
+$ns at 3.0  "$queue0 set limit_ 55"
+$ns at 4.0  "$queue1 set limit_ 65"
+$ns at 30.0 "$link0 down"
+$ns at 35.0 "$link0 up"
 
 $ns run
