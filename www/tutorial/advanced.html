@@ -209,7 +209,16 @@ tb-set-node-startup $nodeA /usr/site/bin/run-my-experiment
 tb-set-node-startup $nodeB /usr/site/bin/run-my-experiment
 $ns run					</code></pre>
 
-<p>
+<i>Implementation Notes:</i>
+<ul>
+<li> Deltas are created and installed with the unix filesystem backup
+     utilities <tt>dump</tt> and <tt>restore</tt>.
+<li> Beware of changing too many critical systems and/or too many
+     changes to the <tt>/etc/rc</tt> scripts.
+<li> If you find that your customizations are too much for the Delta
+     mechanism, feel free to contact us so that we can arrange to
+     create a complete snapshot of your system.
+</ul>
 
 </ul>
 
