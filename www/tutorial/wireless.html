@@ -36,7 +36,7 @@ small example:
 	set link0 [$ns duplex-link $nodew1 $node5 100Mb 0ms DropTail]
 
 	# Choose the lan protocol.
-	tb-set-protocol $lan0 "80211g"
+	tb-set-lan-protocol $lan0 "80211g"
 
 	# You must choose which node to act as the access point.
 	tb-set-lan-accesspoint $lan0 $nodew1
