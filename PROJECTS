@@ -8,6 +8,8 @@ Things that could be done:
 
 2. Filesystem compression (mike)
 
+	[ Leigh is working on this. ]
+
 	Jay's Holy Grail of Ultimate Disk Image Compression.  I see three
 	ways of doing this:
 
@@ -85,6 +87,9 @@ Things that could be done:
 
 3. A new tip (mike)
 
+	[ Mike fixed the easy stuff: ripped out most of the escape sequences
+	  and dialer support, reduced to one process, cleanup tty on exit. ]
+
 	Things that are wrong with tip in the environment we use it for
 	(remote console access):
 
@@ -143,9 +148,62 @@ Things that could be done:
 
 6. Reduce (or eliminate) logging in default OSes
 
-	The standard daily/weekly/monthly activities are occuring and
+	The standard daily/weekly/monthly activities are occurring and
 	sending mail to root (at least in our FreeBSD image).  We should
 	either eliminate this or, better, reduce it and have it logged
 	on plastic or paper.  We should at least do some security checking
-	and mail any anomolies to testbed-ops or someplace so we know if
+	and mail any anomalies to testbed-ops or someplace so we know if
 	some machine has been cracked.
+
+7. Reduce power usage
+
+	We should do what we can to reduce excess power usage.  The most
+	obvious thing to do is turn machines off when they are not assigned.
+	The benefits are:
+
+		- maximum power savings
+		- reduced vulnerability to script kiddies
+		- longer component life?
+		- no rc5des!
+
+	The downsides are:
+
+		- can't use unassigned machines for other purposes (abone)
+		- don't save anything if the testbed is in use 24/7/365
+		- frequent transitions would be harder on the HW
+
+	At the very least, we should make our scripts capable of dealing
+	with this model.  For example, os_setup would need to check and see
+	if the machine is powered down and, if so, turn it on.  Likewise,
+	deassignment should turn the machine off.  Note we will need to 
+	differentiate "down to save power" from "down cuz it emits large
+	billows of black smoke when turned on."  Autostatus would have to
+	be taught to show "available/assigned/down" instead of "up/down".
+	To avoid excess transitions due to frequent reassignment, we can
+	delay shutting down a machine "for a while" after an experiment
+	has ended.  The end-experiment algorithm might look like:
+
+		if someone is waiting for an available node,
+			immediately reassign/reload this one
+		else
+			"clean" (reload/zero) the disk
+		if the node still isn't needed,
+			power it down
+
+	That would give a 5-10 minute window for reclamation.
+
+	What can we do for machines that are turned on?  For assigned
+	machines we probably can't dictate much.  The best we can do
+	is make our default kernels "green".  Both Linux and FreeBSD
+	probably idle the CPU, so we are probably ok there.  Not sure
+	about spinning down the disk.  Because of daemons and logging it
+	might be difficult to keep the disk spun down.  Dave/Kevin/Steve
+	worked on this some on the Jaz-disk test machines.  Some keys are:
+
+		- shutdown as many daemons as possible
+		- reduce logging and log across NFS if possible
+		- move unimportant logging to a memory disk
+
+
+	
+
