@@ -22,6 +22,7 @@ use Fcntl ':flock';
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $USERS	= "@USERNODE@";
 
 my $mapdir      = "/etc/namedb";
 my $mapfile	= "$mapdir/@OURDOMAIN@.db";
@@ -78,11 +79,56 @@ print MAP ";\n";
 print MAP "; DO NOT EDIT below this point. Auto generated map entries!\n";
 print MAP ";\n";
 print MAP "\n";
-print MAP "\$TTL\t1\n";
+print MAP "\$TTL\t1\n\n";
 
 #
-# Figure out the set of nodes we are working on. These are the nodes
-# that have a vname in the reserved table. 
+# First create the IA records for those nodes that have a named_root
+# defined. We glean the IP for the node from the interfaces table.
+#
+$db_result =
+    DBQueryFatal("select nt.type,nt.isremotenode,n.node_id,i.IP ".
+		 "  from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join interfaces as i on n.node_id=i.node_id and ".
+		 "     nt.control_net=i.card ".
+		 "where nt.isvirtnode=0 and n.role='testnode' and ".
+		 "      nt.isremotenode=1 and i.IP is not null ".
+		 "order by nt.type,n.node_id");
+
+if ($db_result->numrows > 0) {
+    #
+    # Create an IN record for each node. 
+    #
+    my $oldtype = "";
+    
+    while (@row = $db_result->fetchrow_array) {
+	my $type    = $row[0];
+	my $isremote= $row[1];
+	my $node_id = $row[2];
+	my $IP      = $row[3];
+
+	if ($oldtype ne $type) {
+	    print MAP ";\n";
+	    print MAP "; $type nodes.\n";
+	    print MAP ";\n";
+	    
+	    $oldtype = $type;
+	}
+
+	#
+	# Skip local nodes for now since we also need to add reverse map
+	# auto generation.
+	# 
+	if ($isremote) {
+	    print MAP "$node_id\tIN\tA\t$IP\n";
+	}
+    }
+}
+print MAP "\n";
+
+#
+# Figure out the set of experiment nodes we are working on. These are the 
+# nodes that have a vname in the reserved table. 
 #
 $db_result =
     DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid ".
