@@ -12,8 +12,8 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $RM $CHOWN $MOUNT $UMOUNT ## $CP $LN $CHMOD $TOUCH $EGREP
-	 $NTS $NET ## $HOSTSFILE
+    qw ( $RM $CHOWN $MOUNT $UMOUNT $CP $LN $CHMOD $TOUCH $EGREP
+	 $NTS $NET $HOSTSFILE
 	 $TMPASSWD $SFSSD $SFSCD $RPMCMD
 	 os_account_cleanup os_accounts_start os_accounts_end os_accounts_sync
 	 os_ifconfig_line os_etchosts_line
@@ -50,15 +50,15 @@ use librc;
 #
 # Various programs and things specific to CygWin on XP and that we want to export.
 # 
-##$CP		= "/bin/cp";
-##$LN		= "/bin/ln";
+$CP		= "/bin/cp";
+$LN		= "/bin/ln";
 $RM		= "/bin/rm";
 $CHOWN		= "/bin/chown";
-##$CHMOD	= "/bin/chmod";
-##$TOUCH	= "/bin/touch";
+$CHMOD		= "/bin/chmod";
+$TOUCH		= "/bin/touch";
 $MOUNT		= "/bin/mount";
 $UMOUNT		= "/bin/umount";
-##$EGREP	= "/bin/egrep -q";
+$EGREP		= "/bin/egrep -q";
 
 # Cygwin.
 $MKPASSWD	= "/bin/mkpasswd";
@@ -71,7 +71,9 @@ $NTS		= "/cygdrive/c/WINDOWS/system32";
 $NET		= "$NTS/net";
 $NETSH		= "$NTS/netsh";
 $NTE		= "$NTS/drivers/etc";
-##$HOSTSFILE	= "$NTE/hosts";
+
+#$HOSTSFILE	= "$NTE/hosts";
+$HOSTSFILE	= "/etc/hosts";
 
 #
 # These are not exported
@@ -88,7 +90,7 @@ my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $MKDIR	= "/bin/mkdir";
 my $RMDIR	= "/bin/rmdir";
 my $GATED	= "/usr/sbin/gated";
-my $ROUTE	= "route";
+my $ROUTE	= "$NTS/route";
 my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
 my $winusersfile = "$BOOTDIR/winusers";
