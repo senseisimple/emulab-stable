@@ -1,4 +1,4 @@
-*** cvsupd. - Sep 17 2001 - Needs to be fixed
+*** cvsupd. - Sep 17 2001 - Fixed by Mike on Sep 24 2001
 
 The old version of cvsupd had the billenium bug, whereby number of
 seconds since the epoc is greater than 1billion, and thus breaking
@@ -16,7 +16,7 @@ failures in NFS access from the testbed nodes since the mounts become
 momentarily invalid.
 
 
-*** Batch Mode Nots - Sep 18 2001 - Needs to be fixed
+*** Batch Mode Nits - Sep 18 2001 - Fixed by LBS on Sep 25 2001
 
 Reported by Mike.
 
@@ -46,13 +46,18 @@ experiment is terminating. I view that as intended behaviour, but its
 easy to change, so we should.
 
 
-*** Broken lilo.conf - Sep 17 2001 - Needs to be fixed.
+*** Broken lilo.conf - Sep 17 2001 - Partially fixed by LBS on Sep 24 2001
 
 Reported by Matt (and then Rob).
 
 According to Matt, our lilo.conf file is broken. In the next version
 of the disk image, we should fix it. Matt sent a fixed version to
 testbed-ops on Sep. 17 that we could use as a base.
+
+Partially fixed means I hardwired some assembly code to the serial
+line at 115200. A bug was causing it to go to the VGA all the time,
+and the higher speeds are just a mess in lilo and I did not want to
+mess with the assembly language. Too much of a time sink.
 
 
 *** IPOD support - Sep 17 2001 - Needs to be fixed.
@@ -78,4 +83,28 @@ stuff when configuring the pipes (not too hard).
 
 It is possible to start multiple batch and reload daemons (and many
 other TB daemons). Can really mess things up!
+
+
+*** No text box in approve user page - Sept 24 2001 - Needs to be fixed.
+
+Reported by Mac.
+
+We need to add a text box for sending a message to the applicant, just
+like we have in the project approval page.
+
+*** Cleanup of batch experiments - Sep 26 2001 - Needs to be fixed.
+
+Reported by LBS.
+
+Batch experiment system was created before Chris' big rework of the
+tb system. At this point, it would be cleaner to combine the batch
+experiment table into the normal experiment table (would result in a
+couple of extra slots). The two tables make for consistency and
+locking problems. What I do like about the current batch system is
+that it is more scriptable cause most stuff is done in the backend
+script; the web interface does just a bit of checking and then passes
+the whole thing off. The normal experiment creation path should look
+like this too, since splitting stuff between the web interface and the
+perl scripts is messy, and the PHP DB interface is not as nice or
+robust as the perl interface.
 
