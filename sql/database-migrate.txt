@@ -1081,7 +1081,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (IP)
        ) TYPE=MyISAM;
 
-1.198: Shashi?
+1.198: Add an issimnode column in node_types table so that checks for
+       sim node type in assign_wrapper is consistent with other similar
+       checks
+
+       alter table node_types add issimnode tinyint(4) not null default 0;
 
 1.199: Add a bit to the users table so that we can flag planetlab users:
 
@@ -1113,7 +1117,29 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table nodetypeXpid_permissions add key (pid);
 
-1.204: Shashi?
+1.204: Added the following entries so that the simulation (nse)
+       backend support could be tested in a development tree.
+       With this, simulation resources are automatically
+       mapped to a distributed set of physical resources for
+       scaling simulation resources that cannot be simulated 
+       on a single physical node. The simnode_capacity column is used
+       by ptopgen to associate different sim node capacities per
+       physical node type in the ptop file. Change the erole column in
+       the reserved table for enum simnode to simhost. Added rtabid
+       fields in the interfaces and the veth_interfaces table whichs
+       being computed in assign_wrapper for use in simhosts. The field
+       could be used by jail vnodes as well although it is not used
+       by the jail vnodes currently.
+
+       alter table node_types add simnode_capacity smallint(5) \
+               unsigned not null default 0;
+       alter table reserved change erole erole \
+               enum('node','virthost','delaynode','simhost') \
+	       NOT NULL default 'node';
+       alter table interfaces add rtabid smallint(5) \
+               unsigned not null default 0;
+       alter table veth_interfaces add rtabid smallint(5) \
+               unsigned not null default 0;
 
 1.205: Add enum to projects table to store which interface users
        should start with.
