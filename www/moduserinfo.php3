@@ -153,54 +153,40 @@ function SPITFORM($formfields, $errors)
         echo "    </td>
               </tr>\n";
 
-	#
-	# Postal Address
-	#
-	echo "<tr>
-                  <td colspan=2>*Address Line 1:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_addr]\"
-                             value=\"" . $formfields[usr_addr] . "\"
-	                     size=40>
-                  </td>
-              </tr>\n";
 
-	#
-	# Postal Address
-	#
-	echo "<tr>
-                  <td colspan=2> Address Line 2:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_addr2]\"
-                             value=\"" . $formfields[usr_addr2] . "\"
-	                     size=45>
-                  </td>
-              </tr>\n";
-
-	#
-	# City, State, Zip
-	#
-	echo "<tr>
-                  <td colspan=2>*City[<b>3</b>]:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_city]\"
-                             value=\"" . $formfields[usr_city] . "\"
-	                     size=25>
-                      &nbsp *State:
-                      <input type=text
-                             name=\"formfields[usr_state]\"
-                             value=\"" . $formfields[usr_state] . "\"
-	                     size=2>
-                      &nbsp *Zip:
-                      <input type=text
-                             name=\"formfields[usr_zip]\"
-                             value=\"" . $formfields[usr_zip] . "\"
-	                     size=5>
-                  </td>
-              </tr>\n";
+	echo "<tr><td colspan=3>*Address:<br /><center>
+		<table>
+		  <tr><td>Line 1</td><td colspan=3>
+                    <input type=text
+                           name=\"formfields[usr_addr]\"
+                           value=\"" . $formfields[usr_addr] . "\"
+	                   size=45></td></tr>
+		  <tr><td>Line 2</td><td colspan=3>
+                    <input type=text
+                           name=\"formfields[usr_addr2]\"
+                           value=\"" . $formfields[usr_addr2] . "\"
+	                   size=45></td></tr>
+		  <tr><td>City</td><td>
+                    <input type=text
+                           name=\"formfields[usr_city]\"
+                           value=\"" . $formfields[usr_city] . "\"
+	                   size=25></td>
+		      <td>State/Province</td><td>
+                    <input type=text
+                           name=\"formfields[usr_state]\"
+                           value=\"" . $formfields[usr_state] . "\"
+	                   size=2></td></tr>
+		  <tr><td>ZIP/Postal Code</td><td>
+                    <input type=text
+                           name=\"formfields[usr_zip]\"
+                           value=\"" . $formfields[usr_zip] . "\"
+	                   size=10></td>
+		      <td>Country</td><td>
+                    <input type=text
+                           name=\"formfields[usr_country]\"
+                           value=\"" . $formfields[usr_country] . "\"
+	                   size=15></td></tr>
+               </table></center></td></tr>";
 
 	#
 	# Phone
@@ -255,7 +241,8 @@ function SPITFORM($formfields, $errors)
                  edit your ssh public keys</a> and your
                  <a href='showsfskeys.php3?target_uid=$target_uid'>
 		 sfs public keys</a>.
-            <li> The City, State, Zip fields were added later, and so
+            <li> The City, State, ZIP/Postal Code, and Country fields 
+                 were added later, so
                  some early users will be forced to adjust their addresses
                  before they can proceed. Sorry for the inconvenience.
           </ol>
@@ -332,6 +319,7 @@ $defaults[usr_addr2]   = stripslashes($row[usr_addr2]);
 $defaults[usr_city]    = stripslashes($row[usr_city]);
 $defaults[usr_state]   = stripslashes($row[usr_state]);
 $defaults[usr_zip]     = stripslashes($row[usr_zip]);
+$defaults[usr_country]     = stripslashes($row[usr_country]);
 $defaults[usr_name]    = stripslashes($row[usr_name]);
 $defaults[usr_phone]   = $row[usr_phone];
 $defaults[usr_title]   = stripslashes($row[usr_title]);
@@ -401,7 +389,11 @@ if (!isset($formfields[usr_state]) ||
 }
 if (!isset($formfields[usr_zip]) ||
     strcmp($formfields[usr_zip], "") == 0) {
-    $errors["Zip Code"] = "Missing Field";
+    $errors["ZIP/Postal Code"] = "Missing Field";
+}
+if (!isset($formfields[usr_country]) ||
+    strcmp($formfields[usr_country], "") == 0) {
+    $errors["Country"] = "Missing Field";
 }
 if (!isset($formfields[usr_phone]) ||
     strcmp($formfields[usr_phone], "") == 0) {
@@ -440,6 +432,7 @@ $usr_addr     = addslashes($formfields[usr_addr]);
 $usr_city     = addslashes($formfields[usr_city]);
 $usr_state    = addslashes($formfields[usr_state]);
 $usr_zip      = addslashes($formfields[usr_zip]);
+$usr_country  = addslashes($formfields[usr_country]);
 $usr_phone    = $formfields[usr_phone];
 $password1    = $formfields[password1];
 $password2    = $formfields[password2];
@@ -541,6 +534,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     strcmp($defaults[usr_city],  $formfields[usr_city]) ||
     strcmp($defaults[usr_state], $formfields[usr_state]) ||
     strcmp($defaults[usr_zip],   $formfields[usr_zip]) ||
+    strcmp($defaults[usr_country],   $formfields[usr_country]) ||
     strcmp($defaults[usr_phone], $formfields[usr_phone]) ||
     strcmp($defaults[usr_title], $formfields[usr_title]) ||
     strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
@@ -555,6 +549,7 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 		 "usr_city=\"$usr_city\",       ".
 		 "usr_state=\"$usr_state\",     ".
 		 "usr_zip=\"$usr_zip\",         ".
+		 "usr_country=\"$usr_country\", ".
 		 "usr_phone=\"$usr_phone\",     ".
 		 "usr_title=\"$usr_title\",     ".
 		 "usr_affil=\"$usr_affil\",     ".
@@ -580,7 +575,8 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
 	   "Address2:          $usr_addr2\n".
 	   "City:              $usr_city\n".
 	   "State:             $usr_state\n".
-	   "Zip:               $usr_zip\n".
+	   "ZIP/Postal Code:   $usr_zip\n".
+	   "Country:           $usr_country\n".
 	   "Phone:             $usr_phone\n".
 	   "Title:             $usr_title\n",
 	   "From: $TBMAIL_OPS\n".

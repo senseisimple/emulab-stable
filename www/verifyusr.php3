@@ -83,6 +83,7 @@ function INFORMLEADERS($uid) {
     $usr_city	 = $row[usr_city];
     $usr_state	 = $row[usr_state];
     $usr_zip	 = $row[usr_zip];
+    $usr_country = $row[usr_country];
     $usr_name    = $row[usr_name];
     $usr_phone   = $row[usr_phone];
     $usr_title   = $row[usr_title];
@@ -118,7 +119,8 @@ function INFORMLEADERS($uid) {
 		"Address 2:       $usr_addr2\n".
 		"City:            $usr_city\n".
 		"State:           $usr_state\n".
-		"Zip:             $usr_zip\n".
+		"ZIP/Postal Code: $usr_zip\n".
+		"Country:         $usr_country\n".
 		"Phone:           $usr_phone\n".
 		"\n".
 		"Please return to $TBWWW,\n".

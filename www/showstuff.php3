@@ -364,6 +364,7 @@ function SHOWUSER($uid) {
     $usr_city    = stripslashes($row[usr_city]);
     $usr_state   = stripslashes($row[usr_state]);
     $usr_zip     = stripslashes($row[usr_zip]);
+    $usr_country = stripslashes($row[usr_country]);
     $usr_name    = stripslashes($row[usr_name]);
     $usr_phone   = $row[usr_phone];
     $usr_title   = stripslashes($row[usr_title]);
@@ -380,6 +381,8 @@ function SHOWUSER($uid) {
 	$usr_state = "&nbsp";
     if (!strcmp($usr_zip, ""))
 	$usr_zip = "&nbsp";
+    if (!strcmp($usr_country, ""))
+	$usr_country = "&nbsp";
 
     #
     # Last Login info.
@@ -449,8 +452,13 @@ function SHOWUSER($uid) {
           </tr>\n";
     
     echo "<tr>
-              <td>Zip:</td>
+              <td>ZIP:</td>
               <td>$usr_zip</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Country:</td>
+              <td>$usr_country</td>
           </tr>\n";
     
     echo "<tr>
@@ -1649,8 +1657,8 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
     $connect_type	= $row[connect_type];
     $city		= $row[city];
     $state		= $row[state];
-    $country		= $row[country];
     $zip		= $row[zip];
+    $country		= $row[country];
 
     if (! $embedded) {
 	echo "<table border=2 cellpadding=0 cellspacing=2
@@ -1692,13 +1700,13 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
           </tr>\n";
 
     echo "<tr>
-              <td>Country:</td>
-              <td class=left>$country</td>
+              <td>ZIP:</td>
+              <td class=left>$zip</td>
           </tr>\n";
 
     echo "<tr>
-              <td>Zip:</td>
-              <td class=left>$zip</td>
+              <td>Country:</td>
+              <td class=left>$country</td>
           </tr>\n";
 
     if (! $embedded) {

@@ -1116,6 +1116,7 @@ CREATE TABLE users (
   usr_city tinytext,
   usr_state tinytext,
   usr_zip tinytext,
+  usr_country tinytext,
   usr_phone tinytext,
   usr_pswd tinytext NOT NULL,
   unix_uid smallint(5) unsigned NOT NULL auto_increment,

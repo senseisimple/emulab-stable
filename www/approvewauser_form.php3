@@ -103,7 +103,7 @@ echo "<tr>
           <th>Phone</th>
       </tr>
       <tr>
-          <th colspan=5>Addr</th>
+          <th colspan=5>Address</th>
       </tr>\n";
 
 echo "<form action='approvewauser.php3' method='post'>\n";
@@ -133,6 +133,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
     $city	= $row[usr_city];
     $state	= $row[usr_state];
     $zip	= $row[usr_zip];
+    $country	= $row[usr_country];
     $phone	= $row[usr_phone];
 
     echo "<tr>
@@ -165,7 +166,14 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td>&nbsp;$phone&nbsp;</td>
           </tr>\n";
     echo "<tr>
-              <td colspan=5>&nbsp;$addr&nbsp;</td>
+              <td colspan=5>&nbsp;$addr&nbsp;"
+    if (strcmp($addr2,"")) { 
+	echo "&nbsp;$addr2&nbsp;"; 
+    }
+    echo "                  &nbsp;$city&nbsp;
+                            &nbsp;$state&nbsp;
+                            &nbsp;$zip&nbsp;
+                            &nbsp;$country&nbsp;</td>
           </tr>\n";
 }
 echo "<tr>

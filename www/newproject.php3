@@ -195,54 +195,40 @@ function SPITFORM($formfields, $returning, $errors)
                   </td>
               </tr>\n";
 
-	#
-	# Postal Address
-	#
-	echo "<tr>
-                  <td colspan=2>*Address Line 1:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_addr]\"
-                             value=\"" . $formfields[usr_addr] . "\"
-	                     size=40>
-                  </td>
-              </tr>\n";
 
-	#
-	# Postal Address
-	#
-	echo "<tr>
-                  <td colspan=2> Address Line 2:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_addr2]\"
-                             value=\"" . $formfields[usr_addr2] . "\"
-	                     size=45>
-                  </td>
-              </tr>\n";
-
-	#
-	# City, State, Zip
-	#
-	echo "<tr>
-                  <td colspan=2>*City:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_city]\"
-                             value=\"" . $formfields[usr_city] . "\"
-	                     size=25>
-                      &nbsp *State:
-                      <input type=text
-                             name=\"formfields[usr_state]\"
-                             value=\"" . $formfields[usr_state] . "\"
-	                     size=2>
-                      &nbsp *Zip:
-                      <input type=text
-                             name=\"formfields[usr_zip]\"
-                             value=\"" . $formfields[usr_zip] . "\"
-	                     size=5>
-                  </td>
-              </tr>\n";
+	echo "<tr><td colspan=3>*Postal Address:<br /><center>
+		<table>
+		  <tr><td>Line 1</td><td colspan=3>
+                    <input type=text
+                           name=\"formfields[usr_addr]\"
+                           value=\"" . $formfields[usr_addr] . "\"
+	                   size=45></td></tr>
+		  <tr><td>Line 2</td><td colspan=3>
+                    <input type=text
+                           name=\"formfields[usr_addr2]\"
+                           value=\"" . $formfields[usr_addr2] . "\"
+	                   size=45></td></tr>
+		  <tr><td>City</td><td>
+                    <input type=text
+                           name=\"formfields[usr_city]\"
+                           value=\"" . $formfields[usr_city] . "\"
+	                   size=25></td>
+		      <td>State/Province</td><td>
+                    <input type=text
+                           name=\"formfields[usr_state]\"
+                           value=\"" . $formfields[usr_state] . "\"
+	                   size=2></td></tr>
+		  <tr><td>ZIP/Postal Code</td><td>
+                    <input type=text
+                           name=\"formfields[usr_zip]\"
+                           value=\"" . $formfields[usr_zip] . "\"
+	                   size=10></td>
+		      <td>Country</td><td>
+                    <input type=text
+                           name=\"formfields[usr_country]\"
+                           value=\"" . $formfields[usr_country] . "\"
+	                   size=15></td></tr>
+               </table></center></td></tr>";
 
 	#
 	# Phone
@@ -546,6 +532,7 @@ if (! isset($submit)) {
     $defaults = array();
     $defaults[proj_URL] = "$HTTPTAG";
     $defaults[usr_URL] = "$HTTPTAG";
+    $defaults[usr_country] = "USA";
     $defaults[proj_ronpcs]  = "0";
     $defaults[proj_plabpcs] = "0";
     $defaults[proj_public] = "checked";
@@ -634,7 +621,11 @@ if (! $returning) {
     }
     if (!isset($formfields[usr_zip]) ||
 	strcmp($formfields[usr_zip], "") == 0) {
-	$errors["Zip Code"] = "Missing Field";
+	$errors["ZIP/Postal Code"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_country]) ||
+	strcmp($formfields[usr_country], "") == 0) {
+	$errors["Country"] = "Missing Field";
     }
     if (!isset($formfields[usr_phone]) ||
 	strcmp($formfields[usr_phone], "") == 0) {
@@ -763,6 +754,7 @@ if (!$returning) {
     $usr_city          = addslashes($formfields[usr_city]);
     $usr_state         = addslashes($formfields[usr_state]);
     $usr_zip           = addslashes($formfields[usr_zip]);
+    $usr_country       = addslashes($formfields[usr_country]);
     $usr_phone         = $formfields[usr_phone];
     $password1         = $formfields[password1];
     $password2         = $formfields[password2];
@@ -853,6 +845,7 @@ else {
     $usr_city	   = $row[usr_city];
     $usr_state	   = $row[usr_state];
     $usr_zip	   = $row[usr_zip];
+    $usr_country   = $row[usr_country];
     $usr_phone	   = $row[usr_phone];
     $usr_URL       = $row[usr_URL];
     $usr_returning = "Yes";
@@ -915,12 +908,13 @@ if (! $returning) {
 
     DBQueryFatal("INSERT INTO users ".
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	 " usr_addr2,usr_city,usr_state,usr_zip, ".
+	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
 	 " usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,".
 	 " status,pswd_expires,usr_modified) ".
 	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
          "'$usr_email', ".
 	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
+	 "'$usr_country', ".
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
 	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year), now())");
@@ -1002,7 +996,8 @@ TBMAIL($TBMAIL_APPROVAL,
      "Address 2:       $usr_addr2\n".
      "City:            $usr_city\n".
      "State:           $usr_state\n".
-     "Zip:             $usr_zip\n".
+     "ZIP/Postal Code: $usr_zip\n".
+     "Country:         $usr_country\n".
      "Phone:           $usr_phone\n".
      "Members:         $proj_members\n".
      "PCs:             $proj_pcs\n".
