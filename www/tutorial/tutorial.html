@@ -827,13 +827,13 @@ set clientlan [$ns make-lan "$nodeE $nodeF $nodeG" 100Mb 0ms]
 $nodeA add-route $clientlan $nodeB
 </pre></code>
 
-While all this manual routing infrastructure sounds really nifty,
-its probably a good idea to use
-<tt>Session</tt> routing for all but small, simple topologies.
-Explicitly setting up all the routes in even a
-moderately-sized experiment is extremely error prone.
-Consider this: a recently created experiment with 17 nodes and 10 subnets
-required 140 hand-created routes in the NS file. Yow!
+While all this manual routing infrastructure sounds really nifty, its
+probably a good idea to use either <tt>Session</tt> or <tt>Static</tt>
+routing for all but small, simple topologies.  Explicitly setting up
+all the routes in even a moderately-sized experiment is extremely
+error prone.  Consider this: a recently created experiment with 17
+nodes and 10 subnets required 140 hand-created routes in the NS
+file. Yow!
 
 <p>
 Two final, cautionary notes on routing:
