@@ -266,21 +266,27 @@ tb-set-dnard-os $shelf1 1 MY-SHARK-OS
 <pre>
 tb-create-os <i>id</i> <i>path</i> <i>partition</i>
 
-XXX Need examples
+tb-create-os MYKERNEL pingreply mb
+tb-create-os MYKERNEL image.ndz 4
 </pre>
 
 <dl>
   <dt><i>id</i> - The ID for the OS.
-  <dt><i>path</i> - XXX
-  <dt><i>partition</i> - XXX
+  <dt><i>path</i> - The path, relative to your project directory, to
+      the OS or disk image.
+  <dt><i>partition</i> - Either 4 to install onto DOS slice 4, or
+      <code>mb</code> to boot an OSKIT kernel.
 </dl>
 
 <p>Notes:
 
 <ul>
-  <li>XXX - Need responce from Leigh to finish this section.
+  <li>This command is not fully supported yet.
   <li>This command allows <i>id</i> to be used in other OS commands to
       setup nodes with custom OSs.
+  <li>Currently only two partitions are allowed.  4 refers to DOS
+      slice 4, and <code>mb</code> is specially used to boot OSKIT
+      kernels.
 </ul>
 
 <hr>
@@ -373,7 +379,7 @@ support going.
    Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
 <br>
 <!-- hhmts start -->
-Last modified: Tue Mar 13 12:12:09 MST 2001
+Last modified: Tue Mar 13 12:57:29 MST 2001
 <!-- hhmts end -->
 </address>
 
