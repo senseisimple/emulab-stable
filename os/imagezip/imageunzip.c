@@ -306,8 +306,9 @@ inflate_subblock(char *chunkbufp)
 		total  += offset - total;
 	}
 	else {
-		assert(offset > total);
-		writezeros(offset - total);
+		assert(offset >= total);
+		if (offset > total)
+			writezeros(offset - total);
 	}
 
 	if (debug == 1)
