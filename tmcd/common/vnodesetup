@@ -713,7 +713,7 @@ sub removeconfdir($)
 sub hackwaitandexit()
 {
     my $now   = time();
-    my $goofy = CONFDIR() . "/proceed";
+    my $goofy = CONFDIR() . "/root/var/run/emulab-watchdog.pid";
     my $count = 60;
 	
     while ($count--) {
