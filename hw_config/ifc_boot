@@ -1,4 +1,8 @@
 #!/usr/bin/perl
+
+my $rsh = "ssh";
+my $rcp = "scp";
+
 if ( $#ARGV < 0) {
     die("Usage: ifc_boot <ifc_file>\n". 	
 	"(Sets network configurations for booting)\n");
@@ -41,7 +45,7 @@ while (<IN>) {
 	do { } until ( <PING> =~ /transmitted, (\d*) packets received/ );
 	print "Got $1 ping packet(s) back from $IP.\n";
 	if ( $1 > 0 ) {
-	    open(UNAME,"rsh $IP uname -a 2>&1 |");
+	    open(UNAME,"$rsh $IP uname -a 2>&1 |");
 	    $_ = <UNAME>;
 	    #print $_;
 	    if ($_ ) { @temp = split(" ",$_); $OS = $temp[$0]; }
@@ -81,8 +85,8 @@ while (<IN>) {
     my $host = `uname -n`;
     $host =~ s/\n//;
     open(IFC,
-	 "rsh $IP rcp $host:/tmp/ifc_boot_file ".
-	 "/etc/sysconfig/network-scripts/ifcfg-$ifstr$IF |"
+	 "$rcp /tmp/ifc_boot_file ".
+	 "$IP:/etc/sysconfig/network-scripts/ifcfg-$ifstr$IF |"
 	 );
     while ( <IFC> ) {
 	print ">> $_";

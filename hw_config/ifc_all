@@ -1,4 +1,7 @@
 #!/usr/bin/perl
+
+my $rsh = "ssh";
+
 if ( $#ARGV < 0) {
     die("Usage: ifc_all <ifc_file>\n");
 }
@@ -40,7 +43,7 @@ while (<IN>) {
 	do { } until ( <PING> =~ /transmitted, (\d*) packets received/ );
 	print "Got $1 ping packet(s) back from $IP.\n";
 	if ( $1 > 0 ) {
-	    open(UNAME,"rsh $IP uname -a 2>&1 |");
+	    open(UNAME,"$rsh $IP uname -a 2>&1 |");
 	    $_ = <UNAME>;
 	    #print $_;
 	    if ($_ ) { @temp = split(" ",$_); $OS = $temp[$0]; }
@@ -61,7 +64,7 @@ while (<IN>) {
     }
     print "Setting $IP $ifstr$IF to $newIP...\n";
     open(IFC,
-	 "rsh $IP /sbin/ifconfig $ifstr$IF inet $newIP ".
+	 "$rsh $IP /sbin/ifconfig $ifstr$IF inet $newIP ".
 	 "netmask 255.255.255.0 2>&1 |"
 	 );
     while ( <IFC> ) {
