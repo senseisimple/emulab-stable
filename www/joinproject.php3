@@ -44,9 +44,10 @@ function SPITFORM($formfields, $returning, $errors)
     PAGEHEADER("Apply for Project Membership");
 
     if ($errors) {
-	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
+	echo "<table class=stealth
+                     align=center border=0 cellpadding=0 cellspacing=2>
               <tr>
-                 <td nowrap align=center colspan=3>
+                 <td class=stealth nowrap align=center colspan=3>
                    <font size=+1 color=red>
                       Oops, please fix the following errors!
                    </font>
@@ -55,9 +56,11 @@ function SPITFORM($formfields, $returning, $errors)
 
 	while (list ($name, $message) = each ($errors)) {
 	    echo "<tr>
-                     <td align=right><font color=red>$name:</font></td>
-                     <td>&nbsp &nbsp</td>
-                     <td align=left><font color=red>$message</font></td>
+                     <td class=stealth align=right>
+                         <font color=red>$name:</font></td>
+                     <td class=stealth>&nbsp &nbsp</td>
+                     <td class=stealth align=left>
+                         <font color=red>$message</font></td>
                   </tr>\n";
 	}
 	echo "</table><br>\n";
@@ -204,6 +207,7 @@ function SPITFORM($formfields, $returning, $errors)
                       <br>
 	              <input type=text
                              name=\"formfields[usr_key]\"
+                             value=\"$formfields[usr_key]\"
 	                     size=50
 	                     maxlength=1024>
                   </td>
@@ -275,7 +279,15 @@ function SPITFORM($formfields, $returning, $errors)
     if (! $returning) {
 	echo "<li> If you want us to use your existing ssh public key,
                    then either paste it in or specify the path to your
-                   your identity.pub file.
+                   your identity.pub file.  <font color=red>NOTE:</font>
+                   We use the <a href=www.openssh.org>OpenSSH</a> key format,
+                   which has a slightly different protocol 2 public key format
+                   than some of the commercial vendors such as
+                   <a href=www.ssh.com>SSH Communications</a>. If you
+                   use one of these commercial vendors, then please
+                   upload the public  key file and we will convert it
+                   for you. <i>Please do not paste it in.</i>\n
+
               <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a>
                    users: The file upload mechanism is broken in Opera, so
                    you cannot specify a local file for upload. Instead,
@@ -451,55 +463,41 @@ if (!$returning) {
     }
 
     #
-    # Pasted in key.
-    # 
+    # Pub Key.
+    #
     if (isset($formfields[usr_key]) &&
 	strcmp($formfields[usr_key], "")) {
         #
-        # Replace any embedded newlines first.
-        #
-	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
-
+        # This is passed off to the shell, so taint check it.
+        # 
 	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
 	    $errors["PubKey"] = "Invalid characters";
-
-	    SPITFORM($formfields, $errors);
-	    PAGEFOOTER();
-	    return;
 	}
 	else {
-	    $usr_key[] = $formfields[usr_key];
+            #
+            # Replace any embedded newlines first.
+            #
+	    $formfields[usr_key] =
+		ereg_replace("[\n]", "", $formfields[usr_key]);
+	    $usr_key = $formfields[usr_key];
+	    $addpubkeyargs = "-k $joining_uid '$usr_key' ";
 	}
     }
-    
+
     #
     # If usr provided a file for the key, it overrides the paste in text.
-    # Must read and check it.
     #
     if (isset($usr_keyfile) &&
 	strcmp($usr_keyfile, "") &&
 	strcmp($usr_keyfile, "none")) {
 
-	if (! ($fp = fopen($usr_keyfile, "r"))) {
-	    TBERROR("Could not open $usr_keyfile", 1);
+	if (! stat($usr_keyfile)) {
+	    $errors["PubKey File"] = "No such file";
 	}
-	while (!feof($fp)) {
-	    $buffer = fgets($fp, 4096);
-
-	    if (ereg("^[\n\#]", $buffer))
-		continue;
-
-	    if (! preg_match("/^[-\w\s\.\@\+\/\=\r\n]*$/", $buffer)) {
-		$errors["PubKey File Contents"] = "Invalid characters";
-
-		fclose($fp);
-		SPITFORM($formfields, $returning, $errors);
-		PAGEFOOTER();
-		return;
-	    }
-	    $usr_key[] = Chop($buffer);
+	else {
+	    $addpubkeyargs = "$joining_uid $usr_keyfile";
+	    chmod($usr_keyfile, 0640);	
 	}
-	fclose($fp);
     }
 }
 else {
@@ -542,6 +540,14 @@ elseif (TBGroupMember($joining_uid, $pid, $gid, $approved)) {
     $errors["Membership"] = "You are already a member";
 }
 
+#
+# Verify key format.
+#
+if (isset($addpubkeyargs) &&
+    ADDPUBKEY("nobody", "webaddpubkey -n $addpubkeyargs")) {
+    $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
+}
+
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
     PAGEFOOTER();
@@ -557,6 +563,14 @@ if (count($errors)) {
 if (! $returning) {
     $encoding = crypt("$password1");
 
+    #
+    # Must be done before user record is inserted!
+    # XXX Since user does not exist, must run as nobody. Script checks. 
+    # 
+    if (isset($addpubkeyargs)) {
+	ADDPUBKEY("nobody", "webaddpubkey $addpubkeyargs");
+    }
+
     DBQueryFatal("INSERT INTO users ".
 	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	" usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,".
@@ -567,32 +581,6 @@ if (! $returning) {
         "'$encoding', NULL, 'newuser', ".
 	"date_add(now(), interval 1 year), now())");
 
-    if (isset($usr_key)) {
-	while (list ($idx, $stuff) = each ($usr_key)) {
-            #
-            # Need to separate out the comment field. 
-            #
-	    $pieces = explode(" ", $stuff);
-
-	    if (count($pieces) == 4) {
-		$key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
-		$comment = $pieces[3];
-	    }
-	    elseif (count($pieces) == 3) {
-		$key     = "$pieces[0] $pieces[1] $pieces[2]";
-		$comment = $pieces[0] . "-" . $pieces[2];
-	    }
-	    elseif (count($pieces) == 1) {
-		continue;
-	    }
-	    else {
-		TBERROR("Improper key: $stuff", 0);
-	    }
-	    DBQueryFatal("replace into user_pubkeys ".
-			 "values ('$joining_uid', '$comment', '$key', now())");
-	}
-    }
-    
     $key = GENKEY($joining_uid);
 
     TBMAIL("$usr_name '$joining_uid' <$usr_email>",

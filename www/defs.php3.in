@@ -169,6 +169,19 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
     return $retval;
 }
 
+function ADDPUBKEY($uid, $cmdandargs) {
+    global $TBSUEXEC_PATH;
+
+    ignore_user_abort(1);
+
+    $output = array();
+    $retval = 0;
+    $result = exec("$TBSUEXEC_PATH $uid nobody $cmdandargs",
+		   $output, $retval);
+
+    return $retval;
+}
+
 #
 # Verify a URL.
 #

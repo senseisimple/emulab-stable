@@ -54,7 +54,8 @@ if (! mysql_num_rows($query_result)) {
     SPITSTATUS(CDROMSTATUS_BADCDKEY);
     return;
 }
-$row = mysql_fetch_array($query_result);
+$row    = mysql_fetch_array($query_result);
+$cdvers = $row[version];
 
 #
 # Grab the privkey record. First squeeze out any spaces.
@@ -148,20 +149,20 @@ DBQueryFatal("update widearea_privkeys ".
 
 header("Content-Type: text/plain");
 echo "privkey=$newkey\n";
-if (0) {
-    echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
-    echo "slice1_image=http://${WWWHOST}/images/slice1.ndz\n";
-    echo "slice1_md5=2970e2cf045f5872c6728eeea3b51dae\n";
-    echo "slicex_mount=/users\n";
-    echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
-    echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
-}
-else {
+if ($cdvers == 1) {
     echo "fdisk=image.fdisk\n";
     echo "slice1_image=slice1.ndz\n";
     echo "slice1_md5=cb810b43f49d15b3ac4122ff42f8925d\n";
     echo "slicex_mount=/users\n";
     echo "slicex_tarball=slicex.tar.gz\n";
+    echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
+}
+else {
+    echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
+    echo "slice1_image=http://${WWWHOST}/images/slice1-v2.ndz\n";
+    echo "slice1_md5=5389a2687cee16ff212bbd842585a5d5\n";
+    echo "slicex_mount=/users\n";
+    echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
     echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
 }
 echo "emulab_status=0\n";

@@ -112,9 +112,10 @@ function SPITFORM($formfields, $errors)
           </center><br>\n";
 
     if ($errors) {
-	echo "<table align=center border=0 cellpadding=0 cellspacing=2>
+	echo "<table class=stealth
+                     align=center border=0 cellpadding=0 cellspacing=2>
               <tr>
-                 <td align=center colspan=3>
+                 <td class=stealth align=center colspan=3>
                    <font size=+1 color=red>
                       Oops, please fix the following errors!
                    </font>
@@ -123,9 +124,11 @@ function SPITFORM($formfields, $errors)
 
 	while (list ($name, $message) = each ($errors)) {
 	    echo "<tr>
-                     <td align=right><font color=red>$name:</font></td>
-                     <td>&nbsp</td>
-                     <td align=left><font color=red>$message</font></td>
+                     <td class=stealth align=right>
+                           <font color=red>$name:</font></td>
+                     <td class=stealth>&nbsp</td>
+                     <td class=stealth align=left>
+                           <font color=red>$message</font></td>
                   </tr>\n";
 	}
 	echo "</table><br>\n";
@@ -153,6 +156,7 @@ function SPITFORM($formfields, $errors)
                   <br>
 	          <input type=text
                          name=\"formfields[usr_key]\"
+                         value=\"$formfields[usr_key]\"
 	                 size=50
 	                 maxlength=1024>
               </td>
@@ -199,6 +203,14 @@ function SPITFORM($formfields, $errors)
                  when adding new ssh public keys. 
           </ol>
           </blockquote></blockquote></blockquote>\n";
+
+    echo "<font color=red>NOTE:</font> We use the
+          <a href=www.openssh.org>OpenSSH</a> key format, which has a slightly
+          different protocol 2 public key format than some of the commercial 
+          vendors such as <a href=www.ssh.com>SSH Communications</a>. If you
+          use one of these commercial vendors, then please upload the public
+          key file and we will convert it for you. <i>Please do not paste
+          it in.</i>\n";
 }
 
 #
@@ -219,58 +231,43 @@ $errors = array();
 
 if (isset($formfields[usr_key]) &&
     strcmp($formfields[usr_key], "")) {
-    #
-    # Replace any embedded newlines first.
-    #
-    $formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
 
+    #
+    # This is passed off to the shell, so taint check it.
+    # 
     if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
 	$errors["PubKey"] = "Invalid characters";
-
-	SPITFORM($formfields, $errors);
-	PAGEFOOTER();
-	return;
     }
     else {
-	$usr_key[] = $formfields[usr_key];
+        #
+        # Replace any embedded newlines first.
+        #
+	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
+	$usr_key = $formfields[usr_key];
+	$addpubkeyargs = "-k $uid '$usr_key' ";
     }
 }
 
 #
 # If usr provided a file for the key, it overrides the paste in text.
-# Must read and check it.
 #
 if (isset($usr_keyfile) &&
     strcmp($usr_keyfile, "") &&
     strcmp($usr_keyfile, "none")) {
 
-    if (! ($fp = fopen($usr_keyfile, "r"))) {
-	TBERROR("Could not open $usr_keyfile", 1);
+    if (! stat($usr_keyfile)) {
+	$errors["PubKey File"] = "No such file";
     }
-    while (!feof($fp)) {
-	$buffer = fgets($fp, 4096);
-
-	if (ereg("^[\n\#]", $buffer))
-	    continue;
-
-	if (! preg_match("/^[-\w\s\.\@\+\/\=\r\n]*$/", $buffer)) {
-	    $errors["PubKey File Contents"] = "Invalid characters";
-
-	    fclose($fp);
-	    SPITFORM($formfields, $errors);
-	    PAGEFOOTER();
-	    return;
-	}
-	$usr_key[] = Chop($buffer);
+    else {
+	$addpubkeyargs = "$uid $usr_keyfile";
+	chmod($usr_keyfile, 0640);	
     }
-    fclose($fp);
 }
 
 #
-# Insert each key. The comment field serves as the secondary key
-# to avoid duplication.
-# 
-if (isset($usr_key)) {
+# Must verify passwd to add keys.
+#
+if (isset($addpubkeyargs)) {
     if (! $isadmin) {
 	if (!isset($formfields[password]) ||
 	    strcmp($formfields[password], "") == 0) {
@@ -279,71 +276,35 @@ if (isset($usr_key)) {
 	elseif (VERIFYPASSWD($target_uid, $formfields[password]) != 0) {
 	    $errors["Password"] = "Incorrect password";
 	}
-
-	if (count($errors)) {
-	    SPITFORM($formfields, $errors);
-	    PAGEFOOTER();
-	    return;
-	}
     }
-    
-    $chunky = "";
-    
-    while (list ($idx, $stuff) = each ($usr_key)) {
-	#
-	# Need to separate out the comment field. 
-	#
-	$pieces = explode(" ", $stuff);
-
-	if (count($pieces) == 4) {
-	    $key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
-	    $comment = $pieces[3];
-	}
-	elseif (count($pieces) == 3) {
-	    $key     = "$pieces[0] $pieces[1] $pieces[2]";
-	    $comment = $pieces[0] . "-" . $pieces[2];
-	}
-	elseif (count($pieces) == 1) {
-	    continue;
-	}
-	else {
-	    TBERROR("Improper key: $stuff", 0);
-	}
-	DBQueryFatal("replace into user_pubkeys ".
-		     "values ('$target_uid', '$comment', '$key', now())");
-
-	$chunky .= chunk_split($key, 70, "\n");
-	$chunky .= "\n";
-    }
-
-    DBQueryFatal("update users set usr_modified=now() ".
-		 "where uid='$target_uid'");
-
-    #
-    # Audit
-    #
-    TBUserInfo($uid, $uid_name, $uid_email);
-    TBUserInfo($target_uid, $targuid_name, $targuid_email);
-
-    TBMAIL("$targuid_name <$targuid_email>",
-	   "SSH Public Key for '$target_uid' Added",
-	   "\n".
-	   "SSH Public Key for '$target_uid' added by '$uid'.\n".
-	   "\n".
-	   "$chunky\n".
-	   "\n".
-	   "Thanks,\n".
-	   "Testbed Ops\n".
-	   "Utah Network Testbed\n",
-	   "From: $uid_name <$uid_email>\n".
-	   "Cc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
-
-    #
-    # mkacct updates the user pubkeys.
-    # 
-    SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $target_uid", 0);
 }
+else {
+    $errors["Missing Args"] = "Please supply a key or a keyfile";
+}
+
+# Spit the errors
+if (count($errors)) {
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Okay, first run the script in verify mode to see if the key is
+# parsable. If it is, then do it for real.
+#
+if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
+    $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
+ADDPUBKEY($uid, "webaddpubkey -a $addpubkeyargs");
+
+#
+# mkacct updates the user pubkeys in ~ssh/authorized_keys.
+# 
+SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $target_uid", 0);
 
 header("Location: showpubkeys.php3?target_uid=$target_uid&finished=1");
 ?>
