@@ -160,6 +160,7 @@ namespace eval GLOBALS {
     # Some settings taken from configure.
     variable tbroot @prefix@
     variable libdir @prefix@/lib/ns2ir
+    variable disablense {@DISABLE_NSE@}
 
     # This is the location of the tb_compat.tcl file.  It is copied
     # into the same directory is the ns file so that the initial
@@ -409,9 +410,11 @@ proc parse_delay {dspec} {
 # the NS file.
 
 # We first run the script through NSE to check syntax errors
-file copy -force ${GLOBALS::nstbcompat} tb_compat.tcl
-if { [catch {exec nse ${GLOBALS::nsfile}} errMsg] == 1 } {
-    perror "Syntax check with NS failed\nerrorcode: $errorCode\n error msg: $errMsg"
+if { ${GLOBALS::disablense} != 1 } {
+    file copy -force ${GLOBALS::nstbcompat} tb_compat.tcl
+    if { [catch {exec nse ${GLOBALS::nsfile}} errMsg] == 1 } {
+	perror "Syntax check with NS failed\nerrorcode: $errorCode\n error msg: $errMsg"
+    }
 }
 
 if { ${GLOBALS::errors} != 1 } {
