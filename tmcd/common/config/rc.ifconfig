@@ -175,6 +175,7 @@ sub doboot()
 	    my $iface    = $ifconfig->{IFACE};
 	    my $ifrtabid = undef;
 	    my $encap    = $ifconfig->{ENCAP};
+	    my $vtag	 = $ifconfig->{VTAG};
 
 	    #
 	    # A bit of history.
@@ -199,7 +200,7 @@ sub doboot()
 
 	    my ($upline, $downline) =
 		os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,
-				 $ifrtabid, $encap);
+				 $ifrtabid, $encap, $vtag);
 		    
 	    $upcmds   .= "$upline\n    ";
 	    $upcmds   .= TMROUTECONFIG . " $inet up\n    ";

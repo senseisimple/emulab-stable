@@ -1428,6 +1428,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 	while (nrows) {
 		char *bufp   = buf;
+		char *mask;
 		row = mysql_fetch_row(res);
 
 		if (vers >= 16) {
@@ -1439,10 +1440,11 @@ COMMAND_PROTOTYPE(doifconfig)
 		 * no underlying phys interface (say, colocated nodes in a
 		 * link).
 		 */
+		mask = CHECKMASK(row[4]);
 		bufp += OUTPUT(bufp, ebufp - bufp,
 		       "IFACETYPE=veth "
 		       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
-		       row[1], CHECKMASK(row[4]), row[0], row[2],
+		       row[1], mask, row[0], row[2],
 		       row[3] ? row[3] : "none");
 
 		if (vers >= 14) {
@@ -1456,6 +1458,25 @@ COMMAND_PROTOTYPE(doifconfig)
 		}
 		if (vers >= 17) {
 			bufp += OUTPUT(bufp, ebufp - bufp, " LAN=%s", row[6]);
+		}
+		/*
+		 * Return a VLAN tag.
+		 * XXX right now we compute this from the subnet.
+		 */
+		if (vers >= 20) {
+			unsigned short vtag;
+			struct in_addr tip, tmask;
+			in_addr_t addr;
+			int bits;
+
+			inet_aton(row[1], &tip);
+			inet_aton(mask, &tmask);
+			addr = ntohl(tmask.s_addr);
+			for (bits = 0; (addr & (1 << bits)) == 0; bits++)
+				;
+			vtag = (ntohl(tip.s_addr) >> bits) & 0xFFFF;
+
+			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%d", vtag);
 		}
 
 		OUTPUT(bufp, ebufp - bufp, "\n");

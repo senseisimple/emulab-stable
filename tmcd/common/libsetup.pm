@@ -47,7 +47,7 @@ use POSIX qw(strftime);
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 19; };
+sub TMCD_VERSION()	{ 20; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -479,7 +479,7 @@ sub getifconfig($)
 
     my $vethpat = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
     $vethpat   .= q(ID=(\d*) VMAC=(\w*) PMAC=(\w*) RTABID=(\d*) );
-    $vethpat   .= q(ENCAPSULATE=(\d*) LAN=([-\w\(\)]*));
+    $vethpat   .= q(ENCAPSULATE=(\d*) LAN=([-\w\(\)]*) VTAG=(\d*));
 
     my $setpat  = q(INTERFACE_SETTING MAC=(\w*) );
     $setpat    .= q(KEY='([-\w\.\:]*)' VAL='([-\w\.\:]*)');
@@ -546,6 +546,7 @@ sub getifconfig($)
 	    my $rtabid   = $7;
 	    my $encap    = $8;
 	    my $lan      = $9;
+	    my $vtag	 = $10;
 
 	    #
 	    # Inside a jail, the vmac is really the pmac. That is, when the
@@ -585,6 +586,7 @@ sub getifconfig($)
 	    $ifconfig->{"RTABID"}   = $rtabid;
 	    $ifconfig->{"ENCAP"}    = $encap;
 	    $ifconfig->{"LAN"}      = $lan;
+	    $ifconfig->{"VTAG"}     = $vtag;
 	    push(@ifacelist, $ifconfig);
 	}
 	else {

@@ -189,9 +189,9 @@ sub os_ifconfig_line($$$$$$$;$$)
 #
 # Specialized function for configing locally hacked veth devices.
 #
-sub os_ifconfig_veth($$$$$;$$)
+sub os_ifconfig_veth($$$$$;$$$)
 {
-    my ($iface, $inet, $mask, $id, $vmac, $rtabid, $encap) = @_;
+    my ($iface, $inet, $mask, $id, $vmac, $rtabid, $encap, $vtag) = @_;
     my ($uplines, $downlines);
 
     #
@@ -203,8 +203,10 @@ sub os_ifconfig_veth($$$$$;$$)
     require Socket;
     import Socket;
 
-    # Need to derive a vlan tag. Just use the middle two octets.
-    my $vtag = (unpack("I", inet_aton($inet)) >> 8) & 0xffff;
+    if (!defined($vtag)) {
+	# Need to derive a vlan tag. Just use the middle two octets.
+	my $vtag = (unpack("I", inet_aton($inet)) >> 8) & 0xffff;
+    }
 
     if ($vmac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
 	$vmac = "$1:$2:$3:$4:$5:$6";
