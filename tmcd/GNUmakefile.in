@@ -8,7 +8,7 @@ SUBDIR		= tmcd
 
 include $(OBJDIR)/Makeconf
 
-all:	tmcd tmcc
+all:	tmcd tmcc tmcd.restart
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
