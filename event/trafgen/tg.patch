@@ -1,4 +1,3 @@
-Only in tg2.0/src/tg: #prot_dgram.c#
 diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
 --- dist-tg2.0/src/tg/log.c	Thu Jan 24 16:30:09 2002
 +++ tg2.0/src/tg/log.c	Wed Mar 13 12:43:19 2002
@@ -76,7 +75,7 @@ diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
  
 diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
 --- dist-tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_dgram.c	Wed Mar 20 12:25:16 2002
++++ tg2.0/src/tg/prot_dgram.c	Tue Apr 23 17:34:32 2002
 @@ -198,6 +198,22 @@
  	for (;;)
  		{
@@ -116,9 +115,19 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  		return (-1);
  		}
  	else
+@@ -609,6 +627,9 @@
+ 	justrcvd = 0;
+ 	sta = close(fd);    
+ 	log_teardown(NULL, sta == 0 ? -1 : sta);
++#ifdef USEEVENTS
++	firsttime = 1;
++#endif
+ 	return (sta);
+ 	}
+ 
 diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
 --- dist-tg2.0/src/tg/prot_stream.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_stream.c	Wed Mar 20 12:25:06 2002
++++ tg2.0/src/tg/prot_stream.c	Wed Apr 24 11:44:28 2002
 @@ -147,6 +147,22 @@
  	for (;;)
  		{
@@ -150,10 +159,42 @@ diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
  		return (-1);
              } else {
  
+@@ -597,6 +614,22 @@
+ 		return (-1);
+ 		}
+ 
++#ifdef USEEVENTS
++	/*
++	 * XXX force the connection to disappear quickly in case we are
++	 * doing a restart.
++	 *
++	 * This is not considered a legit thing to do in general as it
++	 * potentially leaves TCP segments floating around that might be
++	 * improperly delivered to a new connection on the same IP/port.
++	 */
++	{
++		struct linger linger;
++		linger.l_onoff = 1;
++		linger.l_linger = 0;
++		setsockopt(fd, SOL_SOCKET, SO_LINGER, &linger, sizeof(linger));
++	}
++#endif
+ 	result = close(fd);
+ 	log_teardown(NULL, result == 0 ? -1 : errno);
+ 
+@@ -626,5 +659,8 @@
+ 		errno = tmperrno;
+ 		}
+ 
++#ifdef USEEVENTS
++	firsttime = 1;
++#endif
+ 	return (result);
+ 	}
 diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
 --- dist-tg2.0/src/tg/prot_tcp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_tcp.c	Tue Apr  2 23:20:41 2002
-@@ -184,7 +184,17 @@
++++ tg2.0/src/tg/prot_tcp.c	Tue Apr 23 17:32:44 2002
+@@ -184,7 +184,24 @@
  			return (-1);
  		}	
  
@@ -161,6 +202,13 @@ diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
 +		/* Bind to a local address if desired.			*/
 +		if (prot->qos & QOS_SRC)
 +			{
++#ifdef USEEVENTS
++			flags = 1;
++			if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof(int)) < 0)
++				{
++				perror("tcp_setup: can't set REUSEADDR");
++				}
++#endif
 +			if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
 +				{
 +				(void)close(sfd);
@@ -170,6 +218,20 @@ diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
 +
 +		if ((connect(sfd, &(prot->dst), sizeof(prot->dst)) < 0) &&
  		    (errno != EINPROGRESS))
+ 			{
+ 			(void)close(sfd);
+@@ -217,6 +234,13 @@
+ 			return (-1);
+ 		}	
+ 
++#ifdef USEEVENTS
++		flags = 1;
++		if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof(int)) < 0)
++			{
++			perror("tcp_setup: can't set REUSEADDR");
++			}
++#endif
+ 		if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
  			{
  			(void)close(sfd);
 diff -ru dist-tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
@@ -185,8 +247,21 @@ diff -ru dist-tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
  	else
 diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
 --- dist-tg2.0/src/tg/prot_udp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_udp.c	Wed Mar 13 09:16:49 2002
-@@ -205,7 +205,7 @@
++++ tg2.0/src/tg/prot_udp.c	Tue Apr 23 17:33:02 2002
+@@ -199,13 +199,20 @@
+ 
+ 		if (prot->qos & QOS_SRC)
+ 			{
++#ifdef USEEVENTS
++			flags = 1;
++			if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof(int)) < 0)
++			{
++				perror("udp_setup: can't set REUSEADDR");
++			}
++#endif
+ 			if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
+ 				{
+ 				(void)close(sfd);
  				return (-1);
  				}
  			}
@@ -195,7 +270,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  		    (errno != EINPROGRESS))
  			{
  			(void)close(sfd);
-@@ -232,7 +232,7 @@
+@@ -232,7 +239,7 @@
  
  
  
@@ -204,33 +279,52 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  		addr = (struct sockaddr_in *)&(prot->src);
  		if ( IN_MULTICAST(ntohl(addr->sin_addr.s_addr)))		
  	        {
+@@ -270,6 +277,13 @@
+ 		 }   
+ 		 else
+ 		 {    
++#ifdef USEEVENTS
++			flags = 1;
++			if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof(int)) < 0)
++			{
++				perror("udp_setup: can't set REUSEADDR");
++			}
++#endif
+ 		        if (bind(sfd, &(prot->src), sizeof(prot->src)) < 0)
+ 			{
+ 			    (void)close(sfd);
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Wed Mar 20 12:23:02 2002
-@@ -133,7 +133,10 @@
++++ tg2.0/src/tg/tg.y	Wed Apr 24 11:41:35 2002
+@@ -133,7 +133,11 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
  char			*ifile = NULL;
 - int			FlushOutput = 0;      /* whether to flush after each*/
 +int			FlushOutput = 0;      /* whether to flush after each*/
++int			active_tx_asn = -1;
 +#ifdef USEEVENTS
 +int			gotevent;
 +#endif
  
  
  /* Variables local to this file.					*/
-@@ -856,6 +859,10 @@
+@@ -856,6 +860,14 @@
  	void		sigint();
  	FILE		*fp;
  
 +#ifdef USEEVENTS
 +	tgevent_init(argc, argv);
++
++	(void) signal(SIGINT, sigint);
++	(void) signal(SIGTERM, sigint);
++
 +	tgevent_loop();
 +#else
  	/* Set debugging if it is desired.				*/
  
  #	if YYDEBUG
-@@ -917,6 +924,7 @@
+@@ -917,6 +929,7 @@
  	/* Generate traffic.						*/
  
  	do_actions();
@@ -238,7 +332,16 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  	return (0);
  	}
  
-@@ -1017,6 +1025,10 @@
+@@ -1005,7 +1018,7 @@
+ 	/* If there is no explicit setup clause, do an immediate setup.	*/
+ 
+ 	if (got_setup_implicit &&
+-	    ((tx_asn = (*(prot.prot->setup))(&prot)) == -1))
++	    ((active_tx_asn = tx_asn = (*(prot.prot->setup))(&prot)) == -1))
+ 		{
+ 
+ 		/* log the setup error. */
+@@ -1017,6 +1030,10 @@
  	/* Each pass through the following loop processes one tg_action	*/
  	/* element from the list.					*/
  
@@ -249,7 +352,16 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  	for (cur_tg = tg_first; cur_tg != NULL; cur_tg = cur_tg->next)
  		{
  
-@@ -1116,7 +1128,7 @@
+@@ -1070,7 +1087,7 @@
+ 
+ 			/* Perform setup phase.				*/
+ 
+-			if ((tx_asn = (*(prot.prot->setup))(&prot)) == -1)
++			if ((active_tx_asn = tx_asn = (*(prot.prot->setup))(&prot)) == -1)
+ 				{
+ 
+ 				/* log the setup error. */
+@@ -1116,7 +1133,7 @@
  
  			(*(prot.prot->sleep_till))(&(cur_tg->stop_before));
  			}
@@ -258,7 +370,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			{
  			/* (Re-)Start logging to a new file */
  			time_t now;
-@@ -1144,6 +1156,10 @@
+@@ -1144,6 +1161,10 @@
  
  			generate(tx_asn, cur_tg, lasttime);
  			}
@@ -269,7 +381,15 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		}
  
  	/* Finished, tear down connection.				*/
-@@ -1341,6 +1357,12 @@
+@@ -1156,6 +1177,7 @@
+ 		perror("do_actions: protocol teardown");
+ 		exit(-1);
+ 		}
++	active_tx_asn = -1;
+ 
+ 	return;
+ 	}
+@@ -1341,6 +1363,12 @@
  
  		if (arrival != 0)
  			(*(prot.prot->sleep_till))(&nextpkt_tv);
@@ -282,7 +402,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		lasttime = nextpkt_tv;
  
  		/* Did we exceed the limit on the number of packets to send? */
-@@ -1382,6 +1404,10 @@
+@@ -1382,6 +1410,10 @@
  						   pktlen,
  						   &(cur_tg->stop_before),
  						   &pktid);
@@ -293,9 +413,17 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			}
  		}
  	}
-@@ -2097,4 +2123,8 @@
+@@ -2096,5 +2128,16 @@
+ 	char		*addr;
  {
  
++	if (active_tx_asn >= 0 && (*(prot.prot->teardown))(active_tx_asn) == -1)
++		{
++
++		/* log the teardown error. */
++
++		perror("sigint: protocol teardown");
++		}
  	log_close();
 +#ifdef USEEVENTS
 +	tgevent_shutdown();

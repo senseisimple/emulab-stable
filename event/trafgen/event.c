@@ -249,8 +249,9 @@ tgevent_shutdown(void)
 #define STOPEVENT	TBDB_EVENTTYPE_STOP
 #define MODIFYEVENT	TBDB_EVENTTYPE_MODIFY
 #define TIMESTARTS	TBDB_EVENTTYPE_START
+#define RESETEVENT	TBDB_EVENTTYPE_RESET
 
-#define DEFAULT_PKT_SIZE	64
+#define DEFAULT_PKT_SIZE	1024
 
 #define MAX_RATE		1000000			/* 1Gbps in Kbps */
 #define MAX_INTERVAL		(double)(24*60*60)	/* 1 day in sec */
@@ -264,10 +265,14 @@ tgevent_shutdown(void)
  * START	PACKETSIZE=NNN RATE=KKK INTERVAL=FFFF
  * STOP
  * MODIFY	PACKETSIZE=NNN or RATE=KKK or INTERVAL=FFFF
+ * RESET
  */
 static int
 parse_args(char *buf, tg_action *tg)
 {
+	static int currate = -1;
+	static int curpsize = DEFAULT_PKT_SIZE;
+	static double curinterval = DEFAULT_INTERVAL;
 	int psize, rate;
 	double interval;
 	char *cp;
@@ -291,39 +296,58 @@ parse_args(char *buf, tg_action *tg)
 	}
 
 	/*
-	 * Get current/default values for unspecified fields
+	 * Determine and validate packet size.
+	 * If a packet size was not explicitly specified, use existing size.
 	 */
-	if (psize < 0) {
-		if (tg->tg_flags & TG_LENGTH)
-			psize = (int)dist_const_gen(&tg->length);
-		else
-			psize = DEFAULT_PKT_SIZE;
-	}
-	if (interval < 0.0) {
-		if (rate > 0)
-			interval = 1.0 / ((rate * 1000) / (8.0 * psize));
-		else if (tg->tg_flags & TG_ARRIVAL)
-			interval = dist_const_gen(&tg->arrival);
-		else
-			interval = DEFAULT_INTERVAL;
-	}
-
-	/*
-	 * Verify and change values
-	 */
+	if (psize < 0)
+		psize = curpsize;
 	if (psize > MAX_PKT_SIZE) {
 		fprintf(stderr, "%s: invalid packet size %d, ignored\n",
 			progname, psize);
 		return(EINVAL);
 	}
+
+	/*
+	 * Determine packet interval.
+	 * If packet interval was not explicitly specified and a rate was
+	 * specified, compute the interval from that.  Otherwise use the
+	 * existing interval.
+	 */
+	if (interval < 0.0) {
+		if (rate < 0) {
+			interval = curinterval;
+			rate = currate;
+		}
+	} else
+		rate = -1;
+
+	/*
+	 * If we are using an explicit rate value specified by the user
+	 * (either from this time or previously), we need to maintain that
+	 * rate in the face of packet length changes.  Thus we recompute
+	 * the interval to ensure a proper value.
+	 */
+	if (rate >= 0)
+		interval = 1.0 / ((rate * 1000) / (8.0 * psize));		
+
+	/*
+	 * Validate the computed interval.
+	 */
 	if (interval > MAX_INTERVAL) {
 		fprintf(stderr, "%s: invalid packet interval %.9f\n",
 			progname, interval);
 		return(EINVAL);
 	}
+
+	/*
+	 * Finally, record the new values.
+	 */
 	dist_const_init(&tg->arrival, interval);
 	dist_const_init(&tg->length, (double)psize);
 	tg->tg_flags |= (TG_ARRIVAL|TG_LENGTH);
+	curinterval = interval;
+	curpsize = psize;
+	currate = rate;
 
 #if 0
 	fprintf(stderr, "parse_args: new psize=%d, interval=%.9f\n",
@@ -485,6 +509,20 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		}
 #endif
 	}
+	/*
+	 * If eventtype is RESET, zero out the event list so that TG
+	 * falls out of its service loop and does a teardown.
+	 * We regain control in tgevent_loop below and reissue a
+	 * SETUP/WAIT combo.
+	 */
+	else if (strcmp(buf[6], RESETEVENT) == 0) {
+#ifdef EVENTDEBUG
+		gettimeofday(&now, NULL);
+		fprintf(stderr, "%lu.%03lu: RESET\n",
+			now.tv_sec, now.tv_usec / 1000);
+#endif
+		tg_first = NULL;
+	}
 	gotevent = 1;
 }
 #endif
@@ -494,19 +532,6 @@ tgevent_loop(void)
 {
 	int err;
 	struct timeval now;
-
-	gettimeofday(&now, NULL);
-#ifdef EVENTDEBUG
-	fprintf(stderr, "%lu.%03lu: trafgen started\n",
-		now.tv_sec, now.tv_usec / 1000);
-#endif
-
-	/*
-	 * XXX hand build a wait forever command.
-	 * Setup happens when the first event arrives.
-	 */
-	memset(actions, 0, sizeof(actions));
-	actions[0].tg_flags = TG_WAIT;
 
 	if (logfile) {
 		extern char prefix[], suffix[];
@@ -525,10 +550,33 @@ tgevent_loop(void)
 	}
 
 	/*
-	 * We loop in here til done
+	 * XXX hand build a wait forever command.
+	 * Setup happens when the first event arrives.
 	 */
-	tg_first = &actions[0];
-	do_actions();
+	memset(actions, 0, sizeof(actions));
+	actions[0].tg_flags = TG_WAIT;
+
+	while (1) {
+		gettimeofday(&now, NULL);
+#ifdef EVENTDEBUG
+		fprintf(stderr, "%lu.%03lu: trafgen (re)started\n",
+			now.tv_sec, now.tv_usec / 1000);
+#endif
+
+		/*
+		 * We loop in here til we get a reset event.
+		 */
+		tg_first = &actions[0];
+		do_actions();
+
+		/*
+		 * Got a reset.  Build a SETUP/WAIT combo and jump back
+		 * into the fray.
+		 */
+		actions[0].tg_flags = TG_SETUP;
+		actions[0].next = &actions[1];
+		actions[1].tg_flags = TG_WAIT;
+	}
 
 	log_close();
 	tgevent_shutdown();
@@ -544,28 +592,55 @@ tgevent_poll(void)
 #ifdef TESTING
 	static unsigned long count;
 	static int state;
+	static struct timeval last;
+	struct timeval now;
 
-	if ((++count % 500) != 0) return;
-	state = (state + 1) % 3;
+	gettimeofday(&now, NULL);
+	if (last.tv_sec == 0) {
+		fprintf(stderr,
+		    "%lu.%03lu: initial setup..\n",
+		    now.tv_sec, now.tv_usec / 1000);
+		memset(tg_first, 0, sizeof(tg_action));
+		actions[0].tg_flags = TG_SETUP;
+		actions[0].next = &actions[1];
+		actions[1].tg_flags = TG_WAIT;
+		gotevent = 1;
+		last = now;
+		return;
+	}
+	if ((prot.qos & QOS_SERVER) || now.tv_sec - last.tv_sec < 5)
+		return;
 
+	last = now;
+	state = (state + 1) % 5;
 	memset(tg_first, 0, sizeof(tg_action));
+
 	switch (state) {
 	case 0:
-		fprintf(stderr,
-		  "sending arrival constant 0.001 length constant 64..\n");
+		fprintf(stderr, "%lu.%03lu: "
+		    "sending arrival constant 0.001 length constant 64..\n",
+		    now.tv_sec, now.tv_usec / 1000);
 		dist_const_init(&tg_first->arrival, 0.001);
 		dist_const_init(&tg_first->length, 64.0);
 		break;
-	case 1:
-		fprintf(stderr,
-		  "idling..\n");
+	case 1: case 3:
+		fprintf(stderr, "%lu.%03lu: "
+		    "idling..\n",
+		    now.tv_sec, now.tv_usec / 1000);
 		tg_first->tg_flags = TG_WAIT;
 		break;
 	case 2:
-		fprintf(stderr,
-		  "sending arrival exp 0.03/0/1 length exp 256/64/1024..\n");
+		fprintf(stderr, "%lu.%03lu: "
+		    "sending arrival exp 0.03/0/1 length exp 256/64/1024..\n",
+		    now.tv_sec, now.tv_usec / 1000);
 		dist_exp_init(&tg_first->arrival, 0.03, 0.0, 1.0);
 		dist_exp_init(&tg_first->length, 256.0, 64.0, 1024.0);
+		break;
+	case 4:
+		fprintf(stderr, "%lu.%03lu: "
+		    "resetting..\n",
+		    now.tv_sec, now.tv_usec / 1000);
+		tg_first = NULL;
 		break;
 	}
 	gotevent = 1;
