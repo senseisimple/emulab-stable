@@ -14,7 +14,9 @@ use Getopt::Std;
 # special hack for sharks is included - allocating 'sh*' expands to
 # allocation of the entire rack.
 #
-
+# Exit status is important! Exit with -1 if an error, else the number
+# of nodes that could not be allocated. Otherwise zero.
+#
 #
 # Configure variables
 #
@@ -23,21 +25,28 @@ use lib '@prefix@/lib';
 use libdb;
 
 my %opt = ();
-getopts(\%opt,'v');
+getopts('vp', \%opt);
 
-my $debug = 0;
+my $debug   = 0;
+my $partial = 0;
+
 if ($opt{v}) {
     $debug = 1;
 }
+if ($opt{p}) {
+    $partial = 1;
+}
 
 if (@ARGV < 2) {
-    die("Usage: nalloc [-v] <pid> <eid> <node> <node> <...>\n".
+    die("Usage: nalloc [-v] [-p] <pid> <eid> <node> <node> <...>\n".
+	 "		-p enables partial allocation mode\n".
 	 "		-v enables debugging output\n");
 }
 
 my $consetup="$TB/libexec/console_setup";
 my $exportsetup="$TB/sbin/exports_setup";
 my $error = 0;
+my $noalloc = 0;
 my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
@@ -95,7 +104,7 @@ foreach my $n (@node_names) {
 	    # Do not increment error code since that throws off tbprerun.
 	} else {
 	    print "Someone else has already reserved node '$n'.\n";
-	    $error++;
+	    $noalloc++;
 	}
 	next; # Go on to the next node if this one is reserved
     }
@@ -135,7 +144,7 @@ if ($debug) { print "List Ready: @vals\nError=$error\n"; }
 # Uses the list built in step 1
 ######################################################################
 
-if (!$error && @vals) {
+if (!$error && (!$noalloc || $partial) && @vals) {
     if ($debug) {
 	print "Resetting node activity...\n";
     }
@@ -167,5 +176,10 @@ if (!$error && @nodes) {
 	print STDERR "WARNING: $consetup @nodes failed!\n";
 }
 
-if ($debug) { print "Returning with value $error\n"; }
-exit($error);
+#
+# Exit with -1 if an error, else the number of nodes that could not
+# be allocated.
+#
+my $exitval = ($error ? -1 : $noalloc);
+if ($debug) { print "Returning with value $exitval\n"; }
+exit($exitval);
