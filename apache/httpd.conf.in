@@ -386,8 +386,11 @@ DocumentRoot "@prefix@/www"
 # permissions.  
 #
 <Directory />
-    Options FollowSymLinks
+    Options None
     AllowOverride None
+    Order deny,allow
+    Deny from all
+#    Allow from 155.98.60.
 </Directory>
 
 #
@@ -396,6 +399,61 @@ DocumentRoot "@prefix@/www"
 # you might expect, make sure that you have specifically enabled it
 # below.
 #
+
+#
+# When granting access, try to minimize the number of entries and hence 
+# complexity of the config file.  Also, remember these rules:
+#
+# 1) <directory> directive options & authconfigs are inherited by subdirs
+# 2) Putting a '+' before an option on the 'Options' line adds it to the
+#    existing set (likely inherited from a dir below it).
+# 3) Putting a '-' before an option removes it from the existing options set.
+# 4) The 'AllowOverride' directive describes how a .htaccess file can
+#    override configuration file settings for a directory.
+# 5) Allowing a .htaccess file to override 'options' is a security hazard.
+#
+# People who are involved with testbed devel can get at
+# stuff under /usr/testbed, but not "outsiders".  If exceptions need
+# to be made under /usr/testbed, create a <Directory> entry for them
+# below.  Try to work under the least req'd privilige model whenever
+# possible.  Add people's cable modems, etc. that need general devel 
+# access to the /usr/testbed <Directory> entry.
+#
+
+<Directory @prefix@>
+    Order allow,deny
+    deny from all
+    allow from 155.99.212.
+    allow from 155.98.60.
+    allow from 204.119.59.136
+    allow from 18.31.0.114
+    allow from 18.31.0.144
+    allow from 24.254.69.120
+    # Jay's machines.
+    allow from 207.173.21.122
+    allow from 207.173.21.123
+    allow from 207.173.21.126
+    # Tim Stack
+    allow from 66.219.220.49
+</Directory>
+
+<Directory @prefix@/webglimpse>
+	Options All MultiViews
+	AllowOverride All
+	Order allow,deny
+	Allow from all
+</Directory>
+
+<Directory @prefix@/www/cricket>
+        Options ExecCGI SymLinksIfOwnerMatch
+        AddHandler cgi-script .cgi
+</Directory>
+
+<Directory @prefix@/devel/*/www>
+    Options +ExecCGI
+    AllowOverride All
+</Directory>
+
 
 #
 # This should be changed to whatever you set DocumentRoot to.
@@ -409,7 +467,7 @@ DocumentRoot "@prefix@/www"
 # Note that "MultiViews" must be named *explicitly* --- "Options All"
 # doesn't give it to you.
 #
-    Options MultiViews
+    Options All +MultiViews -Indexes
 
 #
 # This controls which options the .htaccess files in directories can
@@ -430,31 +488,14 @@ DocumentRoot "@prefix@/www"
 # directory if a ~user request is received.
 #
 <IfModule mod_userdir.c>
-    UserDir public_html
+#    UserDir public_html
+    UserDir disabled
 </IfModule>
 
 #
 # Control access to UserDir directories.  The following is an example
 # for a site where these directories are restricted to read-only.
 #
-<Directory @prefix@/monitor/cricket/public_html>
-	Options MultiViews Indexes SymLinksIfOwnerMatch ExecCGI
-</Directory>
-
-<Directory @prefix@/webglimpse>
-	Options MultiViews
-	AllowOverride All
-	Order allow,deny
-	Allow from all
-</Directory>
-
-<Directory @prefix@/www/cricket>
-        Options ExecCGI SymLinksIfOwnerMatch
-        AddHandler cgi-script .cgi
-        AllowOverride All
-        Order allow,deny
-        Allow from all
-</Directory>
 
 #
 # DirectoryIndex: Name of the file or files to use as a pre-written HTML
