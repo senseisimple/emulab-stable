@@ -627,13 +627,15 @@ sub FinishedInstructions()
 	return 0;
     }
 
+    my $roottag = GetRootTag();
+    
   again:
     while (1) {
 	print "Letting Netbed Central know we finished ...\n";
 	    
 	mysystem("$wget -q -O $path ".
 		 "'${WWW}/cdromcheckin.php3".
-		 "?cdkey=$cdkey&IP=$IP&privkey=$privkey".
+		 "?cdkey=$cdkey&IP=$IP&privkey=$privkey&roottag=$roottag".
 		 "&wahostname=$hostname&updated=1'");
 	if (!$?) {
 	    last;
@@ -841,10 +843,6 @@ sub LocalizeRoot()
     my $root = "${blockdevice}${rootdevice}";
     my $ED;
 	
-    if (! defined($config{"slice1_image"})) {
-	return 0;
-    }
-
     print "Localizing root filesystem on $root ...\n";
     MountRoot();
 
@@ -860,6 +858,14 @@ sub LocalizeRoot()
     mysystem("cp -p /etc/namedb/localhost.rev /mnt/etc/namedb");
     fatal("Failed to copy /etc/namedb/localhost.rev to /mnt/etc!")
 	if ($?);
+
+    #
+    # The rest happens only if a newly installed slice.
+    # 
+    if (! defined($config{"slice1_image"})) {
+	UnMountMnt();
+	return 0;
+    }
 
     #
     # Write MD5 to toplevel. Serves as poor version info.
@@ -907,9 +913,7 @@ sub LocalizeRoot()
     chdir("/") or
 	fatal("Could not chdir to /!");
     
-    mysystem("umount /mnt");
-    $needumount = 0;
-
+    UnMountMnt();
     return 0;
 }
 

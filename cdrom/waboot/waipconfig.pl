@@ -57,7 +57,7 @@ STDERR->autoflush(1);
 # Untaint the environment.
 # 
 $ENV{'PATH'} = "/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
-    "/usr/local/bin:/usr/site/bin:/usr/site/sbin:/usr/local/etc/testbed";
+    "/usr/local/bin:/usr/site/bin:/usr/site/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -121,10 +121,14 @@ exit(0);
 sub BootFromCD()
 {
     #
-    # First check for a config file on the CD.
-    # If found, use that info.  bootdisk must be set.
+    # Always check for a hardwired config. However, it takes precedence
+    # only when the disk is raw. The config block overrides the config
+    # file, except for bootdisk of course. 
     #
-    if (CheckConfigFile() != 0 || !defined($config{'bootdisk'})) {
+    my $hardwired = (CheckConfigFile() == 0 ? 1 : 0);
+
+    # Either no config file, or bootdisk unspecified. Must figure it out.
+    if (!defined($config{'bootdisk'})) {
 	#
 	# Give them multiple tries to find a disk with an existing
 	# configuration block.
@@ -137,16 +141,28 @@ sub BootFromCD()
 	    print "No existing configuration was found on $rawbootdisk\n";
 	    if (Prompt("Try another disk for existing configuration?",
 		       "No", 10) =~ /no/i) {
-		#
-		# Don't want to try another disk,
-		# consider this a first time install.
-		#
-		GetNewConfig();
+		if (! $hardwired) {
+		    #
+		    # Don't want to try another disk,
+		    # consider this a first time install.
+		    #
+		    GetNewConfig();
+		    $rawbootdisk = $config{'bootdisk'};
+		}
 		last;
 	    }
 	}
     }
-    $rawbootdisk = $config{'bootdisk'};
+    else {
+	#
+	# A hardwired config with a disk spec. Allow for overriding by
+	# the config block. If the disk is raw (no config block) then
+	# nothing will have be changed.
+	#
+	$rawbootdisk = $config{'bootdisk'};
+
+	CheckConfigBlock();
+    }
 
     #
     # Give the user a chance to override the normal operation, and specify
@@ -255,8 +271,9 @@ sub GetUserConfig()
     
     $config{'bootdisk'}  = Prompt("System boot disk", $rawbootdisk);
     $config{'interface'} = Prompt("Network Interface", WhichInterface());
-    $config{'hostname'}  = Prompt("Hostname (no domain)", $config{'hostname'});
     $config{'domain'}    = Prompt("Domain", $config{'domain'});
+    $config{'hostname'}  = Prompt("Hostname (without the domain!)",
+				  $config{'hostname'});
     $config{'IP'}        = Prompt("IP Address", $config{'IP'});
     $config{'netmask'}   = Prompt("Netmask", WhichNetMask());
     $config{'gateway'}   = Prompt("Gateway IP", WhichGateway());
@@ -341,7 +358,7 @@ sub WhichInterface()
     #
     foreach my $iface (@allifaces) {
 	if ($iface =~ /([a-zA-z]+)(\d+)/) {
-	    if ($1 eq "lo") {
+	    if ($1 eq "lo" || $1 eq "faith" || $1 eq "gif" || $1 eq "tun") {
 		next;
 	    }
 

@@ -46,7 +46,7 @@ STDERR->autoflush(1);
 # Untaint the environment.
 # 
 $ENV{'PATH'} = "/tmp:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
-    "/usr/local/bin:/usr/site/bin:/usr/site/sbin:/usr/local/etc/testbed";
+    "/usr/local/bin:/usr/site/bin:/usr/site/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -84,7 +84,7 @@ my $IP = $ARGV[1];
 # See if we want to continue. Useful for debugging.
 # 
 print "\n";
-if (! (Prompt("Dance with Netbed?", "Yes", 10) =~ /yes/i)) {
+if (! (Prompt("Dance with Netbed?", "Yes", 15) =~ /yes/i)) {
     exit(0);
 }
 
