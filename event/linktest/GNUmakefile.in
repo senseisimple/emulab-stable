@@ -15,6 +15,7 @@ LTEVENT		= ltevent
 SCRIPT		= linktest.pl
 SCRIPT_RUN	= run_linktest.pl
 SCRIPT_TBCOMPAT = tb_compat.tcl
+SCRIPT_NSTB_COMPAT = /usr/testbed/lib/ns2ir/nstb_compat.tcl
 
 SYSTEM	       := $(shell uname -s)
 
@@ -86,6 +87,12 @@ client-install:
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
 	$(INSTALL_PROGRAM) $(SCRIPT_TBCOMPAT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_TBCOMPAT)
+	$(INSTALL_PROGRAM) $(SCRIPT_NSTB_COMPAT) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_NSTB_COMPAT)
+
+lt-install:
+	$(INSTALL_PROGRAM) $(SCRIPT) \
+            $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 
 clean:
 	/bin/rm -f *.o $(TESTS)
