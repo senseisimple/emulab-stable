@@ -8,6 +8,13 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
+# XXX
+# Currently, TBDB_OSID_OSNAMELEN is shorter then TBDB_IMAGEID_IMAGENAMELEN
+# and that causes problems since we use the same id for both tables. For
+# now, test for the shorted of the two.
+# 
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("Create a new Image Descriptor (EZ Form)");
@@ -72,7 +79,7 @@ function SPITFORM($formfields, $errors)
 {
     global $uid, $projlist, $isadmin, $types_result, $oslist, $opmodes,
       $featurelist;
-    global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
+    global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
     global $TBDB_OSID_VERSLEN, $TBBASE;
 
     echo "<center><b>
@@ -236,8 +243,8 @@ function SPITFORM($formfields, $errors)
                          onChange='SetPrefix(idform);'
                          name=\"formfields[imagename]\"
                          value=\"" . $formfields[imagename] . "\"
-	                 size=$TBDB_IMAGEID_IMAGENAMELEN
-                         maxlength=$TBDB_IMAGEID_IMAGENAMELEN>
+	                 size=$TBDB_OSID_OSNAMELEN
+                         maxlength=$TBDB_OSID_OSNAMELEN>
               </td>
           </tr>\n";
 
@@ -649,10 +656,10 @@ else {
 	    "Must be alphanumeric (includes _, -, +, and .)<br>".
 	    "and must begin with an alphanumeric";
     }
-    elseif (strlen($formfields[imagename]) > $TBDB_IMAGEID_IMAGENAMELEN) {
+    elseif (strlen($formfields[imagename]) > $TBDB_OSID_OSNAMELEN) {
 	$errors["Descriptor Name"] =
 	    "Too long! ".
-	    "Must be less than or equal to $TBDB_IMAGEID_IMAGENAMELEN";
+	    "Must be less than or equal to $TBDB_OSID_OSNAMELEN";
     }
 }
 
