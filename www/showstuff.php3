@@ -980,8 +980,8 @@ function SHOWNODES($pid, $eid) {
     global $SCRIPT_NAME;
     
     $reserved_result =
-	DBQueryFatal("SELECT * FROM reserved WHERE ".
-		     "eid='$eid' and pid='$pid'");
+	DBQueryFatal("select * from reserved as r " .
+		     "where r.eid='$eid' and r.pid='$pid'");
     
     # If this is an expt in emulab-ops, we don't care about vname,
     # since it won't be defined. But we do want to know when the node
@@ -1014,29 +1014,30 @@ function SHOWNODES($pid, $eid) {
                 <th>Node<br>Status</th>
                 <th>Hours<br>Idle[<b>1</b>]</th>
                 <th>Startup<br>Status[<b>2</b>]</th>
-                <th>Console</th>
                 <th>SSH</th>
+                <th>Console</th>
               </tr>\n";
 
-	$sort = "type,priority";
+	$sort = "n.type,n.priority";
 	if ($altnodesort==1) {
-	    $sort = "vname";
+	    $sort = "r.vname";
 	} elseif ($altnodesort==2) {
 	    $sort = "rsrvtime";
 	} # Can add other alt sorts here too
 	
-	
 	$query_result =
-	    DBQueryFatal("SELECT nodes.*,reserved.*,ns.status as nodestatus, ".
-	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
-	        "FROM nodes LEFT JOIN node_activity ".
-		"on nodes.node_id=node_activity.node_id ".
-		"LEFT JOIN reserved ON nodes.node_id=reserved.node_id ".
-		"LEFT JOIN node_status as ns ON ns.node_id=nodes.node_id ".
-	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
+		" ns.status as nodestatus, ".
+		" date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
+	        "from reserved as r ".
+		"left join nodes as n on n.node_id=r.node_id ".
+		"left join node_types as nt on nt.type=n.type ".
+		"left join node_status as ns on ns.node_id=r.node_id ".
+	        "WHERE r.eid='$eid' and r.pid='$pid' ".
 	        "ORDER BY $sort");
 
 	$stalemark = "<b>?</b>";
+	$count = 0;
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];
@@ -1046,6 +1047,7 @@ function SHOWNODES($pid, $eid) {
 	    $startstatus   = $row[startstatus];
 	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
+	    $isvirtnode    = $row[isvirtnode];
 	    $idlehours = TBGetNodeIdleTime($node_id);
 	    $stale = TBGetNodeIdleStale($node_id);
 
@@ -1057,6 +1059,11 @@ function SHOWNODES($pid, $eid) {
 
 	    if (!$vname)
 		$vname = "--";
+
+	    if ($count & 1) {
+		echo "<tr></tr>\n";
+	    }
+	    $count++;
 
 	    echo "<tr>
                     <td><A href='shownode.php3?node_id=$node_id'>$node_id</a>
@@ -1081,11 +1088,16 @@ function SHOWNODES($pid, $eid) {
                     <td align=center>$startstatus</td>\n";
 
 	    echo "  <td align=center>
-                     <A href='nodetipacl.php3?node_id=$node_id'>
-                     <img src=\"console.gif\" alt=c></A></td>\n";
-	    echo "  <td align=center>
                      <A href='nodessh.php3?node_id=$node_id'>
                      <img src=\"ssh.gif\" alt=s></A></td>\n";
+	    if ($isvirtnode) {
+		echo "<td>&nbsp</td>\n";
+	    }
+	    else {
+		echo "  <td align=center>
+                           <A href='nodetipacl.php3?node_id=$node_id'>
+                          <img src=\"console.gif\" alt=c></A></td>\n";
+	    }
 	    echo "</tr>\n";
 	}
 	echo "</table>\n";
