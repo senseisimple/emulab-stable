@@ -58,6 +58,9 @@
 #define TESTMODE
 #define NETMASK		"255.255.255.0"
 
+#define DISKTYPE	"ad"
+#define DISKNUM		0
+
 /* Defined in configure and passed in via the makefile */
 #define DBNAME_SIZE	64
 #define HOSTID_SIZE	(32+64)
@@ -2772,6 +2775,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
+	char		*disktype;
+	int		disknum;
 
 	/*
 	 * Get the address the node should contact to load its image
@@ -2801,7 +2806,31 @@ COMMAND_PROTOTYPE(doloadinfo)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "ADDR=%s PART=%s PARTOS=%s\n", row[0], row[1], row[2]);
+
+	sprintf(buf, "ADDR=%s PART=%s PARTOS=%s", row[0], row[1], row[2]);
+	mysql_free_result(res);
+
+	/*
+	 * Get disk type and number
+	 */
+	disktype = DISKTYPE;
+	disknum = DISKNUM;
+	res = mydb_query("select disktype from nodes as n "
+			 "left join node_types as nt on n.type = nt.type "
+			 "where n.node_id='%s'",
+			 1, reqp->nodeid);
+	if (!res) {
+		error("doloadinfo: %s: DB Error getting disktype!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) > 0) {
+		row = mysql_fetch_row(res);
+		if (row[0] && row[0][0])
+			disktype = row[0];
+	}
+	sprintf(&buf[strlen(buf)], " DISK=%s%d\n", disktype, disknum);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
