@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <pwd.h>
+#include <grp.h>
 #include <time.h>
 #include "tbdefs.h"
 #include "log.h"
@@ -341,6 +342,18 @@ start_program(struct proginfo *pinfo, char *args)
 		     "%s (pid:%d) has exited with status: 0x%x\n",
 		     pinfo->name, pinfo->pid, status);
 		pinfo->pid = 0;
+	}
+
+	/*
+	 * The args string holds the command line to execute. We allow
+	 * this to be reset in dynamic events, but is optional; the cuurent
+	 * command will be used by default, which initially comes from tmcd.
+	 */
+	if (args && strlen(args) &&
+	    !strncmp("COMMAND=", args, strlen("COMMAND="))) {
+		if (pinfo->cmdline)
+			free(pinfo->cmdline);
+		pinfo->cmdline = strdup(&args[strlen("COMMAND=")]);
 	}
 
 	/*
