@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -405,6 +405,10 @@ Phase "event", "Setting up event system", sub {
 
 Phase "rc.d", "Setting up rc.d scripts", sub {
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
+        Phase "elvind.sh", "Removing port version of elvind.sh", sub {
+	    DoneIfDoesntExist("$RCDIR/elvind.sh");
+            ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh");
+        };
 	DoneIfExists("$RCDIR/2.elvind.sh");
 	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d control-install");
     };
