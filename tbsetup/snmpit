@@ -743,7 +743,7 @@ sub mac2ifIndex {
     "w.node_id2,w.card2,w.port2 from interfaces as i ".
     "left join wires as w on w.node_id1 like concat(left(i.node_id,6),'%')".
     " and (i.card=w.card1 or i.node_id like 'tbsh%') and i.port=w.port1 ".
-    "where $cond";
+    "and node_id2='cisco' where $cond";
   print "Using query: $cmd\n" if $debug;
   my %Mod_Port = ();
   $sth = $dbh->query($cmd);
@@ -1048,7 +1048,7 @@ sub ReadTranslationTable {
     #print "Got $mac <==> $name\n" if $debug;
   }
   $sth = $dbh->query("select node_id1,card1,port1,node_id2,card2,port2 ".
-		     "from wires;");
+		     "from wires where node_id2='cisco';");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
     if ($_[3] =~ /Alpha/i) { $_[3] = "155.99.214.170"; }
