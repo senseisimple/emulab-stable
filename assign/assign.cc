@@ -685,7 +685,7 @@ void print_solution()
 		if (!absphys[n]) {
 			cout << "unassigned: " << G[n].name() << endl;
 		} else {
-			cout << G[n].name() << " " << absnodes[n] << " " << PG[absphys[n]->n].name() << endl;
+			cout << G[n].name() << " " << topo->switches[absnodes[n]]->name << " " << PG[absphys[n]->n].name() << endl;
 		}
 	}
 	cout << "End solution" << endl;
