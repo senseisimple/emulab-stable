@@ -55,7 +55,6 @@ if (!isset($pid)) {
 
 $filename = $node_id . ".tbc"; 
 header("Content-Type: text/x-testbed-ssh");
-header("Content-Disposition: attachment; filename=$filename;");
 header("Content-Description: SSH description file for a testbed node");
 
 echo "hostname: $vname.$eid.$pid.$OURDOMAIN\n";

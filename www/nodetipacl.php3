@@ -46,7 +46,6 @@ if (mysql_num_rows($query_result) == 0) {
 $filename = $node_id . ".tbacl"; 
 
 header("Content-Type: text/x-testbed-acl");
-header("Content-Disposition: attachment; filename=$filename;");
 header("Content-Description: ACL key file for a testbed node serial port");
 
 # XXX, should handle multiple tip lines gracefully somehow, 
