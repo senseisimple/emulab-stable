@@ -348,7 +348,8 @@ mail($TBMAIL_APPROVAL,
 #
 echo "<center><h1>Project '$pid' successfully queued.</h1></center>
       Testbed Operations has been notified of your application.
-      Most applications are reviewed within one week. We will notify
+      Most applications are reviewed within a day; some even within
+      the hour, but sometimes as long as a week (rarely). We will notify
       you by e-mail at '$usr_name&nbsp;&lt;$usr_email>' of their decision
       regarding your proposed project '$pid'.\n";
 
