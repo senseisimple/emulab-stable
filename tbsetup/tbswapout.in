@@ -100,6 +100,16 @@ if (! $TESTMODE) {
 	print STDERR "*** Failed to reset VLANs.\n";
 	$errors = 1;
     }
+
+    #
+    # This is a hack. We need a more general os_teardown, but for now
+    # we just kill off the vnode stuff. 
+    #
+    print "Tearing down virtual nodes.\n";
+    if (system("vnode_setup -d -k $pid $eid")) {
+	print STDERR "*** Failed tear down vnodes.\n";
+	$errors = 1;
+    }
 }
     
 print "Freeing resources.\n";
@@ -133,6 +143,8 @@ print "Resetting DB.\n";
 DBQueryWarn("DELETE from delays where pid='$pid' and eid='$eid'")
     or $errors++;
 DBQueryWarn("DELETE from vlans  where pid='$pid' and eid='$eid'")
+    or $errors++;
+DBQueryWarn("DELETE from tunnels where pid='$pid' and eid='$eid'")
     or $errors++;
 
 # Accounting info.
