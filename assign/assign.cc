@@ -383,7 +383,8 @@ int type_precheck() {
 	bool found_match = false;
 	for (vector<crope>::iterator vtype_it = vclass_it->second.begin();
 		vtype_it != vclass_it->second.end(); vtype_it++) {
-	    if (ptypes.find(*vtype_it) != ptypes.end()) {
+	    tb_ptype_map::iterator mit = ptypes.find(*vtype_it);
+	    if ((mit != ptypes.end()) && (mit->second->pnode_slots() != 0)) {
 		found_match = true;
 		break;
 	    }
