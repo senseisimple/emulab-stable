@@ -216,7 +216,7 @@ exit($exit_status);
 sub fatal {
     local($msg) = $_[0];
 
-    if ($copymode && -e $copyfile) {
+    if ($copymode && defined($copyfile) && -e $copyfile) {
 	unlink($copyfile);
     }
     die("*** $0:\n".
