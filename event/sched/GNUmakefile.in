@@ -63,6 +63,7 @@ rrpc.o:			rpc.cc rpc.h
 	$(CXX) $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
 install:
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_DIR)/opsdir/sbin/event-sched
 
 control-install:
@@ -74,8 +75,3 @@ client-install: client
 
 clean:
 	/bin/rm -f *.o event-sched event-sched_rpc event-sched_rrpc
-
-$(INSTALL_DIR)/opsdir/bin/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_DIR)/opsdir/lib
-	$(INSTALL) $< $@
