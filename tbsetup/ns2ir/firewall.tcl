@@ -22,8 +22,11 @@ Firewall instproc init {s} {
 
     $self set sim $s
 
-    $self set style "basic"
-    $self set parent ""
+    $self set type    "ipfw"
+    $self set style   "basic"
+    $self set osid    "FW-IPFW"
+    $self set cmdline ""
+    $self set parent  ""
 
     $self set next_rule 1
     $self instvar rules
@@ -42,6 +45,34 @@ Firewall instproc rename {old new} {
 }
 
 #
+# Set the type of the firewall
+# 
+Firewall instproc set-type {targ} {
+    $self instvar type
+    $self instvar osid
+    $self instvar cmdline
+
+    switch -- $targ {
+	"ipfw" {
+	    set type $targ
+	    set osid "FW-IPFW"
+	}
+	"ipfw2-vlan" {
+	    set type $targ
+	    set osid "FW-IPFW2"
+	    set cmdline "/kernel.fw"
+	}
+	"ipfw2" -
+	"ipchains" {
+	    perror "\[set-type] firewall type $targ not yet implemented"
+	}
+	default {
+	    perror "\[set-type] unknown firewall type: $targ"
+	}
+    }
+}
+
+#
 # Set the style of the firewall
 # 
 Firewall instproc set-style {starg} {
@@ -50,7 +81,7 @@ Firewall instproc set-style {starg} {
     if {$starg == "open" || $starg == "closed" || $starg == "basic"} {
 	set style $starg
     } else {
-	punsup "firewall: unsupported style: $starg"
+	perror "\[set-style] unsupported firewall style: $starg"
     }
 }
 
@@ -106,12 +137,15 @@ Firewall instproc updatedb {DB} {
     var_import ::GLOBALS::eid
     $self instvar rules
     $self instvar sim
+    $self instvar type
     $self instvar style
+    $self instvar osid
+    $self instvar cmdline
 
     # XXX add the firewall to the virt_nodes table to avoid assign hacking
-    $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "$self" "pc" "" "FW-IPFW" "" "" "" "" "" ]
+    $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "$self" "pc" "" $osid $cmdline "" "" "" "" ]
 
-    $sim spitxml_data "firewalls" [list "fwname" "type" "style"] [list $self "ipfw" $style]
+    $sim spitxml_data "firewalls" [list "fwname" "type" "style"] [list $self $type $style]
     foreach rule [array names rules] {
 	set names [list "fwname" "ruleno" "rule"]
 	set vals  [list $self $rule $rules($rule)]

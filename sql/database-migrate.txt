@@ -2054,3 +2054,33 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table nodes add cd_version varchar(32) default NULL;
 
+1.278: Add partial support for hardware control net vlan implementation of
+       firewalls.  The code to manipulate the control net switch has not
+       yet been done and will no doubt lead to more DB changes.  The hardware
+       assisted firewall is done at the moment by specifying a different type
+       'ipfw2-vlan'.
+
+       Note that you will need a FBSD410-IPFW2 image which is a standard
+       image but with an IPFW2 enabled kernel and new versions of ipfw and
+       libaliases (as mentioned in the ipfw man page).
+
+       alter table default_firewall_rules change type type \
+           enum('ipfw','ipfw2','ipchains','ipfw2-vlan') not null default 'ipfw';
+
+       alter table firewalls change type type \
+           enum('ipfw','ipfw2','ipchains','ipfw2-vlan') not null default 'ipfw';
+
+       alter table firewalls add vlan int(11) default NULL;
+
+       update table_regex set check='^(ipfw|ipfw2|ipchains|ipfw2-vlan)$' \
+           where table_name='firewalls' and column_name='type';
+
+       INSERT INTO os_info VALUES ('FW-IPFW2','emulab-ops','FW-IPFW2', \
+           'root',NULL,'IPFW2 Firewall','FreeBSD','',NULL,'FreeBSD','', \
+	   'ping,ssh,ipod,isup,veths,mlinks',0,1,1,'NORMAL', \
+	   'emulab-ops-FBSD410-IPFW2',NULL,0);
+
+       INSERT INTO os_info VALUES ('FBSD410-IPFW2','emulab-ops', \
+           'emulab-ops-FBSD410-IPFW2','root',NULL, \
+	   'FreeBSD 4.10 with IPFW2','FreeBSD','4.10',NULL,NULL,'', \
+	   'ping,ssh,ipod,isup,veths,mlinks',1,1,1,'NORMALv2',NULL,NULL,0);

@@ -521,7 +521,55 @@ sub os_fwconfig_line($@)
     my ($fwinfo, @fwrules) = @_;
     my ($upline, $downline);
 
-    $upline = "kldload ipfw.ko >/dev/null 2>&1\n";
+    #
+    # VLAN enforced layer2 firewall with FreeBSD/IPFW2
+    #
+    if ($fwinfo->{TYPE} eq "ipfw2-vlan") {
+	if (!defined($fwinfo->{IN_VLAN})) {
+	    warn "*** WARNING: no VLAN for ipfw2-vlan firewall, NOT SETUP!\n";
+	    return ("false", "false");
+	}
+
+	my $vlandev = "vlan0";
+	my $vlanno  = $fwinfo->{IN_VLAN};
+	my $pdev    = `$BINDIR/findif $fwinfo->{IN_IF}`;
+	chomp($pdev);
+
+	$upline  = "ifconfig $vlandev create link vlan $vlanno vlandev $pdev\n";
+	$upline .= "    if [ -z \"`sysctl net.link.ether.bridge 2>/dev/null`\" ]; then\n";
+	$upline .= "        kldload bridge.ko >/dev/null 2>&1\n";
+	$upline .= "    fi\n";
+	$upline .= "    sysctl net.link.ether.bridge_vlan=0\n";
+	$upline .= "    sysctl net.link.ether.bridge_ipfw=1\n";
+	$upline .= "    sysctl net.link.ether.bridge_cfg=$vlandev,$pdev\n";
+	$upline .= "    if [ -z \"`sysctl net.inet.ip.fw.enable 2>/dev/null`\" ]; then\n";
+	$upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
+	$upline .= "    fi\n";
+	foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
+	    $upline .= "    ipfw add $rule->{RULENO} $rule->{RULE} || {\n";
+	    $upline .= "        echo 'WARNING: could not load ipfw rule:'\n";
+	    $upline .= "        echo '  $rule->{RULE}'\n";
+	    $upline .= "        exit 1\n";
+	    $upline .= "    }\n";
+	}
+	$upline .= "    sysctl net.link.ether.bridge=1";
+
+	$downline  = "sysctl net.link.ether.bridge=0\n";
+	$downline .= "    ipfw -q flush\n";
+	$downline .= "    sysctl net.link.ether.bridge_cfg=\"\"\n";
+	$downline .= "    sysctl net.link.ether.bridge_ipfw=0\n";
+	$downline .= "    sysctl net.link.ether.bridge_vlan=1\n";
+	$downline .= "    ifconfig $vlandev destroy";
+
+	return ($upline, $downline);
+    }
+
+    #
+    # Voluntary IP firewall with FreeBSD/IPFW
+    #
+    $upline  = "if [ -z \"`sysctl net.inet.ip.fw.enable 2>/dev/null`\" ]; then\n";
+    $upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
+    $upline .= "    fi\n";
     foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
 	$upline .= "    ipfw add $rule->{RULENO} $rule->{RULE} || {\n";
 	$upline .= "        echo 'WARNING: could not load ipfw rule:'\n";

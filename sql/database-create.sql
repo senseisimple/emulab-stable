@@ -56,7 +56,7 @@ CREATE TABLE current_reloads (
 --
 
 CREATE TABLE default_firewall_rules (
-  type enum('ipfw','ipfw2','ipchains') NOT NULL default 'ipfw',
+  type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
   style enum('open','closed','basic') NOT NULL default 'basic',
   enabled tinyint(4) NOT NULL default '0',
   ruleno int(10) unsigned NOT NULL default '0',
@@ -396,8 +396,9 @@ CREATE TABLE firewalls (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   fwname varchar(32) NOT NULL default '',
-  type enum('ipfw','ipfw2','ipchains') NOT NULL default 'ipfw',
+  type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
   style enum('open','closed','basic') NOT NULL default 'basic',
+  vlan int(11) default NULL,
   PRIMARY KEY  (pid,eid,fwname)
 ) TYPE=MyISAM;
 

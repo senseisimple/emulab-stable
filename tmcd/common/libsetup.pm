@@ -856,11 +856,11 @@ sub getfwconfig($$)
     }
 
     my $rempat = q(TYPE=remote FWIP=([0-9\.]*));
-    my $fwpat  = q(TYPE=(\w+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*));
+    my $fwpat  = q(TYPE=([\w-]+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*) IN_VLAN=(\d+) OUT_VLAN=(\d+));
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
 
     foreach my $line (@tmccresults) {
-	if ($line =~ /TYPE=(\w+)/) {
+	if ($line =~ /TYPE=([\w-]+)/) {
 	    my $type = $1;
 	    if ($type eq "none") {
 		$fwinfo->{"TYPE"} = $type;
@@ -877,13 +877,20 @@ sub getfwconfig($$)
 		my $style = $2;
 		my $inif = $3;
 		my $outif = $4;
+		my $invlan = $5;
+		my $outvlan = $6;
 
 		$fwinfo->{"TYPE"} = $type;
 		$fwinfo->{"STYLE"} = $style;
 		$fwinfo->{"IN_IF"}  = $inif;
 		$fwinfo->{"OUT_IF"} = $outif;
+		$fwinfo->{"IN_VLAN"}  = $invlan
+		    if ($invlan != 0);
+		$fwinfo->{"OUT_VLAN"} = $outvlan
+		    if ($outvlan != 0);
 	    } else {
 		warn("*** WARNING: Bad firewall info line: $line\n");
+		return 1;
 	    }
 	} elsif ($line =~ /$rpat/) {
 	    my $ruleno = $1;
@@ -895,6 +902,7 @@ sub getfwconfig($$)
 	    push(@fwrules, $fw);
 	} else {
 	    warn("*** WARNING: Bad firewall info line: $line\n");
+	    return 1;
 	}
     }
 
