@@ -48,7 +48,7 @@ if ($rv > 256) {
 	print "**********\n";
 	print "SSH failed. You may need to run the following commands:\n\n";
 	print "mkdir -m 0755 $ENV{HOME}/.ssh\n";
-	print "ssh-keygen -P '' -f $ENV{HOME}/.ssh/identity\n";
+	print "ssh-keygen -P '' -t rsa -f $ENV{HOME}/.ssh/identity\n";
 	print "cp $ENV{HOME}/.ssh/identity.pub $ENV{HOME}/.ssh/authorized_keys\n";
 	print "chmod 600 $ENV{HOME}/.ssh/authorized_keys\n";
 	print "**********\n";
