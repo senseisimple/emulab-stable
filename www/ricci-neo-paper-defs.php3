@@ -18,4 +18,6 @@ $TBMAILADDR_APPROVAL	= "ricci@fast.cs.utah.edu";
 $TBMAIL_APPROVAL	= "Ricci Testbed Approval <$TBMAILADDR_APPROVAL>";
 $TBMAILADDR_LOGS	= "ricci@fast.cs.utah.edu";
 $TBMAIL_LOGS		= "Ricci Testbed Logs <$TBMAILADDR_LOGS>";
+$TBMAILADDR_AUDIT	= "ricci@fast.cs.utah.edu";
+$TBMAIL_AUDIT		= "Ricci Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>

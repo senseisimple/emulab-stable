@@ -18,4 +18,6 @@ $TBMAILADDR_APPROVAL	= "stoller@fast.cs.utah.edu";
 $TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
 $TBMAILADDR_LOGS	= "stoller@fast.cs.utah.edu";
 $TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
+$TBMAILADDR_AUDIT	= "stoller@fast.cs.utah.edu";
+$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>

@@ -18,4 +18,6 @@ $TBMAILADDR_APPROVAL	= "testbed-approval@flux.cs.utah.edu";
 $TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
 $TBMAILADDR_LOGS	= "testbed-logs@flux.cs.utah.edu";
 $TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
+$TBMAILADDR_AUDIT	= "testbed-audit@flux.cs.utah.edu";
+$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>

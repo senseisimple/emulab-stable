@@ -18,4 +18,6 @@ $TBMAILADDR_APPROVAL	= "newbold@fast.cs.utah.edu";
 $TBMAIL_APPROVAL	= "Newbold Testbed Approval <$TBMAILADDR_APPROVAL>";
 $TBMAILADDR_LOGS	= "newbold@fast.cs.utah.edu";
 $TBMAIL_LOGS		= "Newbold Testbed Logs <$TBMAILADDR_LOGS>";
+$TBMAILADDR_AUDIT	= "newbold@fast.cs.utah.edu";
+$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>
