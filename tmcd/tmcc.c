@@ -578,7 +578,7 @@ dounix(char *data, int outfd, char *unixpath)
 		if (connect(sock, (struct sockaddr *) &sunaddr, length) == 0)
 			break;
 
-		if (errno != ENOENT) {
+		if (errno != ENOENT && errno != ECONNREFUSED) {
 			perror("connecting unix domain socket");
 			close(sock);
 			return -1;
