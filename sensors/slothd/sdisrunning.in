@@ -52,9 +52,32 @@ order by pid,eid,node_id");
     }
 }
 
-sub pcnum { substr($a,2) <=> substr($b,2) }
+# Stolen from snmpit_lib.pm:
+#
+# Used to sort a set of nodes in testbed order (ie. pc2 < pc10)
+sub tbsort { 
+    my ($a,$b) = @_;
+    $a =~ /^([a-z]*)([0-9]*):?([0-9]*)/;
+    my $a_let = ($1 || "");
+    my $a_num = ($2 || 0);
+    my $a_num2 = ($3 || 0);
+    $b =~ /^([a-z]*)([0-9]*):?([0-9]*)/;
+    my $b_let = ($1 || "");
+    my $b_num = ($2 || 0);
+    my $b_num2 = ($3 || 0);
+    if ($a_let eq $b_let) {
+        if ($a_num == $b_num) {
+            return $a_num2 <=> $b_num2;
+        } else {
+            return $a_num <=> $b_num;
+        }
+    } else {
+        return $a_let cmp $b_let;
+    }
+    return 0;
+}
 
-foreach my $n (sort pcnum @nodes) {
+foreach my $n (sort {tbsort($a,$b)} @nodes) {
     print "checking slothd on $n: ";
     #print "\n"; next;
     print check($n);
