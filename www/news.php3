@@ -124,6 +124,7 @@ if ($isadmin) {
 
     if (isset($edit) || isset($addnew)) {	
 	if (isset($addnew)) {
+	    $author = $uid;
 	    echo "<h3>Add new message:</h3>\n";
 	} else {
 	    echo "<h3>Edit message:</h3>\n";
@@ -150,7 +151,7 @@ if ($isadmin) {
 		 "</input><br /><br />\n";
 	}
 	echo "<b>Posted by:</b><br />". 
-	     "<input type='text' name='author' size='50' value='$uid'>".
+	     "<input type='text' name='author' size='50' value='$author'>".
 	     "</input><br /><br />\n". 
 	     "<b>Body (HTML):</b><br />".
        	     "<textarea cols='60' rows='25' name='body'>";
@@ -236,13 +237,7 @@ if (!mysql_num_rows($query_result)) {
 	    echo " (Message <b>#$msgid</b>)";
 	}
 
-	echo "</font></td></tr><tr><td style='padding: 4px; padding-top: 2px;'>".
-	     "<div style='background-color: #FFFFF2; ".
-	     "border: 1px solid #AAAAAA; ".
-      	     "padding: 6px'>".
-	     $body.
-	     "</div>".
-	     "</td></tr>";
+	echo "</font></td></tr>";
 
 	if ($isadmin) {
 	    echo "<tr><td>";
@@ -252,6 +247,17 @@ if (!mysql_num_rows($query_result)) {
 		 "Delete</button>\n";
 	    echo "</td></tr>";
 	}
+
+	echo "<tr><td style='padding: 4px; padding-top: 2px;'>".
+	     "<div style='background-color: #FFFFF2; ".
+	     "border: 1px solid #AAAAAA; ".
+      	     "padding: 6px'>".
+	     $body.
+	     "</div>".
+	     "</td></tr>\n";
+
+	echo "<!-- ' \" > IF YOU CAN READ THIS, YOU FORGOT AN ENDQUOTE -->\n";
+
 	echo "</table><br />";
     } 
 
