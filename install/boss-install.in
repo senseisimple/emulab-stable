@@ -70,11 +70,14 @@ my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
 
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $HTTPD_CONF      = "/usr/local/etc/apache/httpd.conf";
+my $PHP_INI         = "/usr/local/etc/php.ini";
 
 my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
 my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
 my $BOOST_PATCH     = "$TOP_SRCDIR/patches/boost.patch";
+
+my $SSH_CONFIG      = "/etc/ssh/ssh_config";
 
 #
 # Some directories we care about
@@ -84,6 +87,7 @@ my $RCDIR        = "/usr/local/etc/rc.d";
 my $USERSVAR_DIR = "$PREFIX/usersvar";
 my $PORTSDIR     = "/usr/ports/misc";
 my $MIBPATH      = "/usr/local/share/snmp/mibs";
+my $TFTP_DIR     = "$PREFIX/tftpboot";
 
 #
 # URLs
@@ -95,6 +99,8 @@ my $CISCO_MIB_FTP = "ftp://ftp.cisco.com/pub/mibs/v2";
 #
 my @TESTBED_DIRS = ($PREFIX);
 
+my @MOUNTPOINTS = ("$PREFIX/usersvar", "/users", "/proj", "/groups", "/share");
+
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
     "$LOGDIR/frisbeed.log", "$LOGDIR/frisbee.log", "$LOGDIR/tevd.log",
@@ -102,6 +108,8 @@ my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
     "CISCO-PRIVATE-VLAN-MIB", "CISCO-STACK-MIB", "CISCO-VLAN-MEMBERSHIP-MIB");
+
+my @OPS_NAMES = ($FSNODE, $USERNODE);
 
 #
 # Figure out which directory we live in, so that some stages can do thing
@@ -172,10 +180,17 @@ Phase "dirs", "Setting directory permissions", sub {
     }
 };
 
-Phase "usersvar", "Creating $USERSVAR_DIR", sub {
-    DoneIfExists($USERSVAR_DIR);
-    mkdir $USERSVAR_DIR,0777 or
-	PhaseFail("Unable to create $USERSVAR_DIR : $!");
+Phase "tftp", "Setting up directories for tftp", sub {
+    Phase "tftpboot", "Creating $TFTP_DIR", sub {
+	DoneIfExists($TFTP_DIR);
+	mkdir $TFTP_DIR,0775 or
+	    PhaseFail("Unable to create $TFTP_DIR : $!");
+	ExecQuietFatal("$CHGRP tbadmin $TFTP_DIR");
+    };
+    Phase "tftplink", "Linking /tftpboot", sub {
+	DoneIfExists("/tftpboot");
+	ExecQuietFatal("ln -s $TFTP_DIR /tftpboot");
+    };
 };
 
 Phase "ports", "Installing ports", sub {
@@ -184,7 +199,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Checking for port installation", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.1")) {
+	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.2")) {
 	    PhaseSkip("Ports already installed");
 	}
 	PhaseFail("Please install ports manually, since some\n of them are " .
@@ -230,7 +245,6 @@ Phase "apache", "Installing apache config file", sub {
 };
 
 Phase "rc.d", "Setting up rc.d scripts", sub {
-    DoneIfExists("$RCDIR/3.testbed.sh");
     Phase "my-client", "Moving $RCDIR/mysql-client.sh", sub {
 	DoneIfDoesntExist("$RCDIR/mysql-client.sh");
 	ExecQuietFatal("mv $RCDIR/mysql-client.sh $RCDIR/1.mysql-client.sh");
@@ -241,11 +255,10 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
 	}
     };
-    # XXX - Commented until we get the dhcp port thing figured out
-#    Phase "dhcpd", "Moving $RCDIR/dhcpd.sh", sub {
-#	DoneIfExists("$RCDIR/2.dhcpd.sh");
-#	ExecQuietFatal("mv $RCDIR/dchpd.sh $RCDIR/2.dhcpd.sh");
-#    };
+    Phase "dhcpd", "Moving $RCDIR/dhcpd.sh", sub {
+	DoneIfExists("$RCDIR/2.dhcpd.sh");
+	ExecQuietFatal("mv $RCDIR/isc-dhcpd.sh.sample $RCDIR/2.dhcpd.sh");
+    };
     Phase "snmpd", "Removing snmpd starup script",  sub {
 	DoneIfDoesntExist("$RCDIR/snmpd.sh");
 	if (!unlink "$RCDIR/snmpd.sh") {
@@ -296,20 +309,43 @@ Phase "database", "Setting up database", sub {
 Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
     DoneIfEdited($RCCONF);
     AppendToFileFatal($RCCONF,
-	qq|nfs_server_enable = "YES"|,
-	qq|nfs_server_flags  = "-u -t -n 16"|,
-	qq|nfs_client_enable = "YES"|,
-	qq|inetd_enable      = "YES"|,
-	qq|inetd_flags       = "-wW -R 0"|,
-	qq|named_enable      = "YES"|,
-	qq|xntpd_enable      = "YES"|,
-	qq|syslogd_flags     = ""|,
-	qq|tftpd_flags       = "-lvvvv -C 40 -s /tftpboot"|);
+	qq|nfs_server_enable="YES"|,
+	qq|nfs_server_flags="-u -t -n 16"|,
+	qq|nfs_client_enable="YES"|,
+	qq|inetd_enable="YES"|,
+	qq|inetd_flags="-wW -R 0"|,
+	qq|named_enable="YES"|,
+	qq|xntpd_enable="YES"|,
+	qq|syslogd_flags=""|,
+	qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|);
 };
 
 Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
     PhaseSkip("Already done") if (-u $SUIDPERL);
     ExecQuietFatal("$CHMOD u+s $SUIDPERL");
+};
+
+Phase "mountpoints", "Creating mountpoints", sub {
+    foreach my $dir (@MOUNTPOINTS) {
+	Phase $dir, $dir, sub {
+	    DoneIfExists($dir);
+	    mkdir $dir, 0777 or
+		PhaseFail("Unable to create $dir : $!");
+	};
+    }
+};
+
+Phase "resolve", "Checking to make sure names for ops resolve", sub {
+    foreach my $name (@OPS_NAMES) {
+	Phase $name, $name, sub {
+	    if (gethostbyname($name)) {
+		PhaseSkip("$name resolves");
+	    } else {
+		PhaseFail("$name does not resolve - please see setup.txt\n" .
+		    "for further instructions!");
+	    }
+	};
+    }
 };
 
 Phase "mounts", "Setting up mounts of fs and ops", sub {
@@ -406,9 +442,32 @@ Phase "sudoers", "Editing $SUDOERS", sub {
     AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
 };
 
+Phase "php.ini", "Creating php.ini file", sub {
+    DoneIfExists($PHP_INI);
+    CreateFileFatal($PHP_INI,
+	"[PHP]","",
+	";",
+	"; So that quotes are not escaped. Needed for netbuild application.",
+	";", 
+	"magic_quotes_gpc        =       Off","",
+	";",
+	"; Our scripts depend on this!",
+	";",
+	"register_globals        =       On");
+};
+
 Phase "ssh", "Setting up root ssh from boss to ops", sub {
-    DoneIfExists($ROOT_PRIVKEY);
-    ExecQuietFatal("$SSH_KEYGEN -t rsa1 -P '' -f $ROOT_PRIVKEY");
+    Phase "keygen", "Creating root private key", sub {
+	DoneIfExists($ROOT_PRIVKEY);
+	ExecQuietFatal("$SSH_KEYGEN -t rsa1 -P '' -f $ROOT_PRIVKEY");
+    };
+    Phase "ssh", "Editing ssh config file", sub {
+	DoneIfEdited($SSH_CONFIG);
+	AppendToFileFatal($SSH_CONFIG,
+	    "Host *",
+	    "   StrictHostKeyChecking no",
+	    "   Protocol 1,2");
+    };
 };
 
 print "----------------------------------------------------------------------\n";
