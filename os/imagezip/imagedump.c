@@ -311,7 +311,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 
 	for (i = 0; i < hdr->regioncount; i++) {
 		if (detail > 1)
-			printf("    Region %d: %d sectors [%u-%u]\n",
+			printf("    Region %d: %u sectors [%u-%u]\n",
 			       i, reg->size, reg->start,
 			       reg->start + reg->size - 1);
 		if (reg->start < nextsector)

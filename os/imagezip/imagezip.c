@@ -78,6 +78,10 @@ int	frangesize= 64;	/* 32k */
 #define sectobytes(s)	((off_t)(s) * secsize)
 #define bytestosec(b)	(uint32_t)((b) / secsize)
 
+#define HDRUSED(reg, rel) \
+    (sizeof(blockhdr_t) + \
+    (reg) * sizeof(struct region) + (rel) * sizeof(struct blockreloc))
+
 /*
  * We want to be able to compress slices by themselves, so we need
  * to know where the slice starts when reading the input file for
@@ -100,7 +104,7 @@ struct range {
 struct range	*ranges, *skips, *fixups;
 int		numranges, numskips;
 struct blockreloc	*relocs;
-int			numrelocs;
+int			numregions, numrelocs;
 
 void	addskip(uint32_t start, uint32_t size);
 void	dumpskips(void);
@@ -1606,6 +1610,12 @@ addreloc(off_t offset, off_t size, int reloctype)
 	assert(!oldstyle);
 
 	numrelocs++;
+	if (HDRUSED(numregions, numrelocs) > DEFAULTREGIONSIZE) {
+		fprintf(stderr, "Over filled region/reloc table (%d/%d)\n",
+			numregions, numrelocs);
+		exit(1);
+	}
+
 	relocs = realloc(relocs, numrelocs * sizeof(struct blockreloc));
 	if (relocs == NULL) {
 		fprintf(stderr, "Out of memory!\n");
@@ -1645,7 +1655,7 @@ static void	compress_status(int foo);
 int
 compress_image(void)
 {
-	int		cc, full, i, count, numregions, chunkno;
+	int		cc, full, i, count, chunkno;
 	off_t		size = 0, outputoffset;
 	off_t		tmpoffset, rangesize;
 	struct range	*prange;
@@ -1763,12 +1773,18 @@ compress_image(void)
 
 		/*
 		 * Check to see if the region/reloc table is full.
-		 * XXX handle this gracefully sometime.
+		 * If this is the last region that will fit in the available
+		 * space (i.e., one more would not), finish off any
+		 * compression we are in the middle of and declare the
+		 * region full.
 		 */
-		if (numregions*sizeof(struct region) +
-		    numrelocs*sizeof(struct blockreloc) > DEFAULTREGIONSIZE) {
-			fprintf(stderr, "Over filled region table\n");
-			exit(1);
+		if (HDRUSED(numregions+1, numrelocs) > DEFAULTREGIONSIZE) {
+			assert(HDRUSED(numregions, numrelocs) <=
+			       DEFAULTREGIONSIZE);
+			if (!full) {
+				compress_finish(&blkhdr->size);
+				full = 1;
+			}
 		}
 
 		/*
@@ -1904,9 +1920,9 @@ compress_image(void)
 		 * Check to see if the region/reloc table is full.
 		 * XXX handle this gracefully sometime.
 		 */
-		if (numregions*sizeof(struct region) +
-		    numrelocs*sizeof(struct blockreloc) > DEFAULTREGIONSIZE) {
-			fprintf(stderr, "Over filled region table\n");
+		if (HDRUSED(numregions, numrelocs) > DEFAULTREGIONSIZE) {
+			fprintf(stderr, "Over filled region table (%d/%d)\n",
+				numregions, numrelocs);
 			exit(1);
 		}
 
