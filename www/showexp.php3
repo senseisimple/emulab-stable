@@ -87,7 +87,7 @@ if ($expstate) {
 	WRITESUBMENUBUTTON("Swap this Experiment Out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
 
-	WRITESUBMENUBUTTON("Control Traffic Shaping",
+	WRITESUBMENUBUTTON("Modify Traffic Shaping",
 			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
