@@ -805,8 +805,10 @@ sub TearDownEmulab()
     #
     DBQueryFatal("update nodes set ".
 		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
-		 "where " . join(" or ", map("node_id='$_'", @expnodes)));
-
+		 "where " .
+		    join(" or ", map("node_id='$_'",
+				     ($bossnode, $opsnode, @expnodes))));
+    
     #
     # SSH in and kill the inner DHCPD daemon so that it does not reply
     # to rebooting nodes along the inner control network.
