@@ -1,4 +1,4 @@
- #!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 
 # This file is temporarily empty. I'm committing it so that my
 # changes to configure don't cause unnecessary warnings about 

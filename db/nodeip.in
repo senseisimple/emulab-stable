@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 
 #
 # nodeip - Given a node, interface, or MAC address, print the interface

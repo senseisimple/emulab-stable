@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 #
 # snmpit module for a stack of Cisco Catalyst 6509 switches. The main purpose
 # of this module is to contain knowledge of how to manage stack-wide operations

@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 #
 # vlansync - Synchronize the switch vlans to what's in the vlans table
 #            by removing extra vlans/ports, and adding missing ones

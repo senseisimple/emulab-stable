@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/perl -w
 #
 # snmpit module for Intel EtherExpress 510T switches
 #

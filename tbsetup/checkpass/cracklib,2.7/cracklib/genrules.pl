@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 
 ###
 # This program is copyright Alec Muffett 1997. The author disclaims all

@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -wT
+#!/usr/bin/perl -wT
 #
 # savevlans - dump vlans table into a file, suitable for restoration with
 # "load data infile '$name' replace into table vlans;"
