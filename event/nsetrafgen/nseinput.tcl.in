@@ -455,7 +455,7 @@ if { $simcode_present == 1 } {
 set tmccbossinfo [open $CLIENTVARDIR/boot/tmcc.bossinfo r]
 set tmccboss [read $tmccbossinfo]
 close $tmccbossinfo
-set boss [lindex [split $tmccboss " "] 0]
+set boss [lindex [split $tmccboss " \n"] 0]
 set pideidlist [split [exec hostname] "."]
 set vnode [lindex $pideidlist 0]
 set eid [lindex $pideidlist 1]

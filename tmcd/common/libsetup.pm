@@ -95,7 +95,7 @@ my $inixp;
 #
 # The role of this pnode
 #
-my $role   = "";
+my $role;
 
 # Load up the paths. Its conditionalized to be compatabile with older images.
 # Note this file has probably already been loaded by the caller.
@@ -144,7 +144,7 @@ BEGIN
 	open(VN, "$BOOTDIR/role");
 	$role = <VN>;
 	close(VN);
-	$role = chomp($role);
+	chomp($role);
     }
 }
 
