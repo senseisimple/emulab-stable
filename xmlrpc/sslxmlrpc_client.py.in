@@ -172,6 +172,12 @@ try:
             pass
         elif opt in ("-s", "--server"):
 	    xmlrpc_server = val
+            #
+            # Allow port spec here too.
+            #
+            if val.find(":") > 0:
+                xmlrpc_server,xmlrpc_port = string.split(val, ":", 1)
+                pass
             pass
         elif opt in ("-p", "--port"):
 	    xmlrpc_port = val
@@ -208,6 +214,9 @@ ctx.set_allow_unknown_ca(0)
 
 # This is parsed by the Proxy object.
 URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port)
+if debug:
+    print URI
+    pass
 
 # Get a handle on the server,
 server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx));
