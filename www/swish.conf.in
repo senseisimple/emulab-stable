@@ -1,0 +1,28 @@
+IndexFile @prefix@/www/site.index
+IndexDir @prefix@/www
+ReplaceRules remove @prefix@/www/
+
+DefaultContents TXT
+IndexContents HTML .htm .html
+IndexContents TXT  .txt .text
+
+# Don't index any directories of these directories
+FileRules dirname contains /webglimpse
+FileRules dirname contains /images
+FileRules dirname contains /thumbs
+FileRules dirname contains /dev/
+FileRules dirname contains /downloads
+FileRules dirname contains /distributions
+FileRules dirname contains /bugtrack
+
+# But only index the .html files
+IndexOnly .html 
+
+# Show basic info while indexing
+IndexReport 1
+
+MetaNames swishtitle swishdocpath swishdescription
+PropertyNames swishdescription
+
+StoreDescription HTML <body>
+StoreDescription TXT 10000

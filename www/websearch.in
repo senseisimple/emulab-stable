@@ -1,0 +1,157 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use File::Basename;
+
+#
+# Search our web index. Spits out HTML. Sorry, easier that way!
+# 
+sub usage {
+    print STDERR "Usage: websearch ...\n";
+    exit(-1);
+}
+my $optlist  = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $WWW         = "$TB/www";
+my $index	= "$TB/www/site.index";
+my $swish       = "swish-e";
+my $searchstring;
+my $searchwords;
+my $numhits;
+my %hits	= ();	# indexed by document.
+my %lines       = ();   # indexed by document.
+my @order	= ();
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Very simple; one argument is the string to search for.
+#
+usage()
+    if (! @ARGV);
+
+$searchstring = $ARGV[0];
+
+#
+# Do this from the webdir.
+#
+chdir($WWW) or
+    die("*** $0:\n".
+	"    Could not chdir to $WWW!\n");
+
+#
+# Run swish. The next version of swish will include a perl API module, so
+# we will be able to avoid this extra shell call. For now, we are stuck
+# calling swish-e.
+#
+open(SWISH, "swish-e -f $index -p swishlastmodified swishdescription ".
+     "-w '$searchstring' |") or
+    die("*** $0:\n".
+	"    Could not invoke swish-e on '$searchstring'!\n");
+
+#
+# Read back results. 
+#
+while (<SWISH>) {
+    #
+    # First few lines are special.
+    #
+    if ($_ =~ /^\#/) {
+	if ($_ =~ /^\# Search words: (.*)$/) {
+	    $searchwords = $1;
+	}
+	elsif ($_ =~ /^\# Number of hits: (\d*)$/) {
+	    $numhits = $1;
+	}
+    }
+    elsif ($_ =~ /^\.$/) {
+	# So we suck everything up to the dot.
+	last;
+    }
+    else {
+	#
+	# By this point we should have seen the above stuff go by.
+	#
+	if (!defined($searchwords) || !defined($numhits)) {
+	    next;
+	}
+	if ($_ =~ /^(\d*) (.*) \"(.*)\" (\d*) \"(.*)\" \"(.*)\"$/) {
+	    my $rank = $1;
+	    my $path = $2;
+	    my $file = $3;
+	    my $size = $4;
+	    my $mod  = $5;
+	    my $text = $6;
+
+	    $hits{$path}  = [ $rank, $path, $file, $size, $mod,
+			   substr($text, 0, 300) ];
+	    $lines{$path} = [];
+	    push(@order, $path);
+	}
+    }
+}
+close(SWISH);
+
+#
+# Build a query to pass to agrep; this is pathetic, but the next version of
+# swish will handle this, so not going to worry; it will do the job.
+#
+my $query = $searchwords;
+$query =~ s/\s+AND\s+/\;/ig;
+$query =~ s/\s+OR\s+/\,/ig;
+$query =~ s/(?<!\\)\"//ig;
+
+#print "$query\n";
+
+#
+# Run agrep on the list of files. 
+# 
+open(AGREP, "agrep -i '$query' " . join(" ", keys(%hits)) .
+     " /dev/null 2> /dev/null |") or
+    die("*** $0:\n".
+	"    Could not invoke agrep with '$query'!\n");
+
+while (<AGREP>) {
+    if ($_ =~ /^(.*): (.*)$/) {
+	push(@{ $lines{$1} }, $2)
+	    if (scalar(@{ $lines{$1} }) < 10);
+    }
+}
+close(AGREP);
+
+print "Rank, filename, modification date, first part of file<br>\n";
+foreach my $hit (@order) {
+    my ($rank, $path, $file, $size, $mod, $text) = @{ $hits{$hit} };
+    $path = dirname($path);
+
+    print "<hr>\n";
+    print "$rank - <b><a href=$path/docwrapper.php3?docname=$file>".
+	"$path/$file</a></b>, $mod<br>\n";
+    print "<ul>\n";
+    foreach my $line (@{ $lines{$hit} }) {
+	$line =~ s/<li>//ig;
+	$line =~ s/<\/li>//ig;
+	
+	print "<li> $line\n";
+    }
+    print "</ul>\n";
+}
+print "<hr><br><br>".
+      "Web Search powered by <a href=\"http://swish-e.org/\"><b>Swish-e</b></a>".
+      "\n";
+
+exit(0);

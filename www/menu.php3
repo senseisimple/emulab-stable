@@ -201,7 +201,7 @@ function WRITEPLABBOTTOMBAR() {
 	   <center>
 	   <br>
 	   <font size=-1>
-	   <form method=get action='/cgi-bin/webglimpse/usr/testbed/webglimpse'>
+	   <form method=get action=search.php3>
 	   [ <a href='$TBDOCBASE/doc.php3'>
 		Documentation</a> : <input name=query size = 15/>
 		  <input type=submit style='font-size:10px;' value='Search' /> ]
@@ -259,7 +259,7 @@ function WRITESIDEBAR() {
 	}
     }
 
-    echo "<FORM method=get ACTION=\"/cgi-bin/webglimpse/usr/testbed/webglimpse\">\n";
+    echo "<FORM method=get ACTION=search.php3>\n";
 ?>
   <table class="menu" width=210 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
@@ -317,7 +317,6 @@ function WRITESIDEBAR() {
     <tr><td class="menuoptst"><b>Search Documentation:</b></td></tr>
     <tr><td class="menuoptsb"><input name=query size = 15/>
       <input type=submit style="font-size:10px;" value="Go" /><br>
-      [ <a href="<?php echo "$TBDOCBASE/search.php3"; ?>">Advanced Search</a> ]
     </td></tr>
 <?php # BACK TO PHP
     echo "</table>\n";

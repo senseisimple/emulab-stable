@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -20,7 +20,7 @@ include $(OBJDIR)/Makeconf
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: defs.php3 dbdefs.php3
+all: defs.php3 dbdefs.php3 swish.conf websearch
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -114,16 +114,12 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/downloads/, $(ALLDOWNLOADS)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
 	$(INSTALL_DATA) $(TESTBED_SRCDIR)/doc/ChangeLog \
 			$(INSTALL_WWWDIR)/doc/ChangeLog.txt
+	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
-		if test -d ../webglimpse; \
-		then \
-			rm -f webglimpse; \
-			ln -s ../webglimpse webglimpse; \
-			(cd webglimpse && wgreindex -q); \
-		fi; \
 		rm -f tbdb.html; \
 		ln -s index.html tbdb.html; \
 		rm -f icons; \

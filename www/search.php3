@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -10,78 +10,89 @@ require("defs.php3");
 # Standard Testbed Header
 #
 PAGEHEADER("Search Emulab Documentation");
-?>
 
-<center>
-<table border=0 cellpadding=4 cellspacing=0 class="nogrid">
-<FORM method=get ACTION="/cgi-bin/webglimpse/usr/testbed/webglimpse">
+#
+# We no longer support an advanced search option. We might bring it back
+# someday.
+#
+function SPITFORM($query)
+{
+    echo "<table align=center border=1>
+          <form action=search.php3 method=get>\n";
 
-<tr>
-   <th>
-       <font size=+3>
-       <a href="http://glimpse.cs.arizona.edu/webglimpse">WebGlimpse</a>
-       Search</font>
-   </th>
-</tr>
+    $query = htmlspecialchars($query);
 
-<tr><td class="paddedcell">
-        String to search for: <INPUT NAME=query size=30>
-        <INPUT TYPE=submit VALUE=Submit>
-</td></tr>
-<tr><td class="paddedcell">
-        <INPUT NAME=case TYPE=checkbox>Case&nbsp;sensitive
-        <!-- SPACES -->&nbsp;&nbsp;&nbsp;
-        <INPUT NAME=whole TYPE=checkbox>Partial&nbsp;match
-        <!-- SPACES -->&nbsp;&nbsp;&nbsp;
-        <INPUT NAME=lines TYPE=checkbox>Jump&nbsp;to&nbsp;line
-</td></tr>
-<tr><td class="paddedcell">	
-        <SELECT NAME=errors align=right>
-            <OPTION>0
-            <OPTION>1
-            <OPTION>2
-        </SELECT>
-        misspellings&nbsp;allowed
-</td></tr>
-<tr><td class="paddedcell">	
-        Return only files modified within the last <INPUT NAME=age size=5>
-        days.
-</td></tr>
-<tr><td class="paddedcell">	
-        Maximum number of files returned:
-        <SELECT NAME=maxfiles>
-            <OPTION>10
-            <OPTION selected>50
-            <OPTION>100
-            <OPTION>1000
-        </SELECT>
-</td></tr>
-<tr><td class="paddedcell">	
-	Maximum number of matches per file returned:
-        <SELECT NAME=maxlines>
-            <OPTION>10
-            <OPTION selected>30
-            <OPTION>50
-            <OPTION>500
-        </SELECT>
-        <br>
-</td></tr>
-<tr><td class="paddedcell">	
-	Maximum number of characters output per file:
-        <INPUT NAME="maxchars" VALUE=10000>
-</td></tr>
-<tr><td class="paddedcell">	
-    <font size=-1>
-      <a href="http://glimpse.cs.arizona.edu">Glimpse</a> and 
-      <a href="http://glimpse.cs.arizona.edu/webglimpse">WebGlimpse</a>, 
-      Copyright &copy; 1996, University of Arizona
-    </font>
-    </td>
-</tr>
-</form>
-</table>
+    #
+    # Just the query please.
+    #
+    echo "<tr>
+             <td class=left>
+                 <input type=text name=query value=\"$query\"
+                        size=25 maxlength=100>
+               </td>
+           </tr>\n";
+    
+    echo "<tr>
+              <td align=center>
+                 <b><input type=submit name=submit value='Submit Query'></b>
+              </td>
+          </tr>\n";
 
-<?php
+    echo "</form>
+          </table><br>\n";
+}
+
+if (!isset($query) || $query == "") {
+    SPITFORM("");
+    PAGEFOOTER();
+    return;
+}
+
+# Sanitize for the shell. Be fancy later.
+if (!preg_match("/^[-\w\ \"]+$/", $query)) {
+    SPITFORM("");
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Run the query. We get back html we can just spit out.
+#
+#
+# A cleanup function to keep the child from becoming a zombie, since
+# the script is terminated, but the children are left to roam.
+#
+$fp = 0;
+
+function CLEANUP()
+{
+    global $fp;
+
+    if (!$fp || !connection_aborted()) {
+	exit();
+    }
+    pclose($fp);
+    exit();
+}
+ignore_user_abort(1);
+register_shutdown_function("CLEANUP");
+
+SPITFORM($query);
+flush();
+
+if ($fp = popen("$TBSUEXEC_PATH nobody nobody websearch '$query'", "r")) {
+    while (!feof($fp)) {
+	$string = fgets($fp, 1024);
+	echo "$string";
+	flush();
+    }
+    pclose($fp);
+    $fp = 0;
+}
+else {
+    TBERROR("Query failed: $query", 0);
+}
+
 #
 # Standard Testbed Footer
 # 
