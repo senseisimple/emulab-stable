@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+echo "Doing Testbed jailsetup configuration ..."
+$BINDIR/jailsetup
+
+if [ -x $BOOTDIR/rc.rpm  ]; then
+        echo "Installing RPMs ..."
+	$BOOTDIR/rc.rpm
+fi
+
+if [ -x $BOOTDIR/rc.tarballs  ]; then
+        echo "Installing Tarballs ..."
+	$BOOTDIR/rc.tarballs
+fi
+
+if [ -s $BOOTDIR/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit ..."
+	$BINDIR/runstartup
+fi
+
+if [ -x $BINDIR/rc.agents  ]; then
+	$BINDIR/rc.agents
+fi
+
+if [ -x $BOOTDIR/rc.traffic  ]; then
+        echo "Starting traffic generators ..."
+	$BOOTDIR/rc.traffic
+fi
+
+if [ -x $BINDIR/watchdog  ]; then
+        echo "Starting update watchdog ..."
+	$BINDIR/watchdog start
+fi
+
+
+echo "Informing the testbed that we're up and running ..."
+$BINDIR/tmcc state ISUP

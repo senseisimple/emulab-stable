@@ -1,0 +1,24 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+#
+# Then invoke the bootsetup routine in the library. All the work happens
+# in there. 
+#
+jailsetup();
+
+exit 0;
