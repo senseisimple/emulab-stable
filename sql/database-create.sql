@@ -325,7 +325,7 @@ CREATE TABLE images (
   updated datetime default NULL,
   max_concurrent int(11) default NULL,
   PRIMARY KEY  (imagename,pid),
-  KEY imageid (imageid)
+  KEY imageid (imageid),
   KEY gid (gid)
 ) TYPE=MyISAM;
 
@@ -1318,6 +1318,20 @@ CREATE TABLE webdb_table_permissions (
   allow_row_add_edit tinyint(1) default '0',
   allow_row_delete tinyint(1) default '0',
   PRIMARY KEY  (table_name)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'webnews'
+--
+
+CREATE TABLE webnews (
+  msgid int(11) NOT NULL auto_increment,
+  subject tinytext,
+  date datetime default NULL,
+  author varchar(32) default NULL,
+  body text,
+  PRIMARY KEY  (msgid),
+  KEY date (date)
 ) TYPE=MyISAM;
 
 --

@@ -72,6 +72,36 @@ function WRITESIDEBAR() {
     
     # create the main menu table, which also happens to reside in a form
     # (for search.)
+
+    #
+    # get post time of most recent news;
+    # get both displayable version and age in days.
+    #
+    $query_result = 
+	DBQueryFatal("SELECT DATE_FORMAT(date, '%M&nbsp;%e') AS prettydate, ".
+		     " (TO_DAYS(NOW()) - TO_DAYS(date)) AS age ".
+		     "FROM webnews ".
+		     "ORDER BY date DESC ".
+		     "LIMIT 1");
+    $newsDate = "";
+    $newNews  = 0;
+
+    #
+    # This is so an admin can use the editing features of news.
+    #
+    if ($login_uid) { # && ISADMIN($login_uid)) { 
+	$newsBase = $TBBASE; 
+    } else {
+	$newsBase = $TBDOCBASE;
+    }
+
+    if ($row = mysql_fetch_array($query_result)) {
+	$newsDate = "(".$row[prettydate].")";
+	if ($row[age] < 7) {
+	    $newNews = 1;
+	}
+    }
+
 ?>
 <FORM method=get ACTION="/cgi-bin/webglimpse/usr/testbed/webglimpse">
   <table class="menu" width=220 cellpadding="0" cellspacing="0">
@@ -84,8 +114,12 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
 			   $TBDOCBASE, "cdrom.php");
 
-    WRITESIDEBARBUTTON("News (August&nbsp;15)", $TBDOCBASE,
-		       "docwrapper.php3?docname=news.html");
+    if ($newNews) {
+	WRITESIDEBARBUTTON_NEW("News $newsDate", $newsBase, "news.php3");
+    } else {
+	WRITESIDEBARBUTTON("News $newsDate", $newsBase, "news.php3");
+    }
+
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON("Papers", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("Software", $TBDOCBASE, "software.php3");
