@@ -163,24 +163,8 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 
 #
 # This script always does the right thing, so it does not matter who
-# calls it. But we guard it anyway in the case where ops/boss are the
-# same.
+# calls it.
 # 
-if (!TBAdmin($UID)) {
-    #
-    # Check if group_root/project_root anyplace, which indicates caller
-    # has some level of responsibility.
-    #
-    $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where uid='$dbuid' and ".
-		     "trust='project_root' or trust='group_root'");
-
-    if ($query_result->numrows == 0) {
-	die("*** $0:\n".
-	    "    $dbuid does not have permission to update groups!\n");
-    }
-}
 
 #
 # In batch mode, go to background and send email later.
@@ -253,15 +237,25 @@ foreach my $uid (@userlist) {
 
     if (!$query_result->numrows) {
 	#
-	# Non fatal error since there can be group members not approved,
+	# See if an active user with no project membership. If so, then
+	# set groups to just the guest group. If not active, skip
+	# (non-fatal) since there can be group members not approved,
 	# and this is called from the editgroups web page.
-	# 
-	print "Skipping $uid; not in any groups!\n";
-	next;
+	#
+	$query_result =
+	    DBQueryFatal("select status from users where uid='$uid' ".
+			 "and status='" . USERSTATUS_ACTIVE . "'");
+
+	if (!$query_result->numrows) {
+	    print "Skipping $uid; not in any groups!\n";
+	    next;
+	}
+	push(@groupnames, "guest");
     }
-    
-    while (@db_row = $query_result->fetchrow_array() ) {
-	push(@groupnames, $db_row[0]);
+    else {
+	while (@db_row = $query_result->fetchrow_array() ) {
+	    push(@groupnames, $db_row[0]);
+	}
     }
 
     $query_result =
