@@ -747,7 +747,7 @@ int main(int argc,char **argv)
     afile.close();
   }
   
-  if (violated == 0) {
+  if (violated != 0) {
       return 1;
   } else {
       return 0;
