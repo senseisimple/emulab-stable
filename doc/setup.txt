@@ -139,6 +139,10 @@ Also grab the old /etc/groups file
 *.*                     /usr/testbed/log/tiplogs/capture.log
 !dhcpd
 *.*                     /usr/testbed/log/dhcpd.log
+!capserver
+*.*                     /usr/testbed/log/capserver.log
+!frisbeed
+*.*                     /usr/testbed/log/frisbeed.log
 All of these logs should be created before you HUP syslogd or reboot - All of
 them can be world-readable
 
@@ -220,12 +224,16 @@ SSH keys - Generate an SSH key for root by running ssh-keygen. Put an empty
 passphrase on it. You'll want to copy boss:/root/.ssh/identity.pub to
 ops:/root/.ssh/authorized_keys so that boss has the appropriate access on ops.
 
+Process accounting - We generally turn on process accounting, by putting
+accounting_enable="YES"
+in /etc/rc.conf .
+
 ##### Step 6 - Stuff to copy from an old boss node
 
 If you're simply moving from one boss node to another, there are a few files
 and trees you'll want to make sure to copy over:
 /usr/testbed/images/
-/tftpboot/
+/tftpboot/ (a link to /usr/testbed/tftpboot)
 /etc/namedb/
 /etc/master.password
 /etc/group
