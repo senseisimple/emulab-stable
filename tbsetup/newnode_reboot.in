@@ -37,6 +37,12 @@ $ENV{PATH} = "/bin";
 #
 my $privkey = "$TB/etc/identity.newnode";
 
+#
+# We also try root's own private key in case the node has somehow ended up in a
+# state where it's booted from the special boot CD or a 'regular' image.
+#
+my $rootkey = "/root/.ssh/identity";
+
 if (!TBAdmin($UID)) {
     die "Sorry, only admins can run this script\n";
 }
@@ -65,7 +71,7 @@ if ($ARGV[0] !~ /^(\d+\.\d+\.\d+\.\d+)$/) {
     $IP = $1;
 }
 
-my $rv = system("$ssh -l root -i $privkey $IP /sbin/reboot");
+my $rv = system("$ssh -l root -i $privkey -i $rootkey $IP /sbin/reboot");
 
 #
 # XXX - We can't check the return value of ssh for failure, since reboot on
