@@ -354,7 +354,13 @@ while (my %row = $db_result->fetchhash()) {
 			    "*** $0:\n".
 			    "    No mapping can be made for $osid ($node)!");
 		    }
-		    my $nextosid = TBResolveNextOSID($osid);
+
+		    my $nextosid = TBResolveNextOSID($osid, $pid, $eid);
+		    if (!defined($nextosid)) {
+			die_noretry(
+			    "*** $0:\n".
+			    "    No mapping can be made for $osid ($node)!");
+		    }
 		
 		    #
 		    # See if the nextosid is already on the disk. If not,

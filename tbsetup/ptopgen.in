@@ -258,7 +258,7 @@ while (my ($osid) = $result->fetchrow()) {
     #
     # Check to see if they were allowed to use the real OSID
     #
-    my $realosid = TBResolveNextOSID($osid);
+    my $realosid = TBResolveNextOSID($osid, $pid, $exempt_eid);
     if ($osid_node_types{$realosid}) {
 	foreach my $type (@{$osid_node_types{$realosid}}) {
 	    push @{$node_type_osids{$type}}, $osid;

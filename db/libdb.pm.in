@@ -1975,13 +1975,13 @@ sub TBOSCountInstances ($;@)
 # Note: It's okay to call this function with a 'real' OSID, but it would be
 # waseful to do so.
 #
-# usage: TBResolveNextOSID(char *osid)
+# usage: TBResolveNextOSID(char *osid, char *pid, char *eid)
 # returns: The 'real' OSID that the OSID resolves to, or undef if there is a
 #          problem (ie. unknown OSID)
 #
-sub TBResolveNextOSID($)
+sub TBResolveNextOSID($;$$)
 {
-    my ($osid) = @_;
+    my ($osid,$pid,$eid) = @_;
     my $next_osid = $osid;
     my $input_osid = $osid;
 
@@ -2002,8 +2002,43 @@ sub TBResolveNextOSID($)
 	    warn "Resolving $input_osid: Unable to fetch os_info for $osid!\n";
 	    return undef;
 	}
-
 	($next_osid) = $result->fetchrow();
+
+	#
+	# See if we need to resolve using a map
+	#
+	if ($next_osid && $next_osid =~ /^MAP:(\w+)/) {
+	    my $map = $1;
+
+	    my $timestr;
+	    if (defined($pid) && defined($eid)) {
+		my $m_result = DBQueryWarn("select expt_created ".
+					   "from experiments where ".
+					   "pid='$pid' and eid='$eid'");
+		if (!$m_result || $m_result->num_rows() == 0) {
+		    warn "Resolving $input_osid: no experiment $pid/$eid!\n";
+		    return undef;
+		}
+		my ($ctime) = $m_result->fetchrow();
+		$timestr = "'$ctime'";
+	    } else {
+		$timestr = "now()";
+	    }
+
+	    $result = DBQueryWarn("select nextosid from $map ".
+				  "where osid='$osid' and ".
+				  "$timestr between btime and etime");
+	    if (!$result) {
+		warn "No such osid map $map!\n";
+		return undef;
+	    }
+
+	    if ($result->num_rows() == 0) {
+		warn "Resolving $input_osid: Unable to map $osid!\n";
+		return undef;
+	    }
+	    ($next_osid) = $result->fetchrow();
+	}
     } while ($next_osid);
     
     return $osid;

@@ -1963,3 +1963,49 @@ last_net_act,last_cpu_act,last_ext_act);
 	  modify_date datetime default NULL,
 	  PRIMARY KEY  (order_id)
 	) TYPE=MyISAM;
+
+1.275: Add timed-based mapping table for generic OSIDs.  This augments the
+       nextosid mechinism of 1.114 making it possible to map a generic *-STD
+       OSID based on the time in which an experiment is created.  This
+       provides backward compatibility for old experiments when the standard
+       images are changed.
+
+       The osid_map table lookup is triggered when the value of the nextosid
+       field is set to 'MAP:osid_map'.  The nextosid also continues to behave
+       as before: if it contains a valid osid, that OSID value is used to map
+       independent of the experiment creation time.  The two styles can also
+       be mixed, for example FBSD-JAIL has a nextosid of FBSD-STD which in
+       turn is looked up and redirects to the osid_map and selects one of
+       FBSD47-STD or FBSD410-STD depending on the time.
+
+	CREATE TABLE osid_map (
+	  osid varchar(35) NOT NULL default '',
+	  btime datetime NOT NULL default '1000-01-01 00:00:00',
+	  etime datetime NOT NULL default '9999-12-31 23:59:59',
+	  nextosid varchar(35) default NULL,
+	  PRIMARY KEY  (osid,btime,etime)
+	) TYPE=MyISAM;
+
+       Yeah, yeah, I'm using another magic date as a sentinel value.
+       Tell ya what, in 7995 years, find out where I'm buried, dig me up,
+       and kick my ass for being so short-sighted...
+
+       The following commands are not strictly needed, they just give
+       an example, default population of the table.  They cause the standard
+       images to be revectored through the table and then remapped, based on
+       two time ranges, to the exact same image.  Obviously, the second set
+       would normally be mapped to a different set of images (say RHL90 and
+       FBSD410):
+
+	INSERT INTO osid_map (osid,etime,nextosid) VALUES \
+	  ('RHL-STD','2004-09-08 08:59:59','emulab-ops-RHL73-STD');
+	INSERT INTO osid_map (osid,etime,nextosid) VALUES \
+	  ('FBSD-STD','2004-09-08 08:59:59','emulab-ops-FBSD47-STD');
+
+	INSERT INTO osid_map (osid,btime,nextosid) VALUES \
+	  ('RHL-STD','2004-09-08 09:00:00','emulab-ops-RHL73-STD');
+	INSERT INTO osid_map (osid,btime,nextosid) VALUES \
+	  ('FBSD-STD','2004-09-08 09:00:00','emulab-ops-FBSD47-STD');
+
+	UPDATE os_info SET nextosid='MAP:osid_map' \
+	  WHERE osname IN ('RHL-STD','FBSD-STD');

@@ -1152,6 +1152,18 @@ CREATE TABLE os_info (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `osid_map`
+--
+
+CREATE TABLE osid_map (
+  osid varchar(35) NOT NULL default '',
+  btime datetime NOT NULL default '1000-01-01 00:00:00',
+  etime datetime NOT NULL default '9999-12-31 23:59:59',
+  nextosid varchar(35) default NULL,
+  PRIMARY KEY  (osid,btime,etime)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `osidtoimageid`
 --
 
