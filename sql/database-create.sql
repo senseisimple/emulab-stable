@@ -9,7 +9,7 @@
 --
 
 CREATE TABLE buildings (
-  building varchar(32) NOT NULL default '',,
+  building varchar(32) NOT NULL default '',
   image_path tinytext,
   title tinytext NOT NULL,
   PRIMARY KEY  (building)
@@ -341,7 +341,7 @@ CREATE TABLE floorimages (
   y1 int(6) NOT NULL default '0',
   x2 int(6) NOT NULL default '0',
   y2 int(6) NOT NULL default '0',
-  PRIMARY KEY  (building, floor)
+  PRIMARY KEY  (building,floor)
 ) TYPE=MyISAM;
 
 --
@@ -694,6 +694,13 @@ CREATE TABLE new_nodes (
   dmesg text,
   created timestamp(14) NOT NULL,
   identifier varchar(255) default NULL,
+  floor varchar(32) default NULL,
+  building varchar(32) default NULL,
+  loc_x int(10) unsigned NOT NULL default '0',
+  loc_y int(10) unsigned NOT NULL default '0',
+  contact tinytext,
+  phone tinytext,
+  room varchar(32) default NULL,
   PRIMARY KEY  (new_node_id)
 ) TYPE=MyISAM;
 
@@ -1697,7 +1704,7 @@ CREATE TABLE virt_lans (
   protocol varchar(30) NOT NULL default 'ethernet',
   is_accesspoint tinyint(4) default '0',
   KEY pid (pid,eid,vname),
-  KEY vnode (pid,eid,vnode)  
+  KEY vnode (pid,eid,vnode)
 ) TYPE=MyISAM;
 
 --

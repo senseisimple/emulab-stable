@@ -1641,3 +1641,14 @@ last_net_act,last_cpu_act,last_ext_act);
        investigation about appropriate ways to store coordinate values like
        this.
 
+1.253: Add duplicate fields from the location_info table into the new_nodes
+       table - this will allow us to place them on the map while they are still
+       in limbo.
+
+        ALTER TABLE new_nodes ADD COLUMN (floor varchar(32) default NULL,
+	    building varchar(32) default NULL,
+	    loc_x int(10) unsigned NOT NULL default '0',
+	    loc_y int(10) unsigned NOT NULL default '0',
+	    contact tinytext,
+	    phone tinytext,
+	    room varchar(32) default NULL);
