@@ -80,12 +80,15 @@ my %config = ( privkey        => undef,
 	       fdisk_md5      => undef,
 	       fdisk_sig      => undef,
 	       slice1_image   => undef,
+	       slice1_alt_image => undef,
 	       slice1_md5     => undef,
 	       slice1_sig     => undef,
 	       slice3_image   => undef,
+	       slice3_alt_image => undef,
 	       slice3_md5     => undef,
 	       slice3_sig     => undef,
 	       slice4_image   => undef,
+	       slice4_alt_image => undef,
 	       slice4_md5     => undef,
 	       slice4_sig     => undef,
 	       slicex_slice   => undef,
@@ -321,20 +324,47 @@ for ($i = 1; $i <= 4; $i++) {
 	next;
     }
     my $image = $config{"slice${i}_image"};
+    my $alt_image = $config{"slice${i}_alt_image"};
+    my $image_md5 = $config{"slice${i}_md5"};
     
     if (!defined($image) || $image eq "skipit") {
 	next;
     }
 
     #
-    # If told to load a local image from the CDROM, its really easy!
+    # If told to load a local image from the CDROM, do so, but make
+    # sure that we have the right thing on the CD.  If not, fall
+    # back to grabbing it via the network (alt_image).
     # 
+
+    my $bad_local_image = 0;
+
     if (! ($image =~ /^http:.*$/ || $image =~ /^ftp:.*$/)) {
+	
+	if (! -f "/$image") { 
+	    print "No disk image on CDROM.  Trying alternate.\n";
+	    goto tryalt;
+	}
+	
+	if (-f "/${image}.md5") {
+	    open(IN, "/${image}.md5");
+	    my $md5line = <IN>;
+	    close(IN);
+	    chomp($md5line);
+	    $md5line =~ s/[^=]+ = //;
+	    if ($image_md5 && ($md5line ne $image_md5)) {
+		print "CDROM image has wrong MD5.  Trying alternate.\n";
+		goto tryalt;
+	    }
+	}
+
 	#
 	# Always check the signature.
 	#
+
 	if (VerifySig("/$image", "slice${i}") < 0) {
-	    fatal("CDROM image has invalid signature!");
+	    print "CDROM image has invalid signature!  Trying alternate.\n";
+	    goto tryalt;
 	}
 
 	#
@@ -349,9 +379,24 @@ for ($i = 1; $i <= 4; $i++) {
 	} else {
 	    mysystem("imageunzip -n -s $i /$image $rawbootdisk");
 	}
-	fatal("Failed to lay down image /$image!")
-	    if ($?);
+	if ($?) {
+	    # It's possible that a bad read on the CD could cause this
+	    # failure, though not likely that it would pass the signature
+	    # verification.  Probably not worth forcing a net read.
+	    fatal("Failed to lay down image /$image!");
+	}
 	goto finished;
+    tryalt:
+	$bad_local_image = 1;
+    }
+
+    if ($bad_local_image) {
+	if ($alt_image && $alt_image ne "skipit") {
+	    print "Setting image to $alt_image\n";
+	    $image = $alt_image;
+	} else {
+	    fatal("Could not locate a valid image!");
+	}
     }
 
     #
@@ -578,6 +623,10 @@ sub GetInstructions()
 	    /^slice(\d)_image=(.*)$/ && do {
 		$config{"slice${1}_image"} = $2;
 		$needstore++;
+		last SWITCH1;
+	    };
+	    /^slice(\d)_alt_image=(.*)$/ && do {
+		$config{"slice${1}_alt_image"} = $2;
 		last SWITCH1;
 	    };
 	    /^slice(\d)_md5=(.*)$/ && do {
