@@ -87,7 +87,8 @@ CREATE TABLE delays (
   vname varchar(32) default NULL,
   card0 tinyint(3) unsigned default NULL,
   card1 tinyint(3) unsigned default NULL,
-  PRIMARY KEY  (node_id,iface0,iface1)
+  PRIMARY KEY  (node_id,iface0,iface1),
+  KEY pid (pid,eid)
 ) TYPE=MyISAM;
 
 --
@@ -204,7 +205,8 @@ CREATE TABLE experiments (
   idle_ignore tinyint(4) NOT NULL default '0',
   idx int(10) unsigned NOT NULL auto_increment,
   PRIMARY KEY  (eid,pid),
-  KEY idx (idx)
+  KEY idx (idx),
+  KEY batchmode (batchmode)
 ) TYPE=MyISAM;
 
 --
@@ -600,7 +602,8 @@ CREATE TABLE nodes (
   jailflag tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
-  KEY node_id (node_id,phys_nodeid)
+  KEY node_id (node_id,phys_nodeid),
+  KEY role (role)
 ) TYPE=MyISAM;
 
 --
@@ -803,7 +806,8 @@ CREATE TABLE projects (
   expt_last date default NULL,
   pcremote_ok set('pcplab','pcron','pcwa') default NULL,
   PRIMARY KEY  (pid),
-  KEY unix_gid (unix_gid)
+  KEY unix_gid (unix_gid),
+  KEY approved (approved)
 ) TYPE=MyISAM;
 
 --
@@ -919,7 +923,8 @@ CREATE TABLE tiplines (
   portnum int(11) NOT NULL default '0',
   keylen smallint(6) NOT NULL default '0',
   keydata text,
-  PRIMARY KEY  (tipname)
+  PRIMARY KEY  (tipname),
+  KEY node_id (node_id)
 ) TYPE=MyISAM;
 
 --
@@ -958,7 +963,8 @@ CREATE TABLE tunnels (
   encrypt tinyint(3) unsigned NOT NULL default '0',
   compress tinyint(3) unsigned NOT NULL default '0',
   assigned_ip varchar(32) NOT NULL default '',
-  PRIMARY KEY  (pid,eid,node_id,vname)
+  PRIMARY KEY  (pid,eid,node_id,vname),
+  KEY node_id (node_id)
 ) TYPE=MyISAM;
 
 --
@@ -1109,7 +1115,8 @@ CREATE TABLE virt_lans (
   rbandwidth int(10) unsigned default NULL,
   rlossrate float(10,3) default NULL,
   cost float NOT NULL default '1',
-  widearea tinyint(4) default '0'
+  widearea tinyint(4) default '0',
+  KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --
@@ -1130,7 +1137,8 @@ CREATE TABLE virt_nodes (
   type varchar(12) default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
   routertype enum('none','ospf','static','manual') NOT NULL default 'none',
-  fixed text NOT NULL
+  fixed text NOT NULL,
+  KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --
@@ -1195,7 +1203,8 @@ CREATE TABLE vlans (
   virtual varchar(64) default NULL,
   members text NOT NULL,
   id int(11) NOT NULL auto_increment,
-  PRIMARY KEY  (id)
+  PRIMARY KEY  (id),
+  KEY pid (pid,eid)
 ) TYPE=MyISAM;
 
 --
@@ -1272,7 +1281,8 @@ CREATE TABLE widearea_privkeys (
   lockkey varchar(64) default NULL,
   requested datetime NOT NULL default '0000-00-00 00:00:00',
   updated datetime NOT NULL default '0000-00-00 00:00:00',
-  PRIMARY KEY  (privkey,IP)
+  PRIMARY KEY  (privkey,IP),
+  KEY IP (IP)
 ) TYPE=MyISAM;
 
 --
