@@ -9,6 +9,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= tbsetup
 UNIFIED         = @UNIFIED_BOSS_AND_OPS@
+PLABSUPPORT     = @PLABSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
@@ -77,12 +78,23 @@ install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
 
 #
+# Only install the planetlab support if enabled in the defs file
+#
+ifeq ($(PLABSUPPORT),1)
+PLAB_INSTALL      = @$(MAKE) -C plab install
+PLAB_POST_INSTALL = @$(MAKE) -C plab post-install 
+else
+PLAB_INSTALL      =
+PLAB_POST_INSTALL =
+endif
+
+#
 # Automate this part at some point.
 # 
 subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ns2ir install
-#	@$(MAKE) -C plab install
+	$(PLAB_INSTALL)
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -92,7 +104,7 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
-#	@$(MAKE) -C plab post-install
+	$(PLAB_POST_INSTALL)
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)

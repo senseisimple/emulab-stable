@@ -56,6 +56,7 @@ AC_SUBST(TBAUTHDOMAIN)
 AC_SUBST(TBAUTHTIMEOUT)
 AC_SUBST(TBMAINSITE)
 AC_SUBST(SFSSUPPORT)
+AC_SUBST(PLABSUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -95,6 +96,7 @@ JAILIPBASE=172.17.0.0
 JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
+PLABSUPPORT=0
 
 #
 # Okay, I know this is improper usage of --with. Too bad.

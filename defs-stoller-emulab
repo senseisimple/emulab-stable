@@ -22,3 +22,4 @@ WWWHOST=www.emulab.net
 WWW=www.emulab.net/dev/stoller
 THISHOMEBASE=Stoller.Emulab.Net
 FS_WITH_QUOTAS="/q /users"
+PLABSUPPORT=1
