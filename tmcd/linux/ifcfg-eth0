@@ -1,5 +1,5 @@
 DEVICE="eth0"
-if [ "`/etc/rc.d/testbed/nodetype`" = 'pc1500' ]; then
+if [ "`/etc/rc.d/testbed/control_interface`" = "$DEVICE" ]; then
 	ONBOOT="yes"
 	BOOTPROTO="dhcp"
 else

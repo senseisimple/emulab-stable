@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# This interface should only DHCP if this node is a pc1500
-if [ `/etc/testbed/nodetype` = 'pc1500' ]; then
+if [ `/etc/testbed/control_interface` = 'xl0' ]; then
 	dhcp_interfaces="$dhcp_interfaces xl0";
 fi

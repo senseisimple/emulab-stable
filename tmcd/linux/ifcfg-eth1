@@ -1,4 +1,4 @@
-DEVICE="eth4"
+DEVICE="eth1"
 if [ "`/etc/rc.d/testbed/control_interface`" = "$DEVICE" ]; then
 	ONBOOT="yes"
 	BOOTPROTO="dhcp"

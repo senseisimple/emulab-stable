@@ -60,6 +60,8 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(INSTALL_DIR)/control_interface
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth0 /etc/sysconfig/network-scripts/ifcfg-eth0
+	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth1 /etc/sysconfig/network-scripts/ifcfg-eth1
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth2 /etc/sysconfig/network-scripts/ifcfg-eth2
+	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth3 /etc/sysconfig/network-scripts/ifcfg-eth3
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth4 /etc/sysconfig/network-scripts/ifcfg-eth4
 

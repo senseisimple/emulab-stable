@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# This interface should only DHCP if this node is a pc600
-if [ `/etc/testbed/nodetype` = 'pc600' ]; then
+if [ `/etc/testbed/control_interface` = 'fxp4' ]; then
 	dhcp_interfaces="$dhcp_interfaces fxp4";
 fi
