@@ -214,6 +214,8 @@ foreach (@links) {
     $s = "$t[0]\"$t[1]\" $t2[1] $t2[2] $lanloss{$info[0]} " . join(" ",@t2[3..$#t2]);
     push(@newlans,$s);
 }
-&ir_set("/topology/lans",join("\n",@newlans) . "\n");
+if ($#newlans != -1) {
+    &ir_set("/topology/lans",join("\n",@newlans) . "\n");
+}
 
 &ir_write($irfile);
