@@ -1999,7 +1999,7 @@ CREATE TABLE virt_trafgens (
 
 CREATE TABLE virt_vtypes (
   pid varchar(12) NOT NULL default '',
-  eid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
   name varchar(12) NOT NULL default '',
   weight float(7,5) NOT NULL default '0.00000',
   members text

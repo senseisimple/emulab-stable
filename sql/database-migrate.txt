@@ -2260,4 +2260,7 @@ last_net_act,last_cpu_act,last_ext_act);
           PRIMARY KEY  (node_id)
         ) TYPE=MyISAM;
 
-	
+1.296: Fix virt_vtypes table.
+
+         alter table virt_vtypes change eid eid varchar(32) NOT NULL default '';
+
