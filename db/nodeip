@@ -9,13 +9,22 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 my @list = "";
 my $n=0;
 foreach my $node ( @ARGV ) { 
-  $list[$n] ="node_id='$node'";
+  if ( $node =~ /^tb(\w+\d+):(\d+)$/ ) {
+    my $node_id="tb".$1;
+    my $if=$2;
+    $list[$n] .= "(node_id='$node_id' and card='$if')";
+  } elsif ( $node =~ /^tb(\w+\d+)$/ ) {
+    my $node_id="tb".$1;
+    $list[$n] .= "(node_id='$node_id')";
+  } else {
+    $list[$n] ="node_id='$node' or IP='$node'";
+  }
   $n++;
 }
 
 my $cond = join(" or ",@list);
 
 my $sth = $dbh->
-    query("select * from IP_list where $cond");
+    query("select * from interfaces where $cond");
 
 print $sth->as_string();

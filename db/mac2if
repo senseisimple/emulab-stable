@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-if ($#ARGV < 0) {die("Usage: mac2if <mac> <mac> <...>\n");}
+if ($#ARGV < 0) {die("Usage: mac2if <mac|if> <mac|if> <...>\n");}
 
 use Mysql;
 
@@ -9,10 +9,19 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 my @list = "";
 my $n=0;
 foreach my $mac ( @ARGV ) { 
-  $mac =~ s/^(\d):/0$1:/;
-  $mac =~ s/:(\d):/:0$1:/g;
-  $mac =~ s/://g;
-  $list[$n] ="MAC='\L$mac'";
+  if ( $mac =~ /^tb(\w+\d+):(\d+)$/ ) {
+    my $node="tb".$1;
+    my $if=$2;
+    $list[$n] .= "(node_id='$node' and card='$if')";
+  } elsif ( $mac =~ /^tb(\w+\d+)$/ ) {
+    my $node="tb".$1;
+    $list[$n] .= "(node_id='$node')";
+  } else {
+    $mac =~ s/^(\d):/0$1:/;
+    $mac =~ s/:(\d):/:0$1:/g;
+    $mac =~ s/://g;
+    $list[$n] ="MAC='\L$mac'";
+  }
   $n++;
 }
 
