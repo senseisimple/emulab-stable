@@ -197,8 +197,7 @@ use libtestbed;
 my $TB		= "@prefix@";
 
 # Locals
-my $debug         = 0;
-my $impotent      = 1;
+my $debug         = 1;
 my $expt_min;
 my $expt_max;
 my %virt_types    = ();  # Indexed by virt type, gives number desired
@@ -558,7 +557,7 @@ sub TestGlobalPolicy($$$$)
 	# Simple check first.
 	#
 	if (!$count) {
-	    Declare("No one is not allowed to allocate any more nodes!");
+	    Declare("No one is allowed to allocate any more nodes!");
 	    return 0;
 	}
 
@@ -683,9 +682,9 @@ sub TestGlobalPolicy($$$$)
 #
 # Test policies that apply.
 #
-sub TestPolicies($$$)
+sub TestPolicies($$$$)
 {
-    my ($uid, $pid, $gid) = @_;
+    my ($uid, $pid, $eid, $gid) = @_;
     my $failcount       = 0;
     my %user_policies   = ();
     my %group_policies  = ();
@@ -836,7 +835,86 @@ sub TestPolicies($$$)
 	$failcount++
 	    if (!$result);
     }
+    # Skip Robot Lab checks if already failed.
+    return 0
+	if ($failcount);
 
+    #
+    # The Robot lab stuff is handled specially until I come up with a better
+    # approach for global policies.
+    #
+    my $robotlab_isopen;
+    return -1
+	if (! TBGetSiteVar("robotlab/open", \$robotlab_isopen));
+
+    if ($robotlab_isopen) {
+	#
+	# If the lab is open, then normal policies apply, except for
+	# exclusive use of the lab.
+	#
+	my $robotlab_exclusive;
+
+	return -1
+	    if (! TBGetSiteVar("robotlab/exclusive", \$robotlab_exclusive));
+
+	if ($robotlab_exclusive) {
+	    # See who is using the Robot lab.
+	    my ($rpid, $reid);
+
+	    if (TBRobotLabExpt(\$rpid, \$reid) &&
+		! ($pid eq $rpid && $eid eq $reid)) {
+		#
+		# Lab in use by another experiment.
+		#
+		foreach my $type (keys(%node_types)) {
+		    my $class = $node_types{$type};
+
+		    if ($class eq "robot") {
+			if ($assignflag) {
+			    UpdateForAssign($type, 0);
+			}
+			else {
+			    #
+			    # If user wants a robot type, then fail cause
+			    # the lab is currently closed.
+			    # 
+			    if (exists($virt_types{$type}) ||
+				exists($virt_classes{$class})) {
+				Declare("The Robot Lab is already in use!");
+				$failcount++;
+			    }
+			}
+		    }
+		}
+	    }
+	}
+    }
+    else {
+	#
+	# Lab is closed. Make sure assign gets zeros for the types, or if
+	# doing the prepass, check for user defined usage. 
+	#
+	foreach my $type (keys(%node_types)) {
+	    my $class = $node_types{$type};
+
+	    if ($class eq "robot") {
+		if ($assignflag) {
+		    UpdateForAssign($type, 0);
+		}
+		else {
+		    #
+		    # If user wants a robot type, then fail cause the lab
+		    # is currently closed.
+		    # 
+		    if (exists($virt_types{$type}) ||
+			exists($virt_classes{$class})) {
+			Declare("The Robot Lab is closed!");
+			$failcount++;
+		    }
+		}
+	    }
+	}
+    }
     return 0
 	if ($failcount);
     return 1;
@@ -979,7 +1057,7 @@ sub TBAdmissionControlCheck($$$$)
     # Admin people do not get checks (when in admin mode of course).
     #
     return 1
-	if (TBAdmin($UID));
+	if (TBAdmin($uid));
 
     #
     # Nothing in emulab-ops should get admission control either.
@@ -997,7 +1075,7 @@ sub TBAdmissionControlCheck($$$$)
     LoadVirtNodeTypes($pid, $eid);
     LoadCurrent($uid, $pid, $gid);
 
-    my $rval = TestPolicies($uid, $pid, $gid);
+    my $rval = TestPolicies($uid, $pid, $eid, $gid);
     
     if ($debug && $assignflag) {
 	print "Assign type/class max counts:\n";
