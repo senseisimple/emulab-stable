@@ -1,0 +1,26 @@
+These certs are used by tmcd/tmcc. Creating the certs is simple:
+
+	gmake
+	gmake boss-installX
+
+Then on a client node (where you are going to create an image from).
+
+	gmake client-install
+
+**************************************************************************
+* CAUTION: Once you have created the certs and installed the pem files
+* in the client images, you do not want to rerun and reinstall, since
+* that would invalidate those certs already stashed in images. In fact,
+* it is a good idea never to clean this directory or remove it!
+**************************************************************************
+
+-----
+
+Here are some links I found useful when working on this.
+
+ http://www.aboveground.cx/~rjmooney/projects/misc/clientcertauth.html
+ http://www.stunnel.org/faq/certs.html#ToC1
+ http://www.ultranet.com/~fhirsch/Papers/cook/ssl_cook.html
+ http://www.rtfm.com/openssl-examples/
+ http://www.columbia.edu/~ariel/ssleay/x509_index.html
+ http://www.pseudonym.org/ssl/ssl_nsclient_certs.html

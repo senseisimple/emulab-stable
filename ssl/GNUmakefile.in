@@ -150,5 +150,8 @@ tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 	chmod 640 $(INSTALL_SBINDIR)/capture.pem
 
 clean:
+	@echo "BE VERY CAREFUL! CLEANING THE SSL DIR CAN CAUSE DISASTER!"
+
+cleanX:
 	rm -f *.pem serial index.txt *.old dirsmade *.cnf
 	rm -rf newcerts certs
