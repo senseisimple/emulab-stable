@@ -532,10 +532,24 @@ dropped:
 				tipactive = 0;
 				continue;
 #else
-				/* ~115 chars at 115.2 kbaud */
-				timeout.tv_sec  = 0;
-				timeout.tv_usec = 10000;
-				select(0, 0, 0, 0, &timeout);
+				/*
+				 * Delay after reading 0 bytes from the pty.
+				 * At least under FreeBSD, select on a
+				 * disconnected pty (control half) always
+				 * return ready and the subsequent read always
+				 * returns 0.  To keep capture from eating up
+				 * CPU constantly when no one is connected to
+				 * the pty (i.e., most of the time) we delay
+				 * after doing a zero length read.
+				 *
+				 * Note we keep tabs on the device so that we
+				 * will wake up early if it goes active.
+				 */
+				timeout.tv_sec  = 1;
+				timeout.tv_usec = 0;
+				FD_ZERO(&fds);
+				FD_SET(devfd, &fds);
+				select(devfd+1, &fds, 0, 0, &timeout);
 				continue;
 #endif
 			}
