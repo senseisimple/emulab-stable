@@ -97,6 +97,32 @@ Here's an example exports.head file from one of our ops nodes:
 filesystem. You'll need a line for each filesystem that contains these
 three directories.)
 
+##### Step 5B - syslog setup.
+
+You need to add some lines to /etc/syslog.conf.
+
+Put this one after the ftp line:
+
+	# For Testbed user activity logging
+	auth.info				/var/log/logins
+
+Put this one at the end:
+
+	!capture
+	*.*					/var/log/capture.log
+
+Then create the files:
+
+	sudo touch /var/log/logins
+	sudo chmod 640 /var/log/logins
+	sudo touch /var/log/capture.log
+	sudo chmod 640 /var/log/capture.log
+
+Then restart syslog:
+
+	sudo kill -HUP `cat /var/run/syslog.pid`
+	
+
 ##### Step 6 - Capture setup
 
 If you don't have serial lines for all the nodes, you can skip this step.
