@@ -19,8 +19,8 @@ tb_compare("select vname,delay,bandwidth,lossrate,member from virt_lans" .
 ["0:1.0.0.4","node2","pc"],
 ["0:1.0.0.3","node3","pc"],
 ["0:1.0.4.1 1:192.168.1.4","node4","pc"],
-["0:192.168.1.2","s5","shark"],
-["0:192.168.1.3","s6","shark"],
+["0:192.168.1.2","s5","pc"],
+["0:192.168.1.3","s6","pc"],
 );
 tb_compare("select ips,vname,type from virt_nodes" .
     " where pid=\"testbed\" and eid=\"test\"",\@result);

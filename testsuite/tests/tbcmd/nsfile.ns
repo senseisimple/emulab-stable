@@ -34,8 +34,8 @@ set s5 [$ns node]
 set s6 [$ns node]
 $ns make-lan "$s5 $s6 $node4" 100Mb 0ms
 
-tb-set-hardware $s5 shark
-tb-set-hardware $s6 shark
+tb-set-hardware $s5 pc
+tb-set-hardware $s6 pc
 tb-set-hardware $node4 pc
 
 tb-set-node-os $node4 MYOS
