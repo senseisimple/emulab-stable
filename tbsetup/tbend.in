@@ -57,7 +57,7 @@ while (@row = $sth->fetchrow_array) {
 $sth->finish;
 
 &tbs_out("Resetting VLANs\n");
-if (&tbs_exec("resetvlans " . join(" ",@nodes))) {
+if (@nodes && &tbs_exec("resetvlans " . join(" ",@nodes))) {
     &tbs_out("Failed to reset VLANs\n");
     exit(1);
 }
