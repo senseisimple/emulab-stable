@@ -306,6 +306,8 @@ sub ParseArgs {
     if ($s eq "100") { $s="speed100Mbit";}
     $n=0;
     while(@vlan != 0 && $n < @vlan) {
+	# Allow people to specify addresses with colons or dots
+	$vlan[$n] =~ s/[:\.]//g;
 	die("Invalid MAC Address ",$vlan[$n],". Must be 6 byte Hex value.\n")
 	    if (!(($vlan[$n]=~/^([a-f]|\d)*$/i)&&(length ($vlan[$n])== 12)));
 	$n++;
