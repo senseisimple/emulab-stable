@@ -236,9 +236,12 @@ if (isset($formfields[usr_key]) &&
 	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
 
 	#
-	# Must parse it and construct a key for the DB.
+	# Must parse it and construct a key for the DB. Accept both version
+	# 6 and version 7 (, vs :). 
 	#
 	if (! preg_match("/(\w*),([-\w\@\.]*)/",
+			 $formfields[usr_key], $matches) &&
+	    ! preg_match("/(\w*):([-\w\@\.\#]*)/",
 			 $formfields[usr_key], $matches)) {
 	    $errors["SFSKey"] = "Invalid Key Format";
 	}

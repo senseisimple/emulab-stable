@@ -41,6 +41,7 @@ my $tbdata   = "tbdata";
 my $batch    = 0;
 my $idleswap = 0;
 my $reboot   = 0;    
+my $errorstat= -1;
 
 my $inout;
 my $logname;
@@ -318,6 +319,7 @@ if ($inout eq "modify") {
 if ($inout eq "out") {
     print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
     if (system("$tbdir/tbswap out $pid $eid") != 0) {
+	$errorstat = $? >> 8;
 	fatal("tbswap out failed!\n");
     }
     
@@ -329,6 +331,7 @@ if ($inout eq "out") {
 elsif ($inout eq "in") {
     print STDOUT "Running 'tbswap in' with arguments: $pid $eid\n";
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
+	$errorstat = $? >> 8;
 	fatal("tbswap in failed!\n");
     }
     
@@ -347,6 +350,7 @@ elsif ($inout eq "modify") {
     if ($estate eq EXPTSTATE_ACTIVE) {
 	print STDOUT "Running 'tbswap update' with arguments: $pid $eid\n";
 	if (system("$tbdir/tbswap update $pid $eid") != 0) {
+	    $errorstat = $? >> 8;
 	    fatal("tbswap update failed!\n");
 	}
 
@@ -392,13 +396,14 @@ TBUnLockExp($pid, $eid);
 # Gather stats. 
 #
 if ($inout eq "in") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, 0);
 }
 elsif ($inout eq "out") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
+		    ($idleswap ? $TBDB_STATS_FLAGS_IDLESWAP : 0));
 }
 elsif ($inout eq "modify") {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0);
 }
 
 print "Done!\n";
@@ -468,6 +473,19 @@ sub fatal($)
     my($mesg) = $_[0];
     
     print STDOUT $mesg;
+
+    #
+    # Gather stats. 
+    #
+    if ($inout eq "in") {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN, $errorstat);
+    }
+    elsif ($inout eq "out") {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, $errorstat);
+    }
+    elsif ($inout eq "modify") {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, $errorstat);
+    }
 
     #
     # if $hosed == 1, we entirely terminate the experiment.

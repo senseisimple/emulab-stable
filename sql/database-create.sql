@@ -183,6 +183,9 @@ CREATE TABLE experiment_stats (
   swapout_last datetime default NULL,
   swapmodify_count smallint(5) unsigned default '0',
   swapmodify_last datetime default NULL,
+  swap_errors smallint(5) unsigned default '0',
+  swap_exitcode tinyint(3) unsigned default '0', 
+  idle_swaps smallint(5) unsigned default '0',
   swapin_duration int(10) unsigned default '0',
   vnodes smallint(5) unsigned default '0',
   pnodes smallint(5) unsigned default '0',
@@ -198,6 +201,7 @@ CREATE TABLE experiment_stats (
   shapedlans smallint(5) unsigned default '0',
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
+  batch tinyint(3) unsigned default '0',
   PRIMARY KEY  (eid,pid,idx)
 ) TYPE=MyISAM;
 

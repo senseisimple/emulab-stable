@@ -153,8 +153,9 @@ my ($idx) = $query_result->fetchrow_array;
 
 # Insert stats record.
 DBQueryWarn("INSERT INTO experiment_stats ".
-	    "(eid, pid, creator, idx, gid, created) ".
-	    "VALUES ('$eid', '$pid', '$dbuid', $idx, '$gid', now())");
+	    "(eid, pid, creator, idx, gid, created, batch) ".
+	    "VALUES ('$eid', '$pid', '$dbuid', $idx, '$gid', now(), ".
+	    ($immediate ? 0 : 1) . ")");
 
 if (! DBQueryWarn("unlock tables")) {
     fatal("Unexpected DB Error!");

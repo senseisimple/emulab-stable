@@ -275,10 +275,10 @@ TBUnLockExp($pid, $eid);
 # Gather statistics.
 #
 if ($frontend) {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0);
 }
 else {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0);
 }
 
 #
@@ -370,6 +370,16 @@ sub fatal()
     print STDOUT "Cleaning up and exiting with status $errorstat ...\n";
 
     #
+    # Gather statistics.
+    #
+    if ($frontend) {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, $errorstat);
+    }
+    else {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, $errorstat);
+    }
+
+    #
     # If we got far enough to allocate nodes, must run tbend.
     #
     if ($estate ne EXPTSTATE_NEW) {
@@ -385,6 +395,11 @@ sub fatal()
 	TBUnLockExp($pid, $eid);
 	exit($errorstat);
     }
+
+    #
+    # Okay, we *are* going to terminate the experiment.
+    # 
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
 
     # Clear the logfile so the webpage stops. 
     TBExptClearLogFile($pid, $eid);

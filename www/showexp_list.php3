@@ -52,7 +52,6 @@ if ($isadmin) {
     } else {
 	echo "Idle, ";
     }
-    echo "<a class='static' href='showexpstats.php3'>Stats</a>, ";    
 }
 
 if ($showtype != "all") {

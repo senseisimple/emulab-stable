@@ -275,6 +275,8 @@ function WRITESIDEBAR() {
 		if (ISADMIN($login_uid)) {
 		    WRITESIDEBARBUTTON("Edit Site Variables",
 				       $TBBASE, "editsitevars.php3");
+		    WRITESIDEBARBUTTON("View Testbed Stats",
+				       $TBBASE, "showstats.php3");
 		}
 		
 		if ($login_status & CHECKLOGIN_CVSWEB) {

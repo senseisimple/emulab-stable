@@ -345,3 +345,39 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (uid)
 	) TYPE=MyISAM;
 
+1.135: Add exit codes. Obviously, we get just the last exit code, but
+       I still think this will be useful.  Note that we do not track
+       front end parse errors or other very early errors that are
+       likely the result of system problems, not user problems. Also
+       note that we need to standardize the error codes so that these
+       are meaningful a year from now!
+
+	alter table experiment_stats add swap_errors smallint(5) \
+		unsigned default '0' after swapmodify_last;
+	alter table experiment_stats add swap_exitcode tinyint(3) \
+		unsigned default '0' after swap_errors;
+	alter table experiment_stats add idle_swaps smallint(5) \
+		unsigned default '0' after swap_exitcode;
+	alter table experiment_stats add batch tinyint(3) \
+		unsigned default '0' after maxlinks;
+
+       Also add testbed wide stats table. 
+
+	CREATE TABLE testbed_stats (
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  tstamp datetime default NULL,
+	  exptidx int(10) unsigned NOT NULL default '0',
+  	  action varchar(16) NOT NULL default '',
+	  exitcode tinyint(3) unsigned default '0', 
+	  PRIMARY KEY  (idx)
+	) TYPE=MyISAM;
+
+	This table gets an entry for each experiment operation. By
+	cross indexing with experiment_stats via the exptidx field, we
+	can figure out what was running on the testbed and how many
+	nodes it was using, etc. We also get Jay's desire for a per
+	operation log, except its not in a file but in the DB, where
+	all such information belongs. Average size of an entry is 30
+	bytes. We can squeeze this down easily by making the "action"
+	a tinyint instead varchar, but not gonna worry until the table
+	is over 1MB. 

@@ -2942,7 +2942,7 @@ sub TBActivityReport($)
 #			 char *mode, int code, int flags)
 #        Mode is one of preload, start, in, out, modify, end.
 #
-sub GatherSwapStats($$$$;$$)
+sub GatherSwapStats($$$$$;$)
 {
     my ($pid, $eid, $uid, $mode, $ecode, $flags) = @_;
     my ($pnodes,$vnodes,$duration);
@@ -2950,8 +2950,6 @@ sub GatherSwapStats($$$$;$$)
     # Optional argument to modify the stats gathering. 
     $flags = 0
 	if (!defined($flags));
-    $ecode = 0
-	if (!defined($ecode));
     
     local $DBQUERY_MAXTRIES = 5;
 
@@ -2969,7 +2967,7 @@ sub GatherSwapStats($$$$;$$)
     # since the results are not well defined. swapout,terminate
     # errors do normal processing. 
     #
-    if (0 && $ecode) {
+    if ($ecode) {
 	DBQueryWarn("update experiment_stats set ".
 		    "  swap_errors=swap_errors+1, ".
 		    "  swap_exitcode=$ecode ".
@@ -3018,13 +3016,11 @@ sub GatherSwapStats($$$$;$$)
 	#
 	# Increment idleswap indicator, but only valid on swapout.
 	#
-	if (0) {
 	if ($flags & $TBDB_STATS_FLAGS_IDLESWAP) {
 	    DBQueryWarn("update experiment_stats ".
 			"set idle_swaps=idle_swaps+1 ".
 			"where pid='$pid' and eid='$eid' and idx=idx");
 	}
-        }
     }
 
     #
@@ -3115,9 +3111,19 @@ sub GatherSwapStats($$$$;$$)
     }
 
     #
-    # Okay, to make Jay happy, append info to a log file.
+    # Okay, Jay wants a log file but I am not crazy about that. Instead we
+    # have a tiny table of testbed wide stats, which cross indexes with the
+    # experiment_stats table via the idx field (which comes from the
+    # experiments table of course). For each operation insert a record. We
+    # can then construct a complete record of what happened from this
+    # table, when correlated with experiment_stats. We could probably not
+    # have an errorcode in experiment_stats, but since its a tinyint, not
+    # worth worrying about.
     #
   logit:
+    DBQueryWarn("insert into testbed_stats ".
+		"(idx, tstamp, exptidx, action, exitcode) ".
+		"values (0, now(), $idx, '$mode', $ecode)");
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -283,7 +283,7 @@ if ($estate eq EXPTSTATE_ACTIVE) {
     #
     # Gather statistics for the swapout.
     #
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
 }
 
 if ($estate eq EXPTSTATE_SWAPPED) {
@@ -299,7 +299,7 @@ if ($estate eq EXPTSTATE_SWAPPED) {
     #
     # Gather statistics for the swapout.
     #
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE);
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
 }
 
 if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {
