@@ -48,6 +48,9 @@ my $installdir     = "/";
 my $jailmode	   = 0;
 my $jailfile       = "";
 
+# Protos
+sub GetTarFile($$);
+
 #
 # Must be running as root to work. 
 #
@@ -101,7 +104,7 @@ if (! -d $installdir) {
 # the file now. If the tar fails, we got big problems.
 #
 if (-e $IDENTFILE) {
-    if (! `egrep -q -s '^${tarfile}' $IDENTFILE`) {
+    if (! system("egrep -q -s '^${tarfile}' $IDENTFILE")) {
 	print STDOUT "Tarfile $tarfile has already been installed!\n";
 	exit(1);
     }
