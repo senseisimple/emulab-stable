@@ -202,55 +202,66 @@ COMMAND_PROTOTYPE(dosyncserver);
 COMMAND_PROTOTYPE(dokeyhash);
 COMMAND_PROTOTYPE(dofullconfig);
 
+/*
+ * The fullconfig slot determines what routines get called when pushing
+ * pushing out a full configuration. Physnodes get slightly different
+ * then vnodes, and at some point we might want to distinguish different
+ * types of vnodes (jailed, plab).
+ */
+#define FULLCONFIG_NONE		0x0
+#define FULLCONFIG_PHYS		0x1
+#define FULLCONFIG_VIRT		0x2
+#define FULLCONFIG_ALL		FULLCONFIG_PHYS|FULLCONFIG_VIRT
+
 struct command {
 	char	*cmdname;
-	int	full;
+	int	fullconfig;	
 	int    (*func)(int, tmcdreq_t *, char *, int, int);
 } command_array[] = {
-	{ "reboot",	  0, doreboot },
-	{ "nodeid",	  1, donodeid },
-	{ "status",	  0, dostatus },
-	{ "ifconfig",	  1, doifconfig },
-	{ "accounts",	  1, doaccounts },
-	{ "delay",	  1, dodelay },
-	{ "linkdelay",	  1, dolinkdelay },
-	{ "hostnamesV2",  0, dohostsV2 },	/* This will go away */
-	{ "hostnames",	  1, dohosts },
-	{ "rpms",	  1, dorpms },
-	{ "deltas",	  0, dodeltas },
-	{ "tarballs",	  1, dotarballs },
-	{ "startupcmd",	  1, dostartcmd },
-	{ "startstatus",  0, dostartstat }, /* Leave this before "startstat" */
-	{ "startstat",	  0, dostartstat },
-	{ "readycount",   0, doreadycount },
-	{ "ready",	  0, doready },
-	{ "log",	  0, dolog },
-	{ "mounts",	  1, domounts },
-	{ "sfshostid",	  0, dosfshostid },
-	{ "loadinfo",	  0, doloadinfo},
-	{ "reset",	  0, doreset},
-	{ "routing",	  1, dorouting},
-	{ "trafgens",	  1, dotrafgens},
-	{ "nseconfigs",	  1, donseconfigs},
-	{ "creator",	  1, docreator},
-	{ "state",	  0, dostate},
-	{ "tunnels",	  1, dotunnels},
-	{ "vnodelist",	  1, dovnodelist},
-	{ "subnodelist",  1, dosubnodelist},
-	{ "isalive",	  0, doisalive},
-	{ "ipodinfo",	  0, doipodinfo},
-	{ "ntpinfo",	  1, dontpinfo},
-	{ "ntpdrift",	  0, dontpdrift},
-	{ "tarball",	  0, doatarball},
-	{ "rpm",	  0, doanrpm},
-	{ "jailconfig",	  1, dojailconfig},
-	{ "plabconfig",	  1, doplabconfig},
-	{ "subconfig",	  0, dosubconfig},
-        { "sdparams",     1, doslothdparams},
-        { "programs",     1, doprogagents},
-        { "syncserver",   1, dosyncserver},
-        { "keyhash",      1, dokeyhash},
-        { "fullconfig",   0, dofullconfig},
+	{ "reboot",	  FULLCONFIG_NONE, doreboot },
+	{ "nodeid",	  FULLCONFIG_ALL,  donodeid },
+	{ "status",	  FULLCONFIG_NONE, dostatus },
+	{ "ifconfig",	  FULLCONFIG_ALL,  doifconfig },
+	{ "accounts",	  FULLCONFIG_ALL,  doaccounts },
+	{ "delay",	  FULLCONFIG_ALL,  dodelay },
+	{ "linkdelay",	  FULLCONFIG_ALL,  dolinkdelay },
+	{ "hostnamesV2",  FULLCONFIG_NONE, dohostsV2 },	/* This will go away */
+	{ "hostnames",	  FULLCONFIG_ALL,  dohosts },
+	{ "rpms",	  FULLCONFIG_ALL,  dorpms },
+	{ "deltas",	  FULLCONFIG_NONE, dodeltas },
+	{ "tarballs",	  FULLCONFIG_ALL,  dotarballs },
+	{ "startupcmd",	  FULLCONFIG_ALL,  dostartcmd },
+	{ "startstatus",  FULLCONFIG_NONE, dostartstat }, /* Before startstat*/
+	{ "startstat",	  FULLCONFIG_NONE, dostartstat },
+	{ "readycount",   FULLCONFIG_NONE, doreadycount },
+	{ "ready",	  FULLCONFIG_NONE, doready },
+	{ "log",	  FULLCONFIG_NONE, dolog },
+	{ "mounts",	  FULLCONFIG_ALL,  domounts },
+	{ "sfshostid",	  FULLCONFIG_NONE, dosfshostid },
+	{ "loadinfo",	  FULLCONFIG_NONE, doloadinfo},
+	{ "reset",	  FULLCONFIG_NONE, doreset},
+	{ "routing",	  FULLCONFIG_ALL,  dorouting},
+	{ "trafgens",	  FULLCONFIG_ALL,  dotrafgens},
+	{ "nseconfigs",	  FULLCONFIG_ALL,  donseconfigs},
+	{ "creator",	  FULLCONFIG_ALL,  docreator},
+	{ "state",	  FULLCONFIG_NONE, dostate},
+	{ "tunnels",	  FULLCONFIG_ALL,  dotunnels},
+	{ "vnodelist",	  FULLCONFIG_PHYS, dovnodelist},
+	{ "subnodelist",  FULLCONFIG_PHYS, dosubnodelist},
+	{ "isalive",	  FULLCONFIG_NONE, doisalive},
+	{ "ipodinfo",	  FULLCONFIG_NONE, doipodinfo},
+	{ "ntpinfo",	  FULLCONFIG_PHYS, dontpinfo},
+	{ "ntpdrift",	  FULLCONFIG_NONE, dontpdrift},
+	{ "tarball",	  FULLCONFIG_NONE, doatarball},
+	{ "rpm",	  FULLCONFIG_NONE, doanrpm},
+	{ "jailconfig",	  FULLCONFIG_VIRT, dojailconfig},
+	{ "plabconfig",	  FULLCONFIG_VIRT, doplabconfig},
+	{ "subconfig",	  FULLCONFIG_NONE, dosubconfig},
+        { "sdparams",     FULLCONFIG_PHYS, doslothdparams},
+        { "programs",     FULLCONFIG_ALL,  doprogagents},
+        { "syncserver",   FULLCONFIG_ALL,  dosyncserver},
+        { "keyhash",      FULLCONFIG_ALL,  dokeyhash},
+        { "fullconfig",   FULLCONFIG_NONE, dofullconfig},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4962,6 +4973,7 @@ COMMAND_PROTOTYPE(dofullconfig)
 {
 	char		buf[MYBUFSIZE];
 	int		i;
+	int		mask;
 
 	/*
 	 * Now check reserved table. If free, give it a minimal status
@@ -4972,8 +4984,13 @@ COMMAND_PROTOTYPE(dofullconfig)
 		return 1;
 	}
 
+	if (reqp->isvnode)
+		mask = FULLCONFIG_VIRT;
+	else
+		mask = FULLCONFIG_PHYS;
+
 	for (i = 0; i < numcommands; i++) {
-		if (command_array[i].full) {
+		if (command_array[i].fullconfig & mask) {
 			sprintf(buf, "*** %s\n", command_array[i].cmdname);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			command_array[i].func(sock, reqp, rdata, tcp, vers);
