@@ -35,14 +35,15 @@
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Overview"> </a> Overview </h3>
 
-Microsoft Windows XP is now supported as one of the operating system types for
-experiment nodes in Emulab, in addition to FreeBSD and Linux.
+Microsoft <i>Windows XP</i> is now supported as one of the operating system
+types for experiment nodes in Emulab, in addition to FreeBSD and Linux.
 
 Before booting the node at swap-in time, Emulab loads a fresh image of Windows
 XP onto the experiment nodes in parallel, using our Frisbee service.  Emulab
-software automatically configures each Windows XP node, providing the expected
-experiment user environment including: user accounts and Emulab SSH keys; remote
-home, project, and shared directories; and network connections.  <p>
+software automatically configures each <i>Windows XP</i> node, providing the
+expected experiment user environment including: user accounts and Emulab SSH
+keys; remote home, project, and shared directories; and network connections.
+<p>
 
 The Cygwin GNU environment is provided, including Bash and TCSH shells, the
 C/C++, Perl and Python programming languages, and several editors including
@@ -53,9 +54,9 @@ profile, as well as making SSH and RDP login connections to the experiment nodes
 Remote Desktop Protocol service supports Windows Desktop logins from the
 user's workstation screen to the experiment node.  <p>
 
-Windows XP installations are more hardware dependent than Linux or FreeBSD.
-At first, this Windows XP image only runs on the pc850 and pc600 Emulab node
-types.  <p>
+<i>Windows XP</i> installations are more hardware dependent than Linux or
+FreeBSD.  At first, this <i>Windows XP</i> image only runs on the pc850 and
+pc600 Emulab node types.  <p>
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Differences"></a> Differences from FreeBSD and Linux in Emulab </h3>
@@ -118,8 +119,17 @@ Currently available images are:
 
 </ul>
 
-Note: routing is not currently supported on Windows.  Don't put any
-<b>rtproto</b> statements in your .ns file.  <p>
+<div style="margin-left: 40px;"> <b>NOTE:</b> The only form of routing that is
+currently supported on Windows is <b><code>rtproto Static-old</code></b>.
+<code>rtproto Manual</code> should work too.  Don't put any other
+<code>rtproto</code> statements in your .ns file.   <p>
+
+If you built your experiment .ns file with the <i>NetBuild</i> GUI, be aware
+that it puts in a <code>rtproto Static</code> statement, which you will need
+to modify to <code>rtproto Static-old</code>. <p>
+
+There is more information
+on routing in the <a href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#Routing"> Routing Section of the Emulab Tutorial. </a><p> </div>
 
 Notice that Windows reboots an extra time after first swap-in on a node, after
 changing the node name, to set up the network stack properly.   <p>
@@ -176,7 +186,7 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
 <ul>
 
-  <li> Microsoft allows only <b>one desktop login at a time</b> to Windows XP,
+  <li> Microsoft allows only <b>one desktop login at a time</b> to <i>Windows XP</i>,
        although this is the same Citrix Hydra technology that supports many
        concurrent logins to Terminal Server or Server 2003. <p>
 
@@ -192,9 +202,9 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        (kill) a session by ID: <pre> rwinsta</pre> </li>
 
   <li> We rename <b>My Computer</b> to show the PCxxx physical node name, but
-       it doesn't appear on the Windows XP desktop by default.  The XP user
-       interface incorporates My Computer into the upper-right quadrant of the
-       Start menu by default, and removes it from the desktop. <p>
+       it doesn't appear on the <i>Windows XP</i> desktop by default.  The XP
+       user interface incorporates My Computer into the upper-right quadrant
+       of the Start menu by default, and removes it from the desktop. <p>
 
        You can go back to the "classic" user interface of Windows 2000,
        including showing My Computer.  Right-click on the background of the
@@ -210,7 +220,7 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
   <li> There are several <b>Desktop icons</b> (i.e. "shortcuts") installed by
        default in the XP images: Computer Management, Bash and TCSH shells,
-       and NtEmacs.  </li> <br>
+       and <i>NtEmacs</i>.  </li> <br>
        
   <li> The Bash and TCSH icons run their respective shells in a </b>Windows
        Terminal</b>, just like the Windows cmd.exe .  <p>
@@ -252,12 +262,13 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        Emacs wouldn't know how to find your <i>.emacs</i> setup file in your
        remotely mounted home directory. <p>
 
-       User "root" is special, and has a local home directory under /home.
-       /home is a Cygwin symbolic link to "C:\Documents and Settings".  </li>
+       User "root" is special, and has a local home directory under
+       <code>/home</code>.  <code>/home</code> is a Cygwin symbolic link to
+       <code>C:\Documents and Settings</code>.  </li>
 
-  <li> The Windows XP Start menu has no <b>Shutdown</b> button under RDP.
-       Instead, it is labeled <b>Disconnect</b> and only closes the RDP client
-       window, leaving the login session and the node running. <p>
+  <li> The <i>Windows XP</i> Start menu has no <b>Shutdown</b> button under
+       RDP.  Instead, it is labeled <b>Disconnect</b> and only closes the RDP
+       client window, leaving the login session and the node running. <p>
 
        To restart the computer, run <b>/sbin/reboot</b>, or use the "Shut
        Down" menu of <b>Task Manager</b>.  One way to start Task Manager is to
@@ -309,82 +320,140 @@ already.  Download the sources to an experiment node and try
 
 Some details remain to be documented: <br>
 
-<pre>
-       - Home dirs are on //fs via SMB(Windows Client, Samba server)
-         . cygwin/UNC mounts of Windows Shares under /users, /proj, /share.
-         . Can put \\fs\<share_name> into the Windows Explorer "Address"
+<ul>
 
-       - Shared directories: /share, /project/pid, /group/<pid>/<gid>
+  <li> Home dirs are on <code>//fs</code> via SMB(Windows Client, Samba server)
 
-       - Bug: One protection mask for everything in a whole mount/share under SMB.
-</pre>
+       <ul>
+
+         <li> Cygwin/UNC mounts of Windows Shares under <code>/users</code>,
+              <code>/proj</code>, <code>/share</code>. The Cygwin
+              <code>mount</code> command shows what you can access. </li> 
+
+         <li> Can put <code>\\fs\&lt;share_name&gt;</code> into the Windows
+              Explorer "Address".  These shares are marked not browsable, so
+              just <code>\\fs</code> shows little.  </li>
+
+       </ul> </li>
+
+  <li> Shared directories: <code>/share</code>,
+       <code>/project/&lt;pid&gt;</code>, 
+       <code>/group/&lt;pid&gt;/&lt;gid&gt;</code>. </li> 
+
+  <li> Bug: One protection mask for everything in a whole mount/share under
+       SMB. </li>
+
+</ul>
 
 <h4><a name="Cygwin_arcana"> </a> Cygwin arcana </h4>
 
-<pre>
-       - Paths 
-         . \ == / modulo quoting
-         . cygpath -w, cygpath -u
-         . UNC paths: //machine
+<ul>
 
-       - Cygwin mounts
-         . Shown in the "mount" and "df" commands.
-         . / == C:/cygwin
-         . /cygdrive/c == C:
-         . //fs/... all Emulab directories.
+  <li> Paths 
+       <ul>
 
-       - /etc/{passwd,group} contain Windows SID's as UID's and GID's.
+         <li> <code><b>\</b> == <b>/</b></code>, modulo quoting </li>
 
-       -  No suid, but everybody is in group wheel==Administrators.
+         <li> <code>cygpath -w</code>, <code>cygpath -u</code> </li>
 
-       - File protections can lock out root, Administrator, or SYSTEM.
-</pre>
+         <li> UNC paths: <code>//machine</code> </li>
+
+       </ul> </li>
+
+  <li> Cygwin mounts
+       <ul>
+
+         <li> Shown in the <code>mount</code> and <code>df</code> commands. </li>
+
+         <li> <code><b>/</b> == C:/cygwin</code> </li>
+
+         <li> <code>/cygdrive/c == C:</code> </li>
+
+         <li> </code>//fs/...</code> all Emulab directories. </li>
+
+       </ul> </li>
+
+  <li> <code>/etc/passwd</code> and <code>/etc/group</code> contain Windows
+  SID's as UID's and GID's. </li>
+
+  <li> No suid, but everybody is in group wheel==Administrators. </li>
+
+  <li> File protections can lock out root, Administrator, or SYSTEM. </li>
+</ul>
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="NtEmacs"> </a> NtEmacs </h3>
 
 We don't include the Cygwin X server in our XP images to keep the bulk and
 complexity down.  So <a
-href="http://www.gnu.org/software/emacs/windows/ntemacs.html"> NtEmacs 21.3
-</a> is provided instead of the Cygwin X Emacs.  NtEmacs "frames" are windows
-on the Windows Desktop. <p>
+href="http://www.gnu.org/software/emacs/windows/ntemacs.html"> <i>NtEmacs</i>
+21.3 </a> is provided instead of the Cygwin <b>X</b> Emacs.  <i>NtEmacs</i>
+"frames" are windows on the Windows Desktop. <p>
 
-The /usr/local/bin/emacs executable is a symlink to
-/cygdrive/c/emacs-21.3/bin/runemacs.exe, which starts up an Emacs on the desktop.
-This only works under RDP, since SSH logins have a null desktop. <p>
+The <code>/usr/local/bin/emacs</code> executable is a symlink to
+<code>/cygdrive/c/emacs-21.3/bin/runemacs.exe</code>, which starts up an Emacs
+on the desktop.  This only works under RDP, since SSH logins have a null
+desktop. <p>
 
-There is also a /usr/local/bin/emacs-exe executable, a symlink to
-/cygdrive/c/emacs-21.3/bin/emacs.exe, which is only useful as an Emacs
-compiler.  It could be used to run Emacs in an SSH window with the -nw (no
-windows) flag, except that it exits with "emacs: standard input is not a tty".
-Another thing not to try is running "emacs-exe -nw" in a Bash or TCSH shell on
-the RDP desktop.  It crashes Windows XP. <p>
+There is also a <code>/usr/local/bin/emacs-exe</code> executable, a symlink to
+<code>/cygdrive/c/emacs-21.3/bin/emacs.exe</code>, which is only useful as an
+Emacs compiler.  It could be used to run Emacs in an SSH window with the
+<code>-nw</code> (no windows) flag, except that it exits with <code>emacs:
+standard input is not a tty</code>.  Another thing not to try is running
+<code>emacs-exe -nw</code> in a Bash or TCSH shell on the RDP desktop.  It
+crashed <i>Windows XP</i> when I tried it. <p>
 
-<pre>
-       - Can drag-and-drop files from Windows Explorer to NtEmacs windows.
+<ul>
 
-       - cygmount.el makes Cygwin mounts visible within Emacs.
+  <li> Can drag-and-drop files from <i>Windows Explorer</i> to <i>NtEmacs</i>
+       windows.  </li>
 
-       - Options - See ~root/.emacs
-         . mouse-wheel-mode
-         . CUA mode option (^C copy / ^X cut on selection, ^V paste, ^Z undo).
-</pre>
+  <li> <code>cygmount.el</code> makes Cygwin mounts visible within
+       <i>NtEmacs</i>.  </li>
+
+  <li> Options - See <code>~root/.emacs</code>
+
+       <ul>
+
+         <li> <code>mouse-wheel-mode</code></li>
+
+	 <li> <code>CUA-mode</code> option ( <code>^C</code> copy /
+	 <code>^X</code> cut on selection, <code>^V</code> paste,
+	 <code>^Z</code> undo). </li>
+
+       </ul>
+</ul>
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Future"> </a> Future work </h3>
 
 There are still some things left to do: <br>
 
-<pre>
-       - The Elvin event system, and hence progagent, is not yet running.
+<ul>
 
-       - syncerver, slothd and healthd.
+  <li>The <i>Elvin</i> event system, and hence <code>progagent</code>, is
+      not yet running. </li>
 
-       - Password and ssh keys both working (hopefully.)
+  <li> <code>syncerver</code>, <code>slothd</code> and
+       <code>healthd</code>. </li> 
 
-       - Console support (agetty serial line speed 115.2kb doesn't work)
+  <li> <code>linktest</code> </li>
 
-       - No such thing as load averages, see the Task Manager/Performance tab.
+  <li> Add a topomap distribution option to NFS for <code>rtproto
+       Static</code>.  </li>
 
-       - Automate production of Windows XP images for Emulab.
-</pre>
+  <li> <code>gated</code> or equivelant OSPF daemon for <code>rtproto
+       Session</code>.  </li>
+
+  <li> Password and ssh keys both working (hopefully.) </li>
+
+  <li> Console support (<code>agetty</code> serial line speed 115.2kb doesn't
+       work.) </li> 
+
+  <li> No such thing as load averages, see the Task Manager/Performance
+       tab. </li> 
+
+  <li> Automate production of <i>Windows XP</i> images for Emulab. </li>
+
+</ul>
+
