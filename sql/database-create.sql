@@ -1237,9 +1237,11 @@ CREATE TABLE switch_stacks (
 CREATE TABLE table_regex (
   table_name varchar(64) NOT NULL default '',
   column_name varchar(64) NOT NULL default '',
-  regex tinytext NOT NULL,
-  minlen int(11) NOT NULL default '0',
-  maxlen int(11) NOT NULL default '0',
+  column_type enum('text','int','float') default NULL,
+  check_type enum('regex','function','redirect') default NULL,
+  check tinytext NOT NULL,
+  min int(11) NOT NULL default '0',
+  max int(11) NOT NULL default '0',
   comment tinytext,
   UNIQUE KEY table_name (table_name,column_name)
 ) TYPE=MyISAM;

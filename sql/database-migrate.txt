@@ -1081,55 +1081,63 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (IP)
        ) TYPE=MyISAM;
 
-1.198: Add a bit to the users table so that we can flag planetlab users:
+1.198: Shashi?
+
+1.199: Add a bit to the users table so that we can flag planetlab users:
 
        alter table users add column plab_user tinyint(1) not null default 0;
 
-1.199: Add table to hold per table/slot contraint data (min/max len
+1.200: Add table to hold per table/slot contraint data (min/max len
        and a perl regex defining valid data for the slot).
 
 	CREATE TABLE table_regex (
 	  table_name varchar(64) NOT NULL default '',
 	  column_name varchar(64) NOT NULL default '',
-	  regex tinytext NOT NULL,
-	  minlen int(11) NOT NULL default '0',
-	  maxlen int(11) NOT NULL default '0',
+	  column_type enum('text','int','float') default NULL,
+	  check_type enum('regex','function','redirect') default NULL,
+	  check tinytext NOT NULL,
+	  min int(11) NOT NULL default '0',
+	  max int(11) NOT NULL default '0',
 	  comment tinytext,
 	  UNIQUE KEY table_name (table_name,column_name)
 	) TYPE=MyISAM;
 
-1.201: Change the enum for pcremote_ok to match the phys type that was
+1.202: Change the enum for pcremote_ok to match the phys type that was
        ultimately chosen by Austin.
 
 	alter table projects modify pcremote_ok \
 		set('pcplabphys','pcron','pcwa') default NULL;
 
-1.202: Add an index to nodetypeXpid_permissions to make it more efficient
+1.203: Add an index to nodetypeXpid_permissions to make it more efficient
        to get a list of what types a project is allowed to use.
 
        alter table nodetypeXpid_permissions add key (pid);
 
-1.203: Add enum to projects table to store which interface users
+1.204: Shashi?
+
+1.205: Add enum to projects table to store which interface users
        should start with.
 
        alter table projects add default_user_interface \
 		 enum('emulab','plab') NOT NULL default 'emulab';
 
-1.204: Add enum to users table to store which interface user is currently
+1.206: Add enum to users table to store which interface user is currently
        set to use. This will replace plab_user bit.
 
        alter table users add user_interface \
 		 enum('emulab','plab') NOT NULL default 'emulab';
 
-1.206: Add fields to support user directed Forgot My Password changes.
+1.207: Add fields to support user directed Forgot My Password changes.
 
        alter table users add chpasswd_key varchar(32) default NULL;
        alter table users add chpasswd_expires int(10) unsigned \
 			NOT NULL default '0';
 
-1.207: Add project table linked_to_us entry.
+1.208: Add project table linked_to_us entry.
 
        alter table projects add linked_to_us tinyint(4) NOT NULL \
 	       default '0' after default_user_interface;
 
-       
+1.209: Go back to revision 202 and change a bit.
+
+
