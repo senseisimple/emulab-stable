@@ -3023,19 +3023,34 @@ sub LoadPhysInfo()
 	    split(",", $interface_capabilities{$iface_type}->{"protocols"});
 
 	foreach my $proto (@protolist) {
-	    my $speed =
+	    my $def_speed =
 		$interface_capabilities{$iface_type}->{"${proto}_defspeed"};
 
-	    $node_type_linkbw{$node_type}{$proto}->{$speed} = 1;
-	    $node_type_linkbw{$node_class}{$proto}->{$speed} = 1;
+	    if (!defined($def_speed)) {
+		fatal("No default speed in capabilites for $iface_type!");
+	    }
 
-	    #
-	    # If the type/class has a non-zero simnode capacity, then add
-	    # entries for the interface speed so that requires_delay can
-	    # figure out interface speeds the underlying node type supports.
-	    #
-	    if (nodetypesimcap($node_type) || nodetypesimcap($node_class)) {
-		$node_type_linkbw{"sim"}{$proto}->{$speed} = 1;
+	    my $auxspeeds =
+		$interface_capabilities{$iface_type}->{"${proto}_auxspeeds"};
+	    my @auxspeedlist = ();
+	    if ($auxspeeds) {
+		@auxspeedlist = split(",", $auxspeeds);
+	    }
+
+	    foreach my $speed ($def_speed, @auxspeedlist) {
+		print "Interface type $iface_type can handle $speed\n";
+		$node_type_linkbw{$node_type}{$proto}->{$speed} = 1;
+		$node_type_linkbw{$node_class}{$proto}->{$speed} = 1;
+
+		#
+		# If the type/class has a non-zero simnode capacity, then add
+		# entries for the interface speed so that requires_delay can
+		# figure out interface speeds the underlying node type
+		# supports.
+		#
+		if (nodetypesimcap($node_type) || nodetypesimcap($node_class)) {
+		    $node_type_linkbw{"sim"}{$proto}->{$speed} = 1;
+		}
 	    }
 	}
     }
