@@ -150,60 +150,47 @@ sub gen_reach {
     }
 }
 
-# this is a sorting routine that takes two pairs of [node,ip] and sorts
-# by the subnets of the ip.
-
 sub sortbysubnet {
-    local($ipa) = @{$a}[1];
-    local($ipb) = @{$b}[1];
-    local($subneta) = ($ipa =~ /^[0-9]+\.[0-9]+\.([0-9]+)\.[0-9]+$/);
-    local($subnetb) = ($ipb =~ /^[0-9]+\.[0-9]+\.([0-9]+)\.[0-9]+$/);
+    local($subneta) = ($ipmap{$a} =~ /^[0-9]+\.[0-9]+\.([0-9]+)\.[0-9]+$/);
+    local($subnetb) = ($ipmap{$b} =~ /^[0-9]+\.[0-9]+\.([0-9]+)\.[0-9]+$/);
     return $subneta <=> $subnetb;
 };
 
 # main loop
 foreach $node (keys(%rvnodemap)) {
     if (! defined($delays{$node})) {
-	# remove all src entries for node from virt_names
-	$sth=$dbh->prepare("DELETE from virt_names where src_node_id = \"$node\"");
+	# remove all dest entries for node from virt_names
+	$sth=$dbh->prepare("DELETE from virt_names where dest_node_id = \"$node\"");
 	$sth->execute;
 	$sth->finish;
 
 	# calculate reach
-	@reach = ();
-	@done = ();
 	$sth=$dbh->prepare("SELECT MAC from interfaces where node_id = \"$node\"");
 	$sth->execute;
+	@macs = ();
 	while (($mac) = $sth->fetchrow_array) {
+	    @reach = ();
+	    @done = ();
 	    &gen_reach($mac);
-	}
-
-	# reach now contains all mac addresses we need to add an ip for
-
-	# we need to generate lindex's by subnet order.
-	@dests = ();
-	foreach $mac (@reach) {
-	    ($dstnode) = (&mac2node($mac))[0];
-	    if ($dstnode eq $node) {
-		# we have a loop, but that's not our problem
-		next;
+	    if (@reach) {
+		$macreach{$mac} = [];
+		push(@{$macreach{$mac}},@reach);
+		push(@macs,$mac);
 	    }
-	    $ip = $ipmap{$mac};
-	    push(@dests,[$dstnode,$ipmap{$mac}]);
 	}
-	@sortdests = sort sortbysubnet @dests;
+	$sth->finish;
+	@sortmacs = sort sortbysubnet @macs;
 
-	# Now we add them to the table.  In the case of duplicate 
-	# dests we increment the lindex.  As the list is sorted by
-	# subnet the lindex will correspond to the first, second, etc.
-	# subnet.
+	# add to DB
 	$lindex = 0;
-	foreach $dest (@sortdests) {
-	    ($dest,$ip) = @$dest;
-	    $sth = $dbh->prepare("INSERT into virt_names (src_node_id,dest_node_id,lindex,ip) values (\"$node\",\"$dest\",$lindex,\"$ip\")");
+	foreach $mac (@sortmacs) {
+	    foreach $src (@{$macreach{$mac}}) {
+		$srcnode = (&mac2node($src))[0];
+		$sth = $dbh->prepare("INSERT into virt_names (src_node_id,dest_node_id,lindex,ip) values (\"$srcnode\",\"$node\",$lindex,\"$ipmap{$mac}\")");
+		$sth->execute;
+		$sth->finish;
+	    }
 	    $lindex++;
-	    $sth->execute;
-	    $sth->finish;
 	}
     }
 }
