@@ -45,7 +45,7 @@ if (!defined $fileNum) {
 }
 
 for (my $i = $startNum; $i <= $endNum; $i++) {
-	my $filename = $filePrefix . $fileNum-- . $fileSuffix;
+	my $filename = $filePrefix . $fileNum++ . $fileSuffix;
 	my @MACs = parseMac($filename);
 	if (!@MACs) {
 		warn "No MACs found for ${nodeType}${i} in file $filename\n";
