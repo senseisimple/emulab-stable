@@ -50,9 +50,9 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif /* WITHSSL */
+#include "config.h"
 #endif /* USESOCKETS */
 #include "capdecls.h"
-#include "config.h"
 
 #define geterr(e)	strerror(e)
 
@@ -71,6 +71,10 @@ void dolog(int level, char *format, ...);
 #ifdef __linux__
 #define _POSIX_VDISABLE '\0'
 #define revoke(tty)	(0)
+#endif
+
+#ifndef LOG_TESTBED
+#define LOG_TESTBED	LOG_USER
 #endif
 
 /*
@@ -209,7 +213,7 @@ main(int argc, char **argv)
 	(void) sprintf(strbuf, DEVNAME, DEVPATH, argv[1]);
 	Devname = newstr(strbuf);
 
-	openlog(Progname, LOG_PID, LOG_USER);
+	openlog(Progname, LOG_PID, LOG_TESTBED);
 	dolog(LOG_NOTICE, "starting");
 
 	/*

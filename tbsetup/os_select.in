@@ -33,6 +33,7 @@ $| = 1; #Turn off line buffering on output
 # Configure variables
 my $TB          = "@prefix@";
 my $TBOPS       = "@TBSTATEDEMAIL@";
+my $TBLOG	= "@TBLOGFACIL@";
 
 # Testbed Support libraries
 use lib "@prefix@/lib";
@@ -54,7 +55,7 @@ my $pathmode=0; # is osid really a path instead of an osid?
 my $mfs=0; # is this for a pxe_boot_path change?
 
 # Set up syslog
-openlog("osselect","pid","user");
+openlog("osselect","pid",$TBLOG);
 
 # Find default pxe boot path
 my $cmd = "select path from os_info where osid='".TB_OSID_PXEBOOT."'";

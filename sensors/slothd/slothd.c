@@ -281,7 +281,7 @@ DIR *devs;
   signal(SIGSYS, sigunkhandler);
 
   /* Setup logging facil. */
-  openlog("slothd", LOG_NDELAY, LOG_DAEMON);
+  openlog("slothd", LOG_NDELAY, LOG_TESTBED);
 
   /* Setup path */
   if (setenv("PATH", SLOTHD_PATH_ENV, 1) < 0) {

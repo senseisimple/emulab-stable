@@ -18,3 +18,4 @@
 #undef FSDIR_USERS
 #undef FSDIR_SHARE
 #undef SFSSUPPORT
+#undef LOG_TESTBED

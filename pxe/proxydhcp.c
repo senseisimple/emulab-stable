@@ -358,7 +358,7 @@ main(int argc, char *argv[])
 		argn=2;
 	}
 	
-	openlog("proxydhcp", LOG_PID, LOG_USER);
+	openlog("proxydhcp", LOG_PID, LOG_TESTBED);
 	syslog(LOG_NOTICE,
 	       "Minimal PXE Proxy DHCP daemon, for use with BpBatch");
 	syslog(LOG_NOTICE, "By David Clerc & Marc Vuilleumier Stuckelberg"

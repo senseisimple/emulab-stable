@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -30,16 +30,11 @@ PR_DBOBJ   = proxydhcp_cfile.o proxydhcp_mysql.o
 
 INCS    = -I/usr/local/include
 
-#ifeq "$(filter -DLBS, $(CFLAGS))" "-DLBS"
-#INCS   += -I/build/oskit-debug/install/include
-#else
-#INCS   += -I/n/moab/z/mike/flux/install.debug/include
-#endif
-
 CFLAGS	+= $(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
 		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"' \
 		-DFALLBACK_HOST='"$(BOSSNODE)"' -DBOSSNODE='"$(BOSSNODE)"' \
-		-DDEFAULT_PATH='"/tftpboot/pxeboot.newnode"'
+		-DDEFAULT_PATH='"/tftpboot/pxeboot.newnode"' \
+		-DLOG_TESTBED=$(LOG_TESTBED)
 
 ifeq ($(EVENTSYS),1)
 CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib \
@@ -84,4 +79,4 @@ install:	$(INSTALL_SBINDIR)/proxydhcp \
 		$(INSTALL_ETCDIR)/bootinfo.conf
 
 clean: 
-	rm -f *.o core proxydhcp bootinfo testmysql
+	rm -f *.o core proxydhcp bootinfo *.restart testmysql

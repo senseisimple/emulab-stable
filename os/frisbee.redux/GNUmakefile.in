@@ -64,6 +64,9 @@ frisbeed: $(SERVEROBJS)
 	strip frisbeed
 
 
+log.o:		$(SRCDIR)/log.c decls.h log.h
+	$(CC) $(CFLAGS) -DLOG_TESTBED=$(LOG_TESTBED) -c $(SRCDIR)/log.c
+
 event.o:	$(SRCDIR)/event.c decls.h log.h event.h
 	$(CC) $(EVENTFLAGS) -c $(SRCDIR)/event.c
 

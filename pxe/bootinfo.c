@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,7 +23,7 @@ main()
 	boot_info_t		boot_info;
 	boot_what_t	       *boot_whatp = (boot_what_t *) &boot_info.data;
 
-	openlog("bootinfo", LOG_PID, LOG_USER);
+	openlog("bootinfo", LOG_PID, LOG_TESTBED);
 	syslog(LOG_NOTICE, "daemon starting (version %d)", version);
 
 	(void)daemon(0, 0);

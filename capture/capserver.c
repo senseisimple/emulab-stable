@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	if (argc)
 		usage();
 
-	openlog("capserver", LOG_PID, LOG_USER);
+	openlog("capserver", LOG_PID, LOG_TESTBED);
 	syslog(LOG_NOTICE, "daemon starting");
 
 	if (!debug)

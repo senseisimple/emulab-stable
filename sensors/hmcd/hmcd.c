@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -9,6 +9,10 @@
 */
 
 #include "hmcd.h"
+
+#ifndef LOG_TESTBED
+#define LOG_TESTBED	LOG_DAEMON
+#endif
 
 void AcceptClient(int, int*);
 void CollectData(int, HMONENT*);
@@ -65,7 +69,7 @@ int main(int argc, char **argv) {
   strcpy(unixaddr.sun_path, SOCKPATH);
 
   if (strchr(argv[0], '/')) {
-    openlog(strrchr(argv[0], '/')+1, 0, LOG_DAEMON);
+    openlog(strrchr(argv[0], '/')+1, 0, LOG_TESTBED);
   }
   else {
     openlog(argv[0], 0, LOG_DAEMON);

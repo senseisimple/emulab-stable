@@ -71,6 +71,10 @@
 #define LOGINS		"log/logins"
 #define SSHD		"sshd"
 
+#ifndef LOG_TESTBED
+#define LOG_TESTBED	LOG_USER
+#endif
+
 static char		*progname;
 static int		debug = 0;
 static int		mydb_update(char *query, ...);
@@ -121,7 +125,7 @@ main(int argc, char **argv)
 	if (argc)
 		usage();
 
-	openlog("genlastlog", LOG_PID, LOG_USER);
+	openlog("genlastlog", LOG_PID, LOG_TESTBED);
 	syslog(LOG_NOTICE, "genlastlog starting");
 
 	/*

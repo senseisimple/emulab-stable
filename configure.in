@@ -57,6 +57,7 @@ AC_SUBST(TBAUTHTIMEOUT)
 AC_SUBST(TBMAINSITE)
 AC_SUBST(SFSSUPPORT)
 AC_SUBST(PLABSUPPORT)
+AC_SUBST(TBLOGFACIL)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -97,6 +98,7 @@ JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
+TBLOGFACIL="local5"
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -142,6 +144,10 @@ AC_DEFINE_UNQUOTED(FSDIR_USERS, "$FSDIR_USERS")
 if test -n "$FSDIR_SHARE"; then
     AC_DEFINE_UNQUOTED(FSDIR_SHARE, "$FSDIR_SHARE")
 fi
+
+LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
+AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
+AC_SUBST(LOG_TESTBED)
 
 #
 # The email addresses need to be be munged for perl scripts. But,

@@ -80,4 +80,4 @@ ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
 
 clean: 
-	rm -f *.o core tmcd tmcc tmcc-nossl findif version.c
+	rm -f *.o core tmcd tmcd.restart tmcc tmcc-nossl findif version.c

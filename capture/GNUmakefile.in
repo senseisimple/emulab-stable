@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,7 +25,7 @@ DESTDIR=
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
 #
-CFLAGS= -g -O2 -DLOG_DROPS -I${OBJDIR}
+CFLAGS= -g -O2 -DLOG_DROPS -I${OBJDIR} -DLOG_TESTBED=$(LOG_TESTBED)
 
 capture: capture.c capdecls.h
 	cc $(CFLAGS) -DUSESOCKETS -DWITHSSL -DPREFIX=\"$(TBROOT)\" -o capture $< -lssl -lcrypto
@@ -50,4 +50,4 @@ real-install:	all $(INSTALL_SBINDIR)/capserver $(INSTALL_SBINDIR)/capture
 tipserv-install:	tipserv-all $(INSTALL_SBINDIR)/capture
 
 clean:
-	rm -f *.o capture core errs Errs
+	rm -f *.o capture capture-tty capserver core errs Errs

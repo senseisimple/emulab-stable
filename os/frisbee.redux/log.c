@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -16,6 +16,10 @@
 #include <assert.h>
 #include <errno.h>
 #include "decls.h"
+
+#ifndef LOG_TESTBED
+#define LOG_TESTBED	LOG_USER
+#endif
 
 static int usesyslog = 1;
 
@@ -38,7 +42,7 @@ ServerLogInit(void)
 		return 1;
 	}
 
-	openlog("frisbeed", LOG_PID, LOG_USER);
+	openlog("frisbeed", LOG_PID, LOG_TESTBED);
 
 	return 0;
 }

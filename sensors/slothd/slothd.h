@@ -63,6 +63,10 @@
 #define SLOTHD_DEF_SERV "boss"
 #define SLOTHD_DEF_PORT 8509 /* XXX change */
 
+#ifndef LOG_TESTBED
+#define LOG_TESTBED	LOG_DAEMON
+#endif
+
 #ifdef __FreeBSD__
 #define CNTFMTSTR "%s %*s %*s %s %lu %*s %lu"
 #define NUMSCAN 4
