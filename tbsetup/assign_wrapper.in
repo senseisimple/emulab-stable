@@ -1407,7 +1407,7 @@ foreach $pair (@nodepairs) {
     # choose FBSD-STD and static routing
     if( defined($nodes{$vnode}) && $nodes{$vnode} eq "sim" ) {
 
-      my $nsenodeosid = TBOSID("testbed", "FBSD45-NSE" );
+      my $nsenodeosid = TBOSID("emulab-ops", "FBSD45-NSE" );
       system("os_select $nsenodeosid $pnode");
       DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
 		   " startstatus='none'," .
