@@ -533,8 +533,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	my $query_result =
 	    DBQueryFatal("select t.idx,t.exptidx,s.rsrcidx ".
 			 " from testbed_stats as t ".
-			 "left join experiment_stats as s ".
-			 " on s.exptidx=t.exptidx");
+			 "left join experiment_stats as s ");
 
 	while (($idx,$exptidx,$rsrcidx) = $query_result->fetchrow_array()) {
 	    if (!defined($rsrcidx)) {
