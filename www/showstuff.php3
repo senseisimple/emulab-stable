@@ -1402,6 +1402,48 @@ function SPITOSINFOLINK($osid)
 }
 
 #
+# A list of widearea accounts.
+#
+function SHOWWIDEAREAACCOUNTS($uid) {
+    $none = TBDB_TRUSTSTRING_NONE;
+    
+    $query_result =
+	DBQueryFatal("SELECT * FROM widearea_accounts ".
+		     "WHERE uid='$uid' and trust!='$none' ".
+		     "order by node_id");
+    
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+
+    echo "<center>
+          <h3>Widearea Accounts</h3>
+          </center>
+          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+    echo "<tr>
+              <th>Node ID</th>
+              <th>Approved</th>
+              <th>Privs</th>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$node_id   = $row[node_id];
+	$approved  = $row[date_approved];
+	$trust     = $row[trust];
+
+	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
+	    echo "<tr>
+                      <td>$node_id</td>
+                      <td>$approved</td>
+                      <td>$trust</td>\n";
+	    echo "</tr>\n";
+	}
+    }
+    echo "</table>\n";
+}
+
+#
 # This is an included file.
 # 
 ?>
