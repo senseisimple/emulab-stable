@@ -2,14 +2,20 @@
 #
 # Rob's definitions. Selected via configure.
 #
-$WWW            = "www.emulab.net/~ricci/www";
+$WWWHOST        = "www.emulab.net";
+$WWW            = "$WWWHOST/~ricci/www";
 $TBBASE         = "https://$WWW";
 $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
-$TBMAIL_OPS     = "Ricci TB Ops <ricci@cs.utah.edu>";
-$TBMAIL_WWW     = "Ricci TB WWW <ricci@cs.utah.edu>";
-$TBMAIL_APPROVAL= "Ricci TB Approval <ricci@cs.utah.edu>";
-$TBMAIL_LOGS    = "Ricci TB Logs <ricci@cs.utah.edu>";
 $TBAUTHDOMAIN   = ".emulab.net";
 $TBSECURECOOKIES= 1;
+
+$TBMAILADDR_OPS		= "ricci@fast.cs.utah.edu";
+$TBMAIL_OPS		= "Ricci Testbed Ops <$TBMAILADDR_OPS>";
+$TBMAILADDR_WWW		= "ricci@fast.cs.utah.edu";
+$TBMAIL_WWW		= "Ricci Testbed WWW <$TBMAILADDR_WWW>";
+$TBMAILADDR_APPROVAL	= "ricci@fast.cs.utah.edu";
+$TBMAIL_APPROVAL	= "Ricci Testbed Approval <$TBMAILADDR_APPROVAL>";
+$TBMAILADDR_LOGS	= "ricci@fast.cs.utah.edu";
+$TBMAIL_LOGS		= "Ricci Testbed Logs <$TBMAILADDR_LOGS>";
 ?>

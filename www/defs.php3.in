@@ -41,8 +41,8 @@ $THISPROJECT    = "The Utah Network Testbed";
 # This just spits out an email address in a page, so it does not need
 # to be configured per development tree. It could be though ...
 # 
-$TBMAILADDR     = "<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
-                   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>";
+$TBMAILADDR     = "<a href=\"mailto:$TBMAILADDR_OPS\">
+                      Testbed Operations ($TBMAILADDR_OPS)</a>";
 
 #
 # Database constants and the like.
@@ -101,9 +101,7 @@ function USERERROR($message, $death) {
           </h3>";
 
     echo "<p><p>
-          Please contact <a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
-          Testbed Operations (testbed-ops@flux.cs.utah.edu)</a> 
-          if you feel this message is an error.";
+          Please contact $TBMAILADDR if you feel this message is an error.";
 
     if ($death) {
 	PAGEFOOTER();

@@ -2,14 +2,20 @@
 #
 # Mac's definitions. Selected via configure.
 #
-$WWW            = "www.emulab.net/~newbold/www";
+$WWWHOST        = "www.emulab.net";
+$WWW            = "$WWWHOST/~newbold/www";
 $TBBASE         = "https://$WWW";
 $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
-$TBMAIL_OPS     = "Newbold TB Ops <newbold@cs.utah.edu>";
-$TBMAIL_WWW     = "Newbold TB WWW <newbold@cs.utah.edu>";
-$TBMAIL_APPROVAL= "Newbold TB Approval <newbold@cs.utah.edu>";
-$TBMAIL_LOGS    = "Newbold TB Logs <newbold@cs.utah.edu>";
 $TBAUTHDOMAIN   = ".emulab.net";
 $TBSECURECOOKIES= 1;
+
+$TBMAILADDR_OPS		= "newbold@fast.cs.utah.edu";
+$TBMAIL_OPS		= "Newbold Testbed Ops <$TBMAILADDR_OPS>";
+$TBMAILADDR_WWW		= "newbold@fast.cs.utah.edu";
+$TBMAIL_WWW		= "Newbold Testbed WWW <$TBMAILADDR_WWW>";
+$TBMAILADDR_APPROVAL	= "newbold@fast.cs.utah.edu";
+$TBMAIL_APPROVAL	= "Newbold Testbed Approval <$TBMAILADDR_APPROVAL>";
+$TBMAILADDR_LOGS	= "newbold@fast.cs.utah.edu";
+$TBMAIL_LOGS		= "Newbold Testbed Logs <$TBMAILADDR_LOGS>";
 ?>

@@ -2,14 +2,20 @@
 #
 # Leigh's definitions. Selected via configure.
 #
-$WWW            = "golden-gw.ballmoss.com:8080/~stoller/testbed";
+$WWWHOST        = "golden-gw.ballmoss.com:8080";
+$WWW            = "$WWWHOST/~stoller/testbed";
 $TBBASE         = "http://$WWW";
 $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
-$TBMAIL_OPS     = "Testbed Ops <stoller@fast.cs.utah.edu>";
-$TBMAIL_WWW     = "Testbed WWW <stoller@fast.cs.utah.edu>";
-$TBMAIL_APPROVAL= "Testbed Approval <stoller@fast.cs.utah.edu>";
-$TBMAIL_LOGS    = "Testbed Logs <stoller@fast.cs.utah.edu>";
 $TBAUTHDOMAIN   = ".ballmoss.com";
 $TBSECURECOOKIES= 0;
+
+$TBMAILADDR_OPS		= "stoller@fast.cs.utah.edu";
+$TBMAIL_OPS		= "Testbed Ops <$TBMAILADDR_OPS>";
+$TBMAILADDR_WWW		= "stoller@fast.cs.utah.edu";
+$TBMAIL_WWW		= "Testbed WWW <$TBMAILADDR_WWW>";
+$TBMAILADDR_APPROVAL	= "stoller@fast.cs.utah.edu";
+$TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
+$TBMAILADDR_LOGS	= "stoller@fast.cs.utah.edu";
+$TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
 ?>
