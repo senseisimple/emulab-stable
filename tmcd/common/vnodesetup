@@ -631,7 +631,7 @@ sub killvserver()
 		warn("Bad stat line: $statline\n");
 	    }
 	}
-	else {
+	elsif (-e "/proc/$pid/status") {
 	    # FreeBSD (Not used in reality, but useful for testing)
 	    open(STAT, "/proc/$pid/status")
 		or die("Unable to get ppid of $pid");
@@ -643,8 +643,14 @@ sub killvserver()
 	    }
 	    else {
 		warn("Bad stat line: $statline\n");
+                return 0;
 	    }
 	}
+        else {
+            warn("Can't find status file for $pid.".
+                 "Maybe it died or exited?");
+            return 0;
+        }
     }
 
     $SIG{TERM} = 'IGNORE';
@@ -675,7 +681,6 @@ sub killvserver()
 	}
 
 	while (($pid, $ppid) = each %pids) {
-	    $ppid = getanyppid($pid);
 	    if ($pid <= 1 || $pid == $PID) { next; }
 	    
 	    if ($debug) {
