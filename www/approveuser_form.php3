@@ -146,7 +146,10 @@ echo "<tr>
           <th>Phone</th>
       </tr>
       <tr>
-          <th colspan=5>Addr</th>
+          <th colspan=2>Addr</th>
+          <th>City</th>
+          <th>State</th>
+          <th>Zip</th>
       </tr>\n";
 
 echo "<form action='approveuser.php3' method='post'>\n";
@@ -215,7 +218,10 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td>&nbsp;$phone&nbsp;</td>
           </tr>\n";
     echo "<tr>
-              <td colspan=5>&nbsp;$addr&nbsp;</td>
+              <td colspan=5>&nbsp;$addr&nbsp;
+                            &nbsp;$city&nbsp;
+                            &nbsp;$state&nbsp;
+                            &nbsp;$zip&nbsp;</td>
           </tr>\n";
 }
 echo "<tr>

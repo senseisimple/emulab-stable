@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -79,6 +79,10 @@ function INFORMLEADERS($uid) {
     $usr_email   = $row[usr_email];
     $usr_URL     = $row[usr_URL];
     $usr_addr    = $row[usr_addr];
+    $usr_addr2	 = $row[usr_addr2];
+    $usr_city	 = $row[usr_city];
+    $usr_state	 = $row[usr_state];
+    $usr_zip	 = $row[usr_zip];
     $usr_name    = $row[usr_name];
     $usr_phone   = $row[usr_phone];
     $usr_title   = $row[usr_title];
@@ -110,7 +114,11 @@ function INFORMLEADERS($uid) {
 		"User URL:        $usr_URL\n".
 		"Title:           $usr_title\n".
 		"Affiliation:     $usr_affil\n".
-		"Address:         $usr_addr\n".
+		"Address 1:       $usr_addr\n".
+		"Address 2:       $usr_addr2\n".
+		"City:            $usr_city\n".
+		"State:           $usr_state\n".
+		"Zip:             $usr_zip\n".
 		"Phone:           $usr_phone\n".
 		"\n".
 		"Please return to $TBWWW,\n".

@@ -199,12 +199,48 @@ function SPITFORM($formfields, $returning, $errors)
 	# Postal Address
 	#
 	echo "<tr>
-                  <td colspan=2>*Postal Address:</td>
+                  <td colspan=2>*Address Line 1:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_addr]\"
                              value=\"" . $formfields[usr_addr] . "\"
 	                     size=40>
+                  </td>
+              </tr>\n";
+
+	#
+	# Postal Address
+	#
+	echo "<tr>
+                  <td colspan=2> Address Line 2:</td>
+                  <td class=left>
+                      <input type=text
+                             name=\"formfields[usr_addr2]\"
+                             value=\"" . $formfields[usr_addr2] . "\"
+	                     size=45>
+                  </td>
+              </tr>\n";
+
+	#
+	# City, State, Zip
+	#
+	echo "<tr>
+                  <td colspan=2>*City:</td>
+                  <td class=left>
+                      <input type=text
+                             name=\"formfields[usr_city]\"
+                             value=\"" . $formfields[usr_city] . "\"
+	                     size=25>
+                      &nbsp *State:
+                      <input type=text
+                             name=\"formfields[usr_state]\"
+                             value=\"" . $formfields[usr_state] . "\"
+	                     size=2>
+                      &nbsp *Zip:
+                      <input type=text
+                             name=\"formfields[usr_zip]\"
+                             value=\"" . $formfields[usr_zip] . "\"
+	                     size=5>
                   </td>
               </tr>\n";
 
@@ -588,6 +624,18 @@ if (! $returning) {
 	strcmp($formfields[usr_addr], "") == 0) {
 	$errors["Postal Address"] = "Missing Field";
     }
+    if (!isset($formfields[usr_city]) ||
+	strcmp($formfields[usr_city], "") == 0) {
+	$errors["City"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_state]) ||
+	strcmp($formfields[usr_state], "") == 0) {
+	$errors["State"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_zip]) ||
+	strcmp($formfields[usr_zip], "") == 0) {
+	$errors["Zip Code"] = "Missing Field";
+    }
     if (!isset($formfields[usr_phone]) ||
 	strcmp($formfields[usr_phone], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
@@ -712,6 +760,9 @@ if (!$returning) {
     $usr_affil         = addslashes($formfields[usr_affil]);
     $usr_email         = $formfields[usr_email];
     $usr_addr          = addslashes($formfields[usr_addr]);
+    $usr_city          = addslashes($formfields[usr_city]);
+    $usr_state         = addslashes($formfields[usr_state]);
+    $usr_zip           = addslashes($formfields[usr_zip]);
     $usr_phone         = $formfields[usr_phone];
     $password1         = $formfields[password1];
     $password2         = $formfields[password2];
@@ -726,6 +777,13 @@ if (!$returning) {
 	$usr_URL = $formfields[usr_URL];
     }
     
+    if (! isset($formfields[usr_addr2])) {
+	$usr_addr2 = "";
+    }
+    else {
+	$usr_addr2 = addslashes($formfields[usr_addr2]);
+    }
+
     #
     # Pub Key.
     #
@@ -791,6 +849,10 @@ else {
     $usr_affil	   = $row[usr_affil];
     $usr_email	   = $row[usr_email];
     $usr_addr	   = $row[usr_addr];
+    $usr_addr2     = $row[usr_addr2];
+    $usr_city	   = $row[usr_city];
+    $usr_state	   = $row[usr_state];
+    $usr_zip	   = $row[usr_zip];
     $usr_phone	   = $row[usr_phone];
     $usr_URL       = $row[usr_URL];
     $usr_returning = "Yes";
@@ -853,10 +915,13 @@ if (! $returning) {
 
     DBQueryFatal("INSERT INTO users ".
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
+	 " usr_addr2,usr_city,usr_state,usr_zip, ".
 	 " usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,".
 	 " status,pswd_expires,usr_modified) ".
 	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
-	 "'$usr_email', '$usr_addr', '$usr_URL', '$usr_title', '$usr_affil', ".
+         "'$usr_email', ".
+	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
+	 "'$usr_URL', '$usr_title', '$usr_affil', ".
 	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year), now())");
 
@@ -933,7 +998,11 @@ TBMAIL($TBMAIL_APPROVAL,
      "Funders:         $proj_funders\n".
      "Title:           $usr_title\n".
      "Affiliation:     $usr_affil\n".
-     "Address:         $usr_addr\n".
+     "Address 1:       $usr_addr\n".
+     "Address 2:       $usr_addr2\n".
+     "City:            $usr_city\n".
+     "State:           $usr_state\n".
+     "Zip:             $usr_zip\n".
      "Phone:           $usr_phone\n".
      "Members:         $proj_members\n".
      "PCs:             $proj_pcs\n".

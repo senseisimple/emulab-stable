@@ -130,3 +130,12 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (msgid),
 	  KEY date (date)
 	) TYPE=MyISAM;
+
+1.122: Convert usr_zip to tinytext from int. In prep for using these
+       fields.
+
+       alter table users change usr_zip usr_zip tinytext;
+       update users set usr_addr2='',usr_city='',usr_state='',usr_zip='';
+
+       These fields had never been used, so the type change and init
+       are okay.

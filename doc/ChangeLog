@@ -89,3 +89,20 @@ newbold     2003/04/02 15:24:48 MST
   obvious. They may also want to customize some of the other vars that are
   mentioned in configure.in and www/defs.php3.in .
 
+stoller     2003/04/04 10:20:31 MST
+
+  Modified files:
+    sql                  database-migrate.txt 
+    www                  approveproject_list.php3 
+                         approveuser_form.php3 joinproject.php3 
+                         moduserinfo.php3 newproject.php3 
+                         showstuff.php3 verifyusr.php3 
+                         widearea_register.php 
+  Log:
+  Add "Address Line 2", City, State, and Zip as independent entities,
+  finally! These have been in the DB for a long time, but never used.
+  As Eric pointed out, its easier to get realistic address info from
+  people if we provide the right forms. The downside is that all current
+  users will have to adjust their info the next time they edit their
+  info. Thats okay. I thought about forcing all users to do it the next
+  time they log in, but I figured people would scream.

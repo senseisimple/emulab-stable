@@ -360,6 +360,10 @@ function SHOWUSER($uid) {
     $usr_email   = $row[usr_email];
     $usr_URL     = $row[usr_URL];
     $usr_addr    = stripslashes($row[usr_addr]);
+    $usr_addr2   = stripslashes($row[usr_addr2]);
+    $usr_city    = stripslashes($row[usr_city]);
+    $usr_state   = stripslashes($row[usr_state]);
+    $usr_zip     = stripslashes($row[usr_zip]);
     $usr_name    = stripslashes($row[usr_name]);
     $usr_phone   = $row[usr_phone];
     $usr_title   = stripslashes($row[usr_title]);
@@ -367,6 +371,15 @@ function SHOWUSER($uid) {
     $status      = $row[status];
     $admin       = $row[admin];
     $adminoff    = $row[adminoff];
+
+    if (!strcmp($usr_addr2, ""))
+	$usr_addr2 = "&nbsp";
+    if (!strcmp($usr_city, ""))
+	$usr_city = "&nbsp";
+    if (!strcmp($usr_state, ""))
+	$usr_state = "&nbsp";
+    if (!strcmp($usr_zip, ""))
+	$usr_zip = "&nbsp";
 
     #
     # Last Login info.
@@ -416,8 +429,28 @@ function SHOWUSER($uid) {
           </tr>\n";
     
     echo "<tr>
-              <td>Mailing Address:</td>
+              <td>Address 1:</td>
               <td>$usr_addr</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Address 2:</td>
+              <td>$usr_addr2</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>City:</td>
+              <td>$usr_city</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>State:</td>
+              <td>$usr_state</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Zip:</td>
+              <td>$usr_zip</td>
           </tr>\n";
     
     echo "<tr>

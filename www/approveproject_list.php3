@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -73,11 +73,6 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $email	= $row[usr_email];
     $title	= $row[usr_title];
     $affil	= $row[usr_affil];
-    $addr	= $row[usr_addr];
-    $addr2	= $row[usr_addr2];
-    $city	= $row[usr_city];
-    $state	= $row[usr_state];
-    $zip	= $row[usr_zip];
     $phone	= $row[usr_phone];
 
     echo "<tr>
