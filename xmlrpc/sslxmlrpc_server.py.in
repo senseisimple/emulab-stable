@@ -1,0 +1,49 @@
+#! /usr/bin/env python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+import sys
+import getopt
+sys.path.append("@prefix@/lib")
+import socket
+import sshxmlrpc
+from emulabserver import *
+
+#
+# By default, run a wrapper class that includes all off the modules.
+# The client can invoke methods of the form experiment.swapexp when
+# the server is invoked in this manner.
+# 
+DEFAULT_MODULE = "EmulabServer"
+module         = DEFAULT_MODULE
+ReadOnly       = 0;
+
+#
+# Optional argument indicating read-only privs.
+#
+if len(sys.argv) > 1 and sys.argv[1] == "-ro":
+    ReadOnly = 1;
+    sys.argv = sys.argv[1:]
+    pass
+
+#
+# Optional argument indicates the specific module the server wants to use.
+# This form should be deprecated, I think. 
+#
+if len(sys.argv) > 1:
+    module = sys.argv[1]
+    pass
+
+#
+# This is invoked inside an SSH, typically from the paperbag shell.
+# We use stdin/stdout to read/write the request/response. We handle
+# just a single request this way, and then exit. 
+# 
+# Construct and wrap our object.
+server  = eval(module + "(readonly=" + str(ReadOnly) + ")")
+wrapper = sshxmlrpc.SSHServerWrapper(server)
+# Handle the request on stdin and send the response to stdout.
+wrapper.serve_forever((sys.stdin, sys.stdout))
+sys.exit(0)
