@@ -155,6 +155,73 @@ float score()
 	return sc;
 }
 
+void violated()
+{
+	for (int i = 0; i < nparts; i++) {
+		/* Have we violated bandwidth between switches? */
+		if (interlinks[i] > intercap) {
+			cout << "violated:  switch " << i << " bandwidth"
+			     << endl;
+		}
+		for (int j = 0; j < topo->switches[i]->numnodes(); j++) {
+			topo->switches[i]->nodes[j].used = 0;
+		}
+		
+		int numdelays = 0;
+		int assigned = 0;
+		int unassigned = 0;
+		node n;
+		forall_nodes(n, G) {
+		    if (G[n].partition() == i) {
+		        if (G[n].type() == testnode::TYPE_DELAY) {
+				numdelays++;
+			} else {
+			    /* Assign to an available node */
+			    assigned = 0;
+			    for (int j = 0;
+				 j < topo->switches[i]->numnodes();
+				 j++) {
+				    if ((topo->switches[i]->nodes[j].used == 0) && (topo->switches[i]->nodes[j].ints >= G.degree(n))) {
+					    topo->switches[i]->nodes[j].used = 1;
+					    assigned = 1;
+					    break;
+				    }
+			    }
+			    if (!assigned) {
+				    unassigned++;
+			    }
+			}
+		    }
+		}
+		if (unassigned > 0) {
+			cout << "violated:  switch " << i << " had "
+			     << unassigned << " unassigned nodes" << endl;
+		}
+		int numn = numnodes[i];
+
+		numn -= numdelays;
+		/* Now turn normal nodes into delay nodes as needed */
+		/* XXX:  THIS IS NOT OPTIMAL.  We should improve on this
+		 * so it uses the right size nodes a bit... but oh well */
+		int maxnodes = topo->switches[i]->numnodes();
+		int j = 0;
+		while (numdelays > 0 && j < maxnodes) {
+			if (topo->switches[i]->nodes[j].used) { continue; }
+			numdelays -= topo->switches[i]->nodes[j].ints/2;
+			topo->switches[i]->nodes[j].used = 1;
+			j++;
+		}
+
+		/* Add in the unsatisfied delay nodes */
+		if (numdelays > 0) {
+			cout << "violated:  switch " << i << " had "
+			     << numdelays << " unassigned delay nodes"
+			     << endl;
+		}
+	}
+}
+
+
 void screset() {
 	edge e;
 	node n;
@@ -313,6 +380,7 @@ int assign()
 	cout << "   BEST SCORE:  " << score() << " in "
 	     << iters << " iters and " << timeend << " seconds" << endl;
 	cout << "With " << accepts << " accepts of increases\n";
+#if 0
 	for (int i = 0; i < nparts; i++) {
 		if (numnodes[i] > nodecap[i]) {
 			cout << "node " << i << " has "
@@ -328,6 +396,8 @@ int assign()
 	} else {
 		return 0;
 	}
+#endif
+	return 0;
 }
 
 void loopassign()
@@ -346,14 +416,10 @@ void loopassign()
 	nnodes = G.number_of_nodes();
 	optimal = assign();
 	totaltime = used_time(timestart);
+	violated();
 	cout << "Total time to find solution "
 	     << totaltime << " seconds" << endl;
 	node n;
-#if 0
-	forall_nodes(n, G) {
-		cout << "Node degree: " << G.degree(n) << endl;
-	}
-#endif
 }
 
 void chopgraph(GraphWin& gw) {
