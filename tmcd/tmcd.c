@@ -217,6 +217,7 @@ COMMAND_PROTOTYPE(doeventkey);
 COMMAND_PROTOTYPE(dofullconfig);
 COMMAND_PROTOTYPE(doroutelist);
 COMMAND_PROTOTYPE(dorole);
+COMMAND_PROTOTYPE(dorusage);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -278,6 +279,7 @@ struct command {
         { "fullconfig",   FULLCONFIG_NONE, dofullconfig},
         { "routelist",	  FULLCONFIG_PHYS, doroutelist},
         { "role",	  FULLCONFIG_PHYS, dorole},
+        { "rusage",	  FULLCONFIG_PHYS, dorusage},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -930,9 +932,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	}
 
 	/*
-	 * XXX: We allow remote nodes to use UDP for isalive only!
+	 * XXX: We allow remote nodes to use UDP for isalive/rusage only!
 	 */
-	if (!istcp && !reqp->islocal && command_array[i].func != doisalive) {
+	if (!istcp && !reqp->islocal &&
+	    (command_array[i].func != doisalive ||
+	     command_array[i].func != dorusage)) {
 		error("%s: Invalid request (%s) from remote node using UDP!\n",
 		      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
@@ -946,7 +950,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 #else
 	cp = (istcp ? "TCP" : "UDP");
 #endif
-	if (command_array[i].func != doisalive || verbose)
+	if (verbose || ! (command_array[i].func != doisalive ||
+			  command_array[i].func != doisalive))
 		info("%s: vers:%d %s %s\n", reqp->nodeid,
 		     version, cp, command_array[i].cmdname);
 
@@ -960,7 +965,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (!istcp) 
 		client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
-	if (byteswritten)
+	if (byteswritten && ! (command_array[i].func == doisalive ||
+			       command_array[i].func == dorusage))
 		info("%s: %s wrote %d bytes\n",
 		     reqp->nodeid, command_array[i].cmdname,
 		     byteswritten);
@@ -4859,6 +4865,57 @@ COMMAND_PROTOTYPE(dofullconfig)
 			client_writeback(sock, buf, strlen(buf), tcp);
 		}
 	}
+	return 0;
+}
+
+/*
+ * Report node resource usage. This also serves as Isalive(), so we send back
+ * update info. The format for upload is:
+ *
+ *  LA1=x.y LA5=x.y LA15=x.y DUSED=x ...
+ */
+COMMAND_PROTOTYPE(dorusage)
+{
+	char		buf[MYBUFSIZE];
+	float		la1, la5, la15, dused;
+
+	if (sscanf(rdata, "LA1=%f LA5=%f LA15=%f DUSED=%f",
+		   &la1, &la5, &la15, &dused) != 4) {
+		error("RUSAGE: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * See db/node_status script, which uses this info (timestamps)
+	 * to determine when nodes are down.
+	 *
+	 * XXX: Plab physnodes do not report at all; we copy the virtnode
+	 * info to the physnode. Do not update status field though; that
+	 * is handled from one of the plab daemons.
+	 */
+	mydb_update("replace delayed into node_rusage "
+		    " (node_id, status_timestamp, "
+		    "  load_1min, load_5min, load_15min, disk_used) "
+		    " values ('%s', now(), %f, %f, %f, %f)",
+		    reqp->nodeid, la1, la5, la15, dused);
+
+	if (reqp->isplabdslice) {
+		mydb_update("replace delayed into node_status "
+			    " (node_id, status_timestamp, "
+			    "  load_1min, load_5min, load_15min, disk_used) "
+			    " values ('%s', now(), %f, %f, %f, %f)",
+			    reqp->pnodeid, la1, la5, la15, dused);
+	}
+
+	/*
+	 * At some point, maybe what we will do is have the client
+	 * make a request asking what needs to be updated. Right now,
+	 * just return yes/no and let the client assume it knows what
+	 * to do (update accounts).
+	 */
+	OUTPUT(buf, sizeof(buf), "UPDATE=%d\n", reqp->update_accounts);
+	client_writeback(sock, buf, strlen(buf), tcp);
+
 	return 0;
 }
 
