@@ -155,6 +155,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \
+	$(INSTALL_WWWDIR)/doc/LICENSE.txt \
 	$(addprefix $(INSTALL_ETCDIR)/, swish.conf)
 	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
@@ -166,6 +167,10 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 
 post-install:
 
+$(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/LICENSE
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 
 $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
