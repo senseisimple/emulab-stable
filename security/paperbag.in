@@ -28,6 +28,7 @@ my $TB		= "@prefix@";
 		"delay_config"	=> "$TB/bin/delay_config",
 		"savelogs"	=> "$TB/bin/savelogs",
 		"portstats"	=> "$TB/bin/portstats"
+		"eventsys_control" => "$TB/sbin/eventsys_control"
 	   );
 
 # Need to provide a simple path, because some scripts we call need one
