@@ -25,12 +25,12 @@ import java.text.DecimalFormat;
  * Draw the floormap and put little dots on it. 
  */
 public class RoboTrack extends JApplet {
-    static Map map;
-    static JTable maptable;
-    static JPopupMenu MenuPopup;
-    static JMenuItem CancelMenuItem, SubmitMenuItem;
-    static Image floorimage;
-    static double pixels_per_meter = 1.0;
+    Map map;
+    JTable maptable;
+    JPopupMenu MenuPopup;
+    JMenuItem CancelMenuItem, SubmitMenuItem;
+    Image floorimage;
+    double pixels_per_meter = 1.0;
     boolean frozen = false;
     static final DecimalFormat FORMATTER = new DecimalFormat("0.00");
     String uid, auth;
@@ -40,7 +40,7 @@ public class RoboTrack extends JApplet {
      * The connection to boss that will provide robot location info.
      * When run interactively (from main) it is set to stdin (see below).
      */
-    static InputStream is;
+    InputStream is;
 
     public void init() {
 	try
@@ -124,14 +124,17 @@ public class RoboTrack extends JApplet {
 	 * Create the popup menu that will be used to fire off
 	 * robot moves. We use the mouseadaptor for this too. 
 	 */
-        MenuPopup = new JPopupMenu("dd");
+        MenuPopup = new JPopupMenu("Tracker");
+        JMenuItem menuitem = new JMenuItem("   Motion Menu   ");
+        menuitem.addActionListener(mymouser);
+        MenuPopup.add(menuitem);
         SubmitMenuItem = new JMenuItem("Submit All Moves");
         SubmitMenuItem.addActionListener(mymouser);
         MenuPopup.add(SubmitMenuItem);
         CancelMenuItem = new JMenuItem("Cancel All Moves");
         CancelMenuItem.addActionListener(mymouser);
         MenuPopup.add(CancelMenuItem);
-        JMenuItem menuitem = new JMenuItem("Close This Menu");
+        menuitem = new JMenuItem("Close This Menu");
         menuitem.addActionListener(mymouser);
         MenuPopup.add(menuitem);
 	MenuPopup.setBorder(BorderFactory.createLineBorder(Color.black));
@@ -161,7 +164,7 @@ public class RoboTrack extends JApplet {
     /*
      * A container for coordinate information.
      */
-    static class Robot {
+    private class Robot {
         int x, y;			// Current x,y coords in pixels
 	double z;			// Current z in meters
 	double or = 500.0;		// Current orientation 
@@ -195,12 +198,12 @@ public class RoboTrack extends JApplet {
 	int index;
     }
     // Indexed by the robot physical name, points Robot struct above.
-    static Dictionary robots     = new Hashtable();
+    Dictionary robots     = new Hashtable();
     // Map from integer index to a Robot struct.
-    static Vector     robotmap   = new Vector(10, 10);;
-    static int	      robotcount = 0;
+    Vector     robotmap   = new Vector(10, 10);;
+    int	       robotcount = 0;
 
-    static class Map extends JPanel implements Runnable {
+    private class Map extends JPanel implements Runnable {
         private Thread thread;
         private BufferedImage bimg;
 	private Graphics2D G2 = null;
@@ -376,9 +379,9 @@ public class RoboTrack extends JApplet {
 	 * Draw a robot, which is either the real one, a destination one,
 	 * or a shadow one being dragged around.
 	 */
-	static int DRAWROBOT_LOC  = 1;
-	static int DRAWROBOT_DST  = 2;
-	static int DRAWROBOT_DRAG = 3;
+	private int DRAWROBOT_LOC  = 1;
+	private int DRAWROBOT_DST  = 2;
+	private int DRAWROBOT_DRAG = 3;
 	
 	public void drawRobot(Graphics2D g2,
 			      int x, int y, double or,
@@ -683,7 +686,20 @@ public class RoboTrack extends JApplet {
 	    if ((robbie.dragging && (col >= 6 && col <= 8)) ||
 		(!robbie.gotdest && col == 8)) {
 		String stmp = value.toString().trim();
-		double dtmp = Double.parseDouble(stmp);
+		double dtmp;
+
+		if (stmp.length() == 0)
+		    return;
+
+		try
+		{
+		    dtmp = Double.parseDouble(stmp);
+		}
+		catch(Throwable th)
+		{
+		    // Must not be a float.
+		    return;
+		}
 		
 		switch (col) {
 		case 6:
@@ -771,7 +787,7 @@ public class RoboTrack extends JApplet {
 		     * orientation.
 		     */
 		    if (!robbie.dragging) {
-			robbie.drag_or  = robbie.dor;
+			robbie.drag_or  = robbie.or;
 			// For the table.
 			robbie.dragor_string = robbie.or_string;
 		    }
