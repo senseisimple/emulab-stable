@@ -128,12 +128,19 @@ sub EventSendWarn(@) {
 sub EventSend(@) {
 	my %tuple_values = @_;
 
-	my $URL = "elvin://" . TB_BOSSNODE;
+	#
+	# Only connect on the first call - thereafter, just use the existing
+	# handle. The handle gets disconnected in the END block below
+	#
+	if (!$event::EventSendHandle) {
+		my $URL = "elvin://" . TB_BOSSNODE;
 
-	my $handle = event_register($URL,0);
-	if (!$handle) {
-		$EventErrorString = "Unable to register with the event system";
-		return undef;
+		$event::EventSendHandle = event_register($URL,0);
+		if (!$event::EventSendHandle) {
+			$EventErrorString =
+				"Unable to register with the event system";
+			return undef;
+		}
 	}
 
 	my $tuple = address_tuple_alloc();
@@ -147,28 +154,34 @@ sub EventSend(@) {
 	#
 	%$tuple = %tuple_values;
 
-	my $notification = event_notification_alloc($handle,$tuple);
+	my $notification = event_notification_alloc($event::EventSendHandle,
+		$tuple);
 	if (!$notification) {
 		$EventErrorString = "Could not allocate notification";
 		return undef;
 	}
 
-	if (!event_notify($handle, $notification)) {
+	if (!event_notify($event::EventSendHandle, $notification)) {
 		$EventErrorString = "Could not send event notification";
 		return undef;
 	}
 
-	event_notification_free($handle, $notification);
+	event_notification_free($event::EventSendHandle, $notification);
 	address_tuple_free($tuple);
-
-	if (event_unregister($handle) == 0) {
-		$EventErrorString = "Could not unregister with event system";
-		return undef;
-	}
 
 	return 1;
 }
 
+#
+# When we exit, unregister with the event system if we're connected
+#
+END {
+    	if ($event::EventSendHandle) {
+		if (event_unregister($event::EventSendHandle) == 0) {
+			warn "Could not unregister with event system";
+		}
+	}
+}
 
 push @EXPORT, qw(event_subscribe event_poll EventSend EventSendFatal
 	EventSendWarn);
