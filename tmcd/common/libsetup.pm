@@ -42,7 +42,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 15; };
+sub TMCD_VERSION()	{ 16; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -450,6 +450,7 @@ sub getifconfig($)
     my ($rptr)       = @_;	# Return list to caller (reference).
     my @tmccresults  = ();
     my @ifacelist    = ();	# To be returned to caller.
+    my %ifacehash    = ();
 
     if (tmcc(TMCCCMD_IFC, undef, \@tmccresults) < 0) {
 	warn("*** WARNING: Could not get interface config from server!\n");
@@ -457,17 +458,37 @@ sub getifconfig($)
 	return -1;
     }
     
-    my $ethpat  = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
-    $ethpat    .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)" IFACE=(\w*) );
-    $ethpat    .= q(RTABID=(\d*));
+    my $ethpat  = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
+    $ethpat    .= q(MAC=(\w*) SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)" );
+    $ethpat    .= q(IFACE=(\w*) RTABID=(\d*));
 
-    my $vethpat = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) ID=(\d*) );
-    $vethpat   .= q(VMAC=(\w*) PMAC=(\w*) RTABID=(\d*) ENCAPSULATE=(\d*));
+    my $vethpat = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
+    $vethpat   .= q(ID=(\d*) VMAC=(\w*) PMAC=(\w*) RTABID=(\d*) );
+    $vethpat   .= q(ENCAPSULATE=(\d*));
+
+    my $setpat  = q(INTERFACE_SETTING MAC=(\w*) );
+    $setpat    .= q(KEY='([-\w\.\:]*)' VAL='([-\w\.\:]*)');
 
     foreach my $str (@tmccresults) {
 	my $ifconfig = {};
-	
-	if ($str =~ /$ethpat/) {
+
+	if ($str =~ /^$setpat/) {
+	    my $mac     = $1;
+	    my $capkey  = $2;
+	    my $capval  = $3;
+	    
+	    #
+	    # Stash the setting into the setting list, but must find the 
+	    #
+	    if (!exists($ifacehash{$mac})) {
+		warn("*** WARNING: ".
+		     "Could not map $mac for its interface settings!\n");
+		next;
+	    }
+	    $ifacehash{$mac}->{"SETTINGS"}->{$capkey} = $capval;
+	}
+	elsif ($str =~ /$ethpat/) {
+	    my $ifacetype= $1;
 	    my $inet     = $2;
 	    my $mask     = $3;
 	    my $mac      = $4;
@@ -485,6 +506,7 @@ sub getifconfig($)
 	    }
 
 	    $ifconfig->{"ISVETH"}   = 0;
+	    $ifconfig->{"TYPE"}     = $ifacetype;
 	    $ifconfig->{"IPADDR"}   = $inet;
 	    $ifconfig->{"IPMASK"}   = $mask;
 	    $ifconfig->{"MAC"}      = $mac;
@@ -493,7 +515,9 @@ sub getifconfig($)
 	    $ifconfig->{"ALIASES"}  = $aliases;
 	    $ifconfig->{"IFACE"}    = $iface;
 	    $ifconfig->{"RTABID"}   = $rtabid;
+	    $ifconfig->{"SETTINGS"} = {};
 	    push(@ifacelist, $ifconfig);
+	    $ifacehash{$mac}        = $ifconfig;
 	}
 	elsif ($str =~ /$vethpat/) {
 	    my $inet     = $2;

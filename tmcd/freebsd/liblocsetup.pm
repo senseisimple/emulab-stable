@@ -111,9 +111,10 @@ sub os_account_cleanup()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$;$)
+sub os_ifconfig_line($$$$$$$;$$)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $rtabid) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
+	$iface_type, $settings, $rtabid) = @_;
     my $media    = "";
     my $mediaopt = "";
     my ($uplines, $downlines);

@@ -122,12 +122,14 @@ sub doboot()
     foreach my $ifconfig (@ifacelist) {
 	if (! $ifconfig->{ISVETH}) {
 	    my $inet     = $ifconfig->{IPADDR};
+	    my $type     = $ifconfig->{TYPE};
 	    my $mask     = $ifconfig->{IPMASK};
 	    my $mac      = $ifconfig->{MAC};
 	    my $speed    = $ifconfig->{SPEED};
 	    my $duplex   = $ifconfig->{DUPLEX};
 	    my $aliases  = $ifconfig->{ALIASES};
 	    my $iface    = $ifconfig->{IFACE};
+	    my $settings = $ifconfig->{SETTINGS};
 	    my $ifrtabid = undef;
 
 	    #
@@ -145,7 +147,8 @@ sub doboot()
 
 	    my ($upline, $downline) =
 		os_ifconfig_line($iface, $inet, $mask,
-				 $speed, $duplex, $aliases, $ifrtabid);
+				 $speed, $duplex, $aliases,
+				 $type, $settings, $ifrtabid);
 		    
 	    $upcmds   .= "$upline\n    "
 		if (defined($upline));
