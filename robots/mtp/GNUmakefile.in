@@ -71,5 +71,11 @@ install: all
 	$(INSTALL_PROGRAM) mtp_recv $(INSTALL_DIR)/opsdir/bin/mtp_recv
 	$(INSTALL_PROGRAM) mtp_dump $(INSTALL_DIR)/opsdir/bin/mtp_dump
 
+control-install: all
+	-mkdir -p $(INSTALL_DIR)/bin
+	$(INSTALL_PROGRAM) mtp_send $(INSTALL_DIR)/bin/mtp_send
+	$(INSTALL_PROGRAM) mtp_recv $(INSTALL_DIR)/bin/mtp_recv
+	$(INSTALL_PROGRAM) mtp_dump $(INSTALL_DIR)/bin/mtp_dump
+
 clean:
 	/bin/rm -f *.o *.a $(MTPPROGS) mtp_xdr.h mtp_xdr.c $(CLASSES)
