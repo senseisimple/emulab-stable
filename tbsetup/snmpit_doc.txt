@@ -17,8 +17,8 @@ vlanLock	Get a vlan editing lock/token/buffer, and
 vlanUnlock	Release it when done
 setupVlan	(name,ports) - takes a list of ports, and vlans them
 removeVlan	(vlan) - takes vlan number
-listVlans	returns a list of entries, with each entry having an
-		ID, a name, and a list of members (pcX:Y)
+listVlans	returns a list of entries, with each entry having an ID,
+		a name, and a list of members (pcX:Y), tab delimited
 
 Notes:
 showPorts and getStats currently print their results directly. This
@@ -38,13 +38,7 @@ It supports new(ip,args) as above, and power(cmd,port) where cmd is
 
 snmpit library interface
 ------------------------
-init(dbname)		    initialize the module
-macport(pcX:Y || MAC)       return MAC || pcX:Y address respectively
-portnum(pcX:Y || node:port) return node:mod.port or pcX:Y
-Dev(name || IP)             return IP/name
-NodeCheck(pcX:Y)	    return true (1) if okay, false (0) if it failed
-tableVlans(pid,eid)         returns hash: key=id, val=members
+(see comment at top of snmpit_lib.pm)
 
-The snmpit library handles all the database stuff (except some power
-control info). It makes available all the translations that a module
-might need to do.
+The snmpit library handles all the database transactions. It makes
+available all the translations that a module might need to do.

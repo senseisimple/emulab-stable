@@ -31,8 +31,6 @@ use snmpit_cisco;
 use snmpit_apc;
 use snmpit_lib;
 
-snmpit_lib::init($DBNAME, $debug);
-
 $| = 1; # Turn off line buffering on output
 
 my $device;
@@ -41,6 +39,8 @@ my $eid;
 my $t = 0; #VLANs from db table
 my $n;     #VLAN # to move ports into
 my %vlantable = ();
+my @vlanlist = ();
+my %vlansbyname = ();
 
 &myMain;
 
@@ -105,18 +105,49 @@ sub myMain {
   if ($g) { $device->getStats; }
 
   if (@vlan) {
+    getvlans();
+    if (vlanexists($m,@vlan)) {
+      print "VLAN $m exists with ",join(" ",sort @vlan),"\n";
+    } else {
+      $device->vlanLock;
+      $device->setupVlan($m,@vlan);
+      $device->vlanUnlock;
+    }
+  }
+
+  if ($f) {
+    getvlans();
+    my @VLANS= ();
+    my @names= ();
+    my $m="";
+    my @vlan=();
+    &ReadIRFile(\$f,\@names,\@VLANS);
     $device->vlanLock;
-    $device->setupVlan($m,@vlan);
+    while (@VLANS) {
+      @vlan = @{shift(@VLANS)};
+      $m = shift @names;
+      if (vlanexists($m,@vlan)) {
+	print "VLAN $m exists with ",join(" ",sort @vlan),"\n";
+      } else {
+	print "Making $m with ",join(' ',sort @vlan),"\n" if $debug;
+	$device->setupVlan($m,@vlan);
+      }
+    }
     $device->vlanUnlock;
   }
 
-  if ($f) { &AutoVLANConfig(\$f); }
-
   if ($t) {
+    getvlans();
     $device->vlanLock;
+    my @vlan;
     foreach $id (keys %vlantable) {
-      print "Making VLAN '$id' with $vlantable{$id}\n" if $debug;
-      $device->setupVlan($id,split(" ",$vlantable{$id}));
+      @vlan = sort split(" ",$vlantable{$id});
+      if (vlanexists($id,@vlan)) {
+	print "VLAN $id exists with ",join(" ",@vlan),"\n";
+      } else {
+	print "Making VLAN '$id' with @vlan\n" if $debug;
+	$device->setupVlan($id,@vlan);
+      }
     }
     $device->vlanUnlock;
   }
@@ -130,7 +161,29 @@ sub myMain {
   }
 
   #List VLANs is always last so that changes made are reflected
-  if ($l) { $device->listVlans; }
+  if ($l) {
+    my @vlans;
+    getvlans();
+    @vlans = @vlanlist;
+    print "ID  Name\t\t\t    Members of VLAN\n";
+    print "-"x75,"\n";
+    my $id;
+    my $name;
+    my $memberstr;
+    # I'm trying out using formats. See perldoc perlform for details.
+    format vlan = 
+@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$id,$name,                          $memberstr
+~~                                  ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                    $memberstr
+.
+    $FORMAT_NAME = "vlan";
+    while (@vlans) {
+      ($id,$name,$memberstr) = split ("\t",shift @vlans);
+      write;
+    }
+    $FORMAT_NAME = "STDOUT"; # Go back to the normal format
+  }
 
   if ($powerop) {
     foreach $outlet (@outlets) {
@@ -139,22 +192,25 @@ sub myMain {
   }
 }
 
-
-sub AutoVLANConfig {
-  local(*f) = @_;
-  my @VLANS= ();
-  my @names= ();
-  &ReadIRFile(*f,\@names,\@VLANS);
-  $device->vlanLock;
-  my $m="";
-  my @vlan=();
-  while (@VLANS) {
-    @vlan = @{shift(@VLANS)};
-    $m = shift @names;
-    print "Making $m with: ",join(' ',@vlan),"\n" if $debug;
-    $device->setupVlan($m,@vlan);
+sub getvlans {
+  if ( @vlanlist ) { return; }
+  @vlanlist = $device->listVlans;
+  foreach $entry (@vlanlist) {
+    my ($id,$name,$memberstr) = split ("\t", $entry);
+    $vlansbyname{$name} = $memberstr;
+    print "vlansbyname: $name -> $memberstr\n" if $debug;
   }
-  $device->vlanUnlock;
+}
+
+sub vlanexists {
+  my $m = shift;
+  my $members = join(" ",sort @_);
+  print "Checking $m ($members)...\n" if $debug;
+  if (defined $vlansbyname{$m} && $vlansbyname{$m} eq $members) {
+    print "Found $m == $vlansbyname{$m}\n" if $debug;
+    return 1;
+  }
+  return 0;
 }
 
 sub ParseArgs {
@@ -214,10 +270,14 @@ sub ParseArgs {
       }
     }
     elsif (/^-r(.*)/) {
+      @r = ();
       push(@r, ($1 ? $1 : shift(@CMDS)));
       while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) {
 	push(@r, shift(@CMDS));
       }
+      print "remove: '@r' ($#r)\n" if $debug;
+      if ($#r == 0) { die("Which VLANs should I remove?\n"); }
+      if (join(" ",@r) =~ /[^0-9 ]/) { die("Removal list '@r' invalid.\n"); }
     }
     elsif (/^-v(.*)/) {$v = 1;}
     elsif (/^-b(.*)/) {$b = 0;}
@@ -283,6 +343,21 @@ sub ParseArgs {
   die("What shall I do?\n")
     if (!($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||$t||@r||$l
 	  ||$powerop));
+  die("Can't enable and disable at the same time.\n") if ($d && $e);
+  die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd)); 
+  die("Which ports do I control?\n") if (!@p&&($d||$e||$dup||$spd||$a||$n));
+  $dup = "\L$dup\E";		#lowercase it all...
+  die("Invalid duplex $dup: Must be full or half\n")
+    if(!($dup=~/^full$|^half$|^$/));
+  die("Invalid speed $spd: Must be 10 or 100\n")
+    if (!($spd=~/^10$|^100$|^0$/));
+  if (defined($spd) && ($spd != 0)) { $spd= "${spd}mbit"; }
+  die("Only one of -f, -t and -vlan may be used.\n")
+    if (($f && @vlan) || ($f && $t) || ($t && @vlan));
+  die("Project and expt must be specified with -t: '-t <pid> <eid>'\n")
+    if ($t && ((!defined $pid) || (!defined $eid)));
+  # If everything is okay so far, initialize snmpit_lib
+  snmpit_lib::init($DBNAME, $debug);
   if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
   if ( defined Dev($i) ) {
     if (! ($i =~ /[a-zA-Z]/) ) { $i = Dev($i); } # i is now name
@@ -306,7 +381,8 @@ sub ParseArgs {
   if ($debug) {
     if (ref($device)) {
       print "Checking type: ",$device->isa(snmpit_intel)," for intel, ";
-      print $device->isa(snmpit_cisco)," for cisco\n";
+      print $device->isa(snmpit_cisco)," for cisco, ";
+      print $device->isa(snmpit_apc)," for APC\n";
     } else { print "Type '$device' is not a ref.\n"; }
   }
   if ( $i =~ /[a-zA-Z]/) { $i = Dev($i); }
@@ -315,8 +391,6 @@ sub ParseArgs {
 	 ($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||@r||$l));
   die("\"$i\" is not a power controller.\n")
     if (! $device->isa(snmpit_apc) && ($powerop || @outlets) );
-  die("Can't enable and disable at the same time.\n") if ($d && $e);
-  die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd));
   my $num=0;
   if ($device->isa(snmpit_intel)) {
     while( @p != 0 && $num < @p ) {
@@ -325,13 +399,6 @@ sub ParseArgs {
       $num++;
     }
   }
-  die("Which ports do I control?\n") if (!@p&&($d||$e||$dup||$spd||$a||$n));
-  $dup = "\L$dup\E";		#lowercase it all...
-  die("Invalid duplex $dup: Must be full or half\n")
-    if(!($dup=~/^full$|^half$|^$/));
-  die("Invalid speed $spd: Must be 10 or 100\n")
-    if (!($spd=~/^10$|^100$|^0$/));
-  if (defined($spd) && ($spd != 0)) { $spd= "${spd}mbit"; }
   print "original ports: \t@p\n" if ($debug && @p);
   @p = map(lc,@p);
   @p = map {
@@ -354,7 +421,6 @@ sub ParseArgs {
   while(@vlan != 0 && $num < @vlan) {
     $vlan[$num] = lc $vlan[$num];
     print "Checking node $vlan[$num] for validity...\n" if $debug;
-    if ($vlan[$num] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $vlan[$num] = "$1-1:0"; }
     if (defined macport($vlan[$num])) {
       if ($vlan[$num]=~/^([a-f]|\d)*$/i) {
 	$vlan[$num]=macport($vlan[$num]);
@@ -372,19 +438,16 @@ sub ParseArgs {
     }
     $num++;
   }
-  die("Only one of -f, -t and -vlan may be used.\n")
-    if (($f && @vlan) || ($f && $t) || ($t && @vlan));
-  die("Project and expt must be specified with -t: '-t <pid> <eid>'\n")
-    if ($t && ((!defined $pid) || (!defined $eid)));
   if ($t) {
-    %vlantable = tableVlans($pid,$eid);
-    if ( 0 == (keys %vlantable)) {
+    if ( ! vlanid("$pid:$eid")) {
       print "There were no VLANs in the database table for '$pid' '$eid'\n";
       exit(0);
     } else {
-      foreach $id (keys %vlantable) {
-	print "id: $id\t$vlantable{$id}\n" if $debug;
-	foreach $node (split (" ",$vlantable{$id})) {
+      foreach $id ( split(" ",vlanid("$pid:$eid")) ) {
+	my $members = vlanmemb($id);
+	$vlantable{$id} = $members;
+	print "id: $id\t$members\n" if $debug;
+	foreach $node (split (" ",$members)) {
 	  if (!defined macport($node)) {
 	    die("Invalid node found in VLANs table: '$node'\n");
 	  }
@@ -407,6 +470,7 @@ sub ReadIRFile {
   my %exists = ();
   my $skip = 1;
   my $name = "";
+  print "Opening '$f' to read vlans...\n" if $debug;
   if ( -e "$TB/etc/$f") {
     open(IR,"$TB/etc/$f")
       || die("Couldn't open $TB/etc/$f\n");
@@ -430,9 +494,6 @@ sub ReadIRFile {
     while (@v != 0 && $num < @v) {
       $v[$num] = lc $v[$num];
       print "Checking node $v[$num] for validity...\n" if $debug;
-      if ($v[$num] =~ /(sh\d+)(-\d)?(:\d)?/ ) {
-	$v[$num] = "$1-1:0";
-      }
       if (defined macport($v[$num])) {
 	if ($v[$num]=~/^([a-f]|\d)*$/i) {
 	  $v[$num]=macport($v[$num]);

@@ -7,13 +7,12 @@
 # portnum(pcX:Y || node:port) return node:mod.port or pcX:Y
 # Dev(name || IP)             return IP/name
 # NodeCheck(pcX:Y)	      return true (1) if okay, false (0) if it failed
-# tableVlans(pid,eid)         returns hash: key=id, val=members
 
 package snmpit_lib;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( macport portnum Dev NodeCheck tableVlans );
+@EXPORT = qw( macport portnum Dev NodeCheck vlanmemb vlanid);
 
 use English;
 use Mysql;
@@ -24,21 +23,25 @@ my $dbh;
 my $sth;
 
 my %Devices=();
-# %Devices maps device names to device IPs
+# Devices maps device names to device IPs
 
 my %Interfaces=();
-# %Interfaces maps pcX:Y<==>MAC
+# Interfaces maps pcX:Y<==>MAC
 
 my %Ports=();
-# %Ports maps pcX:Y<==>switch:port
+# Ports maps pcX:Y<==>switch:port
+
+my %vlanmembers=();
+# vlanmembers maps id -> members
+
+my %vlanids=();
+# vlanids maps pid:eid <==> id
 
 my $self = (getpwuid($UID))[0]
   || die "Cannot figure out who you are!\n";
 print "User is '$self' (UID $UID)\n" if $debug;
 
 my $admin=0;
-
-my $init = 0 ; # Start out uninitialized
 
 sub init {
   $DBNAME = shift;
@@ -64,6 +67,16 @@ sub Dev {
   return $Devices{$val};
 }
 
+sub vlanmemb {
+  my $val = shift || "";
+  return $vlanmembers{$val};
+}
+
+sub vlanid {
+  my $val = shift || "";
+  return $vlanids{$val};
+}
+
 sub ReadTranslationTable {
   # This function fills in %Interfaces and %Ports
   # They hold pcX:Y<==>MAC and pcX:Y<==>switch:port respectively
@@ -77,11 +90,11 @@ sub ReadTranslationTable {
     $name = "$_[0]:$_[1]";
     if ($_[2] != 1) {$name .=$_[2]; }
     $mac = "$_[3]";
+    if ($name =~ /(sh\d+)(-\d)(:\d)?/ ) { $name = "$1$3"; }
     $Interfaces{$name} = $mac;
     $Interfaces{$mac} = $name;
-    print "Got $mac <==> $name\n" if $debug > 1;
+    print "Interfaces: $mac <==> $name\n" if $debug > 1;
   }
-
 
   print "FILLING %Devices\n" if $debug;
   $sth = $dbh->query("select i.node_id,i.IP from interfaces as i ".
@@ -112,7 +125,39 @@ sub ReadTranslationTable {
     print "switchport='$switchport'\n" if $debug > 2;
     $Ports{$name} = $switchport;
     $Ports{$switchport} = $name;
-    print "READ: '$name' <==> '$switchport'\n" if $debug > 1;
+    print "Ports: '$name' <==> '$switchport'\n" if $debug > 1;
+  }
+
+  print "FILLING %vlanmembers\n" if $debug;
+  $sth = $dbh->
+    query("select id,members from vlans");
+  while (@row = $sth->fetchrow_array()) {
+    my @list = split(" ",$row[1]);
+    foreach $port (@list) {
+      my ($node,$card) = split(":",$port);
+      if ($card =~ /[a-zA-Z]/) {
+	# specified ala ethX
+	my $sth2 = $dbh->
+	  query("select card from interfaces where node_id='$node' ".
+		"and iface='$card'");
+	$card = ($sth2->fetchrow_array())[0];
+	print "Had '$port', changed to '$node:$card'\n" if $debug > 2;
+	$port = "$node:$card";
+      }
+    }
+    $vlanmembers{$row[0]} = join(" ",sort @list);
+    print "vlanmembers: $row[0] -> $vlanmembers{$row[0]}\n" if $debug >1;
+  }
+
+  print "FILLING %vlanids\n" if $debug;
+  $sth = $dbh->
+    query("select pid,eid,id from vlans");
+  while (@row = $sth->fetchrow_array()) {
+    $vlanids{"$row[0]:$row[1]"} = 
+      join(" ",split(" ",($vlanids{"$row[0]:$row[1]"}||"")),$row[2]);
+    $vlanids{$row[2]} = "$row[0]:$row[1]";
+    print "vlanids: '$row[0]:$row[1]' <==> ",$vlanids{"$row[0]:$row[1]"},"\n"
+      if $debug > 1;
   }
 }
 
@@ -158,33 +203,6 @@ sub NodeCheck {
   print "Denied.\n" if $debug;
   print STDERR "Authorization Failed for control to node $node.\n";
   return 0;
-}
-
-sub tableVlans {
-  my $pid = shift;
-  my $eid = shift;
-  #returns hash, key=id, val=members
-  my %table = ();
-  $sth = $dbh->
-    query("select id,members from vlans where pid='$pid' and eid='$eid'");
-  while (@row = $sth->fetchrow_array()) {
-    my @list = split(" ",$row[1]);
-    foreach $port (@list) {
-      my ($node,$card) = split(":",$port);
-      if ($node =~ /^(sh\d+)/) { $node = "$1-1"; }
-      if ($card =~ /[a-zA-Z]/) {
-	# specified ala ethX
-	my $sth2 = $dbh->
-	  query("select card from interfaces where node_id='$node' ".
-		"and iface='$card'");
-	$card = ($sth2->fetchrow_array())[0];
-	print "Had '$port', changed to '$node:$card'\n" if $debug;
-	$port = "$node:$card";
-      }
-    }
-    $table{$row[0]} = join(" ",@list);
-  }
-  return %table;
 }
 
 # End with true

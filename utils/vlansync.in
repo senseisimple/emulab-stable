@@ -4,96 +4,82 @@
 #            by removing extra vlans/ports, and adding missing ones
 #
 
-die("Unimplemented so far... coming soon. - Mac\n");
-
 my $TBROOT = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
+
+use English;
 
 $ENV{'PATH'} = '@prefix@/sbin:@prefix@/bin:/bin';
 
 my $debug = 0;
 
-use Mysql;
+my @extras = ();
+my %missing = ();
+my $force = 0;
+my $args = ":".join(":",@ARGV).":";
 
-my $dbh;
-my $sth;
-
-my %table = ();
-my %switch= ();
-
-# Get all the vlans from the table
-
-$dbh = Mysql->connect("localhost",$DBNAME,"script","none");
-$sth = $dbh->
-  query("select id,members from vlans");
-while (@row = $sth->fetchrow_array()) {
-  my @list = split(" ",$row[1]);
-  foreach $port (@list) {
-    my ($node,$card) = split(":",$port);
-    #if ($node =~ /^(sh\d+)/) { $node = "$1-1"; }
-    if ($card =~ /[a-zA-Z]/) {
-      # specified ala ethX
-      my $sth2 = $dbh->
-	query("select card from interfaces where node_id='$node' ".
-	      "and iface='$card'");
-      $card = ($sth2->fetchrow_array())[0];
-      print "Had '$port', changed to '$node:$card'\n" if $debug;
-      $port = "$node:$card";
-    }
-  }
-  $table{$row[0]} = join(" ",sort @list);
-  print "In table: vlan $row[0]: $table{$row[0]}\n" if $debug;
+if ($args =~ /:-h/) {
+  die("Usage:\nvlansync [-h[elp]] [-f[orce]]\n".
+      "vlansync will add any missing VLANs from the database to the switch.\n".
+      "The -f[orce] option will delete any extra vlans from the switch.\n");
 }
 
-# Get all the vlans from the switch
+# Keep this disabled until its safe (after merging dbtoir branch)
+#if ($args =~ /:-f/) { $force = 1; }
 
-my $list;
-open(LIST,"snmpit -l |") || die ("vlandiff: couldn't run snmpit: $!\n");
-while(<LIST>) {
-  chop;
-  if (/(^ID)|(^--)|(^1 )/) { next; }
-  s/[\t ]+/ /g;
-  /(\d+)\s+(\S+)(?:\s+(.*)?)?/;
-  if (!defined $3) { $list = ""; } else { $list = $3; }
-  if ($2 ne "default") {
-    $switch{$2} = join(" ", sort split(" ",$list));
-    print "On switch: vlan $2: $switch{$2}\n" if $debug;
+open(DIFF,"vlandiff |");
+
+my $table = 0;
+my $switch = 0;
+
+sub num { $a <=> $b } # for sorting numerically...
+
+while (<DIFF>) {
+  chomp;
+  if ( /table/ ) { $table = 1; $switch = 0; next; }
+  if ( /switch/ ) { $table = 0; $switch = 1; next; }
+  if ( $table ) {
+    my ($id, $memb) = split("\t");
+    $missing{$id} = $memb;
+    print "Missing $id: $memb\n" if $debug > 1;
   }
-}
-close(LIST);
-
-# Compare all of them...
-
-foreach $key (sort keys %table) {
-  if ( defined $switch{$key} && ($switch{$key} eq $table{$key}) ) {
-    # If its in both lists, delete it from both
-    print "vlan table:$key ($table{$key}) matches switch:$key ($switch{$key})\n"
-      if $debug;
-    delete $switch{$key};
-    delete $table{$key};
+  if ( $switch) {
+    if ( /^\#(\d+): /) {
+      push(@extras, $1);
+      print "Extra: $1\n" if $debug > 1;
+    } else { die("Couldn't find VLAN number in '$_'\n"); }
   }
 }
 
-# Print out the difference
+@extras = sort num @extras;
 
-my $rv = 0;
-
-if (keys %table) {
-  print "In vlans table only:\n";
-  foreach $key(sort keys %table) {
-    print "$key\t$table{$key}\n";
+if ($debug) {
+  print "Found missing:\n";
+  foreach $id (sort num keys %missing) {
+    print "$id: $missing{$id}\n";
   }
-  $rv++;
+  print "Found extras: @extras\n";
 }
 
-if (keys %switch) {
-  print "On switch only:\n";
-  foreach $key(sort keys %switch) {
-    print "$key\t$switch{$key}\n";
-  }
-  $rv++;
+if ($force && $#extras > 0 ) {
+  print "Removing extra VLANs: @extras\n";
+  system("snmpit -r @extras");
 }
 
-# Return 0 if same, 1 for a one-sided diff, 2 for a two-sided diff
-# (Could be changed to return total # of different vlans)
-exit($rv);
+if ( (scalar keys %missing) == 0) { exit(0); }
+
+print "Creating missing vlans:\n";
+my $tmpfile = "/tmp/vlansync-$PID";
+open(TMP,">$tmpfile") || die("Couldn't open $tmpfile for writing: $!\n");
+print TMP "start vlan\n";
+foreach $id (sort num keys %missing) {
+  print "$id $missing{$id}\n";
+  print TMP "$id $missing{$id}\n";
+}
+print TMP "end vlan\n";
+close TMP;
+
+system("snmpit -f $tmpfile");
+
+system("rm -f $tmpfile");
+
+exit(0);

@@ -199,11 +199,11 @@ sub setupVlan {
     print "***Okay=$okay, Attempts=$attempts (limit of 3)\n" if $debug;
     my $N = 2;
     my $RetVal = $sess->get([[$VlanRowStatus,$N]]);
-    print "Row $N got '$RetVal'  " if $debug;
+    print "Row $N got '$RetVal'  " if $debug > 1;
     while ($RetVal ne '') {
       $N += 1;
       $RetVal = $sess->get([[$VlanRowStatus,$N]]);
-      print "Row $N got '$RetVal'  " if $debug;
+      print "Row $N got '$RetVal'  " if $debug > 1;
     }
     print "\nUsing Row $N\n" if $debug;
     my $SAID = pack("H*",sprintf("%08x",$N+100000));
@@ -470,25 +470,15 @@ sub listVlans {
     }
     $RetVal = $sess->getnext($VlanPortVlan);
     @data = @{$VlanPortVlan};
-  } while ( $data[0] =~ /^vlanPortVlan/ ) ;
-  print "ID  Name\t\t\t    Members of VLAN\n";
-  print "--------------------------------------------------\n";
-  my $id;
-  my $memberstr;
-  # I'm trying out using formats. See perldoc perlform for details.
-  format vlan = 
-@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-($id),($Names{$id}),                $memberstr
-~~                                  ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-.
-  $FORMAT_NAME = "vlan";
-  foreach $id ( sort num keys (%Names) ) {
-    $memberstr = (defined(@{$Members{$id}}) ?
-                  join("  ",sort alphanum(@{$Members{$id}})) : "");
-    write;
+  } while ( $data[0] =~ /^vlanPortVlan/ );
+  my @list = ();
+  foreach $id (sort num keys %Names) {
+    push @list, join("\t", $id, $Names{$id},
+		     (defined(@{$Members{$id}}) ?
+		      join(" ",sort (@{$Members{$id}})) : ""));
   }
-  $FORMAT_NAME = "STDOUT"; # Go back to the normal format
+  print join("\n",@list),"\n" if $debug > 1;
+  return @list;
 }
 
 sub showPorts {
