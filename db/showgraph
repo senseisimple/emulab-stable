@@ -81,7 +81,7 @@ foreach $tbl ( @tbls ) {
 my %sortlist = ("nodes",2,"interfaces",10,"ip_list",14,"node_types",4,
 		"wires",13,"reserved",16,"node_id",1,"ifc",11,"ip",15,
 		"mac",12,"type",3,"proc",5,"speed",6,"ifcs",7,"ram",8,
-		"hd",9,"eid",17,"sw_table",18,"delta_inst",20,"deltas",21,
+		"hd",9,"eid",17,"delta_proj",18,"delta_inst",20,"deltas",21,
 		"delta_compat",22,"disk_images",19,"image_id",23,"delta_id",24,
 		"img_desc",25,"os",26,"ver",27,"extras",28,"free_space",29,
 		"free_space_type",30,"time_install_exp",31,
