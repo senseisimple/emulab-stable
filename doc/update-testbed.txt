@@ -50,11 +50,19 @@ Rough steps for upgrading your existing Emulab.
        sudo gmake boss-install
        sudo gmake post-install
 
-8. Reboot tipservers, ops and boss and make sure things boot up ok.
+8. Install a "shared" copyright to appear on the web pages.  We have not
+   yet integrated this step, so it is a little awkward:
+
+   Edit www/copyright-contrib.html and fill in values for @SITENAME@,
+   @SITEDATES@, @SITECOPYRIGHT@.  Then copy this file to copyright.html
+   in your installed testbed tree, e.g.:
+       cp copyright-contrib.html /usr/testbed/www/copyright.html
+
+9. Reboot tipservers, ops and boss and make sure things boot up ok.
    Try creating/swapping/modifying/destroying an experiment, look
    for errors.
 
-9. Bring up the web interface and inform users that they should reboot
+10.Bring up the web interface and inform users that they should reboot
    their existing experiment nodes if they notice odd behaviors.
 
 Things should be backward compatible so you don't have to update the
