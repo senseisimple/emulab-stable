@@ -61,8 +61,7 @@ function SPITFORM($formfields, $errors)
     echo "<table align=center border=1> 
           <tr>
             <td align=center colspan=3>
-                Fields marked with * are required;
-                those marked + are highly recommended.
+                Fields marked with * are required.
             </td>
           </tr>\n
 
