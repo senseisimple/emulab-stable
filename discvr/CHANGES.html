@@ -18,6 +18,20 @@
 <hr>
 <H3>Current Release 1.0 </a> [PENDING]</h3>
 <ul>
+        <p>
+        <LI><B><A HREF="http://www.cs.utah.edu/~kwright/">[kwright]</A></B>
+	<b>Thu Jul 13 17:00:57 MDT 2000</b><br>
+	Implemented this in forw_reply.c:
+	<pre>
+	/* 
+	 * It's possible that one neighbor responded very quickly
+	 * and other neighbors (perhaps because they have many more
+	 * neighbors whose messages they had to parse) could respond
+	 * slowly. To cover this case, we should continue to try to 
+	 * read from the socket until our delay is up. -lkw
+	 */
+        </pre>
+
 	<p>
 	<LI><B><A HREF="http://www.cs.utah.edu/~kwright/">[kwright]</A></B>
 	<b>Thu Jul 13 12:37:37 MDT 2000</b><br>
