@@ -12,20 +12,65 @@ use File::Basename;
 # TODO: Deal with multiple buildings? Currently defaults to MEB! 
 # 
 sub usage {
-    print STDERR "Usage: floormap [-t] [-o <prefix>] [-f <floor>] [<building>]";
+    print STDERR "Usage: floormap [-t] [-T] [-o <prefix>] ";
+    print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
+    print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
+    print STDERR "[-f <floor>] [<building>]";
     print STDERR "\nor\n";
-    print STDERR "Usage: floormap [-t] [-o <prefix>] [-f <floor>] ";
+    print STDERR "Usage: floormap [-t] [-T] [-o <prefix>] ";
+    print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
+    print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
     exit(-1);
 }
-my $optlist  = "df:o:e:ta";
-my $debug    = 0;
-my $notitles = 0;
+
+# Debugging.
+my $debug = 0;
+sub dprint($) {
+    my ($msg) = @_;
+    
+    print STDERR $msg
+	if ($debug);
+}
+
+my $optlist  = "df:o:s:c:S:C:O:e:tTa";
+my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
+
 my $building;
 my $floor;
 my $image;
+
+# These result from clicking on zoom/pan controls outside.
+my $scale      = 1;	# From clicking on one of the scale buttons.
+my $scale_arg  = 1;     # Scale by half-integer factors: 1=>1, 2=>1.5, 3=>2, etc.
+my $map_x      = 0;	# From clicking on the (possibly scaled and offset) map.
+my $map_y      = 0;
+
+# Calculated from the scale and click coords.
+my $x_offset   = 0;	# Offset on the upper-left corner of the image.
+my $y_offset   = 0;
+my $curr_x     = 0;	# The UNZOOMED, and hence un-offset, click point.
+my $curr_y     = 0;
+
+# We get previous scale, offsets, etc. to help interpret new click coords.
+my $last_scale_arg = 1;
+my $last_scale = 1;
+my $last_x_off = 0;
+my $last_y_off = 0;
+my $last_x  = 0;  # The UNZOOMED, and hence un-offset, previous click point.
+my $last_y  = 0;
+my $last_notitles = 0;  # This says there were no titles around the previous images.
+
+# The image produced for each floor will be this size.
+my $out_width  = 792;
+my $out_height = 492;
+
+# Unless we suppress titles, there will be a header/trailer around each floor image.
+my $head_height = 50;
+my $tail_height = 15;
+
 my $pid;
 my $eid;
 my @areamaps   = ();
@@ -42,40 +87,16 @@ my $ICONDIR     = "$TB/www";
 # Load libraries.
 use lib '@prefix@/lib';
 use libdb;
-use GD;
+
+# See http://www.imagemagick.org/www/perl.html .
+# Also man ImageMagick, identify, display, convert, etc.
+use Image::Magick;
+my $images = new Image::Magick;
+my $img_n  = -1;
 
 # Admin people get extra info
 $mereuser = 0
     if (!TBAdmin($UID));
-
-#
-# Gather image data from DB.
-#
-my $query_result =
-    DBQueryFatal("select b.building,b.title,f.floor,f.image_path ".
-		 "   from buildings as b ".
-		 "left join floorimages as f on f.building=b.building");
-
-if (!$query_result->numrows) {
-    die("*** $0:\n".
-	"    There is no building/floor data in the DB!\n");
-}
-
-while (my ($building,$title,$floor,$image) = $query_result->fetchrow_array()) {
-    if (!exists($baseimages{$building})) {
-	$baseimages{$building} = {};
-	$baseimages{$building}->{"title"}  = $title;
-	$baseimages{$building}->{"floors"} = {};
-    }
-    $image = "$TB/www/$image"
-	if (dirname($image) eq ".");
-
-    if (! -e $image) {
-	die("*** $0:\n".
-	    "    $image does not exist!\n");
-    }
-    $baseimages{$building}->{"floors"}->{$floor} = $image;
-}
 
 # Ha.
 my @floortags = ();
@@ -94,16 +115,12 @@ $floortags[9] = "9th floor";
 #
 $| = 1;
 
-# Debugging.
-sub dprint($) {
-    my ($msg) = @_;
-    
-    print STDERR $msg
-	if ($debug);
-}
+# Forward declarations.
 sub dofloor($$);
 sub writefiles($@);
 sub adjustmap($$$);
+sub adjust_map_y($$);
+sub calc_offsets($$$$$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -122,9 +139,64 @@ if (defined($options{"d"})) {
 if (defined($options{"t"})) {
     $notitles = 1;
 }
+if (defined($options{"T"})) {
+    $last_notitles = 1;
+}
 if (defined($options{"f"})) {
     $floor   = $options{"f"};
     $showany = 1;
+}
+if (defined($options{"s"})) {
+    # Scale by half-integer factors: 1=>1, 2=>1.5, 3=>2, etc.
+    $scale_arg = $options{"s"};
+    $scale = ( $scale_arg + 1 ) / 2;
+    dprint "scale arg $scale_arg, scaling factor $scale\n";
+}
+if (defined($options{"S"})) {
+    $last_scale_arg = $options{"S"};
+    $last_scale = ( $last_scale_arg + 1 ) / 2;
+    dprint "last_scale arg $last_scale_arg, last scaling factor $last_scale\n";
+
+    # Do this now so $scale is defined when reading in images.
+    if (!defined($options{"s"})) {
+	# If we didn't specify a new scale, keep it the same as the last time.
+	$scale_arg = $last_scale_arg;
+	$scale = $last_scale;
+	dprint "scale from last_scale_arg $last_scale_arg, last_scale $scale\n";
+    }
+}
+if (defined($options{"c"})) {
+    if ($options{"c"} =~ /([-\w]*),([-\w]*)/) {
+	$map_x = $1;
+	$map_y = $2;
+        dprint "click point $map_x, $map_y\n";
+    }
+    else {
+	die("*** $0:\n".
+	    "    Invalid argument to -c option!\n");
+    }
+}
+if (defined($options{"C"})) {
+    if ($options{"C"} =~ /([-\w]*),([-\w]*)/) {
+	$last_x = $1;
+	$last_y = $2;
+        dprint "last click $last_x, $last_y\n";
+    }
+    else {
+	die("*** $0:\n".
+	    "    Invalid argument to -C option!\n");
+    }
+}
+if (defined($options{"O"})) {
+    if ($options{"O"} =~ /([-\w]*),([-\w]*)/) {
+	$last_x_off = $1;
+	$last_y_off = $2;
+        dprint "last offset $last_x_off, $last_y_off\n";
+    }
+    else {
+	die("*** $0:\n".
+	    "    Invalid argument to -C option!\n");
+    }
 }
 if (defined($options{"o"})) {
     $prefix = $options{"o"};
@@ -160,6 +232,39 @@ if (defined($options{"e"})) {
 }
 elsif (@ARGV == 1) {
     $building = $ARGV[0];
+}
+
+#
+# Gather image data from DB.
+#
+my $query_result =
+    DBQueryFatal("select b.building,b.title,f.floor,f.image_path ".
+		 "   from buildings as b ".
+		 "left join floorimages as f on f.building=b.building ".
+		 "where f.scale=$scale_arg");
+
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    There is no building/floor data in the DB!\n");
+}
+
+while (my ($building,$title,$floor,$image) = $query_result->fetchrow_array()) {
+    ##dprint "building $building, floor $floor, image $image\n";
+    if (!exists($baseimages{$building})) {
+	$baseimages{$building} = {};
+	$baseimages{$building}->{"title"}  = $title;
+	$baseimages{$building}->{"floors"} = {};
+    }
+
+    $image = "$TB/www/$image"
+	if (dirname($image) eq ".");
+    dprint "image $image\n";
+
+    if (! -e $image) {
+	die("*** $0:\n".
+	    "    $image does not exist!\n");
+    }
+    $baseimages{$building}->{"floors"}->{$floor} = $image;
 }
 
 # Must specify a building with a floor.
@@ -221,41 +326,39 @@ else {
     # Now generate a superimage from all the base images. We just line
     # them up; nothing fancy at all.
     #
-    my $total_y = 0;
-    my $max_x   = 0;
-    foreach my $ref (@floors) {
-	my ($floorimage, $areamap) = @$ref;
-	
-	($x, $y) = $floorimage->getBounds();
-
-	$total_y = $total_y + $y + 15;
-	$max_x = $x
-	    if ($x > $max_x);
-    }
-    #
-    # Create a new image using the aggregate size.
-    #
-    $image = new GD::Image($max_x, $total_y, 1);
-
-    #
-    # Now copy the floor images into the superimage.
-    #
     my $running_y = 0;
     foreach my $ref (@floors) {
 	my ($floorimage, $areamap) = @$ref;
 	
-	($x, $y) = $floorimage->getBounds();
-	$image->copy($floorimage,
-		     0, $running_y,
-		     0, 0, $x, $y);
-	# Move all the map references down/over by adjusted amount.
+	# Move all the map references down by adjusted amount.
 	adjustmap($areamap, 0, $running_y);
 	push(@areamaps, $areamap);
 	
-	$running_y += $y + 15;
+	$running_y += $floorimage->Get('height');
     }
+    dprint "images ".($img_n+1)."\n";
+    ## Append and Coalesce get this error - 
+    ##    Image::Magick=ARRAY(0x84116b8) at ./floormap.in line 266.
+    ## Instead, do it from the shell after writing the component images below.
+    ##$err = $images->Append();
+    ##warn "$err" if "$err";
 }
-writefiles($image, @areamaps);
+writefiles($images->[0], @areamaps);
+
+## Append the component images in the shell, until the Perl function is fixed.
+dprint "Last image is $img_n.";
+if ($img_n > 0) {
+    my @args = ("convert", "${prefix}.jpg.*", "-append", "${prefix}.jpg");
+    dprint "@args\n";
+    system(@args) == 0
+	or die "system @args failed: $?";
+
+    ## Clean up the component image files.
+    @args = ("/bin/sh", "-c", "rm ${prefix}.jpg.*");
+    dprint "@args\n";
+    system(@args) == 0
+	or die "system @args failed: $?";
+}
 exit(0);
 
 #
@@ -311,26 +414,56 @@ sub dofloor($$)
 	die("*** $0:\n".
 	    "    No base image for $building:$floor!\n");
     }
-    my $baseimage =
-      GD::Image->newFromPng($baseimages{$building}->{"floors"}->{$floor}, 1) ||
-	  die("*** $0:\n".
-	      "    Could not get base ".
-	      $baseimages{$building}->{"floors"}->{$floor}  ."!\n");
+    
+    my $err = $images->Read($baseimages{$building}->{"floors"}->{$floor});
+    if ("$err") {
+        die("*** $0:\n".
+            "$err\n".
+            "    Could not get base ".
+            $baseimages{$building}->{"floors"}->{$floor}  ."!\n");
+    }
+    $img_n++;
+    my $baseimage = $images->[$img_n];
 
-    #
+    # Figure out where the user clicked.  (Use the upper-left corner if no click yet.)
+    # We won't have both scale and click coords, because they are separate controls.
+    if (defined($options{"c"})) {
+
+	# Back out the influence of the previously applied scale and offsets, so it is
+	# as if we are always clicking onto an image that is not scaled or offset.
+	my $image_x = $map_x;
+	my $image_y = adjust_map_y($map_y, $last_notitles);
+	dprint "recent click coords $image_x, $image_y ($map_y)\n";
+	$curr_x = int(($image_x + $last_x_off) / $last_scale);
+	$curr_y = int(($image_y + $last_y_off) / $last_scale);
+	dprint "new unzoomed center $curr_x, $curr_y\n";
+    } else {
+	$curr_x = $last_x;
+	$curr_y = $last_y;
+    }
+
+    # Set up for zoom (scale) and pan (offset center).  Get the offset to the
+    # upper-left corner of the output image, based on the desired center point.
+    my $in_width = $baseimage->Get('width');
+    my $in_height = $baseimage->Get('height');
+    dprint "input size $in_width, $in_height\n";
+    ($x_offset, $y_offset) = 
+	calc_offsets($scale, $curr_x, $curr_y, $in_width, $in_height);
+    dprint "new offsets $x_offset, $y_offset\n";
+
+    # Crop the correct rectangle out of the input image.
+    $err = $baseimage->Crop(width=>$out_width, height=>$out_height, 
+			    x=>$x_offset, y=>$y_offset);
+    warn "$err" if "$err";
+
+    # Draw the selected node locations and labels. 
     # Green dot means node is free or owned by pid/eid.
     # Red dot mean node is down.
     # Blue dot means node is allocated
-    #
-    my $black = $baseimage->colorAllocate(0,0,0);
-    my $green = $baseimage->colorAllocate(0,250,0);
-    my $red   = $baseimage->colorAllocate(250,0,0);
-    my $blue  = $baseimage->colorAllocate(0,0,250);
-    my $white = $baseimage->colorAllocate(255,255,255);
-    my $gold  = $baseimage->colorAllocate(255,255,0);
-    my $CY    = 10;
-    my $CX    = 10;
-
+    # Gold dot means node is new.
+    my $DOT_RAD = 5;	# Offset from center to edge of dot.
+    my $LX    = -10;    # Offset from center of dot to label.
+    my $LY    = 15;
     foreach my $isnew (0, 1) {
 	my $table;
 	
@@ -346,64 +479,159 @@ sub dofloor($$)
 	
 	while (my $rowref = $table->fetchrow_hashref()) {
 	    my $nodeid = $rowref->{"node_id"};
-	    my $x      = $rowref->{"loc_x"};
-	    my $y      = $rowref->{"loc_y"};
+	    my $x      = int($rowref->{"loc_x"} * $scale - $x_offset);
+	    my $y      = int($rowref->{"loc_y"} * $scale - $y_offset);
 	    my $rpid   = $rowref->{"pid"};
 	    my $reid   = $rowref->{"eid"};
 	    my $label  = $nodeid;
 	    my $newid  = ($isnew ? $rowref->{"new_node_id"} : 0);
-	    my ($x1,$y1,$x2,$y2);
 
+            my $color;
 	    if ($isnew) {
-		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $gold)
+		$color = 'gold'
 		}
 	    elsif ((!defined($pid) && !(defined($rpid))) ||
 		   (defined($pid) && defined($rpid) && $pid eq $rpid)) {
 		# Without -e option, green means node is free.
 		# With -e option, green means node belongs to experiment. 
-		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $green);
+		$color = 'limegreen';
 	    }
 	    elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
-		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $red);
+		$color = 'red';
 	    }
 	    else {
-		$baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $blue);
+		$color = 'blue';
 	    }
-	    $baseimage->string(gdTinyFont, $x - 7, $y + ($CY / 2),
-			       $label, $black);
+            my $x2 = $x + $DOT_RAD;
+            $err = $baseimage->Draw(fill=>$color, primitive=>'circle', 
+                                    points=>"$x,$y $x2,$y");
+            warn "$err" if "$err";
+            $err = $baseimage->Annotate(fill=>'black', x=>$x+$LX, y=>$y+$LY, 
+					text=>"$label");
+            warn "$err" if "$err";            
 
 	    my $tmp = {};
-	    $tmp->{"X1"} = $x - ($CX / 2);
-	    $tmp->{"Y1"} = $y - ($CY / 2);
-	    $tmp->{"X2"} = $x + ($CX / 2);
-	    $tmp->{"Y2"} = $y + ($CY / 2);
+	    $tmp->{"X1"} = $x - $DOT_RAD;
+	    $tmp->{"Y1"} = $y - $DOT_RAD;
+	    $tmp->{"X2"} = $x + $DOT_RAD;
+	    $tmp->{"Y2"} = $y + $DOT_RAD;
 	    $tmp->{"ISNEW"} = $newid;
 	    $areamap->{$nodeid} = $tmp;
 	}
     }
 
+    # Add a crosshair if the user specified a center point.
+    if ($curr_x || $curr_y) {
+	my $CROSS_SIZE = 12;	# Length of each arm of the crosshair.
+	my $x0 = int($curr_x * $scale - $x_offset);
+	my $y0 = int($curr_y * $scale - $y_offset);
+	my $x1 = $x0 - $CROSS_SIZE;
+	my $x2 = $x0 + $CROSS_SIZE;
+	my $y1 = $y0 - $CROSS_SIZE;
+	my $y2 = $y0 + $CROSS_SIZE;
+	dprint "cross at $x0,$y0, lft $x1, rt $x2, top $y1, bot $y2\n";
+	$err = $baseimage->Draw(stroke=>'red', primitive=>'line',
+				points=>"$x1,$y0, $x2,$y0");
+	warn "$err" if "$err";
+	$err = $baseimage->Draw(stroke=>'red', primitive=>'line',
+				points=>"$x0,$y1, $x0,$y2");
+	warn "$err" if "$err";
+    }
+
     if (!$notitles) {
 	#
-	# We wat to stick in a label for the floor. To do that we need to make
+	# We want to stick in a label for the floor. To do that we need to make
 	# some white space at the top by expanding the image, and moving it down.
-	# Okay, so it takes some steps to do that. 
 	# 
-	my ($x, $y) = $baseimage->getBounds();
-	my $fullimage = new GD::Image($x, $y + 50, 1);
-	$fullimage->copy($baseimage, 0, 50, 0, 0, $x, $y);
-	$fullimage->filledRectangle(0, 0, $x, 50, $white);
+	my $floor_label = $baseimages{$building}->{"title"} . 
+	    " - "  . $floortags[$floor];
+	dprint "head label $floor_label\n";
+        $err = $baseimage->Border(fill=>'white', width=>0, height=>$head_height);
+        warn "$err" if "$err";
+        $err = $baseimage->Annotate(fill=>'black', x=>10, y=>40, 
+                                    font=>"/usr/testbed/lib/arial.ttf", pointsize=>32,
+                                    text=>"$floor_label");
+	warn "$err" if "$err";            
 
-	$fullimage->stringFT($black, "/usr/testbed/lib/arial.ttf",
-			     25, 0, 10, 40,
-			     $baseimages{$building}->{"title"} . " - " .
-			     $floortags[$floor]);
+        # Border adds to both the top and the bottom.  Crop some of it away.
+        my $y1 = $head_height + $out_height;
+        my $y2 = $y1 + $tail_height;
+        $err = $baseimage->Crop(width=>$out_width, height=>$y2);
+        warn "$err" if "$err";
+        # Fill in a black rectangle at the bottom for a separator.
+        $err = $baseimage->Draw(fill=>'black', primitive=>'rectangle',
+                                points=>"0,$y1, $out_width,$y2");
+        warn "$err" if "$err";
 
 	# Have to adjust the maps cause we just moved everything.
 	adjustmap($areamap, 0, 50);
-	$baseimage = $fullimage;
     }
     
     return ($baseimage, $areamap);
+}
+
+#
+# Common code to adjust a Y coordinate from an image click into a map Y coordinate.
+# The image may have multiple floor maps, with optional headers and trailers.
+#
+sub adjust_map_y($$) {
+    my ($_y, $_notitles) = @_;
+    
+    my $map_height = $out_height + ($_notitles ? 0 : $head_height + $tail_height);
+    my $raw_map_y = ($_y % $map_height) - ($_notitles ? 0 : $head_height);
+    # Avoid out-of-bound coords if the header or trailer is clicked.
+    my $map_y = max(0, min($raw_map_y, $out_height));
+    dprint "adjust_map_y map_height $map_height, " .
+	"_y $_y, raw_map_y $raw_map_y, map_y $map_y\n";
+
+    return $map_y;
+}
+
+# 
+# Common code to calculate the image offsets from the upper-left corner, given the
+# desired image scale, UNZOOMED center point, and the dimensions of the source image.
+# 
+# At scale 1, the offsets will always be zero because we have to show the whole image.
+# At higher scales, there is room in the middle of the image where we are not up
+# against the edges, so we can offset to center the clicked point on the map.  Close
+# to the edges, the image edges limit the offsets.
+# 
+sub calc_offsets($$$$$) {
+    my ($scale, $curr_x, $curr_y, $in_width, $in_height) = @_;
+
+    my $scaled_click_x = $curr_x * $scale;
+    my $scaled_click_y = $curr_y * $scale;
+
+    # Offset limited by the scaled image size; scale 1 will always have zero offsets.
+    if ($scaled_click_x > $out_width/2) {
+        my $click_limit = $in_width - $out_width/2;
+        if ($scaled_click_x > $click_limit) {
+            dprint "right limit $click_limit\n";
+            $x_offset = $in_width-$out_width;       # Against the right edge.
+        }
+        else {
+            $x_offset = $scaled_click_x - ($out_width/2) # In the middle.
+        }
+    } else {
+	dprint "left limit 0\n";
+	my $x_offset = 0;                           # Against the left edge.
+    }
+
+    if ($scaled_click_y > $out_height/2) {
+        $click_limit = $in_height - $out_height/2;
+        if ($scaled_click_y > $click_limit) {
+            dprint "bottom limit $click_limit\n"; 
+            $y_offset = $in_height-$out_height;     # Against the bottom edge.
+        }
+        else {
+            $y_offset = $scaled_click_y - ($out_height/2) # In the middle.
+        }
+    } else {
+	dprint "top limit 0\n";
+	my $y_offset = 0;                           # Against the top edge.
+    }
+
+    return (int($x_offset), int($y_offset));
 }
 
 #
@@ -430,16 +658,17 @@ sub writefiles($@)
 {
     my ($image, @maps) = @_;
 
-    # Image
-    open(PNG, "> ${prefix}.png") ||
-	die("*** $0:\n".
-	    "    Could not open ${prefix}.png for writing!\n");
-    print PNG $image->png();
-    close(PNG);
+    # Image.
+    my $err = $images->Write("${prefix}.jpg");
+    if ("$err") {
+        die("*** $0:\n".
+            "$err\n".
+            "    Could not open ${prefix}.jpg for writing!\n");
+    }
 
     # Areamap.
     if (!open(MAP, "> ${prefix}.map")) {
-	unlink("${prefix}.png");
+	unlink("${prefix}.jpg");
 	die("*** $0:\n".
 	    "    Could not open ${prefix}.map for writing!\n");
     }
@@ -464,4 +693,28 @@ sub writefiles($@)
     }
     print MAP "</MAP>\n";
     close(MAP);
+
+    # HTML items save state.  They are included into the form by PHP and returned to
+    # us by HTML-get as page arguments when the map or zoom buttons are clicked on.
+    if (!open(STATE, "> ${prefix}.state")) {
+	unlink("${prefix}.jpg");
+	die("*** $0:\n".
+	    "    Could not open ${prefix}.state for writing!\n");
+    }
+    print STATE "  <input type=\"hidden\" name=\"last_scale\" " .
+	"value=\"$scale_arg\">\n";
+    print STATE "  <input type=\"hidden\" name=\"last_x_off\" " .
+	"value=\"$x_offset\">\n";
+    print STATE "  <input type=\"hidden\" name=\"last_y_off\" " .
+	"value=\"$y_offset\">\n";
+    # Note that the click point is in UNZOOMED, and hence un-offset, coordinates.
+    print STATE "  <input type=\"hidden\" name=\"last_x\" " .
+	"value=\"$curr_x\">\n";
+    print STATE "  <input type=\"hidden\" name=\"last_y\" " .
+	"value=\"$curr_y\">\n";
+    if ($notitles) {
+	print STATE "  <input type=\"hidden\" name=\"last_notitles\" " .
+	    "value=\"$notitles\">\n";
+    }
+    close(STATE);
 }

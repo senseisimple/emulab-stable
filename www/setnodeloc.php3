@@ -258,6 +258,7 @@ if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
 	DBQueryFatal("select b.building,b.title,f.floor,f.thumb_path ".
 		     "   from buildings as b ".
 		     "left join floorimages as f on f.building=b.building " .
+		     "where f.scale=1 " .
 		     "order by b.building,f.floor");
 
     if (! mysql_num_rows($building_result)) {

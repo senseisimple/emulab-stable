@@ -38,8 +38,9 @@ function CLEANUP()
     global $prefix;
     
     if (isset($prefix)) {
-	unlink("${prefix}.png");
+	unlink("${prefix}.jpg");
 	unlink("${prefix}.map");
+	unlink("${prefix}.state");
 	unlink($prefix);
     }
     exit();
@@ -50,8 +51,8 @@ register_shutdown_function("CLEANUP");
 # Spit the areamap contained in the file out; it is fully formatted and
 # called "floormap".
 #
-if (($fp = fopen("${prefix}.png", "r"))) {
-    header("Content-type: image/png");
+if (($fp = fopen("${prefix}.jpg", "r"))) {
+    header("Content-type: image/jpg");
     fpassthru($fp);
 }
 else {

@@ -65,6 +65,97 @@ else {
 }
 
 #
+# Verify numeric scale and centering arguments.
+#
+if (isset($scale) && $scale != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $scale)) {
+	PAGEARGERROR("Invalid scale argument.");
+    }
+}
+else {
+    unset($scale);
+}
+#
+# map_x and map_y are the map.x and map.y coordinates from clicking on the map.
+#
+if (isset($map_x) && $map_x != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $map_x)) {
+	PAGEARGERROR("Invalid map_x argument.");
+    }
+}
+else {
+    unset($map_x);
+}
+if (isset($map_y) && $map_y != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $map_y)) {
+	PAGEARGERROR("Invalid map_y argument.");
+    }
+}
+else {
+    unset($map_y);
+}
+#
+# We need the previous scale and click coords, and offsets to interpret new click coords!
+#
+if (isset($last_scale) && $last_scale != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $last_scale)) {
+	PAGEARGERROR("Invalid last_scale argument.");
+    }
+}
+else {
+    unset($last_scale);
+}
+if (isset($last_x) && $last_x != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $last_x)) {
+	PAGEARGERROR("Invalid last_x argument.");
+    }
+}
+else {
+    unset($last_x);
+}
+if (isset($last_y) && $last_y != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $last_y)) {
+	PAGEARGERROR("Invalid last_y argument.");
+    }
+}
+else {
+    unset($last_y);
+}
+if (isset($last_x_off) && $last_x_off != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $last_x_off)) {
+	PAGEARGERROR("Invalid last_x_off argument.");
+    }
+}
+else {
+    unset($last_x_off);
+}
+if (isset($last_y_off) && $last_y_off != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $last_y_off)) {
+	PAGEARGERROR("Invalid last_y_off argument.");
+    }
+}
+else {
+    unset($last_y_off);
+}
+if (isset($last_notitles) && $last_notitles != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $last_notitles)) {
+	PAGEARGERROR("Invalid last_notitles argument.");
+    }
+}
+else {
+    unset($last_notitles);
+}
+
+#
 # Figure out what channels are in use for the current building. We only
 # have one building (MEB) at the moment, so this is quite easy.
 # Also determine what the free,reserved,dead counts are. 
@@ -122,8 +213,8 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 #
-# Run the script. It will produce two output files; an image and an areamap.
-# We want to embed both of these images into the page we send back. This
+# Run the script. It will produce three output files; image, areamap, and state.
+# We want to embed all of these images into the page we send back. This
 # is painful!
 #
 # Need cleanup "handler" to make sure temp files get deleted! 
@@ -133,8 +224,9 @@ function CLEANUP()
     global $prefix;
     
     if (isset($prefix) && (connection_aborted())) {
-	unlink("${prefix}.png");
+	unlink("${prefix}.jpg");
 	unlink("${prefix}.map");
+	unlink("${prefix}.state");
 	unlink($prefix);
     }
     exit();
@@ -143,7 +235,7 @@ register_shutdown_function("CLEANUP");
 
 #
 # Create a tempfile to use as a unique prefix; it is not actually used but
-# serves the same purpose (the script uses ${prefix}.png and ${prefix}.map)
+# serves the same purpose (The script uses ${prefix}.jpg and ${prefix}.map .)
 # 
 $prefix = tempnam("/tmp", "floormap");
 
@@ -158,7 +250,21 @@ $uniqueid = $matches[1];
 $retval = SUEXEC("nobody", "nobody", "webfloormap -o $prefix " .
 		 (isset($pid) ? "-e $pid,$eid " : "") .
 		 (isset($floor) ? "-f $floor " : "") .
-		 (isset($building) ? "$building" : ""),
+		 (isset($building) ? "$building" : "") .
+
+		 # From clicking on a zoom button.
+		 (isset($scale) ? "-s $scale " : "") .
+
+		 # From clicking on a map image.
+		 (isset($map_x) ? "-c $map_x,$map_y " : "") .
+
+		 # Previous image state info came from an included .state
+		 # file, previously output by the Perl script along with the map.
+		 (isset($last_scale) ? "-S $last_scale " : "") .
+		 (isset($last_x) ? "-C $last_x,$last_y " : "") .
+		 (isset($last_x_off) ? "-O $last_x_off,$last_y_off " : "") .
+		 (isset($last_notitles) && $last_notitles ? "-T " : ""),
+
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval) {
@@ -250,9 +356,51 @@ if (count($channels)) {
     echo "</table>\n";
 }
 
-# Image
-echo "<img src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">
-      </center>\n";
+# Wrap the image and zoom controls together in an input form.
+echo "<br>\n";
+echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
+
+# Zoom controls may be clicked to set a new scale.
+$curr_scale = (isset($scale) ? $scale : (isset($last_scale) ? $last_scale : 1));
+echo "  <a name=zoom></a>\n";
+function zoom_btns($curr_scale) {
+echo "  <table align=\"center\" border=\"2\" cellpadding=\"0\" cellspacing=\"2\">\n";
+echo "    <tbody>\n";
+echo "      <tr>\n";
+echo "        <td><input type=\"image\" src=\"btn_zoom_out.jpg\"\n";
+echo "             name=\"scale\" value=\"" . max($curr_scale-1,1) . "\"><br></td>\n";
+for ($i = 1; $i <= 5; $i++) {
+    $img = "btn_scale_" . $i . "_" . ($curr_scale==$i?"brt":"dim") . ".jpg";
+    echo "        <td><input type=\"image\" src=\"$img\"\n";
+    echo "             name=\"scale\" value=\"$i\"><br></td>\n";
+}
+echo "        <td><input type=\"image\" src=\"btn_zoom_in.jpg\"\n";
+echo "             name=\"scale\" value=\"" . min($curr_scale+1,6) . "\"><br></td>\n";
+echo "      </tr>\n";
+echo "    </tbody>\n";
+echo "  </table>\n";
+}
+
+# The image may be clicked to set a new center-point.
+zoom_btns($curr_scale);  # Two copies of the zoom buttons bracket the image.
+echo "  Click on the map below to set the center point for a zoomed-in view.\n";
+echo "  <br>\n";
+echo "  <input name=\"map\" type=\"image\" style=\"border: 2px solid\" ";
+echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">\n";
+echo "  <br>\n";
+echo "  Click on the map above to set the center point for a zoomed-in view.\n";
+zoom_btns($curr_scale);
+
+# Hidden items are all returned as page arguments when any input control is clicked.
+echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
+
+# The last_* items come from a .state file with the map, from the Perl script.
+if (! readfile("${prefix}.state")) {
+    TBERROR("Could not read ${prefix}.state", 1);
+}
+
+echo "</form>\n";
+echo "</center>\n";
 
 #
 # Standard Testbed Footer
