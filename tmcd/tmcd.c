@@ -225,6 +225,7 @@ COMMAND_PROTOTYPE(dorusage);
 COMMAND_PROTOTYPE(dodoginfo);
 COMMAND_PROTOTYPE(dohostkeys);
 COMMAND_PROTOTYPE(dotmcctest);
+COMMAND_PROTOTYPE(dofwinfo);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -298,6 +299,7 @@ struct command {
         { "watchdoginfo", FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dodoginfo},
         { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
         { "tmcctest",     FULLCONFIG_NONE, F_MINLOG, dotmcctest},
+        { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5110,6 +5112,138 @@ COMMAND_PROTOTYPE(dohostkeys)
 		     (rsav2[0] ? rsav2 : "NULL"),
 		     (dsav2[0] ? dsav2 : "NULL"));
 	}
+	return 0;
+}
+
+COMMAND_PROTOTYPE(dofwinfo)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	char		fwname[TBDB_FLEN_VNAME+2];
+	char		fwtype[TBDB_FLEN_VNAME+2];
+	char		fwstyle[TBDB_FLEN_VNAME+2];
+	int		n, nrows;
+
+	/*
+	 * See if this node's experiment has an associated firewall
+	 */
+	res = mydb_query("select r.node_id,f.type,f.style,f.fwname,i.IP,i.mac "
+			 "from firewalls as f "
+			 "left join reserved as r on"
+			 "  f.pid=r.pid and f.eid=r.eid and f.fwname=r.vname "
+			 "left join interfaces as i on r.node_id=i.node_id "
+			 "where f.pid='%s' and f.eid='%s' "
+			 "and i.role='ctrl'",	/* XXX */
+			 6, reqp->pid, reqp->eid);
+	if (!res) {
+		error("FWINFO: %s: DB Error getting firewall info!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * Common case, no firewall
+	 */
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		strncpy(buf, "TYPE=none\n", sizeof(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
+		return 0;
+	}
+
+	/*
+	 * DB data is bogus
+	 */
+	row = mysql_fetch_row(res);
+	if (!row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		error("FWINFO: %s: DB Error in firewall info, no firewall!\n",
+		      reqp->nodeid);
+		strncpy(buf, "TYPE=none\n", sizeof(buf));
+		client_writeback(sock, buf, strlen(buf), tcp);
+		return 0;
+	}
+
+	/*
+	 * There is a firewall, but it isn't us.
+	 * Put out base info with TYPE=remote.
+	 */
+	if (strcmp(row[0], reqp->nodeid) != 0) {
+		OUTPUT(buf, sizeof(buf), "TYPE=remote FWIP=%s\n", row[4]);
+		mysql_free_result(res);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		if (verbose)
+			info("FWINFO: %s", buf);
+		return 0;
+	}
+
+	/*
+	 * We are the firewall.
+	 * Put out base information and all the rules
+	 * XXX for now we use the control interface for in/out
+	 */
+	OUTPUT(buf, sizeof(buf), "TYPE=%s STYLE=%s IN_IF=%s OUT_IF=%s\n",
+	       row[1], row[2], row[5], row[5]);
+	client_writeback(sock, buf, strlen(buf), tcp);
+	if (verbose)
+		info("FWINFO: %s", buf);
+
+	strncpy(fwtype, row[1], sizeof(fwtype));
+	strncpy(fwstyle, row[2], sizeof(fwstyle));
+	strncpy(fwname, row[3], sizeof(fwname));
+	mysql_free_result(res);
+
+	/*
+	 * Get the user firewall rules from the DB and return them.
+	 */
+	res = mydb_query("select ruleno,rule from firewall_rules "
+			 "where pid='%s' and eid='%s' and fwname='%s' "
+			 "order by ruleno",
+			 2, reqp->pid, reqp->eid, fwname);
+	if (!res) {
+		error("FWINFO: %s: DB Error getting firewall rules!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	nrows = (int)mysql_num_rows(res);
+
+	for (n = nrows; n > 0; n--) {
+		row = mysql_fetch_row(res);
+		OUTPUT(buf, sizeof(buf), "RULENO=%s RULE=\"%s\"\n",
+		       row[0], row[1]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+	}
+
+	mysql_free_result(res);
+	if (verbose)
+	    info("FWINFO: %d user rules in list\n", nrows);
+
+	/*
+	 * Get the default firewall rules from the DB and return them.
+	 */
+	res = mydb_query("select ruleno,rule from default_firewall_rules "
+			 "where type='%s' and style='%s' and enabled!=0 "
+			 "order by ruleno",
+			 2, fwtype, fwstyle);
+	if (!res) {
+		error("FWINFO: %s: DB Error getting default firewall rules!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	nrows = (int)mysql_num_rows(res);
+
+	for (n = nrows; n > 0; n--) {
+		row = mysql_fetch_row(res);
+		OUTPUT(buf, sizeof(buf), "RULENO=%s RULE=\"%s\"\n",
+		       row[0], row[1]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+	}
+
+	mysql_free_result(res);
+	if (verbose)
+	    info("FWINFO: %d default rules in list\n", nrows);
+
 	return 0;
 }
 
