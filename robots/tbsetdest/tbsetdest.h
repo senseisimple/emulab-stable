@@ -1,9 +1,9 @@
-#ifndef __setdest_h__
-#define __setdest_h__
 
-/*#include <sys/queue.h>*/
-#include "../../../config.h"
-#include "../../../lib/bsd-list.h"
+#ifndef __tbsetdest_h__
+#define __tbsetdest_h__
+
+#include "config.h"
+#include <sys/queue.h>
 
 #ifndef LIST_FIRST
 #define LIST_FIRST(head)	((head)->lh_first)
@@ -14,39 +14,39 @@
 
 void ReadInMovementPattern(void);
 
-class vector {
+class sdvector {
 public:
-	vector(double x = 0.0, double y = 0.0, double z = 0.0) {
+	sdvector(double x = 0.0, double y = 0.0, double z = 0.0) {
 		X = x; Y = y; Z = z;
 	}
 	double length() {
 		return sqrt(X*X + Y*Y + Z*Z);
 	}
 
-	inline void vector::operator=(const vector a) {
+	inline void sdvector::operator=(const sdvector a) {
 		X = a.X;
 		Y = a.Y;
 		Z = a.Z;
 	}
-	inline void vector::operator+=(const vector a) {
+	inline void sdvector::operator+=(const sdvector a) {
 		X += a.X;
 		Y += a.Y;
 		Z += a.Z;
 	}
-	inline int vector::operator==(const vector a) {
+	inline int sdvector::operator==(const sdvector a) {
 		return (X == a.X && Y == a.Y && Z == a.Z);
 	}
-	inline int vector::operator!=(const vector a) {
+	inline int sdvector::operator!=(const sdvector a) {
 		return (X != a.X || Y != a.Y || Z != a.Z);
 	}
-	inline vector operator-(const vector a) {
-		return vector(X-a.X, Y-a.Y, Z-a.Z);
+	inline sdvector operator-(const sdvector a) {
+		return sdvector(X-a.X, Y-a.Y, Z-a.Z);
 	}
-	friend inline vector operator*(const double a, const vector b) {
-		return vector(a*b.X, a*b.Y, a*b.Z);
+	friend inline sdvector operator*(const double a, const sdvector b) {
+		return sdvector(a*b.X, a*b.Y, a*b.Z);
 	}
-	friend inline vector operator/(const vector a, const double b) {
-		return vector(a.X/b, a.Y/b, a.Z/b);
+	friend inline sdvector operator/(const sdvector a, const double b) {
+		return sdvector(a.X/b, a.Y/b, a.Z/b);
 	}
 
 	double X;
@@ -93,9 +93,9 @@ private:
 	u_int32_t	index;                  // unique node identifier
 	u_int32_t 	first_trip;		// 1 if first trip, 0 otherwise. (by J. Yoon)
 
-	vector		position;		// current position
-	vector		destination;		// destination
-	vector		direction;		// computed from pos and dest
+	sdvector	position;		// current position
+	sdvector	destination;		// destination
+	sdvector	direction;		// computed from pos and dest
 
 	double		speed;
 	double		time_update;		// when pos last updated

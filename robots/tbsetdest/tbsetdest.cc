@@ -38,7 +38,9 @@
 
 
 extern "C" {
+#include <pwd.h>
 #include <assert.h>
+#include <float.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -52,9 +54,18 @@ extern "C" {
 #include <err.h>
 #endif
 };
-#include "../../../tools/rng.h"
 
-#include "setdest.h"
+#include <ulxmlrpcpp.h>
+#include <iostream>
+#include <ulxr_tcpip_connection.h>  // first, don't move: msvc #include bug
+#include <ulxr_ssl_connection.h> 
+#include <ulxr_http_protocol.h> 
+#include <ulxr_requester.h>
+#include <ulxr_value.h>
+#include <ulxr_except.h>
+#include <emulab_proxy.h>
+
+#include "tbsetdest.h"
 
 
 // #define		DEBUG
@@ -62,11 +73,11 @@ extern "C" {
 //#define		SHOW_SYMMETRIC_PAIRS
 
 
-#define GOD_FORMAT	"$ns_ at %.12f \"$god_ set-dist %d %d %d\"\n"
+#define GOD_FORMAT	"$ns at %.2f \"$god_ set-dist %d %d %d\"\n"
 #define GOD_FORMAT2	"$god_ set-dist %d %d %d\n"
-#define NODE_FORMAT	"$ns_ at %.12f \"$node_(%d) setdest %.12f %.12f %.12f\"\n"
-#define NODE_FORMAT2	"$node_(%d) setdest %.12f %.12f %.12f\n"
-#define NODE_FORMAT3	"$node_(%d) set %c_ %.12f\n"
+#define NODE_FORMAT	"$rtl at %.2f \"$node(%d) setdest %.2f %.2f %.2f\"\n"
+#define NODE_FORMAT2	"$node(%d) setdest %.2f %.2f %.2f\n"
+#define NODE_FORMAT3	"$node(%d) set %c_ %.2f\n"
 
 #define		INFINITY	0x00ffffff
 #define		min(x,y)	((x) < (y) ? (x) : (y))
@@ -100,11 +111,14 @@ const double	RANGE = 250.0;	// transmitter range in meters
 double		TIME = 0.0;			// my clock;
 double		MAXTIME = 0.0;		// duration of simulation
 
+char	       *AREA_NAME = NULL;
+double		MINX = FLT_MAX;
+double		MINY = FLT_MAX;
 double		MAXX = 0.0;			// width of space
 double		MAXY = 0.0;			// height of space
 double		PAUSE = 0.0;		// pause time
-double		MAXSPEED = 0.0;		// max speed
-double		MINSPEED = 0.0;		// min speed 
+double		MAXSPEED = 0.1;		// max speed
+double		MINSPEED = 0.1;		// min speed 
 double		SS_AVGSPEED = 0.0;	// steady-state avg speed 
 double 		KAPPA = 0.0;		// normalizing constant 
 double 		MEAN = 0.0;			// mean for normal speed
@@ -112,9 +126,9 @@ double 		SIGMA = 0.0;		// std for normal speed
 double 		EXP_1_V = 0.0;		// expactation of 1/V
 double 		EXP_R = 0.0;		// expectation of travel distance R
 double 		PDFMAX = 0.0;		// max of pdf for rejection technique
-u_int32_t	SPEEDTYPE = 1;		// speed type (default = uniform)
+u_int32_t	SPEEDTYPE = 2;		// speed type (default = uniform)
 u_int32_t	PAUSETYPE = 1;		// pause type (default = constant)
-u_int32_t	VERSION = 1;		// setdest version (default = original by CMU) 
+u_int32_t	SD_VERSION = 1;		// setdest version (default = original by CMU) 
 u_int32_t	NODES = 0;			// number of nodes
 u_int32_t	RouteChangeCount = 0;
 u_int32_t	LinkChangeCount = 0;
@@ -126,6 +140,10 @@ u_int32_t	*D1 = 0;
 u_int32_t	*D2 = 0;
 
 
+ulxr::SSLConnection *xmlrpc_conn;
+ulxr::Protocol *xmlrpc_proto;
+ulxr::Array cameras;
+
 /* ======================================================================
    Random Number Generation
    ====================================================================== */
@@ -133,13 +151,12 @@ u_int32_t	*D2 = 0;
 #define INVERSE_M	((double)4.656612875e-10)
 
 char random_state[32];
-RNG *rng;
 
 double
 uniform()
 {
         count++;
-        return rng->uniform_double() ;
+        return random() * INVERSE_M;
 }
 
 
@@ -179,19 +196,14 @@ compute_EXP_R()
 void
 usage(char **argv)
 {
-	fprintf(stderr, "\nusage:\n");
 	fprintf(stderr,
-		"\n<original 1999 CMU version (version 1)>\n %s\t-v <1> -n <nodes> -p <pause time> -M <max speed>\n",
-		argv[0]);
-	fprintf(stderr,
-		"\t\t-t <simulation time> -x <max X> -y <max Y>\n");
-	fprintf(stderr,
-		"\nOR\n<modified 2003 U.Michigan version (version 2)>\n %s\t-v <2> -n <nodes> -s <speed type> -m <min speed> -M <max speed>\n",
-		argv[0]);
-	fprintf(stderr,
-		"\t\t-t <simulation time> -P <pause type> -p <pause time> -x <max X> -y <max Y>\n");
-	fprintf(stderr,
-		"\t\t(Refer to the script files make-scen.csh and make-scen-steadystate.csh for detail.) \n\n");
+		"usage: tbsetdest <args>\n"
+		"\n"
+		"Required flags:\n"
+		"  -n <nodes>\tThe number of nodes to generate events for\n"
+		"  -p <time>\tThe amount of 'pause' time\n"
+		"  -t <time>\tThe simulation time\n"
+		"  -a <area>\tThe area name\n");
 }
 
 void
@@ -200,14 +212,28 @@ init()
 	/*
 	 * Initialized the Random Number Generation
 	 */
-	/* 
-	This part of init() is commented out and is replaced by more
-	portable RNG (random number generator class of ns) functions.	
-
+	char buf[1024];
 	struct timeval tp;
 	int fd, seed, bytes;
+	struct passwd *pwd;
+	char *certpath;
+	int retval;
 
-	if((fd = open("/dev/random", O_RDONLY)) < 0) {
+	if ((pwd = getpwuid(getuid())) == NULL) {
+		perror("unknown user");
+		exit(1);
+	}
+
+	snprintf(buf, sizeof(buf), "%s/.ssl/emulab.pem", pwd->pw_dir);
+	certpath = strdup(buf);
+	xmlrpc_conn = new ulxr::SSLConnection(false, BOSSNODE, 3069);
+	xmlrpc_conn->setTimeout(1 * 60);
+	xmlrpc_proto = new ulxr::HttpProtocol(xmlrpc_conn,
+					      xmlrpc_conn->getHostName());
+	xmlrpc_proto->setPersistent(true);
+	xmlrpc_conn->setCryptographyData("", certpath, certpath);
+	
+	if((fd = open("/dev/urandom", O_RDONLY)) < 0) {
 		perror("open");
 		exit(1);
 	}
@@ -216,8 +242,6 @@ init()
 		exit(1);
 	}
 	close(fd);
-
-	fprintf(stderr, "*** read %d bytes from /dev/random\n", bytes);
 
 	if(bytes != sizeof(random_state)) {
 	  fprintf(stderr,"Not enough randomness. Reading `.rand_state'\n");
@@ -237,8 +261,12 @@ init()
 		exit(1);
 	}
 	seed = (tp.tv_sec  >> 12 ) ^ tp.tv_usec;
-        (void) initstate(seed, random_state, bytes & 0xf8);*/
+        (void) initstate(seed, random_state, bytes & 0xf8);
+}
 
+void
+init2()
+{
 	/*
 	 * Allocate memory for globals
 	 */
@@ -270,42 +298,26 @@ main(int argc, char **argv)
 {
 	char ch;
 
-	while ((ch = getopt(argc, argv, "v:n:s:m:M:t:P:p:x:y:i:o:")) != EOF) {       
+	while ((ch = getopt(argc, argv, "n:t:p:a:i:o:")) != EOF) {       
 
-		switch (ch) { 
-		
-		case 'v':
-		  VERSION = atoi(optarg);
-		  break;
-
+		switch (ch) {
 		case 'n':
-		  NODES = atoi(optarg);
-		  break;
-
-		case 's':
-			SPEEDTYPE = atoi(optarg);	
+			NODES = atoi(optarg);
 			break;
-
-		case 'm':
-			MINSPEED = atof(optarg);	
-			break;
-
-		case 'M':
-			MAXSPEED = atof(optarg);
-			break;
-
+			
 		case 't':
 			MAXTIME = atof(optarg);
-			break;
-
-		case 'P':
-			PAUSETYPE = atoi(optarg);	
 			break;
 
 		case 'p':
 			PAUSE = atof(optarg);
 			break;
 
+		case 'a':
+			AREA_NAME = optarg;
+			break;
+			
+#if 0
 		case 'x':
 			MAXX = atof(optarg);
 			break;
@@ -313,11 +325,68 @@ main(int argc, char **argv)
 		case 'y':
 			MAXY = atof(optarg);
 			break;
-
+#endif
+			
 		default:
 			usage(argv);
 			exit(1);
 		}
+	}
+
+	if (AREA_NAME == NULL) {
+		fprintf(stderr, "error: no area name given\n");
+		usage(argv);
+		exit(1);
+	}
+
+	try
+	{
+		unsigned int lpc;
+		
+		init();
+
+		emulab::ServerProxy proxy(xmlrpc_proto, false, TBROOT);
+		emulab::EmulabResponse er;
+		
+		er = proxy.invoke("emulab.vision_config",
+				  emulab::SPA_String, "area", AREA_NAME,
+				  emulab::SPA_TAG_DONE);
+
+		cameras = (ulxr::Array)er.getValue();
+		for (lpc = 0; lpc < cameras.size(); lpc++) {
+			double x, y, width, height;
+			ulxr::Struct attr;
+
+			attr = cameras.getItem(lpc);
+			x = ((ulxr::Double)attr.getMember("x")).getDouble();
+			y = ((ulxr::Double)attr.getMember("y")).getDouble();
+			width = ((ulxr::Double)attr.getMember("width")).
+				getDouble();
+			height = ((ulxr::Double)attr.getMember("height")).
+				getDouble();
+
+			if (x < MINX)
+				MINX = x;
+			if (y < MINY)
+				MINY = y;
+			if ((x + width) > MAXX)
+				MAXX = (x + width);
+			if ((y + height) > MAXY)
+				MAXY = (y + height);
+		}
+
+		init2();
+	}
+	catch(ulxr::Exception &ex)
+	{
+		ULXR_COUT << ULXR_PCHAR("Error occured: ") <<
+			ULXR_GET_STRING(ex.why()) << std::endl;
+		exit(1);
+	}
+	catch(...)
+	{
+		ULXR_COUT << ULXR_PCHAR("unknown Error occured.\n");
+		exit(1);
 	}
 
 	if(MAXX == 0.0 || MAXY == 0.0 || NODES == 0 || MAXTIME == 0.0) {
@@ -326,38 +395,30 @@ main(int argc, char **argv)
 	}
 	
 	/* specify the version */
-	if (VERSION != 1 && VERSION != 2) {
+	if (SD_VERSION != 1 && SD_VERSION != 2) {
 	  printf("Please specify the setdest version you want to use. For original 1999 CMU version use 1; For modified 2003 U.Michigan version use 2\n");
 	  exit(1);
 	}
-
-	if (VERSION == 2 && MINSPEED <= 0) {
-	  usage(argv);
-	  exit(1);
-	} else if (VERSION == 1 && MINSPEED > 0) {
-	  usage(argv);
-	  exit(1);
-	}
-
-
-	// The more portable solution for random number generation
-	rng = new RNG;
-	rng->set_seed(RNG::HEURISTIC_SEED_SOURCE); 
 
 
 
 	/****************************************************************************************
  	 * Steady-state avg speed and distribution depending on the initial distirbutions given
 	 ****************************************************************************************/
+
+	fprintf(stdout, "set rtl [$ns event-timeline]\n");
 	
 	/* original setdest */	
-	if (VERSION == 1) {	
-		fprintf(stdout, "#\n# nodes: %d, pause: %.2f, max speed: %.2f, max x: %.2f, max y: %.2f\n#\n",
-			NODES, PAUSE, MAXSPEED, MAXX, MAXY);
+	if (SD_VERSION == 1) {	
+		fprintf(stdout,
+			"#\n"
+			"# nodes: %d, pause: %.2f, max x: %.2f, max y: %.2f\n"
+			"#\n",
+			NODES, PAUSE, MAXX, MAXY);
 	}	
 
 	/* modified version */
-	else if (VERSION == 2) {
+	else if (SD_VERSION == 2) {
 		/* compute the expectation of travel distance in a rectangle */
 		compute_EXP_R();
 
@@ -408,8 +469,6 @@ main(int argc, char **argv)
 			NODES , SPEEDTYPE, MINSPEED, MAXSPEED, SS_AVGSPEED, PAUSETYPE, PAUSE, MAXX, MAXY);
 	} 	
 
-
-	init();
 
 	while(TIME <= MAXTIME) {
 		double nexttime = 0.0;
@@ -501,12 +560,12 @@ Node::Node()
      *******************************************************************************/
 
 	/* original version */
-	if (VERSION == 1) {
+	if (SD_VERSION == 1) {
 			time_arrival = TIME + PAUSE;			// constant pause
 	}
 
 	/* modified version */ 
-	else if (VERSION == 2) {
+	else if (SD_VERSION == 2) {
 		/* probability that the first trip would be a pause */
 		double prob_pause = PAUSE / (EXP_1_V*EXP_R + PAUSE);
 	
@@ -543,7 +602,7 @@ Node::Node()
 
 	fprintf(stdout, NODE_FORMAT3, index, 'X', position.X);
 	fprintf(stdout, NODE_FORMAT3, index, 'Y', position.Y);
-	fprintf(stdout, NODE_FORMAT3, index, 'Z', position.Z);
+	// fprintf(stdout, NODE_FORMAT3, index, 'Z', position.Z);
 
 	neighbor = new Neighbor[NODES];
 	if(neighbor == 0) {
@@ -563,8 +622,8 @@ Node::Node()
 void
 Node::RandomPosition()
 {
-    position.X = uniform() * MAXX;
-    position.Y = uniform() * MAXY;
+	position.X = uniform() * (MAXX - MINX) + MINX;
+	position.Y = uniform() * (MAXY - MINY) + MINY;
 	position.Z = 0.0;
 }
 
@@ -572,8 +631,8 @@ Node::RandomPosition()
 void
 Node::RandomDestination()
 {
-   	destination.X = uniform() * MAXX;
-   	destination.Y = uniform() * MAXY;
+   	destination.X = uniform() * (MAXX - MINX) + MINX;
+   	destination.Y = uniform() * (MAXY - MINY) + MINY;
 	destination.Z = 0.0;
 	assert(destination != position);
 }
@@ -585,14 +644,17 @@ Node::RandomDestination()
 void
 Node::RandomSpeed()
 {
+	speed = MAXSPEED;
+
+#if 0
 	/* original version */
-	if (VERSION == 1) {
+	if (SD_VERSION == 1) {
        	speed = uniform() * MAXSPEED;
 		assert(speed != 0.0);
 	}
 
 	/* modified version */
-	else if (VERSION == 2) {
+	else if (SD_VERSION == 2) {
 		/* uniform speed */
 		if (SPEEDTYPE == 1) {
 			/* using steady-state distribution for the first trip */
@@ -651,6 +713,7 @@ Node::RandomSpeed()
 		else
 			;
 	}
+#endif
 }
 
 
@@ -660,7 +723,7 @@ Node::Update()
 	position += (speed * (TIME - time_update)) * direction;
 
 	if(TIME == time_arrival) {
-		vector v;
+		sdvector v;
 
 		if(speed == 0.0 || PAUSE == 0.0) {
 
@@ -677,11 +740,11 @@ Node::Update()
 			speed = 0.0;
 
 			/* original version */
-			if (VERSION == 1) {
+			if (SD_VERSION == 1) {
 				time_arrival = TIME + PAUSE;
 			}
 			/* modified version */
-			else if (VERSION == 2) {
+			else if (SD_VERSION == 2) {
 				/* constant pause */
 				if (PAUSETYPE == 1) {
 					time_arrival = TIME + PAUSE;
@@ -708,7 +771,7 @@ Node::UpdateNeighbors()
 {
 	static Node *n2;
 	static Neighbor *m1, *m2;
-	static vector D, B, v1, v2;
+	static sdvector D, B, v1, v2;
 	static double a, b, c, t1, t2, Q;
 	static u_int32_t i, reachable;
 
@@ -734,7 +797,7 @@ Node::UpdateNeighbors()
 		/* ==================================================
 		   Determine Reachability
 		   ================================================== */
-		{	vector d = position - n2->position;
+		{	sdvector d = position - n2->position;
 
 			if(d.length() < RANGE) {
 #ifdef SANITY_CHECKS
@@ -957,6 +1020,7 @@ show_diffs()
                                         NodeList[j].route_changes++;
                                 }
 
+#if 0
 				if(TIME == 0.0) {
 					fprintf(stdout, GOD_FORMAT2,
 						i, j, D2[i*NODES + j]);
@@ -973,6 +1037,7 @@ show_diffs()
 						TIME, j, i, D2[j*NODES + i]);
 #endif
 				}
+#endif
 			}
 		}
 	}
@@ -1003,6 +1068,7 @@ show_counters()
 
 	fprintf(stdout, "#\n# Destination Unreachables: %d\n#\n",
 		DestUnreachableCount);
+#if 0
 	fprintf(stdout, "# Route Changes: %d\n#\n", RouteChangeCount);
         fprintf(stdout, "# Link Changes: %d\n#\n", LinkChangeCount);
         fprintf(stdout, "# Node | Route Changes | Link Changes\n");
@@ -1011,5 +1077,6 @@ show_counters()
                         i, NodeList[i].route_changes,
                         NodeList[i].link_changes);
 	fprintf(stdout, "#\n");
+#endif
 }
 

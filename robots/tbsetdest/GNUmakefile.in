@@ -25,9 +25,10 @@ CXXFLAGS += -pthread
 LDFLAGS   = -L/usr/local/lib
 
 LIBS	  = -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
+LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
 
 tbsetdest: $(OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+	$(CXX) -static $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
