@@ -6,7 +6,7 @@ start)
 		mkdir -m 0755 /etc/sfs;
 	fi
         if [ -f /usr/local/bin/sfskey -a ! -f /etc/sfs/sfs_host_key ]; then
-	        /usr/local/bin/sfskey gen -K -P -n \
+	        /usr/local/bin/sfskey gen -K -P -l \
 			 root@`hostname` /etc/sfs/sfs_host_key
         fi
 	if [ -x /usr/local/sbin/sfscd ]; then
