@@ -231,6 +231,7 @@ int init_slothd(void) {
       }
     }
   }
+  closedir(devs);
 
   /* prepare UDP connection to server */
   if ((pkt->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -306,6 +307,7 @@ void get_min_tty_idle(void) {
           mintime = sb.st_atime;
         }
       }
+      closedir(ptsdir);
     }
   }
 #endif /* __linux__ */
@@ -497,6 +499,7 @@ int get_counters(char *buf, void *data) {
     if (opts->debug) {
       printf("macaddr: %s\n", pkt->ifaces[pkt->ifcnt].addr);
     }
+    close(sfd);
 #endif
     pkt->ifcnt++;
   }
