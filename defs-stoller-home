@@ -15,3 +15,5 @@ OURDOMAIN=ballmoss.com
 FSDIR_GROUPS=/groups
 FSDIR_PROJ=/proj
 FSDIR_USERS=/users
+TBSTATEDEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
+TBTESTSUITEEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'

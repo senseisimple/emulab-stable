@@ -24,3 +24,5 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 UNIFIED_BOSS_AND_OPS=1
 DISABLE_NSE=1
+TBSTATEDEMAIL=widetestbed-stated@flux.cs.utah.edu
+TBTESTSUITEEMAIL=widetestbed-testsuite@flux.cs.utah.edu

@@ -21,3 +21,5 @@ OURDOMAIN=mini.emulab.net
 FSDIR_GROUPS=/z/groups
 FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
+TBSTATEDEMAIL=ricci@cs.utah.edu
+TBTESTSUITEEMAIL=ricci@cs.utah.edu

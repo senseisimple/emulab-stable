@@ -11,3 +11,5 @@ DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
 OURDOMAIN=emulab.net
+TBSTATEDEMAIL=newbold@cs.utah.edu
+TBTESTSUITEEMAIL=newbold@cs.utah.edu

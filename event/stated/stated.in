@@ -22,7 +22,7 @@
 #
 use lib '@prefix@/lib';
 my $BOSSNODE = "@BOSSNODE@";
-my $TBOPS = "@TBOPSEMAIL@";
+my $TBOPS = '@TBSTATEDEMAIL@';
 my $TBDBNAME = "@TBDBNAME@";
 my $osselect = "@prefix@/bin/os_select";
 
@@ -647,7 +647,7 @@ sub debug(@) {
 sub notify($) {
     	my $message = shift;
 	if (!$debug) {
-	    SENDMAIL($TBOPS,"Node State Daemon Messsage",$message,$TBOPS);
+	    SENDMAIL('$TBOPS',"Node State Daemon Messsage",$message,'$TBOPS');
 	} else {
 	    print "notify: Not sending mail in debug mode\n";
 	}

@@ -18,3 +18,5 @@ OURDOMAIN=mini.emulab.net
 FSDIR_GROUPS=/z/groups
 FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
+TBSTATEDEMAIL=barb@cs.utah.edu
+TBTESTSUITEEMAIL=barb@cs.utah.edu

@@ -843,6 +843,8 @@ fi
 
 
 
+
+
 #
 # Defaults for for above variables.
 # 
@@ -1175,7 +1177,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1179: checking for a BSD compatible install" >&5
+echo "configure:1181: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1465,6 +1467,8 @@ s%@TBADMINGROUP@%$TBADMINGROUP%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
 s%@TBAUDITEMAIL@%$TBAUDITEMAIL%g
+s%@TBSTATEDEMAIL@%$TBSTATEDEMAIL%g
+s%@TBTESTSUITEEMAIL@%$TBTESTSUITEEMAIL%g
 s%@TBACTIVEARCHIVE@%$TBACTIVEARCHIVE%g
 s%@TBUSERSARCHIVE@%$TBUSERSARCHIVE%g
 s%@DELAYCAPACITY@%$DELAYCAPACITY%g

@@ -15,3 +15,5 @@ IPBASE=192.168
 FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
+TBSTATEDEMAIL=barb@cs.utah.edu
+TBTESTSUITEEMAIL=barb@cs.utah.edu

@@ -20,3 +20,5 @@ OURDOMAIN=mini.emulab.net
 FSDIR_GROUPS=/z/groups
 FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
+TBSTATEDEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
+TBTESTSUITEEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
