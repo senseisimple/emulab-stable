@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -60,7 +60,6 @@
 #define DEF_CTHRSH 1     /* At least 1 packet */
 #define OFFSET_FRACTION 0.5
 
-#define SLOTHD_DEF_SERV "boss"
 #define SLOTHD_DEF_PORT 8509 /* XXX change */
 
 #ifndef LOG_TESTBED

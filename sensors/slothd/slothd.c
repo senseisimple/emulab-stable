@@ -1,10 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #include "slothd.h"
+#include "config.h"
 
 SLOTHD_OPTS   *opts;
 SLOTHD_PARAMS *parms;
@@ -175,7 +176,7 @@ int parse_args(int argc, char **argv) {
   opts->agg_interval = DEF_AINTVL;
   opts->debug = 0;
   opts->port = SLOTHD_DEF_PORT;
-  opts->servname = SLOTHD_DEF_SERV;
+  opts->servname = BOSSNODE;
   opts->load_thresh = DEF_LTHRSH;
   opts->pkt_thresh = DEF_CTHRSH;
   opts->cif_thresh = DEF_CTHRSH;
