@@ -572,7 +572,7 @@ CREATE TABLE nodes (
   op_mode varchar(20) default NULL,
   op_mode_timestamp int(10) unsigned default NULL,
   update_accounts smallint(6) default '0',
-  next_op_mode varchar(20) default NULL,
+  next_op_mode varchar(20) NOT NULL default '',
   ipodhash varchar(64) default NULL,
   osid varchar(35) NOT NULL default '',
   ntpdrift float default NULL,
