@@ -410,6 +410,18 @@ Phase "syslog", "Setting up syslog", sub {
 	    if ($line =~ /^[^#].*$pat/) {
 		$line =~ s/($pat)/\;$LOGFACIL.none$1/;
 	    }
+
+	    #
+	    # XXX don't send anything to logged in root users.
+	    # Per-user linktest proxies run on ops as root in a "full"
+	    # ssh ("-t -t") which appears as a login shell.  Thus the
+	    # linktest output given to the user might include syslog
+	    # messages.
+	    #
+	    if ($line =~ /root$/) {
+		$line =~ s/^/#/;
+	    }
+
 	    print SC $line;
 
 	    #
