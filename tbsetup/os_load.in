@@ -323,7 +323,7 @@ sub dolisting()
 	    DBQueryFatal("select distinct i.* from images as i ".
 			 "left join proj_memb as p on ".
 			 " i.pid IS NULL or p.pid=i.pid ".
-			 "where p.uid='$me' order by i.pid,o.imageid");
+			 "where p.uid='$me' order by i.pid,i.imageid");
     }
     else {
 	$query_result =
