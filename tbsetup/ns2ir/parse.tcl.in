@@ -227,7 +227,7 @@ namespace eval GLOBALS {
 
     # CPU and MEM usage values. Zero means ignore. For now, lets make
     # it an integer, 1 <= x <= 5.
-    variable cpu_usage 0
+    variable cpu_usage 3
     variable mem_usage 0
 }
 
