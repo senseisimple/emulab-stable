@@ -8,60 +8,49 @@
 
 
 use English;
+use strict;
 
 use lib '@prefix@/lib';
 use libdb;
+
+my $tbadmin = '@TBADMINGROUP@';
 
 my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
 my $mkgroup = '@prefix@/sbin/mkgroup';
 my $mkacct  = '@prefix@/sbin/tbacct add';
 
-print "IMPORTANT: You should ONLY use this script to create the first\n";
-print "testbed user - others should be created through the web interface\n";
+my $protouser       = 'elabman';
+my $protouser_name  = 'Emulab Manager';
+my $protouser_email = '@TBOPSEMAIL@';
+my $protoproj       = 'emulab-ops';
+my $protoproj_desc  = 'Operations Meta-Project';
 
-my $username;
+my $result = DBQueryFatal("select * from users where uid='$protouser'");
+if ($result->num_rows()) {
+    die "This script has already been run, there is no need to run it again\n";
+}
+
 if ($UID != 0) {
-    my $name = getpwuid($UID);
-    print "Make account for $name? (Y/N) ";
-    if (<> =~ /Y/i) {
-	$username = $name;
-    }
+    die "Sorry, this must be run as root\n";
 }
 
-if (!$username) {
-    print "New username (you): ";
-    $username = <>;
-    chomp($username);
-}
+print "This script will create the 'proto-user' $protouser, which you will\n";
+print "use to bootstrap other users. It also creates the emulab-ops\n";
+print "meta-project.\n\n";
 
-my ($userfull, $password, $uid);
-if (getpwnam($username)) {
-    print "User already exists, using existing user information\n";
-    my @user_info = getpwnam($username);
-    $password = $user_info[1];
-    $uid      = $user_info[2];
-    $userfull = $user_info[6];
-} else {
-    print "New user's full name: ";
-    $userfull = <>;
-    chomp($userfull);
+# Get a password for the user
+print "Pick a password for $protouser (warning, will be echoed): ";
+my $password = <>;
+chomp($password);
+my @salt_chars = ('a'..'z','A'..'Z','0'..'9');
+my $salt = $salt_chars[rand(@salt_chars)] .
+	   $salt_chars[rand(@salt_chars)];
+my $encpass = crypt($password, $salt);
 
-    print "Encrypted password for user: ";
-    $password = <>;
-    chomp($password);
-
-    $uid = 10000;
-    while (getpwuid($uid)) { $uid++; }
-}
-
-print "New project pid: ";
-my $project = <>;
-chomp($project);
-
-print "New project description: ";
-my $projdesc = <>;
-chomp($projdesc);
+# Get uid for the user and a gid for the project
+my $uid = 10000;
+while (getpwuid($uid)) { $uid++; }
 
 my $gid = 6000;
 while (getgrgid($gid)) { $gid++; }
@@ -69,50 +58,59 @@ while (getgrgid($gid)) { $gid++; }
 my $ggid = $gid + 1;
 while (getgrgid($ggid)) { $ggid++; }
 
-if (!$username || !$project || !$password || !$userfull || !$projdesc) {
-    die "Not all information given, exiting\n";
+# We put the proto-user in the tbadmin group, because the emulab-ops
+# group does not exist yet
+my $agid = (getgrnam($tbadmin))[2];
+if (!defined $agid) {
+    die "Unable to get group ID for $tbadmin\n";
 }
-
-#
-# Quote special characters in user-supplied data
-#
-$userfull = DBQuoteSpecial($userfull);
-$projdesc = DBQuoteSpecial($projdesc);
 
 print "Creating user/project: Are you sure? (Y/N) ";
 if (<> !~ /Y/i) {
     die "Aborted\n";
 }
 
+print "Creating user on boss...\n";
+if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -h - " .
+       "-s /bin/nologin -c \"$protouser_name\"\n") {
+       die "Unable to add user to the password file!\n";
+}
+
 print "Creating user in database...\n";
-DBQueryFatal("insert into users set uid='$username', usr_created=now(), " .
-	"usr_name=$userfull, usr_pswd='$password', unix_uid=$uid, ".
-	"usr_modified=now(), admin=1, dbedit=1, status='active'");
+DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
+	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
+	"usr_modified=now(), admin=1, webonly=1, status='active'");
 
 print "Creating project in database...\n";
-DBQueryFatal("insert into projects set pid='$project', created=now(), " .
-	"name=$projdesc, head_uid='$username', unix_gid=$gid, " .
+DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
+	"name='$protoproj_desc', head_uid='$protouser', unix_gid=$gid, " .
 	"approved=1");
 
 print "Creating group in database...\n";
-DBQueryFatal("insert into groups set pid='$project', gid='$project', " .
-	"leader='$username', created=now(), description='Default Group', " .
-	"unix_gid=$ggid, unix_name='$project'");
+DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', " .
+	"leader='$protouser', created=now(), description='Default Group', " .
+	"unix_gid=$ggid, unix_name='$protoproj'");
 
 print "Putting user in group...\n";
-DBQueryFatal("insert into group_membership set uid='$username', " .
-	"pid='$project', gid='$project',  trust='project_root'," .
+DBQueryFatal("insert into group_membership set uid='$protouser', " .
+	"pid='$protoproj', gid='$protoproj',  trust='project_root'," .
 	"date_applied=now(), date_approved=now()");
 
+# Flip UID to the new user so that the mk* scripts are happy - they can't
+# be run as root for accountability reasons
+$EUID = $UID = $uid;
+$EGID = $GID = $gid;
+
 print "Running mkproj...\n";
-system "$wap $mkproj $project";
+system "$wap $mkproj $protoproj";
 
 print "Running mkgrp...\n";
-system "$wap $mkgroup $project $project";
+system "$wap $mkgroup $protoproj $protoproj";
 
 print "Running mkacct...\n";
-system "$wap $mkacct $username";
+system "$wap $mkacct $protouser";
 
 print "User created. Once the web page is up, you should be able to log in\n";
-print "as the user you just created. Make sure to go to the user and project\n";
-print "pages, and fill out information such as phone number, web URLs, etc.\n";
+print "as '$protouser' with the password you just entered. Refer to\n";
+print "setup-db.txt for instructions on creating a 'real' user account for\n";
+print "yourself.\n";

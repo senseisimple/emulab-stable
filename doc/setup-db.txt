@@ -3,33 +3,58 @@
 #####
 
 Note: we are working on better automating many of the procedures in this
-document - for now, though, many of them are manual.
+document - for now, though, a few of them are still manual.
 
 Note: steps labeled "Local Only" are only required when setting up a testbed
 with local nodes - they can be skipped in a widearea-only testbed.
 
-##### Step 1 - Setup users
+##### Step 1 - Setup users, projects, and experiments
 
-At this point, it's a good idea to get the nfs mounts between boss and ops
-setup, as well at the ssh root keys. See the boss and ops setup documents for
-details.
+In order to proceed, you should have the following working (from the boss and
+ops setup documentation):
+NFS mounts between boss and ops
+Root ssh keys (so that root on boss can ssh to ops without a password)
+The web interface (you don't need to be able to log in yet)
 
-Run the 'firstuser' script. This will get put in the utils subdirectory of your
-object tree. (Note: configure will not set the executable bit on the script, so
-you'll need to set it yourself, or run 'perl firstuser'.) This script will let
-you create the first user and project in the database. By default, it will grab
-information about the account it's being run as (probably you,) or you can
-supply a username, an encrypted password string (grab it from a password file,)
-etc. This script will also prompt you to create the first project - create the
-project 'emulab-ops', which is a meta-project for holding experiments.
+Run the 'firstuser' script on boss. This will get put in the utils subdirectory
+of your object tree. (Note: configure will not set the executable bit on the
+script, so you'll need to set it yourself, or run 'perl firstuser'.) This
+script will create a dummy user, which will be used only to bootstrap 'real'
+users. The firstuser script will prompt you for a password for this user, named
+'elabman'.
 
-If you want to make sure that this account is a member of any Unix groups (such
-as wheel,) run 'unixgroups -a <uid> <gid> ...'
+Make sure you can log into the web interface using the 'elabman' account. This
+account is created as a testbed administrator, but there is one thing you will
+need to do in order to use your admin powers. For the same reason that you use
+'su' and/or 'sudo' on your UNIX boxes instead of logging in as root, you must
+explicitly enable admin privileges after you log in. When logged in as a user
+who is allowed to become an admin, you will see a green dot one the left side
+of the header above the main page content. The green dot means that although
+you are allowed admin powers, they are currently turned off, and you see the
+same web pages that a regular user sees, and can use the sam actions. If you
+click on the dot, it will turn red, and you will have full administrator
+privileges; we call this 'going red dot'.  Many of the procedures in this file
+require you to be in red dot mode.
 
-##### Step 2 - Setup projects and experiments
+Now, we'll use the elabman user to bootstrap your own account. Log out of the
+web interface, and use the 'Request Account' button to start a new project.
+Create a project that you can use for the faculty/students/staff involved in
+running your testbed - you can name it anything you'd like. Fill in your own
+information in the 'Project Head Information' section.  If you have created an
+account for yourself by hand on boss and/or ops, it is important that you
+either user a different username on this form, or delete your handmade account
+(using 'pw userdel <username>') on BOTH boss AND ops. Shortly after submitting
+this form, you should get email at the address you included on the form -
+follow the instructions it gives for verifying your email address. After
+entering your password, while still logged in to your new account, use the
+'Join project' link in the menu to join the 'emulab-ops' project (leave the
+'group' field blank.)
 
-At this point, you should get the webserver up and running on your boss node.
-Again, instructions are in the boss setup documentation.
+Okay, now log out of the web interface, log back on as elabman, and go 'red
+dot'.  Use the 'Approve New Projects' link on the menu to approve the project
+you just started. Also, use the 'New User Approval' page to approve your new
+account in the the 'emulab-ops' project - give yourself trust 'group root', so
+that you can approve others into this project too.
 
 Go to the web interface, and log in as the admin account you created. Create a
 project for the administrators at your site (we call ours 'testbed', you can
@@ -37,11 +62,51 @@ call yours whatever you call your project or group).  As soon as you've sent
 the request to sart the project, you can use the 'New Project Approval' link to
 make it active.
 
-Others at your site can now apply to join your project.
+Now, that you have an account, there a few things you're going to want to do -
+you'll also want to do these things to other admin-types too, when their
+accounts get created:
+1) Set your 'admin bit' - set the 'admin' column for your account in the users
+   table to '1' - you can do this, on boss, with:
+   
+   echo 'update users set admin=1 where uid="<username>"' | mysql tbdb
 
-There are three experiments that must be created in the emulab-ops project.
-Just start them through the normal 'begin experiment' page, and don't give an
-NS file. These experiments are:
+2) Give yourself the ability to log in to boss - most users have a restricted
+   shell on boss, and are not allowed to log in using a password. Edit the
+   password file (use 'vipw', FreeBSD requires some special processing on the
+   password file after editing). Give yourself a real shell, and paste in your
+   encrypted password string from ops.
+
+3) Add yourself to important groups - If you want to be a member of any UNIX groups
+   on boss, use the 'unixgroups' command (our automated account tools may wipe
+   out groups added by hand.) You will need to be logged in as yourself (not
+   root) on boss to run this command. You will want to be a member of at least
+   the 'tbadmin' and 'wheel' groups. The syntax for this command is:
+
+   unixgroups -a <username> <groupname> ...
+
+Just as you need to go 'red dot' to use admin privileges on the web interface,
+you must also explicitly enable them on the command line. To do this, prefix
+the command you want to run with 'withadminprivs'. For example, I might invoke
+unixgroups like this:
+withadminprivs unixgroups -a ricci tbadmin wheel
+
+(Note: withadminprivs and many other admin-type commands live in
+/usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your
+$PATH.)
+
+Now that you are an admin, you don't need the elabman account anymore. Log into
+the web interface as yourself, go red dot, and go to the user list. Find
+elabman (you may need to click on 'Show: all' a the top of the page). Go to
+elabman's profile page  (by clicking on the uid) and freeze the user.
+
+Others at your site can now apply to join your project, or start their own.
+
+There are three meta-experiments that must be created in the emulab-ops
+project.  Just start them through the normal 'begin experiment' page, and don't
+give an NS file (you must be 'red dot' to do this.) Also, uncheck the
+'idle-swap' checkbox so that they do not get swapped out accidentally.
+
+These experiments are:
 
 hwdown - Nodes that are down due to hardware failure
 reloading - Nodes that are having their disks automatically reloaded
@@ -50,7 +115,7 @@ reloadpending - Nodes that are awaiting disk reloading
 Any other 'holding' experiments that you want for operations should be put
 into the emulab-ops project.
 
-##### Step 3 - Setup web sql editor
+##### Step 2 - Setup web sql editor
 
 Several of the steps below require you to add data to the database by hand. If
 you're comfortable with SQL, you can do this directly with SQL queries, or you
@@ -90,7 +155,7 @@ This is to protect against accidental database damage, as mentioned in the
 warning above. We'll soon provide contents for this table
 (webdb_table_permissions) with the testbed software.
 
-##### Step 4 - Setup switches
+##### Step 3 - Setup switches
 ##### Local Only
 
 1) Create node types for switches
@@ -157,18 +222,10 @@ Finally, add switches to these stacks by putting entries in the switch_stacks
 table, listing the node_id of each switch and the stack_id of the stack it
 belongs to.
 
-##### Step 5 - Setup control hardware
+##### Step 4 - Setup control hardware
 ##### Local Only
 
-1) Boss/ops nodes
-
-Optional step: You can put your control (boss and ops) nodes in the database if
-you wish. You'll need to add entries to the nodes, interfaces, and wires
-tables, and possibly the node_types and interface_types tables as well. See the
-instructions for adding nodes below for descriptions of the contents of these
-tables.
-
-2) Power controllers
+1) Power controllers
 
 The only two supported power controllers at this time are the APC AP9210 and
 the BayTech RPC27. Theoretically, other SNMP and serial-controlled power
@@ -183,7 +240,7 @@ If you have serial power controllers, just create entries node_types and nodes
 - no interfaces or wires. Again, the role in the nodes table should be
 'powerctrl'.
 
-##### Step 6 - Images and OSids
+##### Step 5 - Images and OSids
 
 These will depend on the image(s) and any OSKit kernels you've recieved, or
 built yourself. Since you're probably using disk images from Utah, the best
@@ -193,6 +250,6 @@ required to load disk images.  For a widearea-only testbed, no images entries
 in the images table a required, but OSIDs are still useful, to determine what a
 node's capabilities are. 
 
-##### Step 7 - Setup nodes
+##### Step 6 - Setup nodes
 
 To add nodes to the testbed, see setup-nodes.txt .
