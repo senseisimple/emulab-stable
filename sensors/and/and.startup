@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# /etc/rc.d/init.d/and, /sbin/init.d/and, /etc/init.d/and
+#
+# SysV init.d compliant startup script for auto nice daemon.
+#
+# 1999, 2000, 2001 Patrick Schemitz <schemitz@users.sourceforge.net>
+# http://and.sourceforge.net/
+# 
+# chkconfig: 2345 90 10
+# description: automatically renice and kill jobs.
+#
+# processname: and
+# config: /etc/and.conf
+#
+
+AND_FLAGS=""
+test -r /etc/rc.config && . /etc/rc.config
+
+case "$1" in
+    start)
+	echo -n "Starting auto nice daemon:"
+	INSTALL_SBIN/and $AND_FLAGS >&/dev/null
+	ps axuw | grep -v grep | grep INSTALL_SBIN/and >/dev/null
+	if [ $? = 0 ]; then
+	    echo " done"
+	    exit 0
+	else
+	    echo " failed"
+	    exit 1
+	fi
+	;;
+    stop)
+	echo -n "Shutting down auto nice daemon:"
+        uname | grep OSF1 >/dev/null || killall INSTALL_SBIN/and
+	echo " done"
+	exit 0
+	;;
+    restart)
+	$0 stop  &&  $0 start
+	exit 0
+	;;
+    status)
+	echo -n "Checking for auto nice daemon: "
+	ps axuw | grep -v grep | grep INSTALL_SBIN/and >/dev/null
+	if [ $? = 0 ]; then
+	    echo "running"
+	    exit 0
+	else
+	    echo "no process"
+	    exit 1
+	fi
+	;;
+    *)
+	echo "Usage: $0 {start|stop|status|restart}"
+	exit 1
+esac

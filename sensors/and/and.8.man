@@ -1,0 +1,146 @@
+.TH AND 8 "__DATE__" "Unix" "Administrator's Tools"
+
+.SH "NAME"
+and \- auto nice daemon
+
+.SH "SYNOPSIS"
+.B and
+.RB [ \-htvsx ]
+.RB [ \-i
+.IR interval ]
+.RB [ \-c
+.IR /path/to/and.conf ]
+.RB [ \-d
+.IR /path/to/and.priorities ]
+
+
+.SH "VERSION"
+This manual page documents
+.B and
+version __VERSION__.
+
+.SH "DESCRIPTION"
+The auto nice daemon activates itself in certain intervals and renices and
+even kills jobs according to their priority and CPU usage.
+
+Renice levels and kill signals can be defined in terms of users, groups,
+and commands. Wildcards can be specified for any of these. In addition,
+commands can be specified using POSIX regular expressions. To allow for
+network-wide configuration and priority files, a mechanism for hostname-based
+evaluation is provided, again supporting regular expressions for specifying
+host names.
+
+Jobs owned by root are left alone. Jobs are never increased in their priority.
+
+Here are some real-world examples:
+
+A certain user is notorious for wasting CPU with next-to-irrelevant jobs.
+One line is sufficient to renice all of his jobs to about 19.
+This is a typical situation for a LART (Luser's Attitude Readjustment Tool)
+like
+.B and.
+
+A CPU server is dedicated to a certain group, but others may also use
+it when it's idle. Just define default nice levels of e.g. 18 and a lower
+nice level for the privilegued group, say nice level 12.
+
+A certain web browser who shall remain unnamed tends to go berserk once
+in a while. You can configure 
+.B and
+to kill -9 it after e.g. 20 CPU minutes.
+
+
+.SH "COMMAND\-LINE OPTIONS"
+
+.TP 0.5i
+.B \-c /path/to/and.conf
+Specifies the configuration file. If this flag is omitted,
+.I /etc/and.conf
+is used instead.
+
+.TP 0.5i
+.B \-d /path/to/and.priorities
+Specifies the priority database file. If this flag is omitted,
+.I /etc/and.priorities
+is used instead.
+
+.TP 0.5i
+.B \-h
+Produces a short help text.
+
+.TP 0.5i
+.B \-i interval
+Sets the interval between nice level checks. This flag overrides the
+interval specified in the configuration file, if any. The default interval of
+.I 60
+seconds is used if neither -i nor an interval directive in the configuration
+file is given.
+
+.TP 0.5i
+.B \-s
+Log to stdout. Without this switch, logging goes to syslog (normal
+operations) or
+.I ./debug.and
+(test mode). Useful for debugging config files.
+
+.TP 0.5i
+.B \-t
+Run in test mode only, i.e. don't really renice or kill anything.
+In this mode, logging goes into
+.I ./debug.and
+instead of syslog.
+
+.TP 0.5i
+.B \-v
+Increase verbosity. For maximum verbosity, this flag can be specified
+multiple times. Be warned that this will blow up your log files, so
+you should use it in test mode only.
+
+.TP 0.5i
+.B \-x
+Run in full operational mode, i.e. really renice or kill things.
+This is the default.
+
+.SH "SIGNALS"
+
+On
+.B kill -HUP
+the auto nice daemon will reload its configuration file and priority
+database.
+
+
+.SH "FILES"
+
+.TP 0.5i
+.B  /etc/and.conf
+General configuration file. Stores default nice level, default interval,
+the "time zones" and the database lookup affinity.
+
+.TP 0.5i
+.B /etc/and.priorities
+The priority database (in plain text). Contains the (user, group, command,
+nicelevels) tuples.
+
+.TP 0.5i
+Both files have their own manual pages.
+
+.TP 0.5i
+.B ./debug.and
+Contains logging and status information for debugging purposes. 
+Used in test mode only.
+
+.SH "SEE ALSO"
+.BR and.conf (5),
+.BR and.priorities (5),
+.BR kill (1),
+.BR regex (7),
+.BR renice (8)
+
+
+.SH "INTERNET"
+.B http://and.sourceforge.net/
+
+
+.SH "AUTHOR"
+The auto nice daemon and this manual page were written by
+Patrick Schemitz <schemitz@users.sourceforge.net>

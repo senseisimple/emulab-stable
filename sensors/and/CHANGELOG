@@ -1,0 +1,74 @@
+Changelog for Auto Nice Daemon
+------------------------------
+
+Changes in 1.2.1
+- take into account not only usr but also sys time (Linux only; other
+  Unixes already did this)
+
+Changes in 1.2.0
+- more robust signal handling/config reload
+- startup script fixed for Tru64 killall
+- proper daemon mode
+- improved 64bit hardness
+- verbosity handling now in and_printf()
+- additional criterion: parent process (parent=.../ancestor=...)
+  (thanks to Dr. Hans Ekkehard Plesser, NLH, for idea and testing)
+- additional criterion: minimum user/group id
+  (again thanks to Dr. Hans Ekkehard Plesser)
+
+Changes in 1.0.9
+- fix broken zombie fix (Linux only)
+- fix ultra-long running (248+ days) processes (thanks to Marcelo
+  Matus, UA)
+- clean up signed/unsigned time vars
+- compiled for AMD Opteron
+
+Changes in 1.0.8
+- leave zombies alone (Linux only)
+
+Changes in 1.0.7
+- port to FreeBSD (thanks to a guy who calls himself quake2)
+- version and date are now compiled in
+- make doc target to bump version number in man pages
+
+Changes in 1.0.6
+- stop overwriting existing configuration when make install
+- small docs improvement (command name and regexes)
+- changed misleading log message (seemingly negative nice level)
+- added gtop to default config file
+- fix LICENSE (still GPL, but the file was truncated)
+- port to IRIX, IRIX64 and SunOS (thanks to Dan Stromberg, UCI)
+
+Changes in 1.0.5
+- fix format string vulnerability (please UPDATE!)
+  (thanks to INTEXXIA.com)
+
+Changes in 1.0.4
+- makefile improvements, esp. for Debian (thanks to Andras Bali
+  and Mikael Andersson)
+- include LICENSE
+
+Changes in 1.0.3
+- bug fix Linux/AXP: jiffies to seconds fixed (thanks to Markus
+  Lischka, TUM)
+- in config files, "on" hostname is now an extended regex
+  (thanks to Markus Lischka, TUM)
+- new commandline switch -s for output to stdout
+- documentation updates
+
+Changes in 1.0.2
+- minor documentation updates
+- improved default configuration
+- distribution-independend spec file for source rpms (thanks to
+  Terje Rosten for his help)
+- improved build process to support distribution-independend
+  spec file
+- fix logging: in -x mode (default), log via syslog; in -t mode (test),
+  log to ./debug.and
+- added chkconfig hook in SysV init script
+
+Changes in 1.0.1
+- fix status check in SysV init script
+
+Changes in 1.0.0
+- first official release

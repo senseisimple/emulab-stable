@@ -1,0 +1,108 @@
+#
+# Sample priority database for the auto-nice daemon, /etc/and.priorities
+#
+# Comments must have the # in the _first_ column!
+#
+# File format:
+#    user group job parent nice1 nice2 nice3
+# - user: user name or user id or * for all
+# - group: group name or group id or * for all
+# - job: executable (without path; may be a regexp) or * for all
+# - parent: keyword "parent=" or "ancestor=" followed by the 
+#   executable (without path; may be a regexp), or * for all
+# - nice1, nice2, nice3: nice levels for CPU usage ranges.
+#
+# At least one of user or group must be an asterisk *.
+#
+# After /etc/and.conf:lv1time seconds matching jobs are niced to nice1,
+# after /etc/and.conf:lv2time to nice2 and after /etc/and.conf:lv3time
+# to nice3.
+#
+# Read and.priorities(5) for details.
+#
+# 1999, 2000, 2004 Patrick Schemitz, schemitz@users.sourceforge.net
+#
+
+#
+# Philosophy:
+#
+# Hold down notorious troublemakers (Netscape, colourful screensavers, ...)
+# and leave other jobs alone. (Within reason, that is.)
+# Note that a perceptive user might rename his jobs' executables to
+# obtain higher privilegue. So the values must be sensible to that.
+# For instance, noone with his mind right would rename his computation-
+# intensive job to "gcc" to avoid renicing after two minutes, since
+# gcc is reniced to 19 after just another 18 minutes...
+#
+
+#
+# Default entry -- moderate renicing, priority always above screen savers.
+#
+*	*	*       *	4	8	12
+
+#
+# Jobs started by the Grid master process always run on 10. If someone
+# else besides User grid starts a (fake, presumably) Grid master, kill it
+# at once: it's a fraud! The real Grid master, of course, is left alone.
+#
+#*       *       *       ancestor=grid_nanny      10      10      10	
+#*       *       grid_nanny      *       -9      -9      -9
+#grid    *       grid_nanny      *       0       0       0
+
+#
+# Jobs of the local user are treated more nicely. The local user is
+# identified by the fact that her programs are started by the login
+# screen, kdm or xdm in this case.
+#
+*       *       *       ancestor=[xk]dm   2       2       2
+
+#
+# The hosts bar and baz are reserved for the foo group, so
+# prefer them over other groups.
+#
+#on (bar|baz)
+#*	foo	*       *	4	8	12
+#*	*	*	*	12	16	18
+#on .*
+
+#
+# Our special friend, user dau, tends to thresh machines with long-
+# running unniced jobs... we do not appreciate this behaviour. A little
+# punishment might be in order.
+#
+#dau	*	*	*	12	16	18
+
+#
+# Netscape -- more than 20 minutes probably means it's running berserk,
+# so we just kill it off.
+#
+*	*	.*netscape.*	*       2	-9	-9
+
+#
+# Compilers -- don't renice them the first 20 minutes, but then...
+# After an hour of compilation for one single source file, there
+# *is* something wrong.
+# ld and make shouldn't use more than 2 minutes themselves, so we
+# just leave them to the default.
+#
+*	*	gcc	*	0	19	-9
+*	*	g++	*	0	19	-9
+*	*	g77	*	0	19	-9
+*	*	cc1	*	0	19	-9
+
+#
+# Screen savers -- low priority from the beginning, but enough to log in.
+# KDE screen savers all end with .kss.
+#
+*	*	xlock.*	        *	15	15	15
+*	*	.*\.kss	        *	15	15	15
+
+#
+# System monitors -- don't monitor the system useless.
+#
+*	*	.*top	        *	15	15	15
+*	*	.*xosview.*     *	15	15	15
+*	*	.*xps	        *	15	15	15
+*	*	.*qps   	*	15	15	15
+*	*	.*ktop		*       15	15	15
+*	*	.*gtop		*       15	15	15

@@ -1,0 +1,209 @@
+.TH AND.PRIORITIES 5 "__DATE__" "Unix" "File Formats"
+
+.SH "NAME"
+/etc/and.priorities \- priority database for the auto nice daemon.
+
+
+.SH "VERSION"
+This manual page documents and.priorities for
+.B and
+version __VERSION__.
+
+
+.SH "DESCRIPTION"
+This is the priority database file for
+.B and.
+It stores (user, group, command, parent, nicelevels) tuples (hereafter called
+entries) to determine the new nice level (or the kill signal, for that
+matter) when a job reaches one of the time limits defined in
+.I /etc/and.conf.
+(See lv1time, lv2time, and lv3time on the and.conf manual page for
+details.) See the
+.B affinity
+setting in 
+.I /etc/and.conf
+for how ambiguities between the fields (user, group, command, parent) 
+are dealt with when searching the database to determine the new nice 
+level for a job.
+Note that if more than one entry matches with the same accuracy (e.g.
+with a parent= entry and an ancestor= entry), the 
+.B last entry wins!
+
+Comments start with a # in the
+.B first column.
+Empty lines are ignored. Unlike with other configuration files, lines
+.B cannot be concatenated
+with a backslash. Furthermore, this file is
+.B case sensitive.
+
+.B and
+allows for host-specific sections in the configuration file. These work
+as lines of the form 
+.I on somehost
+and work as follows: the parser determines if the host name (as returned
+by gethostname) matches the extended regular expression that follows the
+.I on
+keyword. If it does, it just keeps processing the file as if nothing had
+happened. If it does not match, however, everything up to the next
+.I on
+keyword is skipped. So if you want to end a host-specific section, you
+must write 
+.I on .*
+(which matches all hosts) to switch back to normal.
+
+Don't forget to
+.B kill -HUP
+the auto nice daemon to enable the changes.
+
+
+.SH "SETTINGS"
+
+A valid entry consists of a line of six columns, separated by one or
+more spaces. These columns are: (in that order)
+
+.TP 0.5i
+.B user
+The user ID the command is running under. May be a user name (which will
+be looked up in the password file and, if enabled, via NIS), or a numeric
+user ID, or an asterisk for any user.
+
+.TP 0.5i
+.B group
+The group ID the command is running under. May be a group name (which will
+be looked up in the group file and again, if enabled, via NIS), or a numeric
+group ID, or an asterisk for any group.
+
+.TP 0.5i
+.B command
+The name of the command, without path. May be a command, a regular
+expression to match multiple commands, or an asterisk for any command.
+Note that "foobar" will
+.B not
+match "/usr/bin/foobar" - you probably mean ".*foobar" or even ".*foobar.*".
+
+.TP 0.5i
+.B parent
+There are two modes of operation for the parent field, determined by a
+keyword:
+.B parent=foobar
+will match if a process' direct parent process matches the command or regular
+expression after the equal sign, whereas
+.B ancestor=foobar
+will match if 
+.I any 
+ancestor process matches. After the keyword and the equal sign goes the 
+name of the parent process, without path. May be a command, a regular
+expression to match multiple commands, or an asterisk for any command.
+(You can just use the asterisk if you want to ignore parents for this
+entry.) Note that again "foobar" will
+.B not
+match "/usr/bin/foobar", as with command.
+
+.TP 0.5i
+.B nicelevel 1
+The nice level after lv1time CPU time was used by the command. Positive
+numbers and 0 are interpreted as nice levels; negative numbers are
+interpreted as signals to be sent to the command. A "nice level" of
+19 will almost stop the job, -9 will actually kill it. (Like in kill -9.)
+lv1time can be set in
+.I /etc/and.conf
+
+.TP 0.5i
+.B nicelevel 2
+Same but after lv2time.
+
+.TP 0.5i
+.B nicelevel 3
+Same but after lv3time.
+
+
+.SH "EXAMPLES"
+
+Here are some entries from the real world (i.e. from "my" cluster
+at the Institute). As lv[123]time, 5 min., 20 min., and 1 hour is
+assumed. (Which is the default. See
+.I /etc/and.conf
+for details.) You might also check the default priority database
+that comes with
+.B and.
+
+
+# A finer default nice level
+.br
+* * * * 4 8 12
+.br
+
+# User dau is an idiot, so treat him like accordingly
+.br
+dau * * * 19 19 19
+.br
+
+# Netscape sometimes goes berserk, we must stop it
+.br
+* * netscape * 4 -9 -9
+.br
+
+# Most hosts are free for everyone but some are
+.br
+# especially for the FOO group
+.br
+* * * * 4 8 12
+.br
+on (bar|baz)
+.br
+* * * * 8 12 16
+.br
+# ... or, more radical: * * * * -9 -9 -9
+.br
+* foo * * 4 8 12
+.br
+on .*
+.br
+
+# KDE screen savers...
+.br
+* * .*kss * 16 16 16
+.br
+
+# Grid jobs (assuming they are started by a master
+.br
+# process)
+.br
+* * * ancestor=grid_master 10 10 10
+.br
+# Now some clever yet deceitful user might start all
+.br
+# his jobs using a shell script named grid_master.
+.br
+# He shall regret... whereas the original grid_master
+.br
+# (owned by grid) is left alone.
+.br
+* * grid_master * -9 -9 -9
+.br
+grid * grid_master * 0 0 0
+.br
+
+.SH "FILES"
+
+.TP 0.5i
+.B  /etc/and.priorities
+The priority database (in plain text). Contains the (user, group, command,
+nicelevels) tuples. This is what this manual page is about.
+
+
+.SH "SEE ALSO"
+.BR and (8),
+.BR and.conf (5),
+.BR kill (1),
+.BR regex (7),
+.BR renice (8)
+
+
+.SH "INTERNET"
+.B http://and.sourceforge.net/
+
+
+.SH "AUTHOR"
+The auto nice daemon and this manual page were written by
+Patrick Schemitz <schemitz@users.sourceforge.net>

@@ -1,0 +1,241 @@
+.TH AND.CONF 5 "__DATE__" "Unix" "File Formats"
+
+.SH "NAME"
+/etc/and.conf \- general configuration parameters for the
+auto nice daemon.
+
+
+.SH "VERSION"
+This manual page documents and.conf for
+.B and
+version __VERSION__.
+
+
+.SH "DESCRIPTION"
+This is the general configuration file for
+.B and.
+It stores settings like the default nice level, the renice intervals,
+the three stages of renicing, and the affinity of the priority database,
+i.e. the weight of (user, group, command) when resolving nice levels
+from the database. These settings are described below.
+
+Comments start with a # in the
+.B first column.
+Empty lines are ignored. Unlike with other configuration files, lines
+.B cannot be concatenated
+with a backslash. Furthermore, this file is
+.B case sensitive.
+
+.B and
+allows for host-specific sections in the configuration file. These work
+as lines of the form
+.I on somehost
+and work as follows: the parser determines if the host name (as returned
+by gethostname) matches the extended regular expression that follows the
+.I on
+keyword. If it does, it just keeps processing the file as if nothing had
+happened. If it does not match, however, everything up to the next
+.I on
+keyword is skipped. So if you want to end a host-specific section, you
+must write
+.I on .*
+(which matches all hosts) to switch back to normal.
+
+Don't forget to
+.B kill -HUP
+the auto nice daemon to enable the changes.
+
+
+.SH "SETTINGS"
+
+.TP 0.5i
+.B defaultnice
+The default nice level. A number between 0 and 19. Jobs for which no
+entry can be found in
+.I /etc/and.priorities
+are reniced to this level, regardless of the CPU time they've used
+so far. If you prefer to renice unknown jobs gradually, you can do
+so by supplying three asterisks as (user, group, command) tuple in
+.I /etc/and.priorities.
+The default nice level is
+.I 0
+
+.TP 0.5i
+.B interval
+The default interval between nice checks of the auto nice daemon,
+in seconds. This value can be overridden by the
+.I -i
+command-line option of
+.B and.
+The default interval is
+.I 60
+seconds.
+
+.TP 0.5i
+.B lv1time
+.TP 0.5i
+.B lv2time
+.TP 0.5i
+.B lv3time
+Ranges for the nice levels. Jobs with less than lv1time seconds
+CPU time are not reniced; jobs between lv1time and lv2time seconds
+are reniced to the first level in an.priorities; jobs between
+lv2time and lv3time seconds to the second level; jobs with more
+than lv3time seconds are reniced to the third level.
+Defaults are
+.I 120
+,
+.I 1200
+, and
+.I 3600
+seconds.
+
+.TP 0.5i
+.B minuid, mingid
+Minimum user id and group id to be considered for renicing. 
+Processes whose user id is below 
+.I minuid
+are left alone, as are processes with a group id of below 
+.I mingid.
+(Note that even if you set minuid to zero, root processes are
+left alone.)
+
+.TP 0.5i
+.B affinity
+Strategy for picking the right priority entry for a user/group/job
+triple. The strategy is a permutation of "cgu", "c"ommand, "g"roup,
+"u"ser. The order specifies the affinity of the priority lookup
+method. Suppose you have an entry for all jobs of user
+.I foo,
+another entry for all jobs of group
+.I bar,
+and yet another entry for the command
+.I baz.
+Furthermore suppose user
+.I foo
+(who happens to belong to group
+.I bar
+) starts a job named
+.I baz
+-- which entry should be chosen? This is what the affinity setting
+means, for example "cug" means an exact match of the command has priority
+over both an exact match of the user and the group. The default affinity is
+"cug", which is probably sensible for most cases, since it's the job
+which takes up CPU time, not the user or group ID.
+
+
+.SH "EXAMPLES"
+
+.TP 0.5i
+.B Default Configuration
+# This is the default configuration:
+.br
+default 0
+.br
+interval 60
+.br
+lv1time 300
+.br
+lv2time 1800
+.br
+lv3time 3600
+.br
+affinity cug
+.br
+minuid 0
+.br
+mingid 0
+.br
+
+.TP 0.5i
+.B Default Configuration, with terminals
+# Normal default configuration for all
+.br
+default 0
+.br
+interval 60
+.br
+lv1time 300
+.br
+lv2time 1800
+.br
+lv3time 3600
+.br
+# Hosts foo, bar, baz are terminals and must
+.br
+# be more responsive, so earlier renice.
+.br
+on (foo|bar)
+.br
+lv1time 120
+.br
+lv2time 600
+.br
+lv3time 1200
+.br
+on .*
+.br
+# This is for all hosts again
+.br
+affinity cug
+.br
+
+.TP 0.5i
+.B Group-specific Hosts
+.br
+default 0
+.br
+interval 60
+.br
+lv1time 300
+.br
+lv2time 1800
+.br
+lv3time 3600
+.br
+# Normal affinity for all hosts.
+.br
+affinity cug
+.br
+# Hosts bar, baz belong to group foo, which
+.br
+# is privilegued on these hosts, so override
+.br
+# affinity. (Note regexp!)
+.br
+on ba[rz]
+.br
+affinity guc
+.br
+on .*
+.br
+minuid 500
+.br
+mingid 100
+.br
+
+
+.SH "FILES"
+
+.TP 0.5i
+.B  /etc/and.conf
+General configuration file. Stores default nice level, default interval,
+the "time zones" and the database lookup affinity. This is what this
+manual page is about.
+
+
+.SH "SEE ALSO"
+.BR and (8),
+.BR and.priorities (5),
+.BR kill (1),
+.BR regex (7),
+.BR renice (8)
+
+
+.SH "INTERNET"
+.B http://and.sourceforge.net/
+
+
+.SH "AUTHOR"
+The auto nice daemon and this manual page were written by
+Patrick Schemitz <schemitz@users.sourceforge.net>

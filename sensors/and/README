@@ -1,0 +1,90 @@
+README for the Auto Nice Daemon, AND
+------------------------------------
+
+The auto nice daemon will renice or even kill jobs according to a priority
+database, after they take up too much CPU time. (You define what "too much"
+actually means.) Refer to the man pages, and(8), and.conf(5), and
+and.priorities(5), for details and instructions, and check the home page,
+http://and.sourceforge.net/.
+
+
+Platforms:
+
+   Digital UNIX 4.0, 5.1
+   FreeBSD 4.x
+   IRIX and IRIX64
+   Linux 2.2.x and 2.4.x
+   OpenBSD 2.7+
+   Solaris 5.6
+
+Requires:
+
+   GNU make
+   ANSI C Compiler
+
+Documentation and Download:
+
+   http://and.sourceforge.net/
+
+Author:
+
+   Patrick Schemitz <schemitz@users.sourceforge.net>
+
+Credits:
+
+   SRPM spec file help by Terje Rosten <terjeros@phys.ntnu.no>
+
+   Linux/AXP jiffies to seconds fix by Markus Lischka
+   <Markus_Lischka@physik.tu-muenchen.de>
+
+   Debian package, Debian init script, Debian Makefile patches
+   by Andras Bali <bali@debian.org>
+
+   Debian Makefile patch by Mikael Andersson <mikan@mikan.net>
+
+   The guys at INTEXXIA, http://www.intexxia.com, noticed a
+   format string vulnerability and provided me with a patch.
+
+   Pauli K. Borodulin <boro@fixel.net> pointed out that overwriting
+   existing config files when doing make install was rude. He is
+   right.
+
+   Janet Casey <jcasey@gnu.org> noticed and reported that the LICENSE
+   file was truncated.
+
+   Dan Stromberg <strombrg@nis.acs.uci.edu> pointed out that
+   the Digital UNIX version, and-OSF1.c, works virtually unchanged
+   on IRIX, IRIX64 and Solaris (SunOS).
+
+   "Quake2" <quake2@vladimir.eso.nu> pointed out that
+   the OpenBSD version works virtually unchanged on FreeBSD.
+
+   Marcelo Matus <mmatus@dinha.acms.arizona.edu> sent a patch for
+   problems with very long running processes (alread longer than 248
+   days when auto nice daemon is started), and other issues.
+
+   Dr. Hans Ekkehard Plesser <hans.ekkehard.plesser@nlh.no> came up with
+   the idea of also examining a process' parent, as well as with the
+   minuid and mingid configuration options.
+
+   Both xavier@rootshell.be and Jerome Warnier <jwarnier@beeznest.net>
+   noticed that the Linux version accounted for usr time only; Xavier
+   also provided a (one-line) fix. (Solaris, IRIX, and Tru 64 already
+   did this.)
+
+Installation:
+
+   Edit the Makefile, which is well documented. (g)make. (g)make install.
+   (make simpleinstall if you don't have install(1) (which you really
+   should). Edit the configuration files, /etc/and.conf and
+   /etc/and.priorities. Start /usr/local/sbin/and. You must run it as
+   root if you want it to renice or kill any jobs but your own; on all
+   platforms but Linux, not even dummy mode will work for mortal users.
+   That's due to the way process information is accessible under these
+   Unices. (Linux is more generous here, which can be seen as both an
+   advantage and a security flaw. I'm not conclusive on this topic.)
+
+Last updated:
+
+   This document was last updated 2004/03/06 by Patrick Schemitz
+   <schemitz@users.sourceforge.net>
