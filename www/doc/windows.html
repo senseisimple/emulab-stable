@@ -78,9 +78,10 @@ under Cygwin mounts, described below.) <p>
 <h4><a name="Windows_Passwords"> </a> Windows Passwords </h4>
 
 A separate <b>Windows password</b> is kept for use only with experiment nodes
-running Windows.  It will eventually be presented behind-the-scenes to
-rdesktop and Samba by our Web interface.  Meanwhile, you will need to type it
-on each connection. <p>
+running Windows.  It is presented behind-the-scenes to rdesktop for RDP logins
+by our Web interface.  However, we still haven't figured out how to present it
+to Windows for the Samba mount of your home directory under an ssh login, so
+you will still need to type it on each ssh connection. <p>
 
 The default Windows password is randomly generated.  It's easy to change it to
 something easier to remember. <p>
@@ -119,17 +120,19 @@ Currently available images are:
 
 </ul>
 
-<div style="margin-left: 40px;"> <b>NOTE:</b> The only form of routing that is
-currently supported on Windows is <b><code>rtproto Static-old</code></b>.
-<code>rtproto Manual</code> should work too.  Don't put any other
-<code>rtproto</code> statements in your .ns file.   <p>
+<div style="margin-left: 40px;"> <b>NOTE:</b> Router nodes can not run Windows
+at present.  The only form of routing that is currently supported on Windows
+is <b><code>rtproto Static-old</code></b>.  <code>rtproto Manual</code> should
+work too.  Don't put any other <code>rtproto</code> statements in your .ns
+file. <p>
 
 If you built your experiment .ns file with the <i>NetBuild</i> GUI, be aware
 that it puts in a <code>rtproto Static</code> statement, which you will need
 to modify to <code>rtproto Static-old</code>. <p>
 
-There is more information
-on routing in the <a href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#Routing"> Routing Section of the Emulab Tutorial. </a><p> </div>
+There is more information on routing in the <a
+href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#Routing">
+Routing Section of the Emulab Tutorial. </a><p> </div>
 
 Notice that Windows reboots an extra time after first swap-in on a node, after
 changing the node name, to set up the network stack properly.   <p>

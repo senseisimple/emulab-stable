@@ -28,6 +28,7 @@ my $hostname;
 my $gateway;
 my $port    = "";
 my $login   = "";
+my $pswd    = "";
 
 #
 # Turn off line buffering on output
@@ -72,6 +73,10 @@ while (<CONFIG>) {
 	    $login = "-u $1";
 	    last SWITCH1;
 	};
+	/^password:\s*(.+)$/ && do {
+	    $pswd = "-p '$1'";
+	    last SWITCH1;
+	};
     }
 }
 close(CONFIG);
@@ -94,7 +99,7 @@ if (!defined($hostname)) {
 #
 my $rd = 'cd ~fish/misc/rdesktop/rdesktop-1.3.1; ./rdesktop -K -g 1280x1024';
 if (!defined($gateway)) {
-    exec "$rd $login $hostname &"; ### -p $pswd
+    exec "$rd $login $pswd $hostname &";
 }
 else {
     die("No proxying yet.\n");
