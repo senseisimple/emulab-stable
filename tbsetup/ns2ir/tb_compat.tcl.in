@@ -306,7 +306,7 @@ proc tb-set-netmask {lanlink netmask} {
 	return
     }
     set netmaskint [inet_atohl $netmask]
-    if {[expr ($netmaskint & 0xFFFFF000)] != 0xFFFFF000} {
+    if {[expr ($netmaskint & 0xFFFF0000)] != 0xFFFF0000} {
 	perror "\[tb-set-netmask] - $netmask is too big"
 	return
     }
