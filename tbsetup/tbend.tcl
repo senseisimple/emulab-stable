@@ -78,7 +78,7 @@ foreach pair $nodemap {
     lappend machines [lindex $pair 1]
 }
 
-if {[catch "exec $nfree $pid $eid >@ $logFp 2>@ $logFp err"]} {
+if {[catch "exec $nfree $pid $eid >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error freeing resources. ($err)"
     exit 1
 }
