@@ -195,9 +195,21 @@ sub DBQueryFatal($)
 sub DBFatal($)
 {
     my($message) = $_[0];
-    my($text);
+    my($text, $progname);
 
-    $text = "$message\n" . "$DBErrorString";
+    #
+    # Must taint check $PROGRAM_NAME cause it comes from outside.
+    #
+    if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
+	$progname = $1;
+    }
+    else {
+	$progname = "Tainted";
+    }
+
+    $text = "In TB script: $progname\n\n $message\n" . "$DBErrorString";
+
+    print STDERR "$text\n";
 
     system("echo \"$text\" | /usr/bin/mail ".
 	   "-s 'TESTBED: DBFatal - $message' \"$TBOPS\"");
