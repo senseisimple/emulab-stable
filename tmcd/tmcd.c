@@ -3682,7 +3682,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
 				 " n.sfshostid,e.eventkey,0, "
-				 " e.veth_encapsulate "
+				 " e.veth_encapsulate,0 "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3692,7 +3692,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.iface=t.control_iface "
 				 "where i.IP='%s'",
-				 23, inet_ntoa(ipaddr));
+				 24, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
