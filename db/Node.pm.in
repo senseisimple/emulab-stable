@@ -213,12 +213,7 @@ sub CreateVnodes($$)
 	return -1;
     }
     my $isremote = $vtype_rowref->{"isremotenode"};
-
-    #
-    # Currently, only local pcvm nodes are jailed and get a jailip.
-    # This little tidbit needs to go into the node_types table. 
-    # 
-    my $isjailed = (!$isremote && $vtype eq "pcvm" ? 1 : 0);
+    my $isjailed = $vtype_rowref->{"isjailed"};
 
     #
     # Make up a priority (just used for sorting). We need the name prefix
