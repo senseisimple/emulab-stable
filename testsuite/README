@@ -1,5 +1,3 @@
-WARNING: Only frontend tests are currently supported.
-
 Testbed Testing Suite
 ---------------------
 
@@ -154,6 +152,7 @@ Options:
   -full - Run in full mode.
   -exitonfail - Exit on any failure.
   -session <sessionid> - Specify alternate session ID.
+  -flest - Generate flest.log for use with flest.
 Mode:
   run <db> <testlist> [<pid> <eid> <num>]
   init <db> [<pid> <eid> <num>]

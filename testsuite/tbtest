@@ -18,6 +18,7 @@
 #   -leavedb - Avoids removing the DB on exit.
 #   -exitonfail - Exit on the first failure.
 #   -session <sessionid> - Specify an alternate session id.
+#   -flest - Generate flest.log file for flest runs.
 #
 # <mode> is one of:
 #    run <db> <testlist> [<pid> <eid> <num>] - Do everything.
@@ -72,6 +73,7 @@ sub show_help {
     print STDERR "  -full - Run in full mode.\n";
     print STDERR "  -exitonfail - Exit on any failure.\n";
     print STDERR "  -session <sessionid> - Specify an alternate session id.\n";
+    print STDERR "  -flest - Generate flest.log for flest runs.\n";
     print STDERR "Mode:\n";
     print STDERR "  run <db> <testlist> [<pid> <eid> <num>]\n";
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
@@ -90,6 +92,7 @@ sub show_help {
 $mode = "";
 $leavedb = 0;
 $exitonfail = 0;
+$flestlog = 0;
 $user=`whoami`;
 chop $user;
 
@@ -109,6 +112,8 @@ while (($#ARGV > -1) && ($mode eq "")) {
     } elsif ($arg eq "-session") {
 	if ($#ARGV == -1) {show_help;}
 	$user = shift;
+    } elsif ($arg eq "-flest") {
+	$flestlog = 1;
     } else {
 	$mode = $arg;
     }
@@ -227,6 +232,18 @@ sub doexit {
     }
     close(LOG);
     exit($_[0]);
+};
+
+# These are flest routines
+sub pass {
+    if ($flestlog) {
+	print FLESTLOG "PASS $_[0]\n";
+    }
+};
+sub fail {
+    if ($flestlog) {
+	print FLESTLOG "FAIL $_[0]\n";
+    }
 };
 
 sub step_init {
@@ -462,6 +479,12 @@ sub step_test {
     
     prints "START TEST\n";
     
+    if ($flestlog) {
+	open(FLESTLOG,"> flest.log");
+    }
+    
+    pass("Pre-Test Setup");
+
     # Time to run tests!
     prints "Running Tests\n";
     prints "Testlist: $testlist\n";
@@ -500,18 +523,21 @@ sub step_test {
 	if (tbexect("echo \"drop database if exists $testdb\" | mysql",TESTLOG)) {
 	    prints "FAIL - Could not drop test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
+	    fail("$test - Drop test DB");
 	    $fail++;
 	    doexit(1);
 	}
 	if (tbexect("echo \"create database $testdb\" | mysql",TESTLOG)) {
 	    prints "FAIL - Could not recreate test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
+	    fail("$test - Recreate test DB");
 	    $fail++;
 	    doexit(1);
 	}
 	if (tbexect("cat $path/clean.txt | mysql $testdb",TESTLOG)) {
 	    prints "FAIL - Could not populate test DB.\n";
 	    prints "Failure was FATAL - Exiting.\n";
+	    fail("$test - Populate test DB");
 	    $fail++;
 	    doexit(1);
 	}
@@ -519,6 +545,7 @@ sub step_test {
 	if (-f "$basedir/tests/$test/dbstate") {
 	    if (tbexect("cat $basedir/tests/$test/dbstate | mysql $testdb",TESTLOG)) {
 		prints "FAIL - Could not evaluate dbstate.\n";
+		fail("$test - Evaluate dbstate");
 		$fail++;
 		if ($exitonfail) {doexit(1);}
 		next;
@@ -557,11 +584,20 @@ sub step_test {
 		$status = "UKNONW";
 	    }
 	    prints "$status\n";
+	    if ($flestlog) {
+		@t = split(" ",$status);
+		$result = $t[0];
+		$msg = join(" ",@t[1..$#t]);
+		print FLESTLOG "$result $test $msg\n";
+	    }
 	}
 	
 	close(TESTLOG);
 	
 	chdir $path;
+    }
+    if ($flestlog) {
+	close FLESTLOG;
     }
     prints "END TEST\n";
 }
@@ -614,7 +650,7 @@ sub step_cleanup {
 	    prints "FAIL\n";
 	    $fail++;
 	} else {
-	    prints "PASS\n";
+	    prints("PASS\n");
 	    $pass++;
 	}
     }
