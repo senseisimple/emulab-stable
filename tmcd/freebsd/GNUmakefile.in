@@ -71,6 +71,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(INSTALL_DIR)/rc.delta
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(INSTALL_DIR)/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(INSTALL_DIR)/rc.mfs
+	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(INSTALL_DIR)/tbshutdown
 	$(INSTALL) -m 755 $(SRCDIR)/setipod $(INSTALL_DIR)/setipod
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname

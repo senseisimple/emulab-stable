@@ -14,6 +14,11 @@ if [ -x /etc/testbed/tmcc ]; then
 	/etc/testbed/tmcc state REBOOTED
 fi
 
+if [ -x /etc/testbed/tbshutdown ]; then
+        echo "Setting up shutdown notification (tbshutdown)..."
+        /etc/testbed/tbshutdown
+fi
+
 if [ -x /etc/testbed/setup ]; then
         echo "Doing Testbed setup configuration ..."
         /etc/testbed/setup

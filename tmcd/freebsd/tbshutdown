@@ -1,0 +1,53 @@
+#!/usr/bin/perl -w
+
+#
+# tbshutdown
+#
+# A simple daemon that starts up automatically, and waits to be killed
+# when the system does a killall just before shutting down, rebooting,
+# or going single-user. When it gets killed, it sends a notification
+# to the testbed.
+#
+
+# First, we background ourselves (daemonize)
+if ( background() ) {
+    # parent exits now
+    exit(0);
+}
+
+# Set up some signal handlers
+$SIG{INT}  = \&cleanup;
+$SIG{QUIT} = \&cleanup;
+$SIG{ABRT} = \&cleanup;
+$SIG{TERM} = \&cleanup;
+$SIG{KILL} = \&cleanup;
+
+# Then fall asleep until we're sent a signal
+
+sleep;
+
+exit(0);
+
+sub cleanup() {
+    # This is our signal handler.
+    system("/etc/testbed/tmcc state SHUTDOWN");
+    exit(0);
+}
+
+# Put ourselves into the background so that caller sees immediate response.
+sub background() {
+
+    $mypid = fork();
+    if ($mypid) { return $mypid; }
+
+    # We have to disconnect from the caller by redirecting both STDIN
+    # and STDOUT away from the pipe. Otherwise the caller will
+    # continue to wait even though the parent has exited.
+    open(STDIN, "< /dev/null") or
+        die("opening /dev/null for STDIN: $!");
+
+    open(STDERR, ">> /dev/null") or die("opening /dev/null for STDERR: $!");
+    open(STDOUT, ">> /dev/null") or die("opening /dev/null for STDOUT: $!");
+
+    return 0;
+}
