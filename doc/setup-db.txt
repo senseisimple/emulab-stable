@@ -1,5 +1,5 @@
 ##### Setting up tbdb for a new boss node
-##### Last updated January i18, 2002
+##### Last updated January 23, 2002
 
 ##### Step 0 - Create the database
 
@@ -225,7 +225,7 @@ delay_osid: Which OS should be run when this node is being a delay node.
 	Should usually be 'FBSD-STD'
 pxe_boot_path: Path (including hostname) to the mini-kernel that should be
 	loaded by PXE. Ask Utah for this kernel. For example,
-	'boss.emulab.net/tftboot/pxeboot'
+	'boss.emulab.net:/tftboot/pxeboot'
 
 2) Create interface types for the nodes
 
@@ -247,7 +247,45 @@ Will be somewhat automated (no script yet)  - documentation coming soon!
 
 5) Create their interfaces
 
-Use the macgrabber.pl script - documentation coming soon!
+The macgrabber script is used when you have serial consoles on all nodes. Thus,
+you should get the capture processes running on your ops node before beginnig
+this step.
+
+When a node is booting, and no data on the node is available in the database
+(ie. there is no entry in the interfaces table that matches it's IP address),
+then the node will boot a kernel from the boss node called /tftpboot/whoami .
+Ask Utah for this kernel - it simply prints out the MAC addresses of all of its
+interfaces.
+
+In order to get the node to boot far enough to load the whoami kernel, one more
+trick is needed: you need to start up your dhcp server with a range of dynamic
+addresses. Take a look at the template file in the dhcpd/ directory for our
+example dhcpd.conf file. Make a copy of this file, fixed up for your local IP
+addresses, etc. - but with the template part ('%%nodetype=foo' - you'll know
+what I mean when you see it) removed. There's an example in this file that
+shows how to set up a dynamic range. I suggest using a range of addresses that
+won't be used once the nodes are up, but is big enough for all of them, if
+possible. Once this is done, and the dhcpd.conf file is installed in the
+proper place, start up the dhcp server.
+
+Now, power cycle all nodes. When they come up, they should print out their
+MAC addresses, and you should have captured these all in /var/log/tiplogs
+on your ops node.
+
+Take a look at the utils/macgrabber.pl script. At the top of this script,
+there is '#defines' section, which contains information about the specific
+nodes you're harvesting information about. Edit this, accoring to the comments,
+to suit your needs. Someday, we may have a better way to record this
+information, but for now, this will do.
+
+Finally, run the macgrabber script, like so:
+macgrabber.pl pcX pcY /var/log/tiplogs/pcX.log
+... where pcX and pcY are the the first and last nodes in your set.  This will
+spit out, on stdout, sql commands to create the interfaces to the database. If
+its output seems to make sense, pipe it into 'mysql tbdb'.
+
+You can now hop back over to the boss setup documentation, and set up the
+dcpd.conf file for real.
 
 6) Create their wires
 
