@@ -438,6 +438,24 @@ sub stateTransition($$) {
 
     # Check if this is TBDB_NODESTATE_BOOTING , which has actions
     if ($newstate eq TBDB_NODESTATE_BOOTING) {
+	# If I skipped shutdown, and came to booting directly from isup,
+	# check for a mode transition so I don't miss one...
+	if ($oldstate eq TBDB_NODESTATE_ISUP) {
+	    info("$node: Came from ISUP! Checking for mode transition\n");
+	    my $r = DBQueryWarn("select next_op_mode from nodes ".
+				"where node_id='$node'");
+	    my ($nextmode) = $r->fetchrow();
+	    if ($nextmode) {
+		# Force the transition even though it is illegal
+		info("$node: Forcing mode transition!\n");
+		opModeTransition($node,$nextmode,1);
+		$mode=$nextmode;
+	    } else {
+		debug("No next mode.\n");
+	    }
+	}
+
+	# Check if I'm in the right mode
 	my $osid = TBBootWhat($node,$debug);
 	my $os_op_mode = os_opmode($osid);
 	info("$node: Current OS is '$osid', OS mode is '$os_op_mode'\n");
@@ -497,9 +515,10 @@ sub stateTransition($$) {
     }
 }
 
-sub opModeTransition($$) {
+sub opModeTransition($$;$) {
 
-    my ($node,$newmode) = @_;
+    my ($node,$newmode,$force) = @_;
+    if (!defined($force)) { $force = 0; }
 
     info("$node: Mode change to $newmode requested\n");
     # Check for invalid transitions
@@ -517,21 +536,25 @@ sub opModeTransition($$) {
 	    notify("Got an event for a node ($node) I don't know about\n");
 	}
     }
-    if (defined($modeTrans{"$mode:$oldstate"})) {
-	debug("Mode Transition check:\n");
-	my $translist = join(",",@{$modeTrans{"$mode:$oldstate"}});
-	#debug("translist=$translist\n");
-	#debug("splitlist=".join(", ",split(/[:,]/,$translist))."\n");
-	my %trans = split(/[:,]/,$translist);
-	debug("Valid transitions from $mode/$oldstate are:\n");
-	foreach my $k (sort keys %trans) {
-	    debug("$k => $trans{$k}\n");
-	}
-	if (defined($trans{$newmode})) {
+    if (defined($modeTrans{"$mode:$oldstate"}) || $force) {
+	if ($force) {
 	    $nextstate=$trans{$newmode};
 	} else {
-	    notify("Invalid mode transition for $node from ".
-		   "$mode/$oldstate to $newmode!\n");
+	    debug("Mode Transition check:\n");
+	    my $translist = join(",",@{$modeTrans{"$mode:$oldstate"}});
+	    #debug("translist=$translist\n");
+	    #debug("splitlist=".join(", ",split(/[:,]/,$translist))."\n");
+	    my %trans = split(/[:,]/,$translist);
+	    debug("Valid transitions from $mode/$oldstate are:\n");
+	    foreach my $k (sort keys %trans) {
+		debug("$k => $trans{$k}\n");
+	    }
+	    if (defined($trans{$newmode})) {
+		$nextstate=$trans{$newmode};
+	    } else {
+		notify("Invalid mode transition for $node from ".
+		       "$mode/$oldstate to $newmode!\n");
+	    }
 	}
     } else {
 	notify("Invalid mode transition for $node from $mode/$oldstate: ".
