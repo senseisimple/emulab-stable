@@ -124,30 +124,6 @@ if (!exists($baseimages{$building})) {
 }
 
 #
-# Red dot mean node is down.
-#
-my $reddot = GD::Image->newFromPng("$ICONDIR/redball.png", 1) ||
-    die("*** $0:\n".
-	"    Could not get reddot image!\n");
-my ($reddot_width, $reddot_height) = $reddot->getBounds();
-
-#
-# Green dot means node is free.
-#
-my $greendot = GD::Image->newFromPng("$ICONDIR/greenball.png", 1) ||
-    die("*** $0:\n".
-	"    Could not get greendot image!\n");
-my ($greendot_width, $greendot_height) = $greendot->getBounds();
-
-#
-# Blue dot means node is allocated
-#
-my $bluedot = GD::Image->newFromPng("$ICONDIR/blueball.png", 1) ||
-    die("*** $0:\n".
-	"    Could not get bluedot image!\n");
-my ($bluedot_width, $bluedot_height) = $bluedot->getBounds();
-
-#
 # If a floor specified, then do just that floor and spit it out.
 #
 if (defined($floor)) {
@@ -244,13 +220,25 @@ sub dofloor($$)
 	die("*** $0:\n".
 	    "    Could not get base ". $baseimages{"$building:$floor"} ."!\n");
 
+    #
+    # Green dot means node is free or owned by pid/eid.
+    # Red dot mean node is down.
+    # Blue dot means node is allocated
+    #
+    my $black = $baseimage->colorAllocate(0,0,0);
+    my $green = $baseimage->colorAllocate(0,250,0);
+    my $red   = $baseimage->colorAllocate(250,0,0);
+    my $blue  = $baseimage->colorAllocate(0,0,250);
+    my $CY    = 10;
+    my $CX    = 10;
 
     #
     # Grab the nodes on this floor in this building. We want to know
     # their allocation status so we know what colors to use.
     # 
     my $query_result =
-	DBQueryFatal("select loc.*,r.pid,r.eid from location_info as loc ".
+	DBQueryFatal("select loc.*,r.pid,r.eid,r.vname ".
+		     "  from location_info as loc ".
 		     "left join reserved as r on r.node_id=loc.node_id ".
 		     "where loc.floor='$floor' and loc.building='$building'");
 
@@ -260,44 +248,28 @@ sub dofloor($$)
 	my $y      = $rowref->{"loc_y"};
 	my $rpid   = $rowref->{"pid"};
 	my $reid   = $rowref->{"eid"};
+	my $label  = $nodeid;
 	my ($x1,$y1,$x2,$y2);
 
 	# Without -e option, green means node is free.
 	# With -e option, green means node belongs to experiment. 
 	if ((!defined($pid) && !(defined($rpid))) ||
 	    (defined($pid) && defined($rpid) && $pid eq $rpid)) {
-	    $x1 = $x - int($greendot_width / 2.0);
-	    $y1 = $y - int($greendot_height / 2.0);
-	    $x2 = $x1 + $greendot_width;
-	    $y2 = $y1 + $greendot_height;
-
-	    $baseimage->copy($greendot, $x1, $y1, 0, 0,
-			     $greendot_width, $greendot_height);
+	    $baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $green);
 	}
 	elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
-	    $x1 = $x - int($reddot_width / 2.0);
-	    $y1 = $y - int($reddot_height / 2.0);
-	    $x2 = $x1 + $reddot_width;
-	    $y2 = $y1 + $reddot_height;
-
-	    $baseimage->copy($reddot, $x1, $y1, 0, 0,
-			     $reddot_width, $reddot_height);
+	    $baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $red);
 	}
 	else {
-	    $x1 = $x - int($bluedot_width / 2.0);
-	    $y1 = $y - int($bluedot_height / 2.0);
-	    $x2 = $x1 + $bluedot_width;
-	    $y2 = $y1 + $bluedot_height;
-
-	    $baseimage->copy($bluedot, $x1, $y1, 0, 0,
-			     $bluedot_width, $bluedot_height);
+	    $baseimage->filledArc($x, $y, $CX, $CY, 0, 360, $blue);
 	}
+	$baseimage->string(gdTinyFont, $x - 7, $y + ($CY / 2), $label, $black);
 
 	my $tmp = {};
-	$tmp->{"X1"} = $x1;
-	$tmp->{"Y1"} = $y1;
-	$tmp->{"X2"} = $x2;
-	$tmp->{"Y2"} = $y2;
+	$tmp->{"X1"} = $x - ($CX / 2);
+	$tmp->{"Y1"} = $y - ($CY / 2);
+	$tmp->{"X2"} = $x + ($CX / 2);
+	$tmp->{"Y2"} = $y + ($CY / 2);
 	$areamap->{$nodeid} = $tmp;
     }
     return ($baseimage, $areamap);
