@@ -37,3 +37,4 @@ INSERT INTO sitevariables VALUES ('plab/setup/vnode_wait_time',NULL,'960','Numbe
 INSERT INTO sitevariables VALUES ('watchdog/rusage',NULL,'1','Interval in minutes between node resource usage reports (0==never report)');
 INSERT INTO sitevariables VALUES ('watchdog/hostkeys',NULL,'999999','Interval in minutes between host key reports (0=never report, 999999=once only)');
 INSERT INTO sitevariables VALUES ('plab/message',NULL,'','Message to display at the top of the plab_ez page');
+INSERT INTO sitevariables VALUES ('node/ssh_pubkey',NULL,'','Boss SSH public key to install on nodes');
