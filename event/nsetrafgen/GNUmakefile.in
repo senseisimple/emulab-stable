@@ -40,6 +40,10 @@ buildnse:
 	ln -sf $(SRCDIR)/../lib/event.h .
 	$(SRCDIR)/nse-install $(SRCDIR)/nse.patch
 
+makepatch:
+	chmod +x nse-makepatch
+	./nse-makepatch
+
 sup-install:
 	-mkdir -p $(INSTALL_SUPDIR)/$(CLIENT_BINDIR)/
 	-cp $(INSTALL_FILES) $(INSTALL_SUPDIR)/$(CLIENT_BINDIR)

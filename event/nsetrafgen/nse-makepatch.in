@@ -1,0 +1,34 @@
+#!/bin/sh
+SRCDIR=@srcdir@
+if [ ! -d ns-allinone-2.26 ]; then 
+    echo "ns-2.26 source does not exist in the current directory" 1>&2
+    echo "Cannot make patch file" 1>&2
+    exit 1
+fi
+if [ ! -d dist-ns-allinone-2.26 ]; then
+    mkdir dist
+    cd dist
+    echo "Downloading ns2.26 source from www.emulab.net"
+    fetch http://www.emulab.net/downloads/ns-allinone-2.26.tar.gz
+    if [ $? -ne 0 ]; then
+        echo "Failed..."
+        echo "Downloading ns2.26 source from www.isi.edu"
+        fetch http://www.isi.edu/nsnam/dist/ns-allinone-2.26.tar.gz
+    fi
+    tar xzf ns-allinone-2.26.tar.gz
+    cd ..
+    mv dist/ns-allinone-2.26 dist-ns-allinone-2.26
+    rmdir dist
+fi
+if [ -e $SRCDIR/nse.patch ]; then 
+    mv $SRCDIR/nse.patch $SRCDIR/nse.patch.old
+fi
+for i in `cat $SRCDIR/ns_files_modified.txt`
+do
+    if [ -e dist-ns-allinone-2.26/$i ]; then
+	diff -u dist-ns-allinone-2.26/$i ns-allinone-2.26/$i >> $SRCDIR/nse.patch
+    else
+	diff -u /dev/null ns-allinone-2.26/$i >> $SRCDIR/nse.patch
+    fi
+done
+exit 0

@@ -337,6 +337,7 @@ else
 		    event/proxy/GNUmakefile \
 		    event/nsetrafgen/GNUmakefile \
 		    event/nsetrafgen/nseinput.tcl \
+		    event/nsetrafgen/nse-makepatch \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
 		    event/stated/waitForState \
