@@ -206,15 +206,15 @@ Time         Node         Agent      Type       Event      Arguments
 120.000      nodeA        cbr1       TRAFGEN    START      PACKETSIZE=500
                                                            RATE=100000
                                                            INTERVAL=0.005
-120.000      nodeA        ftp0       NSETRAFGEN MODIFY     $ftp0 start
+120.000      nodeA        ftp0       TRAFGEN    MODIFY     $ftp0 start
 130.000      nodeA        cbr1       TRAFGEN    MODIFY     PACKETSIZE=512
 130.000      nodeA        cbr1       TRAFGEN    MODIFY     INTERVAL=0.01
 140.000      tbsdelay0    link0      LINK       DOWN       
-140.000      nodeA        tcpfull0   NSETRAFGEN MODIFY     $tcpfull0 set segsize_ 256
-140.000      nodeA        tcpfull0   NSETRAFGEN MODIFY     $tcpfull0 set segsperack_ 2
-145.000      nodeB        tcpfull1   NSETRAFGEN MODIFY     $tcpfull1 set nodelay_ true
+140.000      nodeA        tcpfull0   TRAFGEN    MODIFY     $tcpfull0 set segsize_ 256
+140.000      nodeA        tcpfull0   TRAFGEN    MODIFY     $tcpfull0 set segsperack_ 2
+145.000      nodeB        tcpfull1   TRAFGEN    MODIFY     $tcpfull1 set nodelay_ true
 150.000      tbsdelay0    link0      LINK       UP         
-150.000      nodeA        ftp0       NSETRAFGEN MODIFY     $ftp0 stop
+150.000      nodeA        ftp0       TRAFGEN    MODIFY     $ftp0 stop
 160.000      nodeA        cbr1       TRAFGEN    STOP		</code></pre>
 
 <p>

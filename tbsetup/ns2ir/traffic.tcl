@@ -267,6 +267,7 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
     $self instvar role
     $self instvar simulated
     $self instvar application
+    $self set objname $self
     
     set nseconfig ""
 
@@ -281,7 +282,7 @@ Agent/TCP/FullTcp instproc get_nseconfig {} {
     } else {
           set nseconfig "set $self \[new Agent/TCP/FullTcp/$tcptype]\n"
     }
-    
+
     if { $role == "sink" } {
          append nseconfig "\$$self listen\n\n"
     }
@@ -459,13 +460,15 @@ Application/FTP instproc get_nseconfig {} {
 
     $self instvar agent
     set nseconfig "set $self \[new Application/FTP]\n"
+    
+    append nseconfig "\$$self set objname $self\n"
 
     if { $agent != {} } {
          append nseconfig "\$$self attach-agent \$$agent\n\n"
     }
 
     # XXX temporary untill event system changes get in
-    append nseconfig "\[Simulator instance] at 30.0 \"\$$self start\"\n\n"
+    # append nseconfig "\[Simulator instance] at 30.0 \"\$$self start\"\n\n"
 
    return $nseconfig
 }
@@ -492,6 +495,8 @@ Application/Telnet instproc get_nseconfig {} {
     $self instvar interval_
 
     set nseconfig "set $self \[new Application/Telnet]\n"
+
+    append nseconfig "\$$self set objname $self\n"
                
     append nseconfig "\$$self set interval_ $interval_\n"
     if { $agent != {} } {
@@ -499,7 +504,7 @@ Application/Telnet instproc get_nseconfig {} {
     }
         
     # XXX temporary untill event system changes get in
-    append nseconfig "\[Simulator instance] at 30.0 \"\$$self start\"\n\n"
+    # append nseconfig "\[Simulator instance] at 30.0 \"\$$self start\"\n\n"
 
     return $nseconfig
 }

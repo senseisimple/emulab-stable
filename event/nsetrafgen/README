@@ -13,14 +13,9 @@ b) NSE executable file. To build it, do a "cvs co ns-2" in this
    ./install
    cp ns-2.1b8a/nse <sup_directory>
 
-The current NSE trafgen has the following caveats:
+The current NSE trafgen comes with a major caveat:
 
-0) The Telnet and FTP traffic generators will automatically start
-   30 seconds after "$ns run" in nseinput.tcl has been called. This just 
-   arbitrary and will be fixed in the event system version of NSE.
-1) nseinput.tcl does tmcc ready barrier synchronization which is not
-   sufficient across reboots. Again, this will be fixed
-2) It comes with all the bugs and idiosyncrasies of the FullTcp, FTP and
+0) It comes with all the bugs and idiosyncrasies of the FullTcp, FTP and
    Telnet models in NS.
 
 Here is an example scenario:
@@ -58,6 +53,12 @@ $tcp3 listen
 $ns attach-agent $nodeA $tcp3
 
 $ns connect $tcp2 $tcp3
+
+$ns at 30.0 "$ftp0 start"
+$ns at 120.0 "$ftp0 stop"
+$ns at 60.0 "$telnet0 start"
+$ns at 90.0 "$tcp2 set segsize_ 256; $tcp3 set segsize_ 512"
+$ns at 150.0 "$telnet0 stop"
 
 #Run the simulation
 $ns run

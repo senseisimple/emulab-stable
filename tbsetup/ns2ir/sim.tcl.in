@@ -320,6 +320,26 @@ Simulator instproc at {time eventstring} {
 	    set vnode [$obj get_node]
 	    set vname $obj
 	}
+	"Agent/TCP/FullTcp" -
+	"Agent/TCP/FullTcp/Reno" -
+	"Agent/TCP/FullTcp/Newreno" -
+	"Agent/TCP/FullTcp/Tahoe" -
+	"Agent/TCP/FullTcp/Sack" - 
+	"Application/FTP" -
+	"Application/Telnet" {
+	    # For events sent to NSE, we don't distinguish
+	    # between START, STOP and MODIFY coz the entire
+	    # string passed to '$ns at' is sent for evaluation to the node
+	    # on which NSE is running: fix needed for the
+	    # case when the above string has syntax errors. Maybe
+	    # just have a way reporting errors back to the
+	    # the user from the NSE that finds the syntax errors
+	    set otype TRAFGEN
+	    set etype MODIFY
+	    set args "\$$obj $cmd [lrange $event 2 end]"
+	    set vnode [$obj get_node]
+	    set vname $obj
+	}
 	"Link" {
 	    set otype LINK
 	    switch -- $cmd {

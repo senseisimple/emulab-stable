@@ -1,0 +1,23 @@
+#
+# This is the defaults definitions file for configure.
+#
+# Use the --with-TBDEFS=filename to specify your own. If you add a variable,
+# be sure to go and update configure.in.
+#
+TBDBNAME=tbdb
+WWWDEFS=mini
+WWWDEFS=shash-mini
+TBADMINGROUP=flux
+TBOPSEMAIL=shash+mini-ops@cs.utah.edu
+TBLOGSEMAIL=shash+mini-log@cs.utah.edu
+TBACTIVEARCHIVE=shash+activearch@cs.utah.edu
+TBUSERSARCHIVE=shash+usersarch@cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=1
+BOSSNODE=boss.mini.emulab.net
+USERNODE=users.mini.emulab.net
+FSNODE=fs.mini.emulab.net
+OURDOMAIN=mini.emulab.net
+FSDIR_GROUPS=/z/groups
+FSDIR_PROJ=/z/proj
+FSDIR_USERS=/z/users

@@ -61,12 +61,23 @@ foreach tcpsubclass [Agent/TCP/FullTcp info subclass] {
     lappend tcpclasses $tcpsubclass
 }
 
+set objnamelist ""
+
 foreach tcpclass $tcpclasses {
     set tcpobjs [$tcpclass info instances]
 
     foreach tcpobj $tcpobjs {
 	$ns attach-agent $n0 $tcpobj
+	lappend objnamelist [$tcpobj set objname]
     }
+}
+
+foreach ftpobj [Application/FTP info instances] {
+    lappend objnamelist [$ftpobj set objname]
+}
+
+foreach telnetobj [Application/Telnet info instances] {
+    lappend objnamelist [$telnetobj set objname]
 }
 
 # for each entry in `tmcc trafgens` that has NSE as the generator
@@ -130,5 +141,20 @@ foreach trafgen $trafgenlist {
     }
 
 }
+
+# get some params to configure the event system interface
+set boss [lindex [split [exec tmcc bossinfo] " "] 0]
+set pideidlist [split [exec hostname] "."]
+set vnode [lindex $pideidlist 0]
+set eid [lindex $pideidlist 1]
+set pid [lindex $pideidlist 2]
+set logpath "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
+
+# Configuring the Scheduler to monitor the event system
+set evsink [new TbEventSink]
+$evsink event-server "elvin://$boss"
+$evsink objnamelist [join $objnamelist ","]
+$evsink logfile $logpath
+[$ns set scheduler_] tbevent-sink $evsink
 
 $ns run
