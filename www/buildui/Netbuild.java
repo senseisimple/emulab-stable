@@ -52,8 +52,14 @@ public class Netbuild extends java.applet.Applet
 
     private String status;
 
-    private int workAreaX, workAreaY;
-    private int workAreaWidth, workAreaHeight;
+    private int appWidth, appHeight;
+
+    private int propAreaWidth;
+    private int paletteWidth; 
+    private int workAreaWidth;
+
+    private int workAreaX;
+    private int propAreaX;
 
     //    private Linko exportButton;
     private FlatButton exportButton;
@@ -186,9 +192,9 @@ public class Netbuild extends java.applet.Applet
     }
 
     private boolean isInWorkArea( int x, int y ) {
-	return x > workAreaX && y > workAreaY &&
+	return x > workAreaX && y > 0 &&
                x < workAreaX + workAreaWidth &&
-	       y < workAreaY + workAreaHeight;
+	       y < appHeight;
     }
 
     public static void redrawAll() {
@@ -252,7 +258,7 @@ public class Netbuild extends java.applet.Applet
 				g.drawRect( t.getX() + lastDragX - 16 , t.getY() + lastDragY - 16, 32, 32 );
 			    } else{
 				g.drawRect( t.getX() + lastDragX - 16 + workAreaX, 
-					    t.getY() + lastDragY - 16 + workAreaY, 
+					    t.getY() + lastDragY - 16, 
 					    32, 32 );
 			    }
 			}
@@ -273,7 +279,7 @@ public class Netbuild extends java.applet.Applet
 			    g.drawRect( t.getX() + lastDragX - 16 , t.getY() + lastDragY - 16, 32, 32 );
 			} else{
 			    g.drawRect( t.getX() + lastDragX - 16 + workAreaX, 
-					t.getY() + lastDragY - 16 + workAreaY, 
+					t.getY() + lastDragY - 16, 
 					32, 32 );
 			}
 		    }
@@ -379,7 +385,7 @@ public class Netbuild extends java.applet.Applet
         prePaintSelChange();
 
 	if (isInWorkArea(x,y)) {
-	    clickedOn = workArea.clicked( x - 80, y );
+	    clickedOn = workArea.clicked( x - paletteWidth, y );
 	    selFromPalette = false;
 	} else { 
 	    Thingee.deselectAll();
@@ -518,7 +524,7 @@ public class Netbuild extends java.applet.Applet
 				g.drawRect( t.getX() + lastDragX - 16 , t.getY() + lastDragY - 16, 32, 32 );
 			    } else{
 				g.drawRect( t.getX() + lastDragX - 16 + workAreaX, 
-					    t.getY() + lastDragY - 16 + workAreaY, 
+					    t.getY() + lastDragY - 16, 
 					    32, 32 );
 			    }
 			}
@@ -532,7 +538,7 @@ public class Netbuild extends java.applet.Applet
 		
 		if (selFromPalette) {
 		    // from palette..
-		    if (x < 80) {
+		    if (x < paletteWidth) {
 			// back to palette -- nothing happens.
 		    } else {
 			// into workarea. Create.
@@ -545,7 +551,7 @@ public class Netbuild extends java.applet.Applet
 			    t = new LanThingee(Thingee.genName("lan"));
 			    Netbuild.setStatus("LAN created.");
 			}
-			t.move( x - workAreaX, y - workAreaY );
+			t.move( x - workAreaX, y );
 			workArea.add( t );
 			Thingee.deselectAll();
 			t.select();
@@ -635,7 +641,7 @@ public class Netbuild extends java.applet.Applet
 	    */
 	    if (lastDragX != 0 && lastDragY != 0) {
 		workArea.selectRectangle( new Rectangle( leastX - workAreaX, 
-							 leastY - workAreaY, 
+							 leastY, 
 							 sizeX, 
 							 sizeY), shiftWasDown );
 		
@@ -656,8 +662,10 @@ public class Netbuild extends java.applet.Applet
 	return "Designs a network topology.";
     }
 
-    public Netbuild() {
-	super();
+    //    public Netbuild() {
+    //super();
+
+    public void init() {
 	status = "Netbuild v1.0 started.";
 	me = this;
 	mouseDown = false;
@@ -678,123 +686,87 @@ public class Netbuild extends java.applet.Applet
 	iFacePropertiesArea = new IFacePropertiesArea();
 	lanPropertiesArea   = new LanPropertiesArea();
 	lanLinkPropertiesArea = new LanLinkPropertiesArea();
-	/*
-	add( nodePropertiesArea );
-	add( lanPropertiesArea );
-	add( linkPropertiesArea );
-	add( lanLinkPropertiesArea );
-	add( iFacePropertiesArea );
-	*/
-	/*
-	propertiesPanel.add( nodePropertiesArea );
-	propertiesPanel.add( lanPropertiesArea );
-	propertiesPanel.add( linkPropertiesArea );
-	propertiesPanel.add( lanLinkPropertiesArea );
-	propertiesPanel.add( iFacePropertiesArea );
-*/
+
 	dragStarted = false;
 	
-	workAreaX = 80;
-	workAreaY = 0;
-	workAreaWidth = 400;
-	workAreaHeight = 479;
+	Dimension d = getSize();
+	appWidth    = d.width; //640;
+	appHeight   = d.height; //480;
+
+        propAreaWidth = 160;
+	paletteWidth  = 80;
+	workAreaWidth = appWidth - propAreaWidth - paletteWidth;
+
+	workAreaX = paletteWidth;
+	propAreaX = paletteWidth + workAreaWidth;
 
 	setBackground( darkBlue );
 	propertiesPanel.setBackground( darkBlue );
-	//propertiesPanel.setBackground( Color.white );
 	propertiesPanel.setVisible( true );
 
 	exportButton = new FlatButton( "create experiment" );
 	exportButton.addActionListener( this );
-	//Label l = new Label( "Export topology" );
 
 	copyButton = new FlatButton( "copy selection" );
 	copyButton.addActionListener( this );
 
 	add( propertiesPanel );
 
-	propertiesPanel.setLocation( workAreaX + workAreaWidth + 8, 0 + 8 + 24 );
-	//	propertiesPanel.setSize( 640 - 480 - 16, 480 - 16 - 16 );
-	propertiesPanel.setSize( 640 - 480 - 16, 480 - 16 - 32 - 22);
+	propertiesPanel.setLocation( propAreaX + 8, 0 + 8 + 24 );
+	propertiesPanel.setSize( propAreaWidth - 16, appHeight - 16 - 32 - 22);
 	
 	exportButton.setVisible( true );
 	exportButton.setEnabled( false );
 	add( exportButton );
 
-	exportButton.setLocation( workAreaX + workAreaWidth + 8, 480 - 24 - 2 - 2);
-	exportButton.setSize( 640-480-16, 20 );
-	/*	
-	copyButton.setVisible( true );
-	add( copyButton );
-
-	//copyButton.setLocation( workAreaX + workAreaWidth + 8, 480 - 24 );
-	copyButton.setLocation( workAreaX + workAreaWidth + 8, 6 );
-	copyButton.setSize( 640-480-16, 20);
-	*/
+	exportButton.setLocation( propAreaX + 8, appHeight - 24 - 2 - 2);
+	exportButton.setSize( propAreaWidth - 16, 20 );
 
 	copyButton.setVisible( false );
-	copyButton.setSize( 640-480-16, 20);
-	/*
-	workArea.setVisible( true );
-	add( workArea );
-	workArea.setLocation( workAreaX, workAreaY );
-	workArea.setSize( workAreaWidth, workAreaHeight );
-	*/
-	/*
-	nodePropertiesArea.setLocation( workAreaX + workAreaWidth + 8, 0 + 8 );
-	nodePropertiesArea.setSize( 640 - 480 - 16, 480 - 16 );
-	lanPropertiesArea.setLocation( workAreaX + workAreaWidth + 8, 0 + 8 );
-	lanPropertiesArea.setSize( 640 - 480 - 16, 480 - 16 );
-	linkPropertiesArea.setLocation( workAreaX + workAreaWidth + 8, 0 + 8 );
-	linkPropertiesArea.setSize( 640 - 480 - 16, 480 - 16 );
-	lanLinkPropertiesArea.setLocation( workAreaX + workAreaWidth + 8, 0 + 8 );
-	lanLinkPropertiesArea.setSize( 640 - 480 - 16, 480 - 16 );
-	iFacePropertiesArea.setLocation( workAreaX + workAreaWidth + 8, 0 + 8 );
-	iFacePropertiesArea.setSize( 640 - 480 - 16, 480 - 16 );
-	*/
+	copyButton.setSize( propAreaWidth - 16, 20);
+
 	precachePropertiesAreas();
     }
 
     public void paint( Graphics g ) {
-	//g.drawLine( 64,0,63,479 );
-	//g.fillRect( 0,0, 64, 480 );
-
-	
 	g.setColor( lightBlue );
-	g.fillRect( 0, 0, workAreaX, 479 );
+	g.fillRect( 0, 0, paletteWidth, appHeight );
 
 	g.setColor( cornflowerBlue );
-	g.fillRect( workAreaX, 0, workAreaWidth, 479 );
+	g.fillRect( workAreaX, 0, workAreaX + workAreaWidth, appHeight );
 
 	g.setColor( darkBlue );
-	g.fillRect( workAreaX + workAreaWidth, 0, 
-		    (639 - workAreaX - workAreaWidth), 479 );
+	g.fillRect( propAreaX, 0, 
+		    propAreaX + propAreaWidth, appHeight );
 		   
 	g.setColor( Color.black );
-	g.drawRect( 0, 0, workAreaX, 479 );
-	g.drawRect( workAreaX, 0, workAreaWidth, 479 );
-	g.drawRect( workAreaX + workAreaWidth, 0, 
-		    (639 - workAreaX - workAreaWidth), 479 );
+	g.drawRect( 0, 0, paletteWidth, appHeight );
+	g.drawRect( workAreaX, 0, workAreaWidth, appHeight );
+	g.drawRect( propAreaX, 0, 
+		    propAreaWidth, appHeight );
 
       
 	if (status.compareTo("") != 0 && status.charAt(0) == '!') {
 	    g.setColor( Color.red );
 	}
 
-	g.drawString( status, workAreaX + 4, 474 );
+	g.drawString( status, workAreaX + 4, appHeight - 6 );
 
 	palette.paint( g );
       	//propertiesArea.paint( g );
 
 	g.setColor( Color.black );
-	g.fillRect( workAreaX + workAreaWidth + 8 - 3, 480 - 24 - 2 - 8,640-480-16 + 6, 1 );
+	g.fillRect( propAreaX + 8 - 3, appHeight - 24 - 2 - 8,
+		    propAreaWidth - 16 + 6, 1 );
 
 	g.setColor( Color.darkGray );
-	g.fillRect( workAreaX + workAreaWidth + 8 - 3, 480 - 24 - 2 - 7,640-480-16 + 6, 1 );
+	g.fillRect( propAreaX + 8 - 3, appHeight - 24 - 2 - 7,
+		    propAreaWidth - 16 + 6, 1 );
 
-	g.translate( workAreaX, workAreaY );
-	g.setClip( 1, 1, workAreaWidth - 1, workAreaHeight - 1 );
+	g.translate( workAreaX, 0 );
+	g.setClip( 1, 1, workAreaWidth - 1, appHeight - 1 );
 	workArea.paint( g );
 	super.paint(g);
     }
 }
+
