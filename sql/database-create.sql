@@ -233,6 +233,7 @@ CREATE TABLE eventlist (
   isgroup tinyint(1) unsigned default '0',
   arguments text,
   atstring text,
+  parent varchar(64) NOT NULL default '',
   PRIMARY KEY  (pid,eid,idx),
   KEY vnode (vnode)
 ) TYPE=MyISAM;

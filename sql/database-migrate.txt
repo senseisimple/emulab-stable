@@ -2362,3 +2362,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table experiments change maximum_nodes maximum_nodes \
             int(6) unsigned default NULL; 
+
+1.306: Add a parent slot to the eventlist table for tying events to a
+       timeline or sequence.
+
+	alter table eventlist add parent varchar(64) not null default '';
