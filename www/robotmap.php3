@@ -25,7 +25,7 @@ unset($prefix);
 # One robot map right now ...
 # 
 $building = "MEB-ROBOTS";
-$floor    = 3;
+$floor    = 4;
 
 #
 # Optional pid,eid. Without a building/floor, show all the nodes for the
@@ -72,6 +72,28 @@ if (isset($map_y) && $map_y != "") {
 }
 else {
     unset($map_y);
+}
+
+#
+# max_x and max_y are the bounds of the image from the state file.
+#
+if (isset($max_x) && $max_x != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $max_x)) {
+	PAGEARGERROR("Invalid max_x argument.");
+    }
+}
+else {
+    PAGEARGERROR("Must supply max_x for image");
+}
+if (isset($max_y) && $max_y != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $max_y)) {
+	PAGEARGERROR("Invalid max_y argument.");
+    }
+}
+else {
+    PAGEARGERROR("Must supply max_y for image");
 }
 
 #
@@ -146,7 +168,7 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-$perl_args = "-o $prefix " .
+$perl_args = "-o $prefix -t -z " .
 	     # From clicking on a map image.
 	     (isset($map_x) ? "-c $map_x,$map_y " : "") .
 	     (isset($floor) ? "-f $floor " : "") .
@@ -174,7 +196,7 @@ if (! readfile("${prefix}.map")) {
 echo "<center>\n";
 
 # Wrap the image and zoom controls together in an input form.
-echo "<form method=\"get\" action=\"robotmap.php3\">\n";
+echo "<form method=\"post\" action=\"robotmap.php3\">\n";
 
 # The image may be clicked to get node info or set a new center-point.
 echo "  Click on the dots below to see information about the robot\n";
@@ -183,6 +205,8 @@ echo "  Click elsewhere to get its x,y location.\n";
 echo "  <br>\n";
 
 if (isset($map_x) && isset($map_y)) {
+#    $map_y = $max_y - $map_y;
+	
     if (isset($pixels_per_meter) && $pixels_per_meter) {
 	$meters_x = sprintf("%.3f", $map_x / $pixels_per_meter);
 	$meters_y = sprintf("%.3f", $map_y / $pixels_per_meter);
@@ -201,8 +225,14 @@ echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" ".
 
 echo "  <br>\n";
 
-# Hidden items are all returned as page arguments when any input control is clicked.
+# Hidden items are all returned as page arguments when any input control
+# is clicked.
 echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
+
+# The last_* items come from a .state file with the map, from the Perl script.
+if (! readfile("${prefix}.state")) {
+    TBERROR("Could not read ${prefix}.state", 1);
+}
 
 echo "</form>\n";
 
