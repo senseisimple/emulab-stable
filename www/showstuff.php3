@@ -541,9 +541,13 @@ function SHOWEXP($pid, $eid) {
     $nodes       = $exprow["count(r.node_id)"];
 
     if ($swappable)
-	$swappable = "Yes";
+	$swappable = "Yes
+<a href=\"toggle.php?type=swappable&value=0&pid=$pid&eid=$eid\">
+<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a>";
     else
-	$swappable = "No";
+	$swappable = "No
+<a href=\"toggle.php?type=swappable&value=1&pid=$pid&eid=$eid\">
+<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a>";
 
     #
     # Generate the table.
