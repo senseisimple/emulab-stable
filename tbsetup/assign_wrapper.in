@@ -131,7 +131,6 @@ sub printdb {
 #    switch->node and the others indicate node->switch.
 #  okbandwidths is indexed by bandwidth and is just a set.
 #  lannodes is indexed by physical name is the set of lan nodes.
-#  interfacespeed is indexed by type and contains the bandwidth.
 #  delaynodes is indexed by link name and contains [delay,bw,loss]
 #  portbw is indexed by virtual nodeport and contains the bandwidth
 #    of that port. Note that port bandwidth in the interfaces table is
@@ -170,7 +169,6 @@ printdb "Finding interface speeds:";
 my $result = DBQueryFatal("SELECT type,max_speed from interface_types");
 while (($type,$bandwidth) = $result->fetchrow_array) {
     $okbandwidths{$bandwidth} = 1;
-    $interfacespeed{$type} = $bandwidth;
     printdb " $bandwidth";
 }
 $result->finish;
@@ -186,6 +184,8 @@ $result =
 
 while (($vname,$ips,$type,$fixed,$isvirt) = $result->fetchrow_array) {
     if (! defined($fixed))  {$fixed  = "";}
+
+    # VIRTNODE HACK
     #
     # if its a vtype, no entry in node_types. vtypes break virtual nodes.
     # Need to look inside the vtype and make sure no mixing of vnodes and
@@ -204,15 +204,13 @@ while (($vname,$ips,$type,$fixed,$isvirt) = $result->fetchrow_array) {
     }
     $nodes{$vname} = $type;
     $nodelans{$vname} = [];
-    #
-    # VIRTNODE HACK: For a virtual node, we want to ignore the link info.
+
+    # VIRTNODE HACK
     # 
     $isvirtnode{$vname} = $isvirt;
-    if (! $isvirt) {
-	foreach $ipinfo (split(" ",$ips)) {
-	    ($port,$ip) = split(":",$ipinfo);
-	    $ips{"$vname:$port"} = $ip;
-	}
+    foreach $ipinfo (split(" ",$ips)) {
+	($port,$ip) = split(":",$ipinfo);
+	$ips{"$vname:$port"} = $ip;
     }
     if ($fixed ne "") {
 	$fixed_nodes{$vname} = $fixed;
@@ -229,27 +227,28 @@ $result =
 #
 # VIRTNODE HACK: Virtual nodes are special.
 #
-# Prepass the table looking for those lans that have a virtual node
+# Prepass the table looking for those virt_lans that have a virtual node
 # as a member. We want to ignore those (both sides) if its a duplex
-# link, but if its in a lan then we only want to ignore that particular
-# member of the lan. So, record the number of times we see the lan.
-# See below.
+# link, but if its in a lan then we barf since we cannot support putting
+# a vnode into a lan yet. We might never support it ...
 #
-my %skiplans = ();
+my %vnodelans = ();
 my %lancount = ();
+my %tunnels  = ();
 
 while (($vname,$member) = $result->fetchrow_array) {
     ($node,$port) = split(":",$member);
 
-    if (defined($lancount{$vname})) {
-	$lancount{$vname} += 1;
-    }
-    else {
-	$lancount{$vname} = 1;
-    }
-    
     if ($isvirtnode{$node}) {
-	$skiplans{$vname} = 1;
+	$vnodelans{$vname} = 1;
+    }
+    if (!defined($lancount{$vname})) {
+	$lancount{$vname} = 0;
+    }
+    $lancount{$vname} += 1;
+    if ($lancount{$vname} > 2) {
+	die("*** $0:\n".
+	    "    Virtual node $node in lan $vname not allowed!\n");
     }
 }
 $result->dataseek(0);
@@ -265,13 +264,16 @@ while (($vname,$member,$delay,$bandwidth,$lossrate,
     # VIRTNODE HACK: Virtual nodes are special.
     #
     # If its a duplex link involving a virtnode, skip it. 
-    # If its a lan (not a duplex link) then drop just that member.
     # We do not want to have assign deal with these. The nodes are
     # allocated as unconnected, and we deal with it later.
     # 
-    if ($skiplans{$vname} &&
-	($lancount{$vname} == 2 || $isvirtnode{$node})) {
-	    next;
+    if ($vnodelans{$vname}) {
+	if (! defined($tunnels{$vname})) {
+	    $tunnels{$vname} = [];
+	}
+	push(@{$tunnels{$vname}},$member);
+	printdb "    Added $member to tunnels of $vname\n";
+	next;
     }
     
     if (! defined($lans{$vname})) {
@@ -553,6 +555,7 @@ print "Maximum nodes = $maximum_nodes\n";
 #
 # v2pmap is indexed by virtual and contains the physical node.
 # p2vmap is indexed by physical and contains the virtual node
+# p2pmap is indexed by physical and contains the physical node.
 # plinks is indexed by virtual name and contains 
 #  (pnodeportA,pnodeportB) .  If one is a delay node it is always
 #  the second.
@@ -730,6 +733,21 @@ while (1) {
     $currentrun++;
 }
 
+#
+# VIRTNODES HACK: physical nodes (from the nodes table) might really
+# be a virtual node :-) Must get the underlying phys_nodeid.
+#
+my %p2pmap = ();
+
+foreach my $pnode (keys(%p2vmap)) {
+    my $phys_nodeid;
+
+    if (! TBPhysNodeID($pnode, \$phys_nodeid)) {
+	die("*** $0:\n".
+	    "    Cannot determine phys_nodeid for $pnode!\n");
+    }
+    $p2pmap{$pnode} = $phys_nodeid;
+}
 
 ######################################################################
 # Step 3 - Convert to vlans, delays, and portmap
@@ -1119,6 +1137,96 @@ foreach $vnodeport (keys(%portbw)) {
 }
 
 #
+# Upload the tunnels table. These are built for virtual node links. 
+#
+# First need to assign ports to the servers. To do that need to figure
+# out who is a server! We put the server on a real emulab node if
+# possible, and otherwise one of the virtual nodes. Also, we want to share
+# the server amongst more than one link, if possible, since a server can
+# handle more than one tunnel. So, make sure that only one port is assigned
+# per server node.
+#
+my %lantotunnelserver = ();
+my %vnodetotunnelport = ();
+my $secretkey;
+
+foreach $lan (keys(%vnodelans)) {
+    my $server;
+    my ($vnode,$vport);
+
+    #
+    # Pick one of the members to be the server.
+    # 
+    foreach $member (@{$tunnels{$lan}}) {
+	($vnode,$vport) = split(":",$member);
+
+	if (! $isvirtnode{$vnode} &&
+	    ! defined($lantotunnelserver{$lan})) {
+	    $server = $vnode;
+	}
+    }
+    # If no one qualified, pick the last one.
+    if (! defined($server)) {
+	$server = $vnode;
+    }
+    $lantotunnelserver{$lan} = $server;
+
+    # Assign a port, but only the first time chosen.
+    if (! $vnodetotunnelport{$server}) {
+	$vnodetotunnelport{$server} = nextipportnum($p2pmap{$v2pmap{$server}});
+    }
+}
+
+printdb "Tunnels\n";
+foreach $lan (keys(%vnodelans)) {
+    printdb " LAN: $lan\n";
+
+    my @members = @{$tunnels{$lan}};
+    if (@members != 2) {
+	die("*** $0:\n".
+	    "    Too many members for a tunnel!\n");
+    }
+    my $server = $lantotunnelserver{$lan};
+    my $ipport = $vnodetotunnelport{$server};
+
+    # So we can figure out the peer ip.
+    my ($member0,$member1) = @members;
+    my $node0  = (split(":",$member0))[0];
+    my $node1  = (split(":",$member1))[0];
+    
+    foreach $member (@members) {
+	my ($vnode,$vport) = split(":",$member);
+	my $pnode     = $v2pmap{$vnode};
+	my $isserver  = ($server eq $vnode ? 1 : 0);
+	my $peervnode = ($vnode eq $node0 ? $node1 : $node0);
+	my $peerpnode = $v2pmap{$peervnode};
+	my $ip;
+
+	#
+	# Need to map the server to the control net interface of the
+	# physical node.
+	#
+	if (! TBControlNetIP($peerpnode, \$ip)) {
+	    die("*** $0:\n".
+		"    No Control Network IP for $peerpnode!\n");
+	}
+	
+        printdb "  vnode:$vnode port:$ipport isserver:$isserver peer_ip:$ip ".
+	        "inet:$ips{$member}\n";
+
+	if (!defined($secretkey)) {
+	    $secretkey = TBGenSecretKey();
+	}
+	
+	DBQueryFatal("insert into tunnels ".
+		     " (pid, eid, node_id, vname, isserver, ".
+		     "  port, peer_ip, assigned_ip, password) ".
+		     "values ('$pid', '$eid', '$pnode', '$lan', $isserver, ".
+		     "         $ipport, '$ip', '$ips{$member}','$secretkey')");
+    }
+}
+
+#
 # Post pass the event list. At present, all LINK operations apply to
 # the delay node that is in the middle of it. Rewrite the vnode in
 # the event list. This info becomes stale when the experiment is swapped
@@ -1156,6 +1264,29 @@ foreach $delay (keys(%delays)) {
 		 "   event_objecttypes.type='LINK'");
 }
 
+#
+# Must post pass the trafgens list to make sure no ip port collisions.
+#
+$query_result =
+    DBQueryFatal("select vnode,vname,port,target_vnode,target_vname ".
+		 "from virt_trafgens where pid='$pid' and eid='$eid'");
+
+if ($query_result->numrows) {
+    while (my ($vnode,$vname,$port,$target_vnode,$target_vname) =
+	   $query_result->fetchrow_array()) {
+
+	my $pnode    = $v2pmap{$vnode};
+	my $ipport   = nextipportnum($p2pmap{$pnode});
+
+	DBQueryFatal("update virt_trafgens set port=$ipport ".
+		     "where pid='$pid' and eid='$eid' and ".
+		     " vnode='$vnode' and vname='$vname'");
+	
+	DBQueryFatal("update virt_trafgens set target_port=$ipport ".
+		     "where pid='$pid' and eid='$eid' and ".
+		     " vnode='$target_vnode' and vname='$target_vname'");
+    }
+}
 
 ######################################################################
 # Subroutines
@@ -1232,56 +1363,37 @@ sub find_vport {
     return "";
 };
 
-# keys_equal A B
-# Returns 1 if hashs A and B have the same keys.
-sub keys_equal {
-    my ($ARef,$BRef) = @_;
-    my @AKeys = sort keys(%$ARef);
-    my @BKeys = sort keys(%$BRef);
-    if ($#AKeys != $#BKeys) {
-	return 0;
+#
+# Bump and return the IP port number for a physical node. This is
+# required for multiplexing virtual nodes on a physical node. It has
+# to be done after node assignment of course.
+#
+# port,-1 on success/failure.
+# 
+sub nextipportnum($) {
+    my ($node) = @_;
+
+    DBQueryFatal("lock tables nodeipportnum write");
+
+    my $query_result =
+	DBQueryFatal("select port from nodeipportnum where node_id='$node'");
+    
+    if (! $query_result->numrows) {
+	DBQueryFatal("insert into nodeipportnum (node_id) values ('$node')");
+	DBQueryFatal("unlock tables");
+	return nextipportnum($node, $pport);
     }
-    my $i;
-    for ($i=0;$i<=$#AKeys;++$i) {
-	if ($AKeys[$i] ne $BKeys[$i]) {
-	    return 0;
-	}
+    my ($port) = $query_result->fetchrow_array;
+
+    if ($port < 1024 || $port > 60000) {
+	DBQueryFatal("replace into nodeipportnum (node_id) values ('$node')");
+	DBQueryFatal("unlock tables");
+	return nextipportnum($node, $pport);
     }
-    return 1;
-};
-
-# swapok(pnode,portA,nodeportB)
-# This returns 1 if it is ok to swap portA and portB on node pnode
-# and 0 otherwise.
-sub swapok {
-    my ($pnode,$portA,$portB) = @_;
-    # For the Utah testbed we just check to make sure they have
-    # the same bandwidth.  In other testbeds we'd also want to make
-    # sure they went to the same destination.
-    my $result = DBQueryFatal("SELECT interface_type FROM interfaces" .
-			     " where node_id = \"$pnode\"" .
-			     " and iface = \"$portA\"");
-    my ($Atype) = $result->fetchrow_array;
-    $result->finish;
-    $result = DBQueryFatal("SELECT interface_type FROM interfaces" .
-			     " where node_id = \"$pnode\"" .
-			     " and iface = \"$portB\"");
-    my ($Btype) = $result->fetchrow_array;
-    $result->finish;
-
-    if ($interfacespeed{$Atype} != $interfacespeed{$Btype}) {
-	return 0;
-    }
-
-    # It is illegal to swap ports if either is a control interface
-    $result = DBQueryFatal("SELECT control_iface FROM nodes" .
-    			     " LEFT JOIN node_types ON " .
-			     " nodes.type = node_types.type " .
-			     " WHERE node_id=\"$pnode\"");
-    my ($control_iface) = $result->fetchrow_array;
-    $result->finish;
-
-    return (($portA ne $control_iface) && ($portB ne $control_iface));
-	
-};
-
+    
+    DBQueryFatal("update nodeipportnum set port=${port}+1 ".
+		 "where node_id='$node'");
+    DBQueryFatal("unlock tables");
+    
+    return $port;
+}
