@@ -566,7 +566,7 @@ function WRITESIDEBAR() {
 # spits out beginning part of page
 #
 function PAGEBEGINNING( $title, $nobanner = 0 ) {
-    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE;
+    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB;
     global $TBDIR, $WWW;
     global $MAINPAGE;
     global $TBDOCBASE;
@@ -621,9 +621,15 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
               <td valign='top' class='bannercell' 
               background='$BASEPATH/headerbgbb.jpg'
               bgcolor=#3D627F>
-              <img width=369 height=100 border=0 usemap=\"#overlaymap\" 
-              src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' 
-              alt='$THISHOMEBASE - the network testbed'>\n";
+              <img width=369 height=100 border=0 usemap=\"#overlaymap\" ";
+
+	if ($ELABINELAB) {
+	    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
+	}
+	else {
+	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
+	}
+	echo "alt='$THISHOMEBASE - the network testbed'>\n";
 	      if (!$MAINPAGE) {
 		  echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
 	      }
