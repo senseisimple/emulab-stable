@@ -74,9 +74,10 @@ if ($isadmin) {
 }
 
 #
-# Pass it off to the script.
+# Pass it off to the script. It will check the arguments.
 #
-SUEXEC($uid, "nobody", "webnodecontrol $command_string $node_id", 1);
+SUEXEC($uid, "nobody", "webnodecontrol $command_string $node_id",
+       SUEXEC_ACTION_DIE);
 
 echo "<center>
       <br>
