@@ -17,7 +17,7 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	keys mksig
 
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
-	localnode.pem capture.sha1fingerprint apache.pem
+	localnode.pem capture.sha1fingerprint apache.pem ctrlnode.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
