@@ -207,7 +207,7 @@ foreach (split("\n",&ir_get("/rpms"))) {
     $sth->finish;
 }
 
-foreach (keys(%nodemap)) {
+foreach (values(%nodemap)) {
     $node = $_;
     $sth = $dbh->prepare("UPDATE nodes set ready=0,startstatus = \"none\" ".
 			 "where node_id = \"$node\"");
