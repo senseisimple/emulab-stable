@@ -364,8 +364,8 @@ sub MarkNodeDown($)
     $eid = NODEDEAD_EID;
 
     my $query_result =
-	DBQueryFatal("update reserved set pid='$pid', eid='$eid' ".
-		     "where node_id='$node'");
+	DBQueryFatal("replace into next_reserve (node_id, pid, eid) ".
+		     "values ('$node', '$pid', '$eid')");    
 
     if ($query_result->num_rows < 1) {
 	DBWarn("WARNING: Could not mark $node down");
