@@ -134,13 +134,6 @@ DBQueryFatal("insert into group_membership ".
 #
 TBGroupUnixInfo($group_pid, $group_pid, $unix_gid, $unix_name);
 
-echo "<br>
-      Group '$group_id' in project '$group_pid' is being created!<br><br>
-      This will take a minute or two. <b>Please</b> do not click the Stop
-      button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.\n";
-flush();
-
 #
 # Run the script. This will make the group directory, set the perms,
 # and do the account stuff for all of the people in the group. This
