@@ -64,6 +64,10 @@ Node instproc init {s} {
     # table).
     $self set osid ""
 
+    # Start with an empty set of desires
+    $self instvar desirelist
+    array set desirelist {}
+
     # These are just various strings that we pass through to the DB.
     $self set cmdline ""
     $self set rpms ""
@@ -129,6 +133,7 @@ Node instproc updatedb {DB} {
     $self instvar isvirt
     $self instvar virthost
     $self instvar issubnode
+    $self instvar desirelist
     var_import ::TBCOMPAT::default_osids
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
@@ -180,6 +185,12 @@ Node instproc updatedb {DB} {
 
     # Update the DB
     $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "failureaction" "routertype" "fixed" ] [list $self $type $ipraw $osid $cmdline $rpms $deltas $startup $tarfiles $failureaction $default_ip_routing_type $fixed ]
+
+    # Put in the desires, too
+    foreach desire [lsort [array names desirelist]] {
+	set weight $desirelist($desire)
+	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list $self $desire $weight]
+    }
 }
 
 # add_lanlink lanlink
@@ -393,4 +404,17 @@ Node instproc start-command {command} {
     $sim at 0  "$newprog start"
 
     return $newprog
+}
+
+#
+# Add a desire to the node, with the given weight
+# Fails if the desire already exists, but maybe it could just update the
+# weight?
+#
+Node instproc add-desire {desire weight} {
+    $self instvar desirelist
+    if {[info exists desirelist($desire)]} {
+	perror "\[add-desire] Desire $desire on $self already exists!"
+    }
+    set desirelist($desire) $weight
 }

@@ -42,15 +42,16 @@ my $XMLHEADER = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>";
 # These are the virtual tables that make up an experiment.
 # Each one could have multiple rows, each of which will be a
 # hash table. 
-my %virtual_tables = ("experiments"	=> undef,
-		      "virt_nodes"	=> undef,
-		      "virt_lans"	=> undef,
-		      "virt_trafgens"	=> undef,
-		      "virt_agents"	=> undef,
-		      "virt_routes"	=> undef,
-		      "virt_vtypes"	=> undef,
-		      "nseconfigs"	=> undef,
-		      "eventlist"	=> undef);
+my %virtual_tables = ("experiments"		=> undef,
+		      "virt_nodes"		=> undef,
+		      "virt_lans"		=> undef,
+		      "virt_trafgens"		=> undef,
+		      "virt_agents"		=> undef,
+		      "virt_node_desires"	=> undef,
+		      "virt_routes"		=> undef,
+		      "virt_vtypes"		=> undef,
+		      "nseconfigs"		=> undef,
+		      "eventlist"		=> undef);
 
 # XXX
 # The experiment table is special. Only certain fields are allowed to

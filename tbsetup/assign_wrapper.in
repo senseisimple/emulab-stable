@@ -2618,8 +2618,13 @@ sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
 #
 sub LoadVirtNodes()
 {
-    printdb "Loading virt_nodes.\n";
+    #
+    # Load up the virt_node_desires hash, which we'll use below in the node
+    # loop
+    #
+    my %virt_node_desires = LoadVirtNodeDesires();
 
+    printdb "Loading virt_nodes.\n";
     my $query_result =
 	DBQueryFatal("select * from virt_nodes as vn ".
 		     "where vn.pid='$pid' and vn.eid='$eid' ".
@@ -2785,7 +2790,39 @@ sub LoadVirtNodes()
 	    # Stash this in the virt_nodes data structure.
 	    $rowref->{"__osid"}	= $osid;
 	}
+
+	#
+	# Add in this node's desires 
+	#
+	if ($virt_node_desires{$vname}) {
+	    $rowref->{"__desires"} = $virt_node_desires{$vname};
+	} else {
+	    $rowref->{"__desires"} = {};
+	}
     }
+}
+
+#
+# Returns a hash mapping vnames to desires. The desires themselves are
+# represented by a has from desire name to desire weight.
+#
+sub LoadVirtNodeDesires()
+{
+    printdb "Loading virt_node_desires.\n";
+
+    my %virt_node_desires = ();
+    my $query_result = DBQueryFatal("select vname, desire, weight from " .
+	"virt_node_desires where pid='$pid' and eid='$eid'");
+    while (my ($vname, $desire, $weight) = $query_result->fetchrow()) {
+	if (!$virt_node_desires{$vname}) {
+	    $virt_node_desires{$vname} = { $desire => $weight };
+	} else {
+	    ${virt_node_desires{$vname}}{$desire} = $weight;
+	}
+	printdb "    virt_node $vname has desire $desire = $weight.\n";
+    }
+
+    return %virt_node_desires;
 }
 
 #
@@ -2819,6 +2856,13 @@ sub virtnodeisplabnode($)   {
 }
 sub virtnodeisjailed($) {
     return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
+}
+sub virtnodedesires     {
+    my @desires;
+    while (my ($desire, $weight) = each %{$virt_nodes{$_[0]}->{"__desires"}}) {
+	push @desires, $desire . ":" . sprintf("%f",$weight);
+    }
+    return join(" ",@desires);
 }
 
 #
@@ -3097,10 +3141,10 @@ sub CreateTopFile()
 		my $parent = virtnodeparent($vname);
 		$subnodestr = "subnode_of:$parent";
 	    }
-	    my $desirestr = "";
+	    my $desirestr = virtnodedesires($vname);
 	    if (virtnodeisplabnode($vname) && $cpu_usage) {
 		# Yuck
-		$desirestr = "+load:" . (($cpu_usage - 1) / 5.0);
+		$desirestr .= " +load:" . (($cpu_usage - 1) / 5.0);
 	    }
 	    print TOPFILE "node $vname $type $subnodestr $desirestr\n";
 	    if (virtnodeisvirt($vname)) {
