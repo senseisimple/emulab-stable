@@ -43,8 +43,8 @@ BEGIN
 #
 # Various programs and things specific to win32/cygwin and that we want to export.
 # 
-$CP		= "/bin/cp";
-$EGREP		= "/bin/egrep -q";
+##$CP		= "/bin/cp";
+##$EGREP	= "/bin/egrep -q";
 #$MOUNT		= "/bin/mount";
 #$UMOUNT		= "/bin/umount";
 #$TMPASSWD	= "$ETCDIR/passwd";
@@ -67,12 +67,12 @@ $EGREP		= "/bin/egrep -q";
 #my $IFC_10MBS   = "10baseT";
 #my $IFC_FDUPLEX = "FD";
 #my $IFC_HDUPLEX = "HD";
-#my $RPMINSTALL  = "/bin/rpm -i %s";
+my $RPMINSTALL  = "/bin/rpm -i %s";
 #my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $MKDIR	= "/bin/mkdir";
-#my $GATED	= "/usr/sbin/gated";
+my $GATED	= "/usr/sbin/gated";
 #my $ROUTE	= "/sbin/route";
-#my $SHELLS	= "/etc/shells";
+my $SHELLS	= "/etc/shells";
 #my $DEFSHELL	= "/bin/tcsh";
 
 #
