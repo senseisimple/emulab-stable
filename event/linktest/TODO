@@ -1,0 +1,105 @@
+
+> Linktest needs its own tb_compat.tcl because the linktest version of
+> tb_compat.tcl overrides function definitions in order to parse out the
+> topology. Maybe a workaround would be to have tb_compat.tcl only include
+> definitions it actually overrides, so that the NS script first includes
+> the default, up-to-date script, then the linktest version second. I think
+> I could do that by preprocessing the NS script to add a directive to
+> include the linktest definitions file.
+
+Or perhaps include nstb_compat.tcl since that has stubs of the functions
+that I think you want to be stubs.
+
+> OK. I'll need to set up linktest to calculate its runtime, based on the
+> topology and the options selected, then use that (plus some buffer) as the
+> timeout. Sound reasonable?
+
+Yep. Exit with non-zero if timed out.
+
+===========================================================
+
+> Can you please put your doc into proper html so it can be displayed, since
+> I want to link to that from the beginexp page. You can take a look at
+> www/tutorial/tutorial.html to see what proper format is.
+
+>
+> Right now the output goes to stdout? I think an option (-o filename) to put
+> the output into the exp log directory (/proj/pid/eid/exp/logs) is needed
+> since when it is done in the swapin path, we want to save that output off
+> someplace.
+
+>
+> If the "levels" are really ordered, then maybe a "-l level" option to the
+> run_linktest.pl.in script?
+
+===========================================================
+
+Aside: This is the wrong way to do this:
+
+        #define LINKTEST_SCRIPT "@CLIENT_BINDIR@" "/linktest.pl"
+
+Pass this in from the makefile instead. So, in your makefile do:
+
+        -DCLIENT_BINDIR ='"$(CLIENT_BINDIR)"'
+
+===========================================================
+
+
+> {3} nodeg$ gmake
+> mkdir fbsd
+> mkdir: fbsd: File exists
+> gmake: [linktest] Error 1 (ignored)
+
+Please make these errors silent. In fact, the proper approach is to not
+have subdirs here, but to have an obj-linux tree. See my testbed directory
+on ops. However, just getting rid of the error statements above is okay for
+now.
+
+> gcc  -static -L../lib -L../../lib/libtb linktest.o ../../lib/libtb/log.o
+> ../../lib/libtb/tbdefs.o -levent -lcrypto -lssl `elvin-config --libs
+> vin4c` -o fbsd/linktest
+> gcc  -static -L../lib -L../../lib/libtb ltevent.o ../../lib/libtb/log.o
+> ../../lib/libtb/tbdefs.o -levent -lcrypto -lssl `elvin-config --libs
+> vin4c` -o fbsd/ltevent
+
+Please fix up the dependencies in the makefile so that these are not
+relinked unless something actually changed.
+
+===========================================================
+
+> So, the front end if I understand correctly would have a drop-down for
+> Linktest validation. Contents of which would be:
+> 0 - Do not run Linktest
+> 1 - Connectivity and Latency
+> 2 - Static Routing
+> 3 - Loss
+> 4 - Bandwidth
+
+Sure, sounds good. They should of course correspond to section headers in
+the document (which I link to from the menu).
+
+
+===========================================================
+
+Add copyright headers to all files.
+
+Update linktest.c program style to standard emulab style
+tmcd.c is an example
+
+
+Update linktest.pl program style to standard emulab style
+run_linktest.pl is an example
+
+
+
+
+
+    # TODO to protect the script from NFS mount hups,
+    # always copy the file to /tmp before attempting to read it.
+    # repeatedly call cp and check the exit code.
+
+
+
+####
+Note, ignoring project groups. See the line...
+$gid = $proj_id;

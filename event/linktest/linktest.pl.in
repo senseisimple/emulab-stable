@@ -24,12 +24,16 @@ use English;
 sub usage() 
 {
     print "Usage: linktest.pl\n".
-	  " [STARTAT=<test step, 1-4>]\n".
-	  " [STOPAT=<test step, 1-4>]\n".
-	  " [DEBUG=<debugging level, ie 1 for on>]\n".	      
-	  " [SCRIPT=<alternate ns script to parse>]\n";
-    exit(1);
+	" [STARTAT=<test step, 1-4>]\n".
+	    " [STOPAT=<test step, 1-4>]\n".
+		" [DEBUG=<debugging level. 1=on, 0=off>]\n";
+    exit(0);
 }
+
+
+
+
+
 
 ##############################################################################
 # Constants
@@ -45,6 +49,7 @@ use constant PATH_PATHRATE_SND => "/usr/local/bin/pathrate_snd";
 use constant PATH_PATHRATE_RCV => "/usr/local/bin/pathrate_rcv";
 use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
 use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
+use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
 
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
@@ -74,6 +79,7 @@ use constant BSD => "FreeBSD";
 use constant LINUX => "Linux";
 use constant RTPROTO_STATIC => "Static";
 use constant EVENT_STOP => "STOP";
+use constant EVENT_REPORT => "REPORT";
 use constant PING_SEND_COUNT => 10;
 use constant SYNC_NAMESPACE => "linktest";
 
@@ -89,14 +95,15 @@ use constant NAME_LATENCY => "Latency (Round Trip)";
 use constant NAME_LOSS => "Loss";
 use constant NAME_BW => "Bandwidth";
 
-# error suffix for logging linktest and development (fatal) errors
+# error suffix for logs
 use constant SUFFIX_ERROR => ".error";
-use constant SUFFIX_FATAL => ".fatal";
 use constant SUFFIX_TOPO =>  ".topology";
 use constant DEBUG_ALL => 2; # debug level for all debug info, not just msgs.
 
-# more paths
-use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
+# exit codes
+use constant EXIT_ABORTED => -1;
+use constant EXIT_OK => 0;
+
 
 # struct for representing a link.
 struct ( edge => {
@@ -109,10 +116,6 @@ struct ( edge => {
 # fixes emacs colorization woes introduced by above struct definition.
 struct ( unused => { foo => '$'});
 
-# security: constrain the path
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
-
-# application goo
 use constant TRUE => 1;
 use constant FALSE => 0;
 
@@ -120,8 +123,8 @@ use constant FALSE => 0;
 # Globals
 ##############################################################################
 
-# see init() for initialization of globals
-my $ns_file;    # ns file full path
+my $ns_file;          # location of the customized ns for Linktest
+my $topology_file;    # location of the topology input file.
 my $synserv;    # synch server node
 my $rtproto;    # routing protocol
 my $hostname;   # this hosts name
@@ -151,57 +154,237 @@ my $linktest_path;   # log path (ie tbdata/linktest) set by init.
 # full path to custom NS build. 
 my $ns_cmd; 
 
-# signal handler in case the process is killed.
-$SIG{INT} = sub {
-    &debug("Linktest killed by SIGINT.\n");
-    &cleanup;
-    exit(1);
-};
-
-# security
-$ENV{'PATH'} = '/bin:/usr/bin';
-
 ##############################################################################
 # Main control
 ##############################################################################
-&proc_cmd;
 
-&init;
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-&debug_top;
+$| = 1; #Turn off line buffering on output
+
+#
+# Parse command arguments. Since Linktest is run via the event system,
+# parse out pairs of <symbol>=<value>.
+#
+foreach my $arg (@ARGV) {
+    if($arg =~ /STOPAT=(\d)/) {
+	$stopat=$1;
+    }
+    if($arg =~ /STARTAT=(\d)/) {
+	$startat=$1;
+    }
+    if($arg =~ /DEBUG=(\d)/) {
+	$debug_level=$1;
+    }
+}
+
+#
+# Parse the nickname file to obtain the host name, 
+# experiment ID and the project ID.
+#
+my $fname = PATH_NICKNAME;
+die("Could not locate $fname\n") unless -e $fname;
+my @results = &read_file($fname);
+($hostname, $exp_id, $proj_id) = split /\./, $results[0];
+chomp $hostname;
+chomp $exp_id;
+chomp $proj_id;
+$gid = $proj_id;
+
+#
+# Set path variables storing the experiment logging path,
+# the current ns file and the output file for topology info.
+#
+$expt_path = "/proj/$proj_id/exp/$exp_id/tbdata";
+$linktest_path = "$expt_path/linktest";
+$topology_file = "$linktest_path/$exp_id" . SUFFIX_TOPO;
+if(-e "$expt_path/$exp_id-modify.ns") {
+    $ns_file = "$expt_path/$exp_id-modify.ns";
+} elsif (-e "$expt_path/$exp_id.ns") {
+    $ns_file = "$expt_path/$exp_id.ns";
+} else {
+    die("Could not locate an ns file.\n");
+}
+
+#
+# Determine location of the customized ns binary for Linktest.
+#
+($platform) = POSIX::uname();
+if($platform eq BSD) {
+    $ns_cmd = LINKTEST_NSPATH ."/fbsd/ns";
+} elsif ($platform eq LINUX) {
+    $ns_cmd = LINKTEST_NSPATH ."/linux/ns";
+} else {
+    die ("Platform $platform is not currently supported.\n");
+}
+
+#
+# Parse the syncserver file to find out which node is the sync server.
+#
+my $ssname = "@CLIENT_VARDIR@/boot/syncserver";
+die("Could not locate an emulab-sync server\n") unless -e $ssname;
+@results = &read_file($ssname);
+($synserv) = split/\./, $results[0];
+chomp $synserv;
+
+#
+# Execute tmcc to find out the name of the event server.
+#
+@results = &my_tick("@CLIENT_BINDIR@/tmcc","bossinfo");
+if(@results && $results[0] =~ /^([\w\.]*)\s/) {
+    $event_server = $1; 
+} else {
+    die("Could not determine event server name\n");
+}
+
+#
+# If the current node is the special node (arbitrarily the sync
+# server node), do some housekeeping and run ns to generate
+# the topology input file, which is read by all nodes to obtain
+# the experiment topology.
+#
+if(&is_special_node()) {
+
+    #
+    # If the shared path used by Linktest for logging and temporary
+    # files already exists, clear its contents for this run.
+    #
+    if( -e $linktest_path ) {
+	die("Path $linktest_path is not a directory\n") 
+	    unless -d $linktest_path;
+
+	opendir (DIR,$linktest_path)
+	    ||  die("Could not open $linktest_path: $!");
+	my @dirfiles = grep (/error$/,readdir(DIR));
+	foreach (@dirfiles) {
+	    &do_unlink("$linktest_path/$_");
+	}
+	closedir(DIR);
+
+    } else {
+	# 
+	# The shared path does not exist, create it.
+	#
+	mkdir (&check_filename($linktest_path),0777) 
+	    || die("Could not create directory $linktest_path: $!");
+    }
+
+    # 
+    # Now, run ns in the same path where the nstb_compat.tcl and
+    # tb_compat.tcl files are located. Store the output from 
+    # the linktest-modified ns for use in generating the topology file.
+    #
+    chdir(RUN_PATH);
+    @results = &my_tick($ns_cmd,
+			&check_filename($ns_file));
+    
+    die("Linktest-NS could not parse $ns_file\n") unless @results;
+
+    #
+    # Use results of ns to write the topology input file
+    #
+    &write_file($topology_file,@results);
+
+
+    #
+    # Call get_topo before the other nodes because
+    # get_topo is used to initialize @hosts.
+    #
+    &get_topo($topology_file);
+
+    #
+    # Caculate the barrier count using the results of the NS script.
+    # Note: This could be gotten from scalar(@hosts), but that
+    # requires a successful parse of the NS file, which may fail.
+    #
+    $barr_count = @hosts;
+    $barr_count--;
+    
+} # end of chores for the special node.
+
+#
+# All nodes remove local temporary files remaining from the last
+# run, if any.
+# 
+&do_unlink(CRUDE_DAT);
+&do_unlink(PATHRATE_DAT);
+&do_unlink(RUDE_CFG);
+
+#
+# Start up child processes for receiving RUDE and Pathrate streams.
+# These run over the lifetime of Linktest to reduce the number of
+# barrier synchronizations and startup delays. Always give the 
+# collectors a moment to start up.
+#
+if(&dotest(TEST_BW)){
+    &my_system_initonly(PATH_PATHRATE_SND,"-i","-q");
+    sleep(1);
+}
+if(&dotest(TEST_LOSS)){
+    &my_system_initonly(PATH_CRUDE,"-l",CRUDE_DAT);
+    sleep(1);
+}
+
+#
+# Finally, synchronize so that all nodes have completed startup
+# tasks. When all nodes reach this barrier, the topology input file
+# has been written, local variables are initialized, background
+# listeners have been started, and temporary files have been cleared.
+#
+&barrier;
+
+#
+# Beginning of the tests. First, all nodes read the topology.
+# Since this can occur at the same time after the barrier,
+# have a short randomized delay to avoid hitting NFS too hard.
+#
+sleep(int(rand(5)));
+&get_topo($topology_file) unless &is_special_node();
+&debug_top();
 
 if(&dotest(TEST_LATENCY)) {
-    &debug("\nTesting Single Hop Connectivity and Latency...\n\n");
+    my $msg = "Testing Single Hop Connectivity and Latency...";
+    &post_event(EVENT_REPORT,$msg);
+    &debug("\n$msg\n\n");
     &latency_test;
 }
 
 if(&dotest(TEST_RT_STATIC)
     && defined($rtproto)
     && $rtproto eq RTPROTO_STATIC) {
-
-    &debug("\nTesting Static Routing...\n\n");
+    my $msg = "Testing Static Routing...";
+    &post_event(EVENT_REPORT,$msg);
+    &debug("\n$msg\n\n");
     &static_rt_test; # nodes not covered by 1hop test
 }
 
 if(&dotest(TEST_LOSS)) {
-    &debug("\nTesting Loss...\n\n");
+    my $msg = "Testing Loss...";
+    &post_event(EVENT_REPORT,$msg);
+    &debug("\n$msg\n\n");
     &loss_test; 
 }
 if(&dotest(TEST_BW)){
-    &debug("\nTesting Bandwidth...\n\n");
+    my $msg = "Testing Bandwidth...";
+    &post_event(EVENT_REPORT,$msg);
+    &debug("\n$msg\n\n");
     &bw_test;
 }
 
 &cleanup;
 
-# Ensure done is not sent before all nodes report their errors
 &barrier();
 
-&send_done;
+#
+# Send an event indicating that Linktest has completed normally.
+#
+&post_event(EVENT_STOP,"");
 
 &debug("Done\n");
 
-exit(0);
+exit(EXIT_OK);
 
 
 ##############################################################################
@@ -211,11 +394,16 @@ exit(0);
 # Writes the configuration file used by RUDE.
 sub write_rude_cfg {
     my ($stream_id, $edge) = @_;
-    open FCFG,">" . RUDE_CFG ||  die &fatal ("Could not open " . RUDE_CFG);
-    print FCFG "START NOW\n";
-    print FCFG "0000 $stream_id ON 3001 " . $edge->dst . ":10001 CONSTANT " . &get_loss_sample_size($edge) . " 20\n";
-    print FCFG "1000 $stream_id OFF\n";
-    close FCFG;
+    my @contents;
+    push @contents, "START NOW\n";
+    push @contents, "0000 $stream_id ON 3001 " 
+	. $edge->dst 
+	    . ":10001 CONSTANT " 
+		. &get_loss_sample_size($edge) 
+		    . " 20\n";
+    push @contents, "1000 $stream_id OFF\n";
+
+    &write_file(RUDE_CFG, @contents);
 
 }
 
@@ -317,7 +505,7 @@ sub loss_test {
 
 	    my $p_hat = $received / $n;
 	    my $numerator = $p_hat - $p;
-	    my $denominator = sqrt( $p * (1 - $p_hat) / $n);
+	    my $denominator = sqrt( abs( $p * (1 - $p_hat) / $n) );
 
 	    if( $edge->loss == 0) {
 		if($received < $n) {
@@ -490,7 +678,7 @@ sub latency_test {
 			    my $S = $sample_dev;
 			    
 
-			    my $denominator = $S / sqrt($n);
+			    my $denominator = $S / sqrt( abs( $n ) );
 
 			    if($denominator == 0) {
 				my $errmsg = "Invalid sample standard deviation (possible parse problem, please report). (n=$n, u=$u, x_bar=$x_bar, S=$S)";
@@ -511,7 +699,7 @@ sub latency_test {
 			    }
 
 			}
-			exit(0);
+			exit(EXIT_OK);
 
 		    } else {
 			push @waitlist, $pid;
@@ -605,7 +793,7 @@ sub bw_test {
 		}
 
 	    } else {
-		 die &fatal("Error while parsing " . PATHRATE_DAT);
+		 die ("Error while parsing " . PATHRATE_DAT . "\n");
 	    }
 	}
     }
@@ -663,7 +851,7 @@ sub static_rt_test {
 		} else {
 		    &debug("Attempting to reach $dst... OK\n");
 		}
-		exit;
+		exit(EXIT_OK);
 	    } else {
 		push @waitlist,$pid;
 	    }
@@ -762,30 +950,8 @@ sub error {
 		 $output);
 }
 
-# log to fatal file and exit.
-sub fatal {
-    my ($msg) = @_;
-    my @output;
-    push @output,"Fatal Error: $msg";
-
-    if(defined($linktest_path) && defined($hostname)) {
-	my $fname = $linktest_path . "/" . $hostname . SUFFIX_FATAL;
-	&write_file($fname,@output);
-    }
-    
-    # clean up any child proceses
-    &cleanup;
-
-    return $output[0];
-}
-
-
-# synch all nodes
 sub barrier {
     if($hostname eq $synserv) {
-	# note, the synserver should know what the node count is
-	# since it parsed the NS file.
-	die &fatal("barrcount not defined!") unless defined($barr_count);
 	if($barr_count) {
 	    &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,"-n",SYNC_NAMESPACE);
 	}
@@ -801,114 +967,6 @@ sub debug {
 }
 
 
-# initialize globals and set up linktest directory if needed.
-sub init {
-    ($platform) = POSIX::uname();
-
-    if($platform eq BSD) {
-	$ns_cmd = LINKTEST_NSPATH ."/fbsd/ns";
-    } elsif ($platform eq LINUX) {
-	$ns_cmd = LINKTEST_NSPATH ."/linux/ns";
-    } else {
-	 die &fatal("Platform $platform is not currently supported.");
-    }
-
-    # get the experiment info
-    my $fname = PATH_NICKNAME;
-    die &fatal("Could not locate $fname") unless -e $fname;
-    my @results = &read_file($fname);
-    ($hostname, $exp_id, $proj_id) = split /\./, $results[0];
-    chomp $hostname;
-    chomp $exp_id;
-    chomp $proj_id;
-    $gid = $proj_id; # temporarily ignoring groups
-
-    # get the experiment path and log path
-    $expt_path = "/proj/$proj_id/exp/$exp_id/tbdata";
-    $linktest_path = "$expt_path/linktest";
-
-    if(!defined($ns_file)) {
-	if(-e "$expt_path/$exp_id-modify.ns") {
-	    $ns_file = "$expt_path/$exp_id-modify.ns";
-	} elsif (-e "$expt_path/$exp_id.ns") {
-	    $ns_file = "$expt_path/$exp_id.ns";
-	} else {
-	    die &fatal("Could not locate an ns file.");
-	}
-    }
-
-    my $ssname = "@CLIENT_VARDIR@/boot/syncserver";
-     die &fatal("Could not locate an emulab-sync server") unless -e $ssname;
-
-    @results = &read_file($ssname);
-    ($synserv) = split/\./, $results[0];
-    chomp $synserv;
-
-    # synserv machine makes the linktest directory and invokes ns.
-    my $outname = "$linktest_path/$exp_id" . SUFFIX_TOPO;
-    if($hostname eq $synserv) {
-	if( -e $linktest_path ) {
-	     die &fatal("Path $linktest_path is not a directory") unless -d $linktest_path;
-
-	    # blitz all files in the shared directory from the previous run.
-	    opendir (DIR,$linktest_path) ||  die &fatal("Could not open $linktest_path");
-	     # todo, use the constants.
-	    my @dirfiles = grep (/(error|fatal)$/,readdir(DIR));
-	    foreach (@dirfiles) {
-		&do_unlink("$linktest_path/$_");
-	    }
-	    closedir(DIR);
-
-	} else {
-	    mkdir (&check_filename($linktest_path),0777) or  die &fatal("Could not create directory $linktest_path");
-	}
-
-	chdir(RUN_PATH);
-	@results = &my_tick($ns_cmd,
-			    &check_filename($ns_file));
-	&write_file($outname,@results);
-    }
-    
-    # blitz local files from last run.
-    &do_unlink(CRUDE_DAT);
-    &do_unlink(PATHRATE_DAT);
-    &do_unlink(RUDE_CFG);
-
-    # start up collector streams if necessary.
-    if(&dotest(TEST_LOSS)){
-	&my_system_initonly(PATH_CRUDE,"-l",CRUDE_DAT);
-    }
-    if(&dotest(TEST_BW)){
-	&my_system_initonly(PATH_PATHRATE_SND,"-i","-q");
-    }
-    if(&dotest(TEST_LOSS) || &dotest(TEST_BW)) {
-	sleep(1); # give collectors time to start up (potential race)
-    }
-
-    # synserver host reads the ns file early to get the node count.
-    # not using ready count, in practice sometimes didnt get a ready
-    # in some cases (expt modify).
-    if($hostname eq $synserv) {
-	&get_topo($outname) ;
-	$barr_count = @hosts;
-	$barr_count--;
-    }
-
-    # what is event server...
-    @results = &my_tick("@CLIENT_BINDIR@/tmcc","bossinfo");
-    if(@results && $results[0] =~ /^([\w\.]*)\s/) {
-	$event_server = $1; 
-    } else {
-	die &fatal("Could not determine event server name");
-    }
-
-
-    # big first synch waiting for collector startup and ns execution.
-    &barrier;
-
-    # now all nodes read in the topology file output by ns.
-    &get_topo($outname) unless $hostname eq $synserv;
-}    
 
 
 # returns one edge at a time, reserving two nodes.
@@ -1026,36 +1084,23 @@ sub wait_all {
     }
 }
 
-# process cmd line
-sub proc_cmd {
-    my %options=();
-
-    # use the event format for arguments.
-    foreach my $arg (@ARGV) {
-	if($arg =~ /STOPAT=(\d)/) {
-	    $stopat=$1;
-	}
-	if($arg =~ /STARTAT=(\d)/) {
-	    $startat=$1;
-	}
-
-	# development options
-	if($arg =~ /SCRIPT=(\S+)/) {
-	    $ns_file = $1;
-	}
-	if($arg =~ /DEBUG=(\d)/) {
-	    $debug_level=$1;
-	}
-
-    }
-    &debug( "got arguments: @ARGV\n");
-}
-
-# send the event indicating that the test has completed.
-sub send_done {
-    &debug("sending completion event\n");
+#
+# The special node sends a signal to run_linktest, in case it is listening.
+# Mainly informational, but the STOP message informs run_linktest.pl
+# that all exited properly.
+#
+sub post_event {
+    my ($event,$args) = @_;
     if($hostname eq $synserv) {
-	&my_system(PATH_LTEVENT,"-s",$event_server,"-e","$proj_id/$exp_id","-x",EVENT_STOP, "-k", PATH_KEYFILE);
+	system(PATH_LTEVENT,
+		   "-s",
+		   $event_server,
+		   "-e",
+		   "$proj_id/$exp_id",
+		   "-k", 
+		   PATH_KEYFILE,
+		   "-x",
+		   "$event $args");
     }
 }
 
@@ -1088,11 +1133,19 @@ sub my_tick {
     return @results;
 }
 
-# reads/returns contents of file.
+#
+# Opens a file, reads its contents, and returns the contents in a list.
+#
+# @param The filename as a string.
+#
 sub read_file {
     my @results;
-    my $fname = &check_filename($_[0]);
-    open FILE, $fname || die &fatal ("Could not open $fname");
+    my $filename = &check_filename($_[0]);
+
+    die "Attempted to open missing file $filename\n" 
+	unless -e $filename;
+
+    open FILE, $filename || die ("Could not open $filename\n");
     while(<FILE>) {
 	chomp;
 	push @results, $_;
@@ -1103,11 +1156,10 @@ sub read_file {
 }
 
 
-# purpose: because built-in system does not send SIGINT to child processes,
-# interrupting link test (in development) causes background proceses.
-# using a lower-level implementation enables sending
-# SIGINT to children via the kill_list. Use my_system instead of system
-# for longer-running tasks for which output is redirected to null.
+
+# Use my_system instead of system
+# for longer-running tasks for which output is redirected to null and
+# the procid is saved in the kill list.
 #
 # @param: accepts a list of arguments for exec.
 sub my_system {
@@ -1151,15 +1203,18 @@ sub check_filename {
     if($fname =~ /^(\/?(?:[\/\w-]*(?:\.\w+)?)*)$/) {
 	return "$1";
     } else {
-	die &fatal("Possible taint detected: $fname");
+	die("Taint detected: $fname\n");
     }
 
 }
 
 sub write_file{
     my ($fname,@list) = @_;
-    my $ut_fname = &check_filename($fname);
-    open FILE,">$ut_fname"  || die &fatal("could not open $ut_fname for writing");
+    my $untainted_filename = &check_filename($fname);
+    &do_unlink($untainted_filename);
+
+    open FILE,">$untainted_filename"  
+	|| die("could not open $untainted_filename for writing: $!");
     foreach (@list) {
 	print FILE $_;
     }
@@ -1170,10 +1225,14 @@ sub write_file{
 
 sub do_unlink {
     my $ut_fname = &check_filename(shift @_);
+    my $res;
 
     if( -e $ut_fname) {
 	&debug("unlink $ut_fname\n");
-	unlink $ut_fname ||  die &fatal ("Could not delete $ut_fname");
+	$res = unlink $ut_fname;
+	if(!$res) {
+	    die("Could not delete $ut_fname: $!");
+	}
     }
 }
 
@@ -1186,7 +1245,16 @@ sub do_unlink {
 
 sub append_file {
     my $fname = &check_filename(shift @_);
-    open FILE,">>$fname" || die &fatal ("Could not append to $fname");
+    open FILE,">>$fname" 
+	|| die ("Could not append to $fname: $!");
     print FILE "@_";
     close FILE;
+}
+
+sub is_special_node {
+    if($hostname eq $synserv) {
+	return TRUE;
+    } else {
+	return FALSE;
+    }
 }

@@ -1,5 +1,7 @@
 /*
- * Event helper for Linktest events.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * All rights reserved.
  */
 
 #include <stdio.h>
@@ -13,21 +15,22 @@
 #include <time.h>
 #include "log.h"
 #include "tbdefs.h"
-
 #include "event.h"
 
+#define TRUE    1
+#define FALSE   0
+
 static char	*progname;
-static void
-callback(event_handle_t handle,
-	 event_notification_t notification, void *data);
+static void     callback(event_handle_t handle,
+			 event_notification_t notification, void *data);
 
 void
 usage()
 {
 	fprintf(stderr,
-		"Usage:\t%s -s server [-p port] [-k keyfile] -e pid/eid [-w event | -x event] [ARGS...]\n",
+		"Usage:\t%s -s server [-p port] [-k keyfile] -e pid/eid [-w | -x event] [ARGS...]\n",
 		progname);
-	fprintf(stderr, " -w event\twait for Linktest event\n");
+	fprintf(stderr, " -w      \twait for any Linktest event\n");
 	fprintf(stderr, " -x event\ttransmit Linktest event\n");
 	exit(-1);
 }
@@ -53,13 +56,13 @@ main(int argc, char **argv)
 	char buf[BUFSIZ];
 	char *pideid = NULL;
 	char *send_event = NULL;
-	char *wait_event = NULL;
 	char event_args[BUFSIZ];
-	int c;
+	int c,wait_event;
 
 	progname = argv[0];
+	wait_event = FALSE;
 	
-	while ((c = getopt(argc, argv, "s:p:w:x:e:k:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:wx:e:k:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -68,7 +71,7 @@ main(int argc, char **argv)
 			port = optarg;
 			break;
 		case 'w':
-			wait_event = optarg;;
+			wait_event = TRUE;
 			break;
 		case 'x':
 			send_event = optarg;
@@ -106,7 +109,6 @@ main(int argc, char **argv)
 	 * Uppercase event tags for now. Should be wired in list instead.
 	 */
 	up(send_event);
-	up(wait_event);
 	
 	/*
 	 * Convert server/port to elvin thing.
@@ -154,13 +156,12 @@ main(int argc, char **argv)
 	    }
 	  }
 
+	  /* Send Event */
 	  if (event_notify(handle, notification) == 0) {
 	    fatal("could not send test event notification");
 	  }
-	  
-	  /*gettimeofday(&now, NULL);
-	  info("Sent %s at time: %lu:%d\n",send_event ,now.tv_sec, now.tv_usec);*/
 
+	  /* Cleanup */
 	  event_notification_free(handle, notification);
 
 	}
@@ -182,15 +183,7 @@ main(int argc, char **argv)
 	  tuple->expt      = pideid;
 	  tuple->objtype   = TBDB_OBJECTTYPE_LINKTEST;
 	  tuple->objname   = ADDRESSTUPLE_ANY;
-	  tuple->eventtype = wait_event;
-	  
-	  /*
-	 * Register with the event system. 
-	 */
-	  handle = event_register_withkeyfile(server, 0, keyfile);
-	  if (handle == NULL) {
-	    fatal("could not register with event system");
-	  }
+
 	
 	  /*
 	 * Subscribe to the event we specified above.
@@ -219,9 +212,37 @@ main(int argc, char **argv)
 static void
 callback(event_handle_t handle, event_notification_t notification, void *data)
 {
+	char		objname[TBDB_FLEN_EVOBJTYPE];
+	char		event[TBDB_FLEN_EVEVENTTYPE];
+	char		args[BUFSIZ];
+	struct timeval	now;
 
-	exit(0);
+	gettimeofday(&now, NULL);
+	
+	if (! event_notification_get_objname(handle, notification,
+					     objname, sizeof(objname))) {
+		error("Could not get objname from notification!\n");
+		return;
+	}
+	up(objname);
+	
+	if (! event_notification_get_eventtype(handle, notification,
+					       event, sizeof(event))) {
+		error("Could not get event from notification!\n");
+		return;
+	}
+
+	event_notification_get_arguments(handle,
+					 notification, args, sizeof(args));
+
+	/*
+	 * Print out events and args.
+	 */
+	printf("%s %s\n",event,args);
+	fflush(stdout);
 }
+
+
 
 
 

@@ -7,6 +7,8 @@
 use strict;
 use Getopt::Std;
 use English;
+use POSIX;
+
 
 #
 # Wrapper for running the linktest daemon. This script is currently
@@ -17,12 +19,17 @@ use English;
 sub usage()
 {
     print "Usage: run_linktest.pl ".
-	  "[-q] [-d] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
-	  "Use -q for quick termination mode, same as -l 3\n";
+	  "[-q] [-d] [-t] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
+	  "Use -q for quick termination mode, which skips the Bandwidth test\n".
+          "Use -v for verbose feedback messages\n" .
+	  "Use -t <time> to set a timeout in seconds\n";
+	     
     exit(1);
 }
-my $optlist = "qd:s:p:k:e:l:o:";
+my $optlist = "vqd:s:p:k:e:l:o:t:";
 my $debug   = 0;
+my $verbose = 0;
+my $timeout = 0;
 my $server;
 my $keyfile;
 my $port;
@@ -38,6 +45,9 @@ my $TMCC	= "@CLIENT_BINDIR@/tmcc";
 my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
 my $LTEVENTBOSS = "$TB/libexec/ltevent";
 my $BOSSNODE    = "@BOSSNODE@";
+my $STOPEVENT   = "STOP";
+my $KILLEVENT   = "KILL";
+my $REPORTEVENT   = "REPORT";
 
 #
 # This script should be run as a real person!
@@ -72,6 +82,19 @@ if (defined($options{"d"})) {
     else {
 	die("*** $0:\n".
 	    "    Bad data in debug: $debug\n");
+    }
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+    if ($timeout =~ /^([\w]+)$/) {
+	$timeout = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in timeout: $timeout\n");
     }
 }
 if (defined($options{"l"})) {
@@ -156,11 +179,6 @@ else {
 	"    Bad data in eid: $eid\n");
 }
 
-# signal handler in case the process is killed.
-$SIG{INT} = sub {
-    print "Aborted. Linktest continues on nodes.\nErrors so far:\n";
-    exit &analyze;
-};
 
 #
 # Need to figure out the elvind server. Since this script runs on boss
@@ -184,7 +202,7 @@ if (!defined($server)) {
 }
 
 #
-# These days, must use a keyfile! Hmm, linktest.c is not using a keyfile.
+# These days, must use a keyfile!
 #
 if (!defined($keyfile)) {
     $keyfile = "/proj/$pid/exp/$eid/tbdata/eventkey";
@@ -213,48 +231,120 @@ print "Quick termination requested.\n"
 print "Debug mode requested.\n"
     if ($debug);
 
-# wait for the shutdown event.
+#
+# Now that linktest has started, wait for events to be reported
+# by ltevent. It will print out the event followed by args,
+# which are informational. The events sent are KILL, STOP and REPORT.
+#
 $args = starter();
-$args .= " -w STOP";
+$args .= " -w";
+if(my $pid =fork) {
 
-system($args);
-if ($?) {
-    die("*** $0:\n".
-	"    Error running '$args'\n");
+    #
+    # Install signal handlers to wait for a kill or a timeout.
+    # If the process is killed, kill Linktest!
+    #
+    $SIG{INT} = sub {
+	&kill_linktest_run;
+	print "Linktest KILL event has been sent, aborting the run.\n"
+	    if ($verbose);
+	exit(&analyze);
+    };
+    
+    #
+    # Set timeout behavior if requested.
+    #
+    if($timeout) {
+	$SIG{ALRM} = sub { 
+	    &kill_linktest_run;
+	    print "Timeout expired.\n"
+		if ($verbose);
+	    exit(&analyze);
+
+	};
+	alarm($timeout);
+
+    }
+    waitpid($pid,0);
+    alarm 0;
+    exit(&analyze());
+
+
+} else {
+    
+    #
+    # Open child process to read in the output from ltevent,
+    # and just print out the return values for feedback.
+    #
+    open ARGS,"$args |" || die("*** $0:\n"."    Error running '$args'\n");
+    while(<ARGS>) {
+	chomp;
+	if(/(\w+)\s(.*)/) {
+	    my $eventtype = $1;
+	    my $eventargs = $2;
+	    if($eventtype eq $STOPEVENT) {
+		print "Linktest completed normally.\n"
+		    if($verbose);
+		exit;
+	    } elsif ($eventtype eq $KILLEVENT) {
+		print "Linktest has been cancelled due to a timeout or unrecoverable error.\n"
+			if ($verbose);
+		exit;
+	    } else {
+		#
+		# Print out report messages if in verbose mode.
+		#
+		print lc($eventargs) . "\n"
+		    if ($verbose);
+	    }
+	} else {
+	    # parse error, exit.
+	    print "error parsing: " . $_ . "\n";
+	    exit;
+	}
+    }
+    exit;
 }
 
 #
-# Spit out the results?
+# Spits out the results from the Linktest path,
+# with a return code that indicates whether errors were found
+# by Linktest on the nodes.
 # 
-my @dir_contents;
-opendir(DIR, $linktest_path) ||
-    die("*** $0:\n".
-	"    Cannot open $linktest_path\n");
-@dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
-closedir(DIR);
-
-foreach my $file (@dir_contents) {
-    # Hmm, need to taint check the filenames. Ick.
-    if ($file =~ /^([-\w\.\/]+)$/) {
-	$file = $1;
-    }
-    else {
+sub analyze {
+    my @dir_contents;
+    opendir(DIR, $linktest_path) ||
 	die("*** $0:\n".
-	    "    Bad data in filename: $file\n");
-    }
-    if(defined($options{"o"})) {
-	open LOG_FILE, ">>$logfile" || die "Could not open $logfile for append: $!";
-	open NODE_TRACE, "$linktest_path/$file" || die "Could not open $file for read: $!";
-	while(<NODE_TRACE>) {
-	    print LOG_FILE $_;
+	    "    Cannot open $linktest_path\n");
+    @dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
+    closedir(DIR);
+
+    foreach my $file (@dir_contents) {
+	# Hmm, need to taint check the filenames. Ick.
+	if ($file =~ /^([-\w\.\/]+)$/) {
+	    $file = $1;
 	}
-	close NODE_TRACE;
-	close LOG_FILE;
-    } else {
-	system("/bin/cat $linktest_path/$file");
+	else {
+	    die("*** $0:\n".
+		"    Bad data in filename: $file\n");
+	}
+	if(defined($options{"o"})) {
+	    open LOG_FILE, ">>$logfile" || 
+		die "Could not open $logfile for append: $!";
+
+	    open NODE_TRACE, "$linktest_path/$file" || 
+		die "Could not open $file for read: $!";
+	    while(<NODE_TRACE>) {
+		print LOG_FILE $_;
+	    }
+	    close NODE_TRACE;
+	    close LOG_FILE;
+	} else {
+	    system("/bin/cat $linktest_path/$file");
+	}
     }
+    return scalar(@dir_contents);
 }
-exit(scalar(@dir_contents));
 
 # Initial part of command string to ltevent.
 sub starter {
@@ -273,4 +363,15 @@ sub starter {
 	if (defined($keyfile));
     
     return $cmd
+}
+
+# Sub to kill off linktest on the nodes.
+sub kill_linktest_run {
+    my $args = starter();
+    $args .= " -x $KILLEVENT";
+    system($args);
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error running '$args'\n");
+    }
 }
