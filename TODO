@@ -89,6 +89,14 @@ CDROM changes (dhcp, signing).
 
 *** Medium:
 
+* Switch rpm/tar file to non-nfs solution. Perhaps a ftpd like daemon
+  which does some of the same checks that tmcd does. Or maybe a tmcd
+  variant that does nothing but serve up files according. Maybe it
+  does not need to be separate, but seems like putting this directly
+  into tmcd is a bad idea. Maybe not. 
+
+* Clean up osid/imageid mess. 
+
 * Add a web page to recreate an image from a node and an existing
   image descriptor. Need to add a "kill runnin frisbee" function to
   create_image though (well, need this in general cause I always get
@@ -204,6 +212,8 @@ CDROM changes (dhcp, signing).
 
 *** Minor:
 
+* Clean up ISADMIN() and ISADMININISTRATOR() calls in php pages.
+
 * Allow users to set default group and default shell via web page and
   pass out to nodes when creating accounts.
 
@@ -307,8 +317,3 @@ CDROM changes (dhcp, signing).
 > ANyway, just something for the list, and keep this message in the
 > details part.
 
-This is some not well though out RON stuff:
-* Add startup command for RON nodes. How to stop them? Jail?
-* Add Jail.
-* Add node_reboot of ron nodes.
-* Add retry in wanassign.
