@@ -64,7 +64,7 @@ system "$mysqldump 2> /dev/null > $db_schema";
 #
 # ... and compare it to the schema from the source
 #
-my $diff = (system("$schemadiff $master_schema $db_schema") >> 8);
+my $diff = (system("$schemadiff $db_schema $master_schema") >> 8);
 unlink($db_schema);
 
 if ($diff) {
@@ -77,7 +77,7 @@ until this is resolved.
 
 If you are a user of the emulab software outside of Utah, this is probably
 because your database was created for an older version of the emulab software.
-Contact testbeD-OPS\@EMulab.net for help in updating your database.
+Contact testbed-ops\@eMulab.net for help in updating your database.
 
 If you're a developer at Utah, this is probably because you (or someone else)
 forgot to update sql/database-create.sql .
