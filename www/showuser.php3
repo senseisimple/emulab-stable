@@ -141,6 +141,7 @@ SHOWWIDEAREAACCOUNTS($target_uid);
 #
 # User Profile.
 #
+echo "<a NAME=PROFILE></a>\n";
 echo "<center>
       <h3>Profile</h3>
       </center>\n";

@@ -331,6 +331,25 @@ function CHECKPASSWORD($uid, $password, $name, $email, &$error)
 	    "$TBCHKPASS_PATH $password $uid '$name:$email'", 1);
 }
 
+#
+# Check an email address to make sure its a valid string. 
+#
+function CHECKEMAIL($email)
+{
+    if ($email == "")
+	return 0;
+    
+    $parts = preg_split("/\@/", $email);
+    if (!isset($parts[0]) || !isset($parts[1]) || count($parts) != 2) 
+	return 0;
+
+    if (! preg_match("/^[-\w\+\.]+$/", $parts[0]) ||
+	! preg_match("/^[-\w\.]+$/", $parts[1]))
+	return 0;
+    
+    return 1;
+}
+
 function LASTNODELOGIN($node)
 {
 }

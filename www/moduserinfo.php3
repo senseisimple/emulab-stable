@@ -23,11 +23,10 @@ LOGGEDINORDIE($uid,
 $isadmin = ISADMIN($uid);
 
 
-# temporarily make tcsh the only option until backend stuff
-# gets put into place.
+# Shell options we support. Maybe stick in DB someday.
 $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
 
-# used if db is NULL (should not happen.)
+# used if db slot for user is NULL (should not happen.)
 $defaultshell = 'tcsh';
 
 #
@@ -300,19 +299,32 @@ function SPITFORM($formfields, $errors)
 }
 
 #
-# The target uid and the current uid will generally be the same, unless
-# its an admin user modifying someone elses data. Must verify this case.
+# The target uid and the current uid will be the same, unless its a priv user
+# (admin,PI) modifying someone elses data. Must verify this case. Note that
+# the target uid comes initially as a page arg, but later as a form argument,
+# hence this odd check.
 #
-if (! isset($submit)) {
-    if (! isset($target_uid))
+if (! isset($_POST['submit'])) {
+    # First page load. Default to current user.
+    if (! isset($_GET['target_uid']))
 	$target_uid = $uid;
-}
-elseif (! isset($formfields[target_uid]) ||
-	strcmp($formfields[target_uid], "") == 0) {
-    USERERROR("You must supply a target user id!", 1);
+    else
+	$target_uid = $_GET['target_uid'];
 }
 else {
-    $target_uid = $formfields[target_uid];
+    # Form submitted. Make sure we have a formfields array and a target_uid.
+    if (!isset($_POST['formfields']) ||
+	!is_array($_POST['formfields']) ||
+	!isset($_POST['formfields']['target_uid'])) {
+	PAGEARGERROR("Invalid form arguments!");
+    }
+    $formfields = $_POST['formfields'];
+    $target_uid = $formfields['target_uid'];
+}
+
+# Pedantic check of uid before continuing.
+if ($target_uid == "" || !TBvalid_uid($target_uid)) {
+    PAGEARGERROR("Invalid uid: '$target_uid'");
 }
 
 #
@@ -326,29 +338,13 @@ if (! $isadmin &&
 }
 
 #
-# The conclusion of a modify operation. See below.
-# 
-if (isset($finished)) {
-    PAGEHEADER("Modify User Information");
-    
-    echo "<center>
-          <br>
-          <h3>User information successfully modified!</h3><p>
-          </center>\n";
-    
-    SHOWUSER($target_uid);
-    PAGEFOOTER();
-    return;
-}
-
-#
 # Suck the current info out of the database.
 #
 $query_result =
     DBQueryFatal("select * from users where uid='$target_uid'");
 
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("No such user: $target_uid!", 1);
+    USERERROR("No such user: $target_uid", 1);
 }
 
 $defaults = array();
@@ -363,23 +359,23 @@ $row = mysql_fetch_array($query_result);
 $defaults[target_uid]  = $target_uid;
 $defaults[usr_email]   = $row[usr_email];
 $defaults[usr_URL]     = $row[usr_URL];
-$defaults[usr_addr]    = stripslashes($row[usr_addr]);
-$defaults[usr_addr2]   = stripslashes($row[usr_addr2]);
-$defaults[usr_city]    = stripslashes($row[usr_city]);
-$defaults[usr_state]   = stripslashes($row[usr_state]);
-$defaults[usr_zip]     = stripslashes($row[usr_zip]);
-$defaults[usr_country] = stripslashes($row[usr_country]);
-$defaults[usr_name]    = stripslashes($row[usr_name]);
+$defaults[usr_addr]    = $row[usr_addr];
+$defaults[usr_addr2]   = $row[usr_addr2];
+$defaults[usr_city]    = $row[usr_city];
+$defaults[usr_state]   = $row[usr_state];
+$defaults[usr_zip]     = $row[usr_zip];
+$defaults[usr_country] = $row[usr_country];
+$defaults[usr_name]    = $row[usr_name];
 $defaults[usr_phone]   = $row[usr_phone];
-$defaults[usr_title]   = stripslashes($row[usr_title]);
-$defaults[usr_affil]   = stripslashes($row[usr_affil]);
-$defaults[usr_shell]   = stripslashes($row[usr_shell]);
-$defaults[notes]       = stripslashes($row[notes]);
+$defaults[usr_title]   = $row[usr_title];
+$defaults[usr_affil]   = $row[usr_affil];
+$defaults[usr_shell]   = $row[usr_shell];
+$defaults[notes]       = $row[notes];
 
 #
 # On first load, display a form consisting of current user values, and exit.
 #
-if (! isset($submit)) {
+if (! isset($_POST['submit'])) {
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -413,16 +409,8 @@ if (!isset($formfields[usr_email]) ||
     strcmp($formfields[usr_email], "") == 0) {
     $errors["Email Address"] = "Missing Field";
 }
-else {
-    $usr_email    = $formfields[usr_email];
-    $email_domain = strstr($usr_email, "@");
-    
-    if (! $email_domain ||
-	strcmp($usr_email, $email_domain) == 0 ||
-	strlen($email_domain) <= 1 ||
-	! strstr($email_domain, ".")) {
-	$errors["Email Address"] = "Looks invalid!";
-    }
+elseif (! CHECKEMAIL($formfields[usr_email])) {
+    $errors["Email Address"] = "Looks invalid!";
 }
 if (isset($formfields[usr_URL]) &&
     strcmp($formfields[usr_URL], "") &&
@@ -431,6 +419,7 @@ if (isset($formfields[usr_URL]) &&
     $errors["Home Page URL"] = $urlerror;
 }
 if (!$isadmin) {
+    # Admins can leave these fields blank, but must error check them anyway.
     if (!isset($formfields[usr_addr]) ||
 	strcmp($formfields[usr_addr], "") == 0) {
 	$errors["Postal Address"] = "Missing Field";
@@ -455,9 +444,10 @@ if (!$isadmin) {
 	strcmp($formfields[usr_phone], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     } 
-    elseif (! ereg("^[-0-9ext\(\)\+\. ]+$", $formfields[usr_phone])) {
-        $errors["Phone #"] = "Invalid characters";
-    }
+}
+if (isset($formfields[usr_phone]) &&
+    !TBvalid_phone($formfields[usr_phone])) {
+    $errors["Phone #"] = "Invalid characters";
 }
 if (isset($formfields[password1]) &&
     strcmp($formfields[password1], "")) {
@@ -501,7 +491,7 @@ if (! isset($formfields[usr_URL]) ||
     $usr_URL = "";
 }
 else {
-    $usr_URL = $formfields[usr_URL];
+    $usr_URL = addslashes($formfields[usr_URL]);
 }
 
 if (! isset($formfields[usr_addr2])) {
@@ -512,15 +502,14 @@ else {
 }
 
 #
-# Check that email address looks reasonable. Only admin types can change
-# the email address. If its different, the user circumvented the form,
-# and so its okay to blast it.
+# Only admin types can change the email address. If its different, the
+# user circumvented the form, and so its okay to blast it.
 #
 TBUserInfo($target_uid, $dbusr_name, $dbusr_email);
 
 if (strcmp($usr_email, $dbusr_email)) {
     if (!$isadmin) {
-	USERERROR("You are not allowed to change your password. <br> ".
+	USERERROR("You are not allowed to change your email address. <br> ".
 		  "Please contact Testbed Operations.", 1);
     }
     DBQueryFatal("update users set usr_email='$usr_email' ".
@@ -659,16 +648,15 @@ if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
     #
     # mkacct updates the user gecos
     #
-    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
-	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
-    }
+#    if (HASREALACCOUNT($uid) && HASREALACCOUNT($target_uid)) {
+#	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
+#    }
 }
 
 #
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
-# See above for conclusion.
 # 
-header("Location: moduserinfo.php3?target_uid=$target_uid&finished=1");
+header("Location: showuser.php3?target_uid=$target_uid#PROFILE");
 
 ?>
