@@ -128,6 +128,7 @@ int	fsleep(unsigned int usecs);
  */
 extern int		debug;
 extern int		portnum;
+extern int		broadcast;
 extern struct in_addr	mcastaddr;
 extern struct in_addr	mcastif;
 extern char	       *filename;

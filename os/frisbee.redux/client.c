@@ -37,7 +37,8 @@ static void	PlayFrisbee(void);
 static void	GotBlock(Packet_t *p);
 static void	RequestChunk(int timedout);
 static int	ImageUnzip(int chunk);
-extern int	ImageUnzipInit(char *filename, int slice, int debug);
+extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero);
+extern int	ImageUnzipQuit();
 
 /*
  * The chunker data structure. For each chunk in progress, we maintain this
@@ -88,6 +89,8 @@ char *usagestr =
  " -m mcastaddr    Specify a multicast address in dotted notation.\n"
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
+ " -z              Zero fill the output device\n"
+ " -b              Use broadcast instead of multicast\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
  "\n";
 
@@ -101,13 +104,17 @@ usage()
 int
 main(int argc, char **argv)
 {
-	int	ch, slice = 0;
+	int	ch, slice = 0, zero = 0;
 	char   *filename;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:t")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbz")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
+			break;
+			
+		case 'b':
+			broadcast++;
 			break;
 			
 		case 'p':
@@ -130,6 +137,10 @@ main(int argc, char **argv)
 			tracing++;
 			break;
 
+		case 'z':
+			zero++;
+			break;
+
 		case 'h':
 		case '?':
 		default:
@@ -146,7 +157,7 @@ main(int argc, char **argv)
 		usage();
 
 	ClientLogInit();
-	ImageUnzipInit(filename, slice, debug);
+	ImageUnzipInit(filename, slice, debug, zero);
 	ClientNetInit();
 
 	if (tracing) {
@@ -155,6 +166,7 @@ main(int argc, char **argv)
 	}
 
 	PlayFrisbee();
+	ImageUnzipQuit();
 
 	if (tracing) {
 		TraceStop();

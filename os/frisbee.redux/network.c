@@ -29,6 +29,7 @@
 
 static int		sock;
 struct in_addr		myipaddr;
+int			broadcast = 0;
 
 static void
 CommonInit(void)
@@ -99,15 +100,24 @@ CommonInit(void)
 			pfatal("setsockopt(IPPROTO_IP, IP_MULTICAST_IF)");
 		}
 	}
-	else {
+	else if (broadcast) {
 		/*
 		 * Otherwise, we use a broadcast addr. 
 		 */
 		i = 1;
+
+		log("Setting broadcast mode\n");
 		
 		if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST,
 			       &i, sizeof(i)) < 0)
 			pfatal("setsockopt(SOL_SOCKET, SO_BROADCAST)");
+	}
+	else if (mcastif.s_addr) {
+		/*
+		 * Overload this. In unicast mode, use this as our
+		 * outgoing interface. Useful when multihomed.
+		 */
+		myipaddr.s_addr = mcastif.s_addr;
 	}
 
 	/*
@@ -125,13 +135,15 @@ CommonInit(void)
 	 * This is going to be used to return replies to the sender,
 	 * where appropriate.
 	 */
-	if (gethostname(buf, sizeof(buf)) < 0)
-		pfatal("gethostname failed");
+	if (!myipaddr.s_addr) {
+		if (gethostname(buf, sizeof(buf)) < 0)
+			pfatal("gethostname failed");
 
-	if ((he = gethostbyname(buf)) == 0)
-		fatal("gethostbyname: %s", hstrerror(h_errno));
+		if ((he = gethostbyname(buf)) == 0)
+			fatal("gethostbyname: %s", hstrerror(h_errno));
 
-	memcpy((char *)&myipaddr, he->h_addr, sizeof(myipaddr));
+		memcpy((char *)&myipaddr, he->h_addr, sizeof(myipaddr));
+	}
 }
 
 int

@@ -276,8 +276,11 @@ ServerRecvThread(void *arg)
 			DOSTAT(requests++);
 			ClientRequest(p);
 			break;
+		case PKTSUBTYPE_BLOCK:
+			break;
 		default:
-			fatal("ServerRecvThread: Bad packet type!");
+			fatal("ServerRecvThread: Bad packet type: %d/%d!",
+			      p->hdr.type, p->hdr.subtype);
 			break;
 		}
 	}
@@ -392,9 +395,10 @@ PlayFrisbee(void)
 char *usagestr = 
  "usage: frisbeed [-d] <-p #> <-m mcastaddr> <filename>\n"
  " -d              Turn on debugging. Multiple -d options increase output.\n"
- " -p portnum	   Specify a port number to listen on.\n"
- " -m mcastaddr	   Specify a multicast address in dotted notation.\n"
- " -i mcastif	   Specify a multicast interface in dotted notation.\n"
+ " -p portnum      Specify a port number to listen on.\n"
+ " -m mcastaddr    Specify a multicast address in dotted notation.\n"
+ " -i mcastif      Specify a multicast interface in dotted notation.\n"
+ " -b              Use broadcast instead of multicast\n"
  "\n";
 
 void
@@ -411,8 +415,12 @@ main(int argc, char **argv)
 	pthread_t	child_pid;
 	off_t		fsize;
 
-	while ((ch = getopt(argc, argv, "dhp:m:i:t")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:i:tb")) != -1)
 		switch(ch) {
+		case 'b':
+			broadcast++;
+			break;
+			
 		case 'd':
 			debug++;
 			break;
