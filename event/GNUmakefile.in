@@ -8,7 +8,7 @@ SUBDIR		= event
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= lib sched tbgen example
+SUBDIRS	= lib sched tbgen example trafgen
 
 all:	$(SUBDIRS)
 
@@ -26,6 +26,9 @@ tbgen:
 example:
 	@$(MAKE) -C example all
 
+trafgen:
+	@$(MAKE) -C trafgen all
+
 install: 
 	@$(MAKE) -C lib install
 	@$(MAKE) -C sched install
@@ -38,6 +41,7 @@ subdir-clean:
 	@$(MAKE) -C sched clean
 	@$(MAKE) -C tbgen clean
 	@$(MAKE) -C example clean
+	@$(MAKE) -C trafgen clean
 
 distclean:	subdir-distclean
 
@@ -46,6 +50,7 @@ subdir-distclean:
 	@$(MAKE) -C sched distclean
 	@$(MAKE) -C tbgen distclean
 	@$(MAKE) -C example distclean
+	@$(MAKE) -C trafgen distclean
 
 .PHONY:	$(SUBDIRS)
 

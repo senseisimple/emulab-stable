@@ -173,6 +173,33 @@ event_unregister(event_handle_t handle)
 
 
 /*
+ *
+ */
+
+int
+event_poll(event_handle_t handle)
+{
+	extern int depth;
+	int rv;
+
+	if (!handle->mainloop) {
+		ERROR("multithreaded programs cannot use event_poll\n");
+		return 0;
+	}
+
+	depth++;
+	rv = elvin_sync_default_select_and_dispatch(0, handle->status);
+	depth--;
+	if (rv == 0) {
+		ERROR("Elvin select_and_dispatch failed\n");
+		elvin_error_fprintf(stderr, handle->status);
+	}
+
+	return elvin_error_get_code(handle->status);
+}
+
+
+/*
  * Enter the main loop of the event system, waiting to receive event
  * notifications. Returns non-zero if the operation is successful, 0
  * otherwise.

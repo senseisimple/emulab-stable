@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.8 2002-02-26 21:59:00 stoller Exp $
+ * $Id: event.h,v 1.9 2002-02-28 00:16:18 mike Exp $
  */
 
 #ifndef __EVENT_H__
@@ -61,6 +61,7 @@ typedef struct {
 #define ADDRESSTUPLE_ANY	NULL
 #define ADDRESSTUPLE_ALL	"*"
 #define OBJECTTYPE_TESTBED	"TBCONTROL"
+#define OBJECTTYPE_TRAFGEN	"TRAFGEN"
 
 address_tuple_t	address_tuple_alloc(void);
 int		address_tuple_free(address_tuple_t);
@@ -127,6 +128,7 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
 /* event.c */
 event_handle_t event_register(char *name, int threaded);
 int event_unregister(event_handle_t handle);
+int event_poll(event_handle_t handle);
 int event_main(event_handle_t handle);
 int event_notify(event_handle_t handle, event_notification_t notification);
 int event_schedule(event_handle_t handle, event_notification_t notification,
