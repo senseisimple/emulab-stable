@@ -1015,4 +1015,8 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table interfaces modify role enum('ctrl','expt','jail','fake', \
            'other','gw');
 
-1.193: 
+1.193: Add sfshostid to nodes table. We store that in the filesystem
+       on ops, but its nice to have it in the DB too so that we do not
+       have to read that file!
+
+       alter table nodes add sfshostid varchar(128) default NULL;
