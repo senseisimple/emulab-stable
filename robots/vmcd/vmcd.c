@@ -427,6 +427,7 @@ int main(int argc, char *argv[])
 	    
             for (lpc = 0; lpc < vmc_config.cameras.cameras_len; lpc++) {
 		lnNewList(&vmc_clients[vmc_client_count].vc_frame);
+		lnNewList(&vmc_clients[vmc_client_count].vc_last_frame);
 		vmc_clients[vmc_client_count].vc_hostname =
 		    vmc_config.cameras.cameras_val[lpc].hostname;
 		vmc_clients[vmc_client_count].vc_port =
@@ -823,6 +824,12 @@ int main(int argc, char *argv[])
 					 vc->vc_port);
 				}
 
+				vtAgeTracks(&vc->vc_frame,
+					    &vc->vc_last_frame,
+					    &vt_pool);
+				vtCopyTracks(&vc->vc_last_frame,
+					     &vc->vc_frame,
+					     &vt_pool);
 				lnAppendList(&current_frame, &vc->vc_frame);
 				
 				/*

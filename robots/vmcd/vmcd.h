@@ -7,6 +7,7 @@
 struct vmc_client {
     mtp_handle_t vc_handle;
     struct lnMinList vc_frame;
+    struct lnMinList vc_last_frame;
     unsigned long long vc_frame_count;
     char *vc_hostname;
     int vc_port;

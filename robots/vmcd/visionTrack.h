@@ -32,6 +32,13 @@ int vtUpdate(struct lnMinList *now,
 	     struct mtp_packet *mp,
 	     struct lnMinList *pool);
 
+void vtAgeTracks(struct lnMinList *now,
+		 struct lnMinList *old,
+		 struct lnMinList *pool);
+void vtCopyTracks(struct lnMinList *dst,
+		  struct lnMinList *src,
+		  struct lnMinList *pool);
+
 /**
  * Coalesce tracks that are in an area where cameras are overlapping.
  *
