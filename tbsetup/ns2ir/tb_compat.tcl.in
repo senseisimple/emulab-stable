@@ -139,6 +139,9 @@ namespace eval TBCOMPAT {
     # Experiment directory name.
     variable expdir
 
+    # ElabInElab stuff. Do not initialize.
+    variable elabinelab_maxpcs
+
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
     # (e.g. Client, Server), and a reservation type is a resource name provided

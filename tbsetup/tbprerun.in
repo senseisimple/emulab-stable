@@ -142,6 +142,39 @@ TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
 
 #
+# Need to know if wrapping an experiment.
+#
+my $elabinelab = 0;
+my $elabinelab_eid;
+
+TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
+    or fatal("Failed to get ElabInElab attributes!");
+
+#
+# If we are, and there is an inner experiment, rerun the parser so that
+# we can pass in the proper info this time around. This is a side effect
+# of allowing the elabinelab bit, and the elabinelab eid, to be specified
+# in the NS file. If we did this on the command line, then we could skip
+# this step, but I think ease of use is better if it can be in the NS file.
+#
+if ($elabinelab && defined($elabinelab_eid)) {
+    # Inner experiment better exist.
+    fatal("Inner experiment $elabinelab_eid does not exist!")
+	if (! ExpState($pid, $elabinelab_eid));
+    
+    # Again, kill virtual state.
+    TBExptRemoveVirtualState($pid, $eid);
+
+    print "Re-Running parser ... " . TBTimeStamp() . "\n";
+    TBDebugTimeStamp("parser started");
+    if (system("parse-ns $pid $gid $eid $nsfile")) {
+	fatal("Parsing failed!");
+    }
+    TBDebugTimeStamp("parser finished");
+    print "Parser done! " . TBTimeStamp() . "\n";
+}
+
+#
 # Put the nsfile into the DB, now that we know it parses okay.
 #
 $nsfile_string = `cat $nsfile`;
@@ -290,6 +323,49 @@ if ($security_level >= TBDB_SECLEVEL_ORANGE()) {
 }
 
 #
+# If wrapping an experiment, copy over type/fixnode info to wrapper.
+# We already made sure the experiment was created with enough nodes (see
+# the parser) but now we have to make sure that the type/fixnode stuff will
+# correspond to what the wrapped experiment really wants. It is a lot easier
+# to do this here then in the parser.
+#
+if ($elabinelab && defined($elabinelab_eid)) {
+    my $outer_result;
+    my $inner_result;
+    my $maxnodes;
+
+    if (! ($inner_result =
+	   DBQueryWarn("select type,fixed from virt_nodes ".
+		       "where pid='$pid' and eid='$elabinelab_eid'"))) {
+	fatal("Could not get virt_node info for $pid/$elabinelab_eid!");
+    }
+    if (! ($outer_result =
+	   DBQueryWarn("select vname from virt_nodes ".
+		       "where pid='$pid' and eid='$eid' and ".
+		       "      inner_elab_role='node'"))) {
+	fatal("Could not get virt_node info for $pid/$eid!");
+    }
+
+    #
+    # Move over info for each real node in the inner experiment. Delay
+    # nodes will be extra nodes in the outer experiment, but those do
+    # not currently get type/fix info since the the user has no way to
+    # do that in the NS file.
+    # 
+    while (my ($type,$fixed) = $inner_result->fetchrow_array()) {
+	my ($vname) = $outer_result->fetchrow_array();
+
+	fatal("Not enough nodes in outer experiment!")
+	    if (!defined($vname));
+
+	DBQueryWarn("update virt_nodes set ".
+		    "  type='$type',fixed='$fixed' ".
+		    "where pid='$pid' and eid='$eid' and vname='$vname'")
+	    or fatal("Could not get virt_node info for $pid/$eid!");
+    }
+}
+
+#
 # This stats stuff is not done in testmode.
 # 
 if (! $TESTMODE) {
@@ -298,12 +374,7 @@ if (! $TESTMODE) {
     # Want to move this to the stats records. Ditto for the security stuff,
     # which was handled above.
     #
-    my $elabinelab = 0;
-    my $elabinelab_eid;
     my $elabinelab_exptidx;
-
-    TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-	or fatal("Failed to get ElabInElab attributes!");
 
     if ($elabinelab || $security_level) {
 	DBQueryWarn("update experiment_stats set ".

@@ -462,6 +462,28 @@ sub GenDefsFile($)
 	print TCL "set physnodes($node_id) \"$type\"\n";
     }
 
+    #
+    # ElabInElab stuff.
+    # 
+    my $maxnodes   = 0;
+    if (defined($pid)) {
+	my $elabinelab = 0;
+	my $elabinelab_eid;
+
+	TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
+	    or die("*** $0:\n".
+		   "    Failed to get ElabInElab attributes!");
+
+	if ($elabinelab && defined($elabinelab_eid)) {
+	    if (! TBExptMinMaxNodes($pid, $elabinelab_eid, undef, \$maxnodes)) {
+		die("*** $0:\n".
+		    "    Could not get max nodes from DB!");
+	    }
+	}
+    }
+    # Be sure to initialize this to something ...
+    print TCL "set elabinelab_maxpcs $maxnodes\n";
+
     print TCL "}\n";
     close(TCL);
 }
