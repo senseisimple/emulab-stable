@@ -314,6 +314,22 @@ function LASTNODELOGIN($node)
 }
 
 #
+# A function to print the contents of an array (recursively).
+# Mostly useful for debugging.
+#
+function ARRAY_PRINT($arr) {
+  if (!is_array($arr)) { echo "non-array '$arr'\n"; }
+  foreach ($arr as $i => $val) {
+    echo("'$i' - '$val'\n");
+    if (is_array($val)) {
+      echo "Sub-array $i:\n";
+      array_print($val);
+      echo "End Sub-array $i.\n";
+    }
+  }
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 require("tbauth.php3");
