@@ -71,6 +71,6 @@ source $libdir/sim.tcl
 source $libdir/stubs.tcl
  
 # argv[0] is the ns input file
-set prefix [lindex [split [lindex $argv 0] .] 1]
+set prefix [lindex [split [lindex $argv 1] .] 1]
 source [lindex $argv 0]
 
