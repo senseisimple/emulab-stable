@@ -15,10 +15,9 @@ CP= cp -pf
 
 PROGS= slothd sdcollectd
 
-%.o: %.c
-	$(CC) -g -c $(CFLAGS) $<
-
 all: $(PROGS)
+
+include ${TESTBED_SRCDIR}/GNUmakerules
 
 linux: islinux slothd
 	$(CP) slothd linux/slothd
@@ -29,7 +28,7 @@ fbsd: isfbsd slothd
 slothd: slothd.o slothd.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ slothd.o $(LIBS)
 
-sdcollectd: sdcollectd.o sdcollectd.h $(TESTBED_SRCDIR)/lib/libtb/libtb.a
+sdcollectd: sdcollectd.o sdcollectd.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o $(SDLIBS)
 
 islinux:
@@ -40,9 +39,6 @@ isfbsd:
 
 install:
 
-distclean: clean
-	rm -f GNUmakefile linux/slothd fbsd/slothd
-
 clean:
-	rm -f *.o $(PROGS) *~ core *.core
+	rm -f *.o $(PROGS) *~ core *.core linux/slothd fbsd/slothd
 
