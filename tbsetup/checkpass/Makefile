@@ -1,5 +1,5 @@
-CC=/usr/gnu/bin/gcc 
-# Pick one of the two below.
+include ../../Makeconf
+include ../../GNUmakerules
 
 all: checkpass cracklib
 
@@ -9,8 +9,7 @@ checkpass: cracklib
 cracklib:
 	gmake -C cracklib,2.7 all
 
-install:
-	install -c checkpass /usr/testbed/bin
+install:	$(INSTALL_BINDIR)/checkpass
 
 clean:
 	gmake -C cracklib,2.7 clean

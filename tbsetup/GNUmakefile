@@ -4,13 +4,19 @@
 include ../Makeconf
 include ../GNUmakerules
 
+SUBDIRS		= checkpass
 SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  mkacct rmacct delay_setup ifc_setup ifc_filegen \
 		  ir2ifc power resetvlans savevlans snmpit tbend \
-		  tbprerun tbreport vpower vsnmpit
+		  tbprerun tbreport vpower vsnmpit killtip
+DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir
 
-all:	$(BINS)
+all:	$(BINS) $(SUBDIRS)
+
+.PHONY:	checkpass
+checkpass:
+	@$(MAKE) -C checkpass all
 
 #
 # Currently, all the stuff that gets installed in the bin directory
@@ -21,8 +27,17 @@ INSTALL_LIBTBDIR = $(INSTALL_LIBDIR)/tbsetup
 install: $(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
 	 $(addprefix $(INSTALL_BINDIR)/, $(SUSCRIPTS)) \
 	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SUSCRIPTS))
+	 $(addprefix $(INSTALL_LIBTBDIR)/, $(DATAFILES)) \
+	 subdir-install
 	@echo "Don't forget to do a post-install as root"
+
+#
+# Automate this part at some point.
+# 
+subdir-install:
+	@$(MAKE) -C checkpass install	
+	@$(MAKE) -C ir install	
+	@$(MAKE) -C ns2ir install	
 
 #
 # Leave these rules here. They should be flushed when we no longer
