@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.6 2001-06-14 23:19:23 ikumar Exp $
+ * $Id: serv_listen.c,v 1.7 2001-06-18 01:41:19 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -65,7 +65,7 @@ int is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead)
         for( ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) {
 		name1=inet_ntoa(((struct sockaddr_in *)ifi->ifi_addr)->sin_addr);
 		name2=inet_ntoa(((struct sockaddr_in *)pcliaddr)->sin_addr);
-		fprintf(stderr,"name1:\"%s\" name2:\"%s\"\n",name1,name2);
+		//printf("name1:\"%s\" name2:\"%s\"\n",name1,name2);
 		if(strcmp(name1,name2)==0)
 	                return 1;
 	}
@@ -78,7 +78,11 @@ int is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead)
 int 
 inqid_cmp(struct topd_inqid *tid1, struct topd_inqid *tid2)
 {
-        return( bcmp((void *)tid1, (void*)tid2, sizeof(struct topd_inqid)));
+        //return( bcmp((void *)tid1, (void*)tid2, sizeof(struct topd_inqid)));
+	if((tid1->tdi_tv.tv_sec==tid2->tdi_tv.tv_sec) && (tid1->tdi_tv.tv_usec==tid2->tdi_tv.tv_usec)
+		 && (strcmp(tid1->tdi_nodeID,tid2->tdi_nodeID)==0))
+		return 1;
+	return 0;
 }
 
 
@@ -124,6 +128,8 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	struct in_pktinfo	pktinfo;
 	struct topd_inqnode     *inqn, *inqhead = 0;
 	int i=0,j=0;
+	struct topd_inqid *temp_inqid;
+	int t_int;
 
 	/* 
 	 * Use this option to specify that the receiving interface
@@ -135,7 +141,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	 * is supported on FreeBSD. -lkw
 	 */
 	if (setsockopt(sockfd, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0) {
-		fprintf(stderr, "setsockopt of IP_RECVIF");
+		printf("setsockopt of IP_RECVIF");
 		return;
 		
 	}
@@ -155,7 +161,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		}
 	}
 	memcpy(&myNodeID, myNodeIDtmp, ETHADDRSIZ);
-        fprintf(stderr, "My node id:");
+        printf("My node id:");
 	print_nodeID(myNodeID);
 
 	print_ifi_info(ifihead);
@@ -167,7 +173,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	 */
 	i=0;
 	for ( ; ; ) {
-		fprintf(stderr,"**********for==>%d\n",i++);
+		printf("**********for==>%d\n",i++);
 		len = clilen;
 		flags = 0;
 		n = recvfrom_flags(sockfd, mesg, MAXLINE, &flags,
@@ -206,34 +212,33 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		if(inqhead==NULL) class = NEW;
 		j=0;
 		for ( inqn = inqhead; inqn != NULL; inqn = inqn->inqn_next ) {
-			fflush(stdin);
-			fflush(stderr);
-			fprintf(stderr,"inquiry loop ##### %d\n",j++);
-			fprintf(stderr,"Comparing #### ==>\n\"");
-			print_tdinq((char*)inqn->inqn_inq);
-			fprintf(stderr,"\"and\n\"");
-			print_tdinq(mesg);
-			fprintf(stderr,"\"\n");
-		          if (inqid_cmp(inqn->inqn_inq, (struct topd_inqid *)mesg) == NULL) {
+			//printf("inquiry loop ##### %d\n",j++);
+			//printf("Comparing #### ==>\n\"");
+			//print_tdinq((char*)inqn->inqn_inq);
+			//printf("\"and\n\"");
+			//print_tdinq(mesg);
+			//printf("\"\n");
+		          if (inqid_cmp(inqn->inqn_inq, (struct topd_inqid *)mesg)) {
 		                  /* Duplicate inquiry */
 		                  //if (from_us(&pktinfo, ifihead))... 
 				  if(is_my_packet(pcliaddr, ifihead)) {
-					  fprintf(stderr,"Duplicate inquiry from me\n");
+					  printf("Duplicate inquiry from me\n");
 			                  class = DUP;
 					  break;
 				  } else {
-					  fprintf(stderr,"Duplicate inquiry from others\n");
+					  printf("Duplicate inquiry from others\n");
 				          class = DUP_NBOR;
 					  break;
 				  }
 			  } else {
 		                  /* New inquiry */
-				 fprintf(stderr,"Got a new inquiry\n");
 			          class = NEW;
 			  }
 		}
 
 		if (class == DUP) continue;
+		if (class == NEW)
+			printf("Got a new inquiry\n");
 
 		/* 
 		 * Save the inquiry ID into inqid_current.
@@ -245,8 +250,14 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		 */
  
 		ifihead = get_ifi_info(AF_INET, 0); 
-		if (class == NEW) {
+		temp_inqid = (struct topd_inqid *)mesg;
+		t_int = ntohs(temp_inqid->tdi_ttl);
+		if(t_int==0)
+			printf("The TTL is zero so i will not forward!!\n");
+		if ((class == NEW) && (t_int!=0)) {
 		        struct topd_inqnode *save = inqhead;
+		        //struct topd_inqid *temp;
+			//int t_int;
 		        inqhead = (struct topd_inqnode *)malloc(sizeof(struct topd_inqnode));
 		        inqhead->inqn_inq = (struct topd_inqid *)malloc(sizeof(struct topd_inqid));
 			if (inqhead == NULL || inqhead->inqn_inq == NULL ) {
@@ -255,6 +266,12 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 			}
 			memcpy(inqhead->inqn_inq, mesg, sizeof(struct topd_inqid));
 			inqhead->inqn_next = save;
+				
+			//temp = (struct topd_inqid *)mesg;
+			//t_int = ntohs(temp->tdi_ttl);
+			//t_int=t_int-2;
+			//temp->tdi_ttl = htons(t_int);
+			
 		        ifihead=forward_request(ifihead, &pktinfo, mesg, n );
 			printf("printing after forward===>\n");
 			print_tdifinbrs(ifihead);
@@ -266,9 +283,9 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 			exit(1);
 		}
 		n = compose_reply(ifihead, reply, BUFSIZ, class == NEW);
-		fprintf(stderr, "replying: ");
+		printf("replying: ");
 		print_tdreply(reply, n);
-		fprintf(stderr,"done!\n");
+		printf("done!\n");
 		free_ifi_info(ifihead);
 		
 		printf("I am sending the response to: %s\n",sock_ntop(pcliaddr,sizeof(struct sockaddr)));

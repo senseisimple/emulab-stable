@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.c,v 1.3 2001-06-14 23:19:23 ikumar Exp $
+ * $Id: util.c,v 1.4 2001-06-18 01:41:19 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -34,10 +34,10 @@ println_haddr(u_char *haddr, u_short hlen)
 	if ((i = hlen) > 0) {
 		ptr = haddr;
 		do {
-		        fprintf(stderr, "%s%x", (i == hlen) ? "  " : ":", *ptr++);
+		        printf("%s%x", (i == hlen) ? "  " : ":", *ptr++);
 		} while (--i > 0);
 	}
-	fprintf(stderr, "\n");
+	printf("\n");
 }
 
 void 
@@ -49,7 +49,7 @@ print_haddr(u_char *haddr, u_short hlen)
 	if ((i = hlen) > 0) {
 		ptr = haddr;
 		do {
-  		        fprintf(stderr, "%s%x", (i == hlen) ? "" : ":", *ptr++);
+  		        printf("%s%x", (i == hlen) ? "" : ":", *ptr++);
 		} while (--i > 0);
 	}
 }
@@ -83,17 +83,17 @@ print_tdreply(const char *mesg, size_t nbytes)
 
 	while( (char *)p < mesg + nbytes ) {
 
-		fprintf(stderr, "ROUTE\t\t\t\tDEST\n");
-		fprintf(stderr, "[");
+		printf("ROUTE\t\t\t\tDEST\n");
+		printf("[");
 		print_haddr(p->tdnbor_pnode, ETHADDRSIZ);
-		fprintf(stderr, "-");
+		printf("-");
 		print_haddr(p->tdnbor_pif, ETHADDRSIZ);
-		fprintf(stderr, "] ");
-		fprintf(stderr, "[");	
+		printf("] ");
+		printf("[");	
 		print_haddr(p->tdnbor_dnode, ETHADDRSIZ);
-		fprintf(stderr, "-");
+		printf("-");
 		print_haddr(p->tdnbor_dif, ETHADDRSIZ);
-		fprintf(stderr, "]\n\n");
+		printf("]\n\n");
 
 		p++;
 	}
@@ -108,17 +108,17 @@ print_tdpairs(const char *mesg, size_t nbytes)
 
         while( (char *)p < mesg + nbytes ) {
 
-                fprintf(stderr, "ROUTE\t\t\t\tDEST\n");
-                fprintf(stderr, "[");
+                printf( "ROUTE\t\t\t\tDEST\n");
+                printf( "[");
                 print_haddr(p->tdnbor_pnode, ETHADDRSIZ);
-                fprintf(stderr, "-");
+                printf( "-");
                 print_haddr(p->tdnbor_pif, ETHADDRSIZ);
-                fprintf(stderr, "] ");
-                fprintf(stderr, "[");
+                printf( "] ");
+                printf("[");
                 print_haddr(p->tdnbor_dnode, ETHADDRSIZ);
-                fprintf(stderr, "-");
+                printf("-");
                 print_haddr(p->tdnbor_dif, ETHADDRSIZ);
-                fprintf(stderr, "]\n\n");
+                printf("]\n\n");
 
                 p++;
         }
@@ -169,7 +169,7 @@ print_tdinq(const char *mesg)
 {
         topd_inqid_t *tip = (topd_inqid_t *)mesg;
 
-	fprintf(stderr, "\nINQ:%u.%u TTL:%d FACTOR:%d NODE:",
+	printf("\nINQ:%u.%u TTL:%d FACTOR:%d NODE:",
 		ntohl(tip->tdi_tv.tv_sec), 
 		ntohl(tip->tdi_tv.tv_usec),
 		ntohs(tip->tdi_ttl), 

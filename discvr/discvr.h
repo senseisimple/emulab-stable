@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.4 2001-06-14 23:19:23 ikumar Exp $*/
+/*$Id: discvr.h,v 1.5 2001-06-18 01:41:19 ikumar Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -54,7 +54,7 @@ struct ifi_info {
   struct sockaddr  *ifi_dstaddr;/* destination address */
   struct ifi_info  *ifi_next;	/* next of these structures */
   struct topd_nborlist *ifi_nbors;/* neighbors */
-
+  int 	 sock; 			/* socket associated with this interface */
 };
 
 /* Prototypes */
@@ -92,6 +92,12 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors
 
 int
 is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead) ;
+
+struct ifi_info *
+get_ifi_struct(int sock, struct ifi_info * ifihead);
+
+void
+addMyID(char* mesg, int size);
 
 
 #endif /* _TOPD_DISCVR_H_ */

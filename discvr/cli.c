@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: cli.c,v 1.3 2001-06-14 23:19:23 ikumar Exp $
+ * $Id: cli.c,v 1.4 2001-06-18 01:41:19 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -116,6 +116,7 @@ cli(int sockfd, const struct sockaddr *pservaddr, socklen_t servlen,
 	
 	make_inquiry(&ti, ttl, factor);
 
+	printf("sending query to server:\n");
 	sendto(sockfd, &ti, TOPD_INQ_SIZ, 0, pservaddr, servlen);
 	//print_tdinq((char *)&ti);
 	n = recvfrom(sockfd, recvline, MAXLINE, 0, NULL, NULL);
