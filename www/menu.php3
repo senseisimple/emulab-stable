@@ -357,7 +357,7 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("Change Your Password",
 				   $TBBASE, "moduserinfo.php3");
 	    }
-	    elseif ($login_status & CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY) {
+	    elseif ($login_status & (CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY)) {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
