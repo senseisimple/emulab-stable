@@ -1,0 +1,11 @@
+$TTL	3600
+
+@	IN	SOA	@BOSSNODE@. testbed-ops.@BOSSNODE@. (
+				69        ; Serial (leaveme)
+				3600      ; Refresh
+				900       ; Retry
+				3600000   ; Expire
+				3600 )    ; Minimum
+	IN	NS	@BOSSNODE@.
+ 	IN	PTR	localhost.@OURDOMAIN@.
+

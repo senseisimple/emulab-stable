@@ -1,0 +1,46 @@
+;
+; Authoritative data for @OURDOMAIN@
+;
+
+$TTL	30
+
+@	IN	SOA	@BOSSNODE@. testbed-ops.@BOSSNODE@. (
+				30        ; Serial (leaveme)
+				3600      ; Refresh
+				900       ; Retry
+				3600000   ; Expire
+				3600 )    ; Minimum
+	IN	NS	ns.@OURDOMAIN@.
+
+$TTL	30
+
+
+; '@OURDOMAIN@' is implied in the line below
+		IN	A		@BOSSNODE_IP@
+		IN	MX 10	ops
+
+; Apparently, CNAME NS records are a bad idea - so, ns.emulab.net
+; and boss are both A records
+ns		IN	A		@BOSSNODE_IP@
+boss		IN	A		@BOSSNODE_IP@
+		IN	MX 10	ops
+
+; CNAMEs for boss
+www		IN	CNAME   boss
+db		IN	CNAME	boss
+cvsup		IN	CNAME	boss
+
+; Plastic and names it is otherwise known as...
+ops		IN	A		@USERNODE_IP@
+		IN	MX 10	ops
+users		IN	CNAME	ops
+fs		IN	CNAME	ops
+ntp1		IN	CNAME	ops
+ntp2		IN	CNAME	ops
+event-server	IN	CNAME	ops
+
+; Routers interfaces in the various subnets
+private-router	IN	A		@PRIVATE_ROUTER@
+public-router	IN	A		@PUBLIC_ROUTER@
+control-router	IN	A		@CONTROL_ROUTER_IP@
+

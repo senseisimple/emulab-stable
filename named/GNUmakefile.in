@@ -1,0 +1,74 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= named
+
+ETCDIR          = /etc
+NAMEDB_DIR	= $(ETCDIR)/namedb
+OURDOMAIN       = @OURDOMAIN@
+
+# This is silly. Needs to be done properly.
+TESTBED_NETWORK = @TESTBED_NETWORK@
+REVERSE_MAPNAME = $(subst .0,,$(TESTBED_NETWORK))
+
+NAMED_FILES	= named.conf.template named_makeconf \
+		  reverse.head resolv.conf localhost.rev forward.head \
+		  $(REVERSE_MAPNAME).db.head $(OURDOMAIN).db.head \
+		  named.conf
+
+include $(OBJDIR)/Makeconf
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all: $(NAMED_FILES)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+# This file is just a copy for now. Ick.
+$(REVERSE_MAPNAME).db.head:	reverse.head
+	cp reverse.head $(REVERSE_MAPNAME).db.head
+
+$(OURDOMAIN).db.head:		forward.head
+	cp forward.head $(OURDOMAIN).db.head
+
+named.conf:	named.conf.template named_makeconf
+	perl named_makeconf named.conf.template > named.conf
+
+# This is not a safe install target after initial install!
+install:
+	echo "Are you sure you want to reinstall the namedb files!"
+
+install-real:	$(NAMEDB_DIR)/named.conf \
+		$(NAMEDB_DIR)/localhost.rev \
+		$(NAMEDB_DIR)/$(OURDOMAIN).db.head \
+		$(NAMEDB_DIR)/reverse/$(REVERSE_MAPNAME).db.head \
+		$(ETCDIR)/resolv.conf
+	-rm -rf $(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head
+	ln -s $(OURDOMAIN).db.head $(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head
+
+clean: 
+	rm -f $(NAMED_FILES)
+
+$(ETCDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(ETCDIR)
+	$(INSTALL) $< $@
+
+$(NAMEDB_DIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(NAMEDB_DIR)
+	$(INSTALL) $< $@
+
+$(NAMEDB_DIR)/reverse/%: %
+	@echo "Installing $<"
+	-mkdir -p $(NAMEDB_DIR)/reverse
+	$(INSTALL) $< $@
+

@@ -1,0 +1,77 @@
+#
+# DNS configuration for @BOSSNODE@
+#
+
+#####################
+# IMPORTANT!!!!
+#
+# Note that there are now two 'views' in this file, and unfortunately, we
+# have to duplicate all zones in both of them! So, if you make any zone
+# changes, make sure to make them in both places!!!
+#####################
+
+#
+# global server configuration options
+#
+options {
+    directory "/etc/namedb";
+    # Put forwarders here if you have them
+    #forwarders {
+    #    1.1.1.1;
+    #};
+};
+
+view "internal" {
+    match-clients {
+        127.0.0.0/8;
+	%internal_network_withmask%;
+        172.16.0.0/12;
+    };
+
+    zone "@OURDOMAIN@" in {
+        type master;
+        file "@OURDOMAIN@.internal.db";
+    };
+
+    zone "0.0.127.in-addr.arpa" {
+	      type master;
+	      file "localhost.rev";
+	  };
+
+    zone "." in {
+	      type hint;
+	      file "named.root";
+	  };
+
+    zone "%internal_network_dotted_reverse%.in-addr.arpa" in {
+        type master;
+        file "reverse/%internal_network_dotted%.db";
+    };
+};
+
+view "external" {
+    match-clients {
+        any;
+    };
+
+    zone "@OURDOMAIN@" in {
+        type master;
+        file "@OURDOMAIN@.db";
+    };
+
+    zone "0.0.127.in-addr.arpa" {
+	      type master;
+	      file "localhost.rev";
+	  };
+
+    zone "." in {
+	      type hint;
+	      file "named.root";
+	  };
+
+    zone "%internal_network_dotted_reverse%.in-addr.arpa" in {
+        type master;
+        file "reverse/%internal_network_dotted%.db";
+    };
+};
+
