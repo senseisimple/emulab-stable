@@ -386,12 +386,16 @@ sub message {
 sub error {
     my ($errno, $string) = @_;
 
-    print STDERR "*** Error $errno: $string\n";
+    my $errstr = "*** Error $errno: $string\n"; 
+
+    print STDERR $errstr;
+    push @::messages, $errstr;
 
     #
     # Maybe we ought to beep when headless - right now, we do this only for
     # fatal errors, but maybe we should do it for all of them.
     #
+
 }
 
 #
@@ -399,12 +403,19 @@ sub error {
 #
 sub error_fatal {
     my ($errno, $string) = @_;
-    print STDERR "*** Fatal Error $errno: $string\n";
+    my $errstr =  "*** Fatal Error $errno: $string\n";
+    print STDERR $errstr;
+    push @::messages, $errstr;
 
     #
     # If headless, beep to let the user know what went wrong
     #
     if ($headless) {
+	# Try to write the messages to the floppy
+	if ($writefloppy) {
+	    writefloppy_messages();
+	}
+
 	my $beeps = $BEEP_CODES{$errno} || $UNKNOWN_ERROR_BEEPS;
 	beep($beeps);
     } else {
@@ -450,6 +461,7 @@ sub writefloppy {
     if (system "$FORMAT $FLOPPYDEV") {
 	error_fatal($ERROR_FLOPPYWRITE,"Floppy format failed: $!\n");
     }
+    $::floppy_formatted = 1;
 
     #
     # Drop a file down with the unique identifier we were provided
@@ -457,6 +469,7 @@ sub writefloppy {
     if (system "$MOUNT -t msdos $FLOPPYDEV $MOUNTPOINT") {
 	error_fatal($ERROR_FLOPPYWRITE,"Failed to mount floppy: $!\n");
     }
+    $::floppy_mounted = 1;
 
     if (!open(IDFILE,">$MOUNTPOINT/node.id")) {
 	error_fatal($ERROR_FLOPPYWRITE,"Failed to write floppy: $!\n");
@@ -464,7 +477,14 @@ sub writefloppy {
 
     print IDFILE "$id\n";
     close(IDFILE);
+
+    #
+    # Write out any messages we had, too
+    #
+    writefloppy_messages();
+
     system "$UNMOUNT $MOUNTPOINT";
+    $::floppy_mounted = 0;
 
     #
     # Let the user know we're done
@@ -472,6 +492,49 @@ sub writefloppy {
     wait_for_floppy($FLOPPY_REMOVED);
 
     print "Floppy written!\n";
+}
+
+#
+# Write out a log of messages to the floppy - check to see if any of the basic
+# tasks have already been done by writefloppy, and avoid re-doing them if they
+# have. If we fail, just silently return, we have no way to tell anyone why
+# we failed.
+#
+sub writefloppy_messages {
+
+    #
+    # Format that sucker
+    #
+    if (!$::floppy_mounted && !$::floppy_formatted) {
+	if (system "$FORMAT $FLOPPYDEV") {
+	    return;
+	}
+    }
+
+    #
+    # Drop a file down with the unique identifier we were provided
+    #
+    my $mounted_floppy = 0;
+    if (!$::floppy_mounted) {
+	$mounted_floppy = 1;
+	if (system "$MOUNT -t msdos $FLOPPYDEV $MOUNTPOINT") {
+	    return;
+	}
+    }
+
+    if (!open(MFILE,">$MOUNTPOINT/messages")) {
+	return;
+    }
+
+    print MFILE join("",@::messages), "\n";
+    close(MFILE);
+
+    if ($mounted_floppy) {
+	system "$UNMOUNT $MOUNTPOINT";
+    }
+
+    return;
+
 }
 
 #
