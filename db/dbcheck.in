@@ -4,6 +4,32 @@
 # dbcheck - A script to check database consistency
 #
 
+######################################################################
+#
+# INSTRUCTIONS FOR UPDATING THE foreign_keys TABLE
+#
+# After updating the database schema you'll need to visit the
+# foreign_keys table in the database. Remove any entries in this
+# table for columns/tables that you've removed, and add new ones for
+# any tables/columns you've added. Examples are probably the best
+# way to explain the format. For example, if projects.head_uid needs
+# to correspond to a user (uid stored in users.uid), you have a
+# row like:
+# +-------------------+-----------------+-----------------+---------+
+# | table1            | column1         | table2          | column2 |
+# +-------------------+-----------------+-----------------+---------+
+# | projects          | head_uid        | users           | uid     |
+# +-------------------+-----------------+-----------------+---------+
+# You can put a comma-separated list of colums in the column fields, 
+# as in:
+# +-------------------+-----------------+-----------------+---------+
+# | table1            | column1         | table2          | column2 |
+# +-------------------+-----------------+-----------------+---------+
+# | vlans             | pid,eid         | experiments     | pid,eid |
+# +-------------------+-----------------+-----------------+---------+
+#
+######################################################################
+
 #
 # Configure variables
 #
