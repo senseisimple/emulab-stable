@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,7 +16,7 @@ use strict;
 #
 # This script always does the right thing, so it does not matter who calls it. 
 #
-# usage: named_setup
+# usage: named_setup [-norestart]
 #
 
 #
@@ -38,6 +38,7 @@ my $vnodesfile			= "$mapdir/vnodes.${OURDOMAIN}.db";
 my $vnodesback 			= "$mapdir/vnodes.${OURDOMAIN}.db.backup";
 my $reversedir			= "$mapdir/reverse";
 my $lockfile			= "/var/tmp/testbed_named_lockfile";
+my $restart_named		= 1;
 my $dbg	= 0;
 my @row;
 
@@ -70,6 +71,13 @@ $| = 1;
 use lib "@prefix@/lib";
 use libtestbed;
 use libdb;
+
+#
+# Check for norestart option.
+#
+if (@ARGV && $ARGV[0] eq "-norestart") {
+    $restart_named = 0;
+}
 
 #
 # We need to serialize this script to avoid a trashed map file. Use
@@ -280,12 +288,14 @@ closedir DIR;
 # This is better than HUPing the nameserver directly. Notet that we look
 # for a local port of named first.
 #
-if (-x "/usr/local/sbin/rndc") {
-    system("/usr/local/sbin/rndc reload > /dev/null") == 0 or
-	fatal("/usr/local/sbin/rndc reload failed!\n");
-} else {
-    system("named.reload > /dev/null") == 0 or
-	fatal("named.reload failed!\n");
+if ($restart_named) {
+    if (-x "/usr/local/sbin/rndc") {
+	system("/usr/local/sbin/rndc reload > /dev/null") == 0 or
+	    fatal("/usr/local/sbin/rndc reload failed!\n");
+    } else {
+	system("named.reload > /dev/null") == 0 or
+	    fatal("named.reload failed!\n");
+    }
 }
 
 #
