@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,14 +8,16 @@
 #define SOCKBUFSIZE		(1024 * 128)
 
 /*
- * The barrier request structure sent to the daemon. There is no return
- * value; returning means go!
+ * The barrier request structure sent to the daemon.  A single integer is
+ * returned, its value is zero or the maximum of the error codes from the
+ * clients.
  */
 typedef struct {
 	char		name[64];	/* An arbitrary string */
 	short		request;	/* Either init or wait */
 	short		flags;		/* See below */
 	int		count;		/* Number of waiters */
+	int		error;		/* Error code (0 == no error) */
 } barrier_req_t;
 
 /* Request */
@@ -29,4 +31,9 @@ typedef struct {
 #define DEFAULT_BARRIER "barrier"
 
 /* Info */
-#define CURRENT_VERSION 1
+#define CURRENT_VERSION 2
+
+/* Start of error codes for the server */
+#define SERVER_ERROR_BASE	240
+/* Error code for server got a SIGHUP */
+#define SERVER_ERROR_SIGHUP	(SERVER_ERROR_BASE)

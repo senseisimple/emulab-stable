@@ -45,26 +45,29 @@ static void	deadsyncd(int sig);
 
 char *usagestr = 
  "usage: emulab-sync [options]\n"
- " -n <name>       Optional barrier name; must be less than 64 bytes long\n"
+ " -h              Display this message\n"
+ " -V              Print version information and exit\n"
+ " -n name         Optional barrier name; must be less than 64 bytes long\n"
  " -d              Turn on debugging\n"
  " -s server       Specify a sync server to connect to\n"
  " -p portnum      Specify a port number to connect to\n"
- " -i count        Initialize named barrier to count waiters\n"
+ " -i count        Increase the barrier value by 'count' waiters\n"
  " -a              Master returns immediately when initializing barrier\n"
  " -u              Use UDP instead of TCP\n"
+ " -e errornum     Signal an error (must be zero or >= 32)\n"
  "\n";
 
 void
 usage()
 {
-	fprintf(stderr, usagestr);
-	exit(1);
+	fprintf(stderr, "%s", usagestr);
+	exit(64);
 }
 
 int
 main(int argc, char **argv)
 {
-	int			n, ch;
+	int			n, ch, errval = 0;
 	struct hostent		*he;
 	FILE			*fp;
 	struct in_addr		serverip;
@@ -75,8 +78,9 @@ main(int argc, char **argv)
 	int			nowait  = 0;
 	char			*barrier= DEFAULT_BARRIER;
 	barrier_req_t		barrier_req;
+	extern char		build_info[];
 	
-	while ((ch = getopt(argc, argv, "ds:p:ui:n:a")) != -1)
+	while ((ch = getopt(argc, argv, "hVds:p:ui:n:ae:")) != -1)
 		switch(ch) {
 		case 'a':
 			nowait++;
@@ -85,32 +89,107 @@ main(int argc, char **argv)
 			debug++;
 			break;
 		case 'p':
-			portnum = atoi(optarg);
+			if (sscanf(optarg, "%d", &portnum) == 0) {
+				fprintf(stderr,
+					"Error: -p value is not a number: "
+					"%s\n",
+					optarg);
+				usage();
+			}
+			else if ((portnum <= 0) || (portnum >= 65536)) {
+				fprintf(stderr,
+					"Error: -p value is not between "
+					"0 and 65536: %d\n",
+					portnum);
+				usage();
+			}
 			break;
 		case 'i':
-			initme = atoi(optarg);
+			if (sscanf(optarg, "%d", &initme) == 0) {
+				fprintf(stderr,
+					"Error: -i value is not a number: "
+					"%s\n",
+					optarg);
+				usage();
+			}
+			else if (initme <= 0) {
+				fprintf(stderr,
+					"Error: -i value must be greater "
+					"than zero: %s\n",
+					optarg);
+				usage();
+			}
 			break;
 		case 'n':
-			barrier = optarg;
+			if (strlen(optarg) == 0) {
+				fprintf(stderr, "Error: -n value is empty\n");
+				usage();
+			}
+			else if (strlen(optarg) >= 64) {
+				fprintf(stderr,
+					"Error: -n value is too long: %s\n",
+					optarg);
+				usage();
+			}
+			else {
+				barrier = optarg;
+			}
 			break;
 		case 's':
-			server = optarg;
+			if (strlen(optarg) == 0) {
+				fprintf(stderr, "Error: -s value is empty\n");
+				usage();
+			}
+			else {
+				server = optarg;
+			}
 			break;
 		case 'u':
 			useudp = 1;
+			break;
+		case 'e':
+			if (sscanf(optarg, "%d", &errval) == 0) {
+				fprintf(stderr,
+					"Error: -e value is not a number: "
+					"%s\n",
+					optarg);
+				usage();
+			}
+			else if ((errval < 0) ||
+				 (errval >= SERVER_ERROR_BASE)) {
+				fprintf(stderr,
+					"Error: -e value must be zero or "
+					"less than %d\n",
+					SERVER_ERROR_BASE);
+				usage();
+			}
+			break;
+		case 'V':
+			fprintf(stderr, "%s\n", build_info);
+			exit(0);
+			break;
+		case 'h':
+			fprintf(stderr, "%s", usagestr);
+			exit(0);
 			break;
 		default:
 			usage();
 		}
 
+	if (nowait && (initme == 0)) {
+		fprintf(stderr,	"Error: -a requires the -i option\n");
+		usage();
+	}
+	
 	argv += optind;
 	argc -= optind;
 
-	if (argc)
+	if (argc) {
+		fprintf(stderr,
+			"Error: Unrecognized command line arguments: %s ...\n",
+			argv[0]);
 		usage();
-
-	if (strlen(barrier) >= sizeof(barrier_req.name))
-		usage();
+	}
 
 	/*
 	 * Look for the syncserver access file.
@@ -136,7 +215,12 @@ main(int argc, char **argv)
 		fclose(fp);
 	}
 	if (!server) {
-		fprintf(stderr, "Must provide name of the syncserver!\n\n");
+		fprintf(stderr,
+			"Error: Could not deduce the name of the syncserver!\n"
+			"You may be running in an older experiment, you\n"
+			"will have to manually start the emulab-syncd and\n"
+			"use the -s option, or, you can recreate your\n"
+			"experiment.\n\n");
 		usage();
 	}
 	
@@ -148,7 +232,7 @@ main(int argc, char **argv)
 		memcpy((char *)&serverip, he->h_addr, he->h_length);
 	else {
 		fprintf(stderr, "gethostbyname(%s) failed\n", server); 
-		exit(1);
+		exit(68);
 	}
 
 	/*
@@ -164,12 +248,19 @@ main(int argc, char **argv)
 	}
 	else
 		barrier_req.request = BARRIER_WAIT;
+	barrier_req.error = errval;
 	
 	if (useudp)
 		n = doudp(&barrier_req, serverip, portnum);
 	else
 		n = dotcp(&barrier_req, serverip, portnum);
-	exit(n);
+	
+	if (n < 0)
+		exit(76); /* Protocol failure */
+	else
+		exit(n); /* User defined error. */
+
+	assert(0); /* Not reached. */
 }
 
 /*
@@ -255,17 +346,30 @@ dotcp(barrier_req_t *barrier_reqp, struct in_addr serverip, int portnum)
 		n  -= cc;
 	}
 
+	bp = buf;
+	n = 0;
+	memset(buf, 0, sizeof(buf));
 	while (1) {
-		if ((cc = read(sock, buf, sizeof(buf) - 1)) <= 0) {
+		if ((cc = read(sock, bp, sizeof(buf) - n)) <= 0) {
 			if (cc < 0) {
 				perror("Reading from socket:");
 				goto bad;
 			}
 			break;
 		}
+		else {
+			bp += cc;
+			n += cc;
+		}
 	}
 	close(sock);
-	return 0;
+
+	if (n == 4) {
+		return *((int *)buf);
+	}
+	else {
+		return -1;
+	}
  bad:
 	close(sock);
 	return -1;
@@ -316,7 +420,13 @@ doudp(barrier_req_t *barrier_reqp, struct in_addr serverip, int portnum)
 		return -1;
 	}
 	close(sock);
-	return 0;
+
+	if (cc == 4) {
+		return *((int *)buf);
+	}
+	else {
+		return -1;
+	}
 }
 
 void
