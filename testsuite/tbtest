@@ -471,7 +471,8 @@ sub step_init {
 	prints "  Clearing out existing experiments ";
 	open(CLEARLOG,"> clear.log");
 	$sth = $dbh->prepare("SELECT pid,eid from experiments ".
-			     "where !(pid='emulab-ops' and eid='hwdown')");
+			     "where !(pid='emulab-ops' and eid='hwdown') " .
+			     "and state != 'swapped'");
 	$sth->execute;
 	while (($pid,$eid) = $sth->fetchrow_array) {
 	    print CLEARLOG "$pid $eid\n";
@@ -486,8 +487,8 @@ sub step_init {
 		$fail++;
 		doexit(1);
 	    }
-	    print CLEARLOG "tbend $pid $eid\n";
-	    open(EXEC,"tbend $pid $eid 2>&1 |");
+	    print CLEARLOG "tbend -force $pid $eid\n";
+	    open(EXEC,"tbend -force $pid $eid 2>&1 |");
 	    while (<EXEC>) {
 		print CLEARLOG $_;
 	    }
