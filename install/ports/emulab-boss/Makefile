@@ -52,7 +52,8 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
-	vin4.2:${PORTSDIR}/misc/libelvin
+	vin4.2:${PORTSDIR}/misc/libelvin \
+	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
 RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \

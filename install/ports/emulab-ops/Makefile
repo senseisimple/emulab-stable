@@ -18,7 +18,8 @@ MAINTAINER=	ricci@cs.utah.edu
 .MAKEFLAGS+=	SWIG_LANGUAGES="perl python tcl"
 
 LIB_DEPENDS= lthread.2:${PORTSDIR}/devel/linuxthreads \
-	vin4.2:${PORTSDIR}/misc/libelvin
+	vin4.2:${PORTSDIR}/misc/libelvin \
+	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	sudo:${PORTSDIR}/security/sudo \
