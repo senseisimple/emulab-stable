@@ -351,7 +351,7 @@ sub InitUser()
 
 	if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([\w\@\.]*)/) {
 	    DBQueryFatal("replace into user_pubkeys ".
-			 "values ('$user', '$2', '$1 $2', now())");
+			 "values ('$user', 0, '$1 $2', now(), '$2')");
 
 	    #
 	    # Backwards compat. Remove later.
