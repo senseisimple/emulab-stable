@@ -50,3 +50,7 @@ INSERT INTO sitevariables VALUES ('robotlab/exclusive',NULL,'1','Only one experi
 INSERT INTO sitevariables VALUES ('robotlab/opentime',NULL,'07:00','Time the Robot lab opens for use.');
 INSERT INTO sitevariables VALUES ('robotlab/closetime',NULL,'18:00','Time the Robot lab closes down for the night.');
 INSERT INTO sitevariables VALUES ('robotlab/open',NULL,'0','Turn the Robot Lab on/off for weekends and holidays. Overrides the open/close times.');
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg',NULL,'','Name of boss node install package');
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'','Path from which to fetch boss packages');
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'','Name of ops node install package');
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'','Path from which to fetch ops packages');
