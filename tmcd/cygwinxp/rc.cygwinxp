@@ -36,6 +36,13 @@ else
 
     # Change hostname and computername, rename My Computer, reboot on success.
     /usr/local/etc/emulab/WSName /N:$nodeid /REBOOT /MCN
+    # Does WSName return to the shell?  Log it and give it a minute to take effect.
+    datehost="`date`: Host name '$hostname'"
+    newhost=`/bin/hostname`
+    msg="$datehost WSName returned to the shell after changing to '$newhost'."
+    echo "$msg" >> $logfile
+    echo "$msg"
+    sleep 60
 
     # Should never get here!  Try /sbin/reboot.
     datehost="`date`: Host name '$hostname'"
@@ -44,6 +51,8 @@ else
     echo "$msg" >> $logfile
     echo "$msg"
     /sbin/reboot
+    # Reboot returns to the shell.  Give it a minute to take effect.
+    sleep 60
 
     # Should never get here either!!!  Try /bin/shutdown.
     datehost="`date`: Host name '$hostname'"
@@ -52,8 +61,10 @@ else
     echo "$msg" >> $logfile
     echo "$msg"
     /bin/shutdown -r -f now
+    # Shutdown returns to the shell.  Give it a minute to take effect.
+    sleep 60
 
-    # Give up.
+    # Give up, log it, and go on.
     datehost="`date`: Host name '$hostname'"
     newhost=`/bin/hostname`
     msg="$datehost failed to reboot changing to '$newhost'."

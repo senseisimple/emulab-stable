@@ -116,6 +116,9 @@ if (-f $NTPDRIFT) {
 print "Clearing out testbed sources $SOURCES...\n";
 system("rm -rf $SOURCES");
 
+print "Clearing out testbed sources $OBJS...\n";
+system("rm -rf $OBJS");
+
 print "Clearing out $RUNDIR ...\n";
 system("rm -rf $RUNDIR/*.pid");
 

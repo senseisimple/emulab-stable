@@ -72,22 +72,16 @@ bin-install:	dir-install
 etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	dir-install ###ifcfgs
-	# Copy host keys for the user sshd on port 2222
-	chmod g+r /etc/ssh_host*key
-	-cp /etc/ssh_host_key /etc/ssh_host_key.user
-	-cp /etc/ssh_host_dsa_key /etc/ssh_host_dsa_key.user
-	-cp /etc/ssh_host_rsa_key /etc/ssh_host_rsa_key.user
-	chmod g-r /etc/ssh_host*key /etc/ssh_host*key.user
 	# Watchdog assumes the ssh keys are in /etc/ssh.
 	ln -f -s /etc /etc/ssh
-	# Boot log files have to be writable by SYSTEM under rc.cygwin.
+	# Boot log files have to be writable by root under rc.cygwin .
 	$(INSTALL) -c -m 775 -o root -g wheel -d /var/log
 	$(INSTALL) -c -m 775 -o root -g wheel -d /var/db
 	# Need an /etc/shells file for rc.acounts.
 	$(INSTALL) -m 755 $(SRCDIR)/shells /etc/shells
 
 sysetc-remove:
-	rm -f /etc/ssh_host*key.user /etc/shells
+	rm -f /etc/shells
 
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
@@ -97,6 +91,8 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
 	$(INSTALL) -c -m 755 -o root -g wheel -d /sbin
 	$(INSTALL) -m 755 $(SRCDIR)/reboot /sbin/reboot
+	# Put the tcsh desktop startup script in the CygWin root directory.
+	$(INSTALL) -m 755 $(SRCDIR)/cygwin-tcsh.bat /
 	ln -f -s /bin/shutdown /sbin/shutdown
 	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwin
 	# The following will fail if the user login script is still busy in a shell.

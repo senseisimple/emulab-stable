@@ -581,7 +581,10 @@ sub os_samba_mount($$$)
 
     # Make the CygWin mount from the Samba path to the local mount point directory.
     my $sambapath = $local;
-    $sambapath =~ s|.*/(.*)|//$host/$1|;
+    $sambapath =~ s|^/proj/(.*)|proj-$1|;
+    $sambapath =~ s|^/group/(.*)/(.*)|$1-$2|;
+    $sambapath =~ s|.*/(.*)|$1|;
+    $sambapath = "//$host/$sambapath";
     if (! -e $local) {
 	print "os_samba_mount: Making CygWin '$local' mount point directory.\n"
 	    if ($verbose);
