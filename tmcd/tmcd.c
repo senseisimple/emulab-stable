@@ -633,10 +633,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * both for privacy and to keep our syslog smaller.
 	 */
 	if (command_array[i].func == dolog)
-		info("%s: %s log %d chars\n", nodeid, cp, strlen(rdata));
+		info("%s: vers:%d %s %s log %d chars\n", nodeid, version,
+		     istcp ? "TCP" : "UDP", cp, strlen(rdata));
 	else
-		info("%s: vers:%d %s %s\n", nodeid,
-		     version, cp, command_array[i].cmdname);
+		info("%s: vers:%d %s %s %s\n", nodeid, version,
+		     istcp ? "TCP" : "UDP", cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, nodeid, rdata, istcp, version);
 
