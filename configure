@@ -1355,9 +1355,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/firstuser utils/export_tables \
 	utils/cvsupd.pl \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
-	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
-	vis/dbvistopology vis/dbtopper \
-	vis/top2png vis/render \
+	vis/GNUmakefile vis/webvistopology \
+	vis/dbvistopology \
+	vis/prerender vis/prerender_all vis/render \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/2.elvind.sh \
 	tools/GNUmakefile \
