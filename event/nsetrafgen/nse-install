@@ -1,14 +1,18 @@
 #!/bin/sh
 if [ ! -d ns-allinone-2.26 ]; then
     echo "Downloading ns2.26 source from www.emulab.net"
-    fetch http://www.emulab.net/download/ns-allinone-2.26.tar.gz
+    fetch http://www.emulab.net/downloads/ns-allinone-2.26.tar.gz
     if [ $? -ne 0 ]; then
         echo "Failed..."
         echo "Downloading ns2.26 source from www.isi.edu"
         fetch http://www.isi.edu/nsnam/dist/ns-allinone-2.26.tar.gz
     fi
     tar xzf ns-allinone-2.26.tar.gz
-    patch -p0 < nse.patch
+    if [ $# -ge 1 ]; then
+         patch -p0 < $1
+    else
+         patch -p0 < nse.patch
+    fi
 fi
 cd ns-allinone-2.26
 ./install

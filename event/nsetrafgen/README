@@ -1,3 +1,11 @@
+The web documentation supersedes this README file wrt incorporating
+simulated nodes in your experiment
+
+1) You need to explicitly do a "gmake buildnse" in
+<builddir>/event/nsetrafgen directory
+2) You need the image FBSD-NSE 
+
+****************************************
 For NSE integration and traffic generation, we need the following files
 as part of the FBSD disk image or it should be part of 
 /usr/testbed/sup/sup/FBSD43-STD/root*/etc/testbed on the boss node.

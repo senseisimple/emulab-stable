@@ -18,15 +18,27 @@ all: msg
 
 msg:
 	@echo ""
-	@echo -n "WARNING! You must first do a \"make buildnse\" in $(SRCDIR) "
-	@echo "if $(SRCDIR)/nse is not built"
+	@echo -n "WARNING! You must first do a \"make buildnse\""
+	@echo "if nse is not built"
 	@echo "WARNING! It takes about 15 minutes for buildnse"
 	@echo ""
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+# Symlinking all these files is the only way to ensure the build
+# succeeds with a pre-built nse.patch file. Since we run both
+# the testbed as well as ns configure script, we need to resort
+# to this kind of hack
 buildnse:
-	cd $(SRCDIR); $(SRCDIR)/nse-install
+	ln -s $(SRCDIR)/tbevent.h .
+	ln -s $(SRCDIR)/tbevent.cc .
+	ln -s $(SRCDIR)/tbnexthop.h .
+	ln -s $(SRCDIR)/tbnexthop.cc .
+	ln -s $(SRCDIR)/ip_fw.h .
+	ln -s $(SRCDIR)/../../lib/libtb/log.h .
+	ln -s $(SRCDIR)/../../lib/libtb/tbdefs.h .
+	ln -s $(SRCDIR)/../lib/event.h .
+	$(SRCDIR)/nse-install $(SRCDIR)/nse.patch
 
 sup-install:
 	cp -p $(INSTALL_FILES) $(INSTALL_SUPDIR)$(CLIENT_BINDIR)
