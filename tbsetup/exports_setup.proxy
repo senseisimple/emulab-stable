@@ -86,7 +86,7 @@ system("mv $exportsnew $exports") == 0 or
 chmod(0444, $exports);
 
 #
-# I have little faith in HUPing mountd. Kill it and restart.
+# I have little faith in HUPing mountd, but do it anyway.
 #
 $mpid = `cat /var/run/mountd.pid`;
 $mpid =~ s/\n//;
@@ -94,14 +94,8 @@ $mpid =~ s/\n//;
 if ($mpid =~ /^([-\@\w.]+)$/) {
     $mpid = $1;
 }
-kill('TERM', $mpid) or
-    die("Could not kill(TERM) process $mpid (mountd): $!");
-
-# Allow time to react before starting it again.
-select(undef, undef, undef, 0.5);
-
-system("mountd -r") == 0 or
-    fatal("Failed to restart mountd! $!\n");
+kill('HUP', $mpid) or
+    fatal("Could not kill(HUP) process $mpid (mountd): $!");
 
 exit(0);
 
