@@ -96,6 +96,7 @@ sub read_schema($) {
     my $create_table = 0;
     my $table_name = "";
     my %tables = ();
+    my $skip_table = 0; # Indicates that we should skip this table
 
     while (<FH>) {
 	chomp;
@@ -111,6 +112,17 @@ sub read_schema($) {
 		# Start of a new table definition
 		$create_table = 1;
 		$table_name = $1;
+
+		#
+		# We have to skip any tables that get dynamically generated
+		#
+		if ($table_name =~ /^[\w-]+_[\w-]+_events$/) {
+		    debug("Skipping table $table_name\n");
+		    $skip_table = 1;
+		} else {
+		    $skip_table = 0;
+		}
+
 		debug("Entering table $table_name\n");
 
 	    } else {
@@ -125,13 +137,30 @@ sub read_schema($) {
 	    # what this line is trying to do...
 	    #
 
+	    if (/^\) TYPE=(\w+);/) {
+
+		# The end of the table definition
+		my $type = $1;
+		$create_table = 0;
+		debug("Leaving table $table_name (type $type)\n");
+		if (!$skip_table) {
+		    $tables{$table_name}{TYPE} = $type;
+		}
+
+	    } elsif ($skip_table) {
+		#
+		# Don't bother processing this line
+		#
+		next;
+	    } # NOTE - elsif below
+
 	    #
-	    # Fist, some cases of things we don't handle yet. None of these
+	    # Some cases of things we don't handle yet. None of these
 	    # are used by the testbed software yet, but we should support
 	    # them someday for completeness. For now, we have check for them
 	    # so that we don't accidentally treat them as columns
 	    #
-	    if (/^\s*.*\s+FOREIGN KEY\s+/) {
+	    elsif (/^\s*.*\s+FOREIGN KEY\s+/) {
 		die "Found a FOREIGN KEY line, which we don't handle yet\n";
 	    } elsif (/^\s*CHECK\s*\((.+)\),?$/) {
 		die "Found a CHECK line, which we don't handle yet\n";
@@ -169,15 +198,7 @@ sub read_schema($) {
 		push @{ $tables{$table_name}{ORDERED_COLUMNS} },
 		    [$name, $definition];
 
-	    } elsif (/^\) TYPE=(\w+);/) {
-
-		# The end of the table definition
-		my $type = $1;
-		$create_table = 0;
-		debug("Leaving table $table_name (type $type)\n");
-		$tables{$table_name}{TYPE} = $type;
-
-	    } else {
+	    }  else {
 
 		warn "Found a line I don't know what to do with!\n";
 		die "$_\n";
