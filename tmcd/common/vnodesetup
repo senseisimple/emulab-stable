@@ -256,7 +256,6 @@ if (! -e $vnodedir) {
 #
 REBOOT:
 system("tmcc -n $vnodeid state BOOTING");
-system("tmcc -n $vnodeid state TBSETUP");
 
 #
 # Invoke remotevnodesetup routine in the setup library. This will talk
