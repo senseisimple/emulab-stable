@@ -1497,6 +1497,19 @@ CREATE TABLE virt_lans (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'virt_node_desires'
+--
+
+CREATE TABLE virt_node_desires (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  desire varchar(30) NOT NULL default '',
+  weight float default NULL,
+  PRIMARY KEY  (pid,eid,vname)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'virt_nodes'
 --
 
