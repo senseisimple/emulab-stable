@@ -13,7 +13,8 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin
-SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl
+SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
+                  eventping
 LIBEXEC_SCRIPTS	= webcreateimage 
 
 #

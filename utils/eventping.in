@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# eventping - ping a node until it is reachable, then send ISUP event
+
+# Configure variables
+use lib '@prefix@/lib';
+my $TB = "@prefix@";
+my $BOSSNODE = "@BOSSNODE@";
+my $TBOPS = "@TBOPSEMAIL@";
+
+$| = 1;
+
+use event;
+use libdb; # event constants
+use libtestbed; # sendmail
+
+sub usage {
+    fatal("Usage: eventping <node>\n".
+	  "Ping node until reachable, then send ISUP event.\n");
+}
+
+my $cmdline = "$0 ".join(" ",@ARGV);
+if (@ARGV != 1) { usage(); }
+
+my $d = 0;
+
+my $node = shift;
+
+my $maxtime=600;  # Set the timer for 10 minutes
+my $starttime = time();
+my $endtime = $starttime + $maxtime;
+
+while( time() <= $endtime ) {
+    my $status=system("/sbin/ping -c 1 -t 1 $node ".
+		      "> /dev/null 2>&1 > /dev/null");
+    my $rv = $status >> 8;
+    my $sig = $status & 127;
+    debug("ping returned $status ($rv / $sig)\n");
+    if ($rv==0) {
+	# we got a response
+	EventSendFatal(host      => $BOSSNODE ,
+		       objtype   => TBDB_TBEVENT_NODESTATE ,
+		       eventtype => TBDB_NODESTATE_ISUP ,
+		       objname   => $node);
+	debug("Sent event ". TBDB_NODESTATE_ISUP ." for $node\n");
+	exit(0);
+    } elsif ($rv==2) {
+	# no response
+    } elsif ($rv==68) {
+	# ping: cannot resolve $node: Unknown host
+	fatal("eventping: cannot resolve $node: Unknown host\n");
+    } else {
+	# Unknown error
+	fatal("eventping: ping returned unknown error $rv ($sig)\n");
+    }
+    # sleep just a little bit so we can catch a ^C while debugging
+    if ($d) { select(undef,undef,undef,0.5); }
+}
+
+sub debug { if ($d) { print @_; } }
+
+sub fatal ( $ ) {
+  my $msg = shift;
+  notify("FATAL: ".$msg);
+  die($msg);
+}
+
+sub notify ( $ ) {
+  my $msg = shift;
+  $msg .= "\ndate=".`date`."\ncmdline=\n$cmdline\n\npid=$$\n\n";
+  if (!$d) {
+    SENDMAIL($TBOPS,"eventping failure",$msg,$TBOPS);
+  } else {
+    debug("notify: Not sending mail in debug mode\n");
+  }
+  debug($msg);
+}
