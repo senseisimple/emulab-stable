@@ -1587,7 +1587,7 @@ sub remotenodeupdate()
     # Do account stuff.
     #
     {
-	local $tmcctimeout = 5;
+	local $tmcctimeout = 10;
     
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
