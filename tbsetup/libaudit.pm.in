@@ -153,6 +153,7 @@ sub AuditEnd()
 {
     SendAuditMail(0);
     delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
+    unlink($logfile);
     return 0;
 }
 
