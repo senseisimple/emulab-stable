@@ -1,4 +1,4 @@
-<?php
+e<?php
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2003 University of Utah and the Flux Group.
@@ -97,18 +97,37 @@ if (count($interfaces)) {
 
 
 #
-# Attempt to come up with a node_id and an IP address for it
+# Attempt to come up with a node_id and an IP address for it - unless one was
+# provided by the client.
 #
-$name_info = find_free_id("pc");
-$node_prefix = $name_info[0];
-$node_num = $name_info[1];
-$hostname = $node_prefix . $node_num;
-$IP = guess_IP($node_prefix,$node_num);
+if (!$node_id) {
+    $name_info = find_free_id("pc");
+    $node_prefix = $name_info[0];
+    $node_num = $name_info[1];
+    $hostname = $node_prefix . $node_num;
+} else {
+    $hostname = $node_id;
+}
+
+if ($use_temp_IP) {
+    $IP = $tmpIP;
+} else {
+    $IP = guess_IP($node_prefix,$node_num);
+}
 
 #
 # Make an educated guess as to what type it belongs to
 #
-$type = guess_node_type($cpuspeed,$disksize);
+if (!$type) {
+    $type = guess_node_type($cpuspeed,$disksize);
+}
+
+#
+# Default the role to 'testnode' if the node didn't supply a role
+#
+if (!$role) {
+    $role = "testnode";
+}
 
 #
 # Stash this information in the database
@@ -120,7 +139,7 @@ if ($identifier) {
 }
 DBQueryFatal("insert into new_nodes set node_id='$hostname', type='$type', " .
 	"IP='$IP', temporary_IP='$tmpIP', dmesg='$messages', created=now(), " .
-	"identifier=$identifier");
+	"identifier=$identifier, role='$role'");
 
 $query_result = DBQueryFatal("select last_insert_id()");
 $row = mysql_fetch_array($query_result);

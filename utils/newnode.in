@@ -39,12 +39,14 @@ my $sudo = "/usr/local/bin/sudo -S";
 #
 # MFS to boot the nodes into initially
 #
-my $INITIAL_MFS = TB_OSID_FREEBSD_MFS();
+my $MFS_INITIAL = TB_OSID_FREEBSD_MFS();
+my $OS_OPSNODE  = "OPSNODE-BSD";
 
 #
 # Initial event system state to put the nodes into
 #
-my $INITIAL_STATE = TBDB_NODESTATE_SHUTDOWN;
+my $STATE_INITIAL = TBDB_NODESTATE_SHUTDOWN;
+my $STATE_OPSNODE = TBDB_NODESTATE_ISUP;
 
 #
 # Number of vnodes to create for each physical node
@@ -55,6 +57,14 @@ my $NUM_VNODES = 50;
 # Default number of vnodes that can be hosted on any pnode
 #
 my $DEFAULT_PCVM_COUNT = 20;
+
+#
+# Experiments we might put nodes into
+#
+my $PID_HWDOWN = NODEDEAD_PID();
+my $EID_HWDOWN = NODEDEAD_EID();
+my $PID_OPSNODE = TBOPSPID();
+my $EID_OPSNODE = "opsnodes";
 
 # Turn off line buffering on output
 $| = 1;
@@ -109,16 +119,6 @@ if (!-w $dhcpd_conf) {
 }
 
 #
-# Find out what op_mode the $INITIAL_MFS runs in
-#
-my $result = DBQueryFatal("select op_mode from os_info where " .
-    " osid='$INITIAL_MFS'");
-if ($result->numrows() != 1) {
-    die "Unable to find OS information for $INITIAL_MFS\n";
-}
-my ($INITIAL_OPMODE) = $result->fetchrow();
-
-#
 # For vnodes - figure out the jail IP base
 #
 my $IPBASE;
@@ -151,14 +151,14 @@ NODE: foreach my $node_id (@node_ids) {
     # Grab information about the node from the new_nodes table
     #
     $query_result = DBQueryFatal("SELECT new_node_id, type, IP, temporary_IP, ".
-	"floor, building, loc_x, loc_y, contact, phone, room " .
+	"floor, building, loc_x, loc_y, contact, phone, room, role " .
 	"FROM new_nodes WHERE node_id='$node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: No pending node with that name exists!\n";
 	next NODE;
     }
     my ($new_node_id, $type, $IP, $tempIP, $floor, $building, $loc_x, $loc_y,
-	$contact, $phone, $room) = $query_result->fetchrow();
+	$contact, $phone, $room, $role) = $query_result->fetchrow();
 
     #
     # Make sure they've given it an IP address that looks valid
@@ -224,7 +224,7 @@ NODE: foreach my $node_id (@node_ids) {
 	# Do a sanity check - make sure that we have a switch recorded for all
 	# experimental interfaces
 	#
-	unless ($force_unconnected_interfaces) {
+	unless ($force_unconnected_interfaces || ($role eq "ctrlnode")) {
 	    my $iface = "eth$card";
 	    if (($iface ne $control_iface) && ($connector !~ /wireless/i)
 		&& !$switch_id) {
@@ -255,13 +255,55 @@ NODE: foreach my $node_id (@node_ids) {
     }
 
     #
+    # Figure out which project and experiment this node needs to go into
+    #
+    my ($pid, $eid);
+    if ($role eq "ctrlnode") {
+	$pid = $PID_OPSNODE;
+	$eid = $EID_OPSNODE;
+    } else {
+	$pid = $PID_HWDOWN;
+	$eid = $EID_HWDOWN;
+    }
+
+    #
+    # Figure out what OS this node should run
+    #
+    my $osid;
+    if ($role eq "ctrlnode") {
+	$osid = $OS_OPSNODE;
+    } else {
+	$osid = $MFS_INITIAL;
+    }
+
+    #
+    # Figure out which opmode the OS runs in
+    #
+    my $result = DBQueryFatal("select op_mode from os_info where " .
+	" osid='$osid'");
+    if ($result->numrows() != 1) {
+	die "Unable to find OS information for $osid\n";
+    }
+    my ($opmode) = $result->fetchrow();
+
+    #
+    # Figure out what state to start the node in
+    #
+    my $state;
+    if ($role eq "ctrlnode") {
+	$state = $STATE_OPSNODE;
+    } else {
+	$state = $STATE_INITIAL;
+    }
+
+    #
     # Okay, time to actually add the node!
     #
     
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
-	"phys_nodeid='$node_id', role='testnode', priority=$priority, " .
-    	"eventstate='$INITIAL_STATE', op_mode='$INITIAL_OPMODE', " .
-	"def_boot_osid='$INITIAL_MFS', " .
+	"phys_nodeid='$node_id', role='$role', priority=$priority, " .
+    	"eventstate='$state', op_mode='$opmode', " .
+	"def_boot_osid='$MFS_INITIAL', " .
 	"state_timestamp=unix_timestamp(NOW()), " .
 	"op_mode_timestamp=unix_timestamp(NOW())");
 
@@ -306,7 +348,7 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Add some vnodes
     #
-    if (defined $nodenum) {
+    if (defined $nodenum && ($role eq "testnode")) {
 	my $vtype = $type;
 	if (!($vtype =~ s/pc/pcvm/)) {
 	    $vtype = "$vtype-vm";
@@ -360,7 +402,7 @@ NODE: foreach my $node_id (@node_ids) {
     # Put it into hwdown for now - I would put them in reloading, but I'm
     # afriad the reload_daemon might do the wrong thing to them
     #
-    system "$nalloc emulab-ops hwdown $node_id";
+    system "$nalloc $pid $eid $node_id";
 
     #
     # Remove the node from the new_ tables

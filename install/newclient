@@ -29,7 +29,7 @@ else {
 
 my $FETCH = "/usr/bin/fetch";
 
-my $FORMURL = "newnodecheckin.php";
+my $FORMURL = "dev/ricci/newnodecheckin.php";
 
 my $IFCONFIG = "/sbin/ifconfig";
 my $DMESG = "/var/run/dmesg.boot";
@@ -73,6 +73,13 @@ my $FLOPPY_REMOVED  = 0;
 my $FLOPPY_INSERTED = 1;
 
 #
+# What type of client this node is. Possible values:
+# testnode - The default, a regular testbed node
+# ops      - The node checking in is actually ops
+#
+my $client_type = "testnode";
+
+#
 # Handle command-line arguments - we do them ourselves unstead of using getopt,
 # because we want to be able to run this on minimalist environments where that
 # may not exist.
@@ -82,6 +89,7 @@ my $writefloppy	= 0;
 my $testing	= 0;
 my $bossnode	= "";
 
+
 my $uniquifier;
 foreach my $arg (@ARGV) {
     if ($arg =~ s/^-//) {
@@ -90,6 +98,7 @@ foreach my $arg (@ARGV) {
 		/h/ && do { $headless = 1; last; };
 		/w/ && do { $writefloppy = 1; last; };
 		/t/ && do { $testing = 1; last; };
+		/o/ && do { $client_type = "ops"; last; };
 	    };
 	}
     } else {
@@ -102,10 +111,11 @@ foreach my $arg (@ARGV) {
 }
 
 sub usage {
-    print "Usage: $0 [-h] [-w] [-t] [identifer]\n";
+    print "Usage: $0 [-h] [-w] [-t] [-o] [identifer]\n";
     print " -h         - Run headless (beep codes for errors)\n";
     print " -w         - Write an the node's unique identifier to a floppy\n";
     print " -t         - Test mode\n";
+    print " -o         - 'ops' mode\n";
     print " identifier - supply the given identifier to boss\n";
     1;
 }
@@ -132,10 +142,43 @@ my ($diskdev, $disksize) = get_disksize();
 my $speed = get_cpuspeed();
 
 #
+# For some node types, we may already know the node_id we're supposed to use
+#
+my $node_id;
+if ($client_type eq "ops") {
+    $node_id = "ops";
+}
+
+#
+# For some node types, we know we're supposed to use our 'temporary' IP as the
+# permanent one - take care of those now
+#
+my $use_temp_IP = 0;
+if ($client_type eq "ops") {
+    $use_temp_IP = 1;
+}
+
+#
+# Also, keep track of the role this node will have in the testbed
+#
+my $role = "testnode";
+if ($client_type eq "ops") {
+    $role = "ctrlnode";
+}
+
+#
+# In some cases, we may know the node's type in advance
+#
+my $type;
+if ($client_type eq "ops") {
+    $type = "ops";
+}
+
+#
 # Start the program that will annouce us to the switch, so that it learns
 # MAC addresses, etc.
 #
-if (!$testing) {
+if (!$testing && ($client_type ne "ops")) {
     teachswitch();
 }
 
@@ -186,8 +229,18 @@ sub buildURL {
     $URL .= "cpuspeed=" . urlencode($speed);
     $URL .= "&diskdev=" . urlencode($diskdev);
     $URL .= "&disksize=" . urlencode($disksize);
+    $URL .= "&role=" . urlencode($role);
+    if ($node_id) {
+	$URL .= "&node_id=" . urlencode($node_id);
+    }
     if ($uniquifier) {
 	$URL .= "&identifier=". urlencode($uniquifier);
+    }
+    if ($use_temp_IP) {
+	$URL .= "&use_temp_IP=1";
+    }
+    if ($type) {
+	$URL .= "&type=" . urlencode($type);
     }
 
     my $ifaceindex = 0;
