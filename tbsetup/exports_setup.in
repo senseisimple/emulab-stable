@@ -110,14 +110,19 @@ if (!$TESTMODE) {
 	# If we didn't get the lock, wait for the processes that did to finish
 	#
 	if (!$gotlock) {
-	    while (((stat(LOCK))[9] != $oldlocktime) &&
-	           (flock(LOCK, LOCK_EX|LOCK_NB) == 0)) {
+	    while (1) {
+		if ((stat(LOCK))[9] != $oldlocktime) {
+		    exit(0);
+		}
+		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		    close(LOCK);
+		    exit(0);
+		}
 		if ($count++ > 20)  {
-		    fatal("Could not get the lock after a long time!\n");
+		    fatal("Process with the lock didn't finish after a long time!\n");
 		}
 		sleep(1); 
 	    }
-	    exit(0);
 	}
     }
 }
