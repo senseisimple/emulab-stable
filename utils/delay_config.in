@@ -10,6 +10,7 @@ sub usage()
     print STDERR
 	"Usage: delay_config [-d delay] [-b bw] [-l plr] [-p 0|1] ",
 	"<pid> <eid> <link>\n",
+	"Required: pid, eid, link, and at least one of -d, -b, or -l\n",
 	"  pid = Project ID\n",
 	"  eid = Experiment ID\n",
 	" link = link name from ns file, ie. 'link1' in\n",
@@ -52,6 +53,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
+if (@ARGV < 4) {
+    usage();
+}
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
