@@ -43,7 +43,7 @@
      <li> <a href="#UTT-TUNNEL">How do I connect directly to node consoles, 
                                 without going through <b>users</b>?</a>
      <li> <a href="#UTT-4">Can I reboot (power cycle) my nodes?</a>
-     <li> <a href="#UTT-SCROGGED">I've scrogged my disk! Now what?</a>
+     <li> <a href="#UTT-SCROGGED">I've clobbered my disk! Now what?</a>
      <li> <a href="#UTT-5">Where do I store files needed by my experiment?</a>
      <li> <a href="#UTT-6">Are my files on <b>users.emulab.net</b>
                            backed up (filesaved)?</a>
@@ -115,6 +115,9 @@
      <li> <a href="#TR-5">I decreased the bandwidth on a link and now the
                           ping time between the nodes has increased. Why?</a>
      <li> <a href="#TR-6">I wrote a small TCP application to test the
+     bandwidth of a link/LAN. I do not observe the bandwidth that I
+     asked for. Why?</a>
+     <li> <a href="#TR-6b">I wrote a small UDP application to test the
      bandwidth of a link/LAN. I do not observe the bandwidth that I
      asked for. Why?</a>
      <li> <a href="#TR-7">I am running a routing daemon in my topology
@@ -656,7 +659,7 @@
     <font size='+1'><b>Can I reboot (power cycle) my nodes?</b></font>
     <p>
     Yes. Each of the PCs is independently power controlled. If your
-    node becomes wedged, or otherwise unresponsive, you can use the
+    node hangs, or is otherwise unresponsive, you can use the
     <tt>node_reboot</tt> command, as discussed in the
     <a href="tutorial/tutorial.php3#Wedged">Emulab Tutorial.</a>
     </p>
@@ -669,7 +672,7 @@
     </p>
 
 <li><a NAME="UTT-SCROGGED"></a>
-    <font size='+1'><b>I've scrogged my disk! Now what?</b></font>
+    <font size='+1'><b>I've clobbered my disk! Now what?</b></font>
     <p>
     If you manage to corrupt a disk (or slice), no worries. You can easily
     repair the damage yourself by reloading a fresh copy of the default
@@ -1565,7 +1568,7 @@
     it is necessary to keep the data pipe between the sender and the
     receiver full. For a reliable window based protocol such as TCP,
     the window size represents the number of unacknowledged bytes. TCP
-    needs to keep the unacknowledged bytes around untill the acks for
+    needs to keep the unacknowledged bytes around until the acks for
     them are received. These bytes are retained in socket buffers. On
     a link/LAN with bandwidth B and round-trip-time (RTT) D, the
     sender TCP needs to be able to transmit B times D bytes before
@@ -1580,6 +1583,35 @@
     mini-tutorial"</a> or a basic TCP/IP book for the gory details.
     
     </p>
+
+ <li><a NAME="TR-6b"></a>
+     <font size='+1'><b>I wrote a small UDP application to test the
+    bandwidth of a link/LAN. I do not observe the bandwidth that I
+    asked for. Why?</b></font>
+    
+    <p>
+    Since UDP is unreliable and not flow controlled, you may just be
+    trying to push packets out on the wire too fast.  In this case
+    packets will be dropped before even getting to the wire.  You
+    may also be dropping packets at the receiver side if the consumer
+    cannot keep up.
+    <p>
+    If you are trying to saturate a 100Mb link and can't do it, it
+    may be due to using too small a packet size.
+    For small packet sizes, the limitation on a 100Mb link will be
+    the packet rate, not the raw bandwidth.  The eepro100
+    ethernet NICs in most of our machines can only generate a little
+    over 100,000 packets per second (pps).  With 64-byte packets,
+    you will thus only see about 51.2Mb/sec of raw data or about
+    14.4Mb/sec of UDP payload (a 64 byte ethernet packet can hold
+    only 18 bytes of UDP payload).  Note that the theoretical max
+    is less than 150,000 pps for 64-byte packets, so even better NICs
+    would not change this.
+    </p><p>
+    Considering that stock FreeBSD and Linux can generate even fewer
+    packets per second due to interrupt and scheduling overheads, you
+    probably need to use at least 200-byte packets to saturate a 100Mb
+    link.
 
  <li><a NAME="TR-7"></a>
     <font size='+1'><b>I am running a routing daemon in my topology
