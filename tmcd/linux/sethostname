@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -32,6 +32,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 if (@ARGV) {
     my $token = shift;
@@ -41,10 +42,12 @@ if (@ARGV) {
     }
 }
 
-my $domain = `dnsdomainname`;
-chomp($domain);
-if ($domain =~ /[\w\.]+/) {
-    $domain = ".$domain";
+#
+# We assume that we are in the same domain as our boss node
+#
+my $bossname = tmccbossname();
+if ($bossname =~ /^[^\.]+\.(.*)$/) {
+    $domain = ".$1";
 }
 else {
     $domain = ".foo.net";
