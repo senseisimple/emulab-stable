@@ -63,17 +63,24 @@ $rpms               = $row[rpms];
 $startupcmd         = $row[startupcmd];
 
 #
-# Get the OSID list.
+# Get the OSID list. These are either OSIDs that are currently loaded on
+# the node as indicated by the partitions table, or OSIDs with non-null
+# paths (which means they are OSKit kernels). The list is pruned using the
+# pid of the user when not an admin type, of course.
 #
 if ($isadmin) {
     $osid_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM os_info order by osid");
+	"select o.*,p.osid from os_info as o ".
+	"left join partitions as p on o.osid=p.osid ".
+	"where p.node_id='$node_id' or o.path!='' order by o.osid");
 }
 else {
     $osid_result = mysql_db_query($TBDBNAME,
-	"select distinct o.* from os_info as o ".
-	"left join proj_memb as p on o.pid IS NULL or p.pid=o.pid ".
-	"where p.uid='$uid' order by o.pid,o.osid");
+	"select distinct o.*,p.osid from os_info as o ".
+	"left join proj_memb as m on o.pid IS NULL or m.pid=o.pid ".
+	"left join partitions as p on o.osid=p.osid ".
+	"where m.uid='$uid' and p.node_id='$node_id' or o.path!='' ".
+	"order by o.pid,o.osid");
 }
 if (! $osid_result) {
     $err = mysql_error();
@@ -110,6 +117,9 @@ echo "<tr>
 echo "<tr>
           <td>*Def Boot OSID:</td>";
 echo "    <td><select name=\"def_boot_osid\">\n";
+if ($def_boot_osid) {
+    echo "<option selected value='$def_boot_osid'>$def_boot_osid</option>\n";
+}
                while ($row = mysql_fetch_array($osid_result)) {
                   $osid = $row[osid];
 		  $pid  = $row[pid];
@@ -118,7 +128,7 @@ echo "    <td><select name=\"def_boot_osid\">\n";
 
                   echo "<option ";
 		  if ($def_boot_osid == $osid) {
-			  echo "selected ";
+		      continue;
 		  }
                   echo "value=\"$osid\">$pid - $osid</option>\n";
                }
@@ -144,44 +154,45 @@ echo "<tr>
                      value=\"$def_boot_cmd_line\"></td>
       </tr>\n";
 
+if ($isadmin) {
+    mysql_data_seek($osid_result, 0);
 
-mysql_data_seek($osid_result, 0);
+    echo "<tr>
+              <td>Next Boot OSID:</td>";
+    echo "    <td><select name=\"next_boot_osid\">\n";
+    echo "                <option value=\"\">No OSID</option>\n";
+    
+    while ($row = mysql_fetch_array($osid_result)) {
+	$osid = $row[osid];
+	$pid  = $row[pid];
+	if (!$pid)
+	    $pid = "testbed";
 
-echo "<tr>
-          <td>Next Boot OSID:</td>";
-echo "    <td><select name=\"next_boot_osid\">\n";
-echo "                <option value=\"\">No OSID</option>\n";
-               while ($row = mysql_fetch_array($osid_result)) {
-                  $osid = $row[osid];
-		  $pid  = $row[pid];
-		  if (!$pid)
-		      $pid = "testbed";
+	echo "<option ";
+	if ($next_boot_osid == $osid) {
+	    echo "selected ";
+	}
+	echo "value=\"$osid\">$pid - $osid</option>\n";
+    }
+    echo "       </select>";
+    echo "    </td>
+           </tr>\n";
 
-                  echo "<option ";
-		  if ($next_boot_osid == $osid) {
-			  echo "selected ";
-		  }
-                  echo "value=\"$osid\">$pid - $osid</option>\n";
-               }
-echo "       </select>";
-echo "    </td>
-      </tr>\n";
-
-echo "<tr>
-          <td>Next Boot Path:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"next_boot_path\" size=\"40\"
-                     value=\"$next_boot_path\"></td>
-      </tr>\n";
+    echo "<tr>
+             <td>Next Boot Path:</td>
+             <td class=\"left\">
+                 <input type=\"text\" name=\"next_boot_path\" size=\"40\"
+                        value=\"$next_boot_path\"></td>
+          </tr>\n";
 
 
-echo "<tr>
-          <td>Next Boot Command Line:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"next_boot_cmd_line\" size=\"40\"
-                     value=\"$next_boot_cmd_line\"></td>
-      </tr>\n";
-
+    echo "<tr>
+              <td>Next Boot Command Line:</td>
+              <td class=\"left\">
+                  <input type=\"text\" name=\"next_boot_cmd_line\" size=\"40\"
+                         value=\"$next_boot_cmd_line\"></td>
+          </tr>\n";
+}
 
 echo "<tr>
           <td>Startup Command[1]:</td>

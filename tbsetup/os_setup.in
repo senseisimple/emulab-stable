@@ -40,7 +40,7 @@ my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my @nodes       = ();
-my %osid        = ();
+my %osids       = ();
 my %waitfor     = ();
 my %canfail     = ();
 my $db_result;
@@ -119,11 +119,13 @@ if ($db_result->numrows < 1) {
 }
 
 for ($i = 0; $i < $db_result->numrows; $i++) {
-    my %row  = $db_result->fetchhash();
-    my $node = $row{'node_id'};
+    my %row      = $db_result->fetchhash();
+    my $node     = $row{'node_id'};
+    my $osid     = $row{'def_boot_osid'};
+    my $bootpath = 0;
 
     push(@nodes, $node);
-    $osid{$node} = $row{'def_boot_osid'};
+    $osids{$node} = $osid;
 
     #
     # Make sure the files specified in the paths exist. We mount the
@@ -144,12 +146,13 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 
 	    # Path must begin with $TFTP
 	    if (! ($path =~ /^\/$TFTP\//)) {
-		die("File $path for node $node must reside in $TFTP\n");
+		die("*** File $path for node $node must reside in $TFTP\n");
 	    }
 
 	    if (! -e $path) {
-		die("File $path for node $node does not exist!");
+		die("*** File $path for node $node does not exist!");
 	    }
+	    $bootpath = 1;
 	}
     }
     if (defined($row{'next_boot_path'})) {
@@ -166,11 +169,11 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 
 	    # Path must begin with $TFTP
 	    if (! ($path =~ /^\/$TFTP\//)) {
-		die("File $path for node $node must reside in $TFTP\n");
+		die("*** File $path for node $node must reside in $TFTP\n");
 	    }
 
 	    if (! -e $path) {
-		die("File $path for node $node does not exist!");
+		die("*** File $path for node $node does not exist!");
 	    }
 	}
     }
@@ -183,7 +186,7 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     #
     foreach my $delta (split(":", $row{'deltas'})) {
 	if (! -e $delta) {
-	    die("Delta file $delta for node $node does not exist!");
+	    die("*** Delta file $delta for node $node does not exist!");
 	}
     }
     #
@@ -191,7 +194,7 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     #
     foreach my $rpm (split(":", $row{'rpms'})) {
 	if (! -e $rpm) {
-	    die("RPM $rpm for node $node does not exist!");
+	    die("*** RPM $rpm for node $node does not exist!");
 	}
     }
     
@@ -202,14 +205,94 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 	my ($dir, $tar) = split(" ", $tarspec);
 	
 	if (! -e $tar) {
-	    die("Tarfile $tar for node $node does not exist!");
+	    die("*** Tarfile $tar for node $node does not exist!");
 	}
     }
+
+    #
+    # If there is a path specified, then we don't worry anymore about it.
+    # The user must know what is going on. The OSID might have a path
+    # associated with it, which means the same thing; we don't worry about
+    # it. 
+    #
+    if (! $bootpath) {
+	#
+	# These checks are not necessary if the front end and web page
+	# are doing the right thing, but lets be careful anyway.
+	# 
+	if (! $osid) {
+	    die("*** $node has no bootpath and no def_boot_osid set!\n");
+	}
+
+	#
+	# Grab the info for this OSID. This is part of the image check.
+	#
+	my $osid_result =
+	    DBQueryFatal("select * from os_info where osid='$osid'");
+	
+	if ($osid_result->numrows == 0) {
+	    die("*** No such OSID $osid is defined!\n");
+	}
+	
+	my %osid_row   = $osid_result->fetchhash();
+
+	#
+	# If there is an actual path, its an OSKit kernel not an image.
+	# 
+	if (defined($osid_row{'path'}) && $osid_row{'path'} ne "") {
+	    goto osid_okay;
+	}
+	
+	#
+	# Make sure this OSID is actually loaded on the machine. 
+	#
+	my $p_result =
+	    DBQueryFatal("select * from partitions ".
+			 "where node_id='$node' and osid='$osid'");
+
+	#
+	# If not loaded, then see if the user was looking for the generic
+	# name of the OS that is loaded. 
+	# 
+	if ($p_result->numrows == 0) {
+	    #
+	    # If its a specific Version, and its not loaded on the machine,
+	    # its currently an error. Later we might reload.
+	    #
+	    if (defined($osid_row{'version'}) && $osid_row{'version'} ne "") {
+		die("*** OSID $osid is not currently loaded on $node!\n");
+	    }
+
+	    #
+	    # A non-specific version. Try to map it.
+	    # 
+	    my $o_result =
+		DBQueryFatal("select o1.* from os_info as o1 ".
+			     "left join partitions as p on o1.osid=p.osid ".
+			     "left join os_info as o2 on o2.OS=o1.OS ".
+			     "where p.node_id='$node' and o2.osid='$osid'");
+
+	    if ($o_result->numrows == 0) {
+		die("*** No mapping can be made for $osid on $node!\n".
+		    "    Perhaps the disk needs reloading?\n");
+	    }
+	    else {
+		my %o_row  = $o_result->fetchhash();
+		my $n_osid = $o_row{'osid'};
+
+		print "Mapping $osid on $node to $n_osid.\n";
+		DBQueryFatal("update nodes set def_boot_osid='$n_osid' ".
+			     "where node_id='$node'");
+		$osids{$node} = $n_osid;
+	    }
+	}
+    }
+  osid_okay:
     
     #
     # If pingable, then the node is "waitable".
     #
-    if (OSFeatureSupported($osid{$node}, "ping")) {
+    if (OSFeatureSupported($osids{$node}, "ping")) {
 	$waitfor{$node} = 1;
     }
     else {
@@ -227,7 +310,7 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 	$canfail{$node} = 0;
     }
     
-    print STDOUT "$node - $osid{$node} - $waitfor{$node} - $canfail{$node}\n"
+    print STDOUT "$node - $osids{$node} - $waitfor{$node} - $canfail{$node}\n"
 	if $dbg;
 }
 
@@ -238,7 +321,7 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
 #
 if (!$TESTMODE) {
   if (system("$nodereboot @nodes")) {
-    die("Failed to reboot some nodes!");
+    die("*** Failed to reboot some nodes!");
   }
 }
 

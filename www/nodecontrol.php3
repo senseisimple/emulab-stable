@@ -47,20 +47,26 @@ if (isset($def_boot_osid) && strcmp($def_boot_osid, "None") == 0) {
 }
 
 #
-# Now change the information.
+# Create an update string, that is slightly different if an admin; we allow
+# admin people to set next_boot parameters. Ordinary folks cannot.
 #
-$insert_result = mysql_db_query($TBDBNAME, 
+$query_string =
 	"UPDATE nodes SET ".
 	"def_boot_osid=\"$def_boot_osid\",             ".
 	"def_boot_path=\"$def_boot_path\",             ".
 	"def_boot_cmd_line=\"$def_boot_cmd_line\",     ".
+	"startupcmd='$startupcmd',                     ".
+	"rpms='$rpms'                                  ";
+
+if ($isadmin) {
+    $query_string = "$query_string, ".
 	"next_boot_osid=\"$next_boot_osid\",           ".
 	"next_boot_path=\"$next_boot_path\",           ".
-	"next_boot_cmd_line=\"$next_boot_cmd_line\",   ".
-	"startupcmd='$startupcmd',                     ".
-	"rpms='$rpms'                                  ".
-	"WHERE node_id=\"$node_id\"");
+	"next_boot_cmd_line=\"$next_boot_cmd_line\"    ";
+}
+$query_string = "$query_string WHERE node_id=\"$node_id\"";
 
+$insert_result = mysql_db_query($TBDBNAME, $query_string);
 if (! $insert_result) {
     $err = mysql_error();
     TBERROR("Database Error changing node setup for $node_id: $err", 1);
