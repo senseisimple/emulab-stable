@@ -1,0 +1,328 @@
+#! /usr/bin/perl -wT
+
+use English;
+use Getopt::Std;
+use Socket;
+    
+#
+# Print out the usage statement for this script and exit with a -1 return code.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: webfeedback [-hc] [-d duration] pid gid eid\n".
+	"Web wrapper for dealing with feedback information.\n".
+	"\n".
+	"Required arguments:\n".
+	"  pid - The project ID.\n".
+	"  gid - The group ID.\n".
+	"  eid - The experiment ID.\n".
+	"\n".
+	"Optional arguments:\n".
+	"  -h       Print this message.\n".
+	"  -c       Clear the feedback data.\n".
+	"  -b       Clear the bootstrap data.\n".
+	"  -d secs  Record feedback for the given duration.\n";
+    
+    exit(-1);
+}
+
+#
+# Option list:
+#
+#   -h   Print the usage message.
+#
+my $optlist  = "hcbd:f";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+# Locals
+my $digest_slothd = "$TB/libexec/digest-slothd";
+my $SAVEUID  = $UID;
+my $dbuid;
+my $pid;
+my $gid;
+my $eid;
+my $mode = "";
+my $duration;
+my $fake = 0;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"h"})) {
+    usage();
+}
+if (defined($options{"c"}) || defined($options{"b"})) {
+    $mode = "clear";
+}
+if (defined($options{"d"})) {
+    if ($mode ne "") {
+	print STDERR "error: The clear and feedback options are mutually ".
+	    "exclusive.\n";
+	usage();
+    }
+    $mode = "record";
+    $duration = $options{"d"};
+}
+if (defined($options{"f"})) {
+    $fake = 1;
+}
+if ($mode eq "") {
+    print STDERR "error: No mode specified, use '-c' to clear feedback or ".
+	"'-d N' to record for N seconds.\n";
+    usage();
+}
+if (@ARGV != 3) {
+    usage();
+}
+
+$pid      = $ARGV[0];
+$gid      = $ARGV[1];
+$eid      = $ARGV[2];
+
+#
+# Must taint check!
+#
+if (defined($duration)) {
+    if ($duration =~ /^([0-9]+)$/) {
+	$duration = $1;
+    }
+    else {
+	die("Bad duration argument: $duration.");
+    }
+}
+
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad pid argument: $pid.");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad eid argument: $eid.");
+}
+if ($gid =~ /^([-\w]+)$/) {
+    $gid = $1;
+}
+else {
+    die("Bad gid argument: $gid.");
+}
+
+#
+# Experiment must exist.
+#
+if (!($state = ExpState($pid,$eid))) {
+    die("There is no experiment $eid in project $pid\n");
+}
+
+#
+# User must have permission to view the experiment.
+#
+if ($UID) {
+    if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+        die("*** You not have permission to view this experiment!\n");
+    }
+}
+
+# XXX
+$expdir = "/proj/$pid/exp/$eid";
+
+# Figure out which mode we are in and act accordingly.
+if ($mode eq "clear") {
+    if (defined($options{"c"})) {
+	unlink("$expdir/tbdata/feedback_data.tcl");
+    }
+    if (defined($options{"b"})) {
+	unlink("$expdir/tbdata/bootstrap_data.tcl");
+    }
+}
+if ($mode eq "record") {
+    
+    if ($state ne EXPTSTATE_ACTIVE) {
+	# nothing to do
+	print "Cannot record feedback for an inactive experiment.\n";
+	exit(0);
+    }
+    
+    print STDOUT "Starting tracers...\n";
+    
+    # Get the list of virtual hosts for the virtual nodes.
+    my $query_result =
+	DBQueryFatal("select node_id,vname from reserved ".
+		     "where pid='$pid' and eid='$eid' and erole='virthost'");
+    
+    # Iterate through the virthosts starting up slothd in high-resolution
+    # tracing mode.
+    while (my ($node_id,$vname) = $query_result->fetchrow_array()) {
+	my $cmd;
+	
+	$cmd = "rm -f /var/run/slothd.pid";
+	if (!$fake) {
+	    system("/usr/local/bin/sudo $TB/bin/sshtb -host $node_id \"$cmd\"");
+	}
+	$cmd = "/proj/tbres/kwebb/evslothd -e -i 1 -t ${duration}";
+	if (!$fake) {
+	    system("/usr/local/bin/sudo $TB/bin/sshtb -host $node_id \"$cmd\"");
+	}
+    }
+    
+    # Sleep for the duration of the run, then
+    sleep($duration + 3);
+    
+    $query_result->dataseek(0);
+    
+    print STDOUT "Pulling logs...\n";
+    
+    $vhost_logs = "";
+    
+    # ... iterate through the virthosts again picking up the logs.
+    while (my ($node_id,$vname) = $query_result->fetchrow_array()) {
+	my $cmd;
+	
+	$cmd = "/usr/local/bin/rsync -az ".
+	    "--rsh=\"/usr/local/bin/sudo sshtb -host \" ".
+		"${node_id}:/var/emulab/logs/ ${expdir}/logs/${vname}/";
+	$vhost_logs .= " ${expdir}/logs/${vname}/slothd.log";
+	#if (!$fake) {
+	    system($cmd);
+	#}
+    }
+    
+
+    # Now that we have the logs, we have to find out what the peak resource
+    # needs are and then dump them into a TCL file.  This TCL file is then
+    # included in the main NS file when it is reevaluated during a modify.
+    # Generating the file is actually done by a separate program,
+    # digest-slothd, but it requires a file that maps MAC addresses in the
+    # slothd log to the virtual node/link names.  The rest of this script
+    # generates that file and pipes it into digest-slothd.
+
+    # XXX Most of this code was just lifted from tbreport, it can probably be
+    # optimized a bit.
+
+    # Mappings for IP/MAC addresses and testbed internal node/port member
+    # descriptors.
+    my %ipmap;
+    my %macmap;
+    my %memmap;
+    
+    # Get the virtual node names and IP addresses and
+    my $virtnodes_result =
+	DBQueryFatal("SELECT vname,ips from virt_nodes ".
+		     "where pid='$pid' and eid='$eid' order by vname");
+
+    # ... convert them into "member" form (e.g. node0:0) so we can match them
+    # up against the virt_lans table.
+    while (($vname,$ips) = $virtnodes_result->fetchrow_array()) {
+	foreach $ipinfo (split(" ",$ips)) {
+	    ($port,$ip) = split(":",$ipinfo);
+	    $ipmap{"$vname:$port"} = $ip;
+	    $macmap{$ip}->{"MEMBER"} = "$vname:$port";
+	}
+    }
+    
+    # Get the addresses for regular interfaces and
+    my $result =
+	DBQueryFatal("select i.ip,i.mac,i.iface from reserved as r ".
+		     "left join interfaces as i on r.node_id=i.node_id ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      i.ip is not NULL and i.ip!=''");
+    
+    # ... add the MAC and node vname to the memmap.
+    while (($ip,$mac,$iface) = $result->fetchrow_array()) {
+	if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $mac = "$1:$2:$3:$4:$5:$6";
+	}
+	$macmap{$ip}->{"MAC"}   = $mac;
+	$macmap{$ip}->{"IFACE"} = $iface;
+	if (defined($macmap{$ip}->{"MEMBER"})) {
+	    my $member = $macmap{$ip}->{"MEMBER"};
+	    my ($node,$port) = split(":", $member);
+	    $memmap{$member}->{"MAC"} = $mac;
+	    $memmap{$member}->{"NODE"} = $node;
+	}
+    }
+    
+    # Get the addresses for veth interfaces and
+    $result =
+	DBQueryFatal("select i.IP,i.mac,i.iface from reserved as r ".
+		     "left join veth_interfaces as i on r.node_id=i.node_id ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      i.IP is not NULL and i.IP!=''");
+    
+    # ... add the MAC and node vname to the memmap.
+    while (($ip,$mac,$iface) = $result->fetchrow_array()) {
+	if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $mac = "$1:$2:$3:$4:$5:$6";
+	}
+	$macmap{$ip}->{"MAC"}   = $mac;
+	$macmap{$ip}->{"IFACE"} = $iface;
+	if (defined($macmap{$ip}->{"MEMBER"})) {
+	    my $member = $macmap{$ip}->{"MEMBER"};
+	    ($node,$port) = split(":", $member);
+	    $memmap{$member}->{"MAC"} = $mac;
+	    $memmap{$member}->{"NODE"} = $node;
+	}
+    }
+    
+    # Get all of the virtual LANs in this experiment and
+    $result =
+	DBQueryFatal("select vname,member ".
+		     "  from virt_lans as v ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "order by vname,member");
+    
+    # ... add their vnames to the memmap.
+    while (($vname,$member) = $result->fetchrow_array()) {
+	$memmap{$member}->{"LAN"} = $vname;
+    }
+    
+    # Start digest-slothd with all of the slothd logs, tee its output to the
+    # feedback file, and
+    open(DIGESTER,
+	 "| $digest_slothd ${vhost_logs} - ".
+	 " | tee ${expdir}/tbdata/feedback_data.tcl") or
+	     fatal("Could not run digest-slothd!");
+    
+    # ... pipe in our mapping data over stdin.
+    foreach my $m (sort keys(%memmap)) {
+	if (defined($memmap{$m})) {
+	    printf DIGESTER 
+		"%s %s %s\n", 
+		$memmap{$m}->{"MAC"},
+		$memmap{$m}->{"NODE"},
+		$memmap{$m}->{"LAN"};
+	}
+    }
+    
+    # All done, cleanup.
+    close(DIGESTER) or 
+	fatal("$digest_slothd: " . ($? ? "exited with status $?."
+				    : "error closing pipe: $!"));
+}
+

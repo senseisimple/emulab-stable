@@ -388,6 +388,8 @@ foreach $node (keys(%nodes)) {
 	# Add CPU and RAM information
 	push @features, "?+cpu:$cpu_speed";
 	push @features, "?+ram:$ram";
+	push @features, "?+cpupercent:100";
+	push @features, "?+rampercent:100";
     }
 
     # Add features

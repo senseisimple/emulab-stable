@@ -1,0 +1,350 @@
+#! /usr/bin/awk -f
+
+#
+# Digest slothd logs and generate a TCL file that contains resource usage data
+# that can be fed back into the mapper.
+#
+# Usage: digest-slothd <slothd-log1> [<slothd-log2> ...] <mapping>
+#
+# <slothd-logN> - The output of slothd when it is run in high resolution
+#   tracing mode.
+# <mapping> - A mapping of MAC addresses to node members and LAN/link names.
+#   XXX disgusting.
+#
+
+BEGIN {
+    OVERLOAD_MAX = 3; # XXX Make this a command line argument.
+    error = 0;
+    if( ARGC < 2 )
+    {
+	printf("Convert slothd output to a TCL feedback file.\n");
+	printf("Usage: digest-slothd <file1> [<file2> ...] <mapping>\n");
+	printf("\n");
+	printf("Required arguments:\n");
+	printf("  file1   - A file containing the output of slothd.\n");
+	printf("  mapping - A mapping of MAC addresses to node members\n");
+	printf("            and LAN/link names.");
+	printf("\n");
+	printf("Example:\n");
+	printf("  $ digest-slothd vhost-0.slothd - < mapping\n");
+	printf("\n");
+	printf("Example mapping:\n");
+	printf("  00:00:0a:01:01:02 node0 link");
+	printf("\n");
+	error = -1;
+	exit error;
+    }
+    
+    printf("# -*- TCL -*-\n");
+    printf("# Automatically generated feedback file.\n");
+    printf("#\n");
+    for( lpc = 1; lpc < ARGC; lpc++ )
+    {
+	printf("# ARGV[%d]: %s\n", lpc, ARGV[lpc]);
+    }
+    printf("#\n");
+    printf("# Generated at: %s\n", strftime());
+    printf("#\n\n");
+    printf("# BEGIN Node/LAN\n");
+}
+
+#
+# Process slothd output.  This will digest the "vnode" and "iface" attributes
+# and store the values in the following variables:
+#
+#   vnodes_cpu[<vnode_name>,<instance>] - The vnode percent of CPU used per
+#     second.
+#   vnodes_ram[<vnode_name>,<instance>] - The vnode percent of RAM used per
+#     second.
+#   links_mac_bw[<MAC addr>] - The peak kilobits per second used on the NIC.
+#   links_mac_pkts[<MAC addr>] - The peak number of packets per second used on
+#     the NIC.
+#
+# Example input:
+#
+# vers=3 mis=1084907941 lave=0.0000000000,0.0000000000,0.0000000000 abits=0x5 page=0,0 ints=1134,693,82 cpu=0,1,98 iface=00:02:b3:3f:7a:20,18804,3352,14047137,457522 iface=00:03:47:73:a2:42,9079,125118,3428409,60045802 iface=00:00:00:00:00:00,0,0,0,0 iface=00:00:0a:01:08:03,2846,125780,385828,58014417 iface=00:00:0a:01:12:03,125782,2843,58015462,385822 iface=00:00:0a:01:0d:02,6285,152,2896485,19985 iface=00:00:0a:01:12:02,2845,125781,385780,58015462 vnode=dslclient-11.testdssvm.tbres.emulab.net,0.0,1.8 vnode=server.testdssvm.tbres.emulab.net,2.1,2.5 vnode=corerouter.testdssvm.tbres.emulab.net,0.0,1.2
+#
+/vers=3/ {
+    line_count[ARGIND] += 1;
+    if( (vnode_count > 1) &&
+	(line_count[ARGIND - 1] > 0) &&
+	(line_count[ARGIND - 1] < 3) )
+    {
+#       There are not enough lines to deduce anything other than overload.
+	for( vnode_name in line_vnode_names )
+	{
+	    alerts[vnode_name] = 1;
+	}
+	for( mac in line_macs )
+	{
+	    alerts[mac] = 1;
+	}
+    }
+    vnode_count = 0;
+    total_vnode_cpu = 0;
+    time_diff_s = 0;
+    ovld = 0;
+    delete line_vnode_names;
+    delete line_macs;
+    for( lpc = 2; lpc <= NF; lpc++ )
+    {
+#       Determine the field type and
+	split($lpc, field, /=/);
+#       ... handle it.
+	if( field[1] == "stamp" )
+	{
+	    split(field[2], data, /,/);
+	    if( last_stamp_s[ARGIND] )
+	    {
+		time_diff_us = (data[1] - last_stamp_s[ARGIND]) * 1000000;
+		time_diff_us += (data[2] - last_stamp_us[ARGIND]);
+		time_diff_s = time_diff_us / 1000000.0
+	    }
+	    else
+	    {
+		time_diff_s = 1.0;
+	    }
+	    last_stamp_s[ARGIND] = data[1];
+	    last_stamp_us[ARGIND] = data[2];
+
+#           Assume overload if the time diff is relatively large.
+	    if( time_diff_s > 1.25 )
+	    {
+		ovld = 1;
+#               Signal multiple overload events for each missed time interval.
+		overload[ARGIND] += (time_diff_s - 1.0);
+	    }
+	}
+	else if( field[1] == "ovld" )
+	{
+	    if( !ovld )
+		ovld = field[2];
+	}
+	else if( field[1] == "cpu" )
+	{
+	    total_cpu = field[2];
+	}
+	else if( field[1] == "iface" )
+	{
+#           Split the data values and
+	    split(field[2], data, /,/);
+#           ... the ethernet MAC address.
+	    link_mac = data[1];
+	    links_mac[link_mac] = 1;
+#           ... the input bandwidth/packets for this second, and
+	    if( link_mac in links_last_in )
+	    {
+		last_pkt_value = links_last_pkt_in[link_mac];
+		links_last_pkt_in[link_mac] = data[2];
+		in_pkts = data[2] - last_pkt_value;
+
+		last_value = links_last_in[link_mac];
+		links_last_in[link_mac] = data[4];
+		in_bw = data[4] - last_value;
+	    }
+	    else
+	    {
+		links_last_pkt_in[link_mac] = data[2];
+		links_last_in[link_mac] = data[4];
+
+		in_pkts = 0;
+		in_bw = 0;
+	    }
+#           ... the output bandwidth/packets for this second.
+	    if( link_mac in links_last_out )
+	    {
+		last_pkt_value = links_last_pkt_out[link_mac];
+		links_last_pkt_out[link_mac] = data[3];
+		out_pkts = data[3] - last_pkt_value;
+
+		last_value = links_last_out[link_mac];
+		links_last_out[link_mac] = data[5];
+		out_bw = data[5] - last_value;
+	    }
+	    else
+	    {
+		links_last_pkt_out[link_mac] = data[3];
+		links_last_out[link_mac] = data[5];
+
+		out_pkts = 0;
+		out_bw = 0;
+	    }
+#           Make sure the measures are 'per second' since slothd will sometimes
+#           miss an interval.
+	    in_bw = in_bw / time_diff_s;
+	    in_pkts = in_pkts / time_diff_s;
+	    out_bw = out_bw / time_diff_s;
+	    out_pkts = out_pkts / time_diff_s;
+#           Find the maximum of bandwidth/packets of the data seen so far.
+	    if( in_pkts > links_mac_pkts[link_mac] )
+	    {
+		links_mac_pkts[link_mac] = in_pkts;
+	    }
+	    if( in_bw > links_mac_bw[link_mac] )
+	    {
+		links_mac_bw[link_mac] = in_bw;
+	    }
+	    if( out_pkts > links_mac_pkts[link_mac] )
+	    {
+		links_mac_pkts[link_mac] = out_pkts;
+	    }
+	    if( out_bw > links_mac_bw[link_mac] )
+	    {
+		links_mac_bw[link_mac] = out_bw;
+	    }
+	    line_macs[link_mac] = 1;
+	}
+	else if( field[1] == "vnode" )
+	{
+	    split(field[2], data, /,/);
+	    split(data[1], name, /\./);
+	    vnode_name = name[1];
+	    vnodes_name[vnode_name] = FNR;
+	    vnodes_cpu[vnode_name,FNR] = data[2];
+	    vnodes_ram[vnode_name,FNR] = data[3];
+	    line_vnode_names[vnode_name] = 1;
+	    total_vnode_cpu += data[2];
+	    vnode_count += 1;
+	}
+    }
+
+#   Need to deal with CPU time lost in interrupts.
+    if( vnode_count == 0 )
+    {
+	printf("error: no vnodes in line '%s'\n", $0) > /dev/stderr;
+	error = 1;
+	exit error;
+    }
+    else if( vnode_count == 1 )
+    {
+	vnodes_cpu[vnode_name,FNR] = total_cpu;
+    }
+    else
+    {
+#       Check if slothd signalled overload for this period.
+	if( ovld || (total_cpu >= 99) )
+	{
+#           We're in overload for this period, but do not signal an alert until
+#           we see OVERLOAD_MAX consecutive indicators.
+	    if( overload[ARGIND] >= OVERLOAD_MAX )
+	    {
+		for( vnode_name in line_vnode_names )
+		{
+		    alerts[vnode_name] = 1;
+		}
+		for( mac in line_macs )
+		{
+		    alerts[mac] = 1;
+		}
+	    }
+	    else
+	    {
+		overload[ARGIND] += 1;
+	    }
+	}
+	else
+	{
+#           We're not in overload, so we clear it, and
+	    overload[ARGIND] = 0;
+#           ... add any unaccounted for CPU to _all_ of the vnodes.  Kind of a
+#           hack, but, nothing else to do here except be conservative.
+	    diff = total_cpu - total_vnode_cpu;
+	    printf("warning: unaccounted for CPU %f\n", diff) > /dev/stderr;
+	    for( vnode_name in line_vnode_names )
+	    {
+		vnodes_cpu[vnode_name,FNR] += diff;
+	    }
+	}
+    }
+}
+
+#
+# Process the mapping lines so we can find the mapping of IP addresses to
+# symbolic link names.  Also, we generate the reservations for the node <-> LAN
+# connections, reservations for links will be done at the END when we know who
+# the maximums are for the NICs on the links.
+#
+# Example input:
+#
+#   00:00:0a:01:01:02 node0 link
+#
+# Example output:
+#
+#   set Reservations(link,node0,kbps) 123235.00
+#
+/^[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]] [[:alnum:]\-]* [[:alnum:]\-]*$/ {
+    if( $1 in links_mac )
+    {
+	printf("set Reservations(%s,%s,kbps) %f\n",
+	       $3,
+	       $2,
+	       (links_mac_bw[$1] * 8) / 1000.0);
+	printf("set Reservations(%s,%s,pps) %f\n",
+	       $3,
+	       $2,
+	       links_mac_pkts[$1]);
+	links_name[$3] = 1;
+	if( links_mac_bw[$1] > links_bw[$3] )
+	    links_bw[$3] = links_mac_bw[$1];
+	if( links_mac_pkts[$1] > links_pkts[$3] )
+	    links_pkts[$3] = links_mac_pkts[$1];
+	if( $1 in alerts )
+	{
+	    printf("set Alerts(%s,%s) 1\n", $3, $2);
+	    printf("set Alerts(%s) 1\n", $3);
+	}
+    }
+}
+
+#
+# All done, time to print out the peak values we've discovered while
+# processing.
+#
+END {
+    if( error )
+    {
+	exit error;
+    }
+
+    printf("# END Node/LAN\n\n");
+    
+    printf("# BEGIN Nodes\n");
+    for( vnode_name in vnodes_name )
+    {
+	vnode_cpu = 0.001;
+	vnode_ram = 0.001;
+#       Note that we ignore the first and last values in the log, since the
+#       first value is always 100% and I just felt like making it symmetrical
+#       so the last was dropped as well.
+	for( lpc = 2; lpc < vnodes_name[vnode_name] - 1; lpc++ )
+	{
+	    if( vnodes_cpu[vnode_name,lpc] > vnode_cpu )
+	    {
+		vnode_cpu = vnodes_cpu[vnode_name,lpc];
+	    }
+	    if( vnodes_ram[vnode_name,lpc] > vnode_ram )
+	    {
+		vnode_ram = vnodes_ram[vnode_name,lpc];
+	    }
+	}
+	printf("set Reservations(%s,cpupercent) %f\n", vnode_name, vnode_cpu);
+	printf("set Reservations(%s,rampercent) %f\n", vnode_name, vnode_ram);
+#       Check for an alert.
+	if( vnode_name in alerts )
+	{
+	    printf("set Alerts(%s) 1\n", vnode_name);
+	}
+    }
+    printf("# END Nodes\n\n");
+    printf("# BEGIN Links\n");
+    for( link_name in links_name )
+    {
+	printf("set Reservations(%s,kbps) %f\n",
+	       link_name,
+	       (links_bw[link_name] * 8) / 1000.0);
+	printf("set Reservations(%s,pps) %f\n",
+	       link_name,
+	       links_pkts[link_name]);
+    }
+    printf("# END Links\n\n");
+}

@@ -48,6 +48,37 @@ namespace eval TBCOMPAT {
 	$node ip $port $ip
     }
 
+    #
+    # Named argument helper function.
+    #
+    # Example:
+    #
+    #  proc replace {s args} {
+    #    named $args {-from 0 -to end -with ""}
+    #    string replace $s $(-from) $(-to) $(-with)
+    #  }
+    #
+    #  % replace suchenwirth -from 4 -to 6 -with xx
+    #  suchxxirth
+    #  % replace suchenwirth -from 4 -to 6 -witha xx
+    #  bad option '-witha', should be one of: -from -to -with
+    #
+    # @param args The optional arguments the caller received.
+    # @param defaults The option list with default values.
+    #
+    # @see http://wiki.tcl.tk/10702
+    #
+    proc named-args {args defaults} {
+	upvar 1 "" ""
+	array set "" $defaults
+	foreach {key value} $args {
+	    if {![info exists ($key)]} {
+		error "bad option '$key', should be one of: [lsort [array names {}]]"
+	    }
+	    set ($key) $value
+	}
+    }
+
     # Let's set up a hwtypes table that contains all valid hardware types.
     variable hwtypes
     variable isremote
@@ -90,6 +121,102 @@ namespace eval TBCOMPAT {
 
     # Physical node names
     variable physnodes
+
+    ## Feedback related stuff below:
+
+    # Experiment directory name.
+    variable expdir
+
+    # Mapping of "resource classes" and "reservation types" to bootstrap
+    # values, where a resource class is a symbolic string provided by the user
+    # (e.g. Client, Server), and a reservation type is a resource name provided
+    # by the system (e.g. cpupercent, kbps).  This array will be filled by the
+    # tb-feedback methods and then written out to a "bootstrap_data.tcl" file
+    # to be read in during future evaluations of the NS file.
+    variable BootstrapReservations
+
+    # The experiment directory, this is where the feedback related files will
+    # be read from and dumped to.  XXX Hacky
+    set expdir "/proj/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
+
+    # XXX Just for now...
+    global tbxlogfile
+    if {[file exists "$expdir"]} {
+	set tbxlogfile [open "$expdir/logs/feedback.log" w];
+    }
+
+    # Get any Emulab generated feedback data from the experiment directory.
+    if {[file exists "${expdir}/tbdata/feedback_data.tcl"]} {
+	source "${expdir}/tbdata/feedback_data.tcl"
+    }
+    # Get any bootstrap feedback data from a previous run.
+    if {[file exists "${expdir}/tbdata/bootstrap_data.tcl"]} {
+	source "${expdir}/tbdata/bootstrap_data.tcl"
+    }
+
+    #
+    # Configure the default reservations for an object based on an optional
+    # "resource class".  First, the function will check for a reservation
+    # specifically made for the object, then it will try to initialize the
+    # reservation from the resource class, otherwise it does nothing and
+    # returns zero.
+    #
+    # @param object The object name for which to configure the feedback
+    #   defaults.
+    # @param rclass The "resource class" of the object or the empty string if
+    #   it is not part of any class.  This is just a symbolic string, such as
+    #   "Client" or "Server".
+    # @return One, if there is an initialized slot in the "Reservations" array
+    #   for the given object, or zero if it could not be initialized.
+    #
+    proc feedback-defaults {object rclass} {
+	var_import ::TBCOMPAT::Reservations;  # The reservations to make
+
+	if {[array get Reservations $object,*] == ""} {
+	    # No node-specific values exist, try to initialize from the rclass.
+	    if {[array get Reservations $rclass,*] != ""} {
+		# Use bootstrap feedback from a previous topology,
+		set rcdefaults [array get Reservations $rclass,*]
+		# ... substitute the node name for the rclass, and
+		regsub -all -- $rclass $rcdefaults $object rcdefaults
+		# ... add all the reservations to the table.
+		array set Reservations $rcdefaults
+		set retval 1
+	    } else {
+		# No feedback exists yet, let the caller fill it in.
+		set retval 0
+	    }
+	} else {
+	    # Node-specific values exist, use those.
+	    set retval 1
+	}
+	return $retval
+    }
+
+    #
+    # Record bootstrap feedback data for a resource class.  This function
+    # should be called for every member of a resource class so that the one
+    # with the highest reservation will be used to bootstrap.
+    #
+    # @param rclass The "resource class" for which to update the bootstrap
+    #   feedback data.  This is just a symbolic string, such as "Client" or
+    #   "Server".
+    # @param rtype The type of reservation (e.g. cpupercent,kbps).
+    # @param res The amount to reserve.
+    #
+    proc feedback-bootstrap {rclass rtype res} {
+	# The bootstrap reservations
+	var_import ::TBCOMPAT::BootstrapReservations
+
+	if {$rclass == ""} {
+	    # No class to operate on...
+	} elseif {([array get BootstrapReservations($rclass,$rtype)] == "") ||
+	    ($res > $BootstrapReservations($rclass,$rtype))} {
+		# This is either the first time this function was called for
+		# this rclass/rtype or the new value is greater than the old.
+		set BootstrapReservations($rclass,$rtype) $res
+	}
+    }
 }
 
 # IP addresses routines.  These all do some checks and convert into set-ip
@@ -893,6 +1020,253 @@ proc tb-use-physnaming {onoff} {
 }
 
 #
+# Write to the tb-experimental log file, as defined by the tbxlogfile global
+# variable.  If the tbxlogfile variable is not set, the message is sent to
+# /dev/null.
+#
+# @param msg The message to write to the log file.
+#
+# @global tbxlogfile The path to the log file, if defined.
+#
+proc tbx-log {msg} {
+    global tbxlogfile;
+
+    if {[info exists tbxlogfile]} {
+	puts $tbxlogfile $msg
+    }
+}
+
+##
+## BEGIN Feedback
+##
+
+proc tb-feedback-vnode {vnode hardware args} {
+    var_import ::TBCOMPAT::isvirt;        # Make sure $hardware is a vnode.
+    var_import ::TBCOMPAT::Reservations;  # The reservations to make for nodes.
+    var_import ::TBCOMPAT::BootstrapReservations;  # Bootstrap file.
+    var_import ::TBCOMPAT::Alerts;        # Alert indicators
+
+    ::TBCOMPAT::named-args $args {-scale 1.2 -rclass "" -alertscale 3.0}
+
+    # Check our inputs,
+    if {[$vnode info class] != "Node"} {
+	perror "\[tb-feedback-vnode] $vnode is not a node."
+	return
+    }
+    if {(! [info exists isvirt($hardware)]) || (! $isvirt($hardware))} {
+	perror "\[tb-feedback-vnode] Unknown hardware type: $hardware"
+	return
+    }
+    if {$(-scale) <= 0.0} {
+	perror "\[tb-feedback-vnode] Feedback scale is not greater than zero: $(-scale)"
+	return
+    }
+
+    tbx-log "BEGIN feedback for $vnode"
+
+    # ... set computed default values, and
+    if {[::TBCOMPAT::feedback-defaults $vnode $(-rclass)] == 0} {
+	# No feedback exists yet, so we assume 100%.
+	set Reservations($vnode,cpupercent) 100.0
+	set Reservations($vnode,rampercent) 100.0
+	tbx-log "  Initializing node, $vnode, to one-to-one."
+    }
+
+    # ... make the reservations.
+    foreach name [array names Reservations $vnode,*] {
+	# Get the type of reservation and
+	set reservation_type [lindex [split $name {,}] 1]
+	# ... the amount consumed.
+	set raw_reservation [set Reservations($name)]
+
+	::TBCOMPAT::feedback-bootstrap \
+		$(-rclass) $reservation_type $raw_reservation
+
+	# Then scale the reservation
+	set desired_reservation [expr $raw_reservation * $(-scale)]
+	# ... making sure it is still within the range of the hardware.
+	if {$desired_reservation < 0.0} {
+	    # XXX Not allowing negative values might be too restrictive...
+	    perror "\[tb-feedback-vnode] Bad reservation value: $name = $raw_reservation"
+	    return
+	}
+	if {([array get Alerts $vnode] != "") && [set Alerts($vnode)] > 0} {
+	    tbx-log "Alert for $vnode"
+	    set desired_reservation \
+		    [expr $desired_reservation * $(-alertscale)]; # XXX
+	}
+	if {$desired_reservation > 100.0} {
+	    set desired_reservation 100.0
+	}
+	tbx-log "  $reservation_type: ${desired_reservation}"
+	# Finally, tell assign about our desire.
+	$vnode add-desire ?+${reservation_type} ${desired_reservation}
+    }
+
+    tb-set-hardware $vnode $hardware
+
+    tbx-log "END feedback for $vnode"
+}
+
+proc tb-feedback-vlan {vnode lan args} {
+    var_import ::TBCOMPAT::Reservations;   # The reservations to make for lans
+    var_import ::TBCOMPAT::Alerts;         # Alert indicators
+
+    ::TBCOMPAT::named-args $args {-scale 1.0 -rclass "" -alertscale 3.0}
+
+    if {[$vnode info class] != "Node"} {
+	perror "\[tb-feedback-vlan] $vnode is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-feedback-vlan] $lan is not a LAN."
+	return
+    }
+    if {$(-scale) <= 0.0} {
+	perror "\[tb-feedback-vlan] Feedback scale is not greater than zero: $(-scale)"
+	return
+    }
+
+    tbx-log "BEGIN feedback for node $vnode on lan $lan"
+
+    if {[::TBCOMPAT::feedback-defaults "$vnode,$lan" $(-rclass)] == 0} {
+	# No feedback exists yet, so we assume 100%.  Fortunately, everything
+	# already assumes 100%, so we do not have to do anything extra.
+	tbx-log "  Initializing vlan, $vnode $lan, to one-to-one."
+    }
+
+    foreach name [array names Reservations ${vnode},${lan},kbps] {
+	# Get the type of reservation and
+	set reservation_type [lindex [split $name {,}] 1]
+	# ... its value.
+	set raw_reservation [set Reservations($name)]
+	tbx-log "  raw: $raw_reservation"
+	# Get the maximum allowed value and
+	set max_reservation 0
+	foreach pair [$lan array names bandwidth "${vnode} *"] {
+	    tbx-log "  pair: $pair - [$lan set bandwidth($pair)]"
+	    if {[$lan set bandwidth($pair)] > $max_reservation} {
+		set max_reservation [$lan set bandwidth($pair)]
+	    }
+	}
+	tbx-log "  max: $max_reservation"
+	# ... fix any measuring/shaping error.
+	if {$raw_reservation > $max_reservation} {
+	    tbx-log "  request > max: $raw_reservation $max_reservation"
+	    set raw_reservation $max_reservation
+	}
+
+	::TBCOMPAT::feedback-bootstrap \
+		$(-rclass) $reservation_type $raw_reservation
+
+	# Then scale the reservation
+	set desired_reservation \
+		[expr int(sqrt($raw_reservation * $max_reservation) * $(-scale))]
+	# ... making sure it is still within the range of the hardware.
+	if {$desired_reservation < 0.0} {
+	    # XXX Not allowing negative values might be too restrictive...
+	    perror "\[tb-feedback-vlan] Bad reservation value: $name = $raw_reservation"
+	} elseif {$desired_reservation < 10.0} {
+	    set desired_reservation 10; # XXX see parse.tcl.in
+	}
+	if {([array get Alerts $lan,$vnode] != "") &&
+	    [set Alerts($lan,$vnode)] > 0} {
+	    tbx-log "Alert for $lan, $vnode"
+	    set desired_reservation \
+		    [expr $desired_reservation * $(-alertscale)]; # XXX
+	}
+	if {$desired_reservation > $max_reservation} {
+	    set desired_reservation $max_reservation
+	}
+
+	tbx-log "  $reservation_type: ${desired_reservation}"
+
+	# Finally, adjust the cap.
+	tb-set-node-lan-est-bandwidth $vnode $lan ${desired_reservation}kb
+    }
+    
+    tbx-log "END feedback for node $vnode on lan $lan"
+}
+
+proc tb-feedback-vlink {link args} {
+    var_import ::TBCOMPAT::Reservations;   # The reservations to make for links
+    var_import ::TBCOMPAT::Alerts;         # Alert indicators
+
+    ::TBCOMPAT::named-args $args {-scale 1.2 -rclass "" -alertscale 3.0}
+
+    if {[$link info class] != "Link"} {
+	perror "\[tb-feedback-vlink] $link is not a link."
+	return
+    }
+    if {$(-scale) <= 0.0} {
+	perror "\[tb-feedback-vlink] Feedback scale is not greater than zero: $(-scale)"
+	return
+    }
+
+    tbx-log "BEGIN feedback for link $link"
+
+    if {[::TBCOMPAT::feedback-defaults $link $(-rclass)] == 0} {
+	# No feedback exists yet, so we assume 100%.  Fortunately, not
+	# specifying anything implies 100%, so we do not have to do anything
+	# extra.
+	tbx-log "  Initializing vlink, $link, to one-to-one."
+    }
+
+    foreach name [array names Reservations $link,kbps] {
+	# Get the type of reservation and
+	set reservation_type [lindex [split $name {,}] 1]
+	# ... its value.
+	set raw_reservation [set Reservations($name)]
+	# Get the maximum allowed value and
+	set max_reservation 0
+	foreach pair [$link array names bandwidth] {
+	    if {[$link set bandwidth($pair)] > $max_reservation} {
+		set max_reservation [$link set bandwidth($pair)]
+	    }
+	}
+	# ... fix any measuring/shaping error.
+	if {$raw_reservation > $max_reservation} {
+	    tbx-log "  request > max: $raw_reservation $max_reservation"
+	    set raw_reservation $max_reservation
+	}
+
+	::TBCOMPAT::feedback-bootstrap \
+		$(-rclass) $reservation_type $raw_reservation
+
+	# Then scale the reservation
+	set desired_reservation \
+		[expr int(sqrt($raw_reservation * $max_reservation))]
+	# ... making sure it is still within the range of the hardware.
+	if {$desired_reservation < 0.0} {
+	    # XXX Not allowing negative values might be too restrictive...
+	    perror "\[tb-feedback-vlink] Bad reservation value: $name = $raw_reservation"
+	    return
+	} elseif {$desired_reservation < 10.0} {
+	    set desired_reservation 10; # XXX see parse.tcl.in
+	}
+	if {([array get Alerts $link] != "") && [set Alerts($link)] > 0} {
+	    tbx-log "Alert for $link"
+	    set desired_reservation \
+		    [expr $desired_reservation * $(-alertscale)]; # XXX
+	}
+	if {$desired_reservation > $max_reservation} {
+	    set desired_reservation $max_reservation
+	}
+
+	tbx-log "  $reservation_type: ${desired_reservation}"
+
+	# Finally, adjust the cap.
+	tb-set-link-est-bandwidth $link ${desired_reservation}kb
+    }
+    
+    tbx-log "END feedback for link $link"
+}
+
+##
+## END Feedback
+##
+
+#
 # User indicates that this is a modelnet experiment. Be default, the number
 # of core and edge nodes is set to one each. The user must increase those
 # if desired.
@@ -921,4 +1295,3 @@ proc tb-set-modelnet-physnodes {cores edges} {
     set modelnet_cores $cores
     set modelnet_edges $edges
 }
-

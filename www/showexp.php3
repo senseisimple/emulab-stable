@@ -166,7 +166,20 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON(($linktest_running ?
 			    "Stop LinkTest" : "Run LinkTest"), 
 			   "linktest.php3?pid=$exp_pid&eid=$exp_eid");
+	
+	WRITESUBMENUBUTTON("Record Feedback Data",
+			   "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=record");
     }
+}
+
+if (($expstate == $TB_EXPTSTATE_ACTIVE ||
+     $expstate == $TB_EXPTSTATE_SWAPPED) &&
+    STUDLY()) {
+    WRITESUBMENUBUTTON("Clear Feedback Data",
+		       "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=clear");
+    
+    WRITESUBMENUBUTTON("Remap Virtual Nodes",
+		       "remapexp.php3?pid=$exp_pid&eid=$exp_eid");
 }
     
 # Wireless maps if experiment includes wireless lans.

@@ -1281,16 +1281,36 @@ sub binpack_sort(@) {
 	    }
 	}
 
-	# Then by memory
-	if ($b->{'desires'} && $b->{'desires'}{'?+mem'} &&
-	    $a->{'desires'} && $a->{'desires'}{'?+mem'}) {
+	if ($b->{'desires'} && $b->{'desires'}{'?+cpupercent'} &&
+	    $a->{'desires'} && $a->{'desires'}{'?+cpupercent'}) {
 
-	    $rv = ( $b->{'desires'}{'?+mem'} <=> $a->{'desires'}{'?+mem'} );
+	    $rv = ( $b->{'desires'}{'?+cpupercent'} <=>
+		    $a->{'desires'}{'?+cpupercent'} );
+	    if ($rv != 0) {
+		return $rv;
+	    }
+	}
+
+	# Then by memory
+	if ($b->{'desires'} && $b->{'desires'}{'?+ram'} &&
+	    $a->{'desires'} && $a->{'desires'}{'?+ram'}) {
+
+	    $rv = ( $b->{'desires'}{'?+ram'} <=> $a->{'desires'}{'?+ram'} );
 	    if ($rv != 0) {
 		return $rv;
 	    }
 	}
 	
+	if ($b->{'desires'} && $b->{'desires'}{'?+rampercent'} &&
+	    $a->{'desires'} && $a->{'desires'}{'?+rampercent'}) {
+
+	    $rv = ( $b->{'desires'}{'?+rampercent'} <=>
+		    $a->{'desires'}{'?+rampercent'} );
+	    if ($rv != 0) {
+		return $rv;
+	    }
+	}
+
 	# Fall back to count if neither of the others were given
 	return $b->{'count'} <=> $a->{'count'};
     } @_;

@@ -303,6 +303,26 @@ Simulator instproc run {} {
     # If any errors occur stop here.
     if {$errors == 1} {return}
 
+    # Write out the feedback "bootstrap" file.
+    var_import ::TBCOMPAT::expdir;
+    var_import ::TBCOMPAT::BootstrapReservations;
+
+    if {! [file isdirectory $expdir]} {
+	# Experiment directory does not exist, so we cannot write the file...
+    } elseif {[array size BootstrapReservations] > 0} {
+	set file [open "$expdir/tbdata/bootstrap_data.tcl" w]
+	puts $file "# -*- TCL -*-"
+	puts $file "# Automatically generated feedback bootstrap file."
+	puts $file "#"
+	puts $file "# Generated at: [clock format [clock seconds]]"
+	puts $file "#"
+	puts $file ""
+	foreach res [array names BootstrapReservations] {
+	    puts $file "set Reservations($res) $BootstrapReservations($res)"
+	}
+	close $file
+    }
+
     # If we are running in impotent mode we stop here
     if {$impotent == 1 && $passmode == 0} {return}
     
