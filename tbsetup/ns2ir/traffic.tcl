@@ -47,6 +47,9 @@ namespace eval GLOBALS {
 # Agent
 Agent instproc init {} {
     $self set node {}
+    # Which link (interface) on the node this agent is attached to.
+    # If not set, default to the only one we currently allow.
+    $self set link {}
     $self set application {}
     $self set destination {}
     $self set proto {}
@@ -98,6 +101,7 @@ Agent instproc updatedb {DB} {
     $self instvar role
     $self instvar generator
     $self instvar port
+    $self instvar link
 
     if {$role == {}} {
 	perror "\[updatedb] $self has no role."
@@ -110,15 +114,17 @@ Agent instproc updatedb {DB} {
     set target_vnode [$destination set node]
     set target_port [$destination set port]
 
+    # At some point allow users to set link. For now, first link (0).
+    set ip [$node ip 0]
+    set target_ip [$target_vnode ip 0]
+
     if {$role == "sink"} {
 	set application $self
 	set proto [$destination set proto]
     }
-#   set src_link [lindex [$node set portlist] 0]
-#   set dst_link [lindex [$target_vnode set portlist] 0]
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port,generator) values ('$pid','$eid','$node','$application','$role','$proto', $port,'$target_vnode',$target_port,'$generator')";
+    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_port,target_ip,generator) values ('$pid','$eid','$node','$application','$role','$proto',$port,'$ip','$target_vnode',$target_port,'$target_ip','$generator')";
 
     sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$application','$objtypes(TRAFGEN)')";
 }
@@ -244,6 +250,7 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     $self instvar role
     $self instvar generator
     $self instvar port
+    $self instvar link
 
     if {$role == {}} {
 	perror "\[updatedb] $self has no role."
@@ -256,10 +263,14 @@ Agent/TCP/FullTcp instproc updatedb {DB} {
     set target_vnode [$destination set node]
     set target_port [$destination set port]
 
+    # At some point allow users to set link. For now, first link (0).
+    set ip [$node ip 0]
+    set target_ip [$target_vnode ip 0]
+
     set vname $self
 
     # Update the DB
-    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port,generator) values ('$pid','$eid','$node','$vname','$role','$proto', $port,'$target_vnode',$target_port,'$generator')";
+    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,ip,target_vnode,target_port,target_ip,generator) values ('$pid','$eid','$node','$vname','$role','$proto',$port,'$ip','$target_vnode',$target_port,'$target_ip','$generator')";
 
     sql exec $DB "insert into virt_agents (pid,eid,vnode,vname,objecttype) values ('$pid','$eid','$node','$vname','$objtypes(TRAFGEN)')";
 
