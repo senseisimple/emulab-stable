@@ -1,4 +1,5 @@
 # Makefile for the hyperviewer application directory.  See ROADMAP for details.
+# gmake -f GNUMakefile
 
 # Tamara Munzner's Stanford HyperViewer code is in a subdirectory under here.
 HVROOT = hypviewer
@@ -19,11 +20,15 @@ HVLIB = ${HVLIBDIR}/lib${HVLIBNAME}.a
 
 CFLAGS  = -DHYPGLUT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=
 INCDIRS = -I${HVINC} -I/usr/X11R6/include -I/usr/local/include/python2.3
-LDLIBS  = ${HVLIB} -L/usr/X11R6/lib -lGLU -lGL -lXmu -lXext -lX11 -lm
+###STATIC =  -static
+LDLIBS  = ${HVLIB} ${STATIC} -L/usr/X11R6/lib -lGLU -lGL -lXmu -lXext -lX11 -lm
 
-# Distribute the Python scripts, shared library, and sample input files.
+# Distribute the Python scripts, sources, shared library, and sample input files.
 PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py
-DISTFILES = ${PYFILES} _hv.so BigLan.hyp ts600.hyp
+SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp
+BINFILES = _hv.so 
+DATAFILES = BigLan.hyp ts600.hyp
+DISTFILES = ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${HVROOT}
 
 # Finally, make something.
 default: _hv.so
@@ -58,9 +63,9 @@ ${HVLIB}:
 dist:
 	# Wrap a top-level hyperviewer directory around the dist files in the tarball.
 	mkdir -p temp/hyperviewer
-	cp -p ${DISTFILES} temp/hyperviewer
+	cp -rp ${DISTFILES} temp/hyperviewer
 	tar cvfz hyperviewer.tgz -C temp hyperviewer
-	rm -r temp
+	rm -rf temp
 
 clean:
 	rm *.o *.so
