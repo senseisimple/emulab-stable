@@ -29,6 +29,7 @@ my  $optlist = "sld";
 # Configure variables
 #
 my $TB		= "@prefix@";
+my $TESTMODE    = @TESTMODE@;
 
 #
 # Load the Testbed support stuff. 
@@ -175,9 +176,11 @@ foreach my $node (@nodes) {
     my $pc = $node;
 	
     print STDOUT "Changing default OS for $pc to $defosid\n";
-    DBQueryFatal("update nodes set ".
-		 "def_boot_osid='$defosid',def_boot_path='' ".
-		 "where node_id='$pc'");
+    if (!$TESTMODE) {
+      DBQueryFatal("update nodes set ".
+		   "def_boot_osid='$defosid',def_boot_path='' ".
+		   "where node_id='$pc'");
+    }
 
     #
     # Assign partition table entries for each partition in the image.
@@ -207,16 +210,18 @@ foreach my $node (@nodes) {
     }
     
     print STDOUT "Setting up reload for $pc\n";
-    DBQueryFatal("update nodes set ".
-		 "next_boot_osid='$NETDISKOSID',".
-		 "next_boot_cmd_line='$cmdline' ".
-		 "where node_id='$pc'");
+    if (!$TESTMODE) {
+      DBQueryFatal("update nodes set ".
+		   "next_boot_osid='$NETDISKOSID',".
+		   "next_boot_cmd_line='$cmdline' ".
+		   "where node_id='$pc'");
+    }
 }
 
 #
 # Fire off a reboot.
 #
-if (! $setuponly) {
+if (! $setuponly && ! $TESTMODE ) {
     system("$nodereboot @nodes");
     $failures = $? >> 8;
 }
