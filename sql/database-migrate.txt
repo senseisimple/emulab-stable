@@ -1258,12 +1258,12 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table experiments add veth_encapsulate tinyint(4) \
 		NOT NULL default '1' after sim_reswap_count;
 
-        alter table experiments add allowfixnode tinyint(4) \ 
+        alter table experiments add allowfixnode tinyint(4) \
 	       not null default 0 after veth_encapsulate;
 
 1.221: Fixed allowfixnode to default to 1 instead of 0
 
-        alter table experiments change allowfixnode allowfixnode tinyint(4) \ 
+        alter table experiments change allowfixnode allowfixnode tinyint(4) \
 	       not null default 1;
 
 1.222: Added old_pid and old_eid in reserved table. This allows the moving of
@@ -1331,7 +1331,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table plab_slice_nodes drop column ticketdata, \
            drop column leasedata, \
-           add column nodemeta text default NULL
+           add column nodemeta text default NULL;
 
 1.230: Change all node_id-type columns to be 32 characters long
 
@@ -1545,7 +1545,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table virt_nodes change routertype routertype \
 		 enum('none','ospf','static','manual','static-ddijk') \
-		 NOT NULL default 'none',	
+		 NOT NULL default 'none';
 
 1.247:  Add a 'useprepass' column to the experiments table to enable or
         disable the assign prepass.
@@ -1709,3 +1709,4 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.258: Minor whitespace change in database-create.txt to make
        schemacheck happy. 
+
