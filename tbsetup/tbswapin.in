@@ -94,6 +94,7 @@ sub cleanup {
     DBQueryWarn("DELETE from vlans   where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from tunnels where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from v2pmap where pid='$pid' and eid='$eid'");
+    DBQueryWarn("DELETE from ipport_ranges where pid='$pid' and eid='$eid'");
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 }
 
