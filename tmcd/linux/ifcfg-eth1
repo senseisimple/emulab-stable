@@ -1,10 +1,8 @@
 DEVICE="eth1"
 if [ "`/etc/rc.d/testbed/control_interface`" = "$DEVICE" ]; then
-	ONBOOT="yes"
 	BOOTPROTO="dhcp"
-else
-	ONBOOT="no"
 fi
+ONBOOT="yes"
 IPADDR=""
 NETMASK=""
 IPXNETNUM_802_2=""
