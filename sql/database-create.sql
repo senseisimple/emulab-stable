@@ -1348,7 +1348,7 @@ CREATE TABLE veth_interfaces (
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
   iface varchar(10) NOT NULL default '',
-  vnode varchar(32) default NULL,
+  vnode_id varchar(32) default NULL,
   PRIMARY KEY  (node_id,veth_id),
   KEY IP (IP)
 ) TYPE=MyISAM;

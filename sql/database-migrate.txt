@@ -556,3 +556,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table veth_interfaces add vnode varchar(32) default NULL
 		after iface;
+
+1.146: Minor mod to last revision; use a less ambiguous name. 
+
+        alter table veth_interfaces change vnode vnode_id varchar(32)
+		default NULL;
