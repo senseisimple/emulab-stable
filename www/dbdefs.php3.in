@@ -925,7 +925,8 @@ function TBLeaderMailList($pid, $gid)
 		 "left join group_membership as gm on gm.uid=u.uid ".
 		 "where (trust='". TBDB_TRUSTSTRING_PROJROOT .
 		 "' and pid='$pid') or (trust='". TBDB_TRUSTSTRING_GROUPROOT .
-		 "' and gid='$gid') order by trust DESC, usr_name");
+		 "' and pid='$pid' and gid='$gid') ".
+		 "order by trust DESC, usr_name");
   
   if (mysql_num_rows($query_result) == 0) {
     return 0;
