@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1492,12 +1492,12 @@ sub writeConfigTFTP($$$) {
     # Start off by resolving the server's name into an IP address
     #
     my $ip = inet_aton($server);
-    if (!@ip) {
+    if (!$ip) {
 	warn "Unable to lookup hostname $server\n";
 	return 0;
     }
 
-    $ipstr = join(".",unpack('C4',$ip));
+    my $ipstr = join(".",unpack('C4',$ip));
 
     #
     # Set up a few values on the switch to tell it where to stick the config
