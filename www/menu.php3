@@ -292,8 +292,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	WRITESIDEBARBUTTON("Papers (Oct 28)", $TBDOCBASE, "pubs.php3");
-	WRITESIDEBARBUTTON("Software <font size=-1> ".
-			       "(Oct 21)</font>",
+	WRITESIDEBARBUTTON("Software (Oct 21)",
 			       $TBDOCBASE, "software.php3");
 	WRITESIDEBARBUTTON("Add Widearea Node (CD)",
 				$TBDOCBASE, "cdrom.php");
