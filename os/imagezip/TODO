@@ -1,19 +1,19 @@
-Things to do for netdisk and imagezip:
+Things to do for image*:
 
-1. Need an unimagezip.
+1. Checksum chunks or the entire image file?
+   Maybe just as a debug option to check for bugs in the zipper itself.
+   In general use, we will be using TCP as the transport for image files
+   or we will be using frisbee and the UDP checksum in conjunction with
+   frisbee itself tracking blocks should be sufficient.  Anyway, doing
+   an entire image checksum would be complicated by frisbee's out of order
+   receipt of chunks.
 
-2. Header should include a checksum of the data.
-   Should be a header checksum as well.
+2. Imagezip could be multithread so that we can be reading ahead on the
+   input device and overlapping IO with compression.  Maybe a third thread
+   for doing output.
 
-3. Netdisk should have an option to make a checksum pass over the disk
-   after the image has been loaded.
+3. In imagezip, split out the FS-specific code into subdirectories.
 
-4. Netdisk should have a command to print out the DOS partition table and
-   any embedded disklabels.
+4. Write an imageconvert so that we can convert old version images into
+   new ones and maybe change the compression level used in an image.
 
-5. Netdisk should should have a non-interactive mode, taking commands as
-   arguments on the command line.
-
-6. When interactive, netdisk should possibly not reboot after loading the
-   image, allowing one to load another partition or check on the partition
-   table.

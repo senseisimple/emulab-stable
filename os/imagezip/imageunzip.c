@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <unistd.h>
+#include <string.h>
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -26,6 +27,13 @@
 #include <pthread.h>
 #include "imagehdr.h"
 #include "queue.h"
+
+/*
+ * Define this if you want to test frisbee's random presentation of chunks
+ */
+#ifndef FRISBEE
+#define FAKEFRISBEE
+#endif
 
 long long totaledata = 0;
 long long totalrdata = 0;
@@ -51,23 +59,26 @@ static long long	outputmaxsize	= 0;	/* Sanity check */
     } \
 }
 
-#define SECSIZE 512
-#define BSIZE	(32 * 1024)
-#define OUTSIZE (8  * BSIZE)
-char		outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
+#define sectobytes(s)	((off_t)(s) * SECSIZE)
+#define bytestosec(b)	(uint32_t)((b) / SECSIZE)
 
-static int	 debug  = 0;
+#define OUTSIZE (256 * 1024)
+char		outbuf[OUTSIZE + SECSIZE], zeros[OUTSIZE];
+
+static int	 dostype = -1;
+static int	 slice = 0;
+static int	 debug = 0;
 static int	 outfd;
-static int	 doseek = 0;
 static int	 dofill = 0;
 static int	 nothreads = 0;
 static pthread_t child_pid;
 static int	 rdycount;
+static int	 imageversion = 1;
 #ifndef FRISBEE
 static int	 infd;
 static int	 version= 0;
 static unsigned	 fillpat= 0;
-static int	 dots   = 1;
+static int	 dots   = 0;
 static int	 dotcol;
 static char	 chunkbuf[SUBBLOCKSIZE];
 static struct timeval stamp;
@@ -76,11 +87,26 @@ static void	 threadinit(void);
 static void	 threadwait(void);
 static void	 threadquit(void);
 int		 readmbr(int slice);
-int		 inflate_subblock(char *);
-void		 writezeros(off_t offset, size_t zcount);
+int		 fixmbr(int slice, int dtype);
+static int	 inflate_subblock(char *);
+void		 writezeros(off_t offset, off_t zcount);
+void		 writedata(off_t offset, size_t count, void *buf);
 void	        *DiskWriter(void *arg);
 
+static void	getrelocinfo(blockhdr_t *hdr);
+static void	applyrelocs(off_t offset, size_t cc, void *buf);
+
+static int	 seekable;
+static off_t	 nextwriteoffset;
+
 static int	writeinprogress; /* XXX */
+
+#ifdef FAKEFRISBEE
+#include <sys/stat.h>
+
+static int	dofrisbee;
+static int	*chunklist, *nextchunk;
+#endif
 
 /*
  * Some stats
@@ -94,13 +120,13 @@ unsigned long writeridles;
 typedef struct {
 	queue_chain_t	chain;
 	off_t		offset;
-	size_t		size;
+	off_t		size;
 	int		zero;
 } readyhdr_t;
 
 typedef struct {
 	readyhdr_t	header;
-	unsigned char	buf[OUTSIZE + SECSIZE - sizeof(readyhdr_t)];
+	unsigned char	buf[OUTSIZE + SECSIZE];
 } readyblock_t;
 static queue_head_t	readyqueue;
 static readyblock_t	*freelist;
@@ -110,36 +136,58 @@ static pthread_mutex_t	freelist_mutex, readyqueue_mutex;
 static pthread_cond_t	freelist_condvar, readyqueue_condvar;	
 
 static void
-dowrite_request(off_t offset, int cc, void *buf)
+dowrite_request(off_t offset, off_t size, void *buf)
 {
 	readyhdr_t *hdr;
 	
-	if (!buf) {
-		/*
-		 * Null buf means its a request to zero.
-		 */
+	totaledata += size;
+
+	/*
+	 * Adjust for partition start and ensure data fits
+	 * within partition boundaries.
+	 */
+	offset += sectobytes(outputminsec);
+	assert((offset & (SECSIZE-1)) == 0);
+	if (outputmaxsec > 0 && offset + size > sectobytes(outputmaxsec)) {
+		fprintf(stderr, "Image too large for target slice\n");
+		exit(1);
+	}
+
+	/*
+	 * Null buf means its a request to zero.
+	 * If we are not filling, just return.
+	 */
+	if (buf == NULL) {
+		if (!dofill)
+			return;
+
 		if (nothreads) {
-			writezeros(offset, cc);
+			writezeros(offset, size);
 			return;
 		}
 
-		if ((hdr = (readyhdr_t *) malloc(sizeof(readyhdr_t))) == NULL){
+		if ((hdr = (readyhdr_t *)malloc(sizeof(readyhdr_t))) == NULL) {
 			fprintf(stderr, "Out of memory\n");
 			exit(1);
 		}
 		hdr->zero   = 1;
 		hdr->offset = offset;
-		hdr->size   = cc;
+		hdr->size   = size;
 	}
 	else {
 		readyblock_t	*rdyblk;
+		size_t		cc;
+
+		assert(size <= OUTSIZE+SECSIZE);
+		cc = size;
+
+		/*
+		 * Handle any relocations
+		 */
+		applyrelocs(offset, cc, buf);
 
 		if (nothreads) {
-			int count = pwrite(outfd, buf, cc, offset);
-			if (count != cc) {
-				printf("Short write!\n");
-				exit(1);
-			}
+			writedata(offset, cc, buf);
 			return;
 		}
 
@@ -184,6 +232,7 @@ usage(void)
 		" -v              Print version info and exit\n"
 		" -s slice        Output to DOS slice (DOS numbering 1-4)\n"
 		"                 NOTE: Must specify a raw disk device.\n"
+		" -D DOS-ptype    Set the DOS partition type in slice mode.\n"
 		" -z              Write zeros to free blocks.\n"
 		" -p pattern      Write 32 bit pattern to free blocks.\n"
 		"                 NOTE: Use -z/-p to avoid seeking.\n"
@@ -196,12 +245,17 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int		i, ch, slice = 0;
+	int		i, ch;
 	extern char	build_info[];
 	struct timeval  estamp;
 
-	while ((ch = getopt(argc, argv, "vdhs:zp:on")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:onFD:")) != -1)
 		switch(ch) {
+#ifdef FAKEFRISBEE
+		case 'F':
+			dofrisbee++;
+			break;
+#endif
 		case 'd':
 			debug++;
 			break;
@@ -220,6 +274,10 @@ main(int argc, char **argv)
 
 		case 's':
 			slice = atoi(optarg);
+			break;
+
+		case 'D':
+			dostype = atoi(optarg);
 			break;
 
 		case 'p':
@@ -244,10 +302,6 @@ main(int argc, char **argv)
 
 	if (argc < 1 || argc > 2)
 		usage();
-	if (argc == 1 && slice) {
-		fprintf(stderr, "Cannot specify a slice when using stdout!\n");
-		usage();
-	}
 
 	if (fillpat) {
 		unsigned	*bp = (unsigned *) &zeros;
@@ -271,10 +325,29 @@ main(int argc, char **argv)
 			perror("opening output file");
 			exit(1);
 		}
-		doseek = !dofill;
 	}
 	else
 		outfd = fileno(stdout);
+
+	/*
+	 * If the output device isn't seekable we must modify our behavior:
+	 * we cannot really handle slice mode, we must always zero fill
+	 * (cannot skip free space) and we cannot use pwrite.
+	 */
+	if (lseek(outfd, (off_t)0, SEEK_SET) < 0) {
+		if (slice) {
+			fprintf(stderr, "Output file is not seekable, "
+				"cannot specify a slice\n");
+			exit(1);
+		}
+		if (!dofill)
+			fprintf(stderr,
+				"WARNING: output file is not seekable, "
+				"must zero-fill free space\n");
+		dofill = 1;
+		seekable = 0;
+	} else
+		seekable = 1;
 
 	if (slice) {
 		off_t	minseek;
@@ -283,7 +356,7 @@ main(int argc, char **argv)
 			fprintf(stderr, "Failed to read MBR\n");
 			exit(1);
 		}
-		minseek = ((off_t) outputminsec) * SECSIZE;
+		minseek = sectobytes(outputminsec);
 		
 		if (lseek(outfd, minseek, SEEK_SET) < 0) {
 			perror("Setting seek pointer to slice");
@@ -294,10 +367,54 @@ main(int argc, char **argv)
 	threadinit();
 	gettimeofday(&stamp, 0);
 	
+#ifdef FAKEFRISBEE
+	if (dofrisbee) {
+		struct stat st;
+		int numchunks, i;
+
+		if (fstat(infd, &st) < 0) {
+			fprintf(stderr, "Cannot stat input file\n");
+			exit(1);
+		}
+		numchunks = st.st_size / SUBBLOCKSIZE;
+
+		chunklist = (int *) calloc(numchunks+1, sizeof(*chunklist));
+		assert(chunklist != NULL);
+
+		for (i = 0; i < numchunks; i++)
+			chunklist[i] = i;
+		chunklist[i] = -1;
+
+		srandomdev();
+		for (i = 0; i < 50 * numchunks; i++) {
+			int c1 = random() % numchunks;
+			int c2 = random() % numchunks;
+			int t1 = chunklist[c1];
+			int t2 = chunklist[c2];
+
+			chunklist[c2] = t1;
+			chunklist[c1] = t2;
+		}
+		nextchunk = chunklist;
+	}
+#endif
+
 	while (1) {
 		int	count = sizeof(chunkbuf);
 		char	*bp   = chunkbuf;
 		
+#ifdef FAKEFRISBEE
+		if (dofrisbee) {
+			if (*nextchunk == -1)
+				goto done;
+			if (lseek(infd, (off_t)*nextchunk * SUBBLOCKSIZE,
+				  SEEK_SET) < 0) {
+				perror("seek failed");
+				exit(1);
+			}
+			nextchunk++;
+		}
+#endif
 		/*
 		 * Decompress one subblock at a time. We read the entire
 		 * chunk and hand it off. Since we might be reading from
@@ -324,18 +441,27 @@ main(int argc, char **argv)
 	/* This causes the output queue to drain */
 	threadquit();
 	
+	/* Set the MBR type if necesary */
+	if (slice && dostype >= 0)
+		fixmbr(slice, dostype);
+
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
-	if (dots) {
+	if (debug != 1 && dots) {
 		while (dotcol++ <= 60)
-			printf(" ");
+			fprintf(stderr, " ");
 		
-		printf("%4ld %13qd\n", estamp.tv_sec, totaledata);
+		fprintf(stderr, "%4ld %13qd\n", estamp.tv_sec, totaledata);
 	}
 	else {
-		printf("Done in %ld seconds!\n", estamp.tv_sec);
+		fprintf(stderr, "Done in %ld seconds!\n", estamp.tv_sec);
+		fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
+			totaledata, totalrdata);
 	}
-	fprintf(stderr, "%lu %lu %d\n", decompidles, writeridles, rdycount);
+	if (debug)
+		fprintf(stderr, "decompressor blocked: %lu, "
+			"writer idle: %lu, writes performed: %d\n",
+			decompidles, writeridles, rdycount);
 	return 0;
 }
 #else
@@ -343,7 +469,8 @@ main(int argc, char **argv)
  * When compiled for frisbee, act as a library.
  */
 int
-ImageUnzipInit(char *filename, int slice, int dbg, int zero, int goslow)
+ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
+	       int _nothreads, int _dostype)
 {
 	if (outfd >= 0)
 		close(outfd);
@@ -352,12 +479,30 @@ ImageUnzipInit(char *filename, int slice, int dbg, int zero, int goslow)
 		perror("opening output file");
 		exit(1);
 	}
-	if (zero)
-		dofill = doseek = 1;
-	else
-		doseek = 1;
-	debug     = dbg;
-	nothreads = goslow;
+	dofill    = _fill;
+	debug     = _debug;
+	nothreads = _nothreads;
+	dostype   = _dostype;
+
+	/*
+	 * If the output device isn't seekable we must modify our behavior:
+	 * we cannot really handle slice mode, we must always zero fill
+	 * (cannot skip free space) and we cannot use pwrite.
+	 */
+	if (lseek(outfd, (off_t)0, SEEK_SET) < 0) {
+		if (slice) {
+			fprintf(stderr, "Output file is not seekable, "
+				"cannot specify a slice\n");
+			exit(1);
+		}
+		if (!dofill)
+			fprintf(stderr,
+				"WARNING: output file is not seekable, "
+				"must zero-fill free space\n");
+		dofill = 1;
+		seekable = 0;
+	} else
+		seekable = 1;
 
 	if (slice) {
 		off_t	minseek;
@@ -366,7 +511,7 @@ ImageUnzipInit(char *filename, int slice, int dbg, int zero, int goslow)
 			fprintf(stderr, "Failed to read MBR\n");
 			exit(1);
 		}
-		minseek = ((off_t) outputminsec) * SECSIZE;
+		minseek = sectobytes(outputminsec);
 		
 		if (lseek(outfd, minseek, SEEK_SET) < 0) {
 			perror("Setting seek pointer to slice");
@@ -375,6 +520,12 @@ ImageUnzipInit(char *filename, int slice, int dbg, int zero, int goslow)
 	}
 	threadinit();
 	return 0;
+}
+
+int
+ImageUnzipChunk(char *chunkdata)
+{
+	return inflate_subblock(chunkdata);
 }
 
 void
@@ -387,6 +538,11 @@ int
 ImageUnzipQuit(void)
 {
 	threadquit();
+
+	/* Set the MBR type if necesary */
+	if (slice && dostype >= 0)
+		fixmbr(slice, dostype);
+
 	fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
 		totaledata, totalrdata);
 	fprintf(stderr, "%lu %lu %d\n", decompidles, writeridles, rdycount);
@@ -414,7 +570,7 @@ threadinit(void)
 	queue_init(&readyqueue);
 	if ((ptr = (readyblock_t *) malloc(sizeof(readyblock_t) * READYQSIZE))
 	    == NULL) {
-		fprintf(stderr, "Out of memory!\n");
+		fprintf(stderr, "Not enough memory for readyQ blocks!\n");
 		exit(1);
 	}
 	readyqueuemem = ptr;
@@ -470,13 +626,13 @@ threadquit(void)
 	freelist = 0;
 }
 
-int
+static int
 inflate_subblock(char *chunkbufp)
 {
 	int		cc, err, count, ibsize = 0, ibleft = 0;
 	z_stream	d_stream; /* inflation stream */
 	char		*bp;
-	struct blockhdr *blockhdr;
+	blockhdr_t	*blockhdr;
 	struct region	*curregion;
 	off_t		offset, size;
 	int		chunkbytes = SUBBLOCKSIZE;
@@ -495,21 +651,55 @@ inflate_subblock(char *chunkbufp)
 	 * Grab the header. It is uncompressed, and holds the real
 	 * image size and the magic number. Advance the pointer too.
 	 */
-	blockhdr    = (struct blockhdr *) chunkbufp;
+	blockhdr    = (blockhdr_t *) chunkbufp;
 	chunkbufp  += DEFAULTREGIONSIZE;
 	chunkbytes -= DEFAULTREGIONSIZE;
 	
-	if (blockhdr->magic != COMPRESSED_MAGIC) {
+	switch (blockhdr->magic) {
+	case COMPRESSED_V1:
+	{
+		static int didwarn;
+
+		curregion = (struct region *)
+			((struct blockhdr_V1 *)blockhdr + 1);
+		if (dofill && !didwarn) {
+			fprintf(stderr,
+				"WARNING: old image file format, "
+				"may not zero all unused blocks\n");
+			didwarn = 1;
+		}
+		break;
+	}
+
+	case COMPRESSED_V2:
+		imageversion = 2;
+		curregion = (struct region *)
+			((struct blockhdr_V2 *)blockhdr + 1);
+		/*
+		 * Extract relocation information
+		 */
+		getrelocinfo(blockhdr);
+		break;
+
+	default:
 		fprintf(stderr, "Bad Magic Number!\n");
 		exit(1);
 	}
-	curregion = (struct region *) (blockhdr + 1);
 
+	/*
+	 * Handle any lead-off free space
+	 */
+	if (imageversion > 1 && curregion->start > blockhdr->firstsect) {
+		offset = sectobytes(blockhdr->firstsect);
+		size = sectobytes(curregion->start - blockhdr->firstsect);
+		dowrite_request(offset, size, NULL);
+	}
+ 
 	/*
 	 * Start with the first region. 
 	 */
-	offset = curregion->start * (off_t) SECSIZE;
-	size   = curregion->size  * (off_t) SECSIZE;
+	offset = sectobytes(curregion->start);
+	size   = sectobytes(curregion->size);
 	assert(size);
 	curregion++;
 	blockhdr->regioncount--;
@@ -576,16 +766,14 @@ inflate_subblock(char *chunkbufp)
 			bp     += cc;
 			size   -= cc;
 			offset += cc;
-			totaledata  += cc;
 			assert(count >= 0);
 			assert(size  >= 0);
 
 			/*
 			 * Hit the end of the region. Need to figure out
-			 * where the next one starts. We write a block of
-			 * zeros in the empty space between this region
-			 * and the next. We can lseek, but only if
-			 * not writing to stdout. 
+			 * where the next one starts. If desired, we write
+			 * a block of zeros in the empty space between this
+			 * region and the next.
 			 */
 			if (! size) {
 				off_t	    newoffset;
@@ -596,19 +784,14 @@ inflate_subblock(char *chunkbufp)
 				if (!blockhdr->regioncount)
 					break;
 
-				newoffset = curregion->start * (off_t) SECSIZE;
-				size      = curregion->size  * (off_t) SECSIZE;
+				newoffset = sectobytes(curregion->start);
+				size      = sectobytes(curregion->size);
 				assert(size);
 				curregion++;
 				blockhdr->regioncount--;
-
-				if (dofill) {
-					assert((newoffset-offset) > 0);
-					dowrite_request(offset,
-							newoffset-offset,
-							NULL);
-				} else
-					totaledata += (newoffset - offset);
+				assert((newoffset-offset) > 0);
+				dowrite_request(offset, newoffset-offset,
+						NULL);
 				offset = newoffset;
 			}
 		}
@@ -625,21 +808,34 @@ inflate_subblock(char *chunkbufp)
 	assert(size == 0);
 	assert(blockhdr->size == 0);
 
+	/*
+	 * Handle any trailing free space
+	 */
+	curregion--;
+	if (imageversion > 1 &&
+	    curregion->start + curregion->size < blockhdr->lastsect) {
+		offset = sectobytes(curregion->start + curregion->size);
+		size = sectobytes(blockhdr->lastsect -
+				  (curregion->start + curregion->size));
+		dowrite_request(offset, size, NULL);
+		offset += size;
+	}
+ 
 #ifndef FRISBEE
 	if (debug == 1) {
 		fprintf(stderr, "%14qd\n", offset);
 	}
 	else if (dots) {
-		struct timeval  estamp;
-
-		gettimeofday(&estamp, 0);
-		estamp.tv_sec -= stamp.tv_sec;
-		
-		printf(".");
-		fflush(stdout);
+		fprintf(stderr, ".");
 		if (dotcol++ > 59) {
+			struct timeval estamp;
+
+			gettimeofday(&estamp, 0);
+			estamp.tv_sec -= stamp.tv_sec;
+			fprintf(stderr, "%4ld %13qd\n",
+				estamp.tv_sec, totaledata);
+
 			dotcol = 0;
-			printf("%4ld %13qd\n", estamp.tv_sec, totaledata);
 		}
 	}
 #endif
@@ -648,25 +844,32 @@ inflate_subblock(char *chunkbufp)
 }
 
 void
-writezeros(off_t offset, size_t zcount)
+writezeros(off_t offset, off_t zcount)
 {
-	int	zcc;
-
-	if (doseek)
-		return;
+	size_t	zcc;
 
 	assert((offset & (SECSIZE-1)) == 0);
 
-	if (lseek(outfd, offset, SEEK_SET) < 0) {
-		perror("lseek to write zeros");
+	if (seekable) {
+		/*
+		 * We must always seek, even if offset == nextwriteoffset,
+		 * since we are using pwrite.
+		 */
+		if (lseek(outfd, offset, SEEK_SET) < 0) {
+			perror("lseek to write zeros");
+			exit(1);
+		}
+		nextwriteoffset = offset;
+	} else if (offset != nextwriteoffset) {
+		fprintf(stderr, "Attempted non-contiguous write\n");
 		exit(1);
 	}
 
 	while (zcount) {
-		if (zcount <= BSIZE)
-			zcc = (int) zcount;
+		if (zcount <= OUTSIZE)
+			zcc = zcount;
 		else
-			zcc = BSIZE;
+			zcc = OUTSIZE;
 		
 		if ((zcc = write(outfd, zeros, zcc)) != zcc) {
 			if (zcc < 0) {
@@ -676,8 +879,48 @@ writezeros(off_t offset, size_t zcount)
 		}
 		zcount     -= zcc;
 		totalrdata += zcc;
+		nextwriteoffset += zcc;
 	}
 }
+
+void
+writedata(off_t offset, size_t size, void *buf)
+{
+	ssize_t	cc;
+
+	/*	fprintf(stderr, "Writing %d bytes at %qd\n", size, offset); */
+
+	if (seekable)
+		cc = pwrite(outfd, buf, size, offset);
+	else if (offset == nextwriteoffset)
+		cc = write(outfd, buf, size);
+	else {
+		fprintf(stderr, "Attempted non-contiguous write\n");
+		exit(1);
+	}
+		
+	if (cc != size) {
+		if (cc < 0)
+			perror("write error");
+		else
+			fprintf(stderr, "Short write!\n");
+		exit(1);
+	}
+	nextwriteoffset = offset + cc;
+	totalrdata += cc;
+}
+
+/*
+ * DOS partition table handling
+ */
+struct doslabel {
+	char		align[sizeof(short)];	/* Force alignment */
+	char		pad2[DOSPARTOFF];
+	struct dos_partition parts[NDOSPART];
+	unsigned short  magic;
+};
+#define DOSPARTSIZE \
+	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
 
 /*
  * Parse the DOS partition table to set the bounds of the slice we
@@ -686,15 +929,8 @@ writezeros(off_t offset, size_t zcount)
 int
 readmbr(int slice)
 {
+	struct doslabel doslabel;
 	int		cc;
-	struct doslabel {
-		char		align[sizeof(short)];	/* Force alignment */
-		char		pad2[DOSPARTOFF];
-		struct dos_partition parts[NDOSPART];
-		unsigned short  magic;
-	} doslabel;
-#define DOSPARTSIZE \
-	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
 
 	if (slice < 1 || slice > 4) {
 		fprintf(stderr, "Slice must be 1, 2, 3, or 4\n");
@@ -717,7 +953,7 @@ readmbr(int slice)
 	outputminsec  = doslabel.parts[slice-1].dp_start;
 	outputmaxsec  = doslabel.parts[slice-1].dp_start +
 		        doslabel.parts[slice-1].dp_size;
-	outputmaxsize = ((long long) (outputmaxsec - outputminsec)) * SECSIZE;
+	outputmaxsize = (long long)sectobytes(outputmaxsec - outputminsec);
 
 	if (debug) {
 		fprintf(stderr, "Slice Mode: S:%d min:%ld max:%ld size:%qd\n",
@@ -726,20 +962,57 @@ readmbr(int slice)
 	return 0;
 }
 
+int
+fixmbr(int slice, int dtype)
+{
+	struct doslabel doslabel;
+	int		cc;
+
+	if (lseek(outfd, (off_t)0, SEEK_SET) < 0) {
+		perror("Could not seek to DOS label");
+		return 1;
+	}
+	if ((cc = devread(outfd, doslabel.pad2, DOSPARTSIZE)) < 0) {
+		perror("Could not read DOS label");
+		return 1;
+	}
+	if (cc != DOSPARTSIZE) {
+		fprintf(stderr, "Could not get the entire DOS label\n");
+ 		return 1;
+	}
+	if (doslabel.magic != BOOT_MAGIC) {
+		fprintf(stderr, "Wrong magic number in DOS partition table\n");
+ 		return 1;
+	}
+
+	if (doslabel.parts[slice-1].dp_typ != dostype) {
+		doslabel.parts[slice-1].dp_typ = dostype;
+		if (lseek(outfd, (off_t)0, SEEK_SET) < 0) {
+			perror("Could not seek to DOS label");
+			return 1;
+		}
+		cc = write(outfd, doslabel.pad2, DOSPARTSIZE);
+		if (cc != DOSPARTSIZE) {
+			perror("Could not write DOS label");
+			return 1;
+		}
+		fprintf(stderr, "Set type of DOS partition %d to %d\n",
+			slice, dostype);
+	}
+	return 0;
+}
+
 void *
 DiskWriter(void *arg)
 {
 	readyblock_t	*rdyblk = 0;
-	off_t		offset;
-	size_t		size;
-	ssize_t		cc;
 
 	while (1) {
 		pthread_testcancel();
 
 		pthread_mutex_lock(&readyqueue_mutex);
 		if (queue_empty(&readyqueue)) {
-/*			printf("Writer idle\n"); */
+/*			fprintf(stderr, "Writer idle\n"); */
 			writeridles++;
 			do {
 				pthread_cond_wait(&readyqueue_condvar,
@@ -752,26 +1025,17 @@ DiskWriter(void *arg)
 		writeinprogress = 1; /* XXX */
 		pthread_mutex_unlock(&readyqueue_mutex);
 
-		offset = rdyblk->header.offset +
-			(((off_t) outputminsec) * SECSIZE);
-		assert((offset & (SECSIZE-1)) == 0);
-		size   = rdyblk->header.size;
-
 		if (rdyblk->header.zero) {
-			writezeros(offset, size);
+			writezeros(rdyblk->header.offset, rdyblk->header.size);
 			free(rdyblk);
+			writeinprogress = 0; /* XXX, ok as unlocked access */
 			continue;
 		}
 		rdycount++;
 
-/*		fprintf(stderr, "Writing %d bytes at %qd\n", size, offset); */
-
-		cc = pwrite(outfd, rdyblk->buf, size, offset);
-		if (cc != size) {
-			printf("Short write!\n");
-			exit(1);
-		}
-		totalrdata += cc;
+		assert(rdyblk->header.size <= OUTSIZE+SECSIZE);
+		writedata(rdyblk->header.offset, (size_t)rdyblk->header.size,
+			  rdyblk->buf);
 		writeinprogress = 0; /* XXX, ok as unlocked access */
 
 		pthread_mutex_lock(&freelist_mutex);
@@ -780,4 +1044,128 @@ DiskWriter(void *arg)
 		pthread_mutex_unlock(&freelist_mutex);
 		pthread_cond_signal(&freelist_condvar);
 	}
+}
+
+static struct blockreloc *reloctable;
+static int numrelocs;
+static void reloc_bsdlabel(struct disklabel *label);
+
+static void
+getrelocinfo(blockhdr_t *hdr)
+{
+	struct blockreloc *relocs;
+
+	if (reloctable) {
+		free(reloctable);
+		reloctable = NULL;
+	}
+
+	if ((numrelocs = hdr->reloccount) == 0)
+		return;
+
+	reloctable = malloc(numrelocs * sizeof(struct blockreloc));
+	if (reloctable == NULL) {
+		fprintf(stderr, "No memory for relocation table\n");
+		exit(1);
+	}
+
+	relocs = (struct blockreloc *)
+		((void *)&hdr[1] + hdr->regioncount * sizeof(struct region));
+	memcpy(reloctable, relocs, numrelocs * sizeof(struct blockreloc));
+}
+
+static void
+applyrelocs(off_t offset, size_t size, void *buf)
+{
+	struct blockreloc *reloc;
+	off_t roffset;
+	uint32_t coff;
+
+	if (numrelocs == 0)
+		return;
+
+	offset -= sectobytes(outputminsec);
+
+	for (reloc = reloctable; reloc < &reloctable[numrelocs]; reloc++) {
+		roffset = sectobytes(reloc->sector) + reloc->sectoff;
+		if (offset < roffset+reloc->size && offset+size > roffset) {
+			/* XXX lazy: relocation must be totally contained */
+			assert(offset <= roffset);
+			assert(roffset+reloc->size <= offset+size);
+
+			coff = (u_int32_t)(roffset - offset);
+			if (debug > 1)
+				fprintf(stderr,
+					"Applying reloc type %d [%qu-%qu] "
+					"to [%qu-%qu]\n", reloc->type,
+					roffset, roffset+reloc->size,
+					offset, offset+size);
+			switch (reloc->type) {
+			case RELOC_NONE:
+				break;
+			case RELOC_BSDDISKLABEL:
+				assert(reloc->size >= sizeof(struct disklabel));
+				reloc_bsdlabel((struct disklabel *)(buf+coff));
+				break;
+			default:
+				fprintf(stderr,
+					"Ignoring unknown relocation type %d\n",
+					reloc->type);
+				break;
+			}
+		}
+	}
+}
+
+static void
+reloc_bsdlabel(struct disklabel *label)
+{
+	int i;
+	uint32_t slicesize;
+
+	/*
+	 * This relocation only makes sense in slice mode,
+	 * i.e., we are installing a slice image into another slice.
+	 */
+	if (slice == 0)
+		return;
+
+	if (label->d_magic  != DISKMAGIC || label->d_magic2 != DISKMAGIC) {
+		fprintf(stderr, "No disklabel at relocation offset\n");
+		exit(1);
+	}
+
+	/*
+	 * Verify that the slice image being installed is no larger
+	 * than the slice it is going into.
+	 */
+	assert(outputmaxsize > 0);
+	slicesize = bytestosec(outputmaxsize);
+	for (i = 0; i < MAXPARTITIONS; i++)
+		if (label->d_partitions[i].p_size > slicesize) {
+			fprintf(stderr, "Slice image too big for partition\n");
+			exit(1);
+		}
+
+	/*
+	 * Fixup the partition offsets so they are absolute.
+	 */
+	for (i = 0; i < MAXPARTITIONS; i++) {
+		if (label->d_partitions[i].p_size == 0)
+			continue;
+
+		label->d_partitions[i].p_offset += outputminsec;
+
+#if 0 /* let them do this manually, not our job */
+		/*
+		 * Also change RAW ('c') partition to match slice size.
+		 */
+		if (i == RAW_PART) {
+			assert(label->d_partitions[i].p_offset == outputminsec);
+			label->d_partitions[i].p_size = slicesize;
+		}
+#endif
+	}
+	label->d_checksum = 0;
+	label->d_checksum = dkcksum(label);
 }

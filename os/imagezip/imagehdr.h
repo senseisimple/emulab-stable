@@ -3,8 +3,16 @@
 
 /*
  * Magic number when image is compressed
+ *
+ * This magic number has been commandeered for use as a version number.
+ * None of this wimpy start at version 1 stuff either, our first version
+ * is 1,768,515,945!
  */
-#define COMPRESSED_MAGIC	0x69696969
+#define COMPRESSED_MAGIC_BASE		0x69696969
+#define COMPRESSED_V1			(COMPRESSED_MAGIC_BASE+0)
+#define COMPRESSED_V2			(COMPRESSED_MAGIC_BASE+1)
+
+#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V2
 
 /*
  * Each compressed block of the file has this little header on it.
@@ -12,14 +20,59 @@
  * its internal size (it will probably be shorter than 1MB) since we
  * have to know exactly how much to give the inflator.
  */
-struct blockhdr {
-	int		magic;
-	unsigned long   size;		/* Size of compressed part */
-	int		blockindex;
-	int		blocktotal;
-	int		regionsize;
-	int		regioncount;
+struct blockhdr_V1 {
+	uint32_t	magic;
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;
+	int32_t		blocktotal;
+	int32_t		regionsize;
+	int32_t		regioncount;
 };
+
+/*
+ * Version 2 of the block descriptor adds a first and last sector value.
+ * These are used to describe free space which is adjacent to the allocated
+ * sector data.  This is needed in order to properly zero all free space.
+ * Previously free space between regions that wound up in different
+ * blocks could only be handled if the blocks were presented consecutively,
+ * this was not the case in frisbee.
+ */
+struct blockhdr_V2 {
+	uint32_t	magic;		/* magic/version */
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
+	/* V2 follows */
+	uint32_t	firstsect;	/* first sector described by block */
+	uint32_t	lastsect;	/* last sector described by block */
+	int32_t		reloccount;	/* number of reloc entries */
+};
+
+/*
+ * Relocation descriptor.
+ * Certain data structures like BSD disklabels and LILO boot blocks require
+ * absolute block numbers.  This descriptor tells the unzipper what the
+ * data structure is and where it is located in the block.
+ *
+ * Relocation descriptors follow the region descriptors in the header block.
+ */
+struct blockreloc {
+	uint32_t	type;		/* relocation type (below) */
+	uint32_t	sector;		/* sector it applies to */
+	uint32_t	sectoff;	/* offset within the sector */
+	uint32_t	size;		/* size of data affected */
+};
+#define RELOC_NONE		0
+#define RELOC_BSDDISKLABEL	1	/* BSD disklabel */
+
+/* XXX potential future alternatives to hard-wiring BSD disklabel knowledge */
+#define RELOC_ADDPARTOFFSET	100	/* add partition offset to location */
+#define RELOC_XOR16CKSUM	101	/* 16-bit XOR checksum */
+#define RELOC_CKSUMRANGE	102	/* range of previous checksum */
+
+typedef struct blockhdr_V2 blockhdr_t;
 
 /*
  * This little struct defines the pair. Each number is in sectors. An array
@@ -29,8 +82,8 @@ struct blockhdr {
  * (swap, free FS blocks).
  */
 struct region {
-	unsigned long	start;
-	unsigned long	size;
+	uint32_t	start;
+	uint32_t	size;
 };
 
 /*
@@ -50,3 +103,8 @@ struct region {
  */
 #define SUBBLOCKSIZE		(1024 * 1024)
 #define SUBBLOCKMAX		(SUBBLOCKSIZE - DEFAULTREGIONSIZE)
+
+/*
+ * Assumed sector (block) size
+ */
+#define SECSIZE			512

@@ -6,6 +6,13 @@
 
 /*
  * An image zipper.
+ *
+ * TODO:
+ *	Multithread so that we can be reading ahead on the input device
+ *	and overlapping IO with compression.  Maybe a third thread for
+ *	doing output.
+ *
+ *	Split out the FS-specific code into subdirectories.  Clean it up.
  */
 #include <err.h>
 #include <fcntl.h>
@@ -13,7 +20,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -37,6 +46,7 @@
 /* Why is this not defined in a public header file? */
 #define ACTIVE		0x80
 #define BOOT_MAGIC	0xAA55
+#define DOSPTYP_UNUSED	0	/* Unused */
 #ifndef DOSPTYP_LINSWP
 #define	DOSPTYP_LINSWP	0x82	/* Linux swap partition */
 #define	DOSPTYP_LINUX	0x83	/* Linux partition */
@@ -50,6 +60,7 @@ char	*infilename;
 int	infd, outfd, outcanseek;
 int	secsize	  = 512;	/* XXX bytes. */
 int	debug	  = 0;
+int	dots	  = 0;
 int     info      = 0;
 int     version   = 0;
 int     slicemode = 0;
@@ -57,6 +68,10 @@ int     maxmode   = 0;
 int     slice     = 0;
 int	level	  = 4;
 long	dev_bsize = 1;
+int	ignore[NDOSPART];
+
+#define sectobytes(s)	((off_t)(s) * secsize)
+#define bytestosec(b)	(uint32_t)((b) / secsize)
 
 /*
  * We want to be able to compress slices by themselves, so we need
@@ -72,16 +87,23 @@ long    inputmaxsec	= 0;	/* 0 means the entire input image */
  * A list of data ranges. 
  */
 struct range {
-	unsigned long	start;		/* In sectors */
-	unsigned long	size;		/* In sectors */
+	uint32_t	start;		/* In sectors */
+	uint32_t	size;		/* In sectors */
+	void		*data;
 	struct range	*next;
 };
-struct range	*ranges, *skips;
+struct range	*ranges, *skips, *fixups;
 int		numranges, numskips;
-void	addskip(unsigned long start, unsigned long size);
+struct blockreloc	*relocs;
+int			numrelocs;
+
+void	addskip(uint32_t start, uint32_t size);
 void	dumpskips(void);
-void	sortskips(void);
+void	sortrange(struct range *head, int domerge);
 void    makeranges(void);
+void	addfixup(off_t offset, off_t poffset, off_t size, void *data,
+		 int reloctype);
+void	addreloc(off_t offset, off_t size, int reloctype);
 
 /* Forward decls */
 #ifndef linux
@@ -99,6 +121,7 @@ int	read_linuxswap(int slice, u_int32_t start, u_int32_t size);
 int	read_linuxgroup(struct ext2_super_block *super,
 			struct ext2_group_desc	*group,
 			int index, u_int32_t diskoffset);
+int	read_raw(void);
 int	compress_image(void);
 void	usage(void);
 
@@ -130,7 +153,7 @@ ssize_t
 mywrite(int fd, const void *buf, size_t nbytes)
 {
 	int		cc, i, count = 0;
-	off_t		startoffset, endoffset;
+	off_t		startoffset = 0;
 	int		maxretries = 10;
 
 	if (outcanseek &&
@@ -187,7 +210,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 }
 
 /* Map partition number to letter */
-#define BSDPARTNAME(i)       ("ABCDEFGHIJK"[(i)])
+#define BSDPARTNAME(i)       ("ABCDEFGHIJKLMNOP"[(i)])
 
 int
 main(argc, argv)
@@ -201,7 +224,7 @@ main(argc, argv)
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -218,6 +241,9 @@ main(argc, argv)
 		case 'b':
 			bsdfs++;
 			break;
+		case 'o':
+			dots++;
+			break;
 		case 'r':
 			rawmode++;
 			break;
@@ -227,12 +253,18 @@ main(argc, argv)
 			break;
 		case 'z':
 			level = atoi(optarg);
-			if (level < 1 || level > 9)
+			if (level < 0 || level > 9)
 				usage();
 			break;
 		case 'c':
 			maxmode     = 1;
 			inputmaxsec = atoi(optarg);
+			break;
+		case 'I':
+			rval = atoi(optarg);
+			if (rval < 1 || rval > 4)
+				usage();
+			ignore[rval-1] = 1;
 			break;
 		case 'h':
 		case '?':
@@ -290,10 +322,11 @@ main(argc, argv)
 	else
 		rval = read_image();
 #endif
-	sortskips();
+	sortrange(skips, 1);
 	if (debug)
 		dumpskips();
 	makeranges();
+	sortrange(fixups, 0);
 	fflush(stderr);
 
 	if (info) {
@@ -357,6 +390,9 @@ read_image()
 		for (i = 0; i < NDOSPART; i++) {
 			fprintf(stderr, "  P%d: ", i + 1 /* DOS Numbering */);
 			switch (doslabel.parts[i].dp_typ) {
+			case DOSPTYP_UNUSED:
+				fprintf(stderr, "  UNUSED");
+				break;
 			case DOSPTYP_386BSD:
 				fprintf(stderr, "  BSD   ");
 				break;
@@ -387,9 +423,10 @@ read_image()
 	/*
 	 * In slicemode, we need to set the bounds of compression.
 	 * Slice is a DOS partition number (1-4). If not in slicemode,
-	 * we have to set the bounds according to the doslabel since its
-	 * possible that someone (Mike!) will create a disk with empty
-	 * space before the first partition or after the last partition!
+	 * we cannot set the bounds according to the doslabel since its
+	 * possible that someone will create a disk with empty space
+	 * before the first partition (typical, to start partition 1
+	 * at the second cylinder) or after the last partition (Mike!).
 	 * However, do not set the inputminsec since we usually want the
 	 * stuff before the first partition, which is the boot stuff.
 	 */
@@ -410,6 +447,11 @@ read_image()
 		if (slicemode && i != (slice - 1) /* DOS Numbering */)
 			continue;
 		
+		if (ignore[i]) {
+			fprintf(stderr, "Slice %d ignored.\n", i+1);
+			continue;
+		}
+
 		switch (type) {
 		case DOSPTYP_386BSD:
 			rval = read_bsdslice(i, start, size);
@@ -425,12 +467,19 @@ read_image()
 			rval = read_ntfsslice(i, start, size, infilename);
 			break;
 #endif
-		default:
+		case DOSPTYP_UNUSED:
 			fprintf(stderr,
-				"  Slice %d is an unknown type. Skipping.\n",
-			       i + 1 /* DOS Numbering */);
+				"  Slice %d is unused, NOT SAVING.\n",
+				i + 1 /* DOS Numbering */);
 			if (start != size)
 				addskip(start, size);
+			break;
+		default:
+			fprintf(stderr,
+				"  Slice %d is an unknown type (%x), "
+				"performing raw compression.\n",
+				i + 1 /* DOS Numbering */, type);
+			break;
 		}
 		if (rval) {
 			warnx("Stopping zip at Slice %d",
@@ -463,7 +512,7 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 		fprintf(stderr,
 			"  P%d (BSD Slice)\n", slice + 1 /* DOS Numbering */);
 	
-	if (devlseek(infd, ((off_t)start) * secsize, SEEK_SET) < 0) {
+	if (devlseek(infd, sectobytes(start), SEEK_SET) < 0) {
 		warn("Could not seek to beginning of BSD slice");
 		return 1;
 	}
@@ -471,7 +520,7 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	/*
 	 * Then seek ahead to the disklabel.
 	 */
-	if (devlseek(infd, (off_t)(LABELSECTOR * secsize), SEEK_CUR) < 0) {
+	if (devlseek(infd, sectobytes(LABELSECTOR), SEEK_CUR) < 0) {
 		warn("Could not seek to beginning of BSD disklabel");
 		return 1;
 	}
@@ -486,16 +535,35 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	}
 
 	/*
-	 * Be sure both magic numbers are correct.
+	 * Check the magic numbers.
 	 */
 	if (dlabel.label.d_magic  != DISKMAGIC ||
 	    dlabel.label.d_magic2 != DISKMAGIC) {
+#if 0 /* not needed, a fake disklabel is created by the kernel */
+		/*
+		 * If we were forced with the bsdfs option,
+		 * assume this is a single partition disk like a
+		 * memory or vnode disk.  We cons up a disklabel
+		 * and let it rip.
+		 */
+		if (size == 0) {
+			fprintf(stderr,
+				"No disklabel, assuming single partition\n");
+			dlabel.label.d_partitions[0].p_offset = 0;
+			dlabel.label.d_partitions[0].p_size = 0;
+			dlabel.label.d_partitions[0].p_fstype = FS_BSDFFS;
+			return read_bsdpartition(&dlabel.label, 0);
+		}
+#endif
 		warnx("Wrong magic number is BSD disklabel");
  		return 1;
 	}
 
 	/*
 	 * Now scan partitions.
+	 *
+	 * XXX space not covered by a partition winds up being compressed,
+	 * we could detect this.
 	 */
 	for (i = 0; i < MAXPARTITIONS; i++) {
 		if (! dlabel.label.d_partitions[i].p_size)
@@ -518,6 +586,26 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 			return rval;
 	}
 	
+	/*
+	 * Record a fixup for the partition table, adjusting the
+	 * partition offsets to make them slice relative.
+	 */
+	if (slicemode &&
+	    start != 0 && dlabel.label.d_partitions[0].p_offset == start) {
+		for (i = 0; i < MAXPARTITIONS; i++) {
+			if (dlabel.label.d_partitions[i].p_size == 0)
+				continue;
+
+			assert(dlabel.label.d_partitions[i].p_offset >= start);
+			dlabel.label.d_partitions[i].p_offset -= start;
+		}
+		dlabel.label.d_checksum = 0;
+		dlabel.label.d_checksum = dkcksum(&dlabel.label);
+		addfixup(sectobytes(start+LABELSECTOR), sectobytes(start),
+			 (off_t)sizeof(dlabel.label), &dlabel,
+			 RELOC_BSDDISKLABEL);
+	}
+
 	return 0;
 }
 
@@ -548,27 +636,31 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 	}
 
 	if (dlabel->d_partitions[part].p_fstype != FS_BSDFFS) {
-		warnx("BSD Partition %d: Not a BSD Filesystem", part);
+		warnx("BSD Partition %c: Not a BSD Filesystem",
+		      BSDPARTNAME(part));
 		return 1;
 	}
 
-	if (devlseek(infd, ((off_t)offset * (off_t) secsize) + SBOFF,
-		  SEEK_SET) < 0) {
-		warnx("BSD Partition %d: Could not seek to superblock", part);
+	if (devlseek(infd, sectobytes(offset) + SBOFF, SEEK_SET) < 0) {
+		warnx("BSD Partition %c: Could not seek to superblock",
+		      BSDPARTNAME(part));
 		return 1;
 	}
 
 	if ((cc = devread(infd, &fs, SBSIZE)) < 0) {
-		warn("BSD Partition %d: Could not read superblock", part);
+		warn("BSD Partition %c: Could not read superblock",
+		     BSDPARTNAME(part));
 		return 1;
 	}
 	if (cc != SBSIZE) {
-		warnx("BSD Partition %d: Truncated superblock", part);
+		warnx("BSD Partition %c: Truncated superblock",
+		      BSDPARTNAME(part));
 		return 1;
 	}
  	if (fs.fs.fs_magic != FS_MAGIC) {
-		warnx("BSD Partition %d: Bad magic number in superblock",part);
- 		return (1);
+		warnx("BSD Partition %c: Bad magic number in superblock",
+		      BSDPARTNAME(part));
+ 		return 1;
  	}
 
 	if (debug) {
@@ -582,23 +674,24 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 		cgoff = fsbtodb(&fs.fs, cgtod(&fs.fs, i)) + offset;
 		dboff = fsbtodb(&fs.fs, cgstart(&fs.fs, i)) + offset;
 
-		if (devlseek(infd, (off_t)cgoff * (off_t)secsize, SEEK_SET) < 0) {
-			warn("BSD Partition %d: Could not seek to cg %d",
-			     part, i);
+		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
+			warn("BSD Partition %c: Could not seek to cg %d",
+			     BSDPARTNAME(part), i);
 			return 1;
 		}
 		if ((cc = devread(infd, &cg, fs.fs.fs_bsize)) < 0) {
-			warn("BSD Partition %d: Could not read cg %d",
-			     part, i);
+			warn("BSD Partition %c: Could not read cg %d",
+			     BSDPARTNAME(part), i);
 			return 1;
 		}
 		if (cc != fs.fs.fs_bsize) {
-			warn("BSD Partition %d: Truncated cg %d", part, i);
+			warn("BSD Partition %c: Truncated cg %d",
+			     BSDPARTNAME(part), i);
 			return 1;
 		}
 		if (debug > 1) {
 			fprintf(stderr,
-				"        CG%d\t offset %9d, bfree %6d\n",
+				"        CG%d\t offset %9ld, bfree %6d\n",
 				i, cgoff, cg.cg.cg_cs.cs_nbfree);
 		}
 		
@@ -656,7 +749,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 							count % 4 ? " " :
 							"\n                 ");
 					fprintf(stderr,
-						"%u:%d", dboff, dbcount);
+						"%lu:%ld", dboff, dbcount);
 				}
 				addskip(dboff, dbcount);
 				count++;
@@ -700,8 +793,8 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	/*
 	 * Skip ahead to the superblock.
 	 */
-	if (devlseek(infd, (((off_t)start) * secsize) +
-		  LINUX_SUPERBLOCK_OFFSET, SEEK_SET) < 0) {
+	if (devlseek(infd, sectobytes(start) + LINUX_SUPERBLOCK_OFFSET,
+		     SEEK_SET) < 0) {
 		warnx("Linux Slice %d: Could not seek to superblock",
 		      dosslice);
 		return 1;
@@ -722,7 +815,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
  	}
 
 	if (debug) {
-		fprintf(stderr, "        bfree %9d, size %9d\n",
+		fprintf(stderr, "        bfree %9ld, size %9d\n",
 		       fs.s_free_blocks_count, EXT2_BLOCK_SIZE(&fs));
 	}
 	numgroups = fs.s_blocks_count / fs.s_blocks_per_group;
@@ -740,7 +833,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 
 		gix = (i % LINUX_GRPSPERBLK);
 		if (gix == 0) {
-			soff = ((off_t)start * secsize) +
+			soff = sectobytes(start) +
 				((off_t)(EXT2_BLOCK_SIZE(&fs) +
 					 (i * sizeof(struct ext2_group_desc))));
 			if (devlseek(infd, soff, SEEK_SET) < 0) {
@@ -765,7 +858,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 
 		if (debug) {
 			fprintf(stderr,
-				"        Group:%-2d\tBitmap %9d, bfree %9d\n",
+				"        Group:%-2d\tBitmap %9ld, bfree %9d\n",
 				i, groups[gix].bg_block_bitmap,
 				groups[gix].bg_free_blocks_count);
 		}
@@ -793,11 +886,12 @@ read_linuxgroup(struct ext2_super_block *super,
 	int	count, j;
 	off_t	offset;
 
-	offset  = (off_t)sliceoffset * secsize;
+	offset  = sectobytes(sliceoffset);
 	offset += (off_t)EXT2_BLOCK_SIZE(super) * group->bg_block_bitmap;
 	if (devlseek(infd, offset, SEEK_SET) < 0) {
 		warn("Linux Group %d: "
-		     "Could not seek to Group bitmap %d", i);
+		     "Could not seek to Group bitmap %ld",
+		     index, group->bg_block_bitmap);
 		return 1;
 	}
 
@@ -808,13 +902,13 @@ read_linuxgroup(struct ext2_super_block *super,
 	if (EXT2_BLOCK_SIZE(super) != 0x1000 ||
 	    super->s_blocks_per_group  != 0x8000) {
 		warnx("Linux Group %d: "
-		      "Bitmap size not what I expect it to be!", i);
+		      "Bitmap size not what I expect it to be!", index);
 		return 1;
 	}
 
 	if ((cc = devread(infd, bitmap, sizeof(bitmap))) < 0) {
 		warn("Linux Group %d: "
-		     "Could not read Group bitmap", i);
+		     "Could not read Group bitmap", index);
 		return 1;
 	}
 	if (cc != sizeof(bitmap)) {
@@ -861,7 +955,7 @@ read_linuxgroup(struct ext2_super_block *super,
 						fprintf(stderr, ",%s",
 							count % 4 ? " " :
 							"\n                 ");
-					fprintf(stderr, "%u:%d %d:%d",
+					fprintf(stderr, "%lu:%d %d:%d",
 					       dboff, dbcount, j, i);
 				}
 				addskip(dboff, dbcount);
@@ -889,8 +983,8 @@ read_linuxswap(int slice, u_int32_t start, u_int32_t size)
 			start, size);
 	}
 
-	start += 0x8000 / secsize;
-	size  -= 0x8000 / secsize;
+	start += bytestosec(0x8000);
+	size  -= bytestosec(0x8000);
 	
 	addskip(start, size);
 	return 0;
@@ -974,7 +1068,7 @@ ntfs_read_data_attr(ntfs_attr *na)
 	__s64 tmp;
 	__s64 amount_needed;
 	int   count;
-	int   fd;
+
 	/**ntfs_attr_pread might actually read in more data than we
 	 * ask for.  It will round up to the nearest DEV_BSIZE boundry
 	 * so make sure we allocate enough memory.*/
@@ -1000,13 +1094,17 @@ ntfs_read_data_attr(ntfs_attr *na)
 		pos += tmp;
 	}
 #if 0 /*Turn on if you want to look at the free list directly*/
-	if((fd = open("ntfs_free_bitmap.bin",O_WRONLY | O_CREAT | O_TRUNC)) < 0) {
-		perror("open ntfs_free_bitmap.bin failed\n");
-		exit(1);
-	}
-	if(write(fd, result, na->data_size) != na->data_size) {
-		perror("writing free space bitmap.bin failed\n");
-		exit(1);
+	{
+		int fd;
+
+		if((fd = open("ntfs_free_bitmap.bin",O_WRONLY | O_CREAT | O_TRUNC)) < 0) {
+			perror("open ntfs_free_bitmap.bin failed\n");
+			exit(1);
+		}
+		if(write(fd, result, na->data_size) != na->data_size) {
+			perror("writing free space bitmap.bin failed\n");
+			exit(1);
+		}
 	}
 #endif
 	return result;
@@ -1024,7 +1122,7 @@ ntfs_compute_free(ntfs_attr *na, void *cluster_map, __s64 num_clusters)
 	assert(num_clusters <= na->data_size * 8 && "If there are more clusters than bits in "
 	       "the free space file then we have a problem.  Fewer clusters than bits is okay.");
 	if(debug)
-		fprintf(stderr,"num_clusters==%ld\n",num_clusters);
+		fprintf(stderr,"num_clusters==%qd\n",num_clusters);
 	while(pos < num_clusters) {
 		if(!ntfs_isAllocated(cluster_map,pos++)) {
 			curr->length++;
@@ -1067,9 +1165,8 @@ read_ntfsslice(int slice, u_int32_t start, u_int32_t size, char *openname)
 	struct ntfs_cluster *tmp;
 	char           *name;
 	ntfs_volume    *vol;
-	int            count;
 	int            length;
-	__s64          pos;
+
 	length = strlen(openname);
 	name = malloc(length+3);
 	/*Our NTFS Library code needs the /dev name of the partion to
@@ -1101,9 +1198,9 @@ read_ntfsslice(int slice, u_int32_t start, u_int32_t size, char *openname)
 			vol->major_ver,vol->minor_ver);
 		fprintf(stderr, "        %s",name);
 		fprintf(stderr, "      start %10d, size %10d\n", start, size);
-		fprintf(stderr, "        Sector size: %u, Cluster size: %u\n",
+		fprintf(stderr, "        Sector size: %u, Cluster size: %lu\n",
 			vol->sector_size, vol->cluster_size);
-		fprintf(stderr, "        Volume size in clusters: %u\n", vol->nr_clusters);
+		fprintf(stderr, "        Volume size in clusters: %qd\n", vol->nr_clusters);
 		fprintf(stderr, "        Free clusters:\t\t %u\n",ntfs_freeclusters(cfree));
 	}
 
@@ -1155,20 +1252,20 @@ read_raw(void)
 
 char *usagestr = 
  "usage: imagezip [-vidlbhr] [-s #] [-c #] <image | device> [outputfilename]\n"
- " -v              Print version info and exit\n"
- " -i              Info mode only. Do not write an output file\n"
- " -d              Turn on debugging. Multiple -d options increase output\n"
- " -r              A `raw' image. No FS compression is attempted\n"
- " -c count	   Compress <count> number of sectors (not with slice mode)\n"
- " -s slice        Compress a particular slice (DOS numbering 1-4)\n"
- " -h              Print this help message\n"
- " -z level        Set the compression level. Range 1-9. Default is 4\n"
- " image | device  The input image or a device special file (ie: /dev/rad2)\n"
- " outputfilename  The output file. Use - for stdout. \n"
+ " -v             Print version info and exit\n"
+ " -i             Info mode only. Do not write an output file\n"
+ " -d             Turn on debugging. Multiple -d options increase output\n"
+ " -r             A `raw' image. No FS compression is attempted\n"
+ " -c count	  Compress <count> number of sectors (not with slice mode)\n"
+ " -s slice       Compress a particular slice (DOS numbering 1-4)\n"
+ " -h             Print this help message\n"
+ " -z level       Set the compression level. Range 0-9 (0==none, default==4)\n"
+ " image | device The input image or a device special file (ie: /dev/rad2)\n"
+ " outputfilename The output file. Use - for stdout. \n"
  "\n"
  " Debugging options (not to be used by mere mortals!)\n"
- " -l              Linux slice only. Input must be a Linux slice image\n"
- " -b              FreeBSD slice only. Input must be a FreeBSD slice image\n";
+ " -l             Linux slice only. Input must be a Linux slice image\n"
+ " -b             FreeBSD slice only. Input must be a FreeBSD slice image\n";
 
 void
 usage()
@@ -1178,7 +1275,7 @@ usage()
 }
 
 void
-addskip(unsigned long start, unsigned long size)
+addskip(uint32_t start, uint32_t size)
 {
 	struct range	   *skip;
 
@@ -1194,63 +1291,11 @@ addskip(unsigned long start, unsigned long size)
 	numskips++;
 }
 
-/*
- * A very dumb bubblesort!
- */
-void
-sortskips(void)
-{
-	struct range	*pskip, tmp, *ptmp;
-	int		changed = 1;
-
-	if (!skips)
-		return;
-	
-	while (changed) {
-		changed = 0;
-
-		pskip = skips;
-		while (pskip) {
-			if (pskip->next &&
-			    pskip->start > pskip->next->start) {
-				tmp.start = pskip->start;
-				tmp.size  = pskip->size;
-
-				pskip->start = pskip->next->start;
-				pskip->size  = pskip->next->size;
-				pskip->next->start = tmp.start;
-				pskip->next->size  = tmp.size;
-
-				changed = 1;
-			}
-			pskip  = pskip->next;
-		}
-	}
-
-	/*
-	 * No look for contiguous free regions and combine them.
-	 */
-	pskip = skips;
-	while (pskip) {
-	again:
-		if (pskip->next &&
-		    pskip->start + pskip->size == pskip->next->start) {
-			pskip->size += pskip->next->size;
-			
-			ptmp        = pskip->next;
-			pskip->next = pskip->next->next;
-			free(ptmp);
-			goto again;
-		}
-		pskip  = pskip->next;
-	}
-}
-
 void
 dumpskips(void)
 {
 	struct range	*pskip;
-	unsigned long	total = 0;
+	uint32_t	total = 0;
 
 	if (!skips)
 		return;
@@ -1270,27 +1315,78 @@ dumpskips(void)
 		fprintf(stderr, "\n");
 	
 	fprintf(stderr, "Total Number of Free Sectors: %d (bytes %qd)\n",
-	       total, (off_t)total * (off_t)secsize);
+		total, sectobytes(total));
+}
+
+/*
+ * A very dumb bubblesort!
+ */
+void
+sortrange(struct range *head, int domerge)
+{
+	struct range	*prange, tmp, *ptmp;
+	int		changed = 1;
+
+	if (head == NULL)
+		return;
+	
+	while (changed) {
+		changed = 0;
+
+		prange = head;
+		while (prange) {
+			if (prange->next &&
+			    prange->start > prange->next->start) {
+				tmp.start = prange->start;
+				tmp.size  = prange->size;
+
+				prange->start = prange->next->start;
+				prange->size  = prange->next->size;
+				prange->next->start = tmp.start;
+				prange->next->size  = tmp.size;
+
+				changed = 1;
+			}
+			prange  = prange->next;
+		}
+	}
+
+	if (!domerge)
+		return;
+
+	/*
+	 * Now look for contiguous free regions and combine them.
+	 */
+	prange = head;
+	while (prange) {
+	again:
+		if (prange->next &&
+		    prange->start + prange->size == prange->next->start) {
+			prange->size += prange->next->size;
+			
+			ptmp        = prange->next;
+			prange->next = prange->next->next;
+			free(ptmp);
+			goto again;
+		}
+		prange  = prange->next;
+	}
 }
 
 /*
  * Life is easier if I think in terms of the valid ranges instead of
- * the free ranges. So, convert them.
+ * the free ranges. So, convert them.  Note that if there were no skips,
+ * we create a single range covering the entire partition.
  */
 void
 makeranges(void)
 {
-	struct range	*pskip, *ptmp, *range, *lastrange = 0;
-	unsigned long	offset;
-	unsigned long	total = 0;
+	struct range	*pskip, *ptmp, *range, **lastrange;
+	uint32_t	offset;
+	uint32_t	total = 0;
 	
-	if (!skips)
-		return;
-
-	if (inputminsec)
-		offset = inputminsec;
-	else
-		offset = 0;
+	offset = inputminsec;
+	lastrange = &ranges;
 
 	pskip = skips;
 	while (pskip) {
@@ -1299,18 +1395,14 @@ makeranges(void)
 			fprintf(stderr, "Out of memory!\n");
 			exit(1);
 		}
-		if (! ranges)
-			ranges = range;
-			
 		range->start = offset;
 		range->size  = pskip->start - offset;
 		range->next  = 0;
 		offset       = pskip->start + pskip->size;
 		total	     += range->size;
 		
-		if (lastrange)
-			lastrange->next = range;
-		lastrange = range;
+		*lastrange = range;
+		lastrange = &range->next;
 		numranges++;
 
 		ptmp  = pskip;
@@ -1320,8 +1412,8 @@ makeranges(void)
 	/*
 	 * Last piece, but only if there is something to compress.
 	 */
-	if (!inputmaxsec || (inputmaxsec - offset)) {
-		if ((range = (struct range *) malloc(sizeof(*range))) == NULL){
+	if (inputmaxsec == 0 || (inputmaxsec - offset) != 0) {
+		if ((range = (struct range *)malloc(sizeof(*range))) == NULL) {
 			fprintf(stderr, "Out of memory!\n");
 			exit(1);
 		}
@@ -1337,16 +1429,14 @@ makeranges(void)
 		 * Mark the last range with 0 so compression goes to end
 		 * if we don't know where it is.
 		 */
-		if (inputmaxsec) {
+		if (inputmaxsec)
 			range->size = inputmaxsec - offset;
-		}
 		else
 			range->size = 0;
 		range->next = 0;
 		total += range->size;
 
-		lastrange->next = range;
-		lastrange = range;
+		*lastrange = range;
 		numranges++;
 	}
 
@@ -1359,8 +1449,116 @@ makeranges(void)
 		}
 		fprintf(stderr,
 			"\nTotal Number of Valid Sectors: %d (bytes %qd)\n",
-			total, (off_t)total * (off_t)secsize);
+			total, sectobytes(total));
 	}
+}
+
+/*
+ * Fixup descriptor handling.
+ *
+ * Fixups are modifications that need to be made to file data prior
+ * to compressing.  The only use right now is to fixup BSD disklabel
+ * partition tables so they don't contain absolute offsets.
+ */
+struct fixup {
+	off_t offset;	/* disk offset */
+	off_t poffset;	/* partition offset */
+	off_t size;
+	int reloctype;
+	char data[0];
+};
+
+void
+addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
+{
+	struct range *entry;
+	struct fixup *fixup;
+
+	if ((entry = malloc(sizeof(*entry))) == NULL ||
+	    (fixup = malloc(sizeof(*fixup) + (int)size)) == NULL) {
+		fprintf(stderr, "Out of memory!\n");
+		exit(1);
+	}
+	
+	entry->start = bytestosec(offset);
+	entry->size  = bytestosec(size + secsize - 1);
+	entry->data  = fixup;
+	
+	fixup->offset    = offset;
+	fixup->poffset   = poffset;
+	fixup->size      = size;
+	fixup->reloctype = reloctype;
+	memcpy(fixup->data, data, size);
+
+	entry->next  = fixups;
+	fixups       = entry;
+}
+
+void
+applyfixups(off_t offset, off_t size, void *data)
+{
+	struct range **prev, *entry;
+	struct fixup *fp;
+	uint32_t coff, clen;
+
+	for (prev = &fixups; (entry = *prev) != NULL; prev = &entry->next) {
+		fp = entry->data;
+
+		if (offset < fp->offset+fp->size && offset+size > fp->offset) {
+			/* XXX lazy: fixup must be totally contained */
+			assert(offset <= fp->offset);
+			assert(fp->offset+fp->size <= offset+size);
+
+			coff = (u_int32_t)(fp->offset - offset);
+			clen = (u_int32_t)fp->size;
+			if (debug > 1)
+				fprintf(stderr,
+					"Applying fixup [%qu-%qu] "
+					"to [%qu-%qu]\n",
+					fp->offset, fp->offset+fp->size,
+					offset, offset+size);
+			memcpy(data+coff, fp->data, clen);
+
+			/* create a reloc if necessary */
+			if (fp->reloctype != RELOC_NONE)
+				addreloc(fp->offset - fp->poffset,
+					 fp->size, fp->reloctype);
+
+			*prev = entry->next;
+			free(fp);
+			free(entry);
+
+			/* XXX only one per customer */
+			break;
+		}
+	}
+}
+
+void
+addreloc(off_t offset, off_t size, int reloctype)
+{
+	struct blockreloc *reloc;
+
+	numrelocs++;
+	relocs = realloc(relocs, numrelocs * sizeof(struct blockreloc));
+	if (relocs == NULL) {
+		fprintf(stderr, "Out of memory!\n");
+		exit(1);
+	}
+
+	reloc = &relocs[numrelocs-1];
+	reloc->type = reloctype;
+	reloc->sector = bytestosec(offset);
+	reloc->sectoff = offset - sectobytes(reloc->sector);
+	reloc->size = size;
+}
+
+void
+freerelocs(void)
+{
+	numrelocs = 0;
+	free(relocs);
+	relocs = NULL;
 }
 
 /*
@@ -1368,140 +1566,41 @@ makeranges(void)
  */
 static u_char   output_buffer[SUBBLOCKSIZE];
 static int	buffer_offset;
+static off_t	inputoffset;
+static struct timeval cstamp;
 
+static off_t	compress_chunk(off_t, off_t, int *, uint32_t *);
+static int	compress_finish(uint32_t *subblksize);
+static void	compress_status(int foo);
+
+/*
+ * Loop through the image, compressing the allocated ranges.
+ */
 int
 compress_image(void)
 {
-	int		cc, partial, i, count;
-	off_t		inputoffset, size, outputoffset;
-	off_t		tmpoffset, rangesize, totalinput = 0;
-	struct range	*prange = ranges;
-	struct blockhdr *blkhdr;
+	int		cc, full, i, count, numregions;
+	off_t		size = 0, outputoffset;
+	off_t		tmpoffset, rangesize;
+	struct range	*prange;
+	blockhdr_t	*blkhdr;
 	struct region	*curregion, *regions;
-	off_t		compress_chunk(off_t, int *, unsigned long *);
-	int		compress_finish(unsigned long *subblksize);
-	struct timeval  stamp, estamp;
+	struct timeval  estamp;
 	char		buf[DEFAULTREGIONSIZE];
+	uint32_t	cursect = 0;
+	struct region	*lreg;
 
-	gettimeofday(&stamp, 0);
+	gettimeofday(&cstamp, 0);
+	inputoffset = 0;
+#ifdef SIGINFO
+	signal(SIGINFO, compress_status);
+#endif
 
-	bzero(buf, sizeof(buf));
-	blkhdr    = (struct blockhdr *) buf;
+	memset(buf, 0, sizeof(buf));
+	blkhdr    = (blockhdr_t *) buf;
 	regions   = (struct region *) (blkhdr + 1);
 	curregion = regions;
-
-	/*
-	 * No free blocks? Compress the entire input file. 
-	 */
-	if (!prange) {
-		if (inputminsec)
-			inputoffset = (off_t) inputminsec * (off_t) secsize;
-		else
-			inputoffset = (off_t) 0;
-
-		if (devlseek(infd, inputoffset, SEEK_SET) < 0) {
-			warn("Could not seek to start of image");
-			exit(1);
-		}
-		
-		/*
-		 * We keep a seperate output offset counter, which is always
-		 * relative to zero since images are generally layed down in a
-		 * partition or slice, and where it came from in the input
-		 * image is irrelevant.
-		 */
-		outputoffset = (off_t) 0;
-	again:
-		/*
-		 * Reserve room for the subblock hdr and the region pairs.
-		 * We go back and fill it it later after the subblock is
-		 * done and we know much input data was compressed into
-		 * the block. 
-		 */
-		buffer_offset = DEFAULTREGIONSIZE;
-		
-		if (debug) {
-			fprintf(stderr,
-				"Compressing range: %14qd --> ", inputoffset);
-			fflush(stderr);
-		}
-
-		/*
-		 * A bug in FreeBSD causes lseek on a device special file to
-		 * return 0 all the time! Well we want to be able to read
-		 * directly out of a raw disk (/dev/rad0), so we need to
-		 * use the compressor to figure out the actual size when it
-		 * isn't known beforehand.
-		 */
-		if (inputmaxsec)
-			size = ((inputmaxsec - inputminsec) * (off_t) secsize)
-				- totalinput;
-		else
-			size = 0;
-
-		size = compress_chunk(size, &partial, &blkhdr->size);
-	
-		if (debug)
-			fprintf(stderr, "%12qd\n", inputoffset + size);
-
-		totalinput += size;
-
-		/*
-		 * The last subblock is special if inputmaxsec is nonzero.
-		 * In that case, we have to finish off the compression block
-		 * since the compressor will not have known to do that.
-		 */
-		if (! partial)
-			compress_finish(&blkhdr->size);
-
-		/*
-		 * Go back and stick in the block header and the region
-		 * information. Since there are no skip ranges, there
-		 * is but a single region and it covers the entire block.
-		 */
-		blkhdr->magic       = COMPRESSED_MAGIC;
-		blkhdr->regionsize  = DEFAULTREGIONSIZE;
-		blkhdr->regioncount = 1;
-		curregion->start    = outputoffset / secsize;
-		curregion->size     = size / secsize;
-		curregion++;
-
-		/*
-		 * Stash the region info into the beginning of the block.
-		 */
-		memcpy(output_buffer, buf, sizeof(buf));
-
-		if (partial) {
-			/*
-			 * Write out the finished chunk to disk, and
-			 * start over from the beginning of the buffer.
-			 */
-			mywrite(outfd, output_buffer, sizeof(output_buffer));
-			buffer_offset = 0;
-			
-			outputoffset += size;
-			inputoffset  += size;
-			curregion     = regions;
-			goto again;
-		}
-
-		/*
-		 * We cannot allow the image to end on a non-sector boundry!
-		 */
-		if (totalinput & (secsize - 1)) {
-			fprintf(stderr,
-				"  Input image size (%qd) is not a multiple "
-				"of the sector size (%d)\n",
-				inputoffset, secsize);
-			return 1;
-		}
-		goto done;
-	}
-
-	/*
-	 * Loop through the image, compressing the stuff between the
-	 * the free block ranges.
-	 */
+	numregions = 0;
 
 	/*
 	 * Reserve room for the subblock hdr and the region pairs.
@@ -1511,8 +1610,9 @@ compress_image(void)
 	 */
 	buffer_offset = DEFAULTREGIONSIZE;
 	
+	prange = ranges;
 	while (prange) {
-		inputoffset = (off_t) prange->start * (off_t) secsize;
+		inputoffset = sectobytes(prange->start);
 
 		/*
 		 * Seek to the beginning of the data range to compress.
@@ -1523,7 +1623,7 @@ compress_image(void)
 		 * The amount to compress is the size of the range, which
 		 * might be zero if its the last one (size unknown).
 		 */
-		rangesize = (off_t) prange->size * (off_t) secsize;
+		rangesize = sectobytes(prange->size);
 
 		/*
 		 * Compress the chunk.
@@ -1534,31 +1634,38 @@ compress_image(void)
 			fflush(stderr);
 		}
 
-		size = compress_chunk(rangesize, &partial, &blkhdr->size);
+		size = compress_chunk(inputoffset, rangesize,
+				      &full, &blkhdr->size);
 	
 		if (debug >= 3) {
-			fprintf(stderr, "%14qd -> %12qd %10d %10d %10d %d\n",
+			fprintf(stderr, "%14qd -> %12qd %10ld %10u %10d %d\n",
 				inputoffset, inputoffset + size,
 				prange->start - inputminsec,
-				(int) (size / secsize), 
-				blkhdr->size, partial);
+				bytestosec(size),
+				blkhdr->size, full);
 		}
 		else if (debug) {
 			gettimeofday(&estamp, 0);
-			estamp.tv_sec -= stamp.tv_sec;
+			estamp.tv_sec -= cstamp.tv_sec;
 			fprintf(stderr, "%12qd in %ld seconds.\n",
 				inputoffset + size, estamp.tv_sec);
 		}
-		else {
+		else if (dots && full) {
 			static int pos;
 
 			putc('.', stderr);
 			if (pos++ >= 60) {
-				putc('\n', stderr);
+				gettimeofday(&estamp, 0);
+				estamp.tv_sec -= cstamp.tv_sec;
+				fprintf(stderr, " %12qd %4ld\n",
+					inputoffset+size, estamp.tv_sec);
 				pos = 0;
 			}
 			fflush(stderr);
 		}
+
+		if (size == 0)
+			goto done;
 
 		/*
 		 * This should never happen!
@@ -1570,15 +1677,37 @@ compress_image(void)
 		}
 
 		/*
-		 * If we managed to compress the entire range, we want
-		 * to go to the next range.
+		 * We have completed a region.  We have either:
+		 *
+		 * 1. compressed the entire current input range
+		 * 2. run out of room in the 1MB chunk
+		 * 3. hit the end of the input file
+		 *
+		 * For #1 we want to continue filling the current chunk.
+		 * For 2 and 3 we are done with the current chunk.
 		 */
-		if (! partial) {
-			assert(rangesize == 0 || size == rangesize);
+		curregion->start = prange->start - inputminsec;
+		curregion->size  = bytestosec(size);
+		curregion++;
+		numregions++;
 
-			curregion->start = prange->start - inputminsec;
-			curregion->size  = size / secsize;
-			curregion++;
+		/*
+		 * Check to see if the region/reloc table is full.
+		 * XXX handle this gracefully sometime.
+		 */
+		if (numregions*sizeof(struct region) +
+		    numrelocs*sizeof(struct blockreloc) > DEFAULTREGIONSIZE) {
+			fprintf(stderr, "Over filled region table\n");
+			exit(1);
+		}
+
+		/*
+		 * 1. We managed to compress the entire range,
+		 *    go to the next range continuing to fill the
+		 *    current chunk.
+		 */
+		if (!full) {
+			assert(rangesize == 0 || size == rangesize);
 
 			prange = prange->next;
 			continue;
@@ -1590,13 +1719,42 @@ compress_image(void)
 		 * Go back and stick in the block header and the region
 		 * information.
 		 */
-		curregion->start = prange->start - inputminsec;
-		curregion->size  = size / secsize;
-		curregion++;
-
-		blkhdr->magic       = COMPRESSED_MAGIC;
+		blkhdr->magic       = COMPRESSED_MAGIC_CURRENT;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
+		blkhdr->firstsect   = cursect;
+		if (size == rangesize) {
+			/*
+			 * Finished subblock at the end of a range.
+			 * Find the beginning of the next range so that
+			 * we include any free space between the ranges
+			 * here.  If this was the last range, we use
+			 * inputmaxsec.  If inputmaxsec is zero, we know
+			 * that we did not end with a skip range.
+			 */
+			if (prange->next)
+				blkhdr->lastsect = prange->next->start -
+					inputminsec;
+			else if (inputmaxsec > 0)
+				blkhdr->lastsect = inputmaxsec -
+					inputminsec;
+			else {
+				lreg = curregion - 1;
+				blkhdr->lastsect = lreg->start + lreg->size;
+			}
+		} else {
+			lreg = curregion - 1;
+			blkhdr->lastsect = lreg->start + lreg->size;
+		}
+		cursect = blkhdr->lastsect;
+
+		blkhdr->reloccount = numrelocs;
+		if (numrelocs) {
+			assert(relocs != NULL);
+			memcpy(curregion, relocs,
+			       numrelocs * sizeof(struct blockreloc));
+			freerelocs();
+		}
 
 		/*
 		 * Stash the region info into the beginning of the block.
@@ -1613,6 +1771,7 @@ compress_image(void)
 		 */
 		buffer_offset = DEFAULTREGIONSIZE;
 		curregion     = regions;
+		numregions    = 0;
 
 		/*
 		 * Okay, so its possible that we ended the region at the
@@ -1629,7 +1788,7 @@ compress_image(void)
 		if (size == rangesize) 
 			prange = prange->next;
 		else {
-			unsigned long sectors = size / secsize;
+			uint32_t sectors = bytestosec(size);
 			
 			prange->start += sectors;
 			if (prange->size)
@@ -1644,9 +1803,37 @@ compress_image(void)
 	if (curregion != regions) {
 		compress_finish(&blkhdr->size);
 		
-		blkhdr->magic       = COMPRESSED_MAGIC;
+		blkhdr->magic       = COMPRESSED_MAGIC_CURRENT;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
+		blkhdr->firstsect = cursect;
+		if (inputmaxsec > 0)
+			blkhdr->lastsect = inputmaxsec - inputminsec;
+		else {
+			lreg = curregion - 1;
+			blkhdr->lastsect = lreg->start + lreg->size;
+		}
+
+		/*
+		 * Check to see if the region/reloc table is full.
+		 * XXX handle this gracefully sometime.
+		 */
+		if (numregions*sizeof(struct region) +
+		    numrelocs*sizeof(struct blockreloc) > DEFAULTREGIONSIZE) {
+			fprintf(stderr, "Over filled region table\n");
+			exit(1);
+		}
+
+		/*
+		 * Dump relocation info
+		 */
+		blkhdr->reloccount = numrelocs;
+		if (numrelocs) {
+			assert(relocs != NULL);
+			memcpy(curregion, relocs,
+			       numrelocs * sizeof(struct blockreloc));
+			freerelocs();
+		}
 
 		/*
 		 * Stash the region info into the beginning of the block.
@@ -1661,13 +1848,10 @@ compress_image(void)
 		buffer_offset = 0;
 	}
 
-	if (debug) {
-		gettimeofday(&estamp, 0);
-		estamp.tv_sec -= stamp.tv_sec;
-		fprintf(stderr, "Done in %ld seconds!\n", estamp.tv_sec);
+	if (debug || dots) {
+		inputoffset += size;
+		compress_status(0);
 	}
-	else
-		putc('\n', stderr);
 	fflush(stderr);
 
 	/*
@@ -1694,34 +1878,51 @@ compress_image(void)
 			perror("seeking to read block header");
 			exit(1);
 		}
-		if ((cc = read(outfd, buf, sizeof(struct blockhdr))) < 0) {
+		if ((cc = read(outfd, buf, sizeof(blockhdr_t))) < 0) {
 			perror("reading subblock header");
 			exit(1);
 		}
-		assert(cc == sizeof(struct blockhdr));
+		assert(cc == sizeof(blockhdr_t));
 		if (lseek(outfd, (off_t) outputoffset, SEEK_SET) < 0) {
 			perror("seeking to write new block header");
 			exit(1);
 		}
-		blkhdr = (struct blockhdr *) buf;
+		blkhdr = (blockhdr_t *) buf;
 		blkhdr->blockindex = i;
 		blkhdr->blocktotal = count;
 		
-		if ((cc = mywrite(outfd, buf, sizeof(struct blockhdr))) < 0) {
+		if ((cc = mywrite(outfd, buf, sizeof(blockhdr_t))) < 0) {
 			perror("writing new subblock header");
 			exit(1);
 		}
-		assert(cc == sizeof(struct blockhdr));
+		assert(cc == sizeof(blockhdr_t));
 	}
 	return 0;
+}
+
+static void
+compress_status(int foo)
+{
+	struct timeval stamp;
+	int oerrno = errno;
+
+	gettimeofday(&stamp, 0);
+	if (stamp.tv_usec < cstamp.tv_usec) {
+		stamp.tv_usec += 1000000;
+		stamp.tv_sec--;
+	}
+	fprintf(stderr, "%qu input bytes in %ld.%03ld seconds\n",
+		inputoffset, stamp.tv_sec - cstamp.tv_sec,
+		(stamp.tv_usec - cstamp.tv_usec) / 1000);
+	errno = oerrno;
 }
 
 /*
  * Compress a chunk. The next bit of input stream is read in and compressed
  * into the output file. 
  */
-#define BSIZE		0x20000
-static char		inbuf[BSIZE], outbuf[BSIZE];
+#define BSIZE		(128 * 1024)
+static char		inbuf[BSIZE];
 static			int subblockleft = SUBBLOCKMAX;
 static z_stream		d_stream;	/* Compression stream */
 
@@ -1732,8 +1933,8 @@ static z_stream		d_stream;	/* Compression stream */
     } \
 }
 
-off_t
-compress_chunk(off_t size, int *partial, unsigned long *subblksize)
+static off_t
+compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 {
 	int		cc, count, err, eof, finish;
 	off_t		total = 0;
@@ -1750,8 +1951,8 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		err = deflateInit(&d_stream, level);
 		CHECK_ZLIB_ERR(err, "deflateInit");
 	}
-	*partial = 0;
-	finish   = 0;
+	*full  = 0;
+	finish = 0;
 
 	/*
 	 * If no size, then we want to compress until the end of file
@@ -1760,7 +1961,8 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 	if (!size) {
 		eof  = 1;
 		size = QUAD_MAX;
-	}
+	} else
+		eof  = 0;
 
 	while (size > 0) {
 		if (size > BSIZE)
@@ -1791,8 +1993,6 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 			perror("reading input file");
 			exit(1);
 		}
-		size  -= cc;
-		total += cc;
 		
 		if (cc == 0) {
 			/*
@@ -1808,22 +2008,33 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 			exit(1);
 		}
 
+		/*
+		 * Apply fixups.  This may produce a relocation record.
+		 */
+		if (fixups != NULL)
+			applyfixups(off+total, count, inbuf);
+
+		size  -= cc;
+		total += cc;
+
 		d_stream.next_in   = inbuf;
 		d_stream.avail_in  = cc;
-		d_stream.next_out  = outbuf;
-		d_stream.avail_out = BSIZE;
+		d_stream.next_out  = &output_buffer[buffer_offset];
+		d_stream.avail_out = SUBBLOCKSIZE - buffer_offset;
+		assert(d_stream.avail_out > 0);
 
 		err = deflate(&d_stream, Z_SYNC_FLUSH);
 		CHECK_ZLIB_ERR(err, "deflate");
 
-		if (d_stream.avail_in) {
-			fprintf(stderr, "Something went wrong!\n");
+		if (d_stream.avail_in != 0 || d_stream.avail_out == 0) {
+			fprintf(stderr, "Something went wrong, ");
+			if (d_stream.avail_in)
+				fprintf(stderr, "not all input deflated!\n");
+			else
+				fprintf(stderr, "too much data for chunk!\n");
 			exit(1);
 		}
-		count = BSIZE - d_stream.avail_out;
-
-		/* Stash into the output buffer */
-		memcpy(&output_buffer[buffer_offset], outbuf, count);
+		count = (SUBBLOCKSIZE - buffer_offset) - d_stream.avail_out;
 		buffer_offset += count;
 		assert(buffer_offset <= SUBBLOCKSIZE);
 
@@ -1847,8 +2058,8 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		assert(subblockleft >= 0);
 		
 		if (subblockleft < 0x2000) {
-			finish   = 1;
-			*partial = 1;
+			finish = 1;
+			*full  = 1;
 			break;
 		}
 	}
@@ -1863,35 +2074,36 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 /*
  * Need a hook to finish off the last part and write the pending data.
  */
-int
-compress_finish(unsigned long *subblksize)
+static int
+compress_finish(uint32_t *subblksize)
 {
-	int		err, count, cc;
+	int		err, count;
 
 	if (subblockleft == SUBBLOCKMAX)
 		return 0;
 	
 	d_stream.next_in   = 0;
 	d_stream.avail_in  = 0;
-	d_stream.next_out  = outbuf;
-	d_stream.avail_out = BSIZE;
+	d_stream.next_out  = &output_buffer[buffer_offset];
+	d_stream.avail_out = SUBBLOCKSIZE - buffer_offset;
+
 	err = deflate(&d_stream, Z_FINISH);
 	if (err != Z_STREAM_END)
 		CHECK_ZLIB_ERR(err, "deflate");
 
+	assert(d_stream.avail_out > 0);
+
 	/*
 	 * There can be some left even though we use Z_SYNC_FLUSH!
 	 */
-	count = BSIZE - d_stream.avail_out;
+	count = (SUBBLOCKSIZE - buffer_offset) - d_stream.avail_out;
 	if (count) {
-		/* Stash into the output buffer */
-		memcpy(&output_buffer[buffer_offset], outbuf, count);
 		buffer_offset += count;
 		assert(buffer_offset <= SUBBLOCKSIZE);
-
 		subblockleft -= count;
 		assert(subblockleft >= 0);
 	}
+
 	err = deflateEnd(&d_stream);
 	CHECK_ZLIB_ERR(err, "deflateEnd");
 
@@ -1901,23 +2113,11 @@ compress_finish(unsigned long *subblksize)
 	*subblksize  = SUBBLOCKMAX - subblockleft;
 		
 	/*
-	 * Pad the subblock out. Silly. 
+	 * Pad the subblock out.
 	 */
-	bzero(outbuf, sizeof(outbuf));
-	while (subblockleft) {
-		if (subblockleft > sizeof(outbuf))
-			count = sizeof(outbuf);
-		else
-			count = subblockleft;
-
-		/* Stash zeros into the output buffer */
-		memcpy(&output_buffer[buffer_offset], outbuf, count);
-		buffer_offset += count;
-		assert(buffer_offset <= SUBBLOCKSIZE);
-
-		subblockleft -= count;
-	}
-
+	assert(buffer_offset + subblockleft <= SUBBLOCKSIZE);
+	memset(&output_buffer[buffer_offset], 0, subblockleft);
+	buffer_offset += subblockleft;
 	subblockleft = SUBBLOCKMAX;
 	return 1;
 }

@@ -17,7 +17,7 @@ PTHREADCFLAGS	= -D_THREAD_SAFE \
 		  -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 
-CFLAGS		= -O2 -g -static
+CFLAGS		= -Wall -O2 -g -static
 LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
@@ -33,7 +33,7 @@ LIBS		+= -Lntfs -lntfs
 NTFSDIR		= ntfs
 endif
 
-all:	imagezip imageunzip frisbee.o
+all:	imagezip imageunzip imagedump frisbee.o
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -46,13 +46,16 @@ imageunzip: imageunzip.o version.o
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
 
+imagedump: imagedump.o version.o
+	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
+
 frisbee.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -DFRISBEE -o frisbee.o $<
 
 ntfs:
 	@$(MAKE) -C ntfs all
 
-version.c: imagezip.c imageunzip.c
+version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip

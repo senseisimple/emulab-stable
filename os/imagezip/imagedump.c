@@ -1,0 +1,367 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
+ * Usage: imagedump <input file>
+ *
+ * Prints out information about an image.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <unistd.h>
+#include <string.h>
+#include <zlib.h>
+#include <sys/stat.h>
+#include "imagehdr.h"
+
+static int detail = 0;
+static int dumpmap = 0;
+static int infd = -1;
+
+static unsigned long long wasted;
+static uint32_t sectinuse;
+static uint32_t sectfree;
+
+static void usage(void);
+static void dumpfile(char *name, int fd);
+static int dumpchunk(char *name, char *buf, int chunkno);
+
+int
+main(int argc, char **argv)
+{
+	int ch, version = 0;
+	extern char build_info[];
+
+	while ((ch = getopt(argc, argv, "dmv")) != -1)
+		switch(ch) {
+		case 'd':
+			detail++;
+			break;
+		case 'm':
+			dumpmap++;
+			detail = 0;
+			break;
+		case 'v':
+			version++;
+			break;
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+	argc -= optind;
+	argv += optind;
+
+	if (version || detail) {
+		fprintf(stderr, "%s\n", build_info);
+		if (version)
+			exit(0);
+	}
+
+	if (argc < 1)
+		usage();
+
+	while (argc > 0) {
+		int isstdin = !strcmp(argv[0], "-");
+
+		if (!isstdin) {
+			if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
+				perror("opening input file");
+				exit(1);
+			}
+		} else
+			infd = fileno(stdin);
+
+		dumpfile(isstdin ? "<stdin>" : argv[0], infd);
+
+		if (!isstdin)
+			close(infd);
+		argc--;
+		argv++;
+	}
+	exit(0);
+}
+
+static void
+usage(void)
+{
+	fprintf(stderr, "usage: "
+		"imagedump options <image filename> ...\n"
+		" -v              Print version info and exit\n"
+		" -d              Turn on progressive levels of detail\n");
+	exit(1);
+}	
+
+static char chunkbuf[SUBBLOCKSIZE];
+static unsigned int magic;
+static unsigned long chunkcount;
+static uint32_t nextsector;
+
+static void
+dumpfile(char *name, int fd)
+{
+	unsigned long long tbytes, dbytes, cbytes;
+	int count, chunkno, first = 1;
+	off_t filesize;
+	int isstdin;
+	char *bp;
+
+	isstdin = (fd == fileno(stdin));
+	wasted = sectinuse = sectfree = 0;
+	nextsector = 0;
+
+	if (!isstdin) {
+		struct stat st;
+
+		if (fstat(fd, &st) < 0) {
+			perror(name);
+			return;
+		}
+		if ((st.st_size % SUBBLOCKSIZE) != 0)
+			printf("%s: WARNING: "
+			       "file size not a multiple of chunk size\n",
+			       name);
+		filesize = st.st_size;
+	} else
+		filesize = 0;
+
+	for (chunkno = 0; ; chunkno++) {
+		bp = chunkbuf;
+
+		if (isstdin)
+			count = sizeof(chunkbuf);
+		else {
+			count = DEFAULTREGIONSIZE;
+			if (lseek(infd, (off_t)chunkno*sizeof(chunkbuf),
+				  SEEK_SET) < 0) {
+				perror("seeking on zipped image");
+				return;
+			}
+		}
+
+		/*
+		 * Parse the file one chunk at a time.  We read the entire
+		 * chunk and hand it off.  Since we might be reading from
+		 * stdin, we have to make sure we get the entire amount.
+		 */
+		while (count) {
+			int cc;
+			
+			if ((cc = read(infd, bp, count)) <= 0) {
+				if (cc == 0)
+					goto done;
+				perror("reading zipped image");
+				return;
+			}
+			count -= cc;
+			bp += cc;
+		}
+		if (first) {
+			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
+
+			magic = hdr->magic;
+			if (magic < COMPRESSED_MAGIC_BASE ||
+			    magic > COMPRESSED_MAGIC_CURRENT) {
+				printf("%s: bad version %x\n", name, magic);
+				return;
+			}
+
+			chunkcount = hdr->blocktotal;
+			if ((filesize / SUBBLOCKSIZE) != chunkcount) {
+				if (chunkcount == 0)
+					printf("%s: WARNING: zero chunk count,"
+					       " ignoring block fields\n",
+					       name);
+				else if (isstdin)
+					filesize = (off_t)chunkcount *
+						SUBBLOCKSIZE;
+				else
+					printf("%s: WARNING: "
+					       "file size inconsistant with "
+					       "chunk count (%lu != %lu)\n",
+					       name,
+					       (unsigned long)
+					       (filesize/SUBBLOCKSIZE),
+					       chunkcount);
+			}
+
+			printf("%s: %qu bytes, %lu chunks, version %d\n",
+			       name, filesize,
+			       (unsigned long)(filesize / SUBBLOCKSIZE),
+			       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
+			first = 0;
+		}
+		if (dumpchunk(name, chunkbuf, chunkno))
+			break;
+	}
+ done:
+	if (filesize == 0)
+		filesize = (off_t)(chunkno + 1) * SUBBLOCKSIZE;
+
+	cbytes = (unsigned long long)(filesize - wasted);
+	dbytes = (unsigned long long)sectinuse * SECSIZE;
+	tbytes = (unsigned long long)(sectinuse + sectfree) * SECSIZE;
+
+	if (detail > 0)
+		printf("\n");
+	printf("  %qu bytes of overhead/wasted space (%5.2f%% of image file)\n",
+	       wasted, (double)wasted / filesize * 100);
+	printf("  %qu bytes of compressed data\n",
+	       cbytes);
+	printf("  %5.2fx compression of allocated data (%qu bytes)\n",
+	       (double)dbytes / cbytes, dbytes);
+	printf("  %5.2fx compression of total known disk size (%qu bytes)\n",
+	       (double)tbytes / cbytes, tbytes);
+}
+
+static int
+dumpchunk(char *name, char *buf, int chunkno)
+{
+	blockhdr_t *hdr;
+	struct region *reg;
+	int i;
+
+	hdr = (blockhdr_t *)buf;
+
+	switch (hdr->magic) {
+	case COMPRESSED_V1:
+		reg = (struct region *)((struct blockhdr_V1 *)hdr + 1);
+		break;
+	case COMPRESSED_V2:
+		reg = (struct region *)((struct blockhdr_V2 *)hdr + 1);
+		break;
+	default:
+		printf("%s: bad magic (%x!=%x) in chunk %d\n",
+		       name, hdr->magic, magic, chunkno);
+		return 1;
+	}
+	if (chunkcount && hdr->blockindex != chunkno) {
+		printf("%s: bad chunk index (%d) in chunk %d\n",
+		       name, hdr->blockindex, chunkno);
+		return 1;
+	}
+	if (chunkcount && hdr->blocktotal != chunkcount) {
+		printf("%s: bad chunkcount (%d!=%lu) in chunk %d\n",
+		       name, hdr->blocktotal, chunkcount, chunkno);
+		return 1;
+	}
+	if (hdr->size > (SUBBLOCKSIZE - hdr->regionsize)) {
+		printf("%s: bad chunksize (%d > %d) in chunk %d\n",
+		       name, hdr->size, SUBBLOCKSIZE-hdr->regionsize, chunkno);
+		return 1;
+	}
+#if 1
+	/* include header overhead */
+	wasted += SUBBLOCKSIZE - hdr->size;
+#else
+	wasted += ((SUBBLOCKSIZE - hdr->regionsize) - hdr->size);
+#endif
+
+	if (detail > 0) {
+		printf("  Chunk %d: %u compressed bytes, ",
+		       chunkno, hdr->size);
+		if (hdr->magic > COMPRESSED_V1) {
+			printf("sector range [%u-%u], ",
+			       hdr->firstsect, hdr->lastsect-1);
+			if (hdr->reloccount > 0)
+				printf("%d relocs, ", hdr->reloccount);
+		}
+		printf("%d regions\n", hdr->regioncount);
+	}
+	if (hdr->regionsize != DEFAULTREGIONSIZE)
+		printf("  WARNING: "
+		       "unexpected region size (%d!=%d) in chunk %d\n",
+		       hdr->regionsize, DEFAULTREGIONSIZE, chunkno);
+
+	for (i = 0; i < hdr->regioncount; i++) {
+		if (detail > 1)
+			printf("    Region %d: %d sectors [%u-%u]\n",
+			       i, reg->size, reg->start,
+			       reg->start + reg->size - 1);
+		if (reg->start < nextsector)
+			printf("    WARNING: chunk %d region %d "
+			       "may overlap others\n", chunkno, i);
+		if (hdr->magic > COMPRESSED_V1) {
+			if (i == 0) {
+				if (hdr->firstsect > reg->start)
+					printf("    WARNING: chunk %d bad "
+					       "firstsect value (%u>%u)\n",
+					       chunkno, hdr->firstsect,
+					       reg->start);
+				else
+					sectfree +=
+						(reg->start - hdr->firstsect);
+			} else
+				sectfree += (reg->start - nextsector);
+			if (i == hdr->regioncount-1) {
+				if (hdr->lastsect < reg->start + reg->size)
+					printf("    WARNING: chunk %d bad "
+					       "lastsect value (%u<%u)\n",
+					       chunkno, hdr->lastsect,
+					       reg->start + reg->size);
+				else
+					sectfree += (hdr->lastsect -
+						     (reg->start+reg->size));
+			}
+		} else
+			sectfree += (reg->start - nextsector);
+		sectinuse += reg->size;
+
+		if (dumpmap) {
+			switch (hdr->magic) {
+			case COMPRESSED_V1:
+				if (reg->start - nextsector != 0)
+					printf("F: [%08x-%08x]\n",
+					       nextsector, reg->start-1);
+				printf("A: [%08x-%08x]\n",
+				       reg->start, reg->start + reg->size - 1);
+				break;
+			case COMPRESSED_V2:
+				if (i == 0 && hdr->firstsect < reg->start)
+					printf("F: [%08x-%08x]\n",
+					       hdr->firstsect, reg->start-1);
+				if (i != 0 && reg->start - nextsector != 0)
+					printf("F: [%08x-%08x]\n",
+					       nextsector, reg->start-1);
+				printf("A: [%08x-%08x]\n",
+				       reg->start, reg->start + reg->size - 1);
+				if (i == hdr->regioncount-1 &&
+				    reg->start+reg->size < hdr->lastsect)
+					printf("F: [%08x-%08x]\n",
+					       reg->start+reg->size,
+					       hdr->lastsect-1);
+				break;
+			}
+		}
+
+		nextsector = reg->start + reg->size;
+		reg++;
+	}
+
+	if (hdr->magic == COMPRESSED_V1)
+		return 0;
+
+	for (i = 0; i < hdr->reloccount; i++) {
+		struct blockreloc *reloc = (struct blockreloc *)reg;
+		uint32_t offset = reloc->sector * SECSIZE + reloc->sectoff;
+
+		if (reloc->sector < hdr->firstsect ||
+		    reloc->sector >= hdr->lastsect)
+			printf("    WARNING: "
+			       "Reloc %d at %u not in chunk [%u-%u]\n", i,
+			       reloc->sector, hdr->firstsect, hdr->lastsect-1);
+		if (detail > 1)
+			printf("    Reloc %d: %s [%u-%u] (sector %d)\n", i,
+			       reloc->type == RELOC_BSDDISKLABEL ?
+			       "BSDDISKLABEL" : "??",
+			       offset, offset + reloc->size, reloc->sector);
+	}
+
+	return 0;
+}
