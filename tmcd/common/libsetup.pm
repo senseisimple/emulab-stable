@@ -781,8 +781,11 @@ sub dotrafficconfig()
 	if ($_ =~ /$pat/) {
 	    #
 	    # The following is specific to the modified TG traffic generator:
-	    #  trafgen [-s server] [-p serverport] [-l logfile] \
-	    #        [ -N name ] [ -T targetip.targetport ] [-P proto] [-R role]
+	    #
+	    #  trafgen [-s serverip] [-p serverport] [-l logfile] \
+	    #	     [ -N name ] [-P proto] [-R role] [ -E pid/eid ] \
+	    #	     [ -S srcip.srcport ] [ -T targetip.targetport ]
+	    #
 	    # N.B. serverport is not needed right now
 	    #
 	    my $name = $1;
@@ -794,6 +797,7 @@ sub dotrafficconfig()
 	    my $role = $7;
 	    my $generator = $8;
 	    my $target;
+	    my $source;
 
 	    # Skip if not specified as a TG generator. At some point
 	    # work in Shashi's NSE work.
@@ -810,9 +814,11 @@ sub dotrafficconfig()
 
 	    if ($role eq "sink") {
 		$target = "$ownaddr.$ownport";
+		$source = "$peeraddr.$peerport";
 	    }
 	    else {
 		$target = "$peeraddr.$peerport";
+		$source = "$ownaddr.$ownport";
 	    }
 
 	    if (! $didopen) {
@@ -821,7 +827,7 @@ sub dotrafficconfig()
 		print RC "#!/bin/sh\n";
 		$didopen = 1;
 	    }
-	    print RC "$cmdline -N $name -T $target -P $proto -R $role >/tmp/$name.debug 2>&1 &\n";
+	    print RC "$cmdline -N $name -S $source -T $target -P $proto -R $role >/tmp/$name.debug 2>&1 &\n";
 	}
 	else {
 	    warn "*** WARNING: Bad traffic line: $_";
