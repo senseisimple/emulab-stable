@@ -94,7 +94,7 @@ elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     #$having = "having (lastswap>=1)"; # At least one day since swapin
     $having = "having (lastswap>=0)";
     $idle = 1;
-    $idlehours = 6;
+    $idlehours = 2;
 }
 else {
     # See active above
