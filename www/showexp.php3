@@ -10,13 +10,6 @@ PAGEHEADER("Show Experiment Information");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = "";
-if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
-    $uid=$Vals[1];
-    addslashes($uid);
-} else {
-    unset($uid);
-}
 LOGGEDINORDIE($uid);
 
 $isadmin = ISADMIN($uid);
@@ -137,16 +130,20 @@ if (mysql_num_rows($reserved_result)) {
     echo "<h3>Reserved Nodes</h3>
           <table align=center border=1>
           <tr>
+              <td>Change</td>
               <td>Node ID</td>
               <td>Node Type</td>
               <td>Default Image</td>
+              <td>Default Cmdline</td>
+              <td>Next Path</td>
+              <td>Next Cmdline</td>
           </tr>\n";
 
     #
     # I'm so proud!
     #
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT nodes.node_id, nodes.type, nodes.def_boot_image_id ".
+	"SELECT nodes.* ".
         "FROM nodes LEFT JOIN reserved ".
         "ON nodes.node_id=reserved.node_id ".
         "WHERE reserved.eid=\"$exp_eid\" and reserved.pid=\"$exp_pid\"");
@@ -154,11 +151,28 @@ if (mysql_num_rows($reserved_result)) {
     while ($row = mysql_fetch_array($query_result)) {
         $node_id = $row[node_id];
         $type    = $row[type];
-        $defid   = $row[def_boot_image_id];
+        $def_boot_image_id  = $row[def_boot_image_id];
+        $def_boot_cmd_line  = $row[def_boot_cmd_line];
+        $next_boot_path     = $row[next_boot_path];
+        $next_boot_cmd_line = $row[next_boot_cmd_line];
+
+        if (!$def_boot_cmd_line)
+            $def_boot_cmd_line = "NULL";
+        if (!$next_boot_path)
+            $next_boot_path = "NULL";
+        if (!$next_boot_cmd_line)
+            $next_boot_cmd_line = "NULL";
+
         echo "<tr>
+                  <td align=center>
+                     <A href='nodecontrol_form.php3?uid=$uid&node_id=$node_id&refer=$exp_pideid'>
+                     <img alt=\"o\" src=\"redball.gif\"></A></td>
                   <td>$node_id</td>
                   <td>$type</td>
-                  <td>$defid</td>
+                  <td>$def_boot_image_id</td>
+                  <td>$def_boot_cmd_line</td>
+                  <td>$next_boot_path</td>
+                  <td>$next_boot_cmd_line</td>
               </tr>\n";
     }
     echo "</table>\n";

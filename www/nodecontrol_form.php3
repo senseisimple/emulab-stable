@@ -12,19 +12,7 @@ PAGEHEADER("Node Control Form");
 LOGGEDINORDIE($uid);
 
 #
-# Admin users can control other nodes.
-#
-$isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    USERERROR("You do not have admin privledges!", 1);
-}
-
-echo "<center><h1>
-      Node Control Center: $node_id
-      </h1></center>";
-
-#
-# Check to make sure thats this is a valid nodeid
+# Check to make sure that this is a valid nodeid
 #
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * FROM nodes WHERE node_id=\"$node_id\"");
@@ -32,6 +20,31 @@ if (mysql_num_rows($query_result) == 0) {
   USERERROR("The node $node_id is not a valid nodeid", 1);
 }
 $row = mysql_fetch_array($query_result);
+
+#
+# Admin users can control any node, but normal users can only control
+# nodes in their own experiments.
+#
+$isadmin = ISADMIN($uid);
+if (! $isadmin) {
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT experiments.* ".
+        "FROM experiments LEFT JOIN reserved ".
+        "ON experiments.pid=reserved.pid and experiments.eid=reserved.eid ".
+        "WHERE reserved.node_id=\"$node_id\"");
+    if (mysql_num_rows($query_result) == 0) {
+        USERERROR("The node $node_id is not in an experiment", 1);
+    }
+    $foorow = mysql_fetch_array($query_result);
+    $expt_head_uid = $foorow[expt_head_uid];
+    if ($expt_head_uid != $uid) {
+        USERERROR("You do not have permission to modify node $node_id!", 1);
+    }
+}
+
+echo "<center><h1>
+      Node Control Center: $node_id
+      </h1></center>";
 
 $node_id            = $row[node_id]; 
 $type               = $row[type];
@@ -44,9 +57,11 @@ echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 #
-# Generate the form.
+# Generate the form. Note that $refer is set by the caller so we know
+# how we got to the nodecontrol page. 
 # 
-echo "<form action=\"nodecontrol.php3?uid=$uid\" method=\"post\">\n";
+echo "<form action=\"nodecontrol.php3?uid=$uid&refer=$refer\"
+            method=\"post\">\n";
 
 echo "<tr>
           <td>Node ID:</td>

@@ -71,7 +71,7 @@ you are a member of.</h2>
 <table align="center" border="1">
 
 <?php
-echo "<form action=\"showexp.php3?$uid\" method=\"post\">";
+echo "<form action=\"showexp.php3?uid=$uid\" method=\"post\">";
 echo "<tr>
           <td align='center'>Project/Experiment</td>
       </tr>\n";

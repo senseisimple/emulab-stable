@@ -10,15 +10,6 @@ include("defs.php3");
 LOGGEDINORDIE($uid);
 
 #
-# Admin users can control other nodes.
-#
-$isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    PAGEHEADER("Node Control");
-    USERERROR("You do not have admin privledges!", 1);
-}
-
-#
 # Check to make sure that this is a valid nodeid
 #
 $query_result = mysql_db_query($TBDBNAME,
@@ -26,6 +17,29 @@ $query_result = mysql_db_query($TBDBNAME,
 if (mysql_num_rows($query_result) == 0) {
     PAGEHEADER("Node Control");
     USERERROR("The node $node_id is not a valid nodeid", 1);
+}
+
+#
+# Admin users can control any node, but normal users can only control
+# nodes in their own experiments.
+#
+$isadmin = ISADMIN($uid);
+if (! $isadmin) {
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT experiments.* ".
+        "FROM experiments LEFT JOIN reserved ".
+        "ON experiments.pid=reserved.pid and experiments.eid=reserved.eid ".
+        "WHERE reserved.node_id=\"$node_id\"");
+    if (mysql_num_rows($query_result) == 0) {
+        PAGEHEADER("Node Control");
+        USERERROR("The node $node_id is not in an experiment", 1);
+    }
+    $foorow = mysql_fetch_array($query_result);
+    $expt_head_uid = $foorow[expt_head_uid];
+    if ($expt_head_uid != $uid) {
+        PAGEHEADER("Node Control");
+        USERERROR("You do not have permission to modify node $node_id!", 1);
+    }
 }
 
 #
@@ -46,9 +60,14 @@ if (! $insert_result) {
 }
 
 #
-# Zap back to the list. Seems better than a silly "we did it" message.
-# 
-header("Location: nodecontrol_list.php3?uid=$uid");
+# Zap back to the referrer. Seems better than a silly "we did it" message.
+#
+if ($refer == "list") {
+    header("Location: nodecontrol_list.php3?uid=$uid");
+}
+else {
+    header("Location: showexp.php3?uid=$uid&exp_pideid=$refer");
+}
 
 #
 # No need to do a footer!

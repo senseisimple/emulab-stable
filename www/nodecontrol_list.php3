@@ -83,7 +83,7 @@ while ($row = mysql_fetch_array($query_result)) {
 
     echo "<tr>
               <td align=center>
-                  <A href='nodecontrol_form.php3?uid=$uid&node_id=$node_id'>
+                  <A href='nodecontrol_form.php3?uid=$uid&node_id=$node_id&refer=list'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td>$node_id</td>
               <td>$type</td>
