@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -326,7 +326,7 @@ ClientRequest(Packet_t *p)
 #ifdef STATS
 	else if (chunkmap != 0 && count == CHUNKSIZE) {
 		if (chunkmap[chunk]) {
-			if (debug)
+			if (debug > 1)
 				log("Duplicate chunk request: %d", chunk);
 			DOSTAT(dupsent++);
 		} else

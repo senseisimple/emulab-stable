@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -165,7 +165,7 @@ ClientStatsDump(unsigned int id, ClientStats_t *stats)
 		    stats->u.v1.dupchunk);
 		log("  dupblocks(in progress): %d",
 		    stats->u.v1.dupblock);
-		log("  lost blocks:            %d",
+		log("  partial chunk requests: %d",
 		    stats->u.v1.lostblocks);
 		break;
 
