@@ -13,7 +13,7 @@
 #include "ConservativeAssigner.h"
 #include "HierarchicalAssigner.h"
 #include "Router.h"
-#include "HostRouter.h"
+//#include "HostRouter.h"
 //#include "LanRouter.h"
 #include "NetRouter.h"
 #include "Partition.h"
@@ -204,7 +204,7 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
     switch (routeChoice)
     {
     case HostHost:
-        m_route.reset(new HostRouter());
+//        m_route.reset(new HostRouter());
         break;
     case HostLan:
 //        m_route.reset(new LanRouter());
