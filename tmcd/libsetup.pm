@@ -1399,7 +1399,8 @@ sub doaccounts()
 
     # XXX: hack, hack, hack - Jay requested that user "games" be removed from
     # plab nodes since conflicts with his UID.
-    os_userdel("games");
+    os_userdel("games")
+	if (PLAB());
 
     while (($login, $info) = each %PWDDB) {
 	my $uid = $info;
