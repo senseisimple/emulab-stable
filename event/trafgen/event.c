@@ -555,9 +555,9 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
 			gettimeofday(&now, NULL);
 			fprintf(stderr, "%lu.%03lu: MODIFY length=%d bytes, "
-				"interval=%.9f sec (rate=%f Kbps)\n",
+				"interval=%.9f sec (rate=%f Kbps), iptos=%x\n",
 				now.tv_sec, now.tv_usec / 1000, plen,
-				interval, bps / 1000);
+				interval, bps / 1000, prot.tos);
 		}
 #endif
 		/*
