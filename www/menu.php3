@@ -10,6 +10,7 @@ $login_status     = $STATUS_NOSTATUS;
 $login_message    = "";
 $error_message    = 0;
 $login_uid        = 0;
+$javacode         = file("java.html");
 
 #
 # This has to be set so we can spit out http or https paths properly!
@@ -190,7 +191,7 @@ function WRITESIDEBAR() {
     # Now the login/logout box. Remember, already inside a table.
     # We want the links to the login/logout pages to always be https,
     # but the images path depends on whether the page was loaded as
-    # http or https, since we don't want to mix them, since they
+    # http or https, since we do not want to mix them, since they
     # cause warnings.
     # 
     if ($login_status == $STATUS_LOGGEDIN) {
@@ -323,7 +324,7 @@ function PAGEHEADER($title) {
     global $TBBASE, $TBDOCBASE, $TBDBNAME;
     global $CHECKLOGIN_NOTLOGGEDIN, $CHECKLOGIN_LOGGEDIN;
     global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
-    global $BASEPATH, $SSL_PROTOCOL;
+    global $BASEPATH, $SSL_PROTOCOL, $javacode;
 
     #
     # Determine the proper basepath, which depends on whether the page
@@ -410,8 +411,10 @@ function PAGEHEADER($title) {
               </script>\n";
         #
         # Shove the rest of the Java code through to the output. 
-        # 
-        readfile("java.html");
+        #
+	for ($i = 0; $i < count($javacode); $i++) {
+	    echo "$javacode[$i]";
+	}
     }
     
     echo " <meta HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">

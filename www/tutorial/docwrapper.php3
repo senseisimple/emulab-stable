@@ -1,5 +1,7 @@
 <?php
+chdir("..");
 require("defs.php3");
+chdir("tutorial");
 
 #
 # Standard Testbed Header
