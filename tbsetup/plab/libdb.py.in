@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -82,6 +82,9 @@ def DBQuery(queryPat, querySub = (), asDict = False):
                 if len(rs) > 60:
                     rs = rs[:60] + "..."
                 print "Result: %s" % rs
+                pass
+            if ret == None:
+                return ()
             return ret
         except MySQLdb.MySQLError:
             tries -= 1
