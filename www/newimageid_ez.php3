@@ -327,10 +327,10 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
-    # Node to Create image from.
+    # Node to Obtain image from.
     #
     echo "<tr>
-              <td>Node to Create Image from[<b>2</b>]:</td>
+              <td>Node to Obtain Image from[<b>2</b>]:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[node]\"
@@ -506,7 +506,8 @@ function SPITFORM($formfields, $errors)
                  </ul>
              </li>
              <li> If you already have a node customized, enter that node
-                  name (pcXXX) and the image will be auto created for you.
+                  name (pcXXX) and its disk contents 
+		  will be dumped automatically into the specified Image File.
                   Notification of completion will be sent to you via email. 
 	     </li>
              <li> Guidelines for setting OS features for your OS:
@@ -866,11 +867,11 @@ $confirmationWarning = "";
 #
 if (! isset($node)) {
     $confirmationWarning .=
-          "<h2>You have not defined a node from which to load the image!
+          "<h2>You have not defined a node from which to obtain the image!
            If you do not specify such a node now,
 	   you will later have to go to the Image Descriptor information
-	   page for the new image and then click 'load image from node' from
-	   the menu.
+	   page for the new image and then choose 
+	   'Dump Node Disk Contents into Image' from the menu.
   	   Continue only if this is what you want.</h2>";
 }
 

@@ -10,7 +10,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Load Image into Existing Image Descriptor");
+PAGEHEADER("Dump Node Disk Contents into Existing Image Descriptor");
 
 #
 # Only known and logged in users.
@@ -61,7 +61,7 @@ if (! isset($node) || isset($cancelled)) {
     echo "<br />";
 
     echo "<form action='loadimage.php3' method='post'>\n".
-	 "<font size=+1>Node to load image from for '$imageid':</font> ".
+	 "<font size=+1>Node to dump into image '$imageid':</font> ".
 	 "<input type='text'   name='node' value='$node'></input>\n".
 	 "<input type='hidden' name='imageid' value='$imageid'></input>\n".
 	 "<input type='submit' name='submit'  value='Go!'></input>\n".
@@ -76,7 +76,7 @@ if (! isset($node) || isset($cancelled)) {
 
 if (! TBNodeAccessCheck($uid, $node, $TB_NODEACCESS_LOADIMAGE)) {
     USERERROR("You do not have permission to ".
-	      "load an image from node '$node'.", 1);
+	      "dump an image from node '$node'.", 1);
 }
 
 # Should check for file file_exists($image_path),
@@ -86,8 +86,8 @@ if (! isset($confirmed) ) {
     echo "<center><form action='loadimage.php3' method='post'>\n".
 #         "<h2>Image already exists at '<code>$image_path</code>'.".
          "<h2><b>Warning!</b><br />".
-	 "Loading an image from node '$node' to image '$imageid' ".
-	 "will overwrite any previously loaded image. ".
+	 "Dumping disk contents from node '$node' into image '$imageid' ".
+	 "will overwrite any previously dumped image. ".
 	 "Are you sure you want to continue?</h2>".
          "<input type='hidden' name='node'      value='$node'></input>".
          "<input type='hidden' name='imageid'   value='$imageid'></input>".
