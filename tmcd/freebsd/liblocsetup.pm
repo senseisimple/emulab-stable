@@ -205,16 +205,21 @@ sub os_ifconfig_veth($$$$$;$)
     if (defined($iface)) {
 	$uplines .= "$IFCONFIGBIN $iface up $IFC_100MBS $IFC_FDUPLEX\n";
     }
-    $uplines .= "$IFCONFIGBIN veth${id} create\n" .
+    $uplines .= "$IFCONFIGBIN veth${id} create\n    " .
 	        "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
-		(defined($iface) ? " vethdev $iface\n" : "\n");
+		(defined($iface) ? " vethdev $iface\n    " : "\n    ");
 
+    #
+    # Must set route table id before assigning IP address so that interface
+    # route winds up in the correct table.
+    #
     if (defined($rtabid)) {
-	$uplines .= "$IFCONFIGBIN veth${id} rtabid $rtabid\n";
+	$uplines .= "$IFCONFIGBIN veth${id} rtabid $rtabid\n    ";
     }
-    $uplines  .= "$IFCONFIGBIN veth${id} inet $inet netmask $mask\n";
-    $downlines = "$IFCONFIGBIN veth${id} down\n".
-	         "$IFCONFIGBIN veth${id} destroy\n";
+
+    $uplines  .= "$IFCONFIGBIN veth${id} inet $inet netmask $mask";
+    $downlines = "$IFCONFIGBIN veth${id} down\n    ".
+	         "$IFCONFIGBIN veth${id} destroy";
     return ($uplines, $downlines);
 }
 
@@ -380,7 +385,9 @@ sub os_routing_enable_forward()
     if (REMOTE()) {
 	$cmd = "echo 'IP forwarding not turned on!'";
     }
-    else {
+    elsif (JAILED()) {
+	$cmd = "# IP forwarding is enabled outside the jail";
+    } else {
 	# No Fast Forwarding when operating with linkdelays. 
 	$cmd  = "sysctl -w net.inet.ip.forwarding=1\n" .
 	        "    if [ ! -e $BOOTDIR/rc.linkdelay ]; then\n" .

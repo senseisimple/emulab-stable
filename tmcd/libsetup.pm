@@ -876,11 +876,11 @@ sub doifconfig (;$)
 		    os_ifconfig_line($iface, $inet,
 				     $mask, $speed, $duplex, $aliases,$rtabid);
 		    
-		$upcmds   .= "$upline\n";
+		$upcmds   .= "$upline\n    ";
 		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
 		
-		$downcmds .= TMROUTECONFIG . " $routearg down\n";
-		$downcmds .= "$downline\n"
+		$downcmds .= TMROUTECONFIG . " $routearg down\n    ";
+		$downcmds .= "$downline\n    "
 		    if (defined($downline));
 
 		# There could be routes for each alias.
@@ -914,16 +914,17 @@ sub doifconfig (;$)
 
 	    if ($pmac eq "none" ||
 		($iface = findiface($pmac))) {
-		print XIFS "$iface\n";
+		print XIFS "$iface\n"
+		    if (defined($iface));
 
 		my ($upline, $downline) =
 		    os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,$rtabid);
 		    
-		$upcmds   .= "$upline\n";
+		$upcmds   .= "$upline\n    ";
 		$upcmds   .= TMROUTECONFIG . " $routearg up\n";
 		
-		$downcmds .= TMROUTECONFIG . " $routearg down\n";
-		$downcmds .= "$downline\n"
+		$downcmds .= TMROUTECONFIG . " $routearg down\n    ";
+		$downcmds .= "$downline\n    "
 		    if (defined($downline));
 	    }
 	    else {
@@ -949,11 +950,11 @@ sub doifconfig (;$)
     print IFC "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
     print IFC "case \"\$action\" in\n";
     print IFC "  enable)\n";
-    print IFC "     $upcmds\n";
-    print IFC "     ;;\n";
+    print IFC "    $upcmds\n";
+    print IFC "    ;;\n";
     print IFC "  disable)\n";
-    print IFC "     $downcmds\n";
-    print IFC "     ;;\n";
+    print IFC "    $downcmds\n";
+    print IFC "    ;;\n";
     print IFC "esac\n";
     close(IFC);
     chmod(0755, TMIFC);
