@@ -15,6 +15,7 @@ require("defs.php3");
 # $uid optionally comes in as a variable so admins can logout other users.
 #
 $target_uid = $_GET['target_uid'];
+$next_page  = $_GET['next_page'];
 
 # Pedantic page argument checking. Good practice!
 if (isset($target_uid) && $target_uid == "") {
@@ -46,9 +47,14 @@ if (DOLOGOUT($target_uid) != 0) {
 }
 
 #
-# Success. Zap the user back to the front page, in nonsecure mode.
+# Success. Zap the user back to the front page, in nonsecure mode, or a page
+# the caller specified
 # 
-header("Location: $TBBASE/");
+if ($next_page) {
+    header("Location: $next_page");
+} else {
+    header("Location: $TBBASE/");
+}
 ?>
 
 
