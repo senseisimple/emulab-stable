@@ -61,7 +61,9 @@ bin-install:	dir-install
 etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	ifcfgs dir-install
-#	$(INSTALL) -m 755 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(SYSETCDIR)/modules.conf
+	$(INSTALL) -m 644 $(SRCDIR)/ifcfg-eth99 $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 
 sysetc-remove:
 
@@ -70,5 +72,5 @@ script-install:	dir-install $(SCRIPTS)
 sfs-install:
 
 # create ifcfg-eth? files
-ifcfgs: # $(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
-#	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
+ifcfgs:	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
+	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
