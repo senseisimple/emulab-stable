@@ -160,9 +160,9 @@ if (!defined($server)) {
 #
 # These days, must use a keyfile! Hmm, linktest.c is not using a keyfile.
 #
-#if (!defined($keyfile)) {
-#    $keyfile = "/proj/$pid/exp/$eid/tbdata/eventkey";
-#}
+if (!defined($keyfile)) {
+    $keyfile = "/proj/$pid/exp/$eid/tbdata/eventkey";
+}
 
 my $linktest_path; # path to linktest data.
 $linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
