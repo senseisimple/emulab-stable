@@ -585,6 +585,19 @@ else
 fi
 AC_SUBST(TESTMODE)
 
+# Deal with Python mess.
+changequote(START, END)dnl
+PYTHON_VERSION=`python -V 2>&1 | sed -E -e 's/^[a-zA-Z\ ]*//' -e 's/([0-9].[0-9]).*$/\1/'`
+changequote([, ])dnl
+PYTHON_INCLUDE="/usr/local/include/python${PYTHON_VERSION}"
+PYTHON_HEADER="${PYTHON_INCLUDE}/Python.h"
+
+if test ! -f $PYTHON_HEADER; then
+	AC_MSG_ERROR([Cannot find the Python header file Python.h])
+fi
+
+AC_SUBST(PYTHON_INCLUDE)
+
 # Make sure $INSTALL is valid at any depth in our tree, i.e. make it absoulte.
 # This can be needed when no valid install is found and autoconf falls back on
 # the supplied install.sh, but we called 'configure' with a relative path.

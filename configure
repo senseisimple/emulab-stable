@@ -1786,6 +1786,17 @@ else
 fi
 
 
+# Deal with Python mess.
+PYTHON_VERSION=`python -V 2>&1 | sed -E -e 's/^[a-zA-Z\ ]*//' -e 's/([0-9].[0-9]).*$/\1/'`
+PYTHON_INCLUDE="/usr/local/include/python${PYTHON_VERSION}"
+PYTHON_HEADER="${PYTHON_INCLUDE}/Python.h"
+
+if test ! -f $PYTHON_HEADER; then
+	{ echo "configure: error: Cannot find the Python header file Python.h" 1>&2; exit 1; }
+fi
+
+
+
 # Make sure $INSTALL is valid at any depth in our tree, i.e. make it absoulte.
 # This can be needed when no valid install is found and autoconf falls back on
 # the supplied install.sh, but we called 'configure' with a relative path.
@@ -1801,7 +1812,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1805: checking for a BSD compatible install" >&5
+echo "configure:1816: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1862,7 +1873,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1866: checking for $ac_word" >&5
+echo "configure:1877: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2313,6 +2324,7 @@ s%@CPP@%$CPP%g
 s%@GTK_CONFIG@%$GTK_CONFIG%g
 s%@HAVE_MEZZANINE@%$HAVE_MEZZANINE%g
 s%@TESTMODE@%$TESTMODE%g
+s%@PYTHON_INCLUDE@%$PYTHON_INCLUDE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g

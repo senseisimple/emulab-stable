@@ -40,7 +40,7 @@ ifeq ($(FBSDVERSION),FreeBSD5)
 PCORE  = -I/usr/local/lib/perl5/5.6.1/mach/CORE
 else
 PCORE  = -I/usr/libdata/perl/5.00503/mach/CORE
-PYCORE = -I/usr/local/include/python2.3
+PYCORE = -I@PYTHON_INCLUDE@
 endif
 endif
 
