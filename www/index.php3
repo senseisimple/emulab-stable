@@ -62,8 +62,6 @@ characteristics, including its topology: configurable by users.
           Security Issues</a></b>
 <li><b><a href = "docwrapper.php3?docname=policies.html">
           Administrative Policies and Disclaimer</a></b>
-<li><b><a href = "docwrapper.php3?docname=sponsors.html">
-          Emulab Sponsors</a></b>
 </ul>
 
 <?php

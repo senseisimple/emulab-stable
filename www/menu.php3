@@ -67,6 +67,8 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("The Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects Using $THISHOMEBASE", $TBDOCBASE,
 		       "projectlist.php3");
+    WRITESIDEBARBUTTON("Sponsors", $TBDOCBASE,
+		       "docwrapper.php3?docname=sponsors.html");
 
     echo "<tr>
             <td height=30 valign=center align=center nowrap>
