@@ -154,7 +154,7 @@ else {
 		     0, $running_y,
 		     0, 0, $x, $y);
 	# Move all the map references down/over by adjusted amount.
-	adjustmap($areamap, $x, $running_y);
+	adjustmap($areamap, 0, $running_y);
 	push(@areamaps, $areamap);
 	
 	$running_y += $y + 10;
