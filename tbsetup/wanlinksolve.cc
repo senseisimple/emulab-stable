@@ -637,6 +637,16 @@ int main( int argc, char ** argv )
     }
   }
 
+  if (minrounds < 0 ) { minrounds = 0; }
+  if (maxrounds < 0 ) { maxrounds = -1; }
+
+  if (d1weight < 0.0f || d2weight < 0.0f || d3weight < 0.0f /* || plexPenalty < 0.0f */) {
+    fprintf(stderr, 
+	    "The '-1','-2' and '-3' switches each require\n"
+	    "a positive argument, or zero.\n"
+	    "Negative weights are silly.\n" );
+    exit(1);
+  }
 
   char line[4096];
 
