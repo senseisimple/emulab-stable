@@ -3,9 +3,9 @@
 export EXTRA_LIB_PATH=/home/duerig/metis/metis-4.0
 export EXTRA_INCLUDE_PATH=/home/duerig/metis/metis-4.0/Lib/
 
-#g++ -O3 -c -o tmp/ipassign.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/ipassign.cc
-#g++ -O3 -c -o tmp/bitmath.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/bitmath.cc
-#g++ -O3 -c -o tmp/Assigner.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/Assigner.cc
+g++ -O3 -c -o tmp/ipassign.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/ipassign.cc
+g++ -O3 -c -o tmp/bitmath.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/bitmath.cc
+g++ -O3 -c -o tmp/Assigner.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/Assigner.cc
 g++ -O3 -c -o tmp/ConservativeAssigner.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/ConservativeAssigner.cc
 g++ -O3 -c -o tmp/Framework.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/Framework.cc
 g++ -O3 -c -o tmp/HostRouter.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/HostRouter.cc
