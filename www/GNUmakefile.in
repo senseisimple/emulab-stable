@@ -26,13 +26,14 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 # Generate a list of all the files we want to install from the current
 # directory and the source directory. 
 #
-FILES	= $(wildcard *.css *.jpg *.gif *.png *.html *.php3)
+FILES	= $(wildcard *.css *.jpg *.gif *.png *.html *.php3 *.php)
 FILES  += $(wildcard $(SRCDIR)/*.css)
 FILES  += $(wildcard $(SRCDIR)/*.jpg)
 FILES  += $(wildcard $(SRCDIR)/*.png)
 FILES  += $(wildcard $(SRCDIR)/*.gif)
 FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
+FILES  += $(wildcard $(SRCDIR)/*.php)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml
 
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
@@ -45,6 +46,7 @@ DOCFILES  = $(wildcard $(SRCDIR)/doc/*.html)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.jpg)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.gif)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.php3)
+DOCFILES += $(wildcard $(SRCDIR)/doc/*.php)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.ps)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.pdf)
 
@@ -53,6 +55,7 @@ TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.jpg)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.gif)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.png)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.php3)
+TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.php)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.ns)
 TUTFILES += $(SRCDIR)/tutorial/tb_compat.tcl
 
@@ -60,9 +63,11 @@ BUIFILES  = $(wildcard $(SRCDIR)/buildui/*.html)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.jpg)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.gif)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.php3)
+BUIFILES += $(wildcard $(SRCDIR)/buildui/*.php)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.class)
 
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
+WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php)
 
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
@@ -74,6 +79,7 @@ DOWNLOADFILES += $(wildcard $(SRCDIR)/downloads/*.zip)
 #
 ifeq ($(OURDOMAIN),$(MAINSITE)) 
 	CVSWEBFILES  = $(wildcard $(SRCDIR)/cvsweb/*.php3)
+	CVSWEBFILES  = $(wildcard $(SRCDIR)/cvsweb/*.php)
 	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.conf)
 	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.gif)
 	CVSWEBCGI    = $(wildcard $(SRCDIR)/cvsweb/*.cgi)
