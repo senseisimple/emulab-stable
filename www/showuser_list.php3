@@ -180,7 +180,7 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     if ($isadmin) {
-	echo "<td align=center><A href='modusr_form.php3?target_uid=$thisuid'>
+	echo "<td align=center><A href='moduserinfo.php3?target_uid=$thisuid'>
                      <img alt=\"O\" src=\"blueball.gif\"></A></td>\n";
 	echo "<td align=center><A href='deleteuser.php3?target_uid=$thisuid'>
                      <img alt=\"X\" src=\"redball.gif\"></A></td>\n";
