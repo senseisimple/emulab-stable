@@ -105,11 +105,10 @@ $result =
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as n on a.phys_nodeid=n.node_id ".
-		 "left join node_types as nt on a.type=nt.type ".
-		 "where b.node_id is null and a.role='testnode' and ".
-		 "      (nt.isvirtnode=0 || ".
-		 "       (n.status='up' and (m.node_id is null || ".
-		 "        m.pid!='$DEADPID' || m.eid!='$DEADEID')))");
+		 "where b.node_id is null and (a.role='testnode' or ".
+		 "      (a.role='virtnode' and n.status='up' and ".
+		 "       (m.node_id is null or ".
+		 "        m.pid!='$DEADPID' or m.eid!='$DEADEID')))");
 
 while (($node,$type) = $result->fetchrow_array) {
     # Shark hack
