@@ -289,9 +289,6 @@ if (defined($options{"n"})) {
 }
 if (defined($options{"x"})) {
     $show_exclusion = 1;
-
-    my $err = $excl->Read("$TB/www/floormap/exclusion.png");
-    warn "$err" if "$err";
 }
 
 if (defined($options{"e"})) {
