@@ -1,7 +1,7 @@
 /* test-sched-produce.c: Test event scheduler, with attributes (producer).
    This test may be used with test-consume or test-attr-consume. */
 
-static char rcsid[] = "$Id: test-sched-produce.c,v 1.1 2002-01-29 17:24:59 imurdock Exp $";
+static char rcsid[] = "$Id: test-sched-produce.c,v 1.2 2002-02-19 15:51:01 imurdock Exp $";
 
 #include <event.h>
 
@@ -32,7 +32,7 @@ main(int argc, char **argv)
     }
 
     /* Register with the event system: */
-    handle = event_register(server);
+    handle = event_register(server, 0);
     if (handle == NULL) {
         ERROR("could not register with event system\n");
         return 1;

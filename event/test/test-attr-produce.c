@@ -1,6 +1,6 @@
 /* test-attr-produce.c: Test delivery of events, with attributes (producer). */
 
-static char rcsid[] = "$Id: test-attr-produce.c,v 1.4 2002-01-29 17:23:34 imurdock Exp $";
+static char rcsid[] = "$Id: test-attr-produce.c,v 1.5 2002-02-19 15:51:01 imurdock Exp $";
 
 #include <event.h>
 
@@ -31,7 +31,7 @@ main(int argc, char **argv)
     }
 
     /* Register with the event system: */
-    handle = event_register(server);
+    handle = event_register(server, 0);
     if (handle == NULL) {
         ERROR("could not register with event system\n");
         return 1;

@@ -1,6 +1,6 @@
 /* test-produce.c: Test delivery of events (producer). */
 
-static char rcsid[] = "$Id: test-produce.c,v 1.2 2001-11-06 17:24:16 imurdock Exp $";
+static char rcsid[] = "$Id: test-produce.c,v 1.3 2002-02-19 15:51:01 imurdock Exp $";
 
 #include <event.h>
 
@@ -24,7 +24,7 @@ main(int argc, char **argv)
     }
 
     /* Register with the event system: */
-    handle = event_register(server);
+    handle = event_register(server, 0);
     if (handle == NULL) {
         ERROR("could not register with event system\n");
         return 1;
