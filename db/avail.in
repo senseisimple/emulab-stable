@@ -21,8 +21,7 @@ if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) {
       "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n".#"deltas \t= anetd | ...\n".
       #	"fixes \t\t= cron_off | sendmail_off | ...\n"
       "A field name alone will show that field in the display of available\n".
-      "nodes. A field name with '=' will match nodes that have that field\n".
-      "empty. A field name with '=' followed by a string will match nodes\n".
+      "nodes. A field name with '=' followed by a string will match nodes\n".
       "that have that string in that field.\n"
      );
 }
@@ -65,8 +64,8 @@ if (defined($args{"os"})) {
 }
 if (defined($args{"ver"})) { 
   $os = 1;
-  $cols .= ",d.ver";
-  $cond .= " and d.ver='".$args{"ver"}."'" if $args{"ver"} ne '='; 
+  $cols .= ",d.version";
+  $cond .= " and d.version='".$args{"ver"}."'" if $args{"ver"} ne '='; 
 }
 # if (defined($args{"deltas"})) { 
 #   $os = 1;
