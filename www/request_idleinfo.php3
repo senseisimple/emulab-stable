@@ -138,6 +138,7 @@ TBMAIL("$user_name <$user_email>",
        "experiment out so that others can use the nodes.\n\n".
        "Thanks very much!\n",
        "From: $TBMAIL_OPS\n".
+       "Bcc: $TBMAIL_OPS\n".
        "Errors-To: $TBMAIL_WWW");
 
 echo "<center><h2>Message sent!</h2>
