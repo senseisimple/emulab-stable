@@ -50,7 +50,7 @@ then
           fi
         done
 
-        gzip -9 $CURLOG && cp $CURLOG $DESTDIR && rm $CURLOG
+        gzip -9 $CURLOG && cp $CURLOG.gz $DESTDIR && rm $CURLOG.gz
         if [ $? -ne 0 ]
         then
           echo "Error trying to zip and move log."
