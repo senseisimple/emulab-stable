@@ -278,8 +278,8 @@ else {
     $SIG{TERM} = 'DEFAULT';
     $ENV{'TMCCVNODEID'} = $vnodeid;
 
-    my $cmd = "jail $jailoptions ".
-	"$JAILPATH/$vnodeid/root $jailhostname $IP /etc/jail/injail.pl";
+    my $cmd = "jail $jailoptions $JAILPATH/$vnodeid/root $jailhostname $IP ".
+	"/etc/jail/injail -v $vnodeid";
     if ($interactive) {
 	$cmd .= " /bin/csh";
     }
