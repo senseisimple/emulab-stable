@@ -218,7 +218,7 @@ function SPITFORM($formfields, $errors)
                                    <br>
                                    Or<br>
                                    <br>
-                               On Server (/proj or /users)
+                               On Server <br> (/proj, /groups, /users)
                               </center></td>
 
                   <td rowspan>
