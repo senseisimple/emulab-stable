@@ -200,6 +200,13 @@ if (! -e "$GRPROOT/$pid") {
     if (! chown($uid, $gid, "$GRPROOT/$pid")) {
 	fatal("Could not chown $GRPROOT/$pid to $uid/$gid: $!");
     }
+
+    # Create a group link for the default group.
+    if (! -e "$GRPROOT/$pid/$pid") {    
+	if (system("ln -s $PROJROOT/$pid $GRPROOT/$pid/$pid")) {
+	    fatal("Could not symlink $PROJROOT/$pid to $GRPROOT/$pid/$pid");
+	}
+    }
 }
 
 #
