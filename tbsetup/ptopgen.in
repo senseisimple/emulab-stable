@@ -97,7 +97,13 @@ sub get_iface {
     if (defined($interfacemap{"$node:$card:$port"})) {
 	return $interfacemap{"$node:$card:$port"};
     } else {
-	return "(null)";
+	# shark hack
+	if ($node =~ /^sh/) {
+	    return "eth0";
+	} else {
+	    return "(null)";
+	}
+	# end shark hack 
     }
 };
 sub get_ifacebw {
