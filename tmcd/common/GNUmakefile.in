@@ -32,16 +32,19 @@ INSTALL		= /usr/bin/install -c
 
 install:
 	@echo "You should probably not run this install directly!"
-	@echo -n "If you do, be sure to install from the system specific "
+	@echo "If you do, be sure to install from the system specific "
 	@echo "directory afterwards."
 
 
-local-install:	path-install script-install other-install
+local-install:	path-install script-install
+
+remote-install:	path-install remote-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/../freebsd/liblocsetup.pm \
 			$(BINDIR)/liblocsetup.pm
 
 other-install:
 	(cd ../../os; $(MAKE) client-install)
+	(cd ../../event; $(MAKE) client-install)
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
@@ -52,6 +55,7 @@ dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
 	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
 	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/lock
 
 path-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/paths.pm $(ETCDIR)/paths.pm
@@ -64,12 +68,26 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
 	$(INSTALL) -m 755 $(SRCDIR)/bootsetup $(BINDIR)/bootsetup
 	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(BINDIR)/sendevent
+	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(BINDIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(BINDIR)/rc.agents
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(BINDIR)/rc.delta
 	$(INSTALL) -m 755 $(SRCDIR)/rc.progagent $(BINDIR)/rc.progagent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(BINDIR)/rc.setup
+	# Symlink this cause we invoke it from boss, and its too much
+	# of a hassle to worry about right now.
+	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
+	rm -f $(ETCDIR)/update
+	-ln -s $(BINDIR)/update $(ETCDIR)/update
+	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
+	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
+	-chown root $(BINDIR)/vnodesetup
+	-chmod u+s $(BINDIR)/vnodesetup
+
+remote-script-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
+	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup
+	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
 	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
-	chown root $(BINDIR)/vnodesetup
-	chmod u+s $(BINDIR)/vnodesetup

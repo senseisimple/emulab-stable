@@ -18,90 +18,97 @@ SUBDIR		= tmcd/freebsd
 
 include $(OBJDIR)/Makeconf
 
-all:
+all:	supfile
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 DESTDIR		=
-ETCDIR		= $(DESTDIR)/etc
-JAILDIR		= $(ETCDIR)/jail
-INSTALL_DIR	= $(ETCDIR)/testbed
-RC_DIR		= $(INSTALL_DIR)/rc.d
-RRC_DIR		= $(DESTDIR)/usr/local/etc/rc.d
-ISMFS		= $(INSTALL_DIR)/ismfs
-INSTALL_FILES	= group master.passwd setup
-INSTALL		= /usr/bin/install -c 
+SYSETCDIR	= $(DESTDIR)/etc
+JAILDIR		= $(SYSETCDIR)/jail
+ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
+RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+ISMFS		= $(ETCDIR)/ismfs
+INSTALL		= /usr/bin/install -c
 
-install:	misc-install script-install bin-install
-mfs-install:	script-install bin-install
+install:	common-install etc-install \
+			sup-install script-install bin-install jail-install
+	@echo "Remember to install the PEM files if necessary"
+
+mfs-install:	common-install etc-install \
+			script-install bin-install
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
 
 dir-install:
-	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RC_DIR)
-	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab
-	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/db
-	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/jails
-	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/logs
+	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/sup
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/lock
+	-rm -rf $(DESTDIR)/etc/testbed
+	ln -s emulab $(DESTDIR)/etc/testbed
+	-rm -rf $(DESTDIR)/usr/local/etc/testbed
+	ln -s emulab $(DESTDIR)/usr/local/etc/testbed
 
-misc-install:	dir-install
-	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)/sup
-	$(INSTALL) -m 755 $(SRCDIR)/supfile $(INSTALL_DIR)/supfile
+common-install:	dir-install
+	(cd ../common; $(MAKE) local-install)
+
+sup-install:	dir-install
+	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
 	$(INSTALL) -m 750 -o root -g wheel -d $(DESTDIR)/root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
-	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
-	$(INSTALL) -m 755 ../findif $(INSTALL_DIR)/findif
+	$(INSTALL) -m 755 ../tmcc-nossl $(BINDIR)/tmcc
+	$(INSTALL) -m 755 ../findif $(BINDIR)/findif
+
+etc-install:	dir-install sysetc-install
+	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
+	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(ETCDIR)/master.passwd
+	$(INSTALL) -m 644 $(SRCDIR)/hosts $(ETCDIR)/hosts
+
+sysetc-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 $(SYSETCDIR)/start_if.fxp0
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(SYSETCDIR)/start_if.fxp1
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(SYSETCDIR)/start_if.fxp4
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(SYSETCDIR)/start_if.xl0
 
 script-install:	dir-install
-	$(INSTALL) -m 644 $(SRCDIR)/group $(INSTALL_DIR)/group
-	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(INSTALL_DIR)/master.passwd
-	$(INSTALL) -m 755 $(SRCDIR)/prepare $(INSTALL_DIR)/prepare
-	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(INSTALL_DIR)/sendevent
-	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(INSTALL_DIR)/libsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm \
-			$(INSTALL_DIR)/liblocsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
-	$(INSTALL) -m 755 $(SRCDIR)/update $(INSTALL_DIR)/update
-	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
-	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(INSTALL_DIR)/rc.setup
-	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(INSTALL_DIR)/rc.agents
-	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(INSTALL_DIR)/rc.delayagent
-	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(INSTALL_DIR)/rc.delta
-	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(INSTALL_DIR)/rc.healthd
-	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(INSTALL_DIR)/rc.mfs
-	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(INSTALL_DIR)/tbshutdown
-	$(INSTALL) -m 755 $(SRCDIR)/setipod $(INSTALL_DIR)/setipod
-	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup
-	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname
-	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
-	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
-		$(ETCDIR)/dhclient-exit-hooks
-	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
-	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(INSTALL_DIR)/chipset.awk
-	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(BINDIR)/rc.delayagent
+	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc.healthd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc.mfs
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
+	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
+	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
+	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
+	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
-		$(INSTALL_DIR)/control_interface
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 $(ETCDIR)/start_if.fxp0
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(ETCDIR)/start_if.fxp1
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(ETCDIR)/start_if.fxp4
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(ETCDIR)/start_if.xl0
-	$(INSTALL) -m 755 $(SRCDIR)/rc.conf  $(ETCDIR)/rc.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf \
-			$(INSTALL_DIR)/gated_fxp0.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf \
-			$(INSTALL_DIR)/gated_fxp1.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf \
-			$(INSTALL_DIR)/gated_fxp4.conf
-	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh  $(RRC_DIR)/testbed.sh
+			$(BINDIR)/control_interface
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(BINDIR)/gated_fxp0.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(BINDIR)/gated_fxp1.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(BINDIR)/gated_fxp4.conf
+	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh  $(RCDIR)/testbed.sh
 
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
-	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RC_DIR)/sfs.sh
-	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
-	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config
-	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config $(ETCDIR)/sfs/sfssd_config
+	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/sfs.sh
+	$(INSTALL) -m 644 $(SRCDIR)/exports $(SYSETCDIR)/exports
+	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config \
+			$(SYSETCDIR)/sfs/sfsrwsd_config
+	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config \
+			$(SYSETCDIR)/sfs/sfssd_config
 	$(INSTALL) -m 755 -o sfs -g sfs -d $(DESTDIR)/var/sfs
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/var
@@ -114,6 +121,11 @@ jail-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.conf $(JAILDIR)/rc.conf
 	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.local $(JAILDIR)/rc.local
 	$(INSTALL) -m 755 $(SRCDIR)/jail/injail.pl $(JAILDIR)/injail.pl
-	$(INSTALL) -m 755 $(SRCDIR)/jail/jaildog.pl $(INSTALL_DIR)/jaildog.pl
-	$(INSTALL) -m 755 $(SRCDIR)/jail/jailctl $(INSTALL_DIR)/jailctl
-	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(INSTALL_DIR)/mkjail.pl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/jaildog.pl $(BINDIR)/jaildog.pl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/jailctl $(BINDIR)/jailctl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(BINDIR)/mkjail.pl
+
+# Invoked from ../ron
+remote-install:	jail-install
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc.ipod
+	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
