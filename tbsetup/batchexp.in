@@ -147,6 +147,11 @@ if (!$immediate && TBSiteVarExists("idle/batch_threshold")) {
 }
 
 #
+# Grab me a secret key!
+#
+my $secretkey = TBGenSecretKey();
+
+#
 # Create an experiment record. The pid/eid has to be unique, so lock the
 # table for the check/insert.
 #
@@ -171,11 +176,11 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
-		  " idle_ignore) ".
+		  " idle_ignore, keyhash) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', 'new', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
-		  "'$autoswaptime', $idleignore)")) {
+		  "'$autoswaptime', $idleignore, '$secretkey')")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
