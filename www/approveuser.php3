@@ -470,9 +470,19 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	        TBERROR("Invalid $user status $curstatus in approveuser.php3",
                          1);
 	    }
-	    $query_result =
-		DBQueryFatal("UPDATE users set status='$newstatus' ".
-			     "WHERE uid='$user'");
+	    DBQueryFatal("UPDATE users set status='$newstatus' ".
+			 "WHERE uid='$user'");
+
+            #
+            # Create user account on control node.
+            #
+	    SUEXEC($uid, $TBADMINGROUP, "webtbacct add $user", 1);
+	}
+	else {
+	    #
+	    # Only need to add new membership.
+	    # 
+	    SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 1);
 	}
 
         TBMAIL("$user_name '$user' <$user_email>",
@@ -492,12 +502,6 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	echo "<p>
                   User $user was <b>granted</b> membership in $project/$group
                   with $newtrust permissions.\n";
-
-	#
-        # Create user account on control node.
-        #
-	MKACCT($uid, "webmkacct $user");
-	SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 0);
 		
 	continue;
     }
