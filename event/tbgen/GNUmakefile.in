@@ -34,7 +34,8 @@ tevd:	tevd.o
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:	$(INSTALL_SBINDIR)/tevd \
-		$(INSTALL_SBINDIR)/tevd.restart
+		$(INSTALL_SBINDIR)/tevd.restart \
+		$(INSTALL_BINDIR)/tevc
 
 control-install:	$(INSTALL_BINDIR)/tevc
 
