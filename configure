@@ -895,6 +895,8 @@ fi
 
 
 
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -935,7 +937,9 @@ JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
 ELABINELAB=0
-OUTERBOSSNODE=""
+OUTERBOSS_NODENAME=""
+OUTERBOSS_XMLRPCPORT=3069
+OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
 PLABSUPPORT=0
 PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
@@ -1385,7 +1389,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1389: checking for a BSD compatible install" >&5
+echo "configure:1393: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1763,7 +1767,9 @@ s%@TBAUTHTIMEOUT@%$TBAUTHTIMEOUT%g
 s%@TBMAINSITE@%$TBMAINSITE%g
 s%@SFSSUPPORT@%$SFSSUPPORT%g
 s%@ELABINELAB@%$ELABINELAB%g
-s%@OUTERBOSSNODE@%$OUTERBOSSNODE%g
+s%@OUTERBOSS_NODENAME@%$OUTERBOSS_NODENAME%g
+s%@OUTERBOSS_XMLRPCPORT@%$OUTERBOSS_XMLRPCPORT%g
+s%@OUTERBOSS_SSLCERTNAME@%$OUTERBOSS_SSLCERTNAME%g
 s%@PLABSUPPORT@%$PLABSUPPORT%g
 s%@TBLOGFACIL@%$TBLOGFACIL%g
 s%@PLAB_ROOTBALL@%$PLAB_ROOTBALL%g
