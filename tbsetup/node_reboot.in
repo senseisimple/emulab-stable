@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -51,7 +51,7 @@ my $ping	= "/sbin/ping";
 my %pids	= ();
 my @row;
 my @nodes       = ();
-my $debug       = 0;
+my $debug       = 1;
 my $force       = 0;
 my $waitmode    = 0;
 my $failed      = 0;
@@ -381,7 +381,7 @@ sub RebootNode {
     # UID so that we can restore it after we finish the ssh
     #
     my $oldUID = $UID;
-    print STDERR "Saved UID: $oldUID\n" if $debug;
+#    print STDERR "Saved UID: $oldUID\n" if $debug;
     $UID = 0;
     
     #
@@ -418,7 +418,7 @@ sub RebootNode {
 
 	    system("$ipod $pc");
 	} else {
-	    info("$pc: ssh reboot");
+	    info("$pc: ssh reboot ($?)");
 	}
     }
     else {
@@ -431,7 +431,7 @@ sub RebootNode {
     # user's real UID
     #
     $UID = $oldUID;
-    print STDERR "Restored UID: $UID\n" if $debug;
+#    print STDERR "Restored UID: $UID\n" if $debug;
 
     #
     # Okay, before we power cycle lets really make sure. We wait a while
