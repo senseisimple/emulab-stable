@@ -240,17 +240,17 @@ main(int argc, char **argv)
 			if (strlen(*argv) + strlen(buf) >= sizeof(buf)-2)
 				fatal("Too many event argument strings!");
 
-			bp = *argv;
-			while (*bp && *bp != '=') {
-				*bp = toupper(*bp);
-				bp++;
-			}
-			if (*bp != '=') {
+			if ( strchr(*argv, '=') == 0 ) {
 			    /* Tcl strings are sent in an NSEEVENT. We
 			     * will allow arbitrary strings
 			     */
 			    sprintf(&buf[strlen(buf)], "%s", *argv);
 			} else {
+			    bp = *argv;
+			    while (*bp && *bp != '=') {
+				*bp = toupper(*bp);
+				bp++;
+			    }
 			    if (*(bp-1) == '_')
 				*(bp-1) = (char) NULL;
 			    *bp++ = (char) NULL;
