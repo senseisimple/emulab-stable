@@ -108,8 +108,9 @@ function WRITESIDEBAR() {
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
-    WRITESIDEBARBUTTON_ABS("Univ. Kentucky Emulab", $TBDOCBASE,
-			   "http://www.uky.emulab.net");
+    WRITESIDEBARBUTTON_NEW("Other Emulabs", $TBDOCBASE,
+                  "docwrapper.php3?docname=otheremulabs.html");
+
     
     WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
 			   $TBDOCBASE, "cdrom.php");

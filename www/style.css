@@ -14,6 +14,7 @@ td.stealth { background-color:#FFF; }
 img.stealth { background-color:#FFF; }
 
 td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
+td.paddedcell2 { padding: 0.5em; }
 
 .bordercell {
 	background-color: #000; }
