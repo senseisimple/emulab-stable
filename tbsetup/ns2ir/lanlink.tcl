@@ -12,10 +12,30 @@ Class LanLink -superclass NSObject
 Class Link -superclass LanLink
 Class Lan -superclass LanLink
 Class Queue -superclass NSObject
+# This class is a hack.  It's sole purpose is to associate to a Link
+# and a direction for accessing the Queue class.
+Class SimplexLink -superclass NSObject
 
-Queue instproc init {link type} {
+SimplexLink instproc init {link dir} {
+    $self set mylink $link
+    $self set mydir $dir
+}
+SimplexLink instproc queue {} {
+    $self instvar mylink
+    $self instvar mydir
+    return [$mylink set ${mydir}queue]
+}
+# Don't need any rename procs since these never use their own name and
+# can not be generated during Link creation.
+
+Queue instproc init {link type dir} {
     $self set mylink $link
     
+
+    # direction is either "to" indicating src to dst or "from" indicating
+    # the dst to src.  I.e. to dst or from dst.
+    $self set direction $dir
+
     # These control whether the link was created RED or GRED. It
     # filters through the DB.
     $self set gentle_ 0
@@ -63,10 +83,23 @@ Queue instproc get_link {} {
     return $mylink
 }
 
-LanLink instproc queue {} {
-    $self instvar linkqueue
+Link instproc init {s nodes bw d type} {
+    $self next $s $nodes $bw $d $type
 
-    return $linkqueue
+    set src [lindex $nodes 0]
+    set dst [lindex $nodes 1]
+
+    $self set src_node $src
+    $self set dst_node $dst
+
+    var_import GLOBALS::new_counter
+    set q1 q[incr new_counter]
+    
+    Queue to$q1 $self $type to
+    Queue from$q1 $self $type from
+
+    $self set toqueue to$q1
+    $self set fromqueue from$q1
 }
 
 LanLink instproc init {s nodes bw d type} {
@@ -78,14 +111,6 @@ LanLink instproc init {s nodes bw d type} {
 
     # Now we need to fill out the nodelist
     $self instvar nodelist
-
-    var_import GLOBALS::new_counter
-    set q1 q[incr new_counter]
-
-    Queue $q1 $self $type
-
-    # For now, a single queue for the link. Makes no sense for lans.
-    $self set linkqueue $q1
 
     # r* indicates the switch->node chars, others are node->switch
     $self instvar bandwidth
@@ -172,6 +197,15 @@ LanLink instproc fill_ips {} {
     }
 }
 
+Link instproc rename {old new} {
+    $self next $old $new
+
+    $self instvar toqueue
+    $self instvar fromqueue
+    $toqueue rename_lanlink $old $new
+    $fromqueue rename_lanlink $old $new
+}
+
 # The following methods are for renaming objects (see README).
 LanLink instproc rename {old new} {
     $self instvar nodelist
@@ -179,8 +213,6 @@ LanLink instproc rename {old new} {
 	set node [lindex $nodeport 0]
 	$node rename_lanlink $old $new
     }
-    $self instvar linkqueue
-    $linkqueue rename_lanlink $old $new
     
     [$self set sim] rename_lanlink $old $new
 }
@@ -209,6 +241,61 @@ LanLink instproc rename_node {old new} {
     set nodelist $newnodelist
 }
 
+Link instproc updatedb {DB} {
+    $self next $DB
+    $self instvar toqueue
+    $self instvar fromqueue
+    $self instvar nodelist
+    $self instvar src_node
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+
+    foreach nodeport $nodelist {
+	set node [lindex $nodeport 0]
+	if {$node == $src_node} {
+	    set linkqueue $toqueue
+	} else {
+	    set linkqueue $fromqueue
+	}
+	set limit_ [$linkqueue set limit_]
+	set maxthresh_ [$linkqueue set maxthresh_]
+	set thresh_ [$linkqueue set thresh_]
+	set q_weight_ [$linkqueue set q_weight_]
+	set linterm_ [$linkqueue set linterm_]
+	set queue-in-bytes_ [$linkqueue set queue-in-bytes_]
+	if {${queue-in-bytes_} == "true"} {
+	    set queue-in-bytes_ 1
+	} elseif {${queue-in-bytes_} == "false"} {
+	    set queue-in-bytes_ 0
+	}
+	set bytes_ [$linkqueue set bytes_]
+	if {$bytes_ == "true"} {
+	    set bytes_ 1
+	} elseif {$bytes_ == "false"} {
+	    set bytes_ 0
+	}
+	set mean_pktsize_ [$linkqueue set mean_pktsize_]
+	set red_ [$linkqueue set red_]
+	if {$red_ == "true"} {
+	    set red_ 1
+	} elseif {$red_ == "false"} {
+	    set red_ 0
+	}
+	set gentle_ [$linkqueue set gentle_]
+	if {$gentle_ == "true"} {
+	    set gentle_ 1
+	} elseif {$gentle_ == "false"} {
+	    set gentle_ 0
+	}
+	set wait_ [$linkqueue set wait_]
+	set setbit_ [$linkqueue set setbit_]
+	set droptail_ [$linkqueue set drop-tail_]
+	
+	set nodeportraw [join $nodeport ":"]
+	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_ where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
+    }
+}
+
 # updatedb DB
 # This adds a row to the virt_lans table.
 LanLink instproc updatedb {DB} {
@@ -219,27 +306,11 @@ LanLink instproc updatedb {DB} {
     $self instvar rdelay
     $self instvar loss
     $self instvar rloss
-    $self instvar linkqueue
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
-    # For now, the return params are the same.
-    set limit_ [$linkqueue set limit_]
-    set maxthresh_ [$linkqueue set maxthresh_]
-    set thresh_ [$linkqueue set thresh_]
-    set q_weight_ [$linkqueue set q_weight_]
-    set linterm_ [$linkqueue set linterm_]
-    set queue-in-bytes_ [$linkqueue set queue-in-bytes_]
-    set bytes_ [$linkqueue set bytes_]
-    set mean_pktsize_ [$linkqueue set mean_pktsize_]
-    set red_ [$linkqueue set red_]
-    set gentle_ [$linkqueue set gentle_]
-    set wait_ [$linkqueue set wait_]
-    set setbit_ [$linkqueue set setbit_]
-    set droptail_ [$linkqueue set drop-tail_]
-
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm,q_qinbytes,q_bytes,q_meanpsize,q_wait,q_setbit,q_droptail,q_red,q_gentle) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$limit_,$maxthresh_,$thresh_,$q_weight_,$linterm_,${queue-in-bytes_},$bytes_,$mean_pktsize_,$wait_,$setbit_,$droptail_,$red_,$gentle_)"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport))"
     }
 }

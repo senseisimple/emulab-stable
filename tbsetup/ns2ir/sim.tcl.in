@@ -553,7 +553,18 @@ Simulator instproc find_link {src dst} {
 
 Simulator instproc link {src dst} {
     set reallink [$self find_link $src $dst]
-
+	
+    if {$src == [$reallink set src_node]} {
+	set dir "to"
+    } else {
+	set dir "from"
+    }
+    
+    var_import GLOBALS::new_counter
+    set name sl[incr new_counter]
+    
+    return [SimplexLink $name $reallink $dir]
+    
     return $reallink
 }
 
