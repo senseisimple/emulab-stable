@@ -568,7 +568,8 @@ if (! $returning) {
     elseif (!TBvalid_uid($formfields[proj_head_uid])) {
 	$errors["UserName"] = TBFieldErrorString();
     }
-    elseif (TBCurrentUser($formfields[joining_uid])) {
+    elseif (TBCurrentUser($formfields[proj_head_uid]) ||
+	    posix_getpwnam($formfields[proj_head_uid])) {
 	$errors["UserName"] = "Already in use. Pick another";
     }
     if (!isset($formfields[usr_title]) ||
