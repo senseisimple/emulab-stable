@@ -323,7 +323,7 @@ if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
 	echo "<td>
                 <a href='setnodeloc.php3?node_id=$node_id".
 	               "&building=$building&floor=$floor&isnewid=$isnewid'>
-                   <img src=$thumb></a>
+                   <img src=\"floormap/$thumb\"></a>
               </td>\n";
 	$titles[$i] = "$title - " . $floortags[$floor];
 	$i++;
