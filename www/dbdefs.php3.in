@@ -1781,6 +1781,60 @@ function TBGetSiteVar($name)
 }
 
 #
+# Count available planetlab nodes.
+#
+# usage: TBPlabAvail()
+#        returns the number of free PlanetLab nodes of each type
+#        returns an empty array on error
+#
+function TBPlabAvail() {
+    $types = array();
+    #
+    # We have to do this in two queries, due to the fact that we do pcplabtypes
+    # different from the way we do other types (it's on the vnodes, not in the
+    # node_autypes for the pnode.)
+    #
+    # XXX - hardcodes hwdown and emulab-ops
+    #
+    $tables = "nodes AS n " .
+	      "LEFT JOIN widearea_nodeinfo AS w ON n.phys_nodeid = w.node_id " .
+              "LEFT JOIN node_auxtypes AS na ON n.node_id = na.node_id " .
+	      "LEFT JOIN reserved AS r ON n.phys_nodeid = r.node_id " .
+	      "LEFT JOIN node_status AS ns ON n.phys_nodeid = ns.node_id " .
+	      "LEFT JOIN node_features AS nf ON n.phys_nodeid = nf.node_id " .
+	      "LEFT JOIN node_features AS nf2 ON n.phys_nodeid = nf2.node_id";
+    $available = "ns.status='up' AND (nf.feature='+load' AND nf.weight < 1.0) " .
+                 "AND (nf2.feature='+disk' and nf2.weight < 1.0) " .
+		 "AND !(r.pid = 'emulab-ops' and r.eid = 'hwdown')";
+
+    #
+    # Grab pcplab nodes
+    #
+    $query_result = DBQueryFatal("SELECT count(*), count(distinct w.site) " .
+                                 "FROM $tables " .
+				 "WHERE (n.type='pcplabphys') ".
+				 "    AND($available)");
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	$types['pcplab'] = array($row[0],$row[1]);
+    }
+
+    #
+    # Grab the more specific types
+    #
+    $query_result = DBQueryFatal("SELECT na.type, count(*), " .
+				 "count(distinct w.site) FROM $tables " .
+				 "WHERE (n.type='pcplabphys') " .
+				 "    AND ($available) " .
+				 "GROUP BY na.type");
+    while ($row = mysql_fetch_row($query_result)) {
+	$types[$row[0]] = array($row[1],$row[2]);
+    }
+
+    return $types;
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
