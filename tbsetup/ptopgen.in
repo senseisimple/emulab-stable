@@ -236,7 +236,7 @@ foreach $node (keys(%nodes)) {
 	#
 	# Ditto for jailed nodes
 	#
-	if (defined($mfactor)) {
+	if (defined($mfactor) && $mfactor <= $virtnode_capacity) {
 	    $text .= " pcvm:$mfactor";
 	}
 	else {
