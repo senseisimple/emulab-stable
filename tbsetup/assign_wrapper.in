@@ -223,8 +223,8 @@ $query_result =
     DBQueryFatal("SELECT type,delay_osid,osid from node_types");
 
 while (($type,$delayosid,$defosid) = $query_result->fetchrow_array()) {
-    $delayosids{$type} = $delayosid;
-#   $delayosids{$type} = "testbed-FBSD47-UPDATE";
+#   $delayosids{$type} = $delayosid;
+    $delayosids{$type} = "testbed-FBSD47-UPDATE";
     $defaultosids{$type} = $defosid;
 }
 
@@ -237,6 +237,8 @@ my %iptonodemap = ();
 # XXX Remote/Virt node hacks. Turns out to be similar to NSE.
 my %isremotenode = ();
 my %isvirtnode   = ();
+my $remotecount  = 0;
+my $virtcount    = 0;
 
 printdb "Loading virt_nodes.\n";
 $result =
@@ -282,6 +284,8 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = $result->fetchrow_array){
     # REMOTENODE HACK
     # 
     $isremotenode{$vname} = $isremote;
+    $remotecount++
+	if ($isremote);
     foreach $ipinfo (split(" ",$ips)) {
 	($port,$ip) = split(":",$ipinfo);
 	$ips{"$vname:$port"} = $ip;
@@ -291,6 +295,8 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = $result->fetchrow_array){
 	$iptonodemap{$ip} = $vname;
     }
     $isvirtnode{$vname} = $isvirt;
+    $virtcount++
+	if ($isvirt);
     if (defined($fixed)) {
 	$fixed_nodes{$vname} = $fixed;
     }
@@ -790,9 +796,9 @@ while (1) {
     TBDebugTimeStamp("assign started");
     # Run assign
     $fail = 0;
-    my $cmdargs = "$ptopfile $topfile";
+    my $cmdargs = "-r -p $ptopfile $topfile";
     $cmdargs = "-r -p $cmdargs"
-	if (scalar(keys(%isremotenode)));
+	if ($virtcount);
     print "assign $cmdargs\n";
     open(ASSIGNFP,"assign $cmdargs | tee assign.log |");
     $violations = 0;
