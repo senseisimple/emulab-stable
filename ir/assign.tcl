@@ -18,6 +18,7 @@ set testbed "testbed.ptop"
 set macs "./macs.txt"
 set assign "../assign/assign"
 set maxrun 5
+set switchports 32
 
 if {[llength $argv] != 1} {
     puts stderr "Syntax: assign <ir>"
@@ -57,7 +58,8 @@ while {[gets $fp line] >= 0} {
     if {$line == {}} {continue}
     if {$line == "END links"} {break}
 
-    set links([lindex $line 0]) [list [lindex $line 1] [lindex $line 3]]
+    set links([lindex $line 0]) [list [lrange $line 1 2] \
+				     [lrange $line 3 4]]
 }
 
 # close the ir for now
@@ -76,7 +78,9 @@ foreach node [array names nodes] {
 
 # write links
 foreach link [array names links] {
-    puts $topfp "link $links($link)"
+    set src [lindex $links($link) 0]
+    set dst [lindex $links($link) 1]
+    puts $topfp "link [lindex $src 0] [lindex $dst 0]"
 }
 
 close $topfp
@@ -144,15 +148,63 @@ foreach switch [array names map] {
 puts $fp "END nodes"
 puts $fp "END virtual"
 
+# read macs file
+puts "Reading macs ($macs)"
+set macfp [open $macs r]
+while {[gets $macfp line] >= 0} {
+    set mac([lindex $line 0]) [lrange $line 1 end]
+}
+close $macfp
+
+# do port computations
+puts "Calculating port numbers"
+
+# pass 1 - here we record all used ports
+foreach node [array names nodes] {
+    foreach link [lrange $nodes($node) 1 end] {
+	if {$node == [lindex [lindex $links($link) 0] 0]} {
+	    set port [lindex [lindex $links($link) 0] 1]
+	    set index 0
+	} else {
+	    set port [lindex [lindex $links($link) 1] 1]
+	    set index 1
+	}
+	if {$port == "-1"} {
+	    # save for pass 2
+	    lappend unresolved [list $link $index $node]
+	} else {
+	    set assigned($node:$port) 1
+	}
+    }
+}
+# pass 2 - here we fill in all -1's from unused numbers
+foreach un $unresolved {
+    set link [lindex $un 0]
+    set index [lindex $un 1]
+    set node [lindex $un 2]
+    # find a free number
+    set nnode [lindex $nmap($node) 0]
+    if {[info exists mac($nnode)] == 0} {
+	# switch
+	set numports $switchports
+    } else {
+	set numports [llength $mac([lindex $nmap($node) 0])]
+    }
+    for {set i 0} {$i < $numports} {incr i} {
+	if {! [info exists assigned($node:$i)]} {
+	    # found one
+	    puts "Port $i on node $node assigned to link $link"
+	    set assigned($node:$i) 1
+	    set links($link) [lreplace $links($link) $index $index \
+				  [list $node $i]]
+	    break
+	}
+    }
+}
+
 # now we apprend the vlan section
 # first we need to read in macs
 puts "Adding VLAN section"
-puts "  Reading macs ($macs)"
-set macfp [open $macs r]
-while {[gets $macfp line] >= 0} {
-    set mac([lindex $line 0]) [lindex $line 1]
-}
-close $macfp
 puts $fp "START vlan"
 
 # ok, this is harder.  We need to go through every link in links
@@ -161,15 +213,19 @@ puts $fp "START vlan"
 foreach switch [array names map] {
     puts $fp "switch $switch"
     foreach link [array names links] {
-	set src [lindex $links($link) 0]
-	set dst [lindex $links($link) 1]
+	set srcp [lindex $links($link) 0]
+	set dstp [lindex $links($link) 1]
+	set src [lindex $srcp 0]
+	set dst [lindex $dstp 0]
+	set srcport [lindex $srcp 1]
+	set dstport [lindex $dstp 1]
 	set srcs [lindex $nmap($src) 0]
 	set dsts [lindex $nmap($dst) 0]
 	if {$srcs == $switch || $dsts == $switch} {
 	    # output a vlan for this
 	    set srcp [lindex $nmap($src) 1]
 	    set dstp [lindex $nmap($dst) 1]
-	    puts $fp "$mac($srcp) $mac($dstp)"
+	    puts $fp "[lindex $mac($srcp) $srcport] [lindex $mac($dstp) $dstport]"
 	}
     }
     puts $fp "end"
