@@ -22,13 +22,16 @@ and return improvements to us.  These terms may become more
 liberal in a future formal release.
 
 
-HOW TO
+HOW TO SETUP
 Copy and localize the 'defs-example' file for your environment
 and run "./configure".  See doc/setup.txt for details.
 
 This source currently only builds on FreeBSD, and requires several packages;
 the dependencies can be found in the Makefile for our 'meta-port' in
 install/ports/emulab-boss .
+
+HOW TO UPDATE
+Start by looking at doc/update-testbed.txt.
 
 DOCUMENTATION
 This is a snapshot, not a formal distribution, so don't expect
@@ -78,18 +81,22 @@ account   -  Account creation and management
 apache    -  Apache HTTPD configuration
 assign    -  Resource allocation software
 capture   -  Node serial line server software
-cdrom     -  Configuration files for remote nodes
+cdrom     -  Software related to CD-booting local and remote machines
 db        -  Variety of interfaces to testbed state 
 dhcpd     -  DHCPD configuration
 doc       -  Documentation (mainly internal)
 event     -  Event System
+hyperviewer - 3D experiment visualization tool
 install   -  Site installation scripts
 ipod      -  "Ping of Death" software
 ir        -  NS-to-database interpreter (in TCL)
-lib       -  C++ database interface library
-os        -  Software for saving/distributing images (incl. Frisbee)
-patches   -  Patches needed to compile software
-pxe       -  Intel PXE support
+lib       -  C/C++ interface libraries
+mote      -  Initial testbed support for Berkeley/Crossbow motes
+named     -  BIND configuration files
+os        -  Client-side software (disk loading, route calculation, etc.)
+patches   -  Patches needed to compile standard software packages
+pxe       -  Software related to PXE-booting machines
+rc.d      -  Server-side startup scripts
 security  -  Tools for secure boss node access
 sensors   -  Node monitoring daemons
 sql       -  Database schema and initialization
@@ -98,11 +105,12 @@ sysadmin  -  Apache Log Roller
 tbsetup   -  Experiment creation and manipulation
 testsuite -  Automated testing suite
 tip       -  Node serial line client software
-tmcd      -  Testbed master control daemon (for node configuration)
-tools     -  pcapper tool
+tmcd      -  Testbed master control daemon and client (for node configuration)
+tools     -  Misc. infrastructure tools
 utils     -  Testbed configuration and maintenence tools
 vis       -  Experiment visualization
 www       -  Web Interface / User Documentation
+xmlrpc    -  Programatic XML-RPC interface to testbed
 
 HELP/CONTACT INFORMATION
 For help and to report bugs and problems, mail
