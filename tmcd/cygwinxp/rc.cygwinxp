@@ -6,6 +6,9 @@
 #
 # rc.cygwinxp - CygWin-specific startup.  Run by rc.bootsetup on CygWin.
 
+PATH=/usr/local/etc/emulab:/bin:$SYSTEMROOT/system32:$PATH
+export PATH
+
 # Enable logging.
 logfile=/var/log/EmulabStartup.log
 chmod -f g+w $logfile
@@ -19,16 +22,43 @@ chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
 # Make sure the computer name is right, reboots to change it if necessary.
-nodeid=`$tmcc nodeid`
+nodeid=`tmcc nodeid`
 hostname=`/bin/hostname`
 datehost="`date`: Host name '$hostname'"
 if [ $nodeid == $hostname ]; then
-    echo "$datehost matches nodeid '$nodeid'." >> $logfile
+    msg="$datehost matches nodeid '$nodeid'."
+    echo "$msg" >> $logfile
+    echo "$msg"
 else
-    echo "$datehost differs from nodeid '$nodeid'." >> $logfile
+    msg="$datehost differs from nodeid '$nodeid'." >> $logfile
+    echo "$msg" >> $logfile
+    echo "$msg"
 
     # Change hostname and computername, rename My Computer, reboot on success.
     /usr/local/etc/emulab/WSName /N:$nodeid /REBOOT /MCN
+
+    # Should never get here!  Try /sbin/reboot.
+    datehost="`date`: Host name '$hostname'"
+    newhost=`/bin/hostname`
+    msg="$datehost didn't reboot changing to '$newhost'!  Trying reboot."
+    echo "$msg" >> $logfile
+    echo "$msg"
+    /sbin/reboot
+
+    # Should never get here either!!!  Try /bin/shutdown.
+    datehost="`date`: Host name '$hostname'"
+    newhost=`/bin/hostname`
+    msg="$datehost didn't /sbin/reboot changing to '$newhost'!  Trying shutdown."
+    echo "$msg" >> $logfile
+    echo "$msg"
+    /bin/shutdown -r -f now
+
+    # Give up.
+    datehost="`date`: Host name '$hostname'"
+    newhost=`/bin/hostname`
+    msg="$datehost failed to reboot changing to '$newhost'."
+    echo "$msg" >> $logfile
+    echo "$msg"
 fi
 
 # Sometimes the network stack gets out of sync: 'ipconfig /all' reports different

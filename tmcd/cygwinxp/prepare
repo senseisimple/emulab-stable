@@ -15,8 +15,9 @@ my @DBFILES     = ();
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock", "lib/dhcp");
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
-my $SOURCES     = "~root/flux/testbed";
-my $HISTORY     = "~root/.bash_history";
+my $SOURCES     = "/home/root/flux/testbed";
+my $OBJS        = "/home/root/flux/obj-real";
+my $HISTORY     = "/home/root/.bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
 my $NTPDRIFT    = "/etc/ntp/drift";
 
@@ -112,7 +113,7 @@ if (-f $NTPDRIFT) {
     close(DRIFT);
 }
 
-print "Clearing out testbed sources ...\n";
+print "Clearing out testbed sources $SOURCES...\n";
 system("rm -rf $SOURCES");
 
 print "Clearing out $RUNDIR ...\n";

@@ -11,7 +11,7 @@
 #
 # We also arrange for this to be run by login shells under ssh.
 
-PATH=/usr/local/etc/emulab:/bin:$PATH
+PATH=/usr/local/etc/emulab:/bin:$SYSTEMROOT/system32:$PATH
 export PATH
 
 # Samba server.

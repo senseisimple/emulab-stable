@@ -95,6 +95,17 @@ my $winusersfile = "$BOOTDIR/winusers";
 my $usershellsfile = "$BOOTDIR/usershells";
 
 #
+# system() with error checking.
+#
+sub mysystem($)
+{
+    my ($cmd) = @_;
+    if (system($cmd) != 0) {
+	warning("Failed: ($cmd), $!\n");
+    }
+}
+
+#
 # OS dependent part of cleanup node state.
 # 
 sub os_account_cleanup()
@@ -111,26 +122,18 @@ sub os_account_cleanup()
 	    print "Removing user: $name\n";
 
 	    # There is always an NT account.
-	    my $cmd = "$NET user $name /delete > /dev/null";
-	    if (system($cmd) != 0) {
-		warning("Failed: ($cmd), $!\n");
-	    }
+	    mysystem("$NET user $name /delete > /dev/null");
 
 	    # There will only be an NT homedir if the user has logged in sometime.
-	    $cmd = "$RM -rf C:/Documents and Settings/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed: ($cmd), $!\n");
-	    }
+	    mysystem("$CHOWN -Rf root C:/'Documents and Settings'/$name");
+	    mysystem("$RM -rf C:/'Documents and Settings'/$name");
+	    # It sometimes also makes user.PCnnn, user.PCnnn.000, etc.
+	    mysystem("$CHOWN -Rf root C:/'Documents and Settings'/$name.*");
+	    mysystem("$RM -rf C:/'Documents and Settings'/$name.*");
 
 	    # Unmount the homedir so we can get to the mount point.
-	    $cmd = "$UMOUNT /users/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed: ($cmd), $!\n");
-	    }
-	    $cmd = "$RMDIR /users/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed: ($cmd), $!\n");
-	    }
+	    mysystem("$UMOUNT /users/$name");
+	    mysystem("$RMDIR /users/$name");
 	}
 	closedir(DIRHANDLE);
 
@@ -145,19 +148,13 @@ sub os_account_cleanup()
 		next;
 	    }
 
-	    $cmd = "$CHOWN -R root /sshkeys/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed ($cmd): $!");
-	    }
-	    $cmd = "$RM -rf /sshkeys/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed ($cmd): $!");
-	    }
+	    mysystem("$CHOWN -Rf root /sshkeys/$name");
+	    mysystem("$RM -rf /sshkeys/$name");
 	}
 	closedir(DIRHANDLE);
     }
 
-    # Clean out the /proj directories.
+    # Clean out the /proj subdirectories.
     if (opendir(DIRHANDLE, "/proj")) {
 	while ($name = readdir(DIRHANDLE)) {
 	    if ($name =~ m/^\.+/) {
@@ -166,22 +163,13 @@ sub os_account_cleanup()
 	    print "Removing project: $name\n";
 
 	    # Unmount the project dir so we can get to the mount point.
-	    $cmd = "$UMOUNT /proj/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed ($cmd): $!");
-	    }
-	    $cmd = "$RMDIR /proj/$name";
-	    if (system($cmd) != 0) {
-		warning("Failed ($cmd): $!");
-	    }
+	    mysystem("$UMOUNT /proj/$name");
+	    mysystem("$RMDIR /proj/$name");
 	}
     }
 
-    # Just unmount /share.
-    $cmd = "$UMOUNT /share";
-    if (system($cmd) != 0) {
-	warning("Failed ($cmd): $!");
-    }
+    # Just unmount /share, everybody gets one.
+    mysystem("$UMOUNT /share");
 }
 
 # 
@@ -589,8 +577,7 @@ sub os_samba_mount($$$)
     my ($local, $host, $verbose) = @_;
 
     # Unmount each one first, ignore errors.
-    $cmd = "$UMOUNT $local";
-    system($cmd);
+    system("$UMOUNT $local");
 
     # Make the CygWin mount from the Samba path to the local mount point directory.
     my $sambapath = $local;

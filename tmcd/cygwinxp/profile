@@ -40,7 +40,7 @@ export USER
 #  4) / (root)
 
 ### Try to get a connection to the Samba host.
-/usr/local/etc/emulab/rc/rc.cygwinxp-user
+##/usr/local/etc/emulab/rc/rc.cygwinxp-user
 
 ### Use a local dir under sshd if the mount failed.
 if [ ! -d "$HOME" ]; then

@@ -63,6 +63,8 @@ bin-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/WSName.exe $(BINDIR)/WSName.exe
 	$(INSTALL) -m 755 $(SRCDIR)/addusers.exe $(BINDIR)/addusers.exe
 	$(INSTALL) -m 755 $(SRCDIR)/usrtogrp.exe $(BINDIR)/usrtogrp.exe
+	# Setx is run under CMD early in the user login to make HOME for Emacs.
+	$(INSTALL) -m 755 $(SRCDIR)/setx.exe $(SYSTEM32)/setx.exe
 	# These are used by tmcd/findif.
 	$(INSTALL) -m 755 $(SYSTEM32)/getmac.exe $(BINDIR)/getmac.exe
 	$(INSTALL) -m 755 $(WBEM)/framedyn.dll $(BINDIR)/framedyn.dll
