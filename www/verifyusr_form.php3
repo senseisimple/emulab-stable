@@ -15,7 +15,8 @@ PAGEHEADER("New User Verification");
 # Only known and logged in users can be verified.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER);
+LOGGEDINORDIE($uid,
+	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|CHECKLOGIN_WEBONLY);
 
 echo "<p>
       The purpose of this page is to verify, for security purposes, that

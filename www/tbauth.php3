@@ -286,6 +286,8 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
         USERERROR("You have not verified your account yet!", 1);
     if ($status & CHECKLOGIN_UNAPPROVED)
         USERERROR("Your account has not been approved yet!", 1);
+    if ($status & CHECKLOGIN_WEBONLY)
+        USERERROR("Your account does not permit you to access this page!", 1);
 
     #
     # Lastly, check for nologins here. This heads off a bunch of other

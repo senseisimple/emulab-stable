@@ -11,8 +11,7 @@ include("showstuff.php3");
 # Only known and logged in users can do this.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED);
-
+LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
 #

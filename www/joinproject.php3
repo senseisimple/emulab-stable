@@ -22,7 +22,7 @@ $uid = GETLOGIN();
 if ($uid) {
     # Allow unapproved users to join multiple groups ...
     # Must be verified though.
-    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED);
+    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
     $joining_uid = $uid;
     $returning = 1;
 }

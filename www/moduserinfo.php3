@@ -20,7 +20,8 @@ $changed_password = "No";
 # users with expired passwords to change them.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED);
+LOGGEDINORDIE($uid,
+	      CHECKLOGIN_USERSTATUS|CHECKLOGIN_PSWDEXPIRED|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
 #

@@ -23,7 +23,7 @@ $uid = GETLOGIN();
 if ($uid) {
     # Allow unapproved users to create multiple projects ...
     # Must be verified though.
-    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED);
+    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
     $proj_head_uid = $uid;
     $returning = 1;
 }
