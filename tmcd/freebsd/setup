@@ -162,7 +162,9 @@ if (@delays) {
 	$delay  = $3;
 	$bandw  = $4;
 	$plr    = $5;
-	
+
+	print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex\n";
+	print DEL "ifconfig $iface2 media 100baseTX mediaopt full-duplex\n";
 	print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
 	print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
 	print DEL "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s ";
