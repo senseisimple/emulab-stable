@@ -101,15 +101,14 @@ foreach (['down', @newlyDown], ['up', @newlyUp],
 }
 
 #
-# Now look at widearea nodes. The idea is simple; any nodes that have
-# not reported in (isalive in tmcd) within the last 90 seconds are moved
-# to the down category. 
+# Now look at widearea nodes. 
 #
 $result =
     DBQueryFatal("SELECT n.node_id,n.status, ".
 		 "  UNIX_TIMESTAMP(n.status_timestamp) ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
+		 "left join reserved as r on n.node_id=r.node_id ".
 		 "where nt.isvirtnode=0 and nt.isremotenode=1 and ".
 		 "(UNIX_TIMESTAMP(now()) - ".
 		 " UNIX_TIMESTAMP(n.status_timestamp)) > 90");
@@ -122,4 +121,48 @@ while (my ($node, $status, $stamp) = $result->fetchrow_array) {
 		 "where node_id='$node' and ".
 		 "(UNIX_TIMESTAMP(now()) - ".
 		 " UNIX_TIMESTAMP(status_timestamp)) > 90");
+}
+
+########################################################################
+#
+# New Stuff. The idea is simple; any nodes that have not reported in
+# (isalive in tmcd) within the last XX seconds are moved to the down
+# category. 
+#
+
+my $query_result =
+    DBQueryFatal("SELECT n.node_id,ns.status,r.pid,nt.isremotenode, ".
+		 "  UNIX_TIMESTAMP(now()) - ".
+		 "    UNIX_TIMESTAMP(ns.status_timestamp) ".
+		 " from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join node_status as ns on ns.node_id=n.node_id ".
+		 "left join reserved as r on r.node_id=n.node_id ".
+		 "where nt.isvirtnode=0 and ".
+		 " (UNIX_TIMESTAMP(now()) - ".
+		 "   UNIX_TIMESTAMP(ns.status_timestamp)) > 90");
+
+while (my ($node,$status,$pid,$remote,$timediff) = $result->fetchrow_array) {
+    my $newstatus = "down";
+
+    if (! $remote) {
+	# This time is hardwired onto the client, which report isalive
+	# every 3 minutes locally, and every 60 seconds remotely. 
+	next
+	    if ($timediff <= 180);
+
+	#
+	# If its reserved and not reporting isalive, then its a user
+	# image not doing what it is supposed to. Mark as possibly
+	# down since we do not really know whats up.
+	#
+	if (defined($pid)) {
+	    $newstatus = "possibly down";
+	}
+    }
+    #
+    # Repeat the time check to avoid dropping a node that just came up.
+    # 
+    DBQueryFatal("update node_status set status='$newstatus' ".
+		 "where node_id='$node'");
 }

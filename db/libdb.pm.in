@@ -2364,8 +2364,8 @@ sub DBQuery($)
 	    last;
 	}
 
-	DBWarn("mysqld went away. $maxtries tries left", 0);
 	$maxtries--;
+	DBWarn("mysqld went away. $maxtries tries left", 0);
 	sleep(1);
     }
     return $result;
