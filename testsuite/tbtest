@@ -364,6 +364,7 @@ sub step_init {
 	$testmode = "--enable-testmode";
     }
     tbexec("$basedir/../configure --prefix=$path/install $testmode ".
+	   "--disable-events ".
 	   "--with-TBDEFS=$path/defs --with-LEDA=/usr/testbed/LEDA/LEDA-4.0",
 	   "$path/configure.log");
     
