@@ -1,0 +1,53 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set maxpcs @MAXPCS@
+set security_level @SECURITY_LEVEL@
+
+set myboss [$ns node]
+set myops  [$ns node]
+
+tb-set-hardware $myboss pc2000
+tb-set-hardware $myops  pc2000
+
+tb-elab-in-elab 1
+tb-set-node-inner-elab-role $myboss boss
+tb-set-node-inner-elab-role $myops  ops
+
+set lanstr "myboss myops "
+for {set i 1} {$i <= $maxpcs} {incr i} {
+	set name "mypc${i}"
+	set $name [$ns node]
+	append lanstr "[set $name] "
+	tb-set-node-os [set $name] FBSD-STD
+	tb-set-node-inner-elab-role [set $name] node
+	tb-set-hardware [set $name] pc600
+}
+set publiclan [$ns make-lan $lanstr 100Mb 0ms]
+
+tb-set-ip-lan $myboss $publiclan 10.200.1.70
+tb-set-ip-lan $myops  $publiclan 10.200.1.74
+for {set i 1} {$i <= $maxpcs} {incr i} {
+	set name "mypc${i}"
+	tb-set-ip-lan [set $name] $publiclan 10.200.1.$i
+}
+
+tb-set-node-os $myboss FBSD410-UPDATE
+tb-set-node-cmdline $myboss /kernel.linkdelay
+tb-set-node-os $myops  FBSD410-UPDATE
+
+if {$security_level >= 2} {
+	# Set up a firewall
+	set fw [new Firewall $ns]
+	$fw set-type ipfw2-vlan
+	$fw set-style closed
+
+	# allow tracroute as well
+	$fw add-rule "allow udp from 155.98.36.0/22 to any 33434-33524"
+	$fw add-rule "allow udp from any 33434-33524 to 155.98.36.0/22"
+}
+
+# No routing! 
+$ns run
+

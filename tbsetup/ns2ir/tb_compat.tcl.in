@@ -1454,3 +1454,29 @@ proc tb-set-node-inner-elab-role {node role} {
     $node set inner_elab_role $role
 }
 
+#
+# Set security level.
+#
+proc tb-set-security-level {level} {
+    var_import ::GLOBALS::security_level
+
+    switch -- $level {
+	"Green" {
+	    set level 0
+	}
+	"Yellow" {
+	    set level 1
+	}
+	"Orange" {
+	    set level 2
+	}
+	"Red" {
+	    set level 3
+	}
+	unknown {
+	    perror "\[tb-set-security-level] $level is not a valid level"
+	    return
+	}
+    }
+    set security_level $level
+}

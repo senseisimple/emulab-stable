@@ -150,7 +150,8 @@ my %experiment_fields = ("multiplex_factor"		=> 1,
 		         "usemodelnet"			=> 1,
 		         "modelnet_cores"		=> 1,
 		         "modelnet_edges"		=> 1,
-		         "elab_in_elab"			=> 1);
+		         "elab_in_elab"			=> 1,
+		         "security_level"		=> 1);
 
 # New parsing code state machine control.
 my $PARSING_NOTYET	= 0;
