@@ -1,3 +1,31 @@
+mike        2003/04/09 15:18:00 MDT
+	
+  Semi-major frisbee overhaul:
+
+  Implement PREQUEST message which passes a bit map of desired blocks.
+  We still use the REQUEST message (start block + number of blocks) for
+  full chunk requests as that is more efficient.
+
+  Allow dynamic number of variable-sized write buffers.  Total memory
+  not to exceed the writebufmem limit.
+
+  Eliminate a complete copy of the uncompressed data in the client.
+
+  Fix a bug in the client where we would not keep our request-ahead window full.
+
+  Fix a bug in the server where we would not merge incoming requests with
+  the request currently being serviced.
+	
+  The above changes/bugfixes gave us about a 5% improvement in run time locally.
+
+  Add some client/server convenience options.  For the server, -W allows 
+  specification of a target bandwidth.  For the client, -C, -W and -M
+  give various ways of specifying how much memory to use for net/disk
+  buffering.
+
+  Security: -S option tells client to only accept packets from a specific
+  IP address.
+	
 stoller     2003/04/08 03:03:01 MDT
 
   Update Linux image to Redhat 7.3. The old image is still available to
