@@ -23,6 +23,15 @@ $TBDB_OSID_VERSLEN         = 12;
 $TBDB_IMAGEID_IMAGEIDLEN   = 30;
 
 #
+# User status field.
+#
+$TBDB_USERSTATUS_ACTIVE		= "active";
+$TBDB_USERSTATUS_NEWUSER	= "newuser";
+$TBDB_USERSTATUS_UNAPPROVED	= "unapproved";
+$TBDB_USERSTATUS_UNVERIFIED	= "unverified";
+$TBDB_USERSTATUS_FROZEN		= "frozen";
+
+#
 # Trust. Define the trust level as an increasing value. Then define a
 # function to return whether the given trust is high enough.
 #
@@ -951,6 +960,14 @@ function TBUserPCs($uid)
                      " b.eid=e.eid ".
 		     "where e.expt_head_uid='$uid' and e.pid!='emulab-ops' ".
 		     "  and a.role='testnode' and a.type like 'pc%'");
+
+    return mysql_num_rows($query_result);
+}
+
+function TBWebdbAllowed($uid) {
+    $query_result =
+        DBQueryFatal("select dbedit from users ".
+		     "WHERE uid='$uid' and dbedit=1");
 
     return mysql_num_rows($query_result);
 }
