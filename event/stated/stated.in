@@ -919,6 +919,7 @@ sub cleanup {
 
 # This gets called if we die of 'natural causes' (exit, die, etc.)
 END {
+  my $stat = $?;
   if (defined($lockfile) && $lockfile ne "") {
     unlink $lockfile;
     announce("Stated exiting, cleaning up\n");
@@ -933,5 +934,7 @@ END {
       die "Unable to unregister with event system\n";
     }
   }
+  # Restore $? in case one of the things I called changed it
+  $? = $stat;
 }
 
