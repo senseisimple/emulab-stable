@@ -700,12 +700,13 @@ else
 fi
 /usr/site/bin/dosilly			</code></pre>
 
-As you can see, one of the nodes must be configured to operate as the
-master, initializing the barrier to the number of clients that are
-expected to rendezvous at the barrier. The master will by default wait
-for all of the clients to reach the barrier. Each client of the
-barrier also waits until all of the clients have reached the barrier
-(and of course, until the master initializes the barrier to the proper
+In this example, there are five nodes in the experiment, one of which
+must be configured to operate as the master, initializing the barrier
+to the number of clients (four in the above example) that are expected
+to rendezvous at the barrier. The master will by default wait for all
+of the clients to reach the barrier. Each client of the barrier also
+waits until all of the clients have reached the barrier (and of
+course, until the master initializes the barrier to the proper
 count). Any number of clients may be specified (any subset of nodes in
 your experiment can wait). If the master does not need to wait for the
 clients, you may use the <em>async</em> option which releases the
