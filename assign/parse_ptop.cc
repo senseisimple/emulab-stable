@@ -19,7 +19,7 @@ using namespace boost;
 extern name_pvertex_map pname2vertex;
 extern name_count_map ptypes;
 
-#define ptop_error(s) errors++;cout << "PTOP:" << line << ": " << s << endl
+#define ptop_error(s) errors++;cout << "PTOP:" << line << ": " << s << endl; exit(EXIT_FATAL)
 #define ptop_error_noline(s) errors++;cout << "PTOP: " << s << endl
 
 // Used to do late binding of subnode names to pnodes, so that we're no
@@ -54,12 +54,12 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 {
   int num_nodes = 0;
   int line=0,errors=0;
-  char inbuf[4096];
+  char inbuf[16384];
   string_vector parsed_line;
 
   while (!i.eof()) {
     line++;
-    i.getline(inbuf,4096);
+    i.getline(inbuf,16384);
     parsed_line = split_line(inbuf,' ');
     if (parsed_line.size() == 0) {continue;}
 
