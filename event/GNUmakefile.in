@@ -36,7 +36,7 @@ install:
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
 
-client:		client-subdirs
+client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
 
 control-install: 
