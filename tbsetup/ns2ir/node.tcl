@@ -39,6 +39,9 @@ Node instproc init {s} {
     # The type of the node.
     $self set type "pc" 
 
+    # Is remote flag. Used when we do IP assignment later.
+    $self set isremote 0
+
     # If osid remains blank when updatedb is called it is changed
     # to the default OS based on it's type (taken from node_types
     # table).
@@ -237,6 +240,17 @@ Node instproc add-route {dst nexthop} {
 	perror "\[add-route] route from $self to $dst already exists!"
     }
     set routelist($dst) $nexthop
+}
+
+#
+# Set the type/isremote for a node. Called from tb_compat.
+#
+Node instproc set_hwtype {hwtype isrem} {
+    $self instvar type
+    $self instvar isremote
+
+    set type $hwtype
+    set isremote $isrem
 }
 
 #

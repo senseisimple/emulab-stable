@@ -43,14 +43,23 @@ namespace eval TBCOMPAT {
 
     # Let's set up a hwtypes table that contains all valid hardware types.
     variable hwtypes
-    sql query $DB "select type from node_types"
+    variable isremote
+    sql query $DB "select type,isremotenode from node_types"
     while {[set row [sql fetchrow $DB]] != ""} {
-	set hwtypes($row) 1
+	set type  [lindex $row 0]
+	set isrem [lindex $row 1]
+
+	set hwtypes($type) 1
+	set isremote($type) $isrem
     }
     sql endquery $DB
-    sql query $DB "select class from node_types"
+    sql query $DB "select class,isremotenode from node_types"
     while {[set row [sql fetchrow $DB]] != ""} {
-	set hwtypes($row) 1
+	set type  [lindex $row 0]
+	set isrem [lindex $row 1]
+
+	set hwtypes($type) 1
+	set isremote($type) $isrem
     }
     sql endquery $DB
 
@@ -130,6 +139,7 @@ proc tb-set-ip-link {src link ip} {
 # Node state routines.
 proc tb-set-hardware {node type args} {
     var_import ::TBCOMPAT::hwtypes
+    var_import ::TBCOMPAT::isremote
     var_import ::GLOBALS::vtypes
     if {(! [info exists hwtypes($type)]) &&
 	(! [info exists vtypes($type)])} {
@@ -154,7 +164,11 @@ proc tb-set-hardware {node type args} {
 	    return
 	}
     }
-    $node set type $type
+    set remote 0
+    if {[info exists isremote($type)]} {
+	set remote $isremote($type)
+    }
+    $node set_hwtype $type $remote
 }
 
 proc tb-set-node-os {node os} {
@@ -361,6 +375,9 @@ proc tb-make-soft-vtype {name types} {
 	if {! [info exists hwtypes($type)]} {
 	    perror "\[tb-make-soft-vtype] Invalid hardware type $type."
 	}
+	if {$isremote($type)} {
+	    perror "\[tb-make-soft-vtype] Remote type $type not allowed."
+	}
     }
     set vtypes($name) [Vtype $name $default_soft_vtype_weight $types]
 }
@@ -374,6 +391,9 @@ proc tb-make-hard-vtype {name types} {
 	if {! [info exists hwtypes($type)]} {
 	    perror "\[tb-make-hard-vtype] Invalid hardware type $type."
 	}
+	if {$isremote($type)} {
+	    perror "\[tb-make-hard-vtype] Remote type $type not allowed."
+	}
     }
     set vtypes($name) [Vtype $name $default_hard_vtype_weight $types]
 }
@@ -385,7 +405,10 @@ proc tb-make-weighted-vtype {name weight types} {
 
     foreach type $types {
 	if {! [info exists hwtypes($type)]} {
-	    perror "\[tb-make-hard-vtype] Invalid hardware type $type."
+	    perror "\[tb-make-weighted-vtype] Invalid hardware type $type."
+	}
+	if {$isremote($type)} {
+	    perror "\[tb-make-weighted-vtype] Remote type $type not allowed."
 	}
     }
     if {([regexp $FLOAT $weight] == 0) ||

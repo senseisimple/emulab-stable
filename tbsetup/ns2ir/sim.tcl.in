@@ -769,6 +769,25 @@ Simulator instproc get_subnet {} {
     perror "Ran out of subnets."
 }
 
+# get_subnet_remote
+# This is called by lanlinks.  When called get_subnet will find an available
+# IP subnet, mark it as used, and return it to the caller.
+Simulator instproc get_subnet_remote {} {
+    var_import ::GLOBALS::DB
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+
+    sql exec $DB "insert into ipsubnets values ('$pid','$eid', NULL)"
+    sql endquery $DB
+    sql query $DB "select LAST_INSERT_ID() from ipsubnets"
+    set row [sql fetchrow $DB]
+    sql endquery $DB
+
+    set b [expr [expr $row & 0xff00] >> 8]
+    set c [expr $row & 0xff]
+    return 10.$b.$c
+}
+
 # use_subnet
 # This is called by the ip method of nodes.  It marks the passed subnet
 # as used and thus should never be returned by get_subnet.

@@ -171,6 +171,7 @@ LanLink instproc get_port {node} {
 LanLink instproc fill_ips {} {
     $self instvar nodelist
     $self instvar sim
+    set isremote 0
 
     # Determined a subnet (if possible) and any used IP addresses in it.
     # ips is a set which contains all used IP addresses in this LanLink.
@@ -179,7 +180,11 @@ LanLink instproc fill_ips {} {
 	set node [lindex $nodeport 0]
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
+	set isremote [expr $isremote + [$node set isremote]]
 	if {$ip != {}} {
+	    if {$isremote} {
+		perror "Not allowed to specify IP subnet of a remote lan!"
+	    }
 	    set subnet [join [lrange [split $ip .] 0 2] .]
 	    set ips($ip) 1
 	}
@@ -187,7 +192,11 @@ LanLink instproc fill_ips {} {
 
     # If we couldn't find a subnet we ask the Simulator for one.
     if {$subnet == {}} {
-	set subnet [$sim get_subnet]
+	if {$isremote} {
+	    set subnet [$sim get_subnet_remote]
+	} else {
+	    set subnet [$sim get_subnet]
+	}
     }
 
     # Now we assign IP addresses to any node:port's without them.
