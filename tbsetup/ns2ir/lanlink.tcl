@@ -599,6 +599,8 @@ Lan instproc updatedb {DB} {
     $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
+    var_import ::GLOBALS::modelnet_cores
+    var_import ::GLOBALS::modelnet_edges
     $self instvar bandwidth
     $self instvar rbandwidth
     $self instvar ebandwidth
@@ -619,6 +621,11 @@ Lan instproc updatedb {DB} {
     $self instvar accesspoint
     $self instvar settings
     $self instvar member_settings
+
+    if {$modelnet_cores > 0 || $modelnet_edges > 0} {
+	perror "Lans are not allowed when using modelnet; just duplex links."
+	return
+    }
 
     #
     # Upload lan settings and them per-member settings

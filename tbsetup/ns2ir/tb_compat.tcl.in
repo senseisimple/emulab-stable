@@ -892,3 +892,33 @@ proc tb-use-physnaming {onoff} {
     set use_physnaming $onoff
 }
 
+#
+# User indicates that this is a modelnet experiment. Be default, the number
+# of core and edge nodes is set to one each. The user must increase those
+# if desired.
+# 
+proc tb-use-modelnet {onoff} {
+    var_import ::GLOBALS::modelnet_cores
+    var_import ::GLOBALS::modelnet_edges
+
+    if {$onoff} {
+	set modelnet_cores 1
+	set modelnet_edges 1
+    } else {
+	set modelnet_cores 0
+	set modelnet_edges 0
+    }
+}
+proc tb-set-modelnet-physnodes {cores edges} {
+    var_import ::GLOBALS::modelnet_cores
+    var_import ::GLOBALS::modelnet_edges
+
+    if {$cores == 0 || $edges == 0} {
+	perror "\[tb-set-modelnet-physnodes] cores and edges must be > 0"
+	return
+    }
+
+    set modelnet_cores $cores
+    set modelnet_edges $edges
+}
+

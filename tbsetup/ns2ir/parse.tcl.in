@@ -248,6 +248,11 @@ namespace eval GLOBALS {
 
     # Use phys naming
     variable use_physnaming 0
+
+    # Modelnet support. Number of physical core and edge nodes that user
+    # wants thrown at the problem.
+    variable modelnet_cores 0
+    variable modelnet_edges 0
 }
 
 # Load all our classes

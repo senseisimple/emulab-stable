@@ -255,6 +255,8 @@ Simulator instproc run {} {
     var_import ::GLOBALS::delay_osname
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::GLOBALS::modelnet_cores
+    var_import ::GLOBALS::modelnet_edges
     
     # Fill out IPs
     if {! $use_ipassign } {
@@ -372,6 +374,15 @@ Simulator instproc run {} {
     if { $delay_osname != {} } {
 	lappend fields "delay_osname"
 	lappend values $delay_osname
+    }
+
+    if {$modelnet_cores > 0 && $modelnet_edges > 0} {
+	lappend fields "usemodelnet"
+	lappend values 1
+	lappend fields "modelnet_cores"
+	lappend values $modelnet_cores
+	lappend fields "modelnet_edges"
+	lappend values $modelnet_edges
     }
     
     $self spitxml_data "experiments" $fields $values
