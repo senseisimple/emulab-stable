@@ -1,0 +1,61 @@
+#!/usr/bin/perl -w
+
+if ( @ARGV < 1 ) {
+  die ("Usage: delay_config <node> [<delay>] [<bw>] [<plr>]\n".
+       " node = tbpcXX, where tbpcXX is the delay node to be configured\n".
+       "delay = one-way link delay in milliseconds\n".
+       "   bw = bw<NNN><U>, N=bandwidth (1-100), U=units (M=Mbps, k=kbps)\n".
+       "  plr = packet loss rate (0 <= plr < 1)\n");
+}
+
+@_ = @ARGV;
+my $node = shift;
+
+my $delay=-1;
+my $bw=-1;
+my $unit=-1;
+my $plr=-1;
+
+sub applyChanges {
+  my $cmd = "";
+  if ( $delay != -1) { $cmd .= " delay ".($delay)."ms"; }
+  if ( $bw != -1 ) { $cmd .= " bw ${bw}${unit}bit/s"; }
+  my $cmd2 = $cmd;
+  if ( $plr != -1 ) { $cmd .= " plr $plr"; }
+  if ($cmd ne "") {
+    if ($cmd2 ne "") {
+      #print "ssh $node 'sudo /sbin/ipfw pipe 110 config $cmd;sudo /sbin/ipfw pipe 120 config $cmd2'\n";
+      system("ssh -f -n $node 'sudo /sbin/ipfw pipe 110 config $cmd;sudo /sbin/ipfw pipe 120 config $cmd2'");
+    } else {
+      #print "ssh $node 'sudo /sbin/ipfw pipe 110 config $cmd'\n";
+      system("ssh -f -n $node 'sudo /sbin/ipfw pipe 110 config $cmd'");
+    }
+  }
+}
+
+my $n;
+while (defined ($n = shift)) {
+  if ($n =~ /bw(\d+)(\w)/) {
+    $bw = $1;
+    $unit = $2;
+    if (($bw > 100) || ($bw < 1) || !($unit =~ /^M|k$/)) {
+      die ("Illegal Bandwidth spec '$n'\n");
+    }
+    print "Setting Bandwidth $bw ${unit}bit/s.\n";
+  } elsif ( !($n =~ /^[0-9.]*$/) ) {
+    die ("Illegal parameter '$n'\n");
+  } elsif ($n >= 1 ) { 
+    if ($n % 10 != 0) {
+      print "(Delay of $n may be rounded according to kernel settings)\n";
+    }
+    $delay = $n;
+    print "Setting Delay $delay ms.\n";
+  } elsif (($n >= 0) && ($n < 1)) {
+    $plr = $n;
+    print "Setting Packet Loss Rate ".($plr*100)."%.\n";
+  } else {
+    die ("Illegal parameter '$n'\n");
+  }
+}
+
+applyChanges();
