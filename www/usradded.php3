@@ -38,6 +38,14 @@ if (!isset($usr_title) ||
 }
 
 #
+# Check uid for sillyness.
+#
+if (! ereg("^[a-z0-9]+$", $uid)) {
+    USERERROR("Your username name must be lowercase alphanumeric characters ".
+	      "only!", 1);
+}
+
+#
 # Database limits
 #
 if (strlen($uid) > $TBDB_UIDLEN) {

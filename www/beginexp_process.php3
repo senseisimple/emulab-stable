@@ -42,6 +42,13 @@ if (!isset($exp_created) ||
 LOGGEDINORDIE($uid);
 
 #
+# Check eid for sillyness.
+#
+if (! ereg("^[-_a-zA-Z0-9]+$", $exp_id)) {
+    USERERROR("The experiment name must be alphanumeric characters only!", 1);
+}
+
+#
 # Database limits
 #
 if (strlen($exp_id) > $TBDB_EIDLEN) {

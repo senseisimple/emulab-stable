@@ -71,6 +71,17 @@ if (!isset($usr_phones) ||
 }
 
 #
+# Check uid and pid for sillyness.
+#
+if (! ereg("^[-_a-zA-Z0-9]+$", $pid)) {
+    USERERROR("The project name must be alphanumeric characters only!", 1);
+}
+if (! ereg("^[a-z0-9]+$", $uid)) {
+    USERERROR("Your username name must be lowercase alphanumeric characters ".
+	      "only!", 1);
+}
+
+#
 # Check database length limits.
 #
 if (strlen($pid) > $TBDB_PIDLEN) {
