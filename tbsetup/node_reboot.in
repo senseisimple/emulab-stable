@@ -3,20 +3,24 @@ use English;
 use Getopt::Std;
 
 #
-# Reboot a node. Will power cycle the node as a last resort.
+# Reboot a node (or nodes). Will power cycle the node as a last resort.
+# Use -e option to reboot all nodes in an experiment.
 #
 # usage: node_reboot [-d] [-f] node [node ...]
+#        node_reboot [-d] [-f] -e pid,eid
 #        Exit value is 0 if all nodes reboot okay, or the number of nodes
 #        could not be rebooted.
 #
 sub usage()
 {
     print STDOUT "Usage: node_reboot [-d] [-f] node [node ...]\n" .
+	         "       node_reboot [-d] [-f] -e pid,eid\n".
 	"Use the -d option to turn on debugging\n" .
+	"Use the -e option to reboot all the nodes in an experiment\n" .
 	"Use the -f option to shoot the node in the head\n";
     exit(-1);
 }
-my  $optlist = "df";
+my  $optlist = "dfe:";
 
 #
 # Configure variables
@@ -39,6 +43,9 @@ my @nodes       = ();
 my $debug       = 0;
 my $force       = 0;
 my $failed      = 0;
+my $eidmode     = 0;
+my $pid;
+my $eid;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
@@ -62,26 +69,63 @@ if ($EUID != 0) {
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV == 0) {
-    usage();
-}
 if (defined($options{"d"})) {
     $debug = 1;
 }
 if (defined($options{"f"})) {
     $force = 1;
 }
-
-# Untaint the nodes.
-foreach my $node ( @ARGV ) {
-    if ($node =~ /^([-\@\w]+)$/) {
-	$node = $1;
-    }
-    else {
-	die("Bad node name: $node.");
+if (defined($options{"e"})) {
+    if (@ARGV) {
+	usage();
     }
     
-    push(@nodes, $node);
+    $eidmode = $options{"e"};
+    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
+	$pid = $1;
+	$eid = $2;
+    }
+    else {
+	print STDOUT "Invalid argument to -e option: $eidmode\n";
+	usage();
+    }
+}
+
+#
+# If eidmode, then get the node list out of the DB instead of the command
+# line. A proper check is made later, so need to be fancy about the query.
+#
+if ($eidmode) {
+    my @row;
+    
+    my $query_result =
+	DBQueryFatal("select node_id from reserved where ".
+		     "pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	print STDOUT "There are no nodes reserved in pid/eid $pid/$eid\n";
+	usage();
+    }
+    while (@row = $query_result->fetchrow_array()) {
+	push(@nodes, $row[0]);
+    }
+}
+else {
+    if (@ARGV == 0) {
+	usage();
+    }
+    
+    # Untaint the nodes.
+    foreach my $node ( @ARGV ) {
+	if ($node =~ /^([-\@\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("Bad node name: $node.");
+	}
+    
+	push(@nodes, $node);
+    }
 }
 
 #

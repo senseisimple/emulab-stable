@@ -357,6 +357,17 @@ responsive to network transmission.  In any event, please try to
 reboot your nodes first (see above).
 
 <p>
+You may also reboot all the nodes in an experiment by using the <tt>-e</tt>
+option to specify the project and experiment names. For example:
+
+	<code><pre><xmp>
+	node_reboot -e testbed,multicast		</xmp></code></pre>
+
+will reboot all of the nodes reserved in the "multicast" experiment in
+the "testbed" project. This option is provided as a shorthand method
+for rebooting large groups of nodes.
+
+<p>
 <li> <a NAME="Finished"></a>
      <h3>I've finished my experiment</h3>
 
