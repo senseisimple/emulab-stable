@@ -1,0 +1,29 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= mote
+
+include $(OBJDIR)/Makeconf
+
+BIN_SCRIPTS	= tbuisp
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(BIN_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: \
+	$(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS))
+
+post-install:
+
+clean:

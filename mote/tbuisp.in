@@ -1,0 +1,168 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# tbuisp - An emulab frontend to UISP, which uploads programs to Mica motes
+#
+
+use lib '@prefix@/lib';
+my $TB = '@prefix@';
+
+use libdb;
+use English;
+use Getopt::Std;
+
+use strict;
+
+#
+# Constants
+#
+my $UISP = "$TB/bin/uisp";
+my $DEBUG = 1;
+
+#
+# Handle command-line arguments
+# TODO: Allow a user to specify some of their own arguments to uisp
+# TODO: Allow a user to reprogram all motes in an experiment
+#
+sub usage() {
+    warn "Usage: $0 <operation> [filename] <motes...>\n";
+    warn "Supported operations: upload\n";
+    warn "[filename] is required with the 'upload' operation\n";
+    return 1;
+}
+
+my $operation = shift @ARGV;
+my $filename;
+if (!$operation) {
+    exit usage();
+}
+# Check the operation type
+# XXX - support the other operations uisp supports, like downloading code
+SWITCH: for ($operation) {
+    /^upload$/ && do {
+	$filename = shift @ARGV;
+	if (!$filename) {
+	    exit usage();
+	}
+	last SWITCH;
+    };
+    
+    # Default
+    warn "Uknown operation $operation\n";
+    exit usage();
+}
+
+# They have to give us at least one mote
+my @motes = @ARGV;
+if (!@motes) {
+    exit usage();
+}
+
+#
+# Permission check
+#
+if (!TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@motes)) {
+    die "You do not have permission to modify one or more nodes\n";
+}
+
+#
+# Check the file to make sure it's readable
+#
+if ($filename) {
+    if (!-r $filename) {
+	die "$filename not readable\n";
+    }
+}
+
+#
+# Program each mote
+#
+my $errors = 0;
+MOTE: foreach my $mote (@motes) {
+    #
+    # Figure out the parameters we need to pass to uisp for this mote
+    #
+    my @uisp_args;
+
+    my ($type, $class) = TBNodeType($mote);
+    if ($class ne "mote") {
+	warn "$mote is not a mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+
+    #
+    # Figure out how we talk to the programming board, and what chipset it has
+    #
+    TSWITCH: for ($type) {
+	/^emote$/ && do {
+	    # Crossbow MIB600CA
+
+	    # The name of the host to communicate with
+	    push @uisp_args, "-dhost=$mote";
+	    # The type of programming board on a emote
+	    push @uisp_args, "-dprog=stk500";
+	    last TSWITCH;
+	};
+	# Default
+	warn "Mote $mote has unsupported type $type - skipping";
+	$errors++;
+	next MOTE;
+    }
+
+    #
+    # Find the name of the microcontroller on the board
+    #
+    my ($proc, $speed) = TBNodeTypeProcInfo($type);
+    PSWITCH: for ($proc) {
+	/^ATmega128/i && do {
+	    push @uisp_args, "-dpart=ATmega128";
+	    last PSWITCH;
+	};
+	# Default
+	warn "Unsupported processor $proc for $mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+
+    #
+    # The operation we want to perform
+    #
+    my $opstring;
+    OSWITCH: for ($operation) {
+	/^upload$/ && do {
+	    $opstring = "--wr_fuse_e=ff --erase --upload if=$filename";
+	    last OSWITCH;
+	};
+
+	# No default, we've checked for a valid operation above
+    }
+
+    #
+    # Actually run uisp
+    # TODO - Squelch output
+    # TODO - Allow for some parallelism
+    #
+    print "Uploading code to $mote\n";
+    my $commandstr = "$UISP " . join(" ",@uisp_args,$opstring);
+    dprint("$commandstr\n");
+    if (system($commandstr)) {
+    }
+}
+
+if ($errors) {
+    exit 1;
+} else {
+    exit 0;
+}
+
+sub dprint(@) {
+    if ($DEBUG) {
+	print @_;
+    }
+}

@@ -613,7 +613,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
-	install/newnode_sshkeys/GNUmakefile "
+	install/newnode_sshkeys/GNUmakefile \
+	mote/GNUmakefile mote/tbuisp "
 
 #
 # Do this for easy distclean.
