@@ -8,10 +8,20 @@ my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 
 my $BACKUPDIR	= "$TB/backup";
+my $LOGDIR	= "$TB/log/mysql";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libtestbed;
 
 #
 # Only real root can call this.
@@ -22,15 +32,12 @@ if ($UID != 0) {
 }
 
 #
-# Format the name of the backup with date.
-# Untaint it since it was constructed with date. Dopey.
-# 
-my $name = "tbdb-" . `date +20%y%m%d-%H.%M.%S`;
-
-if ($name =~ /^([-\@\w.]+)$/) {
-    $name = $1;
-}
-
+# Format the name of the backups with date.
+#
+my $extension = TBDateTimeFSSafe();
+my $backname  = "tbdb-$extension";
+my $basename  = "base-$extension";
+    
 #
 # Create a temporary name for a log file and untaint it.
 #
@@ -46,11 +53,6 @@ if ($logname =~ /^([-\@\w.\/]+)$/) {
 }
 
 #
-# Turn off line buffering on output
-#
-$| = 1;
-
-#
 # Reopen both stdout and stderr so that we can record all the output for
 # later mailing.
 # 
@@ -58,20 +60,42 @@ open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
 open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
 if (! chdir($BACKUPDIR)) {
-    print STDERR "Could not chdir to $BACKUPDIR!\n";
+    print STDERR "Could not chdir to $BACKUPDIR: $!\n";
     fatal();
+}
+
+#
+# Move base log out of the way since flush-logs will reset it too.
+#
+if (-e "$LOGDIR/base") {
+    if (system("/bin/mv $LOGDIR/base $LOGDIR/$basename")) {
+	print STDERR "Could not move $LOGDIR/base $LOGDIR/$basename!";
+    }
 }
 
 #
 # Do a mysqldump. This will reset the log files.
 #
-if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $name")) {
+if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
     print STDERR "mysqldump failed!\n";
     fatal();
 }
 
-if (system("gzip $name")) {
-    print STDERR "gzip failed!\n";
+if (system("gzip $backname")) {
+    print STDERR "gzip $backname failed!\n";
+    fatal();
+}
+
+#
+# Compress the base log too, since they get huge!
+#
+if (! chdir($LOGDIR)) {
+    print STDERR "Could not chdir to $LOGDIR: $!\n";
+    fatal();
+}
+
+if (-e $basename && system("gzip $basename")) {
+    print STDERR "gzip $basename failed!\n";
     fatal();
 }
 
