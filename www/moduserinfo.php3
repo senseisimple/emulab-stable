@@ -438,6 +438,12 @@ if ((isset($password1) && strcmp($password1, "")) &&
     }
 
     #
+    # Do it again. This ensures we use the current algorithm, not whatever
+    # it was encoded with last time.
+    #
+    $new_encoding = crypt("$password1");
+
+    #
     # Insert into database. When changing password for someone else,
     # always set the expiration to right now so that the target user
     # is "forced" to change it. 
