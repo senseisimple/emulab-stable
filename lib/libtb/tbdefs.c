@@ -21,6 +21,7 @@ char *tbdb_objecttypes[] = {
 	TBDB_OBJECTTYPE_FRISBEE,
 	TBDB_OBJECTTYPE_SIMULATOR,
 	TBDB_OBJECTTYPE_LINKTEST,
+	TBDB_OBJECTTYPE_NSE,
 	0,
 };
 
@@ -38,6 +39,7 @@ char *tbdb_eventtypes[] = {
 	TBDB_EVENTTYPE_HALT,
 	TBDB_EVENTTYPE_SWAPOUT,
 	TBDB_EVENTTYPE_NSESWAP,
+	TBDB_EVENTTYPE_NSEEVENT,
         TBDB_NODESTATE_ISUP, 
         TBDB_NODESTATE_REBOOTED, 
         TBDB_NODESTATE_REBOOTING, 
@@ -92,3 +94,4 @@ tbdb_valideventtype(char *foo)
 	}
 	return 0;
 }
+

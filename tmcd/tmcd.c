@@ -215,6 +215,8 @@ COMMAND_PROTOTYPE(dosyncserver);
 COMMAND_PROTOTYPE(dokeyhash);
 COMMAND_PROTOTYPE(doeventkey);
 COMMAND_PROTOTYPE(dofullconfig);
+COMMAND_PROTOTYPE(doroutelist);
+COMMAND_PROTOTYPE(dorole);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -277,6 +279,8 @@ struct command {
         { "keyhash",      FULLCONFIG_ALL,  dokeyhash},
         { "eventkey",     FULLCONFIG_ALL,  doeventkey},
         { "fullconfig",   FULLCONFIG_NONE, dofullconfig},
+        { "routelist",	  FULLCONFIG_PHYS, doroutelist},
+        { "role",	  FULLCONFIG_PHYS, dorole},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1022,9 +1026,9 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the interfaces.
 	 */
 	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
-			 " IPaliases,iface,role,mask "
+			 " IPaliases,iface,role,mask,rtabid "
 			 "from interfaces where node_id='%s'",
-			 10, reqp->nodeid);
+			 11, reqp->nodeid);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting interfaces!\n",
 		      reqp->nodeid);
@@ -1099,6 +1103,12 @@ COMMAND_PROTOTYPE(doifconfig)
 					       (strcmp(reqp->class, "ixp") ?
 						"" : iface));
 			}
+
+			if (vers >= 14) {
+			  bufp += OUTPUT(bufp, ebufp - bufp,
+					 " RTABID=%s", row[10] );
+			}
+
 			OUTPUT(bufp, ebufp - bufp, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -1128,12 +1138,12 @@ COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the veth interfaces.
 	 */
-	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac,v.mask "
+	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac,v.mask,v.rtabid "
 			 "  from veth_interfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "where v.node_id='%s' and %s",
-			 5, reqp->pnodeid, buf);
+			 6, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1144,6 +1154,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		return 0;
 	}
 	while (nrows) {
+		char *bufp   = buf;
 		row = mysql_fetch_row(res);
 
 		/*
@@ -1151,12 +1162,18 @@ COMMAND_PROTOTYPE(doifconfig)
 		 * no underlying phys interface (say, colocated nodes in a
 		 * link).
 		 */
-		OUTPUT(buf, sizeof(buf),
+		bufp += OUTPUT(bufp, ebufp - bufp,
 		       "IFACETYPE=veth "
-		       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s\n",
+		       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
 		       row[1], CHECKMASK(row[4]), row[0], row[2],
 		       row[3] ? row[3] : "none");
 
+		if (vers >= 14) {
+		    bufp += OUTPUT( bufp, ebufp - bufp,
+				    " RTABID=%s", row[5] );
+		}
+
+		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
 			info("IFCONFIG: %s", buf);
@@ -3299,9 +3316,9 @@ COMMAND_PROTOTYPE(donseconfigs)
 	}
 
 	res = mydb_query("select nseconfig from nseconfigs as nse "
-			 "where nse.vname='%s' and "
-			 " nse.pid='%s' and nse.eid='%s'",
-			 1, reqp->nickname, reqp->pid, reqp->eid);
+			 "where nse.pid='%s' and nse.eid='%s' "
+			 "and nse.vname='%s'",
+			 1, reqp->pid, reqp->eid, reqp->nickname);
 
 	if (!res) {
 		error("NSECONFIGS: %s: DB Error getting nseconfigs\n",
@@ -5021,6 +5038,168 @@ COMMAND_PROTOTYPE(doeventkey)
 	if (verbose)
 		info("%s", buf);
 	
+	return 0;
+}
+
+/*
+ * Return routing stuff for all vnodes mapped to the requesting physnode
+ */
+COMMAND_PROTOTYPE(doroutelist)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		n, nrows;
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("ROUTES: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the routing type from the nodes table.
+	 */
+	res = mydb_query("select routertype from nodes where node_id='%s'",
+			 1, reqp->nodeid);
+
+	if (!res) {
+		error("ROUTES: %s: DB Error getting router type!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Return type. At some point we might have to return a list of
+	 * routes too, if we support static routes specified by the user
+	 * in the NS file.
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	sprintf(buf, "ROUTERTYPE=%s\n", row[0]);
+	mysql_free_result(res);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	if (verbose)
+		info("ROUTES: %s", buf);
+
+	/*
+	 * Get the routing type from the nodes table.
+	 */
+	res = mydb_query("select vr.vname,src,dst,dst_type,dst_mask,nexthop,cost "
+			 "from virt_routes as vr "
+			 "left join v2pmap as v2p "
+			 "using (pid,eid,vname) "
+			 "where vr.pid='%s' and "
+			 " vr.eid='%s' and v2p.node_id='%s'",
+			 7, reqp->pid, reqp->eid, reqp->nodeid);
+	
+	if (!res) {
+		error("ROUTELIST: %s: DB Error getting manual routes!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	n = nrows;
+
+	while (n) {
+		char dstip[32];
+
+		row = mysql_fetch_row(res);
+				
+		/*
+		 * OMG, the Linux route command is too stupid to accept a
+		 * host-on-a-subnet as the subnet address, so we gotta mask
+		 * off the bits manually for network routes.
+		 *
+		 * Eventually we'll perform this operation in the NS parser
+		 * so it appears in the DB correctly.
+		 */
+		if (strcmp(row[3], "net") == 0) {
+			struct in_addr tip, tmask;
+
+			inet_aton(row[2], &tip);
+			inet_aton(row[4], &tmask);
+			tip.s_addr &= tmask.s_addr;
+			strncpy(dstip, inet_ntoa(tip), sizeof(dstip));
+		} else
+			strncpy(dstip, row[2], sizeof(dstip));
+
+		sprintf(buf, "ROUTE NODE=%s SRC=%s DEST=%s DESTTYPE=%s DESTMASK=%s "
+			"NEXTHOP=%s COST=%s\n",
+			row[0], row[1], dstip, row[3], row[4], row[5], row[6]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		n--;
+	}
+	mysql_free_result(res);
+	if (verbose)
+	    info("ROUTES: %d routes in list\n", nrows);
+
+	return 0;
+}
+
+/*
+ * Return routing stuff for all vnodes mapped to the requesting physnode
+ */
+COMMAND_PROTOTYPE(dorole)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated) {
+		error("ROLE: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the erole from the reserved table
+	 */
+	res = mydb_query("select erole from reserved where node_id='%s'",
+			 1, reqp->nodeid);
+
+	if (!res) {
+		error("ROLE: %s: DB Error getting the role of this node!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	sprintf(buf, "%s\n", row[0]);
+	mysql_free_result(res);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	if (verbose)
+		info("ROLE: %s", buf);
+
 	return 0;
 }
 

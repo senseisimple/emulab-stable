@@ -460,6 +460,7 @@ CREATE TABLE interfaces (
   role enum('ctrl','expt','jail','fake','other','gw') default NULL,
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
+  rtabid smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id,card,port),
   KEY mac (mac),
   KEY IP (IP)
@@ -761,6 +762,7 @@ CREATE TABLE node_types (
   issubnode tinyint(4) NOT NULL default '0',
   isplabdslice tinyint(4) NOT NULL default '0',
   issimnode tinyint(4) NOT NULL default '0',
+  simnode_capacity smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -1125,7 +1127,7 @@ CREATE TABLE reserved (
   eid varchar(32) NOT NULL default '',
   rsrv_time timestamp(14) NOT NULL,
   vname varchar(32) default NULL,
-  erole enum('node','virthost','delaynode','simnode') NOT NULL default 'node',
+  erole enum('node','virthost','delaynode','simhost') NOT NULL default 'node',
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname)
 ) TYPE=MyISAM;
@@ -1479,6 +1481,7 @@ CREATE TABLE veth_interfaces (
   mask varchar(15) default NULL,
   iface varchar(10) default NULL,
   vnode_id varchar(32) default NULL,
+  rtabid smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id,veth_id),
   KEY IP (IP)
 ) TYPE=MyISAM;

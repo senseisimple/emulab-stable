@@ -2222,7 +2222,7 @@ sub InitPnode($pnode, $vnode)
 		     " where node_id='$pnode'");
 
 	$vname = "nsenode${nsenode_id}";
-	$role  = TBDB_RSRVROLE_SIMNODE;
+	$role  = TBDB_RSRVROLE_SIMHOST;
 	$nsenode_id++;
 
 	# Right now, we have only one row for nseconfigs per experiment.
