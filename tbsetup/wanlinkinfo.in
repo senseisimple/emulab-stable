@@ -196,7 +196,8 @@ if ($dovirt) {
 
 foreach my $i (sort (keys %freenodes)) {
     foreach my $j (sort (keys %freenodes)) {
-	my $s = "0";
+	my $s = (($i eq $j) ? 0 : -1);
+
 	if (exists $speeds{ $i."+".$j } ) {
 	    $s = $speeds{ $i . "+" . $j };
 	} 
@@ -211,7 +212,8 @@ if ($dobw) {
 	    # the following is conceptually
 	    # the bandwidth of a machine to itself.
 	    # using ttcp, a typical value was found to be 180 MB/sec
-	    my $s = "180000"; 
+	    my $s = (($i eq $j) ? 180000 : -1);
+	    
 	    if (exists $bws{ $i."+".$j } ) {
 		$s = $bws{ $i . "+" . $j };
 	    } 
@@ -224,7 +226,8 @@ if ($dobw) {
 if ($doplr) {
     foreach my $i (sort (keys %freenodes)) {
 	foreach my $j (sort (keys %freenodes)) {
-	    my $s = "0";
+	    my $s = 0;
+
 	    if (exists $plrs{ $i."+".$j } ) {
 		$s = $plrs{ $i . "+" . $j };
 	    } 
