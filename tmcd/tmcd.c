@@ -484,7 +484,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
  skipit:
 	free(cp);
 	if (!istcp)
-		client_writeback_done(sock, &redirect_client);
+		client_writeback_done(sock, &client);
 	return 0;
 }
 
