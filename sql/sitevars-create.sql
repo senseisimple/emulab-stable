@@ -19,7 +19,7 @@ INSERT INTO sitevariables VALUES ('batch/retry_wait',NULL,'900','Number of secon
 INSERT INTO sitevariables VALUES ('swap/idleswap_warn',NULL,'30','Number of minutes before an Idle-Swap to send a warning message. Set to 0 for no warning.');
 INSERT INTO sitevariables VALUES ('swap/autoswap_warn',NULL,'60','Number of minutes before an Auto-Swap to send a warning message. Set to 0 for no warning.');
 INSERT INTO sitevariables VALUES ('idle/batch_threshold',NULL,'30','Number of minutes of inactivity for a batch node/expt to be considered idle.');
-INSERT INTO sitevariables VALUES ('general/recently_active',NULL,'7','Number of days to be considered a recently active user of the testbed.');
+INSERT INTO sitevariables VALUES ('general/recently_active',NULL,'14','Number of days to be considered a recently active user of the testbed.');
 INSERT INTO sitevariables VALUES ('plab/load_metric',NULL,'load_fifteen','GMOND load metric to use (load_one, load_five, load_fifteen)');
 INSERT INTO sitevariables VALUES ('plab/max_load',NULL,'5.0','Load at which to stop admitting jobs (0==admit nothing, 1000==admit all)');
 INSERT INTO sitevariables VALUES ('plab/min_disk',NULL,'10.0','Minimum disk space free at which to stop admitting jobs (0==admit all, 100==admit none)');
