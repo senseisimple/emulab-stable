@@ -1,6 +1,8 @@
 /**** 
  wanlinksolve - 
- A Reasonably Effective Algorithm for Genetically Assigning Nodes.
+ Resilient Overlay Network 
+ Reasonably Effective Algorithm for Genetically Assigning Nodes.
+
  Chad Barb, May 3, 2002
 
  Applies a standard genetic algorithm (with crossover and elitism)
@@ -8,7 +10,7 @@
  into a larger "physical" graph, such that the actual 
  weights between acquired nodes are similar to desired weights.
 
- The penalty function is the sum of error square roots.
+ The penalty function is the sum of error square roots (for the first dimension).
 
  For the application this was designed for,
  "weights" are values of latency time in milliseconds.
@@ -17,12 +19,22 @@
    -v     Extra verbosity
    -v -v  Jumbo verbosity 
 
+   -1 <weight>
+       Multiply penalty for latency by <weight>.
+       (optional, default weight is 1.0)
+
    -2 <weight>
        Solve for 2nd (bandwidth) dimension;
        Penalty for error is sum of differences of natural logs,
        multiplied by <weight>.
        A good weight seems to be around 7, but the appropriate
        value is pretty much application-dependent.
+
+   -3 <weight>
+       Solve for 3rd (loss) dimension
+       Penalty for error is difference of %% (10 * percent) loss,
+       multiplied by <weight>.
+       -2 must be specified first.
 
    -m <plexpenalty>
        Handle multiple virtual->physical mapping.
@@ -53,6 +65,7 @@
        this is a P x P matrix of the _actual_ weight from pnodes to 
        pnodes. For latencies, there are zeros along the diagonal.
  ? 'p' lines, a P x P matrix of actual bandwidth ('-2' switch only)
+ ? 'p' lines, a P x P matrix of actual loss ('-3' switch only)
 
 
  * One line containing a single number 'v'-- the number of virtual nodes.
@@ -66,6 +79,7 @@
        If link weights are symmetrical, this matrix will be its own
        transpose (symmetric over the diagonal.)
  ? 'v' lines, a V x V matrix of desired bandwidth ('-2' switch only)
+ ? 'v' lines, a V x V matrix of desired loss ('-3' switch only)
 
  output format:
  
@@ -81,7 +95,6 @@
 
  Holland 75
     J. Holland. Adaptation In Natural and Artificial Systems. The University of Michigan Press, Ann Arbour, 1975.
-
 
  
 ****/
@@ -101,7 +114,7 @@
 // accommodate up to MAX_NODES nodes.
 // These could be changed to STL vectors in the future.
 #define MAX_NODES 32
-#define MAX_DIMENSIONS 2
+#define MAX_DIMENSIONS 3
 
 // default rounds to keep going without finding a better solution.
 #define DEFAULT_ROUNDS 512
@@ -168,7 +181,7 @@ static int userSpecifiedMultiplex = 0;
 static int fixed[MAX_NODES];
 
 static int dimensions;
-static float d2weight;
+static float d1weight, d2weight, d3weight;
 
 static int verbose = 0;
 
@@ -179,6 +192,7 @@ static bool himutate = false;
 class Solution
 {
 public:
+  // the beef, as it were.
   int vnode_mapping[MAX_NODES];
 
   // Keep around a list of how many times each physical node is used
@@ -186,7 +200,11 @@ public:
   // (which is often.)
   unsigned char pnode_uses[MAX_NODES];
 
+  // calculated penalty
   float error;
+
+  // probability of selecting this particular one (or any before it)
+  // out of MAXINT
   unsigned int prob;
 };
 
@@ -195,6 +213,8 @@ public:
 // and one is the "next" pool (where the children go)
 static Solution pool[SOLUTIONS];
 static Solution pool2[SOLUTIONS];
+
+const char dimName[3][12] = { "latency", "bandwidth", "loss" };
 
 // determines probabilities of selecting each solution.
 static inline void prepick( Solution * currentPool )
@@ -292,23 +312,31 @@ static inline void calcError( Solution * t )
 	      float errDelta;
 
 	      if (z == 0) {
-		errDelta = sqrtf((float)(abs(should - is)));
-	      } else {
+		errDelta = d1weight * sqrtf((float)(abs(should - is)));
+	      } else if (z == 1) {
 		errDelta = d2weight * (float)(abs(should - is));
 		if (should < is) { errDelta *= 0.5f; }
+	      } else {
+		errDelta = d3weight * (float)(abs( should - is ));
 	      }
 
 	      if (verbose) {
 		if (z == 0) {
-		  printf("%s -> %s latency (ms) should be %i; is %i (err [sqrt |a-b|] %4.3f)\n", 
+		  printf("%s -> %s latency (ms) should be %i; is %i (err [wt * sqrt |a-b|] %4.3f)\n", 
 			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 
 			 should, is, errDelta );
-		} else {
+		} else if (z == 1) {
 		  printf("%s -> %s bandwidth (kB/s) should be ~%i; is ~%i (err [wt %s* ln (a/b)] %4.3f)\n", 
 			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 
 			 (int)expf((float)should / 1000.0f), 
 			 (int)expf((float)is / 1000.0f),
 			 (should < is) ? "* 0.5 " : "",
+			 errDelta );
+		} else {
+		  printf("%s -> %s loss should be %1.4f; is %1.4f (err [wt * |a-b|] %4.3f)\n",
+			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 			 
+			 (float)should / 65536.0f,
+			 (float)is / 65536.0f,
 			 errDelta );
 		}
 	      }
@@ -374,15 +402,6 @@ static inline void mutate( Solution * t )
       }
     } else {
       // reassign mutation
-      /*
-      int pnode_uses[MAX_NODES];
-
-      bzero( pnode_uses, sizeof( pnode_uses ) );
-
-      for (int i = 0; i < vnodes; i++) {
-	++pnode_uses[ t->vnode_mapping[i] ];
-      }
-      */
 
       int a, b;
       // find which vnode to remap
@@ -533,13 +552,17 @@ void usage( char * appname )
 {
   fprintf(stderr,
 	  "Usage:\n"
-	  "%s [-v] [-2 <weight>] [-r <minrounds>] [-R <maxrounds>]\n\n"
+	  "%s [-v [-v]] [-m <penalty>] [-s <seed>] [-1 <weight>]\n"
+	  "\t[-2 <weight> [-3 <weight>]] [-r <minrounds>] [-R <maxrounds>]\n\n"
 	  "  -v              extra verbosity\n"
 	  "  -v -v           jumbo verbosity\n"
 	  "  -m <penalty>    enable many-to-one virtual to physical mappings\n"
 	  "  -s <seed>       seed the random number generator with a specific value\n"
+	  "  -1 <weight>     assign weight to latency penalty (optional; default 1.0)\n"
 	  "  -2 <weight>     enable solving for bandwidth;\n"
 	  "                  multiply bandwidth penalties by <weight>.\n"
+	  "  -3 <weight>     enable solving for loss.\n"
+	  "                  (must specify -2 first)\n"
 	  "  -r <minrounds>  number of rounds to go without a solution before stopping\n"
 	  "                  default: %i\n"
 	  "  -R <maxrounds>  set maximum rounds\n"
@@ -565,14 +588,16 @@ int main( int argc, char ** argv )
 
   verbose = 0;
   dimensions = 1;
+  d1weight = 1.0f;
   d2weight = 1.0f / 1000.0f;
+  d3weight = 1.0f / 65536.0f;
 
   minrounds = DEFAULT_ROUNDS;
   maxrounds = -1;
 
   int ch;
 
-  while ((ch = getopt(argc, argv, "v2:r:R:s:m:")) != -1) {
+  while ((ch = getopt(argc, argv, "v1:2:3:r:R:s:m:")) != -1) {
     switch (ch) {
     case 's':
       srand( atoi( optarg ) );
@@ -584,9 +609,21 @@ int main( int argc, char ** argv )
       plexPenalty = atof( optarg );
       userSpecifiedMultiplex++;
       break;
+    case '1':
+      d1weight = atof( optarg );
+      break;
     case '2': 
       dimensions = 2;
       d2weight = atof( optarg ) / 1000.0f; 
+      break;
+    case '3':
+      if (dimensions != 2) {
+	fprintf(stderr, "Must specify -2 option first when using -3.\n");
+	exit(1);
+      } else {
+	dimensions = 3;
+	d3weight = atof( optarg ) / 65536.0f;
+      }
       break;
     case 'r':
       minrounds = atoi( optarg );
@@ -596,6 +633,7 @@ int main( int argc, char ** argv )
       break;
     default: 
       usage( argv[0] );
+      break;
     }
   }
 
@@ -634,19 +672,22 @@ int main( int argc, char ** argv )
 
     for (int z = 0; z < dimensions; z++) {
       if (verbose > 1) {
-	printf("Enter %ix%i grid o' actual %s.\n", pnodes, pnodes, 
-	     (z == 0) ? "latency" : "bandwidth");
+	printf("Enter %ix%i grid o' actual %s.\n", pnodes, pnodes, dimName[z]);
       }
       for (int y = 0; y < pnodes; y++) {
 	char * linePos = line;
 	gets( line );
 	while (*linePos == ' ') { linePos++; } // skip leading whitespace
 	for (int x = 0; x < pnodes; x++) {
+	  float temp;
 	  sscanf( linePos, "%i", &pLatency[z][x][y] );
-	  if (z == 1) { 
+	  sscanf( linePos, "%f", &temp );
 	    if (pLatency[z][x][y] != -1) {
-	      pLatency[z][x][y] = (int)( logf(pLatency[z][x][y]) * 1000.0f ); 
-	    }
+	      if (z == 1) { 
+		pLatency[z][x][y] = (int)( logf(pLatency[z][x][y]) * 1000.0f ); 
+	      } else if (z == 2) {
+		pLatency[z][x][y] = (int)(temp * 65536.0f);
+	      }
 	  }
 	  while (*linePos != ' ' && *linePos != '\n') { linePos++; }
 	  while (*linePos == ' ') { linePos++; }
@@ -695,17 +736,21 @@ int main( int argc, char ** argv )
     for (int z = 0; z < dimensions; z++) {
       if (verbose > 1) {
 	printf("Enter %ix%i grid o' desired %s (-1 is don't care.)\n", vnodes, vnodes, 
-	       (z == 0) ? "latency" : "bandwidth");
+	       dimName[z]);
       }
       for (int y = 0; y < vnodes; y++) {
 	char * linePos = line;
 	gets( line );
 	while (*linePos == ' ') { linePos++; } // skip leading whitespace
 	for (int x = 0; x < vnodes; x++) {
+	  float temp;
 	  sscanf( linePos, "%i", &vDesiredLatency[z][x][y] );
-	  if (z == 1) { 
-	    if (vDesiredLatency[z][x][y] != -1) {
+	  sscanf( linePos, "%f", &temp );
+	  if (vDesiredLatency[z][x][y] != -1) {
+	    if (z == 1) { 
 	      vDesiredLatency[z][x][y] = (int)(logf(vDesiredLatency[z][x][y]) * 1000.0f); 
+	    } else if (z == 2) {
+	      vDesiredLatency[z][x][y] = (int)(temp * 65536.0f);
 	    }
 	  }
 	  while (*linePos != ' ' && *linePos != '\n') { linePos++; }
@@ -733,9 +778,6 @@ int main( int argc, char ** argv )
 
     himutate = false;
     for (int i = 0; i != maxrounds && i < (highestFoundRound + minrounds); i++) {
-      /*
-
-      */
      
       float avg = 0.0f;
       int xy;
@@ -784,21 +826,7 @@ int main( int argc, char ** argv )
       if (stddev < 0.1f) {
 	himutate = false;
       }
-      /*
-	printf("NUKE!\n");
-	for (j = SOLUTIONS - 10; j != SOLUTIONS; j++) {
-	  generateRandomSolution( &(nextPool[j]) );	
-	}
-      }
-      */
-      /*      
-      for (int j = 0; j < CHILDREN_PER_ROUND; j++) {
-	// Overwrite a "bad" solution with the child of two "good" ones.
-	splice( &(pool[pickAWorst()]), 
-		&(pool[pickABest()]), 
-		&(pool[pickABest()]) ); 
-      }
-      */
+
       sortByError( nextPool );
 
       Solution * temp = currentPool;
