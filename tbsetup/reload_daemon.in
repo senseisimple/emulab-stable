@@ -80,7 +80,7 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Loop, looking for nodes to reload.
 # 
 while (1) {
-    my($count, $which, @row, $imageid, $node, $retry);
+    my($count, $which, @row, $imageid, $node, $retry, $stamp);
     
     #
     # Find all of the free node that have not been reloaded (no pid entry
@@ -128,8 +128,9 @@ while (1) {
     }
     @row     = $query_result->fetchrow_array();
     $imageid = $row[0];
+
     
-    print "Trying to reload $node ...\n";
+    print "Trying to reload $node ... \n";
     
     #
     # Call sched_reload with the "force" option, which says that if
@@ -145,7 +146,10 @@ while (1) {
 	sleep(10);
 	next;
     }
-    print "Reload of $node has started.\n";
+    $stamp = `date '+20%y-%m-%d %H:%M:%S'`;
+    chop($stamp);
+	
+    print "Reload of $node has started at $stamp.\n";
 
     #
     # Reload was started. We want to wait until its finished.
@@ -161,8 +165,11 @@ while (1) {
 	    sleep(10);
 	    next;
 	}
+	$stamp = `date '+20%y-%m-%d %H:%M:%S'`;
+	chop($stamp);
+
 	if (! $query_result->numrows) {
-	    print "\nReload of $node appears to have finished.\n";
+	    print "\nReload of $node appears to have finished at $stamp.\n";
 	    last;
 	}
 	#
@@ -175,7 +182,7 @@ while (1) {
 	#
 	@row  = $query_result->fetchrow_array();
 	if ($row[0] ne "testbed" || $row[1] ne "reloading") {
-	    print "\nReload of $node has finished.\n";
+	    print "\nReload of $node has finished at $stamp.\n";
 	    last;
 	}
 	print ".";
