@@ -29,6 +29,10 @@ get_ifi_info(int family, int doaliases)
 	struct sockaddr_dl	*sdl;
 	struct ifi_info		*ifi, *ifisave, *ifihead, **ifipnext;
 
+	// Get the temporary list of interfaces in the "buf" buffer and the 
+	// length of the list in "len"... 
+	// there may be some interfaces which are not up... or some may not 
+	// be having network addresses already... -ik
 	buf = net_rt_iflist(family, 0, &len);
 
 	ifihead = NULL;
@@ -37,20 +41,41 @@ get_ifi_info(int family, int doaliases)
 	lim = buf + len;
 	for (next = buf; next < lim; next += ifm->ifm_msglen) {
 		ifm = (struct if_msghdr *) next;
+		// "ifm_type" is the interface information message type
+		// RTM_IFINFO: interface going up or down
 		if (ifm->ifm_type == RTM_IFINFO) {
 			if ( ((flags = ifm->ifm_flags) & IFF_UP) == 0)
 				continue;	/* ignore if interface not up */
 
+			// Interface is up.. get the list of addresses on the back of
+			// message header and proceed
 			sa = (struct sockaddr *) (ifm + 1);
+
+			// Get the sockadders in the rti_info array after reading from
+			// "sa" list
 			get_rtaddrs(ifm->ifm_addrs, sa, rti_info);
+
+			// The sockaddr at "RTAX_IFP" index has the name and link level
+			// address for the interface.
 			if ( (sa = rti_info[RTAX_IFP]) != NULL) {
+
+				// Make a node of the link list "ifi" to store information 
+				// about an interface..
 				ifi = calloc(1, sizeof(struct ifi_info));
 				*ifipnext = ifi;			/* prev points to this new one */
 				ifipnext = &ifi->ifi_next;	/* ptr to next one goes here */
 
 				ifi->ifi_flags = flags;
+
+				// If its not a link layer interface then ignore
 				if (sa->sa_family == AF_LINK) {
+
+					// copy the sock adder to link level sockaddr
+					// coz we now know its a link level address
 					sdl = (struct sockaddr_dl *) sa;
+
+					// Now, get the name and address of the link level
+					// interface...
 					if (sdl->sdl_nlen > 0)
 						snprintf(ifi->ifi_name, IFNAMSIZ, "%*s",
 								 sdl->sdl_nlen, &sdl->sdl_data[0]);
@@ -63,6 +88,8 @@ get_ifi_info(int family, int doaliases)
 							   min(IFHADDRSIZ, sdl->sdl_alen));
 				}
 			}
+
+		// Check if address is being added to the interface...
 		} else if (ifm->ifm_type == RTM_NEWADDR) {
 			if (ifi->ifi_addr) {	/* already have an IP addr for i/f */
 				if (doaliases == 0)

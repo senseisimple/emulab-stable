@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv.c,v 1.2 2000-07-13 18:52:52 kwright Exp $
+ * $Id: serv.c,v 1.3 2001-06-14 23:19:23 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -32,6 +32,8 @@ main(int argc, char **argv)
 {
 	int			sockfd;
 	struct sockaddr_in	servaddr, cliaddr;
+	struct sockaddr 	name;
+	int 			namelen=sizeof(name);	
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -40,8 +42,16 @@ main(int argc, char **argv)
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port        = htons(SERV_PORT);
 
-	bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
-
+	if(bind(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr))<0)
+	{
+		perror("bind");
+	}
+	printf("The address I am listening on is: %s\n",inet_ntoa(servaddr.sin_addr));
+	if(getsockname(sockfd, (struct sockaddr *)&name, &namelen)<0)
+	{
+		perror("getsockname\n");
+	}
+	printf("No I am listening on: \"%s\"\n",sock_ntop(&name,name.sa_len));
 	serv_listen(sockfd, (struct sockaddr *) &cliaddr, sizeof(cliaddr));
 	
 	/* We'll never get here */

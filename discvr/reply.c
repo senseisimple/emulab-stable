@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: reply.c,v 1.5 2000-07-18 19:19:28 kwright Exp $
+ * $Id: reply.c,v 1.6 2001-06-14 23:19:23 ikumar Exp $
  */
 
 
@@ -53,7 +53,7 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors
 
 	        /* Add check for control net -LKW */
 	        if (ifi->ifi_flags & !IFF_UP || 
-		    ifi->ifi_flags & IFF_LOOPBACK) {
+		    ifi->ifi_flags & IFF_LOOPBACK || (strcmp(ifi->ifi_name,"fxp4")==0)) {
 		        continue;
 		}
 

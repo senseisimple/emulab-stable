@@ -1,0 +1,22 @@
+
+'td' is a topology discovery program with a client/server
+architecture. The design is platform independent, but this
+instance of the implementation is not. In order to be detected, each machine in a network must
+be running the td server in order to be detected. Closure is provided
+using a hint: the user-estimated network diameter provided as a
+command-line argument.
+
+td is written such that topology is discovered in a recursive manner. 
+When a server receives an 'inquiry' packet   
+
+A single client broadcasts an 'inquiry' packet to its local server.
+
+across all interfaces
+that are     
+
+Limitations:
+- This implementation is restricted to FreeBSD 
+
+
+
+

@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: cli.c,v 1.2 2000-07-13 18:52:51 kwright Exp $
+ * $Id: cli.c,v 1.3 2001-06-14 23:19:23 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -62,6 +62,8 @@ find_nodeID(void)
 		 * since the above is just a debug clause and may be
 		 * compiled out eventually. -lkw
 		 */
+		 
+		 // Why max is being talken ?! -ik
 		if ( ifi->ifi_hlen > 0) {
 		        myNodeIDtmp = max_haddr(myNodeIDtmp, ifi->ifi_haddr);
 		}
@@ -115,9 +117,10 @@ cli(int sockfd, const struct sockaddr *pservaddr, socklen_t servlen,
 	make_inquiry(&ti, ttl, factor);
 
 	sendto(sockfd, &ti, TOPD_INQ_SIZ, 0, pservaddr, servlen);
-	print_tdinq((char *)&ti);
+	//print_tdinq((char *)&ti);
 	n = recvfrom(sockfd, recvline, MAXLINE, 0, NULL, NULL);
-	print_tdreply(recvline, n);
+	//printf("Receiving in client:==>\n");
+	//print_tdreply(recvline, n);
 }
 
 /*
@@ -143,6 +146,7 @@ main(int argc, char **argv)
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
+	printf("calling client\n");
 	cli(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr), atoi(argv[2]), atoi(argv[3]));
 
 	exit(0);

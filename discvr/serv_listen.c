@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.5 2000-07-18 19:19:28 kwright Exp $
+ * $Id: serv_listen.c,v 1.6 2001-06-14 23:19:23 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -58,6 +58,20 @@ from_us(struct in_pktinfo *pktinfo, struct ifi_info *ifihead)
 	return 0;
 }
 
+int is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead) 
+{
+	char *name1,*name2;
+	struct ifi_info *ifi;
+        for( ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) {
+		name1=inet_ntoa(((struct sockaddr_in *)ifi->ifi_addr)->sin_addr);
+		name2=inet_ntoa(((struct sockaddr_in *)pcliaddr)->sin_addr);
+		fprintf(stderr,"name1:\"%s\" name2:\"%s\"\n",name1,name2);
+		if(strcmp(name1,name2)==0)
+	                return 1;
+	}
+	return 0;
+}
+
 /*
  * Return 0 if the two inquiries are identical, non-zero if not.
  */
@@ -81,7 +95,7 @@ print_ifi_info(struct ifi_info *ifihead)
 		if (ifi->ifi_flags & IFF_BROADCAST)		printf("BCAST ");
 		if (ifi->ifi_flags & IFF_MULTICAST)		printf("MCAST ");
 		if (ifi->ifi_flags & IFF_LOOPBACK)		printf("LOOP ");
-		if (ifi->ifi_flags & IFF_POINTOPOINT)	        printf("P2P ");
+		if (ifi->ifi_flags & IFF_POINTOPOINT)   printf("P2P ");
 		printf(">\n");
 		print_nodeID(ifi->ifi_haddr);
 
@@ -109,6 +123,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	struct ifi_info         *ifi, *ifihead;
 	struct in_pktinfo	pktinfo;
 	struct topd_inqnode     *inqn, *inqhead = 0;
+	int i=0,j=0;
 
 	/* 
 	 * Use this option to specify that the receiving interface
@@ -130,6 +145,9 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	/* 
 	 * Find and set our node ID 
 	 */
+
+	//ik: get the list of interfaces using the function "get_ifi_info" into the
+	//link list "ifi"
 	for (ifihead = ifi = get_ifi_info(AF_INET, 0); 
 		 ifi != NULL; ifi = ifi->ifi_next) {
 		if ( ifi->ifi_hlen > 0) {
@@ -147,13 +165,16 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	 * Wait for requests. When a request comes in, send the request
 	 * on to each interface. 
 	 */
+	i=0;
 	for ( ; ; ) {
+		fprintf(stderr,"**********for==>%d\n",i++);
 		len = clilen;
 		flags = 0;
 		n = recvfrom_flags(sockfd, mesg, MAXLINE, &flags,
 						   pcliaddr, &len, &pktinfo);
 		printf("%d-byte datagram from %s", n, sock_ntop(pcliaddr, len));
 		if (memcmp(&pktinfo.ipi_addr, &in_zero, sizeof(in_zero)) != 0)
+			// came to my "below" IP address... -ik
 			printf(", to %s", inet_ntop(AF_INET, &pktinfo.ipi_addr,
 			        str, sizeof(str)));
 		if (pktinfo.ipi_ifindex > 0)
@@ -165,6 +186,10 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		if (flags & MSG_BCAST)	printf(" (broadcast)");
 #endif
 		printf("\n");
+
+		//printf("The message received is: ==>\n%s\n====\n",*mesg);
+		// -ik: just to check what was recevied:
+		print_tdinq(mesg);
 
 		/* 
 		 * There are 3 possible classifications for this inquiry.
@@ -178,16 +203,32 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		 * We now classify each inquiry.
 		 */ 
 		
+		if(inqhead==NULL) class = NEW;
+		j=0;
 		for ( inqn = inqhead; inqn != NULL; inqn = inqn->inqn_next ) {
+			fflush(stdin);
+			fflush(stderr);
+			fprintf(stderr,"inquiry loop ##### %d\n",j++);
+			fprintf(stderr,"Comparing #### ==>\n\"");
+			print_tdinq((char*)inqn->inqn_inq);
+			fprintf(stderr,"\"and\n\"");
+			print_tdinq(mesg);
+			fprintf(stderr,"\"\n");
 		          if (inqid_cmp(inqn->inqn_inq, (struct topd_inqid *)mesg) == NULL) {
 		                  /* Duplicate inquiry */
-		                  if (from_us(&pktinfo, ifihead)) {
+		                  //if (from_us(&pktinfo, ifihead))... 
+				  if(is_my_packet(pcliaddr, ifihead)) {
+					  fprintf(stderr,"Duplicate inquiry from me\n");
 			                  class = DUP;
+					  break;
 				  } else {
+					  fprintf(stderr,"Duplicate inquiry from others\n");
 				          class = DUP_NBOR;
+					  break;
 				  }
 			  } else {
 		                  /* New inquiry */
+				 fprintf(stderr,"Got a new inquiry\n");
 			          class = NEW;
 			  }
 		}
@@ -214,7 +255,10 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 			}
 			memcpy(inqhead->inqn_inq, mesg, sizeof(struct topd_inqid));
 			inqhead->inqn_next = save;
-		        forward_request(ifihead, &pktinfo, mesg, n );
+		        ifihead=forward_request(ifihead, &pktinfo, mesg, n );
+			printf("printing after forward===>\n");
+			print_tdifinbrs(ifihead);
+
 		}
 
 		if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
@@ -224,8 +268,10 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		n = compose_reply(ifihead, reply, BUFSIZ, class == NEW);
 		fprintf(stderr, "replying: ");
 		print_tdreply(reply, n);
+		fprintf(stderr,"done!\n");
 		free_ifi_info(ifihead);
-
+		
+		printf("I am sending the response to: %s\n",sock_ntop(pcliaddr,sizeof(struct sockaddr)));
 		/* send response back to original sender */
 		sendto(sockfd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));
 	}

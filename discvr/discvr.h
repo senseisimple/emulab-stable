@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.3 2000-07-18 19:19:27 kwright Exp $*/
+/*$Id: discvr.h,v 1.4 2001-06-14 23:19:23 ikumar Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -62,7 +62,7 @@ struct ifi_info {
 void 
 serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen);
 
-void
+struct ifi_info  *
 forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		     const char *mesg, const int mesglen);
 struct ifi_info	*
@@ -89,6 +89,9 @@ get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
 u_int32_t
 compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors);
+
+int
+is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead) ;
 
 
 #endif /* _TOPD_DISCVR_H_ */

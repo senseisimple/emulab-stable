@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.c,v 1.2 2000-07-13 18:52:52 kwright Exp $
+ * $Id: util.c,v 1.3 2001-06-14 23:19:23 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -96,6 +96,61 @@ print_tdreply(const char *mesg, size_t nbytes)
 		fprintf(stderr, "]\n\n");
 
 		p++;
+	}
+}
+
+void
+print_tdpairs(const char *mesg, size_t nbytes)
+{
+        struct topd_nbor *p;
+
+        p = (struct topd_nbor *)mesg;
+
+        while( (char *)p < mesg + nbytes ) {
+
+                fprintf(stderr, "ROUTE\t\t\t\tDEST\n");
+                fprintf(stderr, "[");
+                print_haddr(p->tdnbor_pnode, ETHADDRSIZ);
+                fprintf(stderr, "-");
+                print_haddr(p->tdnbor_pif, ETHADDRSIZ);
+                fprintf(stderr, "] ");
+                fprintf(stderr, "[");
+                print_haddr(p->tdnbor_dnode, ETHADDRSIZ);
+                fprintf(stderr, "-");
+                print_haddr(p->tdnbor_dif, ETHADDRSIZ);
+                fprintf(stderr, "]\n\n");
+
+                p++;
+        }
+}
+
+void
+print_tdnbrlist(struct topd_nborlist * list)
+{
+	printf("Printing the neighbor list:\n");
+	while(list!=NULL)
+	{
+		print_tdpairs(list->tdnbl_nbors,list->tdnbl_n * sizeof(struct topd_nbor));
+		list = list->tdnbl_next;
+	}
+	printf("---\n");
+}
+
+void
+print_tdifinbrs(struct ifi_info *ifihead)
+{
+	struct ifi_info      *ifi;
+	ifi = ifihead;
+	for(; ifi != NULL; ifi = ifi->ifi_next) {
+	
+	if (ifi->ifi_flags & !IFF_UP || 
+		    ifi->ifi_flags & IFF_LOOPBACK || (strcmp(ifi->ifi_name,"fxp4")==0)) {
+		        continue;
+		}
+	printf("The neighbor's list of interface \"%s\"==>\n",ifi->ifi_name);
+	print_tdnbrlist(ifi->ifi_nbors);
+	printf("------\n");
+
 	}
 }
 

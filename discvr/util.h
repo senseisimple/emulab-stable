@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.h,v 1.2 2000-07-13 19:04:28 kwright Exp $
+ * $Id: util.h,v 1.3 2001-06-14 23:19:23 ikumar Exp $
  */
 
 void 
@@ -35,3 +35,16 @@ print_tdinq(const char *mesg);
 
 void
 print_tdreply(const char *mesg, size_t nbytes); 
+
+void
+print_tdnbrlist(struct topd_nborlist * list);
+
+void
+print_tdpairs(const char *mesg, size_t nbytes);
+
+void
+print_tdifinbrs(struct ifi_info *ifihead);
+
+
+
+
