@@ -27,6 +27,11 @@ subnet 155.101.132.0 netmask 255.255.252.0 {
 
 	option dhcp-class-identifier "PXEClient";
 
+	# Example of a dynamic range. If you uncomment the following line 
+	# (after changing the IP addresses to suitable ones, of course)
+	# unknown nodes will get assigned a random IP in it
+	# range 155.101.132.200 155.101.132.249;
+
 	# testbed PCs
 	group {
 		option dhcp-class-identifier "PXEClient";
