@@ -6,17 +6,26 @@
   <title>HyperViewer in Emulab</title>
 </head>
 <body>
-<h2>Using HyperViewer in Emulab</h2>
+<h2>Using HyperViewer client program in Emulab</h2>
 <h3>Table of Contents:</h3>
 <ol>
   <li><a href="#intro">Introduction</a></li>
   <li><a href="#install">Installing hypview</a></li>
+  <ol style="list-style-type: lower-alpha;">
+    <li><a href="#getting">Getting and unpacking the Emulab HyperViewer
+client program</a></li>
+    <li><a href="building">Building the Emulab HyperViewer client
+program from sources</a></li>
+    <li><a href="platforms">Supported platforms</a></li>
+    <li><a href="#dependencies">Package dependencies</a></li>
+  </ol>
   <li><a href="#run">Running hypview as a script</a></li>
   <li><a href="#gui">The hypview Graphical User Interface</a><br>
   </li>
 </ol>
 <h3><a name="intro"></a>Introduction</h3>
-This is a client program which runs on your computer, and shows a 3D
+<span style="font-style: italic; font-weight: bold;">hypview</span> is
+a client program which runs on your computer, and shows a 3D
 view of the
 network
 topologies for Emulab experiments.&nbsp; In detail, we have wrapped the
@@ -54,31 +63,82 @@ tilings</a>.<br>
  style="border: 2px solid ; width: 106px; height: 106px;" alt=""
  title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
 <h3><a name="install"></a>Installing hypview</h3>
-Getting and unpacking the binary tarball:<br>
+<h4><a name="getting"></a>Getting and unpacking the Emulab HyperViewer
+client program:</h4>
 <ul>
-  <li>Note: There are .so compatibility problems with .so shared
-libraries used by wxPython, which we are working on.&nbsp; Meanwhile,
-as this is Very Alpha Software now, your best bet is to jump to the
-next section on building from sources.<br>
-  </li>
-  <li>The binary tarball is in
-~fish/flux/testbed/hyperviewer/hyperviewer.tgz on BAS for
+  <li>There are binary tarballs for <a
+ href="http://www.emulab.net/downloads/hyperviewer-FreeBSD.tgz">FreeBSD</a>
 now.</li>
   <li>There is a top-level hyperviewer directory in the tarball, so
-just unpack with:<br>
+just unpack into the directory of your choice with:<br>
   </li>
 </ul>
 <div style="margin-left: 80px;">
-<pre><big>tar xvzf ~fish/flux/testbed/hyperviewer/hyperviewer.tgz<br><br></big></pre>
+<pre><big>tar xvzf hyperviewer.tgz<br></big></pre>
 </div>
-Building from sources - This avoids shared library compatibility
+<ul>
+  <li>Test with:<br>
+    <pre style="margin-left: 40px;"><big>cd hyperviewer</big></pre>
+  </li>
+</ul>
+<pre style="margin-left: 80px;"><big>./hypview ts600.hyp<span
+ style="font-weight: bold;"></span></big></pre>
+<div style="margin-left: 40px;">Notice that hypview runs <span
+ style="font-weight: bold;">only</span> in the hyperviewer directory
+for now.<br>
+</div>
+<ul>
+  <li>You may get an error response like the following, indicating that
+wxPython or one of the other library modules it requires is not
+installed in your computer: <br>
+  </li>
+</ul>
+<div style="margin-left: 80px;">Traceback (most recent call last):<br>
+&nbsp; File "hypview.py", line 17, in ?<br>
+&nbsp;&nbsp;&nbsp; from hvFrameUI import *<br>
+&nbsp; File "hvFrameUI.py", line 8, in ?<br>
+&nbsp;&nbsp;&nbsp; from wxPython.wx import *<br>
+ImportError: <span style="font-weight: bold;">No module named
+wxPython.wx<span style="font-weight: bold;"></span><br>
+</span></div>
+<div style="margin-left: 40px;"><br>
+No problem if so.&nbsp; Just get the supplementary library tarball for
+your platform:&nbsp; <a
+ href="http://www.emulab.net/downloads/hyperviewer-libs.fbsd-4.9.tgz">FreeBSD-4.9</a><br>
+<br>
+Unpack into the hyperviewer directory and try running hypview again.<br>
+</div>
+<ul>
+  <li>Note: This is Very Alpha Software.&nbsp; If there is no
+supplementary library tarball for your platform, or you still have
+problems running with one installed, we want to hear about it.&nbsp;
+Please explain in detail.<br>
+  </li>
+</ul>
+<div style="margin-left: 40px;">If you are comfortable installing
+wxPython and its dependencies, or having your system administator do
+it, we'd still like to hear what version of the system you are running
+on when it is working.&nbsp; <br>
+<br>
+Finally, if you have wxPython installed and are <span
+ style="font-style: italic;">still</span> having trouble, you could go
+to the
+next section on rebuilding hypview from sources.<br>
+</div>
+<br>
+<h4><a name="building"></a>Building the Emulab HyperViewer client
+program from sources</h4>
+Full sources for hypview and a version of the hyperviewer library are
+included in the tarball.<br>
+<br>
+Building from sources avoids shared library compatibility
 problems, but requires that you have wxPython and its dependencies
 installed on your machine first.<br>
 <ul>
   <li>To build the hypviewer C++ library and the _hv.so that is loaded
 into Python:</li>
 </ul>
-<pre style="margin-left: 80px;"><big>cd testbed/hyperviewer<br>gmake -f GNUMakefile</big></pre>
+<pre style="margin-left: 80px;"><big>cd hyperviewer<br>gmake -f GNUMakefile</big></pre>
 <ul>
   <li>See
 the ROADMAP file if you want to know more about internals.</li>
@@ -87,19 +147,43 @@ There are a couple of example files included:
 <ul>
 </ul>
 <div style="margin-left: 80px;">
-<pre><big>cd testbed/hyperviewer<br>./hypview.py BigLan.hyp</big><big><br>./hypview.py ts600.hyp</big>
+<pre><big>cd hyperviewer<br>./hypview BigLan.hyp</big><big><br>./hypview ts600.hyp</big>
 </pre>
 </div>
-Supported platforms:<br>
+<h4><a name="platforms"></a>Supported platforms:</h4>
 <ul>
-  <li>FreeBSD - The first target.<br>
+  <li>FreeBSD - The first target system.<br>
   </li>
   <ul>
-    <li>There is a bug in the Radeon DRI driver which "tatters" bitmap
-text.</li>
-    <li>There are different problems in the nVidia drivers.</li>
-    <li>Turning off hardware acceleration of OpenGL rendering is ugly
-but works.</li>
+    <li>There is a bug in the <span style="font-weight: bold;">ATI
+Radeon</span> DRI graphics card driver which "tatters" bitmap
+text so labels on nodes in the HyperViewer are unreadable.</li>
+    <ul>
+      <li>A temporary work-around which doesn't require restarting X is
+to rename <span style="font-weight: bold;">/dev/dri/card0</span> or
+change its mode to prevent access.&nbsp; This will still throw an X
+"BadMatch" error_code 8 request_code 156 minor_code 5 when used
+remotely, though.</li>
+      <li>A better work-around is to comment out the <span
+ style="font-weight: bold;">Load "dri"</span> line in the <span
+ style="font-weight: bold;">/etc/XF86Config</span> file and restart
+X.&nbsp; You will get a normal warning message when starting up any
+OpenGL program such as HyperViewer: <br>
+      </li>
+    </ul>
+  </ul>
+</ul>
+<pre style="margin-left: 160px;">Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
+<ul>
+  <ul>
+    <li>The <span style="font-weight: bold;">nVidia</span> OpenGL
+drivers on the FreeBSD 4.10 machines have another problem.&nbsp; Mike
+encountered an X 'GLXBadDrawable' error_code 160 request_code 144
+minor_code 11.&nbsp; As a result, our current 4.10 build uses the Mesa
+OpenGL with no DRI, since DRI isn't supported on the nVidia
+cards.&nbsp; You will get a normal warning message:<br>
+      <pre>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
+    </li>
   </ul>
 </ul>
 <ul>
@@ -115,9 +199,11 @@ hypviewer/Makefile.main .<br>
 Fish</a>.<br>
   </li>
 </ul>
-Package dependencies: <br>
-<div style="margin-left: 40px;">It needs wxPython, gtk, glX,
-OpenGL...; and wxGlade on top if you want to modify the GUI.<br>
+<h4><a name="dependencies"></a>Package dependencies: </h4>
+<div style="margin-left: 40px;">It needs wxPython, which requires
+wx_GTK2, GTK-x11, Pango, and glib, as well as glX and
+OpenGL.<br>
+Plus wxGlade on top if you want to modify the GUI.<br>
 </div>
 <h3><a name="run"></a>Running hypview as a script<br>
 </h3>
@@ -127,21 +213,19 @@ summary:<br>
 <pre style="margin-left: 40px;"><big>Hyperviewer usage:</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; No args - Starts up the GUI.&nbsp; Use the File/Open menu item to read a topology.</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; One arg - A .hyp file name.&nbsp; Read it in and start the GUI, e.g.:</big></pre>
-<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview.py BigLan.hyp</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview BigLan.hyp</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; Two args - Project and experiment names in the database.</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Get the topology from XMLRPC, make a .hyp file, start as above.</big></pre>
-<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview.py testbed BigLan</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview testbed BigLan</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; Three args - Project and experiment names, plus an optional root node name.</big></pre>
-<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview.py testbed BigLan clan</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview testbed BigLan clan</big></pre>
 <h3><a name="gui"></a>The hypview Graphical User Interface</h3>
-Getting out: pick the File/Exit menu item, or type Ctrl-Q, or close the
+Getting out: pick the File/Exit menu item, or type Ctrl-Q, or just
+close the
 window.<br>
 <br>
 Here's an example of the appearance of hypview once it is running:<br>
 <ul style="margin-left: 120px;">
-  <li>Note: Text labels on the nodes may show only
-partially on your display if you have an ATI Radeon card, due to a bug
-in the DRI driver for OpenGL.</li>
   <li>Note: the window comes up split down the middle now.&nbsp; Drag
 the
 divider to the right so it looks like the picture below.&nbsp; Also,
@@ -172,7 +256,9 @@ mouse button.&nbsp; Notice how the mid-level branching is more
 visible.&nbsp; <br>
   </li>
   <li>You can walk through the graph this way, dragging from top-level
-details to lower levels.&nbsp; The right mouse button rotates what is
+details to lower levels.&nbsp; The middle mouse button (or holding down
+a control or shift key while clicking the left mouse button) rotates
+what is
 behind to the front so you can better see it.</li>
 </ul>
 <div style="margin-left: 40px;"><a href="gui_top2.jpg"><img align="top"
@@ -263,7 +349,15 @@ cut-and-paste.&nbsp; (This is Alpha software!)</li>
   <li>For experiments, the optional root node is the host or lan from
 which the tree layout starts.&nbsp; If you know it, put it in.&nbsp;
 Otherwise the first lan in the database links list is chosen, or the
-first host if there are no lans.</li>
+first host if there are no lans.&nbsp; <br>
+  </li>
+</ul>
+<div style="margin-left: 40px;">The root node name may optionally be a <span
+ style="font-style: italic;">glob</span> expression, with *, ?, and []
+wildcards.&nbsp; In that case we make up a root node name and put the
+matching nodes under it.<br>
+</div>
+<ul>
   <li>Since HyperViewer is set up to load a file, the experiment option
 actually writes a temp .hyp file.&nbsp; You will see the file name on
 the window title if you want to save the file.<br>
