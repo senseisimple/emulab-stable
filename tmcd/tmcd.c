@@ -4176,7 +4176,7 @@ COMMAND_PROTOTYPE(doroutelist)
 		n--;
 	}
 	mysql_free_result(res);
-	info("ROUTES: %s routes in list\n", nrows);
+	info("ROUTES: %d routes in list\n", nrows);
 
 	return 0;
 }
