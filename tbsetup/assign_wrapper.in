@@ -2269,14 +2269,16 @@ sub InitPnode($pnode, $vnode)
 	$vname = $vnode;
 	$role  = TBDB_RSRVROLE_NODE;
 
+	#
+	# NOTE: We no longer include tarballs and RPMs in this update, because
+	# they are now handled by tarfiles_setup
+	#
 	DBQueryFatal("UPDATE nodes set ".
 		     " def_boot_cmd_line='$cmdline'," .
 		     " startstatus='none'," .
 		     " bootstatus='unknown'," .
 		     " ready=0," .
-		     " rpms='$rpms'," .
 		     " deltas='$deltas'," .
-		     " tarballs='$tarfiles'," .
 		     " startupcmd='$startupcmd'," .
 		     " failureaction='$failureaction'," .
 		     " routertype='$routertype'" .

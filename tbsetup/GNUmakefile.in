@@ -19,7 +19,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load startexp endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
-		  tbswap nseswap
+		  tbswap nseswap tarfiles_setup
 
 # Stuff that mere users get on plastic.
 USERBINS        = os_load node_reboot nscheck node_update savelogs \
@@ -42,7 +42,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  webmkgroup websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
 		  webnodereboot webrmuser webidleswap switchmac \
-		  spewrpmtar
+		  spewrpmtar webtarfiles_setup
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
@@ -144,6 +144,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/vnode_setup
 	chown root $(INSTALL_BINDIR)/eventsys_control
 	chmod u+s $(INSTALL_BINDIR)/eventsys_control
+	chown root $(INSTALL_BINDIR)/tarfiles_setup
+	chmod u+s $(INSTALL_BINDIR)/tarfiles_setup
 
 #
 # Control node installation (okay, plastic)
@@ -158,6 +160,7 @@ endif
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, sfskey_update.proxy) \
+			$(addprefix $(INSTALL_BINDIR)/, fetchtar.proxy) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
 	$(LINKS)

@@ -1,0 +1,180 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use BSD::Resource;
+use POSIX qw(:signal_h);
+    
+#
+# Fetch tarballs and RPMs on behalf of a user
+#
+sub usage()
+{
+    print "Usage: $0 -u user URL localfile\n";
+ 
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $FSDIR_PROJ = "@FSDIR_PROJ@";
+my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
+
+# Locals
+my $WGET = "/usr/local/bin/wget";
+my $REALPATH = "/bin/realpath";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# First option has to be the -u option, the user to run this script as.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!");
+}
+
+if (@ARGV != 4) {
+    usage();
+}
+
+if ((shift @ARGV) ne '-u') {
+    die("*** $0:\n".
+	"    Improper first argument. Must be the user name!\n");
+}
+
+my $user = shift @ARGV;
+my $URL = shift @ARGV;
+my $localfile = shift @ARGV;
+
+#
+# Check arguments
+#
+if (!($user =~ /^([\w-]+)$/)) {
+    die("*** $0:\n".
+	"    Bad username given\n");
+} else {
+    $user = $1;
+}
+
+(undef,undef,$unix_uid) = getpwnam($user) or
+    die("*** $0:\n".
+	"    No such user $user\n");
+
+if (!($URL =~ /^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar\.gz|\.tgz|\.rpm))$/)) {
+    die("*** $0:\n".
+	"    Illegal URL given: $URL\n");
+} else {
+    $URL = $1;
+}
+
+if (!($localfile =~ /^([\w\.\_\-+\/]+)$/)) {
+    die("*** $0:\n".
+	"    Illegal local filename given: $localfile\n");
+} else {
+    $localfile = $1;
+    my $realpath = `$REALPATH $localfile`;
+    chomp $realpath;
+    if ($realpath !~ /^(($FSDIR_PROJ|$FSDIR_GROUPS)\/.*)$/) {
+	die("*** $0:\n".
+	    "    Local file must be in /proj or /groups: $localfile, $realpath \n");
+    } else {
+	$localfile = $1;
+    }
+}
+
+#
+# Need the entire group list for the user, cause of subgroups, and
+# cause thats the correct thing to do. Too bad perl does not have a
+# getgrouplist function like the C library.
+#
+my $glist = `id -G $user`;
+if ($glist =~ /^([\d ]*)$/) {
+    $glist = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Unexpected results from 'id -G $user': $glist\n");
+}
+
+# Need to split off the first group and create a proper list for $GUID.
+my @gglist   = split(" ", $glist);
+my $unix_gid = $gglist[0];
+$glist       = "$unix_gid $glist";
+
+# Flip to user and never go back!
+$GID            = $unix_gid;
+$EGID           = $glist;
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+#
+# Fork a child process to run the wget
+#
+my $pid = fork();
+
+if (!defined($pid)) {
+    die("*** $0:\n".
+	"    Could not fork a new process!");
+}
+
+#
+# Child does the fetch, niced down, and exits
+#
+if (! $pid) {
+    # Set the CPU limit for us.
+    setrlimit(RLIMIT_CPU, 180, 180);
+    
+    # Give parent a chance to react.
+    sleep(1);
+
+    exec("nice -15 $WGET -nv -O $localfile $URL");
+    die("Could not exec wget!\n");
+}
+
+#
+# Parent waits.
+#
+waitpid($pid, 0);
+my $exit_status = $?;
+
+#
+# If the child was KILLed, then it overran its time limit.
+# Send email. Otherwise, exit with result of child.
+#
+if (($exit_status & 0xff) == SIGKILL) {
+    my $msg = "wget CPU Limit";
+
+    SENDMAIL($TBOPS, "wget Exceeded CPU Limit", $msg);
+    
+    print STDERR "$msg\n";
+    exit(15);
+}
+
+exit($exit_status >> 8);
+

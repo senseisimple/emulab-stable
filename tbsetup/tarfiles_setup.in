@@ -1,0 +1,240 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Socket;
+    
+#
+# Fetch all tarball(s) (and RPM(s)) for an experiment. Since we don't want to
+# give users the chance to exploit bugs or features used in the program to do
+# the fetching, we ssh over to ops to do the actual fetching.
+# 
+# As a side-effect, copies the contents of the tarfiles and rpms fields from
+# virt_nodes to the nodes table. Any fetched tarballs (or RPMs) are entered
+# into the nodes table as the location on local disk they were fetched to.
+#
+# Should be run _after_ the experiment has begun swapin - ie. when the
+# virt_nodes have already been assigned to physical nodes.
+#
+
+sub usage()
+{
+    print "Usage: $0 eid pid\n";
+ 
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
+my $TESTMODE = @TESTMODE@;
+
+my $SAVEUID  = $UID;
+my $MD5      = "/sbin/md5";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+if ($TESTMODE) {
+    # In testmode, drop privs (my devel tree at home is TESTMODE=1)
+    $EUID = $UID;
+}
+elsif ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    die("*** $0: Must be root! Maybe its a development version?\n");
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0) {
+    die("*** $0: Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libdb;
+
+if (@ARGV != 2) {
+    usage();
+}
+my ($pid, $eid) = @ARGV;
+
+my $dbuid;
+
+#
+# Verify user and get his DB uid.
+#   
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** Go Away! You do not exist in the Emulab Database.\n");
+}
+#
+# First, make sure the experiment exists
+#
+if (!ExpState($pid,$eid)) {
+    die("*** There is no experiment $eid in project $pid\n");
+}
+
+#
+# User must have at least MODIFY permissions to use this script
+#
+if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
+    die("*** You are not allowed to modify experiment $eid in project $pid\n");
+}
+
+#
+# Get the experiment's directoty - that's where we'll stash any files we
+# fetch
+#
+my $expdir = TBExptUserDir($pid,$eid);
+if (!$expdir) {
+    die("*** Unable to get experiment directory\n");
+}
+
+#
+# Get a list of all RPMs and tarballs to fetch
+#
+my $result = DBQueryFatal("SELECT vname, rpms, tarfiles FROM virt_nodes WHERE " .
+    "pid='$pid' and eid='$eid'");
+
+while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
+    #
+    # Find out the pnode where the this vnode is mapped, if any
+    #
+    my $physnode;
+    VnameToNodeid($pid,$eid,$vname,\$physnode);
+
+    #
+    # Go through the list of RPMs looking for files to fetch
+    #
+    foreach my $rpm (split(";", $rpms)) {
+	if ($rpm =~ /^(http|ftp)/) {
+	    #
+	    # Veryify that they gave us a legal URL
+	    #
+	    my $URL = verifyURL($rpm);
+	    if (!$URL) {
+		die("*** Invalid RPM URL given: $rpm\n");
+	    }
+
+	    #
+	    # Build up a local filename using an MD5 hash of the URL, so that
+	    # we can uniquely identify it, but don't have to worry about
+	    # putting funny characters in filenames.
+	    # 
+	    my $md5 = `$MD5 -q -s '$URL'`;
+	    chomp $md5;
+	    # Have to untaint the hash
+	    $md5 =~ /^(\w+)$/;
+	    $md5 = $1;
+	    my $localfile = $expdir . "/" . $md5 . ".rpm";
+
+	    #
+	    # Remember this RPM and put the local filename in the string that
+	    # will be uploaded to the nodes table
+	    #
+	    $tofetch{$URL} = $localfile;
+	    $rpms =~ s/$URL/$localfile/g;
+	}
+    }
+    
+    #
+    # Same as above, for tarballs
+    #
+    foreach my $tar (split(";", $tarfiles)) {
+	my ($dir,$tarfile) = split(" ",$tar);
+	if ($tarfile =~ /^(http|ftp)/) {
+	    my $URL = verifyURL($tarfile);
+	    if (!$URL) {
+		die("*** Invalid tarball URL given: $tarfile\n");
+	    }
+	    my $md5 = `md5 -q -s '$URL'`;
+	    chomp $md5;
+	    $md5 =~ /^(\w+)$/;
+	    $md5 = $1;
+	    my $localfile = $expdir . "/" . $md5 . ".tar.gz";
+	    $tofetch{$URL} = $localfile;
+	    $tarfiles =~ s/$URL/$localfile/g;
+	}
+    }
+
+    #
+    # Hack, hack, hack! We use ';' as a separator in the virt_nodes table, but
+    # ":" in the nodes table. We should fix the latter
+    #
+    $tarfiles =~ s/;/:/g;
+    $rpms =~ s/;/:/g;
+    
+    #
+    # If this virtual node is allocated, update the nodes table
+    #
+    if ($physnode) {
+	DBQueryFatal("UPDATE nodes SET tarballs='$tarfiles', rpms='$rpms' " .
+	    "WHERE node_id='$physnode'");
+    }
+}
+
+#
+# In testmode, don't actually fetch anything
+#
+if ($TESTMODE) {
+    exit(0);
+}
+
+#
+# Actually fetch the tarballs
+#
+while (my ($URL, $localfile) = each %tofetch) {
+    print "Fetching $URL to $localfile\n";
+
+    #
+    # Build up a new command line to do the fetch on ops
+    #
+    my $cmdargs = "$TB/bin/fetchtar.proxy ";
+    $cmdargs .= " -u $dbuid $URL $localfile ";
+
+    #
+    # Must flip to real root for the ssh, and then flip back afterwards.
+    # 
+    $EUID = $UID = 0;
+    system("sshtb -host $CONTROL $cmdargs ");
+    $EUID = $UID = $SAVEUID;
+
+    if ($?) {
+	die("*** Fetch of Tarball/RPM failed!\n");
+    }
+}
+
+#
+# Check to make sure a URL for a tarball or RPM is valid, and return an
+# untained version of it. Returns undefined if the URL is not valid.
+#
+sub verifyURL($) {
+    my ($URL) = @_;
+    if ($URL =~ /^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar\.gz|\.tgz|\.rpm))$/) {
+	return $1;
+    } else {
+	return undef;
+    }
+}
+
+exit 0;

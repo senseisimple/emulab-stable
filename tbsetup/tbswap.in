@@ -637,6 +637,22 @@ sub doSwapin($) {
     }
 
     #
+    # Handle tarballs - we might need to fetch some from URLs if the user
+    # asked for that.
+    #
+    print "Fetching tarballs and RPMs (if any) ...\n";
+    TBDebugTimeStamp("tarfiles_setup started");
+
+    if (system("tarfiles_setup $pid $eid")) {
+	#
+	# No recovery for now - what would we do?
+	#
+	print STDERR "*** Failed to set up tarballs.\n";
+	return 1;
+    }
+    TBDebugTimeStamp("tarfiles_setup finished");
+
+    #
     # If there are any Plab dslice nodes in the experiment, create the
     # dslice now
     #
