@@ -1913,6 +1913,14 @@ last_net_act,last_cpu_act,last_ext_act);
 	    'emulab-ops-FBSD47-STD',NULL,0);
 
        Poplulate the default_firewall_rules table using sql/fwrules-create.sql.
+       Note that this file include a number of rules involving the networks
+       155.98.32.0/23 and 155.98.36.0/22.  These are specific to Utah's
+       Emulab and would have to be customized for your environment.
+       155.98.32.0/23 refers to the combination of the 'public' and 'private'
+       control net subnets as described in doc/setup-network.txt.  If your
+       public and private nets cannot be covered by a single CIDR block,
+       you will need to create a separate rule for each.
+       155.98.36.0/22 refers to the 'control' net for all nodes.
 
 1.272: Table to manage to SSL certs we create for people to access the
        SSL version of the RPC server. In addition to storing text
