@@ -1016,6 +1016,20 @@ CREATE TABLE node_rusage (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `node_startloc`
+--
+
+CREATE TABLE node_startloc (
+  node_id varchar(32) NOT NULL default '',
+  building varchar(32) NOT NULL default '',
+  floor varchar(32) NOT NULL default '',
+  loc_x float NOT NULL default '0',
+  loc_y float NOT NULL default '0',
+  orientation float NOT NULL default '0',
+  PRIMARY KEY  (node_id,building,floor)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `node_status`
 --
 
