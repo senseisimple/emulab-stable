@@ -44,7 +44,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 20; };
+sub TMCD_VERSION()	{ 21; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.

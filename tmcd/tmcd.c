@@ -3479,7 +3479,13 @@ COMMAND_PROTOTYPE(docreator)
 {
 	char		buf[MYBUFSIZE];
 
-	OUTPUT(buf, sizeof(buf), "CREATOR=%s\n", reqp->creator);
+	/* There was a $ anchored CREATOR= pattern in common/config/rc.misc . */
+	if (vers<=20)
+		OUTPUT(buf, sizeof(buf), "CREATOR=%s\n", reqp->creator);
+	else
+		OUTPUT(buf, sizeof(buf), "CREATOR=%s SWAPPER=%s\n", 
+		       reqp->creator, reqp->swapper);
+
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("CREATOR: %s", buf);

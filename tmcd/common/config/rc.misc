@@ -168,7 +168,7 @@ sub docreator()
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($tmccresults[0] =~ /^CREATOR=([-\w]*)$/) {
+    if ($tmccresults[0] =~ /^CREATOR=([-\w]*)/) {
 	$creator = $1;
     }
     else {
