@@ -13,13 +13,15 @@
 #include "ConservativeAssigner.h"
 #include "HierarchicalAssigner.h"
 #include "Router.h"
-//#include "HostRouter.h"
+#include "HostRouter.h"
 //#include "LanRouter.h"
 #include "NetRouter.h"
 #include "Partition.h"
 #include "FixedPartition.h"
 #include "SearchPartition.h"
 #include "SquareRootPartition.h"
+#include "RatioCutPartition.h"
+#include "CutSearchPartition.h"
 
 using namespace std;
 
@@ -202,7 +204,7 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
     switch (routeChoice)
     {
     case HostHost:
-//        m_route.reset(new HostRouter());
+        m_route.reset(new HostRouter());
         break;
     case HostLan:
 //        m_route.reset(new LanRouter());
@@ -228,7 +230,7 @@ void Framework::parseArgument(string const & arg,
         {
             // p means this argument group is about partitions. It must be
             // followed by a number (Fixed), a 'q' (SquareRoot),
-            // or an 's' (Search)
+            // an 's' (Search), or an 'r' (RatioCut)
         case 'p':
             // if there is a 'p', it must go in its own -group
             // for example -p11 is legal but -p11h is not legal
@@ -255,6 +257,16 @@ void Framework::parseArgument(string const & arg,
                 else if (arg[2] == 's')
                 {
                     m_partition.reset(new SearchPartition);
+                    done = true;
+                }
+                else if (arg[2] == 'r')
+                {
+                    m_partition.reset(new RatioCutPartition);
+                    done = true;
+                }
+                else if (arg[2] == 'c')
+                {
+                    m_partition.reset(new CutSearchPartition);
                     done = true;
                 }
                 else

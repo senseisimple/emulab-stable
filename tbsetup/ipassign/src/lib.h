@@ -25,6 +25,7 @@
 #include <memory>
 #include <climits>
 #include <queue>
+#include <iterator>
 
 extern "C"
 {

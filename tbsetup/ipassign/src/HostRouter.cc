@@ -25,33 +25,32 @@ HostRouter::~HostRouter()
 
 auto_ptr<Router> HostRouter::clone(void) const
 {
-    return auto_ptr<Router>(new HostRouter(*this));
+//    return auto_ptr<Router>(new HostRouter(*this));
+    return auto_ptr<Router>(NULL);
 }
 
 void HostRouter::calculateRoutes(void)
 {
-    if (m_nodeToLevel.size() != 0 && m_levelMaskSize.size() != 0
-        && m_levelPrefix.size() != 0 && m_levelMakeup.size() != 0
-        && m_lanWeights.size() != 0)
+    if (hosts.size() != 0 && lans.size() != 0)
     {
         FileWrapper file(coprocess(ROUTECALC).release());
         m_tableList.clear();
-        m_tableList.resize(m_nodeToLevel[0].size());
-        for (size_t i = 0; i < m_nodeToLevel[0].size(); ++i)
+        m_tableList.resize(hosts.size());
+        for (size_t i = 0; i < hosts.size(); ++i)
         {
             if (isValidNode(i))
             {
-                m_tableList[i].resize(m_nodeToLevel[0].size());
-                for (size_t j = 0; j < m_nodeToLevel[0][i].size(); ++j)
+                m_tableList[i].resize(hosts.size());
+                for (size_t j = 0; j < hosts[i].size(); ++j)
                 {
-                    size_t lan = m_nodeToLevel[0][i][j];
-                    for (size_t k = 0; k < m_levelMakeup[0][lan].size(); ++k)
+                    size_t lan = hosts[i][j];
+                    for (size_t k = 0; k < lans[lan].hosts.size(); ++k)
                     {
-                        size_t node = m_levelMakeup[0][lan][k];
+                        size_t node = lans[lan].hosts[k];
                         if (i != node)
                         {
                             write(file, 'i', i, node,
-                                  static_cast<float>(m_lanWeights[lan]));
+                                  static_cast<float>(lans[lan].weight));
                         }
                     }
                 }
@@ -101,11 +100,11 @@ void HostRouter::findAdjascentInterfaces(size_t node,
 {
     nodeToIP.clear();
     // in every LAN that we're connected to
-    vector<size_t>::const_iterator lanPos = m_nodeToLevel[0][node].begin();
-    for (; lanPos != m_nodeToLevel[0][node].end(); ++lanPos)
+    vector<size_t>::const_iterator lanPos = hosts[node].begin();
+    for (; lanPos != hosts[node].end(); ++lanPos)
     {
         // in every node that is in one of those LANs
-        vector<size_t> const & firstHopList = m_levelMakeup[0][*lanPos];
+        vector<size_t> const & firstHopList = hosts[*lanPos];
         vector<size_t>::const_iterator pos = firstHopList.begin();
         for (; pos != firstHopList.end(); ++pos)
         {
@@ -113,7 +112,7 @@ void HostRouter::findAdjascentInterfaces(size_t node,
             // the current node. But that is ok since the current node is
             // never used as a firstHop.
             // If this becomes an issue, put a conditional here.
-            nodeToIP[*pos] = m_levelPrefix[0][*lanPos] + *pos + 1;
+            nodeToIP[*pos] = lans[*lanPos].partition->getPrefix() + *pos + 1;
         }
     }
 }
@@ -122,25 +121,25 @@ void HostRouter::findAdjascentInterfaces(size_t node,
 void HostRouter::printTable(ostream & output, size_t node,
                             map<size_t, IPAddress> & nodeToIP) const
 {
-    size_t lanCount = m_levelMakeup[0].size();
+    size_t lanCount = lans.size();
     // Print the routing table itself
     output << "Routing table for node: " << node << endl;
     for (size_t destLan = 0; destLan < lanCount; ++destLan)
     {
         for (size_t destNodeIndex = 0;
-             destNodeIndex < m_levelMakeup[0][destLan].size();
+             destNodeIndex < lans[destLan].hosts.size();
              ++destNodeIndex)
         {
-            size_t destNode = m_levelMakeup[0][destLan][destNodeIndex];
+            size_t destNode = lans[destLan].hosts[destNodeIndex];
 
             // if the destination LAN is not connected to the current node.
-            if (find(m_nodeToLevel[0][node].begin(),
-                     m_nodeToLevel[0][node].end(), destLan)
-                == m_nodeToLevel[0][node].end())
+            if (find(hosts[node].begin(),
+                     hosts[node].end(), destLan)
+                == hosts[node].end())
             {
                 output << "Destination: "
-                       << ipToString(m_levelPrefix[0][destLan] + destNodeIndex
-                                                               + 1)
+                       << ipToString(lans[destLan].partition->getPrefix()
+                                     + destNodeIndex + 1)
                        << "/32" // host routing means no subnets
                        << " FirstHop: "
                        << ipToString(

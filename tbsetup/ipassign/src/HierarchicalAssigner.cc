@@ -89,10 +89,11 @@ void HierarchicalAssigner::divideAndConquer(auto_ptr<ptree::Branch> & parent,
     bool goodPartition = partitionPartition(parent.get(), blockBits,
                                             partitionList, components);
     auto_ptr<ptree::Branch> current(new ptree::Branch());
+
     current->setNetworkEntry(subnet, totalBits - blockBits);
     if (goodPartition)
     {
-        int newBits = blockBits - countToBlockBit(components.size());
+        int newBits = blockBits - max(1, countToBlockBit(components.size() - 1));
         // For each component
         for (size_t i = 0; i < components.size(); ++i)
         {
@@ -174,10 +175,12 @@ bool HierarchicalAssigner::partitionPartition(ptree::Node * parent,
     // Ensure that all sub-partitions fit in the blockspace.
     bool goodPartition = partitioningIsOk(blockBits, partitioning,
                                           partitionList);
+
     if (goodPartition)
     {
         // divide up partitionList amongst the children.
         components.resize(m_partition->getPartitionCount());
+
         list<size_t>::iterator dividePos = partitionList.begin();
         list<size_t>::iterator divideLimit = partitionList.end();
         list<size_t>::iterator divideNext = dividePos;
@@ -187,8 +190,10 @@ bool HierarchicalAssigner::partitionPartition(ptree::Node * parent,
             // init
             ++divideNext;
 
-            components[*partPos].splice(components[*partPos].end(),
-                                        partitionList, dividePos);
+            components[*partPos].push_back(*dividePos);
+
+//            components[*partPos].splice(components[*partPos].end(),
+//                                        partitionList, dividePos);
 
             // get ready for next iteration
             dividePos = divideNext;

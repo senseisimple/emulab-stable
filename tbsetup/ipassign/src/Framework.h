@@ -50,7 +50,7 @@ private:
     };
     enum PartitionType
     {
-        Fixed, SquareRoot, Search
+        Fixed, SquareRoot, Search, RatioCut
     };
     enum RouteType
     {

@@ -21,10 +21,34 @@ class HostRouter : public Router
 public:
     HostRouter();
     virtual ~HostRouter();
+
+    virtual void visitBranch(ptree::Branch &)
+    {
+    }
+
+    virtual void visitLeaf(ptree::Leaf &)
+    {
+    }
+
     virtual std::auto_ptr<Router> clone(void) const;
 
     virtual void calculateRoutes(void);
     virtual void print(std::ostream & output) const;
+
+    virtual std::auto_ptr<ptree::Node> & getTree(void)
+    {
+        return tree;
+    }
+
+    virtual std::vector<ptree::LeafLan> & getLans(void)
+    {
+        return lans;
+    }
+
+    virtual void setHosts(Assigner::NodeLookup & source)
+    {
+        hosts = source;
+    }
 private:
     // pre-processing for print. Each host has adjascent interfaces.
     // The first hop information in m_tableList provides hops in terms of
@@ -44,6 +68,9 @@ private:
     // table. The second index is the destination. The result is the next
     // hop.
     std::vector<RouteTable> m_tableList;
+    std::auto_ptr<ptree::Node> tree;
+    std::vector<ptree::LeafLan> lans;
+    Assigner::NodeLookup hosts;
 };
 
 #endif

@@ -34,7 +34,7 @@ public:
 public:
     // Most partitioning schemes (at least in the near future) will presumably
     // use METIS. This is the common code to use METIS in the standard fashion.
-    static void partitionN(int partitionCount,
+    static int partitionN(int partitionCount,
                            std::vector<int> & indexes,
                            std::vector<int> & neighbors,
                            std::vector<int> & weights,
@@ -96,6 +96,7 @@ public:
         {
             fill(partitions.begin(), partitions.end(), 0);
         }
+        return edgesCut;
     }
 
     // Goes through every partition in the graph and checks to see if
