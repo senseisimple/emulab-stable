@@ -140,7 +140,7 @@ namespace eval TBCOMPAT {
     if {[file exists "$expdir"]} {
 	set logname "$expdir/logs/feedback.log"
 	set tbxlogfile [open $logname w 0664];
-	exec chmod 0664 $logname
+	catch "exec chmod 0664 $logname"
 	puts $tbxlogfile "BEGIN feedback log"
     }
 
