@@ -1789,7 +1789,7 @@ doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * Get the address the node should contact to load its image
 	 */
 	res = mydb_query("select load_address from images as i "
-			"left join reloads as r on i.imageid = r.image_id "
+			"left join current_reloads as r on i.imageid = r.image_id "
 			"where node_id='%s'",
 			 1, nodeid);
 
