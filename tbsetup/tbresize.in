@@ -11,22 +11,30 @@ use Getopt::Std;
 
 sub usage() {
     print STDOUT <<EOF;
-Usage: tbresize [-d] -a -e pid,eid -n num -t type [-p prefix]
-       tbresize [-d] -r -e pid,eid <node> [<node> ...]
-       tbresize -h
+Usage:
+tbresize [-d] [-q] -a -e pid,eid -n num -t type [-p prefix] [-v n1,n2,...]
+tbresize [-d] [-q] -r -e pid,eid <node> [<node> ...]
+tbresize -h
+
 Use -h to show this usage message.
 Use -d to enable extra debugging output.
+Use -q to enable quick mode (does not reboot nodes)
+
+Adding nodes:
 Use -a to add nodes to an experiment.
-Use -r to remove nodes from an experiment.
 Use -e pid,eid to specify the experiment to resize.
 Use -n to specify the number of nodes to add.
 Use -t to specify the type of the nodes to be added (pc, pc850, pc600, etc).
 Use -p to specify a prefix for vnames (i.e. "node" => node0 .. nodeN).
+Use -v to specify a list of vnames (must match number of nodes to add)
+
+Removing nodes:
+Use -r to remove nodes from an experiment.
 With -r, specify a list of one or more nodes to be removed (i.e. pcXX).
 EOF
     exit(-1);
 }
-my  $optlist = "hdare:n:t:p:";
+my  $optlist = "hdqare:n:t:p:v:";
 
 # Configure variables
 my $TB          = "@prefix@";
@@ -51,12 +59,14 @@ my $avail        = "$TB/sbin/avail";
 my $nalloc       = "$TB/bin/nalloc";
 my $nfree        = "$TB/bin/nfree";
 my $op = NONE;
+my $noreboot = 0;
 my $pid = "";
 my $eid = "";
 my $num = 0;
 my $type = "";
 my $prefix = "";
 my @nodes = ();
+my @vnames = ();
 my %v2p = (); # vname to phys node_id
 my %p2v = (); # phys node_id to vname
 
@@ -73,9 +83,11 @@ if (!@ARGV) { usage(); }
 if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"h"})) { usage(); }
 if (defined($options{"d"})) { $d++; }
+if (defined($options{"q"})) { $noreboot++; }
 if (defined($options{"a"})) {
     if (defined($options{"r"})) {
-        die("Only one of -a or -r should be given\n");
+        warn("Only one of -a or -r should be given\n");
+	usage();
     }
     $op = ADD;
 }
@@ -89,8 +101,19 @@ if (defined($options{"e"})) {
 	$pid=$1;
 	$eid=$2;
     } else {
-        die("Invalid argument to -e option: $pideid\n");
+        warn("Invalid argument to -e option: $pideid\n");
         usage();
+    }
+}
+if (defined($options{"v"})) {
+    my $vstr = $options{"v"};
+    my @vlist = split(",",$vstr);
+    if (@vlist+0 != $num) {
+      warn("Invalid list for -v: Must have $num vnames\n");
+      usage();
+    }
+    foreach $vname (@vlist) {
+      push(@vnames,untaint($vname));
     }
 }
 
@@ -139,6 +162,7 @@ if ($d) {
 	print "NUM  = $num\n";
 	print "TYPE = $type\n";
 	print "PRFX = $prefix\n";
+	print "VNMS = ".join(" ",@vnames)."\n";
     } else {
 	print "NODES= ".join(" ",@nodes)."\n";
     }
@@ -176,7 +200,7 @@ if ($op == ADD) {
     my $n = 0;
     my @nlist = @nodes;
     while (@nlist) {
-	my $vname = $prefix.$n;
+	my $vname = (shift @vnames) || ($prefix.$n);
 	my $node="";
 	if (! VnameToNodeid($pid,$eid,$vname,\$node)) {
 	    $node = shift @nlist;
@@ -338,8 +362,11 @@ if ($op == ADD) {
 
 
 # Now reboot the nodes in the expt so they all pick up new values
-run("$nodereboot ".($d?"-d ":"")."-e $pid,$eid");
-#print "Not rebooting nodes... [rebooting disabled]\n";
+if (!$noreboot) {
+  run("$nodereboot ".($d?"-d ":"")."-e $pid,$eid");
+} else {
+  print "Not rebooting nodes in quick mode.\n";
+}
 
 # Before we're done we need to rerun a few things:
 run("$exportssetup");
@@ -365,6 +392,7 @@ sub fatal($) {
 
 sub run($) {
     my $cmd = shift;
+    if ($d) { print "Running '$cmd'\n"; }
     my $rv = system($cmd);
     if ($rv) {
 	warn("*** WARNING: $cmd failed!\n");
