@@ -1,0 +1,23 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= os/growdisk
+
+include $(OBJDIR)/Makeconf
+
+all:	growdisk
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS = -O -g -static
+
+growdisk: growdisk.o
+	$(CC) $(CFLAGS) growdisk.o -o growdisk
+	cp growdisk growdisk.debug
+	strip growdisk
+
+# right now growdisk is only installed on the FreeBSD MFS
+install:
+
+clean:
+	/bin/rm -f *.o growdisk growdisk.debug
