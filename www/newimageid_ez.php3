@@ -443,9 +443,9 @@ if (!isset($formfields[imagename]) ||
     $errors["Descriptor Name"] = "Missing Field";
 }
 else {
-    if (! ereg("^[a-zA-Z0-9][-_a-zA-Z0-9\.]+$", $formfields[imagename])) {
+    if (! ereg("^[a-zA-Z0-9][-_a-zA-Z0-9\.\+]+$", $formfields[imagename])) {
 	$errors["Descriptor Name"] =
-	    "Must be alphanumeric (includes _ and - and .)<br>".
+	    "Must be alphanumeric (includes _, -, +, and .)<br>".
 	    "and must begin with an alphanumeric";
     }
     elseif (strlen($formfields[imagename]) > $TBDB_IMAGEID_IMAGENAMELEN) {
