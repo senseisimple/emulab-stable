@@ -9,6 +9,7 @@ use Getopt::Std;
 use Fcntl;
 use IO::Handle;
 use Socket;
+use Fcntl ':flock';
 
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -94,9 +95,18 @@ my @mntpoints   = ();
 my $jailpid;
 my $tmccpid;
 my $interactive = 0;
+
+# This stuff is passed from tmcd, which we parse into a config string
+# and an option set.
 my %jailconfig  = ();
-my $jailoptions;
-my $sshdport;
+my $jailoptions = " -o inaddrany -o routing -r -1";
+my $sshdport    = 50000;	# Bogus default, good for testing.
+my $routetabid  = 0;		# Default to main routing table.
+my $jailflags   = 3;
+my @jailips     = ();		# List of jail IPs (for routing table).
+my $ipfwrules	= ();		# List of IPFW rules to clean.
+my $JAIL_DEVMEM = 0x01;		# We need to know if these options given.
+my $JAIL_ROUTING= 0x02;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -330,7 +340,14 @@ sub mkrootfs($)
     # /dev is also special. It gets a very restricted set of entries.
     # Note that we create some BPF devices since they work in our jails.
     #
-    mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV jail bpf31");
+    my $makedevs = "bpf31";
+    if ($jailflags & $JAIL_DEVMEM) {
+	$makedevs .= " std pty0";
+    }
+    else {
+	$makedevs .= " jail";
+    }
+    mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV $makedevs");
     
     #
     # Create stub /var and create the necessary log files.
@@ -393,7 +410,15 @@ sub mkrootfs($)
     mysystem("cat /etc/resolv.conf | ".
 	     "sed -e 's/127\.0\.0\.1/$hostip/' > ".
 	     "$path/root/etc/resolv.conf");
-    
+
+    #
+    # If the jail gets its own routing table, must arrange for it to
+    # be populated when the jail starts up.
+    # 
+    if ($jailflags & $JAIL_ROUTING) {
+	addroutestorc("$path/root/etc/rc.conf");
+    }
+	
     #
     # Give the jail an NFS mount of the local project directory. This one
     # is read-write.
@@ -577,6 +602,10 @@ sub cleanup()
 	waitpid($jailpid, 0);
     }
 
+    foreach my $ruleno (keys(%ipfwrules)) {
+	system("ipfw delete $ruleno");
+    }
+
     while (@mntpoints) {
 	my $mntpoint = pop(@mntpoints);
 
@@ -592,6 +621,13 @@ sub cleanup()
 	system("vnconfig -u vn${vndevice}");
     }
     if (!$leaveme) {
+        #
+        # Ug, with NFS mounts inside the jail, we need to be really careful.
+        #
+	if (-d "$JAILPATH/$HOST/root" && !rmdir("$JAILPATH/$HOST/root")) {
+	    die("*** $0:\n".
+		"    $JAILPATH/$HOST/root is not empty! This is very bad!\n");
+	}
 	system("rm -rf $JAILPATH/$HOST");
     }
 }
@@ -652,10 +688,6 @@ sub getjailconfig($)
 # See if special jail opts supported.
 #
 sub setjailoptions() {
-    my $sawip = 0;
-    
-    $jailoptions = "";
-
     #
     # Do this all the time, so that we can figure out the sshd port.
     # 
@@ -702,6 +734,37 @@ sub setjailoptions() {
 		}
 		last SWITCH;
 	    };
+	    /^INADDRANY$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o inaddrany";
+		}
+		else {
+		    $jailoptions .= " -o noinaddrany";
+		}
+		last SWITCH;
+	    };
+	    /^ROUTING$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o routing";
+
+		    $jailflags |= $JAIL_ROUTING;
+		    #
+		    # If the jail gets routing privs, then it must get
+		    # its own routing table. We need to know this number
+		    # so we can enter an ipfw rule for it.
+		    #
+		    $routetabid   = getnextrtabid();
+		    $jailoptions .= " -r $routetabid";
+		}
+		else {
+		    $jailoptions .= " -o norouting";
+		}
+		last SWITCH;
+	    };
+	    /^DEVMEM$/ && do {
+		$jailflags |= $JAIL_DEVMEM;
+		last SWITCH;
+	    };
  	    /^IPADDRS$/ && do {
 		# Comma separated list of IPs
 		my @iplist = split(",", $val);
@@ -709,30 +772,163 @@ sub setjailoptions() {
 		foreach my $ip (@iplist) {
 		    if ($ip =~ /(\d+\.\d+\.\d+\.\d+)/) {
 			$jailoptions .= " -i $1";
-			$sawip = 1;
+			push(@jailips, $1);
 		    }
 		}
  		last SWITCH;
  	    };
 	}
     }
-    if (!defined($sshdport)) {
-	$sshdport = 50000;
-    }
     print("SSHD port is $sshdport\n");
 
     system("sysctl jail.inetraw_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.bpf_allowed=1 >/dev/null 2>&1");
-    if ($sawip) {
- 	system("sysctl jail.multiip_allowed=1 >/dev/null 2>&1");
-    }
-    
+    system("sysctl jail.inaddrany_allowed=1 >/dev/null 2>&1");
+    system("sysctl jail.multiip_allowed=1 >/dev/null 2>&1");
+    system("sysctl net.link.ether.inet.useloopback=0 >/dev/null 2>&1");
+
     if ($?) {
 	print("Special jail options are NOT supported!\n");
 	$jailoptions = "";
+	$jailflags   = 0;
 	return 0;
     }
     print("Special jail options are supported: '$jailoptions'\n");
-    
+
+    if (@jailips && ($jailflags & $JAIL_ROUTING)) {
+	genipfwrules();
+    }
     return 0;
+}
+
+#
+# Append a list of static routes to the rc.conf file.
+#
+sub addroutestorc($rc)
+{
+    my ($rc)   = @_;
+    my $count  = 0;
+
+    #
+    # Need the IP of the default router, which we got from DHCP but
+    # is not stashed anyplace easy to get at. 
+    # 
+    my $router_name = `route get default | awk '/gateway:/ {print \$2}'`;
+    chomp($router_name);
+    my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($router_name);
+    my $router_ip = inet_ntoa($ipaddrs[0]);
+    fatal("Could not determine IP of the default router!")
+	if (!defined($router_ip));
+
+    open(RC, ">>$rc") or
+	fatal("Could not open $rc to append static routes");
+
+    #
+    # First the set of routes that all jails get. 
+    # 
+    print RC "static_routes=\"default lo0 host\"\n";
+    print RC "route_default=\"default $router_ip\"\n";
+    print RC "route_lo0=\"localhost -interface lo0\"\n";
+    print RC "route_host=\"$hostip localhost\"\n";
+
+    #
+    # Now a list of routes for each of the IPs the jail has access
+    # to. Of course, we need to know the interface name, so use the
+    # route command again.
+    # 
+    foreach my $ip (@jailips) {
+	my $interface = `route get $ip | awk '/interface:/ {print \$2}'`;
+	my $netmask   = `route get $ip | awk '/mask:/ {print \$2}'`;
+	chomp($interface);
+	chomp($netmask);
+	fatal("Could not find interface for $ip")
+	    if (!defined($interface));
+
+	print RC "static_routes=\"ip${count} \$static_routes\"\n";
+	print RC "route_ip${count}=\"-net $ip -interface $interface " .
+	    "-netmask $netmask\"\n";
+
+	$count++;
+    }
+    close(RC);
+    return 0;
+}
+
+#
+# Ug, with NFS mounts inside the jail, we need to be really careful.
+#
+sub removevnodedir($)
+{
+    my ($dir) = @_;
+
+    if (-d "$dir/root" && !rmdir("$dir/root")) {
+	die("*** $0:\n".
+	    "    $dir/root is not empty! This is very bad!\n");
+    }
+    system("rm -rf $dir");
+}
+
+#
+# Get a free routing table ID. This should eventually come from the
+# kernel, but for now just use a file with a number in it. 
+#
+sub getnextrtabid()
+{
+    my $nextrtabid = 1;
+
+    #
+    # The chances of a race are low, but need to deal with it anyway.
+    #
+    my $lockfile  = "/var/emulab/lock/rtabid";
+    my $rtabidfile= "/var/emulab/db/rtabid";
+
+    open(LOCK, ">>$lockfile") ||
+	fatal("Could not open $lockfile\n");
+    
+    while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+	print "Waiting to get lock for $lockfile\n";
+	sleep(1);
+    }
+    if (-e $rtabidfile) {
+	my $rtabid = `cat $rtabidfile`;
+	if ($rtabid =~ /^(\d*)$/) {
+	    $nextrtabid = $1 + 1;
+	}
+	else {
+	    close(LOCK);
+	    fatal("Bad data in $rtabidfile!");
+	}
+    }
+    system("echo $nextrtabid > $rtabidfile");
+    close(LOCK);
+    return $nextrtabid;
+}
+
+#
+# Generate the list of ipfw rules for setting the rtabid. This should
+# eventually go away when we have better support in the kernel for
+# figuring this out.
+#
+sub genipfwrules()
+{
+    my $index = $routetabid * 100;
+
+    if (scalar(@jailips) > 100) {
+	fatal("Too many ipfw rules (too many IPs)!");
+    }
+
+    foreach my $ip (@jailips) {
+	my $rule = "ipfw add $index rtabid $routetabid ip from any to $ip";
+
+	#
+	# Install rule. If any fail, we are doomed.
+	#
+	system($rule) == 0
+	    or fatal("ipfw failed: $rule");
+	
+	#
+	# Save for cleanup().
+	# 
+	$ipfwrules{$index++} = $rule;
+    }
 }
