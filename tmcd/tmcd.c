@@ -44,8 +44,8 @@
 #define USERDIR		"/users"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
-//#define FSHOSTID	"/usr/testbed/etc/fshostid"
-#define FSHOSTID	"./fshostid"
+#define FSHOSTID	"/usr/testbed/etc/fshostid"
+//#define FSHOSTID	"./fshostid"
 
 #define TESTMODE
 #define NETMASK		"255.255.255.0"

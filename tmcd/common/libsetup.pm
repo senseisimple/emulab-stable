@@ -140,8 +140,8 @@ my $VTUND       = "/usr/local/sbin/vtund";
 # This is a debugging thing for my home network.
 # 
 #my $NODE	= "-p 7778 REDIRECT=192.168.100.1";
-my $NODE	= "-p 7779";
-#$NODE		= "";
+#my $NODE	= "-p 7779";
+$NODE		= "";
 
 # Locals
 my $pid		= "";
