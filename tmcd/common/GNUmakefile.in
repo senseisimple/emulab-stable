@@ -64,6 +64,8 @@ path-install:	dir-install
 
 common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/libtmcc.pm $(BINDIR)/libtmcc.pm
+	$(INSTALL) -m 755 $(SRCDIR)/tmcc.pl $(BINDIR)/tmcc
 	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
 	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup

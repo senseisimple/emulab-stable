@@ -36,6 +36,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 # Locals
 my $logname = "$LOGDIR/bootsubnodes.debug";
@@ -85,20 +86,23 @@ my %subnodelist;
 # Get the current set of subnodes that are supposed to be running on
 # this node.
 #
-my $TM = OPENTMCC(TMCCCMD_SUBNODELIST);
-while (<$TM>) {
-    if ($_ =~ /^NODEID=([-\w]+) TYPE=([-\w]+)$/) {
+my @tmccresults;
+
+if (tmcc(TMCCCMD_SUBNODELIST, undef, \@tmccresults) < 0) {
+    die("*** WARNING: Could not get subnode list from server!\n");
+}
+if (! @tmccresults) {
+    print "No subnodes. Exiting gracefully ...\n";
+    exit(0);
+}
+
+foreach my $str (@tmccresults) {
+    if ($str =~ /^NODEID=([-\w]+) TYPE=([-\w]+)$/) {
 	$subnodelist{$1} = $2;
     }
     else {
-	print "Skipping bad subnodeid: '$_'\n";
+	warn("*** WARNING: Skipping bad subnodeid: '$str'\n");
     }
-}
-CLOSETMCC($TM);
-
-if (! scalar(keys(%subnodelist))) {
-    print "No subnodes. Exiting gracefully ...\n";
-    exit(0);
 }
 print "subnodelist is @{[keys(%subnodelist)]}\n";
 

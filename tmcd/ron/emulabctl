@@ -42,6 +42,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc
 
 # Locals
 my $logname = "$LOGDIR/emulab-boot.debug";
@@ -119,7 +120,7 @@ sub handler () {
     $SIG{TERM} = 'IGNORE';
     $SIG{INT} = 'IGNORE';
     unlink($pidfile);
-    system("tmcc state SHUTDOWN");
+    tmcc(TMCCCMD_STATE, "SHUTDOWN");
     kill('TERM', -$pgrp);
     sleep(1);
     exit(0);
@@ -132,7 +133,7 @@ $SIG{INT}  = \&handler;
 # cannot get a tmcd connection formed to tell it we are rebooting.
 # 
 print "Informing Emulab Operations that we've rebooted ...\n";
-system("tmcc state TBSETUP");
+tmcc(TMCCCMD_STATE, "TBSETUP");
 
 #
 # Do a cvsup to get updated software.
@@ -174,7 +175,7 @@ system("watchdog");
 # Inform TMCD that we are up and running.
 #
 print "Informing Emulab Operations that we're up and running ...\n";
-system("tmcc state ISUP");
+tmcc(TMCCCMD_STATE, "ISUP");
 
 # Done!
 while (1) {

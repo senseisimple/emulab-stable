@@ -1,3 +1,102 @@
+stoller     2003/10/06 14:27:46 MDT
+
+  Modified files:
+    tmcd                 libsetup.pm 
+    tmcd/common          GNUmakefile.in bootsubnodes bootvnodes 
+                         ntpstart rc.progagent sendevent update 
+                         vnodesetup watchdog 
+    tmcd/freebsd         GNUmakefile.in delaysetup rc.delayagent 
+                         tbshutdown 
+    tmcd/linux           GNUmakefile.in delaysetup ixpboot 
+                         supfile.in 
+    tmcd/plab            GNUmakefile.in 
+    tmcd/ron             GNUmakefile.in emulabctl webserver.pl 
+  Added files:
+    tmcd/common          libtmcc.pm tmcc.pl 
+    tmcd/ron             makefile 
+  Log:
+  * New libtmcc.pm module that encapsulates the tmcc interface. Most of the
+    code that was in libsetup has moved into this library, and underwent a
+    giant cleaning and pumping up. The interface from your typical perl
+    script now looks like this:
+  
+    use libtmcc;
+  
+    if (tmcc(TMCCCMD_STATUS, "optional arguments", \@tmccresults) < 0) {
+        warn("*** WARNING: Could not get status from server!\n");
+        return -1;
+    }
+    foreach my $me (@tmccresults) {
+  	print "bite $me";
+    }
+  
+    The arguments and results are optional values. There is a fourth optional
+    value that is a hash of config options (basically converted to command
+    line switches passed to tmcc). For example, to set the timeout on an
+    individual call, pass a fourth argument like:
+  
+  	("timeout" => 5)
+  
+    There is also a way to set global options so that all subsequent tmcc
+    calls are affected:
+  
+  	configtmcc("timeout", 5);
+  
+    I'll probably clean this up a bit to avoid the direct strings.
+  
+    The result list is a list of strings. Since we are trending away from
+    using tmcc to transfer large amounts of data, I think this is okay.
+  
+  * A new tmcc.pl which does little more than load libtmcc and use it.
+    This will become the new tmcc, with the existing C version becoming a
+    backend binary for it.
+  
+  * All of the perl scripts in tmcd have been changed to use the new
+    library. I left the few uses of tmcc in shell scripts alone since they
+    were of the simple variety (mostly "state" command).
+  
+  * And again, if you have read this far, you will learn why I bothered with
+    all this. Well, the existing code was really bad and it was getting out
+    of control. Sort of like a squid that was getting harder to control as
+    its rotting tenticles slithered into more and more scripts. Anyway ...
+  
+    More important, my goal is to use the libtmcc library to add caching.  I
+    have not worked out the details yet, but I am envisioning a configuration
+    file, perhaps generated initially by tmcd, of all of the config
+    values. If the library finds that file, it sucks the info out of the file
+    instead of going to tmcd. Eventually, this config file would be generated
+    as part of experiment swapping and stored in the DB, but thats a longer
+    term project, and perhaps orthogonal (how we fill the cache is not as
+    important as adding the ability to use a cache, right?).
+  
+    Note that certain operations (like "state" and "ready") are flagged by
+    the library to always bypass the "cache".
+  
+  Revision  Changes    Path
+  1.83      +322 -446  testbed/tmcd/libsetup.pm
+  1.14      +2 -0      testbed/tmcd/common/GNUmakefile.in
+  1.2       +14 -10    testbed/tmcd/common/bootsubnodes
+  1.10      +13 -9     testbed/tmcd/common/bootvnodes
+  1.4       +17 -13    testbed/tmcd/common/ntpstart
+  1.4       +2 -1      testbed/tmcd/common/rc.progagent
+  1.2       +4 -3      testbed/tmcd/common/sendevent
+  1.4       +1 -1      testbed/tmcd/common/update
+  1.18      +10 -7     testbed/tmcd/common/vnodesetup
+  1.8       +17 -11    testbed/tmcd/common/watchdog
+  1.40      +1 -1      testbed/tmcd/freebsd/GNUmakefile.in
+  1.10      +18 -13    testbed/tmcd/freebsd/delaysetup
+  1.7       +2 -1      testbed/tmcd/freebsd/rc.delayagent
+  1.3       +4 -2      testbed/tmcd/freebsd/tbshutdown
+  1.36      +1 -1      testbed/tmcd/linux/GNUmakefile.in
+  1.2       +12 -8     testbed/tmcd/linux/delaysetup
+  1.5       +23 -12    testbed/tmcd/linux/ixpboot
+  1.3       +1 -1      testbed/tmcd/linux/supfile.in
+  1.4       +5 -2      testbed/tmcd/plab/GNUmakefile.in
+  1.9       +1 -1      testbed/tmcd/ron/GNUmakefile.in
+  1.7       +4 -3      testbed/tmcd/ron/emulabctl
+  1.4       +49 -12    testbed/tmcd/ron/webserver.pl
+
+
 stoller     2003/09/30 09:30:09 MDT
 
   Modified files:

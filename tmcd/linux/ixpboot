@@ -36,6 +36,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 # Need this below
 my ($pid, $eid) = check_nickname();
@@ -76,6 +77,7 @@ my $ixconfig    = "ixsys.l3fwdr";
 my $ixroute     = "route.l3fwdr";
 my $bootscript  = "$confdir/bootscript";
 my $userconfig  = "$confdir/emulab-config";
+my @tmccresults;
 
 #
 # Okay, lets background so we can redirect all the output. We wait for the
@@ -98,11 +100,13 @@ die("*** $0:\n".
 
 # Tell the library what vnode we are messing with.
 libsetup_setvnodeid($ixpid);
+# Tell tmcc library too, although thats already been done with previous call.
+configtmcc("subnode", $ixpid);
 
 #
 # Tell the testbed the node is booting.
 #
-RUNTMCC(TMCCCMD_STATE, "BOOTING");
+tmcc(TMCCCMD_STATE, "BOOTING");
 
 #
 # Create the config directory. 
@@ -132,11 +136,16 @@ system("cp -f /etc/resolv.conf $confdir") == 0
     or die("*** $0:\n".
 	   "    Could not cp resolv.conf!\n");
 
-my $TM = OPENTMCC(TMCCCMD_STARTUP);
-my $startcmd = <$TM>;
-CLOSETMCC($TM);
+#
+# Startup command (old style).
+# 
+tmcc(TMCCCMD_STARTUP, undef, \@tmccresults) == 0
+    or die("*** $0:\n".
+	   "    Could not get startupcmd from server!\n");
 
-if (defined($startcmd)) {
+if (scalar(@tmccresults)) {
+    my $startcmd = $tmccresults[0];
+    
     open(RUN, "> $bootscript")
 	or die("Could not open $bootscript: $!");
     
@@ -157,10 +166,13 @@ if (defined($startcmd)) {
 # Ask tmcd for the configuration data. Create the file and store into
 # the directory.
 #
-$TM = OPENTMCC(TMCCCMD_SUBCONFIG);
-while (<$TM>) {
-    chomp();
-    SWITCH1: {
+tmcc(TMCCCMD_SUBCONFIG, undef, \@tmccresults) == 0
+    or die("*** $0:\n".
+	   "    Could not get subnode config from server!\n");
+
+foreach my $str (@tmccresults) {
+    chomp($str);
+    SWITCH1: for ($str) {
 	/^IXP_IP="(.*)"$/ && do {
 	    $config{"IXP1200_IP"} = $1;
 	    last SWITCH1;
@@ -191,10 +203,9 @@ while (<$TM>) {
 	    $config{"HOST_MASK"}    = $1;
 	    last SWITCH1;
 	};
-	print STDERR "Invalid Directive: $_\n";
+	print STDERR "Invalid Directive: $str\n";
     }
 }
-CLOSETMCC($TM);
 
 #
 # Generate the file the way Abhijeet wants it.
@@ -434,6 +445,6 @@ print "IXP $ixpid booted okay\n";
 #
 # Tell the testbed the node booted okay
 #
-RUNTMCC(TMCCCMD_STATE, "ISUP");
+tmcc(TMCCCMD_STATE, "ISUP");
 
 exit(0);

@@ -28,6 +28,7 @@ sub fatal($);
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -70,7 +71,7 @@ if ($OSNAME eq "freebsd") {
     $bossname = "localhost";    
 }
 else {
-    ($bossname) = split(" ", `tmcc bossinfo`);
+    $bossname = tmccbossname();
 }
 
 #

@@ -24,6 +24,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -91,7 +92,7 @@ my ($pid, $eid, $vname) = check_nickname();
 #
 my $bossname = "localhost";
 if (! defined($vnodeid)) {
-    ($bossname) = split(" ", `tmcc bossinfo`);
+    $bossname = tmccbossname();
 }
 
 system("delay-agent -s $bossname -E $pid/$eid ".

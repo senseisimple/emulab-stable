@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -21,6 +21,7 @@ my $logname = "/var/emulab/logs/webserver.log";
 my $pidfile = "/var/run/emulab-webserver.pid";
 my $webpage = "http://www.emulab.net/widearea_redirect.php";
 my $IP;
+my $dpid;
 
 #
 # Untaint path
@@ -50,14 +51,8 @@ if ($action eq "stop") {
 	exit(0);
     }
     system("kill `cat $pidfile`");
-    unlink($pidfile);
     exit($? >> 8);
 }
-
-my $webserver = HTTP::Daemon->new(LocalPort => 'http(80)',
-				  Reuse     => 1)
-    || die("*** $0:\n".
-	   "    Could not create a new daemon object!\n");
 
 #
 # Put ourselves into the background, directing output to the log file.
@@ -81,6 +76,30 @@ open(STDERR, ">  $logname") or die("opening $logname for STDERR: $!");
 open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
 #
+# Setup a handler to catch TERM.
+#
+sub handler () {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    unlink($pidfile);
+    kill('TERM', $dpid)
+	if (defined($dpid));
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Get uid/gid for "nobody" since port 80 is a reserved port, and we have
+# to get the port, and then flip later. 
+# 
+my (undef,undef,$unix_uid) = getpwnam("nobody") or
+    die("No such user nobody\n");
+my (undef,undef,$unix_gid) = getgrnam("nobody") or
+    die("No such group nobody\n");
+
+
+#
 # We would like our IP address to pass along.
 # 
 my $hostname = `hostname`;
@@ -96,12 +115,30 @@ if (defined($hostname)) {
 }
 
 #
-# Flip to user nobody after binding to port 80 (a reserved port).
+# Loop. Create a child to run the web server, and wait for it. If it dies,
+# restart it. 
+#
+while (1) {
+    $dpid = fork();
+    # Child runs the server by continuing out of the loop.
+    if (! $dpid) {
+	print "Starting child webserver. PID = $PID\n";
+	$SIG{TERM} = 'DEFAULT';
+	last;
+    }
+    # Parent waits, and loops. Only a signal can stop us.
+    waitpid($dpid, 0);
+    print "Child webserver exited with $?. Restarting in a moment ...\n";
+    sleep(2);
+}
+
+#
+# Only the child executes from here on. 
 # 
-my (undef,undef,$unix_uid) = getpwnam("nobody") or
-    die("No such user nobody\n");
-my (undef,undef,$unix_gid) = getgrnam("nobody") or
-    die("No such group nobody\n");
+my $webserver = HTTP::Daemon->new(LocalPort => 'http(80)',
+				  Reuse     => 1)
+    || die("*** $0:\n".
+	   "    Could not create a new daemon object!\n");
 
 $EGID = $GID = $unix_gid;
 $EUID = $UID = $unix_uid;

@@ -33,6 +33,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 # Locals
 my $action	= "start";
@@ -132,6 +133,9 @@ $SIG{INT}  = \&handler;
 #
 if (JAILED() || PLAB()) {
     $vnodeid = libsetup_getvnodeid();
+    # Tell the tmcc library. Note that its actually been done via libsetup
+    # but I duplicate it here to make it explicit.
+    configtmcc("subnode", $vnodeid);
 }
 
 #
@@ -177,7 +181,7 @@ while (1) {
 	my $drift = `cat $driftfile`;
 	if ($drift =~ /^([-\d\.]*)$/) {
 	    # Server also checks the value for sanity.
-	    system("tmcc -t 3 ntpdrift $1");
+	    tmcc(TMCCCMD_NTPDRIFT, $1, undef, ("timeout" => 3));
 	}
     }
     if (REMOTE()) {
@@ -211,17 +215,19 @@ sub startisalive()
 	my $retries = 3;
 
 	while ($retries) {
-	    my $options = "-u -t 3";
-	    if (defined($vnodeid)) {
-		$options .= " -n $vnodeid";
-	    }
-	    my $result = `tmcc $options isalive`;
-	    if (! $?) {
+	    my @tmccresults;
+
+	    if (tmcc(TMCCCMD_ISALIVE, undef,
+		     \@tmccresults, ("timeout" => 3, "useudp" => 1)) == 0 &&
+		scalar(@tmccresults)) {
 		my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
-		
-		chomp $result;
-		my (undef,$update) = split("=", $result);
-		if ($update || $failed) {
+
+		#
+		# The format of the response is rather simple right now.
+		# If the update failed last time, run it no matter what.
+		#
+		if ($failed ||
+		    $tmccresults[0] =~ /^UPDATE=1$/) {
 		    print "Running an update at $date ...\n";
 		    system("update -i");
 		    $failed = $?;

@@ -10,7 +10,8 @@ SUBDIR		= tmcd/plab
 # The scripts the tarball depends on
 #
 COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
-		    paths.sh paths.pm runstartup vnodesetup update watchdog)
+		    paths.sh paths.pm runstartup vnodesetup update watchdog \
+                    libtmcc.pm)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 TMCDSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/libsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
@@ -62,11 +63,13 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	chmod u+s plabroot/usr/local/etc/emulab/vnodesetup
 	chmod u+s plabroot/usr/local/etc/emulab/update
 	$(INSTALL_PROGRAM) $(OSSCRIPTS)   plabroot/usr/local/bin
+	$(INSTALL_PROGRAM) $(TESTBED_SRCDIR)/tmcd/common/tmcc.pl \
+					  plabroot/usr/local/etc/emulab/tmcc
 	$(INSTALL_PROGRAM) $(EESCRIPTS)   plabroot/etc
 	$(INSTALL) -m 440  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
 					  plabroot/etc/sudoers
 	ln -fs suidperl  plabroot/usr/bin/sperl5.6.1
-	$(INSTALL_PROGRAM) -s tmcc        plabroot/usr/local/etc/emulab/tmcc
+	$(INSTALL_PROGRAM) -s tmcc       plabroot/usr/local/etc/emulab/tmcc.bin
 	$(INSTALL_PROGRAM) -s -m 4511 $(SRCDIR)/suidperl plabroot/usr/bin
 	$(INSTALL_DATA) /usr/testbed/etc/pcplab.pem \
 	                plabroot/usr/local/etc/emulab/client.pem

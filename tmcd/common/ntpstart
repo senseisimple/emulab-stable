@@ -38,6 +38,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 # Locals
 my @ntpinfo	= ();
@@ -48,6 +49,7 @@ my $driftfile   = "/etc/ntp.drift";
 my $pidfile	= "/var/run/ntpd.pid";
 my $ntpdate     = "/usr/sbin/ntpdate";
 my $debug       = 0;
+my @tmccresults;
 
 #
 # Since this is a wrapper, we have to try to start ntp no matter what.
@@ -69,8 +71,8 @@ sub ntpdate() {
     # We need to give -b to set time directly (instead of using adjtime()), and
     # give the boss node's name
     #
-    my ($bossname) = split(" ", `tmcc bossinfo`);
-    my $ntpcmd = "$ntpdate -b -s ";
+    my $bossname = tmccbossname();
+    my $ntpcmd   = "$ntpdate -b -s ";
     if (REMOTE()) {
 	$ntpcmd .= "-t 5 ";
     }
@@ -97,23 +99,25 @@ if (ntpdate()) {
 # but no servers/peers, then need to leave the config alone and just
 # replace the drift file.
 #
-my $args = "";
 if (REMOTE()) {
-    $args .= "-t 5";
+    # Do not allow blocking on the network.
+    configtmcc("timeout", 5);
 }
-open(TM, "tmcc $args ntpinfo |")
-    or fatal("Could not start tmcc: $!");
 
-while (<TM>) {
-    chomp();
-    if ($_ =~ /^PEER=.*$/ ||
-	$_ =~ /^SERVER=.*$/) {
+if (tmcc(TMCCCMD_NTPINFO, undef, \@tmccresults) < 0) {
+    warn("*** $0:\n".
+	 "    Failed to get ntpinfo from server! Falling back ...\n");
+    exit(ntpstart());
+}
+
+foreach my $str (@tmccresults) {
+    chomp($str);
+    if ($str =~ /^PEER=.*$/ ||
+	$str =~ /^SERVER=.*$/) {
 	$useold = 0;
     }
-    push(@ntpinfo, $_);
+    push(@ntpinfo, $str);
 }
-close(TM)
-    or fatal("tmcc error!");
 if (! @ntpinfo) {
     exit(ntpstart());
 }

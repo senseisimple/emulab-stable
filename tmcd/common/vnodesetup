@@ -55,6 +55,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 #
 # Forward declarations for prototype checking
@@ -142,6 +143,8 @@ if ($dojail && $doplab) {
 
 # Tell the library what vnode we are messing with.
 libsetup_setvnodeid($vnodeid);
+# Tell tmcc library too, although thats already been done with previous call.
+configtmcc("subnode", $vnodeid);
 
 #
 # Hacky. All this path stuff is hacky.
@@ -153,9 +156,9 @@ my $logname  = "$LOGDIR/tbvnode-${vnodeid}.log";
 # Need the domain, but no conistent way to do it. Ask tmcc for the
 # boss node and parse out the domain. 
 #
-my ($DOMAINNAME) = split(" ", `tmcc bossinfo`);
-die("Could not get bossinfo!")
-    if ($?);
+my $DOMAINNAME = tmccbossname();
+die("Could not get bossname from tmcc!")
+    if (!defined($DOMAINNAME));
 
 if ($DOMAINNAME =~ /^[-\w]+\.(.*)$/) {
     $DOMAINNAME = $1;
@@ -307,7 +310,7 @@ if (! -e CONFDIR()) {
 # Inform the TMCD we are setting up. 
 #
 REBOOT:
-system("tmcc -n $vnodeid state BOOTING");
+tmcc(TMCCCMD_STATE, "BOOTING");
 
 #
 # Invoke vnode setup routine in the setup library. This will talk to
@@ -442,7 +445,7 @@ else {
     #
     # Inform the TMCD we are ready.
     #
-    system("tmcc -n $vnodeid state ISUP");
+    tmcc(TMCCCMD_STATE, "ISUP");
 
     #
     # Now we just sit and wait to be killed off by a signal sent to the
@@ -533,7 +536,7 @@ sub cleanup()
     $cleaning = 1;
 
     # Inform testbed that vnode going down.
-    system("tmcc -t 2 -n $vnodeid state SHUTDOWN");
+    tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, ("timeout" => 2));
 
     #
     # First force the jail to exit. 
@@ -579,7 +582,7 @@ sub reboot()
     $rebooting = 1;
     
     # Inform testbed that vnode going down.
-    system("tmcc -t 2 -n $vnodeid state SHUTDOWN");
+    tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, ("timeout" => 2));
 
     #
     # First force the jail to exit, but leaving it intact.

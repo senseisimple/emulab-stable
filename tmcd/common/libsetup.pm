@@ -14,7 +14,7 @@ package libsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( libsetup_init libsetup_setvnodeid cleanup_node 
+    qw ( libsetup_init libsetup_setvnodeid libsetup_settimeout cleanup_node 
 	 doifconfig dohostnames domounts dotunnels check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname dosyncserver
@@ -23,24 +23,32 @@ use Exporter;
 	 tmcctimeout libsetup_getvnodeid dotrafficconfig
 	 ixpsetup dokeyhash donodeid
 
-	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED PLAB LOCALROOTFS IXP
+	 MFS REMOTE JAILED PLAB LOCALROOTFS IXP
 
 	 CONFDIR TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
 	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY TMDELMAP TMMOUNTDB
 	 TMPROGAGENTS TMPASSDB TMGROUPDB TMGATEDCONFIG
 	 TMSYNCSERVER TMRCSYNCSERVER TMKEYHASH TMNODEID
-	 
-	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
-	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
-	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
-	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE TMCCCMD_LINKDELAYS
-	 TMCCCMD_PROGRAMS TMCCCMD_SUBNODELIST TMCCCMD_SUBCONFIG
-	 TMCCCMD_STATE TMCCCMD_SYNCSERVER TMCCCMD_KEYHASH TMCCCMD_NODEID
        );
 
 # Must come after package declaration!
 use English;
+
+# The tmcc library.
+use libtmcc;
+
+#
+# This is the VERSION. We send it through to tmcd so it knows what version
+# responses this file is expecting.
+#
+# BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
+#
+sub TMCD_VERSION()	{ 12; };
+libtmcc::configtmcc("version", TMCD_VERSION());
+
+# Control tmcc timeout.
+sub libsetup_settimeout($) { libtmcc::configtmcc("timeout", $_[0]); };
 
 #
 # For virtual (multiplexed nodes). If defined, tack onto tmcc command.
@@ -50,7 +58,17 @@ use English;
 my $vnodeid;
 sub libsetup_setvnodeid($)
 {
-    ($vnodeid) = @_;
+    my ($vid) = @_;
+
+    if ($vid =~ /^([-\w]+)$/) {
+	$vid = $1;
+    }
+    else {
+	die("Bad data in vnodeid: $vid");
+    }
+
+    $vnodeid = $vid;
+    libtmcc::configtmcc("subnode", $vnodeid);
 }
 sub libsetup_getvnodeid()
 {
@@ -93,15 +111,10 @@ BEGIN
     #
     if (-e "$BOOTDIR/jailname") {
 	open(VN, "$BOOTDIR/jailname");
-	$vnodeid = <VN>;
+	my $vid = <VN>;
 	close(VN);
 
-	if ($vnodeid =~ /^([-\w]+)$/) {
-	    $vnodeid = $1;
-	}
-	else {
-	    die("Bad data in vnodeid: $vnodeid");
-	}
+	libsetup_setvnodeid($vid);
 	$injail = 1;
 
 	#
@@ -124,15 +137,10 @@ BEGIN
     # Determine if running inside a Plab vserver.
     if (-e "$BOOTDIR/plabname") {
 	open(VN, "$BOOTDIR/plabname");
-	$vnodeid = <VN>;
+	my $vid = <VN>;
 	close(VN);
 
-	if ($vnodeid =~ /^([-\w]+)$/) {
-	    $vnodeid = $1;
-	}
-	else {
-	    die("Bad data in vnodeid: $vnodeid");
-	}
+	libsetup_setvnodeid($vid);
 	$inplab = 1;
     }
 
@@ -245,50 +253,6 @@ sub TMNODEID()		{ CONFDIR() . "/nodeid";}
 my $USESFS		= 1;
 
 #
-# This is the VERSION. We send it through to tmcd so it knows what version
-# responses this file is expecting.
-#
-# BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
-#
-sub TMCD_VERSION()	{ 12; };
-
-#
-# These are the TMCC commands. 
-#
-sub TMCCCMD_REBOOT()	{ "reboot"; }
-sub TMCCCMD_STATUS()	{ "status"; }
-sub TMCCCMD_STATE()	{ "state"; }
-sub TMCCCMD_IFC()	{ "ifconfig"; }
-sub TMCCCMD_ACCT()	{ "accounts"; }
-sub TMCCCMD_DELAY()	{ "delay"; }
-sub TMCCCMD_HOSTS()	{ "hostnames"; }
-sub TMCCCMD_RPM()	{ "rpms"; }
-sub TMCCCMD_TARBALL()	{ "tarballs"; }
-sub TMCCCMD_STARTUP()	{ "startupcmd"; }
-sub TMCCCMD_DELTA()	{ "deltas"; }
-sub TMCCCMD_STARTSTAT()	{ "startstatus"; }
-sub TMCCCMD_READY()	{ "ready"; }
-sub TMCCCMD_MOUNTS()	{ "mounts"; }
-sub TMCCCMD_ROUTING()	{ "routing"; }
-sub TMCCCMD_TRAFFIC()	{ "trafgens"; }
-sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
-sub TMCCCMD_TUNNEL()	{ "tunnels"; }
-sub TMCCCMD_NSECONFIGS(){ "nseconfigs"; }
-sub TMCCCMD_VNODELIST() { "vnodelist"; }
-sub TMCCCMD_SUBNODELIST(){ "subnodelist"; }
-sub TMCCCMD_ISALIVE()   { "isalive"; }
-sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
-sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
-sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
-sub TMCCCMD_PLABCONFIG(){ "plabconfig"; }
-sub TMCCCMD_SUBCONFIG() { "subconfig"; }
-sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
-sub TMCCCMD_PROGRAMS()  { "programs"; }
-sub TMCCCMD_SYNCSERVER(){ "syncserver"; }
-sub TMCCCMD_KEYHASH()   { "keyhash"; }
-sub TMCCCMD_NODEID()    { "nodeid"; }
-
-#
 # Some things never change.
 # 
 my $TARINSTALL  = "/usr/local/bin/install-tarfile %s %s %s";
@@ -312,10 +276,6 @@ if (defined($ENV{'TMCCARGS'})) {
 my $pid		= "";
 my $eid		= "";
 my $vname	= "";
-
-# Control tmcc error condition and timeout. Dynamic, not lexical!
-$tmcctimeout    = 0;
-my $TMCCTIMEO   = 30;	# Default timeout on remote nodes.
 
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
@@ -353,87 +313,6 @@ sub IXP()	{ if ($inixp) { return $vnodeid; } else { return 0; } }
 if (!MFS()) {
     require Socket;
     import Socket;
-}
-
-#
-# Open a TMCC connection and return the "stream pointer". Caller is
-# responsible for closing the stream and checking return value.
-#
-# usage: OPENTMCC(char *command, char *args, char *options)
-#
-sub OPENTMCC($;$$)
-{
-    my($cmd, $args, $options) = @_;
-    my $vn = "";
-    local *TM;
-
-    if (!defined($args)) {
-	$args = "";
-    }
-    if (!defined($options)) {
-	$options = "";
-    }
-    if (defined($vnodeid)) {
-	$vn = "-n $vnodeid";
-    }
-    if ($tmcctimeout) {
-	$options .= " -t $tmcctimeout";
-    }
-    if (defined($tmccproxy)) {
-	$options .= " -l $tmccproxy";
-    }
-
-    my $foo = sprintf("%s -v %d $options $NODE $vn $cmd $args |",
-		      TMCC, TMCD_VERSION);
-
-    if (!open(TM, $foo)) {
-	print STDERR "Cannot start TMCC: $!\n";
-	return undef;
-    }
-    return (*TM);
-}
-
-#
-# Close connection. Die on error.
-# 
-sub CLOSETMCC($) {
-    my($TM) = @_;
-    
-    if (! close($TM)) {
-	if ($?) {
-	    print STDERR "TMCC exited with status $?!\n";
-	}
-	else {
-	    print STDERR "Error closing TMCC pipe: $!\n";
-	}
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Run a TMCC command with the provided arguments.
-#
-# usage: RUNTMCC(char *command, char *args, char *options)
-#
-sub RUNTMCC($;$$)
-{
-    my($cmd, $args, $options) = @_;
-    my($TM);
-
-    if (!defined($args)) {
-	$args = "";
-    }
-    if (!defined($options)) {
-	$options = "";
-    }
-    
-    $TM = OPENTMCC($cmd, $args, $options);
-
-    close($TM)
-	or die $? ? "TMCC exited with status $?" : "Error closing pipe: $!";
-    
-    return 0;
 }
 
 #
@@ -479,23 +358,28 @@ sub cleanup_node ($) {
 #
 sub check_status ()
 {
-    my $TM = OPENTMCC(TMCCCMD_STATUS);
-    $_  = <$TM>;
-    CLOSETMCC($TM);
+    my $status;
+    my @tmccresults;
 
-    if ($_ =~ /^FREE/) {
+    if (tmcc(TMCCCMD_STATUS, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get status from server!\n");
+	return -1;
+    }
+    $status = $tmccresults[0];
+
+    if ($status =~ /^FREE/) {
 	unlink TMNICKNAME;
 	return 0;
     }
     
-    if ($_ =~ /ALLOCATED=([-\@\w]*)\/([-\@\w]*) NICKNAME=([-\@\w]*)/) {
+    if ($status =~ /ALLOCATED=([-\@\w]*)\/([-\@\w]*) NICKNAME=([-\@\w]*)/) {
 	$pid   = $1;
 	$eid   = $2;
 	$vname = $3;
     }
     else {
 	warn "*** WARNING: Error getting reservation status\n";
-	return 0;
+	return -1;
     }
     
     #
@@ -539,12 +423,12 @@ sub check_nickname()
 #
 sub domounts()
 {
-    my $TM;
     my %MDB;
     my %mounts;
     my %deletes;
     my %sfsmounts;
     my %sfsdeletes;
+    my @tmccresults;
 
     #
     # Update our SFS hostid first. If this fails, dosfshostid will
@@ -564,20 +448,22 @@ sub domounts()
 	}
     }
 
-    $TM = OPENTMCC(TMCCCMD_MOUNTS, "USESFS=$USESFS");
+    if (tmcc(TMCCCMD_MOUNTS, "USESFS=$USESFS", \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get mount list from server!\n");
+	return -1;
+    }
 
-    while (<$TM>) {
-	if ($_ =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+    foreach my $str (@tmccresults) {
+	if ($str =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
 	    $mounts{$1} = $2;
 	}
-	elsif ($_ =~ /^SFS REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+	elsif ($str =~ /^SFS REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
 	    $sfsmounts{$1} = $2;
 	}
 	else {
-	    warn "*** WARNING: Malformed mount information: $_\n";
+	    warn "*** WARNING: Malformed mount information: $str\n";
 	}
     }
-    CLOSETMCC($TM);
     
     #
     # The MFS version does not support (or need) this DB stuff. Just mount
@@ -780,7 +666,8 @@ sub JailedMounts($$$)
 
     if ($usenfs) {
 	$mountstr = $NFSMOUNT;
-    } else {
+    }
+    else {
 	$mountstr = $LOOPBACKMOUNT;
     }
 
@@ -821,7 +708,6 @@ sub JailedMounts($$$)
 #
 sub dosfshostid ()
 {
-    my $TM;
     my $myhostid;
 
     # Do I already have a host key?
@@ -842,12 +728,12 @@ sub dosfshostid ()
 	if ( $myhostid =~ /^([-\.\w_]*:[a-z0-9]*)$/ ) {
 	    $myhostid = $1;
 	    print STDOUT "  Hostid: $myhostid\n";
-	    RUNTMCC(TMCCCMD_SFSHOSTID, "$myhostid");
+	    tmcc(TMCCCMD_SFSHOSTID, "$myhostid");
 	}
 	elsif ( $myhostid =~ /^(@[-\.\w_]*,[a-z0-9]*)$/ ) {
 	    $myhostid = $1;
 	    print STDOUT "  Hostid: $myhostid\n";
-	    RUNTMCC(TMCCCMD_SFSHOSTID, "$myhostid");
+	    tmcc(TMCCCMD_SFSHOSTID, "$myhostid");
 	}
 	else {
 	    warn "*** WARNING: Invalid hostid\n";
@@ -867,57 +753,42 @@ sub dosfshostid ()
 #
 sub doifconfig (;$)
 {
-    my ($rtabid) = @_;
-    my @ifaces   = ();
-    my $upcmds   = "";
-    my $downcmds = "";
-    my @ifacelist= ();
+    my ($rtabid)     = @_;
+    my @tmccresults  = ();
+    my $upcmds       = "";
+    my $downcmds     = "";
+    my @ifacelist    = ();	# IXP siilly
+    my $xifslist     = ();	# NSE/Gated sillyness?
 
     #
     # Kinda ugly, but there is too much perl goo included by Socket to put it
     # on the MFS. 
     # 
     if (MFS()) {
-	return 1;
+	return 0;
     }
 
-    my $TM = OPENTMCC(TMCCCMD_IFC);
+    if (tmcc(TMCCCMD_IFC, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get interface config from server!\n");
+	return -1;
+    }
 
     #
     # XXX hack: workaround for tmcc cmd failure inside TCL
     #     storing the output of a few tmcc commands in
     #     $BOOTDIR files for use by NSE
     if (!REMOTE() && !JAILED()) {
-	open(IFCFG, ">$BOOTDIR/tmcc.ifconfig") or
-		die "Cannot open file $BOOTDIR/tmcc.ifconfig: $!";
-    }
-
-    while (<$TM>) {
-	push(@ifaces, $_);
-
-	#
-	# XXX hack: workaround for tmcc cmd failure inside TCL
-	#     storing the output of a few tmcc commands in
-	#     $BOOTDIR files for use by NSE
-	if (!REMOTE() && !JAILED()) {
-	    print IFCFG "$_";
+	if (open(IFCFG, ">$BOOTDIR/tmcc.ifconfig")) {
+	    foreach my $str (@tmccresults) {
+		print IFCFG "$str";
+	    }
+	    close(IFCFG);
 	}
-    }
-    close(IFCFG);
-    CLOSETMCC($TM);
-
-    #
-    # Create the interface list file.
-    # Control net is always first.
-    #
-    open(XIFS, ">$BOOTDIR/tmcc.ifs") or
-	die "Cannot open file $BOOTDIR/tmcc.ifs: $!";
-
-    print XIFS `control_interface`;
-
-    if (! @ifaces) {
-	close(XIFS);
-	return 0;
+	else {
+	    warn("*** WARNING: ".
+		 "Cannot open file $BOOTDIR/tmcc.ifconfig: $!\n");
+	}
+	# More NSE goop below. 
     }
 
     my $ethpat  = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
@@ -926,7 +797,7 @@ sub doifconfig (;$)
     my $vethpat = q(IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) ID=(\d*) );
     $vethpat   .= q(VMAC=(\w*) PMAC=(\w*));
 
-    foreach my $iface (@ifaces) {
+    foreach my $iface (@tmccresults) {
 	if ($iface =~ /$ethpat/) {
 	    my $inet     = $2;
 	    my $mask     = $3;
@@ -941,7 +812,7 @@ sub doifconfig (;$)
 		if (JAILED()) {
 		    next;
 		}
-		print XIFS "$iface\n";
+		push(@xifslist, $iface);
 
 		#
 		# Rather than try to wedge the IXP in, I am going with
@@ -996,14 +867,14 @@ sub doifconfig (;$)
 
 	    if (JAILED()) {
 		if ($iface = findiface($vmac)) {
-		    print XIFS "$iface\n";
+		    push(@xifslist, $iface);
 		}
 		next;
 	    }
 
 	    if ($pmac eq "none" ||
 		($iface = findiface($pmac))) {
-		print XIFS "$iface\n"
+		push(@xifslist, $iface)
 		    if (defined($iface));
 
 		my ($upline, $downline) =
@@ -1021,34 +892,51 @@ sub doifconfig (;$)
 	    }
 	}
 	else {
-	    warn "*** WARNING: Bad ifconfig line: $_";
+	    warn "*** WARNING: Bad ifconfig line: $iface\n";
 	}
     }
-    close(XIFS);
-    # Done when jailed or an IXP
-    return @ifacelist
-	if (JAILED() || IXP());
+    if (@tmccresults && !(JAILED() || IXP())) {
+	#
+	# Local file into which we write ifconfig commands (as a shell script).
+	#
+	if (open(IFC, ">" . TMIFC)) {
+	    print IFC "#!/bin/sh\n";
+	    print IFC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
+	    print IFC "if [ x\$1 = x ]; ".
+		      "then action=enable; else action=\$1; fi\n";
+	    print IFC "case \"\$action\" in\n";
+	    print IFC "  enable)\n";
+	    print IFC "    $upcmds\n";
+	    print IFC "    ;;\n";
+	    print IFC "  disable)\n";
+	    print IFC "    $downcmds\n";
+	    print IFC "    ;;\n";
+	    print IFC "esac\n";
+	    close(IFC);
+	    chmod(0755, TMIFC);
+	}
+	else {
+	    warn("*** WARNING: Could not open " . TMIFC . ": $!\n");
+	}
+    }
 
     #
-    # Local file into which we write ifconfig commands (as a shell script).
-    # 
-    open(IFC, ">" . TMIFC)
-	or die("Could not open " . TMIFC . ": $!");
+    # Create the interface list file.
+    # Control net is always first.
+    #
+    if (open(XIFS, ">$BOOTDIR/tmcc.ifs")) {
+	print XIFS `control_interface`;
+	foreach my $xif (@xifslist) {
+	    print XIFS "$xif\n";
+	}
+	close(XIFS);
+    }
+    else {
+	warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.ifs: $!\n");
+    }
 
-    print IFC "#!/bin/sh\n";
-    print IFC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
-    print IFC "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
-    print IFC "case \"\$action\" in\n";
-    print IFC "  enable)\n";
-    print IFC "    $upcmds\n";
-    print IFC "    ;;\n";
-    print IFC "  disable)\n";
-    print IFC "    $downcmds\n";
-    print IFC "    ;;\n";
-    print IFC "esac\n";
-    close(IFC);
-    chmod(0755, TMIFC);
-
+    return @ifacelist
+	if (IXP());
     return 0;
 }
 
@@ -1085,18 +973,15 @@ sub dorouterconfig (;$)
     my %upmap    = ();
     my %downmap  = ();
     my @routes   = ();
-    my $TM;
 
-    $TM = OPENTMCC(TMCCCMD_ROUTING);
-    while (<$TM>) {
-	push(@stuff, $_);
+    if (tmcc(TMCCCMD_ROUTING, undef, \@stuff) < 0) {
+	warn("*** WARNING: Could not get routes from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
-
-    if (! @stuff) {
-	return @routes;
-    }
-
+    # IXP sillyness.
+    return ()
+	if (! @stuff);
+    
     #
     # Look for router type. If none, we still write the file since other
     # scripts expect this to exist.
@@ -1107,9 +992,11 @@ sub dorouterconfig (;$)
 	    last;
 	}
     }
-    
-    open(RC, ">" . TMROUTECONFIG)
-	or die("Could not open " . TMROUTECONFIG . ": $!");
+
+    if (!open(RC, ">" . TMROUTECONFIG)) {
+	warn("*** WARNING: Could not open " . TMROUTECONFIG . ": $!\n");
+	return -1;
+    }
 
     print RC "#!/bin/sh\n";
     print RC "# auto-generated by libsetup.pm, DO NOT EDIT\n";
@@ -1118,6 +1005,7 @@ sub dorouterconfig (;$)
 	print RC "true\n";
 	close(RC);
 	chmod(0755, TMROUTECONFIG);
+	# IXP sillyness.
 	return @routes;
     }
 
@@ -1288,21 +1176,30 @@ sub gatedsetup ()
 sub dohostnames (;$)
 {
     my ($pathname) = @_;
-    my $TM;
     my $HTEMP;
+    my @tmccresults;
 
     $pathname = HOSTSFILE()
 	if (!defined($pathname));
     $HTEMP = "${pathname}.new";
 
+    if (tmcc(TMCCCMD_HOSTS, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get hosts file from server!\n");
+	return -1;
+    }
+    # Important; if no results then do nothing. Do not want to kill
+    # the existing hosts file.
+    return 0
+	if (! @tmccresults);
+
     #
     # Note, we no longer start with the 'prototype' file here, because we have
     # to make up a localhost line that's properly qualified.
     #
-    $TM = OPENTMCC(TMCCCMD_HOSTS);
-
-    open(HOSTS, ">$HTEMP")
-	or die("Could not open $HTEMP: $!");
+    if (!open(HOSTS, ">$HTEMP")) {
+	warn("*** WARNING: Could not open $HTEMP: $!\n");
+	return -1;
+    }
 
     my $localaliases = "loghost";
 
@@ -1327,9 +1224,9 @@ sub dohostnames (;$)
     # Should go away at some point.
     #
     my $pat  = q(NAME=([-\w\.]+) IP=([0-9\.]*) ALIASES=\'([-\w\. ]*)\');
-    
-    while (<$TM>) {
-	if ($_ =~ /$pat/) {
+
+    foreach my $str (@tmccresults) {
+	if ($str =~ /$pat/) {
 	    my $name    = $1;
 	    my $ip      = $2;
 	    my $aliases = $3;
@@ -1339,19 +1236,19 @@ sub dohostnames (;$)
 	    print HOSTS  "$hostline\n";
 	}
 	else {
-	    warn "*** WARNING: Bad hosts line: $_";
+	    warn("*** WARNING: Bad hosts line: $str\n");
 	}
     }
-    CLOSETMCC($TM);
     close(HOSTS);
     system("mv -f $HTEMP $pathname") == 0 or
-	warn("*** Could not mv $HTEMP to $pathname!\n");
+	warn("*** WARNING: Could not mv $HTEMP to $pathname!\n");
 
     return 0;
 }
 
 sub doaccounts()
 {
+    my @tmccresults;
     my %newaccounts = ();
     my %newgroups   = ();
     my %pubkeys1    = ();
@@ -1362,7 +1259,14 @@ sub doaccounts()
     my %PWDDB;
     my %GRPDB;
 
-    my $TM = OPENTMCC(TMCCCMD_ACCT);
+    if (tmcc(TMCCCMD_ACCT, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get account info from server!\n");
+	return -1;
+    }
+    # Important; if no results then do nothing. We do not want to remove
+    # accounts cause the server failed to give us anything!
+    return 0
+	if (! @tmccresults);
 
     #
     # The strategy is to keep a record of all the groups and accounts
@@ -1372,8 +1276,8 @@ sub doaccounts()
     #
     # First just get the current set of groups/accounts from tmcd.
     #
-    while (<$TM>) {
-	if ($_ =~ /^ADDGROUP NAME=([-\@\w.]+) GID=([0-9]+)/) {
+    foreach my $str (@tmccresults) {
+	if ($str =~ /^ADDGROUP NAME=([-\@\w.]+) GID=([0-9]+)/) {
 	    #
 	    # Group info goes in the hash table.
 	    #
@@ -1384,14 +1288,14 @@ sub doaccounts()
 	    }
 	    $newgroups{"$gname"} = $2
 	}
-	elsif ($_ =~ /^ADDUSER LOGIN=([0-9A-Za-z]+)/) {
+	elsif ($str =~ /^ADDUSER LOGIN=([0-9A-Za-z]+)/) {
 	    #
 	    # Account info goes in the hash table.
 	    # 
-	    $newaccounts{$1} = $_;
+	    $newaccounts{$1} = $str;
 	    next;
 	}
-	elsif ($_ =~ /^PUBKEY LOGIN=([0-9A-Za-z]+) KEY="(.*)"/) {
+	elsif ($str =~ /^PUBKEY LOGIN=([0-9A-Za-z]+) KEY="(.*)"/) {
 	    #
 	    # Keys go into hash as a list of keys.
 	    #
@@ -1415,7 +1319,7 @@ sub doaccounts()
 	    }
 	    next;
 	}
-	elsif ($_ =~ /^SFSKEY KEY="(.*)"/) {
+	elsif ($str =~ /^SFSKEY KEY="(.*)"/) {
 	    #
 	    # SFS key goes into the array.
 	    #
@@ -1423,10 +1327,9 @@ sub doaccounts()
 	    next;
 	}
 	else {
-	    warn "*** WARNING: Bad accounts line: $_\n";
+	    warn("*** WARNING: Bad accounts line: $str\n");
 	}
     }
-    CLOSETMCC($TM);
 
     if (! MFS()) {
 	#
@@ -1767,16 +1670,19 @@ sub dorpms ()
 {
     my @rpms = ();
     
-    my $TM = OPENTMCC(TMCCCMD_RPM);
-    while (<$TM>) {
-	push(@rpms, $_);
+    if (tmcc(TMCCCMD_RPM, undef, \@rpms) < 0) {
+	warn("*** WARNING: Could not get rpms from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
+    return 0
+	if (! @rpms);
 
-    if (! @rpms) {
-	return 0;
+    if (!open(RPM, ">" . TMRPM)) {
+	warn("*** WARNING: Could not open " . TMRPM . ": $!\n");
+	return -1;
     }
-    
+    print RPM "#!/bin/sh\n";
+
     #
     # Use tmcc to copy rpms for remote/jailed nodes,
     # otherwise access via NFS.
@@ -1787,10 +1693,6 @@ sub dorpms ()
     #
     my $installoption = (REMOTE() ? "-t" : "-c");
 
-    open(RPM, ">" . TMRPM)
-	or die("Could not open " . TMRPM . ": $!");
-    print RPM "#!/bin/sh\n";
-    
     foreach my $rpm (@rpms) {
 	if ($rpm =~ /RPM=(.+)/) {
 	    my $rpmline = sprintf($RPMINSTALL, $installoption, $1);
@@ -1805,7 +1707,6 @@ sub dorpms ()
     }
     close(RPM);
     chmod(0755, TMRPM);
-
     return 0;
 }
 
@@ -1814,17 +1715,20 @@ sub dorpms ()
 #
 sub dotarballs ()
 {
-    my @tarballs   = ();
-    
-    my $TM = OPENTMCC(TMCCCMD_TARBALL);
-    while (<$TM>) {
-	push(@tarballs, $_);
-    }
-    CLOSETMCC($TM);
+    my @tarballs;
 
-    if (! @tarballs) {
-	return 0;
+    if (tmcc(TMCCCMD_TARBALL, undef, \@tarballs) < 0) {
+	warn("*** WARNING: Could not get tarballs from server!\n");
+	return -1;
     }
+    return 0
+	if (! @tarballs);
+
+    if (!open(TARBALL, ">" . TMTARBALLS)) {
+	warn("*** WARNING: Could not open " . TMTARBALLS . ": $!\n");
+	return -1;
+    }
+    print TARBALL "#!/bin/sh\n";
 
     #
     # Use tmcc to copy tarfiles for remote/jailed nodes,
@@ -1836,10 +1740,6 @@ sub dotarballs ()
     #
     my $installoption = (REMOTE() ? "-t" : "-c");
 
-    open(TARBALL, ">" . TMTARBALLS)
-	or die("Could not open " . TMTARBALLS . ": $!");
-    print TARBALL "#!/bin/sh\n";
-    
     foreach my $tarball (@tarballs) {
 	if ($tarball =~ /DIR=(.+)\s+TARBALL=(.+)/) {
 	    my $tbline = sprintf($TARINSTALL, $installoption, $1, $2);
@@ -1849,12 +1749,11 @@ sub dotarballs ()
 	    print TARBALL "$tbline\n";
 	}
 	else {
-	    warn "*** WARNING: Bad Tarballs line: $tarball";
+	    warn("*** WARNING: Bad Tarballs line: $tarball\n");
 	}
     }
     close(TARBALL);
     chmod(0755, TMTARBALLS);
-
     return 0;
 }
 
@@ -1863,33 +1762,22 @@ sub dotarballs ()
 #
 sub dostartupcmd ()
 {
-    my $startupcmd;
-    
-    my $TM = OPENTMCC(TMCCCMD_STARTUP);
-    $_ = <$TM>;
-    if (defined($_)) {
-	$startupcmd = $_;
-    }
-    CLOSETMCC($TM);
+    my @tmccresults;
 
-    if (! $startupcmd) {
-	return 0;
+    if (tmcc(TMCCCMD_STARTUP, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get startupcmd from server!\n");
+	return -1;
     }
-    
-    open(RUN, ">" . TMSTARTUPCMD)
-	or die("Could not open $TMSTARTUPCMD: $!");
-    
-    if ($startupcmd =~ /CMD=(\'.+\') UID=([0-9A-Za-z]+)/) {
-	print  STDOUT "  Will run $1 as $2\n";
-	print  RUN    "$startupcmd";
-    }
-    else {
-	warn "*** WARNING: Bad startupcmd line: $startupcmd";
-    }
+    return 0
+	if (! @tmccresults);
 
+    if (!open(RUN, ">" . TMSTARTUPCMD)) {
+	warn("*** WARNING: Could not open " . TMSTARTUPCMD . ": $!\n");
+	return -1;
+    }
+    print RUN "$tmccresults[0]";
     close(RUN);
     chmod(0755, TMSTARTUPCMD);
-
     return 0;
 }
 
@@ -1900,30 +1788,27 @@ sub dostartupcmd ()
 sub doprogagent ()
 {
     my @agents = ();
-    
-    my $TM = OPENTMCC(TMCCCMD_PROGRAMS);
-    while (<$TM>) {
-	push(@agents, $_);
-    }
-    CLOSETMCC($TM);
 
-    if (! @agents) {
-	return 0;
+    if (tmcc(TMCCCMD_PROGRAMS, undef, \@agents) < 0) {
+	warn("*** WARNING: Could not get progagent config from server!\n");
+	return -1;
     }
+    return 0
+	if (! @agents);
 
     #
     # Write the data to the file. The rc script will interpret it.
     # Note that one of the lines (the first) indicates what user to
     # run the agent as. 
     # 
-    open(RUN, ">" . TMPROGAGENTS)
-	or die("Could not open " . TMPROGAGENTS . ": $!");
-
+    if (!open(RUN, ">" . TMPROGAGENTS)) {
+	warn("*** WARNING: Could not open " . TMPROGAGENTS . ": $!\n");
+	return -1;
+    }
     foreach my $line (@agents) {
 	print RUN "$line";
     }
     close(RUN);
-
     return 0;
 }
 
@@ -1931,7 +1816,7 @@ sub dotrafficconfig()
 {
     my $didopen = 0;
     my $pat;
-    my $TM;
+    my @tmccresults;
     my $boss;
     my $startnse = 0;
     my $nseconfig = "";
@@ -1943,10 +1828,12 @@ sub dotrafficconfig()
     if (MFS()) {
 	return 1;
     }
-    
-    $TM = OPENTMCC(TMCCCMD_BOSSINFO);
-    my $bossinfo = <$TM>;
-    ($boss) = split(" ", $bossinfo);
+
+    if (tmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 || !@tmccresults) {
+	warn("*** WARNING: Could not get bossinfo from server!\n");
+	return -1;
+    }
+    ($boss) = split(" ", $tmccresults[0]);
 
     #
     # XXX hack: workaround for tmcc cmd failure inside TCL
@@ -1954,13 +1841,13 @@ sub dotrafficconfig()
     #     $BOOTDIR files for use by NSE
     #
     if (!REMOTE() && !JAILED()) {
-	open(BOSSINFCFG, ">$BOOTDIR/tmcc.bossinfo") or
-	    die "Cannot open file $BOOTDIR/tmcc.bossinfo: $!";
-	print BOSSINFCFG "$bossinfo";
+	if (!open(BOSSINFCFG, ">$BOOTDIR/tmcc.bossinfo")) {
+	    warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.bossinfo: $!\n");
+	    return -1;
+	}
+	print BOSSINFCFG "$tmccresults[0]";
 	close(BOSSINFCFG);
     }
-
-    CLOSETMCC($TM);
     my ($pid, $eid, $vname) = check_nickname();
 
     my $cmdline = "$BINDIR/trafgen -s ";
@@ -1989,18 +1876,21 @@ sub dotrafficconfig()
 	    die "Cannot open file $BOOTDIR/tmcc.trafgens: $!";    
     }
 
-    $TM = OPENTMCC(TMCCCMD_TRAFFIC);
+    if (tmcc(TMCCCMD_TRAFFIC, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get traffic config from server!\n");
+	return -1;
+    }
 
     $pat  = q(TRAFGEN=([-\w.]+) MYNAME=([-\w.]+) MYPORT=(\d+) );
     $pat .= q(PEERNAME=([-\w.]+) PEERPORT=(\d+) );
     $pat .= q(PROTO=(\w+) ROLE=(\w+) GENERATOR=(\w+));
 
-    while (<$TM>) {
-
+    foreach my $str (@tmccresults) {
 	if (!REMOTE() && !JAILED()) {
-	    print TRAFCFG "$_";
+	    print TRAFCFG "$str";
 	}
-	if ($_ =~ /$pat/) {
+	
+	if ($str =~ /$pat/) {
 	    #
 	    # The following is specific to the modified TG traffic generator:
 	    #
@@ -2053,7 +1943,7 @@ sub dotrafficconfig()
 		"-R $role >$LOGDIR/${name}-${pid}-${eid}.debug 2>&1 &\n";
 	}
 	else {
-	    warn "*** WARNING: Bad traffic line: $_";
+	    warn "*** WARNING: Bad traffic line: $str";
 	}
     }
     if (!REMOTE() && !JAILED()) {
@@ -2063,7 +1953,6 @@ sub dotrafficconfig()
     if( $startnse ) {
 	print RC "$BINDIR/startnse &\n";
     }
-    CLOSETMCC($TM);
 
     #
     # XXX hack: workaround for tmcc cmd failure inside TCL
@@ -2071,16 +1960,20 @@ sub dotrafficconfig()
     #     $BOOTDIR files for use by NSE
     #
     if (!REMOTE() && !JAILED()) {
-	open(NSECFG, ">$BOOTDIR/tmcc.nseconfigs") or
-	    die "Cannot open file $BOOTDIR/tmcc.nseconfigs: $!";
-	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
-	$record_sep = $/;
-	undef($/);
-	$nseconfig = <$TM>;
-	$/ = $record_sep;
-	print NSECFG $nseconfig;
-	CLOSETMCC($TM);
-	close(NSECFG);
+	my @nseconfigs = ();
+
+	if (tmcc(TMCCCMD_NSECONFIGS, undef, \@nseconfigs) < 0) {
+	    warn("*** WARNING: Could not get nseconfigs from server!\n");
+	}
+	if (open(NSECFG, ">$BOOTDIR/tmcc.nseconfigs")) {
+	    foreach my $nseconfig (@nseconfigs) {
+		print NSECFG $nseconfig;
+	    }
+	    close(NSECFG);
+	}
+	else {
+	    warn("*** WARNING: Cannot open file $BOOTDIR/tmcc.nseconfigs: $!");
+	}
     }
 	    
     # XXX hack: need a separate section for starting up NSE when we
@@ -2113,7 +2006,6 @@ sub dotunnels(;$)
     my ($rtabid) = @_;
     my @tunnels;
     my $pat;
-    my $TM;
     my $didserver = 0;
 
     #
@@ -2123,25 +2015,29 @@ sub dotunnels(;$)
     if (MFS()) {
 	return 1;
     }
-    
-    $TM = OPENTMCC(TMCCCMD_TUNNEL);
-    while (<$TM>) {
-	push(@tunnels, $_);
-    }
-    CLOSETMCC($TM);
 
-    if (! @tunnels) {
-	return 0;
+    if (tmcc(TMCCCMD_TUNNEL, undef, \@tunnels) < 0) {
+	warn("*** WARNING: Could not get tunnel config from server!\n");
+	return -1;
     }
+    return 0
+	if (! @tunnels);
+
     my ($pid, $eid, $vname) = check_nickname();
 
-    open(RC, ">" . TMTUNNELCONFIG)
-	or die("Could not open " . TMTUNNELCONFIG . ": $!");
+    if (!open(RC, ">" . TMTUNNELCONFIG)) {
+	warn("*** WARNING: Could not open " . TMTUNNELCONFIG . ": $!");
+	return -1;
+    }
     print RC "#!/bin/sh\n";
     print RC "kldload if_tap\n";
 
-    open(CONF, ">" . TMVTUNDCONFIG)
-	or die("Could not open " . TMVTUNDCONFIG . ": $!");
+    if (!open(CONF, ">" . TMVTUNDCONFIG)) {
+	warn("*** WARNING: Could not open " . TMVTUNDCONFIG . ": $!");
+	close(RC);
+	unlink(TMTUNNELCONFIG);
+	return -1;
+    }
 
     print(CONF
 	  "options {\n".
@@ -2237,22 +2133,20 @@ sub dotunnels(;$)
 # 
 sub dojailconfig()
 {
-    my @configstrings;
+    my @tmccresults;
 
-    $TM = OPENTMCC(TMCCCMD_JAILCONFIG);
-    while (<$TM>) {
-	push(@configstrings, $_);
+    if (tmcc(TMCCCMD_JAILCONFIG, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get jailconfig from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
+    return 0
+	if (! @tmccresults);
 
-    if (! @configstrings) {
-	return 0;
+    if (!open(RC, ">" . TMJAILCONFIG)) {
+	warn "*** WARNING: Could not write " . TMJAILCONFIG . "\n";
+	return -1;
     }
-
-    open(RC, ">" . TMJAILCONFIG)
-	or die("Could not open " . TMJAILCONFIG . ": $!");
-
-    foreach my $str (@configstrings) {
+    foreach my $str (@tmccresults) {
 	print RC $str;
     }
     close(RC);
@@ -2265,32 +2159,27 @@ sub dojailconfig()
 # 
 sub dosyncserver()
 {
-    my @configstrings;
     my $syncserver;
     my $startserver;
+    my @tmccresults;
 
-    $TM = OPENTMCC(TMCCCMD_SYNCSERVER);
-    while (<$TM>) {
-	push(@configstrings, $_);
+    if (tmcc(TMCCCMD_SYNCSERVER, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get syncserver from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
-
-    if (! @configstrings) {
-	return 0;
-    }
+    return 0
+	if (! @tmccresults);
 
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($configstrings[0] =~
-	/SYNCSERVER SERVER=\'([-\w\.]*)\' ISSERVER=(\d)/) {
-
+    if ($tmccresults[0] =~ /SYNCSERVER SERVER=\'([-\w\.]*)\' ISSERVER=(\d)/) {
 	$syncserver = $1;
 	$startserver = $2
     }
     else {
-	warn "*** WARNING: Bad syncserver line: $_";
-	return 1;
+	warn "*** WARNING: Bad syncserver line: $tmccresults[0]";
+	return -1;
     }
 
     #
@@ -2298,7 +2187,7 @@ sub dosyncserver()
     #
     if (system("echo '$syncserver' > ". TMSYNCSERVER)) {
 	warn "*** WARNING: Could not write " . TMSYNCSERVER . "\n";
-	return 1;
+	return -1;
     }
 
     #
@@ -2307,9 +2196,10 @@ sub dosyncserver()
     return 0
 	if (! $startserver);
 
-    open(RC, ">" . TMRCSYNCSERVER)
-	or die("Could not open " . TMRCSYNCSERVER . ": $!");
-
+    if (!open(RC, ">" . TMRCSYNCSERVER)) {
+	warn "*** WARNING: Could not write " . TMRCSYNCSERVER . "\n";
+	return -1;
+    }
     print RC "#!/bin/sh\n";
     print RC "$BINDIR/emulab-syncd -d >$LOGDIR/syncserver.debug 2>&1 &\n";
 
@@ -2323,28 +2213,25 @@ sub dosyncserver()
 # 
 sub dokeyhash()
 {
-    my @configstrings;
     my $keyhash;
+    my @tmccresults;
 
-    $TM = OPENTMCC(TMCCCMD_KEYHASH);
-    while (<$TM>) {
-	push(@configstrings, $_);
+    if (tmcc(TMCCCMD_KEYHASH, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get keyhash from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
-
-    if (! @configstrings) {
-	return 0;
-    }
+    return 0
+	if (! @tmccresults);
 
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($configstrings[0] =~ /KEYHASH HASH=\'([\w]*)\'/) {
+    if ($tmccresults[0] =~ /KEYHASH HASH=\'([\w]*)\'/) {
 	$keyhash = $1;
     }
     else {
-	warn "*** WARNING: Bad keyhash line: $_";
-	return 1;
+	warn "*** WARNING: Bad keyhash line: $tmccresults[0]";
+	return -1;
     }
 
     #
@@ -2354,6 +2241,8 @@ sub dokeyhash()
     
     if (system("echo '$keyhash' > ". TMKEYHASH)) {
 	warn "*** WARNING: Could not write " . TMKEYHASH . "\n";
+	umask($oldumask);
+	return -1;
     }
     umask($oldumask);
     return 0;
@@ -2364,28 +2253,25 @@ sub dokeyhash()
 # 
 sub donodeid()
 {
-    my @configstrings;
     my $nodeid;
+    my @tmccresults;
 
-    $TM = OPENTMCC(TMCCCMD_NODEID);
-    while (<$TM>) {
-	push(@configstrings, $_);
+    if (tmcc(TMCCCMD_NODEID, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get nodeid from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
-
-    if (! @configstrings) {
-	return 0;
-    }
-
+    return 0
+	if (! @tmccresults);
+    
     #
     # There should be just one string. Ignore anything else.
     #
-    if ($configstrings[0] =~ /([-\w]*)/) {
+    if ($tmccresults[0] =~ /([-\w]*)/) {
 	$nodeid = $1;
     }
     else {
-	warn "*** WARNING: Bad nodeid line: $_";
-	return 1;
+	warn "*** WARNING: Bad nodeid line: $tmccresults[0]";
+	return -1;
     }
     
     system("echo '$nodeid' > ". TMNODEID);
@@ -2398,17 +2284,15 @@ sub donodeid()
 sub doplabconfig()
 {
     my $plabconfig;
+    my @tmccresults;
 
-    my $TM = OPENTMCC(TMCCCMD_PLABCONFIG);
-    $_ = <$TM>;
-    if (defined($_)) {
-	$plabconfig = $_;
+    if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get plabconfig from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
-
-    if (! $plabconfig) {
-	return 0;
-    }
+    return 0
+	if (! @tmccresults);
+    $plabconfig = $tmccresults[0];
 
     open(RC, ">" . TMPLABCONFIG)
 	or die("Could not open " . TMPLABCONFIG . ": $!");
@@ -2450,7 +2334,7 @@ sub doplabconfig()
 	print RC "/etc/init.d/sshd restart\n";
     }
     else {
-	warn "*** WARNING: Bad plab line: $_";
+	warn "*** WARNING: Bad plab line: $plabconfig";
     }
 
     close(RC);
@@ -2605,17 +2489,10 @@ sub jailsetup()
     #
     my $vid = $ENV{'TMCCVNODEID'};
     
-    if ($vid =~ /^([-\w]+)$/) {
-	$vid = $1;
-    }
-    else {
-	die("Bad data in vnodeid: $vid");
-    }
-
     #
     # Set global vnodeid for tmcc commands. Must be before all the rest!
     #
-    $vnodeid  = $vid;
+    libsetup_setvnodeid($vid);
     $injail   = 1;
 
     #
@@ -2706,7 +2583,7 @@ sub vnodejailsetup($)
     #
     # Set global vnodeid for tmcc commands.
     #
-    $vnodeid  = $vid;
+    libsetup_setvnodeid($vid);
 
     #
     # This is the directory where the rc files go.
@@ -2839,7 +2716,7 @@ sub vnodeplabsetup($)
     #
     # Set global vnodeid for tmcc commands.
     #
-    $vnodeid  = $vid;
+    libsetup_setvnodeid($vid);
     $inplab   = 1;
 
     # Do not bother if somehow got released.
@@ -2872,7 +2749,7 @@ sub ixpsetup($)
     #
     # Set global vnodeid for tmcc commands.
     #
-    $vnodeid  = $vid;
+    libsetup_setvnodeid($vid);
 
     #
     # Config files go here. 
@@ -2898,15 +2775,14 @@ sub ixpsetup($)
 }
 
 #
-# Report startupcmd status back to the TMCC. Called by the runstartup
+# Report startupcmd status back to TMCD. Called by the runstartup
 # script. 
 #
 sub startcmdstatus($)
 {
     my($status) = @_;
 
-    RUNTMCC(TMCCCMD_STARTSTAT, "$status");
-    return 0;
+    return(tmcc(TMCCCMD_STARTSTAT, "$status"));
 }
 
 #

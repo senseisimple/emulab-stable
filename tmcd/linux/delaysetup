@@ -32,6 +32,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -94,6 +95,7 @@ sub LinkDelaySetup()
     my $kernel;
     my $checkreplace = 0;
     my $gotjails = 0;
+    my @jails;
 
     # Lets clean out old instructions.
     unlink TMLINKDELAY;
@@ -102,25 +104,27 @@ sub LinkDelaySetup()
     # We need to know if any jailed nodes. That changes which kernel
     # we want to boot. Temporary until the jail stuff is better tested.
     #
-    my $TM = OPENTMCC(TMCCCMD_VNODELIST);
-    while (<$TM>) {
-	if ($_ =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+    if (tmcc(TMCCCMD_VNODELIST, undef, \@jails) < 0) {
+	warn("*** WARNING: Could not get jails from server!\n");
+	return -1;
+    }
+    foreach my $str (@jails) {
+	if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
 	    if ($2) {
 		$gotjails++;
 	    }
 	}
     }
-    CLOSETMCC($TM);
     if ($gotjails) {
 	$kernel = $KERNELJAIL;
 	$checkreplace = 1;
     }
 
-    $TM = OPENTMCC(TMCCCMD_LINKDELAYS);
-    while (<$TM>) {
-	push(@delays, $_);
+    # Get delay config.
+    if (tmcc(TMCCCMD_LINKDELAYS, undef, \@delays) < 0) {
+	warn("*** WARNING: Could not get link delays from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
 
     if (@delays) {
 	open(MAP, ">$TMDELMAP")

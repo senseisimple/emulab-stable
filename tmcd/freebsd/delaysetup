@@ -37,6 +37,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 #
 # Must be root.
@@ -63,6 +64,8 @@ if (defined($options{"u"})) {
 if (defined($options{"j"})) {
     $vnodeid = $options{"j"};
     libsetup_setvnodeid($vnodeid);
+    # Tell tmcc library, although thats already been done with previous call.
+    configtmcc("subnode", $vnodeid);
 }
 if (@ARGV) {
     usage();
@@ -131,17 +134,16 @@ exit(0);
 sub DelaySetup()
 {
     my @delays;
-    my $checkreplace;
+    my $checkreplace = 0;
     my $kernel;
 
     # Lets clean out old instructions.
     unlink TMDELAY;
 
-    my $TM = OPENTMCC(TMCCCMD_DELAY);
-    while (<$TM>) {
-	push(@delays, $_);
+    if (tmcc(TMCCCMD_DELAY, undef, \@delays) < 0) {
+	warn("*** WARNING: Could not get delays from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
 
     if (@delays) {
 	my $count    = 69;
@@ -382,6 +384,7 @@ sub DelaySetup()
 sub LinkDelaySetup()
 {
     my @delays;
+    my @jails;
     my $kernel;
     my $checkreplace = 0;
     my $gotjails = (defined($vnodeid) ? 1 : 0); 
@@ -395,25 +398,27 @@ sub LinkDelaySetup()
     # We need to know if any jailed nodes. That changes which kernel
     # we want to boot. Temporary until the jail stuff is better tested.
     #
-    my $TM = OPENTMCC(TMCCCMD_VNODELIST);
-    while (<$TM>) {
-	if ($_ =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+    if (tmcc(TMCCCMD_VNODELIST, undef, \@jails) < 0) {
+	warn("*** WARNING: Could not get jails from server!\n");
+	return -1;
+    }
+    foreach my $str (@jails) {
+	if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
 	    if ($2) {
 		$gotjails++;
 	    }
 	}
     }
-    CLOSETMCC($TM);
     if ($gotjails) {
 	$kernel = $KERNELJAIL;
 	$checkreplace = 1;
     }
 
-    $TM = OPENTMCC(TMCCCMD_LINKDELAYS);
-    while (<$TM>) {
-	push(@delays, $_);
+    # Get delay config.
+    if (tmcc(TMCCCMD_LINKDELAYS, undef, \@delays) < 0) {
+	warn("*** WARNING: Could not get link delays from server!\n");
+	return -1;
     }
-    CLOSETMCC($TM);
 
     if (@delays) {
 	open(MAP, ">" . TMDELMAP)

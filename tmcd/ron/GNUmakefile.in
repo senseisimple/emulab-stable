@@ -72,7 +72,7 @@ sup-install:	dir-install
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
-	$(INSTALL_PROGRAM) ../tmcc $(BINDIR)/tmcc
+	$(INSTALL_PROGRAM) ../tmcc $(BINDIR)/tmcc.bin
 
 etc-install:	dir-install bossnode
 	cp /dev/null $(ETCDIR)/isrem

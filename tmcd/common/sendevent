@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -19,8 +19,9 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # We use the tmcc to figure out where the Testbed Event Daemon is running.
 # Don't worry about the port for now.
 #
-my ($bossname) = split(" ", `tmcc bossinfo`);
-unshift(@ARGV, ("-s", "$bossname"));
+use libtmcc;
+
+unshift(@ARGV, ("-s", tmccbossname()));
 
 exec "tevc", @ARGV;
 

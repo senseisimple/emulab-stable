@@ -61,7 +61,7 @@ sup-install:	dir-install
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
-	$(INSTALL) -m 755 ../tmcc-nossl $(BINDIR)/tmcc
+	$(INSTALL) -m 755 ../tmcc-nossl $(BINDIR)/tmcc.bin
 	$(INSTALL) -m 755 ../findif $(BINDIR)/findif
 
 etc-install:	dir-install sysetc-remove sysetc-install

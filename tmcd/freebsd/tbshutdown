@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -17,6 +17,8 @@ use English;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+use libtmcc;
 
 # First, we background ourselves (daemonize)
 if ( background() ) {
@@ -39,7 +41,7 @@ exit(0);
 
 sub cleanup() {
     # This is our signal handler.
-    system("tmcc state SHUTDOWN");
+    tmcc(TMCCCMD_STATE, "SHUTDOWN");
     exit(0);
 }
 
