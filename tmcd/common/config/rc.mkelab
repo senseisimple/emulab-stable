@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -93,6 +93,9 @@ my ($bossname, $outer_bossip) = tmccbossinfo();
 # Cert stuff to give the inner emulab
 my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
 #my $RPCPORT = 7778;
+
+# This gets turned on/off below
+my $WINSUPPORT = 0;
 
 #
 # Find out our domain name, so that we can qualify the localhost entry
@@ -195,6 +198,11 @@ sub doboot()
     # 
     system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");    
     system("sysctl vfs.nfs.eacces_retry_count=20 >/dev/null 2>&1");
+
+    # Turn on windows support.
+    if (exists($emulabconfig{"WINSUPPORT"}) && $emulabconfig{"WINSUPPORT"}) {
+	$WINSUPPORT = 1;
+    }
 
     #
     # Temp hack; make sure control iface in full duplex mode! pc2000 problem.
@@ -399,7 +407,8 @@ sub SetupOpsNode()
     mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
     mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
 	     "   ../../src/testbed/configure ".
-	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab");
+	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
+	     ($WINSUPPORT ? "--enable-windows" : ""));
 
     #
     # Create the ops node.
@@ -646,7 +655,8 @@ sub SetupBossNode()
     mysystem("mkdir -p ${TBDIR}/testbed/obj/testbed");
     mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
 	     "   ../../src/testbed/configure ".
-	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab");
+	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
+	     ($WINSUPPORT ? "--enable-windows" : ""));
 
     #
     # Create the boss node. This will also install the software.
