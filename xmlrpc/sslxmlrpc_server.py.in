@@ -6,10 +6,34 @@
 #
 import sys
 import getopt
+import os
+import traceback
+import syslog
+import string
+
+# Testbed specific stuff
 sys.path.append("@prefix@/lib")
-import socket
-import sshxmlrpc
+from libdb        import *
+from libtestbed   import SENDMAIL, TBOPS
 from emulabserver import *
+
+from SimpleXMLRPCServer import SimpleXMLRPCDispatcher
+from SimpleXMLRPCServer import SimpleXMLRPCRequestHandler
+from M2Crypto import SSL
+from M2Crypto.SSL import SSLError
+
+# When debugging, runs in foreground printing to stdout instead of syslog
+debug           = 0
+
+# The port to listen on. We should get this from configure.
+PORT            = 3069
+
+# The local address. Using INADDY_ANY for now.
+ADDR            = "0.0.0.0"
+
+# The server certificate and the server CS.
+server_cert     = "@prefix@/etc/server.pem"
+ca_cert         = "@prefix@/etc/emulab.pem"
 
 #
 # By default, run a wrapper class that includes all off the modules.
@@ -18,32 +42,209 @@ from emulabserver import *
 # 
 DEFAULT_MODULE = "EmulabServer"
 module         = DEFAULT_MODULE
-ReadOnly       = 0;
+
+# syslog facility
+LOGFACIL	= "@TBLOGFACIL@"
 
 #
-# Optional argument indicating read-only privs.
-#
-if len(sys.argv) > 1 and sys.argv[1] == "-ro":
-    ReadOnly = 1;
-    sys.argv = sys.argv[1:]
-    pass
-
-#
-# Optional argument indicates the specific module the server wants to use.
-# This form should be deprecated, I think. 
-#
-if len(sys.argv) > 1:
-    module = sys.argv[1]
-    pass
-
-#
-# This is invoked inside an SSH, typically from the paperbag shell.
-# We use stdin/stdout to read/write the request/response. We handle
-# just a single request this way, and then exit. 
+# A simple server based on the forking version SSLServer. We fork cause
+# we want to change our uid/gid to that of the person on the other end.
 # 
-# Construct and wrap our object.
-server  = eval(module + "(readonly=" + str(ReadOnly) + ")")
-wrapper = sshxmlrpc.SSHServerWrapper(server)
-# Handle the request on stdin and send the response to stdout.
-wrapper.serve_forever((sys.stdin, sys.stdout))
-sys.exit(0)
+class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
+    def __init__(self, debug):
+        self.debug         = debug
+	self.logRequests   = 0
+        self.emulabserver  = None;
+
+	ctx = SSL.Context('sslv23')
+	ctx.load_cert(server_cert, server_cert)
+	ctx.load_verify_info(ca_cert)
+        ctx.set_verify(SSL.verify_peer | SSL.verify_fail_if_no_peer_cert, 16)
+	ctx.set_allow_unknown_ca(0)
+	#ctx.set_info_callback()
+	    
+        SimpleXMLRPCDispatcher.__init__(self)
+        SSL.SSLServer.__init__(self, (ADDR, PORT),
+                               SimpleXMLRPCRequestHandler, ctx)
+	pass
+
+    def logit(self, msg):
+        if debug:
+            print msg
+            pass
+        else:
+            syslog.syslog(syslog.LOG_INFO, msg);
+            pass
+        return
+    
+    #
+    # There might be a better arrangement, but the problem is that we
+    # do not want to create the server instance until we get a chance
+    # to look at the certificate and determine the priv level. See
+    # below in process_request(). 
+    #
+    def _dispatch(self, method, params):
+        try:
+            meth = getattr(self.emulabserver, method);
+        except AttributeError:
+            raise Exception('method "%s" is not supported' % method)
+        else:
+            return apply(meth, params);
+        pass
+
+    #
+    # Get the unix_uid for the user.
+    #
+    def getuserid(self, uid):
+        userQuery = DBQueryFatal("SELECT unix_uid FROM users AS u "
+                                 "WHERE u.uid=%s",
+                                 (uid,))
+    
+        if len(userQuery) == 0:
+            return 0
+    
+        return int(userQuery[0][0])
+    
+    #
+    # Get the group list for the user.
+    #
+    def getusergroups(self, user):
+        result = []
+        
+        res = DBQueryFatal("select distinct g.gid,g.unix_gid "
+                           "  from group_membership as m "
+                           "left join groups as g on "
+                           "  g.pid=m.pid and g.gid=m.gid "
+                           "where m.uid=%s "
+                           "order by date_approved asc ",
+                           (user,))
+
+        
+        for group in res:
+            result.append(int(group[1]));
+            pass
+    
+        return result
+    
+    #
+    # Flip to the user that is in the certificate.
+    #
+    def fliptouser(self, request, client):
+        subject = request.get_peer_cert().get_subject()
+        if self.debug:
+            self.logit(str(subject))
+            pass
+        
+        self.user = getattr(subject, "CN");
+        #
+        # Must be a valid and non-zero unix_uid from the DB.
+        #
+        self.uid = self.getuserid(self.user)
+        
+        if self.uid == 0:
+            self.logit('No such user: "%s"' % self.user)
+            raise Exception('No such user: "%s"' % self.user)
+
+        self.glist = self.getusergroups(self.user);
+        if len(self.glist) == 0:
+            self.logit('No groups for user: "%s"' % self.user)
+            raise Exception('No groups for user: "%s"' % self.user)
+       
+        self.logit("Connect from %s: %s %s" %
+                   (client[0], self.user, str(self.glist)))
+        
+        try:
+            os.setgid(self.glist[0])
+            os.setgroups(self.glist)
+            os.setuid(self.uid)
+
+            os.environ["USER"]    = self.user;
+            os.environ["LOGNAME"] = self.user;
+            pass
+        except:
+            traceback.print_exc()
+            os._exit(1)
+            pass
+        pass
+
+    #
+    # XXX - The builtin process_request() method for ForkingMixIn is
+    # broken; it closes the "request" in the parent which shuts down
+    # the ssl connection. So, I have moved the close_request into the
+    # child where it should be, and in the parent I close the socket
+    # by reaching into the Connection() class.
+    # 
+    # In any event, I need to do some other stuff in the child before we
+    # actually handle the request. 
+    # 
+    def process_request(self, request, client_address):
+        """Fork a new subprocess to process the request."""
+        self.collect_children()
+        pid = os.fork()
+        if pid:
+            # Parent process
+            if self.active_children is None:
+                self.active_children = []
+            self.active_children.append(pid)
+            request.socket.close()
+            return
+        else:
+            # Child process.
+            # This must never return, hence os._exit()!
+            try:
+                self.fliptouser(request, client_address);
+                self.emulabserver = EmulabServer(readonly=0)
+                self.finish_request(request, client_address)
+                self.close_request(request)
+                self.logit("request finished");
+                os._exit(0)
+            except:
+                try:
+                    self.handle_error(request, client_address)
+                finally:
+                    os._exit(1)
+
+    def verify_request(self, request, client_address):
+        return True
+
+    pass
+
+if not debug:
+    #
+    # Connect to syslog. 
+    #
+    syslog.openlog("sslxmlrpc", syslog.LOG_PID,
+                   eval("syslog.LOG_" + string.upper(LOGFACIL)))
+    syslog.syslog(syslog.LOG_INFO, "SSL XMLRPC server starting up");
+
+    #
+    # Daemonize. We redirect our output into a log file cause I have no
+    # idea what is going to use plain print. 
+    #
+    try:
+        fp = open("@prefix@/log/sslxmlrpc_server.log", "a");
+        sys.stdout = fp
+        sys.stderr = fp
+        sys.stdin.close();
+        pass
+    except:
+        print "Could not open log file for append"
+        sys.exit(1);
+        pass
+
+    pid = os.fork()
+    if pid:
+        os.system("echo " + str(pid) + " > /var/run/sslxmlrpc_server.pid")
+        sys.exit(0)
+        pass
+    os.setsid();
+    pass
+
+#
+# Create the server and serve forever. We register the instance above
+# when we process the request cause we want to look at the cert before
+# we decide on the priv level. 
+# 
+server = MyServer(debug);
+server.serve_forever()
+
