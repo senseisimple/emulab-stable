@@ -92,7 +92,7 @@ SWITCH: for ($action) {
 exit(0);
 
 # More protos.
-sub TBNewsshKeyfile($$$$$);
+sub TBNewsshKeyfile($$$$@);
 
 #
 # Boot Action.
