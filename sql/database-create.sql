@@ -1423,6 +1423,7 @@ CREATE TABLE users (
   weblogin_frozen tinyint(3) unsigned NOT NULL default '0',
   weblogin_failcount smallint(5) unsigned NOT NULL default '0',
   weblogin_failstamp int(10) unsigned NOT NULL default '0',
+  plab_user tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)

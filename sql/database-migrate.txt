@@ -1080,3 +1080,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  failstamp int unsigned NOT NULL default '0',
 	  PRIMARY KEY  (IP)
        ) TYPE=MyISAM;
+
+1.198: Add a bit to the users table so that we can flag planetlab users:
+
+       alter table users add column plab_user tinyint(1) not null default 0;
