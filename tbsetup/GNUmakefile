@@ -10,7 +10,7 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  ir2ifc power resetvlans savevlans snmpit tbend \
 		  tbrun tbprerun tbreport vpower vsnmpit killtip \
 		  mkacct-ctrl_wrapper rmacct-ctrl_wrapper rmprojdir_wrapper \
-		  sched_reload
+		  sched_reload os_setup
 DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir rmprojdir os_setup mkacct rmacct \
 	          mkacct-ctrl rmacct-ctrl ifc_setup os_load
