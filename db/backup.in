@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -33,6 +33,7 @@ my $BACKUPDIR	= "$TB/backup";
 my $LOGDIR	= "$TB/log/mysql";
 my $BASE	= "base";
 my $UPD		= "update";
+my $SLOW	= "slowqueries";
 my $BACK	= "tbdb";
 my $extension;
 
@@ -103,11 +104,13 @@ print "Extension:        $extension\n";
 
 my $backname  = "$BACK.$extension";
 my $basename  = "$BASE.$extension";
-my $updname  = "$UPD.$extension";
+my $updname   = "$UPD.$extension";
+my $slowname  = "$SLOW.$extension";
 
 print "Backup file name: $backname\n";
 print "Base file name:   $basename\n";
 print "Update file name: $updname\n";
+print "Slow file name:   $slowname\n";
 
 #
 # Move base log out of the way since flush-logs will reset it too.
@@ -115,6 +118,11 @@ print "Update file name: $updname\n";
 if (-e "$LOGDIR/$BASE") {
     if (system("/bin/mv $LOGDIR/$BASE $LOGDIR/$basename")) {
 	print STDERR "Could not move $LOGDIR/$BASE to $LOGDIR/$basename!";
+    }
+}
+if (-e "$LOGDIR/$SLOW") {
+    if (system("/bin/mv $LOGDIR/$SLOW $LOGDIR/$slowname")) {
+	print STDERR "Could not move $LOGDIR/$SLOW to $LOGDIR/$slowname!";
     }
 }
 
@@ -142,6 +150,17 @@ if (-e "$basename" && system("gzip -9 $basename")) {
 
 if (-e "$updname" && system("gzip -9 $updname")) {
     fatal("gzip $updname failed!");
+}
+
+if (-e "$slowname" && system("gzip -9 $slowname")) {
+    fatal("gzip $slowname failed!");
+}
+
+# Should do this too, but right now I do it by hand ...
+if (0) {
+    system("find . \( -name 'base.*.gz' -o -name 'update.*.gz' ".
+	   "         -o -name 'slowqueries.*.gz' \) ".
+	   "-mtime +35 -print -delete");
 }
 
 #SENDMAIL("stoller", "DB Backup Finished", "", undef, undef, ($logname));
