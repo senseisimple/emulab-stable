@@ -1,0 +1,13 @@
+START vlan
+a_b tbpc01:0 tbpc02:0
+a_c tbpc01:1 tbpc03:0
+a_d tbpc01:2 tbpc04:0
+a_e tbpc01:3 tbpc05:0
+b_c tbpc02:1 tbpc03:1
+b_d tbpc02:2 tbpc04:1
+b_e tbpc02:3 tbpc05:1
+c_d tbpc03:2 tbpc04:2
+c_e tbpc03:3 tbpc05:2
+d_e tbpc04:3 tbpc05:3
+END vlan
+
