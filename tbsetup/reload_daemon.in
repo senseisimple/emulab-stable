@@ -3,6 +3,15 @@ use English;
 use Getopt::Std;
 
 #
+# This should run as root to make sure that it has permission to reboot nodes
+# (since only root is allowed to power cycle nodes at any time - it's time-
+# limited for anyone else)
+#
+if ($UID != 0) {
+    die "This should only be run as root!\n";
+}
+
+#
 # Look for nodes to reload.
 #
 #	usage: reload_daemon [-d]
