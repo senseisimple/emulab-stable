@@ -912,7 +912,7 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
     
   case MTP_COMMAND_STOP:
     fprintf(file,
-	    " opcode:\tupdate-id\n"
+	    " opcode:\tcommand-stop\n"
 	    "  commid:\t%d\n"
 	    "  id:\t%d\n",
 	    mp->data.command_stop->command_id,
