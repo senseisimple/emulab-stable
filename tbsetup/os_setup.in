@@ -546,6 +546,7 @@ sub WaitTillAlive ($) {
 	    $minutes = int($waittime / 60);
 	    print "Still waiting for $pc - its been $minutes minute(s).\n";
 	}
+	sleep(1);
     }
 }
 
