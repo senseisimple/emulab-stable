@@ -28,7 +28,7 @@ do
         LOGSIZE=`ls -sk $CURLOG | awk '{ print $1 }'`
         if [ $LOGSIZE -gt $SIZELIMIT ]
         then
-            mv $CURLOG ${CURLOG}.${DATE}
+            mv $CURLOG ${CURLOG}.alr.${DATE}
             echo "Rolling $CURLOG at $LOGSIZE kbytes"
             MOVED=1
         fi
@@ -64,7 +64,7 @@ then
     sleep 60
 
     # Now, lets try to archive off those logs..
-    for CURLOG in `ls *.${DATE}`
+    for CURLOG in `ls *.alr.*`
     do
         # This while loop makes sure nothing still has the moved logfile open.
         COUNT=$MAXTRIES
@@ -74,6 +74,8 @@ then
 
           if [ $COUNT -eq 0 ]
           then
+              # Even if we give up, we'll catch this log next time the
+              # script is run (*.alr.*)
               echo "Tired of waiting for $CURLOG to become free .. skipping."
               continue 2
           fi
@@ -81,7 +83,13 @@ then
         done
 
         # deflate, and move (safely).
-        gzip -9 $CURLOG && cp $CURLOG.gz $DESTDIR && rm $CURLOG.gz
+        TMPLOG=`echo $CURLOG | sed -e 's/\.alr//'`
+        test ! -e $TMPLOG && \
+        mv $CURLOG $TMPLOG && \
+        gzip -9 $TMPLOG && \
+        cp $TMPLOG.gz $DESTDIR && \
+        rm $TMPLOG.gz
+
         if [ $? -ne 0 ]
         then
           echo "Error trying to zip and move $CURLOG."
