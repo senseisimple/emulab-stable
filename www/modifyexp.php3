@@ -64,12 +64,15 @@ if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
 
 
 if (! isset($go)) {
-
+	echo "<h3>Experiment Modify ";
+	echo "<a href='faq.php3#UTT-Modify'>Documentation (FAQ)</a></h3>";
+	echo "<br>";
 	echo "<form action='modifyexp.php3' method='post'>";
 	echo "<textarea cols='100' rows='40' name='nsdata'>";
 
 	$query_result =
-	    DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
+	    DBQueryFatal("SELECT nsfile from nsfiles ".
+                         "where pid='$pid' and eid='$eid'");
 	if (mysql_num_rows($query_result)) {
 	    $row    = mysql_fetch_array($query_result);
 	    $nsfile = stripslashes($row[nsfile]);
@@ -83,14 +86,15 @@ if (! isset($go)) {
 
 	echo "<br />";
 	if (0 == strcmp($expstate, $TB_EXPTSTATE_ACTIVE)) {
-	    echo "<p><b>Note!</b> If changing your experiment topology 
-              (adding or removing nodes, links, and LANs), you will most likely 
-	      have to reboot all nodes in your experiment (check the box below.)
+	    echo "<p><b>Note!</b> It is recommended that you 
+	      reboot all nodes in your experiment by checking the box below.
+	      This is especially important if changing your experiment topology 
+              (adding or removing nodes, links, and LANs).
 	      If adding/removing a delay to/from an existing link, or replacing 
 	      a lost node <i>without modifying the experiment topology</i>,
 	      this won't be necessary.</p>";
 	    echo "<input type='checkbox' name='reboot' value='1' checked='1'>
-	      Reboot nodes in experiment</input>";
+	      Reboot nodes in experiment (Highly Recommended)</input>";
 	}
 	echo "<br />";
 	echo "<input type='hidden' name='pid' value='$pid' />";

@@ -53,6 +53,8 @@
                            counts) for my experiment?</a> 
      <li> <a href="#UTT-Naming">What names should I use to refer to the
 			   nodes in my experiment?</a>
+     <li> <a href="#UTT-Modify">Can I modify my experiment 
+                           after creating it?</a> 
      </ul>
 
 <li> <a href="#HDS">Hardware setup</a>
@@ -806,6 +808,42 @@
 	    </li>
 	</li>
     </ul>
+<br>
+<li><a NAME="UTT-Modify"></a>
+    <font size='+1'><b>Can I modify my experiment after creating it?
+    </b></font>
+
+    <p>Yes. On the experiment view page, choose "Modify this Experiment".
+       This will allow you to modify an experiment, either swapped-out or in,
+       by editing its NS file.</p>
+    <p>If the experiment is swapped-out, 
+       Experiment Modify will simply replace its topology with the
+       newly specified one;
+       this new topology will be mapped when the experiment is swapped in.</p>
+    <p>If the experiment is already swapped-in, Modify will change the topology
+       and map in the portions which have been changed. This allows dynamic
+       addition, subtraction, and replacement of an experiment's nodes and links.
+       However, when modifying swapped-in experiments, there are a couple
+       things to keep in mind:
+       <ul>
+         <li>Any node with the same name in the old and new topology will remain
+	 on the same physical machine, unaffected-- its disk will not be reloaded.
+	 If you want to, for example, change the hardware on a machine, you will
+	 have to call the machine something different in the new topology.
+	 </li>
+	 <br>
+	 <li>
+	 It is highly recommended that you leave the
+	 "Reboot nodes in experiment" box checked in the Experiment Modify form.
+	 This is especially important if changing your experiment topology 
+         (adding or removing nodes, links, and LANs).
+	 If adding/removing a delay to/from an existing link, or replacing 
+	 a lost node <i>without modifying the experiment topology</i>,
+	 this won't be necessary.
+	 </li>
+       </ul>
+    </p>
+
 
 </ul>
 

@@ -108,25 +108,18 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATEACCOUNTS)) {
 if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
     WRITESUBMENUBUTTON("Reboot All Nodes",
 		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
+    WRITESUBMENUBUTTON("Modify this Experiment",
+		       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+
 }
 
 if (ISADMIN($uid)) {
-    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0 ||
-	strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
-
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {		
 	SUBMENUSECTION("Beta-Test Options");
-	
-	if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {		
-	    WRITESUBMENUBUTTON("Restart this Experiment",
-			       "swapexp.php3?inout=restart&pid=$exp_pid".
-			       "&eid=$exp_eid");
-	}              
-	
-	WRITESUBMENUBUTTON("Modify this Experiment",
-			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
-    }
-    
-    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {	
+	WRITESUBMENUBUTTON("Restart this Experiment",
+			   "swapexp.php3?inout=restart&pid=$exp_pid".
+			   "&eid=$exp_eid");
+
 	SUBMENUSECTION("Admin Options");
 	
 	WRITESUBMENUBUTTON("Send a Swap Request",
