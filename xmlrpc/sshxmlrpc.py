@@ -65,7 +65,7 @@ class SSHConnection:
             pass
         else:
             self.user, self.host = urllib.splituser(self.host)
-            print self.user + " " + self.host + " " + handler
+            # print self.user + " " + self.host + " " + handler
             
             flags = ""
             if self.user:
@@ -183,8 +183,11 @@ class SSHTransport:
 
         # Try to get a new connection,
         if not self.connections.has_key((host,handler)):
-            sys.stderr.write("New connection for %s %s\n" %
-                             (host, handler))
+            if verbose:
+                sys.stderr.write("New connection for %s %s\n" %
+                                 (host, handler))
+                pass
+            
             self.connections[(host,handler)] = SSHConnection(host, handler)
             pass
         connection = self.connections[(host,handler)]
