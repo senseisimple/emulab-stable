@@ -53,6 +53,19 @@ require exitonwarn; # exitonwarn isn't really a module, so just require it
 sub doSwapout($);
 sub doSwapin($);
 
+#
+# Firewall stuff
+# XXX maybe should be elsewhere
+#
+sub FWSETUP()  { return 1; }
+sub FWTEARDOWN()  { return 2; }
+sub doFW($$$);
+
+# XXX fixme: should not be hardwired!
+my $cnetstack = "-S cisco2";
+my $cnetvlanname = "Control";
+
+
 sub REAL()    { return 4; }
 sub CLEANUP() { return 3; }
 sub RETRY()   { return 2; }
@@ -174,6 +187,11 @@ if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
 }
 
 #
+# See if the experiment is firewalled
+#
+my $firewalled = TBExptFirewall($pid, $eid);
+
+#
 # Do actual swapping
 #
 if ($swapop eq "out") {
@@ -183,6 +201,18 @@ if ($swapop eq "out") {
     $errors = doSwapout(REAL);
 }
 elsif ($swapop eq "update") {
+
+    #
+    # Disallow modification of firewalled experiments til we figure
+    # out how to do it right.
+    #
+    if ($firewalled) {
+	print STDERR "Cannot modify firewalled experiment right now.\n";
+	print "Failingly finished swap-$swapop for $pid/$eid. ".TBTimeStamp()."\n";
+	TBDebugTimeStamp("tbswap $swapop finished (failed)");
+	exit(1);
+    }
+
     #
     # Update.
     #
@@ -369,6 +399,18 @@ sub doSwapout($) {
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("vnode_setup finished");
+	}
+
+	if ($firewalled) {
+	    # XXX put all nodes into admin mode
+	    print STDERR "Confining firewalled nodes.\n";
+	    TBDebugTimeStamp("moving nodes to purgatory");
+
+	    #
+	    # Once all nodes are safely in the admin MFS, we can take
+	    # down the firewall
+	    #
+	    doFW($pid, $eid, FWTEARDOWN);
 	}
 
 	#
@@ -758,6 +800,14 @@ sub doSwapin($) {
 	if ($canceled);
 
     #
+    # Setup any control-net firewall.
+    # This must be done before reloading and rebooting nodes.
+    #
+    if ($firewalled && doFW($pid, $eid, FWSETUP)) {
+	return 1;
+    }
+
+    #
     # If user specified -reboot to update,
     # and we are successfully performing the update,
     # then mark all nodes in experiment so os_setup will reboot them.
@@ -907,5 +957,165 @@ sub doSwapin($) {
 	TBDebugTimeStamp("elabinelab setup finished");
     }
 
+    return 0;
+}
+
+#
+# Setup and teardown experiment firewall.
+#
+# XXX note that right now, we just setup the switch infrastructure
+# first, and then just let everything else go.  Firewalled nodes will
+# not boot until the firewall is up since the VLAN is isolated til then.
+# The firewall will boot ok since it still talks to the real control net.
+#
+# XXX for tearing down firewalls, we assume that nodes have been "cleansed"
+# and it is safe to put ports back into the default control net VLAN.
+#
+sub doFW($$$) {
+    my ($pid, $eid, $action) = @_;
+    my ($fwnode, $fwvlanname, $fwvlan, $fwport, $fwvid);
+
+    #
+    # See if there is a firewall, fetching node/VLAN info if so.
+    # If not, we are all done.
+    #
+    if (!TBExptFirewall($pid, $eid, \$fwnode, \$fwvid, \$fwvlan)) {
+	return 0;
+    }
+
+    if ($action == FWSETUP) {
+	$fwvid = TBGetUniqueIndex("cnet_vlanid");
+
+	print "Setting up control net firewall.\n";
+    } else {
+	print "Tearing down control net firewall.\n";
+
+	# Prior setup didn't succeed, nothing to do
+	if (!defined($fwvid)) {
+	    return 0;
+	}
+    }
+
+    # XXX vlanid in the DB is currently an int, we need a more unique name
+    $fwvlanname = "fw$fwvid";
+
+    #
+    # Find all the experiment nodes and their control interface switch ports
+    #
+    # XXX this may be replaced by a call to SNMPIT that just specifies
+    # the pid/eid.  In that case someone else will first have to poplulate
+    # the vlans table with this same info. 
+    #
+    my $db_result =
+	DBQueryFatal("SELECT r.node_id,w.card1 ".
+		     "  FROM wires AS w, reserved AS r ".
+		     "WHERE r.node_id=w.node_id1 AND r.pid='$pid' ".
+		     "  AND r.eid='$eid' AND w.type='Control'");
+
+    my $portlist = "";
+    while (my ($node,$cif) = $db_result->fetchrow_array()) {
+	if ($node eq $fwnode) {
+	    $fwport = "$node:$cif";
+	} else {
+	    $portlist .= " $node:$cif";
+	}
+    }
+    if (!defined($fwport)) {
+	print STDERR "*** Firewall node '$fwnode' not found in $pid/$eid?!\n";
+	return 0;
+    }
+    if ($portlist eq "") {
+	print STDERR "*** No firewalled nodes in $pid/$eid?!\n";
+	return 0;
+    }
+
+    #
+    # XXX hack commands til we nail down the API
+    #
+    my $fwsetupstr1 = "snmpit $cnetstack -m $fwvlanname $portlist";
+    my $fwsetupstr2 = "snmpit $cnetstack -T $fwport $cnetvlanname $fwvlanname";
+    my $fwtakedownstr1 = "snmpit $cnetstack -m $cnetvlanname $portlist";
+    my $fwtakedownstr2 = "snmpit $cnetstack -o $fwvlanname";
+    my $fwtakedownstr3 = "snmpit $cnetstack -U $fwport";
+    my $fwtakedownstr4 = "snmpit $cnetstack -m $cnetvlanname $fwport";
+
+    if (0) {
+    # XXX debug fer now
+    TBDebugTimeStamp("    setup1: $fwsetupstr1");
+    TBDebugTimeStamp("    setup2: $fwsetupstr2");
+    TBDebugTimeStamp(" teardown1: $fwtakedownstr1");
+    TBDebugTimeStamp(" teardown2: $fwtakedownstr2");
+    TBDebugTimeStamp(" teardown3: $fwtakedownstr3");
+    TBDebugTimeStamp(" teardown4: $fwtakedownstr4");
+    if ($action == FWSETUP) {
+	my $lan = 100 + $fwvid;
+	$fwsetupstr1    = "/bin/echo VLAN \#$lan on cisco2";
+	$fwsetupstr2    = "true";
+    } else {
+	$fwtakedownstr1 = "true";
+	$fwtakedownstr2 = "true";
+	$fwtakedownstr3 = "true";
+	$fwtakedownstr4 = "true";
+    }
+    }
+
+    if ($action == FWSETUP) {
+	TBDebugTimeStamp("snmpit firewall setup: VLAN");
+	my $snmpit_out = `$fwsetupstr1`;
+	if ($? != 0 || $snmpit_out !~ /VLAN #(\d+) on /) {
+	    print STDERR "*** Failed to setup Firewall control net VLAN.\n";
+	    return 1;
+	}
+	my $fwvlan = $1;
+
+	TBDebugTimeStamp("snmpit firewall setup: trunk");
+	if (system($fwsetupstr2)) {
+	    print STDERR "*** Failed to setup Firewall trunk on port $fwport.\n";
+	    if (system($fwtakedownstr1)) {
+		print STDERR
+		    "*** Could not return $portlist to Control VLAN!\n";
+	    }
+	    if (system($fwtakedownstr2)) {
+		print STDERR
+		    "*** Could not destroy VLAN $fwvlanname ($fwvlan)!\n";
+	    }
+	    return 1;
+	}
+	TBDebugTimeStamp("snmpit firewall setup done");
+
+	# Record VLAN info now that everything is done
+	TBSetExptFirewallVlan($pid, $eid, $fwvid, $fwvlan);
+    } else {
+	TBDebugTimeStamp("snmpit firewall teardown: VLAN");
+	my $failed = 0;
+	if (system($fwtakedownstr1)) {
+	    print STDERR
+		"*** Could not return $portlist to Control VLAN!\n";
+	    $failed = 1;
+	}
+	if (system($fwtakedownstr2)) {
+	    print STDERR
+		"*** Could not destroy VLAN $fwvlanname ($fwvlan)!\n";
+	    $failed = 1;
+	}
+	TBDebugTimeStamp("snmpit firewall teardown: trunk");
+	if (system($fwtakedownstr3)) {
+	    print STDERR
+		"*** Could not tear down trunk on $fwport!\n";
+	    $failed = 1;
+	}
+	if (system($fwtakedownstr4)) {
+	    print STDERR
+		"*** Could not return $fwport to Control VLAN!\n";
+	    $failed = 1;
+	}
+	if ($failed) {
+	    return 1;
+	}
+	TBDebugTimeStamp("snmpit firewall teardown done");
+
+	# Clean VLAN info from DB
+	TBSetExptFirewallVlan($pid, $eid, undef, undef);
+    }
     return 0;
 }
