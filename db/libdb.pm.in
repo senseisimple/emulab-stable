@@ -473,8 +473,10 @@ sub TBAdmin(;$)
     # No one is considered an admin unless they have the magic environment
     # variable set (so that you have to be a bit more explict about wanting
     # admin privs.) Use the withadminprivs script to get this variable set.
+	# Also check with HTTP_ at the front of the name, since this is required
+	# to get it through suexec from the web scripts.
     #
-    if (!$ENV{WITH_TB_ADMIN_PRIVS}) {
+    if (!($ENV{WITH_TB_ADMIN_PRIVS} || $ENV{HTTP_WITH_TB_ADMIN_PRIVS})) {
 	return 0;
     }
 

@@ -222,6 +222,15 @@ function CHECKLOGIN($uid) {
     if (strcmp($status, TBDB_USERSTATUS_ACTIVE) == 0)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ACTIVE;
 
+    #
+    # Set the magic enviroment variable, if appropriate, for the sake of
+    # any processes we might spawn. We prepend an HTTP_ on the front of
+	# the variable name, so that it'll get through suexec.
+    #
+    if ($admin && !$adminoff) {
+    	putenv("HTTP_WITH_TB_ADMIN_PRIVS=1");
+    }
+
     return $CHECKLOGIN_STATUS;
 }
 
