@@ -11,12 +11,7 @@
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
-
-#define PTHREADS
-
-#ifdef PTHREADS
 #include <pthread.h>
-#endif
 
 #include "imagehdr.h"
 
@@ -71,8 +66,10 @@ static const char * frisbee_addr;
 
 void frisbeeEndChunk()
 {
-    frisbeeIndexIntoCurrentChunk = 0;
-    frisbee_data = NULL;
+  printf("frisbeeEndChunk(): ending chunk, read %i bytes into it. xyz\n",
+	 frisbeeIndexIntoCurrentChunk );
+  frisbeeIndexIntoCurrentChunk = 0;
+  frisbee_data = NULL;
 }
 
 int frisbeeRead( char * inbuf, int amt )
@@ -107,32 +104,19 @@ void frisbeeBridgeInit( const char * address )
   frisbee_data = NULL;
   frisbeeIndexIntoCurrentChunk = 0;
 
-#ifdef PTHREADS
   {
     pthread_t     frisbee_pid = 0;
-    void	       *frisbee_thread(void *arg);
-    /* int		frisbee_status; */
+    /* int	  frisbee_status; */
 
     printf("writeimage_driver: creating frisbee thread.\n");
 
     if (0 != pthread_create(&frisbee_pid, NULL,
-		            /* &threadattr, */ &frisbee_thread, (void *) 0)) {
+		            &frisbee_thread, (void *) 0)) {
       perror("pthread_create failure.\n");
     } else {
       printf("pthread_create success!\n");
     }
   }
-#endif
-
-#ifdef RTHREADS
-  if (-1 ==
-      rfork_thread(RFPROC | RFMEM, 
-                   malloc(655360), &frisbee_thread, (void *) 0 )) {
-    perror("rfork_thread failure.\n");
-  } else {
-    printf("rfork_thread success!.\n");
-  }
-#endif
 }
 
 /* frisbee_thread.
@@ -172,6 +156,7 @@ void * frisbee_thread( void *arg )
       /* either we havent given the consumer data yet, or they're done */
       if (lastChunkId != 0xFFFFFFFF) {
         /* they're done with a piece we gave them */
+        printf("frisbee_thread: Unlocking chunk %i. xyz\n", lastChunkId );
 	frisbeeUnlockReadyChunk( lastChunkId );
 	lastChunkId = 0xFFFFFFFF;
       }
@@ -239,6 +224,8 @@ main(int argc, char **argv)
 		 */
 		if (inflate_subblock())
 			break;
+
+		frisbeeEndChunk();
 		/*
 		if ((offset = lseek(infd, (off_t) 0, SEEK_CUR)) < 0) {
 			perror("Getting current seek pointer");
@@ -277,10 +264,6 @@ inflate_subblock(void)
 
 	printf("Inflate subblock called...\n");
 
-	if (frisbee_done) {
-	  printf("But we're done!\n");
-	  return 1;
-	}
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
 	d_stream.opaque   = (voidpf)0;
@@ -314,6 +297,11 @@ inflate_subblock(void)
 	 * Start with the first region. 
 	 */
 	offset = curregion->start * (off_t) SECSIZE;
+
+	if (devlseek(outfd, offset, SEEK_SET) < 0) { /* CRB */
+	  perror("devlseek");
+	}
+
 	size   = curregion->size  * (off_t) SECSIZE;
 	assert(size);
 	curregion++;
@@ -430,8 +418,6 @@ inflate_subblock(void)
 	if (debug)
 		fprintf(stderr, "%14qd\n", total);
 
-        frisbeeEndChunk();
-	
 	return 0;
 }
 
