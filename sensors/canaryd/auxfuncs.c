@@ -1,4 +1,6 @@
+
 #include <sys/param.h>
+#include <sys/wait.h>
 #include <sys/dkstat.h>
 #include <sys/mbuf.h>
 #include <sys/sysctl.h>
@@ -28,10 +30,61 @@ char **specified_devices;
 devstat_select_mode select_mode;
 struct statinfo cur, last;
 
+extern void lerror(const char* msgstr);
+
 static int getswapouts(void);
-static int cpu_state(int which);
 static long percentages(int cnt, int *out, register long *new,
                         register long *old, long *diffs);
+
+#define MAXLINELEN 256
+
+/* XXX change to combine last return value of procfunc with exec'ed process'
+   exit status & write macros for access.
+*/
+int procpipe(char *const prog[], int (procfunc)(char*,void*), void* data) {
+
+  int fdes[2], retcode, cpid, status;
+  char buf[MAXLINELEN];
+  FILE *in;
+
+  if ((retcode=pipe(fdes)) < 0) {
+    lerror("Couldn't alloc pipe");
+  }
+  
+  else {
+    switch ((cpid = fork())) {
+    case 0:
+      close(fdes[0]);
+      dup2(fdes[1], STDOUT_FILENO);
+      if (execvp(prog[0], prog) < 0) {
+        lerror("Couldn't exec program");
+        exit(1);
+      }
+      break;
+      
+    case -1:
+      lerror("Error forking child process");
+      close(fdes[0]);
+      close(fdes[1]);
+      retcode = -1;
+      break;
+      
+    default:
+      close(fdes[1]);
+      in = fdopen(fdes[0], "r");
+      while (!feof(in) && !ferror(in)) {
+        if (fgets(buf, sizeof(buf), in)) {
+          if ((retcode = procfunc(buf, data)) < 0)  break;
+        }
+      }
+      fclose(in);
+      wait(&status);
+      if (retcode > -1)  retcode = WEXITSTATUS(status);
+      break;
+    } /* switch ((cpid = fork())) */
+  }
+  return retcode;
+}
 
 int
 getnumcpus(void)
@@ -73,12 +126,6 @@ getmempages(void)
 	len = sizeof (total);
 	sysctl(mib, 2, &total, &len, NULL, 0);
 	return (int)(total / pagesize);
-}
-
-int
-getcpubusy(void)
-{
-	return (1000 - cpu_state(CP_IDLE)) / 10;
 }
 
 int *
@@ -279,25 +326,23 @@ getdiskbusy(void)
  * Use the constants in <sys/dkstat.h>
  * CP_USER=0, CP_NICE=1, CP_SYS=2, CP_INTR=3, CP_IDLE=4
  */
-static
-int cpu_state(int which) {
+int *getcpustates() {
 
    static long cp_time[CPUSTATES];
    static long cp_old[CPUSTATES];
    static long cp_diff[CPUSTATES];
    static int cpu_states[CPUSTATES];
-   static long tot;
    size_t len = sizeof(cp_time);
-
+   
    /* Copy the last cp_time into cp_old */
    memcpy(&cp_old, &cp_time, CPUSTATES*sizeof(long));
    /* puts kern.cp_time array into cp_time */
    if (sysctlbyname("kern.cp_time", &cp_time, &len, NULL, 0) == -1 || !len)
 	return 0;
    /* Use percentages function lifted from top(1) to figure percentages */
-   tot = percentages(CPUSTATES, cpu_states, cp_time, cp_old, cp_diff);
+   percentages(CPUSTATES, cpu_states, cp_time, cp_old, cp_diff);
 
-   return cpu_states[which];
+   return cpu_states;
 }
 
 /*

@@ -1,1111 +1,735 @@
 /*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * canaryd.c
+ *
+ * Copyright (c) 2004 The University of Utah and the Flux Group.
  * All rights reserved.
+ *
+ * This file is licensed under the terms of the GNU Public License.  
+ * See the file "license.terms" for restrictions on redistribution 
+ * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
 
-#include "canaryd.h"
-#include "config.h"
+/**
+ * @file canaryd.c
+ *
+ * Implementation file for the main bits of canaryd.
+ */
 
-CANARYD_OPTS   *opts;
-CANARYD_PARAMS *parms;
+#include <config.h>
 
-void lerror(const char* msgstr) {
-  if (msgstr) {
-    syslog(LOG_ERR, "%s: %m", msgstr);
-    fprintf(stderr, "canaryd: %s: %s\n", msgstr, strerror(errno));
-  }
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+
+#include <fcntl.h>
+#include <syslog.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/dkstat.h>
+#include <devstat.h>
+#include <sys/stat.h>
+#include <sys/rtprio.h>
+#include <dirent.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <ifaddrs.h>
+
+#include <unistd.h>
+
+#include "auxfuncs.h"
+#include "canarydEvents.h"
+#include "childProcess.h"
+#include "networkInterface.h"
+
+/**
+ * The PATH to use when canaryd executes another program.
+ */
+#define CANARYD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:" CLIENT_BINDIR
+
+/**
+ * The path to this program's PID file.
+ */
+#define PIDFILE "/var/run/canaryd.pid"
+
+/**
+ * The canaryd log file path.
+ */
+#define CANARYD_LOG "/var/emulab/logs/canaryd.log"
+
+/**
+ * Version information.
+ *
+ * @see version.c
+ */
+extern char build_info[];
+
+enum {
+    CDB_LOOPING,
+    CDB_TRACE_IMMEDIATELY,
+    CDB_TRACING,
+    CDB_DEBUG,
+};
+
+/**
+ * Flags for the canaryd_data.cd_Flags variable.
+ */
+enum {
+    CDF_LOOPING = (1L << CDB_LOOPING),	/**< Continue Looping waiting for
+					   events. */
+     /**
+      * Start tracing immediately, do not wait for START event.
+      */
+    CDF_TRACE_IMMEDIATELY = (1L << CDB_TRACE_IMMEDIATELY),
+    CDF_TRACING = (1L << CDB_TRACING),	/**< Generate trace data. */
+    CDF_DEBUG = (1L << CDB_DEBUG),	/**< Debugging mode. */
+};
+
+/*
+ * Global data for canaryd.
+ *
+ * cd_Flags - Holds the CDF_ flags.
+ * cd_IntervalTime - The time to wait between samples.
+ * cd_CurrentTime - The current time of day.
+ * cd_OutputFile - The output file for the trace.
+ */
+struct {
+    int cd_Flags;
+    struct itimerval cd_IntervalTime;
+    struct timeval cd_CurrentTime;
+    struct timeval cd_StopTime;
+    FILE *cd_OutputFile;
+} canaryd_data;
+
+/**
+ * Log an error.
+ *
+ * @param msgstr The message to log.
+ */
+void lerror(const char* msgstr)
+{
+    if( msgstr != NULL )
+    {
+	syslog(LOG_ERR, "%s: %m", msgstr);
+	fprintf(stderr, "canaryd: %s: %s\n", msgstr, strerror(errno));
+    }
 }
 
-void lwarn(const char* msgstr) {
-  if (msgstr) {
-    syslog(LOG_WARNING, "%s", msgstr);
-    fprintf(stderr, "canaryd: %s\n", msgstr);
-  }
+/**
+ * Log a warning.
+ *
+ * @param msgstr The message to log.
+ */
+void lwarn(const char* msgstr)
+{
+    if( msgstr != NULL )
+    {
+	syslog(LOG_WARNING, "%s", msgstr);
+	fprintf(stderr, "canaryd: %s\n", msgstr);
+    }
 }
 
-void lnotice(const char *msgstr) {
-  if (msgstr) {
-    syslog(LOG_NOTICE, "%s", msgstr);
-    printf("canaryd: %s\n", msgstr);
-  }
+/**
+ * Log a notice.
+ *
+ * @param msgstr The message to log.
+ */
+void lnotice(const char *msgstr)
+{
+    if( msgstr != NULL )
+    {
+	syslog(LOG_NOTICE, "%s", msgstr);
+	printf("canaryd: %s\n", msgstr);
+    }
 }
 
-void sigunkhandler(int signum) {
-  int status;
-  char message[50];
-
-  sprintf(message, "Unhandled signal: %d.  Exiting.", signum);
-  lerror(message);
-  unlink(PIDFILE);
-  while (wait(&status) != -1);
-  exit(signum);
+/**
+ * Empty signal handler for SIGALRM.  The mechanics are done in the main loop,
+ * we just use SIGALRM to break the sigsuspend.
+ */
+void sigalrm(int signum)
+{
 }
 
-void siginthandler(int signum) {
-  parms->dolast = 1;
+/**
+ * Signal handler that will cause the program to exit from the main loop.
+ */
+void sigexit(int signum)
+{
+    canaryd_data.cd_Flags &= ~CDF_LOOPING;
 }
 
-void sigalrmhandler(int signum) {
-  lnotice("Run length has expired; exiting.");
-  parms->dolast = 1;
+/**
+ * Print the tool's usage message.
+ *
+ * @param file The file to send the usage to.
+ * @param prog_name The program's real name, as given on the command line.
+ */
+static void cdUsage(FILE *file, char *prog_name)
+{
+    fprintf(file,
+	    "Usage: %s [-hVdt]\n"
+	    "\n"
+	    "Physical node monitoring daemon.\n"
+	    "\n"
+	    "Options:\n"
+	    "  -h\t\tThis help message.\n"
+	    "  -V\t\tShow the version number.\n"
+	    "  -d\t\tDebug mode; do not fork into the background.\n"
+	    "  -t\t\tStart tracing immediately.\n",
+	    prog_name);
 }
 
-void usage(void) {  
+/**
+ * Process the command line options.
+ *
+ * @param argc The argc passed to main.
+ * @param argv The argv passed to main.
+ * @return Zero on success, one if there was an error and the usage message
+ * should be printed, or -1 if there was no error but the tool should exit
+ * immediately.
+ */
+static int cdProcessOptions(int argc, char *argv[])
+{
+    int ch, retval = 0;
+    char *prog_name;
 
-  printf("Usage:\tcanaryd -h\n"
-         "\tcanaryd [-o] [-d] [-i <interval>] [-p <port>] [-s <server>]\n"
-         "\t        [-l] [-t <runlen>] [-r <interval>]\n"
-         "\t -h\t\t This message.\n"
-         "\t -o\t\t Run once (collect a single report).\n"
-         "\t -d\t\t Debug mode; do not fork into background.\n"
-         "\t -i <interval>\t Regular run interval, in seconds.\n"
-         "\t -p <port>\t Send on port <port>\n"
-         "\t -s <server>\t Send data to <server>\n"
-         "\t -l\t\t Run in logging mode.  Will log to: " DEF_CDLOG "\n"
-         "\t -t <runlen>\t Run for <runlen> seconds.\n"
-         "\t -r <interval>\t Report overload at most every <interval> seconds \n");
-  exit(0);
+    prog_name = argv[0];
+    while( ((ch = getopt(argc, argv, "hVdt")) != -1) && (retval == 0) )
+    {
+	switch( ch )
+	{
+	case 'd':
+	    canaryd_data.cd_Flags |= CDF_DEBUG;
+	    break;
+	case 't':
+	    canaryd_data.cd_Flags |= CDF_TRACE_IMMEDIATELY;
+	    break;
+	case 'V':
+	    fprintf(stderr, "%s\n", build_info);
+	    retval = -1;
+	    break;
+	case 'h':
+	case '?':
+	default:
+	    retval = 1;
+	    break;
+	}
+    }
+    return( retval );
 }
 
+/**
+ * Write the PID file for this program.
+ *
+ * @param path The path to the file.
+ * @param pid The PID to store in the file.
+ */
+static int cdWritePIDFile(char *path, pid_t pid)
+{
+    int fd, retval = 1;
 
-int main(int argc, char **argv) {
+    if( (fd = open(path, O_EXCL | O_CREAT | O_WRONLY)) < 0 )
+    {
+	retval = 0;
+    }
+    else
+    {
+	char scratch[32];
+	int rc;
+	
+	rc = snprintf(scratch, sizeof(scratch), "%d", pid);
+	write(fd, scratch, rc);
+	fchmod(fd, S_IRUSR | S_IRGRP | S_IROTH);
+	close(fd);
+	fd = -1;
+    }
+    return( retval );
+}
 
-  int exitcode = -1;
-  u_int span;
-  time_t curtime;
-  int rnd_off = 0;
-  static CANARYD_OPTS mopts;
-  static CANARYD_PARAMS mparms;
-  static CANARYD_PACKET mpkt;
-  CANARYD_PACKET *pkt;
-
-  extern char build_info[];
-
-  /* pre-init */
-  bzero(&mopts, sizeof(CANARYD_OPTS));
-  bzero(&mparms, sizeof(CANARYD_PARAMS));
-  bzero(&mpkt, sizeof(CANARYD_PACKET));
-  opts = &mopts;
-  parms = &mparms;
-  pkt = &mpkt;
-
-  if (parse_args(argc, argv) < 0) {
-    fprintf(stderr, "Error processing arguments.\n");
-    return exitcode;
-  }
-
-  if (init_canaryd() < 0) {
-    lerror("Problem initializing, bailing out.");
-    do_exit(exitcode);
-  }
-
-  get_vmem_stats(pkt); /* XXX: doesn't belong here.. */
-  exitcode = 0;
-  lnotice("Canaryd started");
-  lnotice(build_info);
-
-  for (;;) {
-    curtime = time(0);
-
-    /* Collect current machine stats */
-    mparms.cnt++;
-    get_load(pkt);
-    get_packet_counts(pkt);
-    get_vnode_stats(pkt);
-    get_vmem_stats(pkt);
-    check_overload(pkt);
+/**
+ * Start tracing the system's performance.
+ *
+ * @param path The trace file path.
+ * @return True on success, false otherwise.
+ */
+static int cdStartTracing(char *path)
+{
+    int retval = 1;
     
-    if (pkt->overload && parms->numvnodes/2 > 1) {
-      // (curtime >= mparms.lastolrpt + mopts.ol_rep_interval)) {
-      send_ol_event(pkt);
-      mparms.lastolrpt = curtime;
+    if( canaryd_data.cd_Flags & CDF_TRACING )
+    {
+	/* We're already tracing, nothing to do. */
     }
-
-    /* Poll the event system */
-    event_poll(mparms.ev_handle);
-
-    /*
-     * Time to send a packet?
-     * Yes, if:
-     * 1) We've been idle, and now we see activity (aggressive mode)
-     * 2) Its been over <reg_interval> seconds since the last report
-     */
-    if ((curtime >=  mparms.lastrpt + mopts.interval) ||
-        parms->dolast) {
-      if (send_pkt(pkt)) {
-        mparms.lastrpt = curtime;
-      }
-      if (parms->dolast) {
-        break;
-      }
+    else if( canaryd_data.cd_Flags & CDF_DEBUG )
+    {
+	/* Debug sends to stdout... */
+	canaryd_data.cd_OutputFile = stdout;
+	canaryd_data.cd_Flags |= CDF_TRACING;
     }
-
-    if (mopts.once) {
-      break;
+    else if( (canaryd_data.cd_OutputFile = fopen(path, "w")) == NULL )
+    {
+	lerror("Could not create trace file.");
+	retval = 0;
     }
-    
-    /* 
-     * Figure out, based on run count, and activity, how long
-     * to sleep.
-     */
-    if (mopts.log) {
-      span = mopts.interval;
+    else
+    {
+	/* Good to go. */
+	canaryd_data.cd_Flags |= CDF_TRACING;
     }
-    /* randomly offset the first packet to avoid packet implosion. */
-    else if (mparms.cnt == 1) {
-      rnd_off = (rand() / (float) RAND_MAX) * 
-        (OFFSET_FRACTION*mopts.interval);
-      rnd_off = (rnd_off > 0) ? rnd_off : 0;
-      span = mopts.interval - rnd_off;
-    }
-    else {
-      span = mopts.interval;
-    }
-    
-    if (opts->debug) {
-      printf("About to sleep for %u seconds.\n", span);
-      fflush(stdout);
-    }
-    
-    if (parms->dolast) {
-      continue;
-    }
-    
-    sleep(span);
-  }
-
-  return exitcode; /* NOTREACHED */
+    return( retval );
 }
 
-int parse_args(int argc, char **argv) {
-
-  char ch;
-
-  /* setup defaults. */
-  opts->once = 0;
-  opts->interval = DEF_INTVL;
-  opts->debug = 0;
-  opts->port = CANARYD_DEF_PORT;
-  opts->servname = BOSSNODE;
-  opts->log = 0;
-  opts->run_len = 0;
-  opts->ol_rep_interval = DEF_OLREPINTVL;
-
-  while ((ch = getopt(argc, argv, "oi:g:dp:s:lt:r:h")) != -1) {
-    switch (ch) {
-
-    case 'o': /* run once */
-      opts->once = 1;
-      break;
-
-    case 'i':
-      if ((opts->interval = atol(optarg)) < MIN_INTVL) {
-        lwarn("Warning!  Tnterval set too low, defaulting.");
-        opts->interval = MIN_INTVL;
-      }
-      break;
-
-    case 'd':
-      lnotice("Debug mode requested; staying in foreground.");
-      opts->debug = 1;
-      break;
-
-    case 'p':
-      opts->port = (u_short)atoi(optarg);
-      break;
-
-    case 's':
-      if (optarg && *optarg) {
-        opts->servname = strdup(optarg);
-      }
-      else {
-        lwarn("Invalid server name, default used.");
-      }
-      break;
-
-    case 'l':
-      lnotice("Logging mode enabled");
-      opts->log = 1;
-      break;
-
-    case 't':
-      opts->run_len = strtoul(optarg, NULL, 0);
-      break;
-      
-
-    case 'r':
-      opts->ol_rep_interval = strtoul(optarg, NULL, 0);
-      break;
-
-    case 'h':
-    default:
-      usage();
-      return -1;
-      break;
+/**
+ * Stop tracing the system's performance, if we haven't already.
+ */
+static void cdStopTracing(void)
+{
+    if( !(canaryd_data.cd_Flags & CDF_TRACING) )
+    {
+	/* We're already stopped, nothing to do. */
     }
-  }
-
-  return 0;
+    else
+    {
+	if( !(canaryd_data.cd_Flags & CDF_DEBUG) )
+	{
+	    fclose(canaryd_data.cd_OutputFile);
+	}
+	canaryd_data.cd_OutputFile = NULL;
+	canaryd_data.cd_Flags &= ~CDF_TRACING;
+    }
 }
 
+/**
+ * Scan the "/proc" file system and gather statistics for all of the processes.
+ *
+ * @return True on success, false otherwise.
+ */
+static int cdScanProcFS(void)
+{
+    int retval = 1;
+    DIR *pfs;
 
-int init_canaryd(void) {
-
-  int pfd, i;
-  char pidbuf[10];
-  char servbuf[MAXHNAMELEN];
-  struct hostent *hent;
-  char *ciprog[] = {"control_interface", NULL};
-  char *stprog[] = {"tmcc", "status", NULL};
-  struct rtprio myprio = {RTP_PRIO_REALTIME, 0};
-  char *canaryd_evts = TBDB_EVENTTYPE_START ", " TBDB_EVENTTYPE_STOP ", "
-                      TBDB_EVENTTYPE_RESET ", " TBDB_EVENTTYPE_REPORT;
-  address_tuple_t tuple;
-  char *driveargv[] = {"ad0", NULL};
-
-  /* init internal vars */
-  parms->dolast = 0;  /* init send-last-report-before-exiting variable */
-  parms->cnt = 0;     /* daemon iter count */
-  parms->lastrpt = 0; /* the last time a report pkt was sent */
-  parms->startup = time(NULL); /* Make sure we don't report < invocation */
-  parms->pideid = "";
-  parms->ev_server = "boss.emulab.net"; /* XXX */
-  parms->ol_detect = 0;
-  parms->send_ev_report = 0;
-  parms->numvnodes = 0;
-
-  /* Event arg items */
-  for (i = 0; i < NUMRANGES; ++i) {
-    parms->olr[i].min = evargitems[i].defmin;
-    parms->olr[i].max = evargitems[i].defmax;
-  }
-
-  /* Setup signals */
-  signal(SIGTERM, siginthandler);
-  signal(SIGINT, siginthandler);
-  signal(SIGQUIT, siginthandler);
-  signal(SIGALRM, sigalrmhandler);
-  signal(SIGHUP, SIG_IGN);
-  signal(SIGPIPE, SIG_IGN);
-  signal(SIGBUS, sigunkhandler);
-  signal(SIGSEGV, sigunkhandler);
-  signal(SIGFPE, sigunkhandler);
-  signal(SIGILL, sigunkhandler);
-  signal(SIGSYS, sigunkhandler);
-
-  /* Set the priority to realtime */
-  if (rtprio(RTP_PRIO_REALTIME, getpid(), &myprio) < 0) {
-    lerror("Couldn't set RT priority!");
-  }
-
-  /* Setup logging facil. */
-  openlog("canaryd", LOG_NDELAY, LOG_TESTBED);
-
-  /* Setup path */
-  if (setenv("PATH", CANARYD_PATH_ENV, 1) < 0) {
-    lerror("Couldn't set path env");
-  }
-
-  /* Seed the random number generator */
-  srand(time(NULL));
-
-  /* Grab control net iface */
-  if (procpipe(ciprog, &grab_cifname, parms)) {
-    lwarn("Failed to get control net iface name");
-  }
-
-  /* Get the expt pid/eid. */
-  if (procpipe(stprog, &grab_pideid, parms)) {
-    lwarn("Failed to get pid/eid");
-  }
-
-  /* Open the logfile, if necessary */
-  if (opts->log) {
-    if ((parms->log = fopen(DEF_CDLOG, "w")) == NULL) {
-      lerror("Failed to open log file");
-      return -1;
+    if( (pfs = opendir("/proc")) == NULL )
+    {
+	lerror("Could not open /proc");
+	retval = 0;
     }
-  }
+    else
+    {
+	struct dirent *de;
 
-  /************************************************************
-   *                REGISTER WITH EVENT SYSTEM                *
-   ************************************************************/
+	/* Walk the directories. */
+	while( retval && ((de = readdir(pfs)) != NULL) )
+	{
+	    pid_t pid;
 
-  /*
-   * Find the local monitor node 
-   */
-#ifdef COMMENT /* XXX: fixup to use expt-specific mon node's elvind */
-  if ((ssfile = fopen(SYNCSERVFILE, "r")) == NULL) {
-    lerror("Failed to open sync server ident file");
-    return -1;
-  }
+	    /*
+	     * If the directory name is a number, assume its for a real
+	     * process.
+	     */
+	    if( sscanf(de->d_name, "%d", &pid) == 1 )
+	    {
+		struct cpChildProcess *cp;
 
-  if ((fgets(servbuf, sizeof(servbuf), ssfile) == NULL) ||
-      ! *servbuf) {
-    lerror("No sync server name found in file!");
-    fclose(ssfile);
-    return -1;
-  }
+		/* Its a valid process, try to find/create it. */
+		if( (cp = cpFindChildProcess(pid)) == NULL )
+		{
+		    cp = cpCreateChildProcess(pid);
+		}
+		if( cp == NULL )
+		{
+		    lerror("out of memory");
+		    retval = 0;
+		}
+		else
+		{
+		    /*
+		     * Increment the generation so the cpChildProcess object
+		     * won't be garbage collected.
+		     */
+		    cp->cp_Generation += 1;
+		    if( cp->cp_VNode != NULL )
+		    {
+			/* Its a vnode, sample its usage. */
+			cpSampleUsage(cp);
+		    }
+		}
+	    }
+	}
+	closedir(pfs);
 
-  if (servbuf[strlen(servbuf)-1] == '\n') {
-    servbuf[strlen(servbuf)-1] = '\0';
-  }
-  parms->ev_server = strdup(servbuf);
-  fclose(ssfile);
+	/* Do the garbage collection. */
+	cpCollectChildProcesses();
+    }
+    return( retval );
+}
+
+/**
+ * Print the statistics for the network interfaces.
+ *
+ * @param output_file The file to write the statistics to.
+ * @return True on success, false otherwise.
+ */
+static int cdPrintNetworkInterfaces(FILE *output_file)
+{
+    struct ifaddrs *ifa;
+    int retval = 1;
+    
+    if( getifaddrs(&ifa) < 0 )
+    {
+	lerror("getifaddrs failed");
+	retval = 0;
+    }
+    else
+    {
+	struct ifaddrs *curr;
+
+	/* Walk the list of interfaces. */
+	curr = ifa;
+	while( curr != NULL )
+	{
+	    struct if_data *id;
+	    
+	    if( (id = curr->ifa_data) != NULL ) // Link level only.
+	    {
+		char ifname[64];
+
+		/* Print out the stats. */
+		fprintf(output_file,
+			" iface=%s,%ld,%ld,%ld,%ld",
+			niFormatMACAddress(ifname, curr->ifa_addr),
+			id->ifi_ipackets,
+			id->ifi_ibytes,
+			id->ifi_opackets,
+			id->ifi_obytes);
+	    }
+	    curr = curr->ifa_next;
+	}
+	
+	freeifaddrs(ifa);
+	ifa = NULL;
+    }
+    return( retval );
+}
+
+int main(int argc, char *argv[])
+{
+    int rc, retval = EXIT_SUCCESS;
+    struct sigaction sa;
+    struct rtprio rtp;
+    sigset_t sigmask;
+
+    /* Initialize our globals. */
+    canaryd_data.cd_Flags |= CDF_LOOPING;
+
+    /* Run for forever. */
+    canaryd_data.cd_StopTime.tv_sec = LONG_MAX;
+    canaryd_data.cd_StopTime.tv_usec = LONG_MAX;
+    
+    canaryd_data.cd_IntervalTime.it_interval.tv_sec = 1;
+    canaryd_data.cd_IntervalTime.it_interval.tv_usec = 0;
+    canaryd_data.cd_IntervalTime.it_value.tv_sec = 1;
+    canaryd_data.cd_IntervalTime.it_value.tv_usec = 0;
+
+    /* Prime the sigaction for capturing SIGALRM. */
+    sigemptyset(&sigmask);
+    sigaddset(&sigmask, SIGALRM);
+    sigaddset(&sigmask, SIGINT);
+    sigaddset(&sigmask, SIGTERM);
+    
+    sa.sa_mask = sigmask;
+    sa.sa_flags = 0;
+#if defined(SA_RESTART)
+    sa.sa_flags |= SA_RESTART;
 #endif
 
-  /*
-   * Convert server/port to elvin thing.
-   *
-   * XXX This elvin string stuff should be moved down a layer. 
-   */
+    sa.sa_handler = sigalrm;
+    sigaction(SIGALRM, &sa, NULL);
 
-  if (parms->ev_server) {
-    snprintf(servbuf, sizeof(servbuf), "elvin://%s",
-             parms->ev_server);
-    /* free(parms->ev_server); */
-    parms->ev_server = strdup(servbuf);
-  }
+    sa.sa_handler = sigexit;
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
 
-  /*
-   * Construct an address tuple for subscribing to events for
-   * this node.
-   */
-  tuple = address_tuple_alloc();
-  if (tuple == NULL) {
-    lerror("could not allocate an address tuple");
-    return -1;
-  }
+    rtp.type = RTP_PRIO_REALTIME;
+    rtp.prio = 0;
 
-  printf("pid/eid: %s\n", parms->pideid);
+    getdrivedata((char *[]){ "ad0", NULL });
+    
+    openlog("canaryd", LOG_NDELAY, LOG_TESTBED);
+    
+    setenv("PATH", CANARYD_PATH_ENV, 1);
+    
+    switch( cdProcessOptions(argc, argv) )
+    {
+    case 1:
+	/* There was an error processing the arguments. */
+	cdUsage(stderr, argv[0]);
+	retval = EXIT_FAILURE;
+	break;
+    case -1:
+	/* No errors, but nothing else to do either. */
+	break;
+    case 0:
+	/* Optionally daemonize, */
+	if( !(canaryd_data.cd_Flags & CDF_DEBUG) && ((rc = daemon(0, 0)) < 0) )
+	{
+	    lerror("Could not daemonize.");
+	    retval = EXIT_FAILURE;
+	}
+	/* ... dump our PID file, */
+	else if( !cdWritePIDFile(PIDFILE, getpid()) )
+	{
+	    lerror("Could not write PID file.");
+	    retval = EXIT_FAILURE;
+	}
+	/* ... optionally start tracing immediately, */
+	else if( (canaryd_data.cd_Flags & CDF_TRACE_IMMEDIATELY) &&
+		 !cdStartTracing(CANARYD_LOG) )
+	{
+	    retval = EXIT_FAILURE;
+	}
+	/* ... bump our priority, */
+	else if( rtprio(RTP_SET, getpid(), &rtp) < 0 )
+	{
+	    lerror("Could not set real-time priority!");
+	    retval = EXIT_FAILURE;
+	}
+	/* ... initialize internals, */
+	else if( !cpInitChildProcessData() )
+	{
+	    lerror("Could not initialize internal state");
+	    retval = EXIT_FAILURE;
+	}
+	/* ... connect to the event system, */
+	else if( !ceInitCanarydEvents("elvin://boss.emulab.net") )
+	{
+	    lerror("Could not initialize events");
+	    retval = EXIT_FAILURE;
+	}
+	/* ... setup interval timer, and */
+	else if( setitimer(ITIMER_REAL,
+			   &canaryd_data.cd_IntervalTime,
+			   NULL) < 0 )
+	{
+	    lerror("Could not register itimer.");
+	    retval = EXIT_FAILURE;
+	}
+	/* ... start looping. */
+	else
+	{
+	    int pagesize, mempages;
+	    double physmem;
+	    sigset_t ss;
 
-  /*
-   * Ask for canaryd agent events
-   */
-  tuple->host	   = ADDRESSTUPLE_ANY;
-  tuple->site      = ADDRESSTUPLE_ANY;
-  tuple->group     = ADDRESSTUPLE_ANY;
-  tuple->expt      = parms->pideid;
-  tuple->objtype   = TBDB_OBJECTTYPE_CANARYD;
-  tuple->objname   = ADDRESSTUPLE_ANY;
-  tuple->eventtype = canaryd_evts;
-  
-  /*
-   * Register with the event system. 
-   */
-  parms->ev_handle = event_register_withkeyfile(parms->ev_server, 0,
-                                                EVENTKEYFILE);
-  if (parms->ev_handle == NULL) {
-    lerror("could not register with event system");
-    return -1;
-  }
-  
-  /*
-   * Subscribe to the event we specified above.
-   */
-  if (! event_subscribe(parms->ev_handle, ev_callback, tuple, NULL)) {
-    lerror("could not subscribe to event");
-    return -1;
-  }
+	    pagesize = getpagesize();
+	    mempages = getmempages();
+	    physmem = pagesize * mempages;
+	    sigfillset(&ss);
+	    sigdelset(&ss, SIGALRM);
+	    sigdelset(&ss, SIGINT);
+	    sigdelset(&ss, SIGTERM);
+	    /* Main loop, waits for events and optionally prints stats. */
+	    while( canaryd_data.cd_Flags & CDF_LOOPING )
+	    {
+		gettimeofday(&canaryd_data.cd_CurrentTime, NULL);
 
-  address_tuple_free(tuple); /* XXX: keep around for sending evts. */
+		/* Make sure we're not past the stop time and */
+		if( timercmp(&canaryd_data.cd_CurrentTime,
+			     &canaryd_data.cd_StopTime,
+			     >) )
+		{
+		    cdStopTracing();
+		}
+		/* ... try outputting trace data. */
+		else if( canaryd_data.cd_Flags & CDF_TRACING )
+		{
+		    int *cpu_pct, *mem_busy, *netmem_busy;
+		    struct cpVNode *vn;
 
-#ifdef __linux__
-  /* Open socket for SIOCGHWADDR ioctl (to get mac addresses) */
-  parms->ifd = socket(PF_INET, SOCK_DGRAM, 0);
-#endif
+		    /* We're tracing now, update stats, and */
+		    cpu_pct = getcpustates();
+		    
+		    mem_busy = getmembusy(mempages);
 
-  /* Setup "vmstat" stuff */
-  getdrivedata(driveargv);
+		    netmem_busy = getnetmembusy();
+		    
+		    cdScanProcFS();
 
-  /* prepare UDP connection to server */
-  if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    lerror("Could not alloc socket");
-    return -1;
-  }
-  if (!(hent = gethostbyname(opts->servname))) {
-    lerror("Can't resolve server hostname"); /* XXX use herror */
-    return -1;
-  }
-  bzero(&parms->servaddr, sizeof(struct sockaddr_in));
-  parms->servaddr.sin_family = AF_INET;
-  parms->servaddr.sin_port = htons(opts->port);
-  bcopy(hent->h_addr_list[0], &parms->servaddr.sin_addr.s_addr, 
-        sizeof(struct in_addr));
-  if (connect(parms->sd, (struct sockaddr*)&parms->servaddr, 
-              sizeof(struct sockaddr_in)) < 0) {
-    lerror("Couldn't connect to server");
-    return -1;
-  }
+		    /* ... print them out. */
+		    fprintf(canaryd_data.cd_OutputFile,
+			    "vers=2 stamp=%ld,%ld cpu=%f intr=%f mem=%d,%d "
+			    "disk=%u netmem=%u,%u,%u",
+			    canaryd_data.cd_CurrentTime.tv_sec,
+			    canaryd_data.cd_CurrentTime.tv_usec,
+			    (1000.0 - cpu_pct[CP_IDLE]) / 10.0,
+			    cpu_pct[CP_INTR] / 10.0,
+			    mem_busy[1],
+			    mem_busy[0],
+			    getdiskbusy(),
+			    netmem_busy[0],
+			    netmem_busy[1],
+			    netmem_busy[2]);
+		    
+		    cdPrintNetworkInterfaces(canaryd_data.cd_OutputFile);
 
-  /* Daemonize, unless in debug, or once-only mode. */
-  if (!opts->debug && !opts->once) {
-    if (daemon(0,0) < 0) {
-      lerror("Couldn't daemonize");
-      return -1;
+		    /*
+		     * Dump the vnodes list and clear their counters for the
+		     * next round.
+		     */
+		    vn = child_process_data.cpd_VNodes;
+		    while( vn != NULL )
+		    {
+			double cpu_pct, mem_pct;
+			
+			cpu_pct = (vn->vn_Usage / 1000000.0) * 100.0;
+			mem_pct = ((double)vn->vn_MemoryUsage / physmem) *
+			    100.0;
+			fprintf(canaryd_data.cd_OutputFile,
+				" vnode=%s,%f,%f",
+				vn->vn_Name,
+				cpu_pct,
+				mem_pct);
+			vn->vn_Usage = 0;
+			vn->vn_MemoryUsage = 0;
+			vn = vn->vn_Next;
+		    }
+		    
+		    fprintf(canaryd_data.cd_OutputFile, "\n");
+		    fflush(canaryd_data.cd_OutputFile);
+		}
+
+		/* Check for events and */
+		event_poll(canaryd_events_data.ced_Handle);
+
+		/* ... wait for the next signal. */
+		if( canaryd_data.cd_Flags & CDF_LOOPING )
+		{
+		    sigsuspend(&ss);
+		    /*
+		     * XXX We should probably make sure it was a SIGALRM that
+		     * woke us up, but eh...
+		     */
+		}
+	    }
+	}
+
+	/* Clean up our mess. */
+	cdStopTracing();
+	if( !(canaryd_data.cd_Flags & CDF_DEBUG) )
+	{
+	    unlink(PIDFILE);
+	}
+	break;
     }
-    /* Try to get lock.  If can't, then bail out. */
-    if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
-      lerror("Can't create lock file.");
-      return -1;
-    }
-    fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
-    sprintf(pidbuf, "%d", getpid());
-    write(pfd, pidbuf, strlen(pidbuf));
-    close(pfd);
-  }
-
-  /* Setup run length alarm, if needed. */
-  if (opts->run_len) {
-    alarm(opts->run_len);
-  }
-
-  return 0;
-}
-
-
-void do_exit(int exval) {
-  int status;
-
-  unlink(PIDFILE);
-  if (event_unregister(parms->ev_handle) == 0) {
-    lnotice("could not unregister from event system");
-  }
-  while (wait(&status) != -1);
-  lnotice("exiting.");
-  exit(exval);
-}
-
-int grab_cifname(char *buf, void *data) {
-
-  int retval = -1;
-  char *tmpptr;
-  CANARYD_PARAMS *myparms = (CANARYD_PARAMS*) data;
-
-  if (buf && isalpha(buf[0])) {
-    tmpptr = myparms->cifname = strdup(buf);
-    while (isalnum(*tmpptr))  tmpptr++;
-    *tmpptr = '\0';
-    retval = 0;
-  }
-  else {
-    myparms->cifname = NULL;
-  }
-
-  return retval;
-}
-
-int grab_pideid(char *buf, void *data) {
-  int retval = -1;
-  char *bp, *tmpbp;
-  CANARYD_PARAMS *myparms = (CANARYD_PARAMS*) data;
-
-  if (strstr(buf, "ALLOCATED=")) {
-    bp = tmpbp = buf+10;
-    while (!isspace(*tmpbp)) tmpbp++;
-    *tmpbp = '\0';
-    myparms->pideid = strdup(bp);
-    retval = 0;
-  }
-  else {
-    myparms->pideid = "";
-  }
-
-  return retval;
+    return( retval );
 }
 
 enum {
-  SITEIDX    = 0,
-  EXPTIDX    = 1,
-  GROUPIDX   = 2,
-  HOSTIDX    = 3,
-  OBJTYPEIDX = 4,
-  OBJNAMEIDX = 5,
-  EVTYPEIDX  = 6,
-  ARGSIDX  = 7
+  SITEIDX = 0,
+  EXPTIDX,
+  GROUPIDX,
+  HOSTIDX,
+  OBJTYPEIDX,
+  OBJNAMEIDX,
+  EVTYPEIDX,
+  ARGSIDX,
+
+  MAXIDX
 };
 
-void ev_callback(event_handle_t handle, event_notification_t notification, 
-                 void *data) {
-
-  char		buf[8][128]; /* XXX: bad magic */
-  int		len = 128;
-  struct timeval	now;
-  static int ecount;
-
-  bzero(buf, sizeof(buf));
-
-  event_notification_get_site(handle, notification, buf[SITEIDX], len);
-  event_notification_get_expt(handle, notification, buf[EXPTIDX], len);
-  event_notification_get_group(handle, notification, buf[GROUPIDX], len);
-  event_notification_get_host(handle, notification, buf[HOSTIDX], len);
-  event_notification_get_objtype(handle, notification, buf[OBJTYPEIDX], len);
-  event_notification_get_objname(handle, notification, buf[OBJNAMEIDX], len);
-  event_notification_get_eventtype(handle, notification, buf[EVTYPEIDX], len);
-  event_notification_get_arguments(handle, notification, buf[ARGSIDX], len);
-  
-  if (opts->debug) {          
-    gettimeofday(&now, NULL);
-    fprintf(stderr,"Event %d: %lu.%03lu %s %s %s %s %s %s %s %s\n",
-            ++ecount, now.tv_sec, now.tv_usec / 1000,
-            buf[SITEIDX], buf[EXPTIDX], buf[GROUPIDX],
-            buf[HOSTIDX], buf[OBJTYPEIDX], buf[OBJNAMEIDX], 
-            buf[EVTYPEIDX], buf[ARGSIDX]);
-  }
-
-  if (!strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_START)) {
-    if (! *buf[ARGSIDX]) {
-      lnotice("Arguments not provided in start event - ignoring.");
-    }
-    else {
-      parse_ev_args(buf[ARGSIDX]);
-    }
-  }
-  
-  else if (!strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_START)) {
-    parms->ol_detect = 0;
-  }
-
-  else if (!strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_RESET)) {
-    /* set_default_overload_params(); */
-  }
-
-  else if (!strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_REPORT)) {
-    parms->send_ev_report = 1;
-  }
-
-  else {
-    lnotice("Unknown event type received.");
-  }
-
-  return;
-}
-
-void send_ol_event(CANARYD_PACKET *pkt) {
-
-  int vnbufsiz, minibufsiz, i;
-  char minibuf[50];
-  char vnbuf[2000];
-  event_notification_t notification;
-  address_tuple_t tuple;
-  struct timeval now;
-
-  gettimeofday(&now,0);
-
-  tuple = address_tuple_alloc();
-  if (tuple == NULL) {
-    lerror("could not allocate an address tuple");
-    return;
-  }
-
-  /*
-   * Setup tuple to send profile alert
-   */
-  tuple->host	   = ADDRESSTUPLE_ANY;
-  tuple->site      = ADDRESSTUPLE_ANY;
-  tuple->group     = ADDRESSTUPLE_ANY;
-  tuple->expt      = parms->pideid;
-  tuple->objtype   = TBDB_OBJECTTYPE_CANARYD;
-  tuple->objname   = "canaryd";
-  tuple->eventtype = TBDB_EVENTTYPE_ALERT;
-
-  /* Generate the event */
-  notification = event_notification_alloc(parms->ev_handle, tuple);
-	
-  if (notification == NULL) {
-    lnotice("could not allocate notification");
-    return;
-  }
-
-  strcpy(vnbuf, "vnodes=");
-  vnbufsiz=7;
-
-  /* add vnode info, if necessary */
-  for (i = 0; pkt->vnodes[i].hname; ++i) {
-    sprintf(minibuf, "%s,", pkt->vnodes[i].hname);
-    minibufsiz = strlen(minibuf);
-    if (vnbufsiz + minibufsiz > sizeof(vnbuf)) {
-      lerror("vnbuf not big enough to hold all content!");
-      abort();
-    }
-    strcat(vnbuf, minibuf);
-    vnbufsiz += minibufsiz;
-  }
-  vnbuf[vnbufsiz-1] = '\0';
-
-  event_notification_set_arguments(parms->ev_handle, notification, vnbuf);
-  
-  if (event_schedule(parms->ev_handle, notification, &now) == 0) {
-    lnotice("could not send test event notification");
-  }
-
-  if (opts->debug) {
-    printf("** Alert event sent **\n");
-  }
-
-  event_notification_free(parms->ev_handle, notification);
-  address_tuple_free(tuple);
-  return;
-}
-
-  
-
-int SETRANGE(char *token, RANGE *range) {
-  char *tok = token;
-  char *ebp;
-
-  range->min = strtod(tok, &ebp);
-  if (ebp == tok) {
-    lnotice("bad data in numeric conversion");
-    goto bad;
-  }
-  if (*ebp != ',') {
-    lnotice("unexpected/missing separator in range");
-    goto bad;
-  }
-  tok = ebp+1;
-  range->max = strtod(tok, &ebp);
-  if (ebp == tok) {
-    lnotice("bad data in numeric conversion");
-    goto bad;
-  }
-
-  if (opts->debug) {
-    printf("range min/max: %.03f/%.03f\n", range->min, range->max);
-  }
-  return 1;
-
- bad:
-  range->min = 0;
-  range->max = 0;
-  return 0;
-}
-
-#define EVARGSEPS " \t"
-
-void parse_ev_args(char *args) {
-
-  int i;
-  char *tok;
-
-  tok = strtok(args, EVARGSEPS);
-  do {
-    if (tok && *tok) {
-      if (opts->debug) {
-        printf("ev arg token: %s\n", tok);
-      }
-      for(i = 0; i < NUMRANGES; ++i) {
-        if (strstr(tok, evargitems[i].key)) {
-          tok += strlen(evargitems[i].key)+1;
-          if (! SETRANGE(tok, &parms->olr[i])) goto bad;
-          break;
-        }
-      }
-      if (i == NUMRANGES) {
-        lnotice("Unknown token in args list");
-        goto bad;
-      }
-    }
-  } while ((tok = strtok(NULL, EVARGSEPS)) != NULL);
-
-  parms->ol_detect = 1;
-  return;
-
- bad:
-  lnotice("Problem encountered while parsing event args");
-  parms->ol_detect = 0;
-  return;
-}
-
-
-int send_pkt(CANARYD_PACKET *pkt) {
-
-  int i, numsent, retval = 1;
-  static char pktbuf[8192];
-  static char minibuf[128];
-  int pktbufsiz, minibufsiz;
-  struct timeval now;
-
-  /* Get current time. */
-  gettimeofday(&now, NULL);
-
-  /* flatten data into packet buffer */
-  sprintf(pktbuf, "vers=%s stamp=%lu,%lu lave=%.10f,%.10f,%.10f ovld=%u cpu=%u mem=%u,%u disk=%u netmem=%u,%u,%u ",
-          CDPROTOVERS,
-          now.tv_sec,
-          now.tv_usec,
-          pkt->loadavg[0],
-          pkt->loadavg[1],
-          pkt->loadavg[2],
-          pkt->overload,
-          pkt->olmet[PCTCPU],
-          pkt->olmet[PCTMEM],
-          pkt->olmet[PGOUT],
-          pkt->olmet[PCTDISK],
-          pkt->olmet[PCTNETMEM],
-          pkt->olmet[NETMEMWAITS],
-          pkt->olmet[NETMEMDROPS]);
-
-  pktbufsiz = strlen(pktbuf);
-  
-  /* get all the interfaces too */
-  for (i = 0; i < pkt->ifcnt; ++i) {
-    sprintf(minibuf, "iface=%s,%lu,%lu,%llu,%llu ",
-            pkt->ifaces[i].addr,
-            pkt->ifaces[i].ipkts,
-            pkt->ifaces[i].opkts,
-            pkt->ifaces[i].ibytes,
-            pkt->ifaces[i].obytes);
-    minibufsiz = strlen(minibuf);
-    if (pktbufsiz + minibufsiz + 1 > sizeof(pktbuf)) {
-      lerror("pktbuf not big enough to hold all content!");
-      abort();
-    }
-    strcat(pktbuf, minibuf);
-    pktbufsiz += minibufsiz;
-  }
-
-  /* add vnode info, if necessary */
-  for (i = 0; pkt->vnodes[i].hname; ++i) {
-    sprintf(minibuf, "vnode=%s,%.1f,%.1f ",
-            pkt->vnodes[i].hname,
-            pkt->vnodes[i].cpu,
-            pkt->vnodes[i].mem);
-    minibufsiz = strlen(minibuf);
-    if (pktbufsiz + minibufsiz + 1 > sizeof(pktbuf)) {
-      lerror("pktbuf not big enough to hold all content!");
-      abort();
-    }
-    strcat(pktbuf, minibuf);
-    pktbufsiz += minibufsiz;
-  }
-
-
-  if (opts->debug) {
-    printf("packet: %s\n", pktbuf);
-    printf("packet len: %d\n", pktbufsiz);
-  }
-  
-  /* send it */
-  else {
-    if (opts->log) {
-      fputs(pktbuf, parms->log);
-      fputs("\n", parms->log);
-      fflush(parms->log);
-      if (ferror(parms->log)) {
-        lwarn("Error on log file stream");
-      }
-    }
-    else {
-      if ((numsent = send(parms->sd, pktbuf, pktbufsiz+1, 0)) < 0) {
-        lerror("Problem sending canaryd packet");
-        retval = 0;
-      }
+void ceEventCallback(event_handle_t handle,
+		     event_notification_t en, 
+		     void *data)
+{
+    char buf[MAXIDX][128]; /* XXX: bad magic */
+    int len = 128;
+    struct timeval now;
+    static int ecount;
     
-      else if (numsent < pktbufsiz+1) {
-        lwarn("Warning!  Canaryd packet truncated");
-        retval = 0;
-      }
+    bzero(buf, sizeof(buf));
+    
+    event_notification_get_site(handle, en, buf[SITEIDX], len);
+    event_notification_get_expt(handle, en, buf[EXPTIDX], len);
+    event_notification_get_group(handle, en, buf[GROUPIDX], len);
+    event_notification_get_host(handle, en, buf[HOSTIDX], len);
+    event_notification_get_objtype(handle, en, buf[OBJTYPEIDX], len);
+    event_notification_get_objname(handle, en, buf[OBJNAMEIDX], len);
+    event_notification_get_eventtype(handle, en, buf[EVTYPEIDX], len);
+    event_notification_get_arguments(handle, en, buf[ARGSIDX], len);
+    
+    if( canaryd_data.cd_Flags & CDF_DEBUG )
+    {
+	gettimeofday(&now, NULL);
+	fprintf(stderr,"Event %d: %lu.%03lu %s %s %s %s %s %s %s %s\n",
+		++ecount, now.tv_sec, now.tv_usec / 1000,
+		buf[SITEIDX], buf[EXPTIDX], buf[GROUPIDX],
+		buf[HOSTIDX], buf[OBJTYPEIDX], buf[OBJNAMEIDX], 
+		buf[EVTYPEIDX], buf[ARGSIDX]);
     }
-  }
+    
+    if( strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_START) == 0 )
+    {
+	char *pair, *cursor = buf[ARGSIDX];
 
-  return retval;
-}
+	/* XXX Move this initialization elsewhere. */
+	canaryd_data.cd_StopTime.tv_sec = LONG_MAX;
+	canaryd_data.cd_StopTime.tv_usec = LONG_MAX;
 
-int process_ps(char *psln, void *data) {
+	/* Parse the arguments and */
+	while( (pair = strsep(&cursor, " \t")) != NULL )
+	{
+	    char *key_end;
 
-  VPROCENT *proctab = (VPROCENT*)data;
-  int i;
-  int pid;
-  float cpu, mem;
-  char *eptr;
+	    if( strlen(pair) == 0 )
+	    {
+		/* Empty argument, no reason to complain. */
+	    }
+	    else if( (key_end = strchr(pair, '=')) == NULL )
+	    {
+		/* Poorly formed argument, complain. */
+		lwarn("Bad START event argument");
+	    }
+	    else if( strncasecmp(pair, "duration", (key_end - pair)) == 0 )
+	    {
+		struct timeval duration;
 
-  /* skip label line */
-  if ((strtod(psln, &eptr) == 0) && (eptr == psln)) {
-    return 0;
-  }
+		duration.tv_usec = 0;
+		if( sscanf(key_end + 1, "%ld", &duration.tv_sec) == 0 )
+		{
+		    lwarn("Duration is not an integer.");
+		}
+		else
+		{
+		    timeradd(&canaryd_data.cd_CurrentTime,
+			     &duration,
+			     &canaryd_data.cd_StopTime);
+		}
+	    }
+	    else
+	    {
+		/* Unknown key... */
+		lwarn("Unknown key passed to START event");
+	    }
+	}
 
-  sscanf(psln, "%u %f %f", &pid, &cpu, &mem);
-
-  for (i = 0; proctab[i].hname; ++i) {
-    if (proctab[i].pid == pid) {
-      break;
+	/* ... start tracing again. */
+	cdStartTracing(CANARYD_LOG); // XXX Let the user specify the log file.
     }
-  }
-
-  if (proctab[i].hname) {
-    proctab[i].cpu = cpu;
-    proctab[i].mem = mem;
-  }
-
-  return 0;
-}
-  
-void get_vnode_stats (CANARYD_PACKET *pkt) {
-
-  int i;
-  DIR *pfsdir;
-  struct dirent *procent;
-  FILE *procfile;
-  char sfilename[MAXPATHLEN];
-  char statbuf[MAXLINELEN];
-  static VPROCENT proctab[MAXPROCNUM];
-  unsigned int pid;
-  char hname[MAXHOSTNAMELEN];
-  char *endlptr;
-  char *psprog[] = {"ps", "ax", "-o", "pid,%cpu,%mem", NULL};
-
-  for (i = 0; pkt->vnodes[i].hname; ++i) {
-    pkt->vnodes[i].cpu = 0;
-    pkt->vnodes[i].mem = 0;
-  }
-
-  /* Iterate over the /proc entries, looking for jailed nodes.
-     Once found, we grab their usage stats and pack them up to
-     be sent back.
-  */
-  if ((pfsdir = opendir("/proc")) < 0) {
-    lerror("Problem opening /proc");
-    return;
-  }
-
-  i = 0;
-  while ((procent = readdir(pfsdir)) != NULL) {
-    if (!strcmp(procent->d_name, "curproc") ||
-        (procent->d_name[0] == '.')) {
-      continue;
+    else if( strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_STOP) == 0 )
+    {
+	cdStopTracing();
     }
-
-    snprintf(sfilename, sizeof(sfilename), "/%s/%s/%s", 
-             "proc", 
-             procent->d_name,
-             "status");
-
-    if ((procfile = fopen(sfilename, "r")) == NULL) {
-      lerror("problem opening process file entry");
-      continue;
+    else if( strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_RESET) == 0 )
+    {
+	/* set_default_overload_params(); */
     }
-
-    fgets(statbuf, sizeof(statbuf), procfile);
-    fclose(procfile);
-    sscanf(statbuf, "%*s %u %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %*s %s",
-           &pid, hname);
-    endlptr = strchr(hname, '\n');
-    if (endlptr) {
-      *endlptr = '\0';
+    else if( strcmp(buf[EVTYPEIDX], TBDB_EVENTTYPE_REPORT) == 0 )
+    {
     }
-
-    if (!strcmp(hname, "-")) {
-      continue;
+    else
+    {
+	lnotice("Unknown event type received.");
     }
-
-    proctab[i].pid = pid;
-    proctab[i].hname = strdup(hname);
-    proctab[i].cpu = 0;
-    proctab[i].mem = 0;
-    i++;
-  }
-
-  closedir(pfsdir);
-  procpipe(psprog, process_ps, (void*)proctab);
-  
-  for (i = 0; proctab[i].hname; ++i) {
-    int j;
-
-    for (j = 0; pkt->vnodes[j].hname; ++j) {
-      if (!strcmp(pkt->vnodes[j].hname, proctab[i].hname)) {
-        break;
-      }
-    }
-
-    if (!pkt->vnodes[j].hname) {
-      pkt->vnodes[j].hname = strdup(proctab[i].hname);
-      parms->numvnodes++;
-    }
-    pkt->vnodes[j].cpu += proctab[i].cpu;
-    pkt->vnodes[j].mem += proctab[i].mem;
-    free(proctab[i].hname);
-    proctab[i].hname = NULL;
-  }
-
-  return;
-}
-
-void get_vmem_stats(CANARYD_PACKET *pkt) {
-
-  int *pres;
-
-  pkt->olmet[PCTCPU] = getcpubusy();
-  pres = getmembusy(getmempages());
-  pkt->olmet[PGOUT] = pres[0];
-  pkt->olmet[PCTMEM] = pres[1];
-  pkt->olmet[PCTDISK] = getdiskbusy();
-  pres = getnetmembusy();
-  pkt->olmet[PCTNETMEM] = pres[0];
-  pkt->olmet[NETMEMWAITS] = pres[1];
-  pkt->olmet[NETMEMDROPS] = pres[2];
-
-  return;
-}
-
-void check_overload(CANARYD_PACKET *pkt) {
-
-  int i;
-  
-  pkt->overload = 0;
-  for (i = 0; i < NUMRANGES; ++i) {
-    if (pkt->olmet[i] > (int)parms->olr[i].max) {
-      pkt->overload = 1;
-    }
-  }
-}
-
-void get_load(CANARYD_PACKET *pkt) {
-
-  int retval;
-
-  if ((retval = getloadavg(pkt->loadavg, 3)) < 0 || retval < 3) {
-    lerror("unable to obtain load averages");
-    pkt->loadavg[0] = pkt->loadavg[1] = pkt->loadavg[2] = -1;
-  }
-  else if (opts->debug) {
-    printf("load averages: %f, %f, %f\n", pkt->loadavg[0], pkt->loadavg[1], 
-           pkt->loadavg[2]);
-  }
-  return;
-}
-
-
-void get_packet_counts(CANARYD_PACKET *pkt) {
-
-  int i;
-  char *niprog[] = {"netstat", NETSTAT_ARGS, NULL};
-
-  pkt->ifcnt = 0;
-  if (procpipe(niprog, &get_counters, (void*)pkt)) {
-    lwarn("Netinfo exec failed.");
-    pkt->ifcnt = 0;
-  }
-  else if (opts->debug) {
-    for (i = 0; i < pkt->ifcnt; ++i) {
-      printf("IFACE: %s  ipkts: %lu  opkts: %lu ibytes: %llu obytes: %llu\n", 
-             pkt->ifaces[i].ifname, 
-             pkt->ifaces[i].ipkts,
-             pkt->ifaces[i].opkts,
-             pkt->ifaces[i].ibytes,
-             pkt->ifaces[i].obytes);
-    }
-  }
-  return;
-}
-
-int get_counters(char *buf, void *data) {
-
-  CANARYD_PACKET *pkt = (CANARYD_PACKET*)data;
-#ifdef __linux__
-  struct ifreq ifr;
-  bzero(&ifr, sizeof(struct ifreq));
-#endif
-
-  if (pkt->ifcnt < MAXNUMIFACES
-      && !strstr(buf, "lo")
-#ifdef __FreeBSD__
-      && !strstr(buf, "*")
-      && strstr(buf, "<Link"))
-#endif
-#ifdef __linux__
-      && strstr(buf, "eth"))
-#endif
-  {
-
-    if (sscanf(buf, CNTFMTSTR,
-               pkt->ifaces[pkt->ifcnt].ifname,
-#ifdef __FreeBSD__
-               pkt->ifaces[pkt->ifcnt].addr,
-#endif
-               &pkt->ifaces[pkt->ifcnt].ipkts,
-               &pkt->ifaces[pkt->ifcnt].ibytes,               
-               &pkt->ifaces[pkt->ifcnt].opkts,
-               &pkt->ifaces[pkt->ifcnt].obytes)  != NUMSCAN) {
-      lwarn("scan of netstat line failed!");
-      return -1;
-    }
-#if 0
-    { 
-      struct in_addr iaddr;
-      if (inet_pton(AF_INET, pkt->ifaces[pkt->ifcnt].addr, &iaddr) != 1) {
-        if (opts->debug) {
-          printf("failed to convert addr to inet addr\n");
-        }
-        return 0;
-      }
-    }
-#endif
-#ifdef __linux__
-    strcpy(ifr.ifr_name, pkt->ifaces[pkt->ifcnt].ifname);
-    if (ioctl(parms->ifd, SIOCGIFHWADDR, &ifr) < 0) {
-      perror("error getting HWADDR");
-      return -1;
-    }
-
-    strcpy(pkt->ifaces[pkt->ifcnt].addr, 
-           ether_ntoa((struct ether_addr*)&ifr.ifr_hwaddr.sa_data[0]));
-
-    if (opts->debug) {
-      printf("macaddr: %s\n", pkt->ifaces[pkt->ifcnt].addr);
-    }
-#endif
-    pkt->ifcnt++;
-  }
-  return 0;
-}
-
-
-/* XXX change to combine last return value of procfunc with exec'ed process'
-   exit status & write macros for access.
-*/
-int procpipe(char *const prog[], int (procfunc)(char*,void*), void* data) {
-
-  int fdes[2], retcode, cpid, status;
-  char buf[MAXLINELEN];
-  FILE *in;
-
-  if ((retcode=pipe(fdes)) < 0) {
-    lerror("Couldn't alloc pipe");
-  }
-  
-  else {
-    switch ((cpid = fork())) {
-    case 0:
-      close(fdes[0]);
-      dup2(fdes[1], STDOUT_FILENO);
-      if (execvp(prog[0], prog) < 0) {
-        lerror("Couldn't exec program");
-        exit(1);
-      }
-      break;
-      
-    case -1:
-      lerror("Error forking child process");
-      close(fdes[0]);
-      close(fdes[1]);
-      retcode = -1;
-      break;
-      
-    default:
-      close(fdes[1]);
-      in = fdopen(fdes[0], "r");
-      while (!feof(in) && !ferror(in)) {
-        if (fgets(buf, sizeof(buf), in)) {
-          if ((retcode = procfunc(buf, data)) < 0)  break;
-        }
-      }
-      fclose(in);
-      wait(&status);
-      if (retcode > -1)  retcode = WEXITSTATUS(status);
-      break;
-    } /* switch ((cpid = fork())) */
-  }
-  return retcode;
 }
