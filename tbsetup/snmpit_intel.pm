@@ -26,15 +26,15 @@ my %cmdOIDs =
 (
     "enable" => ["ifAdminStatus","up"],
     "disable"=> ["ifAdminStatus","down"],
-    "100mbit"=> ["portConfConfigAutoNeg","disable",
-		 "portConfConfigSpeed","speed100Mbit"],
-    "10mbit" => ["portConfConfigAutoNeg","disable",
-		 "portConfConfigSpeed","speed10Mbit"],
-    "full"   => ["portConfConfigAutoNeg","disable",
-		 "portConfConfigDuplex","full"],
-    "half"   => ["portConfConfigAutoNeg","disable",
-		 "portConfConfigDuplex","half"],
-    "auto"   => ["portConfConfigAutoNeg","enable"]
+    "100mbit"=> [".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1","disable",
+		 ".1.3.6.1.4.1.343.6.10.2.4.1.10.1.1","speed100Mbit"],
+    "10mbit" => [".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1","disable",
+		 ".1.3.6.1.4.1.343.6.10.2.4.1.10.1.1","speed10Mbit"],
+    "full"   => [".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1","disable",
+		 ".1.3.6.1.4.1.343.6.10.2.4.1.11.1.1","full"],
+    "half"   => [".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1","disable",
+		 ".1.3.6.1.4.1.343.6.10.2.4.1.11.1.1","half"],
+    "auto"   => [".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1","enable"]
 );
 
 
