@@ -1891,7 +1891,7 @@ foreach $vnodeport (keys(%portmap)) {
 	printdb("IP: $pnode:$pport $ip (veth)\n");
 
 	DBQueryFatal("insert into veth_interfaces ".
-		     "(node_id, veth_id, mac, IP, iface, vnode) ".
+		     "(node_id, veth_id, mac, IP, iface, vnode_id) ".
 		     "values ('$pnode', 0, '$mac', '$ip', '$pport', $vvnode)");
     }
     else {
