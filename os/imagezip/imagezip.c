@@ -100,6 +100,41 @@ static inline int devread(int fd, void *buf, size_t size)
 }
 #endif
 
+/*
+ * Wrap up write in a retry mechanism to protect against transient NFS
+ * errors causing a fatal error. 
+ */
+ssize_t
+mywrite(int fd, const void *buf, size_t nbytes)
+{
+	int		cc, i, count = 0;
+
+	while (nbytes) {
+		int	maxretries = 10;
+
+		for (i = 0; i < maxretries; i++) {
+			cc = write(fd, buf, nbytes);
+
+			if (cc > 0) {
+				nbytes -= cc;
+				buf    += cc;
+				count  += cc;
+				goto again;
+			}
+
+			if (i == 0)
+				perror("write error: will retry");
+
+			sleep(1);
+		}
+		perror("write error: busted for too long");
+		fflush(stderr);
+		exit(1);
+	again:
+	}
+	return count;
+}
+
 /* Map partition number to letter */
 #define BSDPARTNAME(i)       ("ABCDEFGHIJK"[(i)])
 
@@ -1097,7 +1132,7 @@ compress_image(void)
 			perror("seeking back to block header offset");
 			exit(1);
 		}
-		if ((cc = write(outfd, buf, sizeof(buf))) < 0) {
+		if ((cc = mywrite(outfd, buf, sizeof(buf))) < 0) {
 			perror("writing subblock header and regions");
 			exit(1);
 		}
@@ -1248,7 +1283,7 @@ compress_image(void)
 			perror("seeking back to block header offset");
 			exit(1);
 		}
-		if ((cc = write(outfd, buf, sizeof(buf))) < 0) {
+		if ((cc = mywrite(outfd, buf, sizeof(buf))) < 0) {
 			perror("writing subblock header and regions");
 			exit(1);
 		}
@@ -1309,7 +1344,7 @@ compress_image(void)
 			perror("seeking back to block header offset");
 			exit(1);
 		}
-		if ((cc = write(outfd, buf, sizeof(buf))) < 0) {
+		if ((cc = mywrite(outfd, buf, sizeof(buf))) < 0) {
 			perror("writing subblock header and regions");
 			exit(1);
 		}
@@ -1354,7 +1389,7 @@ compress_image(void)
 		blkhdr->blockindex = i;
 		blkhdr->blocktotal = count;
 		
-		if ((cc = write(outfd, buf, sizeof(struct blockhdr))) < 0) {
+		if ((cc = mywrite(outfd, buf, sizeof(struct blockhdr))) < 0) {
 			perror("writing new subblock header");
 			exit(1);
 		}
@@ -1469,7 +1504,7 @@ compress_chunk(off_t size, int *partial, unsigned long *subblksize)
 		}
 		count = BSIZE - d_stream.avail_out;
 
-		if ((cc = write(outfd, outbuf, count)) < 0) {
+		if ((cc = mywrite(outfd, outbuf, count)) < 0) {
 			perror("writing output file");
 			exit(1);
 		}
@@ -1532,7 +1567,7 @@ compress_finish(unsigned long *subblksize)
 	 */
 	count = BSIZE - d_stream.avail_out;
 	if (count) {
-		if ((cc = write(outfd, outbuf, count)) < 0) {
+		if ((cc = mywrite(outfd, outbuf, count)) < 0) {
 			perror("writing output file");
 			exit(1);
 		}
@@ -1558,7 +1593,7 @@ compress_finish(unsigned long *subblksize)
 		else
 			count = subblockleft;
 			
-		if ((cc = write(outfd, outbuf, count)) < 0) {
+		if ((cc = mywrite(outfd, outbuf, count)) < 0) {
 			perror("writing output file");
 			exit(1);
 		}
