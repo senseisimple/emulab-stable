@@ -16,7 +16,7 @@
 if [ -r /etc/emulab/paths.sh ]; then
 	. /etc/emulab/paths.sh
 else
-	BINDIR=/etc/rc.d/testbed
+	BINDIR=/etc/testbed
 fi
 
 # Grotesque sed/awk converts IP addrs into an integer for sysctl
