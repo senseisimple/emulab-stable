@@ -520,6 +520,14 @@ else {
     $action = "placed";
 }
 
+$total_cost = 0.0;
+if ($num_mobos) {
+    $total_cost += ($num_mobos * $mobo_price);
+}
+if ($num_dboards) {
+    $total_cost += ($num_dboards * $dboard_price);
+}
+
 #
 # Send email to someone.
 # 
@@ -535,6 +543,7 @@ TBMAIL("$usr_name <$usr_email>",
        "Affiliation:     $usr_affil\n".
        "#Motherboards:   $num_mobos\n".
        "#Daughterboards: $num_dboards\n".
+       "Total Cost:      $total_cost\n".
        "Intended Use:\n".
        "$intended_use\n".
        "Comments:\n".
