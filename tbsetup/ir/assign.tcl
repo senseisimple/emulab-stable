@@ -19,7 +19,7 @@ if {[file dirname [info script]] == "."} {
 } else {
     set updir [file dirname [file dirname [info script]]]
 }
-if {[file exists $updir/../assign]} {
+if {[file exists $updir/../assign/assign]} {
     set assign "$updir/../assign/assign"
 } else {
     set assign "$updir/lib/assign"

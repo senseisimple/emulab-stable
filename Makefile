@@ -49,8 +49,8 @@ install: all
 	install -c tbsetup/tbrun.tcl /usr/testbed/bin/tbrun
 	install -c tbsetup/vpower /usr/testbed/bin
 	install -c tbsetup/vsnmpit /usr/testbed/bin
-	cp -r tbsetup /usr/testbed/lib/tbsetup
-	cp -r db /usr/testbed/lib/db
+	cp -rf tbsetup /usr/testbed/lib/tbsetup
+	cp -rf db /usr/testbed/lib/db
 	install -c assign/assign /usr/testbed/lib/assign
 	@$(MAKE) -C tbsetup/checkpass install
 
