@@ -218,13 +218,16 @@ foreach my $option (keys(%controls)) {
 
     if ($needs_osselect) {
 	# Don't set osselect fields directly in nodes table
-	my $str = ( $debug ? "-d " : "").
-	  ( $physdbkey =~ /^next_/ ? "-1 " : "" ).
-	    ( $physdbkey =~ /pxe_boot_/ ? "-m " : "").
-	      ( $physdbkey =~ /^(def)|(next)_boot_path/ ? "-p " : "").
-		"$value";
-	if ($debug) { print "$option=$value made osselect str='$str'\n"; }
-	push(@osselect_params, $str);
+        if ($value ne "") {
+	  # Make sure we ignore blanks, since osselect needs an OSID
+	  my $str = ( $debug ? "-d " : "").
+	    ( $physdbkey =~ /^next_/ ? "-1 " : "" ).
+	      ( $physdbkey =~ /pxe_boot_/ ? "-m " : "").
+		( $physdbkey =~ /^((def)|(next))_boot_path/ ? "-p " : "").
+		  "$value";
+	  if ($debug) { print "$option=$value ($physdbkey) made osselect str='$str'\n"; }
+	  push(@osselect_params, $str);
+	}
     } else {
 	if (defined($physnodes_updatestr)) {
 	    $physnodes_updatestr = "$physnodes_updatestr, $physdbkey='$value'";
