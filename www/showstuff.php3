@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -233,7 +233,7 @@ function SHOWGROUP($pid, $gid) {
 #
 # A list of Group members.
 #
-function SHOWGROUPMEMBERS($pid, $gid) {
+function SHOWGROUPMEMBERS($pid, $gid, $prived = 0) {
     $query_result =
 	DBQueryFatal("SELECT m.*,u.* FROM group_membership as m ".
 		     "left join users as u on u.uid=m.uid ".
@@ -242,23 +242,30 @@ function SHOWGROUPMEMBERS($pid, $gid) {
     if (! mysql_num_rows($query_result)) {
 	return;
     }
+    $showdel = (($prived && !strcmp($pid, $gid)) ? 1 : 0);
 
-    echo "<center>
-          <h3>Group Members</h3>
-          </center>
+    echo "<center>\n";
+    if (strcmp($pid, $gid)) {
+	echo "<h3>Group Members</h3>\n";
+    }
+    else {
+	echo "<h3>Project Members</h3>\n";
+    }
+    echo "</center>
           <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
               <th>Name</th>
               <th>UID</th>
-              <th>Privs</th>
-              <th>Approved?</th>
-          </tr>\n";
+              <th>Privs</th>\n";
+    if ($showdel) {
+	echo "<th>Remove</th>\n";
+    }
+    echo "</tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
         $target_uid = $row[uid];
 	$usr_name   = $row[usr_name];
-	$status     = $row[status];
 	$trust      = $row[trust];
 
         echo "<tr>
@@ -266,17 +273,19 @@ function SHOWGROUPMEMBERS($pid, $gid) {
                   <td>
                     <A href='showuser.php3?target_uid=$target_uid'>
                        $target_uid</A>
-                  </td>
-                  <td>$trust</td>\n";
-	    
-	if (strcmp($status, "active") == 0 ||
-	    strcmp($status, "unverified") == 0) {
-	    echo "<td align=center>
-                      <img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+                  </td>\n";
+	
+	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
+	    echo "<td>$trust</td>\n";
 	}
 	else {
+	    echo "<td><font color=red>$trust</font></td>\n";
+	}
+	if ($showdel) {
 	    echo "<td align=center>
-                      <img alt=\"N\" src=\"redball.gif\"></td>\n";
+		      <A href='deleteuser.php3?target_uid=$target_uid";
+	    echo         "&target_pid=$pid'>
+                         <img alt=N src=redball.gif></td>\n";
 	}
 	echo "</tr>\n";
     }

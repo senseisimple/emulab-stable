@@ -94,49 +94,7 @@ if (mysql_num_rows($query_result)) {
 #
 # A list of project members (from the default group).
 #
-$query_result =
-    DBQueryFatal("SELECT m.*,u.* FROM group_membership as m ".
-		 "left join users as u on u.uid=m.uid ".
-		 "WHERE pid='$pid' and gid='$pid' order by u.uid");
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Project Members</h3>
-          </center>
-          <table align=center border=1>\n";
-
-    echo "<tr>
-              <th>Name</th>
-              <th>UID</th>
-              <th>Privs</th>
-              <th>Approved?</th>
-          </tr>\n";
-
-    while ($row = mysql_fetch_array($query_result)) {
-        $target_uid = $row[uid];
-	$usr_name   = $row[usr_name];
-	$trust      = $row[trust];
-
-        echo "<tr>
-                  <td>$usr_name</td>
-                  <td>
-                    <A href='showuser.php3?target_uid=$target_uid'>
-                       $target_uid</A>
-                  </td>
-                  <td>$trust</td>\n";
-
-	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
-	    echo "<td align=center>
-                      <img alt=\"Y\" src=\"greenball.gif\"></td>\n";
-	}
-	else {
-	    echo "<td align=center>
-                      <img alt=\"N\" src=\"redball.gif\"></td>\n";
-	}
-	echo "</tr>\n";
-    }
-
-    echo "</table>\n";
-}
+SHOWGROUPMEMBERS($pid, $pid, 0);
 
 #
 # A list of project Groups (if more than just the default).
