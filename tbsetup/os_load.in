@@ -10,6 +10,10 @@ use English;
 use Getopt::Std;
 use File::stat;
 
+# Be careful not to exit on transient error - this script is in the 'critical
+# path' for reload_daemon, so we want to give it the same retries as the daemon
+$libdb::DBQUERY_MAXTRIES = 30;
+
 # XXX boss.emulab.net and users.emulab.net wired in.
 #     wd0 wired in. Should come from node_types table in DB
 
