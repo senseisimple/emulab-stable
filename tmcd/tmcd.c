@@ -161,16 +161,6 @@ struct command {
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
-/* 
- * Simple struct used to make a linked list of ifaces
- */
-struct node_interface {
-	char *iface;
-	struct node_interface *next;
-};
-
-int	directly_connected(struct node_interface *interfaces, char *iface);
-
 char *usagestr = 
  "usage: tmcd [-d] [-p #]\n"
  " -d              Turn on debugging. Multiple -d options increase output\n"
@@ -291,10 +281,21 @@ main(int argc, char **argv)
 	}
 	memcpy((char *)&myipaddr, he->h_addr, he->h_length);
 
-	if (makesockets(portnum, &udpsock, &tcpsock) < 0 ||
-	    makesockets(TBSERVER_PORT2, &altudpsock, &alttcpsock) < 0) {
+	/*
+	 * If we were given a port on the command line, don't open the 
+	 * alternate ports
+	 */
+	if (portnum != TBSERVER_PORT) {
+	    if (makesockets(portnum, &udpsock, &tcpsock) < 0) {
 		error("Could not make sockets!");
 		exit(1);
+	    }
+	} else {
+	    if (makesockets(portnum, &udpsock, &tcpsock) < 0 ||
+		makesockets(TBSERVER_PORT2, &altudpsock, &alttcpsock) < 0) {
+		    error("Could not make sockets!");
+		    exit(1);
+	    }
 	}
 
 	signal(SIGTERM, cleanup);
@@ -322,10 +323,10 @@ main(int argc, char **argv)
 			int which = 0;
 			if (!foo[1])
 				which = 1;
-			else if (! foo[2])
-				which = 2;
-			else if (! foo[3])
-				which = 3;
+		//	else if (! foo[2])
+		//		which = 2;
+		//	else if (! foo[3])
+		//		which = 3;
 			
 			if ((pid = fork()) < 0) {
 				errorc("forking server");
@@ -1482,8 +1483,10 @@ COMMAND_PROTOTYPE(dohosts)
 	char		buf[MYBUFSIZE];
 	char		pid[TBDB_FLEN_PID];
 	char		eid[TBDB_FLEN_EID], gid[TBDB_FLEN_GID];
+	char		nickname[128];
 	int		nrows;
 	int		rv = 0;
+	int		nroutes, i;
 
 	/*
 	 * We build up a canonical host table using this data structure.
@@ -1491,6 +1494,7 @@ COMMAND_PROTOTYPE(dohosts)
 	 * though for each node, to allow us to compute the aliases.
 	 */
 	struct shareditem {
+	    	int	hasalias;
 		char	*firstvlan;	/* The first vlan to another node */
 	};
 	struct hostentry {
@@ -1498,17 +1502,28 @@ COMMAND_PROTOTYPE(dohosts)
 		char	vname[TBDB_FLEN_VNAME];
 		char	vlan[TBDB_FLEN_VNAME];
 		int	virtiface;
-		int	connected;
 		struct in_addr	  ipaddr;
 		struct shareditem *shared;
 		struct hostentry  *next;
 	} *hosts = 0, *host;
 
 	/*
+	 * We store all routes for this node in this structure 
+	 */
+	struct routeentry {
+		struct in_addr	dst;
+		struct in_addr	dst_mask;
+		int		dst_type;
+	} *routes = 0, *route;
+
+	/*
 	 * Now check reserved table
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
+
+	if (nodeidtonickname(nodeid, nickname))
+		strcpy(nickname, nodeid);
 
 	/*
 	 * Now use the virt_nodes table to get a list of all of the
@@ -1650,7 +1665,6 @@ COMMAND_PROTOTYPE(dohosts)
 				    (!tmphost->shared->firstvlan ||
 				     !strcmp(tmphost->vlan,
 					     tmphost->shared->firstvlan))) {
-					tmphost->connected = 1;
 					
 					/*
 					 * Use as flag to ensure only first
@@ -1677,6 +1691,46 @@ COMMAND_PROTOTYPE(dohosts)
 		host = host->next;
 	}
 #endif
+
+	/*
+	 * Get a list of all routes for this host, to be used in creating
+	 * aliases for non-directly connected nodes.
+	 */
+	res = mydb_query("select dst, dst_type, dst_mask from virt_routes "
+			 "where pid='%s' and eid='%s' and vname='%s'"
+			 "order by dst",
+			 3, pid, eid, nickname);
+	if (!res) {
+	    error("HOSTNAMES: %s: DB Error getting routes!\n",
+		    nodeid);
+	    return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+	if (!(routes = (struct routeentry*)
+		(malloc(nrows * sizeof(struct routeentry))))) {
+	    error("HOSTNAMES: Out of memory!\n");
+	    exit(1);
+	}
+	nroutes = nrows;
+	route = routes;
+
+	while (nrows--) {
+	    row = mysql_fetch_row(res);
+	    inet_aton(row[0],&(route->dst));
+	    if (!strcmp(row[1],"host")) {
+		route->dst_type = 0;
+	    } else {
+		/*
+		 * Only bother with the mask if it's a subnet route
+		 */
+		route->dst_type = 1;
+		inet_aton(row[2],&(route->dst_mask));
+	    }
+	    route++;
+	}
+	mysql_free_result(res);
+
 	/*
 	 * Okay, spit the entries out!
 	 */
@@ -1687,9 +1741,33 @@ COMMAND_PROTOTYPE(dohosts)
 		if ((host->shared->firstvlan &&
 		     !strcmp(host->shared->firstvlan, host->vlan)) ||
 		    /* First interface on this node gets an alias */
-		    (!strcmp(host->nodeid, nodeid) && !host->virtiface))
+		    (!strcmp(host->nodeid, nodeid) && !host->virtiface)) {
 			alias = host->vname;
+		} else if (!host->shared->firstvlan && !host->shared->hasalias) {
 		
+		    /*
+		     * Check for routes to this node, if it isn't directly
+		     * connected, and doesn't already have an alias
+		     */
+		    for (i = 0; i < nroutes; i++) {
+			if (routes[i].dst_type == 0) { /* Host route */
+			    if (routes[i].dst.s_addr == host->ipaddr.s_addr) {
+				alias = host->vname;
+				host->shared->hasalias = 1;
+				break;
+			    }
+			} else { /* Net route */
+			    if ((host->ipaddr.s_addr &
+					routes[i].dst_mask.s_addr)
+				    == routes[i].dst.s_addr) {
+				alias = host->vname;
+				host->shared->hasalias = 1;
+				break;
+			    }
+			}
+		    }
+		}
+
 		/* Old format */
 		if (vers == 2) {
 			sprintf(buf,
@@ -1716,6 +1794,7 @@ COMMAND_PROTOTYPE(dohosts)
 		free(host);
 		host = tmphost;
 	}
+	free(routes);
 	return rv;
 }
 
@@ -3462,32 +3541,6 @@ client_writeback_done(int sock, struct sockaddr_in *client)
 	}
 	udpfd = -1;
 	udpix = 0;
-}
-
-/*
- * Return 1 if iface is in connected_interfaces, 0 otherwise
- */
-
-int
-directly_connected(struct node_interface *interfaces, char *iface) {
-
-	struct node_interface *traverse;
-
-	traverse = interfaces;
-	if (iface == NULL) {
-		/* Don't die if address is null */
-		return 0;
-	}
-
-	while (traverse != NULL) {
-		if (!strcmp(traverse->iface,iface)) {
-			return 1;
-		}
-		traverse = traverse->next;
-	}
-
-	return 0;
-
 }
 
 /*
