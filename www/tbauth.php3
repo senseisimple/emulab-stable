@@ -321,7 +321,7 @@ function ISADMIN($uid) {
 }
 
 # Is this user a real administrator (ignore onoff bit).
-function ISADMININSTRATOR() {
+function ISADMINISTRATOR() {
     global $CHECKLOGIN_STATUS;
     
     if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS)

@@ -29,7 +29,7 @@ if (!isset($node_id) || !strcmp($node_id, "") || !TBValidNodeName($node_id)) {
 # Only admin users can do this.
 #
 if (! $isadmin) {
-    USERERROR("Only admininstrators can free nodes from the web interface!",
+    USERERROR("Only administrators can free nodes from the web interface!",
 	      1);
 }
 

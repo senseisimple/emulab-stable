@@ -17,7 +17,7 @@ PAGEHEADER("Widearea Accounts Approval Form");
 $auth_usr = GETLOGIN();
 LOGGEDINORDIE($auth_usr);
 if (! ISADMIN($auth_usr)) {
-    USERERROR("Only testbed admininstrators people can access this page!", 1);
+    USERERROR("Only testbed administrators people can access this page!", 1);
 }
 
 echo "

@@ -470,7 +470,7 @@ function PAGEHEADER($title) {
     FINISHSIDEBAR();
     echo "<h2 class=\"nomargin\">\n";
 
-    if ($login_uid && ISADMININSTRATOR()) {
+    if ($login_uid && ISADMINISTRATOR()) {
 	if (ISADMIN($login_uid)) {
 	    echo "<a href=adminmode.php3?target_uid=$login_uid&adminoff=1>
 	             <img src='/redball.gif'
