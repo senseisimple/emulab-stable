@@ -1,0 +1,56 @@
+<html>
+<head>
+	<title>Security</title>
+	<link rel='stylesheet' href='tbstyle-doc.css' type='text/css'>
+</head>
+<body>
+
+<center>
+<h1>
+    Security Issues
+</h1>
+</center>
+
+Here is a brief rundown of some important security issues you should
+be aware of. 
+
+<h3>Cookies</h3>
+
+<p>
+To enhance operation and security, we make use of a "Cookie" that
+holds your login name. Therefor, you will need to enable cookies on
+your browser. Please contact us if you have questions about how to do
+that in your browser.
+
+<h3>SSL</h3>
+
+<p>
+To protect data you submit, SSL is used to encrypt data as it
+is transferred accross the Internet. Therefore, you will need to
+access these pages with a browser that supports SSL.  We recommend
+Netscape 4.0 or later, or presumably a recent IE, and also recommend a
+screen resolution of at least 800x600 to avoid excessive scrolling.
+
+<h3>SSH</h3>
+
+We require all users to use Secure Shell (SSH) to log into Emulab
+nodes. 
+
+<h3>Accounts</h3>
+
+<p>
+We make use of Unix user and group mechansisms to provide protection
+between users and projects. Each new user gets a new Unix UID, and
+each new project gets a new Unix GID. Users are members of the Unix
+groups that correspond to each of the projects they are working on,
+and thus may share files with other members of those projects. The
+default directory permissions are set so that project files are not
+readable by members of other projects.
+
+<p>
+Each project gets its own directory hierachy (again, protected by the
+Unix group mechanism) that is NFS-exported only to that project's
+assigned test machines.  We don't currently protect against spoofing
+on the control network, so there are vulnerabilities.  The test
+networks are fully separated between experiments by way of VLANs.
+

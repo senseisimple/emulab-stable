@@ -19,7 +19,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 #
 # Generate a list of all the files we want to install from the current
 # directory and the source directory. 
-# 
+#
 FILES	= $(wildcard *.css *.jpg *.gif *.html *.php3)
 FILES  += $(wildcard $(SRCDIR)/*.css)
 FILES  += $(wildcard $(SRCDIR)/*.jpg)
@@ -31,6 +31,12 @@ PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
 
 DOCFILES  = $(wildcard $(SRCDIR)/doc/*.html)
+DOCFILES += $(wildcard $(SRCDIR)/doc/*.jpg)
+DOCFILES += $(wildcard $(SRCDIR)/doc/*.gif)
+
+TUTFILES  = $(wildcard $(SRCDIR)/tutorial/*.html)
+TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.jpg)
+TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.gif)
 
 #
 # Kill the directory part of the names. The vpath rule will do the rest.
@@ -38,9 +44,11 @@ DOCFILES  = $(wildcard $(SRCDIR)/doc/*.html)
 ALLFILES = $(notdir $(FILES))
 ALLPIXES = $(notdir $(PIXFILES))
 ALLDOCS  = $(notdir $(DOCFILES))
+ALLTUTS  = $(notdir $(TUTFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
+	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS))
 
 $(INSTALL_WWWDIR)/%: %

@@ -1,0 +1,13 @@
+
+BODY {background: #EEEEFF; margin-right: 0pt }
+
+H1 { color: #002032; font-weight: bold; font-size: 20pt; margin-top: 10pt}
+H2 { color: #002032; font-weight: bold; font-size: 16pt; margin-top: 10pt}
+H3 { color: #002032; font-weight: bold; font-size: 14pt; margin-top: 10pt}
+H4 { color: #002032; font-weight: bold; font-size: 12pt; margin-top: 10pt}
+P  { margin-right: 32pt; font-size: 10pt; text-align: justify }
+
+A  { color: #004064; text-decoration: underline }
+PRE { margin-left: 30pt; font-size: 8pt }
+.comment { color: #005422; }
+.machinename { color: #005454; }

@@ -1,0 +1,116 @@
+<html>
+<head>
+	<title>Emulab - Hardware Overview</title>
+	<link rel='stylesheet' href='tbstyle-doc.css' type='text/css'>
+</head>
+<body>
+
+<center>
+<h1>
+    Hardware Overview
+</h1>
+</center>
+
+<ul>
+<li>40 PC nodes (<b>tbpc01-40</b>), consisting of:
+
+<ul>
+<li> 600MHz Intel Pentium III "Coppermine" processors.
+<li> 
+<a
+href="http://www.asus.com/Products/Motherboard/Pentiumpro/P3b-f/index.html">
+Asus P3B-F (6 PCI/1 ISA slot)</a> motherboard (old reliable BX chipset).
+<li> 128MB PC100 ECC SDRAM.
+<li> 5 Intel EtherExpress Pro/100B 10/100Mbps Ethernet cards.
+<li> <a href="http://www.storage.ibm.com/hardsoft/diskdrdl/desk/ds34gxp.htm">
+13GB IBM 34GXP DPTA-371360 7200RPM IDE</a> hard drive.
+<li> Floppy drive
+<li> Cheap video card (Jaton Riva 128ZX AGP w/4MB video RAM)
+<li> All in a nice but overweight rackmount case on rails:
+<a href = "http://www.antec-inc.com/product/cases/en_rack.html">
+Antec IPC3480B</a>, with 300W PS and extra fan.
+</ul>
+<p>
+
+<li>160 <a href = "http://www.research.digital.com/SRC/iag/">
+	Compaq DNARD "Sharks"</a> as edge nodes.  233 Mhz StrongARM processors,
+	32M memory, 10Mbps ethernet, diskless.
+	Runs NetBSD and custom kernels (OSKit, etc.)
+<p>
+
+
+<li> a server (<b>users.emulab.net</b>), consisting of:
+
+<ul>
+<li> Dual 500MHz Intel Pentium III cpus
+<li> <a href="http://developer.intel.com/design/servers/l440gx/index.htm">
+Intel L440GX+</a> motherboard (the GX+ chipset)
+<li> 512MB PC100 ECC SDRAM
+<li> 90 GB disk space: 5 
+<a href="http://www.quantum.com/products/hdd/atlas_iv/atlas_iv_overview.htm">
+Quantum Atlas IV 18GB 7200RPM Wide LVD SCSI</a> hard drives
+<li>64 port
+<a href="http://www.cyclades.com/dat-z.html">
+Cyclades-Ze PCI Multiport Serial Board</a>
+<br><em>Soon</em> 64 more ports.
+</ul>
+<p>
+
+<li> 3 <a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/c6000_ds.htm">
+Cisco 6509 high-end switches</a>.  Two function as the "testbed backplane," each filled with a
+	<a href = "http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/prodlit/6nam_ds.htm">
+	Network Analysis Module</a>
+	and seven 48-port 10/100 ethernet modules,
+	giving 336 100Mbps ethernet ports on each.
+	The third 6509 functions as the core router for the testbed and
+	is configured with an assortment of router hardware
+	and software, Gigabit ethernet, OC-12 ATM (~600Mbps), and more 
+	10/100 Ethernet ports.  A fourth 6509 provides expansion room.
+        <!-- Another, but no pix: http://www.cisco.com/univercd/cc/td/doc/pcat/ca6000.htm -->
+<p>
+
+<li>10 APC MasterSwitch AP9210 8 port power controllers.<br>
+    (The AP9210 is discontinued; replaced in the product line by the
+    <a href="http://www.apc.com/products/masterswitch/index.cfm">AP9211</a>.)
+<p>
+
+<li>10 <a href = "http://www.wrightline.com/products/freestnd.htm">
+Wrightline "Tech I" racks</a>: 44U, 34" deep, 8 are  19" wide, 2 are
+	24" with cable management.<br>
+<p>
+
+</ul>
+
+<p><h2>Layout</h2><p>
+
+The first 4 ethernet ports of each PC node are connected to one of the
+      big Cisco switches.  
+All 160 ports can be connected in arbitrary ways by setting up VLANs
+on the switches by using <a href = "snmpit.html">snmpit</a>.
+Cisco 6500 Switch backplane bandwidth is supposed to be near 50Gb/s.
+<!-- but we've heard rumors that it's worse. -->
+<p>
+
+The fifth ethernet port is connected to another Cisco 6509. They
+      each have full duplex 100Mbps connections. These are for dumping 
+      data off of the nodes and such, without interfering with
+      the experimental interfaces. The only impact on the node is
+      processor and disk use, and bandwidth on the PCI bus.
+
+<p>
+
+The DNARD Sharks are also attached to the big Cisco switch by way of a 
+      8+2 10/100 ethernet switch from Asante. Each shelf of 8 sharks
+      is capable of generating up to 80Mbps, and shares one
+      100Mbps link to the Cisco.
+
+<hr>
+<address>
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+Last modified on Mar 10, 2001
+</address>
+
+</body>
+</html>

@@ -1,0 +1,82 @@
+<html>
+<head>
+	<title>Emulab - Software Overview</title>
+	<link rel='stylesheet' href='tbstyle-doc.css' type='text/css'>
+</head>
+<body>
+
+<center>
+<h1>
+    Software Overview
+</h1>
+</center>
+
+<ul>
+<li><b>users.emulab.net</b>: Control node, NFS server, serial line server
+    <p>
+    Runs FreeBSD 3.4-STABLE.  This is the main server machine for
+    the testbed and is where home directories and all project files
+    live. While most of the Testbed configuration process is done via
+    the Web interface, a few things must be done while logged into
+    users.emulab.net. These Testbed specific commands and programs are
+    contained in <code>/usr/testbed/bin</code>. Your skeleton login
+    files will already have this directory in your path.
+    
+    <p>
+    This is also our serial line server, which allows experimentors to
+    access the console port of each node in their experiment.
+
+<p>
+<li><b>tbpc[01-40].emulab.net</b>: Testbed PC nodes
+    <p>
+    The testbed nodes dual boot FreeBSD 4.0 and RedHat Linux 6.2. You
+    may also boot your own OSKit kernels on them. Alternatively, you
+    can run whatever OS you like by loading your own OS image onto the
+    the 4th DOS slice using the Testbed configuration software.
+
+    <p>
+    Each node has 5 10/MBbps ethernet cards. The first four
+    interfaces are connected to the "experimental network," and are
+    used to "wire up" your specific network topology. The last
+    interface is connected to the "control network," and is used
+    for configuration and for login access from users.emulab.net. In
+    FreeBSD this card is named `fxp4', and in Linux it is `eth0'.
+
+    <p>
+    All of the Testbed PCs have their COM1 serial interface (console
+    port) connected to users.emulab.net. The port is configured to run
+    at 115K baud, and are accessible from users.emulab.net (via the
+    tip command) using the appropriate "tbpc" names; e.g., "tbpc06."
+
+<p>
+<li><b>tbsh[1-20]-[1-8].emulab.net</b>: Testbed Shark nodes
+    <p>
+    The Sharks NetBSD by default, with the filesystems provided via
+    NFS. You may also boot your own OSKit kernels. 
+
+    <p>
+    Each Shark has a single 10Mbps ethernet which serves as both the control
+    and experimental interface. This is done with IP "aliasing", and
+    causes experimental traffic to be routed to the experimental
+    network instead of the control network.
+
+    <p>
+    All nodes use the serial port as their console, but due to the
+    limited number of serial ports on the control node, only the last
+    Shark on each shelf is connected to the control node.  These
+    designated Shark console lines are accessible from
+    users.emulab.net (via the tip command) using the appropriate
+    "tbsh" shelf names; e.g., "tbsh16."
+
+</ul>
+
+<hr>
+<address>
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+Last modified on Mar 10, 2001
+</address>
+
+</body>
+</html>
