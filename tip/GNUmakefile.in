@@ -24,8 +24,11 @@ LIBS=
 
 SSLLIBS		= -lssl -lcrypto
 
-tip:	$(OBJS)
-	$(CC) -static -o tip $(OBJS) $(LIBS)
+#tip:	$(OBJS)
+#	$(CC) -static -o tip $(OBJS) $(LIBS)
+
+tip:	$(TESTBED_SRCDIR)/tip/tip.deprecation
+	cp $(TESTBED_SRCDIR)/tip/tip.deprecation tip
 
 tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 	$(CC) -DWITHSSL -o tiptunnel.o -c $<

@@ -1,0 +1,6 @@
+#!/bin/sh
+echo "The use of 'tip' has been deprecated."
+echo "You should use 'console' instead."
+echo "(Note that 'console', unlike 'tip', will give you"
+echo " a telnet session. To escape, use ^] )"
+
