@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/ir/ns2ir/Attic/sim.tcl,v 1.1 2000-05-25 21:07:13 place Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/ir/ns2ir/Attic/sim.tcl,v 1.2 2000-05-26 19:34:41 calfeld Exp $
 
 #
 
@@ -59,7 +59,7 @@ Simulator instproc init args {
 }
 
 Simulator instproc nullagent {} {
-return nop
+    return nop
 }
 
 Simulator instproc use-scheduler type {
@@ -75,30 +75,30 @@ Simulator instproc dumper obj {
 # delaynode. has bandwidth and delay.
 
 Simulator instproc delaynode {b d} {
-set currnode [$self node 0]
-$currnode set type delay
-$currnode set bw $b
-$currnode set delay $d
-return $currnode
+    set currnode [$self node 0]
+    $currnode set type delay
+    $currnode set bw $b
+    $currnode set delay $d
+    return $currnode
 }
 
 # NODE
 
 Simulator instproc node args {
-global nodeID
-global nodelist
+    global nodeID
+    global nodelist
 
-set currnode n$nodeID
-node $currnode
+    set currnode n$nodeID
+    node $currnode
 
-#set them all to pc now. other code may change it, however
-$currnode set type pc
-$currnode set id $nodeID
-$currnode set nodelinks [list]
-incr nodeID
+    #set them all to pc now. other code may change it, however
+    $currnode set type pc
+    $currnode set id $nodeID
+    $currnode set nodelinks [list]
+    incr nodeID
 
-lappend nodelist $currnode
-return $currnode
+    lappend nodelist $currnode
+    return $currnode
 }
 
 
@@ -106,52 +106,52 @@ Simulator instproc hier-node haddr {
 }
 
 Simulator instproc now {} {
-return nop
+    return nop
 }
 
 # AT
 
 Simulator instproc at args {
-#args should look like: time op node node
-#op is: 'up' or 'down'. ns lets you give arbitrary commands for op, but
-#we ignore those...
-global eventID
-global eventlist
-set currEvent ev$eventID
-event $currEvent
-$currEvent set time [lindex $args 0]
+    #args should look like: time op node node
+    #op is: 'up' or 'down'. ns lets you give arbitrary commands for op, but
+    #we ignore those...
+    global eventID
+    global eventlist
+    set currEvent ev$eventID
+    event $currEvent
+    $currEvent set time [lindex $args 0]
 
-#don't tackle arbitrary commands yet...
-switch [lindex $args 1] {
-   up {$currEvent set op link_up}
-   down {$currEvent set op link_down}
-   default {return}
-}
+    #don't tackle arbitrary commands yet...
+    switch [lindex $args 1] {
+	up {$currEvent set op link_up}
+	down {$currEvent set op link_down}
+	default {return}
+    }
 
-#we can't even guarantee that a link is found, since a pair of
-#nodes is used to specify the link. perhaps nobody had the sense
-#to actually link those nodes...
-$currEvent set link No_link_set.
+    #we can't even guarantee that a link is found, since a pair of
+    #nodes is used to specify the link. perhaps nobody had the sense
+    #to actually link those nodes...
+    $currEvent set link No_link_set.
 
-# try to find link
-foreach currlink [[lindex $args 2] set nodelinks] {
-   if {[$currlink set src] == [lindex $args 3] ||  \
-       [$currlink set dst] == [lindex $args 3] } {
-      $currEvent set link $currlink
-      break
-   }
-}
+    # try to find link
+    foreach currlink [[lindex $args 2] set nodelinks] {
+	if {[$currlink set src] == [lindex $args 3] ||  \
+		[$currlink set dst] == [lindex $args 3] } {
+	    $currEvent set link $currlink
+	    break
+	}
+    }
 
-lappend eventlist $currEvent
-return nop
+    lappend eventlist $currEvent
+    return nop
 }
 
 Simulator instproc at-now args {
-return nop
+    return nop
 }
 
 Simulator instproc cancel args {
-return nop
+    return nop
 }
 
 Simulator instproc after {ival args} {
@@ -175,26 +175,26 @@ Simulator instproc chk-hier-field-lengths {} {
 # RUN
 
 Simulator instproc run {} {
-global nodelist
-global linkslist
-global eventlist
-global argv
+    global nodelist
+    global linkslist
+    global eventlist
+    global argv
 
-set IRfile [open [lindex $argv 1] w]
+    set IRfile [open [lindex $argv 1] w]
 
-puts $IRfile "START topology\nSTART nodes"
-foreach node $nodelist {
-   $node print $IRfile
-}
-puts $IRfile "END nodes\nSTART links"
-foreach link $linkslist {
-   $link print $IRfile
-}
-puts $IRfile "END links\nEND topology\nSTART events"
-foreach event $eventlist {
-   $event print $IRfile
-}
-puts $IRfile "END  events"
+    puts $IRfile "START topology\nSTART nodes"
+    foreach node $nodelist {
+	$node print $IRfile
+    }
+    puts $IRfile "END nodes\nSTART links"
+    foreach link $linkslist {
+	$link print $IRfile
+    }
+    puts $IRfile "END links\nEND topology\nSTART events"
+    foreach event $eventlist {
+	$event print $IRfile
+    }
+    puts $IRfile "END  events"
 }
 
 Simulator instproc halt {} {
@@ -204,7 +204,7 @@ Simulator instproc dumpq {} {
 }
 
 Simulator instproc is-started {} {
-return nop
+    return nop
 }
 
 Simulator instproc clearMemTrace {} {
@@ -212,7 +212,7 @@ Simulator instproc clearMemTrace {} {
 
 Simulator instproc simplex-link { n1 n2 bw delay qtype args } {
 
-$self duplex-link $n1 $n2 $bw $delay $qtype $args
+    $self duplex-link $n1 $n2 $bw $delay $qtype $args
 }
 
 #
@@ -233,39 +233,41 @@ Simulator instproc remove-nam-linkconfig {i1 i2} {
 }
 
 Simulator instproc duplex-link { n1 n2 bw delay type args } {
-global linkID
-global linkslist
-global nodeID
+    global linkID
+    global linkslist
+    global nodeID
 
-# if there are delay or bandwidth restrictions, add a delay node
-# and link to it
-if {$delay!="" && $delay!=0  || $bw!="" && $bw!=0} {
-   #delaynode is not a 'real' Sim method. created for testbed.
-   set dnode [$self delaynode [$self bw_parse $bw] [$self delay_parse $delay]]
+    # if there are delay or bandwidth restrictions, add a delay node
+    # and link to it
+#    if {$delay!="" && $delay!=0  || $bw!="" && $bw!=0} {
+#	#delaynode is not a 'real' Sim method. created for testbed.
+#	set dnode [$self delaynode [$self bw_parse $bw] [$self delay_parse $delay]]
+#
+#	$self duplex-link $n1 $dnode 0 0 $type $args
+#	$self duplex-link $n2 $dnode 0 0 $type $args
+#    }
 
-   $self duplex-link $n1 $dnode 0 0 $type $args
-   $self duplex-link $n2 $dnode 0 0 $type $args
-}
+    set currLink l$linkID
+    link $currLink
+    $currLink set src $n1
+    $currLink set srcport -1
+    $currLink set dst $n2
+    $currLink set dstport -1
+    $currLink set delay $delay
+    $currLink set bw $bw
 
-set currLink l$linkID
-link $currLink
-$currLink set src $n1
-$currLink set srcport -1
-$currLink set dst $n2
-$currLink set dstport -1
+    $currLink set id $linkID
+    $n1 addlink $currLink
+    $n2 addlink $currLink
 
-$currLink set id $linkID
-$n1 addlink $currLink
-$n2 addlink $currLink
+    incr linkID
 
-incr linkID
-
-lappend linkslist $currLink
+    lappend linkslist $currLink
 }
 
 # ROB added
 Simulator instproc duplex-link-of-interfaces { n1 n2 bw delay type args } {
-$self duplex-link $n1 $n2 $bw $delay $type $args
+    $self duplex-link $n1 $n2 $bw $delay $type $args
 }
 #----------
 
@@ -291,11 +293,11 @@ Simulator instproc trace-all file {
 }
 
 Simulator instproc get-nam-traceall {} {
-return nop
+    return nop
 }
 
 Simulator instproc get-ns-traceall {} {
-return nop
+    return nop
 }
 
 # If exists a traceAllFile_, print $str to $traceAllFile_
@@ -312,7 +314,7 @@ Simulator instproc namtrace-config { f } {
 }
 
 Simulator instproc get-nam-config {} {
-return nop
+    return nop
 }
 
 # Used only for writing nam configurations to trace file(s). This is different
@@ -325,7 +327,7 @@ Simulator instproc color { id name } {
 }
 
 Simulator instproc get-color { id } {
-return nop
+    return nop
 }
 
 # you can pass in {} as a null file
@@ -344,7 +346,7 @@ Simulator instproc trace-queue { n1 n2 {file ""} } {
 # to learn average q size etc.  XXX this API still rough
 #
 Simulator instproc monitor-queue { n1 n2 qtrace { sampleInterval 0.1 } } {
-return nop
+    return nop
 }
 
 Simulator instproc queue-limit { n1 n2 limit } {
@@ -374,11 +376,11 @@ Simulator instproc delay { n1 n2 delay } {
 
 #XXX need to check that agents are attached to nodes already
 Simulator instproc connect {src dst} {
-return nop
+    return nop
 }
 
 Simulator instproc simplex-connect { src dst } {
-return nop
+    return nop
 }
 
 #
@@ -387,7 +389,7 @@ return nop
 
 
 Simulator proc instance {} {
-return nop
+    return nop
 }
 
 Simulator instproc get-node-by-id id {
@@ -397,7 +399,7 @@ Simulator instproc all-nodes-list {} {
 }
 
 Simulator instproc link { n1 n2 } {
-return nop
+    return nop
 }
 
 # Creates connection. First creates a source agent of type s_type and binds
@@ -405,7 +407,7 @@ return nop
 # it to dest.  Finally creates bindings for the source and destination agents,
 # connects them, and  returns the source agent.
 Simulator instproc create-connection {s_type source d_type dest pktClass} {
-return nop
+    return nop
 }
 
 # Creates connection. First creates a source agent of type s_type and binds
@@ -413,16 +415,16 @@ return nop
 # it to dest.  Finally creates bindings for the source and destination agents,
 # connects them, and  returns a list of source agent and destination agent.
 Simulator instproc create-connection-list {s_type source d_type dest pktClass} {
-return nop
+    return nop
 }   
 
 # This seems to be an obsolete procedure.
 Simulator instproc create-tcp-connection {s_type source d_type dest pktClass} {
-return nop
+    return nop
 }
 
 Simulator instproc makeflowmon { cltype { clslots 29 } } {
-return nop
+    return nop
 }
 
 # attach a flow monitor to a link
@@ -441,35 +443,34 @@ Simulator instproc link-lossmodel {lossobj from to} {
 }
 
 Simulator instproc bw_parse { bspec } {
-if { [scan $bspec "%f%s" b unit] == 1 } {
-                set unit b
-        }
-        # xxx: all units should support X"ps" --johnh
-        switch $unit {
+    if { [scan $bspec "%f%s" b unit] == 1 } {
+	set unit b
+    }
+    # xxx: all units should support X"ps" --johnh
+    switch $unit {
         b  { return [expr int($b/1000000)] }
         bps  { return [expr int($b/1000000] }
-        kb { return [expr int($b/1000)] }
-        Mb { return [expr int($b)] }
-        Gb { return [expr int($b*1000)] }
-        default { 
-                  puts "error: bw_parse: unknown unit `$unit'" 
-                  exit 1
-                }
+	    kb { return [expr int($b/1000)] }
+	    Mb { return [expr int($b)] }
+	    Gb { return [expr int($b*1000)] }
+	    default { 
+		puts "error: bw_parse: unknown unit `$unit'" 
+		exit 1
+	    }
         }
-}
-
-Simulator instproc delay_parse { dspec } {
+    }
+    
+    Simulator instproc delay_parse { dspec } {
 	if { [scan $dspec "%f%s" b unit] == 1 } {
-                set unit s
+	    set unit s
         }
         switch $unit {
-        s  { return [expr int($b*1000)] }
-        ms { return [expr int($b)] }
-        ns { return [expr int($b/1000)] }
-        default { 
-                  puts "error: bw_parse: unknown unit `$unit'" 
-                  exit 1
-                }
+	    s  { return [expr int($b*1000)] }
+	    ms { return [expr int($b)] }
+	    ns { return [expr int($b/1000)] }
+	    default { 
+		puts "error: bw_parse: unknown unit `$unit'" 
+		exit 1
+	    }
         }
-}
-
+    }
