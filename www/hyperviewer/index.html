@@ -561,17 +561,7 @@ window.<br>
 Here's an example of the appearance of hypview once it is
 running.&nbsp; The pane on the left contains the <span
  style="font-weight: bold;">HyperViewer</span>.&nbsp; The pane on the
-right is the <span style="font-weight: bold;">control panel</span>.
-<ul style="margin-left: 120px;">
-  <li>Note: the window comes up split down the middle now.&nbsp; Drag
-the
-divider to the right so it looks like the picture below.&nbsp; Be
-careful not to drag the divider outside the right window boundary,
-since that will leave you with a blank control panel pane.&nbsp; Also,
-resizing the top-level window mis-aligns the OpenGL picking, so don't
-do that
-yet...</li>
-</ul>
+right is the <span style="font-weight: bold;">control panel</span>.<br>
 <br>
 <div style="margin-left: 40px;">
 <div style="margin-left: 40px;"><a href="gui_top.jpg"><img
@@ -594,8 +584,8 @@ the HyperViewer mouse controls which apply to the left pane:</li>
 <br>
 <div style="margin-left: 40px;">
 <ul>
-  <li><span style="font-weight: bold;">Dragging:</span> One way to
-navigate is to drag the view.&nbsp; Here is a picture
+  <li><span style="font-weight: bold;"><a name="mouse_dragging"></a>Dragging:</span>
+One way to navigate is to drag the view.&nbsp; Here is a picture
 just like the one above, but dragged to the left a bit with the left
 mouse button.&nbsp; Notice how the mid-level branching is more
 visible.&nbsp; <br>
@@ -605,8 +595,8 @@ details to lower levels. <br>
   </li>
 </ul>
 <ul>
-  <li><span style="font-weight: bold;">Rotation: </span>The middle
-mouse button (or holding down
+  <li><span style="font-weight: bold;"><a name="mouse_rotation"></a>Rotation:
+    </span>The middle mouse button (or holding down
 a control or shift key while clicking the left mouse button) rotates
 what is
 behind to the front so you can better see it.&nbsp; <br>
@@ -622,8 +612,9 @@ the center.<br>
  style="border: 2px solid ; width: 380px; height: 326px;" alt=""
  src="gui_top_small2.jpg" title="Click for full-size image."></a></div>
 <ul>
-  <li><span style="font-weight: bold;">Picking: </span>As you move the
-mouse over the boxes representing nodes (hosts or
+  <li><span style="font-weight: bold;"><a name="mouse_picking"></a>Picking:
+    </span>As you move the mouse over the boxes representing nodes
+(hosts or
 lans), they turn bright green.&nbsp; Clicking on a bright green box
 selects it to move to the center of the sphere.&nbsp; Its bright yellow
 color denotes its selected status.&nbsp; So you can walk through a tree
@@ -672,11 +663,24 @@ node.<br>
  style="width: 215px; height: 235px;" alt="" src="gui_node.jpg"><br>
 </div>
 <br>
-These controls are used to explore networks with many
-cross-links.&nbsp; The cross-links are not visible at first.&nbsp; Here
+The "show" and "hide" controls are used to explore networks with many
+cross-links.&nbsp; HyperViewer computes a minimal spanning tree through
+the graph, and just shows that at first.&nbsp; The rest of the graph
+links, which cross-link between spanning tree branches, are called
+"non-tree links" by HyperViewer.&nbsp; These links are not visible at
+first, to cut down on clutter.<br>
+<br>
+The "descend" check-boxes are on by default, causing a "show" or "hide"
+to apply to all of the links under the selected node in the minimal
+spanning tree.&nbsp; If you uncheck the "descend" options, the "show"
+and
+"hide" buttons apply only to the selected node, and are greyed-out if
+there are no links in to or out of that node.<br>
+<br>
+Here
 is an example (ts600.hyp) where the links are then turned on by
 clicking either of the "show" buttons for the whole tree (descending
-from the root):<br>
+recursively from the root):<br>
 <br>
 <a href="ts600_hide.jpg"><img
  style="border: 2px solid ; width: 380px; height: 326px;" alt=""
@@ -684,6 +688,9 @@ from the root):<br>
  href="ts600_show.jpg"><img
  style="border: 2px solid ; width: 380px; height: 326px;" alt=""
  src="ts600_show_small.jpg" title="Click for full-size image."></a><br>
+<br>
+There is another example of using the "show" controls while exploring a
+larger Emulab experiment graph <a href="index.html#example">below</a>.<br>
 <div style="margin-left: 40px;"><br>
 </div>
 </div>
@@ -692,19 +699,33 @@ from the root):<br>
 controls</span> are still changing.&nbsp; There are a lot of modes in
 HyperViewer to control the drawing and layout of graphs.&nbsp; (There
 are no layout controls visible yet.)<br>
+<br>
+Boolean check-boxes (click to toggle):
 <ul>
-  <li>Draw {sphere,nodes,links} - Turn off to cut down on clutter.</li>
-  <li>Keep aspect - Whether to keep the sphere round as the window is
-resized.&nbsp; (Not working yet.)<br>
+  <li>Draw {sphere,nodes,links} - Turn off to cut down on
+clutter.&nbsp; Bug: turning off nodes turns off links as well.<br>
   </li>
-  <li>Label to right - Changes the positioning of the text labels.</li>
+  <li>Keep aspect - Whether to keep the sphere round as the window is
+resized.<br>
+  </li>
+  <li>Label to right - Changes the positioning of the text
+labels.&nbsp; Default is to the left of a node.<br>
+  </li>
+</ul>
+Choices (click to choose one or roll with the mouse wheel):<br>
+<ul>
   <li>Labels: Long, Short, None - How much of the label strings are
 shown.</li>
+</ul>
+Numbers (type a new value, click the up/down buttons, or roll with the
+mouse wheel):<br>
+<ul>
   <li>{Node,Link} depth - Allows showing only a few levels down from
 the selected node in very cluttered graphs.</li>
-  <li>Animation frames - Controls how many steps are taken to animate
-the change of view when a node is picked as the new center.&nbsp; (Not
-working yet.)<br>
+  <li>Animation frames - Controls how many frames per second are drawn
+to animate
+the change of view when a node is picked as the new center.&nbsp;
+Defaults to 12, the range is 1 to 30.<br>
   </li>
 </ul>
 <div style="margin-left: 40px;"><img
@@ -755,9 +776,9 @@ using <span style="font-weight: bold;">hypview</span>.<br>
 <a href="2440-a.jpg"><img vspace="5" hspace="10" align="left"
  style="border: 2px solid ; width: 190px; height: 155px;" alt=""
  title="Click for full-size image." src="2440-a_tiny.jpg"></a><br>
-When we first open experiment testbed/2440 (which has 2,611 nodes), the
-view starts at the first node returned from the Emulab experiment
-database, <span style="font-style: italic;">leaf-17-2040-1768.</span>&nbsp;
+When we first <a href="#opening">open experiment</a> testbed/2440
+(which has 2,611 nodes), the view starts at the first node returned
+from the Emulab experiment database, <span style="font-style: italic;">leaf-17-2040-1768.</span>&nbsp;
 The rest of the topology trails off in the distance to the right.<br>
 <br clear="all">
 <a href="2440-a2.jpg"><img vspace="5" hspace="10" align="left"
@@ -766,9 +787,9 @@ The rest of the topology trails off in the distance to the right.<br>
  href="2440-a3.jpg"><img vspace="5" hspace="10" align="left"
  style="border: 2px solid ; width: 190px; height: 155px;" alt=""
  title="Click for full-size image." src="2440-a3_tiny.jpg"></a><br>
-Looking to the right (dragging the view to the left), we pass nodes
-named <span style="font-style: italic;">border-17-1949</span> with
-many leaf nodes fanning out from it, and <span
+Looking to the right (<a href="#mouse_dragging">dragging the view</a>
+to the left), we pass nodes named <span style="font-style: italic;">border-17-1949</span>
+with many leaf nodes fanning out from it, and <span
  style="font-style: italic;">border-17-1937</span> with many other
 border nodes fanning out.&nbsp; Clearly we're climbing up a tree
 branch, although it's upside-down because the HyperViewer spanning tree
@@ -794,12 +815,13 @@ upper left corner.)<br>
  href="2440-b-links.jpg"><img vspace="5" hspace="10" align="left"
  style="border: 2px solid ; width: 190px; height: 155px;" alt=""
  title="Click for full-size image." src="2440-b-links_tiny.jpg"></a><br>
-To see the linkage of the central mesh, we pick node <span
- style="font-style: italic;">interior-19</span> and click on the "show"
-node control buttons.&nbsp; Now we're seeing the "non-tree links",
-not&nbsp; just the minimal spanning tree, and have learned that the
-names of the nodes in the mesh which is really at the root of the tree
-all start with "interior-".<br>
+To see the linkage of the central mesh, we <a href="#mouse_picking">pick
+node</a> <span style="font-style: italic;">interior-19</span> and
+click on the "<a href="#node_controls">show</a>" node control
+buttons.&nbsp; Now we're seeing the "non-tree links", not&nbsp; just
+the minimal spanning tree, and have learned that the names of the nodes
+in the mesh which is really at the root of the tree all start with
+"interior-".<br>
 <br clear="all">
 <a href="2440-c-interior-root.jpg"><img vspace="5" hspace="10"
  align="left" style="border: 2px solid ; width: 190px; height: 155px;"
@@ -809,10 +831,11 @@ all start with "interior-".<br>
  align="left" style="border: 2px solid ; width: 190px; height: 155px;"
  alt="" title="Click for full-size image."
  src="2440-c-interior-root2_tiny.jpg"></a><br>
-So we open the experiment again, this time giving the optional root
-name with a wildcard asterisk: <span style="font-weight: bold;">interior-*</span>.&nbsp;
-A <span style="font-style: italic;">root</span> node is inserted and
-the interior nodes fanned out from it.<br>
+So we <a href="#opening">open the experiment</a> again, this time
+giving the optional root name with a wildcard asterisk: <span
+ style="font-weight: bold;">interior-*</span>.&nbsp; A <span
+ style="font-style: italic;">root</span> node is inserted and the
+interior nodes fanned out from it.<br>
 <br clear="all">
 <a href="2440-c-interior.jpg"><img vspace="5" hspace="10" align="left"
  style="border: 2px solid ; width: 190px; height: 155px;" alt=""
