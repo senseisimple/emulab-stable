@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
 
 int parse_args(int argc, char **argv) {
 
-  char ch;
+  int ch;
 
   /* setup defaults. */
   opts->once = 0;
@@ -242,7 +242,12 @@ int parse_args(int argc, char **argv) {
       break;
       
     case 'h':
+      usage();
+      exit(0);
+      break;
+
     default:
+      printf("Unknown option: %c\n", ch);
       usage();
       return -1;
       break;
@@ -579,6 +584,8 @@ void get_packet_counts(SLOTHD_PACKET *pkt) {
 #ifndef __CYGWIN__
 int get_counters(char *buf, void *data) {
 
+  int nscan = 0;
+
   SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
 #ifdef __linux__
   struct ifreq ifr;
@@ -592,17 +599,18 @@ int get_counters(char *buf, void *data) {
       && strstr(buf, "<Link"))
 #endif
 #ifdef __linux__
-      && strstr(buf, "eth"))
+      && (strstr(buf, "eth") || strstr(buf, "wlan") || strstr(buf, "ath")))
 #endif
   {
 
-    if (sscanf(buf, CNTFMTSTR,
+    if ((nscan = sscanf(buf, CNTFMTSTR,
                pkt->ifaces[pkt->ifcnt].ifname,
 #ifdef __FreeBSD__
                pkt->ifaces[pkt->ifcnt].addr,
 #endif
                &pkt->ifaces[pkt->ifcnt].ipkts,
-               &pkt->ifaces[pkt->ifcnt].opkts) != NUMSCAN) {
+               &pkt->ifaces[pkt->ifcnt].opkts)) != NUMSCAN) {
+      printf("Failed to parse netinfo output.\n");
       return -1;
     }
 #ifdef __linux__
