@@ -445,7 +445,7 @@ int main (int argc, char **argv) {
 	 * are up in response to SIOCGIFCONF
 	 */
 	ifc.ifc_buf = malloc(MAX_INTERFACES * 100 * sizeof (struct ifreq));
-	ifc.ifc_len = MAX_INTERFACES * 100;
+	ifc.ifc_len = MAX_INTERFACES * 100 * sizeof (struct ifreq);
 	if (ioctl(sock,SIOCGIFCONF,&ifc) < 0) {
 		perror("SIOCGIFCONF");
 		exit(1);
