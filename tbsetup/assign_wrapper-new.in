@@ -140,41 +140,6 @@ sub printdb ($)
 print "assign_wrapper improved started\n";
 TBDebugTimeStamp("assign_wrapper started");
 
-######################################################################
-# Step 1 - Setup virtual topology
-#
-# Here we need to read the virtual topology in from the virt_nodes
-# and virt_lans table.  We then need to add delay and lan nodes as
-# necessary.
-#
-# Conversion details:
-#   Let L be a LAN with N members.
-#   If N == 2 
-#      Let N1 be node 1
-#      Let N2 be node 2
-#      If L is delayed
-#         Generate delay node D
-#         Link N1 to D
-#         Link N2 to D
-#      Else
-#         Link N1 to N2
-#   Else
-#      Generate lan node A
-#      If L is delayed
-#        Foreach node N in L
-#           Generate delay node DN
-#           Link A to DN
-#           Link N to DN
-#      Else
-#        Foreach node N in L
-#           Link N to A
-#
-# Delay node names:
-#  delay nodes are named tbdelayXX N > 2
-#   and tbsdelayXX for N == 2.
-#
-########################################################################
-
 #
 # The main data structures:
 #
@@ -231,6 +196,28 @@ my %interface_types = ();
 # to the the corresponding physnode entry. 
 # 
 my %phys_nodes = ();
+
+#
+# More physical side data structures.
+# v2pmap is indexed by virtual and contains the physical node.
+my %v2pmap = ();
+# p2vmap is indexed by physical and contains one or more virtual nodes.
+my %p2vmap = ();
+# plinks is indexed by virtual name and contains
+#  (pnodeportA,pnodeportB) .  If one is a delay node it is always
+#  the second.
+my %plinks = ();
+# virtnodes is the list of subnodes on physnodes.
+my %virtnodes = ();
+my %v2vmap = ();
+
+#
+# Support for experiment modify. We create v2p and v2v mappings of the
+# current topology so we can figure out how its changed after assign
+# runs. These correspond to v2pmap and v2vmap mentioned above.
+# 
+my %reserved_v2pmap  = ();
+my %reserved_v2vmap  = ();
 
 #
 # Experiment wide options. See below. They come from the experiments table.
@@ -292,13 +279,6 @@ my $maximum_nodes;
 my $remotecount  = 0;
 my $virtcount    = 0;
 
-# Support for experiment modify.
-my %alreadyAllocated = ();
-my %reserved_pnodes  = ();
-my %reserved_vnodes  = ();
-my $reserved_pcount  = 0;
-my $reserved_vcount  = 0;
-
 #
 # This is for stats gathering. It might duplicate other stuff, but
 # thats okay.
@@ -337,6 +317,41 @@ my %simnodelans    = ();
 my $virtnode_id  = 0;
 my $veth_id      = 0;
 
+######################################################################
+# Step 1 - Setup virtual topology
+#
+# Here we need to read the virtual topology in from the virt_nodes
+# and virt_lans table.  We then need to add delay and lan nodes as
+# necessary.
+#
+# Conversion details:
+#   Let L be a LAN with N members.
+#   If N == 2 
+#      Let N1 be node 1
+#      Let N2 be node 2
+#      If L is delayed
+#         Generate delay node D
+#         Link N1 to D
+#         Link N2 to D
+#      Else
+#         Link N1 to N2
+#   Else
+#      Generate lan node A
+#      If L is delayed
+#        Foreach node N in L
+#           Generate delay node DN
+#           Link A to DN
+#           Link N to DN
+#      Else
+#        Foreach node N in L
+#           Link N to A
+#
+# Delay node names:
+#  delay nodes are named tbdelayXX N > 2
+#   and tbsdelayXX for N == 2.
+#
+########################################################################
+
 printdb "Generating TOP file.\n";
 TBDebugTimeStamp("TOP started");
 
@@ -347,16 +362,16 @@ TBDebugTimeStamp("TOP started");
 LoadPhysInfo();
 
 #
+# Load the Experiment info and virt topology.
+#
+LoadExperiment();
+
+#
 # If updating, load current experiment resources. We have to be careful
 # of how this is merged in with the (new) desired topology. See below.
 #
 LoadCurrent()
     if ($updating);
-
-#
-# Load the Experiment info and virt topology.
-#
-LoadExperiment();
 
 #
 # Check Max Concurrent for OSID violations.
@@ -384,12 +399,9 @@ if ($toponly) {
 # assign succeeds we attempt to reserve the resources.  If that works
 # we're done with step 2 otherwise we loop again.
 #
-# v2pmap is indexed by virtual and contains the physical node.
-# p2vmap is indexed by physical and contains one or more virtual nodes
-# plinks is indexed by virtual name and contains 
-#  (pnodeportA,pnodeportB) .  If one is a delay node it is always
-#  the second.
 #######################################################################
+
+
 
 TBDebugTimeStamp("assign_loop started");
 $currentrun = 1;
@@ -405,6 +417,7 @@ while (1) {
     # Clear v2pmap, p2vmap, and plinks
     undef %v2pmap;
     undef %p2vmap;
+    undef %v2vmap;
     undef %plinks;
     undef %toreserve;
     undef %virtnodes;
@@ -500,14 +513,14 @@ while (1) {
 		next;
 	    }
 
-	    if ($alreadyAllocated{$physical}) {
+	    if (physnodeallocated($physical)) {
 		#
 		# Mark node as being reused.
 		#
 		# Look at virtual node being mapped to node;
 		# if it wasn't in the previous map, mark node for reboot.
 		#
-		if ($alreadyAllocated{$physical} eq "reboot") {
+		if (physnodereuse($physical) eq "reboot") {
 		    # No changes once it goes into reboot.
 		    ;
 		}
@@ -525,17 +538,17 @@ while (1) {
 		    # (which would require a reboot of the the virtual
 		    # node). 
 		    # 
-		    if (!exists($reserved_pnodes{$virtual})) {
-			$alreadyAllocated{$physical} = "reused";
+		    if (!exists($reserved_v2pmap{$virtual})) {
+			physnodesetreuse($physical, "reused");
 		    }
-		    elsif ($reserved_pnodes{$virtual} eq $physical) {
-			my $reserved = $reserved_vnodes{$virtual};
+		    elsif ($reserved_v2pmap{$virtual} eq $physical) {
+			my $reserved = $reserved_v2vmap{$virtual};
 
-			$alreadyAllocated{$reserved} = "reused";
-			$alreadyAllocated{$physical} = "reused";
+			physnodesetreuse($reserved, "reused");
+			physnodesetreuse($physical, "reused");
 		    }
 		    else {
-			$alreadyAllocated{$physical} = "reused";
+			physnodesetreuse($physical, "reused");
 		    }
 		}
 		else {
@@ -548,12 +561,12 @@ while (1) {
 		    # user requested reboot, that will be handled outside
 		    # of this script.
 		    #
-		    if (!exists($reserved_pnodes{$virtual}) ||
-			$reserved_pnodes{$virtual} ne $physical) {
-			$alreadyAllocated{$physical} = "reboot";
+		    if (!exists($reserved_v2pmap{$virtual}) ||
+			$reserved_v2pmap{$virtual} ne $physical) {
+			physnodesetreuse($physical, "reboot");
 		    }
 		    else {
-			$alreadyAllocated{$physical} = "reused";
+			physnodesetreuse($physical, "reboot");
 		    }
 		}
 	    }
@@ -670,21 +683,23 @@ while (1) {
 	    # wrapper (tbswap), since this only happens when in update mode
 	    # (swapmod).
 	    #
-	    foreach $node (keys(%alreadyAllocated)) {
-		if ($alreadyAllocated{$node} eq "unused") {
+	    foreach my $pnode (keys(%phys_nodes)) {
+		my $reuse = physnodereuse($pnode);
+		
+		if ($reuse eq "unused") {
 		    #
 		    # Node was used in previous incarnation, but not any more.
 		    #
-		    TBSetNodeAllocState($node,
+		    TBSetNodeAllocState($pnode,
 					TBDB_ALLOCSTATE_RES_TEARDOWN());
 		    
 		}
-		elsif ($alreadyAllocated{$node} eq "reboot") {
+		elsif ($reuse eq "reboot") {
 		    #
 		    # Node is being reused, but for a different purpose, so
 		    # it should be rebooted.
 		    #
-		    TBSetNodeAllocState($node,
+		    TBSetNodeAllocState($pnode,
 					TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 		}
 	    }
@@ -814,14 +829,14 @@ foreach my $pnode (keys(%virtnodes)) {
 	my @delvlist = ();
 	
 	foreach my $vnode (@vlist) {
-	    if (!defined($reserved_vnodes{$vnode})) {
+	    if (!defined($reserved_v2vmap{$vnode})) {
 		# A new vnode on pnode to allocate.
 		push(@newvlist, $vnode);
 		next;
 	    }
-	    if ($reserved_pnodes{$vnode} ne $pnode) {
+	    if ($reserved_v2pmap{$vnode} ne $pnode) {
 		# A vnode moved. Its new to this pnode.
-		print "$vnode has moved from $reserved_pnodes{$vnode} ".
+		print "$vnode has moved from $reserved_v2pmap{$vnode} ".
 		    "to $pnode!\n";
 		
 		push(@newvlist, $vnode);
@@ -829,7 +844,7 @@ foreach my $pnode (keys(%virtnodes)) {
 	    }
 
 	    # Push already allocated p/v onto lists for later.
-	    push(@oplist, $reserved_vnodes{$vnode});
+	    push(@oplist, $reserved_v2vmap{$vnode});
 	    push(@ovlist, $vnode);
 	}
 	# These are the new nodes we need to allocate
@@ -916,11 +931,11 @@ foreach my $pnode (keys(%virtnodes)) {
 	# need to reboot them.
 	#
 	if (!$impotent) {
-	    if (!defined($reserved_vnodes{$virtual})) {
+	    if (!defined($reserved_v2vmap{$virtual})) {
 		TBSetNodeAllocState($physical,
 				    TBDB_ALLOCSTATE_RES_INIT_CLEAN());
 	    }
-	    elsif ($reserved_vnodes{$virtual} ne $physical) {
+	    elsif ($reserved_v2vmap{$virtual} ne $physical) {
 		# Node has moved! Nuts!
 		TBSetNodeAllocState($physical,
 				    TBDB_ALLOCSTATE_RES_INIT_DIRTY());
@@ -941,7 +956,7 @@ LoadPhysResources();
 # These will get rebuilt soon. 
 #
 if ($updating && !$impotent) {
-    foreach $node (keys(%alreadyAllocated)) {
+    foreach my $pnode (keys(%phys_nodes)) {
 	#
 	# Do not need to do this for phys nodes that are to be
 	# released, or for virtnodes since they do not have interfaces
@@ -950,10 +965,10 @@ if ($updating && !$impotent) {
 	# library. 
 	#
 	next
-	    if (physnodeisvirtnode($node) ||
-		$alreadyAllocated{$node} eq "unused");
+	    if (physnodeisvirtnode($pnode) ||
+		physnodereuse($pnode) eq "unused");
 
-	my $controlnet  = physnodecontrolnet($node);
+	my $controlnet  = physnodecontrolnet($pnode);
 	my $controltest = "";
 
 	# Is it ever the case that the control net will be null?
@@ -963,10 +978,10 @@ if ($updating && !$impotent) {
 	}
 
 	DBQueryFatal("update interfaces set IP='',IPaliases='' " .
-		     "where node_id='$node' $controltest");
+		     "where node_id='$pnode' $controltest");
 
 	# Clean the veth_interfaces table for this node too.
-	DBQueryFatal("delete from veth_interfaces where node_id='$node'");
+	DBQueryFatal("delete from veth_interfaces where node_id='$pnode'");
     }
 }
 
@@ -1909,8 +1924,9 @@ sub getnodeport {
 sub InitPnode($pnode, $vnode)
 {
     my ($pnode,$vnode) = @_;
-    my $vname = $vnode;
+    my $vname;
     my $osid;
+    my $role;
 
     # XXX NSE hack: if the vnode is simulated, we just
     # choose FBSD-STD and static routing
@@ -1930,8 +1946,7 @@ sub InitPnode($pnode, $vnode)
 		     " where node_id='$pnode'");
 
 	$vname = "nsenode${nsenode_id}";
-	DBQueryFatal("update reserved set vname='$vname'" .
-		     "where node_id='$pnode'");
+	$role  = TBDB_RSRVROLE_SIMNODE;
 	$nsenode_id++;
 
 	# Right now, we have only one row for nseconfigs per experiment.
@@ -1967,6 +1982,8 @@ sub InitPnode($pnode, $vnode)
 	    #
 	    $osid = nodedelayosid(physnodetype($pnode));
 	    $expt_stats{"delaynodes"} += 1;
+	    $vname = $vnode;
+	    $role  = TBDB_RSRVROLE_DELAYNODE;
 	}
 	else {
 	    #
@@ -1978,6 +1995,7 @@ sub InitPnode($pnode, $vnode)
 	    # Set the vname to something useful.
 	    #
 	    $vname = newvhostvname($pnode);
+	    $role  = TBDB_RSRVROLE_VIRTHOST;
 	}
 	fatal(1, "*** $0:\n".
 	         "    No OSID is defined for internal node $vname!")
@@ -1988,9 +2006,6 @@ sub InitPnode($pnode, $vnode)
 		     " bootstatus='unknown', ".
 		     " ready=0 " .
 		     " where node_id='$pnode'");
-
-	DBQueryFatal("update reserved set vname='$vname' " .
-		     "where node_id='$pnode'");
     }
     else {
 	#
@@ -2006,6 +2021,8 @@ sub InitPnode($pnode, $vnode)
 	else {
 	    $osid = nodedefaultosid(physnodetype($pnode));
 	}
+	$vname = $vnode;
+	$role  = TBDB_RSRVROLE_NODE;
 
 	DBQueryFatal("UPDATE nodes set ".
 		     " def_boot_cmd_line='$cmdline'," .
@@ -2019,11 +2036,22 @@ sub InitPnode($pnode, $vnode)
 		     " failureaction='$failureaction'," .
 		     " routertype='$routertype'" .
 		     " where node_id='$pnode'");
-
-	DBQueryFatal("update reserved set vname='$vname' " .
-		     "where node_id='$pnode'");
     }
     printdb("reserved vname: $pnode $vname\n");
+
+    #
+    # Set the vname and role.
+    #
+    if (defined($vname) || defined($role)) {
+	my $sets = "";
+
+	$sets .= "vname='$vname' "
+	    if (defined($vname));
+	$sets .= (defined($vname) ? "," : "") . "erole='$role' "
+	    if (defined($role));	
+
+	DBQueryFatal("update reserved set $sets where node_id='$pnode'");
+    }
     
     #
     # Now call os_select.
@@ -2380,12 +2408,12 @@ sub newvhostvname($)
     #
     # First check to see if this pnode was already allocated (update)
     #
-    foreach my $vname (keys(%reserved_pnodes)) {
+    foreach my $vname (keys(%reserved_v2pmap)) {
 	# Skip the v mappings.
 	next
-	    if (exists($reserved_vnodes{$vname}));
+	    if (exists($reserved_v2vmap{$vname}));
 
-	if ($pnode eq $reserved_pnodes{$vname}) {
+	if ($pnode eq $reserved_v2pmap{$vname}) {
 	    return $vname;
 	}
     }
@@ -2394,47 +2422,8 @@ sub newvhostvname($)
 	my $newname = "vhost-" . $virtnode_id;
 	$virtnode_id++;
 
-	if (!defined($reserved_pnodes{$newname})) {
+	if (!defined($reserved_v2pmap{$newname})) {
 	    return $newname;
-	}
-    }
-}
-
-#
-# If updating (modify) find out what nodes need to be fixed in the new
-# run assign run. virtnodes complicate this!
-#
-sub LoadCurrent()
-{
-    printdb "Fixing previously allocated nodes.\n";
-    
-    my $query_result = 
-	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid ".
-		     " from reserved as r ".
-		     "left join nodes as n on n.node_id=r.node_id ".
-		     "where r.pid='$pid' and r.eid='$eid'");
-    
-    while (($vname,$reserved,$physnode) = $query_result->fetchrow_array) {
-	#
-	# If a virtnode, we need the underlying physnode, since thats
-	# what we fix it to. But we still need to remember which virtnodes
-	# are allocated for later.
-	#
-	# WIDEAREA nodes are going to break. 
-	#
-	if ($reserved ne $physnode) {
-	    $reserved_vnodes{$vname}     = $reserved;
-	    $reserved_pnodes{$vname}     = $physnode;
-	    $fixed_nodes{$vname}         = $physnode;
-	    $alreadyAllocated{$physnode} = "unused";
-	    $alreadyAllocated{$reserved} = "unused";
-	    $reserved_vcount++;
-	}
-	else {
-	    $reserved_pnodes{$vname}     = $reserved;
-	    $fixed_nodes{$vname}         = $reserved;    
-	    $alreadyAllocated{$reserved} = "unused";
-	    $reserved_pcount++;
 	}
     }
 }
@@ -2513,17 +2502,17 @@ sub LoadVirtNodes()
 
 	# Extend the DB info with this stuff:
 	# The mapped osname to actual osid. 
-	$rowref->{"osid"} = undef;
+	$rowref->{"__osid"} = undef;
 	# Eventual physical mapping. 
-	$rowref->{"physnode"} = undef;
+	$rowref->{"__physnode"} = undef;
 	# Handy to combine these now.
-	$rowref->{"settings"} = [ $rowref->{"cmd_line"},
-				  $rowref->{"rpms"},
-				  $rowref->{"deltas"},
-				  $rowref->{"startupcmd"},
-				  $rowref->{"tarfiles"},
-				  $rowref->{"failureaction"},
-				  $rowref->{"routertype"} ];
+	$rowref->{"__settings"} = [ $rowref->{"cmd_line"},
+				    $rowref->{"rpms"},
+				    $rowref->{"deltas"},
+				    $rowref->{"startupcmd"},
+				    $rowref->{"tarfiles"},
+				    $rowref->{"failureaction"},
+				    $rowref->{"routertype"} ];
 
 	# Can fixed really get set to ""?
 	if (defined($fixed) && $fixed ne "") {
@@ -2605,7 +2594,7 @@ sub LoadVirtNodes()
 		         "    Invalid OS $osname in project $pid!\n");
 	    }
 	    # Stash this in the virt_nodes data structure.
-	    $rowref->{"osid"}	= $osid;
+	    $rowref->{"__osid"}	= $osid;
 	}
     }
 }
@@ -2619,9 +2608,10 @@ sub LoadVirtNodes()
 sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
 sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
 sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
-sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"osid"}; }
-sub virtnodephysnode($) { return $virt_nodes{$_[0]}->{"physnode"}; }
-sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"settings"}}; }
+sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
+sub virtnodepnode($)    { return $virt_nodes{$_[0]}->{"__physnode"}; }
+sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
+sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
 sub virtnodeisremote($) {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isremotenode"};
 }
@@ -2629,8 +2619,7 @@ sub virtnodeisvirt($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isvirtnode"};
 }
 sub virtnodeisjailed($) {
-    return virtnodeisvirt($_[0]) &&
-	physnodeisjailed(virtnodephysnode($_[0]));
+    return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
 }
 
 #
@@ -3026,9 +3015,11 @@ sub CreateTopFile()
 					   $nodeport1,$rdelay,$rbw,$rloss];
 
 		    print TOPFILE "node $delayname delay\n";
-		    print TOPFILE "link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
+		    print TOPFILE
+			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
 			"$node0 $delayname $bandwidth 0 0\n";
-		    print TOPFILE "link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
+		    print TOPFILE
+			"link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
 			"$node1 $delayname $bandwidth 0 0\n";
 
 		    $delaynodes{$delayname} = $delayname;
@@ -3220,13 +3211,10 @@ sub CreateTopFile()
 		     "where pid='$pid' and eid='$eid'");
     }
 
-    print "Minimum nodes  = $minimum_nodes\n";
-    print "Maximum nodes  = $maximum_nodes\n";
-    if ($updating && $reserved_pcount) {
-	print "Reserved nodes = $reserved_pcount\n";
-    }
+    print "Minimum nodes   = $minimum_nodes\n";
+    print "Maximum nodes   = $maximum_nodes\n";
     if ($virtnode_count) {
-	print "Virtual nodes  = $virtnode_count\n";
+	print "Virtual nodes   = $virtnode_count\n";
     }
 }
 
@@ -3237,30 +3225,49 @@ sub CreateTopFile()
 # this data structure should be defined outside this module, as more
 # generally usable.
 #
+sub LoadPhysNode($)
+{
+    my ($pnode) = @_;
+    
+    if (! exists($phys_nodes{$pnode})) {
+	my $query_result =
+	    DBQueryFatal("select n.*,nt.* from nodes as n ".
+			 "left join node_types as nt on nt.type=n.type ".
+			 "where n.node_id='$pnode'");
+
+	fatal(1, "*** $0:\n".
+		 "    No such pnode $pnode in nodes table")
+	    if (!$query_result->num_rows);
+
+	my $rowref = $query_result->fetchrow_hashref();
+
+	#
+	# Stash the entire DB row reference. 
+	#
+	$phys_nodes{$pnode} = $rowref;
+
+	#
+	# Pnodes start in "reboot" state.
+	#
+	$rowref->{"__reuse"} = "reboot";
+    }
+    return $phys_nodes{$pnode};
+}
+
 sub LoadPhysResources()
 {
     foreach my $pnode (keys(%p2vmap)) {
 	my @vnodes = @{$p2vmap{$pnode}};
 
-	if (! exists($phys_nodes{$pnode})) {
-	    my $query_result =
-		DBQueryFatal("select n.*,nt.* from nodes as n ".
-			     "left join node_types as nt on nt.type=n.type ".
-			     "where n.node_id='$pnode'");
+	# Load the physical node. 
+	LoadPhysNode($pnode);
 
-	    fatal(1, "*** $0:\n".
-		     "    No such pnode $pnode in nodes table")
-		if (!$query_result->num_rows);
-
-	    my $rowref = $query_result->fetchrow_hashref();
-
-	    #
-	    # Stash the entire DB row reference. We will extend this as
-	    # needed.
-	    #
-	    $phys_nodes{$pnode} = $rowref;
-	}
-
+	#
+	# Typically, its one-to-one, unless its a physnode hosting
+	# virtnodes, in which case the mapping is one-to-many.
+	#
+	# XXX What about sim nodes?
+	#
 	foreach my $vnode (@vnodes) {
 	    #
 	    # Open question: Nodes that we create in assign_wrapper, like
@@ -3272,42 +3279,96 @@ sub LoadPhysResources()
 		if (!virtnodeisvnode($vnode));
 	    
 	    #
-	    # If the vnode is plain (not virtual), then just set the
-	    # phys slot in the virt_nodes entry. 
+	    # The vnode is plain (not virtual).
 	    #
 	    if (!virtnodeisvirt($vnode)) {
-		$virt_nodes{$vnode}->{"physnode"} = $pnode;
+		virtnodesetpnode($vnode, $pnode);
+		physnodesetvnode($pnode, $vnode);
 		next;
 	    }
 	    my $vpnode = $v2vmap{$vnode};
-		
+
 	    #
 	    # Its a virtual node, so the phys node is really another
 	    # virtual node, and its physnode is ...
 	    #
-	    $query_result =
-		DBQueryFatal("select n.*,nt.* from nodes as n ".
-			     "left join node_types as nt on nt.type=n.type ".
-				     "where n.node_id='$vpnode'");
-
-	    fatal(1, "*** $0:\n".
-		     "    No such pnode $pnode in nodes table")
-		if (!$query_result->num_rows);
-
-	    my $rowref = $query_result->fetchrow_hashref();
-
-	    #
-	    # Stash the entire DB row reference.
-	    #
-	    $phys_nodes{$vpnode} = $rowref;
-	    
-	    $virt_nodes{$vnode}->{"physnode"} = $vpnode;
+	    LoadPhysNode($vpnode);
+		
+	    virtnodesetpnode($vnode, $vpnode);
+	    physnodesetvnode($vpnode, $vnode);
 	}
     }
 }
+sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
 sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
-sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailed"}; }
+sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailflag"}; }
 sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{"phys_nodeid"}; }
 sub physnodecontrolnet($){ return $phys_nodes{$_[0]}->{"control_net"}; }
 sub physnodetype($)      { return $phys_nodes{$_[0]}->{"type"}; }
+sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
+sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
+sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
+sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
 
+#
+# Load current resources. We pull in the phys node entries now.
+# 
+sub LoadCurrent()
+{
+    my $reserved_pcount  = 0;
+    my $reserved_vcount  = 0;
+
+    printdb "Fixing previously allocated nodes.\n";
+    
+    my $query_result = 
+	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid, ".
+		     "       nt.isvirtnode,nt.isremotenode ".
+		     " from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "where r.pid='$pid' and r.eid='$eid'");
+    
+    while (($vname,$reserved,$physnode,$isvirt,$isremote) =
+	   $query_result->fetchrow_array) {
+
+	#
+	# WIDEAREA nodes are going to break. Hmm, so are "sim" nodes.
+	#
+	fatal(1, "*** $0:\n".
+		 "    Cannot update widearea nodes yet!")
+	    if ($isremote);
+	
+	LoadPhysNode($reserved);
+	
+	#
+	# If a virtnode, we need the underlying physnode, since thats
+	# what we fix it to. But we still need to remember which virtnodes
+	# are allocated for later.
+	#
+	if ($isvirt) {
+	    LoadPhysNode($physnode);
+	    physnodesetreuse($reserved, "unused");
+	    physnodesetreuse($physnode, "unused");
+	    $reserved_v2vmap{$vname} = $reserved;
+	    $reserved_v2pmap{$vname} = $physnode;
+
+	    # Allow for the user to "move" a node. Yuck!
+	    $fixed_nodes{$vname} = $physnode
+		if (!defined($fixed_nodes{$vname}));
+	    $reserved_vcount++;
+	}
+	else {
+	    $reserved_v2pmap{$vname} = $reserved;
+	    physnodesetreuse($reserved, "unused");
+	    
+	    # Allow for the user to "move" a node. Yuck!
+	    $fixed_nodes{$vname} = $reserved
+		if (!defined($fixed_nodes{$vname}));
+	    $reserved_pcount++;
+	}
+    }
+    print "Reserved pnodes = $reserved_pcount\n"
+	if ($reserved_pcount);
+    print "Reserved vnodes = $reserved_vcount\n"
+	if ($reserved_vcount);
+}
