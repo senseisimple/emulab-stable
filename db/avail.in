@@ -56,10 +56,13 @@ if ( $d ) {
 my $join= "nodes as a left join reserved as b on a.node_id=b.node_id".
   " left join node_types as nt on a.type=nt.type";
 my $cols= "a.node_id,a.type,nt.class";
-my $cond= "b.node_id is null and a.role='testnode'";
+my $cond= "b.node_id is null and ( a.role='testnode'";
 if ($args{"includevirt"}) {
-    $cond .= " or a.role='virtnode' ";
+    $cond .= " or a.role='virtnode' ) ";
+} else {
+    $cond .= " ) ";
 }
+
 my $os = 0;
 my $delta = 0;
 
