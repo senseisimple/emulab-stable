@@ -31,11 +31,12 @@ private:
         std::vector<size_t> nodes;
     };
 public:
-    ConservativeAssigner();
+    ConservativeAssigner(Partition & newPartition);
     virtual ~ConservativeAssigner();
     virtual std::auto_ptr<Assigner> clone(void) const;
 
-    virtual void setPartitionCount(size_t newCount);
+    virtual void setPartition(Partition & newPartition);
+
     virtual void addLan(int bits, int weight, std::vector<size_t> nodes);
     virtual void ipAssign(void);
     virtual void print(std::ostream & output) const;
@@ -75,6 +76,7 @@ private:
     int m_lanMaskSize;
     int m_netMaskSize;
     PrefixTable m_partitionIPList;
+    Partition & m_partition;
 };
 
 #endif

@@ -38,7 +38,6 @@ int main(int argc, char * argv[])
         frame.route();
         frame.printIP(std::cout);
         frame.printRoute(std::cout);
-        frame.printStatistics(std::cerr);
     }
     catch (InvalidArgumentException const & error)
     {
@@ -58,3 +57,6 @@ void usage(ostream & output)
 {
     output << "Usage: ipassign [-p#] [-sbg] [-hln] [-tvc]" << endl;
 }
+
+
+

@@ -83,6 +83,7 @@ public:
         ostringstream buffer;
         buffer << "Node: " << current << " Destination: "
                << ipToString(destination);
+        addToMessage(buffer.str());
     }
 };
 
@@ -253,7 +254,8 @@ void parseArgs(int argc, char * argv[]);
 
 // take the ip assignment portion of the output and use that to set up
 // ip addresses and adjascency for the nodes
-void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces);
+void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces,
+                list<IPAddress> & interfaceOrder);
 
 // For each node's section, set up the routing table for that node.
 // Return the total number of routes found.
@@ -263,7 +265,8 @@ int64 setupRoutes(vector<Node> & nodes);
 // Return the aggregate length of routes from every node to every
 //   interface.
 int64 tryRoutes(vector<Node> & nodes,
-                map<IPAddress,size_t> const & interfaces);
+                map<IPAddress,size_t> const & interfaces,
+                list<IPAddress> const & interfaceOrder);
 
 // Check a particular route for cycles and ensure that it is possible.
 // Return the length of that route.
@@ -293,9 +296,10 @@ int main(int argc, char * argv[])
         parseArgs(argc, argv);
         vector<Node> nodes;
         map<IPAddress,size_t> interfaces;
-        setupNodes(nodes, interfaces);
+        list<IPAddress> interfaceOrder;
+        setupNodes(nodes, interfaces, interfaceOrder);
         int64 routeCount = setupRoutes(nodes);
-        int64 routeLength = tryRoutes(nodes, interfaces);
+        int64 routeLength = tryRoutes(nodes, interfaces, interfaceOrder);
         displayResults(routeCount, routeLength);
     }
     catch(exception & error)
@@ -322,13 +326,15 @@ void parseArgs(int argc, char * argv[])
     }
 }
 
-void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces)
+void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces,
+                list<IPAddress> & interfaceOrder)
 {
     string bufferString;
     size_t lastLan = 0;
     list< pair<size_t,IPAddress> > lastNodes;
 
     interfaces.clear();
+    interfaceOrder.clear();
 
     getline(cin, bufferString);
     while (cin && bufferString != "%%")
@@ -346,6 +352,7 @@ void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces)
                 nodes.resize(currentNode + 1);
             }
             interfaces[ip] = currentNode;
+            interfaceOrder.push_back(ip);
             nodes[currentNode].setValid();
             if (currentLan == lastLan)
             {
@@ -399,19 +406,29 @@ int64 setupRoutes(vector<Node> & nodes)
 }
 
 int64 tryRoutes(vector<Node> & nodes,
-                 map<IPAddress,size_t> const & interfaces)
+                map<IPAddress,size_t> const & interfaces,
+                list<IPAddress> const & interfaceOrder)
 {
     int64 result = 0;
     for (size_t i = 0; i < nodes.size(); ++i)
     {
-        map<IPAddress,size_t>::const_iterator pos = interfaces.begin();
-        for ( ; pos != interfaces.end(); ++pos)
+        list<IPAddress>::const_iterator pos = interfaceOrder.begin();
+//        map<IPAddress,size_t>::const_iterator pos = interfaces.begin();
+        for ( ; pos != interfaceOrder.end(); ++pos)
         {
             if (nodes[i].isValid())
             {
-                //                   (source, dest, nodes, interfaces)
-                result += followRoute(i, pos->first, pos->second,
+                map<IPAddress, size_t>::const_iterator found;
+                found = interfaces.find(*pos);
+                if (found == interfaces.end())
+                {
+                    throw StringException("Impossible condition: interfaces");
+                }
+                //                   (source, destIP, destNode,
+                result += followRoute(i,      *pos,   found->second,
                                       nodes, interfaces);
+
+
             }
         }
         if (i % 10 == 0)
@@ -513,3 +530,4 @@ void clearVisited(vector<Node> & nodes)
         nodes[i].clearVisited();
     }
 }
+

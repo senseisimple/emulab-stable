@@ -59,7 +59,7 @@ void LanRouter::calculateRoutes(void)
 
     // calculate lan shortest paths
     {
-        FileWrapper file(coprocess("bin/routecalc").release());
+        FileWrapper file(coprocess(ROUTECALC).release());
         for (i = 0; i < lanCount; ++i)
         {
             lanShortestPaths[i].resize(lanCount);

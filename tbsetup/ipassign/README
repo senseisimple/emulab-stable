@@ -16,15 +16,23 @@ Example: "bin/ipassign -c -s -h < graph/smalltern.graph"
          Use conservative bitspace allocation for square root of the # of LANs
          partitions with host-host routing on the smalltern graph
 
-'-p#', '-s', '-b', and '-g' modify the same behaviour. If more than one is
-used, the last one used takes precedence.
 
 '-p#'   When calculating assignment for ip addresses, # is used to set how
         many partitions to create. Example: '-p20' would create 20 partitions.
 
-'-s'    When calculating the number of partitions to use for ip assignment,
-        use the square root of the number of LANs. (default)
+'-ps'   Search for the proper number of partitions by running METIS repeatedly
+        and scoring the result.
 
+'-pq'   Use the square root of the number of LANs as the number of partitions.
+	(default)
+
+'-c', '-b', and '-g' modify the same behaviour. If more than one is
+used, the last one used takes precedence.
+!!! Always use this for now. Dynamic bitspace allocation is not yet
+    implemented !!!
+'-c'    Use conservative bitspace allocation. Each level of the hierarchy
+        is allocated a fixed number of bits. Only takes effect alongside
+	of -p or -s
 #'-b'    Instead of using a single level of hierachy in which a set number
 #        of partitions are used, cut the graph in half assigning each
 #        half a zero or one, cut each of the resulting subgraphs in half,
@@ -34,11 +42,6 @@ used, the last one used takes precedence.
 #        METIS.
 #        -- NOT IMPLEMENTED --
 
-!!! Always use this for now. Dynamic bitspace allocation is not yet
-    implemented !!!
-'-c'    Use conservative bitspace allocation. Each level of the hierarchy
-        is allocated a fixed number of bits. Only takes effect alongside
-	of -p or -s
 
 
 '-h', '-l', and '-n' modify the same behaviour. If more than one is used, the

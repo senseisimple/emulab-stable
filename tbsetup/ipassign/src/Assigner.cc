@@ -13,7 +13,3 @@
 Assigner::~Assigner()
 {
 }
-
-void Assigner::setPartitionCount(size_t)
-{
-}

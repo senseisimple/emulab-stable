@@ -15,14 +15,14 @@
 #include "HostRouter.h"
 #include "LanRouter.h"
 #include "NetRouter.h"
+#include "Partition.h"
+#include "FixedPartition.h"
+#include "SearchPartition.h"
+#include "SquareRootPartition.h"
 
 using namespace std;
 
 Framework::Framework(int argCount, char ** argArray)
-    : m_willTime(false)
-    , m_usePartitionCount(false)
-    , m_willPrintStatistics(false)
-    , m_partitionCount(0)
 {
     if (argCount <= 0 || argArray == NULL)
     {
@@ -54,6 +54,11 @@ Framework::Framework(Framework const & right)
         // See above.
         m_route.reset(right.m_route->clone().release());
     }
+    if (right.m_partition.get() != NULL)
+    {
+        // See above.
+        m_partition.reset(right.m_partition->clone().release());
+    }
 }
 
 Framework & Framework::operator=(Framework const & right)
@@ -63,13 +68,13 @@ Framework & Framework::operator=(Framework const & right)
     Framework temp(right);
     swap(m_assign, temp.m_assign);
     swap(m_route, temp.m_route);
+    swap(m_partition, temp.m_partition);
     return *this;
 }
 
 void Framework::input(istream & inputStream)
 {
     string bufferString;
-    size_t lanCount = 0;
     getline(inputStream, bufferString);
     while (inputStream)
     {
@@ -119,20 +124,10 @@ void Framework::input(istream & inputStream)
                 throw NotEnoughNodesException(bufferString);
             }
             // send it off to the
-            ++lanCount;
+            m_partition->addLan();
             m_assign->addLan(bits, weight, nodes);
         }
         getline(inputStream, bufferString);
-    }
-    // If m_usePartitionCount is set, that is the number of partitions
-    // to use. Otherwise, use the square root of the number of LANs.
-    if (m_usePartitionCount)
-    {
-        m_assign->setPartitionCount(m_partitionCount);
-    }
-    else
-    {
-        m_assign->setPartitionCount(sqrt(lanCount));
     }
 }
 
@@ -157,19 +152,11 @@ void Framework::printRoute(ostream & output) const
     m_route->print(output);
 }
 
-void Framework::printStatistics(ostream & output) const
-{
-    if (m_willPrintStatistics)
-    {
-        m_route->printStatistics(output);
-    }
-}
-
 void Framework::parseCommandLine(int argCount, char ** argArray)
 {
-    AssignType assignChoice = SquareRoot;
+    AssignType assignChoice = Conservative;
     RouteType routeChoice = HostNet;
-    bool isConservative = true;
+    m_partition.reset(new SquareRootPartition());
     for (int i = 1; i < argCount; ++i)
     {
         string currentArg = argArray[i];
@@ -179,28 +166,19 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
         }
         else
         {
-            parseArgument(currentArg, assignChoice, routeChoice,
-                          isConservative);
+            parseArgument(currentArg, assignChoice, routeChoice);
         }
     }
     switch (assignChoice)
     {
-    case Partition:
-    case SquareRoot:
-        if (isConservative)
-        {
-            m_assign.reset(new ConservativeAssigner);
-        }
-/*        else
-        {
-            m_assign.reset(new DynamicAssigner);
-            }*/
+    case Conservative:
+        m_assign.reset(new ConservativeAssigner(*m_partition));
         break;
 /*    case Binary:
-        m_assign.reset(new BinaryAssigner);
+        m_assign.reset(new BinaryAssigner(*m_partition));
         break;
     case Greedy:
-    m_assign.reset(new GreedyAssigner);
+    m_assign.reset(new GreedyAssigner(*m_partition));
         break;*/
     default:
         throw ImpossibleConditionException("Framework::ParseCommandLine "
@@ -210,13 +188,13 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
     switch (routeChoice)
     {
     case HostHost:
-        m_route.reset(new HostRouter);
+        m_route.reset(new HostRouter());
         break;
     case HostLan:
-        m_route.reset(new LanRouter);
+        m_route.reset(new LanRouter());
         break;
     case HostNet:
-        m_route.reset(new NetRouter);
+        m_route.reset(new NetRouter());
         break;
     default:
         throw ImpossibleConditionException("Framework::ParseCommandLine "
@@ -227,27 +205,45 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
 
 void Framework::parseArgument(string const & arg,
                               Framework::AssignType & assignChoice,
-                              Framework::RouteType & routeChoice,
-                              bool & isConservative)
+                              Framework::RouteType & routeChoice)
 {
     bool done = false;
     for (size_t j = 1; j < arg.size() && !done; ++j)
     {
         switch(arg[j])
         {
-            // p means explicitly tell us the partitions
+            // p means this argument group is about partitions. It must be
+            // followed by a number (Fixed), a 'q' (SquareRoot),
+            // or an 's' (Search)
         case 'p':
             // if there is a 'p', it must go in its own -group
             // for example -p11 is legal but -p11h is not legal
             if (j == 1 && arg.size() > 1)
             {
-                stringstream buffer;
-                buffer << arg.substr(2);
-                buffer >> m_partitionCount;
-                assignChoice = Partition;
-                m_usePartitionCount = true;
-                done = true;
-                if (buffer.fail())
+                if (isdigit(arg[2]))
+                {
+                    int partitionCount = 0;
+                    stringstream buffer;
+                    buffer << arg.substr(2);
+                    buffer >> partitionCount;
+                    if (buffer.fail())
+                    {
+                        throw InvalidArgumentException(arg);
+                    }
+                    m_partition.reset(new FixedPartition(partitionCount));
+                    done = true;
+                }
+                else if (arg[2] == 'q')
+                {
+                    m_partition.reset(new SquareRootPartition);
+                    done = true;
+                }
+                else if (arg[2] == 's')
+                {
+                    m_partition.reset(new SearchPartition);
+                    done = true;
+                }
+                else
                 {
                     throw InvalidArgumentException(arg);
                 }
@@ -257,20 +253,17 @@ void Framework::parseArgument(string const & arg,
                 throw InvalidArgumentException(arg);
             }
             break;
-            // use the square root of the number of LANs for partitioning
-        case 's':
-            assignChoice = SquareRoot;
-            m_usePartitionCount = false;
+        case 'c':
+            // use conservative ip assignment
+            assignChoice = Conservative;
             break;
             // use a binary partitioning scheme
         case 'b':
             assignChoice = Binary;
-            m_usePartitionCount = false;
             break;
             // use a greedy partitioning algorithm
         case 'g':
             assignChoice = Greedy;
-            m_usePartitionCount = false;
             break;
             // use host-host routing
         case 'h':
@@ -285,18 +278,6 @@ void Framework::parseArgument(string const & arg,
             routeChoice = HostNet;
             break;
             // time ip assignment and routing
-        case 't':
-            m_willTime = true;
-            break;
-            // print statistics about how well routing worked.
-        case 'v':
-            m_willPrintStatistics = true;
-            break;
-        case 'c':
-            isConservative = true;
-            break;
-//      case 'r':
-//          break;
         default:
             throw InvalidArgumentException(arg);
             break;

@@ -12,26 +12,29 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		=
-# src
+IPASSIGN_SCRIPTS = ipassign_wrapper
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SUBDIRS)
+all:	src $(IPASSIGN_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 .PHONY:	src
+
 src:
 	@$(MAKE) -C src all
 
-install: all subdir-install
+install: all subdir-install script-install
 
 #
 # Automate this part at some point.
 # 
+
+script-install:		$(addprefix $(INSTALL_LIBEXECDIR)/, $(IPASSIGN_SCRIPTS))
+
 subdir-install:
 	@$(MAKE) -C src install
 
@@ -39,6 +42,7 @@ post-install:
 	@$(MAKE) -C src post-install
 
 clean:	subdir-clean
+	-rm -f $(IPASSIGN_SCRIPTS)
 
 subdir-clean:
 	@$(MAKE) -C src clean

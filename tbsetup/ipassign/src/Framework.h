@@ -14,6 +14,7 @@
 
 class Assigner;
 class Router;
+class Partition;
 
 class Framework
 {
@@ -27,11 +28,14 @@ public:
     void route(void);
     void printIP(ostream & output) const;
     void printRoute(ostream & output) const;
-    void printStatistics(ostream & output) const;
 private:
     enum AssignType
     {
-        Partition, SquareRoot, Binary, Greedy
+        Conservative, Adaptive, Binary, Greedy
+    };
+    enum PartitionType
+    {
+        Fixed, SquareRoot, Search
     };
     enum RouteType
     {
@@ -40,14 +44,19 @@ private:
 private:
     void parseCommandLine(int argCount, char ** argArray);
     void parseArgument(std::string const & arg, AssignType & assignChoice,
-                       RouteType & routeChoice, bool & isConservative);
+                       RouteType & routeChoice);
 private:
     std::auto_ptr<Assigner> m_assign;
     std::auto_ptr<Router> m_route;
-    bool m_willTime;
-    bool m_usePartitionCount;
-    bool m_willPrintStatistics;
-    int m_partitionCount;
+    std::auto_ptr<Partition> m_partition;
 };
 
 #endif
+
+
+
+
+
+
+
+

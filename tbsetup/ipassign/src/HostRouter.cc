@@ -35,7 +35,7 @@ void HostRouter::calculateRoutes(void)
         && m_levelPrefix.size() != 0 && m_levelMakeup.size() != 0
         && m_lanWeights.size() != 0)
     {
-        FileWrapper file(coprocess("bin/routecalc").release());
+        FileWrapper file(coprocess(ROUTECALC).release());
         m_tableList.clear();
         m_tableList.resize(m_nodeToLevel[0].size());
         for (size_t i = 0; i < m_nodeToLevel[0].size(); ++i)

@@ -260,7 +260,7 @@ void NetRouter::calculateBorderToBorderPaths(size_t level, size_t partition)
         }
     }
     cerr << ".";
-    FileWrapper file(coprocess("bin/routecalc").release());
+    FileWrapper file(coprocess(ROUTECALC).release());
     char command = 'i';
     for (size_t i = 0; i < m_levelMakeup[level][partition].size(); ++i)
     {

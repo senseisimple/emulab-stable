@@ -12,6 +12,8 @@
 #ifndef ASSIGNER_H_IP_ASSIGN_2
 #define ASSIGNER_H_IP_ASSIGN_2
 
+#include "Partition.h"
+
 class Assigner
 {
 public:
@@ -23,9 +25,7 @@ public:
     virtual ~Assigner();
     virtual std::auto_ptr<Assigner> clone(void) const=0;
 
-    // Determines how many partitions to divide the graph into.
-    // Should only affect NumberAssigner and ConservativeAssigner
-    virtual void setPartitionCount(size_t);
+    virtual void setPartition(Partition & newPartition)=0;
     // This is called repeatedly to form the graph. Raw parsing
     // of the command line is done outside.
     // Any numbers between [0..MaxNodeNumber] that are unused

@@ -20,10 +20,15 @@ int main(int argc, char * argv[])
         {
             int left = 0;
             int right = 0;
+            size_t total = 1;
             ideal >> left;
             candidate >> right;
             while (ideal && candidate)
             {
+                if (right - left < 0)
+                {
+                    cerr << total << " ideal: " << left << " candidate: " << right << endl;
+                }
                 absolute << (right - left) << endl;
                 double num = right - left;
                 double denom = right;
@@ -33,6 +38,7 @@ int main(int argc, char * argv[])
                 }
                 ideal >> left;
                 candidate >> right;
+                ++total;
             }
         }
     }

@@ -9,52 +9,69 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../..
 SUBDIR		= tbsetup/ipassign/src
 UNIFIED         = @UNIFIED_BOSS_AND_OPS@
+ROUTECALC_PATH	= \"$(INSTALL_LIBEXECDIR)/rcalc\"
 
 include $(OBJDIR)/Makeconf
 
-CXXFLAGS	+= -I/usr/local/include/metis 
+CXXFLAGS	+= -O3 -I/usr/local/include/metis \
+		   -DROUTECALC=$(ROUTECALC_PATH)
 
 LDFLAGS		+= -L/usr/local/lib
 
-LIBEXEC_STUFF	= ipassign
+LIBEXEC_STUFF	= ipassign rcalc
+
+BIN_STUFF	= difference add-x inet2graph brite2graph top2graph routestat
 
 IPASSIGN_OBJECTS = bitmath.o ipassign.o Assigner.o ConservativeAssigner.o \
-                   Framework.o HostRouter.o NumberAssigner.o Router.o 
+                   Framework.o HostRouter.o Router.o \
+		   LanRouter.o NetRouter.o coprocess.o
 
-IPASSIGN_HEADERS = Exception.h lib.h Assigner.h ConservativeAssigner.h \
-                   Framework.h HostRouter.h NumberAssigner.h Router.h \
+ROUTECALC_OBJECTS = routecalc.o
+
+BIN_OBJECTS	= $(addsuffix .o, $(BIN_STUFF))
+
+HEADERS 	= Exception.h lib.h Assigner.h ConservativeAssigner.h \
+                   Framework.h HostRouter.h Router.h \
+		   LanRouter.h NetRouter.h coprocess.h \
                    bitmath.h
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(LIBEXEC_STUFF)
+all:	$(LIBEXEC_STUFF) $(BIN_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: all libexec-install
+install: all libexec-install bin-install
 
 #
 # Automate this part at some point.
 # 
-libexec-install:	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
+libexec-install:	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
 
-ipassign: $(IPASSIGN_OBJECTS) $(IPASSIGN_HEADERS)
+bin-install:		$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF))
+
+ipassign: $(IPASSIGN_OBJECTS) $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(IPASSIGN_OBJECTS) -lm -lmetis -o ipassign
 
-$(IPASSIGN_OBJECTS): $(IPASSIGN_HEADERS)
+rcalc: $(ROUTECALC_OBJECTS) $(HEADERS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(ROUTECALC_OBJECTS) -lm -o rcalc
+
+$(BIN_STUFF): $(BIN_OBJECTS) $(HEADERS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@ -lm -lmetis
+
+$(IPASSIGN_OBJECTS): $(HEADERS)
+
+$(ROUTECALC_OBJECTS): $(HEADERS)
+
+$(BIN_OBJECTS): $(HEADERS)
 
 post-install: 
 	chmod 775 $(INSTALL_LIBEXECDIR)
 
 clean:
-	rm -f bitmath.o ipassign.o Assigner.o ConservativeAssigner.o \
-              Framework.o HostRouter.o NumberAssigner.o Router.o ipassign
+	rm -f *.o $(LIBEXEC_STUFF) $(BIN_STUFF)
 
 distclean:
-
-
-
-
 

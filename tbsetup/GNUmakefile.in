@@ -13,7 +13,7 @@ PLABSUPPORT     = @PLABSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nseparse
+SUBDIRS		= checkpass ns2ir ipassign nseparse
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load startexp endexp batchexp swapexp \
@@ -36,7 +36,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
-		  assign_wrapper ptopgen webnodeupdate \
+		  assign_wrapper assign_prepass ptopgen webnodeupdate \
 		  webdelay_config \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup websetgroups webmkproj \
@@ -65,7 +65,7 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir plab
+.PHONY:	checkpass ns2ir plab ipassign
 checkpass:
 	@$(MAKE) -C checkpass all
 
@@ -77,6 +77,9 @@ nseparse:
 
 plab:
 	@$(MAKE) -C plab all
+
+ipassign:
+	@$(MAKE) -C ipassign all
 
 install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
@@ -100,6 +103,7 @@ subdir-install:
 	@$(MAKE) -C ns2ir install
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)
+	@$(MAKE) -C ipassign install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -111,6 +115,7 @@ post-install:
 	@$(MAKE) -C ns2ir post-install
 	@$(MAKE) -C nseparse post-install
 	$(PLAB_POST_INSTALL)
+	@$(MAKE) -C ipassign post-install
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
@@ -184,6 +189,7 @@ subdir-clean:
 	@$(MAKE) -C ns2ir clean
 	@$(MAKE) -C nseparse clean
 #	@$(MAKE) -C plab clean
+	@$(MAKE) -C ipassign clean
 
 distclean:	subdir-distclean
 
@@ -192,6 +198,7 @@ subdir-distclean:
 	@$(MAKE) -C ns2ir distclean
 	@$(MAKE) -C nseparse distclean
 	@$(MAKE) -C plab distclean
+	@$(MAKE) -C ipassign distclean
 #
 # XXX Create non .tcl files.
 #

@@ -1,0 +1,373 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Socket;
+use IO::Handle;     # thousands of lines just for autoflush :-(
+
+#
+# usage: ipassign_wrapper <pid> <eid>
+#
+sub usage()
+{
+    print("Usage: ipassign_wrapper [-n [-s|-b|-l]] [-d] [-f] <pid> <eid>\n".
+	  "       Use -n to print routes, but leave the DB alone.\n".
+	  "       Use -s (with -n) to print routes in NS format.\n".
+	  "       Use -b (with -n) to print routes in Freebsd format.\n".
+	  "       Use -l (with -n) to print routes in Linux format.\n".
+	  "       Use -d to turn on debugging output.\n".
+	  "       Use -f to force route calculation; ignore 'static' flag.\n".
+          "       Use -H to specift host-host routing in ipassign\n".
+          "       Use -L to specift host-lan routing in ipassign\n".
+          "       Use -N to specift host-net routing in ipassign\n".
+          "       Use -p to specify the # of partitions\n");
+
+    exit(-1);
+}
+my  $optlist = "nsbldfHLNp:";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+
+my $debug         = 0;
+my $ipassign      = "$TB/libexec/ipassign";
+my $ipassign_args = " -c";
+my $impotent      = 0;
+my $force	  = 0;
+my $format        = "";
+my $routetype     = "host2net";
+my $partitions    = 0;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"s"})) {
+    $format = "ns";
+}
+if (defined($options{"b"})) {
+    $format = "bsd";
+}
+if (defined($options{"l"})) {
+    $format = "suxs";
+}
+if (defined($options{"p"})) {
+    $partitions = $options{"p"};
+    $ipassign_args .= " -p$partitions";
+} else {
+    $ipassign_args .= " -s";
+}
+if (defined($options{"H"})) {
+    $routetype = "host2host";
+    $ipassign_args .= " -h";
+}
+if (defined($options{"L"})) {
+    $routetype = "host2lan";
+    $ipassign_args .= " -l";
+}
+if (defined($options{"N"})) {
+    $routetype = "host2net";
+    $ipassign_args .= " -n";
+}
+if ($format && !$impotent) {
+    usage();
+}
+
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+#
+# Are we doing Static routing?
+#
+my $query_result =
+    DBQueryFatal("select routertype from virt_nodes ".
+		 "where pid='$pid' and eid='$eid' limit 1");
+
+if (!$query_result->numrows) {
+    warn("*** $0:\n".
+	 "    No nodes in experiment $pid/$eid!\n");
+    exit(0);
+} else {
+    my $routertype = $query_result->fetchrow_array;
+    if (!$force && $routertype ne "static") {
+        warn("Static routing not requested in $pid/$eid. This is okay!\n");
+        exit(0);
+    }
+}
+
+
+#
+# Grab virtual lan configuration from the DB
+#
+$query_result =
+    DBQueryFatal("select vname,member,cost,mask " .
+		 "from virt_lans where pid='$pid' and eid='$eid'");
+if (!$query_result->numrows) {
+    warn("*** $0:\n".
+	 "    No links or lans in experiment $pid/$eid!\n");
+    exit(0);
+}
+
+my $vindex = 0;
+my %lans = ();
+my %costs = ();
+my %masks = ();
+my %lan2iface = ();
+while (my ($vlan,$member,$cost,$mask) = $query_result->fetchrow_array) {
+    if (! defined($lans{$vlan})) {
+	$lans{$vlan} = [];
+    }
+    my($vnode, $iface) = split(":", $member);
+    if (! defined($vnode2index{$vnode})) {
+        $vnode2index{$vnode} = $vindex;
+        $index2vnode{$vindex} = $vnode;
+        $vindex++;
+    }
+
+    push(@{$lans{$vlan}},$vnode2index{$vnode});
+    $lan2iface{$vlan}->{$vnode} = $iface;
+    $costs{$vlan} = int($cost);
+    $masks{$vlan} = inet_aton($mask);
+}
+
+#
+# We use perl IPC goo to create a child we can both write to and read from
+# (normal perl I/O provides just unidirectional I/O to a process).
+# 
+if (! socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)) {
+    die("*** $0:\n".
+	"    socketpair failed: $!\n");
+}
+
+CHILD->autoflush(1);
+PARENT->autoflush(1);
+
+my $childpid = fork();
+if (! $childpid) {
+    close CHILD;
+
+    #
+    # Dup our descriptors to the parent, and exec the program.
+    # The parent then talks to it read/write.
+    #
+    open(STDIN,  "<&PARENT") || die "Can't redirect stdin";
+    open(STDOUT, ">&PARENT") || die "Can't redirect stdout";
+    open(STDERR, ">/dev/null") || die "Can't redirect stderr";
+
+    exec($ipassign . $ipassign_args);
+    die("*** $0:\n".
+	"    exec $ipassign $ipassign_args failed: $!\n");
+}
+close PARENT;
+
+my $lindex = 0;
+my %lan2index = ();
+my %index2lan = ();
+while (my ($vlan, $membptr) = each %lans) {
+    my @members = @{$membptr};
+    $index2lan{$lindex} = $vlan;
+    $lan2index{$vlan} = $lindex;
+    $lindex++;
+
+    print CHILD "8 $costs{$vlan} @members\n";
+    if ($debug) {
+        print "8 $costs{$vlan} @members\n";
+    }
+}
+
+shutdown(CHILD,1);
+
+my %CIDR2dotquad   = ();
+$CIDR2dotquad{'8'}  = "255.0.0.0";
+$CIDR2dotquad{'16'} = "255.255.0.0";
+$CIDR2dotquad{'24'} = "255.255.255.0";
+$CIDR2dotquad{'32'} = "255.255.255.255";
+
+my %vnodetab = ();
+my $vnode = "";
+my $mode = "ip";
+
+while(<CHILD>) {
+    if ($debug) {
+        print $_;
+    }
+
+    if (/%%/) {
+        if ($mode eq "ip") {
+            $mode = "route";
+        }
+        next;
+    }
+
+    if ($mode eq "ip") {
+        my ($lindex, $vindex, $ip) = /^\s*(\d+)\s+(\d+)\s+([\d\.]+)/;
+        my $lan = $index2lan{$lindex};
+        my $vn = $index2vnode{$vindex};
+
+        push (@{$vnodetab{$vn}->{'IPS'}}, 
+              [$ip, $masks{$lan}, $lan2iface{$lan}->{$vn}]);
+    }
+
+    elsif ($mode eq "route") {
+        if (/^\s*Routing table for node:\s+(\d+)/) {
+            $vnode = $index2vnode{$1};
+        }
+        elsif (/^\s*Destination:\s+([\d\.]+)\/(\d+)\s+FirstHop:\s+([\d\.]+)/) {
+            my $type;
+
+            if ($2 == 32) {
+                $type = "host";
+            }
+            else {
+                $type = "net";
+            }
+            push(@{$vnodetab{$vnode}->{'routes'}}, 
+                 [$type, $1, $CIDR2dotquad{$2}, $3]);
+        }
+        else {
+            die "Junk in ipassign output.";
+        }
+    }
+}
+
+close CHILD;
+
+if (wait() != $childpid) {
+    die "problem encountered in wait()";
+}
+my $childstatus = $?;
+my $retval = $childstatus >> 8;
+
+if ($childstatus) {
+    die "ipassign failed.  No routes or IPs have been added to the DB.";
+}
+
+#
+# Clean the routes.
+#
+if (! $impotent) {
+    DBQueryFatal("delete from virt_routes where ".
+		 "pid='$pid' and eid='$eid'");
+}
+
+while (my ($vnode, $valhash) = each %vnodetab) {
+
+    my @ipinfo = @{$valhash->{'IPS'}};
+    my @routes =  @{$valhash->{'routes'}};
+
+    my @ipifaces = map { @{$_}[2] . ":" . @{$_}[0] } @ipinfo;
+    
+    if (!$impotent) {
+        DBQueryFatal("update virt_nodes set ips='@ipifaces' ".
+                     "where vname='$vnode' and pid='$pid' and eid='$eid'");
+    }
+
+    if ($debug) {
+        print "Info for $vnode:\n".
+            "IPS: @ipifaces\n";
+    }
+
+    foreach $routeptr (@routes) {
+        my ($type, $dstip, $mask, $hopip) = @{$routeptr};
+        my $srcip;
+
+        foreach my $ipdatum (@ipinfo) {
+            my ($src, $srcmask, $iface) = @{$ipdatum};
+            if ((inet_aton($src) & $srcmask) eq 
+                (inet_aton($hopip) & $srcmask)) {
+                $srcip = $src;
+                last;
+            }
+        }
+
+        if ($debug) {
+            print "route: type: $type src: $srcip dst: $dstip mask: $mask ". 
+                "nexthop: $hopip\n";
+        }
+     
+        if ($impotent) {
+            if ($format eq "bsd") {
+                if ($type eq "host") {
+                    print "route add -host $dstip $hopip\n";
+                }
+                else {
+                    print "route add -net $dstip $hopip $mask\n";
+                }
+            }
+            elsif ($format eq "suxs") {
+                if ($type eq "host") {
+                    print "route add -host $dstip gw $hopip\n";
+                }
+                else {
+                    print "route add -net $dstip netmask ".
+                        "$mask gw $hopip\n";
+                }
+            }
+        }
+        else {
+            DBQueryFatal("insert into virt_routes ".
+                         " (pid,eid,vname,src,dst,nexthop,dst_type,".
+                         "  dst_mask) ".
+                         " values ('$pid', '$eid', '$vnode', '$srcip', ".
+                         "         '$dstip', '$hopip', '$type', '$mask')");
+        }
+    }
+}
+
+exit 0;

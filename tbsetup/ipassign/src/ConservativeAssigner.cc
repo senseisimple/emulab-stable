@@ -13,11 +13,12 @@
 
 using namespace std;
 
-ConservativeAssigner::ConservativeAssigner()
+ConservativeAssigner::ConservativeAssigner(Partition & newPartition)
     : m_partitionCount(0)
     , m_largestLan(0)
     , m_lanMaskSize(0)
     , m_netMaskSize(0)
+    , m_partition(newPartition)
 {
 }
 
@@ -30,9 +31,8 @@ auto_ptr<Assigner> ConservativeAssigner::clone(void) const
     return auto_ptr<Assigner>(new ConservativeAssigner(*this));
 }
 
-void ConservativeAssigner::setPartitionCount(size_t newCount)
+ void ConservativeAssigner::setPartition(Partition & newPartition)
 {
-    m_partitionCount = newCount;
 }
 
 void ConservativeAssigner::addLan(int bits, int weight, vector<size_t> nodes)
@@ -65,66 +65,13 @@ void ConservativeAssigner::ipAssign(void)
     std::vector<int> graphNeighborArray;
     std::vector<int> weightArray;
 
-    //////////////////////////////////////////////////////
     // convert to METIS graph
-    //////////////////////////////////////////////////////
-
     convert(graphIndexArray, graphNeighborArray, weightArray);
-    partitionArray.resize(graphIndexArray.size() - 1);
-    fill(partitionArray.begin(), partitionArray.end(), 0);
 
-    //////////////////////////////////////////////////////
     // partition the graph
-    //////////////////////////////////////////////////////
-
-    int numVertices = graphIndexArray.size() - 1;
-    int weightOption = 1; // Weights on edges only
-    int indexOption = 0; // 0-based index
-    int numPartitions = max(0, m_partitionCount);
-    int options[5];
-    int edgesCut = 0;
-
-    if (numPartitions > 1 && numPartitions <= 8)
-    {
-        options[0] = 0; // use defaults. Ignore other options.
-        options[1] = 3; // (default) Sorted Heavy-Edge matching
-        options[2] = 1; // (default) Region Growing
-        options[3] = 1; // (default) Early-Exit Boundary FM refinement
-        options[4] = 0; // (default) Always set to 0
-
-        METIS_PartGraphRecursive(
-            &numVertices,              // # of vertices in graph
-            &(graphIndexArray[0]),     // xadj
-            &(graphNeighborArray[0]),  // adjncy
-            NULL,                      // vertex weights
-            &(weightArray[0]),         // edge weights
-            &weightOption,             // Weights on edges only
-            &indexOption,              // 0-based index
-            &numPartitions,
-            options,                   // set options to default
-            &edgesCut,                 // return the # of edges cut
-            &(partitionArray[0]));     // return the partition of each vertex
-    }
-    else if (numPartitions > 1)
-    {
-        options[0] = 1; // ignore defaults. Use other options.
-        options[1] = 3; // (default) Sorted Heavy-Edge Matching
-        options[2] = 1; // (default) Multilevel recursive bisection
-        options[3] = 2; // Greedy boundary refinement
-        options[4] = 0; // (default) Always set to 0
-        METIS_PartGraphKway(
-            &numVertices,              // # of vertices in graph
-            &(graphIndexArray[0]),     // xadj
-            &(graphNeighborArray[0]),  // adjncy
-            NULL,                      // vertex weights
-            &(weightArray[0]),         // edge weights
-            &weightOption,             // Weights on edges only
-            &indexOption,              // 0-based index
-            &numPartitions,
-            options,                   // set options to nonrandom
-            &edgesCut,                 // return the # of edges cut
-            &(partitionArray[0]));     // return the partition of each vertex
-    }
+    m_partition.partition(graphIndexArray, graphNeighborArray, weightArray,
+                          partitionArray);
+    m_partitionCount = m_partition.getPartitionCount();
 
 /*    if (numPartitions > 1)
     {
@@ -199,8 +146,6 @@ void ConservativeAssigner::ipAssign(void)
             }
         }
     }
-    cerr << "Border Lan #" << count(border.begin(), border.end(), true) << endl;
-    cerr << "Lan #" << border.size() << endl;
     //////////////////////////////////////////////////////
     // find out which bits go to which subnet
     //////////////////////////////////////////////////////
@@ -209,7 +154,7 @@ void ConservativeAssigner::ipAssign(void)
     // which has a hostname of all 0s or all 1s
 
     int bitsForNodes = getBits(m_largestLan + 2);
-    int bitsForNetwork = getBits(sqrt(m_partitionCount));
+    int bitsForNetwork = getBits(m_partitionCount);
     if (bitsForNetwork < 0)
     {
         bitsForNetwork = 0;
@@ -356,7 +301,6 @@ void ConservativeAssigner::convert(std::vector<int> & indexes,
     neighbors.clear();
     weights.clear();
     indexes.reserve(m_lanList.size() + 1);
-    size_t total = 0;
 
     // fill them up with the graph.
     // See the METIS manual, section [5.1 Graph Data Structure], page 18
@@ -368,13 +312,8 @@ void ConservativeAssigner::convert(std::vector<int> & indexes,
         // starting index for that LAN's set of edges.
         indexes.push_back(neighbors.size());
         convertAddLan(*lanPos, neighbors, weights);
-        for (size_t i = 0; i < lanPos->nodes.size(); ++i)
-        {
-            total += m_nodeToLan[(lanPos->nodes)[i]].size() - 1;
-        }
     }
     indexes.push_back(neighbors.size());
-    cerr << "total: " << total << " neighbors: " << neighbors.size() << endl;
 }
 
 // The following two functions are auxilliary to the 'convert' function
@@ -467,8 +406,8 @@ void ConservativeAssigner::assignNumbers(int networkSize, int lanSize,
     }
 
     // set up netmask sizes
-    m_lanMaskSize = prefixBits + networkSize + lanSize;
-    m_netMaskSize = prefixBits + networkSize;
+    m_lanMaskSize = totalBits - hostSize;
+    m_netMaskSize = totalBits - lanSize - hostSize;
 
     int networkShift = lanSize + hostSize;
     int lanShift = hostSize;
