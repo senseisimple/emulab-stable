@@ -13,20 +13,17 @@ ROUTECALC_PATH	= \"$(INSTALL_LIBEXECDIR)/rcalc\"
 
 include $(OBJDIR)/Makeconf
 
-CXXFLAGS	+= -O3 -I/usr/local/include/metis \
-		   -DROUTECALC=$(ROUTECALC_PATH)
+CXXFLAGS	+= -O3 -I/usr/local/include/metis
 
 LDFLAGS		+= -L/usr/local/lib
 
-LIBEXEC_STUFF	= ipassign rcalc
+LIBEXEC_STUFF	= ipassign
 
-BIN_STUFF	= difference add-x inet2graph brite2graph top2graph routestat
+BIN_STUFF	= difference add-x inet2graph brite2graph top2graph
 
 IPASSIGN_OBJECTS = Assigner.o ConservativeAssigner.o Framework.o \
-                   HierarchicalAssigner.o NetRouter.o Router.o bitmath.o \
+                   HierarchicalAssigner.o bitmath.o \
                    coprocess.o ipassign.o
-
-# LanRouter.o HostRouter.o
 
 ROUTECALC_OBJECTS = routecalc.o
 
@@ -34,8 +31,8 @@ BIN_OBJECTS	= $(addsuffix .o, $(BIN_STUFF))
 
 HEADERS 	= Assigner.h ConservativeAssigner.h Exception.h \
                   FixedPartition.h Framework.h GraphConverter.h \
-                  HierarchicalAssigner.h NetRouter.h \
-                  PTree.h Partition.h Router.h SearchPartition.h \
+                  HierarchicalAssigner.h \
+                  PTree.h Partition.h SearchPartition.h \
                   SquareRootPartition.h bitmath.h coprocess.h lib.h
 
 #
@@ -58,15 +55,10 @@ bin-install:		$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF))
 ipassign: $(IPASSIGN_OBJECTS) $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(IPASSIGN_OBJECTS) -lm -lmetis -o ipassign
 
-rcalc: $(ROUTECALC_OBJECTS) $(HEADERS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(ROUTECALC_OBJECTS) -lm -o rcalc
-
 $(BIN_STUFF): $(BIN_OBJECTS) $(HEADERS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@ -lm -lmetis
 
 $(IPASSIGN_OBJECTS): $(HEADERS)
-
-$(ROUTECALC_OBJECTS): $(HEADERS)
 
 $(BIN_OBJECTS): $(HEADERS)
 

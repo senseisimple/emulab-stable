@@ -36,12 +36,11 @@ int main(int argc, char * argv[])
         frame.input(cin);
         frame.ipAssign();
         frame.printIP(std::cout);
-        frame.route();
-        frame.printRoute(std::cout);
     }
     catch (InvalidArgumentException const & error)
     {
         std::cerr << "ipassign: " << error.what() << std::endl;
+        errorCode = 1;
         usage(std::cerr);
     }
     catch (std::exception const & error)
@@ -55,8 +54,5 @@ int main(int argc, char * argv[])
 
 void usage(ostream & output)
 {
-    output << "Usage: ipassign [-p#] [-sbg] [-hln] [-tvc]" << endl;
+    output << "Usage: See testbed/tbsetup/ipassign/README" << endl;
 }
-
-
-

@@ -13,7 +13,6 @@
 #define FRAMEWORK_H_IP_ASSIGN_2
 
 class Assigner;
-class Router;
 class Partition;
 
 class Framework
@@ -33,14 +32,8 @@ public:
     // Assign IP addresses.
     void ipAssign(void);
 
-    // Assign routes.
-    void route(void);
-
     // Print IP addresses.
     void printIP(ostream & output) const;
-
-    // Print routes.
-    void printRoute(ostream & output) const;
 private:
     // These constants are used to store the module options before the
     // modules themselves are created according to the specification.
@@ -52,31 +45,15 @@ private:
     {
         Fixed, SquareRoot, Search, RatioCut
     };
-    enum RouteType
-    {
-        HostHost, HostLan, HostNet
-    };
 private:
     // The actual gruntwork of parsing the arguments
     void parseCommandLine(int argCount, char ** argArray);
-    void parseArgument(std::string const & arg, AssignType & assignChoice,
-                       RouteType & routeChoice);
+    void parseArgument(std::string const & arg, AssignType & assignChoice);
 private:
     // The selector for which IP assignment strategy to use
     std::auto_ptr<Assigner> m_assign;
-    // The selector for which routing strategy to use
-    std::auto_ptr<Router> m_route;
     // The selector for which partitioning strategy to use
     std::auto_ptr<Partition> m_partition;
-    bool m_doRouting;
 };
 
 #endif
-
-
-
-
-
-
-
-

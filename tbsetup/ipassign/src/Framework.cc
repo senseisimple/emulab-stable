@@ -12,10 +12,6 @@
 #include "Assigner.h"
 #include "ConservativeAssigner.h"
 #include "HierarchicalAssigner.h"
-#include "Router.h"
-//#include "HostRouter.h"
-//#include "LanRouter.h"
-#include "NetRouter.h"
 #include "Partition.h"
 #include "FixedPartition.h"
 #include "SearchPartition.h"
@@ -26,7 +22,6 @@
 using namespace std;
 
 Framework::Framework(int argCount, char ** argArray)
-    : m_doRouting(true)
 {
     if (argCount <= 0 || argArray == NULL)
     {
@@ -53,11 +48,6 @@ Framework::Framework(Framework const & right)
         // You don't want to know.
         m_assign.reset(right.m_assign->clone().release());
     }
-    if (right.m_route.get() != NULL)
-    {
-        // See above.
-        m_route.reset(right.m_route->clone().release());
-    }
     if (right.m_partition.get() != NULL)
     {
         // See above.
@@ -71,9 +61,7 @@ Framework & Framework::operator=(Framework const & right)
     // Herb Sutter's 'Exceptional C++' book.
     Framework temp(right);
     swap(m_assign, temp.m_assign);
-    swap(m_route, temp.m_route);
     swap(m_partition, temp.m_partition);
-    swap(m_doRouting, temp.m_doRouting);
     return *this;
 }
 
@@ -142,35 +130,15 @@ void Framework::ipAssign(void)
     m_assign->ipAssign();
 }
 
-void Framework::route(void)
-{
-    if (m_doRouting)
-    {
-        m_assign->getGraph(m_route->getTree(), m_route->getLans());
-        m_route->setHosts(m_assign->getHosts());
-        m_route->calculateRoutes();
-    }
-}
-
 void Framework::printIP(ostream & output) const
 {
     m_assign->print(output);
 }
 
-void Framework::printRoute(ostream & output) const
-{
-    if (m_doRouting)
-    {
-        m_route->print(output);
-    }
-}
-
 void Framework::parseCommandLine(int argCount, char ** argArray)
 {
     AssignType assignChoice = Hierarchical;
-    RouteType routeChoice = HostNet;
     m_partition.reset(new SquareRootPartition());
-    m_doRouting = false;
     for (int i = 1; i < argCount; ++i)
     {
         string currentArg = argArray[i];
@@ -180,7 +148,7 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
         }
         else
         {
-            parseArgument(currentArg, assignChoice, routeChoice);
+            parseArgument(currentArg, assignChoice);
         }
     }
     switch (assignChoice)
@@ -202,27 +170,10 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
                                            "Variable: assignChoice");
         break;
     }
-    switch (routeChoice)
-    {
-    case HostHost:
-//        m_route.reset(new HostRouter());
-        break;
-    case HostLan:
-//        m_route.reset(new LanRouter());
-        break;
-    case HostNet:
-        m_route.reset(new NetRouter());
-        break;
-    default:
-        throw ImpossibleConditionException("Framework::ParseCommandLine "
-                                           "Variable: routeChoice");
-        break;
-    }
 }
 
 void Framework::parseArgument(string const & arg,
-                              Framework::AssignType & assignChoice,
-                              Framework::RouteType & routeChoice)
+                              Framework::AssignType & assignChoice)
 {
     bool done = false;
     for (size_t j = 1; j < arg.size() && !done; ++j)
@@ -292,24 +243,7 @@ void Framework::parseArgument(string const & arg,
         case 'g':
             assignChoice = Greedy;
             break;
-            // use host-host routing
-        case 'h':
-            m_doRouting = true;
-            routeChoice = HostHost;
-            break;
-            // use host-lan routing
-        case 'l':
-            m_doRouting = true;
-            routeChoice = HostLan;
-            break;
-            // use host-net routing
-        case 'n':
-            m_doRouting = true;
-            routeChoice = HostNet;
-            break;
-            // time ip assignment and routing
         case '!':
-            m_doRouting = false;
             break;
         default:
             throw InvalidArgumentException(arg);
