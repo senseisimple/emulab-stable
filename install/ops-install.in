@@ -342,8 +342,16 @@ Phase "sudoers", "Editing $SUDOERS", sub {
 };
 
 Phase "ssh", "Allowing root ssh", sub {
-    DoneIfEdited($SSHD_CONFIG);
-    AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+    Phase "sshdconfig", "Permitting root login through ssh", sub {
+	DoneIfEdited($SSHD_CONFIG);
+	AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+    };
+    Phase "dotssh", "Making root's .ssh directory", sub {
+	DoneIfExists("/root/.ssh");
+	mkdir("/root/.ssh",0700) or
+	    PhaseFail("Unable to create /root/.ssh: $!");
+    };
+
 };
 
 Phase "capture", "Setting up capture", sub {
