@@ -138,7 +138,9 @@ $sth->finish;
     exit(1);
 };
 foreach (split("\n",&ir_get("/topology/lans"))) {
-    ($lan,$nodesraw,$linksraw) = /^([^ ]+) "([^\"]+)" [^ ]+ [^ ]+ [^ ]+ (.+)$/;
+    printdb("$_\n");
+    ($lan,$nodesraw,$linksraw) = /^([^ ]+) "([^\"]+)" [^ ]+ [^ ]+ [^ ]+(?: )?(.*)$/;
+    printdb("lan='$lan' nodes='$nodesraw' links='$linksraw'\n");
     my(@nodes) = split(" ",$nodesraw);
     $lans{$lan} = [$lan,\@nodes];
     # Check for sharkshelf
