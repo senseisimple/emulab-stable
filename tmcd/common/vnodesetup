@@ -234,7 +234,7 @@ $SIG{USR2} = \&handler;
 # Kill existing directory in case its still there.
 #
 if (!$fromboot && -e $vnodedir) {
-    system("rm -rf $vnodedir");
+    removevnodedir($vnodedir);
 }
 if (! -e $vnodedir) {
     mkdir($vnodedir, 0755) or
@@ -257,7 +257,7 @@ if (!defined($pid)) {
     # Hmm, suddenly got free. 
     # 
     system("rm -f $pidfile");
-    system("rm -rf $vnodedir");
+    removevnodedir($vnodedir);
     exit(0);
 }
 
@@ -426,7 +426,7 @@ sub cleanup()
     print "Waiting 10 seconds for process group to die off ...\n";
     sleep(10);
     if (! $leavejail) {
-	system("rm -rf $vnodedir");
+	removevnodedir($vnodedir);
     }
     system("rm -f $pidfile");
 }
@@ -469,3 +469,16 @@ sub fatal($)
 	"    $msg\n");
 }
 
+#
+# Ug, with NFS mounts inside the jail, we need to be really careful.
+#
+sub removevnodedir($)
+{
+    my ($dir) = @_;
+
+    if (-d "$dir/root" && !rmdir("$dir/root")) {
+	die("*** $0:\n".
+	    "    $dir/root is not empty! This is very bad!\n");
+    }
+    system("rm -rf $dir");
+}
