@@ -5,12 +5,6 @@
 #include "log.h"
 
 /*
- * Max number of clients we can support at once. Not likely to be an issue
- * since the amount of per client state is very little.
- */
-#define MAXCLIENTS	1000
-
-/*
  * We operate in terms of this blocksize (in bytes). 
  */
 #define BLOCKSIZE	1024
@@ -39,12 +33,10 @@
  * Timeout (in usecs) for packet receive. The idletimer number is how
  * many PKT timeouts we allow before requesting more data from the server.
  * That is, if we go TIMEOUT usecs without getting a packet, then ask for
- * more (or on the server side, poll the clients). On the server, side
- * use a timeout to check for dead clients. We want that to be longish.
+ * more.
  */
 #define PKTRCV_TIMEOUT		30000
 #define CLIENT_IDLETIMER_COUNT	1
-#define SERVER_IDLETIMER_COUNT	((300 * 1000000) / PKTRCV_TIMEOUT)
 
 /*
  * Timeout (in seconds!) server will hang around with no active clients.
@@ -70,12 +62,19 @@ typedef struct {
 	union {
 		/*
 		 * Join/leave the Team. Send a randomized ID, and receive
-		 * the number of blocks in the file. 
+		 * the number of blocks in the file. This is strictly
+		 * informational; the info is reported in the log file.
+		 * We must return the number of chunks in the file though.
 		 */
 		union {
 			unsigned int	clientid;
 			int		blockcount;
 		} join;
+		
+		struct {
+			unsigned int	clientid;
+			int		elapsed;	/* Stats only */
+		} leave;
 
 		/*
 		 * A data block, indexed by chunk,block.

@@ -535,37 +535,21 @@ PlayFrisbee(void)
 
 	ChunkerStartup();
 
-	/*
-	 * Done! Handshake our exit with the server.
-	 */
-	while (1) {
-		int	countdown = 0;
-
-		if (countdown <= 0) {
-			p->hdr.type       = PKTTYPE_REQUEST;
-			p->hdr.subtype    = PKTSUBTYPE_LEAVE;
-			p->hdr.datalen    = sizeof(p->msg.join);
-			p->msg.join.clientid = myid;
-			PacketSend(p);
-			countdown = 3;
-		}
-
-		/*
-		 * Throw away any data packets until we get a reply back.
-		 * Wait several receive delays before resending the message.
-		 */
-		if (PacketReceive(p) < 0) {
-			countdown--;
-			continue;
-		}
-
-		if (p->hdr.subtype == PKTSUBTYPE_LEAVE &&
-		    p->hdr.type == PKTTYPE_REPLY) {
-			break;
-		}
-	}
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
+	
+	/*
+	 * Done! Send off a leave message, but do not worry about whether
+	 * the server gets it. All the server does with it is print a
+	 * timestamp, and that is not critical to operation.
+	 */
+	p->hdr.type       = PKTTYPE_REQUEST;
+	p->hdr.subtype    = PKTSUBTYPE_LEAVE;
+	p->hdr.datalen    = sizeof(p->msg.leave);
+	p->msg.leave.clientid = myid;
+	p->msg.leave.elapsed  = estamp.tv_sec;
+	PacketSend(p);
+
 	log("Left the team after %ld seconds on the field!", estamp.tv_sec);
 }
 
@@ -600,11 +584,7 @@ FrisbeeRead(void **buf, size_t count)
 	char	*data = (char *) &ChunkBuffer[ImageUnzipBuffer].blocks;
 	
 	data += ImageUnzipOffset;	
-#if 1
 	*buf = data;
-#else
-	memcpy(buf, data, count);
-#endif
 	ImageUnzipOffset += count;
 	return count;
 }
