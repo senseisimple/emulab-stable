@@ -63,6 +63,7 @@ open(TBCMD,$tbcmdfile) || do {
     print STDERR "IR does not contain vlan section.\n";
     exit(1);
 };
+
 foreach (split("\n",&ir_get("/vlan"))) {
     @vlan = split;
     $vlanmap{$vlan[0]} = [@vlan[1..$#vlan]];
@@ -122,13 +123,14 @@ $sth->execute || do {
     exit(1);
 };
 while (@row = $sth->fetchrow_array) {
-    ($node,$mac) = @row;
+    my ($node,$mac) = @row;
     if (defined($rvnodemap{$node})) {
-	if (! defined($MACTABLE{$rvnodemap{$node}})) {
-	    $MACTABLE{$rvnodemap{$node}} = [];
+		my $vnode = $rvnodemap{$node};
+		if (! defined($MACTABLE{$vnode})) {
+			$MACTABLE{$vnode} = [];
+		}
+		push(@{$MACTABLE{$vnode}},$mac);
 	}
-	push(@{$MACTABLE{$rvnodemap{$node}}},$mac);
-    }
 }
 $sth->finish;
 
@@ -139,28 +141,31 @@ $sth->finish;
 };
 foreach (split("\n",&ir_get("/topology/lans"))) {
     printdb("$_\n");
-    ($lan,$nodesraw,$linksraw) = /^([^ ]+) "([^\"]+)" [^ ]+ [^ ]+ [^ ]+(?: )?(.*)$/;
-    printdb("lan='$lan' nodes='$nodesraw' links='$linksraw'\n");
-    my(@nodes) = split(" ",$nodesraw);
-    $lans{$lan} = [$lan,\@nodes];
-    # Check for sharkshelf
-    if ($nodetypes{$nodes[0]} eq "shark") {
-	# We need to fill in the MACs for the vlan map for this lan
-	# since there is no actual VLAN for it.
-	$vlanmap{$lan} = [];
-	foreach $shark (@nodes) {
-	    push(@{$vlanmap{$lan}},@{$MACTABLE{$shark}});
+
+	my ($lan,$nodesraw,$linksraw) = /^([^ ]+) "([^\"]+)" [^ ]+ [^ ]+ [^ ]+(?: )?(.*)$/;
+	printdb("lan='$lan' nodes='$nodesraw' links='$linksraw'\n");
+	my @nodes = split(" ",$nodesraw);
+	$lans{$lan} = [$lan,\@nodes];
+
+	# Check for sharkshelf
+	if ($nodetypes{$nodes[0]} eq "shark") {
+		# We need to fill in the MACs for the vlan map for this lan
+		# since there is no actual VLAN for it.
+		$vlanmap{$lan} = [];
+		foreach $shark (@nodes) {
+			push(@{$vlanmap{$lan}},@{$MACTABLE{$shark}});
+		}
+
+		# Linksraw only has a single link otherwise assign_wrapper would have
+		# generated an error.
+		my ($src,$dst) = @{$links{$linksraw}};
+		if ($src eq $lan) {
+			$other = $dst;
+		} else {
+			$other = $src;
+		}
+		push(@{$vlanmap{$lan}},@{$MACTABLE{$other}});
 	}
-	# Linksraw only has a single link otherwise assign_wrapper would have
-	# generated an error.
-	($src,$dst) = @{$links{$linksraw}};
-	if ($src eq $lan) {
-	    $other = $dst;
-	} else {
-	    $other = $src;
-	}
-	push(@{$vlanmap{$lan}},@{$MACTABLE{$other}});
-    }
 }
 
 # This is a list of error messages
@@ -306,30 +311,30 @@ sub islan {
 # a link can pass through a delay node this may be more than two.  Returns
 # an array.
 sub get_macs {
-    local($macs)=[];
-    if (defined($vlanmap{$_[0]})) {
-	push(@$macs,@{$vlanmap{$_[0]}});
-    }
-    if (defined($vlanmap{"dsrc_$_[0]"})) {
-	push(@$macs,@{$vlanmap{"dsrc_$_[0]"}});
-    } 
-    if (defined($vlanmap{"ddst_$_[0]"})) {
-	push(@$macs,@{$vlanmap{"ddst_$_[0]"}});
-    }
-    # XXX - Not sure if this is correct
-	# XXX - ricci: still not sure if it is! The old code checked to make sure
-	# that one of the nodes was a delay node - I'm not sure why this was desirable,
-	# but it broke things
+	my ($link) = pop @_;
+	local($macs)=[];
+	if (defined($vlanmap{$link})) {
+		push(@$macs,@{$vlanmap{$link}});
+	} else {
+		# The link may be between a node and a VLAN directly
+		# XXX - Not sure if this is correct
+		if (defined($links{$link})) {
+			printdb "get_macs() $link is a link to a VLAN!\n";
+			my($src,$dst) = @{$links{$link}};
+			if (&islan($src)) {
+				push(@$macs,@{$vlanmap{$src}});
+			} elsif (&islan($dst)) {
+				push(@$macs,@{$vlanmap{$dst}});
+			}
+		}
+	}
 
-    if (defined($links{$_[0]})) {
-  	my($src,$dst) = @{$links{$_[0]}};
-  	if (&islan($src)) {
-  	    push(@$macs,@{$vlanmap{$src}});
-  	} elsif (&islan($dst)) {
-  	    push(@$macs,@{$vlanmap{$dst}});
-  	}
-    }
-
+	if (defined($vlanmap{"dsrc_$link"})) {
+		push(@$macs,@{$vlanmap{"dsrc_$link"}});
+	} 
+	if (defined($vlanmap{"ddst_$link"})) {
+		push(@$macs,@{$vlanmap{"ddst_$link"}});
+	}
     return $macs;
 };
 
