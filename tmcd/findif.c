@@ -182,6 +182,24 @@ find_iface(char *macaddr)
 		if (ioctl(sock, SIOCGIFHWADDR, ifr) < 0)
 			continue;
 
+		/*
+		 * Great, the tulip driver mis-reports the MAC address
+		 * on at least one type of lite-on card.  Looks like it
+		 * byte-swaps pairs of octets.  We recognize the offending
+		 * vendor ID (as reported, it is not a valid ID, so there
+		 * is no ambiguity)
+		 */
+		if ((unsigned char)ifr->ifr_addr.sa_data[1] == 0x00 &&
+		    (unsigned char)ifr->ifr_addr.sa_data[0] == 0x02 &&
+		    (unsigned char)ifr->ifr_addr.sa_data[3] == 0xE3) {
+			unsigned short *usp;
+
+			usp = (unsigned short *)ifr->ifr_addr.sa_data;
+			usp[0] = ntohs(usp[0]);
+			usp[1] = ntohs(usp[1]);
+			usp[2] = ntohs(usp[2]);
+		}
+
 		sprintf(enet, "%02x%02x%02x%02x%02x%02x",
 			(unsigned char) ifr->ifr_addr.sa_data[0],
 			(unsigned char) ifr->ifr_addr.sa_data[1],
