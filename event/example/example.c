@@ -161,7 +161,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	event_notification_get_objname(handle, notification, buf[5], len);
 	event_notification_get_eventtype(handle, notification, buf[6], len);
 
-	printf("Event: %lu %s %s %s %s %s %s %s\n", now.tv_sec,
-	       buf[0], buf[1], buf[2], 
-	       buf[3], buf[4], buf[5], buf[6]);
+	info("Event: %lu %s %s %s %s %s %s %s\n", now.tv_sec,
+	     buf[0], buf[1], buf[2], 
+	     buf[3], buf[4], buf[5], buf[6]);
 }
