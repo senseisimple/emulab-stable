@@ -1,6 +1,4 @@
 #!/usr/bin/perl -w
-use English;
-require Mysql;
 
 #
 # A library of useful DB stuff. Mostly things that get done a lot.
@@ -30,6 +28,10 @@ use Exporter;
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState
 
 	 );
+
+# Must come after package declaration!
+use English;
+require Mysql;
 
 # Configure variables
 my $TB		= "@prefix@";
