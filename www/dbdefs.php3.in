@@ -1282,7 +1282,7 @@ function TBIPtoNodeID($ip) {
 $maxtries = 3;
 $DBlinkid = 0;
 while ($maxtries) {
-    $DBlinkid = mysql_connect();
+    $DBlinkid = mysql_connect("localhost", basename($SCRIPT_NAME));
     if ($DBlinkid) {
 	break;
     }
