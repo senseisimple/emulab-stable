@@ -264,8 +264,8 @@ int assign()
   }
   
   timeend = used_time(timestart);
-  cout << "   BEST SCORE:  " << get_score() << " in "
-       << iters << " iters and " << timeend << " seconds" << endl;
+  printf("   BEST SCORE:  %.2f",get_score());
+  cout << " in " << iters << " iters and " << timeend << " seconds" << endl;
   cout << "With " << violated << " violations" << endl;
   cout << "With " << accepts << " accepts of increases\n";
   cout << "Iters to find best score:  " << cycles_to_best << endl;
