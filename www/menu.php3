@@ -610,15 +610,20 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
             <body bgcolor='#FFFFFF' 
              topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>\n";
     if (! $nobanner ) {
-	echo "
+	echo "<map name=overlaymap>
+                 <area shape=rect coords=\"100,60,369,100\"
+                       href='http://www.emulab.net/index.php3'>
+                 <area shape=rect coords=\"0,0,369,100\"
+                       href='$TBDOCBASE/index.php3'>
+              </map>
             <table cellpadding='0' cellspacing='0' width='100%'>
             <tr>
               <td valign='top' class='bannercell' 
               background='$BASEPATH/headerbgbb.jpg'
-              bgcolor=#3D627F ><a href='www.emulab.net/index.php3'>
-              <img width=369 height=100 border=0
+              bgcolor=#3D627F>
+              <img width=369 height=100 border=0 usemap=\"#overlaymap\" 
               src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' 
-              alt='$THISHOMEBASE - the network testbed' /></a>";
+              alt='$THISHOMEBASE - the network testbed'>\n";
 	      if (!$MAINPAGE) {
 		  echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
 	      }
