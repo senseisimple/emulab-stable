@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -45,10 +45,11 @@ my %cards = ( 'pc600' => [ 'second from left','third from left',
 my %wires = ( Node => 'yellow', Control => 'red', Power => 'green',
 	Serial => 'white' );
 
-# Options: v = verbose, d = debug
-my %opt = ( v => 0, d => 0);
+# Options: v = verbose, d = debug, m = show mac
+my %opt = ( v => 0, d => 0, m => 0);
 
-getopts('vd',\%opt);
+getopts('vdm',\%opt);
+$opt{m} = 0 if ($opt{v});
 
 
 if (@ARGV < 1) {
@@ -60,11 +61,21 @@ while (my $arg = shift @ARGV) {
 	&debug("Node is $node");
 	&debug("Card is $card") if (defined $card);
 
-	my $query = qq|SELECT node_id1,card1,node_id2,card2,port2,cable,len| . 
-		qq|,wires.type,nodes.type FROM wires LEFT JOIN nodes | .
-		qq|ON node_id1 = node_id WHERE node_id1="$node"|;
+	my $query;
+	if ($opt{m}) {
+	    $query = "SELECT w.node_id1,w.card1,i.mac,w.node_id2,".
+		     "w.card2,w.port2,w.cable,w.len,w.type,n.type ".
+		     "FROM wires AS w,nodes AS n,interfaces AS i ".
+		     "WHERE w.node_id1=n.node_id AND ".
+		     "w.node_id1=i.node_id AND w.card1=i.card";
+	} else {
+	    $query = "SELECT w.node_id1,w.card1,w.node_id2,w.card2,w.port2,".
+		     "w.cable,w.len,w.type,n.type ".
+		     "FROM wires AS w,nodes AS n WHERE w.node_id1=n.node_id";
+	}
+	$query .= " AND node_id1='$node'";
 	if (defined $card) {
-		$query .= qq|AND card1="$card"|;
+		$query .= " AND card1='$card'";
 	}
 
 	&debug("Sending query $query\n");
