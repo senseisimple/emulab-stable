@@ -22,11 +22,6 @@ I could just figure out how to add a php mode to emacs ...
 * Decouple root privs from begin experiment privs, as per Jay
   request. Default on for begin experiment, default off for root.
 
-* Fix the email list problem. Right now we add people to the two
-  email list files in /usr/testbed/www/maillist when they apply. We should
-  either delay that until they are approved, or make sure they get taken
-  back out when denied.
-
 * Add verification for when the user wants to change the email address
   through user mod page, to ensure the email is valid.
 
