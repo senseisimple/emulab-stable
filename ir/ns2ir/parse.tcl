@@ -11,6 +11,35 @@ source $libdir/node.tcl
 source $libdir/link.tcl
 source $libdir/event.tcl
 
+###
+# calfeld@cs.utah.edu
+# This some ugly/interesting tcl hacking to figure out what variables the user
+# stored the node ids in.
+###
+rename set real_set
+set skipset 0
+proc set {args} {
+    global skipset
+    global nodeid_map
+    if {! $skipset} {
+	real_set skipset 1
+	real_set var [lindex $args 0]
+	if {$var != "currnode"} {
+	    if {[llength $args] > 1} {
+		real_set val [lindex $args 1]
+		if {[regexp {^n[0-9]+$} $val] != -1} {
+		    if {![info exists nodeid_map($val)]} {
+			real_set nodeid_map($val) $var
+		    }
+		}
+	    }
+	}
+	real_set skipset 0
+    }
+    return [eval "uplevel real_set $args"]
+}
+###
+
 #nop is used for unimplemented $ns instprocs that are supposed to
 #return things. the instproc returns a nop, which users call in their
 #ns input file. 
@@ -39,3 +68,4 @@ source $libdir/stubs.tcl
  
 # argv[0] is the ns input file
 source [lindex $argv 0]
+
