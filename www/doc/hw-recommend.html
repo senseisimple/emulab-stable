@@ -22,13 +22,32 @@
 
 <a NAME="PURP"></a><h2>Purpose of this document</h2>
 The purpose of this document is to share our experience in selecting the
-hardware in Emulab, to aid others who are considering similar projects. It
-outlines the impact in terms of testbed featres caused by hardware decisions.
+hardware in Emulab, to aid others who are considering similar projects. Rather
+than a recipe for bulding testbeds, this document gives a set of
+recommendations, and outlines the consequences of each choice.
 
 <hr>
 
 <a NAME="NODES"></a><h2>Nodes</h2>
 <dl>
+
+	<dt><b>Case/Chassis</b></dt>
+		<dd>This will depend on your space requirements. The cheapest option is
+		to buy standard desktop machines, but these are not very
+		space-efficient. 3U or 4U rackmount cases generally have plenty of
+		space for PCI cards and CPU cooling fans, but still may consume too
+		much space for a large-scale testbed.  Smaller cases (1U or 2U) have
+		fewer PCI slots (usually 2 for 2U cases, and 1 or 2 in 1U cases), and
+		often require custom motherboards. Heat is an issue in smaller cases,
+		as they do not have room for CPU fans. This limits the processor speed
+		that can be used.  For our first round of machines, we bought standard
+		motherboards and 4U cases, and assmbled the machines ourselves. For our
+		second round of PCs, we opted for the <a
+		href="http://www.intel.com">Intel</a> ISP1100 server platform, which
+		includes a 1U case, custom motherboard with 2 onboard NICs and serial
+		console redirection, and a power supply. This product has been
+		discontinued, but others like it are available from other vendors.</dd>
+
 	<dt><b>CPU</b></dt>
 		<dd>Take your pick. Note that small case size (ie. 1U) may limit your
 		options, due to heat issues. Many experiments will not be CPU bound, but
@@ -38,30 +57,38 @@ outlines the impact in terms of testbed featres caused by hardware decisions.
 	<dt><b>Memory</b></dt>
 		<dd>Any amount is probably OK. Most of our experimenters don't seem to
 		need much, but at least one has wished we had more than 512MB. We chose
-		to go with ECC, since it is not much more expensive than non-ECC</dd>
+		to go with ECC, since it is not much more expensive than non-ECC, and
+		with our large scale, ECC will help protect against failure.</dd>
 
 	<dt><b>NICs</b></dt>
-		<dd>At least 2. Our attempts to use nodes with only 1 NIC have not met
-		with much sucess. 3 interfaces lets you have delay nodes, 4 lets you
-		have (really simple) routers. Control net interface should have PXE
-		capability.  All experimental interfaces should be the same, unless you
-		are purposely going for a heterogenous environment. Control net
-		interface can be different.  Intel EtherExpress (fxp) and 3Com 3c???
-		(xl) are known to work. Note that not all these cards have PXE, so make
-		sure that your control net card is one of the models that does.</dd>
+		<dd>At least 2 - one for control net, one for the experimental network.
+		Our attempts to use nodes with only 1 NIC have not met with much
+		success. 3 interfaces lets you have delay nodes, but only linear
+		topolgies (no branching.) 4 lets you have (really simple) routers. We
+		opted to go with 5.  Control net interface should have PXE capability.
+		All experimental interfaces should be the same, unless you are
+		purposely going for a heterogenous environment. Control net interface
+		can be different.  Intel EtherExpress (fxp) and 3Com 3c???  (xl) are
+		known to work. Note that not all these cards have PXE, so make sure
+		that your control net card is one of the models that does. Depedning on
+		usage, it may be OK to get a large number of nodes with 2 interfaces to
+		be edge nodes, and a smaller number with more interfaces to be
+		routers.</dd>
+
 
 	<dt><b>Motherboard</b></dt>
-		<dd>Serial console redirection is nice, and the BIOS should
+		<dd>Serial console redirection is nice, and the BIOS should have
 		the ability to PXE boot from a card. The ability to set IRQs per slot
 		is desirable (to avoid setups where multiple cards share one IRQ.)
 		Health monitoring hardware (temperature, fans, etc.) is good too, but
 		not required. All of our boards so far have been based on Intel's
-		aging put proven BX chipset.</dd>
+		aging put proven BX chipset. Onboard network interfaces can allow you
+		get get more NICs, something especially valuable for small cases with a
+		limited number of PCI slots.</dd>
 
 	<dt><b>Hard Drive</b></dt>
 		<dd>Pretty much any one is OK. With a large number of nodes, you are
 		likely to run into failures, so they should be reasonably reliable</dd>
-
 
 	<dt><b>Floppy</b></dt>
 		<dd>Handy for BIOS updates, and may be used for 'neutering' PXE
@@ -89,7 +116,7 @@ outlines the impact in terms of testbed featres caused by hardware decisions.
 
 		<dt><b>Router</b></dt>
 			 <dd>Required if VLANs are used. Must have DHCP/bootp forwarding.
-			 (Cisco calls this the 'IP Helper') A MSFC card in a Catalyst
+			 (Cisco calls this the 'IP Helper') A MSFC card in a Cisco Catalyst
 			 supervisor module works well for us, but a PC would probably
 			 suffice.</dd>
 
@@ -110,6 +137,7 @@ outlines the impact in terms of testbed featres caused by hardware decisions.
 			 Otherwise, they must be done unicast and serially, which is an
 			 impediment to re-loading disks after experiments (to return nodes
 			 to a clean state.)</dd>
+
 		 </dl>
 
 	<dt><b>Experimental net</b></dt>
@@ -145,12 +173,31 @@ outlines the impact in terms of testbed featres caused by hardware decisions.
 
 <a NAME="OTHER"></a><h2>Other Hardware</h2>
 <dl>
+	<dt><b>Network cables</b></dt>
+		<dd>We use Cat5E, chosen becasue they are not much more expensive than
+		Cat5, and can be used in the future for gigabit ethernet.</dd>
+
+	<dt><b>Serial cables</b></dt>
+		<dd>We use Cat5E, but with a special pin pattern on the ends to avoid
+		interference between the transmit/receive pairs. We use RJ-45
+		connectors on both ends, and a custom serial hood to connect to the
+		DB-9 serial ports on the nodes. Contact us to get our custom cable
+		specs.</dd>
+
 	<dt><b>Power controllers</b></dt>
-		<dd>Without them, nodes can not be reliably rebooted.</dd>
+		<dd>Without them, nodes can not be reliably rebooted. We started out
+		with 8-port SNMP-controlled power contollers from <a
+		href="http://www.apc.com">APC</a>. Our newer nodes use the RPC-27 from
+		<a href="http://www.baytechdcd.com/">BayTech</a>, 20-outlet
+		vertically-mounted, serial-controlled power controllers. The serial
+		controllers are genrally cheaper, and the more ports on each
+		controller, the cheaper.</dd>
 
 	<dt><b>Serial (console) ports</b></dt>
 		<dd>Custom kernels/OSes (specifically, the OSKit) may not support ssh,
-		etc. Also useful if an experimenter somehow scrogs network.</dd>
+		etc. Also useful if an experimenter somehow scrogs network. We use the
+		<a href="http://cyclades.com">Cyclades</a> Cyclom Ze serial adapters,
+		which allow up to 128 serial ports in a single PC.</dd>
 
 	<dt><b>Serial port reset controllers</b><dt>
 		<dd>It may be possible to build (or buy) serial-port passthroughs that
