@@ -41,15 +41,17 @@ my $NoRecover = 0;
     
 sub usage ()
 {
-    print STDERR "Usage: $0 [-v] [-u | -n] pid eid\n";
-    print STDERR " -v   - enables verbose output\n";
-    print STDERR " -u   - enables update functionality\n";
+    print STDERR "Usage: $0 [-v] [-u [-f] | -n] pid eid\n";
+    print STDERR " -v   - Enables verbose output\n";
+    print STDERR " -u   - Enables update mode\n";
+    print STDERR " -f   - Fix current resources during update mode\n";
     print STDERR " -t   - Create the TOP file and then exit\n";
     print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
     exit(-1);
 }
-my $optlist  = "vutn";
+my $optlist  = "vutnf";
 my $verbose  = 0;
+my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
 my $impotent = 0;
@@ -124,6 +126,9 @@ if (defined($options{"t"})) {
 }
 if (defined($options{"n"})) {
     $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $fixmode = 1;
 }
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
@@ -1328,7 +1333,8 @@ if ($updating && !$impotent) {
 	    if (physnodeisvirtnode($pnode) ||
 		physnodereuse($pnode) eq "unused");
 
-	DBQueryFatal("update interfaces set IP='',IPaliases=NULL,mask=NULL,rtabid='0',vnode_id=NULL " .
+	DBQueryFatal("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
+		     "       rtabid='0',vnode_id=NULL " .
 		     "where node_id='$pnode' and ".
 		     "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'");
 
@@ -3540,6 +3546,12 @@ sub LoadExperiment()
 		  "Invalid OS $delay_osname in project $pid!");
 	}
     }
+
+    #
+    # Command line option from tbswap overrides user.
+    #
+    $fix_current_resources = 1
+	if ($fixmode);
 
     printdb "Not fixing current resources during this swapin\n"
 	if (! $fix_current_resources);
