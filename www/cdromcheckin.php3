@@ -24,8 +24,13 @@ define("CDROMSTATUS_OTHER",		199);
 # 
 function SPITSTATUS($status)
 {
+    global $REMOTE_ADDR, $REQUEST_URI;
+    
     header("Content-Type: text/plain");
     echo "emulab_status=$status\n";
+
+    TBERROR("CDROM Checkin Error ($status) from $REMOTE_ADDR:\n\n".
+	    "$REQUEST_URI\n", 0);
 }
 
 #
@@ -62,7 +67,7 @@ $cdvers = $row[version];
 if (isset($needscript)) {
     header("Content-Type: text/plain");
     echo "MD5=d8b6b1cf6ea43abc33b0d700d6e4cda8\n";
-    echo "URL=http://${WWWHOST}/images/netbed-setup.pl\n";
+    echo "URL=https://${WWWHOST}/images/netbed-setup.pl\n";
     echo "emulab_status=0\n";
     return;
 }
@@ -187,7 +192,7 @@ if (strcmp($privIP, "1.1.1.1")) {
     if (0) {
     if ($cdvers == 3) {
 	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	    echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
+	    echo "slice1_md5=9d6da4db9fb8e3b82dcbbcdd24bbdd98\n";
 	    echo "slicex_slice=3\n";
 	    echo "slicex_mount=/users\n";
     }
@@ -262,7 +267,7 @@ else {
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
+	echo "slice1_md5=9d6da4db9fb8e3b82dcbbcdd24bbdd98\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v3.tar.gz\n";
@@ -271,7 +276,7 @@ else {
     else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
+	echo "slice1_md5=9d6da4db9fb8e3b82dcbbcdd24bbdd98\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
