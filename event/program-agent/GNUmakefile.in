@@ -34,7 +34,8 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 install:
 
 client-install: 
-	$(INSTALL_PROGRAM) program-agent /etc/testbed/program-agent
+	$(INSTALL_PROGRAM) program-agent \
+			$(DESTDIR)$(CLIENT_BINDIR)/program-agent
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

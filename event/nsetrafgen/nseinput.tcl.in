@@ -1,4 +1,4 @@
-#!/etc/testbed/nse
+#!/usr/localetc/emulab/nse
 
 #
 # EMULAB-COPYRIGHT
@@ -36,7 +36,7 @@ proc getipaddr {name} {
 # returns the interface name for ipaddr
 proc getif {ipaddr} {
 
-    set tmccifconfig [open /etc/testbed/tmcc.ifconfig r]
+    set tmccifconfig [open /var/emulab/tmcc.ifconfig r]
     set ifconf [read $tmccifconfig]
     close $tmccifconfig
     set ifconfiglist [split $ifconf "\n"]
@@ -53,7 +53,7 @@ proc getif {ipaddr} {
 
 proc getmac {ipaddr} {
 
-    set tmccifconfig [open /etc/testbed/tmcc.ifconfig r]
+    set tmccifconfig [open /var/emulab/tmcc.ifconfig r]
     set ifconf [read $tmccifconfig]
     close $tmccifconfig
     set ifconfiglist [split $ifconf "\n"]
@@ -76,7 +76,7 @@ proc getmac {ipaddr} {
 
 # This is temporary. Needs to be done from libsetup.pm
 proc installipfwfwd {} {
-    set tmccroutelist [open /etc/testbed/tmcc.routelist r]
+    set tmccroutelist [open /var/emulab/tmcc.routelist r]
     set routeliststr [read $tmccroutelist]
     close $tmccroutelist
 
@@ -121,7 +121,7 @@ proc findcpuspeed {} {
 # store a list of routes for all source nodes that are
 # in this simulation
 
-set tmccnseconfigs [open /etc/testbed/tmcc.nseconfigs r]
+set tmccnseconfigs [open /var/emulab/tmcc.nseconfigs r]
 set nseconfig [read $tmccnseconfigs]
 close $tmccnseconfigs
 
@@ -219,9 +219,9 @@ if { $nsetrafgen_present == 1 } {
     # for each entry in `tmcc trafgens` that has NSE as the generator
     # configure that object to connect to a newly created
     # TCPTap along with the required Live and RAW IP objects. Set the filter and interface
-    # after learning it from tmcc commands and other scripts in /etc/testbed
+    # after learning it from tmcc commands and other scripts in /var/emulab
     
-    set tmcctrafgens [open /etc/testbed/tmcc.trafgens r]
+    set tmcctrafgens [open /var/emulab/tmcc.trafgens r]
     set tmcctraf [read $tmcctrafgens]
     close $tmcctrafgens
     set trafgenlist [split $tmcctraf "\n"]
@@ -340,7 +340,7 @@ if { $simcode_present == 1 } {
 # get some params to configure the event system interface
 if { $objnamelist != {} } {
 
-    set tmccbossinfo [open /etc/testbed/tmcc.bossinfo r]
+    set tmccbossinfo [open /var/emulab/tmcc.bossinfo r]
     set tmccboss [read $tmccbossinfo]
     close $tmccbossinfo
     set boss [lindex [split $tmccboss " "] 0]

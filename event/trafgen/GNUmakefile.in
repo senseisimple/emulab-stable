@@ -75,6 +75,9 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:
 
+client-install:
+	$(INSTALL_PROGRAM) trafgen $(DESTDIR)$(CLIENT_BINDIR)/trafgen
+
 clean:
 	/bin/rm -f lex.yy.c y.* *.o $(PROGRAMS)
 

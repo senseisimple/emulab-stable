@@ -5,6 +5,12 @@
 # All rights reserved.
 #
 
+#
+# Confiigure variables
+#
+my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
+my $CLIENT_ETCDIR = "@CLIENT_ETCDIR@";
+
 use lib '@prefix@/lib';
 
 use libdb;
@@ -95,7 +101,7 @@ sub check {
     my $ssh="sshtb -q";
     my $node = shift;
     my $cmd1 = "ps auxwww | grep slothd | grep -v grep";
-    my $cmd2 = "'rm -f /tmp/.sdpid ; /etc/testbed/slothd'";
+    my $cmd2 = "'rm -f /tmp/.sdpid ; ${CLIENT_BINDIR}/slothd'";
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
     # some funky state.

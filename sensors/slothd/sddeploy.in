@@ -5,6 +5,12 @@
 # All rights reserved.
 #
 
+#
+# Confiigure variables
+#
+my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
+my $CLIENT_ETCDIR = "@CLIENT_ETCDIR@";
+
 use lib '@prefix@/lib';
 
 use libdb;
@@ -28,8 +34,8 @@ if (@ARGV < 1) {
 
 my $linpath = "~kwebb/src/testbed/sensors/slothd/linux/slothd";
 my $fbsdpath = "~kwebb/src/testbed/sensors/slothd/fbsd/slothd";
-my $linrcpath = "~kwebb/src/testbed/tmcd/linux/rc.testbed";
-my $fbsdrcpath = "~kwebb/src/testbed/tmcd/freebsd/rc.testbed";
+my $linrcpath = "~kwebb/src/testbed/tmcd/common/rc.testbed";
+my $fbsdrcpath = "~kwebb/src/testbed/tmcd/common/rc.testbed";
 
 my $SSH = "sudo ssh -q";
 my $SCP = "sudo scp -q -o Loglevel=QUIET";
@@ -102,16 +108,16 @@ sub InstallSlothd($) {
         print "stopping slothd on $node\n";
         `$SSH $node killall slothd`;
         sleep 1;
-        `$SCP $linpath $node:/etc/rc.d/testbed`;
-        `$SCP $linrcpath $node:/etc/rc.d/testbed`;
+        `$SCP $linpath $node:$CLIENT_BINDIR`;
+        `$SCP $linrcpath $node:$CLIENT_BINDIR`;
     }
     elsif ($nodeos =~ /freebsd/i) {
         print "Node type is FreeBSD\n";
         print "stopping slothd on $node\n";
         `$SSH $node killall slothd`;
         sleep 1;
-        `$SCP $fbsdpath $node:/etc/testbed`;
-        `$SCP $fbsdrcpath $node:/etc/testbed`;    
+        `$SCP $fbsdpath $node:$CLIENT_BINDIR`;
+        `$SCP $fbsdrcpath $node:$CLIENT_BINDIR`;    
     }
     else {
         print "Unknown node OS: $nodeos: not deploying.\n";
@@ -119,7 +125,7 @@ sub InstallSlothd($) {
     }
 
     print "starting slothd on $node\n";
-    `$SSH $node /etc/testbed/slothd`;
+    `$SSH $node $CLIENT_BINDIR/slothd`;
     if ($?) {
         return 1;
     }

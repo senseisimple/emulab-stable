@@ -7,7 +7,7 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= os/imagezip
+SUBDIR		= os/imagezip.redux
 
 WITH_NTFS	= @WINSUPPORT@
 

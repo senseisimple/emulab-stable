@@ -1,11 +1,9 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
 #
@@ -14,31 +12,12 @@ use English;
 # usage: startnse &
 # 
 
-#
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
-$ENV{'TCL_LIBRARY'} = '/etc/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-#
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use lib "/etc/testbed";
-use libsetup;
+# Stuff is here now.
+chdir $BINDIR;
 
-#
-# We use the tmcc to figure out where the Testbed Event Daemon is running.
-# Don't worry about the port for now.
-#
-#my ($bossname, $bossipaddr) = split(" ", `tmcc bossinfo`);
-
-
-# 1. sysctl tcp blackhole to 2. Done in nseinput.tcl
-# 2. create lots of BPF devices
-
-chdir "/etc/testbed";
 $id = `id`;
 ($vnode,$eid,$pid) = split (/\./, `hostname`);
 $logpath = "/proj/$pid/exp/$eid/logs/nse-$vnode.log";

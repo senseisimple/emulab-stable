@@ -54,6 +54,10 @@ install:
 
 client-install:
 	@$(MAKE) -C nsetrafgen client-install
+	@$(MAKE) -C delay-agent client-install
+	@$(MAKE) -C program-agent client-install
+	@$(MAKE) -C tbgen client-install
+	@$(MAKE) -C trafgen client-install
 
 control-install: 
 	@$(MAKE) -C tbgen control-install

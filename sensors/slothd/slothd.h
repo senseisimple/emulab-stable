@@ -37,7 +37,7 @@
 #include <sys/ioctl.h>
 #endif
 
-#define SLOTHD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:/etc/testbed"
+#define SLOTHD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:" CLIENT_BINDIR
 #define UTMP_PATH "/var/run/utmp"
 #define WTMP_PATH "/var/log/wtmp"
 #define PIDFILE "/var/run/slothd.pid"

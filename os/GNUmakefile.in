@@ -9,6 +9,8 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= os
 
+LBINDIR		= $(DESTDIR)/usr/local/bin
+
 include $(OBJDIR)/Makeconf
 
 SUBDIRS	= imagezip frisbee.redux growdisk
@@ -31,10 +33,12 @@ control-install:
 	@$(MAKE) -C imagezip install
 
 client-install: 
-	$(INSTALL_PROGRAM) create-delta /usr/local/bin/create-delta
-	$(INSTALL_PROGRAM) install-delta /usr/local/bin/install-delta
-	$(INSTALL_PROGRAM) install-tarfile /usr/local/bin/install-tarfile
-	$(INSTALL_PROGRAM) create-image /usr/local/bin/create-image
+	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-delta $(LBINDIR)/create-delta
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-delta $(LBINDIR)/install-delta
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
+	$(MAKE) -C imagezip client-install
 
 clean:		subdir-clean
 

@@ -28,9 +28,16 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 buildnse:
 	cd $(SRCDIR); $(SRCDIR)/nse-install
 
+sup-install:
+	cp -p $(INSTALL_FILES) $(INSTALL_SUPDIR)$(CLIENT_BINDIR)
+	cp -p $(INSTALL_NSE) $(INSTALL_SUPDIR)/usr/local/bin
+
 client-install:
-	cp $(INSTALL_FILES) $(INSTALL_SUPDIR)/etc/testbed
-	cp $(INSTALL_NSE) $(INSTALL_SUPDIR)/usr/local/bin
+	cp -p $(INSTALL_FILES) $(DESTDIR)$(CLIENT_BINDIR)
+	if [ -x $(INSTALL_NSE) ]; then \
+	    $(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin; \
+	    cp -p $(INSTALL_NSE) $(DESTDIR)/usr/local/bin; \
+	fi
 
 clean:
 	/bin/rm -f $(INSTALL_NSE)
