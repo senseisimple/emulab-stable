@@ -12,7 +12,7 @@
 # CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
 # FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 #
-############################################################################
+##########################################################################
 # Some bits of this file are from xmlrpclib.py, which is:
 # --------------------------------------------------------------------
 # Copyright (c) 1999-2002 by Secret Labs AB
@@ -48,10 +48,12 @@ import urllib
 import popen2
 import rfc822
 import xmlrpclib
-import syslog
+if os.name != "nt":
+    import syslog
 
 # XXX This should come from configure.
-LOG_TESTBED = syslog.LOG_LOCAL5;
+if os.name != "nt":
+    LOG_TESTBED = syslog.LOG_LOCAL5;
 
 import traceback
 
@@ -117,8 +119,8 @@ class SSHConnection:
         self.host = host
 
         # ... initialize the read and write file objects.
+        self.myChild = None
         if streams:
-            self.myChild = None
             self.rfile = streams[0]
             self.wfile = streams[1]
             pass
@@ -126,22 +128,38 @@ class SSHConnection:
             self.user, ssh_host = urllib.splituser(self.host)
             # print self.user + " " + self.host + " " + handler
             
+            # Use ssh unless we're on Windows with no ssh-agent running.
+            nt = os.name == "nt"
+            use_ssh = not nt or os.environ.has_key("SSH_AGENT_PID")
+
             flags = ""
             if self.user:
                 flags = flags + " -l " + self.user
                 pass
-            if ssh_config:
+            if use_ssh and ssh_config:
                 flags = flags + " -F " + ssh_config
                 pass
-            self.myChild = popen2.Popen3("ssh -x -C -o 'CompressionLevel 5' "
-                                         + flags
-                                         + " "
-                                         + ssh_host
-                                         + " "
-                                         + handler,
-                                         0)
-            self.rfile = self.myChild.fromchild
-            self.wfile = self.myChild.tochild
+            args = flags + " " + ssh_host + " " + handler
+
+            if use_ssh:
+                cmd = "ssh -x -C -o 'CompressionLevel 5' " + args
+                pass
+            else:
+                # Use the PyTTY plink, equivalent to the ssh command.
+                cmd = "plink -x -C " + args
+                pass
+            
+            if not nt:
+                # Popen3 objects, and the wait method, are Unix-only.
+                self.myChild = popen2.Popen3(cmd, 0)
+                self.rfile = self.myChild.fromchild
+                self.wfile = self.myChild.tochild
+                pass
+            else:
+                # Open the pipe in Binary mode so it doesn't mess with CR-LFs.
+                self.rfile, self.wfile, self.errfile = popen2.popen3(cmd, mode='b')
+                pass
+            # print "wfile", self.wfile, "rfile", self.rfile
             pass
         return
 
@@ -163,6 +181,7 @@ class SSHConnection:
     # @return The amount of data written.
     #
     def write(self, stuff):
+        # print "write", stuff
         return self.wfile.write(stuff)
 
     ##
@@ -310,6 +329,7 @@ class SSHTransport:
             # ... tell the user.
             raise BadResponse(connection.host, connection.handler, e.args[0])
         
+        # print "response /"+response+"/"
         parser.feed(response)
 
         return unmarshaller.close()
@@ -336,11 +356,11 @@ class SSHServerWrapper:
         #
         # Init syslog
         #
-        syslog.openlog("sshxmlrpc", syslog.LOG_PID, LOG_TESTBED);
-        syslog.syslog(syslog.LOG_INFO,
-                      "Connect by " + os.environ['USER'] + " from " +
-                      self.ssh_connection[0]);
-                      
+        if os.name != "nt":
+            syslog.openlog("sshxmlrpc", syslog.LOG_PID, LOG_TESTBED);
+            syslog.syslog(syslog.LOG_INFO,
+                          "Connect by " + os.environ['USER'] + " from " +
+                          self.ssh_connection[0]);
         return
 
     ##
@@ -371,11 +391,12 @@ class SSHServerWrapper:
                 pass
             length = int(hdrs['content-length'])
             params, method = xmlrpclib.loads(connection.read(length))
-            syslog.syslog(syslog.LOG_INFO,
-                          "Calling method '"
-                          + method
-                          + "'; user-agent="
-                          + user_agent);
+            if os.name != "nt":
+                syslog.syslog(syslog.LOG_INFO,
+                              "Calling method '"
+                              + method
+                              + "'; user-agent="
+                              + user_agent);
             try:
                 # ... find the corresponding method in the wrapped object,
                 meth = getattr(self.myObject, method)
@@ -440,8 +461,9 @@ class SSHServerWrapper:
             pass
         finally:
             connection.close()
-            syslog.syslog(syslog.LOG_INFO, "Connection closed");
-            syslog.closelog()
+            if os.name != "nt":
+                syslog.syslog(syslog.LOG_INFO, "Connection closed");
+                syslog.closelog()
             pass
         return
     
@@ -525,5 +547,9 @@ class SSHServerProxy:
     def __getattr__(self, name):
         # magic method dispatcher
         return xmlrpclib._Method(self.__request, name)
+
+    # Locally handle "if not server:".
+    def __nonzero__(self):
+        return True
 
     pass
