@@ -302,7 +302,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 #
 # Specialized function for configing locally hacked veth devices.
 #
-sub os_ifconfig_veth($$$$$;$$)
+sub os_ifconfig_veth($$$$$;$$$)
 {
     return "";
 }
