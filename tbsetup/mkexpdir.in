@@ -170,6 +170,9 @@ if (! chown($UID, $unix_gid, "$workdir")) {
 # there is a common path for all experiments. 
 #
 if ($pid ne $gid) {
+    # XXX Bad. This link should be removed when the experiment is removed.
+    unlink($eidlink)
+	if (-e $eidlink);
     symlink($eiddir, $eidlink) or
 	fatal("Could not symlink($eiddir, $eidlink): $!");
 }
