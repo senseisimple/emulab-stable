@@ -227,7 +227,7 @@ sub os_useradd($$$$$$$$)
     }
 
     if (system("$USERADD $login -u $uid -g $gid $glist ".
-	       "-d $homedir -s /bin/tcsh -c \"$gcos\"") != 0) {
+	       "-m -d $homedir -s /bin/tcsh -c \"$gcos\"") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
     }
