@@ -76,7 +76,7 @@ if ($device =~ /^([-\w.\/]+)$/) {
 else {
     die("Tainted device name: $device");
 }
-if ($filename =~ /^([-\w.\/]+)$/) {
+if ($filename =~ /^([-\w.\/\+]+)$/) {
     $filename = $1;
 }
 else {
