@@ -34,7 +34,7 @@ while {[gets $vlanFp line] >= 0} {
 puts "Removing VLANs: $toremove"
 
 if {$toremove != {}} {
-    if {[catch "exec $snmpit -u -r $toremove >@ stdout 2>@ stderr" err]} {
+    if {[catch "exec $snmpit -debug -u -r $toremove >@ stdout 2>@ stderr" err]} {
 	puts stderr "Error running $snmpit -u -r ($err)"
 	exit 1
     }

@@ -11,6 +11,9 @@
 #                                                                       #
 #########################################################################
 
+my $debug = 0;
+if ( join(" ",@ARGV) =~ /-debug/ ) { $debug = 1; }
+
 &myMain;
 
 sub myMain {
@@ -195,11 +198,13 @@ sub ParseArgs {
 	  *on,*off,*cyc,*all,*outlets,*Interfaces,*Ports) = @_;
     my $help=0; 
     if (@main::CMDS < 1) {$help = 1; }
+    print "Command line was:\nsnmpit ",join(" ",@ARGV),"\n" if $debug;
     while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
 	$_ = shift(@CMDS);
-	#print "Item=$_*\n";
-	#print "i=$i p=",@p," D=$d E=$e a=$a d=$dup s=$s m=$m vlan=",
-	#@vlan," b=$b c=$c on=$on off=$off cyc=$cyc\n";
+	print "Item=$_*\n" if $debug;
+	print "i=$i p=",@p," d=$d e=$e a=$a dup=$dup s=$spd s=$s f=$f l=$l",
+	  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
+	  "off=$off cyc=$cyc all=$all\n" if $debug;
 	if (/^-i(.*)/) {$i = ($1 ? $1 : shift(@CMDS));}
 	elsif (/^-p(.*)/) {
 	    my $Range ="";
@@ -216,6 +221,7 @@ sub ParseArgs {
 	    }
 	    while (@CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) );
 	}
+	elsif (/^-debug(.*)/) {$debug = 1; $v=1; }
 	elsif (/^-h(.*)/) {$help = 2;}
 	elsif (/^-off(.*)/) {$off = 1;}
 	elsif (/^-on(.*)/) {$on = 1;}
@@ -254,7 +260,9 @@ sub ParseArgs {
 	elsif (/^-([1-8])$/) { push(@outlets, $1);}
 	else {die("Unknown Option: $_\n");}
     }
-    #print "Done:\nS=$i p=@p D=$d E=$e a=$a d=$dup s=$s C=$m vlan=@vlan B=$b V=$c on=$on off=$off cyc=$cyc\n";
+    print "Done\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup s=$spd s=$s f=$f l=$l",
+	  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
+	  "off=$off cyc=$cyc all=$all\n" if $debug;
     if ($help) {
 	print
 	    "snmpit - A general purpose SNMP Tool - Version 1.1\n",
@@ -389,7 +397,7 @@ sub ShowPorts {
     $sess->getnext($ifTable);
     do {
 	@data = @{$ifTable};
-	#print "$data[0]\t$data[1]\t$data[2]\n";
+	print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
 	if ($data[1] < 25) {
 	    if ($data[0] =~ /AdminStatus/) { 
 		$Able{$data[1]} = ($data[2]=~/up/ ? "yes" : "no"); 
@@ -406,7 +414,7 @@ sub ShowPorts {
 	@data = @{$portConf};
 	$data[1] =~ s/\./:/g;
 	$data[1] = (split(":",$data[1]))[2];
-	#print "$data[0]\t$data[1]\t$data[2]\n";
+	print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
 	if ($data[1] < 25) {
 	    if ($data[0] =~ /Speed/) {
 		$data[2] =~ s/speed//;
@@ -432,7 +440,7 @@ sub ShowPorts {
     $sess->getnext($field);
     do {
 	@data = @{$field};
-	#print "$data[0]\t$data[1]\t$data[2]\n";
+	print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
 	if ($data[0] =~ /policyVlanName/) { $vlanNames{$data[1]} = $data[2]; }
 	if ($data[0] =~ /MacRuleVlanId/) 
 	{ 
@@ -503,7 +511,7 @@ sub GetStats {
     $sess->getnext($ifTable);
     do {
 	@data = @{$ifTable};
-	#print "$data[0]\t$data[1]\t$data[2]\n";
+	print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
 	if ($data[1] < 25) {
 	    if    ($data[0]=~/InOctets/)  {$inOctets{$data[1]}  = $data[2];} 
 	    elsif ($data[0]=~/InUcast/)   {$inUcast{$data[1]}   = $data[2];}
@@ -578,7 +586,8 @@ sub UpdateField {
     local(*session,*OID,*ports,*val,*b,*c,*v)= @_;
     my $Status = 0;
     foreach my $port (@ports) {
-	#print "Processing port $port, $OID, to $val. Last was $Status.\n";
+	print "Processing port $port, $OID, to $val. Last was $Status.\n" 
+	  if $debug;
 	$Status = $session->get([[$OID,$port]]);
 	if (!defined $Status) { 
 	  print "Port $port, change to $val: No answer from device\n"; 
@@ -692,16 +701,29 @@ sub GetToken {
     #The zeros and ones are a magic number it needs...
     $sess->set([[$TokenReq,0,$Num,"OCTETSTR"]]);
     my $RetVal = $sess->get([[$TokenReqResult,0]]);
-    while ($RetVal eq "notReady") {
+    my $tries = 0;
+    while ($RetVal ne "success" && $tries < 10) {
+      $tries += 1;
+      while ($RetVal eq "notReady") {
 	$RetVal = $sess->get([[$TokenReqResult,0]]);
 	print "VLAN Token Claim Result is $RetVal\n" if ($v);
 	select (undef, undef, undef, .25); #wait 1/4 second
-    }
-    print "VLAN Token Claim Result is $RetVal\n" if ($v);
-    if ($RetVal ne 'success') {
+      }
+      print "VLAN Token Claim Result is $RetVal\n" if ($v);
+      if ($RetVal ne 'success') {
 	my $Owner = $sess->get([[$TokenOwner,0]]);
-	print "VLAN Token Claim Result is $RetVal\n";
-	die("Can't edit VLANs: Token taken by $Owner\n");
+	if ($Owner ne "0.0.0.0") { 
+	  $tries = 10;
+	} else {
+	  print time,"Try #$tries - Result is $RetVal - Waiting 10 seconds\n";
+	  select (undef, undef, undef, 10); #wait 5 seconds
+	}
+      }
+    }
+    if ($RetVal ne 'success') {
+      my $Owner = $sess->get([[$TokenOwner,0]]);
+      print "VLAN Token Claim Result is $RetVal\n";
+      die("Can't edit VLANs: Token taken by $Owner\n");
     }
 }
 
@@ -751,14 +773,14 @@ sub AutoVLANConfig {
     my @VLANS= ();
     my @names= ();
     &ReadIRFile(*f,\@names,\@VLANS,\%Interfaces);
-    #print "Rcvd: ",join (" ",@names),"\n";
+    print "Rcvd: ",join (" ",@names),"\n" if $debug;
     &GetToken(\$sess,\$v);
     my $m="";
     my @vlan=();
     while (@VLANS) {
 	@vlan = @{shift(@VLANS)};
 	$m = shift @names;
-	#print "Making $m with: ",join(' ',@vlan),"\n";
+	print "Making $m with: ",join(' ',@vlan),"\n" if $debug;
 	&OneVLAN(\$sess,\$m,\@vlan,\$v);
     }
     &ReleaseToken(\$sess,\$v,\$u);
@@ -796,25 +818,25 @@ sub ReadIRFile {
 	my @v= split;
 	$name = shift @v;
 	my $n=0;
-	#print "@v is ",@v,"\n";
+	print "@v is ",@v,"\n" if $debug;
 	while(@v != 0 && $n < @v) {
 	    #Lowercase it all, but leave in : for tbpcx:y syntax
 	    $v[$n] = "\L$v[$n]\E";
-	    #print "Took $v[$n]\t";
+	    print "Took $v[$n]\t" if $debug;
 	    if ((!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)))
 		&& (defined $Interfaces{$v[$n]})) {
 		$v[$n] = $Interfaces{$v[$n]};
 	    }
 	    # Allow people to specify addresses with colons or dots
 	    $v[$n] =~ s/[:\.]//g;
-	    #print "Got $v[$n]\t";
+	    print "Got $v[$n]\n" if $debug;
 	    die("Invalid MAC Address ",$v[$n],". Must be 6 byte Hex value.\n")
 	       if (!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)));
 	    $n++;
 	}
 	@v = sort @v;
 	if (!defined $exists{ join(' ',@v) }) {
-	    #print "Read VLAN $name with: ",join (" ",@v),"\n";
+	    print "Read VLAN $name with: ",join (" ",@v),"\n" if $debug;
 	   push( @VLANS, \@v);
 	   push(@names, $name);
 	   $exists{join(' ',@v)} = 1;
@@ -888,7 +910,7 @@ sub ListVLANs {
     $sess->getnext($field);
     do {
 	@data = @{$field};
-	#print "$data[0]\t$data[1]\t$data[2]\n";
+	print "$data[0]\t$data[1]\t$data[2]\n" if $debug;
 	if ($data[0] =~ /policyVlanName/) { $Names{$data[1]} = $data[2]; }
 	if ($data[0] =~ /MacRuleVlanId/) 
 	{ 
@@ -931,7 +953,7 @@ sub RemoveVLAN {
     my $DeleteOID = ".1.3.6.1.4.1.343.6.11.1.9.1.4";
     my $RetVal = "Undef.";
     print "  Removing VLAN #$r ... ";
-    if ($r == 25) {
+    if ($r == 24) {
 	print "VLAN #$r is the Control VLAN, and cannot be removed.\n";
     } else {
 	$RetVal = $sess->set([[$DeleteOID,$r,"delete","INTEGER"]]);
