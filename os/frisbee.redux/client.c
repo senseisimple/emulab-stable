@@ -151,7 +151,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -241,6 +241,15 @@ main(int argc, char **argv)
 			else if (mem > 2048)
 				mem = 2048;
 			maxmem = mem;
+			break;
+
+		case 'R':
+			maxreadahead = atoi(optarg);
+			if (maxinprogress < maxreadahead * 4) {
+				maxinprogress = maxreadahead * 4;
+				if (maxinprogress > maxchunkbufs)
+					maxinprogress = maxchunkbufs;
+			}
 			break;
 
 		case 'h':
