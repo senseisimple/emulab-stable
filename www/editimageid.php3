@@ -81,11 +81,11 @@ if (isset($path) && strcmp($path, "")) {
 	    $pdef = "/groups/" . $pid . "/" . $gid . "/";
 	}
 	else {
-	    $pdef = "/proj/" . $pid . "/images/";
+	    $pdef = "/proj/" . $pid . "/";
 	}
 
 	if (strpos($path, $pdef) === false) {
-	    USERERROR("Invalid path! Must reside in /proj or /groups.", 1);
+	    USERERROR("Invalid path! Must reside in $pdef", 1);
 	}
     }
     $path = "'$path'";
