@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: rmacct,v 1.6 2000-11-29 21:35:33 kwright Exp $
+### $Id: rmacct,v 1.7 2000-12-04 19:53:08 kwright Exp $
 ###
 ### rmacct - Removes accounts for all users in given experiment.
 ###
@@ -139,17 +139,19 @@ print "\n";
 
 ##
 ## Save user dirs in tar file unless -nt specified 
+## Commented out because we will move this to rmacct-ctrl. -lkw 11/30/00
 ##
-if ( $savedir ) {
-    foreach my $user (@users) {
-	if ( -e "/users/$user" ) {
-	    print "Creating $user.tar in /tmp\n";
-	    open(TAR, "/usr/bin/tar cvf /tmp/$user.tar /users/$user 2>&1 |");
-    while (<TAR>) { print "$_"; }
-	    close(TAR);	    
-	}
-    }
-}
+
+#if ( $savedir ) {
+#    foreach my $user (@users) {
+#	if ( -e "/users/$user" ) {
+#	    print "Creating $user.tar in /tmp\n";
+#	    open(TAR, "/usr/bin/tar cvf /tmp/$user.tar /users/$user 2>&1 |");
+#    while (<TAR>) { print "$_"; }
+#	    close(TAR);	    
+#	}
+#    }
+#}
 
 ##
 ## For each machine, ping to see if its alive.
@@ -191,8 +193,9 @@ foreach $IP (@nodes) {
 	    ## FreeBSD says "155.99.214.129: Connection refused"
 	    ##    and can also say "Host key doesn't match..."  
 	    ##    and can also say "@@@@@@... WARNING HOST ID CHANGED..."
+	    ##    and can also say "Cannot stat authentication socket dir..."
             if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) 
-		 || ($_ =~/^@+/) ) { 
+		 || ($_ =~/^@+/) || ($_ =~ /^Cannot stat/)) { 
 		die("Uname failed on $IP:$_\n"); 
 	    } else { 
 		$OS = $_;
@@ -223,11 +226,16 @@ foreach $IP (@nodes) {
  	    ## Fetch remote login information
 
 	    foreach my $user (@users) {
-
+                #
+	        # Note: rmuser removes the user dir. Change to a call
+	        # to pw userdel instead. User dir should get removed only
+	        # when project ends, not when an experiment ends (which is
+	        # when rmacct gets called).
+	        #
 		print "Removing $user from $IP\n";
-		open (RMUSER, "/usr/local/bin/sshtb $IP /usr/sbin/rmuser -y $user 2>&1 |");
-		while ( <RMUSER> ) {print "$_"; }
-		close(RMUSER);
+		open(PWDEL, "/usr/local/bin/sshtb $IP /usr/sbin/pw userdel $user 2>&1 |");
+		while ( <PWDEL> ) {print "$_"; }
+		close(PWDEL);
 	    }
 	    
 	    print "Removing group $group from $IP\n";
@@ -270,10 +278,10 @@ foreach $user (@users) {
 	print "$user $node_id\n";
 	if ($user =~ /^(([a-z]|\d)+)$/) {
 	    $u = $1;
-	    if ($node_id =~ /^tb(pc|sh)([0-9])+$/) {
+	    if ($node_id =~ /^(tb(pc|sh)([0-9])+$)/) {
 		$n = $1;
-		print "\tkilltip $user $node_id\n";
-		open (KILLTIP, "/usr/testbed/bin/killtip $u $n 2>&1 |");
+		print "\tkilltip $u $n\n";
+		open (KILLTIP, "/usr/local/bin/sshtb plastic /usr/testbed/bin/killtip $u $n 2>&1 |");
 		while ( <KILLTIP> ) { print "$_"; }
 	    }
 	}
