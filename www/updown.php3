@@ -6,55 +6,61 @@ require("defs.php3");
 #
 PAGEHEADER("Node Up/Down Status");
 
-?>
-<?php
-# This is kinda a pain!
-$query_result = mysql_db_query($TBDBNAME,
-		"SELECT count(*) FROM nodes ".
-		"WHERE status = 'up'");
+$query_result =
+    DBQueryFatal("SELECT node_id, nodes.type, status FROM nodes ".
+	"left join node_types on node_types.type=nodes.type ".
+	"WHERE node_types.class!='shark' and node_types.isvirtnode=0 ".
+	"ORDER BY nodes.type,priority");
 
-if (! $query_result) {
-	$err = mysql_error();
-	TBERROR("Database Error getting node status: $err\n", 1);
+$num_up    = 0;
+$num_pd    = 0;
+$num_down  = 0;
+$num_unpingable = 0;
+
+while ($r = mysql_fetch_array($query_result)) {
+	$status = $r["status"];
+
+	switch ($status) {
+	case "up":
+	    $num_up++;
+	    break;
+	case "possibly down":
+	    $num_pd++;
+	    break;
+	case "down":
+	    $num_down++;
+	    break;
+	case "unpingable":
+	    $num_unpingable++;
+	    break;
+	default:
+	    break;
+	}
 }
-
-$r = mysql_fetch_array($query_result);
-$num_up = $r[0];
-
-# If you get an answer the first time, you're probably not gonna get an error the
-# second time...
-$query_result = mysql_db_query($TBDBNAME,
-		"SELECT count(*) FROM nodes ".
-		"WHERE status = 'possibly down'");
-$r = mysql_fetch_array($query_result);
-$num_pd = $r[0];
-
-$query_result = mysql_db_query($TBDBNAME,
-		"SELECT count(*) FROM nodes ".
-		"WHERE status = 'down'");
-$r = mysql_fetch_array($query_result);
-$num_down = $r[0];
-
-$query_result = mysql_db_query($TBDBNAME,
-		"SELECT count(*) FROM nodes ".
-		"WHERE status = 'unpingable'");
-$r = mysql_fetch_array($query_result);
-$num_unpingable = $r[0];
-
 $num_total = ($num_up + $num_unpingable + $num_down + $num_pd);
+mysql_data_seek($query_result, 0);
+
 ?>
 
 <table>
-<tr><td align="right"><b>Up</b></td><td align="left"><? echo $num_up ?></td></tr>
-<tr><td align="right"><b>Unpingable</b></td><td align="left"><? echo $num_unpingable ?></td></tr>
-<tr><td align="right"><b>Possibly Down</b></td><td align="left"><? echo $num_pd ?></td></tr>
-<tr><td align="right"><b>Down</b></td><td align="left"><?
-		if ($num_down > 0) {
-			echo "<font color=\"red\">$num_down</font>";
-		} else {
-			echo "$num_down";
-		} ?> </td></tr>
-<tr><td align="right"><b>Total</b></td><td align="left"><? echo $num_total ?></td></tr>
+<tr><td align="right">
+    <b>Up</b></td><td align="left"><? echo $num_up ?></td></tr>
+<tr><td align="right">
+    <b>Unpingable</b></td><td align="left"><? echo $num_unpingable ?></td></tr>
+<tr><td align="right">
+    <b>Possibly Down</b></td><td align="left"><? echo $num_pd ?></td></tr>
+<tr><td align="right"><b>Down</b></td><td align="left">
+<?
+if ($num_down > 0) {
+    echo "<font color=\"red\">$num_down</font>";
+}
+else {
+    echo "$num_down";
+}
+?>
+</td></tr>
+<tr><td align="right">
+    <b>Total</b></td><td align="left"><? echo $num_total ?></td></tr>
 </table>
 
 
@@ -74,17 +80,6 @@ printf("%.2f",(($num_up + $num_unpingable)/$num_total) *100);
 </p>
 
 <?php
-$query_result = mysql_db_query($TBDBNAME,
-		"SELECT node_id, type, status FROM nodes ".
-#		"WHERE type='pc' OR type='shark' " .
-		"ORDER BY type,priority");
-
-if (! $query_result) {
-	$err = mysql_error();
-	TBERROR("Database Error getting node status: $err\n", 1);
-}
-
-
 $nodecount = 0;
 $maxcolumns = 4;
 
