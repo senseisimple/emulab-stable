@@ -7,6 +7,16 @@
 #  Assumes at most 1 link between any two nodes. [Fixing this limitations
 # would also involved changing the TB cmd syntax]
 
+# Set this to 1 for debugging
+$verbose = 0;
+
+# prints output if verbose is
+sub printdb {
+    if ($verbose) {
+	print "DB: $_[0]";
+    }
+};
+
 # This is the prefix used for assigning otherwise unassigned IP addresses:
 $ip_base = "192.168";
 
@@ -40,12 +50,6 @@ if ($@) {
     exit(1);
 }
 
-# Make sure we have links
-&ir_exists("/topology/links") || do {
-    print STDERR "IR does not contain topology/links section.\n";
-    exit(1);
-};
-
 # open NS file
 open(NSFILE,$nsfile) || do {
     print STDERR "Could not open $nsfile\n";
@@ -75,6 +79,28 @@ foreach (split("\n",&ir_get("/virtual/nodes"))) {
     ($virtual,$physical) = split;
     $vnodemap{$virtual} = $physical;
     $rvnodemap{$physical} = $virtual;
+}
+
+# Read in the links
+&ir_exists("/topology/links") || do {
+    print STDERR "IR does not contain topology/links section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/topology/links"))) {
+    @t = split;
+    ($link,$src,$dst) = @t[0,1,3];
+    $links{$link} = [$src,$dst];
+}
+
+# Get an idea of what LANs there are
+&ir_exists("/topology/lans") || do {
+    print STDERR "IR does not contain topology/lans section.\n";
+    exit(1);
+};
+foreach (split("\n",&ir_get("/topology/lans"))) {
+    ($lan,$nodesraw) = /^([^ ]+) "([^\"]+)"/;
+    my(@nodes) = split(" ",$nodesraw);
+    $lans{$lan} = [$lan,\@nodes];
 }
 
 # Pull the MAC table from the database.
@@ -186,6 +212,8 @@ $ip_section = '';
 # if flag is 0 it indicates the slot src->dst and if flag is one it 
 # indicates that both src->dst and dst->src need to be filled.
 
+# lansubnet holds the subnet for a LAN.
+
 # intersect - intersection of two lists.  Takes two list references
 # and returns a single element.
 # We assume that the intersection is of size 1 for optimization.
@@ -202,49 +230,92 @@ sub intersect {
     return "";
 };
 
+# islan - Just returns 1 if the passed node is a lan
+sub islan {
+    return defined($lans{$_[0]});
+};
+
 # get_macs link - Returns all MAC addresses associated with a link.  Because
 # a link can pass through a delay node this may be more than two.  Returns
 # an array.
 sub get_macs {
     local($macs)=[];
+    if (defined($vlanmap{$_[0]})) {
+	push(@$macs,@{$vlanmap{$_[0]}});
+    }
     if (defined($vlanmap{"dsrc_$_[0]"})) {
 	push(@$macs,@{$vlanmap{"dsrc_$_[0]"}});
     } 
     if (defined($vlanmap{"ddst_$_[0]"})) {
 	push(@$macs,@{$vlanmap{"ddst_$_[0]"}});
     }
+    if (defined($links{$_[0]})) {
+	($src,$dst) = @{$links{$_[0]}};
+	if (&islan($src)) {
+	    push(@$macs,@{$vlanmap{$src}});
+	} elsif (&islan($dst)) {
+	    push(@$macs,@{$vlanmap{$dst}});
+	}
+    }
 
     return $macs;
 };
 
 # Phase 1
-foreach (split("\n",&ir_get("/topology/links"))) {
-    @t = split;
-    ($link,$src,$dst) = @t[0,1,3];
+foreach $link (keys(%links)) {
+    ($src,$dst) = @{$links{$link}};
 
+    printdb "Looking at $link ($src <-> $dst)\n";
+    if (&islan($src) && &islan($dst)) {
+	printdb "Skipping LAN link\n";
+	next; # skip lan links
+    }
+   
     # We need to do two iterations, (A=src, B=dst) and (A=dst, B=src)
     $A = $src; $B = $dst;
     foreach (1..2) {
+	printdb "A=$src B=$dst\n";
+	# skip where A is a lan
+	if (&islan($A)) {
+	    $tmp = $A;
+	    $A = $B;
+	    $B = $tmp;
+	    next;
+	}
 	# Look for assigned ip
 	if (defined($IP{"$A:$B"})) {
+	    printdb "Defined link IP " . $IP{"$A:$B"} . "\n";
+	    if (&islan($B)) {
+		$lansubnet{$B} = &get_subnet($IP{"$A:$B"});
+		printdb "lansubnet{$B} = $lansubnet{$B}\n";
+	    }
 	    $ip_section .= "$A $B $IP{$A . ':' . $B}\n";
+	    printdb "ip_section .= \"$A $B " . $IP{"$A:$B"} . "\n";
 	    push(@ip_mac_section, 
 		 [&intersect($MACTABLE{$A},&get_macs($link)),$IP{"$A:$B"}]);
+	    printdb "ip_mac_section <- [" . join(",",&intersect($MACTABLE{$A},&get_macs($link))) . "," . $IP{"$A:$B"} . "]\n";
 	    $ips_assigned{$IP{"$A:$B"}} = 1;
 	    if (!defined($ips_node{$A})) {
 		$ips_node{$A} = [];
 	    }
 	    push(@{$ips_node{$A}},$IP{"$A:$B"});
 	} elsif (defined($IP{$A})) {
+	    printdb "Node IP address $IP{$A}\n";
 	    # node-wide IP address
 	    if (defined($single_node{$A})) {
+		printdb "ERROR multi-link node\n";
 		push(@ERRORS,"Can not use set-ip on nodes with multiple links ($A)");
 	    } else {
 		# mark as a single_node
+		if (&islan($B)) {
+		    $lansubnet{$B} = &get_subnet($IP{$A});
+		}
 		$single_node{$A} = 1;
 		$ip_section .= "$A $B $IP{$A}\n";
+		printdb "ip_section .= $A $B $IP{$A}\n";
 		push(@ip_mac_section,
 		     [&intersect($MACTABLE{$A},&get_macs($link)),$IP{$A}]);
+		printdb "ip_mac_section <- [" . join(",",&intersect($MACTABLE{$A},&get_macs($link))) . ",$IP{$A}]\n";
 		$ips_assigned{$IP{$A}} = 1;
 		if (!defined($ips_node{$A})) {
 		    $ips_node{$A} = [];
@@ -264,6 +335,59 @@ foreach (split("\n",&ir_get("/topology/links"))) {
     }
 }
 
+# Now we need to deal with IP addresses of LANs
+foreach $lan (keys(%lans)) {
+    printdb "lan $lan\n";
+    @nodes = @{$lans{$lan}[1]};
+    foreach $node (@nodes) {
+	printdb "Looking at $node\n";
+	if (defined($IP{"$node:$lan"}) ||
+	    defined($IP{"$lan:$node"})) {
+	    if (defined($IP{"$node:$lan"})) {
+		$ip = $IP{"$node:$lan"};
+		$ips_assigned{$IP{"$node:$lan"}} = 1;
+	    } else {
+		$ip = $IP{"$lan:$node"};
+		$ips_assigned{$IP{"$lan:$node"}} = 1;
+	    }
+	    printdb "Found link IP $ip\n";
+	    $ip_section .= "$node $lan $ip\n";
+	    printdb "ip_section .= $node $lan $ip\n";
+	    push(@ip_mac_section,
+		 [&intersect($MACTABLE{$node},&get_macs($lan)),$ip]);
+	    printdb "ip_mac_section <- [" . join(",",&intersect($MACTABLE{$node},&get_macs($lan))) . ",$ip]\n";
+	    if (! defined($ips_node{$node})) {
+		$ips_node{$node} = [];
+	    } 
+	    push(@{$ips_node{$node}},$ip);
+	    $lansubnet{$lan} = &get_subnet($ip);
+	    printdb "lansubnet{$lan} = $lansubnet{$lan}\n";
+	} elsif (defined($IP{$node})) {
+	    printdb "Found node address\n";
+	    if (defined($single_node{$node})) {
+		push(@ERRORS,"Can not use set-ip on nodes with multiple links ($node)");
+	    } else {
+		$single_node{$node} = 1;
+		$ip_section .= "$node $lan $IP{$node}\n";
+		printdb "ip_section .= $node $lan $IP{$node}\n";
+		push(@ip_mac_section,
+		     [&intersect($MACTABLE{$node},&get_macs($lan)),$IP{$node}]);
+		printdb "ip_mac_section <- [" . join(",",&intersect($MACTABLE{$node},&get_macs($lan))) . ",$IP{$node}]\n";
+		$ips_assigned{$IP{$node}} = 1;
+		if (!defined($ips_node{$node})) {
+		    $ips_node{$node} = [];
+		}
+		push(@{$ips_node{$node}},$IP{$node});
+		$lansubnet{$lan} = &get_subnet($IP{$node});
+		printdb "lansubnet{$lan} = $lansubnet{$lan}\n";
+	    }
+	} else {
+	    $to_assign{"${node}_${lan}"} = [$node,$lan,0];
+	    $vlanmap{"${node}_${lan}"} = $vlanmap{$lan};
+	}
+    }
+}
+    
 # Phase 2 - Assigning all unassigned nodes.
 
 # find_free_ip <subnet> - is a try-every-possibility routine that
@@ -309,6 +433,7 @@ sub find_free_subnet {
 
 foreach $left (keys(%to_assign)) {
     ($node,$dst,$both) = @{$to_assign{$left}};
+    printdb "Dealing with $left: $node,$dst,$both\n";
     if ($both == 1) {
 	$subnet = &find_free_subnet();
 	$ipA = &find_free_ip($subnet);
@@ -328,13 +453,24 @@ foreach $left (keys(%to_assign)) {
 	} elsif (defined($IP{$dst})) {
 	    $subnet = &get_subnet($IP{$dst});
 	} else {
-	    $subnet = &find_free_subnet();
+	    if (defined($lansubnet{$dst})) {
+		$subnet = $lansubnet{$dst};
+	    } else {
+		$subnet = &find_free_subnet();
+	    }
+	}
+	printdb "subnet = $subnet\n";
+	if (&islan($dst)) {
+	    $lansubnet{$dst} = $subnet;
+	    printdb "lansubnet{$dst} = $lansubnet{$dst}\n";
 	}
 	$ip = &find_free_ip($subnet);
 	$ips_assigned{$ip} = 1;
 	$ip_section .= "$node $dst $ip\n";
+	printdb "ip_section .= $node $dst $ip\n";
 	push(@ip_mac_section,
 	     [&intersect($MACTABLE{$node},&get_macs($left)),$ip]);
+	printdb "ip_mac_section  <- [" . join(",",&intersect($MACTABLE{$node},&get_macs($left))) . ",$ip]\n";
 	push(@{$ips_node{$node}},$ip);
     }
 }
