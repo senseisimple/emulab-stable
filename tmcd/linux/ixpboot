@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Startup command in rc.ixp. Use old version.
@@ -69,6 +69,7 @@ else {
 #
 my %config	= ();
 my $logname     = "$LOGDIR/subnode-${ixpid}.log";
+my $RCDIR	= "$BINDIR/rc";
 my $ixpdir	= "/opt/ixasdk/enp-2505/bootixp";
 my $armdir	= "/opt/ixasdk/bin/arm-be";
 my $confdir	= "/opt/config";
@@ -127,7 +128,7 @@ if (! ixpsetup($ixpid)) {
 #
 # Gen up a hostnames in the config dir.
 #
-dohostnames("$confdir/hosts");
+system("$RCDIR/rc.hostnames -j $ixpid -f $confdir/hosts boot");
 
 #
 # Copy resolv.conf
@@ -268,7 +269,11 @@ system("mv -f create_environment.rc.new create_environment.rc") == 0
 # hashes (poor mans data structure). We generate a set of directives to
 # put in the template file, which is in some format that is beyond me.
 #
-my @ifacelist = doifconfig();
+my @ifacelist = ();
+
+if (getifconfig(\@ifacelist) != 0) {
+    die("Could not get ifconfig from libsetup!\n");
+}
 
 #
 # Copy the template to the config file, replace the TAG with the
@@ -342,7 +347,14 @@ foreach my $iface (@ifacelist) {
 #
 # Then put in the standard routes from libsetup, if any.
 #
-if (my @routelist = dorouterconfig()) {
+my @routelist = ();
+my $type      = "";
+
+if (getrouterconfig(\@routelist, \$type)) {
+    die("Could not get router configuration from libsetup!\n");
+}
+
+if (@routelist) {
     foreach my $route (@routelist) {
 	my $inet  = $route->{"IPADDR"};
 	my $mask  = $route->{"IPMASK"};
