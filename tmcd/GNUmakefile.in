@@ -24,9 +24,9 @@ ifeq ($(EVENTSYS),1)
 endif
 
 
-tmcd: tmcd.c ${TMCDLIBS} decls.h
+tmcd: tmcd.c ${TMCDLIBS} decls.h version.o
 	$(CC) $(CFLAGS) $(TMCDCFLAGS) -o tmcd $< \
-		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
+		version.o $(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient \
 		$(ELVINFLAGS) $(TMCDLDFLAGS) $(TMCDLIBS)
 
 tmcc: tmcc.o
@@ -36,6 +36,9 @@ findif: findif.o
 	$(CC) $(CFLAGS) -g -o findif findif.o $(LFLAGS) -static
 
 tmcc.o:	tmcc.c decls.h
+
+version.c: tmcd.c
+	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 install:	all
 
@@ -56,7 +59,5 @@ ${OBJDIR}/event/lib/%:
 ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
 
-
-
 clean: 
-	rm -f *.o core tmcd tmcc findif
+	rm -f *.o core tmcd tmcc findif version.c
