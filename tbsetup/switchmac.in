@@ -136,7 +136,7 @@ SWITCH:
     my $device;
     if ($useindexing) {
 	$device = new snmpit_cisco($switch,$debug,$community);
-	@vlanList = $device->listVlans();
+	@vlanList = ([1,1,[]],$device->listVlans());
     } else {
 	#
 	# Make up a fake VLAN, just so we get into the loop below
