@@ -18,6 +18,7 @@ import pwd
 import grp
 import errno
 import exceptions
+import xmlrpclib
 sys.path.append("@prefix@/lib")
 from libdb        import *
 from libtestbed   import SENDMAIL, TBOPS
@@ -1248,6 +1249,69 @@ class experiment:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    #
+    # Reload all nodes in an experiment.
+    #
+    def virtual_topology(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Illegal characters in arguments!")
+
+        #
+        # Check permission. This needs to be a lib routine!
+        #
+        res = DBQueryFatal("SELECT gid FROM experiments "
+                           "WHERE pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment: " +
+                                  argdict["proj"] + "/" + argdict["exp"])
+
+        gid = res[0][0]
+        
+        res = DBQueryFatal("SELECT trust FROM group_membership "
+                           "WHERE uid=%s and pid=%s and gid=%s",
+                           (UID, argdict["proj"], gid))
+
+        if len(res) == 0:
+            return EmulabResponse(
+                RESPONSE_ERROR,
+                output=("You do not have permission to access experiment: "
+                        + argdict["proj"] + "/" + argdict["exp"]))
+
+        argstr  = escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
+
+        (exitval, output) = runcommand(TBDIR + "/libexec/xmlconvert " + argstr)
+
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+
+        #
+        # Convert the output into python datatypes. Yes, this gets converted
+        # back again, but such is life!
+        #
+        params, method = xmlrpclib.loads(output);
+        return EmulabResponse(RESPONSE_SUCCESS, value=params, output=output)
+    
     pass
 
 #
@@ -1521,7 +1585,14 @@ def escapeshellarg(s):
 # 
 def runcommand(cmd):
     child  = popen2.Popen4(cmd)
-    output = child.fromchild.read(8192)
+    output = ""
+    while (True):
+        foo = child.fromchild.read(8192)
+        if foo == "":
+            break
+        output += foo
+        pass
+    
     return (child.wait(), output)
 
 def writensfile(str):
