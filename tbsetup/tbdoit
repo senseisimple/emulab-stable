@@ -37,7 +37,7 @@ if (system("$tbdir/tbprerun $project $eid $nsfile") != 0) {
     exit(-1);
 }
 
-print STDOUT "Running $ybdir/tbrun with arguments: $project $eid $irfile\n";
+print STDOUT "Running $tbdir/tbrun with arguments: $project $eid $irfile\n";
 if (system("$tbdir/tbrun $project $eid $irfile") != 0) {
     print STDOUT "tbrun failed!\n";
     exit(-1);
