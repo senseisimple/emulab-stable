@@ -982,6 +982,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char *last_id; /* Used to determine link# */
 	int link;
 	int seen_direct;
+	int rv = 0;    /* Return value from the function */
 
 	MYSQL_RES	*interface_result;
 	MYSQL_RES	*nodes_result;
@@ -1090,7 +1091,8 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 	if (!vlan_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting virt_lan members!", nodeid);
-		return 1;
+		rv = 1;
+		goto cleanup; /* At the end of the function */
 	}
 
 	nvlans = (int)mysql_num_rows(vlan_result);
@@ -1132,13 +1134,15 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	if (!nodes_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
 				"in the experiment!", nodeid);
-		return 1;
+		rv = 1;
+		goto cleanup; /* At the end of the function */
 	}
 	
 	if ((nnodes = (int)mysql_num_rows(nodes_result)) == 0) {
 		syslog(LOG_ERR, "dohosts: %s: No nodes in this experiment!", nodeid);
 		mysql_free_result(nodes_result);
-		return 0;
+		rv = 0;
+		goto cleanup; /* At the end of the function */
 	}
 
 	last_id = ""; 
@@ -1174,7 +1178,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		if (!(node_row[5] && atoi(node_row[5]))) {
 
 			/*
-			 * Keep track of node_ids, so we can get the LINK number rigth
+			 * Keep track of node_ids, so we can get the LINK number right
 			 */
 			if (!strcmp(node_row[0],last_id)) {
 				link++;
@@ -1230,6 +1234,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	/*
 	 * Clean up our linked list of interfaces
 	 */
+cleanup:
 	while (connected_interfaces != NULL) {
 		temp_interface = connected_interfaces;
 		connected_interfaces = connected_interfaces->next;
@@ -1237,7 +1242,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		free(temp_interface);
 	}
 	
-	return 0;
+	return rv;
 
 }
 
