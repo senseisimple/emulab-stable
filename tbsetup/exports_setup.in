@@ -296,6 +296,12 @@ close(MAP);
 #
 if (!$TESTMODE) {
   $UID = 0;
+  #
+  # Temp Hack! Save a copy of the exports file for debugging.
+  #
+  my $backup = "$TB/log/exports/" . TBDateTimeFSSafe();
+  system("cp $exportstail $backup");
+  
   system("$SSH $PROG < $exportstail") == 0 or
     fatal("Failed: $SSH $PROG < $exportstail: $?");
   unlink("$exportstail");
