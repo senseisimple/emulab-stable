@@ -72,8 +72,8 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 }
 
 # Configurable parameters
-my $idlehours = $t || 24;
-my $minpph = $p || 4; # Min packets per hour that an idle interface sends/rcvs
+my $idlehours = $t || 12;
+my $minpph = $p || 1; # Min packets per hour that an idle interface sends/rcvs
 my $stalemin = $f || 120; # Max minutes of staleness for latest report
 
 # Derived params

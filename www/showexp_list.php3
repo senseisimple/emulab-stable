@@ -189,7 +189,7 @@ if (mysql_num_rows($experiments_result)) {
           </center>\n";
 
     if ($idle) {
-      echo "<p><center><b>Experiments that have been idle at least 24 hours</b></center></p><br />\n";
+      echo "<p><center><b>Experiments that have been idle at least 12 hours</b></center></p><br />\n";
     }
     
     $idlemark = "<b>*</b>";
