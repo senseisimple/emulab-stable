@@ -28,9 +28,8 @@ contents can be securely and fully replaced with custom images.
 
 <p>
 The Testbed currently features high-speed Cisco switches connecting,
-with over 5 miles of cabling, 160 edge nodes
-<a href = "http://www.research.digital.com/SRC/iag/">
-(Compaq DNARD Sharks)</a> and 168 core nodes (PCs) The core nodes can be
+with over 5 miles of cabling, 168 core nodes (PCs) and 160 edge nodes
+(Compaq DNARD Sharks). The core nodes can be
 used as edge nodes, simulated routers, traffic-shaping nodes, or
 traffic generators.  During an experiment's time slots, the experiment
 (and associated researchers) get exclusive use of the assigned
