@@ -506,7 +506,7 @@ int main(int argc, char *argv[])
 		    vt_unknown = vt;
 		}
 		
-		if (debug > 1) {
+		if (debug > 2) {
 		    printf("track %f %f %f - %d - %p %s\n",
 			   vt->vt_position.x,
 			   vt->vt_position.y,
@@ -714,6 +714,8 @@ int main(int argc, char *argv[])
 				break;
 				
 			    default:
+				info("got an unknown wiggle status!\n");
+
 				if ((wiggle_bot != NULL) &&
 				    (wiggle_bot->ro_id == mws->robot_id)) {
 				    ro = wiggle_bot;

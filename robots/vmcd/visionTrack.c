@@ -108,6 +108,7 @@ int vtUpdate(struct lnMinList *now,
 	    vt->vt_userdata = NULL;
 	    lnAddTail(now, &vt->vt_link);
 
+#if 1
 	    /* Adjust the cameras viewable area based on this track. */
 	    if (mup->position.x < vc->vc_left)
 		vc->vc_left = mup->position.x;
@@ -117,6 +118,7 @@ int vtUpdate(struct lnMinList *now,
 		vc->vc_top = mup->position.y;
 	    if (mup->position.y > vc->vc_bottom)
 		vc->vc_bottom = mup->position.y;
+#endif
 
 #if 0
 	    printf("vc %p %f %f %f %f\n",
@@ -177,9 +179,38 @@ void vtCoalesce(struct lnMinList *extra,
 
 	assert(in_camera_count > 0);
 
+	/* 
+	 * we want to give a slow move-over to the new camera -- i.e., we 
+	 * really don't want to see the position bouncing back and forth
+	 * between cameras...
+	 * 
+	 * how to do this ... ?
+	 * 
+	 * forget slow for now, let's just try to pick the best one.
+	 *   - WENT WITH THIS APPROACH FOR NOW!!!
+	 * 
+	 * the problem would be if a robot sits right on the fricking 
+	 * boundary; if it does, then we could easily get positions that
+	 * switch off between cameras every ...
+	 *
+	 * but wait! we can keep track of orientation for each robot's track;
+	 * since we have that, we can choose which camera is the "overlap"
+	 * camera, and enforce some small buffering to ensure that the robot
+	 * is really moving into the next camera before we allow the switch to
+	 * proceed.
+	 * 
+	 */
+
 	if (in_camera_count > 1) {
 	    struct vision_track *vt_extra;
 	    float distance;
+
+	    float curcam_dx;
+	    float nextcam_dx;
+
+	    float midpoint;
+
+	    curcam_dx = vt->vt_client->vc_right - vt->vt_position.x;
 
 	    while ((in_camera_count > 1) &&
 		   ((vt_extra = vtFindMin(vt,
@@ -187,13 +218,41 @@ void vtCoalesce(struct lnMinList *extra,
 					  vtNextCamera(vt),
 					  &distance)) != NULL) &&
 		   (distance < 0.35)) {
-#if 1
+#if 0
 		printf("coalesce %.2f %.2f %.2f %d --  %.2f %.2f %.2f %d\n",
 		       vt->vt_position.x, vt->vt_position.y,
 		       vt->vt_position.theta, vt->vt_client->vc_port,
 		       vt_extra->vt_position.x, vt_extra->vt_position.y,
 		       vt->vt_position.theta, vt_extra->vt_client->vc_port);
 #endif
+
+		//midpoint = (vt->vt_client->vc_right + 
+		//    vt_extra->vt_client->vc_left) / 2.0f;
+
+		//curcam_dx = midpoint - vt->vt_position.x;
+		//nextcam_dx = vt_extra->vt_position.x - midpoint;
+
+		nextcam_dx = vt_extra->vt_position.x - 
+				   vt_extra->vt_client->vc_left;
+
+		if (nextcam_dx > curcam_dx) {
+		    // need to switch to vt->extra!
+#if 0
+		    info("using next cam up the line:" 
+			 " %d to %d\n",
+			 vt->vt_client->vc_port,
+			 vt_extra->vt_client->vc_port
+			 );
+		    info(" curcam_dx = %f, nextcam_dx = %f\n",
+			 curcam_dx,nextcam_dx
+			 );
+#endif
+		    // we do some structure copying around... it's easiest.
+		    vt->vt_position = vt_extra->vt_position;
+		    vt->vt_client = vt_extra->vt_client;
+		    vt->vt_age = vt_extra->vt_age;
+		    vt->vt_userdata = vt_extra->vt_userdata;
+		}
 		
 		lnRemove(&vt_extra->vt_link);
 		lnAddHead(extra, &vt_extra->vt_link);
@@ -201,7 +260,7 @@ void vtCoalesce(struct lnMinList *extra,
 		in_camera_count -= 1;
 	    }
 	}
-
+	
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;
     }
 }
