@@ -1,6 +1,7 @@
 /*
  *
  */
+#include <string.h>
 #include "tbdefs.h"
 
 char *tbdb_objecttypes[] = {
@@ -8,12 +9,14 @@ char *tbdb_objecttypes[] = {
 	TBDB_OBJECTTYPE_LINK,
 	TBDB_OBJECTTYPE_TRAFGEN,
 	TBDB_OBJECTTYPE_TIME,
+	TBDB_OBJECTTYPE_PROGRAM,
 	0,
 };
 
 char *tbdb_eventtypes[] = {
 	TBDB_EVENTTYPE_START,
 	TBDB_EVENTTYPE_STOP,
+	TBDB_EVENTTYPE_KILL,
 	TBDB_EVENTTYPE_ISUP,
 	TBDB_EVENTTYPE_REBOOT,
 	TBDB_EVENTTYPE_UP,
