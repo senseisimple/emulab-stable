@@ -35,12 +35,17 @@ $| = 1; # Turn off line buffering on output
 
 my $debug = 0;
 #If there is debug, turn it on right now...
-if ( join(" ",@ARGV) =~ /-debug/ ) { $debug = 1; print "DEBUG MODE ON\n"; }
+if ( join(" ",@ARGV) =~ /-debug\s*(\d*)/ ) { 
+  if ( defined $1 && $1 ne "") { $debug = $1; } else { $debug = 1; }
+  print "DEBUG MODE ON: Set to level $debug\n";
+}
 
 my $device;
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 my $sth ="";
 
+my %Dev=();
+# %Dev maps device names to device IPs
 my %Interfaces=();
 my %Ports=();
 my %ifIndex=();
@@ -94,7 +99,7 @@ sub myMain {
   
   use SNMP;
   
-  #$SNMP::debugging = 1;
+  $SNMP::debugging = ($debug - 5) if $debug > 5;
   
   &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
   if ($device eq "Intel") {
@@ -113,8 +118,10 @@ sub myMain {
   SNMP::initMib();		# parses default list of Mib modules 
     
   $SNMP::use_enums = 1;		#use enum values instead of only ints
+  print "Opening SNMP session to $i..." if $debug;
   my $sess = new SNMP::Session(DestHost => $i);
   my $sess2 =new SNMP::Session(DestHost => $i, Community => 'private');
+  print "".(defined $sess ? "Succeeded" : "Failed")."\n" if $debug;
   
   if ($device eq "Cisco") {
     readifIndex(\$sess);
@@ -819,6 +826,7 @@ sub ListVLANs {
     my $VlanPortVlan = ["vlanPortVlan",0]; # index by module.port, gives vlan #
     #do one to get the first field...
     my $RetVal = $sess->getnext($VlanName);
+    if (!defined $RetVal) { die("No response from device\n"); }
     @data = @{$VlanName};
     my $num = 0;
     do {
@@ -969,11 +977,7 @@ sub ShowPorts {
   }
   #Next line is to eliminate some incorrect warnings...
   if (%Link){};if (%portNames){};if (%duplex){};if (%auto){};
-  my $switch = "";
-  if ($i =~ /155\.99\.214\.170/) { $switch = "Alpha"; }
-  if ($i =~ /155\.99\.214\.171/) { $switch = "Beta"; }
-  if ($i =~ /155\.99\.214\.172/) { $switch = "Gamma"; }
-  if ($i =~ /155\.99\.214\.173/) { $switch = "Delta"; }
+  my $switch = (defined $Dev{$i} ? $Dev{$i} : "--unknown--");
   print "Port Configuration, Testbed Switch $switch ($i)\n";
   print "Port Interface\tVLAN\tEnabled\tLink\tAutoNeg\tSpeed\t\tDuplex\n";
   print "----------------------------------------------------------------";
@@ -1056,11 +1060,7 @@ sub GetStats {
     }
     $sess->getnext($ifTable);
   } while ( $data[0] =~ /^i[f](In|Out)/) ;
-  my $switch = "";
-  if ($i =~ /155\.99\.214\.170/) { $switch = "Alpha"; }
-  if ($i =~ /155\.99\.214\.171/) { $switch = "Beta"; }
-  if ($i =~ /155\.99\.214\.172/) { $switch = "Gamma"; }
-  if ($i =~ /155\.99\.214\.173/) { $switch = "Delta"; }
+  my $switch = (defined $Dev{$i} ? $Dev{$i} : "--unknown--");
   print "Port Statistics, Testbed Switch $switch ($i)\n";
   print "\t\t\t     InUcast   InNUcast  In        In      Unknown\t".
     "\t  OutUcast  OutNUcast Out       Out      Out Queue\n";
@@ -1137,21 +1137,19 @@ sub ReadTranslationTable {
     $mac = "$_[3]";
     $Table{$name} = $mac;
     $Table{$mac} = $name;
-    #print "Got $mac <==> $name\n" if $debug;
+    print "Got $mac <==> $name\n" if $debug > 1;
   }
   $sth = $dbh->query("select node_id1,card1,port1,node_id2,card2,port2 ".
-		     "from wires where node_id2='cisco';");
+		     "from wires where node_id2 like 'cisco%';");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]:$_[1]";
-    if ($_[3] =~ /Alpha/i) { $_[3] = "155.99.214.170"; }
-    elsif ($_[3] =~ /Beta/i)  { $_[3] = "155.99.214.171"; }
-    elsif ($_[3] =~ /Gamma/i)  { $_[3] = "155.99.214.172"; }
-    elsif ($_[3] =~ /Delta/i)  { $_[3] = "155.99.214.173"; }
-    elsif ($_[3] =~ /Eta/i)  { $_[3] = "155.99.214.174"; }
-    elsif ($_[3] =~ /Cisco/i)  { $_[3] = "155.99.214.175"; }
-    else { $_[3] = "155.99.214.175"; }
+    if (defined ($Dev{$_[3]}) ) { $_[3] = $Dev{$_[3]}; }
+    else { 
+      print STDERR "SNMPIT: Warning: Device '$_[3]' from database unknown\n";
+      $_[3] = $Dev{"cisco"}; 
+    }
     $switchport = join(":",($_[3],$_[4]));
-    if ($_[3] eq "155.99.214.175") { $switchport .=".$_[5]"; }
+    if ($device eq "Cisco" ) { $switchport .=".$_[5]"; }
     $PortTable{$name} = $switchport;
     $PortTable{$switchport} = $name;
     print "READ: '$name' <==> '$switchport'\n" if $debug > 1;
@@ -1279,7 +1277,10 @@ sub ParseArgs {
       }
       while (@CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) );
     }
-    elsif (/^-debug(.*)/) {$debug = 1; $v=1; }
+    elsif (/^-debug(.*)/) { 
+      if (!($CMDS[0] =~ /^-/)) { shift (@CMDS); } # possibly ignore number
+      $v=1; # debug is already set, so don't do it here
+    } 
     elsif (/^-h(.*)/) {$help = 2;}
     elsif (/^-off(.*)/) {$off = 1;}
     elsif (/^-on(.*)/) {$on = 1;}
@@ -1380,26 +1381,34 @@ sub ParseArgs {
   die("What shall I do?\n")
     if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
 	  ||$on||$off||$cyc));
-  if (!defined($i)||!$i||$i eq "") { $i = "Cisco"; }
-  if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
-  elsif ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
-  elsif ($i =~ /Gamma/i)  { $i = "155.99.214.172"; }
-  elsif ($i =~ /Delta/i)  { $i = "155.99.214.173"; }
-  elsif ($i =~ /Eta/i)  { $i = "155.99.214.174"; }
-  elsif ($i =~ /Cisco/i)  { $i = "155.99.214.175"; }
-  if ($i =~ /155\.99\.214\.17(.*)/ ) { 
-    if ($1 =~ /^[0-4]$/) { $device="Intel"; } 
-    elsif ($1 =~ /^[5-8]$/) { $device="Cisco"; } else { $device ="APC" ; }
-  } else { $device ="APC" ; }
-  die("\"$i\" is not a known switch:\nPossible completions are:\n",
-#      "Alpha/155.99.214.170\nBeta /155.99.214.171\n",
-#      "Gamma/155.99.214.172\nDelta/155.99.214.173\n", 
-#      "Eta  /155.99.214.174\n",
-#      "Cisco/155.99.214.175\n",
-      "Cisco/155.99.214.175\n") 
+
+  $sth = $dbh->query("select i.node_id,i.IP from interfaces as i ".
+		     "left join nodes as n on n.node_id=i.node_id ".
+		     "where n.type!='pc' and n.type!='shark'");
+  while ( @_ = $sth->fetchrow_array()) {
+    $name = "$_[0]";
+    $ip = "$_[1]";
+    $Dev{$name} = $ip;
+    $Dev{$ip} = $name;
+    print "Devices: $name <==> $ip\n" if $debug > 1;
+  }
+
+  if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
+  if ( defined $Dev{$i} ) {
+    if (($Dev{$i} =~ /cisco/i) || ($i =~ /cisco/i) ) { $device = "Cisco"; } 
+    else { $device="APC"; }
+  } else { 
+    my $str= "\"$i\" is not a known device:\nPossible completions are:\n";
+    foreach $name (sort keys %Dev) {
+      if ($name =~ /[a-zA-Z]/) { $str .= "$name/$Dev{$name}\n"; }
+    }
+    die($str);	
+  }
+  if ( $i =~ /[a-zA-Z]/) { $i = $Dev{$i}; }
+  die("\"$i\" is not a switch. Illegal operation requested.\n")
     if ( !($device =~ /^(Intel)|(Cisco)$/)  && 
 	 ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
-  die("$i is not a power controller.\n") 
+  die("\"$i\" is not a power controller.\n") 
     if ( $device ne "APC" && ($on||$off||$cyc) );
   die("Can't enable and disable at the same time.\n") if ($d && $e);
   die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd));
