@@ -7,6 +7,14 @@
 
 class testnode {
 public:
+
+	/* Node types */
+	static const int TYPE_UNSPECIFIED = 0;
+	static const int TYPE_PC = 1;
+	static const int TYPE_SWITCH = 2;
+	static const int TYPE_DNARD = 3;
+	
+	
 	testnode();
 	virtual ~testnode();
 
