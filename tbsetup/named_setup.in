@@ -159,6 +159,6 @@ sub fatal {
     local($msg) = $_[0];
 
     system("echo \"$msg\" | /usr/bin/mail ".
-	   "-s 'Named Setup Failed' stoller\@fast.cs.utah.edu");
+	   "-s 'TESTBED: Named Setup Failed' testbed-ops\@fast.cs.utah.edu");
     die($msg);
 }
