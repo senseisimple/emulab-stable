@@ -20,10 +20,23 @@
 
 void		sigcatcher(int foo);
 
+char *usagestr = 
+ "usage: tmcc [-p #] <command>\n"
+ " -p portnum	   Specify a port number to connect to\n"
+ "\n";
+
+void
+usage()
+{
+	fprintf(stderr, usagestr);
+	exit(1);
+}
+
+
 int
 main(int argc, char **argv)
 {
-	int			sock, data, n, cc;
+	int			sock, data, n, cc, ch, portnum;
 	struct sockaddr_in	name;
 #if 0
 	struct timeval		tv;
@@ -41,10 +54,22 @@ main(int argc, char **argv)
 	}
 #endif
 
+	portnum = TBSERVER_PORT;
+
+	while ((ch = getopt(argc, argv, "p:")) != -1)
+		switch(ch) {
+		case 'p':
+			portnum = atoi(optarg);
+			break;
+		default:
+			usage();
+		}
+
+	argc -= optind;
 	if (argc < 2 || argc > 4) {
-		fprintf(stderr, "usage: %s <command>\n", argv[0]);
-		exit(1);
+		usage();
 	}
+	argv += optind;
 
 #ifdef	LBS
 	inet_aton(MASTERNODE, &serverip);
@@ -73,7 +98,7 @@ main(int argc, char **argv)
 		/* Create name. */
 		name.sin_family = AF_INET;
 		name.sin_addr   = serverip;
-		name.sin_port = htons(TBSERVER_PORT);
+		name.sin_port = htons(portnum);
 
 		if (connect(sock,
 			    (struct sockaddr *) &name, sizeof(name)) == 0) {
@@ -109,16 +134,17 @@ main(int argc, char **argv)
 	}
 #endif
 #endif
-	switch(argc - 1) {
+	/* Since we've gone through a getopt() pass, argv[0] is now the first argument */
+	switch(argc) {
 	case 1:
-		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[1]);
+		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[0]);
 		break;
 	case 2:
-		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[1], argv[2]);
+		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[0], argv[1]);
 		break;
 	case 3:
 		n = snprintf(buf, sizeof(buf) - 1, "%s %s %s",
-			     argv[1], argv[2], argv[3]);
+			     argv[0], argv[1], argv[2]);
 		break;
 	default:
 		fprintf(stderr, "Too many command arguments!\n");
