@@ -264,12 +264,12 @@ foreach my $link ( keys %delayparams ) {
     my $fname  = "/tmp/delayconfig_${pc}_$$";
     
     open(TEMP, "> $fname");
-#    print TEMP "sysctl -w net.link.ether.bridge=0\n";
-#    print TEMP "sysctl -w net.link.ether.bridge_ipfw=0\n";
-#    print TEMP "sysctl -w net.link.ether.bridge_cfg=fxp4:6,";
-#    print TEMP "$iface1:69,$iface2:69,\n";
-#    print TEMP "sysctl -w net.link.ether.bridge=1\n";
-#    print TEMP "sysctl -w net.link.ether.bridge_ipfw=1\n";
+    print TEMP "sysctl -w net.link.ether.bridge=0\n";
+    print TEMP "sysctl -w net.link.ether.bridge_ipfw=0\n";
+    print TEMP "sysctl -w net.link.ether.bridge_cfg=fxp4:6,";
+    print TEMP "$iface1:69,$iface2:69,\n";
+    print TEMP "sysctl -w net.link.ether.bridge=1\n";
+    print TEMP "sysctl -w net.link.ether.bridge_ipfw=1\n";
 
     #
     # Try to form unqiue pipe numbers, since at some point I'll have
@@ -278,11 +278,11 @@ foreach my $link ( keys %delayparams ) {
     my $p1 = $pipe++;
     my $p2 = $pipe++;
 
-#    print TEMP "ipfw -f flush\n";
-#    print TEMP "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
-#    print TEMP "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
-#    print TEMP "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s\n";
-#    print TEMP "ipfw pipe $p2 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+    print TEMP "ipfw -f flush\n";
+    print TEMP "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
+    print TEMP "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
+    print TEMP "ipfw pipe $p1 config delay ${delay}ms bw ${bandw}Mbit/s\n";
+    print TEMP "ipfw pipe $p2 config delay ${delay}ms bw ${bandw}Mbit/s\n";
     print TEMP "echo \"Delay Configuration Complete\"\n";
     
     close(TEMP);
