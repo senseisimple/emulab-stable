@@ -6,19 +6,21 @@
 #
 . /etc/emulab/paths.sh
 
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW ]
+then
+    exit 0
+fi
+
 #
 # Remember our server IP, real hostname, router IP, etc.
 #
-if [ x$reason = xREBOOT ] || [ x$reason = xBOUND ] || [ x$reason = xRENEW ]
-then
-	echo $new_dhcp_server_identifier > $BOOTDIR/bossip
-	echo $new_host_name > $BOOTDIR/realname
-	echo $new_routers > $BOOTDIR/routerip
-	echo $new_ip_address > $BOOTDIR/myip
-	echo $new_subnet_mask > $BOOTDIR/mynetmask
-	if [ -n "$interface" ]; then
-		echo $interface > $BOOTDIR/control_interface
-	fi
+echo $new_dhcp_server_identifier > $BOOTDIR/bossip
+echo $new_host_name > $BOOTDIR/realname
+echo $new_routers > $BOOTDIR/routerip
+echo $new_ip_address > $BOOTDIR/myip
+echo $new_subnet_mask > $BOOTDIR/mynetmask
+if [ -n "$interface" ]; then
+    echo $interface > $BOOTDIR/control_interface
 fi
 
 #
@@ -28,18 +30,26 @@ fi
 # 
 if [ -x $BINDIR/sethostname ]
 then
-	$BINDIR/sethostname $new_domain_name >$LOGDIR/dhclient.log 2>&1
+    $BINDIR/sethostname $new_domain_name >$LOGDIR/dhclient.log 2>&1
 fi
 
 #
 # Once we have an IP address, we can stop dhclient so that it doesn't get
 # in the way 
 #
-if [ x$reason = xREBOOT ] || [ x$reason = xBOUND ] || [ x$reason = xRENEW ]
-then
-	# I'd love to use the dhclient.pid file, but it helpfully has not been
-	# created at this point
-	killall dhclient
-fi  
+# I'd love to use the dhclient.pid file, but it helpfully has not been
+# created at this point
+killall dhclient >>$LOGDIR/dhclient.log 2>&1
 
+#
+# And shutdown all the other interfaces that dhclient was trying
+#
+for _if in `ifconfig -lu`
+do
+    if [ $_if != "lo0" -a x$_if != x$interface ]
+    then
+	echo "taking $_if down"
+        ifconfig $_if down remove
+    fi >>$LOGDIR/dhclient.log 2>&1
+done
 exit 0
