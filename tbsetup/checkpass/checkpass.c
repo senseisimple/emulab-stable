@@ -16,7 +16,7 @@ int main(int ARGC, char* ARGV[]) {
   }
 
   strcpy(passwd,ARGV[1]);
-  sprintf(gecos,"%s:%s",ARGV[1],ARGV[3]);
+  sprintf(gecos,"%s:%s",ARGV[2],ARGV[3]);
 
   retval = (char *) FascistCheck(passwd,path,gecos);
 

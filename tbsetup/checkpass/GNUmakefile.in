@@ -13,7 +13,7 @@ all: checkpass
 #
 SRCDIR	+= $(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib
 OBJECTS  = fascist.o packlib.o rules.o stringlib.o
-CFLAGS  += -I$(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib -DIN_CRACKLIB
+CFLAGS  += -g -I$(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib -DIN_CRACKLIB
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

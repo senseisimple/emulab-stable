@@ -493,24 +493,22 @@ FascistGecos(password, uid, gecos)
     int wc;
     char *ptr;
     int gwords;
-    struct passwd *pwp;
+    struct passwd *pwp, pw;
     char gbuffer[STRINGSIZE];
     char tbuffer[STRINGSIZE];
     char *uwords[STRINGSIZE];
     char longbuffer[STRINGSIZE * 2];
 
-    if (!(pwp = getpwuid(uid)))
-    {
-      /* OLD CODE
-      return ("you are not registered in the password file");
-      */
-      if (gecos) {
+    if (uid && !(pwp = getpwuid(uid))) {
+	return ("you are not registered in the password file");
+    }
+    if (gecos) {
+        pwp = &pw;
 	pwp->pw_name = (char *)(strtok(gecos,":"));
 	pwp->pw_gecos = (char *)(strtok(NULL,":"));
-      } else {
+    } else {
 	return ("you are not registered in the password file");
-      } 
-    }
+    } 
 
     /* lets get really paranoid and assume a dangerously long gecos entry */
 
@@ -719,7 +717,7 @@ FascistLook(pwp, instring, gecos)
     /* OLD CODE
     if (ptr = FascistGecos(password, getuid()))
     */
-    if (ptr = FascistGecos(password, getuid(), gecos))
+    if (ptr = FascistGecos(password, 0, gecos))
     {
 	return (ptr);
     }
