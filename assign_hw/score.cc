@@ -37,7 +37,13 @@ extern tb_pgraph PG;		// physical grpaph
 
 int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s);
 edge *direct_link(node a,node b);
-  
+
+/*
+ * score()
+ * Returns the score.
+ */
+float get_score() {return score;}
+
 /*
  * init_score()
  * This initialized the scoring system.  It also clears all
@@ -55,7 +61,7 @@ void init_score()
     vn.posistion=0;
     vn.no_connections=0;
     score += SCORE_UNASSIGNED;
-    violations++;
+    violated++;
   }
   forall_edges(e,G) {
     tb_vlink &ve=G[e];

@@ -29,10 +29,11 @@ const float SCORE_UNASSIGNED = 1;
 
 
 extern float score;
-extern int violations;
+extern int violated;
 
 void init_score();
 void remove_node(node n);
-void add_node(node n);
+int add_node(node n,int loc);
+float get_score();
 
 #endif

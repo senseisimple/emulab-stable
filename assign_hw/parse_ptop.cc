@@ -22,9 +22,11 @@
 
 extern node pnodes[MAX_PNODES];	// int -> node map
 extern tb_pgraph PG;		// physical graph
+node_array<int> switch_index;
 
 void parse_ptop(tb_pgraph &G, istream& i)
 {
+  int switchi=0;
   dictionary<string, node> nmap;
   node no1;
   edge ed1;
@@ -87,6 +89,7 @@ void parse_ptop(tb_pgraph &G, istream& i)
 	    PG[no1].types[TYPE_SWITCH].name = "switch";
 	    PG[no1].types[TYPE_SWITCH].max = 1;
 	    PG[no1].the_switch = no1;
+	    switch_index[no1] = switchi++;
 	  }
 	}
 	if (! isswitch)

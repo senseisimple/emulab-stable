@@ -1,17 +1,42 @@
+#ifndef __VIRTUAL_H
+#define __VIRTUAL_H
+
 class tb_vnode {
 public:
+  tb_vnode() {;}
+  friend ostream &operator<<(ostream &o, const tb_vnode& node)
+    {
+      o << "TBVNode: " << node.name << endl;
+      return o;
+    }
+  
+  friend istream &operator>>(istream &i, const tb_vnode& node)
+    {
+      return i;
+    }
+
   int posistion;		// index into pnode array
   int no_connections;		// how many unfulfilled connections from this node
   nodeType type;		// type of the node
   char *name;			// string name of the node
 };
 
-enum {LINK_DIRECT,LINK_INTRASWITCH,LINK_INTERSWITCH} tb_link_type;
+typedef enum {LINK_DIRECT,LINK_INTRASWITCH,LINK_INTERSWITCH} tb_link_type;
 
 class tb_plink;
 
 class tb_vlink {
 public:
+  tb_vlink() {;}
+  friend ostream &operator<<(ostream &o, const tb_vlink& edge)
+    {
+      o << "unimplemeted ostream << for tb_vlink " << endl;
+      return o;
+    }
+  friend istream & operator>>(istream &i, const tb_vlink& edge)
+    {
+      return i;
+    } 
   typedef enum {LINK_UNKNOWN, LINK_DIRECT,
 	LINK_INTRASWITCH, LINK_INTERSWITCH} linkType;
   
@@ -22,3 +47,5 @@ public:
 };
 
 typedef GRAPH<tb_vnode,tb_vlink> tb_vgraph;
+
+#endif

@@ -1,5 +1,9 @@
+#ifndef __PHYSICAL_H
+#define __PHYSICAL_H
+
 class tb_pnode {
 public:
+  tb_pnode() {;}
   friend ostream &operator<<(ostream &o, const tb_pnode& node)
     {
       o << "TBNode: " << node.name << endl;
@@ -10,13 +14,11 @@ public:
     {
       return i;
     }
-  tb_pnode();
   
   tb_type types[MAX_TYPES];	// array of types, with counts of max
   nodeType current_type;	// the current type of the node
   int max_load;			// maxmium load for current type
   int current_load;		// how many vnodes are assigned to this pnode
-  //  int index;			// index for switches
   char *name;
   node the_switch;		// the switch the node is attached to
   int pnodes_used;		// for switch nodes
@@ -24,6 +26,7 @@ public:
 
 class tb_plink {
 public:
+  tb_plink() {;}
   friend ostream &operator<<(ostream &o, const tb_plink& edge)
     {
       o << "unimplemeted ostream << for tb_plinke " << endl;
@@ -46,3 +49,5 @@ private:
 };
 
 typedef GRAPH<tb_pnode,tb_plink> tb_pgraph;
+
+#endif
