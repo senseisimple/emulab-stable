@@ -459,6 +459,7 @@ REPLACE INTO state_triggers VALUES ('*','*','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','*','PXEBOOTING','PXEBOOT');
 REPLACE INTO state_triggers VALUES ('*','*','BOOTING','BOOTING, CHECKGENISUP');
 REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('*','RELOAD-MOTE','RELOADDONE','RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 
 --
