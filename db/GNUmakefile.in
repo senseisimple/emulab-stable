@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -20,7 +20,7 @@ LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
 LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic.
-USERBINS	= nalloc nfree node_list readycount
+USERBINS	= node_list readycount
 USERSBINS	= genelists.proxy
 
 #
