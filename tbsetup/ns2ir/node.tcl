@@ -114,7 +114,7 @@ Node instproc updatedb {DB} {
 
         append nseconfig [$agent get_nseconfig]
     }
-    if( $nseconfig != {} } {
+    if {$nseconfig != {}} {
         # update the per-node nseconfigs table in the DB
         sql exec $DB "insert into nseconfigs (pid,eid,vname,nseconfig) values ('$pid','$eid','$self','$nseconfig')";
     }
