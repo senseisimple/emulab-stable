@@ -267,7 +267,7 @@ use Socket;
 
 sub enable_ipod()
 {
-    if (system("sysctl net.ipv4.icmp_ipod_host")) {
+    if (system("sysctl net.ipv4.icmp_ipod_host >/dev/null")) {
 	warn "*** WARNING: IPOD sysctls not supported in the kernel\n";
 	return -1;
     }
@@ -282,14 +282,16 @@ sub enable_ipod()
     # XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
     my $sysctlcmd = sprintf("sysctl -w net.ipv4.icmp_ipod_host=%d", $ipuint);
 
-    if (system($sysctlcmd)) {
+    if (system($sysctlcmd . ">/dev/null")) {
 	warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
 	return -1;
     }
-    if (system("sysctl -w net.ipv4.icmp_ipod_enabled=1")) {
+    if (system("sysctl -w net.ipv4.icmp_ipod_enabled=1 >/dev/null")) {
 	warn "*** WARNING: could not enable IPOD\n";
 	return -1;
     }
+
+    print STDOUT "IPOD enabled from $bip\n";
     return 0;
 }
 
