@@ -34,6 +34,7 @@ my $ssh		= "$TB/bin/sshtb -n";
 my $sshremote	= "$TB/bin/sshremote -n";
 my $expsetup    = "$TB/sbin/exports_setup";
 my $batchmode   = 0;
+my $maxchildren = 20;
 
 #
 # Load the Testbed support stuff. 
@@ -203,7 +204,7 @@ if (! @nodes) {
 #
 my $maxpids = 0;
 foreach my $node ( @nodes ) {
-    while ($maxpids >= 5) {
+    while ($maxpids >= $maxchildren) {
 	my $thispid  = waitpid(-1, 0);
 	my $thisnode = $pids{$thispid};
 	
