@@ -148,9 +148,11 @@ proc dotimeout {s} {
 }
 
 puts "\nConnecting to switch..."
-
+set t0 [clock clicks]
 log_user 0 
 spawn telnet $switch
+set t1 [clock clicks]  
+#14,000-17,000
 
 
 set timeout 10
@@ -160,6 +162,8 @@ expect {
 }
 set timeout 10
 puts "Logging in..."
+set t2 [clock clicks]  
+#80,000-85,000
 send "a"
 expect {
     "password:" {}
@@ -170,6 +174,9 @@ expect {
     "Local Management" {}
     timeout {dotimeout "Waiting for Management Menu"}
 }
+set t3 [clock clicks]  
+#930,000 - 110,000
+
 send "c"
 expect {
     "Configuration" {}
@@ -198,6 +205,8 @@ expect {
 }
 
 puts "Selecting Port $port..."
+set t4 [clock clicks] 
+#2,400,000!!!
 
 for {set i 1} {$i < $port} {incr i} {
     if { $i == 17} {
@@ -205,6 +214,8 @@ for {set i 1} {$i < $port} {incr i} {
     }
 	send $KeyDown
 }
+set t5 [clock clicks] 
+#1044
 
 send "s"
 
@@ -220,6 +231,8 @@ expect {
 }
 
 puts "Configuring..."
+set t6 [clock clicks] 
+#2,000,000
 
 expect {
     -re {Port state[^:]*:[ 	]+([A-Za-z]+)} {
@@ -243,6 +256,8 @@ expect {
 }
 send "\n\r"
 # If disabled, skips to copy these settings....
+set t7 [clock clicks]  
+#400,000
 
 if { $state == "Enabled"} {
     expect {
@@ -265,6 +280,8 @@ if { $state == "Enabled"} {
 	timeout {dotimeout "Waiting for Auto-Negotiation State"}
     }
     send "\n\r"
+set t8 [clock clicks]  
+#32,000
 
     # If $autostate enabled, skip to forwarding
     if { $autostate == "Disabled" } {
@@ -323,6 +340,7 @@ if { $state == "Enabled"} {
     send "\n\r"
 }
 #This ends $state == "Enabled"
+set t9 [clock clicks]  
 
 expect {
     "Copy these settings" {}
@@ -345,7 +363,10 @@ expect {
     "Port Parameter Setup" {}
     timeout {dotimeout "Waiting for return of Port Parameter Setup"}
 }
+
 send "qqqql"
+set t10 [clock clicks]
+
 puts "Configured Port $port on switch $switchname ($switch)"
 puts "           Current Port State : $state"
 if {$state == "Enabled"} {
@@ -362,6 +383,31 @@ if {$state == "Enabled"} {
 if {$copy} {
     puts "Configuration copied to all ports"
 }
+
+puts stderr "Spawn telnet:"
+puts stderr "[expr $t1 - $t0]ms"
+puts stderr "First Menu:"
+puts stderr "[expr $t2 - $t1]ms"
+puts stderr "Login/Password:"
+puts stderr "[expr $t3 - $t2]ms"
+puts stderr "Port Setup Menu:"
+puts stderr "[expr $t4 - $t3]ms"
+puts stderr "Select Port:"
+puts stderr "[expr $t5 - $t4]ms"
+puts stderr "Port Config Menu:"
+puts stderr "[expr $t6 - $t5]ms"
+puts stderr "Port State:"
+puts stderr "[expr $t7 - $t6]ms"
+puts stderr "AutoConfig State:"
+puts stderr "[expr $t8 - $t7]ms"
+puts stderr "Finish Config:"
+puts stderr "[expr $t9 - $t8]ms"
+puts stderr "Exit Telnet:"
+puts stderr "[expr $t10 - $t9]ms"
+puts stderr ""
+puts stderr "Total Time:"
+puts stderr "[expr $t10 - $t0]ms"
+
 puts "\n"
 close
 
