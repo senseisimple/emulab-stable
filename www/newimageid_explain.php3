@@ -45,7 +45,7 @@ the Testbed system.
 
 <p>
 There is a 
-<a href='showimageid_list.php3'>list of image descriptors</a> that
+<a href='showosid_list.php3'>list of descriptors</a> that
 have already been created in your project (and are available for you
 to use in your experiments). 
 

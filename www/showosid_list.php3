@@ -52,10 +52,22 @@ WRITESUBMENUBUTTON("Create an OS Descriptor",
 WRITESUBMENUBUTTON("Back to Image Descriptor list",
 		   "showimageid_list.php3");
 SUBMENUEND();
+
+echo "<p><br>
+      Listed below are the OS Descriptors that you may use in your NS file
+      with the <a href='tutorial/docwrapper.php3?docname=nscommands.html#OS'>
+      <tt>tb-set-node-os</tt></a> directive. If the OS you have selected for
+      a node is not loaded on that node when the experiment is swapped in,
+      the Testbed system will automatically reload that node's disk with the
+      appropriate image. You might notice that it takes a few minutes longer
+      to start start your experiment when selecting an OS that is not
+      already resident. Please be patient.
+      <br>\n";
+
 SUBPAGEEND();
 
-echo "<table border=2 cellpadding=0 cellspacing=2
-       align='center'>\n";
+echo "<br>
+      <table border=2 cellpadding=0 cellspacing=2 align='center'>\n";
 
 echo "<tr>
           <td>Name</td>
