@@ -107,6 +107,16 @@ BEGIN
     require "/etc/emulab/paths.pm";
     import emulabpaths;
 
+    # Make sure these exist! They will not exist on a PLAB vserver initially.
+    if (! -e "$VARDIR/logs") {
+	mkdir("$VARDIR", 0775);
+	mkdir("$VARDIR/jails", 0775);
+	mkdir("$VARDIR/db", 0755);
+	mkdir("$VARDIR/logs", 0775);
+	mkdir("$VARDIR/boot", 0775);
+	mkdir("$VARDIR/lock", 0775);
+    }
+
     #
     # Determine if running inside a jail. This affects the paths below.
     #
