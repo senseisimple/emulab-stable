@@ -192,11 +192,8 @@ DBQueryFatal("unlock tables");
 ######################################################################
 
 foreach my $n (@freed_nodes) {
-    #
-    # This little sillyness is for disk reloading. Kill the last reservation.
-    #
-    DBQueryWarn("delete from last_reservation where node_id='$n'") || $error++;
-
+    my $mustclean = 1;
+    
     #
     # Clean out all delays
     #
@@ -207,11 +204,40 @@ foreach my $n (@freed_nodes) {
     # of the default values for its node type.
     #
     my $result =
-	DBQueryFatal("select control_net,osid,node_types.pxe_boot_path " .
-		     "from node_types " .
+	DBQueryFatal("select control_net,osid,node_types.pxe_boot_path, " .
+		     " nodes.def_boot_osid,nodes.def_boot_path, ".
+		     " node_types.isvirtnode ".
+		     " from node_types " .
 		     "left join nodes on nodes.type=node_types.type " .
 		     "where node_id='$n'");
-    my ($control, $osid, $pxe_boot_path) = $result->fetchrow_array();
+    my ($control,$osid,$pxe_boot_path,$def_boot_osid,$def_boot_path,$isvirt) =
+	$result->fetchrow_array();
+
+    #
+    # See if the OS it was running was marked as mustclean or not. Basically,
+    # this is an OSKit hack to avoid reloading disks that have not been
+    # touched by the kernel. If a def_boot_path was set, there is nothing
+    # we can figure out, so just reload it. This needs to be more general
+    # purpose.
+    #
+    if ($isvirt) {
+	#
+	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
+	# 
+	$mustclean = 0;
+    }
+    elsif (! defined($def_boot_osid) ||
+	 (defined($def_boot_path) && $def_boot_path ne "")) {
+	$mustclean = 1;
+    }
+    else {
+	my $result =
+	    DBQueryFatal("select mustclean from os_info " .
+			 "where osid='$def_boot_osid'");
+	if ($result->numrows()) {
+	    ($mustclean) = $result->fetchrow_array();
+	}
+    }
 
     #
     # Clean up interfaces by clearing IPs and/or aliases.
@@ -283,6 +309,13 @@ foreach my $n (@freed_nodes) {
 	DBQueryWarn("delete from next_reserve where node_id='$n'")
 	    || $error++;
 
+	#
+	# This little sillyness is for disk reloading.
+	# Kill the last reservation since this path is special.
+	#
+	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
+	    $error++;
+
 	next;
     }
     
@@ -300,6 +333,14 @@ foreach my $n (@freed_nodes) {
 	DBQueryWarn("update reserved set ".
 		    "pid='$reloadpid',eid='$pendingeid' ".
 		    "where node_id='$n'") || $error++;
+
+	#
+	# This little sillyness is for disk reloading.
+	# Kill the last reservation since this path is special.
+	#
+	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
+	    $error++;
+
 	next;
     }
 
@@ -307,9 +348,13 @@ foreach my $n (@freed_nodes) {
     # No reloads or reservation changes, so really free the node
     #
     # This little sillyness is for disk reloading. Remember the last
-    # project a node was reserved into.
+    # project a node was reserved into. At present, there might already
+    # be an entry. Eventually, os_setup will look for this and force
+    # a reload.
     #
-    DBQuery("insert into last_reservation values ('$n', '$pid')");
+    if ($mustclean) {
+	DBQueryWarn("replace into last_reservation values ('$n', '$pid')");
+    }
     
     print "Releasing node '$n' ... ";
     if (DBQueryWarn("delete from reserved where node_id='$n'")) {
