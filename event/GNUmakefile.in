@@ -8,7 +8,8 @@ SUBDIR		= event
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= lib sched tbgen example trafgen delay-agent nsetrafgen stated
+SUBDIRS	= lib sched tbgen example trafgen delay-agent nsetrafgen stated \
+		program-agent
 
 all:	$(SUBDIRS)
 
@@ -39,6 +40,9 @@ nsetrafgen:
 delay-agent:
 	@$(MAKE) -C delay-agent all
 
+program-agent:
+	@$(MAKE) -C program-agent all
+
 stated:
 	@$(MAKE) -C stated all
 
@@ -60,6 +64,7 @@ subdir-clean:
 	@$(MAKE) -C example clean
 	@$(MAKE) -C trafgen clean
 	@$(MAKE) -C delay-agent clean
+	@$(MAKE) -C program-agent clean
 
 distclean:	subdir-distclean
 
@@ -70,6 +75,7 @@ subdir-distclean:
 	@$(MAKE) -C example distclean
 	@$(MAKE) -C trafgen distclean
 	@$(MAKE) -C delay-agent distclean
+	@$(MAKE) -C program-agent distclean
 
 .PHONY:	$(SUBDIRS)
 
