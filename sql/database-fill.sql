@@ -302,13 +302,6 @@ REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','BOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','SHUTDOWN','Retry');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RESERVED','');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_DIRTY','RELOAD','');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_DIRTY','RESERVED','');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','REBOOT','FREE_DIRTY','');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD','FREE_CLEAN','');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','REBOOT','');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','RELOAD','');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN','Retry');
@@ -334,13 +327,14 @@ REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','ACTIVE','SwapIn');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','POSTED','Batch');
 REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','REBOOTED','BootOK');
 REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP','BootOK');
 REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN','Reboot');
-REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING','StartBoot');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP','BootDone');
@@ -348,6 +342,7 @@ REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP','Retry');
 REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTING','Error');
 REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','TBSETUP','BootOK');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD_TO_FREE','FREE_CLEAN','ReloadDone');
 REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','REBOOTING','Reboot');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','SHUTDOWN','Error');
@@ -356,6 +351,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','PXEBOOTING','BOOTING','BootIn
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','POSTED','ACTIVATING','SwapIn');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','PXEBOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','PXEBOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RES_INIT_CLEAN','Reserve');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEWAIT','Free');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
@@ -364,7 +360,7 @@ REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN','Reboot')
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','REBOOTING','Error');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','REBOOTING','Reboot');
 REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTED','BootOK');
-REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','PXEBOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','PXEBOOTING','DHCP');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('EXAMPLE','NEW','VERIFIED','Verify');
@@ -410,18 +406,29 @@ REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEWAKEUP','NodeAl
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','SHUTDOWN','PXEBOOTING','BootInfo');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','BOOTING','Not Free');
+REPLACE INTO state_transitions VALUES ('NORMALv2','RECONFIG','SHUTDOWN','ReConfigFail');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD_PENDING','RELOAD_TO_FREE','Reload');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAKEUP','PXEWAKEUP','Retry');
-REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','SHUTDOWN','Retry');
-REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','PXEBOOTING','DHCP');
-REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','PXEBOOTING','KernelChange');
-REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','TBSETUP','BootOK');
-REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','TBSETUP','BootOK');
 REPLACE INTO state_transitions VALUES ('NORMALv2','PXEBOOTING','BOOTING','BootInfo');
+REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','PXEBOOTING','KernelChange');
 REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','RECONFIG','DoReConfig');
+REPLACE INTO state_transitions VALUES ('NORMALv2','RECONFIG','TBSETUP','ReConfig');
+REPLACE INTO state_transitions VALUES ('NORMALv2','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN','Error');
 REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','SHUTDOWN','Retry');
 REPLACE INTO state_transitions VALUES ('NETBOOT','PXEBOOTING','BOOTING','BootInfo');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_INIT_CLEAN','RES_CLEAN_REBOOT','Reboot');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_INIT_CLEAN','RELOAD_TO_DIRTY','Reload');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_CLEAN_REBOOT','RES_WAIT_CLEAN','Rebooting');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD_TO_DIRTY','RES_DIRTY_REBOOT','Reboot');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_DIRTY_REBOOT','RES_WAIT_DIRTY','Rebooting');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_WAIT_CLEAN','RES_READY','IsUp');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_WAIT_DIRTY','RES_READY','IsUp');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RES_READY','RELOAD_PENDING','Free');
 
 --
 -- Dumping data for table `state_triggers`
@@ -450,8 +457,6 @@ REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','defa
 REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z0-9][-a-zA-Z0-9]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
 REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirect','default:tinyint',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','jail_osname','text','redirect','os_info:osname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','delay_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','forcelinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','usewatunnels','int','redirect','default:boolean',0,0,NULL);
@@ -577,6 +582,10 @@ REPLACE INTO table_regex VALUES ('projects','num_pcplab','int','redirect','defau
 REPLACE INTO table_regex VALUES ('projects','num_ron','int','redirect','default:int',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','veth_encapsulate','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','allowfixnode','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','jail_osname','text','redirect','os_info:osname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','delay_osname','text','redirect','os_info:osname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
