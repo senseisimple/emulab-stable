@@ -57,6 +57,7 @@
 #define DOTSFS		".sfs"
 #define RUNASUSER	"nobody"
 #define RUNASGROUP	"nobody"
+#define NTPSERVER       "ntp1"
 
 #define TESTMODE
 #define DEFAULTNETMASK	"255.255.255.0"
@@ -4262,6 +4263,18 @@ COMMAND_PROTOTYPE(dontpinfo)
 			}
 			nrows--;
 		}
+	}
+	else if (reqp->islocal) {
+		/*
+		 * All local nodes default to a our local ntp server,
+		 * which is typically a CNAME to ops.
+		 */
+		OUTPUT(buf, sizeof(buf), "SERVER=%s.%s\n",
+		       NTPSERVER, OURDOMAIN);
+		
+		client_writeback(sock, buf, strlen(buf), tcp);
+		if (verbose)
+			info("NTPINFO: %s", buf);
 	}
 	mysql_free_result(res);
 
