@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)cmdtab.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: cmdtab.c,v 1.2 2000-12-27 00:49:33 mike Exp $";
+	"$Id: cmdtab.c,v 1.3 2001-08-16 16:33:27 stoller Exp $";
 #endif /* not lint */
 
 #include "tip.h"
@@ -49,6 +49,7 @@ esctable_t etable[] = {
 	{ '!',	NORM,	"shell",			 shell },
 	{ 'c',	NORM,	"change directory",		 chdirectory },
 	{ '.',	NORM,	"exit from tip",		 finish },
+	{ ',',	NORM,	"exit from tip",		 finish },
 	{CTRL('d'),NORM,"exit from tip",		 finish },
 	{CTRL('y'),NORM,"suspend tip (local+remote)",	 suspend },
 	{CTRL('z'),NORM,"suspend tip (local only)",	 suspend },

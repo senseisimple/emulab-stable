@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)remote.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: remote.c,v 1.2 2000-12-27 00:49:35 mike Exp $";
+	"$Id: remote.c,v 1.3 2001-08-16 16:33:27 stoller Exp $";
 #endif /* not lint */
 
 #include "tip.h"
@@ -258,13 +258,14 @@ getremcap(host)
 		ET = 10;
 }
 
+static int lookedup = 0;
+
 char *
 getremote(host)
 	char *host;
 {
 	register char *cp;
 	static char *next;
-	static int lookedup = 0;
 
 	if (!lookedup) {
 		if (host == NOSTR && (host = getenv("HOST")) == NOSTR)
@@ -288,4 +289,13 @@ getremote(host)
 		next = cp;
 	}
 	return (DV);
+}
+
+void
+getremote_reset()
+{
+	lookedup = 0;
+	DV = 0;
+	BR = 0;
+	HW = 0;
 }

@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.6 2001-08-14 19:05:12 stoller Exp $";
+	"$Id: hunt.c,v 1.7 2001-08-16 16:33:27 stoller Exp $";
 #endif /* not lint */
 
 #ifdef USESOCKETS
@@ -172,9 +172,10 @@ socket_hunt(name)
 	}
 	alarm(0);
 	if (FD < 0) {
-		warn("%s", name);
 		deadfl = 1;
 	}
+	if (deadfl)
+		getremote_reset();
 	signal(SIGALRM, f);
 	return (deadfl ? -1 : 0);
 }
