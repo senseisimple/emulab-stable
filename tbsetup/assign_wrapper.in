@@ -580,7 +580,7 @@ sub RunAssign ($)
 	# the parent. 
 	#
         POSIX::setsid();
-	exec("assign $cmdargs > assign.log");
+	exec("nice assign $cmdargs > assign.log");
 	die("*** $0:\n".
 	    "    Could not start assign!\n");
     }
@@ -1332,7 +1332,7 @@ foreach $plink (keys(%plinks)) {
 
 	printdb "  VLANS:\n";
 	AddVlan("link", $dlink, $nodeportA, $nodeportB);
-	AddVlan("lan",  $lan, $nodeportD);
+	AddVlan("lan",  $lan,   $nodeportD);
 	
 	my ($member0,$delay,$bandwidth,$loss,
 	    $member1,$rdelay,$rbandwidth,$rloss) = @{$delaylinks{$plink}};
@@ -1488,10 +1488,6 @@ foreach $plink (keys(%plinks)) {
 }
 TBDebugTimeStamp("interpreting finished");
 
-# Stop here ...
-exit(0)
-    if ($impotent);
-
 ######################################################################
 # Step 4 - Upload to DB
 #
@@ -1502,6 +1498,10 @@ TBDebugTimeStamp("uploading started");
 
 # Write the vlans to the DB.
 UploadVlans();
+
+# Stop here ...
+exit(0)
+    if ($impotent);
 
 PatchVeths();
 
@@ -2437,7 +2437,7 @@ sub AddVlan($$$;$)
     elsif (virtlanemulated($lan)) {
 	#
 	# Like above, except that in this case, its a bunch of vlinks
-	# sharing a smaller set of physical links. Just mark is differently
+	# sharing a smaller set of physical links. Just mark it differently
 	# here. See UploadVlans() below; these vlans will be merged to
 	# into one big supervlan since a nodeport can be in just one vlan
 	# at a time.
@@ -2495,16 +2495,22 @@ sub UploadVlans()
 	}
     }
     
-    printdb "Uploading vlans table.\n";
+    if (!$impotent) {
+	printdb "Uploading vlans table.\n";
+    }
+    else {
+	printdb "Dumping vlans table.\n";
+    }
     
     foreach my $lanid (keys(%vlantable)) {
 	my $lan        = (split(":", $lanid))[0];
 	my $memberlist = join(" ", @{$vlantable{$lanid}});
     
-	printdb "  $lanid - $memberlist\n";
+	printdb "  $lan - $memberlist\n";
     
 	DBQueryFatal("insert into vlans (id,pid,eid,virtual,members) ".
-		     "values (0, '$pid', '$eid', '$lan', '$memberlist')");
+		     "values (0, '$pid', '$eid', '$lan', '$memberlist')")
+	    if (!$impotent);
     }
 }
 
