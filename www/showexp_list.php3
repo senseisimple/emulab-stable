@@ -257,9 +257,9 @@ if (mysql_num_rows($experiments_result)) {
 	    $str="";
 	    if ($inactive[$expt]==1) {
 	      if ($stale[$expt]==1) {
-		$str .= "possibly inactive, ";
+		$str .= "possibly&nbsp;inactive, ";
 	      } elseif  ($unswap[$expt]==1) {
-		$str .= "<b>probably inactive, unswappable</b>";
+		$str .= "<b>probably&nbsp;inactive, unswappable</b>";
 	      } else {
 		$str .= "<b>inactive</b>";
 	      }
@@ -271,30 +271,30 @@ if (mysql_num_rows($experiments_result)) {
 	    # sanity check
 	    $slothderr=0;
 	    if ($daysidle==0 && $inactive[$expt]==1 && $stale[$expt]==0) {
-	      $str .= "<b>FAILED SANITY CHECK:</b>
-$pid/$eid has been logged into, but appears inactive. Contact Mac ASAP.
-<pre>
-daysidle=$daysidle
-lastlogin=$lastlogin
-idle,stale,unswap=";
-	      $str .= $inactive[$expt].",".$stale[$expt].",".$unswap[$expt];
-	      $str .="\n</pre>\n";
+	      $str .= " (recently logged into)\n";
 	      $slothderr=1;
 	    }
-	    $foo .= "$str</td>\n";  
- 	    if ($inactive[$expt]==1 && $stale[$expt]!=1) {
+	    $foo .= "$str</td>\n";
+	    if (isset($perexp_usage["$pid:$eid"]) &&
+		isset($perexp_usage["$pid:$eid"]["pc"])) {
+	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
+	    } else { $pcs=0; }
+ 	    if ($inactive[$expt]==1 && $stale[$expt]!=1 &&
+	        !$slothderr && $pcs) {
 	      $foo .= "<td align=center valign=center>
   <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\"> 
   <img src=\"redball.gif\"></a>\n" ;
 	      if ($swapreq > 0) {
-		$foo .= "<br>$swapreq sent $lastswapreq hrs ago\n";
+		$foo .= "&nbsp;$swapreq&nbsp;sent ${lastswapreq}&nbsp;hrs&nbsp;ago\n";
 	      }
 	      $foo .= "</td>\n"; 
-	    }
-	    else {
-		$foo .="<td>&nbsp;</td>\n";
+	    } else {
+	      if (!$pcs) { $foo .= "<td>(no PCs)</td>\n"; }
+	      else { $foo .="<td>&nbsp;</td>\n"; }
 	    }
 	}
+
+	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
 
 	$nodes   = 0;
 	$special = 0;
@@ -302,8 +302,12 @@ idle,stale,unswap=";
 	if (isset($perexp_usage["$pid:$eid"])) {
 	    while (list ($class, $count) = each($perexp_usage["$pid:$eid"])) {
 		$nodes += $count;
-		if (strcmp($class, "pc"))
+		if (strcmp($class, "pc")) {
 		    $special = 1;
+		} else {
+		    $pcs = $count;
+		}
+
 
 		# Summary counts for just the experiments in the projects
 		# the user is a member of.
@@ -316,8 +320,6 @@ idle,stale,unswap=";
 
 	# in idle or active, skip experiments with no nodes.
 	if (($idle || $active) && $nodes == 0) { continue; }
-	if ($idle && $str=="&nbsp;" && !$slothderr) { continue; }
-
 	if ($nodes==0) { $nodes = "&nbsp;"; }
 	
 	echo "<tr>
