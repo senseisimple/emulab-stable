@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# process-acl: Do some trivial processing on acl files - Takes a config
+# file called 'process-acl.cfg' in the current directory, in the form
+# name = value, and a set of input files. '$name' in the input file is
+# replaced with the value from the config file. Intended for use with
+# Cisco acls, but should work fine with anything that doesn't use '$'s
+#
+
+my @filenames = @ARGV;
+
+sub usage {
+    print "usage: $0 filename.in ...\n";
+    print "Filenames should end in '.in' - the output filename will have\n";
+    print "this suffix removed\n";
+    return 1;
+}
+
+if (!@filenames || grep(!/\.in$/,@filenames)) {
+    exit &usage;
+}
+
+open(CONFIG,"< process-acl.cfg") || die "Unable to open process_acl.cfg: $!\n";
+
+my %vars = ();
+
+my $linenum = 0;
+print "Parsing config file ...\n";
+while (my $line = <CONFIG>) {
+    chomp $line;
+    $linenum++;
+
+    #
+    # Nuke comments 
+    #
+    $line =~ s/(#.*)//;
+
+    #
+    # Skip blank lines
+    #
+    next unless ($line =~ /[^\s]/);
+
+    #
+    # Take name = value, with optional $ on name, and optional quotes around
+    # value (lots of whitespace allowed, too)
+    #
+    if ($line =~ /^\s*\$?(\w+)\s*=\s*"?([^\s"].*[^\s"])"?\s*$/) {
+	my ($name, $value) = ($1, $2);
+	$vars{$name} = $value;
+    } else {
+	die "Parse error on line $line\n";
+    }
+}
+
+close(CONFIG);
+
+print "Processing files ...\n";
+foreach my $filename (@filenames) {
+    my $outfile = $filename;
+    $outfile =~ s/\.in$//;
+    print "Processing $filename into $outfile ...\n";
+    open(IN,"<$filename") || die "Unable to open $filename: $!\n";
+    open(OUT,">$outfile") || die "Unable to open $filename: $!\n";
+
+    #
+    # Do the actual replacement
+    #
+    while (<IN>) {
+	while (/\$(\w+)/) {
+	    if (!$vars{$1}) {
+		die "Unknown variable: $1\n";
+	    }
+	    s/\$(\w+)/$vars{$1}/;
+	}
+	print OUT;
+    }
+    close(OUT);
+}
+
+print "Done!\n";
