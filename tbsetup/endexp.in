@@ -111,7 +111,7 @@ if (! UserDBInfo($user_login, \$user_name, \$user_email)) {
 # any script down the line has to do an admin check also. 
 #
 if ($EUID && !TBAdmin($EUID) &&
-    ProjMember($pid, $EUID) != PROJMEMBERTRUST_ROOT) {
+    ProjMember($pid, $user_login) != PROJMEMBERTRUST_ROOT) {
 
     print STDOUT "Go Away! You do not have permission to end experiments ".
 	         "in project $pid\n";
