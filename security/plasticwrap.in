@@ -37,7 +37,7 @@ $cwd = $ENV{PWD};
 # We only want to actually change to $CWD if it will actually
 # be accesible on the other machine - if it's in /users or /proj
 if (!($cwd =~ qr|/users|) &&
-    !($cwd =~ qr|/groups|)
+    !($cwd =~ qr|/groups|) &&
     !($cwd =~ qr|/proj|)) {
 	warn "In order to make sure that this command has access to any\n";
 	warn "files it may need to read, please change directories into\n";
