@@ -126,7 +126,7 @@ $user = $ARGV[0];
 #
 # Untaint the arguments.
 #
-if ($user =~ /^([-\w]+)$/i) {
+if ($user =~ /^([-\w_]+)$/i) {
     $user = $1;
 }
 else {
