@@ -54,16 +54,40 @@ if (! TBExptLogFile($pid, $eid)) {
     USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
 }
 
+#
+# A cleanup function to keep the child from becoming a zombie, since
+# the script is terminated, but the children are left to roam.
+#
+$fp = 0;
+
+function SPEWCLEANUP()
+{
+    global $fp;
+
+    if (!$fp || !connection_aborted()) {
+	exit();
+    }
+    pclose($fp);
+    exit();
+}
+ignore_user_abort(0);
+register_shutdown_function("SPEWCLEANUP");
+
 header("Content-Type: text/plain");
 header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
 header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
-ignore_user_abort(0);
+flush();
 
-$retval = 0;
-$result = system("$TBSUEXEC_PATH $uid $pid spewlogfile $pid $eid", $retval);
-
-if ($retval) {
+if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile $pid $eid", "r")) {
+    while ($string = fread($fp, 128)) {
+	echo "$string";
+	flush();
+    }
+    pclose($fp);
+    $fp = 0;
+}
+else {
     USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
 }
 
