@@ -2,11 +2,11 @@
 # This is the definitions file for Leigh at home.
 #
 TBDBNAME=tbdb
-TBOPSEMAIL=stoller@stoller.casco.net
-TBLOGSEMAIL=stoller@stoller.casco.net
-TBWWWEMAIL=stoller@stoller.casco.net
-TBAPPROVALEMAIL=stoller@stoller.casco.net
-TBAUDITEMAIL=stoller@stoller.casco.net
+TBOPSEMAIL=stoller@stoller.peak.org
+TBLOGSEMAIL=stoller@stoller.peak.org
+TBWWWEMAIL=stoller@stoller.peak.org
+TBAPPROVALEMAIL=stoller@stoller.peak.org
+TBAUDITEMAIL=stoller@stoller.peak.org
 DELAYCAPACITY=2
 BOSSNODE=golden-gw.ballmoss.com
 USERNODE=golden-gw.ballmoss.com
@@ -17,8 +17,8 @@ FSDIR_GROUPS=/groups
 FSDIR_PROJ=/proj
 FSDIR_USERS=/users
 FS_WITH_QUOTAS="/proj /groups /users"
-TBSTATEDEMAIL=stoller@stoller.casco.net
-TBTESTSUITEEMAIL=stoller@stoller.casco.net
+TBSTATEDEMAIL=stoller@stoller.peak.org
+TBTESTSUITEEMAIL=stoller@stoller.peak.org
 WWWHOST=golden-gw.ballmoss.com:9876
 WWW=golden-gw.ballmoss.com:9876/~stoller/testbed
 TBBASE=http://golden-gw.ballmoss.com:9876/~stoller/testbed
