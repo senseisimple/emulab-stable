@@ -49,7 +49,7 @@ def TBDBConnect():
     else:
         raise RuntimeError, "Cannot connect to DB after several attempts!"
 
-def DBQueryFatal(queryPat, querySub = (), asDict = False):
+def DBQuery(queryPat, querySub = (), asDict = False):
     TBDBConnect()
     
     if asDict:
@@ -84,9 +84,9 @@ def DBQueryFatal(queryPat, querySub = (), asDict = False):
     SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg, TBOPS)
     raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
 
-def DBQuery(*args):
+def DBQueryFatal(*args):
     try:
-        ret = DBQueryFatal(*args)
+        ret = DBQuery(*args)
         return ret
     except MySQLdb.MySQLError:
         return None
