@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: reply.c,v 1.3 2000-07-13 18:52:51 kwright Exp $
+ * $Id: reply.c,v 1.4 2000-07-18 17:13:44 kwright Exp $
  */
 
 
@@ -71,8 +71,6 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen)
 		memcpy(nid, myNodeID, ETHADDRSIZ);
 		nid += ETHADDRSIZ;
 		memcpy(nid, ifi->ifi_haddr, ETHADDRSIZ);
-		fprintf(stderr, "\there:");
-		print_haddr(ifi->ifi_haddr, ETHADDRSIZ);
 		nid += ETHADDRSIZ;
 		bzero(nid, ETHADDRSIZ << 1);
 

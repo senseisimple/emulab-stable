@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.4 2000-07-13 23:05:11 kwright Exp $
+ * $Id: forw_requests.c,v 1.5 2000-07-18 17:13:44 kwright Exp $
  */
 
 #include <math.h>
@@ -167,7 +167,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 			
 			/* get ready for next select */
 			elapsed = end - begin;
-			fprintf(stderr, "elapsed:%f ", elapsed);
+			/* fprintf(stderr, "elapsed:%f ", elapsed); DEBUG */
 			if (elapsed > deadline) {
 			        break;
 			}	

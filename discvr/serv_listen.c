@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.3 2000-07-13 18:52:52 kwright Exp $
+ * $Id: serv_listen.c,v 1.4 2000-07-18 17:13:44 kwright Exp $
  */
 
 #include "discvr.h"
@@ -37,6 +37,32 @@ extern topd_inqid_t inqid_current;
  */
 u_char myNodeID[ETHADDRSIZ];
 
+void
+print_ifi_info(struct ifi_info *ifihead)
+{
+        struct ifi_info *ifi;
+	struct sockaddr *sa;
+
+	for (ifihead = ifi = get_ifi_info(AF_INET, 0); 
+		 ifi != NULL; ifi = ifi->ifi_next) {
+		printf("%s: <", ifi->ifi_name);
+		if (ifi->ifi_flags & IFF_UP)			printf("UP ");
+		if (ifi->ifi_flags & IFF_BROADCAST)		printf("BCAST ");
+		if (ifi->ifi_flags & IFF_MULTICAST)		printf("MCAST ");
+		if (ifi->ifi_flags & IFF_LOOPBACK)		printf("LOOP ");
+		if (ifi->ifi_flags & IFF_POINTOPOINT)	        printf("P2P ");
+		printf(">\n");
+		print_nodeID(ifi->ifi_haddr);
+
+		if ( (sa = ifi->ifi_addr) != NULL)
+			printf("  IP addr: %s\n", sock_ntop(sa, sa->sa_len));
+		if ( (sa = ifi->ifi_brdaddr) != NULL)
+			printf("  broadcast addr: %s\n", sock_ntop(sa, sa->sa_len));
+		if ( (sa = ifi->ifi_dstaddr) != NULL)
+			printf("  destination addr: %s\n", sock_ntop(sa, sa->sa_len));
+	}
+}	
+
 
 void
 serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
@@ -48,7 +74,6 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	char			mesg[MAXLINE], str[INET6_ADDRSTRLEN], ifname[IFNAMSIZ];
 	char                    *reply;
 	u_char                  *myNodeIDtmp = 0;
-	struct sockaddr         *sa;
 	struct in_addr		in_zero;
 	struct ifi_info         *ifi, *ifihead;
 	struct in_pktinfo	pktinfo;
@@ -71,41 +96,20 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	bzero(&in_zero, sizeof(struct in_addr));	/* all 0 IPv4 address */
 
 	/* 
-	 * Get interface info for all inet4 interfaces 
-	 * and don't return aliases. 
+	 * Find and set our node ID 
 	 */
 	for (ifihead = ifi = get_ifi_info(AF_INET, 0); 
 		 ifi != NULL; ifi = ifi->ifi_next) {
-		printf("%s: <", ifi->ifi_name);
-		if (ifi->ifi_flags & IFF_UP)			printf("UP ");
-		if (ifi->ifi_flags & IFF_BROADCAST)		printf("BCAST ");
-		if (ifi->ifi_flags & IFF_MULTICAST)		printf("MCAST ");
-		if (ifi->ifi_flags & IFF_LOOPBACK)		printf("LOOP ");
-		if (ifi->ifi_flags & IFF_POINTOPOINT)	printf("P2P ");
-		printf(">\n");
-		print_nodeID(ifi->ifi_haddr);
-
-		/* 
-		 * We update myNodeIDtmp in a block separate from above 
-		 * since the above is just a debug clause and may be
-		 * compiled out eventually. -lkw
-		 */
 		if ( ifi->ifi_hlen > 0) {
 		        myNodeIDtmp = max_haddr(myNodeIDtmp, ifi->ifi_haddr);
 		}
-
-		if ( (sa = ifi->ifi_addr) != NULL)
-			printf("  IP addr: %s\n", sock_ntop(sa, sa->sa_len));
-		if ( (sa = ifi->ifi_brdaddr) != NULL)
-			printf("  broadcast addr: %s\n", sock_ntop(sa, sa->sa_len));
-		if ( (sa = ifi->ifi_dstaddr) != NULL)
-			printf("  destination addr: %s\n", sock_ntop(sa, sa->sa_len));
 	}
-
 	memcpy(&myNodeID, myNodeIDtmp, ETHADDRSIZ);
         fprintf(stderr, "My node id:");
 	print_nodeID(myNodeID);
-	
+
+	print_ifi_info(ifihead);
+	free_ifi_info(ifihead);
 
 	/*
 	 * Wait for requests. When a request comes in, send the request
@@ -131,6 +135,16 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		printf("\n");
 
 		/* 
+		 * There are 3 possible classifications for this inquiry.
+		 * Our response to the inquiry depends upon its classification:
+		 * 
+		 * - New inquiry -> forward and reply
+		 * - Duplicate inquiry
+		 *       - From us -> ignore
+		 *       - From another -> reply with interface list. 
+		 */ 
+		
+		/* 
 		 * Save the inquiry ID into inqid_current.
 		 */
 		memcpy(&inqid_current, mesg, sizeof(topd_inqid_t));
@@ -139,6 +153,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		 * stuff reply into ifi_info. 
 		 */
  
+		ifihead = get_ifi_info(AF_INET, 0); 
 	        forward_request(ifihead, &pktinfo, mesg, n );
 
 		if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
@@ -148,10 +163,9 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		n = compose_reply(ifihead, reply, BUFSIZ);
 		fprintf(stderr, "replying: ");
 		print_tdreply(reply, n);
+		free_ifi_info(ifihead);
 
 		/* send response back to original sender */
 		sendto(sockfd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));
 	}
-
-	free_ifi_info(ifihead);
 }
