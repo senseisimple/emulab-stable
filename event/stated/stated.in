@@ -115,8 +115,11 @@ my $TBREBOOT     = TBDB_COMMAND_REBOOT;
 my $TBPOWEROFF   = TBDB_COMMAND_POWEROFF;
 my $TBPOWERON    = TBDB_COMMAND_POWERON;
 my $TBPOWERCYCLE = TBDB_COMMAND_POWERCYCLE;
-my $TB_OSID_MBKERNEL = TB_OSID_MBKERNEL;
 my $TBISUP       = TBDB_NODESTATE_ISUP;
+my $TBTIMEOUTREBOOT   = TBDB_STATED_TIMEOUT_REBOOT;
+my $TBTIMEOUTNOTIFY   = TBDB_STATED_TIMEOUT_NOTIFY;
+my $TBTIMEOUTCMDRETRY = TBDB_STATED_TIMEOUT_CMDRETRY;
+my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 
 # This only gets used here, so it isn't in a lib constant.
 my $TBFREENODE = "FREENODE";
@@ -362,6 +365,9 @@ sub readStates(;@) {
 	    $nodes{$node_id}{timestamp}      = $timestamp;
 	    $nodes{$node_id}{mode}           = $mode;
 	    $nodes{$node_id}{mode_timestamp} = $mode_timestamp;
+	    $nodes{$node_id}{notified}       = 0;
+	    $nodes{$node_id}{timedout}       = 0;
+	    $nodes{$node_id}{noretry}        = 0;
 	    # Is there a timeout? If so, set it up!
 	    setTimeout($mode,$state,$node_id,$timestamp);
 	}
@@ -537,20 +543,22 @@ sub stateTransition($$) {
     # to check if we had a pending command
     if (qfind($node) &&
 	$timeout_tag{$node} =~ /^$TBCOMMAND:/) {
+        debug("TimeoutTag = '$timeout_tag{$node}'\n");
 	my ($str,$cmd) = split(":",$timeout_tag{$node});
+	debug("str=$str\tcmd=$cmd\tTBREBOOT=$TBREBOOT\tstate=$newstate\n");
 	if ($cmd eq $TBREBOOT) {
-	    if ($state eq TBDB_NODESTATE_SHUTDOWN ) {
+	    if ($newstate eq TBDB_NODESTATE_SHUTDOWN ) {
 		info("$node: $TBREBOOT success\n");
 		# Timeout will get cleared below by setTimeout call
 	    } else {
-		notify("$node: $TBREBOOT in progress, but got state $state ".
-		       "instead of ". TBDB_NODESTATE_SHUTDOWN ."!\n");
+		notify("$node: $TBREBOOT in progress, but got state ".
+		       "$newstate instead of ".TBDB_NODESTATE_SHUTDOWN."!\n");
 	    }
 	#} elsif ($cmd eq $FOO ) {
 	    # Add more here...
 	} else {
 	    notify("$node: Unknown command timeout '$timeout_tag{$node}' ".
-		   "found at $mode/$state\n");
+		   "found at $mode/$newstate\n");
 	}
     }
 
@@ -611,6 +619,9 @@ sub stateTransition($$) {
 	foreach ( @trigs , @nodetrigs) {
 	    my $trig = $_;
 	    /^$TBRESET$/ && do {
+		# We successfully booted, so clear some flags
+		$nodes{$node}{noretry}   = 0;
+		$nodes{$node}{timedout}  = 0;
 		# Check if we really need to do a reset
 		my $r = DBQueryWarn("select osid,def_boot_osid from nodes ".
 				    "where node_id='$node'");
@@ -790,40 +801,60 @@ sub handleCtrlEvent($$) {
 	    }
 	    $nodes{$node}{notified}++;
 	    my $notified = $nodes{$node}{notified};
+	    $nodes{$node}{timedout}++;
+	    my $timedout = $nodes{$node}{timedout};
 	    if ($mode && $state && $timeouts{$mode} &&
 		$timeouts{$mode}{$state}) {
 		($timeout, $action) = @{$timeouts{$mode}{$state}};
 	    }
 	    if ($mode eq $TBCOMMAND) {
 		# It is a command, not a true state
-		if ($action eq "CMDRETRY") {
+		if ($action eq $TBTIMEOUTCMDRETRY) {
 		    # Retry the command
-		    notify("$node: Command $state, retry #$notified\n");
+		    notify("$node: Command $state, retry #$timedout\n");
 		    # notify in case we get in a retry loop...
-		    handleCommand($node,$state,$notified);
+		    handleCommand($node,$state,$timedout,1);
 		} else {
 		    notify("$node: Unknown timeout action for ".
 			   "$mode/$state: '$action'\n");
 		}
 		next;
-	    } else {
-		if ($notified>1) {	
-		    notify("$node: Timed out at $now (d=$deadline), ".
-			   "but notified already!\n");
-		}
 	    }
-	    notify("Node $node has timed out in state $mode/$state".
-		   ($action ne "" ? "\n\tRequested action $action." : "").
-		   "\n");
+	    info("Node $node has timed out in state $mode/$state".
+		 ($action ne "" ? "\n\tRequested action $action." : "").
+		 "\n");
+
+	    foreach ($action) {
+		/^$TBTIMEOUTREBOOT/ && do {
+		    if ($timedout>3) {
+			# We've tried too many times...
+			notify("Node $node has timed out too many times!\n".
+			       "Giving up until it boots sucessfully.\n");
+			$nodes{$node}{noretry} = 1;
+		    } else {
+			# XXX Temporary!  For now notify instead of
+			# really rebooting, until the timeout/retry
+			# stuff is gone from os_setup and os_load
+			notify("Node $node has timed out in state ".
+			       "$mode/$state - REBOOT requested\n");
+			#handleCommand($node,$TBREBOOT,$timedout,1);
+		    }
+		    last; };
+		/^$TBTIMEOUTNOTIFY/ && do {
+		    notify("Node $node has timed out in state $mode/$state\n");
+		    last; };
+		notify("$node: Unknown Timeout Action: $action\n");
+	    }
 	    next;
 	};
 	notify("$node: Unknown CtrlEvent: $event\n");
     }
 }
 
-sub handleCommand($$;$) {
-    my ($params,$command,$retry) = @_;
+sub handleCommand($$;$$) {
+    my ($params,$command,$retry,$force) = @_;
     if (!defined($retry)) { $retry=0; }
+    if (!defined($force)) { $force=0; }
 
     info("Command: $params, $command (attempt $retry)\n");
 
@@ -832,26 +863,53 @@ sub handleCommand($$;$) {
     # We may need to do it here (while iterating over the list), or
     # make some other fix up in handleEvent.
 
-    if ($command eq $TBREBOOT && $retry >=3) {
+    if ($command eq $TBREBOOT && $retry >=4) {
 	announce("Node $params has tried rebooting $retry times and has \n".
 		 "still not been successful. Please look into it soon.\n".
-		 "In the meantime, $params will be powered off.\n");
+	"" );#	 "In the meantime, $params will be powered off.\n");
+	# Just return...
+	return 0;
 	# change my command to poweroff.
-	$command = $TBPOWEROFF;
+	#$command = $TBPOWEROFF;
     }
 
     foreach ($command) {
 	/^$TBREBOOT$/ && do {
 	    # For reboot, the params is a comma-separated list of nodes
 	    my @nodes = split(",",$params);
+
+	    # Check if any of these are in the middle of things and
+	    # shouldn't be rebooted.
+	    if (!$force) {
+		foreach $n ( 0 .. $#nodes ) {
+		    $node = $nodes[$n];
+		    debug("Checking rebooting: $node, $nodes{$node}, ".
+			  "$nodes{$node}{state}, $nodes{$node}{noretry}\n");
+		    if (($nodes{$node}{state} ne TBDB_NODESTATE_ISUP) &&
+			(!$nodes{$node}{noretry}) ) {
+			# This node shouldn't be rebooted now...
+			# XXX Send feedback here somehow!
+
+			info("$node: Trying to reboot too soon! Skipping.\n");
+			# Cut it out of the list
+			debug("Nodelist before ==> ".join(" ",@nodes)."\n");
+			splice(@nodes,$n,1);
+			debug("Nodelist after  ==> ".join(" ",@nodes)."\n");
+		    }
+		}
+		if (@nodes == 0) { next; }
+	    }
+
 	    my $nodelist=join(" ",@nodes);
 	    info("Rebooting nodes: $nodelist\n");
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
 
-	    my $cmd = "$nodereboot $nodelist &";
-	    debug("$cmd\n") or
-	    #system($cmd) and
+	    my $cmd = "$nodereboot -r $nodelist";
+	    my $redir = " 2>&1 >> /usr/testbed/log/nodereboot.log &";
+	    debug("$cmd $redir\n");
+	    system("date $redir");
+	    system($cmd.$redir) and
 	      notify("$params/$command: ".
 		     "Command '$cmd' failed, error $?: $!\n");
 
@@ -874,13 +932,13 @@ sub handleCommand($$;$) {
 			    $TBPOWERON    => "on",
 			    $TBPOWEROFF   => "off");
 	    my $func = $funcmap{$command};
-	    info("Sending power $func nodes: $nodelist\n");
+	    info("Sending power $func for nodes: $nodelist\n");
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
 
 	    my $cmd = "$power $func $nodelist &";
-	    debug("$cmd\n") or
-	    #system($cmd) and
+	    debug("$cmd\n") and
+	    system($cmd) and
 	      notify("$params/$command: ".
 		     "Command '$cmd' failed, error $?: $!\n");
 

@@ -18,21 +18,25 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: node_reboot [-d] [-f] [-w] node [node ...]\n" .
-	         "       node_reboot [-d] [-f] [-w] -e pid,eid\n".
+    print STDOUT "Usage: node_reboot [-d] [-f] [-n] [-w] node [node ...]\n" .
+	         "       node_reboot [-d] [-f] [-n] [-w] -e pid,eid\n".
 	"Use the -d option to turn on debugging\n" .
 	"Use the -e option to reboot all the nodes in an experiment\n" .
+	"Use the -n option to not wait for nodes to go down\n" .
 	"Use the -w option to to wait for nodes is come back up\n" .
 	"Use the -f option to power cycle (and not wait for nodes to die)\n";
     exit(-1);
 }
-my  $optlist = "dfe:w";
+# The hidden -r option runs this in "realmode", ie don't send an event, but
+# really do the work instead.
+my  $optlist = "dfe:nwr";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $CLIENT_BIN  = "@CLIENT_BINDIR@";
+my $BOSSNODE    = "@BOSSNODE@";
 
 #
 # Testbed Support libraries
@@ -40,6 +44,7 @@ my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use event;
 use POSIX qw(strftime);
 
 my $ssh		= "$TB/bin/sshtb -n";
@@ -54,6 +59,8 @@ my @nodes       = ();
 my $debug       = 0;
 my $force       = 0;
 my $waitmode    = 0;
+my $realmode    = 0;
+my $nowait      = 0;
 my $failed      = 0;
 my $eidmode     = 0;
 my $pid;
@@ -90,11 +97,17 @@ if (defined($options{"f"})) {
 if (defined($options{"w"})) {
     $waitmode = 1;
 }
+if (defined($options{"r"})) {
+    $realmode = 1;
+}
+if (defined($options{"n"}) && !defined($options{"w"})) {
+    $nowait = 1;
+}
 if (defined($options{"e"})) {
     if (@ARGV) {
 	usage();
     }
-    
+
     $eidmode = $options{"e"};
     if ($eidmode =~ /([-\w]*),([-\w]*)/) {
 	$pid = $1;
@@ -105,6 +118,12 @@ if (defined($options{"e"})) {
 	usage();
     }
 }
+
+# XXX Temporary, until we make event sending the default
+$realmode=1;
+#if ($realmode && $UID && !TBAdmin($UID)) {
+#    die("*** You cannot use real mode!\n");
+#}
 
 #
 # If eidmode, then get the node list out of the DB instead of the command
@@ -120,7 +139,7 @@ if ($eidmode) {
 	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
 	die("*** You not have permission to reboot nodes in $pid/$eid!\n");
     }
-    
+
     my $query_result =
 	DBQueryFatal("select node_id from reserved where ".
 		     "pid='$pid' and eid='$eid'");
@@ -137,7 +156,7 @@ else {
     if (@ARGV == 0) {
 	usage();
     }
-    
+
     # Untaint the nodes.
     foreach my $node ( @ARGV ) {
 	if ($node =~ /^([-\@\w]+)$/) {
@@ -146,7 +165,7 @@ else {
 	else {
 	    die("Bad node name: $node.");
 	}
-    
+
 	push(@nodes, $node);
     }
 
@@ -171,14 +190,14 @@ my %virtnodes = ();
 
 foreach my $node ( @nodes ) {
     my $jailed;
-    
+
     if (TBIsNodeVirtual($node, \$jailed)) {
 	if (! $jailed) {
 	    print "*** Skipping old style (non-jail) virtual node $node ...\n";
 	    next;
 	}
 	my $pnode;
-	
+
 	if (! TBPhysNodeID($node, \$pnode)) {
 	    die("*** $0:\n".
 		"    No physical node for $node!\n");
@@ -203,18 +222,41 @@ if (! keys(%realnodes) && ! keys(%virtnodes)) {
 }
 
 #
+# By here we've done all the preliminaries... send the event, unless we're
+# in realmode.
+#
+
+my @sortednodes = sort(keys(%realnodes));
+
+if (!$realmode) {
+    EventSendFatal(host      => $BOSSNODE ,
+		   objtype   => TBDB_TBEVENT_COMMAND ,
+		   eventtype => TBDB_COMMAND_REBOOT ,
+		   objname   => join(",",@sortednodes) );
+    if (!$nowait) {
+	# In here we can do some output to tell the user what's going on.
+	if ($waitmode) {
+	    # Wait for [SHUTDOWN,ISUP]
+
+	} else {
+	    # Wait for [SHUTDOWN]
+
+	}
+    }
+    exit(0);
+}
+
+#
 # Another shark hack. Well, perhaps not. We really don't want 50 nodes
 # all rebooting at the same time, PCs *or* sharks. Lets order them
 # so that the shelves are grouped together at least, and issue the reboots
 # in batches. 
 #
-my @sortednodes = sort(keys(%realnodes));
-
 while (@sortednodes) {
     my @batch = ();
     my $i     = 0;
     my $lastshelf = 0;
-    
+
     while ($i < 8 && @sortednodes > 0) {
 	my $node = shift(@sortednodes);
 	my $shelf;
@@ -230,7 +272,7 @@ while (@sortednodes) {
 	    }
 	    $lastshelf = $shelf;
 	}
-	    
+
 	push(@batch, $node);
 	$i++;
     }
@@ -333,7 +375,7 @@ if ($waitmode) {
     # Wait for events to filter through stated! If we do not wait, then we
     # could see nodes still in ISUP.
     sleep(2);
-    
+
     foreach my $node ( sort(@nodes) ) {
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $waitstart, (60*6))) {
 	    print STDOUT "$node is alive and well\n";
@@ -392,7 +434,7 @@ sub RebootNode {
     my $oldUID = $UID;
 #    print STDERR "Saved UID: $oldUID\n" if $debug;
     $UID = 0;
-    
+
     #
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
@@ -411,7 +453,7 @@ sub RebootNode {
 	# FreeBSD for example.
 	#
 	print STDERR "reboot of $pc returned $?.\n" if $debug;
-    
+
 	#
 	# If either ssh is not running or it timed out,
 	# send it a ping of death.
@@ -454,7 +496,7 @@ sub RebootNode {
 	TBSetNodeEventState($pc,$state);
 	exit(0);
     }
-	
+
     #
     # Haven't yet tried an ipod, try that and wait again.
     # This further slows down reboot but is probably worth it
@@ -507,7 +549,7 @@ sub RebootVNode($$) {
 	# FreeBSD for example.
 	#
 	print STDERR "reboot of $vnode returned $exitstatus.\n" if $debug;
-    
+
 	#
 	# Look for setup failure, reported back through ssh.
 	# 
@@ -525,7 +567,7 @@ sub RebootVNode($$) {
     # Must change our real UID to root so that ssh will work.
     #
     $UID = 0;
-    
+
     exec("$ssh -host $pnode $CLIENT_BIN/vnodesetup -r -j $vnode");
     exit(0);
 }
@@ -549,7 +591,7 @@ sub WaitTillDead {
     my ($pc) = @_;
 
     print STDERR "Waiting for $pc to die off\n" if $debug;
-    
+
     #
     # Sigh, a long ping results in the script waiting until all the
     # packets are sent from all the pings, before it will exit. So,
