@@ -10,12 +10,15 @@ use lib '@prefix@/lib';
 use libdb;
 require "ctime.pl";
 
+# Turn off line buffering
+$| = 1;
+
 my $datetag = `date +%Y%m%d%H%M%S`;
 chomp($datetag);
 my $date = &ctime(time);
 $date =~ s/[ \t]+/ /;
 $date =~ s/\n//;
-my $defprefix = "stategraph-$datetag";
+my $defprefix = "stategraph";
 my $prefix = $defprefix;
 my $v = 0; # Verbose
 my $help=0;
@@ -23,12 +26,18 @@ my $allmodes=1;
 my %modes=();
 my $dot=0;
 my $vcg=0;
+my $ps=0;
+my $gif=0;
+my $png=0;
 
 while ($_ = shift) {
     print "arg: '$_'\n" if ($v);
     /^-h/ && do { $help=1; next; };
     /^-dot/ && do { $dot=1; next; };
     /^-vcg/ && do { $vcg=1; next; };
+    /^-ps/ && do { $ps=1; next; };
+    /^-gif/ && do { $gif=1; next; };
+    /^-png/ && do { $png=1; next; };
     /^-[dv]/ && do { $v++; next; };
     /^-o/ && do { $prefix=shift || $defprefix; next; };
     # if it is all lowercase, caps it, otherwise leave it alone
@@ -41,21 +50,29 @@ while ($_ = shift) {
 if ($help) {
     #Help mode
     print <<EOF;
-Usage: stategraph [-h] [-v] [-d] [-dot] [-vcg] [-o <out>] [op_mode1] ...
+Usage: stategraph [-h] [-v] [-d] [-dot] [-vcg] 
+                  [-ps] [-gif] [-png] [-o <out>] [op_mode1] ...
   -h       This help message
   -v       Verbose mode. Multiple -v options cause more verbosity.
   -d       Debug mode. Alias for -v.
   -dot     Generate output using 'dot' graph layout tool.
   -vcg     Generate output using 'vcg' graph layout tool.
+  -ps      Generate PostScript format output.
+  -gif     Generate GIF format output.
+  -png     Generate PNG format output.
   -o <out> Prefix for output filenames.
 
 This program generates a graph of the state machines as defined in the
 state_transitions and mode_transitions tables in the database. This
 graph is generated from the current in the actual database, and is
-always current. By default, output will be generated with the 'dot'
-tool, and will be saved into the "out.ps". If both -dot and -vcg are
-specified, Output is saved into images named "out-vcg.ps" and
-"out-dot.ps", where out defaults to "$defprefix".
+always current. The -dot and -vcg options determine the layout tool(s)
+used for generating the graphs. The -ps, -gif, and -png options 
+determine the format of the output images. If no layout options are 
+given, dot will be used. If no format options are given, ps will be used.
+Output will be saved into <out>.{ps|gif|png}, depending on the format(s)
+requested. When both -dot and -vcg are specified, output will be in 
+<out>-{dot,vcg}.{ps|gif|png}. When -o is not given, <out> defaults to 
+'$defprefix'. If an output file exists, it will be overwritten.
 stategraph will show state machine diagrams for all operational modes
 by default, or for a subset by specifying the desired modes on the
 command line.
@@ -66,7 +83,9 @@ EOF
 
 my $vcgtag="-vcg";
 my $dottag="-dot";
+my $cleanup=1;
 if (!$dot && !$vcg) { $dot=1; }
+if (!$ps && !$gif && !$png) { $ps=1; }
 if (!($dot && $vcg)) { $vcgtag=""; $dottag=""; }
 my $filename="/tmp/stategraph-vcg-$$";
 my $filename2="/tmp/stategraph-dot-$$";
@@ -79,13 +98,10 @@ if ($vcg) {
     print TMP "  priority_phase: yes\n  straight_phase: yes\n";
     print TMP "  arrowmode: fixed\n  node. shape:ellipse\n";
     print TMP "  layoutalgorithm: maxdegree\n  port_sharing: no\n";
-    
-    # Adjust the scale here...
-    print TMP "  display_edge_labels: yes\n  scaling: 1.0\n";
-    
+    print TMP "  display_edge_labels: yes\n  splines: yes\n";
     # Use one of the following to control layout... whichever works better...
-    print TMP "  crossingweight: medianbary\n  splines: yes\n";
-    #print TMP "  crossingweight: barymedian\n  splines: yes\n";
+    print TMP "  crossingweight: medianbary\n";
+    #print TMP "  crossingweight: barymedian\n";
 }
 
 if ($dot) {
@@ -146,18 +162,56 @@ while(@r=$result->fetchrow()) {
 if ($vcg) {
     print TMP "}\n";
     close TMP;
-    print "Generating vcg graph...\n";
-    system("/usr/X11R6/bin/xvcg -silent -color -psoutput $prefix$vcgtag.ps $filename");
+    print "Generating vcg graphs: ";
+    if (-e "$filename.ps") { system("rm $filename.ps"); }
+    system("/usr/X11R6/bin/xvcg -silent -psoutput $filename.ps $filename");
+    doformats("$filename.ps","$prefix$vcgtag");
+    print "\n";
 }
 if ($dot) {
     print TMPN "}\n";
     close TMPN;
-    print "Generating dot graph...\n";
-    system("/usr/local/bin/dot -Tps -o $prefix$dottag.ps $filename2");
+    print "Generating dot graph: ";
+    system("/usr/local/bin/dot -Tps -o $filename2.ps $filename2");
+    doformats("$filename2.ps","$prefix$dottag");
+    print "\n";
 }
 print "Done.\n";
 
-#exec "/bin/rm $filename";
+if ($cleanup && $vcg) {
+    system("/bin/rm $filename");
+    system("/bin/rm $filename.ps");
+}
+if ($cleanup && $dot) {
+    system("/bin/rm $filename2");
+    system("/bin/rm $filename2.ps");
+}
+
+exit(0);
+
+# * stategraph: add options for making png/gif output via pstopnm,
+#   pnmtopng, and ppmtogif
+
+sub doformats() {
+    my ($in,$out) = @_;
+    if ($ps) {
+	print "ps ";
+	system("cp $in $out.ps");
+    }
+    if (!($gif || $png)) { return; }
+    system("pstopnm -stdout $in > $in.ppm 2> /dev/null");
+    if ($gif) {
+	print "gif ";
+	system("ppmtogif $in.ppm > $out.gif 2> /dev/null");
+    }
+    if ($png) {
+	print "png ";
+	system("pnmtopng $in.ppm > $out.png 2> /dev/null");
+    }
+    # The ppm is only a temp file, so clean it up
+    # Later we could add a ppm output option if anyone cared...
+    system("rm $in.ppm") if $cleanup;
+}
 
 sub mkstates {
     foreach $pair (@_) {
