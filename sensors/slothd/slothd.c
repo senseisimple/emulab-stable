@@ -3,16 +3,6 @@
 SLOTHD_PACKET *pkt;
 SLOTHD_OPTS   *opts;
 
-void siginthandler(int signum) {
-
-  int status;
-
-  while (wait(&status) != -1);
-  printf("exiting.\n");
-  exit(0);
-}
-
-
 void lerror(const char* msgstr) {
   if (msgstr) {
     syslog(LOG_ERR, "%s: %m", msgstr);
@@ -34,6 +24,27 @@ void lnotice(const char *msgstr) {
   }
 }
 
+void sigunkhandler(int signum) {
+  int status;
+  char message[50];
+
+  sprintf(message, "Unhandled signal: %d.  Exiting.", signum);
+  lerror(message);
+  unlink(PIDFILE);
+  while (wait(&status) != -1);
+  exit(signum);
+}
+
+void siginthandler(int signum) {
+
+  int status;
+
+  unlink(PIDFILE);
+  while (wait(&status) != -1);
+  lnotice("exiting.");
+  exit(0);
+}
+
 void usage(void) {  
 
   printf("Usage:\tslothd -h\n");
@@ -50,7 +61,9 @@ void usage(void) {
 
 int main(int argc, char **argv) {
 
-  int exitcode = -1, i;
+  int exitcode = -1;
+  int pfd;
+  char pidbuf[10];
   static SLOTHD_OPTS mopts;
   static SLOTHD_PACKET mpkt;
 
@@ -59,6 +72,15 @@ int main(int argc, char **argv) {
   bzero(&mpkt, sizeof(SLOTHD_PACKET));
   opts = &mopts;
   pkt = &mpkt;
+
+  /* Try to get lock.  If can't, then bail out. */
+  if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
+    exit(1);
+  }
+  fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
+  sprintf(pidbuf, "%d", getpid());
+  write(pfd, pidbuf, sizeof(pidbuf));
+  close(pfd);
 
   if (parse_args(argc, argv) < 0) {
     fprintf(stderr, "Error processing arguments.\n");
@@ -69,7 +91,8 @@ int main(int argc, char **argv) {
     }
     else {
       exitcode = 0;
-      for (i = 0; i < 10; ++i) {
+      lnotice("Slothd started");
+      for (;;) {
         if (!opts->first) {
           sleep(mopts.interval);
         }          
@@ -160,8 +183,14 @@ int init_slothd(void) {
   /* Setup signals */
   signal(SIGTERM, siginthandler);
   signal(SIGINT, siginthandler);
+  signal(SIGQUIT, siginthandler);
   signal(SIGHUP, SIG_IGN);
   signal(SIGPIPE, SIG_IGN);
+  signal(SIGBUS, sigunkhandler);
+  signal(SIGSEGV, sigunkhandler);
+  signal(SIGFPE, sigunkhandler);
+  signal(SIGILL, sigunkhandler);
+  signal(SIGSYS, sigunkhandler);
 
   /* Setup logging facil. */
   openlog("slothd", LOG_NDELAY, LOG_DAEMON);
@@ -184,6 +213,7 @@ int init_slothd(void) {
         snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
         opts->ttys[opts->numttys] = strdup(bufstr);
         opts->numttys++;
+        bzero(bufstr, sizeof(bufstr));
       }
     }
   }

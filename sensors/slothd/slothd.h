@@ -34,13 +34,14 @@
 #define SLOTHD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:/etc/testbed"
 #define UTMP_PATH "/var/run/utmp"
 #define WTMP_PATH "/var/log/wtmp"
+#define PIDFILE "/tmp/.sdpid"
 #define MACADDRLEN 18
 #define MAXNUMIFACES 10
 #define MAXIFNAMELEN 10
 #define LINEBUFLEN 256
 #define MAXTTYS 2000
 #define MAXDEVLEN 50
-#define MIN_INTVL 5
+#define MIN_INTVL 1
 #define DEF_INTVL 3600  /* 1 hour */
 
 #define SLOTHD_DEF_SERV "boss"
