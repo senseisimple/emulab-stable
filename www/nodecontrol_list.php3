@@ -38,7 +38,7 @@ if ($isadmin) {
                <a href='nodecontrol_list.php3?showtype=physical'>physical</a>,
                <a href='nodecontrol_list.php3?showtype=all'>all</a>";
 }
-echo ".</b><br><br>\n";
+echo ".</b><br>\n";
 
 if (!isset($showtype)) {
     $showtype='summary';
@@ -260,7 +260,12 @@ while ($row = mysql_fetch_array($query_result)) {
 $num_total = ($num_up + $num_down + $num_pd + $num_unk);
 mysql_data_seek($query_result, 0);
 
-echo "<center><b>
+if (! strcmp($showtype, "widearea")) {
+    echo "<a href=tutorial/docwrapper.php3?docname=widearea.html>
+             Widearea Usage Notes</a>\n";
+}
+
+echo "<br><center><b>
        View: $view\n";
 
 if (! strcmp($showtype, "widearea")) {
