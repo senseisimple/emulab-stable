@@ -104,6 +104,7 @@ my $CDROMSTATUS_BADPRIVKEY =	103;
 my $CDROMSTATUS_BADIPADDR =	104;
 my $CDROMSTATUS_BADREMOTEIP =	105;
 my $CDROMSTATUS_IPADDRINUSE =	106;
+my $CDROMSTATUS_UPGRADEERROR =	107;
 my $CDROMSTATUS_OTHER =		199;
 
 my %weberrors =
@@ -114,6 +115,7 @@ my %weberrors =
       $CDROMSTATUS_BADIPADDR    => "IP address does not match key",
       $CDROMSTATUS_BADREMOTEIP  => "IP address does not match remote IP",
       $CDROMSTATUS_IPADDRINUSE  => "IP address already registered at Netbed",
+      $CDROMSTATUS_UPGRADEERROR => "Error getting upgrade instructions",
       $CDROMSTATUS_OTHER        => "Unknown Error",
     );
 
@@ -768,9 +770,6 @@ sub MakeFS($$)
 	    if ($?);
 	$needumount = 1;
 
-	chdir("/mnt") or
-	    fatal("Could not chdir to /mnt!");
-
 	#
 	# If told to use a local image from the CDROM, its really easy!
 	# 
@@ -785,7 +784,7 @@ sub MakeFS($$)
 	    print "Unpacking $tarball to $mntpoint.\n";
 	    print $PATIENCEMSG;
 	
-	    mysystem("tar -zxf /$tarball");
+	    mysystem("tar -zxf /$tarball -C /mnt");
 	    fatal("Failed to untar /$tarball!")
 		if ($?);
 	}
@@ -814,13 +813,10 @@ sub MakeFS($$)
 	    print "Unpacking tarball.\n";
 	    print $PATIENCEMSG;
 
-	    mysystem("tar -zxf /mnt/slicex.tar.gz");
+	    mysystem("tar -zxf /mnt/slicex.tar.gz -C /mnt");
 	    fatal("Failed to untar /mnt/slicex.tar.gz!")
 		if ($?);
 	}
-	
-	chdir("/") or
-	    fatal("Could not chdir to /!");
 	
 	mysystem("umount /mnt");
 	fatal("Failed to unmount /mnt!")
