@@ -24,3 +24,5 @@ proc tb-fix-node {v p} {}
 proc tb-make-weighted-vtype {name weight types} {}
 proc tb-make-soft-vtype {name types} {}
 proc tb-make-hard-vtype {name types} {}
+proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {}
+proc tb-set-link-simplex-params {link src delay bw loss} {}

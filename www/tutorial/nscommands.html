@@ -20,7 +20,7 @@
   <li><a href="#IP">IP Address Commands</a>
   <li><a href="#ROUTE">IP Routing Commands</a>
   <li><a href="#OS">OS Commands</a>
-  <li><a href="#LOSS">Link Loss Commands</a>
+  <li><a href="#LOSS">Link Characteristic Commands</a>
   <li><a href="#VTYPE">Virtual Type Commands</a>
   <li><a href="#MISC">Misc. Commands</a>
 </ul>
@@ -201,7 +201,6 @@ tb-set-ip $node1 142.3.4.5
       the same node will result in an error.
 </ul>
 
-<hr>
 
 <h4>tb-set-ip-link</h4>
 
@@ -225,7 +224,6 @@ tb-set-ip-link $node0 $link0 142.3.4.6
       same node.
 </ul>
 
-<hr>
 
 <h4>tb-set-ip-lan</h4>
 
@@ -249,7 +247,6 @@ tb-set-ip-lan $node1 $lan0 142.3.4.6
 same node.
 </ul>
 
-<hr>
 
 <h4>tb-set-ip-interface</h4>
 
@@ -338,7 +335,6 @@ tb-set-node-os $node1 MY_OS
       operating systems over the network).
 </ul>
 
-<hr>
 
 <h4>tb-set-node-rpms</h4>
 
@@ -358,7 +354,6 @@ tb-set-node-rpms $node0 rpm1 rpm2 rpm3
   information.
 </ul>
 
-<hr>
 
 <h4>tb-set-node-startup</h4>
 
@@ -375,7 +370,6 @@ tb-set-node-startup $node0 {mystart.sh -a}
   information.
 </ul>
 
-<hr>
 
 <h4>tb-set-node-cmdline</h4>
 
@@ -392,7 +386,6 @@ tb-set-node-cmdline $node0 {???}
   <li>Currently, this is supported on OSKit kernels only. 
 </ul>
 
-<hr>
 
 <h4>tb-set-node-tarfiles</h4>
 
@@ -450,7 +443,6 @@ tb-set-link-loss $link1 0.02
       nodes.  Use the second syntax for this case.
 </ul>
 
-<hr>
 
 <h4>tb-set-lan-loss</h4>
 
@@ -588,6 +580,61 @@ tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
       three commands appropriately.  See above for more information.
   </li>
 </ul>
+
+<h4>tb-set-link-simplex-params</h4>
+
+<pre>
+tb-set-link-simplex-params <i>link</i> <i>src</i> <i>delay</i> <i>bw</i> <i>loss</i>
+
+tb-set-link-simplex-params $link1 $srcnode 100ms 50Mb 0.2
+</pre>
+
+<dl>
+  <dt><i>link</i> - The link we are modifying.
+  <dt><i>src</i> - The source, defining which direction we are
+      modifying.
+  <dt><i>delay</i> - The source to destination delay.
+  <dt><i>bw</i> - The source to destination bandwidth.
+  <dt><i>loss</i> - The source to destination loss.
+</dl>
+
+<p>Notes:
+
+<ul>
+  <li>This commands modifies the delay characteristics of a link in a
+      single direction.  The other direction is unchanged.
+  <li>This command only applies to links.  Use
+      <code>tb-set-lan-simplex-params</code> below for LANs.
+</ul>
+
+<h4>tb-set-lan-simplex-params</h4>
+
+<pre>
+tb-set-lan-simplex-params <i>lan</i> <i>node</i> <i>todelay</i> <i>tobw</i> <i>toloss</i> <i>fromdelay</i> <i>frombw</i> <i>fromloss</i>
+
+tb-set-lan-simplex-params $lan1 $node1 100ms 10Mb 0.1 5ms 100Mb 0
+</pre>
+
+<dl>
+  <dt><i>lan</i> - The lan we are modifying.
+  <dt><i>node</i> - The member of the lan we are modifying.
+  <dt><i>todelay</i> - Node to lan delay.
+  <dt><i>tobw</i> - Node to lan bandwidth.
+  <dt><i>toloss</i> - Node to lan loss.
+  <dt><i>fromdelay</i> - Lan to node delay.
+  <dt><i>frombw</i> - Lan to node bandwidth.
+  <dt><i>fromloss</i> - Lan to node loss.
+</dl>
+
+<p>Notes:
+<ul>
+<li>This command is exactly like <code>tb-set-node-lan-params</code>
+    except that it allows the characteristics in each direction to be
+    chosen separately.  See all the notes for
+    <code>tb-set-node-lan-params</code>.
+</ul>
+
+<hr>
 
 <a name="VTYPE"></a><h3>Virtual Type Commands</h3>
 
