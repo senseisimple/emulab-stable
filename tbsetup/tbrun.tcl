@@ -108,7 +108,7 @@ outs "PLACEHOLDER - Verifying OS functionality."
 #    exit 1
 #}
 
-outs "PLACEHOLDER - Installing secondary pacakages."
+outs "PLACEHOLDER - Installing secondary packages."
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
 
