@@ -12,7 +12,7 @@ SUBDIR		= os/imagezip
 DISTFILES	= ext2_fs.h imagehdr.h linux_types.h queue.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
 		  imageunzip.c crc.c imageunzip.8
-EXPANDCOPYRIGHT	= /flux/doc/copyright/expand-copyr
+EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 WITH_NTFS	= @WINSUPPORT@
 

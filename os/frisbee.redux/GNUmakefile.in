@@ -11,7 +11,7 @@ SUBDIR		= os/frisbee.redux
 
 DISTFILES	= TODO client.c decls.h event.c event.h log.c log.h \
 		  network.c queue.h server.c trace.c trace.h utils.c utils.h
-EXPANDCOPYRIGHT	= /flux/doc/copyright/expand-copyr
+EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 include $(OBJDIR)/Makeconf
 
