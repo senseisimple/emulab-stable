@@ -1036,7 +1036,7 @@ sub fatal($)
 	     "use this web page to get a summary of free nodes:\n\n".
 	     "  ${TBBASE}/nodecontrol_list.php3\n".
 	     "\n".
-	     "Please do not try again until you see enough node free.",
+	     "Please do not try again until you see enough nodes free.",
 	     ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
 	     "Cc:  $TBOPS",
