@@ -272,14 +272,15 @@ heapify(struct dn_heap *h)
 static void
 droppkt(struct dn_pipe *p)
 {
+    struct dn_loss *l = &(p->loss);
     /* CONST_RATE was handled when we first received the packet */
-    switch (p->lossdist) {
+    switch (l->dist) {
 	case DN_DIST_CONST_TIME:
-	    p->nextdroptime = curr_time + p->lossmean;
+	    l->nextdroptime = curr_time + l->mean;
 	    break;
 	case DN_DIST_TABLE_DETERM:
-	    p->losstablepos = ++p->losstablepos % p->lossentries;
-	    p->nextdroptime = curr_time + p->losstable[p->losstablepos];
+	    l->tablepos = ++l->tablepos % l->entries;
+	    l->nextdroptime = curr_time + l->table[l->tablepos];
 	    break;
 	default: /* leave it alone */
     }
@@ -325,7 +326,7 @@ transmit_event(struct dn_pipe *pipe)
 	 */
 	switch (pkt->dn_dir) {
 	case DN_TO_IP_OUT:
-	    if (pipe->nextdroptime <= curr_time)	/* drop it? */
+	    if (pipe->loss.nextdroptime <= curr_time)	/* drop it? */
 		droppkt(pipe);
 	    else
 		(void)ip_output((struct mbuf *)pkt, NULL, NULL, 0, NULL);
@@ -333,7 +334,7 @@ transmit_event(struct dn_pipe *pipe)
 	    break ;
 
 	case DN_TO_IP_IN :
-	    if (pipe->nextdroptime <= curr_time)	/* drop it? */
+	    if (pipe->loss.nextdroptime <= curr_time)	/* drop it? */
 		droppkt(pipe);
 	    else
 		ip_input((struct mbuf *)pkt) ;
@@ -341,7 +342,7 @@ transmit_event(struct dn_pipe *pipe)
 #ifdef BRIDGE
 	case DN_TO_BDG_FWD : {
 	    struct mbuf *m = (struct mbuf *)pkt ;
-	    if (pipe->nextdroptime <= curr_time)	/* drop it? */
+	    if (pipe->loss.nextdroptime <= curr_time)	/* drop it? */
 		droppkt(pipe);
 	    else
 		bdg_forward(&m, pkt->ifp);
@@ -371,30 +372,30 @@ transmit_event(struct dn_pipe *pipe)
  * it should be delayed.
  */
 static int
-delay_ticks(struct dn_pipe *p)
+delay_ticks(struct dn_delay *d)
 {
     int delay = 0;
-    switch (p->delaydist) {
+    switch (d->dist) {
 	case DN_DIST_CONST_TIME:
-	    delay=p->delay;  /* precomputed for this case */
+	    delay=d->delay;  /* precomputed for this case */
 	    break;
 	case DN_DIST_UNIFORM:
 	    /* we need a number somewhere between 
 	     * (mean - 2*variance) aka minimum and
 	     * (mean + 2*variance) aka maximum
 	     */
-	    delay=random() % ( 4 * p->delayvar)
-		+ (p->delaymean - 2 * p->delayvar);
+	    delay=random() % ( 4 * d->variance)
+		+ (d->mean - 2 * d->variance);
 	    delay=delay*hz/1000; /* ms -> ticks */
 	    break;
 	case DN_DIST_POISSON:	/* curr. implemented as random table */
 	case DN_DIST_TABLE_RANDOM:
-	    delay=p->delaytable[random() % p->delayentries];
+	    delay=d->table[random() % d->entries];
 	    delay=delay*hz/1000; /* ms -> ticks */
 	    break;
 	case DN_DIST_TABLE_DETERM:
-	    p->delaytablepos = ++p->delaytablepos % p->delayentries;
-	    delay = p->delaytable[p->delaytablepos];
+	    d->tablepos = ++d->tablepos % d->entries;
+	    delay = d->table[d->tablepos];
 	    delay=delay*hz/1000; /* ms -> ticks */
 	    break;
 	default: /* no delay */
@@ -409,24 +410,24 @@ delay_ticks(struct dn_pipe *p)
  * it is bits/second.
  */     
 static void
-updatebw(struct dn_pipe *p)
+updatebw(struct dn_bw *b)
 {   
-   switch(p->bwdist) {
+   switch(b->dist) {
         case DN_DIST_UNIFORM:
             /* we need a number somewhere between
              * (mean - 2*variance) aka minimum and
              * (mean + 2*variance) aka maximum
              */
-            p->bandwidth = random() % ( 4 * p->bwvar)
-                           + (p->bwmean - 2 * p->bwvar);
+            b->bandwidth = random() % ( 4 * b->variance)
+                           + (b->mean - 2 * b->variance);
             break;
 	case DN_DIST_TABLE_DETERM:
-            p->bwtablepos = ++p->bwtablepos % p->bwentries;
-	    p->bandwidth = p->bwtable[p->bwtablepos];
+            b->tablepos = ++b->tablepos % b->entries;
+	    b->bandwidth = b->table[b->tablepos];
             break;
 	case DN_DIST_POISSON:   /* curr. implemented as random table */
 	case DN_DIST_TABLE_RANDOM:
-	    p->bandwidth = p->bwtable[random() % p->bwentries];
+	    b->bandwidth = b->table[random() % b->entries];
         default: /* no action */
     }   
 }
@@ -443,18 +444,19 @@ ready_event(struct dn_flow_queue *q)
 {
     struct dn_pkt *pkt;
     struct dn_pipe *p = q->p ;
+    struct dn_bw *bw = &(p->bw);
     int p_was_empty = (p->p.head == NULL) ;
 
-    if (p->bwquantum_expire <= curr_time) {
+    if (bw->quantum_expire <= curr_time) {
 	do {
-	    p->bwquantum_expire += p->bwquantum;
-	} while (p->bwquantum_expire <= curr_time);
+	    bw->quantum_expire += bw->quantum;
+	} while (bw->quantum_expire <= curr_time);
 
-	updatebw(p);
+	updatebw(bw);
     }
     while ( (pkt = q->r.head) != NULL ) {
 	int len = pkt->dn_m->m_pkthdr.len;
-	int len_scaled = p->bandwidth ? len*8*hz : 0 ;
+	int len_scaled = bw->bandwidth ? len*8*hz : 0 ;
 	/*
 	 * bandwidth==0 (no limit) means we can drain as many pkts as
 	 * needed from the queue. Setting len_scaled = 0 does the job.
@@ -470,7 +472,7 @@ ready_event(struct dn_flow_queue *q)
 	q->len-- ;
 	q->len_bytes -= len ;
 
-	pkt->output_time = curr_time + delay_ticks(p);
+	pkt->output_time = curr_time + delay_ticks(&(p->delay));
 	if (p->p.head == NULL)
 	    p->p.head = pkt;
 	else
@@ -488,15 +490,15 @@ ready_event(struct dn_flow_queue *q)
      */
     if ( (pkt = q->r.head) != NULL ) { /* this implies bandwidth != 0 */
 	dn_key t ;
-	t = (pkt->dn_m->m_pkthdr.len*8*hz - q->numbytes + p->bandwidth - 1 ) /
-		p->bandwidth ;
+	t = (pkt->dn_m->m_pkthdr.len*8*hz - q->numbytes + bw->bandwidth - 1 ) /
+		bw->bandwidth ;
 	/* the bandwidth could change mid-packet. we will have to calculate
 	 * the time to send the remainder of the pkt when this happens
 	 */
-	if (curr_time + t > p->bwquantum_expire)
-		t = p->bwquantum_expire - curr_time;
+	if (curr_time + t > bw->quantum_expire)
+		t = bw->quantum_expire - curr_time;
 
-	q->numbytes += t * p->bandwidth ;
+	q->numbytes += t * bw->bandwidth ;
 	heap_insert(&ready_heap, curr_time + t, (void *)q );
 	/* XXX should check errors on heap_insert, and drain the whole
 	 * queue on error hoping next time we are luckier.
@@ -684,33 +686,33 @@ find_queue(struct dn_pipe *pipe)
  * determine whether to drop packet based on loss rate parameters
  */
 static int
-rate_based_drop(struct dn_pipe *p)
+rate_based_drop(struct dn_loss *l)
 {
-    if (p->lossdist & (DN_DIST_TABLE_DETERM|DN_DIST_CONST_TIME))
+    if (l->dist & (DN_DIST_TABLE_DETERM|DN_DIST_CONST_TIME))
 	return 0; /* time-based, so don't drop yet */
 
-    if (p->lossquantum_expire <= curr_time) {
+    if (l->quantum_expire <= curr_time) {
 	do {
-	    p->lossquantum_expire += p->lossquantum;
-	} while (p->lossquantum_expire <= curr_time);
+	    l->quantum_expire += l->quantum;
+	} while (l->quantum_expire <= curr_time);
 
-	switch(p->lossdist) {
+	switch(l->dist) {
             case DN_DIST_POISSON:   /* curr. implemented as random table */
             case DN_DIST_TABLE_RANDOM: 
-                p->plr = p->losstable[random() % p->lossentries];
+                l->plr = l->table[random() % l->entries];
 	        break;
 	    case DN_DIST_UNIFORM:
 		/* we need a number somewhere between
 		 * (mean - 2*variance) aka minimum and
 		 * (mean + 2*variance) aka maximum
 		 */
-		p->plr = random() % ( 4 * p->lossvar)
-			+ (p->lossmean - 2 * p->lossvar);
+		l->plr = random() % ( 4 * l->variance)
+			+ (l->mean - 2 * l->variance);
 		break;
 	    default: /* no action */
 	}
     }
-    return (random() < p->plr); /* remember, 0 <= plr <= 7fffffff */
+    return (random() < l->plr); /* remember, 0 <= plr <= 7fffffff */
 }
 
 
@@ -757,7 +759,7 @@ dummynet_io(int pipe_nr, int dir,
 	goto dropit ;		/* cannot allocate queue		*/
     q->tot_bytes += len ;
     q->tot_pkts++ ;
-    if (rate_based_drop(p))
+    if (rate_based_drop(&(p->loss)))
 	goto dropit ;		/* random pkt drop			*/
     if ( p->queue_size && q->len >= p->queue_size)
 	goto dropit ;		/* queue count overflow			*/
@@ -886,6 +888,12 @@ dummynet_flush()
 	curr_p = p ;
 	p = p->next ;	
 	free(curr_p->rq, M_IPFW);
+	if (curr_p->delay.table)
+	    free(curr_p->delay.table,M_IPFW);
+	if (curr_p->bw.table)
+	    free(curr_p->bw.table,M_IPFW);
+	if (curr_p->loss.table)
+	    free(curr_p->loss.table,M_IPFW);
 	free(curr_p, M_IPFW);
     }
 }
@@ -909,6 +917,128 @@ copyin_table(int entries, int *usertable, int **kerntable)
     return copyin(usertable,*kerntable, entries * sizeof(int));
 }
 
+/*
+ * delay configuration
+ */
+static int
+dn_delay_conf(struct dn_delay *d)
+{
+    int error = 0;
+    if (d->dist & ~(DN_DIST_CONST_TIME|DN_DIST_UNIFORM|DN_DIST_POISSON
+		    |DN_DIST_TABLE_RANDOM|DN_DIST_TABLE_DETERM)) {
+	printf("dummynet: invalid delay distribution %x\n", d->dist);
+	return EINVAL;
+    }
+
+    /* in constant case, compute ms->ticks now */
+    if (d->dist & DN_DIST_CONST_TIME)
+	d->delay = ( d->delay * hz ) / 1000 ;
+
+    if (d->dist & DN_DIST_UNIFORM) {
+	if (! d->variance) {
+	    d->dist=DN_DIST_CONST_TIME;
+	    d->delay = ( d->mean * hz ) / 1000 ;
+	}
+	else
+	if (d->variance > d->mean) {
+	    printf("dummynet: var %d > mean %d ???\n",
+		       d->variance, d->mean);
+		return EINVAL;
+	}
+    }
+
+    if (d->dist & DN_TABLE_DIST) { /* one of the table dists */
+	d->tablepos = 0;
+	error = copyin_table(d->entries,d->table,&(d->table));
+	if (error) {
+	    printf("dummynet: delay table could not be copied from userland\n");
+	    return error;
+	}
+    }
+    else
+	d->table=NULL;
+
+    return error;
+}
+
+/*
+ * bandwidth configuration
+ */
+static int
+dn_bw_conf(struct dn_bw *b)
+{
+    int error = 0;
+    if (b->dist & ~(DN_DIST_CONST_RATE|DN_DIST_UNIFORM|
+		    DN_DIST_TABLE_DETERM|DN_DIST_TABLE_RANDOM|
+		    DN_DIST_POISSON)) {
+	printf("dummynet: invalid bw distribution: %x\n",b->dist);
+	return EINVAL;
+    }
+    if (b->dist & DN_TABLE_DIST) { /* one of the table dists */
+	b->tablepos = 0;
+	error = copyin_table(b->entries,b->table,&(b->table));
+	if (error) { 
+	    printf("dummynet: bw table could not be copied from userland\n");
+	    return error;
+	}
+    }
+    else
+	b->table=NULL;
+
+    /* if bw not constant, init quantum */
+    if (b->dist & ~DN_CONST_DIST) {
+        b->quantum = b->quantum * hz /1000; /* ms->ticks */
+	b->quantum_expire = curr_time;
+    }
+    else
+	b->quantum_expire = 0x7fffffff; /* no quantum, so 'never' expire */
+
+    return error;
+}
+
+/*
+ * loss configuration
+ */
+static int
+dn_loss_conf(struct dn_loss *l)
+{
+    int error = 0;
+    if (l->dist & ~(DN_DIST_CONST_RATE|DN_DIST_CONST_TIME|
+		    DN_DIST_TABLE_DETERM|DN_DIST_UNIFORM|
+		    DN_DIST_POISSON|DN_DIST_TABLE_RANDOM)) {
+	printf("dummynet: invalid loss distribution %x\n", l->dist);
+	return EINVAL;
+    }
+
+    if (l->dist & DN_TABLE_DIST) {
+	l->tablepos = 0;
+	error = copyin_table(l->entries,l->table,&(l->table));
+	if (error) { 
+	    printf("dummynet: loss table could not be copied from userland\n");
+	    return error;
+	}
+    }
+    else
+	l->table=NULL;
+
+    /* init expiration timers.
+     * pretend that 7fffffff==heat_death_of_universe. i would
+     * be surprised if anybody ran experiments long enough to roll it over.
+     */
+    if (l->dist & (DN_DIST_TABLE_DETERM|DN_DIST_CONST_TIME))
+	l->nextdroptime = curr_time;
+    else
+	l->nextdroptime = 0x7fffffff; 
+
+    if (l->dist & ~(DN_CONST_DIST|DN_DIST_TABLE_DETERM)) {
+	l->quantum = l->quantum * hz / 1000 ; /* ms->ticks */
+	l->quantum_expire = curr_time;
+    }
+    else
+	l->quantum_expire = 0x7fffffff;
+
+    return error;
+}
 
 /*
  * Configure a pipe
@@ -916,197 +1046,97 @@ copyin_table(int entries, int *usertable, int **kerntable)
 static int
 dummynet_conf(struct dn_pipe *p)
 {
-	struct dn_pipe *a, *b;
-	int error = 0;
-	/*
-	 * The config program passes parameters as follows:
-	 * bw = bits/second (0 means no limits),
-	 * delaydist = integer constant.
-	 * delay = ms, must be translated into ticks.
-	 * queue_size = slots (0 means no limit)
-	 * queue_size_bytes = bytes (0 means no limit)
-	 *	  only one can be set, must be bound-checked
-	 */
-	if (p->delaydist & ~(DN_DIST_CONST_TIME|DN_DIST_UNIFORM|DN_DIST_POISSON
-				|DN_DIST_TABLE_RANDOM|DN_DIST_TABLE_DETERM)) {
-	    printf("dummynet: invalid delay distribution %x\n", p->delaydist);
-	    return EINVAL;
+    struct dn_pipe *a, *b;
+    int error = 0;
+    /*
+     * The config program passes parameters as follows:
+     * bw = bits/second (0 means no limits),
+     * delay = ms, must be translated into ticks.
+     * queue_size = slots (0 means no limit)
+     * queue_size_bytes = bytes (0 means no limit)
+     *	  only one can be set, must be bound-checked
+     */
+    error = dn_delay_conf(&(p->delay));
+    if (error)
+	return error;
+    error = dn_bw_conf(&(p->bw));
+    if (error)
+	return error;
+    error = dn_loss_conf(&(p->loss));
+    if (error)
+	return error;
+
+    if (p->queue_size == 0 && p->queue_size_bytes == 0)
+	p->queue_size = 50 ;
+    if (p->queue_size != 0 )	/* buffers are prevailing */
+	p->queue_size_bytes = 0 ;
+    if (p->queue_size > 100)
+	p->queue_size = 50 ;
+    if (p->queue_size_bytes > 1024*1024)
+	p->queue_size_bytes = 1024*1024 ;
+    for (a = NULL , b = all_pipes ; b && b->pipe_nr < p->pipe_nr ;
+	 a = b , b = b->next) ;
+
+    /* existing pipe */
+    if (b && b->pipe_nr == p->pipe_nr) {
+	/* free any existing tables */
+	if (b->delay.table)
+	    free(b->delay.table,M_IPFW);
+	if (b->bw.table)
+	    free(b->bw.table,M_IPFW);
+	if (b->loss.table)
+	    free(b->loss.table,M_IPFW);
+
+	bcopy(&(p->delay),&(b->delay),sizeof(p->delay));
+	bcopy(&(p->bw),&(b->bw),sizeof(p->bw));
+	bcopy(&(p->loss),&(b->loss),sizeof(p->loss));
+
+	b->flags = p->flags ;
+	b->queue_size = p->queue_size ;
+	b->queue_size_bytes = p->queue_size_bytes ;
+	b->flow_mask = p->flow_mask ;
+    } else {	/* brand new pipe */
+	int s ;
+	struct dn_pipe *x;
+	x = malloc(sizeof(struct dn_pipe), M_IPFW, M_DONTWAIT) ;
+	if (x == NULL) {
+	    printf("ip_dummynet.c: no memory for new pipe\n");
+	    return ENOSPC ;
 	}
 
-	if (p->lossdist & ~(DN_DIST_CONST_RATE|DN_DIST_CONST_TIME|
-			    DN_DIST_TABLE_DETERM|DN_DIST_UNIFORM|
-			    DN_DIST_POISSON)) {
-	    printf("dummynet: invalid loss distribution %x\n", p->lossdist);
-	    return EINVAL;
-	}
-
-	if (p->bwdist & ~(DN_DIST_CONST_RATE|DN_DIST_UNIFORM|
-			  DN_DIST_TABLE_DETERM|DN_DIST_TABLE_RANDOM|
-			  DN_DIST_POISSON)) {
-	    printf("dummynet: invalid bw distribution: %x\n",p->bwdist);
-	    return EINVAL;
-	}
-
-	if (p->delaydist & DN_DIST_CONST_TIME)
-	    p->delay = ( p->delay * hz ) / 1000 ;
-	if (p->delaydist & DN_DIST_UNIFORM) {
-	    if (p->delayvar == p->delaymean) {
-		p->delaydist=DN_DIST_CONST_TIME;
-		p->delay = ( p->delaymean * hz ) / 1000 ;
-	    }
-	    else
-	    if (p->delayvar > p->delaymean) {
-	     	printf("dummynet: min %d mean %d ???\n",
-		       p->delayvar, p->delaymean);
-		return EINVAL;
-	    }
-	}
-	if (p->delaydist & DN_TABLE_DIST) {
-	    p->delaytablepos = 0;
-	    error = copyin_table(p->delayentries,p->delaytable,&(p->delaytable));
-	    if (error) {
-	     	printf("dummynet: delay table could not be copied from userland\n");
-		return error;
-	    }
-	}
-	else /* not custom, so no table */
-	    p->delaytable=NULL;
-
-	if (p->lossdist & DN_TABLE_DIST) {
-	    p->losstablepos = 0;
-	    error = copyin_table(p->lossentries,p->losstable,&(p->losstable));
-	    if (error) { 
-		printf("dummynet: loss table could not be copied from userland\n");
-		return error;
-	    }
-	}
-	else /* not custom, so no table */
-	    p->losstable=NULL;
-
-	if (p->bwdist & DN_TABLE_DIST) {
-	    p->bwtablepos = 0;
-	    error = copyin_table(p->bwentries,p->bwtable,&(p->bwtable));
-	    if (error) { 
-		printf("dummynet: bw table could not be copied from userland\n");
-		return error;
-	    }
-	}
-	else /* not custom, so no table */
-	    p->bwtable=NULL;
-
-	/* convert quanta from ms to ticks */
-	p->lossquantum = p->lossquantum * hz / 1000 ;
-	p->bwquantum = p->bwquantum * hz /1000;
-
-	/* init drop or quantum expiration timers.
-	 * pretend that 7fffffff==heat_death_of_universe. i would
-	 * be surprised if anybody ran experiments long enough to roll it over.
-	 */
-	if (p->lossdist & (DN_DIST_TABLE_DETERM|DN_DIST_CONST_TIME))
-	    p->nextdroptime = curr_time;
-	else
-	    p->nextdroptime = 0x7fffffff; 
-
-	if (p->lossdist & ~DN_CONST_DIST)
-	    p->lossquantum_expire = curr_time;
-	else
-	    p->lossquantum_expire = 0x7fffffff;
-
-	if (p->bwdist & ~DN_CONST_DIST)
-	    p->bwquantum_expire = curr_time;
-	else
-	    p->bwquantum_expire = 0x7fffffff;
-
-	if (p->queue_size == 0 && p->queue_size_bytes == 0)
-	    p->queue_size = 50 ;
-	if (p->queue_size != 0 )	/* buffers are prevailing */
-	    p->queue_size_bytes = 0 ;
-	if (p->queue_size > 100)
-	    p->queue_size = 50 ;
-	if (p->queue_size_bytes > 1024*1024)
-	    p->queue_size_bytes = 1024*1024 ;
-	for (a = NULL , b = all_pipes ; b && b->pipe_nr < p->pipe_nr ;
-		 a = b , b = b->next) ;
-	if (b && b->pipe_nr == p->pipe_nr) {
-	    b->flags = p->flags ;
-
-	    b->bandwidth = p->bandwidth ;
-	    b->bwdist = p->bwdist;
-	    b->bwmean = p->bwmean;
-	    b->bwvar = p->bwvar;
-	    b->bwquantum = b->bwquantum;
-	    b->bwquantum_expire = b->bwquantum_expire;
-	    if (b->bwtable)
-		free(b->bwtable,M_IPFW);
-	    b->bwtable = p->bwtable;
-	    b->bwentries = p->bwentries;
-
-	    b->queue_size = p->queue_size ;
-	    b->queue_size_bytes = p->queue_size_bytes ;
-
-	    b->delay = p->delay ;
-	    b->delaydist = p->delaydist;
-	    b->delaymean = p->delaymean;
-	    b->delayvar = p->delayvar;
-	    if(b->delaytable)
-		free(b->delaytable,M_IPFW);
-	    b->delaytable = p->delaytable;
-	    b->delayentries = p->delayentries;
-
-	    b->plr = p->plr ;
-	    b->lossdist = p->lossdist;
-	    b->nextdroptime = p->nextdroptime;
-	    b->lossmean = p->lossmean;
-	    b->lossvar = p->lossvar;
-	    b->lossquantum = p->lossquantum;
-	    b->lossquantum_expire = p->lossquantum_expire;
-	    if (b->losstable)
-		free(b->losstable,M_IPFW);
-	    b->losstable = p->losstable;
-	    b->lossentries = p->lossentries;
-
-	    b->flow_mask = p->flow_mask ;
-	} else { /* brand new pipe */
-	    int s ;
-	    struct dn_pipe *x;
-	    x = malloc(sizeof(struct dn_pipe), M_IPFW, M_DONTWAIT) ;
-	    if (x == NULL) {
-		printf("ip_dummynet.c: no memory for new pipe\n");
-		return ENOSPC ;
-	    }
-	    bcopy(p,x,sizeof(*x));
-	    bzero(&(x->p), sizeof(x->p));
-	    bzero(&(x->flow_mask), sizeof(x->flow_mask));
-	    x->last_expired = 0;
-	    if (x->flags & DN_HAVE_FLOW_MASK) {/* allocate some slots */
-		int l = p->rq_size ;
-		if (l == 0)
-		    l = dn_hash_size ;
-		if (l < 4)
-		    l = 4 ;
-		else if (l > 1024)
-		    l = 1024 ;
-		x->rq_size = l ;
-	    } else /* one is enough for null mask */
-		x->rq_size = 1 ;
-	    x->rq = malloc((1 + x->rq_size) * sizeof(struct dn_flow_queue *),
+	bcopy(p,x,sizeof(*x));
+	bzero(&(x->p), sizeof(x->p)); /* clear queue and flow mask */
+	bzero(&(x->flow_mask), sizeof(x->flow_mask));
+	x->last_expired = 0;
+	if (x->flags & DN_HAVE_FLOW_MASK) {/* allocate some slots */
+	    int l = p->rq_size ;
+	    if (l == 0)
+		l = dn_hash_size ;
+	    if (l < 4)
+		l = 4 ;
+	    else if (l > 1024)
+		l = 1024 ;
+	    x->rq_size = l ;
+	} else /* one is enough for null mask */
+	    x->rq_size = 1 ;
+	x->rq = malloc((1 + x->rq_size) * sizeof(struct dn_flow_queue *),
 		    M_IPFW, M_DONTWAIT) ;
-	    if (x->rq == NULL ) {
-		printf("sorry, cannot allocate queue\n");
-		free(x, M_IPFW);
-		return ENOSPC ;
-	    }
-	    bzero(x->rq, (1+x->rq_size) * sizeof(struct dn_flow_queue *) );
-	    x->rq_elements = 0 ;
-
-	    s = splnet() ;
-	    x->next = b ;
-	    if (a == NULL)
-		all_pipes = x ;
-	    else
-		a->next = x ;
-	    splx(s);
+	if (x->rq == NULL ) {
+	    printf("sorry, cannot allocate queue\n");
+	    free(x, M_IPFW);
+	    return ENOSPC ;
 	}
+	bzero(x->rq, (1+x->rq_size) * sizeof(struct dn_flow_queue *) );
+	x->rq_elements = 0 ;
+
+	s = splnet() ;
+	x->next = b ;
+	if (a == NULL)
+	    all_pipes = x ;
+	else
+	    a->next = x ;
+	splx(s);
+    }
     return error;
 }
 
@@ -1181,7 +1211,7 @@ ip_dn_ctl(struct sockopt *sopt)
 		 * then copy the queue descriptor(s) one at a time.
 		 */
 		bcopy(p, bp, sizeof( *p ) );
-		pipe_bp->delay = (pipe_bp->delay * 1000) / hz ;
+		pipe_bp->delay.delay = (pipe_bp->delay.delay * 1000) / hz ;
 		bp += sizeof( *p ) ;
 		for (i = 0 ; i <= p->rq_size ; i++)
 		    for (q = p->rq[i] ; q ; q = q->next, bp += sizeof(*q) ) {
@@ -1268,14 +1298,13 @@ ip_dn_ctl(struct sockopt *sopt)
 	    splx(s);
 	    purge_pipe(b);	/* remove pkts from here */
 
-	    if (b->delaydist & 
-		(DN_DIST_TABLE_RANDOM|DN_DIST_TABLE_DETERM|DN_DIST_POISSON))
-		free(b->delaytable, M_IPFW);
-	    if (b->lossdist & (DN_DIST_TABLE_DETERM|DN_DIST_TABLE_RANDOM))
-		free(b->losstable, M_IPFW);
-	    if (b->bwdist & (DN_DIST_TABLE_DETERM|DN_DIST_TABLE_RANDOM))
-		free(b->bwtable, M_IPFW);
 	    free(b->rq, M_IPFW);
+	    if (b->delay.table)
+		free(b->delay.table, M_IPFW);
+	    if (b->loss.table)
+		free(b->loss.table, M_IPFW);
+	    if (b->bw.table)
+		free(b->bw.table, M_IPFW);
 	    free(b, M_IPFW);
 	}
 	break ;
