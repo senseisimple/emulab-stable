@@ -1442,6 +1442,7 @@ CREATE TABLE users (
   weblogin_failcount smallint(5) unsigned NOT NULL default '0',
   weblogin_failstamp int(10) unsigned NOT NULL default '0',
   plab_user tinyint(1) NOT NULL default '0',
+  user_interface enum('emulab','plab') NOT NULL default 'emulab',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)

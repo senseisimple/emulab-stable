@@ -1109,9 +1109,14 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table nodetypeXpid_permissions add key (pid);
 
-1.203: Add enum to projects to table to store which interface users
+1.203: Add enum to projects table to store which interface users
        should start with.
 
        alter table projects add default_user_interface \
 		 enum('emulab','plab') NOT NULL default 'emulab';
 
+1.204: Add enum to users table to store which interface user is currently
+       set to use. This will replace plab_user bit.
+
+       alter table users add user_interface \
+		 enum('emulab','plab') NOT NULL default 'emulab';
