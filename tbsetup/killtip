@@ -1,3 +1,50 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: killtip,v 1.1 2000-11-21 11:19:09 kwright Exp $ 
+# $Id: killtip,v 1.2 2000-11-28 22:17:07 kwright Exp $ 
+
+my $node;
+my $user;
+
+sanitize();
+dowork();
+
+sub dowork() {
+
+        open (PS, "/bin/ps -u  2>&1 |");
+	while (<PS>) {
+	        if ( /^$user\W/ && /\Wtip $node$/ ) {
+		        /\W(\d+)\W/;
+		        $pid = ($1);
+			$command = "kill -1 $pid";
+			print $command;
+			open (KILL, "$command 2>&1 |") or die "Failed: $command\n"; 
+			while (<KILL>) { print $_; }
+		}
+	}
+}
+
+sub sanitize {
+
+        # sanitize path
+        $ENV{'PATH'} = '/bin:/usr/bin';
+	delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+        # check usage
+	if ($#ARGV < 1) { 
+	    die("Usage: killtip <user> <node>\n".
+		"\tKills any tip lines for user/node pair.\n");
+	}
+
+        # sanitize command-line args
+	$user = $ARGV[0];
+	if ( !($user =~ /^[a-zA-Z0-9]+$/) ) { 
+	        die("User '$user' contains illegal characters.\n"); 
+	}
+
+        $node = $ARGV[1];
+	if ( !($node =~ /^tb(pc|sh)([0-9])+$/) ) {
+	        die("Invalid node '$node' illegal node format.\n"); 
+        }	    
+}
+
+
