@@ -7,7 +7,7 @@
 #
 use English;
 use Getopt::Std;
- 
+
 #
 # Deal with user accounts. This script does not deal with group stuff.
 # Just add/del/mod/passwd/freeze/thaw/ stuff. We do give users an
@@ -17,10 +17,10 @@ use Getopt::Std;
 # to be wary of what the UID/EUID is when those scripts are invoked. The
 # subscripts are not generally setuid, but of course the web interface
 # allows users to do things on behalf of other users, and we want to track
-# that in the audit log. 
+# that in the audit log.
 #
 # This script always does the right thing ...
-# 
+#
 sub usage()
 {
     print("Usage: tbacct [-f] ".
@@ -48,12 +48,12 @@ my $USERDEL	= "/usr/sbin/pw userdel";
 my $USERMOD	= "/usr/sbin/pw usermod";
 my $CHPASS	= "/usr/bin/chpass";
 my $SFSKEYGEN	= "/usr/local/bin/sfskey gen";
-my $SETGROUPS	= "setgroups";
-my $GENELISTS	= "genelists";
-my $SFSUPDATE	= "sfskey_update";
+my $SETGROUPS	= "$TB/sbin/setgroups";
+my $GENELISTS	= "$TB/sbin/genelists";
+my $SFSUPDATE	= "$TB/sbin/sfskey_update";
 my $PBAG	= "$TB/sbin/paperbag";
 my $NOLOGIN	= "/sbin/nologin";
-my $SSH		= "sshtb";
+my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
 my $NOSUCHUSER  = 67;
 my $USEREXISTS  = 65;
@@ -74,7 +74,7 @@ if ($EUID != 0) {
 #
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
-# 
+#
 if ($UID == 0) {
     die("*** $0:\n".
 	"    Please do not run this as root! Its already setuid!\n");
@@ -82,7 +82,7 @@ if ($UID == 0) {
 
 #
 # Untaint the path
-# 
+#
 $ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
@@ -92,7 +92,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1;
 
 #
-# Load the Testbed support stuff. 
+# Load the Testbed support stuff.
 #
 use lib "@prefix@/lib";
 use libaudit;
@@ -160,7 +160,7 @@ if ($query_result->numrows == 0) {
 }
 @row            = $query_result->fetchrow_array();
 my $pswd        = $row[0];
-my $user_number = $row[1]; 
+my $user_number = $row[1];
 my $fullname    = $row[2];
 my $user_email  = $row[3];
 my $status      = $row[4];
@@ -187,7 +187,7 @@ if (my ($defpid) = $query_result->fetchrow_array) {
 }
 else {
     print "No group membership for $user; using the guest group!\n";
-    
+
     ($default_groupname,undef,$default_groupgid,undef) = getgrnam("guest");
 }
 
@@ -256,11 +256,11 @@ sub AddUser()
 	}
 	fatal("$user is not active! Cannot build an account!");
     }
-    
+
     $UID = 0;
     if (system("egrep -q -s '^${user}:' /etc/passwd")) {
 	print "Adding user $user ($user_number) to local node.\n";
-    
+
 	if (system("$USERADD $user -u $user_number -c \"$fullname\" ".
 		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
 		   "-g $default_groupname -s $PBAG")) {
@@ -281,7 +281,7 @@ sub AddUser()
 		   "'$USERADD $user -u $user_number -c \\\"$fullname\\\" ".
 		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
 		   "-g $default_groupname -s /bin/tcsh'")) {
-	    if (($? >> 8) != $USEREXISTS) {	    
+	    if (($? >> 8) != $USEREXISTS) {
 		fatal("Could not add user $user ($user_number) to $CONTROL.");
 	    }
 	}
@@ -313,7 +313,7 @@ sub AddUser()
 sub DelUser()
 {
     #
-    # Only admin people can do this. 
+    # Only admin people can do this.
     #
     if (! TBAdmin($UID)) {
 	fatal("You do not have permission to delete user $user.");
@@ -337,7 +337,7 @@ sub DelUser()
 
     if ($CONTROL ne $BOSSNODE) {
 	print "Removing user $user from $CONTROL\n";
-	
+
 	if (system("$SSH -host $CONTROL '$USERDEL $user'")) {
 	    if (($? >> 8) != $NOSUCHUSER) {
 		fatal("Could not remove user $user from $CONTROL.");
@@ -350,20 +350,20 @@ sub DelUser()
     # Remove from elists.
     system("$GENELISTS -n $user");
     $EUID = 0;
-    
+
     $sfsupdate = 1;
     return 0;
 }
 
 #
 # Change a password for the user on the control node. The local password
-# is not touched! 
+# is not touched!
 #
 sub UpdatePassword()
 {
     # shell escape.
     $pswd     =~ s/\$/\\\\\\\$/g;
-    
+
     #
     # Check status. Ignore if user is not active.
     #
@@ -394,13 +394,13 @@ sub UpdateUser(;$)
     my $remshellarg = "";
 
     #
-    # Sanity check. 
+    # Sanity check.
     #
     if ($webonly) {
 	return 0;
     }
     if (!defined($freezeopt) && ($status ne USERSTATUS_ACTIVE)) {
-	fatal("$user is not active! Cannot update the account!");	
+	fatal("$user is not active! Cannot update the account!");
     }
 
     # Shell is different on local vs control node.
@@ -414,14 +414,14 @@ sub UpdateUser(;$)
 	    $remshellarg = "-s /bin/tcsh";
 	}
     }
-    
+
     print "Updating user $user ($user_number) on local node.\n";
-    
+
     $UID = 0;
     if (system("$USERMOD $user $locshellarg -c \"$fullname\" ")) {
 	fatal("Could not modify user $user on local node.");
     }
-    
+
     #
     # Quote special chars for ssh and the shell on the other side
     #
@@ -430,7 +430,7 @@ sub UpdateUser(;$)
 
     if ($CONTROL ne $BOSSNODE) {
 	print "Updating user $user ($user_number) on $CONTROL\n";
-	
+
 	if (system("$SSH -host $CONTROL ".
 		   "'$USERMOD $user $remshellarg -c \\\"$fullname\\\"'")) {
 	    fatal("Could not modify user $user record on $CONTROL.");
@@ -439,10 +439,10 @@ sub UpdateUser(;$)
     $UID = $SAVEUID;
 
     $EUID = $UID;
-    # Update elists in case email changed. 
+    # Update elists in case email changed.
     system("$GENELISTS -n $user");
     $EUID = 0;
-    
+
     return 0;
 }
 
@@ -452,7 +452,7 @@ sub UpdateUser(;$)
 sub FreezeUser()
 {
     #
-    # Only admin people can do this. 
+    # Only admin people can do this.
     #
     if (! TBAdmin($UID)) {
 	fatal("You do not have permission to freeze user $user.");
@@ -464,7 +464,7 @@ sub FreezeUser()
 	fatal("$user is still active! Cannot freeze the account!");
     }
     $sfsupdate = 1;
-    
+
     return UpdateUser(1);
 }
 
@@ -474,7 +474,7 @@ sub FreezeUser()
 sub ThawUser()
 {
     #
-    # Only admin people can do this. 
+    # Only admin people can do this.
     #
     if (! TBAdmin($UID)) {
 	fatal("You do not have permission to thaw user $user.");
@@ -486,7 +486,7 @@ sub ThawUser()
 	fatal("$user is not active! Cannot thaw the account!");
     }
     $sfsupdate = 1;
-    
+
     return UpdateUser(0);
 }
 
@@ -542,7 +542,7 @@ sub CheckDotFiles()
 sub GenerateSFSKey()
 {
     my $sfsdir  = "$HOMEDIR/$user/.sfs";
-    
+
     #
     # Set up the sfs key, but only if not done so already.
     # This has to be done from root because the sfs_users file needs
@@ -566,12 +566,12 @@ sub GenerateSFSKey()
 	    fatal("Failure in sfskey gen!");
         }
 	$UID = $SAVEUID;
-	
+
 	chown($user_number, $default_groupgid, "$sfsdir/identity") or
 	    fatal("Could not chown $sfsdir/identity: $!");
 	chmod(0600, "$sfsdir/identity") or
 	    fatal("Could not chmod $sfsdir/identity: $!");
-	
+
 	#
 	# Grab a copy for the DB. Causes an SFS update key to run so
 	# that key is inserted into the files.
@@ -590,7 +590,7 @@ sub GenerateSFSKey()
 	$sfsupdate = 1;
     }
     return 0;
-}    
+}
 
 sub fatal($) {
     my($mesg) = $_[0];
