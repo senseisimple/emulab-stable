@@ -418,6 +418,13 @@ sub removeVlan($@) {
     my @vlan_ids = @_;
     my $errors = 0;
 
+    #
+    # Exit early if no VLANs given
+    #
+    if (!@vlan_ids) {
+	return 1;
+    }
+
     my %vlan_numbers = $self->{LEADER}->findVlans(@vlan_ids);
     foreach my $vlan_id (@vlan_ids) {
 	#
