@@ -1,12 +1,24 @@
 #!/usr/bin/perl -wT
 use English;
+use Getopt::Std;
 
 #
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
-# usage: tbdoit <pid> <eid> <temp_nsfile>
+# The -b (batch) argument is so that this script can be part of a batchmode
+# that starts/ends experiments offline. In that case, we don't want to put
+# it into the background and send email, but just want an exit status 
+# returned to the batch system.
 #
+# usage: startexp [-b] <pid> <eid> <nsfile>
+#
+sub usage()
+{
+    print STDOUT "Usage: startexp [-b] <pid> <eid> <nsfile>\n";
+    exit(-1);
+}
+my  $optlist = "b";
 
 #
 # Configure variables
@@ -19,6 +31,7 @@ my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
 my $cleanme  = 0;
+my $batch    = 0;
 
 #
 # For debugging all this goo. Leaves the experiment directory intact,
@@ -38,15 +51,22 @@ $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Check args.
-# 
-if (@ARGV != 3) {
-    print STDOUT "Usage: tbdoit <pid> <eid> <temp_nsfile>\n";
-    exit(-1);
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
-my $pid      = $ARGV[0];
-my $eid      = $ARGV[1];
+if (@ARGV != 3) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
 my $tempfile = $ARGV[2];
+if (defined($options{"b"})) {
+    $batch = $options{"b"};
+}
 
 #
 # Untaint the arguments.
@@ -68,7 +88,7 @@ my $eiddir  = "$expdir/$eid";
 my $nsfile  = "$eid.ns";
 my $irfile  = "$eid.ir";
 my $repfile = "$eid.report";
-my $tempcopy= "$tempfile.$$";
+my $tempns  = "$tempfile.$$";
 
 #
 # Set up for querying the database.
@@ -102,10 +122,10 @@ if ($row[0]) {
 }
 
 #
-# Figure out who is going to get the email!
+# Get some user information. 
 #
 $query_result =
-    $DB->query("SELECT usr_name,usr_email from users ".
+    $DB->query("SELECT uid,usr_name,usr_email from users ".
 	       "WHERE unix_uid='$EUID'");
 
 if (! $query_result) {
@@ -117,55 +137,52 @@ if ($query_result->numrows < 1) {
 }
 
 @row = $query_result->fetchrow_array();
-$user_name  = $row[0];
-$user_email = $row[1];
+$uid        = $row[0];
+$user_name  = $row[1];
+$user_email = $row[2];
+
+#
+# Verify that this person is allowed to start the experiment. Must be
+# in the project membership table.
+#
+$query_result =
+    $DB->query("SELECT pid FROM proj_memb ".
+	       "WHERE uid=\"$uid\" and pid=\"$pid\"");
+
+if (! $query_result) {
+    fatal("DB Error getting project membership for uid $uid\n");
+}
+if ($query_result->numrows == 0) {
+    print STDOUT "Go Away! You are not a member of project $pid\n";
+    exit(1);
+}
 
 #
 # Copy the nsfile from wherever the web server stuffed it into a temporary
 # file. The web server is going to delete it once this script returns.
 #
-if (system("/bin/cp", "$tempfile", "$tempcopy") != 0) {
-    fatal("Could not copy $tempfile to $tempcopy: $!\n");
+if (system("/bin/cp", "$tempfile", "$tempns") != 0) {
+    fatal("Could not copy $tempfile to $tempns: $!\n");
 }
+chmod(0770, "$tempns");
 
 #
 # The rest of this goes into the background so that the user sees
 # immediate response. We will send email later when the experiment
 # is actually torn down.
 #
-$mypid = fork();
-if ($mypid) {
-    #
-    # Parent exits normally
-    #
-    print STDOUT
-	"Experiment $pid/$eid is now configuring\n".
-        "You will be notified via email when the experiment is ready to use\n";
-    exit(0);
+if (! $batch) {
+    if (background()) {
+	#
+	# Parent exits normally
+	#
+	print STDOUT
+	    "Experiment $pid/$eid is now configuring\n".
+	    "You will be notified via email when the experiment is ".
+	    "ready to use\n";
+	exit(0);
+    }
 }
-
-#
-# We have to disconnect from the caller by redirecting both STDIN and
-# STDOUT away from the pipe. Otherwise the caller (the web server) will
-# continue to wait even though the parent has exited. 
-#
-open(STDIN, "< /dev/null") or
-    die("opening /dev/null for STDIN: $!");
-
-#
-# Create a temporary name for a log file and untaint it.
-#
-$logname = `mktemp /tmp/$pid-$eid.XXXXXX`;
-
-# Note different taint check (allow /).
-if ($logname =~ /^([-\@\w.\/]+)$/) {
-    $logname = $1;
-} else {
-    die "Bad data in $logname";
-}
-
-open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
 #
 # Create a directory structure for the experiment in the project directory.
@@ -176,16 +193,15 @@ if (system("$TB/libexec/mkexpdir $pid $eid") != 0) {
 
 #
 # Copy the nsfile from wherever the web server stuffed it, into the
-# experiment directory.
+# experiment directory. We leave the tempns file around till later.
 #
 if (! chdir("$eiddir/$tbdata")) {
     fatal("Could not chdir to $tbdata in $eiddir: $!\n");
 }
 
-if (system("/bin/cp", "$tempcopy", "$nsfile") != 0) {
-    fatal("Could not copy $tempcopy to $eiddir/$tbdata/$nsfile: $!\n");
+if (system("/bin/cp", "$tempns", "$nsfile") != 0) {
+    fatal("Could not copy $tempns to $eiddir/$tbdata/$nsfile: $!\n");
 }
-unlink("$tempcopy");
 
 #
 # Run the various scripts.
@@ -230,6 +246,14 @@ $expt_created  = $row[1];
 $expt_expires  = $row[2];
 
 print STDOUT "Setup Success\n";
+
+#
+# In batch mode, just exit without sending email. Remove tempns file!
+#
+if ($batch) {
+    unlink("$tempns");
+    exit(0);
+}
 
 #
 # Dump the report file and the log file to the user via email. 
@@ -285,6 +309,7 @@ if (open(IN, "$nsfile")) {
 }
 close(MAIL);
 
+unlink("$tempns");
 unlink("$logname");
 exit 0;
 
@@ -322,6 +347,14 @@ sub fatal()
     }
 
     #
+    # In batch mode, exit. Make sure to delete tempns file. 
+    #
+    if ($batch) {
+	unlink("$tempns");
+	exit(-1);
+    }
+
+    #
     # Send a message to the testbed list. Append the logfile if it got
     # that far.
     # 
@@ -332,13 +365,14 @@ sub fatal()
 
     print MAIL $mesg;
 
-    if (open(IN, "$nsfile")) {
+    if (open(IN, "$tempns")) {
 	print MAIL "\n\n---------\n\n";
 
 	while (<IN>) {
 	    print MAIL "$_";
 	}
 	close(IN);
+	unlink("$tempns");
     }
 
     if (open(IN, "$logname")) {
@@ -351,6 +385,7 @@ sub fatal()
     }
     close(MAIL);
 
+    unlink("$tempns");
     unlink("$logname");
     exit(-1);
 }
@@ -365,4 +400,41 @@ sub tbendit()
 	if (system("$tbdir/tbend -nologfile $pid $eid") != 0) {
 	    print STDOUT "tbend failed!\n";
 	}
+}
+
+#
+# Put ourselves into the background so that caller sees immediate response.
+# Mail notification will happen later.
+# 
+sub background()
+{
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller (the web server) will
+    # continue to wait even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    #
+    # Create a temporary name for a log file and untaint it.
+    #
+    $logname = `mktemp /tmp/start-$pid-$eid.XXXXXX`;
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    } else {
+	die "Bad data in $logname";
+    }
+
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+    return 0;
 }

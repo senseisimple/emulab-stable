@@ -141,7 +141,7 @@ flush();
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $gid tbstopit $exp_pid $exp_eid",
+$result = exec("$TBSUEXEC_PATH $uid $gid webendexp $exp_pid $exp_eid",
  	       $output, $retval);
 
 if ($retval) {

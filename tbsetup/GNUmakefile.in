@@ -11,12 +11,13 @@ include $(OBJDIR)/Makeconf
 SUBDIRS		= checkpass ir ns2ir
 
 BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
-		  os_load savevlans
+		  os_load savevlans startexp endexp
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
-		  os_setup mkexpdir tbdoit tbstopit console_setup
+		  os_setup mkexpdir console_setup \
+		  webstartexp webendexp
 
 LIB_STUFF       = libtbsetup.pm
 

@@ -17,7 +17,7 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-WWWDEFS=name		Specify WWW defintions ("default" default)"
 ac_help="$ac_help
-  --with-TBOPSEMAIL=name	Specify ops email (testbed-ops@fast default)"
+  --with-TBOPSEMAIL=name	Specify ops email (testbed-ops@flux default)"
 ac_help="$ac_help
   --with-LEDA			Specify LEDA path (/usr/testbed default)"
 ac_help="$ac_help
@@ -820,7 +820,7 @@ if test "${with_TBOPSEMAIL+set}" = set; then
 
 else
   
-    TBOPSEMAIL="testbed-ops@fast.cs.utah.edu"
+    TBOPSEMAIL="testbed-ops@flux.cs.utah.edu"
 
 fi
 
@@ -956,7 +956,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
-	tbsetup/sched_reload tbsetup/tbdoit tbsetup/tbstopit \
+	tbsetup/sched_reload \
+	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
 	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ir/handle_virt \
