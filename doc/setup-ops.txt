@@ -46,9 +46,12 @@ the boss setup instructions for more details.)
 Configure the testbed tree. For example, I have the testbed source in ~/testbed,
 and use the ~/tbobj directory to do my builds in.
 
-cd ~/tbobj
+cd ~/tbobj --with-TBDEFS=/path/to/defs/file
 ~/testbed/configure
 gmake ops-install
+
+The defs file you use should be the same one you created for use on your
+boss nodes.
 
 ##### Step 3 - Mail setup
 
