@@ -213,8 +213,11 @@ sub dodelays ()
 	print DEL "sysctl -w net.link.ether.bridge_cfg=${CTLIFACE}:6,";
 
 	foreach $delay (@delays) {
-	    $delay =~ /DELAY INT0=(\w+) INT1=(\w+) DELAY/;
-	    print DEL "$1:$count,$2:$count,";
+	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) DELAY/;
+	    my $iface1 = libsetup::findiface($1);
+	    my $iface2 = libsetup::findiface($2);
+	    
+	    print DEL "$iface1:$count,$iface2:$count,";
 	    $count++;
 	}
 	print DEL "\n";
@@ -226,13 +229,13 @@ sub dodelays ()
 	$pipe  = 100;
 	foreach $delay (@delays) {
 	    $delay =~
-          /DELAY INT0=(\w+) INT1=(\w+) DELAY=(\d+) BW=([\d\.]+) PLR=([\d\.]+)/;
+  /DELAY INT0=([\d\w]+) INT1=([\d\w]+) DELAY=(\d+) BW=([\d\.]+) PLR=([\d\.]+)/;
 
 	    #
-	    # tmcd returns the INTs as fxpX. Nice, eh?
+	    # tmcd returns the INTs as MAC addrs.
 	    # 
-	    $iface1 = $1;
-	    $iface2 = $2;
+	    my $iface1 = libsetup::findiface($1);
+	    my $iface2 = libsetup::findiface($2);
 	    $p1     = $pipe += 10;
 	    $p2     = $pipe += 10;
 	    $delay  = $3;
