@@ -95,7 +95,9 @@ if (mysql_num_rows($query_result) == 0) {
 if (strcmp($approval, "postpone") == 0) {
     if (isset($message) && strcmp($message, "")) {
 	USERERROR("You requested postponement for $pid, but there is a ".
-		  "message in the text box. Is this what you intended?", 1);
+		  "message in the text box which will vanish. If that is ".
+		  "not what you intended, the back button will give you ".
+		  "another chance, with text intact.", 1);
     }
     echo "<p><h3>
              Project approval for project $pid (User: $headuid) was
