@@ -32,6 +32,13 @@ function WRITESIDEBARBUTTON_NEW($text, $base, $link ) {
     echo "<img src=\"/new.gif\" /></td></tr>\n";
 }
 
+# same as above with "cool" gif next to it.
+function WRITESIDEBARBUTTON_COOL($text, $base, $link ) {
+    $link = "$base/$link";
+    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;";
+    echo "<img src=\"/cool.gif\" /></td></tr>\n";
+}
+
 function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
     $link = "$link";
     echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
@@ -74,14 +81,14 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON_ABS("Univ. Kentucky Emulab", $TBDOCBASE,
 			   "http://www.uky.emulab.net");
     
-    WRITESIDEBARBUTTON_NEW("Join Netbed (CD)",
+    WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
 			   $TBDOCBASE, "cdrom.php");
 
     WRITESIDEBARBUTTON("News (August&nbsp;15)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
-    WRITESIDEBARBUTTON_NEW("Papers", $TBDOCBASE, "pubs.php3");
-    WRITESIDEBARBUTTON_NEW("Software", $TBDOCBASE, "software.php3");
+    WRITESIDEBARBUTTON("Papers", $TBDOCBASE, "pubs.php3");
+    WRITESIDEBARBUTTON("Software", $TBDOCBASE, "software.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
     WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
