@@ -53,12 +53,14 @@ elseif (! strcmp($showtype, "batch")) {
     $title  = "Batch";
 }
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
-    $clause = "e.state='$TB_EXPTSTATE_ACTIVE') having (lastswap>=$minidledays";
+    # Don't put active in the clause for same reason as active
+    $clause = "1) having (lastswap>=$minidledays";
     $title  = "Idle";
     $idle = 1;
 }
 else {
-    $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
+    # See active above
+    $clause = "";
     $title  = "Active";
     $active = 1;
 }
@@ -89,7 +91,7 @@ if ($isadmin) {
         $clause = "";
     
     $experiments_result =
-	DBQueryFatal("select pid,eid,expt_head_uid,expt_name, ".
+	DBQueryFatal("select pid,eid,expt_head_uid,expt_name,state, ".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
 		     "(to_days(now())-to_days(expt_swapped)) as lastswap ".
 		     "from experiments as e $clause ".
@@ -103,8 +105,8 @@ else {
     
     $experiments_result =
 	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name, ".
-		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
-		     "from experiments as e ".
+		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ,".
+		     "state from experiments as e ".
 		     "left join group_membership as g on g.pid=e.pid ".
 		     "where g.uid='$uid' $clause ".
 		     "order by $order");
@@ -163,6 +165,7 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	$huid = $row[expt_head_uid];
 	$name = $row[expt_name];
 	$date = $row[d];
+	$state= $row[state];
 	$daysidle=0;
 	
 	if ($isadmin) {
@@ -173,7 +176,7 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 		  continue;
 		$foo = $lastexpnodelogins["date"] . " " .
 		 "(" . $lastexpnodelogins["uid"] . ")";
-	    } elseif (TBExptState($pid,$eid)=="active") {
+	    } elseif ($state=="active") {
 	        $daysidle=$row[lastswap];
 	        $foo = "$date Swapped In";
 	    }
@@ -186,30 +189,33 @@ kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
 	
 	$usage_query =
 	    DBQueryFatal("select nt.class, count(*) from reserved as r ".
-			 "left join nodes as n ".
-			 " on r.node_id=n.node_id ".
-			 "left join node_types as nt ".
-			 " on n.type=nt.type ".
+			 "left join nodes as n on r.node_id=n.node_id ".
+			 "left join node_types as nt on n.type=nt.type ".
 			 "where r.pid='$pid' and r.eid='$eid' ".
 			 "group by nt.class;");
 
 	$usage["pc"]="";
+	$usage["pcRemote"]="";
 	$usage["shark"]="";
 	while ($n = mysql_fetch_array($usage_query)) {
 	  $usage[$n[0]] = $n[1];
 	}
-
-	# in idle or active, skip experiments with no nodes (for now, node==pc)
-	if (($idle || $active) && $usage["pc"]==0) continue;
-
-	$total_pcs += $usage["pc"];
+	$nodes = $usage["pc"] + $usage["pcRemote"];
+	if ($nodes==0) { $nodes = "&nbsp;"; }
+	
+	# in idle, skip experiments with no nodes (for now, node==pc)
+	if ($idle && $usage["pc"]==0) { continue; }
+	if ($active && $nodes==0 && $state!=$TB_EXPTSTATE_ACTIVE &&
+	    $state!=$TB_EXPTSTATE_ACTIVATING) { continue; }
+	
+	$total_pcs += $nodes;
 	$total_sharks += $usage["shark"];
 
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>
-                <td>".$usage["pc"]." &nbsp;</td>\n";
+                <td> $nodes</td>\n";
 
 	if ($isadmin) echo "<td>$foo</td>\n";
 
