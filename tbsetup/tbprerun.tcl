@@ -78,7 +78,7 @@ load $sqldir/sql.so
 
 set lockfile "/usr/testbed/locks/tblock"
 set ns2ir "$scriptdir/ns2ir/parse.tcl"
-set postparse "$scriptdir/ns2ir/postparse.tcl"
+set postparse "$scriptdir/ns2ir/postparse"
 set assign "$scriptdir/ir/assign.tcl"
 set handle_ip "$scriptdir/ir/handle_ip.tcl"
 set handle_os "$scriptdir/ir/handle_os.tcl"
