@@ -243,6 +243,11 @@ function WRITESIDEBAR() {
 				   $TBBASE, "nodecontrol_list.php3");
 		WRITESIDEBARBUTTON("Node Up/Down Status",
 				   $TBDOCBASE, "updown.php3");
+
+		if (ISADMIN($login_uid)) {
+		    WRITESIDEBARBUTTON("Edit Site Variables",
+				       $TBBASE, "editsitevars.php3");
+		}
 		
 		if ($login_status & CHECKLOGIN_CVSWEB) {
 		    WRITESIDEBARBUTTON("CVS Repository",
@@ -330,20 +335,14 @@ function WRITESIDEBAR() {
       echo "</td></tr>\n";
     }
 
-
     #
-    # MOTD. Set this with the webcontrol script.
+    # Login message. Set via 'web/message' site variable
     #
-    $query_result =
-	DBQueryFatal("SELECT message FROM loginmessage");
-    
-    if (mysql_num_rows($query_result)) {
-    	$row = mysql_fetch_row($query_result);
-	$message = $row[0];
-
-	# XXX: make this red and big (like the old one)?
-	WRITESIDEBARNOTICE($message);    
+    $message = TBGetSiteVar("web/message");
+    if (0 != strcmp($message,"")) {
+	WRITESIDEBARNOTICE($message);    	
     }
+
     echo "</table>\n";
 }
 

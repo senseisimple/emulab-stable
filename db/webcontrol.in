@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 
 #
 # EMULAB-COPYRIGHT
@@ -23,6 +23,11 @@ my  $optlist = "m:l:";
 #
 use lib "@prefix@/lib";
 use libdb;
+
+my $TBROOT         = "@prefix@";
+
+# Untaint the path
+$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 
 #
 # Turn off line buffering on output
@@ -72,13 +77,15 @@ if ($setmesg) {
     if ($message eq "") {
 	print "Clearing Web Message of the Day\n";
 
-    	DBQueryFatal("delete from loginmessage");
+	system("setsitevar web/message -");
     }
     else {
-	print "Setting Web Message of the Day to $message\n";
+	print "Setting Web Message of the Day to \"$message\".\n";
 
-	DBQueryFatal("replace into loginmessage (valid, message) ".
-				"values(1, '$message')");
+	$message =~ s|\&|&amp;|g;
+	$message =~ s|\<|&lt;|g;
+
+	system("setsitevar","web/message", $message);
     }
 }
 
@@ -86,12 +93,12 @@ if ($setlogin) {
     if ($logins) {
 	print "Enabling Web Interface logins\n";
 
-    	DBQueryFatal("delete from nologins");
+	system("setsitevar web/nologins -");
     }
     else {
 	print "Disabling Web Interface logins\n";
 
-	DBQueryFatal("replace into nologins (nologins) values(1)");
+	system("setsitevar web/nologins 1");
 
 	#
 	# Find all non admins and log them out.
@@ -108,4 +115,6 @@ if ($setlogin) {
 	}
     }
 }
+
+
 

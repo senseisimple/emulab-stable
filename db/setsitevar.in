@@ -1,0 +1,149 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# usage: setsitevar
+#         - displays list of all sitevar names and values
+#
+#        setsitevar <variablename>
+#         - displays name, description, value, and default for <variablename>
+#
+#        setsitevar <variablename> -
+#         - sets <variablename> to default value
+#
+#        setsitevar <variablename> <newvalue>
+#         - sets <variablename> to <newvalue>
+#
+
+sub usage()
+{
+   print STDOUT "Usage:\n".
+                "setsitevar -h\n".
+		"  - displays this usage information.\n".
+		"\n".  
+                "setsitevar\n".
+		"  - displays list of all sitevar names and values.\n".
+		"\n".  
+		"setsitevar <variablename>\n".
+		"  - displays name, description, value, \n".
+		"    and default value for <variablename>.\n".
+		"\n".
+		"setsitevar <variablename> -\n".
+		"  - sets <variablename> to default value.\n".
+		"\n".
+		"setsitevar <variablename> <newvalue>\n".
+		"  - sets <variablename> to <newvalue>.\n";
+
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+use lib "@prefix@/lib";
+use libdb;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+$name = shift;
+
+if (defined $name && $name eq "-h") {
+    usage();
+}
+
+$value = shift;
+
+shift and usage(); # too many args
+
+if (defined $name)  { $qname  = DBQuoteSpecial($name); }
+if (defined $value) { $qvalue = DBQuoteSpecial($value); }
+
+#
+# Only root or admin types!
+# 
+if (($UID != 0) && (!TBAdmin($UID))) {
+	die("Only root or TB administrators can set site variables.\n");
+}
+
+#
+# Briefly list all sitevars, a la 'set'.
+#
+if (! defined $name) {
+    $result = DBQueryFatal("SELECT name, value, defaultvalue, description ".
+			   "FROM sitevariables ".
+			   "ORDER BY name");
+
+    while (($name, $value, $default, $desc) = 
+	   $result->fetchrow_array()) {
+	if (defined $value) {	    
+	    print "$name\t\"$value\"\n";
+	} else {
+	    print "$name\t\"$default\"(default)\n";
+	}
+    }
+    exit(0);
+}
+
+
+$result = DBQueryFatal("SELECT value, defaultvalue, description ".
+		       "FROM sitevariables ".
+		       "WHERE name=$qname");
+
+if ($result->numrows == 0) {
+    print STDERR "No such sitevar $qname!\n";
+    exit(1);
+}    
+
+($currentvalue, $default, $desc) = $result->fetchrow_array();
+
+#
+# List a specific sitevar in detail
+#
+if (! defined $value) {
+    print "sitevar name:  $name\n".
+	  "description:   $desc\n".
+	  "value:         ";
+    if (defined $currentvalue) {
+	print "\"$currentvalue\"\n";
+    } else {
+	print "<default>\n";
+    }
+    print "default value: \"$default\"\n";
+    exit(0);
+}
+
+#
+# Set a sitevar
+#
+
+#
+# Handle '-' argument
+#
+if ($qvalue eq "'-'") {
+    $qvalue = "NULL";
+}
+
+$result = DBQueryFatal("UPDATE sitevariables ".
+		       "SET value=$qvalue ".
+		       "WHERE name=$qname");
+
+#
+# Warn user if operation was redundant.
+#
+#if ($result->rows == 0) {
+#    print STDERR "Warning: row value same as before\n";
+#}
+
+exit(0);
+
+

@@ -479,28 +479,15 @@ function DOLOGOUT($uid) {
 }
 
 #
-# Primitive "nologins" support.
+# Simple "nologins" support.
 #
 function NOLOGINS() {
     global $CHECKLOGIN_NOLOGINS;
 
-    #
-    # And lastly, check for NOLOGINS! 
-    #
-    if ($CHECKLOGIN_NOLOGINS >= 0)
-	return $CHECKLOGIN_NOLOGINS;
-
-    $query_result =
-	DBQueryFatal("SELECT nologins FROM nologins where nologins=1");
-
-    # No entry
-    if (($row = mysql_fetch_array($query_result)) == 0) {
-	$CHECKLOGIN_NOLOGINS = 0;
+    if ($CHECKLOGIN_NOLOGINS == -1) {
+	$CHECKLOGIN_NOLOGINS = TBGetSiteVar("web/nologins");
     }
-    else {
-	$CHECKLOGIN_NOLOGINS = $row[nologins];
-    }
-
+	
     return $CHECKLOGIN_NOLOGINS;
 }
 

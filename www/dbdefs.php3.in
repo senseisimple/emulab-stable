@@ -1593,6 +1593,62 @@ function TBGetExptIdleIgnore($pid,$eid) {
     return $row[idle_ignore];
 }
 
+
+#
+# Check if a site-specific variable exists. 
+#
+# usage: TBSiteVarExists($name)
+#        returns 1 if variable exists;
+#        returns 0 otherwise.
+#
+function TBSiteVarExists($name)
+{
+    global $lastact_query;
+
+    $name  = addslashes( $name );
+
+    $query_result = 
+	DBQueryFatal("select name from sitevariables ".
+		     "where name='$name'");
+
+    if (mysql_num_rows($query_result) > 0) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+#
+# Get site-specific variable.
+# Get the value of the variable, or the default value if
+# the value is undefined (NULL).
+#
+# usage: TBGetSiteVar($name)
+#        returns value if variable is defined;
+#        dies otherwise.
+#
+function TBGetSiteVar($name)
+{
+    global $lastact_query;
+
+    $name  = addslashes( $name );
+
+    $query_result = 
+	DBQueryFatal("select value, defaultvalue from sitevariables ".
+		     "where name='$name'");
+
+    if (mysql_num_rows($query_result) > 0) {    
+	$row = mysql_fetch_array($query_result);
+
+	$value = $row[value];
+	$defaultvalue = $row[defaultvalue];
+	if (isset($value)) { return $value; }
+	if (isset($defaultvalue)) { return $defaultvalue; }
+    }
+    
+    TBERROR("Attempted to fetch unknown site variable '$name'!");
+}
+
 #
 # DB Interface.
 #

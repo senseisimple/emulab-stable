@@ -132,6 +132,8 @@ use Exporter;
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID TBTipServers
 
+	 TBSiteVarExists TBGetSiteVar
+
 	 TBActivityReport
 	 );
 
@@ -2129,6 +2131,60 @@ sub TBExptDestroy($$)
     return 0;
 }
 
+
+#
+# Check if a site-specific variable exists.
+#
+# usage: TBSiteVarExists($name)
+#        returns 1 if variable exists;
+#        returns 0 otherwise.
+#
+sub TBSiteVarExists($)
+{
+    my($name) = @_;
+
+    $name  = DBQuoteSpecial( $name );
+
+    $query_result = 
+	DBQueryFatal("select name from sitevariables ".
+		     "where name=$name");
+
+    if ($query_result->numrows > 0) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+#
+# Get site-specific variable.
+# Get the value of the variable, or the default value if
+# the value is undefined (NULL).
+#
+# usage: TBGetSiteVar($name)
+#        returns value if variable is defined;
+#        dies otherwise.
+#
+sub TBGetSiteVar($)
+{
+    my($name) = @_;
+
+    $name  = DBQuoteSpecial( $name );
+
+    $query_result = 
+	DBQueryFatal("select value, defaultvalue from sitevariables ".
+		     "where name=$name");
+
+    if ($query_result->numrows > 0) {
+	my($value, $defaultvalue) = $query_result->fetchrow_array;
+
+	if (defined $value) { return $value; }
+	if (defined $defaultvalue) { return $defaultvalue; }
+    }
+    
+    die("*** attempted to fetch unknown site variable $name!");
+}
+
 #
 # List of tables used for experiment removal/backup/restore.
 #
@@ -2148,7 +2204,8 @@ sub TBExptDestroy($$)
 		   "tunnels",
 		   "v2pmap",
 		   "ipport_ranges",
-		   "linkdelays");
+		   "linkdelays",
+		   "portmap");
 
 
 #
