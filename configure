@@ -1244,7 +1244,8 @@ fi
 if test "$enable_windows" = "yes"; then
 	winfiles="os/imagezip/ntfs/GNUmakefile \
                   os/imagezip/ntfs/liblocale/GNUmakefile \
-                  os/imagezip/ntfs/libntfs/GNUmakefile"
+                  os/imagezip/ntfs/libntfs/GNUmakefile \
+		  os/imagezip/fat/GNUmakefile"
 	optional_subdirs="$optional_subdirs";
         WINSUPPORT=1;
 else
@@ -1362,6 +1363,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
+	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
         os/syncd/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
