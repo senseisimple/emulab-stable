@@ -455,6 +455,44 @@ const char *const sys_signame[NSIG] = {
 	"sys",				/* SIGSYS */
 };
 #endif
+#ifdef __CYGWIN__
+#undef NSIG
+#define NSIG 32
+const char *const sys_signame[NSIG] = {
+	"Signal 0",
+	"hup",				/* SIGHUP */
+	"int",				/* SIGINT */
+	"quit",				/* SIGQUIT */
+	"ill",				/* SIGILL */
+	"trap",				/* SIGTRAP */
+	"abrt",				/* SIGABRT */
+	"emt",				/* SIGEMT */
+	"fpe",				/* SIGFPE */
+	"kill",				/* SIGKILL */
+	"bus",				/* SIGBUS */
+	"segv",				/* SIGSEGV */
+	"sys",				/* SIGSYS */
+	"pipe",				/* SIGPIPE */
+	"alrm",				/* SIGALRM */
+	"term",				/* SIGTERM */
+	"urg",				/* SIGURG */
+	"stop",				/* SIGSTOP */
+	"tstp",				/* SIGTSTP */
+	"cont",				/* SIGCONT */
+	"chld",				/* SIGCHLD */
+	"ttin",				/* SIGTTIN */
+	"ttou",				/* SIGTTOU */
+	"io",				/* SIGIO */
+	"xcpu",				/* SIGXCPU */
+	"xfsz",				/* SIGXFSZ */
+	"vtalrm",			/* SIGVTALRM */
+	"prof",				/* SIGPROF */
+	"winch",			/* SIGWINCH */
+	"lost",				/* SIGLOST */
+	"usr1",				/* SIGUSR1 */
+	"usr2",				/* SIGUSR2 */
+};
+#endif
 
 static void
 signal_program(struct proginfo *pinfo, char *args)

@@ -16,8 +16,8 @@ typedef int socklen_t;
 
 #include <sys/types.h>
 #ifndef _WIN32
-#include <sys/socket.h>
-#include <netinet/in.h>
+#  include <sys/socket.h>
+#  include <netinet/in.h>
 #endif
 #include <sys/un.h>
 #include <sys/fcntl.h>
@@ -26,6 +26,9 @@ typedef int socklen_t;
 #include <syslog.h>
 #include <unistd.h>
 #include <signal.h>
+#ifdef __CYGWIN__
+  typedef _sig_func_ptr sig_t;
+#endif /* __CYGWIN__ */
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,25 +38,25 @@ typedef int socklen_t;
 #include <assert.h>
 #include <sys/types.h>
 #ifndef _WIN32
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+#  include <netinet/in.h>
+#  include <arpa/inet.h>
+#  include <netdb.h>
 #endif
 #include "decls.h"
 #include "ssl.h"
 #ifndef STANDALONE
-#include "config.h"
+#  include "config.h"
 #endif
 #ifndef _WIN32
-#undef  BOSSNODE
-#ifndef BOSSNODE
-#include <resolv.h>
-#endif
+#  undef  BOSSNODE
+#  if !defined(BOSSNODE) && !defined(__CYGWIN__)
+#    include <resolv.h>
+#  endif
 #endif
 #include <setjmp.h>
 
 #ifndef KEYFILE
-#define KEYFILE		"/etc/emulab.pkey"
+#  define KEYFILE		"/etc/emulab.pkey"
 #endif
 
 /*
@@ -364,7 +367,6 @@ getbossnode(char **bossnode, int *portp)
 	*bossnode = strdup(BOSSNODE);
 	return 0;
 #else
-	struct hostent	*he;
 	FILE		*fp;
 	char		buf[BUFSIZ], **cp = bossnodedirs, *bp;
 
@@ -415,18 +417,23 @@ getbossnode(char **bossnode, int *portp)
 		}
 	}
 	
-#ifndef _WIN32
-	/*
-	 * Nameserver goo 
-	 */
-	res_init();
-	he = gethostbyaddr((char *)&_res.nsaddr.sin_addr,
-			   sizeof(struct in_addr), AF_INET);
-	if (he && he->h_name) 
-		*bossnode = strdup(he->h_name);
-	else
-#endif
-		*bossnode = strdup("UNKNOWN");
+#  if ! defined(_WIN32) && ! defined(__CYGWIN__)
+	{
+		/*
+		 * Nameserver goo 
+		 */
+		struct hostent	*he;
+		res_init();
+		he = gethostbyaddr((char *)&_res.nsaddr.sin_addr,
+				   sizeof(struct in_addr), AF_INET);
+		if (he && he->h_name) 
+			*bossnode = strdup(he->h_name);
+		else
+			*bossnode = strdup("UNKNOWN");
+		return 0;
+	}
+#  endif
+	*bossnode = strdup("UNKNOWN");
 	return 0;
 #endif
 }
@@ -481,7 +488,7 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 	connected = 1;
 
 	n = 1;
-	if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &n, sizeof(n)) < 0) {
+	if (setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (void *)&n, sizeof(n)) < 0) {
 		perror("setsockopt SO_KEEPALIVE");
 		goto bad;
 	}
@@ -591,7 +598,10 @@ dounix(char *data, int outfd, char *unixpath)
 
 	sunaddr.sun_family = AF_UNIX;
 	strlcpy(sunaddr.sun_path, unixpath, sizeof(sunaddr.sun_path));
-	sunaddr.sun_len = length = SUN_LEN(&sunaddr)+1;
+	length = SUN_LEN(&sunaddr)+1;
+#  ifndef __CYGWIN__
+	sunaddr.sun_len = length;
+#  endif /* __CYGWIN__ */
 
 	/* Create socket from which to read. */
 	sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -693,8 +703,11 @@ beproxy(char *localpath, struct in_addr serverip, char *partial)
 	memset(&sunaddr, 0, sizeof(sunaddr));
 	sunaddr.sun_family = AF_UNIX;
 	strlcpy(sunaddr.sun_path, localpath, sizeof(sunaddr.sun_path));
-	sunaddr.sun_len = SUN_LEN(&sunaddr) + 1;
-	if (bind(sock, (struct sockaddr *)&sunaddr, sunaddr.sun_len) < 0) {
+	length = SUN_LEN(&sunaddr) + 1;
+#  ifndef __CYGWIN__
+	sunaddr.sun_len = length;
+#  endif /* __CYGWIN__ */
+	if (bind(sock, (struct sockaddr *)&sunaddr, length) < 0) {
 		perror("binding unix domain socket");
 		exit(-1);
 	}

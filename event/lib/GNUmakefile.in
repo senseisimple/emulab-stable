@@ -14,7 +14,8 @@ include $(OBJDIR)/Makeconf
 SYSTEM	       := $(shell uname -s)
 LIBS		= libevent.a
 SWIGLIBS        =
-ifneq ($(SYSTEM),Linux)
+# Re-entrant, multi-threaded version on FreeBSD, not on Linux or Windows clients.
+ifeq ($(SYSTEM),FreeBSD)
 LIBS           += libevent_r.a
 SWIGLIBS       += event.so _tbevent.so
 endif

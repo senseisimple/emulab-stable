@@ -40,22 +40,20 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#ifndef __CYGWIN__
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <netinet/in.h>
 #include <net/ethernet.h>
+#include <net/if.h>
+#endif /* __CYGWIN__ */
 #ifdef __FreeBSD__
 #include <err.h>
-#include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
-#endif
-#ifdef linux
-#include <net/if.h>
-#include <string.h>
 #endif
 
 static int	find_iface(char *mac);
@@ -63,7 +61,7 @@ static int	find_iface(char *mac);
 void
 usage()
 {
-	fprintf(stderr, "usage: foo <macaddr>\n");
+	fprintf(stderr, "usage: findif <macaddr>\n");
 	exit(1);
 }
 
@@ -220,3 +218,46 @@ find_iface(char *macaddr)
 	return 1;
 }
 #endif
+
+#ifdef __CYGWIN__
+static int
+find_iface(char *macaddr)
+{
+	FILE *fp = popen("getmac /nh /v /fo csv", "r");
+	char buf[BUFSIZ];
+	
+	while (fgets(buf, BUFSIZ, fp) != NULL) {
+		char *comma1, *comma2, mac[13], *mc;
+		int i;
+
+		/* The first comma-separated field is the name with quotes, and the
+		 * third is the MAC addr, with quotes and dash separators.
+		 */
+		comma1 = index(buf, ',');
+		if ( comma1 == NULL ) continue;	/* Skip blank line. */
+		comma2 = index(comma1+1, ',');
+		if ( comma2 == NULL ) continue;	/* Shouldn't happen. */
+
+		/* The MAC argument we're comparing against has no separators.
+		 * Dump the dashes.
+		 */ 
+		mc = comma2+2;
+		for (i = 0; i < 6; i++ ) {
+			mac[i*2] = *mc++;
+			mac[i*2 + 1] = *mc++;
+			mc++;
+		}
+		mac[12] = '\0';
+		/* printf("%s %s\n", buf, mac); */
+		
+		if (strcasecmp(mac, macaddr) == 0) {
+			*(comma1-1) = '\0';	/* Prune the quotes. */
+			printf("%s\n", buf+1);
+			pclose(fp);
+			return 0;
+		}
+	}
+	pclose(fp);
+	return 1;
+}
+#endif /* __CYGWIN__ */

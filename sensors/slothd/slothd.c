@@ -466,6 +466,16 @@ void get_min_tty_idle(SLOTHD_PACKET *pkt) {
   return;
 }
 
+#ifdef __CYGWIN__
+int
+getloadavg(double loadavg[], int nelem)
+{
+  FILE *f = fopen("/proc/loadavg", "r");
+  fscanf(f, "%lf %lf %lf", &loadavg[0],  &loadavg[1],  &loadavg[2]);
+  fclose(f);
+  return 3;
+}
+#endif /* __CYGWIN__ */
 
 void get_load(SLOTHD_PACKET *pkt) {
 
@@ -542,10 +552,14 @@ int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
 
 void get_packet_counts(SLOTHD_PACKET *pkt) {
 
+#ifndef __CYGWIN__
   int i;
   char *niprog[] = {"netstat", "-ni", NULL};
+#endif /* __CYGWIN__ */
 
   pkt->ifcnt = 0;
+
+#ifndef __CYGWIN__
   if (procpipe(niprog, &get_counters, (void*)pkt)) {
     lwarn("Netinfo exec failed.");
     pkt->ifcnt = 0;
@@ -558,9 +572,11 @@ void get_packet_counts(SLOTHD_PACKET *pkt) {
              pkt->ifaces[i].opkts);
     }
   }
+#endif /* __CYGWIN__ */
   return;
 }
 
+#ifndef __CYGWIN__
 int get_counters(char *buf, void *data) {
 
   SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
@@ -607,7 +623,7 @@ int get_counters(char *buf, void *data) {
   }
   return 0;
 }
-
+#endif /* __CYGWIN__ */
 
 /* XXX change to combine last return value of procfunc with exec'ed process'
    exit status & write macros for access.

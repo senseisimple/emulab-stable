@@ -47,13 +47,20 @@ LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS     += `elvin-config --libs vin4c`
 
-SYSTEM	       := $(shell uname -s)
+SYSTEM   := $(shell uname -s)
 
 ifeq ($(SYSTEM),FreeBSD)
 # FreeBSD
 CFLAGS	 += -DFREEBSD
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DFREEBSD
 LIBS	 += -ll -lcompat
+endif
+
+ifeq ($(SYSTEM),CYGWIN_NT-5.1)
+# Cygwin on  Windows XP - resembles the Linux case.
+CFLAGS	 += -DCYGWIN -DLINUX
+YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DCYGWIN -DLINUX
+LIBS	 += -lfl
 endif
 
 ifeq ($(SYSTEM),Linux)

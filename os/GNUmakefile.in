@@ -28,7 +28,7 @@ control-install:
 	@$(MAKE) -C imagezip install
 
 client:
-ifneq ($(SYSTEM),Linux)
+ifeq ($(SYSTEM),FreeBSD)
 	$(MAKE) -C growdisk client
 endif
 	$(MAKE) -C syncd client
@@ -39,7 +39,7 @@ client-install: client
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
-ifneq ($(SYSTEM),Linux)
+ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
 	$(MAKE) -C growdisk client-install
 endif
@@ -48,12 +48,12 @@ endif
 	$(MAKE) -C genhostsfile client-install
 
 mfs:
-ifneq ($(SYSTEM),Linux)
+ifeq ($(SYSTEM),FreeBSD)
 	$(MAKE) -C imagezip client
 endif
 
 mfs-install: mfs
-ifneq ($(SYSTEM),Linux)
+ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
 	$(MAKE) -C imagezip client-install
 endif
