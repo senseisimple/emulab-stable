@@ -145,7 +145,7 @@ function CHECKLOGIN($uid) {
     # 
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
-		     "       status,admin,cvsweb,g.trust,adminoff,webonly ".
+		     "       status,admin,cvsweb,g.trust,adminoff,webonly " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -275,7 +275,7 @@ function CHECKLOGIN($uid) {
 # message. The modifier allows you to turn off checks for specified
 # conditions. 
 #
-function LOGGEDINORDIE($uid, $modifier = 0) {
+function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     global $TBBASE, $BASEPATH, $HTTP_COOKIE_VARS, $TBNAMECOOKIE;
 
     # If our login is not valid, then the uid is already set to "",
@@ -283,7 +283,15 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
     # uid to hcecklogin, so we can give the right error message.
     if ($uid=="") { $uid=$HTTP_COOKIE_VARS[$TBNAMECOOKIE]; }
 
-    $link = "\n<a href=\"$TBBASE/login.php3?refer=1\">Please ".
+    #
+    # Allow the caller to specify a different URL to direct the user
+    # to
+    #
+    if (!$login_url) {
+	$login_url = "$TBBASE/login.php3?refer=1";
+    }
+
+    $link = "\n<a href=\"$login_url\">Please ".
 	"log in again.</a>\n";
 
     if ($uid == FALSE)
@@ -366,6 +374,31 @@ function ISADMINISTRATOR() {
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
+}
+
+# Is this user a planetlab user?
+# TODO: I'd like to make this much faster since it will happen often. But,
+# can't roll it into $CHECKLOGIN_STATUS, because we need to be able to tell
+# even when they are logged out (ie. we only have their uid cookie)
+function ISPLABUSER() {
+    global $CHECKLOGIN_STATUS;
+
+    $uid = GETUID();
+    if (!$uid) {
+	return 0;
+    }
+    $query_result =
+	DBQueryFatal("SELECT plab_user FROM users WHERE uid='$uid'");
+    if (!mysql_num_rows($query_result)) {
+	return 0;
+    }
+
+    $row = mysql_fetch_row($query_result);
+    if ($row[0]) {
+	return 1;
+    } else {
+	return 0;
+    }
 }
 
 #
