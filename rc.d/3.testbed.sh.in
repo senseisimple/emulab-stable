@@ -17,6 +17,11 @@ if [ -x @prefix@/sbin/proxydhcp.restart  ]; then
 	@prefix@/sbin/proxydhcp.restart
 fi
 
+if [ -x @prefix@/sbin/capserver  ]; then
+        echo -n " capd"
+        @prefix@/sbin/capserver
+fi
+
 if [ -x /usr/site/etc/capture.rc -a -d /var/log/tiplogs ]; then
 	echo -n " capture"
 	/usr/site/etc/capture.rc
