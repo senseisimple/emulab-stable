@@ -684,20 +684,20 @@ sub TBExptAccessCheck($$$$)
     # An experiment may be destroyed by the experiment creator or the
     # project/group leader.
     # 
-    if ($access_type == TB_EXPT_DESTROY) {
-	if ($uid eq $creator) {
-	    return 1;
-	}
-	$mintrust = PROJMEMBERTRUST_GROUPROOT;
-    }
-    elsif ($access_type == TB_EXPT_READINFO) {
+    if ($access_type == TB_EXPT_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER;
     }
     else {
 	$mintrust = PROJMEMBERTRUST_LOCALROOT;
     }
 
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other people's experiments, including
+    # those in groups they do not belong to.
+    #
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
 }
 
 #
@@ -735,19 +735,26 @@ sub TBNodeAccessCheck($$@)
 
     foreach my $node (@nodelist) {
 	my $query_result =
-	    DBQueryFatal("select trust from reserved as n ".
+	    DBQueryFatal("select e.pid,e.gid from reserved as r ".
 			 "left join experiments as e on ".
-			 "     e.pid=n.pid and e.eid=n.eid ".
-			 "left join group_membership as g on ".
-			 "     g.pid=e.pid and g.gid=e.gid ".
-			 "where g.uid='$uid' and n.node_id='$node'");
+			 "     e.pid=r.pid and e.eid=r.eid ".
+			 "where r.node_id='$node'");
 
 	if ($query_result->numrows == 0) {
 	    return 0;
 	}
 	my @row = $query_result->fetchrow_array();
+	my $pid = $row[0];
+	my $gid = $row[1];
 
-	if (! TBMinTrust($row[0], $mintrust)) {
+	#
+	# Either proper permission in the group, or group_root in the
+	# project. This lets group_roots muck with other people's
+	# nodes, including those in groups they do not belong to.
+	#
+	if (! TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) &&
+	    ! TBMinTrust(TBGrpTrust($uid, $pid, $pid),
+			 PROJMEMBERTRUST_GROUPROOT)) {
 	    return 0;
 	}
     }
@@ -792,7 +799,7 @@ sub TBOSIDAccessCheck($$$)
     my $shared = $row[1];
 
     #
-    # Global OSIDs can be read by anyone.
+    # Global OSIDs can be read by anyone, but must be admin to read. 
     # 
     if ($shared) {
 	if ($access_type == TB_OSID_READINFO) {
@@ -865,7 +872,7 @@ sub TBImageIDAccessCheck($$$)
     }
 
     #
-    # Otherwise must have proper trust in the project.
+    # Otherwise must have proper trust in the pid/gid
     # 
     if ($access_type == TB_IMAGEID_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER;
@@ -880,7 +887,13 @@ sub TBImageIDAccessCheck($$$)
 	$mintrust = PROJMEMBERTRUST_LOCALROOT;
     }
 
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other people's experiments, including
+    # those in groups they do not belong to.
+    #
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
 }
 
 #
@@ -2060,9 +2073,9 @@ sub TBExptCreateLogFile($$$)
 	    "    Bad data in logfile name: $logname");
     }
 
-    chmod(0640, $logname) or
+    chmod(0664, $logname) or
 	die("*** $0:\n".
-	    "    Could not chmod $logname to 0640: $!\n");
+	    "    Could not chmod $logname to 0644: $!\n");
 
     return $logname;
 }

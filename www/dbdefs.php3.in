@@ -324,16 +324,17 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	if (strcmp($gid, $pid) == 0)  {
 	    #
 	    # Only project_root can bestow group_root in default group, and
-	    # we already established that they're not project_root, so fail.
+	    # we already established that they are not project_root, so fail.
 	    #
 	    return 0;
-	} 
+	}
 	else {
 	    #
 	    # Non-default group.
 	    # group_root in default group may bestow group_root.
 	    #
-	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
+	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
+			   $TBDB_TRUST_GROUPROOT)) {
 		return 1;
 	    }
 
@@ -455,7 +456,6 @@ function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
 	    }
 	}
     }
-
     return 1;
 }
 
@@ -523,17 +523,18 @@ function TBExptAccessCheck($uid, $pid, $eid, $access_type)
     if ($access_type == $TB_EXPT_READINFO) {
 	$mintrust = $TBDB_TRUST_USER;
     }
-    elseif ($access_type == $TB_EXPT_UPDATEACCOUNTS) {
-	if (strcmp($uid, $head))
-	    $mintrust = $TBDB_TRUST_GROUPROOT;
-	else
-	    return 1;
-    }
     else {
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
 
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other peoples experiments, including
+    # those in groups they do not belong to.
+    #
+
+   return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
 }
 
 #
@@ -562,18 +563,17 @@ function TBNodeAccessCheck($uid, $node_id, $access_type)
     }
 
     $query_result =
-	DBQueryFatal("select node_id,trust from reserved as n ".
+	DBQueryFatal("select e.pid,e.gid from reserved as r ".
 		     "left join experiments as e on ".
-		     "     e.pid=n.pid and e.eid=n.eid ".
-		     "left join group_membership as g on ".
-		     "     g.pid=e.pid and g.gid=e.gid ".
-		     "where g.uid='$uid' and n.node_id='$node_id'");
+		     "     e.pid=r.pid and e.eid=r.eid ".
+		     "where r.node_id='$node_id'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
-    $foorow = mysql_fetch_array($query_result);
-    $trust  = $foorow[trust];
+    $row = mysql_fetch_array($query_result);
+    $pid = $row[pid];
+    $gid = $row[gid];
 
     if ($access_type == $TB_NODEACCESS_READINFO) {
 	$mintrust = $TBDB_TRUST_USER;
@@ -581,8 +581,8 @@ function TBNodeAccessCheck($uid, $node_id, $access_type)
     else {
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
-
-    return TBMinTrust($trust, $mintrust);
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
 }
 
 #
@@ -604,6 +604,13 @@ function TBUserInfoAccessCheck($uid, $target_uid, $access_type)
     }
 
     if (strcmp($uid, $target_uid) == 0) {
+	return 1;
+    }
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (ISADMIN($uid)) {
 	return 1;
     }
 
@@ -759,7 +766,8 @@ function TBImageIDAccessCheck($uid, $imageid, $access_type)
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
 
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
 }
 
 #
