@@ -12,7 +12,7 @@ my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
-my $HISTORY     = "/root/.bash_history";
+my $HISTORY     = "/.bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
 
 #
