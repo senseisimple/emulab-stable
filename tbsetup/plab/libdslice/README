@@ -1,0 +1,5 @@
+These files come from the dslice project in the planetlab repository on
+SourceForge (http://sf.net/projects/planetlab).  They are in the
+lib/python2.2 directory.  The M2Crypto libraries are not here because
+they have to be installed on the base system (because they involve
+binaries that are built for Linux in dslice's CVS repository)
