@@ -683,7 +683,6 @@
     href="tutorial/tutorial.php3#CustomOS">Custom OS</a> section of
     the <a href = "tutorial/tutorial.php3">Emulab Tutorial.</a>
     </p>
-</ul>
 
 <li><a NAME="SWS-8"></a>
     <h3>What if I need more disk space on my nodes?</h3>
@@ -698,26 +697,53 @@
 	    mount /dev/hda4 /mnt;
 	</code>
     </blockquote>
-
     This partition is only 6 Gigs, the size of the leftover space on our
     smallest drives. If you need more space than this, it would be possible
     to enlarge this partition on some machines (for example, our pc850s
     have 40 GB disks,) but that is outside the scope of this FAQ.
     </p>
-</ul>
 
 <li><a NAME="SWS-9"></a>
     <h3>Are there testbed-specific daemons that could interfere with my
 	experiment?</h3>
     <p>
-    The only daemon that the testbed adds to the OS's standard set is
-    <code>healthd</code>. This daemon periodically polls things such as 
-    motherboard/CPU temperature and fan speed, and reports them back to
-    our <code>boss</code> node. We have picked a large polling interval
-    (five minutes) to minimize the impact on nodes. If you are worried
-    about side effects, however, you can safely kill it off.
-    <code>healthd</code> is stared by <code>/etc/testbed/rc.healthd</code> .
+    By default, the testbed startup scripts currently start two daemons in 
+    addition to the OS's standard set:
     </p>
+
+    <p>
+    <blockquote>
+    <li><code>healthd</code> - A low overhead hardware health monitor.
+    </blockquote>
+    </p>
+
+    <p> 
+    This deamon periodically polls the machine's health monitoring
+    hardware and sends this information back to our <code>boss</code>
+    node for analysis.  The hardware is polled once per second, and a
+    status datagram is sent out once every five minutes.
+    <code>Healthd</code>'s overhead is quite low, but it can be safely
+    killed and disabled from startup if you're worried about possible
+    side effects.  It is started by <code>/etc/testbed/rc.healthd</code>.
+    </p>
+
+    <p>
+    <blockquote>
+    <li><code>slothd</code> - A low overhead usage analysis tool.
+    </blockquote>
+    </p>
+
+    <p>
+    <code>Slothd</code> is important to efficient testbed utilization
+    and should run on every node whenever possible.  Its overhead is
+    almost negligible (essentially like running 'ls -l /dev' once per
+    hour), and should not interfere with your work.  However if your
+    experiment is exceptionally sensitive, then you may arrange with
+    us to disable <code>slothd</code>.  Please note that we will
+    restart this daemon if it is not running unless prior arrangements
+    have been made.
+    </p>
+
     <p>
     If you have requested automatic routing on your nodes with the 
     <code>tb-set-ip-routing</code> command in your NS file, this will
