@@ -21,6 +21,7 @@ if {[file dirname [info script]] == "."} {
 }
 set ns2ir "$updir/ir/ns2ir/parse.tcl"
 set assign "$updir/ir/assign.tcl"
+set handle_ip "$updir/ir/handle_ip.tcl"
 
 if {$argc != 1} {
     puts stderr "Syntax: $argv0 <ns-file>"
@@ -68,6 +69,12 @@ if {[catch "exec $assign $irFile >@ $logFp 2>@ $logFp" err]} {
 }
 
 outs "PLACEHODLER - Reserving resources."
+
+outs "Allocating IP addresses."
+if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error allocating IP addresses. ($err)"
+    exit 1
+}
 
 outs "Setup finished - $irFile generated."
 

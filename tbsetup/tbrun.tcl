@@ -72,7 +72,7 @@ if {[catch "exec $snmpit -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
 outs "PLACEHOLDER - Verifying virtual network."
 outs "PLACEHOLDER - Copying disk images."
 outs "PLACEHOLDER - Booting for the first time."
-outs "PLACEHOLDER - Verifyin OS functionality."
+outs "PLACEHOLDER - Verifying OS functionality."
 outs "PLACEHOLDER - Setting up interfaces."
 outs "PLACEHOLDER - Installing secondary pacakages."
 outs "PLACEHOLDER - Rebooting."
