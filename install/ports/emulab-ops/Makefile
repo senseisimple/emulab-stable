@@ -12,12 +12,12 @@ EXTRACT_ONLY=	#none
 MAINTAINER=	ricci@cs.utah.edu
 
 LIB_DEPENDS= lthread.2:${PORTSDIR}/devel/linuxthreads \
-	vin4.2:${PORTSDIR}/misc/libelvin \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource
+	vin4.2:${PORTSDIR}/misc/libelvin
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	sudo:${PORTSDIR}/security/sudo \
-	otcl:${PORTSDIR}/lang/otcl
+	otcl:${PORTSDIR}/lang/otcl \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource
 
 NO_BUILD=	yes
 
