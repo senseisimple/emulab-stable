@@ -1,0 +1,141 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# idletimes - show how long nodes/expts have been idle
+
+# Configure variables
+use lib '@prefix@/lib';
+use libdb;
+use English;
+use Getopt::Std;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Defaults
+my $defidlehours = 2;
+
+# Don't put 'my' on these, or they won't be settable with ${$var}
+$h = 0; # help mode
+$d = 0; # debug mode
+$a = 0; # show all
+$n = 0; # show nodes
+$t = $defidlehours; # Threshold idle time
+
+print "Got ARGV = ",join(" ",@ARGV),"\n" if $d;
+
+sub help {
+    die("Usage:
+idletimes [-h] [-d] [-a] [-n] [-t hrs]
+ -h	Show this help message
+ -d	Enable debugging/verbose output
+ -a	Show all expts (or nodes with -n)
+ -n	Show nodes instead of experiments
+ -t hrs	Threshold idle time (in hours, default $defidlehours)
+Note: idletimes shows experiments that are set to idle_ignore.
+");
+}
+
+my $optlist = "hdant:";
+my %opt = ();
+if (! getopts($optlist,\%opt)) { help(); }
+# Copy the options into global vars
+foreach $var (keys %opt) {
+    ${$var} = $opt{$var};
+    print "\$$var = $opt{$var} (".${$var}.")\n" if $d;
+}
+
+print "Settings: h=$h  d=$d  a=$a  n=$n  t=$t\n" if $d;
+
+if ($h) { help(); }
+
+# Only root or admin types!
+if (($UID != 0) && (!TBAdmin($UID))) {
+    die("Only root or TB administrators can run idletimes.\n");
+}
+
+# Construct the query
+my $lastact_query = "greatest(last_tty_act, last_net_act, ".
+  "last_cpu_act, last_ext_act)";
+my $sql = "";
+if (!$n) {
+    $sql .= "select pid, eid, last_report,
+max(last_tty_act) as last_tty_act, max(last_net_act) as last_net_act,
+max(last_cpu_act) as last_cpu_act, max(last_ext_act) as last_ext_act,
+max($lastact_query) as last_act, round((unix_timestamp(now()) -
+unix_timestamp(max($lastact_query)))/3600,2) as idle_time,
+count(r.node_id) as nodes
+from node_activity as n left join reserved as r on n.node_id=r.node_id
+where pid is not null and eid is not null
+group by pid,eid order by pid,eid";
+} else {
+    $sql .= "select pid, eid, n.node_id, last_report,
+last_tty_act, last_net_act, last_cpu_act, last_ext_act,
+ $lastact_query as last_act, round((unix_timestamp(now()) -
+unix_timestamp($lastact_query))/3600,2) as idle_time
+from node_activity as n left join reserved as r on n.node_id=r.node_id
+where pid is not null and eid is not null
+order by pid,eid,n.node_id";
+}
+
+my $q = DBQueryFatal($sql);
+
+if ($d) { print $q->as_string; $q->dataseek(0); }
+
+if (!$n) {
+    $FORMAT_NAME = "ByExpt";
+    print <<EOT;
+PID          EID          Nodes  HrsIdle     Last Activity     Act. type
+------------------------------------------------------------------------
+EOT
+} else {
+    $FORMAT_NAME = "ByNode";
+    print <<EOT;
+PID          EID          NodeId  HrsIdle     Last Activity     Act. type
+-------------------------------------------------------------------------
+EOT
+}
+
+format ByExpt =
+@<<<<<<<<<<< @<<<<<<<<<<<<< @##  @##.##   @<<<<<<<<<<<<<<<<<<  @<<<<<<<<<<<<<<
+$pid,        $eid,       $nodes, $time,   $act,                $typestr
+.
+
+format ByNode =
+@<<<<<<<<<<< @<<<<<<<<<<<<< @<<<< @##.##   @<<<<<<<<<<<<<<<<<<  @<<<<<<<<<<<<<<
+$pid,        $eid,          $id,  $time,   $act,                $typestr
+.
+
+
+
+while (%r = $q->fetchhash()) {
+    $pid = $r{'pid'};
+    $eid = $r{'eid'};
+    #rep = $r{'last_report'};
+    $tty = $r{'last_tty_act'};
+    $net = $r{'last_net_act'};
+    $cpu = $r{'last_cpu_act'};
+    $ext = $r{'last_ext_act'};
+    $act = $r{'last_act'};
+    $time= $r{'idle_time'};
+    $nodes=0;
+    $id="";
+    if (!$n) { $nodes = $r{'nodes'}; }
+    else { $id = $r{'node_id'}; }
+    %type = ();
+    if ($tty eq $act) { $type{"tty"} = 1; }
+    if ($net eq $act) { $type{"net"} = 1; }
+    if ($cpu eq $act) { $type{"cpu"} = 1; }
+    if ($ext eq $act) { $type{"ext"} = 1; }
+    $typestr = join(",",keys %type);
+
+    if (!$a && ($time < $t)) { next; }
+    write();
+}
+
+exit(0);
