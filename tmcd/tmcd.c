@@ -893,14 +893,16 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * join is to get the type out so that we can pass it back. Of
 	 * course, this assumes that the type is the BSD name, not linux.
 	 */
-	res = mydb_query("select i.MAC,j.MAC,delay,bandwidth,lossrate "
-                         " from delays "
+	res = mydb_query("select i.MAC,j.MAC, "
+			 "pipe0,delay0,bandwidth0,lossrate0, "
+			 "pipe1,delay1,bandwidth1,lossrate1 "
+                         " from delays as d "
 			 "left join interfaces as i on "
-			 " i.node_id=delays.node_id and i.iface=iface0 "
+			 " i.node_id=d.node_id and i.iface=iface0 "
 			 "left join interfaces as j on "
-			 " j.node_id=delays.node_id and j.iface=iface1 "
-			 " where delays.node_id='%s'",	 
-			 5, nodeid);
+			 " j.node_id=d.node_id and j.iface=iface1 "
+			 " where d.node_id='%s'",	 
+			 10, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "DELAY: %s: DB Error getting delays!",
 		       nodeid);
@@ -925,9 +927,12 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			return 1;
 		}
 
-		sprintf(buf,
-			"DELAY INT0=%s INT1=%s DELAY=%s BW=%s PLR=%s\n",
-			row[0], row[1], row[2], row[3], row[4]);
+		sprintf(buf, "DELAY INT0=%s INT1=%s "
+			"PIPE0=%s DELAY0=%s BW0=%s PLR0=%s "
+			"PIPE1=%s DELAY1=%s BW1=%s PLR1=%s\n",
+			row[0], row[1],
+			row[2], row[3], row[4], row[5],
+			row[6], row[7], row[8], row[9]);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
@@ -945,7 +950,7 @@ static int
 dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 
-	char *tmp, *buf, *vname_list;
+	char *tmp, buf[MYBUFSIZE], *vname_list;
 	char pid[64], eid[64];
 	char		gid[64];
 	char nickname[128]; /* XXX: Shouldn't be statically sized, potential buffer

@@ -750,11 +750,15 @@ foreach $vlan (keys(%vlans)) {
 foreach $delay (keys(%delays)) {
     ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate) = 
 	@{$delays{$delay}};
+    my $pipe0 = 100 + (10 * $delay);
+    my $pipe1 = $pipe0 + 10;
     DBQueryFatal("insert into delays" .
-	     " (pid,eid,node_id,iface0,iface1" .
-	     ",delay,bandwidth,lossrate,vname)" .
-	     " values (\"$pid\",\"$eid\",\"$pnode\",\"$int0\",\"$int1\"".
-	     ",$delay,$bandwidth,$lossrate,\"$vname\")");
+	     " (pid,eid,node_id,vname,iface0,iface1" .
+	     ",pipe0,delay0,bandwidth0,lossrate0" .
+	     ",pipe1,delay1,bandwidth1,lossrate1)" .
+	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
+	     ",$pipe0,$delay,$bandwidth,$lossrate".
+	     ",$pipe1,$delay,$bandwidth,$lossrate)");
 }
 DBQueryFatal("delete from portmap where pid=\"$pid\" and eid=\"$eid\"");
 foreach $vnodeport (keys(%portmap)) {

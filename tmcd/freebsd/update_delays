@@ -1,0 +1,23 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/testbed";
+use libsetup;
+
+#
+# Update the delays configuration. This routine will also run the
+# the commands to make the changes.
+#
+liblocsetup::update_delays();
+
+exit 0;

@@ -10,7 +10,7 @@ use Exporter;
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod
-	 os_rpminstall_line
+	 os_rpminstall_line update_delays
        );
 
 # Must come after package declaration!
@@ -189,6 +189,15 @@ sub os_setup()
     print STDOUT "Checking Testbed delay configuration ... \n";
     dodelays();
 }
+
+#
+# Special update.
+#
+sub update_delays()
+{
+    dodelays();
+    system($TMDELAY);
+}
     
 sub dodelays ()
 {
@@ -210,13 +219,13 @@ sub dodelays ()
 	print DEL "#!/bin/sh\n";
 	print DEL "sysctl -w net.link.ether.bridge=0\n";
 	print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
-	print DEL "sysctl -w net.link.ether.bridge_cfg=${CTLIFACE}:6,";
+	print DEL "sysctl -w net.link.ether.bridge_cfg=";
 
 	foreach $delay (@delays) {
-	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) DELAY/;
+	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
 	    my $iface1 = libsetup::findiface($1);
 	    my $iface2 = libsetup::findiface($2);
-	    
+
 	    print DEL "$iface1:$count,$iface2:$count,";
 	    $count++;
 	}
@@ -226,29 +235,26 @@ sub dodelays ()
 	print DEL "ipfw -f flush\n";
 
 	$count = 69;
-	$pipe  = 100;
 	foreach $delay (@delays) {
-	    $delay =~
-  /DELAY INT0=([\d\w]+) INT1=([\d\w]+) DELAY=(\d+) BW=([\d\.]+) PLR=([\d\.]+)/;
+	    $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
+	    $pat .= q(PIPE0=(\d+) DELAY0=(\d+) BW0=([\d\.]+) PLR0=([\d\.]+) );
+	    $pat .= q(PIPE1=(\d+) DELAY1=(\d+) BW1=([\d\.]+) PLR1=([\d\.]+));
+	    
+	    $delay =~ /$pat/;
 
 	    #
 	    # tmcd returns the INTs as MAC addrs.
 	    # 
 	    my $iface1 = libsetup::findiface($1);
 	    my $iface2 = libsetup::findiface($2);
-	    $p1     = $pipe += 10;
-	    $p2     = $pipe += 10;
-	    $delay  = $3;
-	    $bandw  = $4;
-	    $plr    = $5;
-
-	    #
-	    # We want to know what the minimum delay is so we can boot the
-	    # the correct kernel.
-	    # 
-	    if ($delay < $mindelay) {
-		$mindelay = $delay;
-	    }
+	    $p1        = $3;
+	    $delay1    = $4;
+	    $bandw1    = $5;
+	    $plr1      = $6;
+	    $p2        = $7;
+	    $delay2    = $8;
+	    $bandw2    = $9;
+	    $plr2      = $10;
 
 	    print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex";
 	    print DEL "\n";
@@ -256,13 +262,15 @@ sub dodelays ()
 	    print DEL "\n";
 	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
 	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
-	    print DEL "ipfw pipe $p1 config delay ${delay}ms ";
-	    print DEL "bw ${bandw}Mbit/s plr $plr\n";
-	    print DEL "ipfw pipe $p2 config delay ${delay}ms ";
-	    print DEL "bw ${bandw}Mbit/s plr $plr\n";
+	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
+	    print DEL "bw ${bandw1}Mbit/s plr $plr1\n";
+	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
+	    print DEL "bw ${bandw2}Mbit/s plr $plr2\n";
 
-	    print STDOUT "  $iface1/$iface2 pipe $p1/$p2 config delay ";
-	    print STDOUT "${delay}ms bw ${bandw}Mbit/s plr $plr\n";
+	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
+	    print STDOUT "${delay1}ms bw ${bandw1}Mbit/s plr $plr1\n";
+	    print STDOUT "  $iface1/$iface2 pipe $p2 config delay ";
+	    print STDOUT "${delay2}ms bw ${bandw2}Mbit/s plr $plr2\n";
     
 	    $count++;
 	}
