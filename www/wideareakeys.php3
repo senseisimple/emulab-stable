@@ -95,15 +95,8 @@ if (isset($deletekey)) {
     DBQueryFatal("delete from widearea_privkeys where privkey='$deletekey'");
 
     if (isset($nodeid) && $nodeid) {
-	DBQueryFatal("delete from widearea_nodeinfo where node_id='$nodeid'");
-	DBQueryFatal("delete from widearea_accounts where node_id='$nodeid'");
-	DBQueryFatal("delete from interfaces where node_id='$nodeid'");
-	DBQueryFatal("delete from nodes where node_id='$nodeid'");
-	DBQueryFatal("delete from nodes where phys_nodeid='$nodeid'");
-	DBQueryFatal("delete from node_status where node_id='$nodeid'");
-	DBQueryFatal("delete from reserved where node_id='$nodeid'");
-	DBQueryFatal("delete from node_auxtypes where node_id='$nodeid'");
-	DBQueryFatal("delete from node_activity where node_id='$nodeid'");
+	$retval = SUEXEC($uid, $TBADMINGROUP, "webdeletenode -b $nodeid",
+			 SUEXEC_ACTION_DIE);
     }
     header("Location: wideareakeys.php3");
 }
