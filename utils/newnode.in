@@ -30,8 +30,6 @@ my $nfree = "$TB/bin/nfree";
 my $dhcpd_makeconf = "$TB/sbin/dhcpd_makeconf";
 my $exports_setup = "$TB/sbin/exports_setup";
 
-my $dhcpd_conf = "/usr/local/etc/dhcpd.conf";
-my $dhcpd_template = "/usr/local/etc/dhcpd.conf.template";
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 
 my $sudo = "/usr/local/bin/sudo -S";
@@ -105,17 +103,6 @@ if (@ARGV < 1) {
 #
 if (system "$sudo /bin/pwd < /dev/null") {
     die "You must be able to sudo to root to use this script\n";
-}
-
-#
-# Make sure that the dhcpd template file exists, and that the real version
-# is writable
-#
-if (!-e $dhcpd_template) {
-    die "In order to use this script, $dhcpd_template must exist!\n";
-}
-if (!-w $dhcpd_conf) {
-    die "In order to use this script, you must be able to write $dhcpd_conf\n";
 }
 
 #
@@ -427,13 +414,9 @@ if (!@succeeded_nodes) {
 # Re-generate dhcpd.conf
 #
 print "Re-generating dhcpd.conf\n";
-open(CONF,"$dhcpd_makeconf $dhcpd_template|") or die "Unable to fork: $!\n";
-my @conf = <CONF>;
-close CONF or die "Error reading from dhcpd_makeconf: $!\n";
-
-open(CONF,">$dhcpd_conf") or die "Unable to open $dhcpd_conf for writing\n";
-print CONF @conf;
-close CONF;
+if (system("$dhcpd_makeconf -i")) {
+    die "Unable to open regenerate dhcpd config file\n";
+}
 
 print "Restarting dhcpd: $sudo $dhcpd_rc stop\n";
 my $sudo_rv = system "$sudo $dhcpd_rc stop";

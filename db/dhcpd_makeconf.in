@@ -1,103 +1,268 @@
-#!/usr/bin/perl -w
-
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use English;
 use Getopt::Std;
+use Fcntl ':flock';
 
 #
 # dhcpd_makeconf - helper script to create dhcpd.conf files from the database.
 # The template file should look like an ordinary dhcpd.conf file, but have
 # the string %%nodetype=<type> where you want entries for a set of nodes
-# filled out. For example:
+# filled out. See the template file in the dhcp directory for an example.
 #
-# subnet 155.101.132.0 netmask 255.255.252.0 {
-#	option  routers                 155.101.132.1;
-#	option subnet-mask		255.255.252.0;
-#
-#	option dhcp-class-identifier "PXEClient";
-#
-#	# testbed PCs
-#	group {
-#		option dhcp-class-identifier "PXEClient";
-#
-#		%%nodetype=pc600
-#
-#		%%nodetype=pc850
-#
-#	}
-# }
-#
-# There is an example template file in the CVS repository, in the dhcpd/
-# directory.
-#
-
+sub usage {
+    print "Usage: $0 [-h] [-v] [-i] [-t <templatefile>]\n";
+    print "-h	Show this message\n";
+    print "-v	Use virtual names, when possible, for hostnames\n";
+    print "-i 	Install new config file to standard location.\n";
+    print "Without -i, spits out a dhcpd config file on stdout, as in:\n";
+    print "  $0 > dhcpd.conf\n";
+    exit(1);
+}
+my $optlist = "ihvt:";
+my $install = 0;
+my $vnames  = 0;
 
 #
 # Configure variables
 #
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
 use lib "@prefix@/lib";
 use libdb;
+use libtestbed;
 
-my %opt = ();
-getopts("hv",\%opt);
-if ($opt{h}) { exit &usage; }
+my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
+my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
+my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
+my $lockfile	    = "/var/tmp/testbed_dhcpd_lockfile";
+my %bossnodes	    = ();
+my $template        = $DHCPD_TEMPLATE;
+my $outfile	    = "/tmp/dhcpd_makeconf.$$";
+my $OUT		    = *STDOUT; 
 
-$infile = shift @ARGV || exit &usage;
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"i"})) {
+    $install = 1;
 
-open(IF,"<$infile") or die "Unable to open $infile for reading\n";
+    # We don't want to run this script unless its the real version.
+    if ($EUID != 0) {
+	die("*** $0:\n".
+	    "    Must be root! Maybe its a development version?\n");
+    }
+}
+if (defined($options{"h"})) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $vnames = 1;
+}
+if (defined($options{"t"})) {
+    $template = $options{"t"};
+
+    #
+    # Untaint argument; Allow slash.
+    #
+    if ($template =~ /^([-\w\.\/]+)$/) {
+	$template = $1;
+    }
+    else {
+	die("Tainted template name: $template\n");
+    }
+}
+
+#
+# If we are going to actually install this file, must serialize to
+# avoid a trashed config file. Use a dummy file in /var/tmp, opened for
+# writing and flock'ed.
+#
+if ($install) {
+    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+    my $count = 0;
+    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+	#
+	# If we don't get it the first time, we wait for:
+	# 1) The lock to become free, in which case we do our thing
+	# 2) The time on the lock to change, in which case we wait for
+	#    that process to finish
+	#
+	my $oldlocktime = (stat(LOCK))[9];
+	my $gotlock = 0;
+	while (1) {
+	    print "Another dhcpd config update in progress, ".
+		"waiting for it to finish\n";
+	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		# OK, got the lock, we can do what we're supposed to
+		$gotlock = 1;
+		last;
+	    }
+	    my $locktime = (stat(LOCK))[9];
+	    if ($locktime != $oldlocktime) {
+		$oldlocktime = $locktime;
+		last;
+	    }
+	    if ($count++ > 30)  {
+		fatal("Could not get the lock after a long time!\n");
+	    }
+	    sleep(1);
+	}
+
+	$count = 0;
+	#
+	# If we didn't get the lock, wait for the processes that did to finish
+	#
+	if (!$gotlock) {
+	    while (1) {
+		if ((stat(LOCK))[9] != $oldlocktime) {
+		    exit(0);
+		}
+		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		    close(LOCK);
+		    exit(0);
+		}
+		if ($count++ > 30)  {
+		    fatal("Process with the lock didn't finish after a ".
+			  "long time!\n");
+		}
+		sleep(1); 
+	    }
+	}
+    }
+    #
+    # Perl-style touch(1)
+    #
+    my $now = time;
+    utime $now, $now, $lockfile;
+
+    #
+    # Open temporary output file.
+    # 
+    open(OF, ">$outfile") or
+	fatal("Could not open $outfile\n");
+    $OUT = *OF;
+}
+
+open(IF,"<$template") or
+    fatal("Unable to open $template for reading");
 while (<IF>) {
 	if (/^(\s*)\%\%nodetype=(\w+)/) {
 		my $spaces = $1;
 		my $nodetype = $2;
-		my $query = "SELECT n.node_id, i.IP, i.MAC ";
-		if ($opt{v}) {
-			$query .= ", r.vname ";
+		my $query_result =
+		    DBQueryWarn("select n.node_id,i.IP,i.MAC,r.pid,r.eid, ".
+				"       r.vname,v.inner_elab_role ".
+				"from nodes as n ".
+				"left join interfaces as i on ".
+				"     n.node_id=i.node_id ".
+				"left join node_types as t on n.type=t.type ".
+				"left join reserved as r on ".
+				"     n.node_id=r.node_id ".
+				"left join virt_nodes as v on ".
+				"     v.vname=r.vname and ".
+				"     v.pid=r.pid and v.eid=r.eid ".
+				"where (n.type='$nodetype' or ".
+				"       t.class='$nodetype') and ".
+				"      i.role='$CRTLTAG' ".
+				"order BY n.priority");
+		if (! $query_result) {
+		    fatal("Could not dhcpd data from DB!");
 		}
-		$query .= "FROM nodes AS n LEFT JOIN interfaces AS i ON ".
-		    " n.node_id = i.node_id LEFT JOIN node_types AS t " .
-		    " ON n.type = t.type ";
-		if ($opt{v}) {
-			$query .= "LEFT JOIN reserved AS r ON n.node_id = r.node_id ";
+
+		#
+		# First go through and find any boss nodes. We need these
+		# to create the next-server line for elabinelab.
+		#
+		while (my %row = $query_result->fetchhash()) {
+		    if (defined($row{"pid"}) &&
+			defined($row{"inner_elab_role"}) &&
+			$row{"inner_elab_role"} eq "boss") {
+			my $tag = $row{"pid"} . ":" . $row{"eid"};
+			
+			$bossnodes{$tag} = $row{"IP"};
+		    }
 		}
-		$query .= "WHERE (n.type='$nodetype' OR t.class='$nodetype') ";
-		$query .= "AND i.iface = t.control_iface ";
-		$query .= "ORDER BY n.priority";
+		$query_result->dataseek(0);
+		
+		while (my %row = $query_result->fetchhash()) {
+		    my $ip  = $row{"IP"};
+		    my $mac = $row{"MAC"};
+		    my $node_id;
+		    my $next_server = "";
+		    my $hostname = "";
 
-		my $result = DBQueryFatal($query);
-		while (@row = $result->fetchrow) {
-			my $ip = $row[1];
-			my $mac = $row[2];
-			my $node_id;
-			if ($opt{v} && $row[3]) {
-				$node_id = $row[3];
-			} else {
-				$node_id = $row[0];
-			}
-				
-			# Need to make MAC look right..
-			$mac =~ s/(..)\B/$1:/g;
+		    if ($vnames && defined($row{"vname"})) {
+			$node_id = $row{"vname"};
+		    }
+		    else {
+			$node_id = $row{"node_id"};
+		    }
 
-			print "${spaces}host $ip {\n";
-			print "${spaces}\thardware ethernet $mac;\n";
-			print "${spaces}\toption host-name \"$node_id\";\n";
-			print "${spaces}\tfixed-address $ip;\n";
-			print "${spaces}}\n\n";
+		    if (defined($row{"pid"}) &&
+			defined($row{"inner_elab_role"}) &&
+			$row{"inner_elab_role"} eq "node") {
+			my $tag = $row{"pid"} . ":" . $row{"eid"};
+			
+			$next_server = "${spaces}\tnext-server " .
+			    $bossnodes{$tag} . ";\n";
+		    }
+		    else {
+			$hostname =
+			    "${spaces}\toption host-name \"$node_id\";\n";
+		    }
+		    
+		    # Need to make MAC look right..
+		    $mac =~ s/(..)\B/$1:/g;
+
+		    print $OUT "${spaces}host $ip {\n";
+		    print $OUT $next_server;
+		    print $OUT "${spaces}\thardware ethernet $mac;\n";
+		    print $OUT $hostname;
+		    print $OUT "${spaces}\tfixed-address $ip;\n";
+		    print $OUT "${spaces}}\n\n";
 		}
 	} else {
-		# It's a regular line
-		print;
+	    # It's a regular line
+	    print $OUT $_;
 	}
 }
 close(IF);
+
+if ($install) {
+    close(OF) or
+	fatal("Could not close $outfile");
+
+    if (-e $DHCPD_CONF) {
+	system("cp -fp $DHCPD_CONF ${DHCPD_CONF}.old") == 0 or
+	    fatal("Could not backup copy of ${DHCPD_CONF}");
+    }
+    system("mv -f $outfile $DHCPD_CONF") == 0 or
+	    fatal("Could not install new ${DHCPD_CONF}");
+}
 exit(0);
 
-sub usage {
-	print "Usage: $0 [-h] [-v] <templatefile>\n";
-	print "-h		Show this message\n";
-	print "-v		Use virtual names, when possible, for hostnames\n";
-	print "Spits out a dhcpd config file on stdout, as in:\n";
-	print "$0 dhcpd.conf.template > dhcpd.conf\n";
+#
+# Die.
+#
+sub fatal {
+    my $msg = $_[0];
+    die($msg);
 }
+

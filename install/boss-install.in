@@ -822,13 +822,10 @@ Phase "Software", "Building and Installing Software", sub {
 #
 Phase "dhcpd", "Setting up initial dhcpd configuration", sub {
     Phase "template", "Installing $DHCPD_TEMPLATE", sub {
-	ExecQuietFatal("$CP $TOP_OBJDIR/dhcpd/dhcpd.conf.template ".
-		       "$DHCPD_TEMPLATE");
+	ExecQuietFatal("cd $TOP_OBJDIR/dhcpd; $GMAKE install");
     };
     Phase "config", "Creating $DHCPD_CONF from template", sub {
-	ExecQuietFatal("$DHCPD_MAKECONF $DHCPD_TEMPLATE > $DHCPD_CONF");
-	# Must be group writable for newnode script.
-	ExecQuietFatal("$CHMOD 664 $DHCPD_CONF");	
+	ExecQuietFatal("$DHCPD_MAKECONF -i");
     };
     # How silly is this?
     Phase "leases", "Creating stub leases file", sub {
