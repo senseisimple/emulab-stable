@@ -58,7 +58,7 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
     # Entirely optional stuff; see comments below.
     #tb-set-node-tarfiles $node($i) /somedir /proj/yourproj/tarfiles/yourtarball.tar.gz
     #tb-set-node-rpms     $node($i) /proj/yourproj/rpms/yourrpm.rpm
-    #tb-set-node-startup  $node($i) /usr/local/bin/yourstartupcmd
+    #tb-set-node-startup  $node($i) /somepath/yourstartupcmd
 }
 
 # The above loop includes three optional features:
