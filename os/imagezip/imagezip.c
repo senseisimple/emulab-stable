@@ -69,6 +69,7 @@ int     slice     = 0;
 int	level	  = 4;
 long	dev_bsize = 1;
 int	ignore[NDOSPART];
+int	oldstyle  = 0;
 
 #define sectobytes(s)	((off_t)(s) * secsize)
 #define bytestosec(b)	(uint32_t)((b) / secsize)
@@ -224,7 +225,7 @@ main(argc, argv)
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -265,6 +266,9 @@ main(argc, argv)
 			if (rval < 1 || rval > 4)
 				usage();
 			ignore[rval-1] = 1;
+			break;
+		case '1':
+			oldstyle = 1;
 			break;
 		case 'h':
 		case '?':
@@ -1251,21 +1255,26 @@ read_raw(void)
 }
 
 char *usagestr = 
- "usage: imagezip [-vidlbhr] [-s #] [-c #] <image | device> [outputfilename]\n"
+ "usage: imagezip [-vihor] [-s #] <image | device> [outputfilename]\n"
  " -v             Print version info and exit\n"
- " -i             Info mode only. Do not write an output file\n"
- " -d             Turn on debugging. Multiple -d options increase output\n"
- " -r             A `raw' image. No FS compression is attempted\n"
- " -c count	  Compress <count> number of sectors (not with slice mode)\n"
- " -s slice       Compress a particular slice (DOS numbering 1-4)\n"
+ " -i             Info mode only.  Do not write an output file\n"
  " -h             Print this help message\n"
- " -z level       Set the compression level. Range 0-9 (0==none, default==4)\n"
- " image | device The input image or a device special file (ie: /dev/rad2)\n"
- " outputfilename The output file. Use - for stdout. \n"
+ " -o             Print progress indicating dots\n"
+ " -r             Generate a `raw' image.  No FS compression is attempted\n"
+ " -s slice       Compress a particular slice (DOS numbering 1-4)\n"
+ " image | device The input image or a device special file (ie: /dev/ad0)\n"
+ " outputfilename The output file ('-' for stdout)\n"
+ "\n"
+ " Advanced options\n"
+ " -z level       Set the compression level.  Range 0-9 (0==none, default==4)\n"
+ " -I slice       Ignore (skip) the indicated slice (not with slice mode)\n"
+ " -c count       Compress <count> number of sectors (not with slice mode)\n"
+ " -1             Output a version one image file\n"
  "\n"
  " Debugging options (not to be used by mere mortals!)\n"
- " -l             Linux slice only. Input must be a Linux slice image\n"
- " -b             FreeBSD slice only. Input must be a FreeBSD slice image\n";
+ " -d             Turn on debugging.  Multiple -d options increase output\n"
+ " -l             Linux slice only.  Input must be a Linux slice image\n"
+ " -b             FreeBSD slice only.  Input must be a FreeBSD slice image\n";
 
 void
 usage()
@@ -1474,6 +1483,16 @@ addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
 	struct range *entry;
 	struct fixup *fixup;
 
+	if (oldstyle) {
+		static int warned;
+
+		if (!warned) {
+			fprintf(stderr, "WARNING: no fixups in V1 images\n");
+			warned = 1;
+		}
+		return;
+	}
+
 	if ((entry = malloc(sizeof(*entry))) == NULL ||
 	    (fixup = malloc(sizeof(*fixup) + (int)size)) == NULL) {
 		fprintf(stderr, "Out of memory!\n");
@@ -1539,6 +1558,8 @@ addreloc(off_t offset, off_t size, int reloctype)
 {
 	struct blockreloc *reloc;
 
+	assert(!oldstyle);
+
 	numrelocs++;
 	relocs = realloc(relocs, numrelocs * sizeof(struct blockreloc));
 	if (relocs == NULL) {
@@ -1579,7 +1600,7 @@ static void	compress_status(int foo);
 int
 compress_image(void)
 {
-	int		cc, full, i, count, numregions;
+	int		cc, full, i, count, numregions, chunkno;
 	off_t		size = 0, outputoffset;
 	off_t		tmpoffset, rangesize;
 	struct range	*prange;
@@ -1597,10 +1618,14 @@ compress_image(void)
 #endif
 
 	memset(buf, 0, sizeof(buf));
-	blkhdr    = (blockhdr_t *) buf;
-	regions   = (struct region *) (blkhdr + 1);
+	blkhdr = (blockhdr_t *) buf;
+	if (oldstyle)
+		regions = (struct region *)((struct blockhdr_V1 *)blkhdr + 1);
+	else
+		regions = (struct region *)(blkhdr + 1);
 	curregion = regions;
 	numregions = 0;
+	chunkno = 0;
 
 	/*
 	 * Reserve room for the subblock hdr and the region pairs.
@@ -1719,37 +1744,47 @@ compress_image(void)
 		 * Go back and stick in the block header and the region
 		 * information.
 		 */
-		blkhdr->magic       = COMPRESSED_MAGIC_CURRENT;
+		blkhdr->magic = oldstyle ?
+			COMPRESSED_V1 : COMPRESSED_MAGIC_CURRENT;
+		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
-		blkhdr->firstsect   = cursect;
-		if (size == rangesize) {
-			/*
-			 * Finished subblock at the end of a range.
-			 * Find the beginning of the next range so that
-			 * we include any free space between the ranges
-			 * here.  If this was the last range, we use
-			 * inputmaxsec.  If inputmaxsec is zero, we know
-			 * that we did not end with a skip range.
-			 */
-			if (prange->next)
-				blkhdr->lastsect = prange->next->start -
-					inputminsec;
-			else if (inputmaxsec > 0)
-				blkhdr->lastsect = inputmaxsec -
-					inputminsec;
-			else {
+		if (!oldstyle) {
+			blkhdr->firstsect   = cursect;
+			if (size == rangesize) {
+				/*
+				 * Finished subblock at the end of a range.
+				 * Find the beginning of the next range so that
+				 * we include any free space between the ranges
+				 * here.  If this was the last range, we use
+				 * inputmaxsec.  If inputmaxsec is zero, we know
+				 * that we did not end with a skip range.
+				 */
+				if (prange->next)
+					blkhdr->lastsect = prange->next->start -
+						inputminsec;
+				else if (inputmaxsec > 0)
+					blkhdr->lastsect = inputmaxsec -
+						inputminsec;
+				else {
+					lreg = curregion - 1;
+					blkhdr->lastsect =
+						lreg->start + lreg->size;
+				}
+			} else {
 				lreg = curregion - 1;
 				blkhdr->lastsect = lreg->start + lreg->size;
 			}
-		} else {
-			lreg = curregion - 1;
-			blkhdr->lastsect = lreg->start + lreg->size;
-		}
-		cursect = blkhdr->lastsect;
+			cursect = blkhdr->lastsect;
 
-		blkhdr->reloccount = numrelocs;
+			blkhdr->reloccount = numrelocs;
+		}
+
+		/*
+		 * Dump relocation info
+		 */
 		if (numrelocs) {
+			assert(!oldstyle);
 			assert(relocs != NULL);
 			memcpy(curregion, relocs,
 			       numrelocs * sizeof(struct blockreloc));
@@ -1772,6 +1807,7 @@ compress_image(void)
 		buffer_offset = DEFAULTREGIONSIZE;
 		curregion     = regions;
 		numregions    = 0;
+		chunkno++;
 
 		/*
 		 * Okay, so its possible that we ended the region at the
@@ -1803,15 +1839,20 @@ compress_image(void)
 	if (curregion != regions) {
 		compress_finish(&blkhdr->size);
 		
-		blkhdr->magic       = COMPRESSED_MAGIC_CURRENT;
+		blkhdr->magic =
+			oldstyle ? COMPRESSED_V1 : COMPRESSED_MAGIC_CURRENT;
+		blkhdr->blockindex  = chunkno;
 		blkhdr->regionsize  = DEFAULTREGIONSIZE;
 		blkhdr->regioncount = (curregion - regions);
-		blkhdr->firstsect = cursect;
-		if (inputmaxsec > 0)
-			blkhdr->lastsect = inputmaxsec - inputminsec;
-		else {
-			lreg = curregion - 1;
-			blkhdr->lastsect = lreg->start + lreg->size;
+		if (!oldstyle) {
+			blkhdr->firstsect = cursect;
+			if (inputmaxsec > 0)
+				blkhdr->lastsect = inputmaxsec - inputminsec;
+			else {
+				lreg = curregion - 1;
+				blkhdr->lastsect = lreg->start + lreg->size;
+			}
+			blkhdr->reloccount = numrelocs;
 		}
 
 		/*
@@ -1827,8 +1868,8 @@ compress_image(void)
 		/*
 		 * Dump relocation info
 		 */
-		blkhdr->reloccount = numrelocs;
 		if (numrelocs) {
+			assert(!oldstyle);
 			assert(relocs != NULL);
 			memcpy(curregion, relocs,
 			       numrelocs * sizeof(struct blockreloc));
@@ -1855,10 +1896,11 @@ compress_image(void)
 	fflush(stderr);
 
 	/*
-	 * Skip the rest if not able to seek on output. netdisk will
-	 * not be able to read the file, but so what.
+	 * For version 2 we don't bother to go back and fill in the
+	 * blockcount.  Imageunzip and frisbee don't use it.  We still
+	 * do it if creating V1 images and we can seek on the output.
 	 */
-	if (!outcanseek)
+	if (!oldstyle || !outcanseek)
 		return 0;
 	
 	/*
@@ -1888,7 +1930,7 @@ compress_image(void)
 			exit(1);
 		}
 		blkhdr = (blockhdr_t *) buf;
-		blkhdr->blockindex = i;
+		assert(blkhdr->blockindex == i);
 		blkhdr->blocktotal = count;
 		
 		if ((cc = mywrite(outfd, buf, sizeof(blockhdr_t))) < 0) {
@@ -1911,6 +1953,8 @@ compress_status(int foo)
 		stamp.tv_usec += 1000000;
 		stamp.tv_sec--;
 	}
+	if (foo == 0)
+		fprintf(stderr, "\n");
 	fprintf(stderr, "%qu input bytes in %ld.%03ld seconds\n",
 		inputoffset, stamp.tv_sec - cstamp.tv_sec,
 		(stamp.tv_usec - cstamp.tv_usec) / 1000);
@@ -1936,7 +1980,7 @@ static z_stream		d_stream;	/* Compression stream */
 static off_t
 compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 {
-	int		cc, count, err, eof, finish;
+	int		cc, count, err, eof, finish, outsize;
 	off_t		total = 0;
 
 	/*
@@ -2017,16 +2061,23 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		size  -= cc;
 		total += cc;
 
+		outsize = SUBBLOCKSIZE - buffer_offset;
+
+		/* XXX match behavior of original compressor */
+		if (oldstyle && outsize > 0x20000)
+			outsize = 0x20000;
+
 		d_stream.next_in   = inbuf;
 		d_stream.avail_in  = cc;
 		d_stream.next_out  = &output_buffer[buffer_offset];
-		d_stream.avail_out = SUBBLOCKSIZE - buffer_offset;
+		d_stream.avail_out = outsize;
 		assert(d_stream.avail_out > 0);
 
 		err = deflate(&d_stream, Z_SYNC_FLUSH);
 		CHECK_ZLIB_ERR(err, "deflate");
 
-		if (d_stream.avail_in != 0 || d_stream.avail_out == 0) {
+		if (d_stream.avail_in != 0 ||
+		    (!oldstyle && d_stream.avail_out == 0)) {
 			fprintf(stderr, "Something went wrong, ");
 			if (d_stream.avail_in)
 				fprintf(stderr, "not all input deflated!\n");
@@ -2034,7 +2085,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 				fprintf(stderr, "too much data for chunk!\n");
 			exit(1);
 		}
-		count = (SUBBLOCKSIZE - buffer_offset) - d_stream.avail_out;
+		count = outsize - d_stream.avail_out;
 		buffer_offset += count;
 		assert(buffer_offset <= SUBBLOCKSIZE);
 

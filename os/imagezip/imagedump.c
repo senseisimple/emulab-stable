@@ -30,7 +30,7 @@ static uint32_t sectfree;
 
 static void usage(void);
 static void dumpfile(char *name, int fd);
-static int dumpchunk(char *name, char *buf, int chunkno);
+static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
 
 int
 main(int argc, char **argv)
@@ -107,7 +107,7 @@ static void
 dumpfile(char *name, int fd)
 {
 	unsigned long long tbytes, dbytes, cbytes;
-	int count, chunkno, first = 1;
+	int count, chunkno, checkindex = 1;
 	off_t filesize;
 	int isstdin;
 	char *bp;
@@ -162,7 +162,7 @@ dumpfile(char *name, int fd)
 			count -= cc;
 			bp += cc;
 		}
-		if (first) {
+		if (chunkno == 0) {
 			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
 
 			magic = hdr->magic;
@@ -174,30 +174,43 @@ dumpfile(char *name, int fd)
 
 			chunkcount = hdr->blocktotal;
 			if ((filesize / SUBBLOCKSIZE) != chunkcount) {
-				if (chunkcount == 0)
-					printf("%s: WARNING: zero chunk count,"
-					       " ignoring block fields\n",
+				if (chunkcount != 0) {
+					if (isstdin)
+						filesize = (off_t)chunkcount *
+							SUBBLOCKSIZE;
+					else
+						printf("%s: WARNING: file size "
+						       "inconsistant with "
+						       "chunk count "
+						       "(%lu != %lu)\n",
+						       name,
+						       (unsigned long)
+						       (filesize/SUBBLOCKSIZE),
+						       chunkcount);
+				} else if (magic == COMPRESSED_V1) {
+					printf("%s: WARNING: zero chunk count, "
+					       "ignoring block fields\n",
 					       name);
-				else if (isstdin)
-					filesize = (off_t)chunkcount *
-						SUBBLOCKSIZE;
-				else
-					printf("%s: WARNING: "
-					       "file size inconsistant with "
-					       "chunk count (%lu != %lu)\n",
-					       name,
-					       (unsigned long)
-					       (filesize/SUBBLOCKSIZE),
-					       chunkcount);
+					checkindex = 0;
+				}
 			}
 
 			printf("%s: %qu bytes, %lu chunks, version %d\n",
 			       name, filesize,
 			       (unsigned long)(filesize / SUBBLOCKSIZE),
 			       hdr->magic - COMPRESSED_MAGIC_BASE + 1);
-			first = 0;
+		} else if (chunkno == 1) {
+			blockhdr_t *hdr = (blockhdr_t *)chunkbuf;
+
+			/*
+			 * If reading from stdin, we don't know til the
+			 * second chunk whether blockindexes are being kept.
+			 */
+			if (isstdin && filesize == 0 && hdr->blockindex == 0)
+				checkindex = 0;
 		}
-		if (dumpchunk(name, chunkbuf, chunkno))
+
+		if (dumpchunk(name, chunkbuf, chunkno, checkindex))
 			break;
 	}
  done:
@@ -221,7 +234,7 @@ dumpfile(char *name, int fd)
 }
 
 static int
-dumpchunk(char *name, char *buf, int chunkno)
+dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 {
 	blockhdr_t *hdr;
 	struct region *reg;
@@ -241,7 +254,7 @@ dumpchunk(char *name, char *buf, int chunkno)
 		       name, hdr->magic, magic, chunkno);
 		return 1;
 	}
-	if (chunkcount && hdr->blockindex != chunkno) {
+	if (checkindex && hdr->blockindex != chunkno) {
 		printf("%s: bad chunk index (%d) in chunk %d\n",
 		       name, hdr->blockindex, chunkno);
 		return 1;
