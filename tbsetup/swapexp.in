@@ -349,7 +349,7 @@ sub fatal($)
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
-	     "Bcc: $TBOPS",
+	     "Cc:  $TBOPS",
 	     ($logname));
 
     if (defined($logname)) {
