@@ -361,7 +361,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
        fixed_it!=fixed_nodes.end();++fixed_it) {
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
       cout << "Fixed node: " << (*fixed_it).first <<
-	"does not exist." << endl;
+	" does not exist." << endl;
       exit(EXIT_UNRETRYABLE);
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
