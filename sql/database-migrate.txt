@@ -662,3 +662,6 @@ last_net_act,last_cpu_act,last_ext_act);
 	page. The records are dynamic; someone like Dave will insert
 	them, and the web page will remove them after a node
 	sucessfully updates.
+
+1.155: Bring the definition for the roottag column into sync with what's in
+       the database on boss - no database changes required.

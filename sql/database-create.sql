@@ -1643,7 +1643,7 @@ CREATE TABLE widearea_recent (
 
 CREATE TABLE widearea_updates (
   IP varchar(15) NOT NULL default '1.1.1.1',
-  roottag tinytext NOT NULL default '',
+  roottag tinytext NOT NULL,
   update_requested datetime NOT NULL default '0000-00-00 00:00:00',
   update_started datetime default NULL,
   PRIMARY KEY  (IP)
