@@ -122,7 +122,7 @@ if (system("hostname", "${nickname}${domain}")) {
 # stash off the interface name to use as our control net
 if (defined($iface) && $iface =~ /^([-\w\.]+)$/) {
     $iface = $1;
-    system("echo $iface > $BOOTDIR/control_interface");
+    system("echo $iface > $BOOTDIR/controlif");
 }
 
 print STDERR "Done!\n";
