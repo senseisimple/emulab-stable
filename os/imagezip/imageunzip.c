@@ -48,8 +48,9 @@ static int	 infd, outfd;
 static int	 doseek = 0;
 static int	 debug  = 0;
 static long long total  = 0;
+static char	 chunkbuf[SUBBLOCKSIZE];
 
-int		inflate_subblock(void);
+int		inflate_subblock(char *);
 void		writezeros(off_t zcount);
 
 #ifdef linux
@@ -122,10 +123,15 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
-		perror("opening input file");
-		exit(1);
+	if (strcmp(argv[0], "-")) {
+		if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
+			perror("opening input file");
+			exit(1);
+		}
 	}
+	else
+		infd = fileno(stdin);
+
 	if (argc == 2) {
 		if ((outfd =
 		     open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
@@ -155,30 +161,30 @@ main(int argc, char **argv)
 	gettimeofday(&stamp, 0);
 	
 	while (1) {
-		off_t		offset, correction;
+		int	count = sizeof(chunkbuf);
+		char	*bp   = chunkbuf;
 		
 		/*
-		 * Decompress one subblock at a time. After its done
-		 * make sure the input file pointer is at a block
-		 * boundry. Move it up if not. 
+		 * Decompress one subblock at a time. We read the entire
+		 * chunk and had it off. Since we might be reading from
+		 * stdin, we have to make sure we get the entire amount.
 		 */
-		if (inflate_subblock())
-			break;
-
-		if ((offset = lseek(infd, (off_t) 0, SEEK_CUR)) < 0) {
-			perror("Getting current seek pointer");
-			exit(1);
-		}
-		if (offset & (SUBBLOCKSIZE - 1)) {
-			correction = SUBBLOCKSIZE -
-				(offset & (SUBBLOCKSIZE - 1));
-
-			if ((offset = lseek(infd, correction, SEEK_CUR)) < 0) {
-				perror("correcting seek pointer");
+		while (count) {
+			int	cc;
+			
+			if ((cc = read(infd, bp, count)) <= 0) {
+				if (cc == 0)
+					goto done;
+				perror("reading zipped image");
 				exit(1);
 			}
+			count -= cc;
+			bp    += cc;
 		}
+		if (inflate_subblock(chunkbuf))
+			break;
 	}
+ done:
 	close(infd);
 
 	gettimeofday(&estamp, 0);
@@ -218,7 +224,7 @@ ImageUnzipInit(char *filename, int slice, int dbg)
 #endif
 
 int
-inflate_subblock(void)
+inflate_subblock(char *chunkbufp)
 {
 	int		cc, ccres, err, count, ibsize = 0, ibleft = 0;
 	z_stream	d_stream; /* inflation stream */
@@ -226,8 +232,8 @@ inflate_subblock(void)
 	struct blockhdr *blockhdr;
 	struct region	*curregion;
 	off_t		offset, size;
-	char		blockbuf[DEFAULTREGIONSIZE], *bbuf = blockbuf;
 	char		*buf = inbuf;
+	int		chunkbytes = SUBBLOCKSIZE;
 	
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
@@ -240,22 +246,13 @@ inflate_subblock(void)
 	CHECK_ERR(err, "inflateInit");
 
 	/*
-	 * Read the header. It is uncompressed, and holds the real
-	 * image size and the magic number.
+	 * Grab the header. It is uncompressed, and holds the real
+	 * image size and the magic number. Advance the pointer too.
 	 */
-#ifdef  FRISBEE
-	if ((cc = FrisbeeRead(&bbuf, DEFAULTREGIONSIZE)) <= 0) {
-#else
-	if ((cc = read(infd, bbuf, DEFAULTREGIONSIZE)) <= 0) {
-#endif
-		if (cc == 0)
-			return 1;
-		perror("reading zipped image header goo");
-		exit(1);
-	}
-	assert(cc == DEFAULTREGIONSIZE);
-	blockhdr = (struct blockhdr *) bbuf;
-
+	blockhdr    = (struct blockhdr *) chunkbufp;
+	chunkbufp  += DEFAULTREGIONSIZE;
+	chunkbytes -= DEFAULTREGIONSIZE;
+	
 	if (blockhdr->magic != COMPRESSED_MAGIC) {
 		fprintf(stderr, "Bad Magic Number!\n");
 		exit(1);
@@ -299,23 +296,14 @@ inflate_subblock(void)
 			count = sizeof(inbuf);
 		else
 			count = blockhdr->size;
-			
-#ifdef  FRISBEE
-		if ((cc = FrisbeeRead(&buf, count)) <= 0) {
-#else
-		if ((cc = read(infd, buf, count)) <= 0) {
-#endif
-			if (cc == 0) {
-				return 1;
-			}
-			perror("reading zipped image");
-			exit(1);
-		}
-		assert(cc == count);
-		blockhdr->size -= cc;
-
+		memcpy(buf, chunkbufp, count);
+		chunkbufp  += count;
+		chunkbytes -= count;
+		assert(chunkbytes >= 0);
+		
+		blockhdr->size    -= count;
 		d_stream.next_in   = buf;
-		d_stream.avail_in  = cc;
+		d_stream.avail_in  = count;
 	inflate_again:
 		/*
 		 * Must operate on multiples of the sector size!

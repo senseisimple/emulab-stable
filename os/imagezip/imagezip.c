@@ -31,9 +31,9 @@
 #define	DOSPTYP_EXT	5	/* DOS extended partition */
 #endif
 
-int	infd, outfd;
+int	infd, outfd, outcanseek;
 int	secsize	  = 512;	/* XXX bytes. */
-int	debug	  = 1;
+int	debug	  = 0;
 int     info      = 0;
 int     slicemode = 0;
 int     maxmode   = 0;
@@ -110,8 +110,9 @@ mywrite(int fd, const void *buf, size_t nbytes)
 	int		cc, i, count = 0;
 	off_t		startoffset, endoffset;
 	int		maxretries = 10;
-	
-	if ((startoffset = lseek(fd, (off_t) 0, SEEK_CUR)) < 0) {
+
+	if (outcanseek &&
+	    ((startoffset = lseek(fd, (off_t) 0, SEEK_CUR)) < 0)) {
 		perror("mywrite: seeking to get output file ptr");
 		exit(1);
 	}
@@ -126,8 +127,15 @@ mywrite(int fd, const void *buf, size_t nbytes)
 				count  += cc;
 				continue;
 			}
+			if (!outcanseek) {
+				if (cc < 0)
+					perror("mywrite: writing");
+				else 
+					fprintf(stderr, "mywrite: writing\n");
+				exit(1);
+			}
 
-			if (i == 0)
+			if (i == 0) 
 				perror("write error: will retry");
 	
 			sleep(1);
@@ -136,7 +144,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 			count   = 0;
 			goto again;
 		}
-		if (fsync(fd) < 0) {
+		if (outcanseek && fsync(fd) < 0) {
 			perror("fsync error: will retry");
 			sleep(1);
 			nbytes += count;
@@ -245,23 +253,34 @@ main(argc, argv)
 		rval = read_image();
 #endif
 	sortskips();
-	if (debug > 2)
+	if (debug)
 		dumpskips();
 	makeranges();
+	fflush(stderr);
 
 	if (info) {
 		close(infd);
 		exit(0);
 	}
 
-	if ((outfd = open(outfilename, O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
-		perror("opening output file");
-		exit(1);
+	if (strcmp(outfilename, "-")) {
+		if ((outfd = open(outfilename, O_RDWR|O_CREAT|O_TRUNC, 0666))
+		    < 0) {
+			perror("opening output file");
+			exit(1);
+		}
+		outcanseek = 1;
+	}
+	else {
+		outfd = fileno(stdout);
+		outcanseek = 0;
 	}
 	compress_image();
 	
+	fflush(stderr);
 	close(infd);
-	close(outfd);
+	if (outcanseek)
+		close(outfd);
 	exit(0);
 }
 
@@ -296,30 +315,30 @@ read_image()
 	}
 
 	if (debug) {
-		printf("DOS Partitions:\n");
+		fprintf(stderr, "DOS Partitions:\n");
 		for (i = 0; i < NDOSPART; i++) {
-			printf("  P%d: ", i + 1 /* DOS Numbering */);
+			fprintf(stderr, "  P%d: ", i + 1 /* DOS Numbering */);
 			switch (doslabel.parts[i].dp_typ) {
 			case DOSPTYP_386BSD:
-				printf("  BSD   ");
+				fprintf(stderr, "  BSD   ");
 				break;
 			case DOSPTYP_LINSWP:
-				printf("  LSWAP ");
+				fprintf(stderr, "  LSWAP ");
 				break;
 			case DOSPTYP_LINUX:
-				printf("  LINUX ");
+				fprintf(stderr, "  LINUX ");
 				break;
 			case DOSPTYP_EXT:
-				printf("  DOS   ");
+				fprintf(stderr, "  DOS   ");
 				break;
 			default:
-				printf("  UNKNO ");
+				fprintf(stderr, "  UNKNO ");
 			}
-			printf("  start %9d, size %9d\n", 
+			fprintf(stderr, "  start %9d, size %9d\n", 
 			       doslabel.parts[i].dp_start,
 			       doslabel.parts[i].dp_size);
 		}
-		printf("\n");
+		fprintf(stderr, "\n");
 	}
 
 	/*
@@ -359,7 +378,8 @@ read_image()
 			rval = read_linuxslice(i, start, size);
 			break;
 		default:
-			printf("  Slice %d is an unknown type. Skipping ...\n",
+			fprintf(stderr,
+				"  Slice %d is an unknown type. Skipping.\n",
 			       i + 1 /* DOS Numbering */);
 			if (start != size)
 				addskip(start, size);
@@ -392,7 +412,8 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 	} dlabel;
 
 	if (debug)
-		printf("  P%d (BSD Slice)\n", slice + 1 /* DOS Numbering */);
+		fprintf(stderr,
+			"  P%d (BSD Slice)\n", slice + 1 /* DOS Numbering */);
 	
 	if (devlseek(infd, ((off_t)start) * secsize, SEEK_SET) < 0) {
 		warn("Could not seek to beginning of BSD slice");
@@ -436,9 +457,9 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size)
 			continue;
 
 		if (debug) {
-			printf("    %c ", BSDPARTNAME(i));
+			fprintf(stderr, "    %c ", BSDPARTNAME(i));
 
-			printf("  start %9d, size %9d\t(%s)\n",
+			fprintf(stderr, "  start %9d, size %9d\t(%s)\n",
 			   dlabel.label.d_partitions[i].p_offset,
 			   dlabel.label.d_partitions[i].p_size,
 			   fstypenames[dlabel.label.d_partitions[i].p_fstype]);
@@ -503,7 +524,7 @@ read_bsdpartition(struct disklabel *dlabel, int part)
  	}
 
 	if (debug) {
-		printf("        bfree %9d, size %9d\n",
+		fprintf(stderr, "        bfree %9d, size %9d\n",
 		       fs.fs.fs_cstotal.cs_nbfree, fs.fs.fs_bsize);
 	}
 
@@ -528,8 +549,9 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 			return 1;
 		}
 		if (debug > 1) {
-			printf("        CG%d\t offset %9d, bfree %6d\n",
-			       i, cgoff, cg.cg.cg_cs.cs_nbfree);
+			fprintf(stderr,
+				"        CG%d\t offset %9d, bfree %6d\n",
+				i, cgoff, cg.cg.cg_cs.cs_nbfree);
 		}
 		
 		rval = read_bsdcg(&fs.fs, &cg.cg, dboff);
@@ -563,7 +585,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 	 */
 
 	if (debug > 2)
-		printf("                 ");
+		fprintf(stderr, "                 ");
 	for (count = i = 0; i < max; i++)
 		if (isset(p, i)) {
 			j = i;
@@ -582,17 +604,18 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 					
 				if (debug > 2) {
 					if (count)
-						printf(",%s",
-						       count % 4 ? " " :
-						       "\n                 ");
-					printf("%u:%d", dboff, dbcount);
+						fprintf(stderr, ",%s",
+							count % 4 ? " " :
+							"\n                 ");
+					fprintf(stderr,
+						"%u:%d", dboff, dbcount);
 				}
 				addskip(dboff, dbcount);
 				count++;
 			}
 		}
 	if (debug > 2)
-		printf("\n");
+		fprintf(stderr, "\n");
 	return 0;
 }
 #endif
@@ -624,7 +647,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	assert((sizeof(groups) & ~LINUX_SUPERBLOCK_SIZE) == 0);
 
 	if (debug)
-		printf("  P%d (Linux Slice)\n", dosslice);
+		fprintf(stderr, "  P%d (Linux Slice)\n", dosslice);
 	
 	/*
 	 * Skip ahead to the superblock.
@@ -651,7 +674,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
  	}
 
 	if (debug) {
-		printf("        bfree %9d, size %9d\n",
+		fprintf(stderr, "        bfree %9d, size %9d\n",
 		       fs.s_free_blocks_count, EXT2_BLOCK_SIZE(&fs));
 	}
 	numgroups = fs.s_blocks_count / fs.s_blocks_per_group;
@@ -693,9 +716,10 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 		}
 
 		if (debug) {
-			printf("        Group:%-2d\tBitmap %9d, bfree %9d\n",
-			       i, groups[gix].bg_block_bitmap,
-			       groups[gix].bg_free_blocks_count);
+			fprintf(stderr,
+				"        Group:%-2d\tBitmap %9d, bfree %9d\n",
+				i, groups[gix].bg_block_bitmap,
+				groups[gix].bg_free_blocks_count);
 		}
 
 		rval = read_linuxgroup(&fs, &groups[gix], i, start);
@@ -761,7 +785,7 @@ read_linuxgroup(struct ext2_super_block *super,
 	((EXT2_BLOCK_SIZE(super) / secsize) * (count))
 
 	if (debug > 2)
-		printf("                 ");
+		fprintf(stderr, "                 ");
 	for (count = i = 0; i < max; i++)
 		if (!isset(p, i)) {
 			j = i;
@@ -786,10 +810,10 @@ read_linuxgroup(struct ext2_super_block *super,
 					
 				if (debug > 2) {
 					if (count)
-						printf(",%s",
-						       count % 4 ? " " :
-						       "\n                 ");
-					printf("%u:%d %d:%d",
+						fprintf(stderr, ",%s",
+							count % 4 ? " " :
+							"\n                 ");
+					fprintf(stderr, "%u:%d %d:%d",
 					       dboff, dbcount, j, i);
 				}
 				addskip(dboff, dbcount);
@@ -797,7 +821,7 @@ read_linuxgroup(struct ext2_super_block *super,
 			}
 		}
 	if (debug > 2)
-		printf("\n");
+		fprintf(stderr, "\n");
 
 	return 0;
 }
@@ -810,9 +834,11 @@ int
 read_linuxswap(int slice, u_int32_t start, u_int32_t size)
 {
 	if (debug) {
-		printf("  P%d (Linux Swap)\n", slice + 1 /* DOS Numbering */);
-		printf("        start %12d, size %9d\n",
-		       start, size);
+		fprintf(stderr,
+			"  P%d (Linux Swap)\n", slice + 1 /* DOS Numbering */);
+		fprintf(stderr,
+			"        start %12d, size %9d\n",
+			start, size);
 	}
 
 	start += 0x8000 / secsize;
@@ -837,8 +863,8 @@ read_raw(void)
 	}
 
 	if (debug) {
-		printf("  Raw Image\n");
-		printf("        start %12d, size %12qd\n", 0, size);
+		fprintf(stderr, "  Raw Image\n");
+		fprintf(stderr, "        start %12d, size %12qd\n", 0, size);
 	}
 	return 0;
 }
@@ -942,17 +968,22 @@ dumpskips(void)
 
 	if (!skips)
 		return;
-	
-	printf("Skip ranges (start/size) in sectors:\n");
+
+	if (debug > 2)
+		fprintf(stderr, "Skip ranges (start/size) in sectors:\n");
 	
 	pskip = skips;
 	while (pskip) {
-		printf("  %12d    %9d\n", pskip->start, pskip->size);
+		if (debug > 2)
+			fprintf(stderr,
+				"  %12d    %9d\n", pskip->start, pskip->size);
 		total += pskip->size;
 		pskip  = pskip->next;
 	}
+	if (debug > 2)
+		fprintf(stderr, "\n");
 	
-	printf("\nTotal Number of Free Sectors: %d (bytes %qd)\n",
+	fprintf(stderr, "Total Number of Free Sectors: %d (bytes %qd)\n",
 	       total, (off_t)total * (off_t)secsize);
 }
 
@@ -1031,7 +1062,8 @@ makeranges(void)
 	if (debug > 2) {
 		range = ranges;
 		while (range) {
-			printf("  %12d    %9d\n", range->start, range->size);
+			fprintf(stderr,
+				"  %12d    %9d\n", range->start, range->size);
 			range  = range->next;
 		}
 	}
@@ -1095,8 +1127,9 @@ compress_image(void)
 		buffer_offset = DEFAULTREGIONSIZE;
 		
 		if (debug) {
-			printf("Compressing range: %14qd --> ", inputoffset);
-			fflush(stdout);
+			fprintf(stderr,
+				"Compressing range: %14qd --> ", inputoffset);
+			fflush(stderr);
 		}
 
 		/*
@@ -1115,7 +1148,7 @@ compress_image(void)
 		size = compress_chunk(size, &partial, &blkhdr->size);
 	
 		if (debug)
-			printf("%12qd\n", inputoffset + size);
+			fprintf(stderr, "%12qd\n", inputoffset + size);
 
 		totalinput += size;
 
@@ -1202,34 +1235,35 @@ compress_image(void)
 		 * Compress the chunk.
 		 */
 		if (debug > 0 && debug < 3) {
-			printf("Compressing range: %14qd --> ", inputoffset);
-			fflush(stdout);
+			fprintf(stderr,
+				"Compressing range: %14qd --> ", inputoffset);
+			fflush(stderr);
 		}
 
 		size = compress_chunk(rangesize, &partial, &blkhdr->size);
 	
 		if (debug >= 3) {
-			printf("%14qd -> %12qd %10d %10d %10d %d\n",
-			       inputoffset, inputoffset + size,
-			       prange->start - inputminsec,
-			       (int) (size / secsize), 
-			       blkhdr->size, partial);
+			fprintf(stderr, "%14qd -> %12qd %10d %10d %10d %d\n",
+				inputoffset, inputoffset + size,
+				prange->start - inputminsec,
+				(int) (size / secsize), 
+				blkhdr->size, partial);
 		}
 		else if (debug) {
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= stamp.tv_sec;
-			printf("%12qd in %ld seconds.\n",
-			       inputoffset + size, estamp.tv_sec);
+			fprintf(stderr, "%12qd in %ld seconds.\n",
+				inputoffset + size, estamp.tv_sec);
 		}
 		else {
 			static int pos;
 
-			putchar('.');
+			putc('.', stderr);
 			if (pos++ >= 60) {
-				putchar('\n');
+				putc('\n', stderr);
 				pos = 0;
 			}
-			fflush(stdout);
+			fflush(stderr);
 		}
 
 		/*
@@ -1337,11 +1371,19 @@ compress_image(void)
 	if (debug) {
 		gettimeofday(&estamp, 0);
 		estamp.tv_sec -= stamp.tv_sec;
-		printf("Done in %ld seconds!\n", estamp.tv_sec);
+		fprintf(stderr, "Done in %ld seconds!\n", estamp.tv_sec);
 	}
 	else
-		putchar('\n');
+		putc('\n', stderr);
+	fflush(stderr);
 
+	/*
+	 * Skip the rest if not able to seek on output. netdisk will
+	 * not be able to read the file, but so what.
+	 */
+	if (!outcanseek)
+		return 0;
+	
 	/*
 	 * Get the total filesize, and then number the subblocks.
 	 * Useful, for netdisk.

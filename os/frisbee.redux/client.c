@@ -627,29 +627,15 @@ PlayFrisbee(void)
  *
  * XXX We copy out the data. Need to change this interface to avoid that.
  */
-static int	ImageUnzipOffset;
-static int	ImageUnzipBuffer;
-extern int	inflate_subblock(void);
+extern int	inflate_subblock(char *);
 
 static int
 ImageUnzip(int slot)
 {
-	ImageUnzipBuffer = slot;
-	ImageUnzipOffset = 0;
+	char	*data = (char *) &ChunkBuffer[slot].blocks;
 
-	if (inflate_subblock())
+	if (inflate_subblock(data))
 		pfatal("ImageUnzip: inflate_subblock failed");
 
 	return 0;
-}
-
-int
-FrisbeeRead(void **buf, size_t count)
-{
-	char	*data = (char *) &ChunkBuffer[ImageUnzipBuffer].blocks;
-	
-	data += ImageUnzipOffset;	
-	*buf = data;
-	ImageUnzipOffset += count;
-	return count;
 }
