@@ -19,7 +19,7 @@ sub usage()
  
     exit(-1);
 }
-my $optlist  = "x:vd";
+my $optlist  = "x:nd";
 my $fromxml  = 0;
 my $impotent = 0;
 my $debug    = 0;
@@ -155,13 +155,21 @@ sub readXML($$$) {
     }
 
     #
-    # Check the header.
+    # We want to see a proper XML header. However, if this is coming out
+    # of the parser, there could be some user output ahead of it. At some
+    # point we need to fix how we deal with user output, but for now lets
+    # just eat up the lines till we see the header, printing them to stdout
+    # so that it ends up in the log.
     #
-    $line = <STDIN>;
-    chomp($line);
-    if ($line ne $XMLHEADER) {
-	fatal("Improper XML header line: $line");
+    while (<STDIN>) {
+	chomp($_);
+	last
+	    if ($_ eq $XMLHEADER);
+
+	print STDOUT "$_\n";
     }
+    fatal("Improper XML header line")
+	if (! defined($_));
 
     #
     # The next line should be the virtual_experiment line, with the
