@@ -44,8 +44,10 @@ if ($debug) { print "Expt '$eid', proj '$pid'\n"; }
 # Make sure the user is a member of the correct project, and that the
 # experiment exists
 #
-if (!ProjMember($pid)) {
-    die "You are not a member of project $pid\n";
+if ($UID) {
+    if (!ProjMember($pid)) {
+        die "You are not a member of project $pid\n";
+    }
 }
 if (!ExpState($pid,$eid)) {
     die "There is no experiment $eid in project $pid\n";
