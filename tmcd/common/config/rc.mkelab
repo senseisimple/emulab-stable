@@ -1012,7 +1012,7 @@ sub GetEmulabSource($)
     # Look to see if the source code is already here (say, cause the user
     # specified a tarfile). If so, copy it into place.
     #
-    if (-d "/usr/src") {
+    if (-d "/usr/src/defs-elabinelab") {
 	print "Copying over current testbed software from /usr/src\n";
 	mysystem("rsync -a --delete /usr/src/ $destdir/testbed");
     }
