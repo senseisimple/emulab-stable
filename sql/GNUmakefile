@@ -40,6 +40,7 @@ sitevars:
 	@mysqldump -t tbdb sitevariables > sitevars-create.sql 
 
 fwrules:
-	@mysqldump -t tbdb default_firewall_rules > fwrules-create.sql
+	@echo "DELETE FROM default_firewall_rules;" > fwrules-create.sql
+	@mysqldump -t tbdb default_firewall_rules >> fwrules-create.sql
 
 dist:	db-fill-dist

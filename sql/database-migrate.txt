@@ -2172,3 +2172,13 @@ last_net_act,last_cpu_act,last_ext_act);
          alter table node_types add (isrebootable tinyint(1) default '1');
 	
 
+1.288: Add "emulab" style of firewall for elabinelab
+
+       ALTER table firewalls MODIFY style \
+	 enum('open','closed','basic','emulab') not NULL default 'basic';
+       ALTER table default_firewall_rules MODIFY style \
+	 enum('open','closed','basic','emulab') not NULL default 'basic';
+
+       and update the default rules:
+
+       mysql tbdb < fwrules-create.sql
