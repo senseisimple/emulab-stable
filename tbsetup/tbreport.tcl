@@ -9,12 +9,23 @@ source $updir/ir/libir.tcl
 
 namespace import TB_LIBIR::ir
 
-if {[llength $argv] != 1} {
-    puts stderr "Syntax: $argv0 <irfile>"
+if {[llength $argv] == 0 || [llength $argv] > 2} {
+    puts stderr "Syntax: $argv0 [-v] <irfile>"
     exit 1
 }
 
-ir read [lindex $argv 0]
+set verbose 0
+if {[llength $argv] == 2} {
+    if {[lindex $argv 0] != "-v"} {
+	puts stderr "Bad option: [lindex $argv 0]"
+	exit 1
+    }
+    set verbose 1
+    set file [lindex $argv 1]
+} else {
+    set file [lindex $argv 0]
+}
+ir read $file
 
 if {! [ir exists /virtual/nodes]} {
     puts stderr "IR file incomplete - no /virtual/nodes - run tbprerun"
@@ -41,6 +52,11 @@ foreach line $ips {
     }
 }
 
+set macs [ir get /ip/mac]
+foreach mac $macs {
+    set macmap([lindex $mac 1]) [lindex $mac 0]
+}
+
 proc get_ip {node} {
     regexp {[0-9]+} $node num
     return "155.99.214.1$num"
@@ -62,5 +78,8 @@ foreach link [array names ipmap] {
     puts [format "%-20s %-15s %-20s %-15s" [lindex $t 0] \
 	      [lindex $ipmap($link) 0] \
 	      [lindex $t 1] [lindex $ipmap($link) 1]]
+    if {$verbose == 1} {
+	puts [format "%-20s %-15s %-20s %-15s" "" $macmap([lindex $ipmap($link) 0]) "" $macmap([lindex $ipmap($link) 1])]
+    }
 }
 
