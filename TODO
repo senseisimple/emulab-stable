@@ -1,6 +1,59 @@
 [This file is not kept entirely up to date.]
 
+* From: Jay Lepreau <lepreau@cs.utah.edu>
+  Subject: Snapping an image - physnode menu item
+  Date: Tue, 01 Jul 2003 17:39:36 MDT
+  
+  It's always seemed logical to me to have such a menu item on the
+  (physical) "Node Information" page.
+  In fact, several times I've looked for it there,
+  only to remember it doesn't exist, and I need to go to
+  "ImageIdS and OSIDs" (which is not an "action" item,
+  and is not associated with an experiment).
+
+* Email archive for project email lists. 
+
+* Add NS file history, and links to view/create from old NS files.
+
+	I think this might be pretty cool to do, and its not that
+	hard. Change the nsfiles table to index by the unique
+	experiment idx, instead of pid/eid, and add a copy of the
+	original description field to it. Then link it off the users
+	"Show History" link, which has his experiment log. We could
+	load up the old NS files, but I think thats enough of a pain
+	that I would not nother too.
+
+	From Dave:
+
+	> key by the md5 hash of the ns file and store it by that:
+	> 
+	> table 1:
+	> exp pid date md5_of_file
+	> 
+	> table 2:
+	> md5_of_file  contents_of_file
+	> 
+	> That has the advantage of keeping the commonly accessed 
+	> table (table 1) small and statically sized, whereas the
+	> slow and dynamic TEXT records are then in table 2.
+
+	Could also hang it off the experiment_resources record, which
+	would address the swapmod issue, since a new resource record
+	is created at each swapmod.
+
+* Secure the event system so that experiments cannot spoof/snoop each other.
+
+* Fix case sensitivity of event system (and agents, scheduler).
+
+* Fix idleswap auditing. 
+
+* Aren't users required to fill in their first and last names?
+  Also note the state.
+
 *** Major:
+
+* Fix event scheduler for experiment modify so that it can add new
+  events from the current time index, instead of from time 0. 
 
 * Dynamic reconfiguration of experiments (add and subtract nodes).
    - Special case for flat topologies. LAN Easy.
@@ -72,6 +125,8 @@
   of disk space.
 
 *** Medium:
+
+* Change batch system to handle limited-use disk images like timesys.
 
 * CDROM changes:
     1) Add DHCP support to waipconfig.pl.
@@ -153,9 +208,6 @@
   `/groups/<proj>/<group>/logs/'.
 
 * Clean up ISADMIN() and ISADMININISTRATOR() calls in php pages.
-
-* Allow users to set default group and default shell via web page and
-  pass out to nodes when creating accounts.
 
 * > Mapping RHL-STD on pc92 to emulab-ops-RHL73-STD.
   > *** Tarfile /usr/local for node pc96 does not exist!
