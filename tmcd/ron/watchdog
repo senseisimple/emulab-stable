@@ -123,6 +123,8 @@ system("tmcc state ISUP");
 #
 my $mypid = fork();
 if (! $mypid) {
+    my $failed  = 0;
+    
     print "Keep alive starting up ... \n";
 
     while (1) {
@@ -144,9 +146,10 @@ if (! $mypid) {
 		
 		chomp $result;
 		my (undef,$update) = split("=", $result);
-		if ($update) {
+		if ($update || $failed) {
 		    print "Running an update at $date ...\n";
 		    system("update -i");
+		    $failed = $?;
 		}
 		last;
 	    }
