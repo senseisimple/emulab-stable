@@ -194,8 +194,7 @@ if (! chdir("$expt_path/$tbdata")) {
 # terminated or swapped. This is basically a wrapper state for the
 # variety of actual states.
 #
-DBQueryFatal("UPDATE experiments SET expt_locked=now() ".
-	     "WHERE eid='$eid' and pid='$pid'");
+TBLockExp($pid, $eid);
 
 #
 # The rest of this goes into the background so that the user sees
@@ -335,6 +334,7 @@ sub fatal()
     # In batch mode, exit.
     #
     if ($batch) {
+	TBUnLockExp($pid, $eid);
 	exit($errorstat);
     }
 

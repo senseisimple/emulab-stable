@@ -134,7 +134,7 @@ while (1) {
 		    "      batchstate='$BSTATE_POSTED' and ".
 		    "      (attempts=0 or ".
 		    "       ((UNIX_TIMESTAMP() - ".
-		    "         UNIX_TIMESTAMP(expt_start) > (60 * 10)))) ".
+		    "         UNIX_TIMESTAMP(expt_start) > (60 * 15)))) ".
 		    "ORDER BY expt_start LIMIT 1");
 
     $running_result =
@@ -274,7 +274,7 @@ sub dosomething($$)
     # Get some user information. 
     #
     if (!UserDBInfo($creator, \$user_name, \$user_email)) {
-	fatal("DB Error getting user information for uid $creator\n");
+	fatal("DB Error getting user information for uid $creator");
     }
     
     chdir("$dirname/tbdata") or
@@ -365,21 +365,37 @@ sub startexp($)
 	# XXX - What if this update fails?
 	# 
 	$query_result = 
-	    DBQueryWarn("update experiments set attempts=attempts+1, ".
-			"  batchstate='$BSTATE_POSTED' ".
+	    DBQueryWarn("update experiments set attempts=attempts+1 ".
 			"where eid='$eid' and pid='$pid'");
-	$attempts++;
 
-	if (($exit_status == $TOOFEWNODES && $attempts >= 9 &&
-	     (($attempts % 9) == 0)) ||
-	    (($exit_status != $TOOFEWNODES) && ($attempts % 5) == 0) ||
-	    ($attempts == 0)) {
+	if ($exit_status == $TOOFEWNODES) {
+	    if (($attempts % 5) == 0) {
+		$attempts++;
+		
+		my $msg =
+		    "Could not configure Batch Mode experiment $pid/$eid.\n".
+		    "\n". 
+		    "There are not enough free nodes at this time.\n".
+		    "Another attempt will be made in a little while.\n".
+		    "\n". 
+		    "There have been $attempts attempts to start this batch.";
 	    
-	    email_status("Could not configure Batch Mode experiment ".
-			 "$pid/$eid\n".
-			 "There have been $attempts attempts made to start ".
-			 "this batch\n");
+		email_status($msg);
+	    }
+
+	    #
+	    # There is some state that needs to be reset so that another
+	    # attempt can be made.
+	    # 
+	    SetExpState($pid, $eid, EXPTSTATE_NEW);
+	    TBSetBatchState($pid, $eid, $BSTATE_POSTED);
+	    
+	    exit($exit_status);
 	}
+	email_status("Experiment startup exited with error code $exit_status.".
+		     "\n".
+		     "Batch has been removed from the system.");
+	ExptCleanup();
 	exit($exit_status);
     }
 
@@ -389,7 +405,7 @@ sub startexp($)
     TBSetBatchState($pid, $eid, $BSTATE_RUNNING);
     
     email_status("Batch Mode experiment $pid/$eid is now running!\n".
-		 "Please consult the Web interface to see how it is doing.\n");
+		 "Please consult the Web interface to see how it is doing.");
 
     #
     # Done with this phase. Must exit.
@@ -425,7 +441,7 @@ sub endexp($)
     }
 
     ExptCleanup();
-    email_status("Batch Mode experiment $pid/$eid has finished!\n");
+    email_status("Batch Mode experiment $pid/$eid has finished!");
    
     #
     # Child must exit!
@@ -578,7 +594,9 @@ sub donotify($$$)
     my($subject, $from, $to, $hdrs);
     my $MAIL;
 
-    print STDOUT "$mesg\n";
+    $mesg = "$mesg\n";
+
+    print STDOUT "$mesg";
 
     $subject = "TESTBED: Batch Mode Experiment $subtext $pid/$eid";
     $from    = $TBOPS;
@@ -598,6 +616,6 @@ sub donotify($$$)
     }
 
     SENDMAIL($to, $subject, $mesg, $from, $hdrs,
-	     ($logname, $nsfile));
+	     ($logname, "assign.log", $nsfile));
 }
 
