@@ -1668,6 +1668,8 @@ CREATE TABLE widearea_nodeinfo (
   country tinytext,
   zip tinytext,
   external_node_id tinytext,
+  hostname varchar(255) default NULL,
+  site varchar(255) default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
