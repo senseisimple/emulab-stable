@@ -7,7 +7,7 @@ include ../../GNUmakerules
 #
 # These get installed with .tcl extensions.
 # 
-SCRIPTS		= event.tcl parse.tcl stubs.tcl link.tcl postparse.tcl \
+SCRIPTS		= event.tcl parse.tcl stubs.tcl link.tcl postparse \
 		  tcl-object.tcl node.tcl sim.tcl
 
 all:

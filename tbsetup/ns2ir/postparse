@@ -1,0 +1,69 @@
+#!/usr/bin/perl -w
+
+# This handles some of the TB commands. 
+
+# TB commands handled:
+# set-hardware
+# set-link-loss
+
+push(@INC,"./ir");
+#/usr/testbed/lib/tbsetup/ir");
+require libir;
+
+if ($#ARGV != 1) {
+    die	"Syntax: $0 ns_file ir_file";
+}
+
+($nsfile,$irfile) = @ARGV;
+
+&ir_read($irfile);
+
+# Read in nodes from ir file.
+@nodes = split("\n",&ir_get("/topology/nodes"));
+
+open(NSFILE,$nsfile) || die "Could not open $nsfile\n";
+
+# hwtype is indexed by node and contains the type
+# linkloss is indexed by src:dst and contains the loss rate
+while (<NSFILE>) {
+    /^\#TB/ || next;
+    chop;
+    @line = split;
+    if ($line[1] eq "set-hardware") {
+	# hwtype(node) = type
+	$hwtype{$line[2]} = $line[3];
+    } elsif ($line[1] eq "set-link-loss") {
+	# linkloss(src:dst) = loss
+	$linkloss{"$line[2]:$line[3]"} = $line[4];
+    }
+}
+
+close(NSFILE);
+
+# Set hardware types
+@newnodes = ();
+foreach (@nodes) {
+    ($name,$type,@links) = split;
+    if (defined($hwtype{$name})) {
+	$type = $hwtype{$name};
+    }
+    push(@newnodes,"$name $type " . join(" ",@links));
+}
+&ir_set("/topology/nodes",join("\n",@newnodes) . "\n");
+
+# Set link loss
+@links = split("\n",&ir_get("/topology/links"));
+@newlinks = ();
+foreach (@links) {
+    @info = split;
+    $src = $info[1];
+    $dst = $info[3];
+    if (defined($linkloss{$src . ":" . $dst})) {
+	push(@newlinks,"$_ " . $linkloss{$src . ":" . $dst});
+    } else {
+	push(@newlinks,"$_ 0.0");
+    }
+}
+&ir_set("/topology/links",join("\n",@newlinks) . "\n");
+
+&ir_write($irfile);
