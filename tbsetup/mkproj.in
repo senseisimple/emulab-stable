@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -30,6 +30,7 @@ my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
 		"groups", "tiplogs");
+my $projhead;
 
 #
 # Untaint the path
@@ -46,6 +47,7 @@ $| = 1;
 # Load the Testbed support stuff. 
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
 
@@ -93,8 +95,6 @@ if (!TBAdmin($UID)) {
 	"    You must be a TB administrator to run this script!\n");
 }
 
-my $projhead;
-
 #
 # We need the project leader name.
 #
@@ -104,32 +104,30 @@ if (! ($projhead = ProjLeader($pid))) {
 }
 
 #
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
 # Before we can proceed, we need to create the project (unix) group
 # and then create an account for the project leader. We pass this off
 # to sub scripts, but because they are also setuid, we need to flip
-# our UID (perl sillyness). Do that in a child process cause we need
-# root UID to finish off.
+# our UID (perl sillyness).
 #
-if (my $childpid = fork()) {
-    #
-    # Parent waits for child.
-    # 
-    waitpid($childpid, 0);
-    if ($?) {
-	exit($? >> 8);
-    }
-}
-else {
-    $EUID = $UID;
+$EUID = $UID;
 
-    system("$MKGROUP $pid $pid") == 0 or
-	fatal("$MKGROUP $pid failed!");
+system("$MKGROUP $pid $pid") == 0 or
+    fatal("$MKGROUP $pid failed!");
 
-    system("$MKACCT $projhead") == 0 or
-	fatal("$MKACCT $projhead failed!");
-    
-    exit(0);
-}
+system("$MKACCT $projhead") == 0 or
+    fatal("$MKACCT $projhead failed!");
+
+$EUID = 0;
 
 #
 # This acts as check (and we need the numeric uid) in case mkacct failed!
@@ -221,11 +219,12 @@ if (! -e $workdir) {
     }
 }
 
+print "Project Creation Completed!\n";
 exit(0);
 
-sub fatal {
-    local($msg) = $_[0];
+sub fatal($) {
+    my($mesg) = $_[0];
 
-    SENDMAIL($TBOPS, "mkproj $pid Failed", $msg);
-    die("$0: $msg\n");
+    die("*** $0:\n".
+	"    $mesg\n");
 }
