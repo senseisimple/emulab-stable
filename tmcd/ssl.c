@@ -522,7 +522,7 @@ tmcd_sslerror()
 	ERR_error_string_n(ERR_get_error(), buf, sizeof(buf));
 
 	if (client)
-		printf("SSL Error: %s\n", buf);
+		fprintf(stderr, "SSL Error: %s\n", buf);
 	else
 		error("SSL Error: %s\n", buf);
 }
