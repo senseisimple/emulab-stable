@@ -31,6 +31,11 @@ function WRITESIDEBARBUTTON_NEW($text, $base, $link ) {
     echo "    <tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;<img src=\"/new.gif\" /></td></tr>\n";
 }
 
+function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
+    $link = "$link";
+    echo "    <tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
+}
+
 # same as above, but uses a slightly different style sheet so there
 # is more padding below the last button.
 # The devil is, indeed, in the details.
@@ -65,13 +70,14 @@ function WRITESIDEBAR() {
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
+    WRITESIDEBARBUTTON_ABS("Kentucky Emulab", $TBDOCBASE,
+			   "http://www.uky.emulab.net");
+    
     WRITESIDEBARBUTTON_NEW("Tutorial at SIGCOMM",
 		       $TBDOCBASE, "sc2002tut.php3");
 
     WRITESIDEBARBUTTON_NEW("News (August&nbsp;15)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
-    WRITESIDEBARBUTTON("Online Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
-    WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON_NEW("Papers", $TBDOCBASE, "pubs.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
@@ -123,7 +129,7 @@ function WRITESIDEBAR() {
 				   $TBBASE, "moduserinfo.php3");
 	    }
 	    else {
-		WRITESIDEBARBUTTON("My $THISHOMEBASE",
+		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
 	    
