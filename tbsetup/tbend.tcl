@@ -72,11 +72,6 @@ while {[set machine [sql fetchrow $DB]] != {}} {
     lappend machines $machine
 }
 
-if {[catch "exec $nfree $pid $eid >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error freeing resources. ($err)"
-    exit 1
-}
-
 outs "Resetting VLANs"
 if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error reseting vlans ($err)"
@@ -87,3 +82,10 @@ outs "Removing delay entries"
 foreach machine $machines {
     sql exec $DB "delete from delays where node_id = \"$machine\""
 }
+
+if {[catch "exec $nfree $pid $eid >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error freeing resources. ($err)"
+    exit 1
+}
+
+
