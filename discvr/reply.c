@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: reply.c,v 1.6 2001-06-14 23:19:23 ikumar Exp $
+ * $Id: reply.c,v 1.7 2001-07-19 19:55:57 ikumar Exp $
  */
 
 
@@ -27,8 +27,9 @@
 #include "util.h"
 
 extern u_char myNodeID[ETHADDRSIZ];
+extern u_char parent_nodeIF[ETHADDRSIZ];
 extern topd_inqid_t inqid_current;
-
+extern u_char receivingIF[ETHADDRSIZ];
 /*
  * Concatenate all the individual interfaces' messages into
  * one long neighbor list.
@@ -68,11 +69,16 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors
 		        fprintf(stderr, "ran out of room and you didn't do anything reasonable.\n");
 			return 0;
 		}
+		//printf("My parent's address is:");
+		//print_nodeID(parent_nodeIF);
 		memcpy(nid, myNodeID, ETHADDRSIZ);
 		nid += ETHADDRSIZ;
 		memcpy(nid, ifi->ifi_haddr, ETHADDRSIZ);
 		nid += ETHADDRSIZ;
-		bzero(nid, ETHADDRSIZ << 1);
+		memcpy(nid,parent_nodeIF,ETHADDRSIZ);
+		nid += ETHADDRSIZ;
+		memcpy(nid,receivingIF,ETHADDRSIZ);
+		//bzero(nid, ETHADDRSIZ);
 
 		if ( sendnbors != 0 ) {
 		        while ( nborl != NULL ) {

@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: cli.c,v 1.4 2001-06-18 01:41:19 ikumar Exp $
+ * $Id: cli.c,v 1.5 2001-07-19 19:55:57 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -104,6 +104,7 @@ make_inquiry(topd_inqid_t *tip, u_int16_t ttl, u_int16_t factor)
 	/* ...and now our nodeID */
 	nid = find_nodeID();
 	memcpy((void *)tip->tdi_nodeID, nid, ETHADDRSIZ);
+	bzero(tip->tdi_p_nodeIF,ETHADDRSIZ);
 }
 
 void
@@ -120,6 +121,7 @@ cli(int sockfd, const struct sockaddr *pservaddr, socklen_t servlen,
 	sendto(sockfd, &ti, TOPD_INQ_SIZ, 0, pservaddr, servlen);
 	//print_tdinq((char *)&ti);
 	n = recvfrom(sockfd, recvline, MAXLINE, 0, NULL, NULL);
+	fflush(stdin);
 	//printf("Receiving in client:==>\n");
 	//print_tdreply(recvline, n);
 }

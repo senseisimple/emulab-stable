@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.5 2001-06-18 01:41:19 ikumar Exp $*/
+/*$Id: discvr.h,v 1.6 2001-07-19 19:55:57 ikumar Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -98,6 +98,9 @@ get_ifi_struct(int sock, struct ifi_info * ifihead);
 
 void
 addMyID(char* mesg, int size);
+
+void
+get_recvIFADDR(char *name,struct ifi_info * ifihead);
 
 
 #endif /* _TOPD_DISCVR_H_ */

@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: packet.h,v 1.3 2000-07-18 19:19:28 kwright Exp $
+ * $Id: packet.h,v 1.6 2001-08-02 21:21:05 ikumar Exp $
  */
 
 #ifndef _TOPD_PACKET_H_
@@ -42,10 +42,11 @@
  * are struct timevals returned by gettimeofday().
  */
 typedef struct topd_inqid {
-        struct timeval     tdi_tv;
-        u_int16_t          tdi_ttl;
-        u_int16_t          tdi_factor;
-        u_char             tdi_nodeID[ETHADDRSIZ];
+	struct timeval     tdi_tv;
+	u_int16_t          tdi_ttl;
+	u_int16_t          tdi_factor;
+	u_char             tdi_nodeID[ETHADDRSIZ];
+	u_char			   tdi_p_nodeIF[ETHADDRSIZ];
 } topd_inqid_t;
 
 #define TOPD_INQ_SIZ ALIGN(sizeof(struct topd_inqid))

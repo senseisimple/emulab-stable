@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.7 2001-06-18 01:41:19 ikumar Exp $
+ * $Id: forw_requests.c,v 1.8 2001-07-19 19:55:57 ikumar Exp $
  */
 
 #include <math.h>
@@ -32,6 +32,8 @@
  */
 char recvbuf[BUFSIZ];
 extern u_char myNodeID[ETHADDRSIZ];
+extern u_char parent_nodeIF[ETHADDRSIZ];
+
 static double start = 0.0;
 
 double
@@ -59,6 +61,7 @@ get_ifi_struct(int sock, struct ifi_info * ifihead)
 	return NULL;
 }
 
+/*
 void
 addMyID(char* mesg, int size)
 {
@@ -67,7 +70,7 @@ addMyID(char* mesg, int size)
 
 	memcpy(p->tdnbor_dnode,myNodeID,ETHADDRSIZ);
 }
-
+*/
 
 
 struct ifi_info *
@@ -77,7 +80,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 	int                     s, n;
 	int                     more_time = 1;
 	fd_set                  rset,temp_rset;
-        const int               on = 1;
+    const int               on = 1;
 	char                    ifname[IFNAMSIZ];
 	struct topd_inqid       *tdi;
 	struct topd_nborlist    *save;
@@ -86,7 +89,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 	struct timeval          tv;
 	int selectReturn;
 	struct sockaddr         name;
-        int                     namelen=sizeof(name);
+    int                     namelen=sizeof(name);
 	int 			*sock_list=NULL, *temp_sock_list=NULL;
 	int 			sock_num = 0,i=0;
 	struct topd_inqid *temp_mesg;
@@ -134,12 +137,15 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		// Adding check for control net... -ik
 		if(strcmp(ifi->ifi_name,"fxp4")==0) continue;
 		
+		//memcpy(&(temp_mesg->tdi_p_nodeIF),&(ifi->ifi_haddr),IFHADDRSIZ);
+		memcpy(&(temp_mesg->tdi_p_nodeIF),&myNodeID,IFHADDRSIZ);
+		
 		printf("Forwarding the query to interface: \"%s\"\n",ifi->ifi_name);
 		temp_sock_list = sock_list;
 		sock_list = (int *)malloc(sizeof(int)*(sock_num+1));
 		for(i=0;i<sock_num;i++)
 		{
-			printf("copying: %d\n",temp_sock_list[i]);
+			//printf("copying: %d\n",temp_sock_list[i]);
 			sock_list[i] = temp_sock_list[i];
 		}
 		free(temp_sock_list);
@@ -191,16 +197,17 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		print_tdinq(mesg);
 		n = sendto(s, mesg, mesglen, 0, 
 			   (struct sockaddr *)&sin, sizeof(struct sockaddr_in));
-		printf("$$$after forwarding the enquiry: ");
-		print_tdinq(mesg);
+		//printf("$$$after forwarding the enquiry: ");
+		//print_tdinq(mesg);
 
+		/*
 		if(getsockname(s, (struct sockaddr *)&name, &namelen)<0)
 	        {
         	        perror("getsockname\n");
         	}
 	
-	
-		printf("The address from where i am sending: %s\n",sock_ntop(&name,name.sa_len));
+		*/
+		//printf("The address from where i am sending: %s\n",sock_ntop(&name,name.sa_len));
 		if (n != mesglen) {
 		        perror("Didn't send all of packet");
 			exit(1);
@@ -220,7 +227,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 	 */
 
 	n     = 0;
-        start = tod();
+	start = tod();
 	//while (	more_time  ) {
 	while (1) {
 	        double begin, end, elapsed;
@@ -235,9 +242,9 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		 */
 	        begin = tod();
 		temp_rset = rset;
-		printf("entering select **** sec:%d and usec:%d\n",tv.tv_sec,tv.tv_usec);
+		//printf("entering select **** sec:%d and usec:%d\n",tv.tv_sec,tv.tv_usec);
 		selectReturn = select(FD_SETSIZE, &temp_rset, NULL, NULL, &tv);
-		printf("select return: %d\n",selectReturn);
+		//printf("select return: %d\n",selectReturn);
 	        if( selectReturn < 0 ) {
 			 printf("Error in Select call\n");
                          perror("select");
@@ -260,7 +267,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		deadline -= elapsed;
 		tv.tv_sec = floor(deadline);
 		tv.tv_usec = (deadline - tv.tv_sec) * 1e+6;
-		printf("sec:%d usec:%d\n", tv.tv_sec, tv.tv_usec);
+		//printf("sec:%d usec:%d\n", tv.tv_sec, tv.tv_usec);
 
 
 
@@ -276,7 +283,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		
 			// receive one of my neighbors' list of neighbors through 
 			// "ifi" interface to which I just forwarded the request -ik
-			printf("Checking socket: %d\n",sock_list[i]);
+			//printf("Checking socket: %d\n",sock_list[i]);
 			
 			if (!FD_ISSET(sock_list[i], &temp_rset))  continue;
 
@@ -293,15 +300,14 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		
 			if((ifi=get_ifi_struct(sock_list[i],ifihead)) == NULL)
 			{
-				printf("Socket \"%d\" is not in any ifi struct\n",sock_list[i]);
+				fprintf(stderr,"Socket \"%d\" is not in any ifi struct\n",sock_list[i]);
 			}
 			
-			printf("The interface on which i received is \"%s\"",ifi->ifi_name);
+			//printf("The interface on which i received is \"%s\"\n",ifi->ifi_name);
 				
 			// save the existing list of neighbors which I just received through
 			// the "ifi" interface... -ik
 			save = ifi->ifi_nbors;
-			printf("The value of save: \"%d\"\n",save);
 
 			// create a new node for the neighbor link list pointed by "ifi_nbors"
 			// -ik
@@ -311,7 +317,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 			exit(1);
 			}
 			/* skip inquiry ID */
-			ifi->ifi_nbors->tdnbl_nbors = (u_char *)malloc(n);
+			ifi->ifi_nbors->tdnbl_nbors = (u_char *)malloc(n-sizeof(topd_inqid_t));
 			if ( ifi->ifi_nbors->tdnbl_nbors == NULL ) {
 			perror("Not enough memory for neighbor list.");
 				exit(1);
@@ -322,11 +328,12 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 			//      to every message there is a "inquiry ID" attached in the beginning... 
 			// -ik
 			//print_tdpairs(recvbuf + sizeof(topd_inqid_t),n-sizeof(topd_inqid_t));
-			memcpy((void *)ifi->ifi_nbors->tdnbl_nbors, recvbuf + sizeof(topd_inqid_t), n);
+			memcpy((void *)ifi->ifi_nbors->tdnbl_nbors, recvbuf +
+				   sizeof(topd_inqid_t), (n-sizeof(topd_inqid_t)));
 			// The "tdnbl_n" contains the number of neighbors that the node, along this
 			// interface, has ... -ik
 			
-			ifi->ifi_nbors->tdnbl_n = n / sizeof(struct topd_nbor);
+			ifi->ifi_nbors->tdnbl_n = (n-sizeof(topd_inqid_t)) / sizeof(struct topd_nbor);
 			ifi->ifi_nbors->tdnbl_next = save;
 			//print_tdpairs(ifi->ifi_nbors->tdnbl_nbors,n-sizeof(topd_inqid_t));
 		}

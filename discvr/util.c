@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.c,v 1.4 2001-06-18 01:41:19 ikumar Exp $
+ * $Id: util.c,v 1.5 2001-07-19 19:55:57 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -175,6 +175,8 @@ print_tdinq(const char *mesg)
 		ntohs(tip->tdi_ttl), 
 		ntohs(tip->tdi_factor)); 
 	print_nodeID(tip->tdi_nodeID);
+	printf(" PARENT i/f:");
+	print_nodeID(tip->tdi_p_nodeIF);
 }
 
 u_char *max_haddr(u_char *ha1, u_char *ha2)

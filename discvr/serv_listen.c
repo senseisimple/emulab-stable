@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.7 2001-06-18 01:41:19 ikumar Exp $
+ * $Id: serv_listen.c,v 1.8 2001-07-19 19:55:57 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -41,6 +41,8 @@ extern topd_inqid_t inqid_current;
  * as the nodeID. 
  */
 u_char myNodeID[ETHADDRSIZ];
+u_char parent_nodeIF[ETHADDRSIZ];
+u_char receivingIF[ETHADDRSIZ];
 
 /*
  * Return 0 if the inquiry is not from us, 1 if it is.
@@ -60,17 +62,39 @@ from_us(struct in_pktinfo *pktinfo, struct ifi_info *ifihead)
 
 int is_my_packet(struct sockaddr *pcliaddr, struct ifi_info *ifihead) 
 {
-	char *name1,*name2;
+	char *name1,*name2,*name_tmp;
 	struct ifi_info *ifi;
         for( ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) {
-		name1=inet_ntoa(((struct sockaddr_in *)ifi->ifi_addr)->sin_addr);
-		name2=inet_ntoa(((struct sockaddr_in *)pcliaddr)->sin_addr);
+		name_tmp=inet_ntoa(((struct sockaddr_in *)ifi->ifi_addr)->sin_addr);
+		if((name1 = (char*)malloc(sizeof(char)*strlen(name_tmp)))==NULL)
+			perror("is_my_packet: problem in malloc");
+		strcpy(name1,name_tmp);
+		name_tmp=inet_ntoa(((struct sockaddr_in *)pcliaddr)->sin_addr);
+		if((name2 = (char*)malloc(sizeof(char)*strlen(name_tmp)))==NULL)
+			perror("is_my_packet: problem in malloc");
+		strcpy(name2,name_tmp);
 		//printf("name1:\"%s\" name2:\"%s\"\n",name1,name2);
 		if(strcmp(name1,name2)==0)
 	                return 1;
 	}
 	return 0;
 }
+
+void
+get_recvIFADDR(char *name,struct ifi_info * ifihead)
+{
+	struct ifi_info * ifi=NULL;
+
+	for (ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) 
+	{
+		if(strcmp(name,ifi->ifi_name)==0) 
+			//Will do this once know the conversion from MAC address to hostname
+			//-ik
+			//memcpy(&receivingIF,&(ifi->ifi_haddr),ETHADDRSIZ);	
+			memcpy(&receivingIF,&myNodeID,ETHADDRSIZ);	
+	}
+}
+
 
 /*
  * Return 0 if the two inquiries are identical, non-zero if not.
@@ -116,7 +140,7 @@ print_ifi_info(struct ifi_info *ifihead)
 void
 serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 {
-	int			flags, class;
+	int			flags, class=NEW;
 	const int		on = 1;
    	socklen_t		len;
 	ssize_t			n;
@@ -141,7 +165,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	 * is supported on FreeBSD. -lkw
 	 */
 	if (setsockopt(sockfd, IPPROTO_IP, IP_RECVIF, &on, sizeof(on)) < 0) {
-		printf("setsockopt of IP_RECVIF");
+		fprintf(stderr,"setsockopt of IP_RECVIF");
 		return;
 		
 	}
@@ -153,7 +177,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	 */
 
 	//ik: get the list of interfaces using the function "get_ifi_info" into the
-	//link list "ifi"
+	//link list "ifi" and the max hardware address of all the i/fs is the Node ID
 	for (ifihead = ifi = get_ifi_info(AF_INET, 0); 
 		 ifi != NULL; ifi = ifi->ifi_next) {
 		if ( ifi->ifi_hlen > 0) {
@@ -161,7 +185,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		}
 	}
 	memcpy(&myNodeID, myNodeIDtmp, ETHADDRSIZ);
-        printf("My node id:");
+	printf("My node id:");
 	print_nodeID(myNodeID);
 
 	print_ifi_info(ifihead);
@@ -173,7 +197,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	 */
 	i=0;
 	for ( ; ; ) {
-		printf("**********for==>%d\n",i++);
+		//printf("**********for==>%d\n",i++);
 		len = clilen;
 		flags = 0;
 		n = recvfrom_flags(sockfd, mesg, MAXLINE, &flags,
@@ -208,6 +232,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		 * 
 		 * We now classify each inquiry.
 		 */ 
+		ifihead = get_ifi_info(AF_INET, 0); 
 		
 		if(inqhead==NULL) class = NEW;
 		j=0;
@@ -243,14 +268,22 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		/* 
 		 * Save the inquiry ID into inqid_current.
 		 */
+		get_recvIFADDR(if_indextoname(pktinfo.ipi_ifindex, ifname),ifihead);
+		//printf(">>>>>>>The receiving interface is:");
+		//print_nodeID(receivingIF);
 		memcpy(&inqid_current, mesg, sizeof(topd_inqid_t));
 
 		/* Send string to all interfaces. forward_request() will 
 		 * stuff reply into ifi_info. 
 		 */
  
-		ifihead = get_ifi_info(AF_INET, 0); 
+		//ifihead = get_ifi_info(AF_INET, 0); 
 		temp_inqid = (struct topd_inqid *)mesg;
+
+		memcpy(&parent_nodeIF, &(temp_inqid->tdi_p_nodeIF), ETHADDRSIZ);
+		//printf("Parents interface:");
+		//print_nodeID(parent_nodeIF);
+		
 		t_int = ntohs(temp_inqid->tdi_ttl);
 		if(t_int==0)
 			printf("The TTL is zero so i will not forward!!\n");
@@ -273,8 +306,8 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 			//temp->tdi_ttl = htons(t_int);
 			
 		        ifihead=forward_request(ifihead, &pktinfo, mesg, n );
-			printf("printing after forward===>\n");
-			print_tdifinbrs(ifihead);
+			//printf("printing after forward===>\n");
+			//print_tdifinbrs(ifihead);
 
 		}
 
@@ -288,7 +321,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		printf("done!\n");
 		free_ifi_info(ifihead);
 		
-		printf("I am sending the response to: %s\n",sock_ntop(pcliaddr,sizeof(struct sockaddr)));
+		printf("Sending response to: %s\n",sock_ntop(pcliaddr,sizeof(struct sockaddr)));
 		/* send response back to original sender */
 		sendto(sockfd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));
 	}

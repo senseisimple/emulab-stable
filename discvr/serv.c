@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv.c,v 1.3 2001-06-14 23:19:23 ikumar Exp $
+ * $Id: serv.c,v 1.7 2001-08-04 22:58:30 ikumar Exp $
  */
 
 #include "discvr.h"
@@ -46,12 +46,14 @@ main(int argc, char **argv)
 	{
 		perror("bind");
 	}
-	printf("The address I am listening on is: %s\n",inet_ntoa(servaddr.sin_addr));
+	//printf("The address I am listening on is: %s\n",inet_ntoa(servaddr.sin_addr));
+	/*
 	if(getsockname(sockfd, (struct sockaddr *)&name, &namelen)<0)
 	{
 		perror("getsockname\n");
 	}
 	printf("No I am listening on: \"%s\"\n",sock_ntop(&name,name.sa_len));
+	*/
 	serv_listen(sockfd, (struct sockaddr *) &cliaddr, sizeof(cliaddr));
 	
 	/* We'll never get here */
