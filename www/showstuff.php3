@@ -1841,7 +1841,7 @@ function SHOWNODE($node_id, $flags = 0) {
 		$row = mysql_fetch_array($query_result);
 	    
 		if (isset($row["pixels_per_meter"]) &&
-		    ($pixels_per_meter = $row["pixels_per_meter"])) {
+		    ($pixels_per_meter = $row["pixels_per_meter"]) != 0.0) {
 		
 		    $meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
 		    $meters_y = sprintf("%.3f", $loc_y / $pixels_per_meter);
