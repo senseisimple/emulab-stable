@@ -225,8 +225,8 @@ to run:
 make all certificate
 ... in /usr/ports/www/apache13-modssl . Make sure that you give the same value
 for the 'Common name' that you put in WWWHOST in your defs file, and answer
-'N' to the 'Encrypt the private key now?' question. This script creates the
-files:
+'N' to the 'Encrypt the private key now?' question. You can just take the
+defaults on the rest of the qestions. This script creates the files:
 work/apache_<version>/conf/ssl.key/server.key
 work/apache_<version>/conf/ssl.crt/server.crt
 ... which you can move into the locations mentioned above.
@@ -240,7 +240,16 @@ disk images - You'll also, of course, need disk images to go on your nodes.
 Right now, we have no automatic way of generating these, so you'll have to ask
 Utah for some.
 
-##### Step 8 - Filling the database
+locate database - It can be useful to update the 'locate' database to help you
+find files as you're learning the system. This normally happends nightly, but
+you can force it to happen now by running 'locate.updatedb' as root. This will
+take several minutes. You can then find foo.conf by running 'locate foo.conf'.
+
+##### Step 8 - Reboot boss
+
+Okay, go ahead and reboot boss now, and make sure it comes up okay.
+
+##### Step 9 - Filling the database
 
 See the file setup-db.txt in this directory for instructions on getting the
 proper information about your site and nodes into the database.
