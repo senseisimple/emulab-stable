@@ -38,6 +38,12 @@ PAGEHEADER("Documentation");
         asking for help. Includes sections on "Getting Started" on Emulab,
         using the testbed, hardware setup, software setup, security issues,
         and troubleshooting. Over 50 questions and answers.</dd>
+</dl><br>
+
+<li><dl>
+<dt><b><a href="doc/docwrapper.php3?docname=plab.html">
+              Emulab PlanetLab Interface</a></b></dt>
+    <dd>Documentation for our interface to PlanetLab.</dd>
 </dl>
 
 </ul>
