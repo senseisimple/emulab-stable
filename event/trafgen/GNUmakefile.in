@@ -45,7 +45,8 @@ CFLAGS	 += -DUSEEVENTS
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `elvin-config --libs vin4c`
+# Expand the elvin-config list now so it can be filtered below.
+LIBS     += $(shell elvin-config --libs vin4c)
 
 SYSTEM   := $(shell uname -s)
 
@@ -60,6 +61,13 @@ ifeq ($(SYSTEM),CYGWIN_NT-5.1)
 # Cygwin on  Windows XP - resembles the Linux case.
 CFLAGS	 += -DCYGWIN -DLINUX
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DCYGWIN -DLINUX
+
+# Get rid of the trailing -c from elvin-config.  It causes errors like:
+#     fu000001.o(.idata$3+0xc): undefined reference to `_libc_iname'
+# This is only necessary if we have to add libraries AFTER the elvin args above.
+LIBS     := $(filter-out -lc,$(LIBS))
+
+# Add Flex lib.  Has to be at the end.
 LIBS	 += -lfl
 endif
 
