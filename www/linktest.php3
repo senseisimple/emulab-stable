@@ -9,7 +9,8 @@ include("showstuff.php3");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
-# 
+#
+
 
 #
 # Only known and logged in users can do this.
