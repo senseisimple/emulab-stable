@@ -72,6 +72,7 @@ my $beproxy     = 0;
       "timeout"		=> undef,
       "logfile"		=> undef,
       "nocache"         => 0,
+      "clrcache"        => 0,
     );
 
 # The cache directory is named by the vnodeid. This avoids some confusion.
@@ -321,6 +322,13 @@ sub runtmcc ($;$$%)
 sub tmcc ($;$$%)
 {
     my ($cmd, $args, $results, %opthash) = @_;
+
+    #
+    # Clear cache first if requested.
+    #
+    if ($config{"clrcache"}) {
+	tmccgetconfig();
+    }
 
     #
     # See if this is a cmd we can get from the local config stash. 

@@ -26,9 +26,10 @@ sub usage()
     print STDERR " -t timeout	Timeout waiting for the controller.\n";
     print STDERR " -x path	Be a proxy using the unix domain socket\n";
     print STDERR " -o path	Specify log file name for -x option\n";
+    print STDERR " -c   	Clear tmcc cache first (must be root)\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:b";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:bc";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -83,6 +84,13 @@ sub ParseOptions()
     }
     if (defined($options{"b"})) {
         libtmcc::configtmcc("nocache", 1);
+    }
+    if (defined($options{"c"})) {
+	if ($UID) {
+	    print STDERR "Must be root to use the -c option!\n";
+	    exit(-1);
+	}
+        libtmcc::configtmcc("clrcache", 1);
     }
     if (defined($options{"s"})) {
         libtmcc::configtmcc("server", $options{"s"});
