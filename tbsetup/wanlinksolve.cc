@@ -100,7 +100,8 @@
 #define MAX_NODES 20
 #define MAX_DIMENSIONS 2
 
-#define DEFAULT_ROUNDS 256
+// default rounds to keep going without finding a better solution.
+#define DEFAULT_ROUNDS 512
 
 // The size of our "population."
 // (number of phenotypes)
@@ -180,7 +181,7 @@ public:
   unsigned char pnode_uses[MAX_NODES];
 
   float error;
-  float prob;
+  unsigned int prob;
 };
 
 // the population pool.
@@ -199,23 +200,45 @@ static inline void prepick( Solution * currentPool )
     totalFitness += 1.0f / currentPool[i].error;
   }
 
+  unsigned int probsofar = 0;
   for (i = 0; i < SOLUTIONS; i++) {
-    currentPool[i].prob = (1.0f / currentPool[i].error) / totalFitness;
+    probsofar += (unsigned int)(((float)0xFFFFFFFF / currentPool[i].error) / totalFitness);
+    currentPool[i].prob = probsofar;
   }
+
+  currentPool[SOLUTIONS - 1].prob = 0xFFFFFFFF;
 }
 
+// optimized to 1. not use fp 2. use a binary search, rather than a linear one.
+// win: according to gprof, was taking 75% of the total time, now takes 17%.
 static inline int pickABest( Solution * currentPool )
 {
-  float x = (float)rand() / (float)RAND_MAX;
+  unsigned int x = rand();
 
+  int lo = 0;
+  int hi = SOLUTIONS;
+  int mid;
+
+  while (1) {
+    mid = (hi + lo) / 2;
+    if (x <= currentPool[mid].prob) { 
+      if (mid == 0 || x > currentPool[mid - 1].prob) break; 
+      hi = mid; 
+    } else { 
+      lo = mid; 
+    }
+  } 
+
+  return mid;
+  /*
   int i = 0;
   while (1) { 
-    x -= currentPool[i].prob; 
-    if (x < 0.0f) break;
+    if (x < currentPool[i].prob) break;
     i++;
-    if (i == SOLUTIONS) { i = 0; }
+    if (i == SOLUTIONS) { printf("Ick.\n"); i = 0; break;}
   }
   return i - 1;
+  */
 }
 
 // uses a template to avoid massive numbers
@@ -689,7 +712,7 @@ int main( int argc, char ** argv )
       }
       */
       
-      if (verbose && !(i % (minrounds / 8))) {
+      if (verbose && !(i % 100)) {
 	printf("Round %i. (best %4.3f)\n", i, currentPool[0].error);
       }
       
