@@ -280,6 +280,7 @@ my $minimum_nodes;
 my $maximum_nodes;
 my $remotecount  = 0;
 my $virtcount    = 0;
+my $needwanassign= 0;
 
 #
 # This is for stats gathering. It might duplicate other stuff, but
@@ -438,6 +439,8 @@ while (1) {
 	if (defined($multiplex_factor));
     $ptopargs   .= "-v "
 	if ($virtcount);
+    $ptopargs   .= "-r "
+	if ($remotecount);
     system("ptopgen $ptopargs > $ptopfile");
 
     TBDebugTimeStamp("ptopgen finished");
@@ -575,9 +578,12 @@ while (1) {
 	    }
 	    else {
 		#
-		# This is a new node; we'll have to reserve it.
+		# This is a new node; we'll have to reserve it. Note that
+		# we do not reserve a widearea physnode when a virtual node
+		# is mapped to it; they are special.
 		#
-		$toreserve{$physical} = 1;	    
+		$toreserve{$physical} = 1
+		    if (!virtnodeisremote($virtual));
 	    }
 	    
 	    if (virtnodeisvirt($virtual)) {
@@ -792,7 +798,7 @@ TBDebugTimeStamp("assign_loop finished");
 #
 # VIRTNODES HACK: Allocate the remote virtual nodes.
 #
-if ($remotecount) {
+if ($needwanassign) {
     my $success  = 0;
     my $wanargs  = ($impotent ? "-n" : "");
 
@@ -2551,18 +2557,42 @@ sub LoadPhysInfo()
 	DBQueryFatal("select * from node_types");
 
     while (my $rowref = $query_result->fetchrow_hashref()) {
-	my $type = $rowref->{"type"};
+	my $type  = $rowref->{"type"};
+	my $class = $rowref->{"class"};
 
 	#
-	# Stash the entire DB row reference.
+	# Stash the entire DB row reference. Note that we store it
+	# under both type and class since the user can set the type
+	# to either in the NS file. 
 	#
-	$node_types{$type} = $rowref;
+	$node_types{$type}  = $rowref;
+	$node_types{$class} = $rowref;
+    }
+
+    # Now get the auxtypes. We store a pointer to the row reference under
+    # each auxtype since the user can reference an auxtype in the NS file.
+    $query_result =
+	DBQueryFatal("select * from node_types_auxtypes");
+    
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $type    = $rowref->{"type"};
+	my $auxtype = $rowref->{"auxtype"};
+
+	fatal(1, "*** $0:\n".
+	      "    Invalid type/auxtype $type/$auxtype!\n")
+	    if (!exists($node_types{$type}));
+
+	$node_types{$auxtype}  = $node_types{$type};
     }
 }
 sub interfacespeed($)	{ return $interface_types{$_[0]}->{"max_speed"}; }
+sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
 sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
 sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
 sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
+sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
+sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
+sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
 
 #
 # Load up the virt_nodes info, which includes the type info for each
@@ -2574,11 +2604,7 @@ sub LoadVirtNodes()
     printdb "Loading virt_nodes.\n";
 
     my $query_result =
-	DBQueryFatal("select distinct vn.*, ".
-		     "  nt.isremotenode,nt.isvirtnode,nt.issubnode ".
-		     " from virt_nodes as vn ".
-		     "left join node_types as nt on ".
-		     "     nt.type=vn.type or nt.class=vn.type ".
+	DBQueryFatal("select * from virt_nodes as vn ".
 		     "where vn.pid='$pid' and vn.eid='$eid' ".
 		     "order by vn.vname");
 
@@ -2596,11 +2622,45 @@ sub LoadVirtNodes()
 	my $type    = $rowref->{"type"};
 	my $fixed   = $rowref->{"fixed"};
 	my $osname  = $rowref->{"osname"};
-	my $isremote= $rowref->{"isremotenode"};
-	my $isvirt  = $rowref->{"isvirtnode"};
-	my $issub   = $rowref->{"issubnode"};
+
+	# XXX
+	# If its a vtype, there will not be any node_type data. This
+	# can break things, if one were to mix a virt/remote type with
+	# a nonvirt/local type! Need to actually verify the vtypes
+	# for consistency. 
+	#
+	my $isremote= 0;
+	my $isvirt  = 0;
+	my $issub   = 0;
+
+	# If we have a real type or auxtype ...
+	if (nodetypeistype($type)) {
+	    $isremote = nodetypeisremote($type);
+	    $isvirt   = nodetypeisvirt($type);
+	    $issub    = nodetypeissub($type);
+	}
+	elsif (virttypeisvtype($type)) {
+	    #
+	    # For now, just pick the first member type.
+	    #
+	    my @memberlist = virttypemembers($type);
+	    my $vtype      = $memberlist[0];
+
+	    $isremote = nodetypeisremote($vtype);
+	    $isvirt   = nodetypeisvirt($vtype);
+	    $issub    = nodetypeissub($vtype);
+	}
+	else {
+	    fatal(1, "*** $0:\n".
+		     "    Improper type $type for node $vname!\n");
+	}
 
 	# Extend the DB info with this stuff:
+	# Easy access ...
+	$rowref->{"__isremotenode"} = $isremote;
+	$rowref->{"__isvirtnode"}   = $isvirt;
+	$rowref->{"__issubnode"}    = $issub;
+	$rowref->{"__usewanassign"} = 0;
 	# The mapped osname to actual osid. 
 	$rowref->{"__osid"} = undef;
 	# Eventual physical mapping. 
@@ -2635,17 +2695,6 @@ sub LoadVirtNodes()
 	if (defined($fixed) && $fixed ne "") {
 	    $fixed_nodes{$vname} = $fixed;
 	}
-
-	# XXX
-	# If its a vtype, there will not be any node_type data. This
-	# can break things, if one were to mix a virt/remote type with
-	# a nonvirt/local type! Need to actually verify the vtypes
-	# for consistency. 
-	#
-	$isremote = 0
-	    if (! defined($isremote));
-	$isvirt   = 0
-	    if (! defined($isvirt));
 
 	printdb "  $vname $type $ips\n";
 	printdb "         isrem:$isremote isvirt:$isvirt ";
@@ -2730,15 +2779,17 @@ sub virtnodesetosid($$) { return $virt_nodes{$_[0]}->{"__osid"} = $_[1]; }
 sub virtnodeparent($)   { return $virt_nodes{$_[0]}->{"__parent"}; }
 sub virtnodepnode($)    { return $virt_nodes{$_[0]}->{"__physnode"}; }
 sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
+sub virtnodeusewan($)   { return $virt_nodes{$_[0]}->{"__usewanassign"}; }
+sub virtnodesetusewan($){ return $virt_nodes{$_[0]}->{"__usewanassign"} = 1;}
 sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
 sub virtnodeisremote($) {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isremotenode"};
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isremotenode"};
 }
 sub virtnodeisvirt($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"isvirtnode"};
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isvirtnode"};
 }
 sub virtnodeissubnode($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"issubnode"};
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issubnode"};
 }
 sub virtnodeisjailed($) {
     return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
@@ -2814,6 +2865,7 @@ sub LoadVirtLans()
 	$virt_lans{$vname}->{"TUNNEL"}       = 0;
 	# Netmask for the entire lan.
 	$virt_lans{$vname}->{"MASK"}         = $rowref->{"mask"};
+	$virt_lans{$vname}->{"WIDEAREA"}     = $widearea;
 
 	#
 	# REMOTE VIRTNODE HACK: 
@@ -2834,6 +2886,9 @@ sub LoadVirtLans()
 		printdb "    Added $member to tunnels of $vname\n";
 	    }
 	    $expt_stats{"walinks"} += 1;
+	    $needwanassign = 1;
+	    # Must let wanassign do this. 
+	    virtnodesetusewan($node);
 	    next;
 	}
 
@@ -2915,6 +2970,7 @@ sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
 sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
 sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
 sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
+sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
 
 #
 # Ditto for virt_vtypes.
@@ -2937,9 +2993,10 @@ sub LoadVirtTypes()
 	$virt_vtypes{$typename} = $rowref;
     }
 }
+sub virttypeisvtype($)  { return exists($virt_vtypes{$_[0]}); }
 sub virttypename($)	{ return $virt_vtypes{$_[0]}->{"name"}; }
 sub virttypeweight($)	{ return $virt_vtypes{$_[0]}->{"weight"}; }
-sub virttypemembers($)	{ return $virt_vtypes{$_[0]}->{"members"}; }
+sub virttypemembers($)	{ return split(" ", $virt_vtypes{$_[0]}->{"members"});}
 
 #
 # Load the experiment and the virtual topology.
@@ -2964,7 +3021,7 @@ sub LoadExperiment()
 	if (!defined($multiplex_factor));
     $usewatunnels = $o4
 	if (!defined($usewatunnels));
-    
+
     LoadVirtTypes();
     LoadVirtNodes();
     LoadVirtLans();
@@ -2992,9 +3049,9 @@ sub CreateTopFile()
     foreach my $vtype (keys(%virt_vtypes)) {
 	my $name   = virttypename($vtype);
 	my $weight = virttypeweight($vtype);
-	my $members= virttypemembers($vtype);
+	my @members= virttypemembers($vtype);
 	
-	print TOPFILE "make-vclass $name $weight $members\n";
+	print TOPFILE "make-vclass $name $weight @members\n";
     }
 
     # Dump the node list to the topfile. 
@@ -3002,7 +3059,7 @@ sub CreateTopFile()
 	my $vname = virtnodename($node);
 	my $type  = virtnodetype($node);
 
-	if (!virtnodeisremote($vname)) {
+	if (!virtnodeusewan($vname)) {
 	    my $subnodestr = "";
 	    if (virtnodeissubnode($vname)) {
 		my $parent = virtnodeparent($vname);
@@ -3034,6 +3091,9 @@ sub CreateTopFile()
     }
 
     foreach $lan (keys(%virt_lans)) {
+	next
+	    if (virtlanwidearea($lan));
+	
 	my @members = virtlanmembers($lan);
 	printdb "$lan - " . join(" ",@members) . "\n";
 	my $simnodes = 0;
@@ -3326,7 +3386,7 @@ sub CreateTopFile()
     # NB: This must be done last since we create internal nodes above.
     #
     foreach my $node (keys(%fixed_nodes)) {
-	if (!virtnodeisremote($node) &&
+	if (!virtnodeusewan($node) &&
 	    (virtnodeisvnode($node) || exists $delaynodes{$node})) {
 	    my $pnode = $fixed_nodes{$node};
 
