@@ -20,16 +20,18 @@ mysql tbdb < sql/database-create.sql
 
 ##### Step 1 - Setup users
 
-You'll need to start by creating an admin user. Currently, there is no
-automated way to do this - the easiest thing to do is contact Utah and ask for
-an example entry. We hope to remedy this problem before too long.
-
 At this point, it's a good idea to get the nfs mounts between boss and ops
 setup, as well at the ssh root keys. See the boss and ops setup documents for
 details.
 
-Run 'mkacct <username>' for the user you just created. This will set up a Unix
-account for them on the boss and ops nodes.
+Run the 'firstuser' script. This will get put in the utils subdirectory of your
+boject tree. (Note: configure will not set the executable bit on the script, so
+you'll need to set it yourself, or run 'perl firstuser'.) This script will let
+you create the first user and project in the database. By default, it will grab
+information about the account it's being run as (propably you,) or you can
+supply a sername, an encrypted password string (grab it from a password file,)
+etc. This script will also prompt you to create the first project - we suggest
+you create an 'emulab-ops' project.
 
 If you want to make sure that this account is a member of any Unix groups (such
 as wheel,) run 'unixgroups -a <uid> <gid> ...'
