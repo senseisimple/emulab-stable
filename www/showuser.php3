@@ -70,6 +70,11 @@ if ($yourpcs) {
 }
 
 #
+# Put a link down to the profile
+#
+echo "<h3><a href=\"#PROFILE\">Manage User Profile</a></h3>\n";
+
+#
 # Lets show Experiments.
 #
 SHOWEXPLIST("USER",$target_uid);
@@ -78,12 +83,16 @@ SHOWEXPLIST("USER",$target_uid);
 # Lets show project and group membership.
 #
 $query_result =
-    DBQueryFatal("select distinct g.pid,g.gid,g.trust,p.name,gr.description ".
+    DBQueryFatal("select distinct g.pid,g.gid,g.trust,p.name,gr.description, ".
+    		 "       count(distinct r.node_id) as ncount ".
 		 " from group_membership as g ".
 		 "left join projects as p on p.pid=g.pid ".
 		 "left join groups as gr on gr.pid=g.pid and gr.gid=g.gid ".
+		 "left join experiments as e on g.pid=e.pid and g.gid=e.gid ".
+		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
 		 "where uid='$target_uid' and ".
 		 "trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
+		 "group by g.pid, g.gid ".
 		 "order by g.pid,gr.created");
 
 if (mysql_num_rows($query_result)) {
@@ -95,6 +104,7 @@ if (mysql_num_rows($query_result)) {
     echo "<tr>
               <th>PID</th>
               <th>GID</th>
+	      <th>Nodes</th>
               <th>Name/Description</th>
               <th>Trust</th>
               <th>MailTo</th>
@@ -106,6 +116,7 @@ if (mysql_num_rows($query_result)) {
 	$name  = $projrow[name];
 	$desc  = $projrow[description];
 	$trust = $projrow[trust];
+	$nodes = $projrow[ncount];
 	
 	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
 	    echo "<tr>
@@ -113,6 +124,9 @@ if (mysql_num_rows($query_result)) {
                             $pid</A></td>
                      <td><A href='showgroup.php3?pid=$pid&gid=$gid'>
                             $gid</A></td>\n";
+
+	    echo "<td>$nodes</td>\n";
+
 	    if (strcmp($pid,$gid)) {
 		echo "<td>$desc</td>\n";
 		$mail  = $pid . "-" . $gid . "-users@" . $OURDOMAIN;
@@ -143,7 +157,7 @@ SHOWWIDEAREAACCOUNTS($target_uid);
 #
 echo "<a NAME=PROFILE></a>\n";
 echo "<center>
-      <h3>Profile</h3>
+      <h3>User Profile</h3>
       </center>\n";
 
 SUBPAGESTART();
@@ -159,6 +173,7 @@ if ($isadmin || !strcmp($uid, $target_uid)) {
 		       "showpubkeys.php3?target_uid=$target_uid");
     WRITESUBMENUBUTTON("Edit SFS Keys",
 		       "showsfskeys.php3?target_uid=$target_uid");
+
     WRITESUBMENUBUTTON("Show History",
 		       "showstats.php3?showby=user&which=$target_uid");
 }
