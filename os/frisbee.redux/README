@@ -1,0 +1,138 @@
+From stoller Mon Mar 18 07:17:13 -0800 2002
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Message-ID: <15510.1273.558700.46502@stoller.casco.net>
+Date: Mon, 18 Mar 2002 07:17:13 -0800
+From: Leigh Stoller <stoller@fast.cs.utah.edu>
+To: Jay Lepreau <lepreau@fast.cs.utah.edu>
+Cc: barb@fast.cs.utah.edu
+Subject: Re: Need a summary of the Frisbee algorithm
+In-Reply-To: <200203181215.FAA11167@fast.cs.utah.edu>
+References: <200203181215.FAA11167@fast.cs.utah.edu>
+X-Mailer: VM 6.92 under Emacs 20.7.1
+
+> From: Jay Lepreau <lepreau@fast.cs.utah.edu>
+> Subject: Need a summary of the Frisbee algorithm
+> Date: Mon, 18 Mar 2002 05:15:47 -0700 (MST)
+> 
+> I need this today; tomorrow at the latest.
+> Chad had written one once; where is it?
+> It probably is mostly still true assuming Leigh
+> left it pretty much the same, whuch I thought
+> he said he did.
+
+I changed the algorithm quite a bit actually, to make it less synchronous
+with respect to the server. The toplevel view is still the same, which is
+why we can still call it Frisbee; the server flings blocks out and clients
+catch them. If its a block it needs, it saves it and adds to its list of
+blocks to unzip to disk.
+
+The big change is that clients connect to the server to get the number of
+blocks in the image, but after that the server no longer cares much about
+them, except to read in requests for blocks (or subblocks) that clients
+need.
+
+The server is multithreaded. One thread simply reads those requests and
+adds them to a worklist. The other thread reads the worklist, reads the
+stuff out of the image file, and sends the blocks (or subblocks) out. A
+"block" is one of our 1meg chunks, and a subblock is a range within one of
+the 1 meg chunks (a client can request a missing subblock). Thats all the
+server does. Very simple.
+
+The clients are also multithreaded. One thread takes in blocks and
+subblocks and adds them to an internal cache. The other thread looks for
+completed blocks in that cache, and unzips them to disk. By being
+multithreaded, the receiver thread gets control (can take in more blocks)
+when the disk writer thread blocks in the kernel on a disk write.
+
+Okay, so the main algorithm is contained in the block reader thread in the
+client. It maintains a bitmap of blocks (1 meg chunks) it needs. At startup
+it randomizes the list (using noise), and then doles out those block
+requests to the server. For each block it is working on, it maintains a
+bitmap of 1K chunks it needs. Of course, since multiple clients are all
+requesting blocks which are being multicast out, it could be working on
+lots of different blocks at once; *whenever* a block arrives that it has
+not seen before, it starts working on it, up to a limit of 32 (or perhaps
+64) in progress at once.  To avoid meltdown, each individual client
+requests no more than 2 blocks ahead; if the total number of blocks in
+progress in less <= 2, it will send in a request for another one from its
+randomized list. Now, for each block in progress, it maintains a bitmap of
+1K chunks it needs. If no block or subblock (remember, a subblock is a
+contig range of 1K buffers) arrives after 90ms (timeout on socket read), it
+assumes that the something was lost; it looks at its bitmaps and requests
+more data (either subblock ranges or blocks). Subranges are not lost very
+often of course (all the UDP packets typically make it).
+
+The goal of this algorithm is to keep the diskwriter thread busy *all* the
+time; each time around the loop, there should be a completed block for it
+to to unzip/write. Since the unzip/write operates at a fraction of the
+speed that the server/network can get blocks to it, this turns out to be
+pretty easy to do. The hard part is keeping the server from melting down
+the network (or itself) by sending them too fast! Send too fast and UDP
+packets get toasted and the server thrashes. 
+
+As it turns out, I managed to accomplish this. Other than startup delay,
+the writer thread is never idle, and the server can manage many concurrent
+frisbee daemons doling out different images. Well, I've tested it out to
+about 6. Each one takes about 4% CPU at steady state. 
+
+Is this enough text for you?
+Lbs
+
+From stoller Mon Mar 18 10:43:31 -0800 2002
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Message-ID: <15510.13651.903626.13004@stoller.casco.net>
+Date: Mon, 18 Mar 2002 10:43:31 -0800
+From: Leigh Stoller <stoller@fast.cs.utah.edu>
+To: Jay Lepreau <lepreau@cs.utah.edu>
+Cc: barb@fast.cs.utah.edu
+Subject: Re: Need a summary of the Frisbee algorithm 
+In-Reply-To: <200203181827.LAA19142@fast.cs.utah.edu>
+References: <200203181827.LAA19142@fast.cs.utah.edu>
+X-Mailer: VM 6.92 under Emacs 20.7.1
+
+> From: Jay Lepreau <lepreau@cs.utah.edu>
+> Subject: Re: Need a summary of the Frisbee algorithm 
+> Date: Mon, 18 Mar 2002 11:27:00 MST
+> 
+> Questions:
+> -From what you say about randomizing requests, it doesn't
+> sound like you do anything to keep requests more-or-less
+> sequentially ordered.  Which seems like it would hurt the
+> disk writer, as it would have to seek around.
+> And randomizing the list means that the clients are
+> all asking for different things, which means the
+> server will seek around a lot, too.
+
+True, but the server is sending the chunks out at a fairly relaxed rate,
+and the chunks are large (1MB), so the seeking around on the server is not
+so bad (2ms or so per seek, 300 of them in the full image, and the buffer
+cache read ahead will help as well).
+
+On the write side, the extra 2ms of seek time per chunk is hardly something
+to worry about given it has nothing better to do. So, thats 2/3 of a second
+in 180 seconds?
+
+The point of randomization is to prevent all the clients from getting into
+lockstep mode. Otherwise, they would all (and did) eventually sync with
+each other, and they would all finish at the same time; the time at which
+the slowest (last to start) finished. 
+
+> -How do you pace the rate at which the server sends?
+> > The hard part is keeping the server from melting down
+> > the network (or itself) by sending them too fast!
+
+On the server side its rather simple; a 10000us microsleep! To reiterate,
+the bottleneck is on the client side, unzipping and writing, and so the
+pace at which we send the data is not critical. Fast, but not too fast.
+
+Oh, on the client side I employ a simple linear backoff function to keep
+the clients from overloading the server with requests; Instead of sending
+the same request every 90ms, back off slowly in case the server already has
+a bunch of requests it is working on.
+
+Lbs
+
