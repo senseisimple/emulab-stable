@@ -693,7 +693,8 @@ CREATE TABLE os_info (
   mustclean tinyint(4) NOT NULL default '1',
   op_mode varchar(20) NOT NULL default 'MINIMAL',
   PRIMARY KEY  (osname,pid),
-  KEY osid (osid)
+  KEY osid (osid),
+  KEY OS (OS)
 ) TYPE=MyISAM;
 
 --
@@ -807,7 +808,9 @@ CREATE TABLE projects (
   pcremote_ok set('pcplab','pcron','pcwa') default NULL,
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid),
-  KEY approved (approved)
+  KEY approved (approved),
+  KEY approved_2 (approved),
+  KEY pcremote_ok (pcremote_ok)
 ) TYPE=MyISAM;
 
 --
@@ -1047,7 +1050,8 @@ CREATE TABLE users (
   adminoff tinyint(4) default '0',
   verify_key varchar(32) default NULL,
   PRIMARY KEY  (uid),
-  KEY unix_uid (unix_uid)
+  KEY unix_uid (unix_uid),
+  KEY status (status)
 ) TYPE=MyISAM;
 
 --
