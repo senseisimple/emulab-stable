@@ -148,14 +148,14 @@ elseif (!TBvalid_description($formfields[exp_description])) {
 #
 if (isset($formfields[nsref])) {
     if ($formfields[nsref] == "" ||
-	!ereg("^[0-9]+$", $formfields[nsref] == "")) {
-	$errors["NS File Reference"] = TBFieldErrorString();
+	!preg_match("/^\d+$/", $formfields[nsref])) {
+	$errors["NS File Reference"] = "Invalid characters";
     }
 }
 if (isset($formfields[guid])) {
     if ($formfields[guid] == "" ||
-	!ereg("^[0-9]+$", $formfields[guid] == "")) {
-	$errors["NS File UID"] = TBFieldErrorString();
+	!preg_match("/^\d+$/", $formfields[guid])) {
+	$errors["NS File GUID"] = "Invalid characters";
     }
     $nsfilelocale = "nsref";
 }

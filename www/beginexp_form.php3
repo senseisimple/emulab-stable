@@ -189,7 +189,7 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
     else {
-	if (!isset($nsref) && !isset($view['quiet'])) {
+	if (!isset($formfields[nsref]) && !isset($view['quiet'])) {
 	  echo "<p><ul>
 	    <li><b>If you have an NS file:</b><br> You may want to
                 <b><a href='nscheck_form.php3'>syntax check it first</a></b>
