@@ -28,12 +28,27 @@ my $dhcpd_conf = "/usr/local/etc/dhpcd.conf";
 my $dhcpd_template = "/usr/local/etc/dhcpd.conf.template";
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 
+my $sudo = "/usr/local/bin/sudo";
+
+#
+# Initial event system state to put the nodes into
+#
+my $INITIAL_STATE = "SHUTDOWN";
+my $INITIAL_OPMODE = "MINIMAL";
+
 if (!TBAdmin()) {
     die "Sorry, only testbed administrators can run this script!\n";
 }
 
 if (@ARGV < 1) {
     die "Usage: $0 <node_id> ...\n";
+}
+
+#
+# The user has to be able to run sudo, so they can restart dhcpd.
+#
+if (system "$sudo -s /bin/pwd < /dev/null") {
+    die "You must be able to sudo to root to use this script\n";
 }
 
 my @node_ids = @ARGV;
@@ -81,7 +96,7 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Grab the node's MACs from the new_interfaces table
     #
-    $query_result = DBQueryFatal("SELECT iface, MAC, interface_type, " .
+    $query_result = DBQueryFatal("SELECT card, MAC, interface_type, " .
 	"switch_id, switch_card, switch_port " .
 	"FROM new_interfaces WHERE new_node_id='$new_node_id'");
     if (!$query_result->num_rows()) {
@@ -90,7 +105,7 @@ NODE: foreach my $node_id (@node_ids) {
     }
 
     my %interfaces;
-    while (my ($iface, $MAC, $iface_type, $switch_id, $switch_card,
+    while (my ($card, $MAC, $iface_type, $switch_id, $switch_card,
 	    $switch_port) = $query_result->fetchrow()) {
 	#
 	# Get some more information about this interface type
@@ -98,7 +113,7 @@ NODE: foreach my $node_id (@node_ids) {
 	my $iface_query = DBQueryFatal("SELECT max_speed, full_duplex " .
 	    "FROM interface_types WHERE type='$iface_type'");
 	if (!$iface_query->num_rows()) {
-	    warn "Node $node_id failed: Interface $iface is of unknown type " .
+	    warn "Node $node_id failed: Interface $card is of unknown type " .
 	    	"$iface_type";
 	    next NODE;
 	}
@@ -108,7 +123,7 @@ NODE: foreach my $node_id (@node_ids) {
 	#
 	# Stash it away...
 	#
-	$interfaces{$iface} = [$MAC, $iface_type, $max_speed, $full_duplex,
+	$interfaces{$card} = [$MAC, $iface_type, $max_speed, $full_duplex,
 		$switch_id, $switch_card, $switch_port];
 
     }
@@ -129,13 +144,13 @@ NODE: foreach my $node_id (@node_ids) {
     #
     
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
-	"phys_nodeid='$node_id', role='testnode', priority=$priority");
+	"phys_nodeid='$node_id', role='testnode', priority=$priority" .
+    	"eventstate='$INITIAL_STATE', op_mode='$INITIAL_OPMODE'");
 
-    while (my ($iface, $aref) = each %interfaces) {
+    while (my ($card, $aref) = each %interfaces) {
 	my ($MAC, $iface_type, $speed, $duplex, $switch_id, $switch_card,
 	    $switch_port) = @$aref;
-	$iface =~ /(\d+)$/;
-	my $card = $1;
+	my $iface = "eth$card";
 	my $iface_IP = "";
 	my $wire_type = "Node";
 	if ($card == $control_net) {
@@ -186,8 +201,8 @@ if (!@succeeded_nodes) {
 #
 if (! -f $dhcpd_template) {
     warn "Warning: $dhcpd_template does not exist\n";
-    warn "You'll need to re-run dhcpd_makeconf manually, then free the new\n";
-    warn "nodes from emulab-ops/hwdown\n";
+    warn "You'll need to re-run dhcpd_makeconf manually, free the new\n";
+    warn "nodes from emulab-ops/hwdown, then reboot them.\n";
 } else {
     print "Re-generating dhcpd.conf\n";
     open(CONF,"$dhcpd_makeconf $dhcpd_template|") or die "Unable to fork: $!\n";
@@ -198,14 +213,20 @@ if (! -f $dhcpd_template) {
     print CONF @conf;
     close CONF;
 
-    print "Restarting dhcpd\n";
-    system "$dhcpd_rc stop";
-    system "$dhcpd_rc start";
+    if ($> == 0) {
+	print "Restarting dhcpd\n";
+	system "$sudo $dhcpd_rc stop";
+	sleep 2;
+	system "$sudo $dhcpd_rc start";
 
-    #
-    # Now, free all the nodes we just made from hwdown, so that they can reload
-    #
-    system "$nfree emulab-ops hwdown " . join(" ",@succeeded_nodes);
+	#
+	# Now, free all the nodes we just made from hwdown, so that they can reload
+	#
+	system "$nfree emulab-ops hwdown " . join(" ",@succeeded_nodes);
+    } else {
+	warn "Warning: You will need to restart dhcpd, free the nodes\n";
+	warn "from emulab-ops/hwdown, then reboot them.\n";
+    }
 
 }
 
