@@ -68,6 +68,7 @@ my $TMCCCMD_DELAY = "delay";
 # 
 sub os_cleanup_node () {
     unlink $TMDELAY;
+    unlink $TMDELMAP;
 
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {
@@ -262,6 +263,9 @@ sub dodelays ()
     if (@delays) {
 	$count    = 69;
 	$mindelay = 10000;
+
+	open(MAP, ">$TMDELMAP")
+	    or die("Could not open $TMDELMAP");
     
 	open(DEL, ">$TMDELAY")
 	    or die("Could not open $TMDELAY");
@@ -269,9 +273,6 @@ sub dodelays ()
 	print DEL "sysctl -w net.link.ether.bridge=0\n";
 	print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
 	print DEL "sysctl -w net.link.ether.bridge_cfg=";
-
-	open(MAP, ">$TMDELMAP")
-	    or die("Could not open $TMDELMAP");
 
 	foreach $delay (@delays) {
 	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
@@ -335,9 +336,8 @@ sub dodelays ()
 	    print STDOUT "  $iface1/$iface2 pipe $p2 config delay ";
 	    print STDOUT "${delay2}ms bw ${bandw2}Kbit/s plr $plr2\n";
 
-	    print MAP "$linkname $iface1 $p1\n";
-	    print MAP "$linkname $iface2 $p2\n";
-    
+	    print MAP "$linkname duplex $iface1 $iface2 $p1 $p2\n";
+
 	    $count++;
 	}
 	#

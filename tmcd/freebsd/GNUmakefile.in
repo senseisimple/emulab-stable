@@ -48,6 +48,8 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/update $(INSTALL_DIR)/update
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
 	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(INSTALL_DIR)/rc.setup
+	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(INSTALL_DIR)/rc.agents
+	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(INSTALL_DIR)/rc.delayagent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(INSTALL_DIR)/rc.delta
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname
