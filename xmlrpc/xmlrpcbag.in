@@ -132,7 +132,8 @@ if (defined($module) && !exists($modules{$module})) {
     syslog("err", "unknown module: '$module'");
     exit(-1);
 }
-syslog("info", "module: '$module'");
+syslog("info", "module: '$module'")
+    if (defined($module));
 
 #
 # Invoke the XMLRPC server. Exec ourselves to be SURE that a shell does
