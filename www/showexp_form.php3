@@ -50,6 +50,26 @@ if (mysql_num_rows($groupmemb_result) == 0) {
             "show any experiment information", 1);
 }
 
+#
+# Lets see if the user is even part of any experiements before
+# presenting a bogus option list.
+#
+$experiments = "";
+while ($grprow = mysql_fetch_array($groupmemb_result)) {
+    $pid = $grprow[gid];
+    $exp_result = mysql_db_query($TBDBNAME,
+	"SELECT eid FROM experiments WHERE pid=\"$pid\"");
+    while ($exprow = mysql_fetch_array($exp_result)) {
+        $eid = $exprow[eid];
+        $experiments = "$experiments " .
+                      "<option value=\"$eid\">$eid</option>\n";
+    }
+}
+if (strcmp($experiments, "") == 0) {
+    USERERROR("There are no experiments running in any of the projects ".
+              "you are a member of.", 1);
+}
+
 ?>
 
 <center>
@@ -68,16 +88,8 @@ echo "<form action=\"showexp.php3?$uid\" method=\"post\">";
 #
 echo "<tr>";
 echo "    <td><select name=\"exp_eid\">";
-               while ($grprow = mysql_fetch_array($groupmemb_result)) {
-                  $pid = $grprow[gid];
-		  $exp_result = mysql_db_query($TBDBNAME,
-			"SELECT eid FROM experiments WHERE pid=\"$pid\"");
-                  while ($exprow = mysql_fetch_array($exp_result)) {
-                      $eid = $exprow[eid];
-                      echo "<option value=\"$eid\">$eid</option>\n";
-                  }
-             }
-echo "       </select>";
+echo "        $experiments";
+echo "        </select>";
 echo "    </td>
       </tr>\n";
 
