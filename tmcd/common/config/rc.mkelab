@@ -415,7 +415,7 @@ sub SetupOpsNode()
     #
     # Create the ops node.
     #
-    my $pkg = "-P $emulabconfig{OPS_PKG_DIR}/$emulabconfig{OPS_PKG}";
+    my $pkg = "-P $emulabconfig{OPS_PKG}";
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
 	     "   perl ops-install $pkg -b");
 
@@ -670,7 +670,7 @@ sub SetupBossNode()
     #
     # Create the boss node. This will also install the software.
     #
-    my $pkg = "-P $emulabconfig{BOSS_PKG_DIR}/$emulabconfig{BOSS_PKG}";
+    my $pkg = "-P $emulabconfig{BOSS_PKG}";
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
 	     "   perl boss-install $pkg -b -w ElabInElab");
 
