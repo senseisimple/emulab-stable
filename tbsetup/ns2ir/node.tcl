@@ -404,8 +404,9 @@ Node instproc add_routes_to_DB {DB} {
 #
 Node instproc start-command {command} {
     $self instvar sim
+    set newname "${self}_startcmd"
 
-    set newprog [new Program $sim]
+    set newprog [uplevel 2 "set $newname [new Program $sim]"]
     $newprog set node $self
     $newprog set command $command
 
