@@ -715,8 +715,10 @@ function SHOWNODES($pid, $eid) {
 	"Node Name</a>";
     $vnamefield="vname";
     if (!strcmp($pid, $TBOPSPID)) {
-      $nodename="Reserve Time";
+      $nodename="<a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=2\">".
+	  "Reserve Time</a>";
       $vnamefield="rsrvtime";
+      if (!isset($altnodesort)) { $altnodesort = 2; }
     }
 
     if (mysql_num_rows($reserved_result)) {
@@ -742,6 +744,8 @@ function SHOWNODES($pid, $eid) {
 	$sort = "type,priority";
 	if ($altnodesort==1) {
 	    $sort = "vname";
+	} elseif ($altnodesort==2) {
+	    $sort = "rsrvtime";
 	} # Can add other alt sorts here too
 	
 	
