@@ -15,6 +15,10 @@
 #include "decls.h"
 #include "config.h"
 
+#ifdef EVENTSYS
+#include "event.h"
+#endif
+
 /*
  * XXX This needs to be localized!
  */
@@ -48,6 +52,11 @@ void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
 
+#ifdef EVENTSYS
+int			myevent_send(address_tuple_t address);
+static event_handle_t	event_handle = NULL;
+#endif
+
 /*
  * Commands we support.
  */
@@ -72,6 +81,7 @@ static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dorouting(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dotrafgens(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int donseconfigs(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int dostate(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -99,6 +109,7 @@ struct command {
 	{ "routing",	dorouting},
 	{ "trafgens",	dotrafgens},
 	{ "nseconfigs",	donseconfigs},
+	{ "state",	dostate},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2229,6 +2240,76 @@ donseconfigs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 }
 
 /*
+ * Report that the node has entered a new state
+ */
+static int
+dostate(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	int		nrows;
+	char 		*newstate;
+	time_t		now;
+#ifdef EVENTSYS
+	address_tuple_t tuple;
+#endif
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "STATE: %s: No such node",
+				inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Dig out state that the node is reporting
+	 */
+	while (isspace(*rdata)) {
+		rdata++;
+	}
+	newstate = rdata;
+
+	/*
+	 * Update the state in the database
+	 */
+	now = time(NULL);
+	if (mydb_update("update nodes set state='%s', state_timestamp=%i "
+				"where node_id='%s'",
+				newstate,now,nodeid)) {
+		syslog(LOG_ERR, "dostate: %s: DB Error updating state!",
+			nodeid);
+	    return 1;
+	}
+
+#ifdef EVENTSYS
+	/*
+	 * Send the state out via an event
+	 */
+	/* XXX: Maybe we don't need to alloc a new tuple every time through */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		syslog(LOG_ERR, "dostate: Unable to allocate address tuple!");
+		return 1;
+	}
+
+	tuple->host      = BOSSNODE;
+	tuple->objtype   = "TBNODESTATE";
+	tuple->objname	 = nodeid;
+	tuple->eventtype = newstate;
+
+	if (myevent_send(tuple)) {
+		syslog(LOG_ERR,"dostate: Error sending event\n");
+	}
+
+	address_tuple_free(tuple);
+#endif /* EVENTSYS */
+
+	return 0;
+
+}
+
+
+/*
  * DB stuff
  */
 static MYSQL	db;
@@ -2543,6 +2624,66 @@ checkdbredirect(struct in_addr ipaddr)
 	mysql_free_result(res);
 	return 0;
 }
+
+#ifdef EVENTSYS
+/*
+ * Connect to the event system. It's not an error to call this function if
+ * already connected. Returns 1 on failure, 0 on sucess.
+ */
+int
+event_connect()
+{
+	if (!event_handle) {
+		event_handle = event_register("elvin://" BOSSNODE,0);
+	}
+
+	if (event_handle) {
+		return 0;
+	} else {
+		syslog(LOG_ERR,"event_connect: Unable to register with "
+				"event system!");
+		return 1;
+	}
+}
+
+/*
+ * Send an event to the event system. Automatically connects (registers)
+ * if not already done. Returns 0 on sucess, 1 on failure.
+ */
+int myevent_send(address_tuple_t tuple) {
+	event_notification_t notification;
+
+	if (event_connect()) {
+		return 1;
+	}
+
+	notification = event_notification_alloc(event_handle,tuple);
+	if (notification == NULL) {
+		syslog(LOG_ERR,"myevent_send: Unable to allocate "
+			"notification!");
+		return 1;
+	}
+
+	if (event_notify(event_handle, notification) == NULL) {
+		event_notification_free(event_handle, notification);
+
+		syslog(LOG_ERR,"myevent_send: Unable to send notification!");
+		/*
+		 * Let's try to disconnect from the event system, so that
+		 * we'll reconnect next time around.
+		 */
+		if (!event_unregister(event_handle)) {
+			syslog(LOG_ERR,"myevent_send: Unable to unregister "
+					"with event system!");
+		}
+		event_handle = NULL;
+		return 1;
+	} else {
+		event_notification_free(event_handle,notification);
+		return 0;
+	}
+}
+#endif /* EVENTSYS */
  
 /*
  * Lets hear it for global state...Yeah!
