@@ -30,6 +30,7 @@ my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
 my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
+my $BOSSNODE= "@BOSSNODE@";
 my $ADMINGRP= "@TBADMINGROUP@";
 
 my $SSH     = "$TB/bin/sshtb";
@@ -318,9 +319,11 @@ foreach my $uid (@userlist) {
 
     print "Updating user $uid record on $control_node.\n";
 
-    if (system("$SSH -host $control_node ".
-	       "'$USERMOD $uid -g $project $groupargument'")) {
-	fatal("Could not modify user $uid record on $control_node.");
+    if ($control_node ne $BOSSNODE) {
+        if (system("$SSH -host $control_node ".
+	           "'$USERMOD $uid -g $project $groupargument'")) {
+	    fatal("Could not modify user $uid record on $control_node.");
+	}
     }
 }
 
