@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+disk="ad0"
+
+case $# in
+1)
+	part=$1
+	;;
+2)
+	part=$1
+	disk=$2
+	;;
+*)
+	echo "Usage: $0 partition [disk]"
+	exit 1
+esac
+
+ptype=`fdisk -$part | grep sysid | sed 's/.*sysid \([0-9][0-9]*\),.*/\1/'`
+ptype=${ptype:-0}
+
+dofreebsd() {
+	# see if there is a root ('a') partition on this BSD slice
+	`disklabel ${disk}s${part} 2>1 | grep -s -E '^[ ]+a:' >/dev/null` || {
+		return 1
+	}
+
+	rootdev=/dev/${disk}s${part}a
+	echo "fixing FreeBSD root partition ${disk}s${part}a"
+	fsck -p $rootdev || {
+		echo "Fsck of $rootdev failed"
+		return 1
+	}
+	mount $rootdev /mnt || {
+		echo "Mount of $rootdev failed"
+		return 1
+	}
+	sed -i .orig -e "s/${disk}s./${disk}s${part}/" /mnt/etc/fstab || {
+		echo "Failed to update /etc/fstab"
+		umount $rootdev
+		return 1
+	}
+	sed -i .orig -e "s/${disk}s./${disk}s${part}/" /mnt/etc/dumpdates || {
+		echo "Failed to update /etc/dumpdates"
+		umount $rootdev
+		return 1
+	}
+	umount $rootdev
+	return 0
+}
+
+dolinux() {
+	# need to update fstab, lilo.conf
+}
+
+case $ptype in
+165)
+	dofreebsd
+	exit $?
+	;;
+0)
+	;;
+*)
+	echo "ignoring partition type $ptype"
+	;;
+esac
+
+exit 0
