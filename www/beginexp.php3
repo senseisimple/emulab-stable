@@ -16,12 +16,7 @@ include("defs.php3");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-#
-# Default priorities Needs to move someplace else!
-# 
-$priorities         = array();
-$priorities["high"] = "high";
-$priorities["low"]  = "low";
+$idleswaptimeout = TBGetSiteVar("idle/threshold");
 
 #
 # Helper function to respit on error.
@@ -29,7 +24,7 @@ $priorities["low"]  = "low";
 function RESPIT($tag, $value)
 {
     global $formfields;
-    
+
     $errors[$tag] = $value;
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -37,14 +32,15 @@ function RESPIT($tag, $value)
 }
 
 #
-# Spit the form out using the array of data. 
-# 
+# Spit the form out using the array of data.
+#
 function SPITFORM($formfields, $errors)
 {
-    global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN;
-    global $nsdata, $nsref, $projlist, $priorities, $exp_nsfile;
+    global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
+    global $nsdata, $nsref, $projlist, $exp_nsfile;
     global $uid, $guid;
-    
+    global $idleswaptimeout;
+
     PAGEHEADER("Begin a Testbed Experiment");
 
     if ($errors) {
@@ -69,28 +65,31 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
     else {
+	# Temporary - July 17 was new form install - remove in
+	# mid august or september
+	echo "<h3>For more info about the new form, see the
+		<a href='news.php3'>July 17 News item</a>.</h3>\n";
+	    
 	if (!isset($nsdata) && !isset($nsref)) {
-	echo "<p>Either <b><a href='buildui/bui.php3'>go to the " .
-             "NetBuild GUI</a></b> and create your experiment graphically " .
-	     "(<a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>Additional " .
-             "information</a>), or, if you already have an NS file, " .
-             "fill out the following information:</p>";
-	
-	#echo "<b>
-        #      Looking for a <a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>GUI</a>
-	#      to help you create your topology?
-        #      <a href='buildui/bui.php3'>Check it out!</a></b>\n<br><br>";
+	echo "<p><ul>
+	    <li><b>If you have an NS file:</b><br> You may want to
+                <b><a href='nscheck_form.php3'>syntax check it first</a></b>
+	    <li><b>If you do not have an NS file:</b><br> You may want to
+		<b><a href='buildui/bui.php3'>go to the NetBuild GUI</a></b>
+		to graphically create one<font size=-2>
+		(<a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>Additional 
+		information</a>)</font>
+	     </ul></p><br>";
 	} else {
 	echo "<p><b>Your NetBuild-generated NS file has been uploaded.</b> " .
-             "To finish creating your experiment, " . 
+             "To finish creating your experiment, " .
              "please fill out the following information:</p>";
         }
-        echo "<br />";
     }
 
-    echo "<table align=center border=1> 
+    echo "<table align=center border=1>
           <tr>
-              <td align=center colspan=3>
+              <td align=center colspan=2>
                  <em>(Fields marked with * are required)</em>
               </td>
           </tr>\n";
@@ -102,20 +101,20 @@ function SPITFORM($formfields, $errors)
     # Select Project
     #
     echo "<tr>
-              <td colspan=2>*Select Project:</td>
-              <td><select name=\"formfields[exp_pid]\">\n";
+              <td class='pad4'>*Select Project:</td>
+              <td class='pad4'><select name=\"formfields[exp_pid]\">\n";
 
     # If just one project, make sure just the one option.
     if (count($projlist) != 1) {
 	echo "<option value=''>Please Select &nbsp</option>\n";
     }
-    
+
     while (list($project) = each($projlist)) {
 	$selected = "";
 
 	if (strcmp($formfields[exp_pid], $project) == 0)
 	    $selected = "selected";
-	
+
 	echo "        <option $selected value=\"$project\">
                              $project </option>\n";
     }
@@ -125,10 +124,10 @@ function SPITFORM($formfields, $errors)
 
     #
     # Select a group
-    # 
+    #
     echo "<tr>
-              <td colspan=2>Group[<b>1</b>]:</td>
-              <td><select name=\"formfields[exp_gid]\">
+              <td class='pad4'>Group:</td>
+              <td class='pad4'><select name=\"formfields[exp_gid]\">
                     <option value=''>Default Group </option>\n";
 
     reset($projlist);
@@ -144,13 +143,14 @@ function SPITFORM($formfields, $errors)
 		    strcmp($formfields[exp_pid], $project) == 0 &&
 		    strcmp($formfields[exp_gid], $group) == 0)
 		    $selected = "selected";
-		
+
 		echo "<option $selected value=\"$group\">
                            $project/$group</option>\n";
 	    }
 	}
     }
     echo "     </select>
+	<font size=-1>(Must be default or correspond to selected project)</font>
              </td>
           </tr>\n";
 
@@ -158,8 +158,9 @@ function SPITFORM($formfields, $errors)
     # Name:
     #
     echo "<tr>
-              <td colspan=2>*Name (no blanks):</td>
-              <td class=left>
+              <td class='pad4'>*Name:
+              <br><font size='-1'>(No blanks)</font></td>
+              <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[exp_id]\"
                          value=\"" . $formfields[exp_id] . "\"
@@ -172,13 +173,13 @@ function SPITFORM($formfields, $errors)
     # Description
     #
     echo "<tr>
-              <td colspan=2>*Description:<br>
-                  (a short pithy sentence)</td>
-              <td class=left>
+              <td class='pad4'>*Description:<br>
+                  <font size='-1'>(A concise sentence)</font></td>
+              <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[exp_description]\"
                          value=\"" . $formfields[exp_description] . "\"
-	                 size=50>
+	                 size=60>
               </td>
           </tr>\n";
 
@@ -187,179 +188,169 @@ function SPITFORM($formfields, $errors)
     #
     if (isset($nsdata)) {
         echo "<tr>
-                  <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>*Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsdata value=$nsdata>
-                  <td><a target=_blank href=spitnsdata.php3?nsdata=$nsdata>
+                  <td class='pad4'><a target=_blank href=spitnsdata.php3?nsdata=$nsdata>
                       View NS File</a></td>
               </tr>\n";
     } elseif (isset($nsref)) {
 	if (isset($guid)) {
         echo "<tr>
-                  <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>*Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
                       <input type=hidden name=guid value=$guid>
-                  <td><a target=_blank href=\"spitnsdata.php3?nsref=$nsref&guid=$guid\">
+                  <td class='pad4'><a target=_blank href=\"spitnsdata.php3?nsref=$nsref&guid=$guid\">
                       View NS File</a></td>
               </tr>\n";
         } else {
         echo "<tr>
-                  <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
+                  <td class='pad4'>*Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
-                  <td><a target=_blank href=spitnsdata.php3?nsref=$nsref>
+                  <td class='pad4'><a target=_blank href=spitnsdata.php3?nsref=$nsref>
                       View NS File</a></td>
               </tr>\n";
         }
     }
     else {
+
 	echo "<tr>
-                  <td rowspan>*Your NS file: &nbsp</td>
+                  <td class='pad4'>*Your NS file: &nbsp</td>
 
-                  <td rowspan><center>Upload (50K max)[<b>2</b>]<br>
-                                   <br>
-                                   Or<br>
-                                   <br>
-                               On Server <br> (/proj, /groups, /users)
-                              </center></td>
-
-                  <td rowspan>
-                      <input type=hidden name=MAX_FILE_SIZE value=51200>
-	              <input type=file
-                             name=exp_nsfile
-                             value=\"" . $exp_nsfile . "\"
-	                     size=40>
-                      <br>
-                      <br>
-	              <input type=text
-                             name=\"formfields[exp_localnsfile]\"
-                             value=\"" . $formfields[exp_localnsfile] . "\"
-	                     size=50>
-                  </td>
-              </tr>\n";	
+                  <td><table cellspacing=0 cellpadding=0 border=0>
+                    <tr>
+                      <td class='pad4'>Upload<br>
+			<font size='-1'>(50k&nbsp;max)</font></td>
+                      <td class='pad4'>
+                        <input type=hidden name=MAX_FILE_SIZE value=51200>
+	                <input type=file
+                               name=exp_nsfile
+                               value=\"" . $exp_nsfile . "\"
+	                       size=30>
+                      </td>
+                    </tr><tr>
+                    <td>&nbsp;&nbsp;<b>or</b></td><td></td>
+                    </tr><tr>
+                      <td class='pad4'>On Server<br><font size='-1'>(<code>/proj</code>,
+                        <code>/groups</code>, <code>/users</code>)</font></td>
+                      <td class='pad4'>
+	                <input type=text
+                               name=\"formfields[exp_localnsfile]\"
+                               value=\"" . $formfields[exp_localnsfile] . "\"
+	                       size=40>
+                      </td>
+                    </tr></table></td></tr>\n";
     }
 
-    #
-    # Swappable?
-    # 
-    echo "<tr>
-  	      <td colspan=2>Swappable?[<b>3</b>]:</td>
-              <td class=left>
-                  <input type=checkbox
-                         name=\"formfields[exp_swappable]\"
-                         value=Yep";
+#
+# Swapping
+#
 
-    if (isset($formfields[exp_swappable]) &&
-	strcmp($formfields[exp_swappable], "Yep") == 0)
-	echo "           checked";
-	
-    echo "               > Yes
+    # Add in hidden fields to send swappable and noswap_reason, since
+    # they don't show on the form
+    echo "<tr>
+	      <td class='pad4'>*Swapping:<br>
+              <font size='-1'>
+	      (See <a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
+              Swapping</a>)
+              </font></td>
+	      <td>
+	      <input type=hidden name='formfields[exp_swappable]' value='$formfields[exp_swappable]'>
+	      <input type=hidden name='formfields[exp_noswap_reason]' value='";
+    echo htmlspecialchars($formfields[exp_noswap_reason], ENT_QUOTES);
+    echo "'>
+	      <table cellpadding=0 cellspacing=0 border=0><tr>
+              <td><input type='checkbox'
+	             name='formfields[exp_idleswap]'
+	             value='1'";
+    if ($formfields[exp_idleswap] == "1") {
+	echo " checked='1'";
+    }
+    echo "></td>
+              <td><a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#idleswap'>
+	      <b>Idle-Swap:</b></a> Swap out this experiment
+	      after 
+              <input type='text' name='formfields[exp_idleswap_timeout]'
+		     value='";
+    echo htmlspecialchars($formfields[exp_idleswap_timeout], ENT_QUOTES);
+    echo "' size='3'> hours idle.</td>
+	      </tr><tr>
+              <td> </td>
+	      <td>If not, why not?<br><textarea rows=2 cols=50
+                          name='formfields[exp_noidleswap_reason]'>";
+			  
+    echo htmlspecialchars($formfields[exp_noidleswap_reason], ENT_QUOTES);
+    echo "</textarea></td>
+	      </tr><tr>
+	      <td><input type='checkbox'
+		     name='formfields[exp_autoswap]'
+		     value='1' ";
+    if ($formfields[exp_autoswap] == "1") {
+	echo " checked='1'";
+    }
+    echo "></td>
+	      <td><a href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#autoswap'>
+	      <b>Max. Duration:</b></a> Swap out after
+              <input type='text' name='formfields[exp_autoswap_timeout]'
+		     value='";
+    echo htmlspecialchars($formfields[exp_autoswap_timeout], ENT_QUOTES);
+    echo "' size='3'> hours, even if not idle.</td>
+              </tr></table>
               </td>
-          </tr>\n";
-
-    #
-    # Priority
-    #
-    echo "<tr>
-	      <td colspan=2>Priority[<b>4</b>]:</td>
-              <td class=left>\n";
-
-    reset($priorities);
-    while (list ($prio, $value) = each($priorities)) {
-	$checked = "";
-	
-	if (isset($formfields["exp_priority"]) &&
-	    ! strcmp($formfields["exp_priority"], $prio))
-	    $checked = "checked";
-
-	echo "<input $checked type=radio value=$prio
-                     name=\"formfields[exp_priority]\">
-                     $prio &nbsp\n";
-    }
-    echo "    </td>
-          </tr>\n";
+           </tr>";
 
     #
     # Batch Experiment?
     #
     echo "<tr>
-  	      <td colspan=2>Batch Experiment?[<b>5</b>]:</td>
-              <td class=left>
-                  <input type=checkbox
-                         name=\"formfields[exp_batched]\"
-                         value=Yep";
-    
+  	      <td class='pad4' colspan=2>
+              <input type=checkbox name='formfields[exp_batched]' value='Yep'";
+
     if (isset($formfields[exp_batched]) &&
-	strcmp($formfields[exp_batched], "Yep") == 0)
-	echo "           checked";
-	
-    echo "                       > Yes
-              </td>
+	strcmp($formfields[exp_batched], "Yep") == 0) {
+	    echo " checked='1'";
+	}
+
+    echo ">\n";
+    echo "Batch Mode Experiment &nbsp;
+          <font size='-1'>(See
+          <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+          for more information)</font>
+          </td>
           </tr>\n";
 
     #
     # Preload?
     #
     echo "<tr>
-  	      <td colspan=2>Preload Experiment?[<b>6</b>]:</td>
-              <td class=left>
-                  <input type=checkbox
-                         name=\"formfields[exp_preload]\"
-                         value=Yep";
+  	      <td class='pad4' colspan=2>
+              <input type=checkbox name='formfields[exp_preload]' value='Yep'";
 
     if (isset($formfields[exp_preload]) &&
-	strcmp($formfields[exp_preload], "Yep") == 0)
-	    echo "           checked";
-	
-    echo "                       > Yes
-              </td>
+	strcmp($formfields[exp_preload], "Yep") == 0) {
+	    echo " checked='1'";
+	}
+
+    echo ">\n";
+    echo "Preload Experiment &nbsp;
+          <font size='-1'>(Create experiment but don't swap it in now)
+          </font></td>
           </tr>\n";
 
     echo "<tr>
-              <td align=center colspan=3>
+              <td class='pad4' align=center colspan=2>
                  <b><input type=submit value=Submit name=submit></b></td>
          </tr>
         </form>
         </table>\n";
 
-    echo "<blockquote><blockquote><blockquote>
-          <ol>
-             <li>Leave as the default group, or pick a subgroup that
-                 corresponds to the project you selected.
-             <li>Note to <a href=http://www.opera.com><b>Opera 5</b></a> users:
-                 The file upload mechanism is broken in Opera, so you cannot
-                 specify a local file for upload. Instead, please specify a
-                 file that is resident on the server. 
-             <li>Check if your experiment can be swapped out and swapped back 
-	         in without harm to your experiment. Useful for scheduling when
-	         resources are tight. More information on swapping
-	         is contained in the 
-	         <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>Emulab FAQ</a>.
-             <li>You get brownie points for marking your experiments as Low
-                 Priority, which indicates that we can swap you out before high
-	         priority experiments.
-             <li>Check this if you want to create a
-                 <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>
-                 batch mode</a> experiment.
-             <li>Check this if you want to load the experiment, but not
-                 configure it (assign physical resources). You may swap in the
-                 experiment later, or terminate it without ever swapping
-                 it.\n";
-    echo "</ol>
-          </blockquote></blockquote></blockquote>\n";
-
-    echo "<p><blockquote>
+    echo "<p>
+          <h3>Handy Links:</h3>
           <ul>
-	     <li> Looking for a
-                  <a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>GUI</a>
-                  to help you create your topology?
-                  <a href='buildui/bui.php3'>Check it out!</a>
-             <li> Please <a href='nscheck_form.php3'>syntax check</a> your NS
-                  file first!
-             <li> You can view a <a href='showosid_list.php3'>list of OSIDs</a>
-                  that are available for you to use in your NS file.
+             <li> View a <a href='showosid_list.php3'>list of OSIDs</a>
+                  that are available for you to use in your NS file.</li>
              <li> Create your own <a href='newimageid_ez.php3'>
-                  custom disk images</a>.
-          </ul>
-          </blockquote>\n";
+                  custom disk images</a>.</li>
+          </ul>\n";
 }
 
 if (isset($nsref)) {
@@ -380,7 +371,7 @@ if (isset($guid)) {
 #
 
 if (isset($nsdata)) {
-    if (strcmp($nsdata, "") == 0) 
+    if (strcmp($nsdata, "") == 0)
 	unset($nsdata);
     elseif (! isset($submit))
 	$nsdata = rawurlencode($nsdata);
@@ -406,21 +397,28 @@ if (! isset($submit)) {
     # For users that are in one project and one subgroup, it is usually
     # the case that they should use the subgroup, and since they also tend
     # to be in the clueless portion of our users, give them some help.
-    # 
+    #
     if (count($projlist) == 1) {
 	list($project, $grouplist) = each($projlist);
-	
+
 	if (count($grouplist) <= 2) {
 	    $defaults[exp_pid] = $project;
-	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0])) 
+	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0]))
 		$defaults[exp_gid] = $grouplist[0];
 	    else
 		$defaults[exp_gid] = $grouplist[1];
 	}
 	reset($projlist);
     }
-    $defaults[exp_swappable] = "Yep";
-    $defaults[exp_priority]  = "low";
+
+    $defaults[exp_swappable] = "1";
+    $defaults[exp_noswap_reason] = "";
+    $defaults[exp_idleswap]  = "1";
+    $defaults[exp_noidleswap_reason] = "";
+    $defaults[exp_idleswap_timeout] = "$idleswaptimeout";
+    $defaults[exp_autoswap]  = "0";
+    $defaults[exp_autoswap_timeout] = "10";
+
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -433,7 +431,7 @@ $errors = array();
 
 #
 # Project:
-# 
+#
 if (!isset($formfields[exp_pid]) ||
     strcmp($formfields[exp_pid], "") == 0) {
     $errors["Project"] = "Not Selected";
@@ -444,7 +442,7 @@ elseif (!TBValidProject($formfields[exp_pid])) {
 
 #
 # EID.
-# 
+#
 if (!isset($formfields[exp_id]) ||
     strcmp($formfields[exp_id], "") == 0) {
     $errors["Experiment Name"] = "Missing Field";
@@ -470,26 +468,72 @@ if (!isset($formfields[exp_description]) ||
 
 #
 # Swappable
+# Any of these which aren't "1" become "0".
 #
-if (isset($formfields[exp_swappable]) &&
-    strcmp($formfields[exp_swappable], "") &&
-    strcmp($formfields[exp_swappable], "Yep")) {
-    $errors["Swappable"] = "Bad Value";
+if (!isset($formfields[exp_swappable]) ||
+    strcmp($formfields[exp_swappable], "1")) {
+    $formfields[exp_swappable] = 0;
+
+    if (!isset($formfields[exp_noswap_reason]) ||
+        !strcmp($formfields[exp_noswap_reason], "")) {
+
+        if (! ISADMIN($uid)) {
+          $errors["Not Swappable"] = "No justification provided";
+        } else {
+          $formfields[exp_noswap_reason] = "ADMIN";
+        }
+    }
+}
+
+if (!isset($formfields[exp_idleswap]) ||
+    strcmp($formfields[exp_idleswap], "1")) {
+    $formfields[exp_idleswap] = 0;
+
+    if (!isset($formfields[exp_noidleswap_reason]) ||
+	!strcmp($formfields[exp_noidleswap_reason], "")) {
+	if (! ISADMIN($uid)) {
+	    $errors["Not Idle-Swappable"] = "No justification provided";
+	} else {
+	    $formfields[exp_noidleswap_reason] = "ADMIN";
+	}
+    }
+}
+
+if (!isset($formfields[exp_idleswap_timeout]) ||
+    ($formfields[exp_idleswap_timeout] + 0) <= 0 ||
+    ($formfields[exp_idleswap_timeout] + 0) > $idleswaptimeout) {
+    $errors["Idleswap"] = "No or invalid time provided - must be non-zero and <= $idleswaptimeout";
+}
+
+if (!isset($formfields[exp_noidleswap_reason])) {
+    $formfields[exp_noidleswap_reason] = "";
+}
+
+
+if (!isset($formfields[exp_autoswap]) ||
+    strcmp($formfields[exp_autoswap], "1")) {
+    $formfields[exp_autoswap] = 0;
+} else {
+    if (!isset($formfields[exp_autoswap_timeout]) ||
+	($formfields[exp_autoswap_timeout] + 0) == 0) {
+	$errors["Max. Duration"] = "No or invalid time provided";
+    }
 }
 
 #
-# Priority
+# Preload and Batch are mutually exclusive.
 #
-if (isset($formfields[exp_priority]) &&
-    strcmp($formfields[exp_priority], "") &&
-    ! isset($priorities[$formfields[exp_priority]])) {
-    $errors["Priority"] = "Bad Value";
+if (isset($formfields[exp_batched]) &&
+    !strcmp($formfields[exp_batched], "Yep") &&
+    isset($formfields[exp_preload]) &&
+    !strcmp($formfields[exp_preload], "Yep")) {
+    $errors["Preload"] = "Cannot use with Batch Mode";
 }
 
 #
 # If any errors, respit the form with the current values and the
 # error messages displayed. Iterate until happy.
-# 
+#
 if (count($errors)) {
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -573,7 +617,7 @@ if ($speclocal) {
 	       "Server resident file must be in either ".
 	       "$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/");
     }
-    
+
     $nsfile = $exp_localnsfile;
     $nonsfile = 0;
 }
@@ -628,23 +672,26 @@ else {
 }
 
 #
-# Convert Priority, Swappable, Batched params to arguments to script.
+# Convert Swappable, Batched params to arguments to script.
 #
-if (isset($formfields[exp_swappable]) &&
-    strcmp($formfields[exp_swappable], "Yep") == 0) {
-    $exp_swappable = "-s";
-}
-else {
-    $exp_swappable = "";
+$exp_swappable = "";
+
+if ($formfields[exp_swappable] == "1") {
+    $exp_swappable .= " -s";
 }
 
-if (! isset($formfields[exp_priority]) ||
-    strcmp($formfields[exp_priority], "") == 0) {
-    $exp_priority  = "-n low";
+if ($formfields[exp_autoswap] == "1") {
+    $exp_swappable .= " -a " . (60 * $formfields[exp_autoswap_timeout]);
 }
-else {
-    $exp_priority  = "-n " . $priorities[$formfields[exp_priority]];
+
+if ($formfields[exp_idleswap] == "1") {
+    $exp_swappable .= " -l " . (60 * $idleswaptimeout);
 }
+
+#
+# All experiments are low priority for now.
+#
+$exp_priority  = "-n low";
 
 if (isset($formfields[exp_batched]) &&
     strcmp($formfields[exp_batched], "Yep") == 0) {
@@ -662,7 +709,7 @@ if (isset($formfields[exp_preload]) &&
     $batcharg     .= " -f";
 }
 
-# 
+#
 # I am not spitting out a redirection yet.
 #
 PAGEHEADER("Begin a Testbed Experiment");
@@ -681,8 +728,8 @@ $exp_expires = date("Y:m:d", time() + (86400 * 120));
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
-# Okay, time to do it. 
-# 
+# Okay, time to do it.
+#
 echo "<center><br>";
 echo "<h2>Starting experiment configuration. Please wait a moment ...
       </h2></center>";
@@ -695,7 +742,7 @@ flush();
 # of this. The user will be notified later. Its possible that the
 # script will return non-zero status, but there are just a couple
 # of conditions. Generally, the script exits and the user is told
-# of errors later. 
+# of errors later.
 #
 $output = array();
 $retval = 0;
@@ -703,14 +750,14 @@ $last   = time();
 
 #
 # Avoid SIGPROF in child.
-# 
+#
 set_time_limit(0);
 
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 	       "webbatchexp $batcharg -x \"$exp_expires\" -E \"$exp_name\" ".
 	       "$exp_priority $exp_swappable ".
 	       "-p $exp_pid -g $exp_gid -e $exp_id ".
-	       ($nonsfile ? "" : "$nsfile"), 
+	       ($nonsfile ? "" : "$nsfile"),
  	       $output, $retval);
 
 if ($delnsfile) {
@@ -727,9 +774,27 @@ if ($retval) {
               echo "$output[$i]\n";
           }
     echo "</XMP>\n";
-    
+
     PAGEFOOTER();
     die("");
+}
+
+# add reasons to db, since we don't want to pass these on the command line.
+
+if ($formfields[exp_noswap_reason]) {
+    DBQueryFatal("UPDATE experiments " .
+		 "SET noswap_reason='" .
+                 addslashes($formfields[exp_noswap_reason]).
+                 "' ".
+		 "WHERE eid='$exp_id' and pid='$exp_pid'");
+}
+
+if ($formfields[exp_noidleswap_reason]) {
+    DBQueryFatal("UPDATE experiments " .
+		 "SET noidleswap_reason='" .
+                 addslashes($formfields[exp_noidleswap_reason]).
+                 "' ".
+		 "WHERE eid='$exp_id' and pid='$exp_pid'");
 }
 
 echo "<br><br>";
@@ -751,7 +816,7 @@ elseif ($exp_preload) {
           take less than one minute. If you do not receive email notification
           within a reasonable amount of time, please contact $TBMAILADDR.<br>
           <br>
-          While you are waiting, you can watch the log 
+          While you are waiting, you can watch the log
           in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
           realtime</a>.\n";
 }
@@ -778,6 +843,6 @@ echo "<br>
 
 #
 # Standard Testbed Footer
-# 
+#
 PAGEFOOTER();
 ?>

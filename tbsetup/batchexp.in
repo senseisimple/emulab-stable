@@ -18,9 +18,11 @@ use Getopt::Std;
 sub usage()
 {
     die("Usage: batchexp [-i [-f]] [-x expires] [-E description] [-g gid] ".
-	"[-s] [-n low|high] -p <pid> -e <eid> [<nsfile>]\n");
+	"[-s] [-a <autotime>] [-l <idletime>]] [-n low|high] ".
+        "-p <pid> -e <eid> [<nsfile>]\n");
 }
-my  $optlist = "iE:d:g:x:e:p:sn:fgq";
+
+my  $optlist = "iE:d:g:x:e:p:sa:l:n:fq";
 
 #
 # Configure variables
@@ -60,7 +62,7 @@ umask(0002);
 
 #
 # Untaint the path
-# 
+#
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
@@ -72,6 +74,11 @@ my $description;
 my $expires;
 my $tempnsfile;
 my $swappable = 0;
+my $idleswap = 0;
+my $idleswaptime = 60 * TBGetSiteVar("idle/threshold");
+my $autoswap = 0;
+my $autoswaptime = 10 * 60;
+my $idleignore = 0;
 my $priority  = TB_EXPTPRIORITY_LOW;
 
 #
@@ -89,7 +96,7 @@ ParseArgs();
 
 #
 # Sanity check them.
-# 
+#
 if (!defined($pid) || !defined($eid)) {
     usage();
 }
@@ -120,23 +127,12 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
 }
 
 #
-# All this stuff should change when new web form approved.
-# 
-my $idleswap      = 1;
-my $idleignore    = 0;
-# Must do this before lock tables!
-# idleswap is in minutes, threshold is in hours
-my $idleswap_time = 60 * TBGetSiteVar("idle/threshold");
-
-#
 # If no NS file, then override swap/idle stuff. Again, might change
 # when new forms installed
 #
 if (!defined($tempnsfile)) {
     $swappable     = 0;
     $idleswap      = 0;
-    $idleswap_time = 0;
-    $idleignore    = 1;
 }
 
 #
@@ -158,15 +154,17 @@ if ($query_result->numrows) {
 #
 # Insert the record. This reserves the pid/eid for us. If its a batchmode
 # experiment, we will update the record later so that the batch daemon
-# will recognize it. 
+# will recognize it.
 #
 if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
-		  " idleswap, idleswap_timeout, idle_ignore) ".
+		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
+		  " idle_ignore) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', 'new', $priority, ".
-		  "$swappable, $idleswap, '$idleswap_time', $idleignore)")) {
+		  "$swappable, $idleswap, '$idleswaptime', $autoswap, ".
+		  "'$autoswaptime', $idleignore)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -177,7 +175,7 @@ if (! DBQueryWarn("unlock tables")) {
 }
 
 #
-# Create an experiment_resources record for the above record. 
+# Create an experiment_resources record for the above record.
 #
 if (! DBQueryWarn("insert into experiment_resources (idx, tstamp, exptidx) ".
 		  "select 0, now(), idx from experiments ".
@@ -188,7 +186,7 @@ if (! DBQueryWarn("insert into experiment_resources (idx, tstamp, exptidx) ".
 
 #
 # Now create an experiment_stats record to match.
-# 
+#
 if (! DBQueryWarn("insert into experiment_stats ".
 		  "(eid, pid, creator, gid, created, batch, exptidx,rsrcidx) ".
 		  "select '$eid', '$pid', '$dbuid', '$gid', now(), ".
@@ -208,7 +206,7 @@ if (system("$mkexpdir $pid $gid $eid") != 0) {
 }
 
 #
-# If no NS file, we are done. 
+# If no NS file, we are done.
 #
 exit(0)
     if (!defined($tempnsfile));
@@ -223,7 +221,7 @@ chdir("$workdir") or
     fatal("Could not chdir to $workdir: $!");
 
 #
-# Now we can get the NS file! 
+# Now we can get the NS file!
 #
 if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
     fatal("Could not copy $tempnsfile to $workdir/$nsfile");
@@ -251,8 +249,8 @@ if ($nsfile_string) {
     #
     # I could strlen check the string, but the webserver has a limit,
     # plus the DB is going to truncate it if its longer. Doing it here
-    # would be a third (call it redundant) check. 
-    # 
+    # would be a third (call it redundant) check.
+    #
     DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
 		"VALUES('$pid', '$eid', $nsfile_string)");
 }
@@ -262,14 +260,14 @@ if ($nsfile_string) {
 # the startexp script to do the rest. It exits and so do we; user gets
 # email later. If its a batch experiment, update the experiment record
 # so that the batch daemon will see it and act.
-# 
+#
 if ($immediate) {
     my $optargs = "";
     $optargs .= " -f"
 	if ($frontend);
     $optargs .= " -b"
 	if ($quiet);
-    
+
     if (system("$startexp $optargs -g $gid $pid $eid $nsfile")) {
 	fatal("Failed to start experiment $pid/$eid!");
     }
@@ -279,7 +277,7 @@ else {
     # Preload the experiment in the foreground. User sees parse errors
     # right away, and the experiment is now in the system so we can look
     # at it.
-    # 
+    #
     if (system("$startexp -f -b -g $gid $pid $eid $nsfile")) {
 	fatal("Failed to preload batch experiment $pid/$eid!");
     }
@@ -304,7 +302,7 @@ sub fatal($)
     # waste of space since the testbed_stats log indicates there was a
     # failure and why (sorta, via the exit code).
     #
-    if (($query_result = 
+    if (($query_result =
 	 DBQueryWarn("select idx from experiments ".
 		     "where pid='$pid' and eid='$eid'"))) {
 
@@ -317,12 +315,12 @@ sub fatal($)
 			"WHERE exptidx=$idx");
 	}
     }
-    
+
     #
     # Clear the record and cleanup.
-    # 
+    #
     TBExptDestroy($pid, $eid);
-    
+
     exit(-1);
 }
 
@@ -336,7 +334,7 @@ sub ParseArgs()
     if (! getopts($optlist, \%options)) {
 	usage();
     }
-    
+
     if (@ARGV > 1) {
 	usage();
     }
@@ -351,7 +349,7 @@ sub ParseArgs()
 	    fatal("Bad data in argument: $tempnsfile");
 	}
     }
-    
+
     if (defined($options{"i"})) {
 	$immediate = 1;
     }
@@ -396,6 +394,18 @@ sub ParseArgs()
     }
     if (defined($options{"s"})) {
 	$swappable = 1;
+    }
+    if (defined($options{"l"})) {
+        $idleswap = 1;
+	$idleswaptime = $options{"l"};
+	(($idleswaptime =~ /^\d+$/) &&
+         ($idleswaptime > 0)) or die("Bad idleswap time: '$idleswaptime'");
+    }
+    if (defined($options{"a"})) {
+        $autoswap = 1;
+	$autoswaptime = $options{"a"};
+	(($autoswaptime =~ /^\d+$/) &&
+         ($autoswaptime > 0)) or die("Bad autoswap time: '$autoswaptime'");
     }
     if (defined($options{"q"})) {
 	$quiet = 1;
