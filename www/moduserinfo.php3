@@ -7,8 +7,6 @@
 include("defs.php3");
 include("showstuff.php3");
 
-$changed_password = "No";
-
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
 # 
@@ -278,25 +276,28 @@ if (mysql_num_rows($query_result) == 0) {
     USERERROR("No such user: $target_uid!", 1);
 }
 
+$defaults = array();
+    
+#
+# Construct a defaults array based on current DB info. Used for the initial
+# form, and to determine if any changes were made. This is to avoid churning
+# the passwd file for no reason, given that most people use this page
+# simply yo change their password. 
+# 
+$row = mysql_fetch_array($query_result);
+$defaults[target_uid]  = $target_uid;
+$defaults[usr_email]   = $row[usr_email];
+$defaults[usr_URL]     = $row[usr_URL];
+$defaults[usr_addr]    = stripslashes($row[usr_addr]);
+$defaults[usr_name]    = stripslashes($row[usr_name]);
+$defaults[usr_phone]   = $row[usr_phone];
+$defaults[usr_title]   = stripslashes($row[usr_title]);
+$defaults[usr_affil]   = stripslashes($row[usr_affil]);
+
 #
 # On first load, display a form consisting of current user values, and exit.
 #
 if (! isset($submit)) {
-    $defaults = array();
-    
-    #
-    # Construct a defaults array based on current DB info.
-    # 
-    $row = mysql_fetch_array($query_result);
-    $defaults[target_uid]  = $target_uid;
-    $defaults[usr_email]   = $row[usr_email];
-    $defaults[usr_URL]     = $row[usr_URL];
-    $defaults[usr_addr]    = $row[usr_addr];
-    $defaults[usr_name]    = $row[usr_name];
-    $defaults[usr_phone]   = $row[usr_phone];
-    $defaults[usr_title]   = $row[usr_title];
-    $defaults[usr_affil]   = $row[usr_affil];
-    
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -458,51 +459,64 @@ if ((isset($password1) && strcmp($password1, "")) &&
 		     "pswd_expires=$expires ".
 		     "WHERE uid='$target_uid'");
 
-    $changed_password = "Yes";
+    if (HASREALACCOUNT($uid)) {
+	SUEXEC($uid, "nobody", "webtbacct passwd $target_uid", 1);
+    }
 }
 
 #
-# Now change the rest of the information.
+# Now change the rest of the information, but only if the user actually
+# changed the info. We use the original info in the defaults array and
+# the value in the formfields array to compare, cause of addslashes stuff. 
 #
-DBQueryFatal("UPDATE users SET ".
-	     "usr_name=\"$usr_name\",       ".
-	     "usr_URL=\"$usr_URL\",         ".
-	     "usr_addr=\"$usr_addr\",       ".
-	     "usr_phone=\"$usr_phone\",     ".
-	     "usr_title=\"$usr_title\",     ".
-	     "usr_affil=\"$usr_affil\",     ".
-	     "usr_modified=now()            ".
-	     "WHERE uid=\"$target_uid\"");
+if (strcmp($defaults[usr_name],  $formfields[usr_name]) ||
+    strcmp($defaults[usr_URL],   $formfields[usr_URL]) ||
+    strcmp($defaults[usr_addr],  $formfields[usr_addr]) ||
+    strcmp($defaults[usr_phone], $formfields[usr_phone]) ||
+    strcmp($defaults[usr_title], $formfields[usr_title]) ||
+    strcmp($defaults[usr_affil], $formfields[usr_affil]) ||
+    # Check this too, since we want to call out if the email addr changed.
+    strcmp($defaults[usr_email], $formfields[usr_email])) {
 
-#
-# Audit
-#
-TBUserInfo($uid, $uid_name, $uid_email);
+    DBQueryFatal("UPDATE users SET ".
+		 "usr_name=\"$usr_name\",       ".
+		 "usr_URL=\"$usr_URL\",         ".
+		 "usr_addr=\"$usr_addr\",       ".
+		 "usr_phone=\"$usr_phone\",     ".
+		 "usr_title=\"$usr_title\",     ".
+		 "usr_affil=\"$usr_affil\",     ".
+		 "usr_modified=now()            ".
+		 "WHERE uid=\"$target_uid\"");
 
-TBMAIL("$usr_name <$usr_email>",
-     "User Information for '$target_uid' Modified",
-     "\n".
-     "User information for '$target_uid' changed by '$uid'.\n".
-     "\n".
-     "Name:              $usr_name\n".
-     "Email:             $usr_email\n".
-     "URL:               $usr_URL\n".
-     "Affiliation:       $usr_affil\n".
-     "Address:           $usr_addr\n".
-     "Phone:             $usr_phone\n".
-     "Title:             $usr_title\n".
-     "Password Changed?: $changed_password\n".
-     "\n\n".
-     "Thanks,\n".
-     "Testbed Operations\n",
-     "From: $uid_name <$uid_email>\n".
-     "Cc: $TBMAIL_AUDIT\n".
-     "Errors-To: $TBMAIL_WWW");
+    # Only to user. We care about password and email changes only.
+    $BCC = "";
+    if (strcmp($usr_email, $dbusr_email)) {
+	$BCC = "Bcc: $TBMAIL_AUDIT\n";
+    }
+    
+    TBMAIL("$usr_name <$usr_email>",
+	   "User Information for '$target_uid' Modified",
+	   "\n".
+	   "User information for '$target_uid' changed by '$uid'.\n".
+	   "\n".
+	   "Name:              $usr_name\n".
+	   "Email:             $usr_email\n".
+	   "URL:               $usr_URL\n".
+	   "Affiliation:       $usr_affil\n".
+	   "Address:           $usr_addr\n".
+	   "Phone:             $usr_phone\n".
+	   "Title:             $usr_title\n",
+	   "From: $TBMAIL_OPS\n".
+	   $BCC .
+	   "Errors-To: $TBMAIL_WWW");
 
-#
-# mkacct updates the user gecos and password.
-# 
-MKACCT($uid, "webmkacct $target_uid");
+    #
+    # mkacct updates the user gecos
+    #
+    if (HASREALACCOUNT($uid)) {
+	SUEXEC($uid, "nobody", "webtbacct mod $target_uid", 1);
+    }
+}
 
 #
 # Spit out a redirect so that the history does not include a post

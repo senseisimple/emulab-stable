@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -390,7 +390,7 @@ function DOLOGIN($uid, $password) {
 	# each time the user does something. Eventually the cookie will
 	# expire and the user will be forced to log in again anyway. 
 	#
-	$timeout = time() + (60 * 60 * 24);
+	$timeout = time() + (60 * 60 * 24) + $TBAUTHTIMEOUT;
 	setcookie($TBAUTHCOOKIE, $hashkey, $timeout, "/",
                   $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
@@ -525,7 +525,9 @@ function HASREALACCOUNT($uid) {
     $status  = $row[0];
     $webonly = $row[1];
 
-    if ($webonly || strcmp($status, TBDB_USERSTATUS_ACTIVE)) {
+    if ($webonly ||
+	(strcmp($status, TBDB_USERSTATUS_ACTIVE) &&
+	 strcmp($status, TBDB_USERSTATUS_FROZEN))) {
 	return 0;
     }
     return 1;
