@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show Batch Mode Experiment Information");
+PAGEHEADER("Batch Mode Experiment Information");
 
 #
 # Only known and logged in users can end experiments.
@@ -68,6 +68,8 @@ $attempts  = $exprow[attempts];
 #
 # Generate the table.
 # 
+echo "<table align=center border=1>\n";
+
 echo "<tr>
           <td>Name: </td>
           <td class=\"left\">$exp_eid</td>

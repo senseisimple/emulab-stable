@@ -202,8 +202,10 @@ if ($nonsfile) {
 	     "Cc: $TBMAIL_WWW\n".
              "Errors-To: $TBMAIL_WWW");
     }
-    echo "</body>
-          </html>\n";
+    #
+    # Standard Testbed Footer
+    # 
+    PAGEFOOTER();
     die("");
 }
 

@@ -1,0 +1,19 @@
+set ns [new Simulator]			
+source tb_compat.tcl
+
+set nodeA [$ns node]
+set nodeB [$ns node]
+
+$ns duplex-link $nodeA $nodeB 100Mb 0ms DropTail
+
+tb-set-node-os $nodeA FBSD40-STD
+tb-set-node-os $nodeB FBSD40-STD
+	
+tb-set-node-rpms $nodeA /proj/testbed/rpms/silly-1.0-1.i386-freebsd.rpm
+tb-set-node-rpms $nodeB /proj/testbed/rpms/silly-1.0-1.i386-freebsd.rpm
+
+tb-set-node-startup $nodeA /usr/site/bin/run-silly
+tb-set-node-startup $nodeB /usr/site/bin/run-silly
+
+$ns run
+

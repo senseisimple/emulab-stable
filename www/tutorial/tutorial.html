@@ -54,7 +54,6 @@ running batch jobs, creating your own disk images and loading those
 images on your nodes. 
 </p>
 
-<h2>Contents</h2>
 <ul>
 <li> <a href="#LoggingIn">Logging into the Web Interface</a>
 <li> <a href="#Designing">Designing a Network Topology</a>
@@ -271,6 +270,7 @@ fully configured and ready to use. If you have selected one of the
 Testbed supported operating system images (FreeBSD, Linux, NetBSD),
 this configuration process includes:
 
+<p>
 <ul>
 <li> loading fresh disk images so that each node is in a known clean
      state;
@@ -385,13 +385,15 @@ Operations (testbed-ops@flux.cs.utah.edu)</a>. Also note that much of
 the software is in development, and occasionally things might break or
 not work as you expect. Again, please feel free to contact us.
 
+<!-- This ends the Basic Tutorial Section -->
+</ul>
+
 <hr>
 <a NAME="Advanced"></a>
 <center>
 <h2>Advanced Topics</h2>
 </center>
 
-<h2>Contents</h2>
 <ul>
 <li> <a href="#RPMS">Installing RPMS automatically</a>
 <li> <a href="#Startupcmd">Starting your application automatically</a>
@@ -427,7 +429,7 @@ project member's home directory in <tt>/users</tt>.
 <p>
 
 You can start your application automatically when your nodes boot by
-using the <tt>tb-set-node-startup</tt> NS extenstion. The argument is
+using the <tt>tb-set-node-startup</tt> NS extension. The argument is
 the pathname of a script or program that is run as the <tt>UID</tt> of
 the experiment creator, after the node has reached multiuser mode. You
 can specify the same program for each node, or a different program.
@@ -443,8 +445,18 @@ the node's local filesystem, or in a directory that can be reached via
 NFS. This is either the project's <tt>/proj</tt> directory, or a
 project member's home directory in <tt>/users</tt>.
 
-</p>
+<p>
 
+The exit value of the startup command is reported back to the Web
+Interface, and is made available to you via the "Experiment
+Information" link. There is a listing for all of the nodes in the
+experiment, and the exit value is recorded in this listing. The
+special symbol <tt>none</tt> indicates that the node is still running
+the startup command. The startup command is especially useful when
+combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
+
+
+<p>
 <li> <a NAME="ReadyBits"></a>
      <h3>How do I know when all my nodes are ready?</h3>
 <p>
@@ -603,6 +615,7 @@ $ns run					</code></pre>
      create a complete snapshot of your system.
 </ul>
 
+<!-- This ends the Advanced Tutorial Section -->
 </ul>
 
 
@@ -614,9 +627,96 @@ $ns run					</code></pre>
 <h2>Batch Mode</h2>
 </center>
 
-<h3>
-Please check back again later!
-</h3>
+<ul>
+<li> <a href="#BatchIntro">Batch Mode Introduction</a>
+<li> <a href="#BatchExample">A Batch Mode Example</a>
+</ul>
+
+<ul>
+<li> <a NAME="BatchIntro"></a>
+     <h3>Batch Mode Introduction</h3>
+
+<p>
+Batch Mode experiments can be created on the Testbed via the "Create a
+Batch Experiment" link in the operations menu to your left. A batch
+mode experiment is a lot like a regular experiment, but with a few
+important differences:
+
+<p>
+<ul>
+<li> The experiment is run when enough resources (ie: nodes) are
+     available. This might be immediately, or it might be sometime in
+     the future.
+     <p>
+<li> Once your NS file is handed off to the system, the batch system
+     is responsible for setting up the experiment and tearing it down
+     once the experiment has completed. You will receive email
+     notifying you when the experiment has been scheduled and when it
+     has been terminated.
+     <p>
+<li> Your NS file must define a <i>startup</i> command to run on each
+     node using the <a href="#Startupcmd"><tt>tb-set-node-startup</tt></a>
+     NS extension. It is the exit value(s) of the startup command(s) that
+     indicates that the experiment is completed; when all of the
+     nodes have run their respective startup commands and exited, the
+     batch system will then tear down the experiment. The output of
+     the startup command is stored in a file in your home directory so
+     you can follow what has happened.
+</ul>
+<p>
+
+<li> <a NAME="BatchExample"></a>
+     <h3>A Batch Mode Example</h3>
+
+Consider example NS file <a href="batch.ns" target=stuff>batch.ns</a>.
+First off, we have to arrange for the experimental software to be
+automatically installed when the nodes boot. This is done with the <a
+href="#RPMS"><tt>tb-set-node-rpms</tt></a> NS extension:
+
+<code><pre>
+tb-set-node-rpms $nodeA /proj/testbed/rpms/silly-1.0-1.i386-freebsd.rpm
+tb-set-node-rpms $nodeB /proj/testbed/rpms/silly-1.0-1.i386-freebsd.rpm
+</code></pre>
+
+The next two lines of the NS file specify what program should be run
+on each of the nodes. Using the <a href="#Startupcmd">
+<tt>tb-set-node-startup</tt></a> NS extension, we say that the program
+<tt>run-silly</tt> (installed by the <tt>silly-1.0</tt> RPM) is to be
+run on both nodes:
+
+<code><pre>
+tb-set-node-startup $nodeA /usr/site/bin/run-silly
+tb-set-node-startup $nodeB /usr/site/bin/run-silly
+</code></pre>
+
+After you have been notified via email that the batch experiment is
+running, you can track the progress of your experiment by looking in
+the "Experiment Information" page. As each node completes the startup
+command, the listing for that node will be updated to reflect the exit
+status of the command (you may need to hit the Reload button to see
+the changes). Once all of the nodes hare reported in an exit status,
+the batch system will tear down the experiment and send you email.
+
+<p>
+The status of your batch experiment can be viewed via the "Experiment
+Information" link in the Web Interface Options menu. You may also
+cancel a batch after you have submitted it using the "Terminate"
+option in the information display.
+
+<p>
+<i>
+The batch system is still under development. It appears to be
+functional, but there are bound to be kinks in the system. Please help
+us debug and improve it by letting us know what you think and if you
+have problems with it. Currently, the batch system tries every 10
+minutes to run your batch. It will send you email every 5 or so
+attempts to let you know that it is trying, but that resources are not
+available. It is a good idea to glance at the message to make sure
+that the problem is lack of resources and not an error in your NS
+file.</i>
+
+<!-- This ends the Basic Tutorial Section -->
+</ul>
 
 <!-- Custom OS Images -->
 

@@ -27,8 +27,13 @@ if (mysql_num_rows($query_result) == 0) {
     USERERROR("You do not appear to be a member of any Projects in which ".
 	      "you have permission (root) to create new experiments.", 1);
 }
-
 ?>
+
+<center>
+<h2>For information on <i>Batch Mode</i>, please take a look at the
+<a href="tutorial/tutorial.php3#BatchMode">Emulab Tutorial</a></h2>
+</center>
+
 <table align="center" border="1"> 
 <tr>
     <td align="center" colspan="3">
@@ -86,7 +91,8 @@ echo "<tr>
 # NS file upload.
 # 
 echo "<tr>
-          <td>*Your NS file (20K max):</td>
+          <td>*Your NS file:<br>
+              &nbsp(20K max)</td>
           <td><input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
               </td>
@@ -120,6 +126,12 @@ echo "<tr>
 </tr>
 </form>
 </table>
+
+<p>
+<center>
+<img alt="*" src="redball.gif"> 
+Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
+</center>
 
 <?php
 #

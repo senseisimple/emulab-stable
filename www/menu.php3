@@ -107,11 +107,8 @@ function WRITESIDEBAR() {
 			       $TBBASE, "beginexp_form.php3");
 	    WRITESIDEBARBUTTON("Experiment Information",
 			       $TBBASE, "showexp_list.php3");
-
-	    if ($stud) {
-		WRITESIDEBARBUTTON("Create a Batch Experiment",
-				   $TBBASE, "batchexp_form.php3");
-	    }
+	    WRITESIDEBARBUTTON("Create a Batch Experiment",
+			       $TBBASE, "batchexp_form.php3");
 	    WRITESIDEBARBUTTON("Update user information",
 			       $TBBASE, "modusr_form.php3");
 	    WRITESIDEBARBUTTON("Node Reservation Status",
