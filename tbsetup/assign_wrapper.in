@@ -800,11 +800,14 @@ foreach $vlan (keys(%vlans)) {
 	     " (0,\"$pid\",\"$eid\",\"$lan\",\"" .
 	     join(" ",@$members) . "\")");
 }
+my $pipeid = 100;
+
 foreach $delay (keys(%delays)) {
     ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate) = 
 	@{$delays{$delay}};
-    my $pipe0 = 100 + (10 * $delay);
-    my $pipe1 = $pipe0 + 10;
+    my $pipe0 = $pipeid;
+    my $pipe1 = $pipeid + 10;
+    $pipeid += 100;
     DBQueryFatal("insert into delays" .
 	     " (pid,eid,node_id,vname,iface0,iface1" .
 	     ",pipe0,delay0,bandwidth0,lossrate0" .
