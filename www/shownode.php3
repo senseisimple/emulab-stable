@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -44,37 +44,33 @@ if (! $isadmin) {
     }
 }
 
-
 echo "<font size=+2>".
      "Node <b>$node_id</b>";
 
-$query_result = DBQueryFatal("select r.vname,r.pid,r.eid from nodes as n ".
-	 		     "left join reserved as r on n.node_id=r.node_id ".
-  		             "where n.node_id='$node_id'");
+$query_result =
+    DBQueryFatal("select r.vname,r.pid,r.eid from nodes as n ".
+		 "left join reserved as r on n.node_id=r.node_id ".
+		 "where n.node_id='$node_id'");
 
-if (mysql_num_rows($query_result) != 0) {
-    $row = mysql_fetch_array($query_result);
-    $vname		= $row[vname];
-    $pid 		= $row[pid];
-    $eid		= $row[eid];
+if (! mysql_num_rows($query_result) != 0) {
+    TBERROR("Node $node id does not have a nodes table entry!", 1);
+}
 
-    if ($vname != "") {
-#	    echo " (<b>".
-#        	 "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-#	         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>/".
-#        	 "$vname</b>)";
+$row = mysql_fetch_array($query_result);
+$vname		= $row[vname];
+$pid 		= $row[pid];
+$eid		= $row[eid];
 
-	    echo " (<b>".
-        	 "$vname.".
-	         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
-        	 "<a href='showproject.php3?pid=$pid'>$pid</a>.".
-		 "$OURDOMAIN".
-                 "</b>)";
-
-    }
+if (isset($pid) && $vname != "") {
+    echo " (<b>".
+	 "   $vname.".
+	 "   <a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>.".
+	 "   <a href='showproject.php3?pid=$pid'>$pid</a>.".
+	 "       $OURDOMAIN".
+	 "  </b>)";
 }	
 
-echo "</font><br /><br />\n";
+echo "</font><br><br>\n";
 
 SUBPAGESTART();
 SUBMENUSTART("Node Options");
@@ -82,11 +78,19 @@ SUBMENUSTART("Node Options");
 #
 # Tip to node option
 #
-if (TBHasSerialConsole($node_id) && ($isadmin || 
-    TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO))) {
+if (TBHasSerialConsole($node_id)) {
     WRITESUBMENUBUTTON("Connect to Serial Line</a> " . 
 	"<a href=\"faq.php3#UTT-TUNNEL\">(howto)",
 	"nodetipacl.php3?node_id=$node_id");
+}
+
+#
+# SSH to option.
+# 
+if (! strcmp($OURDOMAIN, "mini.emulab.net") && isset($pid)) {
+    WRITESUBMENUBUTTON("SSH to node</a> ".
+		       "<a href='docwrapper.php3?docname=ssh-mime.html'>".
+		       "(howto)", "nodessh.php3?node_id=$node_id");
 }
 
 #

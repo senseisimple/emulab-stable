@@ -33,12 +33,11 @@ else {
 }
 
 #
-# Check to make sure thats this is a valid UID.
+# Check to make sure thats this is a valid UID. Getting the status works,
+# and we need that later. 
 #
-$query_result =
-    DBQueryFatal("SELECT * FROM users WHERE uid='$target_uid'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The user $target_uid is not a valid user", 1);
+if (! ($userstatus = TBUserStatus($target_uid))) {
+    USERERROR("The user $target_uid is not a valid user", 1);
 }
 
 #
@@ -174,8 +173,12 @@ if ($isadmin) {
     }
     WRITESUBMENUBUTTON("Delete User",
 		       "deleteuser.php3?target_uid=$target_uid");
-    WRITESUBMENUBUTTON("Resend Verification Key",
-		       "resendkey.php3?target_uid=$target_uid");
+
+    if (! strcmp($userstatus, TBDB_USERSTATUS_NEWUSER) ||
+	! strcmp($userstatus, TBDB_USERSTATUS_UNVERIFIED)) {
+	WRITESUBMENUBUTTON("Resend Verification Key",
+			   "resendkey.php3?target_uid=$target_uid");
+    }
 }
 SUBMENUEND();
 

@@ -37,7 +37,7 @@ FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
 FILES  += $(wildcard $(SRCDIR)/*.php)
 FILES  += $(wildcard $(SRCDIR)/*.ico)
-FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml
+FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml $(SRCDIR)/ssh-mime.pl
 
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
 AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
