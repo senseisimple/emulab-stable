@@ -1,6 +1,6 @@
 <html>
 <head>
-	<title>Utah Network Testbed - FAQ</title>
+	<title>Emulab - FAQ</title>
 	<link rel='stylesheet' href='tbstyle-doc.css' type='text/css'>
 </head>
 <body>
@@ -16,8 +16,10 @@
      <ul>
      <li> <a href="#GS-1">How do I start a project?</a>
      <li> <a href="#GS-2">How do I join a project?</a>
-     <li> <a href="#GS-3">Can I be in more than one project?</a>
-     <li> <a href="#GS-4">Do I have a login account at Emulab?</a>
+     <li> <a href="#GS-3">I have an Emulab account. Now what?</a>
+     <li> <a href="#GS-4">Can I be in more than one project?</a>
+     <li> <a href="#GS-5">Can I change my Emulab password?</a>
+     <li> <a href="#GS-6">Where do I get help?</a>
      </ul>
 
 <li> <a href="#UTT">Using the Testbed</a>
@@ -26,21 +28,30 @@
      <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
      <li> <a href="#UTT-3">Do my nodes have consoles I can look at?</a>
      <li> <a href="#UTT-4">Where do I store files needed by my experiment?</a>
-     <li> <a href="#UTT-5">Are my nodes backed up (filesaved)?</a>
+     <li> <a href="#UTT-5">Are my files on <b>users.emulab.net</b>
+                           backed up (filesaved)?</a>
+     <li> <a href="#UTT-6">Are the nodes in my experiment backed up
+                           (filesaved)?</a> 
      </ul>
 
 <li> <a href="#HDS">Hardware setup</a>
      <ul>
      <li> <a href="#HDS-1">How many nodes are there?</a>
-     <li> <a href="#HDS-2">How many ethernet cards are on each node?</a>
-     <li> <a href="#HDS-3">Can I do traffic shaping on my links?</a>
+     <li> <a href="#HDS-2">How many nodes are currently available?</a>
+     <li> <a href="#HDS-3">How many ethernet cards are on each node?</a>
+     <li> <a href="#HDS-4">Can I do traffic shaping on my links?</a>
      </ul>
 
 <li> <a href="#SWS">Software setup</a>
      <ul>
      <li> <a href="#SWS-1">What OS do the nodes run?</a>
-     <li> <a href="#SWS-2">Can I run my own OS?</a>
-     <li> <a href="#SWS-3">How do I load my OS on all my nodes?</a>
+     <li> <a href="#SWS-2">How do I select which OS to run on each node?</a>
+     <li> <a href="#SWS-3">Can I load my own software (RPMs) on my nodes?</a>
+     <li> <a href="#SWS-4">Can I schedule programs to run
+                           automatically when a node boots</a>
+     <li> <a href="#SWS-5">How does my software determine when other
+                           nodes in my experiment are ready?</a>
+     <li> <a href="#SWS-6">Can I run my own Operating System?</a>
      </ul>
 </ul>
 
@@ -50,7 +61,7 @@
 <h3>Getting Started</h3>
 <ul>
 <li><a NAME="GS-1"></a>
-    <h4>How do I start a project?</h4>
+    <h3>How do I start a project?</h3>
     <p>
     If you are new to the Testbed, simply click on the "Start Project"
     link on the Emulab <a href="https://www.emulab.net">Home
@@ -59,6 +70,7 @@
     "Submit" button. Within a few days you will be contacted via email
     with an approval message. More information about starting projects
     can be found in <a href="auth.html">Authorization Page</a>.
+    </p>
     <p>
     If you already have an Emulab account, and wish to start a second
     project, first log into the Web Interface. Then select the "Start
@@ -68,7 +80,7 @@
     </p>
 
 <li><a NAME="GS-2"></a>
-    <h4>Someone told me to join their project. How do I do that?</h4>
+    <h3>Someone told me to join their project. How do I do that?</h3>
     <p>
     If you are new to the Testbed, simply click on the "Join Project"
     link on the Emulab <a href="https://www.emulab.net">Home
@@ -79,6 +91,56 @@
     for the project leader to approve you.  When approved you will
     receive an email message saying so, and you can then log into the
     Testbed.
+    </p>
+
+<li><a NAME="GS-3"></a>
+    <h3>I have an Emulab account. Now what?</h3>
+    <p>
+    Once you have been approved to start (or join) your first project,
+    you will be able to log into Emulab's user machine,
+    <b>users.emulab.net</b>. We require that all Emulab users use ssh. For
+    example, if your Emulab account name is "joe", then you would do:
+    <pre>
+	ssh <b>users.emulab.net</b> -l joe		</pre>
+    </p>
+    <p>
+    Your password starts out the same as the password you initially
+    supplied to the Start (or Join) web page. The skeleton <i>dot</i>
+    files that are provided to all new Emulab users will contain
+    <tt>/usr/testbed/bin</tt> in the <tt>PATH</tt> setting. This
+    directory holds a number of utilities and programs that some (but
+    not all) Emulab users will need in order to conduct experiments.
+    </p>
+
+<li><a NAME="GS-4"></a>
+    <h3>Can I be in more than one project?</h3>
+    <p>
+    Yes. You may join (and/or start) as many projects as you like,
+    subject to Emulab <a href="policies.html">admininstrative
+    policies</a>.
+    </p>
+
+<li><a NAME="GS-5"></a>
+    <h3>Can I change my Emulab password?</h3>
+    <p>
+    Yes. You can change your Emulab Web password and your Emulab login
+    password (the password you use to log into <b>users.emulab.net</b>, as
+    well as nodes in your experiments). To change your Web password,
+    simply click on the "Update User Information" in the menu to your
+    left, and then enter your new password in the location provided. 
+    To change your login password, use the unix <tt>passwd</tt>
+    utility when logged into <b>users.emulab.net</b>. 
+    </p>
+
+<li><a NAME="GS-6"></a>
+    <h3>Where do I get help?</h3>
+    <p>
+    If you cannot find an answer to your question in the
+    <a href="../doc/doc.html">Emulab Documentation</a>, then you can
+    send email to <a href="mailto:testbed-ops@flux.cs.utah.edu"> 
+    Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>. We will try
+    to answer your question as quickly as we can.
+    </p>
 </ul>
 
 <hr>
@@ -87,14 +149,14 @@
 <h3>Using the Testbed</h3>
 <ul>
 <li><a NAME="UTT-1"></a>
-    <h4>Is there a tutorial?</h4>
+    <h3>Is there a tutorial?</h3>
     <p>
     Yes, we have an extensive <a href="tutorial/tutorial.html">tutorial</a>
     on using the Testbed.
     </p>
 
 <li><a NAME="UTT-2"></a>
-    <h4>Do I get root access on my nodes?</h4>
+    <h3>Do I get root access on my nodes?</h3>
     <p>
     Yes. Project leaders get root access to all of the nodes in all of
     the experiments that are running in their project. Project members
@@ -104,8 +166,226 @@
     <a href="tutorial/tutorial.html#RootAccess">tutorial</a> describes
     this in more detail.
     </p>
+
+<li><a NAME="UTT-3"></a>
+    <h3>Do my nodes have consoles I can look at?</h3>
+    <p>
+    Yes. Each of the PCs has its own serial console line that you can
+    interact with using the unix <tt>tip</tt> utility. To "tip" to
+    "pc01" in your experiment, ssh into <b>users.emulab.net</b>, and
+    then type <tt>tip pc01</tt> at the unix prompt. You may then
+    interact with the serial console.
+    </p>
+    <p>
+    The Sharks also have serial console lines, but because of the
+    limited number of serial ports available on <b>users.emulab.net</b>, only
+    one Shark, the last or "eighth", on each shelf has a console line
+    attached. To tip to that shark, you would type <tt>tip shXX</tt>
+    at the unix prompt, where "XX" is the shark shelf number. The
+    shark shelf number is the first digit in the name. Using shark
+    sh16-8 as an example, the shelf number is sixteen, and the number
+    of the node on the shelf is eight.
+    </p>
+
+<li><a NAME="UTT-4"></a>
+    <h3>Where do I store files needed by my experiment?</h3>
+    <p>
+    Each project has its own directory, rooted at <tt>/proj</tt>,
+    which is available via NFS to all of the nodes in experiments
+    running in that project. For example, when the "RON" project was
+    created, a directory called /proj/RON was also created. This
+    directory is owned by the project creator, and is in the unix
+    group "RON." Its permission (mode) is 770; read/write/execute
+    permitted by the project creator and by all of the members of the
+    project RON, but protected against all access by people outside
+    the RON project.
+    </p>
+    <p>
+    Project members are encouraged to store any files needed by their
+    experiments in the corresponding /proj project directory. 
+    </p>
+
+<li><a NAME="UTT-5"></a>
+    <h3>Are my files on <b>users.emulab.net</b> backed up (filesaved)?</h3>
+    <p>
+    Yes. All of the files in your home directory on /users, and all of
+    the files in your project directory in /proj are filesaved. While
+    we can restore lost files in an emergency, we encourage you to
+    back up critical data on your own to avoid (possibly long) delays
+    in conducting your experiments.
+    </p>
+    
+<li><a NAME="UTT-6"></a>
+    <h3>Are the nodes in my experiment backed up (filesaved)?</h3>
+    <p>
+    No! The nodes in your experiment are not filesaved. Any changes
+    you make to the local filesystems will be lost if the event of a
+    disk failure. We plan to provide a mechanism for experimenters to
+    create snapshots of their node state, but that is not done yet. In
+    the meantime, any files that must not be lost should be stored in
+    the project directory (/proj/<project_name>), which is available
+    via NFS to all of the nodes in your experiment. You may also store
+    files in your home directory (/users/<login>), also available via
+    NFS to all of your nodes, but that is not the preferred location
+    since quotas on /users are relatively small.
+    </p>
     
 </ul>
+
+<hr>
+
+
+<a NAME="HDS"></a>
+<h3>Hardware Setup</h3>
+<ul>
+<li><a NAME="HDS-1"></a>
+    <h3>What kind of computers are used for my nodes?
+<li><a NAME="HDS-2"></a>
+    How many nodes are there?
+<li><a NAME="HDS-3"></a>
+    How many ethernet cards are on each node?</h3>
+    <p>
+    Please see the <a href = "hardware.html">Hardware Overview</a>
+    page for a description and count of the computers that comprise
+    the Testbed.
+    </p>
+    
+<li><a NAME="HDS-4"></a>
+    <h3>How many nodes are currently available (free)?</h3>
+    <p>
+    If you click on the "Node Reservation Status" link in the menu to
+    your left, you will see a summary of the number of nodes (by type)
+    that are currently available, followed by a listing of the
+    reservation status of each individual node.
+    </p>
+    
+<li><a NAME="HDS-5"></a>
+    <h3>Can I do traffic shaping on my links?</h3>
+    <p>
+    Yes! You can specify the delay, bandwidth, and packet loss rate
+    between any two nodes in your topology. Bandwidth and delay are
+    specified in the NS <tt>duplex-link</tt> statement, while packet
+    loss rate is specified with the Emulab <tt>tb-set-link-loss</tt>
+    extension to NS. You may also specify delay, bandwidth, and packet
+    loss rate between nodes in a regular LAN.
+    </p>
+    <p>
+    Please see the <a href="tutorial/nscommands.html">Extensions</a>
+    page for a summary of all Emulab NS extensions, and the
+    <a href = "tutorial/tutorial.html">Emulab Tutorial</a> for an
+    example. 
+    </p>
+</ul>
+
+<hr>
+
+<a NAME="SWS"></a>
+<h3>Software Setup</h3>
+<ul>
+<li><a NAME="SWS-1"></a>
+    <h3>What OS do the nodes run?</h3>
+    <p>
+    Please see the <a href = "software.html">Software Overview</a>
+    page for a description of the Operating Systems that can be run on
+    each of the Testbed nodes.
+    </p>
+
+<li><a NAME="SWS-2"></a>
+    <h3>How do I select which OS to run on each node?</h3>
+    <p>
+    When a choice of OS is available, you may specify which one you
+    prefer for each node in the NS file using the Emulab
+    <tt>tb-set-node-os</tt> extension to NS. When your experiment is
+    configured, the appropriate disk image will be loaded on your
+    nodes, and the selected operating system will boot up on each.
+    </p>
+    <p>
+    Please see the <a href="tutorial/nscommands.html">Extensions</a>
+    page for a summary of all Emulab NS extensions, and the
+    <a href = "tutorial/tutorial.html">Emulab Tutorial</a> for an
+    example. 
+    </p>    
+    
+<li><a NAME="SWS-3"></a>
+    <h3>Can I load my own software (RPMs) on my nodes?</h3>
+    <p>
+    Yes! If have an RPM (or more than one) that is appropriate for
+    loading on the OS you have selected, you can arrange to have them
+    loaded automatically when your experiment is configured. The
+    Emulab NS extension <tt>tb-set-node-rpms</tt> is used in the NS
+    file to specify a list of RPMS to install. You may specify a
+    different list for each node in the experiment. When the node
+    first boots after the experiment is configured, each of the RPMs
+    will be installed (but only RPMs that have not already been
+    installed). 
+    </p>
+    <p>
+    Please see the <a href="tutorial/nscommands.html">Extensions</a>
+    page for a summary of all Emulab NS extensions, and the
+    <a href = "tutorial/tutorial.html">Emulab Tutorial</a> for an
+    example. 
+    </p>    
+    
+<li><a NAME="SWS-4"></a>
+    <h3>Can I schedule programs to run automatically when a node boots?</h3>
+    <p>
+    Yes! You can arrange to run a single program or script when your
+    node boots. The script is run as the UID of the experiment
+    creator, and is run after all other node configuration (including
+    RPM installation) has completed. The exit status of the script (or
+    program) is reported back and is made available for you to view in
+    Experiment Information link in the menu at your left. The Emulab
+    NS extension <tt>tb-set-node-startup</tt> is used in the NS file
+    to specify the path of the script (or program) to run. You may
+    specify a different program for each node in the experiment.
+    </p>
+    <p>
+    Please see the <a href="tutorial/nscommands.html">Extensions</a>
+    page for a summary of all Emulab NS extensions, and the
+    <a href = "tutorial/tutorial.html">Emulab Tutorial</a> for an
+    example.
+    </p>    
+    
+<li><a NAME="SWS-5"></a>
+    <h3>How does my software determine when other nodes in my
+    experiment are ready?</h3>
+    <p>
+    If your application requires synchronization to determine when all
+    of the nodes in your experiment have started up and are ready to
+    proceed, then you can use the Testbed's <i>ready bits</i>
+    mechanism. The ready bits are really just a way of determining how
+    many nodes have issued the <b>ready</b> command, and is returned
+    to the application as a simple N of M string, where N is the
+    number that have reported in, and M is the total number of nodes
+    in the experiment. Applications can use this as a very simplistic
+    form of barrier synchronization, albeit one that can be used just
+    once and one that does not actually block!
+    </p>
+    <p>
+    Use of the ready bits is described in more detail in the <a href =
+    "tutorial/tutorial.html">Emulab Tutorial</a> and in the <a href =
+    "doc/tmcd.html"> Testbed Master Control Daemon</a> documentation.
+    </p>
+    
+<li><a NAME="SWS-6"></a>
+    <h3>Can I run my own Operating System?</h3>
+    <p>
+    Yes! You can run your own OS on any of the PCs (the Sharks do not
+    support custom operating systems as this time, however you can run
+    <a href = "http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels
+    on the PCs or the Sharks). Each of the PCs is partitioned so that
+    the 4th DOS slice (about 6GB) is unused and available to be loaded
+    with whatever OS you want to run. The only requirement is that
+    your image contain a proper DOS boot record in the first sector
+    (first sector of the 4th DOS slice) which can be invoked by the
+    DOS Master Boot Record in the first sector of the disk. There are
+    other minor requirements which are detailed in the <a href =
+    "doc/customOS.html">Custom OS</a> documentation page. The
+    procedure for creating and installing your custom OS are also
+    described in this document.
+    </p>
+</ul>
+
 
 <hr size=2 noshade>
 <center>
@@ -119,7 +399,7 @@
 </center>  
 <p align=right>
 <font size="-1">
-<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+<a href="mailto:testbed-ops@flux.cs.utah.edu"> 
    Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
 <br>
 Last modified on Mar 14, 2001
