@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+. /etc/emulab/paths.sh
+
+#
+# This is run to bring up a vserver on Plab.  It calls out to vnodesetup
+# to tell it we're either booting or rebooting (currently not implemented
+# by Plab)
+#
+# There are three ways this can be invoked by Plab/Emulab:
+# * During physical node boot, by S99vserver-init
+# * By the Emulab custom service manager, when the sliver if first
+#   brought up
+# * By vnodesetup (running inside the vserver) when it is asked to
+#   reboot the vnode, after it has killed off everything
+#
+# Once vnodesetup has done its thing, rc.inplab is called to actually
+# bring up the vnode
+#
+
+# XXX Super-kludge to figure out vnodeid until the svm works
+# Only works on Flux Plab nodes
+VNODEID=`hostname -s | sed -e 's/planetlab\(.\)/pcplab\1/'`
+
+if [ -e /home/utah6 ]; then
+    VNODEID=${VNODEID}-1;
+elif [ -e /home/utah7 ]; then
+    VNODEID=${VNODEID}-2;
+else
+    echo Must run as utah6 or utah7;
+fi
+
+# See how we were called.
+case "$1" in
+    start)
+	echo "Booting vnode $VNODEID"
+	echo 'See /var/emulab/logs/* for details'
+	$BINDIR/vnodesetup -b -p $VNODEID
+	;;
+    stop)
+	$BINDIR/vnodesetup -h -p $VNODEID
+	;;
+    *)
+	echo "Usage: rc.vinit {start|stop}"
+	exit 1
+esac
