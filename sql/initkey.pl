@@ -17,7 +17,8 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $query_result =
-    DBQueryFatal("select pid,eid from experiments");
+    DBQueryFatal("select pid,eid from experiments ".
+		 "where eventkey is null");
 
 while (($pid,$eid) = $query_result->fetchrow_array()) {
     my $secretkey = TBGenSecretKey();
