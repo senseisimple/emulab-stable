@@ -127,17 +127,20 @@ if (mysql_num_rows($query_result)) {
     echo "<tr>
               <td align=center>PID</td>
               <td align=center>Name</td>
+              <td align=center>MailTo</td>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
 	$pid   = $projrow[pid];
 	$name  = $projrow[name];
 	$trust = $projrow[trust];
+	$mail  = $pid . "-users@" . $OURDOMAIN;
 
 	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
 	    echo "<tr>
                      <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                      <td>$name</td>
+                     <td><a href=mailto:$mail>$mail</a></td>
                  </tr>\n";
         }
     }
