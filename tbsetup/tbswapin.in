@@ -13,6 +13,7 @@
 use DBI;
 
 # Set up paths
+$TESTMODE = @TESTMODE@;
 $TBDB = "@TBDBNAME@";
 $TBROOT = "@prefix@";
 $TBSETUPLIB = "$TBROOT/lib";
@@ -26,10 +27,9 @@ $| = 1;
 require libtbsetup;
 
 $dolog = 1;
-$test = 0;
 
 sub show_help {
-    print STDERR "Syntax: $0 [-nologfile] [-test] pid eid\n";
+    print STDERR "Syntax: $0 [-nologfile] pid eid\n";
     exit(1);
 };
 
@@ -37,8 +37,6 @@ while ($#ARGV > 1) {
     $arg = shift;
     if ($arg eq "-nologfile") {
 	$dolog = 0;
-    } elsif ($arg eq "-test") {
-	$test = 1;
     } else {
 	&show_help;
     }
@@ -134,7 +132,7 @@ if ($exitcode = &tbs_exec("assign_wrapper $pid $eid")) {
 }
 
 # Exit here if we are testing.
-if ($test == 1) {
+if ($TESTMODE) {
     &tbs_out("Testing run - Stopping here.\n");
     if (! $dbh->do("UPDATE experiments set state=\"testing\"" .
 		   " where pid=\"$pid\" and eid=\"$eid\"")) {

@@ -12,6 +12,7 @@
 use DBI;
 
 # Set up paths
+$TESTMODE = @TESTMODE@;
 $TBDB = "@TBDBNAME@";
 $TBROOT = "@prefix@";
 $TBSETUPLIB = "$TBROOT/lib";
@@ -26,10 +27,9 @@ require libtbsetup;
 
 $dolog = 1;
 $force = 0;
-$test = 0;
 
 sub show_help {
-    print STDERR "Syntax: $0 [-nologfile] [-force] [-test] pid eid\n";
+    print STDERR "Syntax: $0 [-nologfile] [-force] pid eid\n";
     exit(1);
 };
 
@@ -39,8 +39,6 @@ while ($#ARGV > 1) {
 	$dolog = 0;
     } elsif ($arg eq "-force") {
 	$force = 1;
-    } elsif ($arg eq "-test") {
-	$test = 1;
     } else {
 	&show_help;
     }
@@ -71,7 +69,7 @@ if (! (($state) = $sth->fetchrow_array())) {
     exit(1);
 }
 if ($force == 0) {
-    if ($test == 1) {
+    if ($TESTMODE) {
 	if ($state ne "testing") {
 	    &tbs_out("Experiment should be in testing if -test is used.\n");
 	    exit(1);
@@ -97,7 +95,7 @@ if (! $dbh->do("UPDATE experiments set state=\"swapping\" " .
 
 $errors = 0;
 
-if ($test == 0) {
+if (! $TESTMODE) {
     &tbs_out("Clearing VLANs\n");
     if (&tbs_exec("snmpit -reset $pid $eid")) {
 	&tbs_out("Failed to reset VLANs\n");
@@ -108,13 +106,15 @@ if ($test == 0) {
     if (&tbs_exec("savevlans")) {
 	&tbs_out("WARNING: Failed to back up VLAN configuration\n");
     }
+}
     
-    &tbs_out("Freeing resources\n");
-    if (&tbs_exec("nfree $pid $eid")) {
-	&tbs_out("Failed to free resources.\n");
-	$errors=1;
-    }
-    
+&tbs_out("Freeing resources\n");
+if (&tbs_exec("nfree $pid $eid")) {
+    &tbs_out("Failed to free resources.\n");
+    $errors=1;
+}
+
+if (! $TESTMODE) {
     &tbs_out("Resetting mountpoints\n");
     if (&tbs_exec("exports_setup")) {
 	&tbs_out("Failed to setup mountpoints.\n");
