@@ -16,13 +16,16 @@ LOGGEDINORDIE($uid);
 # See what projects the uid is a member of. Must be at least one!
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\"");
+	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" ".
+	"and (trust='local_root' or trust='group_root')");
+    
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error finding project membership: $uid: $err\n", 1);
 }
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("You do not appear to be a member of any Projects!", 1);
+    USERERROR("You do not appear to be a member of any Projects in which ".
+	      "you have permission (root) to create new experiments.", 1);
 }
 
 ?>

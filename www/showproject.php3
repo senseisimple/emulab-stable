@@ -61,20 +61,51 @@ SHOWPROJECT($pid, $uid);
 # A list of project members.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT uid FROM proj_memb WHERE pid=\"$pid\"");
+	"SELECT p.*,u.* FROM proj_memb as p ".
+	"left join users as u on u.uid=p.uid ".
+        "WHERE pid=\"$pid\"");
 if (mysql_num_rows($query_result)) {
     echo "<center>
           <h3>Project Members</h3>
           </center>
           <table align=center border=1>\n";
 
-    while ($row = mysql_fetch_row($query_result)) {
-        $target_uid = $row[0];
-        echo "<tr><td>
-                  <A href='showuser.php3?target_uid=$target_uid'>
-                     $target_uid</A>
+    echo "<tr>
+              <td align=center>Name</td>
+              <td align=center>UID</td>
+              <td align=center>Privs</td>
+              <td align=center>Approved?</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+        $target_uid = $row[uid];
+	$usr_name   = $row[usr_name];
+	$status     = $row[status];
+	$trust      = $row[trust];
+
+	if (strcmp($trust, "local_root") == 0 ||
+	    strcmp($trust, "group_root") == 0) {
+	    $trust = "root";
+	}
+	
+        echo "<tr>
+                  <td>$usr_name</td>
+                  <td>
+                    <A href='showuser.php3?target_uid=$target_uid'>
+                       $target_uid</A>
                   </td>
-              </tr>\n";
+                  <td>$trust</td>\n";
+	    
+	if (strcmp($status, "active") == 0 ||
+	    strcmp($status, "unverified") == 0) {
+	    echo "<td align=center>
+                      <img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+	}
+	else {
+	    echo "<td align=center>
+                      <img alt=\"N\" src=\"redball.gif\"></td>\n";
+	}
+	echo "</tr>\n";
     }
 
     echo "</table>\n";

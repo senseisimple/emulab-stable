@@ -133,6 +133,7 @@ if (mysql_num_rows($reserved_result)) {
           <tr>
               <td align=center>Change</td>
               <td align=center>Node ID</td>
+              <td align=center>Node Name</td>
               <td align=center>Type</td>
               <td align=center>Default<br>Image</td>
               <td align=center>Default<br>Path</td>
@@ -143,7 +144,7 @@ if (mysql_num_rows($reserved_result)) {
     # I'm so proud!
     #
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT nodes.* ".
+	"SELECT nodes.*,reserved.vname ".
         "FROM nodes LEFT JOIN reserved ".
         "ON nodes.node_id=reserved.node_id ".
         "WHERE reserved.eid=\"$exp_eid\" and reserved.pid=\"$exp_pid\" ".
@@ -151,6 +152,7 @@ if (mysql_num_rows($reserved_result)) {
 
     while ($row = mysql_fetch_array($query_result)) {
         $node_id = $row[node_id];
+        $vname   = $row[vname];
         $type    = $row[type];
         $def_boot_image_id  = $row[def_boot_image_id];
         $def_boot_path      = $row[def_boot_path];
@@ -166,12 +168,15 @@ if (mysql_num_rows($reserved_result)) {
             $next_boot_path = "NULL";
         if (!$next_boot_cmd_line)
             $next_boot_cmd_line = "NULL";
+        if (!$vname)
+            $vname = "--";
 
         echo "<tr>
                   <td align=center>
                      <A href='nodecontrol_form.php3?node_id=$node_id&refer=$exp_pideid'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
                   <td>$node_id</td>
+                  <td>$vname</td>
                   <td>$type</td>
                   <td>$def_boot_image_id</td>
                   <td>$def_boot_path</td>
