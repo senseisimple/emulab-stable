@@ -35,11 +35,12 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTakg";
+my $optlist  = "df:o:s:c:S:C:O:e:tTakgz";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
 my $cleanup  = 0;
+my $nozoom   = 0;
 my $ghost    = 0;	#  Overlay ghost nodes from all floors onto each map.
 
 my $building;
@@ -70,6 +71,10 @@ my $last_notitles = 0;  # This says there were no titles around the previous ima
 # The image produced for each floor will be this size, except when using thumbnails.
 my $out_width  = 792;
 my $out_height = 492;
+
+# Max x,y of image to go into state file.
+my $max_x = 0;
+my $max_y = 0;
 
 # Unless we suppress titles, there will be a header/trailer around each floor image.
 my $head_height = 50;
@@ -150,6 +155,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"a"})) {
     $showany = 1;
+}
+if (defined($options{"z"})) {
+    $nozoom = 1;
 }
 if (defined($options{"d"})) {
     $debug = 1;
@@ -351,6 +359,9 @@ if (defined($floor)) {
     my ($floorimage, $areamap) = dofloor($building, $floor);
     $image    = $floorimage;
     @areamaps = ($areamap);
+
+    $max_x = $floorimage->Get('width');
+    $max_y = $floorimage->Get('height');
 }
 else {
     #
@@ -497,15 +508,24 @@ sub dofloor($$)
     # Figure out where the user clicked.  (Use the upper-left corner if no click yet.)
     # We won't have both scale and click coords, because they are separate controls.
     if (defined($options{"c"})) {
-
-	# Back out the influence of the previously applied scale and offsets, so it is
-	# as if we are always clicking onto an image that is not scaled or offset.
-	my $image_x = $map_x;
-	my $image_y = adjust_map_y($map_y, $last_notitles);
-	dprint "recent click coords $image_x, $image_y ($map_y)\n";
-	$curr_x = int(($image_x + $last_x_off) / $last_scale);
-	$curr_y = int(($image_y + $last_y_off) / $last_scale);
-	dprint "new unzoomed center $curr_x, $curr_y\n";
+	if ($nozoom) {
+	    #
+	    # All we want is the crosshair.
+	    # 
+	    $curr_x = $map_x;
+	    $curr_y = $map_y;
+	}
+	else {
+	    # Back out the influence of the previously applied scale and
+	    # offsets, so it is as if we are always clicking onto an image
+	    # that is not scaled or offset.
+	    my $image_x = $map_x;
+	    my $image_y = adjust_map_y($map_y, $last_notitles);
+	    dprint "recent click coords $image_x, $image_y ($map_y)\n";
+	    $curr_x = int(($image_x + $last_x_off) / $last_scale);
+	    $curr_y = int(($image_y + $last_y_off) / $last_scale);
+	    dprint "new unzoomed center $curr_x, $curr_y\n";
+	}
     } else {
 	$curr_x = $last_x;
 	$curr_y = $last_y;
@@ -678,6 +698,9 @@ sub adjust_map_y($$) {
 sub calc_offsets($$$$$) {
     my ($scale, $curr_x, $curr_y, $in_width, $in_height) = @_;
 
+    return (0, 0)
+	if ($nozoom);
+
     my $scaled_click_x = $curr_x * $scale;
     my $scaled_click_y = $curr_y * $scale;
 
@@ -797,5 +820,10 @@ sub writefiles($@)
 	print STATE "  <input type=\"hidden\" name=\"last_notitles\" " .
 	    "value=\"$notitles\">\n";
     }
+    print STATE "  <input type=\"hidden\" name=\"max_x\" " .
+	"value=\"$max_x\">\n";
+    print STATE "  <input type=\"hidden\" name=\"max_y\" " .
+	"value=\"$max_y\">\n";
+    
     close(STATE);
 }
