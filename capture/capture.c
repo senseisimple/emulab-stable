@@ -57,6 +57,11 @@ void usage();
 
 #ifdef __linux__
 #define _POSIX_VDISABLE '\0'
+#define revoke(tty)	(0)
+#endif
+
+#ifdef HPBSD
+#define TWOPROCESS	/* historic? */
 #endif
 
 /*
@@ -71,18 +76,21 @@ void usage();
 #define PIDNAME		"%s/%s.pid"
 #define LOGNAME		"%s/%s.log"
 #define RUNNAME		"%s/%s.run"
+#define TTYNAME		"%s/tip/%s"
 #define PTYNAME		"%s/tip/%s-pty"
 #define DEVNAME		"%s/%s"
+#define BUFSIZE		4096
+#define DROP_THRESH	8192
 
 char 	*Progname;
 char 	*Pidname;
 char	*Logname;
 char	*Runname;
+char	*Ttyname;
 char	*Ptyname;
 char	*Devname;
 char	*Machine;
 int	logfd, runfd, devfd, ptyfd;
-int	pid;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
 
 int
@@ -138,6 +146,8 @@ main(argc, argv)
 	Logname = newstr(strbuf);
 	(void) sprintf(strbuf, RUNNAME, LOGPATH, argv[0]);
 	Runname = newstr(strbuf);
+	(void) sprintf(strbuf, TTYNAME, DEVPATH, argv[0]);
+	Ttyname = newstr(strbuf);
 	(void) sprintf(strbuf, PTYNAME, DEVPATH, argv[0]);
 	Ptyname = newstr(strbuf);
 	(void) sprintf(strbuf, DEVNAME, DEVPATH, argv[1]);
@@ -185,7 +195,9 @@ main(argc, argv)
 	exit(0);
 }
 
-#ifdef HPBSD
+#ifdef TWOPROCESS
+int	pid;
+
 void
 capture()
 {
@@ -204,11 +216,11 @@ capture()
  */
 in()
 {
-	char buf[NBPG];
+	char buf[BUFSIZE];
 	int cc, omask;
 	
 	while (1) {
-		if ((cc = read(devfd, buf, NBPG)) < 0) {
+		if ((cc = read(devfd, buf, BUFSIZE)) < 0) {
 			if ((errno == EWOULDBLOCK) || (errno == EINTR))
 				continue;
 			else
@@ -238,7 +250,7 @@ in()
  */
 out()
 {
-	char buf[NBPG];
+	char buf[BUFSIZE];
 	int cc, omask;
 	struct timeval timeout;
 
@@ -247,7 +259,7 @@ out()
 	
 	while (1) {
 		omask = sigblock(SIGUSR2);
-		if ((cc = read(ptyfd, buf, NBPG)) < 0) {
+		if ((cc = read(ptyfd, buf, BUFSIZE)) < 0) {
 			(void) sigsetmask(omask);
 			if ((errno == EIO) || (errno == EWOULDBLOCK) ||
 			    (errno == EINTR)) {
@@ -273,12 +285,35 @@ void
 capture()
 {
 	fd_set sfds, fds;
-	int n, i, cc, lcc, omask, dchars = 0;
-	char buf[4096];
+	int n, i, cc, lcc, omask;
+	char buf[BUFSIZE];
 	struct timeval timeout;
+#ifdef LOG_DROPS
+	int drop_topty_chars = 0;
+	int drop_todev_chars = 0;
+#endif
 
 	timeout.tv_sec  = 0;
-	timeout.tv_usec = 10000;	/* ~10 chars at 9600 baud */
+	timeout.tv_usec = 10000;	/* ~115 chars at 115.2 kbaud */
+
+	/*
+	 * XXX for now we make both directions non-blocking.  This is a
+	 * quick hack to achieve the goal that capture never block
+	 * uninterruptably for long periods of time (use threads).
+	 * This has the unfortunate side-effect that we may drop chars
+	 * from the perspective of the user (use threads).  A more exotic
+	 * solution would be to poll the readiness of output (use threads)
+	 * as well as input and not read from one end unless we can write
+	 * the other (use threads).
+	 *
+	 * I keep thinking (use threads) that there is a better way to do
+	 * this (use threads).  Hmm...
+	 */
+	n = FNDELAY;
+	if (fcntl(ptyfd, F_SETFL, &n) < 0)
+		die("fcntl(FNDELAY): %s", Ptyname, geterr(errno));
+	if (fcntl(devfd, F_SETFL, &n) < 0)
+		die("fcntl(FNDELAY): %s", Devname, geterr(errno));
 
 	n = devfd;
 	if (devfd < ptyfd)
@@ -288,12 +323,16 @@ capture()
 	FD_SET(devfd, &sfds);
 	FD_SET(ptyfd, &sfds);
 	for (;;) {
-		if (dchars) {
-			warn("%d %s chars dropped",
-			     dchars < 0 ? -dchars : dchars,
-			     dchars < 0 ? "input" : "output");
-			dchars = 0;
+#ifdef LOG_DROPS
+		if (drop_topty_chars >= DROP_THRESH) {
+			warn("%d dev -> pty chars dropped", drop_topty_chars);
+			drop_topty_chars = 0;
 		}
+		if (drop_todev_chars >= DROP_THRESH) {
+			warn("%d pty -> dev chars dropped", drop_todev_chars);
+			drop_todev_chars = 0;
+		}
+#endif
 		fds = sfds;
 		i = select(n, &fds, NULL, NULL, NULL);
 		if (i < 0) {
@@ -322,11 +361,16 @@ capture()
 			for (lcc = 0; lcc < cc; lcc += i) {
 				i = write(ptyfd, &buf[lcc], cc-lcc);
 				if (i < 0) {
-					/* XXX commonly observed */
+					/*
+					 * Either tip is blocked (^S) or
+					 * not running (the latter should
+					 * return EIO but doesn't due to a
+					 * pty bug).  Note that we have
+					 * dropped some chars.
+					 */
 					if (errno == EIO || errno == EAGAIN) {
-/* Dropped -- tip isn't running.  Log it anyway, and just ignore the error.  */
-#if 0
-						dchars = -(cc-lcc);
+#ifdef LOG_DROPS
+						drop_topty_chars += (cc-lcc);
 #endif
 						goto dropped;
 					}
@@ -375,9 +419,14 @@ dropped:
 			for (lcc = 0; lcc < cc; lcc += i) {
 				i = write(devfd, &buf[lcc], cc-lcc);
 				if (i < 0) {
-					/* XXX commonly observed, bad idea? */
+					/*
+					 * Device backed up (or FUBARed)
+					 * Note that we dropped some chars.
+					 */
 					if (errno == EAGAIN) {
-						dchars = cc-lcc;
+#ifdef LOG_DROPS
+						drop_todev_chars += (cc-lcc);
+#endif
 						goto dropped2;
 					}
 					die("write(%s) : %s",
@@ -430,7 +479,7 @@ newrun(int sig)
 	 * because we blocked SIGUSR1 during the write.
 	 */
 	close(runfd);
-	
+
 	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
 		die("open(%s) : %s", Runname, geterr(errno));
 	if (chmod(Runname, 0640) < 0)
@@ -441,7 +490,9 @@ newrun(int sig)
 
 /*
  * SIGUSR2 means we want to revoke the other side of the pty to close the
- * tip down gracefully.
+ * tip down gracefully.  We flush all input/output pending on the pty,
+ * do a revoke on the tty and then close and reopen the pty just to make
+ * sure everyone is gone.
  */
 void
 shutdown(int sig)
@@ -452,6 +503,14 @@ shutdown(int sig)
 	 * We know that the any pending access to the pty completed
 	 * because we blocked SIGUSR2 during the operation.
 	 */
+#ifdef HPBSD
+	int zero = 0;
+	ioctl(ptyfd, TIOCFLUSH, &zero);
+#else
+	tcflush(ptyfd, TCIOFLUSH);
+#endif
+	if (revoke(Ttyname) < 0)
+		dolog(LOG_WARNING, "could not revoke access to tty");
 	close(ptyfd);
 	
 	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
@@ -474,16 +533,16 @@ usage()
 warn(format, arg0, arg1, arg2, arg3)
 	char *format, *arg0, *arg1, *arg2, *arg3;
 {
-	char msgbuf[NBPG];
+	char msgbuf[BUFSIZE];
 
 	sprintf(msgbuf, format, arg0, arg1, arg2, arg3);
-	dolog(LOG_ERR, msgbuf);
+	dolog(LOG_WARNING, msgbuf);
 }
 
 die(format, arg0, arg1, arg2, arg3)
 	char *format, *arg0, *arg1, *arg2, *arg3;
 {
-	char msgbuf[NBPG];
+	char msgbuf[BUFSIZE];
 
 	sprintf(msgbuf, format, arg0, arg1, arg2, arg3);
 	dolog(LOG_ERR, msgbuf);
@@ -492,7 +551,7 @@ die(format, arg0, arg1, arg2, arg3)
 
 dolog(level, msg)
 {
-	char msgbuf[NBPG];
+	char msgbuf[BUFSIZE];
 
 	sprintf(msgbuf, "%s - %s", Machine, msg);
 	syslog(level, msgbuf);
@@ -508,8 +567,11 @@ quit(int sig)
 void
 cleanup()
 {
+	dolog(LOG_NOTICE, "exiting");
+#ifdef TWOPROCESS
 	if (pid)
 		(void) kill(pid, SIGTERM);
+#endif
 	(void) unlink(Pidname);
 }
 
@@ -520,10 +582,8 @@ newstr(str)
 	char *malloc();
 	register char *np;
 
-	if ((np = malloc((unsigned) strlen(str) + 1)) == NULL) {
-		warn("malloc: out of memory");
-		exit(1);
-	}
+	if ((np = malloc((unsigned) strlen(str) + 1)) == NULL)
+		die("malloc: out of memory");
 
 	return(strcpy(np, str));
 }

@@ -1,5 +1,10 @@
 DESTDIR=
-CFLAGS= -O -DNBPG=2048
+
+#
+# Define LOG_DROPS to record warnings in syslog whenever chars were dropped
+# due to the output device/pty being full.
+#
+CFLAGS= -g -O2 -DLOG_DROPS
 
 all: capture
 
