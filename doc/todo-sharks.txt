@@ -1,0 +1,31 @@
+Here's what needs to be done in order to get the sharks working:
+
+* Get our new ranges of IP adresses working
+
+* Run crossover cables from the 2nd 100Mbps port on the Asante switches to
+  control router. One way to do this would be to use cables leftover from
+  elsewhere in the testbed, cut one end off, and crimp a new end on. Or, we
+  could get some real bulk cable and do both ends ourselves.  Or, we could buy
+  them from someone.
+
+* Create a new private VLAN to contain the sharks.
+
+* Do DHCP forwarding from this new VLAN to paper. This seems to be called
+  the 'UDP Helper Address' by Cisco. Docs (probably not for the right version
+  of IOS) can be found at:
+  http://www.ieng.com/univercd/cc/td/doc/product/access/acs_fix/827/827swcfg/routcfig.htm
+
+* Allow routing from the new VLAN to paper, plastic and the outside world.
+  This might be a problem - What routing behavior is possible in a private
+  VLAN? Do we somehow need to make the router interface the promiscous port for
+  the private VLAN?
+	
+* Get tmcc for Sharks. Shouldn't have to be very different from the FreeBSD
+  version, except that it needs to set an alias for the interface, instead of a
+  'real' IP address. (Or is this on the tmcd side??)
+	
+* Look through the NFS images the sharks mount (and their kernel) for
+  hardcoded IPs, etc. and update them, or (better yet), figure out a way to
+  generalize if possible
+  
+* Come up with some reason to use them (could be the hardest part!!) :)
