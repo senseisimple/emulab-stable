@@ -188,6 +188,8 @@ foreach $node (keys(%nodes)) {
 	    else {
 		$text .= " pcvm:$virtnode_capacity";
 	    }
+	    # Add trivial bw spec.
+	    $text .= " - - trivial_bw:400000";
 	}
 	print "$text\n";
     }
