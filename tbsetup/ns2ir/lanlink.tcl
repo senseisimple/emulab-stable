@@ -282,7 +282,7 @@ LanLink instproc fill_ips {} {
 
     # See parse-ns if you change this! 
     if {$isremote && ($netmask != "255.255.255.248")} {
-	puts "Ignoring netmask for remote link; forcing 255.255.255.248"
+	puts stderr "Ignoring netmask for remote link; forcing 255.255.255.248"
 	set netmask "255.255.255.248"
 	set netmaskint [inet_atohl $netmask]
     }
