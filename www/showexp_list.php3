@@ -247,7 +247,7 @@ count(r.node_id) as ncount, swap_requests,
 round((unix_timestamp(now())-unix_timestamp(last_swap_req))/3600,1) as lastreq,
 (unix_timestamp(now()) - unix_timestamp(max(greatest(
 last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
-(last_report is not null) as canbeidle,
+(max(last_report) is not null) as canbeidle,
 ve.thumb_hash as thumb_hash 
 from experiments as e 
 left join vis_experiments as ve on ve.pid=e.pid and ve.eid=e.eid 
@@ -264,7 +264,7 @@ select distinct e.*, date_format(expt_swapped,'%Y-%m-%d') as d,
 date_format(expt_swapped,'%c/%e') as dshort, count(r.node_id) as ncount, 
 (unix_timestamp(now()) - unix_timestamp(max(greatest(
 last_tty_act,last_net_act,last_cpu_act,last_ext_act)))) as idlesec,
-(last_report is not null) as canbeidle,
+(max(last_report) is not null) as canbeidle,
 ve.thumb_hash as thumb_hash 
 from group_membership as g 
 left join experiments as e on g.pid=e.pid and g.pid=g.gid 
@@ -518,6 +518,7 @@ if ($thumb && !$idle) {
 			"where pid='$pid' and eid='$eid'");
 	}
 
+	if ($ignore) { $isidle=0; }
 	
 	if ($isadmin) {
 	    $swappable= $row["swappable"];
