@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: mkacct-ctrl,v 1.7 2000-12-07 08:42:08 kwright Exp $
+### $Id: mkacct-ctrl,v 1.8 2000-12-07 21:30:00 kwright Exp $
 
 use English;
 use Mysql;
@@ -228,7 +228,7 @@ sub sanitize() {
     }
 
     ## sanitize user 
-    if ( $ARGV[1] =~ /^([a-z0-9]+)$/ ) {
+    if ( $ARGV[1] =~ /^([a-z0-9]+)$/i ) {
 	$user = $1;
     } else {
 	die "$0: User argument $ARGV[1] has invalid characters.\n";
