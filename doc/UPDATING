@@ -30,6 +30,19 @@ earliest time one of the steps needs to occur.
 	     gmake
 	     sudo gmake install
 
+20041027: After install (be sure to update sitevars):
+
+	A new sitevariable was added to hold root's ssh public key.
+	When nodes boot using the latest image, the public key is
+	handed across via tmcd and statshed in /root/.ssh. This
+	localizes the image (wrt the root pub key) to the local
+	testbed.
+
+	Using the web interface in red dot mode, go to the Edit Site
+	Variables link and store boss:/root/.ssh/identity.pub into the
+	"node/ssh_pubkey" site variable. Make sure there are no
+	newlines when you paste it in.
+
 20041025: After install
 
 	Run sql/fixstats_swapmod.pl to fix up stats records.
