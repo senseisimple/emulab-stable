@@ -90,6 +90,9 @@ ronnode.pem:	dirsmade ronnode.cnf ca.cnf $(SRCDIR)/mkclient.sh
 pcplab.pem:		dirsmade pcplab.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh pcplab
 
+pcwa.pem:		dirsmade pcwa.cnf ca.cnf $(SRCDIR)/mkclient.sh
+	$(SRCDIR)/mkclient.sh pcwa
+
 dirsmade:
 	-mkdir -p certs
 	-mkdir -p newcerts
@@ -108,12 +111,14 @@ install:
 boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/server.pem \
 		$(INSTALL_ETCDIR)/pcplab.pem \
+		$(INSTALL_ETCDIR)/pcwa.pem \
 		$(INSTALL_ETCDIR)/capture.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcplab.pem
+	chmod 640 $(INSTALL_ETCDIR)/pcwa.pem
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 
 client-install:
