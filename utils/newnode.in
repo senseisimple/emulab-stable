@@ -226,7 +226,7 @@ NODE: foreach my $node_id (@node_ids) {
 	my $iface_IP = "";
 	my $wire_type = "Node";
 	my $iface_role = TBDB_IFACEROLE_EXPERIMENT();
-	if ($iface == $control_iface) {
+	if ($iface eq $control_iface) {
 	    $iface_IP = $IP;
 	    $wire_type = "Control";
 	    $iface_role = TBDB_IFACEROLE_CONTROL();
