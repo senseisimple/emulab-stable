@@ -261,9 +261,13 @@ int ec_check(uint addr) {
  */
 #ifdef FALLBACK_HOST
 #define DEFAULT_HOST	FALLBACK_HOST
+
+#ifndef DEFAULT_PATH
 #define DEFAULT_PATH	"/tftpboot/pxeboot"
-struct in_addr		default_sip;
 #endif
+
+struct in_addr		default_sip;
+#endif /* FALLBACK_HOST */
 
 int gettag(uchar *p, uchar tag, uchar *data, uchar *pend) {
 	uchar t;
