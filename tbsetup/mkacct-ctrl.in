@@ -227,7 +227,7 @@ sub dowork() {
     if (`$ssh $control_node egrep '^${user}:' /etc/passwd` eq "") { 
       print "Adding user $user to $control_node.\n";
       $str = "$ssh $control_node " .
-	     "'/usr/sbin/pw useradd $user -u $user_number -c '\"$fullname\"' ".
+	     "'/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
 	     "-k /usr/share/skel -m -d /users/$user -g $project ".
 	     "$groupargument -s /bin/tcsh'";
       system($str) == 0
@@ -241,8 +241,8 @@ sub dowork() {
       # because perl does the escapes once, then ssh takes them again,
       # so \\\" becomes " by the time the shell gets it.
       $str = "$ssh $control_node ".
-	     "/usr/sbin/pw usermod $user -u $user_number ".
-	     "-c \\\"$fullname\\\" -g $project $groupargument";
+	     "'/usr/sbin/pw usermod $user -u $user_number ".
+	     "-c \"$fullname\" -g $project $groupargument'";
      system($str) == 0       
        or print STDERR "Could not modify user $user on $control_node.\n";
       system("$ssh $control_node ".
