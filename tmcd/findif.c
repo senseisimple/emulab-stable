@@ -226,7 +226,7 @@ find_iface(char *macaddr)
 	/* We copy the Windows getmac.exe and library framedyn.dll into $BINDIR
 	 * because our path gets "untainted" into a pure Unix form in rc scripts.
 	 */
-	FILE *fp = popen("bash -c 'cd $BINDIR; getmac /nh /v /fo csv'", "r");
+	FILE *fp = popen("bash -c 'cd /usr/local/etc/emulab; ./getmac /nh /v /fo csv'", "r");
 	char buf[BUFSIZ];
 	
 	while (fgets(buf, BUFSIZ, fp) != NULL) {
