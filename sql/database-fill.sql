@@ -398,6 +398,7 @@ REPLACE INTO testsuite_preentables VALUES ('group_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('project_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('user_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('experiment_stats','clean');
+REPLACE INTO testsuite_preentables VALUES ('experiment_resources','clean');
 REPLACE INTO testsuite_preentables VALUES ('testbed_stats','clean');
 
 --
