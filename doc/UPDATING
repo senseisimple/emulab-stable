@@ -6,6 +6,20 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040809:
+	New syslog file for logging requests to the XMLRPC server.
+
+		sudo touch /usr/testbed/log/xmlrpcbag.log
+
+	Add these two lines to /etc/syslog.conf and then HUP syslogd:
+
+		!xmlrpcbag
+		*.*                      /usr/testbed/log/xmlrpcbag.log
+
+        Add this line to /etc/newsyslog.conf:
+
+		/usr/testbed/log/xmlrpcbag.log      640  7     1000 *     Z
+
 20040805:
 	Add a new CNAME for boss to /etc/namedb/<OURDMAIN>.db.head -
 	event-server . Re-run named_setup on boss to make this change

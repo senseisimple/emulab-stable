@@ -12,14 +12,13 @@ SUBDIR		= security
 include $(OBJDIR)/Makeconf
 
 BINS		= suexec
-SCRIPTS		= plasticwrap
-SBINS		= paperbag genlastlog lastlog_daemon
+SBINS		= genlastlog lastlog_daemon
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BINS) $(SCRIPTS) $(SBINS)
+all:	$(BINS) $(SBINS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -52,7 +51,7 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-control-install:	$(addprefix $(INSTALL_BINDIR)/, plasticwrap)
+control-install:
 
 clean:
 	rm -f *.o genlastlog suexec core

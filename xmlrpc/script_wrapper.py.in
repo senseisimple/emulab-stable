@@ -1,0 +1,1581 @@
+#! /usr/bin/env python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+# 
+# Permission to use, copy, modify and distribute this software is hereby
+# granted provided that (1) source code retains these copyright, permission,
+# and disclaimer notices, and (2) redistributions including binaries
+# reproduce the notices in supporting documentation.
+#
+# THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+# CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+# FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+#
+
+#
+# Wrapper to convert select commands into XMLRPC calls to boss. The point
+# is to provide a script interface that is backwards compatable with the
+# pre-rpc API, but not have to maintain that interface beyond this simple
+# conversion.
+#
+import sys
+sys.path.append("@prefix@/lib")
+import getopt
+import os
+
+from sshxmlrpc import *
+from emulabclient import *
+
+##
+# The package version number
+#
+PACKAGE_VERSION = 0.1
+
+# Default server
+XMLRPC_SERVER   = "@BOSSNODE@"
+
+# User supplied server name.
+xmlrpc_server   = XMLRPC_SERVER
+
+# User supplied login ID to use (overrides env variable USER if exists).
+login_id        = os.environ["USER"]
+
+# Debugging output.
+debug           = 0
+impotent        = 0
+
+#
+# For admin people, and for using their devel trees. These options are
+# meaningless unless you are an Emulab developer; they will be rejected
+# at the server most ungraciously.
+#
+SERVER_PATH     = "@prefix@"
+SERVER_DIR      = "sbin"
+DEVEL_DIR       = "devel"
+develuser       = None
+path            = None
+admin           = 0
+devel           = 0
+needhelp        = 0
+
+API = {
+    "node_admin"        : { "func" : "adminmode",
+                            "help" : "Boot selected nodes into FreeBSD MFS" },
+    "node_reboot"       : { "func" : "reboot",
+                            "help" : "Reboot selected nodes or all nodes in " +
+                                     "an experiment" },
+    "os_load"           : { "func" : "reload",
+                            "help" : "Reload disks on selected nodes or all " +
+                                     "nodes in an experiment" },
+    "create_image"      : { "func" : "create_image",
+                            "help" : "Create a disk image from a node" },
+    "node_list"         : { "func" : "node_list",
+                            "help" : "Print physical mapping of nodes " +
+                                     "in an experiment" },
+    "delay_config"      : { "func" : "delay_config",
+                            "help" : "Change the link shaping characteristics " +
+                                     "for a link or lan" },
+    "link_config"       : { "func" : "link_config",
+                            "help" : "Change interface parameters " +
+                                     "for a wireless link" },
+    "savelogs"          : { "func" : "savelogs",
+                            "help" : "Save console tip logs to experiment " +
+                                     "directory" },
+    "portstats"         : { "func" : "portstats",
+                            "help" : "Get portstats from the switches" },
+    "eventsys_control"  : { "func" : "eventsys_control",
+                            "help" : "Start/Stop/Restart the event system" },
+    "readycount"        : { "func" : "readycount",
+                            "help" : "Get readycounts for nodes in experiment " +
+                                     "(deprecated)" },
+    "nscheck"           : { "func" : "nscheck",
+                            "help" : "Check and NS file for parser errors" },
+    "startexp"          : { "func" : "startexp",
+                            "help" : "Start an Emulab experiment" },
+    "batchexp"          : { "func" : "startexp",
+                            "help" : "Synonym for startexp" },
+    "swapexp"           : { "func" : "swapexp",
+                            "help" : "Swap experiment in or out" },
+    "modexp"            : { "func" : "modexp",
+                            "help" : "Modify experiment" },
+    "endexp"            : { "func" : "endexp",
+                            "help" : "Terminate an experiment" },
+    "expinfo"           : { "func" : "expinfo",
+                            "help" : "Get information about an experiment" },
+};
+
+#
+# Print the usage statement to stdout.
+#
+def usage():
+    print ("Usage: wrapper [wrapper options] command [command args and opts]");
+    print "";
+    print "Commands:";
+    for key, val in API.items():
+	print ("    %-12s %s." % (key, val["help"]));
+        pass
+    print "(Specify the --help option to specific commands for more help)";
+    wrapperoptions();
+    print
+    print "Example:"
+    print ("  "
+           + "wrapper"
+           + " --server=boss.emulab.net node_admin -n testbed one-node")
+
+def wrapperoptions():
+    print "";
+    print "Wrapper Options:"
+    print "    --help      Display this help message"
+    print "    --server    Set the server hostname"
+    print "    --login     Set the login id (defaults to $USER)"
+    print "    --debug     Turn on semi-useful debugging"
+    return
+
+#
+# Process a single command line
+#
+def do_method(module, method, params):
+    if debug:
+        print module + " " + method + " " + str(params);
+        pass
+    if impotent:
+        return 0;
+
+    # Get a handle on the server,
+    server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
+                            "/xmlrpc/" + module,
+                            path=path,
+                            user_agent="sshxmlrpc_wrapper-v0.1")
+
+    
+    # Get a pointer to the function we want to invoke.
+    meth      = getattr(server, method)
+    meth_args = [ PACKAGE_VERSION, params ]
+
+    #
+    # Make the call. 
+    #
+    try:
+        response = apply(meth, meth_args)
+        pass
+    except BadResponse, e:
+        print ("error: bad reponse from host, " + e.args[0]
+               + ", and handler: " + e.args[1])
+        print "error: " + e.args[2]
+        return -1
+    except xmlrpclib.Fault, e:
+        print e.faultString
+        return -1
+
+    #
+    # Parse the Response, which is a Dictionary. See EmulabResponse in the
+    # emulabclient.py module. The XML standard converts classes to a plain
+    # Dictionary, hence the code below. 
+    # 
+    if len(response["output"]):
+        print response["output"],
+        pass
+
+    rval = response["code"]
+
+    #
+    # If the code indicates failure, look for a "value". Use that as the
+    # return value instead of the code. 
+    # 
+    if rval != RESPONSE_SUCCESS:
+        if response["value"]:
+            rval = response["value"]
+            pass
+        pass
+    return rval, response
+
+#
+# node_admin
+#
+class adminmode:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "nw", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+                pass
+            elif opt == "-n":
+                params["reboot"] = "no";
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes";
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) != 2:
+            self.usage();
+            return -1;
+        
+        params["mode"]  = req_args[0];
+        params["node"]  = req_args[1];
+
+        rval,response = do_method("node", "adminmode", params);
+        return rval;
+
+    def usage(self):
+	print "node_admin [options] on|off node";
+	print "where:";
+	print "    -n    - Do not reboot node; just change OSID";
+	print "    -w    - If rebooting, wait for node to reboot";
+        print "on|off    - Turn admin mode on or off";
+	print "  node    - Node to change (pcXXX)";
+        wrapperoptions();
+        return
+    pass
+
+
+#
+# node_reboot
+#
+class reboot:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "wcfe:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        module = "node";
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+                pass
+            elif opt == "-c":
+                params["reconfig"] = "yes";
+                pass
+            elif opt == "-f":
+                params["power"] = "yes";
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes";
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                module = "experiment";
+                pass
+            pass
+
+        if module == "node":
+            # Do this after so --help is seen.
+            if len(req_args) < 1:
+                self.usage();
+                return -1;
+
+            params["nodes"]  = string.join(req_args, ",");
+            pass
+        else:
+            if len(req_args):
+                self.usage();
+                return -1;
+            pass
+        
+        rval,response = do_method(module, "reboot", params);
+        return rval;
+
+    def usage(self):
+        print "node_reboot [options] node [node ...]";
+        print "node_reboot [options] -e pid,eid"
+	print "where:";
+	print "    -w    - Wait for nodes is come back up";
+	print "    -c    - Reconfigure nodes instead of rebooting";
+	print "    -f    - Power cycle nodes (skip reboot!)";
+ 	print "    -e    - Reboot all nodes in an experiment";
+	print "  node    - Node to reboot (pcXXX)";
+        wrapperoptions();
+        return
+    pass
+
+#
+# os_load
+#
+class reload:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "i:p:m:sre:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        module = "node";
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+                pass
+            elif opt == "-i":
+                params["imagename"] = val;
+                pass
+            elif opt == "-p":
+                params["imageproj"] = val;
+                pass
+            elif opt == "-m":
+                params["imageid"] = val;
+                pass
+            elif opt == "-s":
+                params["wait"] = "no";
+                pass
+            elif opt == "-r":
+                params["reboot"] = "no";
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                module = "experiment";
+                pass
+            pass
+
+        if module == "node":
+            # Do this after so --help is seen.
+            if len(req_args) < 1:
+                self.usage();
+                return -1;
+
+            params["nodes"]  = string.join(req_args, ",");
+            pass
+        else:
+            if len(req_args):
+                self.usage();
+                return -1;
+            pass
+        
+        rval,response = do_method(module, "reload", params);
+        return rval;
+
+    def usage(self):
+        print "os_load [options] node [node ...]";
+        print "os_load [options] -e pid,eid"
+	print "where:";
+	print "    -i    - Specify image name; otherwise load default image";
+	print "    -p    - Specify project for finding image name (-i)";
+	print "    -s    - Do *not* wait for nodes to finish reloading";
+	print "    -m    - Specify internal image id (instead of -i and -p)";
+	print "    -r    - Do *not* reboot nodes; do that yourself";
+ 	print "    -e    - Reboot all nodes in an experiment";
+	print "  node    - Node to reboot (pcXXX)";
+        wrapperoptions();
+        return
+    pass
+
+#
+# create_image
+#
+class create_image:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "p:w", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+                pass
+            elif opt == "-p":
+                params["imageproj"] = val;
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes";
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) != 2:
+            self.usage();
+            return -1;
+        
+        params["imagename"]  = req_args[0];
+        params["node"]      = req_args[1];
+
+        rval,response = do_method("node", "create_image", params);
+        return rval;
+
+    def usage(self):
+	print "create_image [options] imageid node";
+	print "where:";
+	print "     -w   - Wait for image to be created";
+	print "     -p   - Project ID of imageid";
+        print "imageid   - Name of the image";
+	print "   node   - Node to create image from (pcXXX)";
+        wrapperoptions();
+        return
+    pass
+
+
+#
+# node_list
+#
+class node_list:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "pvhe:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        which  = "phys";
+        params = {};
+        params["aspect"] = "mapping";
+
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-p":
+                which = "phys";
+                pass
+            elif opt == "-v":
+                which = "virt";
+                pass
+            elif opt == "-h":
+                which = "pphys";
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) or not params.has_key("proj"):
+            self.usage();
+            return -1;
+
+        rval,response = do_method("experiment", "info", params);
+        if rval:
+            return rval;
+
+        for node in response["value"]:
+            val = response["value"][node];
+
+            if which == "virt":
+                print node, " ",
+                pass
+            elif which == "phys":
+                print val["node"], " ",
+                pass
+            elif which == "pphys":
+                print val["pnode"], " ",
+                pass
+            pass
+        print "";
+        
+        return rval;
+
+    def usage(self):
+	print "node_list [options] -e pid,eid";
+	print "where:";
+	print "     -p   - Print physical (Emulab database) names (default)";
+	print "     -v   - Print virtual (experiment assigned) names";
+	print "     -h   - Print physical name of host for virtual nodes";
+ 	print "     -e   - Project and Experiment ID to list";
+        wrapperoptions();
+        return
+    pass
+
+
+#
+# delay_config
+#
+class delay_config:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "s:me:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        params = {};
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-m":
+                params["persist"] = "yes";
+                pass
+            elif opt == "-s":
+                params["src"] = val;
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]  = req_args[0];
+            params["exp"]   = req_args[1];
+            req_args        = req_args[2:];
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) < 2:
+            self.usage();
+            return -1;
+
+        # Next should be the link we want to control
+        params["link"]  = req_args[0];
+
+        # Now we turn the rest of the arguments into a dictionary
+        linkparams = {}
+        for linkparam in req_args[1:]:
+            plist = string.split(linkparam, "=", 1)
+            if len(plist) != 2:
+                print ("Parameter, '" + param
+                       + "', is not of the form: param=value!")
+                self.usage();
+                return -1
+            
+            linkparams[plist[0]] = plist[1];
+            pass
+        params["params"] = linkparams;
+
+        rval,response = do_method("experiment", "delay_config", params);
+        return rval;
+
+    def usage(self):
+	print "delay_config [options] -e pid,eid link PARAM=value ...";
+	print "delay_config [options] pid eid link PARAM=value ...";
+	print "where:";
+	print "     -m   - Modify virtual experiment as well as current state";
+	print "     -s   - Select the source of the link to change";
+ 	print "     -e   - Project and Experiment ID to operate on";
+        print "   link   - Name of link from your NS file (ie: 'link1')";
+        print "";
+        print "PARAMS";
+        print " BANDWIDTH=NNN   - N=bandwidth (10-100000 Kbits per second)";
+        print " PLR=NNN         - N=lossrate (0 <= plr < 1)";
+        print " DELAY=NNN       - N=delay (one-way delay in milliseconds > 0)";
+        print " LIMIT=NNN       - The queue size in bytes or packets";
+        print " QUEUE-IN-BYTES=N- 0 means in packets, 1 means in bytes";
+        print "RED/GRED Options: (only if link was specified as RED/GRED)";
+        print " MAXTHRESH=NNN   - Maximum threshold for the average Q size";
+        print " THRESH=NNN      - Minimum threshold for the average Q size";
+        print " LINTERM=NNN     - Packet dropping probability";
+        print " Q_WEIGHT=NNN    - For calculating the average queue size\n";
+        wrapperoptions();
+        return
+
+#
+# link_config
+#
+class link_config:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "s:me:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        params = {};
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-m":
+                params["persist"] = "yes";
+                pass
+            elif opt == "-s":
+                params["src"] = val;
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]  = req_args[0];
+            params["exp"]   = req_args[1];
+            req_args        = req_args[2:];
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) < 2:
+            self.usage();
+            return -1;
+
+        # Next should be the link we want to control
+        params["link"]  = req_args[0];
+
+        # Now we turn the rest of the arguments into a dictionary
+        linkparams = {}
+        for linkparam in req_args[1:]:
+            plist = string.split(linkparam, "=", 1)
+            if len(plist) != 2:
+                print ("Parameter, '" + param
+                       + "', is not of the form: param=value!")
+                self.usage();
+                return -1
+            
+            linkparams[plist[0]] = plist[1];
+            pass
+        params["params"] = linkparams;
+
+        rval,response = do_method("experiment", "link_config", params);
+        return rval;
+
+    def usage(self):
+	print "link_config [options] -e pid,eid link PARAM=value ...";
+	print "link_config [options] pid eid link PARAM=value ...";
+	print "where:";
+	print "     -m   - Modify virtual experiment as well as current state";
+	print "     -s   - Select the source of the link to change";
+ 	print "     -e   - Project and Experiment ID to operate on";
+        print "   link   - Name of link from your NS file (ie: 'link1')";
+        print "";
+        print "Special Param";
+        print " ENABLE=yes/no   - Bring the link up or down (or ENABLE=up/down)";
+        wrapperoptions();
+        return
+
+#
+# savelogs
+#
+class savelogs:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "e:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        params = {};
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]  = req_args[0];
+            params["exp"]   = req_args[1];
+            pass
+
+        rval,response = do_method("experiment", "savelogs", params);
+        return rval;
+
+    def usage(self):
+	print "savelogs -e pid,eid";
+	print "savelogs pid eid";
+	print "where:";
+ 	print "     -e   - Project and Experiment ID";
+        wrapperoptions();
+        return
+    pass
+
+#
+# portstats
+#
+class portstats:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "azqcpe", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        params = {};
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-e":
+                params["errors-only"] = "yes";
+                pass
+            elif opt == "-a":
+                params["all"] = "yes";
+                pass
+            elif opt == "-z":
+                params["clear"] = "yes";
+                pass
+            elif opt == "-q":
+                params["quiet"] = "yes";
+                pass
+            elif opt == "-c":
+                params["absolute"] = "yes";
+                pass
+            elif opt == "-p":
+                params["physnames"] = "yes";
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        if not params.has_key("physnames"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]  = req_args[0];
+            params["exp"]   = req_args[1];
+            req_args        = req_args[2:];
+            pass
+        elif len(req_args) < 1:
+            self.usage();
+            return -1;
+        
+        # Send the rest of the args along as a list.
+        params["nodeports"] = req_args;
+
+        rval,response = do_method("experiment", "portstats", params);
+        return rval;
+
+    def usage(self):
+ 	print "portstats <-p | pid eid> [vname ...] [vname:port ...]";
+	print "where:";
+        print "    -e    - Show only error counters";
+        print "    -a    - Show all stats";
+        print "    -z    - Zero out counts for selected counters after printing";
+        print "    -q    - Quiet: don't actually print counts - useful with -z";
+        print "    -c    - Print absolute, rather than relative, counts";
+        print "    -p    - The machines given are physical, not virtual, node";
+        print "            IDs. No pid and eid should be given with this option";
+        print "";
+        print "If only pid and eid are given, prints out information about all";
+        print "ports in the experiment. Otherwise, output is limited to the";
+        print "nodes and/or ports given.";
+        print "";
+        print "NOTE: Statistics are reported from the switch's perspective.";
+        print "      This means that 'In' packets are those sent FROM the node,";
+        print "      and 'Out' packets are those sent TO the node.";
+        print "";
+        print "In the output, packets described as 'NUnicast' or 'NUcast' are ";
+        print "non-unicast (broadcast or multicast) packets.";
+        wrapperoptions();
+        return
+    pass
+
+
+#
+# readycount. This is totally deprecated, but we leave it around. Users
+# should be using the sync daemon.
+#
+class readycount:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "scple:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        params = {};
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-s":
+                params["set"] = "yes";
+                pass
+            elif opt == "-c":
+                params["clear"] = "yes";
+                pass
+            elif opt == "-l":
+                params["list"] = "yes";
+                pass
+            elif opt == "-p":
+                params["physnames"] = "yes";
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if params.has_key("physnames") and params.has_key("proj"):
+            self.usage();
+            return -1;
+        
+        if not params.has_key("physnames") and not params.has_key("proj"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]  = req_args[0];
+            params["exp"]   = req_args[1];
+            req_args        = req_args[2:];
+            pass
+        elif params.has_key("physnames") and len(req_args) < 1:
+            self.usage();
+            return -1;
+        
+        # Send the rest of the args along as a list.
+        params["nodes"] = req_args;
+
+        rval,response = do_method("experiment", "readycount", params);
+        return rval;
+
+    def usage(self):
+	print "readycount [-c | -s] [-l] -e pid,eid [node ...]";
+	print "readycount [-c | -s] [-l] pid eid [node ...]";
+	print "where:";
+ 	print "     -e   - Project and Experiment ID";
+        print "     -s   - Set ready bits";
+        print "     -c   - Clear ready bits";
+        print "     -p   - Use physical node IDs instead of virtual (-c or -s).";
+        print "            No pid and eid should be given with this option";
+        print "     -l   - List ready status for each node in the experiment";
+        print "";
+        print "If no nodes are given, gives a summary of the nodes that have";
+        print "reported ready. If nodes are given, reports just status for the";
+        print "listed nodes. If -s or -c is given, sets or clears ready bits";
+        print "for the listed nodes, or all them as being ready (or clears ";
+        print "their ready bits if -c is given).";
+        wrapperoptions();
+        return
+    pass
+
+#
+# eventsys_control
+#
+class eventsys_control:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "e:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        params = {};
+        for opt, val in opts:
+            if opt == "--help":
+                self.usage()
+                return 0
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]   = req_args[0];
+            params["exp"]    = req_args[1];
+            params["action"] = req_args[2];
+            pass
+        elif len(req_args) != 1:
+            self.usage();
+            return -1;
+        else:
+            params["action"] = req_args[0];            
+
+        rval,response = do_method("experiment", "eventsys_control", params);
+        return rval;
+
+    def usage(self):
+	print "eventsys_control -e pid,eid start|stop|replay";
+	print "eventsys_control pid eid start|stop|replay";
+	print "where:";
+ 	print "     -e   - Project and Experiment ID";
+        print "   stop   - Stop the event scheduler";
+        print "  start   - Start the event stream from time index 0";
+        print " replay   - Replay the event stream from time index 0";
+        wrapperoptions();
+        return
+    pass
+
+#
+# nscheck
+#
+class nscheck:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) != 1:
+            self.usage();
+            return -1;
+
+        try:
+            nsfilestr = open(req_args[0]).read();
+            pass
+        except:
+            print "Could not open file: " + req_args[0];
+            return -1;
+
+        params["nsfilestr"] = nsfilestr;
+        rval,response = do_method("experiment", "nscheck", params);
+        return rval;
+
+    def usage(self):
+	print "nscheck nsfile";
+	print "where:";
+	print " nsfile    - Path to NS file you to wish check for parse errors";
+        wrapperoptions();
+        return
+    pass
+
+#
+# startexp
+#
+class startexp:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv,
+                                           "iwfqS:L:a:l:E:g:p:e:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-i":
+                params["batch"] = "no";
+                pass
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-g":
+                params["group"] = val;
+                pass
+            elif opt == "-e":
+                params["exp"] = val;
+                pass
+            elif opt == "-p":
+                params["proj"] = val;
+                pass
+            elif opt == "-S":
+                params["swappable"]     = "no";
+                params["noswap_reason"] = val;
+                pass
+            elif opt == "-L":
+                params["idleswap"]          = 0;
+                params["noidleswap_reason"] = val;
+                pass
+            elif opt == "-l":
+                params["idleswap"] = val;
+                pass
+            elif opt == "-a":
+                params["max_duration"] = val;
+                pass
+            elif opt == "-f":
+                params["noswapin"] = "yes"
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) != 1:
+            self.usage();
+            return -1;
+
+        try:
+            nsfilestr = open(req_args[0]).read();
+            pass
+        except:
+            print "Could not open file: " + req_args[0];
+            return -1;
+
+        params["nsfilestr"] = nsfilestr;
+        rval,response = do_method("experiment", "startexp", params);
+        return rval;
+
+    def usage(self):
+        print "startexp [-q] [-i [-w]] [-f] [-E description] [-g gid]";
+        print "         [-S reason] [-L reason] [-a <time>] [-l <time>]";
+        print "         -p <pid> -e <eid> <nsfile>";
+	print "where:";
+        print "   -i   - swapin immediately; by default experiment is batched";
+        print "   -w   - wait for non-batchmode experiment to preload or swapin";
+        print "   -f   - preload experiment (do not swapin or queue yet)";
+        print "   -q   - be less chatty";
+        print "   -S   - Experiment cannot be swapped; must provide reason";
+        print "   -L   - Experiment cannot be IDLE swapped; must provide reason";
+        print "   -a   - Auto swapout NN minutes after experiment is swapped in";
+        print "   -l   - Auto swapout NN minutes after experiment goes idle";
+        print "   -E   - A pithy sentence describing your experiment";
+        print "   -g   - The subgroup in which to create the experiment";
+        print "   -p   - The project in which to create the experiment";
+        print "   -e   - The experiment name (unique, alphanumeric, no blanks)";
+        print "nsfile  - NS file to parse for experiment";
+        wrapperoptions();
+        return
+    pass
+
+#
+# swapexp
+#
+class swapexp:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) < 2:
+                self.usage();
+                return -1;
+            
+            params["proj"]      = req_args[0];
+            params["exp"]       = req_args[1];
+            params["direction"] = req_args[2];
+            pass
+        elif len(req_args) != 1:
+            self.usage();
+            return -1;
+        else:
+            params["direction"] = req_args[0];
+            pass
+
+        rval,response = do_method("experiment", "swapexp", params);
+        return rval;
+
+    def usage(self):
+	print "swapexp -e pid,eid in|out";
+	print "swapexp pid eid in|out";
+	print "where:";
+	print "     -w   - Wait for experiment to finish swapping";
+ 	print "     -e   - Project and Experiment ID";
+        print "     in   - Swap experiment in  (must currently be swapped out)";
+        print "    out   - Swap experiment out (must currently be swapped in)";
+        print ""
+        print "By default, swapexp runs in the background, sending you email ";
+        print "when the transition has completed. Use the -w option to wait";
+        print "in the foreground, returning exit status. Email is still sent.";
+        wrapperoptions();
+        return
+    pass
+
+#
+# modexp
+#
+class modexp:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "rswe:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-r":
+                params["reboot"] = "yes"
+                pass
+            elif opt == "-s":
+                params["restart_eventsys"] = "yes"
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) != 3:
+                self.usage();
+                return -1;
+            
+            params["proj"] = req_args[0];
+            params["exp"]  = req_args[1];
+            req_args       = req_args[2:];
+            pass
+        elif len(req_args) != 1:
+            self.usage();
+            return -1;
+
+        #
+        # Read in the NS file to pass along.
+        # 
+        try:
+            nsfilestr = open(req_args[0]).read();
+            pass
+        except:
+            print "Could not open file: " + req_args[0];
+            return -1;
+
+        params["nsfilestr"] = nsfilestr;
+        rval,response = do_method("experiment", "modify", params);
+        return rval;
+
+    def usage(self):
+	print "modexp [-r] [-s] [-w] -e pid,eid nsfile";
+	print "modexp [-r] [-s] [-w] pid eid nsfile";
+	print "where:";
+	print "     -w   - Wait for experiment to finish swapping";
+ 	print "     -e   - Project and Experiment ID";
+        print "     -r   - Reboot nodes (when experiment is active)";
+        print "     -s   - Restart event scheduler (when experiment is active)";
+        print ""
+        print "By default, modexp runs in the background, sending you email ";
+        print "when the transition has completed. Use the -w option to wait";
+        print "in the foreground, returning exit status. Email is still sent.";
+        print ""
+        print "The experiment can be either swapped in *or* swapped out.";
+        print "If the experiment is swapped out, the new NS file replaces the ";
+        print "existing NS file (the virtual topology is updated). If the";
+        print "experiment is swapped in (active), the physical topology is";
+        print "also updated, subject to the -r and -s options above";
+        wrapperoptions();
+        return
+    pass
+
+#
+# endexp
+#
+class endexp:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) != 2:
+                self.usage();
+                return -1;
+            
+            params["proj"] = req_args[0];
+            params["exp"]  = req_args[1];
+            pass
+        elif len(req_args) != 0:
+            self.usage();
+            return -1;
+
+        rval,response = do_method("experiment", "endexp", params);
+        return rval;
+
+    def usage(self):
+	print "endexp [-w] -e pid,eid";
+	print "endexp [-w] pid eid";
+	print "where:";
+	print "     -w   - Wait for experiment to finish terminating";
+ 	print "     -e   - Project and Experiment ID";
+        print ""
+        print "By default, endexp runs in the background, sending you email ";
+        print "when the transition has completed. Use the -w option to wait";
+        print "in the foreground, returning exit status. Email is still sent.";
+        print ""
+        print "The experiment can be terminated when it is currently swapped";
+        print "in *or* swapped out.";
+        wrapperoptions();
+        return
+    pass
+
+#
+# expinfo
+#
+class expinfo:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "nmldae:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        show   = [];
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-n":
+                show.append("nodeinfo");
+                pass
+            elif opt == "-m":
+                show.append("mapping");
+                pass
+            elif opt == "-l":
+                show.append("linkinfo");
+                pass
+            elif opt == "-d":
+                show.append("shaping");
+                pass
+            elif opt == "-a":
+                show = ["nodeinfo", "mapping", "linkinfo", "shaping"];
+                pass
+            elif opt == "-e":
+                pid,eid = string.split(val, ",")
+                params["proj"] = pid;
+                params["exp"]  = eid;
+                pass
+            pass
+
+        #
+        # The point is to allow backwards compatable pid eid arguments, but
+        # move to the better -e pid,eid format eventually. 
+        #
+        if not params.has_key("proj"):
+            if len(req_args) != 2:
+                self.usage();
+                return -1;
+            
+            params["proj"] = req_args[0];
+            params["exp"]  = req_args[1];
+            pass
+        elif len(req_args) or len(show) == 0:
+            self.usage();
+            return -1;
+
+        params["show"] = string.join(show, ",");
+        rval,response = do_method("experiment", "expinfo", params);
+        return rval;
+
+    def usage(self):
+	print "expinfo [-n] [-m] [-l] [-d] [-a] -e pid,eid";
+	print "expinfo [-n] [-m] [-l] [-d] [-a] pid eid";
+	print "where:";
+ 	print "     -e   - Project and Experiment ID";
+        print "     -n   - Show node info";
+        print "     -m   - Show node mapping";
+        print "     -l   - Show link info";
+        print "     -a   - Show all of the above";
+        wrapperoptions();
+        return
+    pass
+
+#
+# Process program arguments. There are two ways we could be invoked.
+# 1) as the wrapper, with the first required argument the name of the script.
+# 2) as the script, with the name of the script in argv[0].
+# ie:
+# 1) wrapper --server=boss.emulab.net node_admin -n pcXXX
+# 2) node_admin --server=boss.emulab.net -n pcXXX
+#
+# So, just split argv into the first part (all -- args) and everything
+# after that which is passed to the handler for additional getopt parsing.
+#
+wrapper_argv = [];
+
+for arg in sys.argv[1:]:
+    if arg.startswith("--"):
+        wrapper_argv.append(arg);
+        pass
+    else:
+        break
+    pass
+
+try:
+    # Parse the options,
+    opts, req_args =  getopt.getopt(wrapper_argv[0:], "",
+                      [ "help", "server=", "login=", "admin", "devel",
+                        "develuser=", "impotent", "debug"])
+    # ... act on them appropriately, and
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit()
+            pass
+        elif opt == "--server":
+	    xmlrpc_server = val
+            pass
+        elif opt == "--login":
+	    login_id = val
+            pass
+        elif opt == "--debug":
+	    debug = 1
+            pass
+        elif opt == "--impotent":
+	    impotent = 1
+            pass
+        elif opt == "--admin":
+	    admin = 1
+            pass
+        elif opt == "--devel":
+	    devel = 1
+            pass
+        elif opt == "--develuser":
+	    develuser = val
+            pass
+        pass
+    pass
+except getopt.error, e:
+    print e.args[0]
+    usage()
+    sys.exit(2)
+    pass
+
+if admin:
+    path = SERVER_PATH
+    if devel:
+        path += "/" + DEVEL_DIR
+        if develuser:
+            path += "/" + develuser
+            pass
+        else:
+            path += "/" + login_id
+            pass
+        pass
+    path += "/" + SERVER_DIR
+    pass
+
+#
+# Okay, determine if argv[0] is the name of the handler, or if this was
+# invoked generically (next token after wrapper args is the name of the
+# handler).
+#
+handler      = None;
+command_argv = None;
+
+if API.has_key(os.path.basename(sys.argv[0])):
+    handler      = API[os.path.basename(sys.argv[0])]["func"];
+    command_argv = sys.argv[len(wrapper_argv) + 1:];
+    pass
+elif (len(wrapper_argv) == len(sys.argv) - 1):
+    # No command token was given.
+    usage();
+    sys.exit(-2);
+    pass
+else:
+    token = sys.argv[len(wrapper_argv) + 1];
+
+    if not API.has_key(token):
+        print "Unknown script command!"
+        usage();
+        sys.exit(-1);
+        pass
+
+    handler      = API[token]["func"];
+    command_argv = sys.argv[len(wrapper_argv) + 2:];
+    pass
+
+instance = eval(handler + "(argv=command_argv)");
+exitval  = instance.apply();
+sys.exit(exitval);

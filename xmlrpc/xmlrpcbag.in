@@ -4,54 +4,59 @@
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use Sys::Syslog;
+use BSD::Resource;
 
-# paperbag - Limited shell for use on ops.emulab.net
-# Allows execution of commands found in a permitted list
-# Also checks arguments for potentially dangerous characters (semicolons,
-# pipes, redirects, etc)
-# Robert Ricci, <ricci@cs.utah.edu>
-# Novemeber 17, 2000
-
-# TODO:
-# Turn off coredumps in ourself, and our children
-# Check to make sure only files/directories under user's $HOME can be
-#  passed as arguments, CD'ed to, etc
+# xmlrpcbag - This is a rework of security/paperbag.in, which was written
+# by Robert Ricci <ricci@cs.utah.edu> on November 17, 2000. This version
+# is tailored to invoking the xmlrpc server, and is quite a bit simpler
+# since we do not have to worry about the command line, interactive mode,
+# directory changing, etc. 
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $USERNODE    = "@USERNODE@";
+my $XMLRPC      = "$TB/sbin/sshxmlrpc_server.py";
+my $TBLOG	= "@TBLOGFACIL@";
 
-# List of allowed commands - Mapping is from command entered by the user
-# to the actual binary to run
-%allowed = (	"node_reboot"	=> "$TB/bin/node_reboot",
-		"node_update"	=> "$TB/bin/node_update",
-		"node_control"	=> "$TB/bin/node_control",
-		"os_load"	=> "$TB/bin/os_load",
-		"create_image"	=> "$TB/bin/create_image",
-		"node_admin"	=> "$TB/bin/node_admin",
-		"node_list"	=> "$TB/bin/node_list",
-		"delay_config"	=> "$TB/bin/delay_config",
-		"link_config"	=> "$TB/bin/link_config",
-		"savelogs"	=> "$TB/bin/savelogs",
-		"portstats"	=> "$TB/bin/portstats",
-		"readycount"	=> "$TB/bin/readycount",
-		"eventsys_control" => "$TB/bin/eventsys_control",
-		"batchexp"	=> "$TB/bin/batchexp",
-		"nscheck"	=> "$TB/bin/nscheck",
-		"swapexp"	=> "$TB/bin/swapexp",
-		"endexp"	=> "$TB/bin/endexp",
-		"tbreport"	=> "$TB/bin/tbreport",
-		"xmlrpc"        => "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/experiment" => "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/node"   => "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/imageid" => "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/osid"	=> "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/fs"	=> "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/user"	=> "$TB/sbin/sshxmlrpc_server.py",
-		"xmlrpc/emulab"	=> "$TB/sbin/sshxmlrpc_server.py",
-	   );
+# Locals.
+my $debug       = 0;
+my $module;
+
+# Turn off line buffering.
+$| = 1;
+
+#
+# Debugging goes to syslog. There is generally no reason to invoke this
+# interactively, except during debugging, and in that case you can go
+# look at the log file.
+#
+sub debug($) {
+    my ($mesg) = @_;
+
+    syslog("debug", $mesg)
+	if ($debug);
+}
+
+#
+# List of allowed RPC modules. The current usage is that the bag is
+# invoked as /xmlrpc/module. We split out the module name and pass it
+# to the server as the first and only argument. In reality, we could
+# skip this check, and just pass the single token to the server and let
+# it validate it. But, might as well be careful.
+#
+my %modules = ( "experiment" => "experiment",
+	        "node"       => "node",
+		"imageid"    => "imageid",
+		"osid"	     => "osid",
+		"fs"	     => "fs",
+		"user"	     => "user",
+		"emulab"     => "emulab",
+		# Wrapper class.
+		"server"     => "EmulabServer",
+	      );
 
 #
 # Scrub the environment - delete all but a few variables we consider to be
@@ -66,137 +71,99 @@ foreach my $var (keys %ENV) {
     }
 }
 
-# Need to provide a simple path, because some scripts we call need one
-$ENV{PATH} = "$TB/bin:/bin:/usr/bin:/usr/local/bin";
+#
+# Provide a simple path. Note though that the server will not call anything
+# without giving it an absolute path.
+#
+$ENV{PATH} = "/bin:/usr/bin:/usr/local/bin";
 
-$prompt = "paperbag> "; # Prompt for interactive commands
+Sys::Syslog::setlogsock('unix');
+openlog("xmlrpcbag", "pid", $TBLOG);
 
-# Following message gets displayed to interactive users
-$message = "This is a restricted shell, and will only allow you to run
-a limited set of commands. For an unrestrictive shell, log into
-$USERNODE\n";
+my $mesg = "Connect:";
+if (exists($ENV{"USER"})) {
+    $mesg .= " user:" . $ENV{"USER"};
+}
+if (exists($ENV{"SSH_CONNECTION"})) {
+    if ($ENV{"SSH_CONNECTION"} =~ /^([\d.]*) .*$/) {
+	$mesg .= " host:" . $1;
+    }
+}
+syslog("info", $mesg);
 
-# Whether or not to allow interactive sessions
-$allow_interactive = 0;
-
-$debug = 0;
-$| = 1; # No line buffering, so that we can see the prompt
-if ($allow_interactive) {
-    $interactive = 1;
-} else {
-    $interactive = 0;
+#
+# When invoked by ssh, we get a -c option cause it thinks we are a real shell.
+# Otherwise, we want exactly one argument.
+#
+if (@ARGV == 2 && $ARGV[0] eq "-c") {
+    $module = $ARGV[1];
+}
+elsif (@ARGV == 1) {
+    $module = $ARGV[0];
+}
+else {
+    syslog("err", "bad args: '@ARGV'");
+    exit(-1);
 }
 
-if (@ARGV && ($ARGV[0] eq "-c")) { # We were called by sshd - transform args into a useful form
-	my $bigarg = pop @ARGV;
-	push(@ARGV,split(/\s+/,$bigarg));
-	shift @ARGV; # Dispose of -c
-	$interactive = 0;
-	&debug("New args are: " . join(",",@ARGV) . "\n");
+#
+# Split the string. We allow xmlrpc, xmlrpc/module or just the module. 
+#
+if ($module =~ /^xmlrpc\/(\w+)$/) {
+    $module = $1;
 }
-	
-# Check for a leading dir= option, which tells us which directory to start from
-if (@ARGV && ($ARGV[0] =~ /dir=(.*)/)) {
-	shift @ARGV;
-	&cd($1); # Change to given directory
-} elsif(@ARGV && ($ARGV[0] eq "cd")) { # also understand 'cd dir &&' or 'cd dir ;' syntax to be a little more compatible
-	  # with other shells
-	# Discard the cd
-	shift @ARGV;
-	my $dir = shift @ARGV;
-	my $trash = shift @ARGV;
-	if (($trash ne "&&") && ($trash ne ";")) {
-		die "Syntax error: expected && or ; after cd <dir>\n";
-	}
-	# Untaint directory name - changing directories isn't a security risk in our situation
-	if ($dir =~ /^(.*)$/) {
-		&cd($1);
-	}
+elsif ($module eq "xmlrpc") {
+    undef($module);
+}
+if (defined($module)) {
+    if ($module =~ /^([\w]*)$/) {
+	$module = $1;
+    }
+    else {
+	syslog("err", "illegal chars in module: '$module'");
+	exit(-1);
+    }
 }
 
-if (@ARGV) { # We were given command line arguments
-	$interactive = 0;
-	$command = $ARGV[0];
-	&debug("NON-INTERACTIVE: command is $command\n");
-	@args = @ARGV[1 .. $#ARGV];
-	&debug("NON-INTERACTIVE: args are " . join(",",@args) ."\n");
+#
+# Okay, module must be in the list unless we want the wrapper class. 
+#
+if (defined($module) && !exists($modules{$module})) {
+    syslog("err", "unknown module: '$module'");
+    exit(-1);
+}
+syslog("info", "module: '$module'");
+
+#
+# Invoke the XMLRPC server. Exec ourselves to be SURE that a shell does
+# not get called and do something insecure.
+#
+my $pid = fork();
+if ($pid < 0) {
+    syslog("err", "Fork failed: errno = $?");
+    exit(-1);
+}
+elsif ($pid) {
+    # Parent just waits.
+    wait;
+    syslog("info", "child exited with status = $?");
+    exit($? >> 0);
+}
+else {
+    #
+    # Lets set some limits. 
+    #
+    setrlimit(RLIMIT_CPU, 1000, 1000);
+    setrlimit(RLIMIT_CORE, 0, 0);
+
+    #
+    # We could also nice ourselves down, but that would put XMLRPC users
+    # at a disadvantage relative to web users.
+    # 
+    
+    # Extra braces avoid warning.
+    { exec($XMLRPC, (defined($module) ? ($modules{$module}) : ())) };
+    syslog("err", "exec failed: errno = $?");
+    exit(-1);
 }
 
-if ($interactive) {
-	print $message;
-}
-
-do {{
-	if ($interactive) {
-		print $prompt;
-		($command, @args) = split /\s+/,<>;
-	}
-	
-	next unless $command; # Don't complain if they leave a blank command
-	# Don't allow any naughty characters - kick the user off if they try
-	foreach $string ($command, @args) {
-		if ($string !~ m|^([A-Za-z0-9._\-/=\+,\,]*)$|) {
-			print "Sorry, you used a forbidden character in your command line\n";
-			print "Please contact testbed-ops\@emulab.net if you believe this message is in error\n";
-			&debug("String was $string\n");
-			exit(-1);
-		} else {
-			$string = $1; # Untaint
-			&debug("No forbidden characters\n");
-		}
-	}
-
-	# xmlrpc is special for now, while we use paperbag for it.
-	# Pass the second token as the first arg to the server.
-	if ($command =~ /^xmlrpc\/(\w*)$/) {
-	        @args = ($1);
-		$command = "xmlrpc/$1";
-	}
-	elsif ($command eq "xmlrpc") {
-	        @args = ();
-	}
-	else {
-	    # Strip off all path information from the command
-	    $command =~ /([^\/]+)$/; $command = $1;
-	}
-	next unless $command; # Don't complain if they leave a blank command
-	&debug("Command = $command, @args = " . join ",",@args . "\n");
-
-	# 'builtin' commands
-	if ($command eq "exit") { $interactive = 0; last; } # Quit loop
-	if ($command eq "cd") {
-		if (@args > 1) {
-			print "cd: Too many arguments\n";
-		} else {
-			&cd($args[0]);
-		}
-		next;
-	}
-	if (!$allowed{$command}) {
-		print "$command is not in the allowed list, sorry\n";
-	} else {
-		# Exec ourselves to be SURE that a shell doesn't get called
-		# and do something insecure
-		my $pid = fork();
-		if ($pid == -1) { # fork failed
-			print "Unable to fork process - Error number $?\n";
-		} elsif ($pid) { # parent - wait for child to exit
-			wait;
-		} else { # child process
-			exec ($allowed{$command},@args) or
-				die "Unable to execute $command: $?\n";
-		}
-	}
-}} while ($interactive);
-
-# Change directory to the given directory, (TODO) checking whether
-# it is appropriate to do so or not
-sub cd {
-	my $dirname = shift;
-	chdir $dirname or warn "Unable to change directories to $dirname\n";
-
-}
-
-sub debug {
-	if ($debug) { print @_; }
-}

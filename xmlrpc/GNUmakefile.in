@@ -13,11 +13,12 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= sshxmlrpc_client.py
-SBIN_SCRIPTS	= sshxmlrpc_server.py
+SBIN_SCRIPTS	= sshxmlrpc_server.py xmlrpcbag
 LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
-DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py README
+DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py README \
+                  script_wrapper.py
 DEBUG_STUFF     = experiment node imageid osid fs user emulab server
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
@@ -25,15 +26,19 @@ EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 #
 # These are the ones installed on plastic (users, control, etc). 
 # 
-CLIENTBIN       = sshxmlrpc_client.py
-USERLIBS	= sshxmlrpc.py emulabclient.py 
+CLIENTBIN       = sshxmlrpc_client.py script_wrapper.py
+USERLIBS	= sshxmlrpc.py emulabclient.py
+SYMLINKS        = node_admin node_reboot os_load create_image node_list \
+		  delay_config link_config savelogs portstats eventsys_control \
+		  readycount nscheck startexp batchexp startexp swapexp endexp \
+		  modexp expinfo
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF) $(LIBEXEC_STUFF) \
-	$(DOWNLOAD_STUFF) $(DEBUG_STUFF)
+	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBIN)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -44,6 +49,8 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_WWWDIR)/, $(WWW_STUFF)) \
 	$(addprefix $(INSTALL_WWWDIR)/downloads/xmlrpc/, $(DOWNLOAD_STUFF)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+	-rm -f $(INSTALL_SBINDIR)/paperbag
+	ln -s xmlrpcbag $(INSTALL_SBINDIR)/paperbag
 
 $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
@@ -63,7 +70,15 @@ $(INSTALL_SBINDIR)/xmlrpc/%: %
 #
 # Control node installation (okay, plastic)
 #
+ifneq ($(UNIFIED),1)
+LINKS=	cd $(INSTALL_BINDIR) && \
+		list='$(SYMLINKS)'; for file in $$list; do \
+			rm -f $$file; \
+			ln -s script_wrapper.py $$file; \
+		done;
+endif
 control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
-	$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBIN))
+			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBIN))
+	$(LINKS)
 
 clean:

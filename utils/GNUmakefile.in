@@ -20,11 +20,6 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 LIBEXEC_SCRIPTS	= webcreateimage newnode
 
 #
-# These are the ones installed on plastic (users, control, etc). 
-# 
-USERBINS        = create_image delay_config node_admin link_config
-
-#
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
@@ -40,17 +35,7 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 #
 # Control node installation (okay, plastic)
 #
-ifneq ($(UNIFIED),1)
-LINKS=	cd $(INSTALL_BINDIR) && \
-		list='$(USERBINS)'; for file in $$list; do \
-			rm -f $$file; \
-			ln -s plasticwrap $$file; \
-		done;
-
-
-endif
 control-install:
-	$(LINKS)
 
 #
 # Automate this part at some point.

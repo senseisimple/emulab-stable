@@ -440,7 +440,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/sitevarscheck db/dbfillcheck \
 	db/grabron db/webnfree db/stategraph db/readycount \
 	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
-	db/node_list db/webnewwanode \
+	db/webnewwanode \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
@@ -449,8 +449,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
 	os/genhostsfile/GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
-	security/GNUmakefile security/paperbag security/lastlog_daemon \
-	security/plasticwrap \
+	security/GNUmakefile security/lastlog_daemon \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
 	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
         sensors/canaryd/GNUmakefile \
@@ -539,7 +538,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
 	xmlrpc/webxmlrpc \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
-	xmlrpc/imageid xmlrpc/osid \
+	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpxbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "

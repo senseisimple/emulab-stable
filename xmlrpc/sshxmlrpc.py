@@ -148,7 +148,7 @@ class SSHConnection:
                 # Use the PyTTY plink, equivalent to the ssh command.
                 cmd = "plink -x -C " + args
                 pass
-            
+
             if not nt:
                 # Popen3 objects, and the wait method, are Unix-only.
                 self.myChild = popen2.Popen3(cmd, 1)
@@ -197,7 +197,6 @@ class SSHConnection:
     #
     def close(self):
         self.wfile.close()
-        self.errfile.close()
         self.rfile.close()
         if self.myChild:
             self.myChild.wait()
