@@ -154,7 +154,7 @@ WRITEOSIDMENU("Default OSID[<b>1</b>]", "default_osid", $osid_result);
 # Path to Multiboot image.
 #
 echo "<tr>
-          <td>Path to Image[<b>2</b>]:<br>
+          <td>Filename (full path) of Image[<b>2</b>]:<br>
               (must reside in /proj)</td>
           <td><input type=text name=path value='/proj/' size=40>
               </td>
