@@ -211,9 +211,14 @@ my %linkdelays = ();
 my $uselinkdelays   = 0;
 my $forcelinkdelays = 0;
 
-# And the per-lan control, based on the above two variables, and
+# And the per-lan controls, based on the above two variables, and
 # per-lan variable in the virt_lans table. Indexed by lan name.
+# The nobwshaping flag is used in conjunction with emulated links
+# to turn off actual bw traffic shaping on an emulated link. This allows
+# assign to match the specified bws, but not force them to be such
+# with delay nodes (leaves it up to the user to moderate the bw). 
 my %uselinkdelay    = ();
+my %nobwshaping     = ();
 
 my $query_result =
     DBQueryFatal("SELECT uselinkdelays,forcelinkdelays from experiments ".
@@ -347,7 +352,7 @@ printdb "Loading virt_lans.\n";
 $result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
 		 "rdelay,rbandwidth,rlossrate,widearea, ".
-		 "emulated,uselinkdelay " .
+		 "emulated,uselinkdelay,nobwshaping " .
 		 "from virt_lans where pid='$pid' and eid='$eid' ".
                  "order by vname,member");
 
@@ -365,7 +370,7 @@ my %tunnels   = ();
 # 
 while (my ($vname,$member,$delay,$bandwidth,$lossrate,
 	   $rdelay,$rbandwidth,$rlossrate,$widearea,
-	   $isemulated,$uselinkdelay) = $result->fetchrow_array) {
+	   $isemulated,$uselinkdelay,$nobwshaping) = $result->fetchrow_array) {
     my ($node,$port) = split(":",$member);
 
     #
@@ -423,6 +428,7 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
     }
     $emulated{$vname} = $isemulated;
     $uselinkdelay{$vname} = $uselinkdelay;
+    $nobwshaping{$vname} = $nobwshaping;
     
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
@@ -540,6 +546,7 @@ foreach $lan (keys(%lans)) {
     my $emulated = $emulated{$lan};
     my $uselinkdelay = $uselinkdelay{$lan};
     my $mustdelay = $mustdelay{$lan};
+    my $nobwshaping = $nobwshaping{$lan};
     $trivial_ok = 0;
     foreach $member (@members) {
 	($node) = (split(":",$member))[0];
@@ -586,14 +593,18 @@ foreach $lan (keys(%lans)) {
 	$bandwidth = &getbandwidth(&min($bw0,$rbw1));
 	$rbandwidth = &getbandwidth(&min($rbw0,$bw1));
 	if (((($delay >= $delaythresh) ||
-	      (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
-	      (($delaywithswitch == 0) && 
-	       (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
+	      (!$nobwshaping &&
+	       ((($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
+		(($delaywithswitch == 0) && 
+		 (($bw != $S100Kbs) &&
+		  (($sharks == 0) || ($nonsharks > 1)))))) || 
 	      ($loss != 0)) ||
 	     (($rdelay >= $delaythresh) ||
-	      (($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
-	      (($delaywithswitch == 0) && 
-	       (($rbw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1))))|| 
+	      (!$nobwshaping &&
+	       ((($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
+		(($delaywithswitch == 0) && !$nobwshaping &&
+		 (($rbw != $S100Kbs) &&
+		  (($sharks == 0) || ($nonsharks > 1)))))) || 
 	      ($rloss != 0)) ||
 	     # Link must be shaped for other reasons (q_red).
 	     $mustdelay ||
@@ -614,13 +625,23 @@ foreach $lan (keys(%lans)) {
 		$forcelinkdelays || $uselinkdelays || $uselinkdelay) {
 		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 		
-		$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-				       $nodeport1,$rdelay,$rbw,$rloss];
-	    
 		print(TOPFILE "link $plink $node0 $node1 ".
 		      max($bw,$rbw) . " 0 0" .
 		      ($emulated ? " emulated\n" : "\n"));
 
+		#
+		# We allow users to oversubscribe by letting them turn
+		# off the bandwidth shaping. If however, the link was
+		# shaped for some other reason (like a delay), then
+		# turn off just the bw shaping part by setting them to 0.
+		# This is special; means no limits in ipfw.
+		#
+		if ($nobwshaping) {
+		    $bw = $rbw = 0;
+		}
+		$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
+				       $nodeport1,$rdelay,$rbw,$rloss];
+	    
 		printdb "Delay link $plink = " . 
 		    join(" ",@{$delaylinks{$plink}}) . "\n";
 	    }
@@ -652,9 +673,12 @@ foreach $lan (keys(%lans)) {
 	    $portbw{$nodeport1} = $S100Mbs;	    
 	} else {
 	    print TOPFILE "link linksimple/$lan/$nodeport0,$nodeport1 ".
-		"$node0 $node1 $bandwidth 0 0";
+		"$node0 $node1 ";
 	    if ($emulated) {
-		print TOPFILE " emulated";
+		print TOPFILE max($bw,$rbw) . " 0 0 emulated";
+	    }
+	    else {
+		print TOPFILE " $bandwidth 0 0";
 	    }
 	    if ($trivial_ok) {
 		print TOPFILE " trivial_ok";
