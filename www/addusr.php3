@@ -17,7 +17,7 @@ echo "<table align=\"center\" border=\"1\">\n";
 echo "<tr><td align='center' colspan=\"4\">\n";
 echo "Only fields marked with * are required</td></tr>\n";
 if (isset($uid)) {
-  echo "<form action=\"added.php3?$uid\" method=\"post\">\n";
+  echo "<form action=\"usradded.php3?$uid\" method=\"post\">\n";
   echo "<input type=\"hidden\" name=\"logged_in\" value=\"true\">";
   echo "<tr><td>*Username:</td><td class=\"left\">";
   echo "<input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>";
@@ -38,12 +38,12 @@ if (isset($uid)) {
   echo "<input type=\"readonly\" name=\"usr_phone\" ";
   echo "value=\"$row[4]\"></td></tr>";
   echo "<tr><td>*Password:</td><td>";
-  echo "<input type=\"password\" name=\"pswd\"></td></tr>";
+  echo "<input type=\"password\" name=\"password1\"></td></tr>";
   echo "<tr><td>*Retype<br>Password:</td><td>";
-  echo "<input type=\"hidden\" name=\"pswd2\" ";
+  echo "<input type=\"hidden\" name=\"password2\" ";
   echo "value=\"$row[5]\">&nbsp;</td></tr>";
 } else {
-  echo "<form action=\"added.php3\" method=\"post\">\n";
+  echo "<form action=\"usradded.php3\" method=\"post\">\n";
   echo "<tr><td>*Username:</td><td><input type=\"text\" name=\"uid\"></td>";
   echo "<td>Expiration date:</td>";
   echo "<td><input type=\"text\" name=\"usr_expires\"";
@@ -57,9 +57,9 @@ if (isset($uid)) {
   echo "<td>Phone #:</td><td>";
   echo "<input type=\"text\" name=\"usr_phone\"></td></tr>";
   echo "<tr><td>*Password:</td><td>";
-  echo "<input type=\"password\" name=\"pswd\"></td></tr>";
+  echo "<input type=\"password\" name=\"password1\"></td></tr>";
   echo "<tr><td>*Retype<br>Password:</td><td>";
-  echo "<input type=\"password\" name=\"pswd2\"></td></tr>";
+  echo "<input type=\"password\" name=\"password2\"></td></tr>";
 }
 echo "<tr><td>*Project:</td><td>";
 echo "<input type=\"text\" name=\"grp\"></td>";

@@ -1,11 +1,10 @@
 <?php
-echo "
-<html>
-<head>
-<title>Adding to the database</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
-</head>
-<body>";
+echo "<html>
+      <head>
+      <title>Joining a project</title>
+      <link rel='stylesheet' href='tbstyle.css' type='text/css'>
+      </head>
+      <body>";
 #
 # First off, sanity check the form to make sure all the required fields
 # were provided. I do this on a per field basis so that we can be

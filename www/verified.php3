@@ -5,6 +5,8 @@
 </head>
 <body>
 <?php
+include("defs.php3");
+
 $auth_usr = "";
 if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
   $auth_usr=$Vals[1];
@@ -37,7 +39,7 @@ Please log in again.</h3>\n</body></html>";
 <h1>Confirming Verification...</h1>
 <?php
 if (isset($uid) && isset($pswd) && isset($key)) {
-  $match = crypt("TB_".$uid."_USR",strlen($uid)+13);
+  $match = GENKEY($uid);
   if ($key==$match) {
     $cmd = "select usr_pswd from users where uid='$uid'";
     $result = mysql_db_query("tbdb", $cmd);
