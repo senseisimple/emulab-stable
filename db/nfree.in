@@ -1,18 +1,24 @@
-#!/usr/local/bin/perl -w
-use Mysql;
+#!/usr/bin/perl
+
+#
+# nfree - Takes pysical node names, and frees them from the experiment they
+# are allocated to. If nodes are ommited, frees up all nodes in the given
+# experiment. Looks in the scheduled_reloads and next_reserve tables to see
+# if this node should be re-reserved into another experiment and/or reloaded,
+# rather than being put back into the pool of free nodes
+#
 
 #
 # Configure variables
 #
 my $TB       = "@prefix@";
-my $DBNAME   = "@TBDBNAME@";
+use lib '@prefix@/lib';
+use libdb;
 
-my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
-
-if ($#ARGV < 1) {
-  die("Usage: nfree <pid> <eid> [<node> <node> <...>]\n".
-      "Releases all nodes in the specified experiment. If nodes are listed,\n".
-      "nfree releases only the listed nodes.\n");
+if (@ARGV < 2) {
+    die("Usage: nfree <pid> <eid> [<node> <node> <...>]\n".
+	"Releases all nodes in the specified experiment. If nodes are listed,\n".
+	"nfree releases only the listed nodes.\n");
 }
 
 my $error = 0;
@@ -22,254 +28,247 @@ my $os_load = "$TB/bin/os_load -r ";
 my $reloadpid="emulab-ops";
 my $reload_pendingeid="reloadpending";
 my $reloadeid="reloading";
-my $pid = shift;
-my $eid = shift;
+
 my @node_names=();
 my @freed_nodes=();
 
-foreach my $n (@ARGV) {
-  if ($n =~ /(sh\d+)/ ) {
-    # its a shark - do the whole shelf if its not done already.
-    my $shelf = $1;
-    if ( ! (join(",",@node_names) =~ /,$shelf-\d,/)) {
-      # Shelf hasn't been done yet...
-      foreach my $n ( 1 .. 8 ) {
-	push(@node_names,"$shelf-$n");
-      }
-    }
-  } else {
-    # its not a shark - just add it in...
-    push(@node_names,"$n");
-  }
+my $pid = shift;
+my $eid = shift;
+
+use strict;
+
+# Make sure that the experiment actually exists
+# NOTE: project permissions checking is done later, on an individual
+# node basis.
+if (!ExpState($pid,$eid)) {
+    die("There is no experiment '$eid' in project '$pid'.\n");
 }
 
+######################################################################
+# Step 1 - Free nodes
+#
+# Find nodes that can be freed at this time, and do so. Nodes which
+# are awaiting reloads and which have been scheduled to be reserved
+# to another experiment, are put into lists so that they can be
+# handled later
+######################################################################
 
-my $cmd = "";
-my $sth = "";
+# Make a list of nodes given on the command line
+foreach my $n (@ARGV) {
+    # Shark hack
+    if ($n =~ /(sh\d+)/ ) {
+	#
+	# It's a shark - do the whole shelf if its not done already.
+	#
+	my $shelf = $1;
+	if ( ! (join(",",@node_names) =~ /,$shelf-\d,/)) {
+	    # Shelf hasn't been done yet...
+	    foreach my $n ( 1 .. 8 ) {
+		push(@node_names,"$shelf-$n");
+	    }
+	}
+	# End shark hack
 
-$cmd = "select * from experiments where eid='$eid' and pid='$pid'";
-$sth = $dbh->query($cmd);
-if ($sth->numrows < 1) {	
-  die("There is no experiment '$eid' in project '$pid'.\n");
+    } else {
+	# its not a shark - just add it in...
+	push(@node_names,"$n");
+    }
 }
  
-$cmd = "lock tables nodes write, node_types read, scheduled_reloads read, ".
-  "interfaces write, delays write, reserved write, last_reservation write,".
-  "current_reloads write, next_reserve read";
-$sth = $dbh->query($cmd) 
-  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+#
+# Lock all of the tables we'll be reading, so that we get a consistent
+# view of the current state
+#
+DBQueryFatal("lock tables nodes write, node_types read, " .
+	     "scheduled_reloads read, interfaces write, delays write, " .
+	     "reserved write, last_reservation write, current_reloads write, " .
+	     "next_reserve read");
 
-# If list is empty, put in all the nodes
-if ($#node_names == -1) {
-  print "Releasing all nodes from experiment '$eid' in project '$pid'...\n";
-  $sth = $dbh->
-    query("select node_id from reserved where pid='$pid' and eid='$eid'");
-  while (@row = $sth->fetchrow_array()) {
-    push(@node_names, $row[0]);
-  }
+#
+# If no nodes were given on the command line, fill the list with all nodes
+# in the experiment.
+#
+if (@node_names == 0) {
+    print "Releasing all nodes from experiment '$eid' in project '$pid'...\n";
+    push @node_names,ExpNodes($pid,$eid);
 }
 
 my @reloads = ();
-# Frisbee reloads get handled differently than 'normal' reloads
-my @frisbee_reloads = ();
 my %reserves= ();
 foreach my $n (@node_names) { 
-  $sth = $dbh->query("select * from reserved where node_id='$n' ".
-		     "and eid='$eid' and pid='$pid'");
-  if ($sth->numrows == 0) {
-    print "Node '$n' is not reserved by your experiment.\n";
-    $error++;
-    next;
-  } else {
-    push(@freed_nodes,$n);
-  }
+    #
+    # Check to make sure they have acutally reserved the nodes.
+    #
+    my $result = DBQueryFatal("select * from reserved where node_id='$n' ".
+	"and eid='$eid' and pid='$pid'");
+    if ($result->numrows == 0) {
+	print "Node '$n' is not reserved by your experiment.\n";
+	$error++;
+	next;
+    } else {
+	push(@freed_nodes,$n);
+    }
 
-  # This little sillyness is for disk reloading. Kill the last reservation.
-  $cmd = "delete from last_reservation where node_id='$n'";
-  $dbh->query($cmd);
+    #
+    # This little sillyness is for disk reloading. Kill the last reservation.
+    #
+    DBQueryWarn("delete from last_reservation where node_id='$n'") || $error++;
 
-  # If the node has a reloads entry, change the reservation and start it
-  $cmd = "select node_id,image_id,reload_type from scheduled_reloads ".
-	"where node_id='$n'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++);
+    #
+    # If the node has a reloads entry, change the reservation so that the
+    # reload_daemon will pick it up.
+    #
+    $result = DBQueryFatal("select node_id,image_id from scheduled_reloads " .
+			  "where node_id='$n'");
+    if ( $result->num_rows() > 0 ) {
 
-  if ( ($sth->num_rows()) > 0) {
-	if ($sth->num_rows() != 1) {
-	  print "Warning: multiple reloads scheduled for $n - using the first\n";
-	}
-	my @row = $sth->fetchrow();
+	my @row = $result->fetchrow();
 	my $image_id = $row[1];
 	my $reload_type = $row[2];
-	# Check for Frisbee-type reloads
-	if ($reload_type eq "frisbee") {
-	  print "Adding scheduled reload for $n of $image_id to the list using Frisbee.\n";
-	  # We'll need to know both the node and image_id to run os_load
-	  push(@frisbee_reloads,[$n,$image_id]);
-	} else {
-	  print "Adding scheduled reload for $n to the list.\n";
-	  push(@reloads,$n);
-	}
-  } else {
-    # If the node has a next_reserve entry, change the reservation and start it
-    $cmd = "select node_id,pid,eid from next_reserve where node_id='$n'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++);
-    if ( ($sth->num_rows()) > 0) {
-      my @reserve;
-      print "Adding next reservation for $n to the list.\n";
-      my $i = 0;
-      my $max = $sth->num_rows();
-      while ( $i < $max  ) {
-	$i++;
-	@reserve = $sth->fetchrow_array();
-	my ($node, $next_pid, $next_eid) = @reserve;
-	$reserves{$node} = "$next_pid:$next_eid";
-      }
+
+	print "Adding scheduled reload for $n to the list.\n";
+	push(@reloads,$n);
+
     } else {
-      # No reloads or reservation changes, so really free the node
-      # This little sillyness is for disk reloading. Remember the last
-      # project a node was reserved into.
-      $cmd = "insert into last_reservation values ('$n', '$pid')";
-      $dbh->query($cmd);
-      print "Releasing node '$n'...";
-      $cmd = "delete from reserved where node_id='$n' and eid='$eid'";
-      $sth = $dbh->query($cmd) && print "Succeeded.\n"
-	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	    && $error++);
+	#
+	# If the node has a next_reserve entry, change the reservation
+	#
+	my $result = DBQueryFatal("select node_id,pid,eid from next_reserve ".
+				  "where node_id='$n'");
+
+	if ( $result->num_rows() > 0 ) {
+	    # 
+	    # Add the reservation to a list to be taken care of later
+	    #
+	    my ($node, $next_pid, $next_eid) = $result->fetchrow_array();
+	    $reserves{$node} = "$next_pid:$next_eid";
+	} else {
+	    #
+	    # No reloads or reservation changes, so really free the node
+	    #
+	    # This little sillyness is for disk reloading. Remember the last
+	    # project a node was reserved into.
+	    #
+	    DBQuery("insert into last_reservation values ('$n', '$pid')");
+
+	    print "Releasing node '$n'...";
+	    if (DBQueryWarn("delete from reserved " .
+			    "where node_id='$n' and eid='$eid'")) {
+		"Succeeded.\n";
+	    } else {
+		$error++;
+	    }
+	}
     }
-  }
 
-  # Find the control net interface for this node type
-  $sth = 
-    $dbh->query("select control_net,osid,node_types.pxe_boot_path " .
-		"from node_types " .
-		"left join nodes on nodes.type=node_types.type " .
-		"where node_id='$n'");
-  my @row= $sth->fetchrow_array();
-  my $control= $row[0];
-  my $osid= $row[1];
-  my $pxe_boot_path = $row[2];
-  if (! ($n =~ /sh\d+/)) { #If its not a shark
-    # Clean out all IPs except the control net
-    $cmd = 
-      "update interfaces set IP='' where node_id='$n' and card!='$control'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++);
-  } else {
-    # it is a shark, so clear out the alias(es)
-    $cmd = "update interfaces set IPalias='' where node_id='$n'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++);
-  }
+    #
+    # Find the control net interface for this node type, as well as some
+    # of the default values for its node type
+    #
+    $result = DBQueryFatal("select control_net,osid,node_types.pxe_boot_path " .
+	"from node_types " .
+	"left join nodes on nodes.type=node_types.type " .
+	"where node_id='$n'");
+    my ($control, $osid, $pxe_boot_path) = $result->fetchrow_array();
+    if (! ($n =~ /sh\d+/)) { # If its not a shark
+	# Clean out all IPs except the control net
+	DBQueryWarn("update interfaces set IP='' " .
+	    "where node_id='$n' and card!='$control'") || $error++;
+    } else {
+	# Shark hack
+	# it is a shark, so clear out the alias(es)
+	DBQueryWarn("update interfaces set IPalias='' ".
+		    "where node_id='$n'") || $error++;
+	# End shark hack
+    }
 
-  # Clean out all delays
-  $cmd = 
-    "delete from delays where node_id='$n'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++);
+    #
+    # Clean out all delays
+    #
+    DBQueryWarn("delete from delays where node_id='$n'") || $error++;
 
-  # And clean out various tidbits from the nodes table.
-  $cmd = "update nodes set def_boot_osid='$osid', def_boot_cmd_line='',".
-      "def_boot_path='',startupcmd='',rpms='',deltas='',tarballs='',".
-	  "pxe_boot_path='$pxe_boot_path', next_pxe_boot_path='' ".
-	  "where node_id='$n'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++);
+    #
+    # And clean out various tidbits from the nodes table.
+    #
+    DBQueryWarn("update nodes set def_boot_osid='$osid', def_boot_cmd_line='',".
+	"def_boot_path='',startupcmd='',rpms='',deltas='',tarballs='',".
+	"pxe_boot_path='$pxe_boot_path', next_pxe_boot_path='' ".
+	"where node_id='$n'") || $error++;
 
-  # Clean out the current_reloads table
-  $cmd = "delete from current_reloads where node_id='$n'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++);
+    #
+    # Clean out the current_reloads table
+    #
+    DBQueryWarn("delete from current_reloads where node_id='$n'") || $error++;
+}
 
+DBQueryFatal("unlock tables");
+
+######################################################################
+# Step 2 - Set up reserves and reloads
+#
+# If any nodes were awaiting reloads, put them in the proper
+# experiment, and issue an os_load, if appropriate. If any nodes were
+# set up for simple reservations, we take care of that in this stage
+# too.
+######################################################################
+ 
+if ((@reloads > 0) || (keys %reserves > 0)) {
+    #
+    # Lock tables to maintain consistency
+    #
+    print "Locking tables.\n";
+    DBQueryFatal("lock tables nodes read, node_types read, scheduled_reloads read, ".
+		 "interfaces write, reserved write, next_reserve write");
+  
+    #
+    # Take care of reloads by putting them into a special experiment,
+    # which is processed by the batch_daemon
+    #
+    foreach my $n ( @reloads ) {
+	#
+	# Change reservation (don't delete or we'll get races)
+	#
+	print "Changing reservation for $n to $reloadpid/$reload_pendingeid...\n";
+	DBQueryWarn("update reserved set ".
+	    "pid='$reloadpid',eid='$reload_pendingeid',vname=NULL ".
+	    "where node_id='$n'") || $error++;
+    }
+  
+    #
+    # Handle scheduled reservations
+    #
+    foreach my $n ( keys %reserves ) {
+	my ($next_pid,$next_eid) = split (":",$reserves{$n});
+	#
+	# Change reservation (don't delete or we'll get races)
+	#
+	print "Changing reservation for $n to $next_pid/$next_eid...\n";
+	DBQueryWarn("update reserved set pid='$next_pid',eid='$next_eid'," .
+		    "vname=NULL where node_id='$n'") || $error++;
+	DBQueryWarn("delete from next_reserve where node_id='$n'") || $error++;
+    }
+
+    #
+    # Done, so we can now unlock tables
+    #
+    print "Unlocking tables.\n";
+    DBQueryFatal("unlock tables");
 
 }
 
-$cmd = "unlock tables";
-$sth = $dbh->query($cmd) 
-  || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
-
-if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
-  print "Locking tables.\n";
-  $cmd = "lock tables nodes read, node_types read, scheduled_reloads read, ".
-    "interfaces write, reserved write, next_reserve write";
-  $sth = $dbh->query($cmd) 
-    || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
-  
-  foreach $n ( @reloads ) {
-    # Change reservation (don't delete or we'll get races)
-    print "Changing reservation for $n to $reloadpid/$reload_pendingeid...\n";
-    $cmd = "update reserved set ".
-	"pid='$reloadpid',eid='$reload_pendingeid',vname=NULL ".
-	"where node_id='$n'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++ && next);
-  }
-  
-  foreach $aref ( @frisbee_reloads ) {
-	my $n = $$aref[0];
-	my $image = $$aref[1];
-    # Change reservation (don't delete or we'll get races)
-    print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
-    $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid',vname=NULL ".
-	"where node_id='$n'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++ && next);
-
-	# NOTE: os_load for frisbee nodes gets run later, because the tables
-	# need to be unlocked for os_load to run
-  }
-
- foreach $n ( keys %reserves ) {
-    my ($next_pid,$next_eid) = split (":",$reserves{$n});
-    # Change reservation (don't delete or we'll get races)
-    print "Changing reservation for $n to $next_pid/$next_eid...\n";
-    $cmd = "update reserved set pid='$next_pid',eid='$next_eid',vname=NULL ".
-      "where node_id='$n'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++ && next);
-    $cmd = "delete from next_reserve where node_id='$n'";
-    $sth = $dbh->query($cmd)
-      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	  && $error++ && next);
-  }
-
-  print "Unlocking tables.\n";
-  $cmd = "unlock tables";
-  $sth = $dbh->query($cmd) 
-    || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
-
-
-  # Continuation of Frisbee code... now that the tables are unlocked, we can
-  # call os_load
-  foreach $aref ( @frisbee_reloads ) {
-	my $n = $$aref[0];
-	my $image = $$aref[1];
-    # Call os_load for the machine, since the reload daemon doesn't handle
-	# frisbee reloads
-	print "Running os_load for $n\n";
-	system "$os_load -i $image $n"
-	  || (print "Failed to run '$os_load $image $n': $!\n"
-	  && $error++ && next);
-  }
-
-}
+######################################################################
+# Step 3 - Set up console for freed nodes.
+#
+# Using a list of freed nodes build eariler, run consetup to reset
+# their serial consoles.
+######################################################################
 
 if (@freed_nodes) {
     my @conlist=();
     my @sharks=();
-    
-    foreach $n ( @freed_nodes ) {
+
+    foreach my $n ( @freed_nodes ) {
+	# Shark hack
 	if ($n =~ /(sh\d+)/) {
 	    # Its a shark - do the shelf if it hasn't been done yet
 	    my $shelf = $1;
@@ -278,12 +277,17 @@ if (@freed_nodes) {
 		push(@conlist,$shelf);
 	    }
 	}
+	# End shark hack
 	else {
 	    push(@conlist,$n);
 	}
     }
+
+    #
+    # Finally, run the actual command
+    #
     system("$consetup @conlist") == 0 or
-	print STDERR "WARNING: $consetup @conlist failed!\n";
+    print STDERR "WARNING: $consetup @conlist failed!\n";
 }
 
 exit($error);
