@@ -50,7 +50,7 @@ my $RELOADPID	= NODERELOADING_PID;
 my $RELOADEID	= NODERELOADING_EID;
 my $PENDINGEID	= NODERELOADPENDING_EID;
 
-my $os_load	= "$TB/bin/os_load";
+my $os_load	= "$TB/bin/os_load -s";
 my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $logfile	= "$TB/log/reloadlog";

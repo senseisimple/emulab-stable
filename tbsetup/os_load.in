@@ -14,18 +14,19 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: os_load [-s | -w] [-r | -n] [-i <imageid>] ".
-	         "<node> [node ...]\n".
+    print STDOUT
+	"Usage: os_load [-s] [-r | -n] [-i <imageid>] <node> [node ...]\n".
+	"       os_load [-s] [-r | -n] [-i <imageid>] -e pid,eid\n".
+	"       os_load -l\n".
 	"Use -i to specify an imageid. Use node default otherwise.\n".
-	"Use -s to setup reload only, but do not issue a reboot.\n".
-	"Use -w to block waiting for nodes to finish reloading.\n".
-	"    (-s and -w are mutually exclusive)\n".
+	"Use -s to start reload, but do not wait for it to complete.\n".
+	"Use -e to reboot all the nodes in an experiment\n" .
 	"Use -l to get a list of images you are permitted to load.\n" .
 	"Use -r to use Frisbee to reload disks.\n" .
 	"Use -n to use netdisk to reload disks.\n";
     exit(-1);
 }
-my  $optlist = "sldwrni:";
+my  $optlist = "sldrni:e:";
 
 #
 # Configure variables
@@ -36,11 +37,16 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $BOSSADDR	= "@BOSSNODE@";
 my $USERADDR	= "@USERNODE@";
 
-
 #
 # Max number of simultaneous loads. Will be better with Frisbee.
 # 
 my $MAXLOADS	= 2;
+
+#
+# Max number of retries (per node) before its deemed fatal. This allows
+# for the occasional pxeboot failure.
+#
+my $MAXRETRIES  = 1;
 
 #
 # Load the Testbed support stuff. 
@@ -61,12 +67,13 @@ my $usedefault  = 1;
 my $imageid;
 my %imageid_row;
 my @nodes       = ();
+my %retries	= ();
 my $mereuser    = 0;
-my $setuponly   = 0;
-my $waitmode    = 0;
+my $waitmode    = 1;
 my $failures    = 0;
 my $startwait   = 0;
 my $type	= TB_DEFAULT_RELOADTYPE;
+my $cmdline     = "";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -86,14 +93,8 @@ if (defined($options{"l"})) {
     dolisting();
     exit(0);
 }
-if (@ARGV < 1) {
-    usage();
-}
 if (defined($options{"s"})) {
-    $setuponly = 1;
-}
-if (defined($options{"w"})) {
-    $waitmode = 1;
+    $waitmode = 0;
 }
 if (defined($options{"r"})) {
     if (defined($options{"n"})) {
@@ -103,9 +104,6 @@ if (defined($options{"r"})) {
 }
 if (defined($options{"n"})) {
     $type = TB_RELOADTYPE_NETDISK;
-}
-if ($waitmode && $setuponly) {
-    usage();
 }
 if (defined($options{"i"})) {
     $imageid    = $options{"i"};
@@ -118,19 +116,40 @@ if (defined($options{"i"})) {
 	die("*** Bad $imageid name.\n");
     }
 }
-
-#
-# Untaint nodes.
-#
-foreach my $node ( @ARGV ) {
-    if ($node =~ /^([-\@\w]+)$/) {
-	$node = $1;
+if (defined($options{"e"})) {
+    if (@ARGV) {
+	usage();
+    }
+    my $pideid = $options{"e"};
+    
+    if ($pideid =~ /([-\w]*),([-\w]*)/) {
+	if (! (@nodes = ExpNodes($1, $2))) {
+	    die("*** $0:\n".
+		"    There are no nodes in $1/$2!\n");
+	}
     }
     else {
-	die("*** Bad node name: $node.\n");
+	die("Invalid argument to -e option: $pideid\n");
+	usage();
     }
+}
+else {
+    if (! @ARGV) {
+	usage();
+    }
+    #
+    # Untaint nodes.
+    #
+    foreach my $node ( @ARGV ) {
+	if ($node =~ /^([-\@\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Bad node name: $node.\n");
+	}
     
-    push(@nodes, $node);
+	push(@nodes, $node);
+    }
 }
 
 #
@@ -205,7 +224,6 @@ foreach my $node (@nodes) {
     # For now, all testbed default images come from paper and all pid specific
     # images come from plastic:/proj.
     # 
-    my $cmdline = "";
     if (defined($imageid_row{'pid'})) {
 	if (! ($imagepath =~ /^\/proj\//)) {
 	    die("*** $0:\n".
@@ -271,27 +289,14 @@ foreach my $node (@nodes) {
     
     print STDOUT "Setting up reload for $node\n";
     if (!$TESTMODE) {
-         if ($type eq TB_RELOADTYPE_FRISBEE) {
-	     DBQueryFatal("update nodes set ".
-	                  "next_pxe_boot_path='$FRISBEEPATH'" .
-	 		  "where node_id='$node'");
-	     system "$FRISBEELAUNCHER $imageid" and
-		 die "*** Unable to launch frisbee daemon\n";
-	 } elsif ($type eq TB_RELOADTYPE_NETDISK) {
-	     DBQueryFatal("update nodes set ".
-	                  "next_boot_osid='$NETDISKOSID',".
-	 		  "next_boot_cmd_line='$cmdline' ".
-	 		  "where node_id='$node'");
-	} else {
-	    die "Unknown reload type ($type)\n";
-	}
+        SetupReload($node);
     }
 }
 
 #
 # Exit if not doing about actual reload.
 #
-if ($setuponly || $TESTMODE) {
+if ($TESTMODE) {
     print STDOUT "OS Reload (Setup/Testmode) Done!\n";
     exit 0;
 }
@@ -311,8 +316,16 @@ if (! $waitmode) {
 # Okay, in waitmode we do a couple at a time and wait for them to come
 # back alive before proceeding to the next one.
 #
+# The retry vector is initialized to the number of retries we allow per
+# node, afterwhich its a fatal error.
+#
+foreach my $node (@nodes) {
+    $retries{$node} = $MAXRETRIES;
+}
+
 while (@nodes) {
-    my @batch = ();
+    my @batch  = ();
+    my @failed = ();
     my $i;
 
     #
@@ -328,27 +341,141 @@ while (@nodes) {
 	@nodes = ();
     }
     
-    print "Issuing reload/reboot for @batch and then waiting ...\n";
+    print "Issuing reboot for @batch and then waiting ...\n";
 
     system("$nodereboot @batch");
-    $failures = $? >> 8;
-    if ($failures) {
+    if ($?) {
 	print "Reboot failed for (some of) @batch. Quitting!\n";
-	exit $failures;
+	exit ($? >> 8);
     }
 
     #
     # Now wait for them.
     #
     $startwait = time;
-    foreach my $node (@batch) {
-	if (WaitTillReloadDone($node) == 0) {
-	    print "$node appears have reloaded okay.\n";
-	    next;
-	}
+    @failed = WaitTillReloadDone(@batch);
+    while (@failed) {
+	my $node = shift(@failed);
 
-	print "$node may be down.\n".
-	      "Please contact $TBOPS for assistance.\n";
+	if ($retries{$node}) {
+	    print "*** Trying $node again (resetting/rebooting) ...\n";
+	    push(@nodes, $node);
+
+	    # Possible race with reboot?
+	    SetupReload($node);
+
+	    # Retry until count hits zero.
+	    $retries{$node} -= 1;
+	}
+	else {
+	    print "*** $node failed too many times. Skipping!\n";
+	    $failures++;
+	}
+    }
+}
+
+print "OS Reload Done! There were $failures failures!\n";
+exit($failures);
+
+#
+# Wait for a reload to finish. We do this in a rather kludgey manner,
+# by waiting for bootinfo to clear the DB state (next_boot_osid).
+# 
+sub WaitTillReloadDone {
+    my (@nodes) = @_;
+    my %done	= ();
+    my $count   = @nodes;
+    my @failed  = ();
+
+    #
+    # Seven minutes seems like a long time to wait, but it ain't!
+    # 
+    my $maxwait = (60 * 7);
+
+    foreach my $node ( @nodes ) {
+	$done{$node}  = 0;
+    }
+
+    print STDERR "Waiting for @nodes to finish reloading\n" if $dbg;
+
+    #
+    # Start a counter going, relative to the time we rebooted the first
+    # node. 
+    # 
+    my $waittime  = 0;
+    my $minutes   = 0;
+
+    while ($count) {
+	foreach my $node ( @nodes ) {
+	    if (! $done{$node}) {
+		my ($query_result, @row);
+
+		if ($type eq TB_RELOADTYPE_FRISBEE) {
+		    $query_result =
+			DBQueryFatal("SELECT next_pxe_boot_path FROM nodes ".
+				     "where node_id='$node'");
+		}
+		else {
+		    $query_result =
+			DBQueryFatal("SELECT next_boot_osid FROM nodes ".
+				     "where node_id='$node'");
+		}
+
+		@row = $query_result->fetchrow_array();
+		if (! $row[0]) {
+		    print STDERR "$node alive and well\n" if $dbg;
+		    $count--;
+		    $done{$node} = 1;
+		    next;
+		}
+	
+		$waittime = time - $startwait;
+		if ($waittime > $maxwait) {
+		    my $t = (int ($waittime / 60));
+		    
+		    print "*** $node appears wedged; ".
+			"its been $t minutes since it was rebooted.\n";
+
+		    $count--;
+		    $done{$node} = 1;
+		    push(@failed, $node);
+		    next;
+		}
+		if (int($waittime / 60) > $minutes) {
+		    $minutes = int($waittime / 60);
+		    print "Still waiting for $node - ".
+			"its been $minutes minute(s)\n";
+		}
+	    }
+	}
+	sleep(5);
+    }
+    return @failed;
+}
+
+#
+# Setup a reload. Note that type, imageid, and cmdline are global.
+#
+sub SetupReload($)
+{
+    my ($node) = @_;
+
+    if ($type eq TB_RELOADTYPE_FRISBEE) {
+	DBQueryFatal("update nodes set ".
+		     "next_pxe_boot_path='$FRISBEEPATH'" .
+		     "where node_id='$node'");
+	
+	system "$FRISBEELAUNCHER $imageid" and
+	    die "*** Unable to launch frisbee daemon\n";
+    }
+    elsif ($type eq TB_RELOADTYPE_NETDISK) {
+	DBQueryFatal("update nodes set ".
+		     "next_boot_osid='$NETDISKOSID',".
+		     "next_boot_cmd_line='$cmdline' ".
+		     "where node_id='$node'");
+    }
+    else {
+	die "*** Unknown reload type ($type)\n";
     }
 }
 
@@ -381,58 +508,3 @@ sub dolisting()
 	printf "%-20s %s\n", $id, $desc;
     }
 }
-
-#
-# Wait for a reload to finish. We do this in a rather kludgey manner,
-# by waiting for bootinfo to clear the DB state (next_boot_osid).
-# 
-sub WaitTillReloadDone {
-    my ($pc) = @_;
-
-    print STDERR "Waiting for $pc to finish reloading\n" if $dbg;
-    
-    #
-    # Seven minutes seems like a long time to wait, but it ain't!
-    # 
-    my $maxwait = (60 * 7);
-
-    #
-    # Start a counter going, relative to the time we rebooted the first
-    # node. 
-    # 
-    my $waittime  = 0;
-    my $minutes   = 0;
-
-    while (1) {
-	my ($query_result, @row);
-
-	if ($type eq TB_RELOADTYPE_FRISBEE) {
-	    $query_result =
-		DBQueryFatal("SELECT next_pxe_boot_path FROM nodes ".
-			     "where node_id='$pc'");
-	} elsif ($type eq TB_RELOADTYPE_NETDISK) {
-	    $query_result =
-		DBQueryFatal("SELECT next_boot_osid FROM nodes ".
-			     "where node_id='$pc'");
-	}
-
-        @row = $query_result->fetchrow_array();
-	if (! $row[0]) {
-	    print STDERR "$pc alive and well\n" if $dbg;
-	    return 0;
-	}
-	
-	$waittime = time - $startwait;
-	if ($waittime > $maxwait) {
-	    print "$pc appears unresponsive; its been ",
-	    (int ($waittime / 60))," minutes since reload started.\n";
-	    return 1;
-	}
-	if (int($waittime / 60) > $minutes) {
-	    $minutes = int($waittime / 60);
-	    print "Still waiting for $pc - its been $minutes minute(s)\n";
-	}
-	sleep(5);
-    }
-}
-

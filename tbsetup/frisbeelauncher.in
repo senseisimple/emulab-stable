@@ -5,6 +5,12 @@ use Sys::Syslog;
 
 # Configure variables
 my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 use lib "@prefix@/lib";
 use libdb;
@@ -17,23 +23,35 @@ my $BASEPORT	= "3564";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 
 # Process command line options
-getopts('nd',\%opt);
+getopts('d',\%opt);
 if (@ARGV != 1) {
 	exit &usage();
 }
 $imageid = shift @ARGV;
 
+# Grab the filename to give to frisbee
+my $filename = &get_filename($imageid);
+
+# Make sure that the user can read the image file or bomb out right now.
+if (! -r $filename) {
+	die("You do not have permission to read the image file for\n".
+	    "imageid $imageid: $filename\n");
+}
+
+#
+# Need to lock the tables here, since we are going to mess with the
+# busy indicator.
+#
+&lock_tables;
+
 # Try to discover if some other process is handling this address
 $address = &get_address($imageid);
 
-if ($address) {
-	&debug("A server (address $address) is already running for image $imageid\n");
+if ($address && &keepbusy($imageid)) {
+        &unlock_tables;
+	&debug("A server ($address) is already running for image $imageid\n");
 	exit (0);
 }
-
-# We're going to pick an address from these tables, so we need to lock
-# the tables to avoid race condidtions
-&lock_tables;
 
 # Pick an address: Die if unsucessful, set address and unlock if sucessful
 $address = &pick_address;
@@ -47,14 +65,6 @@ if (!$address) {
 &set_address($imageid,$address);
 &unlock_tables;
 
-# Grab the filename to give to frisbee
-my $filename = &get_filename($imageid);
-
-# Make sure that the user can read the image file or bomb out right now.
-if (! -r $filename) {
-	die "You don't have permission to read the image file for imageid $imageid: $filename\n";
-}
-
 # Run in the background
 if (TBBackGround($LOGFILE)) {
     exit(0);
@@ -66,33 +76,55 @@ $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
 
 # Now, we actually launch Frisbee
 while (1) {
+        #
+        # Each time the server exits, test the busy bit to see if
+	# it should keep going. This has to be done with tables locked
+	# since another caller is going to bump it.
+	#
+	&lock_tables();
+	if (! &testbusy($imageid)) {
+		last;
+	}
+	&unlock_tables();
+	
 	if ($child_pid = fork()) {
 		# Wait for child to exit
-		wait();
-		if (!$?) {
-			# Proccess exited normally, so we can exit
-			&debug("Frisbee exited normally\n");
-			last;
-		} else {
-			print STDERR "$$: Frisbee died abnormally, with return " .
-				"value $? - restarting\n";
-		}
-	} else {
-		# Child branch
-		# The database format for address is host:port - however, we need
-		# to give them as seperate arguments to frisbeed
-		$address =~ s/:/ /g;
+		waitpid($child_pid, 0);
 
-		if (!exec("$FRISBEED $filename $address")) {
-			# Hmmm. We'll exit(0), so that the parent doesn't try to
-			# restart us
-			print STDERR "$$: Unable to exec $FRISBEED\n";
-			exit(0);
+		if ($?) {
+			SENDMAIL($TBOPS, "TESTBED: Frisbeed Failed!",
+				 "Imageid: $imageid\n".
+				 "Address: $address\n\n".
+				 "Process $child_pid exited with value $?.\n".
+				 "Please look at the syslog for frisbeed!\n\n".
+				 "NOTE: Another frisbeed will not start!\n");
+			#
+			# Dump early. This will leave the address in
+			# in the DB, so that another one will not start
+			# until the matter is resolved by someone. 
+			# 
+			exit(1);
 		}
+	}
+	else {
+		# Child branch
+		# The database format for address is host:port - however,
+		# we need to give them as seperate arguments to frisbeed.
+
+		if ($address =~ /(.*):(.*)/) {
+			my $addr = $1;
+			my $port = $2;
+
+			if (!exec("$FRISBEED -m $addr -p $port $filename")) {
+				die("$$: Unable to exec $FRISBEED\n");
+			}
+		}
+		die("$$: Bad address format: $address.\n");
 	}
 }
 
 &clear_address;
+&unlock_tables();
 exit(0);
 
 ######################################################################
@@ -101,8 +133,7 @@ exit(0);
 
 # Print out a usage mesage
 sub usage {
-	print "Usage: $0 [-n] [-d] IMAGEID\n";
-	print "-n:	Don't kill server when idle\n";
+	print "Usage: $0 [-d] IMAGEID\n";
 	print "-d:	Print debugging output\n";
 }
 
@@ -115,10 +146,10 @@ sub debug {
 # Grab the address for the passed-in imageid
 sub get_address {
 	my ($imageid) = @_;
-	my $image_query = "SELECT imageid,load_address FROM images WHERE " .
-		"imageid='$imageid'";
 
-	my $sth = DBQueryFatal($image_query);
+	my $sth =
+	    DBQueryFatal("SELECT imageid,load_address ".
+			 "FROM images WHERE imageid='$imageid'");
 
 	my @row = $sth->fetchrow;
 	if (!@row) {
@@ -196,9 +227,39 @@ sub pick_address {
 # Pass in an imageid, and an address
 sub set_address {
 	my ($imageid,$address) = @_;
-	my $address_update = "UPDATE images SET load_address='$address' " .
-		"WHERE imageid='$imageid'";
-	DBQueryFatal($address_update);
+
+	DBQueryFatal("UPDATE images SET load_address='$address',load_busy=1 " .
+		     "WHERE imageid='$imageid'");
+}
+
+# Bump the busy indicator to keep the frisbeed going.
+sub keepbusy($imageid) {
+	my ($imageid) = @_;
+
+	DBQueryFatal("UPDATE images SET load_busy=GREATEST(load_busy,1) " .
+		     "WHERE imageid='$imageid'");
+
+	return 1;
+}
+
+# Test the busy indicator, and set to zero.
+sub testbusy($imageid) {
+	my ($imageid) = @_;
+
+	my $query_result =
+	    DBQueryFatal("select load_busy from images ".
+			 "WHERE imageid='$imageid'");
+
+	my @row = $query_result->fetchrow;
+	if (!@row) {
+	        return 0;
+	}
+	
+	if ($row[0]) {
+	    DBQueryFatal("UPDATE images SET load_busy=0 ".
+			 "WHERE imageid='$imageid'");
+	}
+	return $row[0];
 }
 
 # Kill off our child process, if started, and clear out registered address
@@ -212,11 +273,11 @@ sub cleanup {
 	exit(1);
 }
 
-# Clear out the address registered to this process
+# Clear out the address (and pid) registered to this process
 sub clear_address {
 	&debug("Clearing out registered load_address\n");
 	# Now, clear out the load_address we had set up
-	my $address_clear = "UPDATE images SET load_address='' " .
+	my $address_clear = "UPDATE images SET load_address='',load_busy=0 " .
 		"WHERE imageid='$imageid'";
 	DBQueryFatal($address_clear);
 }

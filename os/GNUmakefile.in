@@ -8,7 +8,7 @@ SUBDIR		= os
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= imagezip
+SUBDIRS	= imagezip frisbee.redux
 
 all:	$(SUBDIRS) split-image.sh
 
@@ -17,8 +17,12 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 imagezip:
 	@$(MAKE) -C imagezip all
 
+frisbee.redux:
+	@$(MAKE) -C frisbee.redux all
+
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
+	@$(MAKE) -C frisbee.redux install
 
 control-install: 
 	@$(MAKE) -C imagezip install
@@ -33,6 +37,7 @@ clean:		subdir-clean
 
 subdir-clean:
 	@$(MAKE) -C imagezip clean
+	@$(MAKE) -C frisbee.redux clean
 
 distclean:	subdir-distclean
 

@@ -43,7 +43,7 @@ my $RELOADPID	= NODERELOADING_PID;
 my $RELOADEID	= NODERELOADING_EID;
 my $PENDINGEID	= NODERELOADPENDING_EID;
 
-my $osload      = "$TB/bin/os_load";
+my $osload      = "$TB/bin/os_load -s";
 my $nalloc      = "$TB/bin/nalloc";
 my $name        = "";
 my $error       = 0;
