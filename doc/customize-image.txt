@@ -3,6 +3,7 @@ provided by Utah.  The basic procedure is:
 
   - load the image on a testbed machine
   - customize both FreeBSD and Linux filesystems
+  - save customized image
 
 We will provide you with a generic disk image.  This disk image is one
 which has both a FreeBSD partition and a Linux partition.  You will need
@@ -39,44 +40,32 @@ A. Load the image on a testbed machine.
 
 We will assume the machine is called "pc1" in the following directions.
 
-* Put the Utah-provided generic image in /usr/testbed/images on your boss.
+* Put the Utah-provided generic image in /usr/testbed/images on your
+  file server machine.  The generic image will be loaded, and the custom
+  image saved, using this directory.
 
 * Boot pc1 into the admin MFS as described above
 
-* Copy the frisbee binary to the MFS.
-  Due to a lack of foresight, the frisbee client binary is not in the
-  admin MFS, so you need to copy it over there.  Copy the frisbee binary
-  that was part of this tarball over to the node:
+* Use 'imageunzip' to load the disk.
+  If all went well, the node should be up and accessible via ssh.
+  To copy the generic image onto the test machine disk, do the following
+  from boss:
 
-      scp frisbee pc1:/usr/testbed/bin
+      sudo ssh pc1 imageunzip - /dev/ad0 < /usr/testbed/images/FBSD47+RHL73-GENERIC.ndz
 
-* Login as root.
-  Either:
-
-      sudo slogin pc1
-
-  from your boss node, or login as root on the console.
-
-* Use frisbee to load the disk.
-  On boss do:
-
-      /usr/testbed/sbin/frisbeed -m 234.5.6.1 -p 3564 \
-	/usr/testbed/images/FBSD47+RHL73-GENERIC.ndz
-
-  On the node do:
-
-      /usr/testbed/bin/frisbee -m 234.5.6.1 -p 3564 /dev/ad0
-
-  (or "/dev/da0" for SCSI).  Image loading should take anywhere from
-  45 seconds, to several minutes.  The client should print '.'s as it
-  makes progress.
+  (or use "/dev/da0" for SCSI).  Image loading should take anywhere from
+  45 seconds, to several minutes.
 
 Now you can begin customizing the FreeBSD and Linux partitions.
 
 
 B. Customize FreeBSD:
 
-First, mount the FreeBSD filesystems:
+First, login as root from boss:
+
+       sudo slogin pc1
+
+and mount the FreeBSD filesystems on the node:
 
       mount /dev/ad0s1a /mnt
       mount /dev/ad0s1e /mnt/var
@@ -201,8 +190,93 @@ the time stamp that forces a periodic fsck:
 again, replace "ad" with "da" for SCSI.
 
 
-D. Dealing with SCSI disks (or RAID).
-   [ THIS SECTION NEEDS WORK ]
+D. Saving the customized image
+
+   The "whole disk" image is the one used most frequently, but we also
+   create single partition images of FreeBSD and Linux as well.
+   From boss do:
+
+       cd /usr/testbed/images
+       sudo ssh pc1 imagezip /dev/ad0 - > FBSD47+RHL73-STD.ndz
+       sudo ssh pc1 imagezip -s 1 /dev/ad0 - > FBSD47-STD.ndz
+       sudo ssh pc1 imagezip -s 2 /dev/ad0 - > RHL73-STD.ndz
+
+   replacing "ad0" with "da0" for SCSI of course.
+
+
+E. Testing the image
+
+   Now that you have saved a copy of your customization, you can test out
+   the image and make sure it works.
+
+   NOTE: you will need console access to the node at this point, either
+   the VGA or the serial line depending on which version of pxeboot you
+   are using.
+
+   From your slogin session on the node do:
+
+       reboot
+
+   and wait for the pxeboot prompt to appear on the console as described
+   earlier.  When the "Type a key..." message appears, hit space and then
+   at the prompt type:
+
+       part:1
+
+   which tells pxeboot to boot from partition 1 (aka, the FreeBSD partition).
+   The machine should proceed to boot all the way to a login prompt.  Watch
+   for startup problems, like account setup or mount failures.  If all goes
+   well, login to the console with the root password you set and reboot again.
+   When you get the pxeboot prompt again, type space and then:
+
+       part:2
+
+   to boot into the Linux partition.  Again watch for problems.  If
+   everything worked, skip the next step and proceed to "Installing the
+   images" below.  If there was a catastrophic failure, you can reboot
+   the node into the admin MFS and reload the disk either with the image
+   snapshot you made or, worst case, the generic image.  If you just
+   need to make some minor changes, make them and proceed with the next
+   step.
+
+
+F. Recreating the image
+
+   If you need to tweak either the FreeBSD or Linux partitions, you will
+   need to save the image again.  Doing this properly involves cleaning up
+   anything that the Emulab node self configuration might have done.
+   While you are running either FreeBSD or Linux you do the following
+   from the console:
+
+       shutdown now
+       <wait for single user root prompt>
+       cd /usr/local/etc/emulab
+       ./prepare
+       reboot
+
+   As the node reboots, catch the pxeboot prompt and boot into the admin
+   MFS.  Go back to the "Saving the customized image" step (D).
+
+
+G. Installing the images
+
+   Once you have a working image, go back to your boss and do:
+
+       mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
+
+   and record these initial images in the Emulab database using the
+   SQL INSERT commands in setup-images.sql and setup-osids.sql.
+   As the database schema occasionally changes, it is important to
+   ensure that your DB matches the INSERT commands before doing them.
+   The table formats are listed at the beginning of those files.
+
+
+
+[ XXX THIS ENDS THE INSTRUCTIONS.  THE REST OF THIS FILE IS SUPPLEMENTAL
+  MATERIAL AND NEEDS SOME WORK. ]
+
+Dealing with SCSI disks (or RAID).
+
 
 * Since we have IDE disks, it takes a little more work to create an
   image on IDE disks for a site with SCSI disks.
