@@ -140,11 +140,6 @@ sub DelaySetup()
  	if (-e $KERNELDELAY) {
  	    print DEL "sysctl -w kern.polling.enable=1\n";
  	}
-	#
-	# Turn off Flow-based IP (fast) forwarding since it causes packets 
-	# to bypass traffic shaping and ipfw. Stupid!
-	#
-	print DEL "sysctl -w net.inet.ip.fastforwarding=0\n";
 
 	$count = 69;
 	foreach $delay (@delays) {
@@ -388,6 +383,11 @@ sub LinkDelaySetup()
 	
 	print DEL "#!/bin/sh\n";
 	print DEL "ipfw -f flush\n";
+	#
+	# Turn off Flow-based IP (fast) forwarding since it causes packets 
+	# to bypass traffic shaping and ipfw. Stupid!
+	#
+	print DEL "sysctl -w net.inet.ip.fastforwarding=0\n";
 
 	foreach $delay (@delays) {
 	    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
