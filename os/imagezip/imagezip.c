@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -102,8 +102,8 @@ static SLICEMAP_PROCESS_PROTO(read_slice);
 struct slicemap fsmap[] = {
 	{ DOSPTYP_UNUSED,	"UNUSED",	0 },
 #ifdef WITH_FFS
-	{ DOSPTYP_386BSD,	"FBSD FFS",	read_bsdslice },
-	{ DOSPTYP_OPENBSD,	"OBSD FFS",	read_bsdslice },
+	{ DOSPTYP_386BSD,	"FreeBSD FFS",	read_bsdslice },
+	{ DOSPTYP_OPENBSD,	"OpenBSD FFS",	read_bsdslice },
 #endif
 #ifdef WITH_EXTFS
 	{ DOSPTYP_LINUX,	"Linux EXT",	read_linuxslice },
@@ -387,8 +387,16 @@ main(argc, argv)
 
 	if (version || info || debug) {
 		fprintf(stderr, "%s\n", build_info);
-		if (version)
+		if (version) {
+			fprintf(stderr, "Supports");
+			for (ch = 1; fsmap[ch].type != -1; ch++)
+				if (fsmap[ch].process != 0)
+					fprintf(stderr, "%c %s",
+						ch > 1 ? ',' : ':',
+						fsmap[ch].desc);
+			fprintf(stderr, "\n");
 			exit(0);
+		}
 	}
 
 	if (argc < 1 || argc > 2)

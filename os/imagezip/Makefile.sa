@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,6 +9,14 @@
 # (Standalone meaning not part of the Netbed build environment.)
 #
 BINDIR=	/usr/local/bin
+
+#
+# Which filesystems to support
+#
+WITH_EXTFS	= 1
+WITH_FFS	= 1
+WITH_FAT	= 0
+WITH_NTFS	= 0	# needs work
 
 .if defined(NOTHREADS)
 PTHREADCFLAGS	= -DNOTHREADS
@@ -19,15 +27,35 @@ PTHREADCFLAGS	= -D_THREAD_SAFE \
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 .endif
 
-CFLAGS		= -Wall -O2 -g -static
+CFLAGS		= -Wall -O2 -g -static -I.
 LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 
+.ifdef WITH_EXTFS
+FSDIRS		+= extfs
+FSOBJS		+= extfs.o
+CFLAGS		+= -DWITH_EXTFS -Iextfs
+.endif
+
+.ifdef WITH_FFS
+FSDIRS		+= ffs
+FSOBJS		+= ffs.o
+CFLAGS		+= -DWITH_FFS -Iffs
+.endif
+
+.ifdef WITH_FAT
+FSDIRS		+= fat
+FSOBJS		+= fat_fat.o fat_boot.o fat_glue.o
+CFLAGS		+= -DWITH_FAT -Ifat
+.endif
+
+.PATH:	$(FSDIRS)
+
 all:	imagezip imageunzip imagedump
 
-imagezip: imagezip.o version.o 
-	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
+imagezip: imagezip.o version.o $(FSOBJS)
+	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(LIBS) -o imagezip
 
 imageunzip: imageunzip.o crc.o version.o
 	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip

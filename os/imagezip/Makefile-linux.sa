@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,21 +10,45 @@
 #
 BINDIR=	/usr/local/bin
 
+#
+# Which filesystems to support
+#
+WITH_EXTFS	= 1
+WITH_FFS	= 1
+WITH_FAT	= 0
+WITH_NTFS	= 0	# needs work
+
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
 #PTHREADLIBS	= -L/usr/local/lib -llgcc_r
 
 # get 64-bit off_t and pread/pwrite protos
-LINUXOPTS	= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
+LINUXOPTS	= -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE \
+		  -D_XOPEN_SOURCE=500 -D_BSD_SOURCE=1
 
-CFLAGS		= -Wall -O2 -g -static $(PTHREADCFLAGS) $(LINUXOPTS)
+CFLAGS		= -Wall -O2 -g -static -I. $(PTHREADCFLAGS) $(LINUXOPTS)
 LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) -Wall
 UNZIPLIBS	= $(LIBS)
 
+ifdef WITH_EXTFS
+FSOBJS		+= extfs/extfs.o
+CFLAGS		+= -DWITH_EXTFS -Iextfs
+endif
+
+ifdef WITH_FFS
+FSOBJS		+= ffs/ffs.o
+CFLAGS		+= -DWITH_FFS -Iffs
+endif
+
+ifdef WITH_FAT
+FSOBJS		+= fat/fat_fat.o fat/fat_boot.o fat/fat_glue.o
+CFLAGS		+= -DWITH_FAT -Ifat
+endif
+
 all:	imagezip imageunzip imagedump
 
-imagezip: imagezip.o version.o 
-	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
+imagezip: imagezip.o version.o $(FSOBJS)
+	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(LIBS) -o imagezip
 
 imageunzip: imageunzip.o crc.o version.o
 	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
