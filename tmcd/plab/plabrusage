@@ -80,6 +80,8 @@ else {
 # Grab disk usage.
 #
 if (open(DF, "df -P -k -l / |")) {
+    my $du = "";
+
     # Consume all output ...
     while (<DF>) {
 	next
@@ -87,11 +89,17 @@ if (open(DF, "df -P -k -l / |")) {
 	
 	if ($_ =~ /^[-\w\.\/]+\s+\d+\s+\d+\s+\d+\s+(\d+)%\s+([-\w\.\/]+)$/) {
 	    if ($2 eq "/") {
-		$stats .= " DUSED=$1";
+		$du = " DUSED=$1";
 	    }
 	}
     }
     close(DF);
+
+    # XXX tmcd expects something to be reported
+    $du = " DUSED=100"
+	if ($du eq "");
+
+    $stats .= $du;
 }
 else {
     print STDERR "Could not start df process: !$\n";
