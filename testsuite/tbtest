@@ -316,7 +316,6 @@ sub step_init {
 	    if (! /^\|/) {next};
 	    if (/node_id/) {next;}
 	    ($node,$type,$class) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;
-	    print "node: $node type: $type\n";
 	    if (defined($want{$type}) && $want{$type} > 0) {
 		push(@{$have{$type}},$node);
 		$want{$type}--;
