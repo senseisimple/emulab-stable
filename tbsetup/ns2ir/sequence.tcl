@@ -43,6 +43,16 @@ EventSequence instproc init {s seq args} {
     set ::GLOBALS::last_class $self
 }
 
+EventSequence instproc append {event} {
+    $self instvar sim
+    $self instvar event_list
+    
+    set rc [$sim make_event "sequence" $event]
+    if {$rc != {}} {
+	lappend event_list $rc
+    }
+}
+
 EventSequence instproc rename {old new} {
     $self instvar sim
 

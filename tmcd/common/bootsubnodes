@@ -125,6 +125,38 @@ foreach my $subnode (keys(%subnodelist)) {
 	/^mote$/i && do {
 	    libsetup_setvnodeid($subnode);
 	    configtmcc("subnode", $subnode);
+	    tmcc(TMCCCMD_STATE, "BOOTING");
+	    tmcc(TMCCCMD_SUBCONFIG, undef, \@tmccresults) == 0
+		or die("*** $0:\n".
+		       "    Could not get subnode config from server!\n");
+	    my $BAUD = 0;
+	    my $CAPSERVER = "";
+	    my $CAPPORT = 0;
+	    foreach my $str (@tmccresults) {
+		chomp($str);
+	      SWITCH1: for ($str) {
+		  /^TYPE=([-\w.]+)$/ && do {
+		      if ($1 eq "mica2") {
+			  $BAUD = 57600;
+		      }
+		      last SWITCH1;
+		  };
+		  /^CAPSERVER=([-\w.]+)$/ && do {
+		      $CAPSERVER = $1;
+		      last SWITCH1;
+		  };
+		  /^CAPPORT=(\d+)$/ && do {
+		      $CAPPORT = $1;
+		      last SWITCH1;
+		  };
+		  printf STDERR "Unknown directive: $str\n";
+	      }
+	    }
+	    if (-x "$BINDIR/capture") {
+		system("$BINDIR/capture -a -s $BAUD -u '/usr/local/bin/uisp ".
+		       "-dprog=sggpio -dpart=ATmega128 --wr_fuse_e=ff ".
+		       "--erase --upload if=%s' $CAPSERVER:$CAPPORT tts/2");
+	    }
 	    tmcc(TMCCCMD_STATE, "ISUP");
 	    last SWITCH;
 	};

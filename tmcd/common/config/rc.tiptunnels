@@ -1,0 +1,139 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || PLAB() || JAILED());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my @tiptunnels;
+
+    print STDOUT "Checking Testbed tiptunnel configuration ... \n";
+
+    if (gettiptunnelconfig(\@tiptunnels)) {
+	fatal("Could not get tiptunnel configuration from libsetup!");
+    }
+
+    foreach my $tiptunnel (@tiptunnels) {
+	if (-e "/var/run/tippty.$tiptunnel.pid") {
+	    print STDOUT "Tunnel for '$tiptunnel' is already running.\n";
+	}
+	else {
+	    system("$BINDIR/tippty $tiptunnel");
+	}
+    }
+
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    my @tiptunnels;
+
+    if (gettiptunnelconfig(\@tiptunnels)) {
+	fatal("Could not get tiptunnel configuration from libsetup!");
+    }
+
+    foreach my $tiptunnel (@tiptunnels) {
+	if (-e "/var/run/tippty.$tiptunnel.pid") {
+	    system("kill `cat /var/run/tippty.$tiptunnel.pid`");
+	    unlink "/var/run/tippty.$tiptunnel.pid";
+	}
+    }
+
+    return;
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Shutdown tunnels before doing reconfig.
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}

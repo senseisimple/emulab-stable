@@ -229,7 +229,7 @@ static int do_reboot(node_agent_t na, char *nodeids)
 		warning("failed to sync log hole for node %s\n", nodeids);
 	}
 
-	printf("rebooting; %s\n", nodeids);
+	info("rebooting; %s\n", nodeids);
 
 	/* ... start the reboot. */
 	if ((retval = RPC_invoke("node.reboot",
@@ -258,21 +258,17 @@ static int do_snapshot(node_agent_t na, char *nodeids, char *args)
 
 	handle = na->na_local_agent.la_handle;
 
-	/*
-	 * Get any logs off the node(s) before we destroy them with the disk
-	 * reload, then
-	 */
 	if (systemf("loghole --port=%d --quiet sync %s",
 		    DEFAULT_RPC_PORT,
 		    nodeids) != 0) {
 		warning("failed to sync log hole for node %s\n", nodeids);
 	}
 
-	/* ... reload the default image, or */
 	if ((rc = event_arg_get(args, "IMAGE", &image_name)) < 0) {
 		warning("no image name given: %s\n", nodeids);
+
+		retval = -1;
 	}
-	/* ... a user-specified image. */
 	else {
 		image_name[rc] = '\0';
 		if ((retval = RPC_invoke("node.create_image",

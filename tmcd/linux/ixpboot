@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Startup command in rc.ixp. Use old version.
@@ -94,11 +94,6 @@ if (!$debug && (my $childpid = TBBackGround($logname))) {
 print "Starting IXP bootup at " .
   POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime()) . "\n";
 
-die("*** $0:\n".
-    "    Could not chdir to $ixpdir\n")
-    if (! -d $ixpdir ||
-	! chdir($ixpdir));
-
 # Tell the library what vnode we are messing with.
 libsetup_setvnodeid($ixpid);
 # Tell tmcc library too, although thats already been done with previous call.
@@ -124,6 +119,11 @@ if (! -e CONFDIR()) {
 if (! ixpsetup($ixpid)) {
     exit(0);
 }
+
+die("*** $0:\n".
+    "    Could not chdir to $ixpdir\n")
+    if (! -d $ixpdir ||
+	! chdir($ixpdir));
 
 #
 # Gen up a hostnames in the config dir.

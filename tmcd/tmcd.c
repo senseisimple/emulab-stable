@@ -236,6 +236,8 @@ COMMAND_PROTOTYPE(dobootlog);
 COMMAND_PROTOTYPE(dobattery);
 COMMAND_PROTOTYPE(dotopomap);
 COMMAND_PROTOTYPE(douserenv);
+COMMAND_PROTOTYPE(dotiptunnels);
+COMMAND_PROTOTYPE(dorelayconfig);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -289,14 +291,14 @@ struct command {
 	{ "state",	  FULLCONFIG_NONE, 0, dostate},
 	{ "tunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotunnels},
 	{ "vnodelist",	  FULLCONFIG_PHYS, 0, dovnodelist},
-	{ "subnodelist",  FULLCONFIG_PHYS, F_ALLOCATED, dosubnodelist},
+	{ "subnodelist",  FULLCONFIG_PHYS, 0, dosubnodelist},
 	{ "isalive",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, doisalive},
 	{ "ipodinfo",	  FULLCONFIG_NONE, 0, doipodinfo},
 	{ "ntpinfo",	  FULLCONFIG_PHYS, 0, dontpinfo},
 	{ "ntpdrift",	  FULLCONFIG_NONE, 0, dontpdrift},
 	{ "jailconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, dojailconfig},
 	{ "plabconfig",	  FULLCONFIG_VIRT, F_ALLOCATED, doplabconfig},
-	{ "subconfig",	  FULLCONFIG_NONE, F_ALLOCATED, dosubconfig},
+	{ "subconfig",	  FULLCONFIG_NONE, 0, dosubconfig},
         { "sdparams",     FULLCONFIG_PHYS, 0, doslothdparams},
         { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
         { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
@@ -318,6 +320,7 @@ struct command {
 	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
 	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
 	{ "userenv",      FULLCONFIG_NONE, F_ALLOCATED, douserenv},
+	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -3657,13 +3660,15 @@ COMMAND_PROTOTYPE(dovnodelist)
  */
 COMMAND_PROTOTYPE(dosubnodelist)
 {
-	MYSQL_RES	*res;	
+	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	res = mydb_query("select r.node_id,nt.class from reserved as r "
-			 "left join nodes as n on r.node_id=n.node_id "
+	if (vers <= 23)
+		return 0;
+
+	res = mydb_query("select n.node_id,nt.class from nodes as n "
                          "left join node_types as nt on nt.type=n.type "
                          "where nt.issubnode=1 and n.phys_nodeid='%s'",
                          2, reqp->nodeid);
@@ -4576,6 +4581,9 @@ COMMAND_PROTOTYPE(doplabconfig)
  */
 COMMAND_PROTOTYPE(dosubconfig)
 {
+	if (vers <= 23)
+		return 0;
+
 	if (!reqp->issubnode) {
 		error("SUBCONFIG: %s: Not a subnode\n", reqp->nodeid);
 		return 1;
@@ -4583,6 +4591,9 @@ COMMAND_PROTOTYPE(dosubconfig)
 
 	if (! strcmp(reqp->type, "ixp-bv")) 
 		return(doixpconfig(sock, reqp, rdata, tcp, vers));
+	
+	if (! strcmp(reqp->type, "mica2")) 
+		return(dorelayconfig(sock, reqp, rdata, tcp, vers));
 	
 	error("SUBCONFIG: %s: Invalid subnode class %s\n",
 	      reqp->nodeid, reqp->class);
@@ -5863,7 +5874,7 @@ COMMAND_PROTOTYPE(douserenv)
 			 2, reqp->pid, reqp->eid);
 
 	if (!res) {
-		error("PROGRAM: %s: DB Error getting virt_user_environment\n",
+		error("USERENV: %s: DB Error getting virt_user_environment\n",
 		      reqp->nodeid);
 		return 1;
 	}
@@ -5882,7 +5893,94 @@ COMMAND_PROTOTYPE(douserenv)
 		
 		nrows--;
 		if (verbose)
-			info("PROGAGENTS: %s", buf);
+			info("USERENV: %s", buf);
+	}
+	mysql_free_result(res);
+	return 0;
+}
+
+/*
+ * Return tip tunnels for the node.
+ */
+COMMAND_PROTOTYPE(dotiptunnels)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	res = mydb_query("select vtt.vnode,tl.server,tl.portnum,tl.keylen,"
+			 "tl.keydata "
+			 "from virt_tiptunnels as vtt "
+			 "left join reserved as r on r.vname=vtt.vnode and "
+			 "  r.pid=vtt.pid and r.eid=vtt.eid "
+			 "left join tiplines as tl on tl.node_id=r.node_id "
+			 "where vtt.pid='%s' and vtt.eid='%s' and "
+			 "vtt.host='%s'",
+			 5, reqp->pid, reqp->eid, reqp->nickname);
+
+	if (!res) {
+		error("TIPTUNNELS: %s: DB Error getting virt_tiptunnels\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		if (row[1]) {
+			OUTPUT(buf, sizeof(buf),
+			       "VNODE=%s SERVER=%s PORT=%s KEYLEN=%s KEY=%s\n",
+			       row[0], row[1], row[2], row[3], row[4]);
+			client_writeback(sock, buf, strlen(buf), tcp);
+		}
+		
+		nrows--;
+		if (verbose)
+			info("TIPTUNNELS: %s", buf);
+	}
+	mysql_free_result(res);
+	return 0;
+}
+
+COMMAND_PROTOTYPE(dorelayconfig)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	res = mydb_query("select tl.server,tl.portnum from tiplines as tl "
+			 "where tl.node_id='%s'",
+			 2, reqp->nodeid);
+
+	if (!res) {
+		error("RELAYCONFIG: %s: DB Error getting relay config\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		OUTPUT(buf, sizeof(buf),
+		       "TYPE=%s\n"
+		       "CAPSERVER=%s\n"
+		       "CAPPORT=%s\n",
+		       reqp->type, row[0], row[1]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		if (verbose)
+			info("RELAYCONFIG: %s", buf);
 	}
 	mysql_free_result(res);
 	return 0;

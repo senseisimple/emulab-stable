@@ -5,13 +5,16 @@ SUBDIR		= tip
 
 include $(OBJDIR)/Makeconf
 
-all:	tip tiptunnel console
+all:	tip tiptunnel console tippty
+client: tippty
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 SSLFLAGS = -DWITHSSL
 SSLLIBS	 = -lssl -lcrypto
+PTYLIBS  =
 SYSTEM := $(shell uname -s)
+PTYLIBS += -lutil
 ifeq ($(SYSTEM),Linux)
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 ifeq ($(NEEDKERB),0)
@@ -20,7 +23,7 @@ ifeq ($(NEEDKERB),0)
 endif
 endif
 
-CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture
+CC = gcc -g -O2 -DUSESOCKETS -I$(TESTBED_SRCDIR)/capture -I$(OBJDIR)
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
        remote.o tip.o value.o vars.o getcap.o
@@ -52,10 +55,19 @@ console.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 console: console.o
 	$(CC) -o console console.o
 
+tippty.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
+	$(CC) -DTIPPTY -o $@ -c $<
+
+tippty: tippty.o
+	$(CC) $(PTYLIBS) -o $@ $<
+
 $(OBJS): tipconf.h tip.h
 
+client-install: client
+	$(INSTALL_PROGRAM) tippty$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/tippty$(EXE)
 
 control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console
+	$(INSTALL_PROGRAM) tiptunnel $(INSTALL_DIR)/opsdir/bin/tiptunnel
 
 clean:
-	rm -f $(OBJS) tiptunnel.o console.o tip tiptunnel console
+	rm -f $(OBJS) tiptunnel.o console.o tip tiptunnel console tippty.o tippty

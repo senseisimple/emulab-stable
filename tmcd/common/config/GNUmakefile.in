@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,7 +22,8 @@ SCRIPTS		= $(addprefix $(SRCDIR)/, \
 		    rc.tunnels rc.ifconfig rc.delays rc.hostnames \
 		    rc.syncserver rc.linkagent rc.mkelab rc.localize \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
-		    rc.startcmd rc.simulator rc.topomap rc.firewall)
+		    rc.startcmd rc.simulator rc.topomap rc.firewall \
+		    rc.tiptunnels)
 
 include $(OBJDIR)/Makeconf
 

@@ -46,8 +46,8 @@ Topography instproc load_area {area} {
 
     $self set area_name $area
     # XXX Load the width/height of the floor in here.
-    $self set width 10.0
-    $self set height 10.0
+    $self set width 50.0
+    $self set height 50.0
 }
 
 Topography instproc initialized {} {
@@ -61,19 +61,27 @@ Topography instproc initialized {} {
     }
 }
 
-Topography instproc checkdest {obj x y} {
+Topography instproc checkdest {obj x y args} {
     var_import ::TBCOMPAT::obstacles
     var_import ::TBCOMPAT::cameras
     $self instvar area_name
     $self instvar width
     $self instvar height
 
+    ::GLOBALS::named-args $args {
+	-showerror 0
+    }
+
     if {$x < 0 || $x >= $width} {
-	perror "$x is out of bounds for node \"$obj\""
+	if {$(-showerror)} {
+	    perror "$x is out of bounds for node \"$obj\""
+	}
 	return 0
     }
     if {$y < 0 || $y >= $height} {
-	perror "$y is out of bounds for node \"$obj\""
+	if {$(-showerror)} {
+	    perror "$y is out of bounds for node \"$obj\""
+	}
 	return 0
     }
     
@@ -86,7 +94,9 @@ Topography instproc checkdest {obj x y} {
 	        ($x <= [expr $obstacles($id,$area_name,x2) + 0.25]) &&
 	        ($y >= [expr $obstacles($id,$area_name,y1) - 0.25]) &&
 	        ($y <= [expr $obstacles($id,$area_name,y2) + 0.25])} {
-		    perror "Destination $x,$y puts $obj in obstacle $value."
+		    if {$(-showerror)} {
+			perror "Destination $x,$y puts $obj in obstacle $value."
+		    }
 		    return 0
 	    }
 	}
@@ -107,7 +117,9 @@ Topography instproc checkdest {obj x y} {
 	}
 
 	if {$in_cam == ""} {
-	    perror "Destination $x,$y is out of view of the tracking cameras";
+	    if {$(-showerror)} {
+		perror "Destination $x,$y is out of view of the tracking cameras";
+	    }
 	    return 0
 	}
     }

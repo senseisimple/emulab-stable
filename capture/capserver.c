@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -137,6 +137,8 @@ main(int argc, char **argv)
 		unsigned char	   buf[BUFSIZ], node_id[64];
 		secretkey_t        secretkey;
 		tipowner_t	   tipown;
+		void		  *reply = &tipown;
+		size_t		   reply_size = sizeof(tipown);
 
 		if ((clientsock = accept(tcpsock,
 					 (struct sockaddr *)&client,
@@ -193,9 +195,9 @@ main(int argc, char **argv)
 		 * message in the log file. Local tip will still work but
 		 * remote tip will not.
 		 */
-		res = mydb_query("select server,node_id from tiplines "
+		res = mydb_query("select server,node_id,portnum from tiplines "
 				 "where tipname='%s'",
-				 2, whoami.name);
+				 3, whoami.name);
 		if (!res) {
 			syslog(LOG_ERR, "DB Error getting tiplines for %s!",
 			       whoami.name);
@@ -209,6 +211,8 @@ main(int argc, char **argv)
 		}
 		row = mysql_fetch_row(res);
 		strcpy(node_id, row[1]);
+		port = -1;
+		sscanf(row[2], "%d", &port);
 		mysql_free_result(res);
 
 		/*
@@ -246,15 +250,19 @@ main(int argc, char **argv)
 		}
 		mysql_free_result(res);
 
+		if (whoami.portnum == -1) {
+			reply = &port;
+			reply_size = sizeof(port);
+		}
 		/*
 		 * Update the DB.
 		 */
-		if (mydb_update("update tiplines set portnum=%d, "
-				"keylen=%d, keydata='%s' "
-				"where tipname='%s'", 
-				whoami.portnum,
-				whoami.key.keylen, whoami.key.key,
-				whoami.name)) {
+		else if (mydb_update("update tiplines set portnum=%d, "
+				     "keylen=%d, keydata='%s' "
+				     "where tipname='%s'", 
+				     whoami.portnum,
+				     whoami.key.keylen, whoami.key.key,
+				     whoami.name)) {
 			syslog(LOG_ERR, "DB Error updating tiplines for %s!",
 			       whoami.name);
 			goto done;
@@ -263,13 +271,13 @@ main(int argc, char **argv)
 		/*
 		 * And now send the reply.
 		 */
-		if ((cc = write(clientsock, &tipown, sizeof(tipown))) <= 0) {
+		if ((cc = write(clientsock, reply, reply_size)) <= 0) {
 			if (cc < 0)
 				syslog(LOG_ERR, "Writing reply: %m");
 			syslog(LOG_ERR, "Connection aborted (write)");
 			goto done;
 		}
-		if (cc != sizeof(tipown)) {
+		if (cc != reply_size) {
 			syslog(LOG_ERR, "Wrong byte count (write)!");
 			goto done;
 		}

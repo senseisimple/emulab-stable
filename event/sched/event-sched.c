@@ -44,6 +44,7 @@
 #include "simulator-agent.h"
 #include "group-agent.h"
 #include "node-agent.h"
+#include "console-agent.h"
 #include "timeline-agent.h"
 
 #define EVENT_SCHED_PATH_ENV \
@@ -140,6 +141,9 @@ main(int argc, char *argv[])
 	lnNewList(&timelines);
 	lnNewList(&sequences);
 	lnNewList(&groups);
+
+	if ((primary_simulator_agent = create_simulator_agent()) == NULL)
+		fatal("cannot allocate simulator agent");
 
 	while ((c = getopt(argc, argv, "hVrs:p:dl:k:")) != -1) {
 		switch (c) {
@@ -449,6 +453,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_NODE, node_completes },
 		{ TBDB_OBJECTTYPE_TIMELINE, run_completes },
 		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
+		{ TBDB_OBJECTTYPE_CONSOLE, NULL },
 		{ NULL, NULL }
 	};
 
@@ -766,6 +771,9 @@ AddUserEnv(char *name, char *path)
 			if ((idx = strchr(buf, '\n')) != NULL)
 				*idx = '\0';
 			if ((idx = strchr(buf, '=')) != NULL) {
+				add_report_data(primary_simulator_agent,
+						SA_RDK_CONFIG,
+						buf);
 				*idx = '\0';
 				retval = setenv(strdup(buf), idx + 1, 1);
 			}
@@ -822,15 +830,10 @@ AddAgent(event_handle_t handle,
 	}
 	
 	if (strcmp(type, TBDB_OBJECTTYPE_SIMULATOR) == 0) {
-		if ((primary_simulator_agent =
-		     create_simulator_agent()) != NULL) {
-			primary_simulator_agent->sa_local_agent.la_link.
-				ln_Name = agentp->name;
-			primary_simulator_agent->sa_local_agent.la_agent =
-			    agentp;
-			agentp->handler = &primary_simulator_agent->
-				sa_local_agent;
-		}
+		primary_simulator_agent->sa_local_agent.la_link.ln_Name =
+			agentp->name;
+		primary_simulator_agent->sa_local_agent.la_agent =agentp;
+		agentp->handler = &primary_simulator_agent->sa_local_agent;
 	}
 	else if ((strcmp(type, TBDB_OBJECTTYPE_TIMELINE) == 0) ||
 		 (strcmp(type, TBDB_OBJECTTYPE_SEQUENCE) == 0)) {
@@ -866,6 +869,16 @@ AddAgent(event_handle_t handle,
 		else {
 			na->na_local_agent.la_agent = agentp;
 			agentp->handler = &na->na_local_agent;
+		}
+	}
+	else if (strcmp(type, TBDB_OBJECTTYPE_CONSOLE) == 0) {
+		console_agent_t ca;
+		
+		if ((ca = create_console_agent()) == NULL) {
+		}
+		else {
+			ca->ca_local_agent.la_agent = agentp;
+			agentp->handler = &ca->ca_local_agent;
 		}
 	}
 

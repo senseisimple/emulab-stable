@@ -30,6 +30,7 @@ use Exporter;
 	     TMCCCMD_FIREWALLINFO TMCCCMD_EMULABCONFIG
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
 	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY TMCCCMD_USERENV
+	     TMCCCMD_TIPTUNNELS
 	     );
 
 # Must come after package declaration!
@@ -166,6 +167,7 @@ my %commandset =
       "bootlog"	        => {TAG => "bootlog"},
       "battery"	        => {TAG => "battery"},
       "userenv"	        => {TAG => "userenv"},
+      "tiptunnels"      => {TAG => "tiptunnels"},
     );
 
 #
@@ -218,6 +220,7 @@ sub TMCCCMD_BOOTERRNO   (){ $commandset{"booterrno"}->{TAG}; }
 sub TMCCCMD_BOOTLOG     (){ $commandset{"bootlog"}->{TAG}; }
 sub TMCCCMD_BATTERY     (){ $commandset{"battery"}->{TAG}; }
 sub TMCCCMD_USERENV     (){ $commandset{"userenv"}->{TAG}; }
+sub TMCCCMD_TIPTUNNELS  (){ $commandset{"tiptunnels"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

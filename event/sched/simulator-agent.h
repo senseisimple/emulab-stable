@@ -30,6 +30,7 @@ typedef enum {
 			 the experiment. */
 	SA_RDK_LOG,	/*< Log data for the tail of the report, used for
 			  machine generated data mostly. */
+	SA_RDK_CONFIG,	/*< Config data for the tail of the report. */
 
 	SA_RDK_MAX	/*< The maximum number of message types. */
 } sa_report_data_kind_t;
@@ -77,6 +78,10 @@ simulator_agent_t create_simulator_agent(void);
  * @return True.
  */
 int simulator_agent_invariant(simulator_agent_t sa);
+
+int add_report_data(simulator_agent_t sa,
+		    sa_report_data_kind_t rdk,
+		    char *data);
 
 #ifdef __cplusplus
 }

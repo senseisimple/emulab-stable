@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -30,6 +30,9 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <time.h>
+#include <assert.h>
+#include <paths.h>
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -89,8 +92,10 @@ void dolog(int level, char *format, ...);
 #define DEVNAME		"%s/%s"
 #define BUFSIZE		4096
 #define DROP_THRESH	(32*1024)
-
+#define MAX_UPLOAD_SIZE	(1 * 1024 * 1024)
 #define DEFAULT_CERTFILE PREFIX"/etc/capture.pem"
+#define DEFAULT_CLIENT_CERTFILE PREFIX"/etc/client.pem"
+#define DEFAULT_CAFILE	PREFIX"/etc/emulab.pem"
 
 char 	*Progname;
 char 	*Pidname;
@@ -100,34 +105,187 @@ char	*Ttyname;
 char	*Ptyname;
 char	*Devname;
 char	*Machine;
-int	logfd, runfd, devfd, ptyfd;
+int	logfd = -1, runfd, devfd = -1, ptyfd = -1;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0, standalone = 0;
 int	stampinterval = -1;
 sigset_t actionsigmask;
 sigset_t allsigmask;
-#ifdef  USESOCKETS
+#ifndef  USESOCKETS
+#define relay_snd 0
+#define relay_rcv 0
+#else
 char		  *Bossnode = BOSSNODE;
 struct sockaddr_in Bossaddr;
 char		  *Aclname;
 int		   serverport = SERVERPORT;
-int		   sockfd, tipactive, portnum;
+int		   sockfd, tipactive, portnum, relay_snd, relay_rcv;
+int		   upportnum = -1, upfd = -1, upfilefd = -1;
+char		   uptmpnam[64];
+size_t		   upfilesize = 0;
 struct sockaddr_in tipclient;
+struct sockaddr_in relayclient;
+struct in_addr	   relayaddr;
 secretkey_t	   secretkey;
 char		   ourhostname[MAXHOSTNAMELEN];
 int		   needshake;
 gid_t		   tipgid;
 uid_t		   tipuid;
+char		  *uploadCommand;
 
 #ifdef  WITHSSL
 
 SSL_CTX * ctx;
 SSL * sslCon;
+SSL * sslRelay;
+SSL * sslUpload;
 
 int initializedSSL = 0;
-int usingSSL = 0;
 
 const char * certfile = NULL;
+const char * cafile = NULL;
 
+int
+initializessl(void)
+{
+	static int initializedSSL = 0;
+	
+	if (initializedSSL)
+		return 0;
+	
+	SSL_load_error_strings();
+	SSL_library_init();
+	
+	ctx = SSL_CTX_new( SSLv23_method() );
+	if (ctx == NULL) {
+		dolog( LOG_NOTICE, "Failed to create context.");
+		return 1;
+	}
+	
+#ifndef PREFIX
+#define PREFIX
+#endif
+	
+	if (relay_snd) {
+		if (!cafile) { cafile = DEFAULT_CAFILE; }
+		if (SSL_CTX_load_verify_locations(ctx, cafile, NULL) == 0) {
+			die("cannot load verify locations");
+		}
+		
+		/*
+		 * Make it so the client must provide authentication.
+		 */
+		SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
+				   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+		
+		/*
+		 * No session caching! Useless and eats up memory.
+		 */
+		SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
+		
+		if (!certfile) { certfile = DEFAULT_CLIENT_CERTFILE; }
+		if (SSL_CTX_use_certificate_file( ctx,
+						  certfile,
+						  SSL_FILETYPE_PEM ) <= 0) {
+			dolog(LOG_NOTICE, 
+			      "Could not load %s as certificate file.",
+			      certfile );
+			return 1;
+		}
+		
+		if (SSL_CTX_use_PrivateKey_file( ctx,
+						 certfile,
+						 SSL_FILETYPE_PEM ) <= 0) {
+			dolog(LOG_NOTICE, 
+			      "Could not load %s as key file.",
+			      certfile );
+			return 1;
+		}
+	}
+	else {
+		if (!certfile) { certfile = DEFAULT_CERTFILE; }
+		
+		if (SSL_CTX_use_certificate_file( ctx,
+						  certfile,
+						  SSL_FILETYPE_PEM ) <= 0) {
+			dolog(LOG_NOTICE, 
+			      "Could not load %s as certificate file.",
+			      certfile );
+			return 1;
+		}
+		
+		if (SSL_CTX_use_PrivateKey_file( ctx,
+						 certfile,
+						 SSL_FILETYPE_PEM ) <= 0) {
+			dolog(LOG_NOTICE, 
+			      "Could not load %s as key file.",
+			      certfile );
+			return 1;
+		}
+	}
+		
+	initializedSSL = 1;
+
+	return 0;
+}
+
+int
+sslverify(SSL *ssl, char *requiredunit)
+{
+	X509		*peer = NULL;
+	char		cname[256], unitname[256];
+	
+	assert(ssl != NULL);
+	assert(requiredunit != NULL);
+
+	if (SSL_get_verify_result(ssl) != X509_V_OK) {
+		dolog(LOG_NOTICE,
+		      "sslverify: Certificate did not verify!\n");
+		return -1;
+	}
+	
+	if (! (peer = SSL_get_peer_certificate(ssl))) {
+		dolog(LOG_NOTICE, "sslverify: No certificate presented!\n");
+		return -1;
+	}
+
+	/*
+	 * Grab stuff from the cert.
+	 */
+	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+				  NID_organizationalUnitName,
+				  unitname, sizeof(unitname));
+
+	X509_NAME_get_text_by_NID(X509_get_subject_name(peer),
+				  NID_commonName,
+				  cname, sizeof(cname));
+	X509_free(peer);
+	
+	/*
+	 * On the server, things are a bit more difficult since
+	 * we share a common cert locally and a per group cert remotely.
+	 *
+	 * Make sure common name matches.
+	 */
+	if (strcmp(cname, BOSSNODE)) {
+		dolog(LOG_NOTICE,
+		      "sslverify: commonname mismatch: %s!=%s\n",
+		      cname, BOSSNODE);
+		return -1;
+	}
+
+	/*
+	 * If the node is remote, then the unitname must match the type.
+	 * Simply a convention. 
+	 */
+	if (strcmp(unitname, requiredunit)) {
+		dolog(LOG_NOTICE,
+		      "sslverify: unitname mismatch: %s!=Capture Server\n",
+		      unitname);
+		return -1;
+	}
+	
+	return 0;
+}
 #endif /* WITHSSL */ 
 #endif /* USESOCKETS */
 
@@ -145,7 +303,7 @@ main(int argc, char **argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
 #ifdef  WITHSSL
@@ -187,6 +345,23 @@ main(int argc, char **argv)
 			if (stampinterval < 0)
 				usage();
 			break;
+#ifdef  WITHSSL
+		case 'a':
+			relay_snd = 1;
+			break;
+			
+		case 'o':
+			relay_rcv = 1;
+			break;
+			
+		case 'u':
+			uploadCommand = optarg;
+			break;
+
+		case 'v':
+			cafile = optarg;
+			break;
+#endif
 		}
 
 	argc -= optind;
@@ -232,9 +407,11 @@ main(int argc, char **argv)
 	sa.sa_mask = allsigmask;
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
-	sa.sa_handler = reinit;
-	sa.sa_mask = actionsigmask;
-	sigaction(SIGHUP, &sa, NULL);
+	if (!relay_snd) {
+		sa.sa_handler = reinit;
+		sa.sa_mask = actionsigmask;
+		sigaction(SIGHUP, &sa, NULL);
+	}
 	if (runfile) {
 		sa.sa_handler = newrun;
 		sigaction(SIGUSR1, &sa, NULL);
@@ -242,16 +419,15 @@ main(int argc, char **argv)
 	sa.sa_handler = terminate;
 	sigaction(SIGUSR2, &sa, NULL);
 
+#ifdef HAVE_SRANDOMDEV
 	srandomdev();
+#else
+	srand(time(NULL));
+#endif
 	
 	/*
 	 * Open up run/log file, console tty, and controlling pty.
 	 */
-	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0640)) < 0)
-		die("%s: open: %s", Logname, geterr(errno));
-	if (chmod(Logname, 0640) < 0)
-		die("%s: chmod: %s", Logname, geterr(errno));
-
 	if (runfile) {
 		unlink(Runname);
 		
@@ -313,18 +489,80 @@ main(int argc, char **argv)
 
 	createkey();
 	dolog(LOG_NOTICE, "Ready! Listening on TCP port %d", portnum);
+
+	if (relay_snd) {
+		struct sockaddr_in sin;
+		struct hostent *he;
+		secretkey_t key;
+		char *port_idx;
+		int port;
+
+		if ((port_idx = strchr(argv[0], ':')) == NULL)
+			die("%s: bad format, expecting 'host:port'", argv[0]);
+		*port_idx = '\0';
+		port_idx += 1;
+		if (sscanf(port_idx, "%d", &port) != 1)
+			die("%s: bad port number", port_idx);
+		he = gethostbyname(argv[0]);
+		if (he == 0) {
+			die("gethostbyname(%s): %s",
+			    argv[0], hstrerror(h_errno));
+		}
+		bzero(&sin, sizeof(sin));
+		memcpy ((char *)&sin.sin_addr, he->h_addr, he->h_length);
+		sin.sin_family = AF_INET;
+		sin.sin_port = htons(port);
+
+		if ((ptyfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+			die("socket(): %s", geterr(errno));
+		if (connect(ptyfd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+			die("connect(): %s", geterr(errno));
+		sprintf(key.key, "RELAY %d", portnum);
+		key.keylen = strlen(key.key);
+		if (write(ptyfd, &key, sizeof(key)) != sizeof(key))
+			die("write(): %s", geterr(errno));
+		initializessl();
+		sslRelay = SSL_new(ctx);
+		if (!sslRelay)
+			die("SSL_new()");
+		if (SSL_set_fd(sslRelay, ptyfd) <= 0)
+			die("SSL_set_fd()");
+		if (SSL_connect(sslRelay) <= 0)
+			die("SSL_connect()");
+		if (sslverify(sslRelay, "Capture Server"))
+			die("SSL connection did not verify");
+		if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
+			die("fcntl(O_NONBLOCK): %s", geterr(errno));
+		tipactive = 1;
+	}
+
+	if (relay_rcv) {
+		struct hostent *he;
+
+		he = gethostbyname(argv[1]);
+		if (he == 0) {
+			die("gethostbyname(%s): %s",
+			    argv[1], hstrerror(h_errno));
+		}
+		memcpy ((char *)&relayaddr, he->h_addr, he->h_length);
+	}
 #else
 	if ((ptyfd = open(Ptyname, O_RDWR)) < 0)
 		die("%s: open: %s", Ptyname, geterr(errno));
 #endif
-	if ((devfd = open(Devname, O_RDWR|O_NONBLOCK)) < 0)
-		die("%s: open: %s", Devname, geterr(errno));
-
-	if (ioctl(devfd, TIOCEXCL, 0) < 0)
-		warning("TIOCEXCL %s: %s", Devname, geterr(errno));
-
+	
+	if (!relay_snd) {
+		if ((logfd = open(Logname,O_WRONLY|O_CREAT|O_APPEND,0640)) < 0)
+			die("%s: open: %s", Logname, geterr(errno));
+		if (chmod(Logname, 0640) < 0)
+			die("%s: chmod: %s", Logname, geterr(errno));
+	}
+	
+	if (!relay_rcv) {
+		rawmode(Devname, speed);
+	}
+	
 	writepid();
-	rawmode(speed);
 
 	capture();
 
@@ -443,7 +681,7 @@ capture(void)
 	 * I keep thinking (use threads) that there is a better way to do
 	 * this (use threads).  Hmm...
 	 */
-	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
+	if ((devfd >= 0) && (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0))
 		die("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
 #ifndef USESOCKETS
 	/*
@@ -469,17 +707,19 @@ capture(void)
 #endif /* USESOCKETS */
 
 	FD_ZERO(&sfds);
-	FD_SET(devfd, &sfds);
+	if (devfd >= 0)
+		FD_SET(devfd, &sfds);
 	fdcount = devfd;
 #ifdef  USESOCKETS
 	if (devfd < sockfd)
 		fdcount = sockfd;
 	FD_SET(sockfd, &sfds);
-#else
-	if (devfd < ptyfd)
-		fdcount = ptyfd;
-	FD_SET(ptyfd, &sfds);
 #endif	/* USESOCKETS */
+	if (ptyfd >= 0) {
+		if (devfd < ptyfd)
+			fdcount = ptyfd;
+		FD_SET(ptyfd, &sfds);
+	}
 
 	fdcount++;
 
@@ -525,10 +765,25 @@ capture(void)
 		if (FD_ISSET(sockfd, &fds)) {
 			clientconnect();
 		}
+		if ((upfd >=0) && FD_ISSET(upfd, &fds)) {
+			handleupload();
+		}
 #endif	/* USESOCKETS */
-		if (FD_ISSET(devfd, &fds)) {
+		if ((devfd >= 0) && FD_ISSET(devfd, &fds)) {
 			errno = 0;
-			cc = read(devfd, buf, sizeof(buf));
+#ifdef  WITHSSL
+			if (relay_rcv) {
+			  cc = SSL_read(sslRelay, buf, sizeof(buf));
+			  if (cc <= 0) {
+			    FD_CLR(devfd, &sfds);
+			    devfd = -1;
+			    bzero(&relayclient, sizeof(relayclient));
+			    continue;
+			  }
+			}
+			else
+#endif
+			  cc = read(devfd, buf, sizeof(buf));
 			if (cc < 0)
 				die("%s: read: %s", Devname, geterr(errno));
 			if (cc == 0)
@@ -542,7 +797,10 @@ capture(void)
 #endif
 			for (lcc = 0; lcc < cc; lcc += i) {
 #ifdef  WITHSSL
-			        if (usingSSL) {
+				if (relay_snd) {
+					i = SSL_write(sslRelay, &buf[lcc], cc-lcc);
+				}
+			        else if (sslCon != NULL) {
 				        i = SSL_write(sslCon, &buf[lcc], cc-lcc);
 					if (i < 0) { i = 0; } /* XXX Hack */
 			        } else
@@ -595,11 +853,13 @@ dropped:
 				}
 				laststamp = now;
 			}
-			i = write(logfd, buf, cc);
-			if (i < 0)
-				die("%s: write: %s", Logname, geterr(errno));
-			if (i != cc)
-				die("%s: write: incomplete", Logname);
+			if (logfd >= 0) {
+				i = write(logfd, buf, cc);
+				if (i < 0)
+					die("%s: write: %s", Logname, geterr(errno));
+				if (i != cc)
+					die("%s: write: incomplete", Logname);
+			}
 			if (runfile) {
 				i = write(runfd, buf, cc);
 				if (i < 0)
@@ -611,19 +871,32 @@ dropped:
 			sigprocmask(SIG_SETMASK, &omask, NULL);
 
 		}
-		if (FD_ISSET(ptyfd, &fds)) {
+		if ((ptyfd >= 0) && FD_ISSET(ptyfd, &fds)) {
 			int lerrno;
 
 			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 			errno = 0;
 #ifdef WITHSSL
-			if (usingSSL) {
+			if (relay_snd) {
+				cc = SSL_read( sslRelay, buf, sizeof(buf) );
+				if (cc < 0) { /* XXX hack */
+					cc = 0;
+					SSL_free(sslRelay);
+					sslRelay = NULL;
+					upportnum = -1;
+				}
+			}
+			else if (sslCon != NULL) {
 			        cc = SSL_read( sslCon, buf, sizeof(buf) );
-				if (cc < 0) { cc = 0; } /* XXX hack */
+				if (cc < 0) { /* XXX hack */
+					cc = 0;
+					SSL_free(sslCon);
+					sslCon = NULL;
+				}
 			} else
 #endif /* WITHSSL */ 
 			{
-			        cc = read(ptyfd, buf, sizeof(buf), 0);
+			        cc = read(ptyfd, buf, sizeof(buf));
 			}
 			lerrno = errno;
 			sigprocmask(SIG_SETMASK, &omask, NULL);
@@ -646,6 +919,8 @@ dropped:
 				/*
 				 * Other end disconnected.
 				 */
+				if (relay_snd)
+					die("relay receiver died");
 				dolog(LOG_INFO, "%s disconnecting",
 				      inet_ntoa(tipclient.sin_addr));
 				FD_CLR(ptyfd, &sfds);
@@ -678,7 +953,21 @@ dropped:
 
 			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
 			for (lcc = 0; lcc < cc; lcc += i) {
-				i = write(devfd, &buf[lcc], cc-lcc);
+				if (relay_rcv) {
+#ifdef USESOCKETS
+					if (sslRelay != NULL) {
+						i = SSL_write(sslRelay,
+							      &buf[lcc],
+							      cc - lcc);
+					}
+					else {
+						i = cc - lcc;
+					}
+#endif
+				}
+				else {
+					i = write(devfd, &buf[lcc], cc-lcc);
+				}
 				if (i < 0) {
 					/*
 					 * Device backed up (or FUBARed)
@@ -830,11 +1119,11 @@ terminate(int sig)
 char *optstr =
 #ifdef USESOCKETS
 #ifdef WITHSSL
-"[-c certfile] "
+"[-c certfile] [-v calist] [-u uploadcmd] "
 #endif
 "[-b bossnode] [-p bossport] [-i] "
 #endif
-"-Hdr [-s speed] [-T stampinterval]";
+"-Hdrao [-s speed] [-T stampinterval]";
 void
 usage(void)
 {
@@ -919,6 +1208,9 @@ writepid(void)
 {
 	int fd;
 	char buf[8];
+
+	if (relay_snd)
+		return;
 	
 	if ((fd = open(Pidname, O_WRONLY|O_CREAT|O_TRUNC, 0644)) < 0)
 		die("%s: open: %s", Pidname, geterr(errno));
@@ -937,10 +1229,15 @@ writepid(void)
 /*
  * Put the console line into raw mode.
  */
-rawmode(int speed)
+rawmode(char *devname, int speed)
 {
 	struct termios t;
 
+	if ((devfd = open(devname, O_RDWR|O_NONBLOCK)) < 0)
+		die("%s: open: %s", devname, geterr(errno));
+	
+	if (ioctl(devfd, TIOCEXCL, 0) < 0)
+		warning("TIOCEXCL %s: %s", Devname, geterr(errno));
 	if (tcgetattr(devfd, &t) < 0)
 		die("%s: tcgetattr: %s", Devname, geterr(errno));
 	(void) cfsetispeed(&t, speed);
@@ -1051,18 +1348,175 @@ val2speed(int val)
 int
 clientconnect(void)
 {
-	int		cc, length = sizeof(tipclient);
+	struct sockaddr_in sin;
+	int		cc, length = sizeof(sin);
+	int             dorelay = 0, doupload = 0;
 	int             ret;
 	int		newfd;
 	secretkey_t     key;
 	capret_t	capret;
+	SSL	       *newssl;
 
-	newfd = accept(sockfd, (struct sockaddr *)&tipclient, &length);
+	newfd = accept(sockfd, (struct sockaddr *)&sin, &length);
 	if (newfd < 0) {
 		dolog(LOG_NOTICE, "accept()ing new client: %s", geterr(errno));
 		return 1;
 	}
 
+	/*
+	 * Read the first part to verify the key. We must get the
+	 * proper bits or this is not a valid tip connection.
+	 */
+	if ((cc = read(newfd, &key, sizeof(key))) <= 0) {
+		close(newfd);
+		dolog(LOG_NOTICE, "%s connecting, error reading key",
+		      inet_ntoa(sin.sin_addr));
+		return 1;
+	}
+
+#ifdef WITHSSL
+	if (cc == sizeof(key) && 
+	    (0 == strncmp( key.key, "USESSL", 6 ) ||
+	     (dorelay = (0 == strncmp( key.key, "RELAY", 5 ))) ||
+	     (doupload = (0 == strncmp( key.key, "UPLOAD", 6 ))))) {
+	  /* 
+	     dolog(LOG_NOTICE, "Client %s wants to use SSL",
+		inet_ntoa(sin.sin_addr) );
+	  */
+
+	  initializessl();
+	  /*
+	  if ( write( newfd, "OKAY", 4 ) <= 0) {
+	    dolog( LOG_NOTICE, "Failed to send OKAY to client." );
+	    close( newfd );
+	    return 1;
+	  }
+	  */
+
+	  newssl = SSL_new( ctx );
+	  if (!newssl) {
+	    dolog(LOG_NOTICE, "SSL_new failed.");
+	    close(newfd);
+	    return 1;
+	  }	    
+	    
+	  if ((ret = SSL_set_fd( newssl, newfd )) <= 0) {
+	    dolog(LOG_NOTICE, "SSL_set_fd failed.");
+	    close(newfd);
+	    return 1;
+	  }
+
+	  dolog(LOG_NOTICE, "going to accept" );
+
+	  if ((ret = SSL_accept( newssl )) <= 0) {
+	    dolog(LOG_NOTICE, "%s connecting, SSL_accept error.",
+		  inet_ntoa(sin.sin_addr));
+	    ERR_print_errors_fp( stderr );
+	    SSL_free(newssl);
+	    close(newfd);
+	    return 1;
+	  }
+
+	  if (doupload) {
+	    strcpy(uptmpnam, _PATH_TMP "capture.upload.XXXXXX");
+	    if (upfd >= 0 || !relay_snd || !uploadCommand) {
+	      dolog(LOG_NOTICE, "%s upload already connected.",
+		    inet_ntoa(sin.sin_addr));
+	      SSL_free(newssl);
+	      close(newfd);
+	      return 1;
+	    }
+	    else if (sslverify(newssl, "Capture Server")) {
+	      SSL_free(newssl);
+	      close(newfd);
+	      return 1;
+	    }
+	    else if ((upfilefd = mkstemp(uptmpnam)) < 0) {
+	      dolog(LOG_NOTICE, "failed to create upload file");
+	      printf(" %s\n", uptmpnam);
+	      perror("mkstemp");
+	      SSL_free(newssl);
+	      close(newfd);
+	      return 1;
+	    }
+	    else {
+	      upfd = newfd;
+	      upfilesize = 0;
+	      FD_SET(upfd, &sfds);
+	      if (upfd >= fdcount) {
+		fdcount = upfd;
+		fdcount += 1;
+	      }
+	      sslUpload = newssl;
+	      if (fcntl(upfd, F_SETFL, O_NONBLOCK) < 0)
+		die("fcntl(O_NONBLOCK): %s", geterr(errno));
+	      return 0;
+	    }
+	  }
+	  else if (dorelay) {
+	    if (devfd >= 0) {
+	      dolog(LOG_NOTICE, "%s relay already connected.",
+		    inet_ntoa(sin.sin_addr));
+	      SSL_free(newssl);
+	      shutdown(newfd, SHUT_RDWR);
+	      close(newfd);
+	      return 1;
+	    }
+	    else if (memcmp(&relayaddr,
+			    &sin.sin_addr,
+			    sizeof(relayaddr)) != 0) {
+	      dolog(LOG_NOTICE, "%s is not the relay host.",
+		    inet_ntoa(sin.sin_addr));
+	      SSL_free(newssl);
+	      shutdown(newfd, SHUT_RDWR);
+	      close(newfd);
+	      return 1;
+	    }
+	    else {
+	      relayclient = sin;
+	      devfd = newfd;
+	      sscanf(key.key, "RELAY %d", &upportnum);
+	      FD_SET(devfd, &sfds);
+	      if (devfd >= fdcount) {
+		fdcount = devfd;
+		fdcount += 1;
+	      }
+	      sslRelay = newssl;
+	      if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0)
+		die("fcntl(O_NONBLOCK): %s", geterr(errno));
+	      createkey();
+	      return 0;
+	    }
+	  }
+	  else if (!tipactive) {
+	    sslCon = newssl;
+	    tipclient = sin;
+	    ptyfd = newfd;
+	    dolog(LOG_NOTICE, "going to read key" );
+	    if ((cc = SSL_read(newssl, (void *)&key, sizeof(key))) <= 0) {
+	      ret = cc;
+	      close(newfd);
+	      dolog(LOG_NOTICE, "%s connecting, error reading capturekey.",
+		    inet_ntoa(sin.sin_addr));
+	      /*
+		{
+		FILE * foo = fopen("/tmp/err.txt", "w");
+		ERR_print_errors_fp( foo );
+		fclose( foo );
+		}
+	      */
+	      close(ptyfd);
+	      return 1;
+	    }
+	  }
+
+	  dolog(LOG_NOTICE, "got key" );
+	}
+	else if (!tipactive) {
+		tipclient = sin;
+		ptyfd = newfd;
+	}
+#endif /* WITHSSL */
 	/*
 	 * Is there a better way to do this? I suppose we
 	 * could shut the main socket down, and recreate
@@ -1081,118 +1535,6 @@ clientconnect(void)
 		close(newfd);
 		return 1;
 	}
-	ptyfd = newfd;
-
-	/*
-	 * Read the first part to verify the key. We must get the
-	 * proper bits or this is not a valid tip connection.
-	 */
-	if ((cc = read(ptyfd, &key, sizeof(key))) <= 0) {
-		close(ptyfd);
-		dolog(LOG_NOTICE, "%s connecting, error reading key",
-		      inet_ntoa(tipclient.sin_addr));
-		return 1;
-	}
-
-#ifdef WITHSSL
-	usingSSL = 0;
-
-	if (cc == sizeof(key) && 
-	    0 == strncmp( key.key, "USESSL", 6 )) {
-	  usingSSL = 1;
-	  /* 
-	     dolog(LOG_NOTICE, "Client %s wants to use SSL",
-		inet_ntoa(tipclient.sin_addr) );
-	  */
-
-	  if (!initializedSSL) {
-	    SSL_load_error_strings();
-	    SSL_library_init();
-
-	    ctx = SSL_CTX_new( SSLv23_method() );
-	    if (ctx == NULL) {
-	      dolog( LOG_NOTICE, "Failed to create context.");
-	      close( ptyfd );
-	      return 1;
-	    }
-
-#ifndef PREFIX
-#define PREFIX
-#endif
-
-	    if (!certfile) { certfile = DEFAULT_CERTFILE; }
-
-	    if (SSL_CTX_use_certificate_file( ctx, certfile, SSL_FILETYPE_PEM )
-		<= 0) {
-	      dolog(LOG_NOTICE, 
-		    "Could not load %s as certificate file.",
-		    certfile );
-	      close(ptyfd);
-	      return 1;
-	    }
-
-	    if (SSL_CTX_use_PrivateKey_file( ctx, certfile, SSL_FILETYPE_PEM )
-		<= 0) {
-	      dolog(LOG_NOTICE, 
-		    "Could not load %s as key file.",
-		    certfile );
-	      close(ptyfd);
-	      return 1;
-	    }
-
-	    initializedSSL = 1;
-	  }
-	  /*
-	  if ( write( ptyfd, "OKAY", 4 ) <= 0) {
-	    dolog( LOG_NOTICE, "Failed to send OKAY to client." );
-	    close( ptyfd );
-	    return 1;
-	  }
-	  */
-
-	  sslCon = SSL_new( ctx );
-	  if (!sslCon) {
-	    dolog(LOG_NOTICE, "SSL_new failed.");
-	    close(ptyfd);
-	    return 1;
-	  }	    
-	    
-	  if ((ret = SSL_set_fd( sslCon, ptyfd )) <= 0) {
-	    dolog(LOG_NOTICE, "SSL_set_fd failed.");
-	    close(ptyfd);
-	    return 1;
-	  }
-
-	  dolog(LOG_NOTICE, "going to accept" );
-
-	  if ((ret = SSL_accept( sslCon )) <= 0) {
-	    dolog(LOG_NOTICE, "%s connecting, SSL_accept error.",
-		  inet_ntoa(tipclient.sin_addr));
-	    goto sslerror;
-	  }
-
-	  dolog(LOG_NOTICE, "going to read key" );
-
-	  if ((cc = SSL_read(sslCon, (void *)&key, sizeof(key))) <= 0) {
-	    ret = cc;
-	    close(ptyfd);
-	    dolog(LOG_NOTICE, "%s connecting, error reading capturekey.",
-		  inet_ntoa(tipclient.sin_addr));
-	  sslerror:
-	    /*
-	    {
-	      FILE * foo = fopen("/tmp/err.txt", "w");
-	      ERR_print_errors_fp( foo );
-	      fclose( foo );
-	    }
-	    */
-	    close(ptyfd);
-	    return 1;
-	  }
-
-	  dolog(LOG_NOTICE, "got key" );
-	}
-#endif /* WITHSSL */
 	/* Verify size of the key is sane */
 	if (cc != sizeof(key) ||
 	    key.keylen != strlen(key.key) ||
@@ -1202,7 +1544,7 @@ clientconnect(void)
 		 */
 		capret = CAPNOPERM;
 #ifdef WITHSSL
-		if (usingSSL) {
+		if (sslCon != NULL) {
 		    if ((cc = SSL_write(sslCon, (void *)&capret, sizeof(capret))) <= 0) {
 		        dolog(LOG_NOTICE, "%s connecting, error perm status",
 			      inet_ntoa(tipclient.sin_addr));
@@ -1226,12 +1568,13 @@ clientconnect(void)
 	dolog(LOG_INFO, "Key: %d: %s",
 	      secretkey.keylen, secretkey.key);
 #endif
+
 	/*
 	 * Tell the other side that all is okay.
 	 */
 	capret = CAPOK;
 #ifdef WITHSSL
-	if (usingSSL) {
+	if (sslCon != NULL) {
 	    if ((cc = SSL_write(sslCon, (void *)&capret, sizeof(capret))) <= 0) {
 		close(ptyfd);
 		dolog(LOG_NOTICE, "%s connecting, error writing status",
@@ -1266,6 +1609,49 @@ clientconnect(void)
 	return 0;
 }
 
+int
+handleupload(void)
+{
+	int		drop = 0, rc, retval = 0;
+	char		buffer[BUFSIZE];
+
+	if ((rc = SSL_read(sslUpload, buffer, sizeof(buffer))) < 0) {
+		if ((errno != EINTR) && (errno != EAGAIN)) {
+			drop = 1;
+		}
+	}
+	else if ((upfilesize + rc) > MAX_UPLOAD_SIZE) {
+		dolog(LOG_NOTICE, "upload to large");
+		drop = 1;
+	}
+	else if (rc == 0) {
+		snprintf(buffer, sizeof(buffer), uploadCommand, uptmpnam);
+		dolog(LOG_NOTICE, "upload done");
+		drop = 1;
+		close(devfd);
+		/* XXX run uisp */
+		system(buffer);
+		rawmode(Devname, speed);
+	}
+	else {
+		write(upfilefd, buffer, rc);
+		upfilesize += rc;
+	}
+
+	if (drop) {
+		SSL_free(sslUpload);
+		sslUpload = NULL;
+		FD_CLR(upfd, &sfds);
+		close(upfd);
+		upfd = -1;
+		close(upfilefd);
+		upfilefd = -1;
+		unlink(uptmpnam);
+	}
+	
+	return retval;
+}
+
 /*
  * Generate our secret key and write out the file that local tip uses
  * to do a secure connect.
@@ -1276,6 +1662,9 @@ createkey(void)
 	int			cc, i, fd;
 	unsigned char		buf[BUFSIZ];
 	FILE		       *fp;
+
+	if (relay_snd)
+		return 1;
 
 	/*
 	 * Generate the key. Should probably generate a random
@@ -1343,6 +1732,10 @@ createkey(void)
 
 	fprintf(fp, "host:   %s\n", ourhostname);
 	fprintf(fp, "port:   %d\n", portnum);
+	if (upportnum > 0) {
+		fprintf(fp, "uphost: %s\n", inet_ntoa(relayaddr));
+		fprintf(fp, "upport: %d\n", upportnum);
+	}
 	fprintf(fp, "keylen: %d\n", secretkey.keylen);
 	fprintf(fp, "key:    %s\n", secretkey.key);
 	fclose(fp);
@@ -1384,7 +1777,7 @@ handshake(void)
 	/*
 	 * In standalone, do not contact the capserver.
 	 */
-	if (standalone)
+	if (standalone || relay_snd)
 		return err;
 
 	/*
@@ -1420,7 +1813,7 @@ handshake(void)
 	 * number does not matter.
 	 */
 	if (bindresvport(sock, NULL) < 0) {
-		warnc("Could not bind reserved port");
+		warning("Could not bind reserved port");
 		close(sock);
 		return -1;
 	}

@@ -130,7 +130,11 @@ my %virtual_tables =
      "firewall_rules"		=> { rows  => undef, 
 				     tag   => "firewall_rules",
 				     row   => "firewall_rule",
-				     attrs => [ "fwname", "ruleno", "rule" ]}
+				     attrs => [ "fwname", "ruleno", "rule" ]},
+     "virt_tiptunnels"		=> { rows  => undef, 
+				     tag   => "tiptunnels",
+				     row   => "tiptunnel",
+				     attrs => [ "host", "vnode" ]}
      );
 
 # XXX

@@ -115,9 +115,9 @@ int simulator_agent_invariant(simulator_agent_t sa)
 	return 1;
 }
 
-static int add_report_data(simulator_agent_t sa,
-			   sa_report_data_kind_t rdk,
-			   char *data)
+int add_report_data(simulator_agent_t sa,
+		    sa_report_data_kind_t rdk,
+		    char *data)
 {
 	char *new_data;
 	int retval;
@@ -228,7 +228,8 @@ static int do_modify(simulator_agent_t sa, int token, char *args)
 
 static void dump_report_data(FILE *file,
 			     simulator_agent_t sa,
-			     sa_report_data_kind_t srdk)
+			     sa_report_data_kind_t srdk,
+			     int clear)
 {
 	assert(file != NULL);
 	assert(sa != NULL);
@@ -272,7 +273,8 @@ static int send_report(simulator_agent_t sa, char *args)
 		error("failed to sync log holes\n");
 	}
 	
-	if ((file = popenf("mail -s \"%s: %s experiment report\" %s",
+	if ((file = popenf("tee logs/report.mail | "
+			   "mail -s \"%s: %s experiment report\" %s",
 			   "w",
 			   OURDOMAIN,
 			   pideid,
@@ -288,7 +290,7 @@ static int send_report(simulator_agent_t sa, char *args)
 		retval = 0;
 
 		/* Dump user supplied stuff first, */
-		dump_report_data(file, sa, SA_RDK_MESSAGE);
+		dump_report_data(file, sa, SA_RDK_MESSAGE, 1);
 
 		/* ... run the user-specified log digester, then */
 		if ((rc = event_arg_get(args, "DIGESTER", &digester)) > 0) {
@@ -331,8 +333,10 @@ static int send_report(simulator_agent_t sa, char *args)
 
 			fprintf(file, "loghole-archive: %s\n\n", buf);
 		}
+
+		dump_report_data(file, sa, SA_RDK_CONFIG, 0);
 		
-		dump_report_data(file, sa, SA_RDK_LOG);
+		dump_report_data(file, sa, SA_RDK_LOG, 1);
 		
 		/* ... dump the error records. */
 		if (dump_error_records(&error_records, file) != 0) {
@@ -349,6 +353,21 @@ static int send_report(simulator_agent_t sa, char *args)
 
 	assert(lnEmptyList(&error_records));
 	
+	return retval;
+}
+
+static int do_reset(simulator_agent_t sa, char *args)
+{
+	int retval = 0;
+
+	assert(sa != NULL);
+	assert(args != NULL);
+
+	if (systemf("loghole --port=%d --quiet clean",
+		    DEFAULT_RPC_PORT) != 0) {
+		error("failed to clean log holes\n");
+	}
+
 	return retval;
 }
 
@@ -418,6 +437,9 @@ static void *simulator_agent_looper(void *arg)
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_REPORT) == 0) {
 				send_report(sa, argsbuf);
+			}
+			else if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0) {
+				do_reset(sa, argsbuf);
 			}
 			else {
 				error("cannot handle SIMULATOR event %s.",

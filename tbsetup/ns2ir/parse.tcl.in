@@ -352,6 +352,7 @@ source ${GLOBALS::libdir}/event.tcl
 source ${GLOBALS::libdir}/firewall.tcl
 source ${GLOBALS::libdir}/timeline.tcl
 source ${GLOBALS::libdir}/sequence.tcl
+source ${GLOBALS::libdir}/console.tcl
 source ${GLOBALS::libdir}/topography.tcl
 
 ##################################################

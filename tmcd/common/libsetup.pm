@@ -19,7 +19,7 @@ use Exporter;
 	 check_nickname	bootsetup startcmdstatus whatsmynickname 
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
-	 ixpsetup libsetup_refresh gettopomap getfwconfig
+	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -45,7 +45,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 23; };
+sub TMCD_VERSION()	{ 24; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -847,6 +847,49 @@ sub gettunnelconfig($)
 	}
     }
     @$rptr = @tunnels;
+    return 0;
+}
+
+#
+# Get tiptunnels configuration.
+#
+sub gettiptunnelconfig($)
+{
+    my ($rptr)   = @_;
+    my @tiptunnels = ();
+
+    if (tmcc(TMCCCMD_TIPTUNNELS, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get tiptunnel config from server!\n");
+	return -1;
+    }
+
+    my $pat  = q(VNODE=([-\w.]+) SERVER=([-\w.]+) PORT=(\d+) );
+    $pat    .= q(KEYLEN=(\d+) KEY=([-\w.]+));
+
+    my $ACLDIR = "/var/log/tiplogs";
+
+    mkdir("$ACLDIR", 0755);
+    foreach my $str (@tmccresults) {
+	if ($str =~ /$pat/) {
+	    if (!open(ACL, "> $ACLDIR/$1.acl")) {
+		warn("*** WARNING: ".
+		     "gettiptunnelconfig: Could not open $ACLDIR/$1.acl\n");
+		return -1;
+	    }
+
+	    print ACL "host: $2\n";
+	    print ACL "port: $3\n";
+	    print ACL "keylen: $4\n";
+	    print ACL "key: $5\n";
+	    close(ACL);
+
+	    push(@tiptunnels, $1);
+	}
+	else {
+	    warn("*** WARNING: Bad tiptunnels line: $str\n");
+	}
+    }
+    @$rptr = @tiptunnels;
     return 0;
 }
 

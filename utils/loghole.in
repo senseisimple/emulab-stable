@@ -45,7 +45,7 @@ EXPDIR_FMT = os.path.join("/", DIRS["proj"], "%(PID)s", "exp", "%(EID)s")
 
 GLOBAL_LOGS = [
     "event-sched.log", "feedback.log", "../tbdata/feedback_data.tcl",
-    "digest.out"
+    "digest.out", "report.mail"
     ]
 
 PID = None
@@ -729,6 +729,10 @@ def do_show(args):
                 print "  Keep-until:\t\t%s" % cp.get("MAIN", "keep-until")
                 print ("  Keep-atleast:\t\t%s days" %
                        cp.get("MAIN", "keep-atleast"))
+                if "report.mail" in lh.namelist():
+                    print "Report:"
+                    print lh.read("report.mail")
+                    pass
                 for name in lh.namelist():
                     if re.match(r'loghole-comment.*\.txt', name):
                         before = 38 - (len(name) / 2)

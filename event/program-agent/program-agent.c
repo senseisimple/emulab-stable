@@ -182,6 +182,8 @@ static void	start_program(struct proginfo *pinfo,
 			      unsigned long token,
 			      char *args);
 
+static void	set_program(struct proginfo *pinfo, char *args);
+
 /**
  * Stop a running program.
  *
@@ -825,10 +827,38 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	else if (strcmp(event, TBDB_EVENTTYPE_KILL) == 0) {
 		signal_program(pinfo, args);
 	}
+	else if (strcmp(event, TBDB_EVENTTYPE_MODIFY) == 0) {
+		set_program(pinfo, args);
+	}
 	else {
 		error("Invalid event: %s\n", event);
 		return;
 	}
+}
+
+static char *fileext(char *path)
+{
+    int has_token = 0, lpc, len;
+    char *retval = NULL;
+    
+    assert(path != NULL);
+
+    len = strlen(path);
+    for (lpc = len - 1; lpc > 0; lpc--) {
+	if (path[lpc] == '.') {
+	    if (has_token) {
+		retval = &path[lpc + 1];
+	    }
+	    else if (sscanf(&path[lpc + 1], "%*d") == 1) {
+		has_token = 1;
+	    }
+	    else {
+		retval = &path[lpc + 1];
+	    }
+	}
+    }
+
+    return retval;
 }
 
 static void
@@ -880,20 +910,17 @@ start_callback(event_handle_t handle,
 			char path[1024];
 
 			while ((de = readdir(dir)) != NULL) {
-				unsigned int token = 0;
-				char ext[16];
+				char *ext = NULL;
 
 				if ((strlen(de->d_name) < sizeof(path)) &&
-				    ((sscanf(de->d_name,
-					     "%[^.].%u.%16s",
-					     path, &token, ext) == 3) ||
-				     (sscanf(de->d_name,
-					     "%[^.].%16s",
-					     path, ext) == 2)) &&
+				    (sscanf(de->d_name,
+					    "%1024[^.].",
+					    path) == 1) &&
 				    (find_agent(path) != NULL) &&
-				    ((strcmp(ext, "out") == 0) ||
-				     (strcmp(ext, "err") == 0) ||
-				     (strcmp(ext, "status") == 0))) {
+				    ((ext = fileext(de->d_name)) != NULL) &&
+				    ((strncmp(ext, "out", 3) == 0) ||
+				     (strncmp(ext, "err", 3) == 0) ||
+				     (strncmp(ext, "status", 6) == 0))) {
 					snprintf(path,
 						 sizeof(path),
 						 "%s/%s",
@@ -940,16 +967,16 @@ open_logfile(struct proginfo *pinfo, const char *type)
 	 * agent name, the event token, and the type (e.g. out, err).
 	 */
 	snprintf(buf, sizeof(buf),
-		 "%s/%s.%lu.%s",
-		 LOGDIR, pinfo->name, pinfo->token, type);
+		 "%s/%s.%s.%lu",
+		 LOGDIR, pinfo->name, type, pinfo->token);
 	if ((retval = open(buf, O_WRONLY|O_CREAT|O_APPEND, 0640)) >= 0) {
 		/*
 		 * We've successfully created the file, now create the
 		 * symlinks to that refer to the last run and a tagged run.
 		 */
 		snprintf(buf, sizeof(buf),
-			 "./%s.%lu.%s",
-			 pinfo->name, pinfo->token, type);
+			 "./%s.%s.%lu",
+			 pinfo->name, type, pinfo->token);
 		snprintf(buf2, sizeof(buf2),
 			 "%s/%s.%s",
 			 LOGDIR, pinfo->name, type);
@@ -968,16 +995,11 @@ open_logfile(struct proginfo *pinfo, const char *type)
 }
 
 static void
-start_program(struct proginfo *pinfo, unsigned long token, char *args)
+set_program(struct proginfo *pinfo, char *args)
 {
-	int		pid, in_fd, out_fd = -1, err_fd = -1;
+	assert(pinfo != NULL);
+	assert(args != NULL);
 	
-	if (pinfo->pid != 0) {
-		warning("start_program: %s is still running: %d\n",
-			pinfo->name, pinfo->pid);
-		return;
-	}
-
 	/*
 	 * The args string holds the command line to execute. We allow
 	 * this to be reset in dynamic events, but is optional; the cuurent
@@ -1043,17 +1065,30 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 			value = NULL;
 		}
 	}
+}
+
+static void
+start_program(struct proginfo *pinfo, unsigned long token, char *args)
+{
+	int		pid, in_fd, out_fd = -1, err_fd = -1;
+	
+	if (pinfo->pid != 0) {
+		warning("start_program: %s is still running: %d\n",
+			pinfo->name, pinfo->pid);
+		return;
+	}
+
+	set_program(pinfo, args);
 
 	gettimeofday(&pinfo->started, NULL);
 	pinfo->token = token;
-
 
 	if ((pinfo->timeout > 0) &&
 	    (pinfo->timeout_handle =
 	     elvin_sync_add_timeout(NULL,
 				    pinfo->timeout * 1000,
 				    timeout_callback,
-					 pinfo,
+				    pinfo,
 				    elvin_error)) == NULL) {
 		error("Could not add timeout for %s!", pinfo->name);
 	}
@@ -1525,13 +1560,16 @@ child_callback(elvin_io_handler_t handler,
 				}
 			}
 			else {
-				exit_code = status;
+				if (status == pi->expected_exit_code)
+					exit_code = 0;
+				else
+					exit_code = status;
 			}
 
 			/* Dump a status file and */
 			snprintf(path,
 				 sizeof(path),
-				 "%s/%s.%lu.status",
+				 "%s/%s.status.%lu",
 				 LOGDIR,
 				 pi->name,
 				 pi->token);
@@ -1580,6 +1618,11 @@ child_callback(elvin_io_handler_t handler,
 					ru.ru_maxrss);
 				fclose(file);
 			}
+			snprintf(path,
+				 sizeof(path),
+				 "./%s.status.%lu",
+				 pi->name,
+				 pi->token);
 			snprintf(path2,
 				 sizeof(path),
 				 "%s/%s.status",
@@ -1591,7 +1634,7 @@ child_callback(elvin_io_handler_t handler,
 				snprintf(path2,
 					 sizeof(path),
 					 "%s/%s.%s.status",
-					 LOGDIR, pi->tag, pi->name);
+					 LOGDIR, pi->name, pi->tag);
 				unlink(path2);
 				symlink(path, path2);
 			}

@@ -57,6 +57,8 @@ AC_PATH_PROG(JAR,jar)
 
 AC_CHECK_TOOL(SSH,ssh)
 
+AC_CHECK_FUNCS(srandomdev)
+
 AC_SUBST(optional_subdirs)
 
 #
@@ -751,7 +753,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
-	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower \
+	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
 	robots/mtp/GNUmakefile robots/emc/GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \

@@ -37,6 +37,8 @@ my $UISP   = "$TB/bin/uisp";
 my $SGUISP = "/usr/local/bin/uisp";
 my $SSHTB  = "$TB/bin/sshtb";
 my $POWER  = "$TB/bin/power";
+my $TIP    = "$TB/bin/tiptunnel";
+my $USERS  = "@USERNODE@";
 my $DEBUG  = 1;
 
 #
@@ -188,8 +190,15 @@ MOTE: foreach my $mote (@motes) {
 	next MOTE;
     }
     if ($host eq $mote) {
-	warn "Error - no host found for $mote - skipping\n";
-	$errors++;
+	print "Uploading code to $mote\n";
+	my $commandstr = "$SSHTB -host $USERS $TIP -u $UID -l $mote - < $filename";
+	my $OLDUID = $UID;
+	$UID = $EUID;
+	if (system($commandstr)) {
+	    $errors++;
+	    warn "Failed to upload code to $mote";
+	}
+	$UID = $OLDUID;
 	next MOTE;
     }
     my ($hosttype, $hostclass) = TBNodeType($host);

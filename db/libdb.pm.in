@@ -3144,6 +3144,7 @@ sub TBRobotLabExpt($$)
 		   "event_groups",
 		   "firewalls",
 		   "firewall_rules",
+		   "virt_tiptunnels",
 		   "ipsubnets",
 		   "nsfiles");
 

@@ -114,6 +114,8 @@ ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client
 endif
 	@$(MAKE) -C os client
+	@$(MAKE) -C capture client
+	@$(MAKE) -C tip client
 	@$(MAKE) -C sensors client
 	@$(MAKE) -C tmcd client
 
@@ -122,6 +124,8 @@ ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
 endif
 	@$(MAKE) -C os client-install
+	@$(MAKE) -C capture client-install
+	@$(MAKE) -C tip client-install
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 

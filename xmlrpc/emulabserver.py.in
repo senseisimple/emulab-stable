@@ -108,7 +108,10 @@ virtual_tables = {
                                     "attrs" : [ "vname" ]},
     "eventlist"                 : { "rows"  : None, 
                                     "tag"   : "events",
-                                    "attrs" : [ "vname" ]}
+                                    "attrs" : [ "vname" ]},
+    "virt_tiptunnels"           : { "rows"  : None,
+                                    "tag"   : "tiptunnels",
+                                    "attrs" : [ "host", "vnode" ]},
     }
     
 # Base class for emulab specific exceptions.
@@ -414,6 +417,7 @@ class emulab:
                 ob["y2"] = ob["y2"] / ppm
                 ob["z2"] = ob["z2"] / ppm
                 pass
+            scrubdict(ob)
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
@@ -1624,7 +1628,8 @@ class experiment:
                     tmp["load_15min"] = res[9]
                     pass
                 tmp["erole"] = res[11]
-                mapping[res[0]] = tmp
+                mapping[res[0]] = scrubdict(tmp,
+                                            defaultvals={ "status" : "up" })
                 pass
             pass
 
@@ -2573,7 +2578,10 @@ class experiment:
                 if not ipres or len(ipres) == 0:
                     continue
 
-                ipaddr = ipres[0][0];
+                ipaddr = ipres[0][0]
+                if not ipaddr:
+                    ipaddr = ""
+                    pass
                 nodeid = agent[2]
                 pass 
             
@@ -3845,7 +3853,7 @@ def nfspath(value):
 #
 def scrubdict(retval, prunelist=[], defaultvals={}):
     for key in retval.keys():
-        if not retval[key] or key in prunelist:
+        if (retval[key] == None) or key in prunelist:
             if key in defaultvals:
                 retval[key] = defaultvals[key]
                 pass

@@ -78,6 +78,12 @@ Simulator instproc init {args} {
     $self instvar sequence_list;
     array set sequence_list {}
 
+    $self instvar console_list;
+    array set console_list {}
+
+    $self instvar tiptunnel_list;
+    set tiptunnel_list {}
+
     var_import ::GLOBALS::last_class
     set last_class $self
 
@@ -319,6 +325,8 @@ Simulator instproc run {} {
     $self instvar firewall_list
     $self instvar timeline_list
     $self instvar sequence_list
+    $self instvar console_list
+    $self instvar tiptunnel_list
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -502,6 +510,12 @@ Simulator instproc run {} {
     foreach seq [array names sequence_list] {
 	$seq updatedb "sql"
     }
+    foreach con [array names console_list] {
+	$con updatedb "sql"
+    }
+    foreach tt $tiptunnel_list {
+	$self spitxml_data "virt_tiptunnels" [list "host" "vnode"] $tt
+    }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
     set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $veth_encapsulate $fix_current_resources]
@@ -616,6 +630,25 @@ Simulator instproc attach-agent {node agent} {
 # connect <src> <dst>
 # Connects two agents together.
 Simulator instproc connect {src dst} {
+    $self instvar tiptunnel_list
+
+    if {([$src info class Node] && [$dst info class Console]) ||
+	([$src info class Console] && [$dst info class Node])} {
+	if {[$src info class Node] && [$dst info class Console]} {
+	    set node $src
+	    set con $dst
+	} else {
+	    set node $dst
+	    set con $src
+	}
+	if {[$con set connected]} {
+	    perror "\[connect] $con is already connected"
+	    return
+	}
+	$con set connected 1
+	lappend tiptunnel_list [list $node [$con set node]]
+	return
+    }
     set error 0
     if {! [$src info class Agent]} {
 	perror "\[connect] $src is not an Agent."
@@ -784,6 +817,12 @@ Simulator instproc rename_sequence {old new} {
     set sequence_list($new) {}
 }
 
+Simulator instproc rename_console {old new} {
+    $self instvar console_list
+    unset console_list($old)
+    set console_list($new) {}
+}
+
 # find_link <node1> <node2>
 # This is just an accesor to the link_map datastructure.  If no
 # link is known between <node1> and <node2> the empty list is returned.
@@ -944,6 +983,13 @@ Simulator instproc add_program {prog} {
 Simulator instproc add_eventgroup {group} {
     $self instvar eventgroup_list
     set eventgroup_list($group) {}
+}
+
+# add_console
+# Link to a Console object.
+Simulator instproc add_console {console} {
+    $self instvar console_list
+    set console_list($console) {}
 }
 
 # add_firewall
@@ -1176,12 +1222,12 @@ Simulator instproc make_event {outer event} {
 		    }
 		    set x [lindex $evargs 0]
 		    set y [lindex $evargs 1]
-		    if {! [$topo checkdest $self $x $y]} {
+		    if {! [$topo checkdest $self $x $y -showerror 1]} {
 			return
 		    }
 		    set speed [lindex $evargs 2]
-		    if {$speed != 0.0 && $speed != 0.1} {
-			perror "Speed is currently locked at 0.0 or 0.1"
+		    if {$speed != 0.0 && ($speed < 0.1) && ($speed > 0.4)} {
+			perror "Speed is currently locked at 0.0 or 0.1-0.4"
 			return
 		    }
 		    ::GLOBALS::named-args [lrange $evargs 3 end] {
@@ -1257,8 +1303,16 @@ Simulator instproc make_event {outer event} {
 	    }
 	    
 	    switch -- $cmd {
+		"set" -
 		"run" {
-		    set etype RUN
+		    switch -- $cmd {
+			"set" {
+			    set etype MODIFY
+			}
+			"run" {
+			    set etype RUN
+			}
+		    }
 		    if {[$obj info class] == "EventGroup"} {
 			set default_command {}
 		    } else {
@@ -1314,6 +1368,25 @@ Simulator instproc make_event {outer event} {
 		unknown {
 		    punsup "$obj $cmd $args"
 		    return
+		}
+	    }
+	}
+	"Console" {
+	    set otype CONSOLE
+	    set vname $obj
+
+	    switch -- $cmd {
+		"start" {
+		    set etype START
+		}
+		"stop" {
+		    set etype STOP
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: $obj $cmd $evargs"
+			return
+		    }
+		    set arg [lindex $event 2]
+		    set args "FILE=$arg"
 		}
 	    }
 	}
@@ -1376,6 +1449,11 @@ Simulator instproc make_event {outer event} {
 		    if {$(-digester) != {}} {
 			set args "DIGESTER={$(-digester)}"
 		    }
+		}
+		"cleanlogs" {
+		    set otype SIMULATOR
+		    set etype RESET
+		    set args "ASPECT=LOGHOLE"
 		}
 		unknown {
 		    punsup "$obj $cmd $evargs"

@@ -361,6 +361,14 @@ sub doboot()
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
 	fatal("Error sending ISUP to Emulab Control!");
     }
+    if (-x "$BINDIR/bootsubnodes") {
+	print("Booting up subnodes\n");
+	# Foreground mode.
+	system("$BINDIR/bootsubnodes -f");
+	if ($?) {
+	    fatal("Error running $BINDIR/bootsubnodes");
+	}
+    }
 }
 
 #

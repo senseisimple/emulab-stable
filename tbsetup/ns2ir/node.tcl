@@ -86,6 +86,11 @@ Node instproc init {s} {
     $self set Z_ 0.0
     $self set orientation_ 0.0
 
+    set cname "${self}-console"
+    Console $cname $s $self
+    $s add_console $cname
+    $self set console_ $cname
+
     if { ${::GLOBALS::simulated} == 1 } {
 	$self set simulated 1
     } else {
@@ -97,10 +102,16 @@ Node instproc init {s} {
 # The following procs support renaming (see README)
 Node instproc rename {old new} {
     $self instvar portlist
+    $self instvar console_
+
     foreach object $portlist {
 	$object rename_node $old $new
     }
     [$self set sim] rename_node $old $new
+    $console_ set node $new
+    $console_ rename "${old}-console" "${new}-console"
+    uplevel "#0" rename "${old}-console" "${new}-console"
+    set console_ ${new}-console
 }
 
 Node instproc rename_lanlink {old new} {
@@ -251,7 +262,7 @@ Node instproc updatedb {DB} {
 	    return
 	}
 
-	if {! [$topo checkdest $self $X_ $Y_]} {
+	if {! [$topo checkdest $self $X_ $Y_ -showerror 1]} {
 	    return
 	}
 
@@ -541,4 +552,10 @@ Node instproc topography {topo} {
     if {[$self set type] == "pc"} {
 	$self set type "robot"
     }
+}
+
+Node instproc console {} {
+    $self instvar console_
+    
+    return $console_
 }

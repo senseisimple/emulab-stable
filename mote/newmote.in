@@ -1,0 +1,124 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# newmote -
+#
+
+use lib '@prefix@/lib';
+my $TB = '@prefix@';
+ 
+use libdb;
+use English;
+use Getopt::Std;
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+ 
+use strict;
+
+#
+# Constants
+#
+my $DEBUG  = 1;
+
+#
+# Experiments we might put nodes into
+#
+my $PID_HWDOWN = NODEDEAD_PID();
+my $EID_HWDOWN = NODEDEAD_EID();
+
+my $nalloc = "$TB/bin/nalloc";
+my $phys_nodeid = "";
+my $do_nalloc = 1;
+
+#
+# Handle command-line arguments
+# TODO: Allow a user to specify some of their own arguments to uisp
+#
+sub usage() {
+    print STDERR "Usage: $0 [-hdf] [-p phys] <type> <motes...>\n";
+    exit(2);
+}
+
+my $optlist = "dhfp:";
+
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $DEBUG = 1;
+}
+if (defined($options{"h"})) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $do_nalloc = 0;
+}
+if (defined($options{"p"})) {
+    $phys_nodeid = $options{"p"};
+
+    if ($phys_nodeid =~ /^([-\w]+)$/) {
+	$phys_nodeid = $1;
+    }
+    else {
+	die("*** Bad phys_nodeid: $phys_nodeid.\n");
+    }
+}
+
+if (@ARGV < 2) {
+    usage();
+}
+
+my $type = shift(@ARGV);
+my @node_ids = @ARGV;
+
+if ($type =~ /^([-\w]+)$/) {
+    $type = $1;
+}
+else {
+    die("*** Bad mote type: $type.\n");
+}
+
+foreach my $node_id (@node_ids) {
+    if ($node_id =~ /^([-\w]+)$/) {
+	$node_id = $1;
+    }
+    else {
+	die("*** Bad node id: $node_id.\n");
+    }
+
+    my $pnode;
+    if ($phys_nodeid eq "") {
+	$pnode = $node_id;
+    } else {
+	$pnode = $phys_nodeid;
+    }
+    
+    DBQueryFatal("REPLACE INTO nodes SET ".
+		 "node_id='$node_id',type='$type',phys_nodeid='$pnode',".
+		 "role='testnode',def_boot_osid='emulab-ops-TinyOS-STD',".
+		 "bootstatus='okay',status='up',status_timestamp=NOW(),".
+		 "failureaction='fatal',routertype='none',eventstate='ISUP',".
+		 "state_timestamp=NOW(),op_mode='ALWAYSUP',".
+		 "op_mode_timestamp=NOW(),allocstate='FREE',".
+		 "allocstate_timestamp=NOW()");
+
+    DBQueryFatal("REPLACE INTO partitions SET ".
+		 "node_id='$node_id',partition=1,".
+		 "osid='emulab-ops-TinyOS-STD'");
+    
+    DBQueryFatal("REPLACE INTO tiplines SET ".
+		 "tipname='$node_id',node_id='$node_id',".
+		 "server='@USERNODE@'"); # XXX Better subst for user node
+
+    if ($do_nalloc) {
+	system "$nalloc $PID_HWDOWN $EID_HWDOWN $node_id";
+    }
+}
