@@ -70,6 +70,15 @@ int	close_db(void);
 
 int	binlmode = 0;
 
+/*
+ * Fall back to default
+ */
+#ifdef FALLBACK_HOST
+#define DEFAULT_HOST	FALLBACK_HOST
+#define DEFAULT_PATH	"/tftpboot/pxeboot"
+struct in_addr		default_sip;
+#endif
+
 int gettag(uchar *p, uchar tag, uchar *data, uchar *pend) {
 	uchar t;
 	t=*p;
@@ -132,7 +141,8 @@ int findiface(struct sockaddr_in *client) {
 	return 0;
 }
 
-void main(int argc, char *argv[]) 
+int
+main(int argc, char *argv[]) 
 {
 	int servsock;
 	struct sockaddr_in server, client;
@@ -194,7 +204,17 @@ void main(int argc, char *argv[])
 			strlen(ifname))<0))
 		perror("setsockopt(SO_BINDTODEVICE)");
 #endif
-	
+#ifdef FALLBACK_HOST
+	{
+		struct hostent	*he;
+
+		if ((he = gethostbyname(DEFAULT_HOST)) == 0) {
+			fprintf(stderr, "Cannot map %s!\n", DEFAULT_HOST);
+			exit(1);
+		}
+		memcpy((char *)&default_sip, he->h_addr, sizeof(default_sip));
+	}
+#endif
 	printf("Server started on port %d\n\n", ntohs(server.sin_port));
 	while (1) {
 		int rb;
@@ -273,8 +293,15 @@ void main(int argc, char *argv[])
 
 		if (query_db(client.sin_addr,
 			     &sip, bootprog, sizeof(bootprog))) {
+#ifdef FALLBACK_HOST
+			fprintf(stderr, "No matching record! "
+				"Falling back to default.\n");
+			sip = default_sip;
+			strcpy(bootprog, DEFAULT_PATH);
+#else
 			fprintf(stderr, "No matching record!\n");
 			continue;
+#endif
 		}
 		
 		dhcppak.op=BOOTP_REPLY;

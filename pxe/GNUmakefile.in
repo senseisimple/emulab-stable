@@ -33,7 +33,8 @@ INCS    = -I/usr/local/include
 #endif
 
 CFLAGS	+= $(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
-		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"'
+		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"' \
+		-DFALLBACK_HOST='"$(BOSSNODE)"'
 
 proxydhcp: proxydhcp.o $(PR_DBOBJ)
 	cc $(CFLAGS) $(DBFLAG) $(INCS) \
