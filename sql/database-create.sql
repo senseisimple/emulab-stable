@@ -624,21 +624,22 @@ CREATE TABLE partitions (
 #
 
 CREATE TABLE port_counters (
-  node_id char(10) default NULL,
-  card tinyint(3) unsigned default NULL,
-  port tinyint(3) unsigned default NULL,
-  ifInOctets int(10) unsigned default NULL,
-  ifInUcastPkts int(10) unsigned default NULL,
-  ifInNUcastPkts int(10) unsigned default NULL,
-  ifInDiscards int(10) unsigned default NULL,
-  ifInErrors int(10) unsigned default NULL,
-  ifInUnknownProtos int(10) unsigned default NULL,
-  ifOutOctets int(10) unsigned default NULL,
-  ifOutUcastPkts int(10) unsigned default NULL,
-  ifOutNUcastPkts int(10) unsigned default NULL,
-  ifOutDiscards int(10) unsigned default NULL,
-  ifOutErrors int(10) unsigned default NULL,
-  ifOutQLen int(10) unsigned default NULL
+  node_id char(10) NOT NULL default '',
+  card tinyint(3) unsigned NOT NULL default '0',
+  port tinyint(3) unsigned NOT NULL default '0',
+  ifInOctets int(10) unsigned NOT NULL default '0',
+  ifInUcastPkts int(10) unsigned NOT NULL default '0',
+  ifInNUcastPkts int(10) unsigned NOT NULL default '0',
+  ifInDiscards int(10) unsigned NOT NULL default '0',
+  ifInErrors int(10) unsigned NOT NULL default '0',
+  ifInUnknownProtos int(10) unsigned NOT NULL default '0',
+  ifOutOctets int(10) unsigned NOT NULL default '0',
+  ifOutUcastPkts int(10) unsigned NOT NULL default '0',
+  ifOutNUcastPkts int(10) unsigned NOT NULL default '0',
+  ifOutDiscards int(10) unsigned NOT NULL default '0',
+  ifOutErrors int(10) unsigned NOT NULL default '0',
+  ifOutQLen int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (node_id,card,port)
 ) TYPE=MyISAM;
 
 #
