@@ -1,3 +1,117 @@
+stoller     2003/11/17 17:30:37 MST
+
+  Modified files:
+    db                   libdb.pm.in 
+    sql                  database-fill.sql 
+    tbsetup              assign_wrapper.in batch_daemon.in 
+                         batchexp.in endexp.in eventsys_control.in 
+                         mkexpdir.in node_update.in os_setup.in 
+                         startexp.in swapexp.in tbend.in 
+                         tbprerun.in tbreport.in tbswap.in 
+                         vnode_setup.in 
+    utils                delay_config.in 
+    www                  beginexp.php3 dbdefs.php3.in 
+                         delaycontrol.php3 editexp.php3 
+                         modifyexp.php3 showexp.php3 
+                         showexp_list.php3 showstuff.php3 
+                         swapexp.php3 
+  Log:
+  Merge the two state machines (batchstate and state) into a single
+  state machine (state). All of the stuff that was previously handled by
+  using batchstate is now embedded into the one state machine. Of
+  course, these mostly overlapped, so its not that much of a change,
+  except that we also redid the machine, adding more states (for
+  example, modify phases are now explicit. To get a picture of the
+  actual state machine, on boss:
+  
+  		stategraph -o newstates EXPTSTATE
+  		gv newstates.ps
+  
+  Things to note:
+  
+  * The "batchstate" slot of the experiments table is now used solely to
+    provide a lock for batch daemon. A secondary change will be to
+    change the slot name to something more appropriate, but it can
+    happen anytime after this new stuff is installed.
+  
+  * I have left expt_locked for now, but another later change will be to remove
+    expt_locked, and change it to active_busy or some such new state name in
+    the state machine. I have removed most uses of expt_locked, except those
+    that were necessary until there is a new state to replace it.
+  
+  * These new changes are an implementation of the new state machine,
+    but I have not done anything fancy. Most of the code is the same as
+    it was before.
+  
+  * I suspect that there are races with the batch daemon now, but they
+    are going to be rare, and the end result is probably that a
+    cancelation is delayed a little bit.
+  
+  Revision  Changes    Path
+  1.138     +30 -77    testbed/db/libdb.pm.in
+  1.35      +26 -31    testbed/sql/database-fill.sql
+  1.138     +5 -5      testbed/tbsetup/assign_wrapper.in
+  1.41      +76 -95    testbed/tbsetup/batch_daemon.in
+  1.41      +19 -41    testbed/tbsetup/batchexp.in
+  1.29      +101 -57   testbed/tbsetup/endexp.in
+  1.12      +1 -0      testbed/tbsetup/eventsys_control.in
+  2.5       +8 -7      testbed/tbsetup/mkexpdir.in
+  1.13      +4 -22     testbed/tbsetup/node_update.in
+  1.86      +2 -0      testbed/tbsetup/os_setup.in
+  1.59      +45 -39    testbed/tbsetup/startexp.in
+  1.45      +220 -182  testbed/tbsetup/swapexp.in
+  1.34      +6 -23     testbed/tbsetup/tbend.in
+  1.42      +21 -40    testbed/tbsetup/tbprerun.in
+  1.46      +5 -11     testbed/tbsetup/tbreport.in
+  1.28      +93 -226   testbed/tbsetup/tbswap.in
+  1.35      +2 -1      testbed/tbsetup/vnode_setup.in
+  1.12      +6 -11     testbed/utils/delay_config.in
+  1.41      +6 -1      testbed/www/beginexp.php3
+  1.65      +1 -28     testbed/www/dbdefs.php3.in
+  1.7       +7 -7      testbed/www/delaycontrol.php3
+  1.5       +4 -4      testbed/www/editexp.php3
+  1.11      +7 -1      testbed/www/modifyexp.php3
+  1.75      +14 -15    testbed/www/showexp.php3
+  1.80      +2 -2      testbed/www/showexp_list.php3
+  1.121     +51 -63    testbed/www/showstuff.php3
+  1.21      +3 -3      testbed/www/swapexp.php3
+
+stoller     2003/11/17 15:35:33 MST
+
+  Modified files:
+    www                  tbauth.php3 toggle.php 
+  Log:
+  Add web login attack detection/prevention. Two changes:
+  
+  * Add slots to users table to track number of failures in the last N
+    seconds. If a threshold is passed (currently 4 failures in the last
+    minute), the web login is disabled. Note that I do not disable the
+    ops shell login at this time. Aging is passive; the values are cleared
+    when login is successful, or when more then one minute has passed
+    since the last failure. In other words, a burst of failures will
+    disable the login, but failures over time are okay.
+  
+  * Add login_failures table to do exactly the same as above, except it
+    is on an IP basis (REMOTE_ADDR in the server). Currently the
+    threshold is 8 failures in the last two minutes, at which time all
+    logins from that IP are disabled.
+  
+  In both cases email is sent to tbops (and the user).
+  
+  The constants are defined at the top of www/tbauth.in, rather then as
+  site variables, to avoid pounding the DB when an attack is being
+  launched.
+  
+  To clear a user freeze, go to the user profile page and use the
+  "toggle" near the bottom.
+  
+  To clear an IP freeze: delete from login_failures were IP='1.1.1.1'
+  
+  Revision  Changes    Path
+  1.40      +144 -17   testbed/www/tbauth.php3
+  1.13      +18 -3     testbed/www/toggle.php
+
+	
 stoller     2003/11/05 10:53:00 MST
 
   Modified files:
