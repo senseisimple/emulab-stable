@@ -18,6 +18,21 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20041104: Before build
+	A new directory, pxe/freebsd, contains the diffs necessary
+	to build your own pxeboot program more easily.  The entry
+	for 20040112 below instructs you to "Rebuild pxeboot kernel
+	from source".  Now you can actually do that!  See the README
+	file in pxe/freebsd.  You should rebuild your pxeboot program
+	to take advantage of a couple of new features: the ability
+	to specify an explicit machine from which to TFTP load a file,
+	and the ability to specify command lines to Linux (actually,
+	to LILO).
+
+	You will need to update your frisbee/freebsd MFSes to take
+	full advantage of recent changes.  A new file, doc/update-mfs.txt,
+	describes the process.  Read it. Believe it. Live by it.
+
 20041029: Before build
 	The ulsshxmlrpcpp package was updated to version 0.1.1:
 
