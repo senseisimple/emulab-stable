@@ -4,20 +4,17 @@
 include ../Makeconf
 include ../GNUmakerules
 
-CC=gcc
-CFLAGS=-O
+SUBDIRS	= imagezip
 
-SCRIPTS		= oslib.tcl
+.PHONY:	$(SUBDIRS)
 
-all:
+all:	$(SUBDIRS)
 
-key7: key7.c
-	$(CC) $(CFLAGS) -o key7 key7.c
+imagezip:
+	@$(MAKE) -C imagezip all
 
-key8: key8.c
-	$(CC) $(CFLAGS) -o key8 key8.c
-
-install: $(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS))
+install: 
+	@$(MAKE) -C imagezip install	
 
 clean:
-	/bin/rm -f *.o key7 key8
+	@$(MAKE) -C imagezip clean
