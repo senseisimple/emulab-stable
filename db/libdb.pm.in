@@ -744,8 +744,7 @@ sub SetExpState($$$)
 	DBQueryWarn("update experiments set state='$state' ".
 		    "where eid='$eid' and pid='$pid'");
 
-    if (! $query_result ||
-	$query_result->numrows == 0) {
+    if (! $query_result) {
 	return 0;
     }
     return 1;
