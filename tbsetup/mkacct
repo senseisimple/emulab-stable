@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: mkacct,v 1.22 2000-11-21 10:49:47 kwright Exp $
+### $Id: mkacct,v 1.23 2000-11-27 22:34:23 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -104,7 +104,7 @@ while (@row = $sth->fetchrow_array) {
 	    die "Fullname from database not valid.\n";
 	} 
 
-	if ( $row[4] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
+	if ( $row[4] =~ /^(([^:]+$|^))$/ ) {          # control node 
 	    $control_node = $1;
 	} else {
 	    die "Control node from database not valid.\n";
@@ -160,13 +160,6 @@ while (@row = $sth->fetchrow_array) {
     push(@nodes,$row[0]);
     print " $row[0] ";
 }
-print "\n";
-
-## 
-## Add in the control node. We selected it above when 
-## getting the user info.
-##
-
 ##
 ## XXX control nodes not currently set correctly by
 ## web interface (not yet implemented); all projects
@@ -174,13 +167,11 @@ print "\n";
 ## it looks as if the database type is a string not an
 ## IP address.  
 ##
-## push(@nodes, $control_node);
-##
-## Turns out we can't just push the control_node here because we
-## can't su1 ssh to plastic at this time.
-##
-## push(@nodes, "155.99.212.74");  
-##
+##push(@nodes, $control_node);
+push(@nodes, "155.99.212.74"); 
+print " 155.99.212.74";
+print "\n";
+
 
 ##
 ## For each machine, ping to see if its alive.
