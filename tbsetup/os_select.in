@@ -143,8 +143,10 @@ foreach $n (@nodes) {
     my $curmode = node_opmode($n);
     if (!$curmode) { next; }
     debug("Current opmode for node '$n' is '$curmode'.\n");
-    if ($mfs) { set_pxe_path($n); }
-    else { set_boot_osid($n); }
+    # Always set the pxe_boot_path (to the osid in mfs mode, else PXEBOOT)
+    set_pxe_path($n);
+    # Only do the boot osid if we're not in mfs mode
+    if (!$mfs) { set_boot_osid($n); }
     my $boot = TBBootWhat($n);
     if (!$boot) { fatal("***Bootwhat query failed. Contact testbed-ops.\n"); }
     debug("Bootwhat says: $n => $boot\n");
