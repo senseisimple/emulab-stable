@@ -36,12 +36,25 @@ my $pid = shift;
 my $eid = shift;
 
 use strict;
+use English;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 # Make sure that the experiment actually exists
 # NOTE: project permissions checking is done later, on an individual
 # node basis.
 if (!ExpState($pid,$eid)) {
     die("There is no experiment '$eid' in project '$pid'.\n");
+}
+
+#
+# Make sure the user has the ability to modify this experiment
+#
+if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("You don't have sufficient access to modify '$eid' in project '$pid'.\n");
 }
 
 ######################################################################
@@ -120,7 +133,7 @@ foreach my $n (@node_names) {
     #
     $result = DBQueryFatal("select node_id,image_id from scheduled_reloads " .
 			  "where node_id='$n'");
-    if ( $result->num_rows() > 0 ) {
+    if ( $result->numrows() > 0 ) {
 
 	my @row = $result->fetchrow();
 	my $image_id = $row[1];
@@ -222,7 +235,7 @@ if ((@reloads > 0) || (keys %reserves > 0)) {
   
     #
     # Take care of reloads by putting them into a special experiment,
-    # which is processed by the batch_daemon
+    # which is processed by the reload_daemon
     #
     foreach my $n ( @reloads ) {
 	#
