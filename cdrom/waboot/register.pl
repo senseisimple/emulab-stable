@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -56,9 +56,11 @@ my $WWW         = "https://www.emulab.net";
 #my $WWW        = "http://golden-gw.ballmoss.com:8080/~stoller/testbed";
 #my $WWW        = "https://www.emulab.net/~stoller/www";
 my $cdkeyfile	= "/etc/emulab.cdkey";
+my $pubkey      = "/etc/emulab_pubkey.pem";
 my $wget	= "wget";
 my $logfile     = "/tmp/register.log";
 my $scriptfile  = "/tmp/netbed-setup.pl";
+my $sigfile     = "/tmp/netbed-setup.pl.sig";
 my $tmpfile	= "/tmp/foo.$$";
 
 #
@@ -105,8 +107,7 @@ chomp($cdkey);
 #
 while (1) {
     my $emulab_status;
-    my $url;
-    my $md5;
+    my ($url, $md5, $sig);
 
     while (1) {
 	print "Checking in at Netbed Central for instructions ...\n";
@@ -126,7 +127,7 @@ while (1) {
     }
 
     #
-    # Parse the response. We get back the URL and the MD5, as well as
+    # Parse the response. We get back the URL and the signature, as well as
     # a status code.
     #
     if (! open(INSTR, $tmpfile)) {
@@ -143,11 +144,16 @@ while (1) {
 		$url = $1;
 		last SWITCH1;
 	    };
+	    # Leave this in to avoid error below.
 	    /^MD5=(.*)$/ && do {
 		$md5 = $1;
 		last SWITCH1;
 	    };
-	    print STDERR "Invalid instruction: $_\n";
+	    /^SIG=(.*)$/ && do {
+		$sig = $1;
+		last SWITCH1;
+	    };
+	    print STDERR "Ignoring unknown instruction: $_\n";
 	}
     }
     close(INSTR);
@@ -162,8 +168,8 @@ while (1) {
     }
     fatal("Improper instructions; did not include URL!")
 	if (!defined($url));
-    fatal("Improper instructions; did not include MD5!")
-	if (!defined($md5));
+    fatal("Improper instructions; did not include digital signature!")
+	if (!defined($sig));
 
     while (1) {
 	print "Downloading script from Netbed Central ...\n";
@@ -173,23 +179,41 @@ while (1) {
 	    last;
 	}
 
-	print "Error getting scriptfile. Will try again in one minute ...\n";
-	sleep(60);
+	print "Error getting scriptfile. Will try again in 15 seconds!\n";
+	sleep(15);
+    }
+
+    while (1) {
+	print "Downloading script signature from Netbed Central ...\n";
+
+	mysystem("$wget -nv -O $sigfile $sig");	
+	if (!$?) {
+	    last;
+	}
+
+	print "Error getting signature. Will try again in 15 seconds!\n";
+	sleep(15);
     }
 
     #
-    # Check the MD5.
-    # 
-    print "Checking MD5 hash of the scriptfile.\n";
+    # Check the digital signature. 
+    #
+    print "Checking digital signature of the scriptfile.\n";
 
-    my $hval = `md5 -q $scriptfile`;
+    my $cmd  = "openssl dgst -sha1 -verify $pubkey ".
+	"-signature $sigfile $scriptfile";
+    my $hval = `$cmd`;
     chomp($hval);
 
-    if ($md5 eq $hval) {
-	last;
-    }
-    print("Bad MD5! Will try again in one minute!\n");
-    sleep(60);
+    #
+    # Yep, its amazing. Instead of exiting with status, this stupid
+    # program always exits with 0, so have to check the output. 
+    #
+    last
+	if ($hval eq "Verified OK");
+
+    print("Bad signature! Will try again in 15 seconds!\n");
+    sleep(15);
 }
 
 #
