@@ -3,9 +3,15 @@
  * Dan Flickinger
  *
  * 2004/10/04
- * 2004/11/19
+ * 2004/12/07
  */
 
+ 
+// FIXME: have dgoto register a goto command, check all 3 callbacks,
+// and create a function to poll for completion of a goto command.
+// Also, have dgoto give an error if a goto command is currently executing
+// (NO QUEUEING!!!)
+ 
 #ifndef GROBOT_H
 #define GROBOT_H
 
