@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+
+# This is a hack
+
+# * It must be run as root inside a Plab vserver (not necessarily a
+#   dslice) in order to get the permissions right
+# * Make sure OBJTMCD, SRCTMCD, and BOSSNODE are set correctly
+# * This will create a "plabroot" directory and a plabroot.tgz file in
+#   the current directory.  Put plabroot.tgz in /usr/testbed/etc/plab/
+
+set -e
+
+OBJTMCD=~/tbbuild/tmcd
+SRCTMCD=~/testbed/tmcd
+BOSSNODE=boss.mini.emulab.net
+
+function copy()
+{
+    SRC=$1
+    DEST=$2
+
+    if [ -e `dirname $OBJTMCD/$SRC` ]; then
+	pushd `dirname $OBJTMCD/$SRC`
+	gmake `basename $SRC`
+	popd;
+    fi
+
+    if [ -e $OBJTMCD/$SRC ]; then
+	LNSRC=$OBJTMCD/$SRC;
+    elif [ -e $SRCTMCD/$SRC ]; then
+	LNSRC=$SRCTMCD/$SRC;
+    else
+	echo "Couldn't find $SRC"
+	exit 1;
+    fi
+
+
+    if [ `basename $LNSRC` == vnodesetup ]; then
+	# Err, kludge
+	chmod a+x $LNSRC;
+    fi
+
+    echo Copying $LNSRC to $PWD/$DEST
+    if [ -z $DEST ]; then
+	cp $LNSRC .
+        chown root:root `basename $LNSRC`;
+    else
+	cp $LNSRC $DEST
+        chown root:root $DEST;
+    fi
+}
+
+rm -rf plabroot
+
+mkdir plabroot
+pushd plabroot
+
+mkdir -p etc
+pushd etc
+copy plab/rc.vinit
+copy plab/sudoers
+chown root:root sudoers
+chmod 440 sudoers
+ln -sf ../usr/local/etc/emulab
+popd
+
+mkdir -p usr/local/etc/emulab
+pushd usr/local/etc/emulab
+touch isrem
+copy plab/plabsetup
+copy plab/rc.inplab
+copy tmcc-nossl tmcc
+copy libsetup.pm
+copy common/paths.pm
+copy common/paths.sh
+copy common/runstartup
+copy common/vnodesetup
+chown root:root vnodesetup
+chmod u+s vnodesetup
+copy common/update
+chown root:root update
+chmod u+s update
+copy common/watchdog
+copy linux/liblocsetup.pm
+echo $BOSSNODE > bossnode
+popd
+
+mkdir -p usr/bin
+pushd usr/bin
+copy plab/clean
+copy plab/clean2
+popd
+
+mkdir -p tmp
+pushd tmp
+copy plab/perl-suidperl-5.6.1-34.99.6.i386.rpm
+popd
+
+popd
+
+#tar -czvhpf plabroot.tar.gz -C plabroot .
+tar -czvpf plabroot.tgz -C plabroot .
