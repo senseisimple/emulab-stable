@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+require 'ctime.pl';
 
 # This has the common functionality for tbprerun/tbrun/tbend.
 
@@ -40,8 +41,11 @@ sub tbs_prefix {
 
 sub tbs_out {
     my($s) = $_[0];
+    my $t = ctime(time);
+    print $t;
     print $s;
     if ($logging) {
+	print LOGFILE $t;
 	print LOGFILE $s;
     }
 };

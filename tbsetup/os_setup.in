@@ -1,5 +1,6 @@
 #!/usr/bin/perl -wT
 use English;
+require 'ctime.pl';
 
 #
 # TODO: Delta stuff.
@@ -299,8 +300,14 @@ foreach my $node ( keys %nodeos ) {
     if ($?) {
 	die("Reboot of node $pc failed!");
     }
+    my $t = ctime(time);
+    print STDOUT "$t";
+    print STDOUT "$pc rebooting ...\n"
 }
 
+my $t = ctime(time);
+print STDOUT "$t";
+	
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
 
 my $waitstart = time;
@@ -322,6 +329,9 @@ foreach my $node ( keys %nodeos ) {
     }	
 
     if (WaitTillAlive($pc) == 0) {
+	my $t = ctime(time);
+	print STDOUT "$t";
+	
 	print STDOUT "$pc is alive and well\n";
 	next;
     }
@@ -414,6 +424,9 @@ sub WaitTillAlive {
 sub RebootNode {
     local($pc) = @_;
 
+    my $t = ctime(time);
+    print STDOUT "$t";
+	
     print STDOUT "Rebooting $pc ...\n";
 
     $mypid = fork();
