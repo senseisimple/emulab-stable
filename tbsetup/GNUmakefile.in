@@ -13,7 +13,7 @@ SUBDIRS		= checkpass ir ns2ir
 BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
 		  vpower vsnmpit os_load savevlans
 
-SBIN_STUFF	= resetvlans console_setup.proxy sched_reload
+SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup
 
 LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir tbdoit tbstopit console_setup
@@ -67,6 +67,8 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmacct-ctrl
 	chown root $(INSTALL_LIBEXECDIR)/os_setup
 	chmod u+s $(INSTALL_LIBEXECDIR)/os_setup
+	chown root $(INSTALL_SBINDIR)/named_setup
+	chmod u+s $(INSTALL_SBINDIR)/named_setup
 	chown root $(INSTALL_BINDIR)/os_load
 	chmod u+s $(INSTALL_BINDIR)/os_load
 	chown root $(INSTALL_BINDIR)/savevlans

@@ -57,6 +57,14 @@ if (&tbs_exec("os_setup $pid $eid $irfile")) {
     exit(1);
 }
 
+&tbs_out("Setting up named maps.\n");
+if (&tbs_exec("named_setup")) {
+    &tbs_out("Failed to add node names to named map.\n");
+    #
+    # This is a non-fatal error.
+    # 
+}
+
 &tbs_out("Run finished - " . &ctime(time) . "\n");
 
 0;
