@@ -425,11 +425,6 @@ TBSaveExpLogFiles($pid, $eid);
 system("cp -Rfp $workdir/ $userdir/tbdata/");
 
 #
-# Must unlock before exit.
-#
-TBUnLockExp($pid, $eid);
-
-#
 # Gather stats. 
 #
 if ($inout eq "in") {
@@ -442,6 +437,16 @@ elsif ($inout eq "out") {
 elsif ($inout eq "modify") {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0);
 }
+
+#
+# Set the swapper uid on success only, and *after* gathering swap stats!
+#
+TBExptSetSwapUID($pid, $eid, $dbuid);
+
+#
+# Must unlock before exit.
+#
+TBUnLockExp($pid, $eid);
 
 print "Done!\n";
 

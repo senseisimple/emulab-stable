@@ -129,7 +129,7 @@ use Exporter;
 	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
-	 TBLeaderMailList ExpGroup
+	 TBLeaderMailList ExpGroup TBExptSetSwapUID
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState 
 	 TBExptRestoreVirtualState
@@ -2535,6 +2535,17 @@ sub TBExptRestorePhysicalState($$$)
 }
 
 #
+# Restores backed up virtual state of pid/eid from directory in /tmp.
+#
+sub TBExptSetSwapUID($$$)
+{
+    my ($pid, $eid, $uid) = @_;
+
+    return DBQueryWarn("update experiments set expt_swap_uid='$uid' ".
+		       "where pid='$pid' and eid='$eid'");
+}
+
+#
 # Get the control network IP for a node (underlying physical node!).
 #
 # usage TBControlNetIP(char *nodeid, char \*ip)
@@ -3131,14 +3142,17 @@ sub GatherSwapStats($$$$$;$)
     local $DBQUERY_MAXTRIES = 5;
 
     my $query_result =
-	DBQueryWarn("select e.gid,e.idx,s.rsrcidx,s.lastrsrc ".
+	DBQueryWarn("select e.gid,e.idx,s.rsrcidx,s.lastrsrc,e.expt_swap_uid ".
 		    "  from experiments as e ".
 		    "left join experiment_stats as s on e.idx=s.exptidx ".
 		    "where e.pid='$pid' and e.eid='$eid'");
     if (!$query_result || !$query_result->numrows) {
 	return;
     }
-    my ($gid,$exptidx,$rsrcidx,$lastrsrc) = $query_result->fetchrow_array;
+    my ($gid, $exptidx, $rsrcidx, $lastrsrc, $lastswapuid) =
+	$query_result->fetchrow_array;
+    $lastswapuid = $uid
+	if (!defined($lastswapuid));
 
     #
     # A non-zero ecode indicates error. If op is a preload/swapin/start/modify
@@ -3160,7 +3174,7 @@ sub GatherSwapStats($$$$$;$)
 
 	#
 	# If a modify failed, we need to revert back to the old
-	# stats record since the current one is bogus.
+	# resource record since the current one is bogus.
 	#
 	if ($mode eq TBDB_STATS_SWAPMODIFY) {
 	    if (defined($lastrsrc)) {
@@ -3186,7 +3200,8 @@ sub GatherSwapStats($$$$$;$)
     }
 
     #
-    # Preswap. Need to generate a new resource record.
+    # Pre-modify. Need to generate a new resource record. If the experiment
+    # fails to modify, we revert back to the old resource record later.
     #
     if ($mode eq TBDB_STATS_SWAPMODIFY &&
 	$flags & TBDB_STATS_FLAGS_PREMODIFY) {
@@ -3210,18 +3225,30 @@ sub GatherSwapStats($$$$$;$)
     }
 
     #
-    # On a swapout, update the duration counters. We want to update the
-    # aggregates too below, so get the numbers we need for that first.
+    # On a swapout/modify complete, update the duration counters. We
+    # want to update the aggregates too below, so get the numbers we
+    # need for that first. Modify is a bit of a complication since we
+    # want to charge for the experiment as it *was* until this point,
+    # since the number of nodes has changed. So, each modify changes
+    # the time we use to determine the resource usage; the start time is
+    # the greater of the swapin time or the last modify time. 
     #
     $pnodes   = 0;
     $vnodes   = 0;
     $duration = 0;
     
-    if ($mode eq TBDB_STATS_SWAPOUT) {
+    if ($mode eq TBDB_STATS_SWAPOUT ||
+	($mode eq TBDB_STATS_SWAPMODIFY &&
+	 ($flags & TBDB_STATS_FLAGS_PREMODIFY) == 0)) {
 	$query_result =
 	    DBQueryWarn("select r.pnodes,r.vnodes, ".
-			"       UNIX_TIMESTAMP(now()) - ".
-			"       UNIX_TIMESTAMP(s.swapin_last) ".
+			"       IF(s.swapmod_last is not NULL and ".
+			"          UNIX_TIMESTAMP(s.swapmod_last) > ".
+			"          UNIX_TIMESTAMP(s.swapin_last),  ".
+			"         UNIX_TIMESTAMP(now()) - ".
+			"         UNIX_TIMESTAMP(s.swapmod_last), ".
+			"         UNIX_TIMESTAMP(now()) - ".
+			"         UNIX_TIMESTAMP(s.swapin_last)) ".
 			" from experiment_stats as s ".
 			"left join experiment_resources as r on ".
 			" r.idx=s.rsrcidx ".
@@ -3285,7 +3312,10 @@ sub GatherSwapStats($$$$$;$)
 		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
 		    "    allexpt_pnode_duration=".
 		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
-		    "where uid='$uid'");
+		    "where uid=".
+		    ((($mode eq TBDB_STATS_SWAPOUT) ||
+		      ($mode eq TBDB_STATS_SWAPMODIFY)) ?
+		     "'$lastswapuid'" : "'$uid'"));
 
 	#
 	# Update the per-experiment record.
