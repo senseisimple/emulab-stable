@@ -28,10 +28,11 @@ if (!isset($node_id) ||
 $query_result =
     DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
 		 "       r.vname,r.pid,r.eid, ".
-		 "       t.isvirtnode,t.isremotenode,t.isplabdslice ".
+		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, oi.OS ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
+		 "left join os_info as oi on n.def_boot_osid=oi.osid ".
 		 "where n.node_id='$node_id'");
 
 if (mysql_num_rows($query_result) == 0) {
@@ -46,6 +47,7 @@ $vname    = $row[vname];
 $pid      = $row[pid];
 $eid      = $row[eid];
 $isvirt   = $row[isvirtnode];
+$iswindowsnode = $row[OS]=='Windows';
 $isremote = $row[isremotenode];
 $isplab   = $row[isplabdslice];
 
@@ -60,6 +62,11 @@ header("Content-Description: SSH description file for a testbed node");
 
 echo "hostname: $vname.$eid.$pid.$OURDOMAIN\n";
 echo "login:    $uid\n";
+
+# Hack for multiple logins/sshd's on Windows.
+if ($iswindowsnode) {
+    echo "port: 2222\n";
+}
 
 if ($isvirt) {
     if ($isremote) {
