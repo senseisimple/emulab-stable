@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,15 +20,21 @@ LOADINFO=`$BINDIR/tmcc loadinfo`
 #BOSSINFO='boss.emulab.net 155.101.128.70'
 #LOADINFO='ADDR=234.5.6.69:4444 PART=0'	# for testing
 
+BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
+
+# XXX should be part of loadinfo
+LOADIP="-S $BOSSIP"
+
 if [ -x /usr/sbin/ntpdate ]; then
-	BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
-	/usr/sbin/ntpdate $BOSSIP >/dev/null 2>&1
+	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
 fi
 
-DISKDEV=/dev/ad0
 ADDRESS=`echo $LOADINFO | awk -F= '{ printf $2 }' | awk -F' ' '{ print $1 }'`
 PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }' | awk -F' ' '{ print $1 }'`
 PARTOS=`echo $LOADINFO | awk -F= '{ printf $4 }' | awk -F' ' '{ print $1 }'`
+DISK=`echo $LOADINFO | awk -F= '{ printf $5 }' | awk -F' ' '{ print $1 }'`
+DISK=${DISK:-'ad0'}
+
 if [ x"$PARTITION" != x -a "$PARTITION" != "0" ]; then
 	SLICE="-s $PARTITION";
 	case $PARTOS in
@@ -54,23 +60,51 @@ if [ -r $BINDIR/rc.ipod ]; then
 	. $BINDIR/rc.ipod
 fi
 
+#
+# set memory limits:
+#	allow 8MB for non-frisbee stuff
+#	split remaining memory between network/disk buffering in frisbee
+#
+HOSTMEM=`dmesg | grep 'avail memory' | sed -e 's/.* (\([0-9]*\)K bytes.*/\1/'`
+if [ $HOSTMEM -ge 10240 ]; then
+	HOSTMEM=`expr $HOSTMEM - 8192`
+	ulimit -v $HOSTMEM
+	HOSTMEM=`expr $HOSTMEM / 1024`
+
+	## For GaTech we use more memory for disks since the disks are so slow
+	#NETMEM=`expr $HOSTMEM \* 1 / 3`
+	#DISKMEM=`expr $HOSTMEM \* 2 / 3`
+	#MEMARGS="-C $NETMEM -W $DISKMEM"
+
+	# For Utah, we let the client split up the memory
+	# (50/50, but no more chunk buffers than there are chunks in the image)
+	MEMARGS="-M $HOSTMEM"
+fi
+
 if [ x"$ADDRESS" != x ]; then
         PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`;
 	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`;
 	MCASTADDR="-m $MCAST -p $PORT";
 
-	echo "Running $BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV at `date`";
+	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTADDR /dev/$DISK at `date`";
 	$BINDIR/tmcc state RELOADING;
 
-	$BINDIR/frisbee $SLICE $MCASTADDR $DISKDEV;
+	$BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTADDR /dev/$DISK;
 	case $? in
 	0)
 		echo "Frisbee run finished";
 		echo "Resizing final disk partition";
-		$BINDIR/growdisk -vW;
-		if [ x"$SLICE" != x -a x"$PTYPE" != x -a -x $BINDIR/slicefix ]; then
+		$BINDIR/growdisk -vW /dev/$DISK;
+		if [ x"$PTYPE" != x -a -x $BINDIR/slicefix ]; then
 			echo "Adjusting slice-related files";
-			$BINDIR/slicefix $PARTITION $PTYPE
+			if [ x"$SLICE" != x ]; then
+				$BINDIR/slicefix $PARTITION $DISK
+			else
+				$BINDIR/slicefix 1 $DISK
+				$BINDIR/slicefix 2 $DISK
+				$BINDIR/slicefix 3 $DISK
+				$BINDIR/slicefix 4 $DISK
+			fi
 		fi
 		echo "Image load complete, rebooting ...";
 		$BINDIR/tmcc state RELOADDONE;
