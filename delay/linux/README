@@ -1,0 +1,8 @@
+This directory contains modules that were added or changed in Linux in
+order to accomodate testbed link shaping and emulation.
+
+kmods         - kernel or kernel module changes / additions
+tc_mods       - updates to iproute2+tc, the userland app used to control 
+                link shaping.
+iptables_mods - updates to the Linux userland firewall control app
+
