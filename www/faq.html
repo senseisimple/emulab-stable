@@ -461,8 +461,8 @@ tb-set-node-startup $router /users/myname/router-startup
     router-startup script, which should look like this:
 <pre>
 #!/bin/sh
-/usr/site/bin/su1 sysctl -w net.inet.ip.forwarding=1
-/usr/site/bin/su1 sysctl -w net.inet.ip.fastforwarding=1
+sudo sysctl -w net.inet.ip.forwarding=1
+sudo sysctl -w net.inet.ip.fastforwarding=1
 exit 0
 </pre>
     That will make sure that routing gets turned on when my router
