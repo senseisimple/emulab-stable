@@ -1,0 +1,67 @@
+# Makefile for the hyperviewer application directory.  See ROADMAP for details.
+
+# Tamara Munzner's Stanford HyperViewer code is in a subdirectory under here.
+HVROOT = hypviewer
+HVINC  = ${HVROOT}/include
+HVSRC  = ${HVROOT}/src
+
+# The follosing matches Munzner's Makefile scheme.
+CPU = free
+##CPU = linux
+WINSYS = glut
+##WINSYS = xt
+ARCH = ${CPU}${WINSYS}
+
+LIBRARY = hypviewer
+HVLIBDIR  = ${HVSRC}/${ARCH}
+HVLIBNAME = ${LIBRARY}${ARCH}
+HVLIB = ${HVLIBDIR}/lib${HVLIBNAME}.a
+
+CFLAGS  = -DHYPGLUT -DHYPFREE -DGL_GLEXT_LEGACY -g -DNAMESPACEHACK=
+INCDIRS = -I${HVINC} -I/usr/X11R6/include -I/usr/local/include/python2.3
+LDLIBS  = ${HVLIB} -L/usr/X11R6/lib -lGLU -lGL -lXmu -lXext -lX11 -lm
+
+# Distribute the Python scripts, shared library, and sample input files.
+PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py
+DISTFILES = ${PYFILES} _hv.so BigLan.hyp ts600.hyp
+
+# Finally, make something.
+default: _hv.so
+
+# The input for SWIG is in a .i file.  Add stuff to the interface class .h file.
+# How come %apply doesn't work for std::string in hv.mod?  Workaround with sed instead.
+hv.i: hv.mod ${HVINC}/HypView.h
+	sed -e 's/const string & [a-z][a-z]*/const std::string \& INPUT/g' \
+	    ${HVINC}/HypView.h | cat hv.mod - > hv.i
+
+# Create the wrappers using SWIG.
+hvmain.o: hvmain.cpp
+	g++ -fpic -c ${CFLAGS} ${INCDIRS} hvmain.cpp
+_hv.cpp hv.py: hv.i
+	swig -c++ -python -DHYPGLUT -DHYPFREE -module hv -o _hv.cpp hv.i
+
+# Put the wrappers in a shared library for import by hv.py .
+_hv.o: _hv.cpp
+	g++ -fpic -c ${CFLAGS} ${INCDIRS} _hv.cpp
+_hv.so: hvmain.o _hv.o ${HVLIB}
+	gcc -shared hvmain.o _hv.o ${LDLIBS} -o _hv.so
+
+hvlib: ${HVLIB}
+${HVLIB}:
+	@echo ""
+	@echo Make sure that Makefile.${ARCH} is included, and not commented-out.
+	grep Makefile.${ARCH} ${HVROOT}/Makefile.main
+	@echo ""
+	@echo Making ${HVLIB}
+	cd ${HVROOT}; make
+
+dist:
+	# Wrap a top-level hyperviewer directory around the dist files in the tarball.
+	mkdir -p temp/hyperviewer
+	cp -p ${DISTFILES} temp/hyperviewer
+	tar cvfz hyperviewer.tgz -C temp hyperviewer
+	rm -r temp
+
+clean:
+	rm *.o *.so
+	cd ${HVROOT}; make clean
