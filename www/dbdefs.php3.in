@@ -1546,7 +1546,7 @@ function TBGetExptIdleTime($pid, $eid, $format = 0) {
     if (!$format) {
 	$t = round($t/3600,2);
     } else {
-	$t = date($format,mktime(0,0,$t));
+	$t = date($format,mktime(0,0,$t,1,1));
     }
     return $t;
 }

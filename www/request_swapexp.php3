@@ -81,19 +81,19 @@ $r=mysql_fetch_array($q);
 $c=$r["c"];
 
 if (!$confirmed) {
-    echo "<center><h3><br>
+    echo "<center><h3>
 Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
-      " reserved,<br>and has been sent $swap_requests swap request".
-      ($swap_requests!=1?"s":"")." since it went idle.<br>";
+      " reserved,<br>\nand has been sent $swap_requests swap request".
+      ($swap_requests!=1?"s":"")." since it went idle.<br>\n";
     if ($swap_requests > 0) {
-      echo "The most recent one was sent at $last_swap_req.<br>";
+      echo "The most recent one was sent at $last_swap_req.<br>\n";
     }
     if ($swap_requests >= $tell_proj_head) {
-      echo "This notification will also be sent to the project leader.<br>";
+      echo "This notification will also be sent to the project leader.\n";
     }
     echo "<p>
-          Are you sure you want to send an email message requesting that<br>
-          experiment '$eid' be swapped or terminated?
+          Are you sure you want to send an email message requesting that
+          experiment '$eid' be swapped or terminated?</p>
           </h3>\n";
 
     #
@@ -134,9 +134,16 @@ if (! $leaders) {
 }
 
 $lastact = TBGetExptLastAct($pid,$eid);
-$idletime= TBGetExptIdleTime($pid,$eid,"G:i");
+$idletime= TBGetExptIdleTime($pid,$eid,"j:G:i");
 $idletime = str_replace(":0",":",$idletime);
-list($idlehrs,$idlemin) = explode(":",$idletime);
+list($idledays,$idlehrs,$idlemin) = explode(":",$idletime);
+#print "<pre>idletime=$idletime\nidledays=$idledays\nidlehrs=$idlehrs\n</pre>";
+$idledays -= 1; # Measured from the first of the month...
+#print "<pre>\nidledays=$idledays\nidlehrs=$idlehrs\n</pre>";
+$idlehrs += 24*$idledays;
+#print "<pre>\nidledays=$idledays\nidlehrs=$idlehrs\n</pre>";
+
+
 
 $msg =
 "Hi, this is an important automated message from $THISHOMEBASE.\n\n".
