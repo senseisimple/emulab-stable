@@ -877,6 +877,8 @@ CREATE TABLE node_types (
   bootdisk_unit tinyint(3) unsigned NOT NULL default '0',
   delay_osid varchar(35) default NULL,
   jail_osid varchar(35) default NULL,
+  modelnetcore_osid varchar(35) default NULL,
+  modelnetedge_osid varchar(35) default NULL,
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   ismodelnet tinyint(1) NOT NULL default '0',

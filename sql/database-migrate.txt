@@ -1713,3 +1713,10 @@ last_net_act,last_cpu_act,last_ext_act);
 1.258: Minor whitespace change in database-create.txt to make
        schemacheck happy. 
 
+1.259: Add modelnet OSIDs to node_types table so we know what image to load
+       when doing modelnet. Sure wish we had a better way to do this!
+
+       alter table node_types add modelnetcore_osid varchar(35) \
+                 default NULL after jail_osid;
+       alter table node_types add modelnetedge_osid varchar(35) 
+                 default NULL after modelnetcore_osid;
