@@ -1505,9 +1505,15 @@ COMMAND_PROTOTYPE(dodelay)
 			row[32], row[33], row[34],
 			row[35], row[36]);
 
-		if (vers >= 8 && row[37] && row[38]) {
+		if (vers >= 8) {
+			/*
+			 * Temp. This is so current experiments with delay
+			 * entries continues to work okay with the new image.
+			 */
 			sprintf(&buf[strlen(buf)],
-				" VNODE0=%s VNODE1=%s", row[37], row[38]);
+				" VNODE0=%s VNODE1=%s",
+				(row[37] ? row[37] : "foo"),
+				(row[38] ? row[38] : "bar"));
 		}
 		strcat(buf, "\n");
 			
