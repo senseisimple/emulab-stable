@@ -122,7 +122,7 @@ function WRITESIDEBAR() {
 			       $TBBASE, "modusr_form.php3");
 	}
 	elseif ($status == "active") {
-	    WRITESIDEBARBUTTON("My Testbed Account",
+	    WRITESIDEBARBUTTON("My Emulab.Net",
 			       $TBBASE,
 			       "showuser.php3?target_uid=$login_uid");
 	    
