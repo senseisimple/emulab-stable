@@ -371,6 +371,20 @@ sub doSwapout($) {
 		}
 	    }
 	}
+	
+	#
+	# Do teardown of inner elab. We must do this before we teardown the
+	# vlans since the inner control network is a vlan, and we want that
+	# active so inner boss can reboot the inner nodes (avoid power cycle).
+	#
+	if ($elabinelab) {
+	    print "Tearing down elabinelab. This could take a while.\n";
+	    if (system("elabinelab -k $pid $eid")) {
+		print STDERR "*** Failed to teardown elabinelab!\n";
+		$swapout_errors = 1;
+	    }
+	}
+
 	#
 	# Clean up any VLANs in experiment.
 	#
@@ -494,18 +508,6 @@ sub doSwapout($) {
     }
 
     if (! $TESTMODE) {
-	#
-	# Restart DHCPD as soon as possible after freeing the nodes; they
-	# are going into a reload, so DHCPD better be ready for them!
-	# 
-	if ($elabinelab) {
-	    print "Regenerating DHCPD config file and restarting daemon.\n";
-	    if (system("dhcpd_makeconf -i -r")) {
-		print STDERR "*** Failed to reconfig/restart DHCPD.\n";
-		$swapout_errors = 1;
-	    }
-	}
-
 	#
 	# If the experiment has no Plab dslice nodes left, but still has
 	# a Plab slice, destroy the slice
