@@ -117,3 +117,16 @@ last_net_act,last_cpu_act,last_ext_act);
 	update images set gid=pid,global=shared;
 	update images set shared=0;
 	
+1.121:  Create empty 'webnews' table with following schema for 
+	$TBSRC/www/news.php3 ('blog-like news posting system):
+	('date' is keyed since 'ORDER BY date DESC' is used a lot.)
+
+	CREATE TABLE webnews (
+	  msgid int(11) NOT NULL auto_increment,
+	  subject tinytext,
+	  date datetime default NULL,
+	  author varchar(32) default NULL,
+	  body text,
+	  PRIMARY KEY  (msgid),
+	  KEY date (date)
+	) TYPE=MyISAM;
