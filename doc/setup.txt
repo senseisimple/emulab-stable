@@ -93,3 +93,24 @@ to /etc/ssh/sshd_config (and HUP sshd) so that you can log in a root remotely
 
 Grab the old /etc/master.passwd file, and run 'cd /etc && pwd_mkdb -p master.passwd'
 Also grab the old /etc/groups file
+
+/etc/syslog.conf needs entries for some of our own services. Example:
+!bootinfo
+*.*                     /var/log/testbed/bootinfo.log
+!tmcd
+*.*                     /var/log/testbed/tmcd.log
+!capture
+*.*                     /var/log/tiplogs/capture.log
+!dhcpd
+*.*                     /usr/testbed/log/dhcpd.log
+
+DHCP - Need to install the dhcpd config file. The old (deprecated) location was
+/usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
+install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf
+
+RC scripts - The mysql-client rc script needs to run before ANY testbed
+services are started! The mysql server should also be started early in the
+process.  boot process. You can ensure this by changing directories to
+/usr/local/etc/rc.d and renaming 'mysql-client.sh' to '1.mysql-client.sh' and
+'mysql-server.sh' to '2.mysql-server.sh'. You will also need to install the
+'3.testbed.sh' script (in the rc.d directory of the testbed tree)
