@@ -473,6 +473,15 @@ sub SetupOpsNode()
 	     "   /usr/local/etc/emulab/rc/rc.inelab");
 
     #
+    # Remove source code from ops so that mere users do not get access to it.
+    # Something to do with licensing ...
+    #
+    mysystem("cp -p ${TBDIR}/testbed/src/testbed/defs-elabinelab ".
+	     "      ${TBDIR}/testbed/src");
+    mysystem("rm -rf ${TBDIR}/testbed/src/testbed");
+    mysystem("rm -rf ${TBDIR}/testbed/obj/testbed");
+
+    #
     # Copy the mirror tree into place. Do not use rsync.
     #
     if (0 && -e "${TBDIR}/mirror") {
