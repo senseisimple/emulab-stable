@@ -1,0 +1,23 @@
+source tb_compat.tcl
+set ns [new Simulator]
+
+set myixp   [$ns node]
+set ixphost [$ns node]
+
+tb-set-hardware $myixp ixp-bveil
+tb-fix-node $myixp $ixphost
+
+tb-set-node-os $ixphost RHL73-IXPHOST
+
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+
+set link1 [$ns duplex-link $n0 $myixp 100Mb 0ms DropTail]
+set link2 [$ns duplex-link $n1 $myixp 100Mb 0ms DropTail]
+set link3 [$ns duplex-link $n2 $myixp 100Mb 0ms DropTail]
+set link4 [$ns duplex-link $n3 $myixp 100Mb 0ms DropTail]
+
+$ns rtproto Static
+$ns run

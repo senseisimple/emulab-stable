@@ -1,0 +1,6 @@
+tb_prerun("tbprerun",0);
+tb_run("tbswap in",0);
+tb_run("tbswap out",0);
+tb_run("tbswap in",0);
+tb_run("tbswap out",0);
+tb_run("tbend",0);
