@@ -27,6 +27,18 @@ else {
 }
 
 if (-e $kernel) {
+    #
+    # In FreeBSD 5, the kernel is in /boot/<kernelname> along with its
+    # constituent modules.  We need to figure our what the correct thing
+    # to do is.
+    #
+    if ($kernel =~ m#^/boot/#) {
+	if ($kernel !~ m#^/boot/kernel/kernel$#) {
+	    print "WARNING: FreeBSD 5 running alternate kernel\n";
+	}
+	exit(0);
+    }
+
     if (system("cmp -s /kernel $kernel") != 0) {
 	if (system("cp -f /kernel /kernel.save")) {
 	    print "Could not backup /kernel! Aborting kernel change\n";

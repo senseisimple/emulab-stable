@@ -32,6 +32,15 @@ BEGIN {
 }
 
 #
+# pc850 under FreeBSD 5.x
+#
+/^acpi0: <INTEL  TR440BXA> on motherboard/ {
+    print "BX";
+    found = 1;
+    exit
+}
+
+#
 # aero:    pcib1: <PCI to PCI bridge (vendor=8086 device=2545)> ... Intel HI_C
 # rutgers: pcib1: <PCI to PCI bridge (vendor=8086 device=2543)> ... Intel HI_B
 #

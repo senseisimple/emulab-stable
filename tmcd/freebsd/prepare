@@ -100,7 +100,7 @@ while ($dirent = readdir(LOG)) {
     my $file = $LOGDIR . "/" . $dirent;
     if (-f $file) {
         if (($file =~ /\.\d+$/) || ($file =~ /\.\d\.gz$/) ||
-	    ($file =~ /\.(today|yesterday)$/)) {
+	    ($file =~ /\.\d\.bz2$/) || ($file =~ /\.(today|yesterday)$/)) {
             # Remove archived logfiles
             unlink($file) or
                 die("Could not unlink $file: $!");

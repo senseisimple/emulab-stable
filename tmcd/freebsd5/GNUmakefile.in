@@ -1,0 +1,89 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# XXX ONLY RUN THIS INSTALL ON A FREEBSD TESTBED NODE!
+#
+# Trivial. These things just need to be installed into the right place
+# on a testbed node before cutting an image.
+#
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tmcd/freebsd5
+
+include $(OBJDIR)/Makeconf
+
+all:	supfile
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+DESTDIR		=
+SYSETCDIR	= $(DESTDIR)/etc
+JAILDIR		= $(SYSETCDIR)/jail
+ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
+RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+ISMFS		= $(ETCDIR)/ismfs
+INSTALL		= /usr/bin/install -c
+
+install:	basefbsd-install etc-install \
+			sup-install script-install bin-install # jail-install
+
+simple-install:	script-install bin-install # jail-install
+
+dir-install:
+	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/sup
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/lock
+	-rm -rf $(DESTDIR)/etc/testbed
+	ln -s emulab $(DESTDIR)/etc/testbed
+	-rm -rf $(DESTDIR)/usr/local/etc/testbed
+	ln -s emulab $(DESTDIR)/usr/local/etc/testbed
+
+basefbsd-install: dir-install
+	(cd ../freebsd; $(MAKE) all install)
+	rm -f $(SYSETCDIR)/start_if.*
+
+sup-install:	dir-install
+	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
+
+bin-install:	dir-install
+
+etc-install:	dir-install sysetc-install
+	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
+	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(ETCDIR)/master.passwd
+
+sysetc-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+
+script-install:	dir-install
+#	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient $(BINDIR)/dhclient
+
+jail-install:	dir-install
+	$(INSTALL) -m 755 -o root -g wheel -d $(JAILDIR)
+	$(INSTALL) -m 644 $(SRCDIR)/jail/group $(JAILDIR)/group
+	$(INSTALL) -m 640 $(SRCDIR)/jail/master.passwd $(JAILDIR)/master.passwd
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.conf $(JAILDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.local $(JAILDIR)/rc.local
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.injail $(BINDIR)/rc.injail
+	$(INSTALL) -m 755 $(SRCDIR)/jail/crontab $(JAILDIR)/crontab
+	$(INSTALL) -m 755 $(SRCDIR)/jail/jailsetup $(BINDIR)/jailsetup
+	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(BINDIR)/mkjail.pl
+	$(INSTALL) -m 755 ./injail $(JAILDIR)/injail
+
+clean:
+	/bin/rm -f supfile
