@@ -38,14 +38,33 @@ if (! count($projlist)) {
 }
 
 #
+# Options for using this page with different types of nodes
+#
+$nodetypes = array( "mote" );
+if ($nodetype == "mote") {
+    $view = array('hide_partition' => 1, 'hide_os' => 1, 'hide_version' => 1,
+		  'hide_snapshot' => 1, 'hide_features' => 1,
+		  'hide_opmode' => 1, 'hide_footnotes' => 1);
+    $nodeclass = "mote";
+} else {
+    # Defaults to PC view
+    $view = array('hide_upload' => 1);
+    $nodeclass = "pc";
+}
+
+#
 # Need a list of node types. We join this over the nodes table so that
 # we get a list of just the nodes that currently in the testbed, not
-# just in the node_types table.
+# just in the node_types table. Limit by class if given.
 #
-$types_result =
-    DBQueryFatal("select distinct n.type from nodes as n ".
+$types_querystring = "select distinct n.type from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
-		 "where nt.imageable=1");
+		 "where nt.imageable=1 ";
+if ($nodeclass) {
+    $types_querystring .= " and nt.class='$nodeclass' ";
+}
+
+$types_result = DBQueryFatal($types_querystring);
 
 #
 # Spit the form out using the array of data. 
@@ -53,9 +72,18 @@ $types_result =
 function SPITFORM($formfields, $errors)
 {
     global $uid, $projlist, $isadmin, $types_result, $osid_oslist, $osid_opmodes,
-      $osid_featurelist;
+      $osid_featurelist, $nodetype, $filename_extension;
     global $TBDB_OSID_OSNAMELEN, $TBDB_NODEIDLEN;
     global $TBDB_OSID_VERSLEN, $TBBASE;
+
+    global $view;
+    #
+    # Explanation of the $view argument: used to turn on and off display of
+    # various parts of the form, so that it can be used for different types
+    # of nodes. It's an associative array, with contents like: 'hide_partition'.
+    # In general, when an option is hidden, it is replaced with a hidden
+    # field from $formfields
+    #
 
     echo "<center><b>
           See the
@@ -127,7 +155,7 @@ function SPITFORM($formfields, $errors)
                   }
                   else if (theform['formfields[imagename]'].value != '') {
                       var filename = theform['formfields[imagename]'].value +
-                                     '.ndz';
+                                     '.$filename_extension';
 
                       if (global) {
     	                  theform['formfields[path]'].value =
@@ -153,7 +181,17 @@ function SPITFORM($formfields, $errors)
                  <em>(Fields marked with * are required)</em>
              </td>
           </tr>
-          <form action='newimageid_ez.php3' method=post name=idform>\n";
+          <form action='newimageid_ez.php3' enctype=\"multipart/form-data\"
+              method=post name=idform>\n";
+
+    #
+    # Carry along the nodetype variable - have to do it here, so that's inside
+    # the form
+    #
+    if (isset($nodetype)) {
+	echo "<input type=hidden name=nodetype value='$nodetype'>";
+    }
+
 
     #
     # Select Project
@@ -240,62 +278,75 @@ function SPITFORM($formfields, $errors)
     #
     # Load Partition
     #
-    echo "<tr>
-              <td>*Which DOS Partition[<b>1</b>]:<br>
-                  (DOS partitions are numbered 1-4)</td>
-              <td><select name=\"formfields[loadpart]\">
-                          <option value=X>Please Select </option>\n";
+    if ($view[hide_partition]) {
+	spithidden($formfields, 'loadpart');
+    } else {
+	echo "<tr>
+		  <td>*Which DOS Partition[<b>1</b>]:<br>
+		      (DOS partitions are numbered 1-4)</td>
+		  <td><select name=\"formfields[loadpart]\">
+			      <option value=X>Please Select </option>\n";
 
-    for ($i = 1; $i <= 4; $i++) {
-	$selected = "";
+	for ($i = 1; $i <= 4; $i++) {
+	    $selected = "";
 
-	if (strcmp($formfields[loadpart], "$i") == 0)
-	    $selected = "selected";
-	
-	echo "        <option $selected value=$i>$i </option>\n";
+	    if (strcmp($formfields[loadpart], "$i") == 0)
+		$selected = "selected";
+	    
+	    echo "        <option $selected value=$i>$i </option>\n";
+	}
+	echo "       </select>";
+	echo "    </td>
+	      </tr>\n";
     }
-    echo "       </select>";
-    echo "    </td>
-          </tr>\n";
 
     #
     # Select an OS
     # 
-    echo "<tr>
-             <td>*Operating System:<br>
-                (OS that is on the partition)</td>
-             <td><select name=\"formfields[os_name]\">
-                   <option value=none>Please Select </option>\n";
+    if ($view[hide_os]) {
+	spithidden($formfields, 'os_name');
+    } else {
+	echo "<tr>
+		 <td>*Operating System:<br>
+		    (OS that is on the partition)</td>
+		 <td><select name=\"formfields[os_name]\">
+		       <option value=none>Please Select </option>\n";
 
-    while (list ($os, $userokay) = each($osid_oslist)) {
-	$selected = "";
+	while (list ($os, $userokay) = each($osid_oslist)) {
+	    $selected = "";
 
-	if (!$userokay && !$isadmin)
-	    continue;
+	    if (!$userokay && !$isadmin)
+		continue;
 
-	if (isset($formfields[os_name]) &&
-	    strcmp($formfields[os_name], $os) == 0)
-	    $selected = "selected";
+	    if (isset($formfields[os_name]) &&
+		strcmp($formfields[os_name], $os) == 0)
+		$selected = "selected";
 
-	echo "<option $selected value=$os>$os &nbsp </option>\n";
+	    echo "<option $selected value=$os>$os &nbsp </option>\n";
+	}
+	echo "       </select>
+		 </td>
+	      </tr>\n";
     }
-    echo "       </select>
-             </td>
-          </tr>\n";
 
     #
     # Version String
     #
-    echo "<tr>
-              <td>*OS Version:<br>
-                  (eg: 4.3, 7.2, etc.)</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[os_version]\"
-                         value=\"" . $formfields[os_version] . "\"
-	                 size=$TBDB_OSID_VERSLEN maxlength=$TBDB_OSID_VERSLEN>
-              </td>
-          </tr>\n";
+    if ($view[hide_version]) {
+	spithidden($formfields, 'os_version');
+    } else {
+	echo "<tr>
+		  <td>*OS Version:<br>
+		      (eg: 4.3, 7.2, etc.)</td>
+		  <td class=left>
+		      <input type=text
+			     name=\"formfields[os_version]\"
+			     value=\"" . $formfields[os_version] . "\"
+			     size=$TBDB_OSID_VERSLEN
+			     maxlength=$TBDB_OSID_VERSLEN>
+		  </td>
+	      </tr>\n";
+    }
 
     #
     # Path to image.
@@ -314,70 +365,88 @@ function SPITFORM($formfields, $errors)
     #
     # Node to Snapshot image from.
     #
-    echo "<tr>
-              <td>Node to Obtain Snapshot from[<b>2</b>]:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[node]\"
-                         value=\"" . $formfields[node] . "\"
-	                 size=$TBDB_NODEIDLEN maxlength=$TBDB_NODEIDLEN>
-              </td>
-          </tr>\n";
+    if ($view[hide_snapshot]) {
+	spithidden($formfields, 'node');
+    } else {
+	echo "<tr>
+		  <td>Node to Obtain Snapshot from[<b>2</b>]:</td>
+		  <td class=left>
+		      <input type=text
+			     name=\"formfields[node]\"
+			     value=\"" . $formfields[node] . "\"
+			     size=$TBDB_NODEIDLEN maxlength=$TBDB_NODEIDLEN>
+		  </td>
+	      </tr>\n";
+    }
 
     #
     # OS Features.
     # 
-    echo "<tr>
-              <td>OS Features[<b>3</b>]:</td>
-              <td>";
+    if ($view[hide_features]) {
+        reset($osid_featurelist);
+        while (list ($feature, $userokay) = each($osid_featurelist)) {
+            spithidden($formfields, "os_feature_$feature");
+        }
+    } else {
+	echo "<tr>
+		  <td>OS Features[<b>3</b>]:</td>
+		  <td>";
 
-    reset($osid_featurelist);
-    while (list ($feature, $userokay) = each($osid_featurelist)) {
-	$checked = "";
-	
-	if (!$userokay && !$isadmin)
-	    continue;
+	reset($osid_featurelist);
+	while (list ($feature, $userokay) = each($osid_featurelist)) {
+	    $checked = "";
+	    
+	    if (!$userokay && !$isadmin)
+		continue;
 
-	if (isset($formfields["os_feature_$feature"]) &&
-	    ! strcmp($formfields["os_feature_$feature"], "checked"))
-	    $checked = "checked";
+	    if (isset($formfields["os_feature_$feature"]) &&
+		! strcmp($formfields["os_feature_$feature"], "checked"))
+		$checked = "checked";
 
-	echo "<input $checked type=checkbox value=checked
-                     name=\"formfields[os_feature_$feature]\">
-                   $feature &nbsp\n";
+	    echo "<input $checked type=checkbox value=checked
+			 name=\"formfields[os_feature_$feature]\">
+		       $feature &nbsp\n";
+	}
+	echo "    </td>
+	      </tr>\n";
     }
-    echo "    </td>
-          </tr>\n";
 
     #
     # Operational Mode
     # 
-    echo "<tr>
-             <td>*Operational Mode[<b>4</b>]:</td>
-             <td><select name=\"formfields[op_mode]\">
-                   <option value=none>Please Select </option>\n";
+    if ($view[hide_opmode]) {
+	spithidden($formfields, 'op_mode');
+    } else {
+	echo "<tr>
+		 <td>*Operational Mode[<b>4</b>]:</td>
+		 <td><select name=\"formfields[op_mode]\">
+		       <option value=none>Please Select </option>\n";
 
-    while (list ($mode, $userokay) = each($osid_opmodes)) {
-	$selected = "";
+	while (list ($mode, $userokay) = each($osid_opmodes)) {
+	    $selected = "";
 
-	if (!$userokay && !$isadmin)
-	    continue;
+	    if (!$userokay && !$isadmin)
+		continue;
 
-	if (isset($formfields[op_mode]) &&
-	    strcmp($formfields[op_mode], $mode) == 0)
-	    $selected = "selected";
+	    if (isset($formfields[op_mode]) &&
+		strcmp($formfields[op_mode], $mode) == 0)
+		$selected = "selected";
 
-	echo "<option $selected value=$mode>$mode &nbsp </option>\n";
+	    echo "<option $selected value=$mode>$mode &nbsp </option>\n";
+	}
+	echo "       </select>
+		 </td>
+	      </tr>\n";
     }
-    echo "       </select>
-             </td>
-          </tr>\n";
 
     #
     # Node Types.
     #
+    if (!$view[hide_footnotes]) {
+	$footnote = "[<b>5</b>]";
+    }
     echo "<tr>
-              <td>Node Types[<b>5</b>]:</td>
+              <td>Node Types${footnote}:</td>
               <td>\n";
 
     mysql_data_seek($types_result, 0);
@@ -400,54 +469,82 @@ function SPITFORM($formfields, $errors)
     #
     # Whole Disk Image
     #
-    echo "<tr>
-  	      <td>Whole Disk Image?[<b>6</b>]:</td>
-              <td class=left>
-                  <input type=checkbox
-                         name=\"formfields[wholedisk]\"
-                         value=Yep";
+    if ($view[hide_snapshot]) {
+	spithidden($formfields, 'wholedisk');
+    } else {
+	echo "<tr>
+		  <td>Whole Disk Image?[<b>6</b>]:</td>
+		  <td class=left>
+		      <input type=checkbox
+			     name=\"formfields[wholedisk]\"
+			     value=Yep";
 
-    if (isset($formfields[wholedisk]) &&
-	strcmp($formfields[wholedisk], "Yep") == 0)
-	echo "           checked";
-	
-    echo "                       > Yes
-              </td>
-          </tr>\n";
+	if (isset($formfields[wholedisk]) &&
+	    strcmp($formfields[wholedisk], "Yep") == 0)
+	    echo "           checked";
+	    
+	echo "                       > Yes
+		  </td>
+	      </tr>\n";
+    }
 
     #
     # Maxiumum concurrent loads
     #
-    echo "<tr>
-              <td>Maximum concurrent loads[<b>7</b>]:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[max_concurrent]\"
-                         value=\"" . $formfields[max_concurrent] . "\"
-	                 size=4 maxlength=4>
-              </td>
-          </tr>\n";
+    if ($view[hide_snapshot]) {
+	spithidden($formfields, 'max_concurrent');
+    } else {
+	echo "<tr>
+		  <td>Maximum concurrent loads[<b>7</b>]:</td>
+		  <td class=left>
+		      <input type=text
+			     name=\"formfields[max_concurrent]\"
+			     value=\"" . $formfields[max_concurrent] . "\"
+			     size=4 maxlength=4>
+		  </td>
+	      </tr>\n";
 
+    }
     
     #
     # Shared?
     #
-    echo "<tr>
-  	      <td>Shared?:<br>
-                  (available to all subgroups)</td>
-              <td class=left>
-                  <input type=checkbox
-                         onClick='SetPrefix(idform);'
-                         name=\"formfields[shared]\"
-                         value=Yep";
+    if ($view[hide_snapshot]) {
+	spithidden($formfields, 'shared');
+    } else {
+	echo "<tr>
+		  <td>Shared?:<br>
+		      (available to all subgroups)</td>
+		  <td class=left>
+		      <input type=checkbox
+			     onClick='SetPrefix(idform);'
+			     name=\"formfields[shared]\"
+			     value=Yep";
 
-    if (isset($formfields[shared]) &&
-	strcmp($formfields[shared], "Yep") == 0)
-	echo "           checked";
-	
-    echo "                       > Yes
-              </td>
-          </tr>\n";
+	if (isset($formfields[shared]) &&
+	    strcmp($formfields[shared], "Yep") == 0)
+	    echo "           checked";
+	    
+	echo "                       > Yes
+		  </td>
+	      </tr>\n";
+    }
+
+    #
+    # Upload an image file
+    #
+    if ($view[hide_upload]) {
+        #spithidden($formfields, 'upload_file');
+    } else {
+	echo "<tr>
+		  <td>Upload a file:</td>
+		  <td class=left>
+		      <input type=file
+			     name=\"upload_file\"
+			     value=''
+			     size=35></tr>";
+
+    }
 
     if ($isadmin) {
         #
@@ -481,71 +578,84 @@ function SPITFORM($formfields, $errors)
     echo "</form>
           </table>\n";
 
-    echo "<h4><blockquote>
-          <ol type=1 start=1>
-             <li> If you don't know what partition you have customized,
-    	          here are some guidelines:
-  	         <ul>
- 		    <li> if you customized one of our standard Linux
-		         images (RHL-*) then it is partition 2.
-	            </li>
-                    <li> if you customized one of our standard BSD
- 		         images (FBSD-*) then it is partition 1.
-	            </li>
-                    <li> otherwise, feel free to ask us!
-		    </li>
-                 </ul>
-             </li>
-             <li> If you already have a node customized, enter that node
-                  name (pcXXX) and a snapshot will automatically be made of
-		  its disk contents into the specified Image File. 
-                  Notification of completion will be sent to you via email. 
-	     </li>
-             <li> Guidelines for setting OS features for your OS:
-                  (Most images should mark all four of these.)
-                <ul>
-                  <li> Mark ping and/or ssh if they are supported. 
-		  </li>
-                  <li> If you use one of our standard Linux or FreeBSD
-                       kernels, or started from our kernel configs, mark ipod.
-		  </li>
-                  <li> If it is based on one of our standard Linux or
-                       FreeBSD images (or otherwise
-                       sends its own ISUP notification), mark isup.
-		  </li>
-                </ul>
-	     </li>
-             <li> Guidelines for setting Operational Mode for your OS:
-                  (Most images should use " . TBDB_DEFAULT_OSID_OPMODE . ")
-                <ul>
-                  <li> If it is based on a testbed image (one of our
-                       RedHat Linux or FreeBSD images)  use the same
-                       op_mode as that image. Select it from the
-                       <a href=\"$TBBASE/showosid_list.php3\"
-                       >OS Descriptor List</a> to find out).
-		  </li>
-                  <li> If not, use MINIMAL. 
-		  </li>
-                </ul>
-	     </li>
-             <li> Specify the node types that this image will be able
-                  to work on (can be loaded on and expected to work).
-                  Typically, images will work on all of the \"pc\" types when
-                  you are customizing one of the standard images. However,
-                  if you are installing your own OS from scratch, or you are
-                  using DOS partition four, then this might not be true.
-                  Feel free to ask us!
-	     </li>
-             <li> If you need to snapshot the entire disk (including the MBR),
-                  check this option. <b>Most users will not need to check this
-                  option. Please ask us first to make sure</b>.
-	     </li>
-             <li> If your image contains software that is only licensed to run
-	  	  on a limited number of nodes at a time, you can put this
-		  number here. Most users will want to leave this option blank.
-	     </li>
-          </ol>
-          </blockquote></h4>\n";
+    if (!$view[hide_footnotes]) {
+	echo "<h4><blockquote>
+	      <ol type=1 start=1>
+		 <li> If you don't know what partition you have customized,
+		      here are some guidelines:
+		     <ul>
+			<li> if you customized one of our standard Linux
+			     images (RHL-*) then it is partition 2.
+			</li>
+			<li> if you customized one of our standard BSD
+			     images (FBSD-*) then it is partition 1.
+			</li>
+			<li> otherwise, feel free to ask us!
+			</li>
+		     </ul>
+		 </li>
+		 <li> If you already have a node customized, enter that node
+		      name (pcXXX) and a snapshot will automatically be made of
+		      its disk contents into the specified Image File. 
+		      Notification of completion will be sent to you via email. 
+		 </li>
+		 <li> Guidelines for setting OS features for your OS:
+		      (Most images should mark all four of these.)
+		    <ul>
+		      <li> Mark ping and/or ssh if they are supported. 
+		      </li>
+		      <li> If you use one of our standard Linux or FreeBSD
+			   kernels, or started from our kernel configs, mark ipod.
+		      </li>
+		      <li> If it is based on one of our standard Linux or
+			   FreeBSD images (or otherwise
+			   sends its own ISUP notification), mark isup.
+		      </li>
+		    </ul>
+		 </li>
+		 <li> Guidelines for setting Operational Mode for your OS:
+		      (Most images should use " . TBDB_DEFAULT_OSID_OPMODE . ")
+		    <ul>
+		      <li> If it is based on a testbed image (one of our
+			   RedHat Linux or FreeBSD images)  use the same
+			   op_mode as that image. Select it from the
+			   <a href=\"$TBBASE/showosid_list.php3\"
+			   >OS Descriptor List</a> to find out).
+		      </li>
+		      <li> If not, use MINIMAL. 
+		      </li>
+		    </ul>
+		 </li>
+		 <li> Specify the node types that this image will be able
+		      to work on (can be loaded on and expected to work).
+		      Typically, images will work on all of the \"pc\" types when
+		      you are customizing one of the standard images. However,
+		      if you are installing your own OS from scratch, or you are
+		      using DOS partition four, then this might not be true.
+		      Feel free to ask us!
+		 </li>
+		 <li> If you need to snapshot the entire disk (including the MBR),
+		      check this option. <b>Most users will not need to check this
+		      option. Please ask us first to make sure</b>.
+		 </li>
+		 <li> If your image contains software that is only licensed to run
+		      on a limited number of nodes at a time, you can put this
+		      number here. Most users will want to leave this option blank.
+		 </li>
+	      </ol>
+	      </blockquote></h4>\n";
+    }
+}
+
+#
+# If the given field is defined in the given set of fields, spit out a hidden
+# form element for it
+#
+function spithidden($formfields, $field) {
+    if (isset($formfields[$field])) {
+	echo "<input type=hidden name=formfields[$field] value='" .
+	     $formfields[$field] . "'>\n";
+    }
 }
 
 #
@@ -553,17 +663,35 @@ function SPITFORM($formfields, $errors)
 #
 if (! $submit) {
     $defaults = array();
-    $defaults[loadpart] = "X";
     $defaults[path]     = "/proj/";
-    $defaults[op_mode]  = TBDB_DEFAULT_OSID_OPMODE;
-    $defaults[os_feature_ping] = "checked";
-    $defaults[os_feature_ssh]  = "checked";
-    $defaults[os_feature_ipod] = "checked";
-    $defaults[os_feature_isup] = "checked";
+    $defaults[shared]   = "Nope";
 
-    # mtype_all is a "fake" variable which makes all
-    # mtypes checked in the virgin form.
-    $defaults[mtype_all] = "Yep";
+    if ($nodetype == "mote") {
+	# Defaults for mote-type nodes
+	$defaults[loadpart]    = "1";
+	$defaults[op_mode]     = TBDB_MINIMAL_OPMODE;
+	$defaults[os_name]     = "TinyOS";
+	$defaults[os_version]  = "1.1.0";
+
+	# Default to 'srec' files for use with uisp
+	$filename_extension    = "srec";
+    } else {
+	# Defaulys for PC-type nodes
+	$defaults[loadpart] = "X";
+	$defaults[path]     = "/proj/";
+	$defaults[op_mode]  = TBDB_DEFAULT_OSID_OPMODE;
+	$defaults[os_feature_ping] = "checked";
+	$defaults[os_feature_ssh]  = "checked";
+	$defaults[os_feature_ipod] = "checked";
+	$defaults[os_feature_isup] = "checked";
+
+	# mtype_all is a "fake" variable which makes all
+	# mtypes checked in the virgin form.
+	$defaults[mtype_all] = "Yep";
+
+	# Default to imagezip ndz files
+	$filename_extension    = "ndz";
+    }
 
     #
     # For users that are in one project and one subgroup, it is usually
@@ -882,16 +1010,30 @@ $confirmationWarning = "";
 # If user does not define a node to suck the image from,
 # we seek confirmation.
 #
-if (! isset($node)) {
-    $confirmationWarning .=
-          "<h2>You have not defined a node to obtain a snapshot from!
-	   If you continue, the image descriptor will be created,
-	   but not associated with any actual disk data.
-	   You will be able to remedy this later by
-	   going to the Image Descriptor information
-	   page for the new image and choosing 
-	   'Snapshot Node Disk into Image' from the menu.<br />
-  	   Continue only if this is what you want.</h2>";
+if ($nodetype == "mote") {
+    # We expect them to give us a file to upload
+    if (! isset($_FILES['upload_file'])) {
+        # We expect them to pick a node to take a snapshot from
+        $confirmationWarning .=
+              "<h2>You have not uploaded a file for this image.
+               If you continue, the image descriptor will be created,
+               but, you will need to copy your image into the pathname
+               you gave in the form yourself.<br />
+               Continue only if this is what you want.</h2>";
+    }
+} else {
+    if (! isset($node)) {
+        # We expect them to pick a node to take a snapshot from
+        $confirmationWarning .=
+              "<h2>You have not defined a node to obtain a snapshot from!
+               If you continue, the image descriptor will be created,
+               but not associated with any actual disk data.
+               You will be able to remedy this later by
+               going to the Image Descriptor information
+               page for the new image and choosing 
+               'Snapshot Node Disk into Image' from the menu.<br />
+               Continue only if this is what you want.</h2>";
+    }
 }
 
 #
@@ -899,13 +1041,17 @@ if (! isset($node)) {
 #
 if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
     echo "<center><br />$confirmationWarning<br />";
-    echo "<form action='newimageid_ez.php3' method=post>";
+    echo "<form enctype=\"multipart/form-data\" action='newimageid_ez.php3'
+            method=post name=idform>";
     #
     # tramp all of their settings along.
     #
     reset($formfields);
     while (list($key, $value) = each($formfields)) {
 	echo "<input type=hidden name=\"formfields[$key]\" value=\"$value\"></input>\n";
+    }
+    if (isset($nodetype)) {
+	echo "<input type=hidden name=nodetype value='$nodetype'>";
     }
     echo "<input type=hidden name='submit' value='Submit'>\n";
     echo "<input type=submit name=confirmed value=Confirm>&nbsp;";
@@ -1049,6 +1195,31 @@ if (isset($node)) {
           <b>PLEASE DO NOT</b> delete the imageid or the experiment
           $node is in. In fact, it is best if you do not mess with 
           the node at all!<br>\n";
+}
+
+#
+# If we were given a file that represents the image, save that to the correct
+# place now
+#
+if (isset($_FILES['upload_file']) &&
+    $_FILES['upload_file']['name'] != "" &&
+    $_FILES['upload_file']['name'] != "none") {
+        
+    # Get the correct group information for this image
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    $tmpfile   = $_FILES['upload_file']['tmp_name'];
+    $localfile = $formfields['path'];
+
+    if (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+        # Taint check shell arguments always!
+	$errors["Image File"] = "Invalid characters";
+    } else {
+	# Note - the script we call takes care of making sure that the local
+        # filename is in /proj or /groups
+        $retval = SUEXEC($uid, "$pid,$unix_gid", "webcopy $tmpfile $localfile",
+             SUEXEC_ACTION_DUPDIE);
+    }
 }
 
 #
