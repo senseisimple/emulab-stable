@@ -47,7 +47,7 @@ fi
 if [ -x /etc/rc.d/testbed/slothd ]; then
             echo "Starting usage detector ..."
             killall slothd
-            rm -f /var/run/slothd
+            rm -f /var/run/slothd.pid
             /etc/rc.d/testbed/slothd
 fi
 
