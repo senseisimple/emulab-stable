@@ -36,6 +36,11 @@ z_stream	d_stream;	/* Compression stream */
 /* Why is this not defined in a public header file? */
 #define ACTIVE		0x80
 #define BOOT_MAGIC	0xAA55
+#ifndef DOSPTYP_LINSWP
+#define	DOSPTYP_LINSWP	0x82	/* Linux swap partition */
+#define	DOSPTYP_LINUX	0x83	/* Linux partition */
+#define	DOSPTYP_EXT	5	/* DOS extended partition */
+#endif
 
 int	infd, outfd;
 int	secsize	  = 512;	/* XXX bytes. */
