@@ -142,7 +142,7 @@ class SSHConnection:
             args = flags + " " + ssh_host + " " + handler
 
             if use_ssh:
-                cmd = "ssh -x -C -o 'CompressionLevel 5' " + args
+                cmd = "ssh -T -x -C -o 'CompressionLevel 5' " + args
                 pass
             else:
                 # Use the PyTTY plink, equivalent to the ssh command.
@@ -151,9 +151,10 @@ class SSHConnection:
             
             if not nt:
                 # Popen3 objects, and the wait method, are Unix-only.
-                self.myChild = popen2.Popen3(cmd, 0)
-                self.rfile = self.myChild.fromchild
-                self.wfile = self.myChild.tochild
+                self.myChild = popen2.Popen3(cmd, 1)
+                self.rfile   = self.myChild.fromchild
+                self.wfile   = self.myChild.tochild
+                self.errfile = self.myChild.childerr
                 pass
             else:
                 # Open the pipe in Binary mode so it doesn't mess with CR-LFs.
@@ -195,8 +196,9 @@ class SSHConnection:
     # Close the connection.
     #
     def close(self):
-        self.rfile.close()
         self.wfile.close()
+        self.errfile.close()
+        self.rfile.close()
         if self.myChild:
             self.myChild.wait()
             self.myChild = None
@@ -243,6 +245,12 @@ class SSHTransport:
         self.ssh_config = ssh_config
         self.user_agent = user_agent
         return
+
+    def __del__(self):
+        for key, val in self.connections.items():
+            val.close()
+            pass
+        return;
     
     ##
     # Send a request to the destination.
@@ -508,6 +516,10 @@ class SSHServerProxy:
         self.__encoding = encoding
         self.__verbose = verbose
         self.__path = path
+        return
+
+    def __del__(self):
+        del self.__transport
         return
 
     ##
