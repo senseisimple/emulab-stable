@@ -39,7 +39,11 @@ control-install: $(addprefix $(INSTALL_LIBDIR)/ns2ir/, $(LIB_STUFF)) \
 post-install: 
 	chmod 775 $(INSTALL_LIBEXECDIR)
 	chown root $(INSTALL_LIBEXECDIR)/parse-ns
+	chmod 775 $(INSTALL_LIBEXECDIR)/ns2ir
 	chmod u+s $(INSTALL_LIBEXECDIR)/parse-ns
+	chmod 775 $(INSTALL_LIBDIR)/ns2ir
+	chmod 775 $(INSTALL_DIR)/opsdir/lib/ns2ir
+	chmod 775 $(INSTALL_DIR)/opsdir/libexec/ns2ir
 
 $(INSTALL_LIBDIR)/ns2ir/%: %
 	@echo "Installing $<"

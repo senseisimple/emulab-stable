@@ -38,11 +38,14 @@ control-install: $(addprefix $(INSTALL_LIBDIR)/nseparse/, $(LIB_STUFF)) \
 post-install: 
 	chmod 775 $(INSTALL_LIBEXECDIR)
 	chown root $(INSTALL_LIBEXECDIR)/parse-nse
+	chmod 775 $(INSTALL_LIBEXECDIR)/nseparse
 	chmod u+s $(INSTALL_LIBEXECDIR)/parse-nse
+	chmod 775 $(INSTALL_DIR)/opsdir/lib/nseparse
+	chmod 775 $(INSTALL_DIR)/opsdir/libexec/nseparse
 
 $(INSTALL_LIBDIR)/nseparse/%: %
 	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBDIR)/nseparse
+	-mkdir -p -m 775 $(INSTALL_LIBDIR)/nseparse
 	$(INSTALL) $< $@
 
 $(INSTALL_LIBEXECDIR)/nseparse/%: %
