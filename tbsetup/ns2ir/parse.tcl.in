@@ -55,7 +55,8 @@ proc var_import {varspec} {
 # Print an error message and mark as failed run.
 ###
 proc perror {msg} {
-    var_import ::GLOBALS::errors argv0
+    var_import ::GLOBALS::errors 
+    global argv0
     puts stderr "$argv0: *** $msg"
     set errors 1
 }
