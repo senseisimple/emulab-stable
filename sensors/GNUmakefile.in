@@ -16,9 +16,6 @@ ifeq ($(SYSTEM),FreeBSD)
 SUBDIRS	+= canaryd
 endif
 
-SUBDIRCLIENT 	= $(addsufix -client $(SUBDIRS))
-SUBDIRINSTALL 	= $(addsufix -install $(SUBDIRS))
-
 ###############################################################################
 
 ## `ACTIONS' is the set of actions that may be taken on a subdirectory or on
