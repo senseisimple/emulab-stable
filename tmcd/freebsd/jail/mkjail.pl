@@ -818,15 +818,9 @@ sub startproxy($)
     $tmccpid = fork();
     if ($tmccpid) {
 	#
-	# So tmcc will work nicely inside the jail without needing the
-	# -l option specified all over.
-	#
-	$ENV{'TMCCUNIXPATH'} = $insidepath;
-
-	#
-	# The above is good only for direct decendents of the init process.
-	# So, the above will be phased out in favor of a file in the usual
-        # place to clue the client in. 
+	# Create a proxypath file so that libtmcc in the jail will know to
+	# use a proxy for all calls; saves having all clients explicitly
+	# use -l for every tmcc call.
 	#
 	mysystem("echo $insidepath > $dir/root/${BOOTDIR}/proxypath");
 	
