@@ -163,6 +163,11 @@ if (mysql_num_rows($query_result)) {
 SHOWGROUPMEMBERSHIP($target_uid);
 
 #
+# Widearea Accounts
+# 
+SHOWWIDEAREAACCOUNTS($target_uid);
+
+#
 # User Profile.
 #
 echo "<center>
