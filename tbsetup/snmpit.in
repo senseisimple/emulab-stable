@@ -93,6 +93,7 @@ END
 
 
 my %opt = ();
+Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','M','n','o=s@',
     'p=s','r','s','t','u=s','v','w','y=s','x=s','z=s');
 # Unused: b,f,j,q
