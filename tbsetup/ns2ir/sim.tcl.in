@@ -503,7 +503,7 @@ Simulator instproc at {time eventstring} {
 }
 
 #
-# Routing control. Right now, we do not support much at all.
+# Routing control.
 #
 Simulator instproc rtproto {type args} {
     var_import ::GLOBALS::default_ip_routing_type
@@ -516,6 +516,8 @@ Simulator instproc rtproto {type args} {
 	set default_ip_routing_type "ospf"
     } elseif {($type == "Manual")} {
 	set default_ip_routing_type "manual"
+    } elseif {($type == "Static")} {
+	set default_ip_routing_type "static"
     } else {
 	punsup "rtproto: unsupported routing protocol ignored: $type"
 	return

@@ -98,6 +98,14 @@ if (system("parse-ns $pid $eid $nsfile")) {
 }
 print "Parser done! " . TBTimeStamp() . "\n";
 
+print "Setting up static routes (if requested) ... \n";
+if (system("staticroutes $pid $eid")) {
+    cleanup();
+    die("*** $0:\n".
+	"    Static route calculation failed!\n");
+}
+print "Static routing done! " . TBTimeStamp() . "\n";
+
 if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
     cleanup();
     die("*** $0:\n".

@@ -31,7 +31,7 @@ LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  assign_wrapper ptopgen webnodeupdate \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup webmkacct websetgroups webmkproj \
-		  spewlogfile  
+		  spewlogfile staticroutes routecalc
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
@@ -47,8 +47,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 CXXFLAGS += -Wall -O3
 
-wanlinksolve: wanlinksolve.o
-	${CXX} wanlinksolve.o -o wanlinksolve ${LIBS} -lm -lstdc++ ${LDFLAGS}
+wanlinksolve: wanlinksolve.cc
+	${CXX} $< -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
+
+routecalc: routecalc.cc
+	${CXX} $< -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
 .PHONY:	checkpass ns2ir
 checkpass:

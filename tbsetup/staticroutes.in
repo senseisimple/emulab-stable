@@ -1,0 +1,398 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+use Socket;
+use IO::Handle;     # thousands of lines just for autoflush :-(
+
+#
+# usage: staticroutes <pid> <eid>
+#
+sub usage()
+{
+    print("Usage: staticroutes [-n] [-d] [-f] [-t] <pid> <eid>\n".
+	  "       Use -n to print routes, but leave the DB alone.\n".
+	  "       Use -d to turn on debugging output.\n".
+	  "       Use -t to optimize network routes.\n".
+	  "       Use -f to force route calculation; ignore 'static' flag.\n");
+    exit(-1);
+}
+my  $optlist = "dnft";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $NETMASK	= "255.255.255.0";
+
+my $debug       = 0;
+my $routecalc   = "$TB/libexec/routecalc";
+my $impotent    = 0;
+my $force	= 0;
+my $optimize    = 0;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"t"})) {
+    $optimize = 1;
+}
+
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+#
+# Get the list of nodes.
+# 
+my $query_result =
+    DBQueryFatal("select vname,ips,routertype from virt_nodes ".
+		 "where pid='$pid' and eid='$eid'");
+
+if (!$query_result->numrows) {
+    warn("*** $0:\n".
+	 "    No nodes in experiment $pid/$eid!\n");
+    exit(0);
+}
+
+# A Flag.
+my $dostatic = 0;
+
+# A map of ips for each node, indexed by vname:port. 
+my %ips      = ();
+
+# A map (and reverse map) of node (vname) to unique index.
+my %map      = ();
+my %rmap     = ();
+my $index    = 0;
+
+# A map of lans, where each is a list of the members, indexed by lan.
+my %lans     = ();
+
+# A reverse map (sorta). Map a pair of links back to the lan.
+my %rlans    = ();
+
+# The costs, indexed by lan This is kinda bogus, but since the cost
+# is the same for each member of a lan, no big deal.
+my %costs    = ();
+
+#
+# Convert list of nodes into a map of $vname:$port to IP. We will need the
+# IPs later when filling in the virt_routes table.
+# 
+while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
+    if (!$force && $routertype ne "static") {
+	next;
+    }
+    $dostatic++;
+    
+    foreach my $ipinfo (split(" ", $ips)) {
+	my ($port,$ip) = split(":", $ipinfo);
+	$ips{"$vname:$port"} = $ip;
+	if (! defined($map{$vname})) {
+	    $map{$vname}  = $index;
+	    $rmap{$index} = $vname;
+	    $index++;
+	}
+    }
+}
+
+if (! $dostatic) {
+    warn("No nodes requested static routing in $pid/$eid. This is okay!\n");
+    exit(0);
+}
+
+#
+# Now get the lans. 
+#
+$query_result =
+    DBQueryFatal("select vname,member,cost " .
+		 "from virt_lans where pid='$pid' and eid='$eid'");
+if (!$query_result->numrows) {
+    warn("*** $0:\n".
+	 "    No links or lans in experiment $pid/$eid!\n");
+    exit(0);
+}
+
+while (my ($vname,$member,$cost) = $query_result->fetchrow_array) {
+    if (! defined($lans{$vname})) {
+	$lans{$vname} = [];
+    }
+    push(@{$lans{$vname}},$member);
+    $costs{$vname} = $cost;
+}
+
+#
+# We use perl IPC goo to create a child we can both write to and read from
+# (normal perl I/O provides just unidirectional I/O to a process).
+# 
+if (! socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)) {
+    die("*** $0:\n".
+	"    socketpair failed: $!\n");
+}
+
+CHILD->autoflush(1);
+PARENT->autoflush(1);
+
+my $childpid = fork();
+if (! $childpid) {
+    close CHILD;
+
+    #
+    # Dup our descriptors to the parent, and exec the program.
+    # The parent then talks to it read/write.
+    #
+    open(STDIN,  "<&PARENT") || die "Can't redirect stdin";
+    open(STDOUT, ">&PARENT") || die "Can't redirect stdout";
+    open(STDERR, ">&PARENT") || die "Can't redirect stderr";
+
+    exec($routecalc);
+    die("*** $0:\n".
+	"    exec $routecalc failed: $!\n");
+}
+close PARENT;
+
+#
+# Okay, now send adjacency info for all the nodes on each lan to the child.
+#
+foreach my $lan (keys(%lans)) {
+    my @members = @{$lans{$lan}};
+
+    foreach my $member1 (@members) {
+	foreach my $member2 (@members) {
+	    if ($member1 ne $member2) {
+		my ($node1,$port1) = split(":", $member1);
+		my ($node2,$port2) = split(":", $member2);
+		my $id1 = $map{$node1};
+		my $id2 = $map{$node2};
+
+		# Reverse mapping for later. 
+		$rlans{"$node1:$node2"} = $lan;
+
+		if ($debug) {
+		    print STDERR "$member1($id1) $member2($id2)\n";
+		}
+
+		print CHILD "i $id1 $id2 $costs{$lan}\n";
+	    }
+	}
+    }
+}
+# Tell the child to print the routes.
+print CHILD "C\n";
+
+#
+# Read back the results from the child.
+#
+my @results = ();
+while (<CHILD>) {
+    if ($debug) {
+	print "$_";
+    }
+    push(@results, $_);
+}
+# Tell the child to quit. Then wait for it.
+print CHILD "q\n";
+waitpid($childpid, 0);
+if ($?) {
+    die("*** $0:\n".
+	"    $routecalc failed with status: $?\n");
+}
+
+#
+# Parse the routes. Need to map the indices back to nodes, and then form a
+# matrix. Why, well you will see in a bit ...
+#
+my %routes	= ();
+my %netroutes   = ();
+
+foreach my $result (@results) {
+    my ($src, $dst, $hop);
+
+    if ($result =~ /route (\d+) to (\d+) via (\d+)/) {
+	$src = $rmap{$1};
+	$dst = $rmap{$2};
+	$hop = $rmap{$3};
+    }
+    else {
+	die("*** $0:\n".
+	    "    $routecalc returned a bad line: '$result'\n");
+    }
+    if ($debug) {
+	print "src:$src dst:$dst hop:$hop\n";
+    }
+    $routes{"$src:$dst"} = $hop;
+}
+
+#
+# Now it gets fun. We have to go through each src:dst pair in the route
+# list. The problem is that the dst could be multihomed and multiple hops
+# away, and so we have no idea what interface (IP) we are actually routing
+# to. We have to know the IP, or else we won't be able to insert the route!
+# So, we use the matrix to recurse through and find our way to the
+# destination. When we get to the last hop, we can use the src:dst of that
+# last hop to index into rlans, which gives the full lanlink list. Then we
+# search that to find the IP.
+#
+foreach my $route (keys(%routes)) {
+    my ($src,$dst) = split(":", $route);
+    my $hop  = $routes{$route};
+    my $type = 'host';
+
+    #
+    # If directly connected, skip.
+    #
+    if ($dst eq $hop) {
+	next;
+    }
+
+    #
+    # This is the lan that contains the src and hop. (the link). 
+    #
+    my $srclan = $rlans{"$src:$hop"};
+
+    #
+    # Now we need to find the destination lan (link) by stepping through
+    # each hop till we get to it.
+    #
+    my $nhop = $hop;
+    while (1) {
+	# Next hop to destination.
+	if (!defined($routes{"$nhop:$dst"})) {
+	    die("*** $0:\n".
+		"    Failed to find route: $nhop:$dst!\n");
+	}
+	my $nnhop = $routes{"$nhop:$dst"};
+
+	# Last hop to destination.
+	if ($nnhop eq $dst) {
+	    last;
+	}
+	$nhop = $nnhop;
+    }
+    my $dstlan = $rlans{"$nhop:$dst"};
+
+    if ($debug) {
+	print "$src --> $dst : $nhop:$dst\n";
+    }
+    
+    #
+    # The members of the lan are used to map back to the IPs of the
+    # interfaces (since we need IPs to insert route entries).
+    #
+    my @srcmembers = @{$lans{$srclan}};
+    my @dstmembers = @{$lans{$dstlan}};
+
+    # Want to find these.
+    my ($srcip,$dstip,$hopip);
+
+    #
+    # Scan dstmembers till we find the dst. This is the IP we want.
+    #
+    foreach my $member (@dstmembers) {
+	my ($node,$port) = split(":", $member);
+
+	if ($node eq $dst) {
+	    $dstip = $ips{$member};
+	    last;
+	}
+    }
+
+    #
+    # If the dst is a real lan (>2 members) we want to create a net route
+    # and avoid a per-host entry for each pair. Convert the route, but
+    # remember we did it so we can skip similar routes in the future.
+    #
+    if ($optimize && @dstmembers > 2) {
+	my $newip = inet_ntoa(inet_aton($dstip) & inet_aton($NETMASK));
+
+	if (defined($netroutes{"$src:$newip"})) {
+	    if ($netroutes{"$src:$newip"} ne $hop) {
+		die("*** $0:\n".
+		    "    network route mismatch: $src:$dst:$hop!\n");
+	    }
+	    next;
+	}
+
+	$netroutes{"$src:$newip"} = $hop;
+	$type  = "net";
+	$dstip = $newip;
+    }
+
+    #
+    # Scan srcmembers to find the IPs for the src and hop.
+    #
+    foreach my $member (@srcmembers) {
+	my ($node,$port) = split(":", $member);
+
+	if ($node eq $src) {
+	    $srcip   = $ips{$member};
+	    next;
+	}
+	if ($node eq $hop) {
+	    $hopip = $ips{$member};
+	    next;
+	}
+    }
+
+    if ($debug || $impotent) {
+	printf("%s: %-23s --> %-23s - %s\n",
+	       ($type eq "net" ? "n" : "h"),
+	       "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
+    }
+    if (! $impotent) {
+	DBQueryFatal("insert into virt_routes ".
+		     " (pid,eid,vname,dst,nexthop,dst_type) ".
+		     " values ('$pid', '$eid', '$src', '$dstip', ".
+		     "         '$hopip', '$type')");
+    }
+}
+
+exit 0;
