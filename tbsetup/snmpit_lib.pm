@@ -14,7 +14,8 @@ package snmpit_lib;
 use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum Dev vlanmemb vlanid
-		getTestSwitches getControlSwitches getVlanPorts
+		getTestSwitches getControlSwitches getSwitchesInStack
+		getVlanPorts
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchStack
 		getStackType getDeviceOptions getTrunks getTrunksFromSwitches
@@ -337,6 +338,20 @@ sub getControlSwitches () {
     return @switches;
 }
 
+#
+# Returns an array with the names of all switches in the given stack
+#
+sub getSwitchesInStack ($) {
+    my ($stack_id) = @_;
+    my $result = DBQueryFatal("SELECT node_id FROM switch_stacks " .
+	"WHERE stack_id='$stack_id'");
+    my @switches = (); 
+    while (my @row = $result->fetchrow()) {
+	push @switches, $row[0];
+    }
+
+    return @switches;
+}
 
 #
 # Returns the stack_id that a switch belongs to
