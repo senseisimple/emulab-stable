@@ -1,13 +1,13 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
+use POSIX qw(setsid);
+use POSIX qw(strftime);
 
 #
 # Create an experiment. The experiment is either run immediately, or
@@ -26,20 +26,24 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    die("Usage: batchexp [-i [-f]] [-x expires] [-E description] [-g gid] ".
+    die("Usage: batchexp [-w] [-i [-f]] [-x expires] [-E description] [-g gid] ".
 	"[-s] [-a <autotime>] [-l <idletime>]] [-n low|high] ".
         "-p <pid> -e <eid> [<nsfile>]\n");
 }
 
-my  $optlist = "iE:d:g:x:e:p:sa:l:n:fq";
+my $optlist = "iE:d:g:x:e:p:sa:l:n:fw";
+my $immediate= 0;
+my $frontend = 0;
+my $waitmode = 0;
 
 #
 # Configure variables
 #
 my $TB       = "@prefix@";
-my $DBNAME   = "@TBDBNAME@";
 my $PROJROOT = "/proj";
 my $EVENTSYS = @EVENTSYS@;
+my $TBOPS    = "@TBOPSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
 
 #
 # Testbed Support libraries
@@ -50,14 +54,14 @@ use libtestbed;
 
 my $parser   = "$TB/libexec/parse-ns";
 my $mkexpdir = "$TB/libexec/mkexpdir";
-my $startexp = "$TB/bin/startexp";
-my $tbdata   = "tbdata";
-my $immediate= 0;
-my $frontend = 0;
-my $quiet    = 0;
+my $tbbindir = "$TB/bin/";
 my $errorstat=-1;
+my $user_name;
+my $user_email;
 my $dbuid;
-my @row;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
 
 #
 # Turn off line buffering on output
@@ -84,14 +88,16 @@ my $gid;
 my $description;
 my $expires;
 my $tempnsfile;
-my $swappable = 0;
-my $idleswap = 0;
+my $swappable    = 0;
+my $idleswap     = 0;
 my $idleswaptime = 60 * TBGetSiteVar("idle/threshold");
-my $autoswap = 0;
+my $autoswap     = 0;
 my $autoswaptime = 10 * 60;
-my $idleignore = 0;
-my $priority   = TB_EXPTPRIORITY_LOW;
-my $exptstate  = EXPTSTATE_NEW();
+my $idleignore   = 0;
+my $priority     = TB_EXPTPRIORITY_LOW;
+my $exptstate    = EXPTSTATE_NEW();
+my $now          = localtime();
+my $committed    = 0;
 
 #
 # Verify user and get his DB uid.
@@ -99,6 +105,14 @@ my $exptstate  = EXPTSTATE_NEW();
 if (! UNIX2DBUID($UID, \$dbuid)) {
     die("*** $0:\n".
         "    You do not exist in the Emulab Database!\n");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+        "    Cannot determine your name and email address.\n");
 }
 
 #
@@ -128,7 +142,8 @@ if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
     die("*** $0:\n".
 	"    Only admins can create experiments with no NS file\n");
 }
-$nsfile = "$eid.ns";
+my $nsfile  = "$eid.ns";
+my $repfile = "$eid.report";
 
 #
 # Make sure UID is allowed to create experiments in this project.
@@ -146,7 +161,7 @@ if (!defined($tempnsfile)) {
     $swappable     = 0;
     $idleswap      = 0;
 }
-elsif (! -f $tempnsfile || ! -r $tempnsfile) {
+elsif (! -f $tempnsfile || ! -r $tempnsfile || -z $tempnsfile) {
     # Exit so that user sees the error, not us.
     print STDERR "*** $0:\n".
 	         "    $tempnsfile does not exist or is not a readable file!\n";
@@ -170,6 +185,15 @@ if (!$immediate && TBSiteVarExists("idle/batch_threshold")) {
 #
 my $webkey   = TBGenSecretKey();
 my $eventkey = TBGenSecretKey();
+
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
 
 #
 # Create an experiment record. The pid/eid has to be unique, so lock the
@@ -197,12 +221,13 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
-		  " idle_ignore, keyhash, expt_locked, eventkey) ".
+		  " idle_ignore, keyhash, expt_locked, eventkey,".
+		  " noswap_reason, noidleswap_reason) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
-		  "now(), '$eventkey')")) {
+		  "now(), '$eventkey', 'None Given', 'None Given')")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -274,6 +299,7 @@ if (!defined($tempnsfile)) {
 # The user's experiment directory is off in /proj space.
 #
 my $workdir = TBExptWorkDir($pid, $eid);
+my $userdir = TBExptUserDir($pid, $eid);
 
 chdir("$workdir") or
     fatal("Could not chdir to $workdir: $!");
@@ -297,57 +323,335 @@ if (system("$parser -n $pid $gid $eid $nsfile") != 0) {
 }
 
 #
+# Gather statistics; start the clock ticking.
+#
+if ($frontend) {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0,
+		    TBDB_STATS_FLAGS_START);
+}
+else {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0,
+		    TBDB_STATS_FLAGS_START);
+}
+
+#
+# The rest of this goes into the background so that the user sees
+# immediate response. We will send email later when the experiment
+# is ready. In waitmode, we hold the parent waiting so that the user
+# can script it. Must protect against async (^C) termination though.
+#
+my $logname = TBExptCreateLogFile($pid, $eid, "startexp");
+TBExptSetLogFile($pid, $eid, $logname);
+TBExptOpenLogFile($pid, $eid);
+    
+if (my $childpid = TBBackGround($logname)) {
+    #
+    # Parent exits normally, unless in waitmode.
+    #
+    if (!$waitmode) {
+	print("Experiment $pid/$eid is now configuring\n".
+ 	      "You will be notified via email when the experiment is ".
+	      "ready to use\n");
+	exit(0);
+    }
+    print("Waiting for " . (!$immediate ? "batch " : "") . "experiment $eid ".
+	  "to finish " . ($frontend ? "preloading." : "swapping in.") . "\n");
+    print("You may type ^C at anytime; you will be notified via email later;\n".
+	  "you will not actually interrupt the experiment itself.\n");
+
+    # Give child a chance to run.
+    select(undef, undef, undef, 0.25);
+	
+    #
+    # Reset signal handlers. User can now kill this process, without
+    # stopping the child.
+    #
+    $SIG{TERM} = 'DEFAULT';
+    $SIG{QUIT} = 'DEFAULT';
+    $SIG{INT}  = 'DEFAULT';
+
+    #
+    # Wait until child exits or until user gets bored and types ^C.
+    #
+    waitpid($childpid, 0);
+
+    print("Done. Exited with status: $?\n");
+    exit($? >> 8);
+}
+
+# We are committed now. Affects how fatal() operates.
+$committed = 1;
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
+}
+
+#
+# The guts of starting an experiment!
+#
 # A batch experiment is essentially preloaded (frontend mode) and then
 # dropped into the batch queue, unless the user requested only preload.
-# Startexp figures all this out, and in fact this script could easily
-# be merged with startexp. Note that we call startexp with the experiment
-# locked, and it checks to make sure. 
 #
-my $optargs = "";
-$optargs .= " -f"
-    if ($frontend);
-$optargs .= " -b"
-    if ($quiet);
 
-if (system("$startexp $optargs -g $gid $pid $eid $nsfile")) {
-    # Obey exit status protocol for web page.
-    $errorstat = 1;
-    fatal("Failed to start experiment $pid/$eid!");
+#
+# Run the various scripts. We want to propogate the error from tbprerun
+# and tbrun back out, hence the bogus looking errorstat variable.
+#
+SetExpState($pid, $eid, EXPTSTATE_PRERUN);
+print "Running 'tbprerun $pid $eid $nsfile'\n";
+if (system("$tbbindir/tbprerun $pid $eid $nsfile") != 0) {
+    $errorstat = $? >> 8;
+    fatal("tbprerun failed!\n");
 }
+SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
+
+#
+# If not in frontend mode (preload only) continue to swapping exp in.
+# 
+if (!$frontend) {
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVATING);
+
+    print "Running 'tbswap in $pid $eid'\n";
+    if (system("$tbbindir/tbswap in $pid $eid") != 0) {
+	$errorstat = $? >> 8;
+	fatal("tbswap in failed!\n");
+    }
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+
+    #
+    # Look for the unsual case of more than 2 nodes and no vlans. Send a
+    # warning message.
+    #
+    my @localnodes = ExpNodes($pid, $eid, 1);
+    
+    if (defined(@localnodes) && scalar(@localnodes) > 2) {
+	my $vlans_result =
+	    DBQueryFatal("select pid from virt_lans ".
+			 "where pid='$pid' and eid='$eid'");
+    
+	if (!$vlans_result->numrows) {
+	    SENDMAIL("$user_name <$user_email>",
+		     "WARNING: Experiment Configuration: $pid/$eid",
+		     "This experiment has zero network links defined.\n".
+		     "Please check your NS file to verify this is what you ".
+		     "want!\n",
+		     "$user_name <$user_email>",
+		     "Cc: $TBOPS", ($nsfile));
+	}
+    }
+}
+
+# We append this report in the email message below.
+if (system("$tbbindir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
+    fatal("tbreport failed!\n");
+}
+
+#
+# Gather statistics.
+#
+if ($frontend) {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0);
+}
+else {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0);
+}
+
+#
+# Try to copy off the files for testbed information gathering.
+#
+TBSaveExpLogFiles($pid, $eid);
+
+#
+# Make a copy of the work dir in the user visible space so the user
+# can see the log files.
+#
+system("cp -Rfp $workdir/ $userdir/tbdata");
+
+#
+# Close up the log file so the webpage stops.
+#
+TBExptCloseLogFile($pid, $eid);
+
+#
+# Must unlock and drop batch experiments into the queue before exit.
+#
+if (!$frontend && !$immediate) {
+    TBUnLockExp($pid, $eid, EXPTSTATE_QUEUED());
+}
+else {
+    TBUnLockExp($pid, $eid);
+}
+
+#
+# Clear the cancel flag now that the operation is complete. Must be
+# done after we change the experiment state (above).
+#
+TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR());
+
+#
+# Dump the report file and the log file to the user via email. 
+#
+# Yuck. We need some stuff from the DB that the web page inserted. This stuff
+# should come in on the command line, since we allow people to invoke this
+# script from ops, and if that happens, we will not have any strings!
+#
+$query_result =
+    DBQueryFatal("select noswap_reason,noidleswap_reason,expt_created ".
+		 "  from experiments ".
+		 "where pid='$pid' and eid='$eid'");
+my ($noswap_reason,$noidleswap_reason,$expt_created) =
+    $query_result->fetchrow_array();
+$noswap_reason = "None Given"
+    if (!defined($noswap_reason));
+$noidleswap_reason = "None Given"
+    if (!defined($noidleswap_reason));
+
+my $message;
+
+if ($frontend) {
+    $message =
+	"Your experiment `$eid' in project `$pid' has been created.\n" .
+	"You can check the web interface to see if it looks the way\n" .
+	"you expected it to. If so, you may swap the experiment in,\n" .
+	"or terminate it, at any time.\n" .
+        "\n";
+}
+else {
+    $message =
+	"Your experiment `$eid' in project `$pid' has been started.\n" .
+	"Here is the experiment summary detailing the nodes that were\n" .
+	"allocated to you. You may use the `Qualified Name' to log on\n" .
+	"to your nodes. See /etc/hosts on your nodes (when running\n" .
+	"FreeBSD, Linux, or NetBSD) for the IP mapping on each node.\n" .
+        "\n";
+}
+$message .=
+    "User:        $user_name\n" .
+    "EID:         $eid\n" .
+    "PID:         $pid\n" .
+    "GID:         $gid\n" .
+    "Description: $description\n" .
+    "Swappable:   " . ($swappable ? "Yes\n" :
+		                    "No  (Reason: $noswap_reason)\n") .
+    "Idle-Swap:   " . ($idleswap  ? "Yes, at $idleswaptime hours\n" :
+		                    "No  (Reason: $noidleswap_reason)\n") .
+    "Auto-Swap:   " . ($autoswap  ? "Yes, at $autoswaptime hours\n" :
+		                    "No\n") .
+    "Created:     $expt_created\n".
+    "Directory:   $userdir\n".
+    "\n".
+    "Appended at the end is the output of the experiment setup. If you\n" .
+    "have any questions or comments, please include the output below\n" .
+    "in your message to $TBOPS";
+
+SENDMAIL("$user_name <$user_email>",
+	 "New Experiment " . (($frontend == 0) ? "Started" : "Created") .
+	 ": $pid/$eid",
+	 $message,
+	 "$user_name <$user_email>",
+	 "Bcc: $TBLOGS",
+	 ($repfile, $logname, $nsfile));
+
+# Done!
 exit(0);
 
+#
+#
+#
 sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print STDOUT "*** $0:\n";
-    print STDOUT "    $mesg\n";
+    print "*** $0:\n";
+    print "    $mesg\n";
+    print "Cleaning up and exiting with status $errorstat ...\n";
 
     #
-    # Generally, we do not delete the stats/resource record, but if we
-    # failed at this point, no point in keeping the record. Just a
-    # waste of space since the testbed_stats log indicates there was a
-    # failure and why (sorta, via the exit code).
+    # Failed early (say, in parsing). No point in keeping any of the
+    # stats or resource records. Just a waste of space since the
+    # testbed_stats log indicates there was a failure and why (sorta,
+    # via the exit code).
+    # 
+    if (!$committed) {
+	if (($query_result =
+	     DBQueryWarn("select idx from experiments ".
+			 "where pid='$pid' and eid='$eid'"))) {
+
+	    my ($idx) = $query_result->fetchrow_array;
+
+	    if (defined($idx) && $idx) {
+		DBQueryWarn("DELETE from experiment_stats ".
+			    "WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
+		DBQueryWarn("DELETE from experiment_resources ".
+			    "WHERE exptidx=$idx");
+	    }
+	}
+	#
+	# Clear the record and cleanup.
+	#
+	TBExptDestroy($pid, $eid);
+	exit($errorstat);
+    }
+
     #
-    if (($query_result =
-	 DBQueryWarn("select idx from experiments ".
-		     "where pid='$pid' and eid='$eid'"))) {
+    # Gather statistics.
+    #
+    if ($frontend) {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, $errorstat);
+    }
+    else {
+	GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, $errorstat);
+    }
 
-	my ($idx) = $query_result->fetchrow_array;
-
-	if (defined($idx) && $idx) {
-	    DBQueryWarn("DELETE from experiment_stats ".
-			"WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
-	    DBQueryWarn("DELETE from experiment_resources ".
-			"WHERE exptidx=$idx");
+    #
+    # Must clean up the experiment if it made it our of NEW state.
+    #
+    my $estate = ExpState($pid, $eid);
+    if ($estate ne EXPTSTATE_NEW) {    
+	if ($estate eq EXPTSTATE_ACTIVE) {
+	    print "Running 'tbswap out -force $pid $eid'\n";
+	    if (system("$tbbindir/tbswap out $pid $eid") != 0) {
+		print "tbswap out failed!\n";
+	    }
+	}
+	print "Running 'tbend -force $pid $eid'\n";
+	if (system("$tbbindir/tbend -force $pid $eid") != 0) {
+	    print "tbend failed!\n";
 	}
     }
 
     #
-    # Clear the record and cleanup.
-    #
-    TBExptDestroy($pid, $eid);
+    # Okay, we *are* going to terminate the experiment.
+    # 
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
 
+    # Clear the logfile so the webpage stops. 
+    TBExptClearLogFile($pid, $eid);
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL("$user_name <$user_email>",
+	     "Experiment Configure Failure: $pid/$eid",
+	     $mesg,
+	     "$user_name <$user_email>",
+	     "Cc: $TBOPS",
+	     ($logname, "assign.log", "wanassign.log", $nsfile));
+
+    #
+    # Back up the work dir for post-mortem debugging. 
+    #
+    system("/bin/rm -rf  ${workdir}-failed");
+    system("/bin/mv -f   $workdir ${workdir}-failed");
+
+    #
+    # Clear the record and cleanup.
+    # 
+    TBExptDestroy($pid, $eid);    
     exit($errorstat);
 }
 
@@ -369,14 +673,47 @@ sub ParseArgs()
 	$tempnsfile = $ARGV[0];
 
 	# Note different taint check (allow /).
-	if ($tempnsfile =~ /^([-\@\w\.\/]+)$/) {
+	if ($tempnsfile =~ /^([-\w\.\/]+)$/) {
 	    $tempnsfile = $1;
 	}
 	else {
-	    fatal("Bad data in argument: $tempnsfile");
+	    die("*** $0:\n".
+		"    Bad data in nsfile: $tempnsfile\n");
+	}
+
+	#
+	# Called from ops interactively. Make sure NS file in /proj or /users.
+	#
+	# Use realpath to resolve any symlinks.
+	#
+	my $translated = `realpath $tempnsfile`;
+	if ($translated =~ /^([-\w\.\/]+)$/) {
+	    $tempnsfile = $1;
+	}
+	else {
+	    die("*** $0:\n".
+		"    Bad data returned by realpath: $translated\n");
+	}
+
+	#
+	# The file must reside in /proj, /groups, or /users. Since this script
+	# runs as the caller, regular file permission checks ensure its a file
+	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
+	# since this script is invoked directly from web interface.
+	#
+	if (! ($tempnsfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
+	    ! ($tempnsfile =~ /^\/var\/tmp\/php\w+/) &&
+	    ! ($tempnsfile =~ /^\/proj/) &&
+	    ! ($tempnsfile =~ /^\/groups/) &&
+	    ! ($tempnsfile =~ /^\/users/)) {
+	    print STDERR
+		"*** $0:\n".
+		"    $tempnsfile does not resolve to an allowed directory!\n";
+	    # Note positive status; so error goes to user not tbops.
+	    exit(1);
 	}
     }
-
+    
     if (defined($options{"i"})) {
 	$immediate = 1;
     }
@@ -386,7 +723,7 @@ sub ParseArgs()
     if (defined($options{"p"})) {
 	$pid = $options{"p"};
 
-	if ($pid =~ /^([-\@\w]+)$/) {
+	if ($pid =~ /^([-\w]+)$/) {
 	    $pid = $1;
 	}
 	else {
@@ -396,7 +733,7 @@ sub ParseArgs()
     if (defined($options{"e"})) {
 	$eid = $options{"e"};
 
-	if ($eid =~ /^([-\@\w]+)$/) {
+	if ($eid =~ /^([-\w]+)$/) {
 	    $eid = $1;
 	}
 	else {
@@ -406,7 +743,7 @@ sub ParseArgs()
     if (defined($options{"g"})) {
 	$gid = $options{"g"};
 
-	if ($gid =~ /^([-\@\w]+)$/) {
+	if ($gid =~ /^([-\w]+)$/) {
 	    $gid = $1;
 	}
 	else {
@@ -434,8 +771,8 @@ sub ParseArgs()
 	(($autoswaptime =~ /^\d+$/) &&
          ($autoswaptime > 0)) or die("Bad autoswap time: '$autoswaptime'");
     }
-    if (defined($options{"q"})) {
-	$quiet = 1;
+    if (defined($options{"w"})) {
+	$waitmode = 1;
     }
     if (defined($options{"n"})) {
 	if ($options{"n"} eq "low") {

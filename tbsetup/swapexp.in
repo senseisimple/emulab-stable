@@ -8,6 +8,7 @@
 
 use English;
 use Getopt::Std;
+use POSIX qw(setsid);
 
 #
 # This gets invoked from the Web interface.
@@ -16,11 +17,11 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-b] [-i | -a | -f] [-r] [-e] ".
+    print STDOUT "Usage: swapexp [-b | -w] [-i | -a | -f] [-r] [-e] ".
 	"<-s in | out | restart | modify | pause> <pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
-my  $optlist = "biafres:";
+my  $optlist = "biafres:w";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -69,6 +70,7 @@ my $idleswap = 0;
 my $autoswap = 0;
 my $force    = 0;
 my $reboot   = 0;
+my $waitmode = 0;
 my $eventsys_restart   = 0;
 my $errorstat= -1;
 my $modifyHosed = 0;
@@ -113,6 +115,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"i"})) {
     $idleswap = 1;
 }
+if (defined($options{"w"})) {
+    $waitmode = 1;
+}
 if (defined($options{"a"})) {
     $autoswap = 1;
 }
@@ -143,9 +148,11 @@ else {
     usage();
 }
 
-if ($inout ne "modify" && @ARGV != 2) {
-    usage();
-}
+usage()
+    if (($waitmode && $batch) ||
+	($inout ne "modify" && @ARGV != 2) ||
+	(($waitmode || $batch) && ($idleswap || $autoswap || $force)));
+
 if ($eventsys_restart && $inout ne "modify") {
     print STDOUT "Usage: swapexp: -e (eventsys_restart) can be used ".
                  "only with -s modify\n";
@@ -157,13 +164,13 @@ my $eid   = $ARGV[1];
 #
 # Untaint the arguments.
 #
-if ($pid =~ /^([-\@\w.]+)$/) {
+if ($pid =~ /^([-\w\.]+)$/) {
     $pid = $1;
 }
 else {
     die("Tainted argument $pid!\n");
 }
-if ($eid =~ /^([-\@\w.]+)$/) {
+if ($eid =~ /^([-\w\.]+)$/) {
     $eid = $1;
 }
 else {
@@ -181,13 +188,42 @@ if ($inout eq "modify" && @ARGV > 2) {
     #
     # Untaint nsfile argument; Allow slash.
     #
-    if ($tempnsfile =~ /^([-\w.\/]+)$/) {
+    if ($tempnsfile =~ /^([-\w\.\/]+)$/) {
 	$tempnsfile = $1;
     }
     else {
-	die("Tainted nsfile name: $tempnsfile");
+	die("Tainted nsfile name: $tempnsfile\n");
     }
-    if (! -f $tempnsfile || -z $tempnsfile) {
+    #
+    # Called from ops interactively. Make sure NS file in /proj or /users.
+    #
+    # Use realpath to resolve any symlinks.
+    #
+    my $translated = `realpath $tempnsfile`;
+    if ($translated =~ /^([-\w\.\/]+)$/) {
+	$tempnsfile = $1;
+    }
+    else {
+	die("Tainted nsfile returned by realpath: $translated\n");
+    }
+
+    #
+    # The file must reside in /proj, /groups, or /users. Since this script
+    # runs as the caller, regular file permission checks ensure its a file
+    # the user is allowed to use. /tmp/$guid-$nsref.nsfile also allowed
+    # since this script is invoked directly from web interface, which generates
+    # a name that should not be guessable, so as long as it looks to be in
+    # proper format, we accept it. 
+    #
+    if (! ($tempnsfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
+	! ($tempnsfile =~ /^\/var\/tmp\/php\w+/) &&
+	! ($tempnsfile =~ /^\/proj/) &&
+	! ($tempnsfile =~ /^\/groups/) &&
+	! ($tempnsfile =~ /^\/users/)) {
+	die("$tempnsfile does not resolve to an appropriate directory!\n");
+    }
+
+    if (! -f $tempnsfile || -z $tempnsfile || ! -r $tempnsfile) {
 	die("*** $0:\n".
 	    "    $tempnsfile does not look like an NS file!\n");
     }
@@ -223,6 +259,15 @@ if ($UID && !TBAdmin($UID) &&
 # Must do this before lock tables!
 # idleswap is in minutes, threshold is in hours
 $idleswap_time = 60 * TBGetSiteVar("idle/threshold");
+
+#
+# In wait mode, block interrupt until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
 
 #
 # We have to protect against trying to end an experiment that is currently
@@ -553,14 +598,46 @@ if (! $batch) {
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
 
-    if (TBBackGround($logname)) {
+    if (my $childpid = TBBackGround($logname)) {
 	#
-	# Parent exits normally
+	# Parent exits normally, except if in waitmode. 
 	#
-	print "Experiment $pid/$eid is now being $action.\n".
-	    "You will be notified via email when the this is done.\n";
-	exit(0);
+	if (!$waitmode) {
+	    print "Experiment $pid/$eid is now being $action.\n".
+		"You will be notified via email when the this is done.\n";
+	    exit(0);
+	}
+	print("Waiting for experiment $eid to finish its swap${action}\n");
+	print("You may type ^C at anytime; you will be notified via email;\n".
+	      "later; you will not actually interrupt the experiment itself.\n");
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n");
+	exit($? >> 8);
     }
+}
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
 }
 
 #

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,10 +22,12 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: endexp [-b] <pid> <eid>\n";
+    print STDOUT "Usage: endexp [-b | -w] <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "b";
+my $optlist = "bw";
+my $waitmode = 0;
+my $batch    = 0;
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -72,7 +74,6 @@ $libdb::DBQUERY_MAXTRIES = 30;
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
-my $batch    = 0;
 my $nextstate;
 my $logname;
 my $dbuid;
@@ -105,19 +106,24 @@ if (@ARGV != 2) {
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
 if (defined($options{"b"})) {
-    $batch = $options{"b"};
+    $batch = 1;
 }
+if (defined($options{"w"})) {
+    $waitmode = 1;
+}
+usage()
+    if ($waitmode && $batch);
 
 #
 # Untaint the arguments.
 #
-if ($pid =~ /^([-\@\w.]+)$/) {
+if ($pid =~ /^([-\w\.]+)$/) {
     $pid = $1;
 }
 else {
     die("Tainted argument $pid!\n");
 }
-if ($eid =~ /^([-\@\w.]+)$/) {
+if ($eid =~ /^([-\w\.]+)$/) {
     $eid = $1;
 }
 else {
@@ -152,6 +158,14 @@ if ($UID && !TBAdmin($UID) &&
 	"    You do not have permission to end this experiment!\n");
 }
 
+#
+# In wait mode, block interrupt until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
 
 #
 # We have to protect against trying to end an experiment that is currently
@@ -328,15 +342,47 @@ if (! $batch) {
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
 
-    if (TBBackGround($logname)) {
+    if (my $childpid = TBBackGround($logname)) {
 	#
-	# Parent exits normally
+	# Parent exits normally, except if in waitmode. 
 	#
-	ExitWithStatus(0,
-	       "Experiment $pid/$eid is now terminating.\n".
-	       "You will be notified via email when the experiment has been\n".
-	       "torn down, and you can reuse the experiment name.\n");
+	if (!$waitmode) {
+	    ExitWithStatus(0,
+		"Experiment $pid/$eid is now terminating.\n".
+		"You will be notified via email when the experiment has been\n".
+		"torn down, and you can reuse the experiment name.\n");
+	}
+	print("Waiting for experiment $eid to finish terminating.\n");
+	print("You may type ^C at anytime; you will be notified via email;\n".
+	      "later; you will not actually interrupt the experiment itself.\n");
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n");
+	exit($? >> 8);
     }
+}
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
 }
 
 #
