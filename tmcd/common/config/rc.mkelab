@@ -321,8 +321,8 @@ sub SetupOpsNode()
     # must do the unmounts before running ops-install. 
     # 
     print "Installing the ops metaport.\n";
-    $ENV{"PKG_PATH"} = "/share/freebsd/packages/FreeBSD-4.10-20041102";
-    mysystem("pkg_add emulab-ops-1.4 >/tmp/perrs 2>&1");
+    $ENV{"PKG_PATH"} = "/share/freebsd/packages/FreeBSD-4.10-20050126";
+    mysystem("pkg_add emulab-ops-1.5 >/tmp/perrs 2>&1");
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
