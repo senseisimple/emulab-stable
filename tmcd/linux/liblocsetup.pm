@@ -537,6 +537,7 @@ sub os_getnfsmounts($)
 	if ($_ =~ /^([-\w\.\/:\(\)]+) on ([-\w\.\/]+) type (\w+) .*$/) {
 	    # Check type for nfs string.
 	    if ($3 eq "nfs") {
+		# Key is the remote NFS path, value is the mount point path.
 		$mounted{$1} = $2;
 	    }
 	}

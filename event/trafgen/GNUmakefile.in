@@ -58,7 +58,7 @@ LIBS	 += -ll -lcompat
 endif
 
 ifeq ($(SYSTEM),CYGWIN_NT-5.1)
-# Cygwin on  Windows XP - resembles the Linux case.
+# Cygwin on  Windows XP (a.k.a. NT 5.1) - resembles the Linux case.
 CFLAGS	 += -DCYGWIN -DLINUX
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DCYGWIN -DLINUX
 
