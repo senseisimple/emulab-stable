@@ -632,6 +632,7 @@ elsif (@vnodelist) {
     foreach my $node (@vnodelist) {
 	$waitstart{$node} = time;
     }
+    my $maxwait = 120 + (30 * scalar(@vnodelist));
 
     print "Waiting for virtual testbed nodes to finish setting up ...\n";
 
@@ -640,7 +641,7 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $wstart = $waitstart{$node};
 
-	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*3))) {
+	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;
