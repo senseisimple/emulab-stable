@@ -5165,18 +5165,19 @@ COMMAND_PROTOTYPE(dofwinfo)
 	char		fwtype[TBDB_FLEN_VNAME+2];
 	char		fwstyle[TBDB_FLEN_VNAME+2];
 	int		n, nrows;
+	char		*vlan;
 
 	/*
 	 * See if this node's experiment has an associated firewall
 	 */
-	res = mydb_query("select r.node_id,f.type,f.style,f.fwname,i.IP,i.mac "
+	res = mydb_query("select r.node_id,f.type,f.style,f.fwname,i.IP,i.mac,f.vlan "
 			 "from firewalls as f "
 			 "left join reserved as r on"
 			 "  f.pid=r.pid and f.eid=r.eid and f.fwname=r.vname "
 			 "left join interfaces as i on r.node_id=i.node_id "
 			 "where f.pid='%s' and f.eid='%s' "
 			 "and i.role='ctrl'",	/* XXX */
-			 6, reqp->pid, reqp->eid);
+			 7, reqp->pid, reqp->eid);
 	if (!res) {
 		error("FWINFO: %s: DB Error getting firewall info!\n",
 		      reqp->nodeid);
@@ -5211,7 +5212,18 @@ COMMAND_PROTOTYPE(dofwinfo)
 	 * Put out base info with TYPE=remote.
 	 */
 	if (strcmp(row[0], reqp->nodeid) != 0) {
-		OUTPUT(buf, sizeof(buf), "TYPE=remote FWIP=%s\n", row[4]);
+		char *fwip;
+
+		/*
+		 * XXX sorta hack: if we are a HW enforced firewall,
+		 * then the client doesn't need to do anything.
+		 * Set the FWIP to 0 to indicate this.
+		 */
+		if (strcmp(row[1], "ipfw2-vlan") == 0)
+			fwip = "0.0.0.0";
+		else
+			fwip = row[4];
+		OUTPUT(buf, sizeof(buf), "TYPE=remote FWIP=%s\n", fwip);
 		mysql_free_result(res);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
@@ -5220,12 +5232,22 @@ COMMAND_PROTOTYPE(dofwinfo)
 	}
 
 	/*
+	 * Grab vlan info if available
+	 */
+	if (row[6] && row[6][0])
+		vlan = row[6];
+	else
+		vlan = "0";
+
+	/*
 	 * We are the firewall.
 	 * Put out base information and all the rules
+	 *
 	 * XXX for now we use the control interface for in/out
 	 */
-	OUTPUT(buf, sizeof(buf), "TYPE=%s STYLE=%s IN_IF=%s OUT_IF=%s\n",
-	       row[1], row[2], row[5], row[5]);
+	OUTPUT(buf, sizeof(buf),
+	       "TYPE=%s STYLE=%s IN_IF=%s OUT_IF=%s IN_VLAN=%s OUT_VLAN=%s\n",
+	       row[1], row[2], row[5], row[5], vlan, vlan);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("FWINFO: %s", buf);
