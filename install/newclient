@@ -208,7 +208,7 @@ sub buildURL {
 #
 sub checkin {
     my ($URL) = @_;
-    open(CHECKIN,"$FETCH -o '-' $URL|")
+    open(CHECKIN,"$FETCH -o '-' '$URL'|")
 	or error_fatal($ERROR_CHECKIN,"Unable to check in with boss!\n");
     my $id = undef;
     while (<CHECKIN>) {
