@@ -1092,19 +1092,29 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * For Virtual Nodes, we return interfaces that belong to it.
 	 */
 	if (reqp->isvnode && !reqp->issubnode)
-		sprintf(clause, "vnode_id='%s'", reqp->vnodeid);
+		sprintf(clause, "i.vnode_id='%s'", reqp->vnodeid);
 	else
-		strcpy(clause, "vnode_id is NULL");
+		strcpy(clause, "i.vnode_id is NULL");
 
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
-			 " IPaliases,iface,role,mask,rtabid,interface_type "
-			 "from interfaces where node_id='%s' and %s",
-			 12, reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
+	res = mydb_query("select i.card,i.IP,i.IPalias,i.MAC,i.current_speed,"
+			 "       i.duplex,i.IPaliases,i.iface,i.role,i.mask,"
+			 "       i.rtabid,i.interface_type,v.vname "
+			 "  from interfaces as i "
+			 "left join reserved as r on "
+			 "     r.node_id=IFNULL(i.vnode_id,i.node_id) "
+			 "left join virt_nodes as n on n.pid=r.pid and "
+			 "     n.eid=r.eid and n.vname=r.vname "
+			 "left join virt_lans as v on "
+			 "     v.member=CONCAT(r.vname, ':', "
+			 "          SUBSTRING(n.ips,"
+			 "                    POSITION(i.IP in n.ips)-2,1)) "
+			 "     and v.pid=r.pid and v.eid=r.eid "
+			 "where i.node_id='%s' and %s",
+			 13, reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
 			 clause);
-
 	/*
 	 * We need pnodeid in the query. But error reporting is done
 	 * by nodeid. For vnodes, nodeid is pcvmXX-XX and for the rest
@@ -1124,6 +1134,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *iface  = row[7];
 			char *role   = row[8];
 			char *type   = row[11];
+			char *lan    = row[12];
 			char *speed  = "100";
 			char *unit   = "Mbps";
 			char *duplex = "full";
@@ -1184,10 +1195,13 @@ COMMAND_PROTOTYPE(doifconfig)
 					       (strcmp(reqp->class, "ixp") ?
 						"" : iface));
 			}
-
 			if (vers >= 14) {
-			  bufp += OUTPUT(bufp, ebufp - bufp,
-					 " RTABID=%s", row[10] );
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " RTABID=%s", row[10]);
+			}
+			if (vers >= 17) {
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " LAN=%s", lan);
 			}
 
 			OUTPUT(bufp, ebufp - bufp, "\n");
@@ -1253,12 +1267,22 @@ COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the veth interfaces.
 	 */
-	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac,v.mask,v.rtabid "
+	res = mydb_query("select v.veth_id,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
+			 "       vl.vname "
 			 "  from veth_interfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
+			 "left join reserved as r on "
+			 "     r.node_id=IFNULL(v.vnode_id,v.node_id) "
+			 "left join virt_nodes as n on n.pid=r.pid and "
+			 "     n.eid=r.eid and n.vname=r.vname "
+			 "left join virt_lans as vl on "
+			 "     vl.member=CONCAT(r.vname, ':', "
+			 "          SUBSTRING(n.ips,"
+			 "                    POSITION(v.IP in n.ips)-2,1)) "
+			 "     and vl.pid=r.pid and vl.eid=r.eid "
 			 "where v.node_id='%s' and %s",
-			 6, reqp->pnodeid, buf);
+			 7, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1294,12 +1318,16 @@ COMMAND_PROTOTYPE(doifconfig)
 		       row[3] ? row[3] : "none");
 
 		if (vers >= 14) {
-		    bufp += OUTPUT( bufp, ebufp - bufp,
-				    " RTABID=%s", row[5] );
+			bufp += OUTPUT( bufp, ebufp - bufp,
+					" RTABID=%s", row[5] );
 		}
 		if (vers >= 15) {
-		    bufp += OUTPUT(bufp, ebufp - bufp,
-				   " ENCAPSULATE=%d", reqp->veth_encapsulate);
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       " ENCAPSULATE=%d",
+				       reqp->veth_encapsulate);
+		}
+		if (vers >= 17) {
+			bufp += OUTPUT(bufp, ebufp - bufp, " LAN=%s", row[6]);
 		}
 
 		OUTPUT(bufp, ebufp - bufp, "\n");
