@@ -89,28 +89,48 @@ MOTE: foreach my $mote (@motes) {
     #
     my @uisp_args;
 
-    my ($type, $class) = TBNodeType($mote);
-    if ($class ne "mote") {
+    #
+    # Make sure they gave us an actual mote
+    #
+    my ($motetype, $moteclass) = TBNodeType($mote);
+    if ($moteclass ne "mote") {
 	warn "$mote is not a mote - skipping\n";
 	$errors++;
 	next MOTE;
     }
 
     #
+    # Find out the type of the mote's host, which we use for actual programming
+    #
+    my $host;
+    if (!TBPhysNodeID($mote,\$host)) {
+	warn "Error getting host for $mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+    if ($host eq $mote) {
+	warn "Error - no host found for $mote - skipping\n";
+	$errors++;
+	next MOTE;
+    }
+    my ($hosttype, $hostclass) = TBNodeType($host);
+
+    #
     # Figure out how we talk to the programming board, and what chipset it has
     #
-    TSWITCH: for ($type) {
+    TSWITCH: for ($hosttype) {
 	/^emote$/ && do {
 	    # Crossbow MIB600CA
 
 	    # The name of the host to communicate with
-	    push @uisp_args, "-dhost=$mote";
+	    push @uisp_args, "-dhost=$host";
 	    # The type of programming board on a emote
 	    push @uisp_args, "-dprog=stk500";
 	    last TSWITCH;
 	};
 	# Default
-	warn "Mote $mote has unsupported type $type - skipping";
+	warn "Mote host $host for $mote has unsupported type $hosttype " .
+	    "- skipping";
 	$errors++;
 	next MOTE;
     }
@@ -118,7 +138,7 @@ MOTE: foreach my $mote (@motes) {
     #
     # Find the name of the microcontroller on the board
     #
-    my ($proc, $speed) = TBNodeTypeProcInfo($type);
+    my ($proc, $speed) = TBNodeTypeProcInfo($motetype);
     PSWITCH: for ($proc) {
 	/^ATmega128/i && do {
 	    push @uisp_args, "-dpart=ATmega128";
