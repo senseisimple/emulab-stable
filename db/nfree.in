@@ -36,7 +36,7 @@ if ($sth->numrows < 1) {
  
 print "Locking tables.\n";
 $cmd = "lock tables nodes read, node_types read, reloads read, ".
-  "interfaces write, reserved write";
+  "interfaces write, delays write, reserved write";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
@@ -111,6 +111,13 @@ foreach my $n (@node_names) {
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++);
   }
+
+  # Clean out all delays
+  $cmd = 
+    "delete from delays where node_id='$n'";
+  $sth = $dbh->query($cmd)
+    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	&& $error++);  
 }
 
 print "Unlocking tables.\n";
