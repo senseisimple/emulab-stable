@@ -42,6 +42,7 @@ my $EMULAB_KEY  = "$TB/etc/emulab.key";
 my $OPENSSL     = "/usr/bin/openssl";
 my $lockfile    = "/var/tmp/testbed_mkusercert_lockfile";
 my $WORKDIR     = "$TB/ssl";
+my $SAVEUID	= $UID;
 
 #
 # We don't want to run this script unless its the real version.
@@ -291,11 +292,13 @@ close(SER);
 #
 # Sign the client cert request, creating a client certificate.
 #
+$UID = 0;
 system("$OPENSSL ca -batch -policy policy_sslxmlrpc -config $CACONFIG ".
        " -name CA_usercerts ".
        " -out usercert_cert.pem -cert $EMULAB_CERT -keyfile $EMULAB_KEY ".
        " -infiles usercert_req.pem") == 0
     or fatal("Could not sign certificate request");
+$UID = $SAVEUID;
 
 #
 # For now, there can be just one cert of each kind (encrypted, and
