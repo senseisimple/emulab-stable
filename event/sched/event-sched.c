@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -357,16 +357,40 @@ get_static_events(event_handle_t handle)
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
-		if (!row[0] || !row[1] || !row[2] || !row[3])
+		if (!row[0] || !row[1] || !row[3])
 			continue;
 
 		strcpy(agents[numagents].objname, row[0]);
 		strcpy(agents[numagents].vnode,   row[1]);
-		strcpy(agents[numagents].nodeid,  row[2]);
 		strcpy(agents[numagents].objtype, row[3]);
 
-		if (! mydb_nodeidtoip(row[2], agents[numagents].ipaddr))
-			continue;
+		/*
+		 * Look for a wildcard in the vnode slot. As a result
+		 * the node_id will come back null from the reserved
+		 * table.
+		 */
+		if (strcmp("*", row[1])) {
+			if (! row[2]) {
+				error("No node_id for vnode %s", row[1]);
+				continue;
+			}
+			
+			strcpy(agents[numagents].nodeid,  row[2]);
+
+			if (! mydb_nodeidtoip(row[2],
+					      agents[numagents].ipaddr)) {
+				error("No ipaddr for node_id %s", row[2]);
+				continue;
+			}
+		}
+		else {
+			/*
+			 * Force events to all nodes. The agents will
+			 * need to discriminate on stuff inside the event.
+			 */
+			strcpy(agents[numagents].nodeid, ADDRESSTUPLE_ALL);
+			strcpy(agents[numagents].ipaddr, ADDRESSTUPLE_ALL);
+		}
 		numagents++;
 		if (numagents >= MAXAGENTS) {
 			fatal("Too many agents!");
@@ -389,7 +413,7 @@ get_static_events(event_handle_t handle)
 	 * Now get the eventlist. There should be entries in the
 	 * agents table for anything we find in the list.
 	 */
-	res = mydb_query("select ex.idx,ex.time,ex.vnode,ex.vname,"
+	res = mydb_query("select ex.idx,ex.time,ex.vname,"
 			 " ex.arguments,ot.type,et.type from eventlist as ex "
 			 "left join event_eventtypes as et on "
 			 " ex.eventtype=et.idx "
@@ -397,14 +421,13 @@ get_static_events(event_handle_t handle)
 			 " ex.objecttype=ot.idx "
 			 "where ex.pid='%s' and ex.eid='%s' "
 			 "order by ex.time ASC",
-			 7, pid, eid);
+			 6, pid, eid);
 #define EXIDX	 row[0]
 #define EXTIME	 row[1]
-#define EXVNODE	 row[2]
-#define OBJNAME  row[3]
-#define EXARGS	 row[4]
-#define OBJTYPE	 row[5]
-#define EVTTYPE	 row[6]
+#define OBJNAME  row[2]
+#define EXARGS	 row[3]
+#define OBJTYPE	 row[4]
+#define EVTTYPE	 row[5]
 
 	if (!res) {
 		error("getting static event list for %s/%s", pid, eid);
@@ -458,8 +481,8 @@ get_static_events(event_handle_t handle)
 		tuple->eventtype = EVTTYPE;
 
 		if (debug) 
-			info("%8s %10s %10s %10s %10s %10s %10s\n",
-			     EXTIME, EXVNODE, OBJNAME, OBJTYPE,
+			info("%8s %10s %10s %10s %10s %10s\n",
+			     EXTIME, OBJNAME, OBJTYPE,
 			     EVTTYPE, agents[adx].ipaddr, 
 			     EXARGS ? EXARGS : "");
 
