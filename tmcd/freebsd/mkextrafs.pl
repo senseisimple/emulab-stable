@@ -16,10 +16,19 @@ use Socket;
 #
 sub usage()
 {
-    print("Usage: mkextrafs.pl <mountpoint>\n");
+    print("Usage: mkextrafs.pl [-f] <mountpoint>\n");
     exit(-1);
 }
-my  $optlist = "";
+my  $optlist = "f";
+
+#
+# Yep, hardwired for now.  Should be options or queried via TMCC.
+#
+my $disk       = "ad0";
+my $slice      = "4";
+my $partition  = "e";
+
+my $forceit    = 0;
 
 #
 # Turn off line buffering on output
@@ -42,6 +51,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"f"})) {
+    $forceit = 1;
+}
 if (@ARGV != 1) {
     usage();
 }
@@ -52,37 +64,70 @@ if (! -d $mountpoint) {
 	"    $mountpoint does not exist!\n");
 }
 
-#
-# Yep, hardwired for now.
-#
-my $rawdevice  = "ad0";
-my $slice      = "4";
-my $partition  = "e";
-my $fsdevice   = "/dev/${rawdevice}s${slice}${partition}";
-my $slice4setup= `fdisk -s $rawdevice | grep '^[ ]*4:'`;
+my $slicedev   = "${disk}s${slice}";
+my $fsdevice   = "/dev/${slicedev}${partition}";
 
+#
+# An existing fstab entry indicates we have already done this
+# XXX override with forceit?  Would require unmounting and removing from fstab.
+#
 if (!system("egrep -q -s '^${fsdevice}' /etc/fstab")) {
     die("*** $0:\n".
-	"    There is already an entry in /ets/fstab for $fsdevice\n");
+	"    There is already an entry in /etc/fstab for $fsdevice\n");
 }
-if ($slice4setup =~ /^[ ]*4:\s*(\d*)\s*(\d*)/) {
-    mysystem("echo \"p 4 165 $1 $2\" | fdisk -f - $rawdevice")
+
+#
+# Likewise, if already mounted somewhere, fail
+#
+my $mounted = `mount | egrep '^${fsdevice}'`;
+if ($mounted =~ /^${fsdevice} on (\S*)/) {
+    die("*** $0:\n".
+	"    $fsdevice is already mounted on $1\n");
+}
+
+my $slice4setup= `fdisk -s $disk | grep '^[ ]*${slice}:'`;
+my $sstart;
+my $ssize;
+my $stype;
+
+if ($slice4setup =~ /^[ ]*${slice}:\s*(\d*)\s*(\d*)\s*(0x\S\S)\s*/) {
+    $sstart = $1;
+    $ssize = $2;
+    $stype = hex($3);
 }
 else {
     die("*** $0:\n".
-	"    Could not parse slice 4 fdisk entry!\n");
+	"    Could not parse slice $slice fdisk entry!\n");
 }
-mysystem("disklabel -w -r ${rawdevice}s${slice} auto");
+
+#
+# Fail if not forcing and the partition type is non-zero.
+#
+if (!$forceit) {
+    if ($stype != 0) {
+	die("*** $0:\n".
+	    "    non-zero partition type ($stype) for /dev/${slicedev}, ".
+	    "use -f to override\n");
+    }
+} elsif ($stype && $stype != 165) {
+    warn("*** $0: WARNING: changing partition type from $stype to 165\n");
+}
+
+#
+# Set the partition type to BSD and create a disk label
+#
+mysystem("echo \"p $slice 165 $sstart $ssize\" | fdisk -f - $disk");
+mysystem("disklabel -w -r $slicedev auto");
 
 # Make sure the kernel really has the new label!
-mysystem("disklabel -r ${rawdevice}s${slice} > /tmp/disklabel");
-mysystem("disklabel -R -r ${rawdevice}s${slice} /tmp/disklabel");
+mysystem("disklabel -r $slicedev > /tmp/disklabel");
+mysystem("disklabel -R -r $slicedev /tmp/disklabel");
 
 $ENV{'EDITOR'} = "ed";
 
-open(ED, "| disklabel -e -r ${rawdevice}s${slice}") or
+open(ED, "| disklabel -e -r $slicedev") or
     die("*** $0:\n".
-	"    Oops, could not edit label on ${rawdevice}s${slice}!\n");
+	"    Oops, could not edit label on /dev/${slicedev}!\n");
 
 print ED "/^  c: /\n";
 print ED "t\n";
@@ -91,9 +136,9 @@ print ED "w\n";
 print ED "q\n";
 if (!close(ED)) {
     die("*** $0:\n".
-	"    Oops, error editing label on ${rawdevice}s${slice}!\n");
+	"    Oops, error editing label on /dev/${slicedev}!\n");
 }
-mysystem("newfs -U -i 25000 ${rawdevice}s${slice}${partition}");
+mysystem("newfs -U -i 25000 $fsdevice");
 mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
 mysystem("mount $mountpoint");
