@@ -43,7 +43,7 @@ if (mysql_num_rows($query_result) == 0) {
   USERERROR("The node $node_id does not exist, or seem to have a tipline!", 1);
 }
 
-$filename = $node_id . ".acl"; 
+$filename = $node_id . ".tbacl"; 
 
 header("Content-Type: text/x-testbed-acl");
 header("Content-Disposition: attachment; filename=$filename;");
