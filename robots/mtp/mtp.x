@@ -277,6 +277,7 @@ struct mtp_garcia_telemetry {
     int idle;
     int user_button;
     int user_led;
+    int stall_contact;
 };
 
 enum mtp_wiggle_t {
