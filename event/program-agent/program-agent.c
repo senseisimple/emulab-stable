@@ -418,8 +418,42 @@ stop_program(struct proginfo *pinfo, char *args)
  * Signal a program.
  */
 #ifdef linux
-extern const char * const sys_siglist[];
-#define sys_signame sys_siglist
+#undef NSIG
+#define NSIG 32
+const char *const sys_signame[NSIG] = {
+	"Signal 0",
+	"hup",				/* SIGHUP */
+	"int",				/* SIGINT */
+	"quit",				/* SIGQUIT */
+	"ill",				/* SIGILL */
+	"trap",				/* SIGTRAP */
+	"abrt",				/* SIGABRT */
+	"bus",				/* SIGBUS */
+	"fpe",				/* SIGFPE */
+	"kill",				/* SIGKILL */
+	"usr1",				/* SIGUSR1 */
+	"segv",				/* SIGSEGV */
+	"usr2",				/* SIGUSR2 */
+	"pipe",				/* SIGPIPE */
+	"alrm",				/* SIGALRM */
+	"term",				/* SIGTERM */
+	"stkflt",			/* SIGSTKFLT */
+	"chld",				/* SIGCHLD */
+	"cont",				/* SIGCONT */
+	"stop",				/* SIGSTOP */
+	"tstp",				/* SIGTSTP */
+	"ttin",				/* SIGTTIN */
+	"ttou",				/* SIGTTOU */
+	"urg",				/* SIGURG */
+	"xcpu",				/* SIGXCPU */
+	"xfsz",				/* SIGXFSZ */
+	"vtalrm",			/* SIGVTALRM */
+	"prof",				/* SIGPROF */
+	"winch",			/* SIGWINCH */
+	"io",				/* SIGIO */
+	"pwr",				/* SIGPWR */
+	"sys",				/* SIGSYS */
+};
 #endif
 
 static void
