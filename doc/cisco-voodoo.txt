@@ -91,3 +91,23 @@ ID  Name                            Members of VLAN
 
       set port enable card/port
 
+
+
+2. Checking on the firewall rules
+
+   You have to login to the "control" Cisco, enable and then
+   "session 15" to connect to the Router module.
+
+   While at the Router> prompt, you will get any "access denied" type
+   messages that the router produces, ala:
+
+   23w2d: %SEC-6-IPACCESSLOGP: list control-shark denied \
+	  udp 0.0.0.0(0) -> 255.255.255.255(0), 602 packets
+
+   If you suspect that some rule is preventing your traffic from getting
+   through, then try generating your traffic while you are connected to
+   the router and see if you get errors.
+
+3. Changing the firewall rules
+
+   No freakin' clue.
