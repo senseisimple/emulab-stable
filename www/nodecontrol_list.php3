@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -79,10 +79,11 @@ if ($isadmin || !strcmp($showtype, "widearea")) {
 # Suck out info for all the nodes.
 # 
 $query_result =
-    DBQueryFatal("select n.node_id,n.phys_nodeid,n.type,n.status, ".
+    DBQueryFatal("select n.node_id,n.phys_nodeid,n.type,ns.status, ".
 		 "   n.def_boot_osid,r.pid,r.eid,nt.class,r.vname ".
 		 " from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
+		 "left join node_status as ns on n.node_id=ns.node_id ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "where $role $clause ".
 		 "ORDER BY priority");
@@ -174,12 +175,18 @@ while ($row = mysql_fetch_array($query_result)) {
     
     echo "   <td>$type ($class)</td>\n";
 
-    if ($status == "up")
+    if (!$status)
+	echo "<td align=center>
+                  <img src='/autostatus-icons/blueball.gif' alt=unk></td>\n";
+    elseif ($status == "up")
 	echo "<td align=center>
                   <img src='/autostatus-icons/greenball.gif' alt=up></td>\n";
-    else
+    elseif ($status == "down")
 	echo "<td align=center>
                   <img src='/autostatus-icons/redball.gif' alt=down></td>\n";
+    else
+	echo "<td align=center>
+                  <img src='/autostatus-icons/yellowball.gif' alt=unk></td>\n";
 
     # Admins get pid/eid/vname, but mere users yes/no.
     if ($isadmin) {
