@@ -170,6 +170,7 @@ while (1) {
     $running_result =
 	DBQuery("select * from experiments ".
 		"where batchmode=1 and batchstate='$BSTATE_RUNNING' ".
+		" and expt_head_uid!='stoller' ".
 		"ORDER BY expt_start");
 
     if (!$pending_result || !$running_result) {
