@@ -57,13 +57,13 @@ if (! $info_result) {
     TBERROR("Database Error getting user info for user $uid: $err\n", 1);
 }
 
-$row = mysql_fetch_row($info_result);
-$usr_expires = $row[0];
-$usr_email   = $row[1];
-$usr_addr    = $row[2];
-$usr_name    = $row[3];
-$usr_phone   = $row[4];
-$usr_passwd  = $row[5];
+$row = mysql_fetch_array($info_result);
+$usr_expires = $row[usr_expires];
+$usr_email   = $row[usr_email];
+$usr_addr    = $row[usr_addr];
+$usr_name    = $row[usr_name];
+$usr_phone   = $row[usr_phone];
+$usr_passwd  = $row[usr_pswd];
 
 #
 # Generate the form.
