@@ -53,11 +53,9 @@ endif
 
 # Link against some of the object files from libtb, instead of the
 # whole library, since the latter cannot be built on clients (without mysql)
-tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
+tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o ../lib/libevent.a ../lib/event.h
 	$(CC) $(LDFLAGS) -o $@ tevc.o $(LIBTBDIR)/log.o \
 		$(LIBTBDIR)/tbdefs.o $(LIBS)
-
-$(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:	$(INSTALL_BINDIR)/tevc \
 		$(INSTALL_DIR)/opsdir/bin/tevc
