@@ -29,6 +29,11 @@ use lib '@prefix@/lib';
 use libdb;
 require exitonwarn;
 
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
 use Getopt::Std;
 
 getopts('v',\%opt);
@@ -352,12 +357,13 @@ while (1) {
     system("ptopgen > $ptopfile");
 
     # Get number of nodes
-    # NOTE: The result of a DBQuery, in scalar context, is the number of rows
-    $numnodes = DBQueryFatal("select a.node_id,a.type from" .
+    my $numnodes_result = 
+	DBQueryFatal("select a.node_id,a.type from" .
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
 		     " where b.node_id is null" .
 		     " and a.role='testnode' and a.type!='dnard'");
+    $numnodes = $numnodes_result->numrows;
     
     if ($numnodes < $minimum_nodes) {
 	print STDERR "$0: *** Insufficient nodes available.\n";
