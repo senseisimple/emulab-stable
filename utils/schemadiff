@@ -133,7 +133,7 @@ sub read_schema($) {
 	# differs depending on whether or not we're in a create definition.
 	#
 	if (!$create_table) {
-	    if (/^\s*$/ || /^\s*#/ || /^INSERT INTO/) {
+	    if (/^\s*$/ || /^\s*#/ || /^--/ || /^INSERT INTO/) {
 		# An insert statement, a comment, or a blank line. Do nothing.
 	    } elsif (/^CREATE TABLE (\w+) \($/) {
 
