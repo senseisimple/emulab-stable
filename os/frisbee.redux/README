@@ -1,20 +1,17 @@
-[Note: This file contains some mail exchanged about the design and
-implementation of Frisbee. For a better discussion, read
-doc/papers/frisbee-usenix03.pdf]
+[Note: This file contains some old mail exchanged about the design and
+implementation of Frisbee.  For a much better discussion, read our
+Usenix 2003 paper, available on the Web or in the testbed source tree at
+doc/papers/frisbee-usenix03.pdf ]
 
+------------------------------------------------
 From stoller Mon Mar 18 07:17:13 -0800 2002
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Transfer-Encoding: 7bit
-Message-ID: <15510.1273.558700.46502@stoller.casco.net>
 Date: Mon, 18 Mar 2002 07:17:13 -0800
 From: Leigh Stoller <stoller@fast.cs.utah.edu>
 To: Jay Lepreau <lepreau@fast.cs.utah.edu>
 Cc: barb@fast.cs.utah.edu
 Subject: Re: Need a summary of the Frisbee algorithm
 In-Reply-To: <200203181215.FAA11167@fast.cs.utah.edu>
-References: <200203181215.FAA11167@fast.cs.utah.edu>
-X-Mailer: VM 6.92 under Emacs 20.7.1
+
 
 > From: Jay Lepreau <lepreau@fast.cs.utah.edu>
 > Subject: Need a summary of the Frisbee algorithm
@@ -186,31 +183,12 @@ if it exceeds some thresshold, and then ramp it back up a bit over time?
   -dave
 
 From testbed-request  Fri May 10 12:34:34 2002
-Return-Path: <stoller@stoller.casco.net>
-Received: from clark.casco.net (clark.pioneer.net [204.119.56.2])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id MAA19435
-	for <testbed@fast.cs.utah.edu>; Fri, 10 May 2002 12:34:34 -0600 (MDT)
-Received: from stoller.casco.net (stoller.casco.net [204.119.59.136])
-	by clark.casco.net (Postfix) with ESMTP
-	id 9036DCF5E2; Fri, 10 May 2002 11:34:30 -0700 (PDT)
-Received: (from stoller@localhost)
-	by stoller.casco.net (8.11.3/8.11.0) id g4AIYUY46479;
-	Fri, 10 May 2002 11:34:30 -0700 (PDT)
-	(envelope-from stoller@stoller.casco.net)
-MIME-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Transfer-Encoding: 7bit
 Message-ID: <15580.4790.185138.434691@stoller.casco.net>
 Date: Fri, 10 May 2002 11:34:30 -0700
 From: Leigh Stoller <stoller@fast.cs.utah.edu>
 To: Testbed Project <testbed@fast.cs.utah.edu>
 Cc: Jay Lepreau <lepreau@cs.utah.edu>
 Subject: Frisbee and Multicast
-X-Mailer: VM 6.92 under Emacs 20.7.1
-Status: O
-X-Status: 
-X-Keywords:                  
-X-UID: 1193
 
 Found this site: http://www.roads.lut.ac.uk/DS-Archive/MTP.html
 
@@ -285,4 +263,4 @@ right over without looking at. Table 1 might be interesting though.
 The ultimate conclusion is that tree based multicast is best ...
 
 Lbs
-
+-----------------------------------------------------------------
