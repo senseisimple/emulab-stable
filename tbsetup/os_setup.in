@@ -219,7 +219,7 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     # Set the canfail bit. Currently, sharks are always canfail=1.
     # Will come from DB at some point.
     #
-    if ($row{'type'} eq "shark") {
+    if ($row{'type'} eq "dnard") {
 	$canfail{$node} = 1;
     }
     else {

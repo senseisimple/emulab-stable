@@ -43,7 +43,7 @@ if ($@) {
 # $delayos is the delay os, currently assumed to be os of PC's
 # XXX - Should grab this from the DB eventually
 $delayos   = "FBSD40-STD";
-$delaytype = "pc";
+$delaytype = "pc600";
 
 $raw = eval {&ir_get("/topology/nodes")};
 if ($@) {

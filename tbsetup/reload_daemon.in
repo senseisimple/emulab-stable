@@ -7,7 +7,7 @@ use Getopt::Std;
 #
 #	usage: reload_daemon [-d]
 #
-# XXX - Hardwired to type "pc".
+# XXX - Hardwired to type "pc600".
 #       Path to image and the partition are hardwired in.
 #
 # TODO: Use "logger" instead of writing a log file.
@@ -27,7 +27,7 @@ my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
 
-my $TYPE     = "pc";
+my $TYPE     = "pc600"; # XXX: Temporary hack! needs to change for ISPs
 my $reloader = "$TB/sbin/sched_reload";
 my $reboot   = "$TB/bin/node_reboot";
 my $logfile  = "$TB/log/reloadlog";

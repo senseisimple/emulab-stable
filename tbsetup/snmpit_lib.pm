@@ -99,7 +99,7 @@ sub ReadTranslationTable {
   print "FILLING %Devices\n" if $debug;
   $sth = $dbh->query("select i.node_id,i.IP from interfaces as i ".
 		     "left join nodes as n on n.node_id=i.node_id ".
-		     "where n.type!='pc' and n.type!='shark'");
+		     "where n.role!='testnode'");
   while ( @_ = $sth->fetchrow_array()) {
     $name = "$_[0]";
     $ip = "$_[1]";

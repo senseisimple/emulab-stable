@@ -383,8 +383,7 @@ while (1) {
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
 		     " where b.node_id is null" .
-		     " and a.type != \"cisco\" and a.type != \"APC\"" .
-		     " and a.type != \"shark\"");
+		     " and a.role='testnode'");
     
     if ($numnodes < $minimum_nodes) {
 	print STDERR "$0: *** Insufficient nodes available.\n";

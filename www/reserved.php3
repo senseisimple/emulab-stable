@@ -7,9 +7,10 @@ include("defs.php3");
 PAGEHEADER("Utah Testbed Machine Status");
 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT n.node_id, n.type, j.pid, j.eid, j.vname FROM nodes ".
-	"AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
-	"WHERE type='pc' OR type='shark' ORDER BY type,priority");
+	"SELECT n.node_id, n.type, nt.class, j.pid, j.eid, j.vname ".
+        "FROM nodes AS n LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
+        "LEFT JOIN node_types AS nt ON n.type=nt.type ".
+	"WHERE role='testnode' ORDER BY type,priority");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error getting node reservation status: $err\n", 1);
@@ -29,7 +30,7 @@ $freepcs   = 0;
 $freesharks= 0;
 
 while ($r = mysql_fetch_array($query_result)) {
-    $type = $r["type"];
+    $type = $r["class"];
     $eid  = $r["eid"];
     
     if ($type == "pc") {
@@ -69,7 +70,7 @@ echo "</tr>\n";
 
 mysql_data_seek($query_result, 0);
 while ($r = mysql_fetch_array($query_result)) {
-    $id = $r["node_id"];  $type = $r["type"]; 
+    $id = $r["node_id"];  $type = $r["type"]; $class = $r["class"];
     $res1 = $r["pid"];
     $res2 = $r["eid"];
     $res3 = $r["vname"];
@@ -82,7 +83,7 @@ while ($r = mysql_fetch_array($query_result)) {
     if (!$res3 || $res3 == "NULL") {
       $res3 = "--";
     }
-    echo "<tr><td>$id</td> <td>$type</td> ";
+    echo "<tr><td>$id</td> <td>$type ($class)</td> ";
     # If I'm an admin, I can see pid/eid/vname, but if not, I only see eid
     if ($isadmin) { echo "<td>$res1</td> "; }
     echo "<td>$res2</td> ";

@@ -26,7 +26,8 @@ Node instproc init {s} {
     $self set iplist {}
 
     # The type of the node.
-    $self set type "pc"
+    $self set type "pc600" 
+    # XXX Temporary hack! to use ISPs, must change
 
     # If osid remains blank when updatedb is called it is changed
     # to the default OS based on it's type (taken from node_types

@@ -7,7 +7,8 @@ $switch_speed = 100;
 
 # Switch types - include all node types that are switches
 %switch_types = (
-		 'cisco', 1,
+		 'cisco6509', 1,
+		 'intel510t', 1
 		 );
 
 # Omit types - Include all types of node that will never be used.
@@ -112,10 +113,10 @@ sub get_ifacebw {
     }
 };
 
-$sth = $dbh->prepare("SELECT type,node_id1,card1,port1,node_id2,card2,port2" .
+$sth = $dbh->prepare("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\"");
 $sth->execute;
-while (($type,$node1,$card1,$port1,$node2,$card2,$port2) = 
+while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $sth->fetchrow_array) {
     if (defined($nodes{$node1}) && defined($nodes{$node2})) {
 	$iface1 = get_iface($node1,$card1,$port1);

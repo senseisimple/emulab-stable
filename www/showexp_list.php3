@@ -63,6 +63,8 @@ if (mysql_num_rows($experiments_result)) {
               <td width=70%>Name</td>
             </tr>\n";
 
+    $total_pcs = 0;
+    $total_sharks = 0;
     while ($row = mysql_fetch_array($experiments_result)) {
 	$pid  = $row[pid];
 	$eid  = $row[eid];
@@ -70,15 +72,19 @@ if (mysql_num_rows($experiments_result)) {
 	$name = $row[expt_name];
 
 	$usage_query = mysql_db_query($TBDBNAME,
-	  "select n.type, count(*) from reserved as r left join nodes as n ".
-	  "on r.node_id=n.node_id where r.pid='$pid' and r.eid='$eid' ".
-	  "group by n.type;");
+	  "select nt.class, count(*) from reserved as r left join nodes as n ".
+	  "on r.node_id=n.node_id left join node_types as nt ".
+	  "on n.type=nt.type where r.pid='$pid' and r.eid='$eid' ".
+	  "group by nt.class;");
 
 	$usage["pc"]="";
 	$usage["shark"]="";
 	while ($n = mysql_fetch_array($usage_query)) {
 	  $usage[$n[0]] = $n[1];
 	}
+
+	$total_pcs += $usage["pc"];
+	$total_sharks += $usage["shark"];
 
 	echo "<tr>
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -95,6 +101,9 @@ if (mysql_num_rows($experiments_result)) {
                </tr>\n";
     }
     echo "</table>\n";
+    echo "<center>\n<h2>Total PCs in use: $total_pcs<br>\n";#</h2>\n";
+    echo "Total Sharks in use: $total_sharks<br>\n";
+    echo "Total Nodes in use: ",$total_sharks+$total_pcs,"</h2>\n</center>\n";
 }
 
 if (mysql_num_rows($batch_result)) {

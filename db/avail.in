@@ -1,15 +1,15 @@
 #!/usr/local/bin/perl -w
 use Mysql;
 
-my $d = 0; #debug mode
+my $d = 1; #debug mode
 
 if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
   die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
-      "      [deltas=<delta[,delta,...]>]".
+      #"      [deltas=<delta[,delta,...]>]".
       #	" [fixes=<fix_name[,fix_name,...]>]".
       "\n".
       "type \t= pc | shark\n"."OS \t= Linux | FreeBSD | NetBSD | ...\n".
-      "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n"."deltas \t= anetd | ...\n".
+      "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n".#"deltas \t= anetd | ...\n".
       #	"fixes \t\t= cron_off | sendmail_off | ...\n"
       "A field name alone will show that field in the display of available\n".
       "nodes. A field name with '=' will match nodes that have that field\n".
@@ -29,7 +29,7 @@ while ($#ARGV >= 0) {
     @_ = split('=',$_);
     my ($opt,$val) = @_ if ($#_ >= 0);
     if (!defined($val)) { $val=""; }
-    $args{$opt}=$val if (defined($opt));
+    $args{"\L$opt"}=$val if (defined($opt));
   }
 }
 if ( $d ) {
@@ -41,12 +41,13 @@ if ( $d ) {
 
 my $join= "nodes as a left join reserved as b on a.node_id=b.node_id";
 my $cols= "a.node_id,a.type";
-my $cond= "b.node_id is null and a.type!='cisco' and a.type!='APC'";
+my $cond= "b.node_id is null and a.role='testnode'";
 my $os = 0;
 my $delta = 0;
 
-if (defined($args{"type"})) { 
-  $cond .= " and a.type='".$args{"type"}."'" if $args{"type"} ne '='; 
+if (defined($args{"type"})) {
+  # Make it a like, so if they type 'pc' they get pc850 and pc600...
+  $cond .= " and a.type like '%".$args{"type"}."%'" if $args{"type"} ne '='; 
 }
 if (defined($args{"os"})) { 
   $os = 1;
@@ -58,25 +59,25 @@ if (defined($args{"ver"})) {
   $cols .= ",d.ver";
   $cond .= " and d.ver='".$args{"ver"}."'" if $args{"ver"} ne '='; 
 }
-if (defined($args{"deltas"})) { 
-  $os = 1;
-  $delta=1;
-  $cols .= ",e.delta_id";
-  $cond .= " and e.delta_id='".$args{"deltas"}."'" if $args{"deltas"} ne '='; 
-}
+# if (defined($args{"deltas"})) { 
+#   $os = 1;
+#   $delta=1;
+#   $cols .= ",e.delta_id";
+#   $cond .= " and e.delta_id='".$args{"deltas"}."'" if $args{"deltas"} ne '='; 
+# }
 
 if ($os) {
   $join .= " left join partitions as c on a.node_id=c.node_id";
-  $join .= " left join disk_images as d on c.image_id=d.image_id";
+  $join .= " left join os_info as d on c.osid=d.osid";
 }
 
-if ($delta) {
-  $join .= " left join delta_inst as e on c.node_id=e.node_id ".
-    "and c.partition=e.partition";
-}
+# if ($delta) {
+#   $join .= " left join delta_inst as e on c.node_id=e.node_id ".
+#     "and c.partition=e.partition";
+# }
 
 
-my $cmd = "select $cols from $join where $cond order by node_id,type";
+my $cmd = "select $cols from $join where $cond order by priority";
 
 print "Sending cmd:\n$cmd\n" if $d;
 
