@@ -16,29 +16,33 @@ use IO::Handle;     # thousands of lines just for autoflush :-(
 #
 sub usage()
 {
-    print("Usage: staticroutes [-n [-s|-l|-b]] [-d] [-f] [-t] <pid> <eid>\n".
+    print("Usage: staticroutes [-n [-s|-l|-b]] [-d] [-m] [-f] [-t] <pid> <eid>\n".
 	  "       Use -n to print routes, but leave the DB alone.\n".
 	  "       Use -s (with -n) to print routes in NS format.\n".
 	  "       Use -b (with -n) to print routes in Freebsd format.\n".
 	  "       Use -l (with -n) to print routes in Linux format.\n".
 	  "       Use -d to turn on debugging output.\n".
+	  "       Use -m to turn on memory debugging output with top.\n".
 	  "       Use -t to optimize network routes.\n".
 	  "       Use -f to force route calculation; ignore 'static' flag.\n");
     exit(-1);
 }
-my  $optlist = "dnftslb";
+my  $optlist = "dnftslbm";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $NETMASK	= "255.255.255.0";
+my $EXPTNETMASK = "255.255.0.0";
 
 my $debug       = 0;
+my $memdebug    = 0;
 my $routecalc   = "$TB/libexec/routecalc";
 my $impotent    = 0;
 my $force	= 0;
 my $optimize    = 1;
+my $edgeoptimize= 0; # Turned off till netmask problem can be fixed
 my $format      = "";
 
 #
@@ -70,6 +74,9 @@ if (@ARGV != 2) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"m"})) {
+    $memdebug = 1;
 }
 if (defined($options{"n"})) {
     $impotent = 1;
@@ -160,7 +167,7 @@ my %nodeportlist = ();
 # IPs later when filling in the virt_routes table.
 # 
 while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
-    if (!$force && $routertype ne TBDB_ROUTERTYPE_STATIC()) {
+    if (!$force && $routertype ne "static") {
 	next;
     }
     $dostatic++;
@@ -171,14 +178,14 @@ while (my ($vname,$ips,$routertype) = $query_result->fetchrow_array) {
       $nodeportlist{$vname} = [];
     }
     
+    if (! defined($map{$vname})) {
+	$map{$vname}  = $index;
+	$rmap{$index} = $vname;
+	$index++;
+    }
     foreach my $ipinfo (split(" ", $ips)) {
 	my ($port,$ip) = split(":", $ipinfo);
 	$ips{"$vname:$port"} = $ip;
-	if (! defined($map{$vname})) {
-	    $map{$vname}  = $index;
-	    $rmap{$index} = $vname;
-	    $index++;
-	}
 	push( @{$nodeportlist{$vname}}, $port );
 	$linkcount{$vname} += 1;
     }
@@ -265,19 +272,60 @@ foreach my $lan (keys(%lans)) {
 	}
     }
 }
+
+#
+# Parse the routes. Need to map the indices back to nodes, and then form a
+# matrix. Why, well you will see in a bit ...
+#
+my @routes	= ();
+my %netroutes   = ();
+
+#
+# Stores routes that will make it to the DB. Hash is per source node and
+# contains an array of routes for each node. This allows for some
+# optimizations in a final pass
+#
+my @dbroutes = ();
+
+#
+# Host route ips for interfaces of a dst node besides the nearest one
+# This is indexed by a node (i.e. a "src:srcip-dst:dstip" node) and gives
+# of hop:hopips. 
+my @hostroutes = ();
+
+if ( $memdebug ) {
+    my $top =`top -n`;
+    print STDERR "top output before reading routes\n$top\n";
+}
+
 # Tell the child to print the routes.
 print CHILD "C\n";
 
 #
 # Read back the results from the child.
 #
-my @results = ();
 while (<CHILD>) {
     if ($debug) {
 	print "$_";
     }
-    push(@results, $_);
+    
+    my ($src, $dst, $hop);
+    
+    if ( /route (\d+) to (\d+) via (\d+)/ ) {
+	$src = $rmap{$1};
+	$dst = $rmap{$2};
+	$hop = $rmap{$3};
+	if ($debug) {
+	    print "src:$src dst:$dst hop:$hop\n";
+	}
+	$routes[($1 * $index) + $2] = int($3);
+    }
+    else {
+	die("*** $0:\n".
+	    "    $routecalc returned a bad line: '$_'\n");
+    }
 }
+
 # Tell the child to quit. Then wait for it.
 print CHILD "q\n";
 waitpid($childpid, 0);
@@ -286,36 +334,7 @@ if ($?) {
 	"    $routecalc failed with status: $?\n");
 }
 
-#
-# Parse the routes. Need to map the indices back to nodes, and then form a
-# matrix. Why, well you will see in a bit ...
-#
-my %routes	= ();
-my %netroutes   = ();
-
-#
-# Host route ips for interfaces of a dst node besides the nearest one
-# This is indexed by a node (i.e. a "src:dst" node) and is a list of dst ips
-# The hop info is obtained from the shortest path route
-my %hostroutes = ();
-
-foreach my $result (@results) {
-    my ($src, $dst, $hop);
-
-    if ($result =~ /route (\d+) to (\d+) via (\d+)/) {
-	$src = $rmap{$1};
-	$dst = $rmap{$2};
-	$hop = $rmap{$3};
-    }
-    else {
-	die("*** $0:\n".
-	    "    $routecalc returned a bad line: '$result'\n");
-    }
-    if ($debug) {
-	print "src:$src dst:$dst hop:$hop\n";
-    }
-    $routes{"$src:$dst"} = $hop;
-}
+close(CHILD);
 
 #
 # Clean the routes.
@@ -323,6 +342,33 @@ foreach my $result (@results) {
 if (! $impotent) {
     DBQueryFatal("delete from virt_routes where ".
 		 "pid='$pid' and eid='$eid'");
+}
+
+if( $memdebug ) {
+    $top =`top -n`;
+    print STDERR "top output after reading routes\n$top\n";
+}
+
+sub type2bin($) {
+    my ($type) = @_;
+    if ($type eq "net") {
+	return 0;
+    } elsif ($type eq "host") {
+	return 1;
+    }
+    die("*** $0:\n".
+	"    type2bin passed invalid type: $type\n");
+}
+
+sub bin2type($) {
+    my ($bin) = @_;
+    if ($bin == 0) {
+	return "net";
+    } elsif ($bin == 1) {
+	return "host";
+    }
+    die("*** $0:\n".
+	"    bin2type passed invalid bintype: $bin\n");
 }
 
 #
@@ -335,280 +381,411 @@ if (! $impotent) {
 # last hop to index into rlans, which gives the full lanlink list. Then we
 # search that to find the IP.
 #
-foreach my $route (keys(%routes)) {
-    my ($src,$dst) = split(":", $route);
-    my $hop  = $routes{$route};
-    my $type = 'host';
-    my $directlyconn = 0;
-    my $netroutedefined = 0;
-    # remember the port for which we have dstip
-    my $dstport;
+for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
+    for( my $dstid = 0 ; $dstid < $index ; $dstid++ ) {
+	my $i = ($srcid * $index) + $dstid;
+	if ( ! defined($routes[$i]) ) {
+	    next;
+	}
 
-    #
-    # This is the lan that contains the src and hop. (the link). 
-    #
-    my $srclan = $rlans{"$src:$hop"};
-    
-    #
-    # This is the lan that contains the node one hop before dst and dst
-    # 
-    my $dstlan;
-    
-    #
-    # Members in the srclan and dstlan respectively
-    #
-    my @srcmembers;
-    my @dstmembers;
+	my $src = $rmap{$srcid};
+	my $dst = $rmap{$dstid};
+	my $hopid = $routes[$i];
+	my $hop = $rmap{$hopid};
+	my $type = 'host';
+	my $directlyconn = 0;
+	my $netroutedefined = 0;
+	my ($srcip,$dstip,$hopip);
+	my ($srcipbin,$dstipbin,$hopipbin);
+	
+	# remember the port for which we have dstip
+	my $dstport;
 
-    #
-    # If directly connected, skip adding the route into the DB
-    # However, we still need to add a route for other interfaces
-    # of the directly connected node
-    if ($dst eq $hop) {
-	$directlyconn = 1;
-	$dstlan = $rlans{"$src:$dst"};
-	@dstmembers = @{$lans{$dstlan}};
-	@srcmembers = @{$lans{$srclan}};
+
 	#
-	# Scan dstmembers till we find the dst. This is the IP we want.
+	# In the case of printing NS format, we don't need to print routes
+	# for different interfaces since NS supports only a single node
+	# address. Also routes for directly connected neighbors in NS
+	# is necessary.
 	#
-	foreach my $member (@dstmembers) {
+	if ($impotent && $format eq "ns") {
+	    print "\$$src add-route \$$dst \$$hop\n";
+	}
+	
+	#
+	# This is the lan that contains the src and hop. (the link). 
+	#
+	my $srclan = $rlans{"$src:$hop"};
+	
+	#
+	# This is the lan that contains the node one hop before dst and dst
+	# 
+	my $dstlan;
+	
+	#
+	# Members in the srclan and dstlan respectively
+	#
+	my @srcmembers;
+	my @dstmembers;
+	
+	#
+	# If directly connected, skip adding the route into the DB
+	# However, we still need to add a route for other interfaces
+	# of the directly connected node
+	if ($dst eq $hop) {
+	    $directlyconn = 1;
+	    $dstlan = $rlans{"$src:$dst"};
+	    @dstmembers = @{$lans{$dstlan}};
+	    @srcmembers = @{$lans{$srclan}};
+	    #
+	    # Scan dstmembers till we find the dst. This is the IP we want.
+	    #
+	    foreach my $member (@dstmembers) {
+		my ($node,$port) = split(":", $member);
+		
+		if ($node eq $dst) {
+		    $dstport = $port;
+		    last;
+		}
+	    }
+	    
+	    #
+	    # goto HOSTROUTES;
+	    # Removed the above goto since using it with the for loop
+	    # tickles a perl bug. Look at 
+	    # http://archive.develooper.com/perl5-porters@perl.org/msg97631.html
+	    # for details
+	    #
+	} else {
+
+	    #
+	    # Now we need to find the destination lan (link) by stepping through
+	    # each hop till we get to it.
+	    #
+	    my $nhop = $hop;
+	    while (1) {
+		# Next hop to destination.
+		my $j = ($map{$nhop} * $index) + $map{$dst};
+		if (!defined($routes[$j])) {
+		    die("*** $0:\n".
+			"    Failed to find route: $nhop:$dst!\n");
+		}
+		my $nnhop = $rmap{$routes[$j]};
+		
+		# Last hop to destination.
+		if ($nnhop eq $dst) {
+		    last;
+		}
+		$nhop = $nnhop;
+	    }
+	    $dstlan = $rlans{"$nhop:$dst"};
+	    
+	    if ($debug) {
+		print "$src --> $dst : $nhop:$dst\n";
+	    }
+	    
+	    #
+	    # The members of the lan are used to map back to the IPs of the
+	    # interfaces (since we need IPs to insert route entries).
+	    #
+	    @srcmembers = @{$lans{$srclan}};
+	    @dstmembers = @{$lans{$dstlan}};
+	    
+	    #
+	    # Scan dstmembers till we find the dst. This is the IP we want.
+	    #
+	    foreach my $member (@dstmembers) {
+		my ($node,$port) = split(":", $member);
+		
+		if ($node eq $dst) {
+		    $dstip = $ips{$member};
+		    $dstipbin = inet_aton($dstip);
+		    $dstport = $port;
+		    last;
+		}
+	    }
+	    
+	    #
+	    # If optimzing create a net route and avoid a per-host entry for each
+	    # pair. Convert the route, but remember we did it so we can skip similar
+	    # routes in the future.
+	    #
+	    if ($optimize) {
+		my $newip = inet_ntoa(inet_aton($dstip) & inet_aton($NETMASK));
+		
+		if (defined($netroutes{"$src:$newip"})) {
+		    if ($netroutes{"$src:$newip"} ne $hop) {
+			die("*** $0:\n".
+			    "    network route mismatch: $src:$dst:$hop!\n");
+		    }
+		    $netroutedefined = 1;
+		} else {
+		    $netroutes{"$src:$newip"} = $hop;
+		    $type  = "net";
+		    $dstip = $newip;
+		    $dstipbin = inet_aton($dstip);
+		}
+	    }
+	}
+	
+	#
+	# Scan srcmembers to find the IPs for the src and hop.
+	#
+	foreach my $member (@srcmembers) {
 	    my ($node,$port) = split(":", $member);
 	    
-	    if ($node eq $dst) {
-		$dstport = $port;
-		last;
+	    if ($node eq $src) {
+		$srcip   = $ips{$member};
+		$srcipbin = inet_aton($srcip);
+		next;
+	    }
+	    if ($node eq $hop) {
+		$hopip = $ips{$member};
+		$hopipbin = inet_aton($hopip);
+		next;
 	    }
 	}
 	
-	goto HOSTROUTES;
-    }
-
-    #
-    # Now we need to find the destination lan (link) by stepping through
-    # each hop till we get to it.
-    #
-    my $nhop = $hop;
-    while (1) {
-	# Next hop to destination.
-	if (!defined($routes{"$nhop:$dst"})) {
-	    die("*** $0:\n".
-		"    Failed to find route: $nhop:$dst!\n");
-	}
-	my $nnhop = $routes{"$nhop:$dst"};
-
-	# Last hop to destination.
-	if ($nnhop eq $dst) {
-	    last;
-	}
-	$nhop = $nnhop;
-    }
-    $dstlan = $rlans{"$nhop:$dst"};
-
-    if ($debug) {
-	print "$src --> $dst : $nhop:$dst\n";
-    }
-    
-    #
-    # The members of the lan are used to map back to the IPs of the
-    # interfaces (since we need IPs to insert route entries).
-    #
-    @srcmembers = @{$lans{$srclan}};
-    @dstmembers = @{$lans{$dstlan}};
-
-    # Want to find these.
-    my ($srcip,$dstip,$hopip);
-    
-    #
-    # Scan dstmembers till we find the dst. This is the IP we want.
-    #
-    foreach my $member (@dstmembers) {
-	my ($node,$port) = split(":", $member);
-
-	if ($node eq $dst) {
-	    $dstip = $ips{$member};
-	    $dstport = $port;
-	    last;
-	}
-    }
-
-    #
-    # If optimzing create a net route and avoid a per-host entry for each
-    # pair. Convert the route, but remember we did it so we can skip similar
-    # routes in the future.
-    #
-    if ($optimize) {
-	my $newip = inet_ntoa(inet_aton($dstip) & inet_aton($NETMASK));
-
-	if (defined($netroutes{"$src:$newip"})) {
-	    if ($netroutes{"$src:$newip"} ne $hop) {
-		die("*** $0:\n".
-		    "    network route mismatch: $src:$dst:$hop!\n");
+	# Construct host routes for the other interfaces of dst
+	foreach my $port (@{$nodeportlist{$dst}}) {
+	    
+	    # We already have a route for the ip on dstport
+	    if ( $port eq $dstport ) {
+		next;
 	    }
-	    $netroutedefined = 1;
-	} else {
-	    $netroutes{"$src:$newip"} = $hop;
-	    $type  = "net";
-	    $dstip = $newip;
+	    
+	    my $newip = $ips{"$dst:$port"};
+	    my $newipsubnet = inet_ntoa(inet_aton($newip) & inet_aton($NETMASK));
+	    
+	    # If we already have a route to newipsubnet via the same hop,
+	    # we don't need the host route
+	    if ( defined($netroutes{"$src:$newipsubnet"}) &&
+		 $netroutes{"$src:$newipsubnet"} eq $hop ) {
+		next;
+	    } else {
+		if ( ! defined($hostroutes[$srcid]) ) {
+		    $hostroutes[$srcid] = [];
+		}
+		my $newipbin = inet_aton($newip);
+		push( @{$hostroutes[$srcid]}, 
+		      pack( "a4Ia4Ia4", $srcipbin, $dstid, $newipbin, $hopid, 
+			    $hopipbin) );
+		      
+	    }
 	}
-    }
-
-HOSTROUTES:    
-
-    #
-    # Scan srcmembers to find the IPs for the src and hop.
-    #
-    foreach my $member (@srcmembers) {
-	my ($node,$port) = split(":", $member);
 	
-	if ($node eq $src) {
-	    $srcip   = $ips{$member};
-	    next;
-	}
-	if ($node eq $hop) {
-	    $hopip = $ips{$member};
-	    next;
-	}
-    }    
-
-    # Construct host routes for the other interfaces of dst
-    foreach my $port (@{$nodeportlist{$dst}}) {
-
-	# We already have a route for the ip on dstport
-	if ( $port eq $dstport ) {
+	# We had to run till here to store hostroutes
+	# that may have to be added later. However,
+	# we can skip for directly connected neighbors
+	# or if net route was already defined
+	if ($directlyconn || $netroutedefined) {
 	    next;
 	}
 	
-	my $newip = $ips{"$dst:$port"};
-	my $newipsubnet = inet_ntoa(inet_aton($newip) & inet_aton($NETMASK));
-	
-	# If we already have a route to newipsubnet via the same hop,
-	# we don't need the host route
-	if ( defined($netroutes{"$src:$newipsubnet"}) &&
-	     $netroutes{"$src:$newipsubnet"} eq $hop ) {
-	    next;
-	} else {	    
-	    $hostroutes{"$src:$srcip%$dst:$newip"} = "$hop:$hopip";
+	if ( !defined($dbroutes[$srcid]) ) {
+	    $dbroutes[$srcid] = [];
 	}
+	push( @{$dbroutes[$srcid]}, 
+	      pack( "a4Ia4Ia4s", $srcipbin, $dstid, $dstipbin, $hopid, $hopipbin,
+		    type2bin($type)) );
     }
+}
 
-    # We had to run till here to store hostroutes
-    # that may have to be added later. However,
-    # we can skip for directly connected neighbors
-    # or if net route was already defined
-    if ($directlyconn || $netroutedefined) {
-	next;
-    }
-    
-    if ($impotent) {
-	if ($debug) {
-	    printf(STDERR "%s: %-23s --> %-23s - %s\n",
-		   ($type eq "net" ? "n" : "h"),
-		   "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
-	}
-	if ($format eq "ns") {
-	    print "\$${src} add-route ";
-	    if ($type eq "host" && $linkcount{$dst} == 1) {
-		print "\$${dst} \$${hop}\n";
-	    }
-	    else {
-		print "\$${dstlan} \$${hop}\n";
-	    }
-	}
-	elsif ($format eq "bsd") {
-	    if ($type eq "host") {
-		print "route add -host $dstip $hopip\n";
-	    }
-	    else {
-		print "route add -net $dstip $hopip $NETMASK\n";
-	    }
-	}
-	elsif ($format eq "suxs") {
-	    if ($type eq "host") {
-		print "route add -host $dstip gw $hopip\n";
-	    }
-	    else {
-		print "route add -net $dstip netmask $NETMASK gw $hopip\n";
-	    }
-	}
-    }
-    else {
-	DBQueryFatal("insert into virt_routes ".
-		     " (pid,eid,vname,src,dst,nexthop,dst_type) ".
-		     " values ('$pid', '$eid', '$src', '$srcip', '$dstip', ".
-		     "         '$hopip', '$type')");
-    }
+# release memory used by the routes hash
+@routes = ();
+undef @routes;
+
+if( $memdebug ) {
+    $top =`top -n`;
+    print STDERR "top output after finding net routes\n$top\n";
 }
 
 # This part adds host routes for subnets that don't have a route.
 # However, the first route will be added as a net route
 # and if subsequent host routes are different from the first
 # route we added, only then will the host routes get added.
-foreach my $hostroute (keys(%hostroutes)) {
-    my ($srcinfo,$dstinfo) = split("%", $hostroute);
-    my ($src,$srcip) = split(":", $srcinfo);
-    my ($dst,$dstip) = split(":", $dstinfo);
-    my ($hop,$hopip) = split(":", $hostroutes{$hostroute});
-    my $type = 'host';
-    
-    my $dstipsubnet = inet_ntoa(inet_aton($dstip) & inet_aton($NETMASK));
-    
-    # If we already have a net route to dstipsubnet via the same hop,
-    # we don't need the host route
-    if ( defined($netroutes{"$src:$dstipsubnet"}) ) {
-	if ($netroutes{"$src:$dstipsubnet"} eq $hop ) {
-	    next;
-	}
-    } else {
-
-	# We do the following optimization only for
-	# hosts that are _not_ directly connected
-	# neighbors. Otherwise, adding interface 
-	# subnet routes fail. Even with this certain
-	# redundant links might be unused since the
-	# route calculator ended up choosing one of
-	# the routes over the other(s)
-	if ($optimize && ($dst ne $hop)) {
-	    $netroutes{"$src:$dstipsubnet"} = $hop;
-	    $type = "net";
-	    $dstip = $dstipsubnet;
-	}
+for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
+    if (! defined($hostroutes[$srcid]) ) {
+	next;
     }
-    
-    if ($impotent) {
-	if ($debug) {
-	    printf(STDERR "%s: %-23s --> %-23s - %s\n",
-		   ($type eq "net" ? "n" : "h"),
-		   "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
+    my $src = $rmap{$srcid};
+    foreach my $hostroute (@{$hostroutes[$srcid]}) {
+	my ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin) =
+	    unpack( "a4Ia4Ia4", $hostroute );
+	my $dstip;
+	my $dst = $rmap{$dstid};
+	my $hop = $rmap{$hopid};
+	my $type = 'host';
+	
+	my $dstipsubnet = inet_ntoa($dstipbin & inet_aton($NETMASK));
+	
+	# If we already have a net route to dstipsubnet via the same hop,
+	# we don't need the host route
+	if ( defined($netroutes{"$src:$dstipsubnet"}) ) {
+	    if ($netroutes{"$src:$dstipsubnet"} eq $hop ) {
+		next;
+	    }
+	} else {
+	    
+	    # We do the following optimization only for
+	    # hosts that are _not_ directly connected
+	    # neighbors. Otherwise, adding interface 
+	    # subnet routes fail. Even with this, certain
+	    # redundant links might be unused since the
+	    # route calculator will choose one of
+	    # the redundant routes over the other(s)
+	    if ($optimize && ($dst ne $hop)) {
+		$netroutes{"$src:$dstipsubnet"} = $hop;
+		$type = "net";
+		$dstip = $dstipsubnet;
+		$dstipbin = inet_aton($dstip);
+	    }
 	}
-	# No need to print the host routes in the 'ns' case
-	# since we already have printed a route for $dst
-	if ($format eq "bsd") {	    
-	    if ($type eq "host") {
-		print "route add -host $dstip $hopip\n";
-	    }
-	    else {
-		print "route add -net $dstip $hopip $NETMASK\n";
-	    }
+	
+	if ( !defined($dbroutes[$srcid]) ) {
+	    $dbroutes[$srcid] = [];
 	}
-	elsif ($format eq "suxs") {
-	    if ($type eq "host") {
-		print "route add -host $dstip gw $hopip\n";
-	    }
-	    else {
-		print "route add -net $dstip netmask $NETMASK gw $hopip\n";
-	    }
-	}
-    }
-    else {
-	DBQueryFatal("insert into virt_routes ".
-		     " (pid,eid,vname,src,dst,nexthop,dst_type) ".
-		     " values ('$pid', '$eid', '$src', '$srcip', '$dstip', ".
-		     "         '$hopip', '$type')");
+	push( @{$dbroutes[$srcid]}, 
+	      pack( "a4Ia4Ia4s", $srcipbin, $dstid, $dstipbin, $hopid, $hopipbin,
+		    type2bin($type)) );
     }
 }
 
+# release memory used by all these hashes.
+# Not much use doing this at this stage though
+%netroutes = ();
+undef %netroutes;
+@hostroutes = ();
+undef @hostroutes;
+%lans = ();
+undef %lans;
+%rlans = ();
+undef %rlans;
+
+if( $memdebug ) {
+    $top =`top -n`;
+    print STDERR "top output before final pass\n$top\n";
+}
+
+# In the final pass, for some source nodes that are "edge" 
+# nodes (i.e. with degree 1), we can replace all routes with
+# one route with a smaller IP prefix since the nexthop is
+# the same for all routes
+for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
+    if ( ! defined($dbroutes[$srcid]) ) {	
+	next;
+    }
+    my $src = $rmap{$srcid};
+    my ($dst, $hop);
+    my ($srcip, $dstip, $hopip, $type, $prevhopip, $prevdstip);
+    my ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin, $typebin);
+    my ($prevdstipprefix, $dstipprefix);
+    my $oneroute = 0;
+    $prevhopip = $prevdstip = 0;
+    $prevdstipprefix = $dstipprefix = 0;
+    if ( $optimize && $edgeoptimize ) {
+	$oneroute = 1;
+	foreach my $route (@{$dbroutes[$srcid]}) {
+	    ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin, $typebin) =
+		unpack( "a4Ia4Ia4s", $route);
+	    $srcip = inet_ntoa($srcipbin);
+	    $dst = $rmap{$dstid};
+	    $dstip = inet_ntoa($dstipbin);
+	    $hop = $rmap{$hopid};
+	    $hopip = inet_ntoa($hopipbin);
+	    $type = bin2type($typebin);
+	    if (! $prevhopip || ! $prevdstip) {
+		$prevhopip = $hopip;
+		$prevdstip = $dstip;
+	    } else {
+		# This can happen when a node has a degree > 1
+		if ($prevhopip ne $hopip) {
+		    $oneroute = 0;
+		    last;
+		}
+		
+		# This can happen if we have both widearea nodes
+		# and local nodes in an experiment. In that case,
+		# the widearea nodes all have 10.* addresses while
+		# the local ones have 192.168.* 
+		$prevdstipprefix = 
+		    inet_ntoa(inet_aton($prevdstip) & inet_aton($EXPTNETMASK));
+		$dstipprefix = 
+		    inet_ntoa(inet_aton($dstip) & inet_aton($EXPTNETMASK));
+		if ($dstipprefix ne $prevdstipprefix) {
+		    $oneroute = 0;
+		    last;
+		}
+		$prevhopip = $hopip;
+		$prevdstip = $dstip;
+	    }
+	}
+    }
+    if( $optimize && $edgeoptimize && $oneroute ) {
+	if ($impotent) {
+	    if ($debug) {
+		printf(STDERR "%s: %-23s --> %-23s - %s\n",
+		       ($type eq "net" ? "n" : "h"),
+		       "$src:$srcip", "ANY:$dstipprefix", "$hop:$hopip");
+	    }
+	    if ($format eq "bsd") {
+		print "route add -net $dstipprefix $hopip $EXPTNETMASK\n";
+	    }
+	    elsif ($format eq "suxs") {
+		print "route add -net $dstipprefix netmask $EXPTNETMASK gw $hopip\n";
+	    }
+	} else {
+	    DBQueryFatal("insert into virt_routes ".
+			 " (pid,eid,vname,src,dst,nexthop,dst_type,dst_mask) ".
+			 " values ('$pid', '$eid', '$src', '$srcip', '$dstipprefix', ".
+			 "         '$hopip', 'net', '$EXPTNETMASK')");		
+	}
+    } else {
+	foreach my $route (@{$dbroutes[$srcid]}) {
+	    ($srcipbin, $dstid, $dstipbin, $hopid, $hopipbin, $typebin) =
+		unpack( "a4Ia4Ia4s", $route);
+	    $srcip = inet_ntoa($srcipbin);
+	    $dst = $rmap{$dstid};
+	    $dstip = inet_ntoa($dstipbin);
+	    $hop = $rmap{$hopid};
+	    $hopip = inet_ntoa($hopipbin);
+	    $type = bin2type($typebin);
+
+	    if ($impotent) {
+		if ($debug) {
+		    printf(STDERR "%s: %-23s --> %-23s - %s\n",
+			   ($type eq "net" ? "n" : "h"),
+			   "$src:$srcip", "$dst:$dstip", "$hop:$hopip");
+		}
+		if ($format eq "bsd") {
+		    if ($type eq "host") {
+			print "route add -host $dstip $hopip\n";
+		    }
+		    else {
+			print "route add -net $dstip $hopip $NETMASK\n";
+		    }
+		}
+		elsif ($format eq "suxs") {
+		    if ($type eq "host") {
+			print "route add -host $dstip gw $hopip\n";
+		    }
+		    else {
+			print "route add -net $dstip netmask $NETMASK gw $hopip\n";
+		    }
+		}
+	    } else {
+		DBQueryFatal("insert into virt_routes ".
+			     " (pid,eid,vname,src,dst,nexthop,dst_type) ".
+			     " values ('$pid', '$eid', '$src', '$srcip', '$dstip', ".
+			     "         '$hopip', '$type')");
+	    }
+	}
+    }
+}
+
+if( $memdebug ) {
+    $top =`top -n`;
+    print STDERR "top output just before exit\n$top\n";
+}
+
 exit 0;
-
-
-
