@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -111,13 +111,14 @@ else {
 #
 my $pc601hack_only = "a.type='pc601' and";
 my $pc601hack_none = "a.type!='pc601' and";
+my $pcvmhack       = "(a.type!='pcvm600' and a.type!='pcvm850') and ";
 
 $result =
     DBQueryFatal("select a.node_id,a.type from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as n on a.phys_nodeid=n.node_id ".
-		 "where b.node_id is null and ".
+		 "where b.node_id is null and $pcvmhack ".
 		 "      $pc601hack_none ".
 		 "      (a.role='testnode' or ".
 		 "       (a.role='virtnode' and n.status='up' and ".
