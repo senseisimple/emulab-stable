@@ -283,3 +283,12 @@ proc tb-set-node-failure-action {node type} {
     }
     $node set failureaction $type
 }
+
+proc tb-fix-node {vnode pnode} {
+    if {[$vnode info class] != "Node"} {
+	perror "\[tb-fix-node] $node is not a node."
+	return
+    }
+    $vnode set fixed $pnode
+}
+
