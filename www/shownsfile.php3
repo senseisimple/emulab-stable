@@ -63,6 +63,13 @@ if (!$isadmin) {
     }
 }
 
+echo "<font size=+2><b>".
+     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
+     "</b></font>\n";
+echo "<br />\n";
+echo "<br />\n";
+
 if ($showevents) {
     echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid'>
                 Hide Event List</a>

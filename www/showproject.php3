@@ -50,6 +50,11 @@ if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
     USERERROR("You are not a member of Project $pid.", 1);
 }
 
+echo "<font size=+2><b>".
+     "$pid".
+     "</font>\n";
+echo "<br /><br />\n";
+
 #
 # A list of project experiments.
 #

@@ -48,8 +48,16 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
+
+
 $expstate = TBExptState($exp_pid, $exp_eid);
+
+echo "<font size=+2><b>".
+     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+     "$eid</b></font>\n";
+echo "<br /><br />\n";
 SUBPAGESTART();
+
 SUBMENUSTART("Experiment Options");
 
 if ($expstate) {
@@ -114,7 +122,15 @@ if (ISADMIN($uid)) {
     WRITESUBMENUBUTTON("Send a swap/terminate request",
 			  "request_swapexp.php3?&pid=$exp_pid&eid=$exp_eid");
 }
-SUBMENUEND();
+SUBMENUEND_2A();
+
+echo "<br />\n";
+echo "<a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>";
+echo "<img width=258 height=258 border=1 src='top2image.php3?pid=$pid&eid=$eid&thumb=258' />\n";
+echo "</a>";
+
+
+SUBMENUEND_2B();
 
 #
 # Dump experiment record.

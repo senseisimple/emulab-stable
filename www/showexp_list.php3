@@ -259,11 +259,13 @@ if ($thumb && !$idle) {
              "<table border=0 cellpadding=4 cellspacing=0>".
 	     "<tr>".
 	     "<td width=128 align=center>".
+	     "<a href='shownsfile.php3?pid=$pid&eid=$eid'>".
 	     "<img border=1 width=128 height=128 class='stealth' ".
 #	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' />".
 #	     " src='thumbs/$pid.$eid.png' />".
 	     " src='thumbs/tn$thumb_hash.png' />".
-             "</td>" .
+	     "</a>".
+             "</td>".
 	     "<td align=left class='paddedcell'>".
 	     "<b>".
  	     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
@@ -463,8 +465,6 @@ if ($thumb && !$idle) {
     }
     echo "</table>\n";
 
-}
-
     echo "<ol>
              <li><font color=red>Red</font> indicates nodes other than PCs.
                  A $idlemark mark by the node count indicates that the
@@ -496,7 +496,8 @@ if ($thumb && !$idle) {
           </tr>\n";
     
     echo "</table>\n";
-}
+} # if ($thumb && !$idle)
+} # if (mysql_num_rows($experiments_result))
 
 #
 # Standard Testbed Footer

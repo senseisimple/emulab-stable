@@ -575,4 +575,21 @@ function SUBMENUEND() {
 <?php
 }
 
+
+# These are here so you can wedge something else under the menu in the left column.
+
+function SUBMENUEND_2A() {
+?>
+    </table>
+    <!-- end submenu -->
+<?php
+}
+
+function SUBMENUEND_2B() {
+?>
+  </td>
+  <td class="stealth" valign=top align=left width='85%'>
+<?php
+}
+
 ?>
