@@ -87,7 +87,7 @@ foreach pair $nodemap {
     lappend machines [lindex $pair 1]
 }
 
-outs "PLACEHOLDER - Reserving resources."
+outs "Reserving resources."
 if {[catch "exec $reserve $prefix $machines >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error reserving resources. ($err)"
     exit 1

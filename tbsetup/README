@@ -1,11 +1,14 @@
 tbsetup
 
 Syntax:
-	tbsetup <ns-file>
+	tbprerun <ns-file>
 
-tbsetup does all tasks necessary to setup up for an experiment on the
+tbprerun does all tasks necessary to setup up for an experiment on the
 testbed.  It generates an IR file that can be used with 'tbrun' to
 actually configure the testbed.
+
+CAVEAT: This does do actual reservation of nodes.  Be sure to free the
+nodes using tbend, even if you never run the experiment.
 
 
 tbrun
@@ -13,7 +16,7 @@ tbrun
 Syntax:
 	tbrun <ir-file>
 
-tbrun setups up the testbed for the experiment.
+tbrun setups up the testbed for the experiment.  
 
 
 tbreport
@@ -21,5 +24,15 @@ tbreport
 Syntax:
 	tbreport <ir-file>
 
-tbreport parses the IR file and produces a human readible report on
+tbreport parses the IR file and produces a human readable report on
 the contents.
+
+
+tbend
+
+Syntax:
+	tbend <ir-file>
+
+tbend does tear down.  It frees allocated nodes and resets VLANs.
+This should be run at the end of every experiment even if nothing was
+done in the experiment.
