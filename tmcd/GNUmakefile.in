@@ -38,4 +38,4 @@ $(INSTALL_BINDIR)/tmcd/%: %
 	$(INSTALL_PROGRAM) $< $@
 
 clean: 
-	rm -f *.o core tmcd tmcc
+	rm -f *.o core tmcd tmcc findif
