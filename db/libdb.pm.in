@@ -1303,11 +1303,11 @@ sub SetExpState($$$)
     my($pid, $eid, $state) = @_;
 
     if ($EVENTSYS) {
-	return EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
-			      objname   => "$pid/$eid",
-			      eventtype => $state,
-			      expt      => "$pid/$eid",
-			      host      => $BOSSNODE);
+	EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		       objname   => "$pid/$eid",
+		       eventtype => $state,
+		       expt      => "$pid/$eid",
+		       host      => $BOSSNODE);
     }
 
     my $query_result =
