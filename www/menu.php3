@@ -380,7 +380,8 @@ function WRITESIDEBAR() {
 # spits out beginning part of page
 #
 function PAGEBEGINNING( $title ) {
-    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $WWW;
+    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE;
+    global $TBDIR, $WWW;
     global $MAINPAGE;
 
     $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/"); 
