@@ -10,12 +10,17 @@ The IXP1200 network processor is now integrated into Emulab, and
 available to external researchers for remote experimentation.
 Similar to other Emulab resources, an IXP1200 node can 
 be allocated through an <i>ns</i> script or through the Netbuild GUI.
-It can be configured as part of an arbitrary topology with end-nodes,
+It can be configured as part of an arbitrary topology (of PCs, IXPs,
+or other node types) with end-nodes,
 traffic generators, routers, links etc.  Through NFS it has access to 
 /proj and your Emulab home directory.  You can configure a command to run
-automatically upon bootup.
-This makes it easy to
-allocate, experiment with, and evaluate an IXP based application.
+automatically upon bootup.  You have full access to the serial
+consoles of both the IXP and its host PC, which you can
+power cycle and of course reboot.
+
+<p>
+All that makes it easy to allocate, experiment with, and evaluate an
+IXP-based application.
 
 <p>
 Currently, we have installed 8 ENP2505 cards (aka Bridalveil), with
