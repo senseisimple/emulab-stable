@@ -23,12 +23,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: tbacct [-f] ".
+    print("Usage: tbacct [-f] [-b] ".
 	  "<add|del|mod|passwd|freeze|thaw> <user>\n");
     exit(-1);
 }
-my $optlist = "f";
-my $force   =  0;
+my $optlist = "fb";
+my $force   = 0;
+my $batch   = 0;
 
 #
 # Configure variables
@@ -114,6 +115,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"f"})) {
     $force = 1;
+}
+if (defined($options{"b"})) {
+    $batch = 1;
 }
 if (@ARGV != 2) {
     usage();
@@ -304,7 +308,8 @@ sub AddUser()
 	fatal("Could not generate initial ssh key for $user");
     }
     # Add to elists.
-    system("$GENELISTS -u $user");
+    system("$GENELISTS -u $user")
+	if (! $batch);
 
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
@@ -318,8 +323,10 @@ sub AddUser()
     # could hang for a while if another update is in progress. Hmm, I
     # do not like this.
     #
-    print "Updating exports file.\n";
-    system("$EXPORTSSETUP");
+    if (! $batch) {
+	print "Updating exports file.\n";
+	system("$EXPORTSSETUP");
+    }
     $EUID = 0;
 
     # SFS key.
