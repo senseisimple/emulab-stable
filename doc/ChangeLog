@@ -1,3 +1,19 @@
+stoller     2003/12/17 11:29:36 MST
+
+  Modified files:
+    tmcd                 tmcd.c 
+  Log:
+  Remove code that required tmcd to run as root, and add the necessary
+  code to run as uid/gid nobody/nobody. I had to remove dolog(), which
+  was to support the oskit on the dnards, so no one will miss that!
+  I also removed the tar/rpm download support since we now do that via
+  the web interface. To support sfshostid, I had to chown/chgrp
+  /proj/.sfs to the nobody/nobody so that tmcd willbe able to create the
+  symlinks in that directory.
+  
+  Revision  Changes    Path
+  1.199     +41 -429   testbed/tmcd/tmcd.c
+
 stoller     2003/12/15 17:41:14 MST
 
   Modified files:
