@@ -1,8 +1,8 @@
 #!/usr/bin/perl -wT
+use English;
 
 #
-# This gets invoked from the Web interface. CD into the proper directory
-# and do the tb stuff.
+# This gets invoked from the Web interface. Terminate an experiment.
 #
 # usage: tbstopit <pid> <eid>
 #
@@ -11,10 +11,13 @@
 # Configure variables
 #
 my $TB     = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+my $TBOPS  = "@TBOPSEMAIL@";
 
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
+my $logname  = 0;
 
 #
 # Untaint the path
@@ -25,7 +28,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # Turn off line buffering on output
 #
-$| = 1; 
+$| = 1;
 
 #
 # Check args.
@@ -34,53 +37,204 @@ if (@ARGV != 2) {
     print STDOUT "Usage: tbstopit <pid> <eid>\n";
     exit(-1);
 }
-my $project = $ARGV[0];
-my $eid     = $ARGV[1];
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
 
 #
 # Untaint the arguments.
 #
-if ($project =~ /^([-\@\w.]+)$/) {
-    $project = $1;
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
 }
 if ($eid =~ /^([-\@\w.]+)$/) {
     $eid = $1;
 }
 
-my $piddir  = "$projroot/$project";
+my $piddir  = "$projroot/$pid";
 my $expdir  = "$piddir/exp";
 my $eiddir  = "$expdir/$eid";
 
 #
-# CD to the proper experiment directory.
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
 #
-if (! chdir($eiddir)) {
-    print STDOUT "Could not chdir to $eiddir: $!\n";
+# We have to protect against trying to end an experiment that is currently
+# in the process of being terminated. We use a timestamp for this purpose.
+# If the timestamp is ever non-null, then something is wrong and we should
+# never proceed.
+#
+$query_result = $DB->query("SELECT expt_terminating FROM experiments ".
+			   "WHERE eid='$eid' and pid='$pid'");
+
+if (! $query_result) {
+    fatal("DB Error getting experiment termination date for $pid/$eid\n");
+}
+if ($query_result->numrows < 1) {
+    print STDOUT "No such experiment $pid/$eid exists!\n";
+    exit(1);
+}
+
+@row = $query_result->fetchrow_array();
+if (defined($row[0])) {
+    print STDOUT
+	"It appears that $pid/$eid started terminating at $row[0]\n".
+	"You will be notified via email when the experiment has been ".
+	"torn down\n";
+    exit(1);
+}
+
+#
+# Figure out who is going to get the email!
+#
+$query_result = $DB->query("SELECT usr_name,usr_email from users ".
+			   "WHERE unix_uid='$EUID'");
+
+if (! $query_result) {
+    fatal("DB Error getting user informarion for uid $EUID\n");
+}
+if ($query_result->numrows < 1) {
+    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
+    exit(1);
+}
+
+@row = $query_result->fetchrow_array();
+$user_name  = $row[0];
+$user_email = $row[1];
+
+#
+# Set the timestamp.
+#
+$stamp = `date '+20%y-%m-%d %H:%M:%S'`;
+
+$query_result = $DB->query("UPDATE experiments SET expt_terminating='$stamp' ".
+			   "WHERE eid='$eid' and pid='$pid'");
+if (! $query_result) {
+    fatal("DB Error setting expt_terminating for experiment $pid/$eid\n");
+}
+
+#
+# The rest of this goes into the background so that the user sees
+# immediate response. We will send email later when the experiment
+# is actually torn down.
+#
+$mypid = fork();
+if ($mypid) {
     #
-    # This exit code matters. The web script uses it.
-    # 
-    exit(69);
+    # Parent exits normally
+    #
+    print STDOUT
+	"Experiment $pid/$eid is now terminating\n".
+	"You will be notified via email when the experiment has been torn \n".
+	"down, and you can reuse the experiment name.\n";
+    exit(0);
 }
 
-print STDOUT "Running tbend with arguments: $project $eid\n";
-if (system("$tbdir/tbend $project $eid") != 0) {
-    print STDOUT "tbend failed!\n";
-    exit(-1);
+#
+# We have to disconnect from the caller by redirecting both STDIN and
+# STDOUT away from the pipe. Otherwise the caller (the web server) will
+# continue to wait even though the parent has exited. 
+#
+open(STDIN, "< /dev/null") or
+    die("opening /dev/null for STDIN: $!");
+
+#
+# Create a temporary name for a log file and untaint it.
+#
+$logname = `mktemp /tmp/tbend-$pid-$eid.XXXXXX`;
+
+if ($logname =~ /^([-\@\w.\/]+)$/) {
+    $logname = $1;
+} else {
+    die "Bad data in $logname";
 }
 
-print STDOUT "Removing experiment directory: $eiddir\n";
-if (! chdir($expdir)) {
-    print STDOUT "In Fatal: Could not chdir to $expdir: $!!\n";
-    exit(-1);
-}
-system("rm -r $eid");
+open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
-#print STDOUT "Running rmacct with argument: $eid\n";
-#if (system("$tbdir/rmacct $eid") != 0) {
-#    print STDOUT "rmacct failed!\n";
-#    exit(-1); 
-#}
+print STDOUT "Running tbend with arguments: -nologfile $pid $eid\n";
+if (system("$tbdir/tbend -nologfile $pid $eid") != 0) {
+    fatal("tbend failed!\n");
+}    
+
+#
+# Try to remove experiment directory. We allow for it not being there
+# cause we often run the tb programs directly.
+#
+if (chdir($expdir)) {
+    print STDOUT "Removing experiment directory: $eiddir\n";
+    system("rm -r $eid");
+}
+
+#
+# Done! Remove all trace from the DB.
+# 
+$query_result = $DB->query("DELETE from experiments ".
+			   "WHERE eid='$eid' and pid='$pid'");
+
+if (! $query_result) {
+    fatal("DB Error deleting experiment record for $pid/$eid\n");
+}
 
 print STDOUT "Termination Success\n";
+
+open(MAIL, "| /usr/bin/mail -s \"Experiment $pid/$eid Terminated\" ".
+     "-c $TBOPS ".
+     "\"$user_name <$user_email>\" >/dev/null 2>&1")
+    or die "Cannot start mail program: $!";
+
+print MAIL "Your experiment `$eid' in project `$pid' has been terminated.\n";
+print MAIL "You may now reuse `$eid' as an experiment name.\n\n";
+print MAIL "Appended below is the output of the experiment teardown.\n";
+print MAIL "If you have any questions or comments, please include the\n";
+print MAIL "output below in your message to $TBOPS\n";
+print MAIL "\n\n---------\n\n";
+
+if (open(IN, "$logname")) {
+    while (<IN>) {
+	print MAIL "$_";
+    }
+    close(IN);
+}
+close(MAIL);
+
+system("rm -f $logname");
 exit 0;
+
+sub fatal()
+{
+    my($mesg) = $_[0];
+
+    if (chdir($expdir)) {
+	$save = "$eid-$PID";
+	system("mv $eid $save");
+    }
+    print STDOUT $mesg;
+
+    #
+    # Send a message to the testbed list. Append the logfile if it got
+    # that far.
+    # 
+    open(MAIL, "| /usr/bin/mail ".
+	 "-s \"Experiment Termination Failure $pid/$eid\" ".
+	 "$TBOPS >/dev/null 2>&1")
+	or die "Cannot start mail program: $!";
+
+    print MAIL $mesg;
+
+    if (open(IN, "$logname")) {
+	print MAIL "\n\n---------\n\n";
+	
+	while (<IN>) {
+	    print MAIL "$_";
+	}
+	close(IN);
+    }
+    close(MAIL);
+
+    system("rm -f $logname");
+    exit(-1);
+}
 

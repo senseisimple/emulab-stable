@@ -99,11 +99,8 @@ $gid = $row[0];
 #   tbstopit <pid> <eid>
 #
 echo "<center><br>";
-echo "<h3>Terminating the experiment. This may take a few minutes ...
+echo "<h3>Starting experiment termination. Please wait a moment ...
           </center><br><br>
-	  Please do <em>not</em> click the 'Stop' button. This will cause
-	  the experiment teardown to terminate prematurely, which can cause
-  	  problems for future (other) experiments.
       </h3>";
 
 flush();
@@ -118,7 +115,7 @@ $retval = 0;
 $result = exec("$TBSUEXEC_PATH $uid $gid tbstopit $exp_pid $exp_eid",
  	       $output, $retval);
 
-if ($retval && $retval != 69) {
+if ($retval) {
     echo "<br><br><h2>
           Termination Failure($retval): Output as follows:
           </h2>
@@ -132,25 +129,10 @@ if ($retval && $retval != 69) {
     die("");
 }
 
-#
-# From the database too!
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_eid' and pid=\"$exp_pid\"");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error deleting experiment $exp_eid ".
-            "in project $exp_pid: $err\n", 1);
-}
-
 echo "<center><br>";
-echo "<h2>Experiment '$exp_eid' in project '$exp_pid' Terminated!<br>";
-if ($retval == 69) {
-    echo "Since there was no experiment directory to work from, the EID has
-          been removed<br>
-          but you will need to make sure the nodes/vlans are released
-          yourself.\n";
-}
+echo "<h2>Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
+          You will be notified via email when the experiment has been torn<br>
+	  down, and you can reuse the experiment name.<br>";
 echo "</h2>";
 echo "</center>\n";
 
