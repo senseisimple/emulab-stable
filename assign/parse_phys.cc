@@ -33,7 +33,7 @@
  */
 
 #define MAXSW 32
-
+#include "testbed.h"
 #include "phys.h"
 
 topology *parse_phys(char *filename)

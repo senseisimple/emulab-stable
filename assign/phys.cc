@@ -1,6 +1,7 @@
 #include <iostream.h>
 #include <stdlib.h>
 #include <string.h>
+#include "testbed.h"
 #include "phys.h"
 
 toponode::toponode() {
@@ -46,10 +47,11 @@ void topology::print_topo() {
 	cout << "Topology has " << switchcount << " switches" << endl;
 	cout << "--------" << endl;
 	for (int i = 0; i < switchcount; i++) {
-		cout <<  " sw " << i << " has " << switches[i]->numnodes() << " nodes"
-		     << endl;
+		cout <<  " sw " << i << " has " << switches[i]->numnodes()
+		     << " nodes and bw " << switches[i]->bw << endl;
 		for (int j = 0; j < switches[i]->nodecount; j++) {
-			cout << switches[i]->nodes[j].ints << " ";
+			cout << switches[i]->nodes[j].ints <<
+				"/" << switches[i]->nodes[j].int_bw << " ";
 		}
 		cout << endl;
 	}

@@ -21,8 +21,8 @@ public:
 
 	inline char *name() { return name_; }
 	void name(char *newname);
-	inline int interfaces() { return interfaces_; }
-	inline void interfaces(int newint) { interfaces_ = newint; }
+	//	inline int interfaces() { return interfaces_; }
+	//inline void interfaces(int newint) { interfaces_ = newint; }
 	inline int type() { return type_; }
 	inline void type(int newtype) { type_ = newtype; }
 	inline int partition() { return partition_; }
@@ -43,7 +43,7 @@ public:
 private:
 	
 	char *name_;
-	int interfaces_;
+	//	int interfaces_;
 	int type_;
 	int partition_;     /* To which partition does this node belong? */
 };

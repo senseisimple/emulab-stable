@@ -4,7 +4,7 @@
 testnode::testnode()
 {
 	name_ = NULL;
-	interfaces_ = 0;
+	//	interfaces_ = 0;
 	type_ = 0;
 	partition_ = 0;
 }

@@ -18,7 +18,9 @@ class toponode {
 public:
 	toponode();
 	int ints;		/* Number of ethernet interfaces */
+	int int_bw;		/* Bandwidth used by each interface */
 	int used;		/* Used by assign.  Have we assigned here? */
+	node n;
 };
 
 class tbswitch {
@@ -30,9 +32,10 @@ public:
 
 	inline int numnodes();
 	
-	int nodecount;		/* Total number of nodes in the switch */
+	int nodecount;          /* Total number of nodes in the switch */
 	toponode *nodes;	/* Sorted list of the nodes */
 	char *name;		/* Anything you want */
+	int bw;			/* Bandwidth between switch and center */
 };
 
 class topology {
@@ -52,4 +55,4 @@ public:
  */
 
 topology *parse_phys(char *filename);
-
+topology *ptop_to_phys(tbgraph &G);

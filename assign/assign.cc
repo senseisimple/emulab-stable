@@ -15,7 +15,7 @@
 
 #include "phys.h"
 topology *topo = NULL;
-
+tbgraph PG(1,1);
 /* How can we chop things up? */
 #define PARTITION_BY_ANNEALING 0
 
@@ -705,8 +705,8 @@ int main(int argc, char **argv)
 		ifstream infile;
 		infile.open(argv[0]);
 		if (!infile || !infile.good()) {
-		  cerr << "Error opening file: " << argv[0] << "\n";
-		  exit(1);
+		  cerr << "Error opening file: " << argv[0] << endl;
+		  exit(-11);
 		}
 		parse_top(G, infile);
 		gw.update_graph();
@@ -728,10 +728,17 @@ int main(int argc, char **argv)
 	 */
 	
 	if (topofile != NULL) {
-		cout << "Parsing phys\n";
-		topo = parse_phys(topofile);
+		cout << "Parsing ptop\n";
+		ifstream ptopfile;
+		ptopfile.open(topofile);
+		if (!ptopfile || !ptopfile.good()) {
+		  cerr << "Error opening file: " << topofile << endl;
+		  exit(-1);
+		}
+		parse_ptop(PG,ptopfile);
+		topo=ptop_to_phys(PG);
 		if (!topo) {
-			cerr << "Could not read in topofile "
+			cerr << "Could not convert ptop to phys: "
 			     << topofile << endl;
 			exit(-1);
 		}
