@@ -226,6 +226,11 @@ sub setPortVlan($$@) {
 	$errors += $device->setPortVlan($vlan_id,@{$map{$devicename}});
     }
 
+    if ($vlan_id ne 'default') {
+	my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
+	$errors += (!$self->setVlanOnTrunks($vlan_number,1));
+    }
+
     return $errors;
 }
 
@@ -336,6 +341,16 @@ sub removeVlan($$) {
     }
 
     #
+    # Prevent the VLAN from being sent across trunks.
+    #
+    if (!$self->setVlanOnTrunks($vlan_number,0)) {
+	warn "ERROR: Unable to set up VLANs on trunks!\n";
+	#
+	# We can keep going, 'cause we can still remove the VLAN
+	#
+    }
+
+    #
     # Now, we go through each device and remove all ports from the VLAN
     # on that device
     #
@@ -402,7 +417,7 @@ sub getStats($) {
 # this file, not external functions.
 #
 # Enables or disables (depending on $value) a VLAN on all appropriate
-# switches in a stack
+# switches in a stack. Returns 1 on sucess, 0 on failure.
 #
 # ONLY pass in @ports if you're SURE that they are the only ports in the
 # VLAN - basically, only if you just created it. This is a shortcut, so
@@ -487,7 +502,7 @@ sub setVlanOnTrunks($$$;@) {
 	}
     }
 
-    return $errors;
+    return (!$errors);
 }
 
 # End with true

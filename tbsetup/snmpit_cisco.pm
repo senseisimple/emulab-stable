@@ -89,7 +89,8 @@ sub new($$;$) {
     &SNMP::addMibDirs($mibpath);
     &SNMP::addMibFiles("$mibpath/CISCO-STACK-MIB.txt",
 	"$mibpath/CISCO-VTP-MIB.txt",
-	"$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt");
+	"$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt",
+	"$mibpath/CISCO-PAGP-MIB.txt");
     
     $SNMP::save_descriptions = 1; # must be set prior to mib initialization
     SNMP::initMib();		  # parses default list of Mib modules 
@@ -949,6 +950,18 @@ sub setVlanOnTrunk($$$$) {
     my $ifIndex = $self->{IFINDEX}{$modport};
 
     #
+    # If this is part of an EtherChannel, we have to find the ifIndex for the
+    # channel.
+    # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
+    # the channel ifIndex the the port is in a channel. Not sure that
+    # this is _always_ beneficial, though
+    #
+    my $channel = $self->{SESS}->get(["pagpGroupIfIndex",$ifIndex]);
+    if (($channel =~ /^\d+$/) && ($channel != 0)) {
+	$ifIndex = $channel;
+    }
+
+    #
     # Get the exisisting bitfield for allowed VLANs on the trunk
     #
     my $bitfield = $self->{SESS}->get(["vlanTrunkPortVlansEnabled",$ifIndex]);
@@ -962,11 +975,13 @@ sub setVlanOnTrunk($$$$) {
 
     # Pack it back up...
     $unpacked = join('',@bits);
+
     $bitfield = pack("B*",$unpacked);
 
     # And save it back...
-    if (!$self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
-	    "OCTETSTR"])) {
+    my $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
+    	    "OCTETSTR"]);
+    if ($rv) {
 	return 1;
     } else {
 	return 0;
