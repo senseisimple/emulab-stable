@@ -56,6 +56,7 @@ my $slicetag    = "slicetag";
 my $softconfig	= "$etcdir/emulab-soft.txt";
 my $tbboot	= "tbbootconfig";
 my $wget	= "wget";
+my $ifconfig    = "ifconfig";
 my $logfile     = "/tmp/netbed-setup.log";
 
 #
@@ -72,6 +73,7 @@ my $showprogress= 1;
 my $cdkey;
 my $privkey;
 my %slicesizes;
+my $uses_dhcp   = 0;
 	
 my $PATIENCEMSG  = "This could take several minutes, please be patient!\n";
 
@@ -161,15 +163,39 @@ else {
 # If our IP came via DHCP, we need to figure out what it is. 
 #
 if ($IP eq "DHCP") {
-    my @ipaddrs;
-    if ($hostname) {
+    my $ip_found = 0;
+    my $dhcp_if;
+    $uses_dhcp = 1;
+
+    open(SOFT, $softconfig);
+    while (<SOFT>) {
+	if (/^interface=(.*)$/) {
+	    $dhcp_if = $1;
+	    last;
+	}
+    }
+    close(SOFT);
+    if ($dhcp_if) {
+	open(IFCONFIG, "$ifconfig $dhcp_if|");
+	while (<IFCONFIG>) {
+	    if (/inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) /) {
+		$ip_found = 1;
+		$IP = $1;
+		last;
+	    }
+	}
+    }
+    if (!$ip_found && $hostname) {
+	my @ipaddrs;
 	(undef, undef, undef, undef, @ipaddrs) = gethostbyname($hostname);
+	if (scalar @ipaddrs) {
+	    $IP = inet_ntoa($ipaddrs[0]);
+	}
     }
-    if (scalar @ipaddrs) {
-	$IP = inet_ntoa($ipaddrs[0]);
-    }
-    else {
-	fatal("Invalid hostname: $hostname");
+    if ($ip_found && !$hostname) {
+	my $iptrans = $IP;
+	$iptrans =~ s/\./\-/;
+	$hostname = "dhcp-$iptrans.wa.emulab.net";
     }
 }
 
