@@ -361,8 +361,8 @@ else {
 #
 # Swappable
 #
-if (!isset($formfields[swappable]) ||
-    strcmp($formfields[swappable], "1")) {
+if (ISADMIN($uid) && (!isset($formfields[swappable]) ||
+    strcmp($formfields[swappable], "1"))) {
     $formfields[swappable] = 0;
 
     if (!isset($formfields[noswap_reason]) ||
