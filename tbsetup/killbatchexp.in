@@ -1,0 +1,168 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Create a batch experiment.
+#
+# usage: killbatchexp $pid $eid
+#
+sub usage()
+{
+    print STDOUT "Usage: killbatchexp $pid $eid\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $DBNAME   = "@TBDBNAME@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+my $tbbindir = "$TB/bin/";
+my $batchdir = "$TB/batch";
+my $projroot = "/proj";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# be left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+if ($eid =~ /^([-\@\w.]+)$/) {
+    $eid = $1;
+}
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# This is where we currently hold the batch goo.
+#
+$dirname = "$batchdir/$pid-$eid";
+
+#
+# Need to lock the table for this. We could avoid the locking if we just
+# set the canceled bit and let the batch_daemon clean things up, but that
+# introduces needless (and annoying) delay when killing a batch experiment
+# that is not even running. See corresponding lock in the batch_daemon.
+#
+DBquery("lock tables batch_experiments write");
+
+#
+# Set the canceled state right away. This will prevent the batch_daemon
+# from trying to run it. It might already be running, but thats okay.
+#
+DBquery("UPDATE batch_experiments set canceled=1 ".
+	"WHERE eid='$eid' and pid='$pid'");
+
+#
+# Now its safe to look at the state. If its in the "new" state, then
+# all we need to do is kill the record and the directory, since the
+# batch daemon will not bother with it once the canceled bit is set.
+#
+$query_result = 
+    DBquery("SELECT status from batch_experiments ".
+	    "WHERE eid='$eid' and pid='$pid'");
+
+DBquery("unlock tables");
+
+@row = $query_result->fetchrow_array();
+$state = $row[0];
+
+if ($state ne "new") {
+    #
+    # Daemon does the rest ...
+    #
+    print STDOUT
+	"Batch Experiment $eid in project $pid is running on the testbed\n".
+	"You will receive email notification when the experiment is torn\n".
+	"down and you can reuse the experiment name\n";
+
+    #
+    # exit status is special. Tells the caller that cancelation is pending.
+    # The web script will say something useful.
+    #
+    exit(1);
+}
+
+#
+# Delete the DB record. LOCKING!
+#
+DBquery("DELETE from batch_experiments WHERE eid='$eid' and pid='$pid'");
+
+#
+# And kill the directory.
+#
+system("rm -rf $dirname");
+
+#
+# Lets not bother with an email message. Just print out something nice
+# and tell the caller (the php script) to say something nice too).
+# 
+print STDOUT
+    "Batch Experiment $eid in project $pid has been canceled!\n";
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print STDOUT "$mesg\n";
+
+    #
+    # Send a message to the testbed list
+    #
+    open(MAIL, "| /usr/bin/mail ".
+	 "-s \"TESTBED: Batch Mode Cancelation Failure $pid/$eid\" ".
+	 "$TBOPS >/dev/null 2>&1")
+	or die "Cannot start mail program: $!";
+
+    print MAIL $mesg;
+    close(MAIL);
+    exit(-1);
+}
+
+sub DBquery()
+{
+    my($query) = $_[0];
+
+    $query_result = $DB->query($query);
+
+    if (! $query_result) {
+	fatal("DB Error: $query");
+    }
+
+    return $query_result;
+}

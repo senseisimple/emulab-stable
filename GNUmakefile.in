@@ -43,6 +43,8 @@ install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/lists
 	-mkdir -p $(INSTALL_TOPDIR)/backup
+	-mkdir -p $(INSTALL_TOPDIR)/batch
+	-chmod 777 $(INSTALL_TOPDIR)/batch
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

@@ -53,11 +53,10 @@ if (strlen($exp_id) > $TBDB_EIDLEN) {
 # Certain of these values must be escaped or otherwise sanitized.
 # 
 $exp_name = addslashes($exp_name);
-
+    
 #
-# I'm going to allow shell experiments to be created (No NS file).
+# I am not going to allow shell experiments to be created (No NS file).
 # 
-$nonsfile = 0;
 if (!isset($exp_nsfile) ||
     strcmp($exp_nsfile, "") == 0 ||
     strcmp($exp_nsfile, "none") == 0) {
@@ -69,7 +68,7 @@ if (!isset($exp_nsfile) ||
         USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
                   "valid filename. Please go back and try again.", 1);
     }
-
+    
     $nonsfile = 1;
 }
 
@@ -82,6 +81,15 @@ $query_result = mysql_db_query($TBDBNAME,
 if ($row = mysql_fetch_row($query_result)) {
     USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
               "in use in project $exp_pid. Please select another.", 1);
+}
+
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT eid FROM batch_experiments ".
+        "WHERE eid=\"$exp_id\" and pid=\"$exp_pid\"");
+if ($row = mysql_fetch_row($query_result)) {
+    USERERROR("The experiment name \"$exp_id\" you have chosen is a current ".
+              "batch mode experiment in project $exp_pid. ".
+              "Please select another name.", 1);
 }
 
 #

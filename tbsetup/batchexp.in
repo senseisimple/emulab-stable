@@ -1,0 +1,292 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Create a batch experiment.
+#
+# usage: batchexp <batchfile>
+#
+sub usage()
+{
+    print STDOUT "Usage: batchexp <batchfile>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $DBNAME   = "@TBDBNAME@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+my $tbbindir = "$TB/bin/";
+my $batchdir = "$TB/batch";
+my $projroot = "/proj";
+my $dirname;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/libexec/ir".
+    ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$TBIRLIB = "$TB/lib/ir";
+push(@INC,$TBIRLIB);
+require libir;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $tempfile = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($tempfile =~ /^([-\@\w.\/]+)$/) {
+    $tempfile = $1;
+}
+else {
+    fatal("Tainted argument $tempfile");
+}
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# Parse the batchfile.
+#
+my $eid;
+my $pid;
+my $longname;
+my $expires;
+my $webnsfile;
+
+parse_batchfile($tempfile) or
+    fatal("Could not parse batchfile $tempfile");
+
+#
+# Sanity check a few things.
+#
+if (!defined($eid) || !defined($pid) || !defined($longname) ||
+    !defined($expires) || !defined($webnsfile)) {
+    fatal("Batchfile is incomplete!");
+}
+$nsfile = "$eid.ns";
+$irfile = "$eid.ir";
+
+#
+# Create a subdir in the batch directory to work in.
+#
+$dirname = "$batchdir/$pid-$eid";
+
+mkdir($dirname, 0775) or
+    fatal("Could not mkdir $dirname");
+
+chdir($dirname) or
+    fatal("Could not chdir to $dirname");
+
+#
+# Copy in the batch file. Web script is responsible for removing the
+# original.
+#
+if (system("/bin/cp", "$tempfile", "batchfile")) {
+    fatal("Could not copy $tempfile to $dirname");
+}
+
+#
+# Now a bunch of DB checks.
+#
+# First off, get some user information. 
+#
+$query_result =
+    DBquery("SELECT uid,usr_name,usr_email from users ".
+	     "WHERE unix_uid='$EUID'");
+
+if ($query_result->numrows < 1) {
+    fatal("Go Away! You do not exist in the Emulab Database.");
+}
+
+@row = $query_result->fetchrow_array();
+$uid        = $row[0];
+$user_name  = $row[1];
+$user_email = $row[2];
+
+#
+# Make sure UID is allowed to create experiments in this project.
+#
+$query_result =
+    DBquery("SELECT trust from proj_memb WHERE uid='$uid' and pid='$pid'");
+
+if ($query_result->numrows == 0) {
+    fatal("Go Away! You are not a member of project $pid!");
+}
+
+@row = $query_result->fetchrow_array();
+$trust = $row[0];
+
+if ($trust ne "local_root" &&
+    $trust ne "group_root") {
+    fatal("Go Away! You are not a trusted member of project $pid!");
+}
+
+#
+# The pid/eid pair has to be unique. LOCKING!
+# 
+$query_result =
+    DBquery("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
+
+if ($query_result->numrows) {
+    fatal("Experiment $eid in project $pid already exists!");
+}
+
+$query_result =
+    DBquery("SELECT * FROM batch_experiments WHERE eid='$eid' and pid='$pid'");
+
+if ($query_result->numrows) {
+    fatal("Batch experiment $eid in project $pid already exists!");
+}
+
+#
+# Now we can get the NS file! 
+#
+if (system("/bin/cp", "$webnsfile", "$nsfile")) {
+    fatal("Could not copy $webnsfile to $dirname/$nsfile");
+}
+
+#
+# Do a firstcut parse on the NS file, converting it to IR format. This
+# operates as a syntax check on the NS file, so we can kick back bad NS
+# files now instead of later. It also means we don't need the NS file after
+# this.
+#
+# XXX This is copied from tbprerun.
+#
+$tbcmdfile = "tbcmds";
+$id        = "$pid-$eid";
+
+if (system("parse.tcl $id $nsfile $irfile") != 0) {
+    fatal("NS Parse failed!");
+}
+if (system("extract_tb $nsfile $tbcmdfile") != 0) {
+    fatal("NS extract_tb pass failed!");
+}
+if (system("postparse $tbcmdfile $irfile") != 0) {
+    fatal("NS postparse pass failed!");
+}
+
+#
+# Figure out what resources are needed so the batch daemon can make an
+# informed decision about whether to even try.
+#
+$pcs    = 0;
+$sharks = 0;
+
+&ir_read($irfile);
+foreach my $foo (split("\n", &ir_get("/topology/nodes"))) {
+    ($node,$type) = split(' ', $foo);
+    if ($type eq "pc") {
+	$pcs++;
+    }
+    if ($type eq "sh") {
+	$sharks++;
+    }
+}
+
+#
+# Gen up the creation time.
+#
+$created = `date '+%Y:%m:%d %H:%M:%S'`;
+
+#
+# Insert the record. We leave this to very last cause the batch daemon
+# is looking for batch experiments to run. Easy race avoidance.
+#
+DBquery("INSERT INTO batch_experiments ".
+        "(eid, pid, created, started, expires, ".
+	" name, creator_uid, numpcs, numsharks, status) ".
+        "VALUES ('$eid', '$pid', '$created', '$created', '$expires', ".
+	"'$longname', '$uid', $pcs, $sharks, 'new')");
+
+exit 0;
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print STDOUT "$mesg\n";
+    print STDOUT "Cleaning up ...\n";
+
+#    system("/bin/rm", "-rf", "$dirname");
+    exit(-1);
+}
+
+#
+# Open up the batch file and parse it.
+#
+sub parse_batchfile()
+{
+    my($batchfile) = $_[0];
+
+    if (! open(BATCH, "$batchfile")) {
+	print STDERR "Could not open $batchfile\n";
+	return 0;
+    }
+
+    while (<BATCH>) {
+	if ($_ =~ /^EID:\s+([-\@\w.]*)/) {
+	    $eid = $1;
+	    next;
+	}
+	if ($_ =~ /^PID:\s+([-\@\w.]*)/) {
+	    $pid = $1;
+	    next;
+	}
+	if ($_ =~ /^name:\s+([-\@\w.]*)/) {
+	    $longname = $1;
+	    next;
+	}
+	if ($_ =~ /^expires:\s+([-\@\w.: ]*)$/) {
+	    $expires = $1;
+	    next;
+	}
+	if ($_ =~ /^nsfile:\s+([-\@\w.\/]*)/) {
+	    $webnsfile = $1;
+	    next;
+	}
+    }
+    close(BATCH);
+    return 1;
+}
+
+sub DBquery()
+{
+    my($query) = $_[0];
+
+    $query_result = $DB->query($query);
+
+    if (! $query_result) {
+	fatal("DB Error: $query");
+    }
+
+    return $query_result;
+}

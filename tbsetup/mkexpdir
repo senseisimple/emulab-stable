@@ -51,18 +51,18 @@ if (! chdir($expdir)) {
 }
 
 if (! mkdir($eid, 0770)) {
-    print STDOUT "Could not mkdir $eid in $piddir: $!\n";
+    print STDOUT "Could not mkdir $eid in $expdir: $!\n";
     exit(-1);
 }
 
 if (! chmod(0770, "$eid")) {
-    print STDOUT "Could not chmod $eid to 0770 in $piddir: $!\n";
+    print STDOUT "Could not chmod $eid to 0770 in $expdir: $!\n";
     rmdir($eid);
     exit(-1);
 }
 
 if (! chdir($eid)) {
-    print STDOUT "Could not chdir to $eid in $piddir: $!\n";
+    print STDOUT "Could not chdir to $eid in $expdir: $!\n";
     rmdir($eid);
     exit(-1);
 }

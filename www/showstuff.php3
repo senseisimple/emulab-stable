@@ -182,6 +182,153 @@ function SHOWUSER($uid) {
 }
 
 #
+# Show an experiment.
+#
+function SHOWEXP($pid, $eid) {
+    global $TBDBNAME;
+		
+    $query_result = mysql_db_query($TBDBNAME,
+		"SELECT * FROM experiments WHERE ".
+		"eid=\"$eid\" and pid=\"$pid\"");
+
+    $exprow = mysql_fetch_array($query_result);
+
+    $exp_expires = $exprow[expt_expires];
+    $exp_name    = $exprow[expt_name];
+    $exp_created = $exprow[expt_created];
+    $exp_start   = $exprow[expt_start];
+    $exp_end     = $exprow[expt_end];
+    $exp_created = $exprow[expt_created];
+    $exp_head    = $exprow[expt_head_uid];
+
+    #
+    # Generate the table.
+    #
+    echo "<table align=center border=1>\n";
+
+    echo "<tr>
+            <td>Name: </td>
+            <td class=\"left\">$eid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Long Name: </td>
+            <td class=\"left\">$exp_name</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Project: </td>
+            <td class=\"left\">$pid</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Experiment Head: </td>
+            <td class=\"left\">
+                <A href='showuser.php3?target_uid=$exp_head'>
+                   $exp_head</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Created: </td>
+            <td class=\"left\">$exp_created</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Starts: </td>
+            <td class=\"left\">$exp_start</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Ends: </td>
+            <td class=\"left\">$exp_end</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Expires: </td>
+            <td class=\"left\">$exp_expires</td>
+          </tr>\n";
+
+    echo "</table>\n";
+}
+
+#
+# Show Node information for an experiment.
+#
+function SHOWNODES($pid, $eid) {
+    global $TBDBNAME;
+		
+    $reserved_result = mysql_db_query($TBDBNAME,
+		"SELECT * FROM reserved WHERE ".
+		"eid=\"$eid\" and pid=\"$pid\"");
+    
+    if (mysql_num_rows($reserved_result)) {
+	echo "<center>
+              <h3>Reserved Nodes</h3>
+              </center>
+              <table align=center border=1>
+              <tr>
+                <td align=center>Change</td>
+                <td align=center>Node ID</td>
+                <td align=center>Node Name</td>
+                <td align=center>Type</td>
+                <td align=center>Default<br>Image</td>
+                <td align=center>Default<br>Path</td>
+                <td align=center>Default<br>Cmdline</td>
+                <td align=center>Startup<br>Command</td>
+                <td align=center>Startup<br>Status</td>
+              </tr>\n";
+	
+	$query_result = mysql_db_query($TBDBNAME,
+		"SELECT nodes.*,reserved.vname ".
+	        "FROM nodes LEFT JOIN reserved ".
+	        "ON nodes.node_id=reserved.node_id ".
+	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
+	        "ORDER BY type,node_id");
+
+	while ($row = mysql_fetch_array($query_result)) {
+	    $node_id = $row[node_id];
+	    $vname   = $row[vname];
+	    $type    = $row[type];
+	    $def_boot_image_id  = $row[def_boot_image_id];
+	    $def_boot_path      = $row[def_boot_path];
+	    $def_boot_cmd_line  = $row[def_boot_cmd_line];
+	    $next_boot_path     = $row[next_boot_path];
+	    $next_boot_cmd_line = $row[next_boot_cmd_line];
+	    $startupcmd         = $row[startupcmd];
+	    $startstatus        = $row[startstatus];
+
+	    if (!$def_boot_cmd_line)
+		$def_boot_cmd_line = "NULL";
+	    if (!$def_boot_path)
+		$def_boot_path = "NULL";
+	    if (!$next_boot_path)
+		$next_boot_path = "NULL";
+	    if (!$next_boot_cmd_line)
+		$next_boot_cmd_line = "NULL";
+	    if (!$startupcmd)
+		$startupcmd = "NULL";
+	    if (!$vname)
+		$vname = "--";
+
+	    echo "<tr>
+                    <td align=center>
+                       <A href='nodecontrol_form.php3?node_id=$node_id&refer=$pid\$\$$eid'>
+                            <img alt=\"o\" src=\"redball.gif\"></A></td>
+                    <td>$node_id</td>
+                    <td>$vname</td>
+                    <td>$type</td>
+                    <td>$def_boot_image_id</td>
+                    <td>$def_boot_path</td>
+                    <td>$def_boot_cmd_line</td>
+                    <td>$startupcmd</td>
+                    <td align=center>$startstatus</td>
+                 </tr>\n";
+	}
+	echo "</table>\n";
+    }
+}
+
+#
 # This is an included file.
 # 
 ?>

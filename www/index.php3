@@ -86,10 +86,11 @@ echo "</head>
 if (isset($uid)) {
     echo "<hr>";
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT status,admin FROM users WHERE uid='$uid'");
+	"SELECT status,admin,stud FROM users WHERE uid='$uid'");
     $row = mysql_fetch_row($query_result);
     $status = $row[0];
     $admin  = $row[1];
+    $stud   = $row[1];
 
     #
     # See if group_root in any projects, not just the last one in the DB!
@@ -125,10 +126,12 @@ if (isset($uid)) {
                     Project Information</A><p>\n";
         echo "<A href='beginexp_form.php3'>
                     Begin an Experiment</A><p>\n";
-        echo "<A href='endexp_list.php3'>
-                    End an Experiment</A><p>\n";
         echo "<A href='showexp_list.php3'>
                     Experiment Information</A><p>\n";
+	if ($stud) {
+	    echo "<A href='batchexp_form.php3'>
+                    Create a Batch Experiment</A><p>\n";
+	}
         echo "<A href='modusr_form.php3'>
                     Update user information</A><p>\n";
         echo "<A href='reserved.php3'>

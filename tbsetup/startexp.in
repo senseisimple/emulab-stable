@@ -78,8 +78,11 @@ if ($eid =~ /^([-\@\w.]+)$/) {
     $eid = $1;
 }
 # Note different taint check (allow /).
-if ($tempfile =~ /^([\/-\@\w.]+)$/) {
+if ($tempfile =~ /^([-\w.\/]+)$/) {
     $tempfile = $1;
+}
+else {
+    die("Tainted tempfile name: $tempfile");
 }
 
 my $piddir  = "$projroot/$pid";
@@ -360,7 +363,7 @@ sub fatal()
     # 
     open(MAIL, "| /usr/bin/mail ".
 	 "-s \"TESTBED: Experiment Configure Failure $pid/$eid\" ".
-	 "$TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
+	 "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
 	or die "Cannot start mail program: $!";
 
     print MAIL $mesg;

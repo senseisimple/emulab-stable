@@ -116,6 +116,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
 	tbsetup/sched_reload \
+	tbsetup/batchexp tbsetup/killbatchexp tbsetup/batch_daemon \
+	tbsetup/webbatchexp tbsetup/webkillbatchexp \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
 	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \

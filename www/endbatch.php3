@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Terminate Experiment");
+PAGEHEADER("Cancel Batch Mode Experiment");
 
 #
 # Only known and logged in users can end experiments.
@@ -33,54 +33,13 @@ $exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "\$\$", 0));
 # Check to make sure thats this is a valid PID/EID tuple.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM experiments WHERE ".
+	"SELECT * FROM batch_experiments WHERE ".
         "eid=\"$exp_eid\" and pid=\"$exp_pid\"");
 if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The experiment $exp_eid is not a valid experiment ".
+  USERERROR("The experiment $exp_eid is not a valid batch mode experiment ".
             "in project $exp_pid.", 1);
 }
 $row = mysql_fetch_array($query_result);
-
-#
-# If the experiment is still being configured, then do not allow it to
-# be stopped. The user has to wait!
-#
-$ready = $row[expt_ready];
-if (! $ready) {
-    USERERROR("The experiment `$exp_eid' is still configuring!<br>".
-	      "The user that created the experiment will be notified via ".
-	      "email<br>".
-	      "when it has been fully configured and is ready for use.<br>".
-	      "At that time you may terminate the experiment.<br>", 1);
-}
-
-#
-# If the experiment is already in the process of ending, then abort.
-# The wrapper script checks this too, but might as well head it off early.
-#
-$terminating = $row[expt_terminating];
-if ($terminating) {
-    USERERROR("A termination request for experiment $exp_eid was issued at ".
-	      "$terminating.<br>".
-	      "You may not issue multiple termination requests for an ".
-	      "experiment!<br><br>".
-	      "A notification will be sent via email ".
-	      "to the user that initiated the termination request when the ".
-	      "experiment has been torn down.", 1);
-}
-
-#
-# If this is a running batch mode experiment, then force user through the
-# terminate batchmode path, to ensure that this is really what the person
-# wanted to do. Its also easier for me.
-#
-$batchmode = $row[batchmode];
-if ($batchmode) {
-    USERERROR("The experiment $exp_eid is a batch mode experiment that ".
-	      "is currently running on the testbed. If you really want to ".
-	      "terminate this experiment, please go back and terminate it ".
-	      "using the entry in the batch mode experiments listing.", 1);
-}
 
 #
 # Verify that this uid is a member of the project for the experiment
@@ -106,7 +65,7 @@ if (! $isadmin) {
 #
 if ($canceled) {
     echo "<center><h2><br>
-          Experiment termination canceled!
+          Batch Mode Experiment, Cancelation Canceled!
           </h2></center>\n";
     
     PAGEFOOTER();
@@ -116,10 +75,10 @@ if ($canceled) {
 if (!$confirmed) {
     echo "<center><h2><br>
           Are you <b>REALLY</b>
-          sure you want to terminate Experiment '$exp_eid?'
+          sure you want to cancel Batch Mode Experiment '$exp_eid?'
           </h2>\n";
     
-    echo "<form action=\"endexp.php3\" method=\"post\">";
+    echo "<form action=\"endbatch.php3\" method=\"post\">";
     echo "<input type=hidden name=exp_pideid value=\"$exp_pideid\">\n";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
@@ -147,7 +106,7 @@ $gid = $row[0];
 #   tbstopit <pid> <eid>
 #
 echo "<center><br>";
-echo "<h3>Starting experiment termination. Please wait a moment ...
+echo "<h3>Starting Batch Mode Experiment Cancelation. Please wait a moment ...
           </center><br><br>
       </h3>";
 
@@ -160,12 +119,12 @@ flush();
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $gid webendexp $exp_pid $exp_eid",
+$result = exec("$TBSUEXEC_PATH $uid $gid webkillbatchexp $exp_pid $exp_eid",
  	       $output, $retval);
 
-if ($retval) {
+if ($retval && $retval != 1) {
     echo "<br><br><h2>
-          Termination Failure($retval): Output as follows:
+          Cancelation Failure($retval): Output as follows:
           </h2>
           <br>
           <XMP>\n";
@@ -177,12 +136,22 @@ if ($retval) {
     die("");
 }
 
-echo "<center><br>";
-echo "<h2>Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
-          You will be notified via email when the experiment has been torn<br>
-	  down, and you can reuse the experiment name.<br>";
-echo "</h2>";
-echo "</center>\n";
+echo "<center><h2><br>";
+#
+# Exit status 0 means cancelation was immediate.
+# Exit status 1 means the experiment was running, and will terminate later.
+#
+if ($retval) {
+	echo "Cancelation has started<br><br>
+              You will be notified via email when the process has completed,
+    	      and you can reuse the experiment name.<br><br>
+              This might take a few minutes. Please be patient.\n";
+}
+else {
+	echo "Batchmode Experiment $exp_eid in project $exp_pid has
+              been canceled!\n";
+}
+echo "</center></h2>\n";
 
 #
 # Standard Testbed Footer

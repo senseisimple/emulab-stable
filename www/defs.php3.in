@@ -28,7 +28,7 @@ $TBNSSUBDIR     = "nsdir";
 
 $TBAUTHCOOKIE   = "HashCookie";
 $TBNAMECOOKIE   = "MyUidCookie";
-$TBAUTHTIMEOUT  = 10800;
+$TBAUTHTIMEOUT  = 21600;
 
 #
 # Database constants and the like.
