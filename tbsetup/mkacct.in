@@ -14,7 +14,7 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: mkacct <uid>\n";
+    print STDOUT "Usage: mkacct <name>\n";
     exit(-1);
 }
 my  $optlist = "";
