@@ -88,7 +88,7 @@ if (mysql_num_rows($experiments_result)) {
                 <td>".$usage["pc"]." &nbsp;</td>\n";
 
 	if ($isadmin) {
-	    $foo = "N/A";
+	    $foo = "&nbsp";
 
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 		$foo = $lastexpnodelogins["date"] . " " .

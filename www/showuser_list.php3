@@ -111,7 +111,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "<td>$idle_row[0]</td>\n";
     }
     else {
-	echo "<td>N/A</td>\n";
+	echo "<td>&nbsp</td>\n";
     }
 
     if ($loginarray && isset($loginarray["$unix_uid"])) {
@@ -124,7 +124,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "<td>$idle_row[0]</td>\n";
     }
     else {
-	echo "<td>N/A</td>\n";
+	echo "<td>&nbsp</td>\n";
     }
 
     if ($isadmin) {
