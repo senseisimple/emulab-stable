@@ -30,6 +30,7 @@ int nnodes = 0;
 int partition_mechanism;
 int on_line = 0;
 int cycles_to_best = 0;
+int batch_mode = 0;
 
 float sensitivity = .1;
 
@@ -532,7 +533,7 @@ void loopassign()
  * simulated annealing, throw them in here.
  */
 
-void chopgraph(GraphWin& gw) {
+void chopgraph() {
 	node n;
 	forall_nodes(n, G) {
 		G[n].partition(0);
@@ -565,7 +566,7 @@ void display_scc(GraphWin& gw)
 			G[n].partition(0);
 		}
 		if (on_line)
-			chopgraph(gw);
+			chopgraph();
 	}
 	
 	refreshed = 0;
@@ -639,11 +640,24 @@ void reassign(GraphWin& gw)
 	absnodes.init(G, 0);
 	physnodes.init(G, 0);
 	absphys.init(G, 0);
-	chopgraph(gw);
+	chopgraph();
 	refreshed = 1;
 	display_scc(gw);
 }
 
+// XXX : another code by copy
+void batch()
+{
+	node n;
+	forall_nodes(n, G) {
+		G[n].partition(0);
+	}
+	bestnodes.init(G, 0);
+	absnodes.init(G, 0);
+	physnodes.init(G, 0);
+	absphys.init(G, 0);
+	chopgraph();
+}
 
 void new_edge_handler(GraphWin& gw, edge)  { display_scc(gw); }
 void del_edge_handler(GraphWin& gw)        { display_scc(gw); }
@@ -652,13 +666,14 @@ void del_node_handler(GraphWin& gw)        { display_scc(gw); }
 
 void usage() {
 	fprintf(stderr,
-		"usage:  assign [-h] [-ao] [-s <switches>] [-n nodes/switch] [-c cap] [file]\n"
+		"usage:  assign [-h] [-bao] [-s <switches>] [-n nodes/switch] [-c cap] [file]\n"
 		"           -h ...... brief help listing\n"
 		"           -s #  ... number of switches in cluster\n"
 		"           -n #  ... number of nodes per switch\n"
 		"           -a ...... Use simulated annealing (default)\n"
 		"           -o ...... Update on-line (vs batch, default)\n"
 		"           -t <file> Input topology desc. from <file>\n"
+		"           -b ...... batch mode (no gui)\n"
 		);
 }
 
@@ -687,13 +702,14 @@ int main(int argc, char **argv)
 
 	partition_mechanism = PARTITION_BY_ANNEALING;
     
-	while ((ch = getopt(argc, argv, "oas:n:t:h")) != -1)
+	while ((ch = getopt(argc, argv, "boas:n:t:h")) != -1)
 		switch(ch) {
 		case 'h': usage(); exit(0);
 		case 's': nparts = atoi(optarg); break;
 		case 'a': partition_mechanism = PARTITION_BY_ANNEALING; break;
 		case 'o': on_line = 1; break;
 		case 't': topofile = optarg; break;
+		case 'b': batch_mode = 1; break;
 		default: usage(); exit(-1);
 		}
 
@@ -714,18 +730,19 @@ int main(int argc, char **argv)
 	 * the user does anything to the graph, call the
 	 * proper handler.
 	 */
-	
+	// XXX: alas, we need this because all the GW stuff is not in
+	// the same spot.
 	GraphWin gw(G, "Flux Testbed:  Simulated Annealing");
+	if (! batch_mode) {
+		gw.set_init_graph_handler(del_edge_handler);
+		gw.set_new_edge_handler(new_edge_handler);
+		gw.set_del_edge_handler(del_edge_handler);
+		gw.set_new_node_handler(new_node_handler);
+		gw.set_del_node_handler(del_node_handler);
     
-	gw.set_init_graph_handler(del_edge_handler);
-	gw.set_new_edge_handler(new_edge_handler);
-	gw.set_del_edge_handler(del_edge_handler);
-	gw.set_new_node_handler(new_node_handler);
-	gw.set_del_node_handler(del_node_handler);
-    
-	gw.set_node_width(24);
-	gw.set_node_height(24);
-    
+		gw.set_node_width(24);
+		gw.set_node_height(24);
+	}
 	/*
 	 * Allow the user to specify a topology in ".top" format.
 	 */
@@ -738,15 +755,17 @@ int main(int argc, char **argv)
 		  exit(-11);
 		}
 		parse_top(G, infile);
-		gw.update_graph();
-		node n;
-		forall_nodes(n, G) {
-			if (G[n].name() == NULL) {
-				G[n].name("");
+		if (! batch_mode) {
+			gw.update_graph();
+			node n;
+			forall_nodes(n, G) {
+				if (G[n].name() == NULL) {
+					G[n].name("");
+				}
+				gw.set_label(n, G[n].name());
+				gw.set_position(n,
+						point(random() % 200, random() % 200));
 			}
-			gw.set_label(n, G[n].name());
-			gw.set_position(n,
-					point(random() % 200, random() % 200));
 		}
 	}
 
@@ -784,20 +803,24 @@ int main(int argc, char **argv)
 		topo->print_topo();
 	}
 
-	gw.display();
-    
-	gw.set_directed(false);
-    
-	gw.set_node_shape(circle_node);
-	gw.set_node_label_type(user_label);
-    
-	h_menu = gw.get_menu("Layout");
-	gw_add_simple_call(gw, reassign, "Reassign", h_menu);
-
-	/* Run until the user quits.  Everything is handled by callbacks
-	 * from LEDA's event loop from here on.                           */
-	
-	gw.edit();
+	if (! batch_mode) {
+		gw.display();
+		
+		gw.set_directed(false);
+		
+		gw.set_node_shape(circle_node);
+		gw.set_node_label_type(user_label);
+		
+		h_menu = gw.get_menu("Layout");
+		gw_add_simple_call(gw, reassign, "Reassign", h_menu);
+		
+		/* Run until the user quits.  Everything is handled by callbacks
+		 * from LEDA's event loop from here on.                           */
+		
+		gw.edit();
+	} else {
+		batch();
+	}
 
 	print_solution();
     
