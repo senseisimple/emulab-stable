@@ -99,7 +99,10 @@ SENDMAIL($TBOPS, "OPS has rebooted",
 	 "OPS has rebooted.\n".
 	 "Starting up services. Stay tuned for more info ...");
 
-
+#
+# restart the event servers on ops.
+#
+system("$TB/sbin/eventsys_start");
 
 SENDMAIL($TBOPS, "OPS has rebooted",
 	 "OPS has rebooted. Services have been restarted.",
