@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -28,7 +28,9 @@
 #include "imagehdr.h"
 #include "queue.h"
 
+#ifndef linux
 #define TIMEIT
+#endif
 
 #define HASH_MAGIC	".ndzsig"
 #define HASH_VERSION	0x20031107
