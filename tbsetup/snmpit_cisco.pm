@@ -632,7 +632,8 @@ sub createVlan($$;$$$) {
 	#
 	my $SAID = pack("H*",sprintf("%08x",$vlan_number + 100000));
 
-	print "  Creating VLAN $vlan_id as VLAN #$vlan_number ... ";
+	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
+		"$self->{NAME} ... ";
 
 	#
 	# Perform the actual creation. Yes, this next line MUST happen all in
