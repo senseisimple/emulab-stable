@@ -322,7 +322,7 @@ main(int argc, char **argv)
 
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
-	printf("\n\nDone, in %ld seconds!\n\n", estamp.tv_sec);
+	printf("\n\nDone, in %ld seconds! [v5]\n\n", estamp.tv_sec);
 	
 	return 0;
 }

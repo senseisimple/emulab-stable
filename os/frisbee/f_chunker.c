@@ -135,16 +135,78 @@ void c_addKtoM( uint kb, uchar * data )
   }
 }
 
+int minIncompleteSlot()
+{
+  int min = -1;
+  int minCount, i;
+  for (i = 0; i < BufferSlotCount; i++) {
+    if (slots[i].mb != -1 && slots[i].gotCount != 1024) {
+      if (min == -1 || slots[i].gotCount < minCount) {
+        min = i;
+	minCount = slots[i].gotCount;
+      }
+    }
+  }
+  return min;
+}
+
+int maxIncompleteSlot()
+{
+  int max = -1;
+  int maxCount, i;
+  for (i = 0; i < BufferSlotCount; i++) {
+    if (slots[i].mb != -1 && slots[i].gotCount != 1024) {
+      if (max == -1 || slots[i].gotCount > maxCount) {
+        max = i;
+	maxCount = slots[i].gotCount;
+      }
+    }
+  }
+  return max;
+}
+
+int getKForIncompleteBufferSlot( int slot )
+{
+  int i;
+  assert( slots[slot].mb != -1 && slots[slot].gotCount != 1024 );
+  for ( i = 0; i < 1024; i++) {
+    if (!slots[slot].gotBitmap[i]) {
+      return i;
+    }
+  }
+}
+ 
+/* this is the heart of Chunker, and indeed, Frisbee.
+   Could possibly be broken into two or three subfunctions,
+   though it is fairly linear. */
+
 int c_suggestK()
 {
   static int lastMessage = 0;
   static int lastMessageCount = 0;
+  int allDone;
   int i, ii, j, ei;
   int freeCount = 0;
   int highestWeHave;
 
+  int m = maxIncompleteSlot();
+
+  if (m != -1) {
+    return slots[m].mb * 1024 + getKForIncompleteBufferSlot( m );
+  }
+
+  for (i = 0; i < BufferSlotCount; i++) {
+    if (slots[i].mb == -1) {
+      freeCount++;
+    }
+  }
+
+#if 0
   int foo = rand() % BufferSlotCount;
- 
+
+  /* find an incompletely full buffer slot --
+     but start from a random location, as not to give
+     bucket #0 preferential treatment. */
   for (ii = 0; ii < BufferSlotCount; ii++) {
     i = (ii + foo) % BufferSlotCount; 
     if (slots[i].mb != -1) {
@@ -172,62 +234,110 @@ int c_suggestK()
       freeCount++;
     }
   }  
+#endif
+  /* since all 'inProgress' MBs were shown to be complete, 
+     at this point "inProgressMB" means complete, but not consumed. 
+     Establish whether there are MB's that arent either complete and consumed, 
+     or sitting complete (but not consumed) in our buffer. */ 
 
-  highestWeHave = 0;
-  
-  for (i = 1; i < totalMB; i++) {
-    if (finishedMBBitmap[i]) {
-      highestWeHave = i;
-    }
-  }
-
-  for (ei = 0; ei < totalMB; ei++) {
-    /* kind of a hack, so we start at the highest mb we have and
-       swing around. */ 
-    i = (highestWeHave + ei) % totalMB;
+  allDone = 1;
+  for (i = 0; i < totalMB; i++) {
     if (!finishedMBBitmap[i] && !inProgressMB(i)) {
-      if (freeCount >= BUFFER_HEADROOM ) {
-	if (lastMessage != 2) {
-	  if (lastMessageCount) {
-	    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
-		   lastMessageCount );
-	    lastMessageCount = 0;
-	  }
-	  printf("ChunkerSK: Suggesting a new MB (%i)...\n", i);
-	  lastMessage = 2;
-	} else {
-	  lastMessageCount++;
-	}
-	/* incomplete MB, and we *can* deal with data */
-	return i * 1024;
-      } else {
-	/* incomplete MB, but we cannot deal with data. */
-	if (lastMessage != 3) {
-	  if (lastMessageCount) {
-	    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
-		   lastMessageCount );
-	    lastMessageCount = 0;
-	  }
-	  printf("ChunkerSK: Buffer too full to recommend chunks.\n", i);
-	  lastMessage = 3;
-	} else {
-	  lastMessageCount++;
-	}
-	return -1;
-      }
+      allDone = 0;
+      break;
     }
   }
 
-  /* no incomplete MB -> done! */
-  if (lastMessageCount) {
-    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
-	   lastMessageCount );
-    lastMessageCount = 0;
+  /* if there weren't incomplete MBs, craft a suitable reply. */
+
+  if (allDone) {
+    if (lastMessageCount) {
+      printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
+	     lastMessageCount );
+      lastMessageCount = 0;
+    }
+    printf("ChunkerSK: No incomplete MB's - done.\n");
+    printf("ChunkerSK: %i redundant  KBs (MB needed, KB not)\n", redundantKBs);
+    printf("ChunkerSK: %i redundant2 KBs (MB not needed)\n", redundantKBs2);
+    /* tell caller we're done. */
+    return -2;
   }
-  printf("ChunkerSK: No incomplete MB's - done.\n");
-  printf("ChunkerSK: %i redundant  KBs (MB needed, KB not)\n", redundantKBs);
-  printf("ChunkerSK: %i redundant2 KBs (MB not needed)\n", redundantKBs2);
-  return -2;
+  
+  if (freeCount < BUFFER_HEADROOM) {
+    /* there exists one or more incomplete MBs, 
+       but we cannot (or choose not to) deal with data. */
+    if (lastMessage != 3) {
+      if (lastMessageCount) {
+	printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
+	       lastMessageCount );
+	lastMessageCount = 0;
+      }
+      printf("ChunkerSK: Buffer too full to recommend chunks.\n", i);
+      lastMessage = 3;
+    } else {
+      lastMessageCount++;
+    }
+    /* tell caller to punt. */
+    return -1;
+  } else {
+    int beginEqualsICount = 0;
+    int oneDoneYet = 0;
+    int begin = rand() % totalMB; 
+    i = begin;
+
+    /* okay.. starting at a random MB, go through list of complete MBs;
+       first find a MB which _is_ finished, then find the next MB which is _not_,
+       and request that.
+       If there are no finished MBs, request MB #1. 
+       Note this loop must be processed twice for i == begin, 
+       for the (rare) case that MB[begin] is the only incomplete MB in the list.
+    */
+
+    while (1) {
+      /* this loop must get processed twice for i == begin, once for
+         each other MB. */
+      if (begin == i) { 
+	beginEqualsICount++;
+      } 
+
+      if (oneDoneYet) {
+	if (!finishedMBBitmap[i] && !inProgressMB(i)) {
+	  /* found it. */
+	  if (lastMessage != 2) {
+	    if (lastMessageCount) {
+	      printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
+		     lastMessageCount );
+	      lastMessageCount = 0;
+	    }
+	    printf("ChunkerSK: Suggesting a new MB (%i)...\n", i);
+	    lastMessage = 2;
+	  } else {
+	    lastMessageCount++;
+	  }
+	  return i * 1024;
+	}
+      } else {
+	if (finishedMBBitmap[i] || inProgressMB(i)) { 
+	  oneDoneYet = 1;
+	}
+      }  
+
+      if (beginEqualsICount == 2) {
+	/* we've now handled begin == i twice, so break. */ 
+	break;
+      }
+
+      i = (i + 1) % totalMB;
+    } /* while (1) */
+    
+    if (oneDoneYet == 0) {
+      /* there were no complete MBs, so request beginning. */
+      return 0;
+    } else {
+      /* there were no incomplete MBs-- this should've been caught. */ 
+      assert( 0 ); /* there should be an incomplete. */
+    }
+  }
 }
 
 int c_consumeM( uint * mb, uchar ** data )
