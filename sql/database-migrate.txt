@@ -2160,3 +2160,7 @@ last_net_act,last_cpu_act,last_ext_act);
              unsigned default NULL after elabinelab;
 	alter table experiment_stats add security_level tinyint(1) NOT NULL \
             default '0' after elabinelab_exptidx;
+
+	alter table reserved add \
+              inner_elab_role enum('boss','ops','node') default NULL \
+              after cnet_vlan;

@@ -1370,6 +1370,7 @@ CREATE TABLE reserved (
   old_pid varchar(12) NOT NULL default '',
   old_eid varchar(32) NOT NULL default '',
   cnet_vlan int(11) default NULL,
+  inner_elab_role enum('boss','ops','node') default NULL,
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname),
   KEY old_pid (old_pid,old_eid)
