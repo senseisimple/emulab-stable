@@ -100,7 +100,9 @@ static int getOrAllocBufferSlotForMB( BufferSlot ** returnPointer, int mb )
       slots[i].gotCount = 0;
       bzero( slots[i].gotBitmap, 1024 );
       *returnPointer = &(slots[i]);
+      /*
       printf("Chunker: Starting MB %i (in slot %i)\n", mb, i ); 
+      */
       return 1;
     }
   }
@@ -215,11 +217,15 @@ int c_suggestK()
 	  if (!slots[i].gotBitmap[j]) {
 	    if (lastMessage != 1) {
 	      if (lastMessageCount) {
+		/*
 		printf("ChunkerSK: Last ChunkerSK message repeated %i times.\n", 
 		       lastMessageCount );
+ 		*/
 		lastMessageCount = 0;
 	      }
+		/*
 	      printf("ChunkerSK: Suggesting kb from existing MB...\n");
+		*/
 	      lastMessage = 1;
 	    } else {
 	      lastMessageCount++;
@@ -252,8 +258,10 @@ int c_suggestK()
 
   if (allDone) {
     if (lastMessageCount) {
+	/*
       printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
 	     lastMessageCount );
+	*/
       lastMessageCount = 0;
     }
     printf("ChunkerSK: No incomplete MB's - done.\n");
@@ -268,11 +276,15 @@ int c_suggestK()
        but we cannot (or choose not to) deal with data. */
     if (lastMessage != 3) {
       if (lastMessageCount) {
+/*
 	printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
 	       lastMessageCount );
+*/
 	lastMessageCount = 0;
       }
+/*
       printf("ChunkerSK: Buffer too full to recommend chunks.\n", i);
+*/
       lastMessage = 3;
     } else {
       lastMessageCount++;
@@ -305,11 +317,15 @@ int c_suggestK()
 	  /* found it. */
 	  if (lastMessage != 2) {
 	    if (lastMessageCount) {
+/*
 	      printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
 		     lastMessageCount );
+*/
 	      lastMessageCount = 0;
 	    }
+/*
 	    printf("ChunkerSK: Suggesting a new MB (%i)...\n", i);
+*/
 	    lastMessage = 2;
 	  } else {
 	    lastMessageCount++;
@@ -369,7 +385,9 @@ void c_finishedM( uint mb )
 
   for (i = 0; i < BufferSlotCount; i++) {
     if (slots[i].mb == mb) {
-      printf("Chunker: Finishing MB %i (in slot %i)\n", mb, i ); 
+/*
+      printf("Chunker: Finished MB %i (in slot %i)\n", mb, i ); 
+*/
       slots[i].mb = -1;
       return;
     }

@@ -102,8 +102,10 @@ static int frisbee_port;
 
 void frisbeeEndChunk()
 {
+/*
   printf("frisbeeEndChunk(): ending chunk, read %i bytes into it. xyz\n",
 	 frisbeeIndexIntoCurrentChunk );
+*/
   frisbeeIndexIntoCurrentChunk = 0;
   frisbee_data = NULL;
 }
@@ -193,7 +195,9 @@ void * frisbee_thread( void *arg )
       /* either we havent given the consumer data yet, or they're done */
       if (lastChunkId != 0xFFFFFFFF) {
         /* they're done with a piece we gave them */
+	/*
         printf("frisbee_thread: Unlocking chunk %i. xyz\n", lastChunkId );
+	*/
 	frisbeeUnlockReadyChunk( lastChunkId );
 	lastChunkId = 0xFFFFFFFF;
       }
@@ -322,7 +326,7 @@ main(int argc, char **argv)
 
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
-	printf("\n\nDone, in %ld seconds! [v5]\n\n", estamp.tv_sec);
+	printf("\n\n[=)] Frisbee completed in %ld seconds!\n\n", estamp.tv_sec);
 	
 	return 0;
 }
@@ -338,8 +342,9 @@ inflate_subblock(void)
 	off_t		offset, size;
 	char		buf[DEFAULTREGIONSIZE];
 
+/*
 	printf("Inflate subblock called...\n");
-
+*/
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
 	d_stream.opaque   = (voidpf)0;
