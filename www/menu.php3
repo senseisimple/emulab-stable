@@ -56,7 +56,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
     WRITESIDEBARBUTTON("Tutorial at SIGCOMM'02 <img src=/new.gif>",
 		       $TBDOCBASE, "sc2002tut.php3");
-    WRITESIDEBARBUTTON("News (Updated Apr 19)", $TBDOCBASE,
+    WRITESIDEBARBUTTON("News (Updated Aug 15) <img src=/new.gif>", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
