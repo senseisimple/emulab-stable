@@ -1396,7 +1396,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
 	tbsetup/checkports tbsetup/webnodereboot tbsetup/libaudit.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
-	tbsetup/idleswap tbsetup/webidleswap \
+	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
