@@ -108,10 +108,13 @@ if (system("nfree $pid $eid")) {
 }
 
 if (! $TESTMODE) {
+    #
+    # All of these errors are non-fatal on swapout. We find out about them
+    # via email sent from the individual scripts.
+    #
     print "Resetting mountpoints.\n";
     if (system("exports_setup")) {
 	print STDERR "*** Failed to reset mountpoints.\n";
-	$errors=1;
     }
     
     print "Resetting named maps.\n";
