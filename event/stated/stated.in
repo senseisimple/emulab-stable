@@ -116,7 +116,6 @@ my $TBNODESTATE  = TBDB_TBEVENT_NODESTATE;
 my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
 my $TBCONTROL    = TBDB_TBEVENT_CONTROL;
 my $TBCOMMAND    = TBDB_TBEVENT_COMMAND;
-my $TBFAILED     = TBDB_TBEVENT_TBFAILED;
 my $TBREBOOT     = TBDB_COMMAND_REBOOT;
 my $TBPOWEROFF   = TBDB_COMMAND_POWEROFF;
 my $TBPOWERON    = TBDB_COMMAND_POWERON;
@@ -296,10 +295,10 @@ while (1) {
 
     # Check for nodes that have passed their timeout
     if (!qhead($deadline,$node)) {
-	debug("HEAD: $node in ".($deadline-$now).", queue=".qsize()."\n");
+	info("HEAD: $node in ".($deadline-$now).", queue=".qsize()."\n");
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
-	    debug("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
+	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
 	    handleCtrlEvent($node,$TBTIMEOUT);
 	    if (0) { qshow(); }
 	    if (qhead($deadline,$node)) {
@@ -369,7 +368,6 @@ sub readStates(;@) {
 	    $nodes{$node_id}{notified}       = 0;
 	    $nodes{$node_id}{timedout}       = 0;
 	    $nodes{$node_id}{noretry}        = 0;
-	    $nodes{$node_id}{rebooting}      = 0;
 	    # Is there a timeout? If so, set it up!
 	    setTimeout($mode,$state,$node_id,$timestamp);
 	}
@@ -624,7 +622,6 @@ sub stateTransition($$) {
 		# We successfully booted, so clear some flags
 		$nodes{$node}{noretry}   = 0;
 		$nodes{$node}{timedout}  = 0;
-		$nodes{$node}{rebooting} = 0;
 		# Check if we really need to do a reset
 		my $r = DBQueryWarn("select osid,def_boot_osid from nodes ".
 				    "where node_id='$node'");
@@ -829,33 +826,18 @@ sub handleCtrlEvent($$) {
 
 	    foreach ($action) {
 		/^$TBTIMEOUTREBOOT/ && do {
-		    # If the node is in our control (ie node_reboot),
-		    # we want to do something. If it is in the user's
-		    # control (went to shutdown without a reboot event),
-		    # then we don't want to touch it.
-		    if ($nodes{$node}{rebooting}) {
-			if ($timedout>1) {
-			    # We've tried too many times...
-			    # The node has now officially failed to boot
-			    notify("Node $node timed out $timedout times!\n".
-				   "Giving up until it boots sucessfully.\n");
-			    $nodes{$node}{noretry} = 1;
-			    info("$node: Sending $TBFAILED $TBREBOOT $node\n");
-			    EventSendWarn(host      => $BOSSNODE ,
-					  objtype   => $TBFAILED ,
-					  eventtype => $TBREBOOT ,
-					  objname   => $node);
-			} else {
-			    # XXX Temporary!  For now notify instead of
-			    # really rebooting, until the timeout/retry
-			    # stuff is gone from os_setup and os_load
-			    #notify("Node $node has timed out in state ".
-			    #       "$mode/$state - REBOOT requested\n");
-			    handleCommand($node,$TBREBOOT,$timedout,1);
-			}
+		    if ($timedout>3) {
+			# We've tried too many times...
+			notify("Node $node has timed out too many times!\n".
+			       "Giving up until it boots sucessfully.\n");
+			$nodes{$node}{noretry} = 1;
 		    } else {
-			info("Node $node timed out in state $mode/$state ".
-			     "under user's control - not rebooting\n");
+			# XXX Temporary!  For now notify instead of
+			# really rebooting, until the timeout/retry
+			# stuff is gone from os_setup and os_load
+			notify("Node $node has timed out in state ".
+			       "$mode/$state - REBOOT requested\n");
+			#handleCommand($node,$TBREBOOT,$timedout,1);
 		    }
 		    last; };
 		/^$TBTIMEOUTNOTIFY/ && do {
@@ -881,7 +863,7 @@ sub handleCommand($$;$$) {
     # We may need to do it here (while iterating over the list), or
     # make some other fix up in handleEvent.
 
-    if ($command eq $TBREBOOT && $retry >1) {
+    if ($command eq $TBREBOOT && $retry >=4) {
 	announce("Node $params has tried rebooting $retry times and has \n".
 		 "still not been successful. Please look into it soon.\n".
 	"" );#	 "In the meantime, $params will be powered off.\n");
@@ -903,14 +885,11 @@ sub handleCommand($$;$$) {
 		    $node = $nodes[$n];
 		    debug("Checking rebooting: $node, $nodes{$node}, ".
 			  "$nodes{$node}{state}, $nodes{$node}{noretry}\n");
-		    if (($nodes{$node}{rebooting}) &&
-			 (!$nodes{$node}{noretry}) ) {
+		    if (($nodes{$node}{state} ne TBDB_NODESTATE_ISUP) &&
+			(!$nodes{$node}{noretry}) ) {
 			# This node shouldn't be rebooted now...
-			info("$node: Sending $TBFAILED $TBREBOOT $node\n");
-			EventSendWarn(host      => $BOSSNODE ,
-				      objtype   => $TBFAILED ,
-				      eventtype => $TBREBOOT ,
-				      objname   => $node);
+			# XXX Send feedback here somehow!
+
 			info("$node: Trying to reboot too soon! Skipping.\n");
 			# Cut it out of the list
 			debug("Nodelist before ==> ".join(" ",@nodes)."\n");
@@ -925,8 +904,6 @@ sub handleCommand($$;$$) {
 	    info("Rebooting nodes: $nodelist\n");
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
-
-	    $nodes{$node}{rebooting}=1;
 
 	    my $cmd = "$nodereboot -r $nodelist";
 	    my $redir = " 2>&1 >> /usr/testbed/log/nodereboot.log &";
