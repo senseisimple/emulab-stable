@@ -206,11 +206,45 @@ foreach link [array names plinks] {
 	lappend pls $element
     }
     set name [get_link_name $link]
+    if {! [info exists linktmp($name)]} {
+	set linktmp($name) {}
+    }
     foreach l $pls {
 	lappend linktmp($name) $l
     }
 }
+proc node_name {s} {
+    return [lindex [split $s -] 0]
+}
 foreach link [array names linktmp] {
+    # Any "duplicates" should go together.
+    # RULES: Can only swap a and b or c and d (i.e. within a link)
+    # This will only happen in the case of a delay node which will
+    # have four elements (two links of src/dst), we just check every
+    # case.
+    if {[llength $linktmp($link)] == 4} {
+	set a [lindex $linktmp($link) 0]
+	set b [lindex $linktmp($link) 1]
+	set c [lindex $linktmp($link) 2]
+	set d [lindex $linktmp($link) 3]
+	if {[node_name $b] == [node_name $d]} {
+	    set tmp $d
+	    set d $c
+	    set c $tmp
+	} elseif {[node_name $a] == [node_name $c]} {
+	    set tmp $b
+	    set b $a
+	    set a $tmp
+	} elseif {[node_name $a] == [node_name $d]} {
+	    set tmp $b
+	    set b $a
+	    set a $tmp
+	    set tmp $d
+	    set d $c
+	    set c $tmp
+	}
+	set linktmp($link) [list $a $b $c $d]
+    }
     puts $fp "$link $linktmp($link)"
 }
 
