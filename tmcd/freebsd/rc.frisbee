@@ -4,6 +4,13 @@
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
+# Optional flag argument says "do not reboot"
+#
+reboot=1
+
+if [ $# -eq 1 -a "$1" = "-noreboot" ]; then
+    reboot=0
+fi
 
 #
 # Amount of memory in MB to leave for everyone else in the system.  If you
@@ -123,10 +130,15 @@ if [ x"$ADDRESS" != x ]; then
 			echo "Adjusting slice-related files";
 			$BINDIR/slicefix $PARTITION $DISK
 		fi
-		echo "Image load complete, rebooting ..."
+		echo "Image load complete"
 		$BINDIR/tmcc state RELOADDONE
-		/sbin/reboot
-		sleep 100
+		
+		if [ $reboot -eq 1 ]; then
+		    echo "Rebooting ..."
+		    /sbin/reboot
+		    sleep 100
+		fi
+	        exit 0
 		;;
 	*)
 		echo "Frisbee run failed, status $?"
@@ -136,3 +148,4 @@ else
 	echo "Unable to get address for loading image"
 fi
 echo "Failed to load disk, dropping to login prompt"
+exit 1

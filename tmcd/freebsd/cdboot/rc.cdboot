@@ -127,6 +127,7 @@ sub doboot()
     $bootdev = WhichRawDisk();
     print("Using $bootdev for config sector ...\n");
 
+  bootinfo:
     #
     # If this is first install on this disk, or if the disk has just been
     # loaded, initialize the magic sector so that it boots from the CD.
@@ -148,6 +149,7 @@ sub doboot()
     # by the bootinfo server, returning only when bootinfo says that the node
     # should boot (has been allocated or needs to be reloaded).
     #
+    print("Asking bootinfo what to do; warning, this might block ...\n");
     my $bootwhat = `bootinfoclient -s $bossname`;
     if ($?) {
 	print("Error running bootinfoclient; falling back to MFS boot\n");
@@ -196,7 +198,6 @@ sub doboot()
 	#
 	# We know about a couple of different MFSs, but thats it!
 	#
-
 	if ($mfs eq "freebsd.newnode") {
 	    system("$BINDIR/newclient");
 	    #
@@ -207,11 +208,15 @@ sub doboot()
 	}
 	elsif ($mfs =~ /^frisbee.*$/) {
 	    #
-	    # Run the frisbee script. If all goes well it will reboot.
-	    # Any problems we land back here, so go into the MFS so we
-	    # can possibly diagnose the problem.
+	    # Run the frisbee script. We do not want rc.frisbee to reboot
+	    # though since once the frisbee is done, we can immediately go
+	    # back through bootinfo to see what to do next, avoiding a full
+	    # reboot cycle!
 	    #
-	    system("$RCDIR/rc.frisbee");
+	    if (system("$RCDIR/rc.frisbee -noreboot") == 0) {
+		goto bootinfo;
+	    }
+	    # Failed, drop into MFS for easy debug and reboot later.
 	    goto mfs;
 	}
 	elsif ($mfs =~ /^freebsd.*$/) {
