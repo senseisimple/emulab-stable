@@ -150,9 +150,7 @@ main(int argc, char **argv)
 	openlog("tmcd", LOG_PID, LOG_USER);
 	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
 
-#ifndef LBS
 	if (! debug)
-#endif
 		(void)daemon(0, 0);
 
 	/*
@@ -1006,33 +1004,26 @@ donewhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 static int
 dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 {
-
-	char *tmp, buf[MYBUFSIZE], *vname_list;
-	char pid[64], eid[64];
-	char		gid[64];
-	char nickname[128]; /* XXX: Shouldn't be statically sized, potential
-			     *   buffer overflow
-			     */ 
-
-	char nodeid[32]; /* Testbed ID of the node */
-	int control_net; /* Control network interface on this host */
-	int ninterfaces; /* Number of interfaces on the host */
-	int nnodes; /* Number of other nodes in this experiment */
-
-
-	char *last_id; /* Used to determine link# */
-	int link;
-	int seen_direct;
-	int rv = 0;    /* Return value from the function */
-
-	MYSQL_RES	*interface_result;
-	MYSQL_RES	*nodes_result;
-	MYSQL_RES	*vlan_result;
-	MYSQL_RES	*reserved_result;
+	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	char		pid[64], eid[64], gid[64];
+	char		nodeid[32];
+	int		nrows;
+	int		rv;
 
-	struct node_interface *connected_interfaces, *temp_interface;
-	int nvlans;
+	/*
+	 * We build up a canonical host table using this data structure.
+	 */
+	struct hostentry {
+		char	nodeid[32];
+		char	vname[32];
+		char	vlan[32];
+		int	virtiface;
+		int	connected;
+		struct in_addr	 ipaddr;
+		struct hostentry *next;
+	} *hosts = 0, *host;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "HOSTNAMES: %s: No such node",
@@ -1045,265 +1036,199 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 	 */
 	if (nodeidtoexp(nodeid, pid, eid, gid))
 		return 0;
+
 	/*
-	 * Figure out which of our interfaces is on the control network
+	 * Now use the virt_nodes table to get a list of all of the
+	 * nodes and all of the IPs on those nodes. This is the basis
+	 * for the canonical host table. Join it with the reserved
+	 * table to get the node_id at the same time (saves a step).
 	 */
+	res = mydb_query("select v.vname,v.ips,r.node_id from virt_nodes as v "
+			 "left join reserved as r on "
+			 " v.vname=r.vname and v.pid=r.pid and v.eid=r.eid "
+			 " where v.pid='%s' and v.eid='%s' order by r.node_id",
+			 3, pid, eid);
 
-	interface_result = mydb_query("SELECT control_net "
-			"FROM nodes LEFT JOIN node_types ON nodes.type = node_types.type "
-			"WHERE nodes.node_id = '%s'",
-			1, nodeid);
-
-	if (!interface_result) {
-		syslog(LOG_ERR, "dohosts: %s: DB Error getting interface!", nodeid);
+	if (!res) {
+		syslog(LOG_ERR, "HOSTNAMES: %s: DB Error getting virt_nodes!",
+		       nodeid);
 		return 1;
 	}
-
-	/*
-	 * There should be exactly 1 control network interface!
-	 */
-	if ((int)mysql_num_rows(interface_result) != 1) {
-		mysql_free_result(interface_result);
-		syslog(LOG_ERR, "HOSTNAMES: Unable to get control interface for %s",nodeid);
+	if (! (nrows = mysql_num_rows(res))) {
+		mysql_free_result(res);
 		return 0;
 	}
 
-	row = mysql_fetch_row(interface_result);
-	control_net = atoi(row[0]);
-	mysql_free_result(interface_result);
-
 	/*
-	 * For the virt_lans table, we need the virtual name, not the node_id
+	 * Parse the list, creating an entry for each node/IP pair.
 	 */
-	if (nodeidtonickname(nodeid,nickname)) {
-		strcpy(nickname,nodeid);
-	}
+	while (nrows--) {
+		char		 *bp, *ip, *cp;
+		
+		row = mysql_fetch_row(res);
+		if (!row[0] || !row[0][0] ||
+		    !row[1] || !row[1][0])
+			continue;
 
-	/*
-	 * Now, we need to look through the virt_lans table to find a list of all the
-	 * VLANs we're in
-	 */
-	vlan_result = mydb_query("SELECT vname "
-			"FROM virt_lans "
-			"WHERE member LIKE '%s:%%' AND pid='%s' AND eid='%s'",
-			1, nickname,pid,eid);
-
-	if (!vlan_result) {
-		syslog(LOG_ERR, "dohosts: %s: DB Error getting virt_lans!", nodeid);
-		return 1;
-	}
-
-	nvlans = (int)mysql_num_rows(vlan_result);
-	connected_interfaces = NULL;
-
-	/*
-	 * Initializing vname_list to "0" makes the ORs easier to get right,
-	 * and I want to make sure this string gets malloc()ed, to prevent
-	 * problems with the free() inside the loop
-	 */
-	vname_list = (char*)malloc(2);
-	strcpy(vname_list,"0");
-
-	while (nvlans--) {
-		row = mysql_fetch_row(vlan_result);
-
-		/*
-		 * Add this vlan to an OR of vlan names that could contain direct neighbors
-		 */
-		tmp = (char*)malloc(strlen(vname_list) + strlen(row[0]) +14);
-		strcpy(tmp,vname_list);
-		strcat(tmp," OR vname ='");
-		strcat(tmp,row[0]);
-		strcat(tmp,"'");
-		free(vname_list);
-		vname_list = tmp;
-
-	}
-	mysql_free_result(vlan_result);
-
-	/*
-	 * Now, get the members of all these VLANs
-	 */
-	vlan_result = mydb_query("SELECT member "
-			"FROM virt_lans "
-			"WHERE pid='%s' AND eid='%s' AND ( %s )",
-			1, pid,eid,vname_list);
-	free(vname_list);
-
-	if (!vlan_result) {
-		syslog(LOG_ERR, "dohosts: %s: DB Error getting virt_lan members!", nodeid);
-		rv = 1;
-		goto cleanup; /* At the end of the function */
-	}
-
-	nvlans = (int)mysql_num_rows(vlan_result);
-	connected_interfaces = NULL;
-
-	while (nvlans--) {
-		struct node_interface *interface;
-
-		row = mysql_fetch_row(vlan_result);
-
-		/*
-		 * Add this member to the linked list of directly connected
-		 * interfaces
-		 */
-		interface = (struct node_interface *)malloc(sizeof(struct node_interface *));
-		interface->iface = (char*)malloc(strlen(row[0]) +1);
-		strcpy(interface->iface,row[0]);
-		interface->next = connected_interfaces;
-		connected_interfaces = interface;
-
-	}
-
-	mysql_free_result(vlan_result);
-
-	/*
-	 * Grab a list of all other hosts in this experiment - we'll sort
-	 * out the directly connected ones while looping through them.
-	 */
-	nodes_result = 
-		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, "
-			   "  r.vname, CONCAT(r.vname,':',i.card), "
-			   "  i.card = t.control_net, v.vname "
-			   "FROM interfaces AS i "
-			   "LEFT JOIN reserved AS r ON i.node_id = r.node_id "
-			   "LEFT JOIN nodes AS n ON i.node_id = n.node_id "
-			   "LEFT JOIN node_types AS t ON n.type = t.type "
-			   "LEFT JOIN virt_lans as v on "
-			   " member=CONCAT(r.vname,':',i.card) AND "
-			   " v.pid=r.pid AND v.eid=r.eid "
-			   "WHERE IP IS NOT NULL AND IP != '' AND "
-			   " r.pid='%s' AND r.eid='%s'"
-			   " ORDER BY node_id DESC, IP",
-			   7,pid,eid);
-
-	if (!nodes_result) {
-		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
-				"in the experiment!", nodeid);
-		rv = 1;
-		goto cleanup; /* At the end of the function */
-	}
-	
-	if ((nnodes = (int)mysql_num_rows(nodes_result)) == 0) {
-		syslog(LOG_ERR, "dohosts: %s: No nodes in this experiment!", nodeid);
-		mysql_free_result(nodes_result);
-		rv = 0;
-		goto cleanup; /* At the end of the function */
-	}
-
-	last_id = ""; 
-	link = 0; /* Acts as 'lindex' from the virt_names table */
-	seen_direct = 0; /* Set to 1 if we've already seen at least
-						one direct connection to this node */
-	while (nnodes--) {
-		MYSQL_ROW node_row = mysql_fetch_row(nodes_result);
-		char	  *vname, vbuf[256];
-
-		/*
-		 * Watch for null vnames. Just construct something to make
-		 * everyone happy.
-		 */
-		if (node_row[3])
-			vname = node_row[3];
-		else {
-			strcpy(vbuf, "V");
-			strcat(vbuf, node_row[0]);
-			vname = vbuf;
-		}
-
-		/*
-		 * Either the IP or IPalias column (or both!) could have
-		 * matched. Code duplication galore!
-		 */
-
-		/*
-		 * Let's take care of the IP first!
-		 */
-#define P(vers, vname, linknum, linkname, ip, alias) \
-	if (vers == 1) { \
-		sprintf(buf, \
-			"NAME=%s LINK=%i IP=%s ALIAS=%s\n", \
-			(vname), (linknum), (ip), (alias));  \
-	} \
-	else { \
-		sprintf(buf, \
-			"NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n", \
-			(vname), (linkname), (ip), (vname), \
-			(linknum), (alias));  \
-	}
-		/* Skip the control network interface */
-		if (!(node_row[5] && atoi(node_row[5]))) {
-
+		bp = row[1];
+		while (bp) {
 			/*
-			 * Keep track of node_ids, so we can get the LINK
-			 * number right
+			 * Note that the ips column is a space separated list
+			 * of X:IP where X is a logical interface number.
 			 */
-			if (!strcmp(node_row[0],last_id)) {
-				link++;
-			} else {
-				link = seen_direct = 0;
-				last_id = node_row[0];
+			cp = strsep(&bp, ":");
+			ip = strsep(&bp, " ");
+
+			if (! (host = (struct hostentry *)
+			              calloc(1, sizeof(*host)))) {
+				syslog(LOG_ERR, "HOSTNAMES: Out of memory!");
+				exit(1);
 			}
 
-
-			if (directly_connected(connected_interfaces,
-					       node_row[4])) {
-				P(vers, vname, link, node_row[6],
-				  node_row[1], (!seen_direct) ? vname : " ");
-
-				seen_direct = 1;
-			} else {
-				P(vers, vname, link, node_row[6],
-				  node_row[1], " ");
-			}
-
-			client_writeback(sock, buf, strlen(buf), tcp);
-			syslog(LOG_INFO, "HOSTNAMES: %s", buf);
-		}
-
-		/*
-		 * Make sure it really has an IPalias!
-		 */
-
-		if (node_row[2] && strcmp(node_row[2],"")) {
-			if (!strcmp(node_row[0],last_id)) {
-				link++;
-			} else {
-				link = seen_direct = 0;
-				last_id = node_row[0];
-			}
-
-			if (directly_connected(connected_interfaces,
-					       node_row[4])) {
-				P(vers, vname, link, node_row[6],
-				  node_row[2], (!seen_direct) ? vname : " ");
-				seen_direct = 1;
-			} else {
-				P(vers, vname, link, node_row[6],
-				  node_row[2], " ");
-			}
-
-			client_writeback(sock, buf, strlen(buf), tcp);
-			syslog(LOG_INFO, "HOSTNAMES: %s", buf);
-
+			strcpy(host->vname, row[0]);
+			strcpy(host->nodeid, row[2]);
+			host->virtiface = atoi(cp);
+			inet_aton(ip, &host->ipaddr);
+			host->next = hosts;
+			hosts = host;
 		}
 	}
-	mysql_free_result(nodes_result);
+	mysql_free_result(res);
 
 	/*
-	 * Clean up our linked list of interfaces
+	 * Now we need to find the virtual lan name for each interface on
+	 * each node. This is the user or system generated vlan name, and is
+	 * in the virt_lans table. We use the virtiface number we got above
+	 * to match on the member slot.
 	 */
-cleanup:
-	while (connected_interfaces != NULL) {
-		temp_interface = connected_interfaces;
-		connected_interfaces = connected_interfaces->next;
-		free(temp_interface->iface);
-		free(temp_interface);
-	}
-	
-	return rv;
+	res = mydb_query("select vname,member from virt_lans "
+			 " where pid='%s' and eid='%s'",
+			 2, pid, eid);
 
+	if (!res) {
+		syslog(LOG_ERR, "HOSTNAMES: %s: DB Error getting virt_lans!",
+		       nodeid);
+		rv = 1;
+		goto cleanup;
+	}
+	if (! (nrows = mysql_num_rows(res))) {
+		mysql_free_result(res);
+		rv = 1;
+		goto cleanup;
+	}
+
+	while (nrows--) {
+		char	*bp, *cp;
+		int	virtiface;
+		
+		row = mysql_fetch_row(res);
+		if (!row[0] || !row[0][0] ||
+		    !row[1] || !row[1][0])
+			continue;
+
+		/*
+		 * Note that the members column looks like vname:X
+		 * where X is a logical interface number we got above.
+		 * Loop through and find the entry and stash the vlan
+		 * name.
+		 */
+		bp = row[1];
+		cp = strsep(&bp, ":");
+		virtiface = atoi(bp);
+
+		host = hosts;
+		while (host) {
+			if (host->virtiface == virtiface &&
+			    strcmp(cp, host->vname) == 0) {
+				strcpy(host->vlan, row[0]);
+			}
+			host = host->next;
+		}
+	}
+	mysql_free_result(res);
+
+	/*
+	 * The last part of the puzzle is to determine who is directly
+	 * connected to this node so that we can add an alias for the
+	 * first link to each connected node (could be more than one link
+	 * to another node). Since we have the vlan names for all the nodes,
+	 * its a simple matter of looking in the table for all of the nodes
+	 * that are in the same vlan as the node that we are making the
+	 * host table for.
+	 */
+	host = hosts;
+	while (host) {
+		/*
+		 * Only care about this nodes vlans.
+		 */
+		if (strcmp(host->nodeid, nodeid) == 0 && host->vlan) {
+			struct hostentry *tmphost = hosts;
+
+			while (tmphost) {
+				if (tmphost->vlan &&
+				    strcmp(host->vlan, tmphost->vlan) == 0 &&
+				    strcmp(host->nodeid, tmphost->nodeid)
+				    /*  && host->connected == 0 */) {
+					tmphost->connected = 1;
+					/*
+					 * Use as flag to ensure only first
+					 * link flagged as connected.
+					 */
+					host->connected    = 1;
+				}
+				tmphost = tmphost->next;
+			}
+		}
+		host = host->next;
+	}
+#if 0
+	host = hosts;
+	while (host) {
+		printf("%s %s %s %d %s %d\n", host->vname, host->nodeid,
+		       host->vlan, host->virtiface, inet_ntoa(host->ipaddr),
+		       host->connected);
+		host = host->next;
+	}
+#endif
+	/*
+	 * Okay, spit the entries out!
+	 */
+	host = hosts;
+	while (host) {
+		if (vers == 1) {
+			sprintf(buf,
+				"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+				host->vname, host->virtiface,
+				inet_ntoa(host->ipaddr),
+				(host->connected &&
+				 (strcmp(host->nodeid, nodeid) ||
+				  host->virtiface == 0)) ?
+				 host->vname : " ");
+		}
+		else {
+			sprintf(buf,
+				"NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n",
+				host->vname, host->vlan,
+				inet_ntoa(host->ipaddr),
+				host->vname, host->virtiface,
+				(host->connected &&
+				 (strcmp(host->nodeid, nodeid) ||
+				  host->virtiface == 0)) ?
+				 host->vname : " ");
+		}
+		client_writeback(sock, buf, strlen(buf), tcp);
+		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+
+		host = host->next;
+	}
+ cleanup:
+	host = hosts;
+	while (host) {
+		struct hostentry *tmphost = host->next;
+		free(host);
+		host = tmphost;
+	}
+	return rv;
 }
 
 /*
