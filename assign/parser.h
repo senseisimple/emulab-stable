@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 #ifndef __PARSER_H
 #define __PARSER_H

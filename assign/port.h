@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // This file may need to be changed depending on the architecture.
 
 #include <limits.h>

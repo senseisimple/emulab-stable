@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef __DELAY_H
 #define __DELAY_H
 
