@@ -163,13 +163,6 @@ sub MFS()	{ if (-e "$SETUPDIR/ismfs") { return 1; } else { return 0; } }
 sub REMOTE()	{ if (-e "$SETUPDIR/isrem") { return 1; } else { return 0; } }
 
 #
-# Turn off SFS mode on RON nodes until the the code is fixed.
-#
-if (REMOTE() && ! -e "/etc/emulab.pkey") {
-    $USESFS = 0;
-}
-
-#
 # Open a TMCC connection and return the "stream pointer". Caller is
 # responsible for closing the stream and checking return value.
 #
@@ -482,7 +475,7 @@ sub domounts()
 	    
 	    $dir = $local;
 	    $dir =~ s/(.*)\/[^\/]*$/$1/;
-	    if (! -e $dir) {
+	    if ($dir ne "" && ! -e $dir) {
 		print STDOUT "  Making directory $dir\n";
 		if (! os_mkdir($dir, 755)) {
 		    warn "*** WARNING: Could not make directory $local: $!\n";
@@ -490,7 +483,7 @@ sub domounts()
 		}
 	    }
 	    print STDOUT "  Symlinking $remote on $local\n";
-	    if (! symlink("/sfs/" . $remote . "/", $local)) {
+	    if (! symlink("/sfs/" . $remote, $local)) {
 		warn "*** WARNING: Could not make symlink $local: $!\n";
 		next;
 	    }
@@ -1805,6 +1798,7 @@ sub nodeupdate()
     return 0;
 }
 
+#
 # Remote node update. This gets fired off after reboot to update
 # accounts, mounts, etc. Its the start of shared node support. Quite
 # rough at the moment.
@@ -1827,6 +1821,9 @@ sub remotenodeupdate()
 
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
+
+	print STDOUT "Mounting project and home directories ... \n";
+	domounts();
     }
 
     return 0;
