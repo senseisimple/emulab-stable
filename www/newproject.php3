@@ -109,7 +109,11 @@ function SPITFORM($formfields, $returning, $errors)
         #
 	echo "<tr>
                   <th colspan=3>
-                      Project Head Information:
+                      Project Head Information:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
+                      <font size=-2>
+                       (Prospective project leaders please read our
+                       <a href='docwrapper.php3?docname=policies.html'>
+                       Administrative Policies</a>)</font>
                   </th>
               </tr>\n";
 
