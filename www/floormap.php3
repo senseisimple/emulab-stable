@@ -80,6 +80,11 @@ while ($row = mysql_fetch_array($query_result)) {
     $node_id   = $row["node_id"];
     $locfloor  = $row["floor"];
 
+    # Make sure an empty list is displayed if nothing allocated on a floor.
+    if (!isset($channels[$locfloor])) {
+	$channels[$locfloor] = array();
+    }
+
     if (!isset($channel))
 	continue;
 
