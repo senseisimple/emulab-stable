@@ -2,7 +2,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include "bootwhat.h"
+
+#include <oskit/boot/bootwhat.h>
 
 /*
  * For now, hardwired.
@@ -11,11 +12,18 @@
 
 main()
 {
-	int			sock, length, data, i, mlen;
+	int			sock, length, data, i, mlen, err;
 	struct sockaddr_in	name, client;
 	boot_info_t		boot_info;
 	boot_what_t	       *boot_whatp = (boot_what_t *) &boot_info.data;
 
+	/* Initialize data base */
+	err = open_bootinfo_db();
+	if (err) {
+		fprintf(stderr, "Could not open database\n");
+		exit(1);
+	}
+ 
 	/* Create socket from which to read. */
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
@@ -55,15 +63,11 @@ main()
 			continue;
 		}
 		boot_info.opcode = BIOPCODE_BOOTWHAT_REPLY;
-		boot_info.status = BISTAT_SUCCESS;
-#if 0
-		boot_whatp->type = BIBOOTWHAT_TYPE_MB;
-		boot_whatp->what.mb.tftp_ip.s_addr = 0;
-		strcpy(boot_whatp->what.mb.filename, NETBOOT);
-#else
-		boot_whatp->type = BIBOOTWHAT_TYPE_SYSID;
-		boot_whatp->what.sysid = 165; /* BSD */
-#endif
+		err = query_bootinfo_db(client.sin_addr, boot_whatp);
+		if (err)
+			boot_info.status = BISTAT_FAIL;
+		else
+			boot_info.status = BISTAT_SUCCESS;
 		client.sin_family = AF_INET;
 		client.sin_port = htons(BOOTWHAT_SRCPORT);
 		if (sendto(sock, (char *)&boot_info, sizeof(boot_info), 0,
@@ -71,5 +75,7 @@ main()
 			perror("sendto");
 	}
 	close(sock);
+	close_bootinfo_db();
+	exit(0);
 }
 

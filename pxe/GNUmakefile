@@ -3,15 +3,20 @@ INSTALL_BINDIR	= /usr/testbed/bin
 INSTALL		= /usr/bin/install -c
 
 CFLAGS	= -g -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG
-INCS	= -I//n/moab/z/stoller/oskit-debug/install/include/oskit/boot
+CFLAGS += -DUSE_NULL_DB
+INCS	= -I/n/moab/z/mike/flux/install.debug/include
 
 all: proxydhcp bootinfo
 
 proxydhcp: proxydhcp.c
 	cc $(CFLAGS) -o proxydhcp proxydhcp.c $(LFLAGS)
 
-bootinfo: bootinfo.c
-	cc $(CFLAGS) $(INCS) -o bootinfo bootinfo.c $(LFLAGS)
+bootinfo: bootinfo.c bootinfo_null.c bootinfo_mysql.c
+	cc $(CFLAGS) $(INCS) -I/usr/local/include -o bootinfo $? \
+		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
+
+testmysql: bootinfo_mysql.c
+	cc $(CFLAGS) -DTEST $(INCS) -o testmysql bootinfo_mysql.c $(LFLAGS)
 
 install:	all
 	-mkdir $(INSTALL_BINDIR)	
@@ -23,5 +28,5 @@ install:	all
 	$(INSTALL) -m 755 bootinfo.restart $(INSTALL_BINDIR)/pxe
 
 clean: 
-	rm proxydhcp bootinfo
+	rm -f proxydhcp bootinfo testmysql
 
