@@ -306,6 +306,7 @@ else {
 my $free_condition = "(b.node_id is null and ".
                      " (np.eventstate='" . TBDB_NODESTATE_ISUP . "' or ".
                      "  np.eventstate='" . TBDB_NODESTATE_PXEWAIT . "' or ".
+                     "  np.eventstate='" . TBDB_NODESTATE_POWEROFF . "' or ".
                      "  np.eventstate='" . TBDB_NODESTATE_ALWAYSUP . "')) ";
 
 # if the user has specified an exempt pid/eid, 
