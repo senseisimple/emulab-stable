@@ -63,6 +63,8 @@ function SPITFORM($errors, $node_id, $isnewid, $building, $floor,
 		  $room, $contact, $phone, $old_x, $old_y,
 		  $delete = 0)
 {
+    global $uid;
+    
     # Careful with this local variable
     unset($prefix);
 
