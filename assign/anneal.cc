@@ -48,6 +48,64 @@ inline int accept(double change, double temperature)
   return 0;
 }
 
+/*
+ * This overly-verbose function returns true if it's okay to map vn to pn,
+ * false otherwise
+ */
+bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
+  // Find the type record for this type
+  tb_pnode::types_map::iterator mit = pn->types.find(vn->type);
+  if (mit == pn->types.end()) {
+    // The node doesn't even have this type, we can exit early
+    return false;
+  }
+
+  bool matched = false;
+  tb_pnode::type_record *tr = mit->second;
+  if (tr->is_static) {
+    if (tr->current_load >= tr->current_load) {
+      // It's at or over its max load
+      if (allow_overload) {
+	// That's okay, we're allowing overload
+	matched = true;
+      } else {
+	// Nope, it's full
+	matched = false;
+      }
+    } else {
+      // Plenty of room for us
+      matched = true;
+    }
+  } else { // the type is not static
+    if (pn->typed) {
+      if (pn->current_type.compare(vn->type)) {
+	// Failure - the pnode has a type, and it isn't ours
+	matched = false;
+      } else {
+	if (pn->current_type_record->current_load >=
+	    pn->current_type_record->max_load) {
+	  // It's at or over its max load
+	  if (allow_overload) {
+	    // That's okay, we're allowing overload
+	    matched = true;
+	  } else {
+	    // Failure - the type is right, but the pnode is full
+	    matched = false;
+	  }
+	} else {
+	  // It's under its max load, we can fit in
+	  matched = true;
+	}
+      }
+    } else {
+      // pnode doesn't have a type
+      matched = true;
+    }
+  }
+
+  return matched;
+}
+
 tb_pnode *find_pnode(tb_vnode *vn)
 {
 #ifdef PER_VNODE_TT
@@ -110,6 +168,7 @@ REDO_SEARCH:
 	continue;
     }
 #endif
+
     list<tb_pnode*>::iterator it = (*acceptable_types)[i]->members[vn->type]->L.begin();
 #ifdef LOAD_BALANCE
     int skip = std::rand() % (*acceptable_types)[i]->members[vn->type]->L.size();
@@ -141,13 +200,10 @@ REDO_SEARCH:
 	    break;
 	}
 #else // LOAD_BALANCE
-	if ((*it)->typed && ((*it)->current_type.compare(vn->type) ||
-		 (!allow_overload &&
-		  ((*it)->current_type_record->current_load >=
-		   (*it)->current_type_record->max_load)))) {
-	    it++;
+	if (pnode_is_match(vn,*it)) {
+	    break; 
 	} else {
-	    break;
+	    it++;
 	}
 #endif // LOAD_BALANCE
     }
@@ -269,9 +325,8 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
   // Subtract the number of fixed nodes from nnodes, since they don't really
   // count
   if (num_fixed) {
-      nnodes -= num_fixed;
       cout << "Adjusting dificulty estimate for fixed nodes, " <<
-	  nnodes << " remain.\n";
+	  (nnodes - num_fixed) << " remain.\n";
   }
 
   /* We'll check against this later to make sure that whe we've unmapped
@@ -304,7 +359,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
   }
 
   int neighborsize;
-  neighborsize = nnodes * npclasses;
+  neighborsize = (nnodes - num_fixed) * npclasses;
   if (neighborsize < min_neighborhood_size) {
     neighborsize = min_neighborhood_size;
   }
@@ -317,7 +372,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
   double scores[neighborsize];
 #endif
 
-  if (nnodes <= 0) {
+  if (num_fixed >= nnodes) {
     cout << "All nodes are fixed.  No annealing." << endl;
     goto DONE;
   }
@@ -433,7 +488,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
 	if (choice >= 0) {
 	    vv = virtual_nodes[choice];
 	} else {
-	    cout << "All nodes are fixed or LANs.  No annealing." << endl;
+	    cerr << "**** Error, unable to find any non-fixed nodes" << endl;
 	    goto DONE;
 	}
       }
