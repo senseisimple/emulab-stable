@@ -663,7 +663,8 @@ SENDMAIL("$user_name <$user_email>",
 	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
 	 "Bcc: $TBLOGS",
-	 (($inout eq "restart") ? ($logname) : ($repfile, $logname)));
+	 (($inout eq "restart") ? ($logname) :
+	  (($repfile, $logname), (defined($modnsfile) ? ($modnsfile) : ()))));
 
 exit 0;
 
