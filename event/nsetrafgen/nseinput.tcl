@@ -4,6 +4,13 @@
 # returns ip address of name
 proc getipaddr {name} {
 
+    set resolver [new TbResolver]
+    set ip [$resolver lookup $name]
+    delete $resolver
+    if { $ip != {} } {
+	return $ip	
+    }
+
     set hostnamelist [split [exec tmcc hostnames] "\n"]
     foreach hostname $hostnamelist {
 	scan $hostname "NAME=%s IP=%s ALIASES=\'%s\'" hname ip aliases

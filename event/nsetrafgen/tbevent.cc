@@ -1,4 +1,9 @@
 #include "tbevent.h"
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
 static class TbEventSinkClass : public TclClass {
 public:
@@ -6,7 +11,7 @@ public:
 	TclObject* create(int /* argc */, const char*const* /* argv */) {
 		return (new TbEventSink);
 	}
-} class_realtime_sched;
+} class_tbevent_sink;
 
 
 void
@@ -170,3 +175,35 @@ TbEventSink::subscribe() {
   address_tuple_free(tuple);
 
 }
+
+static class TbResolverClass : public TclClass {
+public:
+	TbResolverClass() : TclClass("TbResolver") {}
+	TclObject* create(int /* argc */, const char*const* /* argv */) {
+		return (new TbResolver);
+	}
+} class_tbresolver;
+
+int TbResolver::command(int argc, const char*const* argv)
+{
+  
+  if( argc == 3 ) {
+    if(strcmp(argv[1], "lookup") == 0) {
+      struct hostent *he = gethostbyname(argv[2]);
+      struct in_addr	myip;
+      char   ipaddr[BUFSIZ];
+      Tcl &tcl = Tcl::instance();
+      if( he ) {
+	memcpy((char *)&myip, he->h_addr, he->h_length);
+	strncpy(ipaddr, inet_ntoa(myip), sizeof(ipaddr));
+	sprintf(tcl.buffer(), "%s", ipaddr );
+	tcl.result(tcl.buffer());
+      } else {
+	tcl.result("");
+      }
+      return(TCL_OK);
+    }
+  }
+    
+  return (TclObject::command(argc, argv));
+}  

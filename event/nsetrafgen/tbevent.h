@@ -19,9 +19,6 @@ extern "C" {
 }
 #endif
 
-#include <netdb.h>
-#include <netinet/in.h>
-
 class TbEventSink : public TclObject {
 public:
 	TbEventSink() : gotevent(0), ehandle(0) {
@@ -49,6 +46,11 @@ private:
 	static void
 	  callback(event_handle_t handle,
 		   event_notification_t notification, void *data);
+};
+
+class TbResolver : public TclObject {
+ public:
+  virtual int command(int argc, const char*const* argv);
 };
 
 #endif
