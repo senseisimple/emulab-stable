@@ -773,13 +773,14 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * directly connected ones while looping through them.
 	 */
 	nodes_result = 
-		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname "
-				"FROM interfaces AS i LEFT JOIN reserved AS r "
-				"ON i.node_id = r.node_id "
+		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, i.card = t.control_net "
+				"FROM interfaces AS i LEFT JOIN reserved AS r ON i.node_id = r.node_id "
+				"LEFT JOIN nodes AS n ON i.node_id = n.node_id "
+				"LEFT JOIN node_types AS t ON n.type = t.type "
 				"WHERE IP IS NOT NULL AND IP != '' AND pid='%s' AND eid='%s'"
 		/*		"i.node_id != '%s'" */
 				"ORDER BY node_id DESC, IP",
-				4,pid,eid,nodeid);
+				5,pid,eid,nodeid);
 
 	if (!nodes_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
@@ -809,25 +810,30 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		 * Let's take care of the IP first!
 		 */
 
-		if (!strcmp(node_row[0],last_id)) {
-			link++;
-		} else {
-			link = seen_direct = 0;
-			last_id = node_row[0];
-		}
+		/* Skip the control network interface */
+		if (!(node_row[4] && atoi(node_row[4]))) {
 
-		if (insubnet(subnets,node_row[1])) {
-			sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-					node_row[3], link, node_row[1],
-					(!seen_direct) ? node_row[3] : " ");
-			seen_direct = 1;
-		} else {
-			sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
-					node_row[3], link, node_row[1]);
-		}
+			if (!strcmp(node_row[0],last_id)) {
+				link++;
+			} else {
+				link = seen_direct = 0;
+				last_id = node_row[0];
+			}
 
-		client_writeback(sock, buf, strlen(buf), tcp);
-		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+
+			if (insubnet(subnets,node_row[1])) {
+				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+						node_row[3], link, node_row[1],
+						(!seen_direct) ? node_row[3] : " ");
+				seen_direct = 1;
+			} else {
+				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
+						node_row[3], link, node_row[1]);
+			}
+
+			client_writeback(sock, buf, strlen(buf), tcp);
+			syslog(LOG_INFO, "HOSTNAMES: %s", buf);
+		}
 
 		/*
 		 * Make sure it really has an IPalias!
