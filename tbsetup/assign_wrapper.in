@@ -135,6 +135,8 @@ sub printdb {
 #    left in Mbps units for now. Thats inconsistent, I know. For LANs with
 #    other bandwidths the port speed will be 100 and a delay node will
 #    be inserted.
+#  fixed_nodes is indexed by virtual node name and points to physical node
+#   name.
 #
 # Delay node names:
 #  delay nodes are named tbdelayXX N > 2
@@ -171,10 +173,10 @@ $result->finish;
 printdb "\n";
 
 printdb "Loading virt_nodes.\n";
-$result = DBQueryFatal("SELECT vname,ips,type from virt_nodes" .
+$result = DBQueryFatal("SELECT vname,ips,type,fixed from virt_nodes" .
 		     " where pid=\"$pid\" and eid=\"$eid\"");
-while (($vname,$ips,$type) = $result->fetchrow_array) {
-    printdb "  $vname $type $ips\n";
+while (($vname,$ips,$type,$fixed) = $result->fetchrow_array) {
+    printdb "  $vname $type $ips $fixed\n";
     # We need to check the names to make sure they won't clash with
     # our internal delay node names.
     if (($vname =~ /^tbdelay\d+/) ||
@@ -188,6 +190,9 @@ while (($vname,$ips,$type) = $result->fetchrow_array) {
     foreach $ipinfo (split(" ",$ips)) {
 	($port,$ip) = split(":",$ipinfo);
 	$ips{"$vname:$port"} = $ip;
+    }
+    if ($fixed ne "") {
+	$fixed_nodes{$vname} = $fixed;
     }
 }
 $result->finish;
@@ -365,6 +370,11 @@ foreach $lan (keys(%lans)) {
 	}
     }
     # If a LAN has only one member we don't do anything.
+}
+
+# Print out fixed nodes
+foreach $fixed (keys(%fixed_nodes)) {
+    print TOPFILE "fix-node $fixed $fixed_nodes{$fixed}\n";
 }
 
 close TOPFILE;
