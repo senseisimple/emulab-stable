@@ -247,9 +247,10 @@ proc tb-set-link-loss {srclink args} {
     set adjloss [expr 1-sqrt(1-$lossrate)]
     foreach pair [array names loss] {
 	set loss($pair) $adjloss
-	set rloss(pair) $adjloss
+	set rloss($pair) $adjloss
     }
 }
+
 proc tb-set-lan-loss {lan lossrate} {
     var_import ::TBCOMPAT::FLOAT
     if {[$lan info class] != "Lan"} {

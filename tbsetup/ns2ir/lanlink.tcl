@@ -264,6 +264,9 @@ LanLink instproc rename_node {old new} {
     $self instvar bandwidth
     $self instvar delay
     $self instvar loss
+    $self instvar rbandwidth
+    $self instvar rdelay
+    $self instvar rloss
     set newnodelist {}
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -277,9 +280,15 @@ LanLink instproc rename_node {old new} {
 	set bandwidth($newnodeport) $bandwidth($nodeport)
 	set delay($newnodeport) $delay($nodeport)
 	set loss($newnodeport) $loss($nodeport)
+	set rbandwidth($newnodeport) $rbandwidth($nodeport)
+	set rdelay($newnodeport) $rdelay($nodeport)
+	set rloss($newnodeport) $rloss($nodeport)
 	unset bandwidth($nodeport)
 	unset delay($nodeport)
 	unset loss($nodeport)
+	unset rbandwidth($nodeport)
+	unset rdelay($nodeport)
+	unset rloss($nodeport)
     }
     set nodelist $newnodelist
 }
