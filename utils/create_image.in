@@ -91,7 +91,7 @@ else {
     fatal("*** Bad data in $node\n");
 }
 
-if ($imagename =~ /^([-\w\.]+)$/) {
+if ($imagename =~ /^([-\w\.\+]+)$/) {
     $imagename = $1;
 }
 else {
