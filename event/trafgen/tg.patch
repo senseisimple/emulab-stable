@@ -382,7 +382,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  			    (void)close(sfd);
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Fri Apr 18 13:52:44 2003
++++ tg2.0/src/tg/tg.y	Fri Apr 18 15:32:50 2003
 @@ -133,7 +133,11 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
@@ -480,7 +480,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 +				if (prot.prot->setup == tcp_setup)
 +					tcp_qos(tx_asn);
 +				else if (prot.prot->setup == udp_setup)
-+					udp_qos(tx_asn);
++					udp_qos(tx_asn, &prot);
 +				}
 +			goto restart;
 +			}
