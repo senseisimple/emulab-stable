@@ -46,7 +46,7 @@ if (!TBImageInfo($imageid, $imagename, $pid)) {
 #
 if ($canceled) {
     echo "<center><h2><br>
-          Image Descriptor termination canceled!
+          Image Descriptor removal canceled!
           </h2></center>\n";
     
     PAGEFOOTER();
