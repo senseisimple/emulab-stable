@@ -20,12 +20,19 @@ sub event_subscribe($$$;$) {
 #
 # Clear $callback_ready, call the C event_poll function, and see if the
 # C callback got called (as evidenced by $callback_ready getting set) If it
-# did, call the perl callback function.
+# did, call the perl callback function. Handle both blocking and non-blocking
+# versions of the call
 #
-sub event_poll($) {
-	my $handle = shift;
+sub internal_event_poll($$$) {
+	my ($handle, $block, $timeout) = @_;
 
-	my $rv = c_event_poll($handle);
+	my $rv;
+	if ($block) {
+		$rv = c_event_poll_blocking($handle,$timeout);
+	} else {
+		$rv = c_event_poll($handle);
+	}
+
 	if ($rv) {
 		die "Trouble in event_poll - returned $rv\h";
 	}
@@ -38,6 +45,22 @@ sub event_poll($) {
 	}
 
 	return 0;
+}
+
+#
+# Wrapper for the internal polling function, non-blocking version
+#
+sub event_poll($) {
+	my $handle = shift;
+	return &internal_event_poll($handle,0,0);
+}
+
+#
+# Same as above, but for the blocking version
+#
+sub event_poll_blocking($$) {
+	my ($handle, $timeout) = @_;
+	return &internal_event_poll($handle,1,$timeout);
 }
 
 #
@@ -183,7 +206,7 @@ END {
 	}
 }
 
-push @EXPORT, qw(event_subscribe event_poll EventSend EventSendFatal
-	EventSendWarn);
+push @EXPORT, qw(event_subscribe event_poll event_poll_blocking EventSend
+	EventSendFatal EventSendWarn);
 1;
 

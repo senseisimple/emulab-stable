@@ -14,11 +14,12 @@
 %}
 
 /*
- * Rename the C event_subscribe() and event_poll(), so that we can replace
- * these with perl functions of the same name.
+ * Rename the C event_subscribe(), event_poll(), and event_poll_blocking(), so
+ * that we can replace these with perl functions of the same name.
  */
 %rename event_subscribe c_event_subscribe;
 %rename event_poll c_event_poll;
+%rename event_poll_blocking c_event_poll_blocking;
 
 /*
  * We have to replace this one, because it works in a way very foreign to

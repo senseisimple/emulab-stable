@@ -3,7 +3,7 @@ package event;
 require Exporter;
 require DynaLoader;
 @ISA = qw(Exporter DynaLoader);
-@EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_unregister c_event_poll dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe xmalloc xrealloc allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get  );
+@EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_unregister c_event_poll c_event_poll_blocking dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe xmalloc xrealloc allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get  );
 package eventc;
 bootstrap event;
 var_event_init();
@@ -61,6 +61,12 @@ sub c_event_poll {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
     my $result = eventc::c_event_poll(@args);
+    return $result;
+}
+sub c_event_poll_blocking {
+    my @args = @_;
+    $args[0] = tied(%{$args[0]});
+    my $result = eventc::c_event_poll_blocking(@args);
     return $result;
 }
 sub dont_use_this_function_because_it_does_not_work {
@@ -526,12 +532,19 @@ sub event_subscribe($$$;$) {
 #
 # Clear $callback_ready, call the C event_poll function, and see if the
 # C callback got called (as evidenced by $callback_ready getting set) If it
-# did, call the perl callback function.
+# did, call the perl callback function. Handle both blocking and non-blocking
+# versions of the call
 #
-sub event_poll($) {
-	my $handle = shift;
+sub internal_event_poll($$$) {
+	my ($handle, $block, $timeout) = @_;
 
-	my $rv = c_event_poll($handle);
+	my $rv;
+	if ($block) {
+		$rv = c_event_poll_blocking($handle,$timeout);
+	} else {
+		$rv = c_event_poll($handle);
+	}
+
 	if ($rv) {
 		die "Trouble in event_poll - returned $rv\h";
 	}
@@ -544,6 +557,22 @@ sub event_poll($) {
 	}
 
 	return 0;
+}
+
+#
+# Wrapper for the internal polling function, non-blocking version
+#
+sub event_poll($) {
+	my $handle = shift;
+	return &internal_event_poll($handle,0,0);
+}
+
+#
+# Same as above, but for the blocking version
+#
+sub event_poll_blocking($$) {
+	my ($handle, $timeout) = @_;
+	return &internal_event_poll($handle,1,$timeout);
 }
 
 #
@@ -689,7 +718,7 @@ END {
 	}
 }
 
-push @EXPORT, qw(event_subscribe event_poll EventSend EventSendFatal
-	EventSendWarn);
+push @EXPORT, qw(event_subscribe event_poll event_poll_blocking EventSend
+	EventSendFatal EventSendWarn);
 1;
 
