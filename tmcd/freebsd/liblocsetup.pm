@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -235,7 +235,7 @@ sub os_usermod($$$$$)
 sub os_useradd($$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root) = @_;
-    my $args;
+    my $args = "";
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "wheel");
@@ -254,7 +254,7 @@ sub os_useradd($$$$$$$$)
 	return -1;
     }
 
-    if (system("$CHPASS $pswd $login") != 0) {
+    if (system("$CHPASS '$pswd' $login") != 0) {
 	warn "*** WARNING: $CHPASS $login error.\n";
 	return -1;
     }
