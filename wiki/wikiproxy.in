@@ -39,6 +39,7 @@ my $WIKIUSERDIR  = "$WIKIDATADIR/Main";
 my $WIKIGROUPDIR = "$WIKIDATADIR/Main";
 my $WIKIARCHIVE  = "$WIKIDATADIR/_archive";
 my $WIKIPASSWD   = "$WIKIDIR/data/.htpasswd";
+my $USERMAPDB    = "$WIKIDIR/data/.usermap";
 my $WIKIUSER     = "nobody";
 my $WIKIGROUP    = "nobody";
 my $CI		 = "ci";
@@ -137,7 +138,19 @@ sub AddWikiUser(@)
 	open(PWD, ">> $WIKIPASSWD") or
 	    fatal("Could not open $WIKIPASSWD for appending");
 	print PWD "${wikiname}:${passwd}\n";
+	print PWD "${user}:${passwd}\n";
 	close(PWD);
+
+	#
+	# Add to the user map. 
+	#
+	dbmopen(%MAPDB, $USERMAPDB, 0644) or
+	    fatal("Cannot open $USERMAPDB: $!");
+
+	$MAPDB{$user} = $wikiname;
+
+	# Write the DB back out.
+	dbmclose(%MAPDB);	
     }
     else {
 	#
@@ -154,6 +167,9 @@ sub AddWikiUser(@)
 	while (<PWD>) {
 	    if ($_ =~ /^${wikiname}:.*$/) {
 		$data .= "${wikiname}:${passwd}\n";
+	    }
+  	    elsif ($_ =~ /^${user}:.*$/) {
+	        $data .= "${user}:${passwd}\n";
 	    }
 	    else {
 		$data .= $_;
@@ -275,7 +291,7 @@ sub DelWikiUser(@)
 	    # Now write the new text back out to the file.
 	    #
 	    open(GRP, ">${wikiname}.txt") or
-		fatal("SetWikiGroups: ".
+		fatal("DelWikiUser: ".
 		      "Could not open ${wikiname}.txt (write)\n");
 	    print GRP $data;
 	    close(GRP);
@@ -298,7 +314,8 @@ sub DelWikiUser(@)
 	fatal("Could not open $WIKIPASSWD for reading");
 	
     while (<PWD>) {
-	if ($_ =~ /^$user:.*$/) {
+	if ($_ =~ /^${wikiuser}:.*$/ ||
+	    $_ =~ /^${user}:.*$/) {
 	    next;
 	}
 	else {
@@ -317,6 +334,17 @@ sub DelWikiUser(@)
 
     rename("${WIKIPASSWD}.$$", $WIKIPASSWD)
 	or fatal("Could not rename ${WIKIPASSWD}.$$");
+
+    #
+    # Delete from the user map. 
+    #
+    dbmopen(%MAPDB, $USERMAPDB, 0644) or
+        fatal("Cannot open $USERMAPDB: $!");
+
+    delete($MAPDB{$user});
+
+    # Write the DB back out.
+    dbmclose(%MAPDB);	
 
     #
     # Archive the user file. Removing users is kinda bogus cause I do not
@@ -578,8 +606,10 @@ sub SetWikiGroups(@)
 	my $data     = "";
 	    
 	# Error if no such wikigroup
-	fatal("No group file for wiki group $wikiname!")
-	    if (! -e "${wikiname}.txt");
+	if (! -e "${wikiname}.txt") {
+	    print "No group file for wiki group $wikiname! Skipping ...\n";
+	    next;
+	}
 
 	next
 	    if (!system("egrep -q -s 'GROUP = .*${wikiuser}.*' ".
@@ -629,7 +659,7 @@ sub SetWikiGroups(@)
 	fatal("Could not open ${wikiuser}.txt for reading");
 
     while (<PREFS>) {
-	if ($_ =~ /^(\s*\* Projects\/Groups:).*$/) {
+	if ($_ =~ /^(__These are your Projects\/Groups:__).*$/) {
 	    $data .= $1 . "\n";
 
 	    #
@@ -637,10 +667,10 @@ sub SetWikiGroups(@)
 	    #
 	    foreach my $group (@groups) {
 		if (-d "../$group") {
-		    $data .= "\t\t* [[${group}.WebHome][${group}]]\n";
+		    $data .= "\t* [[${group}.WebHome][${group}]]\n";
 		}
 		else {
-		    $data .= "\t\t* [[%MAINWEB%.${group}Group][${group}Group]]\n";
+		    $data .= "\t* [[%MAINWEB%.${group}Group][${group}Group]]\n";
 		}
 	    }
 
@@ -686,11 +716,16 @@ sub CI($$) {
 	"      '-t-Revision by wikiproxy' $file 2>&1";
     my $output = `$cmd`;
     if ($? && $output =~ /no lock set by/ ) {
-	my $cmd = "rcs -u -M $file";
-	my $output = `$cmd`;
+	my $unlockcmd = "rcs -u -M $file";
+	print "'$unlockcmd'\n"
+	    if ($debug);
+	my $output = `$unlockcmd`;
 	return -1
 	    if ($?);
-	system("sudo -u nobody rcs -l $file");
+	my $lockcmd = "rcs -l $file";
+	print "'$unlockcmd'\n"
+	    if ($debug);
+	system("sudo -u nobody $lockcmd");
 	return -1
 	    if ($?);
         return system($cmd);	
