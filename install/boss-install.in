@@ -168,11 +168,17 @@ sub usage {
 }
 
 my $packagedir = "";
+my $batchmode  = 0;
 my %opts;
-getopt("p:",%opts);
 
-if ($opt{p}) {
-    $packagedir = $opt{p};
+if (! getopts("p:b", \%opts)) {
+    usage();
+}
+if (defined($opts{p})) {
+    $packagedir = $opts{p};
+}
+if (defined($opts{b})) {
+    $batchmode = 1;
 }
 
 if (@ARGV) {
@@ -182,12 +188,16 @@ if (@ARGV) {
 #
 # Make sure they know what they're getting into...
 #
-warn "***** Please run install-ops on ops, and reboot it, before running\n";
-warn "this script!\n\n";
-print STDERR "WARNING: This script is ONLY intended to be run on a machine\n";
-print STDERR "that is being set up as a dedicated boss node. Continue? [y/N] ";
-my $response = <>;
-die "Installation aborted!\n" unless ($response =~ /^y/i);
+if (! $batchmode) {
+    warn "***** Please run install-ops on ops, and reboot it, before running\n";
+    warn "this script!\n\n";
+    print STDERR
+	"WARNING: This script is ONLY intended to be run on a machine\n";
+    print STDERR
+	"that is being set up as a dedicated boss node. Continue? [y/N] ";
+    my $response = <>;
+    die "Installation aborted!\n" unless ($response =~ /^y/i);
+}
 
 if ($UID != 0) {
     die "This script must be run as root.\n";
