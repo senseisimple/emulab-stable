@@ -12,13 +12,10 @@
 # power off <machine> <machine> ...
 # power cycle <machine> <machine> ...
 #
-# Requires a configuration file named power.conf, located in this dir or in
-# /usr/testbed/etc/power.conf
-# Config file has # at beginning of a line for comments, 
-# and takes on each line:
-# machine<tab>powerControllerIP<tab>Outlet#
-#
 ############################################################
+
+my $user = (getpwuid($<))[0]
+    || die "Cannot figure out who you are!\n";
 
 my $op = ""; #stores operation (on/off/cyc)
 my @machines = (); #stores machines to operate on
@@ -55,26 +52,49 @@ while ( @_ = $sth->fetchrow_array()) {
   $OutletList{$_[0]}= '-'.$_[2];
 }
 
+#
+# Get table of users <--> machines for those nodes, to make sure
+# user is authorized to control the nodes
+#
+
+my @conds = ();
+
+foreach $node (@machines) {
+  push(@conds,"node_id='$node'");
+}
+
+my $cmd = 
+  "select uid, node_id from reserved as r left join experiments as e ".
+  "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
+  join(" or ",@conds).") and uid='$user';";
+
+$sth = $dbh->query($cmd);
+
+while ( @_ = $sth->fetchrow_array()) {
+  #print "Got '",join("\t",@_),"\n";
+}
+
+
 #foreach $item (sort keys(%IPList)) {
 #    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
 #}
 
 my $snmpit=(-e '/usr/testbed/bin/snmpit'?'/usr/testbed/bin/snmpit':'snmpit');
 
-foreach $item ( sort @machines) {
-    #print $snmpit, '-i',$IPList{$item},$op,$OutletList{$item},"\n";
-    if ( ! defined ($IPList{$item}) ) {
-	print "Machine $item not found. Skipping...\n";
+foreach $node ( sort @machines) {
+    #print $snmpit, '-i',$IPList{$node},$op,$OutletList{$node},"\n";
+    if ( ! defined ($IPList{$node}) ) {
+	print "Machine $node not found. Skipping...\n";
     } else {
 	my $cmd=join(" ",
-		  ($snmpit,'-v','-i',$IPList{$item},$op,$OutletList{$item}));
+		  ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
 	open(OUT,$cmd." |");
 	while (<OUT>) {
 	    if (/was outlet(.*)/) {
-		print "$item was $1";
+		print "$node was $1";
 	    }
 	    if (/to outlet(.*)/) {
-		print " ... $item now $1";
+		print " ... $node now $1";
 	    }
 	}
 	print "\n";

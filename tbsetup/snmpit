@@ -97,7 +97,8 @@ sub myMain {
 		       '/usr/local/share/snmp/mibs/INTEL-S500-MIB.txt',
 		       '/usr/local/share/snmp/mibs/INTEL-VLAN-MIB.txt');
   } elsif ($device eq "APC") {
-    &SNMP::addMibFiles('/n/moab/x/newbold/mibs/PowerNet-MIB.txt');
+#    &SNMP::addMibFiles('/n/moab/x/newbold/mibs/PowerNet-MIB.txt');
+     &SNMP::addMibFiles('/usr/local/share/snmp/mibs/PowerNet-MIB.txt');
   } elsif ($device eq "Cisco") {
     &SNMP::addMibFiles('/usr/local/share/snmp/mibs/CISCO-STACK-MIB.txt', 
 	       '/usr/local/share/snmp/mibs/CISCO-VTP-MIB.txt',
