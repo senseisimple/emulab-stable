@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -298,7 +298,7 @@ if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
     PAGEFOOTER();
     return;
 }
-ADDPUBKEY($uid, "webaddpubkey -a $addpubkeyargs");
+ADDPUBKEY($uid, "webaddpubkey $addpubkeyargs");
 
 #
 # mkacct updates the user pubkeys in ~ssh/authorized_keys.

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -166,8 +166,8 @@ flush();
 # and do the account stuff for all of the people in the group. This
 # is the same script that gets run when the group membership changes.
 #
-SUEXEC($uid, $unix_gid, "webmkgroup -a $group_pid $group_id", 1);
-SUEXEC($uid, $unix_gid, "websetgroups -a $head_uid $group_leader", 1);
+SUEXEC($uid, $unix_gid, "webmkgroup $group_pid $group_id", 1);
+SUEXEC($uid, $unix_gid, "websetgroups $head_uid $group_leader", 1);
 
 echo "<br><br>
       <b>Done!</b>
@@ -177,6 +177,12 @@ echo "<br><br>
 # Show it!
 #
 SHOWGROUP($group_pid, $group_id);
+
+#
+# Back to ...
+# 
+echo "<br>
+       <A href='showproject.php3?pid=$group_pid'>Back to Project page</a>\n";
 
 #
 # Standard Testbed Footer

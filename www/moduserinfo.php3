@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -496,7 +496,7 @@ TBMAIL("$usr_name <$usr_email>",
 #
 # mkacct updates the user gecos and password.
 # 
-MKACCT($uid, "webmkacct -a $target_uid");
+MKACCT($uid, "webmkacct $target_uid");
 
 #
 # Spit out a redirect so that the history does not include a post
