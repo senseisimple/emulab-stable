@@ -85,6 +85,7 @@ my $LIST_DIR   = "/etc/mail/lists";
 my $TIPLOG_DIR = "/var/log/tiplogs";
 my $PORTSDIR   = "/usr/ports/misc";
 my $SRCDIR     = '@srcdir@';
+my $RCDIR      = "/usr/local/etc/rc.d";
 
 #
 # And some lists that we use
@@ -398,6 +399,13 @@ Phase "event", "Setting up event system", sub {
     Phase "elvinconf", "Installing elvind config file", sub {
 	DoneIfExists("$ELVIND_CONF");
 	ExecQuietFatal("$CP $OPS_ELVIND_CONF $ELVIND_CONF");
+    };
+};
+
+Phase "rc.d", "Setting up rc.d scripts", sub {
+    Phase "rc.testbed", "Installing testbed RC scripts", sub {
+	DoneIfExists("$RCDIR/2.elvind.sh");
+	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d control-install");
     };
 };
 
