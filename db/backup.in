@@ -136,29 +136,28 @@ if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
 #
 # Compress the files.
 # 
-if (system("gzip -9 $backname")) {
+if (system("nice gzip -9 $backname")) {
     fatal("gzip $backname failed!");
 }
 
 # Should do this too, but right now I do it by hand ...
 if (0) {
-    system("find . \( -name 'tbdb.*.gz' \) ".
-	   "-mtime +45 -print -delete");
+    system("find . \( -name 'tbdb.*.gz' \) -mtime +40 -print -delete");
 }
 
 if (! chdir($LOGDIR)) {
     fatal("Could not chdir to $LOGDIR: $!");
 }
 
-if (-e "$basename" && system("gzip -9 $basename")) {
+if (-e "$basename" && system("nice gzip -9 $basename")) {
     fatal("gzip $basename failed!");
 }
 
-if (-e "$updname" && system("gzip -9 $updname")) {
+if (-e "$updname" && system("nice gzip -9 $updname")) {
     fatal("gzip $updname failed!");
 }
 
-if (-e "$slowname" && system("gzip -9 $slowname")) {
+if (-e "$slowname" && system("nice gzip -9 $slowname")) {
     fatal("gzip $slowname failed!");
 }
 
