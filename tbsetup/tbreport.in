@@ -7,9 +7,15 @@
 #
 
 sub usage {
-    print "Usage: $0 [-h] [-v] pid eid\n";
+    print "Usage: $0 [-h] [-n] [-l] [-m] [-e] [-d] [-v] pid eid\n";
     print "-h		Shows this message\n";
-    print "-v		Give verbose output\n";
+    print "-n		Show node info\n";
+    print "-m		Show node mapping\n";
+    print "-l		Show link info\n";
+    print "-d		Show traffic shapping info\n";
+    print "-e		Show event listing\n";
+    print "-b		Show most things\n";
+    print "-v		Show everything!\n";
     return 1;
 }
 
@@ -30,14 +36,50 @@ $| = 1;
 # Get options
 #
 my %opt = ();
-my $verbose = 0;
-getopts('hv',\%opt);
+my $verbose    = 0;
+my $shownodes  = 0;
+my $showmap    = 0;
+my $showlinks  = 0;
+my $showdelays = 0;
+my $showevents = 0;
+my %v2pmap;
+my %p2type;
+my %p2osid;
+
+getopts('hnmdlevb',\%opt);
 
 if ($opt{h}) {
     exit &usage;
 }
 if ($opt{v}) {
     $verbose = 1;
+    $shownodes = 1;
+    $showmap = 1;
+    $showdelays = 1;
+    $showlinks = 1;
+    $showevents = 1;
+}
+if ($opt{b}) {
+    $shownodes = 1;
+    $showmap = 1;
+    $showdelays = 1;
+    $showlinks = 1;
+    $showevents = 1;
+}
+if ($opt{n}) {
+    $shownodes = 1;
+}
+if ($opt{m}) {
+    $showmap = 1;
+}
+if ($opt{d}) {
+    $showdelays = 1;
+}
+if ($opt{l}) {
+    $showlinks = 1;
+}
+if ($opt{e}) {
+    $showevents = 1;
 }
 if (@ARGV != 2) {
     exit &usage;
@@ -62,57 +104,57 @@ if ($UID) {
     }
 }
 
-print "Experiment: $eid\n";
-print "State: $state\n";
-print "\n";
-
-if (($state ne EXPTSTATE_SWAPPED) && ($state ne EXPTSTATE_ACTIVE) &&
-		($state ne EXPTSTATE_TESTING)) {
+if (($state ne EXPTSTATE_SWAPPED) &&
+    ($state ne EXPTSTATE_ACTIVE) &&
+    ($state ne EXPTSTATE_TESTING)) {
     # nothing to do
-    print "No more information available.\n";
+    print "No information available.\n";
     exit(0);
 }
 
+print "Experiment: $pid/$eid\n";
+print "State: $state\n";
+print "\n";
+
 # Read nodemap if applicable
-if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
-    my $result = DBQueryFatal("SELECT vname,node_id from reserved" .
-			      " where pid=\"$pid\" and eid=\"$eid\"");
-    while (($v,$p) = $result->fetchrow_array()) {
+if (($state eq EXPTSTATE_ACTIVE) ||
+    ($state eq EXPTSTATE_TESTING)) {
+    my $query_result =
+	DBQueryFatal("select r.vname,r.node_id,n.type,o.osname ".
+		     " from reserved as r ".
+		     "left join nodes as n on r.node_id=n.node_id ".
+		     "left join os_info as o on o.osid=n.def_boot_osid ".
+		     " where r.pid='$pid' and r.eid='$eid'");
+
+    while (($v,$p,$t,$o) = $query_result->fetchrow_array()) {
 	if (!$v) {
-	    $v = "";
+	    $v = $p;
 	}
 	$v2pmap{$v} = $p;
+	$p2type{$p} = $t;
+	$p2osid{$p} = $o;
     }
-    $result->finish;
 }
 
-# Virtual
-# Display node info
-my $result = DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms,deltas," .
-			  "startupcmd,tarfiles,type from virt_nodes where pid=\"$pid\"" .
-			  " and eid=\"$eid\"");
-print "Node Info:\n";
-printf "%-15s %-10s %-15s\n", "ID", "Type", "OS";
-print "--------------- ---------- ---------------\n";
-while (($vname,$ips,$osname,$cmd_line,$rpms,$deltas,$startupcmd,
-	$tarfiles,$type) = $result->fetchrow_array()) {
-    if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
-	$p = $v2pmap{$vname};
-	if ($p ne "") {
-	    $subresult =
-		DBQueryFatal("SELECT def_boot_osid,type from nodes" .
-			     " where node_id = \"$p\"");
-	    ($osid,$type) = $subresult->fetchrow_array();
-	    $subresult->finish();
+#
+# Display virtual info. We might need the ips for below, so we always do
+# this.
+#
+my $virtnodes_result =
+    DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms,deltas," .
+		 "startupcmd,tarfiles,type from virt_nodes ".
+		 "where pid='$pid' and eid='$eid'");
 
-	    $subresult =
-		DBQueryFatal("SELECT osname from os_info where osid='$osid'");
-	    ($osname) = $subresult->fetchrow_array();
-	    $subresult->finish();
-	}
-    }
-    printf "%-15s %-10s %-15s\n", $vname, $type, $osname;
-    if ($verbose) {
+if ($shownodes) {
+    print "Virtual Node Info:\n";
+    printf "%-15s %-8s %-15s %s\n", "ID", "Type", "OS", "Qualified Name";
+    print "--------------- -------- --------------- --------------------\n";
+
+    while (($vname,$ips,$osname,$cmd_line,$rpms,$deltas,$startupcmd,
+	    $tarfiles,$type) = $virtnodes_result->fetchrow_array()) {
+
+	printf "%-15s %-8s %-15s %s\n", $vname, $type, $osname,
+	       "$vname.$eid.$pid.$DOMAIN";
 	if ($cmd_line ne "") {
 	    printf "   %-17s %s\n", "Command Line:", $cmd_line;
 	}
@@ -129,70 +171,70 @@ while (($vname,$ips,$osname,$cmd_line,$rpms,$deltas,$startupcmd,
 	    printf "   %-17s %s\n", "Tarfiles:", $tarfiles;
 	}
     }
-    foreach $ipinfo (split(" ",$ips)) {
-	($port,$ip) = split(":",$ipinfo);
-	$ipmap{"$vname:$port"} = $ip;
-    }
-}
-$result->finish();
-print "\n";
-
-# Display link info
-if ($state eq EXPTSTATE_SWAPPED) {
-    my $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
-		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
-    print "Lan/Link Info:\n";
-    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "ID", "Member",
-    "IP", "Delay", "BW (Kbs)", "Loss Rate";
-    print "--------------- --------------- --------------- --------- "
-	. "--------- ---------\n";
-    while (($vname,$member,$delay,$bandwidth,$lossrate) 
-	   = $result->fetchrow_array()) {
-	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
-	$member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
-    }
-    $result->finish();
     print "\n";
 }
 
-# Mapping
-if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
-    print "Node Mapping:\n";
-    printf "%-15s %-15s %s\n", "Virtual", "Physical", "Qualified Name";
-    print "--------------- --------------- --------------------\n";
+#
+# Physical mapping of virtual topology
+# 
+if ($showmap &&
+    (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
+
+    print  "Physical Node Mapping:\n";
+    printf "%-15s %-8s %-15s %-12s\n", "ID", "Type", "OS", "Physical";
+    print  "--------------- -------- --------------- ------------\n";
+    
     foreach $v (keys(%v2pmap)) {
 	$p = $v2pmap{$v};
-	if ($p eq "") {$p = $v;}
-	printf "%-15s %-15s %s\n", $v, $p, "$v.$eid.$pid.$DOMAIN";
+	$t = $p2type{$p};
+	$o = $p2osid{$p};
+	printf "%-15s %-8s %-15s %s\n", $v, $t, $o, $p;
     }
     print "\n";
+}
 
-    $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
-		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
-    print "Lan/Link Info:\n";
-    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "ID", "Member", 
-    "IP", "Delay", "BW (Kbs)", "Loss Rate";
-    print "--------------- --------------- --------------- --------- "
-	. "--------- ---------\n";
-    while (($vname,$member,$delay,$bandwidth,$lossrate) 
-	   = $result->fetchrow_array()) {
-	$vnode = (split(":",$member))[0];
-	$pnode = $v2pmap{$vnode};
-	if ($pnode =~ /sh*/) {
-	    $pport = "eth0";
-	} else {
-	    $subresult = DBQueryFatal("select card from interfaces where node_id = \"$pnode\" and IP=\"$ipmap{$member}\"");
-	    ($card) = $subresult->fetchrow_array();
-	    $pport = "eth$card";
-	    $subresult->finish();
-	    $pport = "eth$card";
+#
+# Links and Lans
+#
+if ($showlinks) {
+    my %ipmap;
+    
+    $virtnodes_result->dataseek(0);
+
+    while (($vname,$ips) = $virtnodes_result->fetchrow_array()) {
+	foreach $ipinfo (split(" ",$ips)) {
+	    ($port,$ip) = split(":",$ipinfo);
+	    $ipmap{"$vname:$port"} = $ip;
 	}
-	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
-	    "$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
-    $result->finish();
 
-    $result =
+    my $result =
+	DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
+		     "from virt_lans where pid='$pid' and eid='$eid'");
+
+    if ($result->numrows) {
+	print  "Lan/Link Info:\n";
+	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
+	       "ID", "Member", "IP", "Delay", "BW (Kbs)", "Loss Rate";
+	print  "--------------- --------------- --------------- --------- ".
+	       "--------- ---------\n";
+    
+	while (($vname,$member,$delay,$bandwidth,$lossrate) 
+	       = $result->fetchrow_array()) {
+	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
+	    $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+	}
+	print "\n";
+    }
+}
+
+#
+# Delay node info.
+#
+if ($showdelays &&
+    (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
+    
+    my $result =
 	DBQueryFatal("select d.node_id,d.vname,d.pipe0,d.pipe1,r.vname ".
 		     " from delays as d ".
 		     "left join reserved as r on d.node_id=r.node_id ".
@@ -200,55 +242,80 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 		     "order by d.vname ASC");
 
     if ($result->numrows) {
-	print "\n";
 	print "Delay Node Info:\n";
 	printf "%-15s %-15s %-15s %-15s\n",
-	       "LinkID", "Virtual", "Physical", "Pipe Numbers";
+	       "ID", "Virtual", "Physical", "Pipe Numbers";
 	print "--------------- --------------- --------------- ".
 	      "--------------- \n";
 	while (($phys,$vname,$pipe0,$pipe1,$virt) = $result->fetchrow_array()){
 	    printf "%-15s %-15s %-15s %-15s\n",
 	           $vname, $virt, $phys, "$pipe0,$pipe1";
 	}
+	print "\n";
     }
 }
 
 #
-# Print time sorted avent list.
-# 
-$result =
-    DBQueryFatal("select time,vnode,vname,ot.type,et.type,arguments ".
-		 " from eventlist as ex ".
-		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
-		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
-		 "where ex.pid='$pid' and ex.eid='$eid' ".
-		 "order by time");
+# Print event list or summary
+#
+if ($showevents) {
+    my $result =
+	DBQueryFatal("select time,vnode,vname,ot.type,et.type,arguments ".
+		" from eventlist as ex ".
+		"left join event_eventtypes as et on ex.eventtype=et.idx ".
+		"left join event_objecttypes as ot on ex.objecttype=ot.idx ".
+		"where ex.pid='$pid' and ex.eid='$eid' ".
+		"order by time");
 
-if ($result->numrows) {
-    print "\n";
-    print "Event List:\n";
-    printf "%-12s %-12s %-10s %-10s %-10s %s\n",
-    "Time", "Node", "Agent", "Type", "Event", "Arguments";
-    print "------------ ------------ ---------- ---------- ---------- ".
-	"------------ \n";
+    if ($result->numrows) {
+	if ($verbose) {
+	    print  "Event List:\n";
+	    printf "%-12s %-12s %-10s %-10s %-10s %s\n",
+	           "Time", "Node", "Agent", "Type", "Event", "Arguments";
+	    print  "------------ ------------ ---------- ---------- ".
+		   "---------- ------------ \n";
     
-    while (($time,$vnode,$vname,$obj,$type,$args) = $result->fetchrow_array()){
-	printf("%-12s %-12s %-10s %-10s %-10s ",
-	       $time, $vnode, $vname, $obj, $type);
+	    while (($time,$vnode,$vname,$obj,$type,$args) =
+		   $result->fetchrow_array()){
+		printf("%-12s %-12s %-10s %-10s %-10s ",
+		       $time, $vnode, $vname, $obj, $type);
 
-	my @arglist = split(" ", $args);
-	my $arg     = shift(@arglist);
+		my @arglist = split(" ", $args);
+		my $arg     = shift(@arglist);
 
-	if (defined($arg)) {
-	    printf("$arg");
+		if (defined($arg)) {
+		    printf("$arg");
+		}
+		printf("\n");
+		foreach my $arg (@arglist) {
+		    printf("%-58s %s\n", "", $arg);
+		}
+	    }
 	}
-	printf("\n");
-	foreach my $arg (@arglist) {
-	    printf("%-58s %s\n", "", $arg);
+	else {
+	    my $min;
+	    my $max;
+	    my $count = $result->numrows;
+        
+	    while (($time,$vnode,$vname,$obj,$type,$args) =
+		   $result->fetchrow_array()) {
+
+		if (!defined($min)) {
+		    $min = $time;
+		    $max = $time;
+		}
+		if ($time > $max) {
+		    $max = $time;
+		}
+	    }
+
+	    print "Event Summary:\n";
+	    print "--------------\n";
+	    print "Event count:    $count\n";
+	    print "First event:    $min seconds\n";
+	    print "Last event:     $max seconds\n";
 	}
     }
 }
-$result->finish();
 
-0;
-
+exit(0);

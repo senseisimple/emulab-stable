@@ -239,7 +239,7 @@ if (system("$tbdir/tbswapin  $pid $eid") != 0) {
 # So fatal errors run tbswapout,
 $estate = EXPTSTATE_ACTIVE;
 
-if (system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile") != 0) {
+if (system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
     fatal("tbreport failed!\n");
 }
 
@@ -281,7 +281,7 @@ DBQueryWarn("update experiments set ".
 # In batchmode, send the report to stdout for the batch daemon.
 #
 if ($batch) {
-    system("$tbdir/tbreport -v $pid $eid");
+    system("$tbdir/tbreport -b $pid $eid");
     print STDOUT "\n\n";
 }
 

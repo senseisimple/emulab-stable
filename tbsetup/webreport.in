@@ -15,6 +15,6 @@ my $TB       = "@prefix@";
 #
 # Run the real thing, and never return.
 # 
-exec "$TB/bin/tbreport", "-v", @ARGV;
+exec "$TB/bin/tbreport", @ARGV;
 
 die("webreport: Could not exec tbreport: $!");

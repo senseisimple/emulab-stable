@@ -43,29 +43,37 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
+$expstate = TBExptState($exp_pid, $exp_eid);
 SUBPAGESTART();
 SUBMENUSTART("Experiment Options");
-WRITESUBMENUBUTTON("View NS File and Node Assignment",
-		   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
-WRITESUBMENUBUTTON("Terminate this experiment",
-		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
-# Swap option.
-$expstate = TBExptState($exp_pid, $exp_eid);
 if ($expstate) {
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+	WRITESUBMENUBUTTON("Visualizaton, NS File, Mapping",
+			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
+    }
+    elseif (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
+	WRITESUBMENUBUTTON("Visualizaton and NS File",
+			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
+    }
+    else {
+	WRITESUBMENUBUTTON("View NS File",
+			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
+    }
+
+    # Swap option.
     if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
 	WRITESUBMENUBUTTON("Swap this Experiment in",
 		      "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
-	WRITESUBMENUBUTTON("Graphic Visualization of Topology",
-		      "vistopology.php3?pid=$exp_pid&eid=$exp_eid");
     }
     elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Swap this Experiment out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
-	WRITESUBMENUBUTTON("Graphic Visualization of Topology",
-		      "vistopology.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
+
+WRITESUBMENUBUTTON("Terminate this experiment",
+		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 #
 # Admin folks get a swap request link to send email.

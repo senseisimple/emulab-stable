@@ -282,7 +282,7 @@ else {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 
-    system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile");
+    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
 }
 
 #

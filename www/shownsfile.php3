@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show me the NS File");
+PAGEHEADER("Visualizaton, NS File, and Details");
 
 #
 # Only known and logged in users can end experiments.
@@ -27,6 +27,17 @@ if (!isset($eid) ||
     USERERROR("You must provide an Experiment ID.", 1);
 }
 
+if ($verbose) {
+    echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid'>
+                Be Less Verbose</a>
+          </b><br><br>\n";
+}
+else {
+    echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid&verbose=1'>
+                Be More Verbose</a>
+          </b><br><br>\n";
+}
+
 #
 # Check to make sure this is a valid PID/EID tuple.
 #
@@ -37,6 +48,8 @@ if (mysql_num_rows($query_result) == 0) {
   USERERROR("The experiment $eid is not a valid experiment ".
             "in project $pid.", 1);
 }
+
+$expstate = TBExptState($pid, $eid);
 
 #
 # Verify that this uid is a member of the project for the experiment
@@ -51,6 +64,18 @@ if (!$isadmin) {
     }
 }
 
+#
+# Spit out an image that refers to a php script. That script will run and
+# send back the GIF image contents.
+#
+if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0 ||
+    strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
+    echo "<br>
+          <center>
+            <img src='top2image.php3?pid=$pid&eid=$eid' align=center>
+          </center>\n";
+}
+
 $query_result =
     DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
 if (mysql_num_rows($query_result) == 0) {
@@ -59,18 +84,27 @@ if (mysql_num_rows($query_result) == 0) {
 $row    = mysql_fetch_array($query_result);
 $nsfile = $row[nsfile];
 
+echo "<br>
+      <h3>NS File:</h3>\n";
 echo "<XMP>$nsfile</XMP>\n";
 flush();
 
 echo "<br>
-      <center><h3>
-      Here is the physical mapping for this experiment
-      </h3></center>\n";
+      <h3>
+       Experiment Details:
+      </h3>\n";
 
 $output = array();
 $retval = 0;
 
-$result = exec("$TBSUEXEC_PATH nobody flux webreport $pid $eid",
+if ($verbose) {
+    $flags = "-v";
+}
+else {
+    $flags = "-b";
+}
+
+$result = exec("$TBSUEXEC_PATH nobody flux webreport $flags $pid $eid",
  	       $output, $retval);
 
 echo "<XMP>\n";
