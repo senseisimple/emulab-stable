@@ -202,7 +202,7 @@ CREATE TABLE experiment_stats (
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
   batch tinyint(3) unsigned default '0',
-  PRIMARY KEY  (eid,pid,idx)
+  PRIMARY KEY  (eid,pid,idx),
   KEY idx (idx)
 ) TYPE=MyISAM;
 
@@ -389,7 +389,6 @@ CREATE TABLE images (
   shared tinyint(4) NOT NULL default '0',
   global tinyint(4) NOT NULL default '0',
   updated datetime default NULL,
-  max_concurrent int(11) default NULL,
   PRIMARY KEY  (imagename,pid),
   KEY imageid (imageid),
   KEY gid (gid)
@@ -840,6 +839,7 @@ CREATE TABLE os_info (
   mustclean tinyint(4) NOT NULL default '1',
   op_mode varchar(20) NOT NULL default 'MINIMAL',
   nextosid varchar(35) default NULL,
+  max_concurrent int(11) default NULL,
   PRIMARY KEY  (osname,pid),
   KEY osid (osid),
   KEY OS (OS)

@@ -416,3 +416,10 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table virt_lans add usevethiface tinyint(4) default '0'
 		after nobwshaping;
 
+1.142: Made the max_concurrent value per-OS rather than per-image. If you have
+       any images with this restriction, you'll need to move it over to the
+       OS by hand, but I think the main database on boss is the only place with
+       any of these!
+
+       alter table os_info add column max_concurrent int(11) default NULL;
+       alter table images drop column max_concurrent;

@@ -956,19 +956,20 @@ DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$bootpart" . "_osid, ".
 	     " default_osid, path, pid, global, creator, created, ".
-	     " max_concurrent, gid, shared) ".
+	     " gid, shared) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
 	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $global, ".
-             "   '$uid', now(), $max_concurrent, '$gid', $shared)");
+             "   '$uid', now(), '$gid', $shared)");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
-	     " osfeatures, pid, creator, shared, created, op_mode) ".
+	     " osfeatures, pid, creator, shared, created, op_mode, ".
+	     " max_concurrent) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', $global, now(), '$op_mode')");
+             "   '$uid', $global, now(), '$op_mode', $max_concurrent)");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".

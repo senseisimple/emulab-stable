@@ -196,7 +196,6 @@ foreach my $node (@nodes) {
     my $loadlen        = $imageid_row{'loadlength'};
     my $imagepath      = $imageid_row{'path'};
     my $defosid        = $imageid_row{'default_osid'};
-    my $max_concurrent = $imageid_row{'max_concurrent'};
 
     # Check for a few errors early!
     if (!defined($imagepath)) {
@@ -217,21 +216,10 @@ foreach my $node (@nodes) {
     # XXX This could go outside the @nodes loop, but so could most of this
     # stuff
     #
-    if ($max_concurrent && !TBAdmin($UID)) {
-	# Exclude nodes in this load from the count
-	my $nodelist = join(" or ",map("node_id='$_'",@nodes));
-	if (!@nodes) {
-	    $nodelist = "1";
-	}
-	my $count_result = DBQueryFatal("select count(*) from nodes where " .
-	    "def_boot_osid='$defosid' and !($nodelist)");
-	my ($current_count) = $count_result->fetchrow();
-	if ($current_count + @nodes > $max_concurrent) {
-	    die("*** $0:\n".
-		"    This image is limited to $max_concurrent concurrent " .
-		" loads, and $current_count\nnodes are already running ".
-		" $defosid\n");
-	}
+    if (!TBImageLoadMaxOkay($imageid,scalar(@nodes),@nodes)) {
+	die("*** $0:\n".
+	    "    This image has a limited number of maximum concurrent " .
+	    "instances\n");
     }
 
     #

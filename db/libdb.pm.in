@@ -119,7 +119,9 @@ use Exporter;
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
-	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid TBExpLocked
+	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
+	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID
+	 TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
@@ -1575,6 +1577,121 @@ sub TBOSID ($$) {
     
     my @row = $query_result->fetchrow_array();
     return $row[0];
+}
+
+#
+# Returns the maximum number of concurrent instantiations of an image.
+#
+# usage: TBOSMaxConcurrent(char *osid)
+#        returns >= 1 if there is a maximum number of concurrent instantiations
+#        returns undef if there is no limi
+#        returns 0 if not valid.
+#
+sub TBOSMaxConcurrent ($)
+{
+    my($osid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select max_concurrent from os_info where osid='$osid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Returns the number of nodes that are supposedly booting an OS. A list of
+# nodes that should be excluded from this count can be given.
+# 
+# usage: TBOSCountInstances(char *osid; char *nodeid ...)
+#        returns the number of nodes booting the OSID
+#
+sub TBOSCountInstances ($;@)
+{
+    my($osid,@exclude) = @_;
+
+    my $nodelist = join(" or ",map("node_id='$_'",@exclude));
+    if (!@exclude) {
+	$nodelist = "0";
+    }
+
+    my $query_result = DBQueryFatal("select distinct node_id from partitions " .
+	"where osid='$osid' and !($nodelist)");
+    my $current_count = $query_result->num_rows();
+
+    return $current_count;
+}
+
+#
+# Check whether or not it's permissible, given max_concurrent restrictions, to
+# load an OSID onto a number of nodes - the nodes themselves can be passed, so
+# that they do no count twice (once in the count of current loads, and once in
+# the count of potential loads.)
+#
+# usage: TBOSLoadMaxOkay(char *osid, int node_count; char *nodeid ... )
+#        returns 1 if loading the given OS on the given number of nodes would
+#            not go over the max_concurrent limit for the OS
+#        returns 0 otherwise
+#
+sub TBOSLoadMaxOkay($$;@)
+{
+    my($osid,$node_count,@nodes) = @_;
+
+    if (TBAdmin()) {
+	return 1;
+    }
+
+    my $max_instances = TBOSMaxConcurrent($osid);
+    if (!$max_instances) {
+	return 1;
+    }
+
+    my $current_instances = TBOSCountInstances($osid,@nodes);
+
+    if (($current_instances + $node_count) > $max_instances) {
+	return 0;
+    } else {
+	return 1;
+    }
+}
+
+#
+#
+# Check whether or not it's permissible, given max_concurrent restrictions, to
+# load an image onto a number of nodes - simply checks all OSIDs on the image.
+#
+# usage: TBImageLoadMaxOkay(char *imageid, int node_count; char *nodeid ... )
+#        returns 1 if loading the given image on the given number of nodes
+#        	would not go over the max_concurrent limit for any OS im the
+#        	image
+#        returns 0 otherwise
+#
+sub TBImageLoadMaxOkay($$;@)
+{
+    my($imageid,$node_count,@nodes) = @_;
+
+    
+    my $query_result = DBQueryFatal("select part1_osid, part2_osid, " .
+	"part3_osid, part4_osid from images where imageid='$imageid'");
+
+    if ($query_result->num_rows() != 1) {
+	#
+	# XXX - Just pretend everything is OK, something else will presumably
+	# have to check the imageid anyway
+	#
+	return 1;
+    }
+
+    foreach my $OS ($query_result->fetchrow()) {
+	if ($OS && (!TBOSLoadMaxOkay($imageid,$node_count,@nodes))) {
+	    return 0;
+	}
+    }
+
+    return 1;
 }
 
 #
