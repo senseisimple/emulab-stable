@@ -25,19 +25,9 @@ SDLIBS+= -ltb -lmysqlclient
 LIBS=
 CP= cp -pf
 
-SYSTEM  := $(shell uname -s)
-
 all: $(SDPROGS) client
 
 include ${TESTBED_SRCDIR}/GNUmakerules
-
-ifeq ($(SYSTEM),Linux)
-SLOTHD_DIR	= linuxclient
-endif
-
-ifeq ($(SYSTEM),FreeBSD)
-SLOTHD_DIR	= fbsdclient
-endif
 
 slothd: slothd.o slothd.h version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
@@ -52,14 +42,11 @@ version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 client: slothd
-	-mkdir -p $(SLOTHD_DIR)
-	$(CP) slothd $(SLOTHD_DIR)/slothd
 
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd)
 
 client-install: client
-	$(INSTALL_PROGRAM) -s $(SLOTHD_DIR)/slothd $(DESTDIR)$(CLIENT_BINDIR)
+	$(INSTALL_PROGRAM) -s slothd $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
 	rm -f *.o $(SDPROGS) *~ core *.core version.c
-	rm -rf fbsdclient linuxclient
