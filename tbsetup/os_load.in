@@ -2,12 +2,13 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use English;
 use Getopt::Std;
+use File::stat;
 
 # XXX boss.emulab.net and users.emulab.net wired in.
 #     wd0 wired in. Should come from node_types table in DB
@@ -64,6 +65,7 @@ my $mereuser    = 0;
 my $waitmode    = 1;
 my $failures    = 0;
 my $startwait   = 0;
+my $maxwait	= 0;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -206,6 +208,14 @@ foreach my $node (@nodes) {
 	    "    $imagepath does not exists or cannot be read!\n");
     }
 
+    #
+    # Compute a maxwait time based on the image size plus a constant
+    # factor for the reboot cycle. 
+    #
+    my $sb     = stat($imagepath);
+    my $chunks = $sb->size / (1024 * 1024);
+    $maxwait   = int((($chunks / 100.0) * 25) + (4 * 60));
+
     # 0 means load the entire disk.
     my $diskpart = "";
     if ($loadpart) { $diskpart = "wd0:s${loadpart}"; }
@@ -333,8 +343,6 @@ sub WaitTillReloadDone {
     my $count   = @nodes;
     my @failed  = ();
 
-    # Seems like a long time to wait, but it ain't!
-    my $maxwait = (60 * 15);
     foreach my $node ( @nodes ) { $done{$node}  = 0; }
 
     print STDERR "Waiting for @nodes to finish reloading\n".`date` if $dbg;
@@ -381,7 +389,7 @@ sub WaitTillReloadDone {
 		}
 		if (int($waittime / 60) > $minutes) {
 		    $minutes = int($waittime / 60);
-		    print "Still waiting for $node - ".
+		    print "Still waiting for $node to reload - ".
 			"its been $minutes minute(s)\n";
 		}
 	    }
