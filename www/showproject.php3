@@ -56,6 +56,29 @@ echo "<center>
       </center>\n";
 SHOWPROJECT($pid, $uid);
 
+#
+# A list of project members.
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT uid FROM proj_memb WHERE pid=\"$pid\"");
+if (mysql_num_rows($query_result)) {
+    echo "<center>
+          <h3>Project Members</h3>
+          </center>
+          <table align=center border=1>\n";
+
+    while ($row = mysql_fetch_row($query_result)) {
+        $target_uid = $row[0];
+        echo "<tr><td>
+                  <A href='showuser.php3?uid=$uid&target_uid=$target_uid'>
+                     $target_uid</A>
+                  </td>
+              </tr>\n";
+    }
+
+    echo "</table>\n";
+}
+
 echo "</center>\n";
 
 #
