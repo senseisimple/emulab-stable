@@ -292,6 +292,29 @@ Simulator instproc at {time event} {
 	    switch -- $cmd {
 		"start" {set etype START}
 		"stop" {set etype STOP}
+                "set" {
+		    if {[llength $event] < 4} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set etype MODIFY
+	            set arg [lindex $event 3]
+                    switch -- [lindex $event 2] {
+                        "packetSize_" {
+	                    set args  "PACKETSIZE=$arg"
+                        }
+                        "rate_" {
+	                    set args  "RATE=$arg"
+                        }
+                        "interval_" {
+	                    set args  "INTERVAL=$arg"
+                        }
+			unknown {
+		            punsup "at $time $event"
+		            return
+			}
+		    }
+                }
 		unknown {
 		    punsup "at $time $event"
 		    return
@@ -310,8 +333,17 @@ Simulator instproc at {time event} {
 			punsup "Wrong number of arguments: at $time $event"
 			return
 		    }
-                    set bw    [lindex $event 2]
-                    set args  "BANDWIDTH=$bw"
+                    set arg   [lindex $event 2]
+                    set args  "BANDWIDTH=$arg"
+		    set etype MODIFY
+		}
+		"delay" {
+		    if {[llength $event] < 3} {
+			punsup "Wrong number of arguments: at $time $event"
+			return
+		    }
+                    set arg   [lindex $event 2]
+                    set args  "DELAY=$arg"
 		    set etype MODIFY
 		}
 		unknown {
