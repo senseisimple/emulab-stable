@@ -16,7 +16,7 @@ $TBWWW		= "@TBWWW@";
 $THISHOMEBASE	= "@THISHOMEBASE@";
 $ELABINELAB     = @ELABINELAB@;
 $WIKISUPPORT    = @WIKISUPPORT@;
-$WIKIURL        = "https://${USERNODE}/twiki/bin/logon";
+$WIKIURL        = "https://${USERNODE}/twiki/bin/view";
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
