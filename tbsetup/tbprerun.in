@@ -86,6 +86,7 @@ sub cleanup {
     DBQueryWarn("DELETE from virt_routes   where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from nseconfigs    where pid='$pid' and eid='$eid'");
     DBQueryWarn("DELETE from eventlist     where pid='$pid' and eid='$eid'");
+    DBQueryWarn("DELETE from ipsubnets     where pid='$pid' and eid='$eid'");
     SetExpState($pid, $eid, EXPTSTATE_NEW);
 }
 
