@@ -152,6 +152,7 @@ sub AuditStart($;$)
 sub AuditEnd()
 {
     SendAuditMail(0);
+    delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
     return 0;
 }
 
@@ -171,6 +172,7 @@ sub AuditAbort()
 	    unlink($logfile);
 	    undef($logfile);
 	}
+	delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
     }
     return 0;
 }
@@ -182,6 +184,7 @@ sub AuditAbort()
 sub AuditFork()
 {
     $auditing = 0;
+    delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
     return 0;
 }
 
