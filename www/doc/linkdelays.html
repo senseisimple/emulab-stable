@@ -1,0 +1,161 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h2>Per-Link Delays and Shared Links</h2>
+</center>
+
+<h3>Per-Link Delays:</h3>
+In order to conserve nodes, it is possible to specify that instead of
+doing traffic shaping on separate delay nodes (which eats up a node
+for every two links), it be done on the nodes that are actually
+generating the traffic. Just like normal delay nodes, per-link delays
+use IPFW to direct traffic into the proper Dummynet pipe. On each node
+in a duplex link or lan, a set of ipfw rules and Dummynet pipes is
+setup. As traffic enters or leaves your node, ipfw looks at the packet
+and stuffs it into the proper Dummynet pipe. At the proper time,
+Dummynet takes the packet and sends it on its way. To specify this in
+your NS file, simply setup a normal link or lan, and then mark it as
+wanting to use per-link delays. For example:
+    <code><pre>
+    set link0 [$ns duplex-link $nodeA $nodeD 50Mb 0ms DropTail]
+    set lan0  [$ns make-lan "nodeA nodeB nodeC" 0Mb 100ms]
+
+    tb-set-link-uselinkdelay $link0 1
+    tb-set-lan-uselinkdelay $lan0 1		</code></pre>
+
+Please be aware though, that the kernel is different than the standard
+kernel in a couple of ways.
+<ul>
+<li> The kernel runs at a 1000HZ clockrate instead of 100HZ. That is,
+the timer interrupts 1000 times per second instead of 100. This finer
+granularity allows Dummynet to do a better job of scheduling packets.
+
+<li> IPFW and Dummynet are compiled into the kernel, which affects the
+network stack; all incoming and outgoing packets are sent into ipfw to
+be matched on.
+</ul>
+
+<h3>Shared Links:</h3>
+Another feature we have added is <em>shared</em> (sometimes called
+<em>emulated</em>) links. A shared link is one that can be multiplexed
+over a physical link along with other shared links. Say your
+experimental nodes have just 1 physical interface (call it fxp0), but
+you want to create two duplex links on it:
+    <code><pre>
+    set link0 [$ns duplex-link $nodeA $nodeB 50Mb 0ms DropTail]
+    set link1 [$ns duplex-link $nodeA $nodeC 50Mb 0ms DropTail]
+
+    tb-set-link-emulated $link0 1
+    tb-set-link-emulated $link1 1		</code></pre>
+
+Without shared links, your experiment would not be mappable since
+there are no nodes that can support the two duplex links that nodeA
+requires; there is only one physical interface. Using shared links
+however, the testbed software will assign both links on NodeA to one
+physical interface. That is because each duplex link is only 50Mbs,
+while the physical link (fxp0) is 100Mbs. Of course, if your
+application actually tried to use more than 50Mbs on each shared link,
+there would be a problem; a flow using more than its share on link0
+would cause packets on link1 to be dropped when they otherwise would
+not be. (<b>At this time, you cannot specify that a lan use shared
+links</b>)
+
+<br>
+<br>
+To prevent this problem, a shared link is automatically setup to use
+per-link delays (discussed above). Each of the links in the above
+example would get a set of DummyNet pipes restricting their bandwidth
+to 50Mbs. Each link is forced to behave just as it would if the actual
+link bandwidth were 50Mbs. The keeps the aggragate bandwidth to that
+which can be supported by the underlying physical link (on fxp0,
+100Mbs). Of course, the same caveats mentioned above for per-link
+delays applies when using shared links. 
+
+<h3>Technical Discussion:</h3>
+
+First, lets just look at what happens with per-link delays on a duplex
+link. In this case, an ipfw pipe is setup on each node. The rule for
+the pipe looks like:
+    <code><pre>
+    ipfw add pipe 10 ip from any to any out xmit fxp0 </code></pre>
+
+which says that any packet going out on fxp0 should be stuffed into
+pipe 10. Consider the case of a ping packet that traverses a duplex
+link from NodeA to NodeB. Once the proper interface is choosen (based
+on routing or the fact that the destination is directly connected),
+the packet is handed off to ipfw, which determines that the interface
+(fxp0) matches the rule specified above. The packet is then stuffed
+into the corresponding Dummynet pipe, to emerge sometime later (based
+on the traffic shaping parameters) and be placed on the wire. The
+packet then arrives at NodeB. A ping reply packet is created and
+addressed to NodeA, placed into the proper Dummynet pipe, and arrives
+at NodeA. As you can see, each packet traversed exactly one Dummynet
+pipe (or put another way, the entire ping/reply sequence traversed two
+pipes).
+
+<br>
+<br>
+
+Constructing delayed lans is more complicated than duplex links
+because of the desire to allow each node in a lan to see different
+delays when talking to any other node in the lan. That is, the delay
+when traversing from NodeA to NodeB is different than when traversing
+from NodeA to NodeC. Further, the return delays might be specified
+completely differently so that the return trips take a different
+amount of time. More information on why we allow this can be found <a
+href=../tutorial/docwrapper.php3?docname=behindthescenes.html>here.</a>
+To support this, it is necessary to insert two delay pipes for each
+node. One pipe is for traffic leaving the node for the lan, and the
+other pipe is for traffic entering the node from the lan. The reader
+might ask why not create N pipes on each node for each possible
+destination address in the lan, so that each packet traverses only one
+pipe. The reason is that a node on a lan has only one connection to
+it, and multiple pipes would not respect the aggregate bw cap
+specified. The rule for the second pipe looks like:
+    <code><pre>
+    ipfw add pipe 15 ip from any to any in recv fxp0 </code></pre>
+
+which says that any packet received on fxp0 should be stuffed into
+pipe 15. The packet is later handed up to the application, or
+forwarded on to the next hop, if appropriate.
+
+<br>
+<br>
+The addition of shared links complicates things further. To multiplex
+several different links on a physical interface, one must use either
+encapsulation (ipinip, vlan, etc) or IP interface aliases. We chose IP
+aliases because it does not affect the MTU size. The downside of IP
+aliases is that it is difficult (if not impossible) to determine what
+flow a packet is part of, and thus what ipfw pipe to stuff the packet
+into. In other words, the rules used above:
+    <code><pre>
+    ipfw add ... out xmit fxp0
+    ipfw add ... in recv fxp0 </code></pre>
+
+Do not work because there are now multiple flows multiplexed onto the
+interface (multiple IPs) and so there is no way to distinguish which
+flow. Consider a duplex link in which we use the first rule above.
+If the packet is not addressed to a direct neighbor, the routing
+code lookup will return a nexthop, which <b>does</b> indicate the
+flow, but because the rule is based simply on the interface (fxp0), all
+flows match! Unfortunately, ipfw does not provide an interface for
+matching on the nexthop address, but seeing as we are kernel hackers,
+this is easy to deal with by adding new syntax to ipfw to allow
+matching on nexthop:
+    <code><pre>
+    ipfw add ... out xmit fxp0 nexthop 192.168.2.3 </code></pre>
+
+Now, no matter how the user alters the routing table, packets will be
+stuffed into the proper pipe since the nexthop indicates which
+directly connected virtual link the packet was sent over.  
+
+<br>
+<br>
+Shared lans present even worse problems because of the need to figure
+out which flow a incoming packet is part of. When a packet arrives at
+an interface, there is nothing in the packet to indicate which IP
+alias the packet was intended for (or which it came from) when the
+packet is not destined for the local node (is being forwarded). 
