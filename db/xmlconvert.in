@@ -267,6 +267,18 @@ sub readXML($$$$) {
     }
 
     if ($fromparser) {
+	my $line = <STDIN>;
+	
+	# Scan for the beginning marker or EOF.
+	while ($line && ($line ne "#### BEGIN XML ####\n")) {
+	    print "$line"; # Print it out for the user.
+	    $line = <STDIN>;
+	}
+	
+	if (!$line) {
+	    fatal("NS script never reached \"\$ns run\"");
+	}
+	
 	#
 	# Create a parser.
 	#
