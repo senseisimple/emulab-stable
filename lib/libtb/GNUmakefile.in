@@ -14,12 +14,10 @@ include $(OBJDIR)/Makeconf
 all:	libtb.a
 
 client:	libtb-nodb.a
-	mv libtb-nodb.a libtb.a
+	cmp -s libtb-nodb.a libtb.a || cp -pf libtb-nodb.a libtb.a
 client-install: client
 
 include $(TESTBED_SRCDIR)/GNUmakerules
-
-SYSTEM	:= $(shell uname -s)
 
 OBJS		= log.o tbdefs.o
 CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
