@@ -191,9 +191,10 @@ if (JAILED() || PLAB()) {
 #     combat this by forcing the last retry of a failing call to use TCP
 #     in the plab service slice.  Maybe we should do this for all plab
 #     slices...
+# XXX ok, really bad idea.  This just causes all our tmcd processes to
+#     get hung with open connections to flaky plab machines
 #
-$trytcp = 1
-    if (PLABSVC());
+#$trytcp = 1 if (PLABSVC());
 
 #
 # For sending back ntpdrift.
@@ -454,7 +455,16 @@ sub setintervals($)
 		    qdelete($funcs{$key});
 		} elsif ($firsttime || $oiv{$key} == 0) {
 		    logmsg("setintervals: scheduling $key\n");
-		    qinsert($curtime + $iv{$key}, $funcs{$key});
+		    #
+		    # XXX special firsttime hack
+		    # isalive and rusage must report immediately
+		    #
+		    if ($firsttime &&
+			($key eq "isalive" || $key eq "rusage")) {
+			qinsert($curtime, $funcs{$key});
+		    } else {
+			qinsert($curtime + $iv{$key}, $funcs{$key});
+		    }
 		} else {
 		    #
 		    # To reschedule an already existing event,
