@@ -153,3 +153,17 @@ your desktop or from <tt>users</tt>.
 	sshxmlrpc_client.py link_config proj=myproj exp=myexp
 		link=lan0 "params={'accesspoint': '00:09:5B:94:26:AF'}"
 </code></pre>
+
+You may also change the settings for an individual node in a wireless
+lan (although in some cases this could make the lan unusable if you
+were to change a setting on just a single node). To do this, use the
+<tt>-s</tt> option to link_config or the <tt>src</tt> argument to the
+XMLRPC interface:
+
+<code><pre>
+	link_config -s nodew1 myproj myexp lan0 txpower=50
+
+	sshxmlrpc_client.py link_config proj=myproj exp=myexp
+		src=nodew1 link=lan0 "params={'txpower': 50}"
+</code></pre>
+
