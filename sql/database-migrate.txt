@@ -2190,3 +2190,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table floorimages add pixels_per_meter float(10,3) \
              NOT NULL default '0.000' after scale;
+
+1.290: Add Windows to the OS list in the os_info table.
+
+	 alter table os_info modify column \
+	   OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Windows','Other') \
+	   NOT NULL default 'Unknown';

@@ -1156,7 +1156,7 @@ CREATE TABLE os_info (
   creator varchar(8) default NULL,
   created datetime default NULL,
   description tinytext NOT NULL,
-  OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Other') NOT NULL default 'Unknown',
+  OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Windows','Other') NOT NULL default 'Unknown',
   version varchar(12) default '',
   path tinytext,
   magic tinytext,
