@@ -25,11 +25,20 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $BOSSADDR	= "@BOSSNODE@";
 my $EVENTSYS    = @EVENTSYS@;
+my $TESTMODE    = @TESTMODE@;
 
 #
 # The event system is currently optional.
 #
 if (! $EVENTSYS) {
+    exit(0);
+}
+
+#
+# Do nothing when testing.
+#
+if ($TESTMODE) {
+    print "Testing run - no event system.\n";
     exit(0);
 }
 
