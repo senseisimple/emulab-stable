@@ -1471,6 +1471,35 @@
     then a node failed to reach the point where it would report a successful
     setup to Emulab.
     <p>
+    Near the end of the experiment setup, Emulab's event system can fail to
+    startup with a message like this:
+    <pre>
+      Starting the event system.
+      *** ~/.ssh/identity is not a passphrase-less key
+          You will need to regenerate the key manually
+      *** /usr/testbed/devel/stack/sbin/eventsys.proxy:
+          Failed to start event system for foo/bar
+    </pre>
+    Or, like this:
+    <pre>
+      Starting the event system.
+      Permission denied, please try again.
+      Permission denied, please try again.
+      Permission denied.
+      *** /usr/testbed/devel/stack/sbin/eventsys.proxy:
+          Failed to start event system for foo/bar
+    </pre>
+    This failure occurs because you have manually changed your default SSH
+    identity (~/.ssh/identity) or edited your authorized_keys file in your
+    Emulab home directory without going through the "Edit SSH Keys" web form on
+    your user page.  The easiest way to fix this is to make sure the passphrase
+    is empty using ssh-keygen(1) on the user's machine:
+    <pre>
+      users$ ssh-keygen -p -P "&lt;old-passphrase&gt;" -N "" -f ~/.ssh/identity
+    </pre>
+    Then, make sure the corresponding public key in your Emulab home directory
+    ("~/.ssh/identity.pub") is listed in the "Edit SSH Keys" form.
+    <p>
     Such failures can be caused by many things.  Sometimes
     a transient load on an Emulab server can push a node over its
     timeout, though this is happening less and less as we
