@@ -83,7 +83,7 @@ function CHECKLOGIN($uid) {
     $curhash = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
 
     $query_result =
-	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout ".
+	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout,status".
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "where u.uid='$uid'");
@@ -96,6 +96,7 @@ function CHECKLOGIN($uid) {
     $expired = $row[0];
     $hashkey = $row[1];
     $timeout = $row[2];
+    $status  = $row[3];
 
     #
     # If user exists, but login has no entry, quit now.
@@ -103,7 +104,16 @@ function CHECKLOGIN($uid) {
     if (!$hashkey)
 	return $CHECKLOGIN_NOTLOGGEDIN;
 
-    # A match?
+    #
+    # Check for frozen account.
+    #
+    if ($status == $TBDB_USERSTATUS_FROZEN) {
+	DBQueryFatal("DELETE FROM login WHERE uid='$uid'");
+	return $CHECKLOGIN_NOTLOGGEDIN;
+    }
+
+    # If not frozen and its a match, compare the timeout and hash.
+    # 
     if ($timeout > time()) {
         if (strcmp($curhash, $hashkey) == 0) {
 	    #
@@ -132,6 +142,9 @@ function CHECKLOGIN($uid) {
 	    else
 		return $CHECKLOGIN_MAYBEVALID;
 	}
+	#
+	# A hashkey mismatch is the same as an expired login.
+	#
     }
 
     #
