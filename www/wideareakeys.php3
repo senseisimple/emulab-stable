@@ -23,17 +23,19 @@ if (isset($deletekey)) {
     # Get the actual key.
     #
     $query_result =
-	DBQueryFatal("select * from widearea_privkeys ".
+	DBQueryFatal("select wa.*,i.node_id from widearea_privkeys as wa ".
+		     "left join interfaces as i on wa.IP=i.IP ".
 		     "where privkey='$deletekey'");
 
     if (! mysql_num_rows($query_result)) {
 	USERERROR("No such widearea private key!", 1);
     }
-    $row   = mysql_fetch_array($query_result);
-    $name  = $row[user_name];
-    $email = $row[user_email];
-    $when  = $row[requested];
-    $IP    = $row[IP];
+    $row     = mysql_fetch_array($query_result);
+    $name    = $row[user_name];
+    $email   = $row[user_email];
+    $when    = $row[requested];
+    $IP      = $row[IP];
+    $nodeid  = $row[node_id];
 
     #
     # We run this twice. The first time we are checking for a confirmation
@@ -49,7 +51,7 @@ if (isset($deletekey)) {
               </h2></center>\n";
 
         echo "<br>
-              Back to <a href=cdromprivkeys.php>Back to Widearea Keys.</a>\n";
+              Back to <a href=wideareakeys.php3>Back to Widearea Keys.</a>\n";
     
         PAGEFOOTER();
         return;
@@ -58,17 +60,9 @@ if (isset($deletekey)) {
     if (!$confirmed) {
         PAGEHEADER("Widearea Private Key Deletion Request");
 
-	echo "<center><h2><br>
+	echo "<center><h3><br>
               Are you <b>REALLY</b> sure you want to delete this Key?<br>
-              Deleting a key that has a widearea node attached is a bad
-              thing!
-              </h2>\n";
-
-	echo "<form action=cdromprivkeys.php method=post>";
-	echo "<input type=hidden name=deletekey value=$deletekey>\n";
-	echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
-	echo "<b><input type=submit name=canceled value=Cancel></b>\n";
-	echo "</form>\n";
+              </h3>\n";
 	echo "</center>\n";
 
 	echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
@@ -76,15 +70,34 @@ if (isset($deletekey)) {
   	          <td>$name</td>
   	          <td>$email</td>
   	          <td>$IP</td>
+  	          <td>$nodeid</td>
 	          <td>$when</td>
              </tr>\n";
 	echo "</table>\n";
+
+	echo "<center>\n";
+ 	echo "<form action=wideareakeys.php3 method=post>";
+	echo "<input type=hidden name=deletekey value=$deletekey>\n";
+	echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
+	echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+	echo "</form>\n";
+	echo "</center>\n";
+
+	echo "<br><font color=red>
+              This will delete all trace including the node, vnodes, and
+              interface table entries. Needless to say, deleting a key
+              record of an active widearea node is a bad thing. Be sure!
+              </font>\n";
 
 	PAGEFOOTER();
 	return;
     }
     DBQueryFatal("delete from widearea_privkeys where privkey='$deletekey'");
-    header("Location: cdromprivkeys.php");
+    DBQueryFatal("delete from interfaces where node_id='$nodeid'");
+    DBQueryFatal("delete from nodes where node_id='$nodeid'");
+    DBQueryFatal("delete from nodes where phys_nodeid='$nodeid'");
+    DBQueryFatal("delete from reserved where node_id='$nodeid'");
+    header("Location: wideareakeys.php3");
 }
 
 #
@@ -128,7 +141,7 @@ while ($row = mysql_fetch_array($query_result)) {
 
     echo "<tr>
               <td align=center>
-                  <A href='cdromprivkeys.php?deletekey=$privkey'>
+                  <A href='wideareakeys.php3?deletekey=$privkey'>
 	                  <img alt=X src=redball.gif></A></td>
 	      <td>$name</td>
 	      <td>$email</td>
