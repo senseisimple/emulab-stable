@@ -1,0 +1,2 @@
+#!/bin/sh
+exec @SSH@ -l emulabman @SSH_ARGS@ $*

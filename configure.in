@@ -293,10 +293,12 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
+	tmcd/ron/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
+	utils/sshremote \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	vis/top2png vis/render \

@@ -131,7 +131,8 @@ if (!TBAdmin($UID)) {
 # user's earliest project membership to use for the default group.
 #
 $query_result =
-    DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name,u.usr_email,m.pid ".
+    DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
+		 " u.usr_email,u.home_pubkey,m.pid ".
 		 " from users as u ".
 		 "left join group_membership as m ".
 		 " on u.uid=m.uid and m.pid=m.gid ".
@@ -145,7 +146,8 @@ my $pswd        = $db_row[0];
 my $user_number = $db_row[1]; 
 my $fullname    = $db_row[2];
 my $user_email  = $db_row[3];
-my $defpid      = $db_row[4];
+my $user_pubkey = $db_row[4];
+my $defpid      = $db_row[5];
 
 #
 # Unix info for users default group.
@@ -242,6 +244,23 @@ if (system("$SSH $control_node $CHPASS -p $pswd $user")) {
     fatal("Could not change password for user $user on $control_node.\n");
 }
 
+#
+# Update the DB with the users public key.
+#
+if (-e "$HOMEDIR/$user/.ssh/identity.pub" ) {
+    my $key = `cat $HOMEDIR/$user/.ssh/identity.pub`;
+
+    if ($key =~ /^([-\@\w\s\.]+)$/) {
+	$key = $1;
+    }
+    else {
+	fatal("Bad public key: $key");
+    }
+    chomp $key;
+
+    DBQueryFatal("update users set emulab_pubkey='$key' where uid='$user'");
+}
+
 exit(0);
 
 sub fatal {
@@ -295,6 +314,10 @@ sub FirstTime()
 		   "$HOMEDIR/$user/.ssh/authorized_keys")) {
 	    fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub ".
 		  "to authorized_keys");
+	}
+	if (defined($user_pubkey)) {
+	    system("echo \"$user_pubkey\" >> ".
+		   "$HOMEDIR/$user/.ssh/authorized_keys");
 	}
 	chmod(0600, "$HOMEDIR/$user/.ssh/authorized_keys") or
 	    fatal("Could not chmod $HOMEDIR/$user/.ssh/authorized_keys: $!");

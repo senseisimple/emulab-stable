@@ -33,6 +33,7 @@ else {
 function SPITFORM($formfields, $returning, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN;
+    global $usr_keyfile;
 
     PAGEHEADER("Start a New Testbed Project");
     
@@ -64,7 +65,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<table align=center border=1> 
           <tr>
-            <td align=center colspan=2>
+            <td align=center colspan=3>
                 Fields marked with * are required;
                 those marked + are highly recommended.
             </td>
@@ -77,7 +78,7 @@ function SPITFORM($formfields, $returning, $errors)
         # Start user information stuff. Presented for new users only.
         #
 	echo "<tr>
-                  <td colspan=2>
+                  <td colspan=3>
                       Project Head Information
                   </td>
               </tr>\n";
@@ -86,7 +87,7 @@ function SPITFORM($formfields, $returning, $errors)
         # UserName:
         #
         echo "<tr>
-                  <td>*Username (no blanks, lowercase):</td>
+                  <td colspan=2>*Username (no blanks, lowercase):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[proj_head_uid]\"
@@ -100,7 +101,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Full Name
 	#
         echo "<tr>
-                  <td>*Full Name:</td>
+                  <td colspan=2>*Full Name:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_name]\"
@@ -113,7 +114,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Title/Position:
 	# 
 	echo "<tr>
-                  <td>*Title/Position:</td>
+                  <td colspan=2>*Title/Position:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
@@ -126,7 +127,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Affiliation:
 	# 
 	echo "<tr>
-                  <td>*Institutional<br>Affiliation:</td>
+                  <td colspan=2>*Institutional<br>Affiliation:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_affil]\"
@@ -139,7 +140,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# User URL
 	#
 	echo "<tr>
-                  <td>Home Page URL:</td>
+                  <td colspan=2>Home Page URL:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_URL]\"
@@ -152,7 +153,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Email:
 	#
 	echo "<tr>
-                  <td>*Email Address[<b>1</b>]:</td>
+                  <td colspan=2>*Email Address[<b>1</b>]:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_email]\"
@@ -165,7 +166,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Postal Address
 	#
 	echo "<tr>
-                  <td>*Postal Address:</td>
+                  <td colspan=2>*Postal Address:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_addr]\"
@@ -178,7 +179,7 @@ function SPITFORM($formfields, $returning, $errors)
 	# Phone
 	#
 	echo "<tr>
-                  <td>*Phone #:</td>
+                  <td colspan=2>*Phone #:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_phone]\"
@@ -188,11 +189,41 @@ function SPITFORM($formfields, $returning, $errors)
               </tr>\n";
 
 	#
+	# SSH public key
+	#
+	echo "<tr>
+                  <td rowspan><center>
+                               Your SSH Pub Key: &nbsp<br>
+                                    [<b>2</b>]
+                              </center></td>
+
+                  <td rowspan><center>Upload (1K max)[<b>3</b>]<br>
+                                  <b>Or</b><br>
+                                 Insert Key
+                              </center></td>
+
+                  <td rowspan>
+                      <input type=hidden name=MAX_FILE_SIZE value=1024>
+                      <input type=file
+                             name=usr_keyfile
+                             value=\"" . $usr_keyfile . "\"
+	                     size=50>
+                      <br>
+                      <br>
+	              <input type=text
+                             name=\"formfields[usr_key]\"
+                             value=\"" . $formfields[usr_key] . "\"
+	                     size=50
+	                     maxlength=1024>
+                  </td>
+              </tr>\n";
+
+	#
 	# Password. Note that we do not resend the password. User
 	# must retype on error.
 	#
 	echo "<tr>
-                  <td>*Password[<b>1</b>]:</td>
+                  <td colspan=2>*Password[<b>1</b>]:</td>
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
@@ -200,7 +231,7 @@ function SPITFORM($formfields, $returning, $errors)
               </tr>\n";
 
         echo "<tr>
-                  <td>*Retype Password:</td>
+                  <td colspan=2>*Retype Password:</td>
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
@@ -211,8 +242,8 @@ function SPITFORM($formfields, $returning, $errors)
     #
     # Project information
     #
-    echo "<tr><td colspan=2><hr></td></tr>
-          <tr><td colspan=2>
+    echo "<tr><td colspan=3><hr></td></tr>
+          <tr><td colspan=3>
                Project Information <em>(replace the example entries)</em>
               </td>
           </tr>\n";
@@ -221,7 +252,7 @@ function SPITFORM($formfields, $returning, $errors)
     # Project Name:
     #
     echo "<tr>
-              <td>*Project Name (no blanks):</td>
+              <td colspan=2>*Project Name (no blanks):</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[pid]\"
@@ -234,7 +265,7 @@ function SPITFORM($formfields, $returning, $errors)
     # Project Description:
     #
     echo "<tr>
-              <td>*Project Description:</td>
+              <td colspan=2>*Project Description:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_name]\"
@@ -247,7 +278,7 @@ function SPITFORM($formfields, $returning, $errors)
     # URL:
     #
     echo "<tr>
-              <td>*URL:</td>
+              <td colspan=2>*URL:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_URL]\"
@@ -260,7 +291,8 @@ function SPITFORM($formfields, $returning, $errors)
     # Publicly visible.
     #
     echo "<tr>
-              <td>*Can we list your project publicly as an \"Emulab User?\":
+              <td colspan=2>*Can we list your project publicly as
+                             an \"Emulab User?\":
                   <br>
                   (See our <a href=\"projectlist.php3\"
                               target=\"Users\">Users</a> page)
@@ -282,7 +314,7 @@ function SPITFORM($formfields, $returning, $errors)
     # Funders/Grant numbers
     #
     echo "<tr>
-              <td>*Funding Sources and Grant Numbers:<br>
+              <td colspan=2>*Funding Sources and Grant Numbers:<br>
                   (Type \"none\" if not funded)</td>
               <td class=left>
                   <input type=text
@@ -296,7 +328,7 @@ function SPITFORM($formfields, $returning, $errors)
     # Nodes and PCs and Users
     #
     echo "<tr>
-              <td>*Estimated #of Project Members:</td>
+              <td colspan=2>*Estimated #of Project Members:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_members]\" 
@@ -306,7 +338,7 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     echo "<tr>
-              <td>*Estimated #of PCs:</td>
+              <td colspan=2>*Estimated #of PCs:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_pcs]\"
@@ -316,7 +348,7 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     echo "<tr>
-              <td>*Estimated #of Sharks:</td>
+              <td colspan=2>*Estimated #of Sharks:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_sharks]\"
@@ -329,12 +361,12 @@ function SPITFORM($formfields, $returning, $errors)
     # Why!
     # 
     echo "<tr>
-              <td colspan=2>
+              <td colspan=3>
                *Please describe how and why you'd like to use the testbed.
               </td>
           </tr>
           <tr>
-              <td colspan=2 align=center class=left>
+              <td colspan=3 align=center class=left>
                   <textarea name=\"formfields[proj_why]\"
                     rows=10 cols=60>" .
 	            ereg_replace("\r", "", $formfields[proj_why]) .
@@ -343,7 +375,7 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     echo "<tr>
-              <td colspan=2 align=center>
+              <td colspan=3 align=center>
                  <b><input type=submit name=submit value=Submit></b>
               </td>
           </tr>\n";
@@ -356,8 +388,17 @@ function SPITFORM($formfields, $returning, $errors)
             <li> Please consult our
                  <a href = 'docwrapper.php3?docname=security.html'>
                  security policies</a> for information
-                 regarding passwords and email addresses.
-          </ol>
+                 regarding passwords and email addresses.\n";
+    if (! $returning) {
+	echo "<li> If you want us to use your existing ssh public key,
+                   then either paste it in or specify the path to your
+                   your identity.pub file.
+              <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a>
+                   users: The file upload mechanism is broken in Opera, so
+                   you cannot specify a local file for upload. Instead,
+                   please paste your public key in.\n";
+    }
+    echo "</ol>
           </blockquote></blockquote>
           </h4>\n";
 }
@@ -492,6 +533,11 @@ if (! $returning) {
 			    $formfields[usr_email], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
+    if (isset($formfields[usr_key]) &&
+	strcmp($formfields[usr_key], "") &&
+	! ereg("^[0-9a-zA-Z\@\. ]*$", $formfields[usr_key])) {
+	$errors["PubKey"] = "Invalid characters";
+    }
 }
 
 if (!isset($formfields[pid]) ||
@@ -590,6 +636,33 @@ if (!$returning) {
     else {
 	$usr_URL = $formfields[usr_URL];
     }
+    
+    #
+    # Pasted in key.
+    # 
+    if (isset($formfields[usr_key]) &&
+	strcmp($formfields[usr_key], "")) {
+	$usr_key = $formfields[usr_key];
+    }
+    
+    #
+    # If usr provided a file for the key, it overrides the paste in text.
+    # Must read and check it.
+    #
+    # XXX I allow only a single line of stuff. The rest is ignored for now.
+    #
+    if (isset($usr_keyfile) &&
+	strcmp($usr_keyfile, "") &&
+	strcmp($usr_keyfile, "none")) {
+	$keyfilegoo = file($usr_keyfile);
+
+	if (! ereg("^[0-9a-zA-Z\@\. ]*$", $keyfilegoo[0])) {
+	    $errors["PubKey File Contents"] = "Invalid characters";
+	}
+	else {
+	    $usr_key = $keyfilegoo[0];
+	}
+    }
 }
 else {
     #
@@ -657,6 +730,11 @@ if (! $returning) {
 	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year))");
 
+    if (isset($usr_key)) {
+	DBQueryFatal("update users set home_pubkey='$usr_key' ".
+		     "where uid='$proj_head_uid'");
+    }
+    
     $key = GENKEY($proj_head_uid);
 
     TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",

@@ -24,6 +24,7 @@ $isadmin = ISADMIN($uid);
 function SPITFORM($formfields, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN, $isadmin;
+    global $usr_keyfile;
     
     #
     # Standard Testbed Header. Written late cause of password
@@ -53,7 +54,7 @@ function SPITFORM($formfields, $errors)
 
     echo "<table align=center border=1> 
           <tr>
-            <td align=center colspan=2>
+            <td align=center colspan=3>
                 Fields marked with * are required;
                 those marked + are highly recommended.
             </td>
@@ -65,7 +66,7 @@ function SPITFORM($formfields, $errors)
         # UserName. This is a constant field. 
         #
         echo "<tr>
-                  <td>Username:</td>
+                  <td colspan=2>Username:</td>
                   <td class=left>
                       $formfields[target_uid]
                       <input type=hidden
@@ -80,7 +81,7 @@ function SPITFORM($formfields, $errors)
 	# Full Name
 	#
         echo "<tr>
-                  <td>*Full Name:</td>
+                  <td colspan=2>*Full Name:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_name]\"
@@ -93,7 +94,7 @@ function SPITFORM($formfields, $errors)
 	# Title/Position:
 	# 
 	echo "<tr>
-                  <td>*Title/Position:</td>
+                  <td colspan=2>*Title/Position:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
@@ -106,7 +107,7 @@ function SPITFORM($formfields, $errors)
 	# Affiliation:
 	# 
 	echo "<tr>
-                  <td>*Institutional<br>Affiliation:</td>
+                  <td colspan=2>*Institutional<br>Affiliation:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_affil]\"
@@ -119,7 +120,7 @@ function SPITFORM($formfields, $errors)
 	# User URL
 	#
 	echo "<tr>
-                  <td>Home Page URL:</td>
+                  <td colspan=2>Home Page URL:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_URL]\"
@@ -132,7 +133,7 @@ function SPITFORM($formfields, $errors)
 	# Email:
 	#
 	echo "<tr>
-                  <td>*Email Address[<b>1</b>]:</td>
+                  <td colspan=2>*Email Address[<b>1</b>]:</td>
                   <td class=left> ";
 	if ($isadmin)
 	    echo "    <input type=text ";
@@ -150,7 +151,7 @@ function SPITFORM($formfields, $errors)
 	# Postal Address
 	#
 	echo "<tr>
-                  <td>*Postal Address:</td>
+                  <td colspan=2>*Postal Address:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_addr]\"
@@ -163,7 +164,7 @@ function SPITFORM($formfields, $errors)
 	# Phone
 	#
 	echo "<tr>
-                  <td>*Phone #:</td>
+                  <td colspan=2>*Phone #:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_phone]\"
@@ -173,11 +174,42 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
 
 	#
+	# SSH public key
+	# 
+	echo "<tr>
+                  <td rowspan><center>
+                               Your SSH Pub Key: &nbsp<br>
+                                    [<b>2</b>]
+                              </center></td>
+
+                  <td rowspan><center>Upload (1K max)[<b>3</b>]<br>
+                                  <b>Or</b><br>
+                                   <br>
+                               Insert Key
+                              </center></td>
+
+                  <td rowspan>
+                      <input type=hidden name=MAX_FILE_SIZE value=1024>
+	              <input type=file
+                             name=usr_keyfile
+                             value=\"" . $usr_keyfile . "\"
+	                     size=50>
+                      <br>
+                      <br>
+	              <input type=text
+                             name=\"formfields[usr_key]\"
+                             value=\"" . $formfields[usr_key] . "\"
+	                     size=50
+	                     maxlength=1024>
+                  </td>
+              </tr>\n";	
+
+	#
 	# Password. Note that we do not resend the password. User
 	# must retype on error.
 	#
 	echo "<tr>
-                  <td>Password[<b>1</b>]:</td>
+                  <td colspan=2>Password[<b>1</b>]:</td>
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
@@ -185,7 +217,7 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
 
         echo "<tr>
-                  <td>Retype Password:</td>
+                  <td colspan=2>Retype Password:</td>
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
@@ -193,7 +225,7 @@ function SPITFORM($formfields, $errors)
              </tr>\n";
 
     echo "<tr>
-              <td colspan=2 align=center>
+              <td colspan=3 align=center>
                  <b><input type=submit name=submit value=Submit></b>
               </td>
           </tr>\n";
@@ -207,6 +239,13 @@ function SPITFORM($formfields, $errors)
                  <a href = 'docwrapper.php3?docname=security.html'>
                  security policies</a> for information
                  regarding passwords and email addresses.
+            <li> If you want us to use your existing ssh public key,
+                 then either paste it in or specify the path to your
+                 your identity.pub file.
+            <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a> users:
+                 The file upload mechanism is broken in Opera, so you cannot
+                 specify a local file for upload. Instead, please paste your
+                 key in.
           </ol>
           </blockquote></blockquote>
           </h4>\n";
@@ -282,6 +321,7 @@ if (! isset($submit)) {
     $defaults[usr_phone]   = $row[usr_phone];
     $defaults[usr_title]   = $row[usr_title];
     $defaults[usr_affil]   = $row[usr_affil];
+    $defaults[usr_key]     = $row[home_pubkey];
     
     SPITFORM($defaults, 0);
     PAGEFOOTER();
@@ -356,6 +396,11 @@ if (isset($formfields[password1]) &&
 	$errors["Password"] = "$checkerror";
     }
 }
+if (isset($formfields[usr_key]) &&
+    strcmp($formfields[usr_key], "") &&
+    ! ereg("^[0-9a-zA-Z\@\. ]*$", $formfields[usr_key])) {
+    $errors["PubKey"] = "Invalid characters";
+}
 
 if (count($errors)) {
     SPITFORM($formfields, $errors);
@@ -379,6 +424,35 @@ if (! isset($formfields[usr_URL]) ||
 }
 else {
     $usr_URL = $formfields[usr_URL];
+}
+
+#
+# Pasted key.
+# 
+if (isset($formfields[usr_key]) &&
+    strcmp($formfields[usr_key], "")) {
+    $usr_key = $formfields[usr_key];
+}
+    
+#
+# If usr provided a file for the key, it overrides the paste in text.
+# Must read and check it.
+#
+# XXX I allow only a single line of stuff. The rest is ignored for now.
+#
+if (isset($usr_keyfile) &&
+    strcmp($usr_keyfile, "") &&
+    strcmp($usr_keyfile, "none")) {
+    $keyfilegoo = file($usr_keyfile);
+
+    if (! ereg("^[0-9a-zA-Z\@\. ]*$", $keyfilegoo[0])) {
+	$errors["PubKey File Contents"] = "Invalid characters";
+
+	SPITFORM($formfields, $errors);
+	PAGEFOOTER();
+	return;
+    }
+    $usr_key = $keyfilegoo[0];
 }
 
 #
@@ -426,15 +500,19 @@ if ((isset($password1) && strcmp($password1, "")) &&
 #
 # Now change the rest of the information.
 #
-$insert_result =
-    DBQueryFatal("UPDATE users SET ".
-		 "usr_name=\"$usr_name\",       ".
-		 "usr_URL=\"$usr_url\",         ".
-		 "usr_addr=\"$usr_addr\",       ".
-		 "usr_phone=\"$usr_phone\",     ".
-		 "usr_title=\"$usr_title\",     ".
-		 "usr_affil=\"$usr_affil\"      ".
-		 "WHERE uid=\"$target_uid\"");
+DBQueryFatal("UPDATE users SET ".
+	     "usr_name=\"$usr_name\",       ".
+	     "usr_URL=\"$usr_url\",         ".
+	     "usr_addr=\"$usr_addr\",       ".
+	     "usr_phone=\"$usr_phone\",     ".
+	     "usr_title=\"$usr_title\",     ".
+	     "usr_affil=\"$usr_affil\"      ".
+	     "WHERE uid=\"$target_uid\"");
+
+if (isset($usr_key)) {
+    DBQueryFatal("update users set home_pubkey='$usr_key' ".
+		 "where uid='$target_uid'");
+}
 
 #
 # Audit

@@ -52,7 +52,7 @@ use Exporter;
 
 	 EXPTSTATE_NEW EXPTSTATE_PRERUN EXPTSTATE_SWAPPED EXPTSTATE_SWAPPING
 	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE EXPTSTATE_TESTING
-	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED
+	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED EXPTSTATE_UPDATING
 
 	 BATCHSTATE_POSTED BATCHSTATE_RUNNING BATCHSTATE_TERMINATING
 	 BATCHSTATE_ACTIVATING
@@ -78,7 +78,8 @@ use Exporter;
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
-	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid
+	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid TBExpLocked
+	 TBIsNodeRemote
 	 );
 
 # Must come after package declaration!
@@ -134,6 +135,7 @@ sub EXPTSTATE_ACTIVE()		{ "active"; }
 sub EXPTSTATE_TESTING()		{ "testing"; }
 sub EXPTSTATE_TERMINATING()	{ "terminating"; }
 sub EXPTSTATE_TERMINATED()	{ "ended"; }
+sub EXPTSTATE_UPDATING()	{ "updating"; }
 
 sub BATCHSTATE_POSTED()		{ "posted"; }
 sub BATCHSTATE_ACTIVATING()	{ "activating"; }
@@ -841,6 +843,32 @@ sub TBLockExp($$)
 }
 
 #
+# Test if Experiment is locked
+#
+# usage: TBExpLocked(char *pid, char *eid)
+#        returns 1 if locked.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBExpLocked($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select expt_locked from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    if (! defined($row[0])) {
+	return 0;
+    }
+    return 1;
+}
+
+#
 # UnLock Experiment.
 #
 # usage: TBUnLockExp(char *pid, char *eid)
@@ -1389,6 +1417,33 @@ sub TBGetNodeEventState($$)
 	$$state = TBDB_NODESTATE_UNKNOWN;
     }
     return 1;
+}
+
+#
+# Is a node remote?
+#
+# usage TBIsNodeRemote(char *node)
+#        Returns 1 if yes.
+#        Returns 0 if no.
+#
+sub TBIsNodeRemote($)
+{
+    my ($nodeid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select class from node_types as t ".
+		     "left join nodes as n on t.type=n.type ".
+		     "where n.node_id='$nodeid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    
+    my @row = $query_result->fetchrow_array();
+    if ($row[0] =~ /pcRemote/i) {
+	return 1;
+    }
+    return 0;
 }
 
 #

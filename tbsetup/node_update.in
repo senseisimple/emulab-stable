@@ -13,16 +13,14 @@ use Getopt::Std;
 # The output is all jumbled together since the updates are issued in parallel.
 # Might be a pain when debugging. 
 # 
-# usage: node_update [-b] <pid> <eid>
-#
 sub usage()
 {
     print STDOUT "Usage: node_update [-b] <pid> <eid>\n".
-	"Update user accounts and NFS mounts on nodes in your experiment.\n".
-	"Use the -b option to use batch operation (place in background).\n";
+	"Update user accounts and NFS mounts on nodes in your project.\n".
+	"Use -b to use batch operation (place in background, send email).\n";
     exit(-1);
 }
-my  $optlist = "b";
+my  $optlist = "be:";
   
 #
 # Configure variables
@@ -33,6 +31,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $ssh		= "$TB/bin/sshtb -n";
+my $sshremote	= "$TB/bin/sshremote -n";
 my $expsetup    = "$TB/sbin/exports_setup";
 my $batchmode   = 0;
 
@@ -73,9 +72,15 @@ if (defined($options{"b"})) {
 if ($pid =~ /^([-\@\w]+)$/) {
     $pid = $1;
 }
+else {
+    die("*** Bad data in pid: $pid\n");
+}	
 if ($eid =~ /^([-\@\w]+)$/) {
     $eid = $1;
 }
+else {
+    die("*** Bad data in eid: $eid\n");
+}	
 
 my $user_name;
 my $user_email;
@@ -89,41 +94,65 @@ my $dbuid;
 # That is, it must be setuid root. 
 #
 if ($EUID != 0) {
-    die("Must be root! Maybe its a development version?");
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
 }
 
 #
 # Verify actual user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    print STDOUT "Go Away! You do not exist in the Emulab Database.\n";
-    exit(1);
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
 }
 
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    print STDOUT "Cannot determine your name and email address.\n";
-    exit(1);
+    die("*** $0:\n".
+        "    Cannot determine your name and email address.\n");
 }
 
 #
 # Verify that this person is allowed to do this. Must be an admin type,
 # the experiment creator or the project leader.
 #
-if ($UID && ! TBAdmin()) {
+if ($UID && !TBAdmin()) {
     my $expt_leader = ExpLeader($pid, $eid);
     my $proj_leader = ProjLeader($pid);
 
     if (!$expt_leader || !$proj_leader) {
-	print STDERR "No such Experiment $eid or no such Project $pid\n";
-	exit(1);
+	die("*** $0:\n".
+	    "    No such Experiment $eid or no such Project $pid\n");
     }
 
     if ($expt_leader ne $dbuid && $proj_leader ne $dbuid) {
-	print STDERR "You must be either the experiment creator or ".
-	    "the project leader\n";
-	exit(1);
+	die("*** $0:\n".
+	    "    You must be the experiment creator or the project leader\n");
     }
 }
+
+#
+# We need to lock down the experiment during this. 
+#
+DBQueryFatal("lock tables experiments write");
+
+if (TBExpLocked($pid, $eid)) {
+    DBQueryWarn("unlock tables");
+    die("*** $0:\n".
+	"    Experiment $pid/$eid is in transition. Please try later!\n");
+}
+
+#
+# A sanity check. Lets make sure the experiment is in the swapped in
+# state so that we are not trying to update nodes that are still booting
+# or swapping out, etc. 
+#
+if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE) {
+    DBQueryWarn("unlock tables");
+    die("*** $0:\n".
+	"    The experiment $pid/$eid must be fully activated first!\n");
+}
+TBLockExp($pid, $eid);
+DBQueryFatal("unlock tables");
 
 #
 # Batchmode (as from the web interface) goes to background and reports
@@ -153,25 +182,10 @@ if ($batchmode) {
 #
 $UID = $EUID;
 if (system("$expsetup")) {
-    print STDERR "*** Failed to setup mountpoints.\n";
     fatal("Exports Setup Failed");
 }
 # Give ops a chance to react.
 sleep(2);
-
-#
-# A sanity check. Lets make sure the experiment is in the swapped in
-# state so that we are not trying to update nodes that are still booting
-# or swapping out, etc. 
-#
-if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE) {
-    fatal("The experiment $pid/$eid must be fully activated first!\n".
-	  "Please try again later, after activation. The experiment leader\n".
-	  "will receive email notification when the experiment has been\n".
-	  "fully activated, or you can check the status via the web ".
-	  "interface.\n");
-    exit(1);
-}
 
 #
 # Get the list of nodes that need to be "updated."
@@ -182,30 +196,51 @@ if (! @nodes) {
 }
 
 #
-# Fire off an update process so that we can overlap them all.
-# We need the pid so we can wait for them all before preceeding.
+# We want some overlap, but not too much since we could burn up
+# a lot processes on wedged nodes. Issue a small number in parallel,
+# and wait once we reach the limit for one to finish, before issuing
+# the next one.
 #
+my $maxpids = 0;
 foreach my $node ( @nodes ) {
-    $mypid = UpdateNode($node);
-    $pids{$node} = $mypid;
+    while ($maxpids >= 5) {
+	my $thispid  = waitpid(-1, 0);
+	my $thisnode = $pids{$thispid};
+	
+	if ($?) {
+	    $failed++;
+	    print STDERR "Update of node $thisnode failed!\n";
+	}
+	else {
+	    print STDOUT "$thisnode updated ...\n";
+	}
+
+	delete($pids{$thispid});
+	$maxpids--;
+    }
+    my $thispid = UpdateNode($node);
+    $pids{$thispid} = $node;
+    $maxpids++;
+    sleep(1);
 }
 
 #
-# Wait for all the children to exit before continuing.
+# Wait for any remaining children to exit before continuing.
 #
-foreach my $node ( @nodes ) {
-    my $mypid     = $pids{$node};
+foreach my $thispid ( keys(%pids) ) {
+    my $node = $pids{$thispid};
 
-    waitpid($mypid, 0);
+    waitpid($thispid, 0);
     if ($?) {
 	$failed++;
 	print STDERR "Update of node $node failed!\n";
     }
     else {
-	print STDOUT "$node Updated ...\n";
+	print STDOUT "$node updated ...\n";
     }
 }
 
+TBUnLockExp($pid, $eid);
 NotifyUser("Node Update Complete", $failed);
 if (defined($logname)) {
     unlink($logname);
@@ -221,6 +256,12 @@ sub UpdateNode {
     my($syspid, $mypid);
 
     print STDOUT "Updating $node ...\n";
+
+    #
+    # We need to know if its a remote or local node, so we know how
+    # to update it. This info needs to be in the DB at some point. 
+    #
+    my($isremote) = TBIsNodeRemote($node);
 
     $mypid = fork();
     if ($mypid) {
@@ -260,7 +301,12 @@ sub UpdateNode {
 	exit(0);
     }
     else {
-	exec("$ssh $node /etc/testbed/update");
+	if ($isremote) {
+	    exec("$sshremote $node /usr/local/etc/testbed/update");
+	}
+	else {
+	    exec("$ssh $node /etc/testbed/update");
+	}
 	exit(0);
     }
     exit(0);
@@ -270,7 +316,6 @@ sub NotifyUser($$)
 {
     my($mesg, $iserr) = @_;
     my($subject, $from, $to, $hdrs);
-    local $MAIL;
 
     print STDOUT "$mesg\n";
 
@@ -302,26 +347,16 @@ sub NotifyUser($$)
 	        "$hdrs";
     }
 
-    if (! ($MAIL = OPENMAIL($to, $subject, $from, $hdrs))) {
-	die("Cannot start mail program!");
-    }
-
-    print $MAIL $mesg;
-
-    if (open(IN, "$logname")) {
-	print $MAIL "\n\n--------- $logname ---------\n\n";
-	
-	while (<IN>) {
-	    print $MAIL "$_";
-	}
-	close(IN);
-    }
-    close($MAIL);
+    #
+    # Send a message to the testbed list. Append the logfile.
+    #
+    SENDMAIL($to, $subject, $mesg, $from, $hdrs, ($logname));
 }
 
 sub fatal($) {
     my($mesg) = @_;
 
+    TBUnLockExp($pid, $eid);
     NotifyUser($mesg, 1);
     if (defined($logname)) {
 	unlink($logname);

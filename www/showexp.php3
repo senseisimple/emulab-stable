@@ -76,6 +76,14 @@ WRITESUBMENUBUTTON("Terminate this experiment",
 		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 #
+# Admin and project/experiment leader get this option.
+#
+if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATEACCOUNTS)) {
+    WRITESUBMENUBUTTON("Update Mounts/Accounts",
+		       "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
+}
+
+#
 # Admin folks get a swap request link to send email.
 #
 if (ISADMIN($uid)) {

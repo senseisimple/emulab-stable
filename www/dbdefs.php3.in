@@ -68,8 +68,9 @@ $TB_USERINFO_MAX		= $TB_USERINFO_MODIFYINFO;
 $TB_EXPT_READINFO		= 1;
 $TB_EXPT_MODIFY			= 2;	# Allocate/dealloc nodes
 $TB_EXPT_DESTROY		= 3;
+$TB_EXPT_UPDATEACCOUNTS		= 4;
 $TB_EXPT_MIN			= $TB_EXPT_READINFO;
-$TB_EXPT_MAX			= $TB_EXPT_DESTROY;
+$TB_EXPT_MAX			= $TB_EXPT_UPDATEACCOUNTS;
 
 # Projects.
 $TB_PROJECT_READINFO		= 1;
@@ -309,6 +310,7 @@ function TBExptAccessCheck($uid, $pid, $eid, $access_type)
     global $TB_EXPT_READINFO;
     global $TB_EXPT_MODIFY;
     global $TB_EXPT_DESTROY;
+    global $TB_EXPT_UPDATEACCOUNTS;
     global $TB_EXPT_MIN;
     global $TB_EXPT_MAX;
     global $TBDB_TRUST_USER;
@@ -330,17 +332,24 @@ function TBExptAccessCheck($uid, $pid, $eid, $access_type)
     }
 
     $query_result =
-	DBQueryFatal("SELECT gid FROM experiments WHERE ".
+	DBQueryFatal("SELECT gid,expt_head_uid FROM experiments WHERE ".
 		     "eid='$eid' and pid='$pid'");
     
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
-    $row = mysql_fetch_array($query_result);
-    $gid = $row[pid];
+    $row  = mysql_fetch_array($query_result);
+    $gid  = $row[gid];
+    $head = $row[expt_head_uid];
 
     if ($access_type == $TB_EXPT_READINFO) {
 	$mintrust = $TBDB_TRUST_USER;
+    }
+    elseif ($access_type == $TB_EXPT_UPDATEACCOUNTS) {
+	if (strcmp($uid, $head))
+	    $mintrust = $TBDB_TRUST_GROUPROOT;
+	else
+	    return 1;
     }
     else {
 	$mintrust = $TBDB_TRUST_LOCALROOT;

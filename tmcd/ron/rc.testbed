@@ -1,0 +1,10 @@
+#!/bin/sh
+
+#
+# Boottime initialization. 
+#
+
+if [ -f /usr/local/etc/testbed/update ]; then
+    echo "Checking for Emulab account updates ..."
+    /usr/local/etc/testbed/update
+fi
