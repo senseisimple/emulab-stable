@@ -250,7 +250,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
      * Check if we can make the move by backing up instead of turning all the
      * way around and moving forward.
      */
-    if ((distance <= 0.25) && (fabsf(angle) > M_PI_2)) {
+    if ((distance <= 0.25f) && fabsf(angle) > M_PI_2) {
 	if (angle >= 0.0)
 	    angle -= M_PI;
 	else
@@ -279,7 +279,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
     if ((move = this->createMove(distance, callback)) == NULL) {
 	/* Skipping everything. */
 	if (callback != NULL) {
-	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE);
+	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE, 0);
 	    
 	    delete callback;
 	    callback = NULL;
@@ -305,7 +305,7 @@ void wheelManager::setOrientation(float orientation, wmCallback *callback)
 
     if ((pivot = this->createPivot(orientation, callback)) == NULL) {
 	if (callback != NULL) {
-	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE);
+	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE, 0);
 	    
 	    delete callback;
 	    callback = NULL;
@@ -317,9 +317,11 @@ void wheelManager::setOrientation(float orientation, wmCallback *callback)
     }
 }
 
-void wheelManager::stop(void)
+bool wheelManager::stop(void)
 {
     this->wm_garcia.flushQueuedBehaviors();
+
+    return this->wm_moving;
 }
 
 void wheelManager::motionStarted(void)
@@ -327,7 +329,9 @@ void wheelManager::motionStarted(void)
     if (debug) {
 	fprintf(stderr, "debug: motion started\n");
     }
-    
+
+    this->wm_moving = true;
+
     if ((this->wm_last_status != aGARCIA_ERRFLAG_NORMAL) &&
 	(this->wm_last_status != aGARCIA_ERRFLAG_ABORT)) {
 	if (debug) {
@@ -339,13 +343,15 @@ void wheelManager::motionStarted(void)
     }
 
     this->wm_dashboard->addUserLEDClient(&this->wm_moving_notice);
-    this->wm_dashboard->startMove(this->wm_garcia);
+    this->wm_dashboard->startMove();
 }
 
 void wheelManager::motionFinished(acpObject *behavior,
 				  int status,
 				  wmCallback *callback)
 {
+    float odometer = 0.0f;
+    
     if (debug) {
 	fprintf(stderr, "debug: motion finished -- %d\n", status);
     }
@@ -361,6 +367,8 @@ void wheelManager::motionFinished(acpObject *behavior,
     }
     
     if (status != aGARCIA_ERRFLAG_WONTEXECUTE) {
+	float left_odometer, right_odometer;
+	
 	if ((status != aGARCIA_ERRFLAG_NORMAL) &&
 	    (status != aGARCIA_ERRFLAG_ABORT)) {
 	    if (debug) {
@@ -370,14 +378,25 @@ void wheelManager::motionFinished(acpObject *behavior,
 	    this->wm_dashboard->addUserLEDClient(&this->wm_error_notice);
 	}
 	
-	this->wm_dashboard->endMove(this->wm_garcia);
+	this->wm_dashboard->endMove(left_odometer, right_odometer);
+	if ((left_odometer / fabsf(left_odometer)) ==
+	    (right_odometer / fabsf(right_odometer))) {
+	    printf(" %f %f -- %f %f\n",
+		   left_odometer, right_odometer,
+		   left_odometer / left_odometer,
+		   right_odometer / right_odometer);
+	    odometer = left_odometer;
+	}
+	
 	this->wm_dashboard->remUserLEDClient(&this->wm_moving_notice);
 	
 	this->wm_last_status = status;
     }
     
     if (callback != NULL) {
-	callback->call(this->wm_last_status);
+	this->wm_moving = false; // XXX This assumes callbacks on the last move
+	
+	callback->call(this->wm_last_status, odometer);
 	
 	delete callback;
 	callback = NULL;

@@ -56,9 +56,6 @@ static const char *BATTERY_LOG_PATH = "/var/log/battery.log";
  */
 static volatile int looping = 1;
 
-extern char **environ;
-static char **reexec_argv;
-
 /**
  * Signal handler for SIGINT, SIGTERM, and SIGQUIT signals.  Sets looping to
  * zero and aborts() if it is called more than three times in case the program
@@ -137,20 +134,14 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
-    int lpc, c, port = PILOT_PORT, serv_sock, on_off = 1;
-    const char *logfile = DEFAULT_LOG_PATH, *pidfile = NULL;
+    int c, port = PILOT_PORT, serv_sock, on_off = 1;
+    const char *logfile = NULL, *pidfile = NULL;
     const char *batteryfile = BATTERY_LOG_PATH;
     int retval = EXIT_SUCCESS;
-    std::list<int> fd_list;
     unsigned long now;
     FILE *batterylog;
     aIOLib ioRef;
-    sigset_t ss;
     aErr err;
-
-    reexec_argv = argv;
-    sigfillset(&ss);
-    sigprocmask(SIG_UNBLOCK, &ss, NULL);
 
     while ((c = getopt(argc, argv, "hdp:l:i:b:")) != -1) {
 	switch (c) {
@@ -217,14 +208,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr,
 		"error: cannot open battery log file - %s\n",
 		batteryfile);
-    }
-
-    for (lpc = 3; lpc < 32; lpc++) {
-	struct stat st;
-	
-	if (fstat(lpc, &st) == 0) {
-	    fd_list.push_back(lpc);
-	}
+	exit(1);
     }
 
     acpGarcia garcia;
@@ -290,6 +274,7 @@ int main(int argc, char *argv[])
 	    perror("listen");
 	}
 	else {
+	    int rmc_telemetry_timeout = 60;
 	    pilotClient::list clients;
 	    fd_set readfds, writefds;
 	    
@@ -301,49 +286,6 @@ int main(int argc, char *argv[])
 	    FD_ZERO(&writefds);
 	    FD_SET(serv_sock, &readfds);
 
-	    for (lpc = 3; lpc < 32; lpc++) {
-		struct stat st;
-		
-		if ((fstat(lpc, &st) == 0) &&
-		    (std::find(fd_list.begin(),
-			       fd_list.end(),
-			       lpc) == fd_list.end())) {
-		    fcntl(lpc, F_SETFD, 1);
-		}
-	    }
-	    
-	    for (lpc = 3; lpc < 128; lpc++) {
-		struct sockaddr_in sin;
-		socklen_t sin_len;
-		
-		sin_len = sizeof(sin);
-		if ((lpc != serv_sock) &&
-		    (getpeername(lpc,
-				 (struct sockaddr *)&sin,
-				 &sin_len) == 0)) {
-		    struct mtp_packet ump;
-		    
-		    if (debug) {
-			printf("recovered client: %s:%d\n",
-			       inet_ntoa(sin.sin_addr),
-			       ntohs(sin.sin_port));
-		    }
-		    
-		    pilotClient *pc = new pilotClient(lpc, wm, db);
-		    pc->setFD(&readfds);
-		    pc->setFD(&writefds);
-		    clients.push_back(pc);
-
-		    mtp_init_packet(&ump,
-				    MA_Opcode, MTP_UPDATE_POSITION,
-				    MA_Role, MTP_ROLE_ROBOT,
-				    MA_Status, MTP_POSITION_STATUS_IDLE,
-				    MA_CommandID, 0,
-				    MA_TAG_DONE);
-		    mtp_send_packet(pc->getHandle(), &ump);
-		}
-	    }
-	    
 	    wm.setDashboard(&db);
 	    do {
 		fd_set rreadyfds = readfds, wreadyfds = writefds;
@@ -394,6 +336,21 @@ int main(int argc, char *argv[])
 					MA_Role, MTP_ROLE_RMC,
 					MA_GarciaTelemetry, db.getTelemetry(),
 					MA_TAG_DONE);
+
+			if (pilotClient::pc_rmc_client != NULL) {
+			    rmc_telemetry_timeout -= 1;
+			    if (rmc_telemetry_timeout <= 0) {
+				pilotClient *pc = pilotClient::pc_rmc_client;
+				
+				rmc_telemetry_timeout = 60;
+				if (mtp_send_packet(pc->getHandle(), &tmp) !=
+				    MTP_PP_SUCCESS) {
+				    fprintf(stderr,
+					    "error: cannot send telemetry to "
+					    "rmcd\n");
+				}
+			    }
+			}
 		    }
 
 		    for (i = clients.begin(); i != clients.end(); ) {
@@ -416,7 +373,8 @@ int main(int argc, char *argv[])
 			    } while (pc && pc->getHandle()->mh_remaining);
 			}
 
-			if ((pc->getRole() == MTP_ROLE_EMULAB) &&
+			if (!bad_client &&
+			    (pc->getRole() == MTP_ROLE_EMULAB) &&
 			    pc->isFDSet(&wreadyfds)) {
 			    if (do_telem &&
 				mtp_send_packet(pc->getHandle(), &tmp) !=

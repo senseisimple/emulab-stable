@@ -42,7 +42,7 @@ public:
      * @param status The completion status of the move.  (One of the
      * aGARCIA_ERRFLAG values.)
      */
-    virtual void call(int status) = 0;
+    virtual void call(int status, float odometer) = 0;
     
 };
 
@@ -145,7 +145,7 @@ public:
     /**
      * Stop the robot in its tracks and flush any queued behaviors.
      */
-    virtual void stop(void);
+    virtual bool stop(void);
 
     /**
      * Internal callback method used to update the dashboard when a pivot/move
@@ -186,6 +186,8 @@ private:
      * The last status from a pivot/move.
      */
     int wm_last_status;
+
+    bool wm_moving;
 
     /**
      * Pointer to the dashboard that should be updated when doing pivots/moves.

@@ -14,9 +14,8 @@
 
 #include <math.h>
 
+#include "garciaUtil.hh"
 #include "pilotClient.hh"
-
-extern int debug;
 
 /**
  * Callback passed to the wheelManager when performing movements.
@@ -26,7 +25,7 @@ class pilotMoveCallback : public wmCallback
 
 public:
 
-    pilotMoveCallback(pilotClient::list &pcl, int command_id);
+    pilotMoveCallback(pilotClient::list &pcl, int command_id, float theta);
 
     /**
      * Callback that will send an MTP_UPDATE_POSITION packet back to the client
@@ -34,28 +33,35 @@ public:
      *
      * @param status The completion status of the move.
      */
-    virtual void call(int status);
+    virtual void call(int status, float odometer);
 
 private:
 
-    pilotClient::list &notify_list;
+    pilotClient::list &pmc_notify_list;
 
-    int command_id;
-    
+    int pmc_command_id;
+
+    float pmc_theta;
 };
 
-pilotMoveCallback::pilotMoveCallback(pilotClient::list &pcl, int command_id)
-    : notify_list(pcl), command_id(command_id)
+pilotMoveCallback::pilotMoveCallback(pilotClient::list &pcl,
+				     int command_id,
+				     float theta)
+    : pmc_notify_list(pcl),
+      pmc_command_id(command_id),
+      pmc_theta(theta)
 {
 }
 
-void pilotMoveCallback::call(int status)
+void pilotMoveCallback::call(int status, float odometer)
 {
     pilotClient::iterator i;
     mtp_packet_t mp;
     mtp_status_t ms;
 
-    fprintf(stderr, "callback: %d\n", status);
+    if (debug) {
+	fprintf(stderr, "debug: callback status -- %d\n", status);
+    }
 
     switch (status) {
     case aGARCIA_ERRFLAG_NORMAL:
@@ -84,7 +90,10 @@ void pilotMoveCallback::call(int status)
 		    MA_Opcode, MTP_UPDATE_POSITION,
 		    MA_Role, MTP_ROLE_ROBOT,
 		    MA_Status, ms,
-		    MA_CommandID, this->command_id,
+		    MA_X, cosf(this->pmc_theta) * odometer,
+		    MA_Y, sinf(this->pmc_theta) * odometer,
+		    MA_Theta, this->pmc_theta,
+		    MA_CommandID, this->pmc_command_id,
 		    MA_TAG_DONE);
 
     if (debug > 1) {
@@ -92,7 +101,9 @@ void pilotMoveCallback::call(int status)
 	mtp_print_packet(stderr, &mp);
     }
 
-    for (i = this->notify_list.begin(); i != this->notify_list.end(); i++) {
+    for (i = this->pmc_notify_list.begin();
+	 i != this->pmc_notify_list.end();
+	 i++) {
 	pilotClient *pc = *i;
 	
 	mtp_send_packet(pc->getHandle(), &mp);
@@ -193,6 +204,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    }
 	    
 	    if ((mcg->position.x != 0.0) || (mcg->position.y != 0.0)) {
+		float theta;
 		
 		if (debug) {
 		    fprintf(stderr,
@@ -201,11 +213,14 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    mcg->position.y);
 		}
 
+		/* XXX Need to figure out the real theta and send that back. */
+		theta = atan2f(mcg->position.y, mcg->position.x);
 		this->pc_wheel_manager.
 		    setDestination(mcg->position.x,
 				   mcg->position.y,
 				   new pilotMoveCallback(notify_list,
-							 mcg->command_id));
+							 mcg->command_id,
+							 theta));
 	    }
 	    else {
 		if (debug) {
@@ -217,7 +232,8 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		this->pc_wheel_manager.setOrientation(
 			mcg->position.theta,
 			new pilotMoveCallback(notify_list,
-					      mcg->command_id));
+					      mcg->command_id,
+					      mcg->position.theta));
 	    }
 	    
 	    retval = true;
@@ -228,6 +244,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	if (this->pc_role == MTP_ROLE_RMC) {
 	    struct mtp_packet cmp, rmp;
 	    pilotClient::iterator i;
+	    bool send_idle = false;
 	    
 	    mcs = &mp->data.mtp_payload_u.command_stop;
 	    
@@ -235,13 +252,16 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		fprintf(stderr, "debug: full stop\n");
 	    }
 	    
-	    this->pc_wheel_manager.stop();
-	    mtp_init_packet(&rmp,
-			    MA_Opcode, MTP_UPDATE_POSITION,
-			    MA_Role, MTP_ROLE_ROBOT,
-			    MA_Status, MTP_POSITION_STATUS_IDLE,
-			    MA_CommandID, mcs->command_id,
-			    MA_TAG_DONE);
+	    if (!this->pc_wheel_manager.stop()) {
+		mtp_init_packet(&rmp,
+				MA_Opcode, MTP_UPDATE_POSITION,
+				MA_Role, MTP_ROLE_ROBOT,
+				MA_Status, MTP_POSITION_STATUS_IDLE,
+				MA_CommandID, mcs->command_id,
+				MA_TAG_DONE);
+
+		send_idle = true;
+	    }
 
 	    cmp = *mp;
 	    cmp.role = MTP_ROLE_ROBOT;
@@ -250,7 +270,8 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 
 		if (pc->getRole() == MTP_ROLE_EMULAB)
 		    mtp_send_packet(pc->getHandle(), &cmp);
-		mtp_send_packet(pc->getHandle(), &rmp);
+		if (send_idle)
+		    mtp_send_packet(pc->getHandle(), &rmp);
 	    }
 	    
 	    retval = true;
@@ -261,6 +282,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	{
 	    struct mtp_garcia_telemetry *mgt;
 	    struct contact_point points[8];
+	    pilotClient::iterator i;
 	    struct mtp_packet cmp;
 	    int count = 0;
 	    
@@ -335,8 +357,13 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    MA_ContactPointCount, count,
 			    MA_ContactPoints, points,
 			    MA_TAG_DONE);
-	    mtp_send_packet(this->getHandle(), &cmp);
+	    
+	    for (i = notify_list.begin(); i != notify_list.end(); i++) {
+		pilotClient *pc = *i;
 
+		mtp_send_packet(pc->getHandle(), &cmp);
+	    }
+	    
 	    retval = true;
 	}
 	break;

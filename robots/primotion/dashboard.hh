@@ -137,12 +137,12 @@ public:
     /**
      * Signal the start of a movement.
      */
-    void startMove(acpGarcia &garcia);
+    void startMove();
 
     /**
      * Signal the end of a movement and update the odometers accordingly.
      */
-    void endMove(acpGarcia &garcia);
+    void endMove(float &left_odometer, float &right_odometer);
 
     /**
      * @return True if the battery level is below the threshold.

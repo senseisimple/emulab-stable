@@ -68,7 +68,7 @@ dashboard::~dashboard()
 {
 }
 
-void dashboard::startMove(acpGarcia &garcia)
+void dashboard::startMove()
 {
     assert(this->db_move_start_time.tv_sec == 0);
     assert(this->db_move_start_time.tv_usec == 0);
@@ -78,7 +78,7 @@ void dashboard::startMove(acpGarcia &garcia)
     gettimeofday(&this->db_move_start_time, NULL);
 }
 
-void dashboard::endMove(acpGarcia &garcia)
+void dashboard::endMove(float &left_odometer, float &right_odometer)
 {
     struct timeval tv, diff, total, grande_total;
     acpValue zvalue(0.0f);
@@ -96,10 +96,12 @@ void dashboard::endMove(acpGarcia &garcia)
     this->db_telemetry.move_time_usec = grande_total.tv_usec;
 
     /* ... update our global odometers, and */
-    this->db_telemetry.left_odometer +=
-	fabs(this->db_garcia.getNamedValue("distance-left")->getFloatVal());
-    this->db_telemetry.right_odometer +=
-	fabs(this->db_garcia.getNamedValue("distance-right")->getFloatVal());
+    left_odometer = this->db_garcia.getNamedValue("distance-left")->
+	getFloatVal();
+    right_odometer = this->db_garcia.getNamedValue("distance-right")->
+	getFloatVal();
+    this->db_telemetry.left_odometer += fabs(left_odometer);
+    this->db_telemetry.right_odometer += fabs(right_odometer);
 
     /* ... clear the garcia's per-move odometers. */
     this->db_garcia.setNamedValue("distance-left", &zvalue);

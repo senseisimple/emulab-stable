@@ -18,7 +18,7 @@ PROGS = garcia-pilot
 endif
 
 all client: $(PROGS)
-install:
+install control-install:
 client-install: client
 	$(INSTALL) -m 755 -d $(DESTDIR)$(CLIENT_BINDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(CLIENT_ETCDIR)
