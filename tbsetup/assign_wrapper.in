@@ -428,7 +428,7 @@ my $canceled   = 0;
 # XXX plab hack - only run assign once on plab topologies, since they're easy
 # to map and the physical topology does not change frequently.
 if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
-    $maxrun = 1;
+    $maxrun = 2;
 }
 
 TBDebugTimeStamp("assign_loop started");
@@ -455,16 +455,15 @@ while (1) {
     last
 	if ($retval == 0);
 
+    if ($currentrun >= $maxrun) {
+	fatal($exitcode, "Reached run limit. Giving up.");
+    }
+
     if ($retval < 0) {
 	#
 	# Failure in assign.
 	#
-	if ($currentrun >= $maxrun) {
-	    fatal($exitcode,
-		  "Reached run limit. Giving up.");
-	}
-	fatal($exitcode,
-	      "Unretriable error. Giving up.");
+	fatal($exitcode, "Unretriable error. Giving up.");
     }
     print "Waiting 5 seconds and trying again...\n";
     sleep(5);
