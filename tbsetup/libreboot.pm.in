@@ -141,6 +141,20 @@ sub nodereboot($$)
     my %pids	 = ();
     my $failed   = 0;
 
+    # XXX - Wisconsin hack to avoid rebooting routers - this needs to be
+    # replaced with the node_capabilities stuff or similar.
+    my @temp = ();
+    foreach my $node (@nodes) {
+	my $qr = DBQueryFatal("select nt.isrebootable from " .
+	    "nodes as n, node_types as nt " .
+	    "where n.node_id=\"$node\" and " .
+	    "n.type = nt.type");
+	my ($rebootable) = $qr->fetchrow_array();
+	push(@temp,$node) if $rebootable;
+    }
+    @nodes = @temp;
+    # END XXX
+
     #
     # VIRTNODE HACK: Virtual nodes are special. We can reboot jailed
     # vnodes, but not old style (non-jail). Also, if we are going to
