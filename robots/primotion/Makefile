@@ -3,16 +3,21 @@
 # Dan Flickinger
 #
 # 2004/10/04
-# 2004/11/19
+# 2004/12/08
 
 
 HOSTPATH=/z/garcia/brainstem
 
+# Build for Stargate:
 ARCH=ARM
 CC=/usr/local/arm/3.4.1/bin/arm-linux-g++
+CFLAGS=-DaUNIX -s -static
 
+# Build for i386:
 #ARCH=i686
 #CC=g++
+#CFLAGS=-DaUNIX -g
+
 
 INCLUDES=-I$(HOSTPATH)/aCommon \
 	 -I$(HOSTPATH)/aUnix \
@@ -38,16 +43,12 @@ LIBRARIES=\
           
 VPATH=$(HOSTPATH)/aCommon:$(HOSTPATH)/aUnix
 
-
-CFLAGS=-DaUNIX -s -static
-#CFLAGS=-DaUNIX -g
-
 LDFLAGS=-L$(HOSTPATH)/aRelease/aUnix/$(ARCH)/
 
 OBJECTSREQ=grobot gcallbacks gbehaviors simplepath
 OBJECTS=grobot.o gcallbacks.o gbehaviors.o simplepath.o
 
-all: commotion pathmotion circle gorobot
+all: commotion pathmotion circle gorobot gorobotc
 
 
 commotion: $(OBJECTSREQ)
@@ -61,6 +62,10 @@ circle: $(OBJECTSREQ)
         
 gorobot: $(OBJECTSREQ)
 	$(CC) -o gorobot $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) gorobot.cc $(LIBRARIES)
+        
+gorobotc: $(OBJECTSREQ)
+	$(CC) -o gorobotc $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) gorobotc.cc $(LIBRARIES)
+
         
 # %.o : %.c
 # 	$(CC) $(CFLAGS) -c -o $@ $< $(INCLUDES)
@@ -91,3 +96,4 @@ clean :
 	rm -f circle
 	rm -f batt
 	rm -f gorobot
+	rm -f gorobotc

@@ -6,7 +6,7 @@
  * Dan Flickinger
  *
  * 2004/11/12
- * 2004/12/07
+ * 2004/12/09
  */
  
 #include "dgrobot/commotion.h"
@@ -20,10 +20,12 @@ int main(int argc, char **argv) {
   int quitnow = 0;  // quit now
   int lsetup = 0;   // listener is setup
   
-  grobot mrrobot;  // Mr. Robot
+  int gstatus;      // status of goto move
+  grobot mrrobot;   // Mr. Robot
+  
  
-  int gor_sock;    // GoRobot socket
-  int msg_sock;    // MSG socket
+  int gor_sock;     // GoRobot socket
+  int msg_sock;     // MSG socket
   
   struct sockaddr_in gor_sin; // listener sockaddr
   
@@ -232,15 +234,26 @@ int main(int argc, char **argv) {
       
       // give robot a chance to handle callbacks
       // if (mrrobot.garcia.getNamedValue("idle")->getBoolVal()) {
-      if (mrrobot.sleepy() != 0) {
-        // a callback has been sent
-        // PROBLEM: three callbacks are expected for a goto command
-        
-      }
+      
+      mrrobot.sleepy();
         
       // poll grobot for behavior completion
-      // if behavior has completed: send back notification to RMCD
-      
+      gstatus = mrrobot.getGOTOstatus();
+      if (0 != Gstatus) {
+        // send back notification to RMCD about goto behavior completion
+        
+        // determine if the move was successful
+        if (gstatus > 0) {
+          // move was good
+          // FIXME 
+        } else {
+          // move was bad
+          // FIXME
+        }
+        
+        // send back position
+        // FIXME
+      }
         
       
       
