@@ -8,6 +8,11 @@ importance should be obvious. Whoever does this work *will* program in the
 dominate style of the existing, newly written, 4500 lines of code! Now, if
 I could just figure out how to add a php mode to emacs ...
 
+* tbend should work from the database, not the .ir file.
+
+* Put a limit on the number of new users/projects that can be
+  unapproved (to prevent DOS attacks on the database).
+
 * Run arguments through addslashes to quote special characters since
   things like ' in strings mess up database insertion. 
   
@@ -23,10 +28,17 @@ I could just figure out how to add a php mode to emacs ...
   include the uid in the existing cookie (the one I added to send back the
   hash key).
 
+* Look at the 'suexec' program from the Apache distribution and use it
+  as the basis for the "run as a user" program.  Instead of checking
+  the home directory, it'll check the database.
+
 * Fix the email list problem. Right now we add people people to the two
   email list files in /usr/testbed/www/maillist when they apply. We should
   either delay that until they are approved, or make sure they get taken
   back out when denied.
+
+* Add verification for when the user wants to change the email address
+  through user mod page, to ensure the email is valid.
 
 * Minor bells and whistles and formatting changes. Or maybe I mean fancy
   things up a tiny bit. I tend to be a minimalist (my favorite example is
@@ -66,6 +78,8 @@ I could just figure out how to add a php mode to emacs ...
 * Admin page to remove a user.
 
 * Admin page to remove an experiment.
+
+* Admin page to control node settings (OS, etc.)
 
 * Add confirm buttons in various places. I did one in the end experiments
   page, as a simple button (so you gotta press two things). I think this
