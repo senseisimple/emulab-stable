@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <sys/wait.h>
+#include <paths.h>
 #include <mysql/mysql.h>
 #include "decls.h"
 #include "config.h"
@@ -61,7 +62,7 @@ int		mydb_update(char *query, ...);
 static int	udpchild;
 static int	numchildren;
 static int	maxchildren = MINCHILDREN;
-static int	killme;
+static volatile int killme;
 
 #ifdef EVENTSYS
 int			myevent_send(address_tuple_t address);
@@ -168,6 +169,8 @@ main(int argc, char **argv)
 	int			tcpsock, udpsock, ch;
 	int			length, i, status, pid;
 	struct sockaddr_in	name;
+	FILE			*fp;
+	char			buf[BUFSIZ];
 	extern char		build_info[];
 
 	while ((ch = getopt(argc, argv, "dp:c:")) != -1)
@@ -273,6 +276,16 @@ main(int argc, char **argv)
 	signal(SIGTERM, cleanup);
 	signal(SIGINT, cleanup);
 	signal(SIGHUP, cleanup);
+
+	/*
+	 * Stash the pid away.
+	 */
+	sprintf(buf, "%s/tmcd.pid", _PATH_VARRUN);
+	fp = fopen(buf, "w");
+	if (fp != NULL) {
+		fprintf(fp, "%d\n", getpid());
+		(void) fclose(fp);
+	}
 
 	/*
 	 * Now fork a set of children to handle requests. We keep the

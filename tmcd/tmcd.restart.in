@@ -2,7 +2,12 @@
 
 DIR=@prefix@/sbin
 
-killall tmcd
+if [ -f /var/run/tmcd.pid ]
+then
+	kill `cat /var/run/tmcd.pid`
+	rm -f /var/run/tmcd.pid
+fi
+
 sleep 1
 ${DIR}/tmcd
 
