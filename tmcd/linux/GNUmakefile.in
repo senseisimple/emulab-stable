@@ -70,3 +70,6 @@ script-install:	dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/gated_eth2.conf $(INSTALL_DIR)/gated_eth2.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_eth4.conf $(INSTALL_DIR)/gated_eth4.conf
 	$(INSTALL) -m 755 $(SRCDIR)/S12testbed /etc/rc.d/rc3.d/S12testbed
+	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown /etc/rc.d/init.d/
+	-ln -s /etc/rc.d/init.d/tbshutdown /etc/rc.d/rc3.d/S13tbshutdown
+	-ln -s /etc/rc.d/init.d/tbshutdown /etc/rc.d/rc6.d/K13tbshutdown
