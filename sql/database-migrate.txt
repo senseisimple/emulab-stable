@@ -1775,3 +1775,6 @@ last_net_act,last_cpu_act,last_ext_act);
                  enum('none','ospf','static','manual',\
                       'static-ddijk','static-old') \
                  NOT NULL default 'none';
+
+1.267: Remove table definition that snuck in while developing; skip to
+       next entry;

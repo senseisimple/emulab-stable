@@ -158,21 +158,6 @@ CREATE TABLE event_objecttypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table `event_groups`
---
-
-CREATE TABLE event_groups (
-  pid varchar(12) NOT NULL default '',
-  eid varchar(32) NOT NULL default '',
-  idx int(10) unsigned NOT NULL auto_increment,
-  group_name varchar(64) NOT NULL default '',
-  agent_name varchar(64) NOT NULL default '',
-  PRIMARY KEY  (pid,eid,idx),
-  KEY group_name (group_name),
-  KEY agent_name (agent_name)
-) TYPE=MyISAM;
-
---
 -- Table structure for table `eventlist`
 --
 
