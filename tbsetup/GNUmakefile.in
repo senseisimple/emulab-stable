@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,7 +19,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
-		  tbswap nseswap tarfiles_setup
+		  tbswap nseswap tarfiles_setup node_history
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
@@ -37,7 +37,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webendexp webbatchexp webpanic \
 		  assign_wrapper assign_prepass ptopgen webnodeupdate \
-		  webdelay_config \
+		  webdelay_config webnodehistory \
 		  webrmgroup webswapexp webnodecontrol webeventsys_control \
 		  webmkgroup websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \

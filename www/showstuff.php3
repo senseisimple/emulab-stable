@@ -1002,28 +1002,6 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 }
 
 #
-# Add a LED like applet that turns on/off based on the output of a URL.
-#
-# @param uid The logged-in user ID.
-# @param auth The value of the user's authentication cookie.
-# @param pipeurl The url the applet should connect to to get LED status.  This
-# string must include any parameters, or if there are none, end with a '?'.
-#
-# Example:
-#   SHOWBLINKENLICHTEN($uid,
-#                      $HTTP_COOKIE_VARS[$TBAUTHCOOKIE],
-#                      "ledpipe.php3?node=em1");
-#
-function SHOWBLINKENLICHTEN($uid, $auth, $pipeurl, $width = 30, $height = 10) {
-	echo "
-          <applet code='BlinkenLichten.class' width='$width' height='$height'>
-            <param name='pipeurl' value='$pipeurl'>
-            <param name='uid' value='$uid'>
-            <param name='auth' value='$auth'>
-          </applet>\n";
-}
-
-#
 # Show Node information for an experiment.
 #
 function SHOWNODES($pid, $eid, $sortby) {
@@ -2236,6 +2214,132 @@ function SHOWNODE($node_id, $flags = 0) {
 }
 
 #
+# Show history.
+#
+function SHOWNODEHISTORY($node_id, $showall = 0)
+{
+    global $TBSUEXEC_PATH;
+    $atime = 0;
+    $ftime = 0;
+    $rtime = 0;
+    $dtime = 0;
+	
+    $opt = "-ls";
+    if (!$showall) {
+	$opt .= "a";
+    }
+    if ($node_id == "") {
+	$opt .= "A";
+    }
+    if ($fp = popen("$TBSUEXEC_PATH nobody nobody webnodehistory $opt $node_id", "r")) {
+	if (!$showall) {
+	    $str = "Allocation";
+	} else {
+	    $str = "";
+	}
+	echo "<br>
+              <center>
+              $str History for Node $node_id.
+              </center><br>\n";
+
+	echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
+
+	echo "<tr>
+               <th>Pid</th>
+               <th>Eid</th>
+               <th>Allocated By</th>
+               <th>Allocation Date</th>
+	       <th>Duration</th>
+              </tr>\n";
+
+	$line = fgets($fp);
+	while (!feof($fp)) {
+	    #
+	    # Formats:
+	    # nodeid REC tstamp duration uid pid eid
+	    # nodeid SUM alloctime freetime reloadtime downtime
+	    #
+	    $results = preg_split("/[\s]+/", $line, 8, PREG_SPLIT_NO_EMPTY);
+	    $nodeid = $results[0];
+	    $type = $results[1];
+	    if ($type == "SUM") {
+		# Save summary info for later
+		$atime = $results[2];
+		$ftime = $results[3];
+		$rtime = $results[4];
+		$dtime = $results[5];
+	    } elseif ($type == "REC") {
+		$stamp = $results[2];
+		$datestr = date("Y-m-d H:i:s", $stamp);
+		$duration = $results[3];
+		$durstr = "";
+		if ($duration >= (24*60*60)) {
+		    $durstr = sprintf("%dd", $duration / (24*60*60));
+		    $duration %= (24*60*60);
+		}
+		if ($duration >= (60*60)) {
+		    $durstr = sprintf("%s%dh", $durstr, $duration / (60*60));
+		    $duration %= (60*60);
+		}
+		if ($duration >= 60) {
+		    $durstr = sprintf("%s%dm", $durstr, $duration / 60);
+		    $duration %= 60;
+		}
+		$durstr = sprintf("%s%ds", $durstr, $duration);
+		$uid = $results[4];
+		$pid = $results[5];
+		if ($pid == "FREE") {
+		    $pid = "--";
+		    $eid = "--";
+		    $uid = "--";
+		} else {
+		    $eid = $results[6];
+		}
+		echo "<tr>
+                 <td>$pid</td>
+                 <td>$eid</td>
+                 <td>$uid</td>
+                 <td>$datestr</td>
+                 <td>$durstr</td>
+              </tr>\n";
+	    }
+	    $line = fgets($fp, 1024);
+	}
+	pclose($fp);
+
+	echo "</table>\n";
+
+	$ttime = $atime + $ftime + $rtime + $dtime;
+	if ($ttime) {
+	    echo "<br>
+                  <center>
+                  Usage Summary for Node $node_id.
+                  </center><br>\n";
+
+	    echo "<table border=1 align=center>\n";
+
+	    $str = "Allocated";
+	    $pct = sprintf("%5.1f", $atime * 100.0 / $ttime);
+	    echo "<tr><td>$str</td><td>$pct%</td></tr>\n";
+
+	    $str = "Free";
+	    $pct = sprintf("%5.1f", $ftime * 100.0 / $ttime);
+	    echo "<tr><td>$str</td><td>$pct%</td></tr>\n";
+
+	    $str = "Reloading";
+	    $pct = sprintf("%5.1f", $rtime * 100.0 / $ttime);
+	    echo "<tr><td>$str</td><td>$pct%</td></tr>\n";
+
+	    $str = "Down";
+	    $pct = sprintf("%5.1f", $dtime * 100.0 / $ttime);
+	    echo "<tr><td>$str</td><td>$pct%</td></tr>\n";
+
+	    echo "</table>\n";
+	}
+    }
+}
+
+#
 # Show log.
 # 
 function SHOWNODELOG($node_id)
@@ -2569,6 +2673,28 @@ function SHOWEXPTSTATS($pid, $eid) {
               </tr>\n";
     }
     echo "</table>\n";
+}
+
+#
+# Add a LED like applet that turns on/off based on the output of a URL.
+#
+# @param uid The logged-in user ID.
+# @param auth The value of the user's authentication cookie.
+# @param pipeurl The url the applet should connect to to get LED status.  This
+# string must include any parameters, or if there are none, end with a '?'.
+#
+# Example:
+#   SHOWBLINKENLICHTEN($uid,
+#                      $HTTP_COOKIE_VARS[$TBAUTHCOOKIE],
+#                      "ledpipe.php3?node=em1");
+#
+function SHOWBLINKENLICHTEN($uid, $auth, $pipeurl, $width = 30, $height = 10) {
+	echo "
+          <applet code='BlinkenLichten.class' width='$width' height='$height'>
+            <param name='pipeurl' value='$pipeurl'>
+            <param name='uid' value='$uid'>
+            <param name='auth' value='$auth'>
+          </applet>\n";
 }
 
 #

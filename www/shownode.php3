@@ -131,6 +131,8 @@ if (($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) &&
 if ($isadmin) {
     WRITESUBMENUBUTTON("Show Node Log",
 		       "shownodelog.php3?node_id=$node_id");
+    WRITESUBMENUBUTTON("Show Node History",
+		       "shownodehistory.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Free Node",
 		       "freenode.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Set Node Location",

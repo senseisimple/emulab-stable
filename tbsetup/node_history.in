@@ -1,0 +1,290 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Drill down the node history data in the DB
+#
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+
+use POSIX qw(ctime);
+
+#
+# Magic: Wed Jan 12 13:59:00 2005
+# When Leigh implemented the history log.
+#
+my $epoch = 1105563540;
+
+sub usage {
+    print("Usage: $0 [-ARalrsvw] [node ...]\n".
+	  "  -A print history of all nodes (you do NOT want to do this)\n".
+	  "  -R print raw records (default is to combine some records)\n".
+	  "  -a show only when allocated to experiment\n".
+	  "  -l list records\n".
+	  "  -r reverse order (most recent first)\n".
+	  "  -s show a summary of node's past usage\n".
+	  "  -v verbose output\n".
+	  "  -w print warnings about anomolous records\n");
+    exit(1);
+}
+
+my $optlist = "ARalrswv";
+my $warnme = 0;
+my $verbose = 0;
+my $showall = 0;
+my $showalloconly = 0;
+my $list = 0;
+my $summary = 0;
+my $raw = 0;
+my $revorder = 0;
+
+#
+# Parse command arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"A"})) {
+    $showall = 1;
+}
+if (defined($options{"R"})) {
+    $raw = 1;
+}
+if (defined($options{"a"})) {
+    $showalloconly = 1;
+}
+if (defined($options{"l"})) {
+    $list = 1;
+}
+if (defined($options{"r"})) {
+    $revorder = 1;
+}
+if (defined($options{"s"})) {
+    $summary = 1;
+}
+if (defined($options{"w"})) {
+    $warnme = 1;
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (!$showall && @ARGV == 0) {
+    usage();
+}
+my @nodes = @ARGV;
+
+if (!$list && !$summary) {
+    $list = 1;
+}
+
+if ($showall && $summary) {
+    print STDERR "Cannot summarize for all nodes (yet)\n";
+    exit(1) if (!$list);
+}
+
+#
+# Common case: a single node.
+# Just fetch data for it, otherwise fetch data for all.
+# 
+my $querymod = "";
+if (@nodes == 1) {
+    $querymod = " AND node_id='$nodes[0]'";
+}
+
+# XXX maybe it would be better to sort them here in perl, outside the DB?
+my $orderby = " ORDER BY stamp ASC";
+
+my $query_result =
+    DBQueryFatal("SELECT node_id,stamp,op,uid,pid,eid ".
+		 "FROM node_history,experiment_stats ".
+		 "WHERE node_history.exptidx=experiment_stats.exptidx ".
+		 "$querymod $orderby");
+
+my %nodeinfo;	# [ expt, starttime, uid ]
+my %nodestats;	# [ free, allocated, reloading, down ]
+my @lines;
+
+while (my %row = $query_result->fetchhash()) {
+    my $pideid = "$row{pid}/$row{eid}";
+    my $node = $row{node_id};
+    my $stamp = $row{stamp};
+    my $uid = $row{uid};
+
+    #
+    # XXX if this is the first record for a node, consider it as free
+    # from the epoch til now.
+    #
+    if (!defined($nodeinfo{$node})) {
+	$nodeinfo{$node} = [ "FREE", $epoch, "root" ];
+    }
+    if (!defined($nodestats{$node})) {
+	$nodestats{$node} = [ 0, 0, 0, 0 ];
+    }
+
+    my ($opideid, $ostamp, $ouid) = @{$nodeinfo{$node}};
+    my $elapsed = $stamp - $ostamp;
+    my $start = ctime($ostamp);
+    my $end = ctime($stamp);
+    chomp($start);
+    chomp($end);
+
+    #
+    # Allocating node to experiment.
+    # Should currently be free.
+    #
+    if ($row{op} eq "alloc") {
+	if ($opideid ne "FREE") {
+	    print STDERR "$node: dup alloc: already in $opideid at $start\n"
+		if ($warnme);
+	    # XXX possibly missing state in the DB, treat as move
+	}
+	$nodeinfo{$node} = [ $pideid, $stamp, $uid ];
+    }
+
+    #
+    # Free or move terminates a node's time in an experiment.
+    #
+    elsif ($row{op} eq "free") {
+	if ($opideid ne $pideid) {
+	    print STDERR "$node: mismatched alloc,free records: $opideid,$pideid\n"
+		if ($warnme);
+	}
+	$nodeinfo{$node} = [ "FREE", $stamp, $uid ];
+    }
+    elsif ($row{op} eq "move") {
+	if (!$raw) {
+	    # Moves from reloadpending to reloading are combined as reloading
+	    if ($opideid eq "emulab-ops/reloadpending" &&
+		$pideid eq "emulab-ops/reloading") {
+		$nodeinfo{$node} = [ $pideid, $ostamp, $ouid ];
+		next;
+	    }
+	}
+	$nodeinfo{$node} = [ $pideid, $stamp, $uid ];
+    }
+
+    my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
+    my $isalloced = 0;
+    if ($opideid eq "FREE") {
+	$ftime += $elapsed;
+    } elsif ($opideid eq "emulab-ops/reloadpending" ||
+	     $opideid eq "emulab-ops/reloading") {
+	$rtime += $elapsed;
+    } elsif ($opideid eq "emulab-ops/hwdown") {
+	$dtime += $elapsed;
+    } else {
+	$atime += $elapsed;
+	$isalloced = 1;
+    }
+    $nodestats{$node} = [ $ftime, $atime, $rtime, $dtime ];
+
+    if ($list) {
+	if ($verbose) {
+	    my $str="$node: $opideid from $start til $end ($elapsed sec)\n";
+	    push(@lines, $str)
+		if (!$showalloconly || $isalloced);
+	} else {
+	    my ($pid, $eid) = split("/", $opideid);
+	    $eid = "FREE"
+		if ($pid eq "FREE");
+	    my $str="$node REC $ostamp $elapsed $uid $pid $eid\n";
+	    push(@lines, $str)
+		if (!$showalloconly || $isalloced);
+	}
+    }
+}
+
+# Include the current state of nodes
+my $stamp = time();
+for $node (keys(%nodeinfo)) {
+    my ($opideid, $ostamp, $ouid) = @{$nodeinfo{$node}};
+    my $elapsed = $stamp - $ostamp;
+    my $start = ctime($ostamp);
+    chomp($start);
+
+    my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
+    my $isalloced = 0;
+    if ($opideid eq "FREE") {
+	$ftime += $elapsed;
+    } elsif ($opideid eq "emulab-ops/reloadpending" ||
+	     $opideid eq "emulab-ops/reloading") {
+	$rtime += $elapsed;
+    } elsif ($opideid eq "emulab-ops/hwdown") {
+	$dtime += $elapsed;
+    } else {
+	$atime += $elapsed;
+	$isalloced = 1;
+    }
+    $nodestats{$node} = [ $ftime, $atime, $rtime, $dtime ];
+
+    if ($list) {
+	if ($verbose) {
+	    my $str = "$node: $opideid from $start til NOW ($elapsed sec)\n";
+	    push(@lines, $str)
+		if (!$showalloconly || $isalloced);
+	} else {
+	    my ($pid, $eid) = split("/", $opideid);
+	    $eid = "FREE"
+		if ($pid eq "FREE");
+	    my $str="$node REC $ostamp $elapsed $ouid $pid $eid\n";
+	    push(@lines, $str)
+		if (!$showalloconly || $isalloced);
+	}
+    }
+}
+
+# Print out list
+if ($revorder) {
+    @lines = reverse(@lines);
+}
+print @lines;
+
+# Print out summary information
+my $node = $nodes[0]; # XXX
+if ($summary && defined($nodestats{$node})) {
+    my ($ftime, $atime, $rtime, $dtime) = @{$nodestats{$node}};
+    my $ttime = $ftime + $atime + $rtime + $dtime;
+
+    if ($verbose) {
+	my $pct;
+	print "$node SUMMARY\n";
+	if ($atime > 0) {
+	    $pct = ($atime * 100) / $ttime;
+	    printf("  Allocted:  %9d sec (%5.1f%%)\n", $atime, $pct);
+	}
+	if ($ftime > 0) {
+	    $pct = ($ftime * 100) / $ttime;
+	    printf("  Free:      %9d sec (%5.1f%%)\n", $ftime, $pct);
+	}
+	if ($rtime > 0) {
+	    $pct = ($rtime * 100) / $ttime;
+	    printf("  Reloading: %9d sec (%5.1f%%)\n", $rtime, $pct);
+	}
+	if ($dtime > 0) {
+	    $pct = ($dtime * 100) / $ttime;
+	    printf("  Down:      %9d sec (%5.1f%%)\n", $dtime, $pct);
+	}
+    } else {
+	print "$node SUM $atime $ftime $rtime $dtime\n";
+    }
+}
+
+exit(0);
