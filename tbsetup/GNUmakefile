@@ -11,7 +11,7 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  tbprerun tbreport vpower vsnmpit killtip \
 		  mkacct-ctrl_wrapper rmprojdir_wrapper
 DATAFILES	= default.ifc
-SUSCRIPTS	= mkprojdir os_setup mkacct rmacct \
+SUSCRIPTS	= mkprojdir rmprojdir os_setup mkacct rmacct \
 	          mkacct-ctrl ifc_setup
 
 all:	$(BINS) $(SUBDIRS)
