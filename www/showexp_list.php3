@@ -509,6 +509,9 @@ if ($thumb && !$idle) {
 			    "where pid='$pid' and eid='$eid'");
 		$swapreq=0;
 	    }
+	    $idlemailinterval = TBGetSiteVar("idle/mailinterval");
+	    # Is it toosoon to send another mail?
+	    $toosoon = ($swapreq==0 || ($lastswapreq < $idlemailinterval));
 	    $lastlogin = "<td>";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
@@ -535,7 +538,7 @@ if ($thumb && !$idle) {
 	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
 	    } else { $pcs=0; }
 	    $foo = "<td align=center valign=center>\n";
- 	    if ($inactive && !$stale && !$ignore && $pcs && $swappable) {
+ 	    if ($inactive && !$stale && !$ignore && !$toosoon && $pcs) {
 		$fooswap = "<td><a ".
 		    "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
 		    "<img border=0 src=\"redball.gif\"></a></td>\n" ;
