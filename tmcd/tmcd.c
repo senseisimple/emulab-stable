@@ -1912,12 +1912,6 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 
 	/*
-	 * Now check reserved table
-	 */
-	if (nodeidtoexp(nodeid, pid, eid, gid))
-		return 0;
-
-	/*
 	 * Check to see if next_pxe_boot_path is set
 	 */
 	res = mydb_query("select next_pxe_boot_path from nodes "
