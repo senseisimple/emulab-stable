@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# The script goes in /etc on the CDROM. Must edit /etc/rc to invoke it
+# before doing the network setup. 
+# 
+
+RCCONFLOCAL=/etc/rc.conf.local
+
+#
+# This script runs the testbed IP configuration stuff. It will generate the
+# above named file, which we then suck in to define the IP config so that
+# network configuration will proceed properly. 
+#
+# We also define a routine to call at the end of /etc/rc to change the
+# boot header.
+#
+EmulabCheckIPConfig()
+{
+	if [ -r /usr/site/sbin/waipconfig.pl ]; then
+		/usr/site/sbin/waipconfig.pl
+
+		case $? in
+	        0)
+		       ;;
+		*)
+			echo 'Error in testbed configuration program'
+			#reboot
+			echo 'Reboot failed. HELP!'
+			exit 1
+			;;
+		esac
+
+		if [ -r $RCCONFLOCAL ]; then
+			. $RCCONFLOCAL
+		else
+			echo '$RCCONFLOCAL does not exist!'
+			#reboot
+			echo 'Reboot failed. HELP!'
+			exit 1
+		fi
+	fi
+}
