@@ -418,7 +418,7 @@ function SHOWEXP($pid, $eid) {
     #
     # Generate the table.
     #
-    echo "<table align=center border=1>\n";
+    echo "<table align=center cellpadding=2 cellspacing=0 border=1>\n";
 
     echo "<tr>
             <td>Name: </td>
@@ -489,6 +489,11 @@ function SHOWEXP($pid, $eid) {
 	echo "No";
     }
     echo "   </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Path: </td>
+            <td class=left>$exp_path</td>
           </tr>\n";
 
     echo "<tr>
