@@ -13,6 +13,7 @@ public:
 	static const int TYPE_PC = 1;
 	static const int TYPE_SWITCH = 2;
 	static const int TYPE_DNARD = 3;
+	static const int TYPE_DELAY = 4;
 	
 	
 	testnode();
