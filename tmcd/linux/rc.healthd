@@ -1,0 +1,46 @@
+#!/bin/sh
+
+PREFIX=/etc/testbed
+NODETYPE=`${PREFIX}/nodetype`
+MODPROBE=/sbin/modprobe
+
+case "$1" in
+	start)
+		#
+		# We always load this kernel module
+		#
+		$MODPROBE i2c-piix4
+
+		#
+		# Now, we load the hardware-specific kernel module
+		#
+		case "$NODETYPE" in
+		    pc600)
+			$MODPROBE w83781d
+			;;
+		    pc850)
+		    	$MODPROBE adm9240
+			;;
+		    *)
+		    	echo "Health mointoring not supported on nodetype $NODETYPE"
+			exit 1
+			;;
+		esac
+			
+		[ -x ${PREFIX}/healthd ] \
+                && ${PREFIX}/healthd -f ${PREFIX}/healthd.conf -S -p boss 180 \
+                && echo -n ' healthd'
+		;;
+	stop)
+		/usr/bin/killall healthd > /dev/null 2>&1 && echo -n ' healthd'
+		;;
+	reload)
+		/usr/bin/killall -HUP healthd > /dev/null 2>&1 && echo -n ' healthd'
+		;;
+	*)
+		echo ""
+		echo "Usage: `basename $0` { start | stop | reload }"
+		echo ""
+		exit 1
+		;;
+esac
