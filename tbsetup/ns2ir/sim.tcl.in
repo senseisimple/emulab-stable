@@ -45,6 +45,7 @@ Simulator instproc init {args} {
 
     # event list is a list of {time vnode vname otype etype args atstring}
     $self set event_list {}
+    $self set event_count 0
 }
 
 # node
@@ -260,7 +261,12 @@ Simulator instproc at {time eventstring} {
 	return
     }
     $self instvar event_list
+    $self instvar event_count
 
+    if {$event_count > 4000} {
+	perror "Too many events in your NS file!"
+	exit 1
+    }
     set eventlist [split $eventstring ";"]
 
   foreach event $eventlist {
@@ -427,6 +433,7 @@ Simulator instproc at {time eventstring} {
 	    return
 	}
     }
+    set event_count [expr $event_count + 1]
     lappend event_list [list $time $vnode $vname $otype $etype $args $atstring]
   }
 }
