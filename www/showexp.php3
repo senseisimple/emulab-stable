@@ -163,7 +163,9 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 # Wireless maps if experiment includes wireless lans.
 if ($wireless) {
     WRITESUBMENUBUTTON("Wireless Node Map",
-		       "floormap.php3?pid=$exp_pid&eid=$exp_eid");
+		       "floormap.php3".
+		       ($expstate == $TB_EXPTSTATE_ACTIVE ?
+			"?pid=$exp_pid&eid=$exp_eid" : ""));
 }
 
 # History
