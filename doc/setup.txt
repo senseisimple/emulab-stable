@@ -133,12 +133,7 @@ up, copy root's public identity from boss (created by the boss-install script)
 to ops's authorized_keys file:
 scp /root/.ssh/identity.pub ops:/root/.ssh/authorized_keys
 
-##### Step 6 - Filling the database
-
-See the file setup-db.txt in this directory for instructions on getting the
-proper information about your site and nodes into the database.
-
-##### Step 7 - Other miscellaneous things to set up
+##### Step 6 - Other miscellaneous things to set up
 
 There are a few things we haven't been able to completely automate just yet,
 though we hope to soon. 
@@ -165,7 +160,16 @@ SSL certificates - Our apache config file expects to find SSL certificates in:
 boss's domain name.) 
 Generate a passwordless certificate (up to you if you want to get a 'real' one
 from Verisign, etc., or sign your own), and place the files from it in the
-above locations.
+above locations. An easy way to generate a temporary self-signed certificate is
+to run:
+make all certificate
+... in /usr/ports/www/apache13-modssl . Make sure that you give the same value
+for the 'Common name' that you put in WWWHOST in your defs file, and answer
+'N' to the 'Encrypt the private key now?' question. This script creates the
+files:
+work/apache_<version>/conf/ssl.key/server.key
+work/apache_<version>/conf/ssl.crt/server.crt
+... which you can move into the locations mentioned above.
 
 tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
 to boot, reload, etc. testbed machines, which live in /tftpboot . For the time
@@ -175,3 +179,9 @@ customizations, so ask Utah for the boot loaders, etc.
 disk images - You'll also, of course, need disk images to go on your nodes.
 Right now, we have no automatic way of generating these, so you'll have to ask
 Utah for some.
+
+##### Step 7 - Filling the database
+
+See the file setup-db.txt in this directory for instructions on getting the
+proper information about your site and nodes into the database.
+
