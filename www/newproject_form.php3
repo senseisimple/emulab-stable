@@ -302,8 +302,7 @@ echo "<tr>
 
 <tr>
     <td colspan="2">
-        *Please describe how and why you'd like to use the testbed.<br>
-         If the research is sponsored (funded), list the sponsors.</td>
+        *Please describe how and why you'd like to use the testbed.</td>
 </tr>
 
 <tr>
