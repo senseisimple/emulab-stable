@@ -174,6 +174,8 @@ if ($isadmin) {
     }
     WRITESUBMENUBUTTON("Delete User",
 		       "deleteuser.php3?target_uid=$target_uid");
+    WRITESUBMENUBUTTON("Resend Verification Key",
+		       "resendkey.php3?target_uid=$target_uid");
 }
 SUBMENUEND();
 
