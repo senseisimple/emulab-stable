@@ -45,7 +45,7 @@
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
 #define FSHOSTID	"/usr/testbed/etc/fshostid"
-//#define FSHOSTID	"./fshostid"
+#define DOTSFS		".sfs"
 
 #define TESTMODE
 #define NETMASK		"255.255.255.0"
@@ -2276,6 +2276,12 @@ COMMAND_PROTOTYPE(domounts)
 			}
 		}
 	}
+
+	/*
+	 * Remote nodes must use SFS.
+	 */
+	if (!islocal && !usesfs)
+		return 0;
 	
 	/*
 	 * If SFS is in use, the project mount is done via SFS.
@@ -2302,24 +2308,63 @@ COMMAND_PROTOTYPE(domounts)
 	}
 	else {
 		/*
-		 * Return SFS-based project mount.
+		 * Return SFS-based mounts. Locally, we send back per
+		 * project/group mounts (really symlinks) cause thats the
+		 * local convention. For remote nodes, no point. Just send
+		 * back mounts for the top level directories. 
 		 */
-		sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
-			fshostid, FSDIR_PROJ, pid, PROJDIR, pid);
-		client_writeback(sock, buf, strlen(buf), tcp);
-		info("MOUNTS: %s", buf);
+		if (islocal) {
+			sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
+				fshostid, FSDIR_PROJ, pid, PROJDIR, pid);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
 
-		/*
-		 * Return SFS-based group mount.
-		 */
-		if (strcmp(pid, gid)) {
-			sprintf(buf, "SFS REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
-				fshostid, FSDIR_GROUPS, pid, gid,
-				GROUPDIR, pid, gid);
+			/*
+			 * Return SFS-based group mount.
+			 */
+			if (strcmp(pid, gid)) {
+				sprintf(buf,
+				     "SFS REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
+				     fshostid, FSDIR_GROUPS, pid, gid,
+				     GROUPDIR, pid, gid);
+				client_writeback(sock, buf, strlen(buf), tcp);
+				info("MOUNTS: %s", buf);
+			}
+			
+			/*
+			 * Return a mount for "certprog dirsearch"
+			 * that matches the local convention. This
+			 * allows the same paths to work on remote
+			 * nodes.
+			 */
+			sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
+				fshostid, FSDIR_PROJ, DOTSFS, PROJDIR, DOTSFS);
+			client_writeback(sock, buf, strlen(buf), tcp);
+		}
+		else {
+			/*
+			 * Pointer to /proj.
+			 */
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
+				fshostid, FSDIR_PROJ, PROJDIR);
+			client_writeback(sock, buf, strlen(buf), tcp);
+			info("MOUNTS: %s", buf);
+
+			/*
+			 * Pointer to /groups
+			 */
+			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
+				fshostid, FSDIR_GROUPS, GROUPDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			info("MOUNTS: %s", buf);
 		}
 	}
+
+	/*
+	 * Remote nodes do not get user mounts at this point. 
+	 */
+	if (!islocal)
+		return 0;
 	
 	/*
 	 * Now check for aux project access. Return a list of mounts for
@@ -2468,8 +2513,7 @@ COMMAND_PROTOTYPE(dosfshostid)
 		return 1;
 	}
 	sprintf(sfspath, "/sfs/%s", nodehostid);
-	// sprintf(dspath, "/proj/%s/.sfs/%s/%s", pid, eid, nickname);
-	sprintf(dspath, "/proj/.sfs/%s.%s.%s", nickname, eid, pid);
+	sprintf(dspath, "/proj/%s/%s.%s.%s", DOTSFS, nickname, eid, pid);
 	
 	if (safesymlink(sfspath, dspath) < 0) {
 		return 1;
