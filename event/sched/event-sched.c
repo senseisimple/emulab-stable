@@ -174,8 +174,6 @@ main(int argc, char **argv)
 		fatal("could not subscribe to EVENT_SCHEDULE event");
 	}
 
-	goto doit;
-
 	/*
 	 * Hacky. Need to wait until all nodes in the experiment are
 	 * in the ISUP state before we can start the event list rolling.
@@ -197,8 +195,6 @@ main(int argc, char **argv)
 		 */
 		sleep(3);
 	}
-
- doit:
 
 	/*
 	 * Read the static events list and schedule.
