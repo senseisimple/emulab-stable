@@ -32,6 +32,7 @@ my $TBOPS   = "@TBOPSEMAIL@";
 my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
+my $WITHSFS = @SFSSUPPORT@;
 
 my $HOMEDIR = "/users";
 my $USERPATH= "$TB/bin";
@@ -404,7 +405,6 @@ sub AUDIT($)
 #
 sub FirstTime()
 {
-    my $dosfs = 0;
     my $dossh = 0;
 
     #
@@ -413,25 +413,18 @@ sub FirstTime()
     # to be updated (and "sfskey register" won't work because it
     # prompts for the user's UNIX password if not run from root.)
     #
-    if (! -e "$SFSDIR" ) {
-	print "Setting up sfs configuration for $user.\n";
+    if ($WITHSFS &&
+	! -e "$SFSDIR/identity") {
+	
+	if (! -e "$SFSDIR" ) {
+	    print "Setting up sfs configuration for $user.\n";
 
-	mkdir("$SFSDIR", 0700) or
-	    fatal("Could not mkdir $SFSDIR: $!");
-	chown($user_number, $default_groupgid, "$SFSDIR") or
-	    fatal("Could not chown $SFSDIR: $!");
+	    mkdir("$SFSDIR", 0700) or
+		fatal("Could not mkdir $SFSDIR: $!");
+	    chown($user_number, $default_groupgid, "$SFSDIR") or
+		fatal("Could not chown $SFSDIR: $!");
+	}
 
-	$dosfs = 1;
-    }
-
-    #
-    # Check for missing identity file
-    #
-    if (! -e "$SFSDIR/identity") {
-	$dosfs = 1;
-    }
-
-    if ($dosfs) {
 	print "Generating sfs key\n";
 	if (system("$SSH -host $control_node '$SFSKEYGEN -KPn ".
 		   "$user\@ops.emulab.net $SFSDIR/identity'")) {

@@ -14,4 +14,4 @@
 #undef FSDIR_PROJ
 #undef FSDIR_GROUPS
 #undef FSDIR_USERS
-
+#undef SFSSUPPORT
