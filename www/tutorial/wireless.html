@@ -145,7 +145,6 @@ A few points should be noted:
      unfortunately the proprietary layer under the Linux driver for our
      Atheros cards does not currently support it.
 
-
 <li> Wireless lans allow a number of configuration parameters to be
      specified, either for the lan as a whole, or for individual members of
      a lan. There are two Emulab specific directives that you can use;
@@ -230,6 +229,21 @@ XMLRPC interface:
 	sshxmlrpc_client.py link_config proj=myproj exp=myexp
 		src=nodew1 link=lan0 "params={'txpower': 50}"
 </code></pre>
+
+To <em>enable</em> and <em>disable</em> the interface for individual
+nodes on the lan:
+
+<code><pre>
+	link_config -s nodew1 myproj myexp lan0 enable=no
+	link_config -s nodew1 myproj myexp lan0 enable=yes
+
+	sshxmlrpc_client.py link_config proj=myproj exp=myexp
+		src=nodew1 link=lan0 "params={'enable': 'no'}"
+
+Note this currently operates by bringing the interface up/down with
+the <tt>ifconfig</tt> command. 
+</code></pre>
+
 <br>
 <br>
 
