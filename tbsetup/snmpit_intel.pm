@@ -1090,6 +1090,59 @@ sub getStats($) {
 
 }
 
+#
+# usage: getFields(self,ports,oids)
+#        ports: Reference to a list of ports, in any allowable port format
+#        oids: A list of OIDs to reteive values for
+#
+# On sucess, returns a two-dimensional list indexed by port,oid
+#
+sub getFields($$$) {
+    my $self = shift;
+    my ($ports,$oids) = @_;
+
+
+    my @ifindicies = map { portnum($_) =~ /:1\.(\d+)$/; $1 } @$ports;
+    my @oids = @$oids;
+
+    
+    #
+    # Put together an SNMP::VarList for all the values we want to get
+    #
+    my @vars = ();
+    foreach my $ifindex (@ifindicies) {
+	foreach my $oid (@oids) {
+	    push @vars, ["$oid","$ifindex"];
+	}
+    }
+
+    #
+    # If we try to ask for too many things at once, we get back really bogus
+    # errors. So, we limit ourselves to an arbitrary number that, by
+    # experimentation, works.
+    #
+    my $maxvars = 16;
+    my @results = ();
+    while (@vars) {
+	my $varList = new SNMP::VarList(splice(@vars,0,$maxvars));
+	my $rv = $self->{SESS}->get($varList);
+	push @results, @$varList;
+    }
+	    
+    #
+    # Build up the two-dimensional list for returning
+    #
+    my @return = ();
+    foreach my $i (0 .. $#ifindicies) {
+	foreach my $j (0 .. $#oids) {
+	    my $val = shift @results;
+	    $return[$i][$j] = $$val[2];
+	}
+    }
+
+    return @return;
+}
+
 #   
 # Prints out a debugging message, but only if debugging is on. If a level is
 # given, the debuglevel must be >= that level for the message to print. If
