@@ -25,7 +25,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  rmgroup mkgroup mkacct setgroups mkproj eventsys_control \
 		  exports_setup.proxy
 
-LIBEXEC_STUFF	= rmproj rmacct-ctrl \
+LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
 		  assign_wrapper ptopgen webnodeupdate \
@@ -44,6 +44,11 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 all:	$(BIN_STUFF) $(SBIN_STUFF) $(LIBEXEC_STUFF) $(LIB_STUFF) $(SUBDIRS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
+
+CXXFLAGS += -Wall -O3
+
+wanlinksolve: wanlinksolve.o
+	${CXX} wanlinksolve.o -o wanlinksolve ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
 .PHONY:	checkpass ns2ir
 checkpass:
@@ -136,4 +141,5 @@ subdir-distclean:
 #
 %: %.tcl
 	cp -p $< $@
+
 
