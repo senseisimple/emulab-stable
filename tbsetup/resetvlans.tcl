@@ -6,7 +6,7 @@
 set snmpit [file dirname [info script]]/snmpit
 
 if {[catch "open \"|$snmpit -l\" r" vlanFp]} {
-    puts stderr "Error running $smpit -l ($vlanFp)"
+    puts stderr "Error running $snmpit -l ($vlanFp)"
     exit 1
 }
 
