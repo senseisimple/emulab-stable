@@ -2,27 +2,27 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 
 #
 # Create a group on the control/ops nodes and any tipservers. This does
 # not create accounts, or add users to groups; it just creates the group
-# entries and the group directory.
+# entries and the group directory. Runs in the foreground all the time;
+# Its quick enough that the user can wait for it.
 #
 # XXX - /proj wired in
 #       control node wired in.
 #
 sub usage()
 {
-    print STDOUT "Usage: mkgroup [-b | -a] <pid> <gid>\n";
+    print STDOUT "Usage: mkgroup <pid> <gid>\n";
     exit(-1);
 }
-my  $optlist = "ba";
+my  $optlist = "";
 
 #
 # Configure variables
@@ -31,13 +31,12 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
 my $PROJROOT    = "/proj";
 my $GRPROOT     = "/groups";
 my $SSH         = "$TB/bin/sshtb";
 my $GROUPADD    = "/usr/sbin/pw groupadd";
 
-my $batchmode   = 0;
-my $auditmode   = 0;
 my $dbuid;
 my @db_row;
 my $query_result;
@@ -69,6 +68,7 @@ $| = 1;
 # Load the Testbed support stuff. 
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
 
@@ -99,12 +99,6 @@ if (! getopts($optlist, \%options)) {
 }
 if (@ARGV != 2) {
     usage();
-}
-if (defined($options{"b"})) {
-    $batchmode = 1;
-}
-if (defined($options{"a"})) {
-    $auditmode = 1;
 }
 my $pid = shift(@ARGV);
 my $gid = shift(@ARGV);
@@ -142,32 +136,18 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 }
 
 #
-# This script always does the right thing, so it does not matter who
-# calls it. But we guard it anyway in the case where ops/boss are the
-# same.
-# 
-if (!TBAdmin($UID)) {
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
     #
-    # Must be project root for the project or group root for the group.
+    # Parent exits normally
     #
-    $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where pid='$pid' and uid='$dbuid' and pid=gid and ".
-		     "trust='project_root'");
-    
-    if ($query_result->numrows == 0) {
-	$query_result =
-	    DBQueryFatal("select trust from group_membership ".
-			 "where pid='$pid' and uid='$dbuid' and gid='$gid' ".
-			 "and trust='group_root'");
-
-	if ($query_result->numrows == 0) {
-	    die("*** $0:\n".
-		"    $dbuid does not have permission to update groups!\n");
-	}
-    }
+    exit(0);
 }
 
+#
+# Need Proj leader for ownership.
+# 
 if (! ($leader = GroupLeader($pid, $gid))) {
     die("*** $0:\n".
 	"    Could not determine group leader for $pid/$gid!\n");
@@ -183,35 +163,7 @@ my $grouplink = "$PROJROOT/$pid/groups/$gid";
 # Unix info for the group
 #
 if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
-    die("*** $0:\n".
-	"    No info for project/group $pid/$gid!");
-}
-
-#
-# In batch mode, go to background and send email later.
-# 
-if ($batchmode || $auditmode) {
-    my $childpid;
-    
-    #
-    # Create a temporary name for a log file.
-    #
-    $logname = TBMakeLogname("mkgroup");
-    
-    if ($childpid = TBBackGround($logname)) {
-	if ($auditmode) {
-	    waitpid($childpid, 0);
-	    exit($? >> 8);
-	}
-	    
-	#
-	# Parent exits normally
-	#
-	print STDOUT
-	    "Creating/Updating project/group $pid/$gid\n".
-	    "You will be notified via email when the update is complete.\n";
-	exit(0);
-    }
+    fatal("No info for project/group $pid/$gid!");
 }
 
 # 
@@ -222,7 +174,7 @@ if (system("egrep -q -s '^${unix_name}:' /etc/group")) {
     print "Adding group $unix_name to local node ...\n";
 
     if (system("$GROUPADD $unix_name -g $unix_gid")) {
-	fatal("*** Could not add $unix_gid ($unix_gid) to local node!\n");
+	fatal("Could not add $unix_gid ($unix_gid) to local node!\n");
     }
 }
 
@@ -234,34 +186,29 @@ $UID = $EUID;
 #
 # Create group on the control node if it does not exist.
 #
-if (system("$SSH -host $control_node ".
-	   "egrep -q -s '^${unix_name}:' /etc/group")) {
-    print "Adding group $unix_name to $control_node.\n";
-
+if ($control_node ne $BOSSNODE) {
     if (system("$SSH -host $control_node ".
-	       "$GROUPADD $unix_name -g $unix_gid")) {
-	fatal("*** Could not add $unix_name ($unix_gid) to $control_node!\n");
+	       "egrep -q -s '^${unix_name}:' /etc/group")) {
+	print "Adding group $unix_name to $control_node.\n";
+
+	if (system("$SSH -host $control_node ".
+		   "$GROUPADD $unix_name -g $unix_gid")) {
+	    fatal("Could not add $unix_name ($unix_gid) to $control_node!\n");
+	}
     }
 }
 
 #
 # Create group on the tip servers. 
 #
-$query_result =
-    DBQueryFatal("select * from tipservers");
-
-while (@db_row = $query_result->fetchrow_array() ) {
-    push(@tipservers, $db_row[0]);
-}
-
-foreach my $tipserver ( @tipservers ) {
+foreach my $tipserver ( TBTipServers() ) {
     if (system("$SSH -host $tipserver ".
 	       "egrep -q -s '^${unix_name}:' /etc/group")) {
 	print "Adding group $unix_name to $tipserver\n";
 
 	if (system("$SSH -host $tipserver ".
 		   "$GROUPADD $unix_name -g $unix_gid")) {
-	    fatal("*** Could not add $unix_name ($unix_gid) to $tipserver!\n");
+	    fatal("Could not add $unix_name ($unix_gid) to $tipserver!\n");
 	}
     }
 }
@@ -270,76 +217,38 @@ foreach my $tipserver ( @tipservers ) {
 # Create the group directory if it does not already exist, but not for
 # the default group of the project.
 #
-if (! -e $groupdir && $pid ne $gid) {
-    print "Creating group directory: $groupdir.\n";
+if ($pid ne $gid) {
+    if (! -e $groupdir) {
+	print "Creating group directory: $groupdir.\n";
     
-    if (! mkdir("$groupdir", 0770)) {
-	fatal("*** Could not make directory $groupdir: $!");
+	if (! mkdir("$groupdir", 0770)) {
+	    fatal("Could not make directory $groupdir: $!");
+	}
     }
 
     if (! chmod(0770, "$groupdir")) {
-	fatal("*** Could not chmod directory $groupdir: $!");
+	fatal("Could not chmod directory $groupdir: $!");
     }
 
     $unix_uid = getpwnam($leader);
 
     if (! chown($unix_uid, $unix_gid, "$groupdir")) {
-	fatal("*** Could not chown $groupdir to $leader/$gid: $!");
+	fatal("Could not chown $groupdir to $leader/$gid: $!");
     }
 
     if (! -e $grouplink) {
 	symlink($groupdir, $grouplink) or
-	    fatal("*** Could not symlink($groupdir, $grouplink): $!");
+	    fatal("Could not symlink($groupdir, $grouplink): $!");
     }
 }
 
 print "Group Creation Completed!\n";
-if ($batchmode || $auditmode) {
-    donotify("Group Creation Completed!\n", 0);
-    unlink($logname);
-}
 exit(0);
 
 sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print STDOUT "$mesg\n";
-
-    if ($batchmode || $auditmode) {
-	donotify($mesg, 1);
-	unlink($logname);
-    }
-    exit(-1);
+    die("*** $0:\n".
+	"    $mesg\n");
 }
-
-sub donotify($$)
-{
-    my($mesg, $iserr) = @_;
-    my($subject, $from, $to, $hdrs);
-    my $MAIL;
-
-    $from    = $TBOPS;
-    $hdrs    = "Reply-To: $TBOPS";
-    
-    #
-    # An error goes just to Testbed Operations. Normal status messages go
-    # to the user and to the Testbed Logs address.
-    # 
-    if ($iserr) {
-	$subtext = "Failure";
-	$to      = "$TBOPS";
-    }
-    else {
-	$subtext = "Success";
-	$to      = "$user_name <$user_email>";
-	$hdrs    = "Bcc: $TBLOGS\n" . "$hdrs";
-    }
-
-    SENDMAIL($to,
-	     "Group Creation " . $subtext . ": $pid/$gid",
-	     $mesg, $from, $hdrs,
-	     ($logname));
-}
-
-
