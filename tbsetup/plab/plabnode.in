@@ -27,7 +27,12 @@ def main(args):
         usage(me)
     except ValueError:
         usage(me)
-
+        pass
+    
+    if not len(args):
+        usage(me)
+        pass
+    
     command = args[0]
     opts, args = getopt.getopt(args[1:], "f")
     for o, a in opts:
@@ -58,7 +63,7 @@ def main(args):
             else:
                 print "Giving up after %s setup attempts on %s" % \
                       (TRIES, nodeid)
-#XXX                node.free()
+                node.free()
                 raise
 
     elif command == "renew":
