@@ -17,6 +17,9 @@ all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+post-install:
+	@$(MAKE) -C whol post-install
+
 clean:	clean-subdirs
 
 # How to recursively descend into subdirectories to make general
@@ -24,3 +27,5 @@ clean:	clean-subdirs
 %.MAKE:
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY: post-install
