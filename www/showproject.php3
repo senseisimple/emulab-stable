@@ -90,7 +90,7 @@ $query_result =
 echo "<table align=center border=1>\n";
 echo "<tr>
           <th>GID</th>
-          <th>Desription</th>
+          <th>Description</th>
           <th>Leader</th>
       </tr>\n";
 
