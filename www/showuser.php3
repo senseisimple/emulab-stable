@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -52,6 +52,12 @@ if (!$isadmin &&
 		  "information!", 1);
     }
 }
+
+echo "<center><font color=Red size=+1>\n";
+echo "Please see this important <a href=news.php3#43>news item</a> about
+      upcoming <a href=news.php3#43>Emulab Downtime</a>.\n";
+echo "</font></center><br>\n";
+
 
 #
 # Tell the user how many PCs he is using.
