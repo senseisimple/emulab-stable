@@ -96,12 +96,6 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	USERERROR("You are not allowed to approve users in ".
 		  "$project/$group!", 1);
     }
-    TBProjLeader($project, $projleader);
-    if (strcmp($uid, $projleader) &&
-	strcmp($newtrust, "group_root") == 0) {
-	USERERROR("You do not have permission to add new users with group ".
-		  "root status!", 1);
-    }
     
     #
     # Check if already approved in the project/group. If already an
@@ -230,63 +224,12 @@ while (list ($user, $value) = each ($projectchecks)) {
 	    $projtrust[$pid] = $trust;
 	}
 	$pidlist[$pid] = $pid;
+
+	# Check vs. the database
+	TBCheckGroupTrustConsistency($user, $pid, $gid, $trust, 1);
     }
     
     reset($value);
-
-    while (list ($pid, $foo) = each ($pidlist)) {
-	# Skip if no subgroups were being approved.
-	if (! isset($grouptrust[$pid]))
-	    continue;
-
-	#
-	# This does a consistency check against subgroups in the DB.
-	# If we are approving to any subgroups in the form submittal,
-	# make sure that the user is not in any other subgroups of the
-	# project with a different trust level.
-	#
-	$query_result =
-	    DBQueryFatal("select trust from group_membership ".
-			 "where uid='$user' and pid='$pid' ".
-			 " and pid!=gid and trust!='none' ".
-			 " and trust!='$grouptrust[$pid]'");
-
-	if (mysql_num_rows($query_result)) {	    
-	    USERERROR("User $user may not have different trust levels in ".
-		      "different subgroups of $pid!", 1);
-	}
-
-	#
-	# This does a level check between the subgroups and the project.
-	# Do not allow a higher trust level in the default group than in
-	# the subgroups.
-	# 
-	if (isset($projtrust[$pid]))
-	    $ptrust = TBTrustConvert($projtrust[$pid]);
-	else
-	    $ptrust = TBProjTrust($user, $pid);
-	
-	$bad = 0;
-
-	$query_result =
-	    DBQueryFatal("select trust from group_membership ".
-			 "where uid='$user' and trust!='none' ".
-			 " and pid='$pid' and gid!=pid");
-
-	while ($row = mysql_fetch_array($query_result)) {
-	    if ($ptrust > TBTrustConvert($row[0])) {
-		$bad = 1;
-		break;
-	    }
-	}
-	#echo "F $user $bad $ptrust $pid $grouptrust[$pid]<br>\n";
-
-	if ($bad ||
-	    $ptrust > TBTrustConvert($grouptrust[$pid])) {
-	    USERERROR("User $user may not have a higher trust level in ".
-		      "the default group of $pid, than in a subgroup!", 1);
-	}
-    }
 }
 
 reset($HTTP_POST_VARS);

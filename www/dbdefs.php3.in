@@ -329,6 +329,105 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
     return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
 }
 
+
+#
+# Checks proposed Group trust change for consistency.
+#
+# Usage: TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail) 
+#        returns 1 if proposed change is valid
+#        returns 0 if proposed change is invalid and $fail == 0
+#        does not return if proposed change is invalid and $fail == 1.
+#
+
+function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
+{
+    global $TBDB_TRUST_USER;
+
+    # 
+    # set $newtrustisroot to 1 if attempting to set a rootful trust,
+    # 0 otherwise.
+    #
+    $newtrustisroot = TBTrustConvert($newtrust) > $TBDB_TRUST_USER ? 1 : 0;
+
+    #
+    # If changing subgroup trust level, then compare levels.
+    # A user may not have root privs in the project and user privs
+    # in the subgroup; it makes no sense to do that and can violate trust.
+    #
+    if (strcmp($pid, $gid)) {
+	#
+	# Setting non-default "sub"group.
+	# Verify that if user has root in project,
+	# we are setting a rootful trust for him in 
+	# the subgroup as well.
+	#
+	$projtrustisroot = TBProjTrust($user, $pid) > $TBDB_TRUST_USER ? 1 : 0;
+
+	if ($projtrustisroot > $newtrustisroot) {
+	    if (!$fail) { return 0; }
+	    TBERROR("User $user may not have a root trust level in ".
+		      "the default group of $pid, ".
+		      "yet be non-root in subgroup $gid!", 1);
+	}
+    }
+    else {
+	#
+	# Setting default group.
+	# Don't verify anything (yet.)
+	#
+	$projtrustisroot = $newtrustisroot;
+    }
+
+    #
+    # Get all the subgroups not equal to the subgroup being changed.
+    # 
+    $query_result =
+	DBQueryFatal("select trust,gid from group_membership ".
+		     "where uid='$user' and pid='$pid' and trust!='none' ".
+		     " and gid!=pid and gid!='$gid'");
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$grptrust = $row[0];
+	$ogid     = $row[1];
+	
+	# 
+	# Get what the user's trust level is in the 
+	# current subgroup we're looking at.
+	#
+	$grptrustisroot = 
+	    TBTrustConvert( $grptrust ) > $TBDB_TRUST_USER ? 1 : 0;
+
+	#
+	# If user's trust level is higher in the default group than in the
+	# subgroup we are looking at, this is wrong.
+	#
+	if ($projtrustisroot > $grptrustisroot) {
+	    if (!$fail) { return 0; }
+	    TBERROR("User $user may not have a root trust level in ".
+		      "the default group of $pid, ".
+		      "yet be non-root in subgroup $ogid!", 1);
+	}
+
+	if (strcmp($pid, $gid)) {
+            #
+	    # Iff we're modifying a subgroup, 
+	    # Make sure that the trust we're setting is as
+	    # rootful as the trust we already have set in
+	    # every other subgroup.
+	    # 
+	    if ($newtrustisroot != $grptrustisroot) { 
+		if (!$fail) { return 0; }
+		TBERROR("User $user may not mix root and ".
+			  "non-root trust levels in ".
+			  "different subgroups of $pid!", 1);
+	    }
+	}
+    }
+
+    return 1;
+}
+
+
 # Usage: TBExptGroup($pid, $eid, &$gid)
 #	 returns 0 if expt doesn't exist.
 #        returns 1 if expt exists.

@@ -78,56 +78,6 @@ $nonmembers_result =
 		 "where m.pid='$pid' and m.gid=m.pid and a.uid is NULL ".
 		 "      and m.trust!='none'");
 
-function TBCheckTrustConsistency($user, $pid, $gid, $newtrust)
-{
-    global $TBDB_TRUST_USER;
-    
-    #
-    # If changing default group trust level, then compare levels.
-    # A user may not have root privs in the project and user privs
-    # in the group; make no sense to do that and can violate trust.
-    #
-    if (strcmp($pid, $gid)) {
-	$projtrust = TBProjTrust($user, $pid);
-
-	if (TBTrustConvert($newtrust) == $TBDB_TRUST_USER &&
-	    $projtrust > $TBDB_TRUST_USER) {
-	    USERERROR("User $user may not have a higher trust level in ".
-		      "the default group of $pid, than in subgroup $gid!", 1);
-	}
-    }
-    else
-	$projtrust = TBTrustConvert($newtrust);
-
-    #
-    # Get all the subgroups not equal to the subgroup being changed.
-    # 
-    $query_result =
-	DBQueryFatal("select trust,gid from group_membership ".
-		     "where uid='$user' and pid='$pid' and trust!='none' ".
-		     " and gid!=pid and gid!='$gid'");
-
-    while ($row = mysql_fetch_array($query_result)) {
-	$grptrust = $row[0];
-	$ogid     = $row[1];
-
-	if ($projtrust > TBTrustConvert($grptrust)) {
-	    USERERROR("User $user may not have a higher trust level in ".
-		      "the default group of $pid, than in subgroup $ogid!", 1);
-	}
-
-	if (strcmp($pid, $gid)) {
-            #
-            # Check to make sure new trust is same as all other subgroup trust.
-            # 
-	    if (strcmp($newtrust, $grptrust)) {
-		USERERROR("User $user may not have different trust levels in ".
-			  "different subgroups of $pid!", 1);
-	    }
-	}
-    }
-    return 1;
-}
 
 #
 # First pass does checks. Second pass does the real thing. 
@@ -169,7 +119,7 @@ if (mysql_num_rows($curmembers_result)) {
 	    TBERROR("Invalid trust $newtrust for $user in editgroup.php3.", 1);
 	}
 
-	TBCheckTrustConsistency($user, $pid, $gid, $newtrust);
+	TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, 1);
     }
 }
 

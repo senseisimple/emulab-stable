@@ -164,17 +164,6 @@ while ($usersrow = mysql_fetch_array($query_result)) {
 	$date_applied = "--";
     }
 
-    #
-    # Only project leaders get to add someone as group root.
-    # 
-    TBProjLeader($pid, $projleader);
-    if (strcmp($auth_usr, $projleader) == 0) {
-	    $isleader = 1;
-    }
-    else {
-	    $isleader = 0;
-    }
-
     $userinfo_result =
 	DBQueryFatal("SELECT * from users where uid='$newuid'");
 
@@ -207,12 +196,15 @@ while ($usersrow = mysql_fetch_array($query_result)) {
                   </select>
               </td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$trust-$pid/$gid\">
-                          <option value='user'>User </option>
-                          <option value='local_root'>Local Root </option>\n";
-    if ($isleader) {
-	    echo "        <option value='group_root'>Group Root </option>\n";
+                  <select name=\"$newuid\$\$trust-$pid/$gid\">\n";
+    if (TBCheckGroupTrustConsistency($newuid, $pid, $gid, "user", 0)) {
+	echo  "<option value='user'>User </option>\n";
     }
+    if (TBCheckGroupTrustConsistency($newuid, $pid, $gid, "local_root", 0)) {       
+	# local_root means any root is valid.
+        echo  "<option value='local_root'>Local Root </option>\n";
+	echo  "<option value='group_root'>Group Root </option>\n";
+    }	
     echo "        </select>
               </td>\n";
 

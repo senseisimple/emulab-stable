@@ -146,20 +146,22 @@ if (mysql_num_rows($curmembers_result)) {
 	#
 	# We want to have the current trust value selected in the menu.
 	#
-	echo "<option value='user' " .
-	     ((strcmp($trust, "user") == 0) ? "selected" : "") .
-	     ">User </option>\n";
-
-	echo "<option value='local_root' " .
-	     ((strcmp($trust, "local_root") == 0) ? "selected" : "") .
-	     ">Local Root </option>\n";
+	if (TBCheckGroupTrustConsistency($user, $pid, $gid, "user", 0)) {
+	    echo "<option value='user' " .
+		((strcmp($trust, "user") == 0) ? "selected" : "") .
+		    ">User </option>\n";
+	}
+	if (TBCheckGroupTrustConsistency($user, $pid, $gid, "local_root", 0)) {
+	    echo "<option value='local_root' " .
+		((strcmp($trust, "local_root") == 0) ? "selected" : "") .
+		    ">Local Root </option>\n";
 	    
-	echo "<option value='group_root' " .
-	     ((strcmp($trust, "group_root") == 0) ? "selected" : "") .
-	     ">Group Root </option>\n";
-
+	    echo "<option value='group_root' " .
+		((strcmp($trust, "group_root") == 0) ? "selected" : "") .
+		    ">Group Root </option>\n";
+	}
 	echo "        </select>
-                 </td>\n";
+                   </td>\n";
     }
     echo "</tr>\n";
 }
