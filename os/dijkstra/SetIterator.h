@@ -110,6 +110,7 @@ public:
         secondEnd = right.secondEnd;
         predicate = right.predicate;
         currentSet = right.currentSet;
+        return *this;
     }
 
     void reset(T const & first, T const & second)
