@@ -61,6 +61,24 @@ $next_boot_cmd_line = $row[next_boot_cmd_line];
 $rpms               = $row[rpms];
 $startupcmd         = $row[startupcmd];
 
+#
+# Get the OSID list.
+#
+if ($isadmin) {
+    $osid_result = mysql_db_query($TBDBNAME,
+	"SELECT * FROM os_info order by osid");
+}
+else {
+    $osid_result = mysql_db_query($TBDBNAME,
+	"select distinct o.* from os_info as o ".
+	"left join proj_memb as p on o.pid IS NULL or p.pid=o.pid ".
+	"where p.uid='$uid' order by o.pid,o.osid");
+}
+if (! $osid_result) {
+    $err = mysql_error();
+    TBERROR("Database Error getting OSID list: $err\n", 1);
+}
+
 echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
@@ -86,13 +104,28 @@ echo "<tr>
       </tr>\n";
 
 #
-# This should be a menu.
-# 
+# OSID, as a menu of those allowed.
+#
 echo "<tr>
-          <td>Def Boot OSID:</td>
-          <td class=\"left\">
-              <input type=\"text\" name=\"def_boot_osid\" size=\"30\"
-                     value=\"$def_boot_osid\"></td>
+          <td>*Def Boot OSID:</td>";
+echo "    <td><select name=\"def_boot_osid\">\n";
+               while ($row = mysql_fetch_array($osid_result)) {
+                  $osid = $row[osid];
+		  $pid  = $row[pid];
+		  if (!$pid)
+		      $pid = "testbed";
+
+                  echo "<option ";
+		  if ($def_boot_osid == $osid) {
+			  echo "selected ";
+		  }
+                  echo "value=\"$osid\">$pid - $osid</option>\n";
+               }
+if ($isadmin) {
+    echo "<option value=\"None\">No OSID</option>\n";
+}
+echo "       </select>";
+echo "    </td>
       </tr>\n";
 
 echo "<tr>

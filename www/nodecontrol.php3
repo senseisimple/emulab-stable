@@ -42,6 +42,10 @@ if (! $isadmin) {
     }
 }
 
+if (isset($def_boot_osid) && strcmp($def_boot_osid, "None") == 0) {
+    $def_boot_osid = "";
+}
+
 #
 # Now change the information.
 #

@@ -328,8 +328,14 @@ function SHOWNODES($pid, $eid) {
                             <img alt=\"o\" src=\"redball.gif\"></A></td>
                     <td>$node_id</td>
                     <td>$vname</td>
-                    <td>$type</td>
-                    <td>$def_boot_osid</td>
+                    <td>$type</td>\n";
+	    if ($def_boot_osid)
+		echo "<td><A href='showosinfo.php3?osid=$def_boot_osid'>
+                             $def_boot_osid</A></td>\n";
+	    else
+		echo "<td>&nbsp</td>\n";
+	    
+	    echo "  <td>$def_boot_osid</td>
                     <td>$def_boot_path</td>
                     <td>$def_boot_cmd_line</td>
                     <td>$startupcmd</td>

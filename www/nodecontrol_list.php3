@@ -91,10 +91,13 @@ while ($row = mysql_fetch_array($query_result)) {
               <td>$node_id</td>
               <td>$type</td>
               <td>$pid</td>
-              <td>$eid</td>
-              <td><A href='showosinfo.php3?osid=$def_boot_osid'>
-                     $def_boot_osid</A></td>
-              <td>$def_boot_path</td>
+              <td>$eid</td>\n";
+    if ($def_boot_osid)
+	echo "<td><A href='showosinfo.php3?osid=$def_boot_osid'>
+                     $def_boot_osid</A></td>\n";
+    else
+	echo "<td>&nbsp</td>\n";
+    echo "    <td>$def_boot_path</td>
               <td>$def_boot_cmd_line</td>
               <td>$next_boot_path</td>
               <td>$next_boot_cmd_line</td>
