@@ -54,7 +54,7 @@ my $DBErrorString = "";
 # that look like constants cause you do not need to call a perl subroutine
 # with parens. That is, FOO and FOO() are the same thing.
 #
-sub NODERELOADING_PID()		{ "testbed"; }
+sub NODERELOADING_PID()		{ "emulab-ops"; }
 sub NODERELOADING_EID()		{ "reloading"; }
 sub NODEDEAD_PID()		{ "emulab-ops"; }
 sub NODEDEAD_EID()		{ "hwdown"; }
@@ -309,8 +309,8 @@ sub MarkNodeDown($)
     my($node) = $_[0];
     my($pid, $eid);
 
-    $pid = NODERELOADING_PID;
-    $eid = NODERELOADING_EID;
+    $pid = NODEDEAD_PID;
+    $eid = NODEDEAD_EID;
 
     my $query_result =
 	DBQueryFatal("update reserved set pid='$pid', eid='$eid' ".
