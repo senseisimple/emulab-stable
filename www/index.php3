@@ -62,7 +62,14 @@ elseif (isset($uid)) {
 <head>
 <title>Utah Network Testbed</title>
 <link rel='stylesheet' href='tbstyle.css' type='text/css'>
-<base href='https://www.emulab.net/' target='dynamic'>
+
+<?php
+#
+# So I can test on my home machine easily.
+# 
+echo "<base href=\"$TBBASE\" target=\"dynamic\">\n";
+?>
+
 </head>
 <body>
 <a href="welcome.html"><h3>Utah Network Testbed</h3></a>
@@ -149,7 +156,7 @@ else {
               <td>Username:<input type='text' name='uid' size=8></td>
           </tr>
           <tr>
-              <td>Password:<input type='password' name='password' size=8></td>
+              <td>Password:<input type='password' name='password' size=12></td>
           </tr>
           <tr>
               <td align='center'>

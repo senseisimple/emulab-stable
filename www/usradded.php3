@@ -28,8 +28,8 @@ if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   $formerror = "Full Name";
 }
-if (!isset($grp) ||
-    strcmp($grp, "") == 0) {
+if (!isset($pid) ||
+    strcmp($pid, "") == 0) {
   $formerror = "Project";
 }
 if (!isset($usr_affil) ||
@@ -39,14 +39,6 @@ if (!isset($usr_affil) ||
 if (!isset($usr_title) ||
     strcmp($usr_title, "") == 0) {
   $formerror = "Title/Position";
-}
-#
-# The first password field must always be filled in. The second only
-# if a new user, and we will catch that later.
-#
-if (!isset($password1) ||
-    strcmp($password1, "") == 0) {
-  $formerror = "Password";
 }
 
 if ($formerror != "No Error") {
@@ -69,34 +61,35 @@ if (strlen($uid) > 8) {
 }
 
 #
-# See if this is a new user or one returning. We have to query the database
-# for the uid, and then do the password thing. For a user returning, the
-# password must be valid. For a new user, the password must pass our tests.
+# See if this is a new user or one returning.
 #
-$pswd_query  = "SELECT usr_pswd FROM users WHERE uid=\"$uid\"";
-$pswd_result = mysql_db_query($TBDBNAME, $pswd_query);
-if (!$pswd_result) {
-    TBERROR("Database Error retrieving password for $uid: $err\n", 1);
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
+if (! $query_result) {
+    $err = mysql_error();
+    TBERROR("Database Error retrieving info for $uid: $err\n", 1);
 }
-if ($row = mysql_fetch_row($pswd_result)) {
-    $db_encoding = $row[0];
-    $salt = substr($db_encoding,0,2);
-    if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
-    $encoding = crypt("$password1", $salt);
-    if (strcmp($encoding, $db_encoding)) {
-        die("<h3><br><br>".
-            "The password provided was incorrect. ".
-            "Please go back and retype the password.\n".
-            "</h3>");
-    }
+if (mysql_num_rows($query_result) > 0) {
     $returning = 1;
 }
 else {
+    $returning = 0;
+}
+
+#
+# If a user returning, then the login must be valid to continue any further.
+# For a new user, the password must pass our tests.
+#
+if ($returning) {
+    if (CHECKLOGIN($uid) != 1) {
+        USERERROR("You are not logged in. Please log in and try again.", 1);
+    }
+}
+else {
     if (strcmp($password1, $password2)) {
-        die("<h3><br><br>".
-            "You typed different passwords in each of the two password ".
-            "entry fields. <br> Please go back and correct them.\n".
-            "</h3>");
+        USERERROR("You typed different passwords in each of the two password ".
+                  "entry fields. <br> Please go back and correct them.",
+                  1);
     }
     $mypipe = popen(escapeshellcmd(
     "/usr/testbed/bin/checkpass $password1 $uid '$usr_name:$usr_email'"),
@@ -104,20 +97,16 @@ else {
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);
         if (strcmp($retval,"ok\n") != 0) {
-            die("<h3><br><br>".
-                "The password you have chosen will not work: ".
-                "<br><br>$retval<br>".
-                "</h3>");
+            USERERROR("The password you have chosen will not work: ".
+                      "<br><br>$retval<br>", 1);
         } 
     }
     else {
-        mail($TBMAIL_WWW, "TESTBED: checkpass failure",
-             "\n$usr_name ($uid) just tried to set up a testbed ".
-             "account,\n".
-             "but checkpass pipe did not open (returned '$mypipe').\n".
-             "\nThanks\n");
+        TBERROR("TESTBED: checkpass failure\n".
+                "\n$usr_name ($uid) just tried to set up a testbed ".
+                "account,\n".
+                "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
-    $returning = 0;
 }
 
 #
@@ -204,10 +193,10 @@ if (! $returning) {
 # Don't try to join twice!
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"select * from grp_memb where uid='$uid' and gid='$grp'");
+	"select * from grp_memb where uid='$uid' and gid='$pid'");
 if (mysql_num_rows($query_result) > 0) {
     die("<h3><br><br>".
-        "You have already applied for membership in project: $grp.".
+        "You have already applied for membership in project: $pid.".
         "</h3>");
 }
 
@@ -216,10 +205,10 @@ if (mysql_num_rows($query_result) > 0) {
 # to upgrade the trust level, making the new user real.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"insert into grp_memb (uid,gid,trust) values ('$uid','$grp','none');");
+	"insert into grp_memb (uid,gid,trust) values ('$uid','$pid','none');");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding adding user $uid to group $grp: $err\n", 1);
+    TBERROR("Database Error adding adding user $uid to group $pid: $err\n", 1);
 }
 
 #
@@ -227,10 +216,10 @@ if (! $query_result) {
 # email message out of the database, of course.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT grp_head_uid FROM groups WHERE gid='$grp'");
+	"SELECT grp_head_uid FROM groups WHERE gid='$pid'");
 if (($row = mysql_fetch_row($query_result)) == 0) {
     $err = mysql_error();
-    TBERROR("Database Error getting project leader for group $grp: $err\n", 1);
+    TBERROR("Database Error getting project leader for group $pid: $err\n", 1);
 }
 $group_leader_uid = $row[0];
 
@@ -245,7 +234,7 @@ $group_leader_email = $row[0];
 
 mail("$group_leader_email",
      "TESTBED: New Project Member",
-     "\n$usr_name ($uid) is trying to join your project ($grp).\n".
+     "\n$usr_name ($uid) is trying to join your project ($pid).\n".
      "$usr_name has the\n".
      "Testbed username $uid and email address $usr_email.\n$usr_name's ".
      "phone number is $usr_phone and address $usr_addr.\n\n".
@@ -263,7 +252,7 @@ mail("$group_leader_email",
 # Generate some warm fuzzies.
 #
 echo "<br>
-      <p>The leader of project '$grp' has been notified of your application.
+      <p>The leader of project '$pid' has been notified of your application.
       He/She will make a decision and either approve or deny your application,
       and you will be notified as soon as a decision has been made.";
 ?>

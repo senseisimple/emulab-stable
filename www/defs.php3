@@ -3,10 +3,16 @@
 # Standard definitions!
 #
 $TBWWW          = "<https://www.emulab.net/tbdb.html>";
+$TBBASE         = "https://www.emulab.net/";
 $TBMAIL_CONTROL = "Testbed Ops <testbed-ops@flux.cs.utah.edu>";
 $TBMAIL_WWW     = "Testbed WWW <testbed-www@flux.cs.utah.edu>";
-#$TBMAIL_WWW     = "Testbed WWW <stoller@fast.cs.utah.edu>";
 $TBMAIL_APPROVE = "Testbed Approval <testbed-approval@flux.cs.utah.edu>";
+
+#$TBBASE         = "http://golden-gw.ballmoss.com:8080/src/testbed/www/";
+#$TBMAIL_CONTROL = "Testbed Ops <stoller@fast.cs.utah.edu>";
+#$TBMAIL_WWW     = "Testbed WWW <stoller@fast.cs.utah.edu>";
+#$TBMAIL_APPROVE = "Testbed Approval <stoller@fast.cs.utah.edu>";
+
 $TBDBNAME       = "tbdb";
 $TBDIR          = "/usr/testbed/";
 $TBWWW_DIR	= "$TBDIR"."www/";
@@ -22,7 +28,7 @@ $TBNSSUBDIR     = "nsdir";
 $TBAUTHCOOKIE   = "HashCookie";
 $TBAUTHTIMEOUT  = 10800;
 $TBAUTHDOMAIN   = ".emulab.net";
-#$TBAUTHDOMAIN   = "C884963-A.crvlls1.or.home.com";
+#$TBAUTHDOMAIN   = "golden-gw.ballmoss.com";
 
 #
 # Generate the KEY from a name
