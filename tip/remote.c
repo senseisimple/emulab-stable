@@ -43,8 +43,11 @@ static const char copyright[] =
 static char sccsid[] = "@(#)remote.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: remote.c,v 1.1 2000-12-22 18:48:48 mike Exp $";
+	"$Id: remote.c,v 1.2 2000-12-27 00:49:35 mike Exp $";
 #endif /* not lint */
+
+#include "tip.h"
+#include "pathnames.h"
 
 #ifndef LINUX
 #include <sys/syslimits.h>
@@ -52,10 +55,6 @@ static const char rcsid[] =
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "tipconf.h"
-#include "tip.h"
-#include "pathnames.h"
 
 /*
  * Attributes to be gleened from remote host description
@@ -72,8 +71,6 @@ static char *capstrings[] = {
 };
 
 static char	*db_array[3] = { _PATH_REMOTE, 0, 0 };
-
-char *cgetcap __P((char *, char *, int));
 
 #define cgetflag(f)	(cgetcap(bp, f, ':') != NULL)
 

@@ -38,18 +38,16 @@
  * tip - terminal interface program
  */
 
+#include "tipconf.h"
+
 #ifdef LINUX
 /* signals */
 #define	SIGEMT	SIGUSR1
 #define	SIGSYS	SIGUSR2
 
-/* uucp stuff */
-#define uu_lock(x)	(0)
-#define uu_unlock(x)	(0)
-#define UU_LOCK_OK	0
-#define UU_LOCK_INUSE	1
+#define HAVE_UUCPLOCK	0
+#define HAVE_TERMIOS	1
 
-#define HAVE_TERMIOS	1	/* XXX */
 #endif
 
 #include <sys/types.h>
@@ -153,18 +151,6 @@ typedef
 #define INIT	0100		/* static data space used for initialization */
 #define TMASK	017
 
-/*
- * Definition of ACU line description
- */
-typedef
-	struct {
-		char	*acu_name;
-		int	(*acu_dialer)();
-		void	(*acu_disconnect)();
-		void	(*acu_abort)();
-	}
-	acu_t;
-
 #define	equal(a, b)	(strcmp(a,b)==0)/* A nice function to string compare */
 
 /*
@@ -219,13 +205,10 @@ typedef
 
 extern int	vflag;		/* verbose during reading of .tiprc file */
 extern value_t	vtable[];	/* variable table */
+extern esctable_t etable[];
 
-#if !ACULOG
 #define logent(a, b, c, d)
 #define loginit()
-#else
-void logent __P((char *, char *, char *, char*));
-#endif
 
 /*
  * Definition of indices into variable table so
@@ -272,7 +255,6 @@ void logent __P((char *, char *, char *, char*));
 #define LECHO 33
 #define PARITY 34
 #define NOVAL	((value_t *)NULL)
-#define NOACU	((acu_t *)NULL)
 #define NOSTR	((char *)NULL)
 #ifdef NOFILE
 #undef NOFILE
@@ -294,13 +276,11 @@ struct ltchars	deflchars;	/* initial local characters of terminal */
 
 FILE	*fscript;		/* FILE for scripting */
 
-int	fildes[2];		/* file transfer synchronization channel */
-int	repdes[2];		/* read process sychronization channel */
 int	FD;			/* open file descriptor to remote host */
-int	AC;			/* open file descriptor to dialer (v831 only) */
+int	STDIN;			/* stdin file descriptor */
 int	vflag;			/* print .tiprc initialization sequence */
+int	rflag;			/* use raw mode instead of cbreak */
 int	sfd;			/* for ~< operation */
-int	pid;			/* pid of tipout */
 uid_t	uid, euid;		/* real and effective user id's */
 gid_t	gid, egid;		/* real and effective group id's */
 int	stop;			/* stop transfer session flag */
@@ -308,20 +288,20 @@ int	quit;			/* same; but on other end */
 int	intflag;		/* recognized interrupt */
 int	stoprompt;		/* for interrupting a prompt session */
 int	timedout;		/* ~> transfer timedout */
-int	cumode;			/* simulating the "cu" program */
 
 char	fname[PATH_MAX];	/* file name buffer for ~< */
 char	copyname[PATH_MAX];	/* file name buffer for ~> */
 char	ccc;			/* synchronization character */
 char	ch;			/* for tipout */
+#if HAVE_UUCPLOCK
 char	*uucplock;		/* name of lock file for uucp's */
+#endif
 
 int	odisc;				/* initial tty line discipline */
 extern	int disc;			/* current tty discpline */
 
 extern	char *ctrl();
 extern	char *vinterp();
-extern	char *connect();
 extern	int   size __P((char *));
 extern	int   any __P((char, char *));
 extern	void  setscript __P((void));
@@ -333,18 +313,12 @@ extern	int vstring __P((char *, char *));
 extern	void setparity __P((char *));
 extern	void vlex __P((char *));
 extern	void daemon_uid __P((void));
-extern	void disconnect __P((char *));
 extern	void shell_uid __P((void));
 extern	void unraw __P((void));
 extern	void xpwrite __P((int, char *, int));
 extern	int prompt __P((char *, char *, size_t));
-extern	int consh __P((int));
 extern	void tipabort __P((char *));
 
-#define TL_VERBOSE       0x00000001
-#define TL_SIGNAL_TIPOUT 0x00000002
-
-int tiplink (char *cmd, unsigned int flags);
 void raw ();
 
 /* end of tip.h */

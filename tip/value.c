@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)value.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: value.c,v 1.1 2000-12-22 18:48:50 mike Exp $";
+	"$Id: value.c,v 1.2 2000-12-27 00:49:36 mike Exp $";
 #endif /* not lint */
 
 #include "tip.h"
@@ -93,6 +93,17 @@ vinit()
 	 * To allow definition of exception prior to fork
 	 */
 	vtable[EXCEPTIONS].v_access &= ~(WRITE<<PUBLIC);
+
+	/*
+	 * Disable most magic keys in raw mode
+	 */
+	if (rflag) {
+		character(value(RAISECHAR)) = 0;
+		character(value(FORCE)) = 0;
+		if (value(PARITY) == NOSTR ||
+		    !equal(value(PARITY), "none"))
+			value(PARITY) = "none";
+	}
 }
 
 static int vaccess();
@@ -236,11 +247,12 @@ vprint(p)
 	case STRING:
 		printf("%s=", p->v_name);
 		col++;
-		if (p->v_value) {
+		if (p->v_value)
 			cp = interp(p->v_value, NULL);
-			col += size(cp);
-			printf("%s", cp);
-		}
+		else
+			cp = "<NULL>";
+		col += size(cp);
+		printf("%s", cp);
 		break;
 
 	case NUMBER:
@@ -251,11 +263,12 @@ vprint(p)
 	case CHAR:
 		printf("%s=", p->v_name);
 		col++;
-		if (p->v_value) {
+		if (p->v_value)
 			cp = ctrl(character(p->v_value));
-			col += size(cp);
-			printf("%s", cp);
-		}
+		else
+			cp = "<NULL>";
+		col += size(cp);
+		printf("%s", cp);
 		break;
 	}
 	if (col >= MIDDLE) {

@@ -1,18 +1,16 @@
-CC = gcc -g
+CC = gcc -g -O2
 
-# for BSD
-#CFLAGS = -O
-#LIBS= -lutil
+OBJS = cmds.o cmdtab.o hunt.o partab.o \
+       remote.o tip.o value.o vars.o getcap.o
 
-# for Linux
-CFLAGS = -O -DLINUX
-LIBS= -ldb
+#
+# If HAVE_UUCPLOCK is defined you need -lutil for BSD
+#
+LIBS=
 
-OBJS = acu.o acutab.o cmds.o cmdtab.o cu.o hunt.o log.o partab.o \
-       remote.o tip.o tipout.o value.o vars.o getcap.o
-DESTDIR = /usr/site
+DESTDIR = /usr/testbed
 
-all: tip
+all: tip.static # tip
 
 tip: $(OBJS)
 	$(CC) -o tip $(OBJS) $(LIBS)
@@ -20,8 +18,11 @@ tip: $(OBJS)
 tip.static: $(OBJS)
 	$(CC) -static -o tip.static $(OBJS) $(LIBS)
 
-install:
-	install -s -c tip $(DESTDIR)/bin/tip
+$(OBJS): tipconf.h tip.h
+
+install: all
+#	install -s -c tip $(DESTDIR)/bin/tip
+	install -s -c tip.static $(DESTDIR)/bin/ntip
 
 clean:
 	rm -f $(OBJS) tip tip.static

@@ -31,32 +31,94 @@
 .\"
 .\"	@(#)tip.1	8.4 (Berkeley) 4/18/94
 .\"
-.Dd April 18, 1994
-.Dt TIP 1
+.Dd December 26, 2000
+.Dt NTIP 1
 .Os BSD 4
 .Sh NAME
-.Nm tip
-.Nd connect to a remote system
+.Nm ntip
+.Nd connect to a directly-connected remote system
 .Sh SYNOPSIS
-.Nm tip
+.Nm ntip
+.Op Fl c
+.Op Fl r
 .Op Fl v
 .Fl Ns Ns Ar speed 
 .Ar system\-name
-.Nm tip
-.Op Fl v
-.Fl Ns Ns Ar speed 
-.Ar phone\-number
 .Sh DESCRIPTION
-.Nm Tip
-establish a full-duplex connection to another machine,
+.Nm Ntip
+establishes a full-duplex connection to another machine,
 giving the appearance of being logged in directly on the
 remote cpu.  It goes without saying that you must have a login
 on the machine (or equivalent) to which you wish to connect.
 .Pp
+.Nm Ntip
+differs from the traditional
+.Nm tip
+in a number of ways:
+.Bl -enum
+.It
+It does not support calling a remote system,
+all auto-dialing code has been removed.
+.It
+All the cheezy file transfer support has been removed.
+.It
+Most of the tilde escapes have been removed.  Mostly these were the file
+trasfer related ones.  See below for what remains.
+.It
+.Nm Ntip
+ignores 90% of the
+.Xr remote 5
+capabilities.  You can set the baud rate (br) and the device (dv).
+Period.
+.It
+All of
+.Nm tips
+variables are still present, but most don't do anything.
+It is left as an exercise to the interested user to differentiate.
+.It
+By default, it operates in ``raw'' mode instead of the usual ``cbreak'' mode.
+This means that all input processing (if any) is performed by the remote system.
+Raw mode also disables ``raisechar'' and ``force'' variable interpretation.
+Yes, you can actually run emacs on an
+.Nm ntip
+line (modulo the '~' thing).
+.It
+.Nm Tip
+is the poster-child for fork-without-exec,
+creating separate reader and writer processes executing ``the same code.''
+.Nm Ntip
+is a child of convenience and consists of a single process using
+.Xr select 2 .
+.It
+.Nm Ntip
+no longer uses
+.Xr uucp 1
+style locking.
+It relies on the TIOCEXCL ioctl (see
+.Xr tty 4 )
+to provide ``reasonably mutually exclusive'' access.
+While it is still technically possible that two parties could open the
+same line and both get ``exclusive'' access to it,
+we consider this to be the source of amusing anecdotes rather than a bug.
+.El
+.Pp
 Available Option:
 .Bl -tag -width indent
+.It Fl c
+Force
+.Nm ntip
+to use ``cbreak''
+(``(c)onventional'', ``(c)razy'', ``(c)an't run emacs'')
+mode.
+.It Fl r
+Force
+.Nm ntip
+to use ``raw''
+(``(r)ocks!'', ``(r)ulz!'', ``(r)ighteous'')
+mode.
 .It Fl v
 Set verbose mode.
+Whatever the hell that is.
 .El
 .Pp
 Typed characters are normally transmitted directly to the remote
@@ -76,63 +138,6 @@ implies change to your home directory).
 .It Ic \&~!
 Escape to a shell (exiting the shell will
 return you to tip).
-.It Ic \&~>
-Copy file from local to remote.
-.Nm Tip
-prompts for the name of a local file to transmit.
-.It Ic \&~<
-Copy file from remote to local.
-.Nm Tip
-prompts first for the name of the file to be sent, then for
-a command to be executed on the remote machine.
-.It Ic \&~p Ar from Op Ar to 
-Send a file to a remote
-.Ux
-host.  The put command causes the remote
-.Ux
-system to run the command string ``cat > 'to''', while
-.Nm tip
-sends it the ``from''
-file.  If the ``to'' file isn't specified the ``from'' file name is used.
-This command is actually a
-.Ux
-specific version of the ``~>'' command.
-.It Ic \&~t Ar from Op Ar to 
-Take a file from a remote
-.Ux
-host.
-As in the put command the ``to'' file
-defaults to the ``from'' file name if it isn't specified.
-The remote host
-executes the command string ``cat 'from';echo ^A'' to send the file to
-.Nm tip  .
-.It Ic \&~|
-Pipe the output from a remote command to a local
-.Ux
-process.
-The command string sent to the local
-.Ux
-system is processed by the shell.
-.It Ic \&~$
-Pipe the output from a local
-.Ux
-process to the remote host.
-The command string sent to the local
-.Ux
-system is processed by the shell.
-.It Ic \&~C
-Fork a child process on the local system to perform special protocols
-such as \s-1XMODEM\s+1.  The child program will be run with the following
-somewhat unusual arrangement of file descriptors:
-.nf
-.in +1i
-0 <-> local tty in
-1 <-> local tty out
-2 <-> local tty out
-3 <-> remote tty in
-4 <-> remote tty out
-.in -1i
-.fi
 .It Ic \&~#
 Send a
 .Dv BREAK
@@ -148,20 +153,20 @@ characters.
 Set a variable (see the discussion below).
 .It Ic \&~^Z
 Stop
-.Nm tip
+.Nm ntip
 (only available with job control).
 .It Ic \&~^Y
 Stop only the ``local side'' of
-.Nm tip
+.Nm ntip
 (only available with job control);
 the ``remote side'' of
-.Nm tip  ,
+.Nm ntip  ,
 the side that displays output from the remote host, is left running.
 .It Ic \&~?
 Get a summary of the tilde escapes
 .El
 .Pp
-.Nm Tip
+.Nm Ntip
 uses the file
 .Pa /etc/remote
 to find how to reach a particular
@@ -176,56 +181,18 @@ to be used may be specified on the command line, e.g.
 .Ql "tip -300 mds" .
 .Pp
 When
-.Nm tip
-establishes a connection it sends out a
-connection message to the remote system; the default value, if any,
-is defined in
-.Pa /etc/remote
-(see
-.Xr remote 5 ) .
-.Pp
-When
-.Nm tip
-prompts for an argument (e.g. during setup of
-a file transfer) the line typed may be edited with the standard
+.Nm ntip
+prompts for an argument (e.g. while setting a variable)
+the line typed may be edited with the standard
 erase and kill characters.  A null line in response to a prompt,
 or an interrupt, will abort the dialogue and return you to the
 remote machine.
 .Pp
-.Nm Tip
+.Nm Ntip
 guards against multiple users connecting to a remote system
-by opening modems and terminal lines with exclusive access,
-and by honoring the locking protocol used by
-.Xr uucico 8 .
-.Pp
-During file transfers
-.Nm tip
-provides a running count of the number of lines transferred.
-When using the ~> and ~< commands, the ``eofread'' and ``eofwrite''
-variables are used to recognize end-of-file when reading, and
-specify end-of-file when writing (see below).  File transfers
-normally depend on tandem mode for flow control.  If the remote
-system does not support tandem mode, ``echocheck'' may be set
-to indicate
-.Nm tip
-should synchronize with the remote system on the echo of each
-transmitted character.
-.Pp
-When
-.Nm tip
-must dial a phone number to connect to a system it will print
-various messages indicating its actions.
-.Nm Tip
-supports modems that use the AT command set. 
-.Nm Tip
-uses the file
-.Pa /etc/modems
-to find out how to operate with a particular
-modem; refer to
-.Xr modems  5
-for a full description.
+by opening terminal lines with exclusive access.
 .Ss VARIABLES
-.Nm Tip
+.Nm Ntip
 maintains a set of
 .Ar variables
 which control its operation.
@@ -254,7 +221,7 @@ Variables may be initialized at run time by placing set commands
 in one's home directory).  The
 .Fl v
 option causes
-.Nm tip
+.Nm ntip
 to display the sets as they are made.
 Certain common variables have abbreviations.
 The following is a list of common variables,
@@ -286,7 +253,7 @@ a ~> file transfer command; abbreviated
 .Ar eofw  .
 .It Ar eol
 (str) The set of characters which indicate an end-of-line.
-.Nm Tip
+.Nm Ntip
 will recognize escape characters only after an end-of-line.
 .It Ar escape
 (char) The command prefix (escape) character; abbreviated
@@ -333,7 +300,7 @@ default value is
 .Ar off  .
 When this mode is enabled, all lower case letters will be mapped to
 upper case by
-.Nm tip
+.Nm ntip
 for transmission to the remote machine.
 .It Ar raisechar
 (char) The input character used to toggle upper case mapping mode;
@@ -354,7 +321,7 @@ When
 .Ar script
 is
 .Li true  ,
-.Nm tip
+.Nm ntip
 will record everything transmitted by the remote machine in
 the script record file specified in
 .Ar record  .
@@ -380,13 +347,13 @@ Each tab is expanded to 8 spaces.
 default is
 .Ar true  .
 When verbose mode is enabled,
-.Nm tip
+.Nm ntip
 prints messages while dialing, shows the current number
 of lines transferred during a file transfer operations,
 and more.
 .El
 .Sh ENVIRONMENT
-.Nm Tip
+.Nm Ntip
 uses the following environment variables:
 .Bl -tag -width Fl
 .It Ev SHELL
@@ -399,44 +366,35 @@ value is taken from the environment.
 Check for a default host if none specified.
 .El
 .Pp
-The variables
+The variable
 .Ev ${REMOTE}
-and
-.Ev ${PHONES}
-are also exported.
+is also exported.
 .Sh FILES
-.Bl -tag -width /var/spool/lock/LCK..* -compact
-.It Pa /etc/modems
-Global modem configuration data base.
+.Bl -tag -width /etc/remote -compact
 .It Pa /etc/remote
 Global system descriptions.
-.It Pa /etc/phones
-Global phone number data base.
 .It ${REMOTE}
 Private system descriptions.
-.It ${PHONES}
-Private phone numbers.
 .It ~/.tiprc
 Initialization file.
 .It Pa tip.record
 Record file.
-.It /var/log/aculog
-Line access log.
-.It Pa /var/spool/lock/LCK..*
-Lock file to avoid conflicts with
-.Xr uucp .
 .El
 .Sh DIAGNOSTICS
 Diagnostics are, hopefully, self explanatory.
 .Sh SEE ALSO
-.Xr cu 1 ,
-.Xr phones 5 ,
+.Xr tip 1 ,
 .Xr remote 5
 .Sh HISTORY
 The
 .Nm tip
-appeared command in
+command appeared command in
 .Bx 4.2 .
+The
+.Nm ntip
+command was an act of desperation on the part of its author.
 .Sh BUGS
 The full set of variables is undocumented and should, probably, be
 pared down.
+.Nm Tip
+and all of its bastard spawn should be eliminated from the face of the earth.

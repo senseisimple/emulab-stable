@@ -44,7 +44,7 @@
 /*
 	Specify default bit rate for connections
 */
-#define DEFBR 1200
+#define DEFBR 9600
 
 /*
 	Default frame size for file transfer buffering of writes
@@ -57,68 +57,29 @@
 #endif
 
 /*
-	Enable logging of ACU use
+	Enable use of UUCP lockfiles.
+	Otherwise relies on using the exclusive use ioctl.  This opens up
+	a minor race since setting exclusive use is not atomic with opening
+	the device, but we live with it.
 */
-#define ACULOG             1
-
-/*
-	Strip phone #s from ACU log file
-*/
-#define PRISTINE           1
-
-/*
-	Enable command to "connect" remote with local process
-*/
-#define CONNECT            1
+#define	HAVE_UUCPLOCK	   0
 
 /*
 	Specify style of UUCP lock files
+	(only matters if UUCPLOCK is defined non-zero)
 */
 #define HAVE_V2_LOCKFILES  0
 #define HAVE_HDB_LOCKFILES 1
-
-/*
-	System has a millisecond based sleep function
-*/
-#define HAVE_USLEEP        0
-
-/*
-	System has select
-*/
-#define HAVE_SELECT        1
 
 /*
 	System has termios tty interface
 */
 #define HAVE_TERMIOS       1
 
-/*
-	Include configurable modem driver
-*/
-#define UNIDIALER          0
+#endif
 
-/*
-	Specify builtin modem drivers to include
-*/
-#define BIZ1031            0
-#define BIZ1022            0
-#define COURIER            0
-#define DF02               0
-#define DF03               0
-#define DN11               0
-#define HAYES              0
-#define MULTITECH          0
-#define T3000              0
-#define V3451              0
-#define V831               0
-#define VENTEL             0
-
-/*
-	Include cu interface so that, when tip is linked to cu and then
-	invoked as cu, it behaves like cu.
-*/
-#define INCLUDE_CU_INTERFACE 0
-
+#ifdef __linux__
+#define LINUX
 #endif
 
 /* end of tipconf.h */

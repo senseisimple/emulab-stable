@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)tip.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: tip.c,v 1.1 2000-12-22 18:48:49 mike Exp $";
+	"$Id: tip.c,v 1.2 2000-12-27 00:49:35 mike Exp $";
 #endif /* not lint */
 
 /*
@@ -57,15 +57,15 @@ void ttysetup (int speed);
  *  cu phone-number [-s speed] [-l line] [-a acu]
  */
 
+#include "tip.h"
+#include "pathnames.h"
+
 #include <err.h>
 #include <errno.h>
 #include <sys/types.h>
 #ifndef LINUX
 #include <libutil.h>
 #endif
-#include "tipconf.h"
-#include "tip.h"
-#include "pathnames.h"
 
 /*
  * Baud rate mapping table
@@ -110,16 +110,18 @@ int	disc = OTTYDISC;		/* tip normally runs this way */
 
 void	intprompt();
 void	timeout();
-void	cleanup();
 void	tipdone();
 char	*sname();
 char	PNbuf[256];			/* This limits the size of a number */
 
+int	rflag = 1;
+
 static void usage __P((void));
 void setparity __P((char *));
 void xpwrite __P((int, char *, int));
-char escape __P((void));
-void tipin __P((void));
+void tipio __P((void));
+void tipinfunc __P((char *, int));
+void tipoutfunc __P((char *, int));
 int prompt __P((char *, char *, size_t));
 void unraw __P((void));
 void shell_uid __P((void));
@@ -141,18 +143,12 @@ main(argc, argv)
 	uid = getuid();
 	euid = geteuid();
 
-#if INCLUDE_CU_INTERFACE
-	if (equal(sname(argv[0]), "cu")) {
-		cumode = 1;
-		cumain(argc, argv);
-		goto cucommon;
-	}
-#endif /* INCLUDE_CU_INTERFACE */
-
 	if (argc > 4)
 		usage();
 	if (!isatty(0))
 		errx(1, "must be interactive");
+
+	STDIN = 0;
 
 	for (; argc > 1; argv++, argc--) {
 		if (argv[1][0] != '-')
@@ -161,6 +157,13 @@ main(argc, argv)
 
 		case 'v':
 			vflag++;
+			break;
+
+		case 'c':
+			rflag = 0;
+			break;
+		case 'r':
+			rflag = 1;
 			break;
 
 		case '0': case '1': case '2': case '3': case '4':
@@ -174,38 +177,25 @@ main(argc, argv)
 		}
 	}
 
-	if (system == NOSTR)
-		goto notnumber;
-	if (isalpha(*system))
-		goto notnumber;
-	/*
-	 * System name is really a phone number...
-	 * Copy the number then stomp on the original (in case the number
-	 *	is private, we don't want 'ps' or 'w' to find it).
-	 */
-	if (strlen(system) > sizeof(PNbuf) - 1)
-		errx(1, "phone number too long (max = %d bytes)", sizeof PNbuf - 1);
-	strncpy(PNbuf, system, sizeof(PNbuf) - 1);
-	for (p = system; *p; p++)
-		*p = '\0';
-	PN = PNbuf;
-	(void)snprintf(sbuf, sizeof(sbuf), "tip%ld", BR);
-	system = sbuf;
-
-notnumber:
-	(void)signal(SIGINT, cleanup);
-	(void)signal(SIGQUIT, cleanup);
-	(void)signal(SIGHUP, cleanup);
-	(void)signal(SIGTERM, cleanup);
+	(void)signal(SIGINT, tipdone);
+	(void)signal(SIGQUIT, tipdone);
+	(void)signal(SIGHUP, tipdone);
+	(void)signal(SIGTERM, tipdone);
 	(void)signal(SIGUSR1, tipdone);
+
+	/* reset the tty on screw ups */
+	(void)signal(SIGBUS, tipdone);
+	(void)signal(SIGSEGV, tipdone);
 
 	if ((i = hunt(system)) == 0) {
 		printf("all ports busy\n");
 		exit(3);
 	}
 	if (i == -1) {
-		printf("link down\n");
+		printf("%s: busy\n", system);
+#if HAVE_UUCPLOCK
 		(void)uu_unlock(uucplock);
+#endif
 		exit(3);
 	}
 	setbuf(stdout, NULL);
@@ -221,7 +211,9 @@ notnumber:
 	setparity("even");			/* set the parity table */
 	if ((i = speed(number(value(BAUDRATE)))) == 0) {
 		printf("tip: bad baud rate %d\n", number(value(BAUDRATE)));
+#if HAVE_UUCPLOCK
 		(void)uu_unlock(uucplock);
+#endif
 		exit(3);
 	}
 
@@ -241,15 +233,7 @@ notnumber:
 	 */
 	if (HW)
 		ttysetup(i);
-	if ((p = connect())) {
-		printf("\07%s\n[EOT]\n", p);
-		daemon_uid();
-		(void)uu_unlock(uucplock);
-		exit(1);
-	}
-	if (!HW)
-		ttysetup(i);
-/* cucommon:*/
+
 	/*
 	 * From here down the code is shared with
 	 * the "cu" version of tip.
@@ -258,27 +242,40 @@ notnumber:
 #if HAVE_TERMIOS
 	tcgetattr (0, &otermios);
 	ctermios = otermios;
+	if (rflag) {
+		ctermios.c_iflag = (IGNBRK|IGNPAR);
+		ctermios.c_lflag = 0;
+		ctermios.c_cflag = (CLOCAL|CREAD|CS8);
+		ctermios.c_cc[VMIN] = 1;
+		ctermios.c_cc[VTIME] = 5;
+		ctermios.c_oflag = 0;
+	} else {
 #ifndef _POSIX_SOURCE
-	ctermios.c_iflag = (IMAXBEL|IXANY|ISTRIP|IXON|BRKINT);
-	ctermios.c_lflag = (PENDIN|IEXTEN|ISIG|ECHOCTL|ECHOE|ECHOKE);
+		ctermios.c_iflag = (IMAXBEL|IXANY|ISTRIP|IXON|BRKINT);
+		ctermios.c_lflag = (PENDIN|IEXTEN|ISIG|ECHOCTL|ECHOE|ECHOKE);
 #else
-	ctermios.c_iflag = (ISTRIP|IXON|BRKINT);
-	ctermios.c_lflag = (PENDIN|IEXTEN|ISIG|ECHOE);
+		ctermios.c_iflag = (ISTRIP|IXON|BRKINT);
+		ctermios.c_lflag = (PENDIN|IEXTEN|ISIG|ECHOE);
 #endif
-	ctermios.c_cflag = (CLOCAL|HUPCL|CREAD|CS8);
-	ctermios.c_cc[VINTR] = 	ctermios.c_cc[VQUIT] = -1;
-	ctermios.c_cc[VSUSP] = ctermios.c_cc[VDISCARD] =
-		ctermios.c_cc[VLNEXT] = -1;
+		ctermios.c_cflag = (CLOCAL|HUPCL|CREAD|CS8);
+		ctermios.c_cc[VINTR] = 	ctermios.c_cc[VQUIT] = _POSIX_VDISABLE;
+		ctermios.c_cc[VSUSP] = ctermios.c_cc[VDISCARD] =
+			ctermios.c_cc[VLNEXT] = _POSIX_VDISABLE;
 #ifdef VDSUSP
-	ctermios.c_cc[VDSUSP] = -1;
+		ctermios.c_cc[VDSUSP] = _POSIX_VDISABLE;
 #endif
+	}
 #else /* HAVE_TERMIOS */
 	ioctl(0, TIOCGETP, (char *)&defarg);
 	ioctl(0, TIOCGETC, (char *)&defchars);
 	ioctl(0, TIOCGLTC, (char *)&deflchars);
 	ioctl(0, TIOCGETD, (char *)&odisc);
 	arg = defarg;
-	arg.sg_flags = ANYP | CBREAK;
+	if (rflag)
+		arg.sg_flags = RAW;
+	else
+		arg.sg_flags = CBREAK;
+	arg.sg_flags |= PASS8 | ANYP;
 	tchars = defchars;
 	tchars.t_intrc = tchars.t_quitc = -1;
 	ltchars = deflchars;
@@ -287,7 +284,6 @@ notnumber:
 #endif /* HAVE_TERMIOS */
 	raw();
 
-	pipe(fildes); pipe(repdes);
 	(void)signal(SIGALRM, timeout);
 
 	/*
@@ -295,18 +291,14 @@ notnumber:
 	 *	connection established (hardwired or dialup)
 	 *	line conditioned (baud rate, mode, etc.)
 	 *	internal data structures (variables)
-	 * so, fork one process for local side and one for remote.
+	 * so, fire up!
 	 */
-	printf(cumode ? "Connected\r\n" : "\07connected\r\n");
-
-	if (LI != NOSTR && tiplink (LI, 0) != 0) {
-		tipabort ("login failed");
-	}
-
-	if ((pid = fork()))
-		tipin();
+	if (rflag)
+		printf("\07connected (raw mode)\r\n");
 	else
-		tipout();
+		printf("\07connected\r\n");
+
+	tipio();
 	/*NOTREACHED*/
 }
 
@@ -318,23 +310,22 @@ usage()
 }
 
 void
-cleanup()
+tipdone(sig)
+	int sig;
 {
-
-	daemon_uid();
-	(void)uu_unlock(uucplock);
-#if !HAVE_TERMIOS
-	if (odisc)
-		ioctl(0, TIOCSETD, (char *)&odisc);
-#endif
-	exit(0);
+	switch (sig) {
+	case SIGHUP:
+		tipabort("Hangup.");
+		break;
+	case SIGTERM:
+		tipabort("Killed.");
+		break;
+	default:
+		printf("\r\nSignal %d", sig);
+		tipabort(NOSTR);
+	}
 }
 
-void
-tipdone()
-{
-	tipabort("Hangup.");
-}
 /*
  * Muck with user ID's.  We are setuid to the owner of the lock
  * directory when we start.  user_uid() reverses real and effective
@@ -370,21 +361,27 @@ shell_uid()
 	seteuid(uid);
 }
 
+static int inrawmode;
+
 /*
  * put the controlling keyboard into raw mode
  */
 void
-raw ()
+raw()
 {
+	if (inrawmode)
+		return;
+
 #if HAVE_TERMIOS
 	tcsetattr (0, TCSANOW, &ctermios);
 #else /* HAVE_TERMIOS */
-
 	ioctl(0, TIOCSETP, &arg);
 	ioctl(0, TIOCSETC, &tchars);
 	ioctl(0, TIOCSLTC, &ltchars);
 	ioctl(0, TIOCSETD, (char *)&disc);
 #endif /* HAVE_TERMIOS */
+
+	inrawmode = 1;
 }
 
 
@@ -394,15 +391,19 @@ raw ()
 void
 unraw()
 {
+	if (!inrawmode)
+		return;
+
 #if HAVE_TERMIOS
 	tcsetattr (0, TCSANOW, &otermios);
 #else /* HAVE_TERMIOS */
-
 	ioctl(0, TIOCSETD, (char *)&odisc);
 	ioctl(0, TIOCSETP, (char *)&defarg);
 	ioctl(0, TIOCSETC, (char *)&defchars);
 	ioctl(0, TIOCSLTC, (char *)&deflchars);
 #endif /* HAVE_TERMIOS */
+
+	inrawmode = 0;
 }
 
 static	jmp_buf promptbuf;
@@ -427,7 +428,7 @@ prompt(s, p, sz)
 	unraw();
 	printf("%s", s);
 	if (setjmp(promptbuf) == 0)
-		while ((*p = getchar()) != EOF && *p != '\n' && --sz > 0)
+		while ((*p = tipgetchar()) != '\n' && --sz > 0)
 			p++;
 	*p = '\0';
 
@@ -451,35 +452,123 @@ intprompt()
 }
 
 /*
- * ****TIPIN   TIPIN****
+ * ****TIPIO   TIPIO****
+ *
+ * Replace two process reader/writer with select-based single process
+ * reader and writer.
  */
 void
-tipin()
+tipio()
 {
-	int i;
-	char gch, bol = 1;
+	fd_set sfds, fds;
+	int n, i, cc;
+	char buf[4096];
 
 	/*
-	 * Kinda klugey here...
-	 *   check for scripting being turned on from the .tiprc file,
-	 *   but be careful about just using setscript(), as we may
-	 *   send a SIGEMT before tipout has a chance to set up catching
-	 *   it; so wait a second, then setscript()
+	 * Check for scripting being turned on from the .tiprc file.
 	 */
-	if (boolean(value(SCRIPT))) {
-		sleep(1);
+	if (boolean(value(SCRIPT)))
 		setscript();
-	}
 
-	while (1) {
-		i = tipgetchar();
-		if (i == EOF)
-			break;
-		gch = i&0177;
-		if ((gch == character(value(ESCAPE))) && bol) {
-			if (!(gch = escape()))
+	n = STDIN;
+	if (n < FD)
+		n = FD;
+	n++;
+	FD_ZERO(&sfds);
+	FD_SET(STDIN, &sfds);
+	FD_SET(FD, &sfds);
+	for (;;) {
+		fds = sfds;
+		i = select(n, &fds, NULL, NULL, NULL);
+		if (i <= 0)
+			tipabort("select failed");
+
+		/*
+		 * Check for user input first.
+		 * It is lower volume and possibly more important (^C)
+		 */
+		if (FD_ISSET(STDIN, &fds)) {
+			cc = read(STDIN, buf, sizeof(buf));
+			if (cc < 0)
+				tipabort("stdin read failed");
+			if (cc == 0)
+				finish();
+			tipinfunc(buf, cc);
+		}
+
+		if (FD_ISSET(FD, &fds)) {
+			cc = read(FD, buf, sizeof(buf));
+			if (cc < 0)
+				tipabort("device read failed");
+			if (cc == 0)
+				tipabort("device read EOF");
+
+			tipoutfunc(buf, cc);
+		}
+	}
+}
+
+void
+tipinfunc(buf, nchar)
+	char *buf;
+	int nchar;
+{
+	int i;
+	char gch;
+	char escc = character(value(ESCAPE));
+	char forcec = character(value(FORCE));
+	static int bol = 1;
+	static int inescape = 0;
+	static int inforce = 0;
+
+	for (i = 0; i < nchar; i++) {
+		gch = buf[i] & 0177;
+		if (inescape || (gch == escc && bol)) {
+			esctable_t *p;
+
+			/*
+			 * Read the next char if not already in an escape.
+			 * If there is no next char note that we are in an
+			 * escape and exit.
+			 */
+			if (!inescape && ++i == nchar) {
+				inescape = 1;
+				break;
+			}
+			gch = buf[i] & 0177;
+			inescape = 0;
+
+			for (p = etable; p->e_char; p++)
+				if (p->e_char == gch)
+					break;
+
+			/*
+			 * If this is a legit escape command, process it.
+			 * Otherwise, for an unrecognized sequence (which
+			 * includes ESCAPE ESCAPE), we just send the escaped
+			 * char with no further interpretation.
+			 */
+			if (p->e_char) {
+				if ((p->e_flags&PRIV) && uid)
+					continue;
+				printf("%s", ctrl(escc));
+				(*p->e_func)(gch);
 				continue;
-		} else if (!cumode && gch == character(value(RAISECHAR))) {
+			}
+		} else if (inforce || gch == forcec) {
+			/*
+			 * Same story, different character...
+			 * Read the next char if not already in a force.
+			 * If there is no next char note that we are forcing
+			 * and exit.
+			 */
+			if (!inforce && ++i == nchar) {
+				inforce = 1;
+				break;
+			}
+			gch = buf[i] & 0177;
+			inforce = 0;
+		} else if (gch == character(value(RAISECHAR))) {
 			boolean(value(RAISE)) = !boolean(value(RAISE));
 			continue;
 		} else if (gch == '\r') {
@@ -488,11 +577,6 @@ tipin()
 			if (boolean(value(HALFDUPLEX)))
 				printf("\r\n");
 			continue;
-		} else if (!cumode && gch == character(value(FORCE))) {
-			i = tipgetchar();
-			if (i == EOF)
-				break;
-			gch = i & 0177;
 		}
 		bol = any(gch, value(EOL));
 		if (boolean(value(RAISE)) && islower(gch))
@@ -503,36 +587,28 @@ tipin()
 	}
 }
 
-extern esctable_t etable[];
-
-/*
- * Escape handler --
- *  called on recognition of ``escapec'' at the beginning of a line
- */
-char
-escape()
+void
+tipoutfunc(buf, nchar)
+	char *buf;
+	int nchar;
 {
-	register char gch;
-	register esctable_t *p;
-	char c = character(value(ESCAPE));
-	int i;
+	char *cp;
 
-	i = tipgetchar();
-	if (i == EOF)
-		return 0;
-	gch = (i&0177);
-	for (p = etable; p->e_char; p++)
-		if (p->e_char == gch) {
-			if ((p->e_flags&PRIV) && uid)
-				continue;
-			printf("%s", ctrl(c));
-			(*p->e_func)(gch);
-			return (0);
-		}
-	/* ESCAPE ESCAPE forces ESCAPE */
-	if (c != gch)
-		xpwrite(FD, &c, 1);
-	return (gch);
+	for (cp = buf; cp < buf + nchar; cp++)
+		*cp &= 0177;
+	write(1, buf, nchar);
+
+	if (boolean(value(SCRIPT)) && fscript != NULL) {
+		if (boolean(value(BEAUTIFY))) {
+			char *excepts = value(EXCEPTIONS);
+
+			for (cp = buf; cp < buf + nchar; cp++)
+				if ((*cp >= ' ' && *cp <= '~') ||
+				    any(*cp, excepts))
+					putc(*cp, fscript);
+		} else
+			fwrite(buf, 1, nchar, fscript);
+	}
 }
 
 int
@@ -652,16 +728,14 @@ ttysetup (int speed)
 #if HAVE_TERMIOS
 	struct termios termios;
 	tcgetattr (FD, &termios);
+	termios.c_iflag = (IGNBRK|IGNPAR);
 	if (boolean(value(TAND)))
-		termios.c_iflag = IXOFF;
-	else
-		termios.c_iflag = 0;
-#ifndef _POSIX_SOURCE
-	termios.c_lflag = (PENDIN|ECHOKE|ECHOE);
-#else
-	termios.c_lflag = (PENDIN|ECHOE);
-#endif
+		termios.c_iflag |= IXOFF;
+	termios.c_lflag = 0;
 	termios.c_cflag = (CLOCAL|HUPCL|CREAD|CS8);
+	termios.c_cc[VMIN] = 1;
+	termios.c_cc[VTIME] = 5;
+	termios.c_oflag = 0;
 	cfsetispeed(&termios, speed);
 	cfsetospeed(&termios, speed);
 	tcsetattr (FD, TCSANOW, &termios);
@@ -709,6 +783,7 @@ xpwrite(fd, buf, n)
 {
 	register int i;
 	register char *bp;
+	extern int errno;
 
 	bp = buf;
 	if (bits8 == 0)
@@ -769,9 +844,8 @@ tipgetchar()
 {
 	char gch;
 
-	gch = getchar();
-	if (gch == EOF && feof(stdin))
+	if (read(STDIN, &gch, 1) != 1)
 		finish();
+
 	return gch;
 }
-

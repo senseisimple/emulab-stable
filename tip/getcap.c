@@ -38,6 +38,8 @@
 static char sccsid[] = "@(#)getcap.c	8.3 (Berkeley) 3/25/94";
 #endif /* LIBC_SCCS and not lint */
 
+#include "tipconf.h"
+
 #include <sys/types.h>
 
 #include <ctype.h>

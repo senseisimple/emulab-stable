@@ -36,27 +36,17 @@
 static char sccsid[] = "@(#)cmdtab.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: cmdtab.c,v 1.1 2000-12-22 18:48:47 mike Exp $";
+	"$Id: cmdtab.c,v 1.2 2000-12-27 00:49:33 mike Exp $";
 #endif /* not lint */
 
-#include "tipconf.h"
 #include "tip.h"
 
-extern	int shell(), getfl(), sendfile(), chdirectory();
-extern	int finish(), help(), pipefile(), pipeout(), variable();
-extern	int cu_take(), cu_put(), dollar(), genbrk(), suspend();
+extern	int shell(), chdirectory();
+extern	int finish(), help(), variable();
+extern	dollar(), genbrk(), suspend();
 
 esctable_t etable[] = {
 	{ '!',	NORM,	"shell",			 shell },
-	{ '<',	NORM,	"receive file from remote host", getfl },
-	{ '>',	NORM,	"send file to remote host",	 sendfile },
-	{ 't',	NORM,	"take file from remote UNIX",	 cu_take },
-	{ 'p',	NORM,	"put file to remote UNIX",	 cu_put },
-	{ '|',	NORM,	"pipe remote file",		 pipefile },
-	{ '$',	NORM,	"pipe local command to remote host", pipeout },
-#if CONNECT
-	{ 'C',  NORM,	"connect program to remote host",consh },
-#endif
 	{ 'c',	NORM,	"change directory",		 chdirectory },
 	{ '.',	NORM,	"exit from tip",		 finish },
 	{CTRL('d'),NORM,"exit from tip",		 finish },

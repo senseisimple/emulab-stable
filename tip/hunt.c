@@ -36,16 +36,17 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.1 2000-12-22 18:48:47 mike Exp $";
+	"$Id: hunt.c,v 1.2 2000-12-27 00:49:34 mike Exp $";
 #endif /* not lint */
+
+#include "tip.h"
 
 #include <sys/types.h>
 #include <err.h>
 #ifndef LINUX
 #include <libutil.h>
 #endif
-#include "tipconf.h"
-#include "tip.h"
+
 
 extern char *getremote();
 extern char *rindex();
@@ -71,12 +72,14 @@ hunt(name)
 	f = signal(SIGALRM, dead);
 	while ((cp = getremote(name))) {
 		deadfl = 0;
+#if HAVE_UUCPLOCK
 		uucplock = rindex(cp, '/')+1;
 		if ((res = uu_lock(uucplock)) != UU_LOCK_OK) {
 			if (res != UU_LOCK_INUSE)
 				fprintf(stderr, "uu_lock: %s\n", uu_lockerr(res));
 			continue;
 		}
+#endif
 		/*
 		 * Straight through call units, such as the BIZCOMP,
 		 * VADIC and the DF, must indicate they're hardwired in
@@ -89,6 +92,8 @@ hunt(name)
 		if (setjmp(deadline) == 0) {
 			alarm(10);
 			FD = open(cp, O_RDWR);
+			if (FD >= 0)
+				ioctl(FD, TIOCEXCL, 0);
 		}
 		alarm(0);
 		if (FD < 0) {
@@ -96,14 +101,12 @@ hunt(name)
 			deadfl = 1;
 		}
 		if (!deadfl) {
-			ioctl(FD, TIOCEXCL, 0);
 #if HAVE_TERMIOS
-			{
-				struct termios t;
-				if (tcgetattr(FD, &t) == 0) {
-					t.c_cflag |= HUPCL;
-					(void)tcsetattr(FD, TCSANOW, &t);
-				}
+			struct termios t;
+
+			if (tcgetattr(FD, &t) == 0) {
+				t.c_cflag |= HUPCL;
+				(void)tcsetattr(FD, TCSANOW, &t);
 			}
 #else /* HAVE_TERMIOS */
 #ifdef TIOCHPCL
@@ -113,7 +116,9 @@ hunt(name)
 			signal(SIGALRM, SIG_DFL);
 			return ((int)cp);
 		}
+#if HAVE_UUCPLOCK
 		(void)uu_unlock(uucplock);
+#endif
 	}
 	signal(SIGALRM, f);
 	return (deadfl ? -1 : (int)cp);
