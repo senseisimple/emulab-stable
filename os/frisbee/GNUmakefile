@@ -1,5 +1,7 @@
 all:	frisbee fromage
 
+CFLAGS = -O -g
+
 CFROMAGEFLAGS = -O -g -static -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 CFRISBEEFLAGS = -O -g
 
