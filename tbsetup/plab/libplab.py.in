@@ -20,6 +20,7 @@ import MySQLdb
 import agent, agentproxy
 import nodemgr, nodemgrproxy
 import lease
+import string
 
 #
 # Constants
@@ -35,8 +36,10 @@ RESERVED_EID = "plabnodes"
 MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
 MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
-LOCAL_PLAB_LINKTYPE = "inet2"
-ALLOWED_NODES = ("155.98.35.3", "12.46.129.22")
+LOCAL_PLAB_LINKTYPE = "pcplabinet2"
+#ALLOWED_NODES = ("155.98.35.3", "12.46.129.22")
+ALLOWED_NODES = ()
+NUMVNODES = 10
 
 DEFAULT_DATA_PATH = "@prefix@/etc/plab"
 SSH = "@prefix@/bin/sshtb"
@@ -250,10 +253,10 @@ class Plab:
             else:
                 print "There are %d new Plab nodes." % len(toadd)
                 for ip in toadd:
-                    linktype = self.__findLinkType(ip)
+                    linktype, hostname = self.__findLinkType(ip)
                     if debug:
                         print "Found linktype %s for node %s" % (linktype, ip)
-                    self.__addNode(ip, linktype)
+                    self.__addNode(ip, linktype, hostname)
 
                 print "Forcing a named map update ..."
                 os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
@@ -333,15 +336,15 @@ class Plab:
             hostname = getfqdn(hostname)
         except herror:
             print "WARNING: Failed to get hostname for %s" % ip
-            return "inet"
+            return "pcplabinet", ip
 
         tld = hostname.split(".")[-1]
         if not tld in ("edu", "org", "net", "com", "gov", "us"):
-            return "intl"
+            return "pcplabintl", hostname
 
         # Is it us?
         if hostname.endswith(LOCAL_PLAB_DOMAIN):
-            return LOCAL_PLAB_LINKTYPE
+            return LOCAL_PLAB_LINKTYPE, hostname
 
         # Is host on I2?
         traceroute = os.popen("traceroute -nm 10 -q 1 %s" % ip)
@@ -350,7 +353,7 @@ class Plab:
 
         for gw in MAGIC_INET2_GATEWAYS:
             if trace.find(gw) != -1:
-                return "inet2"
+                return "pcplabinet2", hostname
         for gw in MAGIC_INET_GATEWAYS:
             if trace.find(gw) != -1:
                 break
@@ -358,9 +361,9 @@ class Plab:
             print "WARNING: Unknown gateway for host %s" % ip
 
         # Must be plain 'ole Internet
-        return "inet"
+        return "pcplabinet", hostname
 
-    def __addNode(self, ip, linktype):
+    def __addNode(self, ip, linktype, hostname):
         """
         getFree helper function.  Adds a new Plab pnode and associated
         vnodes to the DB.  linktype should be one of (inet2, inet, intl,
@@ -372,9 +375,10 @@ class Plab:
         adds some additional fields that newwanode doesn't, and takes
         advantage of the fact that the Plab nodes may be added in bulk.
         """
-        defosid, controliface, numvnodes = self.__getNodetypeInfo()
+        defosid, controliface = self.__getNodetypeInfo()
         id, priority = self.__nextFreeNodeid()
-        nodeid = "pcplab%d" % id
+        nodeid = "plab%d" % id
+        hostname = string.replace(hostname, ".", "-")
         print "Creating pnode %s as %s, priority %d." % (ip, nodeid, priority)
 
         DBQueryFatal("insert into nodes"
@@ -397,7 +401,12 @@ class Plab:
         DBQueryFatal("insert into reserved"
                      " (node_id, pid, eid, rsrv_time, vname)"
                      " values (%s, %s, %s, now(), %s)",
-                     (nodeid, RESERVED_PID, RESERVED_EID, nodeid))
+                     (nodeid, RESERVED_PID, RESERVED_EID, hostname))
+
+        DBQueryFatal("insert into node_auxtypes"
+                     " (node_id, type, count)"
+                     " values (%s, %s, %s)",
+                     (nodeid, linktype, 1))
 
         DBQueryFatal("insert into node_status"
                      " (node_id, status, status_timestamp)"
@@ -405,7 +414,7 @@ class Plab:
                      (nodeid, 'up'))
 
         vnodetype = "pcplab"  # %s" % linktype
-        for n in range(numvnodes):
+        for n in range(NUMVNODES):
             vprio = (priority * 100) + (n+1)
             sshdport = 38000+(n+1)
             vnodeid = "%s-%d" % (nodeid, n+1)
@@ -424,11 +433,6 @@ class Plab:
                           'FREE_CLEAN',
                           'SHUTDOWN', sshdport))
 
-            DBQueryFatal("insert into node_auxtypes"
-                         " (node_id, type, count)"
-                         " values (%s, %s, %s)",
-                         (vnodeid, linktype, 1))
-
             DBQueryFatal("insert into node_status"
                          " (node_id, status, status_timestamp)"
                          " values (%s, %s, now())",
@@ -436,14 +440,14 @@ class Plab:
 
     def __getNodetypeInfo(self):
         """
-        addNode helper function.  Returns a (defosid, controliface,
-        numvnodes) tuple for the Plab pnode type.  Caches the result since
+        addNode helper function.  Returns a (defosid, controliface) 
+        tuple for the Plab pnode type.  Caches the result since
         it doesn't change.
         """
         if not hasattr(self, "__getNodetypeInfoCache"):
             if debug:
                 print "Getting node type info"
-            res = DBQueryFatal("select osid, control_iface, virtnode_capacity"
+            res = DBQueryFatal("select osid, control_iface"
                                " from node_types"
                                " where type = 'pcplabphys'")
             assert (len(res) == 1), "Failed to get node type info"
@@ -761,6 +765,8 @@ class Node:
         the node.
         """
         print "Overlaying Emulab files on %s ..." % self.nodeid
+        self.__copy(DEFAULT_DATA_PATH + "/fixsudo.sh", "/tmp/fixsudo.sh")
+        self.__perform("-tt sh /tmp/fixsudo.sh")
         self.addToGroup(self.slice.slicename, "root")
         self.unpackTgz(rootball)
         # Ugh
@@ -806,7 +812,7 @@ class Node:
         # simply like an scp (because the I can't get remote root), or a
         # cat with a redirect (because sshtb munges the redirect and
         # winds up evaluating it in a local shell)
-        if os.system("%s -host %s 'sudo dd of=%s' < '%s' > /dev/null 2>&1" %
+        if os.system("%s -host %s 'dd of=%s' < '%s' > /dev/null 2>&1" %
                      (SSH, self.nodeid, remotefile, localfile)):
             raise RuntimeError, "Copying %s to %s failed" % \
                   (localfile, remotefile)
