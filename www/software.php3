@@ -26,8 +26,7 @@ PAGEHEADER("Emulab Software Distributions");
      Please take a look at the
      <a href="netlab/client.php3">tutorial</a>
      for more information.
-<li> <img src="/new.gif" alt="&lt;NEW&gt;">
-     <a href="/downloads/frisbee-snapshot-20040312.tar.gz">
+<li> <a href="/downloads/frisbee-snapshot-20040312.tar.gz">
      Updated Frisbee Server and Client Source Snapshot</a>.
      This is a ``snapshot'' of the current development tree.  This version
      includes improved Linux support.  The frisbee client will now build
