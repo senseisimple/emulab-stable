@@ -1195,8 +1195,9 @@ function DBQuery($query)
 {
     global	$TBDBNAME;
     global	$DBErrorString;
+    global      $DBlinkid;
     
-    $result = mysql_db_query($TBDBNAME, $query);
+    $result = mysql_query($query, $DBlinkid);
 
     if (! $result) {
 	$DBErrorString =

@@ -2,8 +2,7 @@
 #
 # This is an included file. No headers or footers or includes!
 # 
-$query_result =
-    DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
+$query_result = DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("The project $pid is not a valid project.", 1);
 }
@@ -91,8 +90,8 @@ echo "<tr>
 echo "</table>\n";
 
 
-$userinfo_result = mysql_db_query($TBDBNAME,
-	"SELECT * from users where uid=\"$proj_head_uid\"");
+$userinfo_result =
+    DBQueryFatal("SELECT * from users where uid='$proj_head_uid'");
 
 $row	= mysql_fetch_array($userinfo_result);
 $usr_expires = $row[usr_expires];

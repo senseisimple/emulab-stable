@@ -47,7 +47,32 @@ if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
     USERERROR("You are not a member of Project $pid.", 1);
 }
 
-SHOWPROJECT($pid, $uid);
+#
+# A list of project experiments.
+#
+$query_result =
+    DBQueryFatal("SELECT eid,expt_name FROM experiments WHERE pid='$pid' order by eid");
+if (mysql_num_rows($query_result)) {
+    echo "<center>
+          <h3>Project Experiments</h3>
+          </center>
+          <table align=center border=1>\n";
+
+    while ($row = mysql_fetch_row($query_result)) {
+        $eid  = $row[0];
+        $name = $row[1];
+	if (!$name)
+	    $name = "--";
+        echo "<tr>
+                  <td>
+                      <A href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>
+                      </td>
+                  <td>$name</td>
+              </tr>\n";
+    }
+
+    echo "</table>\n";
+}
 
 #
 # A list of project members (from the default group).
@@ -97,33 +122,6 @@ if (mysql_num_rows($query_result)) {
 }
 
 #
-# A list of project experiments.
-#
-$query_result =
-    DBQueryFatal("SELECT eid,expt_name FROM experiments WHERE pid='$pid' order by eid");
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Project Experiments</h3>
-          </center>
-          <table align=center border=1>\n";
-
-    while ($row = mysql_fetch_row($query_result)) {
-        $eid  = $row[0];
-        $name = $row[1];
-	if (!$name)
-	    $name = "--";
-        echo "<tr>
-                  <td>
-                      <A href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>
-                      </td>
-                  <td>$name</td>
-              </tr>\n";
-    }
-
-    echo "</table>\n";
-}
-
-#
 # A list of project Groups (if more than just the default).
 #
 $query_result =
@@ -163,6 +161,8 @@ if (mysql_num_rows($query_result)) {
 echo "<p><center>
        <A href='newgroup_form.php3?pid=$pid'>Create</a> a new Group?
       </center>\n";
+
+SHOWPROJECT($pid, $uid);
 
 if ($isadmin) {
     echo "<p>

@@ -11,11 +11,8 @@
 function SHOWPROJECT($pid, $thisuid) {
     global $TBDBNAME;
 
-    $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects WHERE pid=\"$pid\"");
-    if (mysql_num_rows($query_result) == 0) {
-       USERERROR("The project $pid is not a valid project.", 1);
-    }
+    $query_result =
+	DBQueryFatal("SELECT * FROM projects WHERE pid='$pid'");
     $row = mysql_fetch_array($query_result);
 
     echo "<center>
@@ -319,9 +316,9 @@ function SHOWGROUPMEMBERSHIP($uid) {
 #
 function SHOWUSER($uid) {
     global $TBDBNAME;
-		
-    $userinfo_result = mysql_db_query($TBDBNAME,
-	"SELECT * from users where uid=\"$uid\"");
+
+    $userinfo_result =
+	DBQueryFatal("SELECT * from users where uid='$uid'");
 
     $row	= mysql_fetch_array($userinfo_result);
     $usr_expires = $row[usr_expires];
@@ -587,9 +584,9 @@ function SHOWNODES($pid, $eid) {
     global $TBDBNAME;
     global $TBOPSPID;
 		
-    $reserved_result = mysql_db_query($TBDBNAME,
-		"SELECT * FROM reserved WHERE ".
-		"eid=\"$eid\" and pid=\"$pid\"");
+    $reserved_result =
+	DBQueryFatal("SELECT * FROM reserved WHERE ".
+		     "eid='$eid' and pid='$pid'");
     
     # If this is an expt in emulab-ops, we don't care about vname,
     # since it won't be defined. But we do want to know when the node
@@ -620,8 +617,8 @@ function SHOWNODES($pid, $eid) {
                 <td align=center>Ready<br>Status[<b>3</b>]</td>
               </tr>\n";
 	
-	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT nodes.*,reserved.vname, ".
+	$query_result =
+	    DBQueryFatal("SELECT nodes.*,reserved.vname, ".
 	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 	        "FROM nodes LEFT JOIN reserved ".
 	        "ON nodes.node_id=reserved.node_id ".
@@ -698,8 +695,8 @@ function SHOWNODES($pid, $eid) {
 function SHOWOSINFO($osid) {
     global $TBDBNAME;
 		
-    $query_result = mysql_db_query($TBDBNAME,
-		"SELECT * FROM os_info WHERE osid='$osid'");
+    $query_result =
+	DBQueryFatal("SELECT * FROM os_info WHERE osid='$osid'");
 
     $osrow = mysql_fetch_array($query_result);
 

@@ -27,12 +27,7 @@ if (! $isadmin) {
 # implies denying the project leader account, when there is just a single
 # project pending for that project leader. 
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * from projects where approved='0'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting unapproved project list: $err\n", 1);
-}
+$query_result = DBQueryFatal("SELECT * from projects where approved='0'");
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no projects to approve!", 1);
 }
@@ -65,8 +60,8 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $Purl     = $projectrow[URL];
     $Pname    = $projectrow[name];
 
-    $userinfo_result = mysql_db_query($TBDBNAME,
-	"SELECT * from users where uid=\"$headuid\"");
+    $userinfo_result =
+	DBQueryFatal("SELECT * from users where uid='$headuid'");
 
     $row	= mysql_fetch_array($userinfo_result);
     $name	= $row[usr_name];

@@ -15,12 +15,7 @@ if (!isset($nid) ||
 }
 $pid = addslashes($pid);
 
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * from wires where node_id1='$nid'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting node information: $err\n", 1);
-}
+$query_result = DBQueryFatal("SELECT * from wires where node_id1='$nid'");
 
 echo "<table border=1 padding=1>\n";
 echo "<tr>

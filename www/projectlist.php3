@@ -51,15 +51,11 @@ function GENPLIST ($query_result)
 #
 # Get the "active" project list.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid,name,URL,usr_affil FROM projects ".
-	"left join users on projects.head_uid=users.uid ".
-	"where public=1 and approved=1 and expt_count>0 order by name");
-
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting active project list: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT pid,name,URL,usr_affil FROM projects ".
+		 "left join users on projects.head_uid=users.uid ".
+		 "where public=1 and approved=1 and expt_count>0 ".
+		 "order by name");
 
 echo "<table width=\"100%\" border=0 cellpadding=2 cellspacing=2
              align='center'>\n";
@@ -71,15 +67,11 @@ if (mysql_num_rows($query_result)) {
 #
 # Get the "inactive" project list.
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid,name,URL,usr_affil FROM projects ".
-	"left join users on projects.head_uid=users.uid ".
-	"where public=1 and approved=1 and expt_count=0 order by name");
-
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting inactive project list: $err\n", 1);
-}
+$query_result =
+    DBQueryFatal("SELECT pid,name,URL,usr_affil FROM projects ".
+		 "left join users on projects.head_uid=users.uid ".
+		 "where public=1 and approved=1 and expt_count=0 ".
+		 "order by name");
 
 if (mysql_num_rows($query_result)) {
     echo "<tr></tr>\n";
