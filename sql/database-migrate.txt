@@ -568,3 +568,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table experiments add expt_swap_uid varchar(8) NOT NULL
 		 default '' after expt_swapped;
+
+       Must also init that field for existing experiments.
+
+        update experiments set expt_swap_uid=expt_head_uid
+		where expt_swapped is not null;
