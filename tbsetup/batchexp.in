@@ -82,6 +82,10 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 # Parse command arguments.
 #
 ParseArgs();
+if (!$immediate) {
+    die("*** $0:\n".
+	"    Batch system is disabled while we do some testing! Sorry.\n");
+}
 
 #
 # Sanity check them.
