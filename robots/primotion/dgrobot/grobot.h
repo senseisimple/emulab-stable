@@ -3,14 +3,9 @@
  * Dan Flickinger
  *
  * 2004/10/04
- * 2004/12/07
+ * 2004/12/09
  */
 
- 
-// FIXME: have dgoto register a goto command, check all 3 callbacks,
-// and create a function to poll for completion of a goto command.
-// Also, have dgoto give an error if a goto command is currently executing
-// (NO QUEUEING!!!)
  
 #ifndef GROBOT_H
 #define GROBOT_H
@@ -48,9 +43,11 @@ class grobot {
     void resetPosition();
     void updatePosition();
     float getArclen();
+    void getDisplacement(float &dxtemp, float &dytemp);
     
     int getGstatus();
-    int sleepy();
+    int getGOTOstatus();
+    void sleepy();
     
     void setCBexec(int id);
     void setCBstatus(int id, int stat);
@@ -61,20 +58,49 @@ class grobot {
   private:
     void createNULLbehavior();
     void createPRIMbehavior();
+    
+    void set_gotocomplete();
+    
         
-    float Vl; // left wheel velocity
-    float Vr; // right wheel velocity
+    // Wheel odometry values
+    float Vl;      // left wheel velocity
+    float Vr;      // right wheel velocity
     
-    acpObject *pBehavior;
+    float dleft;   // left wheel distance
+    float dright;  // right wheel distance
+    
+    float dt_init; // initial pivot angle for a goto command
+    float dx_est;  // estimated displacement x
+    float dy_est;  // estimated displacement y
+
+    
+    
+    // goto command administration shit
+    int gotolock;      // nonzero if a goto command is executing
+    int gotocomplete;  // 1 if a goto has completed, 0 otherwise
+    
+    int gotomexec;     // count for execute
+    int gotomcomplete; // count for complete
+    
+    int gotop1;       // status for first pivot of a goto command
+    int gotom1;       // status for move segment of a goto command
+    int gotop2;       // status for second pivot of a goto command
+    
+    
+    // Garcia stuff
+    acpObject *pBehavior;         // Garcia behavior
      
-    CallbackComplete *completeCB;
-    CallbackExecute *executeCB;
     
-    acpValue completeCBacpV;
-    acpValue executeCBacpV;
+    CallbackComplete *completeCB; // completion callback
+    CallbackExecute *executeCB;   // execution callback
     
-    aIOLib ioRef;
-    aErr err;
+    acpValue completeCBacpV;      // acpValue completion callback
+    acpValue executeCBacpV;       // acpValue execution callback
+    
+    aIOLib ioRef;                 // Garcia Input/Output reference
+    aErr err;                     // Garcia Error
+    
+
     
 };
 

@@ -3,7 +3,7 @@
  * Dan Flickinger
  *
  * 2004/11/16
- * 2004/12/01
+ * 2004/12/09
  */
 
 #include "grobot.h"
@@ -11,7 +11,31 @@
 
 grobot::grobot() {
   // default constructor
-  aIO_GetLibRef(&ioRef, &err);  
+  aIO_GetLibRef(&ioRef, &err);
+  
+  
+  Vl = 0.0f;
+  Vr = 0.0f;
+  
+  dleft = 0.0f;
+  dright = 0.0f;
+  
+  dt_init = 0.0f;
+  dx_est = 0.0f;
+  dy_est = 0.0f;
+  
+  
+  gotolock = 0;
+  gotocomplete = 0;
+  
+  gotomexec = 0;
+  gotomcomplete = 0;
+  
+  gotop1 = 0;
+  gotom1 = 0;
+  gotop2 = 0;
+  
+
 }
 
 
@@ -31,6 +55,10 @@ void grobot::estop() {
   
 //   acpValue abortI((int)(aGARCIA_ERRFLAG_ABORT));
 //   garcia.setNamedValue("status", &abortI);
+  
+  
+  // clear out goto command
+  gotolock = 0;
 
 }
   
@@ -125,15 +153,65 @@ void grobot::pbPivot(float pangle) {
 void grobot::dgoto(float Dx, float Dy, float Rf) {
   // goto a defined point and orientation
   
-  
-  // calculate rotation components
-  float Ri = atan2(Dy, Dx);     
-  float Rfr = Rf - Ri;
+  // make sure that a goto is not currently executing
+  if (0 == gotolock) {
+   
+    // set lock to anticipate first move
+    gotolock = 1;
+    
+    
+    // initialize the status variables
+    gotocomplete = 0;
+    
+    gotomexec = 0;
+    gotomcomplete = 0;
+    
+    gotop1 = 0;
+    gotom1 = 0;
+    gotop2 = 0;
+     
+    // calculate rotation components
+    dt_init = atan2(Dy, Dx); // dt_init is private to grobot
+    float Rfr = Rf - dt_init;
+    
+    float moveL = sqrt((pow(Dx,2)) + (pow(Dy,2)));
 
-  // execute primitives       
-  pbPivot(Ri);
-  pbMove(sqrt((pow(Dx,2)) + (pow(Dy,2))));
-  pbPivot(Rfr);
+    // execute primitives (a zero length pivot or move will BARF!!!)
+    if (0.0f != dt_init) {
+      pbPivot(dt_init);
+    } else {
+      // fake pivot
+      ++gotomexec;
+      ++gotomcomplete;
+      gotop1 = 0;
+    }
+    
+    if (0.0f != moveL) {
+      pbMove(moveL);
+    } else {
+      // fake move
+      ++gotomexec;
+      ++gotomcomplete;
+      gotom1 = 0;
+      
+      dx_est = 0.0f; // move nowhere!
+      dy_est = 0.0f; // move nowhere!
+    }
+     
+    if (0.0f != Rfr) {
+      pbPivot(Rfr);
+    } else {
+      // fake pivot
+      ++gotomexec;
+      ++gotomcomplete;
+      gotop2 = 0;
+      set_gotocomplete();
+    }
+    
+  } else {
+    // if a goto is already executing, drop the command
+    std::cout << "GOTO COMMAND ALREADY EXECUTING" << std::endl;
+  }
   
 }
 
@@ -146,22 +224,23 @@ void grobot::resetPosition() {
   garcia.setNamedValue("distance-left", &zvalue);
   garcia.setNamedValue("distance-right", &zvalue);
   
+  dleft = 0.0f;
+  dright = 0.0f;
+  
+  dx_est = 0.0f;
+  dy_est = 0.0f;
+  
 }
 
 
 
 void grobot::updatePosition() {
   // updates the current position
-  // based on wheel odometry, camera system, etc.
   
   // get wheel odometry:
-  float dleft = garcia.getNamedValue("distance-left")->getFloatVal();
-  float dright = garcia.getNamedValue("distance-right")->getFloatVal();
-  
+  dleft = garcia.getNamedValue("distance-left")->getFloatVal();
+  dright = garcia.getNamedValue("distance-right")->getFloatVal();
 
-  // FIXME
-  
-  
 }
 
 
@@ -170,14 +249,18 @@ float grobot::getArclen() {
   // return the current arc length, assuming a nice circular arc
   // (MAKE SURE TO RESET THE POSITION AT THE BEGINNING OF EACH SEGMENT!)
   
-  
-  float dleft = garcia.getNamedValue("distance-left")->getFloatVal();
-  float dright = garcia.getNamedValue("distance-right")->getFloatVal();
-  
+  updatePosition();  
   return (dleft + dright) / 2.0f;
 }
 
 
+
+void grobot::getDisplacement(float &dxtemp, float &dytemp) {
+  // return the current displacement (for a goto move)
+ 
+  dxtemp = dx_est;
+  dytemp = dy_est;
+}
 
 
 
@@ -188,12 +271,27 @@ int grobot::getGstatus() {
 }
 
 
+
+int grobot::getGOTOstatus() {
+  // return the status of the currently executing goto command
+  
+  int retval_gotocomplete = gotocomplete;
+  
+  if (0 != gotocomplete) {
+    // reset the status
+    gotolock = 0;
+  }
+  
+  return retval_gotocomplete;
+  
+}
    
-int grobot::sleepy() {
+void grobot::sleepy() {
   // sleep for 50ms, allow robot to handle callbacks for another 50ms
   
   aIO_MSSleep(ioRef, 50, NULL);
-  return garcia.handleCallbacks(50);
+  garcia.handleCallbacks(50);
+
 }
 
 
@@ -201,22 +299,78 @@ int grobot::sleepy() {
 
 void grobot::setCBexec(int id) {
   // set execution callback up
-  // FIXME
-         
-  cout << "Behavior #" << id
-       << " started." << endl;
-     
+
+  std::cout << "Behavior #" << id
+            << " started." << std::endl;
+  
+  if (0 != gotolock) {
+    // a goto behavior is currently executing
+    ++gotomexec;
+    
+    if (1 == gotomexec) {
+      // set status for first pivot
+      gotop1 = -1;
+    } else if (2 == gotomexec) {
+      // set status for move
+      gotom1 = -1;
+      
+      // clear position estimate at the start of main move
+      resetPosition();
+      
+    } else if (3 == gotomexec) {
+      // set status for second pivot
+      gotop2 = -1;
+    } else {
+      // oh shit: weirdness!
+      std::cout << "ERROR: Execution callback count "
+                << "for goto command exceeded." << std::endl;
+    }
+  }
+  
 }
 
 
 
 void grobot::setCBstatus(int id, int stat) {
   // set completion callback status
-  // FIXME
   
   cout << "Behavior #" << id
        << " returned with status: " << stat
        << endl;
+     
+  if (0 != gotolock) {
+    // a goto behavior is currently executing
+    ++gotomcomplete;
+    
+    if (1 == gotomcomplete) {
+      // first pivot has finished
+      gotop1 = stat;
+    } else if (2 == gotomcomplete) {
+      // main move has executed
+      gotom1 = stat;
+      
+      // get the Arclength, then estimate and store the displacement
+      // (assume that the first pivot was accurate)
+      float al_temp = getArclen();
+      dx_est = al_temp * cos(dt_init);
+      dy_est = al_temp * sin(dt_init);
+      
+    } else if (3 == gotomcomplete) {
+      // second pivot has executed
+      gotop2 = stat;
+      
+      // the goto command has completed
+      /////////////////////////////////
+      
+      // set the gotocomplete flag
+      set_gotocomplete();
+      
+    } else {
+      // weirdness
+      std::cout << "ERROR: Completion callback count "
+                << "for goto command exceeded." << std::endl;
+    }
+  }
   
 }
 
@@ -281,31 +435,14 @@ void grobot::createPRIMbehavior() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void grobot::set_gotocomplete() {
+  // set the gotocomplete flag  
+  if ((gotop1 + gotom1 + gotop2) > 0) {
+    // there were problems
+    gotocomplete = -1;
+  } else {
+    // goto completed
+    gotocomplete = 1;
+  }
+}
 
