@@ -1,30 +1,15 @@
 #!/bin/sh
 
+#
+# Don't put anything else in here. Put it in the rc.setup file cause
+# if you sup this file, it won't take effect till the next reboot.
+#
+
 echo "Checking for file updates ..."
 export HOME=/root
 /usr/local/bin/cvsup -e -1 -g -L 1 /etc/testbed/supfile
 
-if [ -x /etc/testbed/setup ]; then
-        echo "Setting up Testbed configuration..."
-        /etc/testbed/setup
-fi
-
-if [ -x /etc/testbed/rc.ifc ]; then
-        echo "Setting up Testbed interfaces..."
-        /etc/testbed/rc.ifc
-fi
-
-if [ -x /etc/testbed/rc.delay ]; then
-        echo "Setting up Testbed delay configuration..."
-        /etc/testbed/rc.delay
-fi
-
-if [ -x /etc/testbed/rc.rpm  ]; then
-        echo "Installing RPMS"
-	/etc/testbed/rc.rpm
-fi
-
-if [ -x /etc/testbed/startupcmd  ]; then
-        echo "Scheduling startup command to run in a little bit"
-	echo "/etc/testbed/runstartup" | at 'now + 5 minutes'
+if [ -x /etc/testbed/rc.setup ]; then
+        echo "Starting Testbed Setup ..."
+        /etc/testbed/rc.setup
 fi

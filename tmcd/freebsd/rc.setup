@@ -1,0 +1,27 @@
+#!/bin/sh
+
+if [ -x /etc/testbed/setup ]; then
+        echo "Doing Testbed setup configuration ..."
+        /etc/testbed/setup
+fi
+
+if [ -x /etc/testbed/rc.ifc ]; then
+        echo "Setting up Testbed interfaces ..."
+        /etc/testbed/rc.ifc
+fi
+
+if [ -x /etc/testbed/rc.delay ]; then
+        echo "Setting up Testbed delay configuration ..."
+        /etc/testbed/rc.delay
+fi
+
+if [ -x /etc/testbed/rc.rpm  ]; then
+        echo "Installing RPMs ..."
+	/etc/testbed/rc.rpm
+fi
+
+if [ -x /etc/testbed/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit ..."
+	/bin/rm -f /var/at/jobs/S*
+	echo "/etc/testbed/runstartup" | at -q S 'now + 5 minutes'
+fi

@@ -35,7 +35,7 @@ my $runcmd;
 my $login;
 
 while (<CMD>) {
-    if ($_ =~ /CMD=([-\@\w.\/ ]+) UID=([0-9a-z]+)/) {
+    if ($_ =~ /CMD=\'([-\@\w.\/ ]+)\' UID=([0-9a-z]+)/) {
 	$runcmd = $1;
 	$login  = $2;
     }
@@ -44,9 +44,8 @@ while (<CMD>) {
 if (!defined($runcmd) || !defined($login)) {
     fatal("$TMSTARTUPCMD not in proper format!");
 }
-if (($uid = getpwnam($login)) == 0) {
+(undef,undef,$uid,$gid,undef,undef,undef,$homedir) = getpwnam($login) or
     fatal("Could not determine UID for $login");
-}
 
 #
 # Fork a child so that we can run the command as the user and wait for it.
@@ -64,6 +63,7 @@ else {
     #
     # The child becomes the user and runs the command.
     #
+    $EGID = $GID = $gid;
     $EUID = $UID = $uid;
 
     exec($runcmd);
@@ -80,7 +80,6 @@ system("$TMCC startstatus $stat");
 #
 # Put the log file in the callers home dir! Hmm, what about name clashes?
 #
-(undef,undef,undef,undef,undef,undef,undef,$homedir) = getpwnam($login);
 system("/bin/cp", "$logname", "$homedir");
 
 exit(0);

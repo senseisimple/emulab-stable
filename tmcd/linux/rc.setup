@@ -1,0 +1,22 @@
+#!/bin/sh
+
+if [ -x /etc/rc.d/testbed/setup  ]; then
+        echo "Setting up Testbed Configuration ..."
+	/etc/rc.d/testbed/setup
+fi
+
+if [ -x /etc/rc.d/testbed/rc.ifc  ]; then
+        echo "Setting up Testbed Interfaces ..."
+	/etc/rc.d/testbed/rc.ifc
+fi
+
+if [ -x /etc/rc.d/testbed/rc.rpm  ]; then
+        echo "Installing RPMs ..."
+	/etc/rc.d/testbed/rc.rpm
+fi
+
+if [ -x /etc/rc.d/testbed/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit ..."
+	/bin/rm -f /var/spool/at/S*
+	echo "/etc/rc.d/testbed/runstartup" | at -q S 'now + 5 minutes'
+fi
