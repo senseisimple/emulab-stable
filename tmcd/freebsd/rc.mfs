@@ -1,0 +1,33 @@
+#!/bin/sh
+
+#
+# The MFS does a very restricted set of operations.
+#
+echo "Doing Testbed Setup on an MFS ... "
+
+#
+# Inform TMCD that we've rebooted, and are starting testbed setup
+#
+if [ -x /etc/testbed/tmcc ]; then
+        echo "Informing the testbed that we've rebooted ..."
+	/etc/testbed/tmcc state REBOOTED
+fi
+
+if [ -x /etc/testbed/setup ]; then
+        echo "Doing Testbed setup configuration ..."
+        /etc/testbed/setup
+fi
+
+/bin/rm -f /var/at/jobs/S*
+if [ -s /etc/testbed/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit ..."
+	echo "/etc/testbed/runstartup" | at -q S 'now + 2 minutes'
+fi
+
+#
+# Inform TMCD that we're up and running
+#
+if [ -x /etc/testbed/tmcc ]; then
+        echo "Informing the testbed that we're up and running ..."
+	/etc/testbed/tmcc state ISUP
+fi

@@ -13,6 +13,11 @@ if [ -x /etc/testbed/setup ]; then
         /etc/testbed/setup
 fi
 
+if [ -x /etc/testbed/setipod ]; then
+	echo "Setting up IPOD ... "
+        /etc/testbed/setipod
+fi
+
 if [ -x /etc/testbed/rc.ifc ]; then
         echo "Setting up Testbed interfaces ..."
         /etc/testbed/rc.ifc

@@ -16,11 +16,16 @@ all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-INSTALL_DIR	= /etc/testbed
+DESTDIR		=
+ETCDIR		= $(DESTDIR)/etc
+INSTALL_DIR	= $(ETCDIR)/testbed
+ISMFS		= $(INSTALL_DIR)/ismfs
 INSTALL_FILES	= group master.passwd setup
 INSTALL		= /usr/bin/install -c 
 
 install:	misc-install script-install bin-install
+mfs-install:	script-install bin-install
+	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
 
 dir-install:
 	-mkdir -p $(INSTALL_DIR)
@@ -52,19 +57,21 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(INSTALL_DIR)/rc.delayagent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(INSTALL_DIR)/rc.delta
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(INSTALL_DIR)/rc.healthd
+	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(INSTALL_DIR)/rc.mfs
+	$(INSTALL) -m 755 $(SRCDIR)/setipod $(INSTALL_DIR)/setipod
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
-		/etc/dhclient-exit-hooks
+		$(ETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(INSTALL_DIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(INSTALL_DIR)/control_interface
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 /etc/start_if.fxp0
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 /etc/start_if.fxp1
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 /etc/start_if.fxp4
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0 /etc/start_if.xl0
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 $(ETCDIR)/start_if.fxp0
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(ETCDIR)/start_if.fxp1
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(ETCDIR)/start_if.fxp4
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(ETCDIR)/start_if.xl0
 	$(INSTALL) -m 755 $(SRCDIR)/rc.route $(INSTALL_DIR)/rc.route
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(INSTALL_DIR)/gated_fxp0.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(INSTALL_DIR)/gated_fxp1.conf

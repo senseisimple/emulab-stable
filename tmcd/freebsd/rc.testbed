@@ -5,6 +5,14 @@
 # if you sup this file, it won't take effect till the next reboot.
 #
 
+#
+# If on the MFS, skip this stuff and just do the MFS setup stuff.
+#
+if [ -e /etc/testbed/ismfs ]; then
+        /etc/testbed/rc.mfs
+	exit 0
+fi
+
 echo "Checking for file updates ..."
 export HOME=/root
 
@@ -14,8 +22,8 @@ if [ -f /etc/testbed/supfile ]; then
 fi
 
 if [ -x /etc/testbed/rc.healthd ]; then
-    echo "Starting node health monitoring ..."
-    /etc/testbed/rc.healthd start
+	echo "Starting node health monitoring ..."
+	/etc/testbed/rc.healthd start
 fi
 
 if [ -x /etc/testbed/rc.setup ]; then

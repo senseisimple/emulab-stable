@@ -1,0 +1,43 @@
+#!/usr/bin/perl -wT
+use English;
+use Socket;
+
+#
+# This is in its own file cause its a pain on the MFS, which does not
+# have all the that perl library stuff that Socket needs.
+# 
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Enable ICMP ping-of-death
+#
+if (system("sysctl net.inet.icmp.ipod_host")) {
+    warn "*** WARNING: IPOD sysctls not supported in the kernel\n";
+    exit -1;
+}
+
+my ($bname, $bip) = split(/ /, `tmcc bossinfo`);
+if (!defined($bip)) {
+    warn "*** WARNING: could not determine boss node, IPOD not enabled\n";
+    exit -1;
+}
+my $ipuint = unpack("N", inet_aton($bip));
+
+# XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
+my $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod_host=%d", $ipuint);
+
+if (system($sysctlcmd)) {
+    warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
+    exit -1;
+}
+if (system("sysctl -w net.inet.icmp.ipod_enabled=1")) {
+    warn "*** WARNING: could not enable IPOD\n";
+    exit -1;
+}
+
+exit 0;

@@ -12,10 +12,10 @@ use Exporter;
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 
-	 OPENTMCC RUNTMCC
+	 OPENTMCC RUNTMCC MFS
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
-	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF
+	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF 
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
@@ -106,9 +106,14 @@ my $DELTAINSTALL= "/usr/local/bin/install-delta %s";
 $NODE		= "";
 
 # Locals
-my $pid	     = "";
-my $eid      = "";
-my $vname    = "";
+my $pid		= "";
+my $eid		= "";
+my $vname	= "";
+
+# When on the MFS, we do a much smaller set of stuff.
+# Cause of the way the packages are loaded (which I do not understand),
+# this is computed on the fly instead of once.
+sub MFS()	{ if (-e "$SETUPDIR/ismfs") { return 1; } else { return 0; } }
 
 #
 # Open a TMCC connection and return the "stream pointer". Caller is
@@ -248,7 +253,7 @@ sub domounts()
     # The MFS version does not support (or need) this DB stuff. Just mount
     # them up.
     #
-    if (-e "$SETUPDIR/ismfs") {
+    if (MFS()) {
 	while (($remote, $local) = each %mounts) {
 	    if (! -e $local) {
 		if (! os_mkdir($local, 0770)) {
@@ -751,8 +756,6 @@ sub dostartupcmd ()
     return 0;
 }
 
-use Socket;
-
 sub dotrafficconfig()
 {
     my $didopen = 0;
@@ -760,6 +763,16 @@ sub dotrafficconfig()
     my $TM;
     my $boss;
     my $startnse = 0;
+
+    #
+    # Kinda ugly, but there is too much perl goo included by Socket to put it
+    # on the MFS. 
+    # 
+    if (MFS()) {
+	return 1;
+    }
+    require Socket;
+    import Socket;
     
     $TM = OPENTMCC(TMCCCMD_BOSSINFO);
     ($boss) = split(" ", <$TM>);
@@ -885,46 +898,48 @@ sub bootsetup()
     domounts();
 
     #
-    # Okay, lets find out about interfaces.
-    #
-    print STDOUT "Checking Testbed interface configuration ... \n";
-    doifconfig();
-
-    #
-    # Host names configuration (/etc/hosts). 
-    #
-    print STDOUT "Checking Testbed hostnames configuration ... \n";
-    dohostnames();
-
-    #
     # Do account stuff.
     # 
     print STDOUT "Checking Testbed group/user configuration ... \n";
     doaccounts();
 
-    #
-    # Router Configuration.
-    #
-    print STDOUT "Checking Testbed routing configuration ... \n";
-    dorouterconfig();
+    if (! MFS()) {
+	#
+	# Okay, lets find out about interfaces.
+	#
+	print STDOUT "Checking Testbed interface configuration ... \n";
+	doifconfig();
 
-    #
-    # Traffic generator Configuration.
-    #
-    print STDOUT "Checking Testbed traffic generation configuration ... \n";
-    dotrafficconfig();
+	#
+	# Host names configuration (/etc/hosts). 
+	#
+	print STDOUT "Checking Testbed hostnames configuration ... \n";
+	dohostnames();
 
-    #
-    # RPMS
-    # 
-    print STDOUT "Checking Testbed RPM configuration ... \n";
-    dorpms();
+	#
+	# Router Configuration.
+	#
+	print STDOUT "Checking Testbed routing configuration ... \n";
+	dorouterconfig();
 
-    #
-    # Tar Balls
-    # 
-    print STDOUT "Checking Testbed Tarball configuration ... \n";
-    dotarballs();
+	#
+	# Traffic generator Configuration.
+	#
+	print STDOUT "Checking Testbed traffic generation configuration ...\n";
+	dotrafficconfig();
+
+	#
+	# RPMS
+	# 
+	print STDOUT "Checking Testbed RPM configuration ... \n";
+	dorpms();
+
+	#
+	# Tar Balls
+	# 
+	print STDOUT "Checking Testbed Tarball configuration ... \n";
+	dotarballs();
+    }
 
     #
     # Experiment startup Command.
