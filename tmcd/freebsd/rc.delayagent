@@ -30,5 +30,5 @@ print "Starting Delay Agent ...\n";
 #
 my ($bossname) = split(" ", `tmcc bossinfo`);
 
-system("delay_agent -s $bossname -d -f $MAPFILE &");
+system("delay-agent -s $bossname -d -f $MAPFILE &");
 exit($? >> 0);
