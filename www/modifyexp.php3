@@ -99,7 +99,7 @@ if (! isset($go)) {
 	echo "<br />";
 	echo "<input type='hidden' name='pid' value='$pid' />";
 	echo "<input type='hidden' name='eid' value='$eid' />";
-	echo "<button name='go'>Modify</button>";
+	echo "<input type='submit' name='go' value='Modify' />";
 	echo "</form>\n";
     } else {
 	if (! isset($nsdata)) {
