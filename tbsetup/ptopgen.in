@@ -42,6 +42,8 @@ use lib '@prefix@/lib';
 require exitonwarn;
 use libdb;
 
+my $TRACK_INTERSWITCH_BANDWIDTH = "@TRACK_INTERSWITCH_BANDWIDTH@";
+
 %switches=();
 %used_switches=();
 my $switchtouse;
@@ -155,6 +157,25 @@ while (($type,$speed) = $result->fetchrow_array) {
 }
 $result->finish;
 
+# Read interface switches
+$result = DBQueryFatal("SELECT node_id1, iface, node_id2 FROM wires AS w " .
+	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card");
+while (($node,$iface,$switch) = $result->fetchrow_array) {
+    if ($node && $iface) {
+	$interfaceswitches{"$node:$iface"} = $switch;
+    }
+}
+$result->finish;
+
+# Read interface cards and ports
+$result = DBQueryFatal("SELECT node_id, iface, card, port FROM interfaces");
+while (($node,$iface,$card,$port) = $result->fetchrow_array) {
+    $interfacecardports{"$node:$iface"} = [$card,$port];
+}
+$result->finish;
+
+
+
 $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\" or type=\"Trunk\"");
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
@@ -192,6 +213,56 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
     } 
 }
 $result->finish;
+
+#
+# If we're supposed to track interswitch bandwidth, subtract out the amount
+# that's already in use
+#
+if ($TRACK_INTERSWITCH_BANDWIDTH) {
+    #
+    # Get a list of all VLANs
+    #
+    my $result = DBQueryFatal("SELECT virtual, members FROM vlans");
+    while (my ($virtual, $members) = $result->fetchrow()) {
+	#
+	# Split apart the space-separated list of members
+	#
+	my @members = split /\s+/, $members;
+	my %switches = ();
+	foreach my $member (@members) {
+	    my ($node,$iface) = split /:/, $member;
+	    my $switch = get_ifaceswitch($node,$iface);
+	    my ($card, $port) = get_ifacecardport($node,$iface);
+	    my $bw = get_ifacebw($node,$card,$port);
+	    $switches{$switch} += $bw;
+	}
+
+	#
+	# Check to see if more than one switch was found among the member
+	# list, and if so, go through all the pairs
+	#
+	my @switches = keys %switches;
+	if (@switches > 1) {
+	    for (my $i = 0; $i < (@switches -1); $i++) {
+		my $switch1 = $switches[$i];
+		my $switch2 = $switches[$i+1];
+		my $bw = $switches{$switch1};
+		if ($switches{$switch2} < $bw) {
+			$bw = $switches{$switch2};
+		}
+		#
+		# The trunk link could be listed in either order
+		#
+		if ($interconnects{"$switch1:$switch2"}) {
+		    $interconnects{"$switch1:$switch2"} -= $bw;
+		} elsif ($interconnects{"$switch2:$switch1"}) {
+		    $interconnects{"$switch2:$switch1"} -= $bw;
+		}
+	    }
+	}
+    }
+}
+
 foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
     print "link link-$interconnect $src $dst $interconnects{$interconnect} 1\n";
@@ -234,5 +305,23 @@ sub get_ifacebw {
     }
     else {
 	return $default_switchport_speed;
+    }
+}
+
+sub get_ifaceswitch {
+    ($node,$iface) = @_;
+    if (defined($interfaceswitches{"$node:$iface"})) {
+	return $interfaceswitches{"$node:$iface"};
+    } else {
+	return undef;
+    }
+}
+
+sub get_ifacecardport {
+    ($node,$iface) = @_;
+    if (defined($interfacecardports{"$node:$iface"})) {
+	return @{$interfacecardports{"$node:$iface"}};
+    } else {
+	return ();
     }
 }
