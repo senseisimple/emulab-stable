@@ -384,6 +384,20 @@ CREATE TABLE loginmessage (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'mode_transitions'
+#
+
+CREATE TABLE mode_transitions (
+  op_mode1 varchar(20) NOT NULL default '',
+  state1 varchar(20) NOT NULL default '',
+  op_mode2 varchar(20) NOT NULL default '',
+  state2 varchar(20) NOT NULL default '',
+  PRIMARY KEY  (op_mode1,state1,op_mode2,state2),
+  KEY op_mode1 (op_mode1,state1),
+  KEY op_mode2 (op_mode2,state2)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'newdelays'
 #
 
