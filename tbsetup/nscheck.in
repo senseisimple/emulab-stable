@@ -77,12 +77,12 @@ $dirname = "/tmp/parse-$$";
 mkdir($dirname, 0775) or
     fatal("Could not mkdir $dirname");
 
-chdir($dirname) or
-    fatal("Could not chdir to $dirname");
-
-if (system("/bin/cp", "$tempfile", "$nsfile")) {
+if (system("/bin/cp", "$tempfile", "$dirname/$nsfile")) {
     fatal("Could not copy $tempfile to $dirname");
 }
+
+chdir($dirname) or
+    fatal("Could not chdir to $dirname");
 
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
