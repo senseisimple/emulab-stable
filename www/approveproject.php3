@@ -235,7 +235,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	}
 
         mail("$headuid_email",
-             "TESTBED: Project Membership Approval",
+             "TESTBED: Project Approval",
 	     "\n".
 	     "This message is to notify you that your project $project\n".
 	     "has been approved.\n".
