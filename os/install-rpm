@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -279,11 +279,15 @@ sub GetRPMFile($$$$$$$)
 	open(TMCC, "< $rpm")
 	    or fatal("Could not open rpm on server!");
 
+	binmode TMCC;
+
 	#
 	# Open the target file and start dumping the data in.
 	#
 	open(JFILE, "> $copyfile")
 	    or fatal("Could not open local file $copyfile: $!");
+
+	binmode JFILE;
 
 	#
 	# Deal with NFS read failures
