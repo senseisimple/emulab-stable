@@ -258,7 +258,7 @@ function WRITESIDEBAR() {
 
     echo "<FORM method=get ACTION=\"/cgi-bin/webglimpse/usr/testbed/webglimpse\">\n";
 ?>
-  <table class="menu" width=200 cellpadding="0" cellspacing="0">
+  <table class="menu" width=210 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
     if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
@@ -321,7 +321,7 @@ function WRITESIDEBAR() {
     echo "</table>\n";
     echo "</form>\n";
 ?>
-<table class="menu" width=200 cellpadding="0" cellspacing="0">
+<table class="menu" width=210 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader">
       <b>Interaction</b>
     </td></tr>
