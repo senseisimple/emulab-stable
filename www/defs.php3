@@ -157,6 +157,29 @@ function PAGEFOOTER() {
 }
 
 #
+# Run a program as a user.
+#
+function SUEXEC($uid, $gid, $cmdandargs, $die) {
+    global $TBBIN_DIR;
+
+    $output = array();
+    $retval = 0;
+    $result = exec("$TBBIN_DIR/suexec $uid $gid $cmdandargs",
+		   $output, $retval);
+
+    if ($retval) {
+	$foo = "";
+        for ($i = 0; $i < count($output); $i++) {
+	      $foo = "$foo $output[$i]";
+	}
+	
+	TBERROR("suexec failure. Cmd was \"$cmdandargs\". Error output:\n\n".
+                "$foo", $die);
+    }
+    return $retval;
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 require("tbauth.php3");
