@@ -23,7 +23,7 @@ function SPITFORM($formfields, $errors)
           on your machine. This key is good for one installation;
           if you want to install the CD on multiple machines, you will
           need a separate key for each install. New keys will lapse
-          after 48 hours if not used. 
+          after 12 hours if not used. 
           </blockquote><br>\n";
 
     if ($errors) {
@@ -113,7 +113,7 @@ if (isset($finished)) {
     echo "<p>
           Your request is being processed. You will receive email 
           with your new key in a few moments. Your key is good for one
-          installation, and will lapse after 48 hours if not used.
+          installation, and will lapse after 12 hours if not used.
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
 
@@ -184,7 +184,7 @@ TBMAIL("$user_name <$user_email>",
        "This is your key to unlock your CD:\n\n".
        "          $chunked\n\n".
        "Please enter this key when installing your CD.\n".
-       "This key is good for one installation, and will lapse after 48 hours.".
+       "This key is good for one installation, and will lapse after 12 hours.".
        "\n\n".
        "Thanks,\n".
        "Testbed Ops\n".
