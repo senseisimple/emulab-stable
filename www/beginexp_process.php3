@@ -128,9 +128,11 @@ if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
 # No need to tell me how bogus this is.
 #
 $dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_id";
-$nsname  = "$dirname"."/$exp_id".".ns";
-$irname  = "$dirname"."/$exp_id".".ir";
-$repname = "$dirname"."/$exp_id".".report";
+$nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
+$irname  = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".ir";
+$repname = "$dirname" . "/" . "$exp_id"  . ".report";
+$logname = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".log";
+$assname = "$dirname" . "/" . "assign"   . ".log";
 
 if (! mkdir($dirname, 0777)) {
     TBERROR("Making directory for experiment: $dirname.", 1);
@@ -153,7 +155,8 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbdoit $dirname $pid $nsname", $output, $retval);
+$result = exec("$TBBIN_DIR/tbdoit $dirname $exp_pid $exp_id.ns",
+               $output, $retval);
 if ($retval) {
     echo "<br><br><h2>
           Setup Failure($retval): Output as follows:
@@ -166,20 +169,45 @@ if ($retval) {
     echo "</XMP>\n";
 
     unlink("$nsname");
-    unlink("$irname");
-    unlink("$repname");
-    rmdir("$dirname");
+    if (file_exists($irname))
+        unlink("$irname");
+    if (file_exists($repname))
+        unlink("$repname");
+    if (file_exists($logname))
+        unlink("$logname");
+    if (file_exists($assname))
+        unlink("$assname");
+    if (file_exists($dirname))
+        rmdir("$dirname");
+
     die("");
+}
+
+#
+# Debugging!
+# 
+if (0) {
+    echo "<XMP>\n";
+    for ($i = 0; $i < count($output); $i++) {
+        echo "$output[$i]\n";
+    }
+    echo "</XMP>\n";
 }
 
 #
 # Make sure the report file exists, just to be safe!
 # 
 if (! file_exists($repname)) {
-    unlink("$nsname");
-    unlink("$irname");
-    unlink("$repname");
-    rmdir("$dirname");
+    if (file_exists($nsname))
+        unlink("$nsname");
+    if (file_exists($irname))
+        unlink("$irname");
+    if (file_exists($logname))
+        unlink("$logname");
+    if (file_exists($assname))
+        unlink("$assname");
+    if (file_exists($dirname))
+        rmdir("$dirname");
     TBERROR("Report file for new experiment does not exist!\n", 1);
 }
 
@@ -210,11 +238,33 @@ $fp = fopen($repname, "r");
 if (! $fp) {
     TBERROR("Error opening report file for experiment: $exp_eid\n", 1);
 }
+$summary = "";
 echo "<XMP>";
 while ($line = fgets($fp, 1024)) {
     echo "$line";
+    $summary = "$summary" . "$line";
 }
 echo "</XMP>\n";
+
+#
+# Lets generate a mail message for now so that we can see whats happening.
+#
+if (1) {
+mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
+     "User:        $uid\n".
+     "EID:         $exp_id\n".
+     "PID:         $exp_pid\n".
+     "Name:        $exp_name\n".
+     "Created:     $exp_created\n".
+     "Expires:     $exp_expires\n".
+     "Start:       $exp_start\n".
+     "End:         $exp_end\n".
+     "Directory:   $dirname\n".
+     "Summary:\n\n".
+     "$summary\n",
+     "From: $TBMAIL_WWW\n".
+     "Errors-To: $TBMAIL_WWW");
+}
 
 ?>
 </body>

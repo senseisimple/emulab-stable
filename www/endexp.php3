@@ -71,16 +71,19 @@ if (mysql_num_rows($query_result) == 0) {
 #
 # No need to tell me how bogus this is.
 #
+$exp_pid = $pid;
 $dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_id";
-$nsname  = "$dirname"."/$exp_id".".ns";
-$irname  = "$dirname"."/$exp_id".".ir";
-$repname = "$dirname"."/$exp_id".".report";
+$nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
+$irname  = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".ir";
+$repname = "$dirname" . "/" . "$exp_id"  . ".report";
+$logname = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".log";
+$assname = "$dirname" . "/" . "assign"   . ".log";
 
 #
 # Make sure the experiment directory exists before continuing. 
 # 
 if (! file_exists($irname)) {
-    TBERROR("IR file for new experiment does not exist!\n", 1);
+    TBERROR("IR file $irname for experiment $exp_id does not exist!\n", 1);
 }
 
 echo "<center><br>";
@@ -94,7 +97,8 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbstopit $dirname $irname", $output, $retval);
+$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_pid$exp_id.ir",
+               $output, $retval);
 if ($retval) {
     echo "<br><br><h2>
           Termination Failure($retval): Output as follows:
@@ -112,10 +116,18 @@ if ($retval) {
 #
 # Remove all trace! 
 #
-unlink("$nsname");
-unlink("$irname");
-unlink("$repname");
-rmdir("$dirname");
+if (file_exists($nsname))
+    unlink("$nsname");
+if (file_exists($irname))
+    unlink("$irname");
+if (file_exists($repname))
+    unlink("$repname");
+if (file_exists($logname))
+    unlink("$logname");
+if (file_exists($assname))
+    unlink("$assname");
+if (file_exists($dirname))
+     rmdir("$dirname");
 
 #
 # From the database too!
