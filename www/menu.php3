@@ -151,7 +151,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
 
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON("Papers (Aug 1)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Papers (Oct 28)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software <font size=-1> ".
 			       "(Oct 21)</font>",
 			       $TBDOCBASE, "software.php3");
