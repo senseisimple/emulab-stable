@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
@@ -25,6 +25,7 @@ my $debug   = 0;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ELABINELAB  = @ELABINELAB@;
+my $SAVEUID     = $UID;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
@@ -46,6 +47,13 @@ if (!TBAdmin($UID)) {
     die("*** $0:\n".
 	"    Only TB administrators can run this script!\n");
 }
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -64,9 +72,51 @@ usage()
 my $pid = shift();
 
 #
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+
+#
+# Shift to real user for these scripts.
+#
+$EUID = $UID;
+
+#
 # Build the project.
 #
-mysystem("$TB/sbin/mkproj $pid");
+#mysystem("$TB/sbin/mkproj $pid");
+
+#
+# Get the list of users and admin status. Admin users get a real shell
+# on boss. Create the users, and not that we have to do this before the
+# groups are created (tbacct add does not do a setgroups).
+#
+my $users_result =
+    DBQueryFatal("select distinct u.uid,u.admin from group_membership as m ".
+		 "left join users as u on u.uid=m.uid ".
+		 "where u.status='" . USERSTATUS_ACTIVE() . "'");
+while (my ($uid,$admin) = $users_result->fetchrow_array()) {
+    next
+	if ($uid eq "elabman");
+    
+    mysystem("$TB/sbin/tbacct add $uid");
+    if ($admin) {
+	# Add admin users to group wheel for convenience.
+	DBQueryFatal("replace into unixgroup_membership ".
+		     "values ('$uid','wheel')");
+    }
+    if ($admin) {
+	# Flip back to root for pw command.
+	$EUID = 0;
+	mysystem("pw usermod -n $uid -s /bin/tcsh");
+	$EUID = $UID;
+    }
+}
 
 #
 # Get the list of subgroups in the project and create those groups.
@@ -78,24 +128,14 @@ while (my ($gid) = $query_result->fetchrow_array()) {
 }
 
 #
-# Get the list of users and admin status. Admin users get a real shell
-# on boss. Create the users, and then set their groups.
+# Now do a setgroups.
 #
-$query_result =
-    DBQueryFatal("select distinct u.uid,u.admin from group_membership as m ".
-		 "left join users as u on u.uid=m.uid ".
-		 "where u.status='" . USERSTATUS_ACTIVE() . "'");
-while (my ($uid,$admin) = $query_result->fetchrow_array()) {
-    mysystem("$TB/sbin/tbacct add $uid");
-    if ($admin) {
-	# Add admin users to group wheel for convenience.
-	DBQueryFatal("insert into unixgroup_membership ".
-		     "values ('$uid','wheel')");
-    }
+$users_result->dataseek(0);
+while (my ($uid,$admin) = $users_result->fetchrow_array()) {
+    next
+	if ($uid eq "elabman");
+    
     mysystem("$TB/sbin/setgroups $uid");
-    if ($admin) {
-	mysystem("pw usermod -n $uid -s /bin/tcsh");
-    }
 }
 
 #

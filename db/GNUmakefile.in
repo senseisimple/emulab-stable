@@ -41,6 +41,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/genelists
 	chown root $(INSTALL_SBINDIR)/dhcpd_makeconf
 	chmod u+s $(INSTALL_SBINDIR)/dhcpd_makeconf
+	chown root $(INSTALL_SBINDIR)/elabinelab_bossinit
+	chmod u+s $(INSTALL_SBINDIR)/elabinelab_bossinit
 
 #
 # Control node installation (okay, plastic)
