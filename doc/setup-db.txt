@@ -2,26 +2,11 @@
 ##### Setting up tbdb for a new boss node
 #####
 
+Note: we are working on better automating many of the procedures in this
+document - for now, though, many of them are manual.
+
 Note: steps labeled "Local Only" are only required when setting up a testbed
 with local nodes - they can be skipped in a widearea-only testbed.
-
-##### Step 0 - Create the database
-
-Before beginning this process, you should have mysql installed and running on
-your boss node. If it isn't already running, you can simply reboot the node,
-or run '/usr/local/etc/rc.d/2.mysql-server.sh start'. It's also a good idea
-to run the mysql-client.sh script, so that you'll be able to use the mysql
-client scripts.
-
-Create the database. You can do this with the database-create.sql file in the
-sql subdirectory of the testbed tree, like so:
-
-mysqladmin create tbdb
-mysql tbdb < sql/database-create.sql
-
-Also, you can fill some default values into some of the tables with:
-
-mysql tbdb < sql/database-fill.sql
 
 ##### Step 1 - Setup users
 
@@ -30,11 +15,11 @@ setup, as well at the ssh root keys. See the boss and ops setup documents for
 details.
 
 Run the 'firstuser' script. This will get put in the utils subdirectory of your
-boject tree. (Note: configure will not set the executable bit on the script, so
+object tree. (Note: configure will not set the executable bit on the script, so
 you'll need to set it yourself, or run 'perl firstuser'.) This script will let
 you create the first user and project in the database. By default, it will grab
-information about the account it's being run as (propably you,) or you can
-supply a sername, an encrypted password string (grab it from a password file,)
+information about the account it's being run as (probably you,) or you can
+supply a username, an encrypted password string (grab it from a password file,)
 etc. This script will also prompt you to create the first project - we suggest
 you create an 'emulab-ops' project.
 
@@ -80,7 +65,7 @@ software. If you plan to use the former method, you can skip this step.
 ********************************** WARNING **********************************
 
 First, you'll want to protect the webdb script from outside browsers. Because
-of its flexibilty, it would be quite dangerous if it were broken into. So, we
+of its flexibility, it would be quite dangerous if it were broken into. So, we
 add an additional layer of protection by limiting the IP addresses it may be
 used from. Open your apache.conf file (created as part of the boss
 installation), and find the 'Directory' directives. Add a section such as
@@ -92,7 +77,7 @@ this:
 	allow from 155.99.212.
 </Directory>
 If you installed the testbed tree somewhere other than /usr/testbed, fix the
-directory. Chage the 'allow from' line to match your IP subnet (note the '.'
+directory. Change the 'allow from' line to match your IP subnet (note the '.'
 on the end of the address, to match the entire subnet). You can have as
 many 'allow' lines as you want. Restart apache.
 
@@ -204,9 +189,10 @@ If you have serial power controllers, just create entries node_types and nodes
 These will depend on the image(s) and any OSKit kernels you've recieved, or
 built yourself. Since you're probably using disk images from Utah, the best
 thing to do is ask us for the appropriate lines for the os_info and images
-tables.  For a widearea-only testbed, no images entries in the images table a
-required, but OSIDs are still useful, to determine what a node's capabilities
-are. 
+tables. Make sure to get the PXEBOOT, PXEFRISBEE, and PXEFBSD OSIDs, which are
+required to load disk images.  For a widearea-only testbed, no images entries
+in the images table a required, but OSIDs are still useful, to determine what a
+node's capabilities are. 
 
 ##### Step 7 - Setup nodes
 
@@ -216,7 +202,7 @@ Add an entry to the node_types table for each type of experimental node you
 have. Most of the columns should be self-explanatory, but here are some notes:
 
 class: Should be 'pc'
-type: Shoud be 'pcXXX', where XXX is a short (a few characters) string
+type: Should be 'pcXXX', where XXX is a short (a few characters) string
 	describing the nodes (such as processor speed, chipset, etc.)
 proc: Class of processor (ie. 'PIII')
 speed: CPU speed in MHz
@@ -288,7 +274,7 @@ on your ops node.
 
 Take a look at the utils/macgrabber.pl script. At the top of this script,
 there is '#defines' section, which contains information about the specific
-nodes you're harvesting information about. Edit this, accoring to the comments,
+nodes you're harvesting information about. Edit this, according to the comments,
 to suit your needs. Someday, we may have a better way to record this
 information, but for now, this will do.
 
@@ -330,7 +316,7 @@ middle third, etc. Each of these three sets of wires would be a block.
 
 The cable numbers and length are primarily for your benefit in tracking down
 problems and re-connecting wires correctly. The other information, however, is
-crititcal for the correct operation of the testbed software.
+critical for the correct operation of the testbed software.
 
 Once you've done this, run fillwires.pl for each block. There are 10 arguments
 to it:
