@@ -279,15 +279,20 @@ function WRITEBANNER($title) {
     global $BANNERCOLOR, $THISPROJECT, $THISHOMEBASE, $BASEPATH;
 
     echo "<!-- This is the page Banner -->\n";
-    echo "<a href='$BASEPATH/pix/merge-med.jpg'>
-          <img src='$BASEPATH/pix/merge-mini.jpg' border=2 align=right></a>\n";
-    echo "<table cellpadding=0 cellspacing=0 border=0>";
+
+    echo "
+                <a href='$BASEPATH/pix/merge-med.jpg'>
+                   <img src='$BASEPATH/pix/merge-mini.jpg'
+                        border=2 align=right></a>
+            \n";
+    
+    echo "<table cellpadding=0 cellspacing=0 border=0 width=50%>";
     echo "<tr>
-            <td align=left width=\"0%\">
+            <td align=left valign=top width=\"0%\">
              <table cellpadding=5 cellspacing=0 border=0 bgcolor=\"#880000\">
               <tr>
                 <td>
-                 <b><font size=6 color=white face=Helvetica>
+                 <b><font size=5 color=white face=Helvetica>
                         $THISHOMEBASE
                     </font>
                  </b>
@@ -295,13 +300,13 @@ function WRITEBANNER($title) {
               </tr>
              </table>
             </td>
-            <td align=left width=\"100%\">
+            <td align=left valign=top width=100%>
                 <table cellpadding=5 cellspacing=0 border=0
                          bgcolor=$BANNERCOLOR>
                   <tr>
-                   <td>
+                   <td nowrap>
                      <b>
-                       <font size=6 face=helvetica color=\"#000000\">
+                       <font size=5 face=helvetica color=\"#000000\">
                             $THISPROJECT
                        </font>
                      </b>
@@ -318,18 +323,19 @@ function WRITEBANNER($title) {
 # Called by _STARTPAGE
 #
 function WRITETITLE($title) {
-    global $TITLECOLOR;
+    global $TITLECOLOR, $BASEPATH;
     
     echo "<!-- This is the page Title -->
           <table width=\"100%\">
             <tr>
-               <td width=\"15%\" align=left>\n";
+               <td width=\"10%\" align=left>\n";
                  #
                  # Insert a small logo here if you like.
                  #
+    
     echo "     </td>
                <td align=left>
-                   <b><font size=6 color=$TITLECOLOR>$title</font></b>
+                   <b><font size=5 color=$TITLECOLOR>$title</font></b>
                </td>
             </tr>
           </table>\n";
@@ -472,8 +478,6 @@ function PAGEHEADER($title) {
 	echo "<body>\n";
     }
 
-    echo "<basefont size=4>\n";
-
     WRITEBANNER($title);
     WRITETITLE($title);
 
@@ -492,7 +496,7 @@ function PAGEHEADER($title) {
 
            <!-- PAGE BODY -->
            <td valign=top align=left width=\"85%\">
-               <basefont size=4>
+
                <!-- Content follows this macro ... -->\n";
 }
 
@@ -513,7 +517,7 @@ function ENDPAGE() {
 #
 function PAGEFOOTER() {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE;
-    global $TBMAINSITE;
+    global $TBMAINSITE, $SSL_PROTOCOL;
 
     ENDPAGE();
 
@@ -532,6 +536,14 @@ function PAGEFOOTER() {
     if ($TBMAINSITE) {
 	echo "<p>
               <a href=\"$TBDOCBASE/netemu.php3\"></a>\n";
+
+	if (! isset($SSL_PROTOCOL)) {
+	    echo "<a href=http://www.addme.com>
+	             <img width=8 height=2
+	                 src='http://www.addme.com/link8.gif'
+   	                 alt='Add Me!' border=0>
+	          </a>\n";
+	}
     }
 
     echo "</font>
