@@ -65,6 +65,7 @@ ops-install:
 	@$(MAKE) -C utils control-install
 	@$(MAKE) -C event control-install
 	@$(MAKE) -C xmlrpc control-install
+	@$(MAKE) -C tmcd control-install
 
 install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/opsdir

@@ -89,6 +89,8 @@ install:	all
 install:	$(INSTALL_SBINDIR)/tmcd \
 		$(INSTALL_SBINDIR)/tmcd.restart
 
+control-install: client
+	@$(MAKE) -C freebsd control-install
 
 client-install: client
 	@$(MAKE) -C $(MDSUBDIR) install
