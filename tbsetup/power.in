@@ -10,26 +10,25 @@
 my $verbose = 0;
 #If there is -d or -v, turn it on right now...
 if ( join(" ",@ARGV) =~ /^-[d|v](\s*)(\d*)\s[oc]/ ) {
-  shift;
-  if (defined $1 && $1 ne "") { shift; }
-  if (defined $2 && $2 ne "") { $verbose = $2; } else { $verbose = 1; }
+    shift;
+    if (defined $1 && $1 ne "") { shift; }
+    if (defined $2 && $2 ne "") { $verbose = $2; } else { $verbose = 1; }
 }
 print "VERBOSE ON: Set to level $verbose\n" if $verbose;
 
 #
 # Configure variables
 #
-my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
 use lib "@prefix@/lib";
+use libdb;
 use power_rpc27;
+use snmpit_apc;
 
 # un-taint path since this gets called from setuid scripts.
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:@prefix@/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $user = (getpwuid($<))[0]
-  || die "Cannot figure out who you are!\n";
+my $user = (getpwuid($<))[0] || die "Cannot figure out who you are!\n";
 
 my $op = "";			#stores operation (on/off/cyc)
 my @machines = ();		#stores machines to operate on
@@ -38,7 +37,6 @@ my $outlet = 0;			#stores number of an outlet
 my %IPList = ();		#holds machine/ip pairs
 my %OutletList = ();		#holds machine/outlet pairs
 my $exitval = 0;
-my $snmpit="$TB/bin/snmpit";
 
 #Must have at least an op and a machine, so at least 2 ARGV
 die("Usage:\npower [-v[n]] [on|off|cycle] <node> [<node>] ...\n",
@@ -48,41 +46,38 @@ die("Usage:\npower [-v[n]] [on|off|cycle] <node> [<node>] ...\n",
 #Read in ARGV
 $op = shift (@ARGV);
 if ($op =~ /^(on|off|cycle)$/) {
-  $op = $1;
+    $op = $1;
 } else {
-  die("Invalid command '$op'\n");
+    die("Invalid command '$op'\n");
 }
 @machines = @ARGV;
 foreach my $n (0..$#ARGV) {
-  #
-  # Untaint the arguments.
-  #
-  $machines[$n] =~ s/^([-\@\w.]+)$/$1/;
-  if ($machines[$n] =~ /^(sh\d+)-[1-8]$/) {
-    print "WARNING: Rebooting $machines[$n] will reboot all of shelf $1!\n";
-    $machines[$n] = $1;
-  }
+    #
+    # Untaint the arguments.
+    #
+    $machines[$n] =~ s/^([-\@\w.]+)$/$1/;
+    if ($machines[$n] =~ /^(sh\d+)-[1-8]$/) {
+	print "WARNING: Rebooting $machines[$n] will reboot all of shelf $1!\n";
+	$machines[$n] = $1;
+    }
 }
 my %all_nodes = ();
 foreach my $n (0..$#machines) {
-  $all_nodes{"\L$machines[$n]"} = 1; # Lowercase it and use as hash key
+    $all_nodes{"\L$machines[$n]"} = 1; # Lowercase it and use as hash key
 }
 @machines= sort keys %all_nodes;
 # then dump the args
 print "do \"$op\" to @machines\n" if $verbose > 1;
 
-use Mysql;
-
-my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
-my $sth ="";
-
 print "Looking up node->(power_id,powerIP,outlet,powerType) mappings...\n" 
   if $verbose;
-$sth = $dbh->query("select o.node_id,o.power_id,i.IP,o.outlet, n.type ".
-		   "from outlets as o left join interfaces as i ".
-		   "on o.power_id = i.node_id left join nodes as n ".
-		   "on o.power_id = n.node_id");
-while ( @_ = $sth->fetchrow_array()) {
+
+my $result = DBQueryFatal("select o.node_id,o.power_id,i.IP,o.outlet, n.type ".
+	"from outlets as o left join interfaces as i ".
+	"on o.power_id = i.node_id left join nodes as n ".
+	"on o.power_id = n.node_id");
+
+while ( @_ = $result->fetchrow_array()) {
   $powerID{$_[0]}= $_[1];
   $IPList{$_[0]}= $_[2] || 0; # RPC-27's don't have IPs...
   $OutletList{$_[0]}= $_[3];
@@ -90,11 +85,11 @@ while ( @_ = $sth->fetchrow_array()) {
 }
 
 if ($verbose > 2) {
-  print "Displaying node -> (powerIP, outlet) map...\n";
-  foreach $item (sort keys(%IPList)) {
-    print "$item\t$powerID{$item}\t$IPList{$item}\t".
-      "$OutletList{$item}\t$powerType{$item}\n";
-  }
+    print "Displaying node -> (powerIP, outlet) map...\n";
+    foreach $item (sort keys(%IPList)) {
+	print "$item\t$powerID{$item}\t$IPList{$item}\t".
+	"$OutletList{$item}\t$powerType{$item}\n";
+    }
 }
 
 #
@@ -104,147 +99,129 @@ if ($verbose > 2) {
 
 my @OkNodes = ();
 
-my @conds = ();
-foreach $node (@machines) {
-  push(@conds,"\Lnode_id='$node'");
-  if ($node =~ /sh\d+/) {
-    push(@conds,"\Lnode_id like '$node-%'");
-  }
-}
-
 my %timelimited = ();
 
 if ($user ne "root") {
-  my $cmd =
-	"select uid,node_id from reserved as n ".
-	"left join experiments as e on ".
-	"     e.pid=n.pid and e.eid=n.eid ".
-	"left join group_membership as g on ".
-	"     g.pid=e.pid and g.gid=e.gid ".
-	"where (" . join(" or ",@conds) . ") and g.uid='$user';";
-			 
-  print "Checking authorization for '$user': '$cmd'\n" if $verbose;
-  $sth = $dbh->query($cmd)
-    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-  while ( @_ = $sth->fetchrow_array()) {
-    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
-    my $node = "\L$_[1]";
-    $node =~ s/(sh\d+)-\d/$1/;
-    push(@OkNodes, "$node");
-  }
-  if (@OkNodes > 0) {
-    @conds = ();
-    foreach $node (@OkNodes) {
-      push(@conds,"\Lo.node_id='$node'");
+    print "Checking authorization for '$user'\n" if $verbose;
+
+    #
+    # Though TBNodeAccessCheck can check all nodes at once, we do it one at
+    # a time, so that we can get a list of all nodes we have access to
+    #
+    foreach $node (@machines) {
+	if (TBNodeAccessCheck($<,TB_NODEACCESS_POWERCYCLE,$node)) {
+	    push @OkNodes, $node;
+	} else {
+	    warn "You are not authorized to control pc4. Skipping...";
+	}
     }
-    @OkNodes = ();
-    my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
-      "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
-	"(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
-	  "on n.type=t.type where ".join(" or ",@conds);
-    print "Checking times: '$cmd'\n" if $verbose;
-    $sth = $dbh->query($cmd)
-      || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-    while ( @_ = $sth->fetchrow_array()) {
-      print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
-      my $node = "\L$_[0]";
-      $node =~ s/(sh\d+)-\d/$1/;
-      if ($_[1] <= 0) {
-	$timelimited{$node} = $_[2];
-      } else {
-	push(@OkNodes, "$node");
-      }
+
+    if (@OkNodes > 0) {
+	@conds = ();
+	foreach $node (@OkNodes) {
+	    push(@conds,"\Lo.node_id='$node'");
+	}
+	@OkNodes = ();
+	my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
+	    "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
+	    "(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
+	    "on n.type=t.type where ".join(" or ",@conds);
+	print "Checking times: '$cmd'\n" if $verbose;
+	my $result = DBQueryFatal($cmd);
+	while ( @_ = $result->fetchrow_array()) {
+	    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
+	    my $node = "\L$_[0]";
+	    $node =~ s/(sh\d+)-\d/$1/;
+	    if ($_[1] <= 0) {
+		$timelimited{$node} = $_[2];
+	    } else {
+		push(@OkNodes, "$node");
+	    }
+	}
     }
-  }
 } else {
-  my $cmd = 
-    "select node_id from outlets where ".join(" or ",@conds);
-  print "Root user authorized. Getting node list: '$cmd'\n" if $verbose;
-  $sth = $dbh->query($cmd)
-    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-  while ( @_ = $sth->fetchrow_array()) {
-    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
-    my $node = "\L$_[0]";
-    $node =~ s/(sh\d+)-\d/$1/;
-    push(@OkNodes, "$node");
-  }
+    foreach $node (@machines) {
+	push(@conds,"\Lnode_id='$node'");
+    }
+    $cmd = 
+	"select node_id from outlets where ".join(" or ",@conds);
+    print "Root user authorized. Getting node list: '$cmd'\n" if $verbose;
+    my $result = DBQueryFatal($cmd);
+    while ( @_ = $result->fetchrow_array()) {
+	print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
+	my $node = "\L$_[0]";
+	$node =~ s/(sh\d+)-\d/$1/;
+	push(@OkNodes, "$node");
+    }
 }
 
 if ($verbose) {
-  foreach $node (sort keys %timelimited) {
-    print "TIME_LIMITED: $node = $timelimited{$node}\n";
-  }
+    foreach $node (sort keys %timelimited) {
+	print "TIME_LIMITED: $node = $timelimited{$node}\n";
+    }
 }
 
 if (@OkNodes > 0) {
-  @conds = map {"\Lnode_id='$_'"} @OkNodes;
-  $cmd = "update outlets set last_power = NULL where ".join(" or ",@conds);
-  print "Updating times: '$cmd'\n" if $verbose;
-  $sth = $dbh->query($cmd)
-    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+    @conds = map {"\Lnode_id='$_'"} @OkNodes;
+    $cmd = "update outlets set last_power = NULL where ".join(" or ",@conds);
+    print "Updating times: '$cmd'\n" if $verbose;
+    DBQueryFatal($cmd);
 }
-
-push (@OkNodes,"lights");
 
 print "machines= ",join(" ",@machines),"\n" if $verbose;
 print "oknodes= ",join(" ",@OkNodes),"\n" if $verbose;
 
 foreach $node ( sort @machines) {
-  my $Approved = 0;
-  foreach $ok (sort @OkNodes) {
-    print "Checking $node == $ok\n" if $verbose > 1;
-    if ($node eq $ok) {
-      print "Approved $node.\n" if $verbose > 1;
-      $Approved = 1;
-    }
-  }
-  if (!$Approved) {
-    if (defined ($timelimited{$node})) {
-      print "Node '$node' was power controlled within the last ".
-	$timelimited{$node}." seconds. Skipping...\n";
-    } elsif ( ! defined ($IPList{$node}) ) {
-      print "Machine $node not found. Skipping...\n";
-      $exitval++;
-    } else {
-      print "You are not authorized to control $node. Skipping...\n";
-      $exitval++;
-    }
-  } else {
-    if ( ! defined ($IPList{$node}) ) {
-      print "Power controller for $node not found. Skipping...\n";
-      $exitval++;
-    } else {
-      my $type = $powerType{$node};
-      if ($type eq "APC") {
-	my $cmd = ( $verbose > 1 ? ("-debug ".($verbose-1)) : " ");
-	$cmd .= join(" ",
-		     ('-v','-i',$IPList{$node},"-$op -$OutletList{$node}"));
-	$cmd = "$snmpit ".$cmd;
-	print "Calling snmpit: '$cmd'\n" if $verbose > 1;
-	open(OUT,$cmd." |");
-	while (<OUT>) {
-	  if ($verbose) { print $_; }
-	  if (/was outlet([OnfRebot]+)/) {
-	    print "$node was $1";
-	  }
-	  if (/to outlet([OnfRebot]+)/) {
-	    print " ... $node now $1";
-	  }
+    my $Approved = 0;
+    foreach $ok (sort @OkNodes) {
+	print "Checking $node == $ok\n" if $verbose > 1;
+	if ($node eq $ok) {
+	    print "Approved $node.\n" if $verbose > 1;
+	    $Approved = 1;
 	}
-	print "\n";
-      } elsif ($type eq "RPC27") {
-	  if (rpc27ctrl($op,$powerID{$node},$OutletList{$node})) {
-	      print "Control of $node failed.\n"; $exitval++;
-	  }
-	  else {
-	      print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
-	  }
-      } else {
-	print "power: Unknown power type '$type'\n";
-	$exitval++;
-      }
     }
-  }
+    if (!$Approved) {
+	if (defined ($timelimited{$node})) {
+	    print "Node '$node' was power controlled within the last ".
+	    $timelimited{$node}." seconds. Skipping...\n";
+	} elsif ( ! defined ($IPList{$node}) ) {
+	    print "Machine $node not found. Skipping...\n";
+	    $exitval++;
+	} else {
+	    print "You are not authorized to control $node. Skipping...\n";
+	    $exitval++;
+	}
+    } else {
+	if ( ! defined ($IPList{$node}) ) {
+	    print "Power controller for $node not found. Skipping...\n";
+	    $exitval++;
+	} else {
+	    my $type = $powerType{$node};
+	    if ($type eq "APC") {
+		my $device = new snmpit_apc($IPList{$node},$verbose);
+		if (!defined $device) {
+		    warn "Unable to contact controller for $node, Skipping..\n";
+		    next;
+		} else {
+		    print "Calling device->power($op,$OutletList{$node}\n"
+			    if $verbose > 1;
+		    $device->power($op,$OutletList{$node});
+		    print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
+		}
+
+	    } elsif ($type eq "RPC27") {
+		if (rpc27ctrl($op,$powerID{$node},$OutletList{$node})) {
+		    print "Control of $node failed.\n"; $exitval++;
+		}
+		else {
+		    print "$node now ",($op eq "cycle" ? "reboot" : $op),"\n";
+		}
+	    } else {
+		print "power: Unknown power type '$type'\n";
+		$exitval++;
+	    }
+	}
+    }
 }
 
 # Return 0 on success. Return non-zero number of nodes that failed.
