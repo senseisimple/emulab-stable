@@ -13,18 +13,19 @@ This snapshot of the Emulab/Netbed code:
 -cannot be used for commercial purposes, and
 -cannot be redistributed outside your research group.
 
-By accepting this software, you agree to
--retain this notice and all included copyright and credit notices,
--return improvements to the University of Utah in order to improve
- the common platform,
--prominently give appropriate credit to "Emulab" and the University of
+By accepting this software, you agree
+-to retain this notice and all included copyright and credit notices,
+-that in order to improve the common platform, to return improvements to
+ the University of Utah under terms that allow us, without charge, to
+ use and redistribute them under this license,
+-to prominently give appropriate credit to "Emulab" and the University of
  Utah in the primary user interface(s) to systems that use this
  software, and in talks and all written and promotional material that
  mention features or use of this software.  In the Web interface this
  includes maintaining the portion of the page header banner which
  links to Utah's site and says "Built with Emulab" or, at our discretion,
  a subsequent version which includes a reference to "Utah."
--take reasonable steps to ensure these conditions are met (e.g.,
+-to take reasonable steps to ensure these conditions are met (e.g.,
  make your group's members aware of these terms, limit source access
  to your group's members, and ensure your users are non-commercial).
 
@@ -42,7 +43,7 @@ Contact emulab-dist@flux.utah.edu or 801-585-3271 if you wish to
 explore alternate license terms.  The terms may become more liberal in
 a future formal release.
 
-January 21, 2004
+November 4, 2004
 
     Flux Research Group
     School of Computing
