@@ -124,7 +124,9 @@ print "Vnodelist is @vnodes.\n";
 # If booting with vnodes, then see about creating the extra FS.
 # This will fail if it already exists. Keep going on any failure though.
 #
-system("mkextrafs.pl $vndir");
+if (!REMOTE()) {
+    system("mkextrafs.pl $vndir");
+}
 
 foreach my $vnode (keys(%curvnodelist)) {
     my $jailflag = "";
