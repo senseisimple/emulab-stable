@@ -1,47 +1,63 @@
 #!/usr/local/bin/perl -w
-#
-# mkacct - Makes accounts for all users in this experiment's project.
-#
-# Adds accounts to currently booted OS only.
-#
-# 
-#
 
-#debug flag
-my $d = 1;
+### Really run with -T
+
+###
+### mkacct - Makes accounts for all users in this experiment's project.
+###
+### Adds accounts to currently booted OS only.
+###
+
+###
+### Todo:
+###      - create the user / make key / put in auth keys in tb machine
+###        (tried: cannot due to permissions problems on plastic)
+###
+
+use Mysql;
+
+my $d = 1;			#debug flag
 
 if ($#ARGV < 0) { 
-  die("Usage: mkacct <eid>\n".
-      "Makes accounts for all users in an experiment's project.\n");
+    die("Usage: mkacct <eid>\n".
+	"Makes accounts for all users in an experiment's project.\n");
 }
 my $eid = $ARGV[0];
-
 if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) { 
-  die("Invalid eid '$eid' contains illegal characters.\n"); 
+    die("Invalid eid '$eid' contains illegal characters.\n"); 
 }
 
+##
+## Check for valid user
+##
 open(WHO,"/usr/bin/whoami 2>&1 |");
 $_ = <WHO>;
 chop;
 close(WHO);
 #if ($_ ne "root") { die("This won't work unless you're root.\n"); }
 
-use Mysql;
+##
+## Open database
+##
 my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
-my $sth;
-
+##
+## Check that we have a valid EID. If the EID
+## doesn't exist, it's invalid.
+##
 my $cmd = "select eid from experiments where eid='$eid'";
-
-$sth = $dbh->query($cmd);
-
+my $sth = $dbh->query($cmd);
 my $rows =0;
-
 while ($sth->fetchrow_array) {
-  $rows += 1;
+    $rows += 1;
 }
 if ( $rows != 1 ) { die("Invalid eid '$eid'.\n"); }
 
+
+##
+## Select user parameters for users in given experiment.
+## Join: exp.pid -> p.pid
+##
 $cmd = 
   "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
   "from experiments as e ".
@@ -49,71 +65,75 @@ $cmd =
   "left join proj_memb as pm on p.pid = pm.pid ".
   "left join users as u on u.uid = pm.uid ".
   "where e.eid = '$eid'";
-
 $sth = $dbh->query($cmd);
-
 my %passwd = ();
 my %unix_uid = ();
 my %name = ();
-
 while (@row = $sth->fetchrow_array) {
-  $passwd{$row[0]} = $row[1];
-  $unix_uid{$row[0]} = $row[2];
-  $name{$row[0]} = $row[4];
+    $passwd{$row[0]} = $row[1];
+    $unix_uid{$row[0]} = $row[2];
+    $name{$row[0]} = $row[4];
 }
 
 if ($d) {
-  foreach my $name (sort keys %passwd) {
-    print "Name: $name\tPassword: $passwd{$name}\t".
-      "Unix UID: $unix_uid{$name}\n";
-  }
+    foreach my $name (sort keys %passwd) {
+	print "Name: $name\tPassword: $passwd{$name}\t".
+	  "Unix UID: $unix_uid{$name}\n";
+    }
 }
 
+##
+## Select group ID for experiment.
+##
 $cmd = 
   "select unix_gid from groups as g ".
   "left join proj_grps as pg on g.gid = pg.gid ".
   "left join projects as p on pg.pid = p.pid ".
   "left join experiments as e on e.pid = p.pid ".
   "where e.eid = '$eid'";
-
 $sth = $dbh->query($cmd);
-
-my $unix_gid = 65533; # "nogroup"...
-
+my $unix_gid = 65533;		# "nogroup"...
 if (@row = $sth->fetchrow_array) {
-  $unix_gid = $row[0];
+    $unix_gid = $row[0];
 }
-
 print "Unix GID: $unix_gid\n" if $d;
 
+##
+## Select machines.
+##
 $cmd = 
-  "select IP from IP_list as ip ".
+  "select IP from interfaces as ip ".
   "left join reserved as r on r.node_id=ip.node_id ".
   "left join experiments as e on r.eid = e.eid ".
   "where e.eid = '$eid'";
-
 $sth = $dbh->query($cmd);
-
 my @nodes = ();
-
 while (@row = $sth->fetchrow_array) {
-  push(@nodes,$row[0]);
+    push(@nodes,$row[0]);
 }
 
 if ($d) {
-  print "Nodes: ";
-  foreach (@nodes) {
-    print "$_\t";
-  }
-  print "\n";
+    print "Nodes: ";
+    foreach (@nodes) {
+	print "$_\t\n";
+    }
+    print "\n";
 }
 
+##
+## For each machine, ping to see if its alive.
+## If alive, determine if its FreeBSD or Linux and
+## create the user accounts. 
+##
 my $last = "";
 my $OS = "";
 my $IP = "";
 foreach $IP (@nodes) {
-    #if its not the same as the last one, get the OS
-    if ( $IP ne $last ) {
+    print "before foreach:$IP\n";
+    ## If this machine is not the same as the last one, get the OS
+    ##
+    if ( $IP ne $last && $IP =~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {
+	print "in foreach:$IP\n";
         $last = $IP;
         if (-e "/bin/ping") {
             open(PING,"/bin/ping -c 1 $IP 2>&1 |");
@@ -123,34 +143,52 @@ foreach $IP (@nodes) {
         do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
         print "Got $1 ping packet(s) back from $IP.\n" if $d;
         if ( $1 > 0 ) {
-            open(UNAME,"su1 rsh $IP uname -a 2>&1 |");
+            open(UNAME,"su1 ssh $IP uname -a 2>&1 |");
             $_ = <UNAME>;
-            #print $_;
-            if ( !($_=/^Sorry/) ) { 
-	      @temp = split(" ",$_); 
-	      $OS = $temp[$0]; 
-	    } else { die("Authorization Failed.\n"); }
+            print "back from uname:$_\n";
+	    ## FreeBSD says "155.99.214.129: Connection refused
+            if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) ) { 
+		die("Uname failed on $IP:$_\n"); 
+	    } else { 
+		@temp = split(" ",$_); 
+		$OS = $temp[$0]; 
+	    }
         } else {
             #$ifstr="";
         }
         print "OS for $IP is $OS\n" if $d;
         if ($OS eq "Linux") {  }
-        elsif ($OS eq "FreeBSD") { }
-        else {  }
-        #if ( ) { print "Using \"\"\n"; }
+        elsif ($OS eq "FreeBSD") { 
+	    ## kwright:*:1025:110:Kristin Wright:/home/kwright:/bin/tcsh
+	    ## For FreeBSD
+	    ## 1) Append new account info to master.passwd
+	    ## 2) Create secure (spwd.db) and insecure (pwd.db) password 
+	    ##    databases and
+	    ## 3) Create /etc/passwd
+	    foreach ($name) {
+	    }
+	    my $passwdstr = "";
+	    foreach my $name (keys %passwd) {
+		$passwdstr = "$name:$passwd{$name}:$unix_uid{$name}:$unix_gid{$name}::\/home\/$name:\/bin\/tcsh\\n";
+		print $passwdstr;
+		
+		open(IFC,
+		     "su1 ssh $IP ls 2>&1 |"
+		    );
+		while ( <IFC> ) {
+		    print ">> $_";
+		}
+	    }
+	} else {  
+	    die "Unknown OS ($OS) on machine $IP.\n";
+	}
     }
-
+    
     #Set up the interface
-#    if (  eq "" ) {
-#        print "Unknown OS $OS on $IP. Skipping.\n";
-#        next;
-#    }
-
-    print "Creating    on $IP...\n";
-    open(IFC,
-         "su1 rsh $IP ls 2>&1 |"
-         );
-    while ( <IFC> ) {
-        print ">> $_";
-    }
+    #    if (  eq "" ) {
+    #        print "Unknown OS $OS on $IP. Skipping.\n";
+    #        next;
+    #    }
+    
 }
+
