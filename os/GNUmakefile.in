@@ -29,7 +29,6 @@ control-install:
 
 client:
 ifneq ($(SYSTEM),Linux)
-	$(MAKE) -C imagezip client
 	$(MAKE) -C growdisk client
 endif
 	$(MAKE) -C syncd client
@@ -42,7 +41,6 @@ client-install: client
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 ifneq ($(SYSTEM),Linux)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
-	$(MAKE) -C imagezip client-install
 	$(MAKE) -C growdisk client-install
 endif
 	$(MAKE) -C syncd client-install
