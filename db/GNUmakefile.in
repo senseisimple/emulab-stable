@@ -9,7 +9,8 @@ SUBDIR		= db
 include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= mac2if nalloc nfree nodeip
-SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status
+SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
+                  genelists
 LIBEXEC_SCRIPTS = ptopgen
 LIB_SCRIPTS     = libdb.pm
 
@@ -28,6 +29,10 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/genelists
+	chmod u+s $(INSTALL_SBINDIR)/genelists
 
 #
 # Control node installation (okay, plastic)

@@ -1,0 +1,82 @@
+#!/usr/bin/perl -wT
+use English;
+#use Getopt::Std;
+
+sub usage() {
+    print STDOUT "Usage: genelists\n".
+	"Generate the email list files after things change\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+my $lockfile    = "/var/tmp/testbed_genelists_lockfile";
+my $active   = 0;
+my $userlist = 0;
+
+my $d = 0;
+
+if (@ARGV != 0) { usage(); }
+
+$| = 1; # Turn off line buffering on output
+
+# Load the Testbed support stuff.
+push(@INC, "$TB/lib");
+require libdb;
+
+foreach $active ( 0, 1 ) {
+
+  if ($active) {
+    print "Getting Active Users\n" if $d;
+    # All active users on the testbed
+    if (! ($query_result =
+	   DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
+		   "left join proj_memb as p on e.pid=p.pid ".
+		   "left join users as u on u.uid=p.uid ".
+		   "where u.status='active' order by u.usr_email"))
+       ) {
+      DBFatal("Getting Active Users!");
+    }
+    $userlist = "testbed-ops\@flux.cs.utah.edu
+testbed-active-users-archive\@flux.cs.utah.edu\n";
+    open(LIST,">/mnt/usr/site/lib/lists/testbed-active-users") ||
+      die("Couldn't open testbed-active-users: $!\n");
+    print "Opened testbed-active-users\n" if $d;
+  } else {
+    print "Getting All Users\n" if $d;
+    # All approved users on the testbed
+    if (!($query_result =
+	  DBQuery("SELECT DISTINCT usr_email FROM users ".
+		  "where status='active' order by usr_email"))
+       ) {
+      DBFatal("Getting Users!");
+    }
+    $userlist = "testbed-ops\@flux.cs.utah.edu
+testbed-users-archive\@flux.cs.utah.edu\n";
+    open(LIST,">/mnt/usr/site/lib/lists/testbed-users") ||
+      die("Couldn't open testbed-users: $!\n");
+    print "Opened testbed-users list\n" if $d;
+  }
+
+  for ($i = 0; $i < $query_result->numrows; $i++) {
+    $user_email = ($query_result->fetchrow_array())[0];
+    if (! defined($user_email)) { next; }
+    if ($userlist) { $userlist .= "$user_email\n"; }
+    else { $userlist = "$user_email\n"; }
+  }
+  print LIST $userlist;
+  print $userlist if $d;
+  close(LIST);
+}
+
+exit 0;
+
+sub fatal {
+  local($msg) = $_[0];
+  system("echo \"$msg\" | /usr/bin/mail ".
+	 "-s 'TESTBED: Failure Generating Email Lists' $TBOPS");
+  die($msg);
+}

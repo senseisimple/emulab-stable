@@ -23,6 +23,7 @@ boss-install:	install-subdirs install-mkdirs
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 post-install:
+	@$(MAKE) -C db post-install
 	@$(MAKE) -C ipod post-install
 	@$(MAKE) -C tbsetup post-install
 	@$(MAKE) -C security post-install
