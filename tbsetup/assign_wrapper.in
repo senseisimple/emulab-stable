@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -2192,7 +2192,7 @@ sub InitPnode($pnode, $vnode)
 	#
 	# A normal user node. 
 	#
-	my ($cmdline,$rpms,$deltas,$startupcmd,$tarfiles,
+	my ($cmdline,$rpms,$startupcmd,$tarfiles,
 	    $failureaction,$routertype) = virtnodesettings($vnode);
 
 	# If no OSID defined, then use type-default.
@@ -2214,7 +2214,7 @@ sub InitPnode($pnode, $vnode)
 		     " startstatus='none'," .
 		     " bootstatus='unknown'," .
 		     " ready=0," .
-		     " deltas='$deltas'," .
+		     " deltas=''," .
 		     " startupcmd='$startupcmd'," .
 		     " failureaction='$failureaction'," .
 		     " routertype='$routertype'" .
@@ -2844,7 +2844,6 @@ sub LoadVirtNodes()
 	# Handy to combine these now.
 	$rowref->{"__settings"} = [ $rowref->{"cmd_line"},
 				    $rowref->{"rpms"},
-				    $rowref->{"deltas"},
 				    $rowref->{"startupcmd"},
 				    $rowref->{"tarfiles"},
 				    $rowref->{"failureaction"},
