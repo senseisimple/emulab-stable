@@ -278,6 +278,10 @@ Simulator instproc run {} {
 	return
     }
 
+    if {$elab_in_elab && [llength [array names node_list]] == 0} {
+	uplevel 1 source "@prefix@/lib/ns2ir/elabinelab.ns"
+    }
+
     # Fill out IPs
     if {! $use_ipassign } {
 	foreach obj [concat [array names lanlink_list]] {

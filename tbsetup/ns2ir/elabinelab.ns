@@ -1,19 +1,26 @@
-source tb_compat.tcl
-
-set ns [new Simulator]
-
-set maxpcs @MAXPCS@
-set security_level @SECURITY_LEVEL@
-
+#
+# This file is intended to be included into another NS file. It is not
+# a stand alone file.
+# 
 set myboss [$ns node]
 set myops  [$ns node]
 
 tb-set-hardware $myboss pc2000
 tb-set-hardware $myops  pc850
 
-tb-elab-in-elab 1
 tb-set-node-inner-elab-role $myboss boss
 tb-set-node-inner-elab-role $myops  ops
+
+#
+# This is passed in by the parser, when wrapping an existing experiment.
+# The parser wrapper gets info about the wrapped experiment and passes it
+# along in the TBCOMPAT namespace.
+#
+if { ${::TBCOMPAT::elabinelab_maxpcs} != 0 } {
+    set maxpcs ${::TBCOMPAT::elabinelab_maxpcs}
+} else {
+    set maxpcs 0
+}
 
 set lanstr "myboss myops "
 for {set i 1} {$i <= $maxpcs} {incr i} {
@@ -22,7 +29,6 @@ for {set i 1} {$i <= $maxpcs} {incr i} {
 	append lanstr "[set $name] "
 	tb-set-node-os [set $name] FBSD-STD
 	tb-set-node-inner-elab-role [set $name] node
-#	tb-set-hardware [set $name] pc600
 }
 set publiclan [$ns make-lan $lanstr 100Mb 0ms]
 
@@ -37,13 +43,14 @@ tb-set-node-os $myboss FBSD410-UPDATE
 tb-set-node-cmdline $myboss /kernel.linkdelay
 tb-set-node-os $myops  FBSD410-UPDATE
 
-if {$security_level >= 2} {
+if {${::GLOBALS::security_level} >= 2} {
 	# Set up a firewall
 	set fw [new Firewall $ns]
 	$fw set-type ipfw2-vlan
-	$fw set-style open
+        
+        if {${::GLOBALS::security_level} == 2} {
+	    $fw set-style open
+	} else {
+	    $fw set-style closed
+	}
 }
-
-# No routing! 
-$ns run
-

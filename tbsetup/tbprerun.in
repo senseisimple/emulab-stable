@@ -267,7 +267,7 @@ if (! TBExptSecurityLevel($pid, $eid, \$security_level)) {
     fatal("Could not get security_level from DB!");
 }
 
-if ($security_level >= TBDB_SECLEVEL_ORANGE()) {
+if (0 && $security_level >= TBDB_SECLEVEL_ORANGE()) {
     my $elabinelab_eid = $eid . "-" . "elabinelab";
     my $tempnsfile     = "/tmp/$pid-$elabinelab_eid-$$.nsfile";
     my $maxnodes;
