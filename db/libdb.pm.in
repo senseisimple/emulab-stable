@@ -88,7 +88,7 @@ use Exporter;
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBImageID TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
-	 TBIsNodeVirtual
+	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 );
 
 # Must come after package declaration!
@@ -1617,6 +1617,63 @@ sub TBExptGetLogFile($$$)
     my @row = $query_result->fetchrow_array();
     if (defined($row[0])) {
 	$$logname = $row[0];
+	return 1;
+    }
+    return 0;
+}
+
+#
+# Get the control network IP for a node (underlying physical node!).
+#
+# usage TBControlNetIP(char *nodeid, char \*ip)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBControlNetIP($$)
+{
+    my ($nodeid, $pip) = @_;
+
+    my $query_result =
+	DBQueryFatal("select IP from nodes as n2 ".
+		     "left join nodes as n1 on n1.node_id=n2.phys_nodeid ".
+		     "left join node_types as nt on n1.type=nt.type ".
+		     "left join interfaces as i on ".
+		     "i.node_id=n1.node_id and i.iface=nt.control_iface ".
+		     "where n2.node_id='$nodeid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    if (defined($row[0])) {
+	$$pip = $row[0];
+	return 1;
+    }
+    return 0;
+}
+
+#
+# Get the underlying physical node. Might be the same as the node if its
+# not a virtual node.
+#
+# usage TBPhysNodeID(char *nodeid, char \*phys_nodeid)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBPhysNodeID($$)
+{
+    my ($nodeid, $pphys) = @_;
+
+    my $query_result =
+	DBQueryFatal("select phys_nodeid from nodes ".
+		     "where node_id='$nodeid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    if (defined($row[0])) {
+	$$pphys = $row[0];
 	return 1;
     }
     return 0;
