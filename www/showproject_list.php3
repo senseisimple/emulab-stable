@@ -201,7 +201,7 @@ if (! $isadmin) {
 else {
     if ($splitview) {
 	$query_result =
-	    DBQueryFatal("SELECT p.pid,count(distinct r.node_id) as ncount, ".
+	    DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
 		     "count(distinct e.eid) as ecount, ".
 		     "IF(p.expt_last, ".
 		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
@@ -220,7 +220,7 @@ else {
 	}
 
 	$query_result =
-	    DBQueryFatal("SELECT p.pid,count(distinct r.node_id) as ncount, ".
+	    DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
 		     "count(distinct e.eid) as ecount, ".
 		     "IF(p.expt_last, ".
 		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
