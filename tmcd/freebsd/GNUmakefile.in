@@ -19,6 +19,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 DESTDIR		=
 ETCDIR		= $(DESTDIR)/etc
 INSTALL_DIR	= $(ETCDIR)/testbed
+RC_DIR		= $(INSTALL_DIR)/rc.d
 ISMFS		= $(INSTALL_DIR)/ismfs
 INSTALL_FILES	= group master.passwd setup
 INSTALL		= /usr/bin/install -c 
@@ -29,6 +30,7 @@ mfs-install:	script-install bin-install
 
 dir-install:
 	-mkdir -p $(INSTALL_DIR)
+	-mkdir -p $(RC_DIR)
 
 misc-install:	dir-install
 	-rm -rf $(INSTALL_DIR)/sup/sup
@@ -72,6 +74,8 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(ETCDIR)/start_if.fxp1
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(ETCDIR)/start_if.fxp4
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(ETCDIR)/start_if.xl0
+	$(INSTALL) -m 755 $(SRCDIR)/rc.conf  $(ETCDIR)/rc.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(INSTALL_DIR)/gated_fxp0.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(INSTALL_DIR)/gated_fxp1.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(INSTALL_DIR)/gated_fxp4.conf
+	$(INSTALL) -m 755 $(SRCDIR)/shutdown.sh  $(RC_DIR)/shutdown.sh
