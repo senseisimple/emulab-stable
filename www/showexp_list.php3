@@ -590,7 +590,11 @@ if ($thumb && !$idle) {
 	else
             echo "<td>$nodes</td>\n";
 
-	echo "<td>$idletime</td>\n";
+	if ($idletime == -1) {
+	    echo "<td>&nbsp;</td>\n";
+	} else {
+	    echo "<td>$idletime</td>\n";
+	}
 	
 	if ($showlastlogin) echo "$lastlogin\n";
 	if ($idle) echo "$foo\n";
