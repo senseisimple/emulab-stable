@@ -152,6 +152,9 @@ function showsummary ($showby, $sortby) {
         case "swapins":
 	    $order = "expt_swapins desc";
 	    break;
+        case "new":
+	    $order = "expt_new desc";
+	    break;
         default:
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
@@ -160,8 +163,9 @@ function showsummary ($showby, $sortby) {
 	DBQueryFatal("select $which, allexpt_pnodes, ".
 		     "allexpt_pnode_duration / (24 * 3600) as pnode_days, ".
 		     "allexpt_duration / (24 * 3600) as expt_days, ".
-		     "exptswapin_count+exptstart_count as expt_swapins ".
-		     "from $table where allexpt_pnodes!=0 ".
+		     "exptswapin_count+exptstart_count as expt_swapins, ".
+		     "exptpreload_count+exptstart_count as expt_new ".
+		     "from $table  ".
 		     "$wclause ".
 		     "order by $order");
 
@@ -176,16 +180,19 @@ function showsummary ($showby, $sortby) {
     $pdays_total  = 0;
     $edays_total  = 0;
     $swapin_total = 0;
+    $new_total    = 0;
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pnodes  = $row["allexpt_pnodes"];
 	$pdays   = $row["pnode_days"];
 	$edays   = $row["expt_days"];
 	$swapins = $row["expt_swapins"];
+	$new     = $row["expt_new"];
 	
 	$pnode_total  += $pnodes;
 	$pdays_total  += $pdays;
 	$edays_total  += $edays;
 	$swapin_total += $swapins;
+	$new_total    += $new;
     }
 
     SUBPAGESTART();
@@ -205,6 +212,10 @@ function showsummary ($showby, $sortby) {
            <tr><td nowrap align=right><b>Swapins</b></td>
                <td align=left>$swapin_total</td>
            </tr>
+           <tr><td nowrap align=right><b>New</b></td>
+               <td align=left>$new_total</td>
+           </tr>
+
           </table>\n";
     SUBMENUEND_2B();
     
@@ -226,6 +237,9 @@ function showsummary ($showby, $sortby) {
              <th><a class='static'
                     href='showsumstats.php3?showby=$showby&sortby=swapins'>
                     Swapins</th>
+             <th><a class='static'
+                    href='showsumstats.php3?showby=$showby&sortby=new'>
+                    New</th>
           </tr>\n";
 
     mysql_data_seek($query_result, 0);    
@@ -235,6 +249,7 @@ function showsummary ($showby, $sortby) {
 	$phours  = $row["pnode_days"];
 	$ehours  = $row["expt_days"];
 	$swapins = $row["expt_swapins"];
+	$new     = $row["expt_new"];
 
 	echo "<tr>
                 <td><A href='$link${heading}'>$heading</A></td>
@@ -242,6 +257,7 @@ function showsummary ($showby, $sortby) {
                 <td>$phours</td>
                 <td>$ehours</td>
                 <td>$swapins</td>
+                <td>$new</td>
               </tr>\n";
     }
     echo "</table>\n";
@@ -267,10 +283,12 @@ function edaycmp ($a, $b) {
 function swapincmp ($a, $b) {
     return intcmp($a["swapins"], $b["swapins"]);
 }
+function newexptcmp ($a, $b) {
+    return intcmp($a["new"], $b["new"]);
+}
 
 function showrange ($showby, $sortby, $range) {
-    global $TBOPSPID, $TB_EXPTSTATE_ACTIVE;
-    $debug = 0;
+    global $TBOPSPID, $TB_EXPTSTATE_ACTIVE, $debug;
     $now   = time();
     unset($rangematches);
     
@@ -357,6 +375,7 @@ function showrange ($showby, $sortby, $range) {
 					   'pseconds' => 0,
 					   'eseconds' => 0,
 					   'current'  => 1,
+					   'new'      => 0,
 					   'swapins'  => 0);
 	    }
 	    if (!isset($uid_summary[$uid])) {
@@ -364,6 +383,7 @@ function showrange ($showby, $sortby, $range) {
 					   'pseconds' => 0,
 					   'eseconds' => 0,
 					   'current'  => 1,
+					   'new'      => 0,
 					   'swapins'  => 0);
 	    }
 	    $pid_summary[$pid]["pnodes"]   += $pnodes;
@@ -376,7 +396,7 @@ function showrange ($showby, $sortby, $range) {
     }
 
     $query_result =
-	DBQueryFatal("select s.pid,s.eid,t.uid,t.action,t.exptidx, ".
+	DBQueryFatal("select s.pid,s.eid,t.uid,t.action,t.exptidx,t.exitcode,".
 		     "  r1.pnodes as pnodes1,r2.pnodes as pnodes2, ".
 		     "  UNIX_TIMESTAMP(t.end_time) as ttstamp ".
 		     " from testbed_stats as t ".
@@ -386,7 +406,7 @@ function showrange ($showby, $sortby, $range) {
 		     "  r1.idx=t.rsrcidx ".
 		     "left join experiment_resources as r2 on ".
 		     "  r2.idx=r1.lastidx and r1.lastidx is not null ".
-		     "where t.exitcode = 0 && ".
+		     "where t.exitcode=0 && ".
 		     "    (UNIX_TIMESTAMP(t.end_time) <= $spanend && ".
 		     "     UNIX_TIMESTAMP(t.end_time) >= $spanstart) ".
 		     "order by t.end_time");
@@ -403,6 +423,7 @@ function showrange ($showby, $sortby, $range) {
 	$action  = $row["action"];
 	$pnodes  = $row["pnodes1"];
 	$pnodes2 = $row["pnodes2"];
+	$ecode   = $row["exitcode"];
 
 	if ($pnodes == 0)
 	    continue;
@@ -417,19 +438,21 @@ function showrange ($showby, $sortby, $range) {
 	if ($action == "swapmod" &&
 	    ! isset($expt_start["$pid:$eid"])) {
 	    $swapper_result =
-		DBQueryFatal("select action from testbed_stats ".
+		DBQueryFatal("select action,exitcode from testbed_stats ".
 			     "where exptidx=$idx and ".
 			     "      UNIX_TIMESTAMP(end_time)<$tstamp ".
 			     "order by end_time desc");
 
 	    while ($srow = mysql_fetch_assoc($swapper_result)) {
 		$saction = $srow["action"];
+		$secode  = $srow["exitcode"];
 
 		if ($saction != "swapmod")
 		    break;
 	    }
 	    if (!$srow ||
-		($saction == "swapout" || $saction == "preload"))
+		($saction == "swapout" || $saction == "preload" ||
+		 ($saction == "swapin" && $secode)))
 		continue;
 	    
 	    if ($debug)
@@ -441,6 +464,7 @@ function showrange ($showby, $sortby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 0,
+				       'new'      => 0,
 				       'swapins'  => 0);
 	}
 	if (!isset($uid_summary[$uid])) {
@@ -448,6 +472,7 @@ function showrange ($showby, $sortby, $range) {
 				       'pseconds' => 0,
 				       'eseconds' => 0,
 				       'current'  => 0,
+				       'new'      => 0,
 				       'swapins'  => 0);
 	}
 
@@ -455,15 +480,26 @@ function showrange ($showby, $sortby, $range) {
 	    echo "$idx $pid $eid $uid $tstamp $action $pnodes $pnodes2<br>\n";
 
 	switch ($action) {
+        case "preload":
+	    $pid_summary[$pid]["new"]++;
+	    $uid_summary[$uid]["new"]++;
+	    break;
         case "start":
+	    $pid_summary[$pid]["new"]++;
+	    $uid_summary[$uid]["new"]++;
         case "swapin":
 	    $expt_start["$pid:$eid"] = array('pnodes' => $pnodes,
 					     'uid'    => $uid,
 					     'pid'    => $pid,
+					     'idx'    => $idx,
 					     'stamp'  => $tstamp);
 	    $pid_summary[$pid]["swapins"]++;
 	    $uid_summary[$uid]["swapins"]++;
 	    break;
+	case "destroy":
+	    #
+	    # Yuck, this happens. Treat it like swapout if there is a record.
+	    #
         case "swapout":
         case "swapmod":
 	    if (isset($expt_start["$pid:$eid"])) {
@@ -474,6 +510,9 @@ function showrange ($showby, $sortby, $range) {
 		$uid    = $expt_start["$pid:$eid"]["uid"];
 		$pnodes = $expt_start["$pid:$eid"]["pnodes"];
 		$diff = $tstamp - $expt_start["$pid:$eid"]["stamp"];
+	    }
+	    elseif ($action == "destroy") {
+		break;
 	    }
 	    else {
 		#
@@ -504,17 +543,18 @@ function showrange ($showby, $sortby, $range) {
 	    
 	    # Basically, start the clock ticking again with the new
 	    # number of pnodes.
+	    #
+	    # XXX This errorcode is special. See swapexp/tbswap.
+	    #
 	    if ($action == "swapmod") {
 		# Yuck, we redefined uid/pnodes above, but we want to start the
 		# new record for the current swapper/#pnodes.
 		$expt_start["$pid:$eid"] = array('pnodes' => $row['pnodes1'],
 						 'uid'    => $row['uid'],
 						 'pid'    => $pid,
+						 'idx'    => $idx,
 						 'stamp'  => $tstamp);
 	    }
-	    break;
-	case "preload":
-	case "destroy":
 	    break;
         default:
 	    TBERROR("Invalid action: $action!", 1);
@@ -534,10 +574,11 @@ function showrange ($showby, $sortby, $range) {
 	    $pid     = $value["pid"];
 	    $uid     = $value["uid"];
 	    $stamp   = $value["stamp"];
+	    $idx     = $value["idx"];
 	    $diff    = $now - $stamp;
 
 	    if ($debug)
-		echo "$pnodes, $pid, $uid, $stamp, $diff<br>\n";
+		echo "$pnodes, $key, $uid, $stamp, $diff<br>\n";
 
 	    $pid_summary[$pid]["pnodes"]   += $pnodes;
 	    $pid_summary[$pid]["pseconds"] += $pnodes * $diff;
@@ -581,6 +622,9 @@ function showrange ($showby, $sortby, $range) {
         case "swapins":
 	    uasort($table, "swapincmp");
 	    break;
+        case "new":
+	    uasort($table, "newexptcmp");
+	    break;
         default:
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
@@ -592,10 +636,12 @@ function showrange ($showby, $sortby, $range) {
     $pdays_total  = 0;
     $edays_total  = 0;
     $swapin_total = 0;
+    $new_total    = 0;
 
     foreach ($table as $key => $value) {
 	$pnodes  = $value["pnodes"];
 	$swapins = $value["swapins"];
+	$new     = $value["new"];
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
 
@@ -606,6 +652,7 @@ function showrange ($showby, $sortby, $range) {
 	$pdays_total  += $pdays;
 	$edays_total  += $edays;
 	$swapin_total += $swapins;
+	$new_total    += $new;
     }
 
     SUBPAGESTART();
@@ -624,6 +671,9 @@ function showrange ($showby, $sortby, $range) {
            </tr>
            <tr><td nowrap align=right><b>Swapins</b></td>
                <td align=left>$swapin_total</td>
+           </tr>
+           <tr><td nowrap align=right><b>New</b></td>
+               <td align=left>$new_total</td>
            </tr>
           </table>\n";
     SUBMENUEND_2B();
@@ -649,12 +699,16 @@ function showrange ($showby, $sortby, $range) {
              <th><a class='static'
                     href='showsumstats.php3?showby=$showby&sortby=swapins&range=$range'>
                     Swapins</th>
+             <th><a class='static'
+                    href='showsumstats.php3?showby=$showby&sortby=new&range=$range'>
+                    New</th>
           </tr>\n";
 
     foreach ($table as $key => $value) {
 	$heading = $key;
 	$pnodes  = $value["pnodes"];
 	$swapins = $value["swapins"];
+	$new     = $value["new"];
 	$current = $value["current"];
 	$pdays   = sprintf("%.2f", $value["pseconds"] / (3600 * 24));
 	$edays   = sprintf("%.2f", $value["eseconds"] / (3600 * 24));
@@ -675,6 +729,7 @@ function showrange ($showby, $sortby, $range) {
                 <td>$pdays</td>
                 <td>$edays</td>
                 <td>$swapins</td>
+                <td>$new</td>
               </tr>\n";
     }
     echo "</table>\n";
