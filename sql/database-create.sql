@@ -156,7 +156,7 @@ CREATE TABLE deltas (
 
 CREATE TABLE emulab_indicies (
   name varchar(64) NOT NULL default '',
-  idx int(10) unsigned NOT NULL default 0,
+  idx int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (name)
 ) TYPE=MyISAM;
 
@@ -1588,7 +1588,7 @@ CREATE TABLE user_sfskeys (
 
 CREATE TABLE user_sslcerts (
   uid varchar(8) NOT NULL default '',
-  idx int(10) unsigned NOT NULL default 0,
+  idx int(10) unsigned NOT NULL default '0',
   cert text,
   privkey text,
   created datetime default NULL,
