@@ -843,6 +843,60 @@ if (count($errors)) {
 }
 
 #
+# See if the user is trying anything funky.
+# If so, we run this twice.
+# The first time we are checking for a confirmation
+# by putting up a form (we tramp their settings through
+# hidden variables). The next time through the confirmation will be
+# set. Or, the user can hit the 'back' button, 
+# which will respit the form with their old values still filled in.
+#
+
+if ($cancelled) {
+    SPITFORM($formfields, 0);    
+    PAGEFOOTER();
+    return;
+}
+
+$confirmationWarning = "";
+
+#
+# If user doesn't define a node to suck the image from,
+# we seek confirmation.
+#
+if (! isset($node)) {
+    $confirmationWarning .=
+          "<h2>You have not defined a node from which to load the image!
+           If you do not specify such a node,
+           you will have to use <code>create_image</code> on <i>ops</i> to
+	   load an image to the Image Descriptor you are creating.
+  	   Continue only if this is what you want.</h2>";
+}
+
+#
+# Generic confirmation-seeker.
+#
+if (!isset($confirmed) && 0 != strcmp($confirmationWarning,"")) {
+    echo "<center><br />$confirmationWarning<br />";
+    echo "<form action='newimageid_ez.php3' method=post>";
+    #
+    # tramp all of their settings along.
+    #
+    reset($formfields);
+    while (list($key, $value) = each($formfields)) {
+	echo "<input type=hidden name=\"formfields[$key]\" value=\"$value\"></input>\n";
+    }
+    echo "<input type=hidden name='submit' value='Submit'>\n";
+    echo "<input type=submit name=confirmed value=Confirm>&nbsp;";
+    echo "<input type=submit name=cancelled  value=Back>\n";
+    echo "</form></center>";
+
+    PAGEFOOTER();
+    return;
+}
+
+
+#
 # For the rest, sanitize and convert to locals to make life easier.
 # 
 $description = addslashes($formfields[description]);
