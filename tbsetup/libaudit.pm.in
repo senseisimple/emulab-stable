@@ -239,10 +239,11 @@ sub SendAuditMail($)
 	else {
 	    $TO    = $TBOPS;
 	}
-	SENDMAIL($TO, $subject, $body, $FROM, $HDRS, @FILES);
 
-	if ($? == 0 && defined($logfile)) {
-	    unlink($logfile);
+	# Leave logfile if sendmail fails. 
+	if (SENDMAIL($TO, $subject, $body, $FROM, $HDRS, @FILES)) {
+	    unlink($logfile)
+		if (defined($logfile));
 	}
     }
 }
