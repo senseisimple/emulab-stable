@@ -568,8 +568,8 @@ list(ac, av)
 		    printf("constant, %4d ",p->bw.bandwidth);
 		else
 		if (p->bw.dist & DN_DIST_UNIFORM)
-		    printf("uniform, var %4d mean %4d ",
-			p->bw.variance,p->bw.mean);
+		    printf("uniform, stddev %4d mean %4d ",
+			p->bw.stddev,p->bw.mean);
 		else
 		if (p->bw.dist & DN_DIST_POISSON)
 		    printf("Poisson, mean %4d ",p->bw.mean);
@@ -588,8 +588,8 @@ list(ac, av)
 		    printf("constant, %4d ms",p->delay.delay);
 		else
 		if (p->delay.dist & DN_DIST_UNIFORM)
-		    printf("uniform, var %4d mean %4d ",
-			p->delay.variance,p->delay.mean);
+		    printf("uniform, stddev %4d mean %4d ",
+			p->delay.stddev,p->delay.mean);
 		else
 		if (p->delay.dist & DN_DIST_POISSON)
 		    printf("Poisson, mean %4d ",p->delay.mean);
@@ -611,8 +611,8 @@ list(ac, av)
 		    printf("constant rate, %4d ",p->loss.plr);
 		else
 		if (p->loss.dist & DN_DIST_UNIFORM)
-		    printf("uniform, var %4d mean %4d ",
-			p->loss.variance,p->loss.mean);
+		    printf("uniform, stddev %4d mean %4d ",
+			p->loss.stddev,p->loss.mean);
 		else
 		if (p->loss.dist & DN_DIST_POISSON)
 		    printf("Poisson, mean %4d ",p->loss.mean);
@@ -817,21 +817,21 @@ show_usage(const char *fmt, ...)
 "    icmptypes {type[,type]}...\n"
 "  pipeconfig:\n"
 "    [delaydist constant] delay <milliseconds>\n"
-"    delaydist uniform delaymean <ms> delayvar <ms>\n"
-"    delaydist random delayentries <entry_count> <entry> <entry> <entry> ...\n"
-"    delaydist determ delayentries <entry_count> <entry> <entry> <entry> ...\n"
-"    delaydist poisson delaymean <ms>\n"
+"    delaydist uniform mean <ms> stddev <ms>\n"
+"    delaydist random entries <entry_count> <entry> <entry> <entry> ...\n"
+"    delaydist determ entries <entry_count> <entry> <entry> <entry> ...\n"
+"    delaydist poisson mean <ms>\n"
 "    [lossdist constrate] plr <decimal>\n"
-"    lossdist consttime lossmean <ms>\n"
-"    lossdist uniform lossmean <decimal> lossvar <decimal>\n"
-"    lossdist poisson lossmean <decimal>\n"
-"    lossdist random lossentries <entry_count> <entry> <entry> <entry> ...\n"
-"    lossdist determ lossentries <entry_count> <entry> <entry> <entry> ...\n"
+"    lossdist consttime mean <ms>\n"
+"    lossdist uniform mean <decimal> stddev <decimal> quantum <ms>\n"
+"    lossdist poisson mean <decimal> quantum <ms>\n"
+"    lossdist random quantum <ms> entries <entry_count> <entry> <entry> <entry> ...\n"
+"    lossdist determ quantum <ms> entries <entry_count> <entry> <entry> <entry> ...\n"
 "    [bwdist constant] {bw|bandwidth} <number>{bit/s|Kbit/s|Mbit/s|Bytes/s|KBytes/s|MBytes/s}\n"
-"    bwdist uniform bwmean <value> bwvar <value>\n"
-"    bwdist poisson bwmean <value>\n"
-"    bwdist random bwentries <entry_count> <entry> <entry> <entry> ...\n"
-"    bwdist determ bwentries <entry_count> <entry> <entry> <entry> ...\n"
+"    bwdist uniform mean <value> stddev <value> quantum <ms>\n"
+"    bwdist poisson mean <value> quantum <ms>\n"
+"    bwdist random quantum <ms> entries <entry_count> <entry> <entry> <entry> ...\n"
+"    bwdist determ quantum <ms> entries <entry_count> <entry> <entry> <entry> ...\n"
 "    queue <size>{packets|Bytes|KBytes}\n"
 "    mask {all| [dst-ip|src-ip|dst-port|src-port|proto] <number>}\n"
 "    buckets <number>}\n"
@@ -1436,7 +1436,7 @@ config_pipe(int ac, char **av)
  
         memset(&pipe, 0, sizeof pipe);
  
-        av++; ac-=2;
+        av++; ac--;
 
         /* Pipe number */
         if (ac && isdigit(**av)) {
@@ -1471,7 +1471,7 @@ config_pipe(int ac, char **av)
 		    adjust_ac(&ac,-7);
 		    pipe.bw.dist=DN_DIST_UNIFORM;
 		    pipe.bw.mean = readbw_rate("mean",av+1);
-		    pipe.bw.variance = readbw_rate("var",av+3);
+		    pipe.bw.stddev = readbw_rate("stddev",av+3);
 		    pipe.bw.quantum = readint("quantum",av+5);
 		    av+=7;
 		} else if (!strncmp(*av,"poisson",arglen) ) {
@@ -1517,7 +1517,7 @@ config_pipe(int ac, char **av)
 		    adjust_ac(&ac,-5);
                     pipe.delay.dist=DN_DIST_UNIFORM;
 		    pipe.delay.mean = readint("mean",av+1);
-		    pipe.delay.variance = readint("var",av+3);
+		    pipe.delay.stddev = readint("stddev",av+3);
 		    av+=5;
                 } else if (!strncmp(*av,"poisson",arglen) ) {
 		    adjust_ac(&ac,-3);
@@ -1578,7 +1578,7 @@ config_pipe(int ac, char **av)
 		    adjust_ac(&ac,-6);
 		    pipe.loss.dist=DN_DIST_UNIFORM;
 		    pipe.loss.mean = readlossrate("mean",av+1);
-		    pipe.loss.variance = readlossrate("var",av+3);
+		    pipe.loss.stddev = readlossrate("stddev",av+3);
 		    pipe.loss.quantum = readint("quantum",av+5);
 		    av+=6;
 		} else if (!strncmp(*av,"poisson",arglen) ) {
