@@ -45,7 +45,8 @@ else {
 
 # Page args,
 if (isset($slice)) {
-    if (preg_match("/^emulab_[-\w]*_([\d]*)$/", $slice, $matches)) {
+    if (preg_match("/^emulab_[-\w]*_([\d]*)$/", $slice, $matches) ||
+	preg_match("/^emulab_([\d]*)$/", $slice, $matches)) {
 	$wclause = "and s.exptidx='$matches[1]'";
     }
     else {
@@ -121,7 +122,7 @@ while ($row = mysql_fetch_assoc($query_result)) {
     $action  = $row[action];
     $pnodes  = $row[plabnodes];
     $exptidx = $row[exptidx];
-    $slice   = "emulab_${pid}_${eid}_${exptidx}";
+    $slice   = "emulab_${exptidx}";
 
     if (!strcmp($action, "start")) {
 	$action = "swapin";
