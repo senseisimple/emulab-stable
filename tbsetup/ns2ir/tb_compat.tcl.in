@@ -1469,14 +1469,18 @@ proc tb-set-security-level {level} {
 	"Green" {
 	    set level 0
 	}
-	"Yellow" {
+	"Blue" {
 	    set level 1
 	}
-	"Orange" {
+	"Yellow" {
 	    set level 2
 	}
-	"Red" {
+	"Orange" {
 	    set level 3
+	}
+	"Red" {
+	    perror "\[tb-set-security-level] Red security not implemented yet"
+	    return
 	}
 	unknown {
 	    perror "\[tb-set-security-level] $level is not a valid level"

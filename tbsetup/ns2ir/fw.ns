@@ -10,12 +10,12 @@ if {${::GLOBALS::security_level} >= 1} {
     if {${::GLOBALS::security_level} == 1} {
 	$fw set-style open
     } elseif {${::GLOBALS::security_level} == 2} {
+	$fw set-style basic	
+    } elseif {${::GLOBALS::security_level} == 3} {
 	if {${::GLOBALS::elab_in_elab}} {
 	    $fw set-style emulab
 	} else {
-	    $fw set-style basic
+	    $fw set-style closed
 	}
-    } else {
-	$fw set-style closed
     }
 }
