@@ -5,8 +5,51 @@ echo "
 <title>Adding to the database</title>
 <link rel='stylesheet' href='tbstyle.css' type='text/css'>
 </head>
-<body>
-<h1>Adding information to the Testbed Database</h1>\n";
+<body>";
+#
+# First off, sanity check the form to make sure all the required fields
+# were provided. I do this on a per field basis so that we can be
+# informative. Be sure to correlate these checks with any changes made to
+# the project form. Note that this sequence of statements results in
+# only the last bad field being displayed, but thats okay. The user will
+# eventually figure out that fields marked with * mean something!
+#
+$formerror="No Error";
+if (!isset($uid) ||
+    strcmp($uid, "") == 0) {
+  $formerror = "UserName";
+}
+if (!isset($usr_email) ||
+    strcmp($usr_email, "") == 0) {
+  $formerror = "Email Address";
+}
+if (!isset($usr_name) ||
+    strcmp($usr_name, "") == 0) {
+  $formerror = "Full Name";
+}
+if (!isset($grp) ||
+    strcmp($grp, "") == 0) {
+  $formerror = "Project";
+}
+#
+# Not sure about the passwd. If the user is already known, then is he
+# supposed to plug his passwd in?
+#
+if ((!isset($pswd)  || strcmp($pswd, "") == 0) ||
+    (!isset($pswd2) || strcmp($pswd2, "") == 0)) {
+  $formerror = "Password";
+}
+
+if ($formerror != "No Error") {
+  echo "<h3><br><br>
+        Missing field; Please go back and fill out the \"$formerror\" field!\n
+        </h3>
+        </body>
+        </html>";
+  die("");
+}
+
+echo "<h1>Adding information to the Testbed Database</h1>\n";
 $my_passwd=$pswd;
 $mypipe = popen(escapeshellcmd(
     "/usr/testbed/bin/checkpass $my_passwd $grp_head_uid '$usr_name:$email'"),
@@ -58,7 +101,7 @@ if (isset($pid)) { #add a project to the database
     $email = $row[1];
     echo "<h1>Add Project Failed:</h1>\n<h3>You are not authorized to add ".
       "projects in group '$grp_assoc'. If you feel you have reached this ".
-      "message in error, please contact the group head, ".
+      "message in error, please contact the project head, ".
       "'$grp_head <$email>'.</h3>";
   }
 } elseif ( !empty($uid) && !empty($usr_email) &&
@@ -97,7 +140,7 @@ if (isset($pid)) { #add a project to the database
 			 "uid='$uid' and gid='$grp'");
   if (mysql_num_rows($result) > 0) {
     # Already in that group (or applied)
-    echo "<h3>You have already applied for membership in that group.</h3>\n";
+    echo "<h3>You have already applied for membership in that project.</h3>\n";
     echo "</body></html>\n";
     exit;
   }
@@ -111,14 +154,15 @@ if (isset($pid)) { #add a project to the database
   $mres = mysql_db_query("tbdb", $mque);
   $mresrow = mysql_fetch_row($mres);
   $grp_email = $mresrow[0];
-  mail("$grp_email", "TESTBED: New Group Member",
-       "\n$usr_name ($uid) is trying to join your group. $usr_name has the\n".
+  mail("$grp_email", "TESTBED: New Project Member",
+       "\n$usr_name ($uid) is trying to join your project.\n".
+       "$usr_name has the\n".
        "Testbed username $uid and email address $usr_email.\n$usr_name's ".
        "phone number is $usr_phone and address $usr_addr.\n".
        "\nPlease return ".
        "to <https://plastic.cs.utah.edu/tbdb.html>, log in,\nand select the ".
        "'New User Approval' page to enter your decision regarding\n".
-       "$usr_name's membership in your group.".
+       "$usr_name's membership in your project".
        "\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
        "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
        "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
@@ -135,7 +179,7 @@ if (isset($pid)) { #add a project to the database
 	 "'New User Verification'. Select it,\nand on that page enter in ".
 	 "your user name, password, and your key,\nand you will be ".
 	 "verified as a user. When you have been ".
-	 "both verified and\napproved by the head of your group, you will be ".
+	 "both verified and\napproved by the head of your project, you will be ".
 	 "marked as an active user,\nand will be granted full access to your ".
 	 "user account.\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
          "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
@@ -155,7 +199,7 @@ be granted full access to your user account.</h3>
 ";
   }
   echo "
-<h3>The leader of group '$grp' has been notified of your application. He
+<h3>The leader of project '$grp' has been notified of your application. He
 will make a decision and either approve or deny your application, and you
 will be notified as soon as a decision has been made.
  Thanks for using the Testbed! </h3>

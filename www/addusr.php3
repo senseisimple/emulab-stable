@@ -26,7 +26,7 @@ if (isset($uid)) {
   echo "<td>Expiration date:</td>";
   echo "<td class=\"left\"><input type=\"readonly\" name=\"usr_expires\" ";
   echo "value=\"$row[0]\"</td></tr>\n";
-  echo "<tr><td>*Email:</td><td class=\"left\"><input type=\"readonly\" ";
+  echo "<tr><td>*Email Address:</td><td class=\"left\"><input type=\"readonly\" ";
   echo "name=\"usr_email\" value=\"$row[1]\"></td>";
   echo "<td>Mailing Address:</td><td class=\"left\">";
   echo "<input type=\"readonly\" name=\"usr_addr\" ";
@@ -49,7 +49,7 @@ if (isset($uid)) {
   echo "<td><input type=\"text\" name=\"usr_expires\"";
   $time = date("m/d/Y", time() + (86400 * 90)); #add 90 days
   echo "value=\"$time\"></td></tr>\n";
-  echo "<tr><td>*Email:</td><td><input type=\"text\" name=\"usr_email\"></td>";
+  echo "<tr><td>*Email Address:</td><td><input type=\"text\" name=\"usr_email\"></td>";
   echo "<td>Mailing Address:</td><td>";
   echo "<input type\"text\" name=\"usr_addr\"></td></tr>";
   echo "<tr><td>*Full Name:</td><td>";

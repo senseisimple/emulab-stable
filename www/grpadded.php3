@@ -1,10 +1,73 @@
 <html>
 <head>
-<title>Group Request</title>
+<title>Utah Testbed Project Request</title>
 <link rel='stylesheet' href='tbstyle.css' type='text/css'>
 </head>
 <body>
 <?php
+#
+# First off, sanity check the form to make sure all the required fields
+# were provided. I do this on a per field basis so that we can be
+# informative. Be sure to correlate these checks with any changes made to
+# the project form. Note that this sequence of statements results in
+# only the last bad field being displayed, but thats okay. The user will
+# eventually figure out that fields marked with * mean something!
+#
+$formerror="No Error";
+if (!isset($gid) ||
+    strcmp($gid, "TestNet-One") == 0) {
+  $formerror = "Name";
+}
+if (!isset($grp_head_uid) ||
+    strcmp($grp_head_uid, "") == 0) {
+  $formerror = "Username";
+}
+if (!isset($grp_name) ||
+    strcmp($grp_name, "Test Networks One") == 0) {
+  $formerror = "Long Name";
+}
+if (!isset($usr_name) ||
+    strcmp($usr_name, "") == 0) {
+  $formerror = "Full Name";
+}
+if (!isset($grp_URL) ||
+    strcmp($grp_URL, "http://www.testnetworks.org") == 0) {
+  $formerror = "URL";
+}
+if (!isset($email) ||
+    strcmp($email, "") == 0) {
+  $formerror = "Email Address";
+}
+if (!isset($usr_addr) ||
+    strcmp($usr_addr, "") == 0) {
+  $formerror = "Mailing Address";
+}
+if (!isset($grp_affil) ||
+    strcmp($grp_affil, "UofX Networks Group") == 0) {
+  $formerror = "Research Afilliation";
+}
+if (!isset($usr_phones) ||
+    strcmp($usr_phones, "") == 0) {
+  $formerror = "Phone #";
+}
+#
+# Not sure about the passwd. If the user is already known, then is he
+# supposed to plug his passwd in?
+#
+if ((!isset($password1) || strcmp($password1, "") == 0) ||
+    (!isset($password2) || strcmp($password2, "") == 0)) {
+  $formerror = "Password";
+}
+
+if ($formerror != "No Error") {
+  echo "<h3><br><br>
+        Missing field; Please go back and fill out the \"$formerror\" field!\n
+        </h3>
+        </body>
+        </html>";
+  die("");
+}
+
 $returning=0;
 $my_passwd = $password1;
 $mypipe = popen(escapeshellcmd(
@@ -31,7 +94,7 @@ if (isset($gid) && isset($password1) && isset($email) &&
   $query2 = "SELECT gid FROM groups WHERE gid=\"$gid\"";
   $result2 = mysql_db_query("tbdb", $query2);
   if ($row = mysql_fetch_row($result2)) {
-    die("<h3>The group name you have chosen is already in use. ".
+    die("<h3>The project name you have chosen is already in use. ".
 	"Please select another. If you are a returning user, you must ".
 	"log in and use your current password.</h3>");
   } elseif ($row = mysql_fetch_row($result)) {
@@ -73,7 +136,7 @@ if (isset($gid) && isset($password1) && isset($email) &&
   $cresult = mysql_db_query("tbdb", $cmnd2);
   if (!cresult) {
     $err = mysql_error();
-    echo "<H3>Failed to add group $gid to the database: $err</h3>\n";
+    echo "<H3>Failed to add project $gid to the database: $err</h3>\n";
     exit;
   }
   mysql_db_query("tbdb","insert into grp_memb (uid,gid,trust)".
@@ -83,7 +146,7 @@ if (isset($gid) && isset($password1) && isset($email) &&
   fwrite($fp, "$email\n");   #Writes the email address to mailing lists
   fwrite($fp2, "$email\n");
 #  mail("lepreau@cs.utah.edu,calfeld@cs.utah.edu", 
-  mail("newbold@cs.utah.edu,stoller@cs.utah.edu", 
+  mail("newbold@cs.utah.edu,stoller@cs.utah.edu,lepreau@cs.utah.edu", 
        "TESTBED: New Group", "'$usr_name' wants to start group ".
        "'$gid'.\nContact Info:\nName:\t\t$usr_name ($grp_head_uid)\n".
        "Email:\t\t$email\nGroup:\t\t$grp_name\nURL:\t\t$grp_URL\n".
@@ -114,7 +177,7 @@ if (isset($gid) && isset($password1) && isset($email) &&
          "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
   }
   echo "
-<H1>Group '$gid' successfully added.</h1>
+<H1>Project '$gid' successfully added.</h1>
 <h2>The review committee has been notified of your application.
 Most applications are reviewed within one week. We will notify
 you by e-mail at '$usr_name&nbsp;&lt;$email>' of their decision
