@@ -5,10 +5,11 @@ if {$argc != 2} {
    exit 1
 }
 
-source tcl-object.tcl
-source node.tcl
-source link.tcl
-source event.tcl
+set libdir [file dirname [info script]]
+source $libdir/tcl-object.tcl
+source $libdir/node.tcl
+source $libdir/link.tcl
+source $libdir/event.tcl
 
 #nop is used for unimplemented $ns instprocs that are supposed to
 #return things. the instproc returns a nop, which users call in their
@@ -27,14 +28,14 @@ set linkslist [list]
 set eventlist [list]
 
 # sim.tcl handles the ns Simulator methods
-source sim.tcl
+source $libdir/sim.tcl
 
 # stubs.tcl contains a lot of dummy things to allow execution of 
 # ns files without going through the trouble of redoing ns or something.
 # i fear that it will grow without bound (or at least until I give up and
 # make this whole thing into an ns add-on and keep all of the ns behavior)
 
-source stubs.tcl
+source $libdir/stubs.tcl
  
 # argv[0] is the ns input file
 source [lindex $argv 0]
