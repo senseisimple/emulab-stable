@@ -28,7 +28,13 @@ tip.static: $(OBJS)
 $(OBJS): tipconf.h tip.h
 
 install: all
+	-mkdir -p $(INSTALL_BINDIR)
 	$(INSTALL_PROGRAM) tip.static $(INSTALL_BINDIR)/tip
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:	install
 
 clean:
 	rm -f $(OBJS) tip tip.static

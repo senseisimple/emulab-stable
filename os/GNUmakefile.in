@@ -18,7 +18,10 @@ imagezip:
 	@$(MAKE) -C imagezip all
 
 install: 
-	@$(MAKE) -C imagezip install	
+	@$(MAKE) -C imagezip install
+
+control-install: 
+	@$(MAKE) -C imagezip install
 
 clean:		subdir-clean
 

@@ -24,4 +24,13 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
 
+#
+# Control node installation (okay, plastic)
+#
+control-install:
+	cd /tmp/gg && \
+		list='$(BIN_SCRIPTS)'; for file in $$list; do \
+			ln -s plasticwrap $$file; \
+		done;
+
 clean:

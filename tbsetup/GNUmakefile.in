@@ -76,6 +76,10 @@ post-install:
 # Control node installation (okay, plastic)
 #
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
+	cd $(INSTALL_BINDIR) && \
+		list='$(BIN_STUFF)'; for file in $$list; do \
+			ln -s plasticwrap $$file; \
+		done;
 
 clean:	subdir-clean
 	rm -f *.o core tbreport
