@@ -329,35 +329,32 @@ example:
 <ul>
 <li> Links:
      <ul>
-     <code><pre>
      <li> $link0 up
      <li> $link0 down
      <li> $link0 bandwidth 10Mb duplex
      <li> $link0 delay 10ms
-     <li> $link0 plr 0.1</code></pre>
+     <li> $link0 plr 0.1
      </ul>
 
 <li> Queues: Queues are special. In your NS file you modify the actual
      queue, while on the command line you use the link that queue is
      part of.
      <ul>
-     <code><pre>
      <li> $queue0 set queue-in-bytes_ 0
      <li> $queue0 set limit_ 75
      <li> $queue0 set maxthresh_ 20
      <li> $queue0 set thresh_ 7
      <li> $queue0 set linterm_ 11
-     <li> $queue0 set q_weight_ 0.004</code></pre>
+     <li> $queue0 set q_weight_ 0.004
      </ul>
 
 <li> CBR
      <ul>
-     <code><pre>
      <li> $cbr0 start
      <li> $cbr0 set packetSize_ 512
      <li> $cbr0 set interval_ 0.01
      <li> $cbr0 set rate_ 10Mbs
-     <li> $cbr0 stop </code></pre>
+     <li> $cbr0 stop
      </ul>
 
 <li> FullTcp, FTP and Telnet: Refer NS documentation <a
