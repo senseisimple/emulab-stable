@@ -1,13 +1,3 @@
-From: Leigh Stoller <stoller@fast.cs.utah.edu>
-To: Testbed Operations <testbed-ops@fast.cs.utah.edu>
-Subject: Re: web form stuff
-Date: Tue, 7 Nov 2000 17:20:42 -0800 (PST)
-
-So, here is my list of things to do. No particular order. Relative
-importance should be obvious. Whoever does this work *will* program in the
-dominate style of the existing, newly written, 4500 lines of code! Now, if
-I could just figure out how to add a php mode to emacs ...
-
 * Add DB connect as authorized user so we can track whats going in
   the DB log files.
 
@@ -16,9 +6,6 @@ I could just figure out how to add a php mode to emacs ...
 * Put a limit on the number of new users/projects that can be
   unapproved (to prevent DOS attacks on the database).
 
-* Run arguments through addslashes to quote special characters since
-  things like ' in strings mess up database insertion. 
-  
 * Decouple root privs from begin experiment privs, as per Jay
   request. Default on for begin experiment, default off for root.
 
@@ -29,13 +16,6 @@ I could just figure out how to add a php mode to emacs ...
   things up a tiny bit. I tend to be a minimalist (my favorite example is
   the google search page compared to the Lycos or netscape page), but my
   stuff is probably too minimal.
-
-* Admin pages. Continue to add the admin modes to various pages, or create
-  a new set of admin only pages. I prefer admin modes in existing pages.
-
-* Continue on the authentication stuff as per Dave's original suggestion of
-  certificates. I'm not too crazy about this unless its easy to do all of it
-  on my home machine (apache server).
 
 * More linking of information in the forms. There are some obvious places
   where stuff should be presented as hypertext links so that navigation is
@@ -55,4 +35,4 @@ I could just figure out how to add a php mode to emacs ...
 * Lastly, macrofy the entire thing and get rid the damn frames! I hate
   frames!
 
-Lbs
+* Maybe add VLAN info to the experiment info page.
