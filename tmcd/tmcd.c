@@ -19,6 +19,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <sys/wait.h>
+#include <sys/fcntl.h>
 #include <paths.h>
 #include <mysql/mysql.h>
 #include "decls.h"
@@ -115,6 +116,7 @@ COMMAND_PROTOTYPE(docreator);
 COMMAND_PROTOTYPE(dotunnels);
 COMMAND_PROTOTYPE(dovnodelist);
 COMMAND_PROTOTYPE(doisalive);
+COMMAND_PROTOTYPE(doipodhash);
 
 struct command {
 	char	*cmdname;
@@ -147,6 +149,7 @@ struct command {
 	{ "tunnels",	dotunnels},
 	{ "vnodelist",	dovnodelist},
 	{ "isalive",	doisalive},
+	{ "ipodhash",	doipodhash},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -3209,6 +3212,53 @@ COMMAND_PROTOTYPE(doisalive)
 	 * to do (update accounts).
 	 */
 	sprintf(buf, "UPDATE=%d\n", doaccounts);
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	return 0;
+}
+  
+/*
+ * Return a ipod hash.
+ */
+COMMAND_PROTOTYPE(doipodhash)
+{
+	char		buf[MYBUFSIZE], *bp;
+	unsigned char	randdata[16];
+	int		fd, cc, i;
+
+	if (!tcp) {
+		error("IPODHASH: %s: Cannot do this in UDP mode!\n", nodeid);
+		return 1;
+	}
+
+	if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
+		errorc("opening /dev/urandom");
+		return 1;
+	}
+	if ((cc = read(fd, randdata, sizeof(randdata))) < 0) {
+		errorc("reading /dev/urandom");
+		close(fd);
+		return 1;
+	}
+	if (cc != sizeof(randdata)) {
+		error("Short read from /dev/urandom: %d", cc);
+		close(fd);
+		return 1;
+	}
+	close(fd);
+
+	bp = buf;
+	for (i = 0; i < sizeof(randdata); i++) {
+		bp += sprintf(bp, "%02x", randdata[i]);
+	}
+	*bp = '\0';
+
+	mydb_update("update nodes set ipodhash='%s' "
+		    "where node_id='%s'",
+		    buf, nodeid);
+	
+	*bp++ = '\n';
+	*bp++ = '\0';
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	return 0;
