@@ -12,13 +12,14 @@ my  $optlist = "";
 # Configure variables
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $USERS       = "@USERNODE@";
 
 # Should be configure variable!
 my $TBACTIVE	= "testbed-active-users-archive\@flux.cs.utah.edu";
 my $TBALL	= "testbed-users-archive\@flux.cs.utah.edu";
 
 # Note no -n option. We redirect stdin from the new exports file below.
-my $SSH		= "$TB/bin/sshtb -l root users.emulab.net";
+my $SSH		= "$TB/bin/sshtb -l root $USERS";
 my $PROG	= "/usr/testbed/sbin/genelists.proxy";
 my $lockfile    = "/var/tmp/testbed_genelists_lockfile";
 my $tempfile    = "/var/tmp/testbed_genelists_tempfile";
