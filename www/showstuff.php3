@@ -891,11 +891,12 @@ function SHOWNODES($pid, $eid) {
 	
 	
 	$query_result =
-	    DBQueryFatal("SELECT nodes.*,reserved.*, ".
+	    DBQueryFatal("SELECT nodes.*,reserved.*,ns.status as nodestatus, ".
 	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 	        "FROM nodes LEFT JOIN node_activity ".
 		"on nodes.node_id=node_activity.node_id ".
 		"LEFT JOIN reserved ON nodes.node_id=reserved.node_id ".
+		"LEFT JOIN node_status as ns ON ns.node_id=nodes.node_id ".
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
 	        "ORDER BY $sort");
 
@@ -906,7 +907,7 @@ function SHOWNODES($pid, $eid) {
 	    $def_boot_osid = $row[def_boot_osid];
 	    $startstatus   = $row[startstatus];
 	    $readystatus   = $row[ready];
-	    $status        = $row[status];
+	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
 	    $idlehrs       = TBGetNodeIdleTime($node_id);
 
