@@ -64,4 +64,6 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth2 /etc/sysconfig/network-scripts/ifcfg-eth2
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth3 /etc/sysconfig/network-scripts/ifcfg-eth3
 	$(INSTALL) -m 755 $(SRCDIR)/ifcfg-eth4 /etc/sysconfig/network-scripts/ifcfg-eth4
-
+	$(INSTALL) -m 755 $(SRCDIR)/rc.route $(INSTALL_DIR)/rc.route
+	$(INSTALL) -m 644 $(SRCDIR)/gated_eth2.conf $(INSTALL_DIR)/gated_eth2.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_eth4.conf $(INSTALL_DIR)/gated_eth4.conf
