@@ -692,8 +692,22 @@ while ( @nodelist ) {
 	next;
     }
 
-    # Reserve it to down experiment.
-    MarkNodeDown($node);
+    #
+    # If the user has picked a standard image and it fails to boot,
+    # something is wrong, so reserve it to hwdwon experiment. If the
+    # image belongs to the user, then we assume its the image at fault,
+    # and allow it to be returned to the pool (caller, tbswap will end
+    # doing the nfree on nodes with a DOWN allocstate).
+    #
+    my $pidofosid;
+    if (! TBOsidToPid($osids{$node}, \$pidofosid) ||
+	$pidofosid eq TBOPSPID()) {
+	MarkNodeDown($node);
+	TBSetNodeLogEntry($node, $dbuid, TB_DEFAULT_NODELOGTYPE(),
+			  "'Moved to hwdown by os_setup; ".
+			  "failed to boot image for osid " . $osids{$node} .
+			  " in $pid/$eid'");
+    }
     TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_DOWN() );
     $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 

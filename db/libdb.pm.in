@@ -28,7 +28,7 @@ use vars qw(@ISA @EXPORT);
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT
 
-	 PROJROOT GROUPROOT USERROOT TBOPSPID
+	 PROJROOT GROUPROOT USERROOT TBOPSPID 
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
 
 	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust
@@ -152,7 +152,7 @@ use vars qw(@ISA @EXPORT);
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
-	 TBResolveNextOSID
+	 TBResolveNextOSID TBOsidToPid
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
 	 TBdbfork VnameToNodeid TBExpLocked
 	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
@@ -1920,6 +1920,27 @@ sub TBOSID ($$) {
 
     my @row = $query_result->fetchrow_array();
     return $row[0];
+}
+
+#
+# Return pid of an osid (internal name).
+#
+# usage: TBOsidToPid(char *osid, \$pid)
+#        returns 1 if osid is valid; store pid into return arg.
+#        returns 0 if osid is not valid.
+#
+sub TBOsidToPid ($$) {
+    my($osid, $ppid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select pid from os_info where osid='$osid'");
+
+    if (! $query_result->num_rows) {
+	return 0;
+    }
+    my ($pid) = $query_result->fetchrow_array();
+    $$ppid = $pid;
+    return 1;
 }
 
 #
