@@ -229,6 +229,7 @@ COMMAND_PROTOTYPE(dotmcctest);
 COMMAND_PROTOTYPE(dofwinfo);
 COMMAND_PROTOTYPE(dohostinfo);
 COMMAND_PROTOTYPE(doemulabconfig);
+COMMAND_PROTOTYPE(dolocalize);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -305,6 +306,7 @@ struct command {
         { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
         { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
 	{ "emulabconfig", FULLCONFIG_NONE, F_ALLOCATED, doemulabconfig},
+	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5449,3 +5451,40 @@ COMMAND_PROTOTYPE(dotmcctest)
 		info("%s", buf);
 	return 0;
 }
+
+/*
+ * Return node localization. For example, boss root pub key, root password,
+ * stuff like that.
+ */
+COMMAND_PROTOTYPE(dolocalize)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
+	int		nrows;
+
+	*bufp = (char) NULL;
+
+	/*
+	 * XXX sitevar fetching should be a library function
+	 */
+	res = mydb_query("select name,value "
+			 "from sitevariables where name='node/ssh_pubkey'",
+			 2);
+	if (!res || (nrows = (int)mysql_num_rows(res)) == 0) {
+		error("DOLOCALIZE: sitevar node/ssh_pubkey does not exist\n");
+		if (res)
+			mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	if (row[1]) {
+	    bufp += OUTPUT(bufp, ebufp - bufp, "ROOTPUBKEY='%s'\n", row[1]);
+	}
+	mysql_free_result(res);
+	client_writeback(sock, buf, strlen(buf), tcp);
+	return 0;
+}
+
