@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -26,12 +26,9 @@ my $STALESLOP = 1 * 60;
 #
 # Age (in seconds) at which we consider metric data stale
 #
-my $STALEAGE  = 30 * 60;
+my $STALEAGE;
 
-my $fetch   = 0;
 my $debug   = 0;
-my $tempfile = "/tmp/plabxml.$$";
-my $agedfile = "$TB/log/plabxml.txt";
 my $showload = 0;
 my $showcpu = 0;
 my $showmem = 0;
@@ -39,7 +36,6 @@ my $showdisk = 0;
 my $showhost = 1;
 my $showip = 0;
 my $showstate = 0;
-my $ganglianames = 0;
 my $now = time();
 my $header;
 
@@ -48,18 +44,16 @@ my $optlist = "CDLMSdfhino";
 sub usage()
 {
     print STDOUT
-	"Usage: plabstats [-dfh] [-CDHILMS]\n".
+	"Usage: plabstats [-dhin] [-CDLMS]\n".
 	"  -d	print debug diagnostics\n".
-	"  -f	fetch new data, else use what is in $agedfile\n".
 	"  -h	this help message\n".
 	"  -i	print IP address along with metrics\n".
 	"  -n	do not print hostname with metrics\n".
-	"  -o   print hostnames from Ganglia, rather than the database\n".
 	"\n".
-	"  -C	print Ganglia CPU metrics, sorted by %CPU usage\n".
-	"  -D	print Ganglia disk metrics, sorted by %disk usage\n".
-	"  -L	print Ganglia load metrics, sorted by one minute load\n".
-	"  -M	print Ganglia memory metrics, sorted by %mem usage\n".
+	"  -C	print CPU metrics, sorted by %CPU usage\n".
+	"  -D	print disk metrics, sorted by %disk usage\n".
+	"  -L	print load metrics, sorted by one minute load\n".
+	"  -M	print memory metrics, sorted by %mem usage\n".
 	"  -S	print Emulab state info, summarizing per-node availability\n".
 	"\n".
 	"Default is to print a terse summary of per-node resource usage.\n";
@@ -86,8 +80,6 @@ use libdb;
 use libtestbed;
 
 # Locals
-my %nodemap     = ();
-my %dbhostnames = ();
 my $LOADMETRIC;
 my $MAXLOAD;
 my $MINDISK;
@@ -113,9 +105,6 @@ if (@ARGV) {
 if (defined($options{"d"})) {
     $debug   = 1;
 }
-if (defined($options{"f"})) {
-    $fetch = 1;
-}
 if (defined($options{"h"})) {
     usage();
 }
@@ -124,9 +113,6 @@ if (defined($options{"i"})) {
 }
 if (defined($options{"n"})) {
     $showhost = 0;
-}
-if (defined($options{"o"})) {
-    $ganglianames = 1;
 }
 if (defined($options{"C"})) {
     $showcpu = 1;
@@ -149,7 +135,7 @@ if (defined($options{"S"})) {
 #
 if (TBSiteVarExists("plab/load_metric")) {
     $LOADMETRIC = TBGetSiteVar("plab/load_metric");
-    if ($LOADMETRIC !~ /^load_(one|five}fifteen)$/) {
+    if ($LOADMETRIC !~ /^load_(one|five|fifteen)$/) {
 	undef $LOADMETRIC;
     }
 }
@@ -173,61 +159,13 @@ if (TBSiteVarExists("plab/min_disk")) {
     $MINDISK = 10;
 }
 
-#
-# Download the metrics from the plab site.
-# Do this before hitting the DB in case it fails.
-#
-if ($fetch) {
-    #
-    # Must prevent hangs ...
-    #
-    my $syspid = fork();
-
-    if ($syspid) {
-	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 60;
-	waitpid($syspid, 0);
-	alarm 0;
-
-	fatal("Timed out downloading XML data from web site!")
-	    if ($? == 15);
-	    
-	fatal("Could not download XML data from web site!")
-	    if ($?);
-    }
-    else {
-	exec("/usr/local/bin/wget -q -O $tempfile ".
-	     "http://www.planet-lab.org/xml/gmetad.xml");
-	exit(0);
-    }
+if (TBSiteVarExists("plab/stale_age")) {
+    $STALEAGE = TBGetSiteVar("plab/stale_age");
+    $STALEAGE = 0 if $STALEAGE < 0;
+} else {
+    $STALEAGE = 60;
 }
-else {
-    #
-    # Copy aged file to avoid having it changed underneath. Not perfect.
-    # Okay for now; will eventually be in the DB where we can lock it.
-    #
-    fatal("File does not exist: $agedfile")
-        if (! -e $agedfile);
-    system("cp -pf $agedfile $tempfile") == 0 or
-        fatal("Could not copy $agedfile to $tempfile!");
-}
-
-#
-# Grab the node list from the DB in one query, which we use later to
-# map from the IP we get from the XML output, to our node_id. 
-#
-my $query_result =
-    DBQueryFatal("select i.node_id,i.IP,w.hostname from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "left join interfaces as i on i.node_id=n.node_id ".
-		 "left join widearea_nodeinfo as w on n.node_id=w.node_id ".
-		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
-    		 "and nt.class='pcplabphys'");
-
-while (my ($nodeid,$IP,$hostname) = $query_result->fetchrow_array()) {
-    $nodemap{$IP} = $nodeid;
-    $dbhostnames{$nodeid} = $hostname;
-}
+$STALEAGE *= 60;
 
 #
 # Compute max load for each user-specified level
@@ -240,29 +178,42 @@ if ($showstate) {
 }
 
 #
-# Finally, run the parser.
+# Grab the node list from the DB in one query, which we use later to
+# map from the IP we get from the XML output, to our node_id. 
 #
-$p1 = new XML::Parser(Style => 'Tree');
-$p1->setHandlers('Start'   => \&StartElement,
-		 'End'     => \&EndElement);
+my $query_result =
+    DBQueryFatal("select n.node_id as plabnode, ni.hostname, i.IP, ".
+		 "    nr.load_1min,nr.load_5min,nr.load_15min,nr.disk_used, ".
+		 "    now() - nr.status_timestamp as metricsage ".
+		 " from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join widearea_nodeinfo as ni on n.node_id=ni.node_id ".
+		 "left join interfaces as i on n.node_id=i.node_id ".
+		 "left join node_rusage as nr on nr.node_id=n.node_id ".
+		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
+    		 "and nt.class='pcplabphys'");
 
-fatal($@)
-    if (eval { $p1->parsefile($tempfile); return 1; } != 1);
-
 #
-# Loop thru the IP map looking for any nodes that we have listed in the DB
-# but for which we got no metrics.
-#
+# Loop through and extract metrics.
+# 
 $debug = 0;
-foreach my $arg (keys(%nodemap)) {
-    $IP = $arg;
-    if (defined($nodemap{$IP})) {
-	$host = "(" . $dbhostnames{$nodemap{$IP}} . ")";
-	ShowMetrics();
-	undef($host);
-	undef($metricsage);
-	%metrics = ();
+while (my %row = $query_result->fetchhash()) {
+    my $nodeid = $row{'plabnode'};
+
+    # XXX compat
+    $host = $row{'hostname'};
+    $IP = $row{'IP'};
+    $metricsage = $row{'metricsage'};
+    $metrics{load_one} = $row{'load_1min'} if defined($row{'load_1min'});
+    $metrics{load_five} = $row{'load_5min'} if defined($row{'load_5min'});
+    $metrics{load_fifteen} = $row{'load_15min'} if defined($row{'load_15min'});
+    if (defined($row{'disk_used'})) {
+	$metrics{disk_total} = 100;
+	$metrics{disk_free} = 100 - $row{'disk_used'};
     }
+
+    ShowMetrics();
+    %metrics = ();
 }
 
 sub SortMe
@@ -312,8 +263,6 @@ for $line (sort SortMe @nodelist) {
     print "$line\n";
 }
 
-unlink($tempfile)
-    if (defined($tempfile) && -e $tempfile);
 exit(0);
 
 sub CheckMetrics()
@@ -461,7 +410,7 @@ sub ShowMetrics()
 	my $gotone = 0;
 
 	$line .= "STATE=";
-	if (!defined($nodemap{$IP})) {
+	if (0) {
 	    $gotone = 1;
 	    $line .= "reject_unknown_node";
 	}
@@ -490,104 +439,11 @@ sub ShowMetrics()
 	}
     }
 
-    # XXX so we can detect nodes in the DB for which we got no status
-    undef($nodemap{$IP});
-
     push @nodelist, $line;
 }
-
-#
-# Start an element.
-# 
-sub StartElement ($$$)
-{
-    my ($expat, $element, %attrs) = @_;
-
-    SWITCH: for ($element) {
-	/^CLUSTER/i && do {
-	    fatal("Out of Sync: CLUSTER!")
-		if (defined($cluster) || defined($host));
-	    
-	    fatal("Malformed CLUSTER Element!")
-		if (!defined($attrs{"NAME"}));
-	    
-	    $cluster = $attrs{"NAME"};
-	    last SWITCH;
-	};
-	/^HOST/i && do {
-	    fatal("Out of Sync: HOST!")
-		if (defined($host) || !defined($cluster));
-	    
-	    fatal("Malformed HOST Element!")
-		if (!defined($attrs{"NAME"}));
-	    
-	    $host = $attrs{"NAME"};
-	    $IP   = $attrs{"IP"};
-
-	    $metricsage = $now - $attrs{"REPORTED"};
-	    if ($metricsage < 0) {
-		print "* * * WARNING $host: bogus report time (" .
-		    $attrs{"REPORTED"} . " > $now)\n";
-		$metricsage = 0x3fffffff;
-	    }
-	    last SWITCH;
-	};
-	/^METRIC/i && do {
-	    fatal("Out of Sync: METRIC!")
-		if (!defined($host) || !defined($cluster));
-
-	    fatal("Malformed METRIC Element!")
-		if (!defined($attrs{"NAME"}) ||
-		    !defined($attrs{"VAL"}));
-		
-	    $metrics{$attrs{"NAME"}} = $attrs{"VAL"};
-	    last SWITCH;
-	};
-    }
-}
-
-#
-# End an element.
-# 
-sub EndElement ($$)
-{
-    my ($expat, $element) = @_;
-
-    SWITCH: for ($element) {
-	/^CLUSTER/i && do {
-	    fatal("Out of Sync (End): CLUSTER!")
-		if (!defined($cluster) || defined($host));
-	    
-	    undef($cluster);
-	    last SWITCH;
-	};
-	/^HOST/i && do {
-	    fatal("Out of Sync (End): HOST!")
-		if (!defined($host) || !defined($cluster));
-
-	    ShowMetrics();
-
-	    undef($host);
-	    undef($IP);
-	    undef($metricsage);
-	    %metrics = ();
-	    last SWITCH;
-	};
-	/^METRIC/i && do {
-	    fatal("Out of Sync (End): METRIC!")
-		if (!defined($host) || !defined($cluster));
-
-	    last SWITCH;
-	};
-    }
-}
-
-
 
 sub fatal {
     my $msg = $_[0];
 
-    unlink($tempfile)
-	if (defined($tempfile) && -e $tempfile);
     die($msg);
 }

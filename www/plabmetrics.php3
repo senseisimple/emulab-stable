@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -182,10 +182,7 @@ echo "<table border=2
 echo "<tr>
           <th><a href='plabmetrics.php3?&sortby=nodeid'>Node ID</a></th>
           <th><a href='plabmetrics.php3?&sortby=load'>$loadmetric</a></th>
-          <th><a href='plabmetrics.php3?&sortby=cpu'>%CPU Used</a></th>
-          <th><a href='plabmetrics.php3?&sortby=mem'>%Mem Used</a></th>
           <th><a href='plabmetrics.php3?&sortby=disk'>%Disk Used</a></th>
-          <th><a href='plabmetrics.php3?&sortby=netbw'>Net BW (KB/sec)</a></th>
           <th><a href='plabmetrics.php3?&sortby=name'>Name</a></th>
       </tr>\n";
 
@@ -202,10 +199,7 @@ foreach ($nodemetrics as $index => $metrics) {
     echo "<tr>
               <td>$nodeid</td>
               <td>$load</td>
-              <td>$cpu</td>
-              <td>$mem</td>
               <td>$disk</td>
-              <td>$netbw</td>
               <td>$name</td>
           </tr>\n";
 }
