@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,6 +22,7 @@ use POSIX qw(setsid);
 use Fcntl;
 use IO::Handle;
 use File::Basename;
+use Time::HiRes qw(gettimeofday);
 
 #my $MAILTAG  = "@OURDOMAIN@";
 my $MAILTAG  = "@THISHOMEBASE@";
@@ -147,7 +148,9 @@ sub OPENMAIL($$;$$)
 #
 sub TBTimeStamp()
 {
-    return POSIX::strftime("%H:%M:%S", localtime());
+    my ($seconds, $microseconds) = gettimeofday();
+    
+    return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
 }
 
 #
