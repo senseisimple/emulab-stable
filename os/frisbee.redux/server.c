@@ -101,7 +101,6 @@ typedef struct {
 } WQelem_t;
 static queue_head_t     WorkQ;
 static pthread_mutex_t	WorkQLock;
-static pthread_cond_t	WorkQCond;
 static int		WorkQDelay = -1;
 static int		WorkQSize = 0;
 #ifdef STATS
@@ -128,7 +127,6 @@ static void
 WorkQueueInit(void)
 {
 	pthread_mutex_init(&WorkQLock, NULL);
-	pthread_cond_init(&WorkQCond, NULL);
 	queue_init(&WorkQ);
 
 	if (WorkQDelay < 0)
@@ -187,8 +185,6 @@ WorkQueueEnqueue(int chunk, int block, int blockcount)
 		WorkQMax = WorkQSize;
 #endif
 
-	if (WorkQSize == 1)
-		pthread_cond_signal(&WorkQCond);
 	pthread_mutex_unlock(&WorkQLock);
 
 	EVENT(1, EV_WORKENQ, mcastaddr, chunk, block, blockcount, WorkQSize);
@@ -200,31 +196,16 @@ WorkQueueDequeue(int *chunk, int *block, int *blockcount)
 {
 	WQelem_t	*wqel;
 
-	/*
-	 * Wait for up to WorkQDelay usec for work
-	 */
 	pthread_mutex_lock(&WorkQLock);
-	if (WorkQSize == 0) {
-		struct timeval tv;
-		struct timespec ts;
 
-		gettimeofday(&tv, 0);
-		ts.tv_nsec = tv.tv_usec * 1000 + WorkQDelay;
-		if (ts.tv_nsec >= 1000000000) {
-			ts.tv_sec = tv.tv_sec + 1;
-			ts.tv_nsec -= 1000000000;
-		} else
-			ts.tv_sec = tv.tv_sec;
-
-		do {
-			if (pthread_cond_timedwait(&WorkQCond,
-						   &WorkQLock, &ts) != 0) {
-				pthread_mutex_unlock(&WorkQLock);
-				return 0;
-			}
-			if (WorkQSize == 0)
-				DOSTAT(wakeups++);
-		} while (WorkQSize == 0);
+	/*
+	 * Condvars broken in linux threads impl, so use this rather bogus
+	 * sleep to keep from churning cycles. 
+	 */
+	if (queue_empty(&WorkQ)) {
+		pthread_mutex_unlock(&WorkQLock);
+		fsleep(WorkQDelay);
+		return 0;
 	}
 	
 	queue_remove_first(&WorkQ, wqel, WQelem_t *, chain);
