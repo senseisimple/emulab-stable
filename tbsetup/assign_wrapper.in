@@ -220,6 +220,31 @@ my $forcelinkdelays = 0;
 my %uselinkdelay    = ();
 my %nobwshaping     = ();
 
+#
+# This is for stats gathering. It might duplicate other stuff, but
+# thats okay.
+#
+my %expt_stats = (# pnodes include jailnodes and delaynodes.
+		  # We let the wrapper determine pnodes once the
+		  # experiment is fully swapped in so that the record
+		  # is not "committed" until successful swapin.
+		  jailnodes   => 0,
+		  vnodes      => 0,
+                  # vnodes include wanodes.
+		  wanodes     => 0,
+		  simnodes    => 0,
+		  delaynodes  => 0,
+		  linkdelays  => 0,
+		  links       => 0,
+		  walinks     => 0,
+		  lans        => 0,
+		  shapedlinks => 0,
+		  shapedlans  => 0,
+		  minlinks    => 100000,
+		  # includes emulated links. Maybe thats wrong.
+		  maxlinks    => 0,
+);
+
 my $query_result =
     DBQueryFatal("SELECT uselinkdelays,forcelinkdelays from experiments ".
 		 "where pid='$pid' and eid='$eid'");
@@ -330,7 +355,17 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) =
     $isremotenode{$vname} = $isremote;
     $remotecount++
 	if ($isremote);
-    foreach $ipinfo (split(" ",$ips)) {
+
+    # stats
+    my @iplist  = split(" ", $ips);
+    my $ipcount = scalar(@iplist);
+
+    $expt_stats{"maxlinks"} = $ipcount
+	if ($ipcount > $expt_stats{"maxlinks"});
+    $expt_stats{"minlinks"} = $ipcount
+	if ($ipcount < $expt_stats{"minlinks"});
+
+    foreach $ipinfo (@iplist) {
 	($port,$ip) = split(":",$ipinfo);
 	$ips{"$vname:$port"} = $ip;
 	if( $type eq "sim" ) {
@@ -347,6 +382,11 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) =
     }
 }
 $result->finish;
+
+# Stats
+$expt_stats{"vnodes"}   = $virtcount;
+$expt_stats{"wanodes"}  = $remotecount;
+$expt_stats{"simnodes"} = scalar(@simnodelist);
 
 printdb "Loading virt_lans.\n";
 $result =
@@ -387,6 +427,7 @@ while (my ($vname,$member,$delay,$bandwidth,$lossrate,
 	}
 	push(@{$tunnels{$vname}},$member);
 	$rnodelans{$vname} = 1;
+	$expt_stats{"walinks"} += 1;
 	printdb "    Added $member to tunnels of $vname\n";
 	next;
     }
@@ -546,6 +587,7 @@ foreach $lan (keys(%lans)) {
     my $emulated = $emulated{$lan};
     my $uselinkdelay = $uselinkdelay{$lan};
     my $mustdelay = $mustdelay{$lan};
+    my $isdelayed = 0;
     my $nobwshaping = $nobwshaping{$lan};
     $trivial_ok = 0;
     foreach $member (@members) {
@@ -576,6 +618,7 @@ foreach $lan (keys(%lans)) {
 	$trivial_ok = 1;
     }
     if ($#members == 1) {
+	$expt_stats{"links"} += 1;
 	($nodeport0,$nodeport1) = @members;
 	$node0 = (split(":",$nodeport0))[0];
 	$node1 = (split(":",$nodeport1))[0];
@@ -615,6 +658,7 @@ foreach $lan (keys(%lans)) {
 	    # simulated and a real node, we might need to put in delay
 	    # nodes
 	    ($realnodes != 0)) {
+	    $isdelayed = 1;
 	    #
 	    # We use a linkdelay if the link is emulated, globally forced,
 	    # globally preferred if the link is shaped, or if the per-link
@@ -685,8 +729,10 @@ foreach $lan (keys(%lans)) {
 	    }
 	    print TOPFILE "\n";
 	}
+	$expt_stats{"shapedlinks"} += $isdelayed;
     } elsif ($#members != 0) {
 	print TOPFILE "node lan/$lan lan\n";
+	$expt_stats{"lans"} += 1;
 	$lannodes{"lan/$lan"} = 1;
 	foreach $member (@members) {
 	    ($delay,$bw,$loss,
@@ -715,6 +761,7 @@ foreach $lan (keys(%lans)) {
 		# if we have 1 real node in the LAN, we may need to create
 		# a lan
 		($realnodes != 0)) {
+		$isdelayed = 1;
 		#
 		# We use a linkdelay if the link is emulated, globally forced,
 		# globally preferred if the link is shaped, or if the per-link
@@ -776,6 +823,7 @@ foreach $lan (keys(%lans)) {
 		print TOPFILE "\n";
 	    }
 	}
+	$expt_stats{"shapedlans"} += $isdelayed;
     }
     # If a LAN has only one member we don't do anything.
 }
@@ -1687,6 +1735,8 @@ foreach $delayid (keys(%linkdelays)) {
 		 "   idx from event_objecttypes where ".
 		 "   event_objecttypes.type='LINK'");
 
+    $expt_stats{"linkdelays"} += 1;
+
     #
     # We used to post-pass the eventlist to set the vnode where the agent
     # would be running, but this is no longer needed since the virt_agents
@@ -2088,7 +2138,7 @@ foreach my $vnode (keys(%v2pmap)) {
     DBQueryFatal("insert into v2pmap (pid,eid,vname,node_id) values " .
 		 "('$pid','$eid','$vnode','$pnode')");
 }
-
+UploadStats();
 TBDebugTimeStamp("uploading finished");
 
 TBDebugTimeStamp("assign_wrapper finished");
@@ -2218,6 +2268,8 @@ sub InitPnode($pnode, $vnode)
 
 	DBQueryFatal("update reserved set vname='$vname' " .
 		     "where node_id='$pnode'");
+
+	$expt_stats{"jailnodes"} += 1;
     }
     else {
 	#
@@ -2265,6 +2317,8 @@ sub InitPnode($pnode, $vnode)
 
 	    DBQueryFatal("update reserved set vname='$vname' " .
 			 "where node_id='$pnode'");
+
+	    $expt_stats{"delaynodes"} += 1;
 	}
     }
     printdb("reserved vname: $pnode $vname\n");
@@ -2498,3 +2552,18 @@ sub UploadVlans()
     }
 }
 
+#
+# Write the stats record to the DB. 
+#
+sub UploadStats()
+{
+    my @updates = ();
+
+    foreach my $key (keys(%expt_stats)) {
+	$val = $expt_stats{$key};
+
+	push (@updates, "$key=$val");
+    }
+    DBQueryFatal("update experiment_stats set " . join(",", @updates) . " ".
+		 "where pid='$pid' and eid='$eid'");
+}

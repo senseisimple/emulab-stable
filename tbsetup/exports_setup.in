@@ -46,7 +46,7 @@ if ($EUID != 0) {
 	"    Must be root! Maybe its a development version?\n");
 }
 # XXX Hacky!
-if (1 && $TB ne "/usr/testbed") {
+if (0 && $TB ne "/usr/testbed") {
     print STDERR "*** $0:\n".
 	         "    Wrong version. Maybe its a development version?\n";
     #

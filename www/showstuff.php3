@@ -1738,6 +1738,107 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
 }
 
 #
+# Stats
+#
+function SHOWUSERSTATS($uid) {
+
+    $query_result =
+	DBQueryFatal("SELECT * from user_stats where uid='$uid'");
+
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+    $row = mysql_fetch_assoc($query_result);
+
+    #
+    # Not pretty printed yet.
+    #
+    echo "<table align=center border=1>\n";
+    
+    foreach($row as $key => $value) {
+	echo "<tr>
+                  <td>$key:</td>
+                  <td>$value</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+function SHOWPROJSTATS($pid) {
+
+    $query_result =
+	DBQueryFatal("SELECT * from project_stats where pid='$pid'");
+
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+    $row = mysql_fetch_assoc($query_result);
+
+    #
+    # Not pretty printed yet.
+    #
+    echo "<table align=center border=1>\n";
+    
+    foreach($row as $key => $value) {
+	echo "<tr>
+                  <td>$key:</td>
+                  <td>$value</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+function SHOWGROUPSTATS($pid, $gid) {
+
+    $query_result =
+	DBQueryFatal("SELECT * from group_stats ".
+		     "where pid='$pid' and gid='$gid'");
+
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+    $row = mysql_fetch_assoc($query_result);
+
+    #
+    # Not pretty printed yet.
+    #
+    echo "<table align=center border=1>\n";
+    
+    foreach($row as $key => $value) {
+	echo "<tr>
+                  <td>$key:</td>
+                  <td>$value</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+function SHOWEXPTSTATS($pid, $eid) {
+
+    $query_result =
+	DBQueryFatal("SELECT * from experiment_stats ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if (! mysql_num_rows($query_result)) {
+	return;
+    }
+    $row = mysql_fetch_assoc($query_result);
+
+    #
+    # Not pretty printed yet.
+    #
+    echo "<table align=center border=1>\n";
+    
+    foreach($row as $key => $value) {
+	echo "<tr>
+                  <td>$key:</td>
+                  <td>$value</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+#
 # This is an included file.
 # 
 ?>

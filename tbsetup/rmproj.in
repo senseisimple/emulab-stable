@@ -202,10 +202,11 @@ $EUID = 0;
 #
 # Then the project table itself, plus a few other bits and pieces
 # 
-DBQueryFatal("delete FROM projects where pid='$pid'");
 DBQueryFatal("delete FROM images where pid='$pid'");
 DBQueryFatal("delete FROM os_info where pid='$pid'");
 DBQueryFatal("delete FROM nodetypeXpid_permissions where pid='$pid'");
+DBQueryFatal("delete FROM project_stats where pid='$pid'");
+DBQueryFatal("delete FROM projects where pid='$pid'");
 
 print "Project $pid has been removed!\n";
 exit(0);

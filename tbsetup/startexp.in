@@ -182,8 +182,6 @@ my $estate	= $row{'state'};
 my $expt_path   = $row{'path'};
 my $expt_name   = $row{'expt_name'};
 my $expt_created= $row{'expt_created'};
-my $expt_expires= $row{'expt_expires'};
-my $expt_started;
 
 if ($estate ne EXPTSTATE_NEW) {
     die("*** $0:\n".
@@ -269,22 +267,19 @@ if (system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
 }
 
 #
-# Increment the project experiment count/lastdate. This is informational. 
+# Must unlock before exit.
 #
-if (! $frontend) {
-    DBQueryWarn("update projects ".
-		"set expt_count=expt_count+1, expt_last=now() ".
-		"where pid='$pid'");
-}
+TBUnLockExp($pid, $eid);
 
 #
-# Gen up a date for the started field of the record, and insert it.
-# Unlock the experiment at the same time.
-# 
-$expt_started  = DBDateTime();
-DBQueryWarn("update experiments set ".
-	    "expt_start='$expt_started', expt_locked=NULL ".
-	    "WHERE eid='$eid' and pid='$pid'");
+# Gather statistics.
+#
+if ($frontend) {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD);
+}
+else {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START);
+}
 
 #
 # In batchmode, send the report to stdout for the batch daemon.
@@ -349,8 +344,6 @@ $message .=
     "GID:         $gid\n" .
     "Name:        $expt_name\n" .
     "Created:     $expt_created\n" .
-    "Expires:     $expt_expires\n" .
-    "Started:     $expt_started\n" .
     "Directory:   $expt_path\n".
     "\n".
     "Appended at the end is the output of the experiment setup. If you\n" .

@@ -224,6 +224,9 @@ foreach my $tipserver ( TBTipServers() ) {
 DBQueryFatal("delete from group_membership ".
 	     "where pid='$pid' and gid='$gid'");
     
+DBQueryFatal("delete from group_stats ".
+	     "where pid='$pid' and gid='$gid'");
+
 DBQueryFatal("delete from groups ".
 	     "where pid='$pid' and gid='$gid'");
 

@@ -119,6 +119,10 @@ DBQueryFatal("INSERT INTO groups ".
 	     "VALUES ('$group_pid', '$group_id', '$group_leader', now(), ".
 	     "        '$group_description', NULL, '$unix_gname')");
 
+DBQueryFatal("INSERT INTO group_stats ".
+	     "(pid, gid) ".
+	     "VALUES ('$group_pid', '$group_id')");
+
 DBQueryFatal("insert into group_membership ".
 	     "(uid, pid, gid, trust, date_applied, date_approved) ".
 	     "values ('$group_leader','$group_pid','$group_id', ".

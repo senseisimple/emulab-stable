@@ -116,7 +116,7 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
 # Create an experiment record. The pid/eid has to be unique, so lock the
 # table for the check/insert.
 #
-DBQueryFatal("lock tables experiments write");
+DBQueryFatal("lock tables experiments write, experiment_stats write");
 
 $query_result =
     DBQueryFatal("SELECT pid,eid FROM experiments ".
@@ -142,6 +142,19 @@ if (! DBQueryWarn("INSERT INTO experiments ".
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
 }
+# Need the idx.
+if (! ($query_result =
+       DBQueryWarn("select idx from experiments ".
+		   "where pid='$pid' and eid='$eid'"))) {
+    DBQueryWarn("unlock tables");
+    fatal("Database error inserting experiment stats record for $pid/$eid!\n");
+}
+my ($idx) = $query_result->fetchrow_array;
+
+# Insert stats record.
+DBQueryWarn("INSERT INTO experiment_stats ".
+	    "(eid, pid, creator, idx, gid, created) ".
+	    "VALUES ('$eid', '$pid', '$dbuid', $idx, '$gid', now())");
 
 if (! DBQueryWarn("unlock tables")) {
     fatal("Unexpected DB Error!");
@@ -229,7 +242,15 @@ sub fatal($)
     #
     # Clear the record and cleanup.
     # 
-    TBExptDestroy($pid, $eid);    
+    TBExptDestroy($pid, $eid);
+
+    #
+    # Generally, we do not delete the stats record, but if we failed
+    # at this point, no point in keeping the record. Just a waste of
+    # space.
+    #
+    DBQueryWarn("DELETE from experiment_stats ".
+		"WHERE eid='$eid' and pid='$pid'");
     
     exit(-1);
 }

@@ -234,6 +234,7 @@ DBQueryFatal("delete from nodeuidlastlogin where uid='$user'");
 DBQueryFatal("delete from uidnodelastlogin where uid='$user'");
 DBQueryFatal("delete from unixgroup_membership where uid='$user'");
 DBQueryFatal("delete from userslastlogin where uid='$user'");
+DBQueryFatal("delete from user_stats where uid='$user'");
 
 #
 # Remove user from both local and control node.

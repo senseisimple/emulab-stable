@@ -871,6 +871,8 @@ if (! $returning) {
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
 	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year), now(), 1)");
+    
+    DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$usr_uid')");
 
     $key = TBGenVerificationKey($usr_uid);
 

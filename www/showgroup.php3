@@ -149,6 +149,14 @@ if (mysql_num_rows($query_result)) {
     echo "</table>\n";
 }
 
+if ($isadmin) {
+    echo "<center>
+          <h3>Group Stats</h3>
+         </center>\n";
+
+    SHOWGROUPSTATS($pid, $gid);
+}
+
 #
 # Standard Testbed Footer
 # 

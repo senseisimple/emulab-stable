@@ -47,6 +47,7 @@ my $logname;
 my $dbuid;
 my $user_name;
 my $user_email;
+my @allnodes;
 my @row;
 my $action;
 
@@ -386,6 +387,19 @@ system("cp -Rfp $workdir/ $userdir/tbdata/");
 # Must unlock before exit.
 #
 TBUnLockExp($pid, $eid);
+
+#
+# Gather stats. 
+#
+if ($inout eq "in") {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPIN);
+}
+elsif ($inout eq "out") {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT);
+}
+elsif ($inout eq "modify") {
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY);
+}
 
 print "Done!\n";
 

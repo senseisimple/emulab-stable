@@ -157,6 +157,14 @@ SUBPAGEEND();
 #
 SHOWNODES($exp_pid, $exp_eid);
 
+if (ISADMIN($uid)) {
+    echo "<center>
+          <h3>Experiment Stats</h3>
+         </center>\n";
+
+    SHOWEXPTSTATS($exp_pid, $exp_eid);
+}
+
 #
 # Standard Testbed Footer
 # 

@@ -221,6 +221,14 @@ SUBMENUEND();
 SHOWUSER($target_uid);
 SUBPAGEEND();
 
+if ($isadmin) {
+    echo "<center>
+          <h3>User Stats</h3>
+         </center>\n";
+
+    SHOWUSERSTATS($target_uid);
+}
+
 #
 # Standard Testbed Footer
 # 

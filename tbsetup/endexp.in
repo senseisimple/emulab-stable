@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -279,6 +279,11 @@ if ($estate eq EXPTSTATE_ACTIVE) {
     if ($estate ne EXPTSTATE_SWAPPED) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
+
+    #
+    # Gather statistics for the swapout.
+    #
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT);
 }
 
 if ($estate eq EXPTSTATE_SWAPPED) {
@@ -290,6 +295,11 @@ if ($estate eq EXPTSTATE_SWAPPED) {
     if ($estate ne EXPTSTATE_TERMINATED) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
+
+    #
+    # Gather statistics for the swapout.
+    #
+    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE);
 }
 
 if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {

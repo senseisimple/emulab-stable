@@ -922,6 +922,8 @@ if (! $returning) {
 	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
 	 "date_add(now(), interval 1 year), now())");
 
+    DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$proj_head_uid')");
+    
     $key = TBGenVerificationKey($proj_head_uid);
 
     TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
@@ -961,10 +963,14 @@ DBQueryFatal("INSERT INTO projects ".
 	     "        '$proj_funders', NULL, $proj_plabpcs, $proj_ronpcs, ".
 	     "         $public, '$proj_whynotpublic')");
 
+DBQueryFatal("INSERT INTO project_stats (pid) VALUES ('$pid')");
+
 DBQueryFatal("INSERT INTO groups ".
 	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
 	     "VALUES ('$pid', '$pid', '$proj_head_uid', now(), ".
 	     "        'Default Group', NULL, '$pid')");
+
+DBQueryFatal("INSERT INTO group_stats (pid, gid) VALUES ('$pid', '$pid')");
 
 DBQueryFatal("insert into group_membership ".
 	     "(uid, gid, pid, trust, date_applied) ".
