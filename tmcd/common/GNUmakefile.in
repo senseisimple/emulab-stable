@@ -28,6 +28,7 @@ ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
 BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
 VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
 RCDIR		= $(BINDIR)/rc
+SYSRCDIR	= $(DESTDIR)/usr/local/etc/rc.d
 TBBINDIR	= $(DESTDIR)/usr/testbed/bin
 TBLIBDIR	= $(DESTDIR)/usr/testbed/lib
 INSTALL		= /usr/bin/install -c
@@ -103,7 +104,14 @@ remote-script-install:	common-script-install
 	-chown root $(BINDIR)/vnodesetup
 	-chmod u+s $(BINDIR)/vnodesetup
 
-control-script-install:	dir-install
+control-script-install:	dir-install bossnode
 	$(INSTALL) -m 755 $(SRCDIR)/libsetup.pm $(BINDIR)/libsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
-	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
+	$(INSTALL) -m 755 $(SRCDIR)/libtmcc.pm $(BINDIR)/libtmcc.pm
+	$(INSTALL) -m 755 $(SRCDIR)/tmcc.pl $(BINDIR)/tmcc
+	$(INSTALL) -m 755 $(SRCDIR)/ctrlnode.sh $(SYSRCDIR)/ctrlnode.sh
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ctrlnode $(RCDIR)/rc.ctrlnode
+	$(INSTALL) -m 755 $(SRCDIR)/config/librc.pm $(BINDIR)/librc.pm
+	$(INSTALL) bossnode $(ETCDIR)/bossnode
+
+bossnode:	GNUmakefile
+	echo >$@ "$(BOSSNODE)"

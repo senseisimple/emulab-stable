@@ -1,0 +1,189 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+#
+# This script is run directly from boot on the control node (ops, users).
+# Since boss needs to be up before this stuff will work, we go into the
+# background so that the rest of boot is not held up. 
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . "[-b] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist    = "b";
+my $background = 0;
+my $action     = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($UID || $EUID) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $RCDIR   = "$BINDIR/rc";
+my $LOGFILE = "/var/log/testbedboot.debug";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'b'})) {
+    $background = 1;
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+print "testbed "; 
+# Execute in background and return immediately.
+if ($background && TBBackGround($LOGFILE)) {
+    sleep(1);
+    exit(0);
+}
+# Fully disconnect from bootup. 
+setsid();
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    #
+    # Sort of a hodgepodge of stuff!
+    #
+
+    #
+    # Check for an os dependent initialization script.
+    #
+    my $os_script = "rc." . lc($OSNAME);
+    
+    if (-x "$RCDIR/$os_script") {
+	system("$RCDIR/$os_script");
+	if ($?) {
+	    fatal("Error running $RCDIR/$os_script");
+	}
+    }
+
+    #
+    # This might be a good thing to run on the control node?
+    # 
+    if (-x "$BINDIR/tbshutdown") {
+        print("Starting up shutdown notification daemon\n");
+        system("$BINDIR/tbshutdown");
+	if ($?) {
+	    fatal("Error running $BINDIR/tbshutdown");
+	}
+    }
+
+    #
+    # This might be a good thing to run on the control node?
+    # 
+    if (-x "$RCDIR/rc.ipod") {
+	print("Setting up Ping of Death\n");
+	system("$RCDIR/rc.ipod");
+	# This is allowed to fail; ipod might not be supported.
+    }
+
+    #
+    # Tell boss we rebooted. We do this in a loop cause we have to wait
+    # for boss to come back alive in case it was also down.
+    #
+    print("Informing Emulab Control that we have rebooted\n");
+    while (1) {
+	if (tmcc(TMCCCMD_STATE, "TBSETUP") == 0) {
+	    last;
+	}
+	print "Error sending TBSETUP to Emulab Control. Retrying ...\n";
+	sleep(5);
+    }
+
+    # Not much to do yet inbetween ... just delay a bit for settling down.
+    sleep(5);
+
+    # Now send ISUP
+    print("Informing Emulab Control that we are up and running\n");
+    while (1) {
+	if (tmcc(TMCCCMD_STATE, "ISUP") == 0) {
+	    last;
+	}
+	print "Error sending ISUP to Emulab Control. Retrying ...\n";
+	sleep(5);
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    print("Informing Emulab Control that we are are rebooting\n");
+    if (tmcc(TMCCCMD_STATE, "SHUTDOWN") < 0) {
+	fatal("Error sending SHUTDOWN to Emulab Control!");
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}

@@ -86,7 +86,7 @@ cdboot-install:	destdircheck common-install etc-install \
 
 control-install:	dir-install
 	cp /dev/null $(ETCDIR)/isctrl
-	$(INSTALL) -m 755 ../tmcc $(BINDIR)/tmcc
+	$(INSTALL) -m 755 ../tmcc $(BINDIR)/tmcc.bin
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	(cd ../common; $(MAKE) control-install)
 	@echo "Remember to install the PEM files if necessary"
