@@ -3596,6 +3596,14 @@ COMMAND_PROTOTYPE(doisalive)
 			"where node_id='%s' or phys_nodeid='%s'",
 			reqp->nodeid, reqp->nodeid);
 	}
+	/*
+	 * New stuff. Old stuff above will come out when node_status
+	 * table completely implemented.
+	 */
+	mydb_update("replace delayed into node_status "
+		    " (node_id, status, status_timestamp) "
+		    " values ('%s', 'up', now())",
+		    reqp->nodeid);
 
 	/*
 	 * Return info about what needs to be updated. 
