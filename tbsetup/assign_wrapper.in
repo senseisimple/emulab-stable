@@ -223,8 +223,8 @@ $query_result =
     DBQueryFatal("SELECT type,delay_osid,osid from node_types");
 
 while (($type,$delayosid,$defosid) = $query_result->fetchrow_array()) {
-#   $delayosids{$type} = $delayosid;
-    $delayosids{$type} = "testbed-FBSD47-UPDATE";
+    $delayosids{$type} = $delayosid;
+#  $delayosids{$type} = "testbed-FBSD47-UPDATE";
     $defaultosids{$type} = $defosid;
 }
 
