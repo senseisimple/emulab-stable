@@ -85,6 +85,7 @@ my @row;
 #
 my %reloads     = ();
 my %reboots	= ();
+my %reconfigs	= ();
 my %rebooted    = ();
 my $doautoload  = 1;
 my $dolastload  = 1;
@@ -495,6 +496,34 @@ if (!$TESTMODE) {
 	$pids{$cmd} = ForkCmd($cmd);
     }
 
+    #
+    # Any nodes that were not reloaded or rebooted, get a reconfig. They
+    # must have been in the experiment before, but we check the allocstate
+    # anyway.
+    #
+    foreach my $node (keys(%nodes)) {
+	next
+	    if (exists($rebooted{$node}) ||
+		$nodeAllocStates{$node} ne TBDB_ALLOCSTATE_RES_READY());
+
+	# Currently, only do this for NORMALv2 images. Need a way to
+	# know this is allowed!
+	my $mode;
+
+	if (!TBGetNodeOpMode($node, \$mode)) {
+	    print "*** Error getting operational mode for $node!\n";
+	    next;
+	}
+	next
+	    if ($mode ne "NORMALv2");
+	
+	$reconfigs{$node} = $node;
+    }
+    if (keys(%reconfigs)) {
+	$cmd = "$nodereboot -r -d " . join(" ", keys(%reconfigs));
+	$pids{$cmd} = ForkCmd($cmd);
+    }
+
     foreach $cmd ( keys(%pids) ) {
 	my $pid = $pids{$cmd};
 
@@ -650,9 +679,10 @@ foreach my $vnode (@vnodelist) {
     # Remote node, always does setup.
     next
 	if (!exists($nodes{$pnode}));
-    # Not rebooted, so leave allocstate alone for vnode_setup.
+    # Pnode was neither rebooted or reconfiged, so leave allocstate alone
+    # for vnode_setup (has to be done).
     next
-	if (!exists($rebooted{$pnode}));
+	if (!exists($rebooted{$pnode}) && !exists($reconfigs{$pnode}));
 
     if ($nodeAllocStates{$pnode} eq TBDB_ALLOCSTATE_RES_READY()) {
 	TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_READY());
@@ -693,7 +723,7 @@ elsif (@vnodelist) {
 	TBGetNodeAllocState($node, \$curallocstate);
 
 	#
-	# See if vnode_setup alreadt determined the node was dead.
+	# See if vnode_setup already determined the node was dead.
 	#
 	if ($curallocstate ne TBDB_ALLOCSTATE_DOWN() &&
 	    $curallocstate ne TBDB_ALLOCSTATE_DEAD()) {
