@@ -28,6 +28,7 @@ use IO::Handle;
 my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
 
 # Max number of retries (per node) before its deemed fatal. This allows
 # for the occasional pxeboot failure.
@@ -194,10 +195,25 @@ sub osload ($$) {
 	    goto failednode;
 	}
 	if (! -R $imagepath) {
-	    print STDERR 
-		"*** osload ($node): ".
-		    "$imagepath does not exists or cannot be read!\n";
-	    goto failednode;
+	    if ($ELABINELAB) {
+		#
+		# Yuck. See if we can get it via frisbeelauncher before
+		# giving up. 
+		#
+		system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
+		if ($?) {
+		    print STDERR
+			"*** osload ($node): ".
+			    "Frisbee Launcher ($imageid) failed!\n";
+		    goto failednode;
+		}
+	    }
+	    else {
+		print STDERR 
+		    "*** osload ($node): ".
+			"$imagepath does not exists or cannot be read!\n";
+		goto failednode;
+	    }
 	}
 
 	#
