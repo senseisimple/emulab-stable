@@ -88,6 +88,7 @@ my $logname;
 my %pids	= ();
 my $failed	= 0;
 my $dbuid;
+my @remotenodes = ();
 
 #
 # We don't want to run this script unless its the real version.
@@ -196,6 +197,24 @@ if (! @nodes) {
 }
 
 #
+# For widearea nodes, just update flag them in the DB. The nodes will
+# notice this and suck the data over when they can.
+#
+foreach my $node ( @nodes ) {
+    if (TBIsNodeRemote($node) && !TBIsNodeVirtual($node)) {
+	print STDOUT "Marking widearea node $node for update.\n";
+
+	#
+	# No point in incrementing the flag past 2!
+	#
+	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
+		     "where node_id='$node' and update_accounts<2");
+
+	push(@remotenodes, $node);
+    }
+}
+
+#
 # We want some overlap, but not too much since we could burn up
 # a lot processes on wedged nodes. Issue a small number in parallel,
 # and wait once we reach the limit for one to finish, before issuing
@@ -203,6 +222,13 @@ if (! @nodes) {
 #
 my $maxpids = 0;
 foreach my $node ( @nodes ) {
+    #
+    # Remote nodes handled just above.
+    # 
+    if (TBIsNodeRemote($node) || TBIsNodeVirtual($node)) {
+	next;
+    }
+    
     while ($maxpids >= $maxchildren) {
 	my $thispid  = waitpid(-1, 0);
 	my $thisnode = $pids{$thispid};
@@ -212,7 +238,7 @@ foreach my $node ( @nodes ) {
 	    print STDERR "Update of node $thisnode failed!\n";
 	}
 	else {
-	    print STDOUT "$thisnode updated ...\n";
+	    print STDOUT "$thisnode updated.\n";
 	}
 
 	delete($pids{$thispid});
@@ -236,7 +262,36 @@ foreach my $thispid ( keys(%pids) ) {
 	print STDERR "Update of node $node failed!\n";
     }
     else {
-	print STDOUT "$node updated ...\n";
+	print STDOUT "$node updated.\n";
+    }
+}
+
+#
+# Wait a couple of minutes for remote nodes to do the update. We know
+# this cause tmcd decrements the update_accounts flag whenever a node
+# picks up new accounts.
+#
+if (@remotenodes) {
+    print STDOUT "Waiting a while for widearea nodes to update ...\n";
+    sleep(90);
+    my $foo = pop(@remotenodes);
+    my $str = "node_id='$foo' ";
+
+    foreach my $node ( @remotenodes ) {
+	$str .= "or node_id='$node' ";
+    }
+    my $query_result =
+	DBQueryFatal("select node_id,update_accounts from nodes ".
+		     "where ($str)");
+
+    while (my ($node,$notdone) = $query_result->fetchrow_array) {
+	if ($notdone) {
+	    $failed++;
+	    print STDERR "Update of node $node has not completed!\n";
+	}
+	else {
+	    print STDOUT "$node updated.\n";
+	}
     }
 }
 
@@ -255,7 +310,7 @@ sub UpdateNode {
     my($node) = @_;
     my($syspid, $mypid);
 
-    print STDOUT "Updating $node ...\n";
+    print STDOUT "Updating $node.\n";
 
     #
     # We need to know if its a remote or local node, so we know how
