@@ -6,7 +6,6 @@
 # All rights reserved.
 #
 
-
 # This function as the main assign loop.  It converts the virtual
 # topology into a top input including LAN and delay translation.  It
 # then snapshots the current testbed physical state and runs assign,
@@ -270,8 +269,9 @@ if ($updating) {
 			 "WHERE pid='$pid' AND eid='$eid'");
     
     while (($vname,$reserved) = $result->fetchrow_array) {
-	$fixed_nodes{$vname} = $reserved;    
-	$alreadyAllocated{$reserved} = 1;
+	$reserved_nodes{$vname} = $reserved;
+	$fixed_nodes{$vname}    = $reserved;    
+	$alreadyAllocated{$reserved} = "unused";
     }
     $result->finish;
 }
@@ -291,10 +291,6 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt) =
         $result->fetchrow_array){
     if (defined($fixed) && $fixed eq "") {
 	undef($fixed);
-    }
-
-    if (defined($reserved) && $reserved eq "") {
-	undef($reserved);
     }
     
     # REMOTENODE HACK
@@ -802,17 +798,23 @@ if( scalar(@simnodelist) > 0 ) {
 }
 
 # Print out fixed nodes
+# But _not_ nodes which aren't in the experiment any more.
+# CRB you can only fix nodes and delaynodes, right?
+$reused_count = 0;
+
 foreach $fixed (keys(%fixed_nodes)) {
-    if (!$isremotenode{$fixed}) {
+    if (!$isremotenode{$fixed} && 
+	(exists $nodes{$fixed} || exists $delaynodes{$fixed}) ) {
 	print TOPFILE "fix-node $fixed $fixed_nodes{$fixed}\n";
+	if ($reserved_nodes{$fixed}) { $reused_count++; }
     }
 }
 
 close TOPFILE;
 
 # Set estimations
-$minimum_nodes = $nodes + keys(%delaynodes)/$DELAYCAPACITY;
-$maximum_nodes = $nodes + keys(%delaynodes);
+$minimum_nodes = $nodes + keys(%delaynodes)/$DELAYCAPACITY - $reused_count;
+$maximum_nodes = $nodes + keys(%delaynodes) - $reused_count;
 DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
 	 "minimum_nodes=$minimum_nodes where pid=\"$pid\" and eid=\"$eid\"");
 print "Minimum nodes = $minimum_nodes\n";
@@ -930,7 +932,24 @@ while (1) {
 		next;
 	    }
 
-	    if (!$alreadyAllocated{$physical}) {
+	    if ($alreadyAllocated{$physical}) {
+		#
+		# Mark node as being reused.
+		#
+		# Look at virtual node being mapped to node;
+		# if it wasn't in the previous map, mark node for reboot.
+		# 
+		if (! exists $reserved_nodes{$virtual} ||
+		    $reserved_nodes{$virtual} ne $physical ||
+		    $alreadyAllocated{$physical} eq "reboot") {
+		    $alreadyAllocated{$physical} = "reboot";
+		} else {
+		    $alreadyAllocated{$physical} = "reused";
+		}
+	    } else {
+		#
+		# This is a new node; we'll have to reserve it.
+		#
 		$toreserve{$physical} = 1;	    
 	    }
 	    
@@ -1026,6 +1045,29 @@ while (1) {
 	    }
 
 	    TBDebugTimeStamp("reserving finished");
+
+	    my %tolose = ();
+	    foreach $node (keys(%alreadyAllocated)) {
+		if ($alreadyAllocated{$node} eq "unused") {
+		    #
+		    # Node was used in previous incarnation, but not any more.
+		    #
+		    $tolose{$node} = 1;
+		} elsif ($alreadyAllocated{$node} eq "reboot") {
+		    #
+		    # Node is being reused, but for a different purpose, so
+		    # it should be rebooted.
+		    #
+		    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
+		}
+	    }
+	    
+	    if ((keys %tolose) > 0) {
+		if (system("nfree $pid $eid " . join(" ", keys(%tolose)))) {
+		    print "Failed to free no-longer-needed nodes!";
+		}
+	    }
+
 	    last;
 	}
     }
