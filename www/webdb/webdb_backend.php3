@@ -381,9 +381,9 @@ function manageData( $cmd ) {
 		$type = strtok( $fieldtype, " (,)\n" );
 		if ($type == "enum" || $type == "set") {
 			if ($type == "enum") {
-  				$cell = "<select name=$fieldname>"; 	 
+  				$cell = "<select name=c_$fieldname>"; 	 
 			} else {
-				$cell = "<select name=$fieldname size=4 multiple>\n";
+				$cell = "<select name=c_$fieldname size=4 multiple>\n";
 			}
 			$cell .= strtok( "'" );
 			while ($str = strtok( "'" ) ) {
