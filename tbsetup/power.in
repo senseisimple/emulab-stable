@@ -124,10 +124,10 @@ foreach $node ( sort @machines) {
 		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
       open(OUT,$cmd." |");
       while (<OUT>) {
-	if (/was outlet(O[nf]*)/) {
+	if (/was outlet([OnfCycle]*)/) {
 	  print "$node was $1";
 	}
-	if (/to outlet(O[nf]*)/) {
+	if (/to outlet([OnfCycle]*)/) {
 	  print " ... $node now $1";
 	}
       }

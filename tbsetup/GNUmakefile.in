@@ -53,6 +53,10 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF))
 
 post-install: 
+	chmod go-w $(INSTALL_BINDIR)
+	chmod go-w $(INSTALL_SBINDIR)
+	chmod go-w $(INSTALL_LIBDIR)
+	chmod go-w $(INSTALL_LIBEXECDIR)
 	chown root $(INSTALL_LIBEXECDIR)/mkprojdir
 	chmod u+s $(INSTALL_LIBEXECDIR)/mkprojdir
 	chown root $(INSTALL_LIBEXECDIR)/rmprojdir
