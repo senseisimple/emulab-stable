@@ -31,6 +31,11 @@ BEGIN {
     found = 1;
     exit
 }
+/^[ ]+PCI bridge: Intel Corp.*HI_C Virtual PCI-to-PCI Bridge/ {
+    print "HI_C";
+    found = 1;
+    exit
+}
 /^[ ]+PCI bridge: Intel Corp.*HI_B Virtual PCI-to-PCI Bridge/ {
     print "HI_B";
     found = 1;
