@@ -11,15 +11,11 @@ negprerun
 nodes
 ping
 set-ip
-sharkshelf
-dnardshelf
 simplelink
 singlenode
-spinglass
 tbcmd
 trafgen
 trivial
-spinglass2
 fixed
 vtypes
 simplex
