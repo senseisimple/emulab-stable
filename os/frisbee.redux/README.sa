@@ -17,17 +17,10 @@ features that were not in 0.3:
 	- support for extended partitions in imagezip.
 
 This tarball also includes source for "growdisk", a program run post-Frisbee
-on our machines to extend partitions, and the FreeBSD startup script (in the
-misc subdir) we use to invoke Frisbee.
+on our machines to extend DOS partitions (not filesystems!), and the FreeBSD
+startup script (in the misc subdir) we use to invoke Frisbee.
 
 The rest of this file is the standard release README ...
-
-
-Frisbee README version 0.3 of Wed Jul  1 13:42:19 MDT 2003.
-(This is a possibly out of date copy of:
-http://www.emulab.net/downloads/frisbee-README.txt
-Check there for the latest.)
-
 
 This is a preliminary release of the Frisbee[1] disk imaging tool used in
 the University of Utah's Emulab testbed cluster and described in the
@@ -46,6 +39,20 @@ It also includes the associated image creation tool.
 	Note that installing a disk (partition) image is 100% fatal to the
 	current contents of said disk (partition).  Do not use Frisbee or
 	any tool to install an image unless you really mean it.
+
+1a. Is there anything that Frisbee cannot do?
+
+	Frisbee is not a drop-in replacement for commercial imaging
+	solutions.  For one thing, there is no Spiff-Ass GUI that even
+	a grandma could drive.  We're talking command lines here.
+	It also doesn't grow or shrink filesystems to fit the target
+	disk.  If you plop down a 1.4MB DOS filesystem image on your
+	spankin' 250GB hard disk, you wind up with a 1.4MB DOS filesystem
+	and a lotta wasted space.  Finally, Frisbee won't do post-disk-load
+	customizations, such as installing unique system IDs or IP addresses.
+	If you image a disk with a hardwired identity of agentsmith.matrix.com
+	and distribute it to 100 other machines, you'll wind up with 100
+	identical copies, and what good is that?
 
 2. What all is included in the box?
 
