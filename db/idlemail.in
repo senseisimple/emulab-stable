@@ -51,6 +51,7 @@ mail interval  = $mailinterval hours
 Start CC'ing group leaders on message $cc_grp_ldrs\n");
 }
 
+my $TB               = "@prefix@";
 my $THISHOMEBASE     = "@THISHOMEBASE@";
 my $TBBASE           = "@TBBASE@";
 my $TBDOCBASE        = "@TBDOCBASE@";
@@ -87,7 +88,8 @@ foreach $var (keys %opt) {
 my $pid = shift || "";
 my $eid = shift || "";
 
-print "Settings: h=$h  d=$d  n=$n  f=$f  pid=$pid  eid=$eid\n" if $d;
+print "Settings: h=$h  d=$d  n=$n  f=$f  pid=$pid  eid=$eid\n".
+  "Sitevars: thresh=$threshold interval=$mailinterval cc=$cc_grp_ldrs\n" if $d;
 
 if ($h) { help(); }
 
@@ -181,6 +183,42 @@ EOT
 	}
     }
 
+    # Next we need to check for stuff that needs to get swapped.
+    # We need to find stuff to Idle-Swap, and stuff to Auto-Swap,
+    # using two different queries.
+    $sql  = <<EOT;
+select e.pid,e.eid, idleswap_timeout,
+(unix_timestamp(now()) - unix_timestamp(max(greatest(
+last_tty_act,last_net_act,last_cpu_act,last_ext_act))))/60 as idlemin
+from reserved as r left join experiments as e on e.pid=r.pid and e.eid=r.eid
+left join node_activity as na on r.node_id=na.node_id
+where idleswap !=0 and swappable>0 and idle_ignore=0
+group by pid,eid having idlemin >= idleswap_timeout order by pid,eid
+EOT
+    $q = DBQueryFatal($sql);
+    if ($d) { print $q->as_string; $q->dataseek(0); }
+    while (%r = $q->fetchhash()) {
+	$pid = $r{'pid'};
+	$eid = $r{'eid'};
+	system("$TB/sbin/idleswap -i $pid $eid > /dev/null") &&
+	  warn("idlemail: Problem idleswapping $pid/$eid: $!\n");
+    }
+
+    $sql  = <<EOT;
+select pid,eid,autoswap_timeout,
+(unix_timestamp(now()) - unix_timestamp(expt_swapped))/60 as activemin
+from experiments where swappable>0 and state="active" and autoswap>0
+having activemin>=autoswap_timeout order by pid,eid
+EOT
+    $q = DBQueryFatal($sql);
+    if ($d) { print $q->as_string; $q->dataseek(0); }
+    while (%r = $q->fetchhash()) {
+	$pid = $r{'pid'};
+	$eid = $r{'eid'};
+	system("$TB/sbin/idleswap -a $pid $eid > /dev/null") &&
+	  warn("idlemail: Problem autoswapping $pid/$eid: $!\n");
+    }
+
 } else {
     # pid/eid mode - only check pid/eid, and let $f force sending,
     # even if msg was sent recently or expt isn't idle long enough.
@@ -269,8 +307,12 @@ sub SendMessage {
 
     my $expleader_name;
     my $expleader_email;
-    my $uid = ExpLeader($pid,$eid);
+    my $uid = ExpSwapper($pid,$eid);
+    my $uid2 = ExpLeader($pid,$eid);
     UserDBInfo($uid,\$expleader_name,\$expleader_email);
+    if ($uid ne $uid2) {
+	UserDBInfo($uid2,\$expcreator_name,\$expcreator_email);
+    }
     my $leaders = TBLeaderMailList($pid,$gid);
     if ($d > 1) {
 	print "expt=$pid/$eid (gid=$gid)\n".
@@ -327,20 +369,31 @@ sub SendMessage {
 	       "Testbed Operations <$TBMAILADDR_OPS>.",$wrapwidth);
     $msg .= "\nThanks!\nTestbed Operations\n";
 
-    # The sendmail command for non web stuff looks like this:
-    # SENDMAIL(To, Subject, Message, [From], [More Headers], ...)
+    # expleader is really the swapper here
+    # the real leader is expcreator
+    $cclist="";
+    if ($uid ne $uid2) {
+	# creator and swapper are different
+	$cclist="Cc: $expcreator_name <$expcreator_email>";
+    }
+    if ($swapreqs+1 >= $cc_grp_ldrs) {
+	if ($cclist ne "") {
+	    $cclist .= ", $leaders\n";
+	} else {
+	    $cclist = "Cc: $leaders\n"
+	}
+    } elsif ($cclist ne "") {
+	$cclist .="\n";
+    }
 
     if ($n) {
 	# no mail mode: don't send mail or update db counters
 	print "----NO-MAIL-MODE----\n";
 	print "To: $expleader_name <$expleader_email>\n";
 	print "From: $TBMAIL_OPS\n".
-	  # this is message swapreqs+1
-	  ( $swapreqs+1 >= $cc_grp_ldrs
-	    ? "Cc: $leaders\n"
-	    : "") .
-	      "Bcc: $TBMAIL_AUTOMAIL\n".
-		"Errors-To: $TBMAIL_WWW"."\n";
+	  $cclist.
+	  "Bcc: $TBMAIL_AUTOMAIL\n".
+	  "Errors-To: $TBMAIL_WWW"."\n";
 	print "Subject: $c PC".($c!=1?"s":"").
 	  " idle $idlehrs hours: $pid/$eid\n";
 	print "\n$msg\n";
@@ -349,16 +402,14 @@ sub SendMessage {
 	# libtestbed SENDMAIL syntax:
 	# SENDMAIL(To, Subject, Message, [From], [More Headers],...)
 
+
 	# For debugging:
 	#SENDMAIL("Expt Leader <$TBMAILADDR_OPS>",
 	SENDMAIL("$expleader_name <$expleader_email>",
 		 "$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid",
 		 $msg,
 		 "$TBMAIL_OPS",
-		 # this is message swapreqs+1
-		 ( $swapreqs+1 >= $cc_grp_ldrs
-		   ? "Cc: $leaders\n"
-		   : "") .
+		 $cclist.
 		 "Bcc: $TBMAIL_AUTOMAIL\n".
 		 "Errors-To: $TBMAIL_WWW");
 
