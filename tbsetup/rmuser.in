@@ -225,6 +225,10 @@ else {
 # Now schedule account updates on all the nodes that this person has
 # an account on (remaining project/group membership).
 #
+# XXX This is broken. Once the user is removed from the group membership,
+# the list of nodes will change, and those nodes for which the user is
+# suddenly no longer allowed an account on, will not be updated. 
+# 
 TBNodeUpdateAccountsByUID($user);
 
 #
