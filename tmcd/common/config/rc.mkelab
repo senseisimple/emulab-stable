@@ -399,6 +399,13 @@ sub SetupOpsNode()
     close(RC);
 
     #
+    # Remove some cruft from /etc/syslog.conf
+    #
+    mysystem("cat /etc/syslog.conf | grep -v '\@users' > /tmp/syslog.conf");
+    mysystem("cp -pf /etc/syslog.conf /etc/syslog.conf.old ; ".
+	     "cp /tmp/syslog.conf /etc/syslog.conf");
+
+    #
     # Create a defs file. Note that this will move to boss at some point.
     #
     CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
@@ -661,6 +668,13 @@ sub SetupBossNode()
 
     print RC "check_quotas=\"NO\"\n";
     close(RC);
+
+    #
+    # Remove some cruft from /etc/syslog.conf
+    #
+    mysystem("cat /etc/syslog.conf | grep -v '\@users' > /tmp/syslog.conf");
+    mysystem("cp -pf /etc/syslog.conf /etc/syslog.conf.old ; ".
+	     "cp /tmp/syslog.conf /etc/syslog.conf");
 
     #
     # Create a defs file. Note that this will move to boss at some point.
