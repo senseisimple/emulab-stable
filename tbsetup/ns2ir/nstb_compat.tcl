@@ -29,6 +29,9 @@ proc tb-set-link-simplex-params {link src delay bw loss} {}
 
 Class Program
 
+Program instproc init {args} {
+}
+
 Program instproc unknown {m args} {
 }
 
