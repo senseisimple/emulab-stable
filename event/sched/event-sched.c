@@ -19,7 +19,9 @@
 #include <math.h>
 #include <ctype.h>
 #include "event-sched.h"
-#include "libdb.h"
+#include "log.h"
+#include "tbdb.h"
+#include "config.h"
 
 static void enqueue(event_handle_t handle,
 		    event_notification_t notification, void *data);
@@ -28,6 +30,8 @@ static void dequeue(event_handle_t handle);
 static char	*progname;
 static char	*pid, *eid;
 static int	get_static_events(event_handle_t handle);
+static int	debug;
+static void	cleanup(void);
 
 void
 usage()
@@ -40,95 +44,120 @@ usage()
 int
 main(int argc, char **argv)
 {
-    address_tuple_t tuple;
-    event_handle_t handle;
-    char *server = NULL;
-    char *port = NULL;
-    char buf[BUFSIZ];
-    int c;
+	address_tuple_t tuple;
+	event_handle_t handle;
+	char *server = NULL;
+	char *port = NULL;
+	char buf[BUFSIZ];
+	int c, count;
 
-    /* Initialize event queue semaphores: */
-    sched_event_init();
+	/* Initialize event queue semaphores: */
+	sched_event_init();
 
-    while ((c = getopt(argc, argv, "s:p:")) != -1) {
-        switch (c) {
-          case 's':
-              server = optarg;
-              break;
-          case 'p':
-              port = optarg;
-              break;
-          default:
-              fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
-              return 1;
-        }
-    }
-    argc -= optind;
-    argv += optind;
+	while ((c = getopt(argc, argv, "s:p:d")) != -1) {
+		switch (c) {
+		case 'd':
+			debug = 1;
+			break;
+		case 's':
+			server = optarg;
+			break;
+		case 'p':
+			port = optarg;
+			break;
+		default:
+			fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
+			return 1;
+		}
+	}
+	argc -= optind;
+	argv += optind;
 
-    if (argc != 2)
-	    usage();
-    pid = argv[0];
-    eid = argv[1];
+	if (argc != 2)
+		usage();
+	pid = argv[0];
+	eid = argv[1];
 
-    /*
-     * Set up DB state.
-     */
-    if (!dbinit())
-	    return 1;
+	loginit("event-sched", !debug);
 
-    /*
-     * Convert server/port to elvin thing.
-     *
-     * XXX This elvin string stuff should be moved down a layer. 
-     */
-    if (server) {
-	    snprintf(buf, sizeof(buf), "elvin://%s%s%s",
-		     server,
-		     (port ? ":"  : ""),
-		     (port ? port : ""));
-	    server = buf;
-    }
+	/*
+	 * Set up DB state.
+	 */
+	if (!dbinit())
+		return 1;
 
-    /* Register with the event system: */
-    handle = event_register(server, 1);
-    if (handle == NULL) {
-        ERROR("could not register with event system\n");
-        return 1;
-    }
+	/*
+	 * Set our pid in the DB.
+	 */
+	atexit(cleanup);
+	if (! mydb_seteventschedulerpid(pid, eid, getpid()))
+		fatal("Could not update DB with process id!");
 
-    /*
-     * Read the static events list and schedule.
-     */
-    if (!get_static_events(handle)) {
-        ERROR("could not get static event list\n");
-        return 1;
-    }
+	/*
+	 * Convert server/port to elvin thing.
+	 *
+	 * XXX This elvin string stuff should be moved down a layer. 
+	 */
+	if (server) {
+		snprintf(buf, sizeof(buf), "elvin://%s%s%s",
+			 server,
+			 (port ? ":"  : ""),
+			 (port ? port : ""));
+		server = buf;
+	}
 
-    /*
-     * Construct an address tuple for event subscription. We set the scheduler
-     * flag to indicate we want to capture those notifications.
-     */
-    tuple = address_tuple_alloc();
-    if (tuple == NULL) {
-	    ERROR("could not allocate an address tuple\n");
-	    return 1;
-    }
-    tuple->scheduler = 1;
+	/* Register with the event system: */
+	handle = event_register(server, 1);
+	if (handle == NULL) {
+		fatal("could not register with event system");
+	}
 
-    if (event_subscribe(handle, enqueue, tuple, NULL) == NULL) {
-        ERROR("could not subscribe to EVENT_SCHEDULE event\n");
-        return 1;
-    }
+	/*
+	 * Construct an address tuple for event subscription. We set the 
+	 * scheduler flag to indicate we want to capture those notifications.
+	 */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		fatal("could not allocate an address tuple");
+	}
+	tuple->scheduler = 1;
 
-    /* Dequeue events and process them at the appropriate times: */
-    dequeue(handle);
+	if (event_subscribe(handle, enqueue, tuple, NULL) == NULL) {
+		fatal("could not subscribe to EVENT_SCHEDULE event");
+	}
 
-    /* Unregister with the event system: */
-    if (event_unregister(handle) == 0) {
-        ERROR("could not unregister with event system\n");
-        return 1;
-    }
+	/*
+	 * Hacky. Need to wait until all nodes in the experiment are
+	 * in the ISUP state before we can start the event list rolling.
+	 */
+	count = 0;
+	c     = 1;
+	while (c) {
+		if (! mydb_checkexptnodeeventstate(pid, eid,
+						   TBDB_EVENTTYPE_ISUP, &c)) {
+			fatal("Could not get node event state");
+		}
+		count++;
+		if ((count % 10) == 0)
+			info("Waiting for nodes in %s/%s to come up ...");
+
+		sleep(1);
+	}
+
+	/*
+	 * Read the static events list and schedule.
+	 */
+	if (!get_static_events(handle)) {
+		fatal("could not get static event list");
+	}
+
+	/* Dequeue events and process them at the appropriate times: */
+	dequeue(handle);
+
+	/* Unregister with the event system: */
+	if (event_unregister(handle) == 0) {
+		fatal("could not unregister with event system");
+	}
 
     return 0;
 }
@@ -286,7 +315,7 @@ get_static_events(event_handle_t handle)
 #define IPADDR	row[6]
 
 	if (!res) {
-		ERROR("getting static event list for %s/%s", pid, eid);
+		error("getting static event list for %s/%s", pid, eid);
 		return 0;
 	}
 
@@ -301,7 +330,7 @@ get_static_events(event_handle_t handle)
 	 */
 	tuple = address_tuple_alloc();
 	if (tuple == NULL) {
-		ERROR("could not allocate an address tuple\n");
+		error("could not allocate an address tuple");
 		return 1;
 	}
 
@@ -314,13 +343,13 @@ get_static_events(event_handle_t handle)
 
 		row = mysql_fetch_row(res);
 		firetime = atof(EXTIME);
-			
-		DBG("EV: %8s %10s %10s %10s %10s %10s %10s\n",
-		    row[0], row[1], row[2],
-		    row[3] ? row[3] : "",
-		    row[4], row[5],
-		    row[6] ? row[6] : "");
-		
+
+		if (debug) 
+			info("EV: %8s %10s %10s %10s %10s %10s %10s\n",
+			     row[0], row[1], row[2],
+			     row[3] ? row[3] : "",
+			     row[4], row[5],
+			     row[6] ? row[6] : "");
 
 		tuple->expt      = pideid;
 		tuple->host      = IPADDR;
@@ -330,7 +359,7 @@ get_static_events(event_handle_t handle)
 
 		event.notification = event_notification_alloc(handle, tuple);
 		if (! event.notification) {
-			ERROR("could not allocate notification\n");
+			error("could not allocate notification");
 			mysql_free_result(res);
 			return 1;
 		}
@@ -352,3 +381,9 @@ get_static_events(event_handle_t handle)
 	return 1;
 }
 	
+static void
+cleanup(void)
+{
+	if (pid) 
+		mydb_seteventschedulerpid(pid, eid, 0);
+}

@@ -24,5 +24,7 @@ event-sched:	$(OBJS)
 
 $(OBJS):	event-sched.h ../lib/libevent.a
 
+install:	$(addprefix $(INSTALL_SBINDIR)/, event-sched)
+
 clean:
 	/bin/rm -f *.o event-sched
