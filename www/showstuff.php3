@@ -1816,8 +1816,9 @@ function SHOWGROUPSTATS($pid, $gid) {
 function SHOWEXPTSTATS($pid, $eid) {
 
     $query_result =
-	DBQueryFatal("SELECT * from experiment_stats ".
-		     "where pid='$pid' and eid='$eid'");
+	DBQueryFatal("select s.* from experiments as e ".
+		     "left join experiment_stats as s on e.idx=s.idx ".
+		     "where e.pid='$pid' and e.eid='$eid'");
 
     if (! mysql_num_rows($query_result)) {
 	return;

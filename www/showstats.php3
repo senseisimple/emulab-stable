@@ -33,7 +33,7 @@ echo "Show <a class='static' href='showexpstats.php3'>
 # Right now we show just the last 200 records entered. 
 #
 $query_result =
-    DBQueryFatal("select t.*,e.* from testbed_stats as t ".
+    DBQueryFatal("select e.*,t.*,t.idx as statno from testbed_stats as t ".
 		 "left join experiment_stats as e on e.idx=t.exptidx ".
 		 "order by t.idx desc limit 200");
 
@@ -43,16 +43,18 @@ if (mysql_num_rows($query_result) == 0) {
 
 echo "<table align=center border=1>
       <tr>
-        <th>IDX</th>
+        <th>#</th>
         <th>Pid</th>
         <th>Eid</th>
+        <th>ExptIdx</th>
         <th>Time</th>
         <th>Action</th>
         <th>ExitCode</th>
       </tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $idx     = $row[idx];
+    $idx     = $row[statno];
+    $exptidx = $row[exptidx];
     $pid     = $row[pid];
     $eid     = $row[eid];
     $when    = $row[tstamp];
@@ -60,9 +62,10 @@ while ($row = mysql_fetch_assoc($query_result)) {
     $ecode   = $row[exitcode];
 	
     echo "<tr>
-            <td><a href=showexpstats.php3?record=$idx>$idx</a></td>
+            <td>$idx</td>
             <td>$pid</td>
             <td>$eid</td>
+            <td><a href=showexpstats.php3?record=$exptidx>$exptidx</a></td>
             <td>$when</td>
             <td>$action</td>
             <td>$ecode</td>
