@@ -93,7 +93,7 @@ Notes for newer versions of FreeBSD: Newer versions of the mysql port install
 the starup script as '00mysql-client.sh' - you're fine either leaving it with
 that name, or renaming it as suggested above. Also, newer versions of the
 dhcpd port install their startup script as 'isc-dhcpd.sh.sample' - just
-rename this as suggestbed above.
+rename this as suggested above.
 
 ##### Step 2 - LEDA
 
@@ -152,7 +152,7 @@ configure with the --with-TBDEFS option.
 You'll also need to make a defs file for the web system. This is found in
 the www/ directory of the testbed source tree. Copy default-defs.php3 to
 <name>-defs.php3, and put <name> into WWWDEFS in the main defs file. The
-main variables to worray about are:
+main variables to worry about are:
 $WWWHOST, $TBAUTHDOMAIN - replace emulab.net with your domain
 $THISHOMEBASE, $THISPROJECT - Use the name of your site
 $TBMAIL* - These work like the mail addresses of the same names in the
@@ -350,7 +350,7 @@ and trees you'll want to make sure to copy over:
 /etc/ssh
 
 Right before bringing the new boss node online (if copying from an old boss
-node), make sure to have copy over the latest versions of:
+node), make sure to have a copy of the latest versions of:
 * The database
 * The sup tree
 * The dhcpd.conf file
