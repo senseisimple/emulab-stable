@@ -95,7 +95,8 @@ function NLCEMPTY()
     <i><font size="-1">
 
     Note: This part of the testbed is in the prototype stage, so the hardware
-    and software may behave in unexpected ways.
+    and software may behave in unexpected ways.  
+   
 
     </font></i>
 </center>
@@ -114,19 +115,33 @@ function NLCEMPTY()
 <?php NLCBODYBEGIN() ?>
 <!-- Center -->
 
+
+<b>Preface</b>:
+We have deployed and opened to public external use a tiny version of
+what will grow into a large mobile robotic wireless testbed.  The
+small version (4 Motes and 4 Stargates on 4 robots, all remotely
+controllable) is in an open area within our offices; the big one will
+be elsewhere.
+
+
+<h4>How to Use It</h4>
+
 In addition to <a href="docwrapper.php3?docname=wireless.html">fixed wireless
-nodes</a>, Emulab also features wireless nodes attached to robots that can move
+nodes</a> (currently predominantly 802.11), Emulab also features wireless nodes attached
+to robots that can move
 around a small area.  These robots consist of a small body (shown on the right)
 with an <a href="http://www.xbow.com/Products/XScale.htm">Intel Stargate</a>
 that hosts a mote with a wireless network interface.  The goal of this "mobile
 wireless testbed" is to give users an opportunity to conduct experiments with
-wireless nodes in configurable physical locations and while in motion.  For
+wireless nodes that are truly mobile
+<!-- in configurable physical locations and while in motion. -->
+For
 example, mobile nodes could be used to realistically test and evaluate an
 ad-hoc routing algorithm in a fairly repeatable manner.  This document is
-intended as a tutorial for those interested in making use of this testbed,
+intended as a tutorial for those interested in making use of this testbed;
 there is also a short <a href="<?php echo
 $TBBASE?>/doc/docwrapper.php3?docname=mobilewireless.html">reference manual</a>
-available that gives details about the workings of the system.
+available that gives a few details about the workings of the system.
 
 <br>
 <br>
@@ -151,13 +166,16 @@ The current features of the mobile wireless testbed are:
 <li>Four <a href="http://www.acroname.com">Acroname Garcia</a> robots
 <li><a href="http://www.xbow.com/Products/XScale.htm">Intel Stargate</a> single
 board computers for each robot.
-<li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">Mica2 
-motes</a> attached to each stargate.
-<li>Four overhead cameras for visual tracking of the robots.
-<li>A <a href="<?php echo $TBBASE ?>/webcam.php3">webcam</a> for viewing the
+<li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">900MHz Mica2 
+motes</a> attached to each Stargate.
+<!-- <li>Some non-mobile Mica2 motes nearby. -->
+<li>Roaming an area about 8 x 3.5 meters with a sheetrock-covered steel pillar in the middle.
+<li>Four overhead cameras for vision-based position tracking of the robots.
+<li>Two <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> for viewing the
 robots in their habitat.
 <li>An <a href="<?php echo $TBBASE ?>/robotmap.php3">abstract map</a> of the
 current locations of the robots.
+<li>Open for public use weekdays 8am-6pm MST, with operations support.
 </ul>
 
 <?php NLCBODYEND() ?>
@@ -179,14 +197,14 @@ limitations you should be aware of:
 <li>Before you can use the mobile testbed, your project must be granted the
 appropriate privileges.  You can request access by sending mail to <a
 href="mailto:testbed-ops@flux.utah.edu">Testbed Operations</a>.
-<li>Availability is reduced to weekdays between 8am and 6pm mountain time,
-so there is staff available to assist with problems.
-<li>There is no space sharing, only one mobile experiment can be swapped-in at
+<li>The mobile testbed is currently open on non-holiday weekdays between
+8am and 6pm mountain time, so we have staff available to assist with problems.
+<li>There is no space sharing; only one mobile experiment can be swapped-in at
 a time.
 <li>Batteries must be replaced manually by the operator when levels are low.
 </ul>
 
-We hope to overcome these limitations over time, however, we are also eager to
+We expect to overcome these limitations over time; however, we are also eager to
 introduce external users to the mobile testbed early on so we can integrate
 their feedback.
 
@@ -287,8 +305,9 @@ The values specified above are measured in meters and based on the map located
 <a href="<?php echo $TBBASE ?>/robotmap.php3">here</a>, where the origin is in
 the upper left hand corner, with positive X going right and positive Y going
 down.  You can also click on the map to get a specific set of coordinates.
-Note that any coordinates you specify must not be in an obstacle, or they will
-be rejected by the system.
+Note that any coordinates you specify must not fall inside an obstacle, or they will
+be rejected by the system.  A Java applet that updates in real time is linked
+from
 
 <p>
 With this NS file you can now create your first mobile experiment.  Actually
@@ -309,10 +328,12 @@ for use, you can swap-in your experiment and begin to work.
 
 <?php NLCBODYBEGIN() ?>
 
-Now that you have a node allocated, lets make it mobile.  During swap-in,
-Emulab will start moving the node to its initial position, you can watch its
+Now that you have a node allocated, let's make it mobile.  During swap-in,
+Emulab will start moving the node to its initial position.  You can watch its
 progress by using the "Robot Map" menu item on the experiment page and checking
-out the <a href="<?php echo $TBBASE ?>/webcam.php3">webcam</a>.
+out the <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> or
+the <a href="<?php echo $TBBASE ?>/robotrack.php3">applet version of the map</a>
+that updates in real time.
 
 <p>
 <table width="100%" cellpadding=0 cellspacing=0 border=0 class="stealth">
@@ -361,7 +382,7 @@ match your project and experiment IDs.</font>
 
 <!-- mention that one setdest will override the previous. --> 
 
-Then, check back with the map and webcam to see the results of your handiwork.
+Then, check back with the map and webcams to see the results of your handiwork.
 Try moving it around a few more times to get a feel for how things work and
 where the robot can go.  Note that the robot should automatically navigate
 around obstacles in the area, like the pole in the middle, so you do not have
@@ -565,7 +586,7 @@ tb-fix-node $transmitter $node(1)
 This code creates two mote nodes and "attaches" each of them to one of the
 mobile nodes.  The OSs to be loaded on the mote nodes are the receiver,
 TinyOS-RfmLed, and the transmitter, TinyOS-CntRfm.  These are standard
-TinyOS kernels supplied by Emulab - uploading your own is covered below.
+TinyOS kernels supplied by Emulab; uploading your own is covered below.
 The receiver kernel will
 listen for packets containing a number from the transmitter and display the
 number, in binary, on the mote's builtin LEDs.  The transmitter kernel will
@@ -588,7 +609,7 @@ normally (ie. '<code>make mica2</code>').  Then, upload the binary that gets
 placed in <code>build/mica2/main.srec</code> to our
 <a href="<?php echo $TBBASE ?>/newimageid_ez.php3?nodetype=mote">mote image
     creation page</a>.  This page will ask you for a 'descriptor'.  This
-descriptor can then be used in <code>tb-set-node-hardware</code> lines in your
+descriptor can then be used in <code>tb-set-node-os</code> lines in your
 NS files, and your app will be automatically loaded on the appropriate mote(s).
 
 <p>
@@ -596,7 +617,7 @@ At this time, we don't have a TinyOS installation on the Emulab servers, so
 you'll need to have a TinyOS installation to build from on your desktop
 machine, or some other machine you control.  We hope to provide a way for you
 build TinyOS apps on Emulab in the near future.  Also, at the current time, all
-of our motes have radios in the 900HMz band, so see the TinyOS
+of our motes have radios in the 900MHz band, so see the TinyOS
 <a href="http://www.tinyos.net/tinyos-1.x/doc/mica2radio/CC1000.html">CC1000
 radio document</a> to make sure you're tuning the radios to the right band.
 

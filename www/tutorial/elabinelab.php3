@@ -48,13 +48,6 @@ ensures that the node in question is actually part of the inner Emulab
 ElabInElab serves several purposes:
 
 <ul>
-<li> Allows testing and development of Emulab itself in a controlled
-     environment, without needing a dedicated testbed. New features
-     can be tested without affecting users of the main testbed.
-     In fact, multiple independent inner Emulabs can be constructed
-     with each one being used for the testing and development of
-     different features. 
-
 <li> Can be used to provide an isolated environment (in conjunction
      with firewalling) for running "dangerous" experiments that
      include the use of worms and other malware. Instead of running
@@ -62,6 +55,13 @@ ElabInElab serves several purposes:
      inner Emulab, and thus has access to all of the Emulab's
      services, but in a context that does not put the outer Emulab at
      risk from attack. 
+
+<li> Allows testing and development of Emulab itself in a controlled
+     environment, without needing a dedicated testbed. New features
+     can be tested without affecting users of the main testbed.
+     In fact, multiple independent inner Emulabs can be constructed
+     with each one being used for the testing and development of
+     different features. 
 </ul>
 
 <p>
@@ -80,7 +80,7 @@ There are a few things to keep in mind about ElabInElab:
 
 <li> All of the nodes consume one of their experimental network
      interfaces to use for the innner Emulab "control" network.
-     Therefore, inner experimental nodes have one less experimental
+     Therefore, inner experimental nodes have one fewer experimental
      interface to use in experiments.
 </ul>
 
@@ -139,8 +139,8 @@ Another example:
 In this example, we have included a <tt>tb-set-inner-elab-eid</tt>
 directive, which says to automatically launch an experiment within the
 inner Emulab once it is set up. The "myexp" experiment must already
-exist in the same project; an experiment called "myexp" should already
-be created, but not swapped in. The system uses the NS file associated
+exist in the same project; it must have already
+been created, but not swapped in. The system uses the NS file associated
 with the "myexp" experiment to construct an experiment on the inner
 Emulab and swap it in. You will be notified via email, first when the
 inner Emulab has been fully swapped in, and then again when the inner
@@ -178,6 +178,14 @@ cannot let the inner boss access the switches (or any other protected
 resources) directly; it must be mediated via a proxy on the outer
 boss. The proxy on the outer boss checks to make sure that the actions
 are allowed (and make sense), and then proceeds to do them itself. 
+
+
+<br><br>
+<b>Setup time</b>: Largely due to dynamic construction of extensive
+parts of the inner Emulab environment, it currently takes about 20
+minutes to set up ElabinElab on pc850s.  In the future we will reduce
+this time considerably by more caching of pre-built components.
+Some faster nodes (2 and 3 GHz) will soon be available, which will also help.
 
 
 <?php

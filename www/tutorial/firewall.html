@@ -135,7 +135,7 @@ But this one probably crosses the line:
 <ul>
 <li><b>The firewall exposes more of the infrastructure than it should</b>.
 The Emulab node self-configuration and monitoring infrastructure uses a
-lot of difference services on the boss and ops nodes.  At the current time,
+lot of different services on the boss and ops nodes.  At the current time,
 we allow all those through.  Moreover, many of these, such as TFTP, cannot
 be pinned down too precisely in firewall rules, so the rules are more open
 than we would prefer.  Additionally, we also currently preserve the shared
@@ -232,20 +232,20 @@ and <code>ntp2</code>, are Emulab infrastructure related.
 <a NAME="YeOleImpl"></a><h2>The deprecated <code>ipfw</code> firewall</h2>
 <p>
 An earlier, less secure, firewall implementation did not require support
-from the switching infrastructure.  This "software" firewall solution,
+from the switching infrastructure.  This "software" firewall solution
 still allocated an extra node to act as an IP firewall.
 This node was then set as the default route for all other nodes in the
 experiment.  Thus, all outgoing, non-experimental traffic was passed through
-the node.  Inbound traffic directed to the nodes did not pass through the
+the firewall node.  Inbound traffic directed to the nodes did not pass through the firewall.
 So in addition to <a href="#Limitations">the limitations above</a>
-you can add the following:
+you can add the following for this deprecated version:
 <ul>
-<li><b>The firewall is implemented using OS-provided routing</b>.
+<li><b>The firewall was implemented using OS-provided routing</b>.
 Specifically, every node has its default route changed to point to the
 firewall node.  Sufficiently powerful applications could accidentally
-or intentionally change the default route back to the Emulab router
+or intentionally change the default route back to the Emulab router,
 thus circumventing all protection.
-<li><b>Intra-Emulab traffic is not firewalled</b>.
+<li><b>Intra-Emulab traffic was not firewalled</b>.
 Traffic between nodes over the control net
 (155.98.36.x addresses) is not filtered since the shared control net is a LAN
 and all other nodes are directly reachable.

@@ -27,11 +27,11 @@ were used, the threat model being addressed was accidental "attacks" on
 isolation; e.g., a misconfigured interface causing flooding of another
 experiment's network.
 We are now building up the Emulab infrastructure to allow experimentation
-with more potent threats, in particular ''malware'', which attempts to
+with more potent threats, in particular ''malware,'' which attempts to
 actively exploit weaknesses on nodes and in the network.
 </p><p>
 Since Emulab is intended for use by researchers, we did not unnecessarily
-want to restrict access from the Internet to experimental nodes and visa-versa.
+want to restrict access from the Internet to experimental nodes and vice-versa.
 Thus the central Emulab firewall is fairly permissive.  For high-risk
 experiments, this is not acceptable.  To address this, we have added
 <a href="docwrapper.php3?docname=firewall.html">per-experiment control net
@@ -66,8 +66,8 @@ Hence all nodes are still on the shared control network.
 <li>Blue.
 An <a href="docwrapper.php3?docname=firewall.html#Styles">open style</a>
 firewall is allocated.  This is largely worthless since you cannot add
-any rules to the firewall.  However, you can use it to gage the performance
-impact of placing a firewall node between you experiment and the outside
+any rules to the firewall.  However, you can use it to gauge the performance
+impact of placing a firewall node between your experiment and the outside
 world.
 <li>Yellow.
 A <a href="docwrapper.php3?docname=firewall.html#Styles">basic style</a>
@@ -84,7 +84,7 @@ You can explicitly combine a per-experiment Emulab with an "Orange" experiment
 to get the highest level of protection we currently offer.  It further
 restricts access from the experiment to the "real" Emulab infrastructure
 (e.g., no NFS allowed to the real "fs" node).
-<emph>Please note that this configuration currently takes about 30 minutes
+<emph>Please note that this configuration currently takes over 20 minutes
 to setup, regardless of the size of the experiment!</emph>
 </p>
 <a NAME="Limitations"></a><h2>Limitations</h2>
@@ -120,7 +120,7 @@ the firewall example</a> except that there are no additional firewall
 rules to allow <code>traceroute</code>.
 </p><p>
 To setup a high-security prison for running a
-<a href="docname=windows_in_emulab_user.html">Windows XP experiment</a>
+<a href="../doc/docwrapper.php3?docname=windows_in_emulab_user.html">Windows XP experiment</a>
 you could do:
 	<code><pre>
 	source tb_compat.tcl
@@ -154,7 +154,8 @@ Here <code>winxpnodes</code> might look like:
 	set lan [$ns make-lan "$win1 $win2" 100Mb 0ms]
 
 	$ns run
-	<code><pre>
+	<code></pre>
 </p>
+
 See the <a href="elabinelab.php3">''Emulab in Emulab''</a> section for
 more details.
