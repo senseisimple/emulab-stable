@@ -120,7 +120,7 @@ my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/frisbeed.log", "$LOGDIR/tevd.log", "$LOGDIR/proxydhcpd.log",
     "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
-    "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log",
+    "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log"
     "$LOGDIR/plabrenew.log");
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
@@ -319,6 +319,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
 	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
 	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
+	    "!xmlrpcbag", "*.*\t\t\t\t\t\t$LOGDIR/xmlrpcbag.log",
 	    "!sshxmlrpc", "*.*\t\t\t\t\t\t$LOGDIR/sshxmlrpc.log");
     };
 
@@ -368,6 +369,7 @@ Phase "syslog", "Setting up syslog", sub {
 	        "/var/run/lastlog_daemon.pid",
 	    "$LOGDIR/plabmetrics.log        640  7     1000 *     Z",
 	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z",
+	    "$LOGDIR/xmlrpcbag.log          640  7     300  *     Z",
 	    "$LOGDIR/sshxmlrpc.log          640  7     300  *     Z");
     };
 };
