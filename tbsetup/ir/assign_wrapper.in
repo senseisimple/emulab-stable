@@ -414,6 +414,8 @@ while ($run <= $maxrun) {
 	}
     }
     
+    while (<ASSIGNFP>) { } # Read anything left in the pipe before closing
+
     close(ASSIGNFP);
     
     if ($violations > 0) {
