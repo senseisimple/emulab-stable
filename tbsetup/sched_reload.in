@@ -14,10 +14,11 @@ sub usage()
 {
     print STDOUT "Usage: sched_reload [-f | -p] <imageid> <node> [node ...]\n".
 	"Use the -f to force reload. Fail if node cannot be reserved.\n".
-	"Use the -p to pend reload for the reload daemon.\n";
+	"Use the -p to pend reload for the reload daemon.\n" .
+	"Use the -r use Frisbee rather than netdisk (experimental).\n";
     exit(-1);
 }
-my  $optlist = "fp";
+my  $optlist = "fpr";
 
 #
 # Configure variables
@@ -44,6 +45,7 @@ my $error       = 0;
 my $debug       = 0;
 my $force	= 0;
 my $pend	= 0;
+my $frisbee	= 0;
 my @nodes       = ();
 my @row;
 
@@ -69,6 +71,10 @@ if (defined($options{"f"})) {
 }
 if (defined($options{"p"})) {
     $pend = $options{"p"};
+}
+if (defined($options{"r"})) {
+    $frisbee = 1;
+	$osload .= " -r ";
 }
 if ($pend and $force) {
     usage();

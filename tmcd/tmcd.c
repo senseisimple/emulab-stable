@@ -1878,6 +1878,15 @@ doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			    "next_pxe_boot_path!", nodeid);
 		    return 1;
 		}
+		syslog(LOG_INFO, "doreset: %s: Clearing current_reloads",
+			nodeid);
+		if (mydb_update("delete from current_reloads "
+			"where node_id='%s'", nodeid)) {
+		    syslog(LOG_ERR, "doreset: %s: DB Error clearing "
+			    "current_reloads!", nodeid);
+		    return 1;
+		}
+
 		return 0;
 	}
 

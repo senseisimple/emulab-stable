@@ -17,15 +17,15 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: os_load [-sw] [-f] <imageid> <node> [node ...]\n".
+    print STDOUT "Usage: os_load [-sw] [-r] <imageid> <node> [node ...]\n".
 	"Use -s to setup reload only, but do not issue a reboot\n".
 	"Use -w to block waiting for nodes to finish reloading\n".
 	"    (-s and -w are mutually exclusive)\n".
 	"Use -l to get a list of images you are permitted to load\n" .
-	"Use -f to use (highly experimental) frisbee support instead of netdisk\n";
+	"Use -r to use Frisbee support instead of netdisk\n";
     exit(-1);
 }
-my  $optlist = "sldwf";
+my  $optlist = "sldwr";
 
 #
 # Configure variables
@@ -50,6 +50,7 @@ my $BOSSADDR	= "boss.emulab.net";
 my $USERADDR	= "users.emulab.net";
 my $NETDISKOSID = "NETDISK-STD";
 my $FRISBEEPATH = "boss.emulab.net:/tftpboot/pxeboot.frisbee";
+my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
@@ -90,7 +91,7 @@ if (defined($options{"s"})) {
 if (defined($options{"w"})) {
     $waitmode = 1;
 }
-if (defined($options{"f"})) {
+if (defined($options{"r"})) {
     $frisbee = 1;
 }
 if ($waitmode && $setuponly) {
@@ -205,6 +206,11 @@ foreach my $node (@nodes) {
 		   "where node_id='$pc'");
     }
 
+    # Put it in the current_reloads table so that nodes can find out which
+	# OS to load
+    DBQueryFatal("replace into current_reloads ".
+		 "(node_id, image_id) values ('$pc', '$imageid')");
+
     #
     # Assign partition table entries for each partition in the image.
     # This is complicated by the fact that an image that covers only
@@ -238,8 +244,7 @@ foreach my $node (@nodes) {
 	     DBQueryFatal("update nodes set ".
 	                  "next_pxe_boot_path='$FRISBEEPATH'" .
 	 		  "where node_id='$pc'");
-			  # XXX: Need to pass image somehow
-
+	     system "$FRISBEELAUNCHER $imageid" and die "Unable to launch frisbee daemon\n";
 	 } else {
 	     DBQueryFatal("update nodes set ".
 	                  "next_boot_osid='$NETDISKOSID',".

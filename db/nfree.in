@@ -163,6 +163,14 @@ foreach my $n (@node_names) {
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
+
+  # Clean out the current_reloads table
+  $cmd = "delete from current_reloads where node_id='$'";
+  $sth = $dbh->query($cmd)
+    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	&& $error++);
+
+
 }
 
 $cmd = "unlock tables";
