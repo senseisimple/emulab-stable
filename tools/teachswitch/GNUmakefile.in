@@ -1,0 +1,25 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = tools/teachswitch
+
+include $(OBJDIR)/Makeconf
+
+all: teachswitch
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+teachswitch: GNUmakefile teachswitch.o
+	$(CC) $(CFLAGS) $(LDFLAGS) teachswitch.o -o teachswitch
+		cp teachswitch teachswitch.debug
+		strip teachswitch
+
+teachswitch.o: teachswitch.c
+	$(CC) -c -o teachswitch.o $(CFLAGS) $<
+

@@ -11,7 +11,7 @@ SUBDIR		= utils
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = pcapper
+SUBDIRS = pcapper teachswitch
 
 all:            all-subdirs
 
