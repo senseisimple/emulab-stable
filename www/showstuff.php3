@@ -2017,6 +2017,8 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
     $state		= $row[state];
     $zip		= $row[zip];
     $country		= $row[country];
+    $hostname		= $row[hostname];
+    $site		= $row[site];
 
     if (! $embedded) {
 	echo "<table border=2 cellpadding=0 cellspacing=2
@@ -2065,6 +2067,16 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
     echo "<tr>
               <td>Country:</td>
               <td class=left>$country</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Hostname:</td>
+              <td class=left>$hostname</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Site:</td>
+              <td class=left>$site</td>
           </tr>\n";
 
     if (! $embedded) {

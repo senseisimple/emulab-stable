@@ -56,6 +56,8 @@ my %v2pmap;
 my %p2type;
 my %p2osid;
 my %vv2pmap;
+my $hasremote  = 0;
+my $hasplab    = 0;
 
 getopts('hnmdlevbr',\%opt);
 
@@ -157,6 +159,12 @@ if (($state eq EXPTSTATE_ACTIVE) ||
 	    ISREMOTE    => $r,
 	    PLAB	=> $d,
 	};
+	if ($r) {
+	    $hasremote = 1;
+	}
+	if ($d) {
+	    $hasplab = 1;
+	}
     }
 }
 
@@ -225,6 +233,28 @@ if ($showmap &&
 	printf "\n";
     }
     print "\n";
+
+    if ($hasremote || $hasplab) {
+	my $widearea_info_result =
+	    DBQueryFatal("select vname, hostname from reserved as r left join ".
+			 "nodes as n on r.node_id=n.node_id left join " .
+			 "widearea_nodeinfo as w on w.node_id=n.phys_nodeid " .
+			 "where pid='$pid' and eid='$eid'");
+	print  "Wide-Area Node Hostnames:\n";
+	printf "%-15s %-15s %-45s \n", "ID", "Physical", "Hostname";
+	print  "--------------- --------------- --------------------\n";
+	while (($vname,$hostname) = $widearea_info_result->fetchrow_array()) {
+	    next unless
+		($v2pmap{$vname}->{ISREMOTE} || $v2pmap{$vname}->{PLAB});
+	    my $pnode = $v2pmap{$vname}->{VVP};
+	    if (!defined($hostname)) {
+		$hostname = "--";
+	    }
+	    printf "%-15s %-15s %-45s\n", $vname, $pnode, $hostname;
+	}
+	print "\n";
+    }
+
 
     my $range_result =
 	DBQueryFatal("select low,high from ipport_ranges ".

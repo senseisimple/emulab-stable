@@ -81,7 +81,8 @@ elseif (! strcmp($showtype, "widearea")) {
 			   "wani.city,wani.state,wani.country,wani.zip), ".
 		 	   "'USA, ','')".
 			   "AS location, ".
-	 		   "wani.connect_type";
+	 		   "wani.connect_type, ".
+			   "wani.hostname";
     $additionalLeftJoin = "LEFT JOIN widearea_nodeinfo AS wani ".
 			  "ON n.node_id=wani.node_id";
 
@@ -243,12 +244,14 @@ while ($row = mysql_fetch_array($query_result)) {
     $pid                = $row[pid];
     $eid                = $row[eid];
     $vname              = $row[vname];
+    $hostname           = $row[hostname];
     $status             = $row[status];
 
     if (!strcmp($showtype, "widearea")) {	
 	$machine_type = $row[machine_type];
 	$location = $row[location];
 	$connect_type = $row[connect_type];
+	$vname        = $row[hostname];
     } 
 
     echo "<tr>";
