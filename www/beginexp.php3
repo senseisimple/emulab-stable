@@ -43,7 +43,7 @@ function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN;
     global $nsdata, $nsref, $projlist, $priorities, $exp_nsfile;
-    global $uid;
+    global $uid, $guid;
     
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -149,12 +149,22 @@ function SPITFORM($formfields, $errors)
                       View NS File</a></td>
               </tr>\n";
     } elseif (isset($nsref)) {
+	if (isset($guid)) {
+        echo "<tr>
+                  <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
+                      <input type=hidden name=nsref value=$nsref>
+                      <input type=hidden name=guid value=$guid>
+                  <td><a target=_blank href=\"spitnsdata.php3?nsref=$nsref&guid=$guid\">
+                      View NS File</a></td>
+              </tr>\n";
+        } else {
         echo "<tr>
                   <td colspan=2>*Your Auto Generated NS file: &nbsp</td>
                       <input type=hidden name=nsref value=$nsref>
                   <td><a target=_blank href=spitnsdata.php3?nsref=$nsref>
                       View NS File</a></td>
               </tr>\n";
+        }
     }
     else {
 	echo "<tr>
@@ -342,6 +352,11 @@ function SPITFORM($formfields, $errors)
 if (isset($nsref)) {
     if (strcmp($nsref, "") == 0 || !ereg("^[0-9]+$", $nsref))
 	unset($nsref);
+}
+
+if (isset($guid)) {
+    if (strcmp($guid, "") == 0 || !ereg("^[0-9]+$", $guid))
+	unset($guid);
 }
 
 #
@@ -554,7 +569,11 @@ elseif ($specupload) {
     $nonsfile = 0;
 }
 elseif (isset($nsref) && strcmp($nsref, "")) {
-    $nsfile = "/tmp/$uid-$nsref.nsfile";
+    if (isset($guid)) {
+      $nsfile = "/tmp/$guid-$nsref.nsfile";
+    } else {
+      $nsfile = "/tmp/$uid-$nsref.nsfile";
+    }
     $delnsfile = 1;
     $nonsfile  = 0;
 }

@@ -13,8 +13,17 @@ include("defs.php3");
 #
 # Only known and logged in users can begin experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+
+if (isset($guid) && ereg("^[0-9]+$", $guid)) {
+	$uid = $guid;
+} else {
+	if (isset($uid)) {
+		$uid = GETLOGIN();
+		LOGGEDINORDIE($uid);
+	} else {
+		USERERROR( "Need to send guid or uid!" );
+        } 
+}
 
 if (!isset($nsdata)) {
 	USERERROR( "Need to send NSFILE!" );
@@ -51,9 +60,3 @@ if (! ($fp = fopen($nsfilename, "w"))) {
 fwrite($fp, $nsdata);
 fclose($fp);
 ?>
-
-
-
-
-
-

@@ -26,14 +26,23 @@ LOGGEDINORDIE($uid);
 if (isset($nsdata) && strcmp($nsdata, "") != 0) {
     header("Content-Type: text/plain");
     echo "$nsdata";
-} elseif (isset($nsref) && strcmp($nsref,"") != 0 && ereg("^[0-9]+$", $nsref)) {
-    $nsfile = "/tmp/$uid-$nsref.nsfile";    
+} elseif (isset($nsref) && strcmp($nsref,"") != 0 && 
+          ereg("^[0-9]+$", $nsref)) {
+    if (isset($guid) && ereg("^[0-9]+$", $guid)) {
+	$nsfile = "/tmp/$guid-$nsref.nsfile";    
+        $id = $guid;
+    } else {
+	$nsfile = "/tmp/$uid-$nsref.nsfile";    
+        $id = $uid;
+    }
 
     if (! file_exists($nsfile)) {
 	PAGEHEADER("View Generated NS File");
-	USERERROR("Could not find temporary file for user \"$uid\" with id \"$nsref\".<br>\n" . 
+	USERERROR("Could not find temporary file for user/guid \"" . $id .
+                  "\" with id \"$nsref\".<br>\n" . 
 	          "You likely copy-and-pasted an URL incorrectly,<br>\n" .
- 		  "or you've already used the file to create an experiment (thus erasing it),<br>\n" .
+ 		  "or you've already used the file to create an experiment" . 
+                  "(thus erasing it),<br>\n" .
 		  "or the file has expired.\n", 1 );
 	PAGEFOOTER();
     } else {

@@ -338,8 +338,11 @@ public class Netbuild extends java.applet.Applet
 	g.setPaintMode();
     }
 
-    public int postIt( String s ) {
+    public String postIt( String s ) {
 	int hash = s.hashCode();
+        Random rand = new Random();
+        String randVal = String.valueOf(rand.nextInt() % 102010201);
+
 	if (hash < 0) { hash = -hash; }
 	if (hash == 0) { hash = 1; }
 	try {	    
@@ -365,7 +368,8 @@ public class Netbuild extends java.applet.Applet
 	    printout = new DataOutputStream (urlConn.getOutputStream ());
 	    String content =	    
 		"nsdata=" + URLEncoder.encode ( s ) +
-                "&nsref=" + String.valueOf(hash);
+                "&nsref=" + String.valueOf(hash) +
+                "&guid=" + randVal;
 	    printout.writeBytes (content);
 	    printout.flush ();
 	    printout.close ();
@@ -380,9 +384,10 @@ public class Netbuild extends java.applet.Applet
 	} catch (Exception ex) {
 	    System.out.println("exception: " + ex.getMessage());
 	    ex.printStackTrace();	       
-	    return -1;
+	    return "posterror=1";
 	}
-	return hash;
+	return "nsref=" + String.valueOf(hash) + 
+               "&guid=" + randVal;
     }
 
 
@@ -405,12 +410,12 @@ public class Netbuild extends java.applet.Applet
 	    startAppropriatePropertiesArea(); // make sure strings are up'd
 	    String ns = workArea.toNS();
 	    System.out.println( ns );	
-	    int refid = postIt( ns );	
+	    String ref = postIt( ns );	
 	    //String url = getParameter("exporturl") + "?nsdata=" + 
 	    //URLEncoder.encode( ns );
 	    //toCookie( ns );
 	    //String url = getParameter("exporturl") + "?nsdataincookie=1";
-	    String url = getParameter("expcreateurl") + "?nsref=" + String.valueOf(refid);
+	    String url = getParameter("expcreateurl") + "?" + ref;
 	    System.out.println( url );
 	    try {
 		getAppletContext().showDocument( new URL( url ), "_blank" );
