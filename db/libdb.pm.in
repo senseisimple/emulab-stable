@@ -127,6 +127,7 @@ use Exporter;
 	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
+	 TBLeaderMailList ExpGroup
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState 
 	 TBExptRestoreVirtualState
@@ -982,6 +983,63 @@ sub ExpLeader($$)
 		     "where eid='$eid' and pid='$pid'");
 
     if ($query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Return a list of leaders (proj/group roots) for a given pid/gid,
+# in the format of an email address list. If no gid, assumes gid=pid.
+#
+# usage: TBLeaderMailList($pid,[$gid])
+#	 returns string like "name <email>[, name2 <email2>[, ...]]"
+#
+sub TBLeaderMailList($;$) {
+    # Based on the php version in dbdefs.php
+
+    my $pid = shift;
+    my $gid = shift || $pid;
+
+    # XXX: hardcode project_root and group_root here because we don't
+    # have the strings in variables...
+    $query_result =
+    DBQueryFatal("select distinct usr_name,u.uid,usr_email from users as u ".
+                 "left join group_membership as gm on gm.uid=u.uid ".
+                 "where (trust='project_root' and pid='$pid') or ".
+		 "(trust='group_root' and pid='$pid' and gid='$gid') ".
+                 "order by trust DESC, usr_name");
+    
+    if ($query_result->numrows() == 0) {
+	return 0;
+    }
+    $mailstr="";
+    while (@row = $query_result->fetchrow_array()) {
+	if ($mailstr ne "") { $mailstr .=", "; }
+	$mailstr .= '"'.$row[0]." (".$row[1].")\" <".$row[2].">";
+    }
+    return $mailstr;
+}
+
+#
+# Return Experiment group.
+#
+# usage: ExpGroup(char *pid, char *eid)
+#        returns gid if a valid pid/eid.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub ExpGroup($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select gid from experiments ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
 	return 0;
     }
 
