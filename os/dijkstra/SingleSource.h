@@ -1,10 +1,15 @@
 // SingleSource.h
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 #define SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 
 #include <boost/config.hpp>
-#include <vector>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
@@ -22,7 +27,8 @@ public:
 
     virtual ~EdgeInsertException() throw() {}
 
-    void setMessage(string newSource, string newDest, string newCost)
+    void setMessage(std::string newSource, std::string newDest,
+                    std::string newCost)
     {
         message = "Could not insert edge: source=" + newSource + ", dest="
             + newDest + ", cost=" + newCost;
@@ -48,7 +54,7 @@ public:
         return cost;
     }
 private:
-    string message;
+    std::string message;
     int source;
     int dest;
     int cost;
@@ -57,79 +63,17 @@ private:
 class SingleSource
 {
 public:
-    SingleSource(int size)
-        : adj_graph(size)
-        , pred_map(size)
-        , dist_map(size)
-        , first_hop(size)
-        , vertexCount(size)
-        , source(0)
-    {
-        using namespace boost;
-        weightmap = get(edge_weight, adj_graph);
-    }
+    SingleSource(int size);
+    ~SingleSource();
 
-    void insertEdge(int edgeSource, int edgeDest, int cost)
-    {
-        using namespace boost;
-        edge_descriptor edge;
-        bool inserted = false;
-        tie(edge, inserted) = add_edge(edgeSource, edgeDest, adj_graph);
-        if (!inserted)
-        {
-            throw EdgeInsertException(edgeSource, edgeDest, cost);
-        }
-        weightmap[edge] = cost;
-    }
+    void insertEdge(int edgeSource, int edgeDest, int cost);
+    void route(int newSource);
 
-    void route(int newSource)
-    {
-        source = newSource;
-        using namespace boost;
-        // Compute the single-source shortest-path tree rooted at this vertex.
-        dijkstra_shortest_paths(adj_graph, vertex(source, adj_graph),
-                                predecessor_map(&pred_map[0]).
-                                                   distance_map(&dist_map[0]));
-        // set up the first_hop vector
-        first_hop[source] = source;
-        for (int i = 0; i < static_cast<int>(first_hop.size()); ++i)
-        {
-            if (i != source)
-            {
-                int current = i;
-                while(pred_map[current] != source)
-                {
-                    current = pred_map[current];
-                }
-                first_hop[i] = current;
-            }
-        }
-    }
-
-    int getFirstHop(int index) const
-    {
-        return first_hop[index];
-    }
-
-    int getPred(int index) const
-    {
-        return pred_map[index];
-    }
-
-    int getDistance(int index) const
-    {
-        return dist_map[index];
-    }
-
-    int getVertexCount(void) const
-    {
-        return vertexCount;
-    }
-
-    int getSource(void) const
-    {
-        return source;
-    }
+    int getFirstHop(int index) const;
+    int getPred(int index) const;
+    int getDistance(int index) const;
+    int getVertexCount(void) const;
+    int getSource(void) const;
 private:
     // Use an adjacency_list graph instead of an adjacency_matrix
     // graph, based on the assumption that there will be many fewer

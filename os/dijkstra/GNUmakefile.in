@@ -17,8 +17,10 @@ all:	dijkstra
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-dijkstra:	dijkstra.o bitmath.o bitmath.h Exception.h SingleSource.h IpTree.h dijkstra.h
-	$(CXX) $(CXXFLAGS) -static dijkstra.o bitmath.o $(LIBS) -o dijkstra
+dijkstra:	dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o \
+                bitmath.h Exception.h SingleSource.h IpTree.h dijkstra.h \
+                Compressor.h lib.h
+	$(CXX) $(CXXFLAGS) -static dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o $(LIBS) -o dijkstra
 
 client-install: dijkstra
 	$(INSTALL_PROGRAM) dijkstra $(DESTDIR)$(CLIENT_BINDIR)/dijkstra

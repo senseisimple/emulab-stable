@@ -1,28 +1,20 @@
+// dijkstra.cc
 
-/*      dijkstra.c
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
-        Compute shortest paths in weighted graphs using Dijkstra's algorithm
-
-        by: Steven Skiena
-        date: March 6, 2002
-*/
-
-#include <iostream>
-#include <map>
-#include <string>
-#include <utility>
-#include <sstream>
-#include <cstdio>
-#include <cstdlib>
-#include <vector>
-
-using namespace std;
-
+#include "lib.h"
 #include "Exception.h"
 #include "dijkstra.h"
 #include "SingleSource.h"
 #include "bitmath.h"
 #include "IpTree.h"
+#include "Compressor.h"
+
+using namespace std;
 
 // The command line options given to us.
 namespace arg
@@ -126,7 +118,6 @@ void execute(void)
 {
     map<string, int> nameToIndex;
 
-    int i = 0;
     int numVertices = 0;
     int numEdges = 0;
 

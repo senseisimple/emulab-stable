@@ -1,18 +1,18 @@
 // dijkstra.h
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef DIJKSTRA_H_DISTRIBUTED_DIJKSTRA_1
 #define DIJKSTRA_H_DISTRIBUTED_DIJKSTRA_1
 
-// Map every pair of adjascent hosts to the IP addresses of their interfaces.
-typedef std::vector< std::multimap<int,std::pair<std::string,std::string> > >
-                                                               HostHostToIpMap;
-
-// A convenient converter
-std::string intToString(int num);
-void printRouteToIp(string sourceIp, string firstHopIp, string destIp,
-                    int cost);
-void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
-                        int netMaskSize, int cost);
+void printRouteToIp(std::string sourceIp, std::string firstHopIp,
+                    std::string destIp, int cost);
+void printRouteToSubnet(std::string sourceIp, std::string firstHopIp,
+                        std::string destSubnet, int netMaskSize, int cost);
 
 
 // This exception gets thrown if <name> in the 'source=<name>'
@@ -21,7 +21,7 @@ void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
 class InvalidSourceException : public std::exception
 {
 public:
-    InvalidSourceException(string sourceName)
+    InvalidSourceException(std::string sourceName)
     {
         message = "Invalid source argument: name=" + sourceName;
     }
@@ -33,7 +33,7 @@ public:
         return message.c_str();
     }
 private:
-    string message;
+    std::string message;
 };
 
 class RouteNotFoundException : public std::exception
@@ -50,7 +50,8 @@ public:
 
     virtual ~RouteNotFoundException() throw() {}
 
-    void setMessage(string newSource, string newDest, string newFirstHop)
+    void setMessage(std::string newSource, std::string newDest,
+                    std::string newFirstHop)
     {
         message = "Route not found: source=" + newSource + " dest=" + newDest
             + " firstHop=" + newFirstHop;
@@ -79,7 +80,7 @@ private:
     int source;
     int dest;
     int firstHop;
-    string message;
+    std::string message;
 };
 
 class TooManyHostsException : public std::exception
@@ -99,7 +100,7 @@ public:
         return message.c_str();
     }
 private:
-    string message;
+    std::string message;
 };
 
 #endif

@@ -2,7 +2,7 @@
 
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -31,12 +31,12 @@ public:
     {
         message += addend;
     }
-    virtual void addToMessage(string const & addend)
+    virtual void addToMessage(std::string const & addend)
     {
         addToMessage(addend.c_str());
     }
 private:
-    string message;
+    std::string message;
 };
 
 class InvalidArgumentException : public StringException
