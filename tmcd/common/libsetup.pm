@@ -1073,7 +1073,7 @@ sub dorouterconfig (;$)
     CLOSETMCC($TM);
 
     if (! @stuff) {
-	return 0;
+	return @routes;
     }
 
     #
@@ -1097,7 +1097,7 @@ sub dorouterconfig (;$)
 	print RC "true\n";
 	close(RC);
 	chmod(0755, TMROUTECONFIG);
-	return 0;
+	return @routes;
     }
 
     #
@@ -1764,7 +1764,7 @@ sub dorpms ()
     # to avoid the stupid changing-exports-file server race
     # (install-tarfile knows how to deal with said race when copying).
     #
-    my $installoption = "-c";
+    my $installoption = (REMOTE() ? "-t" : "-c");
 
     open(RPM, ">" . TMRPM)
 	or die("Could not open " . TMRPM . ": $!");
@@ -1813,7 +1813,7 @@ sub dotarballs ()
     # to avoid the stupid changing-exports-file server race
     # (install-tarfile knows how to deal with said race when copying).
     #
-    my $installoption = "-c";
+    my $installoption = (REMOTE() ? "-t" : "-c");
 
     open(TARBALL, ">" . TMTARBALLS)
 	or die("Could not open " . TMTARBALLS . ": $!");
