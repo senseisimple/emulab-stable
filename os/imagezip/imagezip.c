@@ -445,8 +445,6 @@ main(int argc, char *argv[])
 
 	if (chkpointdev) {
 #ifdef WITH_SHD
-		u_int32_t ssect = 0;
-
 		rval = 0;
 		if (dorelocs) {
 			fprintf(stderr, "WARNING: no relocation info "
@@ -463,12 +461,16 @@ main(int argc, char *argv[])
 			struct doslabel doslabel;
 
 			rval = read_doslabel(infd, DOSBBSECTOR, 0, &doslabel);
-			if (rval == 0)
-				ssect = doslabel.parts[slice-1].dp_start;
+			if (rval == 0) {
+				inputminsec = doslabel.parts[slice-1].dp_start;
+				inputmaxsec = inputminsec + 
+					doslabel.parts[slice-1].dp_size;
+			}
 		}
 
 		if (rval == 0) {
-			rval = read_shd(chkpointdev, infilename, infd, ssect);
+			rval = read_shd(chkpointdev, infilename, infd,
+					inputminsec);
 			if (rval == 0)
 				sortrange(ranges, 1, 0);
 		}

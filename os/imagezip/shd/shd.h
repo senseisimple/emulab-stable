@@ -3,11 +3,11 @@
  * here to get everything to compile.
  */
 
-#define SHDGETMODIFIEDRANGES	1	/* the ioctl */
+#include <sys/ioctl.h>
 
 struct shd_range {
 	u_int32_t start;
-	u_int32_t size;
+	u_int32_t end;
 };
 
 struct shd_modinfo {
@@ -16,3 +16,5 @@ struct shd_modinfo {
 	long bufsiz;		/* buffer size (in entries) */
 	long retsiz;		/* size of returned data (in entries) */
 };
+
+#define SHDGETMODIFIEDRANGES _IOWR('S', 29, struct shd_modinfo)

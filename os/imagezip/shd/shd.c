@@ -25,7 +25,6 @@
 #include "imagehdr.h"
 
 #define	ENTRIESPERCALL	1024
-#define FAKEIT
 
 #ifdef FAKEIT
 #define SHDIOCTL	fake_ioctl
@@ -79,8 +78,8 @@ read_shd(char *shddev, char *infile, int infd, u_int32_t ssect)
 		for (sr = sm.buf; sm.retsiz > 0; sr++, sm.retsiz--) {
 			if (debug > 2)
 				fprintf(stderr, "  %12d    %9d\n",
-					sr->start, sr->size);
-			addvalid(sr->start + ssect, sr->size);
+					sr->start, (sr->end-sr->start));
+			addvalid(sr->start + ssect, (sr->end-sr->start));
 		}
 
 		sm.command = 2;
