@@ -44,23 +44,23 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
-#ifdef UDPTEST
+#ifdef UDP
 	int			useudp = 0;
 	void			doudp(int argc, char **argv);
-
-	if (argc > 1 && strcmp(argv[1], "-u") == 0) {
-		useudp = 1;
-		argc--, argv++;
-	}
 #endif
 
 	portnum = TBSERVER_PORT;
 
-	while ((ch = getopt(argc, argv, "p:")) != -1)
+	while ((ch = getopt(argc, argv, "p:u")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
 			break;
+#ifdef UDP
+		case 'u':
+			useudp = 1;
+			break;
+#endif
 		default:
 			usage();
 		}
@@ -70,6 +70,16 @@ main(int argc, char **argv)
 		usage();
 	}
 	argv += optind;
+
+#ifdef UDP
+	if (useudp) {
+		doudp(argc, argv);
+		/*
+		 * Never returns.
+		 */
+		abort();
+	}
+#endif
 
 #ifdef	LBS
 	inet_aton(MASTERNODE, &serverip);
@@ -83,10 +93,6 @@ main(int argc, char **argv)
 	}
 #endif
 
-#ifdef UDPTEST
-	if (useudp)
-		doudp(argc, argv);
-#endif
 	while (1) {
 		/* Create socket from which to read. */
 		sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -134,7 +140,10 @@ main(int argc, char **argv)
 	}
 #endif
 #endif
-	/* Since we've gone through a getopt() pass, argv[0] is now the first argument */
+	/*
+	 * Since we've gone through a getopt() pass, argv[0] is now the
+	 * first argument
+	 */
 	switch(argc) {
 	case 1:
 		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[0]);
@@ -199,7 +208,7 @@ sigcatcher(int foo)
 {
 }
 
-#ifdef UDPTEST
+#ifdef UDP
 /*
  * Not very robust, send a single request, read a single reply. 
  */
@@ -211,11 +220,6 @@ doudp(int argc, char **argv)
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
-
-	if (argc < 2 || argc > 3) {
-		fprintf(stderr, "usage: %s <command>\n", argv[0]);
-		exit(1);
-	}
 
 #ifdef	LBS
 	inet_aton(MASTERNODE, &serverip);
@@ -241,10 +245,26 @@ doudp(int argc, char **argv)
 	name.sin_addr   = serverip;
 	name.sin_port = htons(TBSERVER_PORT);
 
-	if (argc == 2)
-		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[1]);
-	else
-		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[1], argv[2]);
+	/*
+	 * Since we've gone through a getopt() pass, argv[0] is now the
+	 * first argument
+	 */
+	switch(argc) {
+	case 1:
+		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[0]);
+		break;
+	case 2:
+		n = snprintf(buf, sizeof(buf) - 1, "%s %s", argv[0], argv[1]);
+		break;
+	case 3:
+		n = snprintf(buf, sizeof(buf) - 1, "%s %s %s",
+			     argv[0], argv[1], argv[2]);
+		break;
+	default:
+		fprintf(stderr, "Too many command arguments!\n");
+		exit(1);
+	}
+		
 	if (n >= sizeof(buf)) {
 		fprintf(stderr, "Command too large!\n");
 		exit(1);
