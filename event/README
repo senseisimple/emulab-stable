@@ -1,0 +1,39 @@
+This directory contains the testbed event system.
+
+BUILDING THE EVENT SYSTEM
+
+To build the event system, you first need to obtain the Elvin publish/
+subscribe system.  You need both the Elvin client library (libelvin)
+and the Elvin server (elvind).  You may either get them directly from
+http://elvin.dstc.com/ or from the Flux CVS repository (module names
+"libelvin" and "elvind").  Once the Elvin client library is built and
+installed, you may build the event system by doing a "make".
+
+USING THE EVENT SYSTEM
+
+Before you may use the event system, you must configure the Elvin
+server.  A sample configuration file may be found in the etc
+directory.  The important parts are (1) to specify a scope
+of "testbed", because that's the scope the event library operates
+in; and (2) to set the "default" parameter to "on", so
+that clients may find the server without having to specify a URL.
+
+Next, you need to start the Elvin server ("elvind") and the event
+scheduler ("event-sched") on a machine in the local network.
+The Elvin server is the component responsible for routing event
+notifications from event producers to event consumers; the event
+scheduler is the component responsible for triggering system
+events at the appropriate times.  Once these two daemons are
+running, clients in the system may use the event library to subscribe
+to system events, and to trigger and respond to their own events as
+well.  For an overview of how the system works, please see the DESIGN
+file.
+
+Clients use the event library to interface with the event system; for
+a description of the API, see the API file.  Clients that need
+additional functionality may also use Elvin directly, though at some
+point in the future we may adopt a different system for event
+notification transport or write our own.  If you find that you
+can't do something with the event library, then it very well
+could be a limitation in the event library API; please contact
+testbed-ops@fast.cs.utah.edu to let us know about it.
