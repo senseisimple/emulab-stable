@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -32,7 +33,6 @@
 #define IPOD_IPLEN	666
 #define IPOD_IDLEN	32
 
-int exit_on_first = 0;  /* Find fastest, then quit */
 int icmpid = 0;
 static char myid[IPOD_IDLEN];
 static int myidlen = 0;
@@ -54,24 +54,6 @@ struct hostdesc {
 
 struct hostdesc *hostnames;
 struct hostdesc *hosttail;
-
-void resolv_from(char *hostfrom, struct in_addr *fromaddr)
-{
-	struct hostent *hp;
-	if (hostfrom == NULL) {
-		fromaddr->s_addr = 0;
-		return;
-	}
-	
-	if ((hp = gethostbyname(hostfrom)) == NULL) {
-		if ((fromaddr->s_addr = inet_addr(hostfrom)) == -1) {
-			fprintf(stderr, "could not resolve from address\n");
-			exit(0);
-		}
-	} else {
-		bcopy(hp->h_addr_list[0], &fromaddr->s_addr, hp->h_length);
-	}
-}
 
 /*
  * Set up the list of hosts.  Return the count.
@@ -254,17 +236,13 @@ main(int argc, char **argv)
 
    char *progname;
    extern char *optarg;         /* getopt variable declarations */
-   char *hostfrom = NULL;
    extern int optind;
-   extern int optopt;
-   extern int opterr;
    char ch;                     /* Holds the getopt result */
    int hostcount;
    int delay = 0;
    int querytype = ICMP_TSTAMP;
    struct in_addr fromaddr;
    int timeout = 5;  /* Default to 5 seconds */
-   int broadcast = 0; /* Should we wait for all responses? */
    int identityfile;
 
    fromaddr.s_addr = 0;
