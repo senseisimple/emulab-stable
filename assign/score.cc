@@ -109,7 +109,8 @@ void init_score()
   forall_edges(e,PG) {
     tb_plink &pe=PG[e];
     pe.bw_used=0;
-    pe.users=0;
+    pe.emulated=0;
+    pe.nonemulated=0;
   }
 
   assert(pnodes[0] == NULL);
@@ -575,9 +576,11 @@ edge direct_link(node a,node b)
     if (dst == b) {
       pl = &PG[e];
       if (! bestpl ||
-	  (pl->users < bestpl->users ||
-	   (pl->users == bestpl->users &&
-	    pl->bw_used < bestpl->bw_used))) {
+	  ((pl->emulated+pl->nonemulated <
+	    bestpl->emulated+bestpl->nonemulated) ||
+	   (pl->emulated+pl->nonemulated ==
+	    bestpl->emulated+bestpl->nonemulated) &&
+	   (pl->bw_used < bestpl->bw_used))) {
 	best = e;
 	bestpl = pl;
       }
@@ -603,11 +606,11 @@ edge find_link_to_switch(node n)
     if (edst == nr.the_switch) {
       tb_plink &er = PG[e];
       bw = er.bw_used / er.bandwidth;
-      if ((er.users < best_users) ||
-	  ((er.users == best_users) && (bw < best_bw))) {
+      if ((er.emulated+er.nonemulated < best_users) ||
+	  ((er.emulated+er.nonemulated == best_users) && (bw < best_bw))) {
 	best = e;
 	best_bw = bw;
-	best_users = er.users;
+	best_users = er.emulated+er.nonemulated;
       }
     }
   }
@@ -680,33 +683,34 @@ void score_link(edge e,edge v,bool interswitch)
 #endif
 
   if (! interswitch) {
-    if (! er.emulated) {
-      pl.users++;
-      if (pl.users == 1) {
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"    first user\n");
-#endif
-	SADD(SCORE_DIRECT_LINK);
-      } else {
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"    not first user - penalty\n");
-#endif
-	SADD(SCORE_DIRECT_LINK_PENALTY);
-	vinfo.link_users++;
-	violated++;
-      }
-    } else {
-      pl.users++;
+    // need too account for three things here, the possiblity of a new plink
+    // the user of a new emulated link, and a possible violation.
+    if (er.emulated) {
+      pl.emulated++;
       SADD(SCORE_EMULATED_LINK);
-      if (pl.users == 1) {
+    }
+    else pl.nonemulated++;
+    if (pl.nonemulated+pl.emulated == 1) {
+      // new link
 #ifdef SCORE_DEBUG
-	fprintf(stderr,"    emulated - first user\n");
+      fprintf(stderr,"    first user\n");
 #endif
-	SADD(SCORE_DIRECT_LINK);
+      SADD(SCORE_DIRECT_LINK);
+    } else {
+      // check for violation, basically if this is the first of it's
+      // type to be added.
+      if (((! er.emulated) && (pl.nonemulated == 1)) ||
+	  ((er.emulated) && (pl.emulated == 1))) {
+#ifdef SCORE_DEBUG
+	  fprintf(stderr,"    link user - penalty\n");
+#endif
+	  SADD(SCORE_DIRECT_LINK_PENALTY);
+	  vinfo.link_users++;
+	  violated++;
       }
     }
-  } 
-  
+  }
+    
   // bandwidth
   int prev_bw = pl.bw_used;
   pl.bw_used += er.bandwidth;
@@ -732,33 +736,31 @@ void unscore_link(edge e,edge v,bool interswitch)
 #endif
 
   if (!interswitch) {
-    if (! er.emulated) {
-      pl.users--;
-      if (pl.users == 0) {
-	// link no longer used
+    if (er.emulated) {
+      pl.emulated--;
+      SSUB(SCORE_EMULATED_LINK);
+    } else {
+      pl.nonemulated--;
+    }
+    if (pl.nonemulated+pl.emulated == 0) {
+      // link no longer used
 #ifdef SCORE_DEBUG
-	fprintf(stderr,"   freeing link\n");
+      fprintf(stderr,"   freeing link\n");
 #endif
-	SSUB(SCORE_DIRECT_LINK);
-      } else {
-	// getting close to no violations
+      SSUB(SCORE_DIRECT_LINK);
+    } else {
+      // check to see if re freed up a violation, basically did
+      // we remove the last of it's link type.
+      if ((er.emulated && (pl.emulated == 0)) ||
+	  ((! er.emulated) && pl.nonemulated == 0)) {
+	// all good
 #ifdef SCORE_DEBUG
-	fprintf(stderr,"   reducing users\n");
+	fprintf(stderr,"   users ok\n");
 #endif
 	SSUB(SCORE_DIRECT_LINK_PENALTY);
 	vinfo.link_users--;
 	violated--;
       }
-    } else {
-      pl.users--;
-      SSUB(SCORE_EMULATED_LINK);
-      if (pl.users == 0) {
-	// link no longer used
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"   emulated - freeing link\n");
-#endif
-	SSUB(SCORE_DIRECT_LINK);
-      } 
     }
   }
   

@@ -146,8 +146,9 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  ed1=PG.new_edge(node1, node2);
 	  PG[ed1].bandwidth=size;
 	  PG[ed1].bw_used=0;
-	  PG[ed1].users=0;
 	  PG[ed1].name=linkname;
+	  PG[ed1].emulated=0;
+	  PG[ed1].nonemulated=0;
 	  if (smac)
 	    PG[ed1].srcmac = string(smac);
 	  else

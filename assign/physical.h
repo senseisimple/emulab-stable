@@ -64,9 +64,10 @@ public:
     }
   int bandwidth;		// maximum bandwidth of this link
   int bw_used;			// how much is used
-  int users;			// number of users in direct links
   string srcmac,dstmac;		// source and destination MAC addresses.
   string name;			// The name
+  int emulated;			// number of emulated vlinks
+  int nonemulated;		// number of nonemulated vlinks
 };
 
 class tb_slink {
