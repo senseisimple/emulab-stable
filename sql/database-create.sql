@@ -103,6 +103,25 @@ CREATE TABLE event_objecttypes (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'eventlist'
+#
+
+CREATE TABLE eventlist (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  idx int(10) unsigned NOT NULL auto_increment,
+  time float(10,3) NOT NULL default '0.000',
+  vnode varchar(32) NOT NULL default '',
+  vname varchar(20) NOT NULL default '',
+  objecttype smallint(5) unsigned NOT NULL default '0',
+  eventtype smallint(5) unsigned NOT NULL default '0',
+  arguments tinytext,
+  atstring tinytext,
+  PRIMARY KEY  (pid,eid,idx),
+  KEY vnode (vnode)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'experiments'
 #
 
@@ -662,7 +681,7 @@ CREATE TABLE users (
   dbedit tinyint(4) default '0',
   stud tinyint(4) default '0',
   pswd_expires date default NULL,
-  cvsweb tinyint(4) default NULL,
+  cvsweb tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
 ) TYPE=MyISAM;
