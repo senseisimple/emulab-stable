@@ -250,7 +250,7 @@ full_duplex: 1 if the card can operate in full duplex, 0 otherwise
 
 Will be somewhat automated (no script yet) - documentation coming soon!
 
-4) Setup outlets
+4) Setup outlets - Local Only
 
 Will be somewhat automated (no script yet)  - documentation coming soon!
 
