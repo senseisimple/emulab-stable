@@ -425,6 +425,7 @@ sub mkrootfs($)
     foreach my $dir (@ROOTCPDIRS) {
 	mysystem("hier -f -FN cp /$dir root/$dir");
     }
+    TBDebugTimeStamp("mkjail copying root cp dirs done!");
 
     #
     # Make some other directories that are nice to have!
@@ -433,6 +434,7 @@ sub mkrootfs($)
 	mkdir("root/$dir", 0755) or
 	    fatal("Could not mkdir '$dir' in $path/root: $!");
     }
+    TBDebugTimeStamp("mkjail creating root mkdir dirs done!");
 
     #
     # Okay, mount some other directories to save space.
@@ -445,11 +447,13 @@ sub mkrootfs($)
 	}
 	push(@mntpoints, "$path/root/$dir");
     }
+    TBDebugTimeStamp("mkjail mounting root NFS dirs done!");
 
     #
     # The proc FS in the jail is per-jail of course.
     # 
     mysystem("mount -t procfs proc $path/root/proc");
+    TBDebugTimeStamp("mkjail mounting /proc done!");
     push(@mntpoints, "$path/root/proc");
 
     #
