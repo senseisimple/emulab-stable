@@ -44,9 +44,13 @@ if (isset($force) && $force == 1) {
 		USERERROR("Only testbed administrators can forcibly swap ".
 			  "an experiment out!", 1);
 	}
+	if (!isset($idleswap)) { $idleswap=0; }
+	if (!isset($autoswap)) { $autoswap=0; }
 }
 else {
 	$force = 0;
+	$idleswap=0;
+	$autoswap=0;
 }
 
 $exp_eid = $eid;
@@ -75,6 +79,7 @@ if (mysql_num_rows($query_result) == 0) {
 $row = mysql_fetch_array($query_result);
 $exp_gid = $row[gid];
 $batch   = $row[batchmode];
+$swappable=$row[swappable];
 
 #
 # Look for transition in progress and exit with error. 
@@ -122,13 +127,18 @@ if (!$confirmed) {
     
     echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
                 method=post>";
-    echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
-    echo "<b><input type=submit name=canceled value=Cancel></b>\n";
 
     if ($force) {
-	    echo "<input type=hidden name=force value=$force>\n";
+	if (!$swappable) {
+	    echo "<h2>Note: This experiment is <em>NOT</em> swappable!</h2>\n";
+	}
+	echo "<input type=hidden name=force value=$force>\n";
+	echo "<input type=hidden name=idleswap value=$idleswap>\n";
+	echo "<input type=hidden name=autoswap value=$autoswap>\n";
     }
     
+    echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
+    echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
 
     if (!strcmp($inout, "restart")) {
