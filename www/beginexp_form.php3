@@ -92,7 +92,8 @@ echo "<tr>
 # NS file upload.
 # 
 echo "<tr>
-          <td>*Your NS file (20K max):</td>
+          <td>*Your NS file:<br>
+              &nbsp(20K max)</td>
           <td><input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
               </td>
@@ -143,6 +144,7 @@ echo "<tr>
 
 <p>
 <center>
+<img alt="*" src="redball.gif"> 
 Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
 </center>
 

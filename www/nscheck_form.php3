@@ -17,6 +17,10 @@ LOGGEDINORDIE($uid);
 <tr>
     <td align="center" colspan="2">
         <h1>Syntax check an NS file</h1>
+        <font size="+1">
+               Use this page to syntax check your NS file before
+               submitting it.
+        </font>
     </td>
 </tr>
 
@@ -38,7 +42,7 @@ echo "<tr>
 
 <tr>
     <td align="center" colspan="2">
-        <b><input type="submit" value="Submit"></b></td>
+        <b><input type="submit" value="Check"></b></td>
 </tr>
 </form>
 </table>
