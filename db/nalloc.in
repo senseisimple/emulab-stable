@@ -33,7 +33,6 @@ if ( ($sth->numrows < 1) && ($UID != 0) && ($EUID != 0)) {
   die("You are not a member of experiment '$eid' in project '$pid'.\n");
 }
  
-print "Locking tables.\n";
 $cmd = "lock tables nodes read, reserved write";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
@@ -76,7 +75,6 @@ if (!$error && @vals) {
   }
 }
 
-print "Unlocking tables.\n";
 $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");

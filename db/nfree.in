@@ -34,7 +34,6 @@ if ($sth->numrows < 1) {
   die("There is no experiment '$eid' in project '$pid'.\n");
 }
  
-print "Locking tables.\n";
 $cmd = "lock tables nodes read, node_types read, reloads read, ".
   "interfaces write, delays write, reserved write";
 $sth = $dbh->query($cmd) 
@@ -120,7 +119,6 @@ foreach my $n (@node_names) {
 	&& $error++);  
 }
 
-print "Unlocking tables.\n";
 $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
@@ -160,7 +158,7 @@ if ( %reloads > 0 ) {
 }
 
 foreach $n ( @freed_nodes ) {
-  print "Setting up console for $n...\n";
+  print "Resetting console for $n...\n";
   system("$consetup $n") == 0 or
     print STDERR "WARNING: $consetup $n failed!\n";
 }
