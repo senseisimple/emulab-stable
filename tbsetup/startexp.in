@@ -256,6 +256,13 @@ if (system("$tbdir/tbreport -v $pid $eid 2>&1 > $repfile") != 0) {
 }
 
 #
+# Increment the experiment count, and date. This is informational. 
+#
+$DB->query("update projects ".
+	   "set expt_count=expt_count+1, expt_last=NOW() ".
+	   "where pid='$pid'");
+
+#
 # In batchmode, send the report to stdout for the batch daemon.
 #
 if ($batch) {
