@@ -769,6 +769,8 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl remote-site-boss-install");
     };
     Phase "sslopscopy", "Copying SSL certificates to ops", sub {
+ 	ExecQuietFatal("$SSH -o 'BatchMode=yes' root\@${USERNODE} ".
+		       "     mkdir -p ${ETC_EMULAB_DIR} ");
  	ExecQuietFatal("$SCP $PREFIX/etc/$EMULAB_PEM ".
  		       "     ${USERNODE}:${ETC_EMULAB_DIR}");
  	ExecQuietFatal("$SCP $TOP_OBJDIR/ssl/$CTRLNODE_PEM".
