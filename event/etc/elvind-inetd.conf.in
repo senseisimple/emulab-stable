@@ -1,0 +1,4 @@
+#
+# Stub entry to redirect event system connections from boss to ops.
+#
+elvin stream tcp nowait nobody /usr/local/bin/nc nc -w 3 @USERNODE@ 2917

@@ -1,0 +1,29 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/etc
+SYS_ETCDIR	= /usr/local/etc
+
+include $(OBJDIR)/Makeconf
+
+CONFIGS		= elvind-inetd.conf elvind-ops.conf elvind-boss.conf
+
+all:		$(CONFIGS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: 
+	$(INSTALL_DATA) elvind-boss.conf $(SYS_ETCDIR)/elvind.conf
+	$(INSTALL_DATA) elvind-inetd.conf $(INSTALL_ETCDIR)/inetd.conf
+
+control-install:
+	$(INSTALL_DATA) elvind-ops.conf $(SYS_ETCDIR)/elvind.conf
+
+clean:
+	rm -f $(CONFIGS)
