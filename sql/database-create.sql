@@ -1102,6 +1102,19 @@ CREATE TABLE switch_stacks (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'testbed_stats'
+--
+
+CREATE TABLE testbed_stats (
+  idx int(10) unsigned NOT NULL auto_increment,
+  tstamp datetime default NULL,
+  exptidx int(10) unsigned NOT NULL default '0',
+  action varchar(16) NOT NULL default '',
+  exitcode tinyint(3) unsigned default '0', 
+  PRIMARY KEY  (idx)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'testsuite_preentables'
 --
 
