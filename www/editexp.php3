@@ -8,7 +8,7 @@ include("defs.php3");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
-# 
+#
 
 #
 # Only known and logged in users can end experiments.
@@ -19,7 +19,7 @@ $idleswaptimeout = TBGetSiteVar("idle/threshold");
 
 #
 # Verify page arguments.
-# 
+#
 if (!isset($pid) ||
     strcmp($pid, "") == 0) {
     USERERROR("You must provide a Project ID.", 1);
@@ -46,12 +46,12 @@ if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
 }
 
 #
-# Spit the form out using the array of data. 
-# 
+# Spit the form out using the array of data.
+#
 function SPITFORM($formfields, $errors)
 {
     global $eid, $pid, $TBDOCBASE;
-    
+
     #
     # Standard Testbed Header
     #
@@ -85,7 +85,7 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
 
-    echo "<table align=center border=1> 
+    echo "<table align=center border=1>
           <form action=editexp.php3?pid=$pid&eid=$eid method=post>\n";
 
     echo "<tr>
@@ -100,7 +100,7 @@ function SPITFORM($formfields, $errors)
 
     #
     # Swapping goo.
-    # 
+    #
     $swaplink = "$TBDOCBASE/docwrapper.php3?docname=swapping.html";
 
     echo "<tr>
@@ -130,7 +130,7 @@ function SPITFORM($formfields, $errors)
 	                   Idle Ignore
                       </td>
                   </tr>\n";
-	
+
 	echo "    <tr>
                        <td>
                           <input type='checkbox'
@@ -145,7 +145,7 @@ function SPITFORM($formfields, $errors)
                       <td>
                           <a href='{$swaplink}#swapping'>
 	                     <b>Swappable:</b></a>
-                             This experiment can be swapped. 
+                             This experiment can be swapped.
                       </td>
 	              </tr>
 	              <tr>
@@ -154,7 +154,7 @@ function SPITFORM($formfields, $errors)
                           <textarea rows=2 cols=50
                                     name='formfields[noswap_reason]'>" .
 	                    htmlspecialchars($formfields[noswap_reason],
-					     ENT_QUOTES) . 
+					     ENT_QUOTES) .
 	                 "</textarea>
                       </td>
 	              </tr><tr>\n";
@@ -172,7 +172,7 @@ function SPITFORM($formfields, $errors)
                   <td>
                       <a href='{$swaplink}#idleswap'>
 	                 <b>Idle-Swap:</b></a>
-                         Swap out this experiment after 
+                         Swap out this experiment after
                          <input type='text'
                                 name='formfields[idleswap_timeout]'
 		                value='" . $formfields[idleswap_timeout] . "'
@@ -186,7 +186,7 @@ function SPITFORM($formfields, $errors)
                       <textarea rows=2 cols=50
                                 name='formfields[noidleswap_reason]'>" .
 	                    htmlspecialchars($formfields[noidleswap_reason],
-					     ENT_QUOTES) . 
+					     ENT_QUOTES) .
 	             "</textarea>
                   </td>
 	          </tr><tr>
@@ -194,7 +194,7 @@ function SPITFORM($formfields, $errors)
                       <input type='checkbox'
 		             name='formfields[autoswap]'
 		             value='1' ";
-    
+
     if ($formfields[autoswap] == "1") {
 	echo " checked='1'";
     }
@@ -225,10 +225,10 @@ function SPITFORM($formfields, $errors)
                          name=\"formfields[cpu_usage]\"
                          value=\"" . $formfields[cpu_usage] . "\"
 	                 size=2>
-                  (PlanetLab Nodes Only: 1 &lt= X &lt= 5) 
+                  (PlanetLab Nodes Only: 1 &lt= X &lt= 5)
               </td>
           </tr>\n";
-    
+
     echo "<tr>
               <td class='pad4'>Mem Usage:</td>
               <td class=left>
@@ -239,7 +239,7 @@ function SPITFORM($formfields, $errors)
                   (PlanetLab Nodes Only: 1 &lt= X &lt= 5)
               </td>
           </tr>\n";
-    
+
     #
     # Batch Experiment?
     #
@@ -289,7 +289,7 @@ $doemail = 0;
 #
 # Construct a defaults array based on current DB info. Used for the initial
 # form, and to determine if any changes were made and to send email.
-# 
+#
 $defaults                    = array();
 $defaults[description]       = stripslashes($row[expt_name]);
 $defaults[idle_ignore]       = $row[idle_ignore];
@@ -326,7 +326,7 @@ if (! isset($submit)) {
 
 #
 # Otherwise, must validate and redisplay if errors. Build up a DB insert
-# string as we go. 
+# string as we go.
 #
 $errors  = array();
 $inserts = array();
@@ -361,14 +361,14 @@ else {
 #
 # Swappable
 #
-if (ISADMIN($uid) && (!isset($formfields[swappable]) ||
+if (ISADMIN() && (!isset($formfields[swappable]) ||
     strcmp($formfields[swappable], "1"))) {
     $formfields[swappable] = 0;
 
     if (!isset($formfields[noswap_reason]) ||
         !strcmp($formfields[noswap_reason], "")) {
 
-        if (!ISADMIN($uid)) {
+        if (!ISADMIN()) {
 	    $errors["Swappable"] = "No justification provided";
         }
 	else {
@@ -383,7 +383,8 @@ if (ISADMIN($uid) && (!isset($formfields[swappable]) ||
 }
 else {
     $inserts[] = "swappable=1";
-    $inserts[] = "noswap_reason=''";
+    $inserts[] = "noswap_reason='" .
+	         addslashes($formfields[noswap_reason]) . "'";
 }
 
 #
@@ -395,8 +396,8 @@ if (!isset($formfields[idleswap]) ||
 
     if (!isset($formfields[noidleswap_reason]) ||
 	!strcmp($formfields[noidleswap_reason], "")) {
-	
-	if (! ISADMIN($uid)) {
+
+	if (! ISADMIN()) {
 	    $errors["IdleSwap"] = "No justification provided";
 	}
 	else {
@@ -412,13 +413,15 @@ if (!isset($formfields[idleswap]) ||
 }
 elseif (!isset($formfields[idleswap_timeout]) ||
 	($formfields[idleswap_timeout] + 0) <= 0 ||
-	($formfields[idleswap_timeout] + 0) > $idleswaptimeout) {
+	( (($formfields[idleswap_timeout] + 0) > $idleswaptimeout) &&
+	  !ISADMIN()) ) {
     $errors["Idleswap"] = "Invalid time provided (0 < X <= $idleswaptimeout)";
 }
 else {
     $inserts[] = "idleswap=1";
     $inserts[] = "idleswap_timeout=" . 60 * $formfields[idleswap_timeout];
-    $inserts[] = "noidleswap_reason=''";
+    $inserts[] = "noidleswap_reason='" .
+	         addslashes($formfields[noidleswap_reason]) . "'";
 }
 
 #
@@ -441,10 +444,10 @@ else {
 
 #
 # CPU Usage
-# 
+#
 if (isset($formfields[cpu_usage]) &&
     strcmp($formfields[cpu_usage], "")) {
-    
+
     if (($formfields[cpu_usage] + 0) < 0 ||
 	($formfields[cpu_usage] + 0) > 5) {
 	$errors["CPU Usage"] = "Invalid (0 <= X <= 5)";
@@ -459,7 +462,7 @@ else {
 
 #
 # Mem Usage
-# 
+#
 if (isset($formfields[mem_usage]) &&
     strcmp($formfields[mem_usage], "")) {
 
@@ -477,7 +480,7 @@ else {
 
 #
 # Spit any errors before dealing with batchmode, which changes the DB.
-# 
+#
 if (count($errors)) {
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -505,7 +508,7 @@ if ($defaults[batchmode] != $formfields[batchmode]) {
 	$batchmode = 1;
 	$formfields[batchmode] = 1;
     }
-    
+
     DBQueryFatal("lock tables experiments write");
 
     $query_result =
@@ -515,16 +518,16 @@ if ($defaults[batchmode] != $formfields[batchmode]) {
 		     "     expt_locked is NULL and batchstate='$batchstate'");
 
     $success = DBAffectedRows();
-    
+
     DBQueryFatal("unlock tables");
 
     #
-    # Lets see if that worked. 
+    # Lets see if that worked.
     #
     if (! $query_result || !$success) {
 	$errors["Batch Mode"] = "Experiment is running or in transition; ".
 	    "try again later";
-	
+
 	SPITFORM($formfields, $errors);
 	PAGEFOOTER();
 	return;
@@ -565,7 +568,7 @@ if ($doemail &&
     $ir   = $formfields[noidleswap_reason];
     $a    = ($formfields[autoswap] ? "Yes" : "No");
     $at   = $formfields[autoswap_timeout];
-	
+
     TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
 	   "\nThe swap settings for $pid/$eid have changed.\n".
 	   "\nThe old settings were:\n".
@@ -590,7 +593,7 @@ if ($doemail &&
 #
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
-# 
+#
 header("Location: showexp.php3?pid=$pid&eid=$eid");
 
 ?>
