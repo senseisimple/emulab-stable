@@ -354,7 +354,7 @@ tb-set-node-cmdline $node0 {???}
 
 <p>Notes:
 <ul>
-  <li>Set the command line, to be passed to the <i>kernel<i> when it
+  <li>Set the command line, to be passed to the <i>kernel</i> when it
   is booted.
   <li>Currently, this is supported on OSKit kernels only. 
 </ul>
@@ -466,6 +466,8 @@ tb-set-node-lan-delay $lan0 $node0 40ms
       <code>make-lan</code>.
   <li>The behavior of this command is not defined when used with nodes
       that are in the same LAN multiple times.
+  <li>Delays of less than 3ms (per trip) are too small to be
+      accurately modeled at this time, and will be silently ignored.
 </ul>
 
 <h4>tb-set-node-lan-bandwidth</h4>
@@ -521,8 +523,8 @@ tb-set-node-lan-loss $lan0 $node0 0.05
       <code>(1-(1-<var>A</var>)(1-<var>B</var>))</code>.
   <li>If this command is not used to overwrite the loss, then the
       loss for a given node to switch link is taken from the loss rate
-      passed to the <code>make-lan<code> command.  If a loss rate of
-      <var>L</var> is passed to <code>make-lan<code> then the node to
+      passed to the <code>make-lan</code> command.  If a loss rate of
+      <var>L</var> is passed to <code>make-lan</code> then the node to
       switch loss rate for each node is set to
       <code>(1-sqrt(1-<var>L</var>))</code>.  Thus as each packet will
       have two such chances to be lost the node to loss rate comes out
