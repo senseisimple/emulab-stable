@@ -16,11 +16,11 @@ push(@INC, $IRLIB);
 require libir;
 
 if ($#ARGV != 1) {
-    print STDERR "Syntax: $0 ns_file ir_file\n";
+    print STDERR "Syntax: $0 tbcmds_file ir_file\n";
     exit(1);
 }
 
-($nsfile,$irfile) = @ARGV;
+($tbcmdfile,$irfile) = @ARGV;
 
 use DBI;
 
@@ -84,36 +84,40 @@ while (@row = $sth->fetchrow_array) {
 }
 $sth->finish;
 
-open(NSFILE,$nsfile) || do {
+open(TBCMD,$tbcmdfile) || do {
     print STDERR "Could not open $nsfile\n";
     exit(1);
 };
 
 # hwtype is indexed by node and contains the type
 # linkloss is indexed by src:dst and contains the loss rate
-while (<NSFILE>) {
-    /^\#TB/ || next;
+while (<TBCMD>) {
     chop;
     @line = split;
-    if ($line[1] eq "set-hardware") {
-	if ($#line != 3) {
+    if ($line[0] eq "tb-set-hardware") {
+	if ($#line != 2) {
 	    print "!\n";
-	    push(@ERRORS,"Syntax: set-hardware node type");
+	    push(@ERRORS,"Syntax: tb-set-hardware node type");
 	    next;
 	} 
-	if (! defined($nodes{$line[2]})) {
-	    push(@ERRORS,"$line[2] is not a valid node.");
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
 	    next;
 	}
-	if (! defined($hwtypes{$line[3]})) {
-	    push(@ERRORS,"$line[3] is not a valid hw type.");
+	if (! defined($hwtypes{$line[2]})) {
+	    push(@ERRORS,"$line[2] is not a valid hw type.");
 	    next;
 	}
 	# hwtype(node) = type
-	$hwtype{$line[2]} = $line[3];
-    } elsif ($line[1] eq "set-link-loss") {
-	if ($#line != 4) {
-	    push(@ERRORS,"Syntax: set-link-loss src dst loss_rate");
+	$hwtype{$line[1]} = $line[2];
+    } elsif ($line[0] eq "tb-set-link-loss") {
+	if ($#line != 3) {
+	    push(@ERRORS,"Syntax: tb-set-link-loss src dst loss_rate");
+	    next;
+	}
+	if ((! defined($nodes{$line[1]})) &&
+	    (! defined($lans{$line[1]}))) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
 	    next;
 	}
 	if ((! defined($nodes{$line[2]})) &&
@@ -121,44 +125,39 @@ while (<NSFILE>) {
 	    push(@ERRORS,"$line[2] is not a valid node.");
 	    next;
 	}
-	if ((! defined($nodes{$line[3]})) &&
-	    (! defined($lans{$line[3]}))) {
-	    push(@ERRORS,"$line[3] is not a valid node.");
+	if (! defined($links{"$line[1]:$line[2]"})) {
+	    push(@ERRORS,"No link between $line[1] and $line[2]");
 	    next;
 	}
-	if (! defined($links{"$line[2]:$line[3]"})) {
-	    push(@ERRORS,"No link between $line[2] and $line[3]");
-	    next;
-	}
-	if ( ((! ($line[4] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
-	      (! ($line[4] =~ /^\.[0-9]+$/))) ||
-	     ($line[4] < 0) || ($line[4] > 1)) {
-	    push(@ERRORS,"$line[4] not between 0.0 and 1.0");
+	if ( ((! ($line[3] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
+	      (! ($line[3] =~ /^\.[0-9]+$/))) ||
+	     ($line[3] < 0) || ($line[3] > 1)) {
+	    push(@ERRORS,"$line[3] not between 0.0 and 1.0");
 	    next;
 	}
 	# linkloss(src:dst) = loss
-	$linkloss{"$line[2]:$line[3]"} = $line[4];
-    } elsif ($line[1] eq "set-lan-loss") {
-	if ($#line != 3) {
-	    push(@ERRORS,"Syntax: set-lan-loss lan loss_rate");
+	$linkloss{"$line[1]:$line[2]"} = $line[4];
+    } elsif ($line[1] eq "tb-set-lan-loss") {
+	if ($#line != 2) {
+	    push(@ERRORS,"Syntax: tb-set-lan-loss lan loss_rate");
 	} else {
-	    if (! defined($lans{$line[2]})) {
-		push(@ERRORS,"$line[2] is not a valid lan.");
+	    if (! defined($lans{$line[1]})) {
+		push(@ERRORS,"$line[1] is not a valid lan.");
 		next;
 	    }
-	    if ( ((! ($line[3] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
-		  (! ($line[3] =~ /^\.[0-9]+$/))) ||
-		 ($line[3] < 0) || ($line[3] > 1)) {
-		push(@ERRORS, "$line[3] not between 0.0 and 1.0");
+	    if ( ((! ($line[2] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
+		  (! ($line[2] =~ /^\.[0-9]+$/))) ||
+		 ($line[2] < 0) || ($line[2] > 1)) {
+		push(@ERRORS, "$line[2] not between 0.0 and 1.0");
 		next;
 	    } 
 	    # lanloss(lan) = loss
-	    $lanloss{$line[2]} = $line[3];
+	    $lanloss{$line[1]} = $line[2];
 	}
     }
 }
 
-close(NSFILE);
+close(TBCMD);
 
 if ($#ERRORS != -1) {
     foreach (@ERRORS) {

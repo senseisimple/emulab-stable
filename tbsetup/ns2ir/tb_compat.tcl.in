@@ -1,0 +1,50 @@
+# This is the tb_compact.tcl that deals with all the TB specific commands.
+# It should be loaded at the beginning of any ns script using the TB commands.
+
+# Open up the tbcmds file
+if {[catch "open tbcmds w" TBCMD]} {
+    puts stderr "Fatal Error: Could not open tbcmds file for writing."
+    exit 1
+}
+
+proc tb-set-ip {node ip} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-ip $nodeid_map($node) $ip"
+}
+proc tb-set-ip-interface {src dst ip} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-ip-interface $nodeid_map($src) $nodeid_map($dst) $ip"
+}
+proc tb-set-hardware {node type args} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-hardware $nodeid_map($node) $type $args"
+}
+proc tb-set-node-os {node os} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-node-os $nodeid_map($node) $os"
+}
+proc tb-create-os {label path partition} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-create-os $label $path $partition"
+}
+proc tb-set-link-loss {src dst rate} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-link-loss $nodeid_map($src) $nodeid_map($dst) $rate"
+}
+proc tb-set-lan-loss {lan rate} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-lan-loss $nodeid_map($lan) $rate"
+}
+proc tb-set-dnard-os {shelf number os} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-dnard-os $nodeid_map($shelf) $number $os"
+}
+
+# The following commands are not clearly defined and probably will be
+# changed or removed
+proc tb-set-dnard-ip {shelf number ip} {}
+proc tb-set-node-deltas {node deltas} {}
+proc tb-set-dnard-deltas {shelf number deltas} {}
+
+# Show that we have loaded
+set TB_COMPACT 1

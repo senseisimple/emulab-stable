@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.4 2000-12-26 23:54:15 calfeld Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.5 2001-02-14 16:34:53 calfeld Exp $
 
 #
 
@@ -180,6 +180,7 @@ Simulator instproc run {} {
     global eventlist
     global lanlist
     global irfile
+    global TBCMD
 
     set IRfile [open $irfile w]
 
@@ -205,6 +206,11 @@ Simulator instproc run {} {
     puts $IRfile "END events"
 
     close $IRfile
+
+    # Close the TBCMDs file if necessary
+    if {[info exists TBCMD]} {
+	close $TBCMD
+    }
 }
 
 Simulator instproc halt {} {

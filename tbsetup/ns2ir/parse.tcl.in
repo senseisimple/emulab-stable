@@ -11,6 +11,7 @@ set irfile [lindex $argv 2]
 set tbroot @prefix@
 
 set libdir @prefix@/lib/ns2ir
+set tbcompat "$libdir/tb_compat.tcl"
 source $libdir/tcl-object.tcl
 source $libdir/node.tcl
 source $libdir/link.tcl
@@ -84,5 +85,7 @@ source $libdir/sim.tcl
 source $libdir/stubs.tcl
  
 set prefix $id
-source $nsfile
 
+# Copy in tb_compat.tcl
+file copy -force $tbcompat [file dirname $nsfile]
+source $nsfile

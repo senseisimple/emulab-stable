@@ -9,7 +9,8 @@ SUBDIR		= tbsetup/ns2ir
 include $(OBJDIR)/Makeconf
 
 LIB_STUFF	= event.tcl stubs.tcl link.tcl \
-		  tcl-object.tcl node.tcl sim.tcl lan.tcl
+		  tcl-object.tcl node.tcl sim.tcl lan.tcl \
+		  tb_compat.tcl
 LIBEXEC_STUFF	= parse.tcl postparse 
 
 #
