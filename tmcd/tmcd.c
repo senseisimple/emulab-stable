@@ -43,9 +43,13 @@
 #define FSPROJDIR	FSNODE ":" FSDIR_PROJ
 #define FSGROUPDIR	FSNODE ":" FSDIR_GROUPS
 #define FSUSERDIR	FSNODE ":" FSDIR_USERS
+#ifdef  FSDIR_SHARE
+#define FSSHAREDIR	FSNODE ":" FSDIR_SHARE
+#endif
 #define PROJDIR		"/proj"
 #define GROUPDIR	"/groups"
 #define USERDIR		"/users"
+#define SHAREDIR	"/share"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
 #define FSHOSTID	"/usr/testbed/etc/fshostid"
@@ -2308,6 +2312,14 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		info("MOUNTS: %s", buf);
 		
+#ifdef FSSHAREDIR
+		/*
+		 * Return share mount if its defined.
+		 */
+		sprintf(buf, "REMOTE=%s LOCAL=%s\n",FSSHAREDIR, SHAREDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		info("MOUNTS: %s", buf);
+#endif
 		/*
 		 * If pid!=gid, then this is group experiment, and we return
 		 * a mount for the group directory too.
@@ -2320,6 +2332,15 @@ COMMAND_PROTOTYPE(domounts)
 		}
 	}
 	else {
+#ifdef FSSHAREDIR
+		/*
+		 * Pointer to /share.
+		 */
+		sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
+			fshostid, FSDIR_SHARE, SHAREDIR);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		info("MOUNTS: %s", buf);
+#endif
 		/*
 		 * Return SFS-based mounts. Locally, we send back per
 		 * project/group mounts (really symlinks) cause thats the
