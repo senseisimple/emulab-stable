@@ -54,7 +54,7 @@ echo "<form action=newgroup.php3 method=post>
 
 if (isset($pid)) {
     echo "<tr>
-              <td>Project:</td>
+              <td>* Project:</td>
               <td class=left>
                   <input name=group_pid type=readonly value='$pid'>
               </td>
