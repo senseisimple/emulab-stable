@@ -123,15 +123,6 @@ When you're done, re-run the boss-install script.
 Like the ops-install script, boss-install sets up paswordless sudo for anyone
 in the wheel group.
 
-There is one bootstrapping problem we have that needs to be worked around - we
-put fully-qualified names for the ops/users node into /etc/fstab on boss. But,
-if you're running the nameserver for this domain on boss, those names won't be
-resolvable yet. Since we don't yet have a way to auto-generate DNS
-configuration files, the suggested work-around is to add addresses for the
-FSNODE and USERNODE that you specified in your defs file (which may be the same
-thing), to /etc/hosts on boss. Remember to remove them once you really have
-DNS set up.
-
 ##### Step 4 - Installing from source.
 
 In your object directory, do a 'gmake && gmake boss-install'. Then, as root, do
@@ -140,12 +131,15 @@ it can make certain scripts setuid, etc.
 
 ##### Step 5 - Setting up root ssh from boss to ops
 
-The boss node needs to be able to ssh in, as root, to the ops node. To set this
-up, copy root's public identity from boss (created by the boss-install script)
-to ops's authorized_keys file:
-scp /root/.ssh/identity.pub ops:/root/.ssh/authorized_keys
+This step is now done as part of boss-install/ops-install. To confirm
+this, make sure this works:
 
+	boss> sudo ssh ops ls /
 
+If this *FAILS*, you will need to do this by hand, typing a password:
+
+	scp /root/.ssh/identity.pub ops:/root/.ssh/authorized_keys
+	
 ##### Step 6 - Setting up named
 
 The testbed software manipulates DNS zone files for two reasons. First, it
@@ -158,41 +152,35 @@ The named_setup script does this by generating zone files - in general, it
 concatenates a '.head' file, written by you, with it's own generated entries.
 The main zone file is /etc/namedb/OURDOMAIN.db, where OURDOMAIN is from your
 defs file. (OURDOMAIN, unless explicitly specified, is taken to be the domain
-portion of BOSSNODE.) We also generate reverse zone files (for inverse
+portion of BOSSNODE). We also generate reverse zone files (for inverse
 lookups, ie. turning IP addresses back into names) in
 /etc/named/reverse/SUBNET.db, where SUBNET is the the class-C subnet in which
-the addresses reside (ie. 10.0.0.db).
+the addresses reside (ie. 10.0.0.db). This value is defined in the defs
+file created above, as TESTBED_NETWORK.
 
-You'll need to create these .head files yourself. The easiest way to do this
-is to start with the examples we've provided in this directory:
-1) Create /etc/namedb/OURDOMAIN.db.head from example.emulab.net.db.head
-    - the forward zone file
-2) Create /etc/named/reverse/SUBNET.db.head from example-155.101.128.db.head
-    - a reverse zone file
-If you have more than one class-C subnet for your testbed, you'll need a copy
-of the reverse zone file for each one. Follow the examples in these .head
-files, making sure to get boss, ops, and any 'infrastructure' equipment (such
-as routers and switches) into the zone files.  These zone files do not need to
-include the nodes - the nodes will be added to them automatically.
+boss-install makes a reasonable attempt to create a set of named config
+files for your, placing them in /etc/named. If your testbed consists of
+a single class-C network, then these files will most likely be correct,
+although you want to look at them to make sure. Look at these files to make
+sure:
 
-Now edit /etc/namedb/named.conf, and add an entry like this for the forward
-zone:
-        zone "example.emulab.net" in {
-            type master;
-            file "example.emulab.net.db";
-        };
+	/etc/named/OURDOMAIN.db.head
+	/etc/named/reverse/SUBNET.db.head
+	/etc/named/named.conf
 
-And one of these for each reverse subnet:
-        zone "128.101.155.in-addr.arpa" in {
-            type master;
-            file "reverse/155.101.128.db";
-        };
+If you have more than one class-C subnet for your testbed, you'll need a
+copy of the reverse zone file for each one. You want to out boss, ops, and
+any 'infrastructure' equipment (such as routers and switches) into the zone
+files.  These zone files do not need to include the nodes - the nodes will
+be added to them automatically. Be sure to edit /etc/named/named.conf if
+you add any reverse map files (follow the format for the existing entry).
 
 Once you think you've got things set up, run /usr/testbed/sbin/named_setup,
 and make sure that it doesn't give you any error messages. It will generate
 the following files:
-1) /etc/namedb/OURDOMAIN.db
-2) /etc/namedb/reverse/SUBNET.db
+
+	/etc/namedb/OURDOMAIN.db
+	/etc/namedb/reverse/SUBNET.db
 
 ##### If you are using unroutable private IP addresses for part of the
       testbed:
@@ -219,27 +207,24 @@ OURDOMAIN.internal.db.head .
 There are a few things we haven't been able to completely automate just yet,
 though we hope to soon. 
 
-hosts file - It's a good idea to put ops' name/IP address in /etc/hosts - this
-helps out NFS mounts, which are typically done before the nameserver is started,
-and is generally helpful if things go wrong with the nameserver.
+hosts file - You want to put boss/ops name/IP addresses in /etc/hosts on
+both boss and ops to avoid boottime circular dependencies (cause of NFS
+cross mounts). This is done for you in ops-install and boss-install, but
+you might want to confirm it was done properly. If you change the IP
+addresses of boss/ops later, you will want to be sure to update /etc/hosts
+on both machines.
 
-SSL certificates - Our apache config file expects to find SSL certificates in:
-/usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
-/usr/local/etc/apache/ssl.key/www.<sitename>.key
-(where <sitename> is OURDOMAIN from the configure defs file, which defaults to
-boss's domain name.) 
-Generate a passwordless certificate (up to you if you want to get a 'real' one
-from Verisign, etc., or sign your own), and place the files from it in the
-above locations. An easy way to generate a temporary self-signed certificate is
-to run:
-make all certificate
-... in /usr/ports/www/apache13-modssl . Make sure that you give the same value
-for the 'Common name' that you put in WWWHOST in your defs file, and answer
-'N' to the 'Encrypt the private key now?' question. You can just take the
-defaults on the rest of the qestions. This script creates the files:
-work/apache_<version>/conf/ssl.key/server.key
-work/apache_<version>/conf/ssl.crt/server.crt
-... which you can move into the locations mentioned above.
+SSL certificates - Our apache config file expects to find SSL certificates
+in: 
+	/usr/local/etc/apache/ssl.crt/www.<sitename>.crt
+	/usr/local/etc/apache/ssl.key/www.<sitename>.key
+	
+(where <sitename> is OURDOMAIN from the configure defs file, which defaults
+to boss's domain name).
+
+boss-install already generated a temporary no-passhrase certificate for you
+and placed them in the locations specified above. However, we recommend
+that you get a "real" certificate from Verisign (or one of the others). 
 
 tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
 to boot, reload, etc. testbed machines, which live in /tftpboot . For the time

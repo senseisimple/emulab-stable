@@ -101,23 +101,6 @@ elabman's profile page  (by clicking on the uid) and freeze the user.
 
 Others at your site can now apply to join your project, or start their own.
 
-There are five meta-experiments that must be created in the emulab-ops
-project.  Just start them through the normal 'begin experiment' page, and don't
-give an NS file (you must be 'red dot' to do this.) Also, uncheck the
-'idle-swap' checkbox so that they do not get swapped out accidentally.
-
-These experiments are:
-
-hwdown - Nodes that are down due to hardware failure
-reloading - Nodes that are having their disks automatically reloaded
-reloadpending - Nodes that are awaiting disk reloading
-oldreserved - For use in holding nodes while modifying an experiment.
-nfree-locked - For use in transitioning nodes from reserved to free.
-opsnode - Psuedo experiment for the operations node.
-
-Any other 'holding' experiments that you want for operations should be put
-into the emulab-ops project.
-
 ##### Step 2 - Setup web sql editor
 
 Several of the steps below require you to add data to the database by hand. If
