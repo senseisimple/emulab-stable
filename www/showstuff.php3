@@ -715,16 +715,13 @@ function SHOWNODES($pid, $eid) {
                 <th>Type</th>
                 <th>Default OSID</th>
                 <th>Node<br>Status</th>
-                <th>Last Active</th>
+                <th>Hours<br>Idle</th>
                 <th>Startup<br>Status[<b>1</b>]</th>
                 <th>Ready<br>Status[<b>2</b>]</th>
               </tr>\n";
 	
 	$query_result =
 	    DBQueryFatal("SELECT nodes.*,reserved.vname, ".
-	        "lower(date_format(greatest(last_tty_act,last_net_act,".
-		"last_cpu_act,last_ext_act),\"%c/%d&nbsp;%l:%i:%s&nbsp;%p\"))".
-		"as acttime, ".
 	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 	        "FROM nodes LEFT JOIN node_activity ".
 		"on nodes.node_id=node_activity.node_id ".
@@ -741,7 +738,7 @@ function SHOWNODES($pid, $eid) {
 	    $readystatus   = $row[ready];
 	    $status        = $row[status];
 	    $bootstate     = $row[eventstate];
-	    $acttime     = $row[acttime];
+	    $idlehrs       = TBGetNodeIdleTime($node_id);
 
 	    if (!$vname)
 		$vname = "--";
@@ -769,7 +766,7 @@ function SHOWNODES($pid, $eid) {
 		echo "  <td>$status</td>\n";
 	    }
 	    
-	    echo "  <td>$acttime</td>
+	    echo "  <td>$idlehrs</td>
                     <td align=center>$startstatus</td>
                     <td align=center>$readylabel</td>
                    </tr>\n";
