@@ -905,7 +905,12 @@ elseif ($exp_batched) {
           available. This might happen immediately, or it may take hours
 	  or days. You will be notified via email when the experiment has
           been run. If you do not receive email notification within a
-          reasonable amount of time, please contact $TBMAILADDR.\n";
+          reasonable amount of time, please contact $TBMAILADDR.
+          <br>
+          <br>
+          While you are waiting, you can watch the log of start attempts
+          in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
+          realtime</a>.\n";
 }
 else {
     echo "You will be notified via email when the experiment has been fully

@@ -10,8 +10,11 @@ use English;
 use Getopt::Std;
 
 #
-# This gets invoked from the Web interface. CD into the proper directory
-# and do the tb stuff.
+# This gets invoked from the Web interface via batchexp. At this point, we
+# could combine batchexp and startexp into one script, since the distinction
+# was originally because of the batch system. An alternate approach would get
+# rid of startexp and have batchexp call swapexp (letting batchexp do the
+# prerun part).
 #
 sub usage()
 {
@@ -37,6 +40,9 @@ my $PROJROOT = "/proj";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
 
 my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
@@ -175,7 +181,8 @@ if (! $query_result->numrows) {
 
 my %row		= $query_result->fetchhash();
 my $estate	= $row{'state'};
-my $ebatchstate = $row{'batchstate'};
+my $isbatch     = $row{'batchmode'};
+my $expt_locked = $row{'expt_locked'};
 my $expt_path   = $row{'path'};
 my $expt_name   = $row{'expt_name'};
 my $expt_created= $row{'expt_created'};
@@ -197,13 +204,18 @@ my $swapsettings =
   "Auto-Swap:   $autoswap".
   ($autoswapbit ? ", at $autoswaptime hours\n" : "\n");
 
-if ($estate ne EXPTSTATE_NEW ||
-    $ebatchstate ne BATCHSTATE_ACTIVATING ||
-    !defined($row{'expt_name'})) {
+#
+# No longer possible to call startexp independently; eventually merge into
+# batchexp or shift to letting swapexp do the work. 
+# 
+if ($estate ne EXPTSTATE_NEW) {
     die("*** $0:\n".
 	"    Experiment $pid/$eid is not in the proper state!\n");
 }
-
+if (! defined($expt_locked)) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid should be locked but is not!\n");
+}
 if (! chdir($workdir)) {
     die("*** $0:\n".
 	"    Could not chdir to $workdir: $!\n");
@@ -235,7 +247,7 @@ if (! $nodetach) {
 #
 # Gather statistics; start the clock ticking.
 #
-if ($frontend) {
+if ($frontend || $isbatch) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0,
 		    TBDB_STATS_FLAGS_START);
 }
@@ -248,20 +260,21 @@ else {
 # Run the various scripts. We want to propogate the error from tbprerun
 # and tbrun back out, hence the bogus looking errorstat variable.
 #
+SetExpState($pid, $eid, EXPTSTATE_PRERUN);
 if (system("$tbdir/tbprerun $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbprerun failed!\n");
 }
-# So fatal errors run tbend.
-$estate = EXPTSTATE_PRERUN;
+SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 
-if (! $frontend) {
+if (! ($frontend || $isbatch)) {
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVATING);
+
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!\n");
     }
-    # So fatal errors run tbswap out,
-    $estate = EXPTSTATE_ACTIVE;
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 
     #
     # Look for the unsual case of more than 2 nodes and no vlans. Send a
@@ -293,7 +306,7 @@ if (system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
 #
 # Gather statistics.
 #
-if ($frontend) {
+if ($frontend || $isbatch) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0);
 }
 else {
@@ -320,20 +333,20 @@ system("cp -Rfp $workdir/ $userdir/tbdata");
 TBExptCloseLogFile($pid, $eid);
 
 #
-# Must unlock before exit.
+# Must unlock and drop batch experiments into the queue before exit.
 #
-if ($frontend) {
-    TBUnLockExp($pid, $eid, BATCHSTATE_PAUSED());
+if (!$frontend && $isbatch) {
+    TBUnLockExp($pid, $eid, EXPTSTATE_QUEUED());
 }
 else {
-    TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
+    TBUnLockExp($pid, $eid);
 }
 
 #
 # Clear the cancel flag now that the operation is complete. Must be
 # done after we change the experiment state (above).
 #
-TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELCLEAR);
+TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR());
 
 #
 # In nodetach mode, just exit without sending email. 
@@ -407,10 +420,20 @@ sub fatal()
     }
 
     #
-    # Must clean state.
+    # Must clean up the experiment.
     #
-    if ($estate ne EXPTSTATE_NEW) {
-	tbendit();
+    $estate = ExpState($pid, $eid);
+    if ($estate ne EXPTSTATE_NEW) {    
+	if ($estate eq EXPTSTATE_ACTIVE) {
+	    print "Running 'tbswap out -force $pid $eid'\n";
+	    if (system("$tbdir/tbswap out $pid $eid") != 0) {
+		print "tbswap out failed!\n";
+	    }
+	}
+	print "Running 'tbend -force $pid $eid'\n";
+	if (system("$tbdir/tbend -force $pid $eid") != 0) {
+	    print "tbend failed!\n";
+	}
     }
 
     #
@@ -454,20 +477,3 @@ sub fatal()
     exit($errorstat);
 }
 
-#
-# If tbprerun finishes, but tbrun fails, lets do a tbend to make sure
-# the nodes and vlans are released.
-# 
-sub tbendit()
-{
-    if ($estate eq EXPTSTATE_ACTIVE) {
-	print "Running 'tbswap out' with arguments: $pid $eid\n";
-	if (system("$tbdir/tbswap out $pid $eid") != 0) {
-	    print "tbswap out failed!\n";
-	}
-    }
-    print "Running tbend with arguments: -force $pid $eid\n";
-    if (system("$tbdir/tbend -force $pid $eid") != 0) {
-	print "tbend failed!\n";
-    }
-}

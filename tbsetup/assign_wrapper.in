@@ -436,7 +436,7 @@ if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
 TBDebugTimeStamp("assign_loop started");
 while (1) {
     # Check cancel flag before continuing. 
-    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    TBGetCancelFlag($pid, $eid, \$canceled);
     fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
@@ -545,7 +545,7 @@ sub RunAssign ($)
 	    }
 
 	    # Check cancel flag.
-	    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+	    TBGetCancelFlag($pid, $eid, \$canceled);
 	    if ($canceled) {
 		if ((my $pgrp = getpgrp($childpid)) > 0) {
 		    kill('TERM', -$pgrp);
@@ -570,7 +570,7 @@ sub RunAssign ($)
     }
 
     # Check cancel flag before continuing. 
-    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    TBGetCancelFlag($pid, $eid, \$canceled);
     fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER, 
 	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
@@ -1028,7 +1028,7 @@ foreach my $pnode (keys(%virtnodes)) {
     my @ovlist = ();
 
     # Check cancel flag before continuing. 
-    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    TBGetCancelFlag($pid, $eid, \$canceled);
     fatal($WRAPPER_FAILED,
 	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
@@ -1158,7 +1158,7 @@ foreach my $pnode (keys(%virtnodes)) {
 }
 
 # Check cancel flag before continuing. 
-TBGetBatchCancelFlag($pid, $eid, \$canceled);
+TBGetCancelFlag($pid, $eid, \$canceled);
 fatal($WRAPPER_FAILED,
       "Cancel flag set; aborting assign run!")
     if ($canceled);

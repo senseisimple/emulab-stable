@@ -191,7 +191,8 @@ foreach my $node (@nodes) {
 		$mode = "cleanup";
 	    }
 	}
-	elsif ($exptstate eq EXPTSTATE_ACTIVATING) {
+	elsif ($exptstate eq EXPTSTATE_ACTIVATING ||
+	       $exptstate eq EXPTSTATE_MODIFY_RESWAP) {
 	    #
 	    # The allocstate determines if the vnode actually needs to
 	    # be setup or torndown. Note that a failed experiment will

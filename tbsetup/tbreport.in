@@ -121,8 +121,7 @@ if ($UID) {
 }
 
 if (($state ne EXPTSTATE_SWAPPED) &&
-    ($state ne EXPTSTATE_ACTIVE) &&
-    ($state ne EXPTSTATE_TESTING)) {
+    ($state ne EXPTSTATE_ACTIVE)) {
     # nothing to do
     print "No information available.\n";
     exit(0);
@@ -133,8 +132,7 @@ print "State: $state\n";
 print "\n";
 
 # Read nodemap if applicable
-if (($state eq EXPTSTATE_ACTIVE) ||
-    ($state eq EXPTSTATE_TESTING)) {
+if ($state eq EXPTSTATE_ACTIVE) {
     my $query_result =
 	DBQueryFatal("select r.vname,r.node_id,n.type,n.phys_nodeid,o.osname,".
 		     "       n.sshdport,n.jailflag,nt.isremotenode,".
@@ -214,9 +212,7 @@ if ($shownodes) {
 #
 # Physical mapping of virtual topology
 #
-if ($showmap &&
-    (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
-
+if ($showmap && $state eq EXPTSTATE_ACTIVE) {
     print  "Physical Node Mapping:\n";
     printf "%-15s %-12s %-15s %-12s\n", "ID", "Type", "OS", "Physical";
     print  "--------------- ------------ --------------- ------------\n";
@@ -367,7 +363,7 @@ if ($showlinks) {
     #
     # Actual mapped information for widearea links
     #
-    if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
+    if ($state eq EXPTSTATE_ACTIVE) {
 	#
 	# Grab all widearea links from the database
 	#
@@ -470,9 +466,7 @@ if ($showlinks) {
 #
 # Delay node info.
 #
-if ($showdelays &&
-    (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
-
+if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
     $result_delays =
 	DBQueryFatal("select d.*,r.vname as delayvname from delays as d ".
 		     "left join reserved as r on d.node_id=r.node_id ".

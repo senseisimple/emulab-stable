@@ -80,7 +80,7 @@ if (mysql_num_rows($query_result) == 0) {
 $row           = mysql_fetch_array($query_result);
 $exp_gid       = $row[gid];
 $isbatch       = $row[batchmode];
-$batchstate    = $row[batchstate];
+$state         = $row[state];
 $swappable     = $row[swappable];
 $idleswap_bit  = $row[idleswap];
 $idleswap_time = $row[idleswap_timeout];
@@ -104,7 +104,7 @@ elseif (!strcmp($inout, "out")) {
     if ($isbatch) 
 	$action = "swapout";
     else {
-	if (! strcmp($batchstate, TBDB_BATCHSTATE_ACTIVATING)) {
+	if ($state == $TB_EXPTSTATE_ACTIVATING) {
 	    $action = "cancel";
 	}
 	else {
@@ -274,7 +274,7 @@ else {
     }
     else {
 	if (strcmp($inout, "out") == 0 &&
-	    strcmp($batchstate, TBDB_BATCHSTATE_ACTIVATING) == 0) {
+	    strcmp($state, $TB_EXPTSTATE_ACTIVATING) == 0) {
 
 	    echo "Your experiment swapin has been marked for cancelation.
                   It typically takes a few minutes for this to be recognized,

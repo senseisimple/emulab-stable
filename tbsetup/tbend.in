@@ -62,25 +62,13 @@ my ($pid,$eid) = @ARGV;
 print "Beginning cleanup for $pid/$eid. " . TBTimeStamp() . "\n";
 
 if (! ($state = ExpState($pid, $eid))) {
-    print STDERR "*** No such experiment $pid/$eid\n";
-    exit(1);
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid\n");
 }
-if (! $force) {
-    if ($state eq EXPTSTATE_ACTIVE) {
-	print STDERR "*** Experiment is running. Must be swapped out.\n";
-	exit(1);
-    }
-    elsif ($state ne EXPTSTATE_SWAPPED) {
-	print STDERR "*** Experiment is in the wrong state: $state.\n";
-	exit(1);
-    }
-}
-elsif ($state ne EXPTSTATE_SWAPPED) {
-    print STDERR "*** WARNING: Ignoring improper state: $state.\n";
-}
-if (! SetExpState($pid, $eid, EXPTSTATE_TERMINATING)) {
-    print STDERR "*** Failed to set intermediate experiment state.\n";
-    exit(1);
+# Sanity check the state.
+if (!$force && $state ne EXPTSTATE_TERMINATING) {
+    die("*** $0:\n".
+	"    Experiment is in the wrong state: $state.\n");
 }
 
 print "Clearing out virtual state.\n";
@@ -89,11 +77,6 @@ $errors += TBExptRemoveVirtualState( $pid, $eid );
 # This will kill a running prerender.
 print "Removing visualization data...\n";
 system("prerender -r $pid $eid");
-
-if ($errors == 0) {
-    SetExpState($pid, $eid, EXPTSTATE_TERMINATED) or
-	$errors++;
-}
 
 print "Cleanup finished! " . TBTimeStamp() . "\n";
 

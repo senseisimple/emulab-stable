@@ -186,7 +186,13 @@ if ($retval != 0) {
     }
     # Netbuild requires the following line.
     echo "\n\n<!-- NetBuild! Modifed NS file contains syntax errors -->\n\n";
-    USERERROR("Modified NS file contains syntax errors; aborting.", 1);
+
+    echo "<br>";
+    echo "<h3>Modified NS file contains syntax errors</h3>";
+    echo "<blockquote><pre>$suexec_output<pre></blockquote>";
+
+    PAGEFOOTER();
+    exit();
 }
 
 echo "<center>";

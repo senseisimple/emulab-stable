@@ -27,10 +27,10 @@ function SHOWPROJECT($pid, $thisuid) {
     
     $proj_created	= $row[created];
     #$proj_expires	= $row[expires];
-    $proj_name		= stripslashes($row[name]);
+    $proj_name		= $row[name];
     $proj_URL		= $row[URL];
     $proj_public        = $row[public];
-    $proj_funders	= stripslashes($row[funders]);;
+    $proj_funders	= $row[funders];
     $proj_head_uid	= $row[head_uid];
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
@@ -168,7 +168,7 @@ function SHOWGROUP($pid, $gid) {
 
     $leader	= $row[leader];
     $created	= $row[created];
-    $description= stripslashes($row[description]);
+    $description= $row[description];
     $expt_count = $row[expt_count];
     $expt_last  = $row[expt_last];
     $unix_gid   = $row[unix_gid];
@@ -366,21 +366,24 @@ function SHOWUSER($uid) {
     #$usr_expires = $row[usr_expires];
     $usr_email   = $row[usr_email];
     $usr_URL     = $row[usr_URL];
-    $usr_addr    = stripslashes($row[usr_addr]);
-    $usr_addr2   = stripslashes($row[usr_addr2]);
-    $usr_city    = stripslashes($row[usr_city]);
-    $usr_state   = stripslashes($row[usr_state]);
-    $usr_zip     = stripslashes($row[usr_zip]);
-    $usr_country = stripslashes($row[usr_country]);
-    $usr_name    = stripslashes($row[usr_name]);
+    $usr_addr    = $row[usr_addr];
+    $usr_addr2   = $row[usr_addr2];
+    $usr_city    = $row[usr_city];
+    $usr_state   = $row[usr_state];
+    $usr_zip     = $row[usr_zip];
+    $usr_country = $row[usr_country];
+    $usr_name    = $row[usr_name];
     $usr_phone   = $row[usr_phone];
-    $usr_shell   = stripslashes($row[usr_shell]);
-    $usr_title   = stripslashes($row[usr_title]);
-    $usr_affil   = stripslashes($row[usr_affil]);
+    $usr_shell   = $row[usr_shell];
+    $usr_title   = $row[usr_title];
+    $usr_affil   = $row[usr_affil];
     $status      = $row[status];
     $admin       = $row[admin];
     $adminoff    = $row[adminoff];
-    $notes       = stripslashes($row[notes]);
+    $notes       = $row[notes];
+    $frozen      = $row['weblogin_frozen'];
+    $failcount   = $row['weblogin_failcount'];
+    $failstamp   = $row['weblogin_failstamp'];
 
     if (!strcmp($usr_addr2, ""))
 	$usr_addr2 = "&nbsp";
@@ -524,12 +527,27 @@ function SHOWUSER($uid) {
           </tr>\n";
 
     if (ISADMIN()) {
+	$freezeflip = ($frozen ? 0 : 1);
+	
+	echo "<tr>
+                  <td>Web Freeze:</td>
+                  <td>$frozen (<a href=toggle.php?target_uid=$uid".
+	                          "&type=webfreeze&value=$freezeflip>Toggle</a>)
+              </tr>\n";
+	
+	if ($frozen && $failstamp && $failcount) {
+	    $when = strftime("20%y-%m-%d %H:%M:%S", $failstamp);
+	    
 	    echo "<tr>
-                      <td>Notes:</td>
-                      <td>$notes</td>
+                      <td>Login Failures:</td>
+                      <td>$failcount ($when)</td>
                   </tr>\n";
+	}
+	echo "<tr>
+                  <td>Notes:</td>
+                  <td>$notes</td>
+              </tr>\n";
     }
-    
     echo "</table>\n";
 
 }
@@ -539,7 +557,6 @@ function SHOWUSER($uid) {
 #
 function SHOWEXP($pid, $eid, $short = 0) {
     global $TBDBNAME, $TBDOCBASE;
-    global $TB_EXPTSTATE_SWAPPED, $TB_EXPTSTATE_SWAPPING;
     $nodecounts  = array();
 
     # Node counts, by class. 
@@ -566,26 +583,25 @@ function SHOWEXP($pid, $eid, $short = 0) {
     }
 
     $exp_gid     = $exprow[gid];
-    $exp_name    = stripslashes($exprow[expt_name]);
+    $exp_name    = $exprow[expt_name];
     $exp_swapped = $exprow[expt_swapped];
     $exp_swapuid = $exprow[expt_swap_uid];
     $exp_end     = $exprow[expt_end];
     $exp_created = $exprow[expt_created];
     $exp_head    = $exprow[expt_head_uid];
-    $exp_status  = $exprow[state];
+    $exp_state   = $exprow[state];
     $exp_shared  = $exprow[shared];
     $exp_path    = $exprow[path];
     $batchmode   = $exprow[batchmode];
     $canceled    = $exprow[canceled];
     $attempts    = $exprow[attempts];
-    $batchstate  = $exprow[batchstate];
     $expt_locked = $exprow[expt_locked];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
-    $noswap_reason = stripslashes($exprow[noswap_reason]);
+    $noswap_reason = $exprow[noswap_reason];
     $idleswap    = $exprow[idleswap];
     $idleswap_timeout  = $exprow[idleswap_timeout];
-    $noidleswap_reason = stripslashes($exprow[noidleswap_reason]);
+    $noidleswap_reason = $exprow[noidleswap_reason];
     $autoswap    = $exprow[autoswap];
     $autoswap_timeout  = $exprow[autoswap_timeout];
     $idle_ignore = $exprow[idle_ignore];
@@ -627,14 +643,6 @@ function SHOWEXP($pid, $eid, $short = 0) {
 	$expt_locked = "($expt_locked)";
     else
 	$expt_locked = "";
-
-    #
-    # XXX - Temporary until we clear up the state machine stuff.
-    #
-    if (!strcmp($batchstate, TBDB_BATCHSTATE_PAUSED))
-	$batchstate = $TB_EXPTSTATE_SWAPPED;
-    elseif (!strcmp($batchstate, TBDB_BATCHSTATE_TERMINATING))
-	$batchstate = $TB_EXPTSTATE_SWAPPING;
 
     #
     # Generate the table.
@@ -717,12 +725,10 @@ function SHOWEXP($pid, $eid, $short = 0) {
                 <td class=left>$exp_path</td>
               </tr>\n";
 
-	if (ISADMIN()) {
-	    echo "<tr>
-                    <td>Status: </td>
-                    <td class=\"left\">$exp_status</td>
-                  </tr>\n";
-	}
+        echo "<tr>
+                <td>Status: </td>
+                <td class=\"left\">$exp_state $expt_locked</td>
+              </tr>\n";
     }
 
     if (count($nodecounts)) {
@@ -801,21 +807,11 @@ function SHOWEXP($pid, $eid, $short = 0) {
                   </tr>\n";
 
 	    echo "<tr>
-                    <td>State: </td>
-                    <td class=\"left\">$batchstate $expt_locked</td>
-                  </tr>\n";
-
-	    echo "<tr>
                     <td>Start Attempts: </td>
                     <td class=\"left\">$attempts</td>
                   </tr>\n";
     }
-    else {
-	    echo "<tr>
-                    <td>State: </td>
-                    <td class=\"left\">$batchstate $expt_locked</td>
-                  </tr>\n";
-    }
+
     if ($canceled) {
 	echo "<tr>
                  <td>Cancel Flag: </td>
@@ -891,26 +887,18 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	while ($row = mysql_fetch_array($query_result)) {
 	    $pid  = $row[pid];
 	    $eid  = $row[eid];
-	    $bstate= $row[batchstate];
+	    $state= $row[state];
 	    $nodes= $row["nodes"];
 	    $minnodes = $row["min_nodes"];
 	    $idlehours = TBGetExptIdleTime($pid,$eid);
 	    $stale = TBGetExptIdleStale($pid,$eid);
 	    $ignore = $row["idle_ignore"];
-	    $name = stripslashes($row[expt_name]);
+	    $name = $row[expt_name];
 	    if ($nodes==0) {
 		$nodes = "<font color=green>$minnodes</font>";
 	    } elseif ($row[swap_requests] > 0) {
 		$nodes .= $idlemark;
 	    }
-
-            #
-            # XXX - Temporary until we clear up the state machine stuff.
-            #
-	    if (!strcmp($bstate, TBDB_BATCHSTATE_PAUSED))
-		$bstate = $TB_EXPTSTATE_SWAPPED;
-	    elseif (!strcmp($bstate, TBDB_BATCHSTATE_TERMINATING))
-		$bstate = $TB_EXPTSTATE_SWAPPING;
 
 	    if ($nopid) {
 		$pidrow="";
@@ -927,7 +915,7 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	    
 	    echo "<tr>$pidrow
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
-		 <td>$bstate</td>
+		 <td>$state</td>
                  <td align=center>$nodes</td>
                  <td align=center>$idlestr</td>
                  <td>$name</td>
@@ -1107,7 +1095,7 @@ function SHOWOSINFO($osid) {
 
     $osrow = mysql_fetch_array($query_result);
 
-    $os_description = stripslashes($osrow[description]);
+    $os_description = $osrow[description];
     $os_OS          = $osrow[OS];
     $os_version     = $osrow[version];
     $os_path        = $osrow[path];
@@ -1253,7 +1241,7 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
     $imagename   = $row[imagename];
     $pid         = $row[pid];
     $gid         = $row[gid];
-    $description = stripslashes($row[description]);
+    $description = $row[description];
     $loadpart	 = $row[loadpart];
     $loadlength	 = $row[loadlength];
     $part1_osid	 = $row[part1_osid];
@@ -1900,7 +1888,7 @@ function SHOWNODELOG($node_id)
 	$log_id     = $row[log_id];
 	$reporter   = $row[reporting_uid];
 	$date       = $row[reported];
-	$entry      = stripslashes($row[entry]);
+	$entry      = $row[entry];
 
 	echo "<tr>
  	         <td align=center>
@@ -1937,7 +1925,7 @@ function SHOWNODELOGENTRY($node_id, $log_id)
     $log_id     = $row[log_id];
     $reporter   = $row[reporting_uid];
     $date       = $row[reported];
-    $entry      = stripslashes($row[entry]);
+    $entry      = $row[entry];
 
     echo "<tr>
              <td>$date</td>

@@ -92,7 +92,6 @@ my $autoswaptime = 10 * 60;
 my $idleignore = 0;
 my $priority   = TB_EXPTPRIORITY_LOW;
 my $exptstate  = EXPTSTATE_NEW();
-my $swapstate  = BATCHSTATE_ACTIVATING(); 
 
 #
 # Verify user and get his DB uid.
@@ -192,12 +191,12 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
-		  " idle_ignore, keyhash, batchstate, expt_locked, eventkey) ".
+		  " idle_ignore, keyhash, expt_locked, eventkey) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
-		  "'$swapstate', now(), '$eventkey')")) {
+		  "now(), '$eventkey')")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -254,7 +253,7 @@ if ($EVENTSYS) {
 # the user is forced to do a modify first (to give it a topology). 
 #
 if (!defined($tempnsfile)) {
-    TBUnLockExp($pid, $eid, BATCHSTATE_PAUSED);
+    TBUnLockExp($pid, $eid, EXPTSTATE_NEW());
     exit(0);
 }
 
@@ -305,44 +304,23 @@ if ($nsfile_string) {
 }
 
 #
-# Check for immediate or batch experiment. If immediate, fire off the
-# the startexp script to do the rest. It exits and so do we; user gets
-# email later. If its a batch experiment, update the experiment record
-# so that the batch daemon will see it and act.
+# A batch experiment is essentially preloaded (frontend mode) and then
+# dropped into the batch queue, unless the user requested only preload.
+# Startexp figures all this out, and in fact this script could easily
+# be merged with startexp. Note that we call startexp with the experiment
+# locked, and it checks to make sure. 
 #
-# Note that we hand off to startexp with the experiment locked and ACTIVATING.
-# This is "okay" since no one else calls startexp.
-#
-if ($immediate) {
-    my $optargs = "";
-    $optargs .= " -f"
-	if ($frontend);
-    $optargs .= " -b"
-	if ($quiet);
+my $optargs = "";
+$optargs .= " -f"
+    if ($frontend);
+$optargs .= " -b"
+    if ($quiet);
 
-    if (system("$startexp $optargs -g $gid $pid $eid $nsfile")) {
-	# Obey exit status protocol for web page.
-	$errorstat = 1;
-	fatal("Failed to start experiment $pid/$eid!");
-    }
+if (system("$startexp $optargs -g $gid $pid $eid $nsfile")) {
+    # Obey exit status protocol for web page.
+    $errorstat = 1;
+    fatal("Failed to start experiment $pid/$eid!");
 }
-else {
-    #
-    # Preload the experiment in the foreground. User sees parse errors
-    # right away, and the experiment is now in the system so we can look
-    # at it.
-    #
-    if (system("$startexp -f -b -g $gid $pid $eid $nsfile")) {
-	# Obey exit status protocol for web page.
-	$errorstat = 1;
-	fatal("Failed to preload batch experiment $pid/$eid!");
-    }
-    # And drop the batch into the queue unless the user was preloading
-    # a batch experiment.
-    TBSetBatchState($pid, $eid,
-		    ($frontend ? BATCHSTATE_PAUSED : BATCHSTATE_POSTED));
-}
-
 exit(0);
 
 sub fatal($)

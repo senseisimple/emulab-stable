@@ -63,14 +63,14 @@ use Exporter;
 	 DBLIMIT_NSFILESIZE NODERELOADPENDING_EID
 
 	 EXPTSTATE_NEW EXPTSTATE_PRERUN EXPTSTATE_SWAPPED EXPTSTATE_SWAPPING
-	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE EXPTSTATE_TESTING
-	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED EXPTSTATE_UPDATING
+	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE
+	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED EXPTSTATE_QUEUED
+	 EXPTSTATE_MODIFY_PARSE EXPTSTATE_MODIFY_REPARSE EXPTSTATE_MODIFY_RESWAP
+	 EXPTSTATE_RESTARTING
+	 BATCHSTATE_LOCKED BATCHSTATE_UNLOCKED
+	 EXPTCANCEL_CLEAR EXPTCANCEL_TERM EXPTCANCEL_SWAP
 
-	 BATCHSTATE_POSTED BATCHSTATE_RUNNING BATCHSTATE_TERMINATING
-	 BATCHSTATE_ACTIVATING BATCHSTATE_PAUSED
-	 BATCHSTATE_RUNNING_LOCKED BATCHSTATE_MODIFYING
-	 BATCHMODE_CANCELTERM BATCHMODE_CANCELSWAP BATCHMODE_CANCELCLEAR
-	 TBBatchState TBSetBatchState TBSetBatchCancelFlag TBGetBatchCancelFlag
+	 TBSetCancelFlag TBGetCancelFlag
 
 	 TB_NODELOGTYPE_MISC TB_NODELOGTYPES TB_DEFAULT_NODELOGTYPE 
 
@@ -287,29 +287,28 @@ sub NODEFAILMODE_FATAL()	{ "fatal"; }
 sub NODEFAILMODE_NONFATAL()	{ "nonfatal"; }
 sub NODEFAILMODE_IGNORE()	{ "ignore"; }
 
-# These are really "sub" states.
+# Experiment states
 sub EXPTSTATE_NEW()		{ "new"; }
 sub EXPTSTATE_PRERUN()		{ "prerunning"; }
 sub EXPTSTATE_SWAPPED()		{ "swapped"; }
+sub EXPTSTATE_QUEUED()		{ "queued"; }
 sub EXPTSTATE_SWAPPING()	{ "swapping"; }
 sub EXPTSTATE_ACTIVATING()	{ "activating"; }
 sub EXPTSTATE_ACTIVE()		{ "active"; }
-sub EXPTSTATE_TESTING()		{ "testing"; }
 sub EXPTSTATE_TERMINATING()	{ "terminating"; }
 sub EXPTSTATE_TERMINATED()	{ "ended"; }
+sub EXPTSTATE_MODIFY_PARSE()	{ "modify_parse"; }
+sub EXPTSTATE_MODIFY_REPARSE()	{ "modify_reparse"; }
+sub EXPTSTATE_MODIFY_RESWAP()	{ "modify_reswap"; }
+sub EXPTSTATE_RESTARTING()	{ "restarting"; }
+# For the batch_daemon.
+sub BATCHSTATE_LOCKED()		{ "locked";}
+sub BATCHSTATE_UNLOCKED()	{ "unlocked";}
 
-# These are really experiment states (both batch *and* plain).
-sub BATCHSTATE_POSTED()		{ "posted"; }
-sub BATCHSTATE_ACTIVATING()	{ "activating"; }
-sub BATCHSTATE_RUNNING()	{ "active"; }
-sub BATCHSTATE_RUNNING_LOCKED()	{ "active_locked"; }
-sub BATCHSTATE_MODIFYING()	{ "modifying"; }
-sub BATCHSTATE_PAUSED()		{ "paused"; }
-sub BATCHSTATE_TERMINATING()	{ "terminating"; }
 # Cancel flags
-sub BATCHMODE_CANCELCLEAR	{ 0 ;}
-sub BATCHMODE_CANCELTERM	{ 1 ;}
-sub BATCHMODE_CANCELSWAP	{ 2 ;}
+sub EXPTCANCEL_CLEAR()		{ 0 ;}
+sub EXPTCANCEL_TERM()		{ 1 ;}
+sub EXPTCANCEL_SWAP()		{ 2 ;}
 
 sub USERSTATUS_ACTIVE()		{ "active"; }
 sub USERSTATUS_FROZEN()		{ "frozen"; }
@@ -348,7 +347,7 @@ sub TB_USERINFO_MODIFYINFO()	{ 2; }
 sub TB_USERINFO_MIN()		{ TB_USERINFO_READINFO; }
 sub TB_USERINFO_MAX()		{ TB_USERINFO_MODIFYINFO; }
 
-# Experiments (also batch experiments).
+# Experiments.
 sub TB_EXPT_READINFO()		{ 1; }
 sub TB_EXPT_MODIFY()		{ 2; }
 sub TB_EXPT_DESTROY()		{ 3; }
@@ -1302,7 +1301,7 @@ sub TBLockExp($$;$)
 
     my $query_result =
 	DBQueryWarn("update experiments set expt_locked=now() ".
-		    (defined($newstate) ? ",batchstate='$newstate' " : "") .
+		    (defined($newstate) ? ",state='$newstate' " : "") .
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
@@ -1324,7 +1323,7 @@ sub TBExpLocked($$;$)
     my($pid, $eid, $curstate) = @_;
 
     my $query_result =
-	DBQueryWarn("select expt_locked,batchstate from experiments ".
+	DBQueryWarn("select expt_locked,state from experiments ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
@@ -1353,7 +1352,7 @@ sub TBUnLockExp($$;$)
 
     my $query_result =
 	DBQueryWarn("update experiments set expt_locked=NULL ".
-		    (defined($newstate) ? ",batchstate='$newstate' " : "") .
+		    (defined($newstate) ? ",state='$newstate' " : "") .
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
@@ -1364,59 +1363,13 @@ sub TBUnLockExp($$;$)
 }
 
 #
-# Return BatchMode state.
+# Set cancel flag,
 #
-# usage: TBBatchState(char *pid, char *eid)
-#        returns state if a valid pid/eid.
-#        returns 0 if an invalid pid/eid or if an error.
-# 
-sub TBBatchState($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryWarn("select batchstate from experiments ".
-		    "where eid='$eid' and pid='$pid' and batchmode=1");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Set BatchMode state.
-#
-# usage: SetBatchState(char *pid, char *eid, char *state)
+# usage: SetCancelFlag(char *pid, char *eid, char *flag)
 #        returns 1 if okay.
 #        returns 0 if an invalid pid/eid or if an error.
 # 
-sub TBSetBatchState($$$)
-{
-    my($pid, $eid, $state) = @_;
-
-    my $query_result =
-	DBQueryWarn("update experiments set batchstate='$state',batchmode=1 ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Set BatchMode cancel flag,
-#
-# usage: SetBatchCancel(char *pid, char *eid, char *flag)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-# 
-sub TBSetBatchCancelFlag($$$)
+sub TBSetCancelFlag($$$)
 {
     my($pid, $eid, $flag) = @_;
 
@@ -1432,13 +1385,13 @@ sub TBSetBatchCancelFlag($$$)
 }
 
 #
-# Get BatchMode cancel flag,
+# Get cancel flag,
 #
-# usage: GetBatchCancel(char *pid, char *eid, char **flag)
+# usage: TBGetCancelFlag(char *pid, char *eid, char **flag)
 #        returns 1 if okay.
 #        returns 0 if an invalid pid/eid or if an error.
 # 
-sub TBGetBatchCancelFlag($$$)
+sub TBGetCancelFlag($$$)
 {
     my($pid, $eid, $flag) = @_;
 
@@ -2409,7 +2362,7 @@ sub MarkPhysNodeDown($)
     DBQueryFatal("lock tables reserved write");
 
     DBQueryFatal("update reserved set " .
-		 "  pid='$pid',eid='$eid' ".
+		 "  pid='$pid',eid='$eid',rsrv_time=now() ".
 		 "where node_id='$pnode'");
 
     DBQueryFatal("unlock tables");

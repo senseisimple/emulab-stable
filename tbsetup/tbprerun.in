@@ -18,11 +18,10 @@ use English;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-force | -m] pid eid nsfile\n";
+    print STDERR "Usage: $0 [-force] pid eid nsfile\n";
     exit(-1);
 }
 my $force = 0;
-my $modify = 0;
 my $state;
 
 #
@@ -56,10 +55,6 @@ if ($ARGV[0] eq "-force") {
     $force = 1;
     shift;
 }
-if ($ARGV[0] eq "-m") {
-    $modify = 1;
-    shift;
-}
 
 if (@ARGV != 3) {
     usage();
@@ -84,42 +79,36 @@ if (! ($gid = ExpGroup($pid,$eid))) {
 	"    Unable to get group for $pid/$eid\n");
 }
 
-if (! $modify) {
-    if (!$force && $state ne EXPTSTATE_NEW) {
-	die("*** $0:\n".
-	    "    Experiment is not in the proper state: $state\n");
-    }
-    if (! SetExpState($pid, $eid, EXPTSTATE_PRERUN)) {
-	die("*** $0:\n".
-	    "    Failed to set intermediate experiment state.\n");
-    }
-} else {
-    if ($state ne EXPTSTATE_ACTIVE &&
-	$state ne EXPTSTATE_SWAPPED ) {
-	die("*** $0:\n".
-	    "    Experiment is in transition state: $state\n");
-    }
+#
+# These are the valid states for running this script.
+#
+if (!$force &&
+    !($state eq EXPTSTATE_PRERUN || $state eq EXPTSTATE_MODIFY_PARSE ||
+      $state eq EXPTSTATE_MODIFY_REPARSE)) {
+    die("*** $0:\n".
+	"    Experiment is not in the proper state: $state\n");
 }
 
 #
 # Cleanup if something goes wrong.
 #
 sub cleanup {
-    if (! $modify) {
-	print STDERR "Cleaning up after errors.\n";
-	# Must kill the prerender process first!
-	system("prerender -r $pid $eid");
-	
+    print STDERR "Cleaning up after errors.\n";
+    # Must kill the prerender process before we remove virt state.
+    system("prerender -r $pid $eid");
+
+    # When doing a modify, this is handled elsewhere. 
+    if ($state eq EXPTSTATE_PRERUN) {
 	print "Removing experiment state ... " . TBTimeStamp() . "\n";
 	TBExptRemoveVirtualState($pid, $eid );
-	print "Removal done! " . TBTimeStamp() . "\n";
-
-	#
-	# Going to "NEW" allows the experiment to be wiped out.
-	#
-	SetExpState($pid, $eid, EXPTSTATE_NEW);
     }
 }
+
+# Must kill any prerender process first!
+system("prerender -r $pid $eid");
+
+# Kill old virtual state.
+TBExptRemoveVirtualState($pid, $eid);
 
 # This setups virt_nodes, virt_names including all IP address calculation
 # and tb-* handling.
@@ -146,14 +135,6 @@ if (system("staticroutes $pid $eid")) {
 }
 TBDebugTimeStamp("routes finished");
 print "Static routing done! " . TBTimeStamp() . "\n";
-
-if (! $modify) {
-    if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
-	cleanup();
-	die("*** $0:\n".
-	    "    Failed to set experiment state!\n");
-    }
-}
 
 TBDebugTimeStamp("tbprerun finished");
 print "Pre run finished. " . TBTimeStamp() . "\n";

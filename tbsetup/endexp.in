@@ -66,10 +66,14 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
 my $batch    = 0;
+my $nextstate;
 my $logname;
 my $dbuid;
 my $user_name;
@@ -168,32 +172,51 @@ if (! $query_result->numrows) {
 my %hashrow = $query_result->fetchhash();
 my $expt_head_login = $hashrow{'expt_head_uid'};
 my $estate          = $hashrow{'state'};
+my $batchstate      = $hashrow{'batchstate'};
 my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
-my $ebatchstate     = $hashrow{'batchstate'};
 my $cancelflag      = $hashrow{'canceled'};
+my $expt_locked     = $hashrow{'expt_locked'};
 
 #
 # Batch experiments get a different protocol to avoid races with the
 # batch daemon. We can kill the experiment directly, but only if the
 # batch daemon is not currently working on it. In this case, its the
-# same as killing an experiment that is not running.
+# same as killing an experiment that is SWAPPED.
 #
-# XXX: This script is run from the batch daemon. Use the batch state
-# to determine when this was invoked from the batch daemon for a valid
-# teardown. 
+# XXX: This script is run from the batch daemon. 
 #
-if ($isbatchexpt) {
+if ($batch) {
     #
-    # Sanity Check. If called from the daemon, must be in the proper state.
+    # Sanity Check. If called from the daemon, must already be locked,
+    # must be a batch experiment, and must be ACTIVE or SWAPPED.
     #
-    if ($batch) {
-	die("*** $0:\n".
-	    "    Batch experiment $pid/$eid is not in the correct state!\n".
-	    "    Currently $ebatchstate, but should be TERMINATING\n")
-	    if ($ebatchstate ne BATCHSTATE_TERMINATING);
-    }
-    else {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid is supposed to be a batch experiment!\n")
+	if (!$isbatchexpt);
+    
+    die("*** $0:\n".
+	"    Batch experiment $pid/$eid should be locked!\n")
+	if (!defined($expt_locked) ||
+	    $batchstate ne BATCHSTATE_LOCKED());
+	
+    die("*** $0:\n".
+	"    Batch experiment $pid/$eid is not in the correct state!\n".
+	"    Currently $estate, but should be SWAPPED,QUEUED, or ACTIVE\n")
+	if ($estate ne EXPTSTATE_ACTIVE &&
+	    $estate ne EXPTSTATE_QUEUED &&
+	    $estate ne EXPTSTATE_SWAPPED);
+}
+else {
+    #
+    # Called from user (via web interface).
+    #
+    if ($isbatchexpt) {
+	#
+	# This cancels a batchexp, telling the daemon if it has control.
+	# If the daemon is not currently working on the experiment, we
+	# can do it right away in this script. Otherwise must wait.
+	#
 	ExitWithStatus(1, "Batch experiment $pid/$eid is still canceling!")
 	    if ($cancelflag);
 
@@ -201,54 +224,77 @@ if ($isbatchexpt) {
 	# Set the canceled flag. This will prevent the batch_daemon
 	# from trying to run it (once the table is unlocked). It might
 	# already be running, but we deal with that by looking at the
-	# batch state.
+	# state below.
 	#
-	TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELTERM);
+	TBSetCancelFlag($pid, $eid, EXPTCANCEL_TERM);
 
 	#
-	# If the state is POSTED or PAUSED, we can do it right away.
+	# If the state is QUEUED or SWAPPED, we can do it right away.
 	# Otherwise, have to let the batch daemon deal with it.
 	# 
 	ExitWithStatus(0, 
 		       "Batch experiment $pid/$eid has been canceled.\n".
 		       "You will receive email when the experiment is\n".
 		       "torn down and you can reuse the experiment name.")
-	    if ($ebatchstate ne BATCHSTATE_POSTED &&
-		$ebatchstate ne BATCHSTATE_PAUSED);
+	    if (($estate ne EXPTSTATE_QUEUED &&
+		 $estate ne EXPTSTATE_SWAPPED) ||
+		$batchstate != BATCHSTATE_UNLOCKED());
     }
-    #
-    # Let termination proceed normally. 
-    # 
-}
-else {
-    #
-    # If the cancel flag is set, then user must wait for that to clear before
-    # we can do anything else.
-    #
-    ExitWithStatus(1,
-		   "Experiment $pid/$eid has its cancel flag set!.\n".
-		   "You must wait for that to clear before you can terminate ".
-		   "the experiment.\n")
-	if ($cancelflag);
+    else {
+	#
+	# If the cancel flag is set, then user must wait for that to clear before
+	# we can do anything else.
+	#
+	ExitWithStatus(1,
+		       "Experiment $pid/$eid has its cancel flag set!\n".
+		       "You must wait for that to clear before you can ".
+		       "terminate the experiment.\n")
+	    if ($cancelflag);
+	
+	#
+	# Must be unlocked if called by the user.
+	#
+	ExitWithStatus(1,
+		       "Experiment $pid/$eid went into transition at ".
+		       "$expt_locked!\n".
+		       "You must wait until it is no longer in transition.\n")
+	    if (defined($expt_locked));
 
-    #
-    # Okay, check state. We do not allow termination to start when the
-    # experiment is in transition. A future task would be to allow this,
-    # but for now the experiment must be in one of a few states to proceed.
-    #
-    if ($ebatchstate ne BATCHSTATE_PAUSED() &&
-	$ebatchstate ne BATCHSTATE_RUNNING()) {
-
+	#
+	# Okay, check state. We do not allow termination to start when the
+	# experiment is in transition. A future task would be to allow this,
+	# but for now it is not allowed. 
+	#
 	ExitWithStatus(1,
 		       "Experiment $pid/$eid is currently in transition.\n".
-		       "You must wait until it is no longer $ebatchstate!");
+		       "You must wait until it is no longer $estate!")
+	    if ($estate ne EXPTSTATE_SWAPPED() &&
+		$estate ne EXPTSTATE_NEW() &&
+		$estate ne EXPTSTATE_TERMINATED() &&
+		$estate ne EXPTSTATE_ACTIVE());
     }
 }
 
 #
-# Lock the experiment and change state so no one can mess with it.
+# Lock the experiment and change state so no one can mess with it. We need
+# to determine our next state before we unlock the table. 
 #
-TBLockExp($pid, $eid, BATCHSTATE_TERMINATING());
+if ($estate eq EXPTSTATE_ACTIVE) {
+    $nextstate = EXPTSTATE_SWAPPING;
+}
+elsif ($estate eq EXPTSTATE_SWAPPED || 
+       $estate eq EXPTSTATE_QUEUED) {
+    $nextstate = EXPTSTATE_TERMINATING;
+}
+elsif ($estate eq EXPTSTATE_NEW ||
+       $estate eq EXPTSTATE_TERMINATED) {
+    $nextstate = EXPTSTATE_TERMINATED;
+}
+else {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid appears to be in the wrong state: $estate\n");
+}
+TBLockExp($pid, $eid, $nextstate);
 DBQueryFatal("unlock tables");
 
 #
@@ -300,34 +346,30 @@ if ($estate eq EXPTSTATE_ACTIVE) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
 		    TBDB_STATS_FLAGS_START);
 
-    print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
+    print STDOUT "Running 'tbswap out $pid $eid'\n";
     if (system("$tbdir/tbswap out $pid $eid") != 0) {
 	fatal("tbswap out failed!\n");
     }
+    SetExpState($pid, $eid, EXPTSTATE_TERMINATING);
+    $estate = EXPTSTATE_SWAPPED;
     
-    $estate = ExpState($pid,$eid);
-    if ($estate ne EXPTSTATE_SWAPPED) {
-	fatal("Experiment is in the wrong state: $estate\n");
-    }
-
     #
     # Gather statistics for the swapout.
     #
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
 }
 
-if ($estate eq EXPTSTATE_SWAPPED) {
+if ($estate eq EXPTSTATE_SWAPPED ||
+    $estate eq EXPTSTATE_QUEUED) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0,
 		    TBDB_STATS_FLAGS_START);
     
-    print STDOUT "Running tbend with arguments: $pid $eid\n";
+    print STDOUT "Running 'tbend $pid $eid'\n";
     if (system("$tbdir/tbend $pid $eid") != 0) {
 	fatal("tbend failed!\n");
-    }    
-    $estate = ExpState($pid,$eid);
-    if ($estate ne EXPTSTATE_TERMINATED) {
-	fatal("Experiment is in the wrong state: $estate\n");
     }
+    SetExpState($pid, $eid, EXPTSTATE_TERMINATED);
+    $estate = EXPTSTATE_TERMINATED;
 
     #
     # Gather statistics for the swapout.
@@ -335,7 +377,9 @@ if ($estate eq EXPTSTATE_SWAPPED) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
 }
 
-if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {
+# We better be here ...
+$estate = ExpState($pid, $eid);
+if ($estate ne EXPTSTATE_TERMINATED) {
     fatal("Experiment is in the wrong state: $estate\n");
 }
 

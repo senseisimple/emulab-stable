@@ -490,15 +490,15 @@ if (count($errors)) {
 #
 # Converting the batchmode is tricky, but we can let the DB take care
 # of it by requiring that the experiment not be locked, and it be in
-# the paused state. If the query fails, we know that the experiment
+# the swapped state. If the query fails, we know that the experiment
 # was in transition.
 #
 if (!isset($formfields[batchmode])) {
     $formfields[batchmode] = 0;
 }
 if ($defaults[batchmode] != $formfields[batchmode]) {
-    $batchstate = TBDB_BATCHSTATE_PAUSED;
-    $success    = 0;
+    $reqstate = $TB_EXPTSTATE_SWAPPED;
+    $success  = 0;
 
     if (strcmp($formfields[batchmode], "1")) {
 	$batchmode = 0;
@@ -515,7 +515,7 @@ if ($defaults[batchmode] != $formfields[batchmode]) {
 	DBQueryFatal("update experiments set ".
 		     "   batchmode=$batchmode ".
 		     "where pid='$pid' and eid='$eid' and ".
-		     "     expt_locked is NULL and batchstate='$batchstate'");
+		     "     expt_locked is NULL and state='$reqstate'");
 
     $success = DBAffectedRows();
 

@@ -10,6 +10,8 @@ use English;
 # Returns 0 on success.
 # Returns 1 on non-assign_wrapper failure.
 # Returns (1 | assign_wrapper's errorcode) on assign_wrapper failure.
+# Returns |0x40 if update caused a swapout. Icky.
+# Returns -1 on uncontrolled error (die called).
 
 # XXX: handle error cases for update? (backup the db?)
 # XXX: Shouldn't do idempotent stuff twice for update.
@@ -22,7 +24,7 @@ use English;
 
 sub usage()
 {
-    print STDERR "Usage: $0 { in | out [-force] | update [-reboot] } pid eid\n";
+    print STDERR "Usage: $0 -force { in | out | update [-reboot] } pid eid\n";
     exit(-1);
 }
 
@@ -67,10 +69,12 @@ my $updateReboot = 0;
 my $force  = 0;
 my $errors = 0;
 my $assignWrapperErrorCode = 0;
+my $updatehosed = 0;
 my $state;
 my $canceled;
 my $os_setup_pid;
 my $cleanvlans;
+my $nextState;
 
 #
 # First argument is either "in", "out", or "update";
@@ -133,281 +137,144 @@ TBDebugTimeStamp("tbswap $swapop started");
 #
 # Get experiment state; verify that experiment exists.
 #
-
 if (! ($state = ExpState($pid, $eid))) {
-    print STDERR "*** No such experiment $pid/$eid\n";
-    $errors = 1;
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid\n");
 }
-
-#
-# Figure out which state we're looking for 
-# and which state we're going to set according to the operation.
-#
-
-my $desiredState;
-my $nextState;
-my $suggestion;
-my $suggestUseOfForce;
-
-if ($swapop eq "in") {
-    $desiredState = EXPTSTATE_SWAPPED;
-    $nextState    = EXPTSTATE_ACTIVATING;
-    $suggestion   = "Must be swapped out.";
-    $suggestUseOfForce = 0;
-} elsif ($swapop eq "out") {
-    if (! $TESTMODE) {
-	$desiredState = EXPTSTATE_ACTIVE;
-	$suggestion   = "Must be running.";
-    } else {
-	$desiredState = EXPTSTATE_TESTING;
-	$suggestion   = "Must be in testing state.";
+# Sanity check the current state. 
+if (!$force) {
+    if ($swapop eq "in") {
+	die("*** $0:\n".
+	    "    Experiment should be ACTIVATING. Currently $state.\n")
+	    if ($state ne EXPTSTATE_ACTIVATING);
     }
-    $nextState    = EXPTSTATE_SWAPPING;
-    $suggestUseOfForce = 1;
-} elsif ($swapop eq "update") {
-    $desiredState = EXPTSTATE_ACTIVE;
-    $nextState    = EXPTSTATE_ACTIVATING; # XXX add an updating state?
-    $suggestion   = "Must be running.";
-    $suggestUseOfForce = 0;
-}
-
-#
-# Check that experiment is in correct state.
-# If it is not, print appropriate error message.
-#
-
-if (! $errors) {
-    if ($state ne $desiredState) {
-	if (! $force) {
-	    if ($state eq EXPTSTATE_SWAPPED) {
-		print STDERR "*** Experiment is already swapped out. $suggestion\n";
-	    } elsif ($state eq EXPTSTATE_ACTIVE) {
-		print STDERR "*** Experiment is already running. $suggestion\n";
-	    } else {
-		print STDERR "*** Experiment is in the wrong state: $state. $suggestion\n";
-	    }
-	    if ($suggestUseOfForce) {
-		print STDERR "    Try using -force to ignore improper state.\n";
-	    }
-	    $errors = 1;
-	} else {
-	    print STDERR "*** WARNING: Ignoring improper state: $state.\n";
-	}
+    elsif ($swapop eq "out") {
+	die("*** $0:\n".
+	    "    Experiment should be SWAPPING. Currently $state.\n")
+	    if ($state ne EXPTSTATE_SWAPPING);
     }
-}
-
-#
-# Set intermediate experiment state.
-#
-
-if (! $errors) {
-    if (! SetExpState($pid, $eid, $nextState)) {
-	print STDERR "*** Failed to set intermediate experiment state.\n";
-	$errors = 1;
+    elsif ($swapop eq "update") {
+	die("*** $0:\n".
+	    "    Experiment should be MODIFY_RESWAP. Currently $state.\n")
+	    if ($state ne EXPTSTATE_MODIFY_RESWAP);
     }
 }
 
 #
 # Do actual swapping
 #
-
-undef $nextState;
-
-if (! $errors) {
-    if ($swapop eq "out") {
-	#
-	# Swap out
-	#
-	$errors = doSwapout(REAL);
-	if (! $errors) {
-	    $nextState = EXPTSTATE_SWAPPED;
-	} else {
-	    # leave $nextState undefined
-	    # experiment will stay in SWAPPING.
-	}
-
-	#
-	# Update Accounting Information
-	#
-	TBSetExpSwapTime($pid, $eid);
-    }
+if ($swapop eq "out") {
+    #
+    # Swap out
+    #
+    $errors = doSwapout(REAL);
 }
+elsif ($swapop eq "update") {
+    #
+    # Update.
+    #
+    # Phase One -- swap experiment partially out.
+    #
+    print STDERR "Backing up physical state...\n";
+    TBExptBackupPhysicalState($pid,$eid);
 
-#
-# Update, Phase One -- swap experiment partially out.
-#
-if (! $errors) {
-    if ($swapop eq "update") {
-	print STDERR "Backing up physical state...\n";
-	TBExptBackupPhysicalState($pid,$eid);
+    $errors = doSwapout(UPDATE);
 
-	$errors = doSwapout(UPDATE);
-	if (! $errors) {
-	    # leave $nextState undefined. 
-	    # (this will get defined below.)
-	} else {
-	    # Error; Clean up and put experiment in SWAPPED.
-	    print STDERR "Cleaning up after errors.\n";
-	    doSwapout(CLEANUP);
-	    $nextState = EXPTSTATE_SWAPPED;
-	}
-	
+    if ($errors) {
 	#
-	# Update Accounting Information
-	#
-	TBSetExpSwapTime($pid, $eid);
+	# Clean up the mess, leaving the experiment in the SWAPPED state,
+	# 
+	print STDERR "Cleaning up after errors.\n";
+	doSwapout(CLEANUP);
+	$updatehosed = 1;
     }
-}
-
-#
-# Update, Phase Two -- swap experiment back in.
-#
-if (! $errors) { 
-    if ($swapop eq "update") {
+    else {
 	#
-	# Update
+	# Phase Two -- swap experiment back in.
 	#
 	$errors = doSwapin(UPDATE);
 
-	if (! $errors) {
-	    #
-	    # Update Accounting Information
-	    #
-	    TBSetExpSwapTime($pid, $eid);
-
-	    #
-	    # Swapin worked; exp is now ACTIVE.
-	    # (or TESTING) 
-	    #
-	    if ($TESTMODE) {
-		$nextState = EXPTSTATE_TESTING;
-	    } else {
-		$nextState = EXPTSTATE_ACTIVE;
-	    }
-	} else {
+	if ($errors) {
 	    #
 	    # There were errors; see if we can recover.
 	    #
-	    my $canStillRecover = 1;
+	    my $NoRecover = 0;
 
 	    if ($errors != 7) {
 		print STDERR "Update failure occurred _after_ assign phase; ";
-		$canStillRecover = 0;
+		$NoRecover = 1;
 	    }
 
-	    if ($canStillRecover) {
-		print STDERR "Recovering physical state...\n";
-		my $recoverErrors = TBExptRestorePhysicalState($pid,$eid);
-		if ($recoverErrors) {
+	    if (! $NoRecover) {
+		print STDERR "Recovering physical state.\n";
+		if (($NoRecover = TBExptRestorePhysicalState($pid,$eid))) {
 		    print STDERR "Could not restore backed-up physical state; ";
-		    $canStillRecover = 0;
 		}
 	    }
-
-	    if ($canStillRecover) {
-		print STDERR "Doing a recovery swap-in of old state...\n";
-		$recoverErrors = doSwapin(UPDATE_RECOVER);
-		if ($recoverErrors) {
+	    if (! $NoRecover) {
+		print STDERR "Doing a recovery swap-in of old state.\n";
+		if (($NoRecover = doSwapin(UPDATE_RECOVER))) {
 		    print STDERR "Could not swap in old physical state; ";
-		    $canStillRecover = 0;
 		}
 	    }
-
-	    if ($canStillRecover) {
-		print STDERR "Update recovery successful.\n";
-		$nextState = EXPTSTATE_ACTIVE;
-	    } else {
-		print STDERR "update recovery aborted!\n".
-		             "Swapping experiment out...\n";
+	    if ($NoRecover) {
+		print STDERR "Recovery aborted! Swapping experiment out.\n";
 		doSwapout(CLEANUP);
-
-		$nextState = EXPTSTATE_SWAPPED;
+		$updatehosed = 1;
+	    }
+	    else {
+		print STDERR "Update recovery successful.\n";
 	    }
 	}
     }
 }
+elsif ($swapop eq "in") {
+    #
+    # Swap in
+    #
+    my $retries = 2;
+    
+    $errors = doSwapin(REAL);
 
-if (! $errors) {
-    if ($swapop eq "in") {
-	#
-	# Swap in
-	#
-	$errors = doSwapin(REAL);
+    #
+    # Attempt a retry if: 
+    #   a) there were errors, 
+    #   b) doswapin() indicated (via return code 3) a retry is appropriate,
+    #   c) we haven't tried too many times already.
+    #   d) The cancelflag has not been set.
+    #   e) $TESTMODE == 0.
+    #
+    while ($errors == 3 && $retries && !$canceled && !$TESTMODE) {
+	$retries--;
 
-	my $retries = 2;
+	print STDERR "Cleaning up after errors; will try again.\n";
+	doSwapout(RETRY);
 
-	#
-	# Attempt a retry if: 
-	#   a) there were errors, 
-	#   b) doswapin() indicated (via return code 3) a retry is appropriate,
-	#   c) we haven't tried too many times already.
-	#   d) The cancelflag has not been set.
-	#
-	# NOTE that if $TESTMODE == 1, retries are impossible, since
-        # $retry will never get set to 1.
-	#
-	while ($errors == 3 && $retries && !$canceled) {
-	    $retries--;
-
-	    print STDERR "Cleaning up after errors; will try again.\n";
-	    doSwapout(RETRY);
-
-	    print STDERR "Trying again...\n";
-	    $errors = doSwapin(RETRY);
-	}
-
-	if (! $errors) {
-	    #
-	    # Update Accounting Information
-	    #
-	    TBSetExpSwapTime($pid, $eid);
-
-	    #
-	    # Swapin worked; exp is now ACTIVE.
-	    # (or TESTING)
-	    #
-	    if ($TESTMODE) {
-		$nextState = EXPTSTATE_TESTING;
-	    } else {
-		$nextState = EXPTSTATE_ACTIVE;
-	    }
-	} else {
-	    print STDERR "Cleaning up after errors.\n";
-	    doSwapout(CLEANUP);
-
-	    #
-	    # Regardless of how well cleanup swapout worked,
-	    # send exp to SWAPPED.
-	    #
-	    $nextState = EXPTSTATE_SWAPPED; 
-	}
+	print STDERR "Trying again...\n";
+	$errors = doSwapin(RETRY);
     }
-}
-
-if (defined $nextState) {
-    if (! SetExpState($pid, $eid, $nextState)) {
-	print STDERR "*** Failed to set experiment state.\n";
-	$errors = 1;
+    if ($errors || $canceled) {
+	print STDERR "Cleaning up after " .
+	    ($errors ? "errors" : "cancelation") . ".\n";
+	doSwapout(CLEANUP);
     }
 }
 
 #
 # Write appropriate message and exit.
 #
-
 if ($errors) {
-    print "Failingly finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
+    print "Failingly finished swap-$swapop for $pid/$eid. " .TBTimeStamp(). "\n";
     TBDebugTimeStamp("tbswap $swapop finished (failed)");
 
     # pass assign wrapper info along.
     # other codes in 'errors' (3 or 7) are meaningless and
     # should just be reported as 1's.
-    exit( 1 | $assignWrapperErrorCode );
-} else {
-    print "Successfully finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
-    TBDebugTimeStamp("tbswap $swapop finished (succeeded)");
-    exit( 0 );
+    exit(1 | $assignWrapperErrorCode | ($updatehosed ? 0x40 : 0));
 }
+print "Successfully finished swap-$swapop for $pid/$eid. " . TBTimeStamp() ."\n";
+TBDebugTimeStamp("tbswap $swapop finished (succeeded)");
+exit(0);
 
 #################################
 
@@ -701,7 +568,7 @@ sub doSwapin($) {
     }
 
     # Check cancel flag before continuing. No retry, 
-    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    TBGetCancelFlag($pid, $eid, \$canceled);
     return 1
 	if ($canceled);
 
@@ -807,7 +674,7 @@ sub doSwapin($) {
     }
 
     # Check cancel flag before continuing. No retry, 
-    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    TBGetCancelFlag($pid, $eid, \$canceled);
     return 1
 	if ($canceled);
 
@@ -836,7 +703,7 @@ sub doSwapin($) {
     TBDebugTimeStamp("named finished");
 
     # Check cancel flag before continuing. No retry, 
-    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+    TBGetCancelFlag($pid, $eid, \$canceled);
     return 1
 	if ($canceled);
 

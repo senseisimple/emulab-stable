@@ -112,21 +112,16 @@ if ($UID && !TBAdmin($UID) &&
 #
 # No transitional experiments.
 #
-my $query_result =
-    DBQueryFatal("select state,expt_locked from experiments ".
-		 "where eid='$eid' and pid='$pid'");
-
-if (! $query_result->numrows) {
+my $estate = ExpState($pid, $eid);
+if (! $estate) {
     die("*** $0:\n".
 	"    No such experiment $pid/$eid exists!\n");
 }
-my ($estate,$expt_locked) = $query_result->fetchrow_array();
-
-if (defined($expt_locked)) {
+if ($estate ne EXPTSTATE_ACTIVE &&
+    $estate ne EXPTSTATE_SWAPPED) {
     die("*** $0:\n".
-	"    Experiment $pid/$eid went into transition at $expt_locked.\n".
-	"    You will be notified via email when experiment transition ".
-	"    is complete and you can alter its delay configuration.\n");
+	"    Experiment $pid/$eid must be ACTIVE or SWAPPED\n".
+	"    to alter its delay configuration.\n");
 }
 
 #

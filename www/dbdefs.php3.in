@@ -37,15 +37,6 @@ define("TBDB_USERSTATUS_UNVERIFIED",	"unverified");
 define("TBDB_USERSTATUS_FROZEN",	"frozen");
 
 #
-# Batch experiment strings.
-#
-define("TBDB_BATCHSTATE_POSTED",	"posted");
-define("TBDB_BATCHSTATE_ACTIVATING",	"activating");
-define("TBDB_BATCHSTATE_RUNNING",	"active");
-define("TBDB_BATCHSTATE_PAUSED",	"paused");
-define("TBDB_BATCHSTATE_TERMINATING",	"terminating");
-
-#
 # Trust. Define the trust level as an increasing value. Then define a
 # function to return whether the given trust is high enough.
 #
@@ -132,6 +123,7 @@ $TB_EXPTSTATE_SWAPPING		= "swapping";
 $TB_EXPTSTATE_SWAPPED		= "swapped";
 $TB_EXPTSTATE_ACTIVATING	= "activating";
 $TB_EXPTSTATE_ACTIVE		= "active";
+$TB_EXPTSTATE_QUEUED		= "queued";
 
 # Interfaces roles.
 define("TBDB_IFACEROLE_CONTROL",	"ctrl");
@@ -1301,25 +1293,6 @@ function TBExptState($pid, $eid)
     $row   = mysql_fetch_array($query_result);
     $state = $row[state];
     return $state;
-}
-
-function TBExptBatchState($pid, $eid, &$bstate)
-{
-    $query_result =
-	DBQueryFatal("select batchmode,batchstate from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-
-    $row    = mysql_fetch_array($query_result);
-    $mode   = $row[batchmode];
-    $bstate = $row[batchstate];
-    if (!$mode) {
-	return 0;
-    }
-    return 1;
 }
 
 function TBExptIndex($pid, $eid)

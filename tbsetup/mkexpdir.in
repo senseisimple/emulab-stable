@@ -166,12 +166,13 @@ if (! chown($UID, $unix_gid, "$workdir")) {
 
 #
 # If a group experiment, leave behind a symlink from the project experiment
-# directory to the group experiment directory.
+# directory to the group experiment directory. This is convenient so that
+# there is a common path for all experiments. 
 #
-#if ($pid ne $gid) {
-#    symlink($eiddir, $eidlink) or
-#	fatal("Could not symlink($eiddir, $eidlink): $!");
-#}
+if ($pid ne $gid) {
+    symlink($eiddir, $eidlink) or
+	fatal("Could not symlink($eiddir, $eidlink): $!");
+}
 
 exit(0);
 
@@ -181,8 +182,8 @@ sub fatal($)
 
     system("/bin/rm -rf $eiddir");
     system("/bin/rm -rf $workdir");
-#    unlink($eidlink)
-#	if ($pid ne $gid && -l $eidlink);
+    unlink($eidlink)
+	if ($pid ne $gid && -l $eidlink);
 
     die("*** $0:\n".
 	"    $msg\n");

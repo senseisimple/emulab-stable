@@ -132,6 +132,7 @@ if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
 #
 if ($expstate ne EXPTSTATE_ACTIVE &&
     $expstate ne EXPTSTATE_ACTIVATING &&
+    $expstate ne EXPTSTATE_MODIFY_RESWAP &&
     $expstate ne EXPTSTATE_SWAPPING) {
     die("*** $0:\n".
 	"    Experiment $pid/$eid must active (or swapping)!\n");

@@ -142,30 +142,14 @@ if (!TBAdmin() &&
 }
 
 #
-# We need to lock down the experiment during this. 
+# Check state. Only ACTIVE experiments. 
 #
-DBQueryFatal("lock tables experiments write");
-
-if (TBExpLocked($pid, $eid, \$estate)) {
-    DBQueryWarn("unlock tables");
-    print STDERR "Experiment $pid/$eid is in transition! Please try later!\n";
+$estate = ExpState($pid, $eid);
+if ($estate ne EXPTSTATE_ACTIVE) {
+    print STDERR "Experiment $pid/$eid is not ACTIVE!\n";
     # For web page.
     exit(1);
 }
-
-#
-# A sanity check. Lets make sure the experiment is in the swapped in
-# state so that we are not trying to update nodes that are still booting
-# or swapping out, etc. 
-#
-if ($estate ne BATCHSTATE_RUNNING) {
-    DBQueryWarn("unlock tables");
-    print STDERR "Experiment $pid/$eid is not active or is in transition!\n";
-    # For web page.
-    exit(1);
-}
-TBLockExp($pid, $eid, BATCHSTATE_RUNNING_LOCKED);
-DBQueryFatal("unlock tables");
 
 #
 # Get the list of nodes that need to be "updated." We already have the
@@ -183,7 +167,6 @@ else {
 
     foreach my $n1 (@nodes) {
 	if (! grep {$_ eq $n1} @allnodes) {
-	    TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
 	    die("*** $0:\n".
 		"    Node $n1 is not allocated to $pid/$eid!\n");
 	}
@@ -191,7 +174,6 @@ else {
 }
 if (! scalar(@nodes)) {
     print STDERR "There are no nodes allocated to experiment $pid/$eid\n";
-    TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
     # For web page.
     exit(1);
 }

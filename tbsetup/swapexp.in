@@ -81,8 +81,7 @@ my @allnodes;
 my @row;
 my $action;
 my $nextswapstate;
-my $tempswapstate;
-
+my $termswapstate;
 
 #
 # Untaint the path
@@ -231,10 +230,11 @@ if (! $query_result->numrows) {
 my %hashrow = $query_result->fetchhash();
 my $expt_head_login = $hashrow{'expt_head_uid'};
 my $estate          = $hashrow{'state'};
+my $batchstate      = $hashrow{'batchstate'};
 my $expt_path       = $hashrow{'path'};
+my $expt_locked     = $hashrow{'expt_locked'};
 my $isbatchexpt     = $hashrow{'batchmode'};
-my $ebatchstate     = $hashrow{'batchstate'};
-my $cancelflag  = $hashrow{'canceled'};
+my $canceled        = $hashrow{'canceled'};
 my $swappablebit= $hashrow{'swappable'};
 my $idleswapbit = $hashrow{'idleswap'};
 my $autoswapbit = $hashrow{'autoswap'};
@@ -264,77 +264,96 @@ if (! chdir($workdir)) {
 }
 
 #
-# Batchmode.
-#
-if ($isbatchexpt) {
+# This script is called from the batch daemon.
+# 
+if ($batch) {
     #
-    # When coming from the daemon, sanity check the batch state.
+    # Sanity Check. If called from the daemon, must already be locked,
+    # must be a batch experiment, and must be in proper state for the
+    # operation requested. 
     #
-    if ($batch) {
-	if ($inout eq "in") {
-	    die("*** $0:\n".
-		"    Batch experiment $pid/$eid is not in the proper state!\n".
-		"    Currently $ebatchstate, but should be ACTIVATING\n")
-		if ($ebatchstate ne BATCHSTATE_ACTIVATING);
-	}
-	elsif ($inout eq "out") {
-	    die("*** $0:\n".
-		"    Batch experiment $pid/$eid is not in the proper state!\n".
-		"    Currently $ebatchstate, but should be TERMINATING\n")
-		if ($ebatchstate ne BATCHSTATE_TERMINATING);
-	}
-	else {
-	    die("*** $0:\n".
-		"    Improper request from batch daemon for $pid/$eid!\n");
-	}
+    die("*** $0:\n".
+	"    Experiment $pid/$eid is supposed to be a batch experiment!\n")
+	if (!$isbatchexpt);
+    
+    die("*** $0:\n".
+	"    Batch experiment $pid/$eid should be locked!\n")
+	if (!defined($expt_locked) ||
+	    $batchstate ne BATCHSTATE_LOCKED());
+
+    if ($inout eq "in") {
+	die("*** $0:\n".
+	    "    Batch experiment $pid/$eid is not in the proper state!\n".
+	    "    Currently $estate, but should be QUEUED.\n")
+	    if ($estate ne EXPTSTATE_QUEUED);
+	
+	die("*** $0:\n".
+	    "    Batch experiment $pid/$eid has been canceled! Aborting.\n")
+	    if ($canceled);
+    }
+    elsif ($inout eq "out") {
+	die("*** $0:\n".
+	    "    Batch experiment $pid/$eid is not in the proper state!\n".
+	    "    Currently $estate, but should be ACTIVE.\n")
+	    if ($estate ne EXPTSTATE_ACTIVE);
     }
     else {
+	die("*** $0:\n".
+	    "    Improper request from batch daemon for $pid/$eid!\n");
+    }
+}
+else {
+    if ($isbatchexpt) {
 	#
 	# User is requesting that a batch either be injected or paused.
 	# Sanity check the state, but otherwise let the batch daemon
 	# handle it.
 	#
 	ExitWithStatus(1, "Batch experiment $pid/$eid is still canceling!")
-	    if ($cancelflag);
+	    if ($canceled);
 
 	if ($inout eq "in") {
 	    ExitWithStatus(1,
-			   "Batch experiment $pid/$eid must be PAUSED to\n".
-			   "swap in. Currently $ebatchstate.")
-		if ($ebatchstate ne BATCHSTATE_PAUSED);
-	    TBSetBatchState($pid, $eid, BATCHSTATE_POSTED);
+			   "Batch experiment $pid/$eid must be SWAPPED to\n".
+			   "QUEUE. Currently $estate.")
+		if ($estate ne EXPTSTATE_SWAPPED);
+	    SetExpState($pid, $eid, EXPTSTATE_QUEUED);
 	}
 	elsif ($inout eq "out") {
 	    ExitWithStatus(1,
-			   "Batch experiment $pid/$eid must be RUNNING or\n".
-			   "ACTIVATING to swap out. Currently $ebatchstate.")
-		if ($ebatchstate ne BATCHSTATE_RUNNING &&
-		    $ebatchstate ne BATCHSTATE_ACTIVATING);
+			   "Batch experiment $pid/$eid must be ACTIVE or\n".
+			   "ACTIVATING to swap out. Currently $estate.")
+		if ($estate ne EXPTSTATE_ACTIVE &&
+		    $estate ne EXPTSTATE_ACTIVATING);
 
 	    #
 	    # Since the batch daemon has control, all we can do is set
 	    # the cancel bit.
 	    # 
-	    TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELSWAP);
+	    TBSetCancelFlag($pid, $eid, EXPTCANCEL_SWAP);
 	}
 	elsif ($inout eq "pause") {
 	    ExitWithStatus(1,
-			   "Batch experiment $pid/$eid must be POSTED to\n".
-			   "pause. Currently $ebatchstate.")
-		if ($ebatchstate ne BATCHSTATE_POSTED);
+			   "Batch experiment $pid/$eid must be QUEUED to\n".
+			   "DEQUEUE. Currently $estate.")
+		if ($estate ne EXPTSTATE_QUEUED);
 
 	    #
-	    # If the batchstate is POSTED, we can just set it to PAUSED
-	    # since the batch_daemon is locked out from messing with it.
+	    # XXX. The batch daemon might already have the experiment, but
+	    # not have shipped it off to startexp. Change the state
+	    # anyway. The error will be noticed later when startexp dies,
+	    # and the batch daemon gets the error back. This sucks.
 	    #
-	    TBSetBatchState($pid, $eid, BATCHSTATE_PAUSED);
+	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 	}
 	elsif ($inout eq "modify") {
 	    ExitWithStatus(1,
-			   "Batch experiment $pid/$eid must be PAUSED or\n".
-			   "RUNNING to modify. Currently $ebatchstate.")
-		if ($ebatchstate ne BATCHSTATE_PAUSED &&
-		    $ebatchstate ne BATCHSTATE_RUNNING);
+			   "Batch experiment $pid/$eid must be SWAPPED or\n".
+			   "ACTIVE to modify. Currently $estate.")
+		if (($estate ne EXPTSTATE_SWAPPED &&
+		     $estate ne EXPTSTATE_ACTIVATING) ||
+		    $batchstate != BATCHSTATE_UNLOCKED());
+
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
 	    # locked below, and so it cannot be injected or otherwise messed
@@ -352,75 +371,81 @@ if ($isbatchexpt) {
 	}
 	ExitWithStatus(0, 
 		       "Batch experiment $pid/$eid state has been changed.\n");
+      doit:
     }
-  doit:
-}
-else {
-    #
-    # If the cancel flag is set, then user must wait for that to clear before
-    # we can do anything else.
-    #
-    ExitWithStatus(1,
-		   "Experiment $pid/$eid has its cancel flag set!.\n".
-		   "You must wait for that to clear before you can swap or\n".
-		   "or modify the experiment.\n")
-	if ($cancelflag);
+    else {
+	#
+	# If the cancel flag is set, then user must wait for that to
+	# clear before we can do anything else.
+	#
+	ExitWithStatus(1,
+		       "Experiment $pid/$eid has its cancel flag set!.\n".
+		       "You must wait for that to clear before you can swap\n".
+		       "or modify the experiment.\n")
+	    if ($canceled);
 
-    #
-    # Check the state for the various operations.
-    #
-    if (!$force) {
-        SWITCH: for ($inout) {
-	    /^in$/i && do {
-		if ($ebatchstate ne BATCHSTATE_PAUSED()) {
-		    ExitWithStatus(1,
-				   "Experiment $pid/$eid is not swapped out!");
-		}
-		last SWITCH;
-	    };
-	    /^out$/i && do {
-		if ($ebatchstate eq BATCHSTATE_PAUSED()) {
-		    ExitWithStatus(1,
-				   "Experiment $pid/$eid is swapped out!");
-		}
-		elsif ($ebatchstate ne BATCHSTATE_RUNNING() &&
-		       $ebatchstate ne BATCHSTATE_ACTIVATING()) {
-		    ExitWithStatus(1,
-				   "Experiment $pid/$eid is not swapped in!");
-		}
+	#
+	# Must be unlocked if called by the user.
+	#
+	die("*** $0:\n".
+	    "    Experiment $pid/$eid went into transition at $expt_locked!\n".
+	    "    You must wait until it is no longer in transition.\n")
+	    if (defined($expt_locked));
 
-		if ($ebatchstate eq BATCHSTATE_ACTIVATING()) {
-		    #
-		    # All we can do is set the cancel flag and hope that
-		    # it gets noticed. We do not wait. 
-		    # 
-		    TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELSWAP);
-
-		    ExitWithStatus(0,
-				   "Experiment $pid/$eid swapin has been  ".
-				   "marked for cancelation.\n".
-				   "You will receive email when the original ".
-				   "swap request has finished.");
-		}
-		last SWITCH;
-	    };
-	    /^restart$/i && do {
-		if ($ebatchstate ne BATCHSTATE_RUNNING()) {
-		    ExitWithStatus(1,
-				   "Experiment $pid/$eid is not swapped in!");
-		}
-		last SWITCH;
-	    };
-	    /^modify$/i && do {
-		if ($ebatchstate ne BATCHSTATE_RUNNING() &&
-		    $ebatchstate ne BATCHSTATE_PAUSED()) {
-		    ExitWithStatus(1,
-				   "Experiment $pid/$eid is in transition!");
-		}
-		last SWITCH;
-	    };
-	    die("*** $0:\n".
-		"    Missing state check for action: $action\n");
+	#
+	# Check the state for the various operations.
+	#
+	if (!$force) {
+	  SWITCH: for ($inout) {
+	      /^in$/i && do {
+		  if ($estate ne EXPTSTATE_SWAPPED()) {
+		      ExitWithStatus(1,
+				     "Experiment $pid/$eid is not swapped out!");
+		  }
+		  last SWITCH;
+	      };
+	      /^out$/i && do {
+		  if ($estate ne EXPTSTATE_ACTIVE() &&
+		      $estate ne EXPTSTATE_ACTIVATING()) {
+		      ExitWithStatus(1,
+				     "Experiment $pid/$eid is not swapped in ".
+				     "or activating!\n");
+		  }
+		  
+		  if ($estate eq EXPTSTATE_ACTIVATING()) {
+		      #
+		      # All we can do is set the cancel flag and hope that
+		      # it gets noticed. We do not wait. 
+		      # 
+		      TBSetCancelFlag($pid, $eid, EXPTCANCEL_SWAP);
+		      
+		      ExitWithStatus(0,
+				     "Experiment $pid/$eid swapin has been  ".
+				     "marked for cancelation.\n".
+				     "You will receive email when the original ".
+				     "swap request has finished.");
+		  }
+		  last SWITCH;
+	      };
+	      /^restart$/i && do {
+		  if ($estate ne EXPTSTATE_ACTIVE()) {
+		      ExitWithStatus(1,
+				     "Experiment $pid/$eid is not swapped in!");
+		  }
+		  last SWITCH;
+	      };
+	      /^modify$/i && do {
+		  if ($estate ne EXPTSTATE_ACTIVE() &&
+		      $estate ne EXPTSTATE_SWAPPED()) {
+		      ExitWithStatus(1,
+				     "Experiment $pid/$eid must be ACTIVE or\n".
+				     "SWAPPED to modify!\n");
+		  }
+		  last SWITCH;
+	      };
+	      die("*** $0:\n".
+		  "    Missing state check for action: $action\n");
+	  }
 	}
     }
 }
@@ -432,23 +457,20 @@ else {
 #
 SWITCH: for ($inout) {
     /^in$/i && do {
-	$tempswapstate = BATCHSTATE_ACTIVATING();
-	$nextswapstate = BATCHSTATE_RUNNING();
+	$nextswapstate = EXPTSTATE_ACTIVATING();
 	last SWITCH;
     };
     /^out$/i && do {
-	$tempswapstate = BATCHSTATE_TERMINATING();
-	$nextswapstate = BATCHSTATE_PAUSED();
+	$nextswapstate = EXPTSTATE_SWAPPING();
 	last SWITCH;
     };
     /^restart$/i && do {
-	$tempswapstate = BATCHSTATE_RUNNING_BUSY();
-	$nextswapstate = BATCHSTATE_RUNNING();
+	$nextswapstate = EXPTSTATE_RESTARTING();
 	last SWITCH;
     };
     /^modify$/i && do {
-	$tempswapstate = BATCHSTATE_MODIFYING();
-	$nextswapstate = $ebatchstate;
+	$nextswapstate = (($estate eq EXPTSTATE_SWAPPED()) ?
+			  EXPTSTATE_MODIFY_PARSE() : EXPTSTATE_MODIFY_REPARSE());
 	last SWITCH;
     };
     die("*** $0:\n".
@@ -461,8 +483,13 @@ if ($inout ne "out") {
 		 "where eid='$eid' and pid='$pid'");
 }
 
-# Lock the record, set the intermediate state, and unlock the table.
-TBLockExp($pid, $eid, $tempswapstate);
+#
+# On a failure, we go back to this swapstate. Might be modified below.
+# 
+$termswapstate = $estate;
+
+# Lock the record, set the nextstate, and unlock the table.
+TBLockExp($pid, $eid, $nextswapstate);
 DBQueryFatal("unlock tables");
 
 #
@@ -558,34 +585,28 @@ if ($inout ne "restart" && -e $repfile) {
 # Sanity check states in case someone changes something.
 #
 if ($inout eq "out") {
-    if ($force || $idleswap) { $arg = "-force"; } else { $arg = ""; }
-    print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
-    if (system("$tbdir/tbswap out $arg $pid $eid") != 0) {
+    my $optarg = (($force || $idleswap) ? "-force" : "");
+    
+    print STDOUT "Running 'tbswap out $optarg $pid $eid'\n";
+    if (system("$tbdir/tbswap out $optarg $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap out failed!");
     }
-
-    $estate = ExpState($pid,$eid);
-    if ($estate ne EXPTSTATE_SWAPPED) {
-	fatal("Experiment is in the wrong state: $estate");
-    }
+    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 }
 elsif ($inout eq "in") {
-    print STDOUT "Running 'tbswap in' with arguments: $pid $eid\n";
+    print STDOUT "Running 'tbswap in $pid $eid'\n";
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
     }
-
-    $estate = ExpState($pid,$eid);
-    if ($estate ne EXPTSTATE_ACTIVE) {
-	fatal("Experiment is in the wrong state: $estate");
-    }
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
 }
 elsif ($inout eq "modify") {
     my $modifyError = "";
+    my $oldstate    = $estate;
 
     GatherSwapStats($pid, $eid, $dbuid,
 		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
@@ -594,51 +615,54 @@ elsif ($inout eq "modify") {
     if (TBExptBackupVirtualState($pid, $eid)) {
 	fatal("Could not backup experiment state; cannot safely continue!");
     }
-    # Must deal with the prerender explicitly since it runs background.
-    system("prerender -r $pid $eid");
-    
-    TBExptRemoveVirtualState($pid, $eid);
 
     #
     # Rerun tbprerun if modifying.
     #
-    if (system("$tbdir/tbprerun -m $pid $eid $modnsfile") != 0) {
+    print STDOUT "Running 'tbprerun $pid $eid $modnsfile'\n";
+    if (system("$tbdir/tbprerun $pid $eid $modnsfile") != 0) {
 	$modifyError = "tbprerun failed!";
     }
 
     #
-    # If experiment is currently swapped out, no need to do an update 
-    # after modifying it.
+    # Our next state depends on whether the experiment was active or swapped.
     #
-    if (! $modifyError && $estate eq EXPTSTATE_ACTIVE) {
-	print STDOUT "Running 'tbswap update' with arguments: $pid $eid\n";
-
-	my $rebootSwitch = "";
-	if ($reboot) {
-	    $rebootSwitch = "-reboot";
+    if (! $modifyError) {
+	if ($estate eq EXPTSTATE_SWAPPED) {
+	    SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 	}
+	else {
+	    SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
+	    
+	    my $optarg = ($reboot ? "-reboot" : "");
 
-	if (system("$tbdir/tbswap update $rebootSwitch $pid $eid") != 0) {
-	    $errorstat = $? >> 8;
-	    $modifyError = "tbswap update failed!";
-	}
-
-	#
-	# See what state tbswap left it in. It might have swapped it out
-	# or restored it, if there was an error. 
-	# 
-	$estate = ExpState($pid, $eid);
-	
-	if (! $modifyError) {
-	    if ($estate ne EXPTSTATE_ACTIVE) {
-		$modifyHosed = 1;
-		fatal("Experiment is in the wrong state: $estate!");
+	    print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
+	    if (system("$tbdir/tbswap update $optarg $pid $eid") != 0) {
+		$errorstat = $? >> 8;
+		$modifyError = "tbswap update failed!";
 	    }
-	    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
-	}
-	elsif ($estate ne EXPTSTATE_ACTIVE) {
-	    # Was active, now its not! tbswap was not able to recover.
-	    $modifyHosed = 1;
+
+	    #
+	    # See what tbswap did. It might have swapped it out if there
+	    # was an error. 
+	    # 
+	    if (! $modifyError) {
+		SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
+		$estate = EXPTSTATE_ACTIVE;
+	    }
+	    elsif ($errorstat & 0x40) {
+		#
+		# Icky. Magic return code that says tbswap swapped it out.
+		# We do not want tbswap to muck with states anymore, so
+		# need to know what it did. At some point we should clean
+		# up the exit reporting! Anyway, fatal() needs to know the
+		# the right state to go back to (no longer ACTIVE).
+		#
+		$estate = EXPTSTATE_SWAPPED;
+		$termswapstate = EXPTSTATE_SWAPPED;
+                # Old accounting info.
+		TBSetExpSwapTime($pid, $eid);
+	    }
 	}
     }
 
@@ -651,7 +675,6 @@ elsif ($inout eq "modify") {
 	TBExptRemoveVirtualState($pid, $eid);
 	
 	if (TBExptRestoreVirtualState($pid, $eid) == 0) {
-	    TBExptClearBackupState($pid, $eid);
 	    # Must deal with the prerender explicitly since it runs background.
 	    system("prerender -t $pid $eid");
 	    fatal("Update aborted; old state restored.");
@@ -661,13 +684,16 @@ elsif ($inout eq "modify") {
 	    fatal("Experiment state could not be restored!");
 	}
     }
+    
     TBExptClearBackupState($pid, $eid);
+    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
 }
 else { # $inout eq "restart" assumed.
-    print STDOUT "Running tbrestart with arguments: $pid $eid\n";
+    print STDOUT "Running 'tbrestart $pid $eid'\n";
     if (system("$tbdir/tbrestart $pid $eid") != 0) {
 	fatal("tbrestart failed!");
     }
+    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 }
 
 #
@@ -695,6 +721,8 @@ elsif ($inout eq "out") {
 elsif ($inout eq "modify") {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0);
 }
+# Old accounting info.
+TBSetExpSwapTime($pid, $eid);
 
 #
 # Set the swapper uid on success only, and *after* gathering swap stats!
@@ -703,7 +731,7 @@ TBExptSetSwapUID($pid, $eid, $dbuid);
 
 #
 # In batch mode, just exit without sending email or unlocking. The
-# batch daemon will take care of that and setting the proper state. 
+# batch daemon will take care of that.
 #
 if ($batch) {
     exit(0);
@@ -737,13 +765,13 @@ if (defined($logname)) {
 #
 # Must unlock before exit.
 #
-TBUnLockExp($pid, $eid, $nextswapstate);
+TBUnLockExp($pid, $eid);
 
 #
 # Since the swap completed, clear the cancel flag. This must be done
 # after we change the experiment state (above). 
 #
-TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELCLEAR);
+TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR);
 
 print "Swap Success!\n";
 
@@ -814,6 +842,13 @@ sub fatal($)
     }
 
     #
+    # Clear backup state since not needed anymore; experiment is toast. 
+    # 
+    if ($inout eq "modify") {
+	TBExptClearBackupState($pid, $eid);
+    }
+
+    #
     # If hosed, we entirely terminate the experiment.
     #
     if ($modifyHosed) {
@@ -821,26 +856,29 @@ sub fatal($)
 	# Note: $estate is indeed still set appropriately!
 	#
 	if ($estate eq EXPTSTATE_ACTIVE) {
-	    print "Running 'tbswap out' with arguments: $pid $eid\n";
+	    print "Running 'tbswap out -force $pid $eid'\n";
 	    if (system("$tbdir/tbswap out -force $pid $eid") != 0) {
 		print "tbswap out failed!\n";
 	    }
 	}
 
-	print "Running tbend with arguments: -force $pid $eid\n";
+	print "Running 'tbend -force $pid $eid'\n";
 	if (system("$tbdir/tbend -force $pid $eid") != 0) {
 	    print "tbend failed!\n";
 	}
 	# Must override since we are so badly hosed. 
-	$ebatchstate = BATCHSTATE_PAUSED;
+	$termswapstate = EXPTSTATE_TERMINATED;
     }
 
     # Copy over the log files so the user can see them.
     system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
 
+    # Set proper state, which is typically the way we came in.
+    SetExpState($pid, $eid, $termswapstate);
+
     #
     # In batch mode, exit without sending the email or unlocking. The
-    # batch daemon will take care of that and setting the proper state. 
+    # batch daemon will take care of that.
     #
     if ($batch) {
 	exit($errorstat);
@@ -853,14 +891,14 @@ sub fatal($)
 	TBExptCloseLogFile($pid, $eid);
     }
 
-    # Unlock and reset state to its original value. 
-    TBUnLockExp($pid, $eid, $ebatchstate);
+    # Unlock and reset state to its terminal value.
+    TBUnLockExp($pid, $eid);
 
     #
     # Clear the cancel flag now that the operation is complete. Must be done
     # after we change the experiment state (above).
     #
-    TBSetBatchCancelFlag($pid, $eid, BATCHMODE_CANCELCLEAR);
+    TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR);
 
     #
     # Send a message to the testbed list. Append the logfile.

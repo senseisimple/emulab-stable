@@ -730,6 +730,8 @@ elsif (@vnodelist) {
 	    # again, until the plab monitor daemon determines that it is
 	    # really working again. 
 	    #
+	    # XXX Need to deal with the same pnode being used twice.
+	    #
 	    MarkPhysNodeDown($pnode);
 	    TBSetNodeLogEntry($pnode, $dbuid, TB_DEFAULT_NODELOGTYPE(),
 			      "'Moved to hwdown; ".

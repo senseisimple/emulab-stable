@@ -35,18 +35,18 @@ if (!TBValidExperiment($pid, $eid)) {
     USERERROR("No such experiment $eid in project $eid!", 1);
 }
 $query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE ".
+    DBQueryFatal("SELECT gid,state FROM experiments WHERE ".
 		 "eid='$eid' and pid='$pid'");
 $row = mysql_fetch_array($query_result);
 $gid         = $row[gid];
-$expt_locked = $row[expt_locked];
-$batchstate  = $row[batchstate];
+$state       = $row[state];
 
 #
-# Look for transition progress and exit with error.
+# Look for transition and exit with error.
 #
-if ($expt_locked) {
-    USERERROR("Experiment $eid went into transition at $expt_locked.<br>".
+if ($state != $TB_EXPTSTATE_ACTIVE &&
+    $state != $TB_EXPTSTATE_SWAPPED) {
+    USERERROR("Experiment $eid is not ACTIVE or SWAPPED.<br>".
 	      "You must wait until the experiment is no longer in transition.".
 	      "<br>", 1);
 }
@@ -56,7 +56,7 @@ if ($expt_locked) {
 # when the experiment is swapped out, but we need to generate a form based
 # on virt_lans instead of delays/linkdelays. Thats harder to do. 
 #
-if (strcmp($batchstate, TBDB_BATCHSTATE_RUNNING)) {
+if (strcmp($state, $TB_EXPTSTATE_ACTIVE)) {
     USERERROR("Experiment $eid must be active to change its traffic ".
 	      "shaping configuration!", 1);
 }
