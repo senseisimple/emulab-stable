@@ -170,6 +170,7 @@ void Framework::parseCommandLine(int argCount, char ** argArray)
     AssignType assignChoice = Hierarchical;
     RouteType routeChoice = HostNet;
     m_partition.reset(new SquareRootPartition());
+    m_doRouting = false;
     for (int i = 1; i < argCount; ++i)
     {
         string currentArg = argArray[i];
@@ -293,14 +294,17 @@ void Framework::parseArgument(string const & arg,
             break;
             // use host-host routing
         case 'h':
+            m_doRouting = true;
             routeChoice = HostHost;
             break;
             // use host-lan routing
         case 'l':
+            m_doRouting = true;
             routeChoice = HostLan;
             break;
             // use host-net routing
         case 'n':
+            m_doRouting = true;
             routeChoice = HostNet;
             break;
             // time ip assignment and routing
