@@ -55,6 +55,11 @@ my $PORT_FORMAT_MODPORT  = 2;
 my $PORT_FORMAT_NODEPORT = 3;
 
 #
+# Highest-numbered VLAN we will try
+#
+my $MAX_VLAN_NUMBER = 999;
+
+#
 # Creates a new object.
 #
 # usage: new($classname,$devicename,$debuglevel)
@@ -398,23 +403,22 @@ sub vlanUnlock($;$) {
 
     my $EditOp = 'vtpVlanEditOperation'; # use index 1
     my $ApplyStatus = 'vtpVlanApplyStatus'; # use index 1
-    my $RetVal = $self->{SESS}->set([[$EditOp,1,"apply","INTEGER"]]);
-    $self->debug("Apply set: '$RetVal'\n");
+    my $ApplyRetVal = $self->{SESS}->set([[$EditOp,1,"apply","INTEGER"]]);
+    $self->debug("Apply set: '$ApplyRetVal'\n");
 
-    $RetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
-    $self->debug("Apply gave $RetVal\n");
-    while ($RetVal eq "inProgress") { 
-	$RetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
-	$self->debug("Apply gave $RetVal\n");
+    $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
+    $self->debug("Apply gave $ApplyRetVal\n");
+    while ($ApplyRetVal eq "inProgress") { 
+	$ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
+	$self->debug("Apply gave $ApplyRetVal\n");
     }
 
-    my $ApplyRetVal = $RetVal;
-
-    if ($RetVal ne "succeeded") {
-	$self->debug("Apply failed: Gave $RetVal\n");
+    if ($ApplyRetVal ne "succeeded") {
+	$self->debug("Apply failed: Gave $ApplyRetVal\n");
+	warn("ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
 	# Only release the buffer if they've asked to force it.
 	if (!$force) {
-	    $RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
+	    my $RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
 	    $self->debug("Release: '$RetVal'\n");
 	    if (! $RetVal ) {
 		warn("VLAN Reconfiguration Failed. No changes saved.\n");
@@ -424,7 +428,7 @@ sub vlanUnlock($;$) {
     } else { 
 	$self->debug("Apply Succeeded.\n");
 	# If I succeed, release buffer
-	$RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
+	my $RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
 	if (! $RetVal ) {
 	    warn("VLAN Reconfiguration Failed. No changes saved.\n");
 	    return 0;
@@ -621,19 +625,35 @@ sub createVlan($$;$$$) {
 	    #
 	    # Find a free VLAN number to use. Since 1 is the default VLAN on
 	    # Ciscos, we start with number 2.
-	    # XXX: The maximum VLAN number is hardcoded at 1000
 	    #
 	    $vlan_number = 2; # We need to start at 2
-	    my $RetVal = snmpitGetFatal($self->{SESS},
+	    my $RetVal = snmpitGetWarn($self->{SESS},
 		[$VlanRowStatus,"1.$vlan_number"]);
-	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
-	    while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
-		$vlan_number += 1;
-		$RetVal = snmpitGetFatal($self->{SESS},
-		    [$VlanRowStatus,"1.$vlan_number"]);
-		$self->debug("Row $vlan_number got '$RetVal'\n",2);
+	    if (!defined($RetVal)) {
+		#
+		# If we can't get the first one, we might as well bail
+		#
+		warn "WARNING: Failed to VLAN name for VLAN $vlan_number\n";
+		next;
 	    }
-	    if ($vlan_number > 1000) {
+	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
+	    while (($RetVal ne 'NOSUCHINSTANCE') &&
+		    ($vlan_number <= $MAX_VLAN_NUMBER)) {
+		$vlan_number += 1;
+		$RetVal = snmpitGetWarn($self->{SESS},
+		    [$VlanRowStatus,"1.$vlan_number"]);
+		if (!defined($RetVal)) {
+		    #
+		    # We probably could unlock the edit buffer and die, but
+		    # the script using this library could have other unfinished
+		    # business
+		    #
+		    warn "WARNING: Failed to VLAN name for VLAN $vlan_number\n";
+		} else {
+		    $self->debug("Row $vlan_number got '$RetVal'\n",2);
+		}
+	    }
+	    if ($vlan_number > $MAX_VLAN_NUMBER) {
 		#
 		# We must have failed to find one
 		#
@@ -876,7 +896,9 @@ sub setPortVlan($$@) {
 	my $RetVal = $self->{SESS}->set([$PortVlanMemb,$port,$vlan_number,
 					 'INTEGER']);
 	if (!$RetVal) {
-	    print STDERR "$port VLAN change failed with $RetVal.\n";
+	    my $RetValString = defined($RetVal) ? $RetVal : "(undefined)";
+	    print STDERR "ERROR - Failed to put $port on $self->{NAME} into " .
+	    	"VLAN $vlan_number - Error was $RetValString\n";
 	    $errors++;
 	    next;
 	} else {
@@ -889,14 +911,14 @@ sub setPortVlan($$@) {
     # disable them. Otherwise, we need to make sure they get enabled.
     #
     if ($vlan_number == 1) {
-	$self->debug("Disabling " . join(',',@ports) . "...");
-	if ( my $rv = $self->portControl("disable",@ports) ) {
+	$self->debug("Disabling " . join(',',@okports) . "...");
+	if ( my $rv = $self->portControl("disable",@okports) ) {
 	    print STDERR "Port disable had $rv failures.\n";
 	    $errors += $rv;
 	}
     } else {
-	$self->debug("Enabling "  . join(',',@ports) . "...");
-	if ( my $rv = $self->portControl("enable",@ports) ) {
+	$self->debug("Enabling "  . join(',',@okports) . "...");
+	if ( my $rv = $self->portControl("enable",@okports) ) {
 	    print STDERR "Port enable had $rv failures.\n";
 	    $errors += $rv;
 	}
@@ -1041,7 +1063,7 @@ sub UpdateField($$$@) {
 	    $trans = ""; # Guard against some uninitialized value warnings
 	}
 	$self->debug("Checking port $port ($trans) for $val...");
-	$Status = snmpitGetFatal($self->{SESS},[$OID,$port]);
+	$Status = snmpitGetWarn($self->{SESS},[$OID,$port]);
 	if (!defined $Status) {
 	    warn "Port $port ($trans), change to $val: No answer from device\n";
 	    return -1;		# return error
@@ -1056,7 +1078,7 @@ sub UpdateField($$$@) {
 		if ($self->{BLOCK}) {
 		    my $n = 0;
 		    while ($Status ne $val) {
-			$Status = snmpitGetFatal($self->{SESS},[$OID,$port]);
+			$Status = snmpitGetWarn($self->{SESS},[$OID,$port]);
 			$self->debug("Value for $port was $Status\n");
 			select (undef, undef, undef, .25); # wait .25 seconds
 			$n++;
