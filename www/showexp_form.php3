@@ -19,15 +19,27 @@ if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
 }
 LOGGEDINORDIE($uid);
 
+$isadmin = ISADMIN($uid);
+
 #
 # Show a menu of all experiments for all projects that this uid
-# is a member of.
+# is a member of. Or, if an admin type person, show them all!
 #
-$projmemb_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM proj_memb WHERE uid=\"$uid\"");
-if (mysql_num_rows($projmemb_result) == 0) {
-  USERERROR("You are not a member of any Projects, so you cannot ".
-            "show any experiment information", 1);
+if ($isadmin) {
+    $projmemb_result = mysql_db_query($TBDBNAME,
+	"SELECT DISTINCT pid FROM proj_memb");
+    if (mysql_num_rows($projmemb_result) == 0) {
+        USERERROR("There are no experiments to ".
+                  "show any experiment information", 1);
+    }
+}
+else {
+    $projmemb_result = mysql_db_query($TBDBNAME,
+	"SELECT pid FROM proj_memb WHERE uid=\"$uid\"");
+    if (mysql_num_rows($projmemb_result) == 0) {
+        USERERROR("You are not a member of any Projects, so you cannot ".
+                  "show any experiment information", 1);
+    }
 }
 
 #

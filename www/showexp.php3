@@ -19,6 +19,8 @@ if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
 }
 LOGGEDINORDIE($uid);
 
+$isadmin = ISADMIN($uid);
+
 #
 # Verify form arguments.
 # 
@@ -51,11 +53,13 @@ $exprow = mysql_fetch_array($query_result);
 # Verify that this uid is a member of the project for the experiment
 # being displayed.
 #
-$query_result = mysql_db_query($TBDBNAME,
+if (!$isadmin) {
+    $query_result = mysql_db_query($TBDBNAME,
 	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$exp_pid\"");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("You are not a member of Project $exp_pid for ".
-            "Experiment: $exp_eid.", 1);
+    if (mysql_num_rows($query_result) == 0) {
+        USERERROR("You are not a member of Project $exp_pid for ".
+                  "Experiment: $exp_eid.", 1);
+    }
 }
 ?>
 

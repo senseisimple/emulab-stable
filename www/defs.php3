@@ -91,6 +91,26 @@ function USERERROR($message, $death) {
 }
 
 #
+# Is this user an admin type?
+#
+function ISADMIN($uid) {
+    global $TBDBNAME;
+
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT admin FROM users WHERE uid='$uid'");
+
+    if (! $query_result) {
+        $err = mysql_error();
+        TBERROR("Database Error getting admin status for $uid: $err\n", 1);
+    }
+
+    $row = mysql_fetch_row($query_result);
+    $admin  = $row[0];
+
+    return $admin;
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 require("tbauth.php3");
