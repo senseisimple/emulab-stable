@@ -1,7 +1,7 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= os/frisbee.new
+SUBDIR		= os/frisbee.redux
 
 include $(OBJDIR)/Makeconf
 
@@ -22,7 +22,7 @@ SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
-CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS)
+CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= -static
 
 frisbee: $(CLIENTOBJS) ../imagezip/frisbee.o
@@ -38,6 +38,8 @@ frisbeed: $(SERVEROBJS)
 client.o:	decls.h log.h
 server.o:	decls.h log.h
 log.o:		decls.h log.h
+
+install:	$(INSTALL_SBINDIR)/frisbeed
 
 clean:
 	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
