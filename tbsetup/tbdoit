@@ -91,6 +91,7 @@ print STDOUT "Running $tbdir/tbrun with arguments: $project $eid $irfile\n";
 if (system("$tbdir/tbrun $project $eid $irfile") != 0) {
     print STDOUT "tbrun failed!\n";
     dumplog();
+    tbendit();
     fatal();
 }
 
@@ -98,14 +99,9 @@ print STDOUT "Running tbreport with arguments: -v $irfile 2>&1 > $repfile\n";
 if (system("$tbdir/tbreport -v $irfile 2>&1 > $repfile") != 0) {
     print STDOUT "tbreport failed!\n";
     dumplog();
+    tbendit();
     fatal();
 }
-
-print STDOUT "Running mkacct with argument: $eid\n";
-#if (system("$tbdir/mkacct $eid") != 0) {
-#    print STDOUT "mkacct failed!\n";
-#    fatal();
-#}
 
 #
 # The web server will not be able to access the report file, so just
@@ -143,3 +139,18 @@ sub dumplog()
 	close(IN);
     }
 }
+
+#
+# If tbprerun finishes, but tbrun fails, lets do a tbend to make sure
+# the nodes and vlans are released.
+# 
+sub tbendit()
+{
+	print STDOUT "Running tbend with arguments: $project $eid\n";
+	if (system("$tbdir/tbend $project $eid") != 0) {
+	    print STDOUT "tbend failed!\n";
+	}
+}
+
+
+
