@@ -77,23 +77,15 @@ applyChanges() && updatedb();
 exit(0);
 
 sub applyChanges {
-  my $cmd1 = "";
-  $cmd1 .= " delay ${delay}ms bw ${bw}${unit}bit/s";
-  my $cmd2 = $cmd1;
-  $cmd1 .= " plr $plr";
-  my $ssh1 = "ssh -f -n $node 'sudo /sbin/ipfw pipe $pipe1 config $cmd1 ;".
-    "sudo /sbin/ipfw pipe $pipe2 config $cmd2'";
-  my $ssh2 = "ssh -f -n $node 'sudo /sbin/ipfw pipe $pipe1 config $cmd1'";
-  if ($cmd1 ne "") {
-    if ($cmd2 ne "") {
-      if ($debug) { print "$ssh1\n"; }
-      system($ssh1) && die("Command '$ssh1' failed: $!\n");
-    } else {
-      if ($debug) { print "$ssh2\n"; }
-      system($ssh2) && die("Command '$ssh2' failed: $!\n");
-    }
-  }
-  1;
+  my $config = " config delay ${delay}ms bw ${bw}${unit}bit/s plr $plr";
+  my $cmd    = "ssh -f -n $node ".
+               "'sudo /sbin/ipfw pipe $pipe1 $config ; ".
+               " sudo /sbin/ipfw pipe $pipe2 $config'";
+  
+  if ($debug) { print "$cmd\n"; }
+  system($cmd) && die("Command '$cmd' failed: $!\n");
+
+  return 1;
 }
 
 sub updatedb {
