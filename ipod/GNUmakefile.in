@@ -1,0 +1,31 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= ipod
+
+include $(OBJDIR)/Makeconf
+
+all: ipod
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS= -g -O2
+
+ipod: ipod.c
+	$(CC) $(CFLAGS) -o ipod $<
+
+install: all $(INSTALL_SBINDIR)/ipod
+	echo "Don't forget to do a post-install as root"
+
+post-install:
+	chown root $(INSTALL_SBINDIR)/ipod
+	chmod u+s $(INSTALL_SBINDIR)/ipod
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:
+	@echo "No wrapper for IPOD yet"
+
+clean:
+	rm -f ipod

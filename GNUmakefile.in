@@ -9,7 +9,7 @@ DISTCLEAN_FILES = @DISTCLEAN_FILES@
 
 include Makeconf
 
-SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd utils www tip capture
+SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd utils www tip capture ipod
 
 all:		all-subdirs
 
@@ -23,6 +23,7 @@ ops-install:	install-subdirs install-mkdirs
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 post-install:
+	@$(MAKE) -C ipod post-install
 	@$(MAKE) -C tbsetup post-install
 	@$(MAKE) -C security post-install
 

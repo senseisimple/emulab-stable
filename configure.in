@@ -108,6 +108,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	discvr/GNUmakefile \
+	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
