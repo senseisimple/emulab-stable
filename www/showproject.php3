@@ -169,8 +169,7 @@ if (mysql_num_rows($query_result)) {
 }
 
 echo "<p><center>
-       Do you want to create a group?
-       <A href='newgroup_form.php3?pid=$pid'>Yes</a>
+       <A href='newgroup_form.php3?pid=$pid'>Create</a> a new Group?
       </center>\n";
 
 if ($isadmin) {
