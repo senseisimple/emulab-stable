@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,6 +16,8 @@
 #
 # Configure variables
 #
+my $TBOPS = "@TBOPSEMAIL@";
+
 use lib "@prefix@/lib";
 use libdb;
 use power_rpc27;
@@ -149,6 +151,10 @@ foreach my $node (@machines) {
 	"where o.node_id='$node'");
     if ($result->num_rows() == 0) {
 	warn "No outlets table entry found for $node. Skipping...\n";
+	SENDMAIL($TBOPS,
+		 "No power outlet for $node",
+		 "Unable to power '$op' $node; no outlets table entry!",
+		 $TBOPS);
 	next;
     }
 
