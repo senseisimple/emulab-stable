@@ -2201,20 +2201,37 @@ exit 0;
 
 # getbandwidth(bw)
 # Returns the lowest ok bandwidth that is greater than or equal to
-# the one passed.
-sub getbandwidth {
-    my $targetbandwidth= $_[0];
-    my $bandwidth;
+# the one passed. Takes a virtual node, from which it grabs a type - only
+# consideres bandwidths on the node types the virtual node can be mapped to.
+# Very similar to requires_delay above
+sub getbandwidth($$) {
+    my ($node, $targetbw) = @_;
     my $best = 10000000000;
 
-    foreach my $itype (keys(%interface_types)) {
-	my $bandwidth = interfacespeed($itype);
+    my $node_type  = virtnodetype($node);
+    my $node_class = nodetypeclass($node_type);
     
-	if (($bandwidth >= $targetbandwidth) && ($bandwidth < $best)) {
-	    $best = $bandwidth;
+    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	  "getbandwidth(): $node - invalid type/class $node_type/$node_class!")
+	if (!exists($node_type_linkbw{$node_type}) &&
+	    ($node_class && !exists($node_type_linkbw{$node_class})));
+
+    foreach my $bw (keys(%{ $node_type_linkbw{$node_type} })) {
+	if (($bw >= $targetbw) && ($bw < $best)) {
+	    $best = $bw;
 	}
     }
+
+    if ($node_class) {
+	foreach my $bw (keys(%{ $node_type_linkbw{$node_class} })) {
+	    if (($bw >= $targetbw) && ($bw < $best)) {
+		$best = $bw;
+	    }
+	}
+    }
+
     return $best;
+
 }
 
 # getnodeport(s)
@@ -3438,7 +3455,8 @@ sub LoadVirtLans()
 		$portbw{$member} = $S100Mbs;
 	    }
 	} else {
-	    $portbw{$member} = &getbandwidth($bandwidth);
+	    my $node = (split(":",$member))[0];
+	    $portbw{$member} = &getbandwidth($node,$bandwidth);
 	}
 	
 	printdb "  portbw of $member = $portbw{$member}\n";
@@ -3775,8 +3793,8 @@ sub CreateTopFile()
 	    $rdelay = $rdelay0+$delay1;
 	    $rloss = 1-(1-$rloss0)*(1-$loss1);
 	    $rbw = &min($rbw0,$bw1);
-	    $bandwidth = &getbandwidth(&min($bw0,$rbw1));
-	    $rbandwidth = &getbandwidth(&min($rbw0,$bw1));
+	    $bandwidth = &getbandwidth($node0,&min($bw0,$rbw1));
+	    $rbandwidth = &getbandwidth($node1,&min($rbw0,$bw1));
 	    if (((($delay >= $delaythresh) ||
 		  (!$nobwshaping && (requires_delay($node0, $bw) ||
 				     requires_delay($node1, $bw))) ||
@@ -3852,8 +3870,8 @@ sub CreateTopFile()
 		# could not tell earlier if the link was going to get a real
 		# delay node or just a delaywithswitch.
 		#
-		$portbw{$nodeport0} = getbandwidth($bandwidth);
-		$portbw{$nodeport1} = getbandwidth($rbandwidth);
+		$portbw{$nodeport0} = getbandwidth($node0,$bandwidth);
+		$portbw{$nodeport1} = getbandwidth($node0,$rbandwidth);
 	    }
 	    else {
 		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
@@ -3891,9 +3909,9 @@ sub CreateTopFile()
 	    foreach $member (@members) {
 		($delay,$bw,$loss,
 		 $rdelay,$rbw,$rloss) = virtlandelayinfo($lan, $member);
-		$bandwidth = &getbandwidth($bw);
-		$rbandwidth = &getbandwidth($rbw);
 		($node) = (split(":",$member))[0];
+		$bandwidth = &getbandwidth($node,$bw);
+		$rbandwidth = &getbandwidth($node,$rbw);
                 # XXX The expression below should be modified for
                 # better bandwidth support.  Probably needs to happen
                 # post assign somehow.
