@@ -1,3 +1,83 @@
+ricci       2003/07/01 10:14:42 MDT
+
+  Modified files:
+    assign               anneal.cc anneal.h assign.cc 
+                         assign_todo.txt pclass.cc pclass.h 
+                         physical.h score.cc 
+  Log:
+  Give assign the ability to make dynamic pclasses. Here's how it works:
+  After building the set of pclasses normally, we make another pass
+  through the vnodes. The goal to create a pclass for each individual
+  node. We disable the node's 'own' pclass to begin with. Then, the
+  _first_ time it gets a vnode mapped to it, we remove it from the
+  'regular' pclass it belongs to, and enable it's own pclass. Then, if
+  it goes empty, we put it back in its regular pclass and disable it's
+  own.
+  
+  The point of this is to replace -p for use with multiplexed nodes.
+  Instead of disabling pclasses altogheter, which has serious
+  performance implications, we can instead be smart about which pnodes
+  remain equivalent (because nothing's been mapped to them), and which
+  are now different. The result is that on my test topoloy, the time to
+  get a good mapping has gone from over 3 minutes to about 6 seconds.
+  
+  This feature is enabled with the -d option, and the -P option is
+  pretty much mandatory when using it, since it greatly exacerbates the
+  problem of cruft in the ptop file.
+  
+  This satisfies #14 from the todo file:
+  14.  do dynamic pclasses
+  
+  Also bumped up the minimum neighborhood size from 500 to 1000. In some
+  tests I was doing, this resulted in better solutions.
+  
+ricci       2003/06/26 13:13:16 MDT
+
+  Modified files:
+    assign               anneal.cc anneal.h assign.cc 
+                         assign_internals.txt parse_ptop.cc 
+                         pclass.cc physical.h score.cc solution.cc 
+    tbsetup              assign_wrapper.in ptopgen.in 
+  Log:
+  Major changes to the way assign handles LAN nodes.
+  
+  LAN nodes are no longer treated specially. Instead, I've introduced
+  the idea of 'static' types (old-style types retroactively become
+  'dynamic' types). While a pnode can only satisfy one dynamic type at a
+  time, it can always satisfy its static types (assuming it has enough
+  capacity left.) Static types are flagged by prepending them with a '*'
+  in the ptop file. So, for example, you may give switches the
+  '*lan:10000' type so that they can satisfy virtual LAN nodes. Of
+  course, other pnodes can have this type too, so that we can get
+  'trivial LANs'.
+  
+  Actually, removing special treatment for LANs cleans up a lot of code.
+  However, it may have some negative impacts on solutions, since we're
+  not as smart about where to place LAN nodes as we used to be (they get
+  annealed along with everything else, and not migrated.) I haven't seen
+  any evidence of this yet, however.
+  
+  This leaves us with a single type of special pnode, a switch.
+  
+  Also added a new bit of syntax in ptop files - when '*' is given as a
+  the maxiumum load for a type, the node is allowed to take on an
+  infinite (well, actually, just a really big number of) vnodes of that
+  type.
+  
+  ptopgen was modified to always report switches as being capable of
+  hosting LANs, and assign_wrapper now understands direct links to LANs,
+  which is what we get when the LAN is hosted directly on a switch.
+  
+  Fixed a bug in scoring direct links, in which the penatly was being
+  added once when a direct link was mapped, but subtracted only once
+  when it was freed.
+  
+  Added a '-T' option for doing simple self-testing. When adding a node
+  to the solution, assign records the score, adds the node, removes it
+  again, and checks to make sure that the resulting score is the same as
+  the original score. The usefulness of this feature in debugging
+  scoring problems cannot be understated...
+
 stoller     2003/05/1 09:09:12 MDT
 	
   Modified files:
