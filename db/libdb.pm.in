@@ -70,7 +70,7 @@ use Exporter;
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
-	 TBSetSchedReload MapNodeOSID
+	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp
 	 );
 
 # Must come after package declaration!
@@ -740,6 +740,50 @@ sub SetExpState($$$)
 
     my $query_result =
 	DBQueryWarn("update experiments set state='$state' ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Lock Experiment.
+#
+# usage: TBLockExp(char *pid, char *eid)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBLockExp($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("update experiments set expt_locked=now() ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# UnLock Experiment.
+#
+# usage: TBUnLockExp(char *pid, char *eid)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBUnLockExp($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("update experiments set expt_locked=NULL ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
