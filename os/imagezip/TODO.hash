@@ -165,6 +165,26 @@ might well wind up in the delta.  So the process becomes:
 	   - blocks allocated in the sig, but not on the disk are NOT saved
 	   - for all others, we compare hashes
 
+Note that #3 is a simplification.  Since hashes in the signature file are
+computed over groups of blocks (up to 64KB, 128 blocks, currently), the
+overlap between a hashed range from the original image and allocated blocks
+on the current disk may not be exact.  That is, for every block in the
+original hash range, some of the corresponding blocks on the disk may no
+longer be allocated.  If fact, there could be as little as a single block
+left allocated on the disk for the original 128 block hash range.  So do
+we calculate and use the hash anyway, or do we ignore the hash and just
+save the currently allocated blocks in that range?  The latter is obviously
+faster, but may make the delta image larger than it needs to be.  The
+former takes longer (must compute the hash on the disk contents) but may
+enable us skip saving some blocks.  So what do we do?  It depends on how
+likely it is that computing/using the hash will pay off.  To pay off, it
+must be the case that blocks that were deallocated in the range in question
+must not have changed contents since the original image was loaded.  My
+gut feeling is that this will be the case quite often.  Neither FreeBSD
+or Linux zero blocks that get freed nor do they chain free blocks together
+using part of the block as a link field.  So I think still hashing the
+blocks might pay off, but we'll have to do some tests.
+
 Another issue is how does imagezip know how much of the file it should look
 at when creating a delta.  If a users only loads FreeBSD in partition 1,
 but then puts data in the other partitions, how do we know that we should
@@ -192,3 +212,119 @@ scan and create the image.  Again, if the user is made to specify what
 partitions should be examined when creating the delta image, this won't
 happen.
 
+3/7/05
+
+So here are some specifics on how the "merge" of the signature file hash
+ranges ("hrange") and the on-node computed disk ranges ("drange") works.
+hranges consist of a start block, end block (actually a size), and a hash
+value for that range.  dranges consist of a start block and end block
+(again, actually a size).
+
+    /*
+     * Nothing on the disk
+     */
+    if (no dranges)
+	quit;
+    /*
+     * We have no signature info to use, so just treat this like a normal
+     * imagezip.
+     */
+    if (no hranges)
+	use drange info;
+
+    drange = first element of dranges;
+    for (all hranges) {
+	/*
+	 * Any allocated range in the original file that is below our
+	 * first allocated range on the current disk can be ignored.
+	 * (The blocks must have been deallocated.)
+	 */
+	if (hrange.end <= drange.start)
+	    continue;
+
+	/*
+	 * Any allocated ranges on disk that are before the first
+	 * hash range are newly allocated, and must be put in the image.
+	 */
+	while (drange && drange.end <= hrange.start) {
+	    add drange to merged list;
+	    next drange;
+	}
+	if (!drange)
+	    break;
+
+	/*
+	 * Otherwise there is some overlap between the current drange
+	 * and hrange.  To simplfy things, we split dranges so they
+	 * align with hrange boundaries, and then treat the portion
+	 * outside the hrange accordingly.
+	 */
+	if (drange.start < hrange.start) {
+	    split drange at hrange.start value;
+	    add leading drange to merged list;
+	    trailing drange becomes current drange;
+	}
+	if (drange.end > hrange.end) {
+	    split drange at hrange.end value;
+	    leading drange becomes current drange;
+	}
+
+	/*
+	 * The crux of the biscuit: we have now isolated one or more
+	 * dranges that are "covered" by the current hrange.  Here we
+	 * might use the hash value associated with the hrange to
+	 * determine whether the corresponding disk contents have
+	 * changed.  If there is a single drange that exactly matches
+	 * the hrange, then we obviously do this.  But what if there
+	 * are gaps in the coverage, i.e., multiple non-adjacent
+	 * dranges covered by the hrange?  This implies that not all
+	 * blocks described by the original hash are still important
+	 * in the current image.  In fact there could be as little as
+	 * a single disk block still valid for a very large hrange.
+	 *
+	 * In this case we can either blindly include the dranges
+	 * in the merged list, or we can go ahead and do the hash
+	 * over the entire range on the chance that the blocks that
+	 * are no longer allocated (the "gaps" between dranges) have
+	 * not changed content and the hash will still match and thus
+	 * we can avoid including the dranges in the merged list.
+	 * The latter is valid, but is it likely to pay off?  We will
+	 * have to see.
+	 */
+	if (doinghash || drange == hrange) {
+	    hash disk contents indicated by hrange;
+	    if (hash == hrange.hash)
+		keepit = 0;
+	    else
+		keepit = 1;
+	} else
+	    keepit = 1;
+
+	while (drange && drange.start < hrange.end) {
+	    if (keepit)
+		add drange to merged list;
+	}
+	if (!drange)
+	    break;
+    }
+
+    /*
+     * Any remaining hranges can be ignored
+     */
+    while (hrange)
+        next hrange;
+    /*
+     * and any remaining dranges must be included
+     */
+    while (drange) {
+	add drange to merged list;
+	next drange;
+    }
+
+    /*
+     * Since we may have (unnecessarily) split entries in the drange
+     * list from which we are derived, we try to squeeze things back
+     * together.  Or maybe this is done automatically in the "add to
+     * merged list" function.
+     */
+    coalesce merged list;
