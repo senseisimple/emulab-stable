@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,15 +47,21 @@ LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
 LIBS     += `elvin-config --libs vin4c`
 
+SYSTEM	       := $(shell uname -s)
+
+ifeq ($(SYSTEM),FreeBSD)
 # FreeBSD
 CFLAGS	 += -DFREEBSD
 YCFLAGS	 += -I. -DUSEEVENTS -DFREEBSD
 LIBS	 += -ll -lcompat
+endif
 
+ifeq ($(SYSTEM),Linux)
 # Linux
-#CFLAGS	 += -DLINUX
-#YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
-#LIBS	 += -ll
+CFLAGS	 += -DLINUX
+YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
+LIBS	 += -ll
+endif
 
 LEX	 = flex -l
 
