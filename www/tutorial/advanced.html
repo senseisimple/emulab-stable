@@ -274,11 +274,22 @@ Some points worth mentioning:
 <ul>
 <li> There is no "global" clock; Emulab nodes are kept in sync with
      NTP, which does a very good job of keeping all of the clocks
-     within 0.3ms of each other.
+     within 1ms of each other.
+
+<li> The times "now" and "+seconds" are relative to the time at which
+     each event is submitted, not to each other or the start of the
+     experiment. 
 
 <li> The set of events you can send is currently limited to control of
      traffic generators and delay nodes. We expect to add more agents
      in the future.
+
+<li> Sending dynamic events that intermix with statically scheduled events
+     can result in unpredictable behavior if you are not careful.
+
+<li> Currently, the event list is replayed each time the experiment is
+     swapped in. This is almost certainly not the behaviour people
+     expect; we plan to change that very soon.
 
 <li> <tt>tevc</tt> does not provide any feedback; if you specify an
      object (say, cbr78 or link45) that is not a valid object in your
