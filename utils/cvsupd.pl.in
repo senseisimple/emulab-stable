@@ -1,0 +1,32 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+my $TB     = "/usr/testbed";
+my $cvsupd = "/usr/local/sbin/cvsupd";
+my $log    = "cvsupd.log";
+
+chdir("$TB/sup") or
+    die("Could no chdir to $TB/sup: $!\n");
+
+my (undef,undef,$unix_uid) = getpwnam("nobody") or
+    die("No such user nobody\n");
+my (undef,undef,$unix_gid) = getgrnam("nobody") or
+    die("No such group nobody\n");
+
+if (! -e $log) {
+    system("touch $log");
+    chown($unix_uid, $unix_gid, $log);
+}
+
+# Flip to the user/group nobody.
+$EGID = $GID = $unix_gid;
+$EUID = $UID = $unix_uid;
+
+exec "$cvsupd -l $log -C 100 -b .";
+die("*** $0:\n".
+    "    Could not exec cvsupd: $!\n");
