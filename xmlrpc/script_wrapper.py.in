@@ -164,10 +164,10 @@ def do_method(module, method, params):
         print ("error: bad reponse from host, " + e.args[0]
                + ", and handler: " + e.args[1])
         print "error: " + e.args[2]
-        return -1
+        return (-1, None)
     except xmlrpclib.Fault, e:
         print e.faultString
-        return -1
+        return (-1, None)
 
     #
     # Parse the Response, which is a Dictionary. See EmulabResponse in the
@@ -189,7 +189,7 @@ def do_method(module, method, params):
             rval = response["value"]
             pass
         pass
-    return rval, response
+    return (rval, response)
 
 #
 # node_admin
