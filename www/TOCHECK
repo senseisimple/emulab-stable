@@ -1,3 +1,21 @@
+Here is what I think we need to do:
+
+* Remove our reliance on register_globals. This is going to be a lot
+  of messy work since $foo now becomes $_GET['foo'] or $_POST['foo']
+  or $_SERVER['DOCUMENT_ROOT'] or $_COOKIE['authname'].
+
+* Chack all args before handing off to DB queries. We are not going to
+  use magic quotes, so before we can give a random argument (like uid)
+  to a DB query, we have to check it.
+
+  We should add some utility functions for this. Generally, all args
+  need better checking.
+
+* Anything that goes to the shell needs even tighter checks.
+
+* Kill all the stripslashes call on data that came from the DB since
+  they are not needed (no slashes stored in the DB). 
+
 apc.php
 approveproject.php3
 approveproject_form.php3
