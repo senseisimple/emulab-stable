@@ -59,7 +59,9 @@ $| = 1;
 my $restart = 0;
 my $force  = 0;
 my $errors = 0;
+
 my $retry  = 0;
+
 my $state;
 
 my $os_setup_pid;
@@ -405,6 +407,11 @@ sub doSwapout($) {
 	    $swapout_errors = 1;
 	}
 	TBDebugTimeStamp("nfree finished");
+
+	#
+	# Since this is an actual swapout, 
+	# reset our count of swap out nag emails sent.
+	#
 	DBQueryWarn("update experiments set swap_requests='' ".
 		    "where eid='$eid' and pid='$pid'");
     } else {
@@ -491,18 +498,7 @@ sub doSwapout($) {
     #
     
     print STDERR "Resetting DB.\n";
-    DBQueryWarn("DELETE from delays  where pid='$pid' and eid='$eid'")
-	or $swapout_errors++;
-    DBQueryWarn("DELETE from vlans   where pid='$pid' and eid='$eid'")
-	or $swapout_errors++;
-    DBQueryWarn("DELETE from tunnels where pid='$pid' and eid='$eid'")
-	or $swapout_errors++;
-    DBQueryWarn("DELETE from v2pmap  where pid='$pid' and eid='$eid'")
-	or $swapout_errors++;
-    DBQueryWarn("DELETE from ipport_ranges where pid='$pid' and eid='$eid'")
-	or $swapout_errors++;
-    DBQueryWarn("DELETE from linkdelays where pid='$pid' and eid='$eid'")
-	or $swapout_errors++;
+    TBExptRemovePhysicalState( $pid, $eid );
 
     return $swapout_errors;
 }

@@ -18,10 +18,11 @@ use English;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-force] pid eid nsfile\n";
+    print STDERR "Usage: $0 [-force | -m] pid eid nsfile\n";
     exit(-1);
 }
 my $force = 0;
+my $modify = 0;
 my $state;
 
 #
@@ -55,6 +56,11 @@ if ($ARGV[0] eq "-force") {
     $force = 1;
     shift;
 }
+if ($ARGV[0] eq "-m") {
+    $modify = 1;
+    shift;
+}
+
 if (@ARGV != 3) {
     usage();
 }
@@ -72,30 +78,61 @@ if (! ($state = ExpState($pid, $eid))) {
     die("*** $0:\n".
 	"    No such experiment $pid/$eid\n");
 }
-if (!$force && $state ne EXPTSTATE_NEW) {
-    die("*** $0:\n".
-	"    Experiment is not in the proper state: $state\n");
-}
-if (! SetExpState($pid, $eid, EXPTSTATE_PRERUN)) {
-    die("*** $0:\n".
-	"    Failed to set intermediate experiment state.\n");
+
+if (! $modify) {
+    if (!$force && $state ne EXPTSTATE_NEW) {
+	die("*** $0:\n".
+	    "    Experiment is not in the proper state: $state\n");
+    }
+    if (! SetExpState($pid, $eid, EXPTSTATE_PRERUN)) {
+	die("*** $0:\n".
+	    "    Failed to set intermediate experiment state.\n");
+    }
+} else {
+    if ($state ne EXPTSTATE_ACTIVE &&
+	$state ne EXPTSTATE_SWAPPED ) {
+	die("*** $0:\n".
+	    "    Experiment is in transition state: $state\n");
+    }
 }
 
 #
 # Cleanup if something goes wrong. 
 # 
 sub cleanup {
+    if ($modify) {
+	print STDERR "Recovering from errors.\n";
+        print "Restoring old experiment state ... " . TBTimeStamp() . "\n";
+	if (0 == TBExptRestoreVirtualState($pid, $eid, $$)) {
+	    print "Restoration done! " . TBTimeStamp() . "\n";
+	    return;
+	} else {
+	    print "Restoration failed... aborting! " . TBTimeStamp() . "\n";
+	    # Fall through to full cleanup...
+	}
+    }
+
     print STDERR "Cleaning up after errors.\n";
-    DBQueryWarn("DELETE from virt_nodes    where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from virt_lans     where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from virt_trafgens where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from virt_agents   where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from virt_routes   where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from nseconfigs    where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from eventlist     where pid='$pid' and eid='$eid'");
-    DBQueryWarn("DELETE from ipsubnets     where pid='$pid' and eid='$eid'");
+    print "Removing experiment state ... " . TBTimeStamp() . "\n";
+    TBExptRemoveVirtualState($pid, $eid );
+    print "Removal done! " . TBTimeStamp() . "\n";
+
+    #
+    # If modify fails, and recovery fails,
+    # going to "NEW" tells swapexp to fully terminate the experiment.
+    #
     SetExpState($pid, $eid, EXPTSTATE_NEW);
     system("prerender -r $pid $eid");
+}
+
+if ($modify) {
+    print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
+    if (TBExptBackupVirtualState($pid, $eid, $$)) {
+	die("*** $0:\n".
+	    "    Could not backup experiment state!\n");
+    }
+    TBExptRemoveVirtualState($pid, $eid);
+    print "Backup done! " . TBTimeStamp() . "\n";
 }
 
 # This setups virt_nodes, virt_names including all IP address calculation
@@ -124,10 +161,12 @@ if (system("staticroutes $pid $eid")) {
 TBDebugTimeStamp("routes finished");
 print "Static routing done! " . TBTimeStamp() . "\n";
 
-if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
-    cleanup();
-    die("*** $0:\n".
-	"    Failed to set experiment state!\n");
+if (! $modify) {
+    if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
+	cleanup();
+	die("*** $0:\n".
+	    "    Failed to set experiment state!\n");
+    }
 }
 
 TBDebugTimeStamp("tbprerun finished");

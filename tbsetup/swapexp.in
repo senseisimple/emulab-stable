@@ -10,11 +10,13 @@ use English;
 use Getopt::Std;
 
 #
-# This gets invoked from the Web interface. Swap an experiment in or out.
+# This gets invoked from the Web interface. 
+# Swap an experiment in, swap it out, restart or modify.
 #
 sub usage()
 {
-    print STDOUT "Usage: swapexp <-s in | out | restart> <pid> <eid>\n";
+    print STDOUT "Usage: swapexp <-s in | out | restart | modify> ". 
+	         "<pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
 my  $optlist = "s:";
@@ -72,20 +74,40 @@ umask(0002);
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 2) {
-    usage();
-}
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
+
 if (defined($options{"s"})) {
     $inout = $options{"s"};
 
-    if ($inout ne "out" && $inout ne "in" && $inout ne "restart") {
+    if ($inout ne "out" && 
+	$inout ne "in" && 
+	$inout ne "restart" && 
+	$inout ne "modify") {
 	usage();
     }
 }
 else {
     usage();
+}
+
+if (@ARGV != (($inout eq "modify") ? 3 : 2)) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+
+my $nsfile;
+
+if ($inout eq "modify") { 
+    $nsfile = $ARGV[2];
+
+    #
+    # Untaint nsfile argument; Allow slash.
+    #
+    if ($nsfile =~ /^([-\w.\/]+)$/) {
+	$nsfile = $1;
+    } else {
+	die("Tainted nsfile name: $nsfile");
+    }
 }
 
 #
@@ -124,13 +146,13 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 }
 
 #
-# Verify that this person is allowed to end the experiment.
+# Verify that this person can muck with the experiment.
 # Note that any script down the line has to do an admin check also. 
 #
 if ($UID && !TBAdmin($UID) &&
     !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
-	"    You do not have permission to swap this experiment!\n");
+	"    You do not have permission to swap or modify this experiment!\n");
 }
 
 #
@@ -175,11 +197,11 @@ if (defined($hashrow{'expt_locked'})) {
 #
 if ($isbatchexpt) {
     die("*** $0:\n".
-	"    Batch experiments cannot be swapped yet!");
+	"    Batch experiments cannot be swapped or modified yet!");
 }
 
 #
-# Okay, check state. We do not allow swapping to start when the
+# Okay, check state. We do not allow modification or swapping to start when the
 # experiment is in transition. A future task would be to allow this,
 # but for now the experiment must be in one of a few states to proceed
 #
@@ -205,6 +227,8 @@ if ($inout eq "restart" && $estate ne EXPTSTATE_ACTIVE) {
 	"    It appears that experiment $pid/$eid is not active!");
 }
 
+# if $inout eq "modify", either EXPTSTATE_ACTIVE -or- EXPTSTATE_SWAPPED is ok.
+
 #
 # Set the timestamp now, and unlock the experiments table.
 #
@@ -226,6 +250,9 @@ if ($inout eq "out") {
 }
 if ($inout eq "restart") {
     $action = "restarted";
+}
+if ($inout eq "modify") {
+    $action = "modified";
 }
 
 #
@@ -269,6 +296,15 @@ if ($inout ne "restart" && -e $repfile) {
 }
 
 #
+# Rerun tbprerun if modifying.
+#
+if ($inout eq "modify") {
+    if (system("$tbdir/tbprerun -m $pid $eid $nsfile") != 0) {
+	fatal("tbprerun failed!\n"); 
+    }
+}
+
+#
 # Sanity check states in case someone changes something.
 #
 if ($inout eq "out") {
@@ -294,8 +330,27 @@ elsif ($inout eq "in") {
     }
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+} 
+elsif ($inout eq "modify") {
+    #
+    # If experiment is currently swapped out, no need to do an update 
+    # after modifying it.
+    #
+    if ($estate eq EXPTSTATE_ACTIVE) {
+	print STDOUT "Running 'tbswap update' with arguments: $pid $eid\n";
+	if (system("$tbdir/tbswap update $pid $eid") != 0) {
+	    fatal("tbswap update failed!\n");
+	}
+
+	$estate = ExpState($pid, $eid);
+	if ($estate ne EXPTSTATE_ACTIVE) {
+	    fatal("Experiment is in the wrong state: $estate\n");
+	}
+	
+	system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+    }
 }
-else {
+else { # $inout eq "restart" assumed.
     print STDOUT "Running tbrestart with arguments: $pid $eid\n";
     if (system("$tbdir/tbrestart $pid $eid") != 0) {
 	fatal("tbrestart failed!\n");
@@ -329,6 +384,23 @@ if ($batch) {
 }
 
 #
+# HACK! if successful, put new NS file in DB.
+#
+
+if ($inout eq "modify") {
+    $nsdata_string = `cat $nsfile`;
+    if (defined($nsdata_string)) {
+	$nsdata_string = DBQuoteSpecial($nsdata_string);
+
+	DBQueryWarn("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
+	DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
+		    "VALUES('$pid', '$eid', $nsdata_string)");
+    } else {
+	print "Warning!! Couldn't read nsfile '$nsfile'!\n";
+    }
+}
+
+#
 # Clear the log file so the web page stops spewing. 
 #
 if (defined($logname)) {
@@ -358,6 +430,36 @@ sub fatal($)
     my($mesg) = $_[0];
     
     print STDOUT $mesg;
+
+    #
+    # if $hosed == 1, we entirely terminate the experiment.
+    #
+    my $hosed = 0;
+
+    # If we're doing a modify,
+    # and tbprerun sent the experiment to "NEW",
+    # we're hosed.
+    if ($inout eq "modify" && ExpState($pid,$eid) eq EXPTSTATE_NEW) {
+	$hosed = 1;
+    }
+
+    if ($hosed) { 
+	#
+	# Note: $estate is still set to the state which the experiment was in
+	# when we began.
+	#
+	if ($estate eq EXPTSTATE_ACTIVE) {
+	    print "Running 'tbswap out' with arguments: $pid $eid\n";
+	    if (system("$tbdir/tbswap out -force $pid $eid") != 0) {
+		print "tbswap out failed!\n";
+	    }
+	}
+	
+	print "Running tbend with arguments: -force $pid $eid\n";
+	if (system("$tbdir/tbend -force $pid $eid") != 0) {
+	    print "tbend failed!\n";
+	}
+    }
 
     #
     # Kill this for convenience later.
@@ -393,6 +495,19 @@ sub fatal($)
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
 	     "Cc:  $TBOPS",
 	     ($logname));
+
+    if ($hosed) {
+	#
+	# Copy off the workdir to the user directory, Then back up both of
+	# them for post-mortem debugging.
+	#
+	system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+	system("/bin/rm -rf  ${workdir}-failed");
+	system("/bin/mv -f   $workdir ${workdir}-failed");
+	system("/bin/rm -rf  ${userdir}-failed");
+	system("/bin/mv -f   $userdir ${userdir}-failed");
+	TBExptDestroy($pid, $eid);        
+    }
 
     exit(-1);
 }

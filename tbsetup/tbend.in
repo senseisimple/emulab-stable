@@ -84,26 +84,7 @@ if (! SetExpState($pid, $eid, EXPTSTATE_TERMINATING)) {
 }
 
 print "Clearing out virtual state.\n";
-DBQueryWarn("DELETE from virt_nodes where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from virt_lans  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from virt_trafgens  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from virt_agents  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from virt_routes  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from virt_vtypes  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from nseconfigs  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from eventlist  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from ipsubnets  where pid='$pid' and eid='$eid'") or
-    $errors++;
-DBQueryWarn("DELETE from ipport_ranges  where pid='$pid' and eid='$eid'") or
-    $errors++;
+$errors += TBExptRemoveVirtualState( $pid, $eid );
 
 print "Removing visualization data...\n";
 system("prerender -r -t $pid $eid");

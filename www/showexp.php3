@@ -92,7 +92,15 @@ if ($expstate) {
 		"swapexp.php3?inout=restart&pid=$exp_pid&eid=$exp_eid");
 	}
     }
+
+    if (ISADMIN($uid)) {
+	WRITESUBMENUBUTTON("Modify this Experiment",
+			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+    }
 }
+
+
+		       
 
 WRITESUBMENUBUTTON("Terminate this experiment",
 		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
