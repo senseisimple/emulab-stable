@@ -1,9 +1,10 @@
-There are a few things could/should be done to back configurations              before the Ciscos loose power.
+There are a few things could/should be done to back up configurations
+before the Ciscos lose power.
 
 NECESSARY:
 
 Save cisco2's MSFC (router) card's configuration. Unlike the switch
-configuration, this _does not_ happen automatically, so we could loose
+configuration, this _does not_ happen automatically, so we could lose
 configuration if we forget do do this.
 
 ----------------------------------------------------------------------
@@ -27,7 +28,7 @@ Router#
 OPTIONAL:
 
 To be safe, we can save backups of the switch and router configuration on the
-boss, saved via TFTP. Before doing this, make sure that
+boss node, saved via TFTP.  Before doing this, make sure that
 boss:/tftpboot/cisco-config and all of the files it contains are world-writable
 (and remove world-write permissions when you're done.) Files _must_ exist
 before you can upload via TFTP, so if you want to upload to a file that isn't
