@@ -84,8 +84,7 @@ foreach my $n (@node_names) {
   $dbh->query($cmd);
 
   # If the node has a reloads entry, change the reservation and start it
-  $cmd = "select node_id,partition,image_id,path from reloads where ".
-    "node_id='$n'";
+  $cmd = "select node_id,image_id from reloads where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
@@ -98,15 +97,15 @@ foreach my $n (@node_names) {
     while ( $i < $max  ) {
       $i++;
       @reload = $sth->fetchrow_array();
-      my ($node, $part, $image, $path) = @reload;
+      my ($node, $image) = @reload;
 
-      if (! defined($reloads{"$image $part $path"})) {
+      if (! defined($reloads{"$image"})) {
 	my @list = ($node);
-	$reloads{"$image $part $path"} = \@list;
+	$reloads{"$image"} = \@list;
       } else {
-	my @list = @{$reloads{"$image $part $path"}};
+	my @list = @{$reloads{"$image"}};
 	push(@list,$node);
-	$reloads{"$image $part $path"} = \@list;
+	$reloads{"$image"} = \@list;
       }
     }
   } else {
@@ -150,19 +149,9 @@ foreach my $n (@node_names) {
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
 
-  # Find out what the default OS should be.
-  $cmd = "select image_id from node_types left join nodes on ".
-      "node_types.type=nodes.type where nodes.node_id='$n'";
-  $sth = $dbh->query($cmd)
-    || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
-	&& $error++);
-  my @row= $sth->fetchrow_array();
-  my $defimageid = $row[0];
-
   # And clean out various tidbits from the nodes table.
   $cmd = "update nodes set def_boot_cmd_line='',def_boot_path='',".
-      "startupcmd='',rpms='',deltas='',def_boot_image_id='$defimageid' ".
-      "where node_id='$n'";
+      "startupcmd='',rpms='',deltas='' where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
