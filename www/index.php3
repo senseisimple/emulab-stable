@@ -97,7 +97,7 @@ if (isset($uid)) {
 
     if ($status == "active") {
         if ($admin) {
-            echo "<A href='approveproject_form.php3?$uid'>
+            echo "<A href='approveproject_list.php3?uid=$uid'>
                      New Project Approval</A><p>\n";
         }
         if ($trusted) {

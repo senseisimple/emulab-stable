@@ -10,50 +10,30 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = "";
-if (ereg("php3\?([[:alnum:]]+)", $REQUEST_URI, $Vals)) {
-    $uid=$Vals[1];
-    addslashes($uid);
-}
-else {
-    unset($uid);
-}
 LOGGEDINORDIE($uid);
-
-echo "<center><h1>Approve New Projects</h1></center>\n";
 
 #
 # Of course verify that this uid has admin privs!
 #
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT admin from users where uid='$uid' and admin='1'" );
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting admin status for $uid: $err\n", 1);
-}
-if (mysql_num_rows($query_result) == 0) {
+$isadmin = ISADMIN($uid);
+if (! $isadmin) {
     USERERROR("You do not have admin privledges to approve projects!", 1);
 }
 
+echo "<center><h1>Approve a Project</h1></center>\n";
+
 #
-# Look in the projects table to see which projects have not been approved.
-# Present a menu of options to either approve or deny the projects.
-# Approving a project implies approving the project leader. Denying a project
-# implies denying the project leader account, when there is just a single
-# project pending for that project leader. 
+# Check to make sure thats this is a valid PID.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * from projects where approved='0'");
-if (! $query_result) {
-    $err = mysql_error();
-    TBERROR("Database Error getting unapproved project list: $err\n", 1);
-}
+	"SELECT * FROM projects WHERE pid=\"$pid\"");
 if (mysql_num_rows($query_result) == 0) {
-    USERERROR("There are no projects to approve!", 1);
+  USERERROR("The project $pid is not a valid project.", 1);
 }
+$row = mysql_fetch_array($query_result);
 
-echo "For each project waiting to be approved, you may select on of the
-      following choices:
+
+echo "<center><h3>You have the following choices:</h3></center>
       <table align=center border=0>
         <tr>
             <td>Deny</td>
@@ -74,96 +54,177 @@ echo "For each project waiting to be approved, you may select on of the
         </tr>
 
         <tr>
+            <td>More Info</td>
+            <td>-</td>
+            <td>Ask for more info</td>
+        </tr>
+
+        <tr>
             <td>Postpone</td>
             <td>-</td>
             <td>Twiddle your thumbs some more</td>
         </tr>
       </table>\n";
 
-#
-# Now build a table with a bunch of selections. The thing to note about the
-# form inside this table is that the selection fields are constructed with
-# name= on the fly, from the uid of the user to be approved. In other words:
-#
-#             project   menu 
-#	name=testbed$$approval value=approve,deny,murder,postpone
-#
-# so that we can go through the entire list of post variables, looking
-# for these. The alternative is to work backwards, and I don't like that.
-# 
-echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
-       align='center'>\n";
+echo "<center>
+      <h3>Project Information</h3>
+      </center>
+      <table align=center border=1>\n";
 
+$proj_created	= $row[created];
+$proj_expires	= $row[expires];
+$proj_name	= $row[name];
+$proj_URL	= $row[URL];
+$proj_head_uid	= $row[head_uid];
+$proj_pcs       = $row[num_pcs];
+$proj_sharks    = $row[num_sharks];
+$proj_why       = $row[why];
+$control_node	= $row[control_node];
+
+#
+# Generate the table.
+# 
 echo "<tr>
-          <td rowspan=2>Project</td>
-          <td rowspan=2>User</td>
-          <td rowspan=2>Action</td>
-          <td>User Name</td>
-          <td>Title</td>
-          <td>User Affil</td>
-          <td>E-mail</td>
-      </tr>
-      <tr>
-          <td>Proj Name</td>
-          <td>URL</td>
-          <td>Proj Affil</td>
-          <td>Phone</td>
+          <td>Name: </td>
+          <td class=\"left\">$pid</td>
       </tr>\n";
 
-echo "<form action='approveproject.php3?$uid' method='post'>\n";
-
-while ($projectrow = mysql_fetch_array($query_result)) {
-    $pid      = $projectrow[pid];
-    $headuid  = $projectrow[head_uid];
-    $Purl     = $projectrow[URL];
-    $Pname    = $projectrow[name];
-    $Paffil   = $projectrow[affil];
-
-    $userinfo_result = mysql_db_query($TBDBNAME,
-	"SELECT * from users where uid=\"$headuid\"");
-
-    $row	= mysql_fetch_array($userinfo_result);
-    $name	= $row[usr_name];
-    $email	= $row[usr_email];
-    $title	= $row[usr_title];
-    $affil	= $row[usr_affil];
-    $addr	= $row[usr_addr];
-    $addr2	= $row[usr_addr2];
-    $city	= $row[usr_city];
-    $state	= $row[usr_state];
-    $zip	= $row[usr_zip];
-    $phone	= $row[usr_phone];
-
-    echo "<tr>
-              <td colspan=7> </td>
-          </tr>
-          <tr>
-              <td rowspan=2>
-                  <A href='showproject.php3?uid=$uid&pid=$pid'>$pid</A></td>
-              <td rowspan=2>$headuid</td>
-              <td rowspan=2>
-                  <select name=\"$pid\$\$approval\">
-                          <option value='postpone'>Postpone</option>
-                          <option value='approve'>Approve</option>
-                          <option value='deny'>Deny</option>
-                          <option value='destroy'>Destroy</option>
-                  </select>
-              </td>\n";
-
-    echo "    <td>$name</td>
-              <td>$title</td>
-              <td>$affil</td>
-              <td>$email</td>
-          </tr>\n";
-    echo "<tr>
-              <td>$Pname</td>
-              <td>$Purl</td>
-              <td>$Paffil</td>
-              <td>$phone</td>
-          </tr>\n";
-}
 echo "<tr>
-          <td align=center colspan=7>
+          <td>Long Name: </td>
+          <td class=\"left\">$proj_name</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Project Head: </td>
+          <td class=\"left\">$proj_head_uid</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>URL: </td>
+          <td class=\"left\">
+              <A href='$proj_URL'>$proj_URL</A></td>
+      </tr>\n";
+
+echo "<tr>
+          <td>#PCs: </td>
+          <td class=\"left\">$proj_pcs</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>#Sharks: </td>
+          <td class=\"left\">$proj_sharks</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Created: </td>
+          <td class=\"left\">$proj_created</td>
+      </tr>\n";
+
+echo "<tr>
+          <td colspan='2'>Why?</td>
+      </tr>\n";
+
+echo "<tr>
+          <td colspan='2' width=600>$proj_why</td>
+      </tr>\n";
+
+echo "</table>\n";
+
+
+$userinfo_result = mysql_db_query($TBDBNAME,
+	"SELECT * from users where uid=\"$proj_head_uid\"");
+
+$row	= mysql_fetch_array($userinfo_result);
+$usr_expires = $row[usr_expires];
+$usr_email   = $row[usr_email];
+$usr_addr    = $row[usr_addr];
+$usr_name    = $row[usr_name];
+$usr_phone   = $row[usr_phone];
+$usr_passwd  = $row[usr_pswd];
+$usr_title   = $row[usr_title];
+$usr_affil   = $row[usr_affil];
+
+echo "<center>
+      <h3>Project Leader Information</h3>
+      </center>
+      <table align=center border=1>\n";
+
+echo "<tr>
+          <td>Username:</td>
+          <td>$proj_head_uid</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Full Name:</td>
+          <td>$usr_name</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Email Address:</td>
+          <td>$usr_email</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Expiration date:</td>
+          <td>$usr_expires</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Mailing Address:</td>
+          <td>$usr_addr</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Phone #:</td>
+          <td>$usr_phone</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Title/Position:</td>
+          <td>$usr_title</td>
+     </tr>\n";
+
+echo "<tr>
+          <td>Institutional Affiliation:</td>
+          <td>$usr_affil</td>
+      </tr>\n";
+
+echo "</table>\n";
+
+#
+# Now put up the menu choice along with a text box for an email message.
+#
+echo "<center>
+      <h3>What would you like to do?</h3>
+      </center>
+      <table align=center border=1>
+      <form action='approveproject.php3?uid=$uid&pid=$pid' method='post'>\n";
+
+echo "<tr>
+          <td align=center>
+              <select name=approval>
+                      <option value='postpone'>Postpone</option>
+                      <option value='approve'>Approve</option>
+                      <option value='moreinfo'>More Info</option>
+                      <option value='deny'>Deny</option>
+                      <option value='destroy'>Destroy</option>
+              </select>
+          </td>
+       </tr>\n";
+
+
+echo "<tr>
+          <td>Use the text box to add a message to the email notification.</td>
+      </tr>\n";
+
+echo "<tr>
+         <td align=center class=left>
+             <textarea name=message rows=5 cols=60></textarea>
+         </td>
+      </tr>\n";
+
+echo "<tr>
+          <td align=center colspan=2>
               <b><input type='submit' value='Submit' name='OK'></td>
       </tr>
       </form>
@@ -171,4 +232,3 @@ echo "<tr>
 ?>
 </body>
 </html>
-
