@@ -1,0 +1,274 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# install-ops.sh - Script to do the initial install of an ops node
+#
+# The main things it does not do yet:
+# * Figure out where to put directories such as /users /proj - they must
+#   already exist
+# * Fill out mailing list files - presumably, it's easier to just get the
+#   user to edit them himself
+#
+
+#
+# Configure variables
+#
+my $PREFIX = '@prefix@';
+
+my @mailing_lists = ('@TBOPSEMAIL@','@TBLOGSEMAIL@','@TBWWWEMAIL@',
+    '@TBAPPROVALEMAIL@','@TBLOGSEMAIL@','@TBAUDITEMAIL@','@TBSTATEDEMAIL@',
+    '@TBTESTSUITEEMAIL@');
+
+my $OURDOMAIN = '@OURDOMAIN@';
+
+my $USERNODE = '@USERNODE@';
+my $FSNODE = '@FSNODE@';
+my $BOSSNODE = '@BOSSNODE@';
+
+use English;
+
+#
+# Make sure they know what they're getting into...
+#
+warn "WARNING: This script is ONLY intended to be run on a machine that is\n";
+warn "being set up as a dedicated ops node. Continue? [y/N]\n";
+my $response = <>;
+die "Installation aborted!\n" unless ($response =~ /^y/i);
+
+if ($UID != 0) {
+    die "This script must be run as root.\n";
+}
+
+#
+# Create the tbadmin group
+#
+print "Creating tbadmin group ...\n";
+
+#
+# We don't want to fail if pw fails - we want to be able to run this script
+# mutliple times
+#
+system "/usr/sbin/pw groupadd tbadmin -g 101 -q";
+
+#
+# Make sure that they have all the proper directories created, and chmod 'em
+# to the proper thing.
+#
+print "Setting up directories ...\n";
+my @testbeddirs = ($PREFIX,"/users","/proj","/groups");
+foreach my $dir (@testbeddirs) {
+    if (-d $dir) {
+	system "/usr/bin/chgrp tbadmin $dir" and
+	    die "Unable to chgrp $dir!\n";
+	chmod 0775, $dir or die "Unable to chmod $dir : $!\n";
+    } else {
+	die "ERROR - Directory $dir has not yet been created - please see\n",
+	    "Step 0 in doc/setup-ops.txt\n";
+    }
+}
+
+#
+# Add stuff to /etc/rc.conf
+#
+print "Editing /etc/rc.conf ... \n";
+open(RC,"+</etc/rc.conf") or die "Unable to open /etc/rc.conf: $!\n";
+
+#
+# See if we've already done this
+#
+if (grep /testbed installation/,<RC>) {
+    print "    Already done, skipping\n";
+} else {
+    print RC "\n# The following lines were added by the testbed installation ".
+    	"process\n";
+    print RC "sendmail_enable=\"YES\"\n";
+    print RC "nfs_server_enable=\"YES\"\n";
+    print RC "nfs_server_flags=\"-u -t -n 16\"\n";
+    print RC "syslogd_flags=\"\"\n";
+    print RC "# End of testbed section\n";
+}
+close RC;
+
+#
+# Set up sendmail
+#
+print "Setting up sendmail ...\n";
+
+#
+# Tell sendmail which hosts it's supposed to receive mail for
+#
+my $local_hostnames = "/etc/mail/local-host-names";
+print "    Setting up $local_hostnames ...\n";
+if (-e $local_hostnames) {
+    print "        $local_hostnames already exists, skipping\n";
+} else {
+    open(LHN,">$local_hostnames") or die "Unable to open $local_hostnames : $!\n";
+    my @hostnames = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
+    print LHN map "$_\n",@hostnames;
+    close LHN;
+}
+
+#
+# Create the directory for auto-generated lists
+#
+my $lists_dir = "/etc/mail/lists";
+print "    Creating $lists_dir ...\n";
+if (-d $lists_dir) {
+    print "        $lists_dir already exists, skipping\n";
+} else {
+    mkdir($lists_dir,0755) or die "Unable to make $lists_dir : $!\n";
+}
+
+#
+# Find lists that are to be hosted on this machine - put them in the aliases
+# file, and make a file to put the addresses in
+#
+print "    Creating mailing lists ...";
+@mailing_lists = grep /\@$OURDOMAIN$/, @mailing_lists;
+open(MA,">>/etc/mail/aliases") or die "Unable to open /etc/mail/aliases: $!\n";
+foreach $list (@mailing_lists) {
+    $list =~ /^([\w-]+)\@/;
+    my $list_name = $1;
+    if (!$list_name) {
+	die "Malformed email address: $list\n";
+    }
+    if (-e "$lists_dir/$list_name") {
+	next;
+    }
+    system "touch $lists_dir/$list_name" and die
+	"Unable to create $lists_dir/$list_name";
+    print MA "$list_name:\t:include:$lists_dir/$list_name\n";
+}
+close MA;
+
+if (@mailing_lists) {
+    print "    Running newaliases ...\n";
+    system "newaliases" and die "Error running newaliases!\n";
+}
+
+#
+# Set up exports
+#
+print "Creating /etc/exports.head ...\n";
+if (-e "/etc/exports.head") {
+    print "    Already done, skipping\n";
+} else {
+    #
+    # Figure out which of these directories are on the same
+    # filesystems
+    #
+    my @dirs = ('/users','/groups','/proj','/var');
+    @dirs = map {`realpath $_`} @dirs;
+    chomp @dirs;
+    my %filesystems;
+    foreach my $dir (@dirs) {
+	my ($dev,@junk) = stat $dir;
+	push @{$filesystems{$dev}}, $dir;
+    }
+    
+    #
+    # Now, make the exports entries
+    #
+    open(EX,">>/etc/exports.head") or die
+	"Unable to open /etc/exports.head: $!\n";
+    foreach my $key (keys %filesystems) {
+	print EX join(" ",@{$filesystems{$key}}), "\t$BOSSNODE -alldirs -maproot=root\n";
+    }
+    close EX;
+    system "cp /etc/exports.head /etc/exports" and die
+    	"Unable to copy /etc/exports.head to /etc/exports\n";
+}
+
+#
+# Set up syslog
+#
+print "Setting up syslog ...\n";
+print "    Editing /etc/syslog.conf\n";
+open(SC,"+</etc/syslog.conf") or die "Unable to open /etc/syslog.conf: $!\n";
+#
+# See if we've already done this
+#
+my @sc = <SC>;
+if (grep /testbed installation/, @sc) {
+    print "        Already done, skipping\n";
+} else {
+    # Make sure we can find what we're looking for before we clobber
+    # the file!
+    if (scalar(grep(/^cron/, @sc)) != 1) {
+	die "Unable to find marker in /etc/syslog.conf!\n";
+    }
+    # Clobber and re-write
+    seek(SC,0,0);
+    truncate(SC,0);
+
+    #
+    # Find the ftp line, after which we place our auth.info line
+    #
+    foreach my $line (@sc) {
+	print SC $line;
+	if ($line =~ /^cron/) {
+	    print SC "# The following line was added by the testbed " .
+		"installation process\n";
+	    print SC "auth.info\t\t\t\t\t/var/log/logins\n";
+	}
+    }
+
+    #
+    # Put a few more lines at the end
+    #
+    print SC "# The following line was added by the testbed installation ".
+	"process\n";
+    print SC "!capture\n";
+    print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
+    print SC "!mountd\n";
+    print SC "*.*\t\t\t\t\t\t/var/log/mountd.log\n";
+}
+close SC;
+
+my $tiplog_dir = "/var/log/tiplogs";
+print "    Creating $tiplog_dir ...\n";
+if (-d $tiplog_dir) {
+    print "        $tiplog_dir already exists, skipping\n";
+} else {
+    mkdir($tiplog_dir,0755) or die "Unable to make $tiplog_dir : $!\n";
+}
+
+print "    Creatings logs ...\n";
+my @logfiles = ("/var/log/logins","/var/log/tiplogs/capture.log",
+    "/var/log/mountd.log");
+foreach my $logfile (@logfiles) {
+    system "touch $logfile" and die "Unable to create $logfile!\n";
+    chmod 0640, $logfile or die "Unable to change permissions on $logfile!\n";
+}
+
+print "    Editing /etc/newsyslog.conf ...\n";
+open(NS,"+</etc/newsyslog.conf") or die "Unable to open /etc/newsyslog.conf: $!\n";
+#
+# See if we've already done this
+#
+if (grep /testbed installation/,<NS>) {
+    print "        Already done, skipping\n";
+} else {
+    print NS "\n# The following lines were added by the testbed installation ".
+    	"process\n";
+    print NS "/var/log/logins\t\t\t\t640  7     200 *      Z\n";
+    print NS "/var/log/mountd.log\t\t\t640  5     200 *      Z\n";
+    print NS "/var/log/tiplogs/capture.log\t\t644  7     *    168   Z\n";
+}
+close NS;
+
+print "----------------------------------------------------------------------\n";
+print "Installation completed succesfully!\n";
+print "Please reboot this machine before proceeding with boss setup\n";
+if (@mailing_lists) {
+    print "Local mailing lists have been created, with no members, in\n";
+    print "/etc/mail/lists/ . Please add members to the following lists:\n";
+    print map "$_\n", @mailing_lists;
+}
+exit 0;

@@ -400,7 +400,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tools/pcapper/GNUmakefile \
 	$eventfiles \
 	$winfiles \
-	apache/GNUmakefile apache/apache.conf "
+	apache/GNUmakefile apache/apache.conf \
+	install/ops-install "
 
 #
 # Do this for easy distclean.
