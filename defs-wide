@@ -1,0 +1,25 @@
+#
+# This is the defaults definitions file for configure.
+# See doc/setup.txt for an explanation of these variables.
+#
+# Use the --with-TBDEFS=filename to specify your own file.
+# If you add a variable, be sure to go and update configure.in.
+#
+TBDBNAME=tbdb
+WWWDEFS=wide
+TBADMINGROUP=tbadmin
+TBOPSEMAIL=widetestbed-ops@flux.cs.utah.edu
+TBLOGSEMAIL=widetestbed-logs@flux.cs.utah.edu
+TBAUDITEMAIL=widetestbed-audit@flux.cs.utah.edu
+TBACTIVEARCHIVE=testbed-active-users-archive@flux.cs.utah.edu
+TBUSERSARCHIVE=testbed-users-archive@flux.cs.utah.edu
+IPBASE=192.168
+DELAYCAPACITY=2
+BOSSNODE=boss.wide.emulab.net
+USERNODE=boss.wide.emulab.net
+FSNODE=fs.wide.emulab.net
+OURDOMAIN=wide.emulab.net
+FSDIR_GROUPS=/z/groups
+FSDIR_PROJ=/z/proj
+FSDIR_USERS=/z/users
+UNIFIED_BOSS_AND_OPS=1
