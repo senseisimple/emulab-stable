@@ -24,3 +24,11 @@ INSERT INTO sitevariables VALUES ('plab/load_metric',NULL,'load_fifteen','GMOND 
 INSERT INTO sitevariables VALUES ('plab/max_load',NULL,'5.0','Load at which to stop admitting jobs (0==admit nothing, 1000==admit all)');
 INSERT INTO sitevariables VALUES ('plab/min_disk',NULL,'10.0','Minimum disk space free at which to stop admitting jobs (0==admit all, 100==admit none)');
 INSERT INTO sitevariables VALUES ('plab/stale_age',NULL,'60','Age in minutes at which to consider site data stale and thus node down (0==always use data)');
+INSERT INTO sitevariables VALUES ('watchdog/interval',NULL,'60','Interval in minutes between checks for changes in timeout values (0==never check)');
+INSERT INTO sitevariables VALUES ('watchdog/ntpdrift',NULL,'240','Interval in minutes between reporting back NTP drift changes (0==never report)');
+INSERT INTO sitevariables VALUES ('watchdog/cvsup',NULL,'720','Interval in minutes between remote node checks for software updates (0==never check)');
+INSERT INTO sitevariables VALUES ('watchdog/isalive/local',NULL,'3','Interval in minutes between local node status reports (0==never report)');
+INSERT INTO sitevariables VALUES ('watchdog/isalive/vnode',NULL,'10','Interval in minutes between virtual node status reports (0==never report)');
+INSERT INTO sitevariables VALUES ('watchdog/isalive/plab',NULL,'10','Interval in minutes between planetlab node status reports (0==never report)');
+INSERT INTO sitevariables VALUES ('watchdog/isalive/wa',NULL,'1','Interval in minutes between widearea node status reports (0==never report)');
+INSERT INTO sitevariables VALUES ('watchdog/isalive/dead_time',NULL,'120','Time, in minutes, after which to consider a node dead if it has not checked in via tha watchdog');
