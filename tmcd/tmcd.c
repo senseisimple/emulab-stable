@@ -183,7 +183,6 @@ COMMAND_PROTOTYPE(doaccounts);
 COMMAND_PROTOTYPE(dodelay);
 COMMAND_PROTOTYPE(dolinkdelay);
 COMMAND_PROTOTYPE(dohosts);
-COMMAND_PROTOTYPE(dohostsV2);
 COMMAND_PROTOTYPE(dorpms);
 COMMAND_PROTOTYPE(dodeltas);
 COMMAND_PROTOTYPE(dotarballs);
@@ -254,8 +253,7 @@ struct command {
 	{ "accounts",	  FULLCONFIG_ALL,  0, doaccounts },
 	{ "delay",	  FULLCONFIG_ALL,  0, dodelay },
 	{ "linkdelay",	  FULLCONFIG_ALL,  0, dolinkdelay },
-	{ "hostnamesV2",  FULLCONFIG_NONE, 0, dohostsV2 },   /* Will go away */
-	{ "hostnames",	  FULLCONFIG_ALL,  0, dohosts },
+	{ "hostnames",	  FULLCONFIG_NONE, 0, dohosts },
 	{ "rpms",	  FULLCONFIG_ALL,  0, dorpms },
 	{ "deltas",	  FULLCONFIG_NONE, 0, dodeltas },
 	{ "tarballs",	  FULLCONFIG_ALL,  0, dotarballs },
@@ -2090,17 +2088,6 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	mysql_free_result(res);
 
 	return 0;
-}
-
-/*
- * Return host table information.
- */
-COMMAND_PROTOTYPE(dohostsV2)
-{
-	/*
-	 * This will go away. Ignore version and assume latest.
-	 */
-	return(dohosts(sock, reqp, rdata, tcp, CURRENT_VERSION));
 }
 
 COMMAND_PROTOTYPE(dohosts)
