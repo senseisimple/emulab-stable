@@ -32,6 +32,8 @@ my $USERNODE = '@USERNODE@';
 my $FSNODE =   '@FSNODE@';
 my $BOSSNODE = '@BOSSNODE@';
 
+my $LOGFACIL = '@TBLOGFACIL@';
+
 #
 # Allow this to work if the library is left in the source directory
 #
@@ -250,6 +252,9 @@ Phase "syslog", "Setting up syslog", sub {
 	open(SC,"+<$SYSLOG_CONF") or
 	    PhaseFail("Unable to open $SYSLOG_CONF : $!");
 	my @sc = <SC>;
+	if (scalar(grep(/$LOGFACIL/, @sc)) != 0) {
+	    PhaseFail("Testbed chosen facility $LOGFACIL already in use in /etc/syslog.conf!");
+	}
 	if (scalar(grep(/^cron/, @sc)) != 1) {
 	    PhaseFail("Unable to find marker in /etc/syslog.conf!");
 	}
@@ -260,11 +265,19 @@ Phase "syslog", "Setting up syslog", sub {
 	seek(SC,0,0);
 	truncate(SC,0);
 
-	#
-	# Find the cron line, after which we place our auth.info line
-	#
 	foreach my $line (@sc) {
+	    #
+	    # Modify the /var/log/messages line to exclude testbed stuff
+	    #
+	    my $pat = q(\s+/var/log/messages);
+	    if ($line =~ /^[^#].*$pat/) {
+		$line =~ s/($pat)/\;$LOGFACIL.none$1/;
+	    }
 	    print SC $line;
+
+	    #
+	    # Find the cron line, after which we place our auth.info line
+	    #
 	    if ($line =~ /^cron/) {
 		print SC "# " . MAGIC_TESTBED_START . "\n";
 		print SC "auth.info\t\t\t\t\t/var/log/logins\n";

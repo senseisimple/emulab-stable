@@ -108,8 +108,9 @@ my @MOUNTPOINTS = ("$PREFIX/usersvar", "$PREFIX/opsdir",
 
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
-    "$LOGDIR/frisbeed.log", "$LOGDIR/frisbee.log", "$LOGDIR/tevd.log",
-    "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log");
+    "$LOGDIR/frisbeed.log", "$LOGDIR/tevd.log", "$LOGDIR/proxydhcp.log",
+    "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
+    "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log");
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
     "CISCO-PRIVATE-VLAN-MIB", "CISCO-STACK-MIB", "CISCO-VLAN-MEMBERSHIP-MIB");
@@ -267,19 +268,42 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 Phase "syslog", "Setting up syslog", sub {
     Phase "sysconf", "Editing $SYSLOG_CONF", sub {
 	DoneIfEdited($SYSLOG_CONF);
+
+	#
+	# Modify the /var/log/messages line to exclude testbed stuff
+	#
+	open(SC,"+<$SYSLOG_CONF") or
+	    PhaseFail("Unable to open $SYSLOG_CONF : $!");
+	my @sc = <SC>;
+	if (scalar(grep(/$LOGFACIL/, @sc)) != 0) {
+	    PhaseFail("Testbed chosen facility $LOGFACIL already in use in /etc/syslog.conf!");
+	}
+	seek(SC,0,0);
+	truncate(SC,0);
+	foreach my $line (@sc) {
+	    my $pat = q(\s+/var/log/messages);
+	    if ($line =~ /^[^#].*$pat/) {
+		$line =~ s/($pat)/\;$LOGFACIL.none$1/;
+	    }
+	    print SC $line;
+	}
+	close(SC);
+
 	AppendToFileFatal($SYSLOG_CONF,
 	    "!bootinfo",  "*.*\t\t\t\t\t\t$LOGDIR/bootinfo.log",
 	    "!tmcd",      "*.*\t\t\t\t\t\t$LOGDIR/tmcd.log",
 	    "!capture",   "*.*\t\t\t\t\t\t$LOGDIR/capture.log",
 	    "!dhcpd",     "*.*\t\t\t\t\t\t$LOGDIR/dhcpd.log",
+	    "!proxydhcpd","*.*\t\t\t\t\t\t$LOGDIR/proxydhcpd.log",
+	    "!tftpd",     "*.*\t\t\t\t\t\t$LOGDIR/tftpd.log",
 	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
 	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
-	    "!frisbee",   "*.*\t\t\t\t\t\t$LOGDIR/frisbee.log",
 	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
 	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
 	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
 	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
 	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
+	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log");
     };
 
