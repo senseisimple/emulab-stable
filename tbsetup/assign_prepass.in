@@ -28,6 +28,7 @@ if (@ARGV < 2) {
     die "Usage: $0 [assign args] ptopfile topfile\n";
 }
 my $topfile = pop @ARGV;
+my $ptopfile = $ARGV[$#ARGV];
 
 #
 # Okay, this is absolutely terrible - look for our own arguments
@@ -60,6 +61,15 @@ if ($topfile =~ /(.*).top$/) {
 # Read in and coarsen the virtual graph
 #
 my ($realnodes, $reallinks) = parse_top($topfile);
+
+#
+# Get some information about the physical graph
+#
+my ($colocate,$addfeatures,$trivialbw) = parse_ptop($ptopfile);
+%::colocate = %$colocate;
+%::additive_features = %$addfeatures;
+%::trivialbw = %$trivialbw;
+
 #my $newgraph = combine_lans($realnodes);
 #my $newgraph = do_metis($realnodes);
 my $newgraph = factor_out_fixednodes($realnodes,\&do_metis);
@@ -264,6 +274,124 @@ sub generate_topfile($;$) {
     
 
     return @topfile;
+}
+
+#
+# Parse up a ptop file to find out what the resources available on various
+# nodes are. Takes a filename, and returns three hash references.
+# * A hash, indexed by type, of colocation factors
+# * A hash of hash refs, indexed by type and feature name, of additive feature
+#   values
+# * A hash, indexed by type, of trivial bandwidths
+#
+sub parse_ptop($) {
+    my ($filename) = @_;
+
+    open(PTOP,"<$filename") or die "Unable to open $filename for reading\n";
+
+    #
+    # We want to find:
+    # The minimum packing factor for each type
+    # The minimum value for each additive feature, per type
+    # The minimum value of the trivial bandwidth for each type
+    #
+    my %typecounts = ();
+    my %addfeatures = ();
+    my %trivialbw = ();
+
+    while (my $line = <PTOP>) {
+	chomp $line;
+	my @tokens = split /\s+/,$line;
+	next unless (@tokens); # Skip blank lines
+	SWITCH: for (shift @tokens) {
+	    /^node$/ && do {
+		my $name = shift @tokens;
+		my @types;
+		while (my $type = shift @tokens) {
+		    #
+		    # First, handle the types
+		    #
+		    last if ($type eq "-");
+		    my ($typename, $count) = split /:/, $type;
+
+		    # Handle types with no count or an 'infinite' count
+		    if (!$count) {
+			$count = 1;
+		    }
+		    if ($count eq "*") {
+			$count = 65535;
+		    }
+
+		    push @types, $typename;
+
+		    # Record this count if it's the first or the lowest seen so
+		    # far
+		    if ($typecounts{$typename}) {
+			if ($count < $typecounts{$typename}) {
+			    $typecounts{$typename} = $count;
+			}
+		    } else {
+			$typecounts{$typename} = $count;
+		    }
+		}
+		while (my $feature = shift @tokens) {
+		    #
+		    # Next handle features
+		    #
+		    last if ($feature eq "-");
+
+		    # Additive features only
+		    if ($feature =~ /^\?\+/) {
+			my ($name, $value) = split /:/, $feature;
+			foreach my $type (@types) {
+			    # Apply to all types
+			    if ($addfeatures{$type}) {
+				if ($addfeatures{$type}{$name}) {
+				    if ($value < $addfeatures{$type}{$name}) {
+					$addfeatures{$type}{$name} = $value;
+				    }
+				} else {
+				    $addfeatures{$type}{$name} = $value;
+				}
+			    } else {
+				$addfeatures{$type} = {$name => $value};
+			    }
+			}
+		    }
+		}
+		while (my $flag = shift @tokens) {
+		    #
+		    # Next, handle flags - trivial bandwidth is the only one we
+		    # care about for now
+		    #
+		    if ($flag =~ /^trivial_bw/) {
+			my ($name, $value) = split /:/, $flag;
+			foreach my $type (@types) {
+			    if ($trivialbw{$type}) {
+				if ($value < $trivialbw{$type}) {
+				    $trivialbw{$type} = $value;
+				}
+			    } else {
+				$trivialbw{$type} = $value;
+			    }
+			}
+		    }
+		}
+		last;
+	    };
+	    /^link$/ && do {
+		#
+		# May want to grab out bandwidth some day, but right now,
+		# nothing we really need to do
+		#
+		my ($name, $src, $dst, $bw, $delay, $plr, $type) = @tokens;
+		last;
+	    };
+	    die "Bad line: $line\n";
+	}
+    }
+
+    return (\%typecounts,\%addfeatures,\%trivialbw);
 }
 
 #
@@ -787,29 +915,6 @@ sub make_conglomerates(@) {
 sub node_fits_in_conglomerate($$) {
     my ($node, $conglomerate) = @_;
 
-    #
-    # XXX - These need to come from parsing the ptop file!
-    #
-    my %colocate = (
-	'pcvm' => 10,
-	'pcvm850' => 20,
-	'pcvm600' => 10,
-	'pc' => 1,
-	'delay' => 2,
-	'pc850' => 1,
-	'pc600' => 1,
-	'lan'   => 100,
-	'sim'	=> 1000
-    );
-
-    my %additive_features = (
-	'?+ram'        => 512,
-	'?+cpu'        => 850,
-	'?virtpercent' => 100
-    );
-
-    my $max_self_link_bandwidth = 400000;
-
     # We can conglomerate nodes that are:
     # 1) Not fixed
     # 2) One is fixed, but the other is not
@@ -819,15 +924,17 @@ sub node_fits_in_conglomerate($$) {
 	return 0;
     }
 
+    my $type = $node->{'type'};
+
     # Can't conglomerate nodes of different types
-    if ($node->{'type'} ne $conglomerate->{'type'}) {
+    if ($type ne $conglomerate->{'type'}) {
 	return 0;
     }
 
     #
     # Can't go over the colocate factor
     #
-    my $colocate = $colocate{$node->{'type'}};
+    my $colocate = $::colocate{$type};
     if (!$colocate) {
 	die "Don't know colocate factor for $node->{type}\n";
     }
@@ -850,8 +957,9 @@ sub node_fits_in_conglomerate($$) {
 		each %{$node->{'desires'}}) {
 	next unless exists $conglomerate->{'desires'}{$name};
 	my $old_weight = $conglomerate->{'desires'}{$name};
-	if (exists $additive_features{$name} && 
-	    (($old_weight + $new_weight) > $additive_features{$name})) {
+	if (exists $::additive_features{$type} &&
+	    exists $::additive_features{$type}{$name} &&
+	    (($old_weight + $new_weight) > $::additive_features{$type}{$name})) {
 		return 0;
 	}
     }
@@ -875,7 +983,7 @@ sub node_fits_in_conglomerate($$) {
 	}
     }
 
-    if ($self_link_bandwidth > $max_self_link_bandwidth) {
+    if ($::trivialbw{$type} && $self_link_bandwidth > $::trivialbw{$type}) {
 	return 0;
     }
 
