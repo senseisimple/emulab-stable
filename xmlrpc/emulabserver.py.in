@@ -21,6 +21,7 @@ import exceptions
 import xmlrpclib
 import signal
 import types
+import datetime
 sys.path.append("@prefix@/lib")
 from libdb        import *
 from libtestbed   import SENDMAIL, TBOPS
@@ -1857,6 +1858,10 @@ class experiment:
             if val == None:
                 res[0][key] = ""
                 pass
+            elif isinstance(val, datetime.datetime):
+                res[0][key] = xmlrpclib.DateTime(
+                    time.strptime(str(val), "%Y-%m-%d %H:%M:%S"))
+                pass
             pass
 
         result   = {}
@@ -1885,6 +1890,10 @@ class experiment:
                     for key2, val2 in row.items():
                         if val2 == None:
                             row[key2] = ""
+                            pass
+                        elif isinstance(val2, datetime.datetime):
+                            row[key2] = xmlrpclib.DateTime(
+                                time.strptime(str(val2), "%Y-%m-%d %H:%M:%S"))
                             pass
                         pass
 
