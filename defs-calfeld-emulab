@@ -5,11 +5,11 @@
 # be sure to go and update configure.in.
 #
 TBDBNAME=tbdb
-TBOPSEMAIL=calfeld@flux.cs.utah.edu
-TBLOGSEMAIL=calfeld@flux.cs.utah.edu
-TBWWWEMAIL=calfeld@flux.cs.utah.edu
-TBAPPROVALEMAIL=calfeld@flux.cs.utah.edu
-TBAUDITEMAIL=calfeld@flux.cs.utah.edu
+TBOPSEMAIL=calfeld@flux.utah.edu
+TBLOGSEMAIL=calfeld@flux.utah.edu
+TBWWWEMAIL=calfeld@flux.utah.edu
+TBAPPROVALEMAIL=calfeld@flux.utah.edu
+TBAUDITEMAIL=calfeld@flux.utah.edu
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
@@ -18,8 +18,8 @@ OURDOMAIN=emulab.net
 FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
-TBSTATEDEMAIL=calfeld@flux.cs.utah.edu
-TBTESTSUITEEMAIL=calfeld@flux.cs.utah.edu
+TBSTATEDEMAIL=calfeld@flux.utah.edu
+TBTESTSUITEEMAIL=calfeld@flux.utah.edu
 WWWHOST=www.emulab.net
 THISHOMEBASE=Emulab.Net
 FS_WITH_QUOTAS="/q /users"
