@@ -112,6 +112,13 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
 	"    You do not have permission to create experiments in $pid/$gid\n");
 }
 
+# Must do this before lock tables!
+# idleswap is in minutes, threshold is in hours
+$idleswap_time = 60 * TBGetSiteVar("idle/threshold");
+# XXX : Remove this and the idle parts of the insert below when we get
+# the new form committed, and they get filled in according to what the
+# expt creator requested.
+
 #
 # Create an experiment record. The pid/eid has to be unique, so lock the
 # table for the check/insert.
@@ -134,11 +141,12 @@ if ($query_result->numrows) {
 # will recognize it. 
 #
 if (! DBQueryWarn("INSERT INTO experiments ".
-		  "(eid, pid, gid, expt_created, expt_expires, expt_name, ".
-		  " expt_head_uid,expt_swap_uid, state, priority, swappable) ".
+		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
+		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
+		  " idleswap, idleswap_timeout) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', 'new', $priority, ".
-		  "$swappable)")) {
+		  "$swappable, 1, '$idleswap_time')")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
