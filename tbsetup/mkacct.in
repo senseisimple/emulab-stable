@@ -131,10 +131,9 @@ my $SSHDIR  = "$HOMEDIR/$user/.ssh";
 my $SFSDIR  = "$HOMEDIR/$user/.sfs";
 
 #
-# This script always does the right thing, but we prefer that mere users
-# do not run it, except when its for themselves. Otherwise, make sure that
-# user has group/project root in at least one project, which indicates they
-# have some level of responsibility.
+# This script always does the right thing, but if a non admin runs it
+# for someone else, force auditmode. Technically speaking, this should
+# never happen since mere users do not have access to this script ...
 #
 if (!TBAdmin($UID)) {
     my $dbuid;
@@ -143,17 +142,7 @@ if (!TBAdmin($UID)) {
 	die("You are not a valid emulab user!\n");
     }
     if ($dbuid ne $user) {
-	#
-	# Check if group_root/project_root anyplace.
-	#
-	$query_result =
-	    DBQueryFatal("select trust from group_membership ".
-			 "where uid='$dbuid' and ".
-			 "trust='project_root' or trust='group_root'");
-
-	if ($query_result->numrows == 0) {
-	    die("$0: You do not have permission to run this script!\n");
-	}
+	$auditmode = 1;
     }
 }
 
@@ -180,11 +169,8 @@ if ($auditmode) {
 #
 $query_result =
     DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,m.pid ".
-		 " from users as u ".
-		 "left join group_membership as m ".
-		 " on u.uid=m.uid and m.pid=m.gid ".
-		 "where u.uid='$user' order by date_approved asc limit 1");
+		 " u.usr_email,u.status,u.webonly from users as u ".
+		 "where u.uid='$user'");
 
 if ($query_result->numrows == 0) {
     fatal("$user is not in the DB. This is bad.\n");
@@ -195,11 +181,14 @@ my $user_number = $db_row[1];
 my $fullname    = $db_row[2];
 my $user_email  = $db_row[3];
 my $status      = $db_row[4];
-my $defpid      = $db_row[5];
+my $webonly     = $db_row[5];
 
-if ($status eq USERSTATUS_FROZEN ||
+if ($webonly ||
+    $status eq USERSTATUS_FROZEN ||
     $status eq USERSTATUS_NEWUSER ||
     $status eq USERSTATUS_UNAPPROVED) {
+
+    print "User $user status indicates he/she should not have an account!\n";
     
     #
     # All this stuff must be done as root (ssh).
@@ -238,23 +227,35 @@ if ($status eq USERSTATUS_FROZEN ||
 	fatal("Error clearing account for $user!");
     }
 
+    if ($auditmode) {
+	unlink($logname);
+    }
     exit(0);
 }
 
-if (!defined($defpid)) {
-    die("*** $0:\n".
-	"    $user is not in any projects!\n");
-}
-
 #
-# Unix info for users default group.
+# Get the users earliest project membership to use as the default group
+# for the case that the account is being (re)created. We convert that to
+# the unix info.
 #
 my $default_groupname;
 my $default_groupgid;
 
-if (! TBGroupUnixInfo($defpid, $defpid,
-		      \$default_groupgid, \$default_groupname)) {
-    fatal("No info for default project $defpid!");
+$query_result =
+    DBQueryFatal("select m.pid from group_membership as m ".
+		 "where m.uid='$user' and m.pid=m.gid ".
+		 "order by date_approved asc limit 1");
+
+if (my ($defpid) = $query_result->fetchrow_array) {
+    if (! TBGroupUnixInfo($defpid, $defpid,
+			  \$default_groupgid, \$default_groupname)) {
+	fatal("No info for default project $defpid!");
+    }
+}
+else {
+    print "No group membership for $user; using the guest group!\n";
+    
+    ($default_groupname,undef,$default_groupgid,undef) = getgrnam("guest");
 }
 
 #
@@ -387,33 +388,7 @@ NewsshKeyfile($SSHDIR, $user_number, $default_groupgid, 2, @p2keys);
 # Now schedule account updates on all the nodes that this person has
 # an account on.
 #
-# There are two sets of nodes. The first is all of the local nodes in all of
-# projects the user is a member of. The second is all of the widearea nodes
-# that the project has access to. Rather than operate on a per node basis.
-# grab the project names (for the reserved table) and the remote types
-# to match against the node types. Of course, the pcremote_ok slot is a
-# set, so need to parse that. 
-#
-$query_result =
-    DBQueryFatal("select p.pid,pcremote_ok from users as u ".
-		 "left join group_membership as g on ".
-		 "  u.uid=g.uid and g.pid=g.gid ".
-		 "left join projects as p on p.pid=g.pid ".
-		 "where u.uid='$user'");
-
-while (my %row = $query_result->fetchhash()) {
-    my $pid      = $row{'pid'};
-    my $pcremote = $row{'pcremote_ok'};
-
-    if (defined($pcremote)) {
-	my @typelist = split(',', $pcremote);
-
-	foreach my $nodetype (@typelist) {
-	    TBNodeUpdateAccountsByType($nodetype);
-	}
-    }
-    TBNodeUpdateAccountsByPid($pid);
-}
+TBNodeUpdateAccountsByUID($user);
 
 #
 # If an SFS change was requested (or a new user), then must update.
