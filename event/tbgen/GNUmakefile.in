@@ -26,16 +26,19 @@ CFLAGS	 += -O -g -static -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`
 
-LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb
+LDFLAGS  += -L../lib
+LIBS     += -levent
 LIBS     += `elvin-config --libs vin4c`
 
 tevc:	tevc.o
-	$(CC) $(LDFLAGS) -static -o $@ tevc.o $(LIBS)
+	# Link against some of the object files from libtb, instead of the
+	# whole library, since the latter cannot be built on ops
+	$(CC) $(LDFLAGS) -static -o $@ tevc.o ../../lib/libtb/log.o \
+		../../lib/libtb/tbdefs.o $(LIBS)
 
 tevd:	tevd.o
 	$(CC) $(LDFLAGS) -o $@ tevd.o \
-		-L/usr/local/lib/mysql -lmysqlclient $(LIBS)
+		-L/usr/local/lib/mysql -lmysqlclient -ltb $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 

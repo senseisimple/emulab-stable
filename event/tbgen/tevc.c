@@ -27,7 +27,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include "config.h"
-#include "log.h"
 #include "tbdefs.h"
 #include "event.h"
 
@@ -279,8 +278,6 @@ main(int argc, char **argv)
 			
 			gettimeofday(&now, NULL);
 			
-			info("Now:  %ld:%d\n", now.tv_sec, now.tv_usec);
-			info("When: %ld:%d\n", when.tv_sec, when.tv_usec);
 		}
 		
 		if (event_schedule(handle, notification, &when) == 0) {
