@@ -1,6 +1,18 @@
 [This file is not kept entirely up to date.]
 
+CDROM changes (dhcp, signing).
+
 *** Major:
+
+* Dynamic reconfiguration of experiments (add and subtract nodes).
+   - Special case for flat topologies. LAN Easy.
+   - Adding to complicated topologies.
+   - Reboot or not reboot everything. In flat case, not rebooting would be
+     easy, although I contend its essentially the same.
+
+* Break up emulab.
+
+* Swapout and state saving.
 
 * Fix the entire nalloc/nfree/reloading mechansism and the state
   control stuff for it that is scattered around nfree, tmcd, stated,
