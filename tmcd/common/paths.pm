@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package emulabpaths;
@@ -18,6 +18,7 @@ $BINDIR  = "";
 $ETCDIR  = "";
 $VARDIR  = "";
 $BOOTDIR = "";
+$DBDIR   = "";
 $LOGDIR  = "/var/tmp";
 $LOCKDIR = "/var/tmp";
 
@@ -34,6 +35,7 @@ if (-d "/usr/local/etc/emulab") {
     $BOOTDIR = "/var/emulab/boot";
     $LOGDIR  = "/var/emulab/logs";
     $LOCKDIR = "/var/emulab/lock";
+    $DBDIR   = "/var/emulab/db";
 }
 elsif (-d "/etc/testbed") {
     unshift(@INC, "/etc/testbed");
@@ -41,6 +43,7 @@ elsif (-d "/etc/testbed") {
     $BINDIR  = "/etc/testbed";
     $VARDIR  = "/etc/testbed";
     $BOOTDIR = "/etc/testbed";
+    $DBDIR   = "/etc/testbed";
 }
 elsif (-d "/etc/rc.d/testbed") {
     unshift(@INC, "/etc/rc.d/testbed");
@@ -48,6 +51,7 @@ elsif (-d "/etc/rc.d/testbed") {
     $BINDIR  = "/etc/rc.d/testbed";
     $VARDIR  = "/etc/rc.d/testbed";
     $BOOTDIR = "/etc/rc.d/testbed";
+    $DBDIR   = "/etc/rc.d/testbed";
 }
 else {
     print "$0: Cannot find proper emulab paths!\n";

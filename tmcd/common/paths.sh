@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,16 +25,19 @@ if [ -d /usr/local/etc/emulab ]; then
 	BOOTDIR=/var/emulab/boot
 	LOGDIR=/var/emulab/logs
 	LOCKDIR=/var/emulab/lock
+	DBDIR=/var/emulab/db
 elif [ -d /etc/testbed ]; then
 	ETCDIR=/etc/testbed
 	BINDIR=/etc/testbed
 	VARDIR=/etc/testbed
 	BOOTDIR=/etc/testbed
+	DBDIR=/etc/testbed
 elif [ -d /etc/rc.d/testbed ]; then
 	ETCDIR=/etc/rc.d/testbed
 	BINDIR=/etc/rc.d/testbed
 	VARDIR=/etc/rc.d/testbed
 	BOOTDIR=/etc/rc.d/testbed
+	DBDIR=/etc/rc.d/testbed
 else
         echo "$0: Cannot find proper emulab paths!"
 	exit 1
@@ -45,6 +48,7 @@ export BINDIR
 export VARDIR
 export BOOTDIR
 export LOGDIR
+export DBDIR
 export LOCKDIR
 PATH=$BINDIR:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:\
 /usr/site/bin:/usr/site/sbin
