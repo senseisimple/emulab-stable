@@ -5,7 +5,8 @@
 #include "mtp.h"
 #include "rclip.h"
 
-struct obstacle_config *ob_find_obstacle(struct mtp_config_rmc *mcr,
-					 rc_line_t line);
+int ob_find_obstacle(struct obstacle_config *oc,
+		     struct mtp_config_rmc *mcr,
+		     rc_line_t line);
 
 #endif

@@ -27,7 +27,6 @@ enum {
     PCB_WAYPOINT,
     PCB_CONTACT,
     PCB_WIGGLE_REVERSE,
-    PCB_IN_PROGRESS,
 };
 
 enum {
@@ -37,7 +36,6 @@ enum {
     PCF_WAYPOINT = (1L << PCB_WAYPOINT),
     PCF_CONTACT = (1L << PCB_CONTACT),
     PCF_WIGGLE_REVERSE = (1L << PCB_WIGGLE_REVERSE),
-    PCF_IN_PROGRESS = (1L << PCB_IN_PROGRESS),
 };
 
 struct pilot_connection {

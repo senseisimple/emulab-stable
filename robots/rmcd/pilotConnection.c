@@ -240,7 +240,6 @@ struct pilot_connection *pc_find_pilot(int robot_id)
 
 void pc_plot_waypoint(struct pilot_connection *pc)
 {
-    struct obstacle_config *oc;
     struct rc_line rl;
     
     assert(pc != NULL);
@@ -250,10 +249,11 @@ void pc_plot_waypoint(struct pilot_connection *pc)
     rl.x1 = pc->pc_goal_pos.x;
     rl.y1 = pc->pc_goal_pos.y;
     if ((pc->pc_obstacle_count == 0) &&
-	(oc = ob_find_obstacle(pc_data.pcd_config, &rl)) != NULL) {
+	ob_find_obstacle(&pc->pc_obstacles[pc->pc_obstacle_count],
+			 pc_data.pcd_config,
+			 &rl)) {
 	info("debug: preloaded obstacle\n");
 	
-	pc->pc_obstacles[pc->pc_obstacle_count] = *oc;
 	pc->pc_obstacle_count += 1;
     }
 
@@ -745,8 +745,6 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 
     switch (ps) {
     case PS_REFINING_POSITION:
-	pc->pc_flags &= ~PCF_IN_PROGRESS;
-	
 	if (pc->pc_state != ps) {
 	    pc->pc_tries_remaining = MAX_REFINE_RETRIES;
 	}
@@ -851,10 +849,6 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 
     case PS_PENDING_POSITION:
     case PS_START_WIGGLING:
-	if ((ps == PS_PENDING_POSITION) &&
-	    (pc->pc_state != PS_ARRIVED) && (pc->pc_state != PS_WIGGLING)) {
-	    pc->pc_flags |= PCF_IN_PROGRESS;
-	}
 	mtp_init_packet(&pmp,
 			MA_Opcode, MTP_COMMAND_STOP,
 			MA_Role, MTP_ROLE_RMC,
@@ -983,9 +977,7 @@ static void pc_handle_update(struct pilot_connection *pc,
     case MTP_POSITION_STATUS_IDLE:
 	/* Response to a COMMAND_STOP. */
 	pc->pc_flags &= ~PCF_VISION_POSITION;
-	if (mup->command_id == 1 &&
-	    !(pc->pc_flags & PCF_IN_PROGRESS) &&
-	    pc->pc_state == PS_PENDING_POSITION) {
+	if (pc->pc_state == PS_PENDING_POSITION) {
 	    pc_change_state(pc, PS_REFINING_POSITION);
 	}
 	break;
@@ -1119,7 +1111,8 @@ static void pc_handle_report(struct pilot_connection *pc,
 	}
 	
 	if (pc->pc_obstacle_count == 0 &&
-	    (oc = ob_find_obstacle(pc_data.pcd_config, &rl)) != NULL) {
+	    ob_find_obstacle(&oc_fake, pc_data.pcd_config, &rl)) {
+	    oc = &oc_fake;
 	    if (debug) {
 		info("debug: found obstacle %d\n", oc->id);
 	    }
