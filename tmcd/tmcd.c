@@ -135,6 +135,7 @@ typedef struct {
 	int		issubnode;
 	int		islocal;
 	int		iscontrol;
+	int		isplabdslice;
 	int		update_accounts;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
@@ -1487,7 +1488,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * from the project (above). Of course, tbadmin overrides
 		 * everthing!
 		 */
-		if (!reqp->islocal) {
+		if (!reqp->islocal && !reqp->isplabdslice) {
 			if (!reqp->isvnode)
 				root = atoi(row[14]);
 			else
@@ -3705,7 +3706,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,pt.class,pt.type, "
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
-				 " nv.sfshostid,e.eventkey "
+				 " nv.sfshostid,e.eventkey,vt.isplabdslice "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3721,7 +3722,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as vt on "
 				 " vt.type=nv.type "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 21, reqp->vnodeid, inet_ntoa(ipaddr));
+				 22, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -3730,7 +3731,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
-				 " n.sfshostid,e.eventkey "
+				 " n.sfshostid,e.eventkey,0 "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3740,7 +3741,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.iface=t.control_iface "
 				 "where i.IP='%s'",
-				 21, inet_ntoa(ipaddr));
+				 22, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3766,9 +3767,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	strncpy(reqp->pclass, row[14], sizeof(reqp->pclass));
 	strncpy(reqp->ptype,  row[15], sizeof(reqp->ptype));
 	strncpy(reqp->nodeid, row[2],  sizeof(reqp->nodeid));
-	reqp->islocal   = (! strcasecmp(row[16], "0") ? 1 : 0);
-	reqp->jailflag  = (! strcasecmp(row[3],  "0") ? 0 : 1);
-	reqp->issubnode = (! strcasecmp(row[17], "0") ? 0 : 1);
+	reqp->islocal      = (! strcasecmp(row[16], "0") ? 1 : 0);
+	reqp->jailflag     = (! strcasecmp(row[3],  "0") ? 0 : 1);
+	reqp->issubnode    = (! strcasecmp(row[17], "0") ? 0 : 1);
+	reqp->isplabdslice = (! strcasecmp(row[21], "0") ? 0 : 1);
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
 	if (row[4] && row[5]) {
