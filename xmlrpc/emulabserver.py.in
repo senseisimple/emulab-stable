@@ -576,6 +576,7 @@ class osid:
 
     pass
 
+
 #
 # This class implements the server side of the XMLRPC interface to experiments.
 #
@@ -1312,6 +1313,75 @@ class experiment:
         params, method = xmlrpclib.loads(output);
         return EmulabResponse(RESPONSE_SUCCESS, value=params, output=output)
     
+    #
+    # Return the visualization data for the experiment.
+    #
+    def getviz(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+        
+        #
+        # Check permission. This needs to be a lib routine!
+        #
+        res = DBQueryFatal("SELECT gid FROM experiments "
+                           "WHERE pid=%s and eid=%s",
+                           (argdict["proj"], argdict["exp"]))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment: " +
+                                  argdict["proj"] + "/" + argdict["exp"])
+
+        gid = res[0][0]
+        
+        res = DBQueryFatal("SELECT trust FROM group_membership "
+                           "WHERE uid=%s and pid=%s and gid=%s",
+                           (UID, argdict["proj"], gid))
+
+        if len(res) == 0:
+            return EmulabResponse(
+                RESPONSE_FORBIDDEN,
+                output=("You do not have permission to access experiment: "
+                        + argdict["proj"] + "/" + argdict["exp"]))
+
+        dbres = DBQueryFatal("select vname,vis_type,x,y from vis_nodes "
+                             "where pid=%s and eid=%s",
+                             (argdict["proj"], argdict["exp"]))
+
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+
+        result = {}
+        for res in dbres:
+            tmp = {}
+            tmp["name"] = res[0]
+            tmp["type"] = res[1]
+            tmp["x"] = res[2]
+            tmp["y"] = res[3]
+            result[res[0]] = tmp
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
     pass
 
 #
@@ -1401,7 +1471,7 @@ class node:
 
         if len(trust) == 0:
             return EmulabResponse(
-                RESPONSE_ERROR,
+                RESPONSE_FORBIDDEN,
                 output=("You do not have permission to access: "
                         + argdict["node"]))
 
@@ -1427,6 +1497,76 @@ class node:
             "certsha" : sha_fp,
             "certsha1" : sha1_fp,
             }
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+
+    #
+    # Get the ssh host keys
+    #
+    def hostkeys(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("node",))
+        if (argerror):
+            return argerror
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        if not re.match("^[-\w]*$", str(argdict["node"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node value!")
+        
+        # XXX Refactor the trust stuff
+        res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
+                           "left join experiments as e on "
+                           "     e.pid=r.pid and e.eid=r.eid "
+                           "WHERE r.node_id=%s",
+                           (argdict["node"],))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        trust = DBQueryFatal("SELECT trust FROM group_membership "
+                             "WHERE uid=%s and pid=%s and gid=%s",
+                             (UID, res[0][0], res[0][1]))
+
+        if len(trust) == 0:
+            return EmulabResponse(
+                RESPONSE_FORBIDDEN,
+                output=("You do not have permission to access: "
+                        + argdict["node"]))
+
+        res = DBQueryFatal("SELECT sshrsa_v1,sshrsa_v2,sshdsa_v2,sfshostid "
+                           "FROM node_hostkeys WHERE node_id=%s",
+                           (argdict["node"],))
+        
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node: " + argdict["node"])
+
+        result = {}
+        if res[0][0]:
+            result["sshrsa_v1"] = res[0][0]
+            pass
+        if res[0][1]:
+            result["sshrsa_v2"] = res[0][1]
+            pass
+        if res[0][2]:
+            result["sshdsa_v2"] = res[0][2]
+            pass
+        if res[0][3]:
+            result["sfshostid"] = res[0][3]
+            pass
 
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
