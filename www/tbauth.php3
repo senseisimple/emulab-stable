@@ -383,7 +383,7 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
         USERERROR("You have not verified your account yet!", 1);
     if ($status & CHECKLOGIN_UNAPPROVED)
         USERERROR("Your account has not been approved yet!", 1);
-    if ($status & CHECKLOGIN_WEBONLY)
+    if (($status & CHECKLOGIN_WEBONLY) && ! ISADMIN($uid))
         USERERROR("Your account does not permit you to access this page!", 1);
 
     #
