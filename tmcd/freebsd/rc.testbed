@@ -26,6 +26,11 @@ if [ -x /etc/testbed/rc.healthd ]; then
 	/etc/testbed/rc.healthd start
 fi
 
+if [ -x /etc/testbed/slothd ]; then
+	echo "Starting idle detector ..."
+	/etc/testbed/slothd
+fi
+
 if [ -x /etc/testbed/rc.setup ]; then
         echo "Starting Testbed Setup ..."
         /etc/testbed/rc.setup
