@@ -21,6 +21,9 @@ use DBI;
 my $TBDB = "@TBDBNAME@";
 my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
 
+@switches=();
+%used_switches=();
+
 # Find available nodes
 $sth = $dbh->prepare("select a.node_id,a.type from" .
 		     " nodes as a left join reserved as b" .
@@ -38,6 +41,7 @@ while (($node,$type) = $sth->fetchrow_array) {
     } else {
 	if (defined($switch_types{$type})) {
 	    $type = "switch";
+	    push(@switches,$node);
 	}
 	$nodes{$node} = $type;
 	$nodetypes{$type} = 1;
@@ -123,6 +127,9 @@ while (($type,$node1,$card1,$port1,$node2,$card2,$port2) =
 	} else {
 	    $bw = $iface2bw;
 	}
+	if ($nodes{$node2} eq "switch") {
+	    $used_switches{$node2} = 1;
+	}
 	# !!! - Here we use our knowledge that in the wires table links
 	# to the switch always come as node2.
 	print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
@@ -134,9 +141,11 @@ $sth->finish;
 print $sharklinks;
 
 # Add a bunch of LANs
-for ($i = 0;$i <= 100;$i++) {
-    print "node lan$i lan:1\n";
-    print "link link-lan$i lan${i}:lan$i cisco 100000 1000\n";
+foreach $switch (keys(%used_switches)) {
+    for ($i = 0;$i <= 20;$i++) {
+	print "node lan-$switch-$i lan:1\n";
+	print "link link-lan-$switch-$i lan-$switch-${i}:lan-$switch-$i" .
+	    " $switch 100000 1000\n";
+    }
 }
-
 
