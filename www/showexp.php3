@@ -68,6 +68,8 @@ echo "         <tr><td align=center><b>Experiment Options</b></td></tr>\n";
 echo "         <tr></tr>\n";
 WRITESIDEBARSUBBUTTON("View NS File and Node Assignment",
 		      "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");
+WRITESIDEBARSUBBUTTON("Graphic Visualization of Topology",
+		      "vistopology.php3?pid=$exp_pid&eid=$exp_eid");
 WRITESIDEBARSUBBUTTON("Terminate this experiment",
 		      "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
