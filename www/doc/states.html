@@ -1,8 +1,10 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
    All rights reserved.
   -->
+<b><a href="docwrapper.php3?docname=internals.html">
+Back to Emulab Internals</a></b>
 <center>
 <h1>Emulab State Machines</h1>
 </center>
@@ -17,7 +19,7 @@
 
 <a name="nodeboot"></a>
 <h3>Node Boot Process</h3>
-<img align="right" src="nodeboot.gif">
+<img src="nodeboot.gif">
 <p>
 The node boot process shows the legal state transitions a node may
 make during its cycle of rebooting. The NORMALv1 subgraph shows the
@@ -92,9 +94,13 @@ safely removed from the Emulab database.
 
 <a name="nodealloc"></a>
 <h3>Node Allocation</h3>
+<p>
+[Note: Some of the lower level details of this have changed, but the
+principle is still the same.]
+</p>
 <img align="right" src="nodealloc.gif">
 <p>
-The node allocation state machie also governs nodes, like the node
+The node allocation state machine also governs nodes, like the node
 boot process, but instead of their boot status, it governs their
 allocation status. A node that is not reserved and has a fresh copy of
 the Emulab standard disk images starts in the FREE_CLEAN state. When
