@@ -197,7 +197,6 @@ TBMAIL($TBMAIL_AUDIT,
        "Swap or Terminate Request: $pid/$eid",
        "A swap/terminate $pid/$eid request was sent by $uid ($uid_name).\n",
        "From: $uid_name <$uid_email>\n".
-       "X-NetBed: request_swapexp.php3\n".
        "Errors-To: $TBMAIL_WWW");
 
 # Update the count and the time in the database
