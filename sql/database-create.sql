@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.54-log
+-- Server version	3.23.52-log
 
 --
 -- Table structure for table 'cdroms'
@@ -479,6 +479,30 @@ CREATE TABLE mode_transitions (
   PRIMARY KEY  (op_mode1,state1,op_mode2,state2),
   KEY op_mode1 (op_mode1,state1),
   KEY op_mode2 (op_mode2,state2)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'new_interfaces'
+--
+
+CREATE TABLE new_interfaces (
+  node_id varchar(10) NOT NULL default '',
+  iface varchar(10) NOT NULL default '',
+  mac varchar(12) NOT NULL default '',
+  interface_type varchar(15) default NULL,
+  PRIMARY KEY  (node_id,iface)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'new_nodes'
+--
+
+CREATE TABLE new_nodes (
+  node_id varchar(10) NOT NULL default '',
+  type varchar(30) default NULL,
+  IP varchar(15) default NULL,
+  dmesg text,
+  PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
 --

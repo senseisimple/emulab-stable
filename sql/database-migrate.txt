@@ -204,3 +204,24 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table users add widearearoot tinyint(4) default '0';
        alter table users add wideareajailroot tinyint(4) default '0';
+
+1.131: Add two new tables, new_nodes and new_interfaces, for nodes
+       that will automatically report in when they are first booted
+       up. The testbed admins will then be notified, so that they can
+       move these into the real nodes and interfaces tables with the
+       newnode script.
+
+       CREATE TABLE new_interfaces (
+          node_id varchar(10) NOT NULL default '',
+          iface varchar(10) NOT NULL default '',
+          mac varchar(12) NOT NULL default '',
+          interface_type varchar(15) default NULL,
+          PRIMARY KEY  (node_id,iface)
+       ) TYPE=MyISAM;
+       CREATE TABLE new_nodes (
+          node_id varchar(10) NOT NULL default '',
+          type varchar(30) default NULL,
+	  IP varchar(15) default NULL,
+	  dmesg text,
+	  PRIMARY KEY  (node_id)
+       ) TYPE=MyISAM;
