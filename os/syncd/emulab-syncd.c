@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -24,7 +24,8 @@
 #include "decls.h"
 #include "log.h"
 
-int		debug = 0;
+int		debug   = 0;
+int		verbose = 0;
 static int	portnum = SERVER_PORTNUM;
 static int      handle_request(int, struct sockaddr_in *, barrier_req_t *,int);
 static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
@@ -56,7 +57,9 @@ barrier_ctrl_t *allbarriers;
 
 char *usagestr =
  "usage: tmcd [-d] [-p #]\n"
- " -d              Turn on debugging.\n"
+ " -d              Do not daemonize.\n"
+ " -v              Turn on verbose logging\n"
+ " -l              Specify log file instead of syslog\n"
  " -p portnum	   Specify a port number to listen on\n"
  "\n";
 
@@ -73,9 +76,9 @@ setverbose(int sig)
 	signal(sig, SIG_IGN);
 	
 	if (sig == SIGUSR1)
-		debug = 1;
+		verbose = 1;
 	else
-		debug = 0;
+		verbose = 0;
 }
 
 int
@@ -86,14 +89,20 @@ main(int argc, char **argv)
 	char			buf[BUFSIZ];
 	extern char		build_info[];
 	fd_set			fds, sfds;
+	char			*logfile = (char *) NULL;
 
-	while ((ch = getopt(argc, argv, "dp:")) != -1)
+	while ((ch = getopt(argc, argv, "dp:vl:")) != -1)
 		switch(ch) {
+		case 'l':
+			logfile = optarg;
+			break;
 		case 'p':
 			portnum = atoi(optarg);
 			break;
 		case 'd':
 			debug++;
+		case 'v':
+			verbose++;
 			break;
 		case 'h':
 		case '?':
@@ -107,11 +116,12 @@ main(int argc, char **argv)
 		usage();
 
 	if (debug) 
-		loginit(0, 0);
+		loginit(0, logfile);
 	else {
-		/* Become a daemon */
-		daemon(0, 0);
-		loginit(1, "tmcd");
+		if (logfile)
+			loginit(0, logfile);
+		else
+			loginit(1, "syncd");
 	}
 	info("daemon starting (version %d)\n", CURRENT_VERSION);
 	info("%s\n", build_info);
@@ -123,6 +133,9 @@ main(int argc, char **argv)
 		error("Could not make sockets!");
 		exit(1);
 	}
+	/* Now become a daemon */
+	if (!debug)
+		daemon(0, 1);
 
 	signal(SIGUSR1, setverbose);
 	signal(SIGUSR2, setverbose);
@@ -130,12 +143,13 @@ main(int argc, char **argv)
 	/*
 	 * Stash the pid away.
 	 */
-	i = getpid();
-	sprintf(buf, "%s/syncd.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
-	if (fp != NULL) {
-		fprintf(fp, "%d\n", i);
-		(void) fclose(fp);
+	if (!geteuid()) {
+		sprintf(buf, "%s/syncd.pid", _PATH_VARRUN);
+		fp = fopen(buf, "w");
+		if (fp != NULL) {
+			fprintf(fp, "%d\n", getpid());
+			(void) fclose(fp);
+		}
 	}
 
 	/*
@@ -320,7 +334,7 @@ handle_request(int sock, struct sockaddr_in *client,
 			fatal("Out of memory!");
 
 		barrierp->name = strdup(barrier_reqp->name);
-		if (debug)
+		if (verbose)
 			info("Barrier created: %s\n", barrierp->name);
 		barrierp->next = allbarriers;
 		allbarriers    = barrierp;
@@ -330,7 +344,7 @@ handle_request(int sock, struct sockaddr_in *client,
 		barrierp->count  += barrier_reqp->count;
 		barrierp->ipaddr.s_addr = client->sin_addr.s_addr;
 
-		if (debug)
+		if (verbose)
 			info("%s: Barrier initialized: %s %d (%d)\n",
 			     inet_ntoa(client->sin_addr),
 			     barrierp->name, barrier_reqp->count,
@@ -348,7 +362,7 @@ handle_request(int sock, struct sockaddr_in *client,
 	else if (barrier_reqp->request == BARRIER_WAIT) {
 		barrierp->count -= 1;
 
-		if (debug)
+		if (verbose)
 			info("%s: Barrier waiter: %s %d\n",
 			     inet_ntoa(client->sin_addr),
 			     barrierp->name, barrierp->count);
@@ -379,7 +393,7 @@ handle_request(int sock, struct sockaddr_in *client,
 		return 0;
 
 	for (i = 0; i < barrierp->index; i++) {
-		if (debug)
+		if (verbose)
 			info("%s: releasing %s\n", barrierp->name,
 			     inet_ntoa(barrierp->waiters[i].ipaddr));
 
