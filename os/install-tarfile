@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -108,14 +108,10 @@ if (-e $IDENTFILE) {
 }
 
 #
-# The tarfile may only come from a /proj directory unless in jailmode in
-# which case we have to get it from the server. 
+# Must be able to see the tarfile if not in jail mode. The front end
+# ensures that its in a reasonable place, but have to make sure here.
 #
 if (! $jailmode) {
-    if (! ($tarfile =~ /^\/proj\//)) {
-	fatal("The tar file must reside in /proj");
-    }
-
     #
     # Make sure its really there.
     #
