@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -81,19 +81,22 @@ example.
 
 <p>
 Each link is has an NS "Queue" object associated with it, which you
-can modify to suit your needs. (<em>currently, there is a single queue
-object per duplex link; you can cannot set the parameters
-asymmetrically</em>). The following parameters can be changed, and are
-defined in the NS manual (see Section 7.3):
+can modify to suit your needs (<em>currently, there are two queue
+objects per duplex link; one for each direction. You need to set the
+parameters for both directions, which means you can set the parameters
+asymmetrically if you want</em>). The following parameters can be
+changed, and are defined in the NS manual (see Section 7.3). <b>Note,
+only duplex links have queue objects, lans do not</b>.
 	<code><pre>
 	set queue0 [[$ns link $nodeA $nodeB] queue]
 	$queue0 set gentle_ 0
+	$queue0 set red_ 0
 	$queue0 set queue-in-bytes_ 0
-	$queue0 set limit_ 75
-	$queue0 set maxthresh_ 20
-	$queue0 set thresh_ 7
-	$queue0 set linterm_ 11
-	$queue0 set q_weight_ 0.004</code></pre>
+	$queue0 set limit_ 50
+	$queue0 set maxthresh_ 15
+	$queue0 set thresh_ 5
+	$queue0 set linterm_ 10
+	$queue0 set q_weight_ 0.002</code></pre>
 </p>
 
 <p>
