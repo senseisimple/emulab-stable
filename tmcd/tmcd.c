@@ -1254,6 +1254,47 @@ COMMAND_PROTOTYPE(doifconfig)
 		return 0;
 
 	/*
+	 * First, return config info the physical interfaces so those can be
+	 * set up. We do this just for the physical node; no need to send it
+	 * back every single time!
+	 */
+	if (vers >= 18 && !reqp->isvnode) {
+		res = mydb_query("select distinct "
+				 "       i.interface_type,i.mac, "
+				 "       i.current_speed,i.duplex "
+				 "  from veth_interfaces as v "
+				 "left join interfaces as i on "
+				 "  i.node_id=v.node_id and i.iface=v.iface "
+				 "where v.iface is not null and v.node_id='%s'",
+				 4, reqp->pnodeid);
+		if (!res) {
+			error("IFCONFIG: %s: "
+			      "DB Error getting interfaces underlying veths!\n",
+			      reqp->nodeid);
+			return 1;
+		}
+		nrows = (int)mysql_num_rows(res);
+		while (nrows) {
+			char *bufp   = buf;
+			row = mysql_fetch_row(res);
+
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       "INTERFACE IFACETYPE=%s "
+				       "INET= MASK= MAC=%s "
+				       "SPEED=%sMbps DUPLEX=%s "
+				       "IPALIASES=\"\" IFACE= "
+				       "RTABID= LAN=\n",
+				       row[0], row[1], row[2], row[3]);
+
+			client_writeback(sock, buf, strlen(buf), tcp);
+			if (verbose)
+				info("IFCONFIG: %s", buf);
+			nrows--;
+		}
+		mysql_free_result(res);
+	}
+
+	/*
 	 * Outside a vnode, return only those veths that have vnode=NULL,
 	 * which indicates its an emulated interface on a physical node. When
 	 * inside a vnode, only return veths for which vnode=curvnode,

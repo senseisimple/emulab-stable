@@ -19,7 +19,7 @@ use Exporter;
 	 check_nickname	bootsetup startcmdstatus whatsmynickname 
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
-	 ixpsetup libsetup_refresh
+	 ixpsetup libsetup_refresh gettopomap
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -28,7 +28,7 @@ use Exporter;
 
 	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
-	 TMROUTECONFIG TMLINKDELAY TMDELMAP
+	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY
        );
 
@@ -47,7 +47,7 @@ use POSIX qw(strftime);
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 17; };
+sub TMCD_VERSION()	{ 18; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -214,6 +214,7 @@ sub TMEVENTKEY()	{ CONFDIR() . "/eventkey";}
 sub TMNODEID()		{ CONFDIR() . "/nodeid";}
 sub TMROLE()		{ CONFDIR() . "/role";}
 sub TMSIMRC()		{ CONFDIR() . "/rc.simulator";}
+sub TMTOPOMAP()		{ CONFDIR() . "/topomap";}
 
 #
 # This is a debugging thing for my home network.
@@ -592,6 +593,53 @@ sub getifconfig($)
 }
 
 #
+# Read the topomap and return something.
+#
+sub gettopomap($)
+{
+    my ($rptr)       = @_;	# Return array to caller (reference).
+    my $topomap	     = {};
+    my $section;
+    my @slots;
+
+    if (! -e TMTOPOMAP()) {
+	$rptr = {};
+	return 0;
+    }
+
+    if (!open(TOPO, TMTOPOMAP())) {
+	warn("*** WARNING: ".
+	     "gettopomap: Could not open " . TMTOPOMAP() . "!\n");
+	@$rptr = ();
+	return -1;
+    }
+
+    #
+    # First line of topo map describes the nodes.
+    #
+    while (<TOPO>) {
+	if ($_ =~ /^\#\s*([-\w]*): ([-\w,]*)$/) {
+	    $section = $1;
+	    @slots = split(",", $2);
+
+	    $topomap->{$section} = [];
+	    next;
+	}
+	chomp($_);
+	my @values = split(",", $_);
+	my $rowref = {};
+    
+	for (my $i = 0; $i < scalar(@values); $i++) {
+	    $rowref->{$slots[$i]} = $values[$i];
+	}
+	push(@{ $topomap->{$section} }, $rowref);
+    }
+    close(TOPO);
+    $$rptr = $topomap;
+    return 0;
+}
+
+#
 # Convert from MAC to iface name (eth0/fxp0/etc) using little helper program.
 # 
 sub findiface($)
@@ -645,50 +693,6 @@ sub getrouterconfig($$)
 	return 0;
     }
 
-    #
-    # Special case. If the routertype is "static-ddijk" then we run our
-    # dijkstra program on the linkmap, and use that to feed the code
-    # below (it outputs exactly the same goo).
-    #
-    # XXX: If we change the return from tmcd, the output of dijkstra will
-    # suddenly be wrong. Yuck, need a better solution. 
-    #
-    if ($type eq "static-ddijk") {
-	#
-	# We get the linkmap from the proj directory. 
-	#
-	my ($pid, $eid, $vname) = check_nickname();
-	my $linkmap = "/proj/$pid/exp/$eid/tbdata/linkmap";
-
-	if (! -e $linkmap) {
-	    warn("*** WARNING: $linkmap does exist!\n");
-	    @$rptr  = ();
-	    $$ptype = undef;
-	    return -1;
-	}
-
-	if (!open(DIJK, "cat $linkmap | $BINDIR/dijkstra $vname |")) {
-	    warn("*** WARNING: Could not invoke dijkstra on linkmap!\n");
-	    @$rptr  = ();
-	    $$ptype = undef;
-	    return -1;
-	}
-	while (<DIJK>) {
-	    push(@tmccresults, $_);
-	}
-	if (! close(DIJK)) {
-	    if ($?) {
-		warn("*** WARNING: dijkstra exited with status $?!\n");
-	    }
-	    else {
-		warn("*** WARNING: Error closing dijkstra pipe: $!\n");
-	    }
-	    @$rptr  = ();
-	    $$ptype = undef;
-	    return -1;
-	}
-    }
-    
     #
     # ROUTERTYPE=manual
     # ROUTE DEST=192.168.2.3 DESTTYPE=host DESTMASK=255.255.255.0 \
@@ -925,7 +929,7 @@ sub bootsetup()
     # be expensive.
     #
     dorole();
-    
+
     return ($pid, $eid, $vname);
 }
 
