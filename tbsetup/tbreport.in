@@ -213,5 +213,41 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
     }
 }
 
+#
+# Print time sorted avent list.
+# 
+$result =
+    DBQueryFatal("select time,vnode,vname,ot.type,et.type,arguments ".
+		 " from eventlist as ex ".
+		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
+		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
+		 "order by time");
+
+if ($result->numrows) {
+    print "\n";
+    print "Event List:\n";
+    printf "%-12s %-12s %-10s %-10s %-10s %s\n",
+    "Time", "Node", "Agent", "Type", "Event", "Arguments";
+    print "------------ ------------ ---------- ---------- ---------- ".
+	"------------ \n";
+    
+    while (($time,$vnode,$vname,$obj,$type,$args) = $result->fetchrow_array()){
+	printf("%-12s %-12s %-10s %-10s %-10s ",
+	       $time, $vnode, $vname, $obj, $type);
+
+	my @arglist = split(" ", $args);
+	my $arg     = shift(@arglist);
+
+	if (defined($arg)) {
+	    printf("$arg");
+	}
+	printf("\n");
+	foreach my $arg (@arglist) {
+	    printf("%-58s %s\n", "", $arg);
+	}
+    }
+}
+$result->finish();
+
 0;
 

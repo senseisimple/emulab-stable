@@ -48,6 +48,11 @@ my $state;
 sub cleanup {
     print STDERR "Cleaning up after errors.\n";
 
+    print "Stopping event system\n";
+    if (system("eventsys_control stop $pid $eid")) {
+	print STDERR "*** Failed to stop the event system.\n";
+    }
+
     if ($cleanvlans) {
 	print STDERR "Removing VLANs.\n";
 	if (system("snmpit -r $pid $eid")) {
@@ -129,6 +134,14 @@ if (system("exports_setup")) {
     exit(1);
 }
 
+print "Setting up named maps.\n";
+if (system("named_setup")) {
+    print STDERR "*** WARNING: Failed to add node names to named map.\n";
+    #
+    # This is a non-fatal error.
+    # 
+}
+
 print "Resetting OS and rebooting.\n";
 if (system("os_setup $pid $eid")) {
     print STDERR "*** Failed to reset OS and reboot nodes.\n";
@@ -136,12 +149,11 @@ if (system("os_setup $pid $eid")) {
     exit(1);
 }
 
-print "Setting up named maps.\n";
-if (system("named_setup")) {
-    print STDERR "*** WARNING: Failed to add node names to named map.\n";
-    #
-    # This is a non-fatal error.
-    # 
+print "Starting the event system.\n";
+if (system("eventsys_control start $pid $eid")) {
+    print STDERR "*** Failed to start the event system.\n";
+    cleanup;
+    exit(1);
 }
 
 print "Setting up email lists.\n";

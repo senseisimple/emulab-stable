@@ -53,6 +53,7 @@ $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/sbin:$TBROOT/bin";
 
 use lib '@prefix@/lib';
 use libdb;
+use libtestbed;
 require exitonwarn;
 
 #
@@ -235,6 +236,21 @@ while (($vname,$member,$delay,$bandwidth,$lossrate,
 }
 $result->finish;
 
+#
+# Check event list. Anytime we find an event to control a link, we need
+# to drop a delay node in. start/stop especially, since thats the easiest
+# way to do that, even if the link has no other traffic shaping in it. 
+# 
+printdb "Checking events for LINK commands.\n";
+$result =
+    DBQueryFatal("select distinct vname from eventlist as ex ".
+		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
+		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
+		 "where ot.type='LINK' and ex.pid='$pid' and ex.eid='$eid'");
+while (($vname) = $result->fetchrow_array) {
+    $mustdelay{$vname} = 1;
+}
+
 # Shark hack
 foreach $lan (keys(%lans)) {
     $realmembers = [];
@@ -330,10 +346,11 @@ foreach $lan (keys(%lans)) {
 	$bandwidth = &getbandwidth(&min($bw0,$rbw1));
 	$rbandwidth = &getbandwidth(&min($rbw0,$bw1));
 	if ((($delay >= $delaythresh) ||
-	    (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
-	    (($delaywithswitch == 0) && 
-	     (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
-	     ($loss != 0)) || 
+	     (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
+	     (($delaywithswitch == 0) && 
+	      (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
+	     ($loss != 0)) ||
+	    (defined($mustdelay{$lan})) ||
 	    (($rdelay >= $delaythresh) ||
 	     (($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
 	     (($delaywithswitch == 0) && 
@@ -374,11 +391,12 @@ foreach $lan (keys(%lans)) {
 # XXX The expression below should be modified for better bandwidth support.
 # Probably needs to happen post assign somehow.
 	    if ((($delay >= $delaythresh) ||
-		(($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
-		(($delaywithswitch == 0) && 
-		 (($bw != $S100Kbs) && (($sharks == 0) ||
-					($nonsharks > 1)))) ||
-		($loss != 0)) || 
+		 (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
+		 (($delaywithswitch == 0) && 
+		  (($bw != $S100Kbs) && (($sharks == 0) ||
+					 ($nonsharks > 1)))) ||
+		 ($loss != 0)) || 
+		(defined($mustdelay{$lan})) ||
 		(($rdelay >= $delaythresh) ||
 		 (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
 		 (($delaywithswitch == 0) && 
@@ -928,6 +946,24 @@ foreach $vnodeport (keys(%portbw)) {
 		" current_speed=\"$portbw{$vnodeport}\"" .
 		" where node_id=\"$pnode\" and iface=\"$pport\"");
     }
+}
+
+#
+# Post pass the event list. At present, all LINK operations apply to
+# the delay node that is in the middle of it. Rewrite the vnode in
+# the event list.
+#
+$eventlist_result =
+    DBQueryFatal("select ex.idx,ex.vname,r.vname ".
+		 " from eventlist as ex ".
+		 "left join delays as d on ex.vname=d.vname ".
+		 "left join reserved as r on r.node_id=d.node_id ".
+		 "left join event_objecttypes as ob on ob.idx=ex.objecttype ".
+		 "where ob.type='LINK' and ex.pid='$pid' and ex.eid='$eid'");
+
+while (my ($idx,$vname,$vnode) = $eventlist_result->fetchrow_array) {
+    DBQueryFatal("update eventlist set vnode='$vnode' ".
+		 "where idx=$idx and pid='$pid' and eid='$eid'");
 }
 
 ######################################################################

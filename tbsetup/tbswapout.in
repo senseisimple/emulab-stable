@@ -89,6 +89,12 @@ if (! SetExpState($pid, $eid, EXPTSTATE_SWAPPING)) {
 }
 
 if (! $TESTMODE) {
+    print "Stopping the event system.\n";
+    if (system("eventsys_control stop $pid $eid")) {
+	print STDERR "*** Failed to stop the event system.\n";
+	$errors = 1;
+    }
+
     print "Clearing VLANs.\n";
     if (system("snmpit -r $pid $eid")) {
 	print STDERR "*** Failed to reset VLANs.\n";

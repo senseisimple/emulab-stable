@@ -481,18 +481,19 @@ sub WaitTillAlive {
 	# other problems.  Any non-zero return indicates "not pingable" to us.
 	# 
 	if (! $status) {
-	    print STDERR "$pc alive and well\n" if $dbg;
+	    print "$pc is alive and well\n" if $dbg;
 	    return 0;
 	}
+	
 	$waittime = time - $waitstart;
 	if ($waittime > $maxwait) {
-	    print "$pc appears dead; its been ",
-	    (int ($waittime / 60))," minutes since rebooted.\n";
+	    $minutes = int($waittime / 60);
+	    print "*** $pc appears dead - its been $minutes minute(s).\n";
 	    return 1;
 	}
 	if (int($waittime / 60) > $minutes) {
 	    $minutes = int($waittime / 60);
-	    print "Still waiting for $pc - its been $minutes minute(s)\n";
+	    print "Still waiting for $pc - its been $minutes minute(s).\n";
 	}
     }
 }

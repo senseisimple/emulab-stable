@@ -12,7 +12,7 @@ use POSIX ":sys_wait_h";
 #
 sub usage()
 {
-    print STDOUT "Usage: eventsys_control <start|stop> <pid> <eid>\n";
+    print STDOUT "Usage: eventsys_control <start|stop|replay> <pid> <eid>\n";
     exit(-1);
 }
 my  $optlist = "d";
@@ -50,6 +50,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $evsched	= "$TB/sbin/event-sched";
 my $debug	= 0;
+my $expstate;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -73,6 +74,7 @@ my $eid    = $ARGV[2];
 # Untaint args.
 #
 if ($action ne "start" &&
+    $action ne "replay" &&
     $action ne "stop") {
     usage();
 }
@@ -89,6 +91,23 @@ else {
     die("Bad data in eid: $eid.");
 }
 
+if (! ($expstate = ExpState($pid, $eid))) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid!\n");
+}
+
+#
+# Do not allow an event system to be controlled if the experiment is not
+# active (or swapping). We will eventually give the user the ability
+# to control the event system directly.
+#
+if ($expstate ne EXPTSTATE_ACTIVE &&
+    $expstate ne EXPTSTATE_ACTIVATING &&
+    $expstate ne EXPTSTATE_SWAPPING) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid must active (or swapping)!\n");
+}
+
 #
 # Check permission. Only people with permission to destroy the experiment
 # can do this.
@@ -96,34 +115,56 @@ else {
 if ($UID &&
     ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
-	"    You do not have permission to control the event system!");
+	"    You do not have permission to control the event system!\n");
 }
 
 #
 # If stopping, find the pid from the DB and send it a kill.
 #
-if ($action eq "stop") {
+if ($action eq "stop" ||
+    $action eq "replay") {
+    #
+    # Simple protocol to prevent concurrent manipulation; If there is a pid
+    # set it to -pid to prevent another start/stop operation. The event
+    # scheduler itself will catch the signal and clear the pid to 0 when it
+    # exits, thus releasing the scheduler. 
+    # 
     DBQueryFatal("lock tables experiments write");
 
     $query_result =
 	DBQueryFatal("select event_sched_pid from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    DBQueryFatal("update experiments set event_sched_pid=0 ".
-		     "where pid='$pid' and eid='$eid'");
+    DBQueryFatal("update experiments set ".
+		 "event_sched_pid=-event_sched_pid ".
+		 "where pid='$pid' and eid='$eid'");
 		 
     DBQueryWarn("unlock tables");
 
     my @row    = $query_result->fetchrow_array();
     my $procid = $row[0];
 
-    if ($procid &&
+    if ($procid > 0 &&
 	! kill('TERM', $procid)) {
+	DBQueryFatal("update experiments set ".
+		     "event_sched_pid=-event_sched_pid ".
+		     "where pid='$pid' and eid='$eid'");
+	
 	SENDMAIL($TBOPS,
 		 "Failed to stop event system for $pid/$eid",
 		 "Could not kill(TERM) process $procid: $? $!");
+
+	die("*** $0:\n".
+	    "Failed to stop event system for $pid/$eid!\n");
     }
-    exit(0);
+    
+    if ($action eq "stop") {
+	if ($procid <= 0) {
+	    print "There is no event scheduler running for $pid/$eid!\n";
+	}
+	exit(0);
+    }
+    # replay continues below 
 }
 
 #
@@ -133,15 +174,42 @@ if ($action eq "stop") {
 $EUID=$UID;
 
 #
+# Check for a running scheduler, This is a loose check since its the users 
+# responsibility to make sure that they don't try and do two things
+# at the same time. All that *really* matters is that we do not start two
+# at a time, and that we make sure we kill off existing ones (making sure
+# the pid is not cleared from the DB unless it really does die). This is
+# handled by the stop code above. For start, just check for zero pid.
+# The scheduler itself will lock the table to prevent concurrent startup.
+# 
+$query_result =
+    DBQueryFatal("select event_sched_pid,path from experiments ".
+		 "where pid='$pid' and eid='$eid'");
+my @row    = $query_result->fetchrow_array();
+my $procid = $row[0];
+my $path   = $row[1];
+
+if ($procid != 0) {
+    die("*** $0:\n".
+	"There is already an event scheduler running for $pid/$eid!\n");
+}
+
+#
+# For now, lets not start an event system if there are no events.
+#
+$query_result =
+    DBQueryFatal("select distinct pid,eid from eventlist ".
+		 "where pid='$pid' and eid='$eid'");
+
+if (! $query_result->numrows) {
+    print "*** There are no events for $pid/$eid. Not starting a scheduler.\n";
+    exit(0);
+}
+
+#
 # start the event scheduler, redirecting output to the experiment
 # directory. 
 #
-$query_result = 
-    DBQueryFatal("select path from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-my @row  = $query_result->fetchrow_array();
-my $path = $row[0];
-
 if (my $childpid = TBBackGround("$path/logs/event-sched.log")) {
     #
     # Delay just in case. The event scheduler needs to be turned into
@@ -151,7 +219,7 @@ if (my $childpid = TBBackGround("$path/logs/event-sched.log")) {
     sleep(1);
     my $foo = waitpid($childpid, &WNOHANG);
     if ($foo) {
-	print STDERR "Failed to start event system $foo $?!\n";
+	print STDERR "Failed to start event system for $pid/$eid: $foo $?!\n";
 	SENDMAIL($TBOPS,
 		 "Event System Failure: $pid/$eid!\n",
 		 "Failed to start event system for $pid/$eid",
