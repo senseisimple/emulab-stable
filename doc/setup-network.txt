@@ -1,0 +1,101 @@
+##### Configuration suggestions for Cisco switches
+##### Last updated April 5, 2002 
+
+The purpose of this document is to aid in designing and setting up the control
+and experimental networks on other emulabs.
+
+First a bit of background: On the the control network will be your control
+nodes (boss, ops, any tipservers, etc.), control hardware (SNMP-controllable
+devices such as power controllers and switch IP interfaces), your connection to
+the outside world, and the control interfaces of your nodes. So far, we haven't
+tried to distribute the control net across multiple switches, but this should
+be theorically possible. You'll need to set up the VLANs, etc. on the control
+net by hand.
+
+The experimental network will consist of one or more (this, we have tested)
+switches connected with trunk (802.1q, or proprietary, like Cisco ISL) lines.
+Most configuration of these switches will be taken care of by our software.
+(See setup-cisco.txt for some configruation options you many want to apply to
+these switches if they are Ciscos.)
+
+##### Splitting up the control net
+
+We basically have 4 VLANs on the control network:
+'external' contains our connection to the outside world
+'private' contains the boss node, and all IP-controllable devices
+        (namely, power controllers and switch IP interfaces)
+'public' contains our ops node
+'control' contains the control net interfaces of all experimental nodes
+
+This is done for security - we route (using a module in our control-net switch)
+between these VLANs, and do some firewalling between each of them. The main
+goals are:
+1) Protect both control and experimental nodes from the outside world (and
+   vice-versa - we don't want people attacking the outside world from our nodes)
+2) Protect the control nodes from the experimental nodes
+3) Protect the control hardware (power controllers, etc.) from nodes
+   and the outside world
+4) Protect the boss node (which is _not_ publically accessible) from the ops
+   node (which all experimenters have shells on.)
+
+Now, it's entirely possible to combine these VLANs into one big one - this is
+what we've done on our mini-testbed here. But, there are some serious security
+implications with doing it this way - namely, that the nodes can theoretically
+impersonate each other, power cycle each other, and all kinds of nasty things.
+
+At the very least, you should have a firewall between your testbed and the
+outside world, to satisfy #1.
+
+It is also a good idea to separate the nodes' control net into a separate VLAN,
+which satisfies #2 and #3. After all, you are giving people root access to the
+experimental nodes. In situations where you are only giving acess to a small
+number of trusted people, this is probably not too big a deal, but once access
+gets outside the small circle of your friends, or if you are allowing students
+access, then taking these precautions are a very good idea.
+
+If possible, putting boss and ops on separate networks is also a good idea
+(#4), but is probably the least important part to worry about.
+
+Basically, it's up to you to decide how much security you want to worry about.
+I'd recommend at least going after #1, #2, and #3. We've put a lot of thought
+into this, so if you're wondering how your choice here will affect other
+aspects of security, ask Utah, and we can probably help you.
+
+A (somewhat outdated) overview of the firewall rules we have in place can be
+found in vlans.txt.
+
+##### Connecting the contol net to the experimental net
+
+In order to be able to control the experimental switches (ie. create new VLANs,
+etc.) you need a way to talk to them. So, you'll need one line that goes from
+your control net to the experimental net. However, you will need to be _very_
+careful that no experimental traffic can leak across this line, and that it
+cannot be used as a 'back door' into the private net by nodes.
+
+On the control switch, it should be in the same VLAN as your boss node.
+
+On the experimental switch, it should be in the same VLAN as the switch's IP
+interface. The simplest way to accomplish this is just to leave it in VLAN 1,
+the default one. However, you want to make sure that no ports on the nodes can
+talk to it, so you'll want to disable them all. (Our software will re-enable
+them, and disable them as needed.)                           
+
+##### Some variations on the above configuration
+
+There are some variations on the above configuration that we haven't tried, but
+may work for you.
+
+First, you may try putting all IP-controllable control hardware on a VLAN (or
+another switch/hub) hanging directly off another interface on the boss node. In
+the example above, the control hardware is given 'real' IP addresses, but
+prevented from talking to the outside worly by firewall rules. An alternative
+to this would be to give them 'private' (ie. 10.0.0.X) addresses, and put
+another interface in the boss node that talks only to these devices.
+
+As an added measure of security on the experimental network, you could move
+your switch IP interfaces (and the wire that runs from them to the control net)
+out of VLAN 1. When ports are not in use, we put them in VLAN 1 and disable
+them. But, if a port accidentally ends up in VLAN 1 still enabled, it could
+theoretically talk to the switch and change configurations.
+
+
