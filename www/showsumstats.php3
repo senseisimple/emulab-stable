@@ -276,7 +276,7 @@ function showrange ($showby, $sortby, $range) {
 		     "left join experiment_resources as r on s.rsrcidx=r.idx ".
 		     "where e.state='" . $TB_EXPTSTATE_ACTIVE . "'" .
 		     "  and e.pid!='$TBOPSPID' and ".
-		     "      (e.pid!='ron' and e.eid!='all') ");
+		     "      not (e.pid='ron' and e.eid='all') ");
 
     while ($row = mysql_fetch_assoc($query_result)) {
 	$pid         = $row["pid"];

@@ -73,7 +73,7 @@ $query_result =
 		 "where rs.pnodes>0 and ".
 		 "      e.state='" . $TB_EXPTSTATE_ACTIVE . "' and " .
 		 "      e.pid!='emulab-ops' and ".
-		 "      (e.pid!='ron' and e.eid!='all') ".
+		 "      not (e.pid='ron' and e.eid='all') ".
 		 "order by s.swapin_last desc ");
 
 echo "<a NAME=active></a>\n";
