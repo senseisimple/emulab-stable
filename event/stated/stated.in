@@ -593,8 +593,8 @@ sub handleCtrlEvent($$) {
 sub checkGenISUP($) {
   my ($node) = @_;
   info("$node: Checking ISUP Generation\n");
-  my $r = DBQueryWarn("select osfeatures from os_info as o ".
-		      "left join nodes as n on o.osid=n.osid ".
+  my $r = DBQueryWarn("select osfeatures from nodes as n ".
+		      "left join os_info as o on o.osid=n.osid ".
 		      "where node_id='$node' and osfeatures is not null");
   my $osfeatures="";
   # If we don't get anything back, assume it has no features.
