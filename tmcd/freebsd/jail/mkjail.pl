@@ -331,7 +331,7 @@ sub mkrootfs($)
     #
     for (my $i = 0; $i < $MAXVNDEVS; $i++) {
 	# Make sure the dev entries exist!
-	if (! -e "vn${i}") {
+	if (! -e "/dev/vn${i}") {
 	    mysystem("(cd /dev; ./MAKEDEV vn${i})");
 	}
 	
