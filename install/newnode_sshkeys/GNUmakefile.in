@@ -1,0 +1,21 @@
+#
+# For installation.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= install/newnode_sskeys
+TBADMINGROUP    = @TBADMINGROUP@
+
+KEY_FILES	= identity.newnode identity.newnode.pub
+
+include $(OBJDIR)/Makeconf
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_ETCDIR)/, $(KEY_FILES))
+	chmod 600 $(INSTALL_ETCDIR)/identity.newnode
+
+clean:
