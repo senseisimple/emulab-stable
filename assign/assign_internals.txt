@@ -79,7 +79,7 @@ Each vlink has the amount of bandwidth is uses.  Each plink has its
 bandwidth capacity and two arbitrary strings which are associated with
 each end.  These strings are not used for any scoring purposes and are
 just passed through, they are their for the use of the user.  A
-virtual to physical link mapping comes in one of three types.  DIRECT
+virtual to physical link mapping comes in one of four types.  DIRECT
 links represent physical wires connecting one node directly to
 another.  INTRASWITCH links are links that go from a node to a switch
 and then from that switch to the destination node.  INTERSWITCH links
@@ -89,7 +89,10 @@ are always one to one, i.e. there is only one plink corresponding to
 the vlink.  In INTRASWITCH maps there are two plinks for the vlink;
 one to the switch, and one from the switch.  In INTERSWITCH maps there
 are at least three (to the switch, at least one interconnect, and from
-the final switch to the destination) and can be any number.
+the final switch to the destination) and can be any number.  The final
+type is a TRIVIAL link.  This type occurs when trying to assign a
+vlink between vnodes that are in the same pnode.  TRIVIAL links impose
+zero cost and have no data associated with them.
 
 For interswitch plinks (switch to switch links) any number of vlinks
 can use the plink.  For all other plinks only a single vlink is
@@ -97,6 +100,9 @@ allowed to use the plink without violations.  Every vlink beyond the
 first results in a violation.  Violations also occur for every vlink
 that causes the used bandwidth of a plink to exceed the allowed
 bandwidth.
+
+A vlink can be marked emulated.  An emulated vlink can share a plink
+with other emulated vlinks.
 
 The switches and their interconnects are collectively called the
 switch fabric.  The shortest path between any two switches is
