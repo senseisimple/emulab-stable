@@ -76,8 +76,6 @@ if ($opt{b}) {
     $showmap = 1;
     $showdelays = 1;
     $showlinks = 1;
-    $showevents = 1;
-    $showroutes = 1;
 }
 if ($opt{n}) {
     $shownodes = 1;
