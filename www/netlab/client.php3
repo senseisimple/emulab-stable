@@ -106,6 +106,7 @@ function NLCEMPTY()
 
 <tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
+
 <tr>
 
 <?php NLCH1("Introduction") ?>
@@ -145,8 +146,8 @@ The current list of features are:
 <li>Build and interact with the topology from a single interface.
 <li>Interact with existing topologies.
 <li>Support for Emulab-specific <a
-href="docwrapper.php3?docname=nscommands.html">extensions</a> to the NS
-syntax.
+href="<? echo $TBBASE ?>/tutorial/docwrapper.php3?docname=nscommands.html"
+>extensions</a> to the NS syntax.
 <li>Uses the Emulab <a href="<? echo $TBBASE ?>/xmlrpcapi.php3">XML-RPC</a>
 interface.
 <li>Integrated access to node consoles.
@@ -195,6 +196,37 @@ requested by the user.
 </tr>
 
 
+<tr>
+
+<?php NLCH2("Download") ?>
+
+<?php NLCBODYBEGIN() ?>
+<!-- Center -->
+
+The client is currently distributed as a self-contained JAR file:
+
+<blockquote>
+<table class="stealth" border=0 cellspacing=0 cellpadding=0 width="100%">
+<tr>
+<td>
+<a href="/downloads/netlab-client.jar">netlab-client.jar</a>
+</td>
+<td align="center">(370K)</td>
+<td align="right">May 11, 2004</td>
+</tr>
+</table>
+</blockquote>
+
+Simply save it to any directory you choose and you can move on to the tutorial.
+<br>
+<br>
+<?php NLCBODYEND() ?>
+
+<?php NLCEMPTY() ?>
+
+</tr>
+
+
 <tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
 
@@ -205,8 +237,7 @@ requested by the user.
 <?php NLCBODYBEGIN() ?>
 <!-- Center -->
 
-Starting the client is simply a matter of executing the Java JAR file retrieved
-from the <a href="<?php echo $TBBASE ?>/software.php3">downloads</a> page:
+Starting the client is just a matter of executing the Java JAR file:
 
 <blockquote>
 <code>[michael@bluth1 ~] java -jar netlab-client.jar</code>
