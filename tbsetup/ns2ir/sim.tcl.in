@@ -169,6 +169,13 @@ Simulator instproc run {} {
 	}
     }
 
+    # Check for one node lans
+    foreach lan [array names lanlink_list] {
+	if {[llength [$lan set nodelist]] <= 1} {
+	    perror "\[run] $lan has only a single node.  LANs must have at least 2 nodes in them."
+	}
+    }
+
     # If any errors occur stop here.
     if {$errors == 1} {return}
 
