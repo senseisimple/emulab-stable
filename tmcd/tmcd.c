@@ -1197,41 +1197,22 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * (for each user) differs by the project PID and it unix
 		 * GID. The intent is to build up a list of GIDs for each
 		 * user to return. Well, a primary group and a list of aux
-		 * groups for that user. It might be cleaner to do this as
-		 * multiple querys, but this makes it atomic.
+		 * groups for that user.
 		 */
-		if (strcmp(reqp->pid, reqp->gid)) {
-			res = mydb_query("select distinct "
-			     "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
-			     "  u.emulab_pubkey,u.home_pubkey, "
-			     "  UNIX_TIMESTAMP(u.usr_modified), "
-			     "  u.usr_email,u.usr_shell, "
-			     "  u.widearearoot,u.wideareajailroot "
-			     "from group_membership as p "
-			     "left join users as u on p.uid=u.uid "
-			     "left join groups as g on p.pid=g.pid "
-			     "where ((p.pid='%s' and p.gid='%s')) "
-			     "      and p.trust!='none' "
-			     "      and u.status='active' order by u.uid",
-			     16, reqp->pid, reqp->gid);
-		}
-		else {
-			res = mydb_query("select distinct "
-			     "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
-			     "  u.emulab_pubkey,u.home_pubkey, "
-			     "  UNIX_TIMESTAMP(u.usr_modified), "
-			     "  u.usr_email,u.usr_shell, "
-			     "  u.widearearoot,u.wideareajailroot "
-			     "from group_membership as p "
-			     "left join users as u on p.uid=u.uid "
-			     "left join groups as g on "
-			     "     p.pid=g.pid and p.gid=g.gid "
-			     "where ((p.pid='%s')) and p.trust!='none' "
-			     "      and u.status='active' order by u.uid",
-			     16, reqp->pid);
-		}
+		res = mydb_query("select distinct "
+				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+				 "  u.emulab_pubkey,u.home_pubkey, "
+				 "  UNIX_TIMESTAMP(u.usr_modified), "
+				 "  u.usr_email,u.usr_shell, "
+				 "  u.widearearoot,u.wideareajailroot "
+				 "from group_membership as p "
+				 "left join users as u on p.uid=u.uid "
+				 "left join groups as g on "
+				 "     p.pid=g.pid and p.gid=g.gid "
+				 "where ((p.pid='%s')) and p.trust!='none' "
+				 "      and u.status='active' order by u.uid",
+				 16, reqp->pid);
 	}
 	else if (reqp->jailflag) {
 		/*
