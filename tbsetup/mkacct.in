@@ -368,18 +368,28 @@ if ($auditmode) {
 exit(0);
 
 sub fatal {
-    local($msg) = $_[0];
+    my($msg) = @_;
 
-    SENDMAIL($TBOPS, "mkacct $user Failed", $msg, $TBOPS, undef,
-	     (defined($logname) ? ($logname) : ()));
-    die("$0: $msg\n");
+    my $flist = ();
+    if (defined($logname)) {
+	$flist = ($logname);
+    }
+
+    SENDMAIL($TBOPS, "mkacct $user Failed", $msg, $TBOPS, undef, $flist);
+
+    if (defined($logname)) {
+	unlink($logname);
+    }
+    die("*** $0:\n".
+	"    $msg\n");
 }
 
 sub AUDIT($)
 {
     my($msg) = @_;
 
-    SENDMAIL($TBLOGS, "mkacct $user Complete", $msg, $TBOPS, undef, $logname);
+    SENDMAIL($TBLOGS, "mkacct $user Complete", $msg,
+	     $TBOPS, undef, ($logname));
 }
 
 #
@@ -417,7 +427,7 @@ sub FirstTime()
     if ($mypid) {
 	waitpid($mypid, 0);
 	if ($?) {
-	    exit($? >> 0);
+	    fatal("Failed to do firsttime user stuff!");
 	}
 	return;
     }
@@ -427,9 +437,13 @@ sub FirstTime()
 
     TBdbfork();
 
+    #
+    # Below here, use die() instead of fatal().
+    # 
+
     if ($dossh) {
-	if (system("$KEYGEN -P '' -f $SSHDIR/identity")) {
-	    fatal("Failure in ssh-keygen");
+	if (system("$KEYGEN -t rsa1 -P '' -f $SSHDIR/identity")) {
+	    die("Failure in ssh-keygen");
 	}
 
 	#
@@ -460,10 +474,10 @@ sub FirstTime()
 	print "Setting up .forward file for $user.\n";
 
 	if (system("echo \"$user_email\" > $HOMEDIR/$user/.forward")) {
-	    fatal("Could not create $HOMEDIR/$user/.forward");
+		die("Could not create $HOMEDIR/$user/.forward");
 	}
 	chmod(0644, "$HOMEDIR/$user/.forward") or
-	    fatal("Could not chmod $HOMEDIR/$user/.forward");
+		die("Could not chmod $HOMEDIR/$user/.forward");
     }
 
     #

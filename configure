@@ -998,6 +998,7 @@ if test "${with_SSH_ARGS+set}" = set; then
 else
   
     SSH_ARGS="-q -o \"BatchMode yes\" -o \"StrictHostKeyChecking no\""
+    SSH_ARGS="$SSH_ARGS -o \"Protocol 1\""
 
 fi
 
@@ -1228,7 +1229,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/checkports tbsetup/webidlecheck \
+	tbsetup/checkports tbsetup/webidlecheck tbsetup/webnodereboot \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/ron/GNUmakefile \

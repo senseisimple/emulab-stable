@@ -33,6 +33,9 @@ if ($#ARGV != 4) {
 # The status of the test.
 $status = "";
 
+# A counter.
+$counter = 0;
+
 sub doexit {
     if ($status eq "") {
 	$status = "PASS";
@@ -53,6 +56,7 @@ $pid = $::pid;
 $test = $::test;
 $dir = $::dir;
 $dbh = $::dbh;
+$db = $::db;
 
 sub tb_prerun {
     my ($cmd,$exitcode) = @_;
@@ -63,6 +67,10 @@ sub tb_prerun {
     }
     close(TBEXEC);
     $ecode = ($? >> 8);
+
+#    system("mysqldump --all $db > $cmd-$::counter.txt");
+    $::counter++;
+    
     if ($ecode != $exitcode) {
 	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
     }
@@ -102,6 +110,10 @@ sub tb_run {
     }
     close(TBEXEC);
     $ecode = ($? >> 8);
+
+#    system("mysqldump --all $db > $cmd-$::counter.txt");
+    $::counter++;
+
     if ($ecode != $exitcode) {
 	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
     }
