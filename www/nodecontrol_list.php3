@@ -196,7 +196,7 @@ echo "<table>
 
 foreach($freetypes as $key => $value) {
     echo "<tr>
-           <td align=right><a href=shownodetype.php3?node_type=$type>
+           <td align=right><a href=shownodetype.php3?node_type=$key>
                            $key</a></td>
            <td align=left>$value</td>
           </tr>\n";
