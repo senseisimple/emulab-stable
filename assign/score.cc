@@ -25,9 +25,11 @@
 #include <string.h>
 
 #include "common.h"
-#include "score.h"
 #include "virtual.h"
 #include "physical.h"
+#include "pclass.h"
+#include "score.h"
+
 
 #include "assert.h"
 
@@ -95,6 +97,7 @@ void init_score()
   forall_edges(e,G) {
     tb_vlink &ve=G[e];
     ve.type=tb_vlink::LINK_UNKNOWN;
+    ve.plink=NULL;
   }
   forall_nodes(n,PG) {
     tb_pnode &pn=PG[n];
@@ -133,9 +136,18 @@ void remove_node(node n)
   fprintf(stderr,"       no_connections = %d\n",vnoder.no_connections);
 #endif
 
-  
   assert(pnode != NULL);
 
+  pclass_unset(pnoder);
+
+  // pclass
+  if (pnoder.my_class->used == 0) {
+#ifdef SCORE_DEBUG
+    cerr << "    freeing pclass\n";
+#endif
+    SSUB(SCORE_PCLASS);
+  }
+  
   edge e;
   tb_vlink *vlink;
   node vdst;
@@ -233,45 +245,11 @@ void remove_node(node n)
   violated++;
 
   // features/desires
-  seq_item desire;
-  seq_item feature;
-  double value;
-  for (desire = vnoder.desires.min_item();desire;
-       desire = vnoder.desires.succ(desire)) {
-    feature = pnoder.features.lookup(vnoder.desires.key(desire));
-#ifdef SCORE_DEBUG
-    cerr << "  desire = " << vnoder.desires.key(desire) \
-	 << " " << vnoder.desires.inf(desire) << "\n";
-#endif
-    if (!feature) {
-      // Unmatched desire.  Remove cost.
-#ifdef SCORE_DEBUG
-      cerr << "    unmatched\n";
-#endif
-      value = vnoder.desires.inf(desire);
-      SSUB(SCORE_DESIRE*value);
-      if (value >= 1) {
-	violated--;
-	vinfo.desires--;
-      }
-    }
-  }
-  for (feature = pnoder.features.min_item();feature;
-       feature = pnoder.features.succ(feature)) {
-    desire = vnoder.desires.lookup(pnoder.features.key(feature));
-#ifdef SCORE_DEBUG
-    cerr << "  feature = " << pnoder.features.key(feature) \
-	 << " " << pnoder.features.inf(feature) << "\n";
-#endif
-    if (! desire) {
-      // Unused feature.  Remove weight
-#ifdef SCORE_DEBUG
-      cerr << "    unused\n";
-#endif
-      value = pnoder.features.inf(feature);
-      SSUB(SCORE_FEATURE*value);
-    }
-  }
+  int fd_violated;
+  double fds=fd_score(vnoder,pnoder,&fd_violated);
+  SSUB(fds);
+  violated -= fd_violated;
+  vinfo.desires -= fd_violated;
   
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
@@ -435,15 +413,32 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"   could not find path - no connection\n");
 #endif
-	  // XXX - this is a hack for the moment
+
+	  // Need to free up all links already made and abort
+	  forall_inout_edges(e,n) {
+	    tb_vlink &vlink = G[e];
+	    if (vlink.type == tb_vlink::LINK_DIRECT) {
+	      unscore_link(vlink.plink,e,false);
+	    } else if (vlink.type == tb_vlink::LINK_INTRASWITCH) {
+	      SSUB(SCORE_INTRASWITCH_LINK);
+	      unscore_link(vlink.plink,e,false);
+	      unscore_link(vlink.plink_two,e,false);
+	    } else if (vlink.type == tb_vlink::LINK_INTERSWITCH) {
+	      edge cur;
+	      forall(cur,G[e].path) {
+		SSUB(SCORE_INTERSWITCH_LINK);
+		unscore_link(cur,e,true);
+	      }
+	      G[e].path.clear();
+	      unscore_link(vlink.plink_local_one,e,false);
+	      unscore_link(vlink.plink_local_two,e,false);
+	    } // else LINK_UNKNOWN i.e. unassigned.
+	  }
+
+	  // Reset to be retyped next time and abort.  This is a
+	  // fatal error.
 	  pnoder.typed = false;
 	  return 1;
-	  
-	  // couldn't find path.
-	  vnoder.no_connections++;
-	  SADD(SCORE_NO_CONNECTION);
-	  vinfo.no_connection++;
-	  violated++;
  	} else {
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"   found interswitch link\n");
@@ -506,50 +501,27 @@ int add_node(node n,int ploc)
   violated--;
 
   // features/desires
-  seq_item desire;
-  seq_item feature;
-  double value;
-  for (desire = vnoder.desires.min_item();desire;
-       desire = vnoder.desires.succ(desire)) {
-    feature = pnoder.features.lookup(vnoder.desires.key(desire));
+  int fd_violated;
+  double fds = fd_score(vnoder,pnoder,&fd_violated);
+  SADD(fds);
+  violated += fd_violated;
+  vinfo.desires += fd_violated;
+
+  // pclass
+  if (pnoder.my_class->used == 0) {
 #ifdef SCORE_DEBUG
-    cerr << "  desire = " << vnoder.desires.key(desire) \
-	 << " " << vnoder.desires.inf(desire) << "\n";
+    cerr << "    new pclass\n";
 #endif
-    if (!feature) {
-      // Unmatched desire.  Add cost.
-#ifdef SCORE_DEBUG
-      cerr << "    unmatched\n";
-#endif
-      value = vnoder.desires.inf(desire);
-      SADD(SCORE_DESIRE*value);
-      if (value >= 1) {
-	violated++;
-	vinfo.desires++;
-      }
-    }
+    SADD(SCORE_PCLASS);
   }
-  for (feature = pnoder.features.min_item();feature;
-       feature = pnoder.features.succ(feature)) {
-    desire = vnoder.desires.lookup(pnoder.features.key(feature));
-#ifdef SCORE_DEBUG
-    cerr << "  feature = " << pnoder.features.key(feature) \
-	 << " " << pnoder.features.inf(feature) << "\n";
-#endif
-    if (! desire) {
-      // Unused feature.  Add weight
-#ifdef SCORE_DEBUG
-      cerr << "    unused\n";
-#endif
-      value = pnoder.features.inf(feature);
-      SADD(SCORE_FEATURE*value);
-    }
-  }
-    
+  
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  posistion = %d\n",vnoder.posistion);
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
 #endif
+
+  pclass_set(vnoder,pnoder);
+  
   return 0;
 }
 
@@ -747,4 +719,53 @@ void unscore_link(edge e,edge v,bool interswitch)
     vinfo.bandwidth--;
     SSUB(SCORE_OVER_BANDWIDTH);
   }
+
+  er.type = tb_vlink::LINK_UNKNOWN;
+}
+
+double fd_score(tb_vnode &vnoder,tb_pnode &pnoder,int *fd_violated)
+{
+  double fd_score=0;
+  (*fd_violated)=0;
+  
+  seq_item desire;
+  seq_item feature;
+  double value;
+  for (desire = vnoder.desires.min_item();desire;
+       desire = vnoder.desires.succ(desire)) {
+    feature = pnoder.features.lookup(vnoder.desires.key(desire));
+#ifdef SCORE_DEBUG
+    cerr << "  desire = " << vnoder.desires.key(desire) \
+	 << " " << vnoder.desires.inf(desire) << "\n";
+#endif
+    if (!feature) {
+      // Unmatched desire.  Add cost.
+#ifdef SCORE_DEBUG
+      cerr << "    unmatched\n";
+#endif
+      value = vnoder.desires.inf(desire);
+      fd_score += SCORE_DESIRE*value;
+      if (value >= 1) {
+	(*fd_violated)++;
+      }
+    }
+  }
+  for (feature = pnoder.features.min_item();feature;
+       feature = pnoder.features.succ(feature)) {
+    desire = vnoder.desires.lookup(pnoder.features.key(feature));
+#ifdef SCORE_DEBUG
+    cerr << "  feature = " << pnoder.features.key(feature) \
+	 << " " << pnoder.features.inf(feature) << "\n";
+#endif
+    if (! desire) {
+      // Unused feature.  Add weight
+#ifdef SCORE_DEBUG
+      cerr << "    unused\n";
+#endif
+      value = pnoder.features.inf(feature);
+      fd_score+=SCORE_FEATURE*value;
+    }
+  }
+
+  return fd_score;
 }

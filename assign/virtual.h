@@ -22,7 +22,6 @@ public:
   string name;			// string name of the node
 };
 
-typedef enum {LINK_DIRECT,LINK_INTRASWITCH,LINK_INTERSWITCH} tb_link_type;
 
 class tb_plink;
 

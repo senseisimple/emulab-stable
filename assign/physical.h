@@ -1,6 +1,8 @@
 #ifndef __PHYSICAL_H
 #define __PHYSICAL_H
 
+class tb_pclass;
+
 class tb_pnode {
 public:
   tb_pnode() {;}
@@ -14,7 +16,7 @@ public:
     {
       return i;
     }
-  
+
   dictionary<string,int> types;	// contains max nodes for each type
   sortseq<string,double> features; // contains cost of each feature
   string current_type;
@@ -27,6 +29,8 @@ public:
   int pnodes_used;		// for switch nodes
   node sgraph_switch;		// only for switches, the corresponding
 				// sgraph switch.
+
+  tb_pclass *my_class;
 };
 
 class tb_switch {
@@ -83,4 +87,5 @@ public:
 typedef GRAPH<tb_pnode,tb_plink> tb_pgraph;
 typedef UGRAPH<tb_switch,tb_slink> tb_sgraph;
 
+int compare(tb_pnode *const &a, tb_pnode *const &b);
 #endif

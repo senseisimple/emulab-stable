@@ -91,3 +91,9 @@ compile time options
 what is going on.
 
 -DSCORE_DEBUG_MORE adds even more output.
+
+-DSCORE_PCLASS spits out the equivalence classes at the beginning.
+
+-DSCORE_PCLASS_MORE spits out lots of output during the assign loop.
+It works best with -DSCORE_DEBUG but does nto require
+-DSCORE_DEBUG_MORE.

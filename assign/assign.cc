@@ -19,6 +19,7 @@
 #include "physical.h"
 #include "virtual.h"
 #include "score.h"
+#include "pclass.h"
 
 void parse_options(char **argv, struct config_param options[], int nopt);
 int config_parse(char **args, struct config_param cparams[], int nparams);
@@ -40,10 +41,15 @@ tb_sgraph SG;
 edge_array<int> edge_costs;
 typedef node_array<int> switch_distance_array;
 typedef node_array<edge> switch_pred_array;
+
 node_array<switch_distance_array> switch_distances;
 node_array<switch_pred_array> switch_preds;
 tb_pgraph PG;
 tb_vgraph G;
+dictionary<tb_pnode*,node> pnode2node;
+dictionary<tb_pnode*,int> pnode2posistion;
+pclass_list pclasses;
+dictionary<string,pclass_list*> type_table;
 
 /* How can we chop things up? */
 #define PARTITION_BY_ANNEALING 0
@@ -83,6 +89,14 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
 list<string> vtypes;
 list<string> ptypes;
 
+// Makes LEDA happy
+
+int compare(tb_pnode *const &a, tb_pnode *const &b)
+{
+  if (a==b) return 0;
+  if (a < b) return -1;
+  return 1;
+}
 
 /*
  * Basic simulated annealing parameters:
@@ -110,6 +124,37 @@ inline int accept(float change, float temperature)
   return 0;
 }
 
+// This routine chooses randomly chooses a pclass based on the weights
+// and *removes that pclass from the weights*.  Total is the total of
+// all weights and is adjusted when a pclass is removed.
+tb_pnode *choose_pnode(dictionary<tb_pclass*,double> &weights,double &total,
+		       string vtype)
+{
+  tb_pnode *pnode;
+  dic_item dit=nil;
+
+  double r = random()/(double)RAND_MAX*total;
+  forall_items(dit,weights) {
+    r -= weights.inf(dit);
+    if (r <= 0) break;
+  }
+  if (dit == nil) return NULL;
+
+  tb_pclass *chosen_class = weights.key(dit);
+
+  // Take the first node of the correct type from the class.
+  pnode = chosen_class->members.access(vtype)->front();
+  
+  total -= weights.inf(dit);
+  weights.del_item(dit);
+  
+#ifdef PCLASS_DEBUG_MORE
+  cout << "choose_pnode = [" << chosen_class->name << "] = "
+       << ((pnode == NULL) ? string("NULL"):pnode->name) << endl;
+#endif
+  
+  return pnode;
+}
 /*
  * The workhorse of our program.
  *
@@ -145,7 +190,7 @@ int assign()
   
   int mintrans = (int)cycles;
   int trans;
-  int naccepts = 40*nnodes;
+  int naccepts = 20*nnodes;
   int accepts = 0;
   int oldpos;
 
@@ -191,7 +236,6 @@ int assign()
     trans = 0;
     accepts = 0;
 
-    bool unassigned = true;
     while (trans < mintrans && accepts < naccepts) {
 #ifdef STATS
       cout << "STATS temp:" << temp << " score:" << get_score() <<
@@ -209,36 +253,135 @@ int assign()
       // Note: we have a lot of +1's here because of the first
       // node loc in pnodes is 1 not 0.
       oldpos = G[n].posistion;
-      newpos = ((oldpos+(random()%(nparts-1)+1))%nparts)+1;
 
       if (oldpos != 0) {
 	remove_node(n);
-	unassigned = false;
+	unassigned_nodes.insert(n,random());
       }
 
-      int first_newpos = newpos;
-      while (add_node(n,newpos) == 1) {
-	newpos = (newpos % nparts)+1;
-	if (newpos == first_newpos) {
-	  // no place to put a node.
-	  // instead re randomly choose a node and remove it and
-	  // then continue the 'continue'
-	  // XXX - could improve this
-	  node ntor = G.choose_node();
-	  while (G[ntor].posistion == 0)
-	    ntor = G.choose_node();
-	  remove_node(ntor);
-	  unassigned_nodes.insert(ntor,random());
-	  continue;
+      //////////////////////////////////////////////////////////////////////
+      // Lots of code to calculate the relative weights of the pclasses.
+      // The weights are stored in the weights dictionary which is indexed
+      // by pclass* and contains the weight.
+      //////////////////////////////////////////////////////////////////////
+      dictionary<tb_pclass*,double> weights;
+      list_item lit;
+      dic_item dit;
+      
+      // find acceptable pclasses
+      tb_vnode &vn=G[n];
+      pclass_list *L = type_table.access(vn.type);
+      forall_items(lit,*L) {
+	tb_pclass *c = L->inf(lit);
+	if (c->used != c->size) {
+	  if (c->members.access(vn.type)->front() != NULL) {
+	    weights.insert(c,PCLASS_BASE_WEIGHT);
+	  }
 	}
       }
-      if (unassigned) unassigned_nodes.del(n);
+      
+      // adjust weight by neighbors
+      edge e;
+      forall_inout_edges(e,n) {
+	node dst = G.target(e);
+	if (dst == n) dst = G.source(e);
+	tb_vnode &vdst = G[dst];
+	if (vdst.posistion != 0) {
+	  tb_pnode &pdst = PG[pnodes[vdst.posistion]];
+	  tb_pclass *c = pdst.my_class;
+	  dit = weights.lookup(c);
+	  if (dit != nil) {
+	    weights.change_inf(dit,weights.inf(dit)+PCLASS_NEIGHBOR_WEIGHT);
+	  }
+	}
+      }
+      
+      // Adjust classes by utilizaiton
+      forall_items(lit,pclasses) {
+	tb_pclass *c = pclasses.inf(lit);
+	dit = weights.lookup(c);
+	if (dit != nil) {
+	  if (c->used > 0) {
+	    weights.change_inf(dit,weights.inf(dit)+
+			       PCLASS_UTIL_WEIGHT);
+	  }
+	}
+      }
 
+      // Adjust classes by features/desires
+      // We calculate the fd score for all possible classes and normalize
+      // to 1 and then multiply by PCLASS_FD_WEIGHT
+      dictionary<tb_pclass*,double> fdscores;
+      double max_afds=0;
+      forall_items(dit,weights) {
+	tb_pclass *c = weights.key(dit);
+	tb_pnode *p = c->members.access(vn.type)->front();
+	int v;
+	double score = fd_score(vn,*p,&v);
+	fdscores.insert(c,score);
+	if (fabs(score) > max_afds) max_afds=fabs(score);
+      }
+      if (max_afds == 0) max_afds=1;
+      
+      forall_items(dit,weights) {
+	tb_pclass *c = weights.key(dit);
+	double fds = fdscores.access(c);
+	weights.change_inf(dit,
+			   weights.inf(dit)+PCLASS_FDS_WEIGHT*fds/max_afds);
+      }
+      
+      // Calculate total weight.
+      double total=0;
+      forall_items(dit,weights) {
+	total += weights.inf(dit);
+      }
+      
+#ifdef PCLASS_DEBUG_MORE
+      cerr << "Finding pclass for " << vn.name << endl;
+      {
+	dic_item pit;
+	forall_items(pit,weights) {
+	  tb_pclass *p = weights.key(pit);
+	  cout << "  " << p->name << " " << weights.inf(pit) << endl;
+	}
+      }
+#endif
+      
+      ////
+      // We've now calculated the weights and the total weight.  We
+      // will loop through all the classes until we find an acceptable
+      // one.
+      ////
+      // Loop will break eventually.
+      tb_pnode *newpnode;
+      do {
+	newpnode = choose_pnode(weights,total,vn.type);
+	if (newpnode == NULL) {
+	  // no available nodes
+	  // need to free up a node and recalculate weights.
+	  int pos = 0;
+	  node ntor;
+	  while (pos == 0) {
+	    ntor = G.choose_node();
+	    pos = G[ntor].posistion;
+	  }
+	  remove_node(ntor);
+	  unassigned_nodes.insert(ntor,random());
+	  break;
+	}
+	newpos = pnode2posistion.access(newpnode);
+      } while (add_node(n,newpos) == 1);
+
+      // This occurs when no pclass could be found.
+      if (newpnode == NULL) continue;
+
+      unassigned_nodes.del(n);
+      
       newscore = get_score();
-
-      /* So it's negative if bad */
+      
+      // Negative means bad
       scorediff = bestscore - newscore;
-
+      
       // tinkering aournd witht his.
       if ((newscore < optimal) || (violated < bestviolated) ||
 	  ((violated == bestviolated) && (newscore < bestscore)) ||
@@ -258,7 +401,6 @@ int assign()
 	  absbestv = violated;
 	  cycles_to_best = iters;
 	}
-	//      if (newscore < 0.11f) {
 	if (newscore < optimal) {
 	  timeend = used_time(timestart);
 	  cout << "OPTIMAL ( " << optimal << ") in "
@@ -266,15 +408,15 @@ int assign()
 	       << timeend << " seconds" << endl;
 	  goto DONE;
 	}
-      } else { /* Reject this change */
+	// Accept change
+      } else {
+	// Reject change
 	remove_node(n);
 	if (oldpos != 0) {
-	  int r = add_node(n,oldpos);
-	  assert(r == 0);
+	  add_node(n,oldpos);
 	}
       }
     }
-      
     temp *= temp_rate;
   }
   cout << "Done.\n";
@@ -485,9 +627,11 @@ int main(int argc, char **argv)
   dump_options("Configuration options:", options, noptions);
 #endif
 
-  int seed = time(NULL)+getpid();
+  int seed;
   if (getenv("ASSIGN_SEED") != NULL) {
     sscanf(getenv("ASSIGN_SEED"),"%d",&seed);
+  } else {
+    seed = time(NULL)+getpid();
   }
   printf("seed = %d\n",seed);
   srandom(seed);
@@ -570,6 +714,24 @@ int main(int argc, char **argv)
 #endif
     }
   }
+
+  node pn;
+  forall_nodes(pn,PG) {
+    pnode2node.insert(&PG[pn],pn);
+  }
+  for (int i=0;i<MAX_PNODES;++i) {
+    if (pnodes[i] != nil) {
+      pnode2posistion.insert(&PG[pnodes[i]],i);
+    }
+  }
+
+  cout << "Generating physical classes\n";
+  generate_pclasses(PG);
+  cout << "Nclasses: " << pclasses.length() << endl;
+
+#ifdef PCLASS_DEBUG
+  pclass_debug();
+#endif
   
   cout << "Annealing!" << endl;
   batch();

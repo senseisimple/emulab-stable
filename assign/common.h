@@ -15,7 +15,7 @@ static int init_temp = 100;
 static int USE_OPTIMAL = 1;
 static int temp_prob = 130;
 static int temp_stop = 2;
-static int CYCLES = 120;
+static int CYCLES = 20;
 
 static float temp_rate = 0.9;
 static float opt_nodes_per_sw = 5.0;
@@ -31,7 +31,7 @@ static float SCORE_UNASSIGNED = 1;/* Cost of an unassigned node*/
 static float SCORE_OVER_BANDWIDTH = 0.5;/* Cost of going over bandwidth*/
 static float SCORE_DESIRE = 1;/* Multiplier for desire costs*/
 static float SCORE_FEATURE = 1;/* Multiplier for feature weights*/
-
+static float SCORE_PCLASS = 0.5; /* Cost of each pclass */
 
 static struct config_param options[] = {
   { "IT",	CONFIG_INT,	&init_temp,			0 },
@@ -50,6 +50,7 @@ static struct config_param options[] = {
   { "DP",	CONFIG_FLOAT,	&SCORE_DIRECT_LINK_PENALTY,	0 },
   { "PN",	CONFIG_FLOAT,	&SCORE_PNODE,			0 },
   { "PP",	CONFIG_FLOAT,	&SCORE_PNODE_PENALTY,		0 },
+  { "PC",	CONFIG_FLOAT,	&SCORE_PCLASS,		        0 },
   { "SW",	CONFIG_FLOAT,	&SCORE_SWITCH,			0 },
   { "ON",	CONFIG_FLOAT,	&opt_nodes_per_sw,		0 },
   { "TR",	CONFIG_FLOAT,	&temp_rate,			0 }

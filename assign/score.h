@@ -20,5 +20,6 @@ void init_score();
 void remove_node(node n);
 int add_node(node n,int loc);
 float get_score();
+double fd_score(tb_vnode &vnoder,tb_pnode &pnoder,int *fd_violated);
 
 #endif

@@ -14,7 +14,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 LEDA=@LEDA@
 
-OBJS=score.o parse_top.o parse_ptop.o config.o
+OBJS=score.o parse_top.o parse_ptop.o config.o pclass.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
 LDFLAGS+= -O3
 CXXFLAGS = -I${LEDA}/incl
@@ -22,8 +22,9 @@ CXXFLAGS = -I${LEDA}/incl
 # Pick one of the following:
 CXXFLAGS += -Wall -O3 
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
-#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG
-#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DSCORE_DEBUG_MORE 
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DPCLASS_DEBUG
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DPCLASS_DEBUG -DPCLASS_DEBUG_MORE
+#CXXFLAGS += -O0 -g -Wall -DVERBOSE -DSCORE_DEBUG -DSCORE_DEBUG_MORE -DPCLASS_DEBUG -DPCLASS_DEBUG_MORE
 
 #CXXFLAGS += -DSTATS
 
