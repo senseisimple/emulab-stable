@@ -66,6 +66,7 @@ my $TBOPS  = "@TBOPSEMAIL@";
 my $TBLOGS = "@TBLOGSEMAIL@";
 my $TBINFO = "$TB/expinfo";
 my $TBDOCBASE = "@TBDOCBASE@";
+my $TBBASE = "@TBBASE@";
 
 #
 # Testbed Support libraries
@@ -1029,7 +1030,13 @@ sub fatal($)
     #
     SENDMAIL("$user_name <$user_email>",
 	     "Swap ${inout} Failure: $pid/$eid",
-	     $mesg,
+	     $mesg . "\n\n" .
+	     "Please look at the log below to see what happened. If the error\n".
+	     "resulted from a lack of resources (not enough nodes), you can\n".
+	     "use this web page to get a summary of free nodes:\n\n".
+	     "  ${TBBASE}/nodecontrol_list.php3\n".
+	     "\n".
+	     "Please do not try again until you see enough node free.",
 	     ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
 	     "Cc:  $TBOPS",
