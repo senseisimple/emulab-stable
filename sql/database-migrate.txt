@@ -226,7 +226,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (node_id)
        ) TYPE=MyISAM;
 
-1.132: Changed the new_nodes and new_interfaces table to use a new unique
+1.132: This commit was superseded by 1.133
+
+1.133: Changed the new_nodes and new_interfaces table to use a new unique
        int as they primary key instead of the node_id, so that the latter can
        be easily changed. Also added a timestamp the the new_nodes column.
 
@@ -238,8 +240,6 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table new_interfaces drop column node_id;
        alter table new_interfaces add column new_node_id int not null first,
               add primary key(new_node_id,iface);
-
-1.133: Rob?
 
 1.134: New stats tables. I've checked in a script in this directory to
        fill in the tables as best as possible. See ./initstats.pl. Just
