@@ -198,16 +198,19 @@ function WRITEPLABBOTTOMBAR() {
     }
 
     echo "
-	    <center>
-	    <br>
-	    <font size=-1>
-	    [ <a href='$TBDOCBASE/doc.php3'>
-		Documentation</a> ]
-	    [ <a href='$newsBase/news.php3'>
+	   <center>
+	   <br>
+	   <font size=-1>
+	   <form method=get action='/cgi-bin/webglimpse/usr/testbed/webglimpse'>
+	   [ <a href='$TBDOCBASE/doc.php3'>
+		Documentation</a> : <input name=query size = 15/>
+		  <input type=submit style='font-size:10px;' value='Search' /> ]
+	   [ <a href='$newsBase/news.php3'>
 		News</a> ]
-	    </font>
-	    <br>
-	    </center>\n";
+	   </form>
+	   </font>
+	   <br>
+	   </center>\n";
 
 }
 
