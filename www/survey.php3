@@ -65,13 +65,14 @@ $questions = array(
 );
 
 $followups = array(
-'Any elaborations on your responses above, or other comments?',
+'Any elaborations, comments, or suggestions?',
 
 'If we were to expand as you suggested above, what kinds
  of qualitatively new experiments could you perform, if any?',
 
-'Are there any Emulab characteristics you were forced to "work around," or
- that prevented you from being able to perform an experiment you wanted to?',
+'Besides scale, are there any Emulab characteristics you were forced to
+ "work around," or that prevented you from performing an experiment you
+ wanted to?',
 
 'What are we doing right?<br />Are there things we do well that you
  would like us to continue to focus on?'
