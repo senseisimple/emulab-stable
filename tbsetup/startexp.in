@@ -15,15 +15,13 @@ use Getopt::Std;
 #       save off the file in the expinfo directory. The caller (batch daemon) 
 #       opens the file and just passes the name in. I do not like this!
 #
-# usage: startexp [-l] [-b logfile] [-g gid] <pid> <eid> <nsfile>
-#
 sub usage()
 {
     print STDOUT
-	"Usage: startexp [-l] [-b logfile] [-g gid] <pid> <eid> <nsfile>\n";
+	"Usage: startexp [-b logfile | -f] [-g gid] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
-my  $optlist = "b:g:";
+my  $optlist = "b:g:f";
 
 #
 # Configure variables
@@ -45,6 +43,7 @@ use libtestbed;
 my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
 my $batch    = 0;
+my $frontend = 0;
 my $errorstat= -1;
 my $logname;
 
@@ -89,6 +88,12 @@ my $nsfile= $ARGV[2];
 if (defined($options{"b"})) {
     $batch   = 1;
     $logname = $options{"b"};
+}
+if (defined($options{"f"})) {
+    $frontend = 1;
+}
+if ($batch && $frontend) {
+    usage();
 }
 
 if (defined($options{"g"})) {
@@ -234,34 +239,37 @@ if (system("$tbdir/tbprerun $pid $eid $nsfile") != 0) {
 # So fatal errors run tbend.
 $estate = EXPTSTATE_PRERUN;
 
-if (system("$tbdir/tbswapin  $pid $eid") != 0) {
-    $errorstat = $? >> 8;
-    fatal("tbswapin failed!\n");
+if (! $frontend) {
+    if (system("$tbdir/tbswapin  $pid $eid") != 0) {
+	$errorstat = $? >> 8;
+	fatal("tbswapin failed!\n");
+    }
+    # So fatal errors run tbswapout,
+    $estate = EXPTSTATE_ACTIVE;
+
+    #
+    # Look for the unsual case of more than 2 nodes and no vlans. Send a
+    # warning message.
+    #
+    if (ExpNodes($pid, $eid) > 2) {
+	my $vlans_result =
+	    DBQueryFatal("select * from vlans where ".
+			 "pid='$pid' and eid='$eid'");
+    
+	if (!$vlans_result->numrows) {
+	    SENDMAIL("$user_name <$user_email>",
+		     "WARNING: Experiment Configuration: $pid/$eid",
+		     "This experiment has zero network links defined.\n".
+		     "Please check your NS file to verify this is what you ".
+		     "want!\n",
+		     "$user_name <$user_email>",
+		     "Cc: $TBOPS", ($nsfile));
+	}
+    }
 }
-# So fatal errors run tbswapout,
-$estate = EXPTSTATE_ACTIVE;
 
 if (system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
     fatal("tbreport failed!\n");
-}
-
-#
-# Look for the unsual case of more than 2 nodes and no vlans. Send a
-# warning message.
-#
-if (ExpNodes($pid, $eid) > 2) {
-    my $vlans_result =
-	DBQueryFatal("select * from vlans where pid='$pid' and eid='$eid'");
-    
-    if (!$vlans_result->numrows) {
-	SENDMAIL("$user_name <$user_email>",
-		 "WARNING: Experiment Configuration: $pid/$eid",
-		 "This experiment has zero network links defined.\n".
-		 "Please check your NS file to verify this is what you ".
-		 "want!\n",
-		 "$user_name <$user_email>",
-		 "Cc: $TBOPS", ($nsfile));
-    }
 }
 
 #
@@ -295,9 +303,11 @@ my $infodir = "$pid-$eid-" . TBDateTimeFSSafe();
 
 if (mkdir("$TBINFO/$infodir", 0770)) {
     system("cp $nsfile $TBINFO/$infodir");
-    system("cp *.ptop *.top $TBINFO/$infodir");
-    system("cp assign.log $TBINFO/$infodir");
     system("cp $logname $TBINFO/$infodir/$eid.log");
+    if (-e "assign.log") {
+	system("cp *.ptop *.top $TBINFO/$infodir");
+	system("cp assign.log $TBINFO/$infodir");
+    }
     if (-e "wanassign.log") {
 	system("cp wanassign.log $TBINFO/$infodir");
     }

@@ -7,10 +7,10 @@ use Getopt::Std;
 #
 sub usage()
 {
-    die("Usage: batchexp [-i] [-x expires] [-E description] [-g gid] ".
+    die("Usage: batchexp [-i [-f]] [-x expires] [-E description] [-g gid] ".
 	"[-s] [-n low|high] -p <pid> -e <eid> <nsfile>\n");
 }
-my  $optlist = "iE:d:g:x:e:p:sn:";
+my  $optlist = "iE:d:g:x:e:p:sn:f";
 
 #
 # Configure variables
@@ -31,6 +31,7 @@ my $mkexpdir = "$TB/libexec/mkexpdir";
 my $startexp = "$TB/bin/startexp";
 my $tbdata   = "tbdata";
 my $immediate= 0;
+my $frontend = 0;
 my $dirname;
 my $dbuid;
 my @row;
@@ -205,11 +206,14 @@ if ($nsfile_string) {
 # so that the batch daemon will see it and act.
 # 
 if ($immediate) {
-    if (system("$startexp -g $gid $pid $eid $nsfile")) {
+    my $farg = ($frontend ? "-f" : "");
+    
+    if (system("$startexp $farg -g $gid $pid $eid $nsfile")) {
 	#
 	# Save a copy of the failed experiment directory for debugging. 
 	#
 	system("/bin/rm", "-rf", "${dirname}-TBfailed");
+
 	system("/bin/mv", "-f", "${dirname}", "${dirname}-TBfailed");
 	
 	fatal("Failed to start experiment $pid/$eid!");
@@ -269,6 +273,12 @@ sub ParseArgs()
     
     if (defined($options{"i"})) {
 	$immediate = 1;
+    }
+    if (defined($options{"f"})) {
+	$frontend = 1;
+    }
+    if ($frontend && !$immediate) {
+	usage();
     }
     if (defined($options{"p"})) {
 	$pid = $options{"p"};
