@@ -27,7 +27,7 @@ tip:	$(OBJS)
 	$(CC) -static -o tip $(OBJS) $(LIBS)
 
 tiptunnel: tiptunnel.o
-	$(CC) -o tiptunnel tiptunnel.o $(SSLLIBS) 
+	$(CC) -static -o tiptunnel tiptunnel.o $(SSLLIBS) 
 
 $(OBJS): tipconf.h tip.h
 
