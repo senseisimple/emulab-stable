@@ -64,7 +64,7 @@ else {
 <?php
 if ($returning) {
     echo "<tr>
-              <td>*Username:</td>
+              <td>*Username (no blanks):</td>
               <td class=\"left\">
                   <input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
           </tr>\n";
