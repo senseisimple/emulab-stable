@@ -76,7 +76,7 @@ static int		deadfl;
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: %s\n", progname);
+	fprintf(stderr, "Usage: %s [-a]\n", progname);
 	exit(-1);
 }
 
@@ -93,11 +93,26 @@ main(int argc, char **argv)
 	gzFile	       *infp;
 	char		buf[BUFSIZ], *bp;
 	struct hostent  *he;
-	int		errors = 0;
-	
+	int		ch, errors = 0;
+	int		backcount = 0;
+
 	progname = argv[0];
 
-	if (argc != 1)
+	while ((ch = getopt(argc, argv, "a:")) != -1)
+		switch(ch) {
+		case 'a':
+			backcount = atoi(optarg);
+			break;
+			
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+	argc -= optind;
+	argv += optind;
+
+	if (argc)
 		usage();
 
 	openlog("genlastlog", LOG_PID, LOG_USER);
@@ -116,24 +131,27 @@ main(int argc, char **argv)
 	if (bp = strchr(opshostname, '.')) 
 		*bp = 0;
 
-	sprintf(buf, "%s/%s.0.gz", USERSVAR, LOGINS);
+	while (backcount) {
+		sprintf(buf, "%s/%s.%d.gz", USERSVAR, LOGINS, backcount);
 
-	/*
-	 * Use setjmp and timer to prevent NFS lockup.
-	 */
-	if (setjmp(deadline) == 0) {
-		alarm(15);
+		/*
+		 * Use setjmp and timer to prevent NFS lockup.
+		 */
+		if (setjmp(deadline) == 0) {
+			alarm(15);
 
-		if ((infp = gzopen(buf, "r")) == NULL) {
-			syslog(LOG_ERR, "Opening %s: %m", buf);
-			errors++;
+			if ((infp = gzopen(buf, "r")) == NULL) {
+				syslog(LOG_ERR, "Opening %s: %m", buf);
+				errors++;
+			}
+			else {
+				doit(infp);
+				gzclose(infp);
+			}
 		}
-		else {
-			doit(infp);
-			gzclose(infp);
-		}
+		backcount--;
+		alarm(0);
 	}
-	alarm(0);
 	
 	sprintf(buf, "%s/%s", USERSVAR, LOGINS);
 
@@ -181,7 +199,7 @@ doit(gzFile *infp)
 		if (skip) {
 			skip = 0;
 			continue;
-		}
+ 		}
 
 		/*
 		 * Thank dog for strptime! Convert the syslog timestamp
@@ -193,6 +211,17 @@ doit(gzFile *infp)
 			continue;
 		}
 		ll_time = mktime(&tm);
+
+		/*
+		 * If the constructed time is in the future, then we have
+		 * year off by one (cause we are possibly looking at files
+		 * created in the previous year). Set the year back by one,
+		 * and redo.
+		 */
+		if (ll_time > curtime) {
+			tm.tm_year--;
+			ll_time = mktime(&tm);
+		}
 
 		/*
 		 * Scanf the next part, which looks like:
