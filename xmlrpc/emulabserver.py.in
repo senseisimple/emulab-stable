@@ -1049,8 +1049,10 @@ class experiment:
             ipmap = {}
             for res in dbres:
                 for ipinfo in string.split(res[1], " "):
-                    port, ip = string.split(ipinfo, ":")
-                    ipmap[res[0] + ":" + port] = ip
+                    if len(ipinfo) > 0:
+                        port, ip = string.split(ipinfo, ":")
+                        ipmap[res[0] + ":" + port] = ip
+                        pass
                     pass
                 pass
             
@@ -1060,19 +1062,21 @@ class experiment:
                             "order by vname,member",
                             (argdict["proj"], argdict["exp"]))
 
-            for res in dbres:
-                tmp = {}
-                tmp["name"]        = res[0]
-                tmp["member"]      = res[1]
-                tmp["ipaddr"]      = ipmap[res[1]]
-                tmp["mask"]        = res[2]
-                tmp["delay"]       = res[3]
-                tmp["bandwidth"]   = int(res[4])
-                tmp["plr"]         = res[5]
-                tmp["r_delay"]     = res[6]
-                tmp["r_bandwidth"] = int(res[7])
-                tmp["r_plr"]       = res[8]
-                result[res[1]]     = tmp
+            if len(dbres) > 0:
+                for res in dbres:
+                    tmp = {}
+                    tmp["name"]        = res[0]
+                    tmp["member"]      = res[1]
+                    tmp["ipaddr"]      = ipmap[res[1]]
+                    tmp["mask"]        = res[2]
+                    tmp["delay"]       = res[3]
+                    tmp["bandwidth"]   = int(res[4])
+                    tmp["plr"]         = res[5]
+                    tmp["r_delay"]     = res[6]
+                    tmp["r_bandwidth"] = int(res[7])
+                    tmp["r_plr"]       = res[8]
+                    result[res[1]]     = tmp
+                    pass
                 pass
             pass
         
