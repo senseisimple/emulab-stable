@@ -1929,7 +1929,6 @@ COMMAND_PROTOTYPE(dohosts)
 	char		buf[MYBUFSIZE];
 	int		hostcount, nrows;
 	int		rv = 0;
-	int		nroutes, i;
 
 	/*
 	 * We build up a canonical host table using this data structure.
@@ -1939,6 +1938,7 @@ COMMAND_PROTOTYPE(dohosts)
 	struct shareditem {
 	    	int	hasalias;
 		char	*firstvlan;	/* The first vlan to another node */
+		int	is_me;          /* 1 if this node is the tmcc client */
 	};
 	struct hostentry {
 		char	nodeid[TBDB_FLEN_NODEID];
@@ -1949,15 +1949,6 @@ COMMAND_PROTOTYPE(dohosts)
 		struct shareditem *shared;
 		struct hostentry  *next;
 	} *hosts = 0, *host;
-
-	/*
-	 * We store all routes for this node in this structure 
-	 */
-	struct routeentry {
-		struct in_addr	dst;
-		struct in_addr	dst_mask;
-		int		dst_type;
-	} *routes = 0, *route;
 
 	/*
 	 * Now check reserved table
@@ -2012,6 +2003,13 @@ COMMAND_PROTOTYPE(dohosts)
 		       calloc(1, sizeof(*shareditem)))) {
 			error("HOSTNAMES: Out of memory for shareditem!\n");
 			exit(1);
+		}
+
+		/*
+		 * Check to see if this is the node we're talking to
+		 */
+		if (!strcmp(row[0],reqp->nickname)) {
+		    shareditem->is_me = 1;
 		}
 
 		bp = row[1];
@@ -2144,45 +2142,6 @@ COMMAND_PROTOTYPE(dohosts)
 #endif
 
 	/*
-	 * Get a list of all routes for this host, to be used in creating
-	 * aliases for non-directly connected nodes.
-	 */
-	res = mydb_query("select dst, dst_type, dst_mask from virt_routes "
-			 "where pid='%s' and eid='%s' and vname='%s'"
-			 "order by dst",
-			 3, reqp->pid, reqp->eid, reqp->nickname);
-	if (!res) {
-	    error("HOSTNAMES: %s: DB Error getting routes!\n",
-		    reqp->nodeid);
-	    return 1;
-	}
-
-	nrows = mysql_num_rows(res);
-	if (!(routes = (struct routeentry*)
-		(malloc(nrows * sizeof(struct routeentry))))) {
-	    error("HOSTNAMES: Out of memory!\n");
-	    exit(1);
-	}
-	nroutes = nrows;
-	route = routes;
-
-	while (nrows--) {
-	    row = mysql_fetch_row(res);
-	    inet_aton(row[0],&(route->dst));
-	    if (!strcmp(row[1],"host")) {
-		route->dst_type = 0;
-	    } else {
-		/*
-		 * Only bother with the mask if it's a subnet route
-		 */
-		route->dst_type = 1;
-		inet_aton(row[2],&(route->dst_mask));
-	    }
-	    route++;
-	}
-	mysql_free_result(res);
-
-	/*
 	 * Okay, spit the entries out!
 	 */
 	hostcount = 0;
@@ -2192,33 +2151,17 @@ COMMAND_PROTOTYPE(dohosts)
 
 		if ((host->shared->firstvlan &&
 		     !strcmp(host->shared->firstvlan, host->vlan)) ||
-		    /* First interface on this node gets an alias */
+		    /* Directly connected, first interface on this node gets an
+		       alias */
 		    (!strcmp(host->nodeid, reqp->nodeid) && !host->virtiface)){
 			alias = host->vname;
 		} else if (!host->shared->firstvlan &&
-			   !host->shared->hasalias) {
-		
-		    /*
-		     * Check for routes to this node, if it isn't directly
-		     * connected, and doesn't already have an alias
-		     */
-		    for (i = 0; i < nroutes; i++) {
-			if (routes[i].dst_type == 0) { /* Host route */
-			    if (routes[i].dst.s_addr == host->ipaddr.s_addr) {
-				alias = host->vname;
-				host->shared->hasalias = 1;
-				break;
-			    }
-			} else { /* Net route */
-			    if ((host->ipaddr.s_addr &
-					routes[i].dst_mask.s_addr)
-				    == routes[i].dst.s_addr) {
-				alias = host->vname;
-				host->shared->hasalias = 1;
-				break;
-			    }
-			}
-		    }
+			   !host->shared->hasalias &&
+			   !host->shared->is_me) {
+		    /* Not directly connected, but we'll give it an alias
+		       anyway */
+		    alias = host->vname;
+		    host->shared->hasalias = 1;
 		}
 
 		/* Old format */
@@ -2274,7 +2217,6 @@ COMMAND_PROTOTYPE(dohosts)
 		free(host);
 		host = tmphost;
 	}
-	free(routes);
 	return rv;
 }
 
