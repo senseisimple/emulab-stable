@@ -188,6 +188,9 @@ if (@OkNodes > 0) {
 
 push (@OkNodes,"lights");
 
+print "machines= ",join(" ",@machines),"\n" if $verbose;
+print "oknodes= ",join(" ",@OkNodes),"\n" if $verbose;
+
 foreach $node ( sort @machines) {
   my $Approved = 0;
   foreach $ok (sort @OkNodes) {

@@ -30,13 +30,11 @@ does, and have snmpit be able to use this info.
 
 Features supported in snmpit itself:
  - auto vlan config from file or from db
- - Power control
  - device type discovery and command dispatch
 
-Note: Power control should probably be moved out into its own module
-too, but right now it wasn't important. Its so different from the
-switches that there would be a lot of special cases anyway. But its
-something that could be done for increased generality.
+Power control has also been moved into its own module, snmpit_apc.pm. 
+It supports new(ip,args) as above, and power(cmd,port) where cmd is 
+"on", "off", or "cyc[le]" and port is 1-8.
 
 snmpit library interface
 ------------------------

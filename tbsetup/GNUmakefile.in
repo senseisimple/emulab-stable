@@ -25,7 +25,7 @@ LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  webstartexp webendexp webbatchexp webkillbatchexp
 
 LIB_STUFF       = libtbsetup.pm libtestbed.pm snmpit_intel.pm \
-                  snmpit_cisco.pm snmpit_lib.pm
+                  snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through
