@@ -28,13 +28,17 @@ foreach delta [lindex $nodestate 1] {
 foreach delta [lindex $dbstate 1] {
     if {! [info exists nodedelta($delta)]} {
 	puts "Node missing delta: $delta"
+	set ret 1
     } else {
 	unset nodedelta($delta)
     }
 }
 foreach delta [array names nodedelta] {
     puts "Node has extra delta: $delta"
+    set ret 1
 }
 
 os end
+
+exit $ret
 
