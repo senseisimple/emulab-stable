@@ -69,7 +69,7 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 	rpcgen -c $< > $@
 
 %: %-debug
-	$(STRIP) -o $@ $<
+	$(STRIP) -o $@$(EXE) $<$(EXE)
 
 #
 # Rules to regen configure written files.
