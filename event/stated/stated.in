@@ -27,6 +27,8 @@ my $REALTBOPS = "@TBOPSEMAIL@";
 my $TBDBNAME = "@TBDBNAME@";
 my $REALTBDBNAME = "tbdb"; # So we know if we're using the "real" db
 my $osselect = "$TB/bin/os_select";
+my $nodereboot = "$TB/bin/node_reboot";
+my $power = "$TB/bin/power";
 
 $| = 1;
 
@@ -107,12 +109,16 @@ my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
 my $TBNOTIMEOUT  = TBDB_NO_STATE_TIMEOUT;
 my $TBNODESTATE  = TBDB_TBEVENT_NODESTATE;
 my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
-my $TBCONTROL    = TBDB_TBEVENT_TBCONTROL;
+my $TBCONTROL    = TBDB_TBEVENT_CONTROL;
+my $TBCOMMAND    = TBDB_TBEVENT_COMMAND;
+my $TBREBOOT     = TBDB_COMMAND_REBOOT;
+my $TBPOWEROFF   = TBDB_COMMAND_POWEROFF;
+my $TBPOWERON    = TBDB_COMMAND_POWERON;
+my $TBPOWERCYCLE = TBDB_COMMAND_POWERCYCLE;
 my $TB_OSID_MBKERNEL = TB_OSID_MBKERNEL;
 
 # This only gets used here, so it isn't in a lib constant.
 my $TBFREENODE = "FREENODE";
-my $TBISUP = TBDB_NODESTATE_ISUP;
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -174,7 +180,9 @@ if (!$tuple) {
     fatal("Could not allocate an address tuple\n");
 }
 
-%$tuple = ( objtype => join(",",$TBNODESTATE,$TBNODEOPMODE,$TBCONTROL) );
+%$tuple = ( objtype => join(",",
+			    $TBNODESTATE, $TBNODEOPMODE,
+			    $TBCONTROL, $TBCOMMAND) );
 
 if (!event_subscribe($handle,\&handleEvent,$tuple)) {
     fatal("Could not subscribe to events\n");
@@ -187,6 +195,7 @@ my %valid     = getValid();
 my %modeTrans = getModeTrans();
 my %triggers  = getTriggers();
 my %nodes     = readStates();
+my %timeouttag= ();
 if ($debug) { qshow(); }
 
 # Gets set if a reload of state from the database should happen.
@@ -213,7 +222,7 @@ my $event_count = 0;
 
 # Control how long I block while waiting for events
 my $blockwait=0;
-my $nextdeadline=time();
+my $nextdeadline=0;
 my $mailqueue=0;
 
 notify("Stated starting up\n");
@@ -234,6 +243,8 @@ sub process_event_queue() {
 	    # only wait until the next deadline...
 	    if ($nextdeadline > 0) {
 		$wait = $nextdeadline - $now;
+	    } else {
+		$wait = 0;
 	    }
 	}
     } else {
@@ -275,7 +286,6 @@ sub process_event_queue() {
 
 # Now, we just poll for events, and watch for timeouts
 while (1) {
-    process_event_queue;
     my $now = time();
     my ($deadline,$node);
 
@@ -285,14 +295,7 @@ while (1) {
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
 	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
-	    $notified = $nodes{$node}{notified};
-	    if (!$notified) {
-		handleCtrlEvent($node,$TBTIMEOUT);
-		$nodes{$node}{notified} = 1;
-	    } else {
-		notify("$node: Timed out at $now (d=$deadline), ".
-		       "but notified already!\n");
-	    }
+	    handleCtrlEvent($node,$TBTIMEOUT);
 	    if (0) { qshow(); }
 	    if (qhead($deadline,$node)) {
 		$deadline=0; $node="";
@@ -319,7 +322,7 @@ while (1) {
     if ($sigrestart) { restart(); }
     if ($sigcleanup) { cleanup(); }
 
-    #sleep(1);
+    process_event_queue;
 }
 
 exit(0);
@@ -465,7 +468,7 @@ sub handleEvent($$$) {
     #
     # Check to see if another instance is supposed to be handling this node
     #
-    if (!checkDBRedirect($objname)) {
+    if ($objtype ne $TBCOMMAND && !checkDBRedirect($objname)) {
 	info("Got an event for node $objname, which isn't mine\n");
 	return;
     }
@@ -484,6 +487,10 @@ sub handleEvent($$$) {
 	};
 	(/$TBCONTROL/) && do {
 	    handleCtrlEvent($objname,$eventtype);
+	    last;
+	};
+	(/$TBCOMMAND/) && do {
+	    handleCommand($objname,$eventtype);
 	    last;
 	};
 
@@ -524,6 +531,27 @@ sub stateTransition($$) {
     info("$node: $mode/$oldstate => $mode/$newstate\n");
     DBQueryFatal("UPDATE nodes SET eventstate='$newstate', " .
 		 "state_timestamp='$now' WHERE node_id='$node'");
+
+    # Before we set the timeout (overwriting any current ones), we need
+    # to check if we had a pending command
+    if (qfind($node) &&
+	$timeout_tag{$node} =~ /^$TBCOMMAND:/) {
+	my ($str,$cmd) = split(":",$timeout_tag{$node});
+	if ($cmd eq $TBREBOOT) {
+	    if ($state eq TBDB_NODESTATE_SHUTDOWN ) {
+		info("$node: $TBREBOOT success\n");
+		# Timeout will get cleared below by setTimeout call
+	    } else {
+		notify("$node: $TBREBOOT in progress, but got state $state ".
+		       "instead of ". TBDB_NODESTATE_SHUTDOWN ."!\n");
+	    }
+	#} elsif ($cmd eq $FOO ) {
+	    # Add more here...
+	} else {
+	    notify("$node: Unknown command timeout '$timeout_tag{$node}' ".
+		   "found at $mode/$state\n");
+	}
+    }
 
     # Check if this state has a timeout, and if so, put it in the queue
     setTimeout($mode,$newstate,$node,$now);
@@ -695,25 +723,25 @@ sub opModeTransition($$;$) {
 
 sub handleCtrlEvent($$) {
     my ($node,$event) = @_;
-    
+
     info("CtrlEvent: $node, $event\n");
-    
+
     foreach ($event) {
 	/^$TBRESET$/ && do {
 	    my $result = DBQueryFatal("SELECT pxe_boot_path, def_boot_osid ".
 				      "FROM nodes where node_id='$node'");
 	    my ($pxepath,$osid) = $result->fetchrow();
-	    
+
 	    # Important note on ordering here:
 	    # Because setting a normal osid resets pxe path to PXEBOOT,
 	    # We need to read it out first, then set the osid, then set
 	    # the pxepath back to its original value at the end.
-	    
+
 	    $cmd = "$osselect $osid $node";
 	    system($cmd) and
 	      notify("$node/$event: Couldn't clear next_boot_*\n".
 		     "\tcmd=$cmd\n\t*** $!\n");
-	    
+
 	    $pxepath = "-p ".$pxepath;
 	    if ($pxepath eq "-p ") {
 		$pxepath="PXEBOOT";
@@ -723,7 +751,7 @@ sub handleCtrlEvent($$) {
 	    system($cmd) and
 	      notify("$node/$event: Couldn't clear next_pxe_boot_path\n".
 		     "\tcmd=$cmd\n\t*** $!\n");
-	    
+
 	    info("Performed RESET for $node to $osid/$pxepath\n");
 	    next;
 	};
@@ -751,12 +779,37 @@ sub handleCtrlEvent($$) {
 	    next;
 	};
 	/^$TBTIMEOUT$/ && do {
-	    my $state = $nodes{$node}{state};
-	    my $mode = $nodes{$node}{mode};
+	    my ($mode,$state) = split(":",$timeout_tag{$node});
+	    delete($timeout_tag{$node});
+	    my $curstate = $nodes{$node}{state};
+	    my $curmode = $nodes{$node}{mode};
 	    my ($timeout,$action);
+	    if (!defined($nodes{$node}{notified})) {
+		$nodes{$node}{notified}=0;
+	    }
+	    $nodes{$node}{notified}++;
+	    my $notified = $nodes{$node}{notified};
 	    if ($mode && $state && $timeouts{$mode} &&
 		$timeouts{$mode}{$state}) {
 		($timeout, $action) = @{$timeouts{$mode}{$state}};
+	    }
+	    if ($mode eq $TBCOMMAND) {
+		# It is a command, not a true state
+		if ($action eq "CMDRETRY") {
+		    # Retry the command
+		    notify("$node: Command $state, retry #$notified\n");
+		    # notify in case we get in a retry loop...
+		    handleCommand($node,$state,$notified);
+		} else {
+		    notify("$node: Unknown timeout action for ".
+			   "$mode/$state: '$action'\n");
+		}
+		next;
+	    } else {
+		if ($notified>1) {	
+		    notify("$node: Timed out at $now (d=$deadline), ".
+			   "but notified already!\n");
+		}
 	    }
 	    notify("Node $node has timed out in state $mode/$state".
 		   ($action ne "" ? "\n\tRequested action $action." : "").
@@ -764,6 +817,76 @@ sub handleCtrlEvent($$) {
 	    next;
 	};
 	notify("$node: Unknown CtrlEvent: $event\n");
+    }
+}
+
+sub handleCommand($$;$) {
+    my ($params,$command,$retry) = @_;
+    if (!defined($retry)) { $retry=0; }
+
+    info("Command: $params, $command (attempt $retry)\n");
+
+    # XXX - Right now we skip the checkDBRedirect calls for our
+    # TBCOMMAND events, since they may have a list of nodes in them.
+    # We may need to do it here (while iterating over the list), or
+    # make some other fix up in handleEvent.
+
+    if ($command eq $TBREBOOT && $retry >=3) {
+	announce("Node $params has tried rebooting $retry times and has \n".
+		 "still not been successful. Please look into it soon.\n".
+		 "In the meantime, $params will be powered off.\n");
+	# change my command to poweroff.
+	$command = $TBPOWEROFF;
+    }
+
+    foreach ($command) {
+	/^$TBREBOOT$/ && do {
+	    # For reboot, the params is a comma-separated list of nodes
+	    my @nodes = split(",",$params);
+	    my $nodelist=join(" ",@nodes);
+	    info("Rebooting nodes: $nodelist\n");
+	    # Permissions were checked in order to send the message,
+	    # so we don't need to do any fancy stuff here.
+
+	    my $cmd = "$nodereboot $nodelist &";
+	    debug("$cmd\n") or
+	    #system($cmd) and
+	      notify("$params/$command: ".
+		     "Command '$cmd' failed, error $?: $!\n");
+
+	    # Set up a timeout, so we retry if we don't get SHUTDOWN in time
+	    foreach $node (@nodes) {
+		# Note: This will replace any state timeouts currently in
+		# the queue. But here that's okay because we're expecting
+		# to see another transition really soon anyway.
+		setTimeout($TBCOMMAND,$command,$node,time());
+	    }
+
+	    info("Performed $command for $params\n");
+	    next;
+	};
+	(/^$TBPOWEROFF$/ || /^$TBPOWERON$/ || /^$TBPOWERCYCLE$/) && do {
+	    # For power, the params is a comma-separated list of nodes
+	    my @nodes = split(",",$params);
+	    my $nodelist=join(" ",@nodes);
+	    my %funcmap = ( $TBPOWERCYCLE => "cycle",
+			    $TBPOWERON    => "on",
+			    $TBPOWEROFF   => "off");
+	    my $func = $funcmap{$command};
+	    info("Sending power $func nodes: $nodelist\n");
+	    # Permissions were checked in order to send the message,
+	    # so we don't need to do any fancy stuff here.
+
+	    my $cmd = "$power $func $nodelist &";
+	    debug("$cmd\n") or
+	    #system($cmd) and
+	      notify("$params/$command: ".
+		     "Command '$cmd' failed, error $?: $!\n");
+
+	    info("Performed $command for $params\n");
+	    next;
+	};
+	notify("$params: Unknown Command: $command\n");
     }
 }
 
@@ -850,7 +973,7 @@ sub checkDBRedirect($) {
 sub setTimeout( $$$$ ) {
     my ($mode,$state,$node,$now) = @_;
     if (0) { print "Original: ($mode,$state,$node,$now)\n"; qshow(); }
-    if (defined(qfind($node))) { qdelete($node); }
+    if (defined(qfind($node))) { qdelete($node); delete($timeout_tag{$node}); }
     if (0) { print "Deleted:\n"; qshow(); }
     if (defined($mode) && defined($state) &&
 	defined($timeouts{$mode}) &&
@@ -862,6 +985,7 @@ sub setTimeout( $$$$ ) {
 	    debug("Setting timeout for ($node,$mode,$state) at ".
 		  "$deadline + $now ($TO)\n");
 	    qinsert($TO,$node);
+	    $timeout_tag{$node} = "$mode:$state";
 	    if (0) { qshow(); }
 	}
     }
@@ -1121,6 +1245,8 @@ sub restart {
 	notify("sigprocmask: sig unblock failed! $?, $!\n");
 	die("\n");
     }
+    $lastmail=0;
+    notify("",1);
     announce("Stated restarted\n");
     exec("$prog $params") or 
       do {
@@ -1144,6 +1270,8 @@ sub cleanup {
 END {
     debug("Ending stated...\n");
     my $stat = $?;
+    $lastmail=0;
+    notify("",1);
     if (defined($lockfile) && $lockfile ne "") {
 	unlink $lockfile;
 	announce("Stated exiting, cleaning up\n");
