@@ -10,7 +10,7 @@
 %DVIPSWebPage: (www.radicaleye.com)
 %DVIPSCommandLine: dvips tutdeslong
 %DVIPSParameters: dpi=600, compressed
-%DVIPSSource:  TeX output 2002.05.09:1213
+%DVIPSSource:  TeX output 2002.05.09:1246
 %%BeginProcSet: texc.pro
 %!
 /TeXDict 300 dict def TeXDict begin/N{def}def/B{bind def}N/S{exch}N/X{S
@@ -235,13 +235,15 @@ rf /Fg 133[44 50 1[72 50 55 33 39 44 1[55 50 55 1[28
 2[28 55 50 33 44 55 44 1[50 12[66 4[78 2[66 2[39 78 1[61
 1[72 1[66 72 10[50 50 50 50 50 50 3[33 45[{
 TeXBase1Encoding ReEncodeFont}36 99.6264 /Times-Bold
-rf /Fh 134[50 1[72 50 50 28 39 33 1[50 50 50 1[28 2[28
-50 1[33 44 50 44 50 44 11[72 2[66 3[72 89 61 1[39 6[66
-1[72 7[50 6[50 1[50 3[25 44[{TeXBase1Encoding ReEncodeFont}31
-99.6264 /Times-Roman rf /Fi 107[64 64 27[104 1[72 40
-56 48 2[72 1[112 40 72 1[40 72 2[64 72 64 72 64 11[104
+rf /Fh 134[44 2[44 1[28 39 39 2[50 50 4[28 50 1[28 44
+50 44 1[50 9[83 1[72 7[83 32[25 44[{TeXBase1Encoding ReEncodeFont}18
+99.6264 /Times-Italic rf /Fi 134[50 1[72 1[50 1[39 33
+1[50 50 2[28 2[28 50 1[33 44 50 44 50 44 14[66 3[72 89
+61 1[39 6[66 1[72 7[50 6[50 1[50 3[25 44[{TeXBase1Encoding ReEncodeFont}
+27 99.6264 /Times-Roman rf /Fj 107[64 64 27[104 1[72
+40 56 48 2[72 1[112 40 72 1[40 72 2[64 72 64 72 64 11[104
 88 3[80 1[104 5[104 2[88 69[{TeXBase1Encoding ReEncodeFont}24
-143.462 /Times-Roman rf /Fj 138[72 40 56 56 1[72 72 72
+143.462 /Times-Roman rf /Fk 138[72 40 56 56 1[72 72 72
 1[40 2[40 2[40 64 1[64 1[72 12[80 72 3[104 1[120 3[48
 1[104 2[104 96 16[72 1[72 48[{TeXBase1Encoding ReEncodeFont}23
 143.462 /Times-Italic rf end
@@ -252,364 +254,369 @@ TeXDict begin
 
 %%EndSetup
 %%Page: 1 1
-1 0 bop 780 336 a Fj(T)-8 b(utorial)35 b(Description)e(for)i(SIGCOMM)f
-(2002)491 638 y Fi(Ho)l(w)i(to)f(Use)g(the)g(\223Emulab\224)f(Public)g
-(Netw)o(ork)g(T)-10 b(estbeds)708 891 y Fh(Jay)25 b(Lepreau)200
-b(Mac)25 b(Ne)n(wbold)198 b(Rob)25 b(Ricci)199 b(Chris)25
-b(Alfeld)1608 1097 y(Uni)n(v)o(ersity)e(of)i(Utah)1727
-1299 y(May)f(9,)h(2002)0 1773 y Fg(1)99 b(Ov)o(er)o(view)0
-1912 y Ff(This)26 b(tutorial)i(will)f(focus)g(on)g(teaching)h
+1 0 bop 780 336 a Fk(T)-8 b(utorial)35 b(Description)e(for)i(SIGCOMM)f
+(2002)491 638 y Fj(Ho)l(w)i(to)f(Use)g(the)g(\223Emulab\224)f(Public)g
+(Netw)o(ork)g(T)-10 b(estbeds)1056 891 y Fi(Jay)24 b(Lepreau)200
+b(Mac)25 b(Ne)n(wbold)198 b(Rob)25 b(Ricci)1610 1007
+y Fh(Univer)o(sity)f(of)g(Utah)1732 1168 y Fi(Chris)h(Alfeld)1308
+1285 y Fh(Univer)o(sity)f(of)g(W)-5 b(isconsin,)23 b(Madison)1727
+1487 y Fi(May)h(9,)h(2002)0 1988 y Fg(1)99 b(Ov)o(er)o(view)0
+2134 y Ff(This)26 b(tutorial)i(will)f(focus)g(on)g(teaching)h
 (attendees)h(ho)n(w)d(to)g(ef)n(fecti)n(v)o(ely)j(use)d(a)g(ne)n(w)-6
 b(,)27 b(public)h(e)o(xperimental)g(resource)h(for)0
-2025 y(research,)h(education,)h(or)c(de)n(v)o(elopment)i(in)e(netw)o
+2247 y(research,)h(education,)h(or)c(de)n(v)o(elopment)i(in)e(netw)o
 (orking)j(and)e(distrib)n(uted)i(systems\227a)f(resource)g(that)f(is)f
-(being)i(cloned)0 2138 y(by)c(others.)33 b(Emulab)24
+(being)i(cloned)0 2360 y(by)c(others.)33 b(Emulab)24
 b(\()p Fe(http://www.emula)o(b.)o(ne)o(t)p Ff(\))18 b(is)24
 b(a)g(time)h(and)g(space-shared)j(recon\002gurable)g(\223netw)o(ork)e
-(em-)0 2251 y(ulator)l(,)-6 b(\224)25 b(comprised)g(of)e(hundreds)j(of)
+(em-)0 2473 y(ulator)l(,)-6 b(\224)25 b(comprised)g(of)e(hundreds)j(of)
 d(PCs,)f(miles)i(of)f(cable,)h(and)g(lots)g(of)f(code.)29
 b(Using)24 b(a)f(W)-7 b(eb)23 b(interf)o(ace)i(and)f(a)f(superset)0
-2364 y(of)g(the)h(popular)h Fd(ns)e Ff(netw)o(orking)i(simulation)h
+2586 y(of)g(the)h(popular)h Fd(ns)e Ff(netw)o(orking)i(simulation)h
 (language)f(or)e(a)g(Ja)n(v)n(a)h(GUI,)e(it)g(is)h(simple)h(for)g
-(remote)f(users)i(to)e(con\002gure,)h(in)0 2477 y(minutes,)h(an)o(y)g
+(remote)f(users)i(to)e(con\002gure,)h(in)0 2699 y(minutes,)h(an)o(y)g
 (number)g(of)f(these)i(machines,)f(ethernet)i(cables,)e(traf)n(\002c)g
 (generators,)i(and)e(their)g(choice)g(of)g(operating)i(sys-)0
-2590 y(tems)f(and)g(disk)h(contents,)h(into)f(a)e(netw)o(ork)j(of)d
+2812 y(tems)f(and)g(disk)h(contents,)h(into)f(a)e(netw)o(ork)j(of)d
 (arbitrary)k(topology)f(and)e(characteristics,)31 b(running)d
-(arbitrary)g(programs.)0 2703 y(Li)n(v)o(e)23 b(demos)h(and\227in)g
+(arbitrary)g(programs.)0 2925 y(Li)n(v)o(e)23 b(demos)h(and\227in)g
 (the)g(full)g(day)g(v)o(ersion\227hands-on)k(lab)c(sessions)i(will)d
 (be)h(fully)g(inte)o(grated)i(into)e(the)g(tutorial.)141
-2816 y Fd(In)f(ne)o(w)e(work,)i(Emulab)f(also)h(incorpor)o(ates)j(tr)o
+3038 y Fd(In)f(ne)o(w)e(work,)i(Emulab)f(also)h(incorpor)o(ates)j(tr)o
 (anspar)m(ent)f(\(\223mix)d(and)h(matc)o(h\224\))f(support)j(for)e
-(physically)i(distrib)n(uted)0 2929 y(nodes)g(\(starting)h(with)d(MIT')
+(physically)i(distrib)n(uted)0 3151 y(nodes)g(\(starting)h(with)d(MIT')
 l(s)g(\223R)l(ON\224testbed\))h(and)g(pur)m(ely)h(simulated)g(nodes.)
-141 3041 y Ff(Emulab)18 b(softw)o(are)i(pro)o(vides)g(quick)f(and)f
+141 3263 y Ff(Emulab)18 b(softw)o(are)i(pro)o(vides)g(quick)f(and)f
 (con)l(v)o(enient)k(access)d(to)f(lar)n(ge-scale,)k(dynamically)f
-(recon\002gurable)g(testbeds,)0 3154 y(that)k(serv)o(e)h(as)f
+(recon\002gurable)g(testbeds,)0 3376 y(that)k(serv)o(e)h(as)f
 (platforms)h(for)f(e)o(xperimentation,)k(testing,)d(v)n(alidation,)i
 (prototyping,)g(e)n(v)n(aluation,)f(and)f(instruction.)35
-b(Em-)0 3267 y(ulab)30 b(pro)o(vides)h(zero-penalty)i(for)c(remote)h
+b(Em-)0 3489 y(ulab)30 b(pro)o(vides)h(zero-penalty)i(for)c(remote)h
 (use,)g(complete)h(separation)h(between)e(projects,)j(allo)n(ws)c(full)
-h(\223root\224)g(access,)0 3380 y(allo)n(ws)g(an)o(yone)h(to)e(run)h
+h(\223root\224)g(access,)0 3602 y(allo)n(ws)g(an)o(yone)h(to)e(run)h
 (their)g(o)n(wn)f(custom)h(softw)o(are,)i(including)h(operating)f
 (systems,)f(and)f(allo)n(ws)g(them)g(to)f(observ)o(e,)0
-3493 y(instrument,)g(and)e(measure)h(nearly)g(an)o(ything)h(that)e
+3715 y(instrument,)g(and)e(measure)h(nearly)g(an)o(ything)h(that)e
 (occurs)h(in)f(their)g(e)o(xperiment.)40 b(An)26 b(inte)o(grated)j(e)n
-(v)o(ent)f(system)f(allo)n(ws)0 3606 y(both)h(scripted)h(and)e
+(v)o(ent)f(system)f(allo)n(ws)0 3828 y(both)h(scripted)h(and)e
 (interacti)n(v)o(e)i(control)g(of)e(all)g(aspects)i(of)d(an)h(e)o
 (xperiment.)41 b(W)l(ith)27 b(tri)n(vial)h(changes)h(to)e(their)h
-Fd(ns)f Ff(scripts,)0 3719 y(users)i(can)g(shift)g(the)g(mapping)h(of)e
+Fd(ns)f Ff(scripts,)0 3941 y(users)i(can)g(shift)g(the)g(mapping)h(of)e
 (man)o(y)g(e)o(xperiments)j(between)e(pure)g(simulation,)j(pure)d
-(emulation,)i(or)d(a)g(mixture)h(of)0 3832 y(both.)141
-3945 y(Ov)o(er)f(40)h(projects)i(and)e(25)g(institutions)k(ha)n(v)o(e)c
+(emulation,)i(or)d(a)g(mixture)h(of)0 4054 y(both.)141
+4167 y(Ov)o(er)f(40)h(projects)i(and)e(25)g(institutions)k(ha)n(v)o(e)c
 (so)g(f)o(ar)g(used)g(Utah')-5 b(s)30 b(Emulab.)44 b(The)o(y)29
-b(include)h(man)o(y)f(distinguished)0 4058 y(e)o(xternal)34
+b(include)h(man)o(y)f(distinguished)0 4280 y(e)o(xternal)34
 b(researchers)h(as)e(well)f(as)g(tw)o(o)g(classes)i(at)e(K)n(entuck)o
 (y)h(and)g(MIT)-7 b(,)31 b(in)i(basic)g(and)g(adv)n(anced)h(netw)o
-(orking.)58 b(The)0 4171 y(open-source)37 b(softw)o(are)f(underlying)h
+(orking.)58 b(The)0 4393 y(open-source)37 b(softw)o(are)f(underlying)h
 (Emulab)c(is)h(portable;)42 b(se)n(v)o(eral)34 b(other)h(Emulabs)g(are)
-f(already)h(planned)h(or)e(under)0 4283 y(construction.)f(The)24
+f(already)h(planned)h(or)e(under)0 4505 y(construction.)f(The)24
 b(Uni)n(v)o(ersity)h(of)f(K)n(entuck)o(y)g(has)h(already)g(rack)o(ed)h
 (their)e(hardw)o(are,)h(and)g(additional)h(Emulabs)f(may)e(be)0
-4396 y(running)j(by)d(SIGCOMM)e(in)j(August.)141 4509
-y(This)34 b(tutorial)i(will)d(also)i(outline)h(the)e(minimum)g(and)g
-(optimal)h(resources)h(needed)g(to)e(b)n(uild)h(your)g(o)n(wn)e
-(Emulab,)0 4622 y(what')-5 b(s)24 b(needed)h(to)e(con)l(v)o(ert)j(your)
-e(generic)h(cluster)g(into)f(an)g(Emulab)f(site,)h(and)g(plans)g(to)g
-(federate)h(the)f(Emulab)f(sites)i(into)0 4735 y(a)g(v)n(ast,)g
-(loosely-coupled)30 b(distrib)n(uted)f(testbed.)35 b(W)-7
-b(e)24 b(will)h(also)g(outline)i(other)f(plans,)h(including)g(e)o
-(xtensions)h(to)d(wireless)0 4848 y(and)f(mobile)g(nodes.)0
-5107 y Fg(2)99 b(T)-9 b(utorial)25 b(Or)o(ganization)0
-5233 y Fc(2.1)92 b(Intr)n(oduction)24 b(and)e(Moti)o(v)o(ation)0
-5347 y Ff(W)-7 b(e)20 b(\002rst)h(outline)h(the)g(current)g(methods)h
-(for)e(e)o(xperimentation)j(and)e(v)n(alidation)h(in)e(netw)o(orking)j
-(research,)f(which)e(include)0 5460 y(simulation,)k(testing)h(on)d
-(small-scale)j(static)f(testbeds,)g(on)e(special)j(o)o(v)o(erlay)e
-(testbeds)i(lik)o(e)e(R)l(ON,)e(and)i(on)f(li)n(v)o(e)h(netw)o(orks.)p
+4618 y(running)j(by)d(SIGCOMM)e(in)j(August.)141 4731
+y(This)g(tutorial)h(will)f(also)g(outline)i(ho)n(w)d(to)h(join)g(the)g
+(distrib)n(uted)j(testbed)f(with)e(one)g(or)g(more)f(machines)j(of)d
+(your)i(o)n(wn,)0 4844 y(the)d(minimum)g(and)g(optimal)h(resources)h
+(needed)f(to)f(b)n(uild)h(your)g(o)n(wn)e(Emulab,)h(what')-5
+b(s)22 b(needed)i(to)d(con)l(v)o(ert)j(your)e(generic)0
+4957 y(cluster)33 b(into)g(an)f(Emulab)f(site,)j(and)f(plans)g(to)e
+(federate)j(the)e(Emulab)g(sites)g(into)h(a)e(v)n(ast,)j
+(loosely-coupled)j(distrib)n(uted)0 5070 y(testbed.)30
+b(W)-7 b(e)23 b(will)g(also)h(outline)i(other)e(plans,)h(including)h(e)
+o(xtensions)g(to)d(wireless)i(and)f(mobile)g(nodes.)p
 eop
 %%Page: 2 2
-2 1 bop 0 91 a Ff(The)23 b(strengths)j(and)e(weaknesses)i(of)d(each)i
-(will)e(be)g(brie\003y)h(discussed.)141 204 y(W)-7 b(e)26
-b(then)i(describe,)h(at)e(a)f(high)i(le)n(v)o(el,)g(the)f(Emulab)g(f)o
-(acility)i(that)e(we)f(ha)n(v)o(e)i(de)n(v)o(eloped)h(o)o(v)o(er)d
-(more)h(than)h(tw)o(o)e(years,)0 317 y(which)f(pro)o(vides)i(a)d(ne)n
-(w)-6 b(,)24 b(complementary)j(approach)g(that)e(pro)o(vides)i(both)e
-(complete)h(control)h(and)e(substantial)j(realism.)0
-430 y(W)-7 b(e)23 b(will)g(outline)i(its)f(k)o(e)o(y)f(design)j
-(principles)g(and)e(high-le)n(v)o(el)i(features.)0 621
-y Fc(2.2)92 b(Ho)o(w)22 b(to)i(Use)f(It)0 735 y Ff(This)j(is)g(the)g
-(core)g(of)g(the)g(tutorial,)i(getting)g(the)e(most)g(time.)36
-b(W)-7 b(e)25 b(will)h(start)g(from)g(the)g(premise)h(\223So)f(you)g
-(need)h(a)e(testbed)0 847 y(for)34 b(your)h(research...,)-6
-b(\224)38 b(and)c(will)g(progress)j(through)f(the)e(process)i(of)e
-(designing,)39 b(con\002guring,)g(and)c(using)g(a)f(simple)0
-960 y(netw)o(ork)26 b(on)f(Emulab\227all)g(inte)o(grated)i(with)e(a)f
-(li)n(v)o(e)g(demonstration.)36 b(This)24 b(initial)i(e)o(xample)g
-(will)e(co)o(v)o(er:)32 b(i\))24 b(What)h(kinds)0 1073
-y(of)e(e)o(xperiments)i(are)d(well-suited)j(to)e(Emulab,)g(and)g(what)g
-(kinds)g(are)g(not.)29 b(ii\))23 b(Ho)n(w)e(to)i(use)g(the)g
-Fe(emulab.net)17 b Ff(W)-7 b(eb)23 b(site)0 1186 y(to)e(get)g(an)g
-(Emulab)g(account)h(and)g(to)f(start)g(an)g(e)o(xperiment.)30
-b(iii\))21 b(Ho)n(w)e(to)i(formulate)i(the)e(tar)n(get)h(netw)o(ork)g
-(description)i(with)0 1299 y(an)i Fd(ns)p Ff(-compatible)k(script,)e
-(or)e(alternati)n(v)o(ely)-6 b(,)30 b(a)c(Ja)n(v)n(a)h(GUI.)e(i)n(v\))h
-(Ho)n(w)f(to)h(use)h(the)g(con\002gured)h(netw)o(ork.)38
-b(v\))26 b(Ho)n(w)f(to)i(end)0 1412 y(the)d(e)o(xperiment)h(when)f
-(your)g(w)o(ork)g(is)f(complete,)i(or)e(\223sw)o(ap\224)i(it)e(when)h
-(you)g(reach)g(a)f(hiatus.)141 1525 y(F)o(ollo)n(wing)34
-b(this)h(w)o(alk-through)i(of)d(the)g(process)i(with)e(a)f(small)i(e)o
-(xample,)i(we)c(will)g(discuss)j(ho)n(w)e(to)g(e)o(xtend)h(and)0
-1638 y(e)o(xpand)20 b(a)e(small)g(netw)o(ork)i(to)e(lar)n(ge-scale)k
-(or)c(more)g(comple)o(x)i(netw)o(orks)g(and)f(Emulab)f(services.)29
-b(This)18 b(portion)i(comprises)0 1751 y(the)31 b(lar)n(gest)h(portion)
-h(of)d(the)h(tutorial.)51 b(The)31 b(topics)g(that)g(will)g(be)f(co)o
-(v)o(ered)i(\(both)g(in)e(this)h(session)h(and,)h(in)d(the)h(full-day)0
-1864 y(v)o(ersion)37 b(of)e(the)h(tutorial,)k(the)c(hands-on)i(lab)e
-(session)h(described)h(in)e(Section)g(2.10\))g(are)g(among)g(those)h
-(listed)f(in)g(the)0 1977 y(Appendix.)0 2168 y Fc(2.3)92
-b(Ho)o(w)22 b(Has)h(Emulab)f(Been)h(Used?)0 2281 y Ff(This)28
-b(section)i(will)e(be)g(a)g(series)h(of)f(v)o(ery)h(short)g(case)g
-(studies)g(of)g(our)f(users')i(di)n(v)o(erse)f(research,)i(focusing)f
-(on)f(Emulab')-5 b(s)0 2394 y(role)24 b(and)g(what)g(it)f(brought)i(to)
-f(the)g(table\227as)h(well)e(as)g(where)h(it)g(w)o(ork)o(ed)g(less)g
-(well.)0 2585 y Fc(2.4)92 b(Emulab)21 b(in)i(Education)0
-2698 y Ff(Emulab)32 b(has)h(some)f(features)i(especially)g(tar)n(geted)
-h(to)d(educational)j(use,)g(such)d(as)g(an)g(authorization)k(and)d
-(operational)0 2811 y(hierarchy)c(that)f(models)g(the)f(prof/T)-8
-b(A/student)30 b(relationship.)43 b(It)27 b(has)h(been)g(used)g(in)f(a)
-f(major)i(w)o(ay)f(for)g(tw)o(o)g(netw)o(orking)0 2924
-y(courses,)32 b(an)d(adv)n(anced)i(course)g(at)e(MIT)f(\(Hari)h
-(Balakrishnan)j(prof,)f(Da)n(v)o(e)e(Andersen)i(T)-8
+2 1 bop 0 91 a Fg(2)99 b(T)-9 b(utorial)25 b(Or)o(ganization)0
+224 y Fc(2.1)92 b(Intr)n(oduction)24 b(and)e(Moti)o(v)o(ation)0
+345 y Ff(W)-7 b(e)20 b(\002rst)h(outline)h(the)g(current)g(methods)h
+(for)e(e)o(xperimentation)j(and)e(v)n(alidation)h(in)e(netw)o(orking)j
+(research,)f(which)e(include)0 458 y(simulation,)k(testing)h(on)d
+(small-scale)j(static)f(testbeds,)g(on)e(special)j(o)o(v)o(erlay)e
+(testbeds)i(lik)o(e)e(R)l(ON,)e(and)i(on)f(li)n(v)o(e)h(netw)o(orks.)0
+571 y(The)f(strengths)j(and)e(weaknesses)i(of)d(each)i(will)e(be)g
+(brie\003y)h(discussed.)141 684 y(W)-7 b(e)26 b(then)i(describe,)h(at)e
+(a)f(high)i(le)n(v)o(el,)g(the)f(Emulab)g(f)o(acility)i(that)e(we)f(ha)
+n(v)o(e)i(de)n(v)o(eloped)h(o)o(v)o(er)d(more)h(than)h(tw)o(o)e(years,)
+0 797 y(which)f(pro)o(vides)i(a)d(ne)n(w)-6 b(,)24 b(complementary)j
+(approach)g(that)e(pro)o(vides)i(both)e(complete)h(control)h(and)e
+(substantial)j(realism.)0 910 y(W)-7 b(e)23 b(will)g(outline)i(its)f(k)
+o(e)o(y)f(design)j(principles)g(and)e(high-le)n(v)o(el)i(features.)0
+1109 y Fc(2.2)92 b(Ho)o(w)22 b(to)i(Use)f(It)0 1230 y
+Ff(This)j(is)g(the)g(core)g(of)g(the)g(tutorial,)i(getting)g(the)e
+(most)g(time.)36 b(W)-7 b(e)25 b(will)h(start)g(from)g(the)g(premise)h
+(\223So)f(you)g(need)h(a)e(testbed)0 1343 y(for)34 b(your)h
+(research...,)-6 b(\224)38 b(and)c(will)g(progress)j(through)f(the)e
+(process)i(of)e(designing,)39 b(con\002guring,)g(and)c(using)g(a)f
+(simple)0 1456 y(netw)o(ork)26 b(on)f(Emulab\227all)g(inte)o(grated)i
+(with)e(a)f(li)n(v)o(e)g(demonstration.)36 b(This)24
+b(initial)i(e)o(xample)g(will)e(co)o(v)o(er:)32 b(i\))24
+b(What)h(kinds)0 1569 y(of)e(e)o(xperiments)i(are)d(well-suited)j(to)e
+(Emulab,)g(and)g(what)g(kinds)g(are)g(not.)29 b(ii\))23
+b(Ho)n(w)e(to)i(use)g(the)g Fe(emulab.net)17 b Ff(W)-7
+b(eb)23 b(site)0 1682 y(to)e(get)g(an)g(Emulab)g(account)h(and)g(to)f
+(start)g(an)g(e)o(xperiment.)30 b(iii\))21 b(Ho)n(w)e(to)i(formulate)i
+(the)e(tar)n(get)h(netw)o(ork)g(description)i(with)0
+1795 y(an)i Fd(ns)p Ff(-compatible)k(script,)e(or)e(alternati)n(v)o
+(ely)-6 b(,)30 b(a)c(Ja)n(v)n(a)h(GUI.)e(i)n(v\))h(Ho)n(w)f(to)h(use)h
+(the)g(con\002gured)h(netw)o(ork.)38 b(v\))26 b(Ho)n(w)f(to)i(end)0
+1908 y(the)d(e)o(xperiment)h(when)f(your)g(w)o(ork)g(is)f(complete,)i
+(or)e(\223sw)o(ap\224)i(it)e(when)h(you)g(reach)g(a)f(hiatus.)141
+2021 y(F)o(ollo)n(wing)34 b(this)h(w)o(alk-through)i(of)d(the)g
+(process)i(with)e(a)f(small)i(e)o(xample,)i(we)c(will)g(discuss)j(ho)n
+(w)e(to)g(e)o(xtend)h(and)0 2134 y(e)o(xpand)20 b(a)e(small)g(netw)o
+(ork)i(to)e(lar)n(ge-scale)k(or)c(more)g(comple)o(x)i(netw)o(orks)g
+(and)f(Emulab)f(services.)29 b(This)18 b(portion)i(comprises)0
+2247 y(the)31 b(lar)n(gest)h(portion)h(of)d(the)h(tutorial.)51
+b(The)31 b(topics)g(that)g(will)g(be)f(co)o(v)o(ered)i(\(both)g(in)e
+(this)h(session)h(and,)h(in)d(the)h(full-day)0 2359 y(v)o(ersion)37
+b(of)e(the)h(tutorial,)k(the)c(hands-on)i(lab)e(session)h(described)h
+(in)e(Section)g(2.10\))g(are)g(among)g(those)h(listed)f(in)g(the)0
+2472 y(Appendix.)0 2672 y Fc(2.3)92 b(Ho)o(w)22 b(Has)h(Emulab)f(Been)h
+(Used?)0 2793 y Ff(This)28 b(section)i(will)e(be)g(a)g(series)h(of)f(v)
+o(ery)h(short)g(case)g(studies)g(of)g(our)f(users')i(di)n(v)o(erse)f
+(research,)i(focusing)f(on)f(Emulab')-5 b(s)0 2906 y(role)24
+b(and)g(what)g(it)f(brought)i(to)f(the)g(table\227as)h(well)e(as)g
+(where)h(it)g(w)o(ork)o(ed)g(less)g(well.)0 3105 y Fc(2.4)92
+b(Emulab)21 b(in)i(Education)0 3226 y Ff(Emulab)32 b(has)h(some)f
+(features)i(especially)g(tar)n(geted)h(to)d(educational)j(use,)g(such)d
+(as)g(an)g(authorization)k(and)d(operational)0 3339 y(hierarchy)c(that)
+f(models)g(the)f(prof/T)-8 b(A/student)30 b(relationship.)43
+b(It)27 b(has)h(been)g(used)g(in)f(a)f(major)i(w)o(ay)f(for)g(tw)o(o)g
+(netw)o(orking)0 3452 y(courses,)32 b(an)d(adv)n(anced)i(course)g(at)e
+(MIT)f(\(Hari)h(Balakrishnan)j(prof,)f(Da)n(v)o(e)e(Andersen)i(T)-8
 b(A\))27 b(and)i(a)g(lo)n(wer)n(-le)n(v)o(el)i(course)0
-3037 y(at)d(K)n(entuck)o(y)i(\(Jim)e(Grif)n(\002oen\).)44
+3565 y(at)d(K)n(entuck)o(y)i(\(Jim)e(Grif)n(\002oen\).)44
 b(Their)29 b(e)o(xperiences)j(and)d(lessons)h(learned)g(will)e(be)h
-(summarized,)i(either)f(by)e(the)h(Utah)0 3150 y(instructors)e(or)c(by)
+(summarized,)i(either)f(by)e(the)h(Utah)0 3678 y(instructors)e(or)c(by)
 h(a)f(guest)h(appearance)j(by)d(Andersen)h(and/or)g(Grif)n(\002oen.)0
-3341 y Fc(2.5)92 b(Under)22 b(the)h(Hood)0 3455 y Ff(A)32
+3877 y Fc(2.5)92 b(Under)22 b(the)h(Hood)0 3998 y Ff(A)32
 b(brief)j(o)o(v)o(ervie)n(w)f(of)f(Emulab')-5 b(s)35
 b(internal)g(w)o(orkings,)j(focusing)d(on)f(the)g(more)g(interesting)i
-(or)e(challenging)j(aspects.)0 3568 y(Open)24 b(issues,)g(both)h
+(or)e(challenging)j(aspects.)0 4111 y(Open)24 b(issues,)g(both)h
 (research)g(and)f(otherwise,)h(will)e(be)h(mentioned.)0
-3759 y Fc(2.6)92 b(Building)22 b(Y)-10 b(our)22 b(Own)0
-3872 y Ff(W)-7 b(e)27 b(will)g(outline)j(the)e(issues)h(in)f(b)n
-(uilding)i(your)f(o)n(wn)e(Emulab,)i(either)g(lo)n(w-)e(or)h(high-end,)
-j(using)e(our)f(softw)o(are.)43 b(W)-7 b(e')o(ll)0 3985
-y(summarize)30 b(our)g(e)o(xperience)h(with)e(the)g(operational)k
-(load,)e(and)e(the)g(pros)h(and)g(cons)g(of)f(joining)h(the)g(distrib)n
-(uted)i(set)d(of)0 4098 y(federated)d(Emulab)d(sites.)0
-4289 y Fc(2.7)92 b(What)22 b(Might)i Fb(Y)-10 b(ou)22
-b Fc(do)g(with)h(Emulab?)0 4402 y Ff(This)28 b(will)g(be)g(an)g
-(audience-dri)n(v)o(en)33 b(con)l(v)o(ersation)f(of)c(ho)n(w)f(Emulab)i
-(could)g(help)g(them)f(simplify)-6 b(,)31 b(enhance,)g(or)d(e)o(xpand)0
-4515 y(their)d(w)o(ork.)30 b(It)24 b(will)g(presumably)i(focus)g(on)e
-(the)g(research,)i(instruction,)h(or)d(f)o(acilities)j(in)d(which)g
-(the)g(audience)j(members)0 4628 y(are)f(in)l(v)n(olv)o(ed)j(or)d
-(considering.)39 b(This)26 b(could)h(also)g(include)h(a)d(discussion)k
-(of)d(ne)n(w)g(features)h(the)g(audience)h(w)o(ould)f(lik)o(e)f(to)0
-4741 y(see)e(in)f(their)i(current)g(tools)f(or)g(in)f(Emulab.)0
-4932 y Fc(2.8)92 b(Ongoing)23 b(and)f(Futur)n(e)h(Plans)0
-5046 y Ff(Those)j(items)g(mark)o(ed)h(with)e(a)h(*)f(may)g(already)j
-(be)e(w)o(orking,)h(some)n(what,)g(by)e(August\227if)i(so,)f(we)f(will)
-h(gi)n(v)o(e)g(them)f(time)0 5159 y(in)e(the)h(\223ho)n(w)g(to)f(use)h
-(it\224)g(sections.)136 5347 y(*)46 b(Federated)35 b(emulabs:)50
+4311 y Fc(2.6)92 b(Building)22 b(Y)-10 b(our)22 b(Own)0
+4432 y Ff(W)-7 b(e)25 b(will)g(describe)i(the)f(process)h(and)f(the)g
+(pros)g(and)g(cons)g(of)f(joining)j(\(contrib)n(uting)h(nodes)e(to\))e
+(the)h(distrib)n(uted)j(testbed.)0 4545 y(W)-7 b(e)27
+b(will)g(outline)j(the)e(issues)h(in)f(b)n(uilding)i(your)f(o)n(wn)e
+(Emulab,)i(either)g(lo)n(w-)e(or)h(high-end,)j(using)e(our)f(softw)o
+(are.)43 b(W)-7 b(e')o(ll)0 4658 y(summarize)30 b(our)g(e)o(xperience)h
+(with)e(the)g(operational)k(load,)e(and)e(the)g(pros)h(and)g(cons)g(of)
+f(joining)h(the)g(distrib)n(uted)i(set)d(of)0 4770 y(federated)d
+(Emulab)d(sites.)0 4970 y Fc(2.7)92 b(What)22 b(Might)i
+Fb(Y)-10 b(ou)22 b Fc(do)g(with)h(Emulab?)0 5091 y Ff(This)28
+b(will)g(be)g(an)g(audience-dri)n(v)o(en)33 b(con)l(v)o(ersation)f(of)c
+(ho)n(w)f(Emulab)i(could)g(help)g(them)f(simplify)-6
+b(,)31 b(enhance,)g(or)d(e)o(xpand)0 5204 y(their)d(w)o(ork.)30
+b(It)24 b(will)g(presumably)i(focus)g(on)e(the)g(research,)i
+(instruction,)h(or)d(f)o(acilities)j(in)d(which)g(the)g(audience)j
+(members)0 5317 y(are)f(in)l(v)n(olv)o(ed)j(or)d(considering.)39
+b(This)26 b(could)h(also)g(include)h(a)d(discussion)k(of)d(ne)n(w)g
+(features)h(the)g(audience)h(w)o(ould)f(lik)o(e)f(to)0
+5430 y(see)e(in)f(their)i(current)g(tools)f(or)g(in)f(Emulab.)1957
+5709 y(2)p eop
+%%Page: 3 3
+3 2 bop 0 91 a Fc(2.8)92 b(Ongoing)23 b(and)f(Futur)n(e)h(Plans)0
+213 y Ff(Those)j(items)g(mark)o(ed)h(with)e(a)h(*)f(may)g(already)j(be)
+e(w)o(orking,)h(some)n(what,)g(by)e(August\227if)i(so,)f(we)f(will)h
+(gi)n(v)o(e)g(them)f(time)0 325 y(in)e(the)h(\223ho)n(w)g(to)f(use)h
+(it\224)g(sections.)136 538 y(*)46 b(Federated)35 b(emulabs:)50
 b(moti)n(v)n(ation,)37 b(design,)g(plans,)g(status.)59
 b(Collaboration/mer)n(ging)39 b(with)33 b(the)g(R)l(ON)f(o)o(v)o(erlay)
-227 5460 y(netw)o(ork)25 b(and)f(other)h(distrib)n(uted)h(testbeds.)
-1957 5709 y(2)p eop
-%%Page: 3 3
-3 2 bop 152 91 a Ff(-)45 b(NIMI-lik)o(e)37 b(e)o(xtensible)h(JVM)d(en)l
-(vironment)k(on)d(distrib)n(uted)j(1-2)e(node)f(\223emulabs\224)i(to)e
-(pro)o(vide)h(a)f(distrib)n(uted)227 204 y(measurement)26
-b(infrastructure.)136 392 y(*)46 b(W)l(ireless)25 b(support)h(\(dense)f
-(mesh)f(of)f(\002x)o(ed)g(nodes)i(in)e(a)h(b)n(uilding/campus\).)152
-579 y(-)45 b(Mobile)29 b(support)g(\(real)f(RF)e(de)n(vice)i(carried)h
+227 651 y(netw)o(ork)25 b(and)f(other)h(distrib)n(uted)h(testbeds.)152
+839 y(-)45 b(NIMI-lik)o(e)37 b(e)o(xtensible)h(JVM)d(en)l(vironment)k
+(on)d(distrib)n(uted)j(1-2)e(node)f(\223emulabs\224)i(to)e(pro)o(vide)h
+(a)f(distrib)n(uted)227 951 y(measurement)26 b(infrastructure.)136
+1139 y(*)46 b(W)l(ireless)25 b(support)h(\(dense)f(mesh)f(of)f(\002x)o
+(ed)g(nodes)i(in)e(a)h(b)n(uilding/campus\).)152 1327
+y(-)45 b(Mobile)29 b(support)g(\(real)f(RF)e(de)n(vice)i(carried)h
 (around)g(by)f(passi)n(v)o(e)h(couriers)g(who)e(tra)n(v)o(el)i
-(predictably)h(in)d(time)h(and)227 692 y(space:)j(1\))23
+(predictably)h(in)d(time)h(and)227 1440 y(space:)j(1\))23
 b(students)j(attending)g(classes,)f(and)f(2\))f(city)h(b)n(uses.)136
-880 y(*)46 b(Checkpointing/sw)o(appi)q(ng,)29 b(rollback,)c(\223single)
-h(stepping\224)g(of)d(a)g(closed)i(distrib)n(uted)i(system.)136
-1068 y(*)46 b(Further)25 b(simulation/emulation)j(transparenc)o(y)-6
-b(.)136 1255 y(*)46 b(Multiple)o(xing)26 b(multiple)f(virtual)g(nodes)g
-(on)f(single)h(physical)g(nodes.)136 1443 y(*)46 b(Support)25
-b(for)f(W)l(indo)n(ws.)152 1631 y(-)45 b(.)14 b(.)g(.)0
-1830 y Fc(2.9)92 b(Conclusion)0 1951 y Ff(Lessons)25
-b(learned,)g(including)h(the)e(contrast)h(between)g(our)f(e)o
-(xpectations)j(of)c(emulab')-5 b(s)25 b(v)n(alue)f(and)g(our)g(disco)o
-(v)o(eries.)0 2150 y Fc(2.10)92 b(Lab)22 b(Session)0
-2271 y Ff(In)d(the)h(full-day)h(v)o(ersion)g(of)e(this)h(tutorial,)h
-(the)f(e)o(xtra)g(time\227in)f(the)h(afternoon\227will)i(primarily)f
-(be)e(allocated)j(to)d(a)g(hands-)0 2384 y(on)25 b(\223lab)h(session.)
--6 b(\224)36 b(Attendees)27 b(will)e(pair)h(up)g(with)f(each)h(other)g
-(at)f(laptops.)36 b(W)-7 b(e)24 b(will)h(lead)h(the)g(attendees)i
-(through)f(some)0 2497 y(carefully)32 b(canned)g(projects;)j(the)o(y)30
+1627 y(*)46 b(Checkpointing/sw)o(appi)q(ng,)29 b(rollback,)c
+(\223single)h(stepping\224)g(of)d(a)g(closed)i(distrib)n(uted)i
+(system.)136 1815 y(*)46 b(Further)25 b(simulation/emulation)j
+(transparenc)o(y)-6 b(.)136 2002 y(*)46 b(Multiple)o(xing)26
+b(multiple)f(virtual)g(nodes)g(on)f(single)h(physical)g(nodes.)136
+2190 y(*)46 b(Support)25 b(for)f(W)l(indo)n(ws.)152 2378
+y(-)45 b(.)14 b(.)g(.)0 2577 y Fc(2.9)92 b(Conclusion)0
+2698 y Ff(Lessons)25 b(learned,)g(including)h(the)e(contrast)h(between)
+g(our)f(e)o(xpectations)j(of)c(emulab')-5 b(s)25 b(v)n(alue)f(and)g
+(our)g(disco)o(v)o(eries.)0 2897 y Fc(2.10)92 b(Lab)22
+b(Session)0 3019 y Ff(In)d(the)h(full-day)h(v)o(ersion)g(of)e(this)h
+(tutorial,)h(the)f(e)o(xtra)g(time\227in)f(the)h(afternoon\227will)i
+(primarily)f(be)e(allocated)j(to)d(a)g(hands-)0 3132
+y(on)25 b(\223lab)h(session.)-6 b(\224)36 b(Attendees)27
+b(will)e(pair)h(up)g(with)f(each)h(other)g(at)f(laptops.)36
+b(W)-7 b(e)24 b(will)h(lead)h(the)g(attendees)i(through)f(some)0
+3245 y(carefully)32 b(canned)g(projects;)j(the)o(y)30
 b(will)g(go)f(through)j(the)e(process)i(of)e(specifying)j(their)d
-(systems,)j(using)e(the)f(netw)o(orks)0 2610 y(the)o(y)g(created,)i
+(systems,)j(using)e(the)f(netw)o(orks)0 3357 y(the)o(y)g(created,)i
 (and)d(gathering)j(results.)47 b(A)28 b(v)n(ariety)i(of)f(projects)j
 (will)d(teach)h(the)f(attendees)j(about)e(dif)n(ferent)h(aspects)g(of)0
-2723 y(emulab)24 b(and)g(its)g(features.)141 2836 y(P)o(airs)j(of)g
+3470 y(emulab)24 b(and)g(its)g(features.)141 3583 y(P)o(airs)j(of)g
 (people)h(seem)f(to)g(attain)h(the)f(right)h(balance)h(in)d(all)h
 (respects,)j(including)g(interaction)f(with)e(each)h(other)g(and)0
-2949 y(pressure)e(on)d(Emulab)h(and)g(laptop/terminal)j(resources.)k(W)
+3696 y(pressure)e(on)d(Emulab)h(and)g(laptop/terminal)j(resources.)k(W)
 -7 b(e)23 b(can)h(adapt)g(the)g(\223people)i(cluster\224)f(size)f(as)g
-(needed.)141 3062 y(If)f(time)h(and)g(interest)h(permit,)f(we)f(will)g
+(needed.)141 3809 y(If)f(time)h(and)g(interest)h(permit,)f(we)f(will)g
 (undertak)o(e)j(one)e(or)g(more)f(attendee-pro)o(vided)29
-b(projects.)i(T)-7 b(o)22 b(get)i(them)g(think-)0 3175
+b(projects.)i(T)-7 b(o)22 b(get)i(them)g(think-)0 3922
 y(ing,)g(we)e(will)i(ha)n(v)o(e)g(mailed)g(the)g(re)o(gistrants)i
-(beforehand.)0 3440 y Fg(3)99 b(Intended)27 b(A)-5 b(udience)0
-3587 y Ff(Researchers,)27 b(teachers,)f(and)f(de)n(v)o(elopers)h(in)e
+(beforehand.)0 4188 y Fg(3)99 b(Intended)27 b(A)-5 b(udience)0
+4334 y Ff(Researchers,)27 b(teachers,)f(and)f(de)n(v)o(elopers)h(in)e
 (netw)o(orking,)j(distrib)n(uted)h(systems,)d(or)f(simulation:)33
-b(those)25 b(who)f(are)h(inter)n(-)0 3699 y(ested)k(in)e(ne)n(w)h
+b(those)25 b(who)f(are)h(inter)n(-)0 4447 y(ested)k(in)e(ne)n(w)h
 (methods)h(of)e(e)o(xperimentation,)32 b(testing,)e(v)n(alidation,)i(e)
 n(v)n(aluation,)e(or)e(instruction.)45 b(This)27 b(w)o(ould)h(include)0
-3812 y(f)o(aculty)-6 b(,)26 b(students,)h(research)g(staf)n(f,)e(and)g
+4560 y(f)o(aculty)-6 b(,)26 b(students,)h(research)g(staf)n(f,)e(and)g
 (netw)o(orking)i(professionals)h(from)d(industrial)i
-(settings\227emulab)h(is)d(highly)h(rel-)0 3925 y(e)n(v)n(ant)e(to)g
+(settings\227emulab)h(is)d(highly)h(rel-)0 4672 y(e)n(v)n(ant)e(to)g
 (testing)h(and)f(performance)i(e)n(v)n(aluation)g(of)d(an)o(y)h(system)
-g(that)g(in)l(v)n(olv)o(es)i(a)d(netw)o(ork.)141 4038
+g(that)g(in)l(v)n(olv)o(es)i(a)d(netw)o(ork.)141 4785
 y(Minimum)f(background)k(kno)n(wledge:)31 b(Basic)22
 b(understanding)27 b(of)22 b(core)h(netw)o(orking)i(principles,)g
-(which)d(e)n(v)o(eryone)i(at)0 4151 y(the)29 b(conference)i(will)d
+(which)d(e)n(v)o(eryone)i(at)0 4898 y(the)29 b(conference)i(will)d
 (easily)h(meet.)43 b(Handy)29 b(to)g(ha)n(v)o(e,)g(b)n(ut)g(not)g
 (required:)41 b(some)28 b(f)o(amiliarity)j(with)d(the)h
-Fd(ns)f Ff(simulator;)33 b(a)0 4264 y(\223feel\224)20
+Fd(ns)f Ff(simulator;)33 b(a)0 5011 y(\223feel\224)20
 b(for)f(con\002guring)i(or)e(programming)h(real)g(netw)o(orks)g(\(as)f
 (opposed)i(to)d(strictly)j(analytic)g(or)d(te)o(xtbook)j(understanding)
-0 4377 y(of)i(netw)o(orks\);)j(some)e(kno)n(wledge)h(of)f(standard)h
-(netw)o(ork)g(tools)g(lik)o(e)f Fe(tcpdump)p Ff(.)0 4643
-y Fg(4)99 b(Half-day)25 b(and)g(Full-day)g(Offerings)0
-4789 y Ff(The)d(half-day)i(tutorial,)g(and)f(morning)h(of)e(the)h
-(full-day)h(v)o(ersion,)g(will)e(contain)i(the)f(main)f(lecture)i
-(components)h(co)o(v)o(ering)0 4902 y(man)o(y)31 b(of)f(the)i(topics)g
-(outlined)h(abo)o(v)o(e,)g(interspersed)h(with)d(li)n(v)o(e)g
-(demonstration)j(of)d(Emulab')-5 b(s)31 b(capabilities)j(and)e(uses.)0
-5015 y(The)21 b(afternoon)k(of)d(the)g(full-day)i(v)o(ersion)f(will)e
-(focus)i(on)f(the)g(hands-on)j(lab)d(e)o(x)o(ercises,)h(b)n(ut)g(will)e
-(also)i(contain)g(additional)0 5127 y(lecture)i(material)g(gi)n(ving)g
-(more)e(detail)i(on)e(the)h(issues)h(mentioned)h(abo)o(v)o(e:)k(\223b)n
-(uild)25 b(your)f(o)n(wn,)-6 b(\224)23 b(future)i(plans,)f(etc.)141
-5240 y(Attendee)h(laptops)g(require)h(only)e(a)f(Ja)n(v)n(a-capable)k
-(W)-7 b(eb)23 b(bro)n(wser)h(and)g(an)g(ssh)g(client.)1957
+0 5124 y(of)i(netw)o(orks\);)j(some)e(kno)n(wledge)h(of)f(standard)h
+(netw)o(ork)g(tools)g(lik)o(e)f Fe(tcpdump)p Ff(.)1957
 5709 y(3)p eop
 %%Page: 4 4
-4 3 bop 0 91 a Fg(5)99 b(Detailed)26 b(List)e(of)h(T)-9
-b(opics)0 237 y Ff(The)29 b(Emulab)g(features)i(and)e(topics)i(co)o(v)o
-(ered)f(in)f(the)h(\223Ho)n(w)e(to)h(Use)g(It\224)g(and)g(\223Lab)g
-(Session\224)i(will)e(be)g(dra)o(wn)g(from)g(the)0 350
-y(follo)n(wing)c(list.)136 463 y Fa(\017)46 b Ff(Using)24
-b(the)g(W)-7 b(eb)23 b(interf)o(ace)136 576 y Fa(\017)46
+4 3 bop 0 91 a Fg(4)99 b(Half-day)25 b(and)g(Full-day)g(Offerings)0
+237 y Ff(The)d(half-day)i(tutorial,)g(and)f(morning)h(of)e(the)h
+(full-day)h(v)o(ersion,)g(will)e(contain)i(the)f(main)f(lecture)i
+(components)h(co)o(v)o(ering)0 350 y(man)o(y)31 b(of)f(the)i(topics)g
+(outlined)h(abo)o(v)o(e,)g(interspersed)h(with)d(li)n(v)o(e)g
+(demonstration)j(of)d(Emulab')-5 b(s)31 b(capabilities)j(and)e(uses.)0
+463 y(The)21 b(afternoon)k(of)d(the)g(full-day)i(v)o(ersion)f(will)e
+(focus)i(on)f(the)g(hands-on)j(lab)d(e)o(x)o(ercises,)h(b)n(ut)g(will)e
+(also)i(contain)g(additional)0 576 y(lecture)i(material)g(gi)n(ving)g
+(more)e(detail)i(on)e(the)h(issues)h(mentioned)h(abo)o(v)o(e:)k(\223b)n
+(uild)25 b(your)f(o)n(wn,)-6 b(\224)23 b(future)i(plans,)f(etc.)141
+689 y(Attendee)h(laptops)g(require)h(only)e(a)f(Ja)n(v)n(a-capable)k(W)
+-7 b(eb)23 b(bro)n(wser)h(and)g(an)g(ssh)g(client.)0
+955 y Fg(5)99 b(Detailed)26 b(List)e(of)h(T)-9 b(opics)0
+1101 y Ff(The)29 b(Emulab)g(features)i(and)e(topics)i(co)o(v)o(ered)f
+(in)f(the)h(\223Ho)n(w)e(to)h(Use)g(It\224)g(and)g(\223Lab)g
+(Session\224)i(will)e(be)g(dra)o(wn)g(from)g(the)0 1214
+y(follo)n(wing)c(list.)136 1327 y Fa(\017)46 b Ff(Using)24
+b(the)g(W)-7 b(eb)23 b(interf)o(ace)136 1440 y Fa(\017)46
 b Ff(Ov)o(ervie)n(w/re)n(vie)n(w)25 b(of)e(standard)j
-Fd(ns)e Ff(features)136 689 y Fa(\017)46 b Ff(Specifying)26
+Fd(ns)e Ff(features)136 1553 y Fa(\017)46 b Ff(Specifying)26
 b(a)d(topology)j(and)e(con\002guration)j(using)d Fd(ns)136
-802 y Fa(\017)46 b Ff(Emulab)24 b(e)o(xtensions)i(to)d
-Fd(ns)p Ff(,)h(including:)336 915 y Fc(\226)46 b Ff(Customizing)26
-b(node)e(disk)g(contents)336 1028 y Fc(\226)46 b Ff(Choosing)26
-b(your)e(OS)336 1141 y Fc(\226)46 b Ff(Choosing)26 b(your)e(hardw)o
-(are)336 1254 y Fc(\226)46 b Ff(V)-5 b(irtual)24 b(node)h(and)f(link)g
-(types;)h(equi)n(v)n(alence)h(classes)336 1367 y Fc(\226)46
-b Ff(IP)23 b(addrs)336 1479 y Fc(\226)46 b Ff(Delayed)25
-b(LANs)336 1592 y Fc(\226)46 b Ff(Gi)n(ving)24 b(a)f(startup)j(command)
-136 1705 y Fa(\017)46 b Ff(Automatic)25 b(traf)n(\002c)e(generation)336
-1818 y Fc(\226)46 b Ff(Standard)25 b Fd(ns)f Ff(interf)o(ace)336
-1931 y Fc(\226)46 b Ff(Choosing)26 b(dif)n(ferent)f(implementations)136
-2044 y Fa(\017)46 b Ff(Specifying)26 b(a)d(topology)j(and)e(con\002g)g
+1665 y Fa(\017)46 b Ff(Emulab)24 b(e)o(xtensions)i(to)d
+Fd(ns)p Ff(,)h(including:)336 1778 y Fc(\226)46 b Ff(Customizing)26
+b(node)e(disk)g(contents)336 1891 y Fc(\226)46 b Ff(Choosing)26
+b(your)e(OS)336 2004 y Fc(\226)46 b Ff(Choosing)26 b(your)e(hardw)o
+(are)336 2117 y Fc(\226)46 b Ff(V)-5 b(irtual)24 b(node)h(and)f(link)g
+(types;)h(equi)n(v)n(alence)h(classes)336 2230 y Fc(\226)46
+b Ff(IP)23 b(addrs)336 2343 y Fc(\226)46 b Ff(Delayed)25
+b(LANs)336 2456 y Fc(\226)46 b Ff(Gi)n(ving)24 b(a)f(startup)j(command)
+136 2569 y Fa(\017)46 b Ff(Automatic)25 b(traf)n(\002c)e(generation)336
+2682 y Fc(\226)46 b Ff(Standard)25 b Fd(ns)f Ff(interf)o(ace)336
+2795 y Fc(\226)46 b Ff(Choosing)26 b(dif)n(ferent)f(implementations)136
+2907 y Fa(\017)46 b Ff(Specifying)26 b(a)d(topology)j(and)e(con\002g)g
 (using)h(the)f('netb)n(uilder')j(Ja)n(v)n(a)d(applet)h(GUI)136
-2157 y Fa(\017)46 b Ff(Naming,)24 b(both)g(virtual)h(and)f(physical)136
-2270 y Fa(\017)46 b Ff(Ov)o(ervie)n(w)24 b(of)f(the)h(resource)i
-(allocation)g(report)136 2383 y Fa(\017)46 b Ff(Barrier)24
-b(synchronization)29 b(at)23 b(startup)136 2496 y Fa(\017)46
+3020 y Fa(\017)46 b Ff(Naming,)24 b(both)g(virtual)h(and)f(physical)136
+3133 y Fa(\017)46 b Ff(Ov)o(ervie)n(w)24 b(of)f(the)h(resource)i
+(allocation)g(report)136 3246 y Fa(\017)46 b Ff(Barrier)24
+b(synchronization)29 b(at)23 b(startup)136 3359 y Fa(\017)46
 b Ff(Using)24 b(Emulab')-5 b(s)24 b Fd(ns)p Ff(-compatible)j(e)n(v)o
-(ent)d(system)136 2609 y Fa(\017)46 b Ff(Dynamic)24 b(e)n(v)o(ents)136
-2721 y Fa(\017)46 b Ff(Batch)24 b(e)o(xperiments)136
-2894 y Fa(\017)46 b Ff(Using)24 b(physically)i(distrib)n(uted)h(nodes)
-136 3007 y Fa(\017)46 b Ff(Using)24 b(purely)h(simulated)g(nodes)136
-3180 y Fa(\017)46 b Ff(Structure)25 b(of)f(users')h(\002lesystem)f
-(layout)h(on)f(the)f(serv)o(er;)i(protection)136 3293
+(ent)d(system)136 3472 y Fa(\017)46 b Ff(Dynamic)24 b(e)n(v)o(ents)136
+3585 y Fa(\017)46 b Ff(Batch)24 b(e)o(xperiments)136
+3758 y Fa(\017)46 b Ff(Using)24 b(physically)i(distrib)n(uted)h(nodes)
+136 3871 y Fa(\017)46 b Ff(Using)24 b(purely)h(simulated)g(nodes)136
+4044 y Fa(\017)46 b Ff(Structure)25 b(of)f(users')h(\002lesystem)f
+(layout)h(on)f(the)f(serv)o(er;)i(protection)136 4157
 y Fa(\017)46 b Ff(Access)24 b(to)g(nodes')h(console)g(logs)g(and)f
-(console)h(input)136 3406 y Fa(\017)46 b Ff(Rebooting)26
-b(and)e(po)n(wer)f(control)136 3519 y Fa(\017)46 b Ff(Reco)o(v)o(ering)
-25 b(from)f(a)f(scrogged)j(disk)136 3632 y Fa(\017)46
-b Ff(Routing)25 b(control)136 3745 y Fa(\017)46 b Ff(Generating)26
+(console)h(input)136 4269 y Fa(\017)46 b Ff(Rebooting)26
+b(and)e(po)n(wer)f(control)136 4382 y Fa(\017)46 b Ff(Reco)o(v)o(ering)
+25 b(from)f(a)f(scrogged)j(disk)136 4495 y Fa(\017)46
+b Ff(Routing)25 b(control)136 4608 y Fa(\017)46 b Ff(Generating)26
 b(custom)e(disk)h(images,)f(including)i(k)o(ernels)136
-3858 y Fa(\017)46 b Ff(Using)24 b(your)h(o)n(wn)e(non-standard)k
-(\(non-Unix/Linux/W)l(indo)n(ws\))i(OS)136 3971 y Fa(\017)46
-b Ff(Experiment)25 b(sw)o(apping)136 4083 y Fa(\017)46
-b Ff(Security)136 4196 y Fa(\017)g Ff(Hints)24 b(on)g(optimizing)h
-(performance)h(and)e(use)g(of)g(storage)136 4309 y Fa(\017)46
+4721 y Fa(\017)46 b Ff(Using)24 b(your)h(o)n(wn)e(non-standard)k
+(\(non-Unix/Linux/W)l(indo)n(ws\))i(OS)136 4834 y Fa(\017)46
+b Ff(Experiment)25 b(sw)o(apping)136 4947 y Fa(\017)46
+b Ff(Security)136 5060 y Fa(\017)g Ff(Hints)24 b(on)g(optimizing)h
+(performance)h(and)e(use)g(of)g(storage)136 5173 y Fa(\017)46
 b Ff(Standard)25 b Fd(ns)p Ff(-compatible)i(tools:)j(topology)c
-(generators,)g(visualizers,)h(.)14 b(.)g(.)g(.)136 4422
-y Fa(\017)46 b Ff(Hidden)25 b(directories)h(if)d(things)i(go)f(wrong.)0
-4688 y Fg(6)99 b(Instructor)27 b(Biographies)0 4834 y
-Ff(Unless)g(otherwise)g(noted,)g(all)f(speak)o(ers)i(are)f(with)e(the)h
-(Uni)n(v)o(ersity)i(of)d(Utah,)h(School)h(of)f(Computing.)37
-b(If)26 b(the)g(tutorial)h(is)0 4947 y(full-day)-6 b(,)25
+(generators,)g(visualizers,)h(.)14 b(.)g(.)g(.)136 5286
+y Fa(\017)46 b Ff(Hidden)25 b(directories)h(if)d(things)i(go)f(wrong.)
+1957 5709 y(4)p eop
+%%Page: 5 5
+5 4 bop 0 91 a Fg(6)99 b(Instructor)27 b(Biographies)0
+237 y Ff(Unless)g(otherwise)g(noted,)g(all)f(speak)o(ers)i(are)f(with)e
+(the)h(Uni)n(v)o(ersity)i(of)d(Utah,)h(School)h(of)f(Computing.)37
+b(If)26 b(the)g(tutorial)h(is)0 350 y(full-day)-6 b(,)25
 b(most)f(of)f(the)h(instructors)j(will)c(w)o(ander)h(the)g(room)g
 (during)h(the)f(lab)f(e)o(x)o(ercises,)i(lending)h(indi)n(vidual)g
-(help.)141 5060 y Fc(J)o(ay)32 b(Lepr)n(eau:)91 b Ff(o)o(v)o(erall)32
+(help.)141 463 y Fc(J)o(ay)32 b(Lepr)n(eau:)91 b Ff(o)o(v)o(erall)32
 b(coordinator)j(of)d(the)g(tutorial,)k(and)c(speak)o(er)i(for)e(the)g
-(more)g(general)h(portions.)56 b(He)31 b(is)h(a)0 5173
+(more)g(general)h(portions.)56 b(He)31 b(is)h(a)0 576
 y(f)o(aculty)27 b(member)f(in)f(the)h(Uni)n(v)o(ersity)h(of)e(Utah')-5
 b(s)26 b(School)g(of)f(Computing,)i(where)f(he)g(heads)g(the)g(Flux)f
-(Research)i(Group.)0 5286 y(He)d(has)g(interests)j(in)d(man)o(y)h
-(areas)g(of)f(softw)o(are)i(systems,)g(most)e(of)g(them)h(originating)i
-(in)e(operating)i(systems)e(issues,)h(al-)0 5399 y(though)f(man)o(y)f
-(go)g(f)o(ar)g(a\002eld.)29 b(Those)24 b(disparate)i(areas)f(include)g
+(Research)i(Group.)0 689 y(He)d(has)g(interests)j(in)d(man)o(y)h(areas)
+g(of)f(softw)o(are)i(systems,)g(most)e(of)g(them)h(originating)i(in)e
+(operating)i(systems)e(issues,)h(al-)0 802 y(though)f(man)o(y)f(go)g(f)
+o(ar)g(a\002eld.)29 b(Those)24 b(disparate)i(areas)f(include)g
 (information)h(and)e(resource)i(security)-6 b(,)26 b(netw)o(orking,)g
-(pro-)1957 5709 y(4)p eop
-%%Page: 5 5
-5 4 bop 0 91 a Ff(gramming)24 b(and)f(non-traditional)28
-b(languages,)d(compilers,)g(component-based)i(systems,)d(and)f(e)n(v)o
-(en)g(a)g(pinch)h(of)f(softw)o(are)0 204 y(engineering)k(and)d(formal)h
+(pro-)0 915 y(gramming)e(and)f(non-traditional)28 b(languages,)d
+(compilers,)g(component-based)i(systems,)d(and)f(e)n(v)o(en)g(a)g
+(pinch)h(of)f(softw)o(are)0 1028 y(engineering)k(and)d(formal)h
 (methods.)30 b(In)24 b(1994)h(he)e(founded)j(the)e(highly)i(successful)
-g(and)e(prestigious)j(OSDI)22 b(conference)0 317 y(series,)i(one)g(of)g
-(the)g(tw)o(o)f(premier)h(OS)e(conferences.)32 b(He)23
-b(concei)n(v)o(ed)j(and)e(leads)g(the)g(emulab)g(project.)141
-430 y Fc(Mac)32 b(Newbold:)89 b Ff(Graduate)33 b(student,)i(doing)e(MS)
-e(in)g(C.S.)f(He)h(has)h(been)h(w)o(orking)g(on)f(Emulab)g(for)f(tw)o
-(o)h(years;)0 543 y(while)23 b(an)f(under)n(grad)k(he)c(designed)j(the)
-e(initial)h(v)o(ersions)g(of)f(man)o(y)f(of)g(its)h(core)g(systems.)30
-b(F)o(or)21 b(three)j(years)f(he)g(has)g(helped)0 656
-y(teach)30 b(the)g(\223High)g(School)g(Computing)h(Institute:\224)44
-b(a)29 b(summer)g(program)i(for)f(talented)h(high)f(school)h(students,)
-i(run)d(by)0 769 y(the)24 b(School)g(of)g(Computing,)g(containing)j(a)c
-(lar)n(ge)i(lab)e(component.)141 882 y Fc(Rob)i(Ricci)53
-b Ff(Research)27 b(Associate.)39 b(As)26 b(an)h(under)n(grad,)j(he)c
-(prototyped)k(a)25 b(no)o(v)o(el)i(use)g(of)g(acti)n(v)o(e)g(netw)o
-(orking)h(ideas,)0 995 y(\223agile)23 b(protocols,)-6
-b(\224)25 b(for)d(censor)n(-resistant)27 b(o)o(v)o(erlay)c(netw)o
-(orks,)h(and)e(published)j(it)d(at)g(HotOS'01.)28 b(Rob)22
-b(has)g(been)h(w)o(orking)0 1108 y(on)28 b(the)f(Emulab)h(softw)o(are)g
-(and)g(hardw)o(are)h(base)g(for)e(o)o(v)o(er)h(a)f(year)l(,)i(and)f
-(kno)n(ws)f(its)h(internals)i(well.)40 b(Star)27 b(of)g(a)g(local)i(TV)
-0 1220 y(feature)c(on)f(ste)o(ganography:)32 b(gi)n(v)o(es)24
-b(great)h(intervie)n(w!)141 1333 y Fc(Chris)33 b(Alfeld)65
-b Ff(Ph.D.)32 b(student)j(in)e(Math)h(at)f(the)h(Uni)n(v)o(ersity)h(of)
-e(W)l(isconsin-Madison.)63 b(As)32 b(one)i(of)g(the)f(original)0
-1446 y(Emulab)d(de)n(v)o(elopers,)k(he)d(designed)h(much)f(of)f(the)g
-Fd(ns)p Ff(-compatible)k(front)d(end)g(softw)o(are)g(as)g(well)f(as)g
-(a)g(core)g(algorithm)0 1559 y(that)f(performs)g(the)g(NP-hard)f
-(mapping)i(of)e(the)g(virtual)i(netw)o(ork)f(onto)g(the)g(physical)h
-(netw)o(ork,)g(and)e(remains)i(in)l(v)n(olv)o(ed)0 1672
-y(as)24 b(needed.)31 b(F)o(or)23 b(four)h(years)h(he)e(has)i(helped)g
-(teach)g(the)f(\223High)g(School)g(Computing)h(Institute:\224)33
-b(a)23 b(month-long)j(summer)0 1785 y(program)f(for)g(talented)h(high)f
-(school)h(students,)g(run)f(by)f(the)g(School)h(of)f(Computing.)33
-b(Chris)24 b(is)g(anxious)i(to)e(participate)j(if)0 1898
-y(we)c(need)h(him.)141 2011 y Fc(T)-8 b(echnical)19 b(Backup:)25
-b(Leigh)18 b(Stoller)-8 b(,)20 b(Mik)o(e)e(Hibler:)53
-b Ff(These)19 b(tw)o(o)f(highly)j(skilled)f(and)f(professional)k
-(research)e(staf)n(f)0 2124 y(will)26 b(be)g(\223on)g(alert\224)h(back)
-g(at)f(Utah,)g(to)g(ensure)h(that)g(should)g(an)o(y)f(problems)i(arise)
-f(in)e(emulab)i(during)h(li)n(v)o(e)e(demos)g(or)g(lab)0
-2237 y(e)o(x)o(ercises,)21 b(the)o(y)f(can)f(immediately)h(be)f(\002x)o
-(ed.)27 b(T)-7 b(ogether)20 b(the)o(y)g(ha)n(v)o(e)f(o)o(v)o(er)g(20)g
-(years)h(e)o(xperience)i(w)o(orking)e(with)f(Lepreau')-5
-b(s)0 2350 y(group)21 b(on)f(v)n(arious)i(projects,)g(from)e(virtual)i
-(memory)e(to)g(component-based)k(k)o(ernels)e(to)e(compilers)h(to)f
-(simulators.)30 b(Leigh)0 2462 y(is)23 b(the)h(lead)g(de)n(v)o(eloper)i
-(of)d(much)h(of)g(the)f(Emulab)h(softw)o(are)h(suite;)f(Mik)o(e)g(is)g
-(kno)n(wledgeable)i(on)e(most)g(of)f(it.)1957 5709 y(5)p
-eop
+g(and)e(prestigious)j(OSDI)22 b(conference)0 1141 y(series,)i(one)g(of)
+g(the)g(tw)o(o)f(premier)h(OS)e(conferences.)32 b(He)23
+b(concei)n(v)o(ed)j(and)e(leads)g(the)g(Emulab)g(project.)141
+1254 y Fc(Mac)32 b(Newbold:)89 b Ff(Graduate)33 b(student,)i(doing)e
+(MS)e(in)g(C.S.)f(He)h(has)h(been)h(w)o(orking)g(on)f(Emulab)g(for)f
+(tw)o(o)h(years;)0 1367 y(while)23 b(an)f(under)n(grad)k(he)c(designed)
+j(the)e(initial)h(v)o(ersions)g(of)f(man)o(y)f(of)g(its)h(core)g
+(systems.)30 b(F)o(or)21 b(three)j(years)f(he)g(has)g(helped)0
+1479 y(teach)30 b(the)g(\223High)g(School)g(Computing)h(Institute:\224)
+44 b(a)29 b(summer)g(program)i(for)f(talented)h(high)f(school)h
+(students,)i(run)d(by)0 1592 y(the)24 b(School)g(of)g(Computing,)g
+(containing)j(a)c(lar)n(ge)i(lab)e(component.)141 1705
+y Fc(Rob)i(Ricci)53 b Ff(Research)27 b(Associate.)39
+b(As)26 b(an)h(under)n(grad,)j(he)c(prototyped)k(a)25
+b(no)o(v)o(el)i(use)g(of)g(acti)n(v)o(e)g(netw)o(orking)h(ideas,)0
+1818 y(\223agile)23 b(protocols,)-6 b(\224)25 b(for)d(censor)n
+(-resistant)27 b(o)o(v)o(erlay)c(netw)o(orks,)h(and)e(published)j(it)d
+(at)g(HotOS'01.)28 b(Rob)22 b(has)g(been)h(w)o(orking)0
+1931 y(on)28 b(the)f(Emulab)h(softw)o(are)g(and)g(hardw)o(are)h(base)g
+(for)e(o)o(v)o(er)h(a)f(year)l(,)i(and)f(kno)n(ws)f(its)h(internals)i
+(well.)40 b(Star)27 b(of)g(a)g(local)i(TV)0 2044 y(feature)c(on)f(ste)o
+(ganography:)32 b(gi)n(v)o(es)24 b(great)h(intervie)n(w!)141
+2157 y Fc(Chris)33 b(Alfeld)65 b Ff(Ph.D.)32 b(student)j(in)e(Math)h
+(at)f(the)h(Uni)n(v)o(ersity)h(of)e(W)l(isconsin-Madison.)63
+b(As)32 b(one)i(of)g(the)f(original)0 2270 y(Emulab)d(de)n(v)o
+(elopers,)k(he)d(designed)h(much)f(of)f(the)g Fd(ns)p
+Ff(-compatible)k(front)d(end)g(softw)o(are)g(as)g(well)f(as)g(a)g(core)
+g(algorithm)0 2383 y(that)f(performs)g(the)g(NP-hard)f(mapping)i(of)e
+(the)g(virtual)i(netw)o(ork)f(onto)g(the)g(physical)h(netw)o(ork,)g
+(and)e(remains)i(in)l(v)n(olv)o(ed)0 2496 y(as)24 b(needed.)31
+b(F)o(or)23 b(four)h(years)h(he)e(has)i(helped)g(teach)g(the)f
+(\223High)g(School)g(Computing)h(Institute:\224)33 b(a)23
+b(month-long)j(summer)0 2609 y(program)f(for)e(talented)j(high)e
+(school)h(students,)h(run)e(by)f(the)h(School)h(of)e(Computing.)141
+2721 y Fc(T)-8 b(echnical)19 b(Backup:)25 b(Leigh)18
+b(Stoller)-8 b(,)20 b(Mik)o(e)e(Hibler:)53 b Ff(These)19
+b(tw)o(o)f(highly)j(skilled)f(and)f(professional)k(research)e(staf)n(f)
+0 2834 y(will)26 b(be)g(\223on)g(alert\224)h(back)g(at)f(Utah,)g(to)g
+(ensure)h(that)g(should)g(an)o(y)f(problems)i(arise)f(in)e(emulab)i
+(during)h(li)n(v)o(e)e(demos)g(or)g(lab)0 2947 y(e)o(x)o(ercises,)21
+b(the)o(y)f(can)f(immediately)h(be)f(\002x)o(ed.)27 b(T)-7
+b(ogether)20 b(the)o(y)g(ha)n(v)o(e)f(o)o(v)o(er)g(20)g(years)h(e)o
+(xperience)i(w)o(orking)e(with)f(Lepreau')-5 b(s)0 3060
+y(group)21 b(on)f(v)n(arious)i(projects,)g(from)e(virtual)i(memory)e
+(to)g(component-based)k(k)o(ernels)e(to)e(compilers)h(to)f(simulators.)
+30 b(Leigh)0 3173 y(is)23 b(the)h(lead)g(de)n(v)o(eloper)i(of)d(much)h
+(of)g(the)f(Emulab)h(softw)o(are)h(suite;)f(Mik)o(e)g(is)g(kno)n
+(wledgeable)i(on)e(most)g(of)f(it.)1957 5709 y(5)p eop
 %%Trailer
 end
 userdict /end-hook known{end-hook}if
