@@ -99,7 +99,7 @@ sub new($$$#@) {
 	# we weren't given devicenames for devices that aren't ciscos
 	#
 	SWITCH: for ($type) {
-	    (/cisco6509/ || /cisco4006/ || /cisco2980/ || /catalyst2950/)
+	    (/65\d\d/ || /40\d\d/ || /29\d\d/ || /55\d\d/)
 		    && do {
 		use snmpit_cisco;
 		$device = new snmpit_cisco($devicename,$self->{DEBUG},$type,
