@@ -1949,7 +1949,7 @@ foreach $lan (keys(%rnodelans)) {
 	DBQueryFatal("insert into tunnels ".
 		     " (pid, eid, node_id, vname, isserver, ".
 		     "  port, peer_ip, assigned_ip, password) ".
-		     "values ('$pid', '$eid', '$pnode', '$lan', $isserver, ".
+		     "values ('$pid', '$eid', '$vvnode', '$lan', $isserver, ".
 		     "         $ipport, '$ip', '$ips{$member}','$secretkey')");
     }
 }
