@@ -56,11 +56,11 @@ if (mysql_num_rows($experiments_result)) {
             <tr>
               <td width=8%>PID</td>
               <td width=8%>EID</td>
-              <td width=4%>Head UID</td>
               <td width=3%>PCs</td>
               <td width=3%>Sharks</td>
               <td width=4% align=center>Terminate</td>
               <td width=70%>Name</td>
+              <td width=4%>Head UID</td>
             </tr>\n";
 
     $total_pcs = 0;
@@ -90,14 +90,14 @@ if (mysql_num_rows($experiments_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?exp_pideid=$pid\$\$$eid'>
                        $eid</A></td>
-                <td><A href='showuser.php3?target_uid=$huid'>
-                       $huid</A></td>
                 <td>".$usage["pc"]." &nbsp;</td>
                 <td>".$usage["shark"]." &nbsp;</td>
 	        <td align=center>
                     <A href='endexp.php3?exp_pideid=$pid\$\$$eid'>
                        <img alt=\"o\" src=\"redball.gif\"></A></td>
                 <td>$name</td>
+                <td><A href='showuser.php3?target_uid=$huid'>
+                       $huid</A></td>
                </tr>\n";
     }
     echo "</table>\n";
