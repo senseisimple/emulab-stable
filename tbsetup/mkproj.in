@@ -197,6 +197,21 @@ if (! chown($uid, $gid, "$GRPROOT/$pid")) {
     fatal("Could not chown $GRPROOT/$pid to $uid/$gid: $!");
 }
 
+#
+# Create experiment working directory.
+#
+my $workdir = TBExptWorkDir($pid, $eid);
+
+if (! mkdir("$workdir", 0770)) {
+    fatal("Could not make directory $workdir: $!");
+}
+if (! chmod(0770, "$workdir")) {
+    fatal("Could not chmod directory $workdir: $!");
+}
+if (! chown($uid, $gid, "$workdir")) {
+    fatal("Could not chown $workdir to $uid/$gid: $!");
+}
+
 exit(0);
 
 sub fatal {

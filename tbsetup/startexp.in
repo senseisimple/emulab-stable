@@ -147,9 +147,11 @@ else {
 }
 
 if (!defined($logname)) {
-    $logname = TBExptCreateLogFile($pid, $eid, "start");
+    $logname = TBExptCreateLogFile($pid, $eid, "startexp");
 }
 
+my $workdir = TBExptWorkDir($pid, $eid);
+my $userdir = TBExptUserDir($pid, $eid);
 my $repfile = "$eid.report";
 my $user_name;
 my $user_email;
@@ -204,9 +206,9 @@ if ($estate ne EXPTSTATE_NEW) {
 	"    Experiment $pid/$eid is already configured (or configuring)!\n");
 }
 
-if (! chdir("$expt_path/$tbdata")) {
+if (! chdir($workdir)) {
     die("*** $0:\n".
-	"    Could not chdir to $expt_path/$tbdata: $!\n");
+	"    Could not chdir to $workdir: $!\n");
 }
 
 #
@@ -305,24 +307,19 @@ if ($batch) {
     print STDOUT "\n\n";
 }
 
+# Yippie!
+print STDOUT "Setup Success\n";
+
 #
 # Try to copy off the files for testbed information gathering.
 #
-my $infodir = "$pid-$eid-" . TBDateTimeFSSafe();
+TBSaveExpLogFiles($pid, $eid);
 
-if (mkdir("$TBINFO/$infodir", 0770)) {
-    system("cp $nsfile $TBINFO/$infodir");
-    system("cp $logname $TBINFO/$infodir/$eid.log");
-    if (-e "assign.log") {
-	system("cp *.ptop *.top $TBINFO/$infodir");
-	system("cp assign.log $TBINFO/$infodir");
-    }
-    if (-e "wanassign.log") {
-	system("cp wanassign.log $TBINFO/$infodir");
-    }
-}
-
-print STDOUT "Setup Success\n";
+#
+# Make a copy of the work dir in the user visible space so the user
+# can see the log files.
+#
+system("cp -Rfp $workdir/ $userdir/tbdata");
 
 #
 # In batch mode, just exit without sending email. 
@@ -330,6 +327,11 @@ print STDOUT "Setup Success\n";
 if ($batch) {
     exit(0);
 }
+
+#
+# Close up the log file so the webpage stops.
+#
+TBExptCloseLogFile($pid, $eid);
 
 #
 # Dump the report file and the log file to the user via email. 
@@ -363,17 +365,8 @@ SENDMAIL("$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 ($repfile, $logname, $nsfile));
 
-#
-# Move the temporary log file into the experiment directory and change the
-# name in the DB. This makes it available to the web interface later on
-# if desired.
-#
-system("cp -pf $logname $expt_path/tbdata/startexp.log");
-TBExptCloseLogFile($pid, $eid);
-TBExptSetLogFile($pid, $eid, "$expt_path/tbdata/startexp.log");
-
-unlink($logname);
-exit 0;
+# Done!
+exit(0);
 
 sub fatal()
 {
@@ -398,6 +391,9 @@ sub fatal()
 	exit($errorstat);
     }
 
+    # Clear the logfile so the webpage stops. 
+    TBExptClearLogFile($pid, $eid);
+    
     #
     # Send a message to the testbed list. 
     #
@@ -422,22 +418,15 @@ sub fatal()
 		"WHERE eid='$eid' and pid='$pid'");
 
     #
-    # Move the temporary log file into the experiment directory so its kept.
+    # Copy off the workdir to the user directory, Then back up both of
+    # them for post-mortem debugging.
     #
-    system("cp -pf $logname $expt_path/tbdata/startexp.log");
-    TBExptClearLogFile($pid, $eid);
+    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+    system("/bin/rm -rf  ${workdir}-failed");
+    system("/bin/mv -f   $workdir ${workdir}-failed");
+    system("/bin/rm -rf  ${userdir}-failed");
+    system("/bin/mv -f   $userdir ${userdir}-failed");
     
-    #
-    # Save a copy of the failed experiment directory for debugging.
-    # This must be done *after* sending email so that the nsfile and
-    # log files are where the mail function expects them to be.
-    #
-    if (defined($expt_path)) {
-	system("/bin/rm", "-rf", "${expt_path}-TBfailed");
-	system("/bin/mv", "-f", "${expt_path}", "${expt_path}-TBfailed");
-    }
-
-    unlink($logname);
     exit($errorstat);
 }
 

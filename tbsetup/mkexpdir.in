@@ -86,6 +86,7 @@ else {
 my $piddir  = "$projroot/$pid";
 my $expdir  = "$piddir/exp";
 my $eiddir  = "$expdir/$eid";
+my $workdir = TBExptWorkDir($pid, $eid);
 
 #
 # Unix info for the group
@@ -150,16 +151,24 @@ foreach $dir (@dirlist) {
 DBQueryFatal("update experiments set path='$eiddir' ".
 	     "where pid='$pid' and eid='$eid'");
 
+#
+# Create the working directory.
+#
+if (-e $workdir) {
+    fatal("*** $0:\n".
+	  "    $workdir already exists!\n");
+}
+if (! mkdir($workdir, 0775)) {
+    fatal("*** $0:\n".
+	  "    Could not create $workdir: $!\n");
+}
+
 exit(0);
 
 sub fatal()
 {
-    if (! chdir($expdir)) {
-	print STDOUT "In Fatal: Could not chdir to $expdir!\n";
-	exit(-1);
-    }
-    system("rm -r $eid");
-
+    system("rm -r $eiddir");
+    system("rm -r $workdir");
     exit(-1);
 }
 

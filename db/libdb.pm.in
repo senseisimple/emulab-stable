@@ -82,6 +82,7 @@ use Exporter;
 	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
 	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
 	 TBDB_NODEOPMODE_UNKNOWN
+	 TBDB_EXPT_WORKDIR
 	 TBSetNodeEventState TBGetNodeEventState
 	 TBSetNodeOpMode TBGetNodeOpMode
 
@@ -98,6 +99,7 @@ use Exporter;
 	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
+	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID
@@ -178,6 +180,11 @@ sub TBdbfork()
 #
 my $DBErrorString = "";
 
+#
+# Needs to be config'ed.
+#
+sub TBDB_EXPT_WORKDIR()		{ "/usr/testbed/expwork"; }
+    
 #
 # Define exported "constants". Basically, these are just perl subroutines
 # that look like constants cause you do not need to call a perl subroutine
@@ -1718,16 +1725,65 @@ sub TBExptGetLogFile($$$$)
 }
 
 #
+# Return the working directory name for an experiment. This is where
+# the scripts work. The logs are copied over to the user's version of
+# the directory later. 
+#
+sub TBExptLogDir($$)
+{
+    my($pid, $eid) = @_;
+
+    $query_result =
+	DBQueryFatal("select idx from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    
+    my ($idx) = $query_result->fetchrow_array;
+    
+    return "$TB/expinfo/${pid}-${eid}.${idx}";
+}
+
+#
+# Return the log directory name for an experiment. This is where
+# we keep copies of the files for later inspection.
+#
+sub TBExptWorkDir($$)
+{
+    my($pid, $eid) = @_;
+
+    return TBDB_EXPT_WORKDIR() . "/${pid}/${eid}";
+}
+
+#
+# Return the user's experiment directory name. This is a path in the /proj
+# tree. We keep these separate to avoid NFS issues, and users generally
+# messing with things they should not (by accident or otherwise).
+#
+sub TBExptUserDir($$)
+{
+    my($pid, $eid) = @_;
+
+    $query_result =
+	DBQueryFatal("select path from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    
+    my ($path) = $query_result->fetchrow_array;
+    
+    return $path;
+}
+
+#
 # Create a temp logfile name for an experiment, create it, and untaint it!
-# Note that we create the file in /tmp initially, mostly as a convenience,
-# and then move it into the experiment directory later. 
+# The file is created the experiment working directory and moved later
+# to the user visible directory.
 #
 sub TBExptCreateLogFile($$$)
 {
     my($pid, $eid, $prefix) = @_;
+    my $logdir;
     my $logname;
-    
-    $logname = `mktemp /tmp/${prefix}-${pid}-${eid}.XXXXXX`;
+
+    $logdir  = TBExptWorkDir($pid, $eid);
+    $logname = `mktemp $logdir/${prefix}.XXXXXX`;
 
     if ($logname =~ /^([-\@\w\.\/]+)$/) {
 	$logname = $1;
@@ -2096,6 +2152,21 @@ sub MapNodeOSID($$)
     my $n_osid = $o_row{'osid'};
 
     return $n_osid;
+}
+
+#
+# Save off the log files for an experiment. 
+# 
+sub TBSaveExpLogFiles($$)
+{
+    my($pid, $eid) = @_;
+
+    my $workdir = TBExptWorkDir($pid, $eid);
+    my $logdir  = TBExptLogDir($pid, $eid);
+
+    system("/bin/cp -Rpf $workdir/ $logdir");
+
+    return 1;
 }
 
 1;

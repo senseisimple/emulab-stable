@@ -39,7 +39,6 @@ my $startexp = "$TB/bin/startexp";
 my $tbdata   = "tbdata";
 my $immediate= 0;
 my $frontend = 0;
-my $dirname;
 my $dbuid;
 my @row;
 
@@ -156,26 +155,19 @@ if (system("$mkexpdir $pid $gid $eid") != 0) {
 }
 
 #
-# Grab that path from the DB (set by mkexpdir).
+# Grab the working directory path, and thats where we work.
+# The user's experiment directory is off in /proj space.
 #
-$query_result =
-    DBQueryWarn("select path from experiments ".
-		"where pid='$pid' and eid='$eid'");
-if (! $query_result ||
-    ! $query_result->numrows) {
-    fatal("Unexpected DB Error! Experiment $pid/$eid does not exist!");
-}
-@row      = $query_result->fetchrow_array();
-$dirname  = $row[0];
+my $workdir = TBExptWorkDir($pid, $eid);
 
-chdir("$dirname/$tbdata") or
-    fatal("Could not chdir to $dirname/$tbdata: $!");
+chdir("$workdir") or
+    fatal("Could not chdir to $workdir: $!");
 
 #
 # Now we can get the NS file! 
 #
 if (system("/bin/cp", "$tempnsfile", "$nsfile")) {
-    fatal("Could not copy $tempnsfile to $dirname/$nsfile");
+    fatal("Could not copy $tempnsfile to $workdir/$nsfile");
 }
 chmod(0770, "$nsfile");
 
@@ -219,9 +211,8 @@ if ($immediate) {
 	#
 	# Save a copy of the failed experiment directory for debugging. 
 	#
-	system("/bin/rm", "-rf", "${dirname}-TBfailed");
-
-	system("/bin/mv", "-f", "${dirname}", "${dirname}-TBfailed");
+	system("/bin/rm", "-rf", "${workdir}-TBfailed");
+	system("/bin/mv", "-f", "${workdir}", "${workdir}-TBfailed");
 	
 	fatal("Failed to start experiment $pid/$eid!");
     }
@@ -255,8 +246,8 @@ sub fatal($)
     DBQueryWarn("DELETE from experiments ".
 		"WHERE eid='$eid' and pid='$pid'");
 
-    if (defined($dirname)) {
-	system("/bin/rm", "-rf", "$dirname");
+    if (defined($workdir)) {
+	system("/bin/rm", "-rf", "$workdir");
     }
     exit(-1);
 }

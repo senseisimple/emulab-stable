@@ -18,10 +18,10 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-b] <-s in | out> <pid> <eid>\n";
+    print STDOUT "Usage: swapexp <-s in | out> <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "bs:";
+my  $optlist = "s:";
 
 #
 # Configure variables
@@ -110,6 +110,8 @@ else {
     die("Tainted argument $eid!\n");
 }
 my $repfile = "$eid.report";
+my $workdir = TBExptWorkDir($pid, $eid);
+my $userdir = TBExptUserDir($pid, $eid);
 
 #
 # Verify user and get his DB uid.
@@ -160,9 +162,9 @@ my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $ebatchstate     = $hashrow{'batchstate'};
 
-if (! chdir("$expt_path/$tbdata")) {
+if (! chdir($workdir)) {
     die("*** $0:\n".
-	"    Could not chdir to $expt_path/$tbdata: $!\n");
+	"    Could not chdir to $workdir: $!\n");
 }
 
 if (defined($hashrow{'expt_locked'})) {
@@ -237,7 +239,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch) {
-    $logname = TBExptCreateLogFile($pid, $eid, "end");
+    $logname = TBExptCreateLogFile($pid, $eid, "swapexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
     
@@ -286,24 +288,19 @@ else {
     }
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
-
-    #
-    # Try to copy off the files for testbed information gathering.
-    #
-    my $infodir = "$pid-$eid-" . TBDateTimeFSSafe();
-
-    if (mkdir("$TBINFO/$infodir", 0770)) {
-	system("cp $logname $TBINFO/$infodir/$eid.log");
-	
-	if (-e "assign.log") {
-	    system("cp *.ptop *.top $TBINFO/$infodir");
-	    system("cp assign.log $TBINFO/$infodir");
-	}
-	if (-e "wanassign.log") {
-	    system("cp wanassign.log $TBINFO/$infodir");
-	}
-    }
 }
+
+#
+# Try to copy off the files for testbed information gathering.
+#
+TBSaveExpLogFiles($pid, $eid);
+
+#
+# Make a copy of the work dir in the user visible space so the user
+# can see the log files. This overwrites existing files of course,
+# but thats okay.
+#
+system("cp -Rfp $workdir/ $userdir/tbdata");
 
 #
 # Must unlock before exit.
@@ -317,6 +314,13 @@ print "Swap Success\n";
 #
 if ($batch) {
     exit(0);
+}
+
+#
+# Clear the log file so the web page stops spewing. 
+#
+if (defined($logname)) {
+    TBExptCloseLogFile($pid, $eid);
 }
 
 #
@@ -336,17 +340,6 @@ SENDMAIL("$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 ($repfile, $logname));
 
-if (defined($logname)) {
-    #
-    # Move the temporary log file into the experiment directory and
-    # change the name in the DB. This makes it available to the web
-    # interface later on if desired.
-    #
-    system("cp -pf $logname $expt_path/tbdata/swapexp.log");
-    TBExptCloseLogFile($pid, $eid);
-    TBExptSetLogFile($pid, $eid, "$expt_path/tbdata/swapexp.log");
-    unlink("$logname");
-}
 exit 0;
 
 sub fatal($)
@@ -361,12 +354,22 @@ sub fatal($)
     DBQueryWarn("update experiments set expt_locked=NULL ".
 		"WHERE eid='$eid' and pid='$pid'");
 
+    # Copy over the log files so the user can see them.
+    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+
     #
     # In batch mode, exit without sending the email. 
     #
     if ($batch) {
 	TBUnLockExp($pid, $eid);
 	exit(-1);
+    }
+
+    #
+    # Clear the log file so the web page stops spewing. 
+    #
+    if (defined($logname)) {
+	TBExptCloseLogFile($pid, $eid);
     }
 
     #
@@ -380,17 +383,6 @@ sub fatal($)
 	     "Cc:  $TBOPS",
 	     ($logname));
 
-    if (defined($logname)) {
-	#
-	# Move the temporary log file into the experiment directory and
-	# change the name in the DB. This makes it available to the web
-	# interface later on if desired.
-        #
-	system("cp -pf $logname $expt_path/tbdata/swapexp.log");
-	TBExptCloseLogFile($pid, $eid);
-	TBExptSetLogFile($pid, $eid, "$expt_path/tbdata/swapexp.log");
-	unlink("$logname");
-    }
     exit(-1);
 }
 

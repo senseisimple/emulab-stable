@@ -113,6 +113,30 @@ if (! chown(0, 0, $newname)) {
 }
 
 #
+# Ditto for the experiment working directory.
+#
+my $workdir = TBDB_EXPT_WORKDIR();
+
+if (! chdir($workdir)) {
+    die("*** Could not chdir to $workdir: $!\n");
+}
+
+if (! -e $pid) {
+    die("*** Project directory '$pid' does not exist in $workdir!\n");
+}
+
+if (! rename($pid, $newname)) {
+    die("*** Could not rename $pid to $newname in $workdir: $!\n");
+}
+
+if (! chmod(0700, $newname)) {
+    die("*** Could not chmod directory $newname to 0700: $!\n");
+}
+if (! chown(0, 0, $newname)) {
+    die("*** Could not chown directory $newname to 0/0: $!\n");
+}
+
+#
 # Now remove the group from the group file on both plastic and paper.
 #
 if (system("$GROUPDEL $unix_name")) {

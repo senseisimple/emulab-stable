@@ -100,6 +100,8 @@ if ($eid =~ /^([-\@\w.]+)$/) {
 else {
     die("Tainted argument $eid!\n");
 }
+my $workdir = TBExptWorkDir($pid, $eid);
+my $userdir = TBExptUserDir($pid, $eid);
 
 #
 # Verify user and get his DB uid.
@@ -248,7 +250,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch) {
-    $logname = TBExptCreateLogFile($pid, $eid, "end");
+    $logname = TBExptCreateLogFile($pid, $eid, "endexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
 
@@ -295,6 +297,14 @@ if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {
 }
 
 #
+# Try to copy off the files for testbed information gathering.
+#
+TBSaveExpLogFiles($pid, $eid);
+
+# Terminate the log so the web page stops spewing.
+TBExptClearLogFile($pid, $eid);
+
+#
 # Cleanup DB state and remove directory.
 # 
 ExptCleanup();
@@ -313,22 +323,15 @@ if ($batch) {
 #
 my $message =
     "Experiment `$eid' in project `$pid' has been terminated.\n" .
-    "You may now reuse `$eid' as an experiment name.\n\n" .
-    "Appended below is the output of the experiment teardown. If you\n" .
-    "have any questions or comments, please include the output below\n" .
-    "in your message to $TBOPS\n";
+    "You may now reuse `$eid' as an experiment name.\n";
 
 SENDMAIL("$user_name <$user_email>",
 	 "Experiment $pid/$eid Terminated",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Bcc: $TBLOGS",
-	 ($logname));
+	 "Bcc: $TBLOGS");
 
-if (defined($logname)) {
-    unlink("$logname");
-}
 exit 0;
 
 sub fatal($)
@@ -343,11 +346,21 @@ sub fatal($)
     DBQueryWarn("update experiments set expt_locked=NULL ".
 		"WHERE eid='$eid' and pid='$pid'");
 
+    # Copy over the log files so the user can see them.
+    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+
     #
     # In batch mode, exit without sending the email. 
     #
     if ($batch) {
 	exit(-1);
+    }
+    
+    #
+    # Clear the log file so the web page stops spewing. 
+    #
+    if (defined($logname)) {
+	TBExptClearLogFile($pid, $eid);
     }
 
     #
@@ -361,20 +374,6 @@ sub fatal($)
 	     "Bcc: $TBOPS",
 	     ($logname));
 
-    #
-    # Move the temporary log file into the experiment directory so its kept.
-    #
-    if (defined($logname)) {
-	#
-	# Move the temporary log file into the experiment directory and
-	# change the name in the DB. This makes it available to the web
-	# interface later on if desired.
-        #
-	system("cp -pf $logname $expt_path/tbdata/endexp.log");
-	TBExptCloseLogFile($pid, $eid);
-	TBExptSetLogFile($pid, $eid, "$expt_path/tbdata/endexp.log");
-	unlink("$logname");
-    }
     exit(-1);
 }
 
@@ -387,9 +386,13 @@ sub ExptCleanup()
     # in which case it won't be allowed cause of directory permissions. Thats
     # okay since admin types should rarely end experiments in other projects.
     #
-    print STDOUT "Removing experiment directory: $expt_path ... \n";
-    if (system("rm -rf $expt_path")) {
-	print "*** WARNING: Not able to remove experiment directory.\n";
+    print STDOUT "Removing experiment directories ... \n";
+    if (system("/bin/rm -rf $userdir")) {
+	print "*** WARNING: Not able to remove $userdir\n";
+	print "             Someone will need to do this by hand.\n";
+    }
+    if (system("/bin/rm -rf $workdir")) {
+	print "*** WARNING: Not able to remove $workdir\n";
 	print "             Someone will need to do this by hand.\n";
     }
 
