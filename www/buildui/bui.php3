@@ -11,13 +11,13 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
-if (!$isadmin) {
-    USERERROR("You do not have permission to use this interface!", 1);
-}
+#if (!$isadmin) {
+#    USERERROR("You do not have permission to use this interface!", 1);
+#}
 
 chdir("buildui");
 
-echo "<applet code=\"Netbuild.class\" width=640 height=480>
+echo "<applet code=\"Netbuild.class\" width=800 height=600>
        <param name=exporturl
               value=\"$TBBASE/beginexp.php3\">
        <pre>

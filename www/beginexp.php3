@@ -278,6 +278,10 @@ function SPITFORM($formfields, $errors)
 
     echo "<p><blockquote>
           <ul>
+	     <li> Looking for a
+                  <a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>GUI</a>
+                  to help you create your topology?
+                  <a href='buildui/bui.php3'>Check it out!</a>
              <li> Please <a href='nscheck_form.php3'>syntax check</a> your NS
                   file first!
              <li> You can view a <a href='showosid_list.php3'>list of OSIDs</a>
