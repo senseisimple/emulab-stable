@@ -180,5 +180,15 @@ if (! $impotent) {
     # for this first, so as to reduce the amount of data served up via NFS.
     #
     system("cat $toponame | gzip > ${toponame}.gz");
+
+    #
+    # Now copy over to the user exp directory since in a normal create/modify
+    # files are not copied over from boss to ops until later, which is too
+    # late cause the nodes have already booted, and the topomap will not be
+    # where it supposed to be (or it is stale).
+    #
+    my $userdir = TBExptUserDir($pid, $eid);
+
+    system("cp -fp $toponame ${toponame}.gz $userdir/tbdata");
 }
 exit(0);
