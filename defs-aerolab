@@ -1,0 +1,39 @@
+#
+# This is the defaults definitions file for configure.
+# See doc/setup.txt for an explanation of these variables.
+#
+# Use the --with-TBDEFS=filename to specify your own file.
+# If you add a variable, be sure to go and update configure.in.
+#
+TBDBNAME=tbdb
+TBADMINGROUP=tbadmin
+TBOPSEMAIL=aerolab-ops@ops.outernet.aero.org
+TBLOGSEMAIL=aerolab-logs@ops.outernet.aero.org
+TBWWWEMAIL=aerolab-www@ops.outernet.aero.org
+TBAPPROVALEMAIL=aerolab-approval@ops.outernet.aero.org
+TBAUDITEMAIL=aerolab-audit@ops.outernet.aero.org
+TBSTATEDEMAIL=aerolab-stated@ops.outernet.aero.org
+TBTESTSUITEEMAIL=aerolab-testsuite@ops.outernet.aero.org
+TBAUTOMAILEMAIL=aerolab-automail@ops.outernet.aero.org
+TBACTIVEARCHIVE=aerolab-active-users-archive@ops.outernet.aero.org
+TBUSERSARCHIVE=testbed-users-archive\@ops.outernet.aero.org
+JAILIPBASE=172.16.0.0
+JAILIPMASK=255.240.0.0
+DELAYCAPACITY=2
+BOSSNODE=boss.outernet.aero.org
+USERNODE=users.outernet.aero.org
+FSNODE=fs.outernet.aero.org
+OURDOMAIN=outernet.aero.org
+FSDIR_GROUPS=/Volumes/BAD/emulab/groups
+FSDIR_PROJ=/Volumes/BAD/emulab/proj
+FSDIR_USERS=/Volumes/BAD/emulab/users
+FSDIR_SHARE=/Volumes/BAD/emulab/share
+FS_WITH_QUOTAS=""
+WWWHOST=www.outernet.aero.org
+TBMAINSITE=1
+THISHOMEBASE=Outernet.aero.org
+PLABSUPPORT=0
+SFSSUPPORT=0
+DISABLE_NSE=1
+DISABLE_NAMED_SETUP=1
+DISABLE_EXPORTS_SETUP=1

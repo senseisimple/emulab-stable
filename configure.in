@@ -362,9 +362,9 @@ else
 		    event/program-agent/GNUmakefile \
 		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated \
-			event/linktest/GNUmakefile \
-			event/linktest/linktest.h \
-			event/linktest/linktest.pl";
+		    event/linktest/GNUmakefile \
+		    event/linktest/linktest.h event/linktest/linktest.pl \
+		    event/linktest/run_linktest.pl";
 
 	optional_subdirs="$optional_subdirs event";
         EVENTSYS=1;
@@ -433,6 +433,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/sitevarscheck db/dbfillcheck \
 	db/grabron db/webnfree db/stategraph db/readycount \
 	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
+	db/node_list db/webnewwanode \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
@@ -463,15 +464,15 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
 	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
-	tbsetup/ns2ir/sim.tcl tbsetup/nseparse/GNUmakefile \
+	tbsetup/ns2ir/sim.tcl tbsetup/nseswap tbsetup/nseparse/GNUmakefile \
 	tbsetup/nseparse/nse.parse.proxy tbsetup/nseparse/parse-nse \
 	tbsetup/nseparse/nse.parse.tcl tbsetup/db2ns \
-	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend \
+	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend tbsetup/tbrestart \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
 	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
-	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
+	tbsetup/rmgroup tbsetup/webrmuser tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
 	tbsetup/eventsys_control \
@@ -479,6 +480,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
 	tbsetup/checkports tbsetup/webnodereboot tbsetup/libaudit.pm \
+	tbsetup/libreboot.pm tbsetup/libosload.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tbsetup/newnode_reboot \
@@ -511,9 +513,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch \
-	vis/GNUmakefile vis/webvistopology \
-	vis/dbvistopology \
+	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
+	vis/floormap vis/webfloormap \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/2.elvind.sh rc.d/3.plab.sh \
 	tools/GNUmakefile \
@@ -524,6 +526,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
 	xmlrpc/webxmlrpc \
+	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
+	xmlrpc/imageid xmlrpc/osid \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,6 +47,9 @@ liblocale/liblocale.a:
 	@$(MAKE) -C liblocale
 
 clean:
-	-$(MAKE) -C libntfs clean
-	-$(MAKE) -C liblocale clean
+	@$(MAKE) -C libntfs clean
+	@$(MAKE) -C liblocale clean
 	/bin/rm -f libntfs.a liblocale.a ntfs_glue.o
+
+distclean:
+	@$(MAKE) -C libntfs distclean

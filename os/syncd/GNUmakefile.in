@@ -40,5 +40,5 @@ check:
 	sh $(SRCDIR)/syncd_test.sh
 
 clean:
-	/bin/rm -f *.o emulab-syncd version.c
+	rm -f *.o emulab-syncd emulab-sync version.c
 

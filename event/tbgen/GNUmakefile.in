@@ -67,4 +67,4 @@ client-install: tevc
 	$(INSTALL_PROGRAM) -s tevc $(DESTDIR)$(CLIENT_BINDIR)/tevc
 
 clean:
-	/bin/rm -f *.o $(PROGRAMS)
+	rm -f *.o $(PROGRAMS)

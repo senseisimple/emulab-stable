@@ -22,7 +22,7 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	binaries $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_TBCOMPAT)
+all:	binaries $(SCRIPT) $(SCRIPT_RUN)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -58,12 +58,13 @@ $(LIBEVENTDIR)/%.a:
 
 binaries: $(LOCAL_BINDIR)/$(DAEMON) $(LOCAL_BINDIR)/$(LTEVENT) 
 
-$(LOCAL_BINDIR)/$(DAEMON):	$(DAEMON_OBJS) $(LIBTB_OBJS)
+$(LOCAL_BINDIR):
 	-mkdir -p $(LOCAL_BINDIR)
+
+$(LOCAL_BINDIR)/$(DAEMON):	$(LOCAL_BINDIR) $(DAEMON_OBJS) $(LIBTB_OBJS)
 	$(CC) $(LDFLAGS) $(DAEMON_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
-$(LOCAL_BINDIR)/$(LTEVENT):	$(LTEVENT_OBJS) $(LIBTB_OBJS)
-	-mkdir -p $(LOCAL_BINDIR)
+$(LOCAL_BINDIR)/$(LTEVENT):	$(LOCAL_BINDIR) $(LTEVENT_OBJS) $(LIBTB_OBJS)
 	$(CC) $(LDFLAGS) $(LTEVENT_OBJS) $(LIBTB_OBJS) $(LIBS) -o $@
 
 $(DAEMON_OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
@@ -86,7 +87,7 @@ client-install: all
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
-	$(INSTALL_PROGRAM) $(SCRIPT_TBCOMPAT) \
+	$(INSTALL_PROGRAM) $(SRCDIR)/$(SCRIPT_TBCOMPAT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_TBCOMPAT)
 	$(INSTALL_PROGRAM) $(NSTOIRDIR)/$(SCRIPT_NSTB_COMPAT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_NSTB_COMPAT)
@@ -96,8 +97,5 @@ lt-install:
             $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 
 clean:
-	/bin/rm -f *.o $(TESTS)
-	/bin/rm -f $(LOCAL_BINDIR)/$(DAEMON)
-	/bin/rm -f $(LOCAL_BINDIR)/$(LTEVENT)
-	/bin/rm -f $(SCRIPT)
-	/bin/rm -f $(SCRIPT_RUN)
+	rm -f *.o $(TESTS)
+	rm -rf $(LOCAL_BINDIR)

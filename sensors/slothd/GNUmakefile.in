@@ -61,5 +61,5 @@ client-install: client
 	$(INSTALL_PROGRAM) -s $(SLOTHD_DIR)/slothd $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
-	rm -f *.o $(SDPROGS) $(SBIN_SCRIPTS) *~ core *.core version.c
+	rm -f *.o $(SDPROGS) *~ core *.core version.c
 	rm -rf fbsdclient linuxclient

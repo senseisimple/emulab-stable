@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -55,4 +55,4 @@ post-install:
 control-install:	$(addprefix $(INSTALL_BINDIR)/, plasticwrap)
 
 clean:
-	rm -f *.o $(BINS) $(SBINS) $(SCRIPTS) core
+	rm -f *.o genlastlog suexec core

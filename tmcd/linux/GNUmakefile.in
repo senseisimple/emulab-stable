@@ -61,7 +61,7 @@ dir-install:
 common-install:	dir-install
 	(cd ../common; $(MAKE) local-install)
 
-sup-install:	dir-install
+sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
 	$(INSTALL) -m 750 -o root -g wheel -d $(DESTDIR)/root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
@@ -77,7 +77,7 @@ etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 600 $(SRCDIR)/gshadow $(ETCDIR)/gshadow
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(ETCDIR)/hosts
 
-sysetc-install:	dir-install
+sysetc-install:	dir-install pump.conf
 	$(INSTALL) -m 644 ./pump.conf $(SYSETCDIR)/pump.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 				$(SYSETCDIR)/dhclient-exit-hooks

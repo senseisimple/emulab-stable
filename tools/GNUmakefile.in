@@ -1,26 +1,26 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
-SUBDIR		= utils
+SUBDIR		= tools
 
 include $(OBJDIR)/Makeconf
 
 SUBDIRS = pcapper teachswitch
 
-all:            all-subdirs
+all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
+
+clean:	clean-subdirs
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
 %.MAKE:
 	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
 %-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
-
-clean:

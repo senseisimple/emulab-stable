@@ -57,7 +57,7 @@ basefbsd-install: dir-install
 	(cd ../freebsd; $(MAKE) all install)
 	rm -f $(SYSETCDIR)/start_if.*
 
-sup-install:	dir-install
+sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
 
 bin-install:	dir-install
@@ -84,6 +84,3 @@ jail-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/jail/jailsetup $(BINDIR)/jailsetup
 	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(BINDIR)/mkjail.pl
 	$(INSTALL) -m 755 ./injail $(JAILDIR)/injail
-
-clean:
-	/bin/rm -f supfile

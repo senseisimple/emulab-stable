@@ -182,14 +182,15 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 #
 tipserv-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
 
+
 clean:	subdir-clean
-	rm -f *.o core
+	rm -f *.o core routecalc wanlinksolve
 
 subdir-clean:
 	@$(MAKE) -C checkpass clean
 	@$(MAKE) -C ns2ir clean
 	@$(MAKE) -C nseparse clean
-#	@$(MAKE) -C plab clean
+	@$(MAKE) -C plab clean
 	@$(MAKE) -C ipassign clean
 
 distclean:	subdir-distclean

@@ -173,4 +173,4 @@ locrem-install:
 			$(BINDIR)/control_interface
 
 clean:
-	/bin/rm -f injail
+	rm -f injail

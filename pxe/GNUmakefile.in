@@ -78,4 +78,4 @@ install:	$(INSTALL_SBINDIR)/bootinfo \
 		$(INSTALL_ETCDIR)/bootinfo.conf
 
 clean: 
-	rm -f *.o core bootinfo bootinfosend *.restart testmysql
+	rm -f *.o core bootinfo bootinfosend testmysql bootinfo_version.c

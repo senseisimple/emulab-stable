@@ -131,7 +131,7 @@ install-dbfillcheck:
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs
-	rm -f Makeconf GNUmakefile config.status config.cache config.log
+	rm -f Makeconf GNUmakefile config.h config.status config.cache config.log
 	rm -f $(DISTCLEAN_FILES)
 
 # How to recursively descend into subdirectories to make general

@@ -30,6 +30,10 @@ TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
 ifeq ($(SYSTEM),Linux)
 TMLIBS  += -ldl
+MDSUBDIR  = linux
+endif
+ifeq ($(SYSTEM),FreeBSD)
+MDSUBDIR  = freebsd
 endif
 
 ifeq ($(EVENTSYS),1)
@@ -71,16 +75,7 @@ install:	$(INSTALL_SBINDIR)/tmcd \
 
 
 client-install: tmcc-nossl findif
-ifeq ($(SYSTEM),FreeBSD)
-	@$(MAKE) -C freebsd install
-else
-ifeq ($(SYSTEM),Linux)
-	@$(MAKE) -C linux install
-else
-	@echo "unknown OS, nothing to install"
-endif
-endif
-#endif
+	@$(MAKE) -C $(MDSUBDIR) install
 
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
@@ -96,5 +91,8 @@ ${OBJDIR}/event/lib/%:
 ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
 
-clean: 
-	rm -f *.o core tmcd tmcd.restart tmcc tmcc-nossl findif version.c
+clean:	subdir-clean
+	rm -f *.o core tmcd tmcc tmcc-nossl findif version.c
+
+subdir-clean:
+	@$(MAKE) -C $(MDSUBDIR) clean

@@ -119,12 +119,19 @@ client-install: all
 	$(INSTALL_PROGRAM) imagedump $(DESTDIR)/usr/local/bin/imagedump
 
 clean: subdir-clean
-	/bin/rm -f *.o imagezip imageunzip imagedump version.c
-	/bin/rm -f imagezip.tar imagezip.tar.gz
+	rm -f *.o imagezip imageunzip imagedump imagehash version.c
+	rm -f imagezip.tar imagezip.tar.gz
 
 subdir-clean:
 	@list='$(SUBDIRS)'; for dir in $$list; do \
 		$(MAKE) -C $$dir clean; \
+	done;
+
+distclean: subdir-distclean
+
+subdir-distclean:
+	@list='$(SUBDIRS)'; for dir in $$list; do \
+		$(MAKE) -C $$dir distclean; \
 	done;
 
 imagezip.tar.gz: imagezip.tar

@@ -18,43 +18,14 @@ ifeq ($(SYSTEM),FreeBSD)
 SUBDIRS	       += sched delay-agent nsetrafgen stated
 endif
 
-all:	$(SUBDIRS)
+all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-lib:
-	@$(MAKE) -C lib all
-
-sched:
-	@$(MAKE) -C sched all
-
-tbgen:
-	@$(MAKE) -C tbgen all
-
-example:
-	@$(MAKE) -C example all
-
-trafgen:
+trafgen-fetch:
 	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
-	@$(MAKE) -C trafgen all
 
-nsetrafgen:
-	@$(MAKE) -C nsetrafgen all
-
-delay-agent:
-	@$(MAKE) -C delay-agent all
-
-program-agent:
-	@$(MAKE) -C program-agent all
-
-stated:
-	@$(MAKE) -C stated all
-
-proxy:
-	@$(MAKE) -C proxy all
-
-linktest:
-	@$(MAKE) -C linktest all
+trafgen:	trafgen-fetch
 
 install: 
 	@$(MAKE) -C lib install
@@ -63,7 +34,7 @@ install:
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
 
-client-install: lib
+client-install: lib/all.MAKE
 ifeq ($(SYSTEM),FreeBSD)
 	@$(MAKE) -C delay-agent client-install
 endif
@@ -77,27 +48,13 @@ control-install:
 	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
 
-clean:		subdir-clean
+clean:		clean-subdirs
+distclean:	distclean-subdirs
 
-subdir-clean:
-	@$(MAKE) -C lib clean
-	@$(MAKE) -C sched clean
-	@$(MAKE) -C tbgen clean
-	@$(MAKE) -C example clean
-	@$(MAKE) -C trafgen clean
-	@$(MAKE) -C delay-agent clean
-	@$(MAKE) -C program-agent clean
-
-distclean:	subdir-distclean
-
-subdir-distclean:
-	@$(MAKE) -C lib distclean
-	@$(MAKE) -C sched distclean
-	@$(MAKE) -C tbgen distclean
-	@$(MAKE) -C example distclean
-	@$(MAKE) -C trafgen distclean
-	@$(MAKE) -C delay-agent distclean
-	@$(MAKE) -C program-agent distclean
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
 .PHONY:	$(SUBDIRS)
-
