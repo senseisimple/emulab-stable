@@ -12,6 +12,16 @@
  * 1999-08-27
  */
 
+/*
+ * Account for the time it takes us to enqueue and such.
+ * Could be variable depending on load, of course, but this
+ * is better than nothing.
+ */
+
+#ifndef DELAY_COMPENSATION
+#define DELAY_COMPENSATION 70
+#endif
+
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +84,10 @@ int packet_enq(char *data, int datalen, int usecs, struct sockaddr_in from,
 	       int fromlen)
 {
 	struct packet *tmp;
+
+	/* XXX:  This is probably not good enough long term */
+	usecs -= DELAY_COMPENSATION;
+	if (usecs < 0) usecs = 0;  /* XXX.  Barf.  XXX. :-) */
 	
 	tmp = C_MALLOC(sizeof(*tmp));
 	if (ptail) {
