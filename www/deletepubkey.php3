@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -138,7 +138,7 @@ DBQueryFatal("update users set usr_modified=now() ".
 #
 # mkacct updates the user pubkeys.
 # 
-MKACCT($uid, "webmkacct -a $target_uid");
+MKACCT($uid, "webmkacct $target_uid");
 
 header("Location: showpubkeys.php3?target_uid=$target_uid");
 
