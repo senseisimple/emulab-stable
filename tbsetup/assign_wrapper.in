@@ -1165,8 +1165,8 @@ foreach $plink (keys(%plinks)) {
 		#
 		# Create some new veth devices.
 		# 
-		$portA = NewVethIface($virtA, $nodeA, $portA);
-		$portB = NewVethIface($virtB, $nodeB, $portB);
+		$portA = NewVethIface($lan, $virtA, $nodeA, $portA);
+		$portB = NewVethIface($lan, $virtB, $nodeB, $portB);
 	    }
 	}
 	else {
@@ -1174,8 +1174,8 @@ foreach $plink (keys(%plinks)) {
 	    # for the port.
 	    $nodeA = $v2pmap{(split(":", $virtA))[0]};
 	    $nodeB = $v2pmap{(split(":", $virtB))[0]};
-	    $portA = NewVethIface($virtA, $nodeA);
-	    $portB = NewVethIface($virtB, $nodeB);
+	    $portA = NewVethIface($lan, $virtA, $nodeA);
+	    $portB = NewVethIface($lan, $virtB, $nodeB);
 	}
 	#
 	# Setup portmap using virt members in plink name.
@@ -1222,16 +1222,26 @@ foreach $plink (keys(%plinks)) {
 
 	    if (virtlanuseveth($lan)) {
 		#
-		# Create some new veth devices, and store the mapping
-		# in vethmap so we know the veth->iface mapping later.
+		# Create new veth device.
 		# 
-		$portA = NewVethIface($virtA, $nodeA, $portA);
+		$portA = NewVethIface($lan, $virtA, $nodeA, $portA);
+
+		#
+		# If the "lannode" is placed on a node, and that node is
+		# different than the current node, we have to connect the
+		# two in the vlan. Typically, the lannode is placed on a
+		# switch, and this is not an issue. Rob understands this!
+		#
+		if ($nodeportA ne $nodeportB) {
+		    AddVlan("lan", $lan, $nodeportB);
+		    AddVethPatch($lan, $nodeportB);
+		}
 	    }
 	}
 	else {
 	    # No phys mapping. We create a veth, but there is no phys port.
 	    $nodeA = $v2pmap{(split(":", $virtA))[0]};
-	    $portA = NewVethIface($virtA, $nodeA);
+	    $portA = NewVethIface($lan, $virtA, $nodeA);
 	}
 	$portmap{$virtA} = $portA;
 	printdb "  Portmap:\n";
@@ -1277,6 +1287,8 @@ TBDebugTimeStamp("uploading started");
 
 # Write the vlans to the DB.
 UploadVlans();
+
+PatchVeths();
 
 #
 # Clean the virt_agents table.
@@ -2389,23 +2401,22 @@ sub UploadStats()
 # Create a new veth interface. This sets up the entire veth slot,
 # including IP and mac. The veth_id is used in impotent mode only.
 #
-sub NewVethIface($$;$)
+# XXX: Temp fix: This tracks what veths we create so that we can patch
+#      up lans that span trivial and real links.
+#
+my %veth_interfaces = ();
+my %veth_patches    = ();
+
+sub NewVethIface($$$;$)
 {
-    my ($vnodeport, $pnode, $pport) = @_;
+    my ($lan, $vnodeport, $pnode, $pport) = @_;
     my ($vnode) = split(":", $vnodeport);
     my $ip      = $ips{$vnodeport};
     my $vvnode  = "NULL";
-    my $newid;
+    my $newveth;
+    #my $mask    = virtlannetmask($lan);
 
-    # Null pport means no phys port.
-    if (!defined($pport)) {
-	$pport = "NULL";
-    }
-    else {
-	$pport = "'$pport'";
-    }
-
-    # Mark as being a jail interface be establishing a connection
+    # Mark as being a jail interface by establishing a connection
     # to the nodes table entry for the virtnode. 
     if (virtnodeisjailed($vnode)) {
 	$vvnode = "'$v2vmap{$vnode}'";
@@ -2419,21 +2430,67 @@ sub NewVethIface($$;$)
 
     if ($impotent) {
 	# Make up one; its never used anyplace.
-	$newid = $veth_id++;
+	$newveth = "veth" . $veth_id++;
     }
     else {
 	#
 	# Insert, and then get the id so we can form the name of
-	# the veth device. 
+	# the veth device. A null pport means no phys port.
 	#
 	my $query_result = 
 	    DBQueryFatal("insert into veth_interfaces ".
 			 "(node_id, veth_id, mac, IP, iface, vnode_id) ".
-			 "values ('$pnode', 0, '$mac', '$ip', ".
-			 "        $pport, $vvnode)");
-	$newid = $query_result->insertid;
+			 "values ('$pnode', 0, '$mac', '$ip', " .
+			          (defined($pport) ? "'$pport'" : "NULL") .
+			 "        , $vvnode)");
+	
+	my $newid = $query_result->insertid;
+	$newveth = "veth" . $newid;
+
+	if (!defined($pport)) {
+	    if (!defined($veth_interfaces{$lan})) {
+		$veth_interfaces{$lan} = {};
+	    }
+	    if (!defined($veth_interfaces{$lan}->{$pnode})) {
+		$veth_interfaces{$lan}->{$pnode} = [];
+	    }
+	    push(@{$veth_interfaces{$lan}->{$pnode}}, $newid);
+	}
     }
-    return "veth" . $newid;
+    return $newveth;
+}
+
+#
+# XXX Temporary until we figure out a solution.
+#
+sub AddVethPatch($$)
+{
+    my ($lan, $nodeport) = @_;
+    my ($pnode, $pport) = split(":", $nodeport);
+
+    $veth_patches{$lan}->{$pnode} = $pport;
+}
+
+sub PatchVeths()
+{
+    foreach my $lan (keys(%veth_interfaces)) {
+	next
+	    if (!defined($veth_patches{$lan}));
+	
+	foreach my $pnode (keys(%{$veth_interfaces{$lan}})) {
+	    next
+		if (!defined($veth_patches{$lan}->{$pnode}));
+
+	    my $pport = $veth_patches{$lan}->{$pnode};
+
+	    foreach my $vethid (@{$veth_interfaces{$lan}->{$pnode}}) {
+		printdb "Veth Path: $lan $pnode $vethid $pport\n";
+
+		DBQueryFatal("update veth_interfaces set iface='$pport' ".
+			     "where node_id='$pnode' and veth_id='$vethid'");
+	    }
+	}
+    }
 }
 
 #
@@ -2756,6 +2813,8 @@ sub LoadVirtLans()
 	$virt_lans{$vname}->{"TRIVIAL_OK"}   = $trivial_ok;
 	# Link is connected to a remote node, and gets a tunnel.
 	$virt_lans{$vname}->{"TUNNEL"}       = 0;
+	# Netmask for the entire lan.
+	$virt_lans{$vname}->{"MASK"}         = $rowref->{"mask"};
 
 	#
 	# REMOTE VIRTNODE HACK: 
@@ -2856,6 +2915,7 @@ sub virtlanuseveth($)	{ return $virt_lans{$_[0]}->{"USEVETH"}; }
 sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
 sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
 sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
+sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
 
 #
 # Ditto for virt_vtypes.
