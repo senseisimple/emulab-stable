@@ -21,7 +21,8 @@
 // Purely heuristic
 #define OPTIMAL_SCORE(edges,nodes) (nodes*SCORE_PNODE + \
                                     nodes/5.0*SCORE_SWITCH + \
-                                    edges*(SCORE_INTRASWITCH_LINK*4+\
+                                    edges*((SCORE_INTRASWITCH_LINK+ \
+                                    SCORE_DIRECT_LINK*2)*4+\
                                            SCORE_INTERSWITCH_LINK)/5.0)
 
 tb_pgraph PG(1,1);
