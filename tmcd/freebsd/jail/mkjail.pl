@@ -311,8 +311,9 @@ sub mkrootfs($)
 
     #
     # /dev is also special. It gets a very restricted set of entries.
+    # Note that we create some BPF devices since they work in our jails.
     #
-    mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV jail");
+    mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV jail bpf31");
     
     #
     # Create stub /var and create the necessary log files.
