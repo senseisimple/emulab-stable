@@ -9,7 +9,7 @@
 
 my $TB;
 my $DBNAME = "@TBDBNAME@";
-my $TESTMODE = "@TESTMODE@";
+my $TESTMODE = @TESTMODE@;
 
 BEGIN {
   $TB     = "@prefix@";

@@ -4,27 +4,24 @@ tbsetup README
 tbprerun
 
 Syntax:
-	tbprerun [-nologfile] <pid> <eid> <ns-file>
+	tbprerun <pid> <eid> <ns-file>
 
 tbprerun takes a brand new experiment, checks the syntax of the
 ns-file, and then converts the ns-file into a virtual topology stored
 in the database. 
-
--nologfile - Prevents creation of a logfile.
 
 ----------------------------------------------------------------------
 
 tbswapin
 
 Syntax:
-	tbswapin [-nologfile] <pid> <eid>
+	tbswapin <pid> <eid>
 
 tbswapin swaps an experiment in.  Specifically it finds and allocates
 a set of resources and configures these resources to emulate the
 desired experiment.  As a part of this it configures the physical
 state in the DB.
 
--nologfile - Prevents creation/appending of a logfile.
 
 Exit Codes:
 
@@ -56,14 +53,13 @@ I.e.
 tbswapout
 
 Syntax:
-	tbswapout [-nologfile] [-force] <pid> <eid>
+	tbswapout [-force] <pid> <eid>
 
 tbswapout is the inverse of tbswapin.  It tears down the physical
 state on the testbed, freeing the resources for other use.  It clears
 the physical state from the DB but leaves the virtual state intact.  I.e.
 it reverse tbswapin but not tbprerun.
 
--nologfile - Prevents creation/appending of a logfile.
 -force - Does not check current experiment state.
 
 ----------------------------------------------------------------------
@@ -71,12 +67,11 @@ it reverse tbswapin but not tbprerun.
 tbend
 
 Syntax:
-	tbend [-nologfile] [-force] <pid> <eid>
+	tbend [-force] <pid> <eid>
 
 tbend is the inverse of tbprerun.  It clears the virtual state from
 the DB and marks the experiment as ended.
 
--nologfile - Prevents creation/appending of a logfile.
 -force - Does not check current experiment state.
 
 ----------------------------------------------------------------------

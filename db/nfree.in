@@ -6,7 +6,6 @@ use Mysql;
 #
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
-my $TESTMODE = @TESTMODE@;
 
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
@@ -237,7 +236,7 @@ if ( (@reloaded > 0) || (keys %reserves > 0) ) {
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 }
 
-if (!$TESTMODE && @freed_nodes) {
+if (@freed_nodes) {
     my @conlist=();
     my @sharks=();
     

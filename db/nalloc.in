@@ -10,7 +10,6 @@ my $d = 0;
 #
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
-my $TESTMODE = @TESTMODE@;
 
 my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
 
@@ -102,7 +101,7 @@ $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
-if (! $TESTMODE && !$error && @nodes) {
+if (!$error && @nodes) {
     my @conlist=();
     my @sharks=();
 
