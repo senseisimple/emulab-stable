@@ -483,22 +483,25 @@ int main(int argc, char *argv[])
 	 * process of finding one.
 	 */
 	if ((wiggle_bot == NULL) && !lnEmptyList(&wiggling_bots)) {
-	    struct mtp_packet wmp;
-
 	    /*
 	     * Take a snapshot of the tracks with no robot attached from the
 	     * last frame so we can compare it against the frame when the robot
 	     * has finished its wiggle.
 	     */
 	    vtUnknownTracks(&wiggle_frame, &last_frame);
-	    wiggle_bot = (struct robot_object *)lnRemHead(&wiggling_bots);
-	    mtp_init_packet(&wmp,
-			    MA_Opcode, MTP_WIGGLE_REQUEST,
-			    MA_Role, MTP_ROLE_VMC,
-			    MA_RobotID, wiggle_bot->ro_id,
-			    MA_WiggleType, MTP_WIGGLE_180_R,
-			    MA_TAG_DONE);
-	    mtp_send_packet(emc_handle, &wmp);
+
+	    if (!lnEmptyList(&wiggle_frame)) {
+		struct mtp_packet wmp;
+		
+		wiggle_bot = (struct robot_object *)lnRemHead(&wiggling_bots);
+		mtp_init_packet(&wmp,
+				MA_Opcode, MTP_WIGGLE_REQUEST,
+				MA_Role, MTP_ROLE_VMC,
+				MA_RobotID, wiggle_bot->ro_id,
+				MA_WiggleType, MTP_WIGGLE_180_R,
+				MA_TAG_DONE);
+		mtp_send_packet(emc_handle, &wmp);
+	    }
 	}
 
         rreadyfds = readfds;
