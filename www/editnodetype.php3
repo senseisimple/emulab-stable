@@ -266,6 +266,36 @@ function SPITFORM($node_type, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
+             <td>ismodelnet:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[ismodelnet]\"
+                        value=\"" . $formfields[ismodelnet] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
+    echo "<tr>
+             <td>isphantom:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isphantom]\"
+                        value=\"" . $formfields[isphantom] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
+    echo "<tr>
+             <td>isdynamic:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isdynamic]\"
+                        value=\"" . $formfields[isdynamic] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
+    echo "<tr>
              <td>isremotenode:</td>
              <td class=left>
                  <input type=text
@@ -332,6 +362,7 @@ if ($new_type) {
     $defaults = array("class" => "pc", "power_time" => 60, "imageable" => 1,
 	"delay_capacity" => 2, "disktype" => "ad", "isvirtnode" => 0,
 	"isremotenode" => 0, "issubnode" => 0, "isplabdslice" => 0,
+        "ismodelnet" => 0, "isphantom" => 0, "isdynamic" => 0,
 	"issimnode" => 0, "simnode_capacity" => 20, "bootdisk_unit" => 0);
 } else {
     #
@@ -593,6 +624,36 @@ if (isset($formfields[isvirtnode]) && $formfields[isvirtnode] != "") {
     }
     else {
 	$inserts["isvirtnode"] = $formfields[isvirtnode];
+    }
+}
+
+# ismodelnet
+if (isset($formfields[ismodelnet]) && $formfields[ismodelnet] != "") {
+    if (! TBvalid_boolean($formfields[ismodelnet])) {
+	$errors["ismodelnet"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["ismodelnet"] = $formfields[ismodelnet];
+    }
+}
+
+# isphantom
+if (isset($formfields[isphantom]) && $formfields[isphantom] != "") {
+    if (! TBvalid_boolean($formfields[isphantom])) {
+	$errors["isphantom"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["isphantom"] = $formfields[isphantom];
+    }
+}
+
+# isdynamic
+if (isset($formfields[isdynamic]) && $formfields[isdynamic] != "") {
+    if (! TBvalid_boolean($formfields[isdynamic])) {
+	$errors["isdynamic"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["isdynamic"] = $formfields[isdynamic];
     }
 }
 
