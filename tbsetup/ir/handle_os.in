@@ -206,6 +206,19 @@ foreach (split("\n",&ir_get("/rpms"))) {
     $sth->execute;
     $sth->finish;
 }
+if (! &ir_exists("/deltas")) {
+    print STDERR "IR incomplete: No /deltas.\n";
+    exit(1);
+}
+foreach (split("\n",&ir_get("/deltas"))) {
+    ($node,$deltas) = /^([^ ]+)(.*)$/;
+    $deltas =~ s/^ //;
+    $deltas =~ s/ /:/g;
+    $sth = $dbh->prepare("UPDATE nodes set deltas = \"$deltas\" ".
+			 "where node_id = \"$nodemap{$node}\"");
+    $sth->execute;
+    $sth->finish;
+}
 
 foreach (values(%nodemap)) {
     $node = $_;

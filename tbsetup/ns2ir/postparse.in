@@ -97,6 +97,7 @@ open(TBCMD,$tbcmdfile) || do {
 $cmdlines = ();
 $startups = ();
 $rpms = ();
+$deltas = ();
 while (<TBCMD>) {
     chop;
     @line = split;
@@ -180,8 +181,17 @@ while (<TBCMD>) {
 	    next;
 	}
 	$startups{$line[1]} = join(" ",@line[2..$#line]);	
+    } elsif ($line[0] eq "tb-set-node-deltas") {
+	if ($#line < 2) {
+	    push(@ERRORS,"Syntax: tb-set-node-deltas node rpms...");
+	    next;
+	} 
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
+	    next;
+	}
+	$deltas{$line[1]} = join(" ",@line[2..$#line]);
     }
-
 }
 
 close(TBCMD);
@@ -282,5 +292,14 @@ foreach $node (keys(%nodes)) {
     }
 }
 print IRFILE "END cmdline\n";
+print IRFILE "START deltas\n";
+foreach $node (keys(%nodes)) {
+    if (defined($deltas{$node})) {
+	print IRFILE "$node $deltas{$node}\n";
+    } else {
+	print IRFILE "$node\n";
+    }
+}
+print IRFILE "END deltas\n";
 close IRFILE;
 

@@ -90,6 +90,10 @@ proc tb-set-node-startup {node cmd} {
     global TBCMD nodeid_map
     puts $TBCMD "tb-set-node-startup $nodeid_map($node) $cmd"
 }
+proc tb-set-node-deltas {node args} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-node-deltas $nodeid_map($node) $args"
+}
 
 # Show that we have loaded
 set TB_COMPACT 1

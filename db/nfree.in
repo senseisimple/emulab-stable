@@ -161,7 +161,7 @@ foreach my $n (@node_names) {
 
   # And clean out various tidbits from the nodes table.
   $cmd = "update nodes set def_boot_cmd_line='',def_boot_path='',".
-      "startupcmd='',rpms='',def_boot_image_id='$defimageid' ".
+      "startupcmd='',rpms='',deltas='',def_boot_image_id='$defimageid' ".
       "where node_id='$n'";
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"

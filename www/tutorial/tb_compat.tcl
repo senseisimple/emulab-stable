@@ -13,3 +13,4 @@ proc tb-set-lan-loss {lan rate} {}
 proc tb-set-node-rpms {node args} {}
 proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
+proc tb-set-node-deltas {node args} {}
