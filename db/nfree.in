@@ -351,7 +351,7 @@ foreach my $n (@freed_nodes) {
 		     "where node_id='$n'");
 
     # XXX force reload hack!
-    if (1 || $result->numrows()) {
+    if ( (!$isvirt && 1 ) || $result->numrows()) {
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
 	DBQueryWarn("update reserved set ".
