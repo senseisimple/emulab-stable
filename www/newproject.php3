@@ -390,7 +390,7 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<tr>
               <td colspan=2>*Estimated #of
         <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
-                             MIT Testbed PCs</a>:</td>
+                             wide-area PCs</a>:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_ronpcs]\"
