@@ -56,6 +56,9 @@ variable CurLine {}
 # This indicates whether to display verbose output
 variable Verbose 0
 
+# This indicates whether to dump traceroute output
+variable Dump 0
+
 # A list of IP address to run on.
 variable ToRun {}
 
@@ -163,7 +166,9 @@ proc handleinput {fp ip} {
 	nexttr
     } else {
 	gets $fp line
-	processline PREV($fp) $ip $line
+	if {$line != {}} {
+	    processline PREV($fp) $ip $line
+	}
     }
 }
 
@@ -189,9 +194,14 @@ proc processline {prevV finaldst line} {
     variable LinksL
     variable Bogus
     variable CurLine
+    variable Dump
 
     upvar $prevV prev
     set CurLine "$prev: $line"
+
+    if {$Dump == 1} {
+	puts stderr "$prev > $finaldst: $line"
+    }
 
     # FORMAT:
     # first word is link number and can be ignored
@@ -294,6 +304,7 @@ proc showhelp {} {
     puts " -n #     - Number of simulatenous trace routes."
     puts " -r #     - Number of times to trace each ip."
     puts " -v       - Display extra output to stderr."
+    puts " -d       - Dump lots of info for debugging."
     exit 1
 }
 
@@ -316,6 +327,9 @@ while {$argv != {}} {
 	}
 	"-v" {
 	    set Verbose 1
+	}
+	"-d" {
+	    set Dump 1
 	}
 	default {
 	    if {$file != {}} {showhelp}

@@ -16,6 +16,7 @@
 # delarray <arrayname> - Deletes the array named
 # lremove <list> <element> - Removes an element from <list>
 # lpop <list> - Pops from a list
+# ldiff <a> <b> - returns <a not b> <a and b> <b not a>
 ######################################################################
 
 namespace eval CalfeldLib {
@@ -33,6 +34,7 @@ namespace export listinsert
 namespace export delarray
 namespace export lremove
 namespace export lpop
+namespace export ldiff
 
 ######################################################################
 # Variables
@@ -183,6 +185,50 @@ proc lpop {list} {
     set ret [lindex $L 0]
     set L [lrange $L 1 end]
     return $ret
+}
+
+##################################################
+# ldiff <a> <b>
+#  Returns list of three lists: a-b, intersection, b-a
+##################################################
+proc ldiff {a b} {
+    set a [lsort $a]
+    set b [lsort $b]
+    set ab {}
+    set ba {}
+    set int {}
+    while {$a != {} && $b != {}} {
+	set ae [lindex $a 0]
+	set be [lindex $b 0]
+	if {$ae == $be} {
+	    # in both lists
+	    lappend int $ae
+	    lpop a
+	    lpop b
+	} else {
+	    if {$ae < $be} {
+		# read from ae until >=
+		while {$a != {} && $ae < $be} {
+		    lappend ab $ae
+		    lpop a
+		    set ae [lindex $a 0]
+		}
+	    } else {
+		# read from be until >=
+		while {$b != {} && $be < $ae} {
+		    lappend ba $be
+		    lpop b
+		    set be [lindex $b 0]
+		}
+	    }
+	}
+    }
+    if {$a != {}} {
+	set ab [concat $ab $a]
+    } elseif {$b != {}} {
+	set ba [concat $ba $b]
+    }
+    return [list $ab $int $ba]
 }
 
 }
