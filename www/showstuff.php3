@@ -1072,7 +1072,9 @@ function SHOWIMAGEID($imageid, $edit) {
 #
 function SHOWNODE($node_id) {
     $query_result =
-	DBQueryFatal("select n.*,r.vname,r.pid,r.eid,i.IP from nodes as n ".
+	DBQueryFatal("select n.*,r.vname,r.pid,r.eid,i.IP, ".
+		     " t.isvirtnode,t.isremotenode ".
+		     " from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join node_types as t on t.type=n.type ".
 		     "left join interfaces as i on i.card=t.control_net ".
@@ -1107,6 +1109,11 @@ function SHOWNODE($node_id) {
     $op_mode            = $row[op_mode];
     $op_mode_timestamp  = $row[op_mode_timestamp];
     $IP                 = $row[IP];
+    $isvirtnode         = $row[isvirtnode];
+    $isremotenode       = $row[isremotenode];
+    $ipport_low		= $row[ipport_low];
+    $ipport_next	= $row[ipport_next];
+    $ipport_high	= $row[ipport_high];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -1133,13 +1140,15 @@ function SHOWNODE($node_id) {
               <td class=left>$node_id</td>
           </tr>\n";
 
-    if (strcmp($node_id, $phys_nodeid)) {
-	echo "<tr>
-                  <td>Phys ID:</td>
-                  <td class=left>
-		      <A href='shownode.php3?node_id=$phys_nodeid'>
-                         $phys_nodeid</a></td>
-              </tr>\n";
+    if ($isvirtnode) {
+	if (strcmp($node_id, $phys_nodeid)) {
+	    echo "<tr>
+                      <td>Phys ID:</td>
+                      <td class=left>
+	   	          <A href='shownode.php3?node_id=$phys_nodeid'>
+                             $phys_nodeid</a></td>
+                  </tr>\n";
+	}
     }
 
     if ($vname) {
@@ -1184,37 +1193,55 @@ function SHOWNODE($node_id) {
     echo "    </td>
           </tr>\n";
 
-    echo "<tr>
-              <td>Def Boot Path:</td>
-              <td class=left>$def_boot_path</td>
-          </tr>\n";
+    if (!$isvirtnode && !$isremotenode) {
+        echo "<tr>
+                  <td>Def Boot Path:</td>
+                  <td class=left>$def_boot_path</td>
+              </tr>\n";
 
-    echo "<tr>
-              <td>Def Boot Command Line:</td>
-              <td class=left>$def_boot_cmd_line</td>
-          </tr>\n";
+        echo "<tr>
+                  <td>Def Boot Command Line:</td>
+                  <td class=left>$def_boot_cmd_line</td>
+              </tr>\n";
 
-    echo "<tr>
-              <td>Next Boot OS:</td>
-              <td class=left>";
+        echo "<tr>
+                  <td>Next Boot OS:</td>
+                  <td class=left>";
     
-    if ($next_boot_osid)
-	SPITOSINFOLINK($next_boot_osid);
-    else
-	echo "&nbsp";
+        if ($next_boot_osid)
+	    SPITOSINFOLINK($next_boot_osid);
+	else
+	    echo "&nbsp";
 
-    echo "    </td>
-          </tr>\n";
+	echo "    </td>
+              </tr>\n";
 
-    echo "<tr>
-             <td>Next Boot Path:</td>
-             <td class=left>$next_boot_path</td>
-          </tr>\n";
+	echo "<tr>
+                 <td>Next Boot Path:</td>
+                 <td class=left>$next_boot_path</td>
+              </tr>\n";
 
-    echo "<tr>
-              <td>Next Boot Command Line:</td>
-              <td class=left>$next_boot_cmd_line</td>
-          </tr>\n";
+	echo "<tr>
+                  <td>Next Boot Command Line:</td>
+                  <td class=left>$next_boot_cmd_line</td>
+              </tr>\n";
+    }
+    elseif ($isvirtnode) {
+	echo "<tr>
+                  <td>IP Port Low:</td>
+                  <td class=left>$ipport_low (sshd port)</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>IP Port Next:</td>
+                  <td class=left>$ipport_next</td>
+              </tr>\n";
+
+	echo "<tr>
+                  <td>IP Port High:</td>
+                  <td class=left>$ipport_high</td>
+              </tr>\n";
+    }
 
     echo "<tr>
               <td>Startup Command:</td>
@@ -1222,19 +1249,23 @@ function SHOWNODE($node_id) {
           </tr>\n";
 
     echo "<tr>
-              <td>RPMs:</td>
-              <td class=left>$rpms</td>
-          </tr>\n";
-
-    echo "<tr>
               <td>Tarballs:</td>
               <td class=left>$tarballs</td>
-      </tr>\n";
+          </tr>\n";
 
-    echo "<tr>
-              <td>Router Type:</td>
-              <td class=left>$routertype</td>
-      </tr>\n";
+    if (!$isvirtnode && !$isremotenode) {
+	echo "<tr>
+                  <td>RPMs:</td>
+                  <td class=left>$rpms</td>
+              </tr>\n";
+    }
+
+    if (!$isvirtnode && !$isremotenode) {
+	echo "<tr>
+                  <td>Router Type:</td>
+                  <td class=left>$routertype</td>
+          </tr>\n";
+    }
 
     if ($eventstate) {
 	$when = strftime("20%y-%m-%d %H:%M:%S", $state_timestamp);
