@@ -65,11 +65,14 @@ B. While running Linux (single user):
 
 * /etc/testbed/{client,emulab}.pem
   Generate new ones.  This needs to be done on the site's boss node.
-  Go into the build tree "ssl" subdirectory and edit the *.cnf.in files
+  Go into the source tree "ssl" subdirectory and edit the *.cnf.in files
   to update the "[ req_distinguished_name ]" section with the appropriate
-  country, state, city, etc.  Then do a "gmake boss-installX" which generates
-  the certs and installs the server-side.  Grab the emulab.pem and client.pem
-  from that directory to put in the images.
+  country, state, city, etc.  Then go to the build directory and do a
+  "gmake boss-installX" which generates the certs and installs the
+  server-side.  Grab the emulab.pem and localhost.pem from that directory
+  to put in the images as emulab.pem and client.pem.  [ NOTE: we can
+  get by without the certs if the client tmcc and server tmcd are built
+  without SSL support (tmcc-nossl and tmcd-nossl targets).
 
 * Remount root filesystem read-only (IMPORTANT!)
   cd /
