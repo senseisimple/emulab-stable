@@ -620,6 +620,28 @@ CREATE TABLE partitions (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'port_counters'
+#
+
+CREATE TABLE port_counters (
+  node_id char(10) default NULL,
+  card tinyint(3) unsigned default NULL,
+  port tinyint(3) unsigned default NULL,
+  ifInOctets int(10) unsigned default NULL,
+  ifInUcastPkts int(10) unsigned default NULL,
+  ifInNUcastPkts int(10) unsigned default NULL,
+  ifInDiscards int(10) unsigned default NULL,
+  ifInErrors int(10) unsigned default NULL,
+  ifInUnknownProtos int(10) unsigned default NULL,
+  ifOutOctets int(10) unsigned default NULL,
+  ifOutUcastPkts int(10) unsigned default NULL,
+  ifOutNUcastPkts int(10) unsigned default NULL,
+  ifOutDiscards int(10) unsigned default NULL,
+  ifOutErrors int(10) unsigned default NULL,
+  ifOutQLen int(10) unsigned default NULL
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'portmap'
 #
 
