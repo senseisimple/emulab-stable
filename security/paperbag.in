@@ -52,7 +52,7 @@ if (@ARGV && ($ARGV[0] eq "-c")) { # We were called by sshd - transform args int
 if (@ARGV && ($ARGV[0] =~ /dir=(.*)/)) {
 	shift @ARGV;
 	&cd($1); # Change to given directory
-} elsif($ARGV[0] eq "cd") { # also understand 'cd dir &&' or 'cd dir ;' syntax to be a little more compatible
+} elsif(@ARGV && ($ARGV[0] eq "cd")) { # also understand 'cd dir &&' or 'cd dir ;' syntax to be a little more compatible
 	  # with other shells
 	# Discard the cd
 	shift @ARGV;
