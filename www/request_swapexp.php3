@@ -63,11 +63,12 @@ if ($canceled) {
 
 # We only send to the proj leader after we've sent $tell_proj_head requests
 $tell_proj_head = 2;
-$q = DBQueryWarn("select swap_requests,
+$q = DBQueryWarn("select swappable, swap_requests,
                   date_format(last_swap_req,\"%T\") as lastreq
                   from experiments
                   where eid='$eid' and pid='$pid'");
 $r = mysql_fetch_array($q);
+$swappable = $r["swappable"];
 $swap_requests = $r["swap_requests"];
 $last_swap_req = $r["lastreq"];
 
@@ -128,25 +129,34 @@ TBUserInfo($projleader, $projleader_name, $projleader_email);
 
 TBMAIL("$expleader_name <$expleader_email>",
      "$pid/$eid: Please Swap or Terminate Experiment",
-     "Hi, this is an automated message from Emulab.Net.\n".
+     "Hi, this is an automated message from $THISHOMEBASE.\n".
        ( $swap_requests > 0 
          ? ("You have been sent ".$swap_requests." other message".
 	    ($swap_requests!=1?"s":"")." since this ".
 	    "experiment became idle.\n")
-         : "") .
+         : "").
+       ($swappable ?
+	("This experiment is marked as swappable, so it may be ".
+	 "automatically \nswapped out by $THISHOMEBASE or its ".
+	 "operational staff.\n") :
+	("This experiment has not been marked swappable, so it will not be\n".
+	 "automatically swapped out.\n")).
      "\n".
      "It appears that the $c node".($c!=1?"s":"").
        " in your experiment '$eid' \n".
      "in project '$pid' ".($c!=1?"are":"is")." inactive.\n".
      "We would appreciate it if you could either terminate or swap this\n".
      "experiment out so that the nodes will be available for use by\n".
-     "other experimenters. You can do this by logging into the Emulab Web\n".
-     "Interface, and using the swap or terminate links on this page:\n".
-     "\n".
+     "other experimenters. You can do this by logging into the $THISHOMEBASE".
+     " Web\nInterface, and using the swap or terminate links on this page:".
+     "\n\n".
      "        $TBBASE/showexp.php3?pid=$pid&eid=$eid\n".
      "\n".
      "More information on experiment swapping is available in the Emulab\n".
-     "FAQ at http://www.emulab.net/faq.php3#UTT-Swapping\n".
+     "FAQ at $TBDOCBASE/faq.php3#UTT-Swapping\n".
+     "\n".
+     "More information on our node usage policy is available at\n".
+     "$TBDOCBASE/docwrapper.php3?docname=swapping.html\n".
      "\n".
      "If you feel this message is in error then please contact\n".
      "$TBMAILADDR_OPS.\n".

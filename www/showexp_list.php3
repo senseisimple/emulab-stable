@@ -124,6 +124,10 @@ if ($isadmin) {
 	  if ($tag == "inactive") { $inactive[$expt]=1; }
 	  elseif ($tag == "stale") { $stale[$expt]=1; }
 	  elseif ($tag == "unswappable") { $unswap[$expt]=1; }
+	  else {
+	    if (defined($other[$expt])) { $other[$expt].=$tag; }
+	    else {$other[$expt]=$tag; }
+	  }
 	}
 	
       }
@@ -272,6 +276,7 @@ if (mysql_num_rows($experiments_result)) {
 	    if ($stale[$expt]==1) { $str .= "<b>no&nbsp;report</b> "; }
 	    # For now, don't show this tag, it's redundant
             #if ($unswap[$expt]==1) { $str .= "unswappable"; }
+	    if ($other[$expt]) { $str .= " ($other[$expt]) "; }
 	    if ($str=="") { $str="&nbsp;"; }
 	    # sanity check
 	    $slothderr=0;
