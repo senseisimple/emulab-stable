@@ -381,11 +381,11 @@ delay_ticks(struct dn_delay *d)
 	    break;
 	case DN_DIST_UNIFORM:
 	    /* we need a number somewhere between 
-	     * (mean - 2*variance) aka minimum and
-	     * (mean + 2*variance) aka maximum
+	     * (mean - 2*stddev) aka minimum and
+	     * (mean + 2*stddev) aka maximum
 	     */
-	    delay=random() % ( 4 * d->variance)
-		+ (d->mean - 2 * d->variance);
+	    delay=random() % ( 4 * d->stddev)
+		+ (d->mean - 2 * d->stddev);
 	    delay=delay*hz/1000; /* ms -> ticks */
 	    break;
 	case DN_DIST_POISSON:	/* curr. implemented as random table */
@@ -415,11 +415,11 @@ updatebw(struct dn_bw *b)
    switch(b->dist) {
         case DN_DIST_UNIFORM:
             /* we need a number somewhere between
-             * (mean - 2*variance) aka minimum and
-             * (mean + 2*variance) aka maximum
+             * (mean - 2*stddev) aka minimum and
+             * (mean + 2*stddev) aka maximum
              */
-            b->bandwidth = random() % ( 4 * b->variance)
-                           + (b->mean - 2 * b->variance);
+            b->bandwidth = random() % ( 4 * b->stddev)
+                           + (b->mean - 2 * b->stddev);
             break;
 	case DN_DIST_TABLE_DETERM:
             b->tablepos = ++b->tablepos % b->entries;
@@ -703,11 +703,11 @@ rate_based_drop(struct dn_loss *l)
 	        break;
 	    case DN_DIST_UNIFORM:
 		/* we need a number somewhere between
-		 * (mean - 2*variance) aka minimum and
-		 * (mean + 2*variance) aka maximum
+		 * (mean - 2*stddev) aka minimum and
+		 * (mean + 2*stddev) aka maximum
 		 */
-		l->plr = random() % ( 4 * l->variance)
-			+ (l->mean - 2 * l->variance);
+		l->plr = random() % ( 4 * l->stddev)
+			+ (l->mean - 2 * l->stddev);
 		break;
 	    default: /* no action */
 	}
@@ -935,14 +935,14 @@ dn_delay_conf(struct dn_delay *d)
 	d->delay = ( d->delay * hz ) / 1000 ;
 
     if (d->dist & DN_DIST_UNIFORM) {
-	if (! d->variance) {
+	if (! d->stddev) {
 	    d->dist=DN_DIST_CONST_TIME;
 	    d->delay = ( d->mean * hz ) / 1000 ;
 	}
 	else
-	if (d->variance > d->mean) {
-	    printf("dummynet: var %d > mean %d ???\n",
-		       d->variance, d->mean);
+	if (2 * d->stddev > d->mean) {
+	    printf("dummynet: stddev %d is too large for mean %d.\n",
+		       d->stddev, d->mean);
 		return EINVAL;
 	}
     }
@@ -974,6 +974,13 @@ dn_bw_conf(struct dn_bw *b)
 	printf("dummynet: invalid bw distribution: %x\n",b->dist);
 	return EINVAL;
     }
+
+    if ((b->dist & DN_DIST_UNIFORM) && (2 * b->stddev > b->mean)) {
+	printf("dummynet: stddev %d is too large for mean %d.\n",
+		       b->stddev, b->mean);
+	return EINVAL;
+    }
+
     if (b->dist & DN_TABLE_DIST) { /* one of the table dists */
 	b->tablepos = 0;
 	error = copyin_table(b->entries,b->table,&(b->table));
@@ -987,6 +994,10 @@ dn_bw_conf(struct dn_bw *b)
 
     /* if bw not constant, init quantum */
     if (b->dist & ~DN_CONST_DIST) {
+	if (b->quantum <= 0) {
+	    printf("dummynet: quantum %d is nonsensical\n",b->quantum);
+	    return EINVAL;
+	}
         b->quantum = b->quantum * hz /1000; /* ms->ticks */
 	b->quantum_expire = curr_time;
     }
@@ -1007,6 +1018,12 @@ dn_loss_conf(struct dn_loss *l)
 		    DN_DIST_TABLE_DETERM|DN_DIST_UNIFORM|
 		    DN_DIST_POISSON|DN_DIST_TABLE_RANDOM)) {
 	printf("dummynet: invalid loss distribution %x\n", l->dist);
+	return EINVAL;
+    }
+
+    if ((l->dist & DN_DIST_UNIFORM) && (2 * l->stddev > l->mean)) {
+	printf("dummynet: stddev %d is too large for mean %d.\n",
+		       l->stddev, l->mean);
 	return EINVAL;
     }
 
@@ -1031,6 +1048,10 @@ dn_loss_conf(struct dn_loss *l)
 	l->nextdroptime = 0x7fffffff; 
 
     if (l->dist & ~(DN_CONST_DIST|DN_DIST_TABLE_DETERM)) {
+	if (l->quantum <= 0) {
+	    printf("dummynet: quantum %d is nonsensical\n",l->quantum);
+	    return EINVAL;
+	}
 	l->quantum = l->quantum * hz / 1000 ; /* ms->ticks */
 	l->quantum_expire = curr_time;
     }

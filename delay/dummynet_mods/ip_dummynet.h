@@ -133,7 +133,7 @@ struct dn_delay {
 	int	delay ;			/* really, ticks	*/
 	int	dist;		/* distribution type */
 	int	mean;
-	int	variance;
+	int	stddev;
 	int    *table;		/* table of possible values */
 	int	entries;	/* entries in table */ 
 	int	tablepos;	/* current pos in table for deterministic */
@@ -143,7 +143,7 @@ struct dn_bw {
 	int	bandwidth;		/* bits/sec */
 	int	dist;			/* distribution type */
 	int	mean;
-	int	variance;
+	int	stddev;
 	int	quantum;	/* how frequently to recalculate bw */
 	int	quantum_expire;	/* its expiration date  */
 	int    *table;		/* table of possible values */
@@ -156,7 +156,7 @@ struct dn_loss {
 	int	dist;		/* distribution type */
 	int	nextdroptime;	/* time to drop pkt at head of queue */
 	int	mean;
-	int	variance;
+	int	stddev;
 	int	quantum;	/* how frequently to recalc loss rate */
 	int	quantum_expire;	/* its expiration date	*/
 	int    *table;		/* table of possible values */
