@@ -70,7 +70,7 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
   if (tr->is_static) {
     if ((tr->current_load + vn->typecount) > tr->max_load) {
       // This would put us over its max load
-      if (allow_overload) {
+      if (allow_overload && (tr->max_load > 1)) {
 	// That's okay, we're allowing overload
 	matched = true;
       } else {
@@ -90,7 +90,7 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
 	if ((pn->current_type_record->current_load + vn->typecount) >
 	    pn->current_type_record->max_load) {
 	  // This would put us over its max load
-	  if (allow_overload) {
+	  if (allow_overload && (tr->max_load > 1)) {
 	    // That's okay, we're allowing overload
 	    matched = true;
 	  } else {
