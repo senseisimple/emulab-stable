@@ -70,6 +70,7 @@ while (<FH>) {
     print;
 
     if ($dist && /LOCK TABLES ([-\w]*) WRITE/i) {
-	print "DELETE FROM $1;\n";
+	print "DELETE FROM $1;\n"
+	    if ($1 ne "state_triggers");
     }
 }
