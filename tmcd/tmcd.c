@@ -107,6 +107,7 @@ typedef struct {
 	int		jailflag;
 	int		isvnode;
 	int		islocal;
+	int		iscontrol;
 	int		update_accounts;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
@@ -115,7 +116,8 @@ typedef struct {
 	char		gid[TBDB_FLEN_GID];
 	char		nickname[TBDB_FLEN_VNAME];
 	char		type[TBDB_FLEN_NODETYPE];
-	char		class[TBDB_FLEN_NODECLASS];	
+	char		class[TBDB_FLEN_NODECLASS];
+	char		role[256];
 	char		testdb[256];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
@@ -257,11 +259,9 @@ main(int argc, char **argv)
 		case 'c':
 			maxchildren = atoi(optarg);
 			break;
-#ifdef LBS
 		case 'X':
 			insecure = 1;
 			break;
-#endif
 		case 'h':
 		case '?':
 		default:
@@ -728,6 +728,15 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		if (!insecure)
 			goto skipit;
 	}
+	else if (reqp->iscontrol) {
+		if (!istcp)
+			goto execute;
+
+		error("%s: Control node connection without SSL!\n",
+		      reqp->nodeid);
+		if (!insecure)
+			goto skipit;
+	}
 #else
 	/*
 	 * When not compiled for ssl, do not allow remote connections.
@@ -735,6 +744,12 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (!reqp->islocal) {
 		error("%s: Remote node connection not allowed (Define SSL)!\n",
 		      reqp->nodeid);
+		if (!insecure)
+			goto skipit;
+	}
+	if (reqp->iscontrol) {
+		error("%s: Control node connection not allowed "
+		      "(Define SSL)!\n", reqp->nodeid);
 		if (!insecure)
 			goto skipit;
 	}
@@ -1023,7 +1038,14 @@ COMMAND_PROTOTYPE(doaccounts)
         /*
 	 * We need the unix GID and unix name for each group in the project.
 	 */
-	if (reqp->islocal || reqp->isvnode) {
+	if (reqp->iscontrol) {
+		/*
+		 * All groups! 
+		 */
+		res = mydb_query("select unix_name,unix_gid from groups",
+				 2, reqp->pid);
+	}
+	else if (reqp->islocal || reqp->isvnode) {
 		res = mydb_query("select unix_name,unix_gid from groups "
 				 "where pid='%s'",
 				 2, reqp->pid);
@@ -1101,7 +1123,28 @@ COMMAND_PROTOTYPE(doaccounts)
 	/*
 	 * Now onto the users in the project.
 	 */
-	if (reqp->islocal || reqp->isvnode) {
+	if (reqp->iscontrol) {
+		/*
+		 * All users! This is not currently used. The problem
+		 * is that returning a list of hundreds of users whenever
+		 * any single change is required is bad. Works fine for
+		 * experimental nodes where the number of accounts is small,
+		 * but is not scalable. 
+		 */
+		res = mydb_query("select distinct "
+				 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+				 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+				 "  u.emulab_pubkey,u.home_pubkey, "
+				 "  UNIX_TIMESTAMP(u.usr_modified), "
+				 "  u.usr_email "
+				 "from group_membership as p "
+				 "left join users as u on p.uid=u.uid "
+				 "left join groups as g on p.pid=g.pid "
+				 "where p.trust!='none' "
+				 "      and u.status='active' order by u.uid",
+				 13, reqp->pid, reqp->gid);
+	}
+	else if (reqp->islocal || reqp->isvnode) {
 		/*
 		 * This crazy join is going to give us multiple lines for
 		 * each user that is allowed on the node, where each line
@@ -1116,28 +1159,30 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
-			     "  UNIX_TIMESTAMP(u.usr_modified) "
+			     "  UNIX_TIMESTAMP(u.usr_modified), "
+			     "  u.usr_email "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on p.pid=g.pid "
 			     "where ((p.pid='%s' and p.gid='%s')) "
 			     "      and p.trust!='none' "
 			     "      and u.status='active' order by u.uid",
-			     12, reqp->pid, reqp->gid);
+			     13, reqp->pid, reqp->gid);
 		}
 		else {
 			res = mydb_query("select distinct "
 			     "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
-			     "  UNIX_TIMESTAMP(u.usr_modified) "
+			     "  UNIX_TIMESTAMP(u.usr_modified), "
+			     "  u.usr_email "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on "
 			     "     p.pid=g.pid and p.gid=g.gid "
 			     "where ((p.pid='%s')) and p.trust!='none' "
 			     "      and u.status='active' order by u.uid",
-			     12, reqp->pid);
+			     13, reqp->pid);
 		}
 	}
 	else if (reqp->jailflag) {
@@ -1149,7 +1194,8 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "  u.uid,'*',u.unix_uid,u.usr_name, "
 			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 			     "  u.emulab_pubkey,u.home_pubkey, "
-			     "  UNIX_TIMESTAMP(u.usr_modified) "
+			     "  UNIX_TIMESTAMP(u.usr_modified), "
+			     "  u.usr_email "
 			     "from group_membership as p "
 			     "left join users as u on p.uid=u.uid "
 			     "left join groups as g on "
@@ -1157,7 +1203,7 @@ COMMAND_PROTOTYPE(doaccounts)
 			     "where (p.pid='%s') and p.trust!='none' "
 			     "      and u.status='active' and u.admin=1 "
 			     "      order by u.uid",
-			     12, RELOADPID);
+			     13, RELOADPID);
 	}
 	else {
 		/*
@@ -1174,7 +1220,8 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "u.uid,'*',u.unix_uid,u.usr_name, "
 				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
 				 "u.emulab_pubkey,u.home_pubkey, "
-				 "UNIX_TIMESTAMP(u.usr_modified) "
+				 "UNIX_TIMESTAMP(u.usr_modified), "
+				 "  u.usr_email "
 				 "from projects as p "
 				 "left join group_membership as m "
 				 "  on m.pid=p.pid "
@@ -1186,7 +1233,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "      and m.trust!='none' "
 				 "      and u.status='active' "
 				 "order by u.uid",
-				 12, reqp->type);
+				 13, reqp->type);
 	}
 
 	if (!res) {
@@ -1315,9 +1362,15 @@ COMMAND_PROTOTYPE(doaccounts)
 			sprintf(buf,
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
-				"HOMEDIR=%s/%s GLIST=\"%s\" SERIAL=%s\n",
+				"HOMEDIR=%s/%s GLIST=\"%s\" SERIAL=%s",
 				row[0], row[1], row[2], gidint, root, row[3],
 				USERDIR, row[0], glist, row[11]);
+
+			if (vers >= 9) {
+				sprintf(&buf[strlen(buf)],
+					" EMAIL=\"%s\"", row[12]);
+			}
+			strcat(buf, "\n");
 		}
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -3334,7 +3387,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	if (reqp->isvnode) {
 		res = mydb_query("select t.class,t.type,np.node_id,"
 				 " np.jailflag,r.pid,r.eid,r.vname, "
-				 " e.gid,e.testdb,nv.update_accounts "
+				 " e.gid,e.testdb,nv.update_accounts, "
+				 " np.role "
 				 " from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3347,12 +3401,12 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=np.type and i.card=t.control_net "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 10, reqp->vnodeid, inet_ntoa(ipaddr));
+				 11, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
-				 " n.update_accounts " 
+				 " n.update_accounts,n.role " 
 				 " from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3362,7 +3416,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.card=t.control_net "
 				 "where i.IP='%s'",
-				 10, inet_ntoa(ipaddr));
+				 11, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3416,6 +3470,9 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		reqp->update_accounts = atoi(row[9]);
 	else
 		reqp->update_accounts = 0;
+
+	strncpy(reqp->role, row[10], sizeof(reqp->role));
+	reqp->iscontrol = (! strcasecmp(reqp->role,  "ctrlnode") ? 1 : 0);
 
 	/* If a vnode, copy into the nodeid. Eventually split this */
 	if (reqp->isvnode)
