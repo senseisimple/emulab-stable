@@ -36,16 +36,8 @@ install:
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
 
-client-install: lib/all.MAKE
-ifeq ($(SYSTEM),FreeBSD)
-	@$(MAKE) -C delay-agent client-install
-endif
-	@$(MAKE) -C link-agent client-install
-	@$(MAKE) -C tbgen client-install
-	@$(MAKE) -C program-agent client-install
-	@$(MAKE) -C trafgen client-install
-	@$(MAKE) -C proxy client-install
-	@$(MAKE) -C linktest client-install
+client:		client-subdirs
+client-install: client client-install-subdirs
 
 control-install: 
 	@$(MAKE) -C lib control-install

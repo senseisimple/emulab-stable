@@ -38,8 +38,26 @@ RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
 ISMFS		= $(ETCDIR)/ismfs
 INSTALL		= /usr/bin/install -c
 
-install:	basefbsd-install etc-install \
+install client-install:	basefbsd-install etc-install \
 			sup-install script-install bin-install # jail-install
+
+destdircheck:
+	@if [ -z "$(DESTDIR)" ]; then \
+	    echo "You must define DESTDIR for this target!"; \
+	    false; \
+	fi
+
+cdboot-install:	destdircheck basefbsdcdboot-install etc-install \
+			script-install bin-install
+	rm -f $(SYSETCDIR)/start_if.*
+	rm -f $(SYSETCDIR)/rc.cdroot $(SYSETCDIR)/fstab.lbs
+	rm -f $(DESTDIR)/boot/loader.rc.lbs
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/cdroot $(SYSETCDIR)/rc.d/cdroot
+	cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab
+	cp $(SRCDIR)/cdboot/loader.conf $(DESTDIR)/boot/loader.conf
+	cp $(SRCDIR)/cdboot/.profile $(DESTDIR)/.profile
 
 simple-install:	script-install bin-install # jail-install
 
@@ -62,6 +80,9 @@ dir-install:
 basefbsd-install: dir-install
 	(cd ../freebsd; $(MAKE) all install)
 	rm -f $(SYSETCDIR)/start_if.*
+
+basefbsdcdboot-install: dir-install
+	(cd ../freebsd; $(MAKE) DESTDIR=$(DESTDIR) all cdboot-install)
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile

@@ -52,7 +52,7 @@ SYSTEM	       := $(shell uname -s)
 ifeq ($(SYSTEM),FreeBSD)
 # FreeBSD
 CFLAGS	 += -DFREEBSD
-YCFLAGS	 += -I. -DUSEEVENTS -DFREEBSD
+YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DFREEBSD
 LIBS	 += -ll -lcompat
 endif
 
@@ -86,7 +86,8 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:
 
-client-install: trafgen
+client: $(PROGRAMS)
+client-install: client
 	$(INSTALL_PROGRAM) -s trafgen $(DESTDIR)$(CLIENT_BINDIR)/trafgen
 
 clean:

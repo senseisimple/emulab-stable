@@ -37,13 +37,21 @@ RCDIR		= $(SYSETCDIR)/rc.d
 INSTALL		= /usr/bin/install -c 
 COMMON		= $(SRCDIR)/../common
 
-install:	common-install etc-install \
+install client-install:	common-install etc-install \
 			sup-install script-install bin-install
 	@echo "Remember to install the PEM files if necessary"
 
 simple-install:	common-install script-install bin-install
 
 dir-install:
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/sysconfig
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/init.d
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc1.d
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc3.d
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc6.d
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)

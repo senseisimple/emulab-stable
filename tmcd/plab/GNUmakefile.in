@@ -97,7 +97,7 @@ tmcc:
 	@echo "prior to building the tarball."
 	@false
 
-install:
+install client-install:
 
 rootball-install: 
 	$(INSTALL_DATA) $(ROOTBALLNAME) $(INSTALL_ETCDIR)/plab

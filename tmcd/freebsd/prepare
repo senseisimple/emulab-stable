@@ -30,6 +30,18 @@ my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $MOUNTINFO	= "/var/db/mounttab";
 
 #
+# Dead wood in $BINDIR
+# If you remove/move a script, list it here so that it goes away when the
+# image is remade.
+#
+my @DEADFILES	= ("rc.agents", "rc.delayagent", "rc.delta", "rc.healthd",
+		   "rc.injail", "rc.ipod", "rc.mfs", "rc.progagent",
+		   "rc.setup", "rc.slothd", "rc.testbed",
+		   "batchcmddone", "bootsetup", "install-tarfile",
+		   "jailsetup", "update_delays");
+
+
+#
 # Turn off line buffering on output
 #
 $| = 1;
@@ -189,3 +201,10 @@ foreach my $dir (@VARDIRS) {
     }
 }
 
+print "Clearing out old Emulab scripts and binaries in $BINDIR ...\n";
+foreach my $file (@DEADFILES) {
+    if (-f "$BINDIR/$file") {
+	unlink("$BINDIR/$file") or
+	    warn("*** could not remove $BINDIR/$file\n");
+    }
+}

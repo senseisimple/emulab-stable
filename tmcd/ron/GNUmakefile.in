@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -31,6 +31,7 @@ VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
 RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
 INSTALL		= /usr/bin/install -c
 
+client-install:
 wa-install:	wa-stuff doinstall
 ron-install:	ron-stuff doinstall
 doinstall:	common-install etc-install sysetc-install other-install \

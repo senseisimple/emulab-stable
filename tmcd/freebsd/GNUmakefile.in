@@ -41,7 +41,7 @@ INSTALL		= /usr/bin/install -c
 injail: $(SRCDIR)/jail/injail.c
 	$(CC) $(CFLAGS) -O2 -o injail $<
 
-install:	common-install etc-install \
+install client-install:	common-install etc-install \
 			sup-install script-install bin-install jail-install
 	@echo "Remember to install the PEM files if necessary"
 

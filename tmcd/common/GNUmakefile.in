@@ -32,7 +32,7 @@ TBBINDIR	= $(DESTDIR)/usr/testbed/bin
 TBLIBDIR	= $(DESTDIR)/usr/testbed/lib
 INSTALL		= /usr/bin/install -c
 
-install:
+install client-install:
 	@echo "You should probably not run this install directly!"
 	@echo "If you do, be sure to install from the system specific "
 	@echo "directory afterwards."

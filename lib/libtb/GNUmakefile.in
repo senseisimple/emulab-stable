@@ -15,6 +15,7 @@ all:	libtb.a
 
 client:	libtb-nodb.a
 	mv libtb-nodb.a libtb.a
+client-install: client
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

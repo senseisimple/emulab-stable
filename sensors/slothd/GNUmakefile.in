@@ -52,7 +52,7 @@ version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 client: slothd
-	-mkdir $(SLOTHD_DIR)
+	-mkdir -p $(SLOTHD_DIR)
 	$(CP) slothd $(SLOTHD_DIR)/slothd
 
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd)

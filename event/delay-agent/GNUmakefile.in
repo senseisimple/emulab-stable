@@ -32,7 +32,8 @@ delay-agent:	$(OBJS)
 
 $(OBJS):	main.h ../lib/libevent.a
 
-client-install: delay-agent
+client: delay-agent
+client-install: client
 	$(INSTALL_PROGRAM) -s delay-agent $(DESTDIR)$(CLIENT_BINDIR)/delay-agent
 
 clean:

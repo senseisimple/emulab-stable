@@ -11,8 +11,9 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	server client
-client: tmcc tmcc-nossl findif
+all:	server fullclient client
+fullclient: tmcc
+client: tmcc-nossl findif
 server: tmcd tmcd.restart
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -29,16 +30,26 @@ SSLFLAGS = -DWITHSSL
 TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
 ifeq ($(SYSTEM),Linux)
+RHLVERSION    := $(shell cat /etc/redhat-release | sed -e 's/Red Hat Linux release \([0-9]\).*/Linux\1/')
 NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 ifeq ($(NEEDKERB),0)
  CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
  TMLIBS   += `/usr/kerberos/bin/krb5-config --libs krb5`
 endif
 TMLIBS  += -ldl
+ifeq ($(RHLVERSION),Linux9)
+MDSUBDIR  = linux9
+else
 MDSUBDIR  = linux
 endif
+endif
 ifeq ($(SYSTEM),FreeBSD)
+FBSDVERSION    := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
+ifeq ($(FBSDVERSION),FreeBSD5)
+MDSUBDIR  = freebsd5
+else
 MDSUBDIR  = freebsd
+endif
 endif
 
 ifeq ($(EVENTSYS),1)
@@ -79,7 +90,7 @@ install:	$(INSTALL_SBINDIR)/tmcd \
 		$(INSTALL_SBINDIR)/tmcd.restart
 
 
-client-install: tmcc-nossl findif
+client-install: client
 	@$(MAKE) -C $(MDSUBDIR) install
 
 $(INSTALL_BINDIR)/tmcd/%: %

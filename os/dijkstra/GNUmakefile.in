@@ -22,7 +22,8 @@ dijkstra:	dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o \
                 Compressor.h lib.h
 	$(CXX) $(CXXFLAGS) -static dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o $(LIBS) -o dijkstra
 
-client-install: dijkstra
+client: all
+client-install: client
 	$(INSTALL_PROGRAM) dijkstra $(DESTDIR)$(CLIENT_BINDIR)/dijkstra
 
 clean:

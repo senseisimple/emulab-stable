@@ -18,7 +18,6 @@ endif
 include $(OBJDIR)/Makeconf
 
 all:	$(PROGRAMS)
-client: tevc
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -50,9 +49,9 @@ endif
 LIBS     += -ldl
 endif
 
+# Link against some of the object files from libtb, instead of the
+# whole library, since the latter cannot be built on clients (without mysql)
 tevc:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
-	# Link against some of the object files from libtb, instead of the
-	# whole library, since the latter cannot be built on ops
 	$(CC) $(LDFLAGS) -static -o $@ tevc.o $(LIBTBDIR)/log.o \
 		$(LIBTBDIR)/tbdefs.o $(LIBS)
 
@@ -68,7 +67,8 @@ install:	$(INSTALL_SBINDIR)/tevd \
 
 control-install:	$(INSTALL_BINDIR)/tevc
 
-client-install: tevc
+client: tevc
+client-install: client
 	$(INSTALL_PROGRAM) -s tevc $(DESTDIR)$(CLIENT_BINDIR)/tevc
 
 clean:

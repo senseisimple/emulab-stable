@@ -77,7 +77,8 @@ proxytest:	proxytest.o $(LIBTBDIR)/log.o
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-client-install: evproxy
+client: evproxy
+client-install: client
 	$(INSTALL_PROGRAM) -s evproxy $(DESTDIR)$(CLIENT_BINDIR)/evproxy
 
 clean:

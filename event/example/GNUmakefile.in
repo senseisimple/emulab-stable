@@ -34,5 +34,9 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:	$(addprefix $(INSTALL_SBINDIR)/, eventdebug.pl)
 
+# not a client thing
+client:
+client-install: client
+
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

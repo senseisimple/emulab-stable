@@ -28,16 +28,13 @@ emulab-sync:	emulab-sync.o version.o decls.h
 version.c: emulab-syncd.c 
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-client-install: emulab-syncd emulab-sync
-	$(INSTALL_PROGRAM) -s emulab-syncd \
-		$(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd
-	$(INSTALL_PROGRAM) -s emulab-sync \
-		$(DESTDIR)$(CLIENT_BINDIR)/emulab-sync
+client: all
+client-install: client
+	$(INSTALL_PROGRAM) -s emulab-syncd $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd
+	$(INSTALL_PROGRAM) -s emulab-sync $(DESTDIR)$(CLIENT_BINDIR)/emulab-sync
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)$(CLIENT_MANDIR)/man1
-	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-syncd.1 \
-		$(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
-	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-sync.1 \
-		$(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
+	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-syncd.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
+	$(INSTALL_PROGRAM) $(SRCDIR)/emulab-sync.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
 
 check:
 	sh $(SRCDIR)/syncd_test.sh

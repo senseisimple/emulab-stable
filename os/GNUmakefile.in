@@ -27,16 +27,25 @@ install: $(INSTALL_SBINDIR)/split-image.sh
 control-install: 
 	@$(MAKE) -C imagezip install
 
-client-install: 
+client:
+ifneq ($(SYSTEM),Linux)
+	$(MAKE) -C imagezip client
+	$(MAKE) -C growdisk client
+endif
+	$(MAKE) -C syncd client
+	$(MAKE) -C dijkstra client
+	$(MAKE) -C genhostsfile client
+
+client-install: client
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 ifneq ($(SYSTEM),Linux)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
 	$(MAKE) -C imagezip client-install
+	$(MAKE) -C growdisk client-install
 endif
 	$(MAKE) -C syncd client-install
-	$(MAKE) -C growdisk client-install
 	$(MAKE) -C dijkstra client-install
 	$(MAKE) -C genhostsfile client-install
 

@@ -42,9 +42,9 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:
 
-client-install: program-agent
-	$(INSTALL_PROGRAM) -s program-agent \
-			$(DESTDIR)$(CLIENT_BINDIR)/program-agent
+client: $(PROGRAMS)
+client-install: client
+	$(INSTALL_PROGRAM) -s program-agent $(DESTDIR)$(CLIENT_BINDIR)/program-agent
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

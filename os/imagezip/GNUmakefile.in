@@ -112,7 +112,8 @@ version.c: imagezip.c imageunzip.c imagedump.c
 
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip $(INSTALL_BINDIR)/imagedump
 
-client-install: all
+client: all
+client-install: client
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin
 	$(INSTALL_PROGRAM) imagezip $(DESTDIR)/usr/local/bin/imagezip
 	$(INSTALL_PROGRAM) imageunzip $(DESTDIR)/usr/local/bin/imageunzip

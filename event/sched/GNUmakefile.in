@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,6 +41,10 @@ event-sched:	$(OBJS)
 $(OBJS):	event-sched.h ../lib/libevent.a
 
 install:	$(addprefix $(INSTALL_SBINDIR)/, event-sched)
+
+# not a client thing
+client:
+client-install: client
 
 clean:
 	/bin/rm -f *.o event-sched

@@ -441,7 +441,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
-        os/syncd/GNUmakefile  os/dijkstra/GNUmakefile \
+        os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
 	os/genhostsfile/GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
@@ -507,8 +507,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
 	tmcd/linux/GNUmakefile tmcd/linux/supfile tmcd/linux/pump.conf \
 	tmcd/linux/sethostname tmcd/linux/sethostname.dhclient \
-	tmcd/freebsd5/GNUmakefile tmcd/openbsd/GNUmakefile \
-	tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
+	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
+	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
+	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables utils/eventping \
