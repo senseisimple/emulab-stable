@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -102,7 +102,7 @@ if (!strcmp($inout, "in")) {
 }
 elseif (!strcmp($inout, "out")) {
     if ($isbatch) 
-	$action = "swapout";
+	$action = "swapout and dequeue";
     else {
 	if ($state == $TB_EXPTSTATE_ACTIVATING) {
 	    $action = "cancel";
@@ -115,7 +115,7 @@ elseif (!strcmp($inout, "out")) {
 elseif (!strcmp($inout, "pause")) {
     if (!$isbatch)
 	USERERROR("Only batch experiments can be dequeued!", 1);
-    $action = "Dequeue";
+    $action = "dequeue";
 }
 elseif (!strcmp($inout, "restart")) {
     $action = "restart";
