@@ -1,6 +1,4 @@
 basic
-basic_rsrv
-db1
 delaylan1
 delaylink
 lan1
@@ -9,7 +7,7 @@ mini_nodes
 mini_set-ip
 simplelink
 singlenode
-tbcmd
+mini_tbcmd
 trivial
 fixed
 simplex

@@ -7,8 +7,6 @@ set node2 [$ns node]
 
 $ns duplex-link $node1 $node2 100Mb 0ms DropTail
 $ns duplex-link $node1 $node2 100Mb 0ms DropTail
-$ns duplex-link $node1 $node2 100Mb 0ms DropTail
-$ns duplex-link $node1 $node2 100Mb 0ms DropTail
 
 $ns run
 
