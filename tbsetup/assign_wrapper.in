@@ -3556,13 +3556,13 @@ sub LoadCurrent()
     
     my $query_result = 
 	DBQueryFatal("select r.vname,r.node_id,n.phys_nodeid, ".
-		     "       nt.isvirtnode,nt.isremotenode ".
+		     "       nt.isvirtnode,nt.isremotenode,nt.isplabdslice ".
 		     " from reserved as r ".
 		     "left join nodes as n on n.node_id=r.node_id ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "where r.pid='$pid' and r.eid='$eid'");
     
-    while (($vname,$reserved,$physnode,$isvirt,$isremote) =
+    while (($vname,$reserved,$physnode,$isvirt,$isremote,$isplab) =
 	   $query_result->fetchrow_array) {
 
 	#
@@ -3570,7 +3570,7 @@ sub LoadCurrent()
 	#
 	fatal(1, "*** $0:\n".
 		 "    Cannot update widearea nodes yet!")
-	    if ($isremote);
+	    if ($isremote && !$isplab);
 	
 	LoadPhysNode($reserved);
 	

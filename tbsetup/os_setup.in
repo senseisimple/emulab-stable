@@ -66,11 +66,13 @@ my $osselect    = "$TB/bin/os_select";
 my $dbg		= 0;
 my $failed      = 0;
 my $failedvnodes= 0;
+my $failedplab  = 0;
 my %nodes       = ();
 my %vnodes      = ();
 my %vnodephosts = ();
 my %vnode2pnode = ();
 my %pnodevcount = ();
+my %plabvnodes  = ();
 my %osids       = ();
 my %canfail     = ();
 my $db_result;
@@ -170,6 +172,7 @@ while (my %row = $db_result->fetchhash()) {
     #
     if ($virtnode) {
 	$vnodes{$node} = ($jailnode || $plabnode);
+	$plabvnodes{$node} = $plabnode;
 	if (! $jailnode && ! $plabnode) {
 	    next;
 	}
@@ -681,7 +684,7 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $pnode  = $vnode2pnode{$node};
 	my $wstart = $waitstart{$node};
-	my $maxwait = 90 + (300 * $pnodevcount{$pnode});
+	my $maxwait = 90 + (100 * $pnodevcount{$pnode});
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
@@ -719,7 +722,12 @@ elsif (@vnodelist) {
 	    print "*** Continuing with experiment setup anyway ...\n";
 	    next;
 	}
-	$failedvnodes++;
+	if ($plabvnodes{$node}) {
+	    $failedplab++;
+	}
+	else {
+	    $failedvnodes++;
+	}
     }
     TBDebugTimeStamp("Virtual node waiting finished");
 }
@@ -729,6 +737,8 @@ print "*** There were $failed failed nodes\n"
     if ($failed);
 print "*** There were $failedvnodes failed virtual nodes\n"
     if ($failedvnodes);
+print "*** There were $failedplab failed plab nodes\n"
+    if ($failedplab);
 
 TBDebugTimeStamp("os_setup finished");
 
@@ -736,7 +746,7 @@ TBDebugTimeStamp("os_setup finished");
 exit(-1)
     if ($failedvnodes);
 exit(1)
-    if ($failed);
+    if ($failed || $failedplab);
 exit 0;
 
 #
