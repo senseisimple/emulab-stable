@@ -27,12 +27,12 @@ my ($bossname) = split(" ", `tmcc bossinfo`);
 # Might change at some point with multiuser nodes.
 #
 my (undef,$creator) = split("=", `tmcc creator`);
-chop($creator);
 
 if (!defined($creator)) {
     print STDERR "Could not determine experiment creator!\n";
     exit(1);
 }
+chop($creator);
 (undef,undef,$uid,$gid,undef,undef,undef,undef) = getpwnam($creator);
 
 if (!defined($uid)) {
