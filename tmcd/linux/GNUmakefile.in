@@ -118,6 +118,7 @@ sysetc-remove:
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
+	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc/rc.kname
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc/rc.ixp

@@ -1,0 +1,34 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# See if we need to rerun LILO.  This should only happen after a disk
+# is initially loaded.
+#
+
+if (-e "$BOOTDIR/runlilo") {
+    if (!unlink("$BOOTDIR/runlilo")) {
+	print "WARNING: could not unlink $BOOTDIR/runlilo\n";
+    }
+    if (system("/sbin/lilo >$LOGDIR/lilo.out 2>&1")) {
+	print "WARNING: error $? while running LILO, ".
+	      "see $LOGDIR/lilo.out\n";
+    }
+    else {
+	print "Updated /etc/lilo.conf.\n";
+    }
+}
+
+exit(0);
