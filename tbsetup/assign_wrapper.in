@@ -236,6 +236,17 @@ foreach $node (keys(%nodes)) {
 foreach $lan (keys(%lans)) {
     @members = @{$lans{$lan}};
     printdb "$lan - " . join(" ",@members) . "\n";
+    # Shark hack for rvr
+    $sharks = 0;
+    $nonsharks = 0;
+    foreach $member (@members) {
+	($node) = (split(":",$member))[0];
+	if ($nodes{$node} eq "shark-shelf") {
+	    $sharks++;
+	} else {
+	    $nonsharks++;
+	}
+    }
     if ($#members == 1) {
 	($nodeport0,$nodeport1) = @members;
 	$node0 = (split(":",$nodeport0))[0];
@@ -247,7 +258,8 @@ foreach $lan (keys(%lans)) {
 	$bw = &min($bw0,$bw1);
 	$bandwidth = &getbandwidth(&min($bw0,$bw1));
 	if (($delay > $delaythresh) ||
-	    ($bw != 100) ||
+	    (($bw != 100) && ($bw != 10)) ||
+	    (($bw != 100) && (($sharks == 0) || ($nonsharks > 1))) || 
 	    ($loss != 0)) {
 	    $delayname = "tbsdelay$delayid";
 	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss];
@@ -273,7 +285,8 @@ foreach $lan (keys(%lans)) {
 # XXX The expression below should be modified for better bandwidth support.
 # Probably needs to happen post assign somehow.
 	    if (($delay > $delaythresh) ||
-		($bw != 100) ||
+		(($bw != 100) && ($bw != 10))  ||
+		(($bw != 100) && (($sharks == 0) || ($nonsharks > 1))) || 
 		($loss != 0)) {
 		$delayname = "tbdelay$delayid";
 		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss];
