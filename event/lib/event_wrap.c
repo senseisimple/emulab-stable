@@ -62,7 +62,7 @@ extern "C" {
 
 
 /*****************************************************************************
- * $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/event/lib/event_wrap.c,v 1.2 2002-04-01 23:38:34 ricci Exp $
+ * $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/event/lib/event_wrap.c,v 1.3 2002-04-02 23:29:44 ricci Exp $
  *
  * perl5ptr.swg
  *
@@ -96,21 +96,8 @@ extern "C" {
  * SWIGSTATIC.
  *
  * $Log: event_wrap.c,v $
- * Revision 1.2  2002-04-01 23:38:34  ricci
- * New perl event system functions: EventSend{,Warn,Fatal}() These
- * basically work like the libdb.pm functions of the same name (and in
- * fact much of the code was stolen from there.)
- *
- * Provides a simple single function call to send events. Intended for
- * use in scripts whose primary purpose is _not_ to interface with the
- * event system, like power and node_reboot. If more control/efficiency
- * is required (for example, these functions reconnect to the event
- * system every time they're called) , it's better to use the C-like API.
- *
- * Example call:
- * EventSendFatal(objtype   => "TBEXAMPLE",
- *                eventtype => $ARGV[0],
- *                host      => "*" );
+ * Revision 1.3  2002-04-02 23:29:44  ricci
+ * Somehow, this file didn't get committed with my last commit.
  *
  * Revision 1.1  1996/12/26 22:17:29  beazley
  * Initial revision
@@ -473,16 +460,45 @@ static void _swig_setpv(CPerl *pPerl, char *name, char *value) {
 }
 
 
-	/*
-	 * Set to 1 by the stub callback below if a notification is ready to be
-	 * processed by a callback.
-	 */
-	int callback_ready;
 
 	/*
-	 * Set when callback_ready is also set
+	 * Queue of notifications that have been received
 	 */
-	event_notification_t callback_notification;
+	struct callback_data {
+		event_notification_t callback_notification;
+		struct callback_data *next;
+	};
+	typedef struct callback_data *callback_data_t;
+
+	callback_data_t callback_data_list;
+
+	/*
+	 * Simple wrappers, since we don't want to (maybe can't) call
+	 * malloc/free from perl
+	 */
+	callback_data_t allocate_callback_data() {
+		return (callback_data_t)malloc(sizeof(callback_data_t));
+	}
+
+	void free_callback_data(callback_data_t data) {
+		free(data);
+	}
+
+	callback_data_t dequeue_callback_data() {
+		callback_data_t data = callback_data_list;
+		if (callback_data_list) {
+			callback_data_list = callback_data_list->next;
+		}
+		return data;
+	}
+
+	void enqueue_callback_data(callback_data_t data) {
+		callback_data_t *pos = &callback_data_list;
+		while (*pos) {
+			pos = &((*pos)->next);
+		}
+		*pos = data;
+	}
 
 	/*
 	 * Stub callback that simply sets callback_ready and
@@ -490,16 +506,14 @@ static void _swig_setpv(CPerl *pPerl, char *name, char *value) {
 	 */
 	void perl_stub_callback(event_handle_t handle,
 		event_notification_t notification, void *data) {
-		callback_ready = 1;
-		callback_notification = event_notification_clone(handle,
-			notification);
-		if (!callback_notification) {
-			/*
-			 * event_notification_clone will have already reported
-			 * an error message, so we don't have to again
-			 */
-			callback_ready = 0;
-		}
+		callback_data_t new_data;
+
+		new_data = allocate_callback_data();
+		new_data->callback_notification =
+			event_notification_clone(handle,notification);
+		new_data->next = NULL;
+
+		enqueue_callback_data(new_data);
 	}
 
 	/*
@@ -608,46 +622,28 @@ SWIGCLASS_STATIC int swig_magic_readonly(SV *sv, MAGIC *mg) {
     croak("Value is read-only.");
     return 0;
 }
-SWIGCLASS_STATIC int _wrap_set_callback_ready(SV* sv, MAGIC *mg) {
-
-
-    MAGIC_PPERL
-    mg = mg;
-    callback_ready = (int ) SvIV(sv);
-    return 1;
-}
-
-SWIGCLASS_STATIC int _wrap_val_callback_ready(SV *sv, MAGIC *mg) {
-
-
-    MAGIC_PPERL
-    mg = mg;
-    sv_setiv(sv, (IV) callback_ready);
-    return 1;
-}
-
-SWIGCLASS_STATIC int _wrap_set_callback_notification(SV* sv, MAGIC *mg) {
+SWIGCLASS_STATIC int _wrap_set_callback_data_list(SV* sv, MAGIC *mg) {
 
     void *_temp;
 
     MAGIC_PPERL
     mg = mg;
-    if (SWIG_GetPtr(sv,(void **) &_temp,"event_notification_tPtr")) {
-        croak("Type error in value of callback_notification. Expected event_notification_tPtr.");
+    if (SWIG_GetPtr(sv,(void **) &_temp,"callback_data")) {
+        croak("Type error in value of callback_data_list. Expected callback_data.");
         return(1);
     }
-    callback_notification = *((event_notification_t *) _temp);
+    callback_data_list = (callback_data_t ) _temp;
     return 1;
 }
 
-SWIGCLASS_STATIC int _wrap_val_callback_notification(SV *sv, MAGIC *mg) {
+SWIGCLASS_STATIC int _wrap_val_callback_data_list(SV *sv, MAGIC *mg) {
 
     SV *rsv;
 
     MAGIC_PPERL
     mg = mg;
     rsv = SvRV(sv);
-    sv_setiv(rsv,(IV) &callback_notification);
+    sv_setiv(rsv,(IV) callback_data_list);
     return 1;
 }
 
@@ -1328,6 +1324,70 @@ XS(_wrap_xrealloc) {
     _result = (void *)xrealloc(_arg0,_arg1);
     ST(argvi) = sv_newmortal();
     sv_setref_pv(ST(argvi++),"voidPtr", (void *) _result);
+    XSRETURN(argvi);
+}
+
+XS(_wrap_allocate_callback_data) {
+
+    callback_data_t  _result;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 0) || (items > 0)) 
+        croak("Usage: allocate_callback_data();");
+    _result = (callback_data_t )allocate_callback_data();
+    ST(argvi) = sv_newmortal();
+    sv_setref_pv(ST(argvi++),"callback_data", (void *) _result);
+    XSRETURN(argvi);
+}
+
+XS(_wrap_free_callback_data) {
+
+    callback_data_t  _arg0;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 1) || (items > 1)) 
+        croak("Usage: free_callback_data(data);");
+    if (SWIG_GetPtr(ST(0),(void **) &_arg0,"callback_data")) {
+        croak("Type error in argument 1 of free_callback_data. Expected callback_data.");
+        XSRETURN(1);
+    }
+    free_callback_data(_arg0);
+    XSRETURN(argvi);
+}
+
+XS(_wrap_dequeue_callback_data) {
+
+    callback_data_t  _result;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 0) || (items > 0)) 
+        croak("Usage: dequeue_callback_data();");
+    _result = (callback_data_t )dequeue_callback_data();
+    ST(argvi) = sv_newmortal();
+    sv_setref_pv(ST(argvi++),"callback_data", (void *) _result);
+    XSRETURN(argvi);
+}
+
+XS(_wrap_enqueue_callback_data) {
+
+    callback_data_t  _arg0;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 1) || (items > 1)) 
+        croak("Usage: enqueue_callback_data(data);");
+    if (SWIG_GetPtr(ST(0),(void **) &_arg0,"callback_data")) {
+        croak("Type error in argument 1 of enqueue_callback_data. Expected callback_data.");
+        XSRETURN(1);
+    }
+    enqueue_callback_data(_arg0);
     XSRETURN(argvi);
 }
 
@@ -2171,6 +2231,100 @@ XS(_wrap_address_tuple_scheduler_get) {
     XSRETURN(argvi);
 }
 
+#define callback_data_callback_notification_set(_swigobj,_swigval) (_swigobj->callback_notification = *(_swigval),_swigval)
+XS(_wrap_callback_data_callback_notification_set) {
+
+    event_notification_t * _result;
+    struct callback_data * _arg0;
+    event_notification_t * _arg1;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 2) || (items > 2)) 
+        croak("Usage: callback_data_callback_notification_set(struct callback_data *,event_notification_t *);");
+    if (SWIG_GetPtr(ST(0),(void **) &_arg0,"callback_data")) {
+        croak("Type error in argument 1 of callback_data_callback_notification_set. Expected callback_data.");
+        XSRETURN(1);
+    }
+    if (SWIG_GetPtr(ST(1),(void **) &_arg1,"event_notification_tPtr")) {
+        croak("Type error in argument 2 of callback_data_callback_notification_set. Expected event_notification_tPtr.");
+        XSRETURN(1);
+    }
+    _result = (event_notification_t *)callback_data_callback_notification_set(_arg0,_arg1);
+    ST(argvi) = sv_newmortal();
+    sv_setref_pv(ST(argvi++),"event_notification_tPtr", (void *) _result);
+    XSRETURN(argvi);
+}
+
+#define callback_data_callback_notification_get(_swigobj) (&_swigobj->callback_notification)
+XS(_wrap_callback_data_callback_notification_get) {
+
+    event_notification_t * _result;
+    struct callback_data * _arg0;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 1) || (items > 1)) 
+        croak("Usage: callback_data_callback_notification_get(struct callback_data *);");
+    if (SWIG_GetPtr(ST(0),(void **) &_arg0,"callback_data")) {
+        croak("Type error in argument 1 of callback_data_callback_notification_get. Expected callback_data.");
+        XSRETURN(1);
+    }
+    _result = (event_notification_t *)callback_data_callback_notification_get(_arg0);
+    ST(argvi) = sv_newmortal();
+    sv_setref_pv(ST(argvi++),"event_notification_tPtr", (void *) _result);
+    XSRETURN(argvi);
+}
+
+#define callback_data_next_set(_swigobj,_swigval) (_swigobj->next = _swigval,_swigval)
+XS(_wrap_callback_data_next_set) {
+
+    struct callback_data * _result;
+    struct callback_data * _arg0;
+    struct callback_data * _arg1;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 2) || (items > 2)) 
+        croak("Usage: callback_data_next_set(struct callback_data *,struct callback_data *);");
+    if (SWIG_GetPtr(ST(0),(void **) &_arg0,"callback_data")) {
+        croak("Type error in argument 1 of callback_data_next_set. Expected callback_data.");
+        XSRETURN(1);
+    }
+    if (SWIG_GetPtr(ST(1),(void **) &_arg1,"callback_data")) {
+        croak("Type error in argument 2 of callback_data_next_set. Expected callback_data.");
+        XSRETURN(1);
+    }
+    _result = (struct callback_data *)callback_data_next_set(_arg0,_arg1);
+    ST(argvi) = sv_newmortal();
+    sv_setref_pv(ST(argvi++),"callback_data", (void *) _result);
+    XSRETURN(argvi);
+}
+
+#define callback_data_next_get(_swigobj) ((struct callback_data *) _swigobj->next)
+XS(_wrap_callback_data_next_get) {
+
+    struct callback_data * _result;
+    struct callback_data * _arg0;
+    int argvi = 0;
+    dXSARGS ;
+
+    cv = cv;
+    if ((items < 1) || (items > 1)) 
+        croak("Usage: callback_data_next_get(struct callback_data *);");
+    if (SWIG_GetPtr(ST(0),(void **) &_arg0,"callback_data")) {
+        croak("Type error in argument 1 of callback_data_next_get. Expected callback_data.");
+        XSRETURN(1);
+    }
+    _result = (struct callback_data *)callback_data_next_get(_arg0);
+    ST(argvi) = sv_newmortal();
+    sv_setref_pv(ST(argvi++),"callback_data", (void *) _result);
+    XSRETURN(argvi);
+}
+
 XS(_wrap_perl5_event_var_init) {
     dXSARGS;
     SV *sv;
@@ -2186,12 +2340,9 @@ XS(_wrap_perl5_event_var_init) {
     swig_setiv("EVENT_SCHEDULE", (long) EVENT_SCHEDULE);
     swig_setiv("EVENT_TRAFGEN_START", (long) EVENT_TRAFGEN_START);
     swig_setiv("EVENT_TRAFGEN_STOP", (long) EVENT_TRAFGEN_STOP);
-    sv = perl_get_sv("callback_ready",TRUE | 0x2);
-    sv_setiv(sv,(IV)callback_ready);
-    swig_create_magic(sv,"callback_ready", MAGIC_CAST MAGIC_CLASS _wrap_set_callback_ready, MAGIC_CAST MAGIC_CLASS _wrap_val_callback_ready);
-    sv = perl_get_sv("callback_notification",TRUE | 0x2);
-    sv_setref_pv(sv,"event_notification_tPtr",(void *) &callback_notification);
-    swig_create_magic(sv,"callback_notification", MAGIC_CAST MAGIC_CLASS _wrap_set_callback_notification, MAGIC_CAST MAGIC_CLASS _wrap_val_callback_notification);
+    sv = perl_get_sv("callback_data_list",TRUE | 0x2);
+    sv_setref_pv(sv,"callback_data",(void *) 1);
+    swig_create_magic(sv,"callback_data_list", MAGIC_CAST MAGIC_CLASS _wrap_set_callback_data_list, MAGIC_CAST MAGIC_CLASS _wrap_val_callback_data_list);
     sv = perl_get_sv("event_string_buffer",TRUE | 0x2);
     swig_create_magic(sv,"event_string_buffer",MAGIC_CAST MAGIC_CLASS swig_magic_readonly, MAGIC_CAST MAGIC_CLASS _wrap_val_event_string_buffer);
     XSRETURN(1);
@@ -2229,6 +2380,10 @@ XS(boot_event) {
 	 newXS("eventc::c_event_subscribe", _wrap_c_event_subscribe, file);
 	 newXS("eventc::xmalloc", _wrap_xmalloc, file);
 	 newXS("eventc::xrealloc", _wrap_xrealloc, file);
+	 newXS("eventc::allocate_callback_data", _wrap_allocate_callback_data, file);
+	 newXS("eventc::free_callback_data", _wrap_free_callback_data, file);
+	 newXS("eventc::dequeue_callback_data", _wrap_dequeue_callback_data, file);
+	 newXS("eventc::enqueue_callback_data", _wrap_enqueue_callback_data, file);
 	 newXS("eventc::perl_stub_callback", _wrap_perl_stub_callback, file);
 	 newXS("eventc::stub_event_subscribe", _wrap_stub_event_subscribe, file);
 	 newXS("eventc::event_notification_get_string", _wrap_event_notification_get_string, file);
@@ -2263,12 +2418,18 @@ XS(boot_event) {
 	 newXS("eventc::address_tuple_eventtype_get", _wrap_address_tuple_eventtype_get, file);
 	 newXS("eventc::address_tuple_scheduler_set", _wrap_address_tuple_scheduler_set, file);
 	 newXS("eventc::address_tuple_scheduler_get", _wrap_address_tuple_scheduler_get, file);
+	 newXS("eventc::callback_data_callback_notification_set", _wrap_callback_data_callback_notification_set, file);
+	 newXS("eventc::callback_data_callback_notification_get", _wrap_callback_data_callback_notification_get, file);
+	 newXS("eventc::callback_data_next_set", _wrap_callback_data_next_set, file);
+	 newXS("eventc::callback_data_next_get", _wrap_callback_data_next_get, file);
 /*
  * These are the pointer type-equivalency mappings. 
  * (Used by the SWIG pointer type-checker).
  */
 	 SWIG_RegisterMapping("struct event_handle","event_handle_t",0);
 	 SWIG_RegisterMapping("struct event_handle","event_handle",0);
+	 SWIG_RegisterMapping("callback_data","callback_data_t",0);
+	 SWIG_RegisterMapping("callback_data","struct callback_data",0);
 	 SWIG_RegisterMapping("unsigned short","short",0);
 	 SWIG_RegisterMapping("elvin_subscription_t","event_subscription_t",0);
 	 SWIG_RegisterMapping("address_tuple","address_tuple_t",0);
@@ -2279,6 +2440,8 @@ XS(boot_event) {
 	 SWIG_RegisterMapping("event_handle","struct event_handle",0);
 	 SWIG_RegisterMapping("signed short","short",0);
 	 SWIG_RegisterMapping("event_subscription_t","elvin_subscription_t",0);
+	 SWIG_RegisterMapping("callback_data_t","callback_data",0);
+	 SWIG_RegisterMapping("callback_data_t","struct callback_data",0);
 	 SWIG_RegisterMapping("address_tuple_t","address_tuple",0);
 	 SWIG_RegisterMapping("signed int","int",0);
 	 SWIG_RegisterMapping("event_notification_t","elvin_notification_t",0);
@@ -2290,6 +2453,8 @@ XS(boot_event) {
 	 SWIG_RegisterMapping("unsigned int","int",0);
 	 SWIG_RegisterMapping("event_handle_t","event_handle",0);
 	 SWIG_RegisterMapping("event_handle_t","struct event_handle",0);
+	 SWIG_RegisterMapping("struct callback_data","callback_data_t",0);
+	 SWIG_RegisterMapping("struct callback_data","callback_data",0);
 	 SWIG_RegisterMapping("signed long","long",0);
 	 ST(0) = &sv_yes;
 	 XSRETURN(1);
