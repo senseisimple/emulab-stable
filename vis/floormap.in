@@ -7,15 +7,22 @@
 use English;
 use Getopt::Std;
 
+#
+# TODO: Deal with multiple buildings? Currently defaults to MEB! 
+# 
 sub usage {
-    print STDERR "Usage: plaything [-o <prefix>] [-f <floor>] <building>\n";
+    print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] <building> or \n";
+    print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] ";
+    print STDERR "[-e <pid,eid>] [<building>]\n";
     exit(-1);
 }
-my $optlist = "df:o:";
-my $building;
+my $optlist  = "df:o:e:";
+my $building = "MEB";
 my $floor;
 my $debug;
 my $image;
+my $pid;
+my $eid;
 my @areamaps = ();
 my $prefix = "/tmp/floormap";
 
@@ -30,6 +37,15 @@ my $ICONDIR     = "$TB/www";
 use lib '@prefix@/lib';
 use libdb;
 use GD;
+
+#
+# Hardwire the imagemaps for now.
+#
+my %baseimages = ();
+$baseimages{"MEB"}{"4"} = "$TB/www/meb4fl.png";
+$baseimages{"MEB"}{"3"} = "$TB/www/meb3fl.png";
+#$baseimages{"MEB"}{"2"} = "$TB/www/meb2fl.png";
+#$baseimages{"MEB"}{"1"} = "$TB/www/meb1fl.png";
 
 #
 # Turn off line buffering on output
@@ -55,9 +71,6 @@ sub adjustmap($$$);
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 1) {
-    usage();
-}
 if (defined($options{"d"})) {
     $debug = 1;
 }
@@ -67,19 +80,46 @@ if (defined($options{"f"})) {
 if (defined($options{"o"})) {
     $prefix = $options{"o"};
 }
-$building = $ARGV[0];
 
-#
-# Hardwire the imagemaps for now.
-#
-my %baseimages = ();
-$baseimages{"MEB"}{"4"} = "$TB/www/meb4fl.png";
-$baseimages{"MEB"}{"3"} = "$TB/www/meb3fl.png";
-#$baseimages{"MEB"}{"2"} = "$TB/www/meb2fl.png";
-#$baseimages{"MEB"}{"1"} = "$TB/www/meb1fl.png";
+if (defined($options{"e"})) {
+    if ($options{"e"} =~ /([-\w]*),([-\w]*)/) {
+	$pid = $1;
+	$eid = $2;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Invalid argument to -e option!\n");
+    }
 
+    #
+    # Verify permission to view this experiment.
+    #
+    if ($UID && !TBAdmin($UID) &&
+	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+	die("*** $0:\n".
+	    "    You do not have permission to view $pid/$eid!\n");
+    }
+
+    #
+    # Optional building and floor (see above) for a specific experiment.
+    #
+    usage()
+	if (@ARGV > 1);
+    if (@ARGV) {
+	$building = $ARGV[0];
+    }
+}
+elsif (@ARGV != 1) {
+    usage();
+}
+else {
+    $building = $ARGV[0];
+}
+
+# Building must exist. Someday deal with multiple buildings. 
 if (!exists($baseimages{$building})) {
-    die("No such building: $building\n");
+    die("*** $0:\n".
+	"    No such building: $building\n");
 }
 
 #
@@ -217,11 +257,14 @@ sub dofloor($$)
 	my $nodeid = $rowref->{"node_id"};
 	my $x      = $rowref->{"loc_x"};
 	my $y      = $rowref->{"loc_y"};
-	my $pid    = $rowref->{"pid"};
-	my $eid    = $rowref->{"eid"};
+	my $rpid   = $rowref->{"pid"};
+	my $reid   = $rowref->{"eid"};
 	my ($x1,$y1,$x2,$y2);
 
-	if (!defined($pid)) {
+	# Without -e option, green means node is free.
+	# With -e option, green means node belongs to experiment. 
+	if ((!defined($pid) && !(defined($rpid))) ||
+	    (defined($pid) && defined($rpid) && $pid eq $rpid)) {
 	    $x1 = $x - int($greendot_width / 2.0);
 	    $y1 = $y - int($greendot_height / 2.0);
 	    $x2 = $x1 + $greendot_width;
@@ -230,7 +273,7 @@ sub dofloor($$)
 	    $baseimage->copy($greendot, $x1, $y1, 0, 0,
 			     $greendot_width, $greendot_height);
 	}
-	elsif ($pid eq NODEDEAD_PID() and $eid eq NODEDEAD_EID()) {
+	elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
 	    $x1 = $x - int($reddot_width / 2.0);
 	    $y1 = $y - int($reddot_height / 2.0);
 	    $x2 = $x1 + $reddot_width;

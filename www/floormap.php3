@@ -12,7 +12,7 @@ include("defs.php3");
 PAGEHEADER("Wireless Node Map");
 
 #
-# Only admin people for now.
+# Only logged in people at the moment; might open up at some point.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
@@ -22,21 +22,50 @@ $isadmin = ISADMIN($uid);
 unset($prefix);
 
 #
-# Verify page arguments. For now, just default to MEB since thats the only
-# place we have wireless nodes!
-# 
-if (!isset($building) ||
-    strcmp($building, "") == 0) {
-    $building = "MEB";
+# Verify page arguments. First allow user to optionally specify building/floor.
+#
+if (isset($building) && $building != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[-\w]+$/", $building)) {
+	PAGEARGERROR("Invalid building argument.");
+    }
+    # Optional floor argument. Sanitize for the shell.
+    if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
+	PAGEARGERROR("Invalid floor argument.");
+    }
 }
-# Sanitize for the shell.
-if (!preg_match("/^[-\w]+$/", $building)) {
-    PAGEARGERROR("Invalid building argument.");
+else {
+    unset($building);
+    unset($floor);
 }
 
-# Optional floor argument. Sanitize for the shell.
-if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
-    PAGEARGERROR("Invalid floor argument.");
+#
+# Optional pid,eid. Without a building/floor, show all the nodes for the
+# experiment in all buildings/floors. Without pid,eid show all wireless
+# nodes in the specified building/floor.
+#
+if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
+    if (!TBvalid_pid($pid)) {
+	PAGEARGERROR("Invalid project ID.");
+    }
+    if (!TBvalid_eid($eid)) {
+	PAGEARGERROR("Invalid experiment ID.");
+    }
+
+    if (! TBValidExperiment($pid, $eid)) {
+	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
+    }
+    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view experiment $pid/$eid!", 1);
+    }
+}
+else {
+    unset($pid);
+    unset($eid);
+}
+
+if (!isset($building) && !isset($pid)) {
+    PAGEARGERROR();
 }
 
 #
@@ -73,8 +102,10 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-$retval = SUEXEC("nobody", "nobody", "webfloormap -o $prefix " .
-		 (isset($floor) ? "-f $floor " : "") . "$building",
+$retval = SUEXEC($uid, "nobody", "webfloormap -o $prefix " .
+		 (isset($pid) ? "-e $pid,$eid " : "") .
+		 (isset($floor) ? "-f $floor " : "") .
+		 (isset($building) ? "$building" : ""),
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval) {
@@ -95,30 +126,62 @@ echo "<font size=+1>For more info on using wireless nodes, see the
      <a href='tutorial/docwrapper.php3?docname=wireless.html'>
      wireless tutorial.</a></font><br><br>\n";
 
-# And the img ...
-echo "<center>
-      <table class=nogrid align=center border=0 vpsace=5
-             cellpadding=6 cellspacing=0>
-      <tr>
-         <td align=right>Free</td>
-         <td align=left><img src='/autostatus-icons/greenball.gif' alt=Free>
-          </td>
-      </tr>
-      <tr>
-         <td align=right>Reserved</td>
-         <td align=left><img src='/autostatus-icons/blueball.gif' alt=reserved>
-          </td>
-      </tr>
-      <tr>
-         <td align=right>Dead</td>
-         <td align=left><img src='/autostatus-icons/redball.gif' alt=Free>
-          </td>
-      </tr>
-      </table>
-      Click on the dots below to see information about the node
-      <img src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">
-      </center>\n";
+echo "<center>\n";
 
+# Legend
+if (isset($pid)) {
+    echo "Wireless nodes in experiment <b>".
+         "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+         "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b>\n";
+    echo "<table class=nogrid align=center border=0 vpsace=8
+                 cellpadding=6 cellspacing=0>
+ 	  <tr>
+            <td align=right>Experiment Nodes</td>
+            <td align=left>
+                <img src='/autostatus-icons/greenball.gif' alt=Experiment>
+             </td>
+          </tr>
+          <tr>
+            <td align=right>Other Nodes</td>
+            <td align=left>
+                <img src='/autostatus-icons/blueball.gif' alt=Other>
+             </td>
+          </tr>
+          <tr>
+            <td align=right>Dead</td>
+            <td align=left><img src='/autostatus-icons/redball.gif' alt=Dead>
+              </td>
+          </tr>
+          </table>
+          Click on the dots below to see information about the node\n";
+}
+else {
+    echo "<table class=nogrid align=center border=0 vpsace=5
+                 cellpadding=6 cellspacing=0>
+ 	  <tr>
+            <td align=right>Free</td>
+            <td align=left>
+                <img src='/autostatus-icons/greenball.gif' alt=Free>
+             </td>
+          </tr>
+          <tr>
+            <td align=right>Reserved</td>
+            <td align=left>
+                <img src='/autostatus-icons/blueball.gif' alt=reserved>
+             </td>
+          </tr>
+          <tr>
+            <td align=right>Dead</td>
+            <td align=left><img src='/autostatus-icons/redball.gif' alt=Dead>
+              </td>
+          </tr>
+          </table>
+          Click on the dots below to see information about the node\n";
+}
+
+# Image
+echo "<img src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">
+      </center>\n";
 
 #
 # Standard Testbed Footer
