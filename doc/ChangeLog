@@ -1,3 +1,27 @@
+  Modified files:
+    tbsetup              GNUmakefile.in frisbeelauncher.in 
+    .                    configure configure.in 
+    utils                create_image.in 
+    www                  deleteimageid.php3 showstuff.php3 
+  Added files:
+    tbsetup              webfrisbeekiller.in 
+  Log:
+  Add "killmode" to frisbeelauncher to kill a running frisbee for an
+  imageid.  Uses new slot in the images table (frisbee_pid) to track
+  running frisbee daemon for an image so that it can be killed from
+  create-image (kill before creating new image) and from the web page
+  before deleting an imageid.
+  
+  Revision  Changes    Path
+  1.100     +2 -2      testbed/tbsetup/GNUmakefile.in
+  1.15      +164 -40   testbed/tbsetup/frisbeelauncher.in
+  1.197     +1 -1      testbed/configure
+  1.204     +1 -1      testbed/configure.in
+  1.22      +11 -0     testbed/utils/create_image.in
+  1.7       +7 -1      testbed/www/deleteimageid.php3
+  1.125     +19 -0     testbed/www/showstuff.php3
+
+
 stoller     2004/01/12 09:18:41 MST
 
   Modified files:
