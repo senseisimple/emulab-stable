@@ -24,8 +24,8 @@ if (! $isadmin) {
 # Suck out info for all the nodes.
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM nodes WHERE type='pc' OR type='shark' ".
-	"ORDER BY type,priority");
+	"SELECT * FROM nodes WHERE role='testnode' ".
+	"ORDER BY priority");
 
 if (! $query_result) {
     TBERROR("Database Error retrieving node information", 1);
