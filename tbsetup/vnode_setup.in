@@ -207,6 +207,10 @@ foreach my $node (@nodes) {
 			print "$node never booted; skipping $mode.\n";
 			next;
 		    }
+		    elsif ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
+			print "$node will $mode with local node $pnode.\n";
+			next;
+		    }
 		}
 		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
 		    print "$node is already setting up on local node $pnode\n";
@@ -243,13 +247,13 @@ foreach my $node (@nodes) {
 	waitpid($syspid, 0);
 	alarm 0;
 
-	print STDERR "vnode $mode on $pnode returned $?.\n" if $debug;
-    
 	#
 	# Look for setup failure, reported back through ssh.
 	# 
 	if ($?) {
 	    my $exitstatus = $?;
+
+	    print STDERR "vnode $mode on $pnode returned $?.\n" if $debug;
 
 	    if ($exitstatus == 256) {
 		print STDERR "$node is not running sshd.\n" if $debug;

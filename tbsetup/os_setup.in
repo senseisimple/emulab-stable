@@ -83,7 +83,7 @@ my @row;
 #
 my %reloads     = ();
 my %reboots	= ();
-my %willreboot  = ();
+my %rebooted    = ();
 my $doautoload  = 1;
 my $dolastload  = 1;
     
@@ -455,8 +455,9 @@ if (!$TESTMODE) {
 	foreach my $node (@list) {
 	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_RELOAD() );
 	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
-	    # No point in rebooting, obviously.
+	    # No point in rebooting, obviously, but it does reboot!
 	    delete $reboots{$node};
+	    $rebooted{$node} = 1;
 	}
 
 	sleep(5);
@@ -473,6 +474,8 @@ if (!$TESTMODE) {
 		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
 		$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_DIRTY();
 	    }
+	    # See below, needed for vnode_setup.
+	    $rebooted{$node} = 1;
 	}
 
 	$cmd = "$nodereboot " . join(" ", keys(%reboots));
@@ -635,6 +638,9 @@ foreach my $vnode (@vnodelist) {
     # Remote node, always does setup. 
     next
 	if (!exists($nodes{$pnode}));
+    # Not rebooted, so leave allocstate alone for vnode_setup.
+    next
+	if (!exists($rebooted{$pnode}));
 
     if ($nodeAllocStates{$pnode} eq TBDB_ALLOCSTATE_RES_READY()) {
 	TBSetNodeAllocState($vnode, TBDB_ALLOCSTATE_RES_READY());
@@ -669,7 +675,7 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $pnode  = $vnode2pnode{$node};
 	my $wstart = $waitstart{$node};
-	my $maxwait = 90 + (30 * $pnodevcount{$pnode});
+	my $maxwait = 90 + (300 * $pnodevcount{$pnode});
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
