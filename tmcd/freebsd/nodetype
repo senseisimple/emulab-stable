@@ -6,6 +6,11 @@
 #
 . /etc/emulab/paths.sh
 
+# XXX for FreeBSD 5.x
+if [ ! -r /var/run/dmesg.boot ]; then
+	dmesg > /var/run/dmesg.boot
+fi
+
 if [ -x $BINDIR/cpuspeed.awk ]; then
 	cpuspeed=`$BINDIR/cpuspeed.awk /var/run/dmesg.boot`;
 else
