@@ -339,7 +339,7 @@ sub RebootNode {
     # punch the power button.
     #
     if (WaitTillDead($pc) == 0) {
-	TBSetNodeEventState($pc, TBDB_EVENTTYPE_REBOOT);
+	TBSetNodeEventState($pc, TBDB_NODESTATE_REBOOT);
 	exit(0);
     }
 	

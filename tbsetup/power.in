@@ -202,7 +202,7 @@ foreach my $power_id (keys %outlets) {
     if (!$errors) {
 	foreach my $node (@nodes) {
 	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
-	    TBSetNodeEventState($node, TBDB_EVENTTYPE_REBOOT);
+	    TBSetNodeEventState($node, TBDB_NODESTATE_REBOOT);
 	}
     } else {
 	$exitval += $errors;
