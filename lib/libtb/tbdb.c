@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -194,10 +194,11 @@ mydb_checkexptnodeeventstate(char *pid, char *eid,
 	}
 
 	if (! (nrows = mysql_num_rows(res))) {
-		error("checkexptnodeeventstate: No such experiment: %s/%s",
+		error("checkexptnodeeventstate: Warning: no nodes: %s/%s",
 		      pid, eid);
 		mysql_free_result(res);
-		return 0;
+		/* Warn, then return sucessfully */
+		return 1;
 	}
 
 	*count = 0;
