@@ -29,6 +29,7 @@
      <ul>
      <li> <a href="#UTT-1">Is there a tutorial?</a>
      <li> <a href="#UTT-NODES">How many nodes can I ask for?</a>
+     <li> <a href="#UTT-TOOFEW">What if I need more nodes than are free?</a>
      <li> <a href="#UTT-2">Do I get root access on my nodes?</a>
      <li> <a href="#UTT-3">Do my nodes have consoles I can look at?</a>
      <li> <a href="#UTT-4">Can I reboot (power cycle) my nodes?</a>
@@ -243,6 +244,28 @@
     practical aspects of Emulab operation.</em>
     </p>
 
+<li><a NAME="UTT-TOOFEW"></a>
+    <h3>What if I need more nodes than are free?</h3>
+    <p>
+    For example, say you need 50 nodes but there are only 40 free. In
+    general, getting this many nodes is going to require intervention
+    from Testbed Operations, if only so we can ask other experimentors
+    to free up nodes, if possible. Please send us email if you are not
+    able to able to get the number of nodes you need for your experiment.
+    </p>
+
+    <p>
+    Another alternative is to use the
+    <a href="tutorial/tutorial.php3#BatchMode">Batch System.</a> 
+    If your experiment is amenable to being batched (does not require
+    human intervention to start and stop), then you can submit a batch
+    request, which will be serviced when enough nodes become
+    available.  Typically, you would start out with a few nodes,
+    getting used to the batch system and creating whatever scripts are
+    needed to make the experiment batchable. Then scale up to larger
+    numbers of nodes. Thats the easiest way of getting a lot of nodes!
+    </p>    
+    
 <li><a NAME="UTT-2"></a>
     <h3>Do I get root access on my nodes?</h3>
     <p>
