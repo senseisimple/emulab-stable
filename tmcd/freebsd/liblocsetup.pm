@@ -13,10 +13,11 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $NFSMOUNT $LOOPBACKMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
+    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
+	 $LOOPBACKMOUNT 
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line os_ifconfig_veth
+	 os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel
@@ -56,6 +57,7 @@ $UMOUNT		= "/sbin/umount";
 $TMPASSWD	= "$ETCDIR/master.passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
+$RPMCMD		= "/usr/local/bin/rpm";
 
 #
 # These are not exported
@@ -75,7 +77,6 @@ my $IFC_1000MBS = "media 1000baseSX";
 my $IFC_100MBS  = "media 100baseTX";
 my $IFC_10MBS   = "media 10baseT/UTP";
 my $IFC_FDUPLEX = "mediaopt full-duplex";
-my $RPMINSTALL  = "/usr/local/bin/rpm -i %s";
 my $MKDIR	= "/bin/mkdir";
 my $GATED	= "/usr/local/sbin/gated";
 my $ROUTE	= "/sbin/route";
@@ -337,17 +338,6 @@ sub os_useradd($$$$$$$$$)
 sub os_homedirdel($$)
 {
     return 0;
-}
-
-#
-# Generate and return an RPM install line that is approriate for putting
-# into a shell script (invoked at bootup).
-#
-sub os_rpminstall_line($)
-{
-    my ($rpm) = @_;
-    
-    return sprintf($RPMINSTALL, $rpm);
 }
 
 #
