@@ -434,7 +434,7 @@ if ($inout eq "in") {
 }
 elsif ($inout eq "out") {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
-		    ($idleswap ? $TBDB_STATS_FLAGS_IDLESWAP : 0));
+		    ($idleswap ? TBDB_STATS_FLAGS_IDLESWAP() : 0));
 }
 elsif ($inout eq "modify") {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPMODIFY, 0);
