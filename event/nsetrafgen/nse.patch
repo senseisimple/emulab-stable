@@ -1,5 +1,5 @@
 --- dist-ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Wed Feb 26 15:11:29 2003
-+++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Fri Mar 12 10:35:19 2004
 @@ -941,6 +941,8 @@
  		case PT_GAF:
  		case PT_PING:
@@ -10,7 +10,7 @@
  			fprintf(stderr, "%s - invalid packet type (%s).\n",
  				__PRETTY_FUNCTION__, packet_info.name(ch->ptype()));
 --- dist-ns-allinone-2.26/ns-2.26/tools/random.cc	Wed Feb 26 15:11:28 2003
-+++ ns-allinone-2.26/ns-2.26/tools/random.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tools/random.cc	Fri Mar 12 10:35:19 2004
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -26,7 +26,7 @@
  
  #endif /* !WIN32 */
 --- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Wed Feb 26 15:11:24 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Fri Mar 12 10:35:19 2004
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -502,7 +502,7 @@
  	}
  //if (int(t_seqno_) > 1)
 --- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Wed Feb 26 15:11:24 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Fri Mar 12 10:35:19 2004
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -537,7 +537,7 @@
  	}
  	virtual void oldack() {			// what to do on old ack
 --- dist-ns-allinone-2.26/ns-2.26/tcp/tcp.h	Wed Feb 26 15:11:25 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Fri Mar 12 10:35:19 2004
 @@ -56,6 +56,8 @@
  	int tcp_flags_;         /* TCP flags for FullTcp */
  	int last_rtt_;		/* more recent RTT measurement in ms, */
@@ -556,7 +556,7 @@
  
  /* these are used to mark packets as to why we xmitted them */
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Fri Mar 12 10:35:19 2004
 @@ -162,7 +162,7 @@
  	Simulator set AddressFormat_ HIER
  	Node enable-module "Hier"
@@ -589,7 +589,7 @@
  
  	#chk to ensure there;s no change in size
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Fri Mar 12 10:35:19 2004
 @@ -347,6 +347,8 @@
  Classifier set offset_ 0
  Classifier set shift_ 0
@@ -600,7 +600,7 @@
  
  Classifier/Hash set default_ -1; # none
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Mon Jan 12 00:36:16 2004
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Fri Mar 12 10:35:19 2004
 @@ -1,6 +1,6 @@
  # -*-	Mode:tcl; tcl-indent-level:8; tab-width:8; indent-tabs-mode:t -*-
  #
@@ -799,7 +799,7 @@
 +    $agent set agent_addr_ $srcipaton
 +}
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Tue Dec  2 00:57:03 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Fri Mar 12 10:35:19 2004
 @@ -1,5 +1,5 @@
  #
 -# Copyright (c) 1996 Regents of the University of California.
@@ -947,7 +947,7 @@
  
  Class SimpleLink -superclass Link
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Wed Feb 26 15:09:37 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Sun Jan  4 18:27:34 2004
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Fri Mar 12 10:35:19 2004
 @@ -492,6 +492,15 @@
  		# at the port demuxer (if there is one)
  		$self add-route $address_ $dmux_
@@ -1015,7 +1015,7 @@
 +}
 +
 --- dist-ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Fri Feb 28 10:50:56 2003
-+++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Fri Mar 12 10:35:19 2004
 @@ -125,6 +125,7 @@
  	$classifier_ set mask_ [AddrParams NodeMask 1]
  	$classifier_ set shift_ [AddrParams NodeShift 1]
@@ -1025,7 +1025,7 @@
  	$node install-entry $self $classifier_
  }
 --- dist-ns-allinone-2.26/ns-2.26/apps/telnet.cc	Wed Feb 26 15:07:16 2003
-+++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Fri Mar 12 10:35:19 2004
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -1036,7 +1036,7 @@
  		double t = next();
  		timer_.resched(t);
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Wed Feb 26 15:07:30 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Fri Mar 12 10:35:19 2004
 @@ -177,5 +177,17 @@
  	const char* hashkey(nsaddr_t, nsaddr_t dst, int) {
  		return (const char*) mshift(dst);
@@ -1056,7 +1056,7 @@
  };
  
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Wed Feb 26 15:07:34 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Fri Mar 12 10:35:19 2004
 @@ -52,13 +52,14 @@
  
  
@@ -1074,7 +1074,7 @@
  
  int Classifier::classify(Packet *p)
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier.h	Wed Feb 26 15:07:34 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier.h	Fri Mar 12 10:35:19 2004
 @@ -82,10 +82,11 @@
  	int nslot_;
  	int maxslot_;
@@ -1090,7 +1090,7 @@
  
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-port.h	Wed Feb 26 15:07:33 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.h	Mon Feb 16 22:53:42 2004
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.h	Fri Mar 12 10:35:19 2004
 @@ -29,12 +29,21 @@
  #include "classifier.h"
  
@@ -1114,7 +1114,7 @@
  
  class ReservePortClassifier : public PortClassifier {
 --- dist-ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Wed Feb 26 15:07:33 2003
-+++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Sat Feb 21 20:25:03 2004
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-port.cc	Fri Mar 12 10:35:19 2004
 @@ -26,15 +26,108 @@
  #endif
  
@@ -1225,7 +1225,7 @@
  static class PortClassifierClass : public TclClass {
  public:
 --- dist-ns-allinone-2.26/ns-2.26/common/ip.h	Wed Feb 26 15:07:39 2003
-+++ ns-allinone-2.26/ns-2.26/common/ip.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/ip.h	Fri Mar 12 10:35:19 2004
 @@ -76,11 +76,11 @@
  	/* per-field member acces functions */
  	ns_addr_t& src() { return (src_); }
@@ -1241,7 +1241,7 @@
  	/* ipv6 fields */
  	int& flowid() { return (fid_); }
 --- dist-ns-allinone-2.26/ns-2.26/common/packet.h	Wed Feb 26 15:07:40 2003
-+++ ns-allinone-2.26/ns-2.26/common/packet.h	Fri Jan 16 16:09:19 2004
++++ ns-allinone-2.26/ns-2.26/common/packet.h	Fri Mar 12 10:35:19 2004
 @@ -325,6 +325,10 @@
  	inline int& ref_count() { return (ref_count_); }
  	static inline Packet* alloc();
@@ -1354,7 +1354,7 @@
  
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Thu Mar 11 18:53:04 2004
++++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Fri Mar 12 10:35:19 2004
 @@ -46,12 +46,42 @@
  #include "config.h"
  #include "scheduler.h"
@@ -1738,7 +1738,7 @@
  	// we reach here only if halted
  }
 --- dist-ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Thu Mar 11 19:01:17 2004
++++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Fri Mar 12 10:35:19 2004
 @@ -98,7 +98,7 @@
  protected:
  	void dumpq();	// for debug: remove + print remaining events
@@ -1801,7 +1801,7 @@
  
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/common/simulator.cc	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/simulator.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/simulator.cc	Fri Mar 12 10:35:19 2004
 @@ -23,6 +23,7 @@
  #include "object.h"
  
@@ -1849,7 +1849,7 @@
 +		return (Node *)Tcl_GetHashValue(he);
 +}
 --- dist-ns-allinone-2.26/ns-2.26/common/simulator.h	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/simulator.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/simulator.h	Fri Mar 12 10:35:19 2004
 @@ -25,17 +25,21 @@
  
  #include <tclcl.h>
@@ -1891,7 +1891,7 @@
  
  #endif /* ns_simulator_h */
 --- dist-ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Fri Mar 12 10:35:19 2004
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -1909,7 +1909,7 @@
  
  }
 --- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Fri Mar 12 10:35:19 2004
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -1952,7 +1952,7 @@
 +
 +#endif
 --- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.h	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Fri Mar 12 10:35:19 2004
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -1970,7 +1970,7 @@
 +
  #endif /* timer_handler_h */
 --- dist-ns-allinone-2.26/ns-2.26/routing/address.cc	Wed Feb 26 15:09:15 2003
-+++ ns-allinone-2.26/ns-2.26/routing/address.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/routing/address.cc	Fri Mar 12 10:35:19 2004
 @@ -120,7 +120,7 @@
  			}
  			else 
@@ -1990,7 +1990,7 @@
  				NodeMask_[c] = atoi(argv[i]);
  			return (TCL_OK);
 --- dist-ns-allinone-2.26/ns-2.26/routing/address.h	Wed Feb 26 15:09:15 2003
-+++ ns-allinone-2.26/ns-2.26/routing/address.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/routing/address.h	Fri Mar 12 10:35:19 2004
 @@ -61,10 +61,10 @@
  	// e.g 32 for level=1, 10/11/11 for level=3.
  	// used to check validity of address-str.
@@ -2007,7 +2007,7 @@
   protected:
  	int command(int argc, const char*const* argv);
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Thu Mar 11 14:47:36 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Mar 12 10:41:42 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -2322,7 +2322,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -273,27 +445,118 @@
+@@ -273,27 +445,111 @@
      return(-1);
    }
  
@@ -2432,13 +2432,6 @@
 +    return 0;
  }
  
-+struct pkt_dump_t {
-+    double ts;
-+    int size;
-+};
-+
-+pkt_dump_t pktdump[100000];
-+
 +bool PacketDecapsulateIfNeeded(Packet *p) {
 +    hdr_cmn *hc = HDR_CMN(p);
 +    if ( hc->ptype_ != PT_LIVE )
@@ -2459,7 +2452,7 @@
 +    return true;
 +}
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Fri Mar  5 18:15:03 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Fri Mar 12 10:35:19 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -2526,7 +2519,7 @@
  
  #endif /* iptap_h */
 --- dist-ns-allinone-2.26/ns-2.26/emulate/icmp.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/icmp.cc	Sun Dec 14 01:32:59 2003
++++ ns-allinone-2.26/ns-2.26/emulate/icmp.cc	Fri Mar 12 10:35:19 2004
 @@ -1,5 +1,5 @@
  /*    
 - * Copyright (c) 1998 Regents of the University of California.
@@ -2624,8 +2617,8 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Thu Mar 11 19:40:11 2004
-+++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
+--- /dev/null	Fri Mar 12 12:20:11 2004
++++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Fri Mar 12 10:35:19 2004
 @@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 1997, 1998, 2003 The Regents of the University of California.
@@ -2678,7 +2671,7 @@
 +
 +#endif
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Fri Mar 12 10:35:19 2004
 @@ -668,6 +668,20 @@
  				tcl.result("1");
  			return (TCL_OK);
@@ -2701,7 +2694,7 @@
  	return (Network::command(argc, argv));
  }
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Thu Mar 11 19:13:02 2004
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Fri Mar 12 10:35:19 2004
 @@ -1,5 +1,5 @@
  /*-
 - * Copyright (c) 1998 The Regents of the University of California.
@@ -2875,7 +2868,7 @@
  	}
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net.cc	Fri Dec 12 18:57:43 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net.cc	Fri Mar 12 10:35:19 2004
 @@ -1,5 +1,5 @@
  /*-
 - * Copyright (c) 1993-1994, 1998 The Regents of the University of California.
@@ -2884,7 +2877,7 @@
   *
   * Redistribution and use in source and binary forms, with or without
 --- dist-ns-allinone-2.26/ns-2.26/emulate/net.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net.h	Sat Dec 13 21:20:28 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net.h	Fri Mar 12 10:35:19 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1991-1994, 1998 Regents of the University of California.
@@ -3005,7 +2998,7 @@
 +
  #endif
 --- dist-ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Mar 12 10:35:19 2004
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -3140,7 +3133,7 @@
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
 --- dist-ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Mar 12 10:35:19 2004
 @@ -43,7 +43,7 @@
  #include "agent.h"
  
@@ -3163,7 +3156,7 @@
  };
  
 --- dist-ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Mar 12 10:35:19 2004
 @@ -97,6 +97,11 @@
        return (TCL_OK);
      }
@@ -3239,7 +3232,7 @@
      fprintf(stderr,"TCPTapAgent(%s): sendpkt (%p, %d): %s\n",
  	    name(), p->accessdata(), ns_cmnhdr->size(), strerror(errno));
 --- dist-ns-allinone-2.26/ns-2.26/link/delay.h	Wed Feb 26 15:08:54 2003
-+++ ns-allinone-2.26/ns-2.26/link/delay.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/link/delay.h	Fri Mar 12 10:35:19 2004
 @@ -44,6 +44,10 @@
  #include "ip.h"
  #include "connector.h"
@@ -3264,7 +3257,7 @@
  	double bandwidth() const { return bandwidth_; }
  	void pktintran(int src, int group);
 --- dist-ns-allinone-2.26/ns-2.26/mcast/lms.h	Wed Feb 26 15:08:58 2003
-+++ ns-allinone-2.26/ns-2.26/mcast/lms.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/mcast/lms.h	Fri Mar 12 10:35:19 2004
 @@ -64,7 +64,7 @@
      nsaddr_t    src_;		// original source of mcast packet
      nsaddr_t    group_;		// mcast group
@@ -3275,7 +3268,7 @@
      int	       	lo_, hi_;	// range of lost packets
      double     	ts_;		// timestamp for RTT estimation
 --- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Mar 11 18:33:31 2004
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Fri Mar 12 10:35:19 2004
 @@ -79,6 +79,21 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
@@ -3318,7 +3311,7 @@
  OBJ_EMULATE_C = \
  	emulate/inet.o
 --- dist-ns-allinone-2.26/ns-2.26/config.h	Wed Feb 26 15:07:55 2003
-+++ ns-allinone-2.26/ns-2.26/config.h	Fri Nov 28 16:55:25 2003
++++ ns-allinone-2.26/ns-2.26/config.h	Fri Mar 12 10:35:19 2004
 @@ -73,13 +73,13 @@
   typedef unsigned char u_char;
  typedef unsigned int u_int;
@@ -3338,7 +3331,7 @@
  	ns_addr_t& operator= (const ns_addr_t& n) {
  		addr_ = n.addr_;
 --- dist-ns-allinone-2.26/install	Wed Feb 26 16:07:51 2003
-+++ ns-allinone-2.26/install	Mon Dec 15 19:04:53 2003
++++ ns-allinone-2.26/install	Fri Mar 12 10:35:19 2004
 @@ -41,301 +41,47 @@
  # Get current path
  CUR_PATH=`pwd`
