@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -31,6 +31,15 @@ if (strstr($docname, "../")) {
     USERERROR("Invalid document name: $docname!", 1);
 }
 
+#
+# Check extension. If a .txt file, need some extra wrapper stuff to make
+# it look readable.
+#
+$textfile = 0;
+if (preg_match("/^.*\.txt$/", $docname)) {
+    $textfile = 1;
+}
+
 if ($printable) {
     #
     # Need to spit out some header stuff.
@@ -46,7 +55,15 @@ else {
                  Printable version of this document</a></b><br>\n";
 }
 
+if ($textfile) {
+    echo "<XMP>\n";
+}
+
 readfile("$docname");
+
+if ($textfile) {
+    echo "</XMP>\n";
+}
 
 #
 # Standard Testbed Footer

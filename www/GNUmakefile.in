@@ -111,6 +111,8 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
 	-mkdir -p -m 771 $(INSTALL_WWWDIR)/thumbs
+	$(INSTALL_DATA) $(TESTBED_SRCDIR)/doc/ChangeLog \
+			$(INSTALL_WWWDIR)/doc/ChangeLog.txt
 	cd $(INSTALL_WWWDIR) && \
 		if test -d ../webglimpse; \
 		then \

@@ -188,7 +188,7 @@ if ($isadmin) {
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
 <tr><td class=stealth align=center>
-    <a href = 'doc/docwrapper.php3?docname=changelog.html'>
+    <a href = 'doc/docwrapper.php3?docname=ChangeLog.txt'>
     (Changelog/Technical Details)</a></td></tr>
 </table>
 <br />
