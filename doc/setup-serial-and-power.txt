@@ -2,16 +2,43 @@ The following is a guide to setting up power control and serial lines.
 
 Overview:
 
+0) Setup capture logging
 1) Enter all the power controller's info into the emulab DB 
    and "capture" startup script (if applicable).
 2) Enter all the nodes' outlet info into the DB
 3) Enter all the nodes' serial line info into the DB and "capture" startup
-4) Collect interface mapping from nodes
+4) Enter all tipserver machines into the database.
+5) Collect interface mapping from nodes
 
 Details:
 
 Steps two and three can be easily scripted (automated) if you have an
 online mapping of node to outlet and node to serial line.
+
+0) Setup capture logging
+
+Before you can start capture for any power controllers or nodes, you should
+setup the logging files.  Capture is hardwired to log into /var/log/tiplogs.
+We usually create this as a symlink to /usr/testbed/log/tiplogs (yes, yes,
+we should change the path in the source...).  So for each serial line server
+you should:
+
+	mkdir -p /usr/testbed/log/tiplogs
+	ln -s /usr/testbed/log/tiplogs /var/log/tiplogs
+	cp /dev/null /usr/testbed/log/tiplogs/capture.log
+
+To setup logging for the capture processes themselves, add the following
+to each /etc/syslog.conf:
+
+   # testbed stuff
+   !capture
+   *.*              /usr/testbed/log/tiplogs/capture.log
+
+and then HUP syslog.  To ensure the logfile gets "rolled" periodically,
+put this in /etc/newsyslog.conf do:
+
+   # testbed stuff
+   /usr/testbed/log/tiplogs/capture.log    664  7     1000 *     Z
 
 1) Enter all the power controller's serial line info into the emulab DB
    and add a line to the "capture" startup script.
@@ -53,7 +80,10 @@ Add a line like this to the above file:
 /usr/testbed/sbin/capture -T 15 -r -s 9600 power<X> <ttyport> >/dev/null 2>&1 &
 
 Where <X> is as above, and <ttyport> is the tty device file associated 
-with this power controller.
+with this power controller.  To make sure the console log for the power
+controller gets "rolled", add the following to /etc/newsyslog.conf:
+
+   /usr/testbed/log/tiplogs/power<X>.log      640  7     1000 *     Z /usr/testbed/log/tiplogs/power<X>.pid
 
 * Disable the status detail and confirmation prompt on the power 
   controller.
@@ -106,7 +136,10 @@ Open the above file, and add a line like this:
 /usr/testbed/sbin/capture -T 15 -r -s 115200 pc<XXX> <ttyport> >/dev/null 2>&1 &
 
 Where <XXX> is as above, and <ttyport> is the tty device file associated
-with this pc.
+with this pc.  To make sure the console log for the node gets "rolled",
+add the following to /etc/newsyslog.conf:
+
+   /usr/testbed/log/tiplogs/pc<XXX>.log      640  7     1000 *     Z /usr/testbed/log/tiplogs/pc<XXX>.pid
 
 * Test the console line
 
@@ -121,13 +154,16 @@ For each independent tipserver machine you have, do the following in mysql:
 insert info tipservers values ("<serial_server>");
 
 5) Collect interface mapping from nodes
+   XXXX this should move elsewhere XXXX
 
-Emulab requires a mapping from FreeBSD interface number to Linux interface 
-number.
+Once you have the consoles up and running, it would be a good time to
+collect interface mapping information from the nodes.  Unfortunately,
+FreeBSD and Linux might number interfaces in different orders and they
+do give them different names.  Thus, Emulab requires a mapping from
+FreeBSD interface number to Linux interface number.
 
 You'll need to boot one of each different node type into both freebsd and
 linux, recording the interface number to MAC address mapping.  Use these
 two mappings to correlate the FreeBSD and Linux interface numbers.  You'll 
 use this information in conjunction with the instructions for adding nodes 
 in setup-nodes.txt
-
