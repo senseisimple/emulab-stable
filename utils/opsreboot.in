@@ -9,9 +9,7 @@ use Getopt::Std;
 use Fcntl ':flock';
 
 #
-# Change delay params for a link.
-#
-# XXX - Does not handle vnodes yet.
+# Bootup script for ops; invoked from stated via a trigger in the DB.
 #
 sub usage()
 {
