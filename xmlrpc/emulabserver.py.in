@@ -100,6 +100,9 @@ virtual_tables = {
     "virt_programs"		: { "rows"  : None, 
                                     "tag"   : "programs",
                                     "attrs" : [ "vname", "vnode" ]},
+    "virt_user_environment"	: { "rows"  : None, 
+                                    "tag"   : "user_environment",
+                                    "attrs" : [ "name", "value" ]},
     "nseconfigs"		: { "rows"  : None, 
                                     "tag"   : "nseconfigs",
                                     "attrs" : [ "vname" ]},
@@ -1311,12 +1314,6 @@ class experiment:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
         
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
             return argerror
@@ -1405,12 +1402,6 @@ class experiment:
         if version != self.VERSION:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
-
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp", "state"))
         if (argerror):
@@ -2027,12 +2018,6 @@ class experiment:
             return EmulabResponse(RESPONSE_FORBIDDEN,
                               output="Insufficient privledge to invoke method")
         
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
             return argerror
@@ -2125,12 +2110,6 @@ class experiment:
             return EmulabResponse(RESPONSE_FORBIDDEN,
                               output="Insufficient privledge to invoke method")
         
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
             return argerror
@@ -2674,7 +2653,7 @@ class experiment:
                       "left join event_objecttypes as ot on "
                       " ex.objecttype=ot.idx "
                       "where ex.pid=%s and ex.eid=%s and ot.type!='TIME' "
-                      "order by ex.time ASC",
+                      "order by ex.time,ex.idx ASC",
                       (argdict["proj"], argdict["exp"]))
 
         for event in res:

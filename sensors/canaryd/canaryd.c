@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -18,18 +18,25 @@
 #include <signal.h>
 #include <string.h>
 
-#include <fcntl.h>
-#include <syslog.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/dkstat.h>
-#include <devstat.h>
+#include <sys/param.h>
+#include <sys/mbuf.h>
 #include <sys/stat.h>
 #include <sys/rtprio.h>
-#include <dirent.h>
 #include <sys/socket.h>
+
+#include <syslog.h>
+#include <fcntl.h>
+#include <devstat.h>
+#include <dirent.h>
 #include <net/if.h>
 #include <ifaddrs.h>
+#include <net/route.h> /* def. of struct route */
+#include <netinet/in.h>
+#include <netinet/ip_fw.h>
+#include <netinet/ip_dummynet.h>
 
 #include <unistd.h>
 
@@ -85,12 +92,14 @@ enum {
  * Global data for canaryd.
  *
  * cd_Flags - Holds the CDF_ flags.
+ * cd_Socket - Raw socket used for dummynet.
  * cd_IntervalTime - The time to wait between samples.
  * cd_CurrentTime - The current time of day.
  * cd_OutputFile - The output file for the trace.
  */
 struct {
     int cd_Flags;
+    int cd_Socket;
     struct itimerval cd_IntervalTime;
     struct timeval cd_CurrentTime;
     struct timeval cd_StopTime;
@@ -393,12 +402,13 @@ static int cdPrintNetworkInterfaces(FILE *output_file)
 
 		/* Print out the stats. */
 		fprintf(output_file,
-			" iface=%s,%ld,%ld,%ld,%ld",
+			" iface=%s,%ld,%ld,%ld,%ld,%ld",
 			niFormatMACAddress(ifname, curr->ifa_addr),
 			id->ifi_ipackets,
 			id->ifi_ibytes,
 			id->ifi_opackets,
-			id->ifi_obytes);
+			id->ifi_obytes,
+			id->ifi_iqdrops);
 	    }
 	    curr = curr->ifa_next;
 	}
@@ -406,6 +416,83 @@ static int cdPrintNetworkInterfaces(FILE *output_file)
 	freeifaddrs(ifa);
 	ifa = NULL;
     }
+    return( retval );
+}
+
+static int cdPrintDummynetPipes(FILE *output_file)
+{
+    static int nalloc = 0, nbytes = sizeof(struct dn_pipe);
+    static void *data = NULL;
+    
+    int retval = 1;
+
+    if( (data != NULL) &&
+	(getsockopt(canaryd_data.cd_Socket,
+		    IPPROTO_IP,
+		    IP_DUMMYNET_GET,
+		    data,
+		    &nbytes) == -1) )
+    {
+	lerror("getsockopt(IP_DUMMYNET_GET) 1");
+	retval = 0;
+    }
+    else
+    {
+	while( (nbytes >= nalloc) && (retval == 1) )
+	{
+	    nalloc = nalloc * 2 + 200;
+	    nbytes = nalloc;
+	    if( (data = realloc(data, nbytes)) == NULL )
+	    {
+		lerror("Could not allocate memory.");
+		retval = 0;
+	    }
+	    else if( getsockopt(canaryd_data.cd_Socket,
+				IPPROTO_IP,
+				IP_DUMMYNET_GET,
+				data,
+				&nbytes) == -1 )
+	    {
+		lerror("getsockopt(IP_DUMMYNET_GET)");
+		retval = 0;
+	    }
+	}
+    }
+
+    if( retval )
+    {
+	struct dn_pipe *dp = (struct dn_pipe *)data;
+	struct dn_flow_queue *dfq;
+	void *next = data;
+
+	for( ; nbytes >= sizeof(struct dn_pipe); dp = (struct dn_pipe *)next )
+	{
+	    if( dp->next != (struct dn_pipe *)DN_IS_PIPE )
+	    {
+		nbytes = 0;
+	    }
+	    else
+	    {
+		int len;
+
+		len = sizeof(struct dn_pipe) +
+		    (dp->fs.rq_elements * sizeof(struct dn_flow_queue));
+		next = (void *)dp + len;
+		nbytes -= len;
+
+		dfq = (struct dn_flow_queue *)(dp + 1);
+		fprintf(output_file,
+			" pipe=%d,%d,%d,%d",
+			dp->pipe_nr,
+			dfq->len,
+			dfq->len_bytes,
+			dfq->drops);
+	    }
+	}
+	
+	nbytes = nalloc;
+    }
+    
     return( retval );
 }
 
@@ -467,14 +554,22 @@ int main(int argc, char *argv[])
 	/* No errors, but nothing else to do either. */
 	break;
     case 0:
+	if( (canaryd_data.cd_Socket =
+	     socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) == -1 )
+	{
+	    lerror("Could not allocate raw socket.");
+	    retval = EXIT_FAILURE;
+	}
 	/* Optionally daemonize, */
-	if( !(canaryd_data.cd_Flags & CDF_DEBUG) && ((rc = daemon(0, 0)) < 0) )
+	else if( !(canaryd_data.cd_Flags & CDF_DEBUG) &&
+		 ((rc = daemon(0, 0)) < 0) )
 	{
 	    lerror("Could not daemonize.");
 	    retval = EXIT_FAILURE;
 	}
 	/* ... dump our PID file, */
-	else if( !cdWritePIDFile(PIDFILE, getpid()) )
+	else if( !(canaryd_data.cd_Flags & CDF_DEBUG) &&
+		 !cdWritePIDFile(PIDFILE, getpid()) )
 	{
 	    lerror("Could not write PID file.");
 	    retval = EXIT_FAILURE;
@@ -498,7 +593,7 @@ int main(int argc, char *argv[])
 	    retval = EXIT_FAILURE;
 	}
 	/* ... connect to the event system, */
-	else if( !ceInitCanarydEvents("elvin://boss.emulab.net") )
+	else if( !ceInitCanarydEvents("elvin://localhost") )
 	{
 	    lerror("Could not initialize events");
 	    retval = EXIT_FAILURE;
@@ -568,6 +663,7 @@ int main(int argc, char *argv[])
 			    netmem_busy[2]);
 		    
 		    cdPrintNetworkInterfaces(canaryd_data.cd_OutputFile);
+		    cdPrintDummynetPipes(canaryd_data.cd_OutputFile);
 
 		    /*
 		     * Dump the vnodes list and clear their counters for the
@@ -597,7 +693,7 @@ int main(int argc, char *argv[])
 
 		/* Check for events and */
 		event_poll(canaryd_events_data.ced_Handle);
-
+		
 		/* ... wait for the next signal. */
 		if( canaryd_data.cd_Flags & CDF_LOOPING )
 		{

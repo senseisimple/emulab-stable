@@ -449,7 +449,10 @@ sub osload ($$) {
 
 	# Now wait for them.
 	my $startwait   = time;
-	my @failednodes = WaitTillReloadDone($startwait, \%reload_info, @nodes);
+	my @failednodes = WaitTillReloadDone($startwait,
+					     $waitmode,
+					     \%reload_info, 
+					     @nodes);
 	@nodes=();
     
 	while (@failednodes) {
@@ -504,9 +507,9 @@ sub osload ($$) {
 }
 
 # Wait for a reload to finish by watching its state
-sub WaitTillReloadDone($$@)
+sub WaitTillReloadDone($$$@)
 {
-    my ($startwait, $reload_info, @nodes) = @_;
+    my ($startwait, $waitmode, $reload_info, @nodes) = @_;
     my %done	= ();
     my $count   = @nodes;
     my @failed  = ();
@@ -564,7 +567,7 @@ sub WaitTillReloadDone($$@)
 			"it has been $t minutes since it was rebooted.\n";
 
 		    $count--;
-		    $done{$node} = 1;
+		    $done{$node} = $waitmode;
 		    push(@failed, $node);
 		    next;
 		}
@@ -576,6 +579,27 @@ sub WaitTillReloadDone($$@)
 	    }
 	}
     }
+
+    if ($waitmode > 1) {
+	$count = @nodes - @failed;
+	$startwait = time;
+	while ($count) {
+	    foreach my $node (@nodes) {
+		print STDERR "osload ($node): waiting for node to finish ".
+		    "booting";
+		if ($done{$node} < $waitmode) {
+		    if (!TBNodeStateWait($node,
+					 TBDB_NODESTATE_ISUP,
+					 $startwait,
+					 (60*7))) {
+			$count--;
+			$done{$node} = $waitmode;
+		    }
+		}
+	    }
+	}
+    }
+
     return @failed;
 }
 

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,6 +26,9 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
 	@$(MAKE) -C frisbee.redux install
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
+	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 \
+		$(INSTALL_DIR)/opsdir/man/man1/install-tarfile.1
 
 control-install: 
 	@$(MAKE) -C imagezip install
@@ -41,6 +44,7 @@ endif
 client-install: client
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
+	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image

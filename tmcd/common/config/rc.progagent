@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -95,9 +95,13 @@ exit(0);
 sub doboot()
 {
     my @agents = ();
+    my @userenv = ();
 
     if (tmcc(TMCCCMD_PROGRAMS, undef, \@agents) < 0) {
 	fatal("Could not get progagent config from server!");
+    }
+    if (tmcc(TMCCCMD_USERENV, undef, \@userenv) < 0) {
+	fatal("Could not get user environment from server!");
     }
     unlink $CONFIG;
     return
@@ -113,6 +117,9 @@ sub doboot()
     }
     foreach my $line (@agents) {
 	print RUN "$line";
+    }
+    foreach my $line (@userenv) {
+	print RUN "ENV $line";
     }
     close(RUN);
 

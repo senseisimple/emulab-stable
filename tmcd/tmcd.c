@@ -235,6 +235,7 @@ COMMAND_PROTOTYPE(dobooterrno);
 COMMAND_PROTOTYPE(dobootlog);
 COMMAND_PROTOTYPE(dobattery);
 COMMAND_PROTOTYPE(dotopomap);
+COMMAND_PROTOTYPE(douserenv);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -316,6 +317,7 @@ struct command {
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
 	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
 	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
+	{ "userenv",      FULLCONFIG_NONE, F_ALLOCATED, douserenv},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4667,9 +4669,10 @@ COMMAND_PROTOTYPE(doprogagents)
 	char		buf[MYBUFSIZE];
 	int		nrows;
 
-	res = mydb_query("select vname,command from virt_programs "
+	res = mydb_query("select vname,command,dir,timeout,expected_exit_code "
+			 "from virt_programs "
 			 "where vnode='%s' and pid='%s' and eid='%s'",
-			 2, reqp->nickname, reqp->pid, reqp->eid);
+			 5, reqp->nickname, reqp->pid, reqp->eid);
 
 	if (!res) {
 		error("PROGRAM: %s: DB Error getting virt_agents\n",
@@ -4694,6 +4697,18 @@ COMMAND_PROTOTYPE(doprogagents)
 		row = mysql_fetch_row(res);
 
 		bufp += OUTPUT(bufp, ebufp - bufp, "AGENT=%s", row[0]);
+		if (vers >= 23) {
+			if (row[2] && strlen(row[2]) > 0)
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " DIR=%s", row[2]);
+			if (row[3] && strlen(row[3]) > 0)
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " TIMEOUT=%s", row[3]);
+			if (row[4] && strlen(row[4]) > 0)
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " EXPECTED_EXIT_CODE=%s",
+					       row[4]);
+		}
 		if (vers >= 13)
 			bufp += OUTPUT(bufp, ebufp - bufp,
 				       " COMMAND='%s'", row[1]);
@@ -5824,3 +5839,42 @@ COMMAND_PROTOTYPE(dotopomap)
 	return 0;
 }
 
+/*
+ * Return user environment.
+ */
+COMMAND_PROTOTYPE(douserenv)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	res = mydb_query("select name,value from virt_user_environment "
+			 "where pid='%s' and eid='%s' order by idx",
+			 2, reqp->pid, reqp->eid);
+
+	if (!res) {
+		error("PROGRAM: %s: DB Error getting virt_user_environment\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	
+	while (nrows) {
+		char	*bufp = buf, *ebufp = &buf[sizeof(buf)];
+		
+		row = mysql_fetch_row(res);
+
+		bufp += OUTPUT(bufp, ebufp - bufp, "%s=%s\n", row[0], row[1]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		if (verbose)
+			info("PROGAGENTS: %s", buf);
+	}
+	mysql_free_result(res);
+	return 0;
+}

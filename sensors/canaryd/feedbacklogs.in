@@ -1,0 +1,186 @@
+#! /usr/local/bin/python
+
+import re
+import pwd
+import sys
+import getopt
+import socket
+import os, os.path
+
+from M2Crypto.m2xmlrpclib import SSL_Transport
+from M2Crypto import SSL
+
+prefix = "@prefix@"
+
+LOGDIR = "var/emulab/logs"
+
+PACKAGE_VERSION = 0.1
+
+# Default server
+XMLRPC_SERVER = "@BOSSNODE@"
+XMLRPC_PORT   = 3069
+
+try:
+    pw = pwd.getpwuid(os.getuid())
+except KeyError:
+    sys.stderr.write("error: unknown user id %d" % os.getuid())
+    sys.exit(2)
+    pass
+
+USER = pw.pw_name
+HOME = pw.pw_dir
+
+CERTIFICATE = os.path.join(HOME, ".ssl", "emulab.pem")
+
+debug = 1
+
+def usage():
+    print "Usage: feedbacklogs [-h] pid eid"
+    print "Gather canaryd logs from the physical hosts"
+    print
+    print "Required arguments:"
+    print "  pid - The project ID."
+    print "  eid - The experiment ID."
+    print
+    print "Optional arguments:"
+    print "  -h       Print this message."
+    return
+
+def format_mac(addr):
+    return ":".join(re.findall(r'\w\w', addr))
+
+try:
+    opts, req_args = getopt.getopt(sys.argv[1:],
+                                   "h",
+                                   [ "help" ])
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit()
+            pass
+        pass
+    if len(req_args) > 2:
+        raise getopt.error('error: too many arguments', '')
+    elif len(req_args) < 2:
+        raise getopt.error('error: not enough arguments', '')
+    pass
+except getopt.error, e:
+    print e.args[0]
+    usage()
+    sys.exit(2)
+    pass
+
+pid, eid = req_args
+
+expdir = os.path.join("/proj", pid, "exp", eid)
+
+sys.path.append(os.path.join(prefix, "lib"))
+from sshxmlrpc import *
+from emulabclient import *
+
+# User supplied server name.
+xmlrpc_server   = XMLRPC_SERVER
+
+USER = os.environ["USER"]
+HOME = os.environ["HOME"]
+DIGEST_SLOTHD = os.path.join(prefix, "sbin", "digest-slothd")
+
+URI = "https://" + XMLRPC_SERVER + ":" + str(XMLRPC_PORT) + prefix
+
+ctx = SSL.Context("sslv23")
+ctx.load_cert(CERTIFICATE, CERTIFICATE)
+ctx.set_verify(SSL.verify_none, 16)
+ctx.set_allow_unknown_ca(0)
+
+server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx))
+
+info_method = getattr(server, "experiment.info")
+
+mapping = info_method(PACKAGE_VERSION, {
+    "proj" : pid,
+    "exp" : eid,
+    "aspect" : "mapping",
+    })
+
+physical = info_method(PACKAGE_VERSION, {
+    "proj" : pid,
+    "exp" : eid,
+    "aspect" : "physical",
+    })
+
+links = info_method(PACKAGE_VERSION, {
+    "proj" : pid,
+    "exp" : eid,
+    "aspect" : "links",
+    })
+
+exit_code = 0
+
+if (mapping["code"] != RESPONSE_SUCCESS or
+    physical["code"] != RESPONSE_SUCCESS or
+    links["code"] != RESPONSE_SUCCESS):
+    print ("error: xmlrpc failed "
+           + mapping["output"]
+           + " "
+           + physical["output"]
+           + " "
+           + links["output"])
+    exit_code = 1
+    pass
+else:
+    mapping = mapping["value"]
+    physical = physical["value"]
+    links = links["value"]
+
+    vhosts = []
+    pnode2vnode = {}
+    for pnode in physical["nodes"]:
+        if pnode["erole"] == "virthost":
+            vhosts.append(pnode)
+            pass
+        else:
+            pnode2vnode[pnode["node_id"]] = pnode
+            pass
+        pass
+
+    ip2node2vlink = {}
+    for vlink in links.values():
+        ip = vlink["ipaddr"]
+        if not ip2node2vlink.has_key(ip):
+            ip2node2vlink[ip] = {}
+            pass
+        ip2node2vlink[ip][vlink["member"].split(":", 1)[0]] = vlink
+        pass
+
+    cross = ""
+
+    for nic in physical["interfaces"]:
+        if nic.has_key("vnode_id"):
+            vnode = pnode2vnode[nic["vnode_id"]]["vname"]
+            cross += (format_mac(nic["mac"])
+                      + " "
+                      + vnode
+                      + " "
+                      + ip2node2vlink[nic["IP"]][vnode]["name"])
+            pass
+        pass
+
+    cmd = (os.path.join(prefix, "sbin", "digest-slothd")
+           + " "
+           + os.path.join(expdir, "tbdata", "alerts.dat")
+           + " - "
+           + " ".join([os.path.join(expdir, "logs", x["vname"],
+                                    LOGDIR, "canaryd.log")
+                       for x in vhosts])
+           + " > "
+           + os.path.join(expdir, "tbdata", "feedback_data.tcl"))
+    fd = os.popen(cmd, 'w')
+    fd.write(cross)
+    rc = fd.close()
+
+    if rc:
+        exit_code = os.WEXITSTATUS(rc)
+        pass
+    pass
+
+sys.exit(exit_code)

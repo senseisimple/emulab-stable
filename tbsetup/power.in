@@ -212,7 +212,6 @@ foreach my $node (@machines) {
 	    warn "$node was power cycled recently. Skipping...\n";
 	    next;
 	} elsif ( $power_id ne "mail" ) {
-	    print "updating last_power\n";
 	    DBQueryFatal("update outlets set last_power=CURRENT_TIMESTAMP " .
 			 "where node_id = '$node'");
 	}

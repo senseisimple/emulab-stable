@@ -644,8 +644,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	security/GNUmakefile security/lastlog_daemon \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
 	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
-        sensors/canaryd/GNUmakefile sensors/and/GNUmakefile \
-	sensors/and/and-emulab.conf \
+        sensors/canaryd/GNUmakefile sensors/canaryd/feedbacklogs \
+	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	account/GNUmakefile account/tbacct account/webtbacct \
 	account/addpubkey account/webaddpubkey \
 	account/addsfskey account/webaddsfskey \

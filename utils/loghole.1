@@ -1,6 +1,6 @@
 .\"
 .\" EMULAB-COPYRIGHT
-.\" Copyright (c) 2004 University of Utah and the Flux Group.
+.\" Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 .\" All rights reserved.
 .\"
 .TH LOGHOLE 1 "November 11, 2004" "Emulab" "Emulab Commands Manual"
@@ -37,6 +37,9 @@ loghole \- Log management tool for experiments.
 .BI loghole
 .BI show
 [\fIarchive-name\fR]
+.P
+.BI loghole
+.BI clean
 .P
 .BI loghole
 .BI gc
@@ -94,6 +97,9 @@ Print a brief listing of the archives in the experiment's log directory.
 .TP
 .B show
 Print a detailed listing of the archives in the experiment's log directory.
+.TP
+.B clean
+Clean out the experiment log directory by removing any subdirectories.
 .TP
 .B gc
 Garbage collect old archives to free up disk space.
@@ -178,7 +184,7 @@ action is used to synchronize the logholes on the nodes with the experiment's
 log directory on the Emulab users machine.  The action will iterate through
 each node in the experiment and perform an rsync(1) on the loghole directories
 for that node.  Currently, the only directories synced are "/var/emulab/logs"
-and "/usr/testbed/logs".
+and "/local/logs".
 .P
 Optional arguments:
 .TP

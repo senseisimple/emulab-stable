@@ -16,6 +16,7 @@ import getopt
 import socket
 import zipfile
 import cStringIO
+import threading
 import xmlrpclib
 import os, os.path
 import ConfigParser
@@ -42,22 +43,28 @@ DIRS = {
 
 EXPDIR_FMT = os.path.join("/", DIRS["proj"], "%(PID)s", "exp", "%(EID)s")
 
-GLOBAL_LOGS = [ "event-sched.log" ]
+GLOBAL_LOGS = [
+    "event-sched.log", "feedback.log", "../tbdata/feedback_data.tcl",
+    "digest.out"
+    ]
 
 PID = None
 EID = None
 
-pw = pwd.getpwuid(os.getuid())
-
-if not pw:
+try:
+    pw = pwd.getpwuid(os.getuid())
+    pass
+except KeyError:
     sys.stderr.write("error: unknown user id %d" % os.getuid())
     sys.exit(2)
     pass
 
-USER = pw[0]
-HOME = pw[5]
+USER = pw.pw_name
+HOME = pw.pw_dir
 
 CERTIFICATE = os.path.join(HOME, ".ssl", "emulab.pem")
+
+PARALLELIZATION = 10
 
 DEBUG = 0
 
@@ -170,6 +177,8 @@ def usage():
     print "            experiment's log directory."
     print "  show      Show a detailed listing of the archive(s) in the"
     print "            experiment directory."
+    print "  clean     Clean the experiment log directory by removing any"
+    print "            subdirectories."
     print "  gc        Garbage collect old archives."
     print
     print "Environment:"
@@ -302,6 +311,18 @@ def show_usage():
     return
 
 ##
+# Print the usage statement for the "clean" action.
+#
+def clean_usage():
+    print "Usage: loghole clean"
+    print
+    print "Clean the experiment log directory by removing any subdirectories."
+    print
+    print "Examples:"
+    print "  $ loghole clean"
+    return
+
+##
 # Print the usage statement for the "gc" action.
 #
 def gc_usage():
@@ -317,11 +338,11 @@ def gc_usage():
     print "                        (Default: 3.0 MB)"
     print
     print "Examples:"
-    print "  $ loghole -n -m 1 gc"
+    print "  $ loghole gc -n -m 1"
     print "  Reclaimed 3421 bytes from foo/bar."
     print "  52434 bytes are still in foo/bar."
     print
-    print "  $ loghole -q -m 1 gc"
+    print "  $ loghole -q gc -m 1"
     print "  3421 52434"
     return
 
@@ -745,25 +766,28 @@ def rsync(host, base, *args):
             pass
         except OSError:
             pass
-        extra_flags = ""
+        cmd = [RSYNC, "-rptgoDlz"]
         if VERBOSITY > VERBOSITY_HUMAN:
-            extra_flags = extra_flags + " -v "
+            cmd.append("-v")
             pass
-        cmd = (RSYNC
-               + " -rptgoDLz "
-               + extra_flags
-               + " --rsh=\"ssh -o StrictHostKeyChecking=no "
-               + "-o UserKnownHostsFile="
-               + os.path.join(HOME, ".ssh", "emulab_known_hosts")
-               + "\" "
-               + host
-               + ":" + path + " "
-               + fullpath)
+        cmd.extend([("--rsh=ssh -o StrictHostKeyChecking=no "
+                     + "-o UserKnownHostsFile="
+                     + os.path.join(HOME, ".ssh", "emulab_known_hosts")),
+                    host + ":" + path,
+                    fullpath])
         if DEBUG:
-            print cmd
+            print `cmd`
+            retval = -1
             pass
         else:
-            retval = os.system(cmd)
+            retval = os.fork()
+            if retval != 0:
+                # Parent
+                pass
+            else:
+                os.execve(RSYNC, cmd, os.environ)
+                os._exit(127)
+                pass
             pass
         pass
     
@@ -811,7 +835,7 @@ def do_sync(args):
         else:
             physical = physical["value"]
 
-            hosts = [(x["pnode"], x["name"]) for x in physical.values()
+            hosts = [(x["node"], x["name"]) for x in physical.values()
                      if ((x["erole"] == "virthost" or x["erole"] == "node") and
                          (x["status"] == "up" and x["eventstatus"] == "ISUP"))]
 
@@ -824,18 +848,31 @@ def do_sync(args):
             known_nodes = sets.Set(args) & (phosts | vhosts)
             unknown_nodes = known_nodes ^ sets.Set(args)
 
+            jobs = []
             for phost, vhost in hosts:
                 if (vhost in args) or (phost in args):
-                    rsync(phost,
-                          os.path.join(EXPDIR_FMT % { "PID" : PID,
-                                                      "EID" : EID },
-                                       "logs",
-                                       vhost),
-                          "/var/emulab/logs/",
-                          "/usr/testbed/logs/")
+                    pid = rsync(phost,
+                                os.path.join(EXPDIR_FMT % { "PID" : PID,
+                                                            "EID" : EID },
+                                             "logs",
+                                             vhost),
+                                "/var/emulab/logs/",
+                                "/local/logs/")
+                    jobs.append(pid)
+
+                    while len(jobs) == PARALLELIZATION:
+                        pid, sts = os.waitpid(0, 0)
+                        if pid in jobs:
+                            jobs.remove(pid)
+                            pass
+                        pass
                     pass
                 pass
 
+            for job in jobs:
+                pid, sts = os.waitpid(job, 0)
+                pass
+            
             if len(unknown_nodes) > 0:
                 for vhost in unknown_nodes:
                     sys.stderr.write("error: unknown node - %s\n" % vhost)
@@ -990,6 +1027,35 @@ def do_list(args):
     return retval
 
 ##
+# Performs the "clean" action, which deletes logs from the experiment
+# directory.
+#
+# @param args Action-specific command line arguments.
+#
+def do_clean(args):
+    retval = 0
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    for entry in os.listdir(logdir):
+        entry = os.path.join(logdir, entry)
+        if os.path.isdir(entry):
+            for root, dirs, files in os.walk(entry, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                    pass
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+                    pass
+                pass
+            os.rmdir(entry)
+            pass
+        pass
+
+    return retval
+
+##
 # Performs the "gc" action, which garbage collects old/extra log files.
 #
 # @param args Action-specific command line arguments.
@@ -1069,7 +1135,7 @@ ACTIONS = {
     "archive" : (do_archive, archive_usage),
     "list" : (do_list, list_usage),
     "show" : (do_show, show_usage),
-    "clear" : notimplemented,
+    "clean" : (do_clean, clean_usage),
     "gc" : (do_gc, gc_usage),
     }
 

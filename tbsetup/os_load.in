@@ -21,12 +21,13 @@ sub usage()
 	  "Use -p to specify the project ID in which to find the imageid.\n".
 	  "Use -m to specify the internal name if an image ID.\n".
 	  "Use -s to start reload, but do not wait for it to complete.\n".
+	  "Use -w to wait for the nodes to finish booting.\n".
 	  "Use -r to supress rebooting nodes - you'll need to to it yourself\n".
 	  "Use -e to reload all the nodes in an experiment.\n" .
 	  "Use -l to get a list of images you are permitted to load.\n");
     exit(-1);
 }
-my $optlist   = "sldi:e:p:m:r";
+my $optlist   = "swldi:e:p:m:r";
 my $waitmode  = 1;
 my $listonly  = 0;
 my $debug     = 0;
@@ -76,6 +77,8 @@ if (defined($options{"l"})) {
 
 $waitmode = 0
     if (defined($options{"s"}));
+$waitmode = 2
+    if (defined($options{"w"}));
 $noreboot = 1
     if (defined($options{"r"}));
 

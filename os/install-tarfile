@@ -23,11 +23,29 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 #
 sub usage()
 {
-    print STDOUT "Usage: install-tarfile [-d] [-ct] [-n nodeid] <installdir> ".
-	"<filename>\n";
+    print STDOUT 
+	"Usage: install-tarfile [-hVdfvct] [-n nodeid] [-u user] <installdir> ".
+	    "<filename>\n".
+	"       install-tarfile [-l]\n".
+	"Options:\n".
+	"  -h          Display this message\n".
+	"  -V          Print version information and exit\n".
+        "  -d          Output debugging messages\n".
+	"  -f          Force the installation\n".
+	"  -v          Verify an installation only, do not attempt an install\n".
+	"  -c          Copy the tar file to the local disk (recommended)\n".
+	"  -t          Download the tarfile from Emulab\n".
+	"  -n nodeid   Override the default node ID when downloading from Emulab\n".
+	"  -u user     User that should own files with unknown uid/gid\n".
+	"  -l          List the currently installed tar files and exit\n".
+	"\n".
+	"Required Arguments:".
+	"  installdir  The absolute path of the install directory.\n".
+	"  filename    The absolute path of the tar file to install.\n";
+
     exit(-1);
 }
-my $optlist  = "cdtn:";
+my $optlist  = "hVlvcdftn:u:";
 
 #
 # Turn off line buffering on output
@@ -46,8 +64,12 @@ my $IDENTFILE      = "/var/db/testbed.tarfiles";
 my $tarfile        = "";
 my $decompressflag = "";
 my $installdir     = "/";
+my $unknownuser	   = "";
+my $force	   = 0;
 my $usewget	   = 0;
+my $listmode	   = 0;
 my $copymode	   = 0;
+my $verifymode	   = 0;
 my $debug	   = 0;
 my $copyfile;
 my $nodeid;
@@ -82,8 +104,15 @@ if ($EUID != 0) {
 # left are the required arguments.
 #
 %options = ();
-if (! getopts($optlist, \%options)) {
+if (! getopts($optlist, \%options) || defined($options{"h"})) {
     usage();
+}
+if (defined($options{"V"})) {
+    print STDOUT "0.5";
+    exit(-1);
+}
+if (defined($options{"l"})) {
+    $listmode = 1;
 }
 if (defined($options{"c"})) {
     $copymode = 1;
@@ -91,9 +120,15 @@ if (defined($options{"c"})) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"f"})) {
+    $force = 1;
+}
 if (defined($options{"t"})) {
     $copymode = 1;
     $usewget  = 1;
+}
+if (defined($options{"v"})) {
+    $verifymode = 1;
 }
 if (defined($options{"n"})) {
     $nodeid = $options{"n"};
@@ -104,42 +139,61 @@ if (defined($options{"n"})) {
 	fatal("Tainted nodeid: $nodeid");
     }
 }
+if (defined($options{"u"})) {
+    $unknownuser = $options{"u"};
+    if ($unknownuser =~ /^([-\w]+)$/) {
+	$unknownuser = $1;
+    }
+    else {
+	fatal("Tainted user: $unknownuser");
+    }
+}
 # XXX compat
 if (defined($options{"j"})) {
     $copymode = 1;
     $usewget  = 1;
 }
-if (@ARGV != 2) {
-    usage();
-}
-$installdir = $ARGV[0];
-$tarfile    = $ARGV[1];
+if (!$listmode) {
+    if (@ARGV != 2) {
+	usage();
+    }
+    $installdir = $ARGV[0];
+    $tarfile    = $ARGV[1];
+    
+    #
+    # Untaint the arguments.
+    #
+    # Note different taint check (allow /).
+    if ($tarfile =~ /^([-\w.\/\+]+)$/) {
+	$tarfile = $1;
+    }
+    else {
+	fatal("Tainted filename: $tarfile");
+    }
+    if ($installdir =~ /^([-\w.\/]+)$/) {
+	$installdir = $1;
+    }
+    else {
+	fatal("Tainted directory name: $installdir");
+    }
 
-#
-# Untaint the arguments.
-#
-# Note different taint check (allow /).
-if ($tarfile =~ /^([-\w.\/\+]+)$/) {
-    $tarfile = $1;
+    if (! $tarfile =~ /^\//) {
+	fatal("Tar file must be an absolute path.");
+    }
+    
+    if (! $installdir =~ /^\//) {
+	fatal("Install directory must be an absolute path.");
+    }
+    
+    #
+    # Make sure the installdir exists!
+    #
+    if (! -d $installdir &&
+	! mkdir($installdir, 0775)) {
+	fatal("Could not make directory $installdir: $!");
+    }
 }
-else {
-    fatal("Tainted filename: $tarfile");
-}
-if ($installdir =~ /^([-\w.\/]+)$/) {
-    $installdir = $1;
-}
-else {
-    fatal("Tainted directory name: $installdir");
-}
-
-#
-# Make sure the installdir exists!
-#
-if (! -d $installdir &&
-    ! mkdir($installdir, 0775)) {
-    fatal("Could not make directory $installdir: $!");
-}
-
+   
 #
 # Check to make sure this tarfile has not already been installed.
 # If so, we get the old timestamp and md5 so we can compare against
@@ -154,12 +208,46 @@ if (-e $IDENTFILE) {
 	fatal("Could not open $IDENTFILE: $!");
     }
     while (<IDENT>) {
-	if ($_ =~ /^([-\w\.\/\+]*) ([\d]*) ([\w]*)$/) {
+	if ($_ =~ /^([-\w\.\/\+]*) ([\d]*) ([\w]*) ([-\w\.\/\+]*)$/) {
+	    my $file = $1;
+	    my $stamp= $2;
+	    my $md5  = $3;
+	    my $idir = $4;
+
+	    if ($listmode) {
+		# XXX Perl ignorance here...  I can do ("\t" * 3) in python
+		# to get a string with three tabs, how do you do that in perl?
+		print STDOUT "$idir" .
+		    (length($idir) >= 24 ? "  " :
+		     length($idir) >= 16 ? "\t" :
+		     length($idir) >=  8 ? "\t\t" :
+		                           "\t\t\t") 
+			. "$file\n";
+		# TODO: Tell them which ones are up-to-date?
+		next;
+	    }
+	    elsif (($file eq $tarfile) && ($idir eq $installdir)) {
+		#
+		# Save the info and continue;
+		#
+		$oldstamp = $stamp;
+		$oldmd5   = $md5;
+		next;
+	    }
+	    push(@identlines, "$file $stamp $md5 $idir");
+	}
+	elsif ($_ =~ /^([-\w\.\/\+]*) ([\d]*) ([\w]*)$/) {
+	    # Continue to accept the old school format...
 	    my $file = $1;
 	    my $stamp= $2;
 	    my $md5  = $3;
 
-	    if ($file eq $tarfile) {
+	    if ($listmode) {
+		print STDOUT "(unknown)\t\t$file\n";
+		# TODO: Tell them which ones are up-to-date?
+		next;
+	    }
+	    elsif ($file eq $tarfile) {
 		#
 		# Save the info and continue;
 		#
@@ -174,6 +262,10 @@ if (-e $IDENTFILE) {
 	}
     }
     close(IDENT);
+}
+
+if ($listmode) {
+    exit(0);
 }
 
 #
@@ -194,18 +286,19 @@ if (! $copymode) {
     (undef,undef,undef,undef,undef,undef,
      undef,undef,undef,$filestamp) = stat($tarfile);
 
-    if (defined($oldstamp) && $oldstamp >= $filestamp) {
+    if (defined($oldstamp) && $oldstamp >= $filestamp && !$force) {
 	print STDOUT "Tarfile $tarfile has already been installed!\n";
 	exit(1);
     }
+
     #
     # Otherwise compare MD5.
     #
     $filemd5 = GetMD5($tarfile);
-    if (defined($oldmd5) && $filemd5 eq $oldmd5) {
+    if (defined($oldmd5) && $filemd5 eq $oldmd5 && !$force) {
 	print STDOUT "Tarfile $tarfile has already been installed!\n";
 	# Must write a new ident file to avoid repeated checks.
-	push(@identlines, "$tarfile $filestamp $filemd5");
+	push(@identlines, "$tarfile $filestamp $filemd5 $installdir");
 	WriteIdentFile();
 	exit(1);
     }
@@ -229,7 +322,7 @@ else {
 	print STDOUT "Tarfile $tarfile has already been installed!\n";
 	if (defined($filestamp) && $filestamp != $oldstamp) {
 	    # Must write a new ident file to avoid repeated checks.
-	    push(@identlines, "$tarfile $filestamp $oldmd5");
+	    push(@identlines, "$tarfile $filestamp $oldmd5 $installdir");
 	    WriteIdentFile();
 	}
 	unlink($copyfile)
@@ -238,10 +331,14 @@ else {
     }
 }
 
+if ($verifymode) {
+    exit(0);
+}
+
 #
 # Okay, add new info to the list for update.
 #
-push(@identlines, "$tarfile $filestamp $filemd5");
+push(@identlines, "$tarfile $filestamp $filemd5 $installdir");
 
 #
 # Figure what decompression flag is required, based on file extension.
@@ -249,7 +346,7 @@ push(@identlines, "$tarfile $filestamp $filemd5");
 SWITCH: for ($tarfile) {
     /^.*\.tar\.Z$/   && do {$decompressflag = "-Z"; last SWITCH; } ;
     /^.*\.tar\.gz$/  && do {$decompressflag = "-z"; last SWITCH; } ;
-    /^.*\.tgz$/ && do {$decompressflag = "-z"; last SWITCH; } ;
+    /^.*\.tgz$/      && do {$decompressflag = "-z"; last SWITCH; } ;
     /^.*\.tar\.bz2$/ && do {$decompressflag = "-j"; last SWITCH; } ;
     /^.*\.tar$/      && do {last SWITCH; } ;
 }
@@ -261,17 +358,65 @@ if (! chdir($installdir)) {
     fatal("Could not chdir to $installdir: $!\n");
 }
 
+my ($uuname,$uupasswd,$uuuid,$uugid) = getpwnam($unknownuser)
+    if ($unknownuser);
+    
+if ($unknownuser && ! $uuname) {
+    fatal("No such user: $unknownuser");
+}
+
 #
 # Run the tarfile. 
 #
 if ($copymode) {
     $tarfile = $copyfile;
 }
-system("tar $decompressflag -xf $tarfile");
+$tarlist = `mktemp /var/tmp/tarlist.XXXXXX`;
+if ($tarlist =~ /^([-\@\w\.\/]+)$/) {
+    $tarlist = $1;
+}
+else {
+    die("Bad data in tarlist name: $tarlist");
+}
+system("tar $decompressflag -xvf $tarfile > $tarlist");
 $exit_status = $? >> 8;
 if ($copymode) {
     unlink($copyfile);
 }
+
+if ($unknownuser) {
+    open(TARIN, "< $tarlist");
+    while (my $line = <TARIN>) {
+	chop $line;
+	if ($line =~ /^(.*)$/) {
+	    $line = "$installdir/$1";
+	    if (-e $line &&
+		(my (undef,undef,undef,undef,$fuid,$fgid) = stat $line)) {
+		if ($fuid < 100) {
+		    if ($debug) {
+			print STDERR "exempt file $line $fuid $fgid\n";
+		    }
+		}
+		elsif (! getpwuid $fuid) {
+		    print STDERR "install-tarfile: changing ownership of $line to $uuuid/$uugid";
+		    chown($uuuid, $uugid, $line);
+		}
+		elsif (! getgrgid $fgid) {
+		    print STDERR "install-tarfile: changing ownership of $line to $fuid/$uugid";
+		    chown($fuid, $uugid, $line);
+		}
+		elsif ($debug) {
+		    print STDERR "not changing $line $fuid $fgid\n";
+		}
+	    }
+	    else {
+		print STDERR "ok: $line\n";
+	    }
+	}
+    }
+    close(TARIN);
+}
+unlink($tarlist);
 
 #
 # Recreate the index file if the install was okay.
@@ -310,11 +455,12 @@ sub GetTarFile($$$$$$$)
 	my (undef,undef,undef,undef,undef,undef,undef,$bytelen,
 	    undef,$stamp) = stat($tarfile);
 
-	if (defined($oldstamp) && $oldstamp >= $stamp) {
+	if (defined($oldstamp) && $oldstamp >= $stamp && !$force) {
 	    print STDOUT "Timestamp ($stamp) for $tarfile unchanged!\n"
 		if ($debug);
 	    return 1;
 	}
+	
 	# Must do this for caller so that if the MD5 has not changed,
 	# the caller can update the timestamp in the ident file.
 	$$filestamp = $stamp;
@@ -371,7 +517,7 @@ sub GetTarFile($$$$$$$)
 	# Compare md5.
 	#
 	my $md5 = GetMD5($copyfile);
-	if (defined($oldmd5) && $oldmd5 eq $md5) {
+	if (defined($oldmd5) && $oldmd5 eq $md5 && !$force) {
 	    print STDOUT "MD5 ($md5) for $tarfile unchanged!\n"
 		if ($debug);
 	    return 2;
@@ -484,7 +630,7 @@ sub GetTarFile($$$$$$$)
 	# We got a file. Compare the MD5 now. 
 	#
 	my $md5 = GetMD5($copyfile);
-	if (defined($oldmd5) && $oldmd5 eq $md5) {
+	if (defined($oldmd5) && $oldmd5 eq $md5 && !$force) {
 	    print STDOUT "MD5 ($md5) for $tarfile unchanged!\n"
 		if ($debug);
 	    return 2;

@@ -260,4 +260,12 @@ foreach my $vnode (sort(keys(%newvnodelist))) {
     # Blocks until mostly setup. 
     bootvnode($vnode, "boot", $newvnodelist{$vnode});
 }
+
+my $PIDFILE = "/var/run/progagent.pid";
+
+foreach my $vnode (keys(%newvnodelist)) {
+    system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
+	if (-e "$vndir/$vnode/root/$PIDFILE");
+}
+
 exit(0);

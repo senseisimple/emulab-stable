@@ -502,14 +502,17 @@ Node instproc add-desire {desire weight} {
 
 Node instproc program-agent {args} {
     
-    ::GLOBALS::named-args $args { -command {} -dir {} -timeout {} }
+    ::GLOBALS::named-args $args { 
+	-command {} -dir {} -timeout {} -expected-exit-code {}
+    }
 
     set curprog [new Program [$self set sim]]
     $curprog set node $self
     $curprog set command $(-command)
     $curprog set dir $(-dir)
+    $curprog set expected-exit-code $(-expected-exit-code)
     if {$(-timeout) != {}} {
-	set to [::TBCOMPAT::reltime-to-secs $(-timeout)]
+	set to [::GLOBALS::reltime-to-secs $(-timeout)]
 	if {$to == -1} {
 	    perror "-timeout value is not a relative time: $(-timeout)"
 	    return

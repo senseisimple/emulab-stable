@@ -799,8 +799,7 @@ sub sendbatt($)
     }
     else {
 	logmsg("batt: bad line in log - $line\n");
-	$iv{batt} = 0;
-	return;
+	goto resched;
     }
 
     my $arg = "CAPACITY=$capacity VOLTAGE=$voltage";

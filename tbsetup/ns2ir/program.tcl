@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,7 +25,8 @@ Program instproc init {s} {
     $self set node {}
     $self set command {}
     $self set dir {}
-    $self set timeout 0
+    $self set timeout {}
+    $self set expected-exit-code {}
 
     # Link simulator to this new object.
     $s add_program $self
@@ -49,6 +50,7 @@ Program instproc updatedb {DB} {
     $self instvar command
     $self instvar dir
     $self instvar timeout
+    $self instvar expected-exit-code
     $self instvar sim
 
     if {$node == {}} {
@@ -68,7 +70,7 @@ Program instproc updatedb {DB} {
     }
 
     # Update the DB
-    spitxml_data "virt_programs" [list "vnode" "vname" "command"] [list $progvnode $self $command ]
+    spitxml_data "virt_programs" [list "vnode" "vname" "command" "dir" "timeout" "expected_exit_code"] [list $progvnode $self $command $dir $timeout ${expected-exit-code} ]
 
     $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $progvnode $self $objtypes(PROGRAM) ]
 }

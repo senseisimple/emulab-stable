@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -105,9 +105,9 @@ static int dump_agent_status(error_record_t er, FILE *out)
 {
 	/*
 	 * The format of the path for the status file:
-	 *   logs/<node>/usr/testbed/logs/<agent>.<token>.status
+	 *   logs/<node>/<LOGDIR>/<agent>.<token>.status
 	 */
-	static char *file_format = "logs/%s/usr/testbed/logs/%s.%lu.status";
+	static char *file_format = "logs/%s" LOGDIR "/%s.%lu.status";
 
 	/*
 	 * A map of status file 'keys' that people may be interested in and
@@ -252,8 +252,8 @@ int dump_error_record(error_record_t er, FILE *out)
 		 * be sent back to the user.
 		 */
 		static char *filename_formats[] = {
-			"logs/%s/usr/testbed/logs/%s.%lu.out",
-			"logs/%s/usr/testbed/logs/%s.%lu.err",
+			"logs/%s" LOGDIR "/%s.%lu.out",
+			"logs/%s" LOGDIR "/%s.%lu.err",
 			NULL
 		};
 

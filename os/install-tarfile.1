@@ -1,0 +1,174 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2004 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH INSTALL-TARFILE 1 "October 19, 2004" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+install-tarfile \- Tar file installation tool.
+.SH SYNOPSIS
+.BI install-tarfile
+[\fB-hVdvctf\fR]
+[\fB-n \fInodeid\fR]
+[\fB-u \fIuser\fR]
+.I installdir
+.I filename
+.P
+.BI install-tarfile
+[\fB-l\fR]
+.SH DESCRIPTION
+The
+.B install-tarfile
+utility is used to install tar files on an experimental node.  The "value"
+added by this utility over using
+.B tar(1)
+directly is that it will avoid reinstalling tar files that have not changed.
+So, it can be run repeatedly without performing unnecessary work or burdening
+the NFS server with extra traffic.  Detecting a change from one installation
+attempt to the next is done by checking the tar file's last modified time, and
+if that fails, the MD5 hash of the file.  If both checks fail, or if this is
+the first attempt, the tar file will be unarchived in the given installation
+directory.  The utility will also automatically detect compressed files by
+their file extension and pass the appropriate flags to tar.  The set of
+extensions currently recognized are:
+.I .tar.gz\fR,
+.I .tgz\fR,
+.I .tar.Z\fR,
+and
+.I .tar.bz2\fR.
+Finally, if the installation succeeds, the timestamp and MD5 hash of the pair
+(tar file, install directory) are stored in a file for future reference.
+.P
+Normally, this utility is automatically called on boot by the node\'s startup
+scripts, but you may find it useful to update an existing installation or to
+install a dynamically generated tar file.  The default set of tar files
+installed by the node\'s bootup script is specified in the experiment's NS file
+using the
+.B tb-set-node-tarfiles
+function.  You may want to consult the web based documentation for more
+information about the use of this function.
+.P
+Required arguments:
+.TP
+.I installdir
+The absolute path to the installation directory.  The utility will change to
+this directory before executing
+.B tar(1)\fR.
+.TP
+.I filename
+The absolute path to the tar file to install.
+.P
+Available options:
+.P
+.TP
+\fB-h
+Print out a usage message.
+.TP
+\fB-V
+Print out version information and exit.
+.TP
+\fB-d
+Enable debugging output.
+.TP
+\fB-f
+Force the installation to occur.  This option overrides the default behavior of
+only untarring a file that has not yet been installed or has changed since the
+last install.
+.TP
+\fB-v
+Verify an installation and exit without attempting to install the file.  The
+exit code will be one if the file is installed and up-to-date, otherwise it
+will be zero.
+.TP
+\fB-c
+Copy the tar file to the local disk before installation.  This flag is highly
+recommended because it makes the installation resistant to NFS hiccups.
+.TP
+\fB-t
+Use
+.B wget(1)
+to copy the file from Emulab in case NFS access is not available.
+.TP
+\fB-n \fInodeid
+Override the default node ID when downloading the file from Emulab with
+.B wget(1)\fR.
+This flag is intended for debugging only.
+.TP
+\fB-u \fIuser
+Specify the user name that should own any untarred files whose UID and/or GID
+is greater than 100 and not a valid Emulab user or group.  For example,
+tar files that were not produced inside Emulab might contain files with user or
+group IDs that do not map to valid Emulab users.  By specifying this option,
+the ownership of these files will be changed to the specified user.  The
+default for files specified in the NS file is the user that swapped in the
+experiment, which can be different from the user that created the experiment.
+Note: the exemption for UIDs less than 100 is for pseudo-users that may yet be
+created.
+.TP
+\fB-l
+List the currently installed tar files and then exit.
+.SH RETURN VALUES
+.TP
+255
+If there was a problem with the arguments or a problem was encountered during
+the installation.
+.TP
+1
+If the tar file is already installed and is up-to-date.
+.TP
+0
+If the installation was successful, or if the
+.B -v
+flag is specified and the tar file is out-of-date.
+.SH EXAMPLES
+.PP
+To install "mxc.tar.gz" into the root directory:
+.PP
+.RS
+[kenny@node1 ~] sudo install-tarfile -c / /tmp/mxc.tar.gz
+.RE
+.PP
+To verify the installation:
+.PP
+.RS
+.PD 0
+[kenny@node1 ~] sudo install-tarfile -v / /tmp/mxc.tar.gz
+.P
+[kenny@node1 ~] echo $?
+.P
+1
+.PD
+.RE
+.PP
+To list the installed tar files:
+.PP
+.RS
+[kenny@node1 ~] sudo install-tarfile -l
+.PD 0
+.P
+/			/tmp/mxc.tar.gz
+.PD
+.RE
+.RE
+.SH AUTHORITY
+You must be root to run this script.
+.SH FILES
+.TP
+/usr/local/etc/emulab/rc/rc.tarfiles
+The
+.I rc
+file that determines what tar files are to be installed on this node and then
+calls this utility to actually perform the installation.
+.TP
+/var/db/testbed.tarfiles
+The database of installed tar files, timestamps, MD5 fingerprints, and
+installation directories.  This file is consulted to determine whether or not a
+tar file has changed and the installation needs to be updated.
+.SH SEE ALSO
+wget(1), md5(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

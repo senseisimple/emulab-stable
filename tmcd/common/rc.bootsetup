@@ -293,6 +293,14 @@ sub doboot()
 	fatal("Error running $RCDIR/rc.config");
     }
 
+    if (-x "$RCDIR/rc.canaryd" && -x "$BINDIR/canaryd") {
+	print("Starting canaryd usage tracer\n");
+	system("$RCDIR/rc.canaryd start");
+	if ($?) {
+	    fatal("Error running $RCDIR/rc.canaryd");
+	}
+    }
+
     #
     # Start the linktest daemon. This script will exit without running
     # linktest is the node is hosting SIM or JAILS.

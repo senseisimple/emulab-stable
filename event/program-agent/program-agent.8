@@ -1,0 +1,297 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH PROGRAM-AGENT 8 "November 6, 2004" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+program-agent \- Event-based program executor/manager.
+.SH SYNOPSIS
+.BI program-agent
+[\fB-hVd\fR]
+[\fB-s \fIserver\fR]
+[\fB-p \fIport\fR]
+[\fB-l \fIlogfile\fR]
+[\fB-k \fIkeyfile\fR]
+[\fB-u \fIuser-name\fR]
+[\fB-i \fIpidfile\fR]
+[\fB-e \fIpid/eid\fR]
+[\fB-c \fIconfigfile\fR]
+.SH DESCRIPTION
+The
+.B program-agent
+daemon runs on the Emulab experimental nodes and executes programs as directed
+by the event system.  The daemon is automatically started when the node boots
+or can be started manually by running:
+.P
+.RS
+$ sudo /usr/local/etc/emulab/rc/rc.progagent boot
+.RE
+.P
+The programs managed by the daemon are specified in the NS file.  For example,
+the following NS fragment creates an agent named "webserver" for the "server"
+node:
+.P
+.RS
+.PD 0
+set server [$ns node]
+.P
+set webserver [$server program-agent]
+.RE
+.PD
+.P
+The set of agents for a particular node are then aggregated within a
+.B program-agent
+daemon on a node.  Events sent to the daemon are then dispatched internally to
+the appropriate agent instance.
+.P
+Available options:
+.P
+.TP
+.B -h
+Print out a usage message.
+.TP
+.B -V
+Print out version information and exit.
+.TP
+.B -d
+Turn on debugging mode.  The server will not daemonize and output will go to
+standard out or to a log file, if one is specified.
+.TP
+.B -s \fIserver\fR
+The host name where the elvin event server is located. (Default: localhost)
+.TP
+.B -p \fIport\fR
+The port where the elvin event server is listening.
+.TP
+.B -l \fIlogfile\fR
+The log file name, defaults to syslog(3), or standard out if in debug mode.
+(Default: /var/emulab/logs/program-agent.debug)
+.TP
+.B -k \fIkeyfile\fR
+The private key file used to sign/verify events.  (Default:
+/proj/\fIpid\fR/exp/\fIeid\fR/tbdata/eventkey)
+.TP
+.B -u \fIuser-name\fR
+The name of the user the program should switch to after execution.
+.TP
+.B -i \fIpidfile\fR
+The name of the file to write the process ID to.  (Default:
+/var/run/progagent.pid)
+.TP
+.B -e \fIpid\fR/\fIeid\fR
+The project and experiment identifiers that determine what events the agent
+should listen for.
+.TP
+.B -c \fIconfigfile\fR
+The configuration file that specifies the programs to manage and their initial
+commands and directory settings.  See the
+.B CONFIGURATION FILE FORMAT
+section for more information about the file format.  (Default:
+/var/emulab/boot/progagents)
+.SH FILES
+.TP
+/local/logs/\fIagent\fR.\fItoken\fR.(out|err)
+The standard out and standard error for a particular invocation of a program.
+The
+.I token
+value is a unique ID attached to every event sent by the
+.B event-sched
+scheduler so you can distinguish multiple invocations of the program.
+.TP
+/local/logs/\fIagent\fR.(out|err)
+Symbolic links to the standard out and error of the last invocation of a
+particular program agent.  These links make it easy to monitor the output of a
+particular program, even through multiple invocations (using "tail -F").
+.TP
+/local/logs/\fIagent\fR.\fItoken\fR.status
+Exit status information for a particular invocation of a program.  The file
+contains the following details about the invocation.
+.RS
+.TP
+.B NAME
+The name of the program agent.
+.TP
+.B DIR
+The directory where the program was started.
+.TP
+.B TIMEOUT
+The timeout, in seconds, for this invocation.  A value of zero means there was
+no timeout.
+.TP
+.B TIMEOUT_FIRED
+An indicator of whether or not the timeout fired and caused the program to
+exit.
+.TP
+.B COMMAND
+The command line that was executed.
+.TP
+.B TOKEN
+The unique identifier for this invocation.
+.TP
+.B START_TIME_SECS
+The time that the program was started, in seconds.
+.TP
+.B START_TIME
+The time that the program was started, in human-readable form as returned by
+.B ctime(3)\fR.
+.TP
+.B END_TIME_SECS
+The time that the program finished, in seconds.
+.TP
+.B END_TIME
+The time that the program finished, in human-readable form as returned by
+.B ctime(3)\fR.
+.TP
+.B EXIT_CODE
+The command's exit code.
+.TP
+.B EXPECTED_EXIT_CODE
+The expected exit code, as specified by the user.  If this value is the same as
+EXIT_CODE, then the invocation was considered a success.
+.TP
+.B CPU_TIME
+The amount of CPU time consumed by the command, in
+.I secs\fR.\fIusecs
+form.
+.TP
+.B MAXRSS
+The maximum resident set size, in kilobytes.
+.RE
+.TP
+/local/logs/\fIagent\fR.status
+Symbolic link to the status information for the last invocation of a program.
+.TP
+/var/emulab/logs/program-agent.debug
+The program-agent daemon's log file.
+.TP
+/var/run/progagent.pid
+The default location for the 
+.B program-agent\fR's
+process ID file.
+.SH COMMAND ENVIRONMENT
+The command will be executed with the following environment variables set:
+.TP
+.B PATH
+The default path for binaries is set to the standard path (e.g. /usr/bin, /bin,
+/usr/sbin, /sbin), the binary directories in /usr/local, and the directory
+containing Emulab specific binaries.
+.TP
+.B EXPDIR
+The experiment's directory in NFS space (e.g. /proj/foo/exp/bar).
+.TP
+.B LOGDIR
+The preferred directory for log files.
+.TP
+.B USER
+The name of the user that swapped in this experiment.
+.TP
+.B HOME
+The path to the user's home directory.
+.TP
+.B GROUP
+The name of the unix group for the user that swapped in this experiment.
+.TP
+.B PID
+The project ID for the experiment this agent is running within.
+.TP
+.B EID
+The experiment ID for the experiment this agent is running within.
+.TP
+.B NODE
+The name of the node this program agent is running on.  Note that this is the
+short name and
+.I not
+the fully qualified host name that would refer to the control interface.
+.TP
+.B NODEIP
+The IP address of the experiment network interface that the node name maps to.
+For nodes with no experimental interfaces, this variable will not be set.
+.TP
+set opt(\f(BIVAR\fR) \f(BIvalues\fR
+Any entries in the "opt" array of the NS file will automatically be added to
+the environment.  For example, to set a variable named "DURATION" with a value
+of "100", you would add "set opt(DURATION) 100" to the top of your NS file.
+.SH CONFIGURATION FILE FORMAT
+The configuration file format is line-oriented with each line being a series of
+key-value pairs.
+.TP
+.B UID
+The user name to switch to before the daemon begins to process events.  The
+.B -u
+option will override this value.  There are no other attributes on this line.
+.TP
+.B AGENT
+An individual program agent, possible attributes include COMMAND, TIMEOUT,
+EXPECTED_EXIT_CODE, and DIR.
+.SH EVENTS
+.TP
+.B TIME START
+This event is sent by
+.B event-sched
+shortly after it finishes starting to indicate the start of virtual time for
+the experiment.  The event will cause any running commands to be stopped, the
+state for the agents will be reverted to their initial state as specified by
+the configuration file, and the log files in "/local/logs" will be deleted.
+.TP
+.B PROGRAM START
+Starts the program by running the command-line in the specified directory and
+capturing its standard output and error.  The agent will then switch into
+"management" mode and only accept
+.I STOP
+and
+.i KILL
+events until the command terminates.  The arguments to this event are:
+.RS
+.TP
+.I COMMAND
+Specifies the command-line to run.  Defaults to the last command that was run
+or the command specified in the NS file.
+.TP
+.I DIR
+Specifies the directory to run the command within.  Defaults to the last
+directory that was specified, the directory in the NS file, or "/tmp".
+.TP
+.I TIMEOUT
+Specifies the timeout, in seconds, for the command or zero for no timeout.  If
+the command does not complete before the timeout, it will be stopped
+forcefully.  Defaults to the last timeout used for this agent or no timeout.
+.TP
+.I EXPECTED_EXIT_CODE
+The expected exit code for the command, this value is compared against the
+actual exit code to determine whether or not it completed successfully.
+Defaults to the last value used or zero.
+.RE
+.TP
+.B PROGRAM STOP
+Stops the program, if it is currently running, by sending a SIGTERM to the
+process group.
+.TP
+.B PROGRAM KILL
+Signals the program with the signal name given as the "SIGNAL" argument.  For
+example, to send a SIGHUP to the process you would use "SIGNAL=SIGHUP".
+.TP
+.B PROGRAM COMPLETE
+This event is sent
+.I from
+the agent when a command has terminated and includes an indicator of success or
+failure based on the EXPECTED_EXIT_CODE and the real exit code.  The event will
+eventually be received by the event-sched(8) daemon which will determine what
+event to send next.
+.SH SIGNALS
+.TP
+SIGINFO
+Dumps the list of programs managed by the daemon and some of their attributes.
+.SH PROCESS PRIORITY
+The
+.B program-agent
+runs at the maximum real-time priority so it has a good chance of receiving and
+processing events in case one of the processes it manages is hogging the CPU.
+.SH SEE ALSO
+tevc(1), csh(1), event-sched(8)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

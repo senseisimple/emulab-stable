@@ -34,10 +34,10 @@ BEGIN {
     DISK_OVERLOAD = 50;
     
     error = 0;
-    if( ARGC < 2 )
+    if( ARGC < 3 )
     {
 	printf("Convert slothd output to a TCL feedback file.\n");
-	printf("Usage: digest-slothd <file1> [<file2> ...] <mapping>\n");
+	printf("Usage: digest-slothd <alert> <mapping> <file1> [<file2> ...]\n");
 	printf("\n");
 	printf("Required arguments:\n");
 	printf("  file1   - A file containing the output of slothd.\n");
@@ -50,9 +50,13 @@ BEGIN {
 	printf("Example mapping:\n");
 	printf("  00:00:0a:01:01:02 node0 link");
 	printf("\n");
-	error = -1;
+	error = 1;
 	exit error;
     }
+
+    alert_file = ARGV[1];
+    ARGV[1] = "";
+    printf("") > alert_file;
 }
 
 #
@@ -167,10 +171,19 @@ BEGIN {
 	}
 	else if( field[1] == "disk" )
 	{
-	    if( fields[2] > DISK_OVERLOAD )
+	    if( field[2] > DISK_OVERLOAD )
 	    {
 		overload[ARGIND] += 1;
 	    }
+	}
+	else if( field[1] == "pipe" )
+	{
+	    split(field[2], data, /,/);
+	    
+	    pipe = data[1];
+	    qlen = data[2];
+	    qlen_bytes = data[3];
+	    qdrops = data[4];
 	}
 	else if( field[1] == "iface" )
 	{
@@ -267,7 +280,7 @@ BEGIN {
 #   Need to deal with CPU time lost in interrupts.
     if( vnode_count == 0 )
     {
-	printf("error: no vnodes in line '%s'\n", $0) > /dev/stderr;
+	printf("error: no vnodes in line '%s'\n", $0) > "/dev/stderr";
 	error = 1;
 	exit error;
     }
@@ -348,6 +361,12 @@ BEGIN {
 /^[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]] [[:alnum:]\-]* [[:alnum:]\-]*$/ {
     mac2node[$1] = $2;
     mac2link[$1] = $3;
+    printf("# mac %s -> node %s\n", $1, $2);
+    printf("# mac %s -> link %s\n", $1, $3);
+}
+
+/pipe/ {
+    pipe2link[$2] = $3;
 }
 
 #
@@ -407,6 +426,12 @@ END {
 	{
 	    printf("set Alerts(%s,%s) 1\n", mac2link[mac], mac2node[mac]);
 	    printf("set Alerts(%s) 1\n", mac2link[mac]);
+
+	    printf("link,%s,%s\n",
+		   mac2link[mac],
+		   mac2node[mac]) > alert_file;
+
+	    error = 3;
 	}
     }
 
@@ -437,6 +462,9 @@ END {
 	if( vnode_name in alerts )
 	{
 	    printf("set Alerts(%s) 1\n", vnode_name);
+
+	    printf("node,%s\n", vnode_name) > alert_file;
+	    error = 3;
 	}
     }
     printf("# END Nodes\n\n");
@@ -451,4 +479,7 @@ END {
 	       links_pkts[link_name]);
     }
     printf("# END Links\n\n");
+
+    printf("# %d\n", error);
+    exit error;
 }

@@ -311,7 +311,8 @@ static int timeline_agent_immediate(local_agent_t la, sched_event_t *se)
 		      se->notification);
 		retval = -1;
 	}
-	else if (strcmp(evtype, TBDB_EVENTTYPE_START) == 0) {
+	else if (strcmp(evtype, TBDB_EVENTTYPE_START) == 0 ||
+		 strcmp(evtype, TBDB_EVENTTYPE_RUN) == 0) {
 		struct timeval now, then;
 		int token, lpc;
 
@@ -382,7 +383,8 @@ static int sequence_agent_immediate(local_agent_t la, sched_event_t *se)
 		      se->notification);
 		retval = -1;
 	}
-	else if (strcmp(evtype, TBDB_EVENTTYPE_START) == 0) {
+	else if (strcmp(evtype, TBDB_EVENTTYPE_START) == 0 ||
+		 strcmp(evtype, TBDB_EVENTTYPE_RUN) == 0) {
 		if (sa->ta_current_event != -1) {
 			error("sequence %s is already active\n",
 			      sa->ta_local_agent.la_link.ln_Name);

@@ -531,7 +531,7 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 
     TRACE("allocating notification (tuple=%p)\n", tuple);
 
-    notification = xmalloc(sizeof(event_notification_t));
+    notification = xmalloc(sizeof(struct event_notification));
     elvin_notification = elvin_notification_alloc(handle->status);
     if (elvin_notification == NULL) {
         ERROR("elvin_notification_alloc failed: ");
@@ -620,7 +620,7 @@ event_notification_clone(event_handle_t handle,
 
     TRACE("cloning notification %p\n", notification);
 
-    clone = xmalloc(sizeof(event_notification_t));
+    clone = xmalloc(sizeof(struct event_notification));
     if (! (clone->elvin_notification =
 	   elvin_notification_clone(notification->elvin_notification,
 				    handle->status))) {

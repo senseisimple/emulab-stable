@@ -31,7 +31,6 @@ EventSequence instproc init {s seq args} {
 
     $self instvar event_list
 
-    set seq [split $seq "\n"]
     foreach line $seq {
 	if {[llength $line] > 0} {
 	    set rc [$s make_event "sequence" $line]

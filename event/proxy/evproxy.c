@@ -25,6 +25,7 @@
 
 static int debug = 0;
 static event_handle_t localhandle;
+static event_handle_t bosshandle;
 
 void
 usage(char *progname)
@@ -37,10 +38,13 @@ static void
 callback(event_handle_t handle,
 	 event_notification_t notification, void *data);
 
+static void
+sched_callback(event_handle_t handle,
+	       event_notification_t notification, void *data);
+
 int
 main(int argc, char **argv)
 {
-	event_handle_t		bosshandle;
 	address_tuple_t		tuple;
 	char			*progname;
 	char			*server = NULL;
@@ -156,6 +160,13 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on remote server");
 	}
 
+	tuple->host = ADDRESSTUPLE_ALL;
+	tuple->scheduler = 1;
+	
+	if (! event_subscribe(localhandle, sched_callback, tuple, NULL)) {
+		fatal("could not subscribe to events on remote server");
+	}
+
 	/*
 	 * Stash the pid away.
 	 */
@@ -213,4 +224,13 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	 */
 	if (! event_notify(localhandle, notification))
 		error("Failed to deliver notification!");
+}
+
+static void
+sched_callback(event_handle_t handle,
+	       event_notification_t notification,
+	       void *data)
+{
+	if (! event_notify(bosshandle, notification))
+		error("Failed to deliver scheduled notification!");
 }

@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+USAGE="usage: $0 (start|stop|restart)"
+
+if [ $# -lt 1 ]
+then
+        echo $USAGE
+        exit 1
+fi
+
+. /etc/emulab/paths.sh
+
+ARGS=
+SEDCMD='sed -e s/^.*=\(.*\)/\1/'
+
+start () {
+	if test -x ${BINDIR}/canaryd; then
+		${BINDIR}/canaryd ${ARGS}
+		exit $?
+        fi
+}
+
+stop () {
+        kill `cat /var/run/canaryd.pid`
+}
+
+case $1 in
+        start)
+                start
+                ;;
+        stop)
+                stop
+                ;;
+        restart)
+                stop
+                sleep 1
+                start
+                ;;
+        *)
+                echo "Command $1 not valid"
+                echo $USAGE
+                exit 1
+                ;;
+esac

@@ -282,18 +282,22 @@ Simulator instproc event-sequence {{seq {}} {catch {}} {catch_seq {}}} {
 	set sequence_list($curseq) {}
     } else {
 	set curseq tbseq-seq[incr id_counter]
-	
-	EventSequence $curseq $self [uplevel 1 subst [list $seq]]
+	set lines {}
+
+	foreach line [split $seq "\n"] {
+	    lappend lines [uplevel 1 eval list [list $line]]
+	}
+	EventSequence $curseq $self $lines
 	set sequence_list($curseq) {}
     }
 
     return $curseq
 }
 
-Simulator instproc event-group {args} {
+Simulator instproc event-group {{list {}}} {
     set curgrp [new EventGroup $self]
-    if {$args != {}} {
-	foreach obj $args {
+    if {$list != {}} {
+	foreach obj $list {
 	    $curgrp add $obj
 	}
     }
@@ -570,6 +574,12 @@ Simulator instproc run {} {
 
     $self spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list "*" "slothd" $objtypes(SLOTHD) ]
     
+    if {[array exists ::opt]} {
+	foreach {oname ovalue} [array get ::opt] {
+	    $self spitxml_data "virt_user_environment" [list "name" "value" ] [list "$oname" "$ovalue" ]
+	}
+    }
+
     foreach event $event_list {
 	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] ]
     }
@@ -1049,7 +1059,7 @@ Simulator instproc make_event {outer event} {
 		    set etype START
 		}
 		"run" {
-		    set etype START
+		    set etype RUN
 		}
 		"reset" {
 		    set etype RESET
@@ -1069,7 +1079,7 @@ Simulator instproc make_event {outer event} {
 		    set etype START
 		}
 		"run" {
-		    set etype START
+		    set etype RUN
 		}
 		"reset" {
 		    set etype RESET
@@ -1258,9 +1268,17 @@ Simulator instproc make_event {outer event} {
 			-command $default_command
 			-dir {}
 			-timeout {}
+			-expected-exit-code {}
+			-tag {}
 		    }
 		    if {$(-dir) != {}} {
 			set args "DIR={$(-dir)} "
+		    }
+		    if {$(-expected-exit-code) != {}} {
+			set args "${args}EXPECTED_EXIT_CODE=$(-expected-exit-code) "
+		    }
+		    if {$(-tag) != {}} {
+			set args "${args}TAG=$(-tag) "
 		    }
 		    if {$(-timeout) != {}} {
 			set to [::GLOBALS::reltime-to-secs $(-timeout)]
@@ -1321,6 +1339,7 @@ Simulator instproc make_event {outer event} {
 		    set etype SWAPOUT
 		}
 		"trace-for" {
+		    set vname "slothd"
 		    set otype SLOTHD
 		    set etype START
 		    if {[llength $event] < 3} {
@@ -1339,16 +1358,22 @@ Simulator instproc make_event {outer event} {
 		"message" {
 		    set otype SIMULATOR
 		    set etype MESSAGE
-		    set args "'[lindex $evargs 0]'"
+		    set args "[join $evargs]"
 		}
 		"log" {
 		    set otype SIMULATOR
 		    set etype LOG
-		    set args "'[lindex $evargs 0]'"
+		    set args "[join $evargs]"
 		}
 		"report" {
 		    set otype SIMULATOR
 		    set etype REPORT
+		    ::GLOBALS::named-args $evargs {
+			-digester {}
+		    }
+		    if {$(-digester) != {}} {
+			set args "DIGESTER={$(-digester)}"
+		    }
 		}
 		unknown {
 		    punsup "$obj $cmd $evargs"

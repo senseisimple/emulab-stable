@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -34,11 +34,20 @@ typedef enum {
 	SA_RDK_MAX	/*< The maximum number of message types. */
 } sa_report_data_kind_t;
 
+enum {
+	SAB_STABLE,
+};
+
+enum {
+	SAF_STABLE = (1L << SAB_STABLE),
+};
+
 /**
  * A local agent structure for the NS Simulator object.
  */
 struct _simulator_agent {
 	struct _local_agent sa_local_agent;	/*< Local agent base. */
+	unsigned long sa_flags;
 	struct lnList sa_error_records;		/*< The error records that have
 						  been collected over the
 						  course of the experiment. */

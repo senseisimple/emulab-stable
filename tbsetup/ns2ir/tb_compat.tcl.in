@@ -1156,7 +1156,7 @@ proc tb-feedback-vnode {vnode hardware args} {
     var_import ::GLOBALS::fix_current_resources
 
     ::GLOBALS::named-args $args {
-	-scale 1.2 -rclass "" -alertscale 3.0 -initscale 1.0
+	-scale 1.2 -rclass "" -alertscale 2.0 -initscale 0.01
     }
 
     set fix_current_resources 0

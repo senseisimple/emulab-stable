@@ -29,7 +29,7 @@ use Exporter;
 	     TMCCCMD_ROLE TMCCCMD_RUSAGE TMCCCMD_WATCHDOGINFO TMCCCMD_HOSTKEYS
 	     TMCCCMD_FIREWALLINFO TMCCCMD_EMULABCONFIG
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
-	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY
+	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY TMCCCMD_USERENV
 	     );
 
 # Must come after package declaration!
@@ -165,6 +165,7 @@ my %commandset =
       "booterrno"	=> {TAG => "booterrno"},
       "bootlog"	        => {TAG => "bootlog"},
       "battery"	        => {TAG => "battery"},
+      "userenv"	        => {TAG => "userenv"},
     );
 
 #
@@ -216,6 +217,7 @@ sub TMCCCMD_LOCALIZATION(){ $commandset{"localization"}->{TAG}; }
 sub TMCCCMD_BOOTERRNO   (){ $commandset{"booterrno"}->{TAG}; }
 sub TMCCCMD_BOOTLOG     (){ $commandset{"bootlog"}->{TAG}; }
 sub TMCCCMD_BATTERY     (){ $commandset{"battery"}->{TAG}; }
+sub TMCCCMD_USERENV     (){ $commandset{"userenv"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

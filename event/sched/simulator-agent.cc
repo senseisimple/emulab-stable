@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -18,6 +18,8 @@
 #include "systemf.h"
 #include "rpc.h"
 #include "simulator-agent.h"
+
+using namespace emulab;
 
 /**
  * A "looper" function for the simulator agent that dequeues and processes
@@ -149,13 +151,106 @@ static int add_report_data(simulator_agent_t sa,
 	return retval;
 }
 
-static int send_report(simulator_agent_t sa)
+static int remap_experiment(simulator_agent_t sa, int token)
+{
+	char nsfile[BUFSIZ];
+	EmulabResponse er;
+	int retval;
+
+	rename("tbdata/feedback_data.tcl",
+	       "tbdata/feedback_data_old.tcl");
+	snprintf(nsfile, sizeof(nsfile),
+		 "/proj/%s/exp/%s/tbdata/%s-modify.ns",
+		 pid, eid, eid);
+	if (access(nsfile, R_OK) == -1) {
+		snprintf(nsfile, sizeof(nsfile),
+			 "/proj/%s/exp/%s/tbdata/%s.ns",
+			 pid, eid, eid);
+	}
+	RPC_grab();
+	retval = RPC_invoke("experiment.modify",
+			&er,
+			SPA_String, "proj", pid,
+			SPA_String, "exp", eid,
+			SPA_Boolean, "wait", true,
+			SPA_Boolean, "reboot", true,
+			SPA_Boolean, "restart_eventsys", true,
+			SPA_String, "nsfilepath", nsfile,
+			SPA_TAG_DONE);
+	RPC_drop();
+
+	if (retval != 0) {
+		rename("tbdata/feedback_data.tcl",
+		       "tbdata/feedback_data_failed.tcl");
+		rename("tbdata/feedback_data_old.tcl",
+		       "tbdata/feedback_data.tcl");
+	}
+
+	return retval;
+}
+
+static int do_modify(simulator_agent_t sa, int token, char *args)
+{
+	int rc, retval = 0;
+	char *mode;
+
+	assert(sa != NULL);
+	assert(args != NULL);
+	
+	if ((rc = event_arg_get(args, "MODE", &mode)) <= 0) {
+		error("no mode specified\n");
+	}
+	else if (strncasecmp("stabilize", mode, rc) == 0) {
+		if (systemf("loghole --port=%d --quiet sync",
+			    DEFAULT_RPC_PORT) != 0) {
+			error("failed to sync log holes\n");
+		}
+		else if (systemf("feedbacklogs %s %s", pid, eid) != 0) {
+			if (sa->sa_flags & SAF_STABLE) {
+				/* XXX log error */
+				warning("unstabilized!\n");
+			}
+			else {
+				retval = remap_experiment(sa, token);
+			}
+		}
+		else {
+			info("stabilized\n");
+			sa->sa_flags |= SAF_STABLE;
+		}
+	}
+	else {
+		warning("unknown mode %s\n", mode);
+	}
+
+	return retval;
+}
+
+static void dump_report_data(FILE *file,
+			     simulator_agent_t sa,
+			     sa_report_data_kind_t srdk)
+{
+	assert(file != NULL);
+	assert(sa != NULL);
+	assert(srdk >= 0);
+	assert(srdk < SA_RDK_MAX);
+
+	if ((sa->sa_report_data[srdk] != NULL) &&
+	    (strlen(sa->sa_report_data[srdk]) > 0)) {
+		fprintf(file, "\n%s\n", sa->sa_report_data[srdk]);
+		free(sa->sa_report_data[srdk]);
+		sa->sa_report_data[srdk] = NULL;
+	}
+}
+
+static int send_report(simulator_agent_t sa, char *args)
 {
 	struct lnList error_records;
 	int retval;
 	FILE *file;
 
 	assert(sa != NULL);
+	assert(args != NULL);
 	
 	/*
 	 * Atomically move the error records from the agent object onto our
@@ -186,21 +281,59 @@ static int send_report(simulator_agent_t sa)
 		retval = -1;
 	}
 	else {
-		int lpc;
+		char *digester;
+		int rc, lpc;
+		FILE *dfile;
 		
 		retval = 0;
 
-		/* Dump user supplied stuff first then */
-		for (lpc = 0; lpc < SA_RDK_MAX; lpc++) {
-			if ((sa->sa_report_data[lpc] != NULL) &&
-			    (strlen(sa->sa_report_data[lpc]) > 0)) {
+		/* Dump user supplied stuff first, */
+		dump_report_data(file, sa, SA_RDK_MESSAGE);
+
+		/* ... run the user-specified log digester, then */
+		if ((rc = event_arg_get(args, "DIGESTER", &digester)) > 0) {
+			digester[rc] = '\0';
+
+			if ((dfile = popenf("%s | tee logs/digest.out",
+					    "r",
+					    digester)) == NULL) {
 				fprintf(file,
-					"\n%s\n",
-					sa->sa_report_data[lpc]);
-				free(sa->sa_report_data[lpc]);
-				sa->sa_report_data[lpc] = NULL;
+					"[failed to run digester %s]\n",
+					digester);
 			}
+			else {
+				char buf[BUFSIZ];
+				
+				while ((rc = fread(buf,
+						   1,
+						   sizeof(buf),
+						   dfile)) > 0) {
+					fwrite(buf, 1, rc, file);
+				}
+				pclose(dfile);
+				dfile = NULL;
+			}
+
+			fprintf(file, "\n");
 		}
+		
+		if ((dfile = popenf("loghole --port=%d --quiet archive",
+				    "r",
+				    DEFAULT_RPC_PORT)) == NULL) {
+			error("failed to archive log holes\n");
+		}
+		else {
+			char buf[BUFSIZ];
+
+			fgets(buf, sizeof(buf), dfile);
+			pclose(dfile);
+			dfile = NULL;
+
+			fprintf(file, "loghole-archive: %s\n\n", buf);
+		}
+		
+		dump_report_data(file, sa, SA_RDK_LOG);
+		
 		/* ... dump the error records. */
 		if (dump_error_records(&error_records, file) != 0) {
 			errorc("dump_error_records failed");
@@ -255,7 +388,19 @@ static void *simulator_agent_looper(void *arg)
 			argsbuf[sizeof(argsbuf) - 1] = '\0';
 
 			if (strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT) == 0) {
-				rc = systemf("swapexp -s out %s %s", pid, eid);
+				EmulabResponse er;
+				
+				RPC_grab();
+				RPC_invoke("experiment.swapexp",
+					   &er,
+					   SPA_String, "proj", pid,
+					   SPA_String, "exp", eid,
+					   SPA_String, "direction", "out",
+					   SPA_TAG_DONE);
+				RPC_drop();
+			}
+			else if (strcmp(evtype, TBDB_EVENTTYPE_MODIFY) == 0) {
+				do_modify(sa, token, argsbuf);
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_HALT) == 0) {
 				rc = systemf("endexp %s %s", pid, eid);
@@ -272,7 +417,7 @@ static void *simulator_agent_looper(void *arg)
 				add_report_data(sa, SA_RDK_LOG, argsbuf);
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_REPORT) == 0) {
-				send_report(sa);
+				send_report(sa, argsbuf);
 			}
 			else {
 				error("cannot handle SIMULATOR event %s.",

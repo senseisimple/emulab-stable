@@ -20,6 +20,8 @@ ifneq ($(host_cpu),arm)
 LDFLAGS  += -static
 endif
 
+TESTS = $(SRCDIR)/syncd_test.sh
+
 all:	emulab-syncd emulab-sync
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -33,6 +35,13 @@ emulab-sync-debug:	emulab-sync.o version.o decls.h
 version.c: emulab-syncd.c 
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
+install:
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
+	$(INSTALL) -m 644 $(SRCDIR)/emulab-syncd.1 \
+		$(INSTALL_DIR)/opsdir/man/man1/emulab-syncd.1
+	$(INSTALL) -m 644 $(SRCDIR)/emulab-sync.1 \
+		$(INSTALL_DIR)/opsdir/man/man1/emulab-sync.1
+
 client: all
 client-install: client
 	$(INSTALL_PROGRAM) emulab-syncd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/emulab-syncd$(EXE)
@@ -40,9 +49,6 @@ client-install: client
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)$(CLIENT_MANDIR)/man1
 	$(INSTALL_DATA) $(SRCDIR)/emulab-syncd.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-syncd.1
 	$(INSTALL_DATA) $(SRCDIR)/emulab-sync.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/emulab-sync.1
-
-check:
-	sh $(SRCDIR)/syncd_test.sh
 
 clean:
 	rm -f *.o emulab-syncd emulab-sync version.c

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -13,6 +13,8 @@
 #include "node-agent.h"
 
 using namespace emulab;
+
+#define REBOOT_TIMEOUT (6 * 60)
 
 /**
  * A "looper" function for node agents that dequeues and processes events for
@@ -240,6 +242,65 @@ static int do_reboot(node_agent_t na, char *nodeids)
 	return retval;
 }
 
+static int do_snapshot(node_agent_t na, char *nodeids, char *args)
+{
+	event_handle_t handle;
+	EmulabResponse er;
+	char *image_name;
+	int rc, retval;
+
+	assert(na != NULL);
+	assert(node_agent_invariant(na));
+	assert(nodeids != NULL);
+	assert(strlen(nodeids) > 0);
+	assert(args != NULL);
+
+	handle = na->na_local_agent.la_handle;
+
+	/*
+	 * Get any logs off the node(s) before we destroy them with the disk
+	 * reload, then
+	 */
+	if (systemf("loghole --port=%d --quiet sync %s",
+		    DEFAULT_RPC_PORT,
+		    nodeids) != 0) {
+		warning("failed to sync log hole for node %s\n", nodeids);
+	}
+
+	/* ... reload the default image, or */
+	if ((rc = event_arg_get(args, "IMAGE", &image_name)) < 0) {
+		warning("no image name given: %s\n", nodeids);
+	}
+	/* ... a user-specified image. */
+	else {
+		image_name[rc] = '\0';
+		if ((retval = RPC_invoke("node.create_image",
+					 &er,
+					 SPA_String, "node", nodeids,
+					 SPA_String, "imageproj", pid,
+					 SPA_String, "imagename", image_name,
+					 SPA_Boolean, "wait", true,
+					 SPA_Boolean, "bootwait", true,
+					 SPA_TAG_DONE)) != 0) {
+			warning("could not snapshot: %s\n", nodeids);
+		}
+		/* XXX Kinda hacky way to wait for the node to come up. */
+		else if ((retval =
+			  RPC_invoke("node.statewait",
+				     &er,
+				     SPA_String, "node", nodeids,
+				     SPA_Integer, "timeout", REBOOT_TIMEOUT,
+				     SPA_String, "state", "ISUP",
+				     SPA_TAG_DONE)) != 0) {
+			warning("timeout waiting for node: %s\n", nodeids);
+		}
+	}
+
+	/* XXX dump output to a file. */
+	
+	return retval;
+}
+
 static void *node_agent_looper(void *arg)
 {
 	node_agent_t na = (node_agent_t)arg;
@@ -287,6 +348,10 @@ static void *node_agent_looper(void *arg)
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_RELOAD) == 0) {
 				rc = reload_with(na, nodeids, argsbuf);
+			}
+			else if (strcmp(evtype,
+					TBDB_EVENTTYPE_SNAPSHOT) == 0) {
+				rc = do_snapshot(na, nodeids, argsbuf);
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_SETDEST) == 0) {
 				event_notify(handle, en);

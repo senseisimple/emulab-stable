@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -11,6 +11,7 @@
  */
 
 #include <ctype.h>
+#include <syslog.h>
 
 #include "auxfuncs.h"
 
@@ -21,9 +22,9 @@ struct ceCanarydEventsData canaryd_events_data;
 /**
  * The list of events we care about: start, stop, reset, report.
  */
-static const char *CANARYD_EVENTS = (TBDB_EVENTTYPE_START ", "
-				     TBDB_EVENTTYPE_STOP ", "
-				     TBDB_EVENTTYPE_RESET ", "
+static const char *CANARYD_EVENTS = (TBDB_EVENTTYPE_START ","
+				     TBDB_EVENTTYPE_STOP ","
+				     TBDB_EVENTTYPE_RESET ","
 				     TBDB_EVENTTYPE_REPORT);
 
 /**
@@ -55,7 +56,7 @@ static int ceGrabPidEid(char *buf, void *data)
 
 int ceInitCanarydEvents(const char *event_server)
 {
-    char *stprog[] = {"tmcc", "status", NULL};
+    char *stprog[] = { "tmcc", "status", NULL };
     address_tuple_t tuple = NULL;
     int retval = 1;
 
@@ -67,6 +68,7 @@ int ceInitCanarydEvents(const char *event_server)
     /* ... determine the pid/eid for this node, and */
     else if( procpipe(stprog, &ceGrabPidEid, NULL) )
     {
+	syslog(LOG_ERR, "procpipe failed");
 	retval = 0;
     }
     /* ... attempt the subscription. */
@@ -85,6 +87,7 @@ int ceInitCanarydEvents(const char *event_server)
 					0,
 					EVENTKEYFILE)) == NULL )
 	{
+	    syslog(LOG_ERR, "event_register_failed");
 	    retval = 0;
 	}
 	/* ... subscribe to the canaryd events. */
@@ -93,6 +96,7 @@ int ceInitCanarydEvents(const char *event_server)
 				  tuple,
 				  NULL) )
 	{
+	    syslog(LOG_ERR, "event_subscribe");
 	    retval = 0;
 	}
     }

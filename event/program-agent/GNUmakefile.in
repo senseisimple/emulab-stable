@@ -22,8 +22,9 @@ CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 
-LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += -g -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
 
@@ -40,16 +41,24 @@ LIBS     += -ldl
 endif
 endif
 
-program-agent-debug: program-agent.o
-	$(CC) $(LDFLAGS) -o $@ program-agent.o $(LIBS)
+version.c: program-agent.c
+	echo >$@ "char build_info[] = \"Built on `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
+
+program-agent-debug: program-agent.o version.o
+	$(CC) $(LDFLAGS) -o $@ program-agent.o version.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 install:
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
+	$(INSTALL) -m 0644 $(SRCDIR)/program-agent.8 \
+		$(INSTALL_DIR)/opsdir/man/man8/program-agent.8
 
 client: $(PROGRAMS)
 client-install: client
 	$(INSTALL_PROGRAM) program-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/program-agent$(EXE)
+	chmod u+s-w $(DESTDIR)$(CLIENT_BINDIR)/program-agent
+	$(INSTALL) -m 644 $(SRCDIR)/program-agent.8 $(DESTDIR)$(CLIENT_MANDIR)/man8/program-agent.8
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)
