@@ -1,0 +1,2 @@
+Meta-port for an emulab boss node. This port does not install the emulab
+software itself - it just ensures that the requisite ports are installed.
