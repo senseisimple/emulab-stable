@@ -2,6 +2,10 @@
  * Usage: imageunzip <input file>
  *
  * Writes the uncompressed data to stdout.
+ *
+ * XXX: Be nice to use pwrite. That would simplify the code a alot, but
+ * you cannot pwrite to a device that does not support seek (stdout),
+ * and I want to retain that capability.
  */
 
 #include <stdio.h>
@@ -11,7 +15,23 @@
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/disklabel.h>
 #include "imagehdr.h"
+
+/*
+ * In slice mode, we read the DOS MBR to find out where the slice is on
+ * the raw disk, and then seek to that spot. This avoids sillyness in
+ * the BSD kernel having to do with disklabels. 
+ *
+ * These numbers are in sectors.
+ */
+long		outputminsec	= 0;
+long		outputmaxsec	= 0;
+long long	outputmaxsize	= 0;	/* Sanity check */
+int	slice;
+
+/* Why is this not defined in a public header file? */
+#define BOOT_MAGIC	0xAA55
 
 #define CHECK_ERR(err, msg) { \
     if (err != Z_OK) { \
@@ -27,8 +47,8 @@ char		inbuf[BSIZE], outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
 
 int		infd, outfd;
 int		doseek = 0;
-int		debug = 1;
-long long	total = 0;
+int		debug  = 0;
+long long	total  = 0;
 int		inflate_subblock(void);
 void		writezeros(off_t zcount);
 
@@ -48,29 +68,66 @@ static inline off_t devlseek(int fd, off_t off, int whence)
 static inline int devwrite(int fd, const void *buf, size_t size)
 {
 	assert((size & (SECSIZE-1)) == 0);
+	assert(outputmaxsize == 0 || (total + size) <= outputmaxsize);
 	return write(fd, buf, size);
+}
+
+static inline int devread(int fd, void *buf, size_t size)
+{
+	assert((size & (SECSIZE-1)) == 0);
+	return read(fd, buf, size);
 }
 #endif
 
+static void
+usage(void)
+{
+	fprintf(stderr, "usage: "
+		"imageunzip [-d] [-s #] <input filename> [output filename]\n"
+		" -s slice        Output to DOS slice (DOS numbering 1-4)\n"
+		"                 NOTE: Must specify a raw disk device.\n"
+		" -d              Turn on progressive levels of debugging\n");
+	exit(1);
+}	
 
 int
 main(int argc, char **argv)
 {
+	int		ch;
 	struct timeval  stamp, estamp;
 
-	if (argc < 2 || argc > 3) {
-		fprintf(stderr, "usage: "
-		       "%s <input filename> [output filename]\n", argv[0]);
-		exit(1);
+	while ((ch = getopt(argc, argv, "dhs:")) != -1)
+		switch(ch) {
+		case 'd':
+			debug++;
+			break;
+
+		case 's':
+			slice = atoi(optarg);
+			break;
+
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+	argc -= optind;
+	argv += optind;
+
+	if (argc < 1 || argc > 2)
+		usage();
+	if (argc == 1 && slice) {
+		fprintf(stderr, "Cannot specify a slice when using stdout!\n");
+		usage();
 	}
 
-	if ((infd = open(argv[1], O_RDONLY, 0666)) < 0) {
+	if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
 		perror("opening input file");
 		exit(1);
 	}
-	if (argc == 3) {
+	if (argc == 2) {
 		if ((outfd =
-		     open(argv[2], O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
+		     open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
 			perror("opening output file");
 			exit(1);
 		}
@@ -78,6 +135,21 @@ main(int argc, char **argv)
 	}
 	else
 		outfd = fileno(stdout);
+
+	if (slice) {
+		off_t	minseek;
+		
+		if (readmbr(slice)) {
+			fprintf(stderr, "Failed to read MBR\n");
+			exit(1);
+		}
+		minseek = ((off_t) outputminsec) * SECSIZE;
+		
+		if (lseek(outfd, minseek, SEEK_SET) < 0) {
+			perror("Setting seek pointer to slice");
+			exit(1);
+		}
+	}
 	
 	gettimeofday(&stamp, 0);
 	
@@ -118,7 +190,7 @@ main(int argc, char **argv)
 int
 inflate_subblock(void)
 {
-	int		cc, err, count, ibsize = 0, ibleft = 0;
+	int		cc, ccres, err, count, ibsize = 0, ibleft = 0;
 	z_stream	d_stream; /* inflation stream */
 	char		*bp;
 	struct blockhdr *blockhdr;
@@ -164,8 +236,16 @@ inflate_subblock(void)
 	curregion++;
 	blockhdr->regioncount--;
 
-	if (debug)
-		fprintf(stderr, "Decompressing: %14qd --> ", offset);
+	/*
+	 * Set the output pointer to the beginning of the region.
+	 */
+	if (total != offset) {
+		assert(offset > total);
+		writezeros(offset - total);
+	}
+
+	if (debug == 1)
+		printf("Decompressing: %14qd --> ", offset);
 
 	while (1) {
 		/*
@@ -218,19 +298,30 @@ inflate_subblock(void)
 			else
 				cc = size;
 
-			if ((cc = devwrite(outfd, bp, cc)) != cc) {
-				if (cc < 0) {
+			if (debug == 2) {
+				printf("%12qd %8d %8d %12qd %10qd %8d %5d %8d"
+				       "\n",
+				       offset, cc, count, total, size, ibsize,
+				       ibleft, d_stream.avail_in);
+			}
+
+			if ((ccres = devwrite(outfd, bp, cc)) != cc) {
+				if (ccres < 0) {
 					perror("Writing uncompressed data");
 				}
 				fprintf(stderr, "inflate failed\n");
 				exit(1);
 			}
+			cc = ccres;
 
 			count  -= cc;
 			bp     += cc;
 			size   -= cc;
 			offset += cc;
 			total  += cc;
+			assert(count >= 0);
+			assert(size  >= 0);
+			assert(total == offset);
 
 			/*
 			 * Hit the end of the region. Need to figure out
@@ -248,15 +339,15 @@ inflate_subblock(void)
 				if (!blockhdr->regioncount)
 					break;
 
-				newoffset = curregion->start * (off_t) SECSIZE;
-
-				writezeros(newoffset - offset);
-
-				offset = newoffset;
-				size   = curregion->size * (off_t) SECSIZE;
+				offset = curregion->start * (off_t) SECSIZE;
+				size   = curregion->size  * (off_t) SECSIZE;
 				assert(size);
 				curregion++;
 				blockhdr->regioncount--;
+
+				assert(offset >= total);
+				if (offset > total)
+					writezeros(offset - total);
 			}
 		}
 		if (d_stream.avail_in)
@@ -272,8 +363,8 @@ inflate_subblock(void)
 	assert(size == 0);
 	assert(blockhdr->size == 0);
 
-	if (debug)
-		fprintf(stderr, "%14qd\n", total);
+	if (debug == 1)
+		printf("%14qd\n", total);
 
 	return 0;
 }
@@ -282,13 +373,15 @@ void
 writezeros(off_t zcount)
 {
 	int	zcc;
+	off_t	offset;
 
 	if (doseek) {
-		if (devlseek(outfd, zcount, SEEK_CUR) < 0) {
+		if ((offset = devlseek(outfd, zcount, SEEK_CUR)) < 0) {
 			perror("Skipping ahead");
 			exit(1);
 		}
 		total  += zcount;
+		assert(offset == total + (((long long)outputminsec)*SECSIZE));
 		return;
 	}
 	
@@ -308,3 +401,51 @@ writezeros(off_t zcount)
 		total  += zcc;
 	}
 }
+
+/*
+ * Parse the DOS partition table to set the bounds of the slice we
+ * are writing to. 
+ */
+int
+readmbr(int slice)
+{
+	int		i, cc, rval = 0;
+	struct doslabel {
+		char		align[sizeof(short)];	/* Force alignment */
+		char		pad2[DOSPARTOFF];
+		struct dos_partition parts[NDOSPART];
+		unsigned short  magic;
+	} doslabel;
+#define DOSPARTSIZE \
+	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
+
+	if (slice < 1 || slice > 4) {
+		fprintf(stderr, "Slice must be 1, 2, 3, or 4\n");
+ 		return 1;
+	}
+
+	if ((cc = devread(outfd, doslabel.pad2, DOSPARTSIZE)) < 0) {
+		perror("Could not read DOS label");
+		return 1;
+	}
+	if (cc != DOSPARTSIZE) {
+		fprintf(stderr, "Could not get the entire DOS label\n");
+ 		return 1;
+	}
+	if (doslabel.magic != BOOT_MAGIC) {
+		fprintf(stderr, "Wrong magic number in DOS partition table\n");
+ 		return 1;
+	}
+
+	outputminsec  = doslabel.parts[slice-1].dp_start;
+	outputmaxsec  = doslabel.parts[slice-1].dp_start +
+		        doslabel.parts[slice-1].dp_size;
+	outputmaxsize = ((long long) (outputmaxsec - outputminsec)) * SECSIZE;
+
+	if (debug) {
+		fprintf(stderr, "Slice Mode: S:%d min:%d max:%d size:%qd\n",
+			slice, outputminsec, outputmaxsec, outputmaxsize);
+	}
+	return 0;
+}
+
