@@ -176,6 +176,11 @@ if (isset($frame)) {
     header("Pragma: no-cache");
     flush();
 
+    for ($i = 0; $i < 1025; $i++) {
+	echo " ";
+    }
+    echo "\n";
+
     # See if we can get the browser to say something. 
     echo date("D M d G:i:s T");
     echo "\n";
