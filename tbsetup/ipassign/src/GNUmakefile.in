@@ -18,9 +18,12 @@ LDFLAGS		+= -L/usr/local/lib
 
 LIBEXEC_STUFF	= ipassign
 
-IPASSIGN_OBJECTS = Graph.o ipassign.o
+IPASSIGN_OBJECTS = bitmath.o ipassign.o Assigner.o ConservativeAssigner.o \
+                   Framework.o HostRouter.o NumberAssigner.o Router.o 
 
-IPASSIGN_HEADERS = Exception.h Graph.h lib.h
+IPASSIGN_HEADERS = Exception.h lib.h Assigner.h ConservativeAssigner.h \
+                   Framework.h HostRouter.h NumberAssigner.h Router.h \
+                   bitmath.h
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -46,6 +49,12 @@ post-install:
 	chmod 775 $(INSTALL_LIBEXECDIR)
 
 clean:
-	rm -f ipassign.o Graph.o ipassign
+	rm -f bitmath.o ipassign.o Assigner.o ConservativeAssigner.o \
+              Framework.o HostRouter.o NumberAssigner.o Router.o ipassign
 
 distclean:
+
+
+
+
+

@@ -80,7 +80,7 @@ int main(int argc, char * argv[])
     {
         if (!(pos->second.empty()))
         {
-            cout << "1 ";
+            cout << "8 1 ";
         }
         list<int>::iterator lanPos = pos->second.begin();
         for ( ; lanPos != pos->second.end(); ++lanPos)

@@ -12,7 +12,8 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= src
+SUBDIRS		=
+# src
 
 #
 # Force dependencies on the scripts so that they will be rerun through

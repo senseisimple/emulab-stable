@@ -26,19 +26,27 @@ public:
         : message(error)
     {
     }
-    virtual const char* what() const throw()
+    virtual char const * what() const throw()
     {
         return message.c_str();
+    }
+    virtual void addToMessage(char const * addend)
+    {
+        message += addend;
+    }
+    virtual void addToMessage(string const & addend)
+    {
+        addToMessage(addend.c_str());
     }
 private:
     string message;
 };
 
-class BitOverflowError : public StringException
+class BitOverflowException : public StringException
 {
 public:
-    explicit BitOverflowError(std::string const & error)
-        : StringException(error)
+    explicit BitOverflowException(std::string const & error)
+        : StringException("Too many hosts and lans: " + error)
     {
     }
 };
@@ -47,16 +55,16 @@ class InvalidCharacterException : public StringException
 {
 public:
     explicit InvalidCharacterException(std::string const & error)
-        : StringException(error)
+        : StringException("Invalid character(s) in line: " + error)
     {
     }
 };
 
-class EmptyLineException : public StringException
+class MissingWeightException : public StringException
 {
 public:
-    explicit EmptyLineException(std::string const & error)
-        : StringException(error)
+    explicit MissingWeightException(std::string const & error)
+        : StringException("Missing weight in line: " + error)
     {
     }
 };
@@ -65,12 +73,66 @@ class NotEnoughNodesException : public StringException
 {
 public:
     explicit NotEnoughNodesException(std::string const & error)
-        : StringException(error)
+        : StringException("Not enough nodes in line: " + error)
     {
     }
 };
 
+class NoHeaderException : public StringException
+{
+public:
+    explicit NoHeaderException(std::string const & error)
+        : StringException("Error Reading Header: " + error)
+    {
+    }
+};
 
+class InvalidArgumentException : public StringException
+{
+public:
+    explicit InvalidArgumentException(std::string const & error)
+        : StringException("Invalid Argument: " + error)
+    {
+    }
+};
+
+class ImpossibleConditionException : public StringException
+{
+public:
+    explicit ImpossibleConditionException(std::string const & error)
+        : StringException("Impossible Condition in Function: " + error)
+    {
+    }
+};
+
+class NoConnectionException : public StringException
+{
+public:
+    explicit NoConnectionException(std::string const & error)
+        : StringException("Oops. I tried to get a connection"
+                          " which doesn't exist: " + error)
+    {
+    }
+};
+
+class NoGraphToRouteException : public StringException
+{
+public:
+    explicit NoGraphToRouteException(std::string const & error)
+        : StringException("I was asked to set up routing without a graph: "
+                          + error)
+    {
+    }
+};
+
+class NoTopLevelException : public StringException
+{
+public:
+    explicit NoTopLevelException(std::string const & error)
+        : StringException("Routing Graph had no top level: " + error)
+    {
+    }
+};
 
 #endif
 
