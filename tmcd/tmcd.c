@@ -901,6 +901,7 @@ COMMAND_PROTOTYPE(doaccounts)
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on p.pid=g.pid "
 			 "where ((p.pid='%s' and p.gid='%s')) "
+			 "      and p.trust!='none' "
 			 "      and u.status='active' order by u.uid",
 			 11, pid, gid);
 	}
@@ -913,7 +914,7 @@ COMMAND_PROTOTYPE(doaccounts)
 			 "left join group_membership as p on p.uid=u.uid "
 			 "left join groups as g on "
 			 "     p.pid=g.pid and p.gid=g.gid "
-			 "where ((p.pid='%s')) "
+			 "where ((p.pid='%s')) and p.trust!='none' "
 			 "      and u.status='active' order by u.uid",
 			 11, pid);
 	}
@@ -1020,7 +1021,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				USERDIR, row[0], glist);
 		}
 		else {
-			sprintf(buf,
+			snprintf(buf, sizeof(buf) - 1,
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
 				"HOMEDIR=%s/%s GLIST=\"%s\" "
