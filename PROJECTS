@@ -146,7 +146,7 @@ Things that could be done:
 	(e.g., "tcpdump not switchtraffic")  I am reminded of this by seeing
 	the never-ending stream of "Unknown IPX Data" packets.
 
-6. Reduce (or eliminate) logging in default OSes
+6. Reduce (or eliminate) logging in default OSes (mike)
 
 	The standard daily/weekly/monthly activities are occurring and
 	sending mail to root (at least in our FreeBSD image).  We should
@@ -155,7 +155,7 @@ Things that could be done:
 	and mail any anomalies to testbed-ops or someplace so we know if
 	some machine has been cracked.
 
-7. Reduce power usage
+7. Reduce power usage (mike)
 
 	We should do what we can to reduce excess power usage.  The most
 	obvious thing to do is turn machines off when they are not assigned.
@@ -204,6 +204,8 @@ Things that could be done:
 		- reduce logging and log across NFS if possible
 		- move unimportant logging to a memory disk
 
+	Maybe we should disconnect one of those big case fans in each
+	machine or get temperature regulated fans.
 
-	
-
+	Of course, the most important thing to do is determine whether
+	we really have a problem and what components suck the most power.
