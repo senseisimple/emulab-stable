@@ -12,14 +12,15 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-ETC_STUFF       = cacert.pem cert.pem identity identity.pub key.pem \
-		  plabroot.tgz pubkey.pem req.pem
+ETC_STUFF       = plabroot.tgz 
+
+CERTS		= cacert.pem cert.pem key.pem pubkey.pem req.pem
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(ETC_STUFF)
+all:	$(ETC_STUFF) # $(CERTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -28,15 +29,14 @@ install: all data-install
 #
 # Automate this part at some point.
 # 
-data-install:	 $(addprefix $(INSTALL_ETCDIR)/plab/, $(ETC_STUFF))
+data-install: $(addprefix $(INSTALL_ETCDIR)/plab/, $(ETC_STUFF)) # \
+#		$(addprefix $(INSTALL_ETCDIR)/plab/, $(CERTS))
+	@echo Make sure etc/plab/ has the necessary certificates
+	@echo See tbsetup/plab/etc/README for instructions
 
 post-install: 
 	chmod 775 $(INSTALL_ETCDIR)
 	chmod 775 $(INSTALL_ETCDIR)/plab
-	chown root $(INSTALL_ETCDIR)/plab/identity
-	chmod 600 $(INSTALL_ETCDIR)/plab/identity
-	chown root $(INSTALL_ETCDIR)/plab/identity.pub
-	chmod 600 $(INSTALL_ETCDIR)/plab/identity.pub
 
 clean:
 
