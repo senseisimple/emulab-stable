@@ -267,11 +267,12 @@ sub vlanLock($) {
     my $BufferOwner = 'vtpVlanEditBufferOwner'; # use index 1
 
     #
-    # Try 5 times before we give up, in case some other process just
+    # Try max_tries times before we give up, in case some other process just
     # has it locked.
     #
     my $tries = 1;
-    while ($tries <= 5) {
+    my $max_tries = 20;
+    while ($tries <= $max_tries) {
     
 	#
 	# Attempt to grab the edit buffer
@@ -284,7 +285,13 @@ sub vlanLock($) {
 	$self->debug("Buffer Request Set gave " .
 		(defined($grabBuffer)?$grabBuffer:"undef.") . "\n");
 	if (! $grabBuffer) {
-	    print STDERR "VLAN edit buffer request failed - try $tries.\n";
+	    #
+	    # Only print this message every five tries
+	    #
+	    if (!($tries % 5)) {
+		print STDERR "VLAN edit buffer request failed - " .
+			     "try $tries of $max_tries.\n";
+	    }
 	} else {
 	    last;
 	}
@@ -293,7 +300,7 @@ sub vlanLock($) {
 	sleep(1);
     }
 
-    if ($tries > 5) {
+    if ($tries > $max_tries) {
 	#
 	# Admit defeat and exit
 	#
@@ -596,7 +603,7 @@ sub removePortsFromVlan($$) {
     #
     # Walk the tree to find VLAN membership
     #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan,3);
+    my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan);
     my @ports;
     foreach my $rowref (@$rows) {
     	my ($name,$modport,$port_vlan_number) = @$rowref;
