@@ -99,7 +99,6 @@ function WRITESIDEBAR() {
     </td></tr>  
   </table>
 </form>
-<br>
 <table class="menu" width=220 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Interaction</b></td></tr>
 <?php # BACK TO PHP
@@ -347,8 +346,9 @@ function FINISHSIDEBAR()
 ?>
 <!-- sidebar ends -->
         </td>
-        <td valign="top" width=* class="rightcell">
-          <table class="content" width=100% cellpadding="0" cellspacing="0">
+        <td valign="top" width="100%" class="rightcell">
+          <!-- content body table -->
+          <table class="content" width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td class="contentheader">
 <?php
