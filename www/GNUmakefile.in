@@ -70,7 +70,7 @@ BUIFILES += $(wildcard $(SRCDIR)/buildui/*.php)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.class)
 
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
-WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php)
+WEBDBFILES += $(wildcard $(SRCDIR)/webdb/*.php)
 
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
