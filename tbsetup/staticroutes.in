@@ -444,7 +444,7 @@ foreach my $route (keys(%routes)) {
 		die("*** $0:\n".
 		    "    network route mismatch: $src:$dst:$hop!\n");
 	    }
-	    next;
+	    goto HOSTROUTES;
 	}
 
 	$netroutes{"$src:$newip"} = $hop;
