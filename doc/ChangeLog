@@ -1,3 +1,149 @@
+stoller     2003/12/15 17:41:14 MST
+
+  Modified files:
+    www                  defs.php3.in menu.php3 nscheck.php3 
+                         nscheck_form.php3 
+  Added files:
+    www                  beginexp_form.php3 beginexp_html.php3 
+                         beginexp_xml.php3 
+  Log:
+  Commit functioning XML interface. At present, only isadmin people will
+  see this new page. That allows me to inflict pain on testbed
+  developers while we work out any kinks. These new pages implement an
+  XML interface to experiment creation.
+  
+  Some new files:
+  
+  beginexp_html.php3: A wrapper for the actual beginexp form. This page
+  includes the form, and then invokes the XMLRPC backend page.
+  
+  beginexp_form.html: The original form code, split out from beginexp
+  and turned into a module that can be included into another file.  It
+  is slightly reorganized to make it easier to include as a module.  The
+  idea is that the plab_ez form will be recast in this model, reducing
+  some redundant complexity.
+  
+  beginexp_xml.php3: The XML backend. The idea is that the html page
+  packages up the form arguments as an XMLRPC message, and invokes this
+  page with the XML goo encoded in the URL. It also passes along the
+  uid/cookie so that the authentication happens properly (https of
+  course). The page decodes the URL into PHP datatypes, and does much of
+  the same argument checking that beginexp used to do. Errors are stored
+  up in the same manner, but instead of spitting back html, it now spits
+  back a "structure", encoded in XML so that the _html page can put up a
+  new form. Basically, all output is sent back via an XML encoded
+  structure and displayed in a form that the invoking script deems
+  appropriate.
+  
+  This gives us a pure XMLRPC interface, which we wrap with a form interface
+  so that it looks just like it did before.
+  
+  The next step is to provide an alternate front end, but that will require
+  some certificate stuff that I have not worked out yet.
+  
+  Oh, one more item. The syntax check stuff has been altered a bit.
+  Instead of invoking the beginexp page, which meant a zillion special
+  tests, I now invoke nscheck.php3 directly from the button. Took a few
+  extra lines of Javascript to do this, so watch out for problems there
+  too.
+  
+  Revision  Changes    Path
+  1.51      +30 -11    testbed/www/defs.php3.in
+  1.123     +9 -3      testbed/www/menu.php3
+  1.10      +5 -1      testbed/www/nscheck.php3
+  1.8       +2 -1      testbed/www/nscheck_form.php3
+
+shash       2003/12/15 19:58:47 MST
+
+  Modified files:
+    .                    configure configure.in 
+    db                   xmlconvert.in 
+    event/nsetrafgen     GNUmakefile.in nse-install nse.patch 
+                         nseinput.tcl.in tbevent.cc 
+    event/sched          event-sched.c 
+    tbsetup              GNUmakefile.in assign_wrapper.in 
+                         ptopgen.in 
+    tbsetup/ns2ir        sim.tcl.in traffic.tcl 
+    tmcd                 decls.h libsetup.pm 
+    tmcd/common          libtmcc.pm rc.setup 
+  Added files:
+    event/nsetrafgen     ns_files_modified.txt 
+    tbsetup/nseparse     GNUmakefile.in nse.agent.tcl nse.node.tcl 
+                         nse.null.tcl nse.parse.proxy.in 
+                         nse.parse.tcl.in nse.sim.tcl parse-nse.in 
+  Log:
+  Distributed NSE changes. In other words, simulation resources are
+  now mapped to more than one PC if required. The simnode_capacity
+  column in the node_types table determines how many sim nodes can
+  be packed on one PC. The packing factor can also be controlled via
+  tb-set-colocate-factor to be smaller than simnode_capacity.
+  
+  - No frontend code changes. To summarize:
+    $ns make-simulated {
+      ...
+    }
+    is still the easy way to put a whole bunch of Tcl code to be
+    in simulation.
+    One unrelated fix in the frontend code is to fix the
+    xmlencode() function which prior to this would knock off
+    newlines from columns in the XML output. This affected
+    nseconfigs since it is one of the few columns with embedded
+    newlines. Also changed the event type and event object type
+    in traffic.tcl from TRAFGEN/MODIFY to NSE/NSEEVENT.
+  
+  - More Tcl code in a new directory tbsetup/nseparse
+    -> Runs on ops similar to the main parser. This is invoked
+       from assign_wrapper in the end if there are simnodes
+    -> Partitions the Tcl code into multiple Tcl specifications
+       and updates the nseconfigs table via xmlconvert
+    -> Comes with a lot of caveats. Arbitrary Tcl code such as user
+       specified objects or procedures will not be re-generated. For
+       example, if a user wanted a procedure to be included in Tcl
+       code for all partitions, there is no way for code in nseparse
+       to do that. Besides that, it needs to be tested more thoroughly.
+  
+  - xmlconvert has a new option -s. When invoked with this option,
+    the experiments table is not allowed to be modified. Also,
+    virtual tables are just updated (as opposed to deleting
+    all rows in the first invocation before inserting new rows)
+  
+  - nse.patch has all the IP address related changes committed in
+    iversion 1.11 + 2 other changes. 1) MTU discovery support in
+    the ICMP agent 2) "$ns rlink" mechanism for sim node to real
+    node links
+  
+  - nseinput.tcl includes several client side changes to add IP
+    routes in NSE and the kernel routing table for packets crossing
+    pnodes. Also made the parsing of tmcc command output more robust
+    to new changes. Other client side changes in libsetup.pm and other
+    scripts to run nse, are also in this commit
+  
+  - Besides the expected changes in assign_wrapper for simulated nodes,
+    the interfaces and veth_interfaces tables are updated with
+    routing table identifiers (rtabid). The tmcd changes are already
+    committed. This field is used only by sim hosts on the client side.
+    Of course, they can be used by jails as well if desired.
+  
+  Revision  Changes    Path
+  1.191     +5 -2      testbed/configure
+  1.198     +4 -1      testbed/configure.in
+  1.11      +36 -21    testbed/db/xmlconvert.in
+  1.6       +16 -14    testbed/event/nsetrafgen/GNUmakefile.in
+  1.10      +2 -0      testbed/event/nsetrafgen/nse-install
+  1.14      +3372 -2308testbed/event/nsetrafgen/nse.patch
+  1.16      +206 -137  testbed/event/nsetrafgen/nseinput.tcl.in
+  1.4       +7 -5      testbed/event/nsetrafgen/tbevent.cc
+  1.27      +3 -1      testbed/event/sched/event-sched.c
+  1.97      +9 -1      testbed/tbsetup/GNUmakefile.in
+  1.144     +78 -210   testbed/tbsetup/assign_wrapper.in
+  1.50      +25 -13    testbed/tbsetup/ptopgen.in
+  1.58      +10 -10    testbed/tbsetup/ns2ir/sim.tcl.in
+  1.27      +28 -10    testbed/tbsetup/ns2ir/traffic.tcl
+  1.21      +1 -1      testbed/tmcd/decls.h
+  1.92      +138 -73   testbed/tmcd/libsetup.pm
+  1.6       +6 -1      testbed/tmcd/common/libtmcc.pm
+  1.11      +5 -0      testbed/tmcd/common/rc.setup
+
 ricci       2003/12/02 17:20:12 MST
 
   Added files:
