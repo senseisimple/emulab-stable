@@ -1799,6 +1799,13 @@ COMMAND_PROTOTYPE(doaccounts)
 			goto skipkeys;
 
 		/*
+		 * Locally, everything is NFS mounted so no point in
+		 * sending back pubkey stuff; its never used.
+		 */
+		if (reqp->islocal)
+			goto skipsshkeys;
+
+		/*
 		 * Need a list of keys for this user.
 		 */
 		pubkeys_res = mydb_query("select idx,pubkey "
@@ -1857,7 +1864,12 @@ COMMAND_PROTOTYPE(doaccounts)
 		}
 		mysql_free_result(pubkeys_res);
 
-		if (vers < 6)
+	skipsshkeys:
+		/*
+		 * Do not bother to send back SFS keys if the node is not
+		 * running SFS.
+		 */
+		if (vers < 6 || !strlen(reqp->sfshostid))
 			goto skipkeys;
 
 		/*
