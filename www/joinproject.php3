@@ -543,12 +543,12 @@ if (! $returning) {
     DBQueryFatal("INSERT INTO users ".
 	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	" usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,".
-	" status,pswd_expires) ".
+	" status,pswd_expires,usr_modified) ".
 	"VALUES ('$joining_uid', now(), '$usr_expires', '$usr_name', ".
         "'$usr_email', ".
 	"'$usr_addr', '$usr_URL', '$usr_phone', '$usr_title', '$usr_affil', ".
         "'$encoding', NULL, 'newuser', ".
-	"date_add(now(), interval 1 year))");
+	"date_add(now(), interval 1 year), now())");
 
     if (isset($usr_key)) {
 	while (list ($idx, $stuff) = each ($usr_key)) {

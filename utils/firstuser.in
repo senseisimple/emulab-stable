@@ -74,7 +74,7 @@ if (<> !~ /Y/i) {
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$username', usr_created=now(), " .
 	"usr_name='$userfull', usr_pswd='$password', unix_uid=$uid, ".
-	"admin=1, dbedit=1, status='active'");
+	"usr_modified=now(), admin=1, dbedit=1, status='active'");
 
 print "Creating project in database...\n";
 DBQueryFatal("insert into projects set pid='$project', created=now(), " .
