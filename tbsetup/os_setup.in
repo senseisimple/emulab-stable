@@ -140,16 +140,16 @@ for ($i = 0; $i < $db_result->numrows; $i++) {
     if (defined($row{'def_boot_path'})) {
 	my $path = $row{'def_boot_path'};
 
-	if ($path ne "" && ! -e $path) {
-	    die("File $path for node $node does not exist!");
-	}
+	#if ($path ne "" && ! -e $path) {
+	#    die("File $path for node $node does not exist!");
+	#}
     }
     if (defined($row{'next_boot_path'})) {
 	my $path = $row{'next_boot_path'};
 
-	if ($path ne "" && ! -e $path) {
-	    die("File $path for node $node does not exist!");
-	}
+	#if ($path ne "" && ! -e $path) {
+	#    die("File $path for node $node does not exist!");
+	#}
     }
 
     #

@@ -57,7 +57,7 @@ foreach (split("\n",$raw)) {
     $nodetype{$node} = $type;
     if (! defined($ostype{$type})) {
 	$sth = $dbh->prepare("SELECT osid from node_types ".
-			     "where machinetype=\"$type\"");
+			     "where type=\"$type\"");
 	$rr = $sth->execute;
 	if ($rr == 0) {
 	    push(@ERRORS,"Invalid type $type");
