@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+#
+# This is a sample event generator to send TBEXAMPLE events to all nodes
+# in an experiment. Like tbsend.pl, but uses the shorter EventSendFatal
+# function, to show off how easy it is. This function, though, should only
+# be used in scripts the only occasionally send events.
+#
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+
+use event;
+use Getopt::Std;
+use strict;
+
+sub usage {
+    warn "Usage: $0 <event>\n";
+    return 1;
+}
+
+my %opt = ();
+getopt(\%opt,"h");
+if ($opt{h}) { exit &usage; }
+if (@ARGV != 1) { exit &usage; }
+
+print "Sent at time " . time() . "\n";
+
+EventSendFatal(objtype   => "TBEXAMPLE",
+	       eventtype => $ARGV[0],
+	       host     => "*" );
+
+exit(0);

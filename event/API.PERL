@@ -10,6 +10,20 @@ So, you still have to call address_tuple_alloc/address_tuple_free, etc.
 Examples of the use of the perl event system are in the examples/ directory,
 and mirror the C examples.
 
+The perl API adds a few new functions, intended to be similar to the DBQuery*
+functions from libdb . They are _only_ intended as a quick-and-dirty way to
+send events from programs whose primary purpose is _not_ dealing with the event
+system. This is because they reconnect to the event server on every event, and
+can only pass data through the address tuple. These functions get called like
+so:
+EventSendFatal(objtype => 'TBEXAMPLE',
+               eventtype = 'FOO',
+	       host => $event::ADRESSTUPLE_ALL);
+The functions (names should be self-explanatory) are:
+EventSendFatal
+EventSendWarn
+EventSend
+
 The following functions have been tested, and the same as their C counterparts:
 address_tuple_alloc
 address_tuple_free

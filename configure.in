@@ -211,7 +211,7 @@ else
 		    event/sched/GNUmakefile event/test/GNUmakefile \
                     event/tbgen/GNUmakefile event/tbgen/tevd.restart \
                     event/example/GNUmakefile event/example/tbsend.pl \
-		    event/example/tbrecv.pl \
+		    event/example/tbrecv.pl event/example/tbsend-short.pl \
 		    event/trafgen/GNUmakefile \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \

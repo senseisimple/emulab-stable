@@ -4,10 +4,10 @@ require Exporter;
 require DynaLoader;
 @ISA = qw(Exporter DynaLoader);
 @EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_unregister c_event_poll dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe xmalloc xrealloc perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get  );
-
 package eventc;
 bootstrap event;
 var_event_init();
+
 # ---------- BASE METHODS -------------
 
 package event;
@@ -451,6 +451,137 @@ sub event_poll($) {
 	return 0;
 }
 
-push @EXPORT, qw(event_subscribe event_poll);
+#
+# NOTE: The following line will only work if this module is included by
+# a file that has already done a 'use lib' to get the path to testbed
+# libraries in the INC path. But, since they had to do that to get this
+# library anyway, shouldn't be a problem. (Didn't want to have to make
+# this a .in file.)
+#
+use libtestbed;
+
+#
+# Conveniece functions - Intended to work like DBQuery* from libdb .
+# Much of this code shamlessly ripped off from libdb.pm
+#
+
+#
+# Warn and send email after a failed event send. First argument is the error
+# message to display. The contents of $EventErrorString is also printed.
+# 
+# usage: EventWarn(char *message)
+#
+sub EventWarn($) {
+	my($message) = $_[0];
+	my($text, $progname);
+
+	#
+	# Must taint check $PROGRAM_NAME cause it comes from outside. Silly!
+	#
+	if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
+		$progname = $1;
+	} else {
+		$progname = "Tainted";
+	}
+
+	$text = "$message - In $progname\n" .
+		"$EventErrorString\n";
+
+	print STDERR "*** $text";
+
+	libtestbed::SENDMAIL($TBOPS, "EventError - $message", $text);
+}
+
+#
+# Same as above, but die after the warning.
+# 
+# usage: EventFatal(char *message);
+#
+sub EventFatal($) {
+	my($message) = $_[0];
+
+	EventWarn($message);
+
+	die("\n");
+}
+
+
+#
+# Conveniece function - Intended to work like DBQueryFatal from libdb
+#
+sub EventSendFatal(@) {
+	my @tuple = @_;
+    
+	my $result = EventSend(@tuple);
+
+	if (!$result) {
+		EventFatal("Event Send failed");
+	}
+
+	return $result;
+}
+
+#
+# Conveniece function - Intended to work like DBQueryWarn from libdb
+#
+sub EventSendWarn(@) {
+	my @tuple = @_;
+    
+	my $result = EventSend(@tuple);
+
+	if (!$result) {
+		EventFatal("Event Send failed");
+	}
+
+	return $result;
+}
+
+sub EventSend(@) {
+	my %tuple_values = @_;
+
+	my $URL = "elvin://" . TB_BOSSNODE;
+
+	my $handle = event_register($URL,0);
+	if (!$handle) {
+		$EventErrorString = "Unable to register with the event system";
+		return undef;
+	}
+
+	my $tuple = address_tuple_alloc();
+	if (!$tuple) {
+		$EventErrorString = "Unable to allocate an address tuple";
+		return undef;
+	}
+
+	#
+	# Set the values the user requested
+	#
+	%$tuple = %tuple_values;
+
+	my $notification = event_notification_alloc($handle,$tuple);
+	if (!$notification) {
+		$EventErrorString = "Could not allocate notification";
+		return undef;
+	}
+
+	if (!event_notify($handle, $notification)) {
+		$EventErrorString = "Could not send event notification";
+		return undef;
+	}
+
+	event_notification_free($handle, $notification);
+	address_tuple_free($tuple);
+
+	if (event_unregister($handle) == 0) {
+		$EventErrorString = "Could not unregister with event system";
+		return undef;
+	}
+
+	return 1;
+}
+
+
+push @EXPORT, qw(event_subscribe event_poll EventSend EventSendFatal
+	EventSendWarn);
 1;
 
