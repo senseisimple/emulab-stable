@@ -11,7 +11,7 @@
 # node-adding page.
 #
 
-function find_switch_macs($mac_list) {
+function find_switch_macs(&$mac_list) {
 
     global $uid, $gid, $TBSUEXEC_PATH;
 
@@ -25,25 +25,30 @@ function find_switch_macs($mac_list) {
     #
     # XXX - error checking
     #
+    $line = fgets($macs);
     while (!feof($macs)) {
-        $line = fgets($macs);
+        $line = rtrim($line);
 	$exploded = explode(",",$line);
 	$MAC = $exploded[0];
 	$switchport = $exploded[1];
 	$vlan = $exploded[2];
 	$iface = $exploded[3];
+	$class = $exploded[4];
 	if (!preg_match("/^([\w-]+)\/(\d+)\.(\d+)$/",$switchport,$matches)) {
 	    echo "<h3>Bad line from switchmac: $line\n";
 	    return 0;
 	}
-	$switch = $matches[0];
-	$card = $matches[1];
-	$port = $matches[2];
-	if (in_array($MAC,$mac_list)) {
+	$switch = $matches[1];
+	$card = $matches[2];
+	$port = $matches[3];
+	echo "Class is ($class), (" . $mac_list[$MAC]["class"] . ")";
+	if ($mac_list[$MAC] && (!$mac_list[$MAC]["class"] ||
+	    ($mac_list[$MAC]["class"] == $class))) {
 	    $mac_list[$MAC]["switch"] = $switch;
-	    $mac_list[$MAC]["card"] = $card;
-	    $mac_list[$MAC]["port"] = $port;
+	    $mac_list[$MAC]["switch_card"] = $card;
+	    $mac_list[$MAC]["switch_port"] = $port;
 	}
+	$line = fgets($macs);
     }
 
     pclose($macs);

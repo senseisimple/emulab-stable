@@ -114,26 +114,35 @@ if ($research) {
     # Get the MACs we're supposed to be looking for
     #
     $query_result = DBQueryFatal("SELECT i.mac, i.new_node_id, n.node_id, " .
-	"i.iface FROM new_interfaces as i LEFT JOIN new_nodes as n " .
-	"ON i.new_node_id = n.new_node_id WHERE $whereclause_qualified");
+	"i.card, i.card=t.control_net AS is_control " .
+	"FROM new_interfaces as i LEFT JOIN new_nodes as n " .
+	"ON i.new_node_id = n.new_node_id " .
+	"LEFT JOIN node_types as t on n.type = t.type " .
+	"WHERE $whereclause_qualified");
     $mac_list = array();
     while ($row = mysql_fetch_array($query_result)) {
+        if ($row["is_control"]) {
+	    $class = "control";
+	} else {
+	    $class = "experimental";
+	}
         $mac_list[$row["mac"]] = array( "new_node_id" => $row["new_node_id"],
-	    "node_id" => $row["node_id"], "iface" => $row["iface"]);
+	    "node_id" => $row["node_id"], "card" => $row["card"],
+	    "class" => $class);
     }
 
     echo "<h3>Looking for MACs, this could take a while...</h3>";
     find_switch_macs($mac_list);
     foreach ($mac_list as $mac => $switchport) {
-        if (in_array("switch",$switchport)) {
+        if ($switchport["switch"]) {
 	    DBQueryFatal("UPDATE new_interfaces SET " .
 		"switch_id='$switchport[switch]', " .
-		"switch_card='$switchport[card]', " .
-		"switch_port='$switchport[port]', ".
+		"switch_card='$switchport[switch_card]', " .
+		"switch_port='$switchport[switch_port]' ".
 		"WHERE new_node_id='$switchport[new_node_id]' " .
-		"AND iface='$switchport[iface]'");
+		"AND card=$switchport[card]");
 	} else {
-	    echo "<h4>Unable to find $switchport[node_id]:$switchport[iface] " .
+	    echo "<h4>Unable to find $switchport[node_id]:$switchport[card] " .
 		"on switches, not updating</h4>\n";
 	}
     }
@@ -200,13 +209,42 @@ if ($newprefix || $addnumber) {
     }
 }
 
+#
+# Re-number interfaces
+#
+if ($renumber) {
+    #
+    # Move them out of the way
+    #
+    foreach ($remap as $index => $value) {
+        if ($value != "") {
+	    DBQueryFatal("UPDATE new_interfaces SET card = card + 100 WHERE " .
+	        "card = $index AND ($whereclause)");
+	}
+    }
+
+    #
+    # Move them back to the correct location
+    #
+    foreach ($remap as $index => $value) {
+        if ($value != "") {
+	    DBQueryFatal("UPDATE new_interfaces SET card = $value WHERE " .
+	        "card = " . ($index + 100) . " AND ($whereclause)");
+	}
+    }
+
+}
+
+#
+# Okay, now get the node information and display the form
+#
 $query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
 	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
 	"i.switch_id, i.switch_card, i.switch_port " .
 	"FROM new_nodes AS n " .
 	"LEFT JOIN node_types AS t on n.type=t.type " .
 	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
-	"    AND t.control_iface = i.iface " .
+	"    AND t.control_net = i.card " .
 	"ORDER BY n.new_node_id");
 
 ?>
@@ -290,13 +328,8 @@ while ($row = mysql_fetch_array($query_result)) {
 </table>
 
 <br>
-<center>
+
 <table>
-
-<tr>
-    <td colspan=2 align="center"><b>Actions</b></th>
-</tr>
-
 <tr>
     <th>Set Type</th>
     <td><input type="text" width="10" name="newtype"></td>
@@ -317,35 +350,50 @@ while ($row = mysql_fetch_array($query_result)) {
     <input type="submit" value="Update selected nodes" name="submit">
     </td>
 </tr>
-
-<tr>
-    <td colspan=2 align="center">
-    <input type="submit" value="Recalculate IPs for selected nodes" name="calc">
-    </td>
-</tr>
-
-<tr>
-    <td colspan=2 align="center">
-    <input type="submit" value="Swap Node IDs and IPs for selected nodes" name="swap">
-    </td>
-</tr>
-
-<tr>
-    <td colspan=2 align="center">
-    <input type="submit" value="Re-search switches for selected nodes" name="research">
-    </td>
-</tr>
-
-<tr>
-    <td colspan=2 align="center">
-    <input type="submit" value="Create selected nodes" name="create">
-    &nbsp;
-    <input type="submit" value="Delete selected nodes" name="delete">
-    </td>
-</tr>
-
 </table>
-</center>
+
+<br><br>
+
+<table>
+<tr>
+    <th>0</th>
+    <td><input type="text" size=2 name="remap[0]"></td>
+</tr>
+<tr>
+    <th>1</th>
+    <td><input type="text" size=2 name="remap[1]"></td>
+</tr>
+<tr>
+    <th>2</th>
+    <td><input type="text" size=2 name="remap[2]"></td>
+</tr>
+<tr>
+    <th>3</th>
+    <td><input type="text" size=2 name="remap[3]"></td>
+</tr>
+<tr>
+    <th>4</th>
+    <td><input type="text" size=2 name="remap[4]"></td>
+</tr>
+<tr>
+    <td colspan=2>
+    <input type="submit" value="Re-number interfaces of selected nodes"
+	name="renumber">
+    </td>
+</tr>
+</table>
+
+<br><br>
+
+<input type="submit" value="Recalculate IPs for selected nodes" name="calc">
+<br><br>
+<input type="submit" value="Swap Node IDs and IPs for selected nodes" name="swap">
+<br><br>
+<input type="submit" value="Re-search switches for selected nodes" name="research">
+<br><br>
+<input type="submit" value="Create selected nodes" name="create">
+<br><br>
+<input type="submit" value="Delete selected nodes" name="delete">
 
 </form>
 
