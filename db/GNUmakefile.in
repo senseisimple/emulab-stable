@@ -15,7 +15,7 @@ BIN_SCRIPTS	= nalloc nfree nodeip node_list readycount
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
-		  idletimes idlemail setsitevar
+		  idletimes idlemail setsitevar audit
 LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
 LIB_SCRIPTS     = libdb.pm
 

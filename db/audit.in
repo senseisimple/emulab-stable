@@ -1,0 +1,108 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+#
+# Audit the DB, looking for things we want to catch. Run once a day from cron.
+# 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+#
+# Form a temp name.
+#
+my $logname = TBMakeLogname("audit");
+my $query_result;
+
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+# 
+open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+#
+# Look for experiments running longer than 1 day, using real nodes.
+#
+if (! ($query_result = 
+       DBQueryWarn("select e.pid,e.eid,e.expt_head_uid,expt_swapped, ".
+		   "       count(r.node_id) as ncount from experiments as e ".
+		   "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+		   "left join nodes as n on n.node_id=r.node_id ".
+		   "left join node_types as nt on nt.type=n.type ".
+		   "where e.state='active' and ".
+		   "      e.expt_swapped < date_sub(now(), interval 1 day) and ".
+		   "      nt.isvirtnode=0 and nt.isremotenode=0 ".
+		   "group by e.pid,e.eid ".
+		   "having ncount>0 ".
+		   "order by expt_swapped desc"))) {
+    fatal("Error accessing the database.");
+}
+
+if ($query_result->numrows) {
+    print "\n";
+    print "Experiments swapped in longer than 1 day.\n";
+    printf "%-12s %-12s %-12s %-22s %s\n", "PID", "EID", "Creator", "Swapped",
+           "PCs";
+    print "------------ ------------ ------------ ".
+	  "---------------------- -------\n";
+    
+    while (my ($pid,$eid,$creator,$swapped,$count) = $query_result->fetchrow()) {
+	next
+	    if ($count == 0);
+
+	printf("%-12s %-12s %-12s %-22s %s\n",
+	       $pid, $eid, $creator, $swapped, $count);
+    }
+}
+
+#
+# Send email if anything was reported.
+#
+if (-s $logname) {
+    SENDMAIL($TBOPS, "Testbed Audit Results", "Testbed Audit Results",
+	     $TBOPS, undef, ($logname));
+}
+
+unlink("$logname");
+exit 0;
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    SENDMAIL($TBOPS, "Testbed Audit Failed", $msg, undef, undef, ($logname));
+    unlink("$logname");
+    exit(1);
+}
