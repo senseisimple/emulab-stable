@@ -34,6 +34,10 @@
 #define SERVER_CERTFILE		"server.pem"
 #define CLIENT_CERTFILE		"client.pem"
 
+#ifdef linux
+#define EAUTH	EPERM
+#endif
+
 /*
  * This is used by tmcd to determine if the connection is ssl or not.
  */
@@ -120,7 +124,7 @@ int
 tmcd_client_sslinit(void)
 {
 	char	buf[BUFSIZ], **cp;
-	
+
 	client = 1;
 	SSL_library_init();
 	SSL_load_error_strings();
@@ -249,7 +253,7 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 	X509		*peer;
 	char		cname[256];
 	struct hostent	*he;
-	struct in_addr  ipaddr;
+	struct in_addr  ipaddr, cnameip;
 	
 	if (connect(sock, name, namelen) < 0)
 		return -1;
@@ -306,14 +310,19 @@ tmcd_sslconnect(int sock, const struct sockaddr *name, socklen_t namelen)
 	 */
 	ipaddr = ((struct sockaddr_in *)name)->sin_addr;
 	
-	if (!(he = gethostbyaddr((char *) &ipaddr, sizeof(ipaddr), AF_INET))) {
-		error("Could not reverse map %s: %s\n",
-		      inet_ntoa(ipaddr), hstrerror(h_errno));
+	if (!(he = gethostbyname(cname))) {
+		error("Could not map %s: %s\n", cname, hstrerror(h_errno));
 		goto badauth;
 	}
-	if (strcmp(he->h_name, cname)) {
-		error("Certificate commonname mismatch: %s!=%s\n",
-		      he->h_name, cname);
+	memcpy((char *)&cnameip, he->h_addr, he->h_length);
+
+	if (ipaddr.s_addr != cnameip.s_addr) {
+		char buf[BUFSIZ];
+		
+		strcpy(buf, inet_ntoa(ipaddr));
+		
+		error("Certificate mismatch: %s mapped to %s instead of %s\n",
+		      cname, buf, inet_ntoa(cnameip));
 		goto badauth;
 	}
 	

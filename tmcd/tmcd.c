@@ -438,7 +438,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 {
 	struct sockaddr_in redirect_client;
 	int		   redirect = 0;
-	char		   buf[BUFSIZ], *bp;
+	char		   buf[BUFSIZ], *bp, *cp;
 	char		   nodeid[TBDB_FLEN_NODEID];
 	char		   class[TBDB_FLEN_NODECLASS];
 	char		   type[TBDB_FLEN_NODETYPE];
@@ -567,15 +567,20 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 */
 	bp += strlen(command_array[i].cmdname);
 
+#ifdef	WITHSSL
+	cp = isssl ? "ssl:yes" : "ssl:no";
+#else
+	cp = "";
+#endif
 	/*
 	 * XXX hack, don't log "log" contents,
 	 * both for privacy and to keep our syslog smaller.
 	 */
 	if (command_array[i].func == dolog)
-		info("%s: log %d chars\n", nodeid, strlen(bp));
+		info("%s: %s log %d chars\n", nodeid, cp, strlen(bp));
 	else
-		info("%s: vers:%d %s\n", nodeid,
-		     version, command_array[i].cmdname);
+		info("%s: vers:%d %s %s\n", nodeid,
+		     version, cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, nodeid, bp, istcp, version);
 
@@ -807,7 +812,7 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("IFCONFIG: %s\n", buf);
+			info("IFCONFIG: %s", buf);
 		}
 	skipit:
 		nrows--;
@@ -887,7 +892,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		gidint = atoi(row[1]);
 		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("ACCOUNTS: %s\n", buf);
+		info("ACCOUNTS: %s", buf);
 
 		nrows--;
 	}
@@ -1182,7 +1187,7 @@ COMMAND_PROTOTYPE(dodelay)
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
-		info("DELAY: %s\n", buf);
+		info("DELAY: %s", buf);
 	}
 	mysql_free_result(res);
 
@@ -1407,7 +1412,7 @@ COMMAND_PROTOTYPE(dohosts)
 				 host->vname : " ");
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("HOSTNAMES: %s\n", buf);
+		info("HOSTNAMES: %s", buf);
 
 		host = host->next;
 	}
@@ -1471,7 +1476,7 @@ COMMAND_PROTOTYPE(dorpms)
 
 		sprintf(buf, "RPM=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("RPM: %s\n", buf);
+		info("RPM: %s", buf);
 		
 	} while ((bp = sp));
 	
@@ -1532,7 +1537,7 @@ COMMAND_PROTOTYPE(dotarballs)
 
 		sprintf(buf, "DIR=%s TARBALL=%s\n", bp, tp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("TARBALLS: %s\n", buf);
+		info("TARBALLS: %s", buf);
 		
 	} while ((bp = sp));
 	
@@ -1590,7 +1595,7 @@ COMMAND_PROTOTYPE(dodeltas)
 
 		sprintf(buf, "DELTA=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("DELTAS: %s\n", buf);
+		info("DELTAS: %s", buf);
 		
 	} while ((bp = sp));
 	
@@ -1668,7 +1673,7 @@ COMMAND_PROTOTYPE(dostartcmd)
 	mysql_free_result(res);
 	
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("STARTUPCMD: %s\n", buf);
+	info("STARTUPCMD: %s", buf);
 	
 	return 0;
 }
@@ -1804,7 +1809,7 @@ COMMAND_PROTOTYPE(doreadycount)
 	sprintf(buf, "READY=%d TOTAL=%d\n", ready, total);
 	client_writeback(sock, buf, strlen(buf), tcp);
 		
-	info("READYCOUNT: %s: %s\n", nodeid, buf);
+	info("READYCOUNT: %s: %s", nodeid, buf);
 
 	return 0;
 }
@@ -1955,7 +1960,7 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("MOUNTS: %s\n", buf);
+		info("MOUNTS: %s", buf);
 	}
 	mysql_free_result(res);
 
@@ -2012,7 +2017,7 @@ COMMAND_PROTOTYPE(dorouting)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("ROUTES: %s\n", buf);
+	info("ROUTES: %s", buf);
 
 	return 0;
 }
@@ -2058,7 +2063,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("doloadinfo: %s\n", buf);
+	info("doloadinfo: %s", buf);
 	
 	return 0;
 }
@@ -2191,7 +2196,7 @@ COMMAND_PROTOTYPE(dotrafgens)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("TRAFGENS: %s\n", buf);
+		info("TRAFGENS: %s", buf);
 	}
 	mysql_free_result(res);
 	return 0;
@@ -2300,7 +2305,8 @@ COMMAND_PROTOTYPE(dostate)
 
 	address_tuple_free(tuple);
 #endif /* EVENTSYS */
-
+	
+	info("STATE: %s\n", newstate);
 	return 0;
 
 }
@@ -2344,7 +2350,7 @@ COMMAND_PROTOTYPE(docreator)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("CREATOR: %s\n", buf);
+	info("CREATOR: %s", buf);
 
 	return 0;
 }
