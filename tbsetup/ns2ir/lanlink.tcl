@@ -13,7 +13,9 @@ Class Link -superclass LanLink
 Class Lan -superclass LanLink
 Class Queue -superclass NSObject
 
-Queue instproc init {type} {
+Queue instproc init {link type} {
+    $self set mylink $link
+    
     # These control whether the link was created RED or GRED. It
     # filters through the DB.
     $self set gentle_ 0
@@ -49,6 +51,18 @@ Queue instproc init {type} {
     }
 }
 
+Queue instproc rename_lanlink {old new} {
+    $self instvar mylink
+
+    set mylink $new
+}
+
+Queue instproc get_link {} {
+    $self instvar mylink
+
+    return $mylink
+}
+
 LanLink instproc queue {} {
     $self instvar linkqueue
 
@@ -68,7 +82,7 @@ LanLink instproc init {s nodes bw d type} {
     var_import GLOBALS::new_counter
     set q1 q[incr new_counter]
 
-    Queue $q1 $type
+    Queue $q1 $self $type
 
     # For now, a single queue for the link. Makes no sense for lans.
     $self set linkqueue $q1
@@ -165,6 +179,9 @@ LanLink instproc rename {old new} {
 	set node [lindex $nodeport 0]
 	$node rename_lanlink $old $new
     }
+    $self instvar linkqueue
+    $linkqueue rename_lanlink $old $new
+    
     [$self set sim] rename_lanlink $old $new
 }
 LanLink instproc rename_node {old new} {

@@ -259,18 +259,21 @@ Simulator instproc connect {src dst} {
 #   <link> up
 #   <link> down
 #   ...
-Simulator instproc at {time event} {
+Simulator instproc at {time eventstring} {
     # Check that time is float
     if {[regexp {(^[0-9]+(\.[0-9]+)?$)|(^\.[0-9]+$)} $time] == 0} {
 	perror "Invalid time spec: $time"
 	return
     }
+    $self instvar event_list
 
-    set atstring "$event"
+    set eventlist [split $eventstring ";"]
 
+  foreach event $eventlist {
     # Check otype/command
     set obj [lindex $event 0]
     set cmd [lindex $event 1]
+    set atstring "$event"
     set args {}
     set okargs 0
     switch -- [$obj info class] {
@@ -287,7 +290,7 @@ Simulator instproc at {time event} {
 		}
                 "set" {
 		    if {[llength $event] < 4} {
-			punsup "Wrong number of arguments: at $time $event"
+			perror "Wrong number of arguments: at $time $event"
 			return
 		    }
 		    set etype MODIFY
@@ -324,7 +327,7 @@ Simulator instproc at {time event} {
 		"down"	    {set etype DOWN}
 		"bandwidth" {
 		    if {[llength $event] < 4} {
-			punsup "Wrong number of arguments: at $time $event"
+			perror "Wrong number of arguments: at $time $event"
 			return
 		    }
                     set arg   [lindex $event 2]
@@ -334,7 +337,7 @@ Simulator instproc at {time event} {
 		}
 		"delay" {
 		    if {[llength $event] < 3} {
-			punsup "Wrong number of arguments: at $time $event"
+			perror "Wrong number of arguments: at $time $event"
 			return
 		    }
                     set arg   [lindex $event 2]
@@ -343,68 +346,65 @@ Simulator instproc at {time event} {
 		}
 		"plr" {
 		    if {[llength $event] < 3} {
-			punsup "Wrong number of arguments: at $time $event"
+			perror "Wrong number of arguments: at $time $event"
 			return
 		    }
                     if {[scan [lindex $event 2] "%f" plr] != 1 ||
                         $plr < 0 || $plr > 1} {
-			punsup "Improper argument: at $time $event"
+			perror "Improper argument: at $time $event"
 			return
                     }
                     set args  "PLR=$plr"
 		    set etype MODIFY
 		}
-		"qsize" {
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	}
+	"Queue" {
+	    set otype LINK
+	    set obj [$obj get_link]
+	    switch -- $cmd {
+                "set" {
 		    if {[llength $event] < 4} {
-			punsup "Wrong number of arguments: at $time $event"
+			perror "Wrong number of arguments: at $time $event"
 			return
-		    }
-                    set units [lindex $event 3]
-                    if {[scan [lindex $event 2] "%d" size] != 1 ||
-                        ($units != "bytes" && $units != "packets")} { 
-			punsup "Improper argument: at $time $event"
-			return
-                    }
-                    if {$units == "bytes"} {
-	                set args  "QSIZE=${size}b"
-                    } else {
-	                set args  "QSIZE=${size}p"
 		    }
 		    set etype MODIFY
-		}
-		"qtype" {
-		    if {[llength $event] < 3} {
-			punsup "Wrong number of arguments: at $time $event"
-			return
+	            set arg [lindex $event 3]
+                    switch -- [lindex $event 2] {
+                        "queue-in-bytes_" {
+	                    set args  "QUEUE-IN-BYTES=$arg"
+                        }
+                        "limit_" {
+	                    set args  "LIMIT=$arg"
+                        }
+                        "maxthresh_" {
+	                    set args  "MAXTHRESH=$arg"
+                        }
+                        "thresh_" {
+	                    set args  "THRESH=$arg"
+                        }
+                        "linterm_" {
+	                    set args  "LINTERM=$arg"
+                        }
+                        "q_weight_" {
+			    if {[scan $arg "%f" w] != 1} {
+				perror "Improper argument: at $time $event"
+				return
+			    }
+	                    set args  "Q_WEIGHT=$f"
+                        }
+			unknown {
+		            punsup "at $time $event"
+		            return
+			}
 		    }
-                    if {$time != 0} {
-			punsup "Qtype change after time zero: at $time $event"
-			return
-		    }
-                    set qtype [lindex $event 2]
-                    if {$qtype != "RED" && $qtype != "DropTail"} { 
-			punsup "Improper argument: at $time $event"
-			return
-                    }
-                    set args  "QTYPE=$qtype"
-		    set etype MODIFY
-		}
-		"qparams" {
-		    if {[llength $event] < 6} {
-			punsup "Wrong number of arguments: at $time $event"
-			return
-		    }
-                    if {[scan $event "%s qparams %f %d %d %f" ignore arg1 arg2 arg3 arg4] != 5} {
-			punsup "Improper argument: at $time $event"
-			return
-                    }
-                    if {$arg1 <= 0 || $arg1 > 1 || $arg4 <= 0 || $arg4 > 1} {
-			punsup "Improper argument: at $time $event"
-			return
-		    }
-	            set args  "QPARAMS=$arg1:$arg2:$arg3:$arg4"
-		    set etype MODIFY
-		}
+                }
 		unknown {
 		    punsup "at $time $event"
 		    return
@@ -433,9 +433,8 @@ Simulator instproc at {time event} {
 	    return
 	}
     }
-
-    $self instvar event_list
     lappend event_list [list $time $vnode $vname $otype $etype $args $atstring]
+  }
 }
 
 # unknown 
