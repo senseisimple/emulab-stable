@@ -247,6 +247,10 @@ if ($isadmin) {
 
 	SUBMENUSECTION("Admin Options");
 	
+	WRITESUBMENUBUTTON("Send an Idle Info Request",
+			   "request_idleinfo.php3?".
+			   "&pid=$exp_pid&eid=$exp_eid");
+	
 	WRITESUBMENUBUTTON("Send a Swap Request",
 			   "request_swapexp.php3?".
 			   "&pid=$exp_pid&eid=$exp_eid");

@@ -42,8 +42,8 @@ if (! ISADMIN($uid)) {
 # Check to make sure this is a valid PID/EID tuple.
 #
 if (! TBValidExperiment($pid, $eid)) {
-  USERERROR("The experiment $eid is not a valid experiment ".
-            "in project $pid.", 1);
+    USERERROR("The experiment $eid is not a valid experiment ".
+	      "in project $pid.", 1);
 }
 
 #

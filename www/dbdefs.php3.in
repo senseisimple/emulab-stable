@@ -1089,6 +1089,9 @@ function TBOSInfo($osid, &$osname, &$pid)
 #
 function TBValidExperiment($pid, $eid)
 {
+    $pid = addslashes($pid);
+    $eid = addslashes($eid);
+
     $query_result =
 	DBQueryFatal("select eid from experiments ".
 		     "where eid='$eid' and pid='$pid'");
