@@ -1,0 +1,42 @@
+#!/usr/bin/perl -w
+
+use English;
+# use strict;
+
+use lib '@prefix@/lib';
+use libdb;
+
+my $result = DBQueryFatal("SELECT node_id1, iface1, node_id2, iface2, time " .
+			  "FROM widearea_delays");
+
+my %nodename = ();
+my %speeds   = ();
+
+while (my ($node_id1, $iface1, $node_id2, $iface2, $time) = $result->fetchrow) {
+    my $msectime = $time * 1000;
+    my $glom1    = $node_id1 . ":" . $iface1;
+    my $glom2    = $node_id2 . ":" . $iface2;
+
+    # print "Got $glom1 to $glom2 in $msectime ms\n";
+    $nodename{ $glom1 } = "1";
+    $nodename{ $glom2 } = "1";
+
+    $speeds{ $glom1 . "+" . $glom2 } = $msectime;
+}
+
+print scalar( keys %nodename ) . "\n";
+
+foreach my $i (sort (keys %nodename)) {
+    print "$i\n";
+}
+
+foreach my $i (sort (keys %nodename)) {
+    foreach my $j (sort (keys %nodename)) {
+	my $s = "0";
+	if (exists $speeds{ $i."+".$j } ) {
+	    $s = $speeds{ $i . "+" . $j };
+	} 
+	print sprintf( "%-5i ", $s );
+    }
+    print "\n";
+}
