@@ -134,8 +134,8 @@ WorkQueueInit(void)
 	if (WorkQDelay < 0)
 		WorkQDelay = sleeptime(1000, "workQ check delay");
 
-#ifdef DOSTATS
-	chunkmap = calloc(Fileinfo.blocks, 1);
+#ifdef STATS
+	chunkmap = calloc(FileInfo.blocks, 1);
 #endif
 }
 
@@ -342,7 +342,7 @@ ClientRequest(Packet_t *p)
 	enqueued = WorkQueueEnqueue(chunk, block, count);
 	if (!enqueued)
 		DOSTAT(qmerges++);
-#ifdef DOSTATS
+#ifdef STATS
 	else if (chunkmap != 0 && count == CHUNKSIZE) {
 		if (chunkmap[chunk]) {
 			if (debug)
@@ -379,9 +379,16 @@ ServerRecvThread(void *arg)
 		DOSTAT(msgin++);
 
 		if (! PacketValid(p, FileInfo.chunks)) {
+			struct in_addr ipaddr = { p->hdr.srcip };
 			DOSTAT(badpackets++);
-			log("received bad packet %d/%d, ignored",
-			    p->hdr.type, p->hdr.subtype);
+			log("received bad packet %d/%d from %s, ignored",
+			    p->hdr.type, p->hdr.subtype, inet_ntoa(ipaddr));
+			if (p->hdr.type == PKTTYPE_REQUEST &&
+			    p->hdr.subtype == PKTSUBTYPE_REQUEST)
+				log("  len=%d, chunk=%d(%d), block=%d@%d\n",
+				    p->hdr.datalen, p->msg.request.chunk,
+				    FileInfo.chunks, p->msg.request.count,
+				    p->msg.request.block);
 			continue;
 		}
 
