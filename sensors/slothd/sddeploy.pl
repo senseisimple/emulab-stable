@@ -114,7 +114,7 @@ sub InstallSlothd($) {
     }
 
     print "starting slothd on $node\n";
-    `$SSH $node /etc/testbed/slothd`;
+    `$SSH $node /etc/testbed/slothd -f`;
     if ($?) {
         return 1;
     }

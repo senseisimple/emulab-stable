@@ -43,7 +43,7 @@ foreach $j (ExpNodes($pid, $eid)) {
     else {
         print "not running. ";
         if ($opts{"s"}) {
-            `sudo ssh -q $j /etc/testbed/slothd`;
+            `sudo ssh -q $j /etc/testbed/slothd -f`;
             print "started..";
         }
         print "\n";
