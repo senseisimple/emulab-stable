@@ -102,6 +102,7 @@ frisbee-dist: Makefile.sa Makefile-linux.sa README.sa $(DISTFILES)
 	mv frisbee-dist/frisbee/Makefile-linux.sa frisbee-dist/frisbee/Makefile-linux
 	mv frisbee-dist/frisbee/README.sa frisbee-dist/README
 	cp $(TESTBED_SRCDIR)/COPYING frisbee-dist
+	cp $(TESTBED_SRCDIR)/doc/papers/frisbee-usenix03.pdf frisbee-dist/doc
 	(cd frisbee-dist/frisbee; \
 		$(EXPANDCOPYRIGHT) Makefile Makefile-linux $(DISTFILES))
 	(cd ../imagezip; $(MAKE) imagezip.tar)
