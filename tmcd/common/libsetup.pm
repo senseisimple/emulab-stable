@@ -38,9 +38,6 @@ use English;
 # The tmcc library.
 use libtmcc;
 
-# For timestamps
-use POSIX qw(strftime);
-
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
 # responses this file is expecting.
@@ -1316,6 +1313,7 @@ sub TBForkCmd($) {
 # TBTimeStamp()
 #
 my $imported_hires = 0;
+my $imported_POSIX = 0;
 
 sub TBTimeStamp()
 {
@@ -1327,6 +1325,11 @@ sub TBTimeStamp()
     }
     my ($seconds, $microseconds) = Time::HiRes::gettimeofday();
     
+    if (! $imported_POSIX) {
+	require POSIX;
+	import POSIX::strftime;
+	$imported_POSIX = 1;
+    }
     return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
 }
 
