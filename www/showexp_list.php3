@@ -70,8 +70,11 @@ echo "</b><br />\n";
 #echo "\n       <a class='static' href='showexp_list.php3?showtype=all&sortby=$sortby&thumb=$thumb'>all</a>.
 #      </b><br />\n";
 
-# Default value for showlastlogin
-$showlastlogin = 1;
+# Default value for showlastlogin is 1 for admins
+$showlastlogin = $isadmin;
+# Note: setting this to 1 for non-admins still doesn't make the column
+# show properly... it just shows the header in the table, over the
+# wrong column. 
 
 #
 # Handle showtype
