@@ -76,9 +76,10 @@ sub portControl {
   my $cmd = shift;
   my @ports = @_;
   print "portControl: $cmd -> (@ports)\n" if $debug;
-  my @p = map { 
-    my $p = portnum($_);
-    my $port = (split(":",$p))[1];
+  my @p = map {
+    if ( /^([^-]*)-\d:(.*)$/ ) { $_ = "$1:$2"; }
+    my $pnum = portnum($_);
+    my $port = (split(":",$pnum))[1];
     my $i = $ifIndex{$port};
     print "$_ -> $port -> $i\n" if $debug;
     if ($cmd =~/able/) { $i; } else { $port }
