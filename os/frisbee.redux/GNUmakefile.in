@@ -33,8 +33,14 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= -static
 
+# Hacky loss rate flag
+#CFLAGS		+= -DDOLOSSRATE
+
+# Define this if you implementation of cond_vars works well
+#CFLAGS		+= -DCONDVARS_WORK
+
 # Define this to a non-zero value to enable recording of trace data
-#CFLAGS		+= -DNEVENTS=20000
+#CFLAGS		+= -DNEVENTS=25000
 
 # Turn on client event handling
 #CFLAGS		+= -DDOEVENTS
@@ -61,9 +67,10 @@ $(FRISBEEDIR)/imageunzip.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/queue.h
 frisbee.o:	$(FRISBEEDIR)/imageunzip.c
 	$(CC) -c $(CFLAGS) -DFRISBEE -I$(FRISBEEDIR) -o frisbee.o $<
 
-client.o:	decls.h log.h trace.h
-server.o:	decls.h log.h trace.h
+client.o:	decls.h log.h utils.h trace.h
+server.o:	decls.h log.h utils.h trace.h
 log.o:		decls.h log.h
+network.o:	decls.h utils.h
 trace.o:	decls.h trace.h log.h
 
 install:	$(INSTALL_SBINDIR)/frisbeed

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,7 +23,9 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <pthread.h>
+#include <assert.h>
 #include "decls.h"
+#include "utils.h"
 #include "trace.h"
 
 #ifdef DOEVENTS
@@ -36,13 +38,18 @@ static int exitstatus;
 
 /* Tunable constants */
 int		maxchunkbufs = MAXCHUNKBUFS;
+int		maxwritebufmem = MAXWRITEBUFMEM;
+int		maxmem = 0;
 int		pkttimeout = PKTRCV_TIMEOUT;
 int		idletimer = CLIENT_IDLETIMER_COUNT;
 int		maxreadahead = MAXREADAHEAD;
 int		maxinprogress = MAXINPROGRESS;
 int		redodelay = CLIENT_REQUEST_REDO_DELAY;
 int		idledelay = CLIENT_WRITER_IDLE_DELAY;
-int		startdelay = 0;
+int		startdelay = 0, startat = 0;
+#ifdef DOLOSSRATE
+int		lossrate = 0;
+#endif
 
 int		debug = 0;
 int		tracing = 0;
@@ -51,17 +58,20 @@ int		randomize = 1;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
-static struct timeval  stamp;
 static int	dotcol;
+static struct timeval stamp;
+static struct in_addr serverip;
 
 /* Forward Decls */
 static void	PlayFrisbee(void);
 static void	GotBlock(Packet_t *p);
 static void	RequestChunk(int timedout);
-static void	RequestStamp(int chunk, int block, int count);
+static void	RequestStamp(int chunk, int block, int count, void *arg);
 static int	RequestRedoTime(int chunk, unsigned long long curtime);
-extern int	ImageUnzipInit(char *filename, int slice,
-			       int debug, int zero, int nothreads, int dostype);
+extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
+			       int nothreads, int dostype,
+			       unsigned long writebufmem);
+extern void	ImageUnzipSetMemory(unsigned long writebufmem);
 extern int	ImageUnzipChunk(char *chunkdata);
 extern void	ImageUnzipFlush(void);
 extern int	ImageUnzipQuit(void);
@@ -69,11 +79,12 @@ extern int	ImageUnzipQuit(void);
 /*
  * Chunk descriptor, one for each CHUNKSIZE*BLOCKSIZE bytes of an image file.
  * For each chunk, record its state and the time at which it was last
- * requested by someone.
+ * requested by someone.  Ours indicates a previous request was made by us.
  */
 typedef struct {
+	unsigned long long lastreq:62;
+	unsigned long long ours:1;
 	unsigned long long done:1;
-	unsigned long long lastreq:63;
 } Chunk_t;
 
 /*
@@ -86,11 +97,11 @@ typedef struct {
  * is complete and ready to write to disk.
  */
 typedef struct {
-	int	thischunk;		/* Which chunk in progress */
-	int	inprogress;		/* Chunk in progress? Free/Allocated */
-	int	ready;			/* Ready to write to disk? */
-	int	blockcount;		/* Number of blocks not received yet */
-	char	bitmap[CHUNKSIZE];	/* Which blocks have been received */
+	int	   thischunk;		/* Which chunk in progress */
+	int	   inprogress;		/* Chunk in progress? Free/Allocated */
+	int	   ready;		/* Ready to write to disk? */
+	int	   blockcount;		/* Number of blocks not received yet */
+	BlockMap_t blockmap;		/* Which blocks have been received */
 	struct {
 		char	data[BLOCKSIZE];
 	} blocks[CHUNKSIZE];		/* Actual block data */
@@ -103,6 +114,7 @@ int		TotalChunkCount;	/* Total number of chunks in file */
 int		IdleCounter;		/* Countdown to request more data */
 
 #ifdef STATS
+extern unsigned long decompblocks, writeridles;	/* XXX imageunzip.c */
 ClientStats_t	Stats;
 #define DOSTAT(x)	(Stats.u.v1.x)
 #else
@@ -133,14 +145,14 @@ usage()
 int
 main(int argc, char **argv)
 {
-	int	ch;
+	int	ch, mem;
 	char   *filename;
 	int	zero = 0;
 	int	nothreads = 0;
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -180,6 +192,14 @@ main(int argc, char **argv)
 			slice = atoi(optarg);
 			break;
 
+		case 'S':
+			if (!inet_aton(optarg, &serverip)) {
+				fprintf(stderr, "Invalid server IP `%s'\n",
+					optarg);
+				exit(1);
+			}
+			break;
+
 		case 't':
 			tracing++;
 			break;
@@ -194,6 +214,34 @@ main(int argc, char **argv)
 
 		case 'D':
 			dostype = atoi(optarg);
+			break;
+
+		case 'C':
+			mem = atoi(optarg);
+			if (mem < 1)
+				mem = 1;
+			else if (mem > 1024)
+				mem = 1024;
+			maxchunkbufs = (mem * 1024 * 1024) /
+				sizeof(ChunkBuffer_t);
+			break;
+
+		case 'W':
+			mem = atoi(optarg);
+			if (mem < 1)
+				mem = 1;
+			else if (mem > 1024)
+				mem = 1024;
+			maxwritebufmem = mem;
+			break;
+
+		case 'M':
+			mem = atoi(optarg);
+			if (mem < 2)
+				mem = 2;
+			else if (mem > 2048)
+				mem = 2048;
+			maxmem = mem;
 			break;
 
 		case 'h':
@@ -230,6 +278,10 @@ main(int argc, char **argv)
 			startdelay = event.data.start.startdelay;
 		else
 			startdelay = 0;
+		if (event.data.start.startat > 0)
+			startat = event.data.start.startat;
+		else
+			startat = 0;
 		if (event.data.start.pkttimeout >= 0)
 			pkttimeout = event.data.start.pkttimeout;
 		else
@@ -243,6 +295,16 @@ main(int argc, char **argv)
 			maxchunkbufs = event.data.start.chunkbufs;
 		else
 			maxchunkbufs = MAXCHUNKBUFS;
+		if (event.data.start.writebufmem >= 0 &&
+		    event.data.start.writebufmem < 4096)
+			maxwritebufmem = event.data.start.writebufmem;
+		else
+			maxwritebufmem = MAXWRITEBUFMEM;
+		if (event.data.start.maxmem >= 0 &&
+		    event.data.start.maxmem < 4096)
+			maxmem = event.data.start.maxmem;
+		else
+			maxmem = 0;
 		if (event.data.start.readahead >= 0 &&
 		    event.data.start.readahead <= maxchunkbufs)
 			maxreadahead = event.data.start.readahead;
@@ -286,26 +348,54 @@ main(int argc, char **argv)
 			debug = event.data.start.debug;
 		else
 			debug = 0;
-		if (event.data.start.trace >= 0) {
+		if (event.data.start.trace >= 0)
 			tracing = event.data.start.trace;
-			traceprefix[0] = 0;
-		} else
+		else
 			tracing = 0;
+		if (event.data.start.traceprefix[0] > 0)
+			strncpy(traceprefix, event.data.start.traceprefix, 64);
+		else
+			traceprefix[0] = 0;
+#ifdef DOLOSSRATE
+		if (event.data.start.plr >= 0.0 && event.data.start.plr <= 1.0)
+			lossrate = (int)(event.data.start.plr * 0x7fffffff);
+		else
+			lossrate = 0;
+#endif
 
-		log("Starting: slice=%d, startdelay=%d, zero=%d, "
+		log("Starting: slice=%d, startat=%d, startdelay=%d, zero=%d, "
 		    "randomize=%d, nothreads=%d, debug=%d, tracing=%d, "
-		    "pkttimeout=%d, idletimer=%d, ideldelay=%d, redodelay=%d, "
-		    "chunkbufs=%d maxreadahead=%d, maxinprogress=%d",
-		    slice, startdelay, zero, randomize, nothreads,
+		    "pkttimeout=%d, idletimer=%d, idledelay=%d, redodelay=%d, "
+#ifdef DOLOSSRATE
+		    "plr=%.2f, "
+#endif
+		    "maxmem=%d, chunkbufs=%d, maxwritebumfem=%d, "
+		    "maxreadahead=%d, maxinprogress=%d",
+		    slice, startat, startdelay, zero, randomize, nothreads,
 		    debug, tracing, pkttimeout, idletimer, idledelay, redodelay,
-		    maxchunkbufs, maxreadahead, maxinprogress);
+#ifdef DOLOSSRATE
+		    lossrate ? event.data.start.plr : 0,
+#endif
+		    maxmem, maxchunkbufs, maxwritebufmem,
+		    maxreadahead, maxinprogress);
 	}
 #endif
 
-	redodelay = sleeptime(redodelay, "request retry delay");
-	idledelay = sleeptime(idledelay, "writer idle delay");
+	redodelay = sleeptime(redodelay, "request retry delay", 0);
+	idledelay = sleeptime(idledelay, "writer idle delay", 0);
 
-	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype);
+	/*
+	 * Set initial memory limits.  These may be adjusted when we
+	 * find out how big the image is.
+	 */
+	if (maxmem != 0) {
+		/* XXX divide it up 50/50 */
+		maxchunkbufs = (maxmem/2 * 1024*1024) / sizeof(ChunkBuffer_t);
+		maxwritebufmem = maxmem/2;
+	}
+
+	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype,
+		       maxwritebufmem*1024*1024);
 
 	if (tracing) {
 		ClientTraceInit(traceprefix);
@@ -349,6 +439,7 @@ ClientRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
 	int		BackOff;
+	static int	gotone;
 
 	if (debug)
 		log("Receive pthread starting up ...");
@@ -394,10 +485,11 @@ ClientRecvThread(void *arg)
 		 * see that block for longer than our timeout period,
 		 * leading us to issue another request, etc.
 		 */
-		if (PacketReceive(p) < 0) {
+		if (PacketReceive(p) != 0) {
 			pthread_testcancel();
 			if (--IdleCounter <= 0) {
-				DOSTAT(recvidles++);
+				if (gotone)
+					DOSTAT(recvidles++);
 				CLEVENT(2, EV_CLIRTIMO,
 					pstamp.tv_sec, pstamp.tv_usec, 0, 0);
 #ifdef NEVENTS
@@ -415,6 +507,7 @@ ClientRecvThread(void *arg)
 			continue;
 		}
 		pthread_testcancel();
+		gotone = 1;
 
 		if (! PacketValid(p, TotalChunkCount)) {
 			log("received bad packet %d/%d, ignored",
@@ -424,22 +517,47 @@ ClientRecvThread(void *arg)
 
 		switch (p->hdr.subtype) {
 		case PKTSUBTYPE_BLOCK:
-			CLEVENT(2, EV_CLIGOTPKT,
+			/*
+			 * Ensure blocks comes from where we expect.
+			 * The validity of hdr.srcip has already been checked.
+			 */
+			if (serverip.s_addr != 0 &&
+			    serverip.s_addr != p->hdr.srcip) {
+				struct in_addr tmp = { p->hdr.srcip };
+				log("received BLOCK from non-server %s",
+				    inet_ntoa(tmp));
+				continue;
+			}
+
+			CLEVENT(3, EV_CLIGOTPKT,
 				pstamp.tv_sec, pstamp.tv_usec, 0, 0);
 #ifdef NEVENTS
 			needstamp = 1;
 #endif
 			BackOff = 0;
 			GotBlock(p);
+			/*
+			 * We may have missed the request for this chunk/block
+			 * so treat the arrival of a block as an indication
+			 * that someone requested it.
+			 */
+			RequestStamp(p->msg.block.chunk, p->msg.block.block,
+				     1, 0);
 			break;
 
 		case PKTSUBTYPE_REQUEST:
 			CLEVENT(4, EV_CLIREQMSG,
 				p->hdr.srcip, p->msg.request.chunk,
 				p->msg.request.block, p->msg.request.count);
-			RequestStamp(p->msg.request.chunk,
-				     p->msg.request.block,
-				     p->msg.request.count);
+			RequestStamp(p->msg.request.chunk, p->msg.request.block,
+				     p->msg.request.count, 0);
+			break;
+
+		case PKTSUBTYPE_PREQUEST:
+			CLEVENT(4, EV_CLIPREQMSG,
+				p->hdr.srcip, p->msg.request.chunk, 0, 0);
+			BlockMapApply(&p->msg.prequest.blockmap,
+				      p->msg.prequest.chunk, RequestStamp, 0);
 			break;
 
 		case PKTSUBTYPE_JOIN:
@@ -458,25 +576,25 @@ ClientRecvThread(void *arg)
 static void
 ChunkerStartup(void)
 {
-	pthread_t		child_pid;
-	void		       *ignored;
-	int			chunkcount = TotalChunkCount;
-	int			i;
+	pthread_t	child_pid;
+	void		*ignored;
+	int		chunkcount = TotalChunkCount;
+	int		i, wasidle = 0;
+	static int	gotone;
 
 	/*
 	 * Allocate the chunk descriptors, request list and cache buffers.
 	 */
-	if ((Chunks =
-	     (Chunk_t *) calloc(chunkcount, sizeof(*Chunks))) == NULL)
+	Chunks = calloc(chunkcount, sizeof(*Chunks));
+	if (Chunks == NULL)
 		fatal("Chunks: No more memory");
 
-	if ((ChunkRequestList =
-	     (int *) calloc(chunkcount, sizeof(*ChunkRequestList))) == NULL)
+	ChunkRequestList = calloc(chunkcount, sizeof(*ChunkRequestList));
+	if (ChunkRequestList == NULL)
 		fatal("ChunkRequestList: No more memory");
 
-	if ((ChunkBuffer =
-	     (ChunkBuffer_t *) malloc(maxchunkbufs * sizeof(ChunkBuffer_t)))
-	    == NULL)
+	ChunkBuffer = malloc(maxchunkbufs * sizeof(ChunkBuffer_t));
+	if (ChunkBuffer == NULL)
 		fatal("ChunkBuffer: No more memory");
 
 	/*
@@ -519,15 +637,6 @@ ChunkerStartup(void)
 	 * Loop until all chunks have been received and written to disk.
 	 */
 	while (chunkcount) {
-#ifdef DOEVENTS
-		Event_t event;
-		if (eventserver != NULL &&
-		    EventCheck(&event) && event.type == EV_STOP) {
-			log("Aborted after %d chunks",
-			    TotalChunkCount-chunkcount);
-			break;
-		}
-#endif
 		/*
 		 * Search the chunk cache for a chunk that is ready to write.
 		 */
@@ -540,20 +649,36 @@ ChunkerStartup(void)
 		 * XXX should be a condition variable.
 		 */
 		if (i == maxchunkbufs) {
-			CLEVENT(1, EV_CLIWRIDLE, 0, 0, 0, 0);
-			if (debug)
-				log("No chunks ready to write!");
-			DOSTAT(nochunksready++);
+#ifdef DOEVENTS
+			Event_t event;
+			if (eventserver != NULL &&
+			    EventCheck(&event) && event.type == EV_STOP) {
+				log("Aborted after %d chunks",
+				    TotalChunkCount-chunkcount);
+				break;
+			}
+#endif
+			if (!wasidle) {
+				CLEVENT(1, EV_CLIWRIDLE, 0, 0, 0, 0);
+				if (debug)
+					log("No chunks ready to write!");
+			}
+			if (gotone)
+				DOSTAT(nochunksready++);
 			fsleep(idledelay);
+			wasidle++;
 			continue;
 		}
+		gotone = 1;
 
 		/*
 		 * We have a completed chunk. Write it to disk.
 		 */
 		if (debug)
-			log("Writing chunk %d (buffer %d)",
-			    ChunkBuffer[i].thischunk, i);
+			log("Writing chunk %d (buffer %d) after idle=%d.%03d",
+			    ChunkBuffer[i].thischunk, i,
+			    (wasidle*idledelay) / 1000000,
+			    ((wasidle*idledelay) % 1000000) / 1000);
 		else {
 			struct timeval estamp;
 
@@ -569,6 +694,11 @@ ChunkerStartup(void)
 			}
 		}
 
+		CLEVENT(1, EV_CLIWRSTART,
+			ChunkBuffer[i].thischunk, wasidle,
+			decompblocks, writeridles);
+		wasidle = 0;
+
 		if (ImageUnzipChunk(ChunkBuffer[i].blocks[0].data))
 			pfatal("ImageUnzipChunk failed");
 
@@ -579,7 +709,8 @@ ChunkerStartup(void)
 		ChunkBuffer[i].inprogress = 0;
 		chunkcount--;
 		CLEVENT(1, EV_CLIWRDONE,
-			ChunkBuffer[i].thischunk, chunkcount, 0, 0);
+			ChunkBuffer[i].thischunk, chunkcount,
+			decompblocks, writeridles);
 	}
 	/*
 	 * Kill the child and wait for it before returning. We do not
@@ -596,10 +727,9 @@ ChunkerStartup(void)
 	ImageUnzipFlush();
 #ifdef STATS
 	{
-		extern unsigned long decompidles, writeridles;
 		extern long long totaledata, totalrdata;
 		
-		Stats.u.v1.decompidles = decompidles;
+		Stats.u.v1.decompblocks = decompblocks;
 		Stats.u.v1.writeridles = writeridles;
 		Stats.u.v1.ebyteswritten = totaledata;
 		Stats.u.v1.rbyteswritten = totalrdata;
@@ -622,7 +752,7 @@ ChunkerStartup(void)
  * what would otherwise be a redundant request.
  */
 static void
-RequestStamp(int chunk, int block, int count)
+RequestStamp(int chunk, int block, int count, void *arg)
 {
 	int stampme = 0;
 
@@ -659,21 +789,17 @@ RequestStamp(int chunk, int block, int count)
 	 * further request (i.e., we don't stamp).
 	 */
 	else {
-		int i, j;
+		int i;
 
 		for (i = 0; i < maxchunkbufs; i++)
 			if (ChunkBuffer[i].thischunk == chunk &&
 			    ChunkBuffer[i].inprogress &&
 			    !ChunkBuffer[i].ready)
 				break;
-		if (i < maxchunkbufs) {
-			for (j = 0; j < count; j++)
-				if (! ChunkBuffer[i].bitmap[block+j]) {
-					stampme = 1;
-					break;
-				}
-		}
-
+		if (i < maxchunkbufs &&
+		    BlockMapIsAlloc(&ChunkBuffer[i].blockmap, block, count)
+		    != count)
+				stampme = 1;
 	}
 
 	if (stampme) {
@@ -714,6 +840,7 @@ GotBlock(Packet_t *p)
 	int	chunk = p->msg.block.chunk;
 	int	block = p->msg.block.block;
 	int	i, free = -1;
+	static int lastnoroomchunk = -1, lastnoroomblocks, inprogress;
 
 	/*
 	 * Search the chunk buffer for a match (or a free one).
@@ -735,13 +862,21 @@ GotBlock(Packet_t *p)
 		 * packet if there is no free chunk.
 		 */
 		if (free == -1) {
-			CLEVENT(1, EV_CLINOROOM, chunk, block, 0, 0);
+			if (chunk != lastnoroomchunk) {
+				CLEVENT(1, EV_CLINOROOM, chunk, block,
+					lastnoroomblocks, 0);
+				lastnoroomchunk = chunk;
+				lastnoroomblocks = 0;
+				if (debug)
+					log("No free buffer for chunk %d!",
+					    chunk);
+			}
+			lastnoroomblocks++;
 			DOSTAT(nofreechunks++);
-			if (debug)
-				log("No more free buffer slots for chunk %d!",
-				    chunk);
 			return;
 		}
+		lastnoroomchunk = -1;
+		lastnoroomblocks = 0;
 
 		/*
 		 * Was this chunk already processed? 
@@ -749,7 +884,7 @@ GotBlock(Packet_t *p)
 		if (Chunks[chunk].done) {
 			CLEVENT(3, EV_CLIDUPCHUNK, chunk, block, 0, 0);
 			DOSTAT(dupchunk++);
-			if (0)
+			if (debug > 2)
 				log("Duplicate chunk %d ignored!", chunk);
 			return;
 		}
@@ -763,8 +898,10 @@ GotBlock(Packet_t *p)
 		ChunkBuffer[i].inprogress = 1;
 		ChunkBuffer[i].thischunk  = chunk;
 		ChunkBuffer[i].blockcount = CHUNKSIZE;
-		bzero(ChunkBuffer[i].bitmap, sizeof(ChunkBuffer[i].bitmap));
-		CLEVENT(1, EV_CLISCHUNK, chunk, block, 0, 0);
+		bzero(&ChunkBuffer[i].blockmap,
+		      sizeof(ChunkBuffer[i].blockmap));
+		inprogress++;
+		CLEVENT(1, EV_CLISCHUNK, chunk, block, inprogress, 0);
 	}
 
 	/*
@@ -773,17 +910,34 @@ GotBlock(Packet_t *p)
 	 * issue a request for a lost block, and we will see that even if
 	 * we do not need it (cause of broadcast/multicast).
 	 */
-	if (ChunkBuffer[i].bitmap[block]) {
+	if (BlockMapAlloc(&ChunkBuffer[i].blockmap, block)) {
 		CLEVENT(3, EV_CLIDUPBLOCK, chunk, block, 0, 0);
 		DOSTAT(dupblock++);
-		if (0)
+		if (debug > 2)
 			log("Duplicate block %d in chunk %d", block, chunk);
 		return;
 	}
-	ChunkBuffer[i].bitmap[block] = 1;
 	ChunkBuffer[i].blockcount--;
 	memcpy(ChunkBuffer[i].blocks[block].data, p->msg.block.buf, BLOCKSIZE);
-	CLEVENT(3, EV_CLIBLOCK, chunk, block, ChunkBuffer[i].blockcount, 0);
+
+#ifdef NEVENTS
+	/*
+	 * If we switched chunks before completing the previous, make a note.
+	 */
+	{
+		static int lastchunk = -1, lastblock, lastchunkbuf;
+
+		if (lastchunk != -1 && chunk != lastchunk &&
+		    lastchunk == ChunkBuffer[lastchunkbuf].thischunk &&
+		    ChunkBuffer[lastchunkbuf].ready == 0)
+			CLEVENT(1, EV_CLILCHUNK, lastchunk, lastblock, 0, 0);
+		lastchunkbuf = i;
+		lastchunk = chunk;
+		lastblock = block;
+		CLEVENT(3, EV_CLIBLOCK, chunk, block,
+			ChunkBuffer[i].blockcount, 0);
+	}
+#endif
 
 	/*
 	 * Anytime we receive a packet thats needed, reset the idle counter.
@@ -795,7 +949,8 @@ GotBlock(Packet_t *p)
 	 * Is the chunk complete? If so, then release it to the main thread.
 	 */
 	if (ChunkBuffer[i].blockcount == 0) {
-		CLEVENT(1, EV_CLIECHUNK, chunk, block, 0, 0);
+		inprogress--;
+		CLEVENT(1, EV_CLIECHUNK, chunk, block, inprogress, 0);
 		if (debug)
 			log("Releasing chunk %d to main thread", chunk);
 		ChunkBuffer[i].ready = 1;
@@ -808,6 +963,44 @@ GotBlock(Packet_t *p)
 		 */
 		RequestChunk(0);
 	}
+}
+
+/*
+ * Request a chunk/block/range we do not have.
+ */
+static void
+RequestMissing(int chunk, BlockMap_t *map, int count)
+{
+	Packet_t	packet, *p = &packet;
+
+	if (debug)
+		log("Requesting missing blocks of chunk:%d", chunk);
+	
+	p->hdr.type       = PKTTYPE_REQUEST;
+	p->hdr.subtype    = PKTSUBTYPE_PREQUEST;
+	p->hdr.datalen    = sizeof(p->msg.prequest);
+	p->msg.prequest.chunk = chunk;
+	p->msg.prequest.retries = Chunks[chunk].ours;
+	BlockMapInvert(map, &p->msg.prequest.blockmap);
+	PacketSend(p, 0);
+#ifdef STATS
+	assert(count==BlockMapIsAlloc(&p->msg.prequest.blockmap,0,CHUNKSIZE));
+	if (count == 0)
+		log("Request 0 blocks from chunk %d", chunk);
+	Stats.u.v1.lostblocks += count;
+	Stats.u.v1.requests++;
+	if (Chunks[chunk].ours)
+		Stats.u.v1.rerequests++;
+#endif
+	CLEVENT(1, EV_CLIPREQ, chunk, count, 0, 0);
+
+	/*
+	 * Since stamps are per-chunk and we wouldn't be here
+	 * unless we were requesting something we are missing
+	 * we can just unconditionally stamp the chunk.
+	 */
+	RequestStamp(chunk, 0, CHUNKSIZE, (void *)1);
+	Chunks[chunk].ours = 1;
 }
 
 /*
@@ -832,7 +1025,8 @@ RequestRange(int chunk, int block, int count)
 	CLEVENT(1, EV_CLIREQ, chunk, block, count, 0);
 	DOSTAT(requests++);
 
-	RequestStamp(chunk, block, count);
+	RequestStamp(chunk, block, count, (void *)1);
+	Chunks[chunk].ours = 1;
 }
 
 static void
@@ -879,27 +1073,15 @@ RequestChunk(int timedout)
 			continue;
 
 		/*
-		 * Scan the bitmap. We do not want to request single blocks,
-		 * but rather small groups of them.
+		 * Request all the missing blocks
 		 */
-		for (j = 0; j < CHUNKSIZE; j++) {
-			/*
-			 * When we find a missing block, scan forward from
-			 * that point till we get to a block that is present.
-			 * Send a request for the intervening range.
-			 */
-			if (! ChunkBuffer[i].bitmap[j]) {
-				for (k = j + 1; k < CHUNKSIZE; k++) {
-					if (ChunkBuffer[i].bitmap[k])
-						break;
-				}
-				DOSTAT(lostblocks++);
-				RequestRange(ChunkBuffer[i].thischunk,
-					     j, k - j);
-				j = k;
-			}
-		}
+		DOSTAT(prequests++);
+		RequestMissing(ChunkBuffer[i].thischunk,
+			       &ChunkBuffer[i].blockmap,
+			       ChunkBuffer[i].blockcount);
 	}
+
+	CLEVENT(2, EV_CLIREQRA, emptybufs, fillingbufs, 0, 0);
 
 	/*
 	 * Issue read-ahead requests.
@@ -907,13 +1089,14 @@ RequestChunk(int timedout)
 	 * If we already have enough unfinished chunks on our plate
 	 * or we have no room for read-ahead, don't do it.
 	 */
-	if (emptybufs < maxreadahead || fillingbufs >= maxinprogress)
+	if (emptybufs == 0 || fillingbufs >= maxinprogress)
 		return;
 
 	/*
 	 * Scan our request list looking for candidates.
 	 */
-	for (i = 0, j = 0; i < TotalChunkCount && j < maxreadahead; i++) {
+	k = (maxreadahead > emptybufs) ? emptybufs : maxreadahead;
+	for (i = 0, j = 0; i < TotalChunkCount && j < k; i++) {
 		int chunk = ChunkRequestList[i];
 		
 		/*
@@ -943,6 +1126,7 @@ PlayFrisbee(void)
 	Packet_t	packet, *p = &packet;
 	struct timeval  estamp, timeo;
 	unsigned int	myid;
+	int		delay;
 
 	gettimeofday(&stamp, 0);
 	CLEVENT(1, EV_CLISTART, 0, 0, 0, 0);
@@ -963,13 +1147,18 @@ PlayFrisbee(void)
 	
 	/*
 	 * To avoid a blast of messages from a large number of clients,
-	 * we delay a small random amount before startup.  The delay
-	 * value is uniformly distributed between 0 and startdelay seconds,
-	 * with ms granularity.
+	 * we can delay a small amount before startup.  If startat is
+	 * non-zero we delay for that number of seconds.  Otherwise, if
+	 * startdelay is non-zero, the delay value is uniformly distributed
+	 * between 0 and startdelay seconds, with ms granularity.
 	 */
-	if (startdelay > 0) {
-		int delay = random() % (startdelay * 1000);
-
+	if (startat > 0)
+		delay = startat * 1000;
+	else if (startdelay > 0)
+		delay = random() % (startdelay * 1000);
+	else
+		delay = 0;
+	if (delay) {
 		if (debug)
 			log("Starup delay: %d.%03d seconds",
 			    delay/1000, delay%1000);
@@ -1012,7 +1201,7 @@ PlayFrisbee(void)
 		 * Throw away any data packets. We cannot start until
 		 * we get a reply back.
 		 */
-		if (PacketReceive(p) >= 0 && 
+		if (PacketReceive(p) == 0 &&
 		    p->hdr.subtype == PKTSUBTYPE_JOIN &&
 		    p->hdr.type == PKTTYPE_REPLY) {
 			CLEVENT(1, EV_CLIJOINREP,
@@ -1023,6 +1212,24 @@ PlayFrisbee(void)
 	gettimeofday(&timeo, 0);
 	TotalChunkCount = p->msg.join.blockcount / CHUNKSIZE;
 	
+	/*
+	 * If we have partitioned up the memory and have allocated
+	 * more chunkbufs than chunks in the file, reallocate the
+	 * excess to disk buffering.  If the user has explicitly
+	 * partitioned the memory, we leave everything as is.
+	 */
+	if (maxmem != 0 && maxchunkbufs > TotalChunkCount) {
+		int excessmb;
+
+		excessmb = ((maxchunkbufs - TotalChunkCount) *
+			    sizeof(ChunkBuffer_t)) / (1024 * 1024);
+		maxchunkbufs = TotalChunkCount;
+		if (excessmb > 0) {
+			maxwritebufmem += excessmb;
+			ImageUnzipSetMemory(maxwritebufmem*1024*1024);
+		}
+	}
+ 
 	log("Joined the team after %d sec. ID is %u. "
 	    "File is %d chunks (%d blocks)",
 	    timeo.tv_sec - stamp.tv_sec,
@@ -1049,6 +1256,7 @@ PlayFrisbee(void)
 	Stats.u.v1.runsec        = estamp.tv_sec;
 	Stats.u.v1.runmsec       = estamp.tv_usec / 1000;
 	Stats.u.v1.chunkbufs     = maxchunkbufs;
+	Stats.u.v1.writebufmem   = maxwritebufmem;
 	Stats.u.v1.maxreadahead  = maxreadahead;
 	Stats.u.v1.maxinprogress = maxinprogress;
 	Stats.u.v1.pkttimeout    = pkttimeout;
@@ -1058,10 +1266,35 @@ PlayFrisbee(void)
 	Stats.u.v1.redodelay     = redodelay;
 	Stats.u.v1.randomize     = randomize;
 	p->msg.leave2.stats      = Stats;
+
+#if 1
+	/* XXX hack, make sure stats get through */
+	delay = 0;
+	while (delay < 10) {
+		Packet_t rep;
+		int readretry;
+
+		PacketSend(p, 0);
+		for (readretry = 0; readretry < 10; readretry++) {
+			fsleep(100000);
+			while (PacketReceive(&rep) == 0) {
+				if (rep.hdr.subtype == PKTSUBTYPE_LEAVE2 &&
+				    rep.hdr.type == PKTTYPE_REPLY)
+					goto gotit;
+			}
+		}
+		delay++;
+	}
+ gotit:
+#else
 	PacketSend(p, 0);
+#endif
 
 	log("");
 	ClientStatsDump(myid, &Stats);
+#ifdef DOLOSSRATE
+	dump_network();
+#endif
 #else
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE;

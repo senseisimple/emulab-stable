@@ -74,9 +74,11 @@ int     maxmode   = 0;
 int     slice     = 0;
 int	level	  = 4;
 long	dev_bsize = 1;
-int	ignore[NDOSPART];
+int	ignore[NDOSPART], forceraw[NDOSPART];
 int	oldstyle  = 0;
 int	frangesize= 64;	/* 32k */
+int	safewrites= 1;
+off_t	datawritten;
 
 #define sectobytes(s)	((off_t)(s) * secsize)
 #define bytestosec(b)	(uint32_t)((b) / secsize)
@@ -184,7 +186,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 				count  += cc;
 				continue;
 			}
-			if (!outcanseek) {
+			if (!safewrites) {
 				if (cc < 0)
 					perror("mywrite: writing");
 				else 
@@ -201,7 +203,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 			count   = 0;
 			goto again;
 		}
-		if (outcanseek && fsync(fd) < 0) {
+		if (safewrites && fsync(fd) < 0) {
 			perror("fsync error: will retry");
 			sleep(1);
 			nbytes += count;
@@ -209,6 +211,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 			count   = 0;
 			goto again;
 		}
+		datawritten += count;
 		return count;
 	again:
 		if (lseek(fd, startoffset, SEEK_SET) < 0) {
@@ -236,13 +239,16 @@ main(argc, argv)
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1F:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1F:DR:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
 			break;
 		case 'i':
 			info++;
+			break;
+		case 'D':
+			safewrites = 0;
 			break;
 		case 'd':
 			debug++;
@@ -277,6 +283,12 @@ main(argc, argv)
 			if (rval < 1 || rval > 4)
 				usage();
 			ignore[rval-1] = 1;
+			break;
+		case 'R':
+			rval = atoi(optarg);
+			if (rval < 1 || rval > 4)
+				usage();
+			forceraw[rval-1] = 1;
 			break;
 		case '1':
 			oldstyle = 1;
@@ -365,6 +377,7 @@ main(argc, argv)
 	else {
 		outfd = fileno(stdout);
 		outcanseek = 0;
+		safewrites = 0;
 	}
 	compress_image();
 	
@@ -472,11 +485,14 @@ read_image()
 		
 		if (ignore[i])
 			type = DOSPTYP_UNUSED;
+		else if (forceraw[i]) {
+			fprintf(stderr,
+				"  Slice %d, Forcing raw compression\n", i+1);
+			goto skipcheck;
+		}
 
 		switch (type) {
 		case DOSPTYP_386BSD:
-			rval = read_bsdslice(i, start, size, type);
-			break;
 		case DOSPTYP_OPENBSD:
 			rval = read_bsdslice(i, start, size, type);
 			break;
@@ -495,7 +511,7 @@ read_image()
 			fprintf(stderr,
 				"  Slice %d %s, NOT SAVING.\n", i + 1,
 				ignore[i] ? "ignored" : "is unused");
-			if (start != size)
+			if (size > 0)
 				addskip(start, size);
 			break;
 		default:
@@ -511,6 +527,7 @@ read_image()
 			return rval;
 		}
 		
+	skipcheck:
 		if (!slicemode && !maxmode) {
 			if (start + size > inputmaxsec)
 				inputmaxsec = start + size;
@@ -860,7 +877,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
  	}
 
 	if (debug) {
-		fprintf(stderr, "        bfree %9ld, size %9d\n",
+		fprintf(stderr, "        bfree %9u, size %9d\n",
 		       fs.s_free_blocks_count, EXT2_BLOCK_SIZE(&fs));
 	}
 	numgroups = fs.s_blocks_count / fs.s_blocks_per_group;
@@ -903,7 +920,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 
 		if (debug) {
 			fprintf(stderr,
-				"        Group:%-2d\tBitmap %9ld, bfree %9d\n",
+				"        Group:%-2d\tBitmap %9u, bfree %9d\n",
 				i, groups[gix].bg_block_bitmap,
 				groups[gix].bg_free_blocks_count);
 		}
@@ -1440,7 +1457,9 @@ char *usagestr =
  " Advanced options\n"
  " -z level       Set the compression level.  Range 0-9 (0==none, default==4)\n"
  " -I slice       Ignore (skip) the indicated slice (not with slice mode)\n"
+ " -R slice       Force raw compression of the indicated slice (not with slice mode)\n"
  " -c count       Compress <count> number of sectors (not with slice mode)\n"
+ " -D             Do `dangerous' writes (don't check for async errors)\n"
  " -1             Output a version one image file\n"
  "\n"
  " Debugging options (not to be used by mere mortals!)\n"
@@ -1779,10 +1798,11 @@ static u_char   output_buffer[SUBBLOCKSIZE];
 static int	buffer_offset;
 static off_t	inputoffset;
 static struct timeval cstamp;
+static long long bytescompressed;
 
 static off_t	compress_chunk(off_t, off_t, int *, uint32_t *);
 static int	compress_finish(uint32_t *subblksize);
-static void	compress_status(int foo);
+static void	compress_status(int sig);
 
 /*
  * Loop through the image, compressing the allocated ranges.
@@ -1797,7 +1817,7 @@ compress_image(void)
 	blockhdr_t	*blkhdr;
 	struct region	*curregion, *regions;
 	struct timeval  estamp;
-	char		buf[DEFAULTREGIONSIZE];
+	char		*buf;
 	uint32_t	cursect = 0;
 	struct region	*lreg;
 
@@ -1807,7 +1827,8 @@ compress_image(void)
 	signal(SIGINFO, compress_status);
 #endif
 
-	memset(buf, 0, sizeof(buf));
+	buf = output_buffer;
+	memset(buf, 0, DEFAULTREGIONSIZE);
 	blkhdr = (blockhdr_t *) buf;
 	if (oldstyle)
 		regions = (struct region *)((struct blockhdr_V1 *)blkhdr + 1);
@@ -1988,11 +2009,6 @@ compress_image(void)
 		}
 
 		/*
-		 * Stash the region info into the beginning of the block.
-		 */
-		memcpy(output_buffer, buf, sizeof(buf));
-
-		/*
 		 * Write out the finished chunk to disk.
 		 */
 		mywrite(outfd, output_buffer, sizeof(output_buffer));
@@ -2073,11 +2089,6 @@ compress_image(void)
 		}
 
 		/*
-		 * Stash the region info into the beginning of the block.
-		 */
-		memcpy(output_buffer, buf, sizeof(buf));
-
-		/*
 		 * Write out the finished chunk to disk, and
 		 * start over from the beginning of the buffer.
 		 */
@@ -2085,10 +2096,10 @@ compress_image(void)
 		buffer_offset = 0;
 	}
 
-	if (debug || dots) {
-		inputoffset += size;
-		compress_status(0);
-	}
+	inputoffset += size;
+	if (debug || dots)
+		fprintf(stderr, "\n");
+	compress_status(0);
 	fflush(stderr);
 
 	/*
@@ -2139,21 +2150,28 @@ compress_image(void)
 }
 
 static void
-compress_status(int foo)
+compress_status(int sig)
 {
 	struct timeval stamp;
 	int oerrno = errno;
+	unsigned int ms, bps;
 
 	gettimeofday(&stamp, 0);
 	if (stamp.tv_usec < cstamp.tv_usec) {
 		stamp.tv_usec += 1000000;
 		stamp.tv_sec--;
 	}
-	if (foo == 0)
-		fprintf(stderr, "\n");
-	fprintf(stderr, "%qu input bytes in %ld.%03ld seconds\n",
-		inputoffset, stamp.tv_sec - cstamp.tv_sec,
-		(stamp.tv_usec - cstamp.tv_usec) / 1000);
+	ms = (stamp.tv_sec - cstamp.tv_sec) * 1000 +
+		(stamp.tv_usec - cstamp.tv_usec) / 1000;
+	fprintf(stderr,
+		"%qu input (%qu compressed) bytes in %u.%03u seconds\n",
+		inputoffset, bytescompressed, ms / 1000, ms % 1000);
+	if (sig == 0) {
+		fprintf(stderr, "Image size: %qu bytes\n", datawritten);
+		bps = (bytescompressed * 1000) / ms;
+		fprintf(stderr, "%.3fMB/second compressed\n",
+			(double)bps / (1024*1024));
+	}
 	errno = oerrno;
 }
 
@@ -2285,6 +2303,7 @@ compress_chunk(off_t off, off_t size, int *full, uint32_t *subblksize)
 		count = outsize - d_stream.avail_out;
 		buffer_offset += count;
 		assert(buffer_offset <= SUBBLOCKSIZE);
+		bytescompressed += cc - d_stream.avail_in;
 
 		/*
 		 * If we have reached the subblock maximum, then need

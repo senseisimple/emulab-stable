@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002 University of Utah and the Flux Group.
+ * Copyright (c) 2002, 2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -63,27 +63,37 @@ if (evlogging >= (l)) { \
 #define EV_WORKOVERLAP	9
 #define EV_WORKMERGE	10
 
-#define EV_CLIREQ	11
-#define EV_OCLIMSG	12
-#define EV_CLINOROOM	13
-#define EV_CLIDUPCHUNK	14
-#define EV_CLIDUPBLOCK	15
-#define EV_CLISCHUNK	16
-#define EV_CLIECHUNK	17
-#define EV_CLIREQCHUNK	18
-#define EV_CLIJOINREQ	19
-#define EV_CLIJOINREP	20
-#define EV_CLILEAVE	21
-#define EV_CLIREQMSG	22
-#define EV_CLISTAMP	23
-#define EV_CLIWRDONE	24
-#define EV_CLIWRIDLE	25
-#define EV_CLIBLOCK	26
-#define EV_CLISTART	27
-#define EV_CLIGOTPKT	28
-#define EV_CLIRTIMO	29
+#define EV_CLIREQ	12
+#define EV_OCLIMSG	13
+#define EV_CLINOROOM	14
+#define EV_CLIDUPCHUNK	15
+#define EV_CLIDUPBLOCK	16
+#define EV_CLISCHUNK	17
+#define EV_CLIECHUNK	18
+#define EV_CLILCHUNK	19
+#define EV_CLIREQCHUNK	20
+#define EV_CLIREQRA	21
+#define EV_CLIJOINREQ	22
+#define EV_CLIJOINREP	23
+#define EV_CLILEAVE	24
+#define EV_CLIREQMSG	25
+#define EV_CLISTAMP	26
+#define EV_CLIWRSTART	27
+#define EV_CLIWRDONE	28
+#define EV_CLIWRIDLE	29
+#define EV_CLIBLOCK	30
+#define EV_CLISTART	31
+#define EV_CLIGOTPKT	32
+#define EV_CLIRTIMO	33
+#define EV_PREQMSG	34
+#define EV_CLIPREQ	35
+#define EV_CLIPREQMSG	36
+#define EV_REQRANGE	37
+#define EV_OVERRUN	38
+#define EV_LONGBURST	39
+#define EV_DUPCHUNK	40
 
-#define EV_MAX		29
+#define EV_MAX		40
 
 extern void ClientTraceInit(char *file);
 extern void ClientTraceReinit(char *file);

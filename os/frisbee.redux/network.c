@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -20,16 +20,27 @@
 #include <signal.h>
 #include <errno.h>
 #include "decls.h"
+#include "utils.h"
+
+#ifdef DOLOSSRATE
+#define LOSSONSENDER
+#define LOSSONRECVER
+#endif
+
+#ifdef DOLOSSRATE
+extern int lossrate;
+#endif
 
 #ifdef STATS
+#ifdef DOLOSSRATE
+unsigned long rpackets, rpacketslost;
+unsigned long spackets, spacketslost;
+#endif
 unsigned long nonetbufs;
 #define DOSTAT(x)	(x)
 #else
 #define DOSTAT(x)
 #endif
-
-/* Time in usec to delay waiting for more buffer space on sends */
-#define NOBUF_DELAY	1000
 
 /* Max number of times to attempt bind to port before failing. */
 #define MAXBINDATTEMPTS		10
@@ -41,6 +52,24 @@ static int		sock;
 struct in_addr		myipaddr;
 static int		nobufdelay = -1;
 int			broadcast = 0;
+
+void
+dump_network(void)
+{
+#ifdef DOLOSSRATE
+	if (lossrate == 0)
+		return;
+
+	if (spacketslost)
+		fprintf(stderr, "Lost %lu of %lu send packets (%.2f%%)\n",
+			spacketslost, spackets,
+			(double)spacketslost * 100 / spackets);
+	if (rpacketslost)
+		fprintf(stderr, "Lost %lu of %lu recv packets (%.2f%%)\n",
+			rpacketslost, rpackets,
+			(double)rpacketslost * 100 / rpackets);
+#endif
+}
 
 static void
 CommonInit(void)
@@ -55,10 +84,14 @@ CommonInit(void)
 		pfatal("Could not allocate a socket");
 
 	i = SOCKBUFSIZE;
-	setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &i, sizeof(i));
+	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &i, sizeof(i)) < 0)
+		pwarning("Could not increase send socket buffer size to %d",
+			 SOCKBUFSIZE);
     
 	i = SOCKBUFSIZE;
-	setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &i, sizeof(i));
+	if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &i, sizeof(i)) < 0)
+		pwarning("Could not increase recv socket buffer size to %d",
+			 SOCKBUFSIZE);
 
 	name.sin_family      = AF_INET;
 	name.sin_port	     = htons(portnum);
@@ -123,13 +156,6 @@ CommonInit(void)
 			       &i, sizeof(i)) < 0)
 			pfatal("setsockopt(SOL_SOCKET, SO_BROADCAST)");
 	}
-	else if (mcastif.s_addr) {
-		/*
-		 * Overload this. In unicast mode, use this as our
-		 * outgoing interface. Useful when multihomed.
-		 */
-		myipaddr.s_addr = mcastif.s_addr;
-	}
 
 	/*
 	 * We use a socket level timeout instead of polling for data.
@@ -142,11 +168,13 @@ CommonInit(void)
 		pfatal("setsockopt(SOL_SOCKET, SO_RCVTIMEO)");
 
 	/*
-	 * We add our (unicast) IP addr to every outgoing message.
-	 * This is going to be used to return replies to the sender,
-	 * where appropriate.
+	 * If a specific interface IP is specified, use that to
+	 * tag our outgoing packets.  Otherwise we use the IP address
+	 * associated with our hostname.
 	 */
-	if (!myipaddr.s_addr) {
+	if (mcastif.s_addr)
+		myipaddr.s_addr = mcastif.s_addr;
+	else {
 		if (gethostname(buf, sizeof(buf)) < 0)
 			pfatal("gethostname failed");
 
@@ -157,11 +185,10 @@ CommonInit(void)
 	}
 
 	/*
-	 * Compute the out of buffer space delay
+	 * Compute the out of buffer space delay.
 	 */
 	if (nobufdelay < 0)
-		nobufdelay = sleeptime(NOBUF_DELAY,
-				       "out of socket buffer space delay");
+		nobufdelay = sleeptime(100, NULL, 1);
 }
 
 int
@@ -187,13 +214,39 @@ ServerNetInit(void)
  *
  * The amount of data received is determined from the datalen of the hdr.
  * All packets are actually the same size/structure. 
+ *
+ * Returns 0 for a good packet, 1 for a back packet, -1 on timeout.
  */
 int
 PacketReceive(Packet_t *p)
 {
 	struct sockaddr_in from;
 	int		   mlen, alen;
+#ifdef DOLOSSRATE
+#ifdef LOSSONRECVER
+	struct timeval	   now, then;
 
+	if (lossrate) {
+		/*
+		 * XXX cannot rely on socket timeout value since we need to
+		 * treat received and dropped packets as though they never
+		 * arrived.  This is still not correct as a receive timeout
+		 * could still be up to twice as long as it should be, but
+		 * I don't want to mess with the socket timeout on every
+		 * recv call.
+		 */
+		gettimeofday(&then, 0);
+		if ((then.tv_usec += PKTRCV_TIMEOUT) >= 1000000) {
+			then.tv_sec++;
+			then.tv_usec -= 1000000;
+		}
+	again:
+		gettimeofday(&now, 0);
+		if (timercmp(&now, &then, >=))
+			return -1;
+	}
+#endif
+#endif
 	alen = sizeof(from);
 	bzero(&from, alen);
 	if ((mlen = recvfrom(sock, p, sizeof(*p), 0,
@@ -203,11 +256,36 @@ PacketReceive(Packet_t *p)
 		pfatal("PacketReceive(recvfrom)");
 	}
 
-	if (mlen != sizeof(p->hdr) + p->hdr.datalen)
-		fatal("PacketReceive: Bad message length %d!=%d",
-		      mlen, p->hdr.datalen);
+	/*
+	 * Basic integrity checks
+	 */
+	if (mlen < sizeof(p->hdr) + p->hdr.datalen) {
+		log("Bad message length (%d != %d)",
+		    mlen, p->hdr.datalen);
+		return 1;
+	}
+	if (p->hdr.srcip != from.sin_addr.s_addr) {
+		log("Bad message source (%x != %x)",
+		    ntohl(from.sin_addr.s_addr), ntohl(p->hdr.srcip));
+		return 1;
+	}
 
-	return p->hdr.datalen;
+#ifdef DOLOSSRATE
+#ifdef LOSSONRECVER
+	DOSTAT(rpackets++);
+	if (lossrate && random() < lossrate) {
+		/* XXX hack: don't loose join/leave messages, screws stats */
+		if (p->hdr.subtype != PKTSUBTYPE_JOIN &&
+		    p->hdr.subtype != PKTSUBTYPE_LEAVE &&
+		    p->hdr.subtype != PKTSUBTYPE_LEAVE2) {
+			DOSTAT(rpacketslost++);
+			goto again;
+		}
+	}
+#endif
+#endif
+
+	return 0;
 }
 
 /*
@@ -222,6 +300,21 @@ PacketSend(Packet_t *p, int *resends)
 {
 	struct sockaddr_in to;
 	int		   len, delays;
+
+#ifdef DOLOSSRATE
+#ifdef LOSSONSENDER
+	DOSTAT(spackets++);
+	if (lossrate && random() < lossrate) {
+		/* XXX hack: don't loose join/leave messages, screws stats */
+		if (p->hdr.subtype != PKTSUBTYPE_JOIN &&
+		    p->hdr.subtype != PKTSUBTYPE_LEAVE &&
+		    p->hdr.subtype != PKTSUBTYPE_LEAVE2) {
+			DOSTAT(spacketslost++);
+			return;
+		}
+	}
+#endif
+#endif
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
 	p->hdr.srcip = myipaddr.s_addr;
@@ -312,6 +405,13 @@ PacketValid(Packet_t *p, int nchunks)
 		    p->msg.request.block >= CHUNKSIZE ||
 		    p->msg.request.count < 0 ||
 		    p->msg.request.block+p->msg.request.count > CHUNKSIZE)
+			return 0;
+		break;
+	case PKTSUBTYPE_PREQUEST:
+		if (p->hdr.datalen < sizeof(p->msg.prequest))
+			return 0;
+		if (p->msg.prequest.chunk < 0 ||
+		    p->msg.prequest.chunk >= nchunks)
 			return 0;
 		break;
 	case PKTSUBTYPE_JOIN:

@@ -8,6 +8,7 @@
  * Shared for defintions for frisbee client/server code.
  */
 
+#include <limits.h>	/* CHAR_BIT */
 #include "log.h"
 
 /*
@@ -21,15 +22,38 @@
 #define CHUNKSIZE	1024
 
 /*
- * The number of chunk buffers in the client.
+ * See if we can represent a bitmap of blocks in a single packet.
+ * If so, then allow partial request messages.
  */
-#define MAXCHUNKBUFS	64
+#if (CHUNKSIZE%CHAR_BIT) != 0 || (CHUNKSIZE/CHAR_BIT) > 1450
+#error "Invalid chunk size"
+#endif
+
+/*
+ * Chunk buffers and output write buffers constitute most of the memory
+ * used in the system.  These should be sized to fit in the physical memory
+ * of the client, forcing pieces of frisbee to be paged out to disk (even
+ * if there is a swap disk to use) is not a very efficient way to load disks.
+ *
+ * MAXCHUNKBUFS is the number of BLOCKSIZE*CHUNKSIZE chunk buffers used to
+ * receive data from the network.  With the default values, these are 1MB
+ * each.
+ *
+ * MAXWRITEBUFMEM is the amount, in MB, of write buffer memory in the client.
+ * This is the amount of queued write data that can be pending.  A value of
+ * zero means unlimited.
+ *
+ * The ratio of the number of these two buffer types depends on the ratio
+ * of network to disk speed and the degree of compression in the image.
+ */
+#define MAXCHUNKBUFS	64	/* 64MB */
+#define MAXWRITEBUFMEM	64	/* 64MB */
 
 /*
  * Socket buffer size, used for both send and receive in client and
  * server right now.
  */
-#define SOCKBUFSIZE	(128 * 1024)
+#define SOCKBUFSIZE	(200 * 1024)
 
 /*
  * The number of read-ahead chunks that the client will request
@@ -77,27 +101,31 @@
  *				Given the typical scheduling granularity
  *				of 10ms for most unix systems, this
  *				will likely be set to either 0 or 10000.
+ *				On FreeBSD we set the clock to 1ms
+ *				granularity.
  *
  * Together with the BLOCKSIZE, these two params form a theoretical upper
  * bound on bandwidth consumption for the server.  That upper bound (for
  * ethernet) is:
  *
  *	(1000000 / SERVER_BURST_GAP)		# bursts per second
- *	* (BLOCKSIZE + 42) * SERVER_BURST_SIZE	# * wire size of a burst
+ *	* (BLOCKSIZE+24+42) * SERVER_BURST_SIZE	# * wire size of a burst
  *
- * which for the default 1k packets, gap of 10ms and burst of 64 packets
- * is about 6.8MB/sec.  In practice, the server is ultimately throttled by
- * clients' ability to generate requests which is limited by their ability
- * to decompress and write to disk.
+ * which for the default 1k packets, gap of 1ms and burst of 16 packets
+ * is about 17.4MB/sec.  That is beyond the capacity of a 100Mb ethernet
+ * but with a 1ms granularity clock, the average gap size is going to be
+ * 1.5ms yielding 11.6MB/sec.  In practice, the server is ultimately
+ * throttled by clients' ability to generate requests which is limited by
+ * their ability to decompress and write to disk.
  */
 #define SERVER_BURST_SIZE	16
-#define SERVER_BURST_GAP	1000
+#define SERVER_BURST_GAP	2000
 
 /*
  * Max burst size when doing dynamic bandwidth adjustment.
  * Needs to be large enough to induce loss.
  */ 
-#define SERVER_DYNBURST_SIZE	(SOCKBUFSIZE/BLOCKSIZE)
+#define SERVER_DYNBURST_SIZE	128
 
 /*
  * How long (in usecs) to wait before re-reqesting a chunk.
@@ -105,19 +133,21 @@
  *
  *	(CHUNKSIZE/SERVER_BURST_SIZE) * SERVER_BURST_GAP
  *
- * usec (0.16 sec with defaults) for each each chunk it pumps out,
+ * usec (0.13 sec with defaults) for each each chunk it pumps out,
  * and we conservatively assume that there are a fair number of other
  * chunks that must be processed before it gets to our chunk.
+ *
+ * XXX don't like making the client rely on compiled in server constants,
+ * lets just set it to 1 second right now.
  */
-#define CLIENT_REQUEST_REDO_DELAY	\
-	(10 * ((CHUNKSIZE/SERVER_BURST_SIZE)*SERVER_BURST_GAP))
+#define CLIENT_REQUEST_REDO_DELAY	1000000
 
 /*
  * How long for the writer to sleep if there are no blocks currently
  * ready to write.  Allow a full server burst period, assuming that
  * something in the next burst will complete a block.
  */
-#define CLIENT_WRITER_IDLE_DELAY	SERVER_BURST_GAP
+#define CLIENT_WRITER_IDLE_DELAY	1000
 
 /*
  * Client parameters and statistics.
@@ -145,16 +175,23 @@ typedef struct {
 			unsigned long	nofreechunks;
 			unsigned long	dupchunk;
 			unsigned long	dupblock;
-			unsigned long	lostblocks;
+			unsigned long	prequests;
 			unsigned long	recvidles;
 			unsigned long	joinattempts;
 			unsigned long	requests;
-			unsigned long	decompidles;
+			unsigned long	decompblocks;
 			unsigned long	writeridles;
+			int	writebufmem;
+			unsigned long	lostblocks;
+			unsigned long	rerequests;
 		} v1;
 		unsigned long limit[256];
 	} u;
 } ClientStats_t;
+
+typedef struct {
+	char	map[CHUNKSIZE/CHAR_BIT];
+} BlockMap_t;
 
 /*
  * Packet defs.
@@ -202,6 +239,19 @@ typedef struct {
 		} request;
 
 		/*
+		 * Partial chunk request, a bit map of the desired blocks
+		 * for a chunk.  An alternative to issuing multiple standard
+		 * requests.  Retries is a hint to the server for congestion
+		 * control, non-zero if this is a retry of an earlier request
+		 * we made.
+		 */
+		struct {
+			int		chunk;
+			int		retries;
+			BlockMap_t	blockmap;
+		} prequest;
+
+		/*
 		 * Leave reporting client params/stats
 		 */
 		struct {
@@ -219,6 +269,7 @@ typedef struct {
 #define PKTSUBTYPE_BLOCK	3
 #define PKTSUBTYPE_REQUEST	4
 #define PKTSUBTYPE_LEAVE2	5
+#define PKTSUBTYPE_PREQUEST	6
 
 /*
  * Protos.
@@ -229,10 +280,7 @@ int	PacketReceive(Packet_t *p);
 void	PacketSend(Packet_t *p, int *resends);
 void	PacketReply(Packet_t *p);
 int	PacketValid(Packet_t *p, int nchunks);
-char   *CurrentTimeString(void);
-int	sleeptime(unsigned int usecs, char *str);
-int	fsleep(unsigned int usecs);
-void	ClientStatsDump(unsigned int id, ClientStats_t *stats);
+void	dump_network(void);
 
 /*
  * Globals

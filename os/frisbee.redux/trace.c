@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002 University of Utah and the Flux Group.
+ * Copyright (c) 2002, 2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -139,16 +139,36 @@ TraceDump(void)
 					ptr->args[0], ptr->args[1],
 					ptr->args[1]+ptr->args[2]-1);
 				break;
+			case EV_PREQMSG:
+				fprintf(fd, "%s: PREQUEST msg, %lu(%lu)%s\n",
+					inet_ntoa(ptr->srcip), ptr->args[0],
+					ptr->args[1],
+					ptr->args[2] ? " [RETRY]" : "");
+				break;
+			case EV_OVERRUN:
+				stamp.tv_sec = ptr->args[0];
+				stamp.tv_usec = ptr->args[1];
+				timersub(&ptr->tstamp, &stamp, &stamp);
+				fprintf(fd, "overrun by %lu.%03lu "
+					"after %lu[%lu]\n",
+					stamp.tv_sec, stamp.tv_usec/1000,
+					ptr->args[2], ptr->args[3]);
+				break;
+			case EV_LONGBURST:
+				fprintf(fd, "finished long burst %lu (>%lu) "
+					"after %lu[%lu]\n",
+					ptr->args[0], ptr->args[1],
+					ptr->args[2], ptr->args[3]);
+				break;
 			case EV_BLOCKMSG:
 				fprintf(fd, "send block, %lu[%lu]\n",
 					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_WORKENQ:
-				fprintf(fd, "enqueues, %lu[%lu-%lu], "
+				fprintf(fd, "enqueues, %lu(%lu), "
 					"%lu ents\n",
 					ptr->args[0], ptr->args[1],
-					ptr->args[1]+ptr->args[2]-1,
-					ptr->args[3]);
+					ptr->args[2]);
 				break;
 			case EV_WORKDEQ:
 				fprintf(fd, "dequeues, %lu[%lu-%lu], "
@@ -166,11 +186,18 @@ TraceDump(void)
 					ptr->args[2]+ptr->args[3]-1);
 				break;
 			case EV_WORKMERGE:
-				fprintf(fd, "modqueue, %lu[%lu-%lu] "
-					"at ent %lu\n",
-					ptr->args[0], ptr->args[1],
-					ptr->args[1]+ptr->args[2]-1,
-					ptr->args[3]);
+				if (ptr->args[3] == ~0)
+					fprintf(fd, "merged %lu with current\n",
+						ptr->args[0]);
+				else
+					fprintf(fd, "merged %lu at ent %lu, "
+						"added %lu to existing %lu\n",
+						ptr->args[0], ptr->args[3],
+						ptr->args[2], ptr->args[1]);
+				break;
+			case EV_DUPCHUNK:
+				fprintf(fd, "possible dupchunk %lu\n",
+					ptr->args[0]);
 				break;
 			case EV_READFILE:
 				fprintf(fd, "readfile, %lu@%lu -> %lu\n",
@@ -206,10 +233,22 @@ TraceDump(void)
 					inet_ntoa(ipaddr));
 				break;
 			}
+			case EV_CLIPREQMSG:
+			{
+				struct in_addr ipaddr = { ptr->args[0] };
+
+				fprintf(fd, "%s: saw PREQUEST for ",
+					inet_ntoa(ptr->srcip));
+				fprintf(fd, "%lu, ip=%s\n",
+					ptr->args[1], inet_ntoa(ipaddr));
+				break;
+			}
 			case EV_CLINOROOM:
-				fprintf(fd, "%s: block %lu[%lu], no room\n",
+				fprintf(fd, "%s: block %lu[%lu], no room, "
+					"dropped %lu blocks of previous\n",
 					inet_ntoa(ptr->srcip),
-					ptr->args[0], ptr->args[1]);
+					ptr->args[0], ptr->args[1],
+					ptr->args[2]);
 				break;
 			case EV_CLIDUPCHUNK:
 				fprintf(fd, "%s: block %lu[%lu], dup chunk\n",
@@ -228,12 +267,22 @@ TraceDump(void)
 					ptr->args[2]);
 				break;
 			case EV_CLISCHUNK:
-				fprintf(fd, "%s: start chunk %lu, block %lu\n",
+				fprintf(fd, "%s: start chunk %lu, block %lu, "
+					"%lu chunks in progress\n",
 					inet_ntoa(ptr->srcip),
-					ptr->args[0], ptr->args[1]);
+					ptr->args[0], ptr->args[1],
+					ptr->args[2]);
 				break;
 			case EV_CLIECHUNK:
-				fprintf(fd, "%s: end chunk %lu, block %lu\n",
+				fprintf(fd, "%s: end chunk %lu, block %lu, "
+					"%lu chunks in progress\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1],
+					ptr->args[2]);
+				break;
+			case EV_CLILCHUNK:
+				fprintf(fd, "%s: switched from incomplete "
+					"chunk %lu at block %lu\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
@@ -243,9 +292,20 @@ TraceDump(void)
 					ptr->args[0], ptr->args[1],
 					ptr->args[1]+ptr->args[2]-1);
 				break;
+			case EV_CLIPREQ:
+				fprintf(fd, "%s: send PREQUEST, %lu(%lu)\n",
+					inet_ntoa(ptr->srcip), ptr->args[0],
+					ptr->args[1]);
+				break;
 			case EV_CLIREQCHUNK:
 				fprintf(fd, "%s: request chunk, timeo=%lu\n",
 					inet_ntoa(ptr->srcip), ptr->args[0]);
+				break;
+			case EV_CLIREQRA:
+				fprintf(fd, "%s: issue readahead, "
+					"empty=%lu, filling=%lu\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_CLIJOINREQ:
 				fprintf(fd, "%s: send JOIN, ID=%lx\n",
@@ -265,13 +325,22 @@ TraceDump(void)
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1], ptr->args[2]);
 				break;
+			case EV_CLIWRSTART:
+				fprintf(fd, "%s: writing chunk %lu, "
+					"idle=%lu, (dblock=%lu, widle=%lu)\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1],
+					ptr->args[2], ptr->args[3]);
+				break;
 			case EV_CLIWRDONE:
-				fprintf(fd, "%s: chunk %lu written, %lu left\n",
-					inet_ntoa(ptr->srcip), ptr->args[0],
-					ptr->args[1]);
+				fprintf(fd, "%s: chunk %lu written, "
+					"%lu left, (dblock=%lu, widle=%lu)\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1],
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIWRIDLE:
-				fprintf(fd, "%s: IDLE\n",
+				fprintf(fd, "%s: disk IDLE\n",
 					inet_ntoa(ptr->srcip));
 				break;
 			case EV_CLIGOTPKT:

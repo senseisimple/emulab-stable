@@ -22,6 +22,11 @@ PTHREADCFLAGS	= -D_THREAD_SAFE \
 		  -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 
+# Define this if you implementation of cond_vars works well
+# They don't with linuxthreads under FreeBSD: wakeups take longer than
+# Necessary sometimes.
+#PTHREADCFLAGS	+= -DCONDVARS_WORK
+
 CFLAGS		= -Wall -O2 -g -static
 LIBS 		= -lz $(PTHREADLIBS)
 UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
@@ -46,8 +51,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 imagezip: $(NTFSDIR) imagezip.o version.o 
 	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
 
-imageunzip: imageunzip.o version.o 
-	$(CC) $(CFLAGS) imageunzip.o version.o $(UNZIPLIBS) -o imageunzip
+imageunzip: imageunzip.o crc.o version.o 
+	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
 
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<

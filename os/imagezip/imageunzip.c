@@ -37,6 +37,8 @@
 #define FAKEFRISBEE
 #endif
 
+#define MAXWRITEBUFMEM	0	/* 0 == unlimited */
+
 long long totaledata = 0;
 long long totalrdata = 0;
 
@@ -65,7 +67,7 @@ static long long	outputmaxsize	= 0;	/* Sanity check */
 #define bytestosec(b)	(uint32_t)((b) / SECSIZE)
 
 #define OUTSIZE (256 * 1024)
-char		outbuf[OUTSIZE + SECSIZE], zeros[OUTSIZE];
+char		zeros[OUTSIZE];
 
 static int	 dostype = -1;
 static int	 slice = 0;
@@ -96,7 +98,13 @@ static void	applyrelocs(off_t offset, size_t cc, void *buf);
 static int	 seekable;
 static off_t	 nextwriteoffset;
 
-static int	imagetoobigwarned;
+static int	 imagetoobigwarned;
+
+#ifndef FRISBEE
+static int	 docrconly = 0;
+static u_int32_t crc;
+extern void	 compute_crc(u_char *buf, int blen, u_int32_t *crcp);
+#endif
 
 #ifdef FAKEFRISBEE
 #include <sys/stat.h>
@@ -108,7 +116,7 @@ static int	*chunklist, *nextchunk;
 /*
  * Some stats
  */
-unsigned long decompidles;
+unsigned long decompblocks;
 unsigned long writeridles;
 
 #ifdef NOTHREADS
@@ -123,35 +131,185 @@ static void	*DiskWriter(void *arg);
 
 static int	writeinprogress; /* XXX */
 static pthread_t child_pid;
-static pthread_mutex_t	freelist_mutex, readyqueue_mutex;	
-static pthread_cond_t	freelist_condvar, readyqueue_condvar;	
+static pthread_mutex_t	writequeue_mutex;	
+#ifdef CONDVARS_WORK
+static pthread_cond_t	writequeue_cond;	
+#endif
 
 /*
  * A queue of ready to write data blocks.
  */
 typedef struct {
+	int		refs;
+	size_t		size;
+	char		data[0];
+} buffer_t;
+
+typedef struct {
 	queue_chain_t	chain;
 	off_t		offset;
 	off_t		size;
-	int		zero;
-} readyhdr_t;
+	buffer_t	*buf;
+	char		*data;
+} writebuf_t;
 
-typedef struct {
-	readyhdr_t	header;
-	unsigned char	buf[OUTSIZE + SECSIZE];
-} readyblock_t;
-static queue_head_t	readyqueue;
-static readyblock_t	*freelist;
-#define READYQSIZE	256
+static queue_head_t	writequeue;
+static unsigned long	maxwritebufmem = MAXWRITEBUFMEM;
+static volatile unsigned long	curwritebufmem, curwritebufs;
+static pthread_mutex_t	writebuf_mutex;
+#ifdef CONDVARS_WORK
+static pthread_cond_t	writebuf_cond;
+#endif
+static volatile int	writebufwanted;
+
+/* stats */
+unsigned long		maxbufsalloced, maxmemalloced;
+unsigned long		splits;
+
+#ifndef CONDVARS_WORK
+int fsleep(unsigned int usecs);
+#endif
+
+void
+dump_writebufs(void)
+{
+	fprintf(stderr, "%lu max bufs, %lu max memory\n",
+		maxbufsalloced, maxmemalloced);
+	fprintf(stderr, "%lu buffers split\n",
+		splits);
+}
+
+static writebuf_t *
+alloc_writebuf(off_t offset, off_t size, int allocbuf, int dowait)
+{
+	writebuf_t *wbuf;
+	buffer_t *buf = NULL;
+	size_t bufsize;
+
+	pthread_mutex_lock(&writebuf_mutex);
+	wbuf = malloc(sizeof(*wbuf));
+	if (wbuf == NULL) {
+		fprintf(stderr, "could not alloc writebuf header\n");
+		exit(1);
+	}
+	bufsize = allocbuf ? size : 0;
+	if (bufsize) {
+		do {
+			if (maxwritebufmem &&
+			    curwritebufmem + bufsize > maxwritebufmem)
+				buf = NULL;
+			else
+				buf = malloc(sizeof(buffer_t) + bufsize);
+
+			if (buf == NULL) {
+				if (!dowait) {
+					free(wbuf);
+					pthread_mutex_unlock(&writebuf_mutex);
+					return NULL;
+				}
+
+				decompblocks++;
+				writebufwanted = 1;
+				/*
+				 * Once again it appears that linuxthreads
+				 * condition variables don't work well.
+				 * We seem to sleep longer than necessary.
+				 */
+				do {
+#ifdef CONDVARS_WORK
+					pthread_cond_wait(&writebuf_cond,
+							  &writebuf_mutex);
+#else
+					pthread_mutex_unlock(&writebuf_mutex);
+					fsleep(1000);
+					pthread_mutex_lock(&writebuf_mutex);
+#endif
+					pthread_testcancel();
+				} while (writebufwanted);
+
+//fprintf(stderr, "alloc BLOCKDONE: cur=%lu max=%lu\n", curwritebufmem, maxwritebufmem);
+			}
+		} while (buf == NULL);
+		buf->refs = 1;
+		buf->size = bufsize;
+	}
+	curwritebufs++;
+	curwritebufmem += bufsize;
+	if (curwritebufs > maxbufsalloced)
+		maxbufsalloced = curwritebufs;
+	if (curwritebufmem > maxmemalloced)
+		maxmemalloced = curwritebufmem;
+//fprintf(stderr, "alloc %p: off=%qu size=%qu, doalloc=%d, buf=%p\n", wbuf, offset, size, allocbuf, buf);
+	pthread_mutex_unlock(&writebuf_mutex);
+
+	queue_init(&wbuf->chain);
+	wbuf->offset = offset;
+	wbuf->size = size;
+	wbuf->buf = buf;
+	wbuf->data = buf ? buf->data : NULL;
+
+	return wbuf;
+}
+
+static writebuf_t *
+split_writebuf(writebuf_t *wbuf, off_t doff, int dowait)
+{
+	writebuf_t *nwbuf;
+	off_t size;
+
+	assert(wbuf->buf != NULL);
+//fprintf(stderr, "split %p: doff=%qu, buf=%p, data=%p, refs=%d\n", wbuf, doff, wbuf->buf, wbuf->data, wbuf->buf->refs);
+	splits++;
+	assert(doff < wbuf->size);
+	size = wbuf->size - doff;
+	nwbuf = alloc_writebuf(wbuf->offset+doff, size, 0, dowait);
+	if (nwbuf) {
+		wbuf->size -= size;
+		pthread_mutex_lock(&writebuf_mutex);
+		wbuf->buf->refs++;
+		pthread_mutex_unlock(&writebuf_mutex);
+		nwbuf->buf = wbuf->buf;
+		nwbuf->data = wbuf->data + doff;
+	}
+	return nwbuf;
+}
+
+static void
+free_writebuf(writebuf_t *wbuf)
+{
+	assert(wbuf != NULL);
+
+	pthread_mutex_lock(&writebuf_mutex);
+//fprintf(stderr, "free %p: buf=%p, refs=%d\n", wbuf, wbuf->buf, wbuf->buf ? wbuf->buf->refs : -1);
+	if (wbuf->buf && --wbuf->buf->refs == 0) {
+		curwritebufs--;
+		curwritebufmem -= wbuf->buf->size;
+		assert(curwritebufmem >= 0);
+		free(wbuf->buf);
+		if (writebufwanted) {
+			writebufwanted = 0;
+#ifdef CONDVARS_WORK
+			pthread_cond_signal(&writebuf_cond);
+#endif
+		}
+	}
+	free(wbuf);
+	pthread_mutex_unlock(&writebuf_mutex);
+}
 #endif
 
 static void
-dowrite_request(off_t offset, off_t size, void *buf)
+dowrite_request(writebuf_t *wbuf)
 {
-#ifndef NOTHREADS
-	readyhdr_t *hdr;
-#endif
+	off_t offset, size;
+	void *buf;
 	
+	offset = wbuf->offset;
+	size = wbuf->size;
+	buf = wbuf->data;
+	assert(offset >= 0);
+	assert(size > 0);
+
 	/*
 	 * Adjust for partition start and ensure data fits
 	 * within partition boundaries.
@@ -164,10 +322,14 @@ dowrite_request(off_t offset, off_t size, void *buf)
 				"for target slice, truncating\n");
 			imagetoobigwarned = 1;
 		}
-		if (offset > sectobytes(outputmaxsec))
+		if (offset >= sectobytes(outputmaxsec)) {
+			free_writebuf(wbuf);
 			return;
+		}
 		size = sectobytes(outputmaxsec) - offset;
+		wbuf->size = size;
 	}
+	wbuf->offset = offset;
 
 	totaledata += size;
 
@@ -180,7 +342,7 @@ dowrite_request(off_t offset, off_t size, void *buf)
 			if (dofill)
 				writezeros(offset, size);
 		} else {
-			assert(size <= OUTSIZE+SECSIZE);
+			assert(size <= OUTSIZE);
 
 			/*
 			 * Handle any relocations
@@ -188,58 +350,34 @@ dowrite_request(off_t offset, off_t size, void *buf)
 			applyrelocs(offset, (size_t)size, buf);
 			writedata(offset, (size_t)size, buf);
 		}
+		free_writebuf(wbuf);
 		return;
 	}
 
 #ifndef NOTHREADS
 	if (buf == NULL) {
-		if (!dofill)
+		if (!dofill) {
+			free_writebuf(wbuf);
 			return;
-
-		if ((hdr = (readyhdr_t *)malloc(sizeof(readyhdr_t))) == NULL) {
-			fprintf(stderr, "Out of memory\n");
-			exit(1);
 		}
-		hdr->zero   = 1;
-		hdr->offset = offset;
-		hdr->size   = size;
-	}
-	else {
-		readyblock_t	*rdyblk;
-		size_t		cc;
-
-		assert(size <= OUTSIZE+SECSIZE);
-		cc = size;
+	} else {
+		assert(size <= OUTSIZE);
 
 		/*
 		 * Handle any relocations
 		 */
-		applyrelocs(offset, cc, buf);
-
-		/*
-		 * Try to allocate a block. Wait if none available.
-		 */
-		pthread_mutex_lock(&freelist_mutex);
-		if (! freelist) {
-			decompidles++;
-			do {
-				pthread_cond_wait(&freelist_condvar,
-						  &freelist_mutex);
-			} while (! freelist);
-		}
-		rdyblk   = freelist;
-		freelist = (void *) rdyblk->header.chain.next;
-		pthread_mutex_unlock(&freelist_mutex);
-
-		rdyblk->header.offset = offset;
-		rdyblk->header.size   = cc;
-		memcpy(rdyblk->buf, buf, cc);
-		hdr = (readyhdr_t *) rdyblk;
+		applyrelocs(offset, (size_t)size, buf);
 	}
-	pthread_mutex_lock(&readyqueue_mutex);
-	queue_enter(&readyqueue, hdr, readyhdr_t *, chain);
-	pthread_mutex_unlock(&readyqueue_mutex);
-	pthread_cond_signal(&readyqueue_condvar);
+
+	/*
+	 * Queue it up for the writer thread
+	 */
+	pthread_mutex_lock(&writequeue_mutex);
+	queue_enter(&writequeue, wbuf, writebuf_t *, chain);
+#ifdef CONDVARS_WORK
+	pthread_cond_signal(&writequeue_cond);
+#endif
+	pthread_mutex_unlock(&writequeue_mutex);
 #endif
 }
 
@@ -278,7 +416,7 @@ main(int argc, char **argv)
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:onFD:")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:onFD:W:C")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -315,6 +453,21 @@ main(int argc, char **argv)
 			dofill++;
 			break;
 
+		case 'C':
+			docrconly++;
+			dofill++;
+			seekable = 0;
+			break;
+
+#ifndef NOTHREADS
+		case 'W':
+			maxwritebufmem = atoi(optarg);
+			if (maxwritebufmem >= 4096)
+				maxwritebufmem = MAXWRITEBUFMEM;
+			maxwritebufmem *= (1024 * 1024);
+			break;
+#endif
+
 		case 'h':
 		case '?':
 		default:
@@ -348,7 +501,9 @@ main(int argc, char **argv)
 	else
 		infd = fileno(stdin);
 
-	if (argc == 2 && strcmp(argv[1], "-")) {
+	if (docrconly)
+		outfd = -1;
+	else if (argc == 2 && strcmp(argv[1], "-")) {
 		if ((outfd =
 		     open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
 			perror("opening output file");
@@ -369,7 +524,7 @@ main(int argc, char **argv)
 				"cannot specify a slice\n");
 			exit(1);
 		}
-		if (!dofill)
+		if (!dofill && !docrconly)
 			fprintf(stderr,
 				"WARNING: output file is not seekable, "
 				"must zero-fill free space\n");
@@ -483,14 +638,18 @@ main(int argc, char **argv)
 		fprintf(stderr, "%4ld %13qd\n", estamp.tv_sec, totaledata);
 	}
 	else {
-		fprintf(stderr, "Done in %ld seconds!\n", estamp.tv_sec);
-		fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
-			totaledata, totalrdata);
+		fprintf(stderr, "Wrote %qd bytes (%qd actual) in %ld seconds\n",
+			totaledata, totalrdata, estamp.tv_sec);
+		fprintf(stderr, "%lu %lu %d\n",
+			decompblocks, writeridles, rdycount);
 	}
 	if (debug)
 		fprintf(stderr, "decompressor blocked: %lu, "
 			"writer idle: %lu, writes performed: %d\n",
-			decompidles, writeridles, rdycount);
+			decompblocks, writeridles, rdycount);
+	if (docrconly)
+		fprintf(stderr, "%s: CRC=%u\n", argv[0], ~crc);
+dump_writebufs();
 	return 0;
 }
 #else
@@ -499,7 +658,7 @@ main(int argc, char **argv)
  */
 int
 ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
-	       int _nothreads, int _dostype)
+	       int _nothreads, int _dostype, unsigned long _writebufmem)
 {
 	if (outfd >= 0)
 		close(outfd);
@@ -513,6 +672,9 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	dofill    = _fill;
 	nothreads = _nothreads;
 	dostype   = _dostype;
+#ifndef NOTHREADS
+	maxwritebufmem = _writebufmem;
+#endif
 
 	/*
 	 * If the output device isn't seekable we must modify our behavior:
@@ -552,6 +714,14 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	return 0;
 }
 
+void
+ImageUnzipSetMemory(unsigned long _writebufmem)
+{
+#ifndef NOTHREADS
+	maxwritebufmem = _writebufmem;
+#endif
+}
+
 int
 ImageUnzipChunk(char *chunkdata)
 {
@@ -575,48 +745,36 @@ ImageUnzipQuit(void)
 
 	fprintf(stderr, "Wrote %qd bytes (%qd actual)\n",
 		totaledata, totalrdata);
-	fprintf(stderr, "%lu %lu %d\n", decompidles, writeridles, rdycount);
+	fprintf(stderr, "%lu %lu %d\n", decompblocks, writeridles, rdycount);
 	return 0;
 }
 #endif
 
 #ifndef NOTHREADS
-static void *readyqueuemem;
-
 static void
 threadinit(void)
 {
-	int		i;
-	readyblock_t   *ptr;
 	static int	called;
 
 	if (nothreads)
 		return;
 
-	decompidles = writeridles = 0;
+	decompblocks = writeridles = 0;
 	imagetoobigwarned = 0;
 
 	/*
 	 * Allocate blocks for the ready queue.
 	 */
-	queue_init(&readyqueue);
-	if ((ptr = (readyblock_t *) malloc(sizeof(readyblock_t) * READYQSIZE))
-	    == NULL) {
-		fprintf(stderr, "Not enough memory for readyQ blocks!\n");
-		exit(1);
-	}
-	readyqueuemem = ptr;
-	for (i = 0; i < READYQSIZE; i++, ptr++) {
-		ptr->header.zero       = 0;
-		ptr->header.chain.next = (void *) freelist;
-		freelist = ptr;
-	}
+	queue_init(&writequeue);
+
 	if (!called) {
 		called = 1;
-		pthread_mutex_init(&freelist_mutex, 0);
-		pthread_cond_init(&freelist_condvar, 0);
-		pthread_mutex_init(&readyqueue_mutex, 0);
-		pthread_cond_init(&readyqueue_condvar, 0);
+		pthread_mutex_init(&writebuf_mutex, 0);
+		pthread_mutex_init(&writequeue_mutex, 0);
+#ifdef CONDVARS_WORK
+		pthread_cond_init(&writebuf_cond, 0);
+		pthread_cond_init(&writequeue_cond, 0);
+#endif
 	}
 
 	if (pthread_create(&child_pid, NULL, DiskWriter, (void *)0)) {
@@ -634,9 +792,9 @@ threadwait(void)
 		return;
 
 	while (1) {
-		pthread_mutex_lock(&readyqueue_mutex);
-		done = (queue_empty(&readyqueue) && !writeinprogress);
-		pthread_mutex_unlock(&readyqueue_mutex);
+		pthread_mutex_lock(&writequeue_mutex);
+		done = (queue_empty(&writequeue) && !writeinprogress);
+		pthread_mutex_unlock(&writequeue_mutex);
 		if (done)
 			return;
 		usleep(300000);
@@ -654,51 +812,47 @@ threadquit(void)
 	threadwait();
 	pthread_cancel(child_pid);
 	pthread_join(child_pid, &ignored);
-	free(readyqueuemem);
-	freelist = 0;
 }
 
 void *
 DiskWriter(void *arg)
 {
-	readyblock_t	*rdyblk = 0;
+	writebuf_t	*wbuf = 0;
+	static int	gotone;
 
 	while (1) {
 		pthread_testcancel();
 
-		pthread_mutex_lock(&readyqueue_mutex);
-		if (queue_empty(&readyqueue)) {
-/*			fprintf(stderr, "Writer idle\n"); */
-			writeridles++;
+		pthread_mutex_lock(&writequeue_mutex);
+		if (queue_empty(&writequeue)) {
+			if (gotone)
+				writeridles++;
 			do {
-				pthread_cond_wait(&readyqueue_condvar,
-						  &readyqueue_mutex);
+#ifdef CONDVARS_WORK
+				pthread_cond_wait(&writequeue_cond,
+						  &writequeue_mutex);
+#else
+				pthread_mutex_unlock(&writequeue_mutex);
+				fsleep(1000);
+				pthread_mutex_lock(&writequeue_mutex);
+#endif
 				pthread_testcancel();
-			} while (queue_empty(&readyqueue));
+			} while (queue_empty(&writequeue));
 		}
-		queue_remove_first(&readyqueue, rdyblk,
-				   readyblock_t *, header.chain);
+		queue_remove_first(&writequeue, wbuf, writebuf_t *, chain);
 		writeinprogress = 1; /* XXX */
-		pthread_mutex_unlock(&readyqueue_mutex);
+		gotone = 1;
+		pthread_mutex_unlock(&writequeue_mutex);
 
-		if (rdyblk->header.zero) {
-			writezeros(rdyblk->header.offset, rdyblk->header.size);
-			free(rdyblk);
-			writeinprogress = 0; /* XXX, ok as unlocked access */
-			continue;
+		if (wbuf->data == NULL) {
+			writezeros(wbuf->offset, wbuf->size);
+		} else {
+			rdycount++;
+			assert(wbuf->size <= OUTSIZE);
+			writedata(wbuf->offset, (size_t)wbuf->size, wbuf->data);
 		}
-		rdycount++;
-
-		assert(rdyblk->header.size <= OUTSIZE+SECSIZE);
-		writedata(rdyblk->header.offset, (size_t)rdyblk->header.size,
-			  rdyblk->buf);
+		free_writebuf(wbuf);
 		writeinprogress = 0; /* XXX, ok as unlocked access */
-
-		pthread_mutex_lock(&freelist_mutex);
-		rdyblk->header.chain.next = (void *) freelist;
-		freelist = rdyblk;
-		pthread_mutex_unlock(&freelist_mutex);
-		pthread_cond_signal(&freelist_condvar);
 	}
 }
 #endif
@@ -708,11 +862,12 @@ inflate_subblock(char *chunkbufp)
 {
 	int		cc, err, count, ibsize = 0, ibleft = 0;
 	z_stream	d_stream; /* inflation stream */
-	char		*bp;
 	blockhdr_t	*blockhdr;
 	struct region	*curregion;
 	off_t		offset, size;
 	int		chunkbytes = SUBBLOCKSIZE;
+	char		resid[SECSIZE];
+	writebuf_t	*wbuf;
 	
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
@@ -769,7 +924,11 @@ inflate_subblock(char *chunkbufp)
 	if (imageversion > 1 && curregion->start > blockhdr->firstsect) {
 		offset = sectobytes(blockhdr->firstsect);
 		size = sectobytes(curregion->start - blockhdr->firstsect);
-		dowrite_request(offset, size, NULL);
+		if (dofill) {
+			wbuf = alloc_writebuf(offset, size, 0, 1);
+			dowrite_request(wbuf);
+		} else
+			totaledata += size;
 	}
  
 	/*
@@ -777,43 +936,66 @@ inflate_subblock(char *chunkbufp)
 	 */
 	offset = sectobytes(curregion->start);
 	size   = sectobytes(curregion->size);
-	assert(size);
+	assert(size > 0);
 	curregion++;
 	blockhdr->regioncount--;
 
 	if (debug == 1)
 		fprintf(stderr, "Decompressing: %14qd --> ", offset);
 
+	wbuf = NULL;
 	while (1) {
 		/*
 		 * Read just up to the end of compressed data.
 		 */
 		count              = blockhdr->size;
-		blockhdr->size    -= count;
+		blockhdr->size     = 0;
 		d_stream.next_in   = chunkbufp;
 		d_stream.avail_in  = count;
 		chunkbufp	  += count;
 		chunkbytes	  -= count;
 		assert(chunkbytes >= 0);
 	inflate_again:
-		/*
-		 * Must operate on multiples of the sector size!
-		 */
-		if (ibleft) {
-			memcpy(outbuf, &outbuf[ibsize - ibleft], ibleft);
-		}
-		d_stream.next_out  = &outbuf[ibleft];
-		d_stream.avail_out = OUTSIZE;
+		assert(wbuf == NULL);
+		wbuf = alloc_writebuf(offset, OUTSIZE, 1, 1);
 
+		/*
+		 * Must operate on multiples of the sector size so first we
+		 * restore any residual from the last decompression.
+		 */
+		if (ibleft)
+			memcpy(wbuf->data, resid, ibleft);
+
+		/*
+		 * Adjust the decompression params to account for the resid
+		 */
+		d_stream.next_out  = &wbuf->data[ibleft];
+		d_stream.avail_out = OUTSIZE - ibleft;
+
+		/*
+		 * Inflate a chunk
+		 */
 		err = inflate(&d_stream, Z_SYNC_FLUSH);
 		if (err != Z_OK && err != Z_STREAM_END) {
 			fprintf(stderr, "inflate failed, err=%d\n", err);
 			exit(1);
 		}
-		ibsize = (OUTSIZE - d_stream.avail_out) + ibleft;
+
+		/*
+		 * Figure out how much valid data is in the buffer and
+		 * save off any SECSIZE residual for the next round.
+		 *
+		 * Yes the ibsize computation is correct, just not obvious.
+		 * The obvious expression is:
+		 *	ibsize = (OUTSIZE - ibleft) - avail_out + ibleft;
+		 * so ibleft cancels out.
+		 */
+		ibsize = OUTSIZE - d_stream.avail_out;
 		count  = ibsize & ~(SECSIZE - 1);
 		ibleft = ibsize - count;
-		bp     = outbuf;
+		if (ibleft)
+			memcpy(resid, &wbuf->data[count], ibleft);
+		wbuf->size = count;
 
 		while (count) {
 			/*
@@ -821,15 +1003,25 @@ inflate_subblock(char *chunkbufp)
 			 * the end of the current region. Since outbuf is
 			 * same size as rdyblk->buf, its guaranteed to fit.
 			 */
-			if (count < size)
+			if (count <= size) {
+				dowrite_request(wbuf);
+				wbuf = NULL;
 				cc = count;
-			else
-				cc = size;
+			} else {
+				writebuf_t *wbtail;
 
-			/*
-			 * Put it on the output queue.
-			 */
-			dowrite_request(offset, cc, bp);
+				/*
+				 * Data we decompressed belongs to physically
+				 * distinct areas, we have to split the
+				 * write up, meaning we have to allocate a
+				 * new writebuf and copy the remaining data
+				 * into it.
+				 */
+				wbtail = split_writebuf(wbuf, size, 1);
+				dowrite_request(wbuf);
+				wbuf = wbtail;
+				cc = size;
+			}
 
 			if (debug == 2) {
 				fprintf(stderr,
@@ -840,7 +1032,6 @@ inflate_subblock(char *chunkbufp)
 			}
 
 			count  -= cc;
-			bp     += cc;
 			size   -= cc;
 			offset += cc;
 			assert(count >= 0);
@@ -852,8 +1043,9 @@ inflate_subblock(char *chunkbufp)
 			 * a block of zeros in the empty space between this
 			 * region and the next.
 			 */
-			if (! size) {
+			if (size == 0) {
 				off_t	    newoffset;
+				writebuf_t *wbzero;
 
 				/*
 				 * No more regions. Must be done.
@@ -867,20 +1059,42 @@ inflate_subblock(char *chunkbufp)
 				curregion++;
 				blockhdr->regioncount--;
 				assert((newoffset-offset) > 0);
-				dowrite_request(offset, newoffset-offset,
-						NULL);
+				if (dofill) {
+					wbzero = alloc_writebuf(offset,
+							newoffset-offset,
+							0, 1);
+					dowrite_request(wbzero);
+				} else
+					totaledata += newoffset-offset;
 				offset = newoffset;
+				if (wbuf)
+					wbuf->offset = newoffset;
 			}
 		}
+		assert(wbuf == NULL);
+
+		/*
+		 * Exhausted our output buffer but still have more input in
+		 * the current chunk, go back and deflate more from this chunk.
+		 */
 		if (d_stream.avail_in)
 			goto inflate_again;
 
+		/*
+		 * All input inflated and all output written, done.
+		 */
 		if (err == Z_STREAM_END)
 			break;
+
+		/*
+		 * We should never reach this!
+		 */
+		assert(1);
 	}
 	err = inflateEnd(&d_stream);
 	CHECK_ERR(err, "inflateEnd");
 
+	assert(wbuf == NULL);
 	assert(blockhdr->regioncount == 0);
 	assert(size == 0);
 	assert(blockhdr->size == 0);
@@ -894,14 +1108,18 @@ inflate_subblock(char *chunkbufp)
 		offset = sectobytes(curregion->start + curregion->size);
 		size = sectobytes(blockhdr->lastsect -
 				  (curregion->start + curregion->size));
-		dowrite_request(offset, size, NULL);
+		if (dofill) {
+			wbuf = alloc_writebuf(offset, size, 0, 1);
+			dowrite_request(wbuf);
+		} else
+			totaledata += size;
 		offset += size;
 	}
  
-#ifndef FRISBEE
 	if (debug == 1) {
 		fprintf(stderr, "%14qd\n", offset);
 	}
+#ifndef FRISBEE
 	else if (dots) {
 		fprintf(stderr, ".");
 		if (dotcol++ > 59) {
@@ -927,6 +1145,11 @@ writezeros(off_t offset, off_t zcount)
 
 	assert((offset & (SECSIZE-1)) == 0);
 
+#ifndef FRISBEE
+	if (docrconly)
+		nextwriteoffset = offset;
+	else
+#endif
 	if (seekable) {
 		/*
 		 * We must always seek, even if offset == nextwriteoffset,
@@ -949,6 +1172,11 @@ writezeros(off_t offset, off_t zcount)
 		else
 			zcc = OUTSIZE;
 		
+#ifndef FRISBEE
+		if (docrconly)
+			compute_crc(zeros, zcc, &crc);
+		else
+#endif
 		if ((zcc = write(outfd, zeros, zcc)) != zcc) {
 			if (zcc < 0) {
 				perror("Writing Zeros");
@@ -968,11 +1196,17 @@ writedata(off_t offset, size_t size, void *buf)
 
 	/*	fprintf(stderr, "Writing %d bytes at %qd\n", size, offset); */
 
-	if (seekable)
+#ifndef FRISBEE
+	if (docrconly) {
+		compute_crc(buf, size, &crc);
+		cc = size;
+	} else
+#endif
+	if (seekable) {
 		cc = pwrite(outfd, buf, size, offset);
-	else if (offset == nextwriteoffset)
+	} else if (offset == nextwriteoffset) {
 		cc = write(outfd, buf, size);
-	else {
+	} else {
 		fprintf(stderr, "Non-contiguous write @ %qu (should be %qu)\n",
 			offset, nextwriteoffset);
 		exit(1);
@@ -1222,3 +1456,34 @@ reloc_bsdlabel(struct disklabel *label, int reloctype)
 	label->d_checksum = 0;
 	label->d_checksum = dkcksum(label);
 }
+
+#if !defined(CONDVARS_WORK) && !defined(FRISBEE)
+#include <errno.h>
+
+/*
+ * Sleep. Basically wraps nanosleep, but since the threads package uses
+ * signals, it keeps ending early!
+ */
+int
+fsleep(unsigned int usecs)
+{
+	struct timespec time_to_sleep, time_not_slept;
+	int	foo;
+
+	time_to_sleep.tv_nsec  = (usecs % 1000000) * 1000;
+	time_to_sleep.tv_sec   = usecs / 1000000;
+	time_not_slept.tv_nsec = 0;
+	time_not_slept.tv_sec  = 0;
+
+	while ((foo = nanosleep(&time_to_sleep, &time_not_slept)) != 0) {
+		if (foo < 0 && errno != EINTR) {
+			return -1;
+		}
+		time_to_sleep.tv_nsec  = time_not_slept.tv_nsec;
+		time_to_sleep.tv_sec   = time_not_slept.tv_sec;
+		time_not_slept.tv_nsec = 0;
+		time_not_slept.tv_sec  = 0;
+	}
+	return 0;
+}
+#endif

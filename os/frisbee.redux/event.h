@@ -1,8 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002 University of Utah and the Flux Group.
+ * Copyright (c) 2002, 2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+#define STRSIZE		64
 
 /*
  * Event defs
@@ -12,9 +14,12 @@ typedef struct {
 	union {
 		struct {
 			int startdelay;	/* range in sec of start interval */
+			int startat;	/* start time (alt to startdelay) */
 			int pkttimeout;	/* packet timeout in usec */
 			int idletimer;	/* idle timer in pkt timeouts */
 			int chunkbufs;  /* max receive buffers */
+			int writebufmem;/* max disk write buffer memory */
+			int maxmem;	/* max total memory */
 			int readahead;  /* max readahead in packets */
 			int inprogress; /* max packets in progress */
 			int redodelay;	/* redo delay in usec */
@@ -26,6 +31,11 @@ typedef struct {
 			int dostype;	/* DOS partition type to set */
 			int debug;	/* debug level */
 			int trace;	/* tracing level */
+			char traceprefix[STRSIZE];
+					/* prefix for trace output file */
+#ifdef DOLOSSRATE
+			double plr;
+#endif
 		} start;
 		struct {
 			int exitstatus;

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002 University of Utah and the Flux Group.
+ * Copyright (c) 2002, 2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -34,6 +34,30 @@ static event_handle_t	ehandle;
 static int		gotevent;
 static int		clientnum;
 
+static int
+useclient(int clinum, char *buf)
+{
+	char *cp;
+	int low, high;
+
+	cp = buf;
+	if (cp != NULL) {
+		while ((cp = strsep(&buf, ",")) != NULL) {
+			if (sscanf(cp, "%d-%d", &low, &high) == 2) {
+				if (clinum >= low && clinum <= high)
+					return 1;
+				continue;
+			}
+			if (sscanf(cp, "%d", &low) == 1) {
+				if (clinum == low)
+					return 1;
+				continue;
+			}
+		}
+	}
+	return 0;
+}
+
 /*
  * type==START
  *	STAGGER=N PKTTIMEOUT=N IDLETIMER=N READAHEAD=N INPROGRESS=N REDODELAY=N
@@ -45,6 +69,8 @@ parse_event(Event_t *event, char *etype, char *buf)
 {
 	char *cp;
 	int val;
+	char str[STRSIZE+1];
+	int skipping = 0;
 
 	memset(event, -1, sizeof *event);
 
@@ -58,90 +84,145 @@ parse_event(Event_t *event, char *etype, char *buf)
 	cp = buf;
 	if (cp != NULL) {
 		while ((cp = strsep(&buf, " ")) != NULL) {
-			if (sscanf(cp, "STARTDELAY=%d", &val) == 1) {
-				event->data.start.startdelay = val;
-				continue; 
-			}
-			if (sscanf(cp, "PKTTIMEOUT=%d", &val) == 1) {
-				event->data.start.pkttimeout = val;
-				continue; 
-			}
-			if (sscanf(cp, "IDLETIMER=%d", &val) == 1) {
-				event->data.start.idletimer = val;
-				continue; 
-			}
-			if (sscanf(cp, "CHUNKBUFS=%d", &val) == 1) {
-				event->data.start.chunkbufs = val;
-				continue; 
-			}
-			if (sscanf(cp, "READAHEAD=%d", &val) == 1) {
-				event->data.start.readahead = val;
-				continue; 
-			}
-			if (sscanf(cp, "INPROGRESS=%d", &val) == 1) {
-				event->data.start.inprogress = val;
-				continue; 
-			}
-			if (sscanf(cp, "REDODELAY=%d", &val) == 1) {
-				event->data.start.redodelay = val;
-				continue; 
-			}
-			if (sscanf(cp, "IDLEDELAY=%d", &val) == 1) {
-				event->data.start.idledelay = val;
-				continue; 
-			}
-			if (sscanf(cp, "SLICE=%d", &val) == 1) {
-				event->data.start.slice = val;
-				continue; 
-			}
-			if (sscanf(cp, "ZEROFILL=%d", &val) == 1) {
-				event->data.start.zerofill = val;
-				continue; 
-			}
-			if (sscanf(cp, "RANDOMIZE=%d", &val) == 1) {
-				event->data.start.randomize = val;
-				continue; 
-			}
-			if (sscanf(cp, "NOTHREADS=%d", &val) == 1) {
-				event->data.start.nothreads = val;
-				continue; 
-			}
-			if (sscanf(cp, "DOSTYPE=%d", &val) == 1) {
-				event->data.start.dostype = val;
-				continue; 
-			}
-			if (sscanf(cp, "DEBUG=%d", &val) == 1) {
-				event->data.start.debug = val;
-				continue; 
-			}
-			if (sscanf(cp, "TRACE=%d", &val) == 1) {
-				event->data.start.trace = val;
-				continue; 
-			}
-			if (sscanf(cp, "EXITSTATUS=%d", &val) == 1) {
-				event->data.stop.exitstatus = val;
-				continue; 
-			}
-
 			/*
 			 * Hideous Hack Alert!
 			 *
-			 * Assume our hostname is of the form 'c-<num>.<domain>'
+			 * Assume hostname is of the form 'c-<num>.<domain>'
 			 * and use <num> to determine our client number.
-			 * We use that number and compare to the maxclients
-			 * field to determine if we should process this event.
+			 * We use that number and compare to the useclients
+			 * string to determine if we should process this event.
 			 * If not, we ignore this event.
 			 */
-			if (sscanf(cp, "MAXCLIENTS=%d", &val) == 1) {
-				if (clientnum >= val) {
+			if (sscanf(cp, "USECLIENTS=%s", str) == 1) {
+				if (!useclient(clientnum, str))
+					skipping = 1;
+				else
+					skipping = 0;
+				continue;
+			}
+			if (sscanf(cp, "SKIPCLIENTS=%s", str) == 1) {
+				if (useclient(clientnum, str)) {
 					gotevent = 0;
 					return 0;
 				}
 				continue;
 			}
+			if (skipping)
+				continue;
+
+			if (sscanf(cp, "STARTDELAY=%d", &val) == 1) {
+				event->data.start.startdelay = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "STARTAT=%d", &val) == 1) {
+				event->data.start.startat = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "PKTTIMEOUT=%d", &val) == 1) {
+				event->data.start.pkttimeout = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "IDLETIMER=%d", &val) == 1) {
+				event->data.start.idletimer = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "CHUNKBUFS=%d", &val) == 1) {
+				event->data.start.chunkbufs = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "WRITEBUFMEM=%d", &val) == 1) {
+				event->data.start.writebufmem = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "MAXMEM=%d", &val) == 1) {
+				event->data.start.maxmem = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "READAHEAD=%d", &val) == 1) {
+				event->data.start.readahead = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "INPROGRESS=%d", &val) == 1) {
+				event->data.start.inprogress = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "REDODELAY=%d", &val) == 1) {
+				event->data.start.redodelay = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "IDLEDELAY=%d", &val) == 1) {
+				event->data.start.idledelay = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "SLICE=%d", &val) == 1) {
+				event->data.start.slice = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "ZEROFILL=%d", &val) == 1) {
+				event->data.start.zerofill = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "RANDOMIZE=%d", &val) == 1) {
+				event->data.start.randomize = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "NOTHREADS=%d", &val) == 1) {
+				event->data.start.nothreads = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "DOSTYPE=%d", &val) == 1) {
+				event->data.start.dostype = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "DEBUG=%d", &val) == 1) {
+				event->data.start.debug = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "TRACE=%d", &val) == 1) {
+				event->data.start.trace = val;
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "TRACEPREFIX=%s", str) == 1) {
+				strncpy(event->data.start.traceprefix,
+					str, STRSIZE-1);
+				gotevent = 1;
+				continue; 
+			}
+			if (sscanf(cp, "EXITSTATUS=%d", &val) == 1) {
+				event->data.stop.exitstatus = val;
+				gotevent = 1;
+				continue; 
+			}
+#ifdef DOLOSSRATE
+			{
+				double plr;
+				if (sscanf(cp, "PLR=%lf", &plr) == 1) {
+					event->data.start.plr = plr;
+					gotevent = 1;
+					continue; 
+				}
+			}
+#endif
 		}
 	}
-	gotevent = 1;
 	return 0;
 }
 
