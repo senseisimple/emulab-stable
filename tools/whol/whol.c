@@ -27,7 +27,36 @@ const int MAX_BPFNUM = 16;
 
 const int packet_len = 666;
 
-int main(int argc, char **argv) {
+int
+main(int argc, char **argv)
+{
+    int failed = 0;
+    char *iface;
+
+    /*
+     * Handle command line args
+     */
+    if (argc < 3) {
+        fprintf(stderr,"Usage: whol <interface> <dst_address ...>\n");
+        fprintf(stderr,"interface: Name of the interface to send packet on\n");
+        fprintf(stderr,"dst_addr: MAC addresses in hex, without puncuation\n");
+        exit(1);
+    }
+    argc--, argv++;
+
+    iface = *argv;
+    argc--, argv++;
+
+    while (argc--)
+	if (whackanode(iface, *argv++))
+	    failed++;
+
+    exit(failed);
+}
+
+int
+whackanode(char *iface, char *victim)
+{
     int bpfnum;
     int bpffd;
     struct ifreq req;
@@ -38,29 +67,14 @@ int main(int argc, char **argv) {
     struct ip *ip;
     struct udphdr *udp;
     char *pbody;
-    char *victim;
-    char *iface;
     u_char dst_mac[6];
-
-    /*
-     * Handle command line args
-     */
-    if (argc != 3) {
-        fprintf(stderr,"Usage: whol <dst_address> <interface>\n");
-        fprintf(stderr,"dst_addr: A MAC address in hex, without puncuation\n");
-        fprintf(stderr,"interface: Name of the interface to send packet on\n");
-        exit(1);
-    }
-
-    victim = argv[1];
-    iface = argv[2];
 
     /*
      * Convert the victim MAC address from ASCII into bytes
      */
     if (strlen(victim) != 12) {
         fprintf(stderr,"Bad format for MAC address\n");
-        exit(1);
+	return 1;
     }
     for (i = 0; i < 6; i++) {
         char digits[3];
@@ -69,7 +83,7 @@ int main(int argc, char **argv) {
         digits[2] = '\0'; /* Null-terminate */
         if (sscanf(digits,"%x",&tmp) != 1) {
             printf("Bad hex value in dst_addr: %s\n",digits);
-            exit(1);
+	    return 1;
         }
         dst_mac[i] = tmp;
     }
@@ -88,7 +102,7 @@ int main(int argc, char **argv) {
 
     if (bpffd < 0) {
         fprintf(stderr,"Failed to find an open-able BPF device\n");
-        exit(1);
+	return 1;
     }
 
     /*
@@ -98,7 +112,7 @@ int main(int argc, char **argv) {
 
     if (ioctl(bpffd,BIOCSETIF,&req) < 0) {
         perror("BIOSETIF failed");
-        exit(1);
+	return 1;
     }
 
     /*
@@ -164,14 +178,12 @@ int main(int argc, char **argv) {
     /*
      * Whack away!
      */
-    printf("Whack!\n");
     written = write(bpffd,buf,packet_len);
     if (written < 0) {
-        perror("Write failed");
+        perror("whol: write failed");
     }
 
-    exit(0);
-
+    return 0;
 }
 
 /*

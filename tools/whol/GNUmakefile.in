@@ -23,7 +23,12 @@ whol: GNUmakefile whol.o
 whol.o: whol.c
 	$(CC) -c -o whol.o $(CFLAGS) $<
 
-install: $(INSTALL_SBINDIR)/whol
+install boss-install: $(INSTALL_SBINDIR)/whol
+	@echo "Don't forget to do a post-install as root"
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/whol
+	chmod u+s $(INSTALL_SBINDIR)/whol
 
 clean:
 	rm -f *.o core whol whol.debug
