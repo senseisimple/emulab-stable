@@ -175,6 +175,7 @@ int main(int argc, char *argv[])
     char *logfile = NULL, *pidfile = NULL;
     mtp_handle_t emc_handle = NULL;
     struct timeval last_time;
+    struct mtp_packet rmp;
     fd_set readfds;
 
 #if 0
@@ -300,7 +301,7 @@ int main(int argc, char *argv[])
 #endif
 
     if (emc_hostname != NULL || emc_path != NULL) {
-	struct mtp_packet mp, rmp;
+	struct mtp_packet mp;
 	
 	mtp_init_packet(&mp,
 			MA_Opcode, MTP_CONTROL_INIT,
@@ -323,9 +324,13 @@ int main(int argc, char *argv[])
 	else {
 	    int lpc;
 
+	    mtp_print_packet(stderr, &rmp);
+
 	    FD_SET(emc_handle->mh_fd, &readfds);
 	    rmc_config = &rmp.data.mtp_payload_u.config_rmc;
 
+	    info("bounds %d\n", rmc_config->bounds.bounds_len);
+	    
 	    pc_data.pcd_emc_handle = emc_handle;
 	    pc_data.pcd_config = rmc_config;
 	    
