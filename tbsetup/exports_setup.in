@@ -22,7 +22,7 @@ my $SSH		= "sshtb -q -l root fs.emulab.net";
 my $PROG	= "/usr/testbed/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $lockfile    = "/var/tmp/testbed_exports_lockfile";
-my $projdir     = "/proj";
+my $projdir     = "/q/proj";
 my $usersdir    = "/users";
 my $dbg		= 0;
 my @row;
@@ -138,48 +138,82 @@ if ($db_result->numrows > 0) {
 # Now we need the users list for exporting from /users. We need to export
 # all of the project members to all of the machines in that projects
 # experiments. Also, since we again want the IPs, we need all of that crazy
-# join again. Silly!
+# join again. Even worse, we cannot list an IP address more than once, so
+# we end up with mulitple exports for any particular user (cause they can be
+# in multiple experiments withing a project), but with non overlapping
+# sets of IP addresses. For example:
+#
+#	/users/stoller /users/mike 101.101.101.100 101.101.101.101
+#	/users/stoller             101.101.101.102
+#       /users/mike                101.101.101.103
 #
 $db_result =
-   DBquery("select proj_memb.uid,interfaces.IP from reserved ".
+   DBquery("select reserved.node_id,reserved.pid,proj_memb.uid,interfaces.IP ".
+	   "from reserved ".
 	   "left join proj_memb on proj_memb.pid=reserved.pid ".
 	   "left join nodes on reserved.node_id=nodes.node_id ".
 	   "left join node_types on node_types.type=nodes.type ".
 	   "left join interfaces on reserved.node_id=interfaces.node_id ".
 	   "and interfaces.card=node_types.control_net ".
 	   "where interfaces.IP!='NULL' and proj_memb.trust!='none' ".
-	   "order by proj_memb.uid");
+	   "order by reserved.pid,reserved.node_id");
 
 #
 # Generate a per user directory line, listing all of the nodes for
 # that user. We could do it one per line, but too messy.
 #
 if ($db_result->numrows > 0) {
-    my $lastuid = 0;
-    my @hostlist = ();
+    my $lastpid = 0;
+    my %hostlist = ();
+    my %userlist = ();
     
     print MAP "#\n";
     print MAP "# Export User directories\n";
     print MAP "#\n";
 
     while (@row = $db_result->fetchrow_array) {
-	my $uid     = $row[0];
-	my $ip      = $row[1];
+	my $node     = $row[0];
+	my $pid      = $row[1];
+	my $uid      = $row[2];
+	my $ip       = $row[3];
 
-	if (!$lastuid) {
-	    $lastuid = $uid;
-	    push(@hostlist, $ip);
+	if (!$lastpid) {
+	    $lastpid         = $pid;
+	    $hostlist{$ip}   = $ip;
+	    $userlist{$uid}  = $uid;
 	    next;
 	}
 
-	if ($uid ne $lastuid) {
-	    print MAP "$usersdir/$lastuid -maproot=root @hostlist\n";
-	    @hostlist = ();
-	    $lastuid = $uid;
+	if ($pid ne $lastpid) {
+	    foreach my $user (keys(%userlist)) {
+		print MAP "$usersdir/$user ";
+	    }
+	    print MAP "-maproot=root ";
+	    
+	    foreach my $host (keys(%hostlist)) {
+		print MAP "$host ";
+	    }
+	    print MAP "\n";
+
+	    %hostlist = ();
+	    %userlist = ();
+	    $lastpid = $pid;
 	}
-	push(@hostlist, $ip);
+	$hostlist{$ip}   = $ip;
+	$userlist{$uid}  = $uid
     }
-    print MAP "$usersdir/$lastuid -maproot=root @hostlist\n";
+    #
+    # Last project set
+    # 
+    foreach my $user (keys(%userlist)) {
+	print MAP "$usersdir/$user ";
+    }
+    print MAP "-maproot=root ";
+	    
+    foreach my $host (keys(%hostlist)) {
+	print MAP "$host ";
+    }
+    print MAP "\n";
 }
 
 print MAP "\n";

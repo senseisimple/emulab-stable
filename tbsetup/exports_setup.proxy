@@ -100,7 +100,7 @@ kill('TERM', $mpid) or
 # Allow time to react before starting it again.
 select(undef, undef, undef, 0.5);
 
-system("mountd") == 0 or
+system("mountd -r") == 0 or
     fatal("Failed to restart mountd! $!\n");
 
 exit(0);
