@@ -26,7 +26,7 @@ CFLAGS	 += -O -g -static -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`
 
-LDFLAGS  += -L$(OBJDIR)/lib -L../lib
+LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent
 LIBS     += `elvin-config --libs vin4c`
 
