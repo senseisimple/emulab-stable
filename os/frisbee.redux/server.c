@@ -388,8 +388,9 @@ ClientJoin(Packet_t *p)
 	 * Log after we send reply so that we get the packet off as
 	 * quickly as possible!
 	 */
-	log("%s (id %u) joins at %s!  %d active clients.",
-	    inet_ntoa(ipaddr), clientid, CurrentTimeString(), activeclients);
+	log("%s (id %u, image %s) joins at %s!  %d active clients.",
+	    inet_ntoa(ipaddr), clientid, filename,
+	    CurrentTimeString(), activeclients);
 }
 
 /*
@@ -413,9 +414,9 @@ ClientLeave(Packet_t *p)
 				activeclients--;
 				clients[i].id = 0;
 				clients[i].ip = 0;
-				log("%s (id %u): leaves at %s, "
+				log("%s (id %u, image %s): leaves at %s, "
 				    "ran for %d seconds.  %d active clients",
-				    inet_ntoa(ipaddr), clientid,
+				    inet_ntoa(ipaddr), clientid, filename,
 				    CurrentTimeString(),
 				    p->msg.leave.elapsed, activeclients);
 				break;
@@ -426,8 +427,9 @@ ClientLeave(Packet_t *p)
 	}
 #else
 	activeclients--;
-	log("%s (id %u): leaves at %s, ran for %d seconds.  %d active clients",
-	    inet_ntoa(ipaddr), clientid, CurrentTimeString(),
+	log("%s (id %u, image %s): leaves at %s, ran for %d seconds.  "
+	    "%d active clients",
+	    inet_ntoa(ipaddr), clientid, filename, CurrentTimeString(),
 	    p->msg.leave.elapsed, activeclients);
 #endif
 }
@@ -453,9 +455,9 @@ ClientLeave2(Packet_t *p)
 				clients[i].id = 0;
 				clients[i].ip = 0;
 				activeclients--;
-				log("%s (id %u): leaves at %s, "
+				log("%s (id %u, image %s): leaves at %s, "
 				    "ran for %d seconds.  %d active clients",
-				    inet_ntoa(ipaddr), clientid,
+				    inet_ntoa(ipaddr), clientid, filename,
 				    CurrentTimeString(),
 				    p->msg.leave2.elapsed, activeclients);
 				ClientStatsDump(clientid, &p->msg.leave2.stats);
@@ -467,8 +469,9 @@ ClientLeave2(Packet_t *p)
 	}
 #else
 	activeclients--;
-	log("%s (id %u): leaves at %s, ran for %d seconds.  %d active clients",
-	    inet_ntoa(ipaddr), clientid, CurrentTimeString(),
+	log("%s (id %u, image %s): leaves at %s, ran for %d seconds.  "
+	    "%d active clients",
+	    inet_ntoa(ipaddr), clientid, filename, CurrentTimeString(),
 	    p->msg.leave2.elapsed, activeclients);
 #endif
 }
@@ -646,6 +649,7 @@ PlayFrisbee(void)
 			/* If less than zero, exit when last cilent leaves */
 			if (timeout < 0 &&
 			    Stats.joins > 0 && activeclients == 0) {
+				fsleep(2000000);
 				log("Last client left!");
 				break;
 			}
@@ -679,6 +683,10 @@ PlayFrisbee(void)
 			int	readbytes;
 			int	resends;
 			int	thisburst = 0;
+#ifdef NEVENTS
+			struct timeval rstamp;
+			gettimeofday(&rstamp, 0);
+#endif
 
 			/*
 			 * Read blocks of data from disk.
@@ -698,7 +706,7 @@ PlayFrisbee(void)
 			DOSTAT(filereads++);
 			DOSTAT(filebytes += cc);
 			EVENT(2, EV_READFILE, mcastaddr,
-			      offset, readbytes, cc, 0);
+			      offset, readbytes, rstamp.tv_sec, rstamp.tv_usec);
 			if (cc != readbytes)
 				fatal("Short read: %d!=%d", cc, readbytes);
 
@@ -715,8 +723,8 @@ PlayFrisbee(void)
 				PacketSend(p, &resends);
 				sendretries += resends;
 				DOSTAT(blockssent++);
-				EVENT(3, EV_BLOCKMSG, mcastaddr,
-				      chunk, block+j, 0, 0);
+				EVENT(resends ? 1 : 3, EV_BLOCKMSG, mcastaddr,
+				      chunk, block+j, resends, 0);
 
 				/*
 				 * Completed a burst.  Adjust the busrtsize
@@ -929,10 +937,11 @@ main(int argc, char **argv)
 		log("  client re-req:     %d",
 		    Stats.clientlost);
 		log("  1k blocks sent:    %d (%d repeated)",
-		    Stats.blockssent, Stats.blockssent - FileInfo.blocks);
+		    Stats.blockssent, Stats.blockssent ?
+		    (Stats.blockssent-FileInfo.blocks) : 0);
 		log("  file reads:        %d (%qu bytes, %qu repeated)",
-		    Stats.filereads, Stats.filebytes,
-		    Stats.filebytes - FileInfo.blocks * BLOCKSIZE);
+		    Stats.filereads, Stats.filebytes, Stats.filebytes ?
+		    (Stats.filebytes - FileInfo.blocks * BLOCKSIZE) : 0);
 		log("  net idle/blocked:  %d/%d", Stats.goesidle, nonetbufs);
 		log("  send intvl/missed: %d/%d",
 		    Stats.intervals, Stats.missed);

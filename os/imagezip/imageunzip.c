@@ -841,6 +841,10 @@ threadquit(void)
 	pthread_join(child_pid, &ignored);
 }
 
+#ifdef FRISBEE
+extern void (*DiskIdleCallback)(int);
+#endif
+
 void *
 DiskWriter(void *arg)
 {
@@ -852,8 +856,13 @@ DiskWriter(void *arg)
 
 		pthread_mutex_lock(&writequeue_mutex);
 		if (queue_empty(&writequeue)) {
-			if (gotone)
+			if (gotone) {
 				writeridles++;
+#ifdef FRISBEE
+				if (DiskIdleCallback)
+					(*DiskIdleCallback)(1);
+#endif
+			}
 			do {
 #ifdef CONDVARS_WORK
 				pthread_cond_wait(&writequeue_cond,
@@ -865,6 +874,10 @@ DiskWriter(void *arg)
 #endif
 				pthread_testcancel();
 			} while (queue_empty(&writequeue));
+#ifdef FRISBEE
+			if (DiskIdleCallback)
+				(*DiskIdleCallback)(0);
+#endif
 		}
 		queue_remove_first(&writequeue, wbuf, writebuf_t *, chain);
 		writeinprogress = 1; /* XXX */
@@ -1000,6 +1013,9 @@ inflate_subblock(char *chunkbufp)
 		d_stream.next_out  = &wbuf->data[ibleft];
 		d_stream.avail_out = OUTSIZE - ibleft;
 
+#ifdef FRISBEE
+		sched_yield();
+#endif
 		/*
 		 * Inflate a chunk
 		 */

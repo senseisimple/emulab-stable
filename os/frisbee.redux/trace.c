@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002, 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2002, 2003, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -161,8 +161,9 @@ TraceDump(void)
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_BLOCKMSG:
-				fprintf(fd, "send block, %lu[%lu]\n",
-					ptr->args[0], ptr->args[1]);
+				fprintf(fd, "sent block, %lu[%lu], retry=%lu\n",
+					ptr->args[0], ptr->args[1],
+					ptr->args[2]);
 				break;
 			case EV_WORKENQ:
 				fprintf(fd, "enqueues, %lu(%lu), "
@@ -200,9 +201,12 @@ TraceDump(void)
 					ptr->args[0]);
 				break;
 			case EV_READFILE:
-				fprintf(fd, "readfile, %lu@%lu -> %lu\n",
-					ptr->args[1],
-					ptr->args[0], ptr->args[2]);
+				stamp.tv_sec = ptr->args[2];
+				stamp.tv_usec = ptr->args[3];
+				timersub(&ptr->tstamp, &stamp, &stamp);
+				fprintf(fd, "readfile, %lu@%lu, %lu.%03lus\n",
+					ptr->args[1], ptr->args[0],
+					stamp.tv_sec, stamp.tv_usec/1000);
 				break;
 
 
@@ -282,9 +286,11 @@ TraceDump(void)
 				break;
 			case EV_CLILCHUNK:
 				fprintf(fd, "%s: switched from incomplete "
-					"chunk %lu at block %lu\n",
+					"chunk %lu at block %lu "
+					"(%lu blocks to go)\n",
 					inet_ntoa(ptr->srcip),
-					ptr->args[0], ptr->args[1]);
+					ptr->args[0], ptr->args[1],
+					ptr->args[2]);
 				break;
 			case EV_CLIREQ:
 				fprintf(fd, "%s: send REQUEST, %lu[%lu-%lu]\n",
@@ -316,32 +322,43 @@ TraceDump(void)
 					inet_ntoa(ptr->srcip), ptr->args[0]);
 				break;
 			case EV_CLILEAVE:
-				fprintf(fd, "%s: send LEAVE, ID=%lx, time=%lu\n",
+			{
+				unsigned long long bytes;
+				bytes = (unsigned long long)ptr->args[2] << 32;
+				bytes |= ptr->args[3];
+				fprintf(fd, "%s: send LEAVE, ID=%lx, "
+					"time=%lu, bytes=%qu\n",
 					inet_ntoa(ptr->srcip),
-					ptr->args[0], ptr->args[1]);
+					ptr->args[0], ptr->args[1], bytes);
 				break;
+			}
 			case EV_CLISTAMP:
 				fprintf(fd, "%s: update chunk %lu, stamp %lu.%06lu\n",
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1], ptr->args[2]);
 				break;
-			case EV_CLIWRSTART:
-				fprintf(fd, "%s: writing chunk %lu, "
+			case EV_CLIDCSTART:
+				fprintf(fd, "%s: decompressing chunk %lu, "
 					"idle=%lu, (dblock=%lu, widle=%lu)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
-			case EV_CLIWRDONE:
-				fprintf(fd, "%s: chunk %lu written, "
+			case EV_CLIDCDONE:
+				fprintf(fd, "%s: chunk %lu decompressed, "
 					"%lu left, (dblock=%lu, widle=%lu)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
-			case EV_CLIWRIDLE:
-				fprintf(fd, "%s: disk IDLE\n",
+			case EV_CLIDCIDLE:
+				fprintf(fd, "%s: decompressor IDLE\n",
 					inet_ntoa(ptr->srcip));
+				break;
+			case EV_CLIWRSTATUS:
+				fprintf(fd, "%s: writer %s\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0] ? "IDLE" : "STARTED");
 				break;
 			case EV_CLIGOTPKT:
 				stamp.tv_sec = ptr->args[0];

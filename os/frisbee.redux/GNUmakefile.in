@@ -45,7 +45,7 @@ LDFLAGS		= -static
 #CFLAGS		+= -DCONDVARS_WORK
 
 # Define this to a non-zero value to enable recording of trace data
-#CFLAGS		+= -DNEVENTS=25000
+#CFLAGS		+= -DNEVENTS=50000
 
 # Turn on client event handling
 #CFLAGS		+= -DDOEVENTS

@@ -48,6 +48,7 @@ int		redodelay = CLIENT_REQUEST_REDO_DELAY;
 int		idledelay = CLIENT_WRITER_IDLE_DELAY;
 int		startdelay = 0, startat = 0;
 
+int		nothreads = 0;
 int		debug = 0;
 int		tracing = 0;
 char		traceprefix[64];
@@ -140,6 +141,7 @@ char *usagestr =
  "                 (Half used for network, half for disk).\n"
  " -I ms           The time interval (millisec) between re-requests of a chunk.\n"
  " -R #            The max number of chunks we will request ahead.\n"
+ " -O              Make chunk requests in increasing order (default is random order).\n"
  "\n";
 
 void
@@ -149,17 +151,23 @@ usage()
 	exit(1);
 }
 
+void (*DiskIdleCallback)();
+static void
+WriterIdleCallback(int isidle)
+{
+	CLEVENT(1, EV_CLIWRSTATUS, isidle, 0, 0, 0);
+}
+
 int
 main(int argc, char **argv)
 {
 	int	ch, mem;
 	char   *filename;
 	int	zero = 0;
-	int	nothreads = 0;
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:O")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -264,6 +272,10 @@ main(int argc, char **argv)
 			redodelay = atoi(optarg) * 1000;
 			if (redodelay < 0)
 				redodelay = 0;
+			break;
+
+		case 'O':
+			randomize = 0;
 			break;
 
 		case 'h':
@@ -410,6 +422,8 @@ main(int argc, char **argv)
 	if (tracing) {
 		ClientTraceInit(traceprefix);
 		TraceStart(tracing);
+		if (!nothreads)
+			DiskIdleCallback = WriterIdleCallback;
 	}
 
 	PlayFrisbee();
@@ -539,7 +553,7 @@ ClientRecvThread(void *arg)
 				continue;
 			}
 
-			CLEVENT(3, EV_CLIGOTPKT,
+			CLEVENT(BackOff ? 1 : 3, EV_CLIGOTPKT,
 				pstamp.tv_sec, pstamp.tv_usec, 0, 0);
 #ifdef NEVENTS
 			needstamp = 1;
@@ -667,7 +681,7 @@ ChunkerStartup(void)
 			}
 #endif
 			if (!wasidle) {
-				CLEVENT(1, EV_CLIWRIDLE, 0, 0, 0, 0);
+				CLEVENT(1, EV_CLIDCIDLE, 0, 0, 0, 0);
 				if (debug)
 					log("No chunks ready to write!");
 			}
@@ -702,7 +716,7 @@ ChunkerStartup(void)
 			}
 		}
 
-		CLEVENT(1, EV_CLIWRSTART,
+		CLEVENT(1, EV_CLIDCSTART,
 			ChunkBuffer[i].thischunk, wasidle,
 			decompblocks, writeridles);
 		wasidle = 0;
@@ -715,7 +729,7 @@ ChunkerStartup(void)
 		 */
 		ChunkBuffer[i].state = CHUNK_EMPTY;
 		chunkcount--;
-		CLEVENT(1, EV_CLIWRDONE,
+		CLEVENT(1, EV_CLIDCDONE,
 			ChunkBuffer[i].thischunk, chunkcount,
 			decompblocks, writeridles);
 	}
@@ -935,7 +949,8 @@ GotBlock(Packet_t *p)
 		if (lastchunk != -1 && chunk != lastchunk &&
 		    lastchunk == ChunkBuffer[lastchunkbuf].thischunk &&
 		    ChunkBuffer[lastchunkbuf].state == CHUNK_FILLING)
-			CLEVENT(1, EV_CLILCHUNK, lastchunk, lastblock, 0, 0);
+			CLEVENT(1, EV_CLILCHUNK, lastchunk, lastblock,
+				ChunkBuffer[lastchunkbuf].blockcount, 0);
 		lastchunkbuf = i;
 		lastchunk = chunk;
 		lastblock = block;
@@ -1254,7 +1269,8 @@ PlayFrisbee(void)
 	 * the server gets it. All the server does with it is print a
 	 * timestamp, and that is not critical to operation.
 	 */
-	CLEVENT(1, EV_CLILEAVE, myid, estamp.tv_sec, 0, 0);
+	CLEVENT(1, EV_CLILEAVE, myid, estamp.tv_sec,
+		(Stats.u.v1.rbyteswritten >> 32), Stats.u.v1.rbyteswritten);
 #ifdef STATS
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE2;
