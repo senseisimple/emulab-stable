@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * This odd program is used to generate last login information on a per
  * user and per node basis. That is, for each user we want the last time
  * they logged in anyplace, and for each node we want the last time anyone

@@ -1,5 +1,10 @@
 <?php
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
 # Default definitions, selected via configure.
 # See doc/setup.txt in the root of the source tree for
 # explanations of some of these variables.

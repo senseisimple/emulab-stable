@@ -1,5 +1,10 @@
 <?php
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
 # Leigh's definitions. Selected via configure.
 #
 $WWWHOST        = "golden-gw.ballmoss.com:8080";

@@ -1,5 +1,10 @@
 <?php
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
 # Beware empty spaces (cookies)!
 #
 # The point of this mess is to redirect people from the top level 
