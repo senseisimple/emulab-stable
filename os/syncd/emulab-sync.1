@@ -52,7 +52,7 @@ Available options:
 Print out a usage message.
 .TP
 \fB-V
-Print out a version number.
+Print out version information and exit.
 .TP
 \fB-n \fIname
 The name of the barrier, must be less than 64 bytes long.  (Default: barrier)
@@ -91,22 +91,28 @@ option.
 Use UDP to contact the server.  (Default: TCP)
 .TP
 \fB-e \fIerror-number
-Specify the error code for this client, must be zero (no error) or >= 32.  
-The error codes for all of the clients are collected by the server and 
-the maximum is returned by the clients when they exit.  Note that we 
-reserve error codes [1, 32) so using large numbers is best to avoid 
-interference.  (Default: 0)
+
+Specify the error code for this client.  The value must be greater than zero
+(indicating no error) and less than 240 because we reserve the range [240, 256)
+for internal use.  The error codes for all of the clients are collected by the
+server and the maximum is returned by the clients when they exit.  (Default: 0)
 .SH RETURN VALUES
 .TP
->= 32
+A \fB-e \fRerror value
 If the barrier was crossed, but atleast one of the clients reported a non-zero
 error code.
 .TP
-10
+240
 If the server received a SIGHUP from a user, causing all of the barriers 
 to be cleared and the clients released.
 .TP
-1
+76
+If there was an error while communicating with the server.
+.TP
+68
+If the server name lookup failed.
+.TP
+64
 If there was an invalid command line argument.
 .TP
 0
@@ -134,7 +140,7 @@ To perform two different synchronizations at the same time using barriers named
 [george@bluth2 ~] emulab-sync -n prison
 .RE
 .PP
-To report an error 
+To synchronize and report an error code of "100":
 .PP
 .RS
 .PD 0
@@ -149,7 +155,15 @@ To report an error
 100
 .PD
 .RE
+.SH FILES
+.TP
+/var/emulab/boot/syncserver
+Contains the name and port number of the experiment's default sync server.
 .SH NOTES
+If a client using TCP is unable to connect to the server, it will continue to
+retry at five second intervals.  Clients using UDP do not support such
+reliability, so be careful.
+.P
 If you terminate a TCP client before it returns, the server will recognize the
 closed socket and adjust the counter so that it appears that the call 
 never occurred.
