@@ -959,7 +959,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *request, int tcp)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "CMD=%s UID=", row[0]);
+	sprintf(buf, "CMD='%s' UID=", row[0]);
 	mysql_free_result(res);
 
 	/*
