@@ -451,6 +451,7 @@ sub removeVlan($@) {
     # first, so the other snmpit will not see it free until it's been
     # removed from all switches)
     #
+    my $vlan_removal_errors = 0;
     foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	my @existant_vlans = ();
@@ -475,10 +476,14 @@ sub removeVlan($@) {
 	# If this stack doesn't use VTP, delete the VLAN, too, while
 	# we're at it. If it does, we remove all VLANs down below (we can't
 	# do it until the ports have been cleared from all switches.)
+	# If there have been any errors removing VLANs from other switches,
+	# we don't continue trying to remove them - this is in an attempt to
+	# avoid ending up with VLANs that exist on switches in the stack but
+	# NOT the 'master' (the first one we try to create them on)
 	#
-	if (!$self->{VTP}) {
+	if (!$self->{VTP} && !$vlan_removal_errors) {
 	    my $ok = $device->removeVlan(@existant_vlans);
-	    if (!$ok) { $errors++; }
+	    if (!$ok) { $errors++; $vlan_removal_errors++; }
 	}
     }
 
