@@ -6,10 +6,12 @@ proc getipaddr {name} {
 
     set hostnamelist [split [exec tmcc hostnames] "\n"]
     foreach hostname $hostnamelist {
-	scan $hostname "NAME=%s LINK=%u IP=%s " hname linknum ip
-	set hnametomatch "$hname-$linknum"
-	if { $hnametomatch == $name } {
-	    return $ip
+	scan $hostname "NAME=%s IP=%s ALIASES=\'%s\'" hname ip aliases
+	set aliaslist [split $aliases " "]
+	foreach alias $aliaslist {
+	    if { $alias == $name } {
+		return $ip
+	    }
 	}
     }
     puts stderr "NSE: Could not find ipaddress for $name"
