@@ -32,5 +32,6 @@ INSERT INTO sitevariables VALUES ('watchdog/isalive/vnode',NULL,'10','Interval i
 INSERT INTO sitevariables VALUES ('watchdog/isalive/plab',NULL,'10','Interval in minutes between planetlab node status reports (0==never report)');
 INSERT INTO sitevariables VALUES ('watchdog/isalive/wa',NULL,'1','Interval in minutes between widearea node status reports (0==never report)');
 INSERT INTO sitevariables VALUES ('watchdog/isalive/dead_time',NULL,'120','Time, in minutes, after which to consider a node dead if it has not checked in via tha watchdog');
+INSERT INTO sitevariables VALUES ('watchdog/rusage',NULL,'1','Interval in minutes between node resource usage reports (0==never report)');
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_batch_size',NULL,'40','Number of plab nodes to setup simultaneously');
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_wait_time',NULL,'960','Number of seconds to wait for a plab node to setup');
