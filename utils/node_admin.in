@@ -88,14 +88,9 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 # run this on nodes in their own experiments.
 #
 if ($UID && !TBAdmin($UID)) {
-    if (! NodeAccessCheck(\$node)) {
-	die("*** You do not have permission to create an image from $node\n");
-    }
-    if ($node =~ /^([-\w]+)$/) {
-	$node = $1;
-    }
-    else {
-	fatal("Tainted node name: $node");
+    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, $node)) {
+	die("*** $0:\n".
+	    "    You are not allowed to boot the FreeBSD MFS on $node!\n");
     }
 }
 
