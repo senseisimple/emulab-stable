@@ -9,6 +9,8 @@ use Getopt::Std;
 use File::Basename;
 use Fcntl;
 
+sub WhichRawDisk();
+
 #
 # This script is run directly from boot. It should NOT be run after
 # that since some stuff is not setup to properly restart yet. For
@@ -123,6 +125,13 @@ sub doboot()
 	fatal("Could not determine the name of the boss server!");
     }
 
+    # Enable IPoD
+    if (-x "$RCDIR/rc.ipod") {
+	print("Setting up Ping of Death\n");
+	system("$RCDIR/rc.ipod");
+	# This is allowed to fail; ipod might not be supported.
+    }
+
     # Will not return until it gets something it likes.
     $bootdev = WhichRawDisk();
     print("Using $bootdev for config sector ...\n");
@@ -168,15 +177,22 @@ sub doboot()
 	system("reboot");
 	sleep(10000);
     }
-    elsif ($bootwhat =~ /^partition:(\d)$/) {
+    elsif ($bootwhat =~ /^partition:(\d)\s*(.*)/) {
 	my $bpart = $1;
+	my $cmdline = $2;
+	my $ptype = 0;
+
 	if ($bpart eq "0") {
 	    print("Bootinfo says to boot from MBR ...\n");
 	    $bpart = 255; # XXX
 	} else {
-	    print("Bootinfo says to boot slice $bpart! ".
-		  "Checking MBR first ...\n");
-	    if (VerifyMBR($bootdev, $bpart) < 0) {
+	    print("Bootinfo says to boot slice $bpart");
+	    if ($cmdline ne "") {
+		print(" with command line '$cmdline'");
+	    }
+	    print(".  Checking MBR first ...\n");
+	    $ptype = VerifyMBR($bootdev, $bpart);
+	    if ($ptype < 0) {
 		print("Partition $bpart on $bootdev not valid; ".
 		      "falling back to MFS\n");
 		goto mfs;
@@ -186,6 +202,19 @@ sub doboot()
 	if ($?) {
 	    print("Error running tbbootconfig; falling back to MFS boot\n");
 	    goto mfs;
+	}
+	if ($cmdline ne "") {
+	    # XXX Linux only.  We need to generalize here...
+	    if ($ptype == 131) {
+		system("groklilo -c '$cmdline' $bpart $bootdev");
+		if ($?) {
+		    print("Error setting command line; falling back to MFS boot\n");
+		    goto mfs;
+		}
+	    }
+	    else {
+		print("WARNING: command line ignored for ptype $ptype\n");
+	    }
 	}
 	system("sync");
 	system("reboot");
@@ -426,6 +455,10 @@ sub Prompt($$;$)
     return $_;
 }
 
+#
+# Verify that the desired partition exists and is non-zero length.
+# Returns the type of the partition or zero on an error.
+#
 sub VerifyMBR($$)
 {
     my ($bootdev, $partition) = @_;
@@ -446,10 +479,16 @@ sub VerifyMBR($$)
 	goto bad;
     }
     while (<FDISK>) {
-	if ($_ =~ /^\s*(\d):\s*\d*\s*\d*\s*0x[\w]*\s*0x[\w]*$/) {
+	if ($_ =~ /^\s*(\d):\s*\d*\s*(\d*)\s*(0x[\w]*)\s*0x[\w]*$/) {
 	    if ($1 == $partition) {
+		my $plen = $2;
+		my $ptype = hex($3);
 		close(FDISK);
-		return 0;
+		if ($plen == 0) {
+		    print("Zero length partition $partition\n");
+		    return -1;
+		}
+		return $ptype;
 	    }
 	}
     }
