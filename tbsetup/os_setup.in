@@ -706,8 +706,7 @@ elsif (@vnodelist) {
 		 "if your experiment depends explicitly on this node.\n".
 		 "You should terminate this experiment if it cannot ".
 		 "tolerate this failure.\n\n".
-		 "Testbed Operations has also been notified so they can ".
-		 "investigate.\n\n".
+		 "Testbed Operations has also been notified.\n\n".
 		 "Thanks\n".
 		 "Testbed Operations\n",
 		 0,
