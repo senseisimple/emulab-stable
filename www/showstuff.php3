@@ -1978,12 +1978,16 @@ function SHOWNODE($node_id, $flags = 0) {
 	echo "<tr><th>Interface</th><th>Model; protocols</th>\n";
     
 	$query_result =
-	    DBQueryFatal("select i.*,it.*,c.* from interfaces as i ".
+	    DBQueryFatal("select i.*,it.*,c.*,s.capval as channel ".
+			 "  from interfaces as i ".
 			 "left join interface_types as it on ".
 			 "     i.interface_type=it.type ".
 			 "left join interface_capabilities as c on ".
 			 "     i.interface_type=c.type and ".
 			 "     c.capkey='protocols' ".
+			 "left join interface_settings as s on ".
+			 "     s.node_id=i.node_id and s.iface=i.iface and ".
+			 "     s.capkey='channel' ".
 			 "where i.node_id='$node_id' and ".
 			 "      i.role='" . TBDB_IFACEROLE_EXPERIMENT . "'".
 			 "order by iface");
@@ -1994,9 +1998,16 @@ function SHOWNODE($node_id, $flags = 0) {
 	    $man       = $row["manufacturuer"];
 	    $model     = $row["model"];
 	    $protocols = $row["capval"];
+	    $channel   = $row["channel"];
+
+	    if (isset($channel)) {
+		$channel = " (channel $channel)";
+	    }
+	    else
+		$channel = "";
 
 	    echo "<tr>
-                      <td>$iface:&nbsp </td>
+                      <td>$iface:&nbsp $channel</td>
                       <td class=left>$type ($man $model; $protocols)</td>
                   </tr>\n";
 	}

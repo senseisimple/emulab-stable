@@ -65,6 +65,28 @@ else {
 }
 
 #
+# Figure out what channels are in use for the current building. We only
+# have one building (MEB) at the moment, so this is quite easy.
+#
+$channels = array();
+
+$query_result =
+    DBQueryFatal("select loc.*,s.capval from location_info as loc ".
+		 "left join interface_settings as s on ".
+		 "     s.node_id=loc.node_id and s.capkey='channel'");
+
+while ($row = mysql_fetch_array($query_result)) {
+    $channel   = $row["capval"];
+    $node_id   = $row["node_id"];
+    $locfloor  = $row["floor"];
+
+    if (!isset($channel))
+	continue;
+
+    $channels[$locfloor][$channel] = $channel;
+}
+
+#
 # Run the script. It will produce two output files; an image and an areamap.
 # We want to embed both of these images into the page we send back. This
 # is painful!
@@ -173,6 +195,23 @@ else {
           </tr>
           </table>
           Click on the dots below to see information about the node\n";
+}
+
+if (count($channels)) {
+    echo "<br><br>
+          <table align=center border=2 cellpadding=0 cellspacing=2>
+ 	  <tr><th>Floor</th><th>Channels in Use</th></tr>\n";
+    
+    while (list($floor, $chanlist) = each($channels)) {
+	echo "<tr><td>$floor</td>\n";
+	echo "    <td>";
+
+	echo implode(",", array_keys($chanlist));
+
+	echo "    </td>
+              </tr>\n";
+    }
+    echo "</table>\n";
 }
 
 # Image
