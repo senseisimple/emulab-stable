@@ -117,7 +117,7 @@ function WRITESIDEBAR() {
 				   $TBBASE, "approveproject_list.php3");
 	    }
 	    if ($trusted) {
-                # Only group leaders can do these options
+                # Only project leaders can do these options
 		WRITESIDEBARBUTTON("New User Approval",
 				   $TBBASE, "approveuser_form.php3");
 	    }

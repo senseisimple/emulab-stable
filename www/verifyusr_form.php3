@@ -14,7 +14,7 @@ LOGGEDINORDIE($uid);
 
 echo "<p><h3>
       The purpose of this page is to verify, for security purposes, that
-      information given in your application is correct. If you never
+      information given in your application is authentic. If you never
       received a key at the email address given on your application, please
       contact $TBMAILADDR for further assistance.
       </h3><p>\n";

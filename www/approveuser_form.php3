@@ -35,13 +35,14 @@ echo "
             <td>&nbsp</td>
             <td>Deny</td>
             <td>-</td>
-            <td>Deny user application</td>
+            <td>Deny user application and so notify the user.</td>
         </tr>
         <tr>
             <td>&nbsp</td>
             <td>Nuke</td>
             <td>-</td>
-            <td>Nuke user application. Kills user account. Useful for
+            <td>Nuke user application.  Kills user account, without
+		notice to user.  Useful for
                 bogus project applications.</td>
         </tr>
         <tr>
@@ -69,7 +70,7 @@ echo "
             <td>Root</td>
             <td>-</td>
             <td>User may create/destroy experiments in your project and
-                has root privledges on machines in your experiments</td>
+                has root privileges on machines in your experiments</td>
         </tr>
       </table>
       \n";

@@ -253,7 +253,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	
 	echo "<h3><p>
                   User $user was denied membership in project $project.<br>
-		  The account has also be terminated with prejudice!
+		  The account has also been terminated with prejudice!
               </h3>\n";
 
 	continue;

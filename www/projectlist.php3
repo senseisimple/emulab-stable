@@ -4,10 +4,12 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Clients who have actively used Emulab.net");
+# Change when do check for number of experiments.
+# PAGEHEADER("Projects that have actively used emulab.net");
+PAGEHEADER("Projects that have used emulab.net");
 
 #
-# We let anyone access this page. Its bascailly a pretty printed version of the
+# We let anyone access this page.  It's basically a pretty-printed version of the
 # current testbed clients, who have not opted out from this display.
 #
 # Complete information is better viewed with the "Project Information" link.
@@ -31,10 +33,6 @@ if (! $query_result) {
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no projects!", 1);
 }
-
-echo "<center><h3>
-      Here is a list of research groups actively using Emulab.Net
-      </h3></center>\n";
 
 echo "<table width=\"100%\" border=0 cellpadding=2 cellspacing=2
        align='center'>\n";

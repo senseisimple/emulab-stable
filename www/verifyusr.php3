@@ -51,9 +51,9 @@ if (strcmp($status, "unverified") == 0) {
         TBERROR("Database Error setting status for $uid: $err\n", 1);
     }
 
-    echo "<h3>Because your group leader has already approved ".
-	 "your membership in the group, you are now an active user ".
-	 "of the Testbed. Reload the frame at your left, and any options ".
+    echo "<h3>Because your project leader has already approved ".
+	 "your membership in the project, you are now an active user ".
+	 "of emulab.  Reload the frame at your left, and any options ".
 	 "that are now available to you will appear.</h3>\n";
 }
 elseif (strcmp($status, "newuser") == 0) {
@@ -65,7 +65,7 @@ elseif (strcmp($status, "newuser") == 0) {
     }
 
     echo "<h3>You have now been verified. However, your application ".
-	 "has not yet been approved by the group leader. You will receive ".
+	 "has not yet been approved by the project leader. You will receive ".
 	 "email when that has been done.</h3>\n";
 }
 else {
