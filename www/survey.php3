@@ -117,12 +117,23 @@ if ($submit) {
 		 $answerWord . "\n\n\n";
     }
 
+    if ($uid && ! $anonymous) {
+	TBUserInfo($uid,$name,$mail);
+	if ($name != "" && $mail != "") {
+	    $from = "\"$name\" <$mail>";
+	} else {
+	    $from = "$uid@emulab.net";
+	}
+    } else {
+	$from = "$TBMAIL_OPS";
+    }
+    
 #   testbed-survey@emulab.net
 #    TBMAIL("barb@flux.utah.edu",
     TBMAIL("testbed-survey@emulab.net",
 	   "Survey Answers",
 	   $mesg,
-	   "From: $TBMAIL_OPS\n".
+	   "From: $from\n".
 	   "Reply-To: $TBMAIL_OPS");
 
     if ($anonymous) {
