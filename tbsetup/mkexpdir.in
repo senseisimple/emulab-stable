@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -29,6 +29,7 @@ my $TBOPS    = "@TBOPSEMAIL@";
 # Should be configured.
 # 
 my $projroot = "/proj";
+my $grouproot= "/groups";
 
 #
 # Testbed Support libraries
@@ -83,10 +84,11 @@ else {
     die("Tainted group name: $gid!\n");
 }
 
-my $piddir  = "$projroot/$pid";
-my $expdir  = "$piddir/exp";
-my $eiddir  = "$expdir/$eid";
-my $workdir = TBExptWorkDir($pid, $eid);
+my $piddir    = (($pid eq $gid) ? "$projroot/$pid" : "$grouproot/$pid/$gid");
+my $expdir    = "$piddir/exp";
+my $eiddir    = "$expdir/$eid";
+my $eidlink   = "$projroot/$pid/exp/$eid";
+my $workdir   = TBExptWorkDir($pid, $eid);
 
 #
 # Unix info for the group
@@ -102,29 +104,29 @@ if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
 # We create a directory structure for the experiment in the project directory.
 #
 if (! chdir($expdir)) {
-    print STDOUT "Could not chdir to $expdir: $!\n";
+    print "Could not chdir to $expdir: $!\n";
     exit(-1);
 }
 
 if (! mkdir($eid, 0770)) {
-    print STDOUT "Could not mkdir $eid in $expdir: $!\n";
+    print "Could not mkdir $eid in $expdir: $!\n";
     exit(-1);
 }
 
 if (! chmod(0770, "$eid")) {
-    print STDOUT "Could not chmod $eid to 0770 in $expdir: $!\n";
+    print "Could not chmod $eid to 0770 in $expdir: $!\n";
     rmdir($eid);
     exit(-1);
 }
 
 if (! chown($UID, $unix_gid, "$eid")) {
-    print STDOUT "Could not chown $eid to $UID/$unix_gid in $expdir: $!\n";
+    print "Could not chown $eid to $UID/$unix_gid in $expdir: $!\n";
     rmdir($eid);
     exit(-1);
 }
 
 if (! chdir($eid)) {
-    print STDOUT "Could not chdir to $eid in $expdir: $!\n";
+    print "Could not chdir to $eid in $expdir: $!\n";
     rmdir($eid);
     exit(-1);
 }
@@ -134,13 +136,11 @@ if (! chdir($eid)) {
 #
 foreach $dir (@dirlist) {
     if (! mkdir($dir, 0770)) {
-	print STDOUT "Could not mkdir $dir in $eiddir: $!\n";
-	fatal();
+	fatal("Could not mkdir $dir in $eiddir: $!");
     }
 
     if (! chmod(0770, "$dir")) {
-	print STDOUT "Could not chmod $dir to 0770 in $eiddir: $!\n";
-	fatal();
+	fatal("Could not chmod $dir to 0770 in $eiddir: $!");
     }
 }
 
@@ -155,20 +155,36 @@ DBQueryFatal("update experiments set path='$eiddir' ".
 # Create the working directory.
 #
 if (-e $workdir) {
-    fatal("*** $0:\n".
-	  "    $workdir already exists!\n");
+    fatal("$workdir already exists!");
 }
 if (! mkdir($workdir, 0775)) {
-    fatal("*** $0:\n".
-	  "    Could not create $workdir: $!\n");
+    fatal("Could not create $workdir: $!");
 }
+if (! chown($UID, $unix_gid, "$workdir")) {
+    fatal("Could not chown $workdir to $UID/$unix_gid: $!");
+}
+
+#
+# If a group experiment, leave behind a symlink from the project experiment
+# directory to the group experiment directory.
+#
+#if ($pid ne $gid) {
+#    symlink($eiddir, $eidlink) or
+#	fatal("Could not symlink($eiddir, $eidlink): $!");
+#}
 
 exit(0);
 
-sub fatal()
+sub fatal($)
 {
-    system("rm -r $eiddir");
-    system("rm -r $workdir");
-    exit(-1);
+    my ($msg) = @_;
+
+    system("/bin/rm -rf $eiddir");
+    system("/bin/rm -rf $workdir");
+#    unlink($eidlink)
+#	if ($pid ne $gid && -l $eidlink);
+
+    die("*** $0:\n".
+	"    $msg\n");
 }
 
