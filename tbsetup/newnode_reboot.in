@@ -1,0 +1,68 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Script to reboot nodes that are not yet in the database - overlaps a bit with
+# node_reboot, but can't make any assumptions about the node (given as an IP
+# address) being in the database, no event system, etc.
+#
+
+use English;
+
+use lib '@prefix@/lib';
+use libdb;
+
+my $TB = "@prefix@";
+
+#
+# Ack! Using sshtb gives all kinds of problems, so we have to duplicate a lot
+# of stuff it does.
+#
+my $SSH_ARGS = '@SSH_ARGS@';
+my $ssh = "/usr/bin/ssh -n $SSH_ARGS";
+
+#
+# Scrub PATH
+#
+$ENV{PATH} = "/bin";
+
+#
+# We use a different private key so that we can have a single MFS for this that
+# works at every site
+#
+my $privkey = "$TB/etc/identity.newnode";
+
+if (!TBAdmin($UID)) {
+    die "Sorry, only admins can run this script\n";
+}
+
+#
+# XXX - Check to see if the node we're sshing into is the one we think it is?
+#
+
+if (@ARGV != 1) {
+    die "usage: $0 <IP>\n";
+}
+
+#
+# Check IP
+#
+my $IP;
+if ($ARGV[0] !~ /^(\d+\.\d+\.\d+\.\d+)$/) {
+    die "Invalid IP address\n";
+} else {
+    $IP = $1;
+}
+
+my $rv = system("$ssh -l root -i $privkey $IP /sbin/reboot");
+
+#
+# XXX - We can't check the return value of ssh for failure, since reboot on
+# FreeBSD seems to always return non-zero.
+#
+exit $rv;

@@ -29,7 +29,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  console_reset db2ns bwconfig frisbeelauncher \
 		  rmgroup mkgroup setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
-		  sfskey_update sfskey_update.proxy rmuser idleswap
+		  sfskey_update sfskey_update.proxy rmuser idleswap \
+		  newnode_reboot
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -119,6 +120,8 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/spewlogfile
 	chown root $(INSTALL_BINDIR)/node_reboot
 	chmod u+s $(INSTALL_BINDIR)/node_reboot
+	chown root $(INSTALL_SBINDIR)/newnode_reboot
+	chmod u+s $(INSTALL_SBINDIR)/newnode_reboot
 	chown root $(INSTALL_BINDIR)/node_update
 	chmod u+s $(INSTALL_BINDIR)/node_update
 	chown root $(INSTALL_SBINDIR)/vnode_setup
