@@ -184,7 +184,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Checking for port installation", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.0")) {
+	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.1")) {
 	    PhaseSkip("Ports already installed");
 	}
 	PhaseFail("Please install ports manually, since some\n of them are " .
@@ -318,6 +318,7 @@ Phase "mounts", "Setting up mounts of fs and ops", sub {
 	"$FSNODE:/users\t\t/users\tnfs\trw\t0\t0",
 	"$FSNODE:/proj\t\t/proj\tnfs\trw\t0\t0",
 	"$FSNODE:/groups\t\t/groups\tnfs\trw\t0\t0",
+	"$FSNODE:/share\t\t/share\tnfs\trw\t0\t0",
 	"$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b\t0\t0");
     # XXX - Do we want to do a 'mount -a' at this point?
 };
