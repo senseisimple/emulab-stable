@@ -1,10 +1,11 @@
 Note: The code for assign is currently in a messy state, as numerous options
-have been added to it to explore various improvements and behaviors for a
-paper. The preliminary version of this paper can be found in
-doc/paper/assign-tr.pdf , and is a good place to start to get an understanding
-of assign. A revised version will appear in the April 2003 issue of SIGCOMM
+have been added to it to explore various improvements and behaviors, for a
+paper.  The preliminary version of this paper can be found on the Emulab papers
+page and in the testbed source tree at doc/papers/assign-tr.pdf .
+The paper is the best place to start to get an understanding of assign.
+A revised version will appear in the April 2003 issue of SIGCOMM
 Computer Communications Review. Once numbers for the final version of this
-paper habe been gathered, this code will get cleaned up substantially.
+paper have been gathered, this code will be cleaned up substantially.
 
 running
 -------
@@ -128,4 +129,3 @@ compile time options
 --------------------
 
 See compile-options.txt for a full list of the compile-time options.
-
