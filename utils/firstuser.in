@@ -1,0 +1,105 @@
+#!/usr/bin/perl -w
+
+use English;
+
+use lib '@prefix@/lib';
+use libdb;
+
+my $wap     = '@prefix@/sbin/withadminprivs';
+my $mkproj  = '@prefix@/sbin/mkproj';
+my $mkgroup = '@prefix@/sbin/mkgroup';
+my $mkacct  = '@prefix@/sbin/mkacct';
+
+print "IMPORTANT: You should ONLY use this script to create the first\n";
+print "testbed user - others should be created through the web interface\n";
+
+my $username;
+if ($UID != 0) {
+    my $name = getpwuid($UID);
+    print "Make account for $name? (Y/N) ";
+    if (<> =~ /Y/i) {
+	$username = $name;
+    }
+}
+
+if (!$username) {
+    print "New username (you): ";
+    $username = <>;
+    chomp($username);
+}
+
+my ($userfull, $password, $uid);
+if (getpwnam($username)) {
+    print "User already exists, using existing user information\n";
+    my @user_info = getpwnam($username);
+    $password = $user_info[1];
+    $uid      = $user_info[2];
+    $userfull = $user_info[6];
+} else {
+    print "New user's full name: ";
+    $userfull = <>;
+    chomp($userfull);
+
+    print "Encrypted password for user: ";
+    $password = <>;
+    chomp($password);
+
+    my $uid = 10000;
+    while (getpwuid($uid)) { $uid++; }
+}
+
+print "New project pid: ";
+my $project = <>;
+chomp($project);
+
+print "New project description: ";
+my $projdesc = <>;
+chomp($projdesc);
+
+my $gid = 6000;
+while (getgrgid($gid)) { $gid++; }
+
+my $ggid = $gid + 1;
+while (getgrgid($ggid)) { $ggid++; }
+
+if (!$username || !$project || !$password || !$userfull || !$projdesc) {
+    die "Not all information given, exiting\n";
+}
+
+print "Creating user/project: Are you sure? (Y/N) ";
+if (<> !~ /Y/i) {
+    die "Aborted\n";
+}
+
+print "Creating user in database...\n";
+DBQueryFatal("insert into users set uid='$username', usr_created=now(), " .
+	"usr_name='$userfull', usr_pswd='$password', unix_uid=$uid, ".
+	"admin=1, dbedit=1, status='active'");
+
+print "Creating project in database...\n";
+DBQueryFatal("insert into projects set pid='$project', created=now(), " .
+	"name='$projdesc', head_uid='$username', unix_gid=$gid, " .
+	"approved=1");
+
+print "Creating group in database...\n";
+DBQueryFatal("insert into groups set pid='$project', gid='$project', " .
+	"leader='$username', created=now(), description='Default Group', " .
+	"unix_gid=$ggid, unix_name='$project'");
+
+print "Putting user in group...\n";
+DBQueryFatal("insert into group_membership set uid='$username', " .
+	"pid='$project', gid='$project',  trust='project_root'," .
+	"date_applied=now(), date_approved=now()");
+
+print "Running mkproj...\n";
+system "$wap $mkproj $project";
+
+print "Running mkgrp...\n";
+system "$wap $mkgroup $project $project";
+
+print "Running mkacct...\n";
+system "$wap $mkacct $username";
+
+print "User created. Once the web page is up, you should be able to log in\n";
+print "as the user you just created. Make sure to go to the user and project\n";
+print "pages, and fill out information such as phone number, web URLs, etc.\n";
