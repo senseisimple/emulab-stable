@@ -255,7 +255,7 @@ foreach my $node ( @nodes ) {
     $failed++;
 }
 
-TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING);
+TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
 NotifyUser("Node Update Complete", $failed);
 if (defined($logname)) {
     unlink($logname);
