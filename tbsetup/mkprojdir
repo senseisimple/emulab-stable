@@ -102,8 +102,18 @@ if (! chown($uid, $gid, "$PROJROOT/$pid/exp")) {
     die("Could not chown $PROJROOT/$pid/exp to $uid/$gid: $!\n");
 }
 
+if (! mkdir("$PROJROOT/$pid/images", 0770)) {
+    die("Could not make directory $PROJROOT/$pid/images: $!\n");
+}
+if (! chmod(0770, "$PROJROOT/$pid/images")) {
+    die("Could not chmod directory $PROJROOT/$pid/images: $!\n");
+}
+if (! chown($uid, $gid, "$PROJROOT/$pid/images")) {
+    die("Could not chown $PROJROOT/$pid/images to $uid/$gid: $!\n");
+}
+
 #
-# Make a few subdirs. If this gets long, make it a loop.
+# Create a tftp directory for oskit kernels.
 # 
 if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
     die("Could not make directory $TFTPROOT/proj/$pid: $!\n");
