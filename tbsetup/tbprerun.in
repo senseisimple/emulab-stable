@@ -37,6 +37,8 @@ $logfile = "$prefix.log";
 $ptopfile = "/tmp/testbed$$.ptop";
 $id = "$pid-$eid";
 
+$tbcmdfile = "tbcmds";
+
 # This will hold the list of nodes currently assigned.
 @nodes = ();
 
@@ -59,6 +61,11 @@ if (! -r $nsfile) {
     exit(1);
 }
 
+# remove a tbcmdfile is it exists
+if (-r $tbcmdfile) {
+    unlink $tbcmdfile;
+}
+
 &tbs_out("Parsing ns input.\n");
 if (&tbs_exec("parse.tcl $id $nsfile $irfile")) {
     &tbs_out("Parsing failed.\n");
@@ -70,8 +77,14 @@ if (! -r $irfile) {
     exit(1);
 }
 
+#&tbs_out("Backward Compatability.\n");
+if (&tbs_exec("extract_tb $nsfile $tbcmdfile")) {
+    &tbs_out("Backward Compatability Failed.\n");
+    exit(1);
+}
+
 #&tbs_out("Post parsing NS input.");
-if (&tbs_exec("postparse $nsfile $irfile")) {
+if (&tbs_exec("postparse $tbcmdfile $irfile")) {
     &tbs_out("Postparsing failed.\n");
     exit(1);
 }
@@ -136,14 +149,14 @@ if (&tbs_exec("postassign $irfile")) {
 #&tbs_out("!!! Any further errors will result in partial DB state.\n");
 
 &tbs_out("Allocating IP addresses.\n");
-if (&tbs_exec("handle_ip $irfile $nsfile")) {
+if (&tbs_exec("handle_ip $irfile $tbcmdfile")) {
     &tbs_out("Failed to allocate IP addresses.\n");
     &cleanup();
     exit(1);
 }
 
 &tbs_out("Setting up OS state.\n");
-if (&tbs_exec("handle_os $irfile $nsfile")) {
+if (&tbs_exec("handle_os $irfile $tbcmdfile")) {
     &tbs_out("Failed to set up OS state.\n");
     &cleanup();
     exit(1);

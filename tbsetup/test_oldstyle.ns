@@ -1,0 +1,23 @@
+set ns [new Simulator]
+
+set node0 [$ns node]
+set node1 [$ns node]
+set node2 [$ns node]
+
+$ns duplex-link $node0 $node1 100Mb 150ms DropTail
+$ns duplex-link $node1 $node2 100Mb .1ms DropTail
+
+#TB set-link-loss node1 node2 0.5
+
+#TB set-ip node0 192.168.14.52
+#TB set-ip-interface node2 node1 192.168.5.1
+#TB set-hardware node2 shark-shelf
+
+#TB create-os MY-OS my-os.img 1
+#TB set-node-os node1 FBSD40-STD
+#TB set-dnard-os node2 1-8 MY-OS
+
+# Node 0 should have the default
+
+$ns run
+
