@@ -1,0 +1,83 @@
+If anyone wants to work on any of these, please contact and discuss
+the issues with me (calfeld@cs.utah.edu).
+
+Things to do to assign.
+
+1. multiple switches per node / annealing links
+
+   This may actually not be so hard.  Currently assign decides how to
+   satisfy a vlink deterministically.  What we want to do is change it
+   so that the vlink mappings are chosen semi randomly so that they
+   become a part of the solution and subject to annealing.  When
+   adding in a node, for each vlink we need to figure out the possible
+   ways to satisfy it.  Possibilities include: a direct link to the
+   destination, intraswitch links through any connected switches,
+   interswitch links through any connected switches.  Any valid
+   possibility (one that does not cause violations) should have a
+   chance of being tried.  We may want to weight those with lower
+   scores (direct over intraswitch over interswitch) so they show up
+   more often.  In a basic sense there is a potential path from src to
+   dst for every link in the src node.  In practice we probably want
+   to consider identical link as a whole.  I.e. a node with two
+   identical links to one switch and two to the other should really
+   only have two potential paths, not four.  With interswitch links I
+   would suggest only looking at a single path for each switch the src
+   node is directly connected to and still use the switch MST to find
+   routes.  For an even more versatile model that could take advantage
+   of non-tree switch topologies, we would want to choose a route
+   through the switch fabric semi randomly.
+
+   Example: Let's have A and B be pnodes, and S1, S2, and S3 be
+   switches connected in a complete graph.  A is connected to B, S1,
+   S2, and S3.  B is connected to A, S2, and S3.  Our virtual topology
+   is N1 and N2 connected to each other.  N2 is mapped to B when we
+   map N1 to A.  We look at the link between them.  Possible paths
+   are:
+	   direct link A to B
+	   intraswitch link A to S2 to B
+	   intraswitch link A to S3 to B
+	   interswitch link A to S1 to S2 to B
+	   interswitch link A to S1 to S3 to B
+  for best results we want each of these five possibilities to be have
+  a chance of being used.  For an initial cut, we would try only one
+  of the two interswitch paths, whichever shows up in the MST.
+
+  Actually implementing this change would involve some serious work on
+  the add_node and remove_node code and to the various find*path
+  routines.
+
+
+2. vclass improvements
+  
+  Two immediate improvements to vclass come to mind.  The first is,
+  when choosing the type for the first assignment in a vclass use some
+  sort of heuristics to find the best type.  We still want it to be
+  random among all types that might give a valid solution but we
+  could weight certain types over others.  For example, we weight the
+  types by relative number of pnodes of that type.
+
+  The second improvement is to occasionally induce a complete
+  unmapping of every node in a given vclass at random times.  This
+  should happen repletively rarely and only when either there are no
+  unassigned nodes or we have a high rate of finding pnodes for our
+  vnodes (both cases have special code in assign.cc).  The idea is
+  that it is very hard to back out of a bad type choice with vclasses,
+  so we want to every so often back out of whatever choice we made to
+  allow for other choices.
+
+
+3. port to a third part SA kit.
+
+   My initial impression is that this would be very tough.  Looking in
+   to it more deeply might be fruitful though.
+
+4. rewrite assign.cc
+
+   There's a lot of garbage floating around in that file.  Almost all
+   the original code is either unused or has been rewritten. 
+
+5. robust parser or top and ptop
+
+   The parsing code is extremely intolerant of input errors (it often
+   crashes).
+
