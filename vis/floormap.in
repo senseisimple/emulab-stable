@@ -445,9 +445,11 @@ sub dofloor($$)
     # Grab the nodes on this floor in this building. We want to know
     # their allocation status so we know what colors to use.
     #
-    my $query = "select loc.*,r.pid,r.eid,r.vname ".
+    my $query = "select loc.*,r.pid,r.eid,r.vname, ".
+                "  n.battery_voltage,n.battery_percentage ".
 		"  from location_info as loc ".
 		"left join reserved as r on r.node_id=loc.node_id ".
+		"left join nodes as n on n.node_id=loc.node_id ".
 		"where loc.building='$building' " .
 		(defined($pid) ? " and r.pid='$pid' and r.eid='$eid'" : "");
     my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
@@ -576,7 +578,7 @@ sub dofloor($$)
 	    my $reid   = $rowref->{"eid"};
 	    my $vname  = $rowref->{"vname"};
 	    my $label  = $nodeid;
-	    my $newid  = ($isnew ? $rowref->{"new_node_id"} : 0);
+ 	    my $newid  = ($isnew ? $rowref->{"new_node_id"} : 0);
 	    my $props  = {};
 
             my $color;
@@ -591,16 +593,30 @@ sub dofloor($$)
 		if (defined($vname)) {
 		    $props->{'VNAME'} = $vname;
 		}
+		if (defined($rowref->{"battery_voltage"})) {
+		    $props->{'BATVOLTS'} = $rowref->{"battery_voltage"};
+		}
+		if (defined($rowref->{"battery_percentage"})) {
+		    $props->{'BATPERCENT'} = $rowref->{"battery_percentage"};
+		}
 	    }
 	    elsif ($rpid eq NODEDEAD_PID() and $reid eq NODEDEAD_EID()) {
 		$color = 'red';
 	    }
 	    else {
 		$color = 'blue';
-		if (!$mereuser && defined($rpid)) {
-		    $props->{'VNAME'} = $vname;
-		    $props->{'PID'}   = $rpid;
-		    $props->{'EID'}   = $reid;
+		if (!$mereuser) {
+		    if (defined($rpid)) {
+			$props->{'VNAME'} = $vname;
+			$props->{'PID'}   = $rpid;
+			$props->{'EID'}   = $reid;
+		    }
+		    if (defined($rowref->{"battery_voltage"})) {
+			$props->{'BATVOLTS'} = $rowref->{"battery_voltage"};
+		    }
+		    if (defined($rowref->{"battery_percentage"})) {
+			$props->{'BATPERCENT'} = $rowref->{"battery_percentage"};
+		    }
 		}
 	    }
             my $x2 = $x + $DOT_RAD;
@@ -804,6 +820,12 @@ sub writefiles($@)
 	    $title .= " " . $map{$nodeid}->{'PID'} . "/" .
 		$map{$nodeid}->{'EID'} . ""
 		    if (exists($map{$nodeid}->{'PID'}));
+
+	    $title .= " " . $map{$nodeid}->{'BATVOLTS'} . " volts"
+		if (exists($map{$nodeid}->{'BATVOLTS'}));
+	    
+	    $title .= " " . $map{$nodeid}->{'BATPERCENT'} . "%"
+		if (exists($map{$nodeid}->{'BATPERCENT'}));
 
 	    print MAP "<AREA SHAPE=RECT COORDS=\"$x1,$y1,$x2,$y2\" ".
 		      "TITLE=\"$title\" HREF=\"${link}\">\n\n";
