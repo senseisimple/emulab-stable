@@ -807,6 +807,8 @@ fi
 
 
 
+
+
 #
 # These get defined in the definitions file (--with-TBDEFS).
 # NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
@@ -1034,7 +1036,9 @@ fi
 if test "$enable_events" = "yes"; then
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
-                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart";
+                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart \
+                    event/example/GNUmakefile";
+	optional_subdirs="$optional_subdirs event";
 else
 	eventfiles="";
 fi
@@ -1073,7 +1077,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1077: checking for a BSD compatible install" >&5
+echo "configure:1080: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1142,7 +1146,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot \
 	ipod/GNUmakefile \
-	lib/GNUmakefile \
+	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/frisbee.redux/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
@@ -1340,6 +1344,7 @@ s%@AR@%$AR%g
 s%@RANLIB@%$RANLIB%g
 s%@STRIP@%$STRIP%g
 s%@SSH@%$SSH%g
+s%@optional_subdirs@%$optional_subdirs%g
 s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
 s%@TBADMINGROUP@%$TBADMINGROUP%g

@@ -10,7 +10,7 @@ DISTCLEAN_FILES = @DISTCLEAN_FILES@
 include Makeconf
 
 SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd utils www \
-		tip capture ipod vis
+		tip capture ipod vis @optional_subdirs@
 
 all:		all-subdirs
 

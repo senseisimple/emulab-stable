@@ -13,6 +13,8 @@ AC_CHECK_TOOL(RANLIB,ranlib)
 AC_CHECK_TOOL(STRIP,strip)
 AC_CHECK_TOOL(SSH,ssh)
 
+AC_SUBST(optional_subdirs)
+
 #
 # These get defined in the definitions file (--with-TBDEFS).
 # NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
@@ -179,7 +181,9 @@ AC_ARG_ENABLE(events,
 if test "$enable_events" = "yes"; then
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/sched/GNUmakefile event/test/GNUmakefile \
-                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart";
+                    event/tbgen/GNUmakefile event/tbgen/tbmevd.restart \
+                    event/example/GNUmakefile";
+	optional_subdirs="$optional_subdirs event";
 else
 	eventfiles="";
 fi
@@ -221,7 +225,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot \
 	ipod/GNUmakefile \
-	lib/GNUmakefile \
+	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/frisbee.redux/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
