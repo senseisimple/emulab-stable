@@ -88,7 +88,7 @@ my $logfile = "$TB/log/plabmonitord";
 my @oldnodes = ();
 my $LOOPSLEEP = 1800;  # 1/2 hour between successive loops.
 my $PAUSETIME = 120;   # 2 minute pause after running vnode_setup
-my $BATCHNUM = 40;     # degree of parallelization
+my $BATCHNUM = 20;     # degree of parallelization
 
 #
 # daemonize

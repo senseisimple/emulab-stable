@@ -9,16 +9,11 @@
 import sys
 sys.path.append("@prefix@/lib")
 import getopt
-import libtestbed
 from libtestbed import *
 import libplab
 import time
+import __builtin__
 
-#
-# Add parser options.
-#
-parser.add_option("-f", "--force", dest="force", default=False,
-                  action="store_true", help="Force vserver creation.")
 
 TRIES = 3
 SLEEPINT = 5
@@ -32,16 +27,25 @@ def main(args):
     alloctries = TRIES
     setuptries = TRIES
     Force = False
-    
-    try:
-        args = handleArgs(args[1:])
-    except getopt.GetoptError:
-        usage(me)
-    except ValueError:
-        usage(me)
-        pass
-    
-    if not len(args):
+
+    #
+    # Grab a parser, and add options:
+    #
+    __builtin__.parser = TBParser()
+    parser.add_option("-f", "--force", dest="force", default=False,
+                      action="store_true", help="Force vserver creation.")
+    parser.add_option("--pollNode", action="store_true", dest="pollNode",
+                      default=False,
+                      help="Poll node before attempting to set it up.")
+    parser.add_option("--noIS", dest="noIS", action="store_true",
+                      default=False,
+                      help="Don't run InstantiateSliver() in mod_PLC")
+
+    # parse command line options
+    opts, args = parser.parse_args(args[1:])
+
+    # make sure we were told what to do on the command line.
+    if not len(args) == 4:
         usage(me)
         pass
 
@@ -50,7 +54,7 @@ def main(args):
     slice = plab.loadSlice(pid, eid)
 
     if command == "alloc":
-        node = slice.createNode(nodeid, force=libtestbed.gv.force)
+        node = slice.createNode(nodeid, force=parser.values.force)
         
         while 1:
             try:

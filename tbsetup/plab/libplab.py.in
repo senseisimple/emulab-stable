@@ -33,7 +33,6 @@ from warnings import warn
 #
 # Testbed and DB access libs
 #
-import libtestbed
 from libtestbed import *
 from libdb import *
 
@@ -45,6 +44,12 @@ from mod_dslice import mod_dslice
 
 agents = {'PLC'    : mod_PLC,
           'dslice' : mod_dslice}
+
+#
+# output control vars
+#
+verbose = 0
+debug = 0
 
 #
 # Constants
@@ -94,13 +99,6 @@ NODEPREFIX  = "plab"
 
 BADSITECHARS = re.compile(r"\W+")
 PLABBASEPRIO = 20000
-
-#
-# Additions to parser
-#
-parser.add_option("--pollNode", action="store_true", dest="pollNode",
-                  default=False,
-                  help="Poll node before attempting to set it up.")
 
 #
 # var to track failed renewals
@@ -188,7 +186,7 @@ class Plab:
         if not agent:
             self.agent = agents[DEF_AGENT]()
             pass
-        if libtestbed.gv.debug:
+        if debug:
             print "Using module: %s" % self.agent.modname
             pass
         pass
@@ -241,12 +239,12 @@ class Plab:
         except:
             extype, exval, extrace = sys.exc_info()
             print "Error talking to agent: %s: %s" % (extype, exval)
-            if libtestbed.gv.debug:
+            if debug:
                 print extrace
             print "Going back to sleep until next scheduled poll"
             return
 
-        if libtestbed.gv.debug:
+        if debug:
             print "Got advertisement list:"
             print avail
             pass
@@ -265,7 +263,7 @@ class Plab:
 
         # Get node info we already have.
         known = self.__getKnownPnodes()
-        if libtestbed.gv.debug:
+        if debug:
             print "Got known pnodes:"
             print known
             pass
@@ -299,7 +297,7 @@ class Plab:
         if len(toadd):
             # Are we ignoring new entries?
             if ignorenew:
-                if libtestbed.gv.verbose:
+                if verbose:
                     print "%d new Plab nodes, but ignored for now" % len(toadd)
                     pass
                 pass
@@ -311,7 +309,7 @@ class Plab:
                 for nodeent, update in toadd:
                     # Get the linktype here so we can report it in email.
                     self.__findLinkType(nodeent)
-                    if libtestbed.gv.debug:
+                    if debug:
                         print "Found linktype %s for node %s" % \
                               (nodeent['LINKTYPE'], nodeent['IP'])
                         pass
@@ -505,7 +503,7 @@ class Plab:
                 vprio = (priority * 100) + (n+1)
                 sshdport = 38000+(n+1)
                 vnodeid = "%s-%d" % (nodeid, n+1)
-                if libtestbed.gv.verbose:
+                if verbose:
                     print "Creating vnode %s, priority %d" % (vnodeid, vprio)
                     pass
                     
@@ -556,7 +554,7 @@ class Plab:
         it doesn't change.
         """
         if not hasattr(self, "__getNodetypeInfoCache"):
-            if libtestbed.gv.debug:
+            if debug:
                 print "Getting node type info"
                 pass
             res = DBQueryFatal("select osid, control_iface"
@@ -574,7 +572,7 @@ class Plab:
         addNode helper function.  Returns a (nodeid, priority) tuple of
         the next free nodeid and priority for Plab nodes.
         """
-        if libtestbed.gv.debug:
+        if debug:
             print "Getting next free nodeid"
         DBQueryFatal("lock tables nextfreenode write")
         try:
@@ -764,7 +762,7 @@ class Slice:
         XXX This should probably be made lazy, since not all operations
         really need it
         """
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Loading slice for pid/eid %s/%s" % (self.pid, self.eid)
         res = DBQueryFatal("select slicename, slicemeta from plab_slices"
                            " where pid = %s and eid = %s",
@@ -871,16 +869,12 @@ class Slice:
 #
 
 class Node:
-    def __init__(self, slice, nodeid):
+    def __init__(self, slice, nodeid, pollNode = False):
         self.slice = slice
         self.nodeid = nodeid
         self.IP = self.__findIP()
         self.nodemeta = None
-        self.pollNode = False
-
-        if hasattr(gv,"pollNode"):
-            self.pollNode = gv.pollNode
-            pass
+        self.pollNode = pollNode
         return
 
     # XXX: may want to rethink signal handling here.
@@ -939,7 +933,7 @@ class Node:
         Loads an already allocated node from the DB.  Don't call this
         directly, use Slice.loadNode instead.
         """
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Loading node %s" % self.nodeid
         res = DBQueryFatal("select slicename, nodemeta"
                            " from plab_slice_nodes where node_id = %s",
@@ -1028,7 +1022,7 @@ class Node:
         TIMESTAMP("emulabify finished on %s." % self.nodeid)
 
     def addToGroup(self, user, group):
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Adding %s to group %s on node %s" % \
                   (user, group, self.nodeid)
         self.__perform("sudo /usr/sbin/usermod -G %s %s" % (group, user))
@@ -1038,11 +1032,11 @@ class Node:
         Unpacks a locally stored gzip'd tarball to the specified path
         (default /) on the remote node.  Always done as remote root.
         """
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Unpacking tgz %s to %s on %s" % \
                   (tgzpath, destpath, self.nodeid)
         try:
-            if libtestbed.gv.debug:
+            if debug:
                 print "Trying to grab rootball through loopback service"
             self.__perform("sudo wget -q -nH -P /tmp " +
                            ROOTBALL_URL + tgzname)
@@ -1057,7 +1051,7 @@ class Node:
         """
         Executes the given command on the remote node via sshtb
         """
-        if libtestbed.gv.debug:
+        if debug:
             print "Performing '%s' on %s" % (command, self.nodeid)
         if os.spawnl(os.P_WAIT, SSH, SSH, "-host", self.nodeid, command):
             raise RuntimeError, "ssh '%s' failed" % command
@@ -1068,7 +1062,7 @@ class Node:
         as root.
         """
         import popen2
-        if libtestbed.gv.debug:
+        if debug:
             print "Copying %s to %s on %s" % \
                   (localfile, remotefile, self.nodeid)
         # dd is a bit overbearing for this job, but I can't do something
@@ -1087,15 +1081,15 @@ class Node:
         """
         Figures out and returns the IP of the remote node.
         """
-        res = DBQueryFatal("select i.IP from interfaces as i"
-                           " left join nodes as nv on"
-                           "  i.node_id=nv.phys_nodeid"
+        res = DBQueryFatal("select i.IP from nodes as nv"
+                           " left join interfaces as i on"
+                           "  nv.phys_nodeid=i.node_id"
                            " where nv.node_id=%s"
                            " limit 1",
                            (self.nodeid))
-        assert (len(res) > 0), \
+        assert (res and len(res) > 0), \
                "No IP found for nodeid %s" % self.nodeid
         ((IP, ), ) = res
-        if libtestbed.gv.debug:
+        if debug:
             print "Found IP %s for node %s" % (IP, self.nodeid)
         return IP

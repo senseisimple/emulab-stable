@@ -16,8 +16,13 @@ import nodemgr, nodemgrproxy
 import lease
 import cPickle
 
-import libtestbed
 from libtestbed import *
+
+#
+# output control vars
+#
+verbose = 0
+debug = 0
 
 #
 # Constants
@@ -61,7 +66,7 @@ class mod_dslice:
                                 1, LEASELEN, (node.IP,)))
         assert (len(tickets) == 1), "%d tickets returned" % len(tickets)
         ticketdata = tickets[0]
-        if libtestbed.gv.debug:
+        if debug:
             print "Obtained ticket:"
             print ticketdata
             pass
@@ -108,7 +113,7 @@ class mod_dslice:
                 break
             pass
         
-        if libtestbed.gv.debug:
+        if debug:
             print "Obtained lease/vm:"
             print leasedata
             pass
@@ -163,7 +168,7 @@ class mod_dslice:
         should be one of the keys that ssh naturally knows about, or
         those commands will fail.
         """
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Adding pubkey to node %s" % node.nodeid
             pass
         if not identityfile.endswith(".pub"):
@@ -172,7 +177,7 @@ class mod_dslice:
         pubkey = file(identityfile, "rb").read().strip()
         nodemgr = self.__createNodemgrProxy(node.IP)
         ret = tryXmlrpcCmd(nodemgr.addkey, (node.slice.slicename, pubkey))
-        if libtestbed.gv.debug:
+        if debug:
             print "Added key: %s" % `ret`
             pass
         return ret
@@ -207,7 +212,7 @@ class mod_dslice:
             else:
                 break
 
-        if libtestbed.gv.debug:
+        if debug:
             print "Obtained new lease:"
             print self.leasedata
         self.lease = lease.lease(self.leasedata)
@@ -222,11 +227,11 @@ class mod_dslice:
         # XXX This is a workaround for a bug in M2Crypto
         import tempfile
 
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Generating slice keypair"
         # pdssi = Plab Dynamic Slice SSH Identity
         fname = tempfile.mktemp("pdssi%d" % os.getpid())
-        if libtestbed.gv.debug:
+        if debug:
             print "Writing keypair to %s(.pub)" % fname
         if os.spawnlp(os.P_WAIT, "ssh-keygen",
                       "ssh-keygen", "-t", "rsa", "-b", "1024", "-P", "",
@@ -241,7 +246,7 @@ class mod_dslice:
         
         
         # Below here is the way it _should_ be done
-        if libtestbed.gv.verbose:
+        if verbose:
             print "Generating slice keypair"
         key = RSA.gen_key(1024, 35)    # OpenSSH ssh-keygen uses 35 for e
 
@@ -263,7 +268,7 @@ class mod_dslice:
         Also caches the agent for later reuse.
         """
         if not self.__agentProxy:
-            if libtestbed.gv.verbose:
+            if verbose:
                 print "Connecting to agent %s" % AGENTIP
             if insecure:
                 args = (AGENTIP, agent.PORT)
@@ -279,7 +284,7 @@ class mod_dslice:
         manager.  Also caches the nodemgr for later reuse.
         """
         if not self.__nodemgrProxies[IP]:
-            if libtestbed.gv.verbose:
+            if verbose:
                 print "Connecting to nodemgr on %s" % IP
             self.__nodemgrProxies[IP] = \
                                       nodemgrproxy.nodemgrproxy(IP,

@@ -21,11 +21,8 @@ def usage(me):
 
 def main(args):
     me = args[0]
-    try:
-        args = handleArgs(args[1:])
-    except getopt.GetoptError:
-        usage(me)
-        pass
+    parser = TBParser()
+    parser.parse_args()
 
     plab = libplab.Plab()
     plab.updateNodeEntries()

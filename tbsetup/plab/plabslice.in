@@ -18,12 +18,8 @@ def usage(me):
 
 def main(args):
     me = args[0]
-    try:
-        command, pid, eid = libtestbed.handleArgs(args[1:])
-    except getopt.GetoptError:
-        usage(me)
-    except ValueError:
-        usage(me)
+    parser = TBParser()
+    parser.parse_args()
 
     plab = libplab.Plab()
     if command == "create":

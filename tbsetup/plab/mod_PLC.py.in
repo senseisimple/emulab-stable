@@ -10,16 +10,16 @@ sys.path.append("@prefix@/lib")
 
 import xmlrpclib
 import getopt
+import fcntl
+import time
 
-import libtestbed
 from libtestbed import *
 
 #
-# Setup mod_PLC's parse args
+# output control vars
 #
-parser.add_option("--noIS", dest="noIS", action="store_true",
-                  default=False,
-                  help="Don't run InstantiateSliver() in mod_PLC")
+verbose = 0
+debug = 0
 
 #
 # PLC constants
@@ -28,9 +28,57 @@ DEF_PLC_URI = "https://www.planet-lab.org/db/slices/dynamicprog.php"
 DEF_PLC_USER = "lepreau@cs.utah.edu"
 DEF_PLC_PASS = "phurds"
 DEF_PLC_LEASELEN = 1*30*24*60*60   # add one month (XXX: for now)
-DEF_PLC_SHARES = 30
+DEF_PLC_SHARES = 30 # XXX: totally arbitrary
 EMULABMAN_EMAIL = "emulabman@emulab.net"
 
+PLC_LOCKFILE = "/tmp/.PLC-lock"
+DEF_PLC_SPACING = 3 # seconds
+
+#
+# Reflective wrapper class for real PLCagent.
+# This class forces global, mutually exclusive access to PLC
+# function calls.
+#
+# XXX: Created per Jay's request, then deactivated per Jay's
+# subsequent request.
+#
+class __PLCagent:
+    
+    class __PLCMutexMethod:
+        def __init__(self, funcname, obj):
+            self.__lockfile = open(PLC_LOCKFILE, "w")
+            self.__meth = eval("obj.%s" % funcname)
+            self.func_name = funcname
+            return
+        
+        def __call__(self, *args):
+            retval = None
+            if debug:
+                TIMESTAMP("Acquiring PLC lock")
+                pass
+            fcntl.lockf(self.__lockfile, fcntl.LOCK_EX)
+            if debug:
+                TIMESTAMP("Lock acquired.")
+                pass
+            time.sleep(DEF_PLC_SPACING)
+            fcntl.lockf(self.__lockfile, fcntl.LOCK_UN)
+            if debug:
+                TIMESTAMP("PLC lock released")
+                pass
+            return self.__meth(*args)
+        pass
+
+    def __init__(self, *args):
+        self.__myPLC = _PLCagent(*args)
+        return
+
+    def __getattr__(self, name):
+        return self.__PLCMutexMethod(name, self.__myPLC)
+
+#
+# The real PLC agent.  Wraps up standard arguments to the
+# PLC XMLRPC interface.
+#
 class PLCagent:
     def __init__(self, slicename,
                  uri = DEF_PLC_URI,
@@ -49,6 +97,7 @@ class PLCagent:
         except:
             print "Failed to create XML-RPC proxy"
             raise
+        return
 
     def createSlice(self):
         return self.__server.createSlice(self.__slice, self.__auth)
@@ -104,12 +153,9 @@ class PLCagent:
 
 
 class mod_PLC:
-    def __init__(self):
+    def __init__(self, noIS = False):
         self.modname = "mod_PLC"
-        self.noIS = False
-        if hasattr(libtestbed.gv,"noIS"):
-            self.noIS = libtestbed.gv.noIS
-            pass
+        self.noIS = noIS
         return
 
     def createSlice(self, slice):
@@ -119,7 +165,7 @@ class mod_PLC:
 
         try:
             res = tryXmlrpcCmd(agent.createSlice)
-            if libtestbed.gv.debug:
+            if debug:
                 print res
                 pass
             pass
@@ -130,7 +176,7 @@ class mod_PLC:
         try:
             res = tryXmlrpcCmd(agent.AssignUsers,
                                EMULABMAN_EMAIL)
-            if libtestbed.gv.debug:
+            if debug:
                 print res
                 pass
             pass
@@ -142,7 +188,7 @@ class mod_PLC:
             res = tryXmlrpcCmd(agent.AssignShares,
                                (DEF_PLC_LEASELEN,
                                 DEF_PLC_SHARES))
-            if libtestbed.gv.debug:
+            if debug:
                 print res
                 pass
             pass
@@ -166,7 +212,7 @@ class mod_PLC:
             res = tryXmlrpcCmd(agent.AssignShares,
                                (DEF_PLC_LEASELEN,
                                 DEF_PLC_SHARES))
-            if libtestbed.gv.debug:
+            if debug:
                 print res
                 pass
             pass
@@ -187,7 +233,7 @@ class mod_PLC:
             try:
                 res = tryXmlrpcCmd(agent.AssignNodes, node.IP,
                                    inittries=tries, raisefault=True)
-                if libtestbed.gv.debug:
+                if debug:
                     print res
                     pass
                 pass
@@ -217,7 +263,7 @@ class mod_PLC:
                 TIMESTAMP("InstantiateSliver() starting on %s." % node.nodeid)
                 res = tryXmlrpcCmd(agent.InstantiateSliver, node.IP)
                 TIMESTAMP("InstantiateSliver() complete on %s." % node.nodeid)
-                if libtestbed.gv.debug:
+                if debug:
                     print res
                     pass
                 pass
@@ -239,7 +285,7 @@ class mod_PLC:
             try:
                 res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP,
                                    inittries=tries, raisefault=True)
-                if libtestbed.gv.debug:
+                if debug:
                     print res
                     pass
                 pass
