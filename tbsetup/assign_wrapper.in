@@ -424,9 +424,6 @@ if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
 while (1) {
     my $canceled;
 
-    print "Sleeping for a bit ...\n";
-    sleep(60);
-    
     # Check cancel flag before continuing. 
     TBGetBatchCancelFlag($pid, $eid, \$canceled);
     fatal(1, "*** $0:\n".
