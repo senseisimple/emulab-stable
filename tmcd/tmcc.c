@@ -571,10 +571,23 @@ dounix(char *data, int outfd, char *unixpath)
 		return -1;
 	}
 
-	if (connect(sock, (struct sockaddr *) &sunaddr, length) < 0) {
-		perror("connecting unix domain socket");
-		close(sock);
-		return -1;
+	/*
+	 * Retry if the unixpath does not exist. Caller must use timeout option.
+	 */
+	while (1) {
+		if (connect(sock, (struct sockaddr *) &sunaddr, length) == 0)
+			break;
+
+		if (errno != ENOENT) {
+			perror("connecting unix domain socket");
+			close(sock);
+			return -1;
+		}
+
+		if (debug) 
+			fprintf(stderr,
+				"Connection to TMCD refused. Waiting ...\n");
+		sleep(2);
 	}
 	connected = 1;
 
