@@ -551,11 +551,6 @@ sub os_fwconfig_line($@)
 	$upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
 	$upline .= "    fi\n";
 
-	$upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
-	$upline .= "        echo 'WARNING: could not enable firewall'\n";
-	$upline .= "        exit 1\n";
-	$upline .= "    }\n";
-
 	foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
 	    my $rulestr = $rule->{RULE};
 	    if ($logaccept && $rulestr =~ /^(allow|accept|pass|permit)\s.*/) {
@@ -573,6 +568,10 @@ sub os_fwconfig_line($@)
 	    $upline .= "        exit 1\n";
 	    $upline .= "    }\n";
 	}
+	$upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
+	$upline .= "        echo 'WARNING: could not enable firewall'\n";
+	$upline .= "        exit 1\n";
+	$upline .= "    }\n";
 	$upline .= "    sysctl net.link.ether.bridge=1";
 
 	$downline  = "sysctl net.link.ether.bridge=0\n";
@@ -592,11 +591,6 @@ sub os_fwconfig_line($@)
     $upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
     $upline .= "    fi\n";
 
-    $upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
-    $upline .= "        echo 'WARNING: could not enable firewall'\n";
-    $upline .= "        exit 1\n";
-    $upline .= "    }\n";
-
     foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
 	my $rulestr = $rule->{RULE};
 	if ($logaccept && $rulestr =~ /^(allow|accept|pass|permit)\s.*/) {
@@ -614,6 +608,10 @@ sub os_fwconfig_line($@)
 	$upline .= "        exit 1\n";
 	$upline .= "    }\n";
     }
+    $upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
+    $upline .= "        echo 'WARNING: could not enable firewall'\n";
+    $upline .= "        exit 1\n";
+    $upline .= "    }\n";
     $upline .= "    sysctl net.inet.ip.redirect=0\n";
     $upline .= "    sysctl net.inet.ip.forwarding=1";
 
