@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: util.c,v 1.1 2000-07-06 17:42:39 kwright Exp $
+ * $Id: util.c,v 1.2 2000-07-13 18:52:52 kwright Exp $
  */
 
 #include "discvr.h"
@@ -49,7 +49,7 @@ print_haddr(u_char *haddr, u_short hlen)
 	if ((i = hlen) > 0) {
 		ptr = haddr;
 		do {
-		        fprintf(stderr, "%s%x", (i == hlen) ? "" : ":", *ptr++);
+  		        fprintf(stderr, "%s%x", (i == hlen) ? "" : ":", *ptr++);
 		} while (--i > 0);
 	}
 }
@@ -57,42 +57,46 @@ print_haddr(u_char *haddr, u_short hlen)
 /* 
  * Print a td reply packet. They are of the form
  * 
- * [Inquiry ID],
- * [Path, Dest] 
- * [Path, Dest] 
+ * [Inquiry ID ]
+ * [TTL, Factor]
+ * [Path, Dest ] 
+ * [Path, Dest ] 
  * [...]
  *
  * Inquiry IDs consist of a node ID and a 
  * timestamp. 
+ * 
+ * The TTL and Factor are both unsigned 16-bit
+ * numbers derived from user parameters.
  * 
  * Paths and destinations consist
  * of <node ID, MAC address> pairs. Node IDs 
  * themselves are MAC addresses.
  */
 void
-print_tdreply(const char *mesg)
+print_tdreply(const char *mesg, size_t nbytes)
 {
-	const u_char *p, *p_node, *p_if, *d_node, *d_if;
+	struct topd_nbor *p; 
 	
 	print_tdinq(mesg);
+	p = (struct topd_nbor *) (mesg + sizeof(topd_inqid_t));
 
-	p      = mesg + sizeof(topd_inqid_t);
-        p_node = &p[0];
-	p_if   = &p[ETHADDRSIZ];
-	d_node = &p[ETHADDRSIZ << 1];
-	d_if   = d_node + ETHADDRSIZ;
+	while( (char *)p < mesg + nbytes ) {
 
-	fprintf(stderr, "ROUTE\t\t\t\tDEST\n");
-	fprintf(stderr, "[");
-	print_haddr(p_node, ETHADDRSIZ);
-	fprintf(stderr, "-");
-	print_haddr(p_if, ETHADDRSIZ);
-	fprintf(stderr, "] ");
-	fprintf(stderr, "[");	
-	print_haddr(d_node, ETHADDRSIZ);
-	fprintf(stderr, "-");
-	print_haddr(d_if, ETHADDRSIZ);
-	fprintf(stderr, "]\n\n");
+		fprintf(stderr, "ROUTE\t\t\t\tDEST\n");
+		fprintf(stderr, "[");
+		print_haddr(p->tdnbor_pnode, ETHADDRSIZ);
+		fprintf(stderr, "-");
+		print_haddr(p->tdnbor_pif, ETHADDRSIZ);
+		fprintf(stderr, "] ");
+		fprintf(stderr, "[");	
+		print_haddr(p->tdnbor_dnode, ETHADDRSIZ);
+		fprintf(stderr, "-");
+		print_haddr(p->tdnbor_dif, ETHADDRSIZ);
+		fprintf(stderr, "]\n\n");
+
+		p++;
+	}
 }
 
 /*
@@ -110,8 +114,11 @@ print_tdinq(const char *mesg)
 {
         topd_inqid_t *tip = (topd_inqid_t *)mesg;
 
-	fprintf(stderr, "\nINQ:%u.%u from node: ",
-		ntohl(tip->tdi_tv.tv_sec), ntohl(tip->tdi_tv.tv_usec)); 
+	fprintf(stderr, "\nINQ:%u.%u TTL:%d FACTOR:%d NODE:",
+		ntohl(tip->tdi_tv.tv_sec), 
+		ntohl(tip->tdi_tv.tv_usec),
+		ntohs(tip->tdi_ttl), 
+		ntohs(tip->tdi_factor)); 
 	print_nodeID(tip->tdi_nodeID);
 }
 

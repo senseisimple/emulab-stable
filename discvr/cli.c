@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: cli.c,v 1.1 2000-07-06 17:42:35 kwright Exp $
+ * $Id: cli.c,v 1.2 2000-07-13 18:52:51 kwright Exp $
  */
 
 #include "discvr.h"
@@ -81,7 +81,7 @@ find_nodeID(void)
 }                            
 
 void
-make_inquiry(topd_inqid_t *tip) 
+make_inquiry(topd_inqid_t *tip, u_int16_t ttl, u_int16_t factor) 
 {
         struct timeval tv;
 	u_char         *nid;
@@ -92,8 +92,12 @@ make_inquiry(topd_inqid_t *tip)
 		exit(1);
 	}
 
-	tip->tdi_tv.tv_sec = htonl(tv.tv_sec);
+	tip->tdi_tv.tv_sec  = htonl(tv.tv_sec);
 	tip->tdi_tv.tv_usec = htonl(tv.tv_usec);
+
+	/* ...then the ttl and factor... */
+	tip->tdi_ttl     = htons(ttl);
+	tip->tdi_factor  = htons(factor);
 
 	/* ...and now our nodeID */
 	nid = find_nodeID();
@@ -101,28 +105,34 @@ make_inquiry(topd_inqid_t *tip)
 }
 
 void
-cli(FILE *fp, int sockfd, const struct sockaddr *pservaddr, socklen_t servlen)
+cli(int sockfd, const struct sockaddr *pservaddr, socklen_t servlen, 
+    u_int16_t ttl, u_int16_t factor)
 {
         u_int32_t         n;
 	char              recvline[MAXLINE + 1];
 	topd_inqid_t      ti;
 	
-	make_inquiry(&ti);
+	make_inquiry(&ti, ttl, factor);
 
 	sendto(sockfd, &ti, TOPD_INQ_SIZ, 0, pservaddr, servlen);
 	print_tdinq((char *)&ti);
 	n = recvfrom(sockfd, recvline, MAXLINE, 0, NULL, NULL);
-	print_tdreply(recvline);
+	print_tdreply(recvline, n);
 }
 
+/*
+ * Note that the TTL is a function of the network diameter that
+ * we're interested in. The factor parameter is a function of the
+ * network topology and performance.
+ */ 
 int
 main(int argc, char **argv)
 {
 	int sockfd;
 	struct sockaddr_in servaddr;
 
-	if (argc != 2) {
-		fprintf(stderr, "usage: cli <Server IPaddress>\n");
+	if (argc != 4) {
+		fprintf(stderr, "usage: cli <Server IPaddress> <TTL> <factor>\n");
 		exit(1);
 	}
 
@@ -133,7 +143,7 @@ main(int argc, char **argv)
 
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-	cli(stdin, sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+	cli(sockfd, (struct sockaddr *) &servaddr, sizeof(servaddr), atoi(argv[2]), atoi(argv[3]));
 
 	exit(0);
 }

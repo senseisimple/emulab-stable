@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: reply.c,v 1.2 2000-07-06 22:51:47 kwright Exp $
+ * $Id: reply.c,v 1.3 2000-07-13 18:52:51 kwright Exp $
  */
 
 
@@ -36,9 +36,11 @@ extern topd_inqid_t inqid_current;
 u_int32_t
 compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen) 
 {
-	struct ifi_info    *ifihead;
-        char               *nw;
-	char               *nid;
+        struct topd_nborlist *nborl;
+	struct ifi_info      *ifihead;
+        char                 *nw;
+	char                 *nid;
+	struct topd_nbor     *nbor;
 
 	nw = (u_char *) mesg;
 	
@@ -47,37 +49,43 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen)
 	nw += sizeof(topd_inqid_t);
 
 	for (ifihead = ifi; ifi != NULL; ifi = ifi->ifi_next) {
+	        nborl  = ifi->ifi_nbors;
+
 	        /* Add check for control net -LKW */
 	        if (ifi->ifi_flags & !IFF_UP || 
 		    ifi->ifi_flags & IFF_LOOPBACK) {
 		        continue;
 		}
 
-		if (ifi->ifi_nbors == NULL) {
-		        /* 
-			 * There are no neighbors on this interface. 
-			 * We need only report this interface as a
-			 * dead end.  That is, we put down the pair
-			 * [ <myNodeID, ifi->haddr>, <0,0> ]
-			 * for the [path, nbor] pair.
-			 */
-		        nid = nw;
-			nw += ETHADDRSIZ << 2; /* we're writing 4 nodeids */
+		/* We report this interface.
+		 * That is, we put down the pair
+		 * [ <myNodeID, ifi->haddr>, <0,0> ]
+		 * for the [path, nbor] pair.
+		 */
+		nid = nw;
+		nw += ETHADDRSIZ << 2; /* we're writing 4 nodeids */
+		if ((char *)nw > mesg + mesglen ) { 
+		        fprintf(stderr, "ran out of room and you didn't do anything reasonable.\n");
+			return 0;
+		}
+		memcpy(nid, myNodeID, ETHADDRSIZ);
+		nid += ETHADDRSIZ;
+		memcpy(nid, ifi->ifi_haddr, ETHADDRSIZ);
+		fprintf(stderr, "\there:");
+		print_haddr(ifi->ifi_haddr, ETHADDRSIZ);
+		nid += ETHADDRSIZ;
+		bzero(nid, ETHADDRSIZ << 1);
+
+		while ( nborl != NULL ) {
+		        nbor = (struct topd_nbor *)nw;
+		        nw += nborl->tdnbl_n * sizeof(struct topd_nbor);
 			if ((char *)nw > mesg + mesglen ) {
 			        fprintf(stderr, "ran out of room and you didn't do anything reasonable.\n");
-			        return 0;
+				return 0;
 			}
-			memcpy(nid, myNodeID, ETHADDRSIZ);
-			nid += ETHADDRSIZ;
-			memcpy(nid, ifi->ifi_haddr, ETHADDRSIZ);
-			fprintf(stderr, "\there:");
-			print_haddr(ifi->ifi_haddr, ETHADDRSIZ);
-			nid += ETHADDRSIZ;
-			bzero(nid, ETHADDRSIZ << 1);
-			continue;
-		} else {
-		        /* We have neighbors */
-		}
+			memcpy(nbor, nborl->tdnbl_nbors, nborl->tdnbl_n * sizeof(struct topd_nbor));
+			nborl = nborl->tdnbl_next;
+		} 
 	}
 
 	return (nw - mesg);

@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.2 2000-07-06 22:52:36 kwright Exp $
+ * $Id: serv_listen.c,v 1.3 2000-07-13 18:52:52 kwright Exp $
  */
 
 #include "discvr.h"
@@ -138,8 +138,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		/* Send string to all interfaces. forward_request() will 
 		 * stuff reply into ifi_info. 
 		 */
-
-
+ 
 	        forward_request(ifihead, &pktinfo, mesg, n );
 
 		if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
@@ -148,7 +147,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		}
 		n = compose_reply(ifihead, reply, BUFSIZ);
 		fprintf(stderr, "replying: ");
-		print_tdreply(reply);
+		print_tdreply(reply, n);
 
 		/* send response back to original sender */
 		sendto(sockfd, reply, n, 0, pcliaddr, sizeof(struct sockaddr));

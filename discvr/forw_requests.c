@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: forw_requests.c,v 1.2 2000-07-06 22:53:55 kwright Exp $
+ * $Id: forw_requests.c,v 1.3 2000-07-13 18:52:51 kwright Exp $
  */
 
 #include "discvr.h"
@@ -38,6 +38,7 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 	fd_set                  rset;
         const int               on = 1;
 	char                    ifname[IFNAMSIZ];
+	struct topd_inqid       *tdi;
 	struct topd_nborlist    *save;
 	struct sockaddr_in      sin;
 	struct ifi_info         *ifihead;
@@ -109,11 +110,15 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
 		 * Can't wait forever because
 		 * there may be either no nodes on this interface or 
 		 * the nodes that are there may not be responding. 
-		 * Also, the packet size *might* exceed our buffer size. 
+		 * Our wait delay is equal to the factor times the ttl. 
+		 *
+		 * The packet size *might* exceed our buffer size. 
 		 * Put in some mechanism to check. -lkw
 		 */
 
-		tv.tv_sec  = 5;
+		tdi = (struct topd_inqid *)mesg;
+		tv.tv_sec  = ntohs(tdi->tdi_ttl) * ntohs(tdi->tdi_factor);
+		fprintf(stderr, "tv.tv_sec: %d", tv.tv_sec);
 		tv.tv_usec = 0;
 		FD_ZERO(&rset);
 		FD_SET(s, &rset);
@@ -126,23 +131,34 @@ forward_request(struct ifi_info *ifi, const struct in_pktinfo *pktinfo,
                         continue; 
 		}
 
-		n = recvfrom(s, recvbuf, BUFSIZ, 0, NULL, NULL);	
-		
-		/* 
-		 * Be sure to malloc enough space for all of the mesg. 
-		 * See note above about possible datagram truncation. -lkw
-		 */
- 		save = ifi->ifi_nbors;
-		if ( (ifi->ifi_nbors = (struct topd_nborlist *)malloc(sizeof(struct topd_nborlist))) == NULL) {
-		        perror("Not enough memory for neighbor list.");
-			exit(1);
-		}
-		if (( ifi->ifi_nbors->tdnbl_nbors = (u_char *)malloc(n)) == NULL) {
-		        perror("Not enough memory for neighbor list.");
-			exit(1);
-		}
+		while (	(n = recvfrom(s, recvbuf, BUFSIZ, 0, NULL, NULL)) > 0 ) {	
 
-		memcpy((void *)ifi->ifi_nbors->tdnbl_nbors, recvbuf, n);
-		ifi->ifi_nbors->tdnbl_next = save;
+		        /* 
+			 * It's possible that one neighbor responded very quickly
+			 * and other neighbors (perhaps because they have many more
+			 * neighbors whose messages they had to parse) could respond
+			 * slowly. To cover this case, we should continue to try to 
+			 * read from the socket until our delay is up. 
+			 */
+		        /* 
+			 * Be sure to malloc enough space for all of the mesg. 
+			 * See note above about possible datagram truncation. -lkw
+			 */
+		        save = ifi->ifi_nbors;
+			ifi->ifi_nbors = (struct topd_nborlist *)malloc(sizeof(struct topd_nborlist)); 
+			if ( ifi->ifi_nbors == NULL ) {
+		                perror("Not enough memory for neighbor list.");
+				exit(1);
+			}
+			/* skip inquiry ID */
+			ifi->ifi_nbors->tdnbl_nbors = (u_char *)malloc(n);
+			if ( ifi->ifi_nbors->tdnbl_nbors == NULL ) {
+		                perror("Not enough memory for neighbor list.");
+				exit(1);
+			}
+			memcpy((void *)ifi->ifi_nbors->tdnbl_nbors, recvbuf + sizeof(topd_inqid_t), n);
+			ifi->ifi_nbors->tdnbl_n = n / sizeof(struct topd_nbor);
+			ifi->ifi_nbors->tdnbl_next = save;
+		}
 	}
 }
