@@ -58,7 +58,7 @@ chdir($WWW) or
 # we will be able to avoid this extra shell call. For now, we are stuck
 # calling swish-e.
 #
-open(SWISH, "swish-e -f $index -p swishlastmodified swishdescription ".
+open(SWISH, "swish-e -f $index -x '%r %p %l \"%D\" \"%d\"\n' ".
      "-w '$searchstring' |") or
     die("*** $0:\n".
 	"    Could not invoke swish-e on '$searchstring'!\n");
@@ -89,16 +89,16 @@ while (<SWISH>) {
 	if (!defined($searchwords) || !defined($numhits)) {
 	    next;
 	}
-	if ($_ =~ /^(\d*) (.*) \"(.*)\" (\d*) \"(.*)\" \"(.*)\"$/) {
+	if ($_ =~ /^(\d*) (.*) (\d*) \"(.*)\" \"(.*)\"$/) {
 	    my $rank = $1;
 	    my $path = $2;
-	    my $file = $3;
-	    my $size = $4;
-	    my $mod  = $5;
-	    my $text = $6;
+	    my $size = $3;
+	    my $mod  = $4;
+	    my $text = $5;
 
-	    $hits{$path}  = [ $rank, $path, $file, $size, $mod,
-			   substr($text, 0, 300) ];
+	 #   print "$path\n";
+
+	    $hits{$path}  = [ $rank, $path, $size, $mod, substr($text, 0, 300) ];
 	    $lines{$path} = [];
 	    push(@order, $path);
 	}
@@ -126,6 +126,7 @@ open(AGREP, "agrep -i '$query' " . join(" ", keys(%hits)) .
 	"    Could not invoke agrep with '$query'!\n");
 
 while (<AGREP>) {
+#    print $_;
     if ($_ =~ /^(.*): (.*)$/) {
 	push(@{ $lines{$1} }, $2)
 	    if (scalar(@{ $lines{$1} }) < 10);
@@ -133,14 +134,15 @@ while (<AGREP>) {
 }
 close(AGREP);
 
-print "Rank, filename, modification date, first part of file<br>\n";
+print "Rank, filename, modification date, matching lines<br>\n";
 foreach my $hit (@order) {
-    my ($rank, $path, $file, $size, $mod, $text) = @{ $hits{$hit} };
-    $path = dirname($path);
+    my ($rank, $path, $size, $mod, $text) = @{ $hits{$hit} };
+    $dir  = dirname($path);
+    $file = basename($path);
 
     print "<hr>\n";
-    print "$rank - <b><a href=$path/docwrapper.php3?docname=$file>".
-	"$path/$file</a></b>, $mod<br>\n";
+    print "$rank - <b><a href=$dir/docwrapper.php3?docname=$file>".
+	"$path</a></b>, $mod<br>\n";
     print "<ul>\n";
     foreach my $line (@{ $lines{$hit} }) {
 	$line =~ s/<li>//ig;
