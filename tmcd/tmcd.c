@@ -1048,7 +1048,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	/* 
 	 * For Virtual Nodes, we return interfaces that belong to it.
 	 */
-	if (reqp->isvnode)
+	if (reqp->isvnode && !reqp->issubnode)
 		sprintf(buf, "vnode_id='%s'", reqp->vnodeid);
 	else
 		strcpy(buf, "vnode_id is NULL");
