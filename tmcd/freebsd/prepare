@@ -54,6 +54,14 @@ foreach my $dbfile (@DBFILES) {
 }
 
 #
+# Build the locate database. I hate that its never there!
+#
+if (-x /usr/libexec/locate.updatedb) {
+    print "Building the locate database ... Be patient, will ya!\n";
+    system("/usr/libexec/locate.updatedb");
+}
+
+#
 # Generate a dumpdates file. Use fstab to find out what filesystems
 # need entries, and then put in entries for each filesystem using
 # the current date.
