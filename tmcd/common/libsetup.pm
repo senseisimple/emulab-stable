@@ -66,14 +66,22 @@ sub TMROUTECONFIG()     { "$SETUPDIR/router.conf"; }
 sub TMTRAFFICCONFIG()	{ "$SETUPDIR/rc.traffic"; }
 
 #
-# These are the TMCC commands.
+# This is the VERSION. We send it through to tmcd so it knows what version
+# responses this file is expecting.
+#
+# BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
+#
+sub TMCD_VERSION()	{ 3; };
+
+#
+# These are the TMCC commands. 
 #
 sub TMCCCMD_REBOOT()	{ "reboot"; }
 sub TMCCCMD_STATUS()	{ "status"; }
 sub TMCCCMD_IFC()	{ "ifconfig"; }
 sub TMCCCMD_ACCT()	{ "accounts"; }
 sub TMCCCMD_DELAY()	{ "delay"; }
-sub TMCCCMD_HOSTS()	{ "hostnamesV2"; }
+sub TMCCCMD_HOSTS()	{ "hostnames"; }
 sub TMCCCMD_RPM()	{ "rpms"; }
 sub TMCCCMD_TARBALL()	{ "tarballs"; }
 sub TMCCCMD_STARTUP()	{ "startupcmd"; }
@@ -116,7 +124,8 @@ sub OPENTMCC($;$)
     if (!defined($args)) {
 	$args = "";
     }
-    my $foo = sprintf("%s %s %s %s |", TMCC, $NODE, $cmd, $args);
+    my $foo = sprintf("%s -v %d %s %s %s |",
+		      TMCC, TMCD_VERSION, $NODE, $cmd, $args);
 
     open(TM, $foo)
 	or die "Cannot start $TMCC: $!";
@@ -593,12 +602,13 @@ sub doaccounts ()
     # locally from the stub password file. We leave the stub accounts alone
     # since they are in the list to prevent deletion. 
     #
+    my $pat = q(ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
+    $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST=(.*));
+  
     foreach my $login (keys %newaccounts) {
 	my $info = $newaccounts{$login};
 	
-	if ($info =~
-	    /^ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST=(.*)/)
-	{
+	if ($info =~ /$pat/) {
 	    $pswd  = $2;
 	    $uid   = $3;
 	    $gid   = $4;
