@@ -615,8 +615,8 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
             <tr>
               <td valign='top' class='bannercell' 
               background='$BASEPATH/headerbgbb.jpg'
-              bgcolor=#3D627F ><a href='$TBDOCBASE/index.php3'><img width=369
-	      height=100 border=0
+              bgcolor=#3D627F ><a href='www.emulab.net/index.php3'>
+              <img width=369 height=100 border=0
               src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' 
               alt='$THISHOMEBASE - the network testbed' /></a>";
 	      if (!$MAINPAGE) {
