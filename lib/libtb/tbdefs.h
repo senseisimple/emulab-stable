@@ -75,6 +75,12 @@
 #define TBDB_TBCONTROL_RELOADDONE   "RELOADDONE"
 #define TBDB_TBCONTROL_TIMEOUT      "TIMEOUT"
 
+#define TBDB_IFACEROLE_CONTROL		"ctrl"
+#define TBDB_IFACEROLE_EXPERIMENT	"expt"
+#define TBDB_IFACEROLE_JAIL		"jail"
+#define TBDB_IFACEROLE_FAKE		"fake"
+#define TBDB_IFACEROLE_OTHER		"other"
+
 /*
  * Protos.
  */
