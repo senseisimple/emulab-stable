@@ -33,6 +33,8 @@ void NetRouter::calculateRoutes(void)
     size_t j = 0;
     size_t k = 0;
 
+    list<size_t> obsoleteLans;
+
     setup();
 
     // for each level of the hierarchy, starting at one level above LANs
@@ -67,7 +69,7 @@ void NetRouter::calculateRoutes(void)
         for (j = 0; j < currentLevel.size(); ++j)
         {
             // Determine the border LANs for that partition
-            calculateBorders(i, j);
+            calculateBorders(i, j, obsoleteLans);
             // For each border LAN, calculate the routes to all of the other
             // border LANs in this partition.
             calculateBorderToBorderPaths(i, j);
@@ -77,6 +79,7 @@ void NetRouter::calculateRoutes(void)
             // for each node in the partition, and each subnet in
             // the partition, find a route from that node to that subnet
             calculatePartitionRoutes(i, j);
+            removeObsoleteConnections(obsoleteLans);
         }
     }
 }
@@ -168,10 +171,14 @@ void NetRouter::setup(void)
     calculateInterBorders();
 }
 
-void NetRouter::calculateBorders(size_t level, size_t partition)
+void NetRouter::calculateBorders(size_t level, size_t partition,
+                                 list<size_t> & obsoleteLans)
 {
+    obsoleteLans.clear();
+    // For every element in the sub-partition list of [level][partition]
     for (size_t i = 0; i < m_levelMakeup[level][partition].size(); ++i)
     {
+        // oldPartition is the number of a sub-partition
         size_t oldPartition = m_levelMakeup[level][partition][i];
         for (size_t j = 0; j < oldBorderLans[oldPartition].size(); ++j)
         {
@@ -179,6 +186,10 @@ void NetRouter::calculateBorders(size_t level, size_t partition)
             if (isBorderLan(level, currentLanIndex))
             {
                 newBorderLans[partition].push_back(currentLanIndex);
+            }
+            else
+            {
+                obsoleteLans.push_back(currentLanIndex);
             }
         }
     }
@@ -446,6 +457,16 @@ void NetRouter::findRouteToPartition(NodeBorderMap::iterator searchPos,
                 }
             }
         }
+    }
+}
+
+void NetRouter::removeObsoleteConnections(list<size_t> const & obsoleteLans)
+{
+    list<size_t>::const_iterator pos = obsoleteLans.begin();
+    list<size_t>::const_iterator limit = obsoleteLans.end();
+    for ( ; pos != limit; ++pos)
+    {
+        removeBorderLan(*pos);
     }
 }
 

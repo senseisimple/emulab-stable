@@ -79,12 +79,16 @@ private:
                           NodeBorderMap::iterator searchLimit,
                           size_t sourceNode, size_t newPartition,
                           size_t destinationLan);
-    void calculateBorders(size_t level, size_t partition);
+    void calculateBorders(size_t level, size_t partition,
+                          std::list<size_t> & obsoleteLans);
     void calculatePartitionRoutes(size_t level, size_t partition);
     void findRouteToPartition(NodeBorderMap::iterator searchPos,
                               NodeBorderMap::iterator searchLimit,
                               size_t sourceNode, size_t sourcePartition,
                               size_t destPartition, size_t level);
+    // given a list of LANs which we no longer care about, remove all
+    // connections that involve them from the ConnectionMap.
+    void removeObsoleteConnections(std::list<size_t> const & obsoleteLans);
     void calculateInterBorders(void);
 private:
     // partition< borderList >
