@@ -1,0 +1,149 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Errno;
+use POSIX ":sys_wait_h";
+    
+#
+# A wrapper for controlling the event scheduler from boss. 
+#
+# The first argument option is the user to run this script as, since we
+# get invoked by a root ssh from boss. 
+#
+#
+sub usage()
+{
+    print "Usage: linktest.proxy [-d level] -u user -g gid -e pid/eid ".
+	"-l level -o logfile -t timeout\n";
+    exit(-1);
+}
+my $optlist = "d:u:g:e:l:o:t:";
+my $debug   = 0;
+my $user;
+my $gid;
+my $pid;
+my $eid;
+my $level;
+my $logfile;
+my $timeout;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $linktest = "$TB/bin/run_linktest.pl";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, from boss.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (! defined($options{"u"}) ||
+    ! defined($options{"e"}) ||
+    ! defined($options{"l"}) ||
+    ! defined($options{"g"})) {
+    usage();
+}    
+	    
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+$user   = $options{"u"};
+$gid    = $options{"g"};
+$level  = $options{"l"};
+
+if ($options{"e"} =~ /^([-\w]*)\/([-\w]*)$/) {
+    $pid = $1;
+    $eid = $2;
+}
+else {
+    usage();
+}
+
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+}
+if (defined($options{"o"})) {
+    $output = $options{"o"};
+}
+
+#
+# Okay, now flip to user before running linktest. Must put the user
+# into both the project group and the experiment subgroup.
+#
+my (undef,undef,$unix_uid) = getpwnam($user) or
+    die("*** $0:\n".
+	"    No such user $user\n");
+
+my (undef,undef,$unix_ggid) = getgrnam($gid) or
+    die("*** $0:\n".
+	"    No such group $gid\n");
+
+my (undef,undef,$unix_pgid) = getgrnam($pid) or
+    die("*** $0:\n".
+	"    No such group $pid\n");
+
+# Flip to user and never go back!
+$GID            = $unix_ggid;
+$EGID           = "$unix_ggid $unix_ggid $unix_pgid";
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+# And run it. Pass a list to exec to avoid extra shell.
+my @cmdandargs = ("$linktest", "-v", "-l", $level, "-s", "localhost",
+		  "-e", "$pid/$eid");
+push(@cmdandargs, ("-d", $debug))
+    if ($debug);
+push(@cmdandargs, ("-t", $timeout))
+    if (defined($timeout));
+push(@cmdandargs, ("-o", $output))
+    if (defined($output));
+
+exec(@cmdandargs);
+die("*** $0:\n".
+    "    Could not exec $linktest!");
+

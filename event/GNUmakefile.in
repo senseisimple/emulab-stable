@@ -48,6 +48,9 @@ control-install:
 	@$(MAKE) -C sched control-install
 	@$(MAKE) -C linktest install
 
+post-install: 
+	@$(MAKE) -C linktest post-install
+
 clean:		clean-subdirs
 distclean:	distclean-subdirs
 
