@@ -225,8 +225,7 @@ if (!$confirmed) {
 	"<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 
     echo "<center><font size=+2><br>
-              Are you <b>REALLY</b>
-                sure you want to run linktest at level $level?
+              Are you <b>sure</b> you want to run linktest?
               </font><br><br>\n";
 
     SHOWEXP($pid, $eid, 1);
