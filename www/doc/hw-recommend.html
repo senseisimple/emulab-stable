@@ -43,10 +43,7 @@ recommendations, and outlines the consequences of each choice.
 		best to get a sample first and try it out before committing to
 		a card. Depedning on usage, it may be OK to get a large number
 		of nodes with 2 interfaces to be edge nodes, and a smaller
-		number with more interfaces to be routers. <b>Note:</b> Our
-		software currently does not support nodes that are connected to
-		multiple experimental-net switches.  For the time being, all
-		NICs on a node must be attached to the same switch.</dd>
+		number with more interfaces to be routers.</dd>
 
 	<dt><b>Case/Chassis</b></dt>
 		<dd>This will depend on your space requirements. The cheapest
@@ -157,10 +154,13 @@ recommendations, and outlines the consequences of each choice.
 		 <dd><dl>
 
 		 <dt><b>Vendor</b></dt> <dd>Our software currently supports
-		 Cisco Catalyst 6000 series and Intel 510T switches. Other
-		 switches by the same vendors will likely be easy to support.
-		 Cisco switches that support the 'CISCO-STACK-MIB' and
-		 'CISCO-VTP-MIB' MIBs. (You can see a list of which MIBs are
+		 the Cisco Catalyst 6000 and 4000 series and Intel 510T
+		 switches.  Other
+		 switches by the same vendors will likely be easy to support -
+		 in particular, we expect that Cisco swithces supporting
+		 the 'CISCO-VTP-MIB', and the 'CISCO-STACK-MIB' or 
+		 'CISCO-VLAN-MEMBERSHIP-MIB' are likely to 'just work'.
+		 (You can see a list of which MIBs are
 		 supported by which devices at <a
 		 href="http://www.cisco.com/public/sw-center/netmgmt/cmtk/mibs.shtml">Cisco's
 		 MIB page.)</a> If you will be using multiple Ciscos for the
