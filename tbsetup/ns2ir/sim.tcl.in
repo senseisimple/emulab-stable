@@ -935,7 +935,7 @@ Simulator instproc make-simulated {args} {
 
     # we ignore any type of errors coz they have
     # been caught when we ran the script through NSE
-    uplevel 1 eval $script
+    uplevel 1 $script
 
     append nseconfig $script
     append nseconfig \n
