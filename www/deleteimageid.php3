@@ -44,6 +44,35 @@ if (!TBImageInfo($imageid, $imagename, $pid)) {
 }
 
 #
+# Check to see if the imageid is being used in various places
+#
+$query_result1 =
+    DBQueryFatal("select * from current_reloads where image_id='$imageid'");
+$query_result2 =
+    DBQueryFatal("select * from scheduled_reloads where image_id='$imageid'");
+$query_result3 =
+    DBQueryFatal("select * from node_types where imageid='$imageid'");
+
+if (mysql_num_rows($query_result1)) {
+    echo "$imageid is referenced in the current_reloads table!<br>";
+    $conflicts++;
+}
+if (mysql_num_rows($query_result2)) {
+    echo "$imageid is referenced in the scheduled_reloads table!<br>";
+    $conflicts++;
+}
+if (mysql_num_rows($query_result3)) {
+    echo "$imageid is referenced in the node_types table!<br>";
+    $conflicts++;
+}
+if ($conflicts) {
+    echo "<br>
+          You must resolve these issues before the imageid can be deleted!";
+    PAGEFOOTER();
+    return;
+}
+
+#
 # We run this twice. The first time we are checking for a confirmation
 # by putting up a form. The next time through the confirmation will be
 # set. Or, the user can hit the cancel button, in which case we should

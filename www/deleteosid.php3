@@ -43,6 +43,8 @@ if (!TBOSInfo($osid, $osname, $pid)) {
     USERERROR("OS Descriptor '$osid' is no longer valid!", 1);
 }
 
+$conflicts = 0;
+
 #
 # Check to see if the OSID is being used. Force whatever images are using
 # it to be deleted or changed. This subsumes EZ created images/osids.
@@ -77,7 +79,42 @@ if (mysql_num_rows($query_result)) {
               </tr>\n";
     }
     echo "</table>\n";
-    
+    $conflicts++;
+}
+
+# Ditto for node_types table.
+$query_result =
+    DBQueryFatal("select class,type from node_types ".
+		 "where osid='$osid' or delay_osid='$osid'");
+
+if (mysql_num_rows($query_result)) {
+    echo "<br> <center>
+            The following node_types are using this OS Descriptor<br>
+            in the osid and/or delay_osid fields.<br>
+            They must be deleted first!
+          </center><br>\n";
+          
+    echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
+
+    echo "<tr>
+              <td align=center>Class</td>
+              <td align=center>Type</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$class   = $row['class'];
+	$type    = $row['type'];
+
+	echo "<tr>
+                <td>$class</td>
+	        <td>$type</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+    $conflicts++;
+}
+
+if ($conflicts) {
     PAGEFOOTER();
     return;
 }
