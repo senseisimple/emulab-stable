@@ -1,6 +1,5 @@
 #!/usr/local/bin/tclsh
 
-
 proc outs {args} {
     global logFp
     if {[llength $args] == 1} {
@@ -21,6 +20,11 @@ if {[file dirname [info script]] == "."} {
     set updir [file dirname [file dirname [info script]]]
 }
 set snmpit "$updir/switch_tools/intel510/snmpit"
+set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
+set libir "$updir/ir/libir.tcl"
+
+source $libir
+namespace import TB_LIBIR::ir
 
 if {$argc != 1} {
     puts stderr "Syntax: $argv0 <ir-file>"
@@ -47,9 +51,20 @@ if {! [file exists $irFile]} {
 
 outs "Beginning Testbed run for $irFile. [clock format [clock seconds]]"
 
-outs "Setting up VLANs"
+outs "Resetting VLANs"
+ir read $irFile
+set nodemap [ir get /virtual/nodes]
+set machines {}
+foreach pair $nodemap {
+    lappend machines [lindex $pair 1]
+}
+if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error running $resetvlans. ($err)"
+    exit 1
+}
 
-if {[catch "exec $snmpit -f $irFile >@ $logFp 2>@ $logFp" err]} {
+outs "Setting up VLANs"
+if {[catch "exec $snmpit -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error running $snmpit. ($err)"
     exit 1
 }
