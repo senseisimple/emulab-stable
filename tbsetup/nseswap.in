@@ -10,6 +10,7 @@ use Fcntl ':flock';
 use English;
 use Getopt::Std;
 use Socket;
+use IO::Handle;     # thousands of lines just for autoflush :-(
     
 #
 # In an experiment with simulated nodes, if some instance of the
@@ -41,8 +42,8 @@ my $pid;
 my $eid;
 my $eventargs;
 my $simhost = "";
-my $max_retries = 3;
-my $verbose = 0;
+my $max_retries = 100;
+my $verbose = 1;
 
 sub printdb ($)
 {
@@ -111,6 +112,7 @@ if ( $eventargs =~ /$argpat/ ) {
 }
 my $lockfile    = "/var/tmp/$pid-$eid-nseswap-lockfile";
 	       
+TBDebugTimeStampsOn();
 my $query_result =
     DBQueryFatal("select node_id from reserved where pid='$pid' and ".
 		 "eid='$eid' and vname='$simhost'");
@@ -167,15 +169,42 @@ if (flock(LOCK, LOCK_EX|LOCK_NB)) {
 
     swapout_on_max_retries();
 
+    my $qr = DBQueryFatal("select sim_reswap_count from experiments ".
+			  "where eid='$eid' and pid='$pid'");
+    my ($sim_reswap_count) = $qr->fetchrow_array();
     # We wait for a few seconds to let any other pnodes that may not
     # be able to track real-time
-    sleep(20);
+    if ($sim_reswap_count == 0) {
+	sleep(60);
+    } else {
+	sleep(300);
+    }
+    if( $verbose ) {
+	LOCK->autoflush(1);
+	print LOCK "################ Reswap Count:$sim_reswap_count " . 
+	           "################\n";
+	$qr = DBQueryFatal("select vname,node_id,simhost_violation from reserved ".
+	                   "where pid='$pid' and eid='$eid' " .
+	                   "and erole='simhost' order by vname");
+	while( my ($vname,$node_id,$violation) = $qr->fetchrow_array()) {
+	    my $qr2 = DBQueryFatal("select vname from v2pmap " .
+		                   "where pid='$pid' and eid='$eid' " .
+	                           "and node_id='$node_id' order by vname");
+	    print LOCK "vname:$vname node_id:$node_id numvnodes:" . $qr2->numrows() .
+	               " " . ($violation ? "violation; " : " ; ") ;
+	    while( my ($vnode) = $qr2->fetchrow_array()) {
+		print LOCK "$vnode ";
+	    }
+	    print LOCK "\n";
+	}
+	print LOCK "################################################ \n";
+    }
 
     DBQueryFatal("update experiments set sim_reswap_count=sim_reswap_count+1 ".
 	         "where eid='$eid' and pid='$pid'");
 
     # do a swap modify 
-    system("swapexp -e -r -s modify $pid $eid");
+    system("swapexp -w -e -r -s modify $pid $eid");
 }
 
 #
