@@ -239,7 +239,17 @@ foreach my $n (@freed_nodes) {
 
     #
     # Clean up the nodes table so that its in a moderately clean state.
-    # 
+    #
+
+    foreach $var ( 'osid','pxe_boot_path','n') {
+	print "\$$var = ";
+	if (!defined ${$var}) {
+	    print "(null)";
+	} else {
+	    print ${$var};
+        }
+        print "\n";
+    }
     DBQueryWarn("update nodes set def_boot_osid='$osid',def_boot_cmd_line='',".
 		"def_boot_path='',startupcmd='',rpms='',deltas='', ".
 		"tarballs='',pxe_boot_path='$pxe_boot_path', ".
@@ -254,23 +264,6 @@ foreach my $n (@freed_nodes) {
     #
     # Now its safe to change the reservation.
     #
-    #
-    # If the node has a reloads entry, change the reservation so that the
-    # reload_daemon will pick it up.
-    #
-    $result =
-	DBQueryFatal("select node_id,image_id from scheduled_reloads " .
-		     "where node_id='$n'");
-
-    if ($result->numrows()) {
-	print "Moving $n to $reloadpid/$pendingeid.\n";
-	
-	DBQueryWarn("update reserved set ".
-		    "pid='$reloadpid',eid='$pendingeid' ".
-		    "where node_id='$n'") || $error++;
-	next;
-    }
-
     #
     # If the node has a next_reserve entry, change the reservation.
     #
@@ -293,6 +286,23 @@ foreach my $n (@freed_nodes) {
 	next;
     }
     
+    #
+    # If the node has a reloads entry, change the reservation so that the
+    # reload_daemon will pick it up.
+    #
+    $result =
+	DBQueryFatal("select node_id,image_id from scheduled_reloads " .
+		     "where node_id='$n'");
+
+    if ($result->numrows()) {
+	print "Moving $n to $reloadpid/$pendingeid.\n";
+	
+	DBQueryWarn("update reserved set ".
+		    "pid='$reloadpid',eid='$pendingeid' ".
+		    "where node_id='$n'") || $error++;
+	next;
+    }
+
     #
     # No reloads or reservation changes, so really free the node
     #
