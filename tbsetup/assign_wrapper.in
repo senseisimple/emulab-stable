@@ -3887,6 +3887,15 @@ sub CreateTopFile()
 			if (! ($osdoesmlink{$osid} && $osdoesveth{$osid})) {
 			    $nonbsdnodes++;
 			}
+		    } else {
+			# XXX If the user doesn't explicitly set an OS on a PC,
+			# currently it defaults to Redhat. At this point, it is
+			# not possible to know untill mapping if the default OS
+			# is indeed Redhat. Due to lack of information at this 
+			# point in the code, it would safe to assume non-BSD
+			# regardless of whether a future or different emulab is
+			# gonna make BSD as the default OS
+			$nonbsdnodes++;
 		    }
 		}
 		$realnodes++;
