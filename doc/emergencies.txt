@@ -7,8 +7,8 @@ The tip lines for each of paper/plastic/tipserv1 are on snake.cs.utah.edu.
 (standard desktop machine).
 
 You can talk to power controller number 9 from snake by using "tip
-apc" to talk to power9. User is "apc", password is "^pwr".  The
-outlets are set up as follows:
+apc" to talk to power9. User is "apc", password is written on the
+white board in the flux area.  The outlets are set up as follows:
 
 	plastic   - 8 
 	paper     - 6 
@@ -21,4 +21,3 @@ will run on the serial line. You can interrupt the boot there.
 
 Note that Mike and I built/installed new boot blocks on paper/plastic
 and snake that run at 115200. The defaul is 9600 for all 3 stages.
-
