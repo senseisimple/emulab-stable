@@ -131,16 +131,4 @@ foreach trafgen $trafgenlist {
 
 }
 
-exec tmcc ready
-
-while { 1 } {
-
-    set readycount [exec tmcc readycount]
-    scan $readycount "READY=%u TOTAL=%u" numready total
-    if { $numready == $total } {
-	break;
-    }
-    exec sleep 1
-}
-
 $ns run
