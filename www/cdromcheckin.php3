@@ -184,7 +184,7 @@ if (strcmp($privIP, "1.1.1.1")) {
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
 
-    if (1) {
+    if (0) {
     if ($cdvers == 3) {
 	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
 	    echo "slice1_md5=263d82a69e48f37ecd0e31f6f5171faa\n";
