@@ -1,33 +1,31 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 
 #
-# Turn on/off admin mode for a node. 
+# Turn on/off admin mode for nodes and optionally reboot/wait.
 #
 sub usage()
 {
-    print STDOUT "Usage: nodeadmin [-h] [-n | -w] <on | off> <node>\n";
+    print STDOUT "Usage: node_admin [-h] [-n | -w] <on | off> [node ....]\n";
+    print STDOUT "       node_admin [-h] [-n | -w] -p pid,eid <on | off>\n";
     print STDOUT "-h   This message\n";
     print STDOUT "-n   Do not reboot node\n";
     print STDOUT "-w   Wait for node to come back up if rebooted\n";
+    print STDOUT "-e   Operate on all nodes in an experiment\n";
     exit(-1);
 }
-my  $optlist = "hnw";
+my  $optlist = "hnwe:";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSADDR	= "@BOSSNODE@";
 
 #
 # Testbed Support libraries
@@ -53,8 +51,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $nodereboot	= "$TB/bin/node_reboot";
 my $osselect    = "$TB/bin/os_select";
 my $ADMINOSID   = TB_OSID_FREEBSD_MFS;
-my $pxebootpath;
-my $dbuid;
+my @nodes       = ();
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -67,66 +64,118 @@ if (! getopts($optlist, \%options)) {
 if ($options{h}) {
     usage();
 }
-if (@ARGV != 2) {
+if (!@ARGV) {
     usage();
 }
 
-my $onoff  = $ARGV[0];
-my $node   = $ARGV[1];
+my $onoff  = shift(@ARGV);
 
 if ($onoff ne "on" && $onoff ne "off") {
     usage();
 }
 
-#
-# Untaint the arguments.
-#
-if ($node =~ /^([-\w]+)$/) {
-    $node = $1;
+if (defined($options{"e"})) {
+    #
+    # Reboot all nodes in an experiment
+    #
+    if (@ARGV) {
+	usage();
+    }
+
+    my $eidmode = $options{"e"};
+    my $pid;
+    my $eid;
+    
+    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
+	$pid = $1;
+	$eid = $2;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Invalid argument to -e option: $eidmode\n");
+    }
+
+    #
+    # Verify permission to muck with this experiment. This is to head off
+    # permission problems early; the nodes are indvidually checked later
+    # in the library.
+    #
+    if ($UID && !TBAdmin($UID) &&
+	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+	die("*** $0:\n".
+	    "    You not have permission to reboot nodes in $pid/$eid!\n");
+    }
+
+    my $query_result =
+	DBQueryFatal("select node_id from reserved where ".
+		     "pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	die("*** $0:\n".
+            "    There are no nodes reserved in pid/eid $pid/$eid\n");
+    }
+    
+    while (my ($nodeid) = $query_result->fetchrow_array()) {
+	push(@nodes, $nodeid);
+    }
 }
 else {
-    die("Tainted node name: $node");
-}
+    if (! @ARGV) {
+	usage();
+    }
 
-#
-# Verify user and get his DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
-}
+    # Untaint the nodes.
+    foreach my $node ( @ARGV ) {
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Tainted node name: $node\n");
+	}
+	if (!TBValidNodeName($node)) {
+	    die("*** $0:\n".
+		"    Node does not exist: $node\n");
+	}
+	push(@nodes, $node);
+    }
 
-#
-# Root and admin types can do whatever they want. Normal users can only
-# run this on nodes in their own experiments.
-#
-if ($UID && !TBAdmin($UID)) {
-    if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, $node)) {
-	die("*** $0:\n".
-	    "    You are not allowed to boot the FreeBSD MFS on $node!\n");
+    #
+    # Root and admin types can do whatever they want. Normal users
+    # can only run this on nodes in their own experiments.
+    #
+    if ($UID && !TBAdmin($UID)) {
+	if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
+	    die("*** $0:\n".
+		"    You are not allowed to put some nodes into admin mode\n");
+	}
     }
 }
 
+# Switcheroo the osids on the nodes.
 if ($onoff eq "on") {
-    system("$osselect -t $ADMINOSID $node") and
-	die("*** Failed to set temp boot to $ADMINOSID for $node!\n");
+    system("$osselect -t $ADMINOSID @nodes") and
+	die("*** $0:\n".
+	    "    Failed to set temp boot to $ADMINOSID for some nodes!\n");
 }
 else {
-    system("$osselect -c -t $node") and
-	die("*** Failed to clear temp boot for $node!\n");
+    system("$osselect -c -t @nodes") and
+	die("*** $0:\n".
+	    "    Failed to clear temp boot for some nodes!\n");
 }
+
+# Is this needed anymore? 
 DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
-	     "where node_id='$node'");
+	     "where " . join(" or ", map("node_id='$_'", @nodes)));
 
 #
-# Reboot node
+# Reboot nodes
 #
 if (!$options{n}) {
     my $optarg = ($options{"w"} ? "-w" : "");
 	
-    if (system("$nodereboot $optarg $node")) {
+    if (system("$nodereboot $optarg @nodes")) {
 	die("*** $0:\n".
-	"    WARNING: Could not reboot $node.\n");
+	    "    WARNING: Could not reboot some nodes!\n");
     }
 }
 exit(0);
