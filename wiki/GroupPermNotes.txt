@@ -7,14 +7,14 @@ __TWiki permissions explained__
           permissions. 
 	* If you want to allow a specific Wiki user to access (read/write)
           your project Wiki, add their TWiki.WikiName to
-          [[%MAINWEB%.%WEB%Group][%WEB%Group]].
+          [[%MAINWEB%.%INCLUDINGWEB%Group][%INCLUDINGWEB%Group]].
           (Click on the link, and then use _edit_ button in the upper left).
-        * If you want to make your Project wiki *world readable*, edit the
+	* If you want to make your Project wiki *world readable*, edit the
           WebPreferences file, and clear the ALLOWWEBVIEW and NOSEARCHALL
           variables.
-        * If you want to make your Project wiki *world writable*, also
+	* If you want to make your Project wiki *world writable*, also
           clear the ALLOWWEBCHANGE variable.
-        * You should leave the ALLOWWEBRENAME, ALLOWTOPICCHANGE, and
+	* You should leave the ALLOWWEBRENAME, ALLOWTOPICCHANGE, and
           ALLOWTOPICRENAME variables (WebPreferences) alone.
 	* More details (then you could possibly want) can be found in the
           TWiki.TWikiAccessControl page.
