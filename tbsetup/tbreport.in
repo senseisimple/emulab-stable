@@ -159,7 +159,7 @@ if (($state eq EXPTSTATE_ACTIVE) ||
 #
 my $virtnodes_result =
     DBQueryFatal("SELECT vname,ips,osname,cmd_line,rpms,deltas," .
-		 "startupcmd,tarfiles,type from virt_nodes ".
+		 "startupcmd,tarfiles,type,fixed from virt_nodes ".
 		 "where pid='$pid' and eid='$eid'");
 
 if ($shownodes) {
@@ -169,7 +169,11 @@ if ($shownodes) {
 	  "--------------------\n";
 
     while (($vname,$ips,$osname,$cmd_line,$rpms,$deltas,$startupcmd,
-	    $tarfiles,$type) = $virtnodes_result->fetchrow_array()) {
+	    $tarfiles,$type,$fixed) = $virtnodes_result->fetchrow_array()) {
+
+	if ($fixed) {
+	    $vname = "$vname ($fixed)";
+	}
 
 	printf "%-15s %-12s %-15s %s\n", $vname, $type, $osname,
 	       "$vname.$eid.$pid.$DOMAIN";
@@ -214,6 +218,19 @@ if ($showmap &&
 	printf "\n";
     }
     print "\n";
+
+    my $range_result =
+	DBQueryFatal("select low,high from ipport_ranges ".
+		     "where pid='$pid' and eid='$eid'");
+    if ($range_result->numrows) {
+	my ($low,$high) = $range_result->fetchrow_array();
+	
+	print  "IP Port allocation:\n";
+	printf "%-15s %-12s %-15s \n", "Low", "High", "SSHD";
+	print  "--------------- ------------ ---------------\n";
+	printf "%-15s %-12s %-15s (use 'ssh -p $low')\n", $low, $high, $low;
+	print  "\n";
+    }
 }
 
 #
