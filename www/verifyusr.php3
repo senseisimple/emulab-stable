@@ -51,6 +51,16 @@ if (strcmp($status, "unverified") == 0) {
         TBERROR("Database Error setting status for $uid: $err\n", 1);
     }
 
+    TBMAIL($TBMAIL_AUDIT,
+	   "User '$uid' has been verified",
+	   "\n".
+	   "User '$uid' has been verified.\n".
+           "Status has been changed from 'unverified' to 'active'\n".
+	   "\n".
+	   "Testbed Ops\n",
+	   "From: $TBMAIL_OPS\n".
+	   "Errors-To: $TBMAIL_WWW");
+
     echo "<p>".
          "Because your project leader has already approved ".
 	 "your membership in the project, you are now an active user ".
@@ -64,6 +74,16 @@ elseif (strcmp($status, "newuser") == 0) {
         $err = mysql_error();
         TBERROR("Database Error setting status for $uid: $err\n", 1);
     }
+
+    TBMAIL($TBMAIL_AUDIT,
+	   "User '$uid' has been verified",
+	   "\n".
+	   "User '$uid' has been verified.\n".
+           "Status has been changed from 'newuser' to 'unapproved'\n".
+	   "\n".
+	   "Testbed Ops\n",
+	   "From: $TBMAIL_OPS\n".
+	   "Errors-To: $TBMAIL_WWW");
 
     echo "<p>".
 	 "You have now been verified. However, your application ".
