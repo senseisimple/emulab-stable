@@ -18,6 +18,10 @@ sql subdirectory of the testbed tree, like so:
 mysqladmin create tbdb
 mysql tbdb < sql/database-create.sql
 
+Also, you can fill some default values into some of the tables with:
+
+mysql tbdb < sql/database-fill.sql
+
 ##### Step 1 - Setup users
 
 At this point, it's a good idea to get the nfs mounts between boss and ops
