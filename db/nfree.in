@@ -196,17 +196,6 @@ foreach my $n (@nodes) {
 	    next;
 	}
     } else {
-        # XXX stargate reload hack - totally gross..
-        if (TBNodeType($n) eq "garcia") {
-            # path to directory tree "image" hardcoded for now since
-            # users have no choice over OS selection when reloading
-            # isn't performed during swapin.
-            system("$tbrsync upload /usr/testbed/images/garcia $n") == 0 ||
-                print STDERR "Failed to rsync garcia node: $n\n";
-            system("$nodereboot $n") == 0 ||
-                print STDERR "Failed to reboot garcia after rsync: $n\n";
-        }
-
 	# Move to locked reservation. Node is not free, but is no longer
 	# owned by the pid/eid, so cannot be mucked with.
 	if (! DBQueryWarn("update reserved " .
