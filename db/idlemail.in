@@ -31,6 +31,11 @@ use Getopt::Std;
 my $mailinterval = TBGetSiteVar("idle/mailinterval");
 my $threshold    = TBGetSiteVar("idle/threshold");
 my $cc_grp_ldrs  = TBGetSiteVar("idle/cc_grp_ldrs");
+# minutes before idleswap that we warn them
+my $idle_warnmin = TBGetSiteVar("swap/idleswap_warn");
+# minutes before autoswap that we warn them
+my $auto_warnmin = TBGetSiteVar("swap/autoswap_warn");
+
 
 sub help {
     die("Usage:
@@ -130,9 +135,11 @@ last_cpu_act, last_ext_act)) as lastact,
 from node_activity as na left join reserved as r on na.node_id=r.node_id
 left join experiments as e on r.pid=e.pid and r.eid=e.eid
 where r.pid is not null and r.eid is not null and idle_ignore=0
+and idleswap=0
 group by pid,eid having idle_time >= $threshold and nodes > 0
 order by pid,eid
 EOT
+    # We don't want idleswappable ones, since they get a different warning
 
     $q = DBQueryFatal($sql);
 
@@ -224,31 +231,76 @@ EOT
 	  warn("idlemail: Problem autoswapping $pid/$eid: $!\n");
     }
 
-    # Now send warning messages to those who will get autoswapped soon
-    my $warnmin = 60; # minutes before autoswap that we warn them
+    # Now send warning messages to those who will get automatically
+    # swapped soon (idleswap/autoswap)
     my $window = 5; # same as idlemail frequency in cron
-    $sql  = <<EOT;
+
+    if ($idle_warnmin>0) {
+	$sql  = <<EOT;
+select e.pid,e.eid,idleswap_timeout, count(r.node_id) as nodes,
+round((unix_timestamp(now()) - unix_timestamp(max(
+greatest(last_tty_act, last_net_act, last_cpu_act, last_ext_act)
+)))/3600,2) as idle_time, max(greatest(last_tty_act, last_net_act,
+last_cpu_act, last_ext_act)) as lastact,
+(unix_timestamp(now()) - unix_timestamp(min(last_report))) as staleness,
+(unix_timestamp(now()) - unix_timestamp(max(
+greatest(last_tty_act, last_net_act, last_cpu_act, last_ext_act)
+)))/60 as idlemin
+from node_activity as na left join reserved as r on na.node_id=r.node_id
+left join experiments as e on r.pid=e.pid and r.eid=e.eid
+where swappable>0 and state="active" and idleswap>0 group by pid,eid
+having idlemin+$idle_warnmin>=idleswap_timeout and
+idlemin+$idle_warnmin<=idleswap_timeout+$window order by pid,eid
+EOT
+        $q = DBQueryFatal($sql);
+	if ($d) { print $sql,"\n",$q->as_string; $q->dataseek(0); }
+	# enable for extra debugging
+	if (1 && $q->numrows()>0) {
+	    # SENDMAIL(To, Subject, Message, [From], [More Headers],...)
+	    SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
+		     $q->as_string);
+	    $q->dataseek(0);
+	}
+	while (%r = $q->fetchhash()) {
+	    # These get an idlewarn message
+	    $pid = $r{'pid'};
+	    $eid = $r{'eid'};
+	    $nodes = $r{'nodes'};
+	    $time= $r{'idle_time'};
+	    $lastact= $r{'lastact'};
+	    $staleness = $r{'staleness'};
+	    if ($staleness >= 600) { # 10 minute stale limit
+		$stale=1;
+	    }
+	    SendMessage($pid,$pid,$eid,1,0,$nodes,$time,$lastact,$stale,
+			2,$idle_warnmin);
+	}
+    }
+
+    if ($auto_warnmin>0) {
+	$sql  = <<EOT;
 select pid,eid,autoswap_timeout,
 (unix_timestamp(now()) - unix_timestamp(expt_swapped))/60 as activemin
 from experiments where swappable>0 and state="active" and autoswap>0
-having activemin+$warnmin>=autoswap_timeout and
-activemin+$warnmin<=autoswap_timeout+$window order by pid,eid
+having activemin+$auto_warnmin>=autoswap_timeout and
+activemin+$auto_warnmin<=autoswap_timeout+$window order by pid,eid
 EOT
-    $q = DBQueryFatal($sql);
-    if ($d) { print $q->as_string; $q->dataseek(0); }
-    # enable for extra debugging
-    if (1 && $q->numrows()>0) {
-	# SENDMAIL(To, Subject, Message, [From], [More Headers],...)
-	SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
-		 $q->as_string);
-	$q->dataseek(0);
-    }
-    while (%r = $q->fetchhash()) {
-	# These get an autowarn message
-	$pid = $r{'pid'};
-	$eid = $r{'eid'};
-	# all options ignored but autoswap and warnmin and ids
-	SendMessage($pid,$pid,$eid,0,0,0,0,0,0,1,$warnmin);
+        $q = DBQueryFatal($sql);
+	if ($d) { print $q->as_string; $q->dataseek(0); }
+	# enable for extra debugging
+	if (1 && $q->numrows()>0) {
+	    # SENDMAIL(To, Subject, Message, [From], [More Headers],...)
+	    SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
+		     $q->as_string);
+	    $q->dataseek(0);
+	}
+	while (%r = $q->fetchhash()) {
+	    # These get an autowarn message
+	    $pid = $r{'pid'};
+	    $eid = $r{'eid'};
+	    # all options ignored but autoswap and warnmin and ids
+	    SendMessage($pid,$pid,$eid,0,0,0,0,0,0,1,$auto_warnmin);
+	}
     }
 
 } else {
@@ -329,23 +381,23 @@ exit(0);
 
 sub SendMessage {
     my ($pid,$gid,$eid,$swappable,$swapreqs,$c,$time,$lastact,$stale,
-	$autowarn,$warnmin) = @_;
+	$warn,$warnmin) = @_;
     # enable extra debugging...
     if (0) {
 	SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
 		 "idlemail: send message(".join(",",@_)."\n".
 		 "pid=$pid,gid=$gid,eid=$eid\nswappable=$swappable,".
 		 "swapreqs=$swapreqs,c=$c,time=$time,lastact=$lastact,".
-		 "stale=$stale\nautowarn=$autowarn,warnmin=$warnmin\n".
+		 "stale=$stale\nwarn=$warn,warnmin=$warnmin\n".
 		 "Date: ".`date`);
     }
-    if (!defined($autowarn)) { $autowarn=0; }
+    if (!defined($warn)) { $warn=0; }
     $idlehrs = int($time);
     $idlemin = int(($time-$idlehrs)*60);
 
     if ($d) {
-	if ($autowarn) {
-	    print "Sending warning message to $pid/$eid before autoswap\n";
+	if ($warn) {
+	    print "Sending warning message to $pid/$eid before swap\n";
 	} else {
 	    print "Sending message to $pid/$eid, ".
 	      "idle $idlehrs hrs $idlemin min, total $time hrs\n";
@@ -392,9 +444,12 @@ sub SendMessage {
 		    "became idle. ")
 		 : "").
 	       ($swappable ?
-		("This experiment is marked as swappable, so it may be ".
-		 "automatically swapped out by $THISHOMEBASE or its ".
-		 "operational staff. ") :
+		( $warn==2 ?
+		  ("If this experiment continues to be idle, it will be ".
+		   "Idle-Swapped in about $warnmin minutes.") :
+		  ("This experiment is marked as swappable, so it may be ".
+		   "automatically swapped out by $THISHOMEBASE or its ".
+		   "operational staff. ")) :
 		("This experiment has not been marked swappable, so it ".
 		 "will not be automatically swapped out. ")), $wrapwidth);
     $msg .= "\n".
@@ -403,14 +458,15 @@ sub SendMessage {
 	       "available for use by other experimenters. You can do this ".
 	       "by logging into the $THISHOMEBASE Web Interface, and using ".
 	       "the swap or terminate links on this page:",$wrapwidth);
-    if ($autowarn) {
+    if ($warn==1) {
 	# We're sending a different kind of message...
 	# Fix the first half, and the rest is the same as the other message.
 	$msg="Hi, this is an important automated message from $THISHOMEBASE.".
-	  "\n\nYou scheduled your experiment $pid/$eid to be Auto-Swapped\n".
-	  "in about $warnmin minutes, whether it is in active use or not.\n".
-	  "If you would like to change the timing of the Auto-Swap, please \n".
-	  "use the Edit option on this page:\n";
+	  "\n\nYou set a Max Duration for your experiment $pid/$eid\n".
+	  "so that it will be swapped out in about $warnmin minutes, ".
+	  "whether it is in\nactive use or not.\n".
+	  "If you would like to change the Max Duration, please use the \n".
+	  "Edit Metadata option on this page:\n";
     }
     $msg .= "\n$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n";
     $msg .=
@@ -443,8 +499,10 @@ sub SendMessage {
 	$cclist .="\n";
     }
 
-    if ($autowarn) {
-	$subj="Auto-Swap Warning: $pid/$eid";
+    if ($warn==1) {
+	$subj="Max Duration Warning: $pid/$eid";
+    } elsif ($warn==2) {
+	$subj="Idle-Swap Warning: $c PC".($c!=1?"s":"").", $pid/$eid";
     } else {
 	$subj="$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid";
     }
@@ -474,9 +532,12 @@ sub SendMessage {
 		 "Bcc: $TBMAIL_AUTOMAIL\n".
 		 "Errors-To: $TBMAIL_WWW");
 
-	# Update the count and the time in the database
-	DBQueryWarn("update experiments set swap_requests= swap_requests+1,
-                 last_swap_req=now() where pid='$pid' and eid='$eid';");
+	if ($warn!=1) {
+	    # if I'm not doing an autoswap warning,
+	    # Update the count and the time in the database
+	    DBQueryWarn("update experiments set swap_requests=swap_requests+1,
+                         last_swap_req=now() where pid='$pid' and eid='$eid'");
+	}
     }
 
 }
