@@ -1,19 +1,79 @@
 #!/usr/bin/perl -w
-
 use English;
-# use strict;
+use Getopt::Std;
 
-use lib '@prefix@/lib';
+#
+# Need to join with nodes/reserved to make sure node is not dead or
+# in the hwdown group.
+# 
+
+sub usage()
+{
+    print STDOUT
+	"Usage: wanlinkinfo [-d] [-m] [-b]\n".
+	"       Use -m to output virtual node counts per phys node.\n".
+        "       Use -b to output bandwidth matrix.\n";
+    exit(-1);
+}
+my  $optlist = "dmb";
+
+#
+# Configure variables
+#
+my $TB = "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
 use libdb;
+use libtestbed;
 
-my $result = DBQueryFatal("SELECT node_id1, iface1, node_id2, iface2, time, bandwidth " .
-			  "FROM widearea_delays");
+# Locals
+my $debug	= 0;
+my $dobw	= 0;
+my $dovirt	= 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"m"})) {
+    $dovirt = 1;
+}
+if (defined($options{"b"})) {
+    $dobw= 1;
+}
+
+my $result =
+    DBQueryFatal("SELECT node_id1,iface1,node_id2,iface2,time,bandwidth " .
+		 "FROM widearea_delays");
 
 my %nodename = ();
 my %speeds   = ();
 my %bws   = ();
 
-while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw) = $result->fetchrow) {
+while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw) =
+       $result->fetchrow) {
     my $msectime = $time * 1000;
     my $glom1    = $node_id1 . ":" . $iface1;
     my $glom2    = $node_id2 . ":" . $iface2;
@@ -28,8 +88,24 @@ while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw) = $result->fetchr
 
 print scalar( keys %nodename ) . "\n";
 
+#
+# XXX The boss node ends up first strictly by accident. We need to know
+#     which is really the boss so we can fix the mappings to it in the
+#     v section.
+# 
 foreach my $i (sort (keys %nodename)) {
     print "$i\n";
+}
+
+#
+# XXX Hardwired for now. Should read the DB to see what the max allowed
+#     is (which is not stored in the DB yet), and the number already
+#     allocated, and send the difference in as the max. 
+# 
+if ($dovirt) {
+    foreach my $i (sort (keys %nodename)) {
+	print "4\n";
+    }
 }
 
 foreach my $i (sort (keys %nodename)) {
@@ -43,16 +119,18 @@ foreach my $i (sort (keys %nodename)) {
     print "\n";
 }
 
-foreach my $i (sort (keys %nodename)) {
-    foreach my $j (sort (keys %nodename)) {
-        # the following is conceptually
-        # the bandwidth of a machine to itself.
-	# using ttcp, a typical value was found to be 180 MB/sec
-	my $s = "180000"; 
-	if (exists $bws{ $i."+".$j } ) {
-	    $s = $bws{ $i . "+" . $j };
-	} 
-	print sprintf( "%-6i ", $s );
+if ($dobw) {
+    foreach my $i (sort (keys %nodename)) {
+	foreach my $j (sort (keys %nodename)) {
+	    # the following is conceptually
+	    # the bandwidth of a machine to itself.
+	    # using ttcp, a typical value was found to be 180 MB/sec
+	    my $s = "180000"; 
+	    if (exists $bws{ $i."+".$j } ) {
+		$s = $bws{ $i . "+" . $j };
+	    } 
+	    print sprintf( "%-6i ", $s );
+	}
+	print "\n";
     }
-    print "\n";
 }
