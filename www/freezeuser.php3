@@ -159,7 +159,7 @@ DBQueryFatal("update users set status='$dbaction' ".
 #
 # All the real work is done in the script.
 #
-SUEXEC($uid, $TBADMINGROUP, "webmkacct $target_uid", 1);
+SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid", 1);
 
 #
 # Warm fuzzies.

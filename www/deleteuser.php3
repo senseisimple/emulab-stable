@@ -241,7 +241,7 @@ echo "<br>
       "!<br><br>
       This will take a minute or two. <b>Please</b> do not click the Stop
       button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.\n";
+      a reasonable amount of time, please contact $TBMAILADDR.<br>\n";
 flush();
 
 #
