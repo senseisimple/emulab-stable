@@ -1,5 +1,7 @@
 #!/bin/sh
 
-if [ `/etc/testbed/control_interface` = 'xl0' ]; then
+. /etc/emulab/paths.sh
+
+if [ `$BINDIR/control_interface` = 'xl0' ]; then
 	dhcp_interfaces="$dhcp_interfaces xl0";
 fi

@@ -4,21 +4,22 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
 #
 # Remember our server IP as the boss IP
 #
-rm -f /etc/testbed/bossip
+rm -f $BOOTDIR/bossip
 if [ x"$reason" = xREBOOT ]; then
-	echo $new_dhcp_server_identifier > /etc/testbed/bossip
-	echo $new_host_name > /etc/testbed/realname
+	echo $new_dhcp_server_identifier > $BOOTDIR/bossip
+	echo $new_host_name > $BOOTDIR/realname
 fi
 
 #
 # See if the Testbed configuration software wants to change the hostname.
 # Installed into /etc.
 # 
-/etc/testbed/sethostname $new_domain_name
+$BINDIR/sethostname $new_domain_name
 
 #
 # Once we have an IP address, we can stop dhclient so that it doesn't get

@@ -1,5 +1,8 @@
 DEVICE="eth0"
-if [ "`/etc/rc.d/testbed/control_interface`" = "$DEVICE" ]; then
+
+. /etc/emulab/paths.sh
+
+if [ "`control_interface`" = "$DEVICE" ]; then
 	BOOTPROTO="dhcp"
 fi
 ONBOOT="yes"

@@ -1,4 +1,10 @@
 #!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
 
 #
 # tbshutdown
@@ -8,6 +14,9 @@
 # or going single-user. When it gets killed, it sends a notification
 # to the testbed.
 #
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 # First, we background ourselves (daemonize)
 if ( background() ) {
@@ -30,7 +39,7 @@ exit(0);
 
 sub cleanup() {
     # This is our signal handler.
-    system("/etc/testbed/tmcc state SHUTDOWN");
+    system("tmcc state SHUTDOWN");
     exit(0);
 }
 

@@ -4,18 +4,19 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
 #
 # Boottime initialization. 
 #
 case "$1" in
 start)
-	if [ -x /etc/testbed/rc.testbed ]; then
-	    echo ""
-	    /etc/testbed/rc.testbed
-	fi
+	echo ""
+	$BINDIR/rc.testbed
 	;;
 stop)
+	echo "Informing the testbed we're rebooting"
+	$BINDIR/tmcc state SHUTDOWN
 	;;
 *)
 	echo "Usage: `basename $0` {start|stop}" >&2

@@ -4,8 +4,9 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
-NODETYPE=`/etc/testbed/nodetype`
+NODETYPE=`nodetype`
 
 if [ "$NODETYPE" = 'pc600' ]; then
     echo 'eth4'

@@ -4,9 +4,10 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
-if [ -x '/etc/rc.d/testbed/cpuspeed.awk' ]; then
-	cpuspeed=`/etc/rc.d/testbed/cpuspeed.awk /proc/cpuinfo`;
+if [ -x $BINDIR/cpuspeed.awk ]; then
+	cpuspeed=`$BINDIR/cpuspeed.awk /proc/cpuinfo`;
 else
 	cpuspeed='';
 fi
@@ -15,8 +16,8 @@ if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
 	echo "unknown";
 
 # XXX hack for minibed
-elif [ $cpuspeed = "850" -a -x '/etc/rc.d/testbed/chipset.awk' ]; then
-	if [ "`/etc/rc.d/testbed/chipset.awk /proc/pci`" = "GX" ]; then
+elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk ]; then
+	if [ "`$BINDIR/chipset.awk /proc/pci`" = "GX" ]; then
 		echo pcL440GX;
 	else
 		echo pc$cpuspeed;

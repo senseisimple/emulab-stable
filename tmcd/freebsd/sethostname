@@ -4,7 +4,6 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
 #
@@ -17,11 +16,8 @@ use English;
 # Otherwise, we have no safe way to determine the domain.
 # 
 
-#
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Turn off line buffering on output
@@ -32,7 +28,6 @@ $| = 1;
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/etc/testbed";
 use libsetup;
 
 #

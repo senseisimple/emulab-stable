@@ -4,26 +4,21 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
-#
-# Be nice to get this from libloc, but how do you get a package variable?
-#
-my $MAPFILE	= "/etc/testbed/delay_mapping";
-
-#
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/etc/testbed";
 use libsetup;
+
+#
+# Really comes from libloc.
+#
+my $MAPFILE = $libsetup::TMDELMAP;
 
 if (! -s $MAPFILE) {
     exit(0);

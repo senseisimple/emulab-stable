@@ -4,9 +4,11 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 require 'ctime.pl';
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Prepare the node for cutting a new image. Should be run just prior, on
@@ -14,6 +16,7 @@ require 'ctime.pl';
 #
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
+my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
@@ -27,12 +30,6 @@ my $MOUNTINFO	= "/var/db/mounttab";
 my $LOCATEDB	= "/var/db/locate.database";
 
 #
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
-
-#
 # Turn off line buffering on output
 #
 $| = 1;
@@ -41,7 +38,6 @@ $| = 1;
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/etc/testbed";
 use libsetup;
 
 #
@@ -169,3 +165,12 @@ if (-f $SFSUSERS) {
 if (-f $SFSHOSTKEY) {
     system("rm -f $SFSHOSTKEY");
 }
+
+
+print "Clearing out directories in $VARDIR ...\n";
+foreach my $dir (@VARDIRS) {
+    if (-d "$VARDIR/$dir") {
+	system("rm -rf $VARDIR/$dir/*");
+    }
+}
+

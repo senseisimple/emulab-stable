@@ -1,7 +1,12 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
 
-PREFIX=/etc/testbed
-NODETYPE=`${PREFIX}/nodetype`
+NODETYPE=`${BINDIR}/nodetype`
 MODPROBE=/sbin/modprobe
 
 case "$1" in
@@ -27,8 +32,8 @@ case "$1" in
 			;;
 		esac
 			
-		[ -x ${PREFIX}/healthd ] \
-                && ${PREFIX}/healthd -f ${PREFIX}/healthd.conf -S -p boss 180 \
+		[ -x ${BINDIR}/healthd ] \
+                && ${BINDIR}/healthd -f ${BINDIR}/healthd.conf -S -p boss 180 \
                 && echo -n ' healthd'
 		;;
 	stop)

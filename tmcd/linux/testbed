@@ -4,6 +4,7 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
 #
 # testbed       Do some testbed stuff,
@@ -30,12 +31,9 @@ RETVAL=0
 # See how we were called.
 case "$1" in
   start)
-	if [ -r /etc/rc.d/testbed/rc.delta ]; then
-		echo "Doing Testbed Delta Thing ..."
-		/etc/rc.d/testbed/rc.delta
-		RETVAL=$?
-	fi
-	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/testbed
+	# This stuff done from rc.local cause I cannot figure
+	# out a way to log to the console instead of messages.
+	# Note, /var/lock/subsys/testbed will be created at that time.
 	;;
   stop)
   	rm /var/lock/subsys/testbed
@@ -45,7 +43,7 @@ case "$1" in
 	killproc slothd
 	killproc healthd
 	echo "Informing the testbed we're rebooting ..."
-	/etc/rc.d/testbed/tmcc state REBOOTING
+	$BINDIR/tmcc state SHUTDOWN
 	RETVAL=$?
 	;;
   status)
