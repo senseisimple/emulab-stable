@@ -1,0 +1,42 @@
+#
+# dhcpd.conf.template - From the emulab software distribution
+#
+# This file is used with dhcpd_makeconf to generate an actual dhpd.conf file
+# from the database.
+#
+# Make sure to change all subnets (don't forget the mask!), the DHCP and DNS
+# servers' IP addresses, the router's IP, and see the comment about nodetypes
+# below.
+#
+server-identifier               155.101.128.70;
+server-name                     "155.101.128.70";
+next-server			155.101.128.70;
+
+option  domain-name-servers     155.101.128.70;
+option  domain-name             "emulab.net";
+
+option  root-path		"/tftpboot";
+
+default-lease-time              36000;                  # 10 hours
+max-lease-time                  36000;                  # 10 hours
+
+subnet 155.101.132.0 netmask 255.255.252.0 {
+	option subnet-mask		255.255.252.0;
+
+	option  routers                 155.101.132.1;
+
+	option dhcp-class-identifier "PXEClient";
+
+	# testbed PCs
+	group {
+		option dhcp-class-identifier "PXEClient";
+
+		#
+		# For every PC nodetype, include a line like the the one below.
+		# These lines will be replaced with auto-generated entries for
+		# nodes of that type.	
+		#
+		%%nodetype=pc600
+
+	}
+}

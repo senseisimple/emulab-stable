@@ -142,6 +142,9 @@ can be world-readable
 DHCP - Need to install the dhcpd config file. The old (deprecated) location was
 /usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
 install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf .
+After you've filled the nodes and interfaces tables, (described in the database
+setup documentation) use the dhcpd_makeconf script, along with the template in
+the dhcpd directory of the CVS repository, to generate the dhcpd.conf file.
 
 RC scripts - The mysql-client rc script needs to run before ANY testbed
 services are started! The mysql server should also be started early in the

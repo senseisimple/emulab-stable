@@ -9,7 +9,6 @@ use Getopt::Std;
 #
 # subnet 155.101.132.0 netmask 255.255.252.0 {
 #	option  routers                 155.101.132.1;
-#	option  domain-name-servers     155.101.128.70;
 #	option subnet-mask		255.255.252.0;
 #
 #	option dhcp-class-identifier "PXEClient";
@@ -24,6 +23,10 @@ use Getopt::Std;
 #
 #	}
 # }
+#
+# There is an example template file in the CVS repository, in the dhcpd/
+# directory.
+#
 
 
 #
