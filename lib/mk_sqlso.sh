@@ -2,7 +2,7 @@
 ###
 # Compiles and installs sql.so
 ###
-webcopy http://www.binevolve.com/~tdarugar/tcl-sql/download/tcl-sql-20000114.tgz  
+#webcopy http://www.binevolve.com/~tdarugar/tcl-sql/download/tcl-sql-20000114.tgz  
 tar xvfz tcl-sql-20000114.tgz
 cd tcl-sql
 pwd
