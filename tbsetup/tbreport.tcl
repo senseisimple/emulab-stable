@@ -13,7 +13,7 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 
 set updir [file dirname $scriptdir]
 
-source $updir/ir/libir.tcl
+source $scriptdir/ir/libir.tcl
 load $updir/lib/sql.so
 set DB [sql connect]
 sql selectdb $DB tbdb
