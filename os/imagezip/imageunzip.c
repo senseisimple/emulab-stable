@@ -445,6 +445,7 @@ inflate_subblock(char *chunkbufp)
 	assert(size == 0);
 	assert(blockhdr->size == 0);
 
+#ifndef FRISBEE
 	if (debug == 1) {
 		fprintf(stderr, "%14qd\n", total);
 	}
@@ -456,6 +457,7 @@ inflate_subblock(char *chunkbufp)
 			printf("%14qd\n", total);
 		}
 	}
+#endif
 
 	return 0;
 }
