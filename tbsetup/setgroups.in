@@ -361,7 +361,7 @@ else {
     print "Updating email lists for: ".join(" ",@userlist)."\n";
 
     foreach $u (@userlist) {
-	system("$GENELISTS -n $u");
+	system("$GENELISTS -u $u");
     }
 }
 
