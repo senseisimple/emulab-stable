@@ -1,0 +1,289 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Reboot a node. Will power cycle the node as a last resort.
+#
+# usage: node_reboot [-d] node [node ...]
+#        Exit value is 0 if all nodes reboot okay, or the number of nodes
+#        could not be rebooted.
+#
+sub usage()
+{
+    print STDOUT "Usage: node_reboot [-d] node [node ...]\n" .
+	"Use the -d option to turn on debugging\n";
+    exit(-1);
+}
+my  $optlist = "d";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
+my $ssh		= "ssh -n -q";
+my $power	= "$TB/bin/power";
+my $ipod	= "$TB/sbin/ipod";
+my $ping	= "/sbin/ping";
+my %pids	= ();
+my @row;
+my @nodes       = ();
+my $debug       = 0;
+my $failed      = 0;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("Must be root! Maybe its a development version?");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV == 0) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+
+# Untaint the nodes.
+foreach my $node ( @ARGV ) {
+    if ($node =~ /^([-\@\w]+)$/) {
+	$node = $1;
+    }
+    else {
+	die("Bad node name: $node.");
+    }
+    
+    push(@nodes, $node);
+}
+
+#
+# Figure out who called us. Root and admin types can do whatever they
+# want. Normal users can reboot nodes in their experiment.
+#
+if ($UID != 0) {
+    my $query_result;
+    
+    my ($name) = getpwuid($UID) or
+	die("$UID not in passwd file");
+
+    $query_result = DBquery("select admin from users where uid='$name'");
+    if (! $query_result) {
+	die("DB Error getting user status");
+    }
+    @row = $query_result->fetchrow_array();
+    if ($row[0] != 1) {
+	#
+	# Check to make sure that mere user is allowed to muck with nodes
+	#
+	foreach my $node (@nodes) {
+	    $query_result = DBquery("select reserved.node_id from reserved ".
+				    "left join proj_memb on ".
+				    "reserved.pid=proj_memb.pid and ".
+				    "reserved.node_id='$node' ".
+				    "where proj_memb.uid='$name'");
+	    if ($query_result->numrows < 1) {
+		die("You do not have permission to reboot $node\n");
+	    }
+	}
+    }
+}
+
+#
+# Fire off a reboot process so that we can overlap them all.
+# We need the pid so we can wait for them all before preceeding.
+#
+foreach my $node ( @nodes ) {
+    $mypid = RebootNode($node);
+    $pids{$node} = $mypid;
+}
+
+#
+# Wait for all the reboot children to exit before continuing.
+#
+foreach my $node ( @nodes ) {
+    my $mypid     = $pids{$node};
+
+    waitpid($mypid, 0);
+    if ($?) {
+	$failed++;
+	print STDERR "Reboot of node $node failed!\n";
+    }
+    else {
+	print STDOUT "$node rebooting ...\n";
+    }
+}
+
+if ($debug && $failed) {
+    print STDERR "$failed nodes could not be rebooted\n";
+}
+exit $failed;
+
+#
+# Reboot a node in a child process. Return the pid to the parent so
+# that it can wait on all the children later.
+# 
+sub RebootNode {
+    local($pc) = @_;
+    local($status, $syspid, $mypid);
+
+    print STDOUT "Rebooting $pc ...\n";
+
+    $mypid = fork();
+    if ($mypid) {
+	return $mypid;
+    }
+
+    #
+    # See if the machine is pingable. If its not pingable, then we just
+    # power cycle the machine rather than wait for ssh to time out.
+    #
+    # ping returns 0 if any packets make it through. 
+    #
+    system("$ping -q -c 4 -t 4 $pc >/dev/null 2>&1");
+    $status = $? >> 8;
+    print STDERR "Ping $pc returned $status.\n" if $debug;
+
+    #
+    # Power cycle if the machine is dead.
+    #
+    if ($status) {
+	print STDERR "$pc appears to be dead. Power cycling ...\n" if $debug;
+	if (PowerCycle($pc)) {
+	    exit(-1);
+	}
+	exit(0);
+    }
+
+    #
+    # Machine is pingable at least. Try to reboot it gracefully,
+    # or power cycle anyway if that does not work. 
+    #
+    print STDERR "Rebooting $pc with ssh command ...\n" if $debug;
+
+    #
+    # Run an ssh command in a child process, protected by an alarm to
+    # ensure that the ssh is not hung up forever if the machine is in
+    # some funky state.
+    # 
+    $syspid = fork();
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 30;
+	waitpid($syspid, 0);
+	alarm 0;
+
+	#
+	# The ssh can return non-zero exit status, but still have worked.
+	# FreeBSD for example.
+	#
+	print STDERR "reboot returned $?.\n" if $debug;
+    
+	#
+	# Did the ssh time out? Send it a ping of death.
+	# 
+	if ($? == 15) {
+	    print STDERR "$pc is wedged. Sending a POD.\n" if $debug;
+	    system("$ipod $pc");
+	}
+    }
+    else {
+	# Must change our real UID to root so that ssh will work.
+	$UID = 0;
+	exec("$ssh $pc /sbin/reboot");
+	exit(0);
+    }
+
+    #
+    # Okay, before we power cycle lets really make sure. We wait a while
+    # for it to stop responding to pings, and if it never goes silent,
+    # punch the power button.
+    #
+    if (WaitTillDead($pc) == 0) {
+	exit(0);
+    }
+	
+    print STDERR "$pc is still running. Power cycling ...\n" if $debug;
+    if (PowerCycle($pc)) {
+	exit(-1);
+    }
+    exit(0);
+}
+
+#
+# Power cycle a PC using the testbed power program.
+#
+sub PowerCycle {
+    local($pc) = @_;
+
+    system("$power cycle $pc");
+    return $? >> 8;
+}
+
+#
+# Wait until a machine stops returning ping packets.
+# 
+sub WaitTillDead {
+    local($pc) = @_;
+    local($status);
+
+    print STDERR "Waiting for $pc to die off\n" if $debug;
+    
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 15; $i++) {
+	system("$ping -q -c 4 -t 4 $pc >/dev/null 2>&1");
+	$status = $? >> 8;
+
+	#
+	# Returns 0 if any packets are returned. Returns 2 if pingable
+	# but no packets are returned. Other non-zero error codes indicate
+	# other problems. Assume that these other problems do not matter.
+	# 
+	if ($status) {
+	    return 0;
+	}
+    }
+    print STDERR "$pc is still alive.\n" if $debug;
+    return 1;
+}
+
+sub DBquery($)
+{
+    my($query) = $_[0];
+    my($result);
+
+    $result = $DB->query($query);
+
+    if (! $result) {
+	print "DB Query failed: $query\n";
+    }
+
+    return $result;
+}

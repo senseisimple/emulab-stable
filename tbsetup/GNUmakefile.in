@@ -11,9 +11,11 @@ include $(OBJDIR)/Makeconf
 SUBDIRS		= checkpass ir ns2ir
 
 BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
-		  os_load savevlans startexp endexp batchexp killbatchexp
+		  os_load savevlans startexp endexp batchexp killbatchexp \
+		  node_reboot
 
-CONTROL_BIN     = power snmpit os_load
+# Stuff that mere users get on plastic.
+USERS_BIN       = snmpit os_load node_reboot
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon
@@ -69,20 +71,16 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/mkacct-ctrl
 	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl
 	chmod u+s $(INSTALL_LIBEXECDIR)/rmacct-ctrl
-	chown root $(INSTALL_LIBEXECDIR)/os_setup
-	chmod u+s $(INSTALL_LIBEXECDIR)/os_setup
 	chown root $(INSTALL_SBINDIR)/named_setup
 	chmod u+s $(INSTALL_SBINDIR)/named_setup
 	chown root $(INSTALL_SBINDIR)/exports_setup
 	chmod u+s $(INSTALL_SBINDIR)/exports_setup
-	chown root $(INSTALL_BINDIR)/os_load
-	chmod u+s $(INSTALL_BINDIR)/os_load
 	chown root $(INSTALL_BINDIR)/savevlans
 	chmod u+s $(INSTALL_BINDIR)/savevlans
 	chown root $(INSTALL_LIBEXECDIR)/console_setup
 	chmod u+s $(INSTALL_LIBEXECDIR)/console_setup
-	chown root $(INSTALL_SBINDIR)/batch_daemon
-	chmod u+s $(INSTALL_SBINDIR)/batch_daemon
+	chown root $(INSTALL_BINDIR)/node_reboot
+	chmod u+s $(INSTALL_BINDIR)/node_reboot
 
 #
 # Control node installation (okay, plastic)

@@ -25,19 +25,18 @@ require 'ctime.pl';
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 
-my $ssh		= "ssh -n -q";
-my $power	= "$TB/bin/power";
+my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
 my $mail        = "/usr/bin/mail";
 my $tbops       = "testbed-ops\@flux.cs.utah.edu";
 my $dbg		= 0;
+my @nodes       = ();
 my %imagepaths  = ();
 my %imageparts  = ();
 my %nodeos      = ();
 my %nodepath    = ();
 my %nodepart    = ();
 my %waitfor     = ();
-my %pids	= ();
 my $SAVEUID	= $UID;
 my @row;
 
@@ -159,8 +158,17 @@ while (<IN>) {
 	last;
     }
     my ($node,$os) = split();
+
+    # untaint since $node is passed off to another program.
+    if ($node =~ /^([-\@\w]+)$/) {
+	$node = $1;
+    }
+    else {
+	die("Bad node name: $node.");
+    }
     print STDERR "$node $os\n" if $dbg;
     $nodeos{$node} = $os;
+    push(@nodes, $node);
 
     $db_result = $DB->query("select pid,eid from reserved ".
 			    "where node_id='$node'");
@@ -245,7 +253,7 @@ while (<IN>) {
 }
 
 #
-# Lifted right out of delay_setup.
+# Make the DB changes.
 # 
 foreach my $node ( keys %nodeos ) {
     my $pc	= $node;
@@ -284,27 +292,15 @@ foreach my $node ( keys %nodeos ) {
 			  "next_boot_cmd_line='$RELOADCMD' ".
 			  "where node_id='$pc'");
     }
-
-    #
-    # Fire off a reboot process so that we can overlap them all.
-    # We need the pid so we can wait for them all before preceeding.
-    #
-    $mypid = RebootNode($pc);
-    $pids{$pc} = $mypid;
 }
 
 #
-# Wait for all the reboot children to exit before continuing.
+# Fire off a mass reboot. The reboot script does this in parallel, so
+# no need to create any new children here. We just wait until it exits,
+# which means all the nodes are actually rebooting.
 #
-foreach my $node ( keys %nodeos ) {
-    my $pc	= $node;
-    my $mypid     = $pids{$pc};
-
-    waitpid($mypid, 0);
-    if ($?) {
-	die("Reboot of node $pc failed!");
-    }
-    print STDOUT "$pc rebooting ...\n"
+if (system("$nodereboot @nodes")) {
+    die("Failed to reboot some nodes!");
 }
 
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
@@ -363,17 +359,6 @@ foreach my $node ( keys %nodeos ) {
 print STDOUT "OS Setup Done!\n";
 exit 0;
 
-#
-# Power cycle a PC using the testbed power program.
-#
-sub PowerCycle {
-    local($pc) = @_;
-
-    if (system("$power cycle $pc") != 0) {
-	print STDERR "WARNING: Could not power cycle $pc. Skipping ...\n";
-    }
-}
-
 sub WaitTillAlive {
     my ($pc) = @_;
 
@@ -410,129 +395,6 @@ sub WaitTillAlive {
     }
     close(PING);
     print STDERR "$pc is not responding. Better check into it.\n" if $dbg;
-    return 1;
-}
-
-#
-# Reboot a node in a child process. Return the pid to the parent so
-# that it can wait on all the children later.
-# 
-sub RebootNode {
-    local($pc) = @_;
-
-    print STDOUT "Rebooting $pc ...\n";
-
-    $mypid = fork();
-    if ($mypid) {
-	return $mypid;
-    }
-
-    #
-    # See if the machine is pingable. If its not pingable, then
-    # we just power cycle the machine rather than wait for a bunch
-    # of ssh/rsh commands to time out.
-    #
-    print STDERR "Pinging $pc ... \n" if $dbg;
-    if (-e $ping) {
-	open(PING, "$ping -c 4 -t 4 $pc 2>&1 |");
-    }
-    else {
-	die("PING command $ping not found!\n");
-    }
-    do {
-    }
-    until ( <PING> =~ /transmitted, (\d*) packets received/ );
-    close(PING);
-    print STDERR "Got back $1 ping packets from $pc.\n" if $dbg;
-
-    #
-    # Power cycle if the machine is dead. It will come back up with the
-    # proper OS, cause we modified the database above.
-    #
-    if ( $1 == 0 ) {
-	print STDERR "$pc appears to be dead. Power cycling ...\n" if $dbg;
-	PowerCycle($pc);
-	exit(0);
-    }
-
-    #
-    # Machine is pingable at least. Try to reboot it gracefully,
-    # or power cycle anyway if that does not work. To this, we must
-    # change our real UID to root so that ssh will work.
-    #
-    print STDERR "Rebooting $pc with ssh command ...\n" if $dbg;
-
-    #
-    # Run an ssh command in a child process, protected by an alarm to
-    # ensure that the ssh is not hung up forever if the machine is in
-    # some funky state.
-    # 
-    $syspid = fork();
-    if ($syspid) {
-	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 60;
-	waitpid($syspid, 0);
-	alarm 0;
-
-	#
-	# If ssh times out, just punch the button.
-	# 
-	if ($? == 15) {
-	    print STDERR "$pc appears to be wedged. Power cycling ...\n"
-		if $dbg;
-	    PowerCycle($pc);
-	    exit(0);
-	}
-    }
-    else {
-	$UID = 0;
-	exec("$ssh $pc /sbin/reboot");
-	exit(0);
-    }
-    
-    #
-    # Okay, before we power cycle lets really make sure. On FreeBSD, it might
-    # have rebooted, but since the connection is terminated, system returns
-    # an error status. So, lets ping it again and if its pingable, the
-    # reboot must have failed. If it is not pingable, I assume that the
-    # reboot really worked, and the exit value can be ignored.
-    #
-    my $exit_value = $? >> 8;
-    print STDERR "reboot returned $exit_value. Lets make sure it dies\n"
-	if $dbg;
-
-    if (WaitTillDead($pc) == 0) {
-	exit(0);
-    }
-	
-    print STDERR "$pc appears to still be running. Power cycling ...\n"
-	if $dbg;
-    PowerCycle($pc);
-    exit(0);
-}
-
-sub WaitTillDead {
-    local($pc) = @_;
-
-    print STDERR "Waiting for $pc to die off\n" if $dbg;
-    #
-    # Sigh, a long ping results in the script waiting until all the
-    # packets are sent from all the pings, before it will exit. So,
-    # loop doing a bunch of shorter pings.
-    #
-    for ($i = 0; $i < 15; $i++) {
-	open(PING, "$ping -c 4 -t 4 $pc 2>&1 |");
-	do {
-	}
-	until ( <PING> =~ /transmitted, (\d*) packets received/ );
-
-	if ( $1 == 0 ) {
-	    print STDERR "Good, $pc must have rebooted.\n" if $dbg;
-	    return 0;
-	}
-    }
-    close(PING);
-    print STDERR "$pc is still alive.\n" if $dbg;
     return 1;
 }
 
