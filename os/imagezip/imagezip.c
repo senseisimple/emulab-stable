@@ -27,7 +27,7 @@ main(int argc, char **argv)
 	d_stream.opaque = (voidpf)0;
 
 	err = deflateInit(&d_stream, Z_DEFAULT_COMPRESSION);
-	CHECK_ERR(err, "inflateInit");
+	CHECK_ERR(err, "deflateInit");
 
 	if (argc != 3) {
 		fprintf(stderr, "usage: "
