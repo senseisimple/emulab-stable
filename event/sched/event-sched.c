@@ -54,7 +54,14 @@ static int		numagents;
 void
 usage()
 {
-	fprintf(stderr,	"Usage: %s [-s server] [-p port] <pid> <eid>\n",
+	fprintf(stderr,
+		"Usage: %s <options> -k keyfile <pid> <eid>\n"
+		"options:\n"
+		"-d         - Turn on debugging\n"
+		"-s server  - Specify location of elvind server\n"
+		"-p port    - Specify port number of elvind server\n"
+		"-l logfile - Specify logfile to direct output\n"
+		"-k keyfile - Specify keyfile name\n",
 		progname);
 	exit(-1);
 }
@@ -67,6 +74,7 @@ main(int argc, char **argv)
 	char *server = NULL;
 	char *port = NULL;
 	char *log = NULL;
+	char *keyfile = NULL;
 	char pideid[BUFSIZ], buf[BUFSIZ];
 	int c, count;
 
@@ -75,7 +83,7 @@ main(int argc, char **argv)
 	/* Initialize event queue semaphores: */
 	sched_event_init();
 
-	while ((c = getopt(argc, argv, "s:p:dl:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:dl:k:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
@@ -89,6 +97,9 @@ main(int argc, char **argv)
 		case 'l':
 			log = optarg;
 			break;
+		case 'k':
+			keyfile = optarg;
+			break;
 		default:
 			fprintf(stderr, "Usage: %s [-s SERVER]\n", argv[0]);
 			return 1;
@@ -97,8 +108,9 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 2)
+	if (argc != 2 || !keyfile)
 		usage();
+
 	pid = argv[0];
 	eid = argv[1];
 	sprintf(pideid, "%s/%s", pid, eid);
@@ -141,7 +153,7 @@ main(int argc, char **argv)
 	}
 
 	/* Register with the event system: */
-	handle = event_register(server, 1);
+	handle = event_register_withkeyfile(server, 1, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}
@@ -212,10 +224,9 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 
     /* Clone the event notification, since we want the notification to
        live beyond the callback function: */
-    event.notification = elvin_notification_clone(notification,
-                                                  handle->status);
+    event.notification = event_notification_clone(handle, notification);
     if (!event.notification) {
-	    error("elvin_notification_clone failed!\n");
+	    error("event_notification_clone failed!\n");
 	    return;
     }
 
@@ -263,6 +274,7 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
     event_notification_clear_objtype(handle, event.notification);
     event_notification_set_objtype(handle,
 				   event.notification, agents[x].objtype);
+    event_notification_insert_hmac(handle, event.notification);
 
     event.simevent = !strcmp(agents[x].objtype, TBDB_OBJECTTYPE_SIMULATOR);
 
@@ -347,7 +359,7 @@ get_static_events(event_handle_t handle)
 
 	/*
 	 * Build up a table of agents that can receive dynamic events.
-	 * These are stored in the virt_trafgens table, which we join
+	 * These are stored in the virt_agents table, which we join
 	 * with the reserved table to get the physical node name where
 	 * the agent is running.
 	 *
@@ -508,6 +520,7 @@ get_static_events(event_handle_t handle)
 		event_notification_set_arguments(handle,
 						 event.notification, EXARGS);
 
+		event_notification_insert_hmac(handle, event.notification);
 		time.tv_sec  = now.tv_sec  + (int)firetime;
 		time.tv_usec = now.tv_usec +
 			(int)((firetime - (floor(firetime))) * 1000000);
@@ -539,6 +552,7 @@ get_static_events(event_handle_t handle)
 		error("could not allocate notification");
 		return 0;
 	}
+	event_notification_insert_hmac(handle, notification);
 	event.simevent     = 0;
 	event.notification = notification;
 	event.time.tv_sec  = now.tv_sec;

@@ -44,7 +44,7 @@ CFLAGS   += `elvin-config --cflags vin4c`
 CFLAGS	 += -DUSEEVENTS
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb
+LIBS     += -levent -ltb -lcrypto
 LIBS     += `elvin-config --libs vin4c`
 
 SYSTEM	       := $(shell uname -s)

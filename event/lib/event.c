@@ -19,6 +19,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/param.h>
+#include <time.h>
 #include "event.h"
 #include "log.h"
 
@@ -28,6 +30,9 @@
 #else
 #define TRACE(fmt,...)
 #endif
+
+static int event_notification_check_hmac(event_handle_t handle,
+					  event_notification_t notification);
 
 static char hostname[MAXHOSTNAMELEN];
 static char ipaddr[32];
@@ -63,9 +68,44 @@ static int handles_in_use = 0;
  * is NULL, then Elvin's server discovery protocol will be used to find
  * the Elvin server.
  */
-
 event_handle_t
 event_register(char *name, int threaded)
+{
+	return event_register_withkeydata(name, threaded, NULL, 0);
+}
+
+event_handle_t
+event_register_withkeyfile(char *name, int threaded, char *keyfile)
+{
+    /* Grab the key data and stick it into the handle. */
+    if (keyfile) {
+	FILE		*fp;
+	unsigned char   buf[2*BUFSIZ];
+	int		cc;
+
+	if ((fp = fopen(keyfile, "r")) == NULL) {
+		ERROR("could not open keyfile: %s", keyfile);
+		return 0;
+	}
+	if ((cc = fread(buf, sizeof(char), sizeof(buf), fp)) == 0) {
+		ERROR("could not read keyfile: %s", keyfile);
+		fclose(fp);
+		return 0;
+	}
+	if (cc == sizeof(buf)) {
+		ERROR("keyfile is too big: %s", keyfile);
+		fclose(fp);
+		return 0;
+	}
+	fclose(fp);
+	return event_register_withkeydata(name, threaded, buf, cc);
+    }
+    return event_register_withkeydata(name, threaded, NULL, 0);
+}
+
+event_handle_t
+event_register_withkeydata(char *name, int threaded,
+			   unsigned char *keydata, int keylen)
 {
     event_handle_t	handle;
     elvin_handle_t	server;
@@ -92,6 +132,15 @@ event_register(char *name, int threaded)
 
     /* Allocate a handle to be returned to the caller: */
     handle = xmalloc(sizeof(*handle));
+    bzero(handle, sizeof(*handle));
+
+    /* Grab the key data and stick it into the handle. */
+    if (keydata) {
+	handle->keydata = xmalloc(keylen + 1);
+	handle->keylen  = keylen;
+	memcpy(handle->keydata, keydata, keylen);
+	handle->keydata[keylen] = (unsigned char)0;
+    }
 
     /* Set up the Elvin interface pointers: */
     if (threaded) {
@@ -105,8 +154,7 @@ event_register(char *name, int threaded)
         handle->subscribe = elvin_threaded_add_subscription;
 #else
 	ERROR("Threaded API not linked in with the program!\n");
-	free(handle);
-	return 0;
+	goto bad;
 #endif
     } else {
         handle->init = elvin_sync_init_default;
@@ -123,15 +171,13 @@ event_register(char *name, int threaded)
     status = handle->init();
     if (status == NULL) {
         ERROR("could not initialize Elvin\n");
-        free(handle);
-        return 0;
+	goto bad;
     }
     server = elvin_handle_alloc(status);
     if (server == NULL) {
         ERROR("elvin_handle_alloc failed: ");
         elvin_error_fprintf(stderr, status);
-        free(handle);
-        return 0;
+	goto bad;
     }
 
     /* Set the discovery scope to "testbed", so that we only interact
@@ -139,8 +185,7 @@ event_register(char *name, int threaded)
     if (elvin_handle_set_discovery_scope(server, "testbed", status) == 0) {
         ERROR("elvin_handle_set_discovery_scope failed: ");
         elvin_error_fprintf(stderr, status);
-        free(handle);
-        return 0;
+	goto bad;
     }
 
     /* Set the server URL, if we were passed one by the user. */
@@ -148,8 +193,7 @@ event_register(char *name, int threaded)
         if (elvin_handle_append_url(server, name, status) == 0) {
             ERROR("elvin_handle_append_url failed: ");
             elvin_error_fprintf(stderr, status);
-            free(handle);
-            return 0;
+	    goto bad;
         }
     }
 
@@ -157,8 +201,7 @@ event_register(char *name, int threaded)
     if (handle->connect(server, status) == 0) {
         ERROR("could not connect to Elvin server: ");
         elvin_error_fprintf(stderr, status);
-        free(handle);
-        return 0;
+	goto bad;
     }
 
     handle->server = server;
@@ -168,8 +211,13 @@ event_register(char *name, int threaded)
      * Keep track of how many handles we have outstanding
      */
     handles_in_use++;
-
     return handle;
+
+ bad:
+    if (handle->keydata)
+        free(handle->keydata);
+    free(handle);
+    return 0;
 }
 
 
@@ -219,6 +267,8 @@ event_unregister(event_handle_t handle)
 
     handles_in_use--;
 
+    if (handle->keydata)
+        free(handle->keydata);
     free(handle);
 
     return 1;
@@ -273,6 +323,7 @@ internal_event_poll(event_handle_t handle, int blocking, unsigned int timeout)
 	 */
 	if (timeout && elvin_timeout) {
 		elvin_error_t error;
+		elvin_error_clear(error);
 		elvin_sync_remove_timeout(elvin_timeout, error);
 	}
 
@@ -349,13 +400,17 @@ event_notify(event_handle_t handle, event_notification_t notification)
         ERROR("invalid parameter\n");
         return 0;
     }
+    if (handle->keydata && !notification->has_hmac &&
+	event_notification_insert_hmac(handle, notification)) {
+        return 0;
+    }
 
     TRACE("sending event notification %p\n", notification);
 
     /* Send notification to Elvin server for routing: */
-    if (handle->notify(handle->server, notification, 1, NULL, handle->status)
-        == 0)
-    {
+    if (handle->notify(handle->server, notification->elvin_notification,
+		       1, NULL, handle->status)
+        == 0) {
         ERROR("could not send event notification: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
@@ -438,21 +493,28 @@ event_schedule(event_handle_t handle, event_notification_t notification,
 event_notification_t
 event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 {
-    elvin_notification_t notification;
+    event_notification_t notification;
+    elvin_notification_t elvin_notification;
 
-    if (!handle || !tuple) {
+    if (!handle) {
         ERROR("invalid paramater\n");
         return NULL;
     }
 
     TRACE("allocating notification (tuple=%p)\n", tuple);
 
-    notification = elvin_notification_alloc(handle->status);
-    if (notification == NULL) {
+    notification = xmalloc(sizeof(event_notification_t));
+    elvin_notification = elvin_notification_alloc(handle->status);
+    if (elvin_notification == NULL) {
         ERROR("elvin_notification_alloc failed: ");
         elvin_error_fprintf(stderr, handle->status);
         return NULL;
     }
+    notification->elvin_notification = elvin_notification;
+    notification->has_hmac = 0;
+
+    if (tuple == NULL)
+	    return notification;
 
     TRACE("allocated notification %p\n", notification);
 #define EVPUT(name, field) \
@@ -474,7 +536,6 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 	ERROR("could not add attributes to notification %p\n", notification);
         return NULL;
     }
-
     /* Add our address */
     event_notification_set_sender(handle, notification, ipaddr);
 
@@ -491,18 +552,20 @@ int
 event_notification_free(event_handle_t handle,
                         event_notification_t notification)
 {
-    if (!handle || !notification) {
+    if (!handle || !notification || !notification->elvin_notification) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
     TRACE("freeing notification %p\n", notification);
 
-    if (elvin_notification_free(notification, handle->status) == 0) {
+    if (elvin_notification_free(notification->elvin_notification,
+				handle->status) == 0) {
         ERROR("elvin_notification_free failed: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
     }
+    free(notification);
 
     return 1;
 }
@@ -517,18 +580,23 @@ event_notification_clone(event_handle_t handle,
 {
     event_notification_t clone;
 
-    if (!handle || !notification) {
+    if (!handle || !notification || !notification->elvin_notification) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
     TRACE("cloning notification %p\n", notification);
 
-    if (! (clone = elvin_notification_clone(notification, handle->status)) ) {
+    clone = xmalloc(sizeof(event_notification_t));
+    if (! (clone->elvin_notification =
+	   elvin_notification_clone(notification->elvin_notification,
+				    handle->status))) {
         ERROR("elvin_notification_clone failed: ");
         elvin_error_fprintf(stderr, handle->status);
+	free(clone);
         return 0;
     }
+    clone->has_hmac = notification->has_hmac;
 
     return clone;
 
@@ -567,10 +635,9 @@ event_notification_get(event_handle_t handle,
 
     /* attr_traverse returns 0 to indicate that it has found the
        desired attribute. */
-    if (elvin_notification_traverse(notification, attr_traverse, &arg,
-                                    handle->status)
-        == 0)
-    {
+    if (elvin_notification_traverse(notification->elvin_notification,
+				    attr_traverse, &arg, handle->status)
+        == 0) {
         /* Found it. */
         return 1;
     }
@@ -753,8 +820,8 @@ event_notification_put_double(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=%f) to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_real64(notification, name, value,
-                                      handle->status)
+    if (elvin_notification_add_real64(notification->elvin_notification,
+				      name, value, handle->status)
         == 0)
     {
         ERROR("elvin_notification_add_real64 failed: ");
@@ -785,8 +852,8 @@ event_notification_put_int32(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=%d) to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_int32(notification, name, value,
-                                      handle->status)
+    if (elvin_notification_add_int32(notification->elvin_notification,
+				     name, value, handle->status)
         == 0)
     {
         ERROR("elvin_notification_add_int32 failed: ");
@@ -817,8 +884,8 @@ event_notification_put_int64(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=%lld) to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_int64(notification, name, value,
-                                     handle->status)
+    if (elvin_notification_add_int64(notification->elvin_notification,
+				     name, value, handle->status)
         == 0)
     {
         ERROR("elvin_notification_add_int64 failed: ");
@@ -850,8 +917,8 @@ event_notification_put_opaque(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=<opaque>) "
           "to notification %p\n", name, notification);
 
-    if (elvin_notification_add_opaque(notification, name, buffer, length,
-                                      handle->status)
+    if (elvin_notification_add_opaque(notification->elvin_notification,
+				      name, buffer, length, handle->status)
         == 0)
     {
         ERROR("elvin_notification_add_opaque failed: ");
@@ -882,8 +949,8 @@ event_notification_put_string(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=\"%s\") to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_string(notification, name, value,
-                                      handle->status)
+    if (elvin_notification_add_string(notification->elvin_notification,
+				      name, value, handle->status)
         == 0)
     {
         ERROR("elvin_notification_add_string failed: ");
@@ -913,7 +980,8 @@ event_notification_remove(event_handle_t handle,
     TRACE("removing attribute \"%s\" from notification %p\n",
           name, notification);
 
-    if (elvin_notification_remove(notification, name, handle->status) == 0) {
+    if (elvin_notification_remove(notification->elvin_notification,
+				  name, handle->status) == 0) {
         ERROR("elvin_notification_remove failed: ");
         elvin_error_fprintf(stderr, handle->status);
         return 0;
@@ -926,6 +994,7 @@ event_notification_remove(event_handle_t handle,
 struct notify_callback_arg {
     event_notify_callback_t callback;
     void *data;
+    event_handle_t handle;
 };
 
 static void notify_callback(elvin_handle_t server,
@@ -1076,6 +1145,7 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
     /* XXX: Free this in an event_unsubscribe.. */
     arg->callback = callback;
     arg->data = data;
+    arg->handle = handle;
 
     subscription = handle->subscribe(handle->server, expression, NULL, 1,
                                      notify_callback, arg, handle->status);
@@ -1118,27 +1188,43 @@ attr_traverse(void *rock, char *name, elvin_basetypes_t type,
  * Callback passed to handle->subscribe in event_subscribe. Used to
  * provide our own callback above Elvin's.
  */
-
 static void
 notify_callback(elvin_handle_t server,
                 elvin_subscription_t subscription,
-                elvin_notification_t notification, int is_secure,
+                elvin_notification_t elvin_notification, int is_secure,
                 void *rock, elvin_error_t status)
 {
-    struct event_handle handle;
     struct notify_callback_arg *arg = (struct notify_callback_arg *) rock;
+    struct event_notification notification;
+    event_handle_t handle;
     event_notify_callback_t callback;
     void *data;
 
     TRACE("received event notification\n");
-
     assert(arg);
+
+    notification.elvin_notification = elvin_notification;
+    notification.has_hmac = 0;
+    handle = arg->handle;
+
+    /* If MAC does not match, throw it away */
+    if (handle->keydata &&
+	event_notification_check_hmac(handle, &notification)) {
+        return;
+    }
+
+    if (0) {
+	    struct timeval now;
+	    
+	    gettimeofday(&now, NULL);
+
+	    info("note arrived at %ld:%d\n", now.tv_sec, now.tv_usec);
+    }
+	
     callback = arg->callback;
     data = arg->data;
-    handle.server = server;
-    handle.status = status;
 
-    callback(&handle, notification, data);
+    callback(handle, &notification, data);
 }
 
 /*
@@ -1160,3 +1246,177 @@ address_tuple_free(address_tuple_t tuple)
 	free(tuple);
 	return 1;
 }
+
+/*
+ * Insert an HMAC into the notifcation. 
+ */
+#include <openssl/hmac.h>
+
+/*
+ * The traversal function callback. Add to the hmac for each attribute.
+ */
+static int
+hmac_traverse(void *rock, char *name, elvin_basetypes_t type,
+              elvin_value_t value, elvin_error_t status)
+{
+	HMAC_CTX	*ctx = (HMAC_CTX *) rock;
+
+	/*
+	 * Do not include hmac in hmac computation!
+	 */
+	if (!strcmp(name, "__hmac__"))
+		return 1;
+
+	switch (type) {
+	case ELVIN_INT32:
+		HMAC_Update(ctx, (unsigned char *)&(value.i), sizeof(value.i));
+		break;
+		
+	case ELVIN_INT64:
+		HMAC_Update(ctx, (unsigned char *)&(value.h), sizeof(value.h));
+		break;
+		
+	case ELVIN_REAL64:
+		HMAC_Update(ctx, (unsigned char *)&(value.d), sizeof(value.d));
+		break;
+		
+	case ELVIN_STRING:
+		HMAC_Update(ctx, (unsigned char *)(value.s), strlen(value.s));
+		break;
+		
+	case ELVIN_OPAQUE:
+		HMAC_Update(ctx, (unsigned char *)(value.o.data),
+			    value.o.length);
+		break;
+
+	default:
+		ERROR("invalid parameter\n");
+		return 0;
+	}
+	return 1;
+}
+
+int
+event_notification_insert_hmac(event_handle_t handle,
+			       event_notification_t notification)
+{
+	HMAC_CTX	ctx;
+	unsigned char	mac[EVP_MAX_MD_SIZE];
+	int		i, len = EVP_MAX_MD_SIZE;
+
+	if (0)
+	    info("event_notification_insert_hmac: %d %s\n",
+		 handle->keylen, handle->keydata);
+
+	if (notification->has_hmac) {
+		event_notification_remove(handle, notification, "__hmac__");
+		notification->has_hmac = 0;
+	}
+
+	memset(&ctx, 0, sizeof(ctx));
+#ifdef  linux
+	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
+#else	
+	HMAC_CTX_init(&ctx);
+	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
+#endif
+	if (!elvin_notification_traverse(notification->elvin_notification,
+				 hmac_traverse, &ctx, handle->status)) {
+		HMAC_cleanup(&ctx);
+		return 1;
+	}
+	HMAC_Final(&ctx, mac, &len);
+	HMAC_cleanup(&ctx);
+
+	if (0) {
+		info("event_notification_insert_hmac: %d\n", len);
+		for (i = 0; i < len; i += 4) {
+			info("%x", *((unsigned int *)(&mac[i])));
+		}
+		info("\n");
+	}
+
+	/*
+	 * Okay, now insert the MAC into the notification as an opaque field.
+	 */
+	if (!elvin_notification_add_opaque(notification->elvin_notification,
+				   "__hmac__", mac, len, handle->status)) {
+		ERROR("elvin_notification_add_opaque failed: ");
+		elvin_error_fprintf(stderr, handle->status);
+		return 1;
+	}
+	notification->has_hmac = 1;
+    	return 0;
+}
+
+/*
+ * Check HMAC. Return 0 if equal, 1 if they are not, -1 if fatal error.
+ */
+static int
+event_notification_check_hmac(event_handle_t handle,
+			      event_notification_t notification)
+{
+	HMAC_CTX	ctx;
+	unsigned char	srcmac[EVP_MAX_MD_SIZE], mac[EVP_MAX_MD_SIZE];
+	int		i, srclen, len = EVP_MAX_MD_SIZE;
+	elvin_value_t	value;
+	elvin_basetypes_t type;
+
+	if (0)
+	    info("event_notification_check_hmac: %d %s\n",
+		 handle->keylen, handle->keydata);
+		
+	/*
+	 * Pull out the MAC from the notification so we can compare it.
+	 */
+	if (!elvin_notification_get(notification->elvin_notification,
+			    "__hmac__", &type, &value, handle->status)) {
+		ERROR("MAC not present!\n");
+		notification->has_hmac = 0;
+		return -1;
+	}
+	srclen = value.o.length;
+	assert(srclen <= EVP_MAX_MD_SIZE);
+	memcpy(srcmac, (unsigned char *)value.o.data, value.o.length);
+
+	if (0) {
+		info("event_notification_check_hmac1: %d\n", srclen);
+		for (i = 0; i < srclen; i += 4) {
+			info("%x", *((unsigned int *)(&srcmac[i])));
+		}
+		info("\n");
+	}
+	
+	memset(&ctx, 0, sizeof(ctx));
+#ifdef  linux
+	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
+#else	
+	HMAC_CTX_init(&ctx);
+	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
+#endif
+	
+	/* Compute the MAC */
+	if (!elvin_notification_traverse(notification->elvin_notification,
+				 hmac_traverse, &ctx, handle->status)) {
+		HMAC_cleanup(&ctx);
+		return -1;
+	}
+	HMAC_Final(&ctx, mac, &len);
+	HMAC_cleanup(&ctx);
+
+	if (0) {
+		info("event_notification_check_hmac2: %d\n", len);
+		for (i = 0; i < len; i += 4) {
+			info("%x", *((unsigned int *)(&mac[i])));
+		}
+		info("\n");
+	}
+
+	if (srclen != len || memcmp(srcmac, mac, len)) {
+		ERROR("MAC mismatch!\n");
+		return 1;
+	}
+	notification->has_hmac = 1;
+    	return 0;
+}
+

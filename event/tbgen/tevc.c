@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -29,6 +29,7 @@
 #include "config.h"
 #include "tbdefs.h"
 #include "event.h"
+#include "log.h"
 
 static int debug;
 
@@ -37,7 +38,8 @@ usage(char *progname)
 {
     fprintf(stderr,
 	"Usage: %s [-s server] [-c] event\n"
-	"       %s [-s server] -e pid/eid time objname event [args ...]\n"
+	"       %s [-s server] [-k keyfile] -e pid/eid time objname "
+	"event [args ...]\n"
 	"       time: 'now' or '+seconds' or [[[[yy]mm]dd]HH]MMss\n"
 	"Examples:\n"
 	"       %s -e pid/eid now cbr0 set interval_=0.2\n"
@@ -58,13 +60,15 @@ main(int argc, char **argv)
 	char *port = NULL;
 	int control = 0;
 	char *myeid = NULL;
+	char *keyfile = NULL;
+	char keyfilebuf[BUFSIZ];
 	char buf[BUFSIZ], *bp;
 	char *evtime = NULL, *objname = NULL, *event;
 	int c;
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "ds:p:ce:")) != -1) {
+	while ((c = getopt(argc, argv, "ds:p:ce:k:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
@@ -80,6 +84,9 @@ main(int argc, char **argv)
 			break;
 		case 'e':
 			myeid = optarg;
+			break;
+		case 'k':
+			keyfile = optarg;
 			break;
 		default:
 			usage(progname);
@@ -138,9 +145,43 @@ main(int argc, char **argv)
 	if (tuple == NULL) {
 		fatal("could not allocate an address tuple");
 	}
+
+	if (!control) {
+		/*
+		 * A dynamic event. 
+		 */
+		if (! myeid)
+			fatal("Must provide pid/eid");
+
+		/*
+		 * If no keyfile specified, construct the name and
+		 * make sure it can be accessed. Only users with access
+		 * to the keyfile can send events to the pid/eid specified.
+		 */
+		if (! keyfile) {
+			char    temp[BUFSIZ], *bp;
+
+			strncpy(temp, myeid, sizeof(temp));
+			
+			if ((bp = strchr(temp, '/')) == NULL)
+				fatal("Malformed pid/eid: %s", myeid);
+			*bp++ = (char) NULL;
+
+			sprintf(keyfilebuf, "/proj/%s/exp/%s/tbdata/eventkey",
+				temp, bp);
+			keyfile = keyfilebuf;
+		}
+	}
+
+	/*
+	 * Make sure the keyfile exists and is readable.
+	 */
+	if (access(keyfile, R_OK) < 0) {
+		pfatal("Could not read %s", keyfile);
+	}
 	
 	/* Register with the event system: */
-	handle = event_register(server, 0);
+	handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}
@@ -162,12 +203,6 @@ main(int argc, char **argv)
 		tuple->eventtype= event;
 	}
 	else {
-		/*
-		 * A dynamic event. 
-		 */
-		if (! myeid)
-			fatal("Must provide pid/eid");
-
 		bp = event;
 		while (*bp) {
 			*bp = toupper(*bp);
@@ -200,7 +235,7 @@ main(int argc, char **argv)
 	 * XXX For now, uppercase the strings, and remove trailing _.
 	 */
 	if (argc) {
-		buf[0] = NULL;
+		buf[0] = (char) NULL;
 		while (argc) {
 			if (strlen(*argv) + strlen(buf) >= sizeof(buf)-2)
 				fatal("Too many event argument strings!");
@@ -213,8 +248,8 @@ main(int argc, char **argv)
 			if (*bp != '=')
 				fatal("Malformed argument: %s!", *argv);
 			if (*(bp-1) == '_')
-				*(bp-1) = NULL;
-			*bp++ = NULL;
+				*(bp-1) = (char) NULL;
+			*bp++ = (char) NULL;
 
 			sprintf(&buf[strlen(buf)], "%s=%s ", *argv, bp);
 			argc--;

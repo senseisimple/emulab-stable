@@ -24,11 +24,11 @@
 #include "tbdefs.h"
 #include "log.h"
 #include "event.h"
-#define MAXAGENTS	100
+#define MAXAGENTS	250
 
 static char		debug;
-static char		*agentnames[MAXAGENTS];
 static int		numagents;
+static char		*user;
 
 struct proginfo {
 	char		name[TBDB_FLEN_EVOBJNAME];
@@ -41,16 +41,17 @@ static struct proginfo *proginfos;
 
 static void	callback(event_handle_t handle,
 			 event_notification_t notification, void *data);
-static void	start_program(char *objname, char *args);
-static void	stop_program(char *objname, char *args);
-static void	signal_program(char *objname, char *args);
+static void	start_program(struct proginfo *pinfo, char *args);
+static void	stop_program(struct proginfo *pinfo, char *args);
+static void	signal_program(struct proginfo *pinfo, char *args);
+static int	parse_configfile(char *filename);
 
 void
 usage(char *progname)
 {
 	fprintf(stderr,
-		"Usage: %s [-s server] [-p port] [-l logfile] "
-		"[-u login] [-i pidfile] -e pid/eid -a agent [-a agent ...]\n",
+		"Usage: %s [-s server] [-p port] [-l logfile] [-k keyfile] "
+		"[-u login] [-i pidfile] -e pid/eid -c configfile\n",
 		progname);
 	exit(-1);
 }
@@ -65,16 +66,18 @@ main(int argc, char **argv)
 	char *server = NULL;
 	char *port = NULL;
 	char *logfile = NULL;
-	char *user = NULL;
 	char *pidfile = NULL;
 	char *pideid = NULL;
+	char *keyfile = NULL;
+	char *configfile = NULL;
 	char buf[BUFSIZ], agentlist[BUFSIZ];
+	struct proginfo *pinfo;
 	int c;
 
 	progname = argv[0];
 	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "s:p:l:du:i:e:a:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:l:du:i:e:c:k:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -84,6 +87,9 @@ main(int argc, char **argv)
 			break;
 		case 'l':
 			logfile = optarg;
+			break;
+		case 'c':
+			configfile = optarg;
 			break;
 		case 'd':
 			debug++;
@@ -97,14 +103,8 @@ main(int argc, char **argv)
 		case 'e':
 			pideid = optarg;
 			break;
-		case 'a':
-			if (numagents >= MAXAGENTS)
-				fatal("Too many agents listed");
-			agentnames[numagents] = optarg;
-			numagents++;
-			if (strlen(agentlist))
-				strcat(agentlist, ",");
-			strcat(agentlist, optarg);
+		case 'k':
+			keyfile = optarg;
 			break;
 		default:
 			usage(progname);
@@ -113,8 +113,10 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (!pideid || !numagents)
+	if (!pideid || !configfile)
 		usage(progname);
+	if (parse_configfile(configfile) != 0)
+		exit(1);
 	if (!getuid() && !user)
 		usage(progname);
 
@@ -129,6 +131,26 @@ main(int argc, char **argv)
 		else
 			loginit(1, "program-agent");
 	}
+
+	/*
+	 * Cons up the agentlist for subscription below.
+	 */
+	pinfo = proginfos;
+	while (pinfo) {
+		info("AGENT: %s, CMD: %s\n", pinfo->name, pinfo->cmdline);
+
+		if (numagents >= MAXAGENTS)
+			fatal("Too many agents listed");
+
+		numagents++;
+		if (strlen(agentlist))
+			strcat(agentlist, ",");
+		strcat(agentlist, pinfo->name);
+		
+		pinfo = pinfo->next;
+	}
+	info("agentlist: %s\n", agentlist);
+	info("user: %s\n", user);
 
 	/*
 	 * Write out a pidfile if root.
@@ -199,7 +221,7 @@ main(int argc, char **argv)
 	/*
 	 * Register with the event system. 
 	 */
-	handle = event_register(server, 0);
+	handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}
@@ -235,6 +257,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	char		objname[TBDB_FLEN_EVOBJTYPE];
 	char		event[TBDB_FLEN_EVEVENTTYPE];
 	char		args[BUFSIZ];
+	struct proginfo *pinfo;
 	struct timeval	now;
 	
 	gettimeofday(&now, NULL);
@@ -257,15 +280,26 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	info("Event: %lu:%d %s %s %s\n", now.tv_sec, now.tv_usec,
 	     objname, event, args);
 
+	pinfo = proginfos;
+	while (pinfo) {
+		if (! strcmp(pinfo->name, objname))
+			break;
+		pinfo = pinfo->next;
+	}
+	if (!pinfo) {
+		error("Invalid program agent: %s\n", objname);
+		return;
+	}
+
 	/*
 	 * Dispatch the event. 
 	 */
 	if (strcmp(event, TBDB_EVENTTYPE_START) == 0)
-		start_program(objname, args);
+		start_program(pinfo, args);
 	else if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0)
-		stop_program(objname, args);
+		stop_program(pinfo, args);
 	else if (strcmp(event, TBDB_EVENTTYPE_KILL) == 0)
-		signal_program(objname, args);
+		signal_program(pinfo, args);
 	else {
 		error("Invalid event: %s\n", event);
 		return;
@@ -284,36 +318,11 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
  * Start a program.
  */
 static void
-start_program(char *objname, char *args)
+start_program(struct proginfo *pinfo, char *args)
 {
-	struct proginfo	*pinfo;
 	char		buf[BUFSIZ];
 	int		pid, status;
 		
-	/*
-	 * Search for an existing proginfo. If we have one, and its
-	 * running, then ignore the start request. The user has to
-	 * be smarter than that. We do not release the proginfo when
-	 * it stops; why bother.
-	 */
-	pinfo = proginfos;
-	while (pinfo) {
-		if (! strcmp(pinfo->name, objname))
-			break;
-		pinfo = pinfo->next;
-	}
-	if (!pinfo) {
-		pinfo = (struct proginfo *) calloc(1, sizeof(*pinfo));
-
-		if (!pinfo) {
-			error("start_program: out of memory\n");
-			return;
-		}
-		strcpy(pinfo->name, objname);
-		gettimeofday(&pinfo->started, NULL);
-		pinfo->next = proginfos;
-		proginfos   = pinfo;
-	}
 	if (pinfo->pid) {
 		/*
 		 * We reap children here, rather than using SIGCHLD.
@@ -322,28 +331,17 @@ start_program(char *objname, char *args)
 		if ((pid = waitpid(pinfo->pid, &status, WNOHANG) <= 0)) {
 			if (pid < 0)
 				error("start_program: %s waitpid: %s\n",
-				      objname, strerror(errno));
+				      pinfo->name, strerror(errno));
 			
 			warning("start_program: %s is still running: %d\n",
-				objname, pinfo->pid);
+				pinfo->name, pinfo->pid);
 			return;
 		}
 		info("start_program: "
 		     "%s (pid:%d) has exited with status: 0x%x\n",
-		     objname, pinfo->pid, status);
+		     pinfo->name, pinfo->pid, status);
 		pinfo->pid = 0;
 	}
-
-	/*
-	 * The args string holds the command line to execute. We allow
-	 * this to be reset in dynamic events, which may seem a little
-	 * odd, but its easy to support, so why not.
-	 */
-	if (strncmp("COMMAND=", args, strlen("COMMAND="))) {
-		error("start_program: malformed arguments: %s\n", args);
-		return;
-	}
-	pinfo->cmdline = strdup(&args[strlen("COMMAND=")]);
 
 	/*
 	 * Fork a child to run the command in and return to get
@@ -354,7 +352,7 @@ start_program(char *objname, char *args)
 		return;
 	}
 	if (pid) {
-		info("start_program: %s (pid:%d) starting\n", objname, pid);
+		info("start_program: %s (pid:%d) starting\n", pinfo->name,pid);
 		pinfo->pid = pid;
 		return;
 	}
@@ -391,22 +389,10 @@ start_program(char *objname, char *args)
  * Stop a program.
  */
 static void
-stop_program(char *objname, char *args)
+stop_program(struct proginfo *pinfo, char *args)
 {
-	struct proginfo	*pinfo;
-		
-	/*
-	 * Search for an existing proginfo. If there is none, or if
-	 * the pid is zero (stopped), then ignore request.
-	 */
-	pinfo = proginfos;
-	while (pinfo) {
-		if (! strcmp(pinfo->name, objname))
-			break;
-		pinfo = pinfo->next;
-	}
-	if (!pinfo || !pinfo->pid) {
-		warning("stop_program: %s is not running!\n", objname);
+	if (!pinfo->pid) {
+		warning("stop_program: %s is not running!\n", pinfo->name);
 		return;
 	}
 	if (killpg(pinfo->pid, SIGTERM) < 0 &&
@@ -424,24 +410,13 @@ extern const char * const sys_siglist[];
 #endif
 
 static void
-signal_program(char *objname, char *args)
+signal_program(struct proginfo *pinfo, char *args)
 {
 	char		buf[BUFSIZ], *bp;
-	struct proginfo	*pinfo;
 	int		i;
 	
-	/*
-	 * Search for an existing proginfo. If there is none, or if
-	 * the pid is zero (stopped), then ignore request.
-	 */
-	pinfo = proginfos;
-	while (pinfo) {
-		if (! strcmp(pinfo->name, objname))
-			break;
-		pinfo = pinfo->next;
-	}
-	if (!pinfo || !pinfo->pid) {
-		warning("signal_program: %s is not running!\n", objname);
+	if (!pinfo->pid) {
+		warning("signal_program: %s is not running!\n", pinfo->name);
 		return;
 	}
 
@@ -470,4 +445,78 @@ signal_program(char *objname, char *args)
 		error("signal_program: kill(%d) failed: %s!\n", i,
 		      strerror(errno));
 	}
+}
+
+static int
+parse_configfile(char *filename)
+{
+	FILE	*fp;
+	char	buf[BUFSIZ], *bp, *cp;
+	struct proginfo *pinfo;
+	
+	if ((fp = fopen(filename, "r")) == NULL) {
+		errorc("could not open configfile %s", filename);
+		return -1;
+	}
+	
+	while (fgets(buf, sizeof(buf), fp)) {
+		int cc = strlen(buf);
+		if (buf[cc-1] == '\n')
+			buf[cc-1] = (char) NULL;
+
+		if (!strncmp(buf, "UID=", 4)) {
+			if (user) {
+				info("User already set; skipping config\n");
+				continue;
+			}
+			user = strdup(&buf[4]);
+			if (!user) {
+				error("parse_configfile: out of memory\n");
+				goto bad;
+			}
+			continue;
+		}
+		if (!strncmp(buf, "AGENT=", 6)) {
+			pinfo = (struct proginfo *) calloc(1, sizeof(*pinfo));
+
+			if (!pinfo) {
+				error("parse_configfile: out of memory\n");
+				goto bad;
+			}
+			bp = cp = buf + 6;
+			while (*cp && !isspace(*bp))
+				bp++;
+			*bp++ = (char) NULL;
+			strncpy(pinfo->name, cp, sizeof(pinfo->name));
+
+			if (strncmp(bp, "COMMAND='", 9)) {
+				error("parse_configfile: malformed: %s\n", bp);
+				goto bad;
+			}
+			bp += 9;
+			
+			cc = strlen(bp);
+			if (bp[cc-1] != '\'') {
+				error("parse_configfile: malformed: %s\n", bp);
+				goto bad;
+			}
+			bp[cc-1] = (char) NULL;
+			
+			pinfo->cmdline = strdup(bp);
+			if (!pinfo->cmdline) {
+				error("parse_configfile: out of memory\n");
+				goto bad;
+			}
+			pinfo->next = proginfos;
+			proginfos   = pinfo;
+			continue;
+		}
+		error("parse_configfile: malformed: %s\n", buf);
+		goto bad;
+	}
+	fclose(fp);
+	return 0;
+ bad:
+	fclose(fp);
+	return -1;
 }

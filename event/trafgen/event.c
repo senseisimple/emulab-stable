@@ -51,7 +51,7 @@ usage()
 	fprintf(stderr,
 		"Usage: %s [-s serverip] [-p serverport] [-l logfile] "
 		"[ -N name ] [ -S srcip.srcport ] [ -T targetip.targetport ] "
-		"[-P proto] [-R role] [ -E pid/eid ]\n",
+		"[-P proto] [-R role] [ -E pid/eid ] [-k keyfile]\n",
 		progname);
 	exit(-1);
 }
@@ -81,6 +81,7 @@ tgevent_init(int argc, char *argv[])
 	char *port = NULL;
 	char *ipaddr = NULL;
 	char *myname = NULL;
+	char *keyfile = NULL;
 	char buf[BUFSIZ], ipbuf[BUFSIZ];
 	struct sockaddr saddr, taddr;
 	int c, gotsaddr = 0;
@@ -89,7 +90,7 @@ tgevent_init(int argc, char *argv[])
 	memset(&saddr, 0, sizeof(saddr));
 	memset(&taddr, 0, sizeof(taddr));
 	
-	while ((c = getopt(argc, argv, "s:p:S:T:P:R:N:l:E:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:S:T:P:R:N:l:E:k:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
@@ -122,6 +123,9 @@ tgevent_init(int argc, char *argv[])
 			break;
 		case 'l':
 			logfile = optarg;
+			break;
+		case 'k':
+			keyfile = optarg;
 			break;
 
 		default:
@@ -214,7 +218,7 @@ tgevent_init(int argc, char *argv[])
 	/*
 	 * Register with the event system. 
 	 */
-	ehandle = event_register(server, 0);
+	ehandle = event_register_withkeyfile(server, 0, keyfile);
 	if (ehandle == NULL) {
 		fatal("could not register with event system");
 	}

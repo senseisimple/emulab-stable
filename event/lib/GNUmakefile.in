@@ -12,9 +12,9 @@ SUBDIR		= event/lib
 include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= libevent.a libevent_r.a
+PROGRAMS	= libevent.a
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += event.so
+PROGRAMS       += libevent_r.a event.so
 endif
 
 all:		$(PROGRAMS)
@@ -22,10 +22,11 @@ all:		$(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 #CFLAGS += -DDEBUG
-CFLAGS += -O -g -static -I. -Wall -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS += `elvin-config --cflags vin4mt`
+CFLAGS += -O2 -g -static -I. -Wall -I$(TESTBED_SRCDIR)/lib/libtb
+SCFLAGS = $(CFLAGS) `elvin-config --cflags vin4c`
+TCFLAGS = $(CFLAGS) `elvin-config --cflags vin4mt`
 # Special CFLAGS w/o warnings, for SWIG-generated code
-CFLAGS_NOWARN += -O -g -static -I. -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS_NOWARN += -O2 -g -static -I. -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS_NOWARN += `elvin-config --cflags vin4mt`
 
 LDFLAGS += -L${OBJDIR}/lib/libtb
@@ -45,7 +46,12 @@ $(OBJS):	event.h
 $(POBJS):	event.h
 
 event_r.o:	event.c
-	$(CC) $(CFLAGS) -DTHREADED -c -o event_r.o $<
+	$(CC) $(TCFLAGS) -DTHREADED -c -o event_r.o $<
+
+event.o:	event.c
+	$(CC) $(SCFLAGS) -c -o event.o $<
+util.o:		util.c
+	$(CC) $(SCFLAGS) -c -o util.o $<
 
 #
 # These three targets are for the perl binding to the event system
@@ -59,7 +65,7 @@ event_wrap.o:	$(SRCDIR)/event_wrap.c
 
 event.so:	event.o event_wrap.o util.o
 	ld -shared $^ $(OBJDIR)/lib/libtb/libtb.a \
-		`elvin-config --libs vin4c` -o event.so
+		`elvin-config --libs vin4c` -lcrypto -o event.so
 
 LIB_STUFF       = event.pm event.so
 
@@ -67,4 +73,4 @@ install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 
 clean:
-	/bin/rm -f *.o libevent.a *.so *.pm
+	/bin/rm -f *.o libevent.a libevent_r.a *.so *.pm

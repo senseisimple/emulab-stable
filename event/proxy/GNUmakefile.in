@@ -30,28 +30,49 @@ $(LIBEVENTDIR)/%.a:
 	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static -Wall
+CFLAGS	 += -O2 -g -static -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`
 
+PFLAGS    = -pthread
+PFLAGS   += -DDEBUG
+PFLAGS	 += -O2 -g -Wall
+PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+PFLAGS   += `elvin-config --cflags vin4mt`
+
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
-LIBS     += -levent
+LIBS     += -levent -ltb -lcrypto
 LIBS     += `elvin-config --libs vin4c`
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl
+endif
+
+PLDFLAGS  = -pthread -static
+PLDFLAGS += -L../lib -L${OBJDIR}/lib/libtb
+PLIBS     = -levent_r -ltb
+PLIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lcrypto -lm
 
 evproxy:	evproxy.o $(LIBTBDIR)/log.o
-	# Link against some of the object files from libtb, instead of the
-	# whole library, since the latter cannot be built on ops
-	$(CC) $(LDFLAGS) -static -o $@ evproxy.o $(LIBTBDIR)/log.o $(LIBS)
+	$(CC) $(LDFLAGS) -static -o $@ evproxy.o $(LIBS)
+
+evproxyclient:	proxyclient.o $(LIBTBDIR)/log.o
+	$(CC) $(LDFLAGS) -static -o $@ proxyclient.o $(LIBS)
+
+evproxyserver:	proxyserver.o $(LIBTBDIR)/log.o
+	$(CC) $(PLDFLAGS) -static -o $@ proxyserver.o $(PLIBS)
+
+proxyserver.o:  proxyserver.c
+	$(CC) $(PFLAGS) -c $<
 
 proxytest:	proxytest.o $(LIBTBDIR)/log.o
-	# Link against some of the object files from libtb, instead of the
-	# whole library, since the latter cannot be built on ops
-	$(CC) $(LDFLAGS) -static -o $@ proxytest.o $(LIBTBDIR)/log.o $(LIBS)
+	$(CC) $(LDFLAGS) -static -o $@ proxytest.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
 client-install: 
 	$(INSTALL_PROGRAM) evproxy $(DESTDIR)$(CLIENT_BINDIR)/evproxy
+	$(INSTALL_PROGRAM) evproxyclient \
+				$(DESTDIR)$(CLIENT_BINDIR)/evproxyclient
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)

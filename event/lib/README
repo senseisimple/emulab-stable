@@ -1,0 +1,7 @@
+To isolate the pain of building threaded (and statically linked) event
+system programs, we build two versions of the event library, one for
+non threaded programs and another (libevent_r.a) for threaded
+versions. Threaded clients require a bunch of extra link goo, but at
+the moment the only threaded client is the event scheduler.  If you
+try and use the threaded API without the proper link, the library will
+print an error message and quit.

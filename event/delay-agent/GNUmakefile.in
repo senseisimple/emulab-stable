@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,7 +22,7 @@ CFLAGS   += `elvin-config --cflags vin4c`
 
 LDFLAGS  += -static
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb
+LIBS     += -levent -ltb -lcrypto
 LIBS     += `elvin-config --libs vin4c`
 
 OBJS	  = main.o callback.o

@@ -3,6 +3,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= event/example
 
+SYSTEM	       := $(shell uname -s)
 PROGRAMS	= tbrecv tbsend eventdebug.pl
 
 include $(OBJDIR)/Makeconf
@@ -17,8 +18,11 @@ CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`
 
 LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent -ltb
+LIBS     += -levent -ltb -lcrypto
 LIBS     += `elvin-config --libs vin4c`
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl
+endif
 
 tbrecv:		tbrecv.o
 	$(CC) $(LDFLAGS) -o $@ tbrecv.o $(LIBS)

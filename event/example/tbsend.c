@@ -22,7 +22,7 @@ void
 usage()
 {
 	fprintf(stderr,
-		"Usage: %s [-s server] [-p port] <event>\n",
+		"Usage: %s [-s server] [-p port] [-k keyfile] <event>\n",
 		progname);
 	exit(-1);
 }
@@ -35,19 +35,23 @@ main(int argc, char **argv)
 	address_tuple_t	tuple;
 	char *server = NULL;
 	char *port = NULL;
+	char *keyfile = NULL;
 	char buf[BUFSIZ], *bp;
 	struct timeval	now;
 	int c;
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "s:p:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:k:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
 			break;
 		case 'p':
 			port = optarg;
+			break;
+		case 'k':
+			keyfile = optarg;
 			break;
 		default:
 			usage();
@@ -95,7 +99,7 @@ main(int argc, char **argv)
 	tuple->host	= ADDRESSTUPLE_ALL;
 
 	/* Register with the event system: */
-	handle = event_register(server, 0);
+	handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}

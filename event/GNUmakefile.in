@@ -13,9 +13,9 @@ include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
 
-SUBDIRS		= lib tbgen trafgen program-agent
+SUBDIRS		= lib tbgen trafgen program-agent proxy example
 ifeq ($(SYSTEM),FreeBSD)
-SUBDIRS	       += sched example delay-agent nsetrafgen stated proxy
+SUBDIRS	       += sched delay-agent nsetrafgen stated
 endif
 
 all:	$(SUBDIRS)
@@ -60,20 +60,17 @@ install:
 	@$(MAKE) -C stated install
 
 client-install:
+ifeq ($(SYSTEM),FreeBSD)
 	@$(MAKE) -C nsetrafgen client-install
 	@$(MAKE) -C delay-agent client-install
-	@$(MAKE) -C program-agent client-install
+endif
 	@$(MAKE) -C tbgen client-install
+	@$(MAKE) -C program-agent client-install
 	@$(MAKE) -C trafgen client-install
 	@$(MAKE) -C proxy client-install
 
 control-install: 
 	@$(MAKE) -C tbgen control-install
-
-linux-install:
-	@$(MAKE) -C program-agent client-install
-	@$(MAKE) -C tbgen client-install
-	@$(MAKE) -C trafgen client-install
 
 clean:		subdir-clean
 

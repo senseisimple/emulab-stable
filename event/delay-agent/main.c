@@ -75,6 +75,7 @@ int main(int argc, char **argv)
   char *map_file = NULL;
   char *log_file = "/tmp/agentlog";
   char *pid_file = NULL;
+  char *keyfile = NULL;
   FILE *mp = NULL;
   //char *log = NULL;
   char buf[BUFSIZ];
@@ -86,7 +87,7 @@ int main(int argc, char **argv)
   opterr = 0;
 
   /* get params from the optstring */
-  while ((c = getopt(argc, argv, "s:p:f:dE:l:i:")) != -1) {
+  while ((c = getopt(argc, argv, "s:p:f:dE:l:i:k:")) != -1) {
         switch (c) {
 	  case 'd':
 	      debug++;
@@ -108,6 +109,9 @@ int main(int argc, char **argv)
 	      break;
 	  case 'E':
 	      myexp = optarg;
+	      break;
+	  case 'k':
+	      keyfile = optarg;
 	      break;
 	  case '?':
           default:
@@ -274,7 +278,7 @@ int main(int argc, char **argv)
   
   /* register with the event system*/
 
-  handle = event_register(server, 0);
+  handle = event_register_withkeyfile(server, 0, keyfile);
    if (handle == NULL) {
        error("could not register with event system\n");
        return 1;
@@ -319,7 +323,8 @@ void usage(char *progname)
   info("entering function usage\n");
 #endif
   
-  fprintf(stderr, "Usage: %s -s server [-p port] -f link-map-file\n",
+  fprintf(stderr, "Usage: %s -s server [-p port] [-k keyfile] "
+	  "-f link-map-file\n",
 	  progname);
   exit(-1);
 }

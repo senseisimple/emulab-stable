@@ -25,6 +25,8 @@
 struct event_handle {
     elvin_handle_t server;
     elvin_error_t status;
+    unsigned char *keydata;
+    int keylen;
     /* API function pointers: */
     elvin_error_t (*init)(void);
     int (*connect)(elvin_handle_t handle, elvin_error_t error);
@@ -42,7 +44,12 @@ struct event_handle {
 typedef struct event_handle * event_handle_t;
 
 /* Event notification: */
-typedef elvin_notification_t event_notification_t;
+struct event_notification {
+	elvin_notification_t elvin_notification;
+	int		     has_hmac;
+	
+};
+typedef struct event_notification *event_notification_t;
 
 /* Event subscription: */
 typedef elvin_subscription_t event_subscription_t;
@@ -140,6 +147,10 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
 
 /* event.c */
 event_handle_t event_register(char *name, int threaded);
+event_handle_t event_register_withkeyfile(char *name, int threaded,
+					  char *keyfile);
+event_handle_t event_register_withkeydata(char *name, int threaded,
+					  unsigned char *keydata, int len);
 int event_unregister(event_handle_t handle);
 int event_poll(event_handle_t handle);
 int event_poll_blocking(event_handle_t handle, unsigned int timeout);
@@ -188,6 +199,8 @@ int event_notification_remove(event_handle_t handle,
 event_subscription_t event_subscribe(event_handle_t handle,
                                      event_notify_callback_t callback,
                                      address_tuple_t tuple, void *data);
+int event_notification_insert_hmac(event_handle_t handle,
+				   event_notification_t notification);
 
 /* util.c */
 void *xmalloc(int size);

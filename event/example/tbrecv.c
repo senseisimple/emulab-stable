@@ -25,7 +25,7 @@ void
 usage()
 {
 	fprintf(stderr,
-		"Usage: %s [-s server] [-p port]\n", progname);
+		"Usage: %s [-s server] [-p port] [-k keyfile]\n", progname);
 	exit(-1);
 }
 
@@ -35,6 +35,7 @@ main(int argc, char **argv)
 	event_handle_t handle;
 	address_tuple_t	tuple;
 	char *server = NULL;
+	char *keyfile = NULL;
 	char *port = NULL;
 	char *ipaddr = NULL;
 	char buf[BUFSIZ], ipbuf[BUFSIZ];
@@ -42,13 +43,16 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "s:p:i:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:k:")) != -1) {
 		switch (c) {
 		case 's':
 			server = optarg;
 			break;
 		case 'p':
 			port = optarg;
+			break;
+		case 'k':
+			keyfile = optarg;
 			break;
 		default:
 			usage();
@@ -114,7 +118,7 @@ main(int argc, char **argv)
 	/*
 	 * Register with the event system. 
 	 */
-	handle = event_register(server, 0);
+	handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}
