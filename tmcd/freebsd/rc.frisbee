@@ -22,6 +22,9 @@ if [ x"$ADDRESS" != x ]; then
 	/bin/echo "Running /etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV ";
 	/etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV;
 	/bin/echo "Frisbee run finished";
+	/bin/echo "Resizing final disk partition";
+	/etc/testbed/growdisk -vW;
+	/bin/echo "Image load complete, rebooting ...";
 	$TMCC reset;
 	/sbin/reboot &
 else
