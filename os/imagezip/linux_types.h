@@ -1,3 +1,6 @@
+#ifndef __imagezip_linux_types_h__
+#define __imagezip_linux_types_h__
+
 typedef unsigned char		__u8;
 typedef signed   char		__s8;
 
@@ -9,3 +12,5 @@ typedef	unsigned short		__u16;
 
 typedef	signed   long		__s32;
 typedef	unsigned long		__u32;
+
+#endif
