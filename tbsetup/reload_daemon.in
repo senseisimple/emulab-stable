@@ -95,51 +95,18 @@ while (1) {
     # Check for nodes in the reloading experiment. Notify the admins if
     # any node stays in the reloading experiment for longer than $warn_time
     #
-
-    #
-    # Build up a set of nodes in the reloading experiment for this run
-    #
     $query_result =
 	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
-		    "and eid='$RELOADEID'");
-    $time = time();
-    %this_run = ();
-    while (($node) = $query_result->fetchrow()) {
-	$this_run{$node} = 1;
-    }
-
-    #
-    # Take appropriate action for all nodes in the reloading experiment:
-    # warn if it's been in there too long, or put it in node_times if this
-    # is the first time we've seen it
-    #
-    foreach $node (keys %this_run) {
-	if (exists $node_times{$node}) {
-	    #
-	    # %warned is so that we won't warn the admins about the same
-	    # node twice
-	    #
-	    if ((($time - $node_times{$node}) > $warn_time)
-		    && !$warned{$node}) {
-		notify("Node $node has been in $RELOADPID/$RELOADEID for " .
-		       "more than $warn_time seconds");
-		$warned{$node} = 1;
-	    }
-	} else {
-	    $node_times{$node} = $time;
+		    "and eid='$RELOADEID' and " .
+		    "(rsrv_time + $warn_time) < NOW() ");
+    while (($node) = $query_result->fetchrow){ 
+	if (!$warned{$node}) {
+	    notify("Node $node has been in $RELOADPID/$RELOADEID for " .
+	    "more than $warn_time seconds");
+	    $warned{$node} = 1;
 	}
     }
 
-    #
-    # Remove any nodes from node_times that were not in the reloading 
-    # experiment this time
-    #
-    foreach $node (keys %node_times) {
-	if (!$this_run{$node}) {
-	    delete $this_run{$node};
-	}
-    }
-    
     #
     # Find all of the free node that have not been reloaded (no pid entry
     # in last_reservation, which is reset anytime a node is reloaded by
@@ -225,7 +192,7 @@ while (1) {
 	if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
 	    $os_load_flags .= " -r";
 	} elsif ($reload_type eq TB_RELOADTYPE_NETDISK) {
-	    # Nothing special to do
+	    $os_load_flags .= " -n";
 	} else {
 	    fatal("Found a reload type I don't know how to handle: $reload_type");
 	}
