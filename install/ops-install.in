@@ -151,7 +151,7 @@ my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
 # The meta-port (name and version) that drags in all the dependancies for
 # an ops node
 #
-my $OPS_PORT = "emulab-ops-1.4";
+my $OPS_PORT = "emulab-ops-1.5";
 
 #
 # List of names that goes into $HOSTS and which must resolve.

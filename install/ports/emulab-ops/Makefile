@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-ops
-PORTVERSION=	1.4
+PORTVERSION=	1.5
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -28,7 +28,8 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind \
-	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto
+	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto \
+	smbd:${PORTSDIR}/net/samba3
 
 
 NO_BUILD=	yes
