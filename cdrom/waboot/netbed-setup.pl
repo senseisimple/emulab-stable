@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -41,6 +41,7 @@ my $WWW         = "https://www.emulab.net";
 #my $WWW        = "http://golden-gw.ballmoss.com:8080/~stoller/testbed";
 #my $WWW        = "https://www.emulab.net/~stoller/www";
 my $etcdir	= "/etc";
+my $pubkey      = "$etcdir/emulab_pubkey.pem";
 # Hardwired cdkey.
 my $cdkeyfile	= "$etcdir/emulab.cdkey";
 # Hardwired config.
@@ -76,16 +77,22 @@ my $PATIENCEMSG  = "This could take several minutes, please be patient!\n";
 
 my %config = ( privkey        => undef,
 	       fdisk          => undef,
+	       fdisk_md5      => undef,
+	       fdisk_sig      => undef,
 	       slice1_image   => undef,
 	       slice1_md5     => undef,
+	       slice1_sig     => undef,
 	       slice3_image   => undef,
 	       slice3_md5     => undef,
+	       slice3_sig     => undef,
 	       slice4_image   => undef,
 	       slice4_md5     => undef,
+	       slice4_sig     => undef,
 	       slicex_slice   => undef,
 	       slicex_mount   => undef,
 	       slicex_tarball => undef,
 	       slicex_md5     => undef,
+	       slicex_sig     => undef,
 	     );
 
 # These errors must match what the web page returns.
@@ -222,6 +229,13 @@ if ($needstore) {
 	}
 
 	#
+	# Always verify.
+	#
+	if (VerifySig($fdisk, "fdisk") < 0) {
+	    fatal("Could not verify signature of $fdisk!");
+	}
+
+	#
 	# We are going to feed the fdisk table one line at a time
 	# so we can apply the adjustment. Yuck.
 	# 
@@ -305,7 +319,6 @@ for ($i = 1; $i <= 4; $i++) {
 	next;
     }
     my $image = $config{"slice${i}_image"};
-    my $hash  = $config{"slice${i}_md5"};
     
     if (!defined($image) || $image eq "skipit") {
 	next;
@@ -316,17 +329,10 @@ for ($i = 1; $i <= 4; $i++) {
     # 
     if (! ($image =~ /^http:.*$/ || $image =~ /^ftp:.*$/)) {
 	#
-	# First, check the hash if provided.
+	# Always check the signature.
 	#
-	if (defined($hash)) {
-	    print "Checking MD5 hash of the CDROM image.\n";
-	    print $PATIENCEMSG;
-
-	    my $hval = `md5 -q /$image`;
-	    chomp($hval);
-
-	    fatal("CDROM image has invalid hash!")
-		if ($hash ne $hval);
+	if (VerifySig("/$image", "slice${i}") < 0) {
+	    fatal("CDROM image has invalid signature!");
 	}
 
 	#
@@ -337,9 +343,9 @@ for ($i = 1; $i <= 4; $i++) {
 
 	if ($showprogress) {
 	    print "(Output indicates uncompressed bytes written to disk.)\n";
-	    system("imageunzip -o -s $i /$image $rawbootdisk");
+	    system("imageunzip -n -o -s $i /$image $rawbootdisk");
 	} else {
-	    mysystem("imageunzip -s $i /$image $rawbootdisk");
+	    mysystem("imageunzip -n -s $i /$image $rawbootdisk");
 	}
 	fatal("Failed to lay down image /$image!")
 	    if ($?);
@@ -364,20 +370,12 @@ for ($i = 1; $i <= 4; $i++) {
 	    if ($?);
 
 	#
-	# If an md5 hash was provided, compare it.
+	# Always check the signature.
 	#
-	if (defined($hash)) {
-	    print "Checking MD5 hash of the image.\n";
-	    print $PATIENCEMSG;
-
-	    my $hval = `md5 -q /mnt/image.ndz`;
-	    chomp($hval);
-
-	    if ($hash ne $hval) {
-		print "*** Invalid hash! Getting the image again.\n";
-		sleep(60);
-		goto again;
-	    }
+	if (VerifySig("/mnt/image.ndz", "slice${i}") < 0) {
+	    print "*** Invalid signature! Getting the image again.\n";
+	    sleep(60);
+	    goto again;
 	}
 
 	print "Writing image from temp storage to slice $i.\n";
@@ -385,9 +383,9 @@ for ($i = 1; $i <= 4; $i++) {
 
 	if ($showprogress) {
 	    print "(Output indicates uncompressed bytes written to disk.)\n";
-	    system("imageunzip -o -s $i /mnt/image.ndz $rawbootdisk");
+	    system("imageunzip -n -o -s $i /mnt/image.ndz $rawbootdisk");
 	} else {
-	    mysystem("imageunzip -s $i /mnt/image.ndz $rawbootdisk");
+	    mysystem("imageunzip -n -s $i /mnt/image.ndz $rawbootdisk");
 	}
 	fatal("Failed to lay down image!")
 	    if ($?);
@@ -560,11 +558,19 @@ sub GetInstructions()
 		last SWITCH1;
 	    };
 	    /^privkey=(.*)$/ && do {
-		$config{privkey} = $1;
+		$config{"privkey"} = $1;
 		last SWITCH1;
 	    };
 	    /^fdisk=(.*)$/ && do {
-		$config{fdisk} = $1;
+		$config{"fdisk"} = $1;
+		last SWITCH1;
+	    };
+	    /^fdisk_md5=(.*)$/ && do {
+		$config{"fdisk_md5"} = $1;
+		last SWITCH1;
+	    };
+	    /^fdisk_sig=(.*)$/ && do {
+		$config{"fdisk_sig"} = $1;
 		last SWITCH1;
 	    };
 	    /^slice(\d)_image=(.*)$/ && do {
@@ -574,6 +580,10 @@ sub GetInstructions()
 	    };
 	    /^slice(\d)_md5=(.*)$/ && do {
 		$config{"slice${1}_md5"} = $2;
+		last SWITCH1;
+	    };
+	    /^slice(\d)_sig=(.*)$/ && do {
+		$config{"slice${1}_sig"} = $2;
 		last SWITCH1;
 	    };
 	    /^slicex_mount=(.*)$/ && do {
@@ -590,6 +600,10 @@ sub GetInstructions()
 	    };
 	    /^slicex_md5=(.*)$/ && do {
 		$config{"slicex_md5"} = $1;
+		last SWITCH1;
+	    };
+	    /^slicex_sig=(.*)$/ && do {
+		$config{"slicex_sig"} = $1;
 		last SWITCH1;
 	    };
 	    print STDERR "Invalid instruction: $_\n";
@@ -748,7 +762,6 @@ sub MakeFS($$)
     #
     if ($config{"slicex_tarball"}) {
 	my $tarball = $config{"slicex_tarball"};
-	my $tarhash = $config{"slicex_md5"};
 	    
 	mysystem("mount /dev/${blockdevice}${foo} /mnt");
 	fatal("Failed to mount /dev/${blockdevice}${foo} on /mnt!")
@@ -763,17 +776,10 @@ sub MakeFS($$)
 	# 
 	if (! ($tarball =~ /^http:.*$/ || $tarball =~ /^ftp:.*$/)) {
 	    #
-	    # First, check the hash if provided.
-	    #
-	    if (defined($tarhash)) {
-		print "Checking MD5 hash of the tarball.\n";
-		print $PATIENCEMSG;
-
-		my $hval = `md5 -q /$tarball`;
-		chomp($hval);
-
-		fatal("Tarball has invalid hash!")
-		    if ($tarhash ne $hval);
+	    # Always check signature.
+	    # 
+	    if (VerifySig("/$tarball", "slicex") < 0) {
+		fatal("Tarball has an invalid signature!");
 	    }
 
 	    print "Unpacking $tarball to $mntpoint.\n";
@@ -797,20 +803,12 @@ sub MakeFS($$)
 		if ($?);
 
 	    #
-	    # If an md5 hash was provided, compare it.
+	    # Always check the signature.
 	    #
-	    if (defined($tarhash)) {
-		print "Checking MD5 hash of the tarball.\n";
-		print $PATIENCEMSG;
-
-		my $hval = `md5 -q /mnt/slicex.tar.gz`;
-		chomp($hval);
-
-		if ($tarhash ne $hval) {
-		    print "*** Invalid hash! Getting the tarball again.\n";
-		    sleep(60);
-		    goto again;
-		}
+	    if (VerifySig("/mnt/slicex.tar.gz", "slicex") < 0) {
+		print "*** Invalid signature! Getting the tarball again.\n";
+		sleep(60);
+		goto again;
 	    }
 
 	    print "Unpacking tarball.\n";
@@ -1117,3 +1115,55 @@ sub Prompt($$;$)
     return $_;
 }
 
+#
+# Verify a file using the provided digital signature. 
+# 
+sub VerifySig($$)
+{
+    my ($file, $which) = @_;
+
+    if (!defined($config{"${which}_sig"})) {
+	print("No $which signature specification for $file\n");
+	    return -1;
+    }
+    my $sig     = $config{"${which}_sig"};
+
+    #
+    # Sig is either local or remote
+    # 
+    if ($sig =~ /^https:.*$/ || $sig =~ /^ftp:.*$/ || $sig =~ /^http:.*$/) {
+	while (1) {
+	    print "Downloading signature from Netbed Central ...\n";
+
+	    unlink("/tmp/sig");
+	    mysystem("$wget -nv -O /tmp/sig $sig");
+	    if (!$?) {
+		last;
+	    }
+
+	    print "Error getting signature: $sig\n";
+	    print "Will try again in 15 seconds!\n";
+	    sleep(15);
+	}
+	$sig = "/tmp/sig";
+    }
+
+    #
+    # Check the digital signature. 
+    #
+    print "Checking digital signature of $file\n";
+    print $PATIENCEMSG;
+
+    my $cmd  = "openssl dgst -sha1 -verify $pubkey -signature $sig $file";
+    my $hval = `$cmd`;
+    chomp($hval);
+
+    #
+    # Yep, its amazing. Instead of exiting with status, this stupid
+    # program always exits with 0, so have to check the output. 
+    #
+    if ($hval ne "Verified OK") {
+	return -1;
+    }
+    return 0;
+}
