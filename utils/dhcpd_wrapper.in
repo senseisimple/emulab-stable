@@ -59,6 +59,15 @@ if (!$debug && TBBackGround($LOGFILE)) {
     sleep(1);
     exit(0);
 }
+
+#
+# Write our pid into the pid file so we can be killed later. 
+#
+system("echo '$PID' > $PIDFILE") == 0 or
+    die("*** $0:\n".
+	"    Could not create $PIDFILE!");
+
+# Okay, cleanup function.
 $SIG{TERM} = \&Pcleanup;
 
 # Fully disconnect from bootup. 
@@ -67,7 +76,6 @@ setsid();
 # Loop forever, restarting DHCPD if it ever dies.
 while (1) {
     $childpid = fork();
-    $SIG{TERM} = 'IGNORE';
 
     die("*** $0:\n".
 	"    Could not fork!\n")
