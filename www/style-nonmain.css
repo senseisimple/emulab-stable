@@ -1,0 +1,39 @@
+.leftcell {
+ 	background-image: url(wallpaper0.jpg); 
+	background-color: #9BBBAC; 
+}
+.rightcell {
+ 	background-image: url(wallpaper0.jpg); 
+	background-color: #9BBBAC; 
+}
+
+.menuheader {
+	background-color: #060; 
+}
+.menufooter {
+	background-color: #464;
+}
+
+.menuopt,.menuoptb, .menuopts, .menuoptst, .menuoptsb {
+	background-color: #ced; 
+} 
+
+.menuopts, .menuoptst, .menuoptsb {
+	background-color: #dfe;
+}
+
+.contentheader {
+	background-color: #060; 
+}
+
+body  	{ background-image: url(wallpaper0.jpg); }
+
+td, th { 
+     border: solid 0px #696;
+     background-color: #F1FAF1;
+}
+
+th { background-color: #E1EAE1; }
+
+table { border: 0px; background-color: #9A9}
+table.nogrid { border: solid 1px #696; background-color:#9A9; } 

@@ -380,42 +380,53 @@ function WRITESIDEBAR() {
 # spits out beginning part of page
 #
 function PAGEBEGINNING( $title ) {
-    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE;
-?>
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 
- "http://www.w3.org/TR/html4/loose.dtd">
-<html>
-  <head>
-    <title><?php echo "$THISHOMEBASE - $title"; ?></title>
-    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
-    <link REL="stylesheet" HREF="<?php echo "$BASEPATH/common-style.css" ?>" 
-          TYPE="text/css" />
-    <!-- don't import full style sheet into NS47, since it does a bad job
-         of handling it. NS47 doesn't understand '@import'. -->
-    <style type="text/css" media="all">
-    <!-- @import "<?php echo "$BASEPATH/style.css" ?>"; --></style>
-<?php if ($TBMAINSITE) { ?>
-    <meta NAME="keywords" CONTENT="network, emulation, internet, emulator">
-    <meta NAME="ROBOTS" CONTENT="NOARCHIVE">
-<?php } ?>
-  </head>
-  <body bgcolor="#FFFFFF" topmargin=0 leftmargin=0 
-        marginheight=0 marginwidth=0>
-    <table cellpadding="0" cellspacing="0" width="100%">
-      <tr>
-        <td valign="top" class="bannercell" 
-            background="<?php echo "$BASEPATH/headerbgbb.jpg" ?>"
-            bgcolor=#3D627F ><img width=369 height=100 
-            src="<?php echo "$BASEPATH/overlay." . strtolower($THISHOMEBASE) 
-                                                 . ".gif" ?>" 
-            alt="<?php echo "$THISHOMEBASE" ?> - the network testbed" /></td>
-      </tr>
-    </table>
-    <table cellpadding="8" cellspacing="0" height="100%" width="100%">
-      <tr height=100%>
-        <td valign="top" class="leftcell" bgcolor=#ccddee>
-<!-- sidebar begins -->
-<?php
+    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $WWW;
+    global $MAINPAGE;
+
+    $MAINPAGE = !strcmp($TBDIR, "/usr/testbed"); 
+  
+    echo "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 
+          'http://www.w3.org/TR/html4/loose.dtd'>
+	<html>
+	  <head>
+	    <title>$THISHOMEBASE - $title</title>
+    	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
+	    <link REL='stylesheet' HREF='$BASEPATH/common-style.css' TYPE='text/css' />
+    	    <!-- don't import full style sheet into NS47, since it does a bad job
+            of handling it. NS47 doesn't understand '@import'. -->
+    	    <style type='text/css' media='all'>
+            <!-- @import '$BASEPATH/style.css'; -->";
+
+    if (!$MAINPAGE) {
+	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
+    } 
+
+    echo "</style>";
+
+    if ($TBMAINSITE) {
+	echo "<meta NAME='keywords' CONTENT='network, emulation, internet, emulator'>";
+	echo "<meta NAME='ROBOTS' CONTENT='NOARCHIVE'>";
+    }
+
+    echo "</head>
+            <body bgcolor='#FFFFFF' 
+             topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>
+            <table cellpadding='0' cellspacing='0' width='100%'>
+            <tr>
+              <td valign='top' class='bannercell' 
+              background='$BASEPATH/headerbgbb.jpg'
+              bgcolor=#3D627F ><img width=369 height=100 
+              src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' 
+              alt='$THISHOMEBASE - the network testbed' />";
+    if (!$MAINPAGE) {
+	echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
+    }
+    echo "</td></tr></table>\n";
+
+    echo "<table cellpadding='8' cellspacing='0' height='100%' width='100%'>
+            <tr height='100%'>
+              <td valign='top' class='leftcell' bgcolor='#ccddee'>
+              <!-- sidebar begins -->";
 }
 
 #
@@ -423,15 +434,13 @@ function PAGEBEGINNING( $title ) {
 #
 function FINISHSIDEBAR()
 {
-?>
-<!-- sidebar ends -->
+    echo "<!-- sidebar ends -->
         </td>
-        <td valign="top" width="100%" class="rightcell">
+        <td valign='top' width='100%' class='rightcell'>
           <!-- content body table -->
-          <table class="content" width="100%" cellpadding="0" cellspacing="0">
+          <table class='content' width='100%' cellpadding='0' cellspacing='0'>
             <tr>
-              <td class="contentheader">
-<?php
+              <td class='contentheader'>";
 }
 
 #
