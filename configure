@@ -19,6 +19,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-ssh-args	Specify ssh arguments when running from testbed scripts "
 ac_help="$ac_help
+  --with-rcdir		Specify path to install rc.d scripts (/usr/local/etc/rc.d default)"
+ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
 ac_help="$ac_help
@@ -562,7 +564,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:566: checking host system type" >&5
+echo "configure:568: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -583,7 +585,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:587: checking build system type" >&5
+echo "configure:589: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -609,7 +611,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:613: checking for $ac_word" >&5
+echo "configure:615: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -641,7 +643,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:645: checking for $ac_word" >&5
+echo "configure:647: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -673,7 +675,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:677: checking for $ac_word" >&5
+echo "configure:679: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -705,7 +707,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:709: checking for $ac_word" >&5
+echo "configure:711: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -737,7 +739,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:741: checking for $ac_word" >&5
+echo "configure:743: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -769,7 +771,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ssh; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:773: checking for $ac_word" >&5
+echo "configure:775: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -882,6 +884,23 @@ fi
 
 
 #
+# Path to install rc.d scripts in
+#
+# Check whether --with-rcdir or --without-rcdir was given.
+if test "${with_rcdir+set}" = set; then
+  withval="$with_rcdir"
+  
+    INSTALL_RCDIR="$with_rcdir"
+
+else
+  
+    INSTALL_RCDIR="/usr/local/etc/rc.d"
+
+fi
+
+
+
+#
 # Optionally build with optimization or aggressive non-optimization
 # (Actually three options: on, off or default.)
 #
@@ -937,7 +956,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:941: checking for a BSD compatible install" >&5
+echo "configure:960: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1026,7 +1045,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config utils/sshtb \
-	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
+	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
+	rc.d/GNUmakefile rc.d/3.testbed.sh rc.d/cvsupd.sh"
 
 #
 # Do this for easy distclean.
@@ -1203,6 +1223,7 @@ s%@DELAYCAPACITY@%$DELAYCAPACITY%g
 s%@IPBASE@%$IPBASE%g
 s%@LEDA@%$LEDA%g
 s%@SSH_ARGS@%$SSH_ARGS%g
+s%@INSTALL_RCDIR@%$INSTALL_RCDIR%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@TESTMODE@%$TESTMODE%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g

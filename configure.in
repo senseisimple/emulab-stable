@@ -80,6 +80,18 @@ AC_ARG_WITH(SSH_ARGS,
 AC_SUBST(SSH_ARGS)
 
 #
+# Path to install rc.d scripts in
+#
+AC_ARG_WITH(rcdir,
+[  --with-rcdir		Specify path to install rc.d scripts (/usr/local/etc/rc.d default)],
+[
+    INSTALL_RCDIR="$with_rcdir"
+],[
+    INSTALL_RCDIR="/usr/local/etc/rc.d"
+])
+AC_SUBST(INSTALL_RCDIR)
+
+#
 # Optionally build with optimization or aggressive non-optimization
 # (Actually three options: on, off or default.)
 #
@@ -155,7 +167,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config utils/sshtb \
-	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
+	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
+	rc.d/GNUmakefile rc.d/3.testbed.sh rc.d/cvsupd.sh"
 
 #
 # Do this for easy distclean.
