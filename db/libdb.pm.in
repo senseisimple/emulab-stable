@@ -4242,6 +4242,13 @@ sub TBcheck_dbslot($$$;$)
 	    "    Functional DB checks not implemented: $table/$column!\n");
     }
 
+    # Make sure the regex is anchored. Its a mistake not to be!
+    $check = "^" . $check
+	if (! ($check =~ /^\^/));
+
+    $check = $check . "\$"
+	if (! ($check =~ /\Q$/));
+
     # Check regex.
     return 0
 	if (! ("$token" =~ /$check/));
