@@ -387,9 +387,11 @@ function WRITESIDEBAR() {
     #
     # Login message. Set via 'web/message' site variable
     #
+    if (0) {
     $message = TBGetSiteVar("web/message");
     if (0 != strcmp($message,"")) {
-	WRITESIDEBARNOTICE($message);    	
+	WRITESIDEBARNOTICE("<font color=red>$message</font>");
+    }
     }
 
     echo "</table>\n";
@@ -550,11 +552,19 @@ function PAGEHEADER($title) {
     $now = date("D M d g:ia T");
     echo "$title</h2></td>\n";
     echo "<td class=contentheader align=right>\n";
-    if ($login_uid) {
-	echo "<font size=-1>'<b>$login_uid</b>' Logged in.<br>$now</font>\n";
+    
+    $message = TBGetSiteVar("web/message");
+    if (strcmp($message,"")) {
+	echo "<font size=+1 color=white>$message</font>";
     }
     else {
-	echo "$now";
+	if ($login_uid) {
+	    echo "<font size=-1>'<b>$login_uid</b>' Logged in.".
+		 "<br>$now</font>\n";
+	}
+	else {
+	    echo "$now";
+	}
     }
     echo "</td>";
     echo "</tr>\n";
