@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: mkacct,v 1.17 2000-11-13 22:32:45 kwright Exp $
+### $Id: mkacct,v 1.18 2000-11-14 06:35:12 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -266,8 +266,18 @@ foreach $IP (@nodes) {
 		    print "Adding $user to $IP\n";
 		    $addon = "$user:$passwd{$user}:$unix_uid{$user}:" .
 			     "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
-			     "/bin/tcsh\n";
-		    open (CHPASS, "/usr/local/bin/sshtb $IP /usr/bin/chpass -a '$addon' 2>&1 |");
+			     "/bin/tcsh";
+		    $chpassf = "/tmp/chpasstmp";
+		    open (TMPCHPASS, ">$chpassf") or die "Couldn't open $chpassf for writing.\n";
+		    print TMPCHPASS "#!/bin/sh\n";
+		    print TMPCHPASS "/usr/bin/chpass -a '$addon'\n";
+		    close TMPCHPASS;
+		
+		    open(SCP, "/usr/local/bin/scp -pq $chpassf $IP:$chpassf 2>&1 |");
+		    while ( <SCP> ) { print $_; }
+		    close SCP;
+
+		    open (CHPASS, "/usr/local/bin/sshtb $IP source $chpassf 2>&1 |");
 		    while ( <CHPASS> ) {print "$_"; }
 		    close(CHPASS)
 		}
