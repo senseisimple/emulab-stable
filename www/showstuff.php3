@@ -975,9 +975,9 @@ function SHOWNODES($pid, $eid) {
                 <th>Type</th>
                 <th>Default OSID</th>
                 <th>Node<br>Status</th>
-                <th>Hours<br>Idle</th>
-                <th>Startup<br>Status[<b>1</b>]</th>
-                <th>Ready<br>Status[<b>2</b>]</th>
+                <th>Hours<br>Idle[<b>1</b>]</th>
+                <th>Startup<br>Status[<b>2</b>]</th>
+                <th>Ready<br>Status[<b>3</b>]</th>
               </tr>\n";
 
 	$sort = "type,priority";
@@ -998,6 +998,8 @@ function SHOWNODES($pid, $eid) {
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
 	        "ORDER BY $sort");
 
+	$stalemark = "<b>?</b>";
+
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];
 	    $vname   = $row[$vnamefield];
@@ -1007,7 +1009,14 @@ function SHOWNODES($pid, $eid) {
 	    $readystatus   = $row[ready];
 	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
-	    $idlehrs       = TBGetNodeIdleTime($node_id);
+	    $idlehours = TBGetNodeIdleTime($node_id);
+	    $stale = TBGetNodeIdleStale($node_id);
+
+	    $idlestr = $idlehours;
+	    if ($idlehours > 0) {
+		if ($stale) { $idlestr .= $stalemark; }
+		if ($ignore) { $idlestr = "($idlestr)"; $parens=1; }
+	    } elseif ($idlehours == -1) { $idlestr = "&nbsp;"; }
 
 	    if (!$vname)
 		$vname = "--";
@@ -1035,7 +1044,7 @@ function SHOWNODES($pid, $eid) {
 		echo "  <td>$status</td>\n";
 	    }
 	    
-	    echo "  <td>$idlehrs</td>
+	    echo "  <td>$idlestr</td>
                     <td align=center>$startstatus</td>
                     <td align=center>$readylabel</td>
                    </tr>\n";
@@ -1043,6 +1052,8 @@ function SHOWNODES($pid, $eid) {
 	echo "</table>\n";
 	echo "<h4><blockquote><blockquote><blockquote>
               <ol>
+	        <li>A $stalemark indicates that the data is stale, and
+	            the node has not reported on its proper schedule. 
                 <li>Exit value of the node startup command. A value of
                         666 indicates a testbed internal error.
                 <li>User application ready status, reported via TMCC.
