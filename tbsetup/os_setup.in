@@ -751,6 +751,9 @@ elsif (@vnodelist) {
 	    # really working again. 
 	    #
 	    MarkPhysNodeDown($pnode);
+	    TBSetNodeLogEntry($pnode, $dbuid, TB_DEFAULT_NODELOGTYPE(),
+			      "Moved to hwdown; ".
+			      "plab node $node ($pid/$eid) failed to setup.");
 	    $failedplab++;
 	}
 	else {

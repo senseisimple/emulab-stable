@@ -137,6 +137,10 @@ while (1) {
 	    print "$pnode brought back from the afterworld at ".
 		TimeStamp() . "\n";
 	    
+	    TBSetNodeLogEntry($pnode, "root", TB_DEFAULT_NODELOGTYPE(),
+			      "Moved to $PLABHOLDING_EID; ".
+			      "plab node $vnode setup okay by monitor.");
+
 	    SENDMAIL($TBOPS, "$pnode is alive",
 		     "$pnode has been brought back from the afterworld!".
 		     $TBOPS);	    

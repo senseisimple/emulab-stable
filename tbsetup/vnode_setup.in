@@ -104,9 +104,10 @@ else {
 }
 
 #
-# Verify permission to muck with this experiment.
+# Verify permission to muck with this experiment. Note that this script
+# is run as root from the plab monitor daemon.
 #
-if (!TBAdmin($UID) &&
+if ($UID && !TBAdmin($UID) &&
     !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
 	"    You do not have permission to mess with $pid/$eid!\n");
@@ -317,8 +318,8 @@ while (1) {
 
 	    if ($plab && $mode eq "setup") {
 		if (system("$TB/sbin/plabnode alloc $pid $eid $vnode")) {
-		    print STDERR "*** $0:\n" .
-			         "    Plab node allocation failed";
+		    print "*** $0:\n" .
+			  "    Plab node allocation failed\n";
 		    # Should check DB state instead.
 		    exit(99);
 		}
@@ -449,14 +450,20 @@ while (1) {
 }
 
 #
+# In force node, do not bother with this other stuff. 
+#
+exit(scalar(@failed_nodes))
+    if ($force);
+
+#
 # Send mail to testbed-ops about failed nodes
 #
 if (@failed_nodes) { 
     my $failed_lines = join("\n",map { join("\t",@{$_}) } @failed_nodes);
     SENDMAIL($TBOPS, "Virtual Node failure for $pid/$eid",
-	"The following virtual nodes failed: \n" .
-	"vnode\t\tpnode\tmode\texit status\n" .
-	$failed_lines);
+	     "The following virtual nodes failed: \n" .
+	     "vnode\t\tpnode\tmode\texit status\n" .
+	     $failed_lines);
 }
 
 if ($killmode) {
@@ -465,4 +472,4 @@ if ($killmode) {
 else {
     print STDOUT "Vnode setup initiated on all nodes ...\n";
 }
-exit 0;
+exit(0);
