@@ -140,8 +140,13 @@ function SPITFORM($node_type, $formfields, $errors)
 		  $osid_result, $formfields[osid]);
 
     echo "<tr>
-              <td>Control Network Interface:</td>
-              <td class=left>$formfields[control_net]</td>
+             <td>Control Network:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[control_net]\"
+                        value=\"" . $formfields[control_net] . "\"
+	                size=3>
+             </td>
           </tr>\n";
 
     echo "<tr>
@@ -312,7 +317,6 @@ if (! isset($submit)) {
 # We do not allow these to be changed.
 #
 $formfields["class"]       = $defaults["class"];
-$formfields["control_net"] = $defaults["control_net"];
 
 #
 # Otherwise, must validate and redisplay if errors. Build up a DB insert
@@ -384,6 +388,16 @@ if (isset($formfields[osid]) && $formfields[osid] != "") {
     }
     else {
 	$inserts["osid"] = $formfields[osid];
+    }
+}
+
+# control_net
+if (isset($formfields[control_net]) && $formfields[control_net] != "") {
+    if (! TBvalid_tinyint($formfields[control_net])) {
+	$errors["control_net"] = TBFieldErrorString();
+    }
+    else {
+	$inserts["control_net"] = $formfields[control_net];
     }
 }
 
