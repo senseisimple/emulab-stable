@@ -1292,7 +1292,8 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 				    ctoken,
 				    agerror);
 
-	if (strcmp(objtype, TBDB_OBJECTTYPE_TIMELINE) == 0) {
+	if ((strcmp(objtype, TBDB_OBJECTTYPE_TIMELINE) == 0) ||
+	    (strcmp(objtype, TBDB_OBJECTTYPE_SEQUENCE) == 0)) {
 		RPC_grab();
 		RPC_notifystart(pid, eid, objname, 0);
 		RPC_drop();

@@ -316,7 +316,7 @@ static int timeline_agent_immediate(local_agent_t la, sched_event_t *se)
 		struct timeval now, then;
 		int token, lpc;
 
-		if (strcmp(la->la_agent->name, "__ns_timeline") != 0) {
+		if (strncmp(la->la_agent->name, "__", 2) != 0) {
 			RPC_grab();
 			RPC_notifystart(pid, eid, la->la_agent->name, 1);
 			RPC_drop();
@@ -390,6 +390,13 @@ static int sequence_agent_immediate(local_agent_t la, sched_event_t *se)
 			      sa->ta_local_agent.la_link.ln_Name);
 		}
 		else if (sa->ta_count > 0) {
+			if (strncmp(la->la_agent->name, "__", 2) != 0) {
+				RPC_grab();
+				RPC_notifystart(pid, eid,
+						la->la_agent->name, 1);
+				RPC_drop();
+			}
+		
 			event_notification_get_int32(handle,
 						     se->notification,
 						     "TOKEN",
