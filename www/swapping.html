@@ -20,7 +20,7 @@ What is "swapping"?</a>
 <li><a href="#idleswap">
 What is an "Idle-Swap"?</a>
 <li><a href="#autoswap">
-What is an "Auto-Swap"?</a>
+What is "Maximum Duration" (aka an "Auto-Swap")?</a>
 <li><a href="#idle">
 How long is too long for a node to be idle?</a>
 <li><a href="#state">
@@ -45,10 +45,13 @@ others may use them. By way of summary, our policy is that experiments
 should be swapped out when they are not in use. In general, if they
 are idle for several hours, we will send you mail about it and/or
 swap out the experiment for you. The actual grace period will differ
-depending on the size of the experiment and other factors. If you mark
+depending on the size of the experiment and other factors. 
+<!--
+If you mark
 your experiment "unswappable" at creation time, we will contact you
 before swapping it, since local node state will be lost on
 swapout. Please see full details below.
+-->
 </p>
 
 <a name="active"></a>
@@ -92,6 +95,7 @@ called "swapping in" and "swapping out" respectively. See also
 the <A href="docwrapper.php3?docname=faq.html#UTT-Swapping">
 What is Swapping?</a> question on our FAQ.
 </p>
+<!--
 <p>
 When you create your experiment, you can mark your experiment as
 swappable or unswappable. When marking it unswappable, you must
@@ -103,6 +107,7 @@ contact you in the event a swapout becomes necessary. You can edit the
 swap settings (unswappable, idle-swap, auto-swap, and corresponding
 reasons and timeouts) on the experiment page for your experiment.
 </p>
+-->
 
 <a name="idleswap"></a>
 <h3>What is an "Idle-Swap"?</h3>
@@ -131,23 +136,30 @@ contact you, since it may cause you to lose data stored on the nodes.
       
 
 <a name="autoswap"></a>
-<h3>What is an "Auto-Swap"?</h3>
+<h3>What is "Maximum Duration" (aka an "Auto-Swap")?</h3>
 
 <p>
-An "Auto-Swap" is when Emulab or its administrators swap your
-experiment out because it was swapped in for longer than its specified
-time limit. Emulab allows users to schedule experiment swapouts, to
+Each experiment may have a Maximum Duration, where an experimenter
+specifies the maximum amount of time that the experiment should
+stay swapped in. When that time expires, the experiment is swapped
+out. The timer is reset every time the experiment swaps in. A warning
+message is sent about an hour before the experiment is swapped. This
+swapout happens regardless of any activity on the nodes, and can be
+averted by using the "Edit Meta-Data" option on the experiment's page
+to adjust the swapout time or turn off the Maximum Duration
+feature. (This feature was previously also known as an "Auto-Swap".)
+</p>
+<p>
+This feature allows users to schedule experiment swapouts, to
 aid experimenters in releasing nodes in a timely manner.  For
 instance, if you plan to use your experiment throughout an 8 hour work
 day, you can schedule a swapout for 8 hours after it is swapped
 in. That way, if you forget to swap out before leaving for the day, it
 will automatically be taken care of for you, without leaving the nodes
 reserved and idle for several hours before being idle-swapped. For
-automated experiments, it can also help by letting you schedule an
-auto-swap for just after the maximum amount of time your experiment
-should last.  You will typically receive a warning message about any
-upcoming auto-swaps about an hour before they occur, to give you a
-chance to readjust the timing for your auto-swap.
+automated experiments, it can also help by letting you schedule a
+swapout for just after the maximum amount of time your experiment
+should last.
 </p>
 
 <a name="idle"></a>
@@ -206,7 +218,8 @@ to this guideline whenever possible.
 <p>
 Wherever possible it is discouraged to have local node state, since
 swapping out causes this data to be lost. An experiment that needs
-local state should be marked "unswappable" when you create it. If you
+local state should be marked "unswappable" when you create it. 
+(Contact Testbed Ops to have them set this for you.) If you
 must have node state, you can save it before you swap out by creating
 a disk image of the node in question, and later reloading it to a new
 node after you swap in again. Disk images in effect create a "custom
@@ -254,8 +267,11 @@ inadvertently cause problems for you.
 <p>
 As described above, we will typically try to contact you about your
 idle experiment before we swap it out. However, if the experiment has
-been idle for several hours, we may swap it out for you unless you marked
-it as "unswappable" when you created your experiment. Because of this,
+been idle for several hours, we may swap it out for you.
+<!-- unless you marked
+it as "unswappable" when you created your experiment. 
+-->
+Because of this,
 it is critical that you keep in close contact with us about an
 experiment that we may perceive as idle if you want to avoid any loss
 of your work.
