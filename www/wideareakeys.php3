@@ -93,10 +93,15 @@ if (isset($deletekey)) {
 	return;
     }
     DBQueryFatal("delete from widearea_privkeys where privkey='$deletekey'");
-    DBQueryFatal("delete from interfaces where node_id='$nodeid'");
-    DBQueryFatal("delete from nodes where node_id='$nodeid'");
-    DBQueryFatal("delete from nodes where phys_nodeid='$nodeid'");
-    DBQueryFatal("delete from reserved where node_id='$nodeid'");
+
+    if (isset($nodeid) && $nodeid) {
+	DBQueryFatal("delete from widearea_nodeinfo where node_id='$nodeid'");
+	DBQueryFatal("delete from widearea_accounts where node_id='$nodeid'");
+	DBQueryFatal("delete from interfaces where node_id='$nodeid'");
+	DBQueryFatal("delete from nodes where node_id='$nodeid'");
+	DBQueryFatal("delete from nodes where phys_nodeid='$nodeid'");
+	DBQueryFatal("delete from reserved where node_id='$nodeid'");
+    }
     header("Location: wideareakeys.php3");
 }
 
