@@ -39,7 +39,6 @@ my %vlanids=();
 sub init($) {
     $debug = shift || $debug;
     &ReadTranslationTable;
-    print getTrunkPath(\%trunk,[ keys %trunk ],'cisco1','cisco4'),"\n";
     return 0;
 }
 
