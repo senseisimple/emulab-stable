@@ -40,7 +40,8 @@ if (! mysql_num_rows($query_result) != 0) {
 $noderow = mysql_fetch_assoc($query_result);
 
 echo "<font size=+2>".
-     "Node Type <b>$node_type</b>";
+     "Node Type <b>$node_type</b>".
+     "</font>\n";
 
 echo "<table border=2 cellpadding=0 cellspacing=2
              align=center>\n";
