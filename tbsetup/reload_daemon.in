@@ -96,15 +96,16 @@ print "Reload Daemon starting... pid $$\n";
 #
 # Loop, looking for nodes to reload.
 # 
+my $idle=0;
 while (1) {
     my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
     my($pid, $eid);
 
-    #
     # Partial delay between loops in case of an error.
-    # 
-    sleep(1);
+    if ($idle) { sleep(10); } # Wait longer if we're not doing anything
+    else { sleep(1); }
 
+    $idle=1; # Assume we're going to be idle this iteration
     #
     # We use this to figure out when to delete nodes from the retried and
     # warned hashes
@@ -127,6 +128,7 @@ while (1) {
     }
 
     while (($node) = $query_result->fetchrow){ 
+	$idle=0;
 	if (!$retried{$node}) {
 	    print "\nReload appears wedged at ".`date`.
 		"Power cycling and trying once more!\n";
@@ -164,6 +166,7 @@ while (1) {
     }
 
     while (($node) = $query_result->fetchrow){ 
+	$idle=0;
 	if (!$warned{$node}) {
 	    notify("Node $node has been in $RELOADPID/$RELOADEID for " .
 	    "more than $warn_time minutes");
@@ -207,6 +210,8 @@ while (1) {
 
     if (! $count) {
 	next;
+    } else {
+	$idle=0;
     }
 
     #
