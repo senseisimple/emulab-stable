@@ -84,7 +84,7 @@ $assname = "$dirname" . "/" . "assign"   . ".log";
 # Make sure the experiment directory exists before continuing. 
 # 
 if (! file_exists($irname)) {
-    TBERROR("IR file $irname for experiment $exp_id does not exist!\n", 1);
+    TBERROR("IR file $irname for experiment $exp_eid does not exist!\n", 1);
 }
 
 echo "<center><br>";
@@ -98,7 +98,7 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_id.ir",
+$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_eid.ir",
                $output, $retval);
 if ($retval) {
     echo "<br><br><h2>
@@ -134,10 +134,10 @@ if (file_exists($dirname))
 # From the database too!
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_id'");
+	"DELETE FROM experiments WHERE eid='$exp_eid'");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error deleting experiment $exp_id: $err\n", 1);
+    TBERROR("Database Error deleting experiment $exp_eid: $err\n", 1);
 }
 
 echo "<center><br>";
