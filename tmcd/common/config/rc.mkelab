@@ -24,7 +24,7 @@ sub usage()
 my $optlist = "ds";
 my $action  = "boot";
 my $debug   = 0;
-my $skipit  = 0;	# Temporary until images updated.
+my $skipit  = 1;	# Temporary until images updated.
 
 # Turn off line buffering on output
 $| = 1;
@@ -89,6 +89,10 @@ chomp($creator);
 my $hostname = `hostname`;
 chomp($hostname);
 my ($bossname, $bossip) = tmccbossinfo();
+
+# Cert stuff to give the inner emulab
+my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
+my $RPCPORT = 7778;
 
 #
 # Find out our domain name, so that we can qualify the localhost entry
@@ -408,7 +412,7 @@ sub SetupBossNode()
     mysystem("cp -p ~${creator}/.ssl/emulab.pem ${TBDIR}/testbed/stuff");
 
     # Still waiting for Rob to fix packages. This is some extra goo.
-    mysystem("cp -p /proj/$pid/exp/$eid/extras.tar.gz ${TBDIR}/testbed/stuff");
+#    mysystem("cp -p /proj/$pid/exp/$eid/extras.tar.gz ${TBDIR}/testbed/stuff");
 
     #
     # Stash the IP of the outer emulab for tmcc (and script above).
@@ -416,6 +420,7 @@ sub SetupBossNode()
     # 
     mysystem("echo '${bossip}' > $ETCDIR/outer_bossnode");
     mysystem("cp -p $BOOTDIR/routerip $ETCDIR/outer_router");
+    mysystem("cp -p $BOOTDIR/myip $ETCDIR/outer_ipaddr");
 
     #
     # Need outer control router IP below too.
@@ -466,7 +471,7 @@ sub SetupBossNode()
     #
     # Extra stuff to fix up php package stuff. Ask Rob!
     #
-    mysystem("tar xzf ${TBDIR}/testbed/stuff/extras.tar.gz -C /");
+#    mysystem("tar xzf ${TBDIR}/testbed/stuff/extras.tar.gz -C /");
 
     #
     # We no longer need anything from NFS, and we need to unmount everything
@@ -553,7 +558,7 @@ sub SetupBossNode()
     #
     print "Copying over tftpboot tar file from web server and unpacking\n";
     mysystem("wget -q -O ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
-	     "http://www.emulab.net/downloads/tftpboot-new.tar.gz");
+	     "http://www.emulab.net/downloads/tftpboot-latest.tar.gz");
 
     mysystem("tar xzf ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
 	     "    -C /tftpboot");
@@ -567,8 +572,7 @@ sub SetupBossNode()
     # inner boss to invoke the XMLRPC server on the outer boss for
     # doing things like power control, vlan setup, etc.
     #
-    mysystem("cp -p ${TBDIR}/testbed/stuff/emulab.pem ".
-	     "      /usr/testbed/etc/outer_emulab.pem");
+    mysystem("cp -p ${TBDIR}/testbed/stuff/emulab.pem $RPCCERT");
 
     #
     # Set up a bunch of DB stuff.  This part will eventually be optional,
@@ -593,40 +597,11 @@ sub SetupBossNode()
     }
 
     #
-    # We need to actually create the project and users from the DB state.
+    # This script does a bunch of stuff with the above DB state, like
+    # create the initial project, create subgroups, users, etc. 
     #
     mysystem("sudo -u elabman /usr/testbed/sbin/withadminprivs ".
-	     "  /usr/testbed/sbin/mkproj $pid");
-
-    #
-    # Create the users that are part of the project. We need to know those
-    # users though, so ask mysql.
-    #
-    my $cmd   = "select distinct uid from group_membership where pid='$pid'";
-    my @users = split("\n", `echo \"$cmd\" | mysql tbdb`);
-    # Chop first line from mysql results.
-    shift(@users);
-
-    foreach my $uid (@users) {
-	mysystem("sudo -u elabman /usr/testbed/sbin/withadminprivs ".
-		 "  /usr/testbed/sbin/tbacct add $uid");
-    }
-
-    #
-    # Get the list of admin users (subset of above). These users get real
-    # accounts on boss. Note that for elabinelab, its fine to share a home
-    # dir between boss and ops (not allowed on a real Emulab).
-    #
-    $cmd   = "select distinct u.uid from group_membership as m ".
-             "left join users as u on u.uid=m.uid ".
-	     "where u.admin=1 and u.status='active'";
-    @users = split("\n", `echo \"$cmd\" | mysql tbdb`);
-    # Chop first line from mysql results.
-    shift(@users);
-
-    foreach my $uid (@users) {
-	mysystem("pw usermod -n $uid -s /bin/tcsh");
-    }
+	     "     /usr/testbed/sbin/elabinelab_bossinit $pid");
 
     #
     # Need to regen the dhcpd config file after loading the DB above.
@@ -637,6 +612,13 @@ sub SetupBossNode()
     # Ditto for named config.
     #
     mysystem("/usr/testbed/sbin/named_setup");
+
+    #
+    # Tack the frisbee mcast addr ipfw rule onto end of /etc/rc.local.
+    #
+    mysystem("echo 'ipfw add 10 allow udp from any to 224.0.0.0/4' ".
+	     "   >> /etc/rc.local");
+    
 }
 
 #
@@ -658,6 +640,8 @@ sub CreateDefsFile($)
 				    inet_aton("0.0.0.200"));
     my $dynrange_high   = inet_ntoa(inet_aton($control_network) |
 				    inet_aton("0.0.0.249"));
+    my ($a,$b,$c,$d)    = ($bossnode_ip =~ /(\d+).(\d+).(\d+).(\d+)/);
+    my $frismcastaddr   = "235.${d}.${c}";
 
     open(INDEFS, $defsfile) or
 	SetupFatal("Could not open stub defs-elabinelab: $!");
@@ -692,8 +676,11 @@ sub CreateDefsFile($)
 		    print OUTDEFS "BOSSNODE=${bossnode}.${domain}\n";
 		    last SWITCH;
 		};
-		/^OUTERBOSSNODE$/ && do {
-		    print OUTDEFS "OUTERBOSSNODE=${bossname}\n";
+		/^OUTERBOSS_NODENAME$/ && do {
+		    print OUTDEFS "OUTERBOSS_NODENAME=${bossname}\n";
+		    print OUTDEFS "OUTERBOSS_SSLCERTNAME=$RPCCERT\n";
+		    # Debugging
+		    print OUTDEFS "OUTERBOSS_XMLRPCPORT=$RPCPORT\n";
 		    last SWITCH;
 		};
 		/^USERNODE$/ && do {
@@ -774,6 +761,10 @@ sub CreateDefsFile($)
 		/^DHCPD_DYNRANGE$/ && do {
 		    print OUTDEFS "DHCPD_DYNRANGE=".
 			"\"$dynrange_low $dynrange_high\"\n";
+		    last SWITCH;
+		};
+		/^FRISEBEEMCASTADDR$/ && do {
+		    print OUTDEFS "FRISEBEEMCASTADDR=\"$frismcastaddr\"\n";
 		    last SWITCH;
 		};
 		
