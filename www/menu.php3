@@ -125,7 +125,7 @@ function WRITESIDEBAR() {
                 # display this option, and let the form decide if the user is
                 # allowed to do this.
                 #
-		WRITESIDEBARBUTTON("Project Information",
+		WRITESIDEBARBUTTON("Project List",
 				   $TBBASE, "showproject_list.php3");
 	    
 		if (ISADMIN($login_uid)) {
@@ -133,10 +133,10 @@ function WRITESIDEBAR() {
 				       $TBBASE, "showuser_list.php3");
 		}
 	    
+		WRITESIDEBARBUTTON("Experiment List",
+				   $TBBASE, "showexp_list.php3");
 		WRITESIDEBARBUTTON("Begin an Experiment",
 				   $TBBASE, "beginexp.php3");
-		WRITESIDEBARBUTTON("Experiment Information",
-				   $TBBASE, "showexp_list.php3");
 		WRITESIDEBARBUTTON("Update user information",
 				   $TBBASE, "moduserinfo.php3");
 		WRITESIDEBARBUTTON("Node Reservation Status",

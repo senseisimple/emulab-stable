@@ -162,7 +162,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	echo "<td> ";
 	while (list ($idx, $pid) = each($projmemb_array[$thisuid])) {
 	    echo "<A href='showproject.php3?pid=$pid'>$pid</A>";
-	    if ($idx)
+	    if ($idx != (count($projmemb_array[$thisuid]) - 1))
 		echo ", ";
 	}
 	echo "</td>\n";
