@@ -931,7 +931,7 @@ class Node:
             TIMESTAMP("Node %s ready." % self.nodeid)
             pass        
 
-        TIMESTAMP("createnode %s finished." % self.nodeid)
+        TIMESTAMP("createnode finished on %s." % self.nodeid)
         return
 
     def _load(self):
@@ -1019,13 +1019,13 @@ class Node:
         Emulab/Plab node.  Primarily, this unpacks the magic files on to
         the node.
         """
-        TIMESTAMP("emulabify %s started." % self.nodeid)
+        TIMESTAMP("emulabify started on %s." % self.nodeid)
         print "Overlaying Emulab files on %s ..." % self.nodeid
         self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh")
         self.__perform("-tt sh /tmp/fixsudo.sh")
         self.addToGroup(self.slice.slicename, "root")
         self.unpackTgz(rootballpath, rootballname)
-        TIMESTAMP("emulabify %s finished." % self.nodeid)
+        TIMESTAMP("emulabify finished on %s." % self.nodeid)
 
     def addToGroup(self, user, group):
         if libtestbed.gv.verbose:
