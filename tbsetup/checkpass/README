@@ -1,0 +1,8 @@
+This is the README for checkpass by Mac Newbold, Sept. 2000
+
+Checkpass makes use of a modified version of CrackLib v2.7.
+The modifications allowed for a string to be passed in with the password
+line data instead of getting it from the password file. This remedies a
+shortcoming of CrackLib, that it would not allow accounts being created to
+have their passwords checked.
+
