@@ -24,6 +24,7 @@ if (!isset($node_id) ||
 # nodes in their own experiments.
 #
 # XXX is MODIFYINFO the correct one to check? (probably)
+$isadmin = ISADMIN($uid);
 if (! $isadmin) {
     if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
         USERERROR("You do not have permission to tip to node $node_id!", 1);
@@ -36,7 +37,11 @@ if (mysql_num_rows($query_result) == 0) {
   USERERROR("The node $node_id does not exist, or appear to have a tipline!", 1);
 }
 
-header("Content-type: text/testbed-acl");
+$filename = $node_id . ".acl"; 
+
+header("Content-Type: text/testbed-acl");
+header("Content-Disposition: attachment; filename=$filename;");
+header("Content-Description: an ACL file which will allow access to a testbed node serial port");
 
 # XXX, should handle multiple tip lines gracefully somehow, but not important for now.
 
