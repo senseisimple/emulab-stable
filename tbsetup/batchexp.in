@@ -272,7 +272,7 @@ sub fatal($)
 	    DBQueryWarn("DELETE from experiment_stats ".
 			"WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
 	    DBQueryWarn("DELETE from experiment_resources ".
-			"WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
+			"WHERE exptidx=$idx");
 	}
     }
     
