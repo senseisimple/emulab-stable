@@ -106,10 +106,12 @@ function TBMAIL($to, $subject, $message, $headers = 0)
 #
 function TBERROR ($message, $death, $xmp = 0) {
     global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR;
+    $script = $_SERVER['REQUEST_URI'];
 
     TBMAIL($TBMAIL_OPS,
          "WEB ERROR REPORT",
          "\n".
+	 "In $script\n\n".
          "$message\n\n".
          "Thanks,\n".
          "Testbed WWW\n",
