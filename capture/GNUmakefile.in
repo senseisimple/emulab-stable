@@ -30,6 +30,9 @@ CFLAGS= -g -O2 -DLOG_DROPS -I${OBJDIR}
 capture: capture.c capdecls.h
 	cc $(CFLAGS) -DUSESOCKETS -DWITHSSL -DPREFIX=\"$(TBROOT)\" -o capture $< -lssl -lcrypto
 
+capture-nossl: capture.c capdecls.h
+	cc $(CFLAGS) -DUSESOCKETS -DPREFIX=\"$(TBROOT)\" -o capture-nossl $< 
+
 capture-tty: capture.c capdecls.h
 	cc $(CFLAGS) -o capture-tty $<
 

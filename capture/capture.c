@@ -99,7 +99,7 @@ char	*Ptyname;
 char	*Devname;
 char	*Machine;
 int	logfd, runfd, devfd, ptyfd;
-int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
+int	hwflow = 0, speed = B9600, debug = 0, runfile = 0, standalone = 0;
 sigset_t actionsigmask;
 sigset_t allsigmask;
 #ifdef  USESOCKETS
@@ -143,7 +143,7 @@ main(argc, argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:itp:c:")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:ip:c:")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
 #ifdef  WITHSSL
@@ -157,6 +157,10 @@ main(argc, argv)
 
 		case 'p':
 			serverport = atoi(optarg);
+			break;
+
+		case 'i':
+			standalone = 1;
 			break;
 #endif /* USESOCKETS */
 		case 'H':
@@ -1353,6 +1357,12 @@ handshake()
 	struct hostent	       *he;
 	whoami_t		whoami;
 	tipowner_t		tipown;
+
+	/*
+	 * In standalone, do not contact the capserver.
+	 */
+	if (standalone)
+		return err;
 
 	/*
 	 * Global. If we fail, we keep trying from the main loop. This
