@@ -433,7 +433,7 @@ def DBQueryFatal(queryPat, querySub = (), asDict = False):
                     __dbConnection.ping()
                 except MySQLdb.MySQLError: pass
     tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
-    SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg)
+    SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg, TBOPS)
     raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
 
 def DBQuery(*args):
@@ -868,7 +868,7 @@ class Plab:
             SENDMAIL(TBOPS, "Error adding new plab node to DB: %s\n" %
                      nodeid, "Some operation failed while trying to add a"
                      " newly discovered plab node to the DB:\n %s"
-                     "\n Please clean up!\n" % tbmsg)
+                     "\n Please clean up!\n" % tbmsg, TBOPS)
             enable_sigs(osigs)
             raise
 
@@ -944,7 +944,7 @@ class Plab:
                 failstr += "%s %s/%s\n" % n
             SENDMAIL(TBOPS, "Lease renewal(s) failed",
                      "Failed to renew lease on the following nodes:\n%s" %
-                     failstr + "\n\nPlease check the plabrenew log")
+                     failstr + "\n\nPlease check the plabrenew log", TBOPS)
 
 
     def _createAgentProxy(self, insecure = False):
@@ -1045,7 +1045,7 @@ class Slice:
             print "Error deleting slice from DB!"
             tbstr = "".join(traceback.format_exception(*sys.exc_info()))
             SENDMAIL(TBOPS, "Error deleting slice from DB",
-                     "Slice deletion error:\n\n%s" % tbstr)
+                     "Slice deletion error:\n\n%s" % tbstr, TBOPS)
             enable_sigs(osigs)
             raise
         
@@ -1259,7 +1259,7 @@ class Node:
             tbstr = "".join(traceback.format_exception(*sys.exc_info()))
             SENDMAIL(TBOPS, "Error: Couldn't remove plab vnode from DB",
                      "Unable to delete entry for sliver %s from the DB:"
-                     "\n\n%s" % (self.nodeid, tbstr))
+                     "\n\n%s" % (self.nodeid, tbstr), TBOPS)
 
         tries = DEF_TRIES
         while 1:
@@ -1281,7 +1281,7 @@ class Node:
                 tbstr = "".join(traceback.format_exception(*sys.exc_info()))
                 SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
                          "dslice %s" % (self.nodeid, self.slice.slicename),
-                         "Sliver lease deletion failed:\n\n%s" % tbstr)
+                         "Sliver lease deletion failed:\n\n%s" % tbstr, TBOPS)
                 break
             else:
                 deleted = 1
