@@ -479,10 +479,6 @@ Lan instproc updatedb {DB} {
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
 	set isvirt [$node set isvirt]
-	if {$isvirt} {
-	    perror "Virtual nodes ($node) may not be in lans yet!"
-	    return
-	}
 	set linkqueue $linkq($nodeport)
 	set limit_ [$linkqueue set limit_]
 	set maxthresh_ [$linkqueue set maxthresh_]
