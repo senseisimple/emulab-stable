@@ -1,0 +1,41 @@
+#	from @(#)Makefile.inc	8.1 (Berkeley) 6/4/93
+# $FreeBSD: src/lib/libc/locale/Makefile.inc,v 1.42 2002/11/18 09:50:55 ru Exp $
+
+# locale sources
+#.PATH: ${.CURDIR}/${MACHINE_ARCH}/locale ${.CURDIR}/locale
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../../..
+SUBDIR		= os/imagezip/ntfs/liblocale
+
+include $(OBJDIR)/Makeconf
+
+all:	liblocale.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CC		= gcc
+CFLAGS	       += -O2 -g -static -Wall -I${OBJDIR} -I/usr/local/include \
+			-I${SRCDIR}/include
+
+OBJS=	big5.o btowc.o collate.o collcmp.o euc.o fix_grouping.o frune.o \
+	isctype.o iswctype.o \
+	ldpart.o lmessages.o lmonetary.o lnumeric.o localeconv.o mblen.o \
+	mbrlen.o \
+	mbrtowc.o mbrune.o mbsinit.o mbsrtowcs.o mbtowc.o mbstowcs.o \
+	mskanji.o nl_langinfo.o nomacros.o none.o rune.o \
+	runetype.o setinvalidrune.o setlocale.o setrunelocale.o table.o \
+	tolower.o toupper.o utf2.o utf8.o wcrtomb.o wcsrtombs.o wcsftime.o \
+	wcstod.o \
+	wcstoimax.o wcstol.o wcstoll.o \
+	wcstombs.o \
+	wcstoul.o wcstoull.o wcstoumax.o wctob.o wctomb.o wctrans.o wctype.o \
+	wcwidth.o
+
+liblocale.a: $(OBJS)
+	$(AR) crv $@ $(OBJS)
+	$(RANLIB) $@
+
+clean:
+	-rm -f *.o *~ *.a 

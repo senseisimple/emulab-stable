@@ -1,0 +1,73 @@
+#	from @(#)Makefile.inc	8.1 (Berkeley) 6/4/93
+# $FreeBSD: src/lib/libc/locale/Makefile.inc,v 1.42 2002/11/18 09:50:55 ru Exp $
+
+# locale sources
+#.PATH: ${.CURDIR}/${MACHINE_ARCH}/locale ${.CURDIR}/locale
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../../..
+SUBDIR		= os/imagezip/ntfs/libntfs
+NTFSVER		= ntfsprogs-1.7.1
+NTFSDIR		= ntfsprogs
+LIBSRCDIR	= $(NTFSDIR)/libntfs
+PKGHOST		= www.emulab.net
+
+include $(OBJDIR)/Makeconf
+
+FETCH		= fetch -m
+UNPACK		= tar zxf
+PATCH		= patch -sN
+MV		= mv -f
+
+all:	libntfs.a
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CC		= gcc30
+INCLUDES        = -I${NTFSDIR}/include -I${OBJDIR} \
+                  -I${SRCDIR}/../liblocale/include \
+                  -I${SRCDIR}/../extra_bsd_includes \
+                  -I/usr/include \
+                  -I/usr/local/include
+
+CFLAGS	        = -O2 -g -nostdinc -static -Wall $(INCLUDES)
+
+OBJS=	attrib.o \
+	bitmap.o \
+	bootsect.o \
+	compat.o \
+	debug.o \
+	dir.o \
+	disk_io.o \
+	inode.o \
+	lcnalloc.o \
+	mft.o \
+	mst.o \
+	runlist.o \
+	unistr.o \
+	volume.o
+
+SRCS=	$(patsubst %.o,$(LIBSRCDIR)/%.c,$(OBJS))
+
+%.o:	$(LIBSRCDIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+libntfs.a: $(LIBSRCDIR)/patched $(OBJS)
+	$(AR) crv $@ $(OBJS)
+	$(RANLIB) $@
+
+$(SRCS): $(LIBSRCDIR)/patched
+
+$(LIBSRCDIR)/patched:
+	$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz
+	$(UNPACK) $(NTFSVER).tar.gz
+	$(PATCH) < $(SRCDIR)/ntfs.patch
+	$(MV) $(NTFSVER) $(NTFSDIR)
+	$(NTFSDIR)/configure
+	$(MV) config.h $(NTFSDIR)/include
+	touch $(LIBSRCDIR)/patched
+
+clean:
+	-rm -f *.o *~ *.a
+	-rm -rf $(NTFSDIR)
