@@ -1875,7 +1875,13 @@ foreach $vnodeport (keys(%portmap)) {
 	#
 	my $pnode = $v2pmap{$vnode};
 	my $ip    = $ips{$vnodeport};
+	my $vvnode= "NULL";
 
+	# Mark as being a jail interface. 
+	if ($isvirtnode{$vnode} && $jailed{$vnode}) {
+	    $vvnode = "'" . $v2vmap{$vnode} . "'";
+	}
+	
 	#
 	# Not sure about the MAC yet. We need to create something, and
 	# for now it will be helpful for debugging if I use the IP.
@@ -1885,8 +1891,8 @@ foreach $vnodeport (keys(%portmap)) {
 	printdb("IP: $pnode:$pport $ip (veth)\n");
 
 	DBQueryFatal("insert into veth_interfaces ".
-		     "(node_id, veth_id, mac, IP, iface) ".
-		     "values ('$pnode', 0, '$mac', '$ip', '$pport')");
+		     "(node_id, veth_id, mac, IP, iface, vnode) ".
+		     "values ('$pnode', 0, '$mac', '$ip', '$pport', $vvnode)");
     }
     else {
 	#
