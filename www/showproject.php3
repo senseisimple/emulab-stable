@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -81,6 +81,8 @@ WRITESUBMENUBUTTON("Remove Users",
 		   "showgroup.php3?pid=$pid&gid=$pid");
 WRITESUBMENUBUTTON("Show Project History",
 		   "showstats.php3?showby=project&which=$pid");
+WRITESUBMENUBUTTON("Free Node Summary",
+		   "nodecontrol_list.php3?showtype=summary&bypid=$pid");
 SUBMENUEND();
 
 $query_result =

@@ -25,9 +25,23 @@ LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
 #
-# Admin users can control nodes.
-#
-$isadmin = ISADMIN($uid);
+# Verify page arguments.
+# 
+if (isset($target_uid)) {
+    if ($target_uid == "") {
+	$target_uid = $uid;
+    }
+    elseif (! TBvalid_uid($target_uid)) {
+	PAGEARGERROR("Invalid characters in '$target_uid'");
+    }
+    elseif (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
+	USERERROR("You do not have permission to view this user's ".
+		  "information!", 1);
+    }
+}
+else {
+    $target_uid = $uid;
+}
 
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
@@ -115,19 +129,41 @@ if (! strcmp($showtype, "summary")) {
     # to see.
     $perms = array();
     
-    if (!$isadmin) {
+    if (!$isadmin || isset($bypid)) {
 	$query_result =
 	    DBQueryFatal("select type from nodetypeXpid_permissions");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $perms{$row[0]} = 0;
 	}
-    
-	$query_result =
-	    DBQueryFatal("select distinct type from group_membership as g ".
-			 "left join nodetypeXpid_permissions as p ".
-			 "     on g.pid=p.pid ".
-			 "where uid='$uid'");
+
+	$pidclause = "";
+	if (isset($bypid)) {
+	    if ($bypid == "" || !TBvalid_pid($bypid)) {
+		PAGEARGERROR("Invalid characters in 'bypid' argument!");
+	    }
+	    if (! TBValidProject($bypid)) {
+		PAGEARGERROR("No such project '$bypid'!");
+	    }
+	    if (! TBProjAccessCheck($target_uid,
+				    $bypid, $bypid, $TB_PROJECT_READINFO)){
+		USERERROR("You are not a member of project '$bypid!", 1);
+	    }
+	    $pidclause = "and g.pid='$bypid'";
+	}
+	if ($isadmin) {
+	    $query_result =
+		DBQueryFatal("select distinct type ".
+			     "  from nodetypeXpid_permissions ".
+			     "where pid='$bypid'");
+	}
+	else {
+	    $query_result =
+		DBQueryFatal("select distinct type from group_membership as g ".
+			     "left join nodetypeXpid_permissions as p ".
+			     "     on g.pid=p.pid ".
+			     "where uid='$target_uid' $pidclause");
+	}
 	
 	while ($row = mysql_fetch_array($query_result)) {
 	    $perms{$row[0]} = 1;
@@ -143,6 +179,8 @@ if (! strcmp($showtype, "summary")) {
 		     "      and nt.class!='pcplabphys') ".
 		     "group BY n.type");
 
+    $alltotal  = 0;
+    $allfree   = 0;
     $totals    = array();
     $freecount = array();
 
@@ -172,10 +210,25 @@ if (! strcmp($showtype, "summary")) {
 	$freecounts[$type] = $count;
     }
 
-    echo "<center>
+    $projlist = TBProjList($target_uid, $TB_PROJECT_CREATEEXPT);
+    if (count($projlist) > 1) {
+	echo "<b>By Project Permission: ";
+	while (list($project) = each($projlist)) {
+	    echo "<a href='nodecontrol_list.php3?".
+		"showtype=summary&bypid=$project'>$project</a>,\n";
+	}
+	echo "<a href='nodecontrol_list.php3?showtype=summary'>".
+	    "combined membership</a>.\n";
+	echo "</b><br>\n";
+    }
+
+    echo "<br><center>
           <b>Free Node Summary</b>
-          <br>
-          <table>
+          <br>\n";
+    if (isset($bypid)) {
+	echo "($bypid)<br><br>\n";
+    }
+    echo "<table>
           <tr>
              <th>Type</th>
              <th align=center>Free<br>Nodes</th>
@@ -188,6 +241,9 @@ if (! strcmp($showtype, "summary")) {
 	# Check perm entry.
 	if (isset($perms[$key]) && !$perms[$key])
 	    continue;
+
+	$allfree   += $freecount;
+	$alltotal  += $value;
 	
 	echo "<tr>\n";
 	if ($isadmin)
@@ -199,10 +255,18 @@ if (! strcmp($showtype, "summary")) {
               <td align=center>$value</td>
               </tr>\n";
     }
+    echo "<tr></tr>\n";
+    echo "<tr>
+            <td><b>Totals</b></td>
+              <td align=center>$allfree</td>
+              <td align=center>$alltotal</td>
+              </tr>\n";
     if ($isadmin) {
 	# Give admins the option to create a new type
-	echo "<th colspan=3><a href=editnodetype.php3?new_type=1>Create a " .
-		"new type</a></th>\n";
+	echo "<tr></tr>\n";
+	echo "<th colspan=3 align=center>
+                <a href=editnodetype.php3?new_type=1>Create a new type</a>
+              </th>\n";
     }
     echo "</table>\n";
     PAGEFOOTER();
