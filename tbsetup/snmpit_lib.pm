@@ -4,15 +4,16 @@
 #
 # supports the following methods:
 # macport(pcX:Y || MAC)       return MAC || pcX:Y address respectively
-# portnum(pcX:Y || node:port) return node:port/node:mod.port or pcX:Y
+# portnum(pcX:Y || node:port) return node:mod.port or pcX:Y
 # Dev(name || IP)             return IP/name
 # NodeCheck(pcX:Y)	      return true (1) if okay, false (0) if it failed
+# tableVlans(pid,eid)         returns hash: key=id, val=members
 
 package snmpit_lib;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( macport portnum Dev NodeCheck );
+@EXPORT = qw( macport portnum Dev NodeCheck tableVlans );
 
 use English;
 use Mysql;
@@ -158,6 +159,18 @@ sub NodeCheck {
   return 0;
 }
 
+sub tableVlans {
+  my $pid = shift;
+  my $eid = shift;
+  #returns hash, key=id, val=members
+  my %table = ();
+  $sth = $dbh->
+    query("select id,members from vlans where pid='$pid' and eid='$eid'");
+  while (@row = $sth->fetchrow_array()) {
+    $table{$row[0]} = $row[1];
+  }
+  return %table;
+}
 
 # End with true
 1;

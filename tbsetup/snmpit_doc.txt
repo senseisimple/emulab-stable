@@ -2,10 +2,12 @@ Documentation for snmpit
 ------------------------
 
 snmpit uses modules that implement the interface to a given switch
-model. These modules should support these actions:
+model (ie Cisco Catalyst 6509, Intel EhterExpress 510T, etc). They are
+responsable for all communication (typically over SNMP) to the switch. 
+These modules should support these actions:
 
 new(ip,args)	Initializes snmp session to IP, "arg=val" sets
-		module parameters, ignoring unsupported ones
+		module parameters, ignores unsupported args
 portControl(cmd,ports)
 		cmd = {enable, disable, 10mbit, 100mbit, full, half, auto}
 		ports = list of "pcX:Y"
@@ -26,13 +28,25 @@ functions to determine certain things about the state. In the future,
 it would be good to have them return data structures, like listVlans
 does, and have snmpit be able to use this info.
 
-Supported in snmpit:	autovlanconfig from file, db
-			Power control
-			printing list of vlans
-			device type discovery
+Features supported in snmpit itself:
+ - auto vlan config from file or from db
+ - Power control
+ - device type discovery and command dispatch
+
+Note: Power control should probably be moved out into its own module
+too, but right now it wasn't important. Its so different from the
+switches that there would be a lot of special cases anyway. But its
+something that could be done for increased generality.
 
 snmpit library interface
 ------------------------
-macport(pcX:Y || MAC)	return MAC || pcX:Y address respectively
-portnum(pcX:Y)		return node:port (or node:mod.port)
-NodeCheck(node)		return true (1) if okay, false (0) if it failed
+init(dbname)		    initialize the module
+macport(pcX:Y || MAC)       return MAC || pcX:Y address respectively
+portnum(pcX:Y || node:port) return node:mod.port or pcX:Y
+Dev(name || IP)             return IP/name
+NodeCheck(pcX:Y)	    return true (1) if okay, false (0) if it failed
+tableVlans(pid,eid)         returns hash: key=id, val=members
+
+The snmpit library handles all the database stuff (except some power
+control info). It makes available all the translations that a module
+might need to do.
