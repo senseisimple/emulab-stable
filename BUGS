@@ -62,3 +62,20 @@ Reported by Rob.
 Our Linux kernel needs to be rebuilt with ping of death support.
 
 
+*** DummyNet support - Sept 19 2001 - Needs to be fixed.
+
+Reported by Jay.
+
+We need to pass through more DummyNet pipe configuration parameters
+for delay nodes. It basically needs some front end parser work (not
+too hard), and some changes to the DB where we store that stuff (a few
+tables, not too hard), the tmcd to return the additional stuff (not
+too hard), and the client delay configuration to use the additional
+stuff when configuring the pipes (not too hard).
+
+
+*** Multiple batch/reload daemons. - Sept 24 2001 - Needs to be fixed.
+
+It is possible to start multiple batch and reload daemons (and many
+other TB daemons). Can really mess things up!
+
