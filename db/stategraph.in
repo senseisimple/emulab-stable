@@ -199,7 +199,15 @@ sub doformats() {
 	system("cp $in $out.ps");
     }
     if (!($gif || $png)) { return; }
-    system("pstopnm -stdout $in > $in.ppm 2> /dev/null");
+    my $opt = "-stdout -xborder 0 -yborder 0 ";
+    my $box = `grep %%BoundingBox $in`;
+    if ($box =~ /%%BoundingBox:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/) {
+	my ($xmin,$ymin,$xmax,$ymax) = ($1, $2, $3, $4);
+	my $xsize=$xmax-$xmin;
+	my $ysize=$ymax-$ymin;
+	$opt .="-xsize $xsize -ysize $ysize";
+    }
+    system("pstopnm $opt $in > $in.ppm 2> /dev/null");
     if ($gif) {
 	print "gif ";
 	system("ppmtogif $in.ppm > $out.gif 2> /dev/null");
