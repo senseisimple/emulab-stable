@@ -45,25 +45,32 @@ $output = `env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path SCRIPT_NAME=$n
 # through them. Again, yuck!
 #
 $array = split("\n",$output);
-$headers_done = 0;
+$i = 0;
 for ($i = 0; $i < count($array); $i++) {
 	#
 	# A blank line signifies the end of headers
 	#
 	if (!preg_match("/\w+/",$array[$i])) {
-		$headers_done = 1;
+		#
+		# We're done with the headers, we can stop and finish printing
+		# in the loop below
+		#
+		break;
 	} else {
 		#
-		# If it's a header, we use the PHP header() function to add it
-		# to the list of headers that PHP maintains. Otherwise, we
-		# just print it out.
+		# It's a header, we use the PHP header() function to add it
+		# to the list of headers that PHP maintains.
 		#
-		if (!$headers_done) {
-			header($array[$i]);
-		} else {
-			echo "$array[$i]\n";
-		}
+		header($array[$i]);
 	}
+}
+
+#
+# Just print the rest of the output (the $i++ skips the blank line that
+# seperate the headers from the body of the document)
+#
+for ($i++; $i < count($array); $i++) {
+	echo "$array[$i]\n";
 }
 
 ?>
