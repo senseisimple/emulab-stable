@@ -18,6 +18,15 @@ from emulabserver import *
 # 
 DEFAULT_MODULE = "EmulabServer"
 module         = DEFAULT_MODULE
+ReadOnly       = 0;
+
+#
+# Optional argument indicating read-only privs.
+#
+if len(sys.argv) > 1 and sys.argv[1] == "-ro":
+    ReadOnly = 1;
+    sys.argv = sys.argv[1:]
+    pass
 
 #
 # Optional argument indicates the specific module the server wants to use.
@@ -33,7 +42,7 @@ if len(sys.argv) > 1:
 # just a single request this way, and then exit. 
 # 
 # Construct and wrap our object.
-server  = eval(module + "()")
+server  = eval(module + "(readonly=" + str(ReadOnly) + ")")
 wrapper = sshxmlrpc.SSHServerWrapper(server)
 # Handle the request on stdin and send the response to stdout.
 wrapper.serve_forever((sys.stdin, sys.stdout))
