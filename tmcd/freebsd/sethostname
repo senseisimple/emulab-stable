@@ -1,0 +1,42 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Set the hostname for the node according to the current experiment.
+# Run from /etc/dhclient-exit-hooks
+# 
+
+push(@INC, "/etc/testbed");
+require setuplib;
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/rc.d/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Check allocation. Exit now if not allocated.
+#
+my ($pid, $eid, $vname) = check_status();
+if (! $pid) {
+    exit 0;
+}
+
+#
+# Otherwise, sethostname
+# 
+my $nickname= "$vname.$eid.$pid";
+
+print STDOUT "Resetting hostname to $nickname ... ";
+
+if (system("hostname $nickname")) {
+    print STDOUT "*** FAILED!\n";
+    exit 1;
+}
+
+print STDOUT "Done!\n";
+exit 0;

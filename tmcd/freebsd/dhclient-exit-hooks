@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#
+# See if the Testbed configuration software wants to change the hostname.
+# Installed into /etc.
+# 
+exec /etc/testbed/sethostname

@@ -33,8 +33,10 @@ install:
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(INSTALL_DIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(INSTALL_DIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
+	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
 	$(INSTALL) -m 755 $(SRCDIR)/supfile $(INSTALL_DIR)/supfile
 	-mkdir -p /root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth /root/.cvsup/auth
+	$(INSTALL) -m 644 $(SRCDIR)/pump.conf /etc/pump.conf
