@@ -272,6 +272,50 @@ foreach my $node (@nodes) {
 
 }
 
+
+sub plabnode($$$$) {
+    my ($mode, $pid, $eid, $vnode) = @_;
+
+    my $plabpid = 0;
+    $plabpid = fork();
+        
+    if ($plabpid) {
+        local $SIG{TERM} = 
+            sub { 
+                kill("TERM", $plabpid); 
+                print STDERR "*** $0:\n".
+                    "    Plab node allocation terminated.\n"; 
+                exit(1);
+            };
+        
+        my $childpid = wait();
+        if ($childpid < 0) {
+            die("*** $0:\n".
+                "    Uh oh, wait() returned a negative number");
+        }
+        elsif ($childpid != $plabpid) {
+            die("*** $0:\n".
+                "    Whoops! pid returned by wait() != pid ".
+                "from fork().");
+        }
+        
+        if ($?) {
+            #print STDERR "*** $0:\n" .
+            #    "    Plab node $mode failed\n";
+            # Should check DB state instead.
+            return($?);
+        }
+    }
+    else {
+        exec("$TB/sbin/plabnode $mode $pid $eid $vnode");    
+        die("*** $0:\n".
+            "    exec failed!\n");
+    }
+
+    return(0);
+}
+
+
 my $children = 0;
 my %child_vnodes = ();
 while (1) {
@@ -315,14 +359,17 @@ while (1) {
 	    # Must change our real UID to root so that ssh will work.
 	    $UID = 0;
 
+            # If this is a plab vnode, we need to allocate it first.
+            # This will give us a vserver on the physical plab node to
+            # work in.
 	    if ($plab && $mode eq "setup") {
-		if (system("$TB/sbin/plabnode alloc $pid $eid $vnode")) {
-		    print STDERR "*** $0:\n" .
-			         "    Plab node allocation failed";
-		    # Should check DB state instead.
-		    exit(99);
-		}
-	    }
+                if(plabnode("alloc", $pid, $eid, $vnode)) {
+                    print STDERR "*** $0:\n" .
+                                 "    Plab node allocation failed\n";
+                    # Should check DB state instead.
+                    exit(99);
+                }
+            }
 
 	    # Cleanup is used only on plab nodes.
 	    if ($mode ne "cleanup") {
@@ -369,8 +416,8 @@ while (1) {
 	#
 	# Kill of the oldest if he gets too old while we're waiting
 	#
-	local $SIG{ALRM} = sub { kill("TERM", $oldestpid); };
-	alarm(($oldest + 120) - time());
+        local $SIG{ALRM} = sub { kill("TERM", $oldestpid); };
+        alarm(($oldest + 120) - time());
 
 	my $childpid = wait();
 	my $exitstatus = $?;
@@ -427,8 +474,8 @@ while (1) {
 		# Besides teardown/cleanup, we want to do this if the
 		# vnode setup on the node failed, but only if the
 		# plabnode alloc worked (it can fail too, exits with 99).
-		# 
-		if (system("$TB/sbin/plabnode free $pid $eid $vnode")) {
+		#
+                if (plabnode("free", $pid, $eid, $vnode)) {
 		    warn("*** $0:\n".
 			 "    Plab node free of $vnode failed");
 		}
