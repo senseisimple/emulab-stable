@@ -119,7 +119,8 @@ my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
     "$LOGDIR/frisbeed.log", "$LOGDIR/tevd.log", "$LOGDIR/proxydhcp.log",
     "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
-    "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log");
+    "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log",
+    "$LOGDIR/sshxmlrpc.log");
 
 my @CISCO_MIBS = ("CISCO-SMI", "CISCO-TC", "CISCO-VTP-MIB", "CISCO-PAGP-MIB",
     "CISCO-PRIVATE-VLAN-MIB", "CISCO-STACK-MIB", "CISCO-VLAN-MEMBERSHIP-MIB");
@@ -320,7 +321,8 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!genlastlog","*.*\t\t\t\t\t\t$LOGDIR/genlastlog.log",
 	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
 	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
-	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log");
+	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
+	    "!sshxmlrpc", "*.*\t\t\t\t\t\t$LOGDIR/sshxmlrpc.log");
     };
 
     Phase "logdir", "Creating log directory", sub {
@@ -368,7 +370,8 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/genlastlog             640  3     200  *     Z " .
 	        "/var/run/lastlog_daemon.pid",
 	    "$LOGDIR/plabmetrics.log        640  7     1000 *     Z",
-	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z");
+	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z",
+	    "$LOGDIR/sshxmlrpc.log          640  7     300  *     Z");
     };
 };
 
