@@ -10,18 +10,26 @@ use English;
 # Turn off line buffering on output
 $| = 1;
 
-$d = 0; #debug mode
 $h = 0; #help mode
+$t=0;
+$p=0;
+$f=0;
+$u=0;
+$s=0;
+$d = 0; #debug mode
 
 sub help {
-    die("Usage:\nidlecheck [-h] [-t hours] [-p pid -e eid] [-n node_id]
+    die("Usage:
+idlecheck [-h] [-t hours] [-p pph] [-f min] [-u] [-s] [-d]
  -h\tThis help message
- -t\tNumber of hours of inactiviy required to be considered idle
- -p\tSpecify a project
- -e\tSpecify an experiment
- -n\tSpecify a node
-Check activity for the given pid/eid or node, or for all experiments
-if no pid/eid is given. Currently the following qualify as activity:
+ -t\tTime (in hours) of inactivity required to be considered idle
+ -p\tPackets per hour required on average to be considered active
+ -f\tMaximum minutes elapsed for data to be considered fresh
+ -u\tShow unswappable experiments
+ -s\tShow experiments with stale data
+ -d\tDebug/verbose mode
+Check activity for all experiments.
+Currently the following qualify as activity:
  * Packets sent/received on the experimental network
  * Use of a tty
 Activity does not currently include:
@@ -38,12 +46,15 @@ while ($#ARGV >= 0) {
     $_ = shift;
     $_ =~ /^(.)(.)/;
     if ($1 ne '-') { next; }
-    if ($2 ne 'p' && $2 ne 'e' && $2 ne 'n' && 
-	$2 ne 'd' && $2 ne 'h' && $2 ne 't') { next; }
+    if ($2 ne 'h' && $2 ne 't' && $2 ne 'p' && 
+	$2 ne 's' && $2 ne 'u' && $2 ne 'd') { next; }
     my $opt="\L$2";
     my $val = shift if ($#ARGV >= 0 && ($ARGV[0] =~ /^[^-]/));
     if (!defined($val)) { $val=1; }
-    $$opt=$val;
+    # Let -d be used multiple times
+    if ($2 eq 'd') { $d++; } else {
+	$$opt=$val;
+    }
     if ($d>1) { print "$opt = $$opt\n"; }
 }
 if ($h) { help(); }
@@ -54,9 +65,9 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 }
 
 # Configurable parameters
-my $idlehours = 24;
-my $minpph = 4; # Min packets per hour that an idle interface sends/rcvs
-my $stalemin = 120; # Max minutes of staleness for latest report
+my $idlehours = $t || 24;
+my $minpph = $p || 4; # Min packets per hour that an idle interface sends/rcvs
+my $stalemin = $f || 120; # Max minutes of staleness for latest report
 
 # Derived params
 my $minpkts = $idlehours * $minpph;
@@ -71,6 +82,7 @@ if ($n) {
     $node3=",node_id";
 }
 my %active=();
+my %fresh=();
 
 # This query finds how many packets the non-control net interfaces
 # have sent in the last $idlesec seconds, and saves it in a temporary
@@ -107,8 +119,7 @@ left join reserved as r on n.node_id=r.node_id
 left join experiments as e on e.pid=r.pid and e.eid=r.eid
 where tstamp >= expt_swapped and r.pid is not null and r.eid is not null
 group by pid,eid 
-having (unix_timestamp(now())-unix_timestamp(t) <= $stalesec)
-and (unix_timestamp(now())-unix_timestamp(lastuse) <= $idlesec)
+having (unix_timestamp(now())-unix_timestamp(lastuse) <= $idlesec)
 order by pid,eid,last_tty,tstamp;") {
 
     print "Sending cmd:\n$cmd\n" if $d;
@@ -122,26 +133,52 @@ order by pid,eid,last_tty,tstamp;") {
 	    $active{"$pid/$eid"} = 1;
 	}
     }
-    #print $result->as_string();
+    print $result->as_string() if ($d>1);
 }
 
-$cmd = "select r.pid,r.eid,swappable from reserved as r
-left join experiments as e on e.pid=r.pid and e.eid=r.eid
-group by r.pid,r.eid order by r.pid,r.eid";
+# This query finds all experiments that have had at least one report
+# from one of their nodes in the last $stalesec seconds.
+
+$cmd = "select pid,eid,max(tstamp) as t from reserved as r
+left join node_idlestats as n on r.node_id=n.node_id
+where r.node_id not like \"sh%\" and r.node_id not like \"wireless%\" 
+and r.node_id not like \"%ron%\" 
+group by pid,eid
+having t is not null and (unix_timestamp(now())-unix_timestamp(t)<=$stalesec) 
+order by pid,eid";
 print "Sending cmd:\n$cmd\n" if $d;
 my $result = DBQueryFatal($cmd);
 while(@r=$result->fetchrow()) {
     $pid=$r[0];
     $eid=$r[1];
+    print "Adding $pid/$eid to fresh data list\n" if $d;
+    $fresh{"$pid/$eid"} = 1;
+}
+print $result->as_string() if ($d>1);
+
+# Find expts that have nodes reserved, and look up their bits.
+$cmd = "select r.pid,r.eid,swappable,expt_swapped from reserved as r
+left join experiments as e on e.pid=r.pid and e.eid=r.eid
+where (unix_timestamp(now())-unix_timestamp(expt_swapped) >= $idlesec)
+group by r.pid,r.eid order by r.pid,r.eid";
+print "Sending cmd:\n$cmd\n" if $d;
+$result = DBQueryFatal($cmd);
+while(@r=$result->fetchrow()) {
+    $pid=$r[0];
+    $eid=$r[1];
     $swap=$r[2];
     $idle=!defined($active{"$pid/$eid"});
+    $stale=!defined($fresh{"$pid/$eid"});
     print "Checking for $pid/$eid in active list\n" if $d;
     my $str= "$pid/$eid";
-    $str = $str . " " x (40-length($str));
+    $str = $str . " " x (30-length($str))."\t";
     $str .= ($idle? "inactive\t" : "\t\t" );
+    $str .= ($stale?"stale\t" : "\t" );
     $str .= (!$swap? "unswappable\n" : "\n" );
-    if ($idle) { print $str; }
+    if (($idle && !$stale && $swap) ||
+	($stale && $s) || 
+	(!$swap && $u)) { print $str; }
 }
-#print $result->as_string();
+print $result->as_string() if ($d>1);
 
 exit(0);
