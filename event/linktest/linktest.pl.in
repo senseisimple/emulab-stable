@@ -779,6 +779,7 @@ sub init {
 	    foreach (@dirfiles) {
 		&do_unlink("$linktest_path/$_");
 	    }
+	    closedir(DIR);
 
 	} else {
 	    mkdir (&check_filename($linktest_path),0777) or  die &fatal("Could not create directory $linktest_path");
