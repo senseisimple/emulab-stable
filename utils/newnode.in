@@ -267,6 +267,11 @@ NODE: foreach my $node_id (@node_ids) {
 
     DBQueryFatal("insert into node_hostkeys (node_id) ".
 		 "values ('$node_id')");
+    DBQueryFatal("insert into node_status ".
+		 "(node_id, status, status_timestamp) ".
+		 "values ('$node_id', 'down', now()) ");
+    DBQueryFatal("insert into node_activity ".
+		 "(node_id) values ('$node_id')");
 
     #
     # Copy data into the location_info table, if they provided any
