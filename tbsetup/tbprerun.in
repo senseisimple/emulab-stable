@@ -40,8 +40,7 @@ else {
 
 $dbh=&tbs_initdbi($TBDB);
 
-$prefix = &tbs_prefix($nsfile);
-$logfile = "$prefix.log";
+$logfile = "$pid-$eid.log";
 
 if ($dolog) {
     &tbs_initlog($logfile);
