@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -139,17 +139,35 @@ sub dotopomap()
     # Try a couple of times to get the file cause of NFS sillyness.
     # Should probably have our own version of cp that retries at the block
     # level?
-    # 
-    for (my $i = 0; $i < 5; $i++) {
-	last
-	    if (system("cp -fp $topomap $tempmap") == 0);
-	unlink("$tempmap");
+    #
+    if (! (USESFS() || WINDOWS())) {
+	for (my $i = 0; $i < 5; $i++) {
+	    last
+		if (system("cp -fp $topomap $tempmap") == 0);
+	    unlink("$tempmap");
+	}
     }
     
-    if (-e ${tempmap}) {
+    if (! -e $tempmap) {
+	#
+	# Try using tmcc. It returns compressed data so do it directly.
+	#
+	system(TMCC() . " topomap > $tempmap");
+	#
+	# tmcc does not really return useful error codes.
+	#
+	if ($?) {
+	    fatal("Could not get topomap from tmcd or from NFS");
+	}
+    }
+
+    if (-s $tempmap) {
 	system("cat ${tempmap} | gunzip > " . TMTOPOMAP());
+	if ($?) {
+	    fatal("Could not unzip topomap");
+	}
     }
     else {
-	fatal("Could not copy over $topomap");
+	fatal("Could not get topomap");
     }
 }
