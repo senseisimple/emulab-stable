@@ -17,6 +17,11 @@ $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
 # Check args.
 # 
 if (@ARGV != 2) {

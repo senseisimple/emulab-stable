@@ -8,6 +8,21 @@ use English;
 my $debug    = 1;
 
 #
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# We need to protect this from signals.  1st argument is signal name
+#
+sub sighandler {
+    my($sig) = @_;
+    print "Caught a SIG$sig--shutting down\n";
+    tbendit();
+    fatal();
+}
+
+#
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
