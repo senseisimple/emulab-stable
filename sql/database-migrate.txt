@@ -2146,3 +2146,17 @@ last_net_act,last_cpu_act,last_ext_act);
        ID in firewalls table:
 
 	alter table firewalls add vlanid int(11) default NULL;
+
+1.286: ElabinElab and Firewall stuff
+
+	alter table experiments add elabinelab_eid varchar(32) \
+            default NULL after elab_in_elab;
+	alter table experiments add security_level tinyint(1) NOT NULL \
+            default '0' after elabinelab_eid;
+
+	alter table experiment_stats add elabinelab tinyint(1) NOT NULL \
+            default '0' after batch;
+	alter table experiment_stats add elabinelab_exptidx int(10) \ 
+             unsigned default NULL after elabinelab;
+	alter table experiment_stats add security_level tinyint(1) NOT NULL \
+            default '0' after elabinelab_exptidx;

@@ -283,6 +283,9 @@ CREATE TABLE experiment_stats (
   idle_swaps smallint(5) unsigned default '0',
   swapin_duration int(10) unsigned default '0',
   batch tinyint(3) unsigned default '0',
+  elabinelab tinyint(1) unsigned default '0',
+  elabinelab_exptidx int(10) unsigned default NULL,
+  security_level tinyint(1) NOT NULL default '0',  
   PRIMARY KEY  (eid,pid,exptidx),
   KEY exptidx (exptidx),
   KEY rsrcidx (rsrcidx)
@@ -361,6 +364,8 @@ CREATE TABLE experiments (
   modelnetcore_osname varchar(20) default NULL,
   modelnetedge_osname varchar(20) default NULL,
   elab_in_elab tinyint(1) NOT NULL default '0',
+  elabinelab_eid varchar(32) default NULL,
+  security_level tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)
