@@ -55,7 +55,7 @@ sub myMain {
   my @p = ();	#Port numbers
   my $d = 0;    #Disable (bool)
   my $e = 0;	#Enable (bool)
-  my $a = "";	#Auto Negotiation (enable/disable) (two-way switch)
+  my $a = "";	#Auto Negotiation enable
   my $dup = "";	#Duplex (half/full)
   my $spd = 0;	#Speed (10/100)
   my $s = 0;	#Show port configs
@@ -276,8 +276,7 @@ sub ParseArgs {
     elsif (/^-off(.*)/) {$powerop = "off";}
     elsif (/^-on(.*)/) {$powerop = "on";}
     elsif (/^-cyc(.*)/) {$powerop = "cyc";}
-    elsif (/^-a(.*)/) {$a="disable";}
-    elsif (/^\+a(.*)/) {$a="enable";}
+    elsif (/^-a(.*)/) {$a="enable";}
     elsif (/^-dup(.*)/) {$dup = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-spd(.*)/) {$spd = ($1 ? $1 : shift(@CMDS));}
     elsif (/^-n(.*)/) {$n = ($1 ? $1 : shift(@CMDS));}
@@ -333,7 +332,7 @@ sub ParseArgs {
       "\t[-u] [-l] [-f<filename>] [-m<vlan name>] [-vlan<port>]\n",
       "\t[-t <pid> <eid>] [-reset <pid> <eid>] [-r<vlan #> <vlan #> ... ]\n",
       "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
-      "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>] [-n<vlan #>]\n";
+      "\t[-d|-e] [-a] [-spd<speed>] [-dup<duplex>] [-n<vlan #>]\n";
     # Hidden Power control functionality
     # "\t[ [-on|-off|-cyc] | [-<n>] ]\n";
   }
@@ -360,7 +359,7 @@ sub ParseArgs {
       "  -p     List of port numbers and ranges (port = <node>:<if>)\n",
       "  -d     Disable port(s)\n",
       "  -e     Enable port(s)\n",
-      "  +a/-a  Enable/Disable Port Auto-Negotiation of speed/duplex\n",
+      "  -a     Enable Port Auto-Negotiation of speed/duplex\n",
       "  -spd   Port Speed (10 or 100 Mbits)\n",
       "  -dup   Port Duplex (half or full)\n",
       "  -n     Change port VLAN #\n";
