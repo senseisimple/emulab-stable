@@ -8,6 +8,7 @@ DESTDIR		=
 INSTALL_DIR	= $(DESTDIR)/usr/local/etc/emulab
 RC_DIR		= $(DESTDIR)/usr/local/etc/rc.d
 OLD_DIR		= $(DESTDIR)/usr/local/etc/testbed
+SBIN_DIR	= $(DESTDIR)/usr/local/sbin
 INSTALL		= /usr/bin/install -c 
 INSTALL_PROG	= /usr/bin/install -c -m 755
 DISTFILES	= makefile decls.h libsetup.pm ssl.c ssl.h tmcc.c
@@ -37,12 +38,15 @@ emulab-install:	misc-install script-install bin-install post-install
 
 dir-install:
 	$(INSTALL) -d -m 755 -o root -g wheel $(INSTALL_DIR)
+	$(INSTALL) -d -m 755 -o root -g wheel $(SBIN_DIR)
 	$(INSTALL) -d -m 750 -o root -g wheel $(INSTALL_DIR)/.cvsup
 	$(INSTALL) -d -m 755 -o root -g wheel $(DESTDIR)/var/emulab
 	$(INSTALL) -d -m 755 -o root -g wheel $(DESTDIR)/var/emulab/sup
+	$(INSTALL) -d -m 755 -o root -g wheel $(DESTDIR)/var/log/vtund
+	$(INSTALL) -d -m 755 -o root -g wheel $(DESTDIR)/var/lock/vtund
 	$(INSTALL) -d -m 755 -o root -g wheel $(RC_DIR)
 	cp /dev/null $(INSTALL_DIR)/isrem
-	if [ ! -L  $(OLD_DIR) ]; then \
+	if [ -e $(OLD_DIR) -a ! -L $(OLD_DIR) ]; then \
 		cp -p $(OLD_DIR)/passdb.db /var/tmp; \
 		cp -p $(OLD_DIR)/groupdb.db /var/tmp; \
 		cp -p $(OLD_DIR)/passdb.db $(INSTALL_DIR); \
@@ -64,6 +68,7 @@ bin-install:	dir-install tmcc
 	$(INSTALL_PROG) tmcc $(INSTALL_DIR)/tmcc
 	$(INSTALL_PROG) trafgen $(INSTALL_DIR)/trafgen
 	$(INSTALL_PROG) vtund $(INSTALL_DIR)/vtund
+	$(INSTALL_PROG) vtund $(SBIN_DIR)/vtund
 
 script-install:	dir-install
 	for file in $(WAFILES); do \
@@ -81,10 +86,13 @@ script-install:	dir-install
 	$(INSTALL_PROG) $(SRCDIR)/cvsup.sh $(RC_DIR)/0.cvsup.sh
 
 post-install:
-	for file in $(WAFILES); do \
-		chown emulabman $(INSTALL_DIR)/$$file; \
-		chgrp bin $(INSTALL_DIR)/$$file; \
-	done
+	./install.sh
+	(chown emulabman $(INSTALL_DIR)	$(INSTALL_DIR)/*)
+	(chgrp bin $(INSTALL_DIR) $(INSTALL_DIR)/*)
+#	for file in $(WAFILES); do \
+#		chown emulabman $(INSTALL_DIR)/$$file; \
+#		chgrp bin $(INSTALL_DIR)/$$file; \
+#	done
 	chown emulabman $(INSTALL_DIR)/libsetup.pm
 	chgrp bin $(INSTALL_DIR)/libsetup.pm
 	chown root $(INSTALL_DIR)/update
@@ -116,7 +124,7 @@ dist:	trafgen
 	for file in $(BSDFILES); do cp freebsd/$$file $(DISTDIR); done
 	cp /usr/testbed/etc/emulab.pem $(DISTDIR)
 	cp /usr/local/sbin/vtund $(DISTDIR)
-	cp $(TRAFGEN) $(DISTDIR)
+	cp $(TRAFGEN) $(DISTDIR)/trafgen
 
 trafgen:
 ifndef	TRAFGEN

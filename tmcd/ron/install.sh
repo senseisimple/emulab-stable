@@ -14,16 +14,8 @@ endif
 
 $USERADD emulabman -u 65520 -g bin -m -s /bin/tcsh -c "Emulab Man"
 
-cd /usr/local/etc/emulab
-if ($OSTYPE == "FreeBSD") then
-	ln -s liblocsetup-freebsd.pm liblocsetup.pm
-	rm -f /usr/local/etc/rc.d/testbed.sh
-	rm -f /usr/local/etc/rc.d/emulab.sh
-	rm -f /usr/local/etc/rc.d/z.emulab.sh
-	cp -f rc.testbed /usr/local/etc/rc.d/z.emulab.sh
-	rm -f /usr/local/etc/rc.d/0.cvsup.sh
-	cp -f cvsup.sh /usr/local/etc/rc.d/0.cvsup.sh
-else
+if ($OSTYPE == "Linux") then
+	cd /usr/local/etc/emulab
 	ln -s liblocsetup-linux.pm liblocsetup.pm
 	rm -f /etc/init.d/emulab
 	cp rc.testbed /etc/init.d/emulab
@@ -33,22 +25,6 @@ else
 	ln -s ../init.d/emulab /etc/rc2.d/S99emulab
 	rm -f /etc/rc5.d/S99emulab
 	ln -s ../init.d/emulab /etc/rc5.d/S99emulab
-endif
-chown emulabman . *
-chgrp bin . *
-chown root update vnodesetup
-chmod u+s update vnodesetup
-chown root /usr/bin/suidperl
-chmod u+s /usr/bin/suidperl
-chown emulabman client.pem emulab.pem
-chmod 640 client.pem emulab.pem
-/usr/bin/install -c -o root -g wheel -d -m 755 /var/emulab
-/usr/bin/install -c -o root -g wheel -d -m 755 /var/emulab/sup
-
-if ( -e vtund ) then
-  cp vtund /usr/local/sbin
-  /usr/bin/install -c -o root -g wheel -d -m 755 /var/log/vtund
-  /usr/bin/install -c -o root -g wheel -d -m 755 /var/lock/vtund
 endif
 
 if (! -d ~emulabman/.ssh) then
@@ -65,4 +41,4 @@ if (! -d ~emulabman/.ssh) then
 	chmod 644 authorized_keys
 endif
 
-
+exit 0;
