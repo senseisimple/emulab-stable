@@ -1,0 +1,142 @@
+Things that could be done:
+
+1. Monitor temperature sensor on CPU (mike)
+
+	Linux and probably BSD have drivers/software for reading the temp
+	sensors.  We should use, maybe in conjunction with Dave's autostatus
+	to make sure things like fan failure don't kill a CPU.
+
+2. Filesystem compression (mike)
+
+	Jay's Holy Grail of Ultimate Disk Image Compression.  I see three
+	ways of doing this:
+
+	- Have the "zip" part effectively do a tar of everything in the FS
+	  and make a note of how big the FS is.  Unzip will newfs a filesystem
+	  of the same size and untar.  Note that I don't necessarily mean a
+	  literal tar/untar as you may want to operate beneath the FS level
+	  for speed.  Downside is that you don't create an exact copy of the
+	  original.  If something in the original relies on exact location
+	  (e.g., LILO), ya be screwed.
+
+	- Modify zlib (or create a new OSKit library) to know about filesystem
+	  formats, at least UFS and EXT2FS.  The zipper will recognize free
+	  blocks and encode them special.  The unzipper will note these special
+	  runs and just leave room on the disk (rather than zero them).  Note
+	  the information security issue here, we need to provide the user
+	  with an option to wipe the disk when they are done so that their
+	  old stuff doesn't leak through into a new experiment.
+
+	- A not so obvious solution with beneficial side-effects would be to
+	  write a tool to expand filesystems like UFS and EXT2FS.  Then we
+	  could make our image filesystems just big enough to hold everything
+	  we care about, and create regularly zipped images of those.
+	  The unzipper, expands the small disk image and then goes in and
+	  grows the filesystem to some reasonable size.  A filesystem
+	  expansion (contraction?) tool would probably be a nice addition to
+	  *BSD and/or Linux.  Note that this assumes we are creating images
+	  with only a single partition (OS), otherwise you still have to
+	  fill out the first partition no matter how little of it you used.
+
+	FYI: long ago I asked Kirk about expanding an FFS filesystem and this
+	is what he said:
+	---------
+
+	From: mckusick@chez.Berkeley.EDU (Kirk Mckusick)
+	To: mike@cs (Mike Hibler)
+	Subject: Re: a UFS question 
+	Date: Mon, 15 Jul 91 17:11:17 PDT
+
+	        Date: Fri, 5 Jul 91 17:43:36 -0600
+	        From: mike@cs.utah.edu (Mike Hibler)
+	        To: mckusick@okeeffe.Berkeley.EDU
+	        Subject: a UFS question
+
+	        Occasionally we come across a situation where it would be
+	        nice to expand a filesystem.  Rather than create a new
+	        filesystem it would be nice if you could extend an existing
+	        one.  How practical is that with the 4.2 FS?  It seems like
+	        things are fairly encapsulated at the cylinder group level
+	        so it might not be that hard to add more groups.  Is there
+	        any static-sized global state (e.g. bitmaps in the superblock)
+	        that would make this impossible?
+
+	        Thought I would go straight to the source rather than
+	        muddling around.
+
+	In theory expanding a filesystem is not too difficult. The basic
+	algorithm is to add more cylinder groups (possibly first expanding 
+	an existing partial cylinder group at the end of the old filesystem).
+	The easiest way to do this is to update the superblock to reflect
+	the larger size and zero out the inode blocks in the new cylinder
+	groups (if any). Then run fsck to update the bit maps in the new or
+	expanded cylinder groups. The only caveat is that the superblock 
+	summary maps are allocated in the data fragments immediately
+	following the inodes in the first cylinder group. If you add enough
+	new cylinder groups to overflow the previously allocated fragments,
+	you will have to relocate the immediately following fragment to make
+	room for the expanded summary information. On a filesystem with 1K
+	fragments, each fragment holds summaries for 64 cylinder groups,
+	so you can only easily increase (i.e. without relocating an existing
+	file) the total number of cylinder groups to a multiple of 64.
+
+	        ~Kirk
+	---------
+
+3. A new tip (mike)
+
+	Things that are wrong with tip in the environment we use it for
+	(remote console access):
+
+	- Inflexible authentication model.  If there is no lock file and you
+	  can access the tty, you are in.  We need to verify a user ID and tty
+	  combo from a database.
+
+	- Obsolete escape sequences.  Not only are useless, but interfere with
+	  running things like emacs.
+
+	- Ineffective cleanup.  You kill one half of the tip, the other side
+	  might get left around, the lock file left, the tty left screwed up,
+	  you name it.
+
+	- Obsolete or inefficient model.  The two-process input/output model
+	  hardly seems worthwhile.  A simple select-based scheme is probably
+	  more efficient in the modern age.
+
+	- No direct remote access.  You must run tip on the machine with the
+	  serial line.  You can r/slogin to that machine from anywhere, but
+	  there is an extra layer of program.
+
+	- Inadequate logging.  We introduced a layer between the tty and tip
+	  to provide good logging.  Shouldn't be necessary.
+
+	What we want is something along the lines of our current capture,
+	a server per serial port which:
+
+	- always logs to a disk file,
+
+	- allows one (or multiple) users can connect via sockets and get output
+          from (or provide input to) the serial line,
+
+	- ensures all such connections are access checked, with access checking
+	  abstracted to allow for different implementations,
+
+	- supports few (no?) magic escape sequences,
+
+	- possibly encrypts traffic,
+
+
+4. Make DNARDs useful (mike)
+
+	Have someone produce interesting software for the DNARDs.  If they
+	are going to be source/sinks, make useful standalone OSKit kernels
+	to avoid needing NetBSD if possible.  Start with the oskit traffic-gen
+	programs and beef them up (i.e., make them work on the DNARDs, make
+	them remotely, dynamically controllable).
+
+5. Teach tcpdump about spanning tree and other inter-switch traffic (mike)
+
+	Even if it could just make it easier to identify in the output,
+	or even better, give us a simple handle so that we can exclude it
+	(e.g., "tcpdump not switchtraffic")  I am reminded of this by seeing
+	the never-ending stream of "Unknown IPX Data" packets.
