@@ -32,6 +32,11 @@ if [ -x $BINDIR/watchdog  ]; then
 	$BINDIR/watchdog start
 fi
 
+if [ -x $BINDIR/rusaged  ]; then
+        echo "Starting rusage daemon ..."
+	$BINDIR/rusaged start
+fi
+
 echo "Informing the testbed that we're up and running ..."
 # XXX Oogly
 $BINDIR/tmcc -n `cat /var/emulab/boot/plabname` state ISUP

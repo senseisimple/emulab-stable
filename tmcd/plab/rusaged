@@ -40,6 +40,7 @@ my $logname	= "$LOGDIR/rusaged.debug";
 my $pidfile	= "/var/run/emulab-rusaged.pid";
 my $debug	= 0;
 my $isalivewait = 300; # Seconds to wait.
+my $svcslice    = "utah_elab_svc";
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -66,6 +67,13 @@ if (@ARGV) {
 if ($UID != 0) {
     die("*** $0:\n".
 	"    Must be root to run this script!\n");
+}
+
+#
+# This daemon runs in the service slice only! Sorry for the hardwired name!
+#
+if (!defined($ENV{'USER'}) || $ENV{'USER'} ne $svcslice) {
+    exit(0);
 }
 
 #
