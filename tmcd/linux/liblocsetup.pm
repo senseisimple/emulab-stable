@@ -273,13 +273,20 @@ sub os_ifconfig_line($$$$$$$;$$)
     # interface (e1000), and some (eepro100) support the new interface just
     # enough that they can report success but not actually do anything. Sweet!
     #
-    if (-e "/usr/sbin/ethtool") {
+    my $ethtool;
+    if (-e "/sbin/ethtool") {
+	$ethtool = "/sbin/ethtool";
+    } elsif (-e "/usr/sbin/ethtool") {
+	$ethtool = "/usr/sbin/ethtool";
+    }
+    if (defined($ethtool)) {
 	# this seems to work for returning an error on eepro100
-	$uplines = "if /usr/sbin/ethtool $iface >/dev/null 2>&1; then\n    " .
-	       "  /usr/sbin/ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
-	       "else\n    " .
-	       "  /sbin/mii-tool --force=$media $iface\n    " .
-		   "fi\n    ";
+	$uplines = 
+	    "if $ethtool $iface >/dev/null 2>&1; then\n    " .
+	    "  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
+	    "else\n    " .
+	    "  /sbin/mii-tool --force=$media $iface\n    " .
+	    "fi\n    ";
     } else {
 	$uplines = "/sbin/mii-tool --force=$media $iface\n    ";
     }
