@@ -1,0 +1,16 @@
+
+Cross Compiling
+---------------
+
+These are some quick notes on cross-compiling the testbed tree for the
+stargates on the garcia.  Autoconf generates some of the necessary
+code for dealing with this stuff, you just need the necessary magic to
+turn it on.  In this case, running the following command line on the
+RHL90-XSCALE-CROSS disk image should do the trick:
+
+  $ ../testbed/configure --host=arm-linux --build=i686-linux \
+	--with-brainstem=/proj/testbed/src/brainstem
+
+The "--host" argument tells configure what CPU/OS we want the code to
+run on and the "--build" argument tells it what CPU/OS we are building
+on.  Both arguments must be given for this to work.
