@@ -304,25 +304,25 @@ void anneal(bool scoring_selftest, double scale_neighborhood)
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
       cout << "Fixed node: " << (*fixed_it).first <<
 	"does not exist." << endl;
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
     if (pname2vertex.find((*fixed_it).second) == pname2vertex.end()) {
       cout << "Fixed node: " << (*fixed_it).second <<
 	" not available." << endl;
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
     }
     pvertex pv = pname2vertex[(*fixed_it).second];
     tb_vnode *vn = get(vvertex_pmap,vv);
     tb_pnode *pn = get(pvertex_pmap,pv);
     if (vn->vclass != NULL) {
       cout << "Can not have fixed nodes be in a vclass!.\n";
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
     }
     if (add_node(vv,pv,false,false) == 1) {
       cout << "Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
     }
     vn->fixed = true;
     num_fixed++;

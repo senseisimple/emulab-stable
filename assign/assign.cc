@@ -132,7 +132,7 @@ void read_physical_topology(char *filename)
   ptopfile.open(filename);
   if (!ptopfile.is_open()) {
       cout << "Unable to open ptop file " << filename << endl;
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
   }
   cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
 
@@ -241,7 +241,7 @@ void read_virtual_topology(char *filename)
   topfile.open(filename);
   if (!topfile.is_open()) {
       cout << "Unable to open top file " << filename << endl;
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
   }
   cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
 
@@ -314,7 +314,7 @@ void print_help()
   cout << "  -T          - Doing some scoring self-testing." << endl;
   cout << "  -H <float>  - Try <float> times harder." << endl;
   cout << "  -o          - Allow overloaded pnodes to be considered." << endl;
-  exit(2);
+  exit(EXIT_UNRETRYABLE);
 }
  
 // Perfrom a pre-cehck to make sure that there are enough free nodes of the
@@ -560,7 +560,7 @@ int mapping_precheck() {
 // unretryable error
 void exit_unretryable(int signal) {
     cout << "Killed with signal " << signal << " - exiting!" << endl;
-    _exit(2);
+    _exit(EXIT_UNRETRYABLE);
 }
 
 int main(int argc,char **argv)
@@ -680,12 +680,12 @@ int main(int argc,char **argv)
 
   // Run the type precheck
   if (!type_precheck()) {
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
   }
 
   // Run the mapping precheck
   if (!mapping_precheck()) {
-      exit(2);
+      exit(EXIT_UNRETRYABLE);
   }
 
 #ifdef PER_VNODE_TT
@@ -748,9 +748,9 @@ int main(int argc,char **argv)
   }
   
   if (violated != 0) {
-      return 1;
+      exit(EXIT_RETRYABLE);
   } else {
-      return 0;
+      exit(EXIT_SUCCESS);
   }
 }
 

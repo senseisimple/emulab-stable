@@ -311,7 +311,7 @@ int parse_top(tb_vgraph &VG, istream& i)
 
   errors += bind_top_subnodes();
 
-  if (errors > 0) {exit(2);}
+  if (errors > 0) {exit(EXIT_UNRETRYABLE);}
   
   return num_nodes;
 }

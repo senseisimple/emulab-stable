@@ -539,7 +539,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 #endif
   case tb_link_info::LINK_UNKNOWN:
     cout << "Internal error: Should not be here either." << endl;
-    exit(1);
+    exit(EXIT_RETRYABLE);
     break;
   }
 
@@ -953,7 +953,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	      case tb_link_info::LINK_UNKNOWN:
 	      case tb_link_info::LINK_TRIVIAL:
 		cerr << "Internal error: Should not be here." << endl;
-		exit(1);
+		exit(EXIT_RETRYABLE);
 		break;
 	      }
 	      if (choice < 0) break;
@@ -1544,7 +1544,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 	    default:
 	      // Global features are required to have some kind of type
 	      cout << "Bad global feature " << (*feature_it).first << endl;
-	      exit(2);
+	      exit(EXIT_UNRETRYABLE);
 	  }
       } else {
 	desire_it = vnode->desires.find(feature_name);

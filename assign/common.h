@@ -9,7 +9,22 @@
 
 #include "config.h"
 
-const int MAX_PNODES = 1024;	/* maximum # of physical nodes */
+/*
+ * Exit vaules from assign
+ */
+
+// A solution with no violations was found
+#define EXIT_SUCCESS 0
+
+// No valid solution was found, but one may exist
+// No violation-free solution was found after annealing, or there was an
+// internal error
+#define EXIT_RETRYABLE 1
+
+// It is not possible to map the given top file into the given ptop file,
+// so there's no point in re-running assign.
+// Can also occur if the top or ptop file does not exist or cannot be parsed
+#define EXIT_UNRETRYABLE 2
 
 /*
   To use these on the command line, each entry gets a
