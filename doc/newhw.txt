@@ -11,10 +11,9 @@ Temp. worker co-ordination: Mac
 ***** Hardware
 **********************************************************************
 ISP110s:
-	Status: Ordered, 94 received, 1 returned
-	Next shipment: 25-30, Monday 8/20
+	Status: Ordered, 116 received, 1 returned
+	Next shipment: ??
 	Responsible: Rob
-	Note: Rails are currently backordered
 
 Network cables:
 	Status: Received
@@ -29,8 +28,7 @@ Rackmount nuts/screws:
 	Responsible: Rob
 
 Short power cables from Standard:
-	Status: Ordered, recived 60 1.5ft cables
-	Next shipment: Remainder of order (36 2ft. cables) 8/15 or 8/16
+	Status: Received
 	Responsible: Rob or Leigh
 
 Additional RPCs:
@@ -64,6 +62,10 @@ Cable management bars:
 	Responsible: Mac
 	Note: Corey suggests that the metal shop is the simplest way to go,
 		but they may take a week to deiver
+
+Fiber cables:
+	Status: Ordered (4 2m SC->MTRJ, 4 3m SC->SC)
+	Responsible: Leigh
 
 **********************************************************************
 ***** Testbed Software
@@ -134,7 +136,7 @@ Label power cables:
 ***** Testbed state to update
 **********************************************************************
 New machine type:
-	Status: Done, but may need to be updated
+	Status: Done
 	Responsible: Mac
 
 Wires table:
