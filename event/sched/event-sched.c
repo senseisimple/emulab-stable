@@ -60,7 +60,7 @@ main(int argc, char **argv)
 	while ((c = getopt(argc, argv, "s:p:dl:")) != -1) {
 		switch (c) {
 		case 'd':
-			debug = 1;
+			debug++;
 			break;
 		case 's':
 			server = optarg;
@@ -134,8 +134,6 @@ main(int argc, char **argv)
 	if (event_subscribe(handle, enqueue, tuple, NULL) == NULL) {
 		fatal("could not subscribe to EVENT_SCHEDULE event");
 	}
-
-	daemon(1, 1);
 
 	/*
 	 * Hacky. Need to wait until all nodes in the experiment are
@@ -269,23 +267,24 @@ dequeue(event_handle_t handle)
         }
 
         /* Fire event. */
-
-        gettimeofday(&now, NULL);
-
-        TRACE("firing event (event=(notification=%p, "
-              "time=(tv_sec=%ld, tv_usec=%ld)) "
-              "at time (time=(tv_sec=%ld, tv_usec=%ld))\n",
-              next_event.notification,
-              next_event.time.tv_sec,
-              next_event.time.tv_usec,
-              now.tv_sec,
-              now.tv_usec);
+	if (debug > 1)
+	    gettimeofday(&now, NULL);
 
         if (event_notify(handle, next_event.notification) == 0) {
             ERROR("could not fire event\n");
             return;
         }
 
+	if (debug > 1) {
+	    info("firing event (event=(notification=%p, "
+		 "time=(tv_sec=%ld, tv_usec=%ld)) "
+		 "at time (time=(tv_sec=%ld, tv_usec=%ld))\n",
+		 next_event.notification,
+		 next_event.time.tv_sec,
+		 next_event.time.tv_usec,
+		 now.tv_sec,
+		 now.tv_usec);
+	}
         event_notification_free(handle, next_event.notification);
     }
 }
@@ -374,6 +373,8 @@ get_static_events(event_handle_t handle)
 			mysql_free_result(res);
 			return 1;
 		}
+		event_notification_set_arguments(handle,
+						 event.notification, EXARGS);
 
 		time.tv_sec  = now.tv_sec  + (int)firetime;
 		time.tv_usec = now.tv_usec +
