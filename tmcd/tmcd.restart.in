@@ -3,5 +3,6 @@
 DIR=@prefix@/sbin
 
 killall tmcd
+sleep 1
 ${DIR}/tmcd
 
