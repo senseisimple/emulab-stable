@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: healthd.c,v 1.2 2002-03-05 20:35:37 kwebb Exp $
+ * $Id: healthd.c,v 1.3 2002-07-10 00:37:51 kwebb Exp $
  */
 /*
  *
@@ -72,6 +72,7 @@ int deny_severity = LOG_WARNING;
 
 void SIGHUP_handler(int);
 void SIGTERM_handler(int);
+void SIGALRM_handler(int);
 void ReadConfigFile (const char *);
 void ReadCurrentValues(void);
 int GetAnswer(char *, char *);
@@ -251,6 +252,12 @@ SIGTERM_handler(int sig) {
   ExitProgram = 1;
 }
 
+void
+SIGALRM_handler(int sig) {
+  /* do nothing. */
+  signal(SIGALRM, SIGALRM_handler);
+}
+
 #define CHIP_STR_LEN 1024
 
 int
@@ -289,6 +296,9 @@ main(int argc, char *argv[]) {
   time_t now;
   time_t tloc;
 
+  struct itimerval tmo = {{0,0},{0,0}};
+  struct itimerval tmooff = {{0,0},{0,0}};
+
   sock = 0;
   sock6 = 0;
   count = 0;
@@ -299,7 +309,7 @@ main(int argc, char *argv[]) {
   ExitProgram = 0;
   UseVbat = 0;
   pushit = 0;
-  quiet = 0;
+  quiet = 1;
 
   MonitorType = NO_CHIP;
 
@@ -441,7 +451,7 @@ main(int argc, char *argv[]) {
       break;
 
     case 'q':
-      quiet = 1;
+      quiet = 0;
       break;
       
     default:
@@ -463,7 +473,7 @@ main(int argc, char *argv[]) {
 
   if (argc > optind) {
     if((n = atoi(argv[optind])) > 0) {
-      sec = n;
+      tmo.it_value.tv_sec = n;
     } else {
 #ifdef INET6
       fprintf(stderr, "Usage: %s -[1|2] -[I|S] [-dLV46] [-f configfile] [-c|t count] <seconds for sleep>"\
@@ -475,7 +485,7 @@ main(int argc, char *argv[]) {
       exit(1);
     }
   } else {
-    sec = DEFAULT_SEC;
+    tmo.it_value.tv_sec = DEFAULT_SEC;
   }
   if (InitMBInfo(method) != 0) {
     perror("InitMBInfo");
@@ -567,6 +577,7 @@ main(int argc, char *argv[]) {
   }
 
   (void) openlog(DaemonName, LOG_CONS|LOG_NDELAY, hdFACILITY);
+  signal(SIGALRM, SIGALRM_handler);
 
   if (debug == 0) {
     /*
@@ -584,6 +595,7 @@ main(int argc, char *argv[]) {
     /* Since we don't check the ranges */
     signal(SIGHUP, SIGHUP_handler);
     signal(SIGTERM, SIGTERM_handler);
+    siginterrupt(SIGALRM,1);
   }
   if (LocalOnly == 0) {
     /* Create name with wildcards. */
@@ -646,8 +658,6 @@ main(int argc, char *argv[]) {
     }
   }
   ReadCurrentValues();
-  time(&now);
-  time(&tloc);
   if (LocalOnly == 0) {
     /* Start accepting connections */
 #ifdef INET6
@@ -671,6 +681,9 @@ main(int argc, char *argv[]) {
         FD_SET(sock, &ready);
       }
     }
+
+    /* Replace all this goofy shit with setitimer */
+#ifdef COMMENT
     to.tv_sec = 0;
     if (sec <= 3) {
       /* For quick reading we need quicker timeouts */
@@ -682,11 +695,13 @@ main(int argc, char *argv[]) {
       /* Let us reduce CPU ussage */
       to.tv_usec = 1000;
     }
-    if (select(50, &ready, 0, 0, &to) < 0) {
-      if (ExitProgram) {
-	break;
-      }
-      continue;
+#endif /* COMMENT */
+
+    setitimer(ITIMER_REAL,&tmo,0);
+    select(getdtablesize(), &ready, 0, 0, 0);
+    setitimer(ITIMER_REAL,&tmooff,0);
+    if ( ExitProgram ) {
+      break;
     }
     if (ReReadConfigFile) {
       /*
@@ -704,6 +719,7 @@ main(int argc, char *argv[]) {
       ReadConfigFile (ConfigFile);
       ReReadConfigFile = 0;
       syslog(hdNOTICE, "Restarted");
+      continue;
     }
     if (LocalOnly == 0) {
       if (FD_ISSET(sock, &ready)) {
@@ -771,16 +787,12 @@ main(int argc, char *argv[]) {
       }
 #endif /* INET6 */
     }
-    time(&tloc);
-    if (sec <= (int)difftime(tloc, now)) {
-      if (count > 0) {
-	iter++;
-      }
-      ReadCurrentValues();
-      time(&now);
-      if (pushit) {
-        push_stat(psd);
-      }
+    if (count > 0) {
+      iter++;
+    }
+    ReadCurrentValues();
+    if (pushit) {
+      push_stat(psd);
     }
     if (ExitProgram) {
       break;

@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: Makefile.in,v 1.1 2001-12-05 18:45:06 kwebb Exp $
+# $Id: Makefile.in,v 1.2 2002-07-10 00:37:50 kwebb Exp $
 #
 ######################################################
 #
@@ -78,6 +78,8 @@ getnameinfo.o: missing/getnameinfo.c
 clean:
 	$(RM) *.o *.BAK *.CKP a.out *.core errs *~ $(PROGRAM) $(PROGRAM)c buildOT
 
+distclean: real-clean
+allclean: real-clean
 real-clean: clean
 	$(RM) config.log config.status config.h config.cache \
 	Makefile optionTable.h
