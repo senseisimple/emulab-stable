@@ -1388,13 +1388,6 @@ sub bootsetup()
 	dorouterconfig();
 
 	#
-	# Make 32 BPF devices in /dev
-	#
-	select STDOUT; $| = 1;
-	print STDOUT "Making /dev/bpf* devices ...";
-	makebpfdevs();
-	
-	#
 	# Traffic generator Configuration.
 	#
 	print STDOUT "Checking Testbed traffic generation configuration ...\n";
@@ -1691,33 +1684,4 @@ sub TBForkCmd($) {
     exit($? >> 8);
 }
 
-#
-# make some bpf devices in /dev
-#
-sub makebpfdevs() {
-
-    my ($i) = 0;
-
-    chomp($cwd = `pwd`);
-    # Untaint the args.
-    if ($cwd=~ /^([\/\w-]+)$/) {
-	$cwd = $1;
-    }
-
-    chdir("/dev");
-    while( $i < 32 ) {
-
-	if( ! -e "bpf$i" ) {
-	    system("./MAKEDEV bpf$i");
-	    print STDOUT "."
-	}
-	
-	$i++;
-    }
-    print STDOUT "\n";
-    chdir($cwd);
-    return 0;
-}
-
 1;
-
