@@ -56,7 +56,9 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS))
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
-		ln -s index.html tbdb.html;
+		ln -s index.html tbdb.html; \
+		rm -f icons; \
+		ln -s /usr/local/www/icons icons;
 
 $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
