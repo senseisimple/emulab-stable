@@ -20,6 +20,9 @@
 // order output is sorted first by node number and second by the order
 // the interface as listed in the .route file.
 
+// If the argument '--histogram-data=<filenam>' then the number of
+// routes for each node will be sent to <filename> in turn.
+
 #include <string>
 #include <fstream>
 #include <set>
@@ -147,6 +150,16 @@ public:
     virtual ~LogException() throw() {}
 };
 
+class HistException : public StringException
+{
+public:
+    explicit HistException(std::exception const & other)
+        : StringException(string("Hist Error: ") + other.what())
+    {
+    }
+    virtual ~HistException() throw() {}
+};
+
 class NoRouteFileException : public StringException
 {
 public:
@@ -208,7 +221,7 @@ public:
     Route(IPAddress newDestIP, size_t maskSize, IPAddress newFirstHop,
           IPAddress newSourceIP)
     {
-        reset(newDestIP, netMask, newFirstHop, newSourceIP);
+        reset(newDestIP, maskSize, newFirstHop, newSourceIP);
     }
     explicit Route(string const & line)
     {
@@ -218,6 +231,7 @@ public:
     {
         return (destIP & netMask) == (right & netMask);
     }
+    // TODO: Is this really correct?
     bool operator<(Route const & right) const
     {
         return netMask > right.netMask
@@ -236,6 +250,10 @@ public:
     {
         destIP = newDestIP;
         netMask = 0xffffffff << (32 - maskSize);
+        if (maskSize == 0)
+        {
+            netMask = 0;
+        }
         firstHop = newFirstHop;
         sourceIP = newSourceIP;
     }
@@ -374,6 +392,8 @@ namespace arg
 {
     bool shouldLog = false;
     ofstream log;
+    bool shouldHist = false;
+    ofstream hist;
     ifstream ip;
     ifstream route;
 }
@@ -432,7 +452,7 @@ int main(int argc, char * argv[])
     }
     catch(exception & error)
     {
-        cerr << "routestat: " << error.what() << endl;
+        cerr << "check: " << error.what() << endl;
         result = 1;
     }
     return result;
@@ -450,6 +470,17 @@ void parseArgs(int argc, char * argv[])
             if (!(arg::log))
             {
                 throw LogException(FailedFileOpenException(fileName));
+            }
+        }
+        else if (strncmp(argv[i], "--histogram-data=",
+                 sizeof("--histogram-data=") - 1) == 0)
+        {
+            char * fileName = argv[i] + sizeof("--histogram-data=") - 1;
+            arg::shouldHist = true;
+            arg::hist.open(fileName, ios::out | ios::trunc);
+            if (!(arg::hist))
+            {
+                throw HistException(FailedFileOpenException(fileName));
             }
         }
         else if (strncmp(argv[i], "--ipfile=", sizeof("--ipfile=") - 1) == 0)
@@ -549,12 +580,18 @@ int64 setupRoutes(vector<Node> & nodes)
         buffer >> nodeNumber;
         if (buffer && nodeNumber < nodes.size())
         {
+            int64 routesOnThisNode = 0;
             getline(arg::route, bufferString);
             while (arg::route && bufferString != "%%")
             {
                 nodes[nodeNumber].addRoute(Route(bufferString));
-                ++result;
+                ++routesOnThisNode;
                 getline(arg::route, bufferString);
+            }
+            result += routesOnThisNode;
+            if (arg::shouldHist)
+            {
+                arg::hist << routesOnThisNode << endl;
             }
         }
         getline(arg::route, bufferString);
@@ -570,11 +607,11 @@ int64 tryRoutes(vector<Node> & nodes,
     int64 result = 0;
     for (size_t i = 0; i < nodes.size(); ++i)
     {
-        list<IPAddress>::const_iterator pos = interfaceOrder.begin();
-//        map<IPAddress,size_t>::const_iterator pos = interfaces.begin();
-        for ( ; pos != interfaceOrder.end(); ++pos)
+        if (nodes[i].isValid())
         {
-            if (nodes[i].isValid())
+            list<IPAddress>::const_iterator pos = interfaceOrder.begin();
+//        map<IPAddress,size_t>::const_iterator pos = interfaces.begin();
+            for ( ; pos != interfaceOrder.end(); ++pos)
             {
                 map<IPAddress, size_t>::const_iterator found;
                 found = interfaces.find(*pos);
@@ -588,14 +625,14 @@ int64 tryRoutes(vector<Node> & nodes,
 
 
             }
-        }
-        if (i % 10 == 0)
-        {
-            cerr << i;
-        }
-        else
-        {
-            cerr << '.';
+            if (i % 10 == 0)
+            {
+                cerr << i;
+            }
+            else
+            {
+                cerr << '.';
+            }
         }
     }
     return result;
@@ -628,7 +665,6 @@ int64 followRoute(size_t source, IPAddress destination, size_t destNode,
                 nextIP = nodes[current].routeTo(destination);
             }
             found = interfaces.find(nextIP);
-//            cerr << "nextIp: " << ipToString(nextIP) << " foundNode: " << found->second << endl;
             checkHop(destination, current, found, nextIP, nodes, interfaces);
             // The next hop looks good.
             nodes[found->second].setVisited();

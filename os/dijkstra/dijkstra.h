@@ -9,11 +9,13 @@
 #ifndef DIJKSTRA_H_DISTRIBUTED_DIJKSTRA_1
 #define DIJKSTRA_H_DISTRIBUTED_DIJKSTRA_1
 
+// Print a route from a host to a particular destination IP address.
 void printRouteToIp(std::string sourceIp, std::string firstHopIp,
                     std::string destIp, int cost);
+
+// Print a route from a host to a particular destination subnet.
 void printRouteToSubnet(std::string sourceIp, std::string firstHopIp,
                         std::string destSubnet, int netMaskSize, int cost);
-
 
 // This exception gets thrown if <name> in the 'source=<name>'
 // argument is invalid. This is true if <name> doesn't correspond to
@@ -23,7 +25,7 @@ class InvalidSourceException : public std::exception
 public:
     InvalidSourceException(std::string sourceName)
     {
-        message = "Invalid source argument: name=" + sourceName;
+        message = "Invalid source argument: source=" + sourceName;
     }
 
     virtual ~InvalidSourceException() throw() {}

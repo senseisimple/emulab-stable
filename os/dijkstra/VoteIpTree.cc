@@ -1,4 +1,4 @@
-// IpTree.cc
+// VoteIpTree.cc
 
 /*
  * EMULAB-COPYRIGHT
@@ -9,21 +9,26 @@
 #include "lib.h"
 #include "bitmath.h"
 #include "dijkstra.h"
-#include "IpTree.h"
+#include "VoteIpTree.h"
 
 using namespace std;
 
-IpTree::IpTree()
+VoteIpTree::VoteIpTree()
     : m_firstHop(0)
     , m_depth(0)
 {
 }
 
-IpTree::~IpTree()
+VoteIpTree::~VoteIpTree()
 {
 }
 
-void IpTree::reset(void)
+auto_ptr<IpTree> VoteIpTree::exemplar(void) const
+{
+    return auto_ptr<IpTree>(new VoteIpTree());
+}
+
+void VoteIpTree::reset(void)
 {
     m_child[0].reset(NULL);
     m_child[1].reset(NULL);
@@ -32,7 +37,7 @@ void IpTree::reset(void)
     m_depth = 0;
 }
 
-void IpTree::addRoute(IPAddress ip, int newFirstHop, int depth)
+void VoteIpTree::addRoute(IPAddress ip, int newFirstHop, int depth)
 {
     m_depth = depth;
     if (depth < IP_SIZE)
@@ -40,7 +45,7 @@ void IpTree::addRoute(IPAddress ip, int newFirstHop, int depth)
         IPAddress bit = (ip >> (IP_SIZE - depth - 1)) & 0x01;
         if (m_child[bit].get() == NULL)
         {
-            m_child[bit].reset(new IpTree());
+            m_child[bit].reset(new VoteIpTree());
         }
         m_child[bit]->addRoute(ip, newFirstHop, depth + 1);
     }
@@ -51,8 +56,14 @@ void IpTree::addRoute(IPAddress ip, int newFirstHop, int depth)
     ++(m_childHops[newFirstHop]);
 }
 
-void IpTree::printRoutes(int parentFirstHop, HostHostToIpMap const & ip,
-                 int source, IPAddress subnet)
+void VoteIpTree::printRoutes(HostHostToIpMap const & ip, int source,
+                             IPAddress subnet)
+{
+    printRoutes(INT_MAX, ip, source, subnet);
+}
+
+void VoteIpTree::printRoutes(int parentFirstHop, HostHostToIpMap const & ip,
+                             int source, IPAddress subnet)
 {
     if (m_childHops.empty())
     {
@@ -91,7 +102,7 @@ void IpTree::printRoutes(int parentFirstHop, HostHostToIpMap const & ip,
     }
 }
 
-map<int,int>::iterator IpTree::findMostPos(void)
+map<int,int>::iterator VoteIpTree::findMostPos(void)
 {
     map<int,int>::iterator pos = m_childHops.begin();
     map<int,int>::iterator mostPos = pos;

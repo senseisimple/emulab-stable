@@ -17,10 +17,17 @@ all:	dijkstra
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-dijkstra-debug:	dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o \
-                bitmath.h Exception.h SingleSource.h IpTree.h dijkstra.h \
-                Compressor.h lib.h
-	$(CXX) $(CXXFLAGS) -static dijkstra.o bitmath.o Compressor.o IpTree.o SingleSource.o $(LIBS) -o $@
+dijkstra-debug: Compressor.o TreeCompressor.o dijkstra.o \
+                NoneCompressor.o VoteIpTree.o SingleSource.o \
+                OptimalIpTree.o bitmath.o \
+                Compressor.h OptimalIpTree.h VoteIpTree.h \
+                Exception.h SetIterator.h bitmath.h \
+                IpTree.h SingleSource.h dijkstra.h \
+                NoneCompressor.h TreeCompressor.h lib.h
+
+	$(CXX) $(CXXFLAGS) -static Compressor.o TreeCompressor.o dijkstra.o \
+                NoneCompressor.o VoteIpTree.o SingleSource.o \
+                OptimalIpTree.o bitmath.o $(LIBS) -o $@
 
 client: all
 client-install: client

@@ -7,92 +7,31 @@
  */
 
 #include "lib.h"
-#include "bitmath.h"
-#include "dijkstra.h"
 #include "Compressor.h"
 
 using namespace std;
 
-Compressor::Compressor()
-    : graph(NULL)
-    , ipMap(NULL)
-{
-}
+const int Compressor::shift[PRIVATE_SUBNET_COUNT] = {IP_SIZE - 8,
+                                                     IP_SIZE - 12,
+                                                     IP_SIZE - 16};
 
-Compressor::~Compressor()
-{
-}
+const IPAddress Compressor::prefix[PRIVATE_SUBNET_COUNT] = {10,
+                                                            (172 << 8) + 16,
+                                                            (192 << 8) + 168};
 
-void Compressor::compress(SingleSource const & newGraph,
-                          HostHostToIpMap const & newIp)
+Compressor::PRIVATE_SUBNET Compressor::whichSubnet(IPAddress destIp)
 {
-    graph = &newGraph;
-    ipMap = &newIp;
-    root_10.reset();
-    root_172_16.reset();
-    root_192_168.reset();
-
-    set<string> implicitIp;
-    HostEntry::const_iterator implicitPos;
-    HostEntry::const_iterator implicitLimit;
-    implicitPos = (*ipMap)[graph->getSource()].begin();
-    implicitLimit = (*ipMap)[graph->getSource()].end();
-    for ( ; implicitPos != implicitLimit; ++implicitPos)
+#ifdef ROCKETFUEL_TEST
+    return SUB_10;
+#else
+    for (PRIVATE_SUBNET i = PRIVATE_SUBNET_MIN; i < PRIVATE_SUBNET_COUNT;
+         i = static_cast<PRIVATE_SUBNET>(i + PRIVATE_SUBNET_UNIT))
     {
-        implicitIp.insert(implicitPos->second.second);
-    }
-
-    for (int i = 0; i < graph->getVertexCount(); ++i)
-    {
-        int dest = i;
-        if (dest != graph->getSource())
+        if ((destIp >> shift[i]) == prefix[i])
         {
-            HostEntry::const_iterator pos;
-            HostEntry::const_iterator limit;
-            pos = (*ipMap)[dest].begin();
-            limit = (*ipMap)[dest].end();
-            for ( ; pos != limit; ++pos)
-            {
-                if (implicitIp.find(pos->second.first) == implicitIp.end())
-                {
-                    IPAddress destIp = stringToIP(pos->second.first);
-                    add(dest, destIp);
-                }
-            }
+            return i;
         }
     }
-    root_10.printRoutes(INT_MAX, *ipMap, graph->getSource(), ip_10);
-    root_172_16.printRoutes(INT_MAX, *ipMap, graph->getSource(),
-                            ip_172_16);
-    root_192_168.printRoutes(INT_MAX, *ipMap, graph->getSource(),
-                             ip_192_168);
+    return PRIVATE_SUBNET_INVALID;
+#endif
 }
-
-void Compressor::add(int dest, IPAddress destIp)
-{
-    int firstHop = graph->getFirstHop(dest);
-    HostEntry::const_iterator pos;
-    pos = (*ipMap)[graph->getSource()].find(firstHop);
-    if (pos != (*ipMap)[graph->getSource()].end())
-    {
-        if ((destIp >> shift_10) == ip_10)
-        {
-            root_10.addRoute(destIp, firstHop, IP_SIZE - shift_10);
-        }
-        else if ((destIp >> shift_172_16) == ip_172_16)
-        {
-            root_172_16.addRoute(destIp, firstHop, IP_SIZE - shift_172_16);
-        }
-        else if ((destIp >> shift_192_168) == ip_192_168)
-        {
-            root_192_168.addRoute(destIp, firstHop, IP_SIZE - shift_192_168);
-        }
-        else
-        {
-            // TODO: Figure out what cost means
-            printRouteToIp(pos->second.first, pos->second.second,
-                           ipToString(destIp), 1);
-        }
-    }
-}
-

@@ -11,8 +11,11 @@
 #include "dijkstra.h"
 #include "SingleSource.h"
 #include "bitmath.h"
-#include "IpTree.h"
 #include "Compressor.h"
+#include "NoneCompressor.h"
+#include "TreeCompressor.h"
+#include "VoteIpTree.h"
+#include "OptimalIpTree.h"
 
 using namespace std;
 
@@ -21,8 +24,8 @@ namespace arg
 {
     string source;
     bool runAll = true;
-    bool compress = false;
     bool strong = true;
+    auto_ptr<Compressor> compress;
 }
 
 // Figure out what the users command line wishes are and set arg::*
@@ -45,24 +48,6 @@ string reverseMap(int index, map<string,int> const & nameToIndex);
 // Print all the routes that the command line options say we should.
 void printAllRoutes(SingleSource & graph, HostHostToIpMap const & ip,
                     map<string, int> const & nameToIndex);
-void printRoutesFromHost(int source, SingleSource const & graph,
-                         HostHostToIpMap const & ip);
-
-// Print all routes from a particular host to a particular host
-void printRoutesToHost(int source, int dest, SingleSource const & graph,
-                       HostHostToIpMap const & ip);
-
-// Calculate the source ip address and the first hop ip address
-// between a particular pair of hosts.
-void calculateSourceInfo(int source, int dest,
-                         SingleSource const & graph,
-                         HostHostToIpMap const & ip,
-                         string & OutSourceIp, string & OutFirstHopIp);
-
-// Print a route from a host to a specific ip address on another host.
-void printRouteToIp(string sourceIp, string firstHopIp, string destIp,
-                    int cost);
-
 
 //-----------------------------------------------------------------------------
 
@@ -85,6 +70,7 @@ int main(int argc, char * argv[])
 
 void processArgs(int argc, char * argv[])
 {
+    arg::compress.reset(new NoneCompressor());
     // The if/else/if/else construct is cumbersome. Is there a better way?
     for (int i = 1; i < argc; ++i)
     {
@@ -97,9 +83,35 @@ void processArgs(int argc, char * argv[])
         {
             arg::runAll = true;
         }
-        else if (strncmp(argv[i], "--compress", sizeof("--compress") - 1) == 0)
+        else if (strncmp(argv[i], "--compress=vote",
+                         sizeof("--compress=vote") - 1) == 0)
         {
-            arg::compress = true;
+            VoteIpTree temp;
+            arg::compress.reset(new TreeCompressor(temp));
+        }
+        else if (strncmp(argv[i], "--compress=optimal",
+                         sizeof("--compress=optimal") - 1) == 0)
+        {
+            OptimalIpTree temp;
+            arg::compress.reset(new TreeCompressor(temp));
+        }
+        else if (strncmp(argv[i], "--compress=none",
+                         sizeof("--compress=none") - 1) == 0)
+        {
+            arg::compress.reset(new NoneCompressor());
+        }
+/*
+        else if (strncmp(argv[i], "--compress=rocket",
+                         sizeof("--compress=rocket") - 1) == 0)
+        {
+            arg::compress.reset(new RocketCompressor());
+        }
+*/
+        else if (strncmp(argv[i], "--compress",
+                         sizeof("--compress") - 1) == 0)
+        {
+            VoteIpTree temp;
+            arg::compress.reset(new TreeCompressor(temp));
         }
         else if (strncmp(argv[i], "--strong", sizeof("--strong") - 1) == 0)
         {
@@ -233,15 +245,7 @@ void printAllRoutes(SingleSource & graph, HostHostToIpMap const & ip,
         {
             cout << indexToName[i] << endl;
             graph.route(i);
-            if (arg::compress)
-            {
-                Compressor temp;
-                temp.compress(graph, ip);
-            }
-            else
-            {
-                printRoutesFromHost(i, graph, ip);
-            }
+            arg::compress->printRoutes(graph, ip);
             cout << "%%" << endl;
         }
     }
@@ -254,74 +258,8 @@ void printAllRoutes(SingleSource & graph, HostHostToIpMap const & ip,
             throw InvalidSourceException(arg::source);
         }
         graph.route(sourcePos->second);
-        if (arg::compress)
-        {
-            Compressor temp;
-            temp.compress(graph, ip);
-        }
-        else
-        {
-            printRoutesFromHost(sourcePos->second, graph, ip);
-        }
+        arg::compress->printRoutes(graph, ip);
     }
-}
-
-//-----------------------------------------------------------------------------
-
-void printRoutesFromHost(int source, SingleSource const & graph,
-                         HostHostToIpMap const & ip)
-{
-    for (int i = 0; i < graph.getVertexCount(); ++i)
-    {
-        if (i != source)
-        {
-            printRoutesToHost(source, i, graph, ip);
-        }
-    }
-}
-
-//-----------------------------------------------------------------------------
-
-void printRoutesToHost(int source, int dest, SingleSource const & graph,
-                       HostHostToIpMap const & ip)
-{
-    string sourceIp;
-    string firstHopIp;
-    calculateSourceInfo(source, dest, graph, ip, sourceIp, firstHopIp);
-
-    multimap< int, pair<string, string> >::const_iterator pos;
-    pos = ip[dest].begin();
-    multimap< int, pair<string, string> >::const_iterator limit;
-    limit = ip[dest].end();
-    string previous;
-
-    for ( ; pos != limit; ++pos)
-    {
-        string const & destIp = pos->second.first;
-        if (destIp != previous)
-        {
-            printRouteToIp(sourceIp, firstHopIp, destIp,
-                           graph.getDistance(dest));
-            previous = destIp;
-        }
-    }
-}
-
-//-----------------------------------------------------------------------------
-
-void calculateSourceInfo(int source, int dest,
-                         SingleSource const & graph,
-                         HostHostToIpMap const & ip,
-                         string & outSourceIp, string & outFirstHopIp)
-{
-    multimap< int, pair<string, string> >::const_iterator sourcePos;
-    sourcePos = ip[source].find(graph.getFirstHop(dest));
-    if (sourcePos == ip[source].end())
-    {
-        throw RouteNotFoundException(source, dest, graph.getFirstHop(dest));
-    }
-    outSourceIp = sourcePos->second.first;
-    outFirstHopIp = sourcePos->second.second;
 }
 
 //-----------------------------------------------------------------------------
@@ -340,8 +278,6 @@ void printRouteToIp(string sourceIp, string firstHopIp, string destIp,
 
 //-----------------------------------------------------------------------------
 
-
-
 void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
                         int netMaskSize, int cost)
 {
@@ -352,13 +288,16 @@ void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
     else
     {
         IPAddress netMask = 0xffffffff << (32 - netMaskSize);
+        if (netMaskSize <= 0)
+        {
+            netMask = 0;
+        }
+//        cerr << netMaskSize << ", " << netMask << ", " << (0xffffffff << 32) << endl;
         cout << "ROUTE DEST=" << destSubnet << " DESTTYPE=net DESTMASK="
              << ipToString(netMask) << " NEXTHOP=" << firstHopIp << " COST="
              << cost << " SRC=" << sourceIp << endl;
     }
 }
-
-
 
 //-----------------------------------------------------------------------------
 
@@ -368,4 +307,5 @@ string intToString(int num)
     stream << num;
     return stream.str();
 }
+
 //-----------------------------------------------------------------------------

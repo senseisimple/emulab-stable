@@ -18,6 +18,8 @@
 #include <cstdlib>
 #include <vector>
 #include <memory>
+#include <set>
+#include <cassert>
 
 // A convenient converter
 std::string intToString(int num);
