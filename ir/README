@@ -12,6 +12,9 @@ testbed.ptop -
 test.ir -
 	A sample ir file.  Trivial case.
 
+test2.ir -
+	test.ir only with some port numbers explicit.
+	
 macs.txt -
 	A dummy macs.txt file for testing purposes.
 
