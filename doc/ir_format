@@ -183,3 +183,15 @@ START nodes
 END nodes
 END os
 
+START cmdline
+<node> <cmdline>
+END cmdline
+
+START rpms
+<node> <rpms>
+END rpms
+
+START startup
+<node> <runcmd>
+END runcmd
+
