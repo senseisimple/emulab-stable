@@ -19,7 +19,6 @@ my  $optlist = "";
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $PROJROOT	= "/proj";
 my $TFTPDIR     = "/tftpboot";
@@ -96,6 +95,12 @@ else {
 if ($UID && !TBAdmin($UID)) {
     if (! NodeAccessCheck(\$node)) {
 	die("*** You do not have permission to create an image from $node\n");
+    }
+    if ($node =~ /^([-\w]+)$/) {
+	$node = $1;
+    }
+    else {
+	fatal("Tainted node name: $node");
     }
     $mereuser = 1;
 }
@@ -217,7 +222,7 @@ if (! DBQueryWarn("update nodes set pxe_boot_path='$freebsd', ".
 #
 # Reboot node. If this fails must reset.
 #
-if (system("$nodereboot $node")) {
+if (system("$nodereboot", "$node")) {
     cleanup();
     fatal("Failed to reboot $node!");
 }
@@ -226,10 +231,9 @@ if (system("$nodereboot $node")) {
 # Now we wait for the status to flip. We don't want to wait too long of
 # course. 
 #
+my $result = 0;
 my $count  = 120;
 while ($count) {
-    my $result;
-    
     $query_result =
 	DBQueryWarn("select startstatus from nodes where node_id='$node'");
 
@@ -258,7 +262,7 @@ cleanup();
 # Need to reboot the node so that it comes out of the pxebooted kernel and
 # returns to its normal self. Its okay if this fails, although it should not.
 #
-if (system("$nodereboot $node")) {
+if (system("$nodereboot", "$node")) {
     print "*** Failed to reboot $node after zipper completed!\n";
 }
 
@@ -279,6 +283,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "You may now os_load this image on other nodes in your experiment.\n",
 	 "$TBOPS");
 
+unlink("$logname");
 exit 0;
 
 sub cleanup ()
