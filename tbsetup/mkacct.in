@@ -42,6 +42,8 @@ my $USERDEL = "/usr/sbin/pw userdel";
 my $USERMOD = "/usr/sbin/pw usermod";
 my $CHPASS  = "/usr/bin/chpass";
 my $KEYGEN  = "/usr/bin/ssh-keygen";
+my $SFSKEYGEN = "/usr/local/bin/sfskey gen";
+my $SFSKEYREG = "/usr/local/bin/sfskey register";
 my $SETGROUPS = "$TB/sbin/setgroups";
 my $GENELISTS = "$TB/sbin/genelists";
 
@@ -117,6 +119,7 @@ else {
     die("Invalid uid '$user' contains illegal characters.\n");
 }
 my $SSHDIR  = "$HOMEDIR/$user/.ssh";
+my $SFSDIR  = "$HOMEDIR/$user/.sfs";
 
 #
 # This script always does the right thing, but we prefer that mere users
@@ -405,7 +408,65 @@ sub AUDIT($)
 #
 sub FirstTime()
 {
+    my $dosfs = 0;
     my $dossh = 0;
+
+    #
+    # Set up the sfs key, but only if not done so already.
+    # This has to be done from root because the sfs_users file needs
+    # to be updated (and "sfskey register" won't work because it
+    # prompts for the user's UNIX password if not run from root.)
+    #
+    if (! -e "$SFSDIR" ) {
+	print "Setting up sfs configuration for $user.\n";
+
+	mkdir("$SFSDIR", 0700) or
+	    fatal("Could not mkdir $SFSDIR: $!");
+	chown($user_number, $default_groupgid, "$SFSDIR") or
+	    fatal("Could not chown $SFSDIR: $!");
+
+	$dosfs = 1;
+    }
+
+    #
+    # Check for missing identity file
+    #
+    if (! -e "$SFSDIR/identity") {
+	$dosfs = 1;
+    }
+
+    if ($dosfs) {
+	print "Generating sfs key\n";
+	if (system("$SSH -host $control_node '$SFSKEYGEN -KPn ".
+		   "$user\@ops.emulab.net $SFSDIR/identity'")) {
+	    fatal("Failure in sfskey gen: $!");
+        }
+	
+	chown($user_number, $default_groupgid, "$SFSDIR/identity") or
+	    fatal("Could not chown $SFSDIR/identity: $!");
+	chmod(0600, "$SFSDIR/identity") or
+	    fatal("Could not chmod $SFSDIR/identity: $!");
+	
+	print "Registering sfs key\n";
+	if (system("$SSH -host $control_node '$SFSKEYREG -Su ".
+		   "$user $SFSDIR/identity'")) {
+	    fatal("Failure in sfskey register: $!");
+	}
+	
+	#
+	# Grab a copy for the DB.
+	#
+	my $ident = `cat $SFSDIR/identity`;
+
+	if ($ident =~ /.*,.*,.*,(.*),(.*)/) {
+	    DBQueryFatal("replace into user_sfskeys ".
+			 "values ('$user', '$2', '${user}:${1}:${user}::', now())");
+	}
+	else {
+	    warn("*** $0:\n".
+		 "    Bad emulab SFS public key\n");
+	}
+    }
     
     #
     # Set up the ssh key, but only if not done so already.
