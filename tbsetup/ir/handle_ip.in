@@ -527,13 +527,17 @@ if (! &ir_exists("/ip")) {
 # Update virt_names table
 # Clear table
 foreach (split("\n",$ip_section)) {
-    ($src,$dst,$ip) = split;
+    ($vsrc,$vdst,$ip) = split;
+    $src = $vnodemap{$vsrc};
+    $dst = $vnodemap{$vdst};
     $sth = $dbh->prepare("DELETE from virt_names where src_node_id = \"$src\"");
     $sth->execute;
     $sth->finish;
 }
 foreach (split("\n",$ip_section)) {
-    ($src,$dst,$ip) = split;
+    ($vsrc,$vdst,$ip) = split;
+    $src = $vnodemap{$vsrc};
+    $dst = $vnodemap{$vdst};
     $sth = $dbh->prepare("SELECT src_node_id from virt_names where src_node_id = \"$src\" and dest_node_id = \"$dst\"");
     $sth->execute;
     $i = $sth->rows();
