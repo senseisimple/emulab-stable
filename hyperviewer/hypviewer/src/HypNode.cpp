@@ -34,6 +34,8 @@
 // Contractor/manufacturer is Silicon Graphics, Inc., 2011 N.
 // Shoreline Blvd. Mountain View, CA 94039-7311.
 
+#include <sstream>
+
 #include <string>
 NAMESPACEHACK
 
@@ -362,14 +364,14 @@ void HypNode::layoutT() {
 string HypNode::save(int lev) {
   string str;
   string tab;
-  char t1[32], t2[32];
+  ostringstream outerLevStream, outerEnabledStream;
   int i;
   
   for (i = -2; i < lev; i++) tab = tab + " ";
   tab = "";
-  sprintf(t1, "%d ", lev);
-  sprintf(t2, " %d ", this->getEnabled());
-  str = str + tab + t1 + theurl + t2;
+  outerLevStream << lev;
+  outerEnabledStream << this->getEnabled();
+  str = str + tab + outerLevStream.str() + theurl + outerEnabledStream.str();
   for (i = 0; i < thegroups.size(); i++) {
       str = str + " " + thegroups[i];
   }
@@ -381,10 +383,11 @@ string HypNode::save(int lev) {
   tab = tab + " ";
   tab = "";
   for (i = 0; i < outgoing.size(); i++) {
-    sprintf(t1, "%d ", lev+1);
-    sprintf(t2, " %d ", outgoing[i]->getEnabled());
+    ostringstream levStream, enabledStream;
+    levStream << lev + 1;
+    enabledStream << outgoing[i]->getEnabled();
     HypNode *n = outgoing[i]->getChild();
-    str = str + tab + t1 + outgoing[i]->getChildId() + t2;
+    str = str + tab + levStream.str() + outgoing[i]->getChildId() + enabledStream.str();
     for (int j = 0; j < thegroups.size(); j++) 
 	str = str + " " + n->thegroups[j];
     str.append("\n");

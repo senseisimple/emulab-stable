@@ -51,7 +51,8 @@ NAMESPACEHACK
 }
 
 // It's easier to return the pointer to the HypView object rather than access the global.
-extern HypView  *hvmain(int argc, char *argv[], int window, int width, int height);  
+extern HypView  *hvmain(int argc, char *argv[], int window, int width, int height);
+extern void hvkill(HypView *hv);
 //extern int hvmain(int argc, char *argv[]);
 //%include "cpointer.i"
 //%pointer_class(HypView,hvp)

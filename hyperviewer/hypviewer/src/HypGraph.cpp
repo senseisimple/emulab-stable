@@ -440,7 +440,6 @@ void HypGraph::loadSpanGraph(istream & flat)
   HypNode       *current = NULL;
   HypNode       *descend = NULL;
   string         id, type, mainid, line;
-  char           buf[1024];
   string         token;
   StringArray    groups;
   int            level; 
@@ -456,9 +455,7 @@ void HypGraph::loadSpanGraph(istream & flat)
 
     // parse line
     linecount++;
-    buf[0] = '\0';
-    flat.getline(buf,1024,'\n');
-    line = string(buf);
+    getline(flat, line);
     if (line.length() <= 1)
       continue;
 

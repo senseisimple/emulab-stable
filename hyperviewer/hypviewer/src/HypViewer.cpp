@@ -38,6 +38,7 @@
 NAMESPACEHACK
 
 #include <stdio.h>
+//#include <unistd.h>
 
 #ifdef WIN32
 #  include <sys/timeb.h>
@@ -284,12 +285,13 @@ void HypViewer::newLayout() {
   void HypViewer::afterRealize()
   {
     glGetIntegerv ( GL_VIEWPORT, vp );      /* get viewport size */ 
+    //printf("GLUT afterRealize vp=[%d %d %d %d], labelscaledsize=%g\n", vp[0], vp[1], vp[2], vp[3], labelscaledsize );
     resetLabelSize();
     glInit();
     drawStringInit();
     idleFunc(1);
   }
-  
+
 #endif  // HYPGLUT
 
 #ifdef WIN32
@@ -349,6 +351,7 @@ void HypViewer::sphereInit()
 //----------------------------------------------------------------------------
 void HypViewer::glInit()
 {
+  //printf("glInit\n");
   int i, j;
   framePrepare();
   glClearColor(hd->colorBack[0], hd->colorBack[1], hd->colorBack[2], 1.0);
@@ -746,7 +749,8 @@ void HypViewer::drawNode(HypNode *n)
   memcpy(&glm[4],T.T[1],sizeof(double)*4);
   memcpy(&glm[8],T.T[2],sizeof(double)*4);
   memcpy(&glm[12],T.T[3],sizeof(double)*4);
-  
+  //printf("glm\n"); for(int i=0;i<16;i++){printf("  %f", glm[i]); if(i%4==3)printf("\n");}
+
   // glMultMatrixd((double*)T.T);
   glMultMatrixd(glm);
   
@@ -881,12 +885,15 @@ void HypViewer::drawLabel(HypNode *n)
     str = n->getLongLabel().c_str();
   if ( (len = strlen(str)) < 1) return;
   int labw = drawStringWidth(str);
+  int charwidth = labw/len;
+
   // this is strange, but needed to work on weevil. 
   // remove next three lines after upgrade weevil to 6.2
   //  if (n->getHighlighted()) lab.z = 0.0;
   //  glColor3f(hd->colorLabel[0], hd->colorLabel[1], hd->colorLabel[2]);
   //  glBegin(GL_TRIANGLE_STRIP);
   //  glEnd();
+
   if (n->getHighlighted())
     glColor3f(hd->colorLabel[0], hd->colorLabel[1], hd->colorLabel[2]);
   else 
@@ -896,15 +903,31 @@ void HypViewer::drawLabel(HypNode *n)
   if (labeltoright) {
     labl = 0.0;
     labr = labw;
+    if ( lab.x > vp[3] )
+      return;                   // Entirely off the right side of the viewport.
   } else {
     labl = -labw;
     labr = 0.0;
-    if (lab.x+labl < 0.0) {
+    if ( lab.x - charwidth < 0.0 )
+      return;                   // Entirely off the left side of the viewport.
+
+    if (lab.x+labl < 0.0) {     
       // GL won't display string if beginning is to left of window border:
       // truncate the requisite number of chars from the front
-      int truncamt = (int) ((lab.x+labl)*len/labw);
-      str += -truncamt;
-      labl = -lab.x;
+      int truncamt = (int) ((lab.x-labw)/charwidth);
+      /* fprintf(stderr,"drawLabel str=%s, len=%d, truncamt=%d, labl=%f, lab.x=%f\n", 
+         str, len, truncamt, labl, lab.x); /**/
+
+      // Beware of hugely negative lab.x due to busted transform.
+      if ( truncamt < 0 && abs(truncamt) < len && truncamt != 0x80000000 ) {
+        //fprintf(stderr,"  str=%s\n", str);
+        //const char * ostr = str;
+        str += -truncamt;
+        labl = -lab.x;
+        //fprintf(stderr, "  str=%s\n", str);
+      }
+      else
+        return;
     }
   }
   glBegin(GL_TRIANGLE_STRIP);
@@ -1679,6 +1702,8 @@ void HypViewer::resetLabelSize()
     scaledvp = vp[2];
   }
   labelscaledsize = hd->labelsize*(scaledvp/1000.0);
+  //printf("resetLabelSize vp=[%d %d %d %d], labelscaledsize=%g\n", vp[0], vp[1], vp[2], vp[3], labelscaledsize );
+
 }
 
 
@@ -1987,6 +2012,8 @@ int HypViewer::flashLink(HypNode *fromnode, HypNode *tonode)
   {
 #ifndef PyHack
     glutPostRedisplay();
+#else
+    drawFrame();
 #endif
     return;
   }
@@ -2126,9 +2153,7 @@ void HypViewer::frameEnd() {
 void HypViewer::idleCont() {
 /*
    if (idleframe == 1) {
-        char s[256];
-        sprintf(s, "idle cont\n");
-        OutputDebugString(s);
+     OutputDebugString("idle cont\n");
      InvalidateRect(win,NULL,FALSE);
    } else {
       ValidateRect(win,NULL);

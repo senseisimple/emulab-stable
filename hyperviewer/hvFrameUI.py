@@ -84,6 +84,7 @@ class OpenDialogUI(wxDialog):
         # begin wxGlade: OpenDialogUI.__set_properties
         self.SetTitle("Open HyperViewer Data")
         self.SetSize((387, 310))
+        self.FileToOpen.SetFocus()
         # end wxGlade
 
     def __do_layout(self):
@@ -155,7 +156,7 @@ class hvFrameUI(wxFrame):
         self.DrawLinks = wxCheckBox(self.Controls, -1, "Draw links")
         self.KeepAspect = wxCheckBox(self.Controls, -1, "Keep aspect")
         self.LabelToRight = wxCheckBox(self.Controls, -1, "Label to right")
-        self.LabelsMode = wxChoice(self.Controls, -1, choices=["None", "Short", "Long"], style=wxCB_DROPDOWN)
+        self.LabelsMode = wxChoice(self.Controls, -1, choices=["None", "Short", "Long"])
         self.label_3 = wxStaticText(self.Controls, -1, "  Labels")
         self.CountGenNode = wxSpinCtrl(self.Controls, -1, "30", min=1, max=30)
         self.label_4 = wxStaticText(self.Controls, -1, "  Node depth")

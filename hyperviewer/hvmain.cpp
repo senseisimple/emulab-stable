@@ -15,6 +15,8 @@
 
 // hvmain.cpp - hypview for SWIG into _hv.so, based on hypviewer/examples/glut/main.cpp .
 
+#include <stdio.h>
+#include <memory>
 #include <string>
 #include <iostream>
 NAMESPACEHACK
@@ -42,28 +44,28 @@ extern "C" {
 #include "HypData.h"
 #include "HypNode.h"
 
-char prevsel[1024];
-HypView *hv;
+//char prevsel[1024];
+string prevsel;
+auto_ptr<HypView> hv;
 
-char *getSelected(){
-  return prevsel;
+char const *getSelected(){
+  return prevsel.c_str();
 }
 
 // I guess I don't know how to handle a "string" returned by the SWIG Python wrapper...
-char *getGraphCenter(){
-  string * result = new string(hv->getGraphCenter());
-  return (char *)result->c_str();
+char * getGraphCenter(){
+  return const_cast<char *>(hv->getGraphCenter().c_str());
 }
 
 void selectCB(const string & id, int shift, int control) {
-  //printf("selectCB id=%s, prevsel=%s\n", id.c_str(), prevsel);
+  //printf("selectCB id=%s, prevsel=%s\n", id.c_str(), prevsel.c_str());
   //cerr << "selectCB id=" << id.c_str() << ", prevsel=" << prevsel << endl;
   hv->setSelected(id, 1);
   hv->setSelected(prevsel, 0);
   hv->gotoNode(id, HV_ANIMATE);
   hv->drawFrame();
   hv->idle(1);
-  strncpy(prevsel, id.c_str(), sizeof(prevsel));
+  prevsel = id;
 }
 
 void display() { hv->drawFrame(); }
@@ -117,8 +119,9 @@ void keyboard(unsigned char key, int /*x*/, int /*y*/) {
 
 void PrintAllocations()
 {
-  if (hv)
-    delete(hv);
+//  if (hv)
+//    delete(hv);
+  hv.reset(NULL);
   cerr << "HypNode objects not destroyed: " << HypNode::NumObjects() << endl;
   cerr << "HypLink objects not destroyed: " << HypLink::NumObjects() << endl;
   return;
@@ -127,6 +130,10 @@ void PrintAllocations()
 #if 0
 int main(int argc, char *argv[]) {
 #else
+void hvkill(HypView * /*hv*/) {
+//  delete( hv );
+}
+
 HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
 #endif
   char *fname;
@@ -160,11 +167,11 @@ HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
 #endif
 
 #ifndef WIN32
-  hv = new HypView();
+  hv.reset(new HypView());
 #else
   HWND hWnd = (HWND)window;
   HDC hdc = ::GetDC(hWnd);
-  hv = new HypView(hdc, hWnd);
+  hv.reset(new HypView(hdc, hWnd));
   HGLRC ctx = wglCreateContext(hdc);
   if (!ctx) {
     printf("wglCreateContext Failed\n");
@@ -180,8 +187,10 @@ HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
   inFile.close();
 #endif
 #ifndef WIN32
+  //printf("hvmain width=%d, height=%d\n", width, height);
   hv->afterRealize();
 #else
+  //printf("hvmain ctx=0x%x, width=%d, height=%d\n", width, height);
   hv->afterRealize(ctx, width, height);
 #endif
   hv->setSphere(1);
@@ -242,14 +251,18 @@ HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
   glutReshapeFunc(reshape);
   glutMainLoop();
 
-  delete(hv);
+//  delete(hv);
   PrintAllocations();
+
+  return 0;
   
   // free(fname);
 #else
-  return hv;
+  return hv.get();
 #endif
 }
+
+
 
 int hvReadFile(char *fname, int width, int height) {
   ifstream inFile(fname);

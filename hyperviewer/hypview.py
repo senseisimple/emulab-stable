@@ -42,7 +42,7 @@ class hvApp(wxApp):
     def OnInit(self):
 	
 	# Given command-line argument(s), attempt to read in a topology.
-	filename = project = None
+	filename = filearg = project = experiment = root = None
 	# Any dash argument prints a usage message and exits.
 	if len(sys.argv) == 2 and sys.argv[1][0] == '-': 
 	    print '''Hyperviewer usage:
@@ -60,7 +60,7 @@ class hvApp(wxApp):
 	# One command-line argument: read from a .hyp file.
 	# (File/experiment input is also in the OnOpenFile and OnOpenExperiment methods.)
 	elif len(sys.argv) == 2:
-	    filename = sys.argv[1]
+	    filename = filearg = sys.argv[1]
 	    print "Reading file:", filename
 	    pass
 	
@@ -87,6 +87,18 @@ class hvApp(wxApp):
 	self.openDialog = hvOpen(None, -1, "Open HyperViewer Data")
 	self.openDialog.app = self
 	self.usageDialog = UsageDialogUI(None, -1, "HyperViewer Usage")
+	
+
+	# Initialize the text fields in the File/Open dialog.
+	if filearg:
+	    self.openDialog.FileToOpen.SetValue(filearg) 
+	if project:
+	    self.openDialog.ProjectName.SetValue(project)
+	if experiment:
+	    self.openDialog.ExperimentName.SetValue(experiment)
+	    self.openDialog.ExperimentName.SetFocus()
+	if root:
+	    self.openDialog.ExperimentRoot.SetValue(root)
 	
 	# Make it visible.
 	self.frame.Show()
@@ -181,9 +193,20 @@ class hvFrame(hvFrameUI):
 	width, height = self.hypView.GetSizeTuple()
 
 	# Instantiate and initialize the SWIG'ed C++ HypView object, loading graph data.
+	if self.vwr is not None:
+	    # Give up on hvReadFile; the cleanup logic is busted.  Always make a new HypView.
+	    ##print "hvkill", self.vwr
+	    hv.hvkill(self.vwr)
+
+	    # This is *really* evil... It fails every other time, so do it twice.
+	    self.vwr = hv.hvmain([str(name), str(file)], # Must be non-unicode strings.
+				 window, width, height)  # Win32 needs the window info.
+	    hv.hvkill(self.vwr)
+	    self.vwr = None
+
 	self.vwr = hv.hvmain([str(name), str(file)], # Must be non-unicode strings.
 			     window, width, height)  # Win32 needs the window info.
-	if self.vwr is None:		# Must have been a problem....
+	if self.vwr is None:			# Must have been a problem....
 	    return False
 
 	# Initial drawing.

@@ -621,6 +621,7 @@ public:
   //--------------------------------------------------------------------------
   void setLabelPos(double x, double y, double z)
   {
+    //cerr << "setLabelPos " << x << ", " << y << ", "  << z << endl;
     label.x = x;
     label.y = y;
     label.z = z;

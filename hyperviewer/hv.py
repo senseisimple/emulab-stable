@@ -33,6 +33,8 @@ del types
 
 hvmain = _hv.hvmain
 
+hvkill = _hv.hvkill
+
 hvReadFile = _hv.hvReadFile
 
 getSelected = _hv.getSelected

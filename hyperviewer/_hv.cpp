@@ -740,6 +740,7 @@ NAMESPACEHACK
 #include "HypView.h"
 
 extern HypView *hvmain(int,char *[],int,int,int);
+extern void hvkill(HypView *);
 extern int hvReadFile(char *,int,int);
 extern char *getSelected();
 extern char *getGraphCenter();
@@ -838,8 +839,25 @@ static PyObject *_wrap_hvmain(PyObject *self, PyObject *args) {
         }
     }
     result = (HypView *)hvmain(arg1,arg2,arg3,arg4,arg5);
-    
+    //printf("hvmain %d 0x%x\n", result, result);
     resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_HypView, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_hvkill(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    HypView *arg1 = (HypView *) 0 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:hvkill",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    //printf("hvkill %d 0x%x\n", arg1, arg1);
+    hvkill(arg1);
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
     return resultobj;
     fail:
     return NULL;
@@ -3221,6 +3239,7 @@ static PyObject * HypView_swigregister(PyObject *self, PyObject *args) {
 }
 static PyMethodDef SwigMethods[] = {
 	 { (char *)"hvmain", _wrap_hvmain, METH_VARARGS },
+	 { (char *)"hvkill", _wrap_hvkill, METH_VARARGS },
 	 { (char *)"hvReadFile", _wrap_hvReadFile, METH_VARARGS },
 	 { (char *)"getSelected", _wrap_getSelected, METH_VARARGS },
 	 { (char *)"getGraphCenter", _wrap_getGraphCenter, METH_VARARGS },
