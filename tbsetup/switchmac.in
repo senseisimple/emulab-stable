@@ -327,8 +327,14 @@ SWITCH:
 	    #
 	    DEBUG "printing for index $index\n";
 	    next unless ($status{$index} && ($status{$index} eq "learned" || 
-		$status{$index} == 3));
-	    next if ($realports{$index} =~ /ifIndex/);
+		$status{$index} eq "3"));
+	    #
+	    # As far as I can tell, this is a bug with (at least some versions
+	    # of) CatOS - we sometimes get back MACs that are not even in
+	    # this vlan, and those end up with an empty $realport
+	    #
+	    next if ((!$realports{$index}) ||
+		     ($realports{$index} =~ /ifIndex/));
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
 		"$interfaces{$index},$class\n";
 	}
