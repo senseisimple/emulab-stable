@@ -198,12 +198,12 @@ ID  Name                            Members of VLAN
    To stop cloning:
       Console> (enable) set span disable <monitor>
 
-   NOTE: as of 11/5/01 we have fxp1 on plastic attached to the control net
+   NOTE: as of 12/14/04 we have fxp0 on ops attached to the control net
    so that it can be used for cloning.  Its cisco2 port is 3/23, use that
-   for <monitor>.  Also note that you will have to have fxp1 configured
+   for <monitor>.  Also note that you will have to have fxp0 configured
    in order to run tcpdump on it.  I just do:
-      ifconfig fxp1 inet 192.168.1.1 netmask 0xffffff00
-   and then:
+      ifconfig fxp0
+   no IP info is necessary.  Then:
       ifconfig fxp1 down
    when I am done.
 
