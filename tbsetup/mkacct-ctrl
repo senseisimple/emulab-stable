@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: mkacct-ctrl,v 1.6 2000-12-06 19:57:57 kwright Exp $
+### $Id: mkacct-ctrl,v 1.7 2000-12-07 08:42:08 kwright Exp $
 
 use English;
 use Mysql;
@@ -133,7 +133,8 @@ sub dowork() {
 
 
     # The following user/group creation commands must be done as root. 
-    $UID = $EUID;
+
+    $UID       = $EUID;
 
     # 
     # Create group on paper.
@@ -148,7 +149,9 @@ sub dowork() {
     #
     print "Adding user $user to paper.\n";
     my $cmd = "/usr/sbin/pw useradd $user -u $user_number " .
-	      "-d /users/$user -g $project -s /usr/testbed/security/paperbag";
+		  "-k /usr/share/skel -m " .
+		      "-d /users/$user -g $project " .
+			  "-s /usr/testbed/security/paperbag";
     open(PWADDP, "$cmd 2>&1 |") or die "$0: Could not open pw useradd on paper.";
     while (<PWADDP>) { print "$_"; }
     close(PWADDP);
@@ -170,7 +173,7 @@ sub dowork() {
     print "Adding user $user to $control_node.\n";
     $cmd = "/usr/local/bin/sshtb $control_node " .
 	      "/usr/sbin/pw useradd $user -u $user_number " .
-	      "-d /users/$user -g $project -s /bin/tcsh"; 	  
+		      "-d /users/$user -g $project -s /bin/tcsh"; 	  
     open(PWADD, "$cmd 2>&1 |") or die "$0: Could not open pw useradd.";
     while (<PWADD>) { print "$_"; }
     $cmd = "/usr/local/bin/sshtb $control_node " .
@@ -182,30 +185,27 @@ sub dowork() {
     while (<CHPASS>) { print "$_"; }
     close(CHPASS);
 
-    # Note: The PWMOD stmts below do indeed modify the passwd field, but 
-    # we store the encrypted passwd and usermod takes unencrypted passwd 
-    # so the passwd field ends up wrong. Decided to use chpass (see above).
-    # 11/30/00 -lkw 
     #
-    # open (PWMOD, "|$cmd") or die "$0: Could not open pw usermod.";
-    # print PWMOD $pswd;
-    # close(PWMOD); 
+    # Set up the ssh key
+    #
 
-    #
-    # Create home directory
-    #
-    if ( -e "/users/$user" ) {
-        print "/users/$user already exists.\n";
-    } else  { 
+    mkdir("/users/$user/.ssh", 0755);
+    chown($user_number, $group_number, "/users/$user/.ssh");
 
-        print "Creating /users/$user.\n";
-	mkdir("/users/$user", 0770) or die "$0: Could not make /users/$user: $!\n";
-      
-	# If created, change owner and group
-	if (-e "/users/$user") {
-	    chown($user_number, $group_number, "/users/$user") or die "$0: Could not chown /users/$user: $!.\n";
-	}
-    }
+    # Run commands below as the user
+    $EUID = $user_number;
+    $UID  = $EUID;
+
+    print "EUID: $EUID UID:$UID\n";
+    open(KEYGEN, "/usr/bin/ssh-keygen -P '' -f /users/$user/.ssh/identity 2>&1 |");
+    while (<KEYGEN>) { print $_; }
+    close(KEYGEN);
+
+    open(CP, "/bin/cp /users/$user/.ssh/identity.pub /users/$user/.ssh/authorized_keys 2>&1 |");
+    while (<CP>) { print $_; }
+    close(CP); 
+
+    chmod(0600, "/users/$user/.ssh/authorized_keys");
 }
 
 sub sanitize() {
