@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 #include <sys/types.h>
@@ -63,7 +63,7 @@ static int	debug = 0;
 static char    *logfile = NULL;
 
 /* Forward decls */
-static char	*getbossnode(void);
+static int	getbossnode(char **, int *);
 static int	doudp(char *, int, struct in_addr, int);
 static int	dotcp(char *, int, struct in_addr);
 static int	dounix(char *, int, char *);
@@ -172,8 +172,16 @@ main(int argc, char **argv)
 		usage();
 	}
 
-	if (!bossnode)
-		bossnode = getbossnode();
+	if (!bossnode) {
+		int	port = 0;
+		
+		getbossnode(&bossnode, &port);
+		/* In other words, do not override command line port spec! */
+		if (port && numports > 1) {
+			portlist[0] = port;
+			numports    = 1;
+		}
+	}
 	
 	he = gethostbyname(bossnode);
 	if (he)
@@ -283,11 +291,12 @@ main(int argc, char **argv)
 /*
  * Find the bossnode name if one was not specified on the command line.
  */
-static char *
-getbossnode(void)
+static int
+getbossnode(char **bossnode, int *portp)
 {
 #ifdef BOSSNODE
-	return strdup(BOSSNODE);
+	*bossnode = strdup(BOSSNODE);
+	return 0;
 #else
 	struct hostent	*he;
 	FILE		*fp;
@@ -309,7 +318,15 @@ getbossnode(void)
 				if ((bp = strchr(buf, '\n')))
 					*bp = (char) NULL;
 				fclose(fp);
-				return(strdup(buf));
+				/*
+				 * Look for port spec
+				 */
+				if ((bp = strchr(buf, ':'))) {
+					*bp++  = NULL;
+					*portp = atoi(bp);
+				}
+				*bossnode = strdup(buf);
+				return 0;
 			}
 			fclose(fp);
 		}
@@ -321,9 +338,11 @@ getbossnode(void)
 	res_init();
 	he = gethostbyaddr((char *)&_res.nsaddr.sin_addr,
 			   sizeof(struct in_addr), AF_INET);
-	if (he && he->h_name)
-		return strdup(he->h_name);
-	return("UNKNOWN");
+	if (he && he->h_name) 
+		*bossnode = strdup(he->h_name);
+	else
+		*bossnode = strdup("UNKNOWN");
+	return 0;
 #endif
 }
 
@@ -368,8 +387,9 @@ dotcp(char *data, int outfd, struct in_addr serverip)
 			}
 			CLOSE(sock);
 		}
-		fprintf(stderr,
-			"Connection to TMCD refused. Waiting a bit ...\n");
+		if (debug) 
+			fprintf(stderr,
+				"Connection to TMCD refused. Waiting ...\n");
 		sleep(10);
 	}
  foundit:
