@@ -63,6 +63,12 @@ open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 DBQueryFatal("update images set load_address=''");
 
 #
+# Clear the event scheduler pids. Its okay to set them to zero since
+# thats not a valid process id. 
+# 
+DBQueryFatal("update experiments set event_sched_pid=0");
+
+#
 # Clear old logins. 
 #
 DBQueryFatal("delete from login");
