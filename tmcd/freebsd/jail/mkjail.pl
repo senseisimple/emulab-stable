@@ -91,7 +91,7 @@ my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users",
 		   "bin", "sbin", "home", $LOCALMNTPNT);
 my @ROOTMNTDIRS = ("bin", "sbin", "usr");
 my @EMUVARDIRS	= ("logs", "db", "jails", "boot", "lock");
-my $VNFILESECT  = 64 * ((1024 * 1024) / 512); # 64MB in 512b sectors.
+my $VNFILESECT  = 512 * ((1024 * 1024) / 512); # 64MB in 512b sectors.
 my $MAXVNDEVS	= 100;
 my $IP;
 my $IPALIAS;
@@ -525,7 +525,8 @@ sub mkrootfs($)
 	}
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
 
-	mysystem("ln -s $LOCALMNTPNT/$PID/$vnodeid $path/root/opt");
+#	mysystem("ln -s $LOCALMNTPNT/$PID/$vnodeid $path/root/opt");
+	mkdir("$path/root/opt", 0775);
     }
     else {
 	mkdir("$path/root/opt", 0775);
