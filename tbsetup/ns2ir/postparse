@@ -203,10 +203,16 @@ if ($@) {
 foreach (@links) {
     @info = split;
     if (defined($lanloss{$info[0]})) {
-	push(@newlans,"$_ $lanloss{$info[0]}");
+	$loss = $lanloss{$info[0]}
     } else {
-	push(@newlans,"$_ 0.0");
+	$loss = "0.0";
     }
+    # This is kind of ugly because it has a sub list.
+    # Works very nicely in TCL though.
+    @t = split("\"");
+    @t2 = split("[ \t]+",$t[2]);
+    $s = "$t[0]\"$t[1]\" $t2[1] $t2[2] $lanloss{$info[0]} " . join(" ",@t2[3..$#t2]);
+    push(@newlans,$s);
 }
 &ir_set("/topology/lans",join("\n",@newlans) . "\n");
 
