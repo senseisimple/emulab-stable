@@ -91,7 +91,7 @@ for {set i 0} {$i < 4} {incr i} {
 <code>nodes-1</code>, <code>nodes-2</code>, <code>nodes-3</code>. (In
 other words, the <code>(</code> character is replaced with
 <code>-</code>, and <code>)</code> is removed.)  This slightly
-different syntax comes is to avoid any problems that <code>()</code>
+different syntax is used to avoid any problems that <code>()</code>
 may cause later in the process. For example, the <code>()</code>
 characters cannot appear in DNS entries.
 
@@ -192,7 +192,7 @@ tb-set-ip $node1 142.3.4.5
 
 <ul>
   <li>This command should only be used for nodes that have a single
-      link.  For nodes with multiple links the next commands should be
+      link.  For nodes with multiple links the following commands should be
       used.  Mixing <code>tb-set-ip</code> and any other IP command on
       the same node will result in an error.
 </ul>
@@ -778,8 +778,8 @@ vtypes allows logical grouping of nodes.
 
 <p>As an example, imagine we have a network with internal routers
 connecting leaf nodes.  We want the routers to all have the same
-hardware, and the leaf nods to all have the same hardware, but the
-specifics of this hardware do not matter.  We have the following
+hardware, and the leaf nodes to all have the same hardware, but the
+specifics do not matter.  We have the following
 fragment in our NS file:
 
 <pre>
@@ -794,8 +794,8 @@ tb-set-hardware $leaf2 leaf
 </pre>
 
 <p>Here we have set up two soft (see below) vtypes, router and leaf.
-Our router nodes are then specified to be of type router, and the leaf
-nods of type leaf.  When the experiment is swapped in the testbed will
+Our router nodes are then specified to be of type <i>router</i>, and the leaf
+nodes of type <i>leaf</i>.  When the experiment is swapped in the testbed will
 attempt to make router1 and router2 be of the same type, and
 similarly, leaf1 and leaf2 of the same type.  However, the
 routers/leafs may be pc600s or they may be pc850s, whichever is easier
@@ -820,7 +820,7 @@ just like soft vtypes except that the testbed will give higher
 priority to vtype consistency and swapping in will fail if the vtypes
 can not be satisfied.  So, if you use soft vtypes you are more likely
 to swap in but there is a chance your node of a specific vtype will
-not all be the same.  If you use hard vtypes all nods of a given vtype
+not all be the same.  If you use hard vtypes all nodes of a given vtype
 will be the same, but swapping in may fail.
 
 <p>Finally, you can have weighted soft vtypes.  Here you assign a
