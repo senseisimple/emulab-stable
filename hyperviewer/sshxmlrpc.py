@@ -3,7 +3,16 @@
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-############################################################################
+# Permission to use, copy, modify and distribute this software is hereby
+# granted provided that (1) source code retains these copyright, permission,
+# and disclaimer notices, and (2) redistributions including binaries
+# reproduce the notices in supporting documentation.
+#
+# THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+# CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+# FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+#
+##########################################################################
 # Some bits of this file are from xmlrpclib.py, which is:
 # --------------------------------------------------------------------
 # Copyright (c) 1999-2002 by Secret Labs AB
@@ -39,10 +48,14 @@ import urllib
 import popen2
 import rfc822
 import xmlrpclib
-import syslog
+if os.name != "nt":
+    import syslog
 
 # XXX This should come from configure.
-LOG_TESTBED = syslog.LOG_LOCAL5;
+if os.name != "nt":
+    LOG_TESTBED = syslog.LOG_LOCAL5;
+
+import traceback
 
 ##
 # Base class for exceptions in this module.
@@ -62,6 +75,21 @@ class BadResponse(SSHException):
     #
     def __init__(self, host, handler, msg):
         self.args = host, handler, msg,
+        return
+    
+    pass
+
+##
+# Indicates a poorly formatted request from the client.
+#
+class BadRequest(SSHException):
+
+    ##
+    # @param host The client host name.
+    # @param arg Description of the problem.
+    #
+    def __init__(self, host, msg):
+        self.args = host, msg,
         return
     
     pass
@@ -91,31 +119,47 @@ class SSHConnection:
         self.host = host
 
         # ... initialize the read and write file objects.
+        self.myChild = None
         if streams:
-            self.myChild = None
             self.rfile = streams[0]
             self.wfile = streams[1]
             pass
         else:
-            self.user, self.host = urllib.splituser(self.host)
+            self.user, ssh_host = urllib.splituser(self.host)
             # print self.user + " " + self.host + " " + handler
             
+            # Use ssh unless we're on Windows with no ssh-agent running.
+            nt = os.name == "nt"
+            use_ssh = not nt or os.environ.has_key("SSH_AGENT_PID")
+
             flags = ""
             if self.user:
                 flags = flags + " -l " + self.user
                 pass
-            if ssh_config:
+            if use_ssh and ssh_config:
                 flags = flags + " -F " + ssh_config
                 pass
-            self.myChild = popen2.Popen3("ssh -x -C -o 'CompressionLevel 5' "
-                                         + flags
-                                         + " "
-                                         + self.host
-                                         + " "
-                                         + handler,
-                                         1)
-            self.rfile = self.myChild.fromchild
-            self.wfile = self.myChild.tochild
+            args = flags + " " + ssh_host + " " + handler
+
+            if use_ssh:
+                cmd = "ssh -x -C -o 'CompressionLevel 5' " + args
+                pass
+            else:
+                # Use the PyTTY plink, equivalent to the ssh command.
+                cmd = "plink -x -C " + args
+                pass
+            
+            if not nt:
+                # Popen3 objects, and the wait method, are Unix-only.
+                self.myChild = popen2.Popen3(cmd, 0)
+                self.rfile = self.myChild.fromchild
+                self.wfile = self.myChild.tochild
+                pass
+            else:
+                # Open the pipe in Binary mode so it doesn't mess with CR-LFs.
+                self.rfile, self.wfile, self.errfile = popen2.popen3(cmd, mode='b')
+                pass
+            # print "wfile", self.wfile, "rfile", self.rfile
             pass
         return
 
@@ -137,6 +181,7 @@ class SSHConnection:
     # @return The amount of data written.
     #
     def write(self, stuff):
+        # print "write", stuff
         return self.wfile.write(stuff)
 
     ##
@@ -190,10 +235,13 @@ class SSHTransport:
 
     ##
     # @param ssh_config The ssh config file to use when making new connections.
+    # @param user_agent Symbolic name for the program acting on behalf of the
+    #   user.
     #
-    def __init__(self, ssh_config=None):
+    def __init__(self, ssh_config=None, user_agent=None):
         self.connections = {}
         self.ssh_config = ssh_config
+        self.user_agent = user_agent
         return
     
     ##
@@ -226,7 +274,11 @@ class SSHTransport:
         connection = self.connections[(host,handler)]
 
         # ... send our request, and
+        if self.user_agent:
+            connection.putheader("user-agent", self.user_agent)
+            pass
         connection.putheader("content-length", len(request_body))
+        connection.putheader("content-type", "text/xml")
         connection.endheaders()
         connection.write(request_body)
         connection.flush()
@@ -243,6 +295,14 @@ class SSHTransport:
         return xmlrpclib.getparser()
 
     ##
+    # @param connection The connection to drop.
+    #
+    def drop_connection(self, connection):
+        del self.connections[(connection.host,connection.handler)]
+        connection.close()
+        return
+    
+    ##
     # Parse the response from the server.
     #
     # @return The python value returned by the server method.
@@ -253,6 +313,11 @@ class SSHTransport:
         try:
             # Get the headers,
             headers = SSHMessage(connection, False)
+            if headers.status != "":
+                self.drop_connection(connection)
+                raise BadResponse(connection.host,
+                                  connection.handler,
+                                  headers.status)
             # ... the length of the body, and
             length = int(headers['content-length'])
             # ... read in the body.
@@ -260,11 +325,11 @@ class SSHTransport:
             pass
         except KeyError, e:
             # Bad header, drop the connection, and
-            del self.connections[(connection.host,connection.handler)]
-            connection.close()
+            self.drop_connection(connection)
             # ... tell the user.
-            raise BadResponse(connection.host, connection.handler, e.args)
+            raise BadResponse(connection.host, connection.handler, e.args[0])
         
+        # print "response /"+response+"/"
         parser.feed(response)
 
         return unmarshaller.close()
@@ -291,11 +356,11 @@ class SSHServerWrapper:
         #
         # Init syslog
         #
-        syslog.openlog("sshxmlrpc", syslog.LOG_PID, LOG_TESTBED);
-        syslog.syslog(syslog.LOG_INFO,
-                      "Connect by " + os.environ['USER'] + " from " +
-                      self.ssh_connection[0]);
-                      
+        if os.name != "nt":
+            syslog.openlog("sshxmlrpc", syslog.LOG_PID, LOG_TESTBED);
+            syslog.syslog(syslog.LOG_INFO,
+                          "Connect by " + os.environ['USER'] + " from " +
+                          self.ssh_connection[0]);
         return
 
     ##
@@ -310,9 +375,28 @@ class SSHServerWrapper:
         try:
             # Read the request,
             hdrs = SSHMessage(connection, False)
+            if hdrs.status != "":
+                #sys.stderr.write("server error: Expecting rfc822 headers.\n");
+                raise BadRequest(connection.host, hdrs.status)
+            if not hdrs.has_key('content-length'):
+                sys.stderr.write("server error: "
+                                 + "expecting content-length header\n")
+                raise BadRequest(connection.host,
+                                 "missing content-length header")
+            if hdrs.has_key('user-agent'):
+                user_agent = hdrs['user-agent']
+                pass
+            else:
+                user_agent = "unknown"
+                pass
             length = int(hdrs['content-length'])
             params, method = xmlrpclib.loads(connection.read(length))
-            syslog.syslog(syslog.LOG_INFO, "Calling method '" + method + "'");
+            if os.name != "nt":
+                syslog.syslog(syslog.LOG_INFO,
+                              "Calling method '"
+                              + method
+                              + "'; user-agent="
+                              + user_agent);
             try:
                 # ... find the corresponding method in the wrapped object,
                 meth = getattr(self.myObject, method)
@@ -329,6 +413,7 @@ class SSHServerWrapper:
                     pass
                 pass
             except:
+                traceback.print_exc()
                 # Some other exception happened, convert it to an XML-RPC fault
                 response = xmlrpclib.dumps(
                     xmlrpclib.Fault(1,
@@ -376,8 +461,9 @@ class SSHServerWrapper:
             pass
         finally:
             connection.close()
-            syslog.syslog(syslog.LOG_INFO, "Connection closed");
-            syslog.closelog()
+            if os.name != "nt":
+                syslog.syslog(syslog.LOG_INFO, "Connection closed");
+                syslog.closelog()
             pass
         return
     
@@ -397,8 +483,16 @@ class SSHServerProxy:
     # The default is to use a new SSHTransport object.
     # @param encoding Content encoding.
     # @param verbose unused.
+    # @param user_agent Symbolic name for the program acting on behalf of the
+    #   user.
     #
-    def __init__(self, uri, transport=None, encoding=None, verbose=0, path=None):
+    def __init__(self,
+                 uri,
+                 transport=None,
+                 encoding=None,
+                 verbose=0,
+                 path=None,
+                 user_agent=None):
         type, uri = urllib.splittype(uri)
         if type not in ("ssh", ):
             raise IOError, "unsupported XML-RPC protocol"
@@ -406,7 +500,7 @@ class SSHServerProxy:
         self.__host, self.__handler = urllib.splithost(uri)
 
         if transport is None:
-            transport = SSHTransport()
+            transport = SSHTransport(user_agent=user_agent)
             pass
         
         self.__transport = transport
@@ -453,5 +547,9 @@ class SSHServerProxy:
     def __getattr__(self, name):
         # magic method dispatcher
         return xmlrpclib._Method(self.__request, name)
+
+    # Locally handle "if not server:".
+    def __nonzero__(self):
+        return True
 
     pass
