@@ -495,12 +495,12 @@ def tryXmlrpcCmd(cmd, args = (),
             else:
                 return cmd()
         except xmlrpclib.Fault, e:
-            if raisefault:
-                e.triesleft = tries
-                raise xmlrpclib.Fault, e
             print "XML-RPC Fault happened while executing agent " \
                   "command: %s" % cmd.func_name
             print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
+            if raisefault:
+                e.triesleft = tries
+                raise xmlrpclib.Fault, e
         except TimeoutError, e:
             if debug:
                 print "Caught a timeout error, setting triesleft and raising."
@@ -511,7 +511,7 @@ def tryXmlrpcCmd(cmd, args = (),
                   "while executing command: %s" % cmd.func_name
             if debug:
                 print "Exception is of type: %s" % e
-                    
+
         if tries > 0:
             print "Sleeping for %s seconds, then retrying %s command" % \
                   (sleepint, cmd.func_name)
@@ -1343,7 +1343,10 @@ class Node:
                 elif e.triesleft > 0:
                     tries = e.triesleft
                 else:
-                    raise                    
+                    raise
+            else:
+                break
+
         if debug:
             print "Obtained new lease:"
             print self.leasedata
