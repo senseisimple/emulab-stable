@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -245,6 +245,17 @@ sub doboot()
     }
 
     #
+    # Run the stargate startup if necessary
+    # 
+    if (-x "$RCDIR/rc.stargate" && STARGATE()) {
+        print("Firing off garcia/stargate processes\n");
+        system("$RCDIR/rc.stargate start");
+        if ($?) {
+            fatal("Error running $RCDIR/rc.stargate");
+        }
+    }
+
+    #
     # At this point, if we are a free node just run the config scripts
     # to clean things up, although there should not be anything to clean
     # up. We do it anyway just to be safe.
@@ -305,17 +316,6 @@ sub doboot()
 	}
 	# We are done. 
 	return;
-    }
-
-    #
-    # Run the stargate startup if necessary
-    # 
-    if (-x "$RCDIR/rc.stargate" && STARGATE()) {
-        print("Firing off garcia/stargate processes\n");
-        system("$RCDIR/rc.stargate start");
-        if ($?) {
-            fatal("Error running $RCDIR/rc.stargate");
-        }
     }
 
     # Now send ISUP
