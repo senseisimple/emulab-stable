@@ -213,7 +213,7 @@ foreach my $node (@nodes) {
 
     # For now, all testbed default images come from boss and all pid specific
     # images come from ops:/proj.
-    if (! $shared) {
+    if (! $shared && $mereuser) {
 	if (! ($imagepath =~ /^\/proj\//)) {
 	    die("*** $0:\n".
 		"    Your image must reside in /proj\n");
