@@ -2,6 +2,7 @@
 use Getopt::Std;
 use POSIX 'setsid'; # For &daemonize
 use Sys::Syslog;
+use English;
 
 # Configure variables
 my $TB		= "@prefix@";
