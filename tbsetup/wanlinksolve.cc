@@ -274,9 +274,13 @@ static inline int pickABest( Solution * currentPool )
 // uses a template to avoid massive numbers
 // of "if" choices.. compiler should generate two versions,
 // one with dump and one without.
+// returns 'true' if solution is free of invalidities 
+// (e.g. no unusable links are used,)
+// 'false' if invalid.
 template <bool verbose>
-static inline void calcError( Solution * t )
+static inline bool calcError( Solution * t )
 { 
+  bool valid = true;
   float err = 0.0f;
 
   if (verbose) {
@@ -307,10 +311,11 @@ static inline void calcError( Solution * t )
 	    int is     = pLatency[z][ t->vnode_mapping[x] ][ t->vnode_mapping[y] ];
 	    if (is == -1) {
 	      if (verbose) {
-		printf("%s -> %s link nonexistant! Super-icky penality of 10000 assessed.\n",
+		printf("%s -> %s link nonexistant! Super-icky penality of 100000 assessed.\n",
 		       vnodeNames[x].c_str(), vnodeNames[y].c_str() ); 
 	      }
-	      err += 10000.0f;
+	      err += 100000.0f;
+	      valid = false;
 	    } else if (should != is) { 
 	      float errDelta;
 
@@ -353,6 +358,8 @@ static inline void calcError( Solution * t )
 
   if (verbose) { printf("error of %4.3f\n", err ); }
   t->error = err;
+
+  return valid;
 } 
 
 static int compar( const void * a , const void * b )
@@ -881,8 +888,12 @@ int main( int argc, char ** argv )
 
     // dump a detailed report of the returned solution's errors.
     if (verbose > 1) { 
-      calcError<true>( &(currentPool[0]) ); 
-      printf("Found in %i msecs (cpu time)\n", bestSpeed );
+      if (calcError<true>( &(currentPool[0]) )) {
+	printf("Found in %i msecs (cpu time)\n", bestSpeed );
+      } else {
+	fprintf( stderr, "Solution is invalid, since it uses unavailable links.");
+	exit(6);
+      }
     }
   }
 
