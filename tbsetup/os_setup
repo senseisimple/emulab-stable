@@ -4,6 +4,8 @@ use English;
 #
 # TODO: Delta stuff.
 #       Reload disk images.
+#       Finish up local OS spec stuff. Kinda hacky right now. Does not deal
+#       with command lines or disk images. Only does neboot type stuff.
 #
 
 #
@@ -20,9 +22,13 @@ my $TB		= "/usr/testbed/bin";
 my $power	= "$TB/power";
 my $ping	= "/sbin/ping";
 my $dbg		= 1;
+my %imagepaths  = ();
+my %imageparts  = ();
 my %nodeos      = ();
 my %nodepath    = ();
+my %waitfor     = ();
 my $SAVEUID	= $UID;
+my @row;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -57,11 +63,11 @@ if ($UID != 0) {
     if ($db_result->numrows < 1) {	
 	die("There is no experiment '$eid' in project '$pid'.\n");
     }
-    my @row = $db_result->fetchrow_array();
+    @row = $db_result->fetchrow_array();
     if ($row[0] ne "$me") {
 	print STDOUT "Checking for admin status ...\n" if $dbg;
 	$db_result = $DB->query("select admin from users where uid='$me'");
-        my @row = $db_result->fetchrow_array();
+        @row = $db_result->fetchrow_array();
 	if ($row[0] != 1) {
 	    die("mkprojdir: You must be root or a TB administrator\n");
 	}
@@ -95,6 +101,24 @@ if ($ossection == 0) {
 }
 
 #
+# Parse the images table to see what the local images are.
+# 
+while (<IN>) {
+    if ( /^start images/i ) { 
+	print STDERR "Start IMAGES section...\n" if $dbg;
+	next;
+    }
+    elsif ( /^end images/i ) {
+	print STDERR "End IMAGES section...\n" if $dbg;
+	last;
+    }
+    my ($id,$path,$part) = split();
+    print STDERR "$id $path $part\n" if $dbg;
+    $imagepaths{$id} = $path;
+    $imageparts{$id} = $part;
+}
+
+#
 # Okay, parse the OS section.
 # 
 # Search the NODES section for OS labels. Consult the database to make
@@ -117,12 +141,33 @@ while (<IN>) {
     $db_result = $DB->query("select pid,eid from reserved ".
 			    "where node_id='$node'");
     if ($db_result->numrows < 1) {	
-	die("There is no node '$node' in the DB.\n");
+	die("There is no node '$node' reserved in the DB.\n");
     }
-    my @row = $db_result->fetchrow_array();
+    @row = $db_result->fetchrow_array();
     if ($row[0] ne "$pid" ||
 	$row[1] ne "$eid") {
 	die("Node '$node' pid/eid mismatch: $pid/$eid ... $row[0]/$row[1]\n");
+    }
+
+    #
+    # First see if the OS spec is a local one from the images table. We
+    # leave it up to the user to make sure the OS is capable of running
+    # on the node! This local image stuff is pretty hacky right now. I'm
+    # only going to allow netboot type stuff.
+    #
+    if ($imagepaths{$os}) {
+	if ($imageparts{$os} ne "mb") {
+	    die("Improper local OS spec: $os. ".
+		"Partition can only be 'mb' right now.");
+	}
+	#
+	# Okay, now it gets really bad. I'm going to form the tftpboot
+	# path right here, since local OS specs are not in the database
+	# disk_images table.
+	# 
+	$nodepath{$node} = "/proj/$pid/exp/$eid/tftpboot/$imagepaths{$os}";
+	$waitfor{$node}  = 0;
+	next;
     }
 
     #
@@ -139,8 +184,14 @@ while (<IN>) {
     if ($db_result->numrows < 1) {	
 	die("Improper image specification $node:$os in IR file.\n");
     }
-    my @row = $db_result->fetchrow_array();
+    @row = $db_result->fetchrow_array();
     $nodepath{$node} = $row[1];
+    if ($row[1]) {
+	$waitfor{$node}  = 0;
+    }
+    else {
+	$waitfor{$node}  = 1;
+    }
 }
 
 #
@@ -229,6 +280,15 @@ foreach my $node ( keys %nodeos ) {
 #
 foreach my $node ( keys %nodeos ) {
     my $pc	= $node;
+
+    #
+    # Don't bother to wait for nodes that are running foreign OSs since
+    # we are not going to deal with them anyway later in the process.
+    #
+    if ($waitfor{$pc} == 0) {
+	print STDERR "Not waiting for $pc to come alive. Foreign OS.\n";
+	next;
+    }	
 
     if (WaitTillAlive($pc) == 0) {
 	print STDERR "Yippie! $pc is alive and well\n";

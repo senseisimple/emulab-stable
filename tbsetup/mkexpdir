@@ -10,7 +10,7 @@ use English;
 my $tbdir    = "/usr/testbed/bin/";
 my $projroot = "/proj";
 my $tbdata   = "tbdata";
-my @dirlist  = ($tbdata, "bin", "tmp", "logs");
+my @dirlist  = ($tbdata, "bin", "tmp", "logs", "tftpboot");
 
 #
 # Untaint the path

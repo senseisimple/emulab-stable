@@ -44,23 +44,34 @@ set fp [open $nsfile r]
 #
 # Verify that the OS is valid for the node. Return zero if not supported.
 #
-# XXX Checks just for PCs in the disk_images table. Need to add support
-#     for the sharks and for create OS.
+# XXX Checks for PCs in the DB disk_images table or in the local images table.
+#     Need to add support for the sharks.
 #
 proc checkimage {node label} {
     global DB
+    global images
 
+    #
+    # DB holds our supported OS images.
+    # 
     sql query $DB "select image_id from disk_images \
 	           where type='pc' and image_id='$label'"
 
     if {[sql fetchrow $DB] != {}} {
-	set ret 1
-    } else {
-	set ret 0
+	sql endquery $DB
+	return 1;
     }
     sql endquery $DB
 
-    return $ret;
+    #
+    # Check local images table for a match.
+    # 
+    foreach n [array names images] {
+	if {[string match $n $label] == 1} {
+	    return 1;
+	}
+    }
+    return 0;
 }
 
 while {[gets $fp line] >= 0} {
@@ -117,16 +128,16 @@ while {[gets $fp line] >= 0} {
 if {! [ir exists /os]} {
     set fp [open $irfile a]
     puts $fp "START os"
-    puts $fp "START nodes"
-    foreach n [array names os] {
-	puts $fp "$n $os($n)"
-    }
-    puts $fp "END nodes"
     puts $fp "START images"
     foreach i [array names images] {
 	puts $fp "$i $images($i)"
     }
     puts $fp "END images"
+    puts $fp "START nodes"
+    foreach n [array names os] {
+	puts $fp "$n $os($n)"
+    }
+    puts $fp "END nodes"
     puts $fp "END os"
     close $fp
 } else {
