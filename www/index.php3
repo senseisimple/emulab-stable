@@ -78,17 +78,29 @@ echo "<base href=\"$TBBASE\" target=\"dynamic\">\n";
 if (isset($uid)) {
     echo "<hr>";
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT status FROM users WHERE uid='$uid'");
+	"SELECT status,admin FROM users WHERE uid='$uid'");
     $row = mysql_fetch_row($query_result);
     $status = $row[0];
+    $admin  = $row[1];
 
+    #
+    # See if group_root in any projects, not just the last one in the DB!
+    #
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT trust FROM proj_memb WHERE uid='$uid'");
-    $row = mysql_fetch_row($query_result);
-    $trust = $row[0];
-    
+	"SELECT trust FROM proj_memb WHERE uid='$uid' and trust='group_root'");
+    if (mysql_num_rows($query_result)) {
+        $trusted = 1;
+    }
+    else {
+        $trusted = 0;
+    }
+
     if ($status == "active") {
-        if ($trust == "group_root") {
+        if ($admin) {
+            echo "<A href='approveproject_form.php3?$uid'>
+                     New Project Approval</A><p>\n";
+        }
+        if ($trusted) {
             # Only group leaders can do these options
             echo "<A href='approveuser_form.php3?$uid'>
                      New User Approval</A>\n";
