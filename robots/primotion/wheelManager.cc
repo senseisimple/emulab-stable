@@ -323,15 +323,13 @@ void wheelManager::motionStarted(void)
 
 void wheelManager::motionFinished(int status, wmCallback *callback)
 {
-    this->wm_last_status = status;
-
     if (debug) {
 	fprintf(stderr, "debug: motion finished -- %d\n", status);
     }
     
     if (status != aGARCIA_ERRFLAG_WONTEXECUTE) {
-	if ((this->wm_last_status != aGARCIA_ERRFLAG_NORMAL) &&
-	    (this->wm_last_status != aGARCIA_ERRFLAG_ABORT)) {
+	if ((status != aGARCIA_ERRFLAG_NORMAL) &&
+	    (status != aGARCIA_ERRFLAG_ABORT)) {
 	    if (debug) {
 		fprintf(stderr, "debug: set error LED\n");
 	    }
@@ -341,10 +339,12 @@ void wheelManager::motionFinished(int status, wmCallback *callback)
 	
 	this->wm_dashboard->endMove(this->wm_garcia);
 	this->wm_dashboard->remUserLEDClient(&this->wm_moving_notice);
+	
+	this->wm_last_status = status;
     }
     
     if (callback != NULL) {
-	callback->call(status);
+	callback->call(this->wm_last_status);
 	
 	delete callback;
 	callback = NULL;
