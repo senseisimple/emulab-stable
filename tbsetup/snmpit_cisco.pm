@@ -370,16 +370,24 @@ sub vlanUnlock($;$) {
 
 #
 # Given a VLAN identifier from the database, find the cisco-specific VLAN
-# number that is assigned to that VLAN
+# number that is assigned to that VLAN. Retries several times (to account
+# for propagation delays) unless the $no_retry option is given.
 #
-# usage: findVlan($self, $vlan_id)
+# usage: findVlan($self, $vlan_id,$no_retry)
 #        returns the VLAN number for the given vlan_id if it exists
 #        returns undef if the VLAN id is not found
 #
-sub findVlan($$) { 
+sub findVlan($$;$) { 
     my $self = shift;
     my $vlan_id = shift;
-    my $max_tries = 10;
+    my $no_retry = shift;
+
+    my $max_tries;
+    if ($no_retry) {
+	$max_tries = 1;
+    } else {
+	$max_tries = 10;
+    }
 
     my $VlanName = "vtpVlanName"; # index by 1.vlan #
 
@@ -410,8 +418,10 @@ sub findVlan($$) {
 	#
 	# Wait before we try again
 	#
-	$self->debug("VLAN find failed, trying again\n");
-	sleep 1;
+	if ($try != $max_tries) {
+	    $self->debug("VLAN find failed, trying again\n");
+	    sleep 1;
+	}
     }
     #
     # Didn't find it

@@ -293,7 +293,7 @@ sub vlanExists($$) {
     #
     # The leader holds the list of which VLANs exist
     #
-    if ($self->{LEADER}->findVlan($vlan_id)) {
+    if ($self->{LEADER}->findVlan($vlan_id,1)) {
 	return 1;
     } else {
 	return 0;
