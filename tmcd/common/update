@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -15,11 +15,15 @@ use POSIX qw(strftime);
 #
 sub usage()
 {
-    print "Usage: update [-i]\n";
+    print "Usage: update [-i] [-a] [-m] [-h] [-l]\n";
     exit(1);
 }
-my $optlist   = "i";
+my $optlist   = "imalh";
 my $batchmode = 1;
+my $doall     = 0;
+my $accounts  = 0;
+my $mounts    = 0;
+my $hostsfile = 0;
 my $immediate = 0;
 
 # Drag in path stuff so we can find emulab stuff.
@@ -37,27 +41,17 @@ use libsetup;
 $| = 1;
 
 #
-# Must be setuid root.
+# Must either be setuid root (widearea), or it must run as root.
 # 
-if ($EUID != 0) {
-    die("*** $0:\n".
-	"    Must be root! Maybe not installed properly?\n");
-}
-
-#
-# Parse command arguments. Once we return from getopts, all that should be
-# left are the required arguments.
-#
-%options = ();
-if (! getopts($optlist, \%options)) {
-    usage();
-}
-if (defined($options{"i"})) {
-    $batchmode = 0;
-    $immediate = 1;
-}
-if (@ARGV) {
-    usage();
+if ($UID && $EUID) {
+    if ($UID) {
+	die("*** $0:\n".
+	    "    Must be run as root!\n");
+    }
+    else {
+	die("*** $0:\n".
+	    "    Must be setuid root! Maybe not installed properly?\n");
+    }
 }
 
 #
@@ -77,6 +71,38 @@ if ($UID) {
     # But must run as real root!
     #
     $UID = 0;
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"i"})) {
+    $batchmode = 0;
+    $immediate = 1;
+}
+if (defined($options{"a"})) {
+    $doall = 1;
+}
+if (defined($options{"l"})) {
+    $accounts = 1;
+}
+if (defined($options{"m"})) {
+    $mounts = 1;
+}
+if (defined($options{"h"})) {
+    $hostsfile = 1;
+}
+if (@ARGV) {
+    usage();
+}
+# Backwards compat; no options means mounts and accounts.
+if (!$mounts && !$accounts && !$hostsfile) {
+    $mounts = $accounts = 1;
 }
 
 #
@@ -129,7 +155,42 @@ while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
     sleep(5);
 }
 
-my $failed = nodeupdate();
+#
+# When doing an update do not block forever. If no progress in 30 seconds
+# just quit and try again later. For REMOTE() nodes, this is essential
+# to avoid blocking at boot time.
+#
+$tmcctimeout = 30;
+
+#
+# Order matters!
+#
+if (($mounts || $doall) && !JAILED()) {
+    print "Updating project and home directories ... \n";
+
+    if (domounts()) {
+	die("*** $0:\n".
+	    "    Failed to update mountpoints!\n");
+    }
+}
+
+if (($hostsfile || $doall) && !REMOTE()) {
+    print "Updating Testbed hostnames configuration ... \n";
+
+    if (dohostnames()) {
+	die("*** $0:\n".
+	    "    Failed to update hosts file!\n");
+    }
+}
+
+if ($accounts || $doall) {
+    print "Updating groups and accounts ... \n";
+
+    if (doaccounts()) {
+	die("*** $0:\n".
+	    "    Failed to update groups and accounts!\n");
+    }
+}
 
 close(LOCK);
-exit($failed);
+exit(0);
