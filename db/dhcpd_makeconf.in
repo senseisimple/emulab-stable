@@ -39,7 +39,7 @@ my %opt = ();
 getopts("hv",\%opt);
 if ($opt{h}) { exit &usage; }
 
-$infile = shift @ARGV; # || exit &usage;
+$infile = shift @ARGV || exit &usage;
 
 open(IF,"<$infile") or die "Unable to open $infile for reading\n";
 while (<IF>) {
@@ -89,4 +89,6 @@ sub usage {
 	print "Usage: $0 [-h] [-v] <templatefile>\n";
 	print "-h		Show this message\n";
 	print "-v		Use virtual names, when possible, for hostnames\n";
+	print "Spits out a dhcpd config file on stdout, as in:\n";
+	print "$0 dhcpd.conf.template > dhcpd.conf\n";
 }
