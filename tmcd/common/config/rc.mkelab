@@ -710,7 +710,7 @@ sub SetupBossNode()
     #
     print "Copying over tftpboot tar file from web server and unpacking\n";
     mysystem("wget -q -O ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
-	     "http://www.emulab.net/downloads/tftpboot-latest.tar.gz");
+	     "http://www.emulab.net/downloads/tftpboot-elabinelab.tar.gz");
 
     mysystem("tar xzf ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
 	     "    -C /tftpboot");
