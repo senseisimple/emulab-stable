@@ -86,15 +86,16 @@ $TB_PROJECT_READINFO		= 1;
 $TB_PROJECT_MAKEGROUP		= 2;
 $TB_PROJECT_EDITGROUP		= 3;
 $TB_PROJECT_GROUPGRABUSERS      = 4;
-$TB_PROJECT_DELGROUP		= 5;
-$TB_PROJECT_LEADGROUP		= 6;
-$TB_PROJECT_ADDUSER		= 7;
-$TB_PROJECT_DELUSER             = 8;
-$TB_PROJECT_MAKEOSID		= 9;
-$TB_PROJECT_DELOSID		= 10;
-$TB_PROJECT_MAKEIMAGEID		= 11;
-$TB_PROJECT_DELIMAGEID		= 12;
-$TB_PROJECT_CREATEEXPT		= 13;
+$TB_PROJECT_BESTOWGROUPROOT     = 5;
+$TB_PROJECT_DELGROUP		= 6;
+$TB_PROJECT_LEADGROUP		= 7;
+$TB_PROJECT_ADDUSER		= 8;
+$TB_PROJECT_DELUSER             = 9;
+$TB_PROJECT_MAKEOSID		= 10;
+$TB_PROJECT_DELOSID		= 11;
+$TB_PROJECT_MAKEIMAGEID		= 12;
+$TB_PROJECT_DELIMAGEID		= 13;
+$TB_PROJECT_CREATEEXPT		= 14;
 $TB_PROJECT_MIN			= $TB_PROJECT_READINFO;
 $TB_PROJECT_MAX			= $TB_PROJECT_CREATEEXPT;
 
@@ -241,6 +242,7 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
     global $TB_PROJECT_MAKEGROUP;
     global $TB_PROJECT_EDITGROUP;
     global $TB_PROJECT_GROUPGRABUSERS;
+    global $TB_PROJECT_BESTOWGROUPROOT;
     global $TB_PROJECT_DELGROUP;
     global $TB_PROJECT_LEADGROUP;
     global $TB_PROJECT_ADDUSER;
@@ -295,29 +297,59 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	    $access_type == $TB_PROJECT_CREATEEXPT) {
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
-    elseif ($access_type == $TB_PROJECT_ADDUSER) {
+    elseif ($access_type == $TB_PROJECT_ADDUSER ||
+	    $access_type == $TB_PROJECT_EDITGROUP) {
 	#
-	# Allow delegation of approving users to group_root in main group.
+	# If user is project_root or group_root in default group, 
+	# allow them to add/edit/remove users in any group.
 	#
+	if (TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
+	    return 1;
+	}
+	#
+	# Otherwise, editing a group requires group_root 
+	# in that group.
+	#	
 	$mintrust = $TBDB_TRUST_GROUPROOT;
     }
-    elseif ($access_type == $TB_PROJECT_EDITGROUP) {
-	if (strcmp($gid, $pid) == 0) {
-	    $mintrust = $TBDB_TRUST_PROJROOT;
+    elseif ($access_type == $TB_PROJECT_BESTOWGROUPROOT) {
+	#
+	# If user is project_root, 
+	# allow them to bestow group_root in any group.
+	#
+	if (TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_PROJROOT)) {
+	    return 1;
 	}
+
+	if (strcmp($gid, $pid) == 0)  {
+	    #
+	    # Only project_root can bestow group_root in default group, and
+	    # we already established that they're not project_root, so fail.
+	    #
+	    return 0;
+	} 
 	else {
+	    #
+	    # Non-default group.
+	    # group_root in default group may bestow group_root.
+	    #
+	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
+		return 1;
+	    }
+
+	    #
+	    # group_root in the group in question may also bestow group_root.
+	    #
 	    $mintrust = $TBDB_TRUST_GROUPROOT;
 	}
     }
     elseif ($access_type == $TB_PROJECT_GROUPGRABUSERS) {
-	if (strcmp($gid, $pid) == 0) {
-	    $mintrust = $TBDB_TRUST_PROJROOT;
-	}
-	else {
-	    # Grabbing users requires privs in the project, not group!
-	    $gid = $pid;
-	    $mintrust = $TBDB_TRUST_GROUPROOT;
-	}	
+	#
+	# Only project_root or group_root in default group
+	# may grab (involuntarily add) users into groups.
+	#
+	$gid = $pid;
+	$mintrust = $TBDB_TRUST_GROUPROOT;
     }
     elseif ($access_type == $TB_PROJECT_DELUSER) {
 	$mintrust = $TBDB_TRUST_PROJROOT;

@@ -203,7 +203,10 @@ while ($usersrow = mysql_fetch_array($query_result)) {
     if (TBCheckGroupTrustConsistency($newuid, $pid, $gid, "local_root", 0)) {       
 	# local_root means any root is valid.
         echo  "<option value='local_root'>Local Root </option>\n";
-	echo  "<option value='group_root'>Group Root </option>\n";
+	if (TBProjAccessCheck($auth_usr, $pid, $gid,
+                              $TB_PROJECT_BESTOWGROUPROOT)) {
+	    echo  "<option value='group_root'>Group Root </option>\n";
+	}
     }	
     echo "        </select>
               </td>\n";

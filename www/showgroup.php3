@@ -73,7 +73,8 @@ if ($isadmin || TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELUSER)) {
 # This menu only makes sense for people with privs to use them.
 #
 if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||
-    TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELGROUP)) {
+    (strcmp($gid, $pid) && 
+     TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_DELGROUP))) {
 
     SUBPAGESTART();
     SUBMENUSTART("Group Options");

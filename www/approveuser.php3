@@ -89,20 +89,20 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     #
     # Check that the current uid has the necessary trust level
     # to approver users in the project/group. Also, only project leaders
-    # can add someone as group_root. This should probably be encoded in
-    # the permission stuff.
+    # can add someone to the default group as group_root.
     #
     if (! TBProjAccessCheck($uid, $project, $group, $TB_PROJECT_ADDUSER)) {
 	USERERROR("You are not allowed to approve users in ".
 		  "$project/$group!", 1);
     }
 
-    TBProjLeader($project, $projleader);
-    if (strcmp($uid, $projleader) &&
-	strcmp($newtrust, "group_root") == 0 &&
+    if (strcmp($newtrust, "group_root") == 0 &&
 	strcmp($group, $project) == 0) {
-	USERERROR("You do not have permission to add new users with group ".
-		  "root status to the default group!", 1);
+	if (! TBProjAccessCheck($uid, $project, $group, 
+                                $TB_PROJECT_BESTOWGROUPROOT)) {
+	    USERERROR("You do not have permission to add new users with group ".
+		      "root trust to the default group!", 1);
+	}
     }
     
     #

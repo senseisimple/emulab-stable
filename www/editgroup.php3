@@ -55,12 +55,20 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
 }
 
 #
+# See if user is allowed to bestow group_root upon members of group.
+# 
+$bestowgrouproot = 0;
+if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_BESTOWGROUPROOT)) {
+    $bestowgrouproot = 1;
+}
+
+#
 # Grab the current user list for the group. The group leader cannot be
 # removed! Do not include members that have not been approved to main
 # group either! This will force them to go through the approval page first.
 #
 $curmembers_result =
-    DBQueryFatal("select distinct m.uid from group_membership as m ".
+    DBQueryFatal("select distinct m.uid, m.trust from group_membership as m ".
 		 "left join groups as g on g.pid=m.pid and g.gid=m.gid ".
 		 "where m.pid='$pid' and m.gid='$gid' and ".
 		 "      m.uid!=g.leader and m.trust!='none'");
@@ -92,6 +100,7 @@ $nonmembers_result =
 if (mysql_num_rows($curmembers_result)) {
     while ($row = mysql_fetch_array($curmembers_result)) {
 	$user = $row[0];
+	$oldtrust = $row[1];
 	$foo  = "change_$user";
 
 	#
@@ -117,6 +126,18 @@ if (mysql_num_rows($curmembers_result)) {
 	    strcmp($newtrust, "local_root") &&
 	    strcmp($newtrust, "group_root")) {
 	    TBERROR("Invalid trust $newtrust for $user in editgroup.php3.", 1);
+	}
+
+	#
+	# If the user is attempting to bestow group_root on a user who 
+	# did not previously have group_root, check to see if the operation is
+	# permitted.
+	#
+	if (strcmp($newtrust, $oldtrust) &&
+	    !strcmp($newtrust, "group_root") && 
+	    !$bestowgrouproot) {
+	    USERERROR("You do not have permission to bestow group root".
+		      "trust to users in $pid/$gid!", 1 );
 	}
 
 	TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, 1);
@@ -154,6 +175,12 @@ if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
 		TBERROR("Invalid trust $newtrust for $user in editgroup.php3.",
 			1);
 	    }
+
+	    if (!strcmp($newtrust, "group_root")
+		&& !$bestowgrouproot) {
+		USERERROR("You do not have permission to bestow group root".
+			  "trust to users in $pid/$gid!", 1 );
+	    }
 	    
 	    TBCheckTrustConsistency($user, $pid, $gid, $newtrust);
 	}
@@ -177,6 +204,7 @@ if (mysql_num_rows($curmembers_result)) {
     
     while ($row = mysql_fetch_array($curmembers_result)) {
 	$user = $row[0];
+	$oldtrust = $row[1];
 	$foo  = "change_$user";
 
 	if (!$defaultgroup && !isset($$foo)) {
@@ -193,8 +221,10 @@ if (mysql_num_rows($curmembers_result)) {
         $foo      = "$user\$\$trust";
 	$newtrust = $$foo;
 	
-	DBQueryFatal("update group_membership set trust='$newtrust' ".
-		     "where pid='$pid' and gid='$gid' and uid='$user'");
+	if (strcmp($oldtrust,$newtrust)) {
+	    DBQueryFatal("update group_membership set trust='$newtrust' ".
+			 "where pid='$pid' and gid='$gid' and uid='$user'");
+	}
     }
 }
 

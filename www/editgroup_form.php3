@@ -55,6 +55,14 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_GROUPGRABUSERS)) {
 }
 
 #
+# See if user is allowed to bestow group_root upon members of group.
+# 
+$bestowgrouproot = 0;
+if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_BESTOWGROUPROOT)) {
+    $bestowgrouproot = 1;
+}
+
+#
 # Grab the user list for the group. Provide a button selection of people
 # that can be removed. The group leader cannot be removed!
 # Do not include members that have not been approved
@@ -155,10 +163,16 @@ if (mysql_num_rows($curmembers_result)) {
 	    echo "<option value='local_root' " .
 		((strcmp($trust, "local_root") == 0) ? "selected" : "") .
 		    ">Local Root </option>\n";
-	    
-	    echo "<option value='group_root' " .
-		((strcmp($trust, "group_root") == 0) ? "selected" : "") .
-		    ">Group Root </option>\n";
+
+	    #
+	    # If group_root is already selected, or we have permission to set it,
+	    # show it. Otherwise do not.
+	    #
+	    if (strcmp($trust, "group_root") == 0 || $bestowgrouproot) {
+		echo "<option value='group_root' " .
+		    ((strcmp($trust, "group_root") == 0) ? "selected" : "") .
+			">Group Root </option>\n";
+	    }
 	}
 	echo "        </select>
                    </td>\n";
@@ -197,10 +211,12 @@ if ($grabusers && mysql_num_rows($nonmembers_result)) {
 	    echo "<option value='local_root' " .
 		((strcmp($trust, "local_root") == 0) ? "selected" : "") .
 		    ">Local Root</option>\n";
-	    
-	    echo "<option value='group_root' " .
-		((strcmp($trust, "group_root") == 0) ? "selected" : "") .
-		    ">Group Root</option>\n";
+
+	    if ($bestowgrouproot) {
+		echo "<option value='group_root' " .
+		    ((strcmp($trust, "group_root") == 0) ? "selected" : "") .
+			">Group Root</option>\n";
+	    }
 	}
 	echo "        </select>
 	    </td>\n";
