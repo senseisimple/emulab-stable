@@ -31,6 +31,8 @@ my $MAGICNODE = "ron2";
 
 my $logfile = "$TB/log/grabron";
 
+my $debug = 0;
+
 if (@ARGV != 1) {
     die "Usage: $0 <url>\n";
 }
@@ -46,7 +48,7 @@ $| = 1;
 #
 # Time in beteen polls
 #
-my $interval = 24 * 60 *60; # 24 hours
+my $interval = 25 * 60 *60; # 24 hours
 
 #
 # Find out the interface to use for the TBDB_WIDEAREA_LOCALNODE, since I don't
@@ -60,8 +62,10 @@ if ($result->num_rows() != 1){
 }
 my ($localIface) = ($result->fetchrow());
 
-if (TBBackGround($logfile)) {
-   exit(0);
+if (!$debug) {
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
 }
 
 #
@@ -121,13 +125,12 @@ sub upload_times($$$) {
 	    next;
 	}
 	my ($node_id2, $iface2) = @{$ipmap{$dst}};
-	if (!$bandwidths{"$node_id1:$iface1 $node_id2:$iface2"}) {
+	my $bandwidth = $bandwidths{"$node_id1:$iface1 $node_id2:$iface2"};
+	if (!defined $bandwidth) {
 	    warn "Got a pair ($node_id1:$iface1 $node_id2:$iface2) that has ".
 		    "no bandwidth\n";
-	    $failed++;
-	    next;
+	    $bandwidth = -1;
 	}
-	my $bandwidth = $bandwidths{"$node_id1:$iface1 $node_id2:$iface2"};
 	if (!defined($latency)) {
 	    #
 	    # If no latency, that means we can't get there from here, so
@@ -229,14 +232,19 @@ sub get_times($) {
     while (shift @data) { }
 
     #
-    # XXX: Temporary, until Dave fixes the "Plain Text" output, which isn't
-    # really
+    # XXX - hack to work around oddity in fetchAll's output - it uses CRLF for
+    # headers (the standard), but newlines for the body
     #
-    @data = split /<p>|<\/p><p>|<\/p>/, $data[0];
+    if (@data == 1) {
+	@data = split /\n/,$data[0];
+    }
 
     my @return;
     foreach my $line (@data) {
 	chomp $line;
+	if ($debug) {
+	    print "got line $line\n";
+	}
 	if (! ($line =~ /(\d+\.\d+.\d+\.\d+)\s+(\d+\.\d+.\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+)\s+(\d+)/) ) {
 	    warn "Bad data line: $line\n";
 	    next;
