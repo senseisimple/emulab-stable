@@ -534,7 +534,7 @@ if (! $returning) {
 	strcmp($formfields[usr_phone], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     }
-    elseif (! ereg("^[\(]*[0-9][-\(\)0-9]+$", $formfields[usr_phone])) {
+    elseif (! ereg("^[\(]*[0-9][-\(\) 0-9ext]+$", $formfields[usr_phone])) {
 	$errors["Phone"] = "Invalid characters";
     }
     if (!isset($formfields[password1]) ||

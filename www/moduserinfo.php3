@@ -341,7 +341,7 @@ if (!isset($formfields[usr_phone]) ||
     strcmp($formfields[usr_phone], "") == 0) {
     $errors["Phone #"] = "Missing Field";
 }
-elseif (! ereg("^[\(]*[0-9][-\(\)0-9]+$", $formfields[usr_phone])) {
+elseif (! ereg("^[\(]*[0-9][-\(\) 0-9ext]+$", $formfields[usr_phone])) {
     $errors["Phone"] = "Invalid characters";
 }
 if (isset($formfields[password1]) &&
@@ -454,7 +454,8 @@ DBQueryFatal("UPDATE users SET ".
 	     "usr_addr=\"$usr_addr\",       ".
 	     "usr_phone=\"$usr_phone\",     ".
 	     "usr_title=\"$usr_title\",     ".
-	     "usr_affil=\"$usr_affil\"      ".
+	     "usr_affil=\"$usr_affil\",     ".
+	     "usr_modified=now()            ".
 	     "WHERE uid=\"$target_uid\"");
 
 #
