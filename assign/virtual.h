@@ -40,7 +40,8 @@ public:
       return i;
     } 
   typedef enum {LINK_UNKNOWN, LINK_DIRECT,
-	LINK_INTRASWITCH, LINK_INTERSWITCH} linkType;
+	LINK_INTRASWITCH, LINK_INTERSWITCH,
+		LINK_TRIVIAL} linkType;
   
   int bandwidth;		// how much bandwidth this uses
   linkType type;		// link type
@@ -50,6 +51,8 @@ public:
   edge plink_local_two;		// only used in inter - link to local switch
   list<edge> path;		// path for interswitch links
   string name;			// name
+  bool emulated;		// is this an emulated link, i.e. can it
+				// share a plink withouter emulated vlinks
 };
 
 typedef GRAPH<tb_vnode,tb_vlink> tb_vgraph;

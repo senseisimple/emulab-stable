@@ -30,12 +30,13 @@ int parse_top(tb_vgraph &G, istream& i)
   node no1;
   string s1, s2;
   char inbuf[255];
-  char n1[1024], n2[1024];
+  char n1[1024], n2[1024],emustring[1024];
   char lname[1024];
   int num_nodes = 0;
   int bw;
   int r;
   dictionary<string,tb_vclass*> vclass_map;
+  bool emulated=false;
   
   while (!i.eof()) {
     char *ret;
@@ -89,11 +90,15 @@ int parse_top(tb_vgraph &G, istream& i)
 	}
       }
     } else if (!strncmp(inbuf, "link", 4)) {
-      r=sscanf(inbuf, "link %s %s %s %d", lname, n1, n2,&bw);
-      if (r < 3) {
+      r=sscanf(inbuf, "link %s %s %s %d %s", lname, n1, n2,&bw,emustring);
+      if ((r <= 3) || ((r == 5) && strcmp(emustring,"emulated"))) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
-	if (r == 3) bw = 10;
+	if (r == 4) {
+	  emulated = false;
+	} else {
+	  emulated = true;
+	}
 	string s1(n1);
 	string s2(n2);
 	edge e;
@@ -105,6 +110,7 @@ int parse_top(tb_vgraph &G, istream& i)
 	G[e].plink = NULL;
 	G[e].plink_two = NULL;
 	G[e].name = string(lname);
+	G[e].emulated = emulated;
       }
     } else if (! strncmp(inbuf, "fix-node",8)) {
       r=sscanf(inbuf,"fix-node %s %s",n1,n2);

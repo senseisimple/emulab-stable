@@ -213,7 +213,7 @@ void remove_node(node n)
 
       unscore_link(vlink->plink,e,false);
       unscore_link(vlink->plink_two,e,false); 
-    } else {
+    } else if (vlink->type != tb_vlink::LINK_TRIVIAL) {
       // No link
       fprintf(stderr,"Internal error - no link\n");
       abort();
@@ -381,7 +381,12 @@ int add_node(node n,int ploc)
       cerr << "   goes to " << dpnoder.name << endl;
 #endif
 
-      if ((pedge=direct_link(dpnode,pnode)) != NULL) {
+      if (dpnode == pnode) {
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"  trivial link\n");
+#endif SCORE_DEBUG
+	er->type = tb_vlink::LINK_TRIVIAL;
+      } else if ((pedge=direct_link(dpnode,pnode)) != NULL) {
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"   found direct link = %p\n",pedge);
 #endif
@@ -675,21 +680,32 @@ void score_link(edge e,edge v,bool interswitch)
 #endif
 
   if (! interswitch) {
-    pl.users++;
-    if (pl.users == 1) {
+    if (! er.emulated) {
+      pl.users++;
+      if (pl.users == 1) {
 #ifdef SCORE_DEBUG
-      fprintf(stderr,"    first user\n");
+	fprintf(stderr,"    first user\n");
 #endif
-      SADD(SCORE_DIRECT_LINK);
+	SADD(SCORE_DIRECT_LINK);
+      } else {
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"    not first user - penalty\n");
+#endif
+	SADD(SCORE_DIRECT_LINK_PENALTY);
+	vinfo.link_users++;
+	violated++;
+      }
     } else {
+      pl.users++;
+      SADD(SCORE_EMULATED_LINK);
+      if (pl.users == 1) {
 #ifdef SCORE_DEBUG
-      fprintf(stderr,"    not first user - penalty\n");
+	fprintf(stderr,"    emulated - first user\n");
 #endif
-      SADD(SCORE_DIRECT_LINK_PENALTY);
-      vinfo.link_users++;
-      violated++;
+	SADD(SCORE_DIRECT_LINK);
+      }
     }
-  }
+  } 
   
   // bandwidth
   int prev_bw = pl.bw_used;
@@ -716,21 +732,33 @@ void unscore_link(edge e,edge v,bool interswitch)
 #endif
 
   if (!interswitch) {
-    pl.users--;
-    if (pl.users == 0) {
-      // link no longer used
+    if (! er.emulated) {
+      pl.users--;
+      if (pl.users == 0) {
+	// link no longer used
 #ifdef SCORE_DEBUG
-      fprintf(stderr,"   freeing link\n");
+	fprintf(stderr,"   freeing link\n");
 #endif
-      SSUB(SCORE_DIRECT_LINK);
+	SSUB(SCORE_DIRECT_LINK);
+      } else {
+	// getting close to no violations
+#ifdef SCORE_DEBUG
+	fprintf(stderr,"   reducing users\n");
+#endif
+	SSUB(SCORE_DIRECT_LINK_PENALTY);
+	vinfo.link_users--;
+	violated--;
+      }
     } else {
-      // getting close to no violations
+      pl.users--;
+      SSUB(SCORE_EMULATED_LINK);
+      if (pl.users == 0) {
+	// link no longer used
 #ifdef SCORE_DEBUG
-      fprintf(stderr,"   reducing users\n");
+	fprintf(stderr,"   emulated - freeing link\n");
 #endif
-      SSUB(SCORE_DIRECT_LINK_PENALTY);
-      vinfo.link_users--;
-      violated--;
+	SSUB(SCORE_DIRECT_LINK);
+      } 
     }
   }
   

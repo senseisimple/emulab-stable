@@ -565,6 +565,8 @@ void print_solution()
       }
       cout << " " << lp2.name << " (" << lp2.srcmac << "," <<
 	lp2.dstmac << ")" << endl;
+    } else if (v.type == tb_vlink::LINK_TRIVIAL) {
+      cout << " trivial" << endl;
     } else {
       cout << "Unknown link type" << endl;
     }
