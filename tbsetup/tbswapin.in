@@ -65,6 +65,15 @@ sub cleanup {
 	}
     }
     
+    #
+    # This is a hack. We need a more general os_teardown, but for now
+    # we just kill off the vnode stuff. 
+    #
+    TBDebugTimeStamp("vnode_setup -k started");
+    if (system("vnode_setup -d -k $pid $eid")) {
+	print STDERR "*** Failed tear down vnodes.\n";
+    }
+
     print STDERR "Freeing up nodes.\n";
     if (system("nfree $pid $eid")) {
 	print STDERR "*** Could not free nodes.\n";
