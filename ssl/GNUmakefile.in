@@ -15,6 +15,8 @@ include $(OBJDIR)/Makeconf
 all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	keys mksig
 
+remote-site:	emulab.pem capture.pem server.pem localnode.pem
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 #
@@ -143,6 +145,14 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 640 $(INSTALL_ETCDIR)/ronnode.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcwa.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab_privkey.pem
+
+remote-site-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/capture.pem $(INSTALL_ETCDIR)/server.pem
+	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
+	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+	chmod 640 $(INSTALL_ETCDIR)/capture.pem
+	chmod 640 $(INSTALL_ETCDIR)/server.pem
+	chmod 640 $(INSTALL_ETCDIR)/client.pem
 
 client-install:
 	$(INSTALL_DATA) localnode.pem $(DESTDIR)$(CLIENT_ETCDIR)/client.pem
