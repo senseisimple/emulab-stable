@@ -269,13 +269,13 @@ function WRITESIDEBAR() {
 # spits out beginning part of page
 #
 function PAGEBEGINNING( $title ) {
-    global $BASEPATH, $TBMAINSITE;
+    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE;
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 
  "http://www.w3.org/TR/html4/loose.dtd">
 <html>
   <head>
-    <title><?php echo "emulab.net - $title"; ?></title>
+    <title><?php echo "$THISHOMEBASE - $title"; ?></title>
     <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
     <link REL="stylesheet" HREF="<?php echo "$BASEPATH/common-style.css" ?>" 
           TYPE="text/css" />
@@ -295,8 +295,9 @@ function PAGEBEGINNING( $title ) {
         <td valign="top" class="bannercell" 
             background="<?php echo "$BASEPATH/headerbgbb.jpg" ?>"
             bgcolor=#3D627F ><img width=369 height=100 
-            src="<?php echo "$BASEPATH/overlay.gif" ?>" 
-            alt="emulab - the utah network testbed" /></td>
+            src="<?php echo "$BASEPATH/overlay." . strtolower($THISHOMEBASE) 
+                                                 . ".gif" ?>" 
+            alt="<?php echo "$THISHOMEBASE" ?> - the network testbed" /></td>
       </tr>
     </table><table cellpadding="8" cellspacing="0" height="100%">
       <tr height=100%>
