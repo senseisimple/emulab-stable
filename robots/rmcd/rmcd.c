@@ -202,10 +202,9 @@ static void conv_a2r(struct position *rel,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-   
     ct = cos(abs_start->theta);
     st = sin(abs_start->theta);
-    
+
     rel->x = ct*(abs_finish->x - abs_start->x) +
              st*(abs_finish->y - abs_start->y);
     rel->y = ct*(abs_finish->y - abs_start->y) +
@@ -214,6 +213,7 @@ static void conv_a2r(struct position *rel,
     rel->theta = abs_finish->theta - abs_start->theta;
     rel->timestamp = abs_finish->timestamp;
     
+    info("a2r %f %f %f\n", rel->x, rel->y, rel->theta);
 }
 
 /**
@@ -235,8 +235,9 @@ static void conv_r2a(struct position *abs_finish,
     assert(rel != NULL);
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
-    
 
+    rel->x = floor(rel->x * 1000.0) / 1000.0;
+    rel->y = floor(rel->y * 1000.0) / 1000.0;
     
     ct = cos(abs_start->theta);
     st = sin(abs_start->theta);
@@ -247,6 +248,7 @@ static void conv_r2a(struct position *abs_finish,
     abs_finish->theta = abs_start->theta + rel->theta;
     abs_finish->timestamp = rel->timestamp;
 
+    info("r2a %f %f %f\n", abs_finish->x, abs_finish->y, abs_finish->theta);
 }
 
 /**
@@ -701,7 +703,7 @@ int main(int argc, char *argv[])
 	    (void) fclose(fp);
 	}
     }
-  
+
     if (emc_hostname != NULL) {
 	struct mtp_packet *mp = NULL, *rmp = NULL;
 	struct mtp_control mc;
