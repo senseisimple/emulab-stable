@@ -39,11 +39,6 @@ to.
 Use the 'defs-example' file in the root of our source distribution as a
 template. It contains comments explaining the important variables to set.
 
-You'll also need to make a defs file for the web interface. This is found in
-the www/ directory of the testbed source tree. Copy example-defs.php3 to
-<name>-defs.php3, and put <name> into WWWDEFS in the main defs file. Important
-variables in this file are commented as well.
-
 ##### Step 2 -  Unpacking and running configure
 
 This works the same as it did on ops:
