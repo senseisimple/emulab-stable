@@ -509,7 +509,7 @@ sub setVlanOnTrunks($$$;@) {
 	    # first
 	    #
 	    my $modport = $trunks{$dst}{$src}[0];
-	    $errors += !($self->{DEVICES}{$dst}->setVlanOnTrunk($modport,
+	    $errors += !($self->{DEVICES}{$dst}->setVlanOnTrunks($modport,
 		    $value,$vlan_number));
 	}
     }
