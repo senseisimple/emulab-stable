@@ -27,9 +27,15 @@ p5-Mysql-modules-1.2215 Perl5 modules for accessing MySQL databases
 p5-SNMP-4.2.0       A perl5 module for interfacing with the CMU SNMP library
 p5-SNMP_Session-0.83 A perl5 module for providing rudimentary access to SNMPv1 a
 rpm-3.0.6_5         The Red Hat Package Manager
-tcl-8.3.3           Tool Command Language
+tcl-8.2.3           Tool Command Language
 tcl-sql-20000114_1  TCL module for accessing MySQL databases
 ucd-snmp-4.2        An extendable SNMP implimentation
+
+Note on TCL: Do NOT install tcl83 - otcl, which is used by some testbed scripts,
+requires tcl82. When you install the tcl-sql package, it will be put in the library
+directory for the latest version of tcl you have installed, so if you have tcl83
+installed at the time, you will have tcl-sql support under 8.3.X, but not under
+8.2.X (which testbed scripts use)
 
 ##### Step 2 - LEDA
 
@@ -90,31 +96,35 @@ SSH - If possible, grab the old machine's SSH host keys (from
 files from the old machine (/root/.ssh/{identity,identity.pub,known_hosts}) - Make
 sure to preserve file and directory permissions. You'll probably also want to add
 PermitRootLogin yes
-to /etc/ssh/sshd_config (and HUP sshd) so that you can log in a root remotely
+to /etc/ssh/sshd_config (and HUP sshd) so that you can log in as root remotely
 
 Grab the old /etc/master.passwd file, and run 'cd /etc && pwd_mkdb -p master.passwd'
 Also grab the old /etc/groups file
 
 /etc/syslog.conf needs entries for some of our own services. Example:
 !bootinfo
-*.*                     /var/log/testbed/bootinfo.log
+*.*                     /usr/testbed/log/bootinfo.log
 !tmcd
-*.*                     /var/log/testbed/tmcd.log
+*.*                     /usr/testbed/log/tmcd.log
 !capture
-*.*                     /var/log/tiplogs/capture.log
+*.*                     /usr/testbed/log/tiplogs/capture.log
 !dhcpd
 *.*                     /usr/testbed/log/dhcpd.log
+All of these logs should be created before you HUP syslogd or reboot - All of them
+can be world-readable
 
 DHCP - Need to install the dhcpd config file. The old (deprecated) location was
 /usr/site/bin/dhcp/dhcpd.conf. The new location (and the place you should
-install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf
+install it if you used the 'isc-dhcpd' port) is /usr/local/etc/dhcpd.conf .
 
 RC scripts - The mysql-client rc script needs to run before ANY testbed
 services are started! The mysql server should also be started early in the
 process.  boot process. You can ensure this by changing directories to
 /usr/local/etc/rc.d and renaming 'mysql-client.sh' to '1.mysql-client.sh' and
-'mysql-server.sh' to '2.mysql-server.sh'. You will also need to install the
-'3.testbed.sh' script (in the rc.d directory of the testbed tree)
+'mysql-server.sh' to '2.mysql-server.sh'. Furthermore, dhcpd needs to start
+before proxydhcp, so rename 'dhcpd.sh' to '2.dhcpd.sh'. You will also need to
+install the '3.testbed.sh' and 'cvsupd.sh'  scripts (in the rc.d directory of
+the testbed tree)
 
 Logs - To avoid filling up /var, link /var/log/testbed to /usr/testbed/log
 
@@ -163,6 +173,26 @@ ntpd: The boss node should be running ntpd. In FreeBSD, you can enable this with
 the line
 xntpd_enable="YES"
 in /etc/rc.conf. Check out the ntpd man page for configuration information.
+
+You may want a program to allow administraor-types to run stuff easily as root.
+Here at Utah, we have two: su1 (developed locally) and sudo (installed from
+FreeBSD ports) - don't forget to get it set up!
+
+checkpass - Need to get a copy of the dictionary that checkpass uses to check
+for bad passwords when creating a new account. I'll fill out this section
+soon when I figure out the best way to handle this...
+
+##### Step 6 - Stuff to copy from an old boss node
+
+If you're simply moving from one boss node to another, there are a few files
+and trees you'll want to make sure to copy over:
+/usr/testbed/images/
+/tftpboot/
+/etc/namedb/
+/etc/master.password
+/etc/group
+/usr/testbed/sup/
+/usr/site/
 
 ##### Last-minute synching
 Right before bringing the new boss node online (if copying from an old boss node),
