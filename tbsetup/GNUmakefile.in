@@ -38,7 +38,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  webendexp webbatchexp webpanic \
 		  assign_wrapper assign_prepass ptopgen webnodeupdate \
 		  webdelay_config \
-		  webrmgroup webswapexp webnodecontrol \
+		  webrmgroup webswapexp webnodecontrol webeventsys_control \
 		  webmkgroup websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
 		  webnodereboot webrmuser webidleswap switchmac \

@@ -550,7 +550,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/rmgroup tbsetup/webrmuser tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
         tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
-	tbsetup/eventsys_control \
+	tbsetup/eventsys_control tbsetup/webevensys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \

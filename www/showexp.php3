@@ -227,6 +227,8 @@ if ($isadmin) {
 	WRITESUBMENUBUTTON("Restart Experiment",
 			   "swapexp.php3?inout=restart&pid=$exp_pid".
 			   "&eid=$exp_eid");
+	WRITESUBMENUBUTTON("Replay Events",
+			   "replayexp.php3?&pid=$exp_pid&eid=$exp_eid");
 
 	SUBMENUSECTION("Admin Options");
 	
