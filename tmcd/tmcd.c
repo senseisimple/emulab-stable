@@ -116,7 +116,7 @@ COMMAND_PROTOTYPE(docreator);
 COMMAND_PROTOTYPE(dotunnels);
 COMMAND_PROTOTYPE(dovnodelist);
 COMMAND_PROTOTYPE(doisalive);
-COMMAND_PROTOTYPE(doipodhash);
+COMMAND_PROTOTYPE(doipodinfo);
 
 struct command {
 	char	*cmdname;
@@ -149,7 +149,7 @@ struct command {
 	{ "tunnels",	dotunnels},
 	{ "vnodelist",	dovnodelist},
 	{ "isalive",	doisalive},
-	{ "ipodhash",	doipodhash},
+	{ "ipodinfo",	doipodinfo},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -3218,16 +3218,16 @@ COMMAND_PROTOTYPE(doisalive)
 }
   
 /*
- * Return a ipod hash.
+ * Return ipod info for a node
  */
-COMMAND_PROTOTYPE(doipodhash)
+COMMAND_PROTOTYPE(doipodinfo)
 {
 	char		buf[MYBUFSIZE], *bp;
-	unsigned char	randdata[16];
+	unsigned char	randdata[16], hashbuf[16*2+1];
 	int		fd, cc, i;
 
 	if (!tcp) {
-		error("IPODHASH: %s: Cannot do this in UDP mode!\n", nodeid);
+		error("IPODINFO: %s: Cannot do this in UDP mode!\n", nodeid);
 		return 1;
 	}
 
@@ -3247,7 +3247,7 @@ COMMAND_PROTOTYPE(doipodhash)
 	}
 	close(fd);
 
-	bp = buf;
+	bp = hashbuf;
 	for (i = 0; i < sizeof(randdata); i++) {
 		bp += sprintf(bp, "%02x", randdata[i]);
 	}
@@ -3255,10 +3255,13 @@ COMMAND_PROTOTYPE(doipodhash)
 
 	mydb_update("update nodes set ipodhash='%s' "
 		    "where node_id='%s'",
-		    buf, nodeid);
+		    hashbuf, nodeid);
 	
-	*bp++ = '\n';
-	*bp++ = '\0';
+	/*
+	 * XXX host/mask hardwired to us
+	 */
+	sprintf(buf, "HOST=%s MASK=255.255.255.255 HASH=%s\n",
+		inet_ntoa(myipaddr), hashbuf);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	return 0;
