@@ -467,7 +467,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/2.elvind.sh \
+	rc.d/2.elvind.sh rc.d/3.plab.sh \
 	tools/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
 	$eventfiles \
