@@ -294,16 +294,16 @@ parse_args(char *buf, tg_action *tg)
 	cp = buf;
 	if (cp != NULL) {
 		while ((cp = strsep(&buf, " ")) != NULL) {
-			if (sscanf(cp, "PACKETSIZE=%d", &psize) == 1)
+			if (sscanf(cp, "PACKETSIZE=%i", &psize) == 1)
 				continue; 
 
 			if (sscanf(cp, "INTERVAL=%lf", &interval) == 1)
 				continue; 
 
-			if (sscanf(cp, "RATE=%d", &rate) == 1)
+			if (sscanf(cp, "RATE=%i", &rate) == 1)
 				continue; 
 
-			if (sscanf(cp, "QOS=%d", &qos) == 1)
+			if (sscanf(cp, "QOS=%i", &qos) == 1)
 				continue; 
 		}
 	}
