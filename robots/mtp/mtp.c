@@ -105,6 +105,57 @@ int mtp_receive_packet(int fd,struct mtp_packet **packet) {
   idx += 4; \
 }
 
+/* returns 0 if little, 1 if big */
+int endian() {
+  union {
+	short x;
+	char y[sizeof(short)];
+  } u;
+  u.x = 0x0102;
+  if (u.y[0] == 2) {
+	return 0;
+  }
+  else {
+	return 1;
+  }
+}
+  
+#define encode_float64(buf, idx, val) { \
+  union { \
+    double d; \
+    char c[sizeof(double)]; \
+  } __z; \
+  __z.d = val; \
+  if (endian() == 1) { \
+    memcpy((char *)((buf)+(idx)),__z.c,sizeof(double)); \
+  } \
+  else { \
+    *((int *)((buf)+(idx))) = htonl(*((int *)(__z.c + 4))); \
+    idx += 4; \
+    *((int *)((buf)+(idx))) = htonl(*((int *)(__z.c))); \
+    idx += 4; \
+  } \
+}
+
+#define decode_float64(buf, idx, val) { \
+  union { \
+    double d; \
+    char c[sizeof(double)]; \
+  } __z; \
+\
+  if (endian() == 1) { \
+	memcpy((char *)(__z.c),(char *)((buf)+(idx)),sizeof(double)); \
+	val = __z.d; \
+  } \
+  else { \
+    *((int *)(__z.c + 4)) = htonl(*((int *)((buf) + (idx)))); \
+    idx += 4; \
+    *((int *)(__z.c)) = htonl(*((int *)((buf) + (idx)))); \
+    idx += 4; \
+	val = __z.d; \
+  } \
+}
+
 int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   char *buf = *buf_ptr;
   int i,j;
@@ -229,8 +280,7 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     encode_float32(buf, i, data->position.x);
     encode_float32(buf, i, data->position.y);
     encode_float32(buf, i, data->position.theta);
-    *((int *)(buf+i)) = htonl(data->timestamp);
-    i += 4;
+	encode_float64(buf, i, data->position.timestamp);
 
   }
   else if (packet->opcode == MTP_UPDATE_POSITION) {
@@ -248,9 +298,9 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     encode_float32(buf, i, data->position.x);
     encode_float32(buf, i, data->position.y);
     encode_float32(buf, i, data->position.theta);
+	encode_float64(buf, i, data->position.timestamp);
+
     *((int *)(buf+i)) = htonl(data->status);
-    i += 4;
-    *((int *)(buf+i)) = htonl(data->timestamp);
     i += 4;
 
   }
@@ -285,6 +335,7 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     encode_float32(buf, i, data->position.x);
     encode_float32(buf, i, data->position.y);
     encode_float32(buf, i, data->position.theta);
+	encode_float64(buf, i, data->position.timestamp);
 
   }
   else if (packet->opcode == MTP_COMMAND_STOP) {
@@ -423,8 +474,7 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
     decode_float32(buf, i, data->position.x);
     decode_float32(buf, i, data->position.y);
     decode_float32(buf, i, data->position.theta);
-    data->timestamp = ntohl(*((int *)(buf+i)));
-    i += 4;
+    decode_float64(buf, i, data->position.timestamp);
 
   }
   else if (packet->opcode == MTP_UPDATE_POSITION) {
@@ -438,9 +488,8 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
     decode_float32(buf, i, data->position.x);
     decode_float32(buf, i, data->position.y);
     decode_float32(buf, i, data->position.theta);
+	decode_float64(buf, i, data->position.timestamp);
     data->status = ntohl(*((int *)(buf+i)));
-    i += 4;
-    data->timestamp = ntohl(*((int *)(buf+i)));
     i += 4;
 
   }
@@ -467,6 +516,7 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
     decode_float32(buf, i, data->position.x);
     decode_float32(buf, i, data->position.y);
     decode_float32(buf, i, data->position.theta);
+	decode_float64(buf, i, data->position.timestamp);
 
   }
   else if (packet->opcode == MTP_COMMAND_STOP) {
@@ -659,11 +709,11 @@ int mtp_calc_size(int opcode,void *data) {
   }
   else if (opcode == MTP_REQUEST_ID) {
     struct mtp_request_id *c = (struct mtp_request_id *)data;
-    retval += 12 + 4;
+    retval += 20;
   }
   else if (opcode == MTP_UPDATE_POSITION) {
     struct mtp_update_position *c = (struct mtp_update_position *)data;
-    retval += 4 + 12 + 4 + 4;
+    retval += 4 + 20 + 4;
   }
   else if (opcode == MTP_UPDATE_ID) {
     struct mtp_update_id *c = (struct mtp_update_id *)data;
@@ -671,7 +721,7 @@ int mtp_calc_size(int opcode,void *data) {
   }
   else if (opcode == MTP_COMMAND_GOTO) {
     struct mtp_command_goto *c = (struct mtp_command_goto *)data;
-    retval += 4 + 4 + 12;
+    retval += 4 + 4 + 20;
   }
   else if (opcode == MTP_COMMAND_STOP) {
     struct mtp_command_stop *c = (struct mtp_command_stop *)data;
@@ -772,11 +822,11 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    "  x:\t\t%f\n"
 	    "  y:\t\t%f\n"
 	    "  theta:\t%f\n"
-	    "  timestamp:\t%d\n",
+	    "  timestamp:\t%f\n",
 	    mp->data.request_id->position.x,
 	    mp->data.request_id->position.y,
 	    mp->data.request_id->position.theta,
-	    mp->data.request_id->timestamp);
+	    mp->data.request_id->position.timestamp);
     break;
     
   case MTP_UPDATE_POSITION:
@@ -787,13 +837,13 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    "  y:\t\t%f\n"
 	    "  theta:\t%f\n"
 	    "  status:\t%d\n"
-	    "  timestamp:\t%d\n",
+	    "  timestamp:\t%f\n",
 	    mp->data.update_position->robot_id,
 	    mp->data.update_position->position.x,
 	    mp->data.update_position->position.y,
 	    mp->data.update_position->position.theta,
 	    mp->data.update_position->status,
-	    mp->data.update_position->timestamp);
+	    mp->data.update_position->position.timestamp);
     break;
     
   case MTP_UPDATE_ID:
@@ -810,12 +860,14 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    "  id:\t\t%d\n"
 	    "  x:\t\t%f\n"
 	    "  y:\t\t%f\n"
-	    "  theta:\t%f\n",
+	    "  theta:\t%f\n"
+        "  timestamp:\t%f\n",
 	    mp->data.command_goto->command_id,
 	    mp->data.command_goto->robot_id,
 	    mp->data.command_goto->position.x,
 	    mp->data.command_goto->position.y,
-	    mp->data.command_goto->position.theta);
+	    mp->data.command_goto->position.theta,
+	    mp->data.update_position->position.timestamp);
     break;
     
   case MTP_COMMAND_STOP:
