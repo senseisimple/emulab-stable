@@ -134,12 +134,27 @@ LanLink instproc init {s nodes bw d type} {
     # By default, a local link
     $self set widearea 0
 
+    # A simulated lanlink unless we find otherwise
+    $self set simulated 1
+    # Figure out if this is a lanlink that has at least
+    # 1 non-simulated node in it. 
+    foreach node $nodes {
+	if { [$node set simulated] == 0 } {
+	    $self set simulated 0
+	    break
+	}
+    }
+    
+
     # Make sure BW is reasonable. 
     # XXX: Should come from DB instead of hardwired max.
     # Measured in kbps
     set maxbw 100000
 
-    if { $bw > $maxbw } {
+    # XXX skip this check for a simulated lanlink even if it
+    # causes nse to not keep up with real time. The actual max
+    # for simulated links will be added later
+    if { [$self set simulated] != 1 && $bw > $maxbw } {
 	perror "Bandwidth requested ($bw) exceeds maximum of $maxbw kbps!"
 	return
     }

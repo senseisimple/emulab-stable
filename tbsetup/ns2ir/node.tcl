@@ -152,12 +152,15 @@ Node instproc updatedb {DB} {
 Node instproc add_lanlink {lanlink} {
     $self instvar portlist
     $self instvar iplist
+    $self instvar simulated
 
     # Check if we're making too many lanlinks to this node
     # XXX Could come from db from node_types if necessary
     # For now, no more than 4 links or interfaces per node
+    # XXX Ignore if the lanlink is simulated i.e. one that
+    # has all simulated nodes in it. 
     set maxlanlinks 4
-    if { $maxlanlinks == [llength $portlist] } {
+    if { [$lanlink set simulated] != 1 && $maxlanlinks == [llength $portlist] } {
 	# adding this one would put us over
 	perror "Too many links/LANs to node $self! Maximum is $maxlanlinks."
     }
