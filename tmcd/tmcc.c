@@ -40,6 +40,15 @@
 #define BOSSNODEFILE	 "/usr/local/etc/testbed/bossnode"
 #endif
 
+/*
+ * Need to try several ports cause of firewalling. 
+ */
+static int portlist[] = {
+	TBSERVER_PORT,
+	TBSERVER_PORT2,
+};
+static int numports = sizeof(portlist)/sizeof(int);
+
 void		sigcatcher(int foo);
 char		*getbossnode(void);
 #ifdef UDP
@@ -67,7 +76,7 @@ usage()
 int
 main(int argc, char **argv)
 {
-	int			sock, data, n, cc, ch, portnum;
+	int			sock, data, n, cc, ch;
 	struct sockaddr_in	name;
 	struct hostent		*he;
 	struct in_addr		serverip;
@@ -80,12 +89,11 @@ main(int argc, char **argv)
 	int			useudp  = 0;
 #endif
 
-	portnum = TBSERVER_PORT;
-
 	while ((ch = getopt(argc, argv, "v:s:p:un:t:")) != -1)
 		switch(ch) {
 		case 'p':
-			portnum = atoi(optarg);
+			portlist[0] = atoi(optarg);
+			numports    = 1;
 			break;
 		case 's':
 			bossnode = optarg;
@@ -158,8 +166,8 @@ main(int argc, char **argv)
 
 #ifdef UDP
 	if (useudp) {
-		doudp(argc, argv,
-		      version, serverip, portnum, vnodeid, waitfor);
+		doudp(argc, argv, version, serverip,
+		      portlist[0], vnodeid, waitfor);
 		/*
 		 * Never returns.
 		 */
@@ -173,34 +181,35 @@ main(int argc, char **argv)
 	}
 #endif
 	while (1) {
-		/* Create socket from which to read. */
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (sock < 0) {
-			perror("creating stream socket:");
-			exit(1);
-		}
+		for (n = 0; n < numports; n++) {
+			/* Create socket from which to read. */
+			sock = socket(AF_INET, SOCK_STREAM, 0);
+			if (sock < 0) {
+				perror("creating stream socket:");
+				exit(1);
+			}
 
-		/* Create name. */
-		name.sin_family = AF_INET;
-		name.sin_addr   = serverip;
-		name.sin_port = htons(portnum);
+			/* Create name. */
+			name.sin_family = AF_INET;
+			name.sin_addr   = serverip;
+			name.sin_port   = htons(portlist[n]);
 
-		if (CONNECT(sock,
-			    (struct sockaddr *) &name, sizeof(name)) == 0) {
-			break;
-		}
-		if (errno == ECONNREFUSED) {
-			fprintf(stderr, "Connection to TMCD refused "
-				"Sleeping a little while ...\n");
-			sleep(10);
-		}
-		else {
-			perror("connecting stream socket");
+			if (CONNECT(sock, (struct sockaddr *) &name,
+				    sizeof(name)) == 0) {
+				goto foundit;
+			}
+			if (errno != ECONNREFUSED) {
+				perror("connecting stream socket");
+				CLOSE(sock);
+				exit(1);
+			}
 			CLOSE(sock);
-			exit(1);
 		}
-		CLOSE(sock);
+		fprintf(stderr,
+			"Connection to TMCD refused. Waiting a bit ...\n");
+		sleep(10);
 	}
+ foundit:
 
 	data = 1;
 	if (setsockopt(sock, SOL_SOCKET,
