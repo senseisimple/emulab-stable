@@ -2156,7 +2156,7 @@ sub InitPnode($pnode, $vnode)
     # XXX NSE hack: if the vnode is simulated, we just
     # choose FBSD-STD and static routing
     if (virtnodeisvnode($vnode) && virtnodetype($vnode) eq "sim") {
-	$osid = TBOSID("emulab-ops", "FBSD45-NSE" );
+	$osid = TBOSID("emulab-ops", "FBSD-NSE" );
 	
 	DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
 		     " startstatus='none'," .
