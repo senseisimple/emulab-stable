@@ -5,3 +5,8 @@
 #
 # Please indicate the CVS revision number your instructions refer to.
 # 
+
+1.112 - Made it illegal to put NULL values in interfaces.iface . Would be a
+    good idea to run:
+    	select * from interfaces where iface is null;
+    first, to make sure you don't have any!
