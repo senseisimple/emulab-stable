@@ -91,8 +91,8 @@ if ($impotent) {
     $OUT = *STDOUT;
 }
 else {
-    open(MAP, "> $toponame") or
-	die("Could not create $toponame: $!\n");
+    open(MAP, "> ${toponame}.new") or
+	die("Could not create ${toponame}.new: $!\n");
 
     $OUT = *MAP;
 }
@@ -175,11 +175,13 @@ foreach my $lan (sort keys(%lans)) {
 if (! $impotent) {
     close(MAP);
 
+    system("mv -f ${toponame}.new $toponame");
+
     #
     # Create a compressed copy of the file. The experiment nodes will look
     # for this first, so as to reduce the amount of data served up via NFS.
     #
-    system("cat $toponame | gzip > ${toponame}.gz");
+    system("rm -f ${toponame}.gz ; cat $toponame | gzip > ${toponame}.gz");
 
     #
     # Now copy over to the user exp directory since in a normal create/modify
