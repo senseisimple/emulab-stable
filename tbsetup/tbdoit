@@ -49,6 +49,13 @@ if (system("$tbdir/tbreport -v $irfile 2>&1 > $repfile") != 0) {
     exit(-1);
 }
 
+print STDOUT "Running mkacct with argument: $eid";
+if (system("$tbdir/mkacct $eid") != 0) {
+    print STDOUT "mkacct failed!\n";
+    exit(-1); 
+}
+
+
 print STDOUT "Setup Success\n";
 exit 0;
 
