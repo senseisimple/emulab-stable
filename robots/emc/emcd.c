@@ -154,6 +154,16 @@ static void dump_info(void)
 }
 #endif
 
+static void sigpanic(int sig)
+{
+  char buf[32];
+
+  sprintf(buf, "sigpanic %d\n", sig);
+  write(1, buf, strlen(buf));
+  sleep(120);
+  exit(1);
+}
+
 static void usage(char *progname)
 {
   fprintf(stderr,
@@ -269,6 +279,9 @@ int main(int argc, char *argv[])
     else
       loginit(1, "emcd");
   }
+
+  signal(SIGSEGV, sigpanic);
+  signal(SIGBUS, sigpanic);
   
   if (pidfile)
     strcpy(buf, pidfile);
@@ -1023,6 +1036,49 @@ int emulab_callback(elvin_io_handler_t handler,
 	retval = 1;
       }
       break;
+    case MTP_REQUEST_POSITION:
+      {
+	// find the latest position data for the robot:
+	//   supply init pos if no positions in rmc_data or vmc_data;
+	//   otherwise, take the position with the most recent timestamp
+	//     from rmc_data or vmc_data
+	int my_id = mp->data.request_position->robot_id;
+	struct mtp_update_position *vmc_up;
+	struct mtp_update_position up_copy;
+	struct mtp_packet *wb;
+	
+	info("request pos\n");
+	
+	vmc_up = (struct mtp_update_position *)
+	  robot_list_search(vmc_data.position_list, my_id);
+
+	if (vmc_up != NULL) {
+	  // since VMC isn't hooked in, we simply write back the rmc posit
+	  up_copy = *vmc_up;
+	  // the status field has no meaning when this packet is being sent
+	  up_copy.status = -1;
+	  // construct the packet
+	  wb = mtp_make_packet(MTP_UPDATE_POSITION, MTP_ROLE_EMC, &up_copy);
+	  mtp_send_packet(fd, wb);
+	}
+	else  {
+	  struct mtp_control mc;
+
+	  info("no updates for %d\n", my_id);
+
+	  mc.id = -1;
+	  mc.code = -1;
+	  mc.msg = "position not updated yet";
+	  wb = mtp_make_packet(MTP_CONTROL_ERROR, MTP_ROLE_EMC, &mc);
+	  mtp_send_packet(fd, wb);
+	}
+	
+	free(wb);
+	wb = NULL;
+	
+	retval = 1;
+      }
+      break;
     default:
       {
 	struct mtp_packet *wb;
@@ -1128,35 +1184,49 @@ int vmc_callback(elvin_io_handler_t handler,
 
         double dx,dy,dtheta,ddist;
 
-        struct mtp_packet *mp;
         struct mtp_update_id uid;
+	struct mtp_packet *ump;
 
 	int my_retval;
 
         int id = -1;
         struct position *p;
-        struct robot_list_item *i = rmc_data.position_list->head;
-        while (i != NULL) {
-          p = (struct position *)(i->data);
-          id = i->id;
-          
-          dx = rid->position.x - p->x;
-          dy = rid->position.y - p->y;
-          ddist = sqrt(dx*dx + dy*dy);
-          dtheta = rid->position.theta - p->theta;
-          
-          if (fabsf(ddist) > best_dist_delta) {
-            continue;
-          }
-          
-          if (fabsf(dtheta) > best_pose_delta) {
-            continue;
-          }
-          
-          best_dist_delta = ddist;
-          best_pose_delta = dtheta;
-          robot_id = id;
-        }
+	struct robot_list_item *i;
+
+	mtp_print_packet(stdout, mp);
+	fflush(stdout);
+	
+	if (rmc_data.position_list == NULL) {
+	  info("no robot positions yet\n");
+	}
+	else {
+	  i = rmc_data.position_list->head;
+	  while (i != NULL) {
+	    p = (struct position *)(i->data);
+	    id = i->id;
+	    
+	    dx = rid->position.x - p->x;
+	    dy = rid->position.y - p->y;
+	    ddist = sqrt(dx*dx + dy*dy);
+	    dtheta = rid->position.theta - p->theta;
+	    
+	    if (fabsf(ddist) > best_dist_delta) {
+	      i = i->next;
+	      continue;
+	    }
+	    
+	    if (fabsf(dtheta) > best_pose_delta) {
+	      i = i->next;
+	      continue;
+	    }
+	    
+	    best_dist_delta = ddist;
+	    best_pose_delta = dtheta;
+	    robot_id = id;
+	    
+	    i = i->next;
+	  }
+	}
 
         // we really ought to not search teh initial posit list AFTER vmc has
         // initialized completely (that is, associated IDs for all objects
@@ -1182,18 +1252,23 @@ int vmc_callback(elvin_io_handler_t handler,
             dtheta = rid->position.theta - p->theta;
 
             if (fabsf(ddist) > best_dist_delta) {
+	      i = i->next;
               continue;
             }
 
             if (fabsf(dtheta) > best_pose_delta) {
+	      i = i->next;
               continue;
             }
 
             best_dist_delta = ddist;
             best_pose_delta = dtheta;
             robot_id = id;
+	    
+	    i = i->next;
           }
 
+	  info("just using initial pos %f %f\n", dx, dy);
           // now send whatever we got to the caller as we fall through:
         }
         
@@ -1202,13 +1277,14 @@ int vmc_callback(elvin_io_handler_t handler,
         uid.request_id = rid->request_id;
         uid.robot_id = robot_id;
         
-        mp = mtp_make_packet(MTP_UPDATE_ID,MTP_ROLE_EMC,&uid);
-        my_retval = mtp_send_packet(fd,mp);
-        mtp_free_packet(mp);
+        ump = mtp_make_packet(MTP_UPDATE_ID,MTP_ROLE_EMC,&uid);
+        my_retval = mtp_send_packet(fd, ump);
+        mtp_free_packet(ump);
         if (my_retval != MTP_PP_SUCCESS) {
           fprintf(stdout,"Could not send update_id packet!\n");
         }
 
+	retval = 1;
       }
       break;
     default:

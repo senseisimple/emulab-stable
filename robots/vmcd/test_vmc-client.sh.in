@@ -32,6 +32,7 @@ check_output() {
 
 vmc-client -l `pwd`/test_vmc-client.log \
     -i `pwd`/test_vmc-client.pid \
+    -f ${SRCDIR}/test_vmc-client.pos \
     -p ${PORT} \
     foobar
 
@@ -39,9 +40,10 @@ trap 'kill `cat test_vmc-client.pid`' EXIT
 
 sleep 1
 
-(sleep 1; kill -s USR1 `cat test_vmc-client.pid`) &
+(sleep 1; kill -s USR1 `cat test_vmc-client.pid`; 
+sleep 1; kill -s USR1 `cat test_vmc-client.pid`;) &
 
-run_test ../mtp/mtp_dump localhost ${PORT} 2
+run_test ../mtp/mtp_dump localhost ${PORT} 4
 
 check_output "bad update?" <<EOF
 Packet: length 36; version 1; role 2
@@ -57,6 +59,22 @@ Packet: length 36; version 1; role 2
   id:		-1
   x:		4.500000
   y:		6.500000
+  theta:	0.540000
+  status:	32
+  timestamp:	20.000000
+Packet: length 36; version 1; role 2
+ opcode:	update-position
+  id:		-1
+  x:		3.000000
+  y:		5.500000
+  theta:	0.480000
+  status:	-1
+  timestamp:	20.000000
+Packet: length 36; version 1; role 2
+ opcode:	update-position
+  id:		-1
+  x:		4.500000
+  y:		7.500000
   theta:	0.540000
   status:	32
   timestamp:	20.000000

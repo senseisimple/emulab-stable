@@ -115,6 +115,16 @@ static void sigquit(int signal)
     looping = 0;
 }
 
+static void sigpanic(int sig)
+{
+  char buf[32];
+
+  sprintf(buf, "sigpanic %d\n", sig);
+  write(1, buf, strlen(buf));
+  sleep(120);
+  exit(1);
+}
+
 static int mygethostbyname(struct sockaddr_in *host_addr,
                            char *host,
                            int port)
@@ -273,6 +283,9 @@ int main(int argc, char *argv[])
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
     
+    signal(SIGSEGV, sigpanic);
+    signal(SIGBUS, sigpanic);
+    
     /* connect to emc and send init packet */
     /* in future, vmc will be a separate identity that emc can connect to
      * as necessary; vmc will not connect to emc.
@@ -371,7 +384,7 @@ int main(int argc, char *argv[])
                 }
                 else {
                     /* XXX Need to handle update_id msgs here. */
-                    //mtp_print_packet(stdout, mp);
+                    mtp_print_packet(stdout, mp);
 
                     vmc_handle_update_id(mp);
                 }
@@ -390,8 +403,9 @@ int main(int argc, char *argv[])
                         fatal("bad packet from vmc-client\n");
                     }
                     else {
-                        //mtp_print_packet(stdout, mp);
-
+                        mtp_print_packet(stdout, mp);
+			fflush(stdout);
+			
                         vmc_handle_update_position(vc,mp);
 
                     }
@@ -401,7 +415,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        else if (rc == -1) {
+        else if (rc == -1 && errno != EINTR) {
             perror("select");
         }
     }
@@ -417,8 +431,11 @@ void vmc_handle_update_id(struct mtp_packet *p) {
     // we have to search all of the vmc_clients' tracks arrays for this
     // request_id, IF the returned robot_id isn't -1
     if (p->data.update_id->robot_id == -1) {
+      error("no robot id?\n");
         return;
     }
+
+    info("update id %d\n", p->data.update_id->request_id);
 
     // now check through all the possible tracks:
     for (i = 0; i < MAX_VMC_CLIENTS; ++i) {
@@ -494,8 +511,8 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
             my_pose_delta = p->data.update_position->position.theta - 
                 vc->tracks[i].position.theta;
 
-            if (fabsf(my_dist_delta) > DIST_THRESHOLD || 
-                fabsf(my_dist_delta) > best_dist_delta) {
+            if (fabsf(my_dist_delta) < DIST_THRESHOLD || 
+                fabsf(my_dist_delta) < best_dist_delta) {
                 continue;
             }
             if (fabsf(my_pose_delta) > POSE_THRESHOLD ||
@@ -511,12 +528,13 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
         else if (first_invalid_track == -1) {
             first_invalid_track = i;
         }
-            
+	
     }
 
     // now check to see if we found a match.
     // if we did, update the track:
     if (best_track_idx > -1) {
+      info("got a match\n");
         vc->tracks[best_track_idx].position = p->data.update_position->position;
         // now we try to update real_robots
         if (vc->tracks[best_track_idx].robot_id != -1) {
@@ -553,11 +571,13 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
                 // we have to send our request_id packet, now:
                 struct mtp_request_id rid;
                 struct mtp_packet *mp;
-                rid.position = vc->tracks[i].position;
+		
+                rid.position = vc->tracks[first_invalid_track].position;
                 rid.request_id = get_next_request_id();
                 mp = mtp_make_packet(MTP_REQUEST_ID, MTP_ROLE_VMC, &rid);
                 retval = mtp_send_packet(emc_fd,mp);
                 if (retval == MTP_PP_SUCCESS) {
+		  info("sent request %d\n", rid.request_id);
                     vc->tracks[first_invalid_track].request_id = rid.request_id;
                 }
                 else {
@@ -579,11 +599,24 @@ void vmc_handle_update_position(struct vmc_client *vc,struct mtp_packet *p) {
     // COMPLETE, we want to go though and weed out any valid tracks that
     // were not updated:
     if (p->data.update_position->status == MTP_POSITION_STATUS_CYCLE_COMPLETE) {
+	struct mtp_update_position mup;
+	struct mtp_packet *mp;
+
+	mp = mtp_make_packet(MTP_UPDATE_POSITION, MTP_ROLE_VMC, &mup);
         for (i = 0; i < MAX_TRACKED_OBJECTS; ++i) {
             if (vc->tracks[i].valid && !(vc->tracks[i].updated)) {
                 vc->tracks[i].valid = -1;
             }
+	    else if (vc->tracks[i].valid && vc->tracks[i].robot_id != -1) {
+	      info("sending update for %d\n",vc->tracks[i].robot_id);
+		mup.robot_id = vc->tracks[i].robot_id;
+		mup.position = vc->tracks[i].position;
+		mup.status = MTP_POSITION_STATUS_UNKNOWN;
+		mtp_send_packet(emc_fd, mp);
+	    }
         }
+	mtp_free_packet(mp);
+	mp = NULL;
     }
 
     // finis!

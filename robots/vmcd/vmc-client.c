@@ -48,6 +48,8 @@ static int debug = 0;
 
 static int looping = 1;
 
+static FILE *posfile = NULL;
+
 static unsigned int mezz_event_count = 0;
 
 static void usage(void)
@@ -84,8 +86,27 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     
     assert(buffer != NULL);
     assert(mm != NULL);
-    
+
     mol = &mm->objectlist;
+    
+#if !defined(HAVE_MEZZANINE)
+    if (posfile) {
+	if (fscanf(posfile, "%d", &mol->count) != 1) {
+	    error("bad position file, expecting object count\n");
+	}
+	else {
+	    for (lpc = 0; lpc < mol->count; lpc++) {
+		if (fscanf(posfile,
+			   "%lf %lf %lf",
+			   &mol->objects[lpc].px,
+			   &mol->objects[lpc].py,
+			   &mol->objects[lpc].pa) != 3) {
+		    error("bad position file, expecting coords\n");
+		}
+	    }
+	}
+    }
+#endif
     
     mp.length = mtp_calc_size(MTP_UPDATE_POSITION, &mup);
     mp.opcode = MTP_UPDATE_POSITION;
@@ -130,7 +151,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in sin;
     struct sigaction sa;
     
-    while ((c = getopt(argc, argv, "hdp:l:i:")) != -1) {
+    while ((c = getopt(argc, argv, "hdp:l:i:f:")) != -1) {
         switch (c) {
         case 'h':
             usage();
@@ -152,6 +173,11 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             break;
+	case 'f':
+	    if ((posfile = fopen(optarg, "r")) == NULL) {
+		error("cannot open %s\n", optarg);
+	    }
+	    break;
         default:
             break;
         }
@@ -278,6 +304,7 @@ int main(int argc, char *argv[])
                         errorc("accept");
                     }
                     else {
+		      info("accept %d\n", fd);
                         FD_SET(fd, &readfds);
                         FD_SET(fd, &clientfds);
                     }
@@ -304,9 +331,7 @@ int main(int argc, char *argv[])
                     if (mezz_event_count > last_mezz_event) {
                         char buffer[8192];
                         
-                        if (debug) {
-                            info("sending updates\n");
-                        }
+			info("sending updates\n");
                         
                         if ((rc = encode_packets(buffer, mezzmap)) == -1) {
                             errorc("unable to encode packets");
