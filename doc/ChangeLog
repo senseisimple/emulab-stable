@@ -1,3 +1,23 @@
+ricci       2003/07/14 18:27:27 MDT
+  Modified files:
+    utils                newnode.in
+    www                  newnodecheckin.php
+  Added files:
+    www                  newnode-defs.php3 newnode_edit.php3
+                         newnodes_list.php3
+  Log:
+  Web interface for autoconfiguring nodes. This consisits of two pages,
+  one that lists and allows operations on a number of nodes at once, and
+  another that allows editing of an individual node.
+
+  Split much of the functionality of newnodecheckin.php into a new
+  library, so it can get re-called from newnodes_list.php3 later.
+
+  Move where we look for MACs on the switches - instead of doing in in
+  newnode, call it from newnodecheckin.php - this provides the admins
+  more feedback as to what's going on, and allows them to call it again
+  later or put the information in by hand.
+
 stoller     2003/07/08 17:34:42 MDT
 
   Modified files:
