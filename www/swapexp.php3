@@ -139,7 +139,7 @@ $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 	       "webswapexp -s $inout $exp_pid $exp_eid",
  	       $output, $retval);
 
-if ($retval < 0) {
+if ($retval) {
     echo "<br><br><h2>
           Swap Failure($retval): Output as follows:
           </h2>
