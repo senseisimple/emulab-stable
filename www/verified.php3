@@ -38,11 +38,17 @@ Please log in again.</h3>\n</body></html>";
 <?php
 if (isset($uid) && isset($pswd) && isset($key)) {
   $match = crypt("TB_".$uid."_USR",strlen($uid)+13);
-  $passwd = crypt($pswd,strlen($uid));
   if ($key==$match) {
-    $cmd = "select status from users where uid='$uid' and usr_pswd='$passwd'";
+    $cmd = "select usr_pswd from users where uid='$uid'";
     $result = mysql_db_query("tbdb", $cmd);
-    if (mysql_num_rows($result) == 1) {      
+    $row = mysql_fetch_row($result);
+    $usr_pswd = $row[0];
+    $salt = substr($usr_pswd,0,2);
+    if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
+    $PSWD = crypt("$pswd",$salt);
+    if ($PSWD == $usr_pswd) {
+      $cmd = "select status from users where uid='$uid'";
+      $result = mysql_db_query("tbdb", $cmd);
       $row = mysql_fetch_row($result);
       $status = $row[0];
       if ($status=="unverified") {
@@ -63,27 +69,28 @@ if (isset($uid) && isset($pswd) && isset($key)) {
       } else {
 	echo "<h3>You have already been verified, $uid. If you did not ".
 	  "perform this verification, please notify ".
-	  "<a href=\"mailto:newbold@cs.utah.edu\">Mac Newbold ".
-	  "(newbold@cs.utah.edu)</a> immediately.</h3>\n";
+	  "<a href=\"mailto:testbed-control@flux.cs.utah.edu\">".
+	  "Testbed Control (testbed-control@flux.cs.utah.edu)</a> immediately.</h3>\n";
       }
     } else {
-      echo "<h3>The given password and key are incorrect. Please go back to ".
+      echo "<h3>The given password is incorrect. Please go back to ".
 	"<a href=\"verify.php3?$uid\">New User Verification</a> and ".
 	"enter the correct password and key.</h3>\n";
     }
   } else {
-    echo "<h3>The given password and key are incorrect. Please go back to ".
+    echo "<h3>The given key is incorrect. Please go back to ".
       "<a href=\"verify.php3?$uid\">New User Verification</a> and ".
       "enter the correct password and key.</h3>\n";
   }
 } else {
-  echo "<h3>The given password and key are incorrect. Please go back to ".
+  echo "<h3>The username, password or key are invalid. Please go back to ".
     "<a href=\"verify.php3?$uid\">New User Verification</a> and ".
     "enter the correct password and key.</h3>\n";
 }
 ?>
 <p>Please contact 
-<a href="mailto:newbold@cs.utah.edu">Mac Newbold (newbold@cs.utah.edu)</a> 
+<a href="mailto:testbed-control@flux.cs.utah.edu">Testbed Control
+(testbed-control@flux.cs.utah.edu)</a> 
 if you need further assistance.
 </p>
 </body>

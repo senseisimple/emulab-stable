@@ -5,7 +5,7 @@
 <base href='https://plastic.cs.utah.edu/' target='dynamic'>
 </head>
 <body>
-<h3>Welcome to the Utah Network Testbed</h3>
+<a href="welcome.html"><h3>Utah Network Testbed</h3></a>
 <?php
 if (isset($login)) {
   unset($login);
@@ -33,13 +33,13 @@ if (isset($login)) {
 	$c="insert into login (uid,timeout) values ('$auth_usr','$timeout')";
 	mysql_db_query("tbdb", $c);
       }
-      echo "Welcome to the Testbed, $auth_usr!";  
+      echo "$auth_usr Logged in!";  
     } else {
-      echo "<h3>Login Failed</h3>\n";
+      echo "Login Failed\n";
       unset($auth_usr);
     }
   } else {
-    echo "<h3>Login Failed</h3>\n";
+    echo "Login Failed\n";
     unset($auth_usr);
   }
 } elseif (isset($logout)) { # a logout clause 
@@ -110,8 +110,8 @@ if (isset($auth_usr)) {
   } elseif ($status == "unapproved") {
     echo "Your account has not been approved yet. Please try back ";
     echo "later. Contact ";
-    echo "<a href=\"mailto:newbold@cs.utah.edu\">";
-    echo "Mac Newbold (newbold@cs.utah.edu)</a>";
+    echo "<a href=\"mailto:testbed-control@flux.cs.utah.edu\">";
+    echo "Testbed Control (testbed-control@flux.cs.utah.edu)</a>";
     echo " for further assistance.\n";  
   } elseif (($status == "newuser") || ($status == "unverified")) {
     echo "<A href='verify.php3?$auth_usr'>New User Verification</A>\n";
@@ -119,8 +119,8 @@ if (isset($auth_usr)) {
     echo "Your account has been changed to status $status, and is ";
     echo "currently unusable. Please contact your group leader to find out ";
     echo "why. If you need further help, contact ";
-    echo "<a href=\"mailto:newbold@cs.utah.edu\">";
-    echo "Mac Newbold (newbold@cs.utah.edu)</a>.";
+    echo "<a href=\"mailto:testbed-control@flux.cs.utah.edu\">";
+    echo "Testbed Control (testbed-control@flux.cs.utah.edu)</a>.";
   }
 }
 ?>
@@ -128,12 +128,12 @@ if (isset($auth_usr)) {
 <?php
 echo "<A href='addgrp.php3";
 if (isset($auth_usr)) { echo "?$auth_usr"; }
-echo "'>Apply to Start a Project</A>\n";
+echo "'>Start a Project</A>\n";
 echo "<p><A href='addusr.php3";
 if (isset($auth_usr)) { echo "?$auth_usr"; }
-echo "'>Apply to Join a Project</A>";
+echo "'>Join a Project</A>";
 ?>
-<hr><A href='faq.html'>Frequently<br>Asked<br>Questions</a></p>
+<hr><A href='faq.html'>Testbed FAQ</a></p>
 <table cellpadding='0' cellspacing='0' width="100%">
 <form action="index.php3" method='post' target='fixed'>
 <?php

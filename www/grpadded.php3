@@ -16,10 +16,10 @@ if ($mypipe) {
     die("<h3>The password you have chosen will not work:<p>$retval</h3>");
   }
 } else {
-  mail("newbold@cs.utah.edu","TESTBED: checkpass failure",
+  mail("testbed-www@flux.cs.utah.edu","TESTBED: checkpass failure",
        "\n$usr_name ($grp_head_uid) just tried to set up a testbed account,\n".
        "but checkpass pipe did not open (returned '$mypipe').\n".
-       "\nThanks,\nMac\n");
+       "\nThanks\n");
 }
 $enc = crypt("$my_passwd");
 array_walk($HTTP_POST_VARS, 'addslashes');
@@ -83,7 +83,7 @@ if (isset($gid) && isset($password1) && isset($email) &&
   fwrite($fp, "$email\n");   #Writes the email address to mailing lists
   fwrite($fp2, "$email\n");
 #  mail("lepreau@cs.utah.edu,calfeld@cs.utah.edu", 
-  mail("newbold@cs.utah.edu", 
+  mail("newbold@cs.utah.edu,stoller@cs.utah.edu", 
        "TESTBED: New Group", "'$usr_name' wants to start group ".
        "'$gid'.\nContact Info:\nName:\t\t$usr_name ($grp_head_uid)\n".
        "Email:\t\t$email\nGroup:\t\t$grp_name\nURL:\t\t$grp_URL\n".
@@ -93,14 +93,14 @@ if (isset($gid) && isset($password1) && isset($email) &&
        "made a decision, go to <https://plastic.cs.utah.edu/tbdb.html> and\n".
        "select the 'Group Approval' page.\n\nThey are expecting a result ".
        "within 72 hours.\n", 
-       "From: $usr_name <$email>\nCc: newbold@cs.utah.edu\n".
-       "Errors-To: newbold@cs.utah.edu");
+       "From: $usr_name <$email>\nCc: testbed-www@flux.cs.utah.edu\n".
+       "Errors-To: testbed-www@flux.cs.utah.edu");
   if (! $returning) {
     mail("$email","TESTBED: Your New User Key",
 	 "\nDear $usr_name:\n\n\tThank you for applying to use the Utah ".
 	 "Network Testbed. As promised,\nhere is your key to verify your ".
 	 "account. Your key is:\n\n".
-	 crypt("TB_".$uid."_USR",strlen($uid)+13)."\n\n\t Please ".
+	 crypt("TB_".$grp_head_uid."_USR",strlen($grp_head_uid)+13)."\n\n\t Please ".
 	 "return to <https://plastic.cs.utah.edu/tbdb.html> and log in,\nusing ".
 	 "the user name and password you gave us when you applied. You will\n".
 	 "then find an option on the menu called 'New User Verification'. ".
@@ -108,9 +108,10 @@ if (isset($gid) && isset($password1) && isset($email) &&
 	 "your key,\nand you will be verified as a user. When you have been ".
 	 "both verified and\napproved by the Approval Committee, you will be ".
 	 "marked as an active user,\nand will be granted full access to your ".
-	 "user account.\n\nThanks,\nMac Newbold\nUtah Network Testbed\n",
-	 "From: Mac Newbold <newbold@cs.utah.edu>\nCc: newbold@cs.utah.edu\n".
-	 "Errors-To: newbold@cs.utah.edu");
+  	 "user account.\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
+         "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+         "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
+         "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
   }
   echo "
 <H1>Group '$gid' successfully added.</h1>

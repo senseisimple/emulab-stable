@@ -22,7 +22,8 @@ Only fields marked with * are required</td></tr>
   <form action=grpadded.php3 method="post">
 	<tr><td colspan=2>Project Information</td>
   <td colspan=2>Project Head Information</td></tr>
-  <tr><td>*Project Name:</td><td><input type="text" name="gid"></td>
+  <tr><td>*Name:</td><td><input type="text" name="gid" value="TestNet-One">
+      </td>
   <td>*Username:</td><td class="left">
   <?php
   if (isset($auth_usr)) {
@@ -36,15 +37,19 @@ Only fields marked with * are required</td></tr>
 	} else {
     echo "<input type=\"text\" name=\"grp_head_uid\"></td></tr>\n";
 	}
-echo "<tr><td>*Project long name:</td><td><input type=\"text\" name=\"grp_name\"></td>
-<td>*Full Name:</td><td class=\"left\">";
+echo "<tr><td>*Long name:</td><td>
+      <input type=\"text\" name=\"grp_name\" value=\"Test Networks One\">
+      </td>
+      <td>*Full Name:</td><td class=\"left\">";
 if (isset($row)) {
   echo "<input type=\"readonly\" value=\"$row[usr_name]\"";
 } else {
   echo "<input type=\"text\"";
 }
 echo "name=\"usr_name\"></td></tr>
-<tr><td>Project URL:</td><td><input type=\"text\" name=\"grp_URL\"></td>
+<tr><td>URL:</td><td><input type=\"text\" name=\"grp_URL\"
+                 value=\"http://www.testnetworks.org\">
+                 </td>
 <td>*Email<br>Address:</td><td class=\"left\">";
 if (isset($row)) {
   echo "<input type=\"readonly\" value=\"$row[usr_email]\" ";
@@ -64,7 +69,7 @@ if (isset($row)) {
 		echo "<input type=\"text\"  name=\"usr_addr\">";
 }
 echo "</td></tr>
-<tr><td>*Project Affiliation:</td><td><input type=\"text\" name=\"grp_affil\"></td>
+<tr><td>*Your Research<br>Affiliation:</td><td><input type=\"text\" name=\"grp_affil\" value=\"UofX Networks Group\"></td>
 	<td>*Phone #:</td><td class=\"left\"><input ";
 if (isset($row)) {
   echo "type=\"readonly\" value=\"$row[usr_phone]\"";
@@ -73,7 +78,10 @@ if (isset($row)) {
 } 
 echo "name=\"usr_phones\"></td></tr>\n";
 ?>
-<tr><td>*Password:</td><td><input type="password" name="password1"></td>
+<tr>
+<td>*Password:</td><td><input type="password" name="password1"></td>
+</tr>
+<tr>
 <td>*Retype<br>Password:</td><td><input 
 <?php
 if (isset($row)) {
@@ -86,7 +94,7 @@ name="password2">&nbsp;</td></tr>
 <tr><td colspan="4">*Please describe how and why you plan 
 to use the Testbed:</td></tr> 
 <tr><td colspan="4" class="left"><textarea name="why"
-rows="10" cols="62"></textarea></td></tr>
+rows="10" cols="70"></textarea></td></tr>
   <tr><td colspan="4" align="center"><b><input type="submit" 
 value="Submit"></b></td></tr>
 </form>

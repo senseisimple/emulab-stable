@@ -35,17 +35,17 @@ Please log in again.</h3>\n</body></html>";
   unset($auth_usr);
 }
 echo "
-<h1>Approve new users in your group</h1>
+<h1>Approve new users in your Project</h1>
 <h3><p>
-This page will let you approve new members of your group. Once approved,
-they will be able to log into machines in your group's experiments.</p>
+This page will let you approve new members of your Project. Once approved,
+they will be able to log into machines in your Projects's experiments.</p>
 <p> If you desire, you may set their trust/privilege levels to give them
 more or less access to your nodes:
 <ol>
 <li>User - Can log into machines in your experiments.
 <li>Local Root - Can have root access on machines, can create new experiments.
 ";
-#echo "<li>Group Root - Can approve users, create projects, and update any group info or personal info for group members.";
+#echo "<li>Group Root - Can approve users, create projects, and update any project info or personal info for project members.";
 echo "</ol>
 </p></h3>\n";
 $query="SELECT gid FROM grp_memb WHERE uid='$auth_usr' and trust='group_root'";
@@ -77,7 +77,7 @@ while ($row = mysql_fetch_row($selected)) {
 $find .= ")";
 $found = mysql_db_query("tbdb", $find);
 if ( mysql_num_rows($found) == 0 ) {
-  echo "<h3>You have no new group members who need approval</h3>\n";
+  echo "<h3>You have no new project members who need approval</h3>\n";
 } else {
   echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2 align='center'>
 <tr>

@@ -17,10 +17,10 @@ if ($mypipe) {
     die("<h3>The password you have chosen will not work:<p>$retval</h3>");
   }
 } else {
-  mail("newbold@cs.utah.edu","TESTBED: checkpass failure",
+  mail("testbed-www@flux.cs.utah.edu","TESTBED: checkpass failure",
        "\n$usr_name ($grp_head_uid) just tried to set up a testbed account,\n".
        "but checkpass pipe did not open (returned '$mypipe').\n".
-       "\nThanks,\nMac\n");
+       "\nThanks\n");
 }
 $enc = crypt("$my_passwd");
 array_walk($HTTP_POST_VARS, 'addslashes');
@@ -119,9 +119,10 @@ if (isset($pid)) { #add a project to the database
        "to <https://plastic.cs.utah.edu/tbdb.html>, log in,\nand select the ".
        "'New User Approval' page to enter your decision regarding\n".
        "$usr_name's membership in your group.".
-       "\n\nThanks,\nMac Newbold\nUtah Network Testbed\n",
-       "From: Mac Newbold <newbold@cs.utah.edu>\nCc: newbold@cs.utah.edu\n".
-       "Errors-To: newbold@cs.utah.edu");
+       "\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
+       "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+       "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
+       "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
   if ($newuser==1) {
     mail("$usr_email","TESTBED: Your New User Key",
 	 "\nDear $usr_name:\n\n\tThank you for applying to use the Utah ".
@@ -136,9 +137,10 @@ if (isset($pid)) { #add a project to the database
 	 "verified as a user. When you have been ".
 	 "both verified and\napproved by the head of your group, you will be ".
 	 "marked as an active user,\nand will be granted full access to your ".
-	 "user account.\n\nThanks,\nMac Newbold\nUtah Network Testbed\n",
-	 "From: Mac Newbold <newbold@cs.utah.edu>\nCc: newbold@cs.utah.edu\n".
-	 "Errors-To: newbold@cs.utah.edu");
+	 "user account.\n\nThanks,\nTestbed Control\nUtah Network Testbed\n",
+         "From: Testbed Control <testbed-control@flux.cs.utah.edu>\n".
+         "Cc: Testbed WWW <testbed-www@flux.cs.utah.edu>\n".
+         "Errors-To: Testbed WWW <testbed-www@flux.cs.utah.edu>");
     echo "
 <h3> As a new user of the Testbed, for
 security purposes, you will receive by e-mail a key. When you

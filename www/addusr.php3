@@ -38,8 +38,8 @@ if (isset($uid)) {
   echo "<input type=\"readonly\" name=\"usr_phone\" ";
   echo "value=\"$row[4]\"></td></tr>";
   echo "<tr><td>*Password:</td><td>";
-  echo "<input type=\"password\" name=\"pswd\"></td>";
-  echo "<td>*Retype Password:</td><td>";
+  echo "<input type=\"password\" name=\"pswd\"></td></tr>";
+  echo "<tr><td>*Retype<br>Password:</td><td>";
   echo "<input type=\"hidden\" name=\"pswd2\" ";
   echo "value=\"$row[5]\">&nbsp;</td></tr>";
 } else {
@@ -57,12 +57,13 @@ if (isset($uid)) {
   echo "<td>Phone #:</td><td>";
   echo "<input type=\"text\" name=\"usr_phone\"></td></tr>";
   echo "<tr><td>*Password:</td><td>";
-  echo "<input type=\"password\" name=\"pswd\"></td>";
-  echo "<td>*Retype Password:</td><td>";
+  echo "<input type=\"password\" name=\"pswd\"></td></tr>";
+  echo "<tr><td>*Retype<br>Password:</td><td>";
   echo "<input type=\"password\" name=\"pswd2\"></td></tr>";
-}  
-echo "<tr><td>*Project:</td><td><b>";
+}
+echo "<tr><td>*Project:</td><td>";
 echo "<input type=\"text\" name=\"grp\"></td>";
+echo "</tr>";
 # This used to give the selection box with all the groups...
 #$query = "SELECT gid FROM groups";
 #$result = mysql_db_query("tbdb", $query);
@@ -81,7 +82,7 @@ echo "<input type=\"text\" name=\"grp\"></td>";
 #  echo "There don't seem to be any groups in the database</td>\n";
 #}
 ?>
-<td colspan="2" align="center">
+<td colspan="4" align="center">
 <b><input type="submit" value="Submit"></b></td></tr>
 </form>
 </table>
