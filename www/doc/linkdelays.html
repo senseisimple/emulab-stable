@@ -37,6 +37,10 @@ granularity allows Dummynet to do a better job of scheduling packets.
 <li> IPFW and Dummynet are compiled into the kernel, which affects the
 network stack; all incoming and outgoing packets are sent into ipfw to
 be matched on.
+
+<li> Flow-based IP forwarding is turned off. This is also known as
+IP <em>fast forwarding</em> in the FreeBSD kernel. Note that
+regular IP packet forwarding is still enabled. 
 </ul>
 
 If you would like to use end node traffic shaping globally, without
