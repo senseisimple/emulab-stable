@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -76,14 +76,14 @@ static int	 dofill = 0;
 static int	 nothreads = 0;
 static int	 rdycount;
 static int	 imageversion = 1;
+static int	 dots   = 0;
+static int	 dotcol;
+static struct timeval stamp;
 #ifndef FRISBEE
 static int	 infd;
 static int	 version= 0;
 static unsigned	 fillpat= 0;
-static int	 dots   = 0;
-static int	 dotcol;
 static char	 chunkbuf[SUBBLOCKSIZE];
-static struct timeval stamp;
 #endif
 int		 readmbr(int slice);
 int		 fixmbr(int slice, int dtype);
@@ -190,10 +190,11 @@ dump_stats(int sig)
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
 	if (sig == 0 && debug != 1 && dots) {
-		while (dotcol++ <= 60)
+		while (dotcol++ <= 66)
 			fprintf(stderr, " ");
 		
-		fprintf(stderr, "%4ld %13lld\n", estamp.tv_sec, totaledata);
+		fprintf(stderr, "%4ld %6d\n",
+			estamp.tv_sec, totalchunks - donechunks);
 	}
 	else {
 		if (sig) {
@@ -215,6 +216,57 @@ dump_stats(int sig)
 			decompblocks, writeridles, rdycount);
 }
 #endif
+
+#define DODOTS_CHUNKS	1
+#define DODOTS_DATA	2
+#define DODOTS_ZERO	3
+#define DODOTS_SKIP	4
+
+void dodots(int dottype, off_t cc)
+{
+	static int lastgb = 0;
+	int count = 0, newgb;
+	char chr = 0;
+
+
+	switch (dottype) {
+	case DODOTS_CHUNKS:
+		if ((dots & 1) == 0)
+			return;
+		count = 1;
+		chr = '.';
+		break;
+	case DODOTS_DATA:
+	case DODOTS_ZERO:
+	case DODOTS_SKIP:
+		if ((dots & 2) == 0)
+			return;
+		/*
+		 * totaledata has not been updated yet, so we have to
+		 * figure it out ourselves.
+		 */
+		newgb = (totaledata + cc) / 1000000000LL;
+		if ((count = newgb - lastgb) <= 0)
+			return;
+		lastgb = newgb;
+		chr = (dottype == DODOTS_DATA) ? '*' :
+			(dottype == DODOTS_ZERO) ? 'o' : 's';
+		break;
+	}
+
+	while (count-- > 0) {
+		fputc(chr, stderr);
+		if (dotcol++ > 65) {
+			struct timeval estamp;
+		
+			gettimeofday(&estamp, 0);
+			estamp.tv_sec -= stamp.tv_sec;
+			fprintf(stderr, "%4ld %6d\n",
+				estamp.tv_sec, totalchunks - donechunks);
+			dotcol = 0;
+		}
+	}
+}
 
 void
 dump_writebufs(void)
@@ -441,7 +493,8 @@ usage(void)
 		" -z              Write zeros to free blocks.\n"
 		" -p pattern      Write 32 bit pattern to free blocks.\n"
 		"                 NOTE: Use -z/-p to avoid seeking.\n"
-		" -o              Output 'dots' indicating progress\n"
+		" -o              Output progress indicator (compressed chunks processed)\n"
+		" -O              Output progress indicator (GBs of uncompressed data written)\n"
 		" -n              Single threaded (slow) mode\n"
 		" -d              Turn on progressive levels of debugging\n"
 		" -W size         MB of memory to use for write buffering\n");
@@ -457,7 +510,7 @@ main(int argc, char *argv[])
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:onFD:W:C")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:C")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -477,7 +530,11 @@ main(int argc, char *argv[])
 			break;
 
 		case 'o':
-			dots++;
+			dots |= 1;
+			break;
+
+		case 'O':
+			dots |= 2;
 			break;
 
 		case 's':
@@ -686,7 +743,6 @@ main(int argc, char *argv[])
 		}
 		if (inflate_subblock(chunkbuf))
 			break;
-		donechunks++;
 	}
  done:
 	close(infd);
@@ -710,8 +766,11 @@ main(int argc, char *argv[])
  */
 int
 ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
-	       int _nothreads, int _dostype, unsigned long _writebufmem)
+	       int _nothreads, int _dostype, int _dodots,
+	       unsigned long _writebufmem)
 {
+	gettimeofday(&stamp, 0);
+
 	if (outfd >= 0)
 		close(outfd);
 
@@ -724,6 +783,7 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	dofill    = _fill;
 	nothreads = _nothreads;
 	dostype   = _dostype;
+	dots      = _dodots;
 #ifndef NOTHREADS
 	maxwritebufmem = _writebufmem;
 #endif
@@ -764,6 +824,12 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 	}
 	threadinit();
 	return 0;
+}
+
+void
+ImageUnzipSetChunkCount(unsigned long _chunkcount)
+{
+	totalchunks = _chunkcount;
 }
 
 void
@@ -949,6 +1015,10 @@ write_subblock(int chunkno, char *chunkbufp)
 		offset += size;
 		bytesleft -= size;
 	}
+
+	donechunks++;
+	dodots(DODOTS_CHUNKS, 0);
+
 	return 0;
 }
 #endif
@@ -1024,8 +1094,10 @@ inflate_subblock(char *chunkbufp)
 		if (dofill) {
 			wbuf = alloc_writebuf(offset, size, 0, 1);
 			dowrite_request(wbuf);
-		} else
+		} else {
+			dodots(DODOTS_SKIP, size);
 			totaledata += size;
+		}
 	}
  
 	/*
@@ -1172,8 +1244,10 @@ inflate_subblock(char *chunkbufp)
 							newoffset-offset,
 							0, 1);
 					dowrite_request(wbzero);
-				} else
+				} else {
+					dodots(DODOTS_SKIP, newoffset-offset);
 					totaledata += newoffset-offset;
+				}
 				offset = newoffset;
 				if (wbuf)
 					wbuf->offset = newoffset;
@@ -1219,29 +1293,18 @@ inflate_subblock(char *chunkbufp)
 		if (dofill) {
 			wbuf = alloc_writebuf(offset, size, 0, 1);
 			dowrite_request(wbuf);
-		} else
+		} else {
+			dodots(DODOTS_SKIP, size);
 			totaledata += size;
+		}
 		offset += size;
 	}
  
+	donechunks++;
 	if (debug == 1) {
 		fprintf(stderr, "%14lld\n", offset);
 	}
-#ifndef FRISBEE
-	else if (dots) {
-		fprintf(stderr, ".");
-		if (dotcol++ > 59) {
-			struct timeval estamp;
-
-			gettimeofday(&estamp, 0);
-			estamp.tv_sec -= stamp.tv_sec;
-			fprintf(stderr, "%4ld %13lld\n",
-				estamp.tv_sec, totaledata);
-
-			dotcol = 0;
-		}
-	}
-#endif
+	dodots(DODOTS_CHUNKS, 0);
 
 	return 0;
 }
@@ -1250,6 +1313,7 @@ void
 writezeros(off_t offset, off_t zcount)
 {
 	size_t	zcc;
+	off_t ozcount;
 
 	assert((offset & (SECSIZE-1)) == 0);
 
@@ -1274,6 +1338,7 @@ writezeros(off_t offset, off_t zcount)
 		exit(1);
 	}
 
+	ozcount = zcount;
 	while (zcount) {
 		if (zcount <= OUTSIZE)
 			zcc = zcount;
@@ -1294,6 +1359,7 @@ writezeros(off_t offset, off_t zcount)
 		zcount     -= zcc;
 		totalrdata += zcc;
 		nextwriteoffset += zcc;
+		dodots(DODOTS_ZERO, ozcount-zcount);
 	}
 }
 
@@ -1329,6 +1395,7 @@ writedata(off_t offset, size_t size, void *buf)
 	}
 	nextwriteoffset = offset + cc;
 	totalrdata += cc;
+	dodots(DODOTS_DATA, cc);
 }
 
 #include "sliceinfo.h"

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -57,7 +57,6 @@ int		randomize = 1;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
-static int	dotcol;
 static struct timeval stamp;
 static struct in_addr serverip;
 
@@ -68,8 +67,9 @@ static void	RequestChunk(int timedout);
 static void	RequestStamp(int chunk, int block, int count, void *arg);
 static int	RequestRedoTime(int chunk, unsigned long long curtime);
 extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
-			       int nothreads, int dostype,
+			       int nothreads, int dostype, int dodots,
 			       unsigned long writebufmem);
+extern void	ImageUnzipSetChunkCount(unsigned long chunkcount);
 extern void	ImageUnzipSetMemory(unsigned long writebufmem);
 extern int	ImageWriteChunk(int chunkno, char *chunkdata);
 extern int	ImageUnzipChunk(char *chunkdata);
@@ -422,7 +422,7 @@ main(int argc, char **argv)
 		maxwritebufmem = maxmem/2;
 	}
 
-	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype,
+	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype, 3,
 		       maxwritebufmem*1024*1024);
 
 	if (tracing) {
@@ -707,20 +707,6 @@ ChunkerStartup(void)
 			    ChunkBuffer[i].thischunk, i,
 			    (wasidle*idledelay) / 1000000,
 			    ((wasidle*idledelay) % 1000000) / 1000);
-		else {
-			struct timeval estamp;
-
-			gettimeofday(&estamp, 0);
-			estamp.tv_sec -= stamp.tv_sec;
-		
-			printf(".");
-			fflush(stdout);
-			if (dotcol++ > 65) {
-				dotcol = 0;
-				printf("%4ld %6d\n",
-				       estamp.tv_sec, chunkcount);
-			}
-		}
 
 		CLEVENT(1, EV_CLIDCSTART,
 			ChunkBuffer[i].thischunk, wasidle,
@@ -1247,6 +1233,7 @@ PlayFrisbee(void)
 	}
 	gettimeofday(&timeo, 0);
 	TotalChunkCount = p->msg.join.blockcount / CHUNKSIZE;
+	ImageUnzipSetChunkCount(TotalChunkCount);
 	
 	/*
 	 * If we have partitioned up the memory and have allocated
