@@ -99,7 +99,7 @@ while (1) {
     #
     # Partial delay between loops in case of an error.
     # 
-    sleep(10);
+    sleep(2);
 
     #
     # We use this to figure out when to delete nodes from the retried and
