@@ -12,7 +12,7 @@ all: checkpass
 # is for vpath.
 #
 SRCDIR	+= $(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib
-OBJECTS  = fascist.o packlib.o rules.o stringlib.o
+OBJECTS  = cracklib,2.7/cracklib/fascist.o cracklib,2.7/cracklib/packlib.o cracklib,2.7/cracklib/rules.o cracklib,2.7/cracklib/stringlib.o
 CFLAGS  += -I$(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib -DIN_CRACKLIB
 
 include $(TESTBED_SRCDIR)/GNUmakerules
