@@ -255,6 +255,7 @@ REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
 --
 
 
+REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','ACTIVE');
@@ -314,6 +315,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP');
 REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN');
@@ -369,6 +371,7 @@ REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
 
 REPLACE INTO testsuite_preentables VALUES ('comments','drop');
 REPLACE INTO testsuite_preentables VALUES ('iface_counters','drop');
+REPLACE INTO testsuite_preentables VALUES ('experiment_resources','clean');
 REPLACE INTO testsuite_preentables VALUES ('login','drop');
 REPLACE INTO testsuite_preentables VALUES ('loginmessage','drop');
 REPLACE INTO testsuite_preentables VALUES ('node_idlestats','drop');
@@ -397,7 +400,6 @@ REPLACE INTO testsuite_preentables VALUES ('group_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('project_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('user_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('experiment_stats','clean');
-REPLACE INTO testsuite_preentables VALUES ('experiment_resources','clean');
 REPLACE INTO testsuite_preentables VALUES ('testbed_stats','clean');
 
 --
