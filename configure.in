@@ -214,7 +214,8 @@ else
 		    event/example/tbrecv.pl \
 		    event/trafgen/GNUmakefile \
                     event/delay-agent/GNUmakefile \
-		    event/program-agent/GNUmakefile";
+		    event/program-agent/GNUmakefile \
+		    event/stated/stated";
 
 	optional_subdirs="$optional_subdirs event";
         EVENTSYS=1;

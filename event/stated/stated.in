@@ -1,0 +1,271 @@
+#!/usr/bin/perl -w
+#
+# stated - A daemon to monitor the states of nodes in the testbed. Recives
+# state change notification through the event system, and writes the new
+# state into the database.
+#
+# In the future, will watch for invalid state transitions, and watch for nodes
+# that time out.
+#
+# Send it a HUP signal to get it to reload the timeout and transition
+# information. Periodically reloads this information regardless, though.
+#
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+my $BOSSNODE = "@BOSSNODE@";
+my $TBOPS = "@TBOPSEMAIL@";
+
+$| = 1;
+
+use event;
+package event; 
+
+use libdb;
+use libtestbed;
+use Getopt::Std;
+use strict;
+use English;
+
+#
+# Will need permissions to do something about nodes that have timed out
+#
+if ($UID != 0) {
+	die "This should only be run as root!\n";
+}
+
+#
+# Number of iterations (roughly, seconds) after which we'll reload 
+# information from the database. This is so we don't end up with information
+# that's _too_ out of sync.
+#
+my $reload_time = 360;
+
+#
+# Process command-line arguments
+#
+
+sub usage {
+	print << "END";
+Usage: $0 [-d] [-s server] [-p port] [-h]
+-s server       Use specified server, instead of this site's bossnode
+-p port	        Use specified port
+-d              Turn on debugging output, and don't go into the background
+-h              This message
+END
+}
+
+my %opt = ();
+getopts("ds:p:h",\%opt);
+
+if ($opt{h}) { exit &usage; }
+if (@ARGV) { exit &usage; }
+
+my ($server,$port,$debug);
+if ($opt{s}) { $server = $opt{s}; } else { $server = $BOSSNODE; }
+if ($opt{p}) { $port = $opt{p}; }
+if ($opt{d}) { $debug = 1; } else { $debug = 0; }
+
+#
+# Background
+#
+if (!$debug) {
+	if (TBBackGround("/var/log/testbed/stated.log")) {
+		exit(0);
+	}
+}
+
+my $URL = "elvin://$server";
+if ($port) { $URL .= ":$port"; }
+
+#
+# Connect to the event system, and subscribe the the events we want 
+#
+my $handle = event_register($URL,0);
+if (!$handle) { die "Unable to register with event system\n"; }
+
+my $tuple = address_tuple_alloc();
+if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+%$tuple = ( host      => $BOSSNODE,
+	    objtype   => 'TBNODESTATE' );
+
+if (!event_subscribe($handle,\&handleEvent,$tuple)) {
+	die "Could not subscribe to event\n";
+}
+
+
+#
+# Read in the pre-existing node states, and timeout and valid transition
+# information from the database
+#
+my %nodes    = readStates();
+my %timeouts = getTimeouts();
+my %valid    = getValid();
+
+#
+# Gets set if a reload of state from the database should happen.
+#
+my $do_reload = 0;
+
+#
+# Make the daemon reload database state on a sighup - but I'm worried
+# about what would happen if we tried to do this mid-loop. So, we'll
+# just set a flag and do it when we're done with our current pass.
+#
+$SIG{HUP} = sub { print "Recieved a SIGHUP\n"; $do_reload = 1; };
+
+print "stated starting up\n";
+
+#
+# Now, we just poll for events, and watch for 
+#
+my $iterations = 0;
+while (1) {
+	event_poll($handle);
+	my $now = time();
+	#
+	# Look for nodes that have passed their timeout
+	#
+	while (my ($node, $value) = each %nodes) {
+		my $state    = $value->{state};
+		my $time     = $value->{time};
+		my $notified = $value->{notified};
+		my ($timeout,$action);
+		if ($state && $timeouts{$state}) {
+			($timeout, $action) = @{$timeouts{$state}};
+		}
+		if ((!$notified) && $time && $timeout &&
+				(($time + $timeout) < $now)) {
+			   #
+			   # TODO: Need to actually do something!
+			   #
+			   notify("Node $node has timed out in state $state\n");
+			   $value->{notified} = 1;
+		}
+	}
+
+	if ($do_reload || ($iterations > $reload_time)) {
+		reload();
+		$do_reload = 0;
+		$iterations = 0;
+	}
+
+	$iterations++;
+	sleep(1);
+}
+
+#
+# Read the current states of nodes from the database
+#
+sub readStates() {
+	debug("readStates called\n");
+	my $result = DBQueryFatal("SELECT node_id, eventstate, " .
+				  "state_timestamp FROM nodes");
+
+	my %nodes;
+	while (my ($node_id, $state, $time) = $result->fetchrow()) {
+		$nodes{$node_id}{state} = $state;
+		$nodes{$node_id}{time}  = $time;
+	}
+	return %nodes;
+}
+
+#
+# Read timeouts for various states from the database
+#
+sub getTimeouts() {
+	debug("getTimeouts called\n");
+	my $result = DBQueryFatal("SELECT state, timeout, action " .
+				  "FROM state_timeouts");
+
+	my %timeouts;
+	while (my ($state, $timeout, $action) = $result->fetchrow()) {
+		$timeouts{$state} = [ $timeout, $action ];
+	}
+	return %timeouts;
+}
+
+#
+# Read the list of valid state transitions from the database
+#
+sub getValid() {
+	debug("getValid called\n");
+	my $result = DBQueryFatal("SELECT state1, state2 " .
+				  "FROM state_transitions");
+
+	my %valid;
+	while (my ($state1, $state2) = $result->fetchrow()) {
+		$valid{$state1}{$state2} = 1;
+	}
+	return %valid;
+}
+
+#
+# Gets called for every event that we recieve
+#
+sub handleEvent($$$) {
+	my ($handle,$notification,$data) = @_;
+	my $objname = event_notification_get_objname($handle,$notification);
+	my $eventtype = event_notification_get_eventtype($handle,$notification);
+
+	print "Got an event: ($objname,$eventtype)\n";
+
+	# Check for invalid transitions
+	my $oldstate;
+	if ($nodes{$objname}) {
+		$oldstate = $nodes{$objname}{state};
+	} else {
+		notify("Got an event for a node ($objname) I don't know ".
+		      "about\n");
+	}
+	if ($oldstate && !$valid{$oldstate}{$eventtype}) {
+		notify("Invalid transition from $oldstate to $eventtype\n");
+	}
+
+	my $now = time();
+	$nodes{$objname}{state}     = $eventtype;
+	$nodes{$objname}{time}      = $now;
+	$nodes{$objname}{notified}  = 0;
+
+	DBQueryFatal("UPDATE nodes SET eventstate='$eventtype', " .
+		     "state_timestamp='$now' WHERE node_id='$objname'");
+
+}
+
+#
+# Reload state from the database
+#
+sub reload() {
+    	print "Reloading state from database\n";
+	%nodes    = readStates();
+	%timeouts = getTimeouts();
+	%valid     = getValid();
+}
+
+sub debug(@) {
+	if ($debug) { print @_; }
+}
+
+sub notify($) {
+    	my $message = shift;
+	if (!$debug) {
+	    	SENDMAIL($TBOPS,"Node State Daemon Messsage",$message);
+	}
+	print $message;
+}
+
+#
+# This gets called if we die of 'natural causes' (exit, die, etc.)
+#
+END {
+    	if ($handle) {
+		print "Exiting, cleaning up\n";
+		if (event_unregister($handle) == 0) {
+			die "Unable to unregister with event system\n";
+		}
+	}
+
+}
