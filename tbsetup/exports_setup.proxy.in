@@ -9,6 +9,7 @@
 use English;
 use Errno;
 use Fcntl ':flock';
+use Getopt::Std;
 
 #
 # Create and /etc/exports file based on current reserved table and project
@@ -17,17 +18,45 @@ use Fcntl ':flock';
 # usage: exports_setup
 #
 
+my %opts = ();
+getopts('S', \%opts);
+
 #
 # Configure variables
 #
 my $TBOPS       = "@TBOPSEMAIL@";
 
-my $etcdir      = "/etc";
-my $exports	= "$etcdir/exports";
-my $exportsnew  = "$etcdir/exports.new";
-my $exportsback	= "$etcdir/exports.backup";
-my $exportshead = "$etcdir/exports.head";
-my $exportstail = "$etcdir/exports.tail";
+my $etcdir;
+my $exports;
+my $exportsnew;
+my $exportsback;
+my $exportshead;
+my $exportstail;
+my $pidfile;
+my $daemon;
+
+# Are we modifying the Samba config file or the NFS exports?
+if (defined($opts{'S'})) {
+    $etcdir      = "/usr/local/etc";
+    $exports	 = "$etcdir/smb.conf";
+    $exportsnew  = "$etcdir/smb.conf.new";
+    $exportsback = "$etcdir/smb.conf.backup";
+    $exportshead = "$etcdir/smb.conf.head";
+    $exportstail = "$etcdir/smb.conf.tail";
+    $pidfile     = "/var/run/smbd.pid";
+    $daemon      = "smbd";
+}
+else {
+    $etcdir      = "/etc";
+    $exports	 = "$etcdir/exports";
+    $exportsnew  = "$etcdir/exports.new";
+    $exportsback = "$etcdir/exports.backup";
+    $exportshead = "$etcdir/exports.head";
+    $exportstail = "$etcdir/exports.tail";
+    $pidfile     = "/var/run/mountd.pid";
+    $daemon      = "mountd";
+}
+
 my $dbg		= 0;
 my @row;
 
@@ -102,14 +131,14 @@ chmod(0444, $exports);
 #
 # I have little faith in HUPing mountd, but do it anyway.
 #
-$mpid = `cat /var/run/mountd.pid`;
-$mpid =~ s/\n//;
+my $daemonpid = `cat $pidfile`;
+$daemonpid =~ s/\n//;
 # untaint
-if ($mpid =~ /^([-\@\w.]+)$/) {
-    $mpid = $1;
+if ($daemonpid =~ /^([-\@\w.]+)$/) {
+    $daemonpid = $1;
 }
-if (kill('HUP', $mpid) == 0) {
-    fatal("Could not kill(HUP) process $mpid (mountd): $!");
+if (kill('HUP', $daemonpid) == 0) {
+    fatal("Could not kill(HUP) process $daemonpid ($daemon): $!");
 }
 
 #
