@@ -434,6 +434,7 @@ CREATE TABLE node_types (
   control_net tinyint(3) unsigned default NULL,
   power_time smallint(5) unsigned NOT NULL default '60',
   imageid varchar(45) NOT NULL default '',
+  imageable tinyint(4) default '0',
   delay_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
   delay_osid varchar(35) default NULL,
