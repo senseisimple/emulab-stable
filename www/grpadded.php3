@@ -28,6 +28,14 @@ if (!isset($grp_name) ||
     strcmp($grp_name, "UCB Overlay Multicast") == 0) {
   $formerror = "Long Name";
 }
+if (!isset($grp_pcs) ||
+    strcmp($grp_pcs, "") == 0) {
+  $formerror = "Estimated #of PCs";
+}
+if (!isset($grp_sharks) ||
+    strcmp($grp_sharks, "") == 0) {
+  $formerror = "Estimated #of Sharks";
+}
 if (!isset($usr_name) ||
     strcmp($usr_name, "") == 0) {
   $formerror = "Full Name";
@@ -89,8 +97,8 @@ if ($row = mysql_fetch_row($project_result)) {
 $pswd_query  = "SELECT usr_pswd FROM users WHERE uid=\"$grp_head_uid\"";
 $pswd_result = mysql_db_query($TBDBNAME, $pswd_query);
 if (!$pswd_result) {
-    TBERROR("Database Error retrieving password for $grp_head_uid: $err\n",
-            1);
+    $err = mysql_error();
+    TBERROR("Database Error retrieving password for $grp_head_uid: $err\n", 1);
 }
 if ($row = mysql_fetch_row($pswd_result)) {
     $db_encoding = $row[0];
@@ -230,6 +238,8 @@ mail($TBMAIL_APPROVAL,
      "Email:\t\t$email\nGroup:\t\t$grp_name\nURL:\t\t$grp_URL\n".
      "Title:\t$usr_title\n".
      "Affiliation:\t$usr_affil\nAddress:\t$usr_addr\n".
+     "PCs:\t$grp_pcs\n".
+     "Sharks:\t$grp_sharks\n".
      "Phone:\t\t$usr_phones\n\n".
      "Reasons:\n$why\n\nPlease review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".

@@ -32,37 +32,93 @@ $expiretime = date("m/d/Y", time() + (86400 * 90));
 ?>
 <table align="center" border="1"> 
 <tr>
-    <td colspan="4">
+    <td colspan="2">
         <h1 align="center">Apply to Use the Utah Network Testbed</h1>
     </td>
 </tr>
 
 <tr>
-    <td align="center" colspan="4">
+    <td align="center" colspan="2">
         Fields marked with * are required;
         those marked + are highly recommended.
     </td>
 </tr>
 
 <form action=grpadded.php3 method="post">
+<tr></tr>
+<tr></tr>
 <tr>
     <td colspan=2>
         Project Information <em>(replace the example entries)</em>
-    </td>
-    <td colspan=2>
-        Project Head Information
     </td>
 </tr>
 
 <?php
 
 #
-#  Name: and Username:
+#  Project Name:
 #
 echo "<tr>
           <td>*Name (no blanks):</td>
           <td><input type=\"text\" name=\"gid\" value=\"ucb-omcast\"></td>
+      </tr>\n";
 
+#
+#  Long Name
+#
+echo "<tr>
+          <td>*Long name:</td>
+          <td><input type=\"text\" name=\"grp_name\"
+                     value=\"UCB Overlay Multicast\"></td>
+      </tr>\n";
+
+#
+#  URL
+#
+echo "<tr>
+         <td>+URL:</td>
+         <td><input type=\"text\" name=\"grp_URL\"
+                    value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
+      </tr>\n";
+
+#
+# Nodes and PCs
+# 
+echo "<tr>
+         <td>*Estimated #of PCs:</td>
+         <td><input type=\"text\" name=\"grp_pcs\"></td>
+      </tr>\n";
+
+echo "<tr>
+         <td>*Estimated #of Sharks:</td>
+         <td><input type=\"text\" name=\"grp_sharks\" value=\"0\"></td>
+      </tr>\n";
+
+#
+#  Expires
+#
+echo "<tr>
+          <td>When do you expect to be<br>done using the testbed</td>
+          <td><input type=\"text\" name=\"grp_expires\"
+                     value=\"$expiretime\"></td>
+      </tr>\n";
+
+
+#
+# User information.
+#
+echo "<tr></tr>\n";
+echo "<tr></tr>\n";
+echo "<tr>
+          <td colspan=2>
+              Project Head Information
+          </td>
+      </tr>\n";
+
+#
+# UserName:
+#
+echo "<tr>
           <td>*Username:</td>
           <td class=\"left\">
               <input name=\"grp_head_uid\"";
@@ -76,13 +132,9 @@ echo "     </td>
       </tr>\n";
 
 #
-#  Long Name: and Full Name:
+# Full Name
 #
 echo "<tr>
-          <td>*Long name:</td>
-          <td><input type=\"text\" name=\"grp_name\"
-                     value=\"UCB Overlay Multicast\"></td>
-
           <td>*Full Name:</td>
           <td class=\"left\">
               <input name=\"usr_name\"";
@@ -95,13 +147,9 @@ echo "     </td>
       </tr>\n";
 
 #
-#  URL: and Title/Position:
-#
+# Title/Position:
+# 
 echo "<tr>
-         <td>+URL:</td>
-         <td><input type=\"text\" name=\"grp_URL\"
-                    value=\"http://www.cs.berkeley.edu/netgrp/omcast/\"></td>
-
          <td>*Title/Position:</td>
          <td class=\"left\">
              <input name=\"usr_title\"";
@@ -115,15 +163,9 @@ echo "     </td>
       </tr>\n";
 
 #
-#  Expires: and Affiliation:
+# Affiliation:
 #
 echo "<tr>
-          <td>When do&nbsp;you<br>
-              expect&nbsp;to&nbsp;be&nbsp;done<br>
-              using&nbsp;the&nbsp;testbed?</td>
-          <td><input type=\"text\" name=\"grp_expires\"
-                     value=\"$expiretime\"></td>
-
          <td>*Institutional<br>Affiliation:</td>
          <td class=\"left\">
              <input name=\"usr_affil\"";
@@ -136,12 +178,11 @@ if ($row) {
 echo "     </td>
       </tr>\n";
 
+
 #
-#  Blank and Email:
+# Email:
 #
 echo "<tr>
-         <td></td>
-         <td></td>
          <td>*Email<br>Address:</td>
          <td class=\"left\">
              <input name=\"email\"";
@@ -155,12 +196,9 @@ echo "    </td>
       </tr>\n";
 
 #
-# Password and Postal Address:
+# Postal Address
 #
 echo "<tr>
-         <td>*Password:</td>
-         <td><input type=\"password\" name=\"password1\"></td>
-
          <td>*Postal<br>Address:</td>
          <td class=\"left\">
               <input name=\"usr_addr\"";
@@ -173,19 +211,8 @@ echo "    </td>
       </tr>\n";
 
 #
-# If a new usr, then provide a second password confirmation field.
-# Otherwise, a blank spot.
+# Phone
 #
-echo "<tr>";
-if (! $row) {
-    echo "<td>*Retype<br>New Password:</td>
-          <td class=\"left\">
-              <input type=\"password\" name=\"password2\"></td>";
-}
-else {
-    echo "<td></td>
-          <td></td>";
-}
 echo "    <td>*Phone #:</td>
           <td class=\"left\">
               <input name=\"usr_phones\"";
@@ -197,26 +224,47 @@ if ($row) {
 echo "    </td>
       </tr>\n";
 
+#
+# Password
+#
+echo "<tr>
+         <td>*Password:</td>
+         <td><input type=\"password\" name=\"password1\"></td>
+      </tr>\n";
+
+#
+# If a new usr, then provide a second password confirmation field.
+# Otherwise, a blank spot.
+#
+if (! $row) {
+echo "<tr>
+          <td>*Retype<br>New Password:</td>
+          <td class=\"left\">
+              <input type=\"password\" name=\"password2\"></td>
+      </tr>\n";
+}
+
 ?>
 
+<tr></tr>
+<tr></tr>
 <tr>
-    <td colspan="4">
-        *Please describe how and why you'd like
-        to use the testbed, including an estimate of the number of nodes
-        and their type.  If the research is sponsored (funded),
-        list the sponsors.</td>
+    <td colspan="2">
+        *Please describe how and why you'd like to use the testbed.<br>
+         If the research is sponsored (funded), list the sponsors.</td>
 </tr>
 
 <tr>
-    <td colspan="4" align="center" class="left">
-        <textarea name="why" rows="10" cols="70"></textarea></td>
+    <td colspan="2" align="center" class="left">
+        <textarea name="why" rows="10" cols="60"></textarea></td>
 </tr>
 
 <tr>
-    <td colspan="4" align="center">
+    <td colspan="2" align="center">
         <b><input type="submit" value="Submit"></b></td>
 </tr>
 </form>
 </table>
 </body>
 </html>
+
