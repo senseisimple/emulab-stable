@@ -1,0 +1,56 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = sensors/canaryd
+TBLIB		= $(OBJDIR)/lib/libtb/libtb.a
+
+SBIN_SCRIPTS    = 
+CDPROGS		= canaryd alertlistener
+
+include $(OBJDIR)/Makeconf
+
+CC?=gcc
+CFLAGS+= -Wall -g -I${OBJDIR} -I/usr/local/include \
+		-I$(TESTBED_SRCDIR)/lib/libtb \
+		-I$(TESTBED_SRCDIR)/event/lib \
+		-DCLIENT_BINDIR='"$(CLIENT_BINDIR)"' \
+		-DLOG_TESTBED=$(LOG_TESTBED) \
+		`elvin-config --cflags vin4c`
+LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql -L${OBJDIR}/event/lib
+LIBS+= -ltb -levent -lcrypto `elvin-config --libs vin4c`
+CP= cp -pf
+
+SYSTEM  := $(shell uname -s)
+
+all: $(CDPROGS) client
+
+include ${TESTBED_SRCDIR}/GNUmakerules
+
+canaryd: canaryd.o auxfuncs.o version.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ canaryd.o auxfuncs.o version.o $(LIBS) -ldevstat
+
+alertlistener: alertlistener.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ alertlistener.o $(LIBS)
+
+$(TBLIB):
+	gmake -C $(OBJDIR)/lib
+
+version.c: canaryd.c canaryd.h auxfuncs.c auxfuncs.h alertlistener.c
+	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
+
+client: canaryd
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) alertlistener)
+
+client-install: client
+	$(INSTALL_PROGRAM) -s canaryd $(DESTDIR)$(CLIENT_BINDIR)
+
+clean:
+	rm -f *.o $(CDPROGS) *~ core *.core version.c
+

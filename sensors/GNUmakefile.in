@@ -8,7 +8,7 @@ SUBDIR		= sensors
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= slothd
+SUBDIRS	= slothd canaryd
 
 all:	$(SUBDIRS)
 
@@ -17,23 +17,31 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 slothd:
 	@$(MAKE) -C slothd all
 
+canaryd:
+	@$(MAKE) -C canaryd all
+
 install: 
 	@$(MAKE) -C slothd install
+	@$(MAKE) -C canaryd install
 
 client:
 	@$(MAKE) -C slothd client
+	@$(MAKE) -C canaryd client
 
 client-install: client
 	@$(MAKE) -C slothd client-install
+	@$(MAKE) -C canaryd client-install
 
 clean:		subdir-clean
 
 subdir-clean:
 	@$(MAKE) -C slothd clean
+	@$(MAKE) -C canaryd clean
 
 distclean:	subdir-distclean
 
 subdir-distclean:
 	@$(MAKE) -C slothd distclean
+	@$(MAKE) -C canaryd distclean
 
 .PHONY:	$(SUBDIRS)
