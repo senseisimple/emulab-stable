@@ -67,7 +67,7 @@ if {[catch "exec $resetvlans $machines >@ $logFp 2>@ $logFp" err]} {
 }
 
 outs "Setting up VLANs"
-if {[catch "exec $snmpit -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error running $snmpit. ($err)"
     exit 1
 }
