@@ -147,6 +147,8 @@ int main(int argc, char **argv) {
     // wait for configuration data from EMC
     
   
+    // select??
+    
     
     // read a packet in
     read_packet = receive_packet(FD_emc);
@@ -226,12 +228,12 @@ int main(int argc, char **argv) {
   /*** Notify EMCD that RMCD is ready to receive commands ***/
   /**********************************************************/   
   
+  // FIXME: is this right??
   // send packet to EMC updating ready status
-  // FIXME: need to look at structure in the protocol
-  struct mtp_config rc_packet;
-  rc_packet.id = -1; // ID: FIXME
-  rc_packet.code = -1; // code: FIXME
-  rc_packet.msg = ""; // message: FIXME
+  struct mtp_control rc_packet;
+  rc_packet.id = -1; // ID: ?? FIXME
+  rc_packet.code = -1; // Code: ?? FIXME
+  rc_packet.msg = "RMCD ready";
   
   struct mtp_packet *rc = mtp_make_packet(MTP_CONFIG, MTP_ROLE_RMC, &rc_packet); // FIXME: not MTP_CONFIG
   
