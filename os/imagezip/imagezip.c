@@ -305,7 +305,8 @@ read_image()
 		default:
 			printf("  Slice %d is an unknown type. Skipping ...\n",
 			       i + 1 /* DOS Numbering */);
-			addskip(start, size);
+			if (start != size)
+				addskip(start, size);
 		}
 		if (rval) {
 			warnx("Stopping zip at Slice %d",
