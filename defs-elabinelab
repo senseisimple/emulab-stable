@@ -1,0 +1,33 @@
+#
+# Stub file for setting up elab in elab.
+#
+# Use the --with-TBDEFS=filename to specify your own file.
+# If you add a variable, be sure to go and update configure.in.
+#
+TBDBNAME=tbdb
+TBADMINGROUP=tbadmin
+TBOPSEMAIL=testbed-ops@changeme
+TBLOGSEMAIL=testbed-logs@changeme
+TBWWWEMAIL=testbed-www@changeme
+TBAPPROVALEMAIL=testbed-approval@changeme
+TBAUDITEMAIL=testbed-audit@changeme
+TBSTATEDEMAIL=testbed-stated@changeme
+TBTESTSUITEEMAIL=testbed-testsuite@changeme
+TBAUTOMAILEMAIL=testbed-automail@changeme
+TBACTIVEARCHIVE=testbed-active-users-archive@changeme
+TBUSERSARCHIVE=testbed-users-archive@changeme
+JAILIPBASE=172.17.0.0
+JAILIPMASK=255.240.0.0
+DELAYCAPACITY=1
+BOSSNODE=changeme
+USERNODE=changeme
+FSNODE=changeme
+OURDOMAIN=changeme
+FSDIR_GROUPS=/q/groups
+FSDIR_PROJ=/q/proj
+FSDIR_USERS=/q/users
+FSDIR_SHARE=/share
+WWWHOST=changeme
+TBMAINSITE=0
+THISHOMEBASE=changeme
+PLABSUPPORT=0
