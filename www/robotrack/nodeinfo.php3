@@ -49,7 +49,8 @@ register_shutdown_function("SPEWCLEANUP");
 
 # Get the robot information. Actually, this includes motes.
 $query_result =
-    DBQueryFatal("select loc.node_id,r.pid,r.eid,r.vname,n.type,nt.class ".
+    DBQueryFatal("select loc.node_id,r.pid,r.eid,r.vname,n.type,nt.class, ".
+		 "       loc.loc_x,loc.loc_y,loc.loc_z,loc.orientation ".
 		 "  from location_info as loc ".
 		 "left join reserved as r on r.node_id=loc.node_id ".
 		 "left join nodes as n on n.node_id=loc.node_id ".
@@ -65,6 +66,10 @@ while ($row = mysql_fetch_array($query_result)) {
     $eid    = $row["eid"];
     $type   = $row["type"];
     $class  = $row["class"];
+    $loc_x  = $row["loc_x"];
+    $loc_y  = $row["loc_y"];
+    $loc_z  = $row["loc_z"];
+    $or     = $row["orientation"];
     $mobile = ($class == "robot" ? 1 : 0);
     # In meters.
     $size   = ($class == "robot" ? 0.27 : 0.07);
@@ -73,8 +78,21 @@ while ($row = mysql_fetch_array($query_result)) {
 
     if (!isset($vname))
 	$vname = $pname;
+    if (!isset($loc_z))
+	$loc_z = "";
+    if (!isset($or))
+	$or = "";
 							      
-    echo "$pname, $vname, $type, $alloc, $mobile, $size, $radius\n";
+    echo "$pname, ";
+    if (!isset($selector)) {
+	echo "$vname, ";
+    }
+    echo "$type, $alloc, $mobile, $size, $radius";
+
+    if (isset($selector)) {
+	echo ", $loc_x, $loc_y, $loc_z, $or";
+    }
+    echo "\n";
 }
 
 ?>
