@@ -1979,8 +1979,11 @@ COMMAND_PROTOTYPE(dohosts)
 	 */
 	res = mydb_query("select v.vname,v.ips,v2p.node_id from virt_nodes as v "
 			 "left join v2pmap as v2p on "
-			 " v.vname=v2p.vname and v.pid=v2p.pid and v.eid=v2p.eid "
-			 " where v.pid='%s' and v.eid='%s' order by v2p.node_id",
+			 "     v.vname=v2p.vname and v.pid=v2p.pid and "
+			 "     v.eid=v2p.eid "
+			 "where v.pid='%s' and v.eid='%s' and "
+			 "      v2p.node_id is not null "
+			 "      order by v2p.node_id",
 			 3, reqp->pid, reqp->eid);
 
 	if (!res) {
@@ -3757,8 +3760,10 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		/* event key for the experiment */
 		if (row[20]) 
 			strcpy(reqp->eventkey, row[20]);
+
+		/* Only meaningful when reserved to an experiment */
+		reqp->veth_encapsulate = (! strcasecmp(row[22], "0") ? 0 : 1);
 	}
-	reqp->veth_encapsulate = (! strcasecmp(row[22], "0") ? 0 : 1);
 	
 	if (row[9])
 		reqp->update_accounts = atoi(row[9]);
