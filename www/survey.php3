@@ -10,9 +10,19 @@ include("showstuff.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-$isadmin = ISADMIN($uid);
+$effuid = "unknown";
+$uidnotes = "No UID Provided.";
+$uid = GETUID(); 
+# GETLOGIN();
+
+if ($uid) {
+  $effuid = $uid; 
+  $uidnotes = "Checklogin returned " . CHECKLOGIN($uid) . ".";
+}
+
+#LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+#$isadmin = ISADMIN($uid);
+#$checklogin = CHECKLOGIN($uid);
 
 $intro = "How would adding the following to Emulab/Netbed affect you?";
 
@@ -86,13 +96,17 @@ $followups = array(
 
 PAGEHEADER("Emulab Survey");  
 
+# echo "<h1>I think you are $effuid</h1>";
+
 if ($submit) {
 
     $mesg = "";
     if ($anonymous) {
-	$mesg .= "\nSurvey Responder: *Anonymous* (uid hash ='" . md5($uid) . "' )\n";
+	$mesg .= "\nSurvey Responder: *Anonymous* (uid hash ='" . md5($effuid) . "' )\n";
+	$mesg .= "Auth notes: $uidnotes\n";
     } else {
-        $mesg .= "\nSurvey Responder: $uid\n";
+        $mesg .= "\nSurvey Responder: $effuid\n";
+	$mesg .= "Auth notes: $uidnotes\n";
     }
     $mesg .= "> Multiple Choice:\n";
     $foo = 0;
@@ -126,8 +140,8 @@ if ($submit) {
     }
 
 #   testbed-survey@emulab.net
-    TBMAIL("barb@flux.utah.edu",
-#    TBMAIL("testbed-survey@emulab.net",
+#    TBMAIL("barb@flux.utah.edu",
+    TBMAIL("testbed-survey@emulab.net",
 	   "Survey Answers",
 	   $mesg,
 	   "From: $TBMAIL_OPS");	      
@@ -143,6 +157,13 @@ if ($submit) {
 
     PAGEFOOTER();
     return;
+}
+
+if (0 == strcmp($effuid, "unknown")) {
+    echo "<h3>If you have an account, please ";
+    echo "<a href=\"$TBBASE/login.php3\">log in</a>. ";
+    echo "If you don't have an account, or can't log in, ";
+    echo "please fill out this form anyway!</h3>\n";
 }
 
 echo "<p>";
