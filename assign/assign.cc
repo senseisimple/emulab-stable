@@ -13,6 +13,9 @@
 
 #include "testbed.h"
 
+#include "phys.h"
+topology *topo = NULL;
+
 /* How can we chop things up? */
 #define PARTITION_BY_ANNEALING 0
 
@@ -463,6 +466,7 @@ void usage() {
 		"                 (# of links which can go between switches\n"
 		"           -a ...... Use simulated annealing (default)\n"
 		"           -o ...... Update on-line (vs batch, default)\n"
+		"           -t <file> Input topology desc. from <file>\n"
 		);
 }
 
@@ -471,12 +475,13 @@ int main(int argc, char **argv)
 	int h_menu;
 	extern char *optarg;
 	extern int optind;
+	char *topofile = NULL;
     
 	int ch;
 
 	partition_mechanism = PARTITION_BY_ANNEALING;
     
-	while ((ch = getopt(argc, argv, "oas:n:c:h")) != -1)
+	while ((ch = getopt(argc, argv, "oas:n:c:t:h")) != -1)
 		switch(ch) {
 		case 'h': usage(); exit(0);
 		case 'n': nodecap = atoi(optarg); break;
@@ -484,6 +489,7 @@ int main(int argc, char **argv)
 		case 'c': intercap = atoi(optarg); break;
 		case 'a': partition_mechanism = PARTITION_BY_ANNEALING; break;
 		case 'o': on_line = 1; break;
+		case 't': topofile = optarg; break;
 		default: usage(); exit(-1);
 		}
 
@@ -513,7 +519,7 @@ int main(int argc, char **argv)
 	if (argc == 1) {
 		ifstream infile;
 		infile.open(argv[0]);
-		if (!infile) {
+		if (!infile || !infile.good()) {
 		  cerr << "Error opening file: " << argv[0] << "\n";
 		  exit(1);
 		}
@@ -525,6 +531,16 @@ int main(int argc, char **argv)
 			gw.set_position(n,
 					point(random() % 200, random() % 200));
 		}
+	}
+
+	if (topofile != NULL) {
+		topo = parse_phys(topofile);
+		if (!topo) {
+			cerr << "Could not read in topofile "
+			     << topofile << endl;
+			exit(-1);
+		}
+		nparts = topo->switchcount;
 	}
     
 	gw.display();

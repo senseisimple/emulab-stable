@@ -1,7 +1,7 @@
 CXX=/usr/gnu/bin/g++
 CC=/usr/gnu/bin/gcc 
 LEDA=/n/paria/z/dga/LEDA-4.0
-OBJS=testbed.o parse_top.o parse_ir.o parse_ptop.o
+OBJS=testbed.o parse_top.o parse_ir.o phys.o parse_phys.o parse_ptop.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L. -lg2c
 LDFLAGS+= -O3 -fomit-frame-pointer -m486
 CXXFLAGS = -I${LEDA}/incl
