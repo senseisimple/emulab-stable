@@ -247,15 +247,19 @@ echo "<tr>
       </tr>\n";
 
 #
-# Publiclly visible.
+# Publicly visible.
 # 
 echo "<tr>
-         <td>*Can we list your URL publicly as an \"Emulab User?\":
+         <td>*Can we list your project publicly as an \"Emulab User?\":
              <br>
              (See our <a href=\"projectlist.php3\" target=\"Users\">Users</a> page)
              </td>
          <td><input type=radio name=proj_public value=yes checked>Yes &nbsp
              <input type=radio name=proj_public value=no>No
+
+	     <br>
+             *If \"No\" please tell us why not:<br>
+             <input type=\"text\" name=\"proj_whynotpublic\" size=\"45\">
              </td>
       </tr>\n";
 

@@ -77,6 +77,10 @@ if (!isset($proj_public) ||
     (strcmp($proj_public, "yes") && strcmp($proj_public, "no"))) {
   FORMERROR("Publicly Visible");
 }
+if ((strcmp($proj_public, "no") == 0) &&
+    (!isset($proj_whynotpublic) || strcmp($proj_whynotpublic, "") == 0)) {
+  FORMERROR("Please tell us why we may not list your project publicly");
+}
 
 #
 # Check uid and pid for sillyness.
@@ -132,6 +136,7 @@ VERIFYURL($proj_URL);
 $proj_why     = addslashes($proj_why);
 $proj_name    = addslashes($proj_name);
 $proj_funders = addslashes($proj_funders);
+$proj_whynotpublic = addslashes($proj_whynotpublic);
 $usr_affil    = addslashes($usr_affil);
 $usr_title    = addslashes($usr_title);
 $usr_addr     = addslashes($usr_addr);
@@ -228,8 +233,6 @@ else {
     }
 }
 
-array_walk($HTTP_POST_VARS, 'addslashes');
-
 #
 # For a new user:
 # * Create a new account in the database.
@@ -287,10 +290,11 @@ if (! $returning) {
 #
 $newproj_command = "INSERT INTO projects ".
      "(pid, created, expires, name, URL, head_uid, ".
-     " num_members, num_pcs, num_sharks, why, funders, unix_gid, public)".
+     " num_members, num_pcs, num_sharks, why, funders, unix_gid, ".
+     " public, public_whynot)".
      "VALUES ('$pid', now(), '$proj_expires','$proj_name','$proj_URL',".
      "'$proj_head_uid', '$proj_members', '$proj_pcs', '$proj_sharks', ".
-     "'$proj_why', '$proj_funders', NULL, $public)";
+     "'$proj_why', '$proj_funders', NULL, $public, '$proj_whynotpublic')";
 $newproj_result  = mysql_db_query($TBDBNAME, $newproj_command);
 if (! $newproj_result) {
     $err = mysql_error();
@@ -319,22 +323,23 @@ $unix_gid = $row[0];
 mail($TBMAIL_APPROVAL,
      "TESTBED: New Project '$pid' ($proj_head_uid)", "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
-     "Name:          $usr_name ($proj_head_uid)\n".
-     "Email:         $usr_email\n".
-     "User URL:      $usr_url\n".
-     "Project:       $proj_name\n".
-     "Expires:	     $proj_expires\n".
-     "Project URL:   $proj_URL\n".
-     "Public URL:    $proj_public\n".
-     "Funders:       $proj_funders\n".
-     "Title:         $usr_title\n".
-     "Affiliation:   $usr_affil\n".
-     "Address:       $usr_addr\n".
-     "Phone:         $usr_phones\n".
-     "Members:       $proj_members\n".
-     "PCs:           $proj_pcs\n".
-     "Sharks:        $proj_sharks\n".
-     "Unix GID:      $unix_gid\n".
+     "Name:            $usr_name ($proj_head_uid)\n".
+     "Email:           $usr_email\n".
+     "User URL:        $usr_url\n".
+     "Project:         $proj_name\n".
+     "Expires:	       $proj_expires\n".
+     "Project URL:     $proj_URL\n".
+     "Public URL:      $proj_public\n".
+     "Why Not Public:  $proj_whynotpublic\n".
+     "Funders:         $proj_funders\n".
+     "Title:           $usr_title\n".
+     "Affiliation:     $usr_affil\n".
+     "Address:         $usr_addr\n".
+     "Phone:           $usr_phones\n".
+     "Members:         $proj_members\n".
+     "PCs:             $proj_pcs\n".
+     "Sharks:          $proj_sharks\n".
+     "Unix GID:        $unix_gid\n".
      "Reasons:\n$proj_why\n\n".
      "Please review the application and when you have\n".
      "made a decision, go to $TBWWW and\n".
