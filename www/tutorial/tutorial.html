@@ -783,7 +783,7 @@ route to an entire LAN. It would be tedious and error prone to specify
 a route to each node in a LAN by hand. Instead, just route to the
 entire network:
 <code><pre>
-set clientlan [$ns make-lan "nodeE nodeF nodeG" 100Mb 0ms]
+set clientlan [$ns make-lan "$nodeE $nodeF $nodeG" 100Mb 0ms]
 $nodeA add-route $clientlan $nodeB
 </pre></code>
 
