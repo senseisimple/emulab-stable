@@ -363,6 +363,15 @@ function WRITESIDEBAR() {
 	    
 		WRITESIDEBARBUTTON("Update User Information",
 				   $TBBASE, "moduserinfo.php3");
+
+	        if (ISADMIN($login_uid)) {
+		    WRITESIDEBARBUTTON("Approve New Projects",
+				       $TBBASE, "approveproject_list.php3");
+		    WRITESIDEBARBUTTON("User List",
+				       $TBBASE, "showuser_list.php3");
+		    WRITESIDEBARBUTTON("New User Approval",
+				       $TBBASE, "approveuser_form.php3");
+		}
 	    }
 	    else {
 		WRITESIDEBARBUTTON("My Emulab",
