@@ -295,7 +295,8 @@ if ($showlinks) {
 
 	print  "Wide-Area Lan/Link Info: Recent Data\n";
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-		"ID", "Source", "Destination", "Delay/2", "BW (Kbs)", "Loss Rate";
+		"ID", "Source", "Destination", "Delay/2", "BW (Kbs)",
+		"Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 		"--------- ---------\n";
 
@@ -304,22 +305,38 @@ if ($showlinks) {
 	    my ($virt1,$pname1,$card1) = @$node1;
 	    my ($virt2,$pname2,$card2) = @$node2;
 
+	    my ($wname1, $wname2);
+	    if (!TBWideareaNodeID($pname1,\$wname1)) {
+		$wname1 = $pname1;
+	    }
+	    if (!TBWideareaNodeID($pname2,\$wname2)) {
+		$wname2 = $pname2;
+	    }
+
 	    #
 	    # Have to get both orders (node1,node2) and (node2,node1)
 	    #
 	    printf "%-15s %-15s %-15s ", $link, $virt1, $virt2;
-	    my $delay1 = $delaymap{"$pname1 $pname2"};
+	    my $delay1 = $delaymap{"$wname1 $wname2"};
 	    if (!$delay1) {
-		print "No data available\n";
+		if ($wname1 eq $wname2) {
+		    print "Local or loopback connection\n";
+		} else {
+		    print "No data available\n";
+		}
 	    } else {
 		my ($time, $bandwidth, $lossrate) =  @$delay1;
 		printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth, $lossrate;
 	    }
 
 	    printf "%-15s %-15s %-15s ", $link, $virt2, $virt1;
-	    my $delay2 = $delaymap{"$pname2 $pname1"};
+	    my $delay2 = $delaymap{"$wname2 $wname1"};
 	    if (!$delay2) {
-		print "No data available\n";
+		if ($wname1 eq $wname2) {
+		    print "Local or loopback connection\n";
+		} else {
+		    print "No data available\n";
+		}
 	    } else {
 		my ($time, $bandwidth, $lossrate) =  @$delay2;
 		printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth, $lossrate;
