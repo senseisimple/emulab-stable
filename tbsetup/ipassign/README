@@ -6,13 +6,14 @@ certain check results and progress messages are printed to standard error
 as well. When the program is integrated with the rest of Emulab, these will
 be removed.
 
-Note that for now, the command line option should include '-c ', then either '-s ' or '-p<something> ', then one of '-h ', '-l ', or '-n '.
+For now, the command line should be
+'ipassign -pc < <input_file> > <output_file>' for most uses.
 
-Example: "bin/ipassign -c -p2 -n < graph/pastry44.graph"
+Example: "bin/ipassign -c -p2 < graph/pastry44.graph"
          Use conservative bitspace allocation for 2 partitions with
          host-to-network routing on the pastry44 graph.
 
-Example: "bin/ipassign -c -s -h < graph/smalltern.graph"
+Example: "bin/ipassign -c -s < graph/smalltern.graph"
          Use conservative bitspace allocation for square root of the # of LANs
          partitions with host-host routing on the smalltern graph
 
@@ -26,34 +27,22 @@ Example: "bin/ipassign -c -s -h < graph/smalltern.graph"
 '-pq'   Use the square root of the number of LANs as the number of partitions.
 	(default)
 
-'-c', '-b', and '-g' modify the same behaviour. If more than one is
-used, the last one used takes precedence.
-!!! Always use this for now. Dynamic bitspace allocation is not yet
-    implemented !!!
+'-pc'   Search for the proper number of partitions using METIS and scoring
+        the result by ratio-cut.
+
+'-pr'   Divide the graph in two with a ratio-cut
+
+
+default Hierarchical bitspace allocation. Recursively partition the graph
+        until the bitspace is used up.
 '-c'    Use conservative bitspace allocation. Each level of the hierarchy
         is allocated a fixed number of bits.
 #'-g'    Partition the graph using a greedy marriage algorithm instead of
 #        METIS.
 #        -- NOT IMPLEMENTED --
 
-
-
-'-h', '-l', and '-n' modify the same behaviour. If more than one is used, the
-last one used takes precedence.
-
-'-h'    When calculating the routing tables, use host-to-host routing. This
-        will create one table entry for every host in the network.
-
-'-l'    Calculate routing using host-lan routing. This will create a table
-        entry for each LAN in the network.
-	Note that there is a bug here which causes circular routes on large
-        topologies. I am tracking it down.
-
-'-n'    Host-to-net routing. Calculate routes using a hierarchical network
-        number if possible. Otherwise use a LAN. Theoretically, this should
-        produce the smallest number of routes in each routing table. (default)
-
-'-!'    Do not calculate routes or output them. Only do ipassignment.
+'-!'    Do not calculate routes or output them. Routes are no longer
+        calculated here. Therefore this option does nothing.
 
 Input
 -----
@@ -89,20 +78,11 @@ Output is divided into two sections. The first section associates each node-lan
 connection pair with an IP address. The second section, delimited by '%%' on
 a line by itself, shows the routing table associated with each node.
 
-<route-file> := <ip-section> "%%\n" <route-section>
-
-<ip-section> := <ip-line>*
+<ip-file> := <ip-line>*
 
 <ip-line> := <LAN#> " " <node#> " " <IP-address> "\n"
 
-<route-section> := <route-table>*
-
-<route-table> := "Routing table for node: " <node#> "\n" <route>* "%%\n"
-
-<route> := "Destination: " <IP-address> "/" <netmask-size>
-           " FirstHop: " <IP-address> "\n"
-
-An example of the output for the above graph for host-host routing would be:
+An example of the output for the above graph would be:
 
 0 0 10.0.0.1
 0 1 10.0.0.2
@@ -110,19 +90,6 @@ An example of the output for the above graph for host-host routing would be:
 1 2 10.0.1.2
 2 1 10.0.2.1
 2 2 10.0.2.2
-%%
-Routing table for node: 0
-Destination: 10.0.2.1/32 FirstHop: 10.0.0.2
-Destination: 10.0.2.2/32 FirstHop: 10.0.1.2
-%%
-Routing table for node: 1
-Destination: 10.0.1.1/32 FirstHop: 10.0.0.1
-Destination: 10.0.1.2/32 FirstHop: 10.0.2.2
-%%
-Routing table for node: 2
-Destination: 10.0.0.1/32 FirstHop: 10.0.1.1
-Destination: 10.0.0.2/32 FirstHop: 10.0.2.1
-%%
 
 If there was an error, this program returns 1, otherwise it returns 0.
 
@@ -158,53 +125,6 @@ ConservativeAssigner -- The largest LAN size is used to determine the number
     boundaries are used because of human readability. Note that in addition
     to IP assignment, disconnected partitions are seperated here.
 
-HostRouter -- Ignore any hierarchy that was given to us by ip assignment.
-    Use routecalc to get the shortest path from every node to every other node
-    and use this information to calculate a route from every node to every
-    interface.
-
-LanRouter -- Ignore any hierarchy that was given to us by ip assignment.
-    Use routecalc to get the shortest path from every LAN to every other LAN,
-    and use the result to calculate a route from every node to every LAN.
-
-NetRouter -- This is a generalized algorithm that takes advantage of all levels
-    of hierarchy that ip assignment provides. Here is the outline of that
-    algorithm:
-  A) Algorithm
-    1) for each level starting at just above the LAN level
-      a) for each partition in the current level
-        i) calculateBorders()
-        ii) calculateBorderToBorderPaths()
-        iii) calculateNodeToBorderPaths()
-        iv) calculatePartitionRoutes()
-  B) calculateBorders
-    1) The border LANs at each level are a subset of the border LANs of
-       the level below.
-    2) Therefore, only border LANs of the level below need
-       to be checked to see if they are still border LANs.
-    3) To check if a LAN is a border LAN, go through every host that it
-       connects to. If any host connects to more than one partition on
-       this level, this is a border LAN.
-  C) calculateBorderToBorderPaths
-    1) Take all the border nodes within the current partition and
-       temporarily renumber them so that they are contiguous and small.
-    2) Feed them into routecalc
-    3) Take the results and update the borderConnection structure to
-       reflect the known routes.
-  D) calculateNodeToBorderPaths
-    1) From any host, we already know the routes to the border LANs in its
-       partition from the level below.
-    2) We also know the routes between the old border LANs and the new
-       ones from G.
-    3) Therefore, we can find the shortest path to the new border LANs by
-       systematically combining pairs of the two routes.
-  E) calculatePartitionRoutes
-    1) We know the routes from each host to every border LAN in its
-       sub-partition and routes from each border LAN in that sub-partition
-       to every other border LAN in the partition. Calculating routes is
-       similar to the above.
-
-
 Exceptions
 ----------
 
@@ -220,15 +140,8 @@ Room for Improvement
 
 Take the adaptive ip-assignment algorithm and turn it into an ip assignment
     module which works with the framework.
-Create an ip-assignment module that provides more than one additional level
-    of hierarchy.
 Change output format to be more compact. Possible change it to some form of
     binary representation.
-Modify both ip assignment and routing to allow for disconnected graphs.
-Find a better scoring algorithm for METIS.
-Find a replacement for METIS which is more suited to this particular problem.
-    I have talked with Scott a bit about a suggestion for using spanning-trees
-    in partitioning.
 Improve logging/testing automation.
 
 Bugs
