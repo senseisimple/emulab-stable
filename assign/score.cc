@@ -1443,6 +1443,18 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 	if (value >= FD_VIOLATION_WEIGHT) {
 	  fd_violated++;
 	}
+      } else {
+	// Features/desires with a '+' at the front are additive - rather than
+	// 'cancelling out' if both have it, they add together, possibly
+	// resulting in a violation
+	if (((*desire_it).first)[0] == '+') {
+	  value = (*desire_it).second + (*feature_it).second;
+	  SDEBUG(cerr << "    additive - total " << value << endl);
+	  fd_score += SCORE_DESIRE*value;
+	  if (value >= FD_VIOLATION_WEIGHT) {
+	    fd_violated++;
+	  }
+	}
       }
     }
   }
@@ -1467,7 +1479,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
     }
   }
 
-  SDEBUG(cerr << "  Total feature score: " << fd_score << endl;)
+  SDEBUG(cerr << "  Total feature score: " << fd_score << endl);
   return fd_score;
 }
 
