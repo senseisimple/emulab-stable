@@ -189,9 +189,6 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
                 self.logit("Path not accessible by user: %s" % path)
                 raise Exception("Permission denied: %s" % path)
 
-            print `path`
-            print `sys.path`
-
             if path not in sys.path:
                 sys.path.append(path)
                 pass
