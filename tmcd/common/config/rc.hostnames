@@ -33,9 +33,7 @@ $| = 1;
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 # Script specific goo
-my $HOSTSFILE  = "/etc/hosts";
 my $DEFAULT    = "$ETCDIR/hosts";
-my $pathname   = $HOSTSFILE;
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -45,6 +43,8 @@ use libsetup;
 use liblocsetup;
 use libtmcc;
 use librc;
+
+my $pathname   = $HOSTSFILE;  # Default path from liblocsetup.
 
 #
 # Not all clients support this.

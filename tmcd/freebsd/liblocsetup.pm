@@ -13,7 +13,7 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
+    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD $HOSTSFILE
 	 $LOOPBACKMOUNT 
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
@@ -59,6 +59,7 @@ $TMPASSWD	= "$ETCDIR/master.passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/usr/local/bin/rpm";
+$HOSTSFILE	= "/etc/hosts";
 
 #
 # These are not exported
