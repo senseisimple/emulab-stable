@@ -20,15 +20,30 @@ if (! $isadmin) {
     USERERROR("You do not have admin privledges!", 1);
 }
 
-if ($verbose) {
-    echo "<b><a href=nodecontrol_list.php3>
-                Less Clutter</a>
-          </b><br><br>\n";
+echo "<b>Show: <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
+               <a href='nodecontrol_list.php3?showtype=dnards'>dnards</a>,
+               <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
+               <a href='nodecontrol_list.php3?showtype=all'>all</a>.
+      </b><br><br>\n";
+
+if (!isset($showtype)) {
+    $showtype='pcs';
+}
+
+if (! strcmp($showtype, "all")) {
+    $clause = "role='testnode' or role='virtnode'";
+}
+elseif (! strcmp($showtype, "pcs")) {
+    $clause = "role='testnode' and type!='dnard'";
+}
+elseif (! strcmp($showtype, "dnards")) {
+    $clause = "role='testnode' and type='dnard'";
+}
+elseif (! strcmp($showtype, "virtnodes")) {
+    $clause = "role='virtnode'";
 }
 else {
-    echo "<b><a href='nodecontrol_list.php3?verbose=1'>
-                Add Clutter</a>
-          </b><br><br>\n";
+    $clause = "role='testnode' and type!='dnard'";
 }
 
 #
@@ -37,7 +52,12 @@ else {
 $query_result =
     DBQueryFatal("SELECT nodes.*,reserved.pid,reserved.eid FROM nodes ".
 		 "left join reserved on nodes.node_id=reserved.node_id ".
-		 "WHERE role='testnode' ORDER BY priority");
+		 "WHERE $clause ORDER BY priority");
+
+if (mysql_num_rows($query_result) == 0) {
+    echo "<center>Oops, no nodes to show you!</center>";
+    PAGEFOOTER();
+}
 
 echo "<table border=2 cellpadding=2 cellspacing=1
        align='center'>\n";
@@ -58,9 +78,6 @@ while ($row = mysql_fetch_array($query_result)) {
     $pid                = $row[pid];
     $eid                = $row[eid];
     $status             = $row[status];
-
-    if ($type == "dnard" && !$verbose)
-	continue;
 
     echo "<tr>
              <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>\n
