@@ -140,6 +140,7 @@ use Exporter;
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
+	 TBNodeAllocCheck
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState 
 	 TBExptRestoreVirtualState
@@ -954,6 +955,59 @@ sub TBImageIDAccessCheck($$$)
     #
     return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
 	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
+}
+
+#
+# Determine if a node can be allocated to a project. 
+#
+# Usage: TBNodeAllocCheck($pid, $node_id)
+#	 returns 0 if not allowed or error.
+#        returns 1 if allowed.
+# 
+sub TBNodeAllocCheck($$)
+{
+    my ($pid, $node_id) = @_;
+
+    #
+    # Admins do whatever they want!
+    # 
+    if (TBAdmin()) {
+	return 1;
+    }
+
+    #
+    # Hmm. The point of this join is to find rows in the permissions table
+    # with the corresponding type of the node. If no rows come back, its
+    # a non-existent node! If the values are NULL, then there are no rows
+    # with that type/class, and thus the type/class is free to be allocated
+    # by anyone. Otherwise we get the list of projects that are allowed,
+    # and so we have to look at those.
+    #
+    $query_result =
+	DBQueryFatal("select distinct p.* from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "left join nodetypeXpid_permissions as p on ".
+		     "     (p.type=nt.type or p.type=nt.class) ".
+		     "where node_id='$node_id'");
+
+    if (!$query_result->numrows) {
+	print STDERR "TBNodeAllocCheck: No such node $node_id!\n";
+	return 0;
+    }
+    my ($ptype,$ppid) = $query_result->fetchrow_array();
+
+    # No rows, or a pid match. 
+    if (!defined($ptype) || $ppid eq $pid) {
+	return 1;
+    }
+
+    # Okay, must be rows in the permissions table. Check each pid for a match.
+    while (my ($ptype,$ppid) = $query_result->fetchrow_array()) {
+	if ($ppid eq $pid) {
+	    return 1;
+	}
+    }
+    return 0;
 }
 
 #

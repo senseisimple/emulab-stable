@@ -62,6 +62,17 @@ if ($UID) {
     }
 }
 
+#
+# Before locking any tables, do a quick check to make sure the project
+# is allowed to allocate the nodes, by type/class. 
+#
+foreach my $n (@node_names) {
+    if (! TBNodeAllocCheck($pid, $n)) {
+	die("*** $0:\n".
+	    "    You are not allowed to allocate $n to project $pid!\n");
+    }
+}
+
 ######################################################################
 # Step 1 - Make a list of nodes to reserve
 #
