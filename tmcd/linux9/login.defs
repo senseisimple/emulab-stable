@@ -43,5 +43,5 @@ GID_MAX			60000
 # On RH systems, we do. This option is ORed with the -m flag on
 # useradd command line.
 #
-CREATE_HOME	yes
+#CREATE_HOME	yes
 
