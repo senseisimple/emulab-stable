@@ -1067,8 +1067,8 @@ CREATE TABLE sitevariables (
 CREATE TABLE state_timeouts (
   op_mode varchar(20) NOT NULL default '',
   state varchar(20) NOT NULL default '',
-  timeout int(11) default NULL,
-  action mediumtext,
+  timeout int(11) NOT NULL default '0',
+  action mediumtext NOT NULL,
   PRIMARY KEY  (op_mode,state)
 ) TYPE=MyISAM;
 

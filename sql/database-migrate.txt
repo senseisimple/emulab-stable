@@ -639,3 +639,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	    DBQueryFatal("update nodes set ".
 			 "jailip='172.16.${p}.${v}' where node_id='$node_id'");
 	}
+
+1.153:	Disallow nulls in state_timeouts table.
+	
+	alter table state_timeouts modify timeout int(11) not null;
+	alter table state_timeouts modify action mediumtext not null;

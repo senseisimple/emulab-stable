@@ -258,37 +258,37 @@ REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv1','SHUTDOWN')
 
 REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTING',120,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTED',60,'NOTIFY');
-REPLACE INTO state_timeouts VALUES ('NORMAL','ISUP',0,NULL);
+REPLACE INTO state_timeouts VALUES ('NORMAL','ISUP',0,'');
 REPLACE INTO state_timeouts VALUES ('MINIMAL','SHUTDOWN',120,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','SHUTDOWN',120,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('RELOAD','RELOADDONE',60,'NOTIFY');
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','ACTIVATING',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','ACTIVE',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','NEW',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','PRERUN',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','SWAPPED',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','SWAPPING',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','TERMINATING',0,NULL);
-REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','TESTING',0,NULL);
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','ACTIVATING',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','ACTIVE',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','NEW',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','PRERUN',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','SWAPPED',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','SWAPPING',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','TERMINATING',0,'');
+REPLACE INTO state_timeouts VALUES ('EXPTSTATUS','TESTING',0,'');
 REPLACE INTO state_timeouts VALUES ('MINIMAL','BOOTING',180,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('MINIMAL','ISUP',0,NULL);
-REPLACE INTO state_timeouts VALUES ('NODEALLOC','FREE_CLEAN',0,NULL);
-REPLACE INTO state_timeouts VALUES ('NODEALLOC','FREE_DIRTY',0,NULL);
-REPLACE INTO state_timeouts VALUES ('NODEALLOC','REBOOT',0,NULL);
-REPLACE INTO state_timeouts VALUES ('NODEALLOC','RELOAD',0,NULL);
-REPLACE INTO state_timeouts VALUES ('NODEALLOC','RESERVED',0,NULL);
+REPLACE INTO state_timeouts VALUES ('MINIMAL','ISUP',0,'');
+REPLACE INTO state_timeouts VALUES ('NODEALLOC','FREE_CLEAN',0,'');
+REPLACE INTO state_timeouts VALUES ('NODEALLOC','FREE_DIRTY',0,'');
+REPLACE INTO state_timeouts VALUES ('NODEALLOC','REBOOT',0,'');
+REPLACE INTO state_timeouts VALUES ('NODEALLOC','RELOAD',0,'');
+REPLACE INTO state_timeouts VALUES ('NODEALLOC','RESERVED',0,'');
 REPLACE INTO state_timeouts VALUES ('NORMAL','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','BOOTING',180,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('NORMALv1','ISUP',0,NULL);
+REPLACE INTO state_timeouts VALUES ('NORMALv1','ISUP',0,'');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('RELOAD','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('RELOAD','RELOADING',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('RELOAD','RELOADSETUP',60,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('RELOAD','SHUTDOWN',120,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('USERSTATUS','ACTIVE',0,NULL);
-REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,NULL);
-REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,NULL);
-REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,NULL);
+REPLACE INTO state_timeouts VALUES ('USERSTATUS','ACTIVE',0,'');
+REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,'');
+REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,'');
+REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,'');
 
 --
 -- Dumping data for table 'state_transitions'
@@ -402,6 +402,7 @@ REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
 
 REPLACE INTO testsuite_preentables VALUES ('comments','drop');
 REPLACE INTO testsuite_preentables VALUES ('iface_counters','drop');
+REPLACE INTO testsuite_preentables VALUES ('lastlogin','drop');
 REPLACE INTO testsuite_preentables VALUES ('login','drop');
 REPLACE INTO testsuite_preentables VALUES ('loginmessage','drop');
 REPLACE INTO testsuite_preentables VALUES ('node_idlestats','drop');
@@ -431,7 +432,6 @@ REPLACE INTO testsuite_preentables VALUES ('group_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('project_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('user_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('experiment_stats','clean');
-REPLACE INTO testsuite_preentables VALUES ('experiment_resources','clean');
 REPLACE INTO testsuite_preentables VALUES ('testbed_stats','clean');
 
 --
