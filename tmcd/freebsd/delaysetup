@@ -131,6 +131,7 @@ sub DelaySetup
 
     # Lets clean out old instructions.
     unlink TMDELAY;
+    unlink TMDELMAP;
 
     if (tmcc(TMCCCMD_DELAY, undef, \@delays) < 0) {
 	warn("*** WARNING: Could not get delays from server!\n");
@@ -385,6 +386,7 @@ sub LinkDelaySetup
 
     # Lets clean out old instructions.
     unlink TMLINKDELAY;
+    unlink TMDELMAP;
 
     #
     # We need to know if any jailed nodes. That changes which kernel
