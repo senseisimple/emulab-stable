@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
     }
   bool cfile= (strcmp(argv[1],"-c")==0);
   bool portlogs=false;
-  if(argc>1)
+  if (argc >=3)
     portlogs= (strcmp(argv[2],"-l")==0);
   char* filename;
   char filename2[30];
@@ -66,6 +66,9 @@ int main(int argc, char* argv[])
   cout << setiosflags(ios::right | ios::fixed | ios::showpoint);
   cout <<setprecision(3);
 
+  //cout << "Debug: cf "<<int(cfile) <<" ports"<<int(portlogs)<< "  ";
+  //cout << "File:"<<filename<<"  2:"<<filename2<<endl;
+  
   if (outonly)
     {
       StatLogs();
@@ -399,10 +402,10 @@ void StatLogs()
   alog.close();
   elog.close();
   
-  cout << "\nDisable:"<<setw(4)<<Num[0][0]<<" Times/port    ";
+  cout << "Disable:"<<setw(4)<<Num[0][0]<<" Times/port  ";
   cout << "Auto-Config:"<<setw(4)<<Num[0][1]<<" Times/port  ";
   cout << "Explicit:"<<setw(4)<<Num[0][2]<<" Times/port\n";
-  cout << "Port    Mean Variance      ";
+  cout << "Port    Mean Variance    ";
   cout << "Port    Mean Variance        ";
   cout << "Port    Mean Variance\n";
 
@@ -414,7 +417,7 @@ void StatLogs()
       cout << setw(3)<<x+1;
       cout << setw(9)<<Mean[x][0];
       cout << setw(9)<<Var[x][0];
-      cout << setw(9)<<x+1;
+      cout << setw(7)<<x+1;
       cout << setw(9)<<Mean[x][1];
       cout << setw(9)<<Var[x][1];
       cout << setw(11)<<x+1;
@@ -422,7 +425,5 @@ void StatLogs()
       cout << setw(9)<<Var[x][2];
       cout << "\n";
     }
-
-  cout <<endl;
  
 }
