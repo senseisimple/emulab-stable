@@ -3038,7 +3038,6 @@ sub LoadPhysInfo()
 	    }
 
 	    foreach my $speed ($def_speed, @auxspeedlist) {
-		print "Interface type $iface_type can handle $speed\n";
 		$node_type_linkbw{$node_type}{$proto}->{$speed} = 1;
 		$node_type_linkbw{$node_class}{$proto}->{$speed} = 1;
 
