@@ -128,8 +128,6 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	sleep(10);
-
 	bzero(&boot_info, sizeof(boot_info));
 	boot_info.version = BIVERSION_CURRENT;
 	if (reboot) {
