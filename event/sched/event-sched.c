@@ -632,7 +632,11 @@ handle_simevent(event_handle_t handle, sched_event_t *eventp)
 	else if (!strcmp(evtype, TBDB_EVENTTYPE_NSESWAP)) {
 	    event_notification_get_arguments(handle, eventp->notification,
 					     argsbuf, sizeof(argsbuf));
-	    sprintf(cmd, "nseswap %s %s %s", pid, eid, argsbuf);
+	    /* Need to run nseswap as a background process coz it
+	     * sleeps a while before getting done. Also one instance
+	     * waits for a swapmod to complete
+	     */
+	    sprintf(cmd, "nseswap %s %s %s &", pid, eid, argsbuf);
 	}
 	rcode = system(cmd);
 	
