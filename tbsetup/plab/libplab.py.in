@@ -1219,7 +1219,7 @@ class Node:
             # attempts.
             except xmlrpclib.Fault, e:
                 if e.faultString.find("already exists") != -1:
-                    print "Lease for %s already exists!" % self.nodeid
+                    print "Lease for %s already exists; deleting." % self.nodeid
                     nodeleases = tryXmlrpcCmd(nodemgr.getleases)
                     for mylease in nodeleases:
                         if mylease.find(self.slice.slicename) != -1:
@@ -1228,8 +1228,12 @@ class Node:
                     else:
                         raise RuntimeError, "Whoop!  Couldn't find my lease " \
                               "even though it was supposed to be present!"
-                    break
-                elif e.triesleft > 0:
+                    if self._free():
+                        raise RuntimeError, "Could not delete lingering " \
+                              "lease for slice %s on %s" % \
+                              (self.slice.slicename, self.nodeid)
+                    
+                if e.triesleft > 0:
                     tries = e.triesleft
                 else:
                     raise
