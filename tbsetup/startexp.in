@@ -349,13 +349,29 @@ sub fatal()
 	     ($logname, "assign.log", $nsfile));
 
     #
-    # We have to cleanup since we are disconnected from the wrapper script.
-    # Must be done after sending email so the nsfile is still around.
-    # 
-    ExptCleanup();
+    # We have to cleanup the DB since we are disconnected from the
+    # wrapper script.
+    #
+    DBQueryWarn("DELETE from nsfiles ".
+		"WHERE eid='$eid' and pid='$pid'");
+
+    DBQueryWarn("DELETE from exppid_access ".
+		"WHERE exp_eid='$eid' and exp_pid='$pid'");
+
+    DBQueryWarn("DELETE from experiments ".
+		"WHERE eid='$eid' and pid='$pid'");
+    
+    #
+    # Save a copy of the failed experiment directory for debugging.
+    # This must be done *after* sending email so that the nsfile and
+    # log files are where the mail function expects them to be.
+    #
+    if (defined($expt_path)) {
+	system("/bin/rm", "-rf", "${expt_path}-TBfailed");
+	system("/bin/mv", "-f", "${expt_path}", "${expt_path}-TBfailed");
+    }
 
     unlink($logname);
-    
     exit($errorstat);
 }
 
@@ -376,33 +392,3 @@ sub tbendit()
 	print "tbend failed!\n";
     }
 }
-
-sub ExptCleanup()
-{
-    #
-    # Try to remove experiment directory. We allow for it not being there
-    # cause we often run the tb programs directly. We also allow for not
-    # having permission, in the case that an admin type is running this,
-    # in which case it won't be allowed cause of directory permissions. Thats
-    # okay since admin types should rarely end experiments in other projects.
-    #
-    print STDOUT "Removing experiment directory: $expt_path ... \n";
-    if (system("rm -rf $expt_path")) {
-	print "*** WARNING: Not able to remove experiment directory.\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-
-    #
-    # Remove all trace from the DB.
-    # 
-    DBQueryWarn("DELETE from nsfiles ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-}
-
-
