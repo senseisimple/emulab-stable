@@ -172,6 +172,12 @@ in YYYYMMDD format.
 		sudo inetd -a boss.foo.bar -p /var/run/testbed-inetd.pid \
 			/usr/testbed/etc/inetd.conf
 
+	* Stick boss's host keys onto ops so that users do not get
+	  those silly questions about adding know hosts.
+
+		sudo cat /etc/ssh/*.pub |
+			ssh myops '(cat > /etc/ssh/ssh_known_hosts)'
+
 20040815:
 	After some changes to ptopgen, you'll need to run the following SQL
 	command to keep vnodes working properly:
