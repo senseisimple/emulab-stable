@@ -597,7 +597,7 @@ function WRITESUBMENUBUTTON($text, $link) {
 function SUBPAGESTART() {
     echo "<!-- begin subpage -->";
     echo "<table class=\"stealth\"
-	  cellspacing='0' cellpadding='0' width='85%' border='0'>\n
+	  cellspacing='0' cellpadding='0' width='100%' border='0'>\n
             <tr>\n
               <td class=\"stealth\"valign=top>\n";
 }
@@ -616,7 +616,7 @@ function SUBPAGEEND() {
 function SUBMENUSTART($title) {
 ?>
     <!-- begin submenu -->
-    <table class='menu' width='200' cellpadding="0" cellspacing="0"
+    <table class='menu' cellpadding="0" cellspacing="0"
 	style="margin-right: 6px;" >
       <tr>
         <td class="menuheader"><b><?php echo "$title";?></b></td>
@@ -629,10 +629,28 @@ function SUBMENUEND() {
     </table>
     <!-- end submenu -->
   </td>
-  <td class="stealth" valign=top align=left width='85%'>
+  <td class="stealth" valign=top align=left width='100%'>
 <?php
 }
 
+# Start a new section in an existing submenu
+# This includes ending the one before it
+function SUBMENUSECTION($title) {
+    SUBMENUSECTIONEND();
+?>
+      <!-- new submenu section -->
+      <tr>
+        <td class="menuheader"><b><?php echo "$title";?></b></td>
+      </tr>
+<?php
+}
+
+# End a submenu section - only need this on the last one of the table.
+function SUBMENUSECTIONEND() {
+?>
+      <tr height=5><td></td></tr>
+<?php
+}
 
 # These are here so you can wedge something else under the menu in the left column.
 

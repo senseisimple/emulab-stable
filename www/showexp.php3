@@ -81,40 +81,16 @@ if ($expstate) {
 
     # Swap option.
     if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
-	WRITESUBMENUBUTTON("Swap this Experiment in",
+	WRITESUBMENUBUTTON("Swap this Experiment In",
 		      "swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
     }
     elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
-	WRITESUBMENUBUTTON("Swap this Experiment out",
+	WRITESUBMENUBUTTON("Swap this Experiment Out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
-        #
-        # Admin folks get a swap request link to send email.
-        #
-        if (ISADMIN($uid)) {
-            WRITESUBMENUBUTTON("Send a swap/terminate request",
-			       "request_swapexp.php3?".
-			       "&pid=$exp_pid&eid=$exp_eid");
-
-	    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
-		WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
-				   "swapexp.php3?inout=out&force=1".
-				   "&pid=$exp_pid&eid=$exp_eid");
-	    }
-	    WRITESUBMENUBUTTON("Control Delay Nodes (BETA)",
-			       "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
-	    
-	    WRITESUBMENUBUTTON("Restart this Experiment",
-		"swapexp.php3?inout=restart&pid=$exp_pid&eid=$exp_eid");
-	}
-    }
-
-    if (ISADMIN($uid)) {
-	WRITESUBMENUBUTTON("Modify this Experiment",
-			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
 
-WRITESUBMENUBUTTON("Terminate this experiment",
+WRITESUBMENUBUTTON("Terminate this Experiment",
 		   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 #
@@ -127,10 +103,40 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATEACCOUNTS)) {
 
 # Reboot option
 if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
-    WRITESUBMENUBUTTON("Reboot all Nodes",
+    WRITESUBMENUBUTTON("Reboot All Nodes",
 		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
 }
 
+if (ISADMIN($uid)) {
+
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+
+	SUBMENUSECTION("Beta-Test Options");
+	    
+	WRITESUBMENUBUTTON("Control Delay Nodes",
+			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
+	
+	WRITESUBMENUBUTTON("Restart this Experiment",
+			   "swapexp.php3?inout=restart&pid=$exp_pid".
+			   "&eid=$exp_eid");
+	
+	WRITESUBMENUBUTTON("Modify this Experiment",
+			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
+
+	SUBMENUSECTION("Admin Options");
+	
+	WRITESUBMENUBUTTON("Send a Swap Request",
+			   "request_swapexp.php3?".
+			   "&pid=$exp_pid&eid=$exp_eid");
+	
+	WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
+			   "swapexp.php3?inout=out&force=1".
+			   "&pid=$exp_pid&eid=$exp_eid");
+
+	SUBMENUSECTIONEND();
+    }
+}
+    
 SUBMENUEND_2A();
 
 echo "<br>
