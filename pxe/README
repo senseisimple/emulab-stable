@@ -1,0 +1,32 @@
+This directory contains support for remote booting of PCs via Intel's PXE
+(Preboot eXecution Environment) which is supported on ethernet cards like
+the eepro100.
+
+A client PC equipped with such a card and configured to boot from the network
+first does the following:
+
+1. the LAN card uses DHCP to get its IP info from a standard DHCP server
+2. as PXE requires DHCP extensions, and thus cannot use may standard DHCP
+   servers, so it gets redirected to a Proxy DHCP server (proxydhcp* in
+   this directory)
+3. This server tells the client which boot program to download via TFTP
+   and the client does so.
+
+The above steps are not specific to the testbed.  Starting with the execution
+of the downloaded boot program, a testbed specific protocol takes over:
+
+4. The PXE-loaded boot program (pxeboot from the OSKit) speaks a custom hack
+   UDP protocol ("defined" in oskit/boot/bootwhat.h) with yet another server.
+
+5. This server (bootinfo* in this directory) is responsible for determining,
+   in a testbed-specific way, what action should be performed by the client.
+   This action is either boot from a specific partition on the hard disk
+   or download (via TFTP) a particular multiboot OSKit kernel (e.g., netboot)
+
+6. Finally, pxeboot transfers control either to the first-level boot code
+   in the indicated hard disk partition or to the OSKit kernel it has just
+   downloaded.
+
+If you are interested in more general remote booting mechanisms see:
+www.bpbatch.org.
+ 

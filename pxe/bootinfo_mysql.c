@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <syslog.h>
 
 #include <oskit/boot/bootwhat.h>
 #include <mysql/mysql.h>
@@ -31,19 +32,19 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	n = snprintf(querybuf, sizeof querybuf, dbquery, inet_ntoa(ipaddr));
 	if (n > sizeof querybuf) {
-		fprintf(stderr, "query too long for buffer\n");
+		syslog(LOG_ERR, "query too long for buffer");
 		return 1;
 	}
 
 	mysql_init(&db);
 	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
-		fprintf(stderr, "%s: connect failed: %s\n",
+		syslog(LOG_ERR, "%s: connect failed: %s",
 			dbname, mysql_error(&db));
 		return 1;
 	}
 
 	if (mysql_real_query(&db, querybuf, n) != 0) {
-		fprintf(stderr, "%s: query failed: %s\n",
+		syslog(LOG_ERR, "%s: query failed: %s",
 			dbname, mysql_error(&db));
 		mysql_close(&db);
 		return 1;
@@ -51,7 +52,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	res = mysql_store_result(&db);
 	if (res == 0) {
-		fprintf(stderr, "%s: store_result failed: %s\n",
+		syslog(LOG_ERR, "%s: store_result failed: %s",
 			dbname, mysql_error(&db));
 		mysql_close(&db);
 		return 1;
@@ -62,14 +63,14 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	nrows = (int)mysql_num_rows(res);
 	switch (nrows) {
 	case 0:
-		fprintf(stderr, "%s: no entry for host %s\n",
+		syslog(LOG_ERR, "%s: no entry for host %s",
 			dbname, inet_ntoa(ipaddr));
 		mysql_free_result(res);
 		return 1;
 	case 1:
 		break;
 	default:
-		fprintf(stderr, "%s: %d entries for IP %s, using first\n",
+		syslog(LOG_ERR, "%s: %d entries for IP %s, using first",
 			dbname, nrows, inet_ntoa(ipaddr));
 		break;
 	}
@@ -79,7 +80,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	case 1:
 		break;
 	default:
-		fprintf(stderr, "%s: %d fields in query for IP %s!\n",
+		syslog(LOG_ERR, "%s: %d fields in query for IP %s!",
 			dbname, ncols, inet_ntoa(ipaddr));
 		mysql_free_result(res);
 		return 1;
@@ -87,7 +88,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	row = mysql_fetch_row(res);
 	if (row[0] == 0 || row[0] == '\0') {
-		fprintf(stderr, "%s: null query result for IP %s!\n",
+		syslog(LOG_ERR, "%s: null query result for IP %s!",
 			dbname, inet_ntoa(ipaddr));
 		mysql_free_result(res);
 		return 1;
@@ -112,22 +113,37 @@ close_bootinfo_db(void)
 }
 
 #ifdef TEST
+#include <stdarg.h>
+
+void
+syslog(int prio, const char *msg, ...)
+{
+	va_list ap;
+
+	va_start(ap, msg);
+	vfprintf(stderr, msg, ap);
+	va_end(ap);
+	fprintf(stderr, "\n");
+}
+
 main(int argc, char **argv)
 {
 	struct in_addr ipaddr;
 	boot_info_t boot_info;
 	boot_what_t *boot_whatp = (boot_what_t *)&boot_info.data;
 
+	open_bootinfo_db();
 	while (--argc > 0) {
 		if (inet_aton(*++argv, &ipaddr))
 			if (query_bootinfo_db(ipaddr, boot_whatp) == 0)
-				printf("returned partition %d\n",
-				       boot_whatp->what.partition);
+				printf("%s: returned partition %d\n",
+				       *argv, boot_whatp->what.partition);
 			else
-				printf("failed\n");
+				printf("%s: failed\n", *argv);
 		else
 			printf("bogus IP address `%s'\n", *argv);
 	}
+	close_bootinfo_db();
 	exit(0);
 }
 #endif

@@ -5,6 +5,12 @@
 #include <oskit/boot/bootwhat.h>
 
 #ifdef USE_NULL_DB
+
+/*
+ * For now, hardwired.
+ */
+#define NETBOOT		"/tftpboot/netboot"
+
 int
 open_bootinfo_db(void)
 {

@@ -2,13 +2,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <syslog.h>
+#include <signal.h>
 
 #include <oskit/boot/bootwhat.h>
 
-/*
- * For now, hardwired.
- */
-#define NETBOOT		"/tftpboot/netboot"
+static void log_bootwhat(struct in_addr ipaddr, boot_what_t *bootinfo);
+static void onhup(int sig);
+static int version = 1;
 
 main()
 {
@@ -17,17 +18,22 @@ main()
 	boot_info_t		boot_info;
 	boot_what_t	       *boot_whatp = (boot_what_t *) &boot_info.data;
 
+	openlog("bootinfo", LOG_PID, LOG_USER);
+	syslog(LOG_NOTICE, "daemon starting (version %d)", version);
+
+	(void)daemon(0, 0);
+
 	/* Initialize data base */
 	err = open_bootinfo_db();
 	if (err) {
-		fprintf(stderr, "Could not open database\n");
+		syslog(LOG_ERR, "could not open database");
 		exit(1);
 	}
  
 	/* Create socket from which to read. */
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock < 0) {
-		perror("opening datagram socket");
+		syslog(LOG_ERR, "opening datagram socket: %m");
 		exit(1);
 	}
 	
@@ -36,46 +42,89 @@ main()
 	name.sin_addr.s_addr = INADDR_ANY;
 	name.sin_port = htons(BOOTWHAT_DSTPORT);
 	if (bind(sock, (struct sockaddr *) &name, sizeof(name))) {
-		perror("binding datagram socket");
+		syslog(LOG_ERR, "binding datagram socket: %m");
 		exit(1);
 	}
 	/* Find assigned port value and print it out. */
 	length = sizeof(name);
 	if (getsockname(sock, (struct sockaddr *) &name, &length)) {
-		perror("getting socket name");
+		syslog(LOG_ERR, "getting socket name: %m");
 		exit(1);
 	}
-	printf("Socket has port #%d\n", ntohs(name.sin_port));
+	syslog(LOG_NOTICE, "listening on port %d", ntohs(name.sin_port));
 
+	signal(SIGHUP, onhup);
 	while (1) {
 		if ((mlen = recvfrom(sock, &boot_info, sizeof(boot_info),
 				     0, (struct sockaddr *)&client, &length))
 		    < 0) {
-			perror("receiving datagram packet");
+			syslog(LOG_ERR, "receiving datagram packet: %m");
 			exit(1);
 		}
 
-		printf("Datagram of %d bytes received from %s\n",
-			mlen, inet_ntoa(client.sin_addr));
-
 		if (boot_info.opcode != BIOPCODE_BOOTWHAT_REQUEST) {
-			printf("Throwing away invalid packet\n");
+			syslog(LOG_INFO, "%s: invalid packet",
+			       inet_ntoa(client.sin_addr));
 			continue;
 		}
+		syslog(LOG_INFO, "%s: REQUEST", inet_ntoa(client.sin_addr));
+
 		boot_info.opcode = BIOPCODE_BOOTWHAT_REPLY;
 		err = query_bootinfo_db(client.sin_addr, boot_whatp);
-		if (err)
+		if (err) {
+			syslog(LOG_INFO, "%s: FAIL: no valid entry",
+			       inet_ntoa(client.sin_addr));
 			boot_info.status = BISTAT_FAIL;
-		else
+		} else {
+			log_bootwhat(client.sin_addr, boot_whatp);
 			boot_info.status = BISTAT_SUCCESS;
+		}
 		client.sin_family = AF_INET;
 		client.sin_port = htons(BOOTWHAT_SRCPORT);
 		if (sendto(sock, (char *)&boot_info, sizeof(boot_info), 0,
 			(struct sockaddr *)&client, sizeof(client)) < 0)
-			perror("sendto");
+			syslog(LOG_ERR, "sendto: %m");
 	}
 	close(sock);
 	close_bootinfo_db();
+	syslog(LOG_NOTICE, "daemon terminating");
 	exit(0);
 }
 
+static void
+onhup(int sig)
+{
+	int err;
+
+	syslog(LOG_NOTICE, "re-initializing configuration database");
+	close_bootinfo_db();
+	err = open_bootinfo_db();
+	if (err) {
+		syslog(LOG_ERR, "Could not open database");
+		exit(1);
+	}
+}
+
+static void
+log_bootwhat(struct in_addr ipaddr, boot_what_t *bootinfo)
+{
+	char ipstr[32];
+
+	strncpy(ipstr, inet_ntoa(ipaddr), sizeof ipstr);
+	switch (bootinfo->type) {
+	case BIBOOTWHAT_TYPE_PART:
+		syslog(LOG_INFO, "%s: REPLY: boot from partition %d",
+		       ipstr, bootinfo->what.partition);
+		break;
+	case BIBOOTWHAT_TYPE_SYSID:
+		syslog(LOG_INFO, "%s: REPLY: boot from partition with sysid %d",
+		       ipstr, bootinfo->what.sysid);
+		break;
+	case BIBOOTWHAT_TYPE_MB:
+		syslog(LOG_INFO, "%s: REPLY: boot multiboot image %s:%s\n",
+		       ipstr,
+		       inet_ntoa(bootinfo->what.mb.tftp_ip),
+		       bootinfo->what.mb.filename);
+		break;
+	}
+}
