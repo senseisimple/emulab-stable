@@ -159,7 +159,7 @@ foreach my $node (@nodes) {
 
     $sth = $DB->query("select * from nodes where node_id='$pc'");
     if ($sth == 0) {
-	die("Database lookup failed (reserved). Aborted...\n");
+	die("Database lookup failed (exists). Aborted...\n");
     }
     if ($sth->num_rows() != 1) {
       print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
