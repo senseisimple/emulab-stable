@@ -166,7 +166,6 @@ Agent/UDP instproc connect {dst} {
     if {$error} {return}
 
     $self set proto "udp"
-    $node set osid "FBSD-STD"
 }
 
 # Agent/TCP
@@ -197,7 +196,6 @@ Agent/TCP instproc connect {dst} {
     if {$error} {return}
 
     $self set proto "tcp"
-    $node set osid "FBSD-STD"
 }
 
 # Agent/TCP/FullTcp
@@ -388,7 +386,6 @@ Agent/Null instproc connect {dst} {
     if {$error} {return}
 
     $self set role "sink"
-    $node set osid "FBSD-STD"
 }
 
 # Agent/Null
@@ -415,7 +412,6 @@ Agent/TCPSINK instproc connect {dst} {
 
     $self set role "sink"
     $self set proto "tcp"
-    $node set osid "FBSD-STD"
 }
 
 # Application
