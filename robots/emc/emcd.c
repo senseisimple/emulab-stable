@@ -1297,22 +1297,6 @@ int rmc_callback(elvin_io_handler_t handler,
       break;
       
     case MTP_TELEMETRY:
-      if (handle != NULL) {
-	struct mtp_garcia_telemetry *mgt;
-	struct emc_robot_config *erc;
-
-	mgt = &mp->data.mtp_payload_u.telemetry.mtp_telemetry_u.garcia;
-	erc = robot_list_search(hostname_list, mgt->robot_id);
-	event_do(handle,
-		 EA_Experiment, pideid,
-		 EA_Type, TBDB_OBJECTTYPE_NODE,
-		 EA_Event, TBDB_EVENTTYPE_MODIFY,
-		 EA_Name, erc->vname,
-		 EA_ArgFloat, "BATTERY_LEVEL", mgt->battery_level,
-		 EA_ArgFloat, "BATTERY_VOLTAGE", mgt->battery_voltage,
-		 EA_TAG_DONE);
-      }
-      
       retval = 1;
       break;
       

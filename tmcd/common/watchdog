@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -50,6 +50,7 @@ my $pidfile	= "/var/run/emulab-watchdog.pid";
 my $rusagebin	= "$BINDIR/plabrusage";
 my $keydir	= "/etc/ssh";
 my @keylist     = ("ssh_host_key", "ssh_host_dsa_key", "ssh_host_rsa_key");
+my $battlog     = "/var/log/battery.log";
 my $debug	= 0;
 my $verbose     = 0;
 my $updatefailed= 0;
@@ -85,6 +86,7 @@ my %iv = (
     cvsup   => (60 * 60 * 12),
     rusage  => 0,
     hkeys   => 0,
+    batt    => (STARGATE() ? 60 : 0),
 );
 
 my %funcs = (
@@ -93,7 +95,8 @@ my %funcs = (
     drift   => \&ntpdrift,
     cvsup   => \&runcvsup,
     rusage  => \&sendrusage,
-    hkeys   => \&sendhkeys,     
+    hkeys   => \&sendhkeys,
+    batt    => \&sendbatt,
 );
 
 my %immediate = (
@@ -102,7 +105,8 @@ my %immediate = (
     drift   => 0,
     cvsup   => 0,
     rusage  => 1,
-    hkeys   => 1,	 
+    hkeys   => 1,
+    batt    => 1,
 );
 
 #
@@ -114,6 +118,7 @@ sub ntpdrift($);
 sub runcvsup($);
 sub sendrusage($);
 sub sendhkeys($);
+sub sendbatt($);
 sub logmsg($;$);
 sub saysomething($);
 
@@ -251,6 +256,7 @@ $retry{isalive} = 0;
 $retry{drift} = 0;
 $retry{rusage} = 0;
 $retry{hkeys} = 0;
+$retry{batt} = 0;
 
 $curtime = time();
 if ($fakeit) {
@@ -376,6 +382,7 @@ sub setintervals($)
 	$iv{drift} = 9;
 	$iv{cvsup} = 21;
 	$iv{rusage} = 15;
+	$iv{batt} = 25;
 
 	my $delta = $curtime - $faketimes{check};
 	$faketimes{check} = $curtime;
@@ -455,6 +462,7 @@ sub setintervals($)
 	    $iv{cvsup} = 0;
 	    $iv{rusage} = 0;
 	    $iv{hkeys} = 0;
+	    $iv{batt} = 0;
 	}
 
 	foreach my $key (keys %iv) {
@@ -518,7 +526,7 @@ sub setintervals($)
     if ($report) {
 	logmsg("setintervals: check=$iv{check}, isalive=$iv{isalive}, ".
 	       "drift=$iv{drift}, cvsup=$iv{cvsup}, rusage=$iv{rusage}, ".
-	       "hostkeys=$iv{hkeys}\n");
+	       "hostkeys=$iv{hkeys} battery=$iv{batt}\n");
     }
 
     #
@@ -756,6 +764,87 @@ sub sendhkeys($)
     $curtime = time();
     qinsert($curtime + $iv{hkeys}, \&sendhkeys)
 	if ($iv{hkeys});
+}
+
+sub sendbatt($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{batt};
+	$faketimes{batt} = $curtime;
+	logmsg("sendbatt at +$delta\n");
+	qinsert($curtime + $iv{batt}, \&sendbatt) if ($iv{batt});
+	return;
+    }
+
+    if ($retry{batt} == 0) {
+	logmsg("batt: sending\n", 1);
+    } else {
+	logmsg("batt: resending, retry=$retry{batt}\n", 1);
+    }
+
+    if (! -r $battlog) {
+	logmsg("batt: no battery log $battlog\n");
+	$iv{batt} = 0;
+	return;
+    }
+
+    my $line = `tail -1 /var/log/battery.log`;
+    my $capacity;
+    my $voltage;
+
+    if ($line =~ /^([-\d\.]*) ([-\d\.]+) ([-\d\.]+).*/) {
+	$capacity = $2;
+	$voltage = $3;
+    }
+    else {
+	logmsg("batt: bad line in log - $line\n");
+	$iv{batt} = 0;
+	return;
+    }
+
+    my $arg = "CAPACITY=$capacity VOLTAGE=$voltage";
+    if ($arg ne "") {
+	$arg = "\"" . $arg . "\"";
+	print "batt: $arg\n"
+	    if ($debug);
+
+	my %tmccargs = ();
+	$tmccargs{nocache} = 1;
+	$tmccargs{timeout} = 3;
+	$tmccargs{useudp} = 1
+	    if (!$trytcp || $retry{batt} != $maxretries);
+
+	if (tmcc(TMCCCMD_BATTERY, $arg, undef, %tmccargs) != 0) {
+	    #
+	    # Failed, schedule a retry using a backoff.
+	    #
+	    if ($retry{batt} < $maxretries) {
+		my $nexttime = time() + (1 << $retry{batt});
+		qinsert($nexttime, \&sendbatt);
+		$retry{batt}++;
+		logmsg("batt: failed ($?), retry $retry{batt}\n");
+		return;
+	    }
+	    #
+	    # Failed miserably, just whine and reschedule at the normal time.
+	    #
+	    logmsg("batt: failed ($?) after $maxretries attempts\n");
+	} else {
+	    logmsg("batt: succeeded after $retry{batt} retries\n")
+		if ($retry{batt});
+	}
+    }
+
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $retry{batt} = 0;
+    $curtime = time();
+    qinsert($curtime + $iv{batt}, \&sendbatt)
+	if ($iv{batt});
 }
 
 sub saysomething($)

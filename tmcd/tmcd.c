@@ -233,6 +233,7 @@ COMMAND_PROTOTYPE(doemulabconfig);
 COMMAND_PROTOTYPE(dolocalize);
 COMMAND_PROTOTYPE(dobooterrno);
 COMMAND_PROTOTYPE(dobootlog);
+COMMAND_PROTOTYPE(dobattery);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -312,6 +313,7 @@ struct command {
 	{ "localization", FULLCONFIG_PHYS, 0, dolocalize},
 	{ "booterrno",    FULLCONFIG_NONE, 0, dobooterrno},
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
+	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5736,6 +5738,50 @@ COMMAND_PROTOTYPE(dobooterrno)
 	if (verbose)
 		info("DOBOOTERRNO: errno=%d\n", myerrno);
 		
+	return 0;
+}
+
+/*
+ * Tell us about battery statistics.
+ */
+COMMAND_PROTOTYPE(dobattery)
+{
+	float		capacity = 0.0, voltage = 0.0;
+	char		buf[MYBUFSIZE];
+	
+	/*
+	 * Dig out the capacity and voltage, then
+	 */
+	if ((sscanf(rdata,
+		    "CAPACITY=%f VOLTAGE=%f",
+		    &capacity,
+		    &voltage) != 2) ||
+	    (capacity < 0.0f) || (capacity > 100.0f) ||
+	    (voltage < 5.0f) || (voltage > 15.0f)) {
+		error("DOBATTERY: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+	/*
+	 * ... update DB.
+	 */
+	if (mydb_update("UPDATE nodes SET battery_percentage=%f,"
+			"battery_voltage=%f,"
+			"battery_timestamp=UNIX_TIMESTAMP(now()) "
+			"WHERE node_id='%s'",
+			capacity, voltage, reqp->nodeid)) {
+		error("DOBATTERY: %s: setting boot errno!\n", reqp->nodeid);
+		return 1;
+	}
+	if (verbose) {
+		info("DOBATTERY: capacity=%.2f voltage=%.2f\n",
+		     capacity,
+		     voltage);
+	}
+	
+	OUTPUT(buf, sizeof(buf), "OK\n");
+	client_writeback(sock, buf, strlen(buf), tcp);
+	
 	return 0;
 }
 

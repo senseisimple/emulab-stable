@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -29,7 +29,7 @@ use Exporter;
 	     TMCCCMD_ROLE TMCCCMD_RUSAGE TMCCCMD_WATCHDOGINFO TMCCCMD_HOSTKEYS
 	     TMCCCMD_FIREWALLINFO TMCCCMD_EMULABCONFIG
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
-	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG
+	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY
 	     );
 
 # Must come after package declaration!
@@ -164,6 +164,7 @@ my %commandset =
       "localization"	=> {TAG => "localization"},
       "booterrno"	=> {TAG => "booterrno"},
       "bootlog"	        => {TAG => "bootlog"},
+      "battery"	        => {TAG => "battery"},
     );
 
 #
@@ -214,6 +215,7 @@ sub TMCCCMD_HOSTINFO    (){ $commandset{"hostinfo"}->{TAG}; }
 sub TMCCCMD_LOCALIZATION(){ $commandset{"localization"}->{TAG}; }
 sub TMCCCMD_BOOTERRNO   (){ $commandset{"booterrno"}->{TAG}; }
 sub TMCCCMD_BOOTLOG     (){ $commandset{"bootlog"}->{TAG}; }
+sub TMCCCMD_BATTERY     (){ $commandset{"battery"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
