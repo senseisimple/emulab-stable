@@ -73,6 +73,12 @@ if (!$username || !$project || !$password || !$userfull || !$projdesc) {
     die "Not all information given, exiting\n";
 }
 
+#
+# Quote special characters in user-supplied data
+#
+$userfull = DBQuoteSpecial($userfull);
+$projdesc = DBQuoteSpecial($projdesc);
+
 print "Creating user/project: Are you sure? (Y/N) ";
 if (<> !~ /Y/i) {
     die "Aborted\n";
@@ -80,12 +86,12 @@ if (<> !~ /Y/i) {
 
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$username', usr_created=now(), " .
-	"usr_name='$userfull', usr_pswd='$password', unix_uid=$uid, ".
+	"usr_name=$userfull, usr_pswd='$password', unix_uid=$uid, ".
 	"usr_modified=now(), admin=1, dbedit=1, status='active'");
 
 print "Creating project in database...\n";
 DBQueryFatal("insert into projects set pid='$project', created=now(), " .
-	"name='$projdesc', head_uid='$username', unix_gid=$gid, " .
+	"name=$projdesc, head_uid='$username', unix_gid=$gid, " .
 	"approved=1");
 
 print "Creating group in database...\n";
