@@ -91,6 +91,9 @@ void score_link_endpoints(pedge pe);
 #define SDEBUG(a) 
 #endif
 
+#define MIN(a,b) (((a) < (b))? (a) : (b))
+#define MAX(a,b) (((a) > (b))? (a) : (b))
+
 /*
  * For features and desires that have a some sort of global impact
  */
@@ -473,8 +476,9 @@ void remove_node(vvertex vv)
   /*
    * Adjust scores for the pnode
    */
-  tr->current_load--;
-  pnode->total_load--;
+  int old_load = tr->current_load;
+  tr->current_load -= vnode->typecount;
+  pnode->total_load -= vnode->typecount;
 #ifdef LOAD_BALANCE
   // Use this tricky formula to score based on how 'full' the pnode is, so that
   // we prefer to equally fill the minimum number of pnodes
@@ -487,15 +491,17 @@ void remove_node(vvertex vv)
     SDEBUG(cerr << "  releasing pnode" << endl);
     SSUB(SCORE_PNODE);
     pnode->remove_current_type();
-  } else if (tr->current_load >= tr->max_load) {
-    // If the pnode is still over its max load, reduce the penalty to adjust
-    // for the new load.
-    SDEBUG(cerr << "  reducing penalty, new load=" <<
-	pnode->current_type_record->current_load <<
-	   " (>= " << pnode->current_type_record->max_load << ")" << endl);
-    SSUB(SCORE_PNODE_PENALTY);
-    vinfo.pnode_load--;
-    violated--;
+  } else if (old_load > tr->max_load) {
+    // If the pnode was over its load, remove the penalties for the nodes we
+    // just removed, down to the max_load.
+    SDEBUG(cerr << "  reducing penalty, old load was " << old_load <<
+	    ", new load = " << tr->current_load << ", max load = " <<
+	    tr->max_load << endl);
+    for (int i = old_load; i > MAX(tr->current_load,tr->max_load); i--) {
+      SSUB(SCORE_PNODE_PENALTY);
+      vinfo.pnode_load--;
+      violated--;
+    }
   }
 
   /*
@@ -1069,9 +1075,12 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
     }
   }
   
+  int old_load = tr->current_load;
+  int old_total_load = pnode->total_load;
+
   // finish setting up pnode
-  tr->current_load++;
-  pnode->total_load++;
+  tr->current_load += vnode->typecount;
+  pnode->total_load += vnode->typecount;
 
 #ifdef PENALIZE_UNUSED_INTERFACES
   assert(pnode->used_interfaces <= pnode->total_interfaces);
@@ -1081,13 +1090,15 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
   if (tr->current_load > tr->max_load) {
     SDEBUG(cerr << "  load too high - penalty (" <<
 	pnode->current_type_record->current_load << ")" << endl);
-    SADD(SCORE_PNODE_PENALTY);
-    vinfo.pnode_load++;
-    violated++;
+    for (int i = MAX(old_load,tr->max_load); i < tr->current_load; i++) {
+      SADD(SCORE_PNODE_PENALTY);
+      vinfo.pnode_load++;
+      violated++;
+    }
   } else {
     SDEBUG(cerr << "  load is fine" << endl);
   }
-  if (pnode->total_load == 1) {
+  if (old_total_load == 0) {
     SDEBUG(cerr << "  new pnode" << endl);
     SADD(SCORE_PNODE);
   }

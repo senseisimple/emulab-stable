@@ -454,6 +454,18 @@ int mapping_precheck() {
 		    potential_match = false;
 		}
 
+		// Check to see if if the pnode has enough slots of the
+		// appropriate type available
+		tb_pnode::types_map::iterator mit = pnode->types.find(v->type);
+		if (mit == pnode->types.end()) {
+		    // Must have been a vtype to get here - ignore it
+		} else {
+		    if (v->typecount > mit->second->max_load) {
+			// Nope, this vnode is too demanding
+			potential_match = false;
+		    }
+		}
+
 		//
 		// Check features and desires
 		//

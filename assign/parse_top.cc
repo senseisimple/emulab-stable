@@ -86,7 +86,19 @@ int parse_top(tb_vgraph &VG, istream& i)
 	top_error("Bad node line, too few arguments.");
       } else {
 	crope name = parsed_line[1];
-	crope type = parsed_line[2];
+	crope unparsed_type = parsed_line[2];
+
+	// Type might now a have a 'number of slots' assoicated with it
+	crope type;
+	crope typecount_str;
+	split_two(unparsed_type,':',type,typecount_str,"1");
+
+	int typecount;
+	if (sscanf(typecount_str.c_str(),"%i",&typecount) != 1) {
+	    top_error("Bad type slot count.");
+	    typecount = 1;
+	}
+
 	num_nodes++;
 	tb_vnode *v = new tb_vnode();
 	vvertex vv = add_vertex(VG);
@@ -107,6 +119,7 @@ int parse_top(tb_vgraph &VG, istream& i)
 	      vtypes[v->type]++;
 	  }
 	}
+	v->typecount = typecount;
 #ifdef PER_VNODE_TT
 	v->num_links = 0;
 	v->total_bandwidth = 0;

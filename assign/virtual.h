@@ -67,12 +67,12 @@ public:
 class tb_vnode {
 public:
   tb_vnode(): vclass(NULL), fixed(false), assigned(false), subnode_of(NULL),
-      subnode_of_name("") {;}
+      subnode_of_name(""), typecount(1) {;}
 
   friend ostream &operator<<(ostream &o, const tb_vnode& node)
   {
     o << "tb_vnode: " << node.name << " (" << &node << ")" << endl;
-    o << "  Type: " << node.type << endl;
+    o << "  Type: " << node.type <<  " Count: " << node.typecount << endl;
     o << "  Desires:" << endl;
     for (desires_map::const_iterator it = node.desires.begin();
 	 it!=node.desires.end();it++) 
@@ -89,6 +89,7 @@ public:
   desires_map desires;
 
   crope type;			// the current type of the node
+  int typecount;		// How many slots of the type this vnode takes up
   tb_vclass *vclass;		// the virtual class of the node, if any
   crope name;			// string name of the node
   bool fixed;			// is this node fixed

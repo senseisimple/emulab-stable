@@ -63,8 +63,8 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
   bool matched = false;
   tb_pnode::type_record *tr = mit->second;
   if (tr->is_static) {
-    if (tr->current_load >= tr->max_load) {
-      // It's at or over its max load
+    if ((tr->current_load + vn->typecount) > tr->max_load) {
+      // This would put us over its max load
       if (allow_overload) {
 	// That's okay, we're allowing overload
 	matched = true;
@@ -82,9 +82,9 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
 	// Failure - the pnode has a type, and it isn't ours
 	matched = false;
       } else {
-	if (pn->current_type_record->current_load >=
+	if ((pn->current_type_record->current_load + vn->typecount) >
 	    pn->current_type_record->max_load) {
-	  // It's at or over its max load
+	  // This would put us over its max load
 	  if (allow_overload) {
 	    // That's okay, we're allowing overload
 	    matched = true;
