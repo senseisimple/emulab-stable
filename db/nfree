@@ -11,6 +11,7 @@ if ($#ARGV < 1) {
 
 my $error = 0;
 my $TB="/usr/testbed/bin";
+my $consetup="$TB/console_setup";
 my $osload="$TB/os_load";
 my $reloadpid="testbed";
 my $reloadeid="reloading";
@@ -106,6 +107,8 @@ foreach my $n (@node_names) {
 	  && $error++);
   }
 
+  system("$consetup $n") == 0 or
+      print STDERR "WARNING: $consetup $n failed!";
 }
 
 foreach $reload ( keys(%reloads)) {

@@ -6,6 +6,11 @@ $(INSTALL_BINDIR)/%: %
 	-mkdir -p $(INSTALL_BINDIR)
 	$(INSTALL_PROGRAM) $< $@
 
+$(INSTALL_SBINDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_SBINDIR)
+	$(INSTALL_PROGRAM) $< $@
+
 $(INSTALL_BINDIR)/%: %.tcl
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)
@@ -15,4 +20,6 @@ $(INSTALL_LIBDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_LIBDIR)
 	$(INSTALL_PROGRAM) $< $@
+
+CFLAGS += $(LOCALCFLAGS)
 

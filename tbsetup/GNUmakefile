@@ -13,7 +13,8 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  sched_reload os_setup
 DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir rmprojdir os_setup mkacct rmacct \
-	          mkacct-ctrl rmacct-ctrl ifc_setup os_load
+	          mkacct-ctrl rmacct-ctrl ifc_setup os_load console_setup
+SBINSCRIPTS     = console_setup.proxy
 
 all:	$(BINS) $(SUBDIRS)
 
@@ -41,7 +42,8 @@ subdir-install:
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
 	 $(addprefix $(INSTALL_BINDIR)/, $(SUSCRIPTS)) \
 	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(DATAFILES))
+	 $(addprefix $(INSTALL_LIBTBDIR)/, $(DATAFILES)) \
+	 $(addprefix $(INSTALL_SBINDIR)/, $(SBINSCRIPTS))
 
 #
 # Leave these rules here. They should be flushed when we no longer
@@ -94,6 +96,10 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/delay_setup
 	chown root $(INSTALL_LIBTBDIR)/delay_setup
 	chmod u+s $(INSTALL_LIBTBDIR)/delay_setup
+	chown root $(INSTALL_BINDIR)/console_setup
+	chmod u+s $(INSTALL_BINDIR)/console_setup
+	chown root $(INSTALL_LIBTBDIR)/console_setup
+	chmod u+s $(INSTALL_LIBTBDIR)/console_setup
 
 clean:
 	rm -f *.o $(BINS) core

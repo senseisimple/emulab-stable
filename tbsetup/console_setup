@@ -1,0 +1,68 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# usage: console_setup node [node node ...]
+#
+my $SSH		= "sshtb -q -l root plastic.cs.utah.edu";
+my $PROG	= "/usr/testbed/sbin/console_setup.proxy";
+my $TBPID	= "flux";
+my $dbg		= 1;
+my $cmdargs     = "";
+my @row;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+
+if ( $#ARGV < 0 ) {
+    die("Usage: console_setup node [nodes ... ]\n". 	
+	"Enables project members to access consoles logs of nodes.\n");
+}
+my @nodes     = @ARGV;
+
+#
+# Script must be setuid root. We don't worry about who called us or what
+# nodes are specified since this script always does the right thing.
+#
+if ($EUID != 0) {
+    die("Must be run as root");
+}
+
+#
+# Build of a list of nodes/pid pairs and then send the command over to
+# plastic.
+# 
+foreach my $node (@nodes) {
+    #
+    # Untaint the argument. 
+    #
+    if ($node =~ /^([-\@\w.]+)$/) {
+	$node = $1;
+    }
+
+    #
+    # Need the project for the node since that is the group.
+    # 
+    $db_result = $DB->query("select pid from reserved where node_id='$node'");
+    if ($db_result->numrows == 1) {
+	@row = $db_result->fetchrow_array();
+	$pid = $row[0];
+    }
+    else {
+	$pid = $TBPID;
+    }
+    $cmdargs = "$cmdargs $node $pid";
+}
+
+$UID = 0;
+system("$SSH $PROG $cmdargs") == 0 or
+    die("Failed: $SSH $PROG $cmdargs: $?");
+
+exit 0;

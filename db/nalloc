@@ -5,6 +5,8 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
 if ($#ARGV < 1) {die("Usage: nalloc <pid> <eid> <node> <node> <...>\n");}
 
+my $TB="/usr/testbed/bin";
+my $consetup="$TB/console_setup";
 my $error = 0;
 my $pid = shift;
 my $eid = shift;
@@ -48,6 +50,8 @@ foreach my $n (@node_names) {
   $sth = $dbh->query($cmd) && print "Succeeded.\n"
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
       && $error++);
+  system("$consetup $n") == 0 or
+      print STDERR "WARNING: $consetup $n failed!";
 }
 
 exit($error);
