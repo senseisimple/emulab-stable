@@ -100,7 +100,7 @@ function GETUID() {
 #
 function CHECKLOGIN($uid) {
     global $TBAUTHCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
-    global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $ADMINMODE;
+    global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID;
 
     #
     # If we already figured this out, do not duplicate work!
@@ -238,9 +238,6 @@ function CHECKLOGIN($uid) {
     #
     if ($admin && !$adminoff) {
     	putenv("HTTP_WITH_TB_ADMIN_PRIVS=1");
-	$ADMINMODE=1;
-    } else {
-	$ADMINMODE=0;
     }
 
     return $CHECKLOGIN_STATUS;
