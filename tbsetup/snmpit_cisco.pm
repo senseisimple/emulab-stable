@@ -418,6 +418,48 @@ sub vlanUnlock($;$) {
 }
 
 #
+# Given VLAN indentifiers from the database, finds the cisco-specific VLAN
+# number for them. If not VLAN id is given, returns mappings for the entire
+# switch.
+# 
+# usage: findVlans($self, @vlan_ids)
+#        returns a hash mapping VLAN ids to Cisco VLAN numbers
+#        any VLANs not found have NULL VLAN numbers
+#
+sub findVlans($@) { 
+    my $self = shift;
+    my @vlan_ids = @_;
+
+    my $VlanName = "vtpVlanName"; # index by 1.vlan #
+
+    #
+    # Walk the tree to find the VLAN names
+    # TODO - we could optimize a bit, since, if we find all VLAN, we can stop
+    # looking, potentially saving us a lot of time. But, it would require a
+    # more complex walk.
+    #
+    my %mapping = ();
+    @mapping{@vlan_ids} = undef;
+    my ($rows) = $self->{SESS}->bulkwalk(0,32,[$VlanName]);
+    foreach my $rowref (@$rows) {
+	my ($name,$vlan_number,$vlan_name) = @$rowref;
+	#
+	# We get the VLAN number in the form 1.number - we need to strip
+	# off the '1.' to make it useful
+	#
+	$vlan_number =~ s/^1\.//;
+
+	$self->debug("Got $name $vlan_number $vlan_name\n",2);
+	if (!@vlan_ids || exists $mapping{$vlan_name}) {
+	    $self->debug("Putting in mapping from $vlan_name to $vlan_number\n",2);
+	    $mapping{$vlan_name} = $vlan_number;
+	}
+    }
+
+    return %mapping;
+}
+
+#
 # Given a VLAN identifier from the database, find the cisco-specific VLAN
 # number that is assigned to that VLAN. Retries several times (to account
 # for propagation delays) unless the $no_retry option is given.
@@ -438,30 +480,15 @@ sub findVlan($$;$) {
 	$max_tries = 10;
     }
 
-    my $VlanName = "vtpVlanName"; # index by 1.vlan #
-
     #
     # We try this a few time, with 1 second sleeps, since it can take
     # a while for VLAN information to propagate
     #
     foreach my $try (1 .. $max_tries) {
 
-	#
-	# Walk the tree to find the VLAN names
-	#
-	my ($rows) = $self->{SESS}->bulkwalk(0,32,[$VlanName]);
-	foreach my $rowref (@$rows) {
-	    my ($name,$vlan_number,$vlan_name) = @$rowref;
-	    #
-	    # We get the VLAN number in the form 1.number - we need to strip
-	    # off the '1.' to make it useful
-	    #
-	    $vlan_number =~ s/^1\.//;
-
-	    $self->debug("Got $name $vlan_number $vlan_name\n",2);
-	    if ($vlan_name eq $vlan_id) {
-		return $vlan_number;
-	    }
+	my %mapping = $self->findVlans($vlan_id);
+	if (defined($mapping{$vlan_id})) {
+	    return $mapping{$vlan_id};
 	}
 
 	#

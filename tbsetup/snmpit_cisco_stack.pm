@@ -129,7 +129,7 @@ sub new($$$#@) {
 #
 # List all VLANs on all switches in the stack
 #
-# usage: vlistVlans(self)
+# usage: listVlans(self)
 #
 # returns: A list of VLAN information. Each entry is an array reference. The
 #	array is in the form [id, ddep, members] where:
@@ -238,7 +238,7 @@ sub setPortVlan($$@) {
 
     if ($vlan_id ne 'default') {
 	my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
-	$errors += (!$self->setVlanOnTrunks($vlan_number,1));
+	$errors += (!$self->setVlanOnTrunks($vlan_number,1,@ports));
     }
 
     return $errors;
@@ -329,6 +329,35 @@ sub vlanExists($$) {
 }
 
 #
+# Return a list of which VLANs from the input set exist on this stack
+#
+# usage: existantVlans(self, vlan identifiers)
+#
+# returns: a list containing the VLANs from the input set that exist on this
+# 	stack
+#
+sub existantVlans($@) {
+    my $self = shift;
+    my @vlan_ids = @_;
+
+    #
+    # The leader holds the list of which VLANs exist
+    #
+    my %mapping = $self->{LEADER}->findVlans(@vlan_ids);
+
+    my @existant = ();
+    foreach my $vlan_id (@vlan_ids) {
+	if (defined $mapping{$vlan_id}) {
+	    push @existant, $vlan_id;
+	}
+    }
+
+    return @existant;
+
+}
+
+
+#
 # Removes a VLAN from the stack. This implicitly removes all ports from the
 # VLAN. It is an error to remove a VLAN that does not exist.
 #
@@ -342,11 +371,12 @@ sub removeVlan($@) {
     my (@vlan_ids) = @_;
     my $errors = 0;
 
+    my %vlan_numbers = $self->{LEADER}->findVlans(@vlan_ids);
     foreach my $vlan_id (@vlan_ids) {
 	#
 	# First, make sure that the VLAN really does exist
 	#
-	my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
+	my $vlan_number = $vlan_numbers{$vlan_id};
 	if (!$vlan_number) {
 	    warn "ERROR: VLAN $vlan_id not found on switch!";
 	    return 0;
@@ -371,13 +401,14 @@ sub removeVlan($@) {
     foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
 	my $device = $self->{DEVICES}{$devicename};
 	my @existant_vlans = ();
+	my %vlan_numbers = $device->findVlans(@vlan_ids);
 	foreach my $vlan_id (@vlan_ids) {
 
 	    #
 	    # Only remove ports from the VLAN if it exists on this
 	    # device. Do it in one pass for efficiency
 	    #
-	    if (defined(my $number = $device->findVlan($vlan_id))) {
+	    if (defined $vlan_numbers{$vlan_id}) {
 		push @existant_vlans, $vlan_id;
 	    }
 	}
