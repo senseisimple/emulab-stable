@@ -22,6 +22,7 @@ my $MAILFILE    = "/var/spool/mail/root";
 my $NTPDRIFT    = "/etc/ntp/drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
+my $VARACCTDIR  = "/var/account";
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -112,6 +113,25 @@ while ($dirent = readdir(LOG)) {
 }
 closedir(LOG);
 
+print "Removing accounting files ...\n";
+if ( -f "$LOGDIR/pacct" ) {
+    unlink("$LOGDIR/pacct");
+}
+
+opendir(VARACCT,$VARACCTDIR) or
+    die("Could not open directory $VARACCTDIR: $!");
+
+while ($dirent = readdir(VARACCT)) {
+    my $file = $VARACCTDIR . "/" . $dirent;
+    if (-f $file) {
+	if ($file =~ /acct/) {
+	    unlink($file) or
+		die ("Could not unlink $file: $!");
+	}
+    }
+}
+closedir(VARACCT);
+
 print "Removing root's history ...\n";
 if (-f $HISTORY) {
     unlink($HISTORY) or
@@ -158,3 +178,19 @@ foreach my $dir (@VARDIRS) {
 	system("rm -rf $VARDIR/$dir/*");
     }
 }
+
+print "Removing backup files in /etc\n";
+
+opendir(ETC,"/etc") or
+    die ("Couldn't open /etc: $!");
+
+while ($dirent = readdir(ETC)) {
+    my $file = "/etc/" . $dirent;
+    if (-f $file) {
+	if (($file =~ /~$/) || ($file =~ /-$/)) {
+	    unlink($file) or
+		die ("Couldn't unlink $file: $!");
+	}
+    }
+}
+closedir(ETC);
