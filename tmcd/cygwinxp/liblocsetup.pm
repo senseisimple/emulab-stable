@@ -394,7 +394,7 @@ sub os_useradd($$$$$$$$$)
     # Use the leading 8 chars of the Unix MD5 passwd hash as a known random
     # password, both here and in Samba.  Skip over a "$1$" prefix.
     my $pwd = $pswd;
-    $pwd =~ s/^(\$1\$)?(.{8}).*/$2/;
+    $pwd =~ s/^(\$1\$)(.{8}).*/$2/;
     
     print WINUSERS "$login,$gcos,$pwd,,,,,\r\n";
 
