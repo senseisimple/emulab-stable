@@ -196,7 +196,9 @@ foreach (@links) {
 	push(@newlinks,"$_ 0.0");
     }
 }
-&ir_set("/topology/links",join("\n",@newlinks) . "\n");
+if ($#newlinks != -1) {
+    &ir_set("/topology/links",join("\n",@newlinks) . "\n");
+}
 
 # Set lan loss
 $raw = eval{&ir_get("/topology/lans")};
@@ -207,7 +209,8 @@ if ($@) {
 @lans = split("\n",$raw);
 @newlans = ();
 foreach (@lans) {
-    ($lan,$prefix,$postfix) = /^([^ ]+) ("[^\"]+" [^ ]+ [^ ]+)[ \t]+(.*)$/;
+    ($lan,$prefix,$postfix) = 
+        /^([^ ]+) (\"[^\"]+\" [^ ]+ [^ ]+)(?:[ \t]+(.*))?$/;
     if (defined($lanloss{$lan})) {
 	$loss = $lanloss{$lan}
     } else {
