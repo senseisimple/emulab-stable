@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -79,26 +79,62 @@ else {
     PAGEARGERROR();
 }
 
+
 #
 # We are going to invoke the XML backend, and read back an XML representation
 # of the results.
 #
-$url   = "$TBBASE/beginexp_xml.php3?".
-         "nocookieuid=$uid&nocookieauth=" . $_COOKIE[$TBAUTHCOOKIE] .
-         "&xmlcode=" . urlencode($xmlcode);
+$uriargs  = "nocookieuid=$uid&nocookieauth=" . $_COOKIE[$TBAUTHCOOKIE];
+$postdata = "xmlcode=" . urlencode($xmlcode);
+
+#
+# Yuck, no good support for sending POST requests. Must use fsockopen, which
+# is not so bad, except you have to specify the port. Okay, ssl is on port
+# 443, but at home I do not use ssl and I use a non-standard port since my
+# ISP blocks port 80 and 8080. Also, devel trees are in a subdir, and so need
+# to pull that out. Did I say Yuck?
+#
+if (preg_match("/^([-\w\.]+):(\d+)(.*)$/", $WWW, $matches)) {
+    $host = $matches[1];
+    $port = $matches[2];
+    $base = $matches[3];
+    $targ = $host;
+}
+elseif (preg_match("/^([-\w\.]+)(.*)$/", $WWW, $matches)) {
+    $host = $matches[1];
+    $base = $matches[2];
+    $port = 443;
+    $targ = "ssl://" . $host;
+}
+else {
+    TBERROR("Could not parse $WWW for host/port/base!", 1);
+}
+#TBERROR("$host $port $base\n$uriargs\n". urldecode($postdata), 0);
+
+$sock = fsockopen($targ, $port, $errno, $errstr, 30);
+if ($sock == FALSE) {
+    TBERROR("Could not invoke XML backend script.\n".
+	    "$host $port $base\n".
+	    "$errno: $errstr\n".
+	    "$uriargs\n" . urldecode($postdata), 1);
+}
+fputs($sock, "POST $base/beginexp_xml.php3?" . $uriargs . " HTTP/1.0\r\n");
+fputs($sock, "Host: $host\r\n");
+fputs($sock, "Content-type: application/x-www-form-urlencoded\r\n");
+fputs($sock, "Content-length: " . strlen($postdata) . "\r\n");
+fputs($sock, "Accept: */*\r\n");
+fputs($sock, "\r\n");
+fputs($sock, "$postdata\r\n");
+fputs($sock, "\r\n");
+
+$headers = "";
+while ($str = trim(fgets($sock, 4096)))
+    $headers .= "$str\n";
+
 $reply = "";
-
-# TBERROR(urldecode($url), 0);
-
-$fp = @fopen($url, "r");
-if ($fp == FALSE) {
-    TBERROR("Could not invoke XML backend script. URL was:<br><br>\n".
-	    "$url\n<br>", 1);
-}
-while (!feof($fp)) {
-    $reply .= fgets($fp, 1024);
-}
-fclose($fp);
+while (!feof($sock))
+    $reply .= fgets($sock, 4096);
+fclose($sock);
 
 #
 # Error reporting is not well thought out yet. If the backend page gets

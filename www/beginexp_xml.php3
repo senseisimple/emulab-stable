@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -280,7 +280,7 @@ $exp_id      = $formfields[exp_id];
 # Verify permissions. We do this here since pid/eid/gid could be bogus above.
 #
 if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
-    $errors["Project/Group"] = "Not enough permission to create experiment";
+    $errors["Project/Group"] = "Not $exp_gid enough permission to create experiment";
     XMLERROR();
 }
 
