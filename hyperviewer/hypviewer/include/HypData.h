@@ -37,10 +37,21 @@
 #define HYPDATA_H
 
 // #include <utmpx.h>
+
 #ifdef WIN32
+
 // disable warning C4786: symbol greater than 255 character,
 // okay to ignore
 #pragma warning(disable: 4786)
+
+// Get rid of these warnings that come from double literals:
+// truncation from const double to float
+// conversion from double to float
+#pragma warning(disable: 4305 4244)
+
+// And this one: forcing value to bool 'true' or 'false' (performance warning)
+#pragma warning(disable: 4800)
+
 #include <winsock.h>   
 #else
 #include <sys/time.h>

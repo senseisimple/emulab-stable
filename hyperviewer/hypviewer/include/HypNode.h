@@ -36,6 +36,12 @@
 #ifndef HYPNODE_H
 #define HYPNODE_H
 
+#ifdef WIN32
+// Disable this warning, which occurs voluminously during debug compilation:
+// warning C4786: : identifier was truncated to '255' characters in the debug information
+#pragma warning(disable: 4786)
+#endif
+
 #include <vector>
 
 

@@ -36,6 +36,13 @@
 #ifndef HYPQUAT_H
 #define HYPQUAT_H
 
+#ifdef WIN32
+// Get rid of these warnings that come from double literals:
+// truncation from const double to float
+// conversion from double to float
+#pragma warning(disable: 4305 4244)
+#endif
+
 #include "HypTransform.h"
 
 class HypQuat {

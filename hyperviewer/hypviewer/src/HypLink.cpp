@@ -33,6 +33,13 @@
 // reserved under the Copyright Laws of United States.
 // Contractor/manufacturer is Silicon Graphics, Inc., 2011 N.
 // Shoreline Blvd. Mountain View, CA 94039-7311.
+
+#ifdef WIN32
+// Disable this warning, which occurs voluminously during debug compilation:
+// warning C4786: : identifier was truncated to '255' characters in the debug information
+#pragma warning(disable: 4786)
+#endif
+
 #include <string>
 NAMESPACEHACK
 

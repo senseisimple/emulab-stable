@@ -37,8 +37,14 @@
 #define HYPGRAPH_H
 
 #include <string>
-#include <map>
 
+#ifdef WIN32
+// Disable this warning, which occurs voluminously during debug compilation:
+// warning C4786: : identifier was truncated to '255' characters in the debug information
+#pragma warning(disable: 4786)
+#endif
+
+#include <map>
 
 #include "HypNode.h"
 #include "HypLink.h"
