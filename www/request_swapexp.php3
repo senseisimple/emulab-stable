@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -53,16 +53,19 @@ if (! ISADMIN($uid)) {
 # probably redirect the browser back up a level.
 #
 if ($canceled) {
-    echo "<center><h2><br>
-          Swap/Termination request canceled!
-          </h2></center>\n";
+    echo <<<END
+<center><h2>Swap request canceled!</h2>
+<p>
+<a href="showexp.php3?pid=$pid&eid=$eid">Back to experiment $pid/$eid</a>
+</p></center>
+END;
     
     PAGEFOOTER();
     return;
 }
 
 # We only send to the proj leader after we've sent $tell_proj_head requests
-$tell_proj_head = 2;
+$tell_proj_head = TBGetSiteVar("idle/cc_grp_ldrs");
 $q = DBQueryWarn("select swappable, swap_requests,
                   date_format(last_swap_req,\"%T\") as lastreq
                   from experiments
@@ -102,8 +105,10 @@ Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
     SHOWEXP($pid, $eid);
     
     echo "<form action='request_swapexp.php3?pid=$pid&eid=$eid' method=post>";
-    echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
-    echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+    echo "<p><input type=checkbox name=force value=1>Force: ".
+	"Send message even if not idle</p>\n";
+    echo "<input type=submit name=confirmed value=Confirm>\n";
+    echo "<input type=submit name=canceled value=Cancel>\n";
     echo "</form>\n";
     echo "</center>\n";
 
@@ -111,101 +116,39 @@ Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
     return;
 }
 
-#
-# Grab experiment/project leaders and email info.
-#
-$expleader  = 0;
-$projleader = 0;
-
-if (! TBExpLeader($pid, $eid, $expleader)) {
-    TBERROR("Could not determine experiment leader!", 1);
-}
-TBUserInfo($expleader, $expleader_name, $expleader_email);
-
-if (! TBProjLeader($pid, $projleader)) {
-    TBERROR("Could not determine project leader!", 1);
-}
-if (! TBExptGroup($pid,$eid,$gid)) {
-    TBERROR("Could not determine experiment group!", 1);
-}
-$leaders = TBLeaderMailList($pid,$gid);
-if (! $leaders) {
-    TBERROR("Could not get leader emails!", 1);
+# Confirmed and ready to go...
+if ($force) {
+    $force="-f";
+} else {
+    $force="";
 }
 
-$lastact = TBGetExptLastAct($pid,$eid);
-$idletime= TBGetExptIdleTime($pid,$eid,"j:G:i");
-$idletime = str_replace(":0",":",$idletime);
-list($idledays,$idlehrs,$idlemin) = explode(":",$idletime);
-#print "<pre>idletime=$idletime\nidledays=$idledays\nidlehrs=$idlehrs\n</pre>";
-$idledays -= 1; # Measured from the first of the month...
-#print "<pre>\nidledays=$idledays\nidlehrs=$idlehrs\n</pre>";
-$idlehrs += 24*$idledays;
-#print "<pre>\nidledays=$idledays\nidlehrs=$idlehrs\n</pre>";
+SUEXEC($uid, $TBADMINGROUP,
+       "webidlemail $force $pid $eid", SUEXEC_ACTION_IGNORE);
+# sets some globals for us...
 
-
-
-$msg =
-"Hi, this is an important automated message from $THISHOMEBASE.\n\n".
-"It appears that the $c node".($c!=1?"s":"")." in your experiment ".
-"'$eid' ".($c!=1?"have":"has")." been inactive for ".
-"$idlehrs hours, $idlemin minutes, since $lastact. ".
-( $swap_requests > 0 
-  ? ("You have been sent ".$swap_requests." other message".
-     ($swap_requests!=1?"s":"")." since this ".
-     "experiment became idle. ")
-  : "").
-($swappable ?
- ("This experiment is marked as swappable, so it may be ".
-  "automatically swapped out by $THISHOMEBASE or its ".
-  "operational staff.\n") :
- ("This experiment has not been marked swappable, so it will not be ".
-  "automatically swapped out.\n")).
-"\nWe would appreciate it if you could either terminate or swap this ".
-"experiment out so that the nodes will be available for use by ".
-"other experimenters. You can do this by logging into the ".
-"$THISHOMEBASE Web Interface, and using the swap or terminate ".
-"links on this page:\n\n$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n".
-"More information on experiment swapping is available in the $THISHOMEBASE ".
-"FAQ at $TBDOCBASE/faq.php3#UTT-Swapping\n\n".
-"More information on our node usage policy is available at ".
-"$TBDOCBASE/docwrapper.php3?docname=swapping.html\n\n".
-"If you feel this message is in error then please contact ".
-"Testbed Operations <$TBMAILADDR_OPS>.\n\n".
-"Thanks!\nTestbed Operations\n";
-
-#print "<pre>\n$msg\n</pre>\n";
-
-# For debugging:
-#TBMAIL("Expt Leader <$TBMAILADDR_OPS>",
-TBMAIL("$expleader_name <$expleader_email>",
-       "$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid",
-       wordwrap($msg,75),
-       "From: $TBMAIL_OPS\n".
-       ( $swap_requests >= $tell_proj_head
-	 ? "Cc: $leaders\n"
-	 : "") .
-       "Bcc: $TBMAIL_OPS\n".
-       "Errors-To: $TBMAIL_WWW");
-
-#
-# And log a copy so we know who sent it. 
-#
-TBUserInfo($uid, $uid_name, $uid_email);
-
-TBMAIL($TBMAIL_AUDIT,
-       "Swap or Terminate Request: $pid/$eid",
-       "A swap/terminate $pid/$eid request was sent by $uid ($uid_name).\n",
-       "From: $uid_name <$uid_email>\n".
-       "Errors-To: $TBMAIL_WWW");
-
-# Update the count and the time in the database
-DBQueryWarn("update experiments set swap_requests= swap_requests+1,
-             last_swap_req=now() where pid='$pid' and eid='$eid';");
-
-echo "<p><center>
+if ($suexec_retval == 0) {
+    echo "<p><center>
          Message successfully sent!
-         </center>\n";
+         </center></p>\n";
+} elseif ($suexec_retval == 2) {
+    echo "<p><center>
+         No message was sent, because it wasn't time for a message.<br>
+	 Use the <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">Force</a>
+	 option to send a message anyway.
+         </center></p>\n";
+} else {
+    echo "<p><center>
+	 There was an unknown problem sending the message.<br>
+	 Output was:<pre>$suexec_output</pre>
+         </center></p>\n";
+}
+
+echo <<<END
+<p><center>
+<a href="showexp.php3?pid=$pid&eid=$eid">Back to experiment $pid/$eid</a>
+</center></p>
+END;
 
 #
 # Standard Testbed Footer
