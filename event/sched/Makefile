@@ -1,11 +1,11 @@
 # Makefile for building event scheduler
 #
-# $Id: Makefile,v 1.2 2001-12-04 15:15:32 imurdock Exp $
+# $Id: Makefile,v 1.3 2002-01-29 17:08:51 imurdock Exp $
 
 CC		= gcc
 CFLAGS		= -g -I. -I../lib -Wall -DDEBUG
 LDFLAGS		=
-LIBS		= -L../lib -levent
+LIBS		= -lpthread -L../lib -levent
 
 CFLAGS         += `elvin-config --cflags`
 LIBS           += `elvin-config --libs`
