@@ -413,8 +413,13 @@ if ($firewalled) {
     $UID = 0;
     system("$SSH -host $firewall ipfw delete 1");
     if ($?) {
-	print STDERR "*** $0:\n".
-	             "    Error turning back on firewall rules ($firewall)!\n";
+	print STDERR "*** Error turning back on firewall rules ($firewall)!\n".
+		     "    Will retry again.\n";
+	system("$SSH -host $firewall ipfw delete 1");
+	if ($?) {
+	    die("*** $0:\n".
+		"    Error turning back on firewall rules! Retry failed.\n");
+	}
     }
     $UID = $SAVEUID;
 }
