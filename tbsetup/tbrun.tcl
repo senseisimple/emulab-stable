@@ -32,11 +32,11 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 
 set updir [file dirname $scriptdir]
 
-set snmpit "$updir/switch_tools/intel510/snmpit"
+set snmpit "$scriptdir/snmpit"
 set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
-set libir "$updir/ir/libir.tcl"
-set ir2ifc "$updir/hw_config/ir2ifc"
-set ifcboot "$updir/hw_config/ifc_boot"
+set libir "$scriptdir/ir/libir.tcl"
+set ir2ifc "$scriptdir/ir2ifc"
+set ifcboot "$scriptdir/ifc_setup"
 
 source $libir
 namespace import TB_LIBIR::ir
