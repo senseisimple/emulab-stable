@@ -12,7 +12,6 @@
 ###
 ### Todo:
 ###      - create the user / make key / put in auth keys in tb machine
-###        (tried: cannot due to permissions problems on plastic)
 ###
 
 use Mysql;
@@ -75,6 +74,8 @@ while (@row = $sth->fetchrow_array) {
     $passwd{$row[0]} = $row[1];
     $unix_uid{$row[0]} = $row[2];
     $fullname{$row[0]} = $row[4];
+#    print "fullname: $fullname{$row[0]}\n";
+#    print "row4: $row[4]\n"; 
 }
 
 ##
@@ -135,10 +136,12 @@ foreach $IP (@nodes) {
             open(PING,"/sbin/ping -c 1 $IP 2>&1 |");
         }
         do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
+	close(PING); 
         print "Got $1 ping packet(s) back from $IP.\n" if $d;
         if ( $1 > 0 ) {
             open(UNAME,"su1 ssh $IP uname -a 2>&1 |");
             $_ = <UNAME>;
+	    close(UNAME);
             print "back from uname:$_";
 	    ## FreeBSD says "155.99.214.129: Connection refused"
 	    ##    and can also say "Host key doesn't match..."  
@@ -146,24 +149,37 @@ foreach $IP (@nodes) {
 		die("Uname failed on $IP:$_\n"); 
 	    } else { 
 		@temp = split(" ",$_); 
-		$OS = $temp[$0]; 
+		$OS = $temp[0]; 
 	    }
         } 
 
         print "OS for $IP is $OS\n" if $d;
         if ($OS eq "Linux") {  
 	    
-
 	    ## 1) Use groupadd to add group
 	    ## 2) Use useradd to add users
 	    ##
 	    ## Rather than use useradd's defaults (which are normally)
 	    ## fine, we're explicit.
 	    
-	    open(GROUPADD, "/usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
-	    foreach my $name (keys %passwd) {
-		open(USERADD, "/usr/sbin/useradd -c $fullname{$user} -d /home/$user -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user} -m $user 2>&1 |");
+	    open(GROUPADD, "ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
+	    while (<GROUPADD>) { print "groupadd:$_"; }
+	    close(GROUPADD); 
+	    my $i = 1;
+	    foreach $user (keys %passwd) {
+		print "user$i: $user\n";
+		$i++;
 	    }
+	    foreach my $user (keys %passwd) {
+		print "user:$user\n";
+#		print "fn: $fullname{$user}\n";
+		print "pass:$passwd{$user}\n";
+		print "uid:$unix_uid{$user}\n";
+		print "ssh $IP /usr/sbin/useradd -c 'comment' -d /home/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |\n";
+		open(USERADD, "ssh $IP /usr/sbin/useradd -c 'comment' -d /home/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
+		while (<USERADD>) { print "useradd: $_"; }
+		close(USERADD);
+	    } 
 
 	} elsif ($OS eq "FreeBSD") { 
 
@@ -185,11 +201,13 @@ foreach $IP (@nodes) {
 	    print OUT $addon;
 	    close(OUT);
 	    open(SCP, "scp -p /tmp/master.passwd.$IP $IP:/etc/master.passwd");
+	    close(SCP); # this closes above SCP
  
 	    ## Create secure and insecure databases (/etc/[s]*pwd.db)
 #	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
-	    ## Update /etc/passwd
+	    ## Update /etc/passwd (this closes above MKDB)
 #	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
+#	    close(MKDB); 
 
 #/usr/sbin/pwd_mkdb: corrupted entry
 #/usr/sbin/pwd_mkdb: at line #14
