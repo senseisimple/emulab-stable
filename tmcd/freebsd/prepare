@@ -6,7 +6,7 @@ require 'ctime.pl';
 # Prepare the node for cutting a new image. Should be run just prior, on
 # each of the FreeBSD and Linux partitions.
 #
-my $SUPCHECKOUT = "/etc/testbed/sup/sup/FBSD40-STD/checkouts";
+my $SUPCHECKOUT = "/etc/testbed/sup/sup/FBSD43-STD/checkouts";
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
 my $FSTAB       = "/etc/fstab";
@@ -14,6 +14,7 @@ my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
 my $HISTORY     = "/root/.history";
 my $MAILFILE    = "/var/mail/root";
+my $LEASES      = "/var/db/dhclient.leases";
 
 #
 # Load the testbed library.
@@ -116,3 +117,6 @@ system("rm -rf $RUNDIR/*.pid");
 
 print "Cleaing out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
+
+print "Removing dhclient leases ...\n";
+system("rm -f $LEASES");
