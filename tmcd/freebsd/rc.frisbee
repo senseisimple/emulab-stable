@@ -67,8 +67,8 @@ fi
 #	in frisbee
 #
 HOSTMEM=`dmesg | grep 'avail memory' | sed -e 's/.* (\([0-9]*\)K bytes.*/\1/'`
-if [ $HOSTMEM -ge 18432 ]; then
-	HOSTMEM=`expr $HOSTMEM - 16384`
+if [ $HOSTMEM -ge 26624 ]; then
+	HOSTMEM=`expr $HOSTMEM - 24576`
 	ulimit -v $HOSTMEM
 	HOSTMEM=`expr $HOSTMEM / 1024`
 
