@@ -627,7 +627,7 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * since someday we may allow a single machine to operate as a
 	 * delay node across multiple links.
 	 */
-	res = mydb_query("select card0,card1,delay,bandwidth,lossrate "
+	res = mydb_query("select iface0,iface1,delay,bandwidth,lossrate "
 			 "from delays where node_id='%s'",
 			 5, nodeid);
 	if (!res) {
