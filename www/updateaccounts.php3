@@ -84,7 +84,7 @@ if ($canceled) {
 
 if (!$confirmed) {
     echo "Confirming this operation will cause the password file on each
-          node in experiment '$exp_eid?' to be updated. Typically, you would
+          node in experiment '$exp_eid' to be updated. Typically, you would
           initiate this operation if a new project member has been approved and
           you want his/her account added immediately (without having to reboot
           all your nodes or swap the experiment in/out).\n";
