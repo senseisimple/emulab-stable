@@ -80,6 +80,16 @@ function NLCLINKFIG($link, $value, $caption)
               </td>";
 }
 
+function NLCLINKFIG2($link, $value, $caption, $explanation)
+{
+	echo "<td valign=\"top\" class=\"stealth\" width='50%'>
+                <a href=\"$link\" border=\"1\">
+                  <center>$value</center></a>
+                  <font size=\"-2\"><b>$caption:</b>
+                $explanation</font>
+              </td>";
+}
+
 function NLCEMPTY()
 {
 	echo "<td class=\"stealth\"></td>";
@@ -347,26 +357,34 @@ that updates in real time.
 <p>
 <table width="100%" cellpadding=0 cellspacing=0 border=0 class="stealth">
 <tr>
-<?php NLCLINKFIG("robotmap-ss.gif", 
-		 "<img src=\"robotmap-ss-thumb.gif\" border=1
-		 alt=\"Robot Map Screenshot\">",
-		 "Sample Robot Map Screenshot") ?>
-<?php NLCLINKFIG("webcam-ss.gif", 
-		 "<img src=\"webcam-ss-thumb.gif\" border=1
-		 alt=\"Webcam Screenshot\">",
-		 "Sample Webcam Screenshot") ?>
+<?php NLCLINKFIG2("robotmap-ss.gif", 
+		  "<img src=\"robotmap-ss-thumb.gif\" border=2
+		  alt=\"Robot Map Screenshot\">",
+		  "Sample Robot Map Screenshot",
+		  "All four robots arranged in an 'L' shape.  The real world
+		  coordinates for the robots are in the bottom middle table.")
+		  ?>
+<?php NLCLINKFIG2("webcam-ss.gif",
+		  "<img src=\"webcam-ss-thumb.gif\" border=2
+		  alt=\"Webcam Screenshot\">",
+		  "Sample Webcam Screenshot",
+		  "The real world view of the same four robots from the map
+                  screenshot.  Note that the grid on the floor is used to
+                  calibrate the overhead tracking cameras and not lines for the
+                  robots to follow.") ?>
 </tr>
 </table>
 
 <p>
 Take a few moments to familiarize yourself with those pages since we'll be
 making use of them during the rest of the tutorial.  One important item to note
-is the "Elapsed event time" value, which displays how much time has elapsed
-since the robots have reached their initial positions.  The elapsed time is
-also connected to when <code>"$ns at"</code> events in the NS file are run.  In
-this case, there were no events in the NS file, so we'll be moving the robot by
-sending dynamic SETDEST events, much like sending START and STOP events to <a
-href="docwrapper.php3?docname=advanced.html">traffic generators</a> and <a
+on the robot map page is the "Elapsed event time" value, which displays how
+much time has elapsed since the robots have reached their initial positions.
+The elapsed time is also connected to when <code>"$ns at"</code> events in the
+NS file are run.  In this case, there were no events in the NS file, so we'll
+be moving the robot by sending dynamic SETDEST events, much like sending START
+and STOP events to <a href="docwrapper.php3?docname=advanced.html">traffic
+generators</a> and <a
 href="docwrapper.php3?docname=advanced.html#ProgramObjects">program
 objects</a>.
 
