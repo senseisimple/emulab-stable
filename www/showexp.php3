@@ -58,15 +58,17 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 # Need some DB info.
 #
 $query_result =
-    DBQueryFatal("select e.idx,e.state,e.batchmode,s.rsrcidx ".
+    DBQueryFatal("select e.idx,e.state,e.batchmode,s.rsrcidx,r.wirelesslans ".
 		 "  from experiments as e ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
+		 "left join experiment_resources as r on s.rsrcidx=r.idx ".
 		 "where e.eid='$eid' and e.pid='$pid'");
 $row        = mysql_fetch_array($query_result);
 $expindex   = $row["idx"];
 $expstate   = $row["state"];
 $rsrcidx    = $row["rsrcidx"];
 $isbatch    = $row["batchmode"];
+$wireless   = $row["wirelesslans"];
 
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
@@ -156,6 +158,12 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE &&
 if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
     WRITESUBMENUBUTTON("Reboot All Nodes",
 		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
+}
+
+# Wireless maps if experiment includes wireless lans.
+if ($wireless) {
+    WRITESUBMENUBUTTON("Wireless Node Map",
+		       "floormap.php3?pid=$exp_pid&eid=$exp_eid");
 }
 
 # History
