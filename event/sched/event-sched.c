@@ -73,9 +73,9 @@ unsigned long next_token;
 
 simulator_agent_t primary_simulator_agent;
 
-static pid_t emcd_pid;
-static pid_t vmcd_pid;
-static pid_t rmcd_pid;
+static pid_t emcd_pid = -1;
+static pid_t vmcd_pid = -1;
+static pid_t rmcd_pid = -1;
 
 static struct agent ns_sequence_agent;
 static timeline_agent_t ns_sequence;
@@ -84,11 +84,78 @@ static timeline_agent_t ns_timeline;
 
 static void sigpass(int sig)
 {
-	kill(emcd_pid, sig);
-	kill(vmcd_pid, sig);
-	kill(rmcd_pid, sig);
+	if (emcd_pid != -1)
+		kill(emcd_pid, sig);
+	if (vmcd_pid != -1)
+		kill(vmcd_pid, sig);
+	if (rmcd_pid != -1)
+		kill(rmcd_pid, sig);
 
 	exit(0);
+}
+
+static void sigchld(int sig)
+{
+	pid_t child_pid;
+	int status;
+
+	child_pid = wait(&status);
+	if (child_pid == rmcd_pid) {
+		if (vmcd_pid != -1)
+			kill(vmcd_pid, SIGTERM);
+
+		vmcd_pid = -1;
+		rmcd_pid = -1;
+	}
+}
+
+static char emc_path[256];
+
+static void sighup(int sig)
+{
+	if (emc_path[0] == '\0')
+		return;
+	
+	rmcd_pid = fork();
+	switch (rmcd_pid) {
+	case -1:
+		fatal("could not start rmcd");
+		break;
+	case 0:
+		execlp("rmcd",
+		       "rmcd",
+		       "-dd",
+		       "-l",
+		       "logs/rmcd.log",
+		       "-U",
+		       emc_path,
+		       NULL);
+		exit(0);
+		break;
+	default:
+		break;
+	}
+	
+	vmcd_pid = fork();
+	switch (vmcd_pid) {
+	case -1:
+		fatal("could not start vmcd");
+		break;
+	case 0:
+		sleep(1);
+		execlp("vmcd",
+		       "vmcd",
+		       "-d",
+		       "-l",
+		       "logs/vmcd.log",
+		       "-U",
+		       emc_path,
+		       NULL);
+		exit(0);
+		break;
+	default:
+		break;
+	}
 }
 
 void
@@ -230,7 +297,10 @@ main(int argc, char *argv[])
 	signal(SIGTERM, sigpass);
 	signal(SIGINT, sigpass);
 	signal(SIGQUIT, sigpass);
-
+	
+	signal(SIGCHLD, sigchld);
+	signal(SIGHUP, sighup);
+	
 	/*
 	 * Convert server/port to elvin thing.
 	 *
@@ -304,15 +374,15 @@ main(int argc, char *argv[])
 		fatal("waitforrobots: RPC failed!");
 
 	if (access("tbdata/emcd.config", R_OK) == 0) {
-	    char emc_path[256];
 
-	    snprintf(emc_path,
-		     sizeof(emc_path),
-		     "%s/%s.%s.emcd",
-		     _PATH_TMP,
-		     pid,
-		     eid);
-	    
+		systemf("echo %d > tmp/event-sched.pid", getpid());
+		snprintf(emc_path,
+			 sizeof(emc_path),
+			 "%s/%s.%s.emcd",
+			 _PATH_TMP,
+			 pid,
+			 eid);
+		
 		emcd_pid = fork();
 		switch (emcd_pid) {
 		case -1:
