@@ -114,14 +114,15 @@ if (!TBAdmin($UID) &&
 
 #
 # Get the list of nodes in this experiment.
-# 
+#
 my @nodes = ExpNodes($pid, $eid);
 if (! @nodes) {
-    die("*** $0:\n".
-	"    No allocated nodes in experiment $pid/$eid!\n");
+    warn("*** $0:\n".
+	 "    No allocated nodes in experiment $pid/$eid!\n");
+    exit(0);
 }
-    
-# Nodes on the command line. Operate only on this set. 
+
+# Nodes on the command line. Operate only on this set.
 if (@ARGV) {
     my %fulllist = ();
 
@@ -153,7 +154,7 @@ foreach my $node (@nodes) {
     my $pnode;
     my $jailed;
     my $allocstate;
-    
+
     if (! TBIsNodeVirtual($node, \$jailed)) {
 	next;
     }
