@@ -351,7 +351,9 @@ sub readXML($$$$) {
 		# Sanity check the fields.
 		if (TBcheck_dbslot($val, "experiments", $key,
 			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-		    push(@setlist, "$key='$val'");
+		    $val = DBQuoteSpecial($val);
+		    
+		    push(@setlist, "$key=$val");
 		}
 		else {
 		    fatal("Illegal characters in table data: ".
