@@ -32,7 +32,6 @@ if [ -s $BOOTDIR/startupcmd  ]; then
 	$BINDIR/runstartup
 fi
 
-# XXX Can this run in Plab?
 if [ -x $BINDIR/watchdog  ]; then
         echo "Starting update watchdog ..."
 	$BINDIR/watchdog start
@@ -40,4 +39,5 @@ fi
 
 
 echo "Informing the testbed that we're up and running ..."
-$BINDIR/tmcc state ISUP
+# XXX Oogly
+$BINDIR/tmcc -n `cat /var/emulab/boot/plabname` state ISUP

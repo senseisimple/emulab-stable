@@ -23,16 +23,22 @@
 # bring up the vnode
 #
 
-# XXX Super-kludge to figure out vnodeid until the svm works
-# Only works on Flux Plab nodes
-VNODEID=`hostname -s | sed -e 's/planetlab\(.\)/pcplab\1/'`
-
-if [ -e /home/utah6 ]; then
-    VNODEID=${VNODEID}-1;
-elif [ -e /home/utah7 ]; then
-    VNODEID=${VNODEID}-2;
+if [ -e /var/emulab/boot/plabname ]; then
+    VNODEID=`cat /var/emulab/boot/plabname`;
+elif [ -e /etc/vnodeid ]; then
+    VNODEID=`cat /etc/vnodeid`;
 else
-    echo Must run as utah6 or utah7;
+    # XXX Super-kludge to figure out vnodeid if unpacked by hand
+    # Only works on Flux Plab nodes
+    VNODEID=`hostname -s | sed -e 's/planetlab\(.\)/pcplab\1/'`
+    if [ -e /home/utah6 ]; then
+	VNODEID=${VNODEID}-1;
+    elif [ -e /home/utah7 ]; then
+	VNODEID=${VNODEID}-2;
+    else
+	echo Must run as utah6 or utah7 or be setup by Emulab svm
+	exit 1;
+    fi;
 fi
 
 # See how we were called.

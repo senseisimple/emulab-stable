@@ -68,14 +68,15 @@ if ($EUID != 0) {
 }
 
 #
-# If not invoked as real root, then must be invoked as emulabman.
+# If not invoked as real root, then must be invoked as emulabman or the
+# Plab management user (emulab_EID_PID).
 #
 if ($UID) {
     my ($pwname) = getpwuid($UID) or
 	die("*** $0:\n".
 	    "    $UID is not in the password file!\n");
 
-    if ($pwname ne "emulabman") {
+    if ($pwname ne "emulabman" && !($pwname =~ /emulab_[-\@\w]*_[-\@\w]*/)) {
 	die("*** $0:\n".
 	    "    You do not have permission to run this script!\n");
     }
