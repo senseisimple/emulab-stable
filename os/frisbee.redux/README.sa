@@ -89,7 +89,7 @@ It also includes the associated image creation tool.
 
 	where <address> is either a multicast address or the address of
 	the destination machine if you only want to unicast.  The -W
-	option sets a crude bandwidth throttle (in Mbit/sec) for sending.
+	option sets a crude bandwidth throttle (in bits/sec) for sending.
 	By default it is pretty low (14Mbit/sec) so you will probably want
 	to crank it up.  The current frisbeed is what you might call
 	"TCP-hostile" so don't push it too high.
