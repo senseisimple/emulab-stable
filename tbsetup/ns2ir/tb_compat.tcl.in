@@ -577,3 +577,32 @@ proc tb-set-wasolver-weights {delay bw plr} {
     set wa_bw_solverweight $bw
     set wa_plr_solverweight $plr
 }
+
+#
+# Control emulated for a link (lans not allowed yet). 
+# 
+proc tb-set-link-emulated {link onoff} {
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-emulated] $link is not a link."
+	return
+    }
+    $link set emulated $onoff
+}
+
+#
+# Control linkdelays for lans and links
+# 
+proc tb-set-link-uselinkdelay {link onoff} {
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-uselinkdelay] $link is not a link."
+	return
+    }
+    $link set uselinkdelay $onoff
+}
+proc tb-set-lan-uselinkdelay {link onoff} {
+    if {[$link info class] != "Lan"} {
+	perror "\[tb-set-lan-uselinkdelay] $link is not a lan."
+	return
+    }
+    $link set uselinkdelay $onoff
+}

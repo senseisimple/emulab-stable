@@ -26,7 +26,7 @@
 	update node_types set disktype='ad' where type='pc2000';
 	update node_types set disktype='ad' where type='pc601';
 
-1.114  Add nextosid slot to os_info table for mapping the generic
+1.114: Add nextosid slot to os_info table for mapping the generic
        osids (RHL-STD) to a specific one. Primarily used in os_setup
        to figure out what to do with the generic names, but might also
        be used someday to migrate people to newer versions?
@@ -65,4 +65,15 @@ alter table node_activity add last_report datetime not null;
 
 update node_activity set last_report=greatest(last_tty_act,
 last_net_act,last_cpu_act,last_ext_act);
+
+1.117:  Add emulated and uselinkdelay slots to the virt_lans
+        table. Set in the front end, used in assign_wrapper.
+
+	alter table virt_lans add emulated tinyint(4) default '0' \
+			after widearea;
+	alter table virt_lans add uselinkdelay tinyint(4) default '0' \
+			after emulated;
+
+        Nothing special needs to be done.
+
 

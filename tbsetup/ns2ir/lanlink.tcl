@@ -150,6 +150,15 @@ LanLink instproc init {s nodes bw d type} {
     # By default, a local link
     $self set widearea 0
 
+    # Allow user to control whether link gets a linkdelay, if link is shaped.
+    # If not shaped, and user sets this variable, a link delay is inserted
+    # anyway on the assumption that user wants later control over the link.
+    # Both lans and links can get linkdelays.     
+    $self set uselinkdelay 0
+
+    # Allow user to control if link is emulated. Only links, not lans.
+    $self set emulated 0
+
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
     # Figure out if this is a lanlink that has at least
@@ -479,11 +488,13 @@ LanLink instproc updatedb {DB} {
     $self instvar rloss
     $self instvar cost
     $self instvar widearea
+    $self instvar uselinkdelay
+    $self instvar emulated
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost,widearea) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport),$widearea)"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost,widearea,emulated,uselinkdelay) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport),$widearea,$emulated,$uselinkdelay)"
     }
 }

@@ -174,7 +174,9 @@ TBDebugTimeStamp("top started");
 $sharkshelfid = 0;
 
 # lans is indexed by virtual lan and is a list of nodeport members.
-# emulated is 1 if the link/lan is emulated (virtual).
+# emulated is 1 if the link/lan is emulated (virtual). This is
+# controlled by the a variable in the virt_lans table. It also gets
+# set when one of the nodes in the lan is a virtnode (jail).
 my %lans     = ();
 my %emulated = ();
 
@@ -209,6 +211,10 @@ my %linkdelays = ();
 # link delay, even when no delay would otherwise be inserted. 
 my $uselinkdelays   = 0;
 my $forcelinkdelays = 0;
+
+# And the per-lan control, based on the above two variables, and
+# per-lan variable in the virt_lans table. Indexed by lan name.
+my %uselinkdelay    = ();
 
 my $query_result =
     DBQueryFatal("SELECT uselinkdelays,forcelinkdelays from experiments ".
@@ -344,7 +350,8 @@ $result->finish;
 printdb "Loading virt_lans.\n";
 $result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
-		 "rdelay,rbandwidth,rlossrate,widearea " .
+		 "rdelay,rbandwidth,rlossrate,widearea, ".
+		 "emulated,uselinkdelay " .
 		 "from virt_lans where pid='$pid' and eid='$eid' ".
                  "order by vname,member");
 
@@ -358,11 +365,12 @@ my %rnodelans = ();
 my %tunnels   = ();
 
 #
-# Now do the real pass.
+# Process the virt_lans table.
 # 
-while (($vname,$member,$delay,$bandwidth,$lossrate,
-	$rdelay,$rbandwidth,$rlossrate,$widearea) = $result->fetchrow_array) {
-    ($node,$port) = split(":",$member);
+while (my ($vname,$member,$delay,$bandwidth,$lossrate,
+	   $rdelay,$rbandwidth,$rlossrate,$widearea,
+	   $isemulated,$uselinkdelay) = $result->fetchrow_array) {
+    my ($node,$port) = split(":",$member);
 
     #
     # REMOTENODE HACK: 
@@ -417,6 +425,8 @@ while (($vname,$member,$delay,$bandwidth,$lossrate,
     if ($q_red) {
 	$mustdelay{$vname} = 1;
     }
+    $emulated{$vname} = $isemulated;
+    $uselinkdelay{$vname} = $uselinkdelay;
     
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
@@ -531,9 +541,10 @@ foreach $lan (keys(%lans)) {
     $nonsharks = 0;
     $simnodes = 0;
     $realnodes = 0;
-    $emulated = 0;
+    my $emulated = $emulated{$lan};
+    my $uselinkdelay = $uselinkdelay{$lan};
+    my $mustdelay = $mustdelay{$lan};
     $trivial_ok = 0;
-    $emulated{$lan} = 0;
     foreach $member (@members) {
 	($node) = (split(":",$member))[0];
 	if ($nodes{$node} eq "shark-shelf") {
@@ -542,6 +553,7 @@ foreach $lan (keys(%lans)) {
 	    $simnodes++;
 	    $simnodelans{$lan} = 1;
 	} else {
+	    # We always use an emulated link when its a virtnode.
 	    if ($isvirtnode{$node}) {
 		$emulated++;
 		$emulated{$lan} = 1;
@@ -578,28 +590,32 @@ foreach $lan (keys(%lans)) {
 	$bandwidth = &getbandwidth(&min($bw0,$rbw1));
 	$rbandwidth = &getbandwidth(&min($rbw0,$bw1));
 	if (((($delay >= $delaythresh) ||
-	     (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
-	     (($delaywithswitch == 0) && 
-	      (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
-	     ($loss != 0)) ||
-	    (defined($mustdelay{$lan})) ||
-	    ($forcelinkdelays != 0) ||
-	    (($rdelay >= $delaythresh) ||
-	     (($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
-	     (($delaywithswitch == 0) && 
-	      (($rbw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
-	     ($rloss != 0))) &&
+	      (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
+	      (($delaywithswitch == 0) && 
+	       (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
+	      ($loss != 0)) ||
+	     (($rdelay >= $delaythresh) ||
+	      (($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
+	      (($delaywithswitch == 0) && 
+	       (($rbw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1))))|| 
+	      ($rloss != 0)) ||
+	     # Link must be shaped for other reasons (q_red).
+	     $mustdelay ||
+	     # Global force, or per-link force. 
+	     $forcelinkdelays || $uselinkdelay) &&
 	    # XXX simulated nodes hack. We don't want to put delay nodes
 	    # between simulated nodes. If there is a link between a
 	    # simulated and a real node, we might need to put in delay
 	    # nodes
-	    ($realnodes != 0)
-	   ) {
-	    if ($emulated || $uselinkdelays || $forcelinkdelays) {
-		#
-		# Emulated links are special. We want to do traffic shaping
-		# but not using a delay node.
-		#
+	    ($realnodes != 0)) {
+	    #
+	    # We use a linkdelay if the link is emulated, globally forced,
+	    # globally preferred if the link is shaped, or if the per-link
+	    # flag was set (which means to put in a link delay regardless
+	    # of whether the link is shaped).
+	    #
+	    if ($emulated ||
+		$forcelinkdelays || $uselinkdelays || $uselinkdelay) {
 		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 		
 		$delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
@@ -661,28 +677,34 @@ foreach $lan (keys(%lans)) {
 # XXX The expression below should be modified for better bandwidth support.
 # Probably needs to happen post assign somehow.
 	    if (((($delay >= $delaythresh) ||
-		 (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
-		 (($delaywithswitch == 0) && 
-		  (($bw != $S100Kbs) && (($sharks == 0) ||
-					 ($nonsharks > 1)))) ||
-		 ($loss != 0)) || 
-		(defined($mustdelay{$lan})) ||
-		($forcelinkdelays != 0) ||
-		(($rdelay >= $delaythresh) ||
-		 (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
-		 (($delaywithswitch == 0) && 
-		  (($rbw != $S100Kbs) && (($sharks == 0) ||
-					 ($nonsharks > 1)))) ||
-		 ($rloss != 0))) &&
+		  (($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
+		  (($delaywithswitch == 0) && 
+		   (($bw != $S100Kbs) && (($sharks == 0) ||
+					  ($nonsharks > 1)))) ||
+		  ($loss != 0)) || 
+		 (($rdelay >= $delaythresh) ||
+		  (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
+		  (($delaywithswitch == 0) && 
+		   (($rbw != $S100Kbs) && (($sharks == 0) ||
+					   ($nonsharks > 1)))) ||
+		  ($rloss != 0)) ||
+		 # Link must be shaped for other reasons (q_red).
+		 $mustdelay ||
+		 # Global force, or per-lan force. 
+		 $forcelinkdelays || $uselinkdelay) &&
 		# if we have 1 real node in the LAN, we may need to create
 		# a lan
-		($realnodes != 0)
-	       ) {
-		if ($emulated || $uselinkdelays || $forcelinkdelays) {
-		    #
-		    # Emulated links are special. We want to do traffic shaping
-		    # but not using a delay node.
-		    #
+		($realnodes != 0)) {
+		#
+		# We use a linkdelay if the link is emulated, globally forced,
+		# globally preferred if the link is shaped, or if the per-link
+		# flag was set (which means to put in a link delay regardless
+		# of whether the link is shaped).
+		#
+		# NB: Emulated lans not supported at this time. Caught above.
+		#
+		if ($emulated ||
+		    $forcelinkdelays || $uselinkdelays || $uselinkdelay) {
 		    my $plink = "linklan/$lan/$member";
 		    
 		    $delaylinks{$plink} =

@@ -1185,6 +1185,8 @@ CREATE TABLE virt_lans (
   rlossrate float(10,3) default NULL,
   cost float NOT NULL default '1',
   widearea tinyint(4) default '0',
+  emulated tinyint(4) default '0',
+  uselinkdelay tinyint(4) default '0',
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 

@@ -38,6 +38,9 @@ proc tb-set-usewatunnels {onoff} {}
 proc tb-set-wasolver-weights {delay bw plr} {}
 proc tb-set-uselinkdelays {onoff} {}
 proc tb-set-forcelinkdelays {onoff} {}
+proc tb-set-link-emulated {link onoff} {}
+proc tb-set-link-uselinkdelay {link onoff} {}
+proc tb-set-lan-uselinkdelay {link onoff} {}
 
 Class Program
 
