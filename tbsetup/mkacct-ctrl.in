@@ -6,11 +6,12 @@ use Mysql;
 #
 # Configure variables
 #
-my $TB     = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
+my $TB      = "@prefix@";
+my $DBNAME  = "@TBDBNAME@";
 
-my $PBAG   = "$TB/sbin/paperbag";
-my $ssh    = "ssh";
+my $PBAG    = "$TB/sbin/paperbag";
+my $ssh     = "ssh";
+my $CONTROL = "users.emulab.net";
 
 my $me;                # alphanumeric username of $UID 
 
@@ -115,7 +116,7 @@ sub dowork() {
     #got_tuples($sth) or die "$0: Error selecting control_node.\n";
     #@db_row       = $sth->fetchrow_array();
     #$control_node = $db_row[0];
-    $control_node = "plastic";           # see note above  
+    $control_node  = $CONTROL;           # see note above  
 
     # get user info
     $db_query       = "select usr_pswd,unix_uid,usr_name from users " .
@@ -128,7 +129,8 @@ sub dowork() {
     $fullname    = $db_row[2];
 
     # get group names
-    $db_query       = "select pid from proj_memb where uid='$user'";
+    $db_query       = "select pid from proj_memb where uid='$user' ".
+			" and trust!='none'";
     $sth            = $dbh->query($db_query);
     got_tuples($sth) or die "$0: Error selecting group names.\n";
     while (@db_row = $sth->fetchrow_array() ) {
@@ -186,6 +188,12 @@ sub dowork() {
     # Main project is first on list, rest go into new list
     $project = shift @groupnames;
     $grouplist = join(",",@groupnames);
+    if ($grouplist) {
+      $groupargument = "-G $grouplist";
+    }
+    else {
+      $groupargument = " ";
+    }
 
     #
     # Make user on paper. We don't give them a password.
@@ -194,7 +202,7 @@ sub dowork() {
       print "Adding user $user to paper.\n";
       system("/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
 	     "-k /usr/share/skel -m -d /users/$user ".
-	     "-g $project -G $grouplist -s $PBAG") == 0
+	     "-g $project $groupargument -s $PBAG") == 0
 	       or print STDERR "Could not add user $user to paper\n";
     } else {
       print "User $user already exists on paper. Updating record.\n";
@@ -202,7 +210,7 @@ sub dowork() {
       # paper, we don't want to paperbag them...
       system("/usr/sbin/pw usermod $user -u $user_number -c \"$fullname\" ".
 	     "-k /usr/share/skel -m -d /users/$user ".
-	     "-g $project -G $grouplist") == 0
+	     "-g $project $groupargument") == 0
 	       or print STDERR "Could not modify user $user on paper\n";
     }
 
@@ -220,7 +228,7 @@ sub dowork() {
       $str = "$ssh $control_node " .
 	     "'/usr/sbin/pw useradd $user -u $user_number -c '\"$fullname\"' ".
 	     "-k /usr/share/skel -m -d /users/$user -g $project ".
-	     "-G $grouplist -s /bin/tcsh'";
+	     "$groupargument -s /bin/tcsh'";
       system($str) == 0
 	or print STDERR "Could not add user $user to $control_node.\n";
       system("$ssh $control_node ".
@@ -234,7 +242,7 @@ sub dowork() {
       $str = "$ssh $control_node " .
 	     "/usr/sbin/pw usermod $user -u $user_number -c \\\"$fullname\\\" ".
 	     "-k /usr/share/skel -m -d /users/$user -g $project ".
-	     "-G $grouplist -s /bin/tcsh";
+	     "$groupargument -s /bin/tcsh";
      system($str) == 0       
        or print STDERR "Could not modify user $user on $control_node.\n";
       system("$ssh $control_node ".
