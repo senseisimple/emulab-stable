@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -152,9 +152,9 @@ function SPITDATA($table, $title, $showtype, $plain)
     
 	while (list($n2, $ignore2) = each($nodenamescol)) {
 	    if (strcmp($n1, $n2)) {
-		$s = 0;
-		$b = 0;
-		$p = 0.0;
+		$s = -1;
+		$b = -1;
+		$p = -1;
 		$d = (($plain) ? "" : "&nbsp");
 		$glom = $n1 . "+" . $n2;
 
