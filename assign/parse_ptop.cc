@@ -178,27 +178,21 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	pname2vertex[name] = pv;
       }
     } else if (command.compare("link") == 0) {
-      if (parsed_line.size() < 7) {
+      if (parsed_line.size() < 8) {
 	ptop_error("Bad link line, too few arguments.");
       }
       int num = 1;
 #ifdef PENALIZE_BANDWIDTH
       float penalty;
-      if (parsed_line.size() == 8) {
-	if (sscanf(parsed_line[7].c_str(),"%f",&penalty) != 1) {
-	  ptop_error("Bad number argument: " << parsed_line[7] << ".");
+      if (parsed_line.size() == 9) {
+	if (sscanf(parsed_line[8].c_str(),"%f",&penalty) != 1) {
+	  ptop_error("Bad number argument: " << parsed_line[8] << ".");
 	  penalty=1.0;
-	}
-      }
-#else
-      if (parsed_line.size() == 8) {
-	if (sscanf(parsed_line[7].c_str(),"%d",&num) != 1) {
-	  ptop_error("Bad number argument: " << parsed_line[7] << ".");
-	  num=1;
 	}
       }
 #endif
 
+#if 0
 #ifdef FIX_PLINK_ENDPOINTS
       bool fixends;
 #ifdef FIX_PLINKS_DEFAULT
@@ -206,16 +200,18 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 #else
       fixends = false;
 #endif
-      if (parsed_line.size() == 9) {
-	  if (parsed_line[8].compare("fixends") == 0) {
+      if (parsed_line.size() == 10) {
+	  if (parsed_line[9].compare("fixends") == 0) {
 	      fixends = true;
 	  }
       }
 #else
-      if (parsed_line.size() > 8) {
+      if (parsed_line.size() > 9) {
 	ptop_error("Bad link line, too many arguments.");
       }
 #endif
+#endif
+
       crope name = parsed_line[1];
       crope src,srcmac;
       split_two(parsed_line[2],':',src,srcmac,"(null)");
@@ -224,6 +220,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
       crope bw = parsed_line[4];
       crope delay = parsed_line[5];
       crope loss = parsed_line[6];
+      crope link_type = parsed_line[7];
       int ibw,idelay;
       double gloss;
 
@@ -252,13 +249,16 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
       
       for (int cur = 0;cur<num;++cur) {
 	pedge pe = (add_edge(srcv,dstv,PG)).first;
-	tb_plink *pl = new tb_plink(name,tb_plink::PLINK_NORMAL,srcmac,dstmac);
+	tb_plink *pl = new
+	    tb_plink(name,tb_plink::PLINK_NORMAL,link_type,srcmac,dstmac);
 	put(pedge_pmap,pe,pl);
 	pl->delay_info.bandwidth = ibw;
 	pl->delay_info.delay = idelay;
 	pl->delay_info.loss = gloss;
+#if 0
 #ifdef FIX_PLINK_ENDPOINTS
 	pl->fixends = fixends;
+#endif
 #endif
 #ifdef PENALIZE_BANDWIDTH
 	pl->penalty = penalty;
@@ -275,11 +275,19 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    tb_slink *sl = new tb_slink();
 	    put(sedge_pmap,swedge,sl);
 	    sl->mate = pe;
-	    pl->type = tb_plink::PLINK_INTERSWITCH;
+	    pl->is_type = tb_plink::PLINK_INTERSWITCH;
 	  }
 	}
 	srcnode->total_interfaces++;
 	dstnode->total_interfaces++;
+	srcnode->link_counts[link_type]++;
+	dstnode->link_counts[link_type]++;
+	for (int i = 8; i < parsed_line.size(); i++) {
+	  crope link_type = parsed_line[i];
+	  pl->types.insert(link_type);
+	  srcnode->link_counts[link_type]++;
+	  dstnode->link_counts[link_type]++;
+	}
 	if (ISSWITCH(srcnode) &&
 	    ! ISSWITCH(dstnode)) {
 	  dstnode->switches.insert(srcv);

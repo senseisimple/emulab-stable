@@ -49,21 +49,23 @@ void print_solution()
 
 	cout << vlink->name;
 
-	if (vlink->link_info.type == tb_link_info::LINK_DIRECT) {
+	if (vlink->link_info.type_used == tb_link_info::LINK_DIRECT) {
 	    // Direct link - just need the source and destination
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
 	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
 	    cout << " direct " << p->name << " (" <<
 		p->srcmac << "," << p->dstmac << ") " <<
 		p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
-	} else if (vlink->link_info.type == tb_link_info::LINK_INTRASWITCH) {
+	} else if (vlink->link_info.type_used ==
+		tb_link_info::LINK_INTRASWITCH) {
 	    // Intraswitch link - need to grab the plinks to both nodes
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
 	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
 	    cout << " intraswitch " << p->name << " (" <<
 		p->srcmac << "," << p->dstmac << ") " <<
 		p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
-	} else if (vlink->link_info.type == tb_link_info::LINK_INTERSWITCH) {
+	} else if (vlink->link_info.type_used ==
+		tb_link_info::LINK_INTERSWITCH) {
 	    // Interswitch link - interate through each intermediate link
 	    cout << " interswitch ";
 	    for (pedge_path::iterator it=vlink->link_info.plinks.begin();
@@ -72,7 +74,7 @@ void print_solution()
 		cout << " " << p->name << " (" << p->srcmac << "," <<
 		    p->dstmac << ")";
 	    }
-	} else if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+	} else if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
 	    // Trivial link - we really don't have useful information to
 	    // print, but we'll fake a bunch of output here just to make it
 	    // consistent with other (ie. intraswitch) output
@@ -211,7 +213,7 @@ void pedge_writer::operator()(ostream &out,const pedge &p) const {
     out << plink->delay_info.bandwidth << "/" <<
 	plink->delay_info.delay << "/" << plink->delay_info.loss << "\"";
 #endif
-    if (plink->type == tb_plink::PLINK_INTERSWITCH) {
+    if (plink->is_type == tb_plink::PLINK_INTERSWITCH) {
 	out << " style=dashed";
     }
     tb_pnode *src = get(pvertex_pmap,source(p,PG));
@@ -259,8 +261,8 @@ void solution_edge_writer::operator()(ostream &out,const vedge &v) const {
     crope style;
     crope color;
     crope label;
-    switch (linfo.type) {
-	case tb_link_info::LINK_UNKNOWN: style="dotted";color="red"; break;
+    switch (linfo.type_used) {
+	case tb_link_info::LINK_UNMAPPED: style="dotted";color="red"; break;
 	case tb_link_info::LINK_DIRECT: style="dashed";color="black"; break;
 	case tb_link_info::LINK_INTRASWITCH:
 	    style="solid";color="black";

@@ -129,7 +129,7 @@ void init_score()
   tie(vedge_it,end_vedge_it) = edges(VG);
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink=get(vedge_pmap,*vedge_it);
-    vlink->link_info.type=tb_link_info::LINK_UNKNOWN;
+    vlink->link_info.type_used=tb_link_info::LINK_UNMAPPED;
     vlink->no_connection=false;
   }
   pvertex_iterator pvertex_it,end_pvertex_it;
@@ -166,7 +166,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 
   // Handle vnodes that are not allowed to have a mix of trivial and
   // non-trivial links
-  if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+  if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
       src_vnode->trivial_links--;
       dst_vnode->trivial_links--;
       if (src_vnode->disallow_trivial_mix &&
@@ -185,7 +185,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	  violated--;
 	  vinfo.trivial_mix--;
       }
-  } else if (vlink->link_info.type != tb_link_info::LINK_UNKNOWN) {
+  } else if (vlink->link_info.type_used != tb_link_info::LINK_UNMAPPED) {
       src_vnode->nontrivial_links--;
       dst_vnode->nontrivial_links--;
       if (src_vnode->disallow_trivial_mix &&
@@ -207,7 +207,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
   }
 
   // Unscore the link itself
-  if (vlink->link_info.type == tb_link_info::LINK_DIRECT) {
+  if (vlink->link_info.type_used == tb_link_info::LINK_DIRECT) {
     // DIRECT LINK
     SDEBUG(cerr << "   direct link" << endl);
     src_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
@@ -216,7 +216,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
     SSUB(SCORE_DIRECT_LINK);
     unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
     vlink->link_info.plinks.clear();
-  } else if (vlink->link_info.type == tb_link_info::LINK_INTERSWITCH) {
+  } else if (vlink->link_info.type_used == tb_link_info::LINK_INTERSWITCH) {
     // INTERSWITCH LINK
     SDEBUG(cerr << "  interswitch link" << endl);
     src_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
@@ -253,7 +253,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
       the_switch->nontrivial_bw_used -= vlink->delay_info.bandwidth * 2;
     }
     vlink->link_info.switches.clear();
-  } else if (vlink->link_info.type == tb_link_info::LINK_INTRASWITCH) {
+  } else if (vlink->link_info.type_used == tb_link_info::LINK_INTRASWITCH) {
     // INTRASWITCH LINK
     SDEBUG(cerr << "   intraswitch link" << endl);
     src_pnode->nontrivial_bw_used -= vlink->delay_info.bandwidth;
@@ -276,7 +276,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
   }
 
 #ifdef TRIVIAL_LINK_BW
-  else if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+  else if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
       // Trivial link - we may get to remove violations
       SDEBUG(cerr << "  trivial bandwidth used " <<
 	      src_pnode->trivial_bw_used << " max is " <<
@@ -539,7 +539,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
   tb_pnode *the_switch;
-  switch (vlink->link_info.type) {
+  switch (vlink->link_info.type_used) {
   case tb_link_info::LINK_DIRECT:
     SADD(SCORE_DIRECT_LINK);
     src_pnode->nontrivial_bw_used += vlink->delay_info.bandwidth;
@@ -628,7 +628,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
     }
     break;
 #endif
-  case tb_link_info::LINK_UNKNOWN:
+  case tb_link_info::LINK_UNMAPPED:
     cout << "Internal error: Should not be here either." << endl;
     exit(EXIT_FATAL);
     break;
@@ -636,7 +636,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 
   // Handle vnodes that are not allowed to have a mix of trivial and
   // non-trivial links
-  if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+  if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
       src_vnode->trivial_links++;
       dst_vnode->trivial_links++;
       if (src_vnode->disallow_trivial_mix &&
@@ -849,7 +849,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	    seen_loopback_links.insert(vlink);
 	}
 	if (allow_trivial_links && vlink->allow_trivial) {
-	    vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
+	    vlink->link_info.type_used = tb_link_info::LINK_TRIVIAL;
 	    // XXX - okay, this is really bad, but score_link_info doesn't
 	    // usually get called for trivial links, and letting them fall
 	    // through into the 'normal' link code below is disatrous!
@@ -875,7 +875,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	pedge pe;
 	// Direct link
 	if (find_best_link(dest_pv,pv,vlink,pe)) {
-	  resolutions[resolution_index].type = tb_link_info::LINK_DIRECT;
+	  resolutions[resolution_index].type_used = tb_link_info::LINK_DIRECT;
 	  resolutions[resolution_index].plinks.push_back(pe);
 	  resolution_index++;
 	  total_weight += LINK_RESOLVE_DIRECT;
@@ -924,7 +924,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	      }
 
 
-	    resolutions[resolution_index].type = tb_link_info::LINK_INTRASWITCH;
+	    resolutions[resolution_index].type_used =
+		tb_link_info::LINK_INTRASWITCH;
 	    if (flipped) { // Order these need to go in depends on flipped bit
 	      if (second_link) {
 		resolutions[resolution_index].plinks.push_back(second);
@@ -997,7 +998,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 		}
 	      }
 
-	      resolutions[resolution_index].type = tb_link_info::LINK_INTERSWITCH;
+	      resolutions[resolution_index].type_used =
+		  tb_link_info::LINK_INTERSWITCH;
 	      if (flipped) { // Order these need to go in depends on flipped bit
 		if (second_link) {
 		  resolutions[resolution_index].plinks.push_front(second);
@@ -1033,7 +1035,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	  SADD(SCORE_NO_CONNECTION);
 	  vlink->no_connection=true;
 	  vinfo.no_connection++;
-	  vlink->link_info.type = tb_link_info::LINK_UNKNOWN;
+	  vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
 	  violated++;
 	} else {
 	  // Check to see if we are fixing a violation
@@ -1051,14 +1053,14 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	    float choice;
 	    choice = std::random()%(int)total_weight;
 	    for (index = 0;index < resolution_index;++index) {
-	      switch (resolutions[index].type) {
+	      switch (resolutions[index].type_used) {
 	      case tb_link_info::LINK_DIRECT:
 		choice -= LINK_RESOLVE_DIRECT; break;
 	      case tb_link_info::LINK_INTRASWITCH:
 		choice -= LINK_RESOLVE_INTRASWITCH; break;
 	      case tb_link_info::LINK_INTERSWITCH:
 		choice -= LINK_RESOLVE_INTERSWITCH; break;
-	      case tb_link_info::LINK_UNKNOWN:
+	      case tb_link_info::LINK_UNMAPPED:
 	      case tb_link_info::LINK_TRIVIAL:
 		cerr << "Internal error: Should not be here." << endl;
 		exit(EXIT_FATAL);
@@ -1194,6 +1196,11 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
     if (dest_pv == switch_pv) {
       tb_plink *plink = get(pedge_pmap,*pedge_it);
 
+      // Skip any links whose type is wrong (ie. doesn't match the vlink)
+      if (plink->types.find(vlink->type) == plink->types.end()) {
+	  continue;
+      }
+
       // Get delay characteristics - NOTE: Currently does not actually do
       // anything
       tb_delay_info physical_delay;
@@ -1303,7 +1310,7 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
   cerr << *vlink;
 #endif
   
-  if (plink->type == tb_plink::PLINK_NORMAL) {
+  if (plink->is_type == tb_plink::PLINK_NORMAL) {
     // need to account for three things here, the possiblity of a new plink
     // the user of a new emulated link, and a possible violation.
     if (vlink->emulated) {
@@ -1367,7 +1374,7 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
   }
 #endif
 
-  if (plink->type != tb_plink::PLINK_LAN) {
+  if (plink->is_type != tb_plink::PLINK_LAN) {
     tb_delay_info physical_delay;
     physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
     physical_delay.delay = plink->delay_info.delay;
@@ -1414,7 +1421,7 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
   // This is not in the slightest bit graceful! This function was not designed
   // for use with trivial links (which have no plink,) but I would like to call
   // it for symmetry
-  if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
+  if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
     goto UNSCORE_TRIVIAL;
   }
 
@@ -1429,7 +1436,7 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
   cerr << *vlink;
 #endif
 
-  if (plink->type == tb_plink::PLINK_NORMAL) {
+  if (plink->is_type == tb_plink::PLINK_NORMAL) {
     if (vlink->emulated) {
       plink->emulated--;
       SSUB(SCORE_EMULATED_LINK);
@@ -1508,7 +1515,7 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
 #endif
   
   // bandwidth check
-  if (plink->type != tb_plink::PLINK_LAN) {
+  if (plink->is_type != tb_plink::PLINK_LAN) {
 #ifdef PENALIZE_BANDWIDTH
     SSUB(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
 #endif
@@ -1543,7 +1550,7 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
   }
 
 UNSCORE_TRIVIAL:
-  vlink->link_info.type = tb_link_info::LINK_UNKNOWN;
+  vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
 }
 
 double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
@@ -1792,125 +1799,3 @@ void remove_global_fds(tb_vnode *vnode,tb_pnode *pnode) {
     }
   }
 }
-
-/* make_lan_node(vvertex vv)
- * This routines create a physical lan node and connects it to a switch
- * with a LAN plink.  Most of the code is in determining which switch to
- * connect the LAN node to.  Specifically, it connects it to the switch
- * which will maximize the number of intra (rather than inter) links for
- * assigned adjancent nodes of vv.
- *
- * NOTE: This function is deprecated, since there are no longer special
- * physical LAN nodes.
- *
- */
-pvertex make_lan_node(vvertex vv)
-{
-  typedef hash_map<pvertex,int,hashptr<void *> > switch_int_map;
-  switch_int_map switch_counts;
-
-  tb_vnode *vnode = get(vvertex_pmap,vv);
-
-  SDEBUG(cerr << "make_lan_node(" << vnode->name << ")" << endl);
-  
-  // Choose switch
-  pvertex largest_switch;
-  int largest_switch_count=0;
-  voedge_iterator vedge_it,end_vedge_it;
-  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);
-  for (;vedge_it!=end_vedge_it;++vedge_it) {
-    vvertex dest_vv = target(*vedge_it,VG);
-    if (dest_vv == vv)
-      dest_vv = source(*vedge_it,VG);
-    tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
-    if (dest_vnode->assigned) {
-      pvertex dest_pv = dest_vnode->assignment;
-      tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
-      for (pvertex_set::iterator switch_it = dest_pnode->switches.begin();
-	   switch_it != dest_pnode->switches.end();switch_it++) {
-	if (switch_counts.find(*switch_it) != switch_counts.end()) {
-	  switch_counts[*switch_it]++;
-	} else {
-	  switch_counts[*switch_it]=1;
-	}
-	if (switch_counts[*switch_it] > largest_switch_count) {
-	  largest_switch = *switch_it;
-	  largest_switch_count = switch_counts[*switch_it];
-	}
-      }
-    }
-  }
-
-  SDEBUG(cerr << "  largest_switch=" << largest_switch <<
-	 " largest_switch_count=" << largest_switch_count << endl);
-  
-  pvertex pv = add_vertex(PG);
-  tb_pnode *p = new tb_pnode(vnode->name);
-  put(pvertex_pmap,pv,p);
-  p->types["lan"] = new tb_pnode::type_record(1,false);
-  p->set_current_type("lan");
-  
-  // If the below is false then we have an orphaned lan node which will
-  // quickly be destroyed when add_node fails.
-  if (largest_switch_count != 0) {
-    pedge pe = (add_edge(pv,largest_switch,PG)).first;
-
-    p->name = "lan-";
-    p->name += get(pvertex_pmap,largest_switch)->name;
-    p->name += "-";
-    p->name += vnode->name;
-
-    // Build a link name that looks like the ones we used to supply in the ptop
-    // file
-    crope link_name = "link-";
-    link_name += p->name;
-    tb_plink *pl = new tb_plink(link_name, tb_plink::PLINK_LAN,
-	    p->name, "(null)");
-
-    p->switches.insert(largest_switch);
-    put(pedge_pmap,pe,pl);
-
-#ifdef FIX_PLINK_ENDPOINTS
-    pl->fixends = false;
-#endif
-  } else {
-    p->name += "orphan";
-  }
-
-  return pv;
-}
-
-/* delete_lan_node(pvertex pv)
- * Removes the physical lan node and the physical lan link.  Assumes that
- * nothing is assigned to it.
- *
- * NOTE: This function is deprecated, since there are no longer special
- * physical LAN nodes.
- *
- */
-void delete_lan_node(pvertex pv)
-{
-  tb_pnode *pnode = get(pvertex_pmap,pv);
-
-  SDEBUG(cerr << "delete_lan_node(" << pnode->name << ")" << endl);
-
-  // delete LAN link
-  typedef list<pedge> pedge_list;
-  pedge_list to_free;
-  
-  poedge_iterator pedge_it,end_pedge_it;
-  tie(pedge_it,end_pedge_it) = out_edges(pv,PG);
-  // We need to copy because removing edges invalidates out iterators.
-  for (;pedge_it != end_pedge_it;++pedge_it) {
-    to_free.push_front(*pedge_it);
-  }
-  for (pedge_list::iterator free_it = to_free.begin();
-       free_it != to_free.end();++free_it) {
-    delete(get(pedge_pmap,*free_it));
-    remove_edge(*free_it,PG);
-  }
-
-  remove_vertex(pv,PG);
-  delete pnode;
-}
-

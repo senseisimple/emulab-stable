@@ -30,20 +30,22 @@ typedef graph_traits<tb_vgraph>::vertex_iterator vvertex_iterator;
 typedef graph_traits<tb_vgraph>::edge_iterator vedge_iterator;
 typedef graph_traits<tb_vgraph>::out_edge_iterator voedge_iterator;
 
+
 class tb_link_info {
 public:
-  typedef enum {LINK_UNKNOWN, LINK_DIRECT,
+  typedef enum {LINK_UNMAPPED, LINK_DIRECT,
 		LINK_INTRASWITCH, LINK_INTERSWITCH,
 		LINK_TRIVIAL, LINK_DELAYED} linkType;
-  linkType type;
+  linkType type_used;		// type of physical link used to satisfy this
+  				// virtual link
   pedge_path plinks;		// the path of pedges
   pvertex_list switches;	// what switches were used
 
   friend ostream &operator<<(ostream &o, const tb_link_info& link)
   {
     o << "  Type: ";
-    switch (link.type) {
-    case LINK_UNKNOWN : o << "LINK_UNKNOWN"; break;
+    switch (link.type_used) {
+    case LINK_UNMAPPED : o << "LINK_UNMAPPED"; break;
     case LINK_DIRECT : o << "LINK_DIRECT"; break;
     case LINK_INTRASWITCH : o << "LINK_INTRASWITCH"; break;
     case LINK_INTERSWITCH : o << "LINK_INTERSWITCH"; break;
@@ -115,6 +117,10 @@ public:
   subnode_list subnodes;
   crope subnode_of_name;
 
+  // Counts how many links of each type this virtual node has
+  typedef hash_map<crope,int> link_counts_map;
+  link_counts_map link_counts;
+
 };
 
 class tb_vlink {
@@ -134,6 +140,7 @@ public:
   tb_delay_info delay_info;	// the delay characteristics of the link
   tb_link_info link_info;	// what it's mapped to
   crope name;			// name
+  crope type;			// type of this link
   bool emulated;		// is this an emulated link, i.e. can it
 				// share a plink withouter emulated vlinks
   bool no_connection;		// true if this link should be satisfied

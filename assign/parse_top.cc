@@ -158,12 +158,13 @@ int parse_top(tb_vgraph &VG, istream& i)
 	}
       }
     } else if (command.compare("link") == 0) {
-      if (parsed_line.size() < 7) {
+      if (parsed_line.size() < 8) {
 	top_error("Bad link line, too few arguments.");
       } else {
 	crope name = parsed_line[1];
 	crope src = parsed_line[2];
 	crope dst = parsed_line[3];
+	crope link_type = parsed_line[7];
 	crope bw,bwunder,bwover;
 	crope delay,delayunder,delayover;
 	crope loss,lossunder,lossover;
@@ -238,6 +239,7 @@ int parse_top(tb_vgraph &VG, istream& i)
 	tb_vlink *l = new tb_vlink();
 	l->src = node1;
 	l->dst = node2;
+	l->type = link_type;
 	put(vedge_pmap,e,l);
 
 	if ((sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) ||
@@ -264,7 +266,7 @@ int parse_top(tb_vgraph &VG, istream& i)
 #endif
 	l->emulated = false;
 	
-	for (unsigned int i = 7;i < parsed_line.size();++i) {
+	for (unsigned int i = 8;i < parsed_line.size();++i) {
 	  if (parsed_line[i].compare("nodelay") == 0) {
 	    l->allow_delayed = false;
 	  } else if (parsed_line[i].compare("emulated") == 0) {
@@ -288,6 +290,8 @@ int parse_top(tb_vgraph &VG, istream& i)
 	} else {
 	    vnode1->num_links++;
 	    vnode2->num_links++;
+	    vnode1->link_counts[link_type]++;
+	    vnode2->link_counts[link_type]++;
 	}
 #endif
       }

@@ -11,7 +11,7 @@
 #include <hash_map>
 #include <rope>
 #include <queue>
-#include <slist>
+#include <list>
 #include <algorithm>
 
 #include <boost/config.hpp>
@@ -48,26 +48,15 @@ extern pclass_list pclasses;
 // length of the array.
 extern pclass_types type_table;
 
-typedef pair<pvertex,int> link_info; // dst, bw
-
-struct hashlinkinfo {
-  size_t operator()(link_info const &A) const {
-    hashptr<void *> ptrhash;
-    return ptrhash(A.first)/2+A.second;
-  }
-};
-
 // returns 1 if a and b are equivalent.  They are equivalent if the
 // type and features information match and if there is a one-to-one
 // mapping between links that preserves bw, and destination.
 int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 {
-  typedef hash_multiset<link_info,hashlinkinfo> link_set;
-
   // The unique flag is used to signify that there is some reason that assign
   // is not aware of that the node is unique, and shouldn't be put into a
   // pclass. The usual reason for doing this is for scoring purposes - ie.
-  // don't prefer one just because it's the same pclass as another that, in
+  // don't prefer one just because it's the same pclass over another that, in
   // reality, is very different.
   if (a->unique || b->unique) {
       return 0;
@@ -129,33 +118,51 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
     }
   }
 
-  // check links - to do this we first create sets of every link in b.
-  // we then loop through every link in a, find a match in the set, and
-  // remove it from the set.
+  // Check links
   pvertex an = pnode2vertex[a];
   pvertex bn = pnode2vertex[b];
 
-  link_set b_links;
+  // Make a list of all links for node b
+  typedef list<pedge> link_list;
+  link_list b_links;
 
   poedge_iterator eit,eendit;
   tie(eit,eendit) = out_edges(bn,PG);
   for (;eit != eendit;++eit) {
     pvertex dst = target(*eit,PG);
-    if (dst == bn)
-      dst = source(*eit,PG);
-    b_links.insert(link_info(dst,get(pedge_pmap,*eit)->delay_info.bandwidth));
+    b_links.push_back(*eit);
   }
+  
+  // Go through all of a's links, trying to find matches on node b. If we find
+  // a match, we remove it from the list
   tie(eit,eendit) = out_edges(an,PG);
   for (;eit != eendit;++eit) {
-    pvertex dst = target(*eit,PG);
-    if (dst == an)
-      dst = source(*eit,PG);
-    int bw = get(pedge_pmap,*eit)->delay_info.bandwidth;
-    link_info tomatch = link_info(dst,bw);
-    link_set::iterator found = b_links.find(tomatch);
-    if (found == b_links.end()) return 0;
-    else b_links.erase(found);
+    tb_plink *plink_a = get(pedge_pmap,*eit);
+    pvertex dest_pv_a = target(*eit,PG);
+    if (dest_pv_a == a)
+      dest_pv_a = source(*eit,PG);
+
+    link_list::iterator bit;
+    for (bit = b_links.begin(); bit != b_links.end(); bit++) {
+      tb_plink *plink_b = get(pedge_pmap,*bit);
+      pvertex dest_pv_b = target(*bit,PG);
+      if (dest_pv_b == b)
+	dest_pv_b = source(*bit,PG);
+
+      // If links are equivalent, remove this link in b from further
+      // consideration, and go to the next link in a
+      if ((dest_pv_a == dest_pv_b) && plink_a->is_equiv(*plink_b)) {
+	b_links.erase(bit);
+	break;
+      }
+    }
+    // If we never found a match, these nodes aren't equivalent
+    if (bit == b_links.end()) {
+      return 0;
+    }
   }
+
+  // Make sure node b has no extra links
   if (b_links.size() != 0) return 0;
   return 1;
 }

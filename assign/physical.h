@@ -61,6 +61,8 @@ typedef hash_map<svertex,switch_dist_map*>switch_dist_map_map;
 typedef list<pedge> pedge_path;
 typedef list<pvertex> pvertex_list;
 
+typedef hash_map<crope,int> link_type_count_map;
+
 // Globals, declared in assign.cc
 
 extern tb_pgraph_vertex_pmap pvertex_pmap;
@@ -156,6 +158,9 @@ public:
 
   bool is_switch;		// Indicates whether or not this pnode is a
                                 // switch
+				//
+  link_type_count_map link_counts; // Counts how many links of each type this
+  				   // node has 
 	
   bool set_current_type(crope type) {
       if (types.find(type) == types.end()) {
@@ -228,17 +233,22 @@ typedef hash_map<nodepair,int,pairhash<crope> > nodepair_count_map;
 class tb_plink {
 public:
   typedef enum {PLINK_NORMAL,PLINK_INTERSWITCH,PLINK_LAN} plinkType;
+  typedef hash_set<crope> type_set;
 
-  tb_plink(crope _name, plinkType _type, crope _srcmac, crope _dstmac)
-    : name(_name), srcmac(_srcmac), dstmac(_dstmac), type(_type),
+  tb_plink(crope _name, plinkType _is_type, crope _type, crope _srcmac, crope
+      _dstmac)
+    : name(_name), srcmac(_srcmac), dstmac(_dstmac), is_type(_is_type),
       delay_info(), bw_used(0), emulated(0), nonemulated(0),
       penalty(0.0), fixends(false), current_endpoints(), current_count(0),
-      vedge_counts() {;}
+      vedge_counts() {
+	  types.insert(_type);
+      }
 
   crope name;			// the name
   crope srcmac,dstmac;		// source and destination MAC addresses.
 
-  plinkType type;		// type of the link
+  plinkType is_type;		// inter-switch type of the link
+  type_set types;		// type (ie. ethernet) of the link
   tb_delay_info delay_info;	// the delay characteristics of this link
   int bw_used;			// how much is used
 
@@ -258,7 +268,7 @@ public:
   {
     o << "tb_plink: " << link.name << " (" << &link << ")" << endl;
     o << "  type: ";
-    switch (link.type) {
+    switch (link.is_type) {
     case tb_plink::PLINK_NORMAL:
       o << "normal" << endl;
       break;
@@ -275,6 +285,21 @@ public:
       link.nonemulated << endl;
     o << link.delay_info;
     return o;
+  }
+
+  // Return true if the two plinks are equivalent, in terms of type and
+  // bandwidth.
+  // NOTE: should probably use a helper function in delay_info, but right now,
+  // we only care about bandwidth
+  const bool is_equiv(const tb_plink& link) {
+      if (types == link.types) {
+	  return false;
+      }
+      if (delay_info.bandwidth != link.delay_info.bandwidth) {
+	  return false;
+      }
+
+      return true;
   }
 };
 

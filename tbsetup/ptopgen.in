@@ -413,6 +413,15 @@ foreach $node (keys(%nodes)) {
 # physnode. 
 #
 if ($widearea) {
+    #
+    # If we are spposed to exempt a certain eid from being considered down,
+    # build up a clause to do that - we consider all nodes already used by that
+    # experiment to be available
+    #
+    my $exempt_condition = "0";
+    if (defined($exempt_eid)) {
+	$free_condition = "(r.pid='$pid' and r.eid='$exempt_eid')"; 
+    }
     $result =
 	DBQueryFatal("select count(a.node_id),a.phys_nodeid,aa.type, ".
 		     "  ns.status,m.pid,m.eid,wn.site ".
@@ -576,7 +585,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	    # !!! - Here we use our knowledge that in the wires table links
 	    # to the switch always come as node2.
 	    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-		" $node2:$iface2 $bw 0 0 1\n";
+		" $node2:$iface2 $bw 0 0 1 ethernet\n";
 	}
     } 
 }
@@ -632,7 +641,8 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
 
 foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
-    print "link link-$interconnect $src $dst $interconnects{$interconnect} 0 0 1\n";
+    print "link link-$interconnect $src $dst $interconnects{$interconnect} " .
+	"0 0 1 ethernet\n";
 }
 
 #
@@ -659,7 +669,7 @@ foreach my $switchtype (("80211a", "80211b", "80211g")) {
 		#print "$node $card $port $type $proto\n";
 		
 		print "link link-$node:$iface-$switchname:(null) ".
-		    "$node:$node/$iface $switchname:(null) $ifacebw 0 0 1\n";
+		    "$node:$node/$iface $switchname:(null) $ifacebw 0 0 1 80211\n";
 	    }
 	}
     }

@@ -3,9 +3,11 @@ node pa pc:1
 node pb pc:1
 node pc pc:1
 node pd pc:1
-link l1 pa S 100 0 0
-link l2 pa S 100 0 0
-link l3 pb S 100 0 0
-link l4 pb S 100 0 0
-link l5 pc S 100 0 0
-link l6 pc S 100 0 0
+link l1 pa S 100 0 0 ethernet
+link l2 pa S 100 0 0 ethernet 
+link l3 pb S 100 0 0 ethernet
+link l4 pb S 100 0 0 ethernet
+link l5 pc S 100 0 0 ethernet
+link l6 pc S 100 0 0 ethernet
+link l7 pd S 100 0 0 80211
+link l8 pd S 100 0 0 80211

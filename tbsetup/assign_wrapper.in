@@ -3890,7 +3890,8 @@ sub CreateTopFile()
 		my ($node) = (split(":",$member))[0];
 		my $bandwidth = &getbandwidth($node, $lan, $bw);
 		    
-		print TOPFILE "link $plink $node fakelan/$lan $bandwidth 0 0\n";
+		print TOPFILE "link $plink $node fakelan/$lan $bandwidth " .
+		    "0 0 wireless\n";
 	    }
 	}
 	elsif ($#members == 1) {
@@ -3940,7 +3941,7 @@ sub CreateTopFile()
 		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 		    
 		    print(TOPFILE "link $plink $node0 $node1 ".
-			  max($bw,$rbw) . " 0 0" .
+			  max($bw,$rbw) . " 0 0 ethernet " .
 			  ($emulated ? " emulated" : "") .
 			  ($trivial_ok ? " trivial_ok\n" : "\n"));
 
@@ -3970,10 +3971,10 @@ sub CreateTopFile()
 		    print TOPFILE "node $delayname delay\n";
 		    print TOPFILE
 			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
-			"$node0 $delayname $bandwidth 0 0\n";
+			"$node0 $delayname $bandwidth 0 0 ethernet\n";
 		    print TOPFILE
 			"link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
-			"$node1 $delayname $bandwidth 0 0\n";
+			"$node1 $delayname $bandwidth 0 0 ethernet\n";
 
 		    $delaynodes{$delayname} = $delayname;
 		    
@@ -3994,10 +3995,10 @@ sub CreateTopFile()
 		
 		print TOPFILE "link $plink $node0 $node1";
 		if ($emulated) {
-		    print TOPFILE " " . max($bw,$rbw) . " 0 0 emulated";
+		    print TOPFILE " " . max($bw,$rbw) . " 0 0 ethernet emulated";
 		}
 		else {
-		    print TOPFILE " $bandwidth 0 0";
+		    print TOPFILE " $bandwidth 0 0 ethernet";
 		}
 		if ($trivial_ok) {
 		    print TOPFILE " trivial_ok";
@@ -4061,7 +4062,7 @@ sub CreateTopFile()
 			     $member,$rdelay,$rbw,$rloss,0];
 
 			print(TOPFILE "link $plink $node lan/$lan " .
-			      max($bw,$rbw) . " 0 0" .
+			      max($bw,$rbw) . " 0 0 ethernet" .
 			      ($emulated ? " emulated" : "") .
 			      ($trivial_ok ? " trivial_ok\n" : "\n"));
 
@@ -4078,9 +4079,9 @@ sub CreateTopFile()
 			
 			print TOPFILE "node $delayname delay\n";
 			print TOPFILE "link linkdelaysrc/$lan/$member" .
-			    " $node $delayname $bandwidth 0 0\n";
+			    " $node $delayname $bandwidth 0 0 ethernet\n";
 			print TOPFILE "link linkdelaydst/$lan/$member" .
-			    " lan/$lan $delayname $bandwidth 0 0\n";
+			    " lan/$lan $delayname $bandwidth 0 0 ethernet\n";
 			
 			$delaynodes{$delayname} = $delayname;
 
@@ -4098,7 +4099,8 @@ sub CreateTopFile()
 		else {
 		    my $plink = "linklan/$lan/$member";
 		    
-		    print TOPFILE "link $plink $node lan/$lan $bandwidth 0 0";
+		    print TOPFILE "link $plink $node lan/$lan $bandwidth " .
+			"0 0 ethernet";
 		    if ($emulated) {
 			print TOPFILE " emulated";
 		    }

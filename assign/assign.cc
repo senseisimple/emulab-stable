@@ -333,7 +333,8 @@ void print_help()
       << endl;
   cout << "  -u          - Print a summary of the solution." << endl;
   cout << "  -c <float>  - Use the 'connected' pnode finding algorithm " <<
-      "<float>% of the time." << endl;
+      "<float>*100% of the time." << endl;
+  cout << "  -n          - Don't anneal - just do the prechecks." << endl;
   exit(EXIT_FATAL);
 }
  
@@ -386,7 +387,7 @@ int type_precheck() {
     }
 
     if (ok) {
-      cout << "Type preecheck passed." << endl;
+      cout << "Type precheck passed." << endl;
       return 1;
     } else {
       cout << "Type precheck failed!" << endl;
@@ -424,11 +425,15 @@ int mapping_precheck() {
 
 	// This constitutes a list of the number of ptypes that matched the
 	// criteria. We use to guess what's wrong with the vnode.
-	int matched_links = 0;
 	int matched_bw = 0;
 	// Keep track of desires had how many 'hits', so that we can tell
 	// if any simply were not matched
 	tb_vnode::desires_count_map matched_desires;
+
+	// Keep track of which link types had how many 'hits', so that we can
+	// tell which type(s) caused this node to fail
+	tb_vnode::link_counts_map matched_link_counts;
+	map<crope,bool> matched_links;
 
 	tb_vclass *vclass = v->vclass;
 	tb_vclass::members_map::iterator mit;
@@ -452,6 +457,7 @@ int mapping_precheck() {
 		// Grab the first node of the pclass as a representative sample
 		tb_pnode *pnode = *((*it)->members[this_type]->L.begin());
 
+#if 0
 		// Check the number of interfaces - if the pnode is a switch,
 		// for now, we don't check this, since it can end up with more
 		// 'interfaces' due to the fact that it can have interswitch
@@ -462,6 +468,10 @@ int mapping_precheck() {
 		} else {
 		    potential_match = false;
 		}
+#endif
+
+		// Check to see if any of the link that this pnode has are of
+		// the correct type for the virtual node
 
 		// Check bandwidth on emulated links
 		if (pnode->total_bandwidth >= v->total_bandwidth) {
@@ -528,6 +538,26 @@ int mapping_precheck() {
 		    }
 		}
 
+		// Check link types
+		tb_vnode::link_counts_map::iterator vit;
+		for (vit = v->link_counts.begin(); vit != v->link_counts.end();
+		    vit++) {
+		  crope type = vit->first;
+		  int count = vit->second;
+		  if (pnode->link_counts.find(type) !=
+			pnode->link_counts.end()) {
+		    // Found at least one link of this type
+		    matched_links[type] = true;
+		    if (pnode->link_counts[type] >= count) {
+		      // Great, there are enough, too
+		      matched_link_counts[type]++;
+		    } else {
+		      potential_match = false;
+		    }
+		  } else {
+		    potential_match = false;
+		  }
+		}
 
 		if (potential_match) {
 		    vec->push_back(*it);
@@ -553,8 +583,20 @@ int mapping_precheck() {
 	if (vnode_type_table[v->name].first == 0) {
 	    cout << "  *** No possible mapping for " << v->name << endl;
 	    // Make an attempt to figure out why it didn't match
-	    if (!matched_links) {
-		cout << "      Too many links!" << endl;
+	    
+	    // Check all of its link types
+	    tb_vnode::link_counts_map::iterator lit;
+	    for (lit = v->link_counts.begin(); lit != v->link_counts.end();
+		lit++) {
+	      crope type = lit->first;
+	      if (!matched_links[type]) {
+		cout << "      No links of type " << type << " found!" << endl;
+	      } else {
+		if (!matched_link_counts[type]) {
+		  cout << "      Too many links of type " << type << "!"
+		    << endl;
+		}
+	      }
 	    }
 
 	    if (!matched_bw) {
@@ -612,12 +654,13 @@ int main(int argc,char **argv)
   int seed = 0;
   crope viz_prefix;
   bool scoring_selftest = false;
+  bool prechecks_only = false;
   
   // Handle command line
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:n")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -673,6 +716,10 @@ int main(int argc,char **argv)
       if (sscanf(optarg,"%lf",&use_connected_pnode_find) != 1) {
 	print_help();
       }
+      break;
+    case 'n':
+      prechecks_only = true;
+      cout << "Doing only prechecks, exiting early" << endl;
       break;
     default:
       print_help();
@@ -751,6 +798,11 @@ int main(int argc,char **argv)
   // Run the mapping precheck
   if (!mapping_precheck()) {
       exit(EXIT_UNRETRYABLE);
+  }
+
+  // Bomb out early if we're only doing the prechecks
+  if (prechecks_only) {
+      exit(EXIT_SUCCESS);
   }
 
 #ifdef PER_VNODE_TT
