@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -280,11 +280,12 @@ parse_args(char *buf, tg_action *tg)
 	static int currate = -1;
 	static int curpsize = DEFAULT_PKT_SIZE;
 	static double curinterval = DEFAULT_INTERVAL;
-	int psize, rate;
+	static int curqos = -1;
+	int psize, rate, qos;
 	double interval;
 	char *cp;
 
-	psize = rate = -1;
+	psize = rate = qos = -1;
 	interval = -1.0;
 
 	/*
@@ -300,6 +301,9 @@ parse_args(char *buf, tg_action *tg)
 				continue; 
 
 			if (sscanf(cp, "RATE=%d", &rate) == 1)
+				continue; 
+
+			if (sscanf(cp, "QOS=%d", &qos) == 1)
 				continue; 
 		}
 	}
@@ -349,18 +353,30 @@ parse_args(char *buf, tg_action *tg)
 	}
 
 	/*
+	 * Check QOS value
+	 */
+	if (qos == -1)
+		qos = curqos;
+
+	/*
 	 * Finally, record the new values.
 	 */
 	dist_const_init(&tg->arrival, interval);
 	dist_const_init(&tg->length, (double)psize);
 	tg->tg_flags |= (TG_ARRIVAL|TG_LENGTH);
+	if (qos != -1) {
+		prot.tos = qos;
+		prot.qos |= QOS_TOS;
+	} else
+		prot.qos &= ~QOS_TOS;
 	curinterval = interval;
 	curpsize = psize;
 	currate = rate;
+	curqos = qos;
 
 #if 0
-	fprintf(stderr, "parse_args: new psize=%d, interval=%.9f\n",
-		psize, interval);
+	fprintf(stderr, "parse_args: new psize=%d, interval=%.9f, qos=%d\n",
+		psize, interval, qos);
 #endif
 
 	return(0);

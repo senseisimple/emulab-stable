@@ -1,3 +1,4 @@
+Only in tg2.0/src/tg: #prot_tcp.c#
 diff -ru dist-tg2.0/src/tg/config.h tg2.0/src/tg/config.h
 --- dist-tg2.0/src/tg/config.h	Thu Jan 24 16:30:09 2002
 +++ tg2.0/src/tg/config.h	Mon Jul  8 14:46:06 2002
@@ -242,8 +243,36 @@ diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
  	}
 diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
 --- dist-tg2.0/src/tg/prot_tcp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_tcp.c	Mon Jul  8 14:46:06 2002
-@@ -184,7 +184,24 @@
++++ tg2.0/src/tg/prot_tcp.c	Fri Apr 18 13:36:45 2003
+@@ -93,6 +93,12 @@
+ 
+ #endif /* QOSDEBUG */
+ 
++#ifndef SUNOS4 
++    if ((prot->qos & QOS_TOS) != 0)
++	if (setsockopt(fd, IPPROTO_IP, IP_TOS, (char *)(&(prot->tos)), 
++		       sizeof(prot->tos)) == -1)
++	    perror("tcp_setup: can't set TOS");
++#endif              
+ 
+     if ((prot->qos & QOS_RCVWIN) != 0)
+     {
+@@ -165,14 +171,6 @@
+ 			return(-1);
+ 			}
+ 		/* handle any QOS parameters */
+-#ifndef SUNOS4 
+-               if ((prot->qos & QOS_TOS) != 0)
+-               /* Set IP tos */
+- 	              if (setsockopt(sfd, IPPROTO_IP, IP_TOS, (char *)(&(prot->tos)), 
+-                         sizeof(prot->tos)) == -1)
+-		            perror("tcp_setup: can't set TOS");
+-#endif              
+-
+ 		tcp_qos(sfd);
+ 
+ 		tmpaddr = (struct sockaddr_in *)&(prot->dst); 
+@@ -184,7 +182,24 @@
  			return (-1);
  		}	
  
@@ -269,7 +298,7 @@ diff -ru dist-tg2.0/src/tg/prot_tcp.c tg2.0/src/tg/prot_tcp.c
  		    (errno != EINPROGRESS))
  			{
  			(void)close(sfd);
-@@ -217,6 +234,13 @@
+@@ -217,6 +232,13 @@
  			return (-1);
  		}	
  
@@ -296,7 +325,16 @@ diff -ru dist-tg2.0/src/tg/prot_test.c tg2.0/src/tg/prot_test.c
  	else
 diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
 --- dist-tg2.0/src/tg/prot_udp.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_udp.c	Mon Jul  8 14:46:06 2002
++++ tg2.0/src/tg/prot_udp.c	Fri Apr 18 13:53:15 2003
+@@ -47,7 +47,7 @@
+ 
+ /* Apply QOS parameters to an existing fd.                              */
+ 
+-static void udp_qos(fd, prot)
++void udp_qos(fd, prot)
+ int             fd;
+ protocol       *prot;
+ {
 @@ -199,13 +199,20 @@
  
  		if (prot->qos & QOS_SRC)
@@ -344,7 +382,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  			    (void)close(sfd);
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Tue Jan  7 13:07:44 2003
++++ tg2.0/src/tg/tg.y	Fri Apr 18 13:52:44 2003
 @@ -133,7 +133,11 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;
@@ -427,18 +465,30 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			{
  			/* (Re-)Start logging to a new file */
  			time_t now;
-@@ -1144,6 +1160,10 @@
+@@ -1144,6 +1160,22 @@
  
  			generate(tx_asn, cur_tg, lasttime);
  			}
 +#ifdef USEEVENTS
 +		if (gotevent)
++			{
++			if (prot.qos & QOS_TOS)
++				{
++				/* XXX should be in proto table */
++				extern long tcp_setup(), udp_setup();
++				extern void tcp_qos(), udp_qos();
++				if (prot.prot->setup == tcp_setup)
++					tcp_qos(tx_asn);
++				else if (prot.prot->setup == udp_setup)
++					udp_qos(tx_asn);
++				}
 +			goto restart;
++			}
 +#endif
  		}
  
  	/* Finished, tear down connection.				*/
-@@ -1154,8 +1174,11 @@
+@@ -1154,8 +1186,11 @@
  		/* log the teardown error. */
  
  		perror("do_actions: protocol teardown");
@@ -450,7 +500,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  
  	return;
  	}
-@@ -1341,6 +1364,12 @@
+@@ -1341,6 +1376,12 @@
  
  		if (arrival != 0)
  			(*(prot.prot->sleep_till))(&nextpkt_tv);
@@ -463,7 +513,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  		lasttime = nextpkt_tv;
  
  		/* Did we exceed the limit on the number of packets to send? */
-@@ -1382,6 +1411,10 @@
+@@ -1382,6 +1423,10 @@
  						   pktlen,
  						   &(cur_tg->stop_before),
  						   &pktid);
@@ -474,7 +524,7 @@ diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
  			}
  		}
  	}
-@@ -2096,5 +2129,16 @@
+@@ -2096,5 +2141,16 @@
  	char		*addr;
  {
  
