@@ -1,0 +1,167 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# For restart: event system restart. clear ready bits and startup status,
+#             boot status, port counters.
+
+use English;
+use Getopt::Std;
+
+#
+# This gets invoked from the Web interface. Swap an experiment in or out.
+#
+sub usage()
+{
+    print STDOUT "Usage: tbrestart <pid> <eid>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB     = "@prefix@";
+my $DBNAME = "@TBDBNAME@";
+my $TBOPS  = "@TBOPSEMAIL@";
+my $TBLOGS = "@TBLOGSEMAIL@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Locals
+my $nodereboot = "$TB/bin/node_reboot";
+my $waitstart  = time;
+my $failed     = 0;
+my $state;
+
+#
+# Untaint the path
+# 
+# Untaint the path
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:$TB/libexec:$TB/sbin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+my @nodes = ExpNodes($pid, $eid);
+
+print "Beginning restart in for $pid/$eid. " . TBTimeStamp() . "\n";
+TBDebugTimeStamp("tbrestart started");
+
+#
+# Must be an active experiment to restart!
+# 
+if (! ($state = ExpState($pid, $eid))) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid\n");
+}
+if ($state ne EXPTSTATE_ACTIVE) {
+    die("*** $0:\n".
+	"    Experiment must be active to be restart!\n");
+}
+
+#
+# Stop the event system. 
+# 
+if (!$DISABLE_EVENTS) {
+    print "Stopping the event system.\n";
+    TBDebugTimeStamp("eventsys_control started");
+    if (system("eventsys_control stop $pid $eid")) {
+	die("*** $0:\n".
+	    "    Failed to stop the event system.\n");
+    }
+    TBDebugTimeStamp("eventsys_control finished");
+}
+
+#
+# Clearing the portstat counters seems like a good idea.
+# 
+print "Clearing port counters.\n";
+TBDebugTimeStamp("portstats started");
+if (system("portstats -z -a -q $pid $eid")) {
+    print STDERR "*** WARNING: Failed to clear port counters.\n";
+    #
+    # This is a non-fatal error.
+    # 
+}
+TBDebugTimeStamp("portstats finished");
+
+#
+# Grab the node list. We are going to reboot each one in turn, instead of
+# as a group. Why? Cause we need to know when the node is down so that we
+# clear/reset state in the DB. We have no idea what the node is doing at
+# this point. This is terribly imperfect of course, since there are no
+# guarantees, especially since the events are async (a tbreset and isup
+# could be in the event queue for a node). The ready bits present the worst
+# problem. 
+#
+print "Rebooting all nodes\n";
+TBDebugTimeStamp("node reboot started");
+foreach my $node ( @nodes ) {
+    if (system("$nodereboot $node")) {
+	die("*** $0:\n".
+	    "    Failed to reboot node $node!\n");
+    }
+    # Clears various things including ready bits.
+    TBNodeBootReset($node);
+}
+
+print STDOUT "Waiting for nodes to come up ...\n";
+    
+foreach my $node ( sort(@nodes) ) {
+    if (! TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $waitstart, (60*6))) {
+	print STDOUT "$node is alive and well\n";
+	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	next;
+    }
+    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
+    $failed++;
+}
+TBDebugTimeStamp("node reboot finished");
+
+if ($failed) {
+    die("*** $0:\n".
+	"    $failed nodes failed to reboot properly! \n");
+}
+
+#
+# Start the event system. 
+# 
+if (!$DISABLE_EVENTS) {
+    print "Starting the event system.\n";
+    TBDebugTimeStamp("eventsys_control started");
+    if (system("eventsys_control start $pid $eid")) {
+	die("*** $0:\n".
+	    "    Failed to start the event system.\n");
+    }
+    TBDebugTimeStamp("eventsys_control finished");
+}
+
+print "Restart finished. " . TBTimeStamp() . "\n";
+TBDebugTimeStamp("tbrestart finished");
+exit(0);

@@ -12,13 +12,9 @@ use Getopt::Std;
 #
 # This gets invoked from the Web interface. Swap an experiment in or out.
 #
-# Note about exit value. -1 means error. 0 means backgrounded. 1 means
-# somthing else. The web page uses this to decide what kind of message
-# to give the user. 
-#
 sub usage()
 {
-    print STDOUT "Usage: swapexp <-s in | out> <pid> <eid>\n";
+    print STDOUT "Usage: swapexp <-s in | out | restart> <pid> <eid>\n";
     exit(-1);
 }
 my  $optlist = "s:";
@@ -48,6 +44,7 @@ my $dbuid;
 my $user_name;
 my $user_email;
 my @row;
+my $action;
     
 #
 # Untaint the path
@@ -80,13 +77,10 @@ if (@ARGV != 2) {
 }
 my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
-if (defined($options{"b"})) {
-    $batch = $options{"b"};
-}
 if (defined($options{"s"})) {
     $inout = $options{"s"};
 
-    if ($inout ne "out" && $inout ne "in") {
+    if ($inout ne "out" && $inout ne "in" && $inout ne "restart") {
 	usage();
     }
 }
@@ -136,7 +130,7 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 if ($UID && !TBAdmin($UID) &&
     !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
-	"    You do not have permission to end this experiment!\n");
+	"    You do not have permission to swap this experiment!\n");
 }
 
 #
@@ -206,6 +200,10 @@ if ($inout eq "out" && $estate eq EXPTSTATE_SWAPPED) {
     die("*** $0:\n".
 	"    It appears that experiment $pid/$eid is already swapped out!");
 }
+if ($inout eq "restart" && $estate ne EXPTSTATE_ACTIVE) {
+    die("*** $0:\n".
+	"    It appears that experiment $pid/$eid is not active!");
+}
 
 #
 # Set the timestamp now, and unlock the experiments table.
@@ -219,6 +217,16 @@ DBQueryFatal("unlock tables");
 # XXX - At this point a failure is going to leave things in an
 # inconsistent state.
 #
+
+if ($inout eq "in") {
+    $action = "swapped in";
+}
+if ($inout eq "out") {
+    $action = "swapped out";
+}
+if ($inout eq "restart") {
+    $action = "restarted";
+}
 
 #
 # Get email address of the experiment head, which may be different than
@@ -247,10 +255,8 @@ if (! $batch) {
 	#
 	# Parent exits normally
 	#
-	print STDOUT
-	    "Experiment $pid/$eid is now swapping $inout.\n".
-	    "You will be notified via email when the experiment has ".
-	    "finished swapping.\n";
+	print "Experiment $pid/$eid is now being $action.\n".
+	    "You will be notified via email when the this is done.\n";
 	exit(0);
     }
 }
@@ -258,7 +264,7 @@ if (! $batch) {
 #
 # Remove old report file since its contents are going to be invalid.
 #
-if (-e $repfile) {
+if ($inout ne "restart" && -e $repfile) {
     unlink("$repfile");
 }
 
@@ -276,7 +282,7 @@ if ($inout eq "out") {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 }
-else {
+elsif ($inout eq "in") {
     print STDOUT "Running tbswapin with arguments: $pid $eid\n";
     if (system("$tbdir/tbswapin $pid $eid") != 0) {
 	fatal("tbswapin failed!\n");
@@ -288,6 +294,12 @@ else {
     }
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+}
+else {
+    print STDOUT "Running tbrestart with arguments: $pid $eid\n";
+    if (system("$tbdir/tbrestart $pid $eid") != 0) {
+	fatal("tbrestart failed!\n");
+    }
 }
 
 #
@@ -307,7 +319,7 @@ system("cp -Rfp $workdir/ $userdir/tbdata");
 #
 TBUnLockExp($pid, $eid);
 
-print "Swap Success\n";
+print "Done!\n";
 
 #
 # In batch mode, just exit without sending email.
@@ -327,18 +339,17 @@ if (defined($logname)) {
 # Send email notification to user.
 #
 my $message =
-    "Experiment `$eid' in project `$pid' has been swapped $inout.\n\n" .
-    "Appended below is the output of the experiment swap${inout}. If you\n" .
-    "have any questions or comments, please include the output below\n" .
-    "in your message to $TBOPS\n";
+    "Experiment `$eid' in project `$pid' has been $action.\n\n" .
+    "Appended below is the output. If you have any questions or comments,\n" .
+    "please include the output in your message to $TBOPS\n";
 
 SENDMAIL("$user_name <$user_email>",
-	 "Experiment $pid/$eid Swapped $inout",
+	 "Experiment $pid/$eid $action",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
 	 "Bcc: $TBLOGS",
-	 ($repfile, $logname));
+	 (($inout eq "restart") ? ($logname) : ($repfile, $logname)));
 
 exit 0;
 
@@ -376,7 +387,7 @@ sub fatal($)
     # Send a message to the testbed list. Append the logfile.
     #
     SENDMAIL("$user_name <$user_email>",
-	     "Swap${inout} Failure: $pid/$eid",
+	     "Swap ${inout} Failure: $pid/$eid",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc:  $expt_head_name <$expt_head_email>\n".

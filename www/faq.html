@@ -43,6 +43,7 @@
      <li> <a href="#UTT-7">Are the nodes in my experiment backed up
                            (filesaved)?</a> 
      <li> <a href="#UTT-Swapping">What is Swapping?</a> 
+     <li> <a href="#UTT-Restart">What is Experiment Restart?</a> 
      <li> <a href="#UTT-8">How can I get switch statistics (such as packet
                            counts) for my experiment?</a> 
      <li> <a href="#UTT-Naming">What names should I use to refer to the
@@ -601,6 +602,23 @@
     Make sure to take a look at our 
     <a href="docwrapper.php3?docname=swapping.html"> Node Usage Policies</a> 
     as well.
+    </p>
+
+<li><a NAME="UTT-Restart"></a>
+    <h3>What is Experiment Restart?</h3>
+    <p>
+    Experiment restart (or perhaps more aptly, replay) allows you to
+    rerun your experiment from scratch, but without the added expense
+    of a swapin and swapout. In other words, the nodes that are
+    currently allocated to your experiment are all rebooted, and the
+    experiment startup state is cleared. This includes the
+    <a href="#SWS-6">ready bits</a>, the boot status in the web page,
+    and the <a href="#SWS-4">startup command status</a>. In addition,
+    the event scheduler for the experiment is restarted, and your event
+    sequence is replayed again. Note that your rpms and tarfiles are
+    <b>not</b> installed again. Replay is obviously faster than
+    swapout/swapin, and has the added benefit that you will not run
+    the risk of not being able to swapin for lack of available nodes.
     </p>
 
 <li><a NAME="UTT-8"></a>
