@@ -17,7 +17,9 @@ $query_result =
     DBQueryFatal("select count(*) from experiments as e " .
 	"left join experiment_stats as s on s.exptidx=e.idx " .
 	"left join experiment_resources as rs on rs.idx=s.rsrcidx ".
-	"where state='active' and rs.pnodes > 0 and e.pid != 'emulab-ops'");
+	"where state='active' and rs.pnodes > 0 and " .
+        "      e.pid!='emulab-ops' and (e.pid!='ron' and e.eid!='all')");
+
 if (mysql_num_rows($query_result) != 1) {
     $active_expts = "ERR";
 } else {
@@ -52,13 +54,15 @@ if (mysql_num_rows($query_result) != 1) {
 	Current Experiments</th></tr>
 <tr><td align="right" class="menuopt"><?php echo $active_expts ?></td> 
     <td align="left" class="menuopt">
-        <a href=explist.php3>Active</a>
+        <a href=explist.php3#active>Active</a>
+        <img src=/new.gif>
     </td></tr>
 <tr><td align="right" class="menuopt"><?php echo $idle_expts ?></td>
     <td align="left" class="menuopt">Idle</td></tr>
 <tr><td align="right" class="menuopt"><?php echo $swapped_expts ?></td>
     <td align="left" class="menuopt">
-        <a href=explist.php3>Swapped</a>
+        <a href=explist.php3#swapped>Swapped</a>
+        <img src=/new.gif>
     </td></tr>
 </table>
 </center>

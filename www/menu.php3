@@ -131,7 +131,7 @@ function WRITESIDEBAR() {
     if ($rootEmulab) {
 	WRITESIDEBARBUTTON("Other Emulabs", $TBDOCBASE,
 			       "docwrapper.php3?docname=otheremulabs.html");
-	WRITESIDEBARBUTTON_COOL("Join Netbed (CD)",
+	WRITESIDEBARBUTTON("Join Netbed (CD)",
 				$TBDOCBASE, "cdrom.php");
     } else {
 	WRITESIDEBARBUTTON_ABS("Utah Emulab", $TBDOCBASE,
