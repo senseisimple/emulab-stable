@@ -10,9 +10,13 @@ if ($#ARGV >= 1) {
     if ($oper eq '-r') {
 	foreach $n (@usrs) {
 	    chomp($n);
-	    $sth = $dbh->prepare("DELETE FROM users WHERE uid = \"$n\" OR usr_name = \"$n\"");
+	    $sth = $dbh->prepare("DELETE FROM users WHERE uid = \"$n\"");
+	    $sth2 = $dbh->prepare("DELETE FROM grp_memb WHERE uid = \"$n\"");
+	    $sth3 = $dbh->prepare("DELETE FROM proj_memb WHERE uid = \"$n\"");
 	    $rr = $sth->execute;
 	    $rr == 0 && die "User $n not found.\n";
+	    $sth2->execute;
+	    $sth3->execute;
 	    print "User $n removed.\n"; 
 	}
     } elsif ($oper eq '-a') { 
