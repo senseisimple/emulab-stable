@@ -2155,7 +2155,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
 	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
-	utils/grabwebcams utils/loghole \
+	utils/grabwebcams utils/loghole utils/webcopy \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
