@@ -47,7 +47,8 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
 	sudo:${PORTSDIR}/security/sudo \
 	${LOCALBASE}/sbin/named:${PORTSDIR}/net/bind9 \
-	wget:${PORTSDIR}/ftp/wget
+	wget:${PORTSDIR}/ftp/wget \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
