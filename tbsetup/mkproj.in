@@ -143,58 +143,65 @@ my (undef,undef,$gid) = getgrnam($pid)
 #
 # Okay, do it.
 #
-if (! mkdir("$PROJROOT/$pid", 0770)) {
-    fatal("Could not make directory $PROJROOT/$pid: $!");
-}
+if (! -e "$PROJROOT/$pid") {
+    if (! mkdir("$PROJROOT/$pid", 0770)) {
+	fatal("Could not make directory $PROJROOT/$pid: $!");
+    }
 
-if (! chmod(0770, "$PROJROOT/$pid")) {
-    fatal("Could not chmod directory $PROJROOT/$pid: $!");
-}
+    if (! chmod(0770, "$PROJROOT/$pid")) {
+	fatal("Could not chmod directory $PROJROOT/$pid: $!");
+    }
 
-if (! chown($uid, $gid, "$PROJROOT/$pid")) {
-    fatal("Could not chown $PROJROOT/$pid to $uid/$gid: $!");
+    if (! chown($uid, $gid, "$PROJROOT/$pid")) {
+	fatal("Could not chown $PROJROOT/$pid to $uid/$gid: $!");
+    }
 }
 
 #
 # Make project subdirs.
 #
 foreach my $dir (@DIRLIST) {
-
-    if (! mkdir("$PROJROOT/$pid/$dir", 0770)) {
-	fatal("Could not make directory $PROJROOT/$pid/$dir: $!");
-    }
-    if (! chmod(0770, "$PROJROOT/$pid/$dir")) {
-	fatal("Could not chmod directory $PROJROOT/$pid/$dir: $!");
-    }
-    if (! chown($uid, $gid, "$PROJROOT/$pid/$dir")) {
-	fatal("Could not chown $PROJROOT/$pid/$dir to $uid/$gid: $!");
+    if (! -e "$PROJROOT/$pid/$dir") {
+	if (! mkdir("$PROJROOT/$pid/$dir", 0770)) {
+	    fatal("Could not make directory $PROJROOT/$pid/$dir: $!");
+	}
+	if (! chmod(0770, "$PROJROOT/$pid/$dir")) {
+	    fatal("Could not chmod directory $PROJROOT/$pid/$dir: $!");
+	}
+	if (! chown($uid, $gid, "$PROJROOT/$pid/$dir")) {
+	    fatal("Could not chown $PROJROOT/$pid/$dir to $uid/$gid: $!");
+	}
     }
 }
 
 #
 # Create a tftp directory for oskit kernels.
-# 
-if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
-    fatal("Could not make directory $TFTPROOT/proj/$pid: $!");
-}
-if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
-    fatal("Could not chmod directory $TFTPROOT/proj/$pid: $!");
-}
-if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
-    fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+#
+if (! -e "$TFTPROOT/proj/$pid") {
+    if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
+	fatal("Could not make directory $TFTPROOT/proj/$pid: $!");
+    }
+    if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
+	fatal("Could not chmod directory $TFTPROOT/proj/$pid: $!");
+    }
+    if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
+	fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+    }
 }
 
 #
 # Create groups directory.
-# 
-if (! mkdir("$GRPROOT/$pid", 0770)) {
-    fatal("Could not make directory $GRPROOT/$pid: $!");
-}
-if (! chmod(0777, "$GRPROOT/$pid")) {
-    fatal("Could not chmod directory $GRPROOT/$pid: $!");
-}
-if (! chown($uid, $gid, "$GRPROOT/$pid")) {
-    fatal("Could not chown $GRPROOT/$pid to $uid/$gid: $!");
+#
+if (! -e "$GRPROOT/$pid") {
+    if (! mkdir("$GRPROOT/$pid", 0770)) {
+	fatal("Could not make directory $GRPROOT/$pid: $!");
+    }
+    if (! chmod(0777, "$GRPROOT/$pid")) {
+	fatal("Could not chmod directory $GRPROOT/$pid: $!");
+    }
+    if (! chown($uid, $gid, "$GRPROOT/$pid")) {
+	fatal("Could not chown $GRPROOT/$pid to $uid/$gid: $!");
+    }
 }
 
 #
@@ -202,14 +209,16 @@ if (! chown($uid, $gid, "$GRPROOT/$pid")) {
 #
 my $workdir = TBDB_EXPT_WORKDIR() . "/$pid";
 
-if (! mkdir("$workdir", 0770)) {
-    fatal("Could not make directory $workdir: $!");
-}
-if (! chmod(0770, "$workdir")) {
-    fatal("Could not chmod directory $workdir: $!");
-}
-if (! chown($uid, $gid, "$workdir")) {
-    fatal("Could not chown $workdir to $uid/$gid: $!");
+if (! -e $workdir) {
+    if (! mkdir("$workdir", 0770)) {
+	fatal("Could not make directory $workdir: $!");
+    }
+    if (! chmod(0770, "$workdir")) {
+	fatal("Could not chmod directory $workdir: $!");
+    }
+    if (! chown($uid, $gid, "$workdir")) {
+	fatal("Could not chown $workdir to $uid/$gid: $!");
+    }
 }
 
 exit(0);
