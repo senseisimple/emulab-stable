@@ -228,7 +228,7 @@ if (mysql_num_rows($experiments_result)) {
     #
 if ($thumb && !$idle) {
     echo "<table border=2 cols=0
-                 cellpadding=0 cellspacing=2 align=center><tr>";
+                 cellpadding=2 cellspacing=2 align=center><tr>";
 
     $thumbCount = 0;
  
@@ -240,11 +240,20 @@ if ($thumb && !$idle) {
 	$date = $row["d"];
 	
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
+#	echo "<table style=\"float: none;\" width=256 height=192><tr><td>".
+#	echo "And<table align=left width=256 height=192><tr width=256><td height=192>".
+#	echo "<table width=256 height=192><tr><td>".
+#	echo "<td width=50%>".
+#	echo "<tr
 
-	echo "<td width=33%><img src='top2image.php3?pid=$pid&eid=$eid&thumb=128' align=center><br />\n" .
-	     "<b><a href='showproject.php3?pid=$pid'>$pid</a>/".
+	echo "<td>".
+             "<table border=0 cellpadding=0 cellspacing=0 style='margin: 2px;' width=100%><tr>".
+	     "<td width=128>".
+	     "<img border=1 width=128 height=128 style='background-color:#FFF;' ".
+	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' align=center></td>" .
+	     "<td style='padding: 8px;'><b><a href='showproject.php3?pid=$pid'>$pid</a>/".
              "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></h4><br />\n".
-	     "<font size=-1>$name</font><br />\n";
+	     "<b><font size=-1>$name</font></b><br />\n";
 
 	# echo "<font size=-2>Using 69 PCs</font>\n";
 
@@ -265,14 +274,15 @@ if ($thumb && !$idle) {
 	    }
 	    # if ($lastlogin=="") { $lastlogin="<td>&nbsp;</td>\n"; }
 	    if ($lastlogin != "") {
-		echo "<font size=-2>Last Login: $lastlogin</font><br />\n";
+		echo "<font size=-2><b>Last Login:</b> $lastlogin</font><br />\n";
 	    }
 	}	
 
-	echo "</td>\n";
+	echo "</td></tr></table> \n";
+	echo "</td>";
 
 	$thumbcount++;
-	if (($thumbcount % 3) == 0) { echo "</tr><tr>\n"; }
+	if (($thumbcount % 2) == 0) { echo "</tr><tr>\n"; }
     }
 
     echo "</tr></table>";
