@@ -3,7 +3,7 @@ package event;
 require Exporter;
 require DynaLoader;
 @ISA = qw(Exporter DynaLoader);
-@EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_unregister c_event_poll dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe xmalloc xrealloc perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get  );
+@EXPORT = qw(address_tuple_alloc address_tuple_free event_register event_unregister c_event_poll dont_use_this_function_because_it_does_not_work event_notify event_schedule event_notification_alloc event_notification_free event_notification_clone event_notification_get_double event_notification_get_int32 event_notification_get_int64 event_notification_get_opaque c_event_notification_get_string event_notification_put_double event_notification_put_int32 event_notification_put_int64 event_notification_put_opaque event_notification_put_string event_notification_remove c_event_subscribe xmalloc xrealloc allocate_callback_data free_callback_data dequeue_callback_data enqueue_callback_data perl_stub_callback stub_event_subscribe event_notification_get_string event_notification_get_site event_notification_get_expt event_notification_get_group event_notification_get_host event_notification_get_objtype event_notification_get_objname event_notification_get_eventtype event_notification_get_arguments event_notification_set_arguments event_notification_get_sender event_notification_set_sender event_handle_server_set event_handle_server_get event_handle_status_set event_handle_status_get address_tuple_site_set address_tuple_site_get address_tuple_expt_set address_tuple_expt_get address_tuple_group_set address_tuple_group_get address_tuple_host_set address_tuple_host_get address_tuple_objtype_set address_tuple_objtype_get address_tuple_objname_set address_tuple_objname_get address_tuple_eventtype_set address_tuple_eventtype_get address_tuple_scheduler_set address_tuple_scheduler_get callback_data_callback_notification_set callback_data_callback_notification_get callback_data_next_set callback_data_next_get  );
 package eventc;
 bootstrap event;
 var_event_init();
@@ -175,6 +175,34 @@ sub c_event_subscribe {
 }
 *xmalloc = *eventc::xmalloc;
 *xrealloc = *eventc::xrealloc;
+sub allocate_callback_data {
+    my @args = @_;
+    my $result = eventc::allocate_callback_data(@args);
+    return undef if (!defined($result));
+    my %resulthash;
+    tie %resulthash, "callback_data", $result;
+    return bless \%resulthash, "callback_data";
+}
+sub free_callback_data {
+    my @args = @_;
+    $args[0] = tied(%{$args[0]});
+    my $result = eventc::free_callback_data(@args);
+    return $result;
+}
+sub dequeue_callback_data {
+    my @args = @_;
+    my $result = eventc::dequeue_callback_data(@args);
+    return undef if (!defined($result));
+    my %resulthash;
+    tie %resulthash, "callback_data", $result;
+    return bless \%resulthash, "callback_data";
+}
+sub enqueue_callback_data {
+    my @args = @_;
+    $args[0] = tied(%{$args[0]});
+    my $result = eventc::enqueue_callback_data(@args);
+    return $result;
+}
 sub perl_stub_callback {
     my @args = @_;
     $args[0] = tied(%{$args[0]});
@@ -389,6 +417,71 @@ sub NEXTKEY {
 }
 
 
+############# Class : callback_data ##############
+
+package callback_data;
+@ISA = qw( event );
+%OWNER = ();
+%BLESSEDMEMBERS = (
+    next => 'callback_data',
+);
+
+%ITERATORS = ();
+sub DISOWN {
+    my $self = shift;
+    my $ptr = tied(%$self);
+    delete $OWNER{$ptr};
+    };
+
+sub ACQUIRE {
+    my $self = shift;
+    my $ptr = tied(%$self);
+    $OWNER{$ptr} = 1;
+    };
+
+sub FETCH {
+    my ($self,$field) = @_;
+    my $member_func = "eventc::callback_data_${field}_get";
+    my $val = &$member_func($self);
+    if (exists $BLESSEDMEMBERS{$field}) {
+        return undef if (!defined($val));
+        my %retval;
+        tie %retval,$BLESSEDMEMBERS{$field},$val;
+        return bless \%retval, $BLESSEDMEMBERS{$field};
+    }
+    return $val;
+}
+
+sub STORE {
+    my ($self,$field,$newval) = @_;
+    my $member_func = "eventc::callback_data_${field}_set";
+    if (exists $BLESSEDMEMBERS{$field}) {
+        &$member_func($self,tied(%{$newval}));
+    } else {
+        &$member_func($self,$newval);
+    }
+}
+
+sub FIRSTKEY {
+    my $self = shift;
+    $ITERATORS{$self} = ['callback_notification', 'next', ];
+    my $first = shift @{$ITERATORS{$self}};
+    return $first;
+}
+
+sub NEXTKEY {
+    my $self = shift;
+    $nelem = scalar @{$ITERATORS{$self}};
+    if ($nelem > 0) {
+        my $member = shift @{$ITERATORS{$self}};
+        return $member;
+    } else {
+        $ITERATORS{$self} = ['callback_notification', 'next', ];
+        return ();
+    }
+}
+
+
 # ------- VARIABLE STUBS --------
 
 package event;
@@ -404,8 +497,11 @@ package event;
 *EVENT_SCHEDULE = *eventc::EVENT_SCHEDULE;
 *EVENT_TRAFGEN_START = *eventc::EVENT_TRAFGEN_START;
 *EVENT_TRAFGEN_STOP = *eventc::EVENT_TRAFGEN_STOP;
-*callback_ready = *eventc::callback_ready;
-*callback_notification = *eventc::callback_notification;
+
+my %__callback_data_list_hash;
+tie %__callback_data_list_hash,"callback_data", $eventc::callback_data_list;
+$callback_data_list= \%__callback_data_list_hash;
+bless $callback_data_list, callback_data;
 *event_string_buffer = *eventc::event_string_buffer;
 1;
 #
@@ -435,17 +531,16 @@ sub event_subscribe($$$;$) {
 sub event_poll($) {
 	my $handle = shift;
 
-	$event::callback_ready = 0;
-
 	my $rv = c_event_poll($handle);
 	if ($rv) {
 		die "Trouble in event_poll - returned $rv\h";
 	}
 
-	if ($event::callback_ready) {
-		&$event::callback($handle,$event::callback_notification,
+	while (my $data = dequeue_callback_data() ) {
+		&$event::callback($handle,$data->{callback_notification},
 				$event::callback_data);
-		event_notification_free($handle,$event::callback_notification);
+		event_notification_free($handle,$data->{callback_notification});
+		free_callback_data($data);
 	}
 
 	return 0;

@@ -25,17 +25,16 @@ sub event_subscribe($$$;$) {
 sub event_poll($) {
 	my $handle = shift;
 
-	$event::callback_ready = 0;
-
 	my $rv = c_event_poll($handle);
 	if ($rv) {
 		die "Trouble in event_poll - returned $rv\h";
 	}
 
-	if ($event::callback_ready) {
-		&$event::callback($handle,$event::callback_notification,
+	while (my $data = dequeue_callback_data() ) {
+		&$event::callback($handle,$data->{callback_notification},
 				$event::callback_data);
-		event_notification_free($handle,$event::callback_notification);
+		event_notification_free($handle,$data->{callback_notification});
+		free_callback_data($data);
 	}
 
 	return 0;

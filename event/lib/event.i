@@ -37,33 +37,60 @@
  * Glue needed to support callbacks under perl
  */
 %inline %{
-	/*
-	 * Set to 1 by the stub callback below if a notification is ready to be
-	 * processed by a callback.
-	 */
-	int callback_ready;
 
 	/*
-	 * Set when callback_ready is also set
+	 * Queue of notifications that have been received
 	 */
-	event_notification_t callback_notification;
+	struct callback_data {
+		event_notification_t callback_notification;
+		struct callback_data *next;
+	};
+	typedef struct callback_data *callback_data_t;
+
+	callback_data_t callback_data_list;
 
 	/*
-	 * Stub callback that simply sets callback_ready and
-	 * callback_notification
+	 * Simple wrappers, since we don't want to (maybe can't) call
+	 * malloc/free from perl
+	 */
+	callback_data_t allocate_callback_data() {
+		return (callback_data_t)malloc(sizeof(callback_data_t));
+	}
+
+	void free_callback_data(callback_data_t data) {
+		free(data);
+	}
+
+	callback_data_t dequeue_callback_data() {
+		callback_data_t data = callback_data_list;
+		if (callback_data_list) {
+			callback_data_list = callback_data_list->next;
+		}
+		return data;
+	}
+
+	void enqueue_callback_data(callback_data_t data) {
+		callback_data_t *pos = &callback_data_list;
+		while (*pos) {
+			pos = &((*pos)->next);
+		}
+		*pos = data;
+	}
+
+	/*
+	 * Stub callback that simply pushes a new entry onto the list
+	 * of data for the perl callback function
 	 */
 	void perl_stub_callback(event_handle_t handle,
 		event_notification_t notification, void *data) {
-		callback_ready = 1;
-		callback_notification = event_notification_clone(handle,
-			notification);
-		if (!callback_notification) {
-			/*
-			 * event_notification_clone will have already reported
-			 * an error message, so we don't have to again
-			 */
-			callback_ready = 0;
-		}
+		callback_data_t new_data;
+
+		new_data = allocate_callback_data();
+		new_data->callback_notification =
+			event_notification_clone(handle,notification);
+		new_data->next = NULL;
+
+		enqueue_callback_data(new_data);
 	}
 
 	/*
