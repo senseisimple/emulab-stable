@@ -291,7 +291,7 @@ class emulab:
             tmp["subject"] = res[0]
             tmp["author"] = res[1]
             tmp["date"] = xmlrpclib.DateTime(
-                time.strptime(res[2], "%Y-%m-%d %H:%M:%S"))
+                time.strptime(str(res[2]), "%Y-%m-%d %H:%M:%S"))
             tmp["msgid"] = res[3]
             result.append(tmp)
             pass
