@@ -58,6 +58,8 @@ PAGEHEADER("Documentation");
           Publications</a></b>
 <li><b><a href = "docwrapper.php3?docname=sponsors.html">
           Emulab Sponsors</a></b>
+<li><b><a href = "doc/docwrapper.php3?docname=changelog.html">
+          (Changelog/Techincal Details)</a></b>
 </ul>
 
 <?php
