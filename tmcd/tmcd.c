@@ -2165,7 +2165,19 @@ nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
 	mysql_free_result(res);
 	strcpy(pid, row[0]);
 	strcpy(eid, row[1]);
-	strcpy(gid, row[2]);
+
+	/*
+	 * If there is no gid (yes, thats bad and a mistake), then copy
+	 * the pid in. Also warn.
+	 */
+	if (row[2]) {
+		strcpy(gid, row[2]);
+	}
+	else {
+		strcpy(gid, pid);
+		syslog(LOG_ERR, "nodeidtoexp: %s: No GID for %s/%s (pid/eid)!",
+		       nodeid, pid, eid);
+	}
 
 	return 0;
 }
