@@ -57,7 +57,7 @@ Node instproc rename_lanlink {old new} {
 	if {$node == $old} {
 	    lappend newportlist $new
 	} else {
-	    lappend newportlist $old
+	    lappend newportlist $node
 	}
     }
     set portlist $newportlist
