@@ -587,7 +587,7 @@ dounix(char *data, int outfd, char *unixpath)
 		if (debug) 
 			fprintf(stderr,
 				"Connection to TMCD refused. Waiting ...\n");
-		sleep(2);
+		sleep(1);
 	}
 	connected = 1;
 
