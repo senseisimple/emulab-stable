@@ -1029,6 +1029,7 @@ function SHOWNODE($node_id) {
     $row = mysql_fetch_array($query_result);
 
     $node_id            = $row[node_id]; 
+    $phys_nodeid        = $row[phys_nodeid]; 
     $type               = $row[type];
     $vname		= $row[vname];
     $pid 		= $row[pid];
@@ -1069,6 +1070,15 @@ function SHOWNODE($node_id) {
               <td>Node ID:</td>
               <td class=left>$node_id</td>
           </tr>\n";
+
+    if (strcmp($node_id, $phys_nodeid)) {
+	echo "<tr>
+                  <td>Phys ID:</td>
+                  <td class=left>
+		      <A href='shownode.php3?node_id=$phys_nodeid'>
+                         $phys_nodeid</a></td>
+              </tr>\n";
+    }
 
     if ($vname) {
 	echo "<tr>
