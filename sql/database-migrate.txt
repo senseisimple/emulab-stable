@@ -1276,7 +1276,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table reserved add KEY old_pid (old_pid,old_eid);
 
-1.123: Add jail_osname and delay_osname as temporary (well, perhaps)
+1.223: Add jail_osname and delay_osname as temporary (well, perhaps)
        aids for paper effort. Note, not an osid, but an osname like we
        specify for a virt_node. Lookup rules are the same; first check
        the current project for a match, and then check emulab-ops.
@@ -1286,19 +1286,19 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add delay_osname varchar(20) \
 		default NULL after jail_osname;
 		
-1.124: Add rtabid to nodes table, athough it is meaninful only on a
+1.224: Add rtabid to nodes table, athough it is meaninful only on a
        jailed vnode. Set in assign_wrapper.
 
        alter table nodes add rtabid smallint(5) unsigned NOT NULL \
 		default '0' after stated_tag;
 
-1.125: Add 'veths' and 'mlinks' to the list of possible osfeatures in
+1.225: Add 'veths' and 'mlinks' to the list of possible osfeatures in
        is_info table.
 
        alter table os_info change osfeatures osfeatures \
 	set('ping','ssh','ipod','isup','veths','mlinks') default NULL;
 
-1.126: Add a use_ipassign column to the experiments table, to enable and
+1.226: Add a use_ipassign column to the experiments table, to enable and
        disable the use of Jon's ipassign program. Also add a column to
        specify arguments for it.
 
@@ -1307,13 +1307,13 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add column ipassign_args varchar(255) \
 	   default NULL;
 
-1.127: Add cable and len columns to the new_interfaces table, so that when
+1.227: Add cable and len columns to the new_interfaces table, so that when
        we're adding a small number of nodes by hand, we can set these:
 
        alter table new_interfaces add cable smallint;
        alter table new_interfaces add len tinyint;
 
-1.128: Increase size of eventlist arguments (and atstring) from
+1.228: Increase size of eventlist arguments (and atstring) from
        tinytext (255 chars) to text (65K chars) to avoid too-short problems
        with program agent command lines. Note that the maximum size allowed
        by table_regex checking will be set to 1024 for now.
@@ -1321,3 +1321,14 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table eventlist change arguments arguments text;
        alter table eventlist change atstring atstring text;
 
+1.229: Change the definition of the plab_* tables to store module-specific
+       data in opaque columns
+
+       alter table plab_slices drop column privkey, \
+           drop column pubkey, \
+           add column slicemeta text default NULL;
+           
+
+       alter table plab_slice_nodes drop column ticketdata, \
+           drop column leasedata, \
+           add column nodemeta text default NULL

@@ -1021,9 +1021,8 @@ CREATE TABLE plab_slice_nodes (
   eid varchar(32) NOT NULL default '',
   slicename varchar(64) NOT NULL default '',
   node_id varchar(10) NOT NULL default '',
-  ticketdata text,
-  leasedata text,
   leaseend datetime default NULL,
+  nodemeta text,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -1035,8 +1034,7 @@ CREATE TABLE plab_slices (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   slicename varchar(64) NOT NULL default '',
-  privkey text,
-  pubkey text,
+  slicemeta text,
   PRIMARY KEY  (pid,eid)
 ) TYPE=MyISAM;
 
