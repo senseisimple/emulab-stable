@@ -166,7 +166,7 @@ CREATE TABLE eventlist (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'experiments'
+-- Table structure for table 'experiment_stats'
 --
 
 CREATE TABLE experiment_stats (
@@ -184,7 +184,7 @@ CREATE TABLE experiment_stats (
   swapmodify_count smallint(5) unsigned default '0',
   swapmodify_last datetime default NULL,
   swap_errors smallint(5) unsigned default '0',
-  swap_exitcode tinyint(3) unsigned default '0', 
+  swap_exitcode tinyint(3) unsigned default '0',
   idle_swaps smallint(5) unsigned default '0',
   swapin_duration int(10) unsigned default '0',
   vnodes smallint(5) unsigned default '0',
@@ -1110,7 +1110,7 @@ CREATE TABLE testbed_stats (
   tstamp datetime default NULL,
   exptidx int(10) unsigned NOT NULL default '0',
   action varchar(16) NOT NULL default '',
-  exitcode tinyint(3) unsigned default '0', 
+  exitcode tinyint(3) unsigned default '0',
   PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
@@ -1225,7 +1225,6 @@ CREATE TABLE user_sfskeys (
   stamp datetime default NULL,
   PRIMARY KEY  (uid,comment)
 ) TYPE=MyISAM;
-
 
 --
 -- Table structure for table 'user_stats'
