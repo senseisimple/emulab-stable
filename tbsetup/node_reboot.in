@@ -31,7 +31,7 @@ sub usage()
 }
 # The hidden -r option runs this in "realmode", ie don't send an event, but
 # really do the work instead.
-my  $optlist = "dfe:nwrka";
+my  $optlist = "dfe:nwrkar";
 
 #
 # Configure variables
@@ -68,6 +68,7 @@ my $failed      = 0;
 my $eidmode     = 0;
 my $killmode    = 0;
 my $freemode    = 0;
+my $reconfig    = 0;
 my $batchcount  = 12;
 my $pid;
 my $eid;
@@ -111,6 +112,9 @@ if (defined($options{"r"})) {
 }
 if (defined($options{"a"})) {
     $freemode = 1;
+}
+if (defined($options{"r"})) {
+    $reconfig = 1;
 }
 if (defined($options{"n"}) && !defined($options{"w"})) {
     $nowait = 1;
@@ -379,10 +383,10 @@ if (! $force) {
 	    push @needPowercycle, $node;
 	} elsif ($?) {
 	    $failed++;
-	    print STDERR "Reboot of node $node failed!\n";
+	    print STDERR "$node failed!\n";
 	}
 	else {
-	    print STDOUT "$node rebooting ...\n";
+	    print STDOUT "$node successful ...\n";
 	}
     }
 }
@@ -436,7 +440,7 @@ if ($waitmode) {
 	$failed++;
     }
 }
-print "Done. There were $failed failures to reboot.\n";
+print "Done. There were $failed failures to reboot/reconfig.\n";
 exit $failed;
 
 #
@@ -447,7 +451,12 @@ sub RebootNode {
     my ($pc) = @_;
     my ($status, $syspid, $mypid, $didipod, $nodestate);
 
-    print STDOUT "Rebooting $pc ...\n";
+    if ($reconfig) {
+	print "Reconfiguring $pc ...\n";
+    }
+    else {
+	print "Rebooting $pc ...\n";
+    }
 
     # Report some activity into last_ext_act
     TBActivityReport($pc);
@@ -524,7 +533,7 @@ sub RebootNode {
     # Machine is pingable at least. Try to reboot it gracefully,
     # or power cycle anyway if that does not work.
     #
-    print STDERR "Trying ssh reboot of $pc ...\n" if $debug;
+    print STDERR "Trying ssh reboot or reconfig of $pc ...\n" if $debug;
 
     #
     # Must change our real UID to root so that ssh will work. We save the old
@@ -533,6 +542,40 @@ sub RebootNode {
     my $oldUID = $UID;
 #    print STDERR "Saved UID: $oldUID\n" if $debug;
     $UID = 0;
+
+    #
+    # If doing a reconfig, first try that in a child.
+    #
+    if ($reconfig) {
+	TBSetNodeEventState($pc, "RECONFIG");
+	$syspid = fork();
+
+	if ($syspid) {
+	    local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	    alarm 20;
+	    waitpid($syspid, 0);
+	    alarm 0;
+
+	    #
+	    # The ssh can return non-zero exit status, but still have worked.
+	    # FreeBSD for example.
+	    #
+	    print "reconfig of $pc returned $?.\n" if $debug;
+
+	    #
+	    # Any failure, revert to plain reboot. 
+	    #
+	    if (! $?) {
+		$UID = $oldUID;
+		exit(0);
+	    }
+	}
+	else {
+	    exec("$ssh -host $pc ".
+		 "/usr/local/etc/emulab/rc/rc.bootsetup -b reconfig");
+	    exit(0);
+	}
+    }
 
     #
     # Run an ssh command in a child process, protected by an alarm to
