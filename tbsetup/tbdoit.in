@@ -273,6 +273,16 @@ if (open(IN, "$logname")) {
     }
     close(IN);
 }
+
+if (open(IN, "$nsfile")) {
+    print MAIL "\n\n---------\n\n";
+    print MAIL "Here is the NS file\n\n";
+
+    while (<IN>) {
+	print MAIL "$_";
+    }
+    close(IN);
+}
 close(MAIL);
 
 unlink("$logname");
@@ -321,6 +331,15 @@ sub fatal()
 	or die "Cannot start mail program: $!";
 
     print MAIL $mesg;
+
+    if (open(IN, "$nsfile")) {
+	print MAIL "\n\n---------\n\n";
+
+	while (<IN>) {
+	    print MAIL "$_";
+	}
+	close(IN);
+    }
 
     if (open(IN, "$logname")) {
 	print MAIL "\n\n---------\n\n";
