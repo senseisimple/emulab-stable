@@ -150,7 +150,7 @@ sub dowork() {
     # Create group on paper.
     #
     system("/usr/sbin/pw groupadd $project -g $group_number") == 0 or
-	die("Could not add group $project with gid $group_number to paper");
+      print STDERR "Could not add group $project with gid $group_number to paper\n";
     
     #
     # Make user on paper. We don't give them a password.
@@ -158,7 +158,7 @@ sub dowork() {
     print "Adding user $user to paper.\n";
     system("/usr/sbin/pw useradd $user -u $user_number -c \"$fullname\" ".
 	   "-k /usr/share/skel -m -d /users/$user -g $project -s $PBAG") == 0
-	or die("Could not add user $user to paper");
+	or print STDERR "Could not add user $user to paper\n";
 	       
     #
     # Make group on control node.
@@ -166,8 +166,8 @@ sub dowork() {
     print "Adding group $project to $control_node.\n";
     system("/usr/local/bin/sshtb $control_node /usr/sbin/pw ".
 	   "groupadd $project -g $group_number") == 0 or
-	die("Could not add group $project with gid $group_number to ".
-	    "$control_node");
+	print STDERR "Could not add group $project with gid $group_number to ".
+	    "$control_node\n";
     
     #
     # Make user on control node. Note that we cannot get back any output from 
@@ -180,11 +180,11 @@ sub dowork() {
 	   "/usr/sbin/pw useradd $user -u $user_number -c '\"$fullname\"' ".
 	   "-k /usr/share/skel -m -d /users/$user -g $project ".
 	   "-s /bin/tcsh") == 0
-	or die("Could not add user $user to $control_node.");
+	or print STDERR "Could not add user $user to $control_node.\n";
 
     system("/usr/local/bin/sshtb $control_node ".
 	   "/usr/bin/chpass -p $pswd $user") == 0
-	or die("Could not change password for user $user on $control_node.");
+	or print STDERR"Could not change password for user $user on $control_node.\n";
 
     #
     # Set up the ssh key
