@@ -32,8 +32,8 @@ use English;
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 
-my $rsh		= "sshtb -q";
-my $ssh		= "sshtb -q";
+my $rsh		= "sshtb -n -q";
+my $ssh		= "sshtb -n -q";
 my $NETDISK     = "/tftpboot/netdisk";
 my $PAPERADDR	= "boss.emulab.net";
 my $PLASTICADDR	= "users.emulab.net";

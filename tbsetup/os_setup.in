@@ -24,7 +24,7 @@ use English;
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
 
-my $ssh		= "ssh -q";
+my $ssh		= "ssh -n -q";
 my $power	= "$TB/bin/power";
 my $ping	= "/sbin/ping";
 my $mail        = "/usr/bin/mail";

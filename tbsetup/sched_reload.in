@@ -23,8 +23,8 @@ use English;
 my $TB     = "@prefix@/bin";
 my $DBNAME = "@TBDBNAME@";
 
-my $rsh		= "sshtb -q";
-my $ssh		= "sshtb -q";
+my $rsh		= "sshtb -n -q";
+my $ssh		= "sshtb -n -q";
 my $NETDISK     = "/tftpboot/netdisk";
 my $power	= "$TB/power";
 my $osload      = "$TB/os_load";
