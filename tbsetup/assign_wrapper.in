@@ -1248,8 +1248,8 @@ foreach $plink (keys(%plinks)) {
 	# assert nodeB == nodeD
 
 	printdb "  VLANS:\n";
-	AddVlan("link", $lan, $nodeportA, $nodeportB);
-	AddVlan("link", $lan, $nodeportC, $nodeportD);
+	AddVlan("link", "$lan" . "-delaysrc", $nodeportA, $nodeportB);
+	AddVlan("link", "$lan" . "-delaydst", $nodeportC, $nodeportD);
 	
 	my ($member0,$delay,$bandwidth,$lossrate,
 	    $member1,$rdelay,$rbandwidth,$rlossrate) = @{$delaylinks{$plink}};
