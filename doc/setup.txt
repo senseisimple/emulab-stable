@@ -122,6 +122,9 @@ $TBMAIL* - These work like the mail addresses of the same names in the
 	CCed on certain mail sent to users.
 $TBMAINSITE - Set this to 0
 
+Create the /usr/testbed directory. Make sure that this directory is writable to
+the tbadmin group.
+
 Now, build and install the software. For example, I have the testbed source in
 ~/testbed, and use the ~/tbobj directory to do my builds in. To use the
 defs-ricci-emulab defs file in my home directory, I would do:
