@@ -55,14 +55,19 @@ $libdb::DBQUERY_MAXTRIES = 30;
 my $RELOADPID	= NODERELOADING_PID;
 my $RELOADEID	= NODERELOADING_EID;
 my $PENDINGEID	= NODERELOADPENDING_EID;
+my $NODEDEAD_PID= NODEDEAD_PID;
+my $NODEDEAD_EID= NODEDEAD_EID;
 
 my $os_load	= "$TB/bin/os_load -s";
 my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
-my $retry_time  = 10; # in minutes
+my $retry_time  = 15; # in minutes
 my $warn_time   = 30; # in minutes
+my %retried     = ();
+my %warned	= ();
+my %failed	= ();
 
 #
 # Turn off line buffering on output (dots ...).
@@ -104,6 +109,7 @@ my $idle=0;
 while (1) {
     my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
     my($pid, $eid);
+    my @retry_list = ();
 
     # Partial delay between loops in case of an error.
     if ($idle) { sleep(10); } # Wait longer if we're not doing anything
@@ -133,12 +139,30 @@ while (1) {
 
     while (($node) = $query_result->fetchrow){ 
 	$idle=0;
+	#
+	# If this was a node that failed os_load, then instead of rebooting,
+	# send it back through os_load.
+	# 
+	if ($failed{$node}) {
+	    print "$node failed an earlier os_load. Trying again\n";
+	    push(@retry_list, $node);
+	    delete $failed{$node};
+	    # Skip any reboots. 
+	    $retried{$node} = $time;
+	    next;
+	}
 	if (!$retried{$node}) {
 	    print "\nReload appears wedged at ".`date`.
 		"Power cycling and trying once more!\n";
 		
 	    if (system("$reboot -f $node")) {
-		fatal("$node was wedged, but could not be power cycled.\n");
+		notify("$node was wedged, but could not be rebooted.\n".
+		       "Moved to $NODEDEAD_PID/$NODEDEAD_EID\n");
+
+		MarkPhysNodeDown($node);
+		TBSetNodeLogEntry($node, "daemon",
+				  TB_DEFAULT_NODELOGTYPE(),
+				  "'Moved to hwdown; reload reboot failed'");
 	    }
 	}
 	$retried{$node} = $time;
@@ -220,16 +244,12 @@ while (1) {
 
     # Grab all the nodes that match
     my @node_list = ();
-    my @pending_list = ();
-    my %pid = ();
-    my %eid = ();
-    while ( %hrow  = $query_result->fetchhash() ) {
+    my @pending_list = @retry_list;
+    while (%hrow  = $query_result->fetchhash()) {
 	$node  = $hrow{'node_id'};
 	push(@node_list,$node);
 	$pid = $hrow{'pid'};
 	$eid = $hrow{'eid'};
-	$pid{$node}   = $pid;
-	$eid{$node}   = $eid;
 	if ($pid eq $RELOADPID && $eid eq $PENDINGEID) {
 	    push(@pending_list,$node);
 	} else {
@@ -286,7 +306,8 @@ while (1) {
 	# directly.
 	#
 	my $cond = join(" or ",map("node_id='$_'",@pending_list));
-	if (! DBQueryWarn("update reserved set eid='$RELOADEID' ".
+	if (! DBQueryWarn("update reserved set ".
+			  "rsrv_time=now(),eid='$RELOADEID' ".
 			  "where $cond")) {
 	    print "Could not update EID for ".join(" ",@pending_list).
 	      ". Waiting a bit.\n";
@@ -315,14 +336,22 @@ while (1) {
 
 	    if (system("$os_load $os_load_flags $nodelist")) {
 		#
-		# This should not fail! 
+		# This should not fail, but it does when the DB gets busy.
 		#
-		fatal("$os_load failed on $nodelist. ".
-		      "That's not supposed to happen.\n".
-		      "Please check the reload daemon log ".
-		      "before restarting!\n");
+		notify("$os_load failed on $nodelist. ".
+		       "That is not supposed to happen.\n".
+		       "Attempting to recover from this unfortunate ".
+		       "situation!\n");
+
+		# Record the failure list. If we get to the 15 minute
+		# retry, call os_load again instead of rebooting.
+		foreach my $node (@{$imagenodes{$imageid}}) {
+		    $failed{$node} = $time;		    
+		}
 	    }
-	    print "os_load done at ".`date`;
+	    else {
+		print "os_load done at ".`date`;
+	    }
 	}
     }
 	
