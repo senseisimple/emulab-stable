@@ -86,7 +86,7 @@ if (! $debug) {
 # 
 while (1) {
     my($count, $which, @row, %hrow, $imageid, $node, $retry, $stamp);
-    my($pid, $eid, $type);
+    my($pid, $eid, $type, $reload_type);
 
     #
     # Partial delay between loops in case of an error.
@@ -143,8 +143,8 @@ while (1) {
 	# EID was when nfree noticed an entry in the table.
 	#
 	$query_result =
-	    DBQueryWarn("select image_id from scheduled_reloads where ".
-			"node_id='$node'");
+	    DBQueryWarn("select image_id, reload_type from scheduled_reloads " .
+			"where node_id='$node'");
     
 	if (! $query_result) {
 	    print "DB Error getting imageid from scheduled_reloads. ".
@@ -153,6 +153,7 @@ while (1) {
 	}
 	@row     = $query_result->fetchrow_array();
 	$imageid = $row[0];
+	$reload_type= $row[1];
 	
 	#
 	# The node is reserved into the special pid/eid, as the result
@@ -165,7 +166,21 @@ while (1) {
 	    print "Could not update EID for $node. Waiting a bit.\n";
 	    next;
 	}
-	if (system("$os_load -i $imageid $node")) {
+	
+	#
+	# We add flags to our os_load call depending on the type of reload
+	# the user asked for. We basically need a case for each type.
+	#
+	my $os_load_flags = "";
+	if ($reload_type eq 'frisbee') {
+	    $os_load_flags .= " -r";
+	} elsif ($reload_type eq 'netdisk') {
+	    # Nothing special to do
+	} else {
+	    fatal("Found a reload type I don't know how to handle: $reload_type");
+	}
+
+	if (system("$os_load $os_load_flags -i $imageid $node")) {
 	    #
 	    # This should not fail! 
 	    #
@@ -195,6 +210,15 @@ while (1) {
     $stamp = DBDateTime();
 	
     print "Reload of $node has started at $stamp.\n";
+
+    #
+    # For Frisbee reloads, we don't wait for the node to finish reloading,
+    # since the whole point is to let many nodes load at once.
+    #
+    if ($reload_type eq "frisbee") {
+	print "Not waiting for frisbee reload of $node.\n";
+	next;
+    }
 
     #
     # Reload was started. We want to wait until its finished.
