@@ -66,10 +66,18 @@ $r = mysql_fetch_array($q);
 $swap_requests = $r["swap_requests"];
 $last_swap_req = $r["lastreq"];
 
+$q=DBQueryWarn("select count(*) as c from reserved as r
+left join nodes as n on r.node_id=n.node_id 
+left join node_types as nt on n.type=nt.type 
+where nt.class='pc' and pid='$pid' and eid='$eid'");
+
+$r=mysql_fetch_array($q);
+$c=$r["c"];
+
 if (!$confirmed) {
     echo "<center><h2><br>
-          Experiment '$eid' in project '$pid' has been sent
-          $swap_requests swap request(s) since it went idle.\n";
+Experiment '$eid' in project '$pid' has $c Emulab nodes reserved,
+and has been sent $swap_requests swap request(s) since it went idle.\n";
     if ($swap_requests > 0) {
       echo "The most recent one was sent at $last_swap_req.\n";
     }
@@ -112,16 +120,11 @@ if (! TBProjLeader($pid, $projleader)) {
 }
 TBUserInfo($projleader, $projleader_name, $projleader_email);
 
-$q=DBQueryWarn("select count(*) as c from reserved ".
-	       "where pid='$pid' and eid='$eid'");
-$r=mysql_fetch_array($q);
-$c=$r["c"];
-
 TBMAIL("$expleader_name <$expleader_email>",
      "$pid/$eid: Please Swap or Terminate Experiment",
      "Hi, this is an automated message from Emulab.Net.\n".
        ( $swap_requests > 0 
-         ? ("You have been sent ".($swap_requests+1)." messages since this ".
+         ? ("You have been sent ".$swap_requests." other messages since this ".
 	    "experiment became idle.\n")
          : "") .
      "\n".
