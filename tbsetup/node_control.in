@@ -1,11 +1,9 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 
@@ -13,7 +11,10 @@ use Getopt::Std;
 # usage: node_control [options] node [node ...]
 #        node_control [options] -e pid,eid
 #
-# XXX virt_nodes osname is not handled properly. 
+# XXX virt_nodes osname is not handled properly.
+#
+# This script is invoked from ops and from the web interface. Must check
+# all the args.
 #
 sub usage()
 {
@@ -36,17 +37,27 @@ my  $optlist = "de:l";
 my %controlset =
 (
  #
- # Symbolic name => Admin, Multi args, nodes field, virt_nodes field, osselect
+ # Symbolic name =>
+ #      Admin, Multi args, nodes field, virt_nodes field, osselect, checkslot
  #
- default_boot_osid      => [0, 0, "def_boot_osid",      undef,       1, ""],
- default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line",  0, ""],
- startup_command	=> [0, 0, "startupcmd",		"startupcmd",0, ""],
- tarfiles		=> [0, 1, "tarballs",		"tarfiles",  0, ""],
- rpms			=> [0, 1, "rpms",		"rpms",      0, ""],
- next_boot_osid         => [1, 0, "next_boot_osid",     undef,       1, "-1"],
- next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef,       0, ""],
- temp_boot_osid         => [1, 0, "temp_boot_osid",     undef,       1, "-t"],
- bios_version		=> [1, 0, "bios_version",	undef,       0, ""],
+ default_boot_osid      =>
+     [0, 0, "def_boot_osid",      undef,       1, "",   "os_info:osid"],
+ default_boot_cmdline	=> 
+     [0, 0, "def_boot_cmd_line",  "cmd_line",  0, "",   "virt_nodes:cmd_line"],
+ startup_command	=>
+     [0, 0, "startupcmd",         "startupcmd",0, "",   "virt_nodes:startupcmd"],
+ tarfiles		=>
+     [0, 1, "tarballs",	          "tarfiles",  0, "",   "virt_nodes:tarfiles"],
+ rpms			=>
+     [0, 1, "rpms",	   	  "rpms",      0, "",   "virt_nodes:rpms"],
+ next_boot_osid         =>
+     [1, 0, "next_boot_osid",     undef,       1, "-1", "os_info:osid"],
+ next_boot_cmdline	=>
+     [1, 0, "next_boot_cmd_line", undef,       0, "",   "virt_nodes:cmd_line"],
+ temp_boot_osid         =>
+     [1, 0, "temp_boot_osid",     undef,       1, "-t", "os_info:osid"],
+ bios_version		=>
+     [1, 0, "bios_version",	  undef,       0, "",   "nodes:bios_version"],
 );
   
 #
@@ -143,7 +154,7 @@ while (@ARGV) {
 	die("*** $0:\n".
 	    "    Illegal control setting: $1='$2'. Try the -l option!\n");
     }
-    my ($admin, $multi, $dbkey) = @{ $controlset{$1} };
+    my ($admin,$multi) = @{ $controlset{$1} };
 
     if ($admin && ! $IsAdmin) {
 	die("*** $0:\n".
@@ -189,7 +200,7 @@ else {
     
     # Untaint the nodes.
     foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\@\w]+)$/) {
+	if ($node =~ /^([-\w]+)$/) {
 	    $node = $1;
 	}
 	else {
@@ -209,8 +220,20 @@ my @osselect_params=();
 
 foreach my $option (keys(%controls)) {
     my ($admin, $multi, $physdbkey, $virtdbkey,
-	$needs_osselect, $osselect_arg) = @{ $controlset{$option} };
+	$needs_osselect, $osselect_arg, $checkslot) = @{ $controlset{$option} };
     my $value = $controls{$option};
+
+    #
+    # Do a checkslot on it to make sure its valid for the DB slot.
+    #
+    my ($table,$slot) = split(":", $checkslot);
+
+    if ($value ne "" &&
+	!TBcheck_dbslot($value, $table, $slot,
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	die("*** $0:\n".
+	    "    Illegal value specified for $option: '$value'\n");
+    }
 
     if ($needs_osselect) {
 	my $str = ($debug ? "-d " : "");
