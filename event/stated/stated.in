@@ -437,7 +437,7 @@ sub stateTransition($$) {
 		handleCtrlEvent($node,$trig);
 		next;
 	    };
-	    notify("Unknown trigger '$trig' in $mode/$newstate!\n");
+	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");
 	}
     }
 
@@ -484,11 +484,11 @@ sub opModeTransition($$) {
 	if (defined($trans{$newmode})) {
 	    $nextstate=$trans{$newmode};
 	} else {
-	    notify("Invalid mode transition from ".
+	    notify("Invalid mode transition for $node from ".
 		   "$mode/$oldstate to $newmode!\n");
 	}
     } else {
-	notify("Invalid mode transition from $mode/$oldstate: ".
+	notify("Invalid mode transition for $node from $mode/$oldstate: ".
 	       "Not a valid mode transition state!\n");
     }
     if (!$nextstate) { $nextstate=$oldstate; }
