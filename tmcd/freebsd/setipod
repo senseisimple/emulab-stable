@@ -5,6 +5,11 @@
 # All rights reserved.
 #
 
+#
+# Enable ICMP ping-of-death
+# Support both the old style (host only) and the new style (host+mask+key)
+#
+
 use English;
 use Socket;
 
@@ -20,30 +25,78 @@ $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Enable ICMP ping-of-death
+# Handle old style
 #
-if (system("sysctl net.inet.icmp.ipod_host")) {
-    warn "*** WARNING: IPOD sysctls not supported in the kernel\n";
+if (system("sysctl -w net.inet.icmp.ipod_enabled=0 >/dev/null") == 0) {
+    my ($bname, $bip) = split(/ /, `tmcc bossinfo`);
+    if (!defined($bip)) {
+	warn "*** WARNING: could not determine boss node, IPOD not enabled\n";
+	exit -1;
+    }
+    my $ipuint = unpack("N", inet_aton($bip));
+
+    # XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
+    my $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod_host=%d", $ipuint);
+
+    if (system($sysctlcmd . ">/dev/null")) {
+	warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
+	exit -1;
+    }
+    if (system("sysctl -w net.inet.icmp.ipod_enabled=1 >/dev/null")) {
+	warn "*** WARNING: could not enable IPOD\n";
+	exit -1;
+    } else {
+	print STDOUT "IPOD enabled from $bip\n";
+    }
+    exit 0;
+}
+
+#
+# New style
+#
+if (system("sysctl -w net.inet.icmp.ipod.enabled=0 >/dev/null")) {
+    warn "*** WARNING: IPOD sysctls not supported, not enabled\n";
     exit -1;
 }
 
-my ($bname, $bip) = split(/ /, `tmcc bossinfo`);
-if (!defined($bip)) {
-    warn "*** WARNING: could not determine boss node, IPOD not enabled\n";
-    exit -1;
-}
-my $ipuint = unpack("N", inet_aton($bip));
+my $pat = q(HOST=([0-9.]*) MASK=([0-9.]*) HASH=([0-9a-f]*));
+if (`tmcc ipodinfo` =~ /$pat/) {
+    my $ipaddr = $1;
+    my $ipmask = $2;
+    my $hash = $3;
 
-# XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
-my $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod_host=%d", $ipuint);
+    #
+    # Note the use of sprintf below.
+    # We need this to "cast" the arg to a signed 32-bit int for sysctl.
+    #
+    my $ipuint = unpack("N", inet_aton($ipaddr));
+    my $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod.host=%d", $ipuint);
+    if (system($sysctlcmd . ">/dev/null")) {
+	warn "*** WARNING: could not set IPOD host to $ipaddr ($ipuint)\n";
+	exit -1;
+    }
 
-if (system($sysctlcmd)) {
-    warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
-    exit -1;
-}
-if (system("sysctl -w net.inet.icmp.ipod_enabled=1")) {
-    warn "*** WARNING: could not enable IPOD\n";
-    exit -1;
-}
+    $ipuint = unpack("N", inet_aton($ipmask));
+    $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod.mask=%d", $ipuint);
+    if (system($sysctlcmd . ">/dev/null")) {
+	warn "*** WARNING: could not set IPOD mask to $ipmask ($ipuint)\n";
+	exit -1;
+    }
 
+    $sysctlcmd = sprintf("sysctl -w net.inet.icmp.ipod.hash=%.32s", $hash);
+    if (system($sysctlcmd . ">/dev/null")) {
+	warn "*** WARNING: could not set IPOD hash\n";
+	exit -1;
+    }
+
+    if (system("sysctl -w net.inet.icmp.ipod.enabled=1 >/dev/null")) {
+	warn "*** WARNING: could not enable IPOD\n";
+	exit -1;
+    } else {
+	print STDOUT "Authenticated IPOD enabled from $ipaddr/$ipmask\n";
+    }
+} else {
+    warn "*** WARNING: no IPOD info, not enabled\n";
+}
+    
 exit 0;
