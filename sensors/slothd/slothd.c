@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
   }
   else {
     if (init_slothd() < 0) {
-      lerror("Problem initializing, bailing out");
+      lerror("Problem initializing, bailing out.");
     }
     else {
       exitcode = 0;
@@ -88,12 +88,12 @@ int main(int argc, char **argv) {
         if (!opts->first) {
           sleep(mopts.interval);
         }          
-        get_load();
-        get_min_tty_idle();
-        get_packet_counts();
-        send_pkt();
+        do_update();
+        if (opts->once) {
+          break;
+        }
         if (opts->first) {
-          sleep(mopts.interval);
+            sleep(mopts.interval);
         }
       }
     }
@@ -101,6 +101,12 @@ int main(int argc, char **argv) {
   return exitcode;
 }
 
+void do_update (void) {
+  get_load();
+  get_min_tty_idle();
+  get_packet_counts();
+  send_pkt();
+}
 
 int parse_args(int argc, char **argv) {
 
@@ -113,9 +119,14 @@ int parse_args(int argc, char **argv) {
   opts->port = SLOTHD_DEF_PORT;
   opts->servname = SLOTHD_DEF_SERV;
   opts->first = 1;
+  opts->once = 0;
 
-  while ((ch = getopt(argc, argv, "ai:dp:s:hf")) != -1) {
+  while ((ch = getopt(argc, argv, "ai:dp:s:hfo")) != -1) {
     switch (ch) {
+
+    case 'o': /* run once */
+      opts->once = 1;
+      break;
 
     case 'i':
       if ((opts->interval = atoi(optarg)) < MIN_INTVL) {
@@ -241,22 +252,22 @@ int init_slothd(void) {
     return -1;
   }
 
-  /* Daemonize, unless in debug mode. */
-  if (!opts->debug && daemon(0,0) < 0) {
-    lerror("Couldn't daemonize");
-    return -1;
+  /* Daemonize, unless in debug, or once-only mode. */
+  if (!opts->debug && !opts->once) {
+    if (daemon(0,0) < 0) {
+      lerror("Couldn't daemonize");
+      return -1;
+    }
+    /* Try to get lock.  If can't, then bail out. */
+    if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
+      lerror("Can't create lock file.");
+      return -1;
+    }
+    fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
+    sprintf(pidbuf, "%d", getpid());
+    write(pfd, pidbuf, strlen(pidbuf));
+    close(pfd);
   }
-
-  /* Try to get lock.  If can't, then bail out. */
-  if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
-    lerror("Can't create lock file, quiting.");
-    exit(1);
-  }
-  fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
-  sprintf(pidbuf, "%d", getpid());
-  write(pfd, pidbuf, strlen(pidbuf));
-  close(pfd);
-
   return 0;
 }
 

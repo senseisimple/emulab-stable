@@ -34,7 +34,7 @@
 #define SLOTHD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:/etc/testbed"
 #define UTMP_PATH "/var/run/utmp"
 #define WTMP_PATH "/var/log/wtmp"
-#define PIDFILE "/var/run/slothd"
+#define PIDFILE "/var/run/slothd.pid"
 #define MACADDRLEN 18
 #define MAXNUMIFACES 10
 #define MAXIFNAMELEN 10
@@ -77,6 +77,7 @@ typedef struct {
   u_char debug;
   u_char actterms;
   u_char first;
+  u_char once;
   char *servname;
   u_short port;
   char *ttys[MAXTTYS];
@@ -84,6 +85,7 @@ typedef struct {
 
 int parse_args(int, char**);
 int init_slothd(void);
+void do_update(void);
 
 void get_min_tty_idle(void);
 void utmp_enum_terms(void);
