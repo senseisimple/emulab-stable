@@ -140,3 +140,12 @@ Things that could be done:
 	or even better, give us a simple handle so that we can exclude it
 	(e.g., "tcpdump not switchtraffic")  I am reminded of this by seeing
 	the never-ending stream of "Unknown IPX Data" packets.
+
+6. Reduce (or eliminate) logging in default OSes
+
+	The standard daily/weekly/monthly activities are occuring and
+	sending mail to root (at least in our FreeBSD image).  We should
+	either eliminate this or, better, reduce it and have it logged
+	on plastic or paper.  We should at least do some security checking
+	and mail any anomolies to testbed-ops or someplace so we know if
+	some machine has been cracked.
