@@ -212,7 +212,8 @@ The client is currently distributed as a self-contained JAR file:
 <a href="/downloads/netlab-client.jar">netlab-client.jar</a>
 </td>
 <td align="center">(370K)</td>
-<td align="right">May 11, 2004</td>
+<td align="center">v0.1.0a</td>
+<td align="right">May 12, 2004</td>
 </tr>
 </table>
 </blockquote>
