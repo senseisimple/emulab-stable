@@ -1,0 +1,10 @@
+#
+# This is the defaults definitions file for configure.
+#
+# Use the -with-DEFS=filename to specify your own. If you add a variable,
+# be sure to go and update configure.in.
+#
+TBDBNAME=tbdb
+WWWDEFS=default
+TBOPSEMAIL=calfeld@flux.cs.utah.edu
+TBLOGSEMAIL=calfeld@flux.cs.utah.edu
