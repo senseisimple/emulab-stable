@@ -35,14 +35,23 @@ CFLAGS	 += -O -g -static #-Wall
 CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
 CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4c`
-CFLAGS	 += -DFREEBSD -DUSEEVENTS
-
-YCFLAGS	 += -I. -DFREEBSD -DUSEEVENTS
+CFLAGS	 += -DUSEEVENTS
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb
-LIBS	 += -ll -lcompat
 LIBS     += `elvin-config --libs vin4c`
+
+# FreeBSD
+CFLAGS	 += -DFREEBSD
+YCFLAGS	 += -I. -DUSEEVENTS -DFREEBSD
+LIBS	 += -ll -lcompat
+
+# Linux
+#CFLAGS	 += -DLINUX
+#YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
+#LIBS	 += -ll
+
+LEX	 = flex -l
 
 lex.yy.c: scan.l
 	@echo 'Expect non-portable character class warning (ASCII assumed).'
