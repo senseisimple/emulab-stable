@@ -914,18 +914,18 @@ last_net_act,last_cpu_act,last_ext_act);
        update veth_interfaces set mask='255.255.255.0';
        update tunnels set mask='255.255.255.0';
 
-1.177: Add notes field to the users table for storing admin only
+1.178: Add notes field to the users table for storing admin only
        notes.
 
        alter table users add notes text after wideareajailroot;
 
-1.178: Add a table to contain auxiliary types for nodes.
+1.179: Add a table to contain auxiliary types for nodes.
 
        create table node_auxtypes (node_id varchar(10) not null, type \
        		varchar(30) not null, count int default 1, primary \
 		key(node_id,type));
 
-1.179: Add a table to map auxtypes to node_types table. 
+1.180: Add a table to map auxtypes to node_types table. 
 
 	CREATE TABLE node_types_auxtypes (
 	  auxtype varchar(30) NOT NULL default '',
@@ -941,7 +941,7 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add mem_usage tinyint(4) unsigned \
 		NOT NULL default '0' after cpu_usage;
 
-1.180: Add a node_features table, just like the node_type_features
+1.181: Add a node_features table, just like the node_type_features
        table, but for individual nodes.
 
        create table node_features (node_id varchar(30) not null,
@@ -949,9 +949,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	   primary key (node_id,feature));
 
 
-1.181: Add plabnodes count to the experiment resource table so we can
+1.182: Add plabnodes count to the experiment resource table so we can
        track exactly how many slices an experiment is using.
 
        alter table experiment_resources add
           plabnodes smallint(5) unsigned default '0' after wanodes;
-	  
+
+1.183: Add index to testbed_stats table to speed up big joins by
+       several orders of magnitude!
+
+       alter table testbed_stats add index(rsrcidx);
