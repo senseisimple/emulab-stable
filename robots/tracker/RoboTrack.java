@@ -196,7 +196,9 @@ public class RoboTrack extends JApplet {
 	String dx_meters          = "";
 	String dy_meters          = "";
 	String dor_string         = "";
-	String pname, vname;		
+	String pname, vname;
+	long last_update          = 0;	// Unix time of last update.
+	String update_string      = "";
 	int index;
     }
     // Indexed by the robot physical name, points Robot struct above.
@@ -262,10 +264,11 @@ public class RoboTrack extends JApplet {
 	 */
 	public void parseRobot(String str) {
 	    StringTokenizer tokens = new StringTokenizer(str, ",");
+	    Calendar Now = new GregorianCalendar();
 	    String tmp;
 	    Robot robbie;
 	    int index;
-	    
+
 	    System.out.println(str);
 
 	    tmp = tokens.nextToken().trim();	    
@@ -333,6 +336,10 @@ public class RoboTrack extends JApplet {
 		    FORMATTER.format(Float.parseFloat(str));
 	    else
 		robbie.battery_voltage = "";
+
+	    robbie.last_update   = Now.getTimeInMillis();
+	    robbie.update_string = Now.get(Calendar.HOUR_OF_DAY) + ":" +
+		Now.get(Calendar.MINUTE) + ":" + Now.get(Calendar.SECOND);
 	}
 
 	/*
@@ -477,11 +484,17 @@ public class RoboTrack extends JApplet {
 	    BufferedReader input
 		= new BufferedReader(new InputStreamReader(is));
 	    String str;
+	    long start_time = System.currentTimeMillis();
 	    
             while (thread == me) {
 		try
 		{
 		    while (null != ((str = input.readLine()))) {
+			long now  = System.currentTimeMillis();
+			long diff = (now - start_time) / 1000;
+
+			System.out.println("" + diff);
+			
 			parseRobot(str);
 			repaint();
 			maptable.repaint(10);
@@ -526,7 +539,7 @@ public class RoboTrack extends JApplet {
 	                                "X (meters)", "Y (meters)",
 					"O (degrees)",
 	                                "Dest-X", "Dest-Y", "Dest-O",
-					"Battery %", "Voltage"
+					"Battery %", "Voltage", "Updated"
 	};
 	
         public int getColumnCount() {
@@ -568,6 +581,7 @@ public class RoboTrack extends JApplet {
 	    case 7: return robbie.dor_string;
 	    case 8: return robbie.battery_percentage;
 	    case 9: return robbie.battery_voltage;
+	    case 10: return robbie.update_string;
 	    }
 	    return "Foo";
         }
