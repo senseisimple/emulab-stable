@@ -14,6 +14,10 @@
 #
 ############################################################
 
+# un-taint path since this gets called from setuid scripts.
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/testbed/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
 my $user = (getpwuid($<))[0]
     || die "Cannot figure out who you are!\n";
 
@@ -23,6 +27,8 @@ my $ip = ""; #stores IP of a power controller
 my $outlet = 0; #stores number of an outlet
 my %IPList = (); #holds machine/ip pairs
 my %OutletList = (); #holds machine/outlet pairs
+my $exitval = 0;
+my $snmpit="/usr/testbed/bin/snmpit";
 
 #Must have at least an op and a machine, so at least 2 ARGV
 die("Syntax:\npower on <machine> <machine> ...\n",
@@ -35,6 +41,14 @@ $op = shift (@ARGV);
 if ($op eq "cycle") { $op = "cyc"; }
 $op = '-'.$op;
 @machines = @ARGV;
+foreach my $n (0..$#ARGV) {
+  #
+  # Untaint the arguments.
+  #
+  if ($machines[$n] =~ /^([-\@\w.]+)$/) {
+      $machines[$n] = $1;
+  }
+}
 foreach my $n (0..$#ARGV) {
   $machines[$n]= "\L$machines[$n]"; #Lowercase everything...
 }
@@ -85,17 +99,17 @@ if ($user ne "root") {
 #    print "$item\t",$IPList{$item},"\t",$OutletList{$item},"\n";
 #}
 
-my $snmpit=(-e '/usr/testbed/bin/snmpit'?'/usr/testbed/bin/snmpit':'snmpit');
-
 foreach $node ( sort @machines) {
   my $Approved = 0;
   foreach $ok (sort @OkNodes) { if ($node eq $ok) { $Approved = 1; } }
   if (!$Approved && ($user ne "root")) { 
     print "You are not authorized to control $node. Skipping...\n";
+    $exitval++;
   } else {
     #print $snmpit, '-i',$IPList{$node},$op,$OutletList{$node},"\n";
     if ( ! defined ($IPList{$node}) ) {
       print "Machine $node not found. Skipping...\n";
+      $exitval++;
     } else {
       my $cmd=join(" ",
 		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
@@ -112,3 +126,8 @@ foreach $node ( sort @machines) {
     }
   }
 }
+
+#
+# Return 0 on success. Return non-zero number of nodes that failed.
+# 
+exit $exitval;
