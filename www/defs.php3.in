@@ -185,32 +185,6 @@ function ADDPUBKEY($uid, $cmdandargs) {
 #
 # Verify a URL.
 #
-function VERIFYURL($url) {
-    global $HTTPTAG;
-
-    if (strlen($url)) {
-	if (strstr($url, " ")) {
-	    USERERROR("URL ($url) is malformed; spaces are not allowed. ".
-		      "Please go back and fix it up.", 1);
-	}
-	
-	if (strcmp($HTTPTAG, substr($url, 0, strlen($HTTPTAG)))) {
-	    USERERROR("URL ($url) must begin with $HTTPTAG. ".
-		      "Please go back and fix it up.", 1);
-	}
-	$fp = fopen($url, "r");
-	if (! $fp) {
-	    USERERROR("URL ($url) is not valid (cannot be accessed). ".
-		      "Please go back and fix it up.", 1);
-	}
-	fclose($fp);
-    }
-    return 0;
-}
-
-#
-# Verify a URL.
-#
 function CHECKURL($url, &$error) {
     global $HTTPTAG;
 
@@ -224,13 +198,22 @@ function CHECKURL($url, &$error) {
 	    $error = "URL is malformed; must begin with $HTTPTAG!";
 	    return 0;
 	}
-	
+
 	$fp = @fopen($url, "r");
 	if (! $fp) {
-	    $error = "URL is not valid; Cannot be accessed!";
-	    return 0;
+	    # Check to see if it was a redirect, in which case it's OK
+	    for ($i = 0; $i < count($http_response_header); $i++) {
+		if (!strcmp("Location:", substr($http_response_header[$i],0,9))) {
+		    $is_redirect = 1;
+		}
+	    }
+	    if (!$is_redirect) {
+		$error = "URL is not valid; Cannot be accessed!";
+		return 0;
+	    }
+	} else {
+	    fclose($fp);
 	}
-	fclose($fp);
     }
     return 1;
 }
