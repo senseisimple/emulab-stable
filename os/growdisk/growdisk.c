@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -51,11 +51,16 @@ struct diskinfo {
 
 char optionstr[] =
 "[-fhvW] [disk]\n"
+"Create or extend a DOS partition to contain all trailing unallocated space\n"
 "	-h print usage message\n"
 "	-v verbose output\n"
-"	-f output fdisk style partition entry (slice type=FreeBSD)\n"
+"	-f output fdisk style partition entry\n"
+"	   (sets slice type=FreeBSD if not already set)\n"
+"	-N create a new partition to include the extra space (the default)\n"
 "	-W actually change the partition table\n"
 "	   (default is to just show what would be done)\n"
+"	-X extend the final partition to include the extra space\n"
+"	   (alternative to -N)\n"
 "	[disk] is the disk special file to operate on\n"
 "	   (default is /dev/ad0)";
 
@@ -67,7 +72,7 @@ int tweakdiskinfo(char *disk);
 int showdiskinfo(char *disk);
 
 char *progname;
-int list = 1, verbose, fdisk;
+int list = 1, verbose, fdisk, usenewpart = 1;
 
 main(int argc, char *argv[])
 {
@@ -75,7 +80,7 @@ main(int argc, char *argv[])
 	char *disk = "/dev/ad0";
 
 	progname = argv[0];
-	while ((ch = getopt(argc, argv, "fvhW")) != -1)
+	while ((ch = getopt(argc, argv, "fvhNWX")) != -1)
 		switch(ch) {
 		case 'v':
 			verbose++;
@@ -83,8 +88,14 @@ main(int argc, char *argv[])
 		case 'f':
 			fdisk++;
 			break;
+		case 'N':
+			usenewpart = 1;
+			break;
 		case 'W':
 			list = 0;
+			break;
+		case 'X':
+			usenewpart = 0;
 			break;
 		case 'h':
 		case '?':
@@ -150,30 +161,32 @@ getdiskinfo(char *disk)
 int
 tweakdiskinfo(char *disk)
 {
-	int i, last = NDOSPART;
+	int i, lastspace = NDOSPART, lastunused = NDOSPART;
 	struct dos_partition *dp;
 	long firstfree = -1;
 
 	for (i = 0; i < NDOSPART; i++) {
 		dp = &diskinfo.parts[i];
 		if (dp->dp_typ != 0) {
-			last = i;
 			if (firstfree < 0 ||
-			    dp->dp_start + dp->dp_size > firstfree)
+			    dp->dp_start + dp->dp_size > firstfree) {
+				lastspace = i;
 				firstfree = dp->dp_start + dp->dp_size;
+			}
 		}
 	}
 
 	/*
-	 * Extremely paranoid.  Only change if:
-	 *	- there is an unused (type==0) partition available
-	 *	- there is unused (not covered by another partition) space
-	 *	- unused partition start/size is 0 or start corresponds
-	 *		to the beginning of the unused space
+	 * If wanting to extend the final used partition but there is
+	 * no such partition, just create a new partition instead.
 	 */
-	if (last >= NDOSPART-1 || firstfree >= diskinfo.disksize ||
-	    (dp->dp_start != 0 && dp->dp_start != firstfree) ||
-	    (dp->dp_start == 0 && dp->dp_size != 0)) {
+	if (!usenewpart && lastspace == NDOSPART)
+		usenewpart = 1;
+
+	/*
+	 * No trailing free space, nothing to do
+	 */
+	if (firstfree >= diskinfo.disksize) {
 		/*
 		 * Warn about an allocated partition that exceeds the
 		 * physical disk size.  This can happen if someone
@@ -187,19 +200,58 @@ tweakdiskinfo(char *disk)
 		return 0;
 	}
 
-	/*
-	 * And of course make sure the partition isn't already correctly
-	 * defined.
-	 */
-	if (dp->dp_start == firstfree &&
-	    dp->dp_size == diskinfo.disksize - firstfree)
-		return 0;
+	if (usenewpart) {
+		int found = 0;
 
-	dp = &diskinfo.parts[last+1];
+		/*
+		 * Look for unused partitions already correctly defined.
+		 * If we don't find one of those, we pick the first unused
+		 * partition after the last used partition if possible.
+		 * This prevents us from unintuitive behavior like defining
+		 * partition 4 when no other partition is defined.
+		 */
+		for (i = NDOSPART-1; i >= 0; i--) {
+			dp = &diskinfo.parts[i];
+			if (dp->dp_typ != 0) {
+				if (!found && lastunused != NDOSPART)
+					found = 1;
+			} else {
+				if (dp->dp_start == firstfree &&
+				    dp->dp_size == diskinfo.disksize-firstfree)
+					return 0;
+				/*
+				 * Paranoia: avoid partially defined but
+				 * unused partitions unless the start
+				 * corresponds to the beginning of the
+				 * unused space.
+				 */
+				if (!found &&
+				    ((dp->dp_start == 0 && dp->dp_size == 0) ||
+				     dp->dp_start == firstfree))
+					lastunused = i;
+			}
+		}
+	} else {
+		/*
+		 * Only change if:
+		 *	- um...nothing else to check
+		 *
+		 * But tweak variables for the rest of this function.
+		 */
+		firstfree = diskinfo.parts[lastspace].dp_start;
+		lastunused = lastspace;
+	}
+
+	if (lastunused == NDOSPART) {
+		warnx("WARNING! No usable partition for free space");
+		return 0;
+	}
+	dp = &diskinfo.parts[lastunused];
+
 	if (fdisk) {
 		printf("p %d %d %d %d\n",
-		       last+2, DOSPTYP_386BSD,
-		       dp->dp_start ? dp->dp_size : firstfree,
+		       lastunused+1, dp->dp_typ ? dp->dp_typ : DOSPTYP_386BSD,
+		       dp->dp_start ? dp->dp_start : firstfree,
 		       diskinfo.disksize-firstfree);
 		return 1;
 	}
@@ -208,13 +260,13 @@ tweakdiskinfo(char *disk)
 			printf("%s: %s size of partition %d "
 			       "from %lu to %lu\n", disk,
 			       list ? "would change" : "changing",
-			       last+2, dp->dp_size,
+			       lastunused+1, dp->dp_size,
 			       diskinfo.disksize-firstfree);
 		else
 			printf("%s: %s partition %d "
 			       "as start=%lu, size=%lu\n", disk,
 			       list ? "would define" : "defining",
-			       last+2, firstfree,
+			       lastunused+1, firstfree,
 			       diskinfo.disksize-firstfree);
 	}
 	dp->dp_start = firstfree;
