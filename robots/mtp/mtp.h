@@ -12,6 +12,9 @@
 #define __MTP_H__
 
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <netinet/in.h>
 
 #include "mtp_xdr.h"
 
@@ -83,6 +86,13 @@ int mtp_packet_invariant(mtp_packet_t *packet);
  */
 mtp_handle_t mtp_create_handle(int fd);
 
+mtp_handle_t mtp_create_handle2(char *host, int port, char *path);
+
+int mtp_bind(char *host, int port, char *path);
+
+int mtp_gethostbyname(struct sockaddr_in *host_addr, char *host, int port);
+int mtp_initunixpath(struct sockaddr_un *host_addr, char *path);
+
 /**
  * Delete an initialized mtp_handle structure.
  *
@@ -122,6 +132,8 @@ typedef enum {
     MA_Vertical,	 /*< (double) */
     MA_RobotLen,	 /*< (int) */
     MA_RobotVal,	 /*< (robot_config *) */
+    MA_CameraLen,	 /*< (int) */
+    MA_CameraVal,	 /*< (camera_config *) */
     MA_RobotID,	 	 /*< (int) */
     MA_Position,	 /*< (robot_position *) */
     MA_X,	 	 /*< (double) */

@@ -21,7 +21,7 @@ static int debug = 0;
 
 static int looping = 1;
 
-static char *emc_hostname = NULL;
+static char *emc_hostname = NULL, *emc_path = NULL;
 static int emc_port = 0;
 
 static char *logfile = NULL;
@@ -112,7 +112,6 @@ int find_real_robot_id(struct robot_position *p);
  *
  */
 
-
 static void sigquit(int signal)
 {
     looping = 0;
@@ -120,12 +119,12 @@ static void sigquit(int signal)
 
 static void sigpanic(int sig)
 {
-  char buf[32];
-
-  sprintf(buf, "sigpanic %d\n", sig);
-  write(1, buf, strlen(buf));
-  sleep(120);
-  exit(1);
+    char buf[32];
+    
+    sprintf(buf, "sigpanic %d\n", sig);
+    write(1, buf, strlen(buf));
+    sleep(120);
+    exit(1);
 }
 
 static int mygethostbyname(struct sockaddr_in *host_addr,
@@ -187,7 +186,7 @@ static int parse_client_options(int *argcp, char **argvp[])
     argc = *argcp;
     argv = *argvp;
     
-    while ((c = getopt(argc, argv, "hdp:l:i:e:c:P:")) != -1) {
+    while ((c = getopt(argc, argv, "hdp:U:l:i:e:c:P:")) != -1) {
         switch (c) {
         case 'h':
             usage();
@@ -212,6 +211,9 @@ static int parse_client_options(int *argcp, char **argvp[])
                 exit(1);
             }
             break;
+	case 'U':
+	    emc_path = optarg;
+	    break;
         case 'c':
             vmc_clients[vmc_client_count].vc_hostname = optarg;
             break;
@@ -292,25 +294,17 @@ int main(int argc, char *argv[])
     /* in future, vmc will be a separate identity that emc can connect to
      * as necessary; vmc will not connect to emc.
      */
-    if (emc_hostname != NULL) {
+    if (emc_hostname != NULL || emc_path != NULL) {
         struct mtp_packet mp, rmp;
-	int emc_fd;
 
 	mtp_init_packet(&mp,
 			MA_Opcode, MTP_CONTROL_INIT,
 			MA_Role, MTP_ROLE_VMC,
 			MA_Message, "vmcd init",
 			MA_TAG_DONE);
-        if (mygethostbyname(&sin, emc_hostname, emc_port) == 0) {
-            pfatal("bad emc hostname: %s\n", emc_hostname);
-        }
-        else if ((emc_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-            pfatal("socket");
-        }
-        else if (connect(emc_fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-            pfatal("connect");
-        }
-	else if ((emc_handle = mtp_create_handle(emc_fd)) == NULL) {
+        if ((emc_handle = mtp_create_handle2(emc_hostname,
+					     emc_port,
+					     emc_path)) == NULL) {
 	    pfatal("mtp_create_handle");
 	}
         else if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
@@ -320,7 +314,7 @@ int main(int argc, char *argv[])
             pfatal("could not get vmc config packet");
         }
         else {
-            FD_SET(emc_fd, &readfds);
+            FD_SET(emc_handle->mh_fd, &readfds);
             vmc_config = rmp.data.mtp_payload_u.config_vmc;
             
             for (lpc = 0; lpc < vmc_config.robots.robots_len; lpc++) {
@@ -328,6 +322,18 @@ int main(int argc, char *argv[])
                      lpc,
                      vmc_config.robots.robots_val[lpc].id,
                      vmc_config.robots.robots_val[lpc].hostname);
+            }
+            for (lpc = 0; lpc < vmc_config.cameras.cameras_len; lpc++) {
+		vmc_clients[vmc_client_count].vc_hostname =
+		    vmc_config.cameras.cameras_val[lpc].hostname;
+		vmc_clients[vmc_client_count].vc_port =
+		    vmc_config.cameras.cameras_val[lpc].port;
+		vmc_client_count += 1;
+		
+                info(" camera[%d] = %s:%d\n",
+                     lpc,
+                     vmc_config.cameras.cameras_val[lpc].hostname,
+                     vmc_config.cameras.cameras_val[lpc].port);
             }
 
 	    mtp_free_packet(&rmp);
@@ -353,7 +359,7 @@ int main(int argc, char *argv[])
         else if (connect(vc->vc_fd,
                          (struct sockaddr *)&sin,
                          sizeof(sin)) == -1) {
-            pfatal("connect");
+            pfatal("vmc-client connect");
         }
         else if ((vc->vc_handle = mtp_create_handle(vc->vc_fd)) == NULL) {
 	    pfatal("mtp_create_handle");
@@ -372,7 +378,7 @@ int main(int argc, char *argv[])
             }
         }
     }
-    
+
     /* handle input from emc and vmc */
     while (looping) {
         fd_set rreadyfds;

@@ -284,7 +284,7 @@ static int cmp_pos(struct robot_position *pos1, struct robot_position *pos2)
 /**
  * Handle an mtp packet from emcd.
  *
- * @param emc_fd The connection to emcd.
+ * @param emc_handle The connection to emcd.
  */
 static void handle_emc_packet(mtp_handle_t emc_handle)
 {
@@ -613,15 +613,16 @@ static void handle_gc_packet(struct gorobot_conn *gc, mtp_handle_t emc_handle)
 
 int main(int argc, char *argv[])
 {
-    char *logfile = NULL, *pidfile = NULL, *emc_hostname = NULL;
-    int c, emc_fd = -1, emc_port = 0, retval = EXIT_SUCCESS;
+    char *emc_hostname = NULL, *emc_path = NULL;
+    int c, emc_port = 0, retval = EXIT_SUCCESS;
+    char *logfile = NULL, *pidfile = NULL;
     mtp_handle_t emc_handle = NULL;
     struct sockaddr_in saddr;
     fd_set readfds;
 
     FD_ZERO(&readfds);
 
-    while ((c = getopt(argc, argv, "hdp:l:i:e:c:P:")) != -1) {
+    while ((c = getopt(argc, argv, "hdp:l:i:e:c:U:")) != -1) {
 	switch (c) {
 	case 'h':
 	    usage();
@@ -645,6 +646,9 @@ int main(int argc, char *argv[])
 		usage();
 		exit(1);
 	    }
+	    break;
+	case 'U':
+	    emc_path = optarg;
 	    break;
 	}
     }
@@ -671,7 +675,7 @@ int main(int argc, char *argv[])
 	}
     }
 
-    if (emc_hostname != NULL) {
+    if (emc_hostname != NULL || emc_path != NULL) {
 	struct mtp_packet mp, rmp;
 	
 	mtp_init_packet(&mp,
@@ -681,18 +685,9 @@ int main(int argc, char *argv[])
 			MA_TAG_DONE);
 
 	/* Connect to emcd and get the configuration. */
-	if (mygethostbyname(&saddr, emc_hostname, emc_port) == 0) {
-	    pfatal("bad emc hostname: %s\n", emc_hostname);
-	}
-	else if ((emc_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-	    pfatal("socket");
-	}
-	else if (connect(emc_fd,
-			 (struct sockaddr *)&saddr,
-			 sizeof(saddr)) == -1) {
-	    pfatal("emc connect");
-	}
-	else if ((emc_handle = mtp_create_handle(emc_fd)) == NULL) {
+	if ((emc_handle = mtp_create_handle2(emc_hostname,
+					     emc_port,
+					     emc_path)) == NULL) {
 	    pfatal("mtp_create_handle");
 	}
 	else if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
@@ -704,7 +699,7 @@ int main(int argc, char *argv[])
 	else {
 	    int lpc;
 	    
-	    FD_SET(emc_fd, &readfds);
+	    FD_SET(emc_handle->mh_fd, &readfds);
 	    rmc_config = &rmp.data.mtp_payload_u.config_rmc;
 
 	    /*
@@ -796,7 +791,7 @@ int main(int argc, char *argv[])
 	if (rc > 0) {
 	    int lpc;
 	    
-	    if (FD_ISSET(emc_fd, &rreadyfds)) {
+	    if (FD_ISSET(emc_handle->mh_fd, &rreadyfds)) {
 		handle_emc_packet(emc_handle);
 	    }
 

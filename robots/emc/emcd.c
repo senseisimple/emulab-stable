@@ -138,6 +138,8 @@ static void parse_movement_file(char *filename);
  */
 static int got_siginfo = 0;
 
+static char *unix_path = NULL;
+
 /**
  * Handler for SIGINFO that sets the got_siginfo variable and breaks the main
  * loop so we can really handle the signal.
@@ -157,6 +159,17 @@ static void dump_info(void)
 {
 }
 #endif
+
+static void emcd_atexit(void)
+{
+  if (unix_path != NULL)
+    unlink(unix_path);
+}
+
+static void sigquit(int sig)
+{
+  exit(0);
+}
 
 static void sigpanic(int sig)
 {
@@ -178,6 +191,7 @@ static void usage(char *progname)
 	  "  -e pid/eid\tConnect to the experiment event server\n"
 	  "  -k keyfile\tKeyfile for the experiment\n"
 	  "  -p port\tPort to listen on for mtp messages\n"
+	  "  -U path\tUnix socket path\n"
 	  "  -c config\tThe config file to use\n"
 	  "  -l logfile\tThe log file to use\n"
 	  "  -i pidfile\tThe file to write the PID to\n");
@@ -185,12 +199,11 @@ static void usage(char *progname)
 
 int main(int argc, char *argv[])
 {
-  int c, on_off = 1, emc_sock, retval = EXIT_SUCCESS;
   char pid[MAXHOSTNAMELEN], eid[MAXHOSTNAMELEN];
+  int c, emc_sock, retval = EXIT_SUCCESS;
   char *server = "localhost";
   char *movement_file = NULL;
   char *config_file = NULL;
-  struct sockaddr_in sin;
   elvin_io_handler_t eih;
   address_tuple_t tuple;
   char *keyfile = NULL;
@@ -200,10 +213,10 @@ int main(int argc, char *argv[])
   char buf[BUFSIZ], buf2[BUFSIZ];
   char *idx;
   FILE *fp;
-  
+
   progname = argv[0];
   
-  while ((c = getopt(argc, argv, "hde:k:p:c:f:s:P:l:i:")) != -1) {
+  while ((c = getopt(argc, argv, "hde:k:p:c:f:s:P:U:l:i:")) != -1) {
     switch (c) {
     case 'h':
       usage(progname);
@@ -246,6 +259,9 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "error: illegible port: %s\n", optarg);
 	exit(1);
       }
+      break;
+    case 'U':
+      unix_path = optarg;
       break;
     case 'c':
       config_file = optarg;
@@ -296,6 +312,12 @@ int main(int argc, char *argv[])
   }
 
   debug = 1;
+
+  atexit(emcd_atexit);
+
+  signal(SIGINT, sigquit);
+  signal(SIGTERM, sigquit);
+  signal(SIGQUIT, sigquit);
   
   signal(SIGSEGV, sigpanic);
   signal(SIGBUS, sigpanic);
@@ -311,32 +333,12 @@ int main(int argc, char *argv[])
   }
   
   // first, EMC server sock:
-  emc_sock = socket(AF_INET,SOCK_STREAM,0);
+  emc_sock = mtp_bind("0.0.0.0", port, unix_path);
   if (emc_sock == -1) {
     fprintf(stdout,"Could not open socket for EMC: %s\n",strerror(errno));
     exit(1);
   }
 
-  memset(&sin, 0, sizeof(sin));
-#ifndef linux
-  sin.sin_len = sizeof(sin);
-#endif
-  sin.sin_family = AF_INET;
-  sin.sin_port = htons(port);
-  sin.sin_addr.s_addr = INADDR_ANY;
-
-  setsockopt(emc_sock, SOL_SOCKET, SO_REUSEADDR, &on_off, sizeof(on_off));
-  
-  if (bind(emc_sock, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-    perror("bind");
-    exit(1);
-  }
-  
-  if (listen(emc_sock, 5) == -1) {
-    perror("listen");
-    exit(1);
-  }
-  
 #if defined(SIGINFO)
   signal(SIGINFO, siginfo);
 #endif
@@ -386,10 +388,11 @@ int main(int argc, char *argv[])
     if (!event_subscribe(handle, ev_callback, tuple, NULL)) {
       fatal("could not subscribe to event");
     }
-    
-    if ((elvin_error = elvin_error_alloc()) == NULL) {
-      fatal("could not allocate elvin error");
-    }
+
+  }
+  
+  if ((elvin_error = elvin_error_alloc()) == NULL) {
+    fatal("could not allocate elvin error");
   }
   
   if ((eih = elvin_sync_add_io_handler(NULL,
@@ -414,9 +417,24 @@ int main(int argc, char *argv[])
   return retval;
 }
 
+int have_camera_config(char *hostname, int port,
+		       struct camera_config *cc, int cc_size)
+{
+    int lpc, retval = 0;
+
+    for (lpc = 0; lpc < cc_size; lpc++) {
+	if (strcmp(hostname, cc[lpc].hostname) == 0 && port == cc[lpc].port) {
+	    return 1;
+	}
+    }
+    
+    return retval;
+}
+
 void parse_config_file(char *config_file) {
+  struct camera_config *cc = NULL;
+  int cc_size = 0, line_no = 0;
   char line[BUFSIZ];
-  int line_no = 0;
   FILE *fp;
 
   if (config_file == NULL) {
@@ -431,11 +449,7 @@ void parse_config_file(char *config_file) {
 
   // read line by line
   while (fgets(line, sizeof(line), fp) != NULL) {
-    int id;
-    char *hostname, *vname;
-    float init_x;
-    float init_y;
-    float init_theta;
+    char directive[16];
 
     // parse the line
     // sorry, i ain't using regex.h to do this simple crap
@@ -444,79 +458,85 @@ void parse_config_file(char *config_file) {
     // so basically, 5 non-whitespace groups separated by whitespace (tabs or
     // spaces)
 
-    // we use strtok_r because i'm complete
-    char *token = NULL;
-    char *delim = " \t\n";
-    char *state = NULL;
-    struct emc_robot_config *rc;
-    struct robot_position *p;
-    struct hostent *he;
-    
-    ++line_no;
+    sscanf(line, "%16s", directive);
 
-    token = strtok_r(line,delim,&state);
-    if (token == NULL) {
-      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
-      continue;
-    }
-    id = atoi(token);
+    if (strcmp(directive, "robot") == 0) {
+      char hostname[MAXHOSTNAMELEN], vname[TBDB_FLEN_EVOBJNAME];
+      int id;
+      float init_x;
+      float init_y;
+      float init_theta;
 
-    token = strtok_r(NULL,delim,&state);
-    if (token == NULL) {
-      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
-      continue;
-    }
-    hostname = strdup(token);
-
-    token = strtok_r(NULL,delim,&state);
-    if (token == NULL) {
-      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
-      continue;
-    }
-    init_x = (float)atof(token);
-	  
-    token = strtok_r(NULL,delim,&state);
-    if (token == NULL) {
-      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
-      continue;
-    }
-    init_y = (float)atof(token);
-
-    token = strtok_r(NULL,delim,&state);
-    if (token == NULL) {
-      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
-      continue;
-    }
-    init_theta = (float)atof(token);
-
-    token = strtok_r(NULL,delim,&state);
-    if (token == NULL) {
-      fprintf(stdout,"Syntax error in config file, line %d.\n",line_no);
-      continue;
-    }
-    vname = strdup(token);
+      if (sscanf(line,
+		 "%16s %d %" __XSTRING(MAXHOSTNAMELEN) "s %f %f %f "
+		 "%" __XSTRING(TBDB_FLEN_EVOBJNAME) "s",
+		 directive,
+		 &id,
+		 hostname,
+		 &init_x,
+		 &init_y,
+		 &init_theta,
+		 vname) != 7) {
+	fprintf(stderr,
+		"error:%d: syntax error in config file - %s\n",
+		line_no,
+		line);
+      }
+      else {
+	struct emc_robot_config *rc;
+	struct robot_position *p;
+	struct hostent *he;
 	
-    // now we save this data to the lists:
-    rc = (struct emc_robot_config *)malloc(sizeof(struct emc_robot_config));
-    rc->id = id;
-    rc->hostname = hostname;
-    if ((he = gethostbyname(hostname)) == NULL) {
-      fprintf(stderr, "error: unknown robot: %s\n", hostname);
-      free(hostname);
-      free(rc);
-      continue;
+	// now we save this data to the lists:
+	rc = (struct emc_robot_config *)
+	  malloc(sizeof(struct emc_robot_config));
+	rc->id = id;
+	rc->hostname = strdup(hostname);
+	if ((he = gethostbyname(hostname)) == NULL) {
+	  fprintf(stderr, "error: unknown robot: %s\n", hostname);
+	  free(hostname);
+	  free(rc);
+	  continue;
+	}
+	memcpy(&rc->ia, he->h_addr, he->h_length);
+	rc->vname = strdup(vname);
+	rc->token = ~0;
+	
+	robot_list_append(hostname_list,id,(void*)rc);
+	p = (struct robot_position *)malloc(sizeof(struct robot_position *));
+	p->x = init_x;
+	p->y = init_y;
+	p->theta = init_theta;
+	robot_list_append(initial_position_list,id,(void*)p);
+      }
     }
-    memcpy(&rc->ia, he->h_addr, he->h_length);
-    rc->vname = vname;
-    rc->token = ~0;
-    
-    robot_list_append(hostname_list,id,(void*)rc);
-    p = (struct robot_position *)malloc(sizeof(struct robot_position *));
-    p->x = init_x;
-    p->y = init_y;
-    p->theta = init_theta;
-    robot_list_append(initial_position_list,id,(void*)p);
+    else if (strcmp(directive, "camera") == 0) {
+      char hostname[MAXHOSTNAMELEN];
+      int port;
 
+      if (sscanf(line,
+		 "%16s %" __XSTRING(MAXHOSTNAMELEN) "s %d",
+		 directive,
+		 hostname,
+		 &port) != 3) {
+	fprintf(stderr,
+		"error:%d: syntax error in config file - %s\n",
+		line_no,
+		line);
+      }
+      else if (have_camera_config(hostname, port, cc, cc_size)) {
+      }
+      else if ((cc = realloc(cc,
+			     (cc_size + 1) *
+			     sizeof(struct camera_config))) == 0) {
+	fatal("cannot allocate memory\n");
+      }
+      else {
+	cc[cc_size].hostname = strdup(hostname);
+	cc[cc_size].port = port;
+	cc_size += 1;
+      }
+    }
     // next line!
   }
 
@@ -545,6 +565,8 @@ void parse_config_file(char *config_file) {
 		      MA_Role, MTP_ROLE_EMC,
 		      MA_RobotLen, hostname_list->item_count,
 		      MA_RobotVal, robot_val,
+		      MA_CameraLen, cc_size,
+		      MA_CameraVal, cc,
 		      MA_TAG_DONE);
   }
 }
@@ -632,12 +654,13 @@ void ev_callback(event_handle_t handle,
 		 void *data)
 {
   struct emc_robot_config *match = NULL;
-  char objname[TBDB_FLEN_EVOBJTYPE];
+  char objname[TBDB_FLEN_EVOBJNAME];
   robot_list_item_t *rli;
   
   if (! event_notification_get_objname(handle, notification,
 				       objname, sizeof(objname))) {
     error("Could not get objname from notification!\n");
+    return;
   }
   
   for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
@@ -662,18 +685,21 @@ void ev_callback(event_handle_t handle,
     if (event_arg_get(args, "X", &value) > 0) {
       if (sscanf(value, "%f", &x) != 1) {
 	error("X argument in event is not a float: %s\n", value);
+	return;
       }
     }
     
     if (event_arg_get(args, "Y", &value) > 0) {
       if (sscanf(value, "%f", &y) != 1) {
 	error("Y argument in event is not a float: %s\n", value);
+	return;
       }
     }
     
     if (event_arg_get(args, "ORIENTATION", &value) > 0) {
       if (sscanf(value, "%f", &orientation) != 1) {
 	error("ORIENTATION argument in event is not a float: %s\n", value);
+	return;
       }
     }
     
@@ -993,7 +1019,7 @@ int rmc_callback(elvin_io_handler_t handler,
 		     EA_Name, erc->vname,
 		     EA_Event, TBDB_EVENTTYPE_COMPLETE,
 		     EA_ArgInteger, "ERROR",
-		     mp->data.update_position->status ==
+		     mp->data.mtp_payload_u.update_position.status ==
 		     MTP_POSITION_STATUS_ERROR ? 1 : 0,
 		     EA_ArgInteger, "CTOKEN", erc->token,
 		     EA_TAG_DONE);

@@ -16,7 +16,11 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "mtp.h"
 
@@ -98,6 +102,138 @@ mtp_handle_t mtp_create_handle(int fd)
 	retval = mh;
 	mh = NULL;
     }
+    
+    return retval;
+}
+
+int mtp_gethostbyname(struct sockaddr_in *host_addr, char *host, int port)
+{
+    struct hostent *host_ent;
+    int retval = 0;
+    
+    assert(host_addr != NULL);
+    assert(host != NULL);
+    assert(strlen(host) > 0);
+    
+    memset(host_addr, 0, sizeof(struct sockaddr_in));
+#ifndef linux
+    host_addr->sin_len = sizeof(struct sockaddr_in);
+#endif
+    host_addr->sin_family = AF_INET;
+    host_addr->sin_port = htons(port);
+    if( (host_ent = gethostbyname(host)) != NULL ) {
+        memcpy((char *)&host_addr->sin_addr.s_addr,
+               host_ent->h_addr,
+               host_ent->h_length);
+        retval = 1;
+    }
+    else {
+        retval = inet_aton(host, &host_addr->sin_addr);
+    }
+    return( retval );
+}
+
+int mtp_initunixpath(struct sockaddr_un *host_addr, char *path)
+{
+    int retval = 0;
+    
+    assert(host_addr != NULL);
+    assert(path != NULL);
+    assert(strlen(path) > 0);
+
+    memset(host_addr, 0, sizeof(struct sockaddr_un));
+#ifndef linux
+    host_addr->sun_len = sizeof(struct sockaddr_un);
+#endif
+    host_addr->sun_family = AF_UNIX;
+    if (strlen(path) < sizeof(host_addr->sun_path)) {
+	strcpy(host_addr->sun_path, path);
+	retval = 1;
+    }
+    
+    return( retval );
+}
+
+mtp_handle_t mtp_create_handle2(char *host, int port, char *path)
+{
+    mtp_handle_t retval = NULL;
+    int family, fd;
+
+    union {
+	struct sockaddr s;
+	struct sockaddr_in sin;
+	struct sockaddr_un sun;
+    } saddr;
+
+    family = (host != NULL) ? AF_INET : AF_UNIX;
+    if ((fd = socket(family, SOCK_STREAM, 0)) == -1) {
+	perror("socket");
+    }
+    else if (((family == AF_INET) &&
+	      !mtp_gethostbyname(&saddr.sin, host, port)) ||
+	     ((family == AF_UNIX) && !mtp_initunixpath(&saddr.sun, path))) {
+    }
+    else if (connect(fd,
+		     &saddr.s,
+		     (family == AF_INET) ?
+		     sizeof(saddr.sin) : sizeof(saddr.sun)) == -1) {
+	perror("connect");
+    }
+    else if ((retval = mtp_create_handle(fd)) == NULL) {
+	perror("mtp_create_handle");
+    }
+    else {
+	fd = -1;
+    }
+
+    if (fd != -1)
+	close(fd);
+    
+    return retval;
+}
+
+int mtp_bind(char *host, int port, char *path)
+{
+    int family, fd, retval = -1;
+
+    union {
+	struct sockaddr s;
+	struct sockaddr_in sin;
+	struct sockaddr_un sun;
+    } saddr;
+
+    family = (path != NULL) ? AF_UNIX : AF_INET;
+    if ((fd = socket(family, SOCK_STREAM, 0)) == -1) {
+	perror("socket");
+    }
+    else if (((family == AF_INET) &&
+	      !mtp_gethostbyname(&saddr.sin, host, port)) ||
+	     ((family == AF_UNIX) && !mtp_initunixpath(&saddr.sun, path))) {
+    }
+    else {
+	int on_off = 1;
+
+	if (family == AF_INET)
+	    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on_off, sizeof(int));
+	else
+	    unlink(path);
+	if (bind(fd,
+		 &saddr.s,
+		 (family == AF_INET) ?
+		 sizeof(saddr.sin) : sizeof(saddr.sun)) == -1) {
+	    perror("bind");
+	}
+	else if (listen(fd, 5) == -1) {
+	    perror("listen");
+	}
+	else {
+	    retval = fd;
+	    fd = -1;
+	}
+    }
+
+    if (fd != -1)
+	close(fd);
     
     return retval;
 }
@@ -211,6 +347,14 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	case MA_RobotVal:
 	    mp->data.mtp_payload_u.config_rmc.robots.robots_val =
 		va_arg(args, struct robot_config *);
+	    break;
+	case MA_CameraLen:
+	    mp->data.mtp_payload_u.config_vmc.cameras.cameras_len =
+		va_arg(args, int);
+	    break;
+	case MA_CameraVal:
+	    mp->data.mtp_payload_u.config_vmc.cameras.cameras_val =
+		va_arg(args, struct camera_config *);
 	    break;
 	case MA_RobotID:
 	    switch (mp->data.opcode) {
@@ -428,6 +572,17 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    lpc,
 		    mcv->robots.robots_val[lpc].id,
 		    mcv->robots.robots_val[lpc].hostname);
+	}
+	for (lpc = 0;
+	     lpc < mp->data.mtp_payload_u.config_vmc.cameras.cameras_len;
+	     lpc++) {
+	    struct mtp_config_vmc *mcv = &mp->data.mtp_payload_u.config_vmc;
+	    
+	    fprintf(file,
+		    "  camera[%d]:\t%s:%d\n",
+		    lpc,
+		    mcv->cameras.cameras_val[lpc].hostname,
+		    mcv->cameras.cameras_val[lpc].port);
 	}
 	break;
     

@@ -85,7 +85,7 @@ Packet: version 2; role emc
   id:		1
   x:		6.000000
   y:		5.040000
-  theta:	-2.761593
+  theta:	-1.190796
   status:	-1
   timestamp:	1.000000
 EOF
@@ -100,7 +100,7 @@ Packet: version 2; role emc
   id:		2
   x:		20.000000
   y:		20.000000
-  theta:	-3.141593
+  theta:	-1.570796
   status:	-1
   timestamp:	1.000000
 EOF

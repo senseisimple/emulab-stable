@@ -51,7 +51,7 @@ Packet: version 2; role vmc
   id:		-1
   x:		5.500000
   y:		2.500000
-  theta:	-2.661593
+  theta:	-1.090796
   status:	-1
   timestamp:	0.000000
 Packet: version 2; role vmc
@@ -59,7 +59,7 @@ Packet: version 2; role vmc
   id:		-1
   x:		6.500000
   y:		4.500000
-  theta:	-2.601593
+  theta:	-1.030796
   status:	32
   timestamp:	0.000000
 Packet: version 2; role vmc
@@ -67,7 +67,7 @@ Packet: version 2; role vmc
   id:		-1
   x:		5.500000
   y:		3.000000
-  theta:	-2.661593
+  theta:	-1.090796
   status:	-1
   timestamp:	1.000000
 Packet: version 2; role vmc
@@ -75,7 +75,7 @@ Packet: version 2; role vmc
   id:		-1
   x:		7.500000
   y:		4.500000
-  theta:	-2.601593
+  theta:	-1.030796
   status:	32
   timestamp:	1.000000
 EOF

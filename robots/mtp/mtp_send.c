@@ -30,27 +30,6 @@
 
 static int debug = 0;
 
-static int mygethostbyname(struct sockaddr_in *host_addr, char *host)
-{
-    struct hostent *host_ent;
-    int retval = 0;
-
-    assert(host_addr != NULL);
-    assert(host != NULL);
-    assert(strlen(host) > 0);
-
-    if( (host_ent = gethostbyname(host)) != NULL ) {
-	memcpy((char *)&host_addr->sin_addr.s_addr,
-	       host_ent->h_addr,
-	       host_ent->h_length);
-	retval = 1;
-    }
-    else {
-	retval = inet_aton(host, &host_addr->sin_addr);
-    }
-    return( retval );
-}
-
 /**
  * Print the usage message for this utility.
  */
@@ -121,6 +100,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	int id;
 	int code;
 	char *hostname;
+	char *path;
 	int command_id;
 	float x;
 	float y;
@@ -137,6 +117,7 @@ static int interpret_options(int *argcp, char ***argvp)
 	-1,		/* id */
 	-1,		/* code */
 	NULL,		/* hostname */
+	NULL,		/* path */
 	-1,		/* command_id */
 	DBL_MIN,	/* x */
 	DBL_MIN,	/* y */
@@ -154,12 +135,13 @@ static int interpret_options(int *argcp, char ***argvp)
     char **argv = *argvp;
 
     int c, waitmode = 0, retval = EXIT_SUCCESS;
-    struct sockaddr_in sin;
     mtp_packet_t mp;
     char opcode;
 
     /* Loop through the current set of command-line flags. */
-    while ((c = getopt(argc, argv, "hdwi:c:C:n:x:y:o:H:V:t:s:m:r:P:")) != -1) {
+    while ((c = getopt(argc,
+		       argv,
+		       "hdwi:c:C:n:U:x:y:o:H:V:t:s:m:r:P:")) != -1) {
 	switch (c) {
 	case 'h':
 	    usage();
@@ -205,6 +187,14 @@ static int interpret_options(int *argcp, char ***argvp)
 		exit(1);
 	    }
 	    args.hostname = optarg;
+	    break;
+	case 'U':
+	    if (strlen(optarg) == 0) {
+		fprintf(stderr, "error: U option is empty\n");
+		usage();
+		exit(1);
+	    }
+	    args.path = optarg;
 	    break;
 	case 'x':
 	    if (sscanf(optarg, "%f", &args.x) != 1) {
@@ -332,10 +322,10 @@ static int interpret_options(int *argcp, char ***argvp)
     *argcp = argc - 1;
     *argvp = argv + 1;
 
-    if (args.hostname == NULL) {
+    if (args.hostname == NULL && args.path == NULL) {
 	required_option("n");
     }
-    if (args.port == -1) {
+    if (args.port == -1 && args.path == NULL) {
 	required_option("P");
     }
     
@@ -542,29 +532,7 @@ static int interpret_options(int *argcp, char ***argvp)
     }
 
     if (mh == NULL) {
-	int fd;
-	
-	memset(&sin, 0, sizeof(sin));
-#if !defined(linux)
-	sin.sin_len = sizeof(sin);
-#endif
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(args.port);
-	
-	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-	    perror("socket");
-	}
-	else if (mygethostbyname(&sin, args.hostname) == 0) {
-	    perror("gethostbyname");
-	}
-	else if (connect(fd,
-			 (struct sockaddr *)&sin,
-			 sizeof(struct sockaddr_in)) == -1) {
-	    perror("connect");
-	}
-	else if ((mh = mtp_create_handle(fd)) == NULL) {
-	    perror("mtp_init_handle");
-	}
+	mh = mtp_create_handle2(args.hostname, args.port, args.path);
     }
 
     if (mh == NULL) {

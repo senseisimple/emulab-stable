@@ -10,7 +10,6 @@ test_file_base="test_emcd.sh"
 test_num=0
 
 SRCDIR=@srcdir@
-PORT=6060
 
 ## Helper functions
 
@@ -32,7 +31,7 @@ check_output() {
 
 emcd -l `pwd`/test_emcd.log \
     -i `pwd`/test_emcd.pid \
-    -p ${PORT} \
+    -U /tmp/$USER.emcd \
     -s ops \
     -c `realpath ${SRCDIR}/test_emcd.config`
 
@@ -40,7 +39,7 @@ trap 'kill `cat test_emcd.pid`' EXIT
 
 sleep 2
 
-run_test ../mtp/mtp_send -n localhost -P ${PORT} \
+run_test ../mtp/mtp_send -U /tmp/$USER.emcd \
     -w -r rmc -i 0 -c 0 -m "empty" init -- \
     -w -r rmc -i 1 request-position
 
@@ -59,7 +58,19 @@ Packet: version 2; role emc
   msg:		position not updated yet
 EOF
 
-run_test ../mtp/mtp_send -n localhost -P ${PORT} \
+run_test ../mtp/mtp_send -U /tmp/$USER.emcd \
+    -w -r vmc -i 0 -c 0 -m "empty" init
+
+check_output "init -> request-position failed?" <<EOF
+Packet: version 2; role emc
+ opcode:	config-vmc
+  num:		2
+  robot[0]:	1, garcia1.flux.utah.edu
+  robot[1]:	2, garcia2.flux.utah.edu
+  camera[0]:	junk.flux.utah.edu:6100
+EOF
+
+run_test ../mtp/mtp_send -U /tmp/$USER.emcd  \
     -w -r rmc -i 0 -c 0 -m "empty" init -- \
     -r rmc -i 1 -x 6 -y 7 -o 0.44 -s complete -t 1.0 update-position -- \
     -w -r rmc -i 1 request-position

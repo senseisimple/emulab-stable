@@ -151,6 +151,11 @@ struct robot_config {
     string hostname<>;
 };
 
+struct camera_config {
+    string hostname<>;
+    int port;
+};
+
 struct global_bound {
     float horizontal;
     float vertical;
@@ -163,6 +168,7 @@ struct mtp_config_rmc {
 
 struct mtp_config_vmc {
     robot_config robots<>;
+    camera_config cameras<>;
 };
 
 struct mtp_request_position {

@@ -10,7 +10,6 @@ test_file_base="test_vmcd.sh"
 test_num=0
 
 # SRCDIR=@srcdir@
-EMC_PORT=6565
 VMC1_PORT=6566
 
 ## Helper functions
@@ -35,7 +34,7 @@ check_output() {
 
 ../emc/emcd -l `pwd`/test_emcd.log \
     -i `pwd`/test_emcd.pid \
-    -p ${EMC_PORT} \
+    -U /tmp/$USER.emcd \
     -s ops \
     -c `realpath ${SRCDIR}/test_emcd.config`
 
@@ -49,8 +48,7 @@ vmc-client -l `pwd`/test_vmc-client1.log \
 
 vmcd -l `pwd`/test_vmcd.log \
     -i `pwd`/test_vmcd.pid \
-    -e localhost \
-    -p ${EMC_PORT} \
+    -U /tmp/$USER.emcd \
     -c localhost -P ${VMC1_PORT}
 
 cleanup() {
@@ -73,7 +71,7 @@ sleep 1
 
 newframe
 
-run_test ../mtp/mtp_send -n localhost -P ${EMC_PORT} \
+run_test ../mtp/mtp_send -U /tmp/$USER.emcd \
     -r emulab -i 1 -c 0 -m "empty" init -- \
     -w -i 1 request-position
 
@@ -83,7 +81,7 @@ Packet: version 2; role emc
   id:		1
   x:		6.000000
   y:		5.040000
-  theta:	-2.761593
+  theta:	-1.190796
   status:	-1
   timestamp:	1.000000
 EOF
