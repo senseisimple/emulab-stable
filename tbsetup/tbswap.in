@@ -832,20 +832,25 @@ sub doSwapin($) {
     #
     # If user specified -reboot to update,
     # and we are successfully performing the update,
-    # then mark all nodes in experiment
-    # so os_setup will reboot them.
+    # then mark all nodes in experiment so os_setup will reboot them.
     #
     if (($type == UPDATE) && $updateReboot) {
 	print STDERR "Marking nodes for reboot.\n";
 	$db_result =
-	    DBQueryFatal("select rv.node_id ".
-                         "from reserved as rv ".
-			 "left join nodes as n on ".
-			 "n.node_id = rv.node_id ".
-			 "where rv.pid='$pid' and rv.eid='$eid'");
+	    DBQueryFatal("select r.node_id,n.allocstate from reserved as r ".
+			 "left join nodes as n on n.node_id=r.node_id ".
+			 "where r.pid='$pid' and r.eid='$eid'");
 
-	while (my ($node) = $db_result->fetchrow_array) {
-	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
+	while (my ($node,$allocstate) = $db_result->fetchrow_array) {
+	    #
+	    # If the node is INIT_CLEAN, leave it alone. It will still get
+	    # rebooted, but will not falsely be tagged as dirty. This is
+	    # important for vnodes too, where INIT_CLEAN indicated the vnode
+	    # does not even exist yet (plab nodes).
+	    #
+	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+	    }
 	}
     }
 

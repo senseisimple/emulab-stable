@@ -46,7 +46,6 @@ my $debug       = 0;
 my $force       = 0;
 my $failed      = 0;
 my $killmode    = 0;
-my $mode        = "setup";
 my $dbuid;
 
 my $MAX_CHILDREN = 8;
@@ -84,7 +83,6 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"k"})) {
     $killmode = 1;
-    $mode = "teardown";
 }
 my $pid   = shift(@ARGV);
 my $eid   = shift(@ARGV);
@@ -157,6 +155,7 @@ foreach my $node (@nodes) {
     my $jailed;
     my $plab;
     my $allocstate;
+    my $mode = ($killmode ? "teardown" : "setup");
 
     if (! TBIsNodeVirtual($node, \$jailed, \$plab)) {
 	next;
@@ -220,14 +219,24 @@ foreach my $node (@nodes) {
 		    next;
 		}
 	    }
-	    elsif ($killmode) {
-		if ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
-		    print "$node failed to boot; skipping $mode.\n";
+	    else {
+		if ($killmode) {
+		    if ($allocstate eq TBDB_ALLOCSTATE_DOWN) {
+			print "$node failed to boot; skipping $mode.\n";
+			next;
+		    }
+		    elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+			print "$node never booted; skipping $mode.\n";
+			next;
+		    }
+		}
+		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_READY()) {
+		    print "$node is already set up on remote node $pnode\n";
 		    next;
 		}
-		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
-		    print "$node never booted; skipping $mode.\n";
-		    next;
+		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) {
+		    print "$node only needs a reboot on remote node $pnode\n";
+		    $mode = "reboot";
 		}
 	    }
 	}
@@ -237,7 +246,7 @@ foreach my $node (@nodes) {
     # When setting up a vnode, force its event state into SHUTDOWN since
     # no telling what its initial state is. 
     # 
-    if (!$killmode) {
+    if ($mode eq "teardown" || $mode eq "reboot") {
 	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
     }
 
@@ -288,7 +297,8 @@ while (1) {
 		[$vnode, $pnode, $mode, $jailed, $plab, time()];
 	    $children++;
 	} else {
-	    my $args = ($killmode ? "-k " : " ");
+	    my $args = (($mode eq "teardown") ? "-k " :
+			($mode eq "reboot" ? "-r " : " "));
 	    $args   .= ($jailed   ? "-j " : " ");
 	    $args   .= ($plab     ? "-p " : " ");
 	    $args   .= "$vnode ";
@@ -296,7 +306,7 @@ while (1) {
 	    # Must change our real UID to root so that ssh will work.
 	    $UID = 0;
 
-	    if ($plab && !$killmode) {
+	    if ($plab && $mode eq "setup") {
 		if (system("$TB/sbin/plabnode alloc $pid $eid $vnode")) {
 		    die("*** $0:\n".
 			"    Plab node allocation failed");
