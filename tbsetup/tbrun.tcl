@@ -28,7 +28,7 @@ if {$argc != 1} {
 }
 
 set irFile [lindex $argv 0]
-set t [split $nsFile .]
+set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set logFile "$prefix.log"
 
@@ -49,8 +49,8 @@ outs "Beginning Testbed run for $irFile. [clock format [clock seconds]]"
 
 outs "Setting up VLANs"
 
-if {[catch "exec $snmpit $irFile >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error running $smpit. ($err)"
+if {[catch "exec $snmpit -f $irFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error running $snmpit. ($err)"
     exit 1
 }
 
