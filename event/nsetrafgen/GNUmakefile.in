@@ -27,7 +27,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 buildnse:
 	cd $(SRCDIR); $(SRCDIR)/nse-install
 
-install:
+client-install:
 	cp $(INSTALL_FILES) $(INSTALL_SUPDIR)/etc/testbed
 	cp $(INSTALL_NSE) $(INSTALL_SUPDIR)/usr/local/bin
 
