@@ -1,14 +1,20 @@
 /*
- * sched.c --
+ * event-sched.c --
  *
  *      Testbed event scheduler.
+ *
+ *      The event scheduler is an event system client; it operates by
+ *      subscribing to the EVENT_SCHEDULE event, enqueuing the event
+ *      notifications it receives, and resending the notifications at
+ *      the indicated times.
  *
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event-sched.c,v 1.1 2001-12-04 15:15:32 imurdock Exp $";
+static char rcsid[] = "$Id: event-sched.c,v 1.2 2002-01-29 17:08:14 imurdock Exp $";
 
 #include <stdio.h>
+#include <pthread.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
@@ -16,38 +22,20 @@ static char rcsid[] = "$Id: event-sched.c,v 1.1 2001-12-04 15:15:32 imurdock Exp
 
 #include <event-sched.h>
 
-static void sched_seed_event_queue(void);
-#ifdef TEST_SCHED
-static void sched_seed_event_queue_debug(void);
-#endif /* TEST_SCHED */
-
-/* Returns the amount of time until EVENT fires. */
-static struct timeval
-sched_time_until_event_fires(sched_event_t event)
-{
-    struct timeval now, time;
-
-    gettimeofday(&now, NULL);
-
-    time.tv_sec = event.time.tv_sec - now.tv_sec;
-    time.tv_usec = event.time.tv_usec - now.tv_usec;
-    if (time.tv_usec < 0) {
-        time.tv_sec -= 1;
-        time.tv_usec += 1000000;
-    }
-
-    return time;
-}
+static void enqueue(event_handle_t handle, event_notification_t notification,
+                    char *host, event_type_t type, void *data);
+static void dequeue(event_handle_t handle);
 
 int
 main(int argc, char **argv)
 {
-    sched_event_t next_event;
-    struct timeval next_event_wait, now;
     event_handle_t handle;
-    event_notification_t notification;
+    pthread_t thread;
     char *server = NULL;
     int c;
+
+    /* Initialize event queue semaphores: */
+    sched_event_init();
 
     while ((c = getopt(argc, argv, "s:")) != -1) {
         switch (c) {
@@ -67,55 +55,19 @@ main(int argc, char **argv)
         return 1;
     }
 
-#ifdef TEST_SCHED
-    /* Seed event queue with scripted events, for testing. */
-    sched_seed_event_queue_debug();
-#endif /* TEST_SCHED */
-
-    /* Get static events from testbed database. */
-    sched_seed_event_queue();
-
-    while (sched_event_dequeue(&next_event) != 0) {
-        /* Determine how long to wait before firing the next event. */
-        next_event_wait = sched_time_until_event_fires(next_event);
-
-        /* If the event's firing time is in the future, then use
-           select to wait until the event should fire. */
-        if (next_event_wait.tv_sec >= 0 && next_event_wait.tv_usec > 0) {
-            if (select(0, NULL, NULL, NULL, &next_event_wait) != 0) {
-                ERROR("select did not timeout\n");
-                return 1;
-            }
-        }
-
-        /* Fire event. */
-
-        gettimeofday(&now, NULL);
-
-        TRACE("firing event (event=(time=(tv_sec=%ld, tv_usec=%ld)), "
-              "host=%s, type=%d) "
-              "at time (time=(tv_sec=%ld, tv_usec=%ld))\n",
-              next_event.time.tv_sec,
-              next_event.time.tv_usec,
-              next_event.host,
-              next_event.type,
-              now.tv_sec,
-              now.tv_usec);
-
-        notification = event_notification_alloc(handle, next_event.host,
-                                                next_event.type);
-        if (notification == NULL) {
-            ERROR("could not allocate notification\n");
-            return 1;
-        }
-
-        if (event_notify(handle, notification) == 0) {
-            ERROR("could not fire event\n");
-            return 1;
-        }
-
-        event_notification_free(handle, notification);
+    /* Subscribe to the EVENT_SCHEDULE event, and enqueue events as
+       they arrive: */
+    if (event_subscribe(handle, enqueue, EVENT_SCHEDULE, NULL) == NULL) {
+        ERROR("could not subscribe to EVENT_SCHEDULE event\n");
+        return 1;
     }
+
+    /* Create a thread to dequeue events: */
+    pthread_create(&thread, NULL, (void *(*)(void *)) dequeue, handle);
+    pthread_detach(thread);
+
+    /* Begin the event loop, waiting to receive enqueue requests: */
+    event_main(handle);
 
     /* Unregister with the event system: */
     if (event_unregister(handle) == 0) {
@@ -126,58 +78,132 @@ main(int argc, char **argv)
     return 0;
 }
 
+/* Enqueue event notifications as they arrive. */
 static void
-sched_seed_event_queue(void)
-{
-    /* XXX: Load events from database here. */
-}
-
-#ifdef TEST_SCHED
-/* Load scripted events into the event queue. */
-static void
-sched_seed_event_queue_debug(void)
+enqueue(event_handle_t handle, event_notification_t notification, char *host,
+        event_type_t type, void *data)
 {
     sched_event_t event;
-    struct timeval now;
+    event_type_t old_type;
 
-    strncpy(event.host, EVENT_HOST_ANY, MAXHOSTNAMELEN);
-    event.type = EVENT_TEST;
+    /* Clone the event notification, since we want the notification to
+       live beyond the callback function: */
+    event.notification = elvin_notification_clone(notification,
+                                                  handle->status);
+    if (!event.notification) {
+        ERROR("elvin_notification_clone failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return;
+    }
+
+    /* Restore the original event type: */
+
+    if (event_notification_get_int32(handle, event.notification, "old_type",
+                                    (int *) &old_type)
+        == 0)
+    {
+        ERROR("could not restore type attribute of notification %p\n",
+              event.notification);
+        return;
+    }
+
+    if (event_notification_remove(handle, event.notification, "type") == 0) {
+        ERROR("could not restore type attribute of notification %p\n",
+              event.notification);
+        return;
+    }
+
+    if (event_notification_put_int32(handle, event.notification, "type",
+                                     old_type)
+        == 0)
+    {
+        ERROR("could not restore type attribute of notification %p\n",
+              event.notification);
+        return;
+    }
+
+    /* Get the event's firing time: */
+
+    if (event_notification_get_int32(handle, event.notification, "time_sec",
+                                     (int *) &event.time.tv_sec)
+        == 0)
+    {
+        ERROR("could not get time.tv_sec attribute from notification %p\n",
+              event.notification);
+        return;
+    }
+
+    if (event_notification_get_int32(handle, event.notification, "time_usec",
+                                     (int *) &event.time.tv_usec)
+        == 0)
+    {
+        ERROR("could not get time.tv_usec attribute from notification %p\n",
+              event.notification);
+        return;
+    }
+
+    /* Enqueue the event notification for resending at the indicated
+       time: */
+    sched_event_enqueue(event);
+}
+
+/* Returns the amount of time until EVENT fires. */
+static struct timeval
+sched_time_until_event_fires(sched_event_t event)
+{
+    struct timeval now, time;
 
     gettimeofday(&now, NULL);
 
-    event.time = now;
-    event.time.tv_sec += 5;
-    if (sched_event_enqueue(event) == 0) {
-        ERROR("could not enqueue event\n");
-        return;
+    time.tv_sec = event.time.tv_sec - now.tv_sec;
+    time.tv_usec = event.time.tv_usec - now.tv_usec;
+    if (time.tv_usec < 0) {
+        time.tv_sec -= 1;
+        time.tv_usec += 1000000;
     }
 
-    /* Do two events at once, to make sure we can deal with that. */
-    event.time = now;
-    event.time.tv_sec += 60;
-    if (sched_event_enqueue(event) == 0) {
-        ERROR("could not enqueue event\n");
-        return;
-    }
-    event.time = now;
-    event.time.tv_sec += 60;
-    if (sched_event_enqueue(event) == 0) {
-        ERROR("could not enqueue event\n");
-        return;
-    }
+    return time;
+}
 
-    event.time = now;
-    event.time.tv_sec += 120;
-    if (sched_event_enqueue(event) == 0) {
-        ERROR("could not enqueue event\n");
-        return;
-    }
+/* Dequeue events from the event queue and fire them at the
+   appropriate time.  Runs in a separate thread. */
+static void
+dequeue(event_handle_t handle)
+{
+    sched_event_t next_event;
+    struct timeval next_event_wait, now;
 
-    event.time = now;
-    event.time.tv_sec += 300;
-    if (sched_event_enqueue(event) == 0) {
-        ERROR("could not enqueue event\n");
-        return;
+    while (sched_event_dequeue(&next_event, 1) != 0) {
+        /* Determine how long to wait before firing the next event. */
+        next_event_wait = sched_time_until_event_fires(next_event);
+
+        /* If the event's firing time is in the future, then use
+           select to wait until the event should fire. */
+        if (next_event_wait.tv_sec >= 0 && next_event_wait.tv_usec > 0) {
+            if (select(0, NULL, NULL, NULL, &next_event_wait) != 0) {
+                ERROR("select did not timeout\n");
+                return;
+            }
+        }
+
+        /* Fire event. */
+
+        gettimeofday(&now, NULL);
+
+        TRACE("firing event (event=(notification=%p, "
+              "time=(tv_sec=%ld, tv_usec=%ld)) "
+              "at time (time=(tv_sec=%ld, tv_usec=%ld))\n",
+              next_event.notification,
+              next_event.time.tv_sec,
+              next_event.time.tv_usec,
+              now.tv_sec,
+              now.tv_usec);
+
+        if (event_notify(handle, next_event.notification) == 0) {
+            ERROR("could not fire event\n");
+            return;
+        }
+
+        event_notification_free(handle, next_event.notification);
     }
 }
-#endif /* TEST_SCHED */

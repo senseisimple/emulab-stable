@@ -1,12 +1,12 @@
 /*
- * sched.h --
+ * event-sched.h --
  *
  *      This file contains definitions for the testbed event
  *      scheduler.
  *
  * @COPYRIGHT@
  *
- * $Id: event-sched.h,v 1.1 2001-12-04 15:15:32 imurdock Exp $
+ * $Id: event-sched.h,v 1.2 2002-01-29 17:08:14 imurdock Exp $
  */
 
 #ifndef __SCHED_H__
@@ -22,10 +22,8 @@
 
 /* Scheduler-internal representation of an event. */
 typedef struct sched_event {
+    event_notification_t notification; /* event notification */
     struct timeval time;        /* event firing time */
-    char host[MAXHOSTNAMELEN];  /* host to send the event to, or "*"
-                                 * for all hosts */
-    event_type_t type;          /* event type */
 } sched_event_t;
 
 /*
@@ -33,9 +31,9 @@ typedef struct sched_event {
  */
 
 /* queue.c */
+void sched_event_init(void);
 int sched_event_enqueue(sched_event_t event);
-int sched_event_dequeue(sched_event_t *event);
+int sched_event_dequeue(sched_event_t *event, int wait);
 void sched_event_queue_dump(FILE *fp);
-void sched_event_queue_verify(void);
 
 #endif /* __SCHED_H__ */

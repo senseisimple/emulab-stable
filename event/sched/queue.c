@@ -6,10 +6,12 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: queue.c,v 1.2 2001-12-04 15:17:09 imurdock Exp $";
+static char rcsid[] = "$Id: queue.c,v 1.3 2002-01-29 17:08:14 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -24,7 +26,7 @@ static char rcsid[] = "$Id: queue.c,v 1.2 2001-12-04 15:17:09 imurdock Exp $";
    the queue is EVENT_QUEUE[1], and the tail is
    EVENT_QUEUE[EVENT_QUEUE_TAIL].  EVENT_QUEUE[0] is initialized to 0,
    since it should never be used; this makes it easier to catch errors. */
-static sched_event_t event_queue[EVENT_QUEUE_LENGTH] = { { { 0, 0 } } };
+static sched_event_t event_queue[EVENT_QUEUE_LENGTH];
 
 /* The index of the event queue head (fixed). */
 #define EVENT_QUEUE_HEAD 1
@@ -32,9 +34,18 @@ static sched_event_t event_queue[EVENT_QUEUE_LENGTH] = { { { 0, 0 } } };
 /* The index of the event queue tail. */
 static int event_queue_tail = 0;
 
+static pthread_mutex_t event_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/* Producer/consumer semaphores. */
+static sem_t empty_slot, event_to_consume;
+
+static int initialized = 0;
+
 static void sched_event_queue_dump_node_and_descendents(FILE *fp,
                                                         int index,
                                                         int level);
+
+static void sched_event_queue_verify(void);
 
 /* Returns non-zero if EVENT1 is more recent than EVENT2, 0 otherwise. */
 static inline int
@@ -47,6 +58,15 @@ event_is_more_recent(sched_event_t event1, sched_event_t event2)
     }
 }
 
+/* Initialize priority queue semaphores. */
+void
+sched_event_init(void)
+{
+    sem_init(&empty_slot, 0, EVENT_QUEUE_LENGTH);
+    sem_init(&event_to_consume, 0, 0);
+    initialized = 1;
+}
+
 /* Enqueue the event EVENT to the priority queue.  Returns non-zero if
    successful, 0 otherwise. */
 int
@@ -54,19 +74,23 @@ sched_event_enqueue(sched_event_t event)
 {
     int parent, child;
 
-    if (event_queue_tail == EVENT_QUEUE_LENGTH - 1) {
-        ERROR("queue full\n");
-        return 0;
-    }
+    assert(initialized);
+
+    /* Wait until there is an empty slot in the event queue. */
+    sem_wait(&empty_slot);
+
+    pthread_mutex_lock(&event_queue_mutex);
+
+    assert(event_queue_tail < EVENT_QUEUE_LENGTH - 1);
 
     /* Add the event to the priority queue.  The event is first
        inserted as a leaf of the tree, then propogated up the tree
        until the heap property is again satisfied.  At each iteration,
        we check to see if the event being inserted is more
-       recent that it's parent.  If it is, we swap parent and child,
-       move up one level in the tree, and iterate again; if it
-       isn't, we're as far up the tree as we're going to get and are
-       done. */
+       recent that its parent.  If it is, we swap parent and child,
+       move up one level in the tree, and iterate again; if
+       it isn't, we're as far up the tree as we're going to get and
+       are done. */
 
     event_queue[++event_queue_tail] = event;
 
@@ -88,35 +112,55 @@ sched_event_enqueue(sched_event_t event)
         }
     }
 
-    TRACE("enqueued event (event=(time=(tv_sec=%ld, tv_usec=%ld)), "
-          "host=%s, type=%d)\n",
+    TRACE("enqueued event (event=(notification=%p, "
+          "time=(tv_sec=%ld, tv_usec=%ld)))\n",
+          event.notification,
           event.time.tv_sec,
-          event.time.tv_usec,
-          event.host,
-          event.type);
+          event.time.tv_usec);
 
     /* Sanity check: Make sure the heap property is satisfied. */
     sched_event_queue_verify();
 
+    pthread_mutex_unlock(&event_queue_mutex);
+
+    /* Signal that there is now an event to be consumed. */
+    sem_post(&event_to_consume);
+
     return 1;
 }
 
-/* Dequeue the next event from the priority queue.  Stores the event
+/* Dequeue the next event from the priority queue.  If WAIT is
+   non-zero, block until there is an event to dequeue, otherwise
+   return immediately if the queue is empty.  Stores the event
    at *EVENT and returns non-zero if successful, 0 otherwise. */
 int
-sched_event_dequeue(sched_event_t *event)
+sched_event_dequeue(sched_event_t *event, int wait)
 {
     int parent, child;
+
+    assert(initialized);
 
     if (event == NULL) {
         ERROR("invalid event pointer\n");
         return 0;
     }
 
-    if (event_queue_tail == 0) {
-        ERROR("queue empty\n");
-        return 0;
+    if (wait) {
+        /* Wait until there is an event to be consumed. */
+        sem_wait(&event_to_consume);
+    } else {
+        /* Return immediately if the queue is empty. */
+        int val;
+        sem_getvalue(&event_to_consume, &val);
+        if (val == 0) {
+            TRACE("queue empty\n");
+            return 0;
+        }
     }
+
+    pthread_mutex_lock(&event_queue_mutex);
+
+    assert(event_queue_tail > 0);
 
     /* Remove the next event from the priority queue. */
 
@@ -157,15 +201,19 @@ sched_event_dequeue(sched_event_t *event)
         }
     }
 
-    TRACE("dequeued event (event=(time=(tv_sec=%ld, tv_usec=%ld)), "
-          "host=%s, type=%d)\n",
+    TRACE("dequeued event (event=(notification=%p, "
+          "time=(tv_sec=%ld, tv_usec=%ld)))\n",
+          event->notification,
           event->time.tv_sec,
-          event->time.tv_usec,
-          event->host,
-          event->type);
+          event->time.tv_usec);
 
     /* Sanity check: Make sure the heap property is satisfied. */
     sched_event_queue_verify();
+
+    pthread_mutex_unlock(&event_queue_mutex);
+
+    /* Signal that there is now an empty slot in the event queue. */
+    sem_post(&empty_slot);
 
     return 1;
 }
@@ -174,11 +222,13 @@ sched_event_dequeue(sched_event_t *event)
 void
 sched_event_queue_dump(FILE *fp)
 {
+    pthread_mutex_lock(&event_queue_mutex);
     sched_event_queue_dump_node_and_descendents(fp, EVENT_QUEUE_HEAD, 0);
+    pthread_mutex_unlock(&event_queue_mutex);
 }
 
 /* Dump an event queue node and its descendents, with indentation for
-   readability. */
+   readability.  Expects EVENT_QUEUE_MUTEX to be locked. */
 static void
 sched_event_queue_dump_node_and_descendents(FILE *fp, int index, int level)
 {
@@ -211,8 +261,9 @@ sched_event_queue_dump_node_and_descendents(FILE *fp, int index, int level)
     }
 }
 
-/* Verify that the event queue satisfies the heap property. */
-void
+/* Verify that the event queue satisfies the heap property.  Expects
+   EVENT_QUEUE_MUTEX to be locked. */
+static void
 sched_event_queue_verify(void)
 {
     int error, i;
@@ -264,6 +315,8 @@ main(int argc, char **argv)
     gettimeofday(&now, NULL);
     srand((int) now.tv_usec);
 
+    sched_event_init();
+
     /* Enqueue events. */
     printf("Enqueueing events...\n");
     fflush(stdout);
@@ -285,7 +338,7 @@ main(int argc, char **argv)
     printf("Dequeueing events...\n");
     fflush(stdout);
     for (i = 0; i < events; i++) {
-        if (sched_event_dequeue(&event) == 0) {
+        if (sched_event_dequeue(&event, 0) == 0) {
             ERROR("could not dequeue event\n");
             return 1;
         }
