@@ -1174,6 +1174,58 @@ class experiment:
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
     #
+    # Wireless link configuration
+    #
+    def link_config(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict,
+                                     ("proj", "exp", "link", "params"))
+        if (argerror):
+            return argerror
+
+        argstr = ""
+        for opt, val in argdict.items():
+            if opt == "persist":
+                if xbool(val):
+                    argstr += " -m "
+                    pass
+                pass
+            elif opt == "src":
+                argstr += " -s "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
+        argstr += " " + escapeshellarg(argdict["link"])
+
+        for opt, val in argdict["params"].items():
+            argstr += " " + escapeshellarg(opt + "=" + str(val))
+            pass
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/link_config " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # iwconfig is an alias for link_config
+    # 
+    def iwconfig(self, version, argdict):
+        return self.link_config(version, argdict)
+
+    #
     # Reboot all nodes in an experiment.
     #
     def reboot(self, version, argdict):

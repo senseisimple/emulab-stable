@@ -902,6 +902,71 @@ experiments.
   </table>
 
   <br>
+  <li><tt><b>link_config</b></tt>: Change the link characteristics for a
+  wireless lan. Note that the lan must already be a wireless link; you
+  cannot convert wired link to a wireless link! 
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>link</tt></td>
+    <td>string</td>
+    <td>The name of the lan to change; see your NS file</td>
+  </tr>
+  <tr>
+    <td><tt>params</tt></td>
+    <td>Dictionary</td>
+    <td>A hashed array (Dictionary) of parameters to change; see below</td>
+  </tr>
+  </table>
+  
+  <br>
+  The optional arguments are:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>persist</tt></td>
+    <td>boolean</td>
+    <td>false</td>
+    <td>If true, the base experiment is changed in the Emulab Database;
+    changes will persist across swapin and swapout. By default, just the
+    physical experiment is changed, and changes are lost at swapout</td>
+   </tr>
+   <tr>
+    <td><tt>src</tt></td>
+    <td>string</td>
+    <td>&nbsp;</td>
+    <td>If specified, change a duplex link asymmetrically; just the link from
+    the node specified will be changed. <em>This option is ignored on lans; the
+    entire lan must be changed</em></td>
+   </tr>
+  </table>
+
+  <br>
+  In addition to the required arguments, you must also supply at least
+  one parameter to change in the <tt>params</tt> argument. The reader is
+  encouraged to read the
+  <a href=tutorial/docwrapper.php3?docname=wireless.html>wireless
+  tutorial</a> to see what parameters can be changed.
+  <br>
+
+  <br>
   <li><tt><b>reboot</b></tt>: Reboot all nodes in an experiment.
   The required arguments are:<br><br>
   <table cellpadding=2>
