@@ -833,6 +833,11 @@ class Plab:
                          " values (%s, %s, %s)",
                          (nodeid, linktype, 1))
             
+            DBQueryFatal("insert into node_auxtypes"
+                         " (node_id, type, count)"
+                         " values (%s, %s, %s)",
+                         (nodeid, 'pcplab', 1))
+            
             DBQueryFatal("insert into node_status"
                          " (node_id, status, status_timestamp)"
                          " values (%s, %s, now())",
