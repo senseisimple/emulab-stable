@@ -69,7 +69,7 @@ if (TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_REBOOT)) {
 }
 
 if ($isadmin) {
-    WRITESUBMENUBUTTON("Access Node Log",
+    WRITESUBMENUBUTTON("Show Node Log",
 		       "shownodelog.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Free Node",
 		       "freenode.php3?node_id=$node_id");
