@@ -1519,10 +1519,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tbsetup/newnode_reboot \
+        tbsetup/libtestbed.py \
 	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
-        tbsetup/plab/libtestbed.py \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
