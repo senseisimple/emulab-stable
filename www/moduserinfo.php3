@@ -380,32 +380,34 @@ if (isset($formfields[usr_URL]) &&
     ! CHECKURL($formfields[usr_URL], $urlerror)) {
     $errors["Home Page URL"] = $urlerror;
 }
-if (!isset($formfields[usr_addr]) ||
-    strcmp($formfields[usr_addr], "") == 0) {
-    $errors["Postal Address"] = "Missing Field";
-}
-if (!isset($formfields[usr_city]) ||
-    strcmp($formfields[usr_city], "") == 0) {
-    $errors["City"] = "Missing Field";
-}
-if (!isset($formfields[usr_state]) ||
-    strcmp($formfields[usr_state], "") == 0) {
-    $errors["State"] = "Missing Field";
-}
-if (!isset($formfields[usr_zip]) ||
-    strcmp($formfields[usr_zip], "") == 0) {
-    $errors["ZIP/Postal Code"] = "Missing Field";
-}
-if (!isset($formfields[usr_country]) ||
-    strcmp($formfields[usr_country], "") == 0) {
-    $errors["Country"] = "Missing Field";
-}
-if (!isset($formfields[usr_phone]) ||
-    strcmp($formfields[usr_phone], "") == 0) {
-    $errors["Phone #"] = "Missing Field";
-}
-elseif (! ereg("^[\(]*[0-9][-\(\) 0-9ext]+$", $formfields[usr_phone])) {
-    $errors["Phone"] = "Invalid characters";
+if (!$isadmin) {
+    if (!isset($formfields[usr_addr]) ||
+	strcmp($formfields[usr_addr], "") == 0) {
+	$errors["Postal Address"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_city]) ||
+	strcmp($formfields[usr_city], "") == 0) {
+	$errors["City"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_state]) ||
+	strcmp($formfields[usr_state], "") == 0) {
+	$errors["State"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_zip]) ||
+	strcmp($formfields[usr_zip], "") == 0) {
+	$errors["ZIP/Postal Code"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_country]) ||
+	strcmp($formfields[usr_country], "") == 0) {
+	$errors["Country"] = "Missing Field";
+    }
+    if (!isset($formfields[usr_phone]) ||
+	strcmp($formfields[usr_phone], "") == 0) {
+	$errors["Phone #"] = "Missing Field";
+    } 
+    elseif (! ereg("^[-0-9ext\(\)\+\. ]+$", $formfields[usr_phone])) {
+        $errors["Phone #"] = "Invalid characters";
+    }
 }
 if (isset($formfields[password1]) &&
     strcmp($formfields[password1], "")) {
