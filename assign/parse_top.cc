@@ -34,6 +34,7 @@ void parse_top(tbgraph &G, istream& i)
 		} else {
 		    string s1(n1);
 		    no1 = G.new_node();
+		    G[no1].name(n1);
 		    nmap.insert(s1, no1);
 		    if (!strcmp(type, "delay")) {
 			    G[no1].type(testnode::TYPE_DELAY);
