@@ -37,11 +37,15 @@
 
 use DBI;
 use POSIX;
+use BSD::Resource;
 
 #die("*** $0:\n".
 #    "    Testsuite Disabled. Come edit me if need be.\n");
 
 $| = 1;
+
+# Lower priority since this whole thing consumes CPU like nuts
+setpriority(PRIO_PROCESS, 0, 15);
 
 #
 # Set our WITH_TB_ADMIN_PRIVS environment variable, so that we have the
