@@ -212,7 +212,7 @@ The client is currently distributed as a self-contained JAR file:
 <a href="/downloads/netlab-client.jar">netlab-client.jar</a>
 </td>
 <td align="center">(370K)</td>
-<td align="center">v0.1.0a</td>
+<td align="center">v0.1.0b</td>
 <td align="right">May 12, 2004</td>
 </tr>
 </table>
@@ -409,10 +409,14 @@ topology in multiple experiments, you need to save it to a separate file now.
 
 <?php NLCBODYBEGIN() ?>
 <!-- Center -->
+
 From this point on, you will need an account on an Emulab site and an SSH
 configured to use public/private keys instead of passwords.  If all of these
-preconditions are met, check the preferences in "Edit / Preferences" to
-ensure that your user name and Emulab domain name are correct.  These values
+preconditions are met, check the preferences in "Edit / Preferences" to ensure
+that your user name and Emulab domain name are correct.  Also, the client uses
+its own SSH config file, so you might need to edit the "SSH Config Template" to
+suit your needs.  For example, a common change will be to use version two of
+the protocol by changing the line "Protocol 1,2" to "Protocol 2".  These values
 are needed to properly communicate with your Emulab's XML-RPC interface.
 <br>
 <br>
@@ -616,6 +620,80 @@ select one to load.  After the client has finished retrieving information about
 the experiment, you should be able to use the client like in the previous
 sections to login to your nodes, change link parameters, and swap in/out your
 experiment.
+
+<?php NLCBODYEND() ?>
+
+<?php NLCEMPTY() ?>
+
+</tr>
+
+
+<tr>
+
+<?php NLCH2("Troubleshooting") ?>
+
+<?php NLCBODYBEGIN() ?>
+<!-- Center -->
+We will try and cover some of the more common problems and their solutions in
+this section:<br>
+<br>
+
+<table class="stealth" width="25%">
+<tr><th>"Bad Response" when trying to connect to Emulab.</th></tr>
+<tr>
+<td>
+This error is usually due to the client not configuring SSH correctly.  First,
+check your preferences to make sure they are correct.  It is easy to overlook
+minor details in the defaults, for example, the client assumes that the user
+name on your desktop machine is the same as your Emulab user name, which is not
+always the case.
+<p>
+If those settings all look correct, you may want to go into the "SSH Config
+Template" page of the preferences dialog and change the line "Protocol 1,2" to
+"Protocol 2".  This is required if your keys are for version 2 of the SSH
+protocol, since the client currently assumes version 1.
+
+<p>
+If all else fails, leave
+the client running and execute the following in another terminal:
+<pre>
+$ ssh -v -v -v -F ~/.netlab-client/emulab.net.ssh-config boss.emulab.net
+</pre>
+This should give you an idea of what might be going wrong.  If you cannot
+figure out the output on your own, send the output to the testbed operators.
+
+<p>
+In the future, we will hopefully be able to make the client figure this all out
+on its own.
+</td>
+</tr>
+</table>
+
+<?php NLCBODYEND() ?>
+
+<?php NLCEMPTY() ?>
+
+</tr>
+
+
+<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
+
+
+<tr>
+
+<?php NLCH1("History") ?>
+
+<?php NLCBODYBEGIN() ?>
+<!-- Center -->
+
+The release history:
+
+<ul>
+<li>v0.1.0b - Add ability to customize the SSH config template.
+Ask the user before swapping/terminating an experiment.
+Fix some other minor bugs.
+<li>v0.1.0 - Initial release
+</ul>
 
 <?php NLCBODYEND() ?>
 
