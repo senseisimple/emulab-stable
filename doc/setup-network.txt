@@ -1,5 +1,5 @@
 ##### Configuration suggestions for Cisco switches
-##### Last updated April 5, 2002 
+##### Last updated July 25, 2002 
 
 The purpose of this document is to aid in designing and setting up the control
 and experimental networks on other emulabs.
@@ -80,6 +80,20 @@ the default one. However, you want to make sure that no ports on the nodes can
 talk to it, so you'll want to disable them all. (Our software will re-enable
 them, and disable them as needed.)                           
 
+##### DHCP through the router
+
+If your boss node is on a seperate VLAN from the node control net, you'll need
+to make sure that DHCP traffic can get from the control net to your boss node,
+since normally, DHCP is not forwarded through routers. On Cisco routers, this
+is done with the 'ip helper-address'. For example, here, the name of the
+router's interface in the node control net is 'Vlan3'.  So, I'd log  into the
+router, and run the following:                                 
+  configure terminal                                                      
+  interface Vlan3                                                         
+  ip helper-address 155.101.128.70                                   
+
+Of course, replace 'Vlan3' with the name of your router's node
+control-net interface, and replace the IP address with that of your boss node.                                                          
 ##### Some variations on the above configuration
 
 There are some variations on the above configuration that we haven't tried, but
@@ -96,6 +110,7 @@ As an added measure of security on the experimental network, you could move
 your switch IP interfaces (and the wire that runs from them to the control net)
 out of VLAN 1. When ports are not in use, we put them in VLAN 1 and disable
 them. But, if a port accidentally ends up in VLAN 1 still enabled, it could
-theoretically talk to the switch and change configurations.
-
-
+theoretically talk to the switch and change configurations. Furthermore, we've
+had circumstances in which delay nodes accidentally ended up in tis VLAN, still
+forwarding packets, which created a very nasty forwarding loop. Using some
+VLAN other than #1 prevents such problems from impacting the boss node.
