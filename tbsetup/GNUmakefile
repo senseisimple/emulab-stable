@@ -9,7 +9,7 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  delay_setup ifc_setup ifc_filegen \
 		  ir2ifc power resetvlans savevlans snmpit tbend \
 		  tbprerun tbreport vpower vsnmpit killtip \
-		  mkacct-ctrl_wrapper
+		  mkacct-ctrl_wrapper rmprojdir_wrapper
 DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir os_setup mkacct rmacct \
 	          mkacct-ctrl ifc_setup
@@ -58,6 +58,8 @@ $(INSTALL_LIBTBDIR)/%: %.tcl
 post-install: 
 	chown root $(INSTALL_BINDIR)/mkprojdir
 	chmod u+s $(INSTALL_BINDIR)/mkprojdir
+	chown root $(INSTALL_BINDIR)/rmprojdir
+	chmod u+s $(INSTALL_BINDIR)/rmprojdir
 	chown root $(INSTALL_BINDIR)/mkacct-ctrl
 	chmod u+s $(INSTALL_BINDIR)/mkacct-ctrl
 	chown root $(INSTALL_BINDIR)/mkacct

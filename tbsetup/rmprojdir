@@ -1,0 +1,94 @@
+#!/usr/local/bin/perl -wT
+use Mysql;
+use English;
+
+#
+# Remove a project directory hierarchy. Actually, the project directory
+# is *renamed* from $pid to $pid-`date +20%y%m%d-%H.%M.%S` since we do
+# not want to be so destructive.
+#
+# usage: rmprojdir <pid>
+#
+# TODO: Allow for the head of a project delete it.
+#
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+my $PROJROOT = "/proj";
+my $dbh      = Mysql->connect("localhost","tbdb","script","none");
+my $db_result= "";
+
+#
+# Check args.
+#
+if ($#ARGV < 0) {
+    die("Usage: rmprojdir <pid>\n");
+}
+my $pid = $ARGV[0];
+
+#
+# Untaint the argument.
+#
+if ($pid =~ /^([-\@\w.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Invalid pid '$pid' contains illegal characters.\n");
+}
+
+#
+# Figure out who called us. Only root or people with admin status
+# can run this script.
+#
+if ($UID != 0) {
+    my ($me) = getpwuid($UID)
+	or die "$UID not in passwd file";
+    
+    $db_result = $dbh->query("select admin from users where uid='$me'");
+    my @row = $db_result->fetchrow_array();
+    if ($row[0] != 1) {
+	die("rmprojdir: ".
+	    "You must be root or TB admin to remove a project directory\n");
+    }
+}
+
+#
+# Ensure that the project is not in the database!
+#
+$db_result = $dbh->query("select head_uid ".
+			 "from projects where pid='$pid'");
+if ($db_result->numrows == 1) {	
+    die("Project '$pid' is still in the database!\n");
+}
+
+#
+# Rename the project directory.
+# 
+my $newname = "$pid-" . `date +20%y%m%d-%H.%M.%S`;
+
+#
+# Untaint the new name since it was constructed with date. Dopey.
+#
+if ($newname =~ /^([-\@\w.]+)$/) {
+    $newname = $1;
+}
+
+if (! chdir($PROJROOT)) {
+    print STDOUT "Could not chdir to $PROJROOT!\n";
+    exit(-1);
+}
+
+if (! -e $pid) {
+    print STDOUT "Project directory '$pid' does not exist!\n";
+    exit(-1);
+}
+
+if (! rename($pid, $newname)) {
+    print STDOUT "Could not rename project directory $pid to $newname: $!\n";
+    exit(-1);
+}
+
+exit(0);
+
