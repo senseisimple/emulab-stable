@@ -2,29 +2,13 @@ HyperViewer in Emulab - A wxGlade Python GUI on top of Tamara Munzner's 3D
 hyperbolic graph viewer from Stanford.  This is a client program, connected to
 the Emulab database via XML-RPC over SSH.
 
-See the writeup in ../www/hyperviewer/index.html .
-
-This is Very Alpha Software.  Until we get wxPython compatibility issues
-resolved there will not be a binary distribution of the client.  Thus you need
-to do a make from sources on the C++ part, which is imported by Python from a
-shared library at runtime.  Before you can do that you must first have
-wxPython installed, and wxGlade if you want to edit the GUI.  Then do a make
-as described in the writeup.
+See the installation and usage writeup in www/index.html !
 
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# Permission to use, copy, modify and distribute this software is hereby
-# granted provided that (1) source code retains these copyright, permission,
-# and disclaimer notices, and (2) redistributions including binaries
-# reproduce the notices in supporting documentation.
-#
-# THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
-# CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
-# FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
-#
 
 HyperViewer sources are included in the hypviewer subdirectory.
-See hypviewer/README and hypviewer/COPYRIGHT.
+See the hypviewer/README and hypviewer/COPYRIGHT files for more information.

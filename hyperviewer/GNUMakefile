@@ -23,14 +23,15 @@ INCDIRS = -I${HVINC} -I/usr/X11R6/include -I/usr/local/include/python2.3
 ###STATIC =  -static
 LDLIBS  = ${HVLIB} ${STATIC} -L/usr/X11R6/lib -lGLU -lGL -lXmu -lXext -lX11 -lm
 
-# Distribute the Python scripts, sources, shared library, and sample input files.
+# Distribute the Python scripts, sources, shared library, sample input files, and user doc.
 PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py
 SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp
 BINFILES = _hv.so 
 DATAFILES = BigLan.hyp ts600.hyp
 SCRIPTFILES = hypview pangorc.local pango.modules.local
-DOCFILES = www
-DISTFILES = ${SCRIPTFILES} ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${DOCFILES} ${HVROOT}
+DOCDIR = www
+DISTFILES = ${SCRIPTFILES} ${PYFILES} ${SRCFILES} ${BINFILES} ${DATAFILES} ${DOCDIR} ${HVROOT}
+DISTARCH = FreeBSD
 
 # Finally, make something.
 default: _hv.so
@@ -66,8 +67,8 @@ dist:
 	# Wrap a top-level hyperviewer directory around the dist files in the tarball.
 	mkdir -p temp/hyperviewer
 	cp -rp ${DISTFILES} temp/hyperviewer
-	ln -s www/index.html temp/hyperviewer
-	tar cfz hyperviewer.tgz -C temp hyperviewer
+	ln -s ${DOCDIR}/index.html temp/hyperviewer
+	tar cfz hyperviewer-${DISTARCH}.tgz -C temp hyperviewer
 	rm -rf temp
 
 clean:

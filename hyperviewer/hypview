@@ -9,7 +9,12 @@
 
 # Optionally use shared libs under the local directory.
 if [ -d libs ]; then
-    LD_LIBRARY_PATH=./libs;        export LD_LIBRARY_PATH
+    if [ $LD_LIBRARY_PATH ]; then
+        LD_LIBRARY_PATH=./libs:$LD_LIBRARY_PATH
+    else
+        LD_LIBRARY_PATH=./libs
+    fi
+    export LD_LIBRARY_PATH
 fi
 
 # Optionally use Pango loadable modules under the local directory.
