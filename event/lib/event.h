@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.12 2002-03-25 21:24:45 ricci Exp $
+ * $Id: event.h,v 1.13 2002-03-25 23:02:45 ricci Exp $
  */
 
 #ifndef __EVENT_H__
@@ -66,6 +66,7 @@ typedef struct {
 address_tuple_t	address_tuple_alloc(void);
 int		address_tuple_free(address_tuple_t);
 
+#ifndef NO_EVENT_MACROS
 #define event_notification_get_site(handle, note, buf, len) \
         event_notification_get_string(handle, note, "SITE", buf, len)
 #define event_notification_get_expt(handle, note, buf, len) \
@@ -105,6 +106,7 @@ int		address_tuple_free(address_tuple_t);
         event_notification_get_string(handle, note, "___SENDER___", buf, len)
 #define event_notification_set_sender(handle, note, buf) \
         event_notification_put_string(handle, note, "___SENDER___", buf)
+#endif /* ifndef NO_EVENT_MACROS */
 
 
 /* The "any host" string: */
