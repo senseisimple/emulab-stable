@@ -3308,7 +3308,15 @@ sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
 sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
 sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
 sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
-sub physnodenextpipe($)  { return $phys_nodes{$_[0]}->{"__pipeno"} += 10; }
+sub physnodenextpipe($)  {
+    my $pipeno = $phys_nodes{$_[0]}->{"__pipeno"} += 10;
+
+    fatal(1, "*** $0:\n".
+	     "    Too many ipfw pipes on node $pnode!")
+	if ($pipeno >= 65535);
+    
+    return $pipeno;
+}
 
 #
 # Load current resources. We pull in the phys node entries now.
