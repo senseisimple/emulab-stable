@@ -2156,7 +2156,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table experiment_stats add elabinelab tinyint(1) NOT NULL \
             default '0' after batch;
-	alter table experiment_stats add elabinelab_exptidx int(10) \ 
+	alter table experiment_stats add elabinelab_exptidx int(10) \
              unsigned default NULL after elabinelab;
 	alter table experiment_stats add security_level tinyint(1) NOT NULL \
             default '0' after elabinelab_exptidx;
