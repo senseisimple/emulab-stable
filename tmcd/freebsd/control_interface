@@ -1,23 +1,27 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
+
 . /etc/emulab/paths.sh
 
 NODETYPE=`nodetype`
-
-if [ "$NODETYPE" = 'pc600' ]; then
-    echo 'fxp4'
-elif [ "$NODETYPE" = 'pc850' ]; then
+case $NODETYPE in
+pc300|pc850)
     echo 'fxp0'
-elif [ "$NODETYPE" = 'pcL440GX' ]; then
+    ;;
+pcL440GX)
     echo 'fxp1'
-elif [ "$NODETYPE" = 'pc1500' ]; then
+    ;;
+pc600)
+    echo 'fxp4'
+    ;;
+pc1500|pc2000)
     echo 'xl0'
-elif [ "$NODETYPE" = 'pc2000' ]; then
-    echo 'xl0'
-else
-    echo 'unknown'
-fi
+    ;;
+*)
+    echo 'unknown';
+    ;;
+esac
