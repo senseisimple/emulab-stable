@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: healthd.c,v 1.1 2001-12-05 18:45:08 kwebb Exp $
+ * $Id: healthd.c,v 1.2 2002-03-05 20:35:37 kwebb Exp $
  */
 /*
  *
@@ -282,7 +282,7 @@ main(int argc, char *argv[]) {
   struct servent *sp;
   struct timeval to;
   unsigned long port;
-  int psd;
+  int psd = -1;
   struct sockaddr_in paddr;
   struct hostent *hent;
 
@@ -340,9 +340,9 @@ main(int argc, char *argv[]) {
   LocalOnly = 0;
 
 #ifdef INET6
-  while((ch=getopt(argc, argv, "1246BDILSP:Vc:df:t:p:")) != -1) {
+  while((ch=getopt(argc, argv, "1246BDILSP:Vc:df:t:p:q")) != -1) {
 #else /* !INET6 */
-  while((ch=getopt(argc, argv, "12BDILSP:Vc:df:t:p:")) != -1) {
+  while((ch=getopt(argc, argv, "12BDILSP:Vc:df:t:p:q")) != -1) {
 #endif /* !INET6 */
     switch(ch){
     case '1':
@@ -479,6 +479,11 @@ main(int argc, char *argv[]) {
   }
   if (InitMBInfo(method) != 0) {
     perror("InitMBInfo");
+    exit(1);
+  }
+
+  if (RstChip() < 0) {
+    perror("RstChip");
     exit(1);
   }
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: getMBinfo-bsd.c,v 1.1 2001-12-05 18:45:08 kwebb Exp $
+ *	$Id: getMBinfo-bsd.c,v 1.2 2002-03-05 20:35:37 kwebb Exp $
  */
 
 /************************************************
@@ -41,6 +41,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -63,6 +64,8 @@ static struct lm_methods *this_method;
 #define CloseIO()            (this_method->Close());
 #define ReadByte(addr)       (this_method->Read((addr)))
 #define WriteByte(addr, val) (this_method->Write((addr), (val)))
+
+#define MAXTRIES 4
 
 /*----------------------
   Restarting Chip
@@ -91,7 +94,14 @@ FiniMBInfo(void)
 
 int 
 RstChip(void) {
-  return WriteByte(0x40,0x01);
+  int i;
+
+  for (i = 0; i < MAXTRIES; ++i) {
+    WriteByte(0x40,0x01);
+    usleep(200);
+    if (ReadByte(0x40) == 0x01) return 0;
+  }
+  return -1;
 }
 
 unsigned int 
