@@ -1,0 +1,43 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= os/frisbee.new
+
+include $(OBJDIR)/Makeconf
+
+all:	frisbee frisbeed
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+SHAREDOBJS	= log.o network.o utils.o
+PTHREADCFLAGS	= -D_THREAD_SAFE \
+		  -I/usr/local/include/pthread/linuxthreads
+PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
+
+CLIENTFLAGS	= $(CFLAGS)
+CLIENTLIBS	= ../imagezip/frisbee.o -lz $(PTHREADLIBS)
+CLIENTOBJS	= client.o $(SHAREDOBJS)
+
+SERVERFLAGS	= $(CFLAGS)
+SERVERLIBS	= $(PTHREADLIBS)
+SERVEROBJS	= server.o $(SHAREDOBJS)
+
+CFLAGS		= -O2 -g -Wall -static $(PTHREADCFLAGS)
+LDFLAGS		= -static
+
+frisbee: $(CLIENTOBJS) ../imagezip/frisbee.o
+	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
+	cp frisbee frisbee.debug
+	strip frisbee
+
+frisbeed: $(SERVEROBJS)
+	$(CC) $(LDFLAGS) $(SERVERFLAGS) $(SERVEROBJS) $(SERVERLIBS) -o frisbeed
+	cp frisbeed frisbeed.debug
+	strip frisbeed
+
+client.o:	decls.h log.h
+server.o:	decls.h log.h
+log.o:		decls.h log.h
+
+clean:
+	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug

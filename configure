@@ -1049,6 +1049,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
+	os/frisbee.redux/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
 	security/GNUmakefile security/paperbag security/lastlog_daemon \
 	tbsetup/GNUmakefile tbsetup/console_setup \
