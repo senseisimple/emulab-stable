@@ -23,7 +23,8 @@
      <li> <a href="#GS-4">Can I be in more than one project?</a>
      <li> <a href="#GS-5">Can I change my Emulab password?</a>
      <li> <a href="#GS-6">I'm a project leader. Can I designate TAs?</a>
-     <li> <a href="#GS-7">Where do I get help?</a>
+     <li> <a href="#GS-7a">How do I report a specific problem?</a>
+     <li> <a href="#GS-7">Where do I get more help?</a>
      </ul>
 
 <li> <a href="#UTT">Using the Testbed</a>
@@ -286,8 +287,40 @@
     <a href="docwrapper.php3?docname=groups.html">Groups Tutorial</a>.
     </p>
 
+<li><a NAME="GS-7a"></a>
+    <font size='+1'><b>How do I report a specific problem?</b></font>
+    <p>
+    Don't hesitate to send us <a href="emailus.php3">email</a>!
+    <p>
+    Ok, hesitate just a little and read the rest of this entry first.
+    Before sending email, be sure to check out the
+    <a href="#TR">Troubleshooting</a>
+    entry which describes several common problems and possible causes.
+    If you do send email, there are several pieces of information you
+    should include to make our job easier.
+    <ul>
+    <li> The affected <b>project and experiment name</b> is pretty obvious,
+    but some people forget.
+    <li> The particular <b>nodes, OSes, and programs</b>
+    involved will help us zero in on the problem more quickly.
+    <li> The <b>time</b> at which the problem occurred.
+    We need this to correlate with our various log files.
+    <li> Any <b>relevant observations and actions</b> you have attempted.
+    Did the problem only happen once?  Is it reproducible?  Did restarting
+    a program or rebooting a node help?
+    </ul>
+    After sending email,
+    <em>please do not swap or terminate the experiment</em>, if possible.
+    It can be a lot harder to track down a problem after the experiment
+    is gone.  Sometime you may need to terminate it, for example it is
+    in the middle of the night our time and you really need the nodes
+    that are tied up in the experiment.  But at least give us 15 minutes
+    to respond to your message before acting, and then let us know that
+    you did swap/terminate it.
+    </p>
+
 <li><a NAME="GS-7"></a>
-    <font size='+1'><b>Where do I get help?</b></font>
+    <font size='+1'><b>Where do I get more help?</b></font>
     <p>
     If you cannot find an answer to your question in the
     <a href="doc.php3">Emulab Documentation</a>, then you can
@@ -1145,7 +1178,8 @@
     (via a link or a lan), then there are two possibilities:
     either the nodes did not properly negotiate their speed and
     duplex with the Cisco switch, or the physical wire is loose
-    or bad.  In these cases, you should contact us for help.
+    or bad.  In these cases, <a href="#GS-7a">you should contact us</a>
+    for help.
     </p>
 
 <li><a NAME="TR-2"></a>
