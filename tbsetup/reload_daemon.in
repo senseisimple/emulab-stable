@@ -354,16 +354,16 @@ sub fatal($)
 {
     local($msg) = $_[0];
 
-    SENDMAIL($TBOPS, "Reload Daemon Died", $msg);
+    SENDMAIL($TBOPS, "Reload Daemon Died", $msg, $TBOPS);
     die($msg);
 }
 
 sub notify($)
 {
     my($mesg) = $_[0];
-    
+
     print "$mesg\n";
-    SENDMAIL($TBOPS, "Reload Daemon Message", $mesg);
+    SENDMAIL($TBOPS, "Reload Daemon Message", $mesg, $TBOPS);
 }
 
 #
