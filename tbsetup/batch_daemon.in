@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,11 +35,22 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
 
 #
+# Only root can run this script.
+#
+if ($UID) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
+
+#
 # Testbed Support libraries
 #
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 10;
 
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
