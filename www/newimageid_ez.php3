@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -328,6 +328,24 @@ function SPITFORM($formfields, $errors)
               </td>
           </tr>\n";
 
+    #
+    # Whole Disk Image
+    #
+    echo "<tr>
+  	      <td>Whole Disk Image?[<b>6</b>]:</td>
+              <td class=left>
+                  <input type=checkbox
+                         name=\"formfields[wholedisk]\"
+                         value=Yep";
+
+    if (isset($formfields[wholedisk]) &&
+	strcmp($formfields[wholedisk], "Yep") == 0)
+	echo "           checked";
+	
+    echo "                       > Yes
+              </td>
+          </tr>\n";
+    
     if ($isadmin) {
         #
         # Shared?
@@ -399,6 +417,9 @@ function SPITFORM($formfields, $errors)
              <li> If you already have a node customized, enter that node
                   name (pcXXX) and the image will be auto created for you.
                   Notification of completion will be sent to you via email. 
+             <li> If you need to snapshot the entire disk (including the MBR),
+                  check this option. <b>Most users will not need to check this
+                  option. Please ask us first to make sure</b>.
           </ol>
           </blockquote></h4>\n";
 }
@@ -592,6 +613,15 @@ if (isset($formfields[node]) &&
 }
 
 #
+# Wholedisk
+# 
+if (isset($formfields[wholedisk]) &&
+    strcmp($formfields[wholedisk], "Yep") == 0) {
+    $shared = 1;
+}
+
+
+#
 # If any errors, respit the form with the current values and the
 # error messages displayed. Iterate until happy.
 # 
@@ -618,11 +648,24 @@ if ($isadmin &&
 $description = addslashes($formfields[description]);
 $pid         = $formfields[pid];
 $imagename   = $formfields[imagename];
-$loadpart    = $formfields[loadpart];
+$bootpart    = $formfields[loadpart];
 $path        = $formfields[path];
 $os_name     = $formfields[os_name];
 $os_version  = $formfields[os_version];
 $op_mode     = $formfields[op_mode];
+
+#
+# Special option. Whole disk image, but only one partition that actually
+# matters. 
+#
+$loadlen   = 1;
+$loadpart  = $bootpart;
+
+if (isset($formfields[wholedisk]) &&
+    strcmp($formfields[wholedisk], "Yep") == 0) {
+    $loadlen   = 4;
+    $loadpart  = 0;
+}
 
 DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 
@@ -649,11 +692,11 @@ if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
 
 DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
-	     " part" . "$loadpart" . "_osid, ".
+	     " part" . "$bootpart" . "_osid, ".
 	     " default_osid, path, pid, shared, creator, created) ".
 	     "VALUES ".
-	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, 1, ".
-	     "   '$imageid', '$imageid', '$path', '$pid', $shared, ".
+	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
+	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $shared, ".
              "   '$uid', now())");
 
 DBQueryFatal("INSERT INTO os_info ".
