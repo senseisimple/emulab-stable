@@ -583,7 +583,7 @@ esac]
 
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
-        named/GNUmakefile \
+        named/GNUmakefile firewall/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
