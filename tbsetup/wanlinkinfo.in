@@ -79,6 +79,15 @@ if (defined($options{"p"})) {
     $doplr = 1;
 }
 
+my %nodename = ();
+my %speeds   = ();
+my %bws      = ();
+my %plrs     = ();
+my %freenodes= ();
+
+#
+# First get the widearea data.
+# 
 my $result =
     DBQueryFatal("SELECT node_id1,iface1,node_id2,iface2,time, " .
 		 "       bandwidth,lossrate FROM " .
@@ -86,16 +95,12 @@ my $result =
 		 ($noboss ? "where node_id1!='boss' and ".
 		  "                node_id2!='boss'" : ""));
 
-my %nodename = ();
-my %speeds   = ();
-my %bws      = ();
-my %plrs     = ();
-
 while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw, $plr) =
        $result->fetchrow) {
+
     my $msectime = $time * 1000;
-    my $glom1    = $node_id1 . ":" . $iface1;
-    my $glom2    = $node_id2 . ":" . $iface2;
+    my $glom1    = $node_id1;
+    my $glom2    = $node_id2;
 
     # print "Got $glom1 to $glom2 in $msectime ms\n";
     $nodename{ $glom1 } = "1";
@@ -106,36 +111,76 @@ while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw, $plr) =
     $plrs{ $glom1 . "+" . $glom2 } = $plr;
 }
 
-print scalar( keys %nodename ) . "\n";
+#
+# Need to figure out which nodes are free! This query not only looks
+# for free nodes, but also for the virtual nodes that are assigned to
+# them so that we can provide the multiplex count to the solver.
+# It is essentially the same query as ptopgen.
+#
+my $DEADPID = NODEDEAD_PID();
+my $DEADEID = NODEDEAD_EID();
+
+$result =
+    DBQueryFatal("select a.node_id,a.phys_nodeid,count(*) from nodes as a ".
+		 "left join reserved as b on a.node_id=b.node_id ".
+		 "left join reserved as m on a.phys_nodeid=m.node_id ".
+		 "left join nodes as n on a.phys_nodeid=n.node_id ".
+		 "left join node_types as nt on a.type=nt.type ".
+		 "where b.node_id is null and ".
+		 "      (nt.isremotenode=1 and n.status='up' and ".
+		 "       (m.node_id is null or ".
+		 "        m.pid!='$DEADPID' or m.eid!='$DEADEID')) ".
+		 "group by a.phys_nodeid");
+
+while (my ($node_id, $phys_nodeid, $count) = $result->fetchrow) {
+    if ($dovirt) {
+	#
+	# In dovirt mode, we care about how many free vnodes per real node.
+	#
+	if ($node_id ne $phys_nodeid) {
+	    $freenodes{$phys_nodeid} = $count;
+	}
+    }
+    else {
+	#
+	# In normal mode, we care about free phys nodes only.
+	#
+	if ($node_id eq $phys_nodeid) {
+	    $freenodes{$phys_nodeid} = 1;
+	}
+    }
+}
+
+# The boss node is fake, and so gets a count of one when its included.
+if (!$noboss) {
+    my $boss = TBDB_WIDEAREA_LOCALNODE;
+    
+    $freenodes{$boss} = 1;
+}
+
+# Only free nodes are considered.
+print scalar( keys %freenodes ) . "\n";
 
 #
-# XXX The boss node ends up first strictly by accident. We need to know
-#     which is really the boss so we can fix the mappings to it in the
-#     v section.
+# XXX The boss node ends up first strictly by accident. 
 # 
-foreach my $i (sort (keys %nodename)) {
+foreach my $i (sort (keys %freenodes)) {
     print "$i\n";
 }
 
 #
-# XXX Hardwired for now. Should read the DB to see what the max allowed
-#     is (which is not stored in the DB yet), and the number already
-#     allocated, and send the difference in as the max. 
+# Print the multiplex count.
 # 
 if ($dovirt) {
-    foreach my $i (sort (keys %nodename)) {
-	my $vcount = 4;
+    foreach my $i (sort (keys %freenodes)) {
+	my $vcount = $freenodes{$i};
 	
-	if ($i =~ /^boss.*/) {
-	    $vcount = 1;
-	}
-
 	print "$vcount\n";
     }
 }
 
-foreach my $i (sort (keys %nodename)) {
-    foreach my $j (sort (keys %nodename)) {
+foreach my $i (sort (keys %freenodes)) {
+    foreach my $j (sort (keys %freenodes)) {
 	my $s = "0";
 	if (exists $speeds{ $i."+".$j } ) {
 	    $s = $speeds{ $i . "+" . $j };
@@ -146,8 +191,8 @@ foreach my $i (sort (keys %nodename)) {
 }
 
 if ($dobw) {
-    foreach my $i (sort (keys %nodename)) {
-	foreach my $j (sort (keys %nodename)) {
+    foreach my $i (sort (keys %freenodes)) {
+	foreach my $j (sort (keys %freenodes)) {
 	    # the following is conceptually
 	    # the bandwidth of a machine to itself.
 	    # using ttcp, a typical value was found to be 180 MB/sec
@@ -162,8 +207,8 @@ if ($dobw) {
 }
 
 if ($doplr) {
-    foreach my $i (sort (keys %nodename)) {
-	foreach my $j (sort (keys %nodename)) {
+    foreach my $i (sort (keys %freenodes)) {
+	foreach my $j (sort (keys %freenodes)) {
 	    my $s = "0";
 	    if (exists $plrs{ $i."+".$j } ) {
 		$s = $plrs{ $i . "+" . $j };

@@ -114,6 +114,9 @@ my $wa_delay_solverweight = 1.0;
 my $wa_bw_solverweight    = 7.0;
 my $wa_plr_solverweight   = 500.0;
 
+# The BOSS name in the widearea info tables.
+my $boss = TBDB_WIDEAREA_LOCALNODE;
+
 #
 # A node record (poor man struct). We create a hashed array of these,
 # indexed by the vnode name.
@@ -567,12 +570,12 @@ sub runwansolver() {
 	    # Check for fixed mappings. 
 	    #
 	    if (isfixednode($vnode)) {
-		$tag = "$tag " . physnode($vnode) . ":eth0";
+		$tag = "$tag " . physnode($vnode);
 	    }
 	    print INPUT "$tag\n";
 	}
 	elsif ($vnode eq $seenboss) {
-	    print INPUT "boss boss:ti0\n";
+	    print INPUT "$boss $boss\n";
 	}
     }
 
@@ -703,13 +706,13 @@ sub runwansolver() {
 
 	if ($_ =~ /(\S+)\smapsTo\s(\S+)/) {
 	    # XXX
-	    if ($1 eq "boss") {
+	    if ($1 eq $boss) {
 		next;
 	    }
 	    my $virtnode = $virtnodes{$1};
 	    my ($pnode)  = split(":", $2);
 
-	    if ($pnode eq "boss") {
+	    if ($pnode eq $boss) {
 		die("*** $0:\n".
 		    "    Oops, $1 was assigned to boss. That won't work!\n");
 	    }
