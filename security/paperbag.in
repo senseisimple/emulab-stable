@@ -92,7 +92,7 @@ do {{
 	next unless $command; # Don't complain if they leave a blank command
 	# Don't allow any naughty characters - kick the user off if they try
 	foreach $string ($command, @args) {
-		if ($string !~ m|^([A-Za-z0-9._\-/=\+]*)$|) {
+		if ($string !~ m|^([A-Za-z0-9._\-/=\+,\,]*)$|) {
 			print "Sorry, you used a forbidden character in your command line\n";
 			print "Please contact testbed-ops\@emulab.net if you believe this message is in error\n";
 			&debug("String was $string\n");
