@@ -115,13 +115,29 @@ if ($EVENTSYS) {
 #
 # Set up for querying the database. Note that fork causes a reconnect
 # to the DB in the child. 
-# 
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+#
+my $DB;
+
+sub TBDBConnect()
+{
+    my $maxtries = 5;
+    
+    while ($maxtries && !defined($DB)) {
+	$DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+	$maxtries--;
+	sleep(1);
+    }
+    if (!defined($DB)) {
+	die("Cannot connect to DB after several attempts!\n");
+    }
+    $DB->{'dbh'}->{'PrintError'} = 0;    
+}
+TBDBConnect();
 
 sub TBdbfork()
 {
     undef($DB);
-    $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+    TBDBConnect();
 }
 
 #
