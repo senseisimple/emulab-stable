@@ -38,7 +38,7 @@ if (!$isadmin &&
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $usr_keyfile_name, $target_uid;
+    global $isadmin, $usr_keyfile_name, $target_uid, $BOSSNODE;
 
     #
     # Standard Testbed Header, now that we know what we want to say.
@@ -72,7 +72,12 @@ function SPITFORM($formfields, $errors)
 	    $comment = $row[comment];
 	    $pubkey  = $row[pubkey];
 	    $date    = $row[stamp];
-	    $chunky  = chunk_split("$pubkey", 75, "<br>\n");
+	    $fnote   = "";
+
+	    if (strstr($comment, $BOSSNODE)) {
+		$fnote = "[<b>1</b>]";
+	    }
+	    $chunky  = chunk_split("$pubkey $fnote", 75, "<br>\n");
 
 	    echo "<tr>
                      <td align=center>
@@ -89,6 +94,11 @@ function SPITFORM($formfields, $errors)
              There are no public keys on file for user $target_uid!
              </center>\n";
     }
+    echo "<blockquote><blockquote><blockquote>
+          <ol>
+            <li> Please do not delete your Emulab generated public key.
+          </ol>
+          </blockquote></blockquote></blockquote>\n";
 
     echo "<br><hr size=4>\n";
     echo "<center>
@@ -164,7 +174,7 @@ function SPITFORM($formfields, $errors)
     echo "</form>
           </table>\n";
 
-    echo "<h4><blockquote><blockquote>
+    echo "<blockquote><blockquote><blockquote>
           <ol>
             <li> Please consult our
                  <a href = 'docwrapper.php3?docname=security.html#SSH'>
@@ -182,8 +192,7 @@ function SPITFORM($formfields, $errors)
             <li> As a security precaution, you must supply your password
                  when adding new ssh public keys. 
           </ol>
-          </blockquote></blockquote>
-          </h4>\n";
+          </blockquote></blockquote></blockquote>\n";
 }
 
 #
