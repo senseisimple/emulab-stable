@@ -1,0 +1,73 @@
+\item[Integration with and improved interface to PlanetLab.]
+%% Note: doesn't directly correspond to any of our proposed milestones.
+%%
+%% Original author: Kirk Webb
+%%
+% Work on the Emulab portal to PlanetLab
+%
+In the interest of adding PlanetLab as an Emulab resource, we have put forth
+significant development effort in bringing PlanetLab resources to Emulab
+experimenters.  We have also developed a powerful, easy to use interface
+targeted at native PlanetLab experimenters.
+
+We provide a rich set of resource allocation semantics for experimenters,
+including selection based on last-mile link type, load conditions, and
+administrative/geographic domain (e.g., an experimenter can choose to allocate
+a slice that spans one node at each PlanetLab ``site'').  Our sophisticated
+resource mapping program (assign) uses these specifiable criterion to select
+the set of nodes to use.
+
+Underneath, Emulab is able to dynamically discover new PlanetLab nodes,
+classify their last-mile link using an inference heuristic, and add them to its
+database.  Once discovered, these nodes are immediately available for use by
+experimenters.  Emulab also attempts to minimize the significant delays present
+in PlanetLab vserver setup by running many instances of the initialization and
+bootstrap processes in parallel.
+
+To conserve resources and provide ongoing statistical feedback, and support
+rich Experimental setup features, Emulab sets up a service vserver (sliver) on
+every PlanetLab node it becomes aware of.  This service sliver reports node
+load, provides liveness testing, and stores common vserver overlay files which
+are utilized when a new Emulab-managed PlanetLab sliver is setup on a
+particular node.
+
+Over the past year, Emulab has tracked the RPC interface provided by PlanetLab,
+which has been subject to abrupt change with no transition period.  Emulab's
+PlanetLab back-end has been modularized for easy porting to new API schemas,
+and has accounted for a wide range of resource and credential handling,
+including resource tokens and per-slice authentication keys.
+
+Additionally, due to the inherent instability in research platforms such as
+PlanetLab, Emulab's back-end to it has been hardened to handle a variety of
+failure modes (with retry).  Node outage, RPC call hangs, and other abnormal
+termination and resource malformation (e.g., half setup vservers) have been
+accounted for.  When we find that a PlanetLab node is problematic, we move it
+out of production into a special pool where a back-end daemon at Emulab central
+will test it.  This daemon will continually cycle through the nodes in the down
+pool, testing them in batches.  When a node successfully runs through an end to
+end PlanetLab vserver setup, it is released back into production.
+
+\item[Planetlab EZ interface.]
+%% Note: doesn't directly correspond to any of our proposed milestones.
+%%
+%% Original author: Rob Ricci
+%%
+One of the important advantages offered by \emulab's interface to PlanetLab
+over PlanetLab's own native interface is an easy-to-use web interface for
+configuring experiments (called ``slices'' in PlanetLab terminology).  In
+contrast to the PlanetLab interface, which requires users to select individual
+nodes manually, our interface also allows the option to ask for a certain
+number of nodes, and \emulab automatically decides which ones to use.  Since a
+substantial number PlanetLab nodes are frequently down, and some often see
+heavy use, \emulab constantly monitors PlanetLab and only assigns nodes which
+are up and have a reasonable amount of load.  The Web interface also provides a
+mechanism for distributing files to every node in the experiment and for a
+command to be run on each node at startup.  It provides an easy way to start an
+experiment that uses every (currently up) node in PlanetLab, or one node at
+each site.
+
+\end{asparadesc}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% End of file.
