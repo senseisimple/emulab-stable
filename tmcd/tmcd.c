@@ -623,13 +623,19 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		return 0;
 
 	/*
-	 * Get delay parameters for the machine. Might be more than one
-	 * since someday we may allow a single machine to operate as a
-	 * delay node across multiple links.
+	 * Get delay parameters for the machine. The point of this silly
+	 * join is to get the type out so that we can pass it back. Of
+	 * course, this assumes that the type is the BSD name, not linux.
 	 */
-	res = mydb_query("select iface0,iface1,delay,bandwidth,lossrate "
-			 "from delays where node_id='%s'",
-			 5, nodeid);
+	res = mydb_query("select iface0,i.interface_type,"
+			 " iface1,j.interface_type,delay,bandwidth,lossrate "
+                         " from delays "
+			 "left join interfaces as i on "
+			 " i.node_id=delays.node_id and i.iface=iface0 "
+			 "left join interfaces as j on "
+			 " j.node_id=delays.node_id and j.iface=iface1 "
+			 " where delays.node_id='%s'",	 
+			 7, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "DELAY: %s: DB Error getting delays!",
 		       nodeid);
@@ -641,11 +647,28 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		return 0;
 	}
 	while (nrows) {
+		char	card0[64], card1[64];
+		
 		row = mysql_fetch_row(res);
+
+		/*
+		 * Yikes, this is ugly! Sanity check though, since I saw
+		 * some bogus values in the DB.
+		 */
+		if (!row[0] || !row[1] || !row[2] || !row[3]) {
+			syslog(LOG_ERR, "DELAY: %s: DB values are bogus!",
+			       nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
+		strcpy(card0, row[1]);
+		strcat(card0, strpbrk(row[0], "0123456789"));
+		strcpy(card1, row[3]);
+		strcat(card1, strpbrk(row[2], "0123456789"));
 
 		sprintf(buf,
 			"DELAY INT0=%s INT1=%s DELAY=%s BW=%s PLR=%s\n",
-			row[0], row[1], row[2], row[3], row[4]);
+			card0, card1, row[4], row[5], row[6]);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
