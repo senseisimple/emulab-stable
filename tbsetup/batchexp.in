@@ -20,7 +20,7 @@ sub usage()
     die("Usage: batchexp [-i [-f]] [-x expires] [-E description] [-g gid] ".
 	"[-s] [-n low|high] -p <pid> -e <eid> [<nsfile>]\n");
 }
-my  $optlist = "iE:d:g:x:e:p:sn:f";
+my  $optlist = "iE:d:g:x:e:p:sn:fgq";
 
 #
 # Configure variables
@@ -42,6 +42,7 @@ my $startexp = "$TB/bin/startexp";
 my $tbdata   = "tbdata";
 my $immediate= 0;
 my $frontend = 0;
+my $quiet    = 0;
 my $dbuid;
 my @row;
 
@@ -233,7 +234,7 @@ chmod(0664, "$nsfile");
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
 #
-if (system("$parser -n -a $nsfile") != 0) {
+if (system("$parser -n $pid $gid $eid $nsfile") != 0) {
     fatal("NS Parse failed!");
 }
 
@@ -263,9 +264,13 @@ if ($nsfile_string) {
 # so that the batch daemon will see it and act.
 # 
 if ($immediate) {
-    my $farg = ($frontend ? "-f" : "");
+    my $optargs = "";
+    $optargs .= " -f"
+	if ($frontend);
+    $optargs .= " -b"
+	if ($quiet);
     
-    if (system("$startexp $farg -g $gid $pid $eid $nsfile")) {
+    if (system("$startexp $optargs -g $gid $pid $eid $nsfile")) {
 	fatal("Failed to start experiment $pid/$eid!");
     }
 }
@@ -391,6 +396,9 @@ sub ParseArgs()
     }
     if (defined($options{"s"})) {
 	$swappable = 1;
+    }
+    if (defined($options{"q"})) {
+	$quiet = 1;
     }
     if (defined($options{"n"})) {
 	if ($options{"n"} eq "low") {

@@ -127,7 +127,7 @@ proc tb-set-hardware {node type args} {
 	perror "\[tb-set-hardware] Invalid hardware type $type."
 	return
     }
-    if {! ${GLOBALS::anonymous}} {
+    if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
 	var_import ::TBCOMPAT::nodetypeXpid_permissions
 	var_import ::GLOBALS::pid
 	set allowed 1
@@ -157,7 +157,7 @@ proc tb-set-hardware {node type args} {
 }
 
 proc tb-set-node-os {node os} {
-    if {! ${GLOBALS::anonymous}} {
+    if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
 	var_import ::TBCOMPAT::osids
 	if {! [info exists osids($os)]} {
 	    perror "\[tb-set-node-os] Invalid osid $os."

@@ -25,8 +25,9 @@ sub usage()
  
     exit(-1);
 }
-my $optlist  = "nqa";
+my $optlist  = "nqap";
 my $anonmode = 0;
+my $passmode = 0;
 my $impotent = 0;
 my $debug    = 0;
 
@@ -96,6 +97,9 @@ if (defined($options{"a"})) {
 }
 if (defined($options{"n"})) {
     $impotent = 1;
+}
+if (defined($options{"p"})) {
+    $passmode = 1;
 }
 if (@ARGV != 4 && @ARGV != 1) {
     usage();
@@ -172,15 +176,17 @@ system("cat $nsfile >> $infile") == 0
 # result back to a file if not in anonmode. Remember to tack on the
 # user ID to flip to, when not in testmode.
 #
-my $cmdargs = "$TB/libexec/ns2ir/parse.proxy";
+my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
 $cmdargs .= " -u $dbuid"
     if (defined($dbuid));
 $cmdargs .= " -a"
-    if (defined($options{"a"}));
+    if ($anonmode);
 $cmdargs .= " -n"
     if (defined($options{"n"}));
 $cmdargs .= " -q"
     if (defined($options{"q"}));
+$cmdargs .= " -p"
+    if ($passmode);
 $cmdargs .= " $pid $gid $eid"
     if (!$anonmode);
 

@@ -16,10 +16,20 @@
 # See README for extensive discussion of the structure and 
 # implementation.
 #
-# -q will supress all the unsupported messages.
-# -n will cause the parser to output error/warning messages and exit
-#    without updating the database.
+# -q quiet mode: supress all the unsupported messages.
+# -n impotent mode: parser will output error/warning messages and exit
+#    without spitting out the actual parse results.
+# -a anonymous mode: do not do project related checks. Turns on impotent
+#    mode (-n).
+# -p pass mode: Similar to anonymous mode, except that the parser *will*
+#    spit out the parse results. 
 ######################################################################
+
+proc usage {} {
+    puts stderr "Syntax: $argv0 \[-q\] -a ns_file"    
+    puts stderr "        $argv0 \[-q\] \[-p\] \[-n\] pid gid eid ns_file"
+    exit 1
+}
 
 # Initial Procedures
 
@@ -109,6 +119,7 @@ namespace eval GLOBALS {
 variable verbose 1
 variable impotent 0
 variable anonymous 0
+variable passmode 0
 variable vtype_list {}
 }
 
@@ -123,22 +134,19 @@ while {$argv != {}} {
     } elseif {$arg == "-a"} {
 	lpop argv
 	set GLOBALS::anonymous 1
+	set GLOBALS::impotent 1
+    } elseif {$arg == "-p"} {
+	lpop argv
+	set GLOBALS::passmode 1
     } else {
 	break
     }
 }
 
-if {${GLOBALS::anonymous} && ! ${GLOBALS::impotent}} {
-    puts stderr "-a can only be used with -n."
-    exit 1
-}
-
 if {${GLOBALS::anonymous} && ([llength $argv] != 1)} {
-    puts stderr "Syntax: $argv0 \[-q\] -n -a ns_file"
-    exit 1
+    usage();
 } elseif {(! ${GLOBALS::anonymous}) && ([llength $argv] != 4)} {
-    puts stderr "Syntax: $argv0 \[-q\] \[-n \[-a\]\] pid gid eid ns_file"
-    exit 1
+    usage();
 }
 
 # Now we can set up the rest of our global variables.
