@@ -527,8 +527,8 @@ if ($showdelays &&
 		   ($row{q_red} ?
 		    ($row{q_gentle} ? "GRED" : "RED") : "Tail"),
 		   ($row{q_red} ?
-		    "$row{q_weight}/$row{q0_minthresh}/".
-		    "$row{q_maxthresh}/$row{q0_linterm}" :
+		    "$row{q_weight}/$row{q_minthresh}/".
+		    "$row{q_maxthresh}/$row{q_linterm}" :
 		    "0/0/0/0"));
 	}
 	print "\n";
