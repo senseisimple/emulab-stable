@@ -252,15 +252,35 @@ foreach my $link ( keys %delayparams ) {
     # 
     print STDERR "Rebooting $pc cause its not running the correct OS\n";
 
-    if (system("$rsh -l root $pc /sbin/reboot") == 0 ||
-	system("$ssh -l root $pc /sbin/reboot") == 0) {
+    if (system("$ssh -l root $pc /sbin/reboot") == 0) {
 	printf STDERR "$pc appears to be rebooting\n" if $dbg;
+	#
+	# Wait for it to really die so we are sure, and to avoid problems
+	# with WaitTillAlive down below.
+	# 
+	if (WaitTillDead($pc) == 0) {
+	    next;
+	}
+	printf STDERR "Hmm, maybe not. $pc is still alive\n" if $dbg;
     }
-    else {
-	print STDERR "$pc appears to be unrepsonsive Power cycling ... ";
-	PowerCycle($pc);
-	print STDERR "Done!\n";
+
+    #
+    # Okay, before we power cycle lets really make sure. On FreeBSD, it might
+    # have rebooted, but since the connection is terminated, system returns
+    # an error status. So, lets ping it again and if its pingable, the
+    # reboot must have failed. If it is not pingable, I assume that the
+    # reboot really worked, and the exit value can be ignored.
+    #
+    my $exit_value = $? >> 8;
+    print STDERR "reboot returned $exit_value. Lets make sure it dies\n"
+	if $dbg;
+
+    if (WaitTillDead($pc) == 0) {
+	next;
     }
+	
+    print STDERR "$pc appears to still be running Power cycling ...\n";
+    PowerCycle($pc);
 }
 
 #
@@ -316,42 +336,11 @@ foreach my $link ( keys %delayparams ) {
     }
 
     #
-    # Copy the file over to the target machine. Since the machine might
-    # have been rebooted above, run a short ping waiting for it come alive.
-    # The most you want to wait is 60 seconds, I think, before throwing
-    # in the towl.
-
-    # Wait a few seconds to make sure the node has gone down for the reboot
-    # already. Then start pinging it...
-    #
-    # Constant in here should be big enough for a reboot cmd to take effect,
-    # but not so big that the node could have already come all the way back up
-
-    sleep(10); 
-    
-    # Sigh, a 60 second ping results in the script waiting until all the
-    # packets are sent from all the pings, before it will exit. So,
-    # loop doing a bunch of shorter pings
-    #
-    print STDERR "Checking $pc to make sure it is alive ... " if $dbg;
-    for ($i = 0; $i < 30; $i++) {
-	open(PING, "$ping -c 2 $pc 2>&1 |");
-	do {
-	    $_ = <PING>;
-	    if ( $_ =~ /bytes from/ ) {
-		#
-		# Do not close PING, cause we end up waiting for all the
-		# packets to be sent.
-		close(PING);
-		print STDERR "Yep, alive and well\n" if $dbg;
-		goto ALIVE;
-	    }
-	}
-	until ( $_ =~ /transmitted, (\d*) packets received/ );
+    # Wait for it to be pingable again
+    # 
+    if (WaitTillAlive($pc)) {
+	die("Oops, $pc did not come back alive!");
     }
-    close(PING);
-    die("$pc is not responding. Better check into it\n");
- ALIVE:
 
     #
     # Copy the file over to the target machine.
@@ -392,6 +381,7 @@ FIGGED:
 }
 
 print STDERR "Done!\n";
+exit 0;
 
 #
 # Power cycle a PC using the testbed power program.
@@ -399,14 +389,58 @@ print STDERR "Done!\n";
 sub PowerCycle {
     local($pc) = @_;
 
-    open(POWER, "$power cycle $pc 2>&1 |");
-    $_ = <POWER>;
-    close(POWER);
-    if ( $_ =~ /Reboot/ ) {
-	return;
-    }
-    else {
+    if (system("$power cycle $pc") != 0) {
 	die("Could not power cycle $pc! Quitting\n");
     }
+}
+
+sub WaitTillAlive {
+    local($pc) = @_;
+
+    print STDERR "Waiting for $pc to come alive\n" if $dbg;
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 30; $i++) {
+	open(PING, "$ping -c 5 $pc 2>&1 |");
+	do {
+	    $_ = <PING>;
+	    if ( $_ =~ /bytes from/ ) {
+		print STDERR "Yep, $pc alive and well\n" if $dbg;
+		return 0;
+	    }
+	}
+	until ( $_ =~ /transmitted, (\d*) packets received/ );
+    }
+    close(PING);
+    print STDERR "$pc is not responding. Better check into it\n";
+    return 1;
+}
+
+sub WaitTillDead {
+    local($pc) = @_;
+
+    print STDERR "Waiting for $pc to die off\n" if $dbg;
+    #
+    # Sigh, a long ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings.
+    #
+    for ($i = 0; $i < 12; $i++) {
+	open(PING, "$ping -c 5 $pc 2>&1 |");
+	do {
+	}
+	until ( <PING> =~ /transmitted, (\d*) packets received/ );
+
+	if ( $1 == 0 ) {
+	    print STDERR "Good, $pc must have rebooted.\n" if $dbg;
+	    return 0;
+	}
+    }
+    close(PING);
+    print STDERR "$pc is still alive.\n" if $dbg;
+    return 1;
 }
 
