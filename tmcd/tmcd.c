@@ -1688,7 +1688,7 @@ COMMAND_PROTOTYPE(dostartstat)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		*exitstatus;
+	int		exitstatus;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "STARTSTAT: %s: No such node",
@@ -1699,12 +1699,14 @@ COMMAND_PROTOTYPE(dostartstat)
 	/*
 	 * Dig out the exit status
 	 */
-	while (isspace(*rdata))
-		rdata++;
-	exitstatus = rdata;
-
+	if (! sscanf(rdata, "%d", &exitstatus)) {
+		syslog(LOG_ERR, "STARTSTAT: %s: Invalid exit status: %s",
+		       inet_ntoa(ipaddr), rdata);
+		return 1;
+	}
+	
 	syslog(LOG_INFO, "STARTSTAT: "
-	       "%s is reporting startup command exit status: %s",
+	       "%s is reporting startup command exit status: %d",
 	       nodeid, exitstatus);
 
 	/*
@@ -1715,15 +1717,12 @@ COMMAND_PROTOTYPE(dostartstat)
 		return 0;
 	}
 
-	syslog(LOG_INFO, "STARTSTAT: %s: Node is in experiment %s/%s",
-	       nodeid, pid, eid);
-
 	/*
 	 * Update the node table record with the exit status. Setting the
 	 * field to a non-null string value is enough to tell whoever is
 	 * watching it that the node is done.
 	 */
-	if (mydb_update("update nodes set startstatus='%s' "
+	if (mydb_update("update nodes set startstatus='%d' "
 			"where node_id='%s'", exitstatus, nodeid)) {
 		syslog(LOG_ERR, "STARTSTAT: %s: DB Error setting exit status!",
 		       nodeid);
