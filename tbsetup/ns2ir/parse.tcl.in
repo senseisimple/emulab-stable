@@ -387,13 +387,17 @@ proc parse_bw {bspec} {
 	set unit b
     }
 
+    # We could do better below with a regexp match. But it is better to keep it simple.
     switch -- $unit {
 	b {set val [expr int($bw/1000)]} 
 	bps {set val [expr int($bw/1000)]} 
+	k {set val [expr int($bw)]}
 	kb {set val [expr int($bw)]}
 	kbps {set val [expr int($bw)]}
+	M {set val [expr int($bw*1000)]}
 	Mb {set val [expr int($bw*1000)]}
 	Mbps {set val [expr int($bw*1000)]}
+	G {set val [expr int($bw*1000000)]}
 	Gb {set val [expr int($bw*1000000)]}
 	Gbps {set val [expr int($bw*1000000)]}
 	default {
