@@ -285,7 +285,7 @@ Phase "patches", "Applying patches", sub {
 	ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
     };
     Phase "m2cryptopatch", "Patching m2crypto", sub {
-	if (!ExecQuiet("$PATCH -C -f -R -p0 -i $M2CRYPTO_PATCH")) {
+	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $M2CRYPTO_PATCH")) {
 	    PhaseSkip("$M2CRYPTO_PATCH already applied");
 	}
 	ExecQuietFatal("$PATCH -f -l -p0 -i $M2CRYPTO_PATCH");

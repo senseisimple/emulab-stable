@@ -222,7 +222,7 @@ Phase "ports", "Installing ports", sub {
 
 Phase "patches", "Applying patches", sub {
     Phase "m2cryptopatch", "Patching m2crypto", sub {
-        if (!ExecQuiet("$PATCH -C -f -R -p0 -i $M2CRYPTO_PATCH")) {
+        if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $M2CRYPTO_PATCH")) {
             PhaseSkip("$M2CRYPTO_PATCH already applied");
         }
         ExecQuietFatal("$PATCH -f -p0 -l -i $M2CRYPTO_PATCH");
