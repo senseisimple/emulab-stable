@@ -28,6 +28,9 @@ FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml
 
+AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
+AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
+
 PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
 
@@ -49,11 +52,13 @@ ALLFILES = $(notdir $(FILES))
 ALLPIXES = $(notdir $(PIXFILES))
 ALLDOCS  = $(notdir $(DOCFILES))
 ALLTUTS  = $(notdir $(TUTFILES))
+ALLICONS = $(notdir $(AUTOICONS))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
 	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
-	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS))
+	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \
+	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS))
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
 		ln -s index.html tbdb.html; \
