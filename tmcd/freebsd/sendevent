@@ -1,0 +1,32 @@
+#!/usr/bin/perl -w
+use English;
+
+#
+# Send a Testbed Control event.
+#
+# usage: sendevent <event>
+# 
+
+#
+# Untaint path
+#
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use lib "/etc/testbed";
+use libsetup;
+
+#
+# We use the tmcc to figure out where the Testbed Event Daemon is running.
+# Don't worry about the port for now.
+#
+my ($bossname) = split(" ", `tmcc bossinfo`);
+unshift(@ARGV, ("-s", "$bossname"));
+
+exec "tbmevc", @ARGV;
+
+die("Could not exec tbevc: $!");
