@@ -18,9 +18,9 @@ $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";
 $TBSUEXEC_PATH  = "$TBBIN_DIR/suexec";
 
-$TBLIST_DIR     = "/usr/testbed/www/maillist";
-$TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.txt";
-$TBLIST_USERS   = "$TBLIST_DIR"."/users.txt";
+$TBLIST_DIR     = "/usr/testbed/lists";
+$TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.list";
+$TBLIST_USERS   = "$TBLIST_DIR"."/users.list";
 
 $TBPROJ_DIR     = "/proj";
 $TBUSER_DIR	= "/users/";

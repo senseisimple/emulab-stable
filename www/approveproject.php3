@@ -212,6 +212,30 @@ elseif (strcmp($approval, "approve") == 0) {
                     "$newstatus.",
                     1);
         }
+
+        #
+        # For new leaders, write their email addresses to files to be used for
+        # generating messages.
+        #
+        $fp = fopen($TBLIST_LEADERS, "a");
+        if (! $fp) {
+            TBERROR("Could not open $TBLIST_LEADERS to add new ".
+		    "project leader email: $headuid_email\n", 0);
+        }
+        else {
+            fwrite($fp, "$headuid_email\n");
+            fclose($fp);
+        }  
+
+        $fp = fopen($TBLIST_USERS, "a");
+        if (! $fp) {
+            TBERROR("Could not open $TBLIST_USERS to add new ".
+		    "project leader email: $headuid_email\n", 0);
+        }
+        else {
+            fwrite($fp, "$headuid_email\n");
+            fclose($fp);
+        }
     }
 
     mail("$headuid_email",

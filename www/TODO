@@ -22,15 +22,6 @@ I could just figure out how to add a php mode to emacs ...
 * Decouple root privs from begin experiment privs, as per Jay
   request. Default on for begin experiment, default off for root.
 
-* Fix the "revisit" problem. If you revisit the page after logging in, your
-  login is lost. The original index page I started with passed the uid along
-  with a URI parameter. If you click "reload" no problem cause it sends the
-  same URI to the page, which includes the uid (?stoller). But if you log
-  in, go someplace else, and then visit the page again, its lost and you
-  have to log in again. The simple fix is to add another cookie, or to
-  include the uid in the existing cookie (the one I added to send back the
-  hash key).
-
 * Fix the email list problem. Right now we add people to the two
   email list files in /usr/testbed/www/maillist when they apply. We should
   either delay that until they are approved, or make sure they get taken

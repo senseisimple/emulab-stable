@@ -138,20 +138,6 @@ if (! $returning) {
         TBERROR("Database Error adding adding new user $uid: $err\n", 1);
     }
 
-    #
-    # Note, we should do this after the user comes back and does the
-    # verification step! This ensures we have a valid email address
-    # and the user really wants to use the testbed.
-    # 
-    $fp = fopen($TBLIST_USERS, "a");
-    if (! $fp) {
-        TBERROR("Could not open $TBLIST_USERS to add new project leader", 0);
-    }
-    else {
-        fwrite($fp, "$usr_email\n");
-        fclose($fp);
-    }
-
     $key = GENKEY($uid);
 
     mail("$usr_email", "TESTBED: Your New User Key",

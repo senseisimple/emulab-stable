@@ -195,6 +195,19 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	        TBERROR("Database Error changing $user status to $newstatus.",
                          1);
             }
+
+	    #
+	    # Add to user email list.
+	    # 
+	    $fp = fopen($TBLIST_USERS, "a");
+	    if (! $fp) {
+		    TBERROR("Could not open $TBLIST_USERS to add new ".
+			    "project member email: $user_email\n", 0);
+	    }
+	    else {
+		    fwrite($fp, "$user_email\n");
+		    fclose($fp);
+	    }
 	}
 
         mail("$user_email",

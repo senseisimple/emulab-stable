@@ -265,34 +265,6 @@ mail($TBMAIL_APPROVAL,
      "Errors-To: $TBMAIL_WWW");
 
 #
-# For new leaders, write their email addresses to files to be used for
-# generating messages.
-#
-# Note, we should do this after the user comes back and does the
-# verification step! This ensures we have a valid email address
-# and the user really wants to use the testbed.
-#
-if (! $returning) {
-    $fp = fopen($TBLIST_LEADERS, "a");
-    if (! $fp) {
-        TBERROR("Could not open $TBLIST_LEADERS to add new project leader", 0);
-    }
-    else {
-        fwrite($fp, "$usr_email\n");
-        fclose($fp);
-    }
-
-    $fp = fopen($TBLIST_USERS, "a");
-    if (! $fp) {
-        TBERROR("Could not open $TBLIST_USERS to add new project leader", 0);
-    }
-    else {
-        fwrite($fp, "$usr_email\n");
-        fclose($fp);
-    }
-}
-
-#
 # Now give the user some warm fuzzies
 #
 echo "<center><h1>Project '$pid' successfully queued.</h1></center>
