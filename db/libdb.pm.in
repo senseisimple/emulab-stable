@@ -458,6 +458,7 @@ sub TBDB_TBEVENT_NODESTATE	{ "TBNODESTATE"; }
 sub TBDB_TBEVENT_NODEOPMODE	{ "TBNODEOPMODE"; }
 sub TBDB_TBEVENT_CONTROL	{ "TBCONTROL"; }
 sub TBDB_TBEVENT_COMMAND	{ "TBCOMMAND"; }
+sub TBDB_TBEVENT_EXPTSTATE	{ "TBEXPTSTATE"; }
 
 #
 # For nodes, we use this set of events.
@@ -1300,6 +1301,14 @@ sub ExpState($$)
 sub SetExpState($$$)
 {
     my($pid, $eid, $state) = @_;
+
+    if ($EVENTSYS) {
+	return EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
+			      objname   => "$pid/$eid",
+			      eventtype => $state,
+			      expt      => "$pid/$eid",
+			      host      => $BOSSNODE);
+    }
 
     my $query_result =
 	DBQueryWarn("update experiments set state='$state' ".
