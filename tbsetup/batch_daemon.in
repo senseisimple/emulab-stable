@@ -49,8 +49,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 100;
+# Be careful not to exit on transient error; 0 means infinite retry.
+$libdb::DBQUERY_MAXTRIES = 0;
 
 my $tbbindir = "$TB/bin/";
 my $swapexp  = "$TB/bin/swapexp";
@@ -122,8 +122,12 @@ if (! $debug) {
 while (1) {
     my($count, $i, $query_result, $pending_result, $running_result);
     my(%pending_row);
-    my $retry_wait = TBGetSiteVar("batch/retry_wait");
+    my $retry_wait = 60;
 
+    if (! TBGetSiteVar("batch/retry_wait", \$retry_wait)) {
+	print "Error getting sitevar 'batch/retry_wait'. Waiting a bit ...\n";
+	goto pause;
+    }
     # Do not allow zero!
     $retry_wait = 60
 	if ($retry_wait == 0);
