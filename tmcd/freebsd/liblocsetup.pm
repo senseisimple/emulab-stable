@@ -69,6 +69,7 @@ my $CHPASS	= "/usr/bin/chpass -p";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s %s %s";
 my $IFALIAS     = "/sbin/ifconfig %s alias %s netmask 0xffffff00";
+my $IFC_1000MBS = "media 1000baseSX";
 my $IFC_100MBS  = "media 100baseTX";
 my $IFC_10MBS   = "media 10baseT/UTP";
 my $IFC_FDUPLEX = "mediaopt full-duplex";
@@ -134,7 +135,10 @@ sub os_ifconfig_line($$$$$$)
 	    warn("*** Bad speed units in ifconfig!\n");
 	    $speed = 100;
 	}
-	if ($speed == 100) {
+	if ($speed == 1000) {
+	    $media = $IFC_1000MBS;
+	}
+	elsif ($speed == 100) {
 	    $media = $IFC_100MBS;
 	}
 	elsif ($speed == 10) {
