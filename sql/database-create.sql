@@ -349,6 +349,18 @@ CREATE TABLE interfaces (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'ipport_ranges'
+#
+
+CREATE TABLE ipport_ranges (
+  eid varchar(32) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  low int(11) NOT NULL default '0',
+  high int(11) NOT NULL default '0',
+  PRIMARY KEY  (eid,pid)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'ipsubnets'
 #
 
@@ -565,6 +577,7 @@ CREATE TABLE nodes (
   osid varchar(35) NOT NULL default '',
   ntpdrift float default NULL,
   ipport_low int(11) NOT NULL default '11000',
+  ipport_next int(11) NOT NULL default '11000',
   ipport_high int(11) NOT NULL default '20000',
   jailflag tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (node_id)
