@@ -510,7 +510,7 @@ if ( @vnodes ) {
 	$waitstart{$node} = time;
     }
 
-    print "Waiting for widearea testbed nodes to finish rebooting ...\n";
+    print "Waiting for widearea testbed nodes to finish setting up ...\n";
 
     TBDebugTimeStamp("Widearea node waiting started");
     while ( @vnodes ) {
