@@ -74,7 +74,8 @@ typedef struct {
   u_int interval;
   u_short numttys;
   u_char debug;
-  u_char allterms;
+  u_char actterms;
+  u_char first;
   char *servname;
   u_short port;
   char *ttys[MAXTTYS];

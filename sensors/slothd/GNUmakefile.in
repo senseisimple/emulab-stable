@@ -32,7 +32,7 @@ sdcollectd: sdcollectd.o sdcollectd.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o $(SDLIBS)
 
 islinux:
-	@uname -s | grep linux > /dev/null
+	@uname -s | grep inux > /dev/null
 
 isfbsd:
 	@uname -s | grep BSD > /dev/null
@@ -40,5 +40,5 @@ isfbsd:
 install:
 
 clean:
-	rm -f *.o $(PROGS) *~ core *.core linux/slothd fbsd/slothd
+	rm -f *.o $(PROGS) *~ core *.core
 

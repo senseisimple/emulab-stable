@@ -39,7 +39,8 @@ void usage(void) {
   printf("Usage:\tslothd -h\n");
   printf("\tslothd [-a] [-d] [-i <interval>] [-p <port>] [-s <server>]\n");
   printf("\t -h\t This message.\n");
-  printf("\t -a\t Scan all terminal special files for activity.\n");
+  printf("\t -a\t Only scan active terminal special files.\n");
+  printf("\t -f\t Send first idle data report immediately on startup.\n");
   printf("\t -d\t Debug mode; do not fork into background.\n");
   printf("\t -i <interval>\t Run interval, in seconds. (default is 10 min.)\n");
   printf("\t -p <port>\t Send on port <port> (default is %d).\n", SLOTHD_DEF_PORT);
@@ -69,11 +70,16 @@ int main(int argc, char **argv) {
     else {
       exitcode = 0;
       for (i = 0; i < 10; ++i) {
-        get_min_tty_idle();
+        if (!opts->first) {
+          sleep(mopts.interval);
+        }          
         get_load();
+        get_min_tty_idle();
         get_packet_counts();
         send_pkt();
-        sleep(mopts.interval);
+        if (opts->first) {
+          sleep(mopts.interval);
+        }
       }
     }
   }
@@ -87,12 +93,13 @@ int parse_args(int argc, char **argv) {
 
   /* setup defaults. */
   opts->debug = 0;
-  opts->allterms = 0;
+  opts->actterms = 0;
   opts->interval = DEF_INTVL;
   opts->port = SLOTHD_DEF_PORT;
   opts->servname = SLOTHD_DEF_SERV;
+  opts->first = 0;
 
-  while ((ch = getopt(argc, argv, "ai:dp:s:h")) != -1) {
+  while ((ch = getopt(argc, argv, "ai:dp:s:hf")) != -1) {
     switch (ch) {
 
     case 'i':
@@ -108,8 +115,12 @@ int parse_args(int argc, char **argv) {
       break;
 
     case 'a':
-      lnotice("Scanning all terminal devices (ignoring UTMP).");
-      opts->allterms = 1;
+      lnotice("Scanning only active terminals.");
+      opts->actterms = 1;
+      break;
+
+    case 'f':
+      opts->first = 1;
       break;
 
     case 'p':
@@ -161,7 +172,7 @@ int init_slothd(void) {
   }
 
   /* enum tty special files, if necessary. */
-  if (opts->allterms) {
+  if (!opts->actterms) {
     if ((devs = opendir("/dev")) == 0) {
       lerror("Can't open directory /dev for processing");
       return -1;
@@ -213,7 +224,7 @@ void get_min_tty_idle(void) {
   time_t mintime = 0;
   struct stat sb;
 
-  if (!opts->allterms) {
+  if (opts->actterms) {
     utmp_enum_terms();
     if (!opts->numttys) {
       mintime = wtmp_get_last();
