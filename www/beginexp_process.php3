@@ -140,13 +140,14 @@ if ($nonsfile) {
     $retval = SUEXEC($uid, $gid, "mkexpdir $exp_pid $exp_id", 0);
 
     echo "<center><br>
-          <h2>Experiment Configured!<br>
-          The ID for your experiment in project $exp_pid is $exp_id<br>
+          <h2>Experiment Configured!
+          </center><br><br>
+          The ID for your experiment in project $exp_pid is $exp_id.<br><br>
           Since you did not provide an NS script, no nodes have been
-          allocated.<br> You must log in and run the tbsetup scripts
+          allocated. You must log in and run the tbsetup scripts
           yourself. For your convenience, we have created a directory
-          hierarchy on the control node:<br>$dirname
-          </h2></center><br>\n";
+          hierarchy on the control node: $dirname
+          </h2>\n";
 
     if (1) {
 	mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
@@ -180,8 +181,12 @@ if ($nonsfile) {
 # if you change things here.
 #
 echo "<center><br>";
-echo "<h3>Setting up experiment. This may take a few minutes ...</h3>";
-echo "</center>";
+echo "<h3>Setting up experiment. This may take a few minutes ...
+          </center><br><br>
+	  Please do <em>not</em> click the 'Stop' button. This will cause
+	  the experiment creation to terminate prematurely, which can cause
+  	  problems for future (other) experiments.
+      </h3>";
 
 flush();
 
