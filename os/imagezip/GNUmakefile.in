@@ -5,7 +5,7 @@ SUBDIR		= os/imagezip
 
 include $(OBJDIR)/Makeconf
 
-all:	imagezip imageunzip
+all:	imagezip imageunzip frisbee.o
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -17,6 +17,9 @@ imagezip: imagezip.o
 
 imageunzip: imageunzip.o 
 	$(CC) $(CFLAGS) imageunzip.o $(LIBS) -o imageunzip
+
+frisbee.o:	imageunzip.c
+	$(CC) -c $(CFLAGS) -DFRISBEE -o frisbee.o $<
 
 install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip
 

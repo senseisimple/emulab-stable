@@ -25,10 +25,9 @@
  *
  * These numbers are in sectors.
  */
-long		outputminsec	= 0;
-long		outputmaxsec	= 0;
-long long	outputmaxsize	= 0;	/* Sanity check */
-int	slice;
+static long		outputminsec	= 0;
+static long		outputmaxsec	= 0;
+static long long	outputmaxsize	= 0;	/* Sanity check */
 
 /* Why is this not defined in a public header file? */
 #define BOOT_MAGIC	0xAA55
@@ -42,13 +41,14 @@ int	slice;
 
 #define SECSIZE 512
 #define BSIZE	(32 * 1024)
-#define OUTSIZE (1 * BSIZE)
+#define OUTSIZE (3 * BSIZE)
 char		inbuf[BSIZE], outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
 
-int		infd, outfd;
-int		doseek = 0;
-int		debug  = 0;
-long long	total  = 0;
+static int	 infd, outfd;
+static int	 doseek = 0;
+static int	 debug  = 0;
+static long long total  = 0;
+
 int		inflate_subblock(void);
 void		writezeros(off_t zcount);
 
@@ -90,10 +90,11 @@ usage(void)
 	exit(1);
 }	
 
+#ifndef FRISBEE
 int
 main(int argc, char **argv)
 {
-	int		ch;
+	int		ch, slice = 0;
 	struct timeval  stamp, estamp;
 
 	while ((ch = getopt(argc, argv, "dhs:")) != -1)
@@ -186,6 +187,35 @@ main(int argc, char **argv)
 	
 	return 0;
 }
+#else
+/*
+ * When compiled for frisbee, act as a library.
+ */
+ImageUnzipInit(char *filename, int slice, int dbg)
+{
+	if ((outfd = open(filename, O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
+		perror("opening output file");
+		exit(1);
+	}
+	doseek = 1;
+	debug  = dbg;
+
+	if (slice) {
+		off_t	minseek;
+		
+		if (readmbr(slice)) {
+			fprintf(stderr, "Failed to read MBR\n");
+			exit(1);
+		}
+		minseek = ((off_t) outputminsec) * SECSIZE;
+		
+		if (lseek(outfd, minseek, SEEK_SET) < 0) {
+			perror("Setting seek pointer to slice");
+			exit(1);
+		}
+	}
+}
+#endif
 
 int
 inflate_subblock(void)
@@ -196,8 +226,8 @@ inflate_subblock(void)
 	struct blockhdr *blockhdr;
 	struct region	*curregion;
 	off_t		offset, size;
-	char		buf[DEFAULTREGIONSIZE];
-
+	char		*buf = inbuf;
+	
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
 	d_stream.opaque   = (voidpf)0;
@@ -212,7 +242,11 @@ inflate_subblock(void)
 	 * Read the header. It is uncompressed, and holds the real
 	 * image size and the magic number.
 	 */
+#ifdef  FRISBEE
+	if ((cc = FrisbeeRead(&buf, DEFAULTREGIONSIZE)) <= 0) {
+#else
 	if ((cc = read(infd, buf, DEFAULTREGIONSIZE)) <= 0) {
+#endif
 		if (cc == 0)
 			return 1;
 		perror("reading zipped image header goo");
@@ -239,7 +273,14 @@ inflate_subblock(void)
 	/*
 	 * Set the output pointer to the beginning of the region.
 	 */
-	if (total != offset) {
+	if (doseek) {
+		if (devlseek(outfd, offset, SEEK_SET) < 0) {
+			perror("Skipping to start of output region");
+			exit(1);
+		}
+		total += offset - total;
+	}
+	else {
 		assert(offset > total);
 		writezeros(offset - total);
 	}
@@ -256,7 +297,11 @@ inflate_subblock(void)
 		else
 			count = blockhdr->size;
 			
-		if ((cc = read(infd, inbuf, count)) <= 0) {
+#ifdef  FRISBEE
+		if ((cc = FrisbeeRead(&buf, count)) <= 0) {
+#else
+		if ((cc = read(infd, buf, count)) <= 0) {
+#endif
 			if (cc == 0) {
 				return 1;
 			}
@@ -266,7 +311,7 @@ inflate_subblock(void)
 		assert(cc == count);
 		blockhdr->size -= cc;
 
-		d_stream.next_in   = inbuf;
+		d_stream.next_in   = buf;
 		d_stream.avail_in  = cc;
 	inflate_again:
 		/*
@@ -321,8 +366,9 @@ inflate_subblock(void)
 			total  += cc;
 			assert(count >= 0);
 			assert(size  >= 0);
+#ifndef	FRISBEE
 			assert(total == offset);
-
+#endif
 			/*
 			 * Hit the end of the region. Need to figure out
 			 * where the next one starts. We write a block of
@@ -339,15 +385,20 @@ inflate_subblock(void)
 				if (!blockhdr->regioncount)
 					break;
 
-				offset = curregion->start * (off_t) SECSIZE;
-				size   = curregion->size  * (off_t) SECSIZE;
+				newoffset = curregion->start * (off_t) SECSIZE;
+				size      = curregion->size  * (off_t) SECSIZE;
 				assert(size);
 				curregion++;
 				blockhdr->regioncount--;
-
+#ifdef FRISBEE
+				writezeros(newoffset - offset);
+				offset = newoffset;
+#else
+				offset = newoffset;
 				assert(offset >= total);
 				if (offset > total)
 					writezeros(offset - total);
+#endif
 			}
 		}
 		if (d_stream.avail_in)
@@ -381,7 +432,9 @@ writezeros(off_t zcount)
 			exit(1);
 		}
 		total  += zcount;
+#ifndef FRISBEE
 		assert(offset == total + (((long long)outputminsec)*SECSIZE));
+#endif
 		return;
 	}
 	
