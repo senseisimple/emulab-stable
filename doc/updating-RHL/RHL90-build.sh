@@ -637,16 +637,20 @@ gmake client-install
 ## Install `gated'.
 ## XXX --- compile w/o debugging?
 ##
-cd "${local_build_root}"
-# wget http://ftp.rge.com/pub/networking/gated/gated-3-6.tar.gz
-wget http://www.funet.fi/pub/unix/tcpip/gated/gated-3-6.tar.gz
-tar zxf gated-3-6.tar.gz
-cd gated-public-3_6
-./configure
-gmake depend
-gmake
-gmake install
-# Installs just `/usr/local/sbin/gated'.
+
+#cd "${local_build_root}"
+## wget http://ftp.rge.com/pub/networking/gated/gated-3-6.tar.gz
+#wget http://www.funet.fi/pub/unix/tcpip/gated/gated-3-6.tar.gz
+#tar zxf gated-3-6.tar.gz
+#cd gated-public-3_6
+#./configure
+#gmake depend
+#gmake
+#gmake install
+## Installs just `/usr/local/sbin/gated'.
+
+# Version built from source doesn't work, install RHL7.3 RPM instead
+rpm -i /share/redhat/7.3/RPMS/gated-3.6-14.i386.rpm
 
 ###############################################################################
 
@@ -960,7 +964,7 @@ cd pathrate_2.4.0
 # XXX Build w/o -g?
 gmake
 # No install target
-install -o root -g root -m 755 pathrate_rcv pathrate_snd /usr/local/sbin
+install -o root -g root -m 755 pathrate_rcv pathrate_snd /usr/local/bin
 install -d -o root -g root -m 755 /usr/local/share/doc/pathrate
 install -o root -g root -m 644 CHANGES README /usr/local/share/doc/pathrate
 
