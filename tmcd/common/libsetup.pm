@@ -1935,7 +1935,7 @@ sub dotunnels(;$)
 	    my $config = TMROUTECONFIG;
 	    $config =~ s/\/\//\//g;
 	    my $rtabopt= "";
-	    if (defined($rtabopt)) {
+	    if (defined($rtabid)) {
 		$rtabopt = "    ifconfig \"%% rtabid $rtabid\";\n";
 	    }
 	    

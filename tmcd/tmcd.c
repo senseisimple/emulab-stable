@@ -4371,8 +4371,8 @@ COMMAND_PROTOTYPE(dojailconfig)
 	row   = mysql_fetch_row(res);
 
 	bzero(buf, sizeof(buf));
-	if (1 && row[1]) {
-		sprintf(buf, "JAILIP=\"%s,%s\"\n", row[1], "255.255.255.255");
+	if (row[1]) {
+		sprintf(buf, "JAILIP=\"%s,%s\"\n", row[1], JAILIPMASK);
 	}
 	
 	sprintf(&buf[strlen(buf)], 
