@@ -680,9 +680,6 @@ function SHOWIMAGEID($imageid, $edit) {
     $part1_osid	 = $row[part1_osid];
     $part2_osid	 = $row[part2_osid];
     $part3_osid	 = $row[part3_osid];
-
-
-
     $part4_osid	 = $row[part4_osid];
     $default_osid= $row[default_osid];
     $path 	 = $row[path];
@@ -796,7 +793,7 @@ function SHOWIMAGEID($imageid, $edit) {
     }
 
     echo "<tr>
-            <td>Path: </td>
+            <td>Filename: </td>
             <td class=left>\n";
 
     if ($edit) {

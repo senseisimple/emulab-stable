@@ -10,7 +10,7 @@ include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
-                  genelists genelists.proxy dhcpd_makeconf
+                  genelists genelists.proxy dhcpd_makeconf nodelog
 LIBEXEC_SCRIPTS = 
 LIB_SCRIPTS     = libdb.pm
 

@@ -55,12 +55,15 @@ use Exporter;
 	 BATCHSTATE_ACTIVATING
 	 TBBatchState TBSetBatchState
 
+	 TB_NODELOGTYPES
+
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
+	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 );
 
 # Must come after package declaration!
@@ -183,6 +186,9 @@ sub TB_IMAGEID_DESTROY()	{ 4; }
 sub TB_IMAGEID_ACCESS()		{ 5; }
 sub TB_IMAGEID_MIN()		{ TB_IMAGEID_READINFO; }
 sub TB_IMAGEID_MAX()		{ TB_IMAGEID_ACCESS; }
+
+# Node Log Types
+sub TB_NODELOGTYPES()		{ ("misc") ; }
 
 #
 # We should list all of the DB limits.
@@ -1006,6 +1012,65 @@ sub UNIX2DBUID ($$) {
     }
 
     $$userlogin = $row[0];
+    return 1;
+}
+
+#
+# Validate a node log type.
+#
+# usage: TBValidNodeLogType(char *type)
+#        Returns 1 if the type string is valid.
+#        Returns 0 if not.
+#
+sub TBValidNodeLogType($)
+{
+    my($type) = @_;
+
+    foreach my $actype ( TB_NODELOGTYPES ) {
+	if ($actype eq $type) {
+	    return 1;
+	}
+    }
+
+    return 0;
+}
+
+#
+# Insert a Log entry for a node.
+#
+# usage: TBSetNodeLogEntry(char *node, char *type, char *message)
+#        Returns 1 if okay.
+#        Returns 0 if failed.
+#
+sub TBSetNodeLogEntry($$$$)
+{
+    my($node, $dbuid, $type, $message) = @_;
+
+    if (! TBValidNodeName($node) || !TBValidNodeLogType($type)) {
+	return 0;
+    }
+    return DBQueryWarn("insert into nodelog ".
+		       "values ".
+                       "('$node', NULL, '$type', '$dbuid', $message, now())");
+}
+
+#
+# Validate a node name.
+#
+# usage: TBValidNodeName(char *name)
+#        Returns 1 if the node is valid.
+#        Returns 0 if not.
+#
+sub TBValidNodeName($)
+{
+    my($node) = @_;
+
+    my $query_result =
+	DBQueryWarn("select node_id from nodes where node_id='$node'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
     return 1;
 }
 

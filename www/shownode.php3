@@ -54,6 +54,13 @@ echo "<p><center>
            <A href='nodecontrol_form.php3?node_id=$node_id'>Yes</a>
          </center>\n";
 
+if ($isadmin) {
+    echo "<br><p>
+          <center>
+            <A href='shownodelog.php3?node_id=$node_id'>Node Log</a>
+          </center>\n";
+}
+
 #
 # Standard Testbed Footer
 # 

@@ -1,0 +1,104 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+sub usage() {
+    print STDOUT "Usage: nodelog [-t type] -m <message> node [node ...]\n";
+    exit(-1);
+}
+my  $optlist = "t:m:";
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+if (!$UID) {
+    die("*** $0:\n".
+	"    Please do not run this script as root!\n");
+}
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You must be a TB administrator to enter a log entry\n");
+}
+
+my $errors = 0;
+my $message;
+my @nodes;
+my $type = "misc";
+my $dbuid;
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    Go Away! You do not exist in the Emulab Database.\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 1) {
+    usage();
+}
+@nodes = @ARGV;
+
+if (defined($options{"m"})) {
+    $message = $options{"m"};
+    $message = DBQuoteSpecial($message);
+}
+else {
+    usage();
+}
+if (defined($options{"t"})) {
+    $type = $options{"t"};
+}
+
+#
+# Validate type tag.
+# 
+if (!TBValidNodeLogType($type)) {
+    die("*** $0:\n".
+	"    Invalid log type $type!\n");
+}
+
+#
+# Validate the nodes names. 
+#
+foreach my $node ( @nodes ) {
+    if (! TBValidNodeName($node)) {
+	die("*** $0:\n".
+	    "    Invalid node name $node!\n");
+    }
+}
+
+#
+# And then insert the log entry.
+#
+foreach my $node ( @nodes ) {
+    if (! TBSetNodeLogEntry($node, $dbuid, $type, $message)) {
+	print STDERR "Failed to insert entry for node $node\n";
+	$errors++;
+    }
+}
+
+exit($errors);
