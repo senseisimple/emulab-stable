@@ -1847,3 +1847,69 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table new_nodes add column role varchar(32) not null \
 	   default 'testnode';
+
+1.271: Add new tables for experiment firewalls: firewalls, firewall_rules
+       and default_firewall_rules:
+
+	CREATE TABLE firewalls (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  fwname varchar(32) NOT NULL default '',
+	  type enum('ipfw','ipfw2','ipchains') NOT NULL default 'ipfw',
+	  style enum('open','closed','basic') NOT NULL default 'basic',
+	  PRIMARY KEY  (pid,eid,fwname)
+	) TYPE=MyISAM;
+
+	CREATE TABLE firewall_rules (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  fwname varchar(32) NOT NULL default '',
+	  ruleno int(10) unsigned NOT NULL default '0',
+	  rule text NOT NULL,
+	  PRIMARY KEY  (pid,eid,fwname,ruleno),
+	  KEY fwname (fwname)
+	) TYPE=MyISAM;
+
+	CREATE TABLE default_firewall_rules (
+	  type enum('ipfw','ipfw2','ipchains') NOT NULL default 'ipfw',
+	  style enum('open','closed','basic') NOT NULL default 'basic',
+	  enabled tinyint(4) NOT NULL default '0',
+	  ruleno int(10) unsigned NOT NULL default '0',
+	  rule text NOT NULL,
+	  PRIMARY KEY  (type,style,ruleno)
+	) TYPE=MyISAM;
+
+       and the associated table_regex's for parsing:
+
+	INSERT INTO table_regex VALUES \
+	  ('firewalls','pid','text','redirect','projects:pid',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewalls','eid','text','redirect','experimenets:eid',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewalls','type','text','regex','^(ipfw|ipfw2|ipchains)$',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewalls','style','text','regex','^(open|closed|basic)$',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewall_rules','pid','text','redirect','projects:pid',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewall_rules','eid','text','redirect','experimenets:eid',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewall_rules','ruleno','int','redirect','default:int',0,50000,NULL);
+	INSERT INTO table_regex VALUES \
+	  ('firewall_rules','rule','text','regex','^\\w[-\\w \\t,/\\{\\}\\(\\)!:\\.]*$',0,1024,NULL);
+
+       Note that there are no regex's for default_firewall_rules since user
+       supplied data are never used to fill the table.
+
+       Create the IPFW firewall OSID with:
+
+	INSERT INTO os_info VALUES ('FW-IPFW','emulab-ops','FW-IPFW',\
+	    'root',NULL,'IPFW Firewall','FreeBSD','',NULL,'FreeBSD',\
+	    '','ping,ssh,ipod,isup,veths,mlinks',0,1,1,'NORMAL',\
+	    'emulab-ops-FBSD47-STD',NULL,0);
+
+       Poplulate the default_firewall_rules table using sql/fwrules-create.sql.

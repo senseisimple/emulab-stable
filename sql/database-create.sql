@@ -52,6 +52,19 @@ CREATE TABLE current_reloads (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `default_firewall_rules`
+--
+
+CREATE TABLE default_firewall_rules (
+  type enum('ipfw','ipfw2','ipchains') NOT NULL default 'ipfw',
+  style enum('open','closed','basic') NOT NULL default 'basic',
+  enabled tinyint(4) NOT NULL default '0',
+  ruleno int(10) unsigned NOT NULL default '0',
+  rule text NOT NULL,
+  PRIMARY KEY  (type,style,ruleno)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `delays`
 --
 
@@ -348,6 +361,33 @@ CREATE TABLE exppid_access (
   exp_pid varchar(12) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
   PRIMARY KEY  (exp_eid,exp_pid,pid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `firewall_rules`
+--
+
+CREATE TABLE firewall_rules (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  fwname varchar(32) NOT NULL default '',
+  ruleno int(10) unsigned NOT NULL default '0',
+  rule text NOT NULL,
+  PRIMARY KEY  (pid,eid,fwname,ruleno),
+  KEY fwname (fwname)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `firewalls`
+--
+
+CREATE TABLE firewalls (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  fwname varchar(32) NOT NULL default '',
+  type enum('ipfw','ipfw2','ipchains') NOT NULL default 'ipfw',
+  style enum('open','closed','basic') NOT NULL default 'basic',
+  PRIMARY KEY  (pid,eid,fwname)
 ) TYPE=MyISAM;
 
 --

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -14,7 +14,7 @@
 # The easy way: do 'gmake all'
 # You can also run the individual targets too.
 
-all: db-create db-fill sitevars
+all: db-create db-fill sitevars fwrules
 
 db-create:
 	@rm -f ./.tmp-db-create.sql ./.tmp-create-diff
@@ -23,7 +23,7 @@ db-create:
 	@if test -s ./.tmp-create-diff; \
 	then \
 		cat ./.tmp-create-diff; \
-		echo "NOTE: Don't forget to update db-migrate.txt!"; \
+		echo "NOTE: Don't forget to update database-migrate.txt!"; \
 		mv ./.tmp-db-create.sql ./database-create.sql; \
 	fi
 	@rm -f ./.tmp-create-diff ./.tmp-db-create.sql
@@ -38,5 +38,8 @@ db-fill-dist:
 
 sitevars:
 	@mysqldump -t tbdb sitevariables > sitevars-create.sql 
+
+fwrules:
+	@mysqldump -t tbdb default_firewall_rules > fwrules-create.sql
 
 dist:	db-fill-dist
