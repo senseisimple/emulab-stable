@@ -96,6 +96,9 @@ sub os_usermod($$$$$)
 {
     my($login, $gid, $glist, $pswd, $root) = @_;
 
+    if ($root) {
+	$glist = join(',', split(/,/, $glist), "wheel");
+    }
     if ($glist ne "") {
 	$glist = "-G $glist";
     }
@@ -127,6 +130,9 @@ sub os_useradd($$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root) = @_;
 
+    if ($root) {
+	$glist = join(',', split(/,/, $glist), "wheel");
+    }
     if ($glist ne "") {
 	$glist = "-G $glist";
     }
