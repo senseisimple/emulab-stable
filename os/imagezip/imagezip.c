@@ -747,14 +747,16 @@ char *usagestr =
  "usage: imagezip [-idlbhr] [-s #] [-c #] <image | device> [outputfilename]\n"
  " -i              Info mode only. Do not write an output file\n"
  " -d              Turn on debugging. Multiple -d options increase output\n"
- " -l              Linux slice only. Input must be a Linux slice image\n"
- " -b              FreeBSD slice only. Input must be a FreeBSD slice image\n"
  " -r              A `raw' image. No FS compression is attempted\n"
  " -c count	   Compress <count> number of sectors (not with slice mode)\n"
  " -s slice        Compress a particular slice (DOS numbering 1-4)\n"
  " -h              Print this help message\n"
  " image | device  The input image or a device special file (ie: /dev/rad2)\n"
- " outputfilename  The output file, when -i is not specified\n";
+ " outputfilename  The output file, when -i is not specified\n"
+ "\n"
+ " Debugging options (not to be used by mere mortals!)\n"
+ " -l              Linux slice only. Input must be a Linux slice image\n"
+ " -b              FreeBSD slice only. Input must be a FreeBSD slice image\n";
 
 void
 usage()
