@@ -228,6 +228,11 @@ $output = array();
 $retval = 0;
 $last   = time();
 
+#
+# Avoid SIGPROF in child.
+# 
+set_time_limit(0);
+
 $result = exec("$TBSUEXEC_PATH $uid $gid webstartexp $exp_pid ".
 	       "$exp_id $exp_nsfile",
  	       $output, $retval);
