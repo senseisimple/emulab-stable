@@ -990,7 +990,7 @@ COMMAND_PROTOTYPE(doifconfig)
 
 	/* Veth interfaces are new. */
 	if (vers < 10)
-	  return 0;
+		return 0;
 
 	/*
 	 * Find all the veth interfaces.
@@ -1632,21 +1632,29 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		return 0;
 
 	/*
-	 * Get delay parameters for the machine. The point of this silly
-	 * join is to get the type out so that we can pass it back. Of
-	 * course, this assumes that the type is the BSD name, not linux.
+	 * Get link delay parameters for the machine. We store veth
+	 * interfaces in another dynamic table, so must join with both
+	 * interfaces and veth_interfaces to see which iface this link
+	 * delay corresponds to. If there is a veth entry use that, else
+	 * use the normal interfaces entry. I do not like this much.
+	 * Maybe we should use the regular interfaces table, with type veth,
+	 * entries added/deleted on the fly. I avoided that cause I view
+	 * the interfaces table as static and pertaining to physical
+	 * interfaces.
 	 */
 	res = mydb_query("select i.MAC,type,vlan,vnode,d.ip,netmask, "
 		 "pipe,delay,bandwidth,lossrate, "
 		 "rpipe,rdelay,rbandwidth,rlossrate, "
 		 "q_red,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm, " 
 		 "q_qinbytes,q_bytes,q_meanpsize,q_wait,q_setbit, " 
-		 "q_droptail,q_gentle "
+		 "q_droptail,q_gentle,v.mac "
                  " from linkdelays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=d.iface "
+		 "left join veth_interfaces as v on "
+		 " v.node_id=d.node_id and v.iface=d.iface and v.IP=d.ip "
 		 " where d.node_id='%s'",	 
-		 27, reqp->nodeid);
+		 28, reqp->nodeid);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);
@@ -1668,7 +1676,7 @@ COMMAND_PROTOTYPE(dolinkdelay)
 			"LINTERM=%s QINBYTES=%s BYTES=%s "
 			"MEANPSIZE=%s WAIT=%s SETBIT=%s "
 			"DROPTAIL=%s GENTLE=%s\n",
-			row[0],  row[1],
+			(row[27] ? row[27] : row[0]), row[1],
 			row[2],  row[3],  row[4],  row[5],
 			row[6],	 row[7],  row[8],  row[9],
 			row[10], row[11], row[12], row[14],
