@@ -625,8 +625,7 @@ event_notification_get_string(event_handle_t handle,
     }
 
     if (event_notification_get(handle, notification, name, &v) == 0) {
-        ERROR("could not get string attribute \"%s\" from notification %p\n",
-              name, notification);
+	buffer[0] = '\0';
         return 0;
     }
 
