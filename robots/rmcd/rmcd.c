@@ -44,16 +44,41 @@ int main(int argc, char **argv) {
    * Everything you beleave is wrong.
    */
 
-
-  int FD_emc; // file descripter: EMC
+  int quitmain = 0; // quit main loop
   int retval; // return value
+
+  int FD_emc; // file descriptor for connection to EMC
+  
   
   int cpacket_rcvd = 0;
   struct mtp_packet *read_packet;
   
-  int quitmain = 0; // quit main loop
+  fd_set defaultset; 
+  int max_fd = -1;
+  struct timeval tv,default_tv;
   
-  // open connection to EMC
+  // socket to connect to EMCD (FIXME: this needs to be a client)
+  struct sockaddr EMC_addr; // address for EMC server (IS THIS RIGHT?)
+  EMC_addr.sin_family = AF_INET;
+  EMC_addr.sin_port = htons(port); // FIXME: define 'port' somewhere
+  EMC_addr.sin_addr.s_addr = INADDR_ANY; // FIXME: is this where to put EMCD's address??
+  
+  // parse options
+  // FIXME
+  
+  
+  // daemon mode
+  // FIXME
+  
+         
+  // set up file descriptors
+  FD_ZERO(&defaultset);
+  default_tv.tv_sec = 5; // 5 seconds
+  default_tv.tv_usec = 0; // wah?
+  
+  
+  
+  // open connection to EMC server
   FD_emc = socket(PF_INET, SOCK_STREAM, 0);
   
   if (FD_emc == -1) {
@@ -63,8 +88,6 @@ int main(int argc, char **argv) {
   }
   
   // bind socket
-  struct sockaddr remoteaddr; // FIXME: fill out this structure
-  
   retval = connect(FD_emc, &remoteaddr, sizeof(struct sockaddr));
   if (retval == -1) {
     // fuckup
@@ -110,9 +133,14 @@ int main(int argc, char **argv) {
   // do something about configuration packet
   
   
-  // list of robots
+  // setup list of robots
+  
+  
   
   // open connection to each robot listener
+  
+  
+  
   
   // store data about connected robots
   
