@@ -293,7 +293,7 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             raise Exception('User "%s" is not active' % self.user)
 
         self.admin = self.isadminuser(self.user)
-        if not self.admin:
+        if self.admin:
             ALLOWED_PATHS.extend(map(lambda x: os.path.join(STD_DEVEL_PATH, x),
                                      os.listdir(STD_DEVEL_PATH)))
             pass
