@@ -23,4 +23,4 @@ INSERT INTO sitevariables VALUES ('general/recently_active',NULL,'14','Number of
 INSERT INTO sitevariables VALUES ('plab/load_metric',NULL,'load_fifteen','GMOND load metric to use (load_one, load_five, load_fifteen)');
 INSERT INTO sitevariables VALUES ('plab/max_load','8.0','5.0','Load at which to stop admitting jobs (0==admit nothing, 1000==admit all)');
 INSERT INTO sitevariables VALUES ('plab/min_disk',NULL,'10.0','Minimum disk space free at which to stop admitting jobs (0==admit all, 100==admit none)');
-
+INSERT INTO sitevariables VALUES ('plab/stale_age',NULL,'60','Age in minutes at which to consider site data stale and thus node down (0==always use data)');
