@@ -113,10 +113,9 @@ clean: subdir-clean
 	/bin/rm -f imagezip.tar imagezip.tar.gz
 
 subdir-clean:
-	@$(MAKE) -C ffs clean
-	@$(MAKE) -C extfs clean
-	@$(MAKE) -C ntfs clean
-	@$(MAKE) -C fat clean
+	@list='$(SUBDIRS)'; for dir in $$list; do \
+		$(MAKE) -C $$dir clean; \
+	done;
 
 imagezip.tar.gz: imagezip.tar
 	gzip -c imagezip.tar > imagezip.tar.gz
