@@ -23,14 +23,15 @@ my $testbed_srcdir = "@top_srcdir@";
 # Locals
 my $master_fill   = "$testbed_srcdir/sql/database-fill.sql";
 my $export_tables = "../utils/export_tables";
+my $wap		  = "$testbed_srcdir/utils/withadminprivs";
 my $tempfile      = "/tmp/dbdiff.$$";
 my $exitcode      = 0;
 
 #
 # Diff exits with 2 if a problem. We tell diff to ignore whitespace
-# changes and comment lines (line starting with '--'). 
-# 
-if (system("perl $export_tables | ".
+# changes and comment lines (line starting with '--').
+#
+if (system("perl $wap perl $export_tables | ".
 	   "diff -b -B -I '^--.*\$' $master_fill - > $tempfile") == 2) {
     unlink($tempfile);
     die("*** $0:\n".
