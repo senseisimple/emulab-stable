@@ -264,22 +264,20 @@ function SPITFORM($formfields, $errors)
     #
     # Preload?
     #
-    if (ISADMIN($uid)) {
-	echo "<tr>
-  	          <td colspan=2>Preload Experiment?[<b>6</b>]:</td>
-                  <td class=left>
-                      <input type=checkbox
-                             name=\"formfields[exp_preload]\"
-                             value=Yep";
+    echo "<tr>
+  	      <td colspan=2>Preload Experiment?[<b>6</b>]:</td>
+              <td class=left>
+                  <input type=checkbox
+                         name=\"formfields[exp_preload]\"
+                         value=Yep";
 
-	if (isset($formfields[exp_preload]) &&
-	    strcmp($formfields[exp_preload], "Yep") == 0)
+    if (isset($formfields[exp_preload]) &&
+	strcmp($formfields[exp_preload], "Yep") == 0)
 	    echo "           checked";
 	
-	echo "                       > Yes
-                  </td>
-              </tr>\n";
-    }
+    echo "                       > Yes
+              </td>
+          </tr>\n";
 
     echo "<tr>
               <td align=center colspan=3>
@@ -306,12 +304,11 @@ function SPITFORM($formfields, $errors)
                  corresponds to the project you selected.
              <li>Check this if you want to create a
                  <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>
-                 batch mode</a> experiment.\n";
-    if (ISADMIN($uid)) {
-	echo "<li>Check this if you want to load the experiment, but not
-                 configure it (assign physical resources). This option is
-                 not compatible with batch mode. Admin only right now.\n";
-    }
+                 batch mode</a> experiment.
+             <li>Check this if you want to load the experiment, but not
+                 configure it (assign physical resources). You may swap in the
+                 experiment later, or terminate it without ever swapping
+                 it. This option is not compatible with batch mode.\n";
     echo "</ol>
           </blockquote></blockquote></blockquote>\n";
 
@@ -601,6 +598,7 @@ if (isset($formfields[exp_batched]) &&
     strcmp($formfields[exp_batched], "Yep") == 0) {
     $exp_batched   = 1;
     $batcharg      = "";
+    $exp_preload   = 0;
 }
 else {
     $exp_batched   = 0;
@@ -756,6 +754,15 @@ if ($exp_batched) {
 	  or days. You will be notified via email when the experiment has
           been run. If you do not receive email notification within a
           reasonable amount of time, please contact $TBMAILADDR.\n";
+}
+elseif ($exp_preload) {
+    echo "Since you are only pre-loading the experiment, this will typically
+          take less than one minute. If you do not receive email notification
+          within a reasonable amount of time, please contact $TBMAILADDR.<br>
+          <br>
+          While you are waiting, you can watch the log 
+          in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
+          realtime</a>.\n";
 }
 else {
     echo "You will be notified via email when the experiment has been fully
