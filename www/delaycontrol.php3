@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -157,7 +157,8 @@ if ($dochange == "1") {
 	    # if something breaks we get the mail from the web interface.
 	    # This might change depending on how often we get email!
 	    #
-	    $retval = SUEXEC($uid, $unix_gid, $cmd, SUEXEC_ACTION_IGNORE);
+	    $retval = SUEXEC($uid, "$pid,$unix_gid", $cmd,
+			     SUEXEC_ACTION_IGNORE);
 	    if ($retval) {
 		# Ug, I know this hardwired return value is bad! 
 		if ($retval == 2) {

@@ -896,7 +896,7 @@ if (isset($node)) {
           <br><br>\n";
     flush();
 
-    SUEXEC($uid, $unix_gid, "webcreateimage -p $pid $imagename $node",
+    SUEXEC($uid, "$pid,$unix_gid", "webcreateimage -p $pid $imagename $node",
 	   SUEXEC_ACTION_DUPDIE);
 
     echo "This will take 10 minutes or more; you will receive email

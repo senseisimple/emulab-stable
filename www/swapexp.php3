@@ -220,7 +220,7 @@ set_time_limit(0);
 # plain force swap, it passes -f for us.
 $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
-$retval = SUEXEC($uid, $unix_gid,
+$retval = SUEXEC($uid, "$exp_pid,$unix_gid",
 		 ($force ?
 		  "webidleswap $args $exp_pid $exp_eid" :
 		  "webswapexp -s $inout $exp_pid $exp_eid"),

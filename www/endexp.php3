@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -107,7 +107,7 @@ flush();
 #
 # Run the backend script.
 #
-$retval = SUEXEC($uid, $unix_gid, "webendexp $exp_pid $exp_eid",
+$retval = SUEXEC($uid, "$exp_pid,$unix_gid", "webendexp $exp_pid $exp_eid",
 		 SUEXEC_ACTION_IGNORE);
 
 #

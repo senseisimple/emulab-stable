@@ -107,7 +107,8 @@ echo "<br>
       <br><br>\n";
 flush();
 
-SUEXEC($uid, $unix_gid, "webcreateimage -p $image_pid $image_name $node",
+SUEXEC($uid, "$image_pid,$unix_gid",
+       "webcreateimage -p $image_pid $image_name $node",
        SUEXEC_ACTION_DUPDIE);
 
 echo "This will take 10 minutes or more; you will receive email

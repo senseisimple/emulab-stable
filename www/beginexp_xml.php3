@@ -407,7 +407,7 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 #
 set_time_limit(0);
 
-$retval = SUEXEC($uid, $unix_gid,
+$retval = SUEXEC($uid, "$exp_pid,$unix_gid",
 		 "webbatchexp $batcharg -E $exp_desc $exp_swappable ".
 		 "$linktestarg -p $exp_pid -g $exp_gid -e $exp_id ".
 		 ($nonsfile ? "" : "$thensfile"),

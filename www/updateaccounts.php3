@@ -138,7 +138,7 @@ echo "<h2>Starting node update. Please wait a moment ...
 
 flush();
 
-$retval = SUEXEC($uid, $unix_gid,
+$retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webnodeupdate -b $pid $eid" .
 		 (isset($nodeid) ? " $nodeid" : ""),
 		 SUEXEC_ACTION_IGNORE);

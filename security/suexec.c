@@ -266,6 +266,7 @@ int main(int argc, char *argv[])
     char dwd[AP_MAXPATH];	/* docroot working directory */
 #ifdef TESTBED
     char cmdpath[AP_MAXPATH];	/* full path to command      */
+    int  grouplist[NGROUPS], ngroups = 0;
 #endif
     struct passwd *pw;		/* password entry holder     */
     struct group *gr;		/* group entry holder        */
@@ -367,6 +368,72 @@ int main(int argc, char *argv[])
 	exit(105);
     }
 
+#ifdef TESTBED
+    {
+	char *cp, *bp, *rname, *temp_gname = strdup(target_gname);
+	gid_t rgid;
+	int i;
+
+	actual_gname = NULL;
+	bp = temp_gname;
+	while ((bp = strsep(&temp_gname, ",")) != NULL) {
+	    if (!*bp)
+		continue;
+	    
+	    /*
+	     * Error out if the target group name is invalid.
+	     */
+	    if (strspn(bp, "1234567890") != strlen(bp)) {
+		if ((gr = getgrnam(bp)) == NULL) {
+		    log_err("crit: invalid target group name: (%s)\n", bp);
+		    exit(106);
+		}
+		rgid  = gr->gr_gid;
+		rname = gr->gr_name;
+	    }
+	    else {
+		rgid  = atoi(bp);
+		rname = bp;
+	    }
+	    /* Watch for duplicates */
+	    for (i = 0; i < ngroups; i++) {
+		if (grouplist[i] == rgid)
+		    goto skip;
+	    }
+	    
+	    grouplist[ngroups++] = rgid;
+
+	    /*
+	     * Error out if attempt is made to execute as root group
+	     * or as a GID less than GID_MIN.  Tsk tsk.
+	     */
+	    if ((rgid == 0) || (rgid < GID_MIN)) {
+	         log_err("crit: cannot run as forbidden gid (%d/%s)\n",
+			 gid, cmd);
+		 exit(108);
+	    }
+
+	    /* see below; need room for primary group in first two slots */
+	    if (ngroups >= (NGROUPS - 2)) {
+		log_err("crit: Too many groups: (%s)\n", bp);
+		exit(106);
+	    }
+
+	    if (actual_gname) {
+		cp = (char *) malloc(strlen(actual_gname) + strlen(rname) + 2);
+		strcpy(cp, actual_gname);
+		strcat(cp, ",");
+		strcat(cp, rname);
+		free(actual_gname);
+		actual_gname = cp;
+	    }
+	    else {
+		actual_gname = strdup(rname);
+	    }
+	skip:
+	}
+    }
+#else
     /*
      * Error out if the target group name is invalid.
      */
@@ -382,6 +449,7 @@ int main(int argc, char *argv[])
 	gid = atoi(target_gname);
 	actual_gname = strdup(target_gname);
     }
+#endif
 
 #ifdef _OSD_POSIX
     /*
@@ -438,6 +506,30 @@ int main(int argc, char *argv[])
 	exit(107);
     }
 
+#ifdef TESTBED
+    {
+	int groups[NGROUPS], i, idx = 0;
+
+	groups[idx++] = primary_gid;
+	/* duplicate has something to do with effective gid */
+	groups[idx++] = primary_gid;
+
+	/* Move over the grouplist from above. */
+	for (i = 0; i < ngroups; i++) {
+ 	    if (grouplist[i] != primary_gid)
+	        groups[idx++] = grouplist[i];
+	}
+	
+	if (setgid(primary_gid) != 0) {
+	    log_err("emerg: failed to setgid (%ld: %s)\n", primary_gid, cmd);
+	    exit(109);
+	}
+	if (setgroups(idx, groups) != 0) {
+	    log_err("emerg: failed to setgroups (%s: %s)\n", actual_gname,cmd);
+	    exit(109);
+	}
+    }
+#else
     /*
      * Error out if attempt is made to execute as root group
      * or as a GID less than GID_MIN.  Tsk tsk.
@@ -447,33 +539,6 @@ int main(int argc, char *argv[])
 	exit(108);
     }
 
-#ifdef TESTBED
-    {
-	int groups[NGROUPS], ngroups, i;
-
-	ngroups = NGROUPS;
-	getgrouplist(actual_uname, primary_gid, groups, &ngroups);
-	if (ngroups == NGROUPS) {
-		log_err("crit: Too many groups (%ld: %s)\n", gid, cmd);
-	}
-	for (i = 0; i < ngroups; i++) {
-		if (groups[i] == gid)
-			break;
-	}
-	if (i == ngroups) {
-		/* Nasty! */
-		if (i == NGROUPS)
-			ngroups--;
-		groups[ngroups++] = gid;
-	}
-	
-	if (((setgid(primary_gid)) != 0) ||
-	    (setgroups(ngroups, groups) != 0)) {
-		log_err("emerg: failed to setgid (%ld: %s)\n", gid, cmd);
-		exit(109);
-	}
-    }
-#else
     /*
      * Change UID/GID here so that the following tests work over NFS.
      *

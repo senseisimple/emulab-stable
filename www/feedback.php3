@@ -166,8 +166,8 @@ if (strcmp($mode, "record") == 0) {
     ignore_user_abort(1);
     
     # Start the script and pipe its output to the user.
-    $fp = popen("$TBSUEXEC_PATH $uid $unix_gid webfeedback -d $duration $pid $gid $eid",
-		"r");
+    $fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid webfeedback ".
+		"-d $duration $pid $gid $eid",	"r");
     if (! $fp) {
 	USERERROR("Feedback failed!", 1);
     }
@@ -204,7 +204,7 @@ else if (strcmp($mode, "clear") == 0) {
     if (isset($clear_bootstrap) && !strcmp($clear_bootstrap, "1"))
 	$options .= " -b";
     if ($options != "") {
-	$retval = SUEXEC($uid, $unix_gid,
+	$retval = SUEXEC($uid, "$pid,$unix_gid",
 			 "webfeedback $options $pid $gid $eid",
 			 SUEXEC_ACTION_USERERROR);
     }

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -50,6 +50,7 @@ if (! TBNodeIDtoExpt($nodeid, $pid, $eid, $gid)) {
     SPITERROR(400, "$nodeid is not reserved to an experiment!");
 }
 TBExpLeader($pid, $eid, $creator);
+TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 #
 # We need the secret key. 
@@ -101,7 +102,8 @@ $arg    = (isset($stamp) ? "-t " . escapeshellarg($stamp) : "");
 # Then do it for real, spitting out the data. Sure, the user could
 # delete the file in the meantime, but thats his problem. 
 #
-$retval = SUEXEC($creator, $gid, "spewrpmtar -v $arg $nodeid $file",
+$retval = SUEXEC($creator, "$pid,$unix_gid",
+		 "spewrpmtar -v $arg $nodeid $file",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval < 0) {
@@ -122,7 +124,7 @@ if ($retval) {
 #
 # Okay, now do it for real. 
 # 
-if ($fp = popen("$TBSUEXEC_PATH $creator $gid ".
+if ($fp = popen("$TBSUEXEC_PATH $creator $pid,$unix_gid ".
 		"spewrpmtar $nodeid $file", "r")) {
     header("Content-Type: application/octet-stream");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");

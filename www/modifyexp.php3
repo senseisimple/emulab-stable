@@ -188,7 +188,7 @@ TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 #
 # Do an initial parse test.
 #
-$retval = SUEXEC($uid, $unix_gid, "webnscheck $nsfile",
+$retval = SUEXEC($uid, "$pid,$unix_gid", "webnscheck $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval != 0) {
@@ -221,7 +221,7 @@ flush();
 set_time_limit(0);
 
 # Run the script.
-$retval = SUEXEC($uid, $unix_gid,
+$retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webswapexp $rebootswitch " . ($reboot ? "-r " : "") .
 		 ($eventrestart ? "-e " : "") .
 		 "-s modify $pid $eid $nsfile",

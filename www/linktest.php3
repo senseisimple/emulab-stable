@@ -68,7 +68,7 @@ if ($linktest_pid && !isset($frame)) {
 	# Form submitted. Kill running linktest and zap back to the initial 
 	# page to redisplay the menu. 
 	# 
-	SUEXEC($uid, $unix_gid, "weblinktest -k $pid $eid",
+	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
 	       SUEXEC_ACTION_DIE);
 	header("Location: linktest.php3?pid=$pid&eid=$eid");
 	return;
@@ -116,7 +116,7 @@ function SPEWCLEANUP()
     global $fp;
 
     if (connection_aborted() && $fp) {
-	SUEXEC($uid, $unix_gid, "weblinktest -k $pid $eid",
+	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
 	       SUEXEC_ACTION_IGNORE);
 	pclose($fp);
 	exit();
@@ -129,7 +129,7 @@ function SPEWCLEANUP()
 if (isset($frame)) {
     if ($frame == "stopbutton") {
 	if (isset($submit) && $submit == "Stop") {
-	    SUEXEC($uid, $unix_gid, "weblinktest -k $pid $eid",
+	    SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
 		   SUEXEC_ACTION_IGNORE);
 	    
 	    echo "<html>
@@ -164,7 +164,7 @@ if (isset($frame)) {
     set_time_limit(0);
     
     $fp = popen("$TBSUEXEC_PATH ".
-		"$uid $unix_gid weblinktest -l $level $pid $eid",
+		"$uid $pid,$unix_gid weblinktest -l $level $pid $eid",
 		"r");
     if (! $fp) {
 	USERERROR("Linktest failed!", 1);

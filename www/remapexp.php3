@@ -126,7 +126,7 @@ fwrite($fp, $nsdata);
 fclose($fp);
 chmod($nsfile, 0666);
 
-$retval = SUEXEC($uid, $unix_gid,
+$retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webswapexp " . ($reboot ? "-r " : "") .
 		 ($eventrestart ? "-e " : "") .
   		 "-s modify $pid $eid $nsfile",
