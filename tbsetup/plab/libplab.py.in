@@ -214,6 +214,13 @@ class Plab:
             print "Got advertisement list:"
             print avail
 
+        if debug:
+            print "Pinging nodes in advertisement list"
+        avail = self.__getPingStatus(avail)
+        if debug:
+            print "Refined node list after ping verification:"
+            print avail
+
         known = self.__getKnownPnodes()
         if debug:
             print "Got known pnodes:"
@@ -276,6 +283,28 @@ class Plab:
             ret[ip] = nodeid
         return ret
 
+    def __getPingStatus(self, ips):
+        """
+        getFree helper function.  Uses fping to test the reachability of
+        the PLAB nodes returned from the dslice agent.  If a node doesn't
+        respond, it is not returned (i.e., not available)
+        """
+        from socket import inet_aton
+        fpin, fpout = os.popen2("fping -aA")
+        fpin.write("\n".join(ips))
+        fpin.close()
+        results = fpout.read().split()
+        # Get rid of potential junk in output
+        for ip in results:
+            try:
+                inet_aton(ip)
+            except:
+                if verbose:
+                    print "Removing junk from fping output:"
+                    print "\t%s" % ip
+                results.remove(ip)
+        return results
+        
     def __setVnodesStatus(self, pnodeids, status):
         """
         getFree helper function.  Sets the status of all vnodes that are
@@ -527,7 +556,15 @@ class Slice:
         Creates a new slice that initially contains no nodes.  Don't call
         this directly, use Plab.createSlice instead.
         """
-        self.slicename = "emulab_%s_%s" % (self.pid, self.eid)
+        # self.slicename = "emulab_%s_%s" % (self.pid, self.eid)
+        res = DBQueryFatal("select idx from experiments "
+                              "where pid=%s "
+                              "and eid=%s",
+                              (self.pid, self.eid))
+        if !len(res):
+            raise RuntimeError, "Didn't get any results while looking for idx"
+        ((eindex, ), ) = res
+        self.slicename = "emulab_%s_%s_%s" % (self.pid, self.eid, eindex)
         print "Creating Plab slice %s." % self.slicename
         self.privkey, self.pubkey = self.__genKeypair()
         try:
@@ -667,6 +704,7 @@ class Node:
         if debug:
             print "Obtained ticket:"
             print self.ticketdata
+
         nodemgr = self._createNodemgrProxy()
         try:
             self.leasedata = nodemgr.newleasevm(self.ticketdata,

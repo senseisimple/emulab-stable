@@ -5,6 +5,11 @@ import sys
 sys.path.append("@prefix@/lib")
 import getopt
 import libplab
+import xmlrpclib
+import time
+
+TRIES = 3
+SLEEPINT = 5
 
 def usage(me):
     print "Usage: %s [ -vd ] { alloc | free } pid eid nodeid" % me
@@ -12,6 +17,9 @@ def usage(me):
 
 def main(args):
     me = args[0]
+    alloctries = TRIES
+    setuptries = TRIES
+    
     try:
         command, pid, eid, nodeid = libplab.handleArgs(args[1:])
     except getopt.GetoptError:
@@ -21,21 +29,54 @@ def main(args):
 
     plab = libplab.Plab()
     slice = plab.loadSlice(pid, eid)
+
     if command == "alloc":
-        node = slice.createNode(nodeid)
-        try:
-            node.addKey("/root/.ssh/identity.pub")
-            node.emulabify()
-            # XXX This file is redundant
-            #node.putConfig("/etc/vnodeid", nodeid)
-            # Note that vnode_setup boots the node
-        except:
-            print "Node setup failed.  Cleaning up"
-            node.free()
-            raise
+        while 1:
+            try:
+                node = slice.createNode(nodeid)
+            except xmlrpclib.Fault, e:
+                print "XML-RPC Fault happened while attempting node alloc:"
+                print "Code: %s, Error: %s" % (e.faultCode, e.faultString)
+                alloctries = alloctries - 1
+                if alloctries > 0:
+                    print "Sleeping %s and trying again" % SLEEPINT
+                    time.sleep(SLEEPINT)
+                else:
+                    print "Giving up after %s tries" % TRIES
+                    sys.exit(1)
+            else:
+                break
+
+        while 1:
+            try:
+                node.addKey("/root/.ssh/identity.pub")
+                node.emulabify()
+                # XXX This file is redundant
+                # node.putConfig("/etc/vnodeid", nodeid)
+                # Note that vnode_setup boots the node
+            except:
+                print "Node setup failed."
+                setuptries = setuptries - 1
+                if setuptries > 0:
+                    print "Sleeping for %s seconds and retrying" % \
+                          SLEEPINT
+                    time.sleep(SLEEPINT)
+                else:
+                    print "Giving up after %s tries" % TRIES
+                    node.free()
+                    raise
+            else:
+                break
+
     elif command == "free":
-        node = slice.loadNode(nodeid)
+        try:
+            node = slice.loadNode(nodeid)
+        except:
+            print "Node %s wasn't really allocated" % nodeid
+            sys.exit(0)
+
         node.free()
+
     else:
         usage(me)
 
