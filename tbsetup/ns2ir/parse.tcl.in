@@ -393,8 +393,8 @@ proc parse_delay {dspec} {
 
 # We first run the script through NSE to check syntax errors
 file copy -force ${GLOBALS::nstbcompat} tb_compat.tcl
-if { [catch {exec nse ${GLOBALS::nsfile}}] == 1 } {
-    perror "Syntax check with NS failed\nerrorcode:$errorCode"
+if { [catch {exec nse ${GLOBALS::nsfile}} errMsg] == 1 } {
+    perror "Syntax check with NS failed\nerrorcode: $errorCode\n error msg: $errMsg"
 }
 
 if { ${GLOBALS::errors} != 1 } {
