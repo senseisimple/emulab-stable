@@ -584,6 +584,12 @@ PlayFrisbee(void)
 	log("Joined the team. ID is %u. File is %d chunks (%d blocks)",
 	    myid, TotalChunkCount, p->msg.join.blockcount);
 
+	/*
+	 * To avoid a blast of messages from a large number of clients,
+	 * delay a small random amount before continuing.
+	 */
+	fsleep(200000 + ((random() % 8) * 100000));
+
 	ChunkerStartup();
 
 	gettimeofday(&estamp, 0);
