@@ -42,6 +42,9 @@ Simulator instproc init {args} {
     # the last one created.
     $self instvar link_map
     array set link_map {}
+
+    # event list is a list of {time vnode vname otype etype args atstring}
+    $self set event_list {}
 }
 
 # node
@@ -143,6 +146,9 @@ Simulator instproc make-lan {nodelist bw delay args} {
 Simulator instproc run {} {
     $self instvar lanlink_list
     $self instvar node_list
+    $self instvar event_list
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
     var_import ::GLOBALS::errors
     var_import ::GLOBALS::irfile
     var_import ::GLOBALS::ran
@@ -177,6 +183,22 @@ Simulator instproc run {} {
 	}
     }
 
+    # Load even indexes
+    sql query $DB "select idx,type from event_objecttypes"
+    while {[set row [sql fetchrow $DB]] != ""} {
+	set idx [lindex $row 0]
+	set type [lindex $row 1]
+	set objtypes($type) $idx
+    }
+    sql endquery $DB
+    sql query $DB "select idx,type from event_eventtypes"
+    while {[set row [sql fetchrow $DB]] != ""} {
+        set idx [lindex $row 0]
+        set type [lindex $row 1]
+        set eventtypes($type) $idx
+    }
+    sql endquery $DB
+
     # If any errors occur stop here.
     if {$errors == 1} {return}
 
@@ -192,6 +214,23 @@ Simulator instproc run {} {
     }
     foreach vtype [array names vtypes] {
 	$vtype updatedb $DB
+    }
+    
+    catch "sql exec $DB \"drop table ${pid}_${eid}_events\""
+    sql exec $DB "CREATE TABLE ${pid}_${eid}_events ( \
+                idx        int unsigned NOT NULL auto_increment, \
+                time       float(10,3) NOT NULL default 0.000, \
+                vnode      varchar(32) NOT NULL default '', \
+                vname      varchar(20) NOT NULL default '', \
+                objecttype smallint unsigned NOT NULL default 0, \
+                eventtype  smallint unsigned NOT NULL default 0, \
+                arguments  tinytext default NULL, \
+                atstring   tinytext default NULL, \
+                PRIMARY KEY  (idx), \
+                KEY (vnode) \
+		) TYPE=MyISAM;"
+    foreach event $event_list {
+	sql exec $DB "insert into ${pid}_${eid}_events (time,vnode,vname,objecttype,eventtype,arguments,atstring) values ([lindex $event 0],\"[lindex $event 1]\",\"[lindex $event 2]\",$objtypes([lindex $event 3]),$eventtypes([lindex $event 4]),\"[lindex $event 5]\",\"[lindex $event 6]\")"
     }
 }
 
@@ -215,7 +254,7 @@ Simulator instproc connect {src dst} {
     set error 0
     if {! [$src info class Agent]} {
 	perror "\[connect] $src is not an Agent."
-	set error 1
+	set error 1OB
     }
     if {! [$dst info class Agent]} {
 	perror "\[connect] $dst is not an Agent."
@@ -224,6 +263,83 @@ Simulator instproc connect {src dst} {
     if {$error} {return}
     $src connect $dst
     $dst connect $src
+}
+
+# at <time> <event>
+# Known events:
+#   <traffic> start
+#   <traffic> stop
+#   <link> up
+#   <link> down
+#   ...
+Simulator instproc at {time event} {
+    # Check that time is float
+    if {[regexp {(^[0-9]+(\.[0-9]+)?$)|(^\.[0-9]+$)} $time] == 0} {
+	perror "Invalid time spec: $time"
+	return
+    }
+
+    set atstring "$time $event"
+
+    # Check otype/command
+    set obj [lindex $event 0]
+    set cmd [lindex $event 1]
+    set okargs 0
+    switch -- [$obj info class] {
+	"Application/Traffic/CBR" {
+	    set otype TRAFGEN
+	    switch -- $cmd {
+		"start" {set etype START}
+		"stop" {set etype STOP}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode $obj
+	    set vname {}
+	}
+	"Link" {
+	    set otype LINK
+	    switch -- $cmd {
+		"up" {set etype UP}
+		"down" {set etype DOWN}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname $obj
+	}
+	"Simulator" {
+	    set otype TBCONTROL
+	    switch -- $cmd {
+		"bandwidth" {
+		    set etype MODIFY
+		}
+		unknown {
+		    punsup "at $time $event"
+		    return
+		}
+	    }
+	    set vnode {}
+	    set vname {}
+	    set okargs 1
+	}
+	unknown {
+	    punsup "Unknown object type: at $time $event"
+	    return
+	}
+    }
+    if {($okargs == 0) && ([llength $event] > 2)} {
+	punsup "Too many arguments: at $time $event"
+	return
+    }
+    set args [lrange $event 2 end]
+
+    $self instvar event_list
+    lappend event_list [list $time $vnode $vname $otype $etype $args $atstring]
 }
 
 # unknown 

@@ -61,6 +61,16 @@ proc perror {msg} {
     set errors 1
 }
 
+###
+# punsup {msg}
+# Print an unsupported message if verbose is on.
+###
+proc punsup {msg} {
+	global ::GLOBALS::verbose
+	if {${::GLOBALS::verbose}} {
+	    puts stderr "Unsupported: $msg"
+	}
+}	
 
 # Parse Arguments
 
