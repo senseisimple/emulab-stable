@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -123,7 +123,17 @@ while (1) {
     my($count, $i, $query_result, $pending_result, $running_result);
     my(%pending_row);
     my $retry_wait = 60;
+    my $disabled;
 
+    if (! TBGetSiteVar("web/nologins", \$disabled)) {
+	print "Error getting sitevar 'web/nologins'. Waiting a bit ...\n";
+	goto pause;
+    }
+    if ($disabled) {
+	print "Web interface is disabled; waiting a bit ...\n";
+	sleep(60);
+	goto pause;
+    }
     if (! TBGetSiteVar("batch/retry_wait", \$retry_wait)) {
 	print "Error getting sitevar 'batch/retry_wait'. Waiting a bit ...\n";
 	goto pause;
