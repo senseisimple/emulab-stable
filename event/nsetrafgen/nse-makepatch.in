@@ -18,7 +18,7 @@ if [ ! -d dist-ns-allinone-2.26 ]; then
     tar xzf ns-allinone-2.26.tar.gz
     cd ..
     mv dist/ns-allinone-2.26 dist-ns-allinone-2.26
-    rmdir dist
+    rm -rf dist
 fi
 if [ -e $SRCDIR/nse.patch ]; then 
     mv $SRCDIR/nse.patch $SRCDIR/nse.patch.old
