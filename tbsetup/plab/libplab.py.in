@@ -1308,7 +1308,7 @@ class Node:
         forks and runs another private method to actually do the
         work!
         """
-        res = ForkCmd(node.renew, timeout = RENEW_TIMEOUT,
+        res = ForkCmd(self._renew, timeout = RENEW_TIMEOUT,
                       disable_sigs_parent = TERMSIGS)
         return res[0] | res[1]
 
