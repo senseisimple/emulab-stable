@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -27,20 +27,27 @@ if (!isset($nodeid) ||
     SPITERROR(400, "You must provide a node ID.");
 }
 $nodeid = addslashes($nodeid);
-if (!isset($file) ||
-    strcmp($file, "") == 0) {
-    SPITERROR(400, "You must provide an filename.");
-}
 if (!isset($key) ||
     strcmp($key, "") == 0) {
     SPITERROR(400, "You must provide an key.");
 }
-if (!isset($stamp) || !strcmp($stamp, "")) {
-    unset($stamp);
-}
-# We ignore MD5 for now. 
-if (!isset($md5) || !strcmp($md5, "")) {
-    unset($md5);
+
+#
+# A variant allows us to pass the Emulab source code back to an ElabInElab
+# experiment. 
+#
+if (!isset($elabinelab_source)) {
+    if (!isset($file) ||
+	strcmp($file, "") == 0) {
+	SPITERROR(400, "You must provide an filename.");
+    }
+    if (!isset($stamp) || !strcmp($stamp, "")) {
+	unset($stamp);
+    }
+    # We ignore MD5 for now. 
+    if (!isset($md5) || !strcmp($md5, "")) {
+	unset($md5);
+    }
 }
 
 #
@@ -56,7 +63,7 @@ TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 # We need the secret key. 
 #
 $query_result =
-    DBQueryFatal("select keyhash from experiments ".
+    DBQueryFatal("select keyhash,elab_in_elab from experiments ".
 		 "where pid='$pid' and eid='$eid'");
 
 if (mysql_num_rows($query_result) == 0) {
@@ -69,6 +76,38 @@ if (!isset($row["keyhash"]) || !$row["keyhash"]) {
 }
 if (strcmp($row["keyhash"], $key)) {
     SPITERROR(403, "Wrong Key!");
+}
+
+#
+# Special case. If requesting elab source code, the experiment must
+# be an elabinelab experiment. 
+#
+if (isset($elabinelab_source)) {
+    #
+    # Make sure the IP really matches. 
+    #
+    $realid = TBIPtoNodeID($REMOTE_ADDR);
+    if ($realid != $nodeid) {
+	SPITERROR(403, "Not an elabinelab experiment!");
+    }
+    
+    #
+    # Must be an elabinelab experiment of course.
+    #
+    if ($row["elab_in_elab"] != "1") {
+	SPITERROR(403, "Not an elabinelab experiment!");
+    }
+    
+    if (!is_readable("/usr/testbed/src/emulab-src.tar.gz")) {
+	SPITERROR(404, "Could not find $file!");
+    }
+    header("Content-Type: application/octet-stream");
+    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+    header("Cache-Control: no-cache, must-revalidate");
+    header("Pragma: no-cache");
+    flush();
+    readfile("/usr/testbed/src/emulab-src.tar.gz");
+    exit(0);
 }
 
 #
