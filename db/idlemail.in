@@ -99,10 +99,21 @@ if (($UID != 0) && (!TBAdmin($UID))) {
 if ($pid eq "" || $eid eq "") {
     # Normal mode
 
+    my @idle=();
+    # Grab a list of inactive expts, so we know who to reset when we're done
+    my $sql = "select pid,eid from experiments where swap_requests > 0";
+    my $q = DBQueryFatal($sql);
+    while (%r = $q->fetchhash()) {
+	$pid = $r{'pid'};
+	$eid = $r{'eid'};
+	push(@idle,"$pid:$eid");
+	if ($d) { print "Was idle: $pid/$eid\n"; }
+    }
+
     # Important note: this query only counts nodes in the
     # node_activity table, which are all local nodes. So no virt or
     # remote nodes get counted towards the node total.
-    my $sql  = <<EOT;
+    $sql  = <<EOT;
 select r.pid, e.gid, r.eid, swappable, swap_requests,
 round((unix_timestamp(now()) - unix_timestamp(last_swap_req))/3600,2)
 as lastreq, count(r.node_id) as nodes,
@@ -118,10 +129,11 @@ group by pid,eid having idle_time >= $threshold and nodes > 0
 order by pid,eid
 EOT
 
-    my $q = DBQueryFatal($sql);
+    $q = DBQueryFatal($sql);
 
     if ($d) { print $q->as_string; $q->dataseek(0); }
 
+    my @stillidle=();
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$gid = $r{'gid'};
@@ -137,6 +149,10 @@ EOT
             $stale=1;
         }
 	
+	# If it is in the query, it is still idle, even if we don't
+	# send a message this time through.
+	push(@stillidle,"$pid:$eid");
+
 	# We already know (from the query) that idletime>threshold.
 	# So check the swap requests and time of last request, to make
 	# sure we can send a message.
@@ -148,6 +164,23 @@ EOT
 	    print "$pid/$eid got msg #$swapreqs only $lastreq hrs ago\n";
 	}
     }
+
+    # Now reset counters for expts that aren't idle anymore.
+    foreach $expt (@idle) {
+	my ($pid,$eid)=split(":",$expt);
+	my $found=0;
+	foreach $e (@stillidle) {
+	    if ($e eq $expt) { $found=1; last; }
+	}
+	if (!$found) {
+	    if ($d) { print "Not idle: $pid/$eid\n"; }
+	    DBQueryFatal("update experiments set swap_requests='' ".
+			 "where pid='$pid' and eid='$eid'");
+	} else {
+	    if ($d) { print "Still idle: $pid/$eid\n"; }
+	}
+    }
+
 } else {
     # pid/eid mode - only check pid/eid, and let $f force sending,
     # even if msg was sent recently or expt isn't idle long enough.
