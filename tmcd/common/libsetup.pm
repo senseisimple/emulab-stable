@@ -2354,6 +2354,7 @@ sub bootsetup()
     #
     if (-e TMNICKNAME) {
 	($oldpid) = check_nickname();
+	unlink TMNICKNAME;
     }
     
     #
