@@ -503,6 +503,9 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		 * is indicated by a null string. If nothing matched,
 		 * and its not an empty token, it must be the actual
 		 * command and arguments. Break out.
+		 *
+		 * Note that rdata will point to any text after the command.
+		 *
 		 */
 		if (*bp) {
 			break;
@@ -602,8 +605,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Execute it.
 	 */
-	bp += strlen(command_array[i].cmdname);
-
 #ifdef	WITHSSL
 	cp = isssl ? "ssl:yes" : "ssl:no";
 #else
@@ -614,12 +615,12 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * both for privacy and to keep our syslog smaller.
 	 */
 	if (command_array[i].func == dolog)
-		info("%s: %s log %d chars\n", nodeid, cp, strlen(bp));
+		info("%s: %s log %d chars\n", nodeid, cp, strlen(rdata));
 	else
 		info("%s: vers:%d %s %s\n", nodeid,
 		     version, cp, command_array[i].cmdname);
 
-	err = command_array[i].func(sock, nodeid, bp, istcp, version);
+	err = command_array[i].func(sock, nodeid, rdata, istcp, version);
 
 	if (err)
 		info("%s: %s: returned %d\n",
@@ -2354,6 +2355,8 @@ COMMAND_PROTOTYPE(dostate)
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
+
+	info("%s\n", rdata);
 
 	/*
 	 * Dig out state that the node is reporting
