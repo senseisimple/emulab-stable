@@ -882,7 +882,9 @@ function SHOWIMAGEID($imageid, $edit) {
 #
 function SHOWNODE($node_id) {
     $query_result =
-	DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
+	DBQueryFatal("select n.*,r.vname from nodes as n ".
+		     "left join reserved as r on n.node_id=r.node_id ".
+		     "where n.node_id='$node_id'");
     
     if (mysql_num_rows($query_result) == 0) {
 	TBERROR("The node $node_id is not a valid nodeid!", 1);
@@ -892,6 +894,7 @@ function SHOWNODE($node_id) {
 
     $node_id            = $row[node_id]; 
     $type               = $row[type];
+    $vname		= $row[vname];
     $bios               = $row[bios_version];
     $def_boot_osid      = $row[def_boot_osid];
     $def_boot_path      = $row[def_boot_path];
@@ -928,7 +931,14 @@ function SHOWNODE($node_id) {
     echo "<tr>
               <td>Node ID:</td>
               <td class=left>$node_id</td>
-      </tr>\n";
+          </tr>\n";
+
+    if ($vname) {
+	echo "<tr>
+                  <td>Virtual Name:</td>
+                  <td class=left>$vname</td>
+              </tr>\n";
+    }
 
     echo "<tr>
               <td>Node Type:</td>

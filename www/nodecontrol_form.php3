@@ -24,7 +24,9 @@ if (!isset($node_id) ||
 # Check to make sure that this is a valid nodeid
 #
 $query_result =
-    DBQueryFatal("SELECT * FROM nodes WHERE node_id='$node_id'");
+    DBQueryFatal("select n.*,r.vname from nodes as n ".
+		 "left join reserved as r on n.node_id=r.node_id ".
+		 "where n.node_id='$node_id'");
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("The node $node_id is not a valid nodeid!", 1);
 }
@@ -43,6 +45,7 @@ if (! $isadmin) {
 
 $node_id            = $row[node_id]; 
 $type               = $row[type];
+$vname		    = $row[vname];
 $def_boot_osid      = $row[def_boot_osid];
 $def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
@@ -93,6 +96,15 @@ echo "<tr>
               <input type=\"readonly\" name=\"node_id\" value=\"$node_id\">
               </td>
       </tr>\n";
+
+if ($vname) {
+    echo "<tr>
+              <td>Virtual Name:</td>
+              <td class=left> 
+                  <input type=readonly name=vname value='$vname'>
+                  </td>
+          </tr>\n";
+}
 
 echo "<tr>
           <td>Node Type:</td>
