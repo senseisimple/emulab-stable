@@ -586,7 +586,8 @@ CREATE TABLE nodes (
   ipport_high int(11) NOT NULL default '20000',
   sshdport int(11) NOT NULL default '11000',
   jailflag tinyint(3) unsigned NOT NULL default '0',
-  PRIMARY KEY  (node_id)
+  PRIMARY KEY  (node_id),
+  KEY phys_nodeid (phys_nodeid)
 ) TYPE=MyISAM;
 
 --
