@@ -493,7 +493,7 @@ $message .=
     "please include the output in your message to $TBOPS\n";
 
 SENDMAIL("$user_name <$user_email>",
-	 "Experiment $pid/$eid $action",
+	 "Experiment $pid/$eid \u$action",
 	 $message,
 	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
