@@ -133,6 +133,8 @@ DBQueryWarn("DELETE from delays where pid='$pid' and eid='$eid'")
     or $errors++;
 DBQueryWarn("DELETE from vlans  where pid='$pid' and eid='$eid'")
     or $errors++;
+DBQueryWarn("DELETE from portmap where pid='$pid' and eid='$eid'")
+    or $errors++;
 
 # Accounting info.
 TBSetExpSwapTime($pid, $eid);
