@@ -42,3 +42,16 @@
        Note that the osids are a little odd on boss, where the early
        ones had osid=osname. On other testbeds, need to check the
        actual value of the osids.
+
+1.115  Add node_activity table for new slothd stuff: (Mac)
+
+CREATE TABLE node_activity (
+  node_id varchar(10) NOT NULL default '',
+  last_tty_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_net_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_cpu_act datetime NOT NULL default '0000-00-00 00:00:00',
+  last_ext_act datetime NOT NULL default '0000-00-00 00:00:00',
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+	No population of the table is necessary.
