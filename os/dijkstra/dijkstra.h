@@ -26,7 +26,9 @@ public:
         message = "Invalid source argument: name=" + sourceName;
     }
 
-    virtual char const * what(void) const
+    virtual ~InvalidSourceException() throw() {}
+
+    virtual char const * what(void) const throw()
     {
         return message.c_str();
     }
@@ -46,13 +48,15 @@ public:
                    intToString(firstHop));
     }
 
+    virtual ~RouteNotFoundException() throw() {}
+
     void setMessage(string newSource, string newDest, string newFirstHop)
     {
         message = "Route not found: source=" + newSource + " dest=" + newDest
             + " firstHop=" + newFirstHop;
     }
 
-    virtual char const * what(void) const
+    virtual char const * what(void) const throw()
     {
         return message.c_str();
     }
@@ -88,7 +92,9 @@ public:
             + intToString(maxHostCount + 1) + ".";
     }
 
-    virtual char const * what(void) const
+    virtual ~TooManyHostsException() throw() {}
+
+    virtual char const * what(void) const throw()
     {
         return message.c_str();
     }

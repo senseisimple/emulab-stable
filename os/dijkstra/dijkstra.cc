@@ -16,13 +16,13 @@
 #include <cstdlib>
 #include <vector>
 
+using namespace std;
+
 #include "Exception.h"
 #include "dijkstra.h"
 #include "SingleSource.h"
 #include "bitmath.h"
 #include "IpTree.h"
-
-using namespace std;
 
 // The command line options given to us.
 namespace arg

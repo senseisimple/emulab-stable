@@ -22,6 +22,7 @@ public:
         : message(error)
     {
     }
+    virtual ~StringException() throw() {}
     virtual char const * what() const throw()
     {
         return message.c_str();
@@ -45,6 +46,7 @@ public:
         : StringException("Invalid Argument: " + error)
     {
     }
+    virtual ~InvalidArgumentException() throw() {}
 };
 
 #endif

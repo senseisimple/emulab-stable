@@ -20,13 +20,15 @@ public:
         setMessage(intToString(source), intToString(dest), intToString(cost));
     }
 
+    virtual ~EdgeInsertException() throw() {}
+
     void setMessage(string newSource, string newDest, string newCost)
     {
         message = "Could not insert edge: source=" + newSource + ", dest="
             + newDest + ", cost=" + newCost;
     }
 
-    virtual char const * what(void)
+    virtual char const * what(void) const throw()
     {
         return message.c_str();
     }

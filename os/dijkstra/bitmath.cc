@@ -9,6 +9,8 @@
 #include <string>
 #include <sstream>
 
+using namespace std;
+
 #include "Exception.h"
 #include "bitmath.h"
 

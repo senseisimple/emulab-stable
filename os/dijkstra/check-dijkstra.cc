@@ -28,11 +28,12 @@
 #include <list>
 #include <sstream>
 #include <stack>
+#include <iostream>
+
+using namespace std;
 
 #include "Exception.h"
 #include "bitmath.h"
-
-using namespace std;
 
 typedef long long int64;
 
@@ -43,6 +44,7 @@ public:
         : StringException("No route exists: " + error)
     {
     }
+    virtual ~NoRouteException() throw() {}
 };
 
 class InvalidIPOnPathException : public StringException
@@ -58,6 +60,7 @@ public:
                << ipToString(nextIP);
         addToMessage(buffer.str());
     }
+    virtual ~InvalidIPOnPathException() throw() {}
 };
 
 class InvalidNodeOnPathException : public StringException
@@ -72,6 +75,7 @@ public:
                << ipToString(destination) << " FirstHop IP: "
                << ipToString(nextIP) << " Offending Node: " << next;
     }
+    virtual ~InvalidNodeOnPathException() throw() {}
 };
 
 class ImpossibleRouteException : public StringException
@@ -86,6 +90,7 @@ public:
                << ipToString(destIP) << " FirstHop: " << ipToString(firstHop);
         addToMessage(buffer.str());
     }
+    virtual ~ImpossibleRouteException() throw() {}
 };
 
 class CircularRouteException : public exception
@@ -97,6 +102,8 @@ public:
         message = "Circular Route: Destination IP: " + ipToString(destination)
             + " Path: ";
     }
+
+    virtual ~CircularRouteException() throw() {}
 
     void setPath(stack<size_t> & newPath)
     {
@@ -111,7 +118,7 @@ public:
         message += buffer.str();
     }
 
-    virtual char const * what() const
+    virtual char const * what() const throw()
     {
         return message.c_str();
     }
@@ -127,6 +134,7 @@ public:
         : StringException("Could not open file: " + file)
     {
     }
+    virtual ~FailedFileOpenException() throw() {}
 };
 
 class LogException : public StringException
@@ -136,6 +144,7 @@ public:
         : StringException(string("Log Error: ") + other.what())
     {
     }
+    virtual ~LogException() throw() {}
 };
 
 class NoRouteFileException : public StringException
@@ -145,6 +154,7 @@ public:
         : StringException("No route file specified. You need to add a 'routefile=<filename>' argument. See README for details.")
     {
     }
+    virtual ~NoRouteFileException() throw() {}
 };
 
 class NoIpFileException : public StringException
@@ -154,6 +164,7 @@ public:
         : StringException("No ip file specified. You need to add an 'ipfile=<filename>' argument. See README for details.")
     {
     }
+    virtual ~NoIpFileException() throw() {}
 };
 
 int maskToMaskSize(IPAddress mask)
