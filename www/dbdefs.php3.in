@@ -1056,7 +1056,8 @@ function TBEventCount($pid, $eid)
 function TBExpUidLastLogins($pid, $eid)
 {
     $query_result =
-	DBQueryFatal("select n.* from nodeuidlastlogin as n ".
+	DBQueryFatal("select n.*, to_days(now())-to_days(n.date) as daysidle ".
+	             "from nodeuidlastlogin as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join experiments as e ".
 		     " on r.eid=e.eid and r.pid=e.pid ".

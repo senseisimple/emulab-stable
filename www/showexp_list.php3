@@ -19,11 +19,17 @@ if (! isset($showtype))
     $showtype="active";
 if (! isset($sortby))
     $sortby = "normal";
+if (! isset($idledays))
+    $idledays = "2";
 
 echo "<b>Show:
          <a href='showexp_list.php3?showtype=active&sortby=$sortby'>active</a>,
-         <a href='showexp_list.php3?showtype=batch&sortby=$sortby'>batch</a>,
-         <a href='showexp_list.php3?showtype=all&sortby=$sortby'>all</a>.
+         <a href='showexp_list.php3?showtype=batch&sortby=$sortby'>batch</a>,";
+if ($isadmin) 
+     echo "\n<a href='showexp_list.php3?showtype=idle&sortby=$sortby".
+       "&idledays=$idledays'>idle</a>,";
+
+echo "\n       <a href='showexp_list.php3?showtype=all&sortby=$sortby'>all</a>.
       </b><br><br>\n";
 
 #
@@ -40,6 +46,11 @@ elseif (! strcmp($showtype, "active")) {
 elseif (! strcmp($showtype, "batch")) {
     $clause = "e.batchmode=1";
     $title  = "Batch";
+}
+elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
+    $clause = "(e.state='$TB_EXPTSTATE_ACTIVE') and (to_days(now())-to_days(expt_swapped)>=$idledays)";
+    $title  = "Idle";
+    $idle=1;
 }
 else {
     $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
@@ -114,6 +125,8 @@ if (mysql_num_rows($experiments_result)) {
 
     if ($isadmin)
 	echo "<td width=17% align=center>Last Login</td>\n";
+    if ($idle)
+      echo "<td width=4% align=center>Swap Req.</td>\n";
 
     echo "    <td width=60%>
                <a href='showexp_list.php3?showactive=$showactive&sortby=name'>
@@ -132,6 +145,22 @@ if (mysql_num_rows($experiments_result)) {
 	$name = $row[expt_name];
 	$date = $row[d];
 
+	if ($isadmin) {
+	    $foo = "&nbsp;";
+	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
+	        if ($idle && $lastexpnodelogins["daysidle"]<$idledays)
+		  continue;
+		$foo = $lastexpnodelogins["date"] . " " .
+		 "(" . $lastexpnodelogins["uid"] . ")";
+	    } elseif (TBExptState($pid,$eid)=="active") {
+	        $foo = "$date Swapped In";
+	    }
+	}
+
+	if ($idle) $foo .= "</td><td align=center valign=center>
+<a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
+<img src=\"redball.gif\"></a>";
+	
 	$usage_query =
 	    DBQueryFatal("select nt.class, count(*) from reserved as r ".
 			 "left join nodes as n ".
@@ -147,6 +176,9 @@ if (mysql_num_rows($experiments_result)) {
 	  $usage[$n[0]] = $n[1];
 	}
 
+	# skip experiments with no nodes (for now, node==pc)
+	if ($usage["pc"]==0) continue;
+
 	$total_pcs += $usage["pc"];
 	$total_sharks += $usage["shark"];
 
@@ -156,18 +188,7 @@ if (mysql_num_rows($experiments_result)) {
                        $eid</A></td>
                 <td>".$usage["pc"]." &nbsp;</td>\n";
 
-	if ($isadmin) {
-	    $foo = "&nbsp;";
-
-	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
-		$foo = $lastexpnodelogins["date"] . " " .
-		 "(" . $lastexpnodelogins["uid"] . ")";
-	    } elseif (TBExptState($pid,$eid)=="active" && $usage["pc"]>0) {
-	        $foo = "$date Swapped In";
-	    }
-	    
-	    echo "<td>$foo</td>\n";
-	}
+	if ($isadmin) echo "<td>$foo</td>\n";
 
         echo "<td>$name</td>
                 <td><A href='showuser.php3?target_uid=$huid'>
@@ -175,9 +196,9 @@ if (mysql_num_rows($experiments_result)) {
                </tr>\n";
     }
     echo "</table>\n";
-    echo "<center>\n<h2>Total PCs in use: $total_pcs<br>\n";#</h2>\n";
-    echo "Total Sharks in use: $total_sharks<br>\n";
-    echo "Total Nodes in use: ",$total_sharks+$total_pcs,"</h2>\n</center>\n";
+    echo "<center>\n<h2>Total PCs in $title experiments: $total_pcs<br>\n";#</h2>\n";
+    echo "Total Sharks in $title experiments: $total_sharks<br>\n";
+    echo "Total Nodes in $title experiments: ",$total_sharks+$total_pcs,"</h2>\n</center>\n";
 }
 
 #
