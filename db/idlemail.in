@@ -255,7 +255,7 @@ EOT
         $q = DBQueryFatal($sql);
 	if ($d) { print $sql,"\n",$q->as_string; $q->dataseek(0); }
 	# enable for extra debugging
-	if (1 && $q->numrows()>0) {
+	if (0 && $q->numrows()>0) {
 	    # SENDMAIL(To, Subject, Message, [From], [More Headers],...)
 	    SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
 		     $q->as_string);
@@ -288,7 +288,7 @@ EOT
         $q = DBQueryFatal($sql);
 	if ($d) { print $q->as_string; $q->dataseek(0); }
 	# enable for extra debugging
-	if (1 && $q->numrows()>0) {
+	if (0 && $q->numrows()>0) {
 	    # SENDMAIL(To, Subject, Message, [From], [More Headers],...)
 	    SENDMAIL("Mac <newbold\@flux.utah.edu>","idlemail warnings",
 		     $q->as_string);
