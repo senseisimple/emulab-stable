@@ -111,7 +111,7 @@ while (1) {
     if (! TBExptGetLogFile($pid, $eid, \$tmp) || $tmp ne $logname) {
 	last;
     }
-    sleep(3);
+    sleep(2);
 }
 close(LOG);
 exit(0);
