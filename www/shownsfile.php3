@@ -130,7 +130,7 @@ if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
     echo "<table cellpadding='0' cellspacing='0' border='0' class='stealth'>
 	    <tr><td class='stealth' width='32'>&nbsp;</td>
             <td class='stealth'><center>
-		<img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center />
+		<img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center>
 	    <h5>
 	      zoom: ";
     if ($zoom == 1.00) { 
