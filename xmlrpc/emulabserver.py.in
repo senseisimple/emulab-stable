@@ -3063,11 +3063,40 @@ class elabinelab:
             pass
 
         (exitval, output) = runcommand(TBDIR + "/bin/power " + argstr)
-#        (exitval, output) = runcommand("/bin/echo " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
+    
+    #
+    # node tip acl stuff so inner console link works, redirecting user
+    # to where the real console is (outer emulab).
+    # 
+    def console(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("node",))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # Funnel up to node.console() routine
+        # 
+        node_instance = node(readonly=self.readonly);
+        
+        return node_instance.console(version, argdict);
     
     #
     # vlan control
