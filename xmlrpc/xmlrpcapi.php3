@@ -977,6 +977,33 @@ experiments.
    </tr>
   </table>
 
+
+  <br>
+  <li><tt><b>eventsys_control</b></tt>: Control the experiment event scheduler.
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>op</tt></td>
+    <td>string</td>
+    <td>One of start, stop, or replay (stop and then start))</td>
+  </tr>
+  </table>
+  
+
   <br>
   <li><tt><b>link_config</b></tt>: Change the link characteristics for a
   wireless lan. Note that the lan must already be a wireless link; you
@@ -1042,6 +1069,7 @@ experiments.
   tutorial</a> to see what parameters can be changed.
   <br>
 
+
   <br>
   <li><tt><b>reboot</b></tt>: Reboot all nodes in an experiment.
   The required arguments are:<br><br>
@@ -1074,6 +1102,19 @@ experiments.
     <td>boolean</td>
     <td>false</td>
     <td>If true, wait synchronously for all nodes to complete their reboot</td>
+   </tr>
+   <tr>
+    <td><tt>reconfig</tt></td>
+    <td>boolean</td>
+    <td>false</td>
+    <td>If true, do a soft reconfiguration instead of rebooting</td>
+   </tr>
+   <tr>
+    <td><tt>power</tt></td>
+    <td>boolean</td>
+    <td>false</td>
+    <td>If true, power cycle the node; do not try to reboot cleanly.
+        Be very careful with this option!</td>
    </tr>
   </table>
   
@@ -1115,10 +1156,11 @@ experiments.
     the reload to proceed in the background (not a good idea)</td>
    </tr>
    <tr>
-    <td><tt>imageid</tt></td>
+    <td><tt>imagename</tt></td>
     <td>string</td>
     <td>&nbsp;</td>
-    <td>Specify the imageid to load on all of the nodes</td>
+    <td>Specify the imagename to load on all of the nodes. See next
+    option for more info</td>
    </tr>
    <tr>
     <td><tt>imageproj</tt></td>
@@ -1128,9 +1170,49 @@ experiments.
     system will look in the project of the experiment, and then in the
     system project for globally shared images.</td>
    </tr>
+   <tr>
+    <td><tt>imageid</tt></td>
+    <td>string</td>
+    <td>&nbsp;</td>
+    <td>Specify image to load using Emulab internal ID for the image</td>
+   </tr>
+   <tr>
+    <td><tt>reboot</tt></td>
+    <td>boolean</td>
+    <td>true</td>
+    <td>If false, the nodes will not be rebooted; you will need to do
+    that yourseld. The default is true (reboot nodes)</td>
+   </tr>
   </table>
 
   
+  <br>
+  <li><tt><b>savelogs</b></tt>: Save off the console tip logs for all of the
+  physical nodes in your experiment. The logs are place in a subdir of your
+  experiment directory. The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>action</tt></td>
+    <td>string</td>
+    <td>One of start, stop, or replay (stop and then start))</td>
+  </tr>
+  </table>
+  
+
   <br>
   <li><tt><b>thumbnail</b></tt>: Get the thumbnail image of the experiment
   topology.  The required arguments are:<br><br>
@@ -1187,7 +1269,21 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       <td><tt>wait</tt></td>
       <td>boolean</td>
       <td>false</td>
-      <td>If true, wait synchronously for all nodes to complete their reboot</td>
+      <td>If true, wait synchronously for all nodes to complete their
+          reboot</td>
+     </tr>
+     <tr>
+      <td><tt>reconfig</tt></td>
+      <td>boolean</td>
+      <td>false</td>
+      <td>If true, do a soft reconfiguration instead of rebooting</td>
+     </tr>
+     <tr>
+      <td><tt>power</tt></td>
+      <td>boolean</td>
+      <td>false</td>
+      <td>If true, power cycle the node; do not try to reboot cleanly.
+          Be very careful with this option!</td>
      </tr>
     </table>
 
@@ -1207,9 +1303,9 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       <td>The node to create the image from</td>
      </tr>
      <tr>
-      <td><tt>imageid</tt></td>
+      <td><tt>imagename</tt></td>
       <td>string</td>
-      <td>The image id (descriptor)</td>
+      <td>The image name (descriptor)</td>
      </tr>
     </table>
 
@@ -1228,7 +1324,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
        reboot</td>
      </tr>
      <tr>
-      <td><tt>proj</tt></td>
+      <td><tt>imageproj</tt></td>
       <td>string</td>
       <td>emulab-ops</td>
       <td>The project ID in which the imageid was created; defaults to
@@ -1239,7 +1335,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
     <br>
     <li><tt><b>reload</b></tt>: Reload the disks on all nodes specified.
     You may specify an imageid to use for all nodes, or you can
-    allow the system to load the default imageid for each node. 
+    allow the system to load the default imageid for each node.
     The required arguments are:<br><br>
     <table cellpadding=2>
      <tr>
@@ -1269,7 +1365,7 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       the reload to proceed in the background (not a good idea)</td>
      </tr>
      <tr>
-      <td><tt>imageid</tt></td>
+      <td><tt>imagename</tt></td>
       <td>string</td>
       <td>&nbsp;</td>
       <td>Specify the imageid to load on all of the nodes</td>
@@ -1281,8 +1377,66 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       <td>Specify the Emulab project ID of the imageid. By default the
       system will look in the system project for globally shared images.</td>
      </tr>
+     <tr>
+      <td><tt>imageid</tt></td>
+      <td>string</td>
+     <td>&nbsp;</td>
+      <td>Specify image to load using Emulab internal ID for the image</td>
+     </tr>
+     <tr>
+      <td><tt>reboot</tt></td>
+      <td>boolean</td>
+      <td>true</td>
+      <td>If false, the nodes will not be rebooted; you will need to do
+      that yourseld. The default is true (reboot nodes)</td>
+     </tr>
     </table>
     
+    <br>
+    <li><tt><b>adminmode</b></tt>: Boot node into <em>administration</em>
+    mode. The node is rebooted, and its OSID is set to boot FreeBSD
+    from a memory resident filesystem. This allows you to operate on
+    the disk while the disk is offline, say to install a new OS, take a
+    snapshot,etc. The required arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <th>Name</th><th>Type</th><th>Description</th>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>mode</tt></td>
+      <td>string</td>
+      <td>One of "on" or "off". Off returns the node to its previous OSID</td>
+     </tr>
+     <tr>
+      <td><tt>node</tt></td>
+      <td>string</td>
+      <td>Node name (pcXXX)</td>
+     </tr>
+    </table>
+  
+    <br>
+    The optional arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <th>Name</th><th>Type</th><th>Default</th><th>Description</th>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>reboot</tt></td>
+      <td>boolean</td>
+      <td>true</td>
+      <td>If true, reboot the node. If false, reset the OSID, but do
+      not reboot the node; you must do that yourself.
+     </tr>
+     <tr>
+      <td><tt>wait</tt></td>
+      <td>boolean</td>
+      <td>false</td>
+      <td>If true, wait synchronously for node to complete its reboot</td>
+     </tr>
+    </table>
+      
   </ul>
 </ul>
 

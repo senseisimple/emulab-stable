@@ -164,6 +164,31 @@ def CheckRequiredArgs(argdict, arglist):
     return None
 
 #
+# Check user permission to access an experiment.
+# 
+def CheckExptPermission(pid, eid):
+    res = DBQueryFatal("SELECT gid FROM experiments "
+                       "WHERE pid=%s and eid=%s",
+                       (pid, eid))
+
+    if len(res) == 0:
+        return EmulabResponse(RESPONSE_ERROR,
+                              output="No such experiment: " +
+                              pid + "/" + eid)
+
+    gid = res[0][0]
+        
+    res = DBQueryFatal("SELECT trust FROM group_membership "
+                       "WHERE uid=%s and pid=%s and gid=%s",
+                       (UID, pid, gid))
+
+    if len(res) == 0:
+        return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output=("You do not have permission to " +
+                                      "access experiment: " + pid + "/" + eid))
+    return None
+
+#
 # This class implements the server side of the XMLRPC interface to emulab as a
 # whole.
 #
@@ -806,14 +831,20 @@ class experiment:
                 pass
             elif opt == "swappable":
                 if not xbool(val):
+                    if not argdict.has_key("noswap_reason"):
+                        return EmulabResponse(RESPONSE_BADARGS,
+                                       output="Must supply noswap reason!");
                     argstr += " -S "
-                    argstr += argdict["noswap_reason"]
+                    argstr += escapeshellarg(argdict["noswap_reason"])
                     pass
                 pass
             elif opt == "noswap_reason":
                 pass
             elif opt == "idleswap":
                 if val == 0:
+                    if not argdict.has_key("noidleswap_reason"):
+                        return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Must supply noidleswap reason!");
                     argstr += " -L "
                     argstr += escapeshellarg(argdict["noidleswap_reason"])
                     pass
@@ -1037,7 +1068,14 @@ class experiment:
                 re.match("^[-\w]*$", argdict["exp"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed proj/exp!")
-        
+
+        #
+        # Check permission.
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
         res = DBQueryFatal("select state from experiments "
                            "where pid=%s and eid=%s",
                            (argdict["proj"], argdict["exp"]))
@@ -1097,19 +1135,11 @@ class experiment:
                                   argdict["proj"] + "/" + argdict["exp"])
 
         #
-        # Check permission. This needs to be a lib routine!
+        # Check permission.
         #
-        state = res[0][0]
-        gid   = res[0][1]
-        res   = DBQueryFatal("SELECT trust FROM group_membership "
-                             "WHERE uid=%s and pid=%s and gid=%s",
-                             (UID, argdict["proj"], gid))
-
-        if len(res) == 0:
-            return EmulabResponse(
-                RESPONSE_ERROR,
-                output=("You do not have permission to access experiment: "
-                        + argdict["proj"] + "/" + argdict["exp"]))
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
 
         #
         # First, see if the experiment is already in the desired state,
@@ -1216,6 +1246,13 @@ class experiment:
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Illegal characters in arguments!")
 
+        #
+        # Check permission.
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
         res = DBQueryFatal("select state from experiments "
                            "where pid=%s and eid=%s",
                            (argdict["proj"], argdict["exp"]))
@@ -1233,7 +1270,8 @@ class experiment:
                 "n.eventstate,"
                 "(unix_timestamp(now()) - unix_timestamp( "
                 "greatest(na.last_tty_act,na.last_net_act,na.last_cpu_act,"
-                "na.last_ext_act))),ni.load_1min,ni.load_5min,ni.load_15min"
+                "na.last_ext_act))),ni.load_1min,ni.load_5min,ni.load_15min,"
+                "n.phys_nodeid "
                 "  from reserved as r "
                 "left join nodes as n on r.node_id=n.node_id "
                 "left join node_status as ns on ns.node_id=n.node_id "
@@ -1249,6 +1287,7 @@ class experiment:
                 tmp["name"] = res[0]
                 tmp["node"] = res[1]
                 tmp["type"] = res[2]
+                tmp["pnode"] = res[10];
                 if not osmappings.has_key(res[3]):
                     osres = DBQuery(
                         "SELECT osname from os_info where osid=%s", (res[3],))
@@ -1489,6 +1528,16 @@ class experiment:
                     argstr += " -w "
                     pass
                 pass
+            elif opt == "power":
+                if xbool(val):
+                    argstr += " -f "
+                    pass
+                pass
+            elif opt == "reconfig":
+                if xbool(val):
+                    argstr += " -c "
+                    pass
+                pass
             pass
 
         argstr += " -e "
@@ -1529,9 +1578,18 @@ class experiment:
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt == "imageid":
+            elif opt == "imagename":
                 argstr += " -i "
                 argstr += escapeshellarg(val)
+                pass
+            elif opt == "imageid":
+                argstr += " -m "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "reboot":
+                if not xbool(val):
+                    argstr += " -r "
+                    pass
                 pass
             pass
 
@@ -1570,29 +1628,11 @@ class experiment:
                                   output="Illegal characters in arguments!")
 
         #
-        # Check permission. This needs to be a lib routine!
+        # Check permission.
         #
-        res = DBQueryFatal("SELECT gid FROM experiments "
-                           "WHERE pid=%s and eid=%s",
-                           (argdict["proj"], argdict["exp"]))
-
-        if len(res) == 0:
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No such experiment: " +
-                                  argdict["proj"] + "/" + argdict["exp"])
-
-        gid = res[0][0]
-        
-        res = DBQueryFatal("SELECT trust FROM group_membership "
-                           "WHERE uid=%s and pid=%s and gid=%s",
-                           (UID, argdict["proj"], gid))
-
-        if len(res) == 0:
-            return EmulabResponse(
-                RESPONSE_ERROR,
-                output=("You do not have permission to access experiment: "
-                        + argdict["proj"] + "/" + argdict["exp"]))
-
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
 
         res = DBQuery("SELECT * FROM experiments "
                       "WHERE pid=%s and eid=%s",
@@ -1669,28 +1709,11 @@ class experiment:
                                   output="Illegal characters in arguments!")
 
         #
-        # Check permission. This needs to be a lib routine!
+        # Check permission. 
         #
-        res = DBQueryFatal("SELECT gid FROM experiments "
-                           "WHERE pid=%s and eid=%s",
-                           (argdict["proj"], argdict["exp"]))
-
-        if len(res) == 0:
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No such experiment: " +
-                                  argdict["proj"] + "/" + argdict["exp"])
-
-        gid = res[0][0]
-        
-        res = DBQueryFatal("SELECT trust FROM group_membership "
-                           "WHERE uid=%s and pid=%s and gid=%s",
-                           (UID, argdict["proj"], gid))
-
-        if len(res) == 0:
-            return EmulabResponse(
-                RESPONSE_ERROR,
-                output=("You do not have permission to access experiment: "
-                        + argdict["proj"] + "/" + argdict["exp"]))
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
 
         argstr  = ""
         argstr += " " + escapeshellarg(argdict["proj"])
@@ -1724,30 +1747,13 @@ class experiment:
                 re.match("^[-\w]*$", argdict["exp"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed proj/exp!")
-        
+
         #
-        # Check permission. This needs to be a lib routine!
+        # Check permission. 
         #
-        res = DBQueryFatal("SELECT gid FROM experiments "
-                           "WHERE pid=%s and eid=%s",
-                           (argdict["proj"], argdict["exp"]))
-
-        if len(res) == 0:
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No such experiment: " +
-                                  argdict["proj"] + "/" + argdict["exp"])
-
-        gid = res[0][0]
-        
-        res = DBQueryFatal("SELECT trust FROM group_membership "
-                           "WHERE uid=%s and pid=%s and gid=%s",
-                           (UID, argdict["proj"], gid))
-
-        if len(res) == 0:
-            return EmulabResponse(
-                RESPONSE_FORBIDDEN,
-                output=("You do not have permission to access experiment: "
-                        + argdict["proj"] + "/" + argdict["exp"]))
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
 
         dbres = DBQueryFatal("select vname,vis_type,x,y from vis_nodes "
                              "where pid=%s and eid=%s",
@@ -1818,6 +1824,244 @@ class experiment:
                               value=result,
                               output="ok")
 
+    #
+    # Control the event system.
+    #
+    def eventsys_control(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp", "action"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"]) and
+                re.match("^[-\w]*$", argdict["action"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp/op!")
+
+        if not (argdict["action"] == "start" or
+                argdict["action"] == "stop" or
+                argdict["action"] == "replay"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                               output="action must be one of start|stop|replay")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        argstr  = ""
+        argstr += " " + escapeshellarg(argdict["action"])
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/eventsys_control "
+                                       + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=exitval, output="")
+
+    #
+    # savelogs. What a silly thing to do.
+    # 
+    def savelogs(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Illegal characters in arguments!")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        argstr  = ""
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/savelogs " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=exitval, output="")
+    
+    #
+    # portstats
+    # 
+    def portstats(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        #
+        # Pass the whole thing off to the backend script. It would be nice
+        # to do this differently, but too much trouble.
+        #
+        proj   = None;
+        expt   = None;
+        argstr = ""
+        for opt, val in argdict.items():
+            if opt == "errors-only":
+                if xbool(val):
+                    argstr += " -e "
+                    pass
+                pass
+            elif opt == "all":
+                if xbool(val):
+                    argstr += " -a "
+                    pass
+                pass
+            elif opt == "clear":
+                if xbool(val):
+                    argstr += " -z "
+                    pass
+                pass
+            elif opt == "quiet":
+                if xbool(val):
+                    argstr += " -q "
+                    pass
+                pass
+            elif opt == "absolute":
+                if xbool(val):
+                    argstr += " -c "
+                    pass
+                pass
+            elif opt == "physnames":
+                if xbool(val):
+                    argstr += " -p "
+                    pass
+                pass
+            elif opt == "proj":
+                proj = val;
+                pass
+            elif opt == "exp":
+                expt = val;
+                pass
+            pass
+
+        if (proj or expt):
+            if ((not (proj and expt)) or argdict.has_key("physnames")):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="pid/eid/physnames")
+            argstr += " " + escapeshellarg(proj);
+            argstr += " " + escapeshellarg(expt);
+            pass
+
+        for name in argdict["nodeports"]:
+            argstr += " " + escapeshellarg(name);
+            pass
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/portstats " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=exitval, output=output)
+    
+    #
+    # readycount
+    # 
+    def readycount(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        #
+        # Pass the whole thing off to the backend script. It would be nice
+        # to do this differently, but too much trouble.
+        #
+        proj   = None;
+        expt   = None;
+        argstr = ""
+        for opt, val in argdict.items():
+            if opt == "set":
+                if xbool(val):
+                    argstr += " -s "
+                    pass
+                pass
+            elif opt == "clear":
+                if xbool(val):
+                    argstr += " -c "
+                    pass
+                pass
+            elif opt == "list":
+                if xbool(val):
+                    argstr += " -l "
+                    pass
+                pass
+            elif opt == "physnames":
+                if xbool(val):
+                    argstr += " -p "
+                    pass
+                pass
+            elif opt == "proj":
+                proj = val;
+                pass
+            elif opt == "exp":
+                expt = val;
+                pass
+            pass
+
+        if (proj or expt):
+            if ((not (proj and expt)) or argdict.has_key("physnames")):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="pid/eid/physnames")
+            argstr += " " + escapeshellarg(proj);
+            argstr += " " + escapeshellarg(expt);
+            pass
+
+        for name in argdict["nodes"]:
+            argstr += " " + escapeshellarg(name);
+            pass
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/readycount " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=exitval, output=output)
+    
     pass
 
 #
@@ -2034,6 +2278,16 @@ class node:
                     argstr += " -w "
                     pass
                 pass
+            elif opt == "power":
+                if xbool(val):
+                    argstr += " -f "
+                    pass
+                pass
+            elif opt == "reconfig":
+                if xbool(val):
+                    argstr += " -c "
+                    pass
+                pass
             pass
 
         tokens = argdict["nodes"].split(",")
@@ -2061,7 +2315,7 @@ class node:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        argerror = CheckRequiredArgs(argdict, ("imageid", "node"))
+        argerror = CheckRequiredArgs(argdict, ("imagename", "node"))
         if (argerror):
             return argerror
 
@@ -2072,13 +2326,13 @@ class node:
                     argstr += " -w "
                     pass
                 pass
-            elif opt == "proj":
+            elif opt == "imageproj":
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
             pass
 
-        argstr += " " + escapeshellarg(argdict["imageid"])
+        argstr += " " + escapeshellarg(argdict["imagename"])
         argstr += " " + escapeshellarg(argdict["node"])
 
         (exitval, output) = runcommand(TBDIR + "/bin/create_image " + argstr)
@@ -2116,9 +2370,18 @@ class node:
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt == "imageid":
+            elif opt == "imagename":
                 argstr += " -i "
                 argstr += escapeshellarg(val)
+                pass
+            elif opt == "imageid":
+                argstr += " -m "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "reboot":
+                if not xbool(val):
+                    argstr += " -r "
+                    pass
                 pass
             pass
 
@@ -2128,6 +2391,53 @@ class node:
             pass
 
         (exitval, output) = runcommand(TBDIR + "/bin/os_load " + argstr)
+
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Turn on/off admin mode (boot into FreeBSD MFS).
+    #
+    def adminmode(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("mode", "node"))
+        if (argerror):
+            return argerror
+
+        if (argdict["mode"] != "on" and
+            argdict["mode"] != "off"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="mode must be on or off")
+
+        argstr = ""
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "reboot":
+                if not xbool(val):
+                    argstr += " -n "
+                    pass
+                pass
+            pass
+
+        argstr += " " + escapeshellarg(argdict["mode"]);
+        argstr += " " + escapeshellarg(argdict["node"]);
+
+        (exitval, output) = runcommand(TBDIR + "/bin/node_admin " + argstr)
 
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
