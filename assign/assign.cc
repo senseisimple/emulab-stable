@@ -57,6 +57,7 @@ name_count_map ptypes;
 
 // List of virtual types by name.
 name_count_map vtypes;
+name_list_map vclasses;
 
 // A list of all pclasses.
 pclass_list pclasses;
@@ -322,6 +323,7 @@ int type_precheck() {
 
     bool ok = true;
 
+    // First, check the regular types
     for (name_count_map::iterator vtype_it=vtypes.begin();
 	    vtype_it != vtypes.end();++vtype_it) {
     
@@ -341,6 +343,26 @@ int type_precheck() {
 	    }
 	}
     }
+
+    // Check the vclasses, too
+    for (name_list_map::iterator vclass_it = vclasses.begin();
+	    vclass_it != vclasses.end(); ++vclass_it) {
+	bool found_match = false;
+	for (vector<crope>::iterator vtype_it = vclass_it->second.begin();
+		vtype_it != vclass_it->second.end(); vtype_it++) {
+	    if (ptypes.find(*vtype_it) != ptypes.end()) {
+		found_match = true;
+		break;
+	    }
+	}
+
+	if (!found_match) {
+	    cout << "  *** No physical nodes can satisfy vclass " <<
+		vclass_it->first << endl;
+	    ok = false;
+	}
+    }
+
     if (ok) {
       cout << "Type preecheck passed." << endl;
       return 1;

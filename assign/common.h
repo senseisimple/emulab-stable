@@ -150,6 +150,7 @@ typedef slist<crope> name_slist;
  * Used to count the number of nodes in each ptype and vtype
  */
 typedef hash_map<crope,int> name_count_map;
+typedef hash_map<crope,vector<crope> > name_list_map;
 
 /*
  * A hash function for pointers
