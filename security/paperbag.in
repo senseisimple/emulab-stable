@@ -43,6 +43,7 @@ my $USERNODE    = "@USERNODE@";
 		"endexp"	=> "$TB/bin/endexp",
 		"tbreport"	=> "$TB/bin/tbreport",
 		"xmlrpc/experiment" => "$TB/sbin/sshxmlrpc_server.py",
+		"xmlrpc/node"   => "$TB/sbin/sshxmlrpc_server.py",
 	   );
 
 #
