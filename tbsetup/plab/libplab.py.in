@@ -76,8 +76,16 @@ DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
 DEF_SLEEPINT = 5
 DEF_TRIES = 3
 
+#
+# output modifiers
+#
 verbose = 0
 debug = 0
+
+#
+# var to track failed renewals
+#
+failedrenew = []
 
 #
 # Disable line buffering
@@ -921,30 +929,52 @@ class Plab:
         # Ugh, MySQL doesn't know UTC until v4.1.1, and unix_timestamp()
         # returns the local time
         import time
-        endtime = int(time.mktime(time.gmtime())) + RENEW_TIME
-        res = DBQueryFatal("select pid, eid, node_id from plab_slice_nodes"
+        now = int(time.mktime(time.gmtime()))
+        endtime = now + RENEW_TIME
+        res = DBQueryFatal("select node_id, pid, eid,"
+                           " unix_timestamp(leaseend) from plab_slice_nodes"
                            " where %s > unix_timestamp(leaseend)",
                            (endtime, ))
         loadedSlices = {}
-        failed = []
-        for pid, eid, nodeid in res:
+        global failedrenew
+        newfail = []
+        failsoon = []
+        for entry in res:
+            nodeid, pid, eid, tstamp = entry
             try:
                 slice = loadedSlices[(pid, eid)]
             except KeyError:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
+            
             if node.renew():
-                print "Failed to renew lease for %s %s/%s" % (nodeid,pid,eid)
-                failed.append((nodeid,pid,eid))
+                print "Failed to renew lease for %s %s/%s" % entry[:3]
+                if entry not in failedrenew:
+                    newfail.append(entry)
+                if entry[3] < (now + (2*3600)):
+                    failsoon.append(entry)
+            else:
+                if entry in failedrenew:
+                    failedrenew.remove(entry)
                 
-        if failed:
+        if newfail:
+            failedrenew += newfail
             failstr = ""
-            for n in failed:
-                failstr += "%s %s/%s\n" % n
+            for n in newfail:
+                failstr += "%s %s/%s\n" % n[:3]
             SENDMAIL(TBOPS, "Lease renewal(s) failed",
                      "Failed to renew lease on the following nodes:\n%s" %
                      failstr + "\n\nPlease check the plabrenew log", TBOPS)
+
+        if failsoon:
+            failstr = ""
+            for n in failsoon:
+                failstr += "%s %s/%s: expires: %s\n" % \
+                           (n[:3] + (ctime(n[3]),))
+            SENDMAIL(TBOPS, "WARNING: PLAB leases are about to expire",
+                     "The following plab leases are about to expire:\n%s" %
+                     failstr + "\n\nPlease look into it!", TBOPS)
 
 
     def _createAgentProxy(self, insecure = False):
