@@ -257,6 +257,7 @@ sub convertPortFormat($$@) {
     # It's possible the ports are already in the right format
     #
     if ($input == $output) {
+	$self->debug("Not converting, input format = output format\n",2);
 	return @ports;
     }
 
@@ -266,20 +267,26 @@ sub convertPortFormat($$@) {
 
     if ($input == $PORT_FORMAT_IFINDEX) {
 	if ($output == $PORT_FORMAT_MODPORT) {
+	    $self->debug("Converting ifindex to modport\n",2);
 	    return map $self->{IFINDEX}{$_}, @ports;
 	} elsif ($output == $PORT_FORMAT_NODEPORT) {
+	    $self->debug("Converting ifindex to nodeport\n",2);
 	    return map portnum($self->{NAME}.":".$self->{IFINDEX}{$_}), @ports;
 	}
     } elsif ($input == $PORT_FORMAT_MODPORT) {
 	if ($output == $PORT_FORMAT_IFINDEX) {
+	    $self->debug("Converting modport to ifindex\n",2);
 	    return map $self->{IFINDEX}{$_}, @ports;
 	} elsif ($output == $PORT_FORMAT_NODEPORT) {
-	    return map portnum($self->{NAME} . $_), @ports;
+	    $self->debug("Converting modport to nodeport\n",2);
+	    return map portnum($self->{NAME} . ":$_"), @ports;
 	}
     } elsif ($input == $PORT_FORMAT_NODEPORT) {
 	if ($output == $PORT_FORMAT_IFINDEX) {
+	    $self->debug("Converting nodeport to ifindex\n",2);
 	    return map $self->{IFINDEX}{(split /:/,portnum($_))[1]}, @ports;
 	} elsif ($output == $PORT_FORMAT_MODPORT) {
+	    $self->debug("Converting nodeport to modport\n",2);
 	    return map { (split /:/,portnum($_))[1] } @ports;
 	}
     }
