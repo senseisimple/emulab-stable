@@ -34,6 +34,10 @@ my $BOSSNODE_IP = '@BOSSNODE_IP@';
 my $USERNODE_IP = '@USERNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
 
+# For /share export below.
+my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
+my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
+
 #
 # Allow this to work if the library is left in the source directory
 #
@@ -337,6 +341,17 @@ Phase "exports", "Setting up exports", sub {
 	    push @exports_lines,
 		join(" ",@{$filesystems{$key}}) . "\t$BOSSNODE -maproot=root";
 	}
+
+	#
+	# /share is special. We want to export that to the control network
+	# read-only (it is exported to boss r/w, above).
+	#
+	my ($a,$b,$c,$d) = ($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+	my $realdir = `realpath /share`;
+	chomp($realdir);
+	push(@exports_lines,
+	     "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
+	     "-maproot=root -ro");
 
 	#
 	# Put them in exports.head, and copy that to /etc/exports
