@@ -1,3 +1,5 @@
+#!/usr/local/bin/tclsh
+
 ######################################################################
 # netpull.tcl
 #
@@ -52,7 +54,7 @@ variable Done 0
 variable CurLine {}
 
 # This indicates whether to display verbose output
-variable Verbose 1
+variable Verbose 0
 
 # A list of IP address to run on.
 variable ToRun {}
@@ -282,19 +284,49 @@ proc processline {prevV finaldst line} {
     set prev $dst
 }
 
+##################################################
+# showhelp
+#  Displays help info to stdout and exits.
+##################################################
+proc showhelp {} {
+    puts "netpull \[<options>\] <file>"
+    puts "Options:"
+    puts " -n #     - Number of simulatenous trace routes."
+    puts " -r #     - Number of times to trace each ip."
+    puts " -v       - Display extra output to stderr."
+    exit 1
+}
+
 ######################################################################
 # Main
 ######################################################################
 
 # Check arguments
-if {[llength $argv] != 1} {
-    puts stderr "Syntax: [file tail [info script]] <file>"
-    exit 1
+set file {}
+while {$argv != {}} {
+    set arg [lpop argv]
+    switch -- $arg {
+	"-n" {
+	    if {$argv == {}} {showhelp}
+	    set NumSpawns [lpop argv]
+	}
+	"-r" {
+	    if {$argv == {}} {showhelp}
+	    set NumRuns [lpop argv]
+	}
+	"-v" {
+	    set Verbose 1
+	}
+	default {
+	    if {$file != {}} {showhelp}
+	    set file $arg
+	}
+    }
 }
 
 # Open file
-if {[catch "open $argv r" fp]} {
-    puts stderr "Error opening $argv."
+if {[catch "open $file r" fp]} {
+    puts stderr "Error opening $file."
     exit 1
 }
 
