@@ -77,7 +77,9 @@ sub cleanup {
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 }
 
-print "Beginning swapin in for $pid/$eid. " .  TBTimeStamp() . "\n";
+print "Beginning swapin in for $pid/$eid\n";
+
+TBDebugTimeStamp("tbswapin started");
 
 if (! ($state = ExpState($pid, $eid))) {
     print STDERR "*** No such experiment $pid/$eid\n";
@@ -98,6 +100,7 @@ if (! SetExpState($pid, $eid, EXPTSTATE_ACTIVATING)) {
 
 # This does all the virtual to physical mapping and updating the DB state.
 print "Mapping to physical reality ...\n";
+TBDebugTimeStamp("assign_wrapper started");
 my $exitcode;
 if ($exitcode = system("assign_wrapper $pid $eid")) {
     print STDERR "*** Failed to map to reality.\n";
@@ -105,7 +108,8 @@ if ($exitcode = system("assign_wrapper $pid $eid")) {
     # Pass exit code through
     exit($exitcode >> 8);
 }
-print "Mapped to physical reality! " . TBTimeStamp() . "\n";
+TBDebugTimeStamp("assign_wrapper finished");
+print "Mapped to physical reality!\n";
 
 # Exit here if we are testing.
 if ($TESTMODE) {
@@ -128,12 +132,15 @@ if ($TESTMODE) {
 # long before the nodes reboot, but better safe than sorry)
 #
 print "Setting up mountpoints.\n";
+TBDebugTimeStamp("mountpoints started");
 if (system("exports_setup")) {
     print STDERR "*** Failed to setup mountpoints.\n";
     cleanup();
     exit(1);
 }
+TBDebugTimeStamp("mountpoints finished");
 
+TBDebugTimeStamp("named started");
 print "Setting up named maps.\n";
 if (system("named_setup")) {
     print STDERR "*** WARNING: Failed to add node names to named map.\n";
@@ -141,12 +148,14 @@ if (system("named_setup")) {
     # This is a non-fatal error.
     # 
 }
+TBDebugTimeStamp("named finished");
 
 #
 # Since it'll take a while for the nodes to reboot, we'll start now, and
 # wait for the os_setup to finish, down below
 #
 print "Resetting OS and rebooting.\n";
+TBDebugTimeStamp("os_setup started");
 if (!($os_setup_pid = fork())) { 
     exec("os_setup $pid $eid") or exit(1);
 } elsif ($os_setup_pid == -1) {
@@ -163,11 +172,13 @@ if (!($os_setup_pid = fork())) {
 #
 
 print "Setting up VLANs.\n";
+TBDebugTimeStamp("snmpit started");
 if (system("snmpit -t $pid $eid")) {
     print STDERR "*** Failed to set up VLANs.\n";
     cleanup();
     exit(1);
 }
+TBDebugTimeStamp("snmpit finished");
 
 #
 # An error now means that the VLANS need to be cleaned up.
@@ -175,12 +186,14 @@ if (system("snmpit -t $pid $eid")) {
 $cleanvlans = 1;
 
 print "Setting up email lists.\n";
+TBDebugTimeStamp("genelists started");
 if (system("genelists")) {
     print STDERR "*** WARNING: Failed to update email lists.\n";
     #
     # This is a non-fatal error.
     # 
 }
+TBDebugTimeStamp("genelists finished");
 
 #
 # OK, let's see how that os_setup did
@@ -199,6 +212,7 @@ if ($kid == $os_setup_pid) {
     cleanup;
     exit(1);
 }
+TBDebugTimeStamp("os_setup finished");
 
 #
 # Okay, start the event system now that we know all the nodes have
@@ -206,11 +220,13 @@ if ($kid == $os_setup_pid) {
 # in the background), so its not enough of a delay to worry about.
 # 
 print "Starting the event system.\n";
+TBDebugTimeStamp("eventsys_control started");
 if (system("eventsys_control start $pid $eid")) {
     print STDERR "*** Failed to start the event system.\n";
     cleanup;
     exit(1);
 }
+TBDebugTimeStamp("eventsys_control finished");
 
 # Accounting info.
 TBSetExpSwapTime($pid, $eid);
@@ -221,5 +237,6 @@ if (!SetExpState($pid, $eid, EXPTSTATE_ACTIVE)) {
     exit(1);
 }
 
-print "Swapin finished. " . TBTimeStamp() . "\n";
+print "Swapin finished.\n";
+TBDebugTimeStamp("tbswapin finished");
 exit(0);

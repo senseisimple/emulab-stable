@@ -115,6 +115,8 @@ if ($UID && !TBAdmin($UID)) {
     }
 }
 
+TBDebugTimeStamp("os_setup started");
+
 #
 # Get the set of nodes, as well as the nodes table information for them.
 #
@@ -361,6 +363,7 @@ while (my %row = $db_result->fetchhash()) {
 #
 # We need to issue the reboots and the reloads in parallel.
 #
+TBDebugTimeStamp("rebooting/reloading started");
 if (!$TESTMODE) {
     my %pids  = ();
     my $count = 0;
@@ -390,6 +393,7 @@ if (!$TESTMODE) {
     }
 }
 
+TBDebugTimeStamp("rebooting/reloading finished");
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
 
 sleep(2);
@@ -406,6 +410,7 @@ foreach my $node ( @nodes ) {
     $waitstart{$node} = time;
 }
 
+TBDebugTimeStamp("waiting started");
 while ( @nodes ) {
     my $node = shift(@nodes);
 
@@ -476,6 +481,7 @@ while ( @nodes ) {
 
     print "*** Experiment will be terminated automatically.\n";
 }
+TBDebugTimeStamp("waiting finished");
 
 #
 # Now deal with virtual nodes.
@@ -493,6 +499,7 @@ if ( @vnodes ) {
 }
 
 print STDOUT "OS Setup Done!\n";
+TBDebugTimeStamp("os_setup finished");
 exit $failed;
 
 #

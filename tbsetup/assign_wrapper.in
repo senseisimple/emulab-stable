@@ -90,6 +90,8 @@ sub printdb {
     }
 };
 
+TBDebugTimeStamp("assign_wrapper started");
+
 ######################################################################
 # Step 1 - Setup virtual topology
 #
@@ -163,6 +165,8 @@ $sharkshelfid = 0;
 $delayid = 0;
 
 printdb "Generating TOP file.\n";
+
+TBDebugTimeStamp("top started");
 
 # Let's figure out what kind of links we have.
 printdb "Finding interface speeds:";
@@ -545,6 +549,8 @@ DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
 print "Minumum nodes = $minimum_nodes\n";
 print "Maximum nodes = $maximum_nodes\n";
 
+TBDebugTimeStamp("top finished");
+
 ######################################################################
 # Step 2 - Assign Loop
 # 
@@ -561,6 +567,7 @@ print "Maximum nodes = $maximum_nodes\n";
 #  the second.
 #######################################################################
 
+TBDebugTimeStamp("assign_loop started");
 $currentrun = 1;
 while (1) {
     print "Assign Run $currentrun\n";
@@ -576,8 +583,10 @@ while (1) {
     undef %p2vmap;
     undef %plinks;
 
+    TBDebugTimeStamp("ptopgen started");
     # Snapshot
     system("ptopgen > $ptopfile");
+    TBDebugTimeStamp("ptopgen finished");
 
     # Get number of nodes
     my $numnodes_result = 
@@ -593,6 +602,7 @@ while (1) {
 	exit(2);
     }
 
+    TBDebugTimeStamp("assign started");
     # Run assign
     $fail = 0;
     print "assign -b -t $ptopfile $topfile\n";
@@ -693,7 +703,9 @@ while (1) {
     }
     while (<ASSIGNFP>) { } # Read anything left in the pipe before closing
     close(ASSIGNFP);
+    TBDebugTimeStamp("assign finished");
 
+    TBDebugTimeStamp("reserving started");
     # Reserve resources
     if (!$fail) {
 	print "Reserving resources.\n";
@@ -711,6 +723,7 @@ while (1) {
 	    last;
 	}
     }
+    TBDebugTimeStamp("reserving finished");
 
     # Check for exit
     if ($currentrun >= $maxrun) {
@@ -733,6 +746,8 @@ while (1) {
     $currentrun++;
 }
 
+TBDebugTimeStamp("assign_loop finished");
+
 #
 # VIRTNODES HACK: physical nodes (from the nodes table) might really
 # be a virtual node :-) Must get the underlying phys_nodeid.
@@ -752,6 +767,7 @@ foreach my $pnode (keys(%p2vmap)) {
     }
     $p2pmap{$pnode} = $phys_nodeid;
 }
+
 
 ######################################################################
 # Step 3 - Convert to vlans, delays, and portmap
@@ -788,6 +804,7 @@ foreach $pnode (keys(%p2vmap)) {
 }
 
 printdb "Interpreting results.\n";
+TBDebugTimeStamp("interpreting started");
 foreach $plink (keys(%plinks)) {
     ($nodeportA,$nodeportB) = @{$plinks{$plink}};
     ($nodeA,$portA) = split(":",$nodeportA);
@@ -911,6 +928,7 @@ foreach $plink (keys(%plinks)) {
     }
     # Else delaysrc case, will be handled by one of the other cases.
 }
+TBDebugTimeStamp("interpreting finished");
 
 ######################################################################
 # Step 4 - Upload to DB
@@ -918,6 +936,7 @@ foreach $plink (keys(%plinks)) {
 # Nothing fancy.
 ######################################################################
 printdb "Uploading to DB\n";
+TBDebugTimeStamp("uploading started");
 foreach $vlan (keys(%vlans)) {
     ($lan,$members) = @{$vlans{$vlan}};
     DBQueryFatal("insert into vlans (id,pid,eid,virtual,members) values" .
@@ -1291,6 +1310,9 @@ if ($query_result->numrows) {
 		     " vnode='$target_vnode' and vname='$target_vname'");
     }
 }
+TBDebugTimeStamp("uploading finished");
+
+TBDebugTimeStamp("assign_wrapper finished");
 
 ######################################################################
 # Subroutines
