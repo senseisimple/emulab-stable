@@ -98,8 +98,6 @@
 * Web page to control delay nodes (well, links). Would go nicely with
   Chads new vis tool that shows you the link characteristics.
 
-* Scripts to age idle data!
-
 * Support images with more than once slice (but not the entire disk).
   At present, people can make use of the 4th slice, but cannot save it
   with an image, unless they create an entire disk image, and we do
@@ -175,6 +173,10 @@
   Need someone to look around for this. I hate GNATS!
   Rob mentioned RT (http://www.fsck.com/projects/rt).
 
+* CDROM installation of nodes.
+
+* Retry/reliability to tmcd from ron nodes. 
+
 *** Minor:
 
 * Fix up updown page. Get rid of virtual nodes. Move Sharks to the
@@ -189,9 +191,6 @@
   Could also add a web link to view the most recent log file. Related
   to current "view in real time" option.
 
-* Add permission check to eventsys_control and install on ops so that
-  users can start/stop/replay the event stream.
-
 * Link on web pages to pop up an ssh to a node. Perhaps do this by
   usurping the telnet client.
 
@@ -199,9 +198,6 @@
   the system (perl and php).
 
 * Macrofy the signature of the email (currently "Testbed Ops").
-
-* Add periodic account update to RON nodes, for when they are off the
-  net and do not get the node_update command.
 
 * FAQ entry for lilo:
   To access partitions on the disk outside of the C:H:S tuple limit (8.4
@@ -238,11 +234,47 @@
 
 * event system. skew and delay. unix domain socket to local proxy.
 
-* Possible Cookie problem:
-
-  1) Logged into mini using Opera (5)
-  2) Without logging out, went to https://www.mini.emulab.net
-  This got me the message "The document contained no data" from Netscape.
-
 * When you're only a part of one project, could that project be the default
   value for the "choose a project" dropdown in "begin an experiment"?
+
+* Add cleanup error handling (send email) in tb scripts.
+
+* Sort osids in newimage pages.
+
+* For example, boot up complains about no rc.route script.
+
+* allow user to specify OSIDs for their delay nodes. Not entirely sure
+  how, since delays are chosen late in the game, but at the moment its
+  difficuly for people to customize delay nodes.
+
+* Fix up hostnames generation from tmcd for lans. Currently, if you
+  have a link and a lan to the same node, you get two aliases.
+
+* Add web interface for generating simple hardwired topologies. ie:
+  "Just give me some nodes in a lan."
+
+> From: Jay Lepreau <lepreau@fast.cs.utah.edu>
+> To: stoller@fast.cs.utah.edu
+> Subject: For the 'todo' list -- project and user "archiving"
+> Date: Tue, 11 Jun 2002 20:49:44 -0600 (MDT)
+> 
+> I don't want to delete projects and probably not users (typically).
+> I want to "retire" them, or move them to "alumni"/archive status.  I
+> want to keep them in the DB for analysis and statistics reasons, but
+> not keep them around forever as active because they clutter things
+> up.
+> 
+> Also, the users might be reactivated if they start a new project.
+> 
+> These take a little thought because of name space issues, at least.
+> Maybe more issues (eg how does an inactive user get reactivated
+> unless their password is still valid?).
+> 
+> ANyway, just something for the list, and keep this message in the
+> details part.
+
+This is some not well though out RON stuff:
+* Add startup command for RON nodes. How to stop them? Jail?
+* Add Jail.
+* Add node_reboot of ron nodes.
+* Add retry in wanassign.
