@@ -149,10 +149,12 @@ Then define the 4 nodes in the topology.
 </p>
 
 <p>
-Next define the 3 links between the nodes. NS syntax permits you to
-specify the bandwidth, latency, and queue type. For our example, we
-will define a full speed LAN between B, C, and D, and a shaped link
-from node A to B.
+Next define the link and the LAN that connect the nodes. NS syntax
+permits you to specify the bandwidth, latency, and queue type. Note
+that since NS can't impose artificial losses like Emulab can, there is
+a separate command to add loss on a link.  For our example, we will
+define a full speed LAN between B, C, and D, and a shaped link from
+node A to B.
 	<code><pre>
 	set link0 [$ns duplex-link $nodeB $nodeA 30Mb 50ms DropTail]
 	tb-set-link-loss $link0 0.01
