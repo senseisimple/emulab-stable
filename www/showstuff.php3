@@ -349,8 +349,7 @@ function SHOWNODES($pid, $eid) {
 	    else
 		echo "<td>&nbsp</td>\n";
 	    
-	    echo "  <td>$def_boot_osid</td>
-                    <td>$def_boot_path</td>
+	    echo "  <td>$def_boot_path</td>
                     <td>$def_boot_cmd_line</td>
                     <td>$startupcmd</td>
                     <td align=center>$startstatus</td>
