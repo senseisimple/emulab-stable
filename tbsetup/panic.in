@@ -1,0 +1,283 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+
+#
+# Press the panic button. Also invoked from web interface.
+#
+sub usage()
+{
+    print(STDERR
+	  "Usage: panicbutton [-r] <pid> <eid>\n".
+	  "switches and arguments:\n".
+	  "-r       - Reset panic state (admin people only)\n".
+	  "<pid>    - The project the experiment belongs to\n".
+	  "<eid>    - The experiment name (id)\n");
+    exit(-1);
+}
+my $optlist = "r";
+my $reset   = 0;
+
+sub Fatal($);
+
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Termination is proceeding in the background. Notified later.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub ExitWithStatus($$)
+{
+    my ($status, $message) = @_;
+    
+    if ($status < 0) {
+	die("*** $0:\n".
+	    "    $message\n");
+    }
+    else {
+	print STDERR "$message\n";
+    }
+    exit($status);
+}
+
+#
+# Configure variables
+#
+my $TB     = "@prefix@";
+my $TBOPS  = "@TBOPSEMAIL@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error; 0 means infinite retry.
+$libdb::DBQUERY_MAXTRIES = 0;
+
+my $snmpit    = "$TB/bin/snmpit";
+my $dbuid;
+my $user_name;
+my $user_email;
+    
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+if (defined($options{"r"})) {
+    $reset = 1;
+}
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\w\.]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted argument $pid!\n");
+}
+if ($eid =~ /^([-\w\.]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Tainted argument $eid!\n");
+}
+
+#
+# See if the experiment is firewalled. Error if not.
+#
+my $firewall;
+my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
+
+if (!$firewalled) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid is not firewalled!\n");
+}
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+	"    Cannot determine your name and email address.\n");
+}
+
+#
+# Verify that this person is allowed to press the panic button.
+# Note that any script down the line has to do an admin check also. 
+#
+if ($UID && !TBAdmin($UID) &&
+    !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to end this experiment!\n");
+}
+
+#
+# We have to protect against trying to end an experiment that is currently
+# in the process of being terminated. We use a "wrapper" state (actually
+# a timestamp so we can say when termination was requested) since
+# terminating consists of a couple of different experiment states down inside
+# the tb scripts. 
+#
+DBQueryFatal("lock tables experiments write");
+
+$query_result =
+    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
+
+if (! $query_result->numrows) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
+}
+my %hashrow = $query_result->fetchhash();
+my $expt_head_login = $hashrow{'expt_head_uid'};
+my $estate          = $hashrow{'state'};
+
+#
+# Called from user (via web interface).
+#
+if ($reset) {
+    ExitWithStatus(1, "Experiment $pid/$eid is not paniced!\n")
+	if ($estate ne EXPTSTATE_PANICED);
+}
+else {
+    ExitWithStatus(1, "Experiment $pid/$eid is not active!\n")
+	if (! ($estate eq EXPTSTATE_ACTIVE ||
+	       $estate eq EXPTSTATE_ACTIVATING ||
+	       $estate eq EXPTSTATE_SWAPPING));
+}
+
+#
+# Change experiment state and lock it.
+# 
+TBLockExp($pid, $eid, ($reset ? EXPTSTATE_ACTIVE : EXPTSTATE_PANICED));
+DBQueryFatal("unlock tables");
+
+#
+# XXX - At this point a failure is going to leave things in an
+# inconsistent state. Be sure to call fatal() only since we are
+# going into the background, and we have to send email since no
+# one is going to see printed error messages (output goes into the
+# log file, which will be sent along in the email). 
+#
+
+#
+# Get email address of the experiment head, which may be different than
+# the person who is actually terminating the experiment, since its polite
+# to let the original creator know whats going on. 
+#
+my $expt_head_name;
+my $expt_head_email;
+
+if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
+    print "*** WARNING: ".
+	  "Could not determine name/email for $expt_head_login.\n";
+    $expt_head_name  = "TBOPS";
+    $expt_head_email = $TBOPS;
+}
+
+$query_result = 
+    DBQueryFatal("select card1 from wires ".
+		 "where node_id1='$firewall' AND type='Control'");
+
+if (!$query_result->numrows) {
+    fatal("Could not determine firewall port for $pid/$eid!");
+}
+my ($port) = $query_result->fetchrow_array();
+
+#
+# Call snmpit.
+#
+if ($reset) {
+    system("$snmpit -e ${firewall}:${port}");
+    if ($?) {
+	fatal("snmpit exited with $?!");
+    }
+    TBExptClearPanicBit($pid, $eid);
+    print "Panic situation has been cleared!\n";
+}
+else {
+    system("$snmpit -d ${firewall}:${port}");
+    if ($?) {
+	fatal("snmpit exited with $?!");
+    }
+    TBExptSetPanicBit($pid, $eid);
+    print "Panic Button has been pressed!\n";
+}
+TBUnLockExp($pid, $eid);
+
+#
+# Send email notification to user *and* to tbops.
+#
+SENDMAIL("$user_name <$user_email>",
+	 "Panic Button ". ($reset ? "Cleared" : "Pressed") .
+	    " for Experiment $pid/$eid",
+	 "$dbuid has " . ($reset ? "cleared" : "pressed") .
+	   " the panic button for experiment $pid/$eid",
+	 "$user_name <$user_email>",
+	 "Cc:  $expt_head_name <$expt_head_email>\n".
+	 "Bcc: $TBOPS");
+
+exit 0;
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+    
+    #
+    # Send a message to the testbed list. Append the logfile.
+    #
+    SENDMAIL("$user_name <$user_email>",
+	     "Panic Button Failure for Experiment $pid/$eid",
+	     "$dbuid ". ($reset ? "cleared" : "pressed") .
+	       " the panic button for experiment $pid/$eid,\n".
+	     "BUT there was a failure!\n\n".
+	     "$mesg\n",
+	     "$user_name <$user_email>",
+	     "Cc:  $expt_head_name <$expt_head_email>\n".
+	     "Bcc: $TBOPS");
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

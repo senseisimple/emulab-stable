@@ -416,15 +416,98 @@ sub doSwapout($) {
 	}
 
 	if ($firewalled) {
-	    # XXX put all nodes into admin mode
-	    print STDERR "Confining firewalled nodes.\n";
-	    TBDebugTimeStamp("moving nodes to purgatory");
+	    #
+	    # If the panic button was pressed, put all nodes into admin
+	    # mode and power them off. After the firewall is torn down,
+	    # we can power them back up.
+	    #
+	    my @nodes     = ExpNodes($pid, $eid, 1);
+	    my $ADMINOSID = TB_OSID_FREEBSD_MFS;
+	    my $paniced;
+
+	    TBExptGetPanicBit($pid, $eid, \$paniced);
+
+	    if ($paniced) {
+		print STDERR "Powering down nodes.\n";
+		TBDebugTimeStamp("Powering down nodes");
+
+		system("power off @nodes");
+		if ($?) {
+		    #
+		    # If an error, cannot continue. Must leave firewall in
+		    # place. 
+		    #
+		    print STDERR "*** Failed to power nodes off! Stopping.\n";
+		    return 1;
+		}
+
+		#
+		# XXX: node_admin should take a list of nodes, or pid,eid.
+		#      Instead, call os_select directly for now. 
+		#
+		# Clear any one-shot boots and partition boots.
+		#
+		print STDERR "Changing OSID to admin MFS.\n";
+		TBDebugTimeStamp("Changing OSID to admin MFS");
+
+		# Order matters cause os_select sillyness.
+		if (system("os_select -c -1 @nodes") ||
+		    system("os_select -t $ADMINOSID @nodes") ||
+		    system("os_select -c @nodes")) {
+
+		    #
+		    # If an error, cannot continue. Must leave firewall in
+		    # place. 
+		    #
+		    print STDERR "*** Failed to reset OSIDs! Stopping.\n";
+		    return 1;
+		}
+
+		#
+		# Now we can power up the nodes again.
+		#
+		print STDERR "Powering up nodes.\n";
+		TBDebugTimeStamp("Powering up nodes");
+
+		system("power on @nodes");
+		if ($?) {
+		    #
+		    # If an error, cannot continue. Must leave firewall in
+		    # place. Eventually, we can continue past this, if we
+		    # know what nodes failed. But for now we have to do the
+		    # ISUP test to make sure nodes really got into the MFS.
+		    #
+		    print STDERR "*** Failed to power on nodes! Stopping.\n";
+		    return 1;
+		}
+	    }
 
 	    #
 	    # Once all nodes are safely in the admin MFS, we can take
 	    # down the firewall
 	    #
 	    doFW($pid, $eid, FWTEARDOWN);
+
+	    if ($paniced) {
+		#
+		# Now wait for ISUP. I do this here cause the reload daemon
+		# will power cycle the nodes again if its reboot fails, and
+		# that will happen if the nodes are not back into the MFS in
+		# time. THe right thing to do is to store the power state in
+		# the DB, and have the reload daemon turn the nodes back on.
+		#
+		print STDERR "Waiting for nodes to boot the MFS.\n";
+		TBDebugTimeStamp("Waiting for nodes to boot the MFS");
+		
+		system("node_statewait -s " . TBDB_NODESTATE_ISUP . " @nodes");
+		if ($?) {
+		    #
+		    # Okay to continue; reload daemon will probably send
+		    # email later when the reload fails.
+		    #
+		    print STDERR "*** Some nodes failed to reboot. Continuing\n";
+		}
+	    }	    
 	}
 
 	#
@@ -1050,6 +1133,7 @@ sub doFW($$$) {
     #
     my $fwsetupstr1 = "snmpit $cnetstack -m $fwvlanname $portlist";
     my $fwsetupstr2 = "snmpit $cnetstack -T $fwport $cnetvlanname $fwvlanname";
+    my $fwtakedownstr0 = "snmpit $cnetstack -e $fwport";
     my $fwtakedownstr1 = "snmpit $cnetstack -m $cnetvlanname $portlist";
     my $fwtakedownstr2 = "snmpit $cnetstack -o $fwvlanname";
     my $fwtakedownstr3 = "snmpit $cnetstack -U $fwport";
@@ -1102,8 +1186,14 @@ sub doFW($$$) {
 	# Record VLAN info now that everything is done
 	TBSetExptFirewallVlan($pid, $eid, $fwvid, $fwvlan);
     } else {
-	TBDebugTimeStamp("snmpit firewall teardown: VLAN");
+	TBDebugTimeStamp("snmpit re-enable fw control port: $fwport");
 	my $failed = 0;
+	if (system($fwtakedownstr0)) {
+	    print STDERR
+		"*** Could not re-enable firewall control port $fwport!\n";
+	    $failed = 1;
+	}
+	TBDebugTimeStamp("snmpit firewall teardown: VLAN");
 	if (system($fwtakedownstr1)) {
 	    print STDERR
 		"*** Could not return $portlist to Control VLAN!\n";

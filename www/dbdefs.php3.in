@@ -130,6 +130,7 @@ $TB_EXPTSTATE_SWAPPING		= "swapping";
 $TB_EXPTSTATE_SWAPPED		= "swapped";
 $TB_EXPTSTATE_ACTIVATING	= "activating";
 $TB_EXPTSTATE_ACTIVE		= "active";
+$TB_EXPTSTATE_PANICED		= "paniced";
 $TB_EXPTSTATE_QUEUED		= "queued";
 
 # Interfaces roles.
@@ -1849,6 +1850,25 @@ function TBPlabAvail() {
     }
 
     return $types;
+}
+
+#
+# Is an experiment firewalled.
+# 
+function TBExptFirewall($pid, $eid) {
+    #
+    # Short form: is there a firewall?
+    # Only check the firewalls table so that we can be called for a swapped
+    # experiment (swapped experiments don't have reserved table info).
+    #
+    $query_result =
+	DBQueryWarn("SELECT eid FROM firewalls ".
+		    "WHERE pid='$pid' and eid='$eid' ".
+		    "AND type LIKE '%-vlan'");
+    if (!$query_result || !mysql_num_rows($query_result))
+	return 0;
+   
+    return 1;
 }
 
 #

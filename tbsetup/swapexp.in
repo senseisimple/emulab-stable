@@ -107,6 +107,7 @@ my @row;
 my $action;
 my $nextswapstate;
 my $termswapstate;
+my $isadmin  = 0;
 
 #
 # Untaint the path
@@ -270,12 +271,13 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
     die("*** $0:\n".
 	"    Cannot determine your name and email address.\n");
 }
+$isadmin = TBAdmin($UID);
 
 #
 # Verify that this person can muck with the experiment.
 # Note that any script down the line has to do an admin check also. 
 #
-if ($UID && !TBAdmin($UID) &&
+if ($UID && !$isadmin &&
     !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
 	"    You do not have permission to swap or modify this experiment!\n");
@@ -470,6 +472,17 @@ else {
 		       "or modify the experiment.\n")
 	    if ($canceled);
 
+  	#
+ 	# Cannot swapmod an active elabinelab experiment, yet.
+ 	# 
+ 	ExitWithStatus(1,
+ 		       "Experiment $pid/$eid is an active ElabInElab.\n".
+ 		       "You cannot modify this type of experiment while it\n".
+ 		       "is swapped in. We hope to support this soon.\n")
+ 	    if ($inout eq "modify" &&
+ 		($elabinelab || defined($elabinelab_eid)) &&
+ 		$estate ne EXPTSTATE_SWAPPED());
+
 	#
 	# Check the state for the various operations.
 	#
@@ -484,12 +497,25 @@ else {
 	      };
 	      /^out$/i && do {
 		  if ($estate ne EXPTSTATE_ACTIVE() &&
+ 		      $estate ne EXPTSTATE_PANICED() &&
 		      $estate ne EXPTSTATE_ACTIVATING()) {
 		      ExitWithStatus(1,
 				     "Experiment $pid/$eid is not swapped in ".
 				     "or activating!\n");
 		  }
 		  
+ 		  #
+ 		  # Must be an admin person to swap out an experiment that
+ 		  # has had its panic button pressed.
+ 		  #
+ 		  if ($estate eq EXPTSTATE_PANICED() && !$isadmin) {
+ 		      ExitWithStatus(1,
+ 				     "Experiment $pid/$eid had its panic ".
+ 				     "button pressed!\n".
+ 				     "Only a testbed administrator can swap ".
+ 				     "this experiment out.");
+ 		  }
+
 		  if ($estate eq EXPTSTATE_ACTIVATING()) {
 		      #
 		      # All we can do is set the cancel flag and hope that
@@ -743,6 +769,7 @@ if ($inout eq "out") {
     }
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
 	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
+    TBExptClearPanicBit($pid, $eid);
 }
 elsif ($inout eq "in") {
     my $optarg = "";

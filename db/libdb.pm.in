@@ -67,7 +67,7 @@ use vars qw(@ISA @EXPORT);
 	 DBLIMIT_NSFILESIZE NODERELOADPENDING_EID
 
 	 EXPTSTATE_NEW EXPTSTATE_PRERUN EXPTSTATE_SWAPPED EXPTSTATE_SWAPPING
-	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE
+	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE EXPTSTATE_PANICED
 	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED EXPTSTATE_QUEUED
 	 EXPTSTATE_MODIFY_PARSE EXPTSTATE_MODIFY_REPARSE EXPTSTATE_MODIFY_RESWAP
 	 EXPTSTATE_RESTARTING
@@ -200,6 +200,8 @@ use vars qw(@ISA @EXPORT);
 	 TBExptMinMaxNodes TBExptSecurityLevel TBExptIDX
 	 TBDB_SECLEVEL_GREEN  TBDB_SECLEVEL_YELLOW
 	 TBDB_SECLEVEL_ORANGE TBDB_SECLEVEL_RED
+
+	 TBExptSetPanicBit TBExptGetPanicBit TBExptClearPanicBit
 	 );
 
 # Must come after package declaration!
@@ -336,6 +338,7 @@ sub EXPTSTATE_QUEUED()		{ "queued"; }
 sub EXPTSTATE_SWAPPING()	{ "swapping"; }
 sub EXPTSTATE_ACTIVATING()	{ "activating"; }
 sub EXPTSTATE_ACTIVE()		{ "active"; }
+sub EXPTSTATE_PANICED()		{ "paniced"; }
 sub EXPTSTATE_TERMINATING()	{ "terminating"; }
 sub EXPTSTATE_TERMINATED()	{ "ended"; }
 sub EXPTSTATE_MODIFY_PARSE()	{ "modify_parse"; }
@@ -3773,6 +3776,46 @@ sub TBNodeFirewall ($$$) {
 	if (defined($fwnodep));
     $$fwvlanp = $row[1]
 	if (defined($fwvlanp));
+    return 1;
+}
+
+#
+# Set the paniced bit for an experiment.
+#
+sub TBExptSetPanicBit($$) {
+    my ($pid, $eid) = @_;
+
+    return DBQueryWarn("update experiments set ".
+		       "    paniced=1,panic_date=now() ".
+		       "where pid='$pid' and eid='$eid'");
+}
+
+#
+# Clear the panic bit.
+# 
+sub TBExptClearPanicBit($$) {
+    my ($pid, $eid) = @_;
+
+    return DBQueryWarn("update experiments set ".
+		       "    paniced=0,panic_date=NULL ".
+		       "where pid='$pid' and eid='$eid'");
+}
+
+#
+# Get the value of the paniced bit. 
+# 
+sub TBExptGetPanicBit($$$) {
+    my ($pid, $eid, $panicp) = @_;
+
+    my $query_result =
+	DBQueryWarn("select paniced,panic_date from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+    if (!$query_result || $query_result->num_rows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    $$panicp = $row[0];
+
     return 1;
 }
 

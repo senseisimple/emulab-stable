@@ -14,11 +14,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: node_statewait [-t timeout] [-a] | [node ...]\n";
+    print STDOUT
+	"Usage: node_statewait [-s state] [-t timeout] [-a] | [node ...]\n";
     exit(-1);
 }
-my $optlist = "at:";
+my $optlist = "at:s:";
 my $timeout = 60 * 6;
+my $state   = TBDB_NODESTATE_PXEWAIT;
 
 #
 # Configure variables
@@ -49,6 +51,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"t"})) {
     $timeout = $options{"t"};
+}
+if (defined($options{"s"})) {
+    $state = $options{"s"};
 }
 
 #
@@ -90,7 +95,7 @@ foreach my $node (sort(@nodes)) {
     #
     # Skip if something failed earlier.
     #
-    if (!TBNodeStateWait($node, TBDB_NODESTATE_PXEWAIT, $waitstart, $timeout)) {
+    if (!TBNodeStateWait($node, $state, $waitstart, $timeout)) {
 	print STDOUT "nodewait ($node): Success\n";
 	next;
     }

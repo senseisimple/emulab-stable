@@ -12,6 +12,7 @@ include("showstuff.php3");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
 # Verify page arguments.
@@ -59,7 +60,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 #
 $query_result =
     DBQueryFatal("select e.idx,e.state,e.batchmode,e.linktest_pid,".
-		 "       s.rsrcidx,r.wirelesslans ".
+		 "       e.paniced,e.panic_date,s.rsrcidx,r.wirelesslans ".
 		 "  from experiments as e ".
 		 "left join experiment_stats as s on s.exptidx=e.idx ".
 		 "left join experiment_resources as r on s.rsrcidx=r.idx ".
@@ -71,6 +72,8 @@ $rsrcidx    = $row["rsrcidx"];
 $isbatch    = $row["batchmode"];
 $wireless   = $row["wirelesslans"];
 $linktest_running = $row["linktest_pid"];
+$paniced    = $row["paniced"];
+$panic_date = $row["panic_date"];
 
 #
 # Get a list of node types and classes in this experiment
@@ -132,7 +135,8 @@ if ($expstate) {
 	    WRITESUBMENUBUTTON("Swap Experiment In",
 			"swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid");
 	}
-	elseif ($expstate == $TB_EXPTSTATE_ACTIVE) {
+	elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
+		($expstate == $TB_EXPTSTATE_PANICED && $isadmin)) {
 	    WRITESUBMENUBUTTON("Swap Experiment Out",
 			"swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
 	}
@@ -142,8 +146,10 @@ if ($expstate) {
 			       "&pid=$exp_pid&eid=$exp_eid");
 	}
     }
-    WRITESUBMENUBUTTON("Terminate Experiment",
-		       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
+    if ($expstate != $TB_EXPTSTATE_PANICED) {
+	WRITESUBMENUBUTTON("Terminate Experiment",
+			   "endexp.php3?pid=$exp_pid&eid=$exp_eid");
+    }
 
     # Batch experiments can be modifed only when paused.
     if ($expstate == $TB_EXPTSTATE_SWAPPED ||
@@ -215,7 +221,7 @@ if ($types['garcia'] || $classes['sg']) {
 		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid");
 }
 
-if (ISADMIN($uid)) {
+if ($isadmin) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	SUBMENUSECTION("Beta-Test Options");
 	WRITESUBMENUBUTTON("Restart Experiment",
@@ -241,12 +247,34 @@ SUBMENUEND_2A();
 echo "<br>
       <a href='shownsfile.php3?pid=$exp_pid&eid=$exp_eid'>
          <img border=1 alt='experiment vis'
-              src='showthumb.php3?idx=$rsrcidx'></a>\n";
+              src='showthumb.php3?idx=$rsrcidx'></a>";
 
 SUBMENUEND_2B();
 
 SHOWEXP($exp_pid, $exp_eid);
 
+if (TBExptFirewall($exp_pid, $exp_eid) &&
+    ($expstate == $TB_EXPTSTATE_ACTIVE ||
+     $expstate == $TB_EXPTSTATE_PANICED ||
+     $expstate == $TB_EXPTSTATE_ACTIVATING ||
+     $expstate == $TB_EXPTSTATE_SWAPPING)) {
+    echo "<center>\n";
+    if ($paniced) {
+	echo "<br><font size=+1 color=red><blink>".
+	     "Your experiment was cut off via the Panic Button on $panic_date!".
+	     "<br>".
+	     "You will need to contact testbed operations to make further ".
+  	     "changes (swap, terminate) to your experiment.</blink></font>";
+    }
+    else {
+	echo "<br><a href='panicbutton.php3?pid=$exp_pid&eid=$exp_eid'>
+                 <img border=1 alt='panic button' src='panicbutton.gif'></a>";
+	echo "<br><font color=red size=+2>".
+	     " Press the Panic Button to contain your experiment".
+	     "</font>\n";
+    }
+    echo "</center>\n";
+}
 SUBPAGEEND();
 
 #
@@ -254,7 +282,7 @@ SUBPAGEEND();
 #
 SHOWNODES($exp_pid, $exp_eid, $sortby);
 
-if (ISADMIN($uid)) {
+if ($isadmin) {
     echo "<center>
           <h3>Experiment Stats</h3>
          </center>\n";

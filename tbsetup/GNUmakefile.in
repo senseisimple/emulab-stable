@@ -28,14 +28,14 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
-		  elabinelab snmpit.proxy 
+		  elabinelab snmpit.proxy panic
 
 CTRLBIN_STUFF   = console_setup.proxy exports_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
-		  webendexp webbatchexp \
+		  webendexp webbatchexp webpanic \
 		  assign_wrapper assign_prepass ptopgen webnodeupdate \
 		  webdelay_config \
 		  webrmgroup webswapexp webnodecontrol \

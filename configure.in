@@ -572,6 +572,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
+	tbsetup/panic tbsetup/webpanic \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
 	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
