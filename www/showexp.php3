@@ -8,12 +8,7 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Show Experiment Information");
-
-#
-# Only known and logged in users can end experiments.
+# Only known and logged in users can look at experiments.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
@@ -32,6 +27,11 @@ if (!isset($eid) ||
 }
 $exp_eid = $eid;
 $exp_pid = $pid;
+
+#
+# Standard Testbed Header now that we have the pid/eid okay.
+#
+PAGEHEADER("Experiment Information ($pid/$eid)");
 
 #
 # Check to make sure this is a valid PID/EID tuple.
