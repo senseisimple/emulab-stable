@@ -6,8 +6,11 @@
 #
 
 #
-# testbed-shutdown - On shutdown, inform the testbed that we're going down
+# testbed       Do some testbed stuff,
 #
+# description:	Installs deltas (forcing reboot if necessary).
+#		On shutdown, it informs the testbed we are rebooting
+#		and terminates any lingering daemons.
 
 # Source function library.
 . /etc/rc.d/init.d/functions
@@ -27,11 +30,20 @@ RETVAL=0
 # See how we were called.
 case "$1" in
   start)
-  	touch /var/lock/subsys/tbshutdown
-	echo "Done"
+	if [ -r /etc/rc.d/testbed/rc.delta ]; then
+		echo "Doing Testbed Delta Thing ..."
+		/etc/rc.d/testbed/rc.delta
+		RETVAL=$?
+	fi
+	[ $RETVAL -eq 0 ] && touch /var/lock/subsys/testbed
 	;;
   stop)
-  	rm /var/lock/subsys/tbshutdown
+  	rm /var/lock/subsys/testbed
+	echo "Shutting down testbed daemons ..."
+	killproc trafgen
+	killproc program-agent
+	killproc slothd
+	killproc healthd
 	echo "Informing the testbed we're rebooting ..."
 	/etc/rc.d/testbed/tmcc state REBOOTING
 	RETVAL=$?
