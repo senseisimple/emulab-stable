@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 use English;
 use Getopt::Std;
-
+ 
 #
 # Create a user account. All this script does is create the account
 # if it does not exist, or update the password and gecos fields.

@@ -199,7 +199,6 @@ function SPITFORM($formfields, $returning, $errors)
                       <br>
 	              <input type=text
                              name=\"formfields[usr_key]\"
-                             value=\"" . $formfields[usr_key] . "\"
 	                     size=50
 	                     maxlength=1024>
                   </td>
@@ -456,7 +455,7 @@ if (!$returning) {
     # 
     if (isset($formfields[usr_key]) &&
 	strcmp($formfields[usr_key], "")) {
-	$usr_key = $formfields[usr_key];
+	$usr_key[] = $formfields[usr_key];
     }
     
     #
@@ -470,16 +469,19 @@ if (!$returning) {
 	if (! ($fp = fopen($usr_keyfile, "r"))) {
 	    TBERROR("Could not open $usr_keyfile", 1);
 	}
-	$buffer = fgets($fp, 4096);
+	while (!feof($fp)) {
+	    $buffer = fgets($fp, 4096);
 
-	if (! ereg("^[0-9a-zA-Z\@\. ]*$", $buffer)) {
-	    $errors["PubKey File Contents"] = "Invalid characters";
+	    if (! ereg("^[0-9a-zA-Z\@\. \n]*$", $buffer)) {
+		$errors["PubKey File Contents"] = "Invalid characters";
 
-	    SPITFORM($formfields, $returning, $errors);
-	    PAGEFOOTER();
-	    return;
+		fclose($fp);
+		SPITFORM($formfields, $returning, $errors);
+		PAGEFOOTER();
+		return;
+	    }
+	    $usr_key[] = Chop($buffer);
 	}
-	$usr_key = Chop($buffer);
 	fclose($fp);
     }
 }
@@ -549,8 +551,25 @@ if (! $returning) {
 	"date_add(now(), interval 1 year))");
 
     if (isset($usr_key)) {
-	DBQueryFatal("update users set home_pubkey='$usr_key' ".
-		     "where uid='$joining_uid'");
+	while (list ($idx, $stuff) = each ($usr_key)) {
+            #
+            # Need to separate out the comment field. 
+            #
+	    $pieces = explode(" ", $stuff);
+
+	    if (count($pieces) != 4) {
+		if (count($pieces) != 1) {
+		    TBERROR("Bad Key for $joining_uid: $stuff", 0);
+		}
+		continue;
+	    }
+            # These have already been tested for bad chars above (ereg).
+	    $key     = "$pieces[0] $pieces[1] $pieces[2] $pieces[3]";
+	    $comment = $pieces[3];
+	
+	    DBQueryFatal("replace into user_pubkeys ".
+			 "values ('$joining_uid', '$comment', '$key', now())");
+	}
     }
     
     $key = GENKEY($joining_uid);

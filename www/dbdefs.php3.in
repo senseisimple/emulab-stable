@@ -1141,6 +1141,19 @@ function TBCvswebAllowed($uid) {
 #
 # DB Interface.
 #
+$maxtries = 3;
+$DBlinkid = 0;
+while ($maxtries && !$DBlinkid) {
+    $DBlinkid = mysql_connect();
+    $maxtries--;
+    sleep(1);
+}
+if (! $DBlinkid) {
+    TBERROR("Could not connect to mysqld after several attempts!", 1);
+}
+if (!mysql_select_db($TBDBNAME)) {
+    TBERROR("Could not select DB after connecting!", 1);
+}
 
 #
 # Record last DB error string.

@@ -106,6 +106,12 @@ $query_result =
     DBQueryFatal("delete FROM users where uid='$target_uid'");
 
 #
+# Then the pubkey table,
+# 
+$query_result =
+    DBQueryFatal("delete FROM user_pubkeys where uid='$target_uid'");
+
+#
 # Warm fuzzies.
 #
 echo "<center><h2>

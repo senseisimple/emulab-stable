@@ -24,7 +24,7 @@ $isadmin = ISADMIN($uid);
 function SPITFORM($formfields, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN, $isadmin;
-    global $usr_keyfile;
+    global $target_uid;
     
     #
     # Standard Testbed Header. Written late cause of password
@@ -60,8 +60,7 @@ function SPITFORM($formfields, $errors)
             </td>
           </tr>\n
 
-          <form enctype=multipart/form-data
-                action=moduserinfo.php3 method=post>\n";
+          <form action=moduserinfo.php3 method=post>\n";
 
         #
         # UserName. This is a constant field. 
@@ -175,36 +174,6 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
 
 	#
-	# SSH public key
-	# 
-	echo "<tr>
-                  <td rowspan><center>
-                               Your SSH Pub Key: &nbsp<br>
-                                    [<b>2</b>]
-                              </center></td>
-
-                  <td rowspan><center>Upload (1K max)[<b>3</b>]<br>
-                                  <b>Or</b><br>
-                               Insert Key
-                              </center></td>
-
-                  <td rowspan>
-                      <input type=hidden name=MAX_FILE_SIZE value=1024>
-	              <input type=file
-                             name=usr_keyfile
-                             value=\"" . $usr_keyfile . "\"
-	                     size=50>
-                      <br>
-                      <br>
-	              <input type=text
-                             name=\"formfields[usr_key]\"
-                             value=\"" . $formfields[usr_key] . "\"
-	                     size=50
-	                     maxlength=1024>
-                  </td>
-              </tr>\n";	
-
-	#
 	# Password. Note that we do not resend the password. User
 	# must retype on error.
 	#
@@ -239,13 +208,9 @@ function SPITFORM($formfields, $errors)
                  <a href = 'docwrapper.php3?docname=security.html'>
                  security policies</a> for information
                  regarding passwords and email addresses.
-            <li> If you want us to use your existing ssh public key,
-                 then either paste it in or specify the path to your
-                 your identity.pub file.
-            <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a> users:
-                 The file upload mechanism is broken in Opera, so you cannot
-                 specify a local file for upload. Instead, please paste your
-                 key in.
+            <li> You can also
+                 <a href='showpubkeys.php3?target_uid=$target_uid'>
+                 edit your ssh public keys.</a>
           </ol>
           </blockquote></blockquote>
           </h4>\n";
@@ -307,7 +272,7 @@ if (mysql_num_rows($query_result) == 0) {
 # On first load, display a form consisting of current user values, and exit.
 #
 if (! isset($submit)) {
-    $formfields = array();
+    $defaults = array();
     
     #
     # Construct a defaults array based on current DB info.
@@ -321,7 +286,6 @@ if (! isset($submit)) {
     $defaults[usr_phone]   = $row[usr_phone];
     $defaults[usr_title]   = $row[usr_title];
     $defaults[usr_affil]   = $row[usr_affil];
-    $defaults[usr_key]     = $row[home_pubkey];
     
     SPITFORM($defaults, 0);
     PAGEFOOTER();
@@ -396,12 +360,6 @@ if (isset($formfields[password1]) &&
 	$errors["Password"] = "$checkerror";
     }
 }
-if (isset($formfields[usr_key]) &&
-    strcmp($formfields[usr_key], "") &&
-    ! ereg("^[0-9a-zA-Z\@\. ]*$", $formfields[usr_key])) {
-    $errors["PubKey"] = "Invalid characters";
-}
-
 if (count($errors)) {
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
@@ -424,40 +382,6 @@ if (! isset($formfields[usr_URL]) ||
 }
 else {
     $usr_URL = $formfields[usr_URL];
-}
-
-#
-# Pasted key.
-# 
-if (isset($formfields[usr_key]) &&
-    strcmp($formfields[usr_key], "")) {
-    $usr_key = $formfields[usr_key];
-}
-    
-#
-# If usr provided a file for the key, it overrides the paste in text.
-# Must read and check it.
-#
-# XXX I allow only a single line of stuff. The rest is ignored for now.
-#
-if (isset($usr_keyfile) &&
-    strcmp($usr_keyfile, "") &&
-    strcmp($usr_keyfile, "none")) {
-
-    if (! ($fp = fopen($usr_keyfile, "r"))) {
-	TBERROR("Could not open $usr_keyfile", 1);
-    }
-    $buffer = fgets($fp, 4096);
-
-    if (! ereg("^[0-9a-zA-Z\@\. \n]*$", $buffer)) {
-	$errors["PubKey File Contents"] = "Invalid characters";
-
-	SPITFORM($formfields, $errors);
-	PAGEFOOTER();
-	return;
-    }
-    $usr_key = Chop($buffer);
-    fclose($fp);
 }
 
 #
@@ -533,11 +457,6 @@ DBQueryFatal("UPDATE users SET ".
 	     "usr_affil=\"$usr_affil\"      ".
 	     "WHERE uid=\"$target_uid\"");
 
-if (isset($usr_key)) {
-    DBQueryFatal("update users set home_pubkey='$usr_key' ".
-		 "where uid='$target_uid'");
-}
-
 #
 # Audit
 #
@@ -567,7 +486,7 @@ TBMAIL("$usr_name <$usr_email>",
 #
 # mkacct updates the user gecos and password.
 # 
-SUEXEC($uid, "flux", "webmkacct $target_uid", 0);
+SUEXEC($uid, "flux", "webmkacct -a $target_uid", 0);
 
 #
 # Spit out a redirect so that the history does not include a post
