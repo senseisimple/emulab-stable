@@ -929,7 +929,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	security/GNUmakefile security/paperbag \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
-	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmprojdir \
+	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/tbdoit tbsetup/tbstopit \
 	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \

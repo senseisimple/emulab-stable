@@ -15,7 +15,7 @@ BIN_STUFF	= power snmpit tbend tbrun tbprerun tbreport \
 
 SBIN_STUFF	= resetvlans savevlans console_setup.proxy sched_reload
 
-LIBEXEC_STUFF	= mkprojdir rmprojdir mkacct-ctrl rmacct-ctrl \
+LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir tbdoit tbstopit console_setup
 
 LIB_STUFF       = libtbsetup.pm
@@ -59,8 +59,8 @@ post-install:
 	chmod 775 $(INSTALL_LIBEXECDIR)
 	chown root $(INSTALL_LIBEXECDIR)/mkprojdir
 	chmod u+s $(INSTALL_LIBEXECDIR)/mkprojdir
-	chown root $(INSTALL_LIBEXECDIR)/rmprojdir
-	chmod u+s $(INSTALL_LIBEXECDIR)/rmprojdir
+	chown root $(INSTALL_LIBEXECDIR)/rmproj
+	chmod u+s $(INSTALL_LIBEXECDIR)/rmproj
 	chown root $(INSTALL_LIBEXECDIR)/mkacct-ctrl
 	chmod u+s $(INSTALL_LIBEXECDIR)/mkacct-ctrl
 	chown root $(INSTALL_LIBEXECDIR)/rmacct-ctrl

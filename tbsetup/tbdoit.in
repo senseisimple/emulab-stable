@@ -115,8 +115,8 @@ if (system("$tbdir/tbrun $project $eid $irfile") != 0) {
     fatal();
 }
 
-print STDOUT "Running tbreport with arguments: -v $irfile 2>&1 > $repfile\n";
-if (system("$tbdir/tbreport -v $irfile 2>&1 > $repfile") != 0) {
+print STDOUT "Running tbreport with arguments: -v $project $eid $irfile 2>&1 > $repfile\n";
+if (system("$tbdir/tbreport -v $project $eid $irfile 2>&1 > $repfile") != 0) {
     print STDOUT "tbreport failed!\n";
     dumplog();
     tbendit();

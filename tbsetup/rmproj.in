@@ -3,13 +3,14 @@ use Mysql;
 use English;
 
 #
-# Remove a project directory hierarchy. Actually, the project directory
+# Remove a project. We delete the project directory hierarchy and the
+# we remove the group from /etc/group. Actually, the project directory
 # is *renamed* from $pid to $pid-`date +20%y%m%d-%H.%M.%S` since we do
 # not want to be so destructive.
 #
 # usage: rmprojdir <pid>
 #
-# TODO: Allow for the head of a project delete it.
+# TODO: Allow for the head of a project to delete it.
 #
 
 #
@@ -25,6 +26,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $PROJROOT = "/proj";
 my $dbh      = Mysql->connect("localhost",$DBNAME,"script","none");
 my $db_result= "";
+my $control_node = "plastic";
 
 #
 # Check args.
@@ -93,6 +95,37 @@ if (! -e $pid) {
 
 if (! rename($pid, $newname)) {
     print STDOUT "Could not rename project directory $pid to $newname: $!\n";
+    exit(-1);
+}
+
+#
+# Chown the owner/group to root and set the permissions so no one is
+# allowed to look inside.
+#
+if (! chmod(0700, $newname)) {
+    print STDOUT "Could not chmod directory $newname to 0700: $!\n";
+    exit(-1);
+}
+if (! chown(0, 0, $newname)) {
+    print STDOUT "Could not chown directory $newname to 0/0: $!\n";
+    exit(-1);
+}
+
+#
+# Now remove the group from the group file on both plastic and paper.
+#
+if (system("/usr/sbin/pw groupdel $pid")) {
+    print STDOUT "Could not remove group $pid fron operatons node (paper)\n";
+    exit(-1);
+}
+
+#
+# Be real root for ssh.
+# 
+$UID = 0;
+
+if (system("/usr/local/bin/sshtb $control_node /usr/sbin/pw groupdel $pid")) {
+    print STDOUT "Could not remove group $pid fron control node (plastic)\n";
     exit(-1);
 }
 

@@ -28,8 +28,4 @@ FILES  += $(wildcard $(SRCDIR)/*.php3)
 #
 ALLFILES = $(notdir $(FILES))
 
-#
-# Do not install by default
-#
-install:
-real-install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES))
+install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES))
