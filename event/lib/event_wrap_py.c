@@ -1039,6 +1039,40 @@ static PyObject *_wrap_event_handle_keylen_get(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *_wrap_event_handle_do_loop_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct event_handle *arg1 = (struct event_handle *) 0 ;
+    int arg2 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Oi:event_handle_do_loop_set",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_event_handle,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if (arg1) (arg1)->do_loop = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_handle_do_loop_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct event_handle *arg1 = (struct event_handle *) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:event_handle_do_loop_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_event_handle,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int) ((arg1)->do_loop);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_event_handle_init_set(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     struct event_handle *arg1 = (struct event_handle *) 0 ;
@@ -1763,6 +1797,47 @@ static PyObject *_wrap_address_tuple_scheduler_get(PyObject *self, PyObject *arg
 }
 
 
+static PyObject *_wrap_address_tuple_timeline_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    address_tuple *arg1 = (address_tuple *) 0 ;
+    char *arg2 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Os:address_tuple_timeline_set",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_address_tuple,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    {
+        if (arg1->timeline) free((char*)arg1->timeline);
+        if (arg2) {
+            arg1->timeline = (char *) malloc(strlen(arg2)+1);
+            strcpy((char*)arg1->timeline,arg2);
+        } else {
+            arg1->timeline = 0;
+        }
+    }
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_address_tuple_timeline_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    address_tuple *arg1 = (address_tuple *) 0 ;
+    char *result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:address_tuple_timeline_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_address_tuple,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (char *) ((arg1)->timeline);
+    
+    resultobj = result ? PyString_FromString(result) : Py_BuildValue((char*)"");
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_new_address_tuple(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     address_tuple *result;
@@ -1948,6 +2023,23 @@ static PyObject *_wrap_dont_use_this_function_because_it_does_not_work(PyObject 
     if(!PyArg_ParseTuple(args,(char *)"O:dont_use_this_function_because_it_does_not_work",&obj0)) goto fail;
     if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
     result = (int)event_main(arg1);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_stop_main(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:event_stop_main",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)event_stop_main(arg1);
     
     resultobj = PyInt_FromLong((long)result);
     return resultobj;
@@ -3059,6 +3151,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"event_handle_keydata_get", _wrap_event_handle_keydata_get, METH_VARARGS },
 	 { (char *)"event_handle_keylen_set", _wrap_event_handle_keylen_set, METH_VARARGS },
 	 { (char *)"event_handle_keylen_get", _wrap_event_handle_keylen_get, METH_VARARGS },
+	 { (char *)"event_handle_do_loop_set", _wrap_event_handle_do_loop_set, METH_VARARGS },
+	 { (char *)"event_handle_do_loop_get", _wrap_event_handle_do_loop_get, METH_VARARGS },
 	 { (char *)"event_handle_init_set", _wrap_event_handle_init_set, METH_VARARGS },
 	 { (char *)"event_handle_init_get", _wrap_event_handle_init_get, METH_VARARGS },
 	 { (char *)"event_handle_connect_set", _wrap_event_handle_connect_set, METH_VARARGS },
@@ -3099,6 +3193,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"address_tuple_eventtype_get", _wrap_address_tuple_eventtype_get, METH_VARARGS },
 	 { (char *)"address_tuple_scheduler_set", _wrap_address_tuple_scheduler_set, METH_VARARGS },
 	 { (char *)"address_tuple_scheduler_get", _wrap_address_tuple_scheduler_get, METH_VARARGS },
+	 { (char *)"address_tuple_timeline_set", _wrap_address_tuple_timeline_set, METH_VARARGS },
+	 { (char *)"address_tuple_timeline_get", _wrap_address_tuple_timeline_get, METH_VARARGS },
 	 { (char *)"new_address_tuple", _wrap_new_address_tuple, METH_VARARGS },
 	 { (char *)"delete_address_tuple", _wrap_delete_address_tuple, METH_VARARGS },
 	 { (char *)"address_tuple_swigregister", address_tuple_swigregister, METH_VARARGS },
@@ -3111,6 +3207,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"c_event_poll", _wrap_c_event_poll, METH_VARARGS },
 	 { (char *)"c_event_poll_blocking", _wrap_c_event_poll_blocking, METH_VARARGS },
 	 { (char *)"dont_use_this_function_because_it_does_not_work", _wrap_dont_use_this_function_because_it_does_not_work, METH_VARARGS },
+	 { (char *)"event_stop_main", _wrap_event_stop_main, METH_VARARGS },
 	 { (char *)"event_notify", _wrap_event_notify, METH_VARARGS },
 	 { (char *)"event_schedule", _wrap_event_schedule, METH_VARARGS },
 	 { (char *)"event_notification_alloc", _wrap_event_notification_alloc, METH_VARARGS },

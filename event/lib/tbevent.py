@@ -50,6 +50,9 @@ class event_handle(_object):
     __swig_setmethods__["keylen"] = _tbevent.event_handle_keylen_set
     __swig_getmethods__["keylen"] = _tbevent.event_handle_keylen_get
     if _newclass:keylen = property(_tbevent.event_handle_keylen_get, _tbevent.event_handle_keylen_set)
+    __swig_setmethods__["do_loop"] = _tbevent.event_handle_do_loop_set
+    __swig_getmethods__["do_loop"] = _tbevent.event_handle_do_loop_get
+    if _newclass:do_loop = property(_tbevent.event_handle_do_loop_get, _tbevent.event_handle_do_loop_set)
     __swig_setmethods__["init"] = _tbevent.event_handle_init_set
     __swig_getmethods__["init"] = _tbevent.event_handle_init_get
     if _newclass:init = property(_tbevent.event_handle_init_get, _tbevent.event_handle_init_set)
@@ -145,6 +148,9 @@ class address_tuple(_object):
     __swig_setmethods__["scheduler"] = _tbevent.address_tuple_scheduler_set
     __swig_getmethods__["scheduler"] = _tbevent.address_tuple_scheduler_get
     if _newclass:scheduler = property(_tbevent.address_tuple_scheduler_get, _tbevent.address_tuple_scheduler_set)
+    __swig_setmethods__["timeline"] = _tbevent.address_tuple_timeline_set
+    __swig_getmethods__["timeline"] = _tbevent.address_tuple_timeline_get
+    if _newclass:timeline = property(_tbevent.address_tuple_timeline_get, _tbevent.address_tuple_timeline_set)
     def __init__(self, *args):
         _swig_setattr(self, address_tuple, 'this', _tbevent.new_address_tuple(*args))
         _swig_setattr(self, address_tuple, 'thisown', 1)
@@ -187,6 +193,8 @@ c_event_poll = _tbevent.c_event_poll
 c_event_poll_blocking = _tbevent.c_event_poll_blocking
 
 dont_use_this_function_because_it_does_not_work = _tbevent.dont_use_this_function_because_it_does_not_work
+
+event_stop_main = _tbevent.event_stop_main
 
 event_notify = _tbevent.event_notify
 
@@ -384,6 +392,9 @@ class NotificationWrapper:
         return event_notification_set_arguments(self.handle,
                                                 self.notification,
                                                 args)
+
+    def getTimeline(self, args):
+        return event_notification_get_timeline(self.handle, self.notification)
 
     def getSender(self):
         return event_notification_get_sender(self.handle, self.notification)

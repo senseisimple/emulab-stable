@@ -88,7 +88,7 @@ event_wrap.o:	$(SRCDIR)/event_wrap.c
 # Note: The python version of the wrappers do not seem to be afflicted by the
 # same problems as the perl one.
 #
-swig-pywrappers: event.i event.c tbevent.py.tail
+swig-pywrappers: event.i event.h event.c tbevent.py.tail
 	swig -python -I$(SRCDIR) -o $(SRCDIR)/event_wrap_py.c -module tbevent \
 		$(SRCDIR)/event.i
 	cat $(SRCDIR)/tbevent.py.tail >> $(SRCDIR)/tbevent.py
