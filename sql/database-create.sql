@@ -1,11 +1,11 @@
--- MySQL dump 8.22
+-- MySQL dump 8.23
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.54-log
+-- Server version	3.23.58-log
 
 --
--- Table structure for table 'cdroms'
+-- Table structure for table `cdroms`
 --
 
 CREATE TABLE cdroms (
@@ -20,7 +20,7 @@ CREATE TABLE cdroms (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'comments'
+-- Table structure for table `comments`
 --
 
 CREATE TABLE comments (
@@ -31,7 +31,7 @@ CREATE TABLE comments (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'current_reloads'
+-- Table structure for table `current_reloads`
 --
 
 CREATE TABLE current_reloads (
@@ -41,7 +41,7 @@ CREATE TABLE current_reloads (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'delays'
+-- Table structure for table `delays`
 --
 
 CREATE TABLE delays (
@@ -94,7 +94,7 @@ CREATE TABLE delays (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'delta_inst'
+-- Table structure for table `delta_inst`
 --
 
 CREATE TABLE delta_inst (
@@ -105,7 +105,7 @@ CREATE TABLE delta_inst (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'delta_proj'
+-- Table structure for table `delta_proj`
 --
 
 CREATE TABLE delta_proj (
@@ -115,7 +115,7 @@ CREATE TABLE delta_proj (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'deltas'
+-- Table structure for table `deltas`
 --
 
 CREATE TABLE deltas (
@@ -127,7 +127,7 @@ CREATE TABLE deltas (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'event_eventtypes'
+-- Table structure for table `event_eventtypes`
 --
 
 CREATE TABLE event_eventtypes (
@@ -137,7 +137,7 @@ CREATE TABLE event_eventtypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'event_objecttypes'
+-- Table structure for table `event_objecttypes`
 --
 
 CREATE TABLE event_objecttypes (
@@ -147,7 +147,7 @@ CREATE TABLE event_objecttypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'eventlist'
+-- Table structure for table `eventlist`
 --
 
 CREATE TABLE eventlist (
@@ -166,7 +166,7 @@ CREATE TABLE eventlist (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'experiment_resources'
+-- Table structure for table `experiment_resources`
 --
 
 CREATE TABLE experiment_resources (
@@ -196,7 +196,7 @@ CREATE TABLE experiment_resources (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'experiment_stats'
+-- Table structure for table `experiment_stats`
 --
 
 CREATE TABLE experiment_stats (
@@ -226,7 +226,7 @@ CREATE TABLE experiment_stats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'experiments'
+-- Table structure for table `experiments`
 --
 
 CREATE TABLE experiments (
@@ -287,7 +287,7 @@ CREATE TABLE experiments (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'exported_tables'
+-- Table structure for table `exported_tables`
 --
 
 CREATE TABLE exported_tables (
@@ -296,7 +296,7 @@ CREATE TABLE exported_tables (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'exppid_access'
+-- Table structure for table `exppid_access`
 --
 
 CREATE TABLE exppid_access (
@@ -307,7 +307,7 @@ CREATE TABLE exppid_access (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'foreign_keys'
+-- Table structure for table `foreign_keys`
 --
 
 CREATE TABLE foreign_keys (
@@ -319,7 +319,7 @@ CREATE TABLE foreign_keys (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'group_membership'
+-- Table structure for table `group_membership`
 --
 
 CREATE TABLE group_membership (
@@ -335,7 +335,7 @@ CREATE TABLE group_membership (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'group_stats'
+-- Table structure for table `group_stats`
 --
 
 CREATE TABLE group_stats (
@@ -360,7 +360,7 @@ CREATE TABLE group_stats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'groups'
+-- Table structure for table `groups`
 --
 
 CREATE TABLE groups (
@@ -380,7 +380,7 @@ CREATE TABLE groups (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'iface_counters'
+-- Table structure for table `iface_counters`
 --
 
 CREATE TABLE iface_counters (
@@ -395,7 +395,7 @@ CREATE TABLE iface_counters (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'images'
+-- Table structure for table `images`
 --
 
 CREATE TABLE images (
@@ -427,7 +427,7 @@ CREATE TABLE images (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'interface_types'
+-- Table structure for table `interface_types`
 --
 
 CREATE TABLE interface_types (
@@ -442,7 +442,7 @@ CREATE TABLE interface_types (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'interfaces'
+-- Table structure for table `interfaces`
 --
 
 CREATE TABLE interfaces (
@@ -465,7 +465,7 @@ CREATE TABLE interfaces (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'ipport_ranges'
+-- Table structure for table `ipport_ranges`
 --
 
 CREATE TABLE ipport_ranges (
@@ -477,7 +477,7 @@ CREATE TABLE ipport_ranges (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'ipsubnets'
+-- Table structure for table `ipsubnets`
 --
 
 CREATE TABLE ipsubnets (
@@ -488,7 +488,7 @@ CREATE TABLE ipsubnets (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'last_reservation'
+-- Table structure for table `last_reservation`
 --
 
 CREATE TABLE last_reservation (
@@ -498,7 +498,7 @@ CREATE TABLE last_reservation (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'linkdelays'
+-- Table structure for table `linkdelays`
 --
 
 CREATE TABLE linkdelays (
@@ -536,7 +536,7 @@ CREATE TABLE linkdelays (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'login'
+-- Table structure for table `login`
 --
 
 CREATE TABLE login (
@@ -547,7 +547,7 @@ CREATE TABLE login (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'loginmessage'
+-- Table structure for table `loginmessage`
 --
 
 CREATE TABLE loginmessage (
@@ -557,7 +557,7 @@ CREATE TABLE loginmessage (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'mode_transitions'
+-- Table structure for table `mode_transitions`
 --
 
 CREATE TABLE mode_transitions (
@@ -565,13 +565,14 @@ CREATE TABLE mode_transitions (
   state1 varchar(20) NOT NULL default '',
   op_mode2 varchar(20) NOT NULL default '',
   state2 varchar(20) NOT NULL default '',
+  label varchar(255) NOT NULL default '',
   PRIMARY KEY  (op_mode1,state1,op_mode2,state2),
   KEY op_mode1 (op_mode1,state1),
   KEY op_mode2 (op_mode2,state2)
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'new_interfaces'
+-- Table structure for table `new_interfaces`
 --
 
 CREATE TABLE new_interfaces (
@@ -586,7 +587,7 @@ CREATE TABLE new_interfaces (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'new_nodes'
+-- Table structure for table `new_nodes`
 --
 
 CREATE TABLE new_nodes (
@@ -601,7 +602,7 @@ CREATE TABLE new_nodes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'newdelays'
+-- Table structure for table `newdelays`
 --
 
 CREATE TABLE newdelays (
@@ -625,7 +626,7 @@ CREATE TABLE newdelays (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'next_reserve'
+-- Table structure for table `next_reserve`
 --
 
 CREATE TABLE next_reserve (
@@ -636,7 +637,7 @@ CREATE TABLE next_reserve (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nextfreenode'
+-- Table structure for table `nextfreenode`
 --
 
 CREATE TABLE nextfreenode (
@@ -647,7 +648,7 @@ CREATE TABLE nextfreenode (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_activity'
+-- Table structure for table `node_activity`
 --
 
 CREATE TABLE node_activity (
@@ -661,7 +662,7 @@ CREATE TABLE node_activity (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_auxtypes'
+-- Table structure for table `node_auxtypes`
 --
 
 CREATE TABLE node_auxtypes (
@@ -672,7 +673,7 @@ CREATE TABLE node_auxtypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_features'
+-- Table structure for table `node_features`
 --
 
 CREATE TABLE node_features (
@@ -683,7 +684,7 @@ CREATE TABLE node_features (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_idlestats'
+-- Table structure for table `node_idlestats`
 --
 
 CREATE TABLE node_idlestats (
@@ -697,7 +698,7 @@ CREATE TABLE node_idlestats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_status'
+-- Table structure for table `node_status`
 --
 
 CREATE TABLE node_status (
@@ -708,7 +709,7 @@ CREATE TABLE node_status (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_type_features'
+-- Table structure for table `node_type_features`
 --
 
 CREATE TABLE node_type_features (
@@ -719,7 +720,7 @@ CREATE TABLE node_type_features (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_types'
+-- Table structure for table `node_types`
 --
 
 CREATE TABLE node_types (
@@ -750,7 +751,7 @@ CREATE TABLE node_types (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'node_types_auxtypes'
+-- Table structure for table `node_types_auxtypes`
 --
 
 CREATE TABLE node_types_auxtypes (
@@ -760,7 +761,7 @@ CREATE TABLE node_types_auxtypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nodeipportnum'
+-- Table structure for table `nodeipportnum`
 --
 
 CREATE TABLE nodeipportnum (
@@ -770,7 +771,7 @@ CREATE TABLE nodeipportnum (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nodelog'
+-- Table structure for table `nodelog`
 --
 
 CREATE TABLE nodelog (
@@ -784,7 +785,7 @@ CREATE TABLE nodelog (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nodes'
+-- Table structure for table `nodes`
 --
 
 CREATE TABLE nodes (
@@ -838,7 +839,7 @@ CREATE TABLE nodes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nodetypeXpid_permissions'
+-- Table structure for table `nodetypeXpid_permissions`
 --
 
 CREATE TABLE nodetypeXpid_permissions (
@@ -848,7 +849,7 @@ CREATE TABLE nodetypeXpid_permissions (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nodeuidlastlogin'
+-- Table structure for table `nodeuidlastlogin`
 --
 
 CREATE TABLE nodeuidlastlogin (
@@ -860,7 +861,7 @@ CREATE TABLE nodeuidlastlogin (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nologins'
+-- Table structure for table `nologins`
 --
 
 CREATE TABLE nologins (
@@ -869,7 +870,7 @@ CREATE TABLE nologins (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nseconfigs'
+-- Table structure for table `nseconfigs`
 --
 
 CREATE TABLE nseconfigs (
@@ -881,7 +882,7 @@ CREATE TABLE nseconfigs (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'nsfiles'
+-- Table structure for table `nsfiles`
 --
 
 CREATE TABLE nsfiles (
@@ -892,7 +893,7 @@ CREATE TABLE nsfiles (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'ntpinfo'
+-- Table structure for table `ntpinfo`
 --
 
 CREATE TABLE ntpinfo (
@@ -903,7 +904,7 @@ CREATE TABLE ntpinfo (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'os_info'
+-- Table structure for table `os_info`
 --
 
 CREATE TABLE os_info (
@@ -932,7 +933,7 @@ CREATE TABLE os_info (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'osidtoimageid'
+-- Table structure for table `osidtoimageid`
 --
 
 CREATE TABLE osidtoimageid (
@@ -943,7 +944,7 @@ CREATE TABLE osidtoimageid (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'outlets'
+-- Table structure for table `outlets`
 --
 
 CREATE TABLE outlets (
@@ -955,7 +956,7 @@ CREATE TABLE outlets (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'partitions'
+-- Table structure for table `partitions`
 --
 
 CREATE TABLE partitions (
@@ -966,7 +967,7 @@ CREATE TABLE partitions (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'plab_slice_nodes'
+-- Table structure for table `plab_slice_nodes`
 --
 
 CREATE TABLE plab_slice_nodes (
@@ -981,7 +982,7 @@ CREATE TABLE plab_slice_nodes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'plab_slices'
+-- Table structure for table `plab_slices`
 --
 
 CREATE TABLE plab_slices (
@@ -994,7 +995,7 @@ CREATE TABLE plab_slices (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'port_counters'
+-- Table structure for table `port_counters`
 --
 
 CREATE TABLE port_counters (
@@ -1017,7 +1018,7 @@ CREATE TABLE port_counters (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'portmap'
+-- Table structure for table `portmap`
 --
 
 CREATE TABLE portmap (
@@ -1029,7 +1030,7 @@ CREATE TABLE portmap (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'proj_memb'
+-- Table structure for table `proj_memb`
 --
 
 CREATE TABLE proj_memb (
@@ -1042,7 +1043,7 @@ CREATE TABLE proj_memb (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'project_stats'
+-- Table structure for table `project_stats`
 --
 
 CREATE TABLE project_stats (
@@ -1066,7 +1067,7 @@ CREATE TABLE project_stats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'projects'
+-- Table structure for table `projects`
 --
 
 CREATE TABLE projects (
@@ -1100,7 +1101,7 @@ CREATE TABLE projects (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'reserved'
+-- Table structure for table `reserved`
 --
 
 CREATE TABLE reserved (
@@ -1115,7 +1116,7 @@ CREATE TABLE reserved (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'scheduled_reloads'
+-- Table structure for table `scheduled_reloads`
 --
 
 CREATE TABLE scheduled_reloads (
@@ -1126,7 +1127,7 @@ CREATE TABLE scheduled_reloads (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'sitevariables'
+-- Table structure for table `sitevariables`
 --
 
 CREATE TABLE sitevariables (
@@ -1138,7 +1139,7 @@ CREATE TABLE sitevariables (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'state_timeouts'
+-- Table structure for table `state_timeouts`
 --
 
 CREATE TABLE state_timeouts (
@@ -1150,18 +1151,19 @@ CREATE TABLE state_timeouts (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'state_transitions'
+-- Table structure for table `state_transitions`
 --
 
 CREATE TABLE state_transitions (
   op_mode varchar(20) NOT NULL default '',
   state1 varchar(20) NOT NULL default '',
   state2 varchar(20) NOT NULL default '',
+  label varchar(255) NOT NULL default '',
   PRIMARY KEY  (op_mode,state1,state2)
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'state_triggers'
+-- Table structure for table `state_triggers`
 --
 
 CREATE TABLE state_triggers (
@@ -1173,7 +1175,7 @@ CREATE TABLE state_triggers (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'switch_paths'
+-- Table structure for table `switch_paths`
 --
 
 CREATE TABLE switch_paths (
@@ -1185,7 +1187,7 @@ CREATE TABLE switch_paths (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'switch_stack_types'
+-- Table structure for table `switch_stack_types`
 --
 
 CREATE TABLE switch_stack_types (
@@ -1200,7 +1202,7 @@ CREATE TABLE switch_stack_types (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'switch_stacks'
+-- Table structure for table `switch_stacks`
 --
 
 CREATE TABLE switch_stacks (
@@ -1210,7 +1212,7 @@ CREATE TABLE switch_stacks (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'testbed_stats'
+-- Table structure for table `testbed_stats`
 --
 
 CREATE TABLE testbed_stats (
@@ -1228,7 +1230,7 @@ CREATE TABLE testbed_stats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'testsuite_preentables'
+-- Table structure for table `testsuite_preentables`
 --
 
 CREATE TABLE testsuite_preentables (
@@ -1238,7 +1240,7 @@ CREATE TABLE testsuite_preentables (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'tiplines'
+-- Table structure for table `tiplines`
 --
 
 CREATE TABLE tiplines (
@@ -1253,7 +1255,7 @@ CREATE TABLE tiplines (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'tipservers'
+-- Table structure for table `tipservers`
 --
 
 CREATE TABLE tipservers (
@@ -1262,7 +1264,7 @@ CREATE TABLE tipservers (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'tmcd_redirect'
+-- Table structure for table `tmcd_redirect`
 --
 
 CREATE TABLE tmcd_redirect (
@@ -1272,7 +1274,7 @@ CREATE TABLE tmcd_redirect (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'tunnels'
+-- Table structure for table `tunnels`
 --
 
 CREATE TABLE tunnels (
@@ -1294,7 +1296,7 @@ CREATE TABLE tunnels (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'uidnodelastlogin'
+-- Table structure for table `uidnodelastlogin`
 --
 
 CREATE TABLE uidnodelastlogin (
@@ -1306,7 +1308,7 @@ CREATE TABLE uidnodelastlogin (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'unixgroup_membership'
+-- Table structure for table `unixgroup_membership`
 --
 
 CREATE TABLE unixgroup_membership (
@@ -1316,7 +1318,7 @@ CREATE TABLE unixgroup_membership (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'user_pubkeys'
+-- Table structure for table `user_pubkeys`
 --
 
 CREATE TABLE user_pubkeys (
@@ -1329,7 +1331,7 @@ CREATE TABLE user_pubkeys (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'user_sfskeys'
+-- Table structure for table `user_sfskeys`
 --
 
 CREATE TABLE user_sfskeys (
@@ -1341,7 +1343,7 @@ CREATE TABLE user_sfskeys (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'user_stats'
+-- Table structure for table `user_stats`
 --
 
 CREATE TABLE user_stats (
@@ -1367,7 +1369,7 @@ CREATE TABLE user_stats (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'users'
+-- Table structure for table `users`
 --
 
 CREATE TABLE users (
@@ -1410,7 +1412,7 @@ CREATE TABLE users (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'userslastlogin'
+-- Table structure for table `userslastlogin`
 --
 
 CREATE TABLE userslastlogin (
@@ -1421,7 +1423,7 @@ CREATE TABLE userslastlogin (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'v2pmap'
+-- Table structure for table `v2pmap`
 --
 
 CREATE TABLE v2pmap (
@@ -1433,7 +1435,7 @@ CREATE TABLE v2pmap (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'veth_interfaces'
+-- Table structure for table `veth_interfaces`
 --
 
 CREATE TABLE veth_interfaces (
@@ -1449,7 +1451,7 @@ CREATE TABLE veth_interfaces (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_agents'
+-- Table structure for table `virt_agents`
 --
 
 CREATE TABLE virt_agents (
@@ -1462,7 +1464,7 @@ CREATE TABLE virt_agents (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_lans'
+-- Table structure for table `virt_lans`
 --
 
 CREATE TABLE virt_lans (
@@ -1501,7 +1503,7 @@ CREATE TABLE virt_lans (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_node_desires'
+-- Table structure for table `virt_node_desires`
 --
 
 CREATE TABLE virt_node_desires (
@@ -1514,7 +1516,7 @@ CREATE TABLE virt_node_desires (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_nodes'
+-- Table structure for table `virt_nodes`
 --
 
 CREATE TABLE virt_nodes (
@@ -1536,7 +1538,7 @@ CREATE TABLE virt_nodes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_routes'
+-- Table structure for table `virt_routes`
 --
 
 CREATE TABLE virt_routes (
@@ -1554,7 +1556,7 @@ CREATE TABLE virt_routes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_trafgens'
+-- Table structure for table `virt_trafgens`
 --
 
 CREATE TABLE virt_trafgens (
@@ -1576,7 +1578,7 @@ CREATE TABLE virt_trafgens (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'virt_vtypes'
+-- Table structure for table `virt_vtypes`
 --
 
 CREATE TABLE virt_vtypes (
@@ -1588,7 +1590,7 @@ CREATE TABLE virt_vtypes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'vis_nodes'
+-- Table structure for table `vis_nodes`
 --
 
 CREATE TABLE vis_nodes (
@@ -1602,7 +1604,7 @@ CREATE TABLE vis_nodes (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'vlans'
+-- Table structure for table `vlans`
 --
 
 CREATE TABLE vlans (
@@ -1616,7 +1618,7 @@ CREATE TABLE vlans (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'webdb_table_permissions'
+-- Table structure for table `webdb_table_permissions`
 --
 
 CREATE TABLE webdb_table_permissions (
@@ -1628,7 +1630,7 @@ CREATE TABLE webdb_table_permissions (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'webnews'
+-- Table structure for table `webnews`
 --
 
 CREATE TABLE webnews (
@@ -1642,7 +1644,7 @@ CREATE TABLE webnews (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'widearea_accounts'
+-- Table structure for table `widearea_accounts`
 --
 
 CREATE TABLE widearea_accounts (
@@ -1655,7 +1657,7 @@ CREATE TABLE widearea_accounts (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'widearea_delays'
+-- Table structure for table `widearea_delays`
 --
 
 CREATE TABLE widearea_delays (
@@ -1673,7 +1675,7 @@ CREATE TABLE widearea_delays (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'widearea_nodeinfo'
+-- Table structure for table `widearea_nodeinfo`
 --
 
 CREATE TABLE widearea_nodeinfo (
@@ -1692,7 +1694,7 @@ CREATE TABLE widearea_nodeinfo (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'widearea_privkeys'
+-- Table structure for table `widearea_privkeys`
 --
 
 CREATE TABLE widearea_privkeys (
@@ -1711,7 +1713,7 @@ CREATE TABLE widearea_privkeys (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'widearea_recent'
+-- Table structure for table `widearea_recent`
 --
 
 CREATE TABLE widearea_recent (
@@ -1729,7 +1731,7 @@ CREATE TABLE widearea_recent (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'widearea_updates'
+-- Table structure for table `widearea_updates`
 --
 
 CREATE TABLE widearea_updates (
@@ -1741,7 +1743,7 @@ CREATE TABLE widearea_updates (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table 'wires'
+-- Table structure for table `wires`
 --
 
 CREATE TABLE wires (

@@ -1026,3 +1026,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table switch_stack_types add column min_vlan int default NULL;
        alter table switch_stack_types add column max_vlan int default NULL;
+
+1.195: Add a label to the state and mode transitions table. After
+       running the two statements below, reload a current version of db-fill.
+
+       alter table state_transitions add label varchar(255) not null;
+       alter table mode_transitions add label varchar(255) not null;

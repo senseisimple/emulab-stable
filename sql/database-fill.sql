@@ -1,11 +1,11 @@
--- MySQL dump 8.21
+-- MySQL dump 8.23
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.49-log
+-- Server version	3.23.58-log
 
 --
--- Dumping data for table 'comments'
+-- Dumping data for table `comments`
 --
 
 
@@ -60,7 +60,7 @@ REPLACE INTO comments VALUES ('widearea_delays','','Delay and bandwidth metrics 
 REPLACE INTO comments VALUES ('virt_nodes','','Experiment virtual nodes');
 
 --
--- Dumping data for table 'event_eventtypes'
+-- Dumping data for table `event_eventtypes`
 --
 
 
@@ -79,7 +79,7 @@ REPLACE INTO event_eventtypes VALUES (11,'HALT');
 REPLACE INTO event_eventtypes VALUES (12,'SWAPOUT');
 
 --
--- Dumping data for table 'event_objecttypes'
+-- Dumping data for table `event_objecttypes`
 --
 
 
@@ -93,7 +93,7 @@ REPLACE INTO event_objecttypes VALUES (6,'SIMULATOR');
 REPLACE INTO event_objecttypes VALUES (7,'LINKTEST');
 
 --
--- Dumping data for table 'exported_tables'
+-- Dumping data for table `exported_tables`
 --
 
 
@@ -110,7 +110,7 @@ REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 
 --
--- Dumping data for table 'foreign_keys'
+-- Dumping data for table `foreign_keys`
 --
 
 
@@ -171,41 +171,41 @@ REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid,vname','virt_nodes','eid
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid','experiments','eid,pid');
 
 --
--- Dumping data for table 'mode_transitions'
+-- Dumping data for table `mode_transitions`
 --
 
 
-REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NETBOOT','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMAL','REBOOTING');
-REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMALv1','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','RELOAD','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','NORMAL','REBOOTING');
-REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','NORMALv1','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','RELOAD','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NETBOOT','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NORMALv1','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','RELOAD','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','NETBOOT','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','NORMALv1','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','RELOAD','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NETBOOT','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NORMAL','REBOOTING');
-REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','RELOAD','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NETBOOT','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMAL','REBOOTING');
-REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMALv1','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','MINIMAL','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NETBOOT','SHUTDOWN');
-REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMAL','REBOOTING');
-REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv1','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NETBOOT','SHUTDOWN','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','RELOAD','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMALv1','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NETBOOT','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMAL','REBOOTING','');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv1','SHUTDOWN','');
 
 --
--- Dumping data for table 'state_timeouts'
+-- Dumping data for table `state_timeouts`
 --
 
 
@@ -252,110 +252,110 @@ REPLACE INTO state_timeouts VALUES ('PCVM','ISUP',0,'');
 REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
 
 --
--- Dumping data for table 'state_transitions'
+-- Dumping data for table `state_transitions`
 --
 
 
-REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP');
-REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','ACTIVE');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','SWAPPED');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','TESTING');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVE','SWAPPING');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','NEW','PRERUN');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','PRERUN','SWAPPED');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPED','ACTIVATING');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPED','TERMINATING');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPING','SWAPPED');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TERMINATING','TERMINATED');
-REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TESTING','SWAPPING');
-REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','BOOTING');
-REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','ISUP');
-REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','BOOTING');
-REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NETBOOT','BOOTING','ISUP');
-REPLACE INTO state_transitions VALUES ('NETBOOT','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','BOOTING');
-REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','ISUP');
-REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RESERVED');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_DIRTY','RELOAD');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_DIRTY','RESERVED');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','REBOOT','FREE_DIRTY');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD','FREE_CLEAN');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','REBOOT');
-REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','RELOAD');
-REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTED');
-REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','REBOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','ISUP');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','REBOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','REBOOTING');
-REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','TBSETUP');
-REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP');
-REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP');
-REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP');
-REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP');
-REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','BOOTING');
-REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','RELOADSETUP');
-REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('RELOAD','RELOADING','RELOADDONE');
-REPLACE INTO state_transitions VALUES ('RELOAD','RELOADING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','RELOADING');
-REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('RELOAD','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('RELOAD','SHUTDOWN','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('USERSTATUS','ACTIVE','FROZEN');
-REPLACE INTO state_transitions VALUES ('USERSTATUS','FROZEN','ACTIVE');
-REPLACE INTO state_transitions VALUES ('USERSTATUS','NEWUSER','UNAPPROVED');
-REPLACE INTO state_transitions VALUES ('USERSTATUS','UNAPPROVED','ACTIVE');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','BOOTING','REBOOTED');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','BOOTING','REBOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','BOOTING','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','REBOOTED');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','REBOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','BOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','ISUP');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','REBOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','SHUTDOWN');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','BOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','REBOOTED');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','REBOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','BOOTING');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','REBOOTED');
-REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('ALWAYSUP','SHUTDOWN','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','ACTIVE','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','SWAPPED','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','TESTING','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVE','SWAPPING','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','NEW','PRERUN','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','PRERUN','SWAPPED','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPED','ACTIVATING','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPED','TERMINATING','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPING','SWAPPED','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TERMINATING','TERMINATED','');
+REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TESTING','SWAPPING','');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','BOOTING','DHCPRetry');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','BOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('MINIMAL','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NETBOOT','BOOTING','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('NETBOOT','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','BOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','ISUP','Retry');
+REPLACE INTO state_transitions VALUES ('NETBOOT','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NETBOOT','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RESERVED','');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_DIRTY','RELOAD','');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_DIRTY','RESERVED','');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','REBOOT','FREE_DIRTY','');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD','FREE_CLEAN','');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','REBOOT','');
+REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','RELOAD','');
+REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','BOOTING','DHCPRetry');
+REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTED','Error');
+REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','REBOOTING','Reboot');
+REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','BOOTING','DHCPRetry');
+REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','TBSETUP','BootOK');
+REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','BOOTING','KernelChange');
+REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','BOOTING','DHCPRetry');
+REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','RELOADSETUP','BootOK');
+REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADING','RELOADDONE','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','RELOADING','ReloadReady');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('RELOAD','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('RELOAD','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('USERSTATUS','ACTIVE','FROZEN','');
+REPLACE INTO state_transitions VALUES ('USERSTATUS','FROZEN','ACTIVE','');
+REPLACE INTO state_transitions VALUES ('USERSTATUS','NEWUSER','UNAPPROVED','');
+REPLACE INTO state_transitions VALUES ('USERSTATUS','UNAPPROVED','ACTIVE','');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','BOOTING','REBOOTED','Error');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','BOOTING','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','REBOOTED','SilentReboot');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','REBOOTING','Reboot');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTED','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','REBOOTED','BootOK');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','REBOOTING','BootOK');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','REBOOTED','Error');
+REPLACE INTO state_transitions VALUES ('WIDEAREA','SHUTDOWN','SHUTDOWN','Retry');
+REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP','BootOK');
+REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN','Reboot');
+REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','ISUP','BootDone');
+REPLACE INTO state_transitions VALUES ('ALWAYSUP','ISUP','ISUP','Retry');
+REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','SHUTDOWN','Retry');
 
 --
--- Dumping data for table 'state_triggers'
+-- Dumping data for table `state_triggers`
 --
 
 
@@ -367,7 +367,7 @@ REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
 REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
 
 --
--- Dumping data for table 'testsuite_preentables'
+-- Dumping data for table `testsuite_preentables`
 --
 
 
@@ -405,7 +405,7 @@ REPLACE INTO testsuite_preentables VALUES ('experiment_stats','clean');
 REPLACE INTO testsuite_preentables VALUES ('testbed_stats','clean');
 
 --
--- Dumping data for table 'webdb_table_permissions'
+-- Dumping data for table `webdb_table_permissions`
 --
 
 
