@@ -417,7 +417,7 @@ sub ShowMetrics()
 	if (!defined($metricsage)) {
 	    $line .= "," if $gotone++;
 	    $line .= "reject_no_data";
-	} elsif ($metricsage > $STALEAGE) {
+	} elsif ($STALEAGE > 0 && $metricsage > $STALEAGE) {
 	    $line .= "," if $gotone++;
 	    $line .= "reject_stale_data";
 	}
