@@ -1,7 +1,0 @@
-#!/bin/csh
-
-TBDIR=@prefix@
-
-killall tbmevd
-exec ${TBDIR}/sbin/tbmevd >>& $TBDIR/log/tbmevd.log
-

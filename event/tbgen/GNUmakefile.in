@@ -4,9 +4,9 @@ OBJDIR		= ../..
 SUBDIR		= event/tbgen
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= tbmevc
+PROGRAMS	= tevc
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += tbmevd tbmevd.restart
+PROGRAMS       += tevd tevd.restart
 endif
 
 include $(OBJDIR)/Makeconf
@@ -34,20 +34,20 @@ endif
 #LIBS     += `elvin-config --libs vin4mt`
 LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
 
-tbmevc:	tbmevc.o
-	$(CC) $(LDFLAGS) -static -o $@ tbmevc.o $(LIBS)
+tevc:	tevc.o
+	$(CC) $(LDFLAGS) -static -o $@ tevc.o $(LIBS)
 
-tbmevd:	tbmevd.o
-	$(CC) $(LDFLAGS) -o $@ tbmevd.o \
+tevd:	tevd.o
+	$(CC) $(LDFLAGS) -o $@ tevd.o \
 		-L/usr/local/lib/mysql -lmysqlclient $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:	$(INSTALL_SBINDIR)/tbmevd \
-		$(INSTALL_SBINDIR)/tbmevd.restart
+install:	$(INSTALL_SBINDIR)/tevd \
+		$(INSTALL_SBINDIR)/tevd.restart
 
 client-install: 
-	$(INSTALL_PROGRAM) tbmevc /etc/testbed/tbmevc
+	$(INSTALL_PROGRAM) tevc /etc/testbed/tevc
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)
