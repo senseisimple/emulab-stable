@@ -214,7 +214,7 @@ foreach my $node ( keys %nodeos ) {
     #
     print STDERR "Changing default OS for $pc to $os:$path\n";
     $sth = $DB->query("update nodes set ".
-		      "def_boot_image_id='$os',next_boot_path='$path' ".
+		      "def_boot_image_id='$os',def_boot_path='$path' ".
 		      "where node_id='$pc'");
     if ($sth == 0) {
 	die("Database update failed. Aborted...\n");
