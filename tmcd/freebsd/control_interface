@@ -9,7 +9,7 @@
 
 NODETYPE=`nodetype`
 case $NODETYPE in
-pc300|pc850|i2)
+pc300|pc850|i2|pc1800)
     echo 'fxp0'
     ;;
 pcL440GX)
