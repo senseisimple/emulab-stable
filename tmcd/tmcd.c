@@ -595,14 +595,12 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 	 */
 	vnames_result =
 		mydb_query("select distinct v.dest_node_id,v.lindex,v.IP,"
-			   "r.vname,i.card from virt_names as v "
+			   "r.vname from virt_names as v "
 			   "left join reserved as r on "
 			   "v.dest_node_id=r.node_id "
-			   "left join interfaces as i on "
-			   "v.IP=i.IP and v.dest_node_id=i.node_id "
 			   "where dest_node_id='%s' or src_node_id='%s' "
-			   "order by dest_node_id,card",
-			   5, nodeid, nodeid);
+			   "order by dest_node_id,lindex",
+			   4, nodeid, nodeid);
 
 	if (!vnames_result) {
 		syslog(LOG_ERR,
@@ -638,7 +636,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 			continue;
 		
 		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
-			vname_row[3], vname_row[4], vname_row[2],
+			vname_row[3], vname_row[1], vname_row[2],
 			(first) ? vname_row[3] : " ");
 
 		if (first)
@@ -666,7 +664,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 			alias = " ";
 
 		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=%s\n",
-			vname_row[3], vname_row[4], vname_row[2], alias);
+			vname_row[3], vname_row[1], vname_row[2], alias);
 			
 		client_writeback(sock, buf, strlen(buf));
 		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
@@ -681,15 +679,13 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 	 */
 	vnames_result =
 		mydb_query("select distinct v.dest_node_id,v.lindex,v.IP,"
-			   "r.vname,i.card from virt_names as v "
+			   "r.vname from virt_names as v "
 			   "left join reserved as r on "
 			   "v.dest_node_id=r.node_id "
-			   "left join interfaces as i on "
-			   "v.IP=i.IP and v.dest_node_id=i.node_id "
 			   "where ( %s ) and "
 			   "(dest_node_id!='%s' and src_node_id!='%s') "
-			   "order by dest_node_id,card",
-			   5, srcnodes, nodeid, nodeid);
+			   "order by dest_node_id,lindex",
+			   4, srcnodes, nodeid, nodeid);
 
 	if (!vnames_result) {
 		syslog(LOG_ERR,
@@ -711,7 +707,7 @@ dohosts(int sock, struct in_addr ipaddr, char *request)
 		vname_row = mysql_fetch_row(vnames_result);
 
 		sprintf(buf, "NAME=%s LINK=%s IP=%s ALIAS=  \n",
-			vname_row[3], vname_row[4], vname_row[2]);
+			vname_row[3], vname_row[1], vname_row[2]);
 			
 		client_writeback(sock, buf, strlen(buf));
 		syslog(LOG_INFO, "HOSTNAMES: %s", buf);
