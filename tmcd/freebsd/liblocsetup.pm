@@ -60,6 +60,7 @@ my $IFACE	= "fxp";
 my $CTLIFACENUM = "4";
 my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $TMDELAY	= "$SETUPDIR/rc.delay";
+my $TMDELMAP	= "$SETUPDIR/delay_mapping";
 my $TMCCCMD_DELAY = "delay";
 
 #
@@ -269,6 +270,9 @@ sub dodelays ()
 	print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
 	print DEL "sysctl -w net.link.ether.bridge_cfg=";
 
+	open(MAP, ">$TMDELMAP")
+	    or die("Could not open $TMDELMAP");
+
 	foreach $delay (@delays) {
 	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
 	    my $iface1 = libsetup::findiface($1);
@@ -286,7 +290,8 @@ sub dodelays ()
 	foreach $delay (@delays) {
 	    $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
 	    $pat .= q(PIPE0=(\d+) DELAY0=([\d\.]+) BW0=(\d+) PLR0=([\d\.]+) );
-	    $pat .= q(PIPE1=(\d+) DELAY1=([\d\.]+) BW1=(\d+) PLR1=([\d\.]+));
+	    $pat .= q(PIPE1=(\d+) DELAY1=([\d\.]+) BW1=(\d+) PLR1=([\d\.]+) );
+	    $pat .= q(LINKNAME=([\d\w]+));
 	    
 	    $delay =~ /$pat/;
 
@@ -303,6 +308,7 @@ sub dodelays ()
 	    $delay2    = $8;
 	    $bandw2    = $9;
 	    $plr2      = $10;
+	    $linkname  = $11;
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
@@ -328,6 +334,9 @@ sub dodelays ()
 	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1\n";
 	    print STDOUT "  $iface1/$iface2 pipe $p2 config delay ";
 	    print STDOUT "${delay2}ms bw ${bandw2}Kbit/s plr $plr2\n";
+
+	    print MAP "$linkname $iface1 $p1\n";
+	    print MAP "$linkname $iface2 $p2\n";
     
 	    $count++;
 	}
@@ -341,6 +350,7 @@ sub dodelays ()
 	print DEL "echo \"Delay Configuration Complete\"\n";
 	close(DEL);
 	chmod(0755, "$TMDELAY");
+	close(MAP);
     
 	#
 	# Now do kernel configuration. All of the above work is wasted, but

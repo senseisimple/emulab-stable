@@ -933,14 +933,15 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 */
 	res = mydb_query("select i.MAC,j.MAC, "
 			 "pipe0,delay0,bandwidth0,lossrate0, "
-			 "pipe1,delay1,bandwidth1,lossrate1 "
+			 "pipe1,delay1,bandwidth1,lossrate1, "
+			 "vname "
                          " from delays as d "
 			 "left join interfaces as i on "
 			 " i.node_id=d.node_id and i.iface=iface0 "
 			 "left join interfaces as j on "
 			 " j.node_id=d.node_id and j.iface=iface1 "
 			 " where d.node_id='%s'",	 
-			 10, nodeid);
+			 11, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "DELAY: %s: DB Error getting delays!",
 		       nodeid);
@@ -967,10 +968,12 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 		sprintf(buf, "DELAY INT0=%s INT1=%s "
 			"PIPE0=%s DELAY0=%s BW0=%s PLR0=%s "
-			"PIPE1=%s DELAY1=%s BW1=%s PLR1=%s\n",
+			"PIPE1=%s DELAY1=%s BW1=%s PLR1=%s "
+			"LINKNAME=%s\n",
 			row[0], row[1],
 			row[2], row[3], row[4], row[5],
-			row[6], row[7], row[8], row[9]);
+			row[6], row[7], row[8], row[9],
+			row[10]);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
