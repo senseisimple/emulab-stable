@@ -217,7 +217,6 @@ sub getvlans {
     my ($id,$name,$memberstr) = split ("\t", $entry);
     $vlansbyname{$name} = $memberstr;
     $vlanids{$name} = $id;
-    $vlanids{$id} = $name;
     print "vlans: #$id -> $name -> $memberstr\n" if $debug;
   }
 }
