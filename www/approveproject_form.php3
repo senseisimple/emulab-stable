@@ -138,7 +138,8 @@ while ($projectrow = mysql_fetch_array($query_result)) {
               <td colspan=7> </td>
           </tr>
           <tr>
-              <td rowspan=2>$pid</td>
+              <td rowspan=2>
+                  <A href='showproject.php3?uid=$uid&pid=$pid'>$pid</A></td>
               <td rowspan=2>$headuid</td>
               <td rowspan=2>
                   <select name=\"$pid\$\$approval\">
