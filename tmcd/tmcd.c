@@ -5341,15 +5341,12 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	 * that, we will have to figure out how to label the specific lans
 	 * se we know which is which.
 	 */
-	res = mydb_query("select r.node_id,vn.inner_elab_role,vl.ip,r.vname "
+	res = mydb_query("select r.node_id,r.inner_elab_role,vl.ip,r.vname "
 			 "  from reserved as r "
-			 "left join virt_nodes as vn on "
-			 "  vn.vname=r.vname and vn.pid=r.pid and "
-			 "  vn.eid=r.eid "
 			 "left join virt_lans as vl on vl.vnode=r.vname and "
 			 "  vl.pid=r.pid and vl.eid=r.eid "
 			 "where r.pid='%s' and r.eid='%s' and "
-			 "      vn.inner_elab_role is not null",
+			 "      r.inner_elab_role is not null",
 			 4, reqp->pid, reqp->eid);
 
 	if (!res) {
