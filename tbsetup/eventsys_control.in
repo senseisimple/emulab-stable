@@ -212,7 +212,7 @@ if ($procid != 0) {
 #
 # For now, lets not start an event system if there are no events.
 #
-if (! $force) {
+if (0) {
     $query_result =
 	DBQueryFatal("select distinct pid,eid from eventlist ".
 		     "where pid='$pid' and eid='$eid'");
