@@ -6,17 +6,17 @@ To build the event system, you first need to obtain the Elvin publish/
 subscribe system.  You need both the Elvin client library (libelvin)
 and the Elvin server (elvind).  You may either get them directly from
 http://elvin.dstc.com/ or from the Flux CVS repository (module names
-"libelvin" and "elvind").  Once the Elvin client library is built and
-installed, you may build the event system by doing a "make".
+"libelvin" and "elvind").  Be sure to configure the Elvin library with
+"--enable-threads" to build support for Elvin's thread-safe
+"threaded" API.  Once the Elvin client library is built and installed,
+you may build the event system by doing a "make".
 
 USING THE EVENT SYSTEM
 
-Before you may use the event system, you must configure the Elvin
-server.  A sample configuration file may be found in the etc
-directory.  The important parts are (1) to specify a scope
-of "testbed", because that's the scope the event library operates
-in; and (2) to set the "default" parameter to "on", so
-that clients may find the server without having to specify a URL.
+Before you may use the event system, you must configure the
+Elvin server. The default Elvin configuration file should suffice. If
+you want to use Elvin's server discovery protocol, you will need
+to set "scope" and "default" accordingly (see the Elvin documentation).
 
 Next, you need to start the Elvin server ("elvind") on a machine in
 the local network.  The Elvin server is responsible for routing event

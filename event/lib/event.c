@@ -7,7 +7,7 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: event.c,v 1.9 2002-02-19 15:45:24 imurdock Exp $";
+static char rcsid[] = "$Id: event.c,v 1.10 2002-02-19 16:18:21 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
@@ -24,6 +24,15 @@ static char hostname[MAXHOSTNAMELEN];
  * the event server.  Returns a pointer to a handle that may be passed
  * to other event system routines if the operation is successful, NULL
  * otherwise.
+ *
+ * The THREADED parameter should be set to 1 if the registering
+ * client is multi-threaded. If THREADED is 1, the event
+ * library will call routines that are thread-safe, and event
+ * notifications will be dispatched using background threads (i.e.,
+ * the client will supply its own event loop). If THREADED is 0, event
+ * notifications will be dispatched using an event system-provided
+ * event loop, and the client must call event_main after connecting in
+ * order to receive notifications.
  *
  * Elvin note: NAME is a URL of the form "elvin:/[protocol
  * stack]/[endpoint]", where a protocol stack names a transport
@@ -201,6 +210,10 @@ event_main(event_handle_t handle)
  * allocated by event_notification_alloc, and may optionally
  * have attributes added to it by event_notification_put_*.
  * Returns non-zero if the operation is successful, 0 otherwise.
+ *
+ * Note that NOTIFICATION is not deallocated by event_notify.  The
+ * caller is responsible for deallocating the notification when it
+ * is finished with it.
  */
 
 int
@@ -236,6 +249,10 @@ event_notify(event_handle_t handle, event_notification_t notification)
  * This function essentially operates as a deferred event_notify.
  * event_notify sends notifications immediately,
  * whereas event_schedule sends notifications at some later time.
+ *
+ * Note that NOTIFICATION is not deallocated by event_schedule.
+ * The caller is responsible for deallocating the notification
+ * when it is finished with it.
  */
 
 int
