@@ -45,6 +45,8 @@ int s_dummy;
 char *ipaddr = NULL;
 
 static int debug = 0;
+
+char buf_link [MAX_LINKS][MAX_LINE_LENGTH];
 /************************GLOBALS*****************************************/
 
 
@@ -109,72 +111,31 @@ int main(int argc, char **argv)
       exit(-1);
     }
 
- #if 0
-  /* read the map file and populate the internal link_map table*/
-  while(fgets(line,MAX_LINE_LENGTH, mp))
-    {
-      /*break into tokens*/
-        char * sep = " \n";
-	char * dummy = NULL;
-	char * temp = NULL;
-	
-	info("line = %s \n", line);	
-	link_map[link_index].linkname = strtok(line, sep);
-        link_map[link_index].linktype = strtok(NULL, sep);
-	link_map[link_index].interfaces[0] = strtok (NULL, sep);
-	
-	if(!strcmp(link_map[link_index].linktype,"duplex"))
-	  {
-	    link_map[link_index].interfaces[1] = strtok(NULL,sep);
-	    link_map[link_index].pipes[0] = atoi(strtok(NULL,sep));
-	    info("%s %d", (temp = strtok(NULL,sep)), strlen(temp));
-	    
-	 //   link_map[link_index].pipes[1] = atoi(strtok(NULL,sep));
-	  }
-	else{
-	  info("%s", (temp = strtok(NULL,sep)));
-	  // link_map[link_index].pipes[0] = atoi(strtok(NULL,sep));
-	}
-	if((dummy = strtok(NULL,sep)) == NULL)
-	  info("NULL\n");
-	else
-	  info("%s\n", dummy);
-        link_index++;
-    }
-
-#endif
-
   {
 
-    char ** temp = NULL;
-    char * buf = (char*) malloc(256);
+    char * temp = NULL;
     char *sep = " \n";
-    
-    if(buf == NULL){
-      error("cannot allocate memory\n");
-      return 1;
-    }
 
-    temp = &buf;
-
-    while(fgets(buf, 256, mp)){
-      link_map[link_index].linkname = strsep(temp, sep);
-      link_map[link_index].linktype = strsep(temp, sep);
-      link_map[link_index].interfaces[0] = strsep(temp, sep);
+    while(fgets(buf_link[link_index], 256, mp)){
+      temp = buf_link[link_index];
+      link_map[link_index].linkname = strsep(&temp, sep);
+      link_map[link_index].linktype = strsep(&temp, sep);
+      link_map[link_index].interfaces[0] = strsep(&temp, sep);
 	
       if(!strcmp(link_map[link_index].linktype,"duplex"))
         {
-          link_map[link_index].interfaces[1] = strsep(temp,sep);
-          link_map[link_index].pipes[0] = atoi(strsep(temp,sep));
-	  link_map[link_index].pipes[1] = atoi(strsep(temp,sep));
+          link_map[link_index].interfaces[1] = strsep(&temp,sep);
+          link_map[link_index].pipes[0] = atoi(strsep(&temp,sep));
+	  link_map[link_index].pipes[1] = atoi(strsep(&temp,sep));
 	}
 	else{
-	  link_map[link_index].pipes[0] = atoi(strtok(temp,sep));
+	  link_map[link_index].pipes[0] = atoi(strsep(&temp,sep));
 	}
       link_index++;
     }
   }
-  
+
+
   /* close the map-file*/
   fclose(mp);
     
