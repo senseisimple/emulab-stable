@@ -843,10 +843,22 @@
 	 a lost node <i>without modifying the experiment topology</i>,
 	 this won't be necessary.
 	 </li>
+	 <li>
+	 The event system is not automatically restarted for your
+	 experiment, so you will not be able to modify the traffic
+	 shaping for new links. In addition, if you add program
+	 agents or traffic generators, these will not activate unless
+	 you restart the event system by hand. Unfortunately, all
+	 events will be replayed, so be careful: On
+	 <tt>users.emulab.net</tt>, you may do the following:
+	     <blockquote>
+	     	<code>
+	        eventsys_control [-f] replay pid eid
+		</code>
+	     </blockquote>
+	 </li>
        </ul>
     </p>
-
-
 </ul>
 
 <hr>
