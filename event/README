@@ -1,7 +1,3 @@
-*****************************************************************************
-*** THIS IS CURRENTLY UNDER HEAVY DEVELOPMENT AND CONSIDERED A PROTOTYPE! ***
-*****************************************************************************
-
 This directory contains the testbed event system. It is enabled with
 --enable-events when you configure the testbed. But first ...
 
@@ -24,20 +20,21 @@ Elvin server. The default Elvin configuration file should suffice. If
 you want to use Elvin's server discovery protocol, you will need
 to set "scope" and "default" accordingly (see the Elvin documentation).
 
-Next, you need to start the Elvin server ("elvind") on a machine in
-the local network.  The Elvin server is responsible for routing event
-notifications from event producers to event consumers.  Once the Elvin
-server is running, clients in the system may use the event library to
-subscribe to and trigger events.  For an overview of how the system
-works, please see the DESIGN file.  (Note that an event scheduler
-must be running for the system to be fully operational; for more
-information about the event scheduler, please see the DESIGN file.)
+Next, you need to start the Elvin server ("elvind") on your boss node
+(We provide a sample startup file in ../rc.d).  The Elvin server is
+responsible for routing event notifications from event producers to
+event consumers.  Once the Elvin server is running, clients in the
+system may use the event library to subscribe to and trigger events.
+For an overview of how the system works, please see the DESIGN file.
+(Note that an event scheduler must be running for the system to be
+fully operational; for more information about the event scheduler,
+please see the DESIGN file.)
 
 Clients use the event library to interface with the event system; for
 a description of the API, see the API file.  Clients that need
 additional functionality may also use Elvin directly, though at some
 point in the future we may adopt a different system for event
-notification transport or write our own.  If you find that you
-can't do something with the event library, then it very well
-could be a limitation in the event library API; please contact
+notification transport or write our own.  If you find that you can't
+do something with the event library, then it very well could be a
+limitation in the event library API; please contact
 testbed-ops@fast.cs.utah.edu to let us know about it.
