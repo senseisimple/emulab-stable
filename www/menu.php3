@@ -323,7 +323,7 @@ function PAGEHEADER($title) {
               </script>\n";
     }
     
-    echo " <link rel=\"stylesheet\" href=\"$TBDOCBASE/tbstyle.css\"
+    echo " <link rel=\"stylesheet\" href=\"$TBBASE/tbstyle.css\"
                  type=\"text/css\">
           </head>\n";
 
