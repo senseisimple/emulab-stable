@@ -491,10 +491,10 @@ function SHOWUSER($uid) {
 	$onoff = ($adminoff ? "Off" : "On");
 	$flip  = ($adminoff ? 0 : 1);
 	echo "<tr>
-                  <td>Admin (on/off):</td>
-                  <td>Yes
-                      <a href=adminmode.php3?target_uid=$uid&adminoff=$flip>
-                         ($onoff)</td>
+              <td>Admin (on/off):</td>
+              <td>Yes
+              <a href=toggle.php?target_uid=$uid&type=adminoff&value=$flip>
+              ($onoff)</td>
               </tr>\n";
     }
     
@@ -564,6 +564,12 @@ function SHOWEXP($pid, $eid) {
     $batchstate  = $exprow[batchstate];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
+    $noswap_reason = $exprow[noswap_reason];
+    $idleswap    = $exprow[idleswap];
+    $idleswap_timeout = $exprow[idleswap_timeout];
+    $noidleswap_reason = $exprow[noidleswap_reason];
+    $autoswap    = $exprow[autoswap];
+    $autoswap_timeout = $exprow[autoswap_timeout];
     $idle_ignore = $exprow[idle_ignore];
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
@@ -576,6 +582,29 @@ function SHOWEXP($pid, $eid) {
     else
 	$swappable = "No
 <a href=\"toggle.php?type=swappable&value=1&pid=$pid&eid=$eid\">
+<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> (\"$noswap_reason\")";
+
+    $idleswap_hrs= ($idleswap_timeout/60.0);
+    $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "" : "s");
+    if ($idleswap)
+	$idleswap = "Yes
+<a href=\"toggle.php?type=idleswap&value=0&pid=$pid&eid=$eid\">
+<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a> (after $idleswap_str)";
+    else
+	$idleswap = "No
+<a href=\"toggle.php?type=idleswap&value=1&pid=$pid&eid=$eid\">
+<img src=\"redball.gif\" border=0 alt=\"Toggle\"></a> ".
+	    "(\"$noidleswap_reason\")";
+
+    $autoswap_hrs= ($autoswap_timeout/60.0);
+    $autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
+    if ($autoswap)
+	$autoswap = "Yes
+<a href=\"toggle.php?type=autoswap&value=0&pid=$pid&eid=$eid\">
+<img src=\"greenball.gif\" border=0 alt=\"Toggle\"></a> (after $autoswap_str)";
+    else
+	$autoswap = "No
+<a href=\"toggle.php?type=autoswap&value=1&pid=$pid&eid=$eid\">
 <img src=\"redball.gif\" border=0 alt=\"Toggle\"></a>";
 
     if ($idle_ignore)
@@ -633,8 +662,24 @@ function SHOWEXP($pid, $eid) {
     }
 
     echo "<tr>
-            <td><a href='$TBDOCBASE/faq.php3#UTT-Swapping'>Swappable:</a></td>
+            <td><a
+            href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#swapping'>
+            Swappable:</a></td>
             <td class=\"left\">$swappable</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td><a
+            href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#idleswap'>
+            Idle-Swap:</a></td>
+            <td class=\"left\">$idleswap</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td><a 
+            href='$TBDOCBASE/docwrapper.php3?docname=swapping.html#autoswap'>
+            Auto-Swap:</a></td>
+            <td class=\"left\">$autoswap</td>
           </tr>\n";
 
     # XXX: isadmin doesn't use the uid you give it, and we don't have a real
@@ -646,11 +691,6 @@ function SHOWEXP($pid, $eid) {
           </tr>\n";
     }
     
-    echo "<tr>
-            <td>Priority: (0 is highest) </td>
-            <td class=\"left\">$priority</td>
-          </tr>\n";
-
     echo "<tr>
             <td>Shared: </td>
             <td class=\"left\">";
@@ -683,11 +723,19 @@ function SHOWEXP($pid, $eid) {
 	echo "</td>
           </tr>\n";
     } else {
-	echo "<tr>
+	if ($minnodes!="") {
+	    echo "<tr>
             <td>Minumum Nodes: </td>
-            <td class=\"left\"><font color=blue>
+            <td class=\"left\"><font color=green>
                $minnodes (estimate)</font></td>
           </tr>\n";
+	} else {
+	    echo "<tr>
+            <td>Minumum Nodes: </td>
+            <td class=\"left\"><font color=green>
+               Unknown</font></td>
+          </tr>\n";
+	}
     }
 
     $lastact = TBGetExptLastAct($pid,$eid);

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -29,11 +29,14 @@ LOGGEDINORDIE($uid);
 # (type & value are required, others are optional and vary by type)
 
 # List of valid toggles
-$toggles = array("adminoff", "swappable", "idle_ignore");
+$toggles = array("adminoff", "swappable", "idleswap", "autoswap",
+		 "idle_ignore");
 
 # list of valid values for each toggle
 $values  = array("adminoff"    => array(0,1),
 		 "swappable"   => array(0,1),
+		 "idleswap"    => array(0,1),
+		 "autoswap"    => array(0,1),
 		 "idle_ignore" => array(0,1) );
 
 if (! in_array($type, $toggles)) {
@@ -56,7 +59,7 @@ if ($type=="adminoff") {
 
     DBQueryFatal("update users set adminoff=$value where uid='$target_uid'");
     
-} elseif ($type=="swappable") {
+} elseif ($type=="swappable" || $type=="idleswap" || $type=="autoswap") {
     # must be admin OR must have permission to modify the expt...
     if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ||
 	! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
@@ -68,7 +71,7 @@ if ($type=="adminoff") {
 	USERERROR("Experiment '$pid/$eid' is not valid!", 1);
     }
     
-    DBQueryFatal("update experiments set swappable=$value ".
+    DBQueryFatal("update experiments set $type=$value ".
 		 "where pid='$pid' and eid='$eid'");
 
 } elseif ($type=="idle_ignore") {
