@@ -220,7 +220,7 @@ if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
     # Change reservation (don't delete or we'll get races)
     print "Changing reservation for $n to $reloadpid/$reloadeid...\n";
     $cmd = "update reserved set pid='$reloadpid',eid='$reloadeid',vname=NULL ".
-	where node_id='$n'";
+	"where node_id='$n'";
     $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++ && next);
