@@ -1,0 +1,5 @@
+#!/bin/sh
+
+export LD_LIBRARY_PATH="/z/garcia/brainstem/aRelease/aUnix/i686:/z/garcia/brainstem/aDebug/aUnix/i686"
+
+./$@
