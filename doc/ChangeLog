@@ -1,3 +1,12 @@
+stoller     2003/07/08 17:34:42 MDT
+
+  Modified files:
+    tbsetup              GNUmakefile.in 
+  Log:
+  Turn off mainbed exclusion of ns2ir build/install, now that parser
+  has been working on minibed okay for a while. In other words, the new
+  parser really is going to be installed on mainbed, any moment!
+  
 ricci       2003/07/01 10:14:42 MDT
 
   Modified files:
