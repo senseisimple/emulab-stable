@@ -54,24 +54,25 @@ LOGGEDINORDIE($uid);
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not
 # too long for the database. PID is 12, and the max is 32, so the user
-# cannot have provided one more than 19, since we add a hyphen in there.
+# cannot have provided one more than 19, since other parts of the system
+# may concatenate them together with a hyphen.
 #
 # XXX Note CONSTANT in expression!
 #
-$exp_eid = $exp_pid . $exp_id;
 if (strlen($exp_id) > 19) {
     USERERROR("The experiment name \"$exp_id\" is too long! ".
               "Please select another.", 1);
 }
 
 #
-# Make sure the experiment ID does not already exist.
+# Make sure the PID/EID tuple does not already exist in the database.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT eid FROM experiments WHERE eid=\"$exp_eid\"");
+	"SELECT eid FROM experiments ".
+        "WHERE eid=\"$exp_id\" and pid=\"$exp_pid\"");
 if ($row = mysql_fetch_row($query_result)) {
-    USERERROR("The experiment name \"$exp_eid\" you have chosen is already ".
-            "in use. Please select another.", 1);
+    USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
+              "in use in project $exp_pid. Please select another.", 1);
 }
 
 #
@@ -95,24 +96,23 @@ if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
 
 #
 # We are going to write out the NS file to a subdir of the testbed
-# directory. We create a subdir in there, and stash the ns file for
-# processing by tbrun. We generate a name from the experiment ID,
-# which we know to be unique cause we tested that above. Later, when
-# the experiment is ended, the directory will be deleted.
+# directory. The name of this directory is <pid>-<eid>, and we stash
+# the <eid>.ns file in there. We then run a wrapper script as:
 #
-# Note that the filenames are all wierd. The tbsetup scripts do very odd
-# things with the name, prepending the "project" to the filename.
+#   tbdoit <path to directory> <pid> <eid> <eid>.ns
+#
+# Later, when the experiment is ended, the directory will be deleted.
 #
 # There is similar path stuff in endexp.php3.  Be sure to sync that up
 # if you change things here.
 #
 # No need to tell me how bogus this is.
 #
-$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_eid";
+$dirname = "$TBWWW_DIR"."$TBNSSUBDIR" . "/" . "$exp_pid" . "-" . "$exp_id";
 $nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
-$irname  = "$dirname" . "/" . "$exp_eid" . ".ir";
+$irname  = "$dirname" . "/" . "$exp_id"  . ".ir";
 $repname = "$dirname" . "/" . "$exp_id"  . ".report";
-$logname = "$dirname" . "/" . "$exp_eid" . ".log";
+$logname = "$dirname" . "/" . "$exp_id"  . ".log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
 if (! mkdir($dirname, 0777)) {
@@ -136,7 +136,7 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbdoit $dirname $exp_pid $exp_id.ns",
+$result = exec("$TBBIN_DIR/tbdoit $dirname $exp_pid $exp_id $exp_id.ns",
                $output, $retval);
 if ($retval) {
     echo "<br><br><h2>
@@ -200,16 +200,16 @@ $query_result = mysql_db_query($TBDBNAME,
 	"INSERT INTO experiments ".
         "(eid, pid, expt_created, expt_expires, expt_name, ".
         "expt_head_uid, expt_start, expt_end) ".
-        "VALUES ('$exp_eid', '$exp_pid', '$exp_created', '$exp_expires', ".
+        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
         "'$exp_name', '$uid', '$exp_start', '$exp_end')");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding new experiment $exp_eid: $err\n", 1);
+    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
 }
 
 echo "<center><br>";
 echo "<h2>Experiment Configured!<br>";
-echo "The ID for your experiment is $exp_eid<br>";
+echo "The ID for your experiment in project $exp_pid is $exp_id<br>";
 echo "Here is a summary of the nodes that were allocated<br>";
 echo "</h2></center><br>";
 
@@ -218,7 +218,7 @@ echo "</h2></center><br>";
 #
 $fp = fopen($repname, "r");
 if (! $fp) {
-    TBERROR("Error opening report file for experiment: $exp_eid\n", 1);
+    TBERROR("Error opening report file for experiment: $exp_id\n", 1);
 }
 $summary = "";
 echo "<XMP>";
@@ -231,10 +231,10 @@ echo "</XMP>\n";
 #
 # Lets generate a mail message for now so that we can see whats happening.
 #
-if (1) {
+if (0) {
 mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
      "User:        $uid\n".
-     "EID:         $exp_eid\n".
+     "EID:         $exp_id\n".
      "PID:         $exp_pid\n".
      "Name:        $exp_name\n".
      "Created:     $exp_created\n".

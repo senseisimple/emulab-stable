@@ -62,7 +62,7 @@ while ($grprow = mysql_fetch_array($groupmemb_result)) {
     while ($exprow = mysql_fetch_array($exp_result)) {
         $eid = $exprow[eid];
         $experiments = "$experiments " .
-                      "<option value=\"$eid\">$eid</option>\n";
+                      "<option value=\"$pid\$\$$eid\">$pid/$eid</option>\n";
     }
 }
 if (strcmp($experiments, "") == 0) {
@@ -81,13 +81,18 @@ you are a member of.</h2>
 
 <?php
 echo "<form action=\"showexp.php3?$uid\" method=\"post\">";
+echo "<tr>
+          <td align='center'>Project/Experiment</td>
+      </tr>\n";
+echo "<tr></tr>";
+echo "<tr></tr>";
 
 #
 # Suck the current info out of the database and display a list of
 # experiments as an option list.
 #
 echo "<tr>";
-echo "    <td><select name=\"exp_eid\">";
+echo "    <td><select name=\"exp_pideid\">";
 echo "        $experiments";
 echo "        </select>";
 echo "    </td>

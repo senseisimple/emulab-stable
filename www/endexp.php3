@@ -22,29 +22,39 @@ LOGGEDINORDIE($uid);
 #
 # Must provide the EID!
 # 
-if (!isset($exp_eid) ||
-    strcmp($exp_eid, "") == 0) {
+if (!isset($exp_pideid) ||
+    strcmp($exp_pideid, "") == 0) {
   USERERROR("The experiment ID was not provided!", 1);
 }
 
 #
-# Verify that this uid is a member of the project for the experiment.
+# First get the project (PID) from the form parameter, which came in
+# as <pid>$$<eid>.
 #
-# First get the project (PID) for the experiment (EID) requested.
-# Then check to see if the user (UID) is a member of that PID.
-#
-$query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM experiments WHERE eid=\"$exp_eid\"");
-if (($exprow = mysql_fetch_array($query_result)) == 0) {
-  USERERROR("The experiment $exp_eid is not a valid experiment.", 1);
-}
-$pid = $exprow[pid];
+$exp_eid = strstr($exp_pideid, "$$");
+$exp_eid = substr($exp_eid, 2);
+$exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "$$", 0));
 
+#
+# Check to make sure thats this is a valid PID/EID tuple.
+#
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$pid\"");
+	"SELECT * FROM experiments WHERE ".
+        "eid=\"$exp_eid\" and pid=\"$exp_pid\"");
 if (mysql_num_rows($query_result) == 0) {
-  USERERROR("You are not a member of the Project for Experiment: $exp_eid.",
-            1);
+  USERERROR("The experiment $exp_eid is not a valid experiment ".
+            "in project $exp_pid.", 1);
+}
+
+#
+# Verify that this uid is a member of the project for the experiment
+# being displayed.
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$exp_pid\"");
+if (mysql_num_rows($query_result) == 0) {
+  USERERROR("You are not a member of Project $exp_pid for ".
+            "Experiment: $exp_eid.", 1);
 }
 
 #
@@ -56,11 +66,10 @@ if (mysql_num_rows($query_result) == 0) {
 #
 # No need to tell me how bogus this is.
 #
-$exp_id  = substr($exp_eid, strlen($pid));
-$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_eid";
-$nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
+$dirname = "$TBWWW_DIR"."$TBNSSUBDIR" . "/" . "$exp_pid" . "-" . "$exp_eid";
+$nsname  = "$dirname" . "/" . "$exp_eid" . ".ns";
 $irname  = "$dirname" . "/" . "$exp_eid" . ".ir";
-$repname = "$dirname" . "/" . "$exp_id"  . ".report";
+$repname = "$dirname" . "/" . "$exp_eid" . ".report";
 $logname = "$dirname" . "/" . "$exp_eid" . ".log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
@@ -82,7 +91,7 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_eid.ir",
+$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_pid $exp_eid $exp_eid.ir",
                $output, $retval);
 if ($retval) {
     echo "<br><br><h2>
@@ -118,10 +127,11 @@ if (file_exists($dirname))
 # From the database too!
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_eid'");
+	"DELETE FROM experiments WHERE eid='$exp_eid' and pid=\"$exp_pid\"");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error deleting experiment $exp_eid: $err\n", 1);
+    TBERROR("Database Error deleting experiment $exp_eid ".
+            "in project $exp_pid: $err\n", 1);
 }
 
 echo "<center><br>";
