@@ -98,7 +98,7 @@ if (!$confirmed) {
     echo "<br>
           This operation will consume a small number of CPU cycles on
           each node. If this would disturb an experiment in progress, you
-          should canel this operation until later.
+          should cancel this operation until later.
           Please note that accounts are automatically updated whenever a node
           reboots, or when an experiment is swapped back in.\n";
 
