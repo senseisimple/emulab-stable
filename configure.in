@@ -161,6 +161,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/batch_daemon \
 	tbsetup/webbatchexp tbsetup/webreport \
+	tbsetup/webswapexp tbsetup/swapexp \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \

@@ -3,27 +3,18 @@ use English;
 use Getopt::Std;
 
 #
-# This gets invoked from the Web interface. Terminate an experiment.
-# Most of the STDOUT prints are never seen since the web interface
-# repeats only errors. My plan is make this script the front end to
-# experiment termination and make tbend a backend program that no one
-# uses.
-#
-# The -b (batch) argument is so that this script can be part of a batchmode
-# that starts/ends experiments offline. In that case, we don't want to put
-# it into the background and send email, but just want an exit status 
-# returned to the batch system.
+# This gets invoked from the Web interface. Swap an experiment in or out.
 #
 # Note about exit value. -1 means error. 0 means backgrounded. 1 means
-# termination happened immediately. The web page uses this to decide
-# what kind of message to give the user. 
+# somthing else. The web page uses this to decide what kind of message
+# to give the user. 
 #
 sub usage()
 {
-    print STDOUT "Usage: endexp [-b] <pid> <eid>\n";
+    print STDOUT "Usage: swapexp [-b] <-s in | out> <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "b";
+my  $optlist = "bs:";
 
 #
 # Configure variables
@@ -41,9 +32,8 @@ use libdb;
 use libtestbed;
 
 my $tbdir    = "$TB/bin/";
-my $projroot = "/proj";
-my $tbdata   = "tbdata";
 my $batch    = 0;
+my $inout;
 my $logname;
 my $dbuid;
 my $user_name;
@@ -76,6 +66,16 @@ my $pid   = $ARGV[0];
 my $eid   = $ARGV[1];
 if (defined($options{"b"})) {
     $batch = $options{"b"};
+}
+if (defined($options{"s"})) {
+    $inout = $options{"s"};
+
+    if ($inout ne "out" && $inout ne "in") {
+	usage();
+    }
+}
+else {
+    usage();
 }
 
 #
@@ -148,65 +148,39 @@ if (defined($hashrow{'expt_locked'})) {
     
     die("*** $0:\n".
 	"    It appears that $pid/$eid went into transition at $val.\n".
-	"    You will be notified via email when the experiment is no\n".
-	"    longer in transition.\n");
+	"    You will be notified via email when experiment transition ".
+	"    is complete.\n");
 }
 
 #
-# Batch experiments get a different protocol to avoid races with the
-# batch daemon. We can kill the experiment directly, but only if the
-# batch daemon is not currently working on it. In this case, its the
-# same as killing an experiment that is not running.
+# Disallow batch experiment swaps for now.
 #
-# XXX: This script is run from the batch daemon. Use the batch state
-# to determine when this was invoked from the batch daemon for a valid
-# teardown. 
-#
-if ($isbatchexpt && $ebatchstate ne BATCHSTATE_TERMINATING) {
-    #
-    # Set the canceled state. This will prevent the batch_daemon from trying
-    # to run it (once the table is unlocked). It might already be running,
-    # but we deal with that by looking at the batch state.
-    #
-    DBQueryFatal("UPDATE experiments set canceled=1 ".
-		 "WHERE eid='$eid' and pid='$pid'");
-
-    if ($ebatchstate ne BATCHSTATE_POSTED) {
-	#
-	# Daemon does the rest ... Exit with non zero status so that caller
-	# knows (web server) that the batch experiement cannot be ended
-	# at this time.
-	#
-	print "Batch Experiment $eid in project $pid is currently running.\n".
-	      "You will receive email notification when the experiment is\n".
-	      "torn down and you can reuse the experiment name\n";
-	exit(0);
-    }
-    DBQueryFatal("unlock tables");
-
-    #
-    # Cleanup Experiment state.
-    # 
-    ExptCleanup();
-    
-    exit(1);
+if ($isbatchexpt) {
+    die("*** $0:\n".
+	"    Batch experiments cannot be swapped yet!");
 }
 
 #
-# Okay, check state. We do not allow termination to start when the
+# Okay, check state. We do not allow swapping to start when the
 # experiment is in transition. A future task would be to allow this,
 # but for now the experiment must be in one of a few states to proceed
 #
 # Seems like too many states!
 #
-if ($estate eq EXPTSTATE_PRERUN ||
-    $estate eq EXPTSTATE_ACTIVATING ||
-    $estate eq EXPTSTATE_SWAPPING ||
-    $estate eq EXPTSTATE_TERMINATING) {
+if ($estate ne EXPTSTATE_ACTIVE && $estate ne EXPTSTATE_SWAPPED) {
     die("*** $0:\n".
 	"    It appears that experiment $pid/$eid is in transition.\n".
 	"    The user that created the experiment will be notified via\n".
         "    email when the experiment is no longer in transition.\n");
+}
+
+if ($inout eq "in" && $estate eq EXPTSTATE_ACTIVE) {
+    die("*** $0:\n".
+	"    It appears that experiment $pid/$eid is already swapped in!");
+}
+if ($inout eq "out" && $estate eq EXPTSTATE_SWAPPED) {
+    die("*** $0:\n".
+	"    It appears that experiment $pid/$eid is already swapped out!");
 }
 
 #
@@ -241,7 +215,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 # If not in batch mode, go into the background. Parent exits.
 #
 if (! $batch) {
-    $logname = `mktemp /tmp/end-$pid-$eid.XXXXXX`;
+    $logname = `mktemp /tmp/swap-$pid-$eid.XXXXXX`;
 
     if ($logname =~ /^([-\@\w.\/]+)$/) {
 	$logname = $1;
@@ -255,9 +229,9 @@ if (! $batch) {
 	# Parent exits normally
 	#
 	print STDOUT
-	    "Experiment $pid/$eid is now terminating\n".
-	    "You will be notified via email when the experiment has been\n".
-	    "torn down, and you can reuse the experiment name.\n";
+	    "Experiment $pid/$eid is now swapping $inout.\n".
+	    "You will be notified via email when the experiment has ".
+	    "finished swapping.\n";
 	exit(0);
     }
 }
@@ -265,7 +239,7 @@ if (! $batch) {
 #
 # Sanity check states in case someone changes something.
 #
-if ($estate eq EXPTSTATE_ACTIVE) { 
+if ($inout eq "out") {
     print STDOUT "Running tbswapout with arguments: $pid $eid\n";
     if (system("$tbdir/tbswapout $pid $eid") != 0) {
 	fatal("tbswapout failed!\n");
@@ -276,28 +250,25 @@ if ($estate eq EXPTSTATE_ACTIVE) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 }
-
-if ($estate eq EXPTSTATE_SWAPPED) {
-    print STDOUT "Running tbend with arguments: $pid $eid\n";
-    if (system("$tbdir/tbend $pid $eid") != 0) {
-	fatal("tbend failed!\n");
-    }    
+else {
+    print STDOUT "Running tbswapin with arguments: $pid $eid\n";
+    if (system("$tbdir/tbswapin $pid $eid") != 0) {
+	fatal("tbswapin failed!\n");
+    }
+    
     $estate = ExpState($pid,$eid);
-    if ($estate ne EXPTSTATE_TERMINATED) {
+    if ($estate ne EXPTSTATE_ACTIVE) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 }
 
-if ($estate ne EXPTSTATE_TERMINATED && $estate ne EXPTSTATE_NEW) {
-    fatal("Experiment is in the wrong state: $estate\n");
-}
-
 #
-# Cleanup DB state and remove directory.
+# Must unlock before exit.
 # 
-ExptCleanup();
+DBQueryWarn("update experiments set expt_locked=NULL ".
+	    "WHERE eid='$eid' and pid='$pid'");
 
-print "Termination Success\n";
+print "Swap Success\n";
 
 #
 # In batch mode, just exit without sending email.
@@ -310,14 +281,13 @@ if ($batch) {
 # Send email notification to user.
 #
 my $message =
-    "Experiment `$eid' in project `$pid' has been terminated.\n" .
-    "You may now reuse `$eid' as an experiment name.\n\n" .
-    "Appended below is the output of the experiment teardown. If you\n" .
+    "Experiment `$eid' in project `$pid' has been swapped $inout.\n\n" .
+    "Appended below is the output of the experiment swap${inout}. If you\n" .
     "have any questions or comments, please include the output below\n" .
     "in your message to $TBOPS\n";
 
 SENDMAIL("$user_name <$user_email>",
-	 "TESTBED: Experiment $pid/$eid Terminated",
+	 "TESTBED: Experiment $pid/$eid Swapped $inout",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
@@ -352,7 +322,7 @@ sub fatal($)
     # Send a message to the testbed list. Append the logfile.
     #
     SENDMAIL("$user_name <$user_email>",
-	     "TESTBED: Termination Failure: $pid/$eid",
+	     "TESTBED: Swap${inout} Failure: $pid/$eid",
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc:  $expt_head_name <$expt_head_email>\n".
@@ -364,33 +334,4 @@ sub fatal($)
     }
     exit(-1);
 }
-
-sub ExptCleanup()
-{
-    #
-    # Try to remove experiment directory. We allow for it not being there
-    # cause we often run the tb programs directly. We also allow for not
-    # having permission, in the case that an admin type is running this,
-    # in which case it won't be allowed cause of directory permissions. Thats
-    # okay since admin types should rarely end experiments in other projects.
-    #
-    print STDOUT "Removing experiment directory: $expt_path ... \n";
-    if (system("rm -rf $expt_path")) {
-	print "*** WARNING: Not able to remove experiment directory.\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-
-    #
-    # Remove all trace from the DB.
-    # 
-    DBQueryWarn("DELETE from nsfiles ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-}
-
 

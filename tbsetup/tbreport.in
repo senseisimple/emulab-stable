@@ -112,13 +112,13 @@ if ($state eq EXPTSTATE_SWAPPED) {
     my $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     print "Lan/Link Info:\n";
-    printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", "ID", "Member",
+    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "ID", "Member",
     "IP", "Delay", "Bandwidth", "Loss Rate";
-    print "--------------- --------------- --------------- ----------"
-	. " ---------- ----------\n";
+    print "--------------- --------------- --------------- --------- "
+	. "--------- ---------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
 	   = $result->fetchrow_array()) {
-	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
+	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
 	$member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
     $result->finish();
@@ -152,10 +152,10 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
     $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
     print "Lan/Link Info:\n";
-    printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", "ID", "Member", 
+    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "ID", "Member", 
     "IP", "Delay", "Bandwidth", "Loss Rate";
-    print "--------------- --------------- --------------- ----------"
-	. " ---------- ----------\n";
+    print "--------------- --------------- --------------- --------- "
+	. "--------- ---------\n";
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
 	   = $result->fetchrow_array()) {
 	($vnode,$vport) = split(":",$member);
@@ -165,7 +165,7 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 	    # shark hack
 	    $pport = "eth0";
 	}
-	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
+	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
 	    "$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
     $result->finish();

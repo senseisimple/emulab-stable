@@ -89,6 +89,10 @@ $TB_IMAGEID_DESTROY		= 4;
 $TB_IMAGEID_MIN			= $TB_IMAGEID_READINFO;
 $TB_IMAGEID_MAX			= $TB_IMAGEID_DESTROY;
 
+# Experiment states (that matter to us).
+$TB_EXPTSTATE_SWAPPED		= "swapped";
+$TB_EXPTSTATE_ACTIVE		= "active";
+
 #
 # Convert a trust string to the above numeric values.
 #
@@ -698,17 +702,16 @@ function TBValidExperiment($pid, $eid)
 }
 
 #
-# Confirm a valid batch,
+# Confirm a valid node name.
 #
-# usage TBValidBatch($pid, $eid)
+# usage TBValidNodeName($node)
 #       returns 1 if valid
 #       returns 0 if not valid
 #
-function TBValidBatch($pid, $eid)
+function TBValidNodeName($node)
 {
     $query_result =
-	DBQueryFatal("select eid from batch_experiments ".
-		     "where eid='$eid' and pid='$pid'");
+	DBQueryFatal("select node_id from nodes where node_id='$node'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
@@ -748,19 +751,25 @@ function TBProjList($uid, $access_type)
     global $TB_PROJECT_CREATEEXPT;
     global $TB_PROJECT_MAKEOSID;
     global $TB_PROJECT_MAKEIMAGEID;
+    global $TB_PROJECT_MAKEGROUP;
     $result = array();
     
-    if ($access_type != $TB_PROJECT_CREATEEXPT &&
-	$access_type != $TB_PROJECT_MAKEOSID &&
-	$access_type != $TB_PROJECT_MAKEIMAGEID) {
+    if ($access_type == $TB_PROJECT_MAKEGROUP) {
+	$trust_clause = "trust='project_root'";
+    }
+    elseif ($access_type == $TB_PROJECT_CREATEEXPT ||
+	    $access_type == $TB_PROJECT_MAKEOSID ||
+	    $access_type == $TB_PROJECT_MAKEIMAGEID) {
+	$trust_clause = "(trust='project_root' or trust='group_root' or ".
+	                " trust='local_root')";
+    }
+    else {
 	TBERROR("Invalid access type $access_type!", 1);
     }
     
     $query_result =
 	DBQueryFatal("SELECT distinct pid FROM group_membership ".
-		     "WHERE uid='$uid' and ".
-		     "      (trust='project_root' or trust='group_root' or ".
-		     "       trust='local_root')");
+		     "WHERE uid='$uid' and $trust_clause");
 
     if (mysql_num_rows($query_result) == 0) {
 	return $result;
@@ -774,6 +783,20 @@ function TBProjList($uid, $access_type)
 	$i++;
     }
     return $result;
+}
+
+function TBExptState($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select state from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $state = $row[state];
+    return $state;
 }
 
 #

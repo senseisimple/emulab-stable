@@ -106,20 +106,31 @@ echo "<tr>
                      name=\"exp_expires\"></td>
      </tr>\n";
 
+echo "<tr>
+	  <td colspan=2>Swappable?[<b>1</b>]:</td>
+          <td><input type=checkbox name=exp_swappable value=Yep> Yes</td>
+     </tr>\n";
+
+echo "<tr>
+	  <td colspan=2>Priority[<b>2</b>]:</td>
+          <td><input type=radio name=exp_priority value=low checked> <b>Low</b>
+              &nbsp &nbsp &nbsp
+              <input type=radio name=exp_priority value=high> High</td>
+     </tr>\n";
+
 #
 # Select a group
 # 
 echo "<tr>
-          <td colspan=2>Group:<br>(leave blank to use default group)</td>
+          <td colspan=2>Group[<b>3</b>]:</td>
           <td><input type=\"text\" name=\"exp_gid\"
                      size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN>
               </td>
       </tr>\n";
 
 echo "<tr>
-	  <td colspan=2>Pool Experiment?:<br>
-                        (Leave unchecked unless you know what this means!)</td>
-          <td><input type=checkbox name=exp_shared value=Yep>&nbsp</td>
+	  <td colspan=2>Pool Experiment?[<b>4</b>]:</td>
+          <td><input type=checkbox name=exp_shared value=Yep>&nbsp Yes</td>
      </tr>\n";
          
 ?>
@@ -131,7 +142,25 @@ echo "<tr>
 </form>
 </table>
 
+<h4><blockquote><blockquote><blockquote>
+   <dl COMPACT>
+      <dt>[1]
+          <dd>Check if your experiment can be swapped out and swapped back in
+	      without harm to your experiment. Useful for scheduling when
+	      resources are tight.
+      <dt>[2]
+          <dd>You get brownie points for marking your experiments as Low
+              Priority, which indicates that we can swap you out before high
+	      priority experiments.
+      <dt>[3]
+          <dd>Leave blank to use the default group for the project.
+      <dt>[4]
+          <dd>Leave unchecked unless you know what this means!
+  </dl>
+</blockquote></blockquote></blockquote></h4>
+
 <p>
+<blockquote>
 <ul>
 <li> Please <a href="nscheck_form.php3">syntax check</a> your NS file first!
 <li> If your NS file is using a custom OSID, you must
@@ -141,7 +170,8 @@ echo "<tr>
      that are available for you to use in your NS file.
 <li>
      You can also view a <a href="showimageid_list.php3"> list of ImageIDs.</a>
-</ul>    
+</ul>
+     </blockquote>
 
 <?php
 #

@@ -8,9 +8,9 @@ use Getopt::Std;
 sub usage()
 {
     die("Usage: batchexp [-i] [-x expires] [-E description] [-g gid] ".
-	"-p <pid> -e <eid> <nsfile>\n");
+	"[-s] [-n low|high] -p <pid> -e <eid> <nsfile>\n");
 }
-my  $optlist = "iE:d:g:x:e:p:";
+my  $optlist = "iE:d:g:x:e:p:sn:";
 
 #
 # Configure variables
@@ -53,6 +53,8 @@ my $gid;
 my $description;
 my $expires;
 my $tempnsfile;
+my $swappable = 0;
+my $priority  = TB_EXPTPRIORITY_LOW;
 
 #
 # Verify user and get his DB uid.
@@ -119,9 +121,9 @@ if ($query_result->numrows) {
 #
 if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, ".
-		  " expt_name, expt_head_uid, state) ".
+		  " expt_name, expt_head_uid, state, priority, swappable) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
-		  "$description, '$dbuid', 'new')")) {
+		  "$description, '$dbuid', 'new', $priority, $swappable)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -300,6 +302,20 @@ sub ParseArgs()
     }
     if (defined($options{"E"})) {
 	$description = $options{"E"};
+    }
+    if (defined($options{"s"})) {
+	$swappable = 1;
+    }
+    if (defined($options{"n"})) {
+	if ($options{"n"} eq "low") {
+	    $priority = TB_EXPTPRIORITY_LOW;
+	}
+	elsif ($options{"n"} eq "high") {
+	    $priority = TB_EXPTPRIORITY_HIGH;
+	}
+	else {
+	    usage();
+	}
     }
 
     # Note different taint check (allow /).

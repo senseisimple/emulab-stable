@@ -4,7 +4,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Terminate a Testbed Experiment");
+PAGEHEADER("Swap an Experiment");
 
 #
 # Only known and logged in users can end experiments.
@@ -25,6 +25,11 @@ if (!isset($eid) ||
   USERERROR("The experiment ID was not provided!", 1);
 }
 
+if (!isset($inout) ||
+    (strcmp($inout, "in") && strcmp($inout, "out"))) {
+  USERERROR("The swap direction must be either in or out!", 1);
+}
+
 $exp_eid = $eid;
 $exp_pid = $pid;
 
@@ -40,11 +45,10 @@ if (mysql_num_rows($query_result) == 0) {
 }
 $row = mysql_fetch_array($query_result);
 $exp_gid = $row[gid];
+$batch   = $row[batchmode];
 
 #
-# Look for termination in progress and exit with error. Other state
-# errors are caught by the backend scripts. We do not set the termination
-# time here. The backend duplicates the check and handles setting it.
+# Look for transition in progress and exit with error. 
 #
 $expt_locked = $row[expt_locked];
 if ($expt_locked) {
@@ -59,8 +63,8 @@ if ($expt_locked) {
 #
 # Verify permissions.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
-    USERERROR("You do not have permission to end experiment $exp_eid!", 1);
+if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to swap experiment $exp_eid!", 1);
 }
 
 #
@@ -71,7 +75,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
 #
 if ($canceled) {
     echo "<center><h2><br>
-          Experiment termination canceled!
+          Experiment swap$inout canceled!
           </h2></center>\n";
     
     PAGEFOOTER();
@@ -80,12 +84,11 @@ if ($canceled) {
 
 if (!$confirmed) {
     echo "<center><h2><br>
-          Are you <b>REALLY</b>
-          sure you want to terminate Experiment '$exp_eid?'
+          Are you sure you want to swap$inout experiment '$exp_eid?'
           </h2>\n";
     
-    echo "<form action='endexp.php3?pid=$exp_pid&eid=$exp_eid' method=post>";
-    echo "<input type=hidden name=exp_pideid value=\"$exp_pideid\">\n";
+    echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
+                method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -108,7 +111,7 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 #   tbstopit <pid> <eid>
 #
 echo "<center><br>";
-echo "<h2>Starting experiment termination. Please wait a moment ...
+echo "<h2>Starting experiment swap$inout. Please wait a moment ...
       </h2></center>";
 
 flush();
@@ -120,12 +123,13 @@ flush();
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBSUEXEC_PATH $uid $unix_gid webendexp $exp_pid $exp_eid",
+$result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
+	       "webswapexp -s $inout $exp_pid $exp_eid",
  	       $output, $retval);
 
 if ($retval < 0) {
     echo "<br><br><h2>
-          Termination Failure($retval): Output as follows:
+          Swap Failure($retval): Output as follows:
           </h2>
           <br>
           <XMP>\n";
@@ -139,20 +143,14 @@ if ($retval < 0) {
 }
 
 #
-# Exit status 1 means termination/cancelation was immediate.
-# Exit status 0 means the experiment is terminating, or will be.
+# Exit status 0 means the experiment is swapping, or will be.
 #
 echo "<br><br><h3>\n";
-if ($retval) {
-    echo "Experiment `$exp_eid' in project `$exp_pid' has been terminated!
+if ($retval == 0) {
+    echo "Experiment `$exp_eid' in project `$exp_pid' is swapping $inout.
           <br><br>
-          You may now reuse the experiment name.\n";         
-}
-else {
-    echo "Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
-          You will be notified via email when the experiment has been torn
-	  down, and you can reuse the experiment name.
-          This typically takes less than 5 minutes.
+          You will be notified via email when the experiment has finished
+          swapping. This typically takes 5-10 minutes.
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
 }

@@ -190,6 +190,14 @@ if (! chdir("$expt_path/$tbdata")) {
 }
 
 #
+# Lock the experiment record with the timestamp so that it cannot
+# terminated or swapped. This is basically a wrapper state for the
+# variety of actual states.
+#
+DBQueryFatal("UPDATE experiments SET expt_locked=now() ".
+	     "WHERE eid='$eid' and pid='$pid'");
+
+#
 # The rest of this goes into the background so that the user sees
 # immediate response. We will send email later when the experiment
 # is actually torn down.
@@ -238,9 +246,11 @@ DBQueryWarn("update projects ".
 
 #
 # Gen up a date for the started field of the record, and insert it.
+# Unlock the experiment at the same time.
 # 
 $expt_started  = DBDateTime();
-DBQueryWarn("update experiments set expt_start='$expt_started' ".
+DBQueryWarn("update experiments set ".
+	    "expt_start='$expt_started', expt_locked=NULL ".
 	    "WHERE eid='$eid' and pid='$pid'");
 
 #
@@ -294,7 +304,7 @@ my $message =
     "\n".
     "Appended at the end is the output of the experiment setup. If you\n" .
     "have any questions or comments, please include the output below\n" .
-    "in your message to $TBOPS\n";
+    "in your message to $TBOPS";
    
 
 SENDMAIL("$user_name <$user_email>",
@@ -329,12 +339,6 @@ sub fatal()
     }
 
     #
-    # Otherwise, we have to cleanup since we are disconnected from the
-    # wrapper script. 
-    # 
-    ExptCleanup();
-
-    #
     # Send a message to the testbed list. 
     #
     SENDMAIL("$user_name <$user_email>",
@@ -343,7 +347,13 @@ sub fatal()
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",
 	     ($logname, "assign.log", $nsfile));
-    
+
+    #
+    # We have to cleanup since we are disconnected from the wrapper script.
+    # Must be done after sending email so the nsfile is still around.
+    # 
+    ExptCleanup();
+
     unlink($logname);
     
     exit($errorstat);

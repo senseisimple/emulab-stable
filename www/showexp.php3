@@ -31,10 +31,7 @@ $exp_pid = $pid;
 #
 # Check to make sure this is a valid PID/EID tuple.
 #
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE ".
-		 "eid='$exp_eid' and pid='$exp_pid'");
-if (mysql_num_rows($query_result) == 0) {
+if (! TBValidExperiment($exp_pid, $exp_eid)) {
   USERERROR("The experiment $exp_eid is not a valid experiment ".
             "in project $exp_pid.", 1);
 }
@@ -57,19 +54,34 @@ echo "<p><center>
        <A href='endexp.php3?pid=$exp_pid&eid=$exp_eid'>Yes</a>
       </center>\n";    
 
+# Swap option.
+$expstate = TBExptState($exp_pid, $exp_eid);
+if ($expstate) {
+    if (strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
+	echo "<p><center>
+             Do you want to swap this experiment in?
+             <A href='swapexp.php3?inout=in&pid=$exp_pid&eid=$exp_eid'>Yes</a>
+             <br>
+             <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>
+                (Information on experiment swapping)</a>
+             </center>\n";
+    }
+    elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+	echo "<p><center>
+             Do you want to swap this experiment out?
+             <A href='swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid'>Yes</a>
+             <br>
+             <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>
+                (Information on experiment swapping)</a>
+             </center>\n";    
+    }
+}
+
 #
 # Dump the node information.
 #
 SHOWNODES($exp_pid, $exp_eid);
     
-#
-# Lets dump the project information too.
-#
-echo "<center>
-      <h3>Project Information</h3>
-      </center>\n";
-SHOWPROJECT($exp_pid, $uid);
-
 #
 # Standard Testbed Footer
 # 

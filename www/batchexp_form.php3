@@ -114,11 +114,23 @@ echo "<tr>
                      name=\"exp_expires\"></td>
      </tr>\n";
 
+echo "<tr>
+	  <td colspan=2>Swappable?[<b>1</b>]:</td>
+          <td><input type=checkbox name=exp_swappable value=Yep> Yes</td>
+     </tr>\n";
+
+echo "<tr>
+	  <td colspan=2>Priority[<b>2</b>]:</td>
+          <td><input type=radio name=exp_priority value=low checked> <b>Low</b>
+              &nbsp &nbsp &nbsp
+              <input type=radio name=exp_priority value=high> High</td>
+     </tr>\n";
+
 #
 # Select a group
 # 
 echo "<tr>
-          <td colspan=2>Group:<br>(leave blank to use default group)</td>
+          <td colspan=2>Group[<b>3</b>]:</td>
           <td><input type=\"text\" name=\"exp_gid\"
                      size=$TBDB_GIDLEN maxlength=$TBDB_GIDLEN>
               </td>
@@ -132,6 +144,21 @@ echo "<tr>
 </tr>
 </form>
 </table>
+
+<h4><blockquote><blockquote><blockquote>
+   <dl COMPACT>
+      <dt>[1]
+          <dd>Check if your experiment can be swapped out and swapped back in
+	      without harm to your experiment. Useful for scheduling when
+	      resources are tight.
+      <dt>[2]
+          <dd>You get brownie points for marking your experiments as Low
+              Priority, which indicates that we can swap you out before high
+	      priority experiments.
+      <dt>[3]
+          <dd>Leave blank to use the default group for the project.
+  </dl>
+</blockquote></blockquote></blockquote></h4>
 
 <p>
 <center>

@@ -388,6 +388,13 @@ function SHOWEXP($pid, $eid) {
     $batchmode   = $exprow[batchmode];
     $attempts    = $exprow[attempts];
     $batchstate  = $exprow[batchstate];
+    $priority    = $exprow[priority];
+    $swappable   = $exprow[swappable];
+
+    if ($swappable)
+	$swappable = "Yes";
+    else
+	$swappable = "No";
 
     #
     # Generate the table.
@@ -408,7 +415,8 @@ function SHOWEXP($pid, $eid) {
 
     echo "<tr>
             <td>Project: </td>
-            <td class=\"left\">$pid</td>
+            <td class=\"left\">
+                <A href='showproject.php3?pid=$pid'>$pid</td>
           </tr>\n";
 
     echo "<tr>
@@ -437,6 +445,16 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Started: </td>
             <td class=\"left\">$exp_start</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Swappable: </td>
+            <td class=\"left\">$swappable</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Priority: (0 is highest) </td>
+            <td class=\"left\">$priority</td>
           </tr>\n";
 
     echo "<tr>

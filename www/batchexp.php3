@@ -27,6 +27,20 @@ if (!isset($exp_name) ||
   FORMERROR("Experiment Description");
 }
 
+if (isset($exp_swappable)) {
+    if (strcmp($exp_swappable, "")) {
+	unset($exp_swappable);
+    }
+    elseif (strcmp($exp_swappable, "Yep")) {
+	USERERROR("Invalid argument for Swappable.", 1);
+    }
+}
+
+if (isset($exp_priority) &&
+    strcmp($exp_priority, "low") && strcmp($exp_priority, "high")) {
+  USERERROR("Invalid argument for Priority.", 1);
+}
+
 #
 # Only known and logged in users can begin experiments.
 #
@@ -128,6 +142,22 @@ if (!TBValidGroup($exp_pid, $exp_gid)) {
 }
 
 #
+# Convert Priority and Swappable params to arguments to script.
+#
+if (isset($exp_swappable)) {
+    $exp_swappable = "-s";
+}
+else {
+    $exp_swappable = "";
+}
+if (!isset($exp_priority) || strcmp($exp_priority, "high") == 0) {
+    $exp_priority  = "-n high";
+}
+else {
+    $exp_priority  = "-n low";
+}
+
+#
 # Verify permissions.
 #
 if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
@@ -157,6 +187,7 @@ $last   = time();
 
 $result = exec("$TBSUEXEC_PATH $uid $unix_gid ".
 	       "webbatchexp -x \"$exp_expires\" -E \"$exp_name\" ".
+	       "$exp_priority $exp_swappable ".
 	       "-p $exp_pid -g $exp_gid -e $exp_id $nsfile",
  	       $output, $retval);
 
