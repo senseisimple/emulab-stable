@@ -3,9 +3,11 @@
 #
 TBDBNAME=tbdb
 WWWDEFS=stoller-emulab
-TBOPSEMAIL='Leigh B Stoller <stoller@flux.utah.edu>'
-TBLOGSEMAIL='Leigh B Stoller <stoller@flux.utah.edu>'
-TBAUDITEMAIL='Leigh B Stoller <stoller@flux.utah.edu>'
+TBOPSEMAIL=stoller@flux.utah.edu
+TBLOGSEMAIL=stoller@flux.utah.edu
+TBWWWEMAIL=stoller@flux.utah.edu
+TBAPPROVALEMAIL=stoller@flux.utah.edu
+TBAUDITEMAIL=stoller@flux.utah.edu
 IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=boss.emulab.net
@@ -15,5 +17,5 @@ OURDOMAIN=emulab.net
 FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
-TBSTATEDEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
-TBTESTSUITEEMAIL='Leigh B Stoller <stoller@fast.cs.utah.edu>'
+TBSTATEDEMAIL=stoller@fast.cs.utah.edu
+TBTESTSUITEEMAIL=stoller@fast.cs.utah.edu

@@ -26,15 +26,4 @@ $TITLECOLOR     = "#E04050";
 $BANNERCOLOR    = "#ABABE0";
 $THISHOMEBASE   = "Wide.Emulab.Net";
 $THISPROJECT    = "The Wide-Area Network Testbed";
-
-$TBMAILADDR_OPS		= "widetestbed-ops@flux.cs.utah.edu";
-$TBMAIL_OPS		= "Testbed Ops <$TBMAILADDR_OPS>";
-$TBMAILADDR_WWW		= "widetestbed-www@flux.cs.utah.edu";
-$TBMAIL_WWW		= "Testbed WWW <$TBMAILADDR_WWW>";
-$TBMAILADDR_APPROVAL	= "widetestbed-approval@flux.cs.utah.edu";
-$TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
-$TBMAILADDR_LOGS	= "widetestbed-logs@flux.cs.utah.edu";
-$TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
-$TBMAILADDR_AUDIT	= "widetestbed-audit@flux.cs.utah.edu";
-$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>

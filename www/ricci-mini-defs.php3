@@ -23,15 +23,4 @@ $TITLECOLOR     = "#E04050";
 $BANNERCOLOR    = "#ABABE0";
 $THISHOMEBASE   = "Mini.Emulab.Net";
 $THISPROJECT    = "The Mini Network Testbed";
-
-$TBMAILADDR_OPS		= "ricci@cs.utah.edu";
-$TBMAIL_OPS		= "Testbed Ops <$TBMAILADDR_OPS>";
-$TBMAILADDR_WWW		= "ricci@cs.utah.edu";
-$TBMAIL_WWW		= "Testbed WWW <$TBMAILADDR_WWW>";
-$TBMAILADDR_APPROVAL	= "ricci@cs.utah.edu";
-$TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
-$TBMAILADDR_LOGS	= "ricci@cs.utah.edu";
-$TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
-$TBMAILADDR_AUDIT	= "ricci@cs.utah.edu";
-$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 ?>

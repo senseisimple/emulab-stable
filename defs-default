@@ -8,8 +8,10 @@
 TBDBNAME=tbdb
 WWWDEFS=default
 TBADMINGROUP=flux
-TBOPSEMAIL='Testbed Operations <testbed-ops@flux.cs.utah.edu>'
+TBOPSEMAIL=testbed-ops@flux.cs.utah.edu
 TBLOGSEMAIL=testbed-logs@flux.cs.utah.edu
+TBWWWEMAIL=testbed-www@flux.cs.utah.edu
+TBAPPROVALEMAIL=testbed-approval@flux.cs.utah.edu
 TBAUDITEMAIL=testbed-audit@flux.cs.utah.edu
 TBSTATEDEMAIL=testbed-stated@flux.utah.edu
 TBTESTSUITEEMAIL=testbed-testsuite@flux.utah.edu

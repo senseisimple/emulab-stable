@@ -8,6 +8,12 @@ $OURDOMAIN      = "@OURDOMAIN@";
 $BOSSNODE       = "@BOSSNODE@";
 $TBADMINGROUP   = "@TBADMINGROUP@";
 
+$TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
+$TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
+$TBMAILADDR_APPROVAL	= "@TBAPPROVALEMAIL_NOSLASH@";
+$TBMAILADDR_LOGS	= "@TBLOGSEMAIL_NOSLASH@";
+$TBMAILADDR_AUDIT	= "@TBAUDITEMAIL_NOSLASH@";
+
 # Overridden by the defs file!
 $TBMAINSITE     = 0;
 
@@ -41,6 +47,12 @@ $TBNAMECOOKIE   = "MyUidCookie" . $TBCOOKIESUFFIX;
 $TBAUTHTIMEOUT  = 21600;
 
 $HTTPTAG        = "http://";
+
+$TBMAIL_OPS		= "Testbed Ops <$TBMAILADDR_OPS>";
+$TBMAIL_WWW		= "Testbed WWW <$TBMAILADDR_WWW>";
+$TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
+$TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
+$TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
 
 #
 # This just spits out an email address in a page, so it does not need

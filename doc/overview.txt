@@ -175,3 +175,19 @@ If the user swaps the experiment in and out during its lifetime, 'tbswapin' and
 When the user terminates the experiment, endexp gets called. It calls tbswapout
 to free hardware resources, then calls tbend, which cleans up the experiment's
 data in the virt_* tables.
+
+##### The Event System
+
+Our event system is implemented as a thin layer on top of the 'elvin' system.
+Elvin is a publish/subscribe system, meaning that programs that want to recive
+events connect to the elvin server and subscribe to all events for a particular
+node, for a particular traffic generator, etc.
+
+We run an event scheduler for each experiment. It's this sheduler's job to keep
+track of future evnets for the experiment, and send them at the appropriate
+time. The most basic exampel of this are events specified through the NS file,
+but tevc can also be used to schedule events for some future time.
+
+We also
+
+

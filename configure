@@ -853,6 +853,22 @@ fi
 
 
 
+#
+# Offer both versions of the email addresses that have the @ escaped
+# for perl (the default), and that don't
+#
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -950,20 +966,32 @@ EOF
 fi
 
 #
-# The email addresses need to be be munged for perl scripts.
+# The email addresses need to be be munged for perl scripts. But,
+# php needs them un-escaped
 #
+TBOPSEMAIL_NOSLASH="$TBOPSEMAIL"
 TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
+TBLOGSEMAIL_NOSLASH="$TBLOGSEMAIL"
 TBLOGSEMAIL="`echo $TBLOGSEMAIL | sed -e 's/@/\\\@/'`"
+TBAUDITEMAIL_NOSLASH="$TBAUDITEMAIL"
 TBAUDITEMAIL="`echo $TBAUDITEMAIL | sed -e 's/@/\\\@/'`"
+TBWWWEMAIL_NOSLASH="$TBWWWEMAIL"
+TBWWWEMAIL="`echo $TBWWWEMAIL | sed -e 's/@/\\\@/'`"
+TBAPPROVALEMAIL_NOSLASH="$TBAPPROVALEMAIL"
+TBAPPROVALEMAIL="`echo $TBAPPROVALEMAIL | sed -e 's/@/\\\@/'`"
 
 if test -n "$TBACTIVEARCHIVE"; then
+    TBACTIVEARCHIVE_NOSLASH="$TBACTIVEARCHIVE"
     TBACTIVEARCHIVE="`echo $TBACTIVEARCHIVE | sed -e 's/@/\\\@/'`"
 else
+    TBACTIVEARCHIVE_NOSLASH="$TBOPSEMAIL_NOSLASH"
     TBACTIVEARCHIVE="$TBOPSEMAIL"
 fi
 if test -n "$TBUSERSARCHIVE"; then
+    TBUSERSARCHIVE_NOSLASH="$TBUSERSARCHIVE"
     TBUSERSARCHIVE="`echo $TBUSERSARCHIVE | sed -e 's/@/\\\@/'`"
 else
+    TBUSERSARCHIVE_NOSLASH="$TBOPSEMAIL_NOSLASH"
     TBUSERSARCHIVE="$TBOPSEMAIL"
 fi
 
@@ -1202,7 +1230,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1206: checking for a BSD compatible install" >&5
+echo "configure:1234: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1490,13 +1518,6 @@ s%@optional_subdirs@%$optional_subdirs%g
 s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
 s%@TBADMINGROUP@%$TBADMINGROUP%g
-s%@TBOPSEMAIL@%$TBOPSEMAIL%g
-s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
-s%@TBAUDITEMAIL@%$TBAUDITEMAIL%g
-s%@TBSTATEDEMAIL@%$TBSTATEDEMAIL%g
-s%@TBTESTSUITEEMAIL@%$TBTESTSUITEEMAIL%g
-s%@TBACTIVEARCHIVE@%$TBACTIVEARCHIVE%g
-s%@TBUSERSARCHIVE@%$TBUSERSARCHIVE%g
 s%@DELAYCAPACITY@%$DELAYCAPACITY%g
 s%@IPBASE@%$IPBASE%g
 s%@BOSSNODE@%$BOSSNODE%g
@@ -1516,6 +1537,24 @@ s%@CLIENT_ETCDIR@%$CLIENT_ETCDIR%g
 s%@CLIENT_BINDIR@%$CLIENT_BINDIR%g
 s%@CLIENT_VARDIR@%$CLIENT_VARDIR%g
 s%@SNMP_RW_COMMUNITY@%$SNMP_RW_COMMUNITY%g
+s%@TBOPSEMAIL@%$TBOPSEMAIL%g
+s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
+s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
+s%@TBLOGSEMAIL_NOSLASH@%$TBLOGSEMAIL_NOSLASH%g
+s%@TBWWWEMAIL@%$TBWWWEMAIL%g
+s%@TBWWWEMAIL_NOSLASH@%$TBWWWEMAIL_NOSLASH%g
+s%@TBAPPROVALEMAIL@%$TBAPPROVALEMAIL%g
+s%@TBAPPROVALEMAIL_NOSLASH@%$TBAPPROVALEMAIL_NOSLASH%g
+s%@TBAUDITEMAIL@%$TBAUDITEMAIL%g
+s%@TBAUDITEMAIL_NOSLASH@%$TBAUDITEMAIL_NOSLASH%g
+s%@TBSTATEDEMAIL@%$TBSTATEDEMAIL%g
+s%@TBSTATEDEMAIL_NOSLASH@%$TBSTATEDEMAIL_NOSLASH%g
+s%@TBTESTSUITEEMAIL@%$TBTESTSUITEEMAIL%g
+s%@TBTESTSUITEEMAIL_NOSLASH@%$TBTESTSUITEEMAIL_NOSLASH%g
+s%@TBACTIVEARCHIVE@%$TBACTIVEARCHIVE%g
+s%@TBACTIVEARCHIVE_NOSLASH@%$TBACTIVEARCHIVE_NOSLASH%g
+s%@TBUSERSARCHIVE@%$TBUSERSARCHIVE%g
+s%@TBUSERSARCHIVE_NOSLASH@%$TBUSERSARCHIVE_NOSLASH%g
 s%@LEDA@%$LEDA%g
 s%@ASSIGN@%$ASSIGN%g
 s%@SSH_ARGS@%$SSH_ARGS%g

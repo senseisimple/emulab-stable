@@ -3,9 +3,11 @@
 #
 TBDBNAME=tbdb
 WWWDEFS=stoller-home
-TBOPSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
-TBLOGSEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
-TBAUDITEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
+TBOPSEMAIL=stoller@stoller.casco.net
+TBLOGSEMAIL=stoller@stoller.casco.net
+TBWWWEMAIL=stoller@stoller.casco.net
+TBAPPROVALEMAIL=stoller@stoller.casco.net
+TBAUDITEMAIL=stoller@stoller.casco.net
 IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=golden-gw.ballmoss.com
@@ -15,5 +17,5 @@ OURDOMAIN=ballmoss.com
 FSDIR_GROUPS=/groups
 FSDIR_PROJ=/proj
 FSDIR_USERS=/users
-TBSTATEDEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
-TBTESTSUITEEMAIL='Leigh B Stoller <stoller@stoller.casco.net>'
+TBSTATEDEMAIL=stoller@stoller.casco.net
+TBTESTSUITEEMAIL=stoller@stoller.casco.net
