@@ -32,6 +32,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $BACKUPDIR	= "$TB/backup";
 my $LOGDIR	= "$TB/log/mysql";
 my $BASE	= "base";
+my $UPD		= "update";
 my $BACK	= "tbdb";
 my $extension;
 
@@ -102,9 +103,11 @@ print "Extension:        $extension\n";
 
 my $backname  = "$BACK.$extension";
 my $basename  = "$BASE.$extension";
+my $updname  = "$UPD.$extension";
 
 print "Backup file name: $backname\n";
 print "Base file name:   $basename\n";
+print "Update file name: $updname\n";
 
 #
 # Move base log out of the way since flush-logs will reset it too.
@@ -135,6 +138,10 @@ if (! chdir($LOGDIR)) {
 
 if (-e "$basename" && system("gzip -9 $basename")) {
     fatal("gzip $basename failed!");
+}
+
+if (-e "$updname" && system("gzip -9 $updname")) {
+    fatal("gzip $updname failed!");
 }
 
 #SENDMAIL("stoller", "DB Backup Finished", "", undef, undef, ($logname));
