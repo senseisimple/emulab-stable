@@ -145,7 +145,7 @@ function WRITEPLABTOPBAR() {
 
 
     WRITETOPBARBUTTON("Advanced Experiment",
-        $TBBASE, "beginexp.php3");
+        $TBBASE, "beginexp_html.php3");
 
     if ($login_status & CHECKLOGIN_TRUSTED) {
 	# Only project/group leaders can do these options
