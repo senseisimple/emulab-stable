@@ -44,6 +44,8 @@ function linkToViewTableExtra( $text, $extra, $dbname, $tablename ) {
 }
 
 function setError( $text ) {
+  global $title_header, $body_header;
+
   $title_header = "Error";
   $body_header = "Error: $text";
 }
