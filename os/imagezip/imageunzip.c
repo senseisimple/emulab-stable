@@ -9,6 +9,8 @@
 #include <assert.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
 #define CHECK_ERR(err, msg) { \
     if (err != Z_OK) { \
@@ -26,8 +28,9 @@ main(int argc, char **argv)
 	int		cc, err, infd;
 	z_stream	d_stream; /* inflation stream */
 	off_t		offset;
-	long long	filesize, magic;
+	long long	filesize, magic, total = 0, blockcount = 0;
 	char		*prog = argv[0];
+	struct timeval  stamp, estamp;
 
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
@@ -63,6 +66,7 @@ main(int argc, char **argv)
 	magic    = *((long long *) &inbuf[sizeof(filesize)]);
 	fprintf(stderr, "Filesize = %qd, Magic = %qx\n", filesize, magic);
 
+	gettimeofday(&stamp, 0);
 	while (1) {
 		if ((cc = read(infd, inbuf, sizeof(inbuf))) <= 0) {
 			if (cc == 0)
@@ -92,12 +96,26 @@ main(int argc, char **argv)
 			fprintf(stderr, "%s: inflate failed\n", prog);
 			exit(1);
 		}
+		total += cc;
+		blockcount += cc;
 		if (d_stream.avail_in)
 			goto inflate_again;
-		
+
+		if (blockcount > (1024 * 16 * 8192)) {
+			gettimeofday(&estamp, 0);
+			estamp.tv_sec -= stamp.tv_sec;
+			fprintf(stderr, "Wrote %qd bytes ", total);
+			fprintf(stderr, "in %ld seconds\n", estamp.tv_sec);
+			blockcount = 0;
+		}
 	}
 	err = inflateEnd(&d_stream);
 	CHECK_ERR(err, "inflateEnd");
+
+	gettimeofday(&estamp, 0);
+	estamp.tv_sec -= stamp.tv_sec;
+	fprintf(stderr, "Finshed! Wrote %qd bytes ", total);
+	fprintf(stderr, "in %ld seconds\n", estamp.tv_sec);
 
 	close(infd);
 	return 0;
