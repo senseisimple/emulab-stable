@@ -7,13 +7,3 @@ news:*:6:8::0:0:Network News:/var/spool/news:/sbin/nologin
 games:*:7:13::0:0:Games pseudo-user:/usr/games:/sbin/nologin
 uucp:*:66:1::0:0:UUCP:/var/spool/uucppublic:/usr/libexec/uucp/uucico
 nobody:*:32767:39::0:0:Unprivileged user:/nonexistent:/sbin/nologin
-lepreau:XzOQ6qRSyDp5A:12:6000::0:0:Jay Lepreau:/users/lepreau:/bin/csh
-mike:OQYay0WnwMYTs:27:6000::0:0:Mike Hibler:/users/mike:/bin/csh
-stoller:4.MMzSPURcOls:282:6000::0:0:Leigh B. Stoller:/users/stoller:/bin/csh
-tullmann:slG0cJEVIV7fk:3654:6000::0:0:Patrick A Tullmann:/users/tullmann:/bin/tcsh
-calfeld:amGW2iuQCjmyQ:2986:6000::0:0:Chris Alfeld:/users/calfeld:/bin/tcsh
-danderse:i7zCwgOeDkwZ6:2146:6000::0:0:David G Andersen:/users/danderse:/bin/tcsh
-reid:i9vTbxvJp1Rpo:1296:6000::0:0:Alastair Reid,,,:/users/reid:/bin/tcsh
-newbold:b5CNBeTTiXYqA:2224:6000::0:0:Mac G Newbold:/users/newbold:/bin/tcsh
-axon:MAg80zUaZS52Q:2347:6000::0:0:Logan Axon:/users/axon:/bin/tcsh
-ricci:3MYM/vEONbd8k:1182:6000::0:0:Robert Ricci:/users/ricci:/bin/tcsh
