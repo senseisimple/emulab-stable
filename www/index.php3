@@ -33,13 +33,16 @@ if (isset($login)) {
 	$c="insert into login (uid,timeout) values ('$auth_usr','$timeout')";
 	mysql_db_query("tbdb", $c);
       }
-      echo "$auth_usr logged in";  
+      $message="Welcome back, $auth_usr...<br>You are logged in.\n";
+      #echo $message;
     } else {
-      echo "Login Failed\n";
+      $message="Login Failed\n";
+      #echo $message;
       unset($auth_usr);
     }
   } else {
-    echo "Login Failed\n";
+    $message="Login Failed\n";
+    #echo $message;
     unset($auth_usr);
   }
 } elseif (isset($logout)) { # a logout clause 
@@ -49,9 +52,11 @@ if (isset($login)) {
   $result = mysql_db_query("tbdb", $cmnd);
   if (!$result) {
     $err = mysql_error();
-    echo "Logout failed: $err";
+    $message="Logout failed: $err";
+    #echo $message;
   } else {
-    echo "<p>You have been logged out, $auth_usr.</p>";
+    $message="<p>You have been logged out, $auth_usr.</p>";
+    #echo $message;
     unset($auth_usr);
   }
 } elseif (isset($auth_usr)) {
@@ -61,13 +66,15 @@ if (isset($login)) {
   $result = mysql_db_query("tbdb", $query);
   $n = mysql_num_rows($result);
   if ($n == 0) {
-    echo "<h3>You are not logged in. Please go back to the
+    $message="<h3>You are not logged in. Please go back to the
 <a href=\"tbdb.html\"> Home Page </a> and log in first.\n";
+    #echo $message;
   } else {
     $row = mysql_fetch_row($result);
     if ($row[0] < time()) { # if their login expired
-      echo "<h3>You have been logged out due to inactivity.
+      $message= "<h3>You have been logged out due to inactivity.
 Please log in again.</h3>\n";
+      #echo $message;
       $cmnd = "DELETE FROM login WHERE uid=\"$auth_usr\"";
       mysql_db_query("tbdb", $cmnd);
     } else {
@@ -138,6 +145,9 @@ echo "'>Join a Project</A>";
 <table cellpadding='0' cellspacing='0' width="100%">
 <form action="index.php3" method='post' target='fixed'>
 <?php
+if (isset($message)) {
+  echo "<b>$message</b>";
+}
 if (!isset($auth_usr)) {
   echo "<tr><td>Username:<input type='text' name='auth_usr' size=8></td></tr><tr><td>Password:<input type='password' name='auth_passwd' size=8></td></tr><tr><td align='center'><b><input type='submit' value='Login' name='login'></td></tr></b>";
 } else {
