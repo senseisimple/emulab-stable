@@ -2,60 +2,83 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
-# idlecheck - See if node/expt is active
+# idlemail - send mail to idle expts
 
 # Configure variables
 use lib '@prefix@/lib';
 use libdb;
+use libtestbed;
 use English;
 use Getopt::Std;
+
+my $THISHOMEBASE     = "@THISHOMEBASE@";
+my $TBBASE           = "@TBBASE@";
+my $TBDOCBASE        = "@TBDOCBASE@";
+my $TBMAILADDR_OPS   = "@TBOPSEMAIL@";
+my $TBMAILADDR_WWW   = "@TBWWWEMAIL@";
+my $TBMAILADDR_AUDIT = "@TBAUDITEMAIL@";
+my $TBMAIL_OPS       = "Testbed Ops <$TBMAILADDR_OPS>";
+my $TBMAIL_WWW       = "Testbed WWW <$TBMAILADDR_WWW>";
+my $TBMAIL_AUDIT     = "Testbed Audit <$TBMAILADDR_AUDIT>";
+my $TBMAIL_AUTOMAIL  = "@TBAUTOMAILEMAIL@";
 
 # Turn off line buffering on output
 $| = 1;
 
 # Defaults
-my $defidlehours = TBGetSiteVar("idle/threshold");
 
 # Don't put 'my' on these, or they won't be settable with ${$var}
 $h = 0; # help mode
 $d = 0; # debug mode
+$n = 0; # no-mail mode
 $f = 0; # force mode
-$t = $defidlehours; # Threshold idle time
 
 print "Got ARGV = ",join(" ",@ARGV),"\n" if $d;
 
+# Grab our site variables...
+my $mailinterval = TBGetSiteVar("idle/mailinterval");
+my $threshold    = TBGetSiteVar("idle/threshold");
+my $cc_grp_ldrs  = TBGetSiteVar("idle/cc_grp_ldrs");
+
 sub help {
     die("Usage:
-idlemail [-h] [-d] [-f] [<pid> <eid>]
+idlemail [-h] [-d] [-n] [[-f] <pid> <eid>]
  -h     Show this help message
  -d     Enable debugging/verbose output
+ -n	No email sending. (for debugging only)
  -f	Force sending a message for <pid> <eid>
 
 If <pid> and <eid> are supplied, send a swap request for that experiment.
-Without -f, the message won't be sent if pid/eid hasn't been idle for at
-least $t hours.
+Without -f, the message won't be sent if pid/eid has not been idle long
+enough or if it hasn't been long enough since its last message.
 
 idlemail runs periodically (via cron(8)) to send email messages
-regarding experiments that are idle for over $t hours.\n");
+regarding experiments that are idle, starting after $threshold hours 
+of inactivity, and sending another message every $mailinterval hours.
+
+Current settings:
+idle threshold = $threshold hours
+mail interval  = $mailinterval hours
+Start CC'ing group leaders on message $cc_grp_ldrs\n");
 }
 
-my $optlist = "hdf";
+my $optlist = "hdnf";
 my %opt = ();
 if (! getopts($optlist,\%opt)) { help(); }
 # Copy the options into global vars
 foreach $var (keys %opt) {
-    ${$var} = $opt{$var};
+    ${$var} += $opt{$var};
     print "\$$var = $opt{$var} (".${$var}.")\n" if $d;
 }
 
 my $pid = shift || "";
 my $eid = shift || "";
 
-print "Settings: h=$h  d=$d  f=$f  pid=$pid  eid=$eid\n" if $d;
+print "Settings: h=$h  d=$d  n=$n  f=$f  pid=$pid  eid=$eid\n" if $d;
 
 if ($h) { help(); }
 
@@ -64,22 +87,27 @@ if (($UID != 0) && (!TBAdmin($UID))) {
     die("Only root or TB administrators can run idlemail.\n");
 }
 
-
 if ($pid eq "" || $eid eq "") {
     # Normal mode
 
-    # Construct the query
-    my $lastact_query = "greatest(last_tty_act, last_net_act, ".
-      "last_cpu_act, last_ext_act)";
-    my $sql = "select pid, eid, last_report,
-max(last_tty_act) as last_tty_act, max(last_net_act) as last_net_act,
-max(last_cpu_act) as last_cpu_act, max(last_ext_act) as last_ext_act,
-max($lastact_query) as last_act, round((unix_timestamp(now()) -
-unix_timestamp(max($lastact_query)))/3600,2) as idle_time,
-count(r.node_id) as nodes
-from node_activity as n left join reserved as r on n.node_id=r.node_id
-where pid is not null and eid is not null
-group by pid,eid order by pid,eid";
+    # Important note: this query only counts nodes in the
+    # node_activity table, which are all local nodes. So no virt or
+    # remote nodes get counted towards the node total.
+    my $sql  = <<EOT;
+select r.pid, e.gid, r.eid, swappable, swap_requests,
+round((unix_timestamp(now()) - unix_timestamp(last_swap_req))/3600,2)
+as lastreq, count(r.node_id) as nodes,
+round((unix_timestamp(now()) - unix_timestamp(max(
+greatest(last_tty_act, last_net_act, last_cpu_act, last_ext_act)
+)))/3600,2) as idle_time, max(greatest(last_tty_act, last_net_act,
+last_cpu_act, last_ext_act)) as lastact,
+(unix_timestamp(now()) - unix_timestamp(min(last_report))) as staleness
+from node_activity as na left join reserved as r on na.node_id=r.node_id
+left join experiments as e on r.pid=e.pid and r.eid=e.eid
+where r.pid is not null and r.eid is not null and idle_ignore=0
+group by pid,eid having idle_time >= $threshold and nodes > 0
+order by pid,eid
+EOT
 
     my $q = DBQueryFatal($sql);
 
@@ -87,38 +115,231 @@ group by pid,eid order by pid,eid";
 
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
+	$gid = $r{'gid'};
 	$eid = $r{'eid'};
-	#rep = $r{'last_report'};
-	$tty = $r{'last_tty_act'};
-	$net = $r{'last_net_act'};
-	$cpu = $r{'last_cpu_act'};
-	$ext = $r{'last_ext_act'};
-	$act = $r{'last_act'};
+	$swappable = $r{'swappable'};
+	$swapreqs = $r{'swap_requests'};
+	$lastreq = $r{'lastreq'};
+	$nodes = $r{'nodes'};
 	$time= $r{'idle_time'};
-	$nodes=0;
-	$id="";
-	if (!$n) { $nodes = $r{'nodes'}; }
-	else { $id = $r{'node_id'}; }
-	%type = ();
-	if ($tty eq $act) { $type{"tty"} = 1; }
-	if ($net eq $act) { $type{"net"} = 1; }
-	if ($cpu eq $act) { $type{"cpu"} = 1; }
-	if ($ext eq $act) { $type{"ext"} = 1; }
-	$typestr = join(",",keys %type);
+	$lastact= $r{'lastact'};
+        $staleness = $r{'staleness'};
+        if ($staleness >= 600) { # 10 minute stale limit
+            $stale=1;
+        }
 	
-	if (!$a && ($time < $t)) { next; }
+	# We already know (from the query) that idletime>threshold.
+	# So check the swap requests and time of last request, to make
+	# sure we can send a message.
 
-	# Do something
+	if ($swapreqs == 0 || ($swapreqs > 0 && $lastreq > $mailinterval)) {
+	    SendMessage($pid,$gid,$eid,$swappable,$swapreqs,$nodes,
+			$time,$lastact,$stale);
+	} elsif ($d) {
+	    print "$pid/$eid got msg #$swapreqs only $lastreq hrs ago\n";
+	}
+    }
+} else {
+    # pid/eid mode - only check pid/eid, and let $f force sending,
+    # even if msg was sent recently or expt isn't idle long enough.
+
+    if ($d) {
+	print "Checking $pid/$eid only... force is $f\n";
     }
 
-} else {
-    # pid/eid mode - send one
+    # Important note: this query only counts nodes in the
+    # node_activity table, which are all local nodes. So no virt or
+    # remote nodes get counted towards the node total.
 
+    # diffs from the normal query: don't restrict based on idleness
+    # or idle_ignore, and only grab our expt
 
+    my $sql  = <<EOT;
+select r.pid, e.gid, r.eid, swappable, swap_requests, idle_ignore,
+round((unix_timestamp(now()) - unix_timestamp(last_swap_req))/3600,2)
+as lastreq, count(r.node_id) as nodes,
+round((unix_timestamp(now()) - unix_timestamp(max(
+greatest(last_tty_act, last_net_act, last_cpu_act, last_ext_act)
+)))/3600,2) as idle_time, max(greatest(last_tty_act, last_net_act,
+last_cpu_act, last_ext_act)) as lastact,
+(unix_timestamp(now()) - unix_timestamp(min(last_report))) as staleness
+from node_activity as na left join reserved as r on na.node_id=r.node_id
+left join experiments as e on r.pid=e.pid and r.eid=e.eid
+where r.pid='$pid' and r.eid='$eid'
+group by pid,eid having nodes > 0
+EOT
+
+    my $q = DBQueryFatal($sql);
+
+    if ($d) { print $q->as_string; $q->dataseek(0); }
+
+    if (%r = $q->fetchhash()) {
+	$pid = $r{'pid'};
+	$gid = $r{'gid'};
+	$eid = $r{'eid'};
+	$swappable = $r{'swappable'};
+	$ignore = $r{'idle_ignore'};
+	$swapreqs = $r{'swap_requests'};
+	$lastreq = $r{'lastreq'};
+	$nodes = $r{'nodes'};
+	$time= $r{'idle_time'};
+	$lastact= $r{'lastact'};
+        $staleness = $r{'staleness'};
+        if ($staleness >= 600) { # 10 minute stale limit
+            $stale=1;
+        }
+	
+	# We don't know (from the query) that idletime>threshold.  So
+	# check that we're either forcing, or that it is idle, and
+	# then check the swap requests and time of last request, to
+	# make sure we can send a message.
+
+	if ($f || ($time > $threshold && !$ignore &&
+		   ($swapreqs == 0 ||
+		    ($swapreqs > 0 && $lastreq > $mailinterval)))) {
+	    SendMessage($pid,$gid,$eid,$swappable,$swapreqs,$nodes,
+			$time,$lastact,$stale);
+	} else {
+	    if ($d) {
+		print "$pid/$eid: no msg (idle $time hrs, ".
+		  "ignore=$ignore, msg #$swapreqs $lastreq hrs ago)\n";
+	    }
+	    # no message sent for whatever reason
+	    exit(2);
+	}
+    } else {
+	# expt didn't exist, or didn't have any nodes in node_activity
+	exit(1);
+    }
 }
 
 exit(0);
 
-
 sub SendMessage {
-    my ($
+    my ($pid,$gid,$eid,$swappable,$swapreqs,$c,$time,$lastact) = @_;
+    $idlehrs = int($time);
+    $idlemin = int(($time-$idlehrs)*60);
+
+    if ($d) {
+	print "Sending message to $pid/$eid, ".
+	  "idle $idlehrs hrs $idlemin min, total $time hrs\n";
+    }
+
+    my $expleader_name;
+    my $expleader_email;
+    my $uid = ExpLeader($pid,$eid);
+    UserDBInfo($uid,\$expleader_name,\$expleader_email);
+    my $leaders = TBLeaderMailList($pid,$gid);
+    if ($d > 1) {
+	print "expt=$pid/$eid (gid=$gid)\n".
+	  "uid=$uid  ($expleader_name <$expleader_email>)\n".
+	  "leaders=$leaders\n";
+    }
+
+    my $wrapwidth=75;
+
+    # Important note about our wordwrapper:
+    # It does funkyness with strings that already have some newlines in 
+    # them, most especially with \n\n embedded. It also adds a final \n
+    # to the end of the string it wraps.
+
+    $msg="Hi, this is an important automated message from $THISHOMEBASE.\n\n";
+    $msg .=
+      wordwrap("It appears that the $c node".($c!=1?"s":"").
+	       " in your experiment ".
+	       "'$eid' ".($c!=1?"have":"has")." been inactive for ".
+	       "$idlehrs hours, $idlemin minutes, since $lastact. ".
+	       ( $stale
+		 ? ("(This message may be based on incomplete or ".
+		    "stale information. ".
+		    "Contact Testbed Ops if this message is a mistake.) ")
+		 : "").
+	       ( $swapreqs > 0
+		 ? ("You have been sent ".$swapreqs." other message".
+		    ($swapreqs!=1?"s":"")." since this experiment ".
+		    "became idle. ")
+		 : "").
+	       ($swappable ?
+		("This experiment is marked as swappable, so it may be ".
+		 "automatically swapped out by $THISHOMEBASE or its ".
+		 "operational staff. ") :
+		("This experiment has not been marked swappable, so it ".
+		 "will not be automatically swapped out. ")), $wrapwidth);
+    $msg .= "\n".
+      wordwrap("We would appreciate it if you could either terminate or ".
+	       "swap this experiment out so that the nodes will be ".
+	       "available for use by other experimenters. You can do this ".
+	       "by logging into the $THISHOMEBASE Web Interface, and using ".
+	       "the swap or terminate links on this page:",$wrapwidth);
+    $msg .= "\n$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n";
+    $msg .=
+      wordwrap("More information on experiment swapping is available ".
+	       "in the $THISHOMEBASE FAQ at",$wrapwidth);
+    $msg .= "$TBDOCBASE/faq.php3#UTT-Swapping\n\n";
+    $msg .=
+      wordwrap("More information on our node usage policy is available at ",
+	       $wrapwidth);
+    $msg .= "$TBDOCBASE/docwrapper.php3?docname=swapping.html\n\n";
+    $msg .=
+      wordwrap("If you feel this message is in error then please contact ".
+	       "Testbed Operations <$TBMAILADDR_OPS>.",$wrapwidth);
+    $msg .= "\nThanks!\nTestbed Operations\n";
+
+    # The sendmail command for non web stuff looks like this:
+    # SENDMAIL(To, Subject, Message, [From], [More Headers], ...)
+
+    if ($n) {
+	# no mail mode: don't send mail or update db counters
+	print "----NO-MAIL-MODE----\n";
+	print "To: $expleader_name <$expleader_email>\n";
+	print "From: $TBMAIL_OPS\n".
+	  # this is message swapreqs+1
+	  ( $swapreqs+1 >= $cc_grp_ldrs
+	    ? "Cc: $leaders\n"
+	    : "") .
+	      "Bcc: $TBMAIL_AUTOMAIL\n".
+		"Errors-To: $TBMAIL_WWW"."\n";
+	print "Subject: $c PC".($c!=1?"s":"").
+	  " idle $idlehrs hours: $pid/$eid\n";
+	print "\n$msg\n";
+	print "----NO-MAIL-MODE----\n";
+    } else {
+	# libtestbed SENDMAIL syntax:
+	# SENDMAIL(To, Subject, Message, [From], [More Headers],...)
+
+	# For debugging:
+	#SENDMAIL("Expt Leader <$TBMAILADDR_OPS>",
+	SENDMAIL("$expleader_name <$expleader_email>",
+		 "$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid",
+		 $msg,
+		 "$TBMAIL_OPS",
+		 # this is message swapreqs+1
+		 ( $swapreqs+1 >= $cc_grp_ldrs
+		   ? "Cc: $leaders\n"
+		   : "") .
+		 "Bcc: $TBMAIL_AUTOMAIL\n".
+		 "Errors-To: $TBMAIL_WWW");
+
+	# Update the count and the time in the database
+	DBQueryWarn("update experiments set swap_requests= swap_requests+1,
+                 last_swap_req=now() where pid='$pid' and eid='$eid';");
+    }
+
+}
+
+sub wordwrap($$) {
+    # Perl version of the PHP wordwrap function.
+    # Got the one-liner at http://www.consistent.org/terran/misc.shtml
+
+    my ($str,$width) = @_;
+
+    # The one liner sometimes produces spurious undefined values warnings, 
+    # so we'll temporarily disable it in this function only
+    local $WARNING = 0;
+
+    if ($d > 1) { print "WRAPPING: $str => $width\n"; }
+    $str=~s/(?:^|\G\n?)(?:(.{1,$width})(?:\s|\n|$)|(\S{$width})|\n)/$1$2\n/sg;
+    if ($d > 1) { print "WRAPPING: => \n$str\n"; }
+
+    return $str;
+}
