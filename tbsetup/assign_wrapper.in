@@ -6,6 +6,8 @@
 #
 use English;
 use Getopt::Std;
+use POSIX qw(setsid);
+use POSIX ":sys_wait_h";
 
 #
 # This function as the main assign loop.  It converts the virtual
@@ -19,21 +21,23 @@ use Getopt::Std;
 #      Internally created nodes (jailhost,delay,sim) are not treated
 #        consistently. Needs more thought.
 #
-# Return codes:
+# Return codes: -1 is an uncontrolled error (someone called die()). No
+# recovery is possible so the caller has to check for this explicitly.
+# The CANRECOVER bit indicates 'recoverability' (no db or physical
+# state was modified by the time the error occurred). It also is used
+# to signal that a retry is possible. 
 #
-# 0  - success
-# 1+ - error (Add other values:)
-# 2  - max_concurrent violation
-# 4  - bandwidth violation
-# 8  - linkusers violation
-# 16 - desires violation
-# 32 - unassigned
-# 64 - Set to indicate 'recoverability'
-#      (E.g., no db or physical state was modified
-#       by the time the error occurred.)
-# -1 - An uncontrolled error (someone called die()). No recovery is possible
-#      so the caller has to check for this explicitly.
-#
+my $WRAPPER_SUCCESS		 = 0x00;
+my $WRAPPER_FAILED		 = 0x01;	# Failed (Add other values)
+my  $WRAPPER_FAILED_MAXCONCURENT = 0x02;	# max_concurrent violation
+my  $WRAPPER_FAILED_BANDWIDTH    = 0x04;	# Bandwidth violation
+my  $WRAPPER_FAILED_LINKUSERS    = 0x08;	# Linkusers violation
+my  $WRAPPER_FAILED_DESIRES      = 0x10;	# Desires violation
+my  $WRAPPER_FAILED_UNASSIGNED   = 0x20;	# Unassigned violation
+my  $WRAPPER_FAILED_CANRECOVER   = 0x80;        # Can recover, retry.
+# Set this once we modify DB state; forces no recover in fatal().
+my $NoRecover = 0;
+    
 sub usage ()
 {
     print STDERR "Usage: $0 [-v] [-u | -n] pid eid\n";
@@ -127,8 +131,13 @@ sub fatal ($$)
 {
     my($exitcode, $message) = @_;
 
-    $message =~ s/\n$//;
-    print STDERR "$message\n";
+    print STDERR "*** $0:\n".
+	         "    $message\n";
+
+    # Remove recover bit.
+    $exitcode = $exitcode & ~$WRAPPER_FAILED_CANRECOVER
+	if ($NoRecover);
+    
     exit($exitcode);
 }
 
@@ -401,6 +410,7 @@ if ($toponly) {
     exit(0);
 }
 
+
 ######################################################################
 # Step 2 - Assign Loop
 # 
@@ -411,44 +421,75 @@ if ($toponly) {
 #
 #######################################################################
 
-
-
-TBDebugTimeStamp("assign_loop started");
-$currentrun = 1;
+my $currentrun = 1;
+my $canceled   = 0;
 
 # XXX plab hack - only run assign once on plab topologies, since they're easy
-# to map and the physical topology does not change frequently
+# to map and the physical topology does not change frequently.
 if ($plabcount && (keys(%virt_nodes) == $plabcount)) {
     $maxrun = 1;
 }
-while (1) {
-    my $canceled;
 
+TBDebugTimeStamp("assign_loop started");
+while (1) {
     # Check cancel flag before continuing. 
     TBGetBatchCancelFlag($pid, $eid, \$canceled);
-    fatal(1, "*** $0:\n".
-	     "    Cancel flag set; aborting assign run!")
+    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
 
     print "Assign Run $currentrun\n";
 
-    # Violation counts
-    $unassigned = -1;
-    $linkusers = -1;
-    $bandwidth = -1;
-    $desires = -1;
+    #
+    # RunAssign returns 0 if successful. Returns -1 if there was an
+    # an error in RunAssign that is deemed fatal; do not try anymore.
+    # The exitcode is returned in $exitcode. If RunAssign returns a
+    # postive value, it means there was a problem, but we can keep
+    # trying.
+    #
+    my $exitcode = 0;
+    my $retval   = RunAssign(\$exitcode);
 
-    # Clear v2pmap, p2vmap, and plinks
+    # Success!
+    last
+	if ($retval == 0);
+
+    if ($retval < 0) {
+	#
+	# Failure in assign.
+	#
+	if ($currentrun >= $maxrun) {
+	    fatal($exitcode,
+		  "Reached run limit. Giving up.");
+	}
+	fatal($exitcode,
+	      "Unretriable error. Giving up.");
+    }
+    print "Waiting 5 seconds and trying again...\n";
+    sleep(5);
+    $currentrun++;
+}
+TBDebugTimeStamp("assign_loop finished");
+
+#
+# Run assign once.
+# 
+sub RunAssign ($)
+{
+    my ($retval) = @_;
+
+    # Clear globals for each run.
     undef %v2pmap;
     undef %p2vmap;
     undef %v2vmap;
     undef %plinks;
-    undef %toreserve;
     undef %virtnodes;
-    my %subnodes = ();
+
+    my %toreserve = ();
+    my %subnodes  = ();
     
     TBDebugTimeStamp("ptopgen started");
-    # Snapshot
+    # Snapshot physical resources.
     #
     # if updating (-u), include any resources that may already be
     # allocated to experiment in the PTOP results.
@@ -476,38 +517,69 @@ while (1) {
     $numnodes = $numnodes_result->numrows;
     
     if ($numnodes < $minimum_nodes) {
-	fatal(65, "*** $0:\n".
-	          "    Insufficient nodes available.\n");
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "Insufficient nodes available.");
     }
 
     TBDebugTimeStamp("assign started");
     # Run assign
-    $fail = 0;
     my $cmdargs = "$ptopfile $topfile";
     $cmdargs = "-Pop $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
-    if (system("assign $cmdargs > assign.log") < 0) {
-	fatal(65, "*** $0:\n".
-	          "    Could not start assign!");
-    }
-    
-    $violations = 0;
-    $score = -1;
-    $assignexitcode = $? >> 8;
 
-    open(ASSIGNFP, "assign.log") or
-	fatal(65, "*** $0:\n".
-	          "    Could not open assign logfile!");
+    #
+    # Fork a child to run assign. Parent spins watching the cancel flag
+    # and waiting for assign to finish.
+    #
+    if (my $childpid = fork()) {
+	while (1) {
+	    sleep(2);
+
+	    if (waitpid($childpid, &WNOHANG) == $childpid) {
+		$assignexitcode = $? >> 8;
+		last;
+	    }
+
+	    # Check cancel flag.
+	    TBGetBatchCancelFlag($pid, $eid, \$canceled);
+	    if ($canceled) {
+		if ((my $pgrp = getpgrp($childpid)) > 0) {
+		    kill('TERM', -$pgrp);
+		    waitpid($childpid, 0);
+	    
+		    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+			  "Cancel flag set; aborting assign run!");
+		}
+		# Loop again to reap child above before exit.
+	    }
+	}
+    }
+    else {
+	#
+	# Change our session so the child can get a killpg without killing
+	# the parent. 
+	#
+        POSIX::setsid();
+	exec("assign $cmdargs > assign.log");
+	die("*** $0:\n".
+	    "    Could not start assign!\n");
+    }
 
     # Check cancel flag before continuing. 
     TBGetBatchCancelFlag($pid, $eid, \$canceled);
-    fatal(1, "*** $0:\n".
-	     "    Cancel flag set; aborting assign run!")
+    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER, 
+	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
 
-    if ($assignexitcode == 0)
-    {
+    my $violations = 0;
+    my $score = -1;
+
+    open(ASSIGNFP, "assign.log") or
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "Could not open assign logfile!");
+
+    if ($assignexitcode == 0) {
 	# read output
 	# Header
 	printdb "Reading assign results.\n";
@@ -528,292 +600,342 @@ while (1) {
 	}
 	if ($score == -2) {
 	    # Type error
-	    fatal(65, "Giving up.\n" );
+	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		  "Type error. Giving up!");
 	}
 	printdb "Found score $score, violations $violations.\n";
     }
 
-    # We do not bother reading anything else if violations occured.
-    if (($violations == 0) && ($score != -1)) {
-	# read nodes section
-	while (<ASSIGNFP> !~ /^Nodes:/) {}
-	printdb "Nodes:\n";
-	while (<ASSIGNFP>) {
-	    chop;
-	    /^End Nodes$/ && last;
-	    @info = split;
-	    ($virtual,$physical) = @info[0,1];
+    #
+    # If we found violations above, or if the score is <0 then figure
+    # out what happened, and return the result. I am not sure if this
+    # stuff is set when the assign exitcode is 2 (no retry), but we end up
+    # in here anyway. Should be harmless.
+    #
+    if ($violations || $score < 0 || $assignexitcode) {
+	# Compute the exitcode and return it. Caller decides what to do.
+	my $exitcode = $WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER;
 
-	    # We don't care about LAN nodes anymore.
-	    if (defined($lannodes{$virtual})) {
-		next;
-	    }
-
-	    if (physnodeallocated($physical)) {
-		#
-		# Mark node as being reused.
-		#
-		# Look at virtual node being mapped to node;
-		# if it wasn't in the previous map, mark node for reboot.
-		#
-		if (physnodereuse($physical) eq "reboot") {
-		    # No changes once it goes into reboot.
-		    ;
-		}
-		elsif (virtnodeisvirt($virtual)) {
-		    #
-		    # A new virt virtual node on an existing physical node
-		    # does not force the physnode to be rebooted; we can
-		    # set up a new virtnode on it without a reboot. If its
-		    # an existing virtual on the same physnode, then mark
-		    # both as reused; no need to reboot either. If the 
-		    # virtnode has moved here from someplace else, no
-		    # reboot of the physnode either, but obviously the
-		    # vnode will be released and a new one allocated.  What
-		    # we cannot determine is if its just a renamed node
-		    # (which would require a reboot of the the virtual
-		    # node). 
-		    # 
-		    if (!exists($reserved_v2pmap{$virtual})) {
-			physnodesetreuse($physical, "reused");
-		    }
-		    elsif ($reserved_v2pmap{$virtual} eq $physical) {
-			my $reserved = $reserved_v2vmap{$virtual};
-
-			physnodesetreuse($reserved, "reused");
-			physnodesetreuse($physical, "reused");
-		    }
-		    else {
-			physnodesetreuse($physical, "reused");
-		    }
-		}
-		else {
-		    #
-		    # If a new virtual node mapped to this physnode (maybe
-		    # even the luser changed the name of the node), or if an
-		    # existing virtual node moved to this physnode, must
-		    # reboot the physnode. Else, the physnode is being
-		    # reused as is, and no need to mess with it. If the
-		    # user requested reboot, that will be handled outside
-		    # of this script.
-		    #
-		    if (!exists($reserved_v2pmap{$virtual}) ||
-			$reserved_v2pmap{$virtual} ne $physical) {
-			physnodesetreuse($physical, "reboot");
-		    }
-		    else {
-			physnodesetreuse($physical, "reused");
-		    }
-		}
-	    }
-	    else {
-		#
-		# This is a new node; we'll have to reserve it. Note that
-		# we do not reserve a widearea physnode when a virtual node
-		# is mapped to it; they are special.
-		#
-		$toreserve{$physical} = 1
-		    if (!virtnodeisremote($virtual));
-	    }
-	    
-	    if (virtnodeisvirt($virtual)) {
-		#
-		# If mapping a virtual node, then record that, since we need
-		# to allocate the virtnodes on that physnode, later.
-		#
-		if (!defined($virtnodes{$physical})) {
-		    $virtnodes{$physical} = [];
-		}
-		push(@{$virtnodes{$physical}}, $virtual);
-	    }
-	    elsif (virtnodeissubnode($virtual)) {
-		#
-		# Need to allocate the parent to. Should be optional?
-		# Save away and deal with once we have all the results.
-		#
-		$subnodes{$virtual} = $physical;
-	    }
-	    
-	    $v2pmap{$virtual} = $physical;
-	    if( ! defined($p2vmap{$physical}) ) {
-		$p2vmap{$physical} = [];
-	    }
-	    push(@{$p2vmap{$physical}}, $virtual);
-	    printdb "  $virtual $physical\n";
-	}
-
-	#
-	# Process the subnodes. We have to allocate the parent at the same
-	# time, lest it get sucked away for some other purpose by another
-	# experiment. We might want to push this off into nalloc, but not
-	# sure yet.
-	#
-	for my $virtual (keys(%subnodes)) {
-	    my $physical = $subnodes{$virtual};
-	    my $parent;
-
-	    TBPhysNodeID($physical, \$parent);
-
-	    printdb "  Subnode: $virtual $physical $parent\n";
-
-	    #
-	    # See if we already have it. Swapmod, retry, or perhaps
-	    # the parent could be named separately? Or maybe there are
-	    # several subnodes on the physnode?
-	    #
-	    next
-		if (exists($p2vmap{$parent}));
-
-	    # Make up a name and add to the list.
-	    my $newvname = newvname($parent, "phost");
-
-	    $v2pmap{$newvname} = $parent;
-	    $p2vmap{$parent} = [ $newvname ];
-	    $toreserve{$parent} = 1;
-	    printdb "  Adding subnode host: $newvname $parent\n";
-	}
-
-	# read Edges
-	# By convention, in plinks, the delay node is always the second
-	# entry.
-	while (<ASSIGNFP> !~ /^Edges:/) { }
-	printdb "Edges:\n";
-	EDGEWHILE: while (<ASSIGNFP>) {
-	    /^End Edges$/ && last EDGEWHILE;
-	    @info = split;
-	    $line = $_;
-	    $_ = $info[1]; # type
-	  SWITCH1: {
-	      /^intraswitch$/ && do {
-		  ($vlink,$rawA,$rawB) = @info[0,3,5];
-		  last SWITCH1;
-	      };
-	      /^interswitch$/ && do {
-		  ($vlink,$rawA,$rawB) = @info[0,3,$#info];
-		  last SWITCH1;
-	      };
-	      /^direct$/ && do {
-		  ($vlink,$rawA,$rawB) = @info[0,3,5];
-		  last SWITCH1;
-	      };
-	      /^trivial$/ && do {
-		  # we don't have plinks for trivial links
-		  $vlink = $info[0];
-		  $plinks{$vlink} = [];
-		  next EDGEWHILE;
-	      };
-	      print "Found garbage: $line\n";
-	  }
-	    $nodeportA = &getnodeport($rawA);
-	    $nodeportB = &getnodeport($rawB);
-	    $nodeportA =~ s/\//:/;
-	    $nodeportB =~ s/\//:/;
-	    $plinks{$vlink} = [$nodeportA,$nodeportB];
-	    printdb "  $vlink " . join(" ",@{$plinks{$vlink}}) . "\n";
-	}
-    } else {
 	# spit out up to nodes
 	print "ASSIGN FAILED: \n";       
 	while (<ASSIGNFP>) {
 	    if (/link_users:\s*(\d+)$/) {
-		$linkusers = $1;
-	    } elsif (/bandwidth:\s*(\d+)$/) {
-		$bandwidth = $1;
-	    } elsif (/unassigned:\s*(\d+)$/) {
-		$unassigned = $1;
-	    } elsif (/desires:\s*(\d+)$/) {
-		$desires = $1;
+		$exitcode |= $WRAPPER_FAILED_LINKUSERS;
+	    }
+	    elsif (/bandwidth:\s*(\d+)$/) {
+		$exitcode |= $WRAPPER_FAILED_BANDWIDTH;
+	    }
+	    elsif (/unassigned:\s*(\d+)$/) {
+		$exitcode |= $WRAPPER_FAILED_UNASSIGNED;
+	    }
+	    elsif (/desires:\s*(\d+)$/) {
+		$exitcode |= $WRAPPER_FAILED_DESIRES;
 	    }
 	    if (/^Nodes:/) {last;}
 	    print "$_";
 	}
-	$fail = 1;
+	close(ASSIGNFP);
+	$$retval = $exitcode;
+
+	# Signal retriable to caller, since assign thinks it is.
+	return 1
+	    if ($assignexitcode == 1);
+	return -1;
     }
-    while (<ASSIGNFP>) { } # Read anything left in the pipe before closing
+
+    #
+    # Assign success; parse results.
+    # 
+    # read nodes section
+    while (<ASSIGNFP> !~ /^Nodes:/) {}
+    printdb "Nodes:\n";
+    while (<ASSIGNFP>) {
+	chop;
+	/^End Nodes$/ && last;
+	@info = split;
+	my ($virtual,$physical) = @info[0,1];
+
+	# We don't care about LAN nodes anymore.
+	if (defined($lannodes{$virtual})) {
+	    next;
+	}
+
+	if (physnodeallocated($physical)) {
+	    #
+	    # Mark node as being reused.
+	    #
+	    # Look at virtual node being mapped to node;
+	    # if it wasn't in the previous map, mark node for reboot.
+	    #
+	    if (physnodereuse($physical) eq "reboot") {
+		# No changes once it goes into reboot.
+		;
+	    }
+	    elsif (virtnodeisvirt($virtual)) {
+		#
+		# A new virt virtual node on an existing physical node
+		# does not force the physnode to be rebooted; we can
+		# set up a new virtnode on it without a reboot. If its
+		# an existing virtual on the same physnode, then mark
+		# both as reused; no need to reboot either. If the 
+		# virtnode has moved here from someplace else, no
+		# reboot of the physnode either, but obviously the
+		# vnode will be released and a new one allocated.  What
+		# we cannot determine is if its just a renamed node
+		# (which would require a reboot of the the virtual
+		# node). 
+		# 
+		if (!exists($reserved_v2pmap{$virtual})) {
+		    physnodesetreuse($physical, "reused");
+		}
+		elsif ($reserved_v2pmap{$virtual} eq $physical) {
+		    my $reserved = $reserved_v2vmap{$virtual};
+
+		    physnodesetreuse($reserved, "reused");
+		    physnodesetreuse($physical, "reused");
+		}
+		else {
+		    physnodesetreuse($physical, "reused");
+		}
+	    }
+	    else {
+		#
+		# If a new virtual node mapped to this physnode (maybe
+		# even the luser changed the name of the node), or if an
+		# existing virtual node moved to this physnode, must
+		# reboot the physnode. Else, the physnode is being
+		# reused as is, and no need to mess with it. If the
+		# user requested reboot, that will be handled outside
+		# of this script.
+		#
+		if (!exists($reserved_v2pmap{$virtual}) ||
+		    $reserved_v2pmap{$virtual} ne $physical) {
+		    physnodesetreuse($physical, "reboot");
+		}
+		else {
+		    physnodesetreuse($physical, "reused");
+		}
+	    }
+	}
+	else {
+	    #
+	    # This is a new node; we'll have to reserve it. Note that
+	    # we do not reserve a widearea physnode when a virtual node
+	    # is mapped to it; they are special.
+	    #
+	    $toreserve{$physical} = 1
+		if (!virtnodeisremote($virtual));
+	}
+	
+	if (virtnodeisvirt($virtual)) {
+	    #
+	    # If mapping a virtual node, then record that, since we need
+	    # to allocate the virtnodes on that physnode, later.
+	    #
+	    if (!defined($virtnodes{$physical})) {
+		$virtnodes{$physical} = [];
+	    }
+	    push(@{$virtnodes{$physical}}, $virtual);
+	}
+	elsif (virtnodeissubnode($virtual)) {
+	    #
+	    # Need to allocate the parent to. Should be optional?
+	    # Save away and deal with once we have all the results.
+	    #
+	    $subnodes{$virtual} = $physical;
+	}
+	
+	$v2pmap{$virtual} = $physical;
+	if( ! defined($p2vmap{$physical}) ) {
+	    $p2vmap{$physical} = [];
+	}
+	push(@{$p2vmap{$physical}}, $virtual);
+	printdb "  $virtual $physical\n";
+    }
+
+    #
+    # Process the subnodes. We have to allocate the parent at the same
+    # time, lest it get sucked away for some other purpose by another
+    # experiment. We might want to push this off into nalloc, but not
+    # sure yet.
+    #
+    for my $virtual (keys(%subnodes)) {
+	my $physical = $subnodes{$virtual};
+	my $parent;
+
+	TBPhysNodeID($physical, \$parent);
+
+	printdb "  Subnode: $virtual $physical $parent\n";
+
+	#
+	# See if we already have it. Swapmod, retry, or perhaps
+	# the parent could be named separately? Or maybe there are
+	# several subnodes on the physnode?
+	#
+	next
+	    if (exists($p2vmap{$parent}));
+
+	# Make up a name and add to the list.
+	my $newvname = newvname($parent, "phost");
+
+	$v2pmap{$newvname} = $parent;
+	$p2vmap{$parent} = [ $newvname ];
+	$toreserve{$parent} = 1;
+	printdb "  Adding subnode host: $newvname $parent\n";
+    }
+
+    # read Edges
+    # By convention, in plinks, the delay node is always the second
+    # entry.
+    while (<ASSIGNFP> !~ /^Edges:/) { }
+    printdb "Edges:\n";
+    EDGEWHILE: while (<ASSIGNFP>) {
+	/^End Edges$/ && last EDGEWHILE;
+	@info = split;
+	$line = $_;
+	$_ = $info[1]; # type
+        SWITCH1: {
+	    /^intraswitch$/ && do {
+		($vlink,$rawA,$rawB) = @info[0,3,5];
+		last SWITCH1;
+	    };
+	    /^interswitch$/ && do {
+		($vlink,$rawA,$rawB) = @info[0,3,$#info];
+		last SWITCH1;
+	    };
+	    /^direct$/ && do {
+		($vlink,$rawA,$rawB) = @info[0,3,5];
+		last SWITCH1;
+	    };
+	    /^trivial$/ && do {
+		# we don't have plinks for trivial links
+		$vlink = $info[0];
+		$plinks{$vlink} = [];
+		next EDGEWHILE;
+	    };
+	    print "Found garbage: $line\n";
+	}
+	$nodeportA = &getnodeport($rawA);
+	$nodeportB = &getnodeport($rawB);
+	$nodeportA =~ s/\//:/;
+	$nodeportB =~ s/\//:/;
+	$plinks{$vlink} = [$nodeportA,$nodeportB];
+	printdb "  $vlink " . join(" ",@{$plinks{$vlink}}) . "\n";
+    }
     close(ASSIGNFP);
     TBDebugTimeStamp("assign finished");
 
     # Reserve resources
-    if (!$fail) {
-	if ($impotent) {
-	    print "Skipping physical reservation, as directed.\n";
-	    last;
-	}
-	TBDebugTimeStamp("reserving started");
+    if ($impotent) {
+	print "Skipping physical reservation, as directed.\n";
+	return 0;
+    }
 
-	if (system("nalloc $pid $eid " . join(" ", keys(%toreserve)))) {
-	    print "Failed to reserve nodes. Trying again.\n";
-	}
-	else {
-	    print "Successfully reserved physical nodes\n";
+    TBDebugTimeStamp("reserving started");
+    system("nalloc -p $pid $eid " . join(" ", keys(%toreserve)));
+    TBDebugTimeStamp("reserving finished");
+    my $exitval  = $? >> 8;
 
-	    foreach $node (keys(%toreserve)) {
-		# in future, this will be a fully enforced state machine.
-		TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
+    #
+    # If nalloc failed with a fatal error, lets give it up. No retry.
+    # 
+    if ($exitval < 0) {
+	print "Failed to reserve any nodes.\n";
+	$$retval = $WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER;
+	return -1; 
+    }
+
+    #
+    # Okay, if nalloc got anything, we have to set the norecover bit,
+    # since tbswap operates on the principle that any change in the DB
+    # means no recover is possible. This can probably me dealt with by
+    # deallocating any nodes we allocated in the wrapper before exiting.
+    #
+    $NoRecover = 1;
+
+    #
+    # Otherwise, all newly allocated nodes MUST go to the INIT_DIRTY
+    # allocstate since the user now has control of them. If we eventually
+    # fail, nodes not in RES_READY are deallocated (retry/modify). 
+    #
+    if ($exitval > 0) {
+	my @reserved = ExpNodes($pid, $eid);
+
+	# We got only some. Need to figure out which.
+	print "Reserved some nodes ($exitval) we needed, but not all.\n";
+	
+	foreach my $node (@reserved) {
+	    if (exists($toreserve{$node})) {
+		TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 	    }
+	}
 
-	    TBDebugTimeStamp("reserving finished");
+	#
+	# We check to see if were were able to reserve all the fixed
+	# nodes we needed. If we couldn't get the fixed list, then
+	# this experiment is unlikely to map in the "near" future, so
+	# give up now (no retry).
+	#
+	foreach my $node (values(%fixed_nodes)) {
+	    if (! grep {$_ eq $node} @reserved) {
+		printdb "  Could not allocate fixed node $node!\n";
+		$$retval = $WRAPPER_FAILED;
+		return -1;
+	    }
+	}
+	#
+	# Okay, must extend the fixed list with newly allocated nodes
+	# so that we can recreate the top file, and try again with a
+	# new set.
+	#
+	foreach my $node (@reserved) {
+	    if (exists($toreserve{$node})) {
+		foreach my $vname (@{$p2vmap{$node}}) {
+		    $fixed_nodes{$vname} = $node;
+		}
+	    }
+	}
+	CreateTopFile();
+	$$retval = 0;
+	return 1;
+    }
 
-	    #
-	    # Release phys and virt nodes no longer needed. They are marked
-	    # for teardown. They need to be freed by SOMEONE, currently the
-	    # wrapper (tbswap), since this only happens when in update mode
-	    # (swapmod).
-	    #
-	    foreach my $pnode (keys(%phys_nodes)) {
-		my $reuse = physnodereuse($pnode);
+    #
+    # We got all the nodes we wanted. All newly allocated nodes MUST
+    # go to the INIT_DIRTY allocstate since the user now has control
+    # of them.
+    #
+    print "Successfully reserved all physical nodes we needed.\n";
+	
+    foreach my $node (keys(%toreserve)) {
+	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+    }
+
+    #
+    # Release phys and virt nodes no longer needed. They are marked
+    # for teardown. They need to be freed by SOMEONE, currently the
+    # wrapper (tbswap), since this only happens when in update mode
+    # (swapmod).
+    #
+    foreach my $pnode (keys(%phys_nodes)) {
+	my $reuse = physnodereuse($pnode);
 		
-		if ($reuse eq "unused") {
-		    #
-		    # Node was used in previous incarnation, but not any more.
-		    #
-		    TBSetNodeAllocState($pnode,
-					TBDB_ALLOCSTATE_RES_TEARDOWN());
-		    
-		}
-		elsif ($reuse eq "reboot") {
-		    #
-		    # Node is being reused, but for a different purpose, so
-		    # it should be rebooted.
-		    #
-		    TBSetNodeAllocState($pnode,
-					TBDB_ALLOCSTATE_RES_INIT_DIRTY());
-		}
-	    }
-	    last;
+	if ($reuse eq "unused") {
+	    #
+	    # Node was used in previous incarnation, but not any more.
+	    #
+	    TBSetNodeAllocState($pnode, TBDB_ALLOCSTATE_RES_TEARDOWN());
+	}
+	elsif ($reuse eq "reboot") {
+	    #
+	    # Node is being reused, but for a different purpose, so
+	    # it should be rebooted.
+	    #
+	    TBSetNodeAllocState($pnode, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 	}
     }
-
-    # Check for exit
-    if ($assignexitcode == 2 || $currentrun >= $maxrun) {
-	$exitcode = 65;
-	if ($bandwidth > 0) {
-	    $exitcode += 4;
-	}
-	if ($linkusers > 0) {
-	    $exitcode += 8;
-	}
-	if ($desires > 0) {
-	    $exitcode += 16;
-	}
-	if ($unassigned > 0) {
-	    $exitcode += 32;
-	}
-
-	if ($assignexitcode == 2) {
-	    fatal($exitcode, "*** $0:\n".
-		     "    Unretriable error. Giving up.\n");
-	} else {
-	    fatal($exitcode, "*** $0:\n".
-		     "    Reached run limit. Giving up.\n");
-	}
-    }
-    print "Waiting 5 seconds and trying again...\n";
-    sleep(5);
-
-    $currentrun++;
+    return 0;
 }
-TBDebugTimeStamp("assign_loop finished");
 
 ###########################################################################
 # Step 2A
@@ -834,8 +956,8 @@ if ($needwanassign) {
 
     print "Running 'wanassign -d $wanargs $pid $eid'\n";
     open(WANFP,"wanassign -d $wanargs $pid $eid 2>&1 | tee wanassign.log |") or
-	fatal(65, "*** $0:\n".
-	          "    Failed to start wanassign: $!\n");
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "Failed to start wanassign: $!");
 
     printdb "Reading wanassign results.\n";
     while (<WANFP>) {
@@ -850,13 +972,14 @@ if ($needwanassign) {
 	# Skip other output. Usually its debugging output.
     }
     close(WANFP) or
-	fatal(65, "*** $0:\n".
-	          "    wanassign: " . $? ? "exited with status: $?.\n" :
-		                         "error closing pipe: $!\n");
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "wanassign: " .
+	      ($? ? "exited with status: $?." :
+	            "error closing pipe: $!"));
 
     if (!$success) {
-	fatal(65,"*** $0:\n".
-	         "    wanassign could not find a solution!\n");
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "wanassign could not find a solution!");
     }
     foreach my $virtual (keys(%v2vmap)) {
 	my $physical = $v2vmap{$virtual};
@@ -882,7 +1005,7 @@ if ($needwanassign) {
 # Recoverability ends.
 # All fatal() calls from this point do not have the recoverable '64' bit set.
 #
-#
+$NoRecover = 1;
 
 # VIRTNODES HACK: Local virtnodes have to be mapped now. This is a little
 # hokey in that the virtnodes just need to be allocated from the pool that
@@ -898,8 +1021,8 @@ foreach my $pnode (keys(%virtnodes)) {
 
     # Check cancel flag before continuing. 
     TBGetBatchCancelFlag($pid, $eid, \$canceled);
-    fatal(1, "*** $0:\n".
-	  "    Cancel flag set; aborting assign run!")
+    fatal($WRAPPER_FAILED,
+	  "Cancel flag set; aborting assign run!")
 	if ($canceled);
 
     #
@@ -950,8 +1073,7 @@ foreach my $pnode (keys(%virtnodes)) {
 	print "Asking avail for $numvs vnodes on $pnode\n";
     
 	open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$numvs |")
-	    or fatal(1, "*** $0:\n".
-		        "    avail failed\n");
+	    or fatal($WRAPPER_FAILED, "avail failed");
 
 	while (<AVAIL>) {
 	    next
@@ -963,16 +1085,16 @@ foreach my $pnode (keys(%virtnodes)) {
 		push(@plist, $1);
 	    }
 	    else {
-		fatal(1, "*** $0:\n".
-		      "    Bad line from avail: $_\n");
+		fatal($WRAPPER_FAILED,
+		      "Bad line from avail: $_");
 	    }
 	}
 	close(AVAIL);
 
 	# Sanity check.
 	if (scalar(@vlist) != scalar(@plist)) {
-	    fatal(1, "*** $0:\n".
-		     "    Could not map some virtual nodes on $pnode\n");
+	    fatal($WRAPPER_FAILED,
+		  "Could not map some virtual nodes on $pnode");
 	}
 
 	#
@@ -986,8 +1108,8 @@ foreach my $pnode (keys(%virtnodes)) {
 	else {
 	    print "Reserving ($pnode) @plist ...\n";
 	    if (system("nalloc $pid $eid @plist")) {
-		fatal(1, "*** $0:\n".
-		         "    Failed to reserve @plist (on $pnode)\n");
+		fatal($WRAPPER_FAILED,
+		      "Failed to reserve @plist (on $pnode)");
 	    }
 	}
     }
@@ -1029,8 +1151,8 @@ foreach my $pnode (keys(%virtnodes)) {
 
 # Check cancel flag before continuing. 
 TBGetBatchCancelFlag($pid, $eid, \$canceled);
-fatal(1, "*** $0:\n".
-      "    Cancel flag set; aborting assign run!")
+fatal($WRAPPER_FAILED,
+      "Cancel flag set; aborting assign run!")
     if ($canceled);
 
 # Set port range (see below for how we deal with update).
@@ -1864,8 +1986,8 @@ foreach $lan (keys(%virt_lans)) {
 
     my @members = virtlanmembers($lan);
     if (@members != 2) {
-	fatal(1, "*** $0:\n".
-	         "    Too many members for a tunnel!\n");
+	fatal($WRAPPER_FAILED,
+	      "Too many members for a tunnel!");
     }
     my $server = $lantotunnelserver{$lan};
     my $ipport = $rnodetotunnelport{$server};
@@ -1908,8 +2030,8 @@ foreach $lan (keys(%virt_lans)) {
 	# physical node.
 	#
 	if (! TBControlNetIP($peervvnode, \$ip)) {
-	    fatal(1, "*** $0:\n".
-		     "    No Control Network IP for $peervvnode!\n");
+	    fatal($WRAPPER_FAILED,
+		  "No Control Network IP for $peervvnode!");
 	}
 	
         printdb "Tunnel: ".
@@ -2096,8 +2218,8 @@ sub InitPnode($pnode, $vnode)
 	    $role  = TBDB_RSRVROLE_VIRTHOST;
 	    $routertype = TBDB_ROUTERTYPE_MANUAL;
 	}
-	fatal(1, "*** $0:\n".
-	         "    No OSID is defined for internal node $vname!")
+	fatal($WRAPPER_FAILED,
+	      "No OSID is defined for internal node $vname!")
 	    if (!defined($osid));
 	
 	DBQueryFatal("UPDATE nodes set ".
@@ -2159,8 +2281,8 @@ sub InitPnode($pnode, $vnode)
     if (defined($osid)) {
 	printdb("os_select $osid $pnode\n");
 	system("os_select $osid $pnode") == 0 or
-	    fatal(1, "*** $0:\n".
-		     "    os_select $osid $pnode failed!\n");
+	    fatal($WRAPPER_FAILED,
+		  "    os_select $osid $pnode failed!\n");
     }
     return 0;
 }
@@ -2287,8 +2409,8 @@ sub nextipportnum($) {
     my $port     = $portnext{$pnode};
 
     if ($port >= $porthigh{$pnode}) {
-	fatal(1, "*** $0:\n".
-	         "    No more dynamic ports available for $pnode!\n");
+	fatal($WRAPPER_FAILED,
+	      "No more dynamic ports available for $pnode!");
     }
     $portnext{$pnode}++;
     return $port;
@@ -2428,10 +2550,9 @@ sub CheckMaxConcurrent()
 	my $count = $counts{$osid};
 
 	if (!TBOSLoadMaxOkay($osid, $count)) {
-	    fatal(2|1|64,
-		  "*** $0:\n".
-		  "    Cannot load $osid on one or more nodes.\n".
-		  "    Too many nodes are already running this OSID!");
+	    fatal($WRAPPER_FAILED|
+		  $WRAPPER_FAILED_MAXCONCURENT|$WRAPPER_FAILED_CANRECOVER,
+		  "Too many nodes are already running OSID $osid!");
 	}
     }
 }
@@ -2620,8 +2741,8 @@ sub LoadPhysInfo()
 	my $type    = $rowref->{"type"};
 	my $auxtype = $rowref->{"auxtype"};
 
-	fatal(1, "*** $0:\n".
-	      "    Invalid type/auxtype $type/$auxtype!\n")
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "Invalid type/auxtype $type/$auxtype!")
 	    if (!exists($node_types{$type}));
 
 	$node_types{$auxtype}  = $node_types{$type};
@@ -2702,8 +2823,8 @@ sub LoadVirtNodes()
 	    $isplab   = nodetypeisplab($vtype);
 	}
 	else {
-	    fatal(1, "*** $0:\n".
-		     "    Improper type $type for node $vname!\n");
+	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		  "Improper type $type for node $vname!");
 	}
 
 	# Extend the DB info with this stuff:
@@ -2735,8 +2856,8 @@ sub LoadVirtNodes()
 	    # Must be a parent. Set in the parser, either explicitly, or else
 	    # one is created if the user leaves it out.
 	    if (!defined($fixed) || $fixed eq "") {
-		fatal(1, "*** $0:\n".
-		         "    Subnode $vname must be fixed to its parent!\n");
+		fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		      "Subnode $vname must be fixed to its parent!");
 	    }
 	    $rowref->{"__parent"} = $fixed;
 	    $rowref->{"fixed"} = "";
@@ -2810,8 +2931,8 @@ sub LoadVirtNodes()
 
 	    if (! ($osid = TBOSID($pid, $osname)) &&
 		! ($osid = TBOSID(TB_OPSPID, $osname))) {
-		fatal(1, "*** $0:\n".
-		         "    Invalid OS $osname in project $pid!\n");
+		fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		      "Invalid OS $osname in project $pid!");
 	    }
 	    # Stash this in the virt_nodes data structure.
 	    $rowref->{"__osid"}	= $osid;
@@ -3144,8 +3265,8 @@ sub CreateTopFile()
     
     # Open the TOP file
     open(TOPFILE,"> $topfile") or
-	fatal(65, "*** $0:\n".
-	          "    Could not open $topfile.\n");
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "Could not open $topfile: $!");
 
     # Print out vtypes
     foreach my $vtype (keys(%virt_vtypes)) {
@@ -3465,8 +3586,8 @@ sub CreateTopFile()
 	my $type;
 	
 	open(AVAIL,"$TBROOT/sbin/avail type=pc rand |")
-	    or fatal(65, "*** $0:\n".
-		         "    Failed to start avail for NSE");
+	    or fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		     "Failed to start avail for NSE: $!");
 
 	while (<AVAIL>) {
 	    if (! /^\|/) {next};
@@ -3478,8 +3599,8 @@ sub CreateTopFile()
 	close(AVAIL);
   
 	if (!defined($fixednode)) {
-	    fatal(65, "*** $0:\n".
-		      "    Insufficient PCs available.");
+	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+		  "Insufficient PCs available to run NSE!");
 	}
 
 	foreach $simnode (@simnodelist) {
@@ -3537,8 +3658,8 @@ sub LoadPhysNode($)
 			 "left join node_types as nt on nt.type=n.type ".
 			 "where n.node_id='$pnode'");
 
-	fatal(1, "*** $0:\n".
-		 "    No such pnode $pnode in nodes table")
+	fatal($WRAPPER_FAILED,
+	      "No such pnode $pnode in nodes table!")
 	    if (!$query_result->num_rows);
 
 	my $rowref = $query_result->fetchrow_hashref();
@@ -3616,8 +3737,8 @@ sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
 sub physnodenextpipe($)  {
     my $pipeno = $phys_nodes{$_[0]}->{"__pipeno"} += 10;
 
-    fatal(1, "*** $0:\n".
-	     "    Too many ipfw pipes on node $pnode!")
+    fatal($WRAPPER_FAILED,
+	  "Too many ipfw pipes on node $pnode!")
 	if ($pipeno >= 65535);
     
     return $pipeno;
@@ -3647,8 +3768,8 @@ sub LoadCurrent()
 	#
 	# WIDEAREA nodes are going to break. Hmm, so are "sim" nodes.
 	#
-	fatal(1, "*** $0:\n".
-		 "    Cannot update widearea nodes yet!")
+	fatal($WRAPPER_FAILED,
+	      "Cannot update widearea nodes yet!")
 	    if ($isremote && !$isplab);
 	
 	LoadPhysNode($reserved);
