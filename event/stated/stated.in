@@ -412,9 +412,22 @@ sub stateTransition($$) {
     # Check if this is TBDB_NODESTATE_BOOTING , which has actions
     if ($newstate eq TBDB_NODESTATE_BOOTING) {
 	my $osid = TBBootWhat($node,$debug);
-	info("$node: Current OS is '$osid'\n");
+	my $os_op_mode = os_opmode($osid);
+	info("$node: Current OS is '$osid', OS mode is '$os_op_mode'\n");
 	DBQueryFatal("UPDATE nodes SET osid='$osid' WHERE node_id='$node'");
-
+	if ($os_op_mode ne $mode) {
+	    my $str = "Node $node is running OS '$osid' but was not in ".
+	      "mode '$os_op_mode'!\n";
+	    if ($os_op_mode ne "") {
+		DBQueryFatal("UPDATE nodes SET op_mode='$os_op_mode', ".
+			     "op_mode_timestamp=unix_timestamp(now()) ".
+			     "WHERE node_id='$node'");
+		$nodes{$node}{mode} = $os_op_mode;
+		$nodes{$node}{mode_timestamp} = $now;
+		$str .= "Forced op_mode to '$os_op_mode'.\n";
+	    }
+	    notify($str);
+	}
 	checkGenISUP($node);
     }
 
@@ -746,6 +759,17 @@ sub handleChild() {
   return 0;
 }
 
+sub os_opmode() {
+    my $osid = shift || "";
+    my $cmd = "select op_mode from os_info where osid='$osid';";
+    my $q = DBQueryFatal($cmd);
+    if ($q->numrows() < 1) { return ""; }
+    my @r = $q->fetchrow_array();
+    my $opmode=$r[0];
+    debug("OpMode for '$osid' is '$opmode'\n");
+    if (defined($opmode) && $opmode ne "") { return $opmode; }
+    return "";
+}
 
 sub debug(@) {
   if ($debug) { print @_; }
