@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -80,6 +80,10 @@ LIB_STUFF       = event.pm event.so
 install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 control-install:	install
+
+client-install: 
+	$(INSTALL_PROGRAM) $(SRCDIR)/event.pm $(DESTDIR)$(CLIENT_BINDIR)/event.pm
+	$(INSTALL_PROGRAM) event.so $(DESTDIR)$(CLIENT_BINDIR)/event.so
 
 clean:
 	/bin/rm -f *.o libevent.a libevent_r.a *.so *.pm
