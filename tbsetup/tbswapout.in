@@ -28,7 +28,7 @@ sub usage()
 #
 my $TBROOT         = "@prefix@";
 my $TESTMODE       = @TESTMODE@;
-my $DISABLE_EVNETS = "@DISABLE_EVENT_SCHED@";
+my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
