@@ -289,39 +289,51 @@ while (my %row = $db_result->fetchhash()) {
 		    $osid_row{'version'} eq "") {
 
 		    #
-		    # A non-specific version. Try to map it.
-		    # XXX - Should this use MapNodeOSID??
+		    # A non-specific version. There needs to be a way to
+		    # map it to another osid. 
+		    #
+		    if (!defined($osid_row{'nextosid'})) {
+			die("*** $0:\n".
+			    "    No mapping can be made for $osid ($node)!\n");
+		    }
+		    my $nextosid = $osid_row{'nextosid'};
+		    
+		    #
+		    # See if the nextosid is already on the disk. If not,
+		    # it needs to be loaded.
 		    # 
 		    my $o_result =
-			DBQueryFatal("select o1.* from partitions as p ".
-				     "left join os_info as o1 ".
-				     "  on o1.osid=p.osid ".
-				     "left join os_info as o2 ".
-				     "  on o2.OS=o1.OS ".
-				     "where p.node_id='$node' ".
-				     "  and o2.osid='$osid'");
+			DBQueryFatal("select osid from partitions as p ".
+				     "where p.node_id='$node' and ".
+				     "      p.osid='$nextosid'");
 
-		    if ($o_result->numrows == 0) {
-			die("*** $0:\n".
-			    "    No mapping can be made for $osid on $node!\n".
-			    "    Perhaps the disk needs reloading?\n");
+		    if (! $o_result->numrows) {
+			#
+			# User wants a specific version of an OS, but its not
+			# loaded on the machine. 
+			#
+			print "Mapping $osid on $node to $nextosid ".
+			    "and setting up a reload.\n";
+			
+			SetupReload($node, $nextosid, $type);
+			$osids{$node} = $nextosid;
 		    }
 		    else {
-			my %o_row  = $o_result->fetchhash();
-			my $n_osid = $o_row{'osid'};
-
-			print "Mapping $osid on $node to $n_osid.\n";
+			#
+			# Already loaded. 
+			# 
+			print "Mapping $osid on $node to $nextosid.\n";
 
 			if ($dolastload &&
 			    defined($row{'pid'}) && $row{'pid'} ne $pid) {
-			    SetupReload($node, $n_osid, $type);
+			    SetupReload($node, $nextosid, $type);
 			}
 			else {
-			    system("$osselect $n_osid $node") and
+			    system("$osselect $nextosid $node") and
 				die("*** Could not set boot OS to ".
-				    "$n_osid for $node\n");
+				    "$nextosid for $node\n");
 			}
-			$osids{$node} = $n_osid;
+			$osids{$node} = $nextosid;
 		    }
 		}
 		else {
@@ -570,7 +582,7 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $wstart = $waitstart{$node};
 
-	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*3))) {
+	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*10))) {
 	    print "$node is alive and well\n";
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;

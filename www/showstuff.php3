@@ -756,6 +756,7 @@ function SHOWOSINFO($osid) {
     $creator        = $osrow[creator];
     $created        = $osrow[created];
     $mustclean      = $osrow[mustclean];
+    $nextosid       = $osrow[nextosid];
 
     if (!$os_description)
 	$os_description = "&nbsp";
@@ -857,6 +858,14 @@ function SHOWOSINFO($osid) {
     
     echo "  </td>
           </tr>\n";
+
+    if ($nextosid) {
+	echo "<tr>
+                <td>Next Osid: </td>
+                <td class=left>
+                    <A href='showosinfo.php3?osid=$nextosid'>$nextosid</A></td>
+              </tr>\n";
+    }
 
     echo "<tr>
             <td>Internal ID: </td>

@@ -740,6 +740,7 @@ CREATE TABLE os_info (
   shared tinyint(4) NOT NULL default '0',
   mustclean tinyint(4) NOT NULL default '1',
   op_mode varchar(20) NOT NULL default 'MINIMAL',
+  nextosid varchar(35) default NULL,
   PRIMARY KEY  (osname,pid),
   KEY osid (osid),
   KEY OS (OS)

@@ -25,3 +25,20 @@
 	update node_types set disktype='ad' where type='pcL440GX';
 	update node_types set disktype='ad' where type='pc2000';
 	update node_types set disktype='ad' where type='pc601';
+
+1.114  Add nextosid slot to os_info table for mapping the generic
+       osids (RHL-STD) to a specific one. Primarily used in os_setup
+       to figure out what to do with the generic names, but might also
+       be used someday to migrate people to newer versions?
+
+        alter table os_info add nextosid varchar(35) default NULL \
+	        after op_mode;
+
+	update os_info set nextosid='RHL71-STD' where \
+		osid='RHL-STD';
+	update os_info set nextosid='emulab-ops-FBSD47-STD' where \
+		osid='FBSD-STD';
+
+       Note that the osids are a little odd on boss, where the early
+       ones had osid=osname. On other testbeds, need to check the
+       actual value of the osids.
