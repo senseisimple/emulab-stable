@@ -925,7 +925,8 @@ CREATE TABLE os_info (
   max_concurrent int(11) default NULL,
   PRIMARY KEY  (osname,pid),
   KEY osid (osid),
-  KEY OS (OS)
+  KEY OS (OS),
+  KEY path (path(255))
 ) TYPE=MyISAM;
 
 --
@@ -1217,7 +1218,7 @@ CREATE TABLE testbed_stats (
   action varchar(16) NOT NULL default '',
   exitcode tinyint(3) default '0',
   uid varchar(8) NOT NULL default '',
-  PRIMARY KEY  (idx)
+  PRIMARY KEY  (idx),
   KEY rsrcidx (rsrcidx)
 ) TYPE=MyISAM;
 
