@@ -169,7 +169,7 @@ sub vlanSetup {
     my %members=();
     my @line=();
     my $ID=0;
-    open(DATA,"snmpit -l 2>&1 |");
+    open(DATA,"snmpit ".join(" ",@ARGV)." -l 2>&1 |");
     while (<DATA>) {
 	chop;
 	if (/^ID/) {next;}
@@ -320,10 +320,10 @@ sub vlanSetup {
 sub addVLAN {
     (my $name, my @v) = @_;
     if ($name) {
-	open(DATA,"snmpit $snmp_u $snmp_v -m \"$name\" -vlan " . 
+	open(DATA,"snmpit ".join(" ",@ARGV)." $snmp_u $snmp_v -m \"$name\" -vlan " . 
 	     join(" ",@v)." 2>&1  |");
     } else {
-	open(DATA,"snmpit $snmp_u $snmp_v -vlan ". join(" ",@v)." 2>&1  |");
+	open(DATA,"snmpit ".join(" ",@ARGV)." $snmp_u $snmp_v -vlan ". join(" ",@v)." 2>&1  |");
     }
     my @output =();
     while (<DATA>) {
@@ -339,7 +339,7 @@ sub addVLAN {
 
 sub removeVLANs {
     (my @v) = @_;
-    open(DATA,"snmpit $snmp_u $snmp_v -r ".join(" ",@v)." 2>&1  |");
+    open(DATA,"snmpit ".join(" ",@ARGV)." $snmp_u $snmp_v -r ".join(" ",@v)." 2>&1  |");
     my @output =();
     while (<DATA>) {
 	chop;
@@ -351,7 +351,7 @@ sub removeVLANs {
 
 sub fileVLAN {
     (my $file) = @_;
-    open(DATA,"snmpit $snmp_u $snmp_v -f $file 2>&1  |");
+    open(DATA,"snmpit ".join(" ",@ARGV)." $snmp_u $snmp_v -f $file 2>&1  |");
     my @output =();
     while (<DATA>) {
 	chop;
@@ -424,7 +424,7 @@ sub portSetup {
     my %dup=();
     my @line=();
     my $port=0;
-    open(DATA,"snmpit -i $switch -s 2>&1 |");
+    open(DATA,"snmpit ".join(" ",@ARGV)." -i $switch -s 2>&1 |");
     while (<DATA>) {
 	chop;
 	if (/^Port Configuration, Testbed Switch (.*) \((.*)\)/) {
@@ -806,7 +806,7 @@ sub portSetup {
 
 sub updatePorts {
     (my $switch, my $en, my $auto, my $spd, my $dup, my @ports) = @_;
-    open(DATA,"snmpit -i $switch $snmp_v $snmp_b $snmp_c -p ".
+    open(DATA,"snmpit ".join(" ",@ARGV)." -i $switch $snmp_v $snmp_b $snmp_c -p ".
 	 join(" ",@ports)." $en $auto $spd $dup 2>&1  |");
     #print "snmpit -i $switch $snmp_v $snmp_b $snmp_c -p ".
     #	join(" ",@ports)." $en $auto $spd $dup ";
@@ -890,7 +890,7 @@ sub stats {
     my %out6=();
     my @line=();
     my $port=0;
-    open(DATA,"snmpit -i $switch -g 2>&1 |");
+    open(DATA,"snmpit ".join(" ",@ARGV)." -i $switch -g 2>&1 |");
     while (<DATA>) {
 	chop;
 	if (/^Port Statistics, Testbed Switch (.*) \((.*)\)/) {
