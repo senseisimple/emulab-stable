@@ -168,7 +168,11 @@ if ($retval == 0) {
           swapping. This typically takes $howlong minutes, depending on the
           number of nodes in the experiment. 
           If you do not receive email notification within a reasonable amount
-          of time, please contact $TBMAILADDR.\n";
+          of time, please contact $TBMAILADDR.
+          <br><br>
+          While you are waiting, you can watch the log of experiment swap
+          in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
+          realtime</a>.\n";
 }
 echo "</h3>\n";
 

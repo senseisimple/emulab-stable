@@ -237,6 +237,7 @@ if (! $batch) {
     else {
 	die("Bad data in logfile name: $logname");
     }
+    TBExptSetLogFile($pid, $eid, $logname);
     
     if (TBBackGround($logname)) {
 	#
@@ -287,9 +288,8 @@ else {
 
 #
 # Must unlock before exit.
-# 
-DBQueryWarn("update experiments set expt_locked=NULL ".
-	    "WHERE eid='$eid' and pid='$pid'");
+#
+TBUnLockExp($pid, $eid);
 
 print "Swap Success\n";
 
@@ -317,6 +317,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 ($repfile, $logname));
 
+TBExptClearLogFile($pid, $eid);
 if (defined($logname)) {
     unlink("$logname");
 }
@@ -338,6 +339,8 @@ sub fatal($)
     # In batch mode, exit without sending the email. 
     #
     if ($batch) {
+	TBExptClearLogFile($pid, $eid);
+	TBUnLockExp($pid, $eid);
 	exit(-1);
     }
 
@@ -352,6 +355,7 @@ sub fatal($)
 	     "Cc:  $TBOPS",
 	     ($logname));
 
+    TBExptClearLogFile($pid, $eid);
     if (defined($logname)) {
 	unlink("$logname");
     }

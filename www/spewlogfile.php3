@@ -45,8 +45,11 @@ if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
 # Check for a logfile. This file is transient, so it could be gone by
 # the time we get to reading it.
 #
-$expstate = TBExptState($pid, $eid);
-if (strcmp($expstate, $TB_EXPTSTATE_ACTIVATING)) {
+$query_result =
+    DBQueryFatal("select logfile from experiments ".
+		 "where pid='$pid' and eid='$eid' and logfile is not null");
+
+if (mysql_num_rows($query_result) == 0) {
     USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
 }
 

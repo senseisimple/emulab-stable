@@ -376,6 +376,7 @@ sub fatal()
     # In batch mode, exit.
     #
     if ($batch) {
+	TBExptClearLogFile($pid, $eid);
 	TBUnLockExp($pid, $eid);
 	exit($errorstat);
     }
