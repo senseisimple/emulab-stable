@@ -201,7 +201,7 @@ function WRITEPLABBOTTOMBAR() {
 	   <center>
 	   <br>
 	   <font size=-1>
-	   <form method=get action=search.php3>
+	   <form method=get action=$TBDOCBASE/search.php3>
 	   [ <a href='$TBDOCBASE/doc.php3'>
 		Documentation</a> : <input name=query size = 15/>
 		  <input type=submit style='font-size:10px;' value='Search' /> ]
@@ -259,7 +259,7 @@ function WRITESIDEBAR() {
 	}
     }
 
-    echo "<FORM method=get ACTION=search.php3>\n";
+    echo "<FORM method=get ACTION=$TBDOCBASE/search.php3>\n";
 ?>
   <table class="menu" width=210 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
