@@ -1,9 +1,12 @@
 #!/usr/local/bin/otclsh
 
-if {$argc != 2} {
-   puts "usage: $argv0 ns_input_file ir_file"
+if {$argc != 3} {
+   puts "usage: $argv0 project ns_input_file ir_file"
    exit 1
 }
+set project [lindex $argv 0]
+set nsfile [lindex $argv 1]
+set irfile [lindex $argv 2]
 
 set libdir [file dirname [info script]]
 source $libdir/tcl-object.tcl
@@ -70,7 +73,6 @@ source $libdir/sim.tcl
 
 source $libdir/stubs.tcl
  
-# argv[0] is the ns input file
-set prefix [lindex [split [lindex [split [lindex $argv 1] /] end] .] 0]
-source [lindex $argv 0]
+set prefix $project[lindex [split [lindex [split $nsfile /] end] .] 0]
+source $nsfile
 

@@ -53,14 +53,15 @@ set libir "$scriptdir/ir/libir.tcl"
 source $libir
 namespace import TB_LIBIR::ir
 
-if {$argc != 1} {
-    puts stderr "Syntax: $argv0 <ns-file>"
+if {$argc != 2} {
+    puts stderr "Syntax: $argv0 <project> <ns-file>"
     exit 1
 }
 
-set nsFile [lindex $argv 0]
+set nsFile [lindex $argv 1]
 set t [split $nsFile .]
-set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
+set project [lindex $argv 0]
+set prefix "$project[join [lrange $t 0 [expr [llength $t] - 2]] .]"
 set irFile "$prefix.ir"
 set logFile "$prefix.log"
 
@@ -81,7 +82,7 @@ if {! [file exists $nsFile]} {
 }
 
 outs "Parsing ns input."
-if {[catch "exec $ns2ir $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $ns2ir $project $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error parsing ns input. ($err)"
     exit 1
 }
