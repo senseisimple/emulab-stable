@@ -20,7 +20,6 @@ sub usage()
 }
 my $optlist = "at:s:";
 my $timeout = 60 * 6;
-my $state   = TBDB_NODESTATE_PXEWAIT;
 
 #
 # Configure variables
@@ -30,6 +29,7 @@ my $TB		= "@prefix@";
 # Locals
 my @nodes       = ();
 my $failed      = 0;
+my $state;
 
 #
 # Load the Testbed support stuff. 
@@ -54,6 +54,9 @@ if (defined($options{"t"})) {
 }
 if (defined($options{"s"})) {
     $state = $options{"s"};
+}
+else {
+    $state = TBDB_NODESTATE_PXEWAIT;
 }
 
 #
