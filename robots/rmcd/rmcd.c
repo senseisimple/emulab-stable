@@ -23,29 +23,617 @@
  * 2004/12/01
  * 2004/12/07
  */
- 
-#include<stdio.h>
-#include<sys/types.h>
 
-#include<unistd.h>
-#include<stdlib.h>
-#include<signal.h>
-#include<netiten/in.h>
-#include<errno.h>
+#include <stdio.h>
+#include <assert.h>
+#include <sys/types.h>
 
-#include<string.h>
-#include<sys/socket.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
+#include <string.h>
+#include <sys/socket.h>
+
+#include "log.h"
+#include "mtp.h"
 #include "rmcd.h"
 
-#define EMC_SERVERPORT 2525
-#define EMC_HOSTNAME "blah.flux.utah.edu"
- 
+#define GOR_SERVERPORT 2531
+
+#define METER_TOLERANCE 0.025
+#define RADIAN_TOLERANCE 0.01
+
+#define MAX_GOTO_RETRIES 5
+
+#define cmp_fuzzy(x1, x2, tol) \
+    ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
+
+static int debug = 0;
+
+static int looping = 1;
+
+static struct mtp_config_rmc *rmc_config = NULL;
+
+enum {
+    GCB_PENDING_POSITION,
+    GCB_REFINING_POSITION,
+};
+
+enum {
+    GCF_PENDING_POSITION = (1L << GCB_PENDING_POSITION),
+    GCF_REFINING_POSITION = (1L << GCB_REFINING_POSITION),
+};
+
+struct gorobot_conn {
+    unsigned long gc_flags;
+    struct robot_config *gc_robot;
+    int gc_fd;
+    int gc_tries_remaining;
+    struct position gc_actual_pos;
+    struct position gc_intended_pos;
+};
+
+static struct gorobot_conn gorobot_connections[128];
+
+static int next_request_id = 0;
+
+static void sigpanic(int sig)
+{
+  write(1, "shit %d\n", sig);
+}
+
+static int mygethostbyname(struct sockaddr_in *host_addr,
+			   char *host,
+			   int port)
+{
+    struct hostent *host_ent;
+    int retval = 0;
+
+    assert(host_addr != NULL);
+    assert(host != NULL);
+    assert(strlen(host) > 0);
+  
+    memset(host_addr, 0, sizeof(struct sockaddr_in));
+    host_addr->sin_len = sizeof(struct sockaddr_in);
+    host_addr->sin_family = AF_INET;
+    host_addr->sin_port = htons(port);
+    if( (host_ent = gethostbyname(host)) != NULL ) {
+	memcpy((char *)&host_addr->sin_addr.s_addr,
+	       host_ent->h_addr,
+	       host_ent->h_length);
+	retval = 1;
+    }
+    else {
+	retval = inet_aton(host, &host_addr->sin_addr);
+    }
+    return( retval );
+}
+
+static void usage(void)
+{
+    fprintf(stderr,
+	    "Usage: rmcd ...\n");
+}
+
+static struct gorobot_conn *find_gorobot(int robot_id)
+{
+    struct gorobot_conn *retval = NULL;
+    int lpc;
+
+    for (lpc = 0; (lpc < rmc_config->num_robots) && !retval; lpc++) {
+	struct gorobot_conn *gc = &gorobot_connections[lpc];
+
+	if (gc->gc_robot->id == robot_id) {
+	    retval = gc;
+	}
+    }
+    
+    return retval;
+}
+
+static void conv_pos(struct position *rel, struct position *abs)
+{
+    *rel = *abs; // XXX
+}
+
+static int cmp_pos(struct position *pos1, struct position *pos2)
+{
+    int retval = 0;
+
+    assert(pos1 != NULL);
+    assert(pos2 != NULL);
+
+    if (cmp_fuzzy(pos1->x, pos2->x, METER_TOLERANCE) &&
+	cmp_fuzzy(pos1->y, pos2->y, METER_TOLERANCE) &&
+	cmp_fuzzy(pos1->theta, pos2->theta, RADIAN_TOLERANCE)) {
+	retval = 1;
+    }
+
+    return retval;
+}
+
+int main(int argc, char *argv[])
+{
+    char *logfile = NULL, *pidfile = NULL, *emc_hostname = NULL;
+    int c, emc_fd = -1, emc_port = 0, retval = EXIT_SUCCESS;
+    struct sockaddr_in saddr;
+    fd_set readfds;
+
+    FD_ZERO(&readfds);
+
+    while ((c = getopt(argc, argv, "hdp:l:i:e:c:P:")) != -1) {
+	switch (c) {
+	case 'h':
+	    usage();
+	    exit(0);
+	    break;
+	case 'd':
+	    debug += 1;
+	    break;
+	case 'l':
+	    logfile = optarg;
+	    break;
+	case 'i':
+	    pidfile = optarg;
+	    break;
+	case 'e':
+	    emc_hostname = optarg;
+	    break;
+	case 'p':
+	    if (sscanf(optarg, "%d", &emc_port) != 1) {
+		error("-p option is not a number: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	}
+    }
+  
+    if (debug) {
+	loginit(0, logfile);
+    }
+    else {
+	/* Become a daemon */
+	daemon(0, 0);
+    
+	if (logfile)
+	    loginit(0, logfile);
+	else
+	    loginit(1, "vmcclient");
+    }
+
+    signal(SIGSEGV, sigpanic);
+    signal(SIGBUS, sigpanic);
+  
+    if (pidfile) {
+	FILE *fp;
+    
+	if ((fp = fopen(pidfile, "w")) != NULL) {
+	    fprintf(fp, "%d\n", getpid());
+	    (void) fclose(fp);
+	}
+    }
+  
+    if (emc_hostname != NULL) {
+	struct mtp_packet *mp = NULL, *rmp = NULL;
+	struct mtp_control mc;
+    
+	mc.id = -1;
+	mc.code = -1;
+	mc.msg = "rmcd init";
+	if (mygethostbyname(&saddr, emc_hostname, emc_port) == 0) {
+	    pfatal("bad emc hostname: %s\n", emc_hostname);
+	}
+	else if ((emc_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	    pfatal("socket");
+	}
+	else if (connect(emc_fd,
+			 (struct sockaddr *)&saddr,
+			 sizeof(saddr)) == -1) {
+	    pfatal("connect");
+	}
+	else if ((mp = mtp_make_packet(MTP_CONTROL_INIT,
+				       MTP_ROLE_RMC,
+				       &mc)) == NULL) {
+	    pfatal("mtp_make_packet");
+	}
+	else if (mtp_send_packet(emc_fd, mp) != MTP_PP_SUCCESS) {
+	    pfatal("could not configure with emc");
+	}
+	else if (mtp_receive_packet(emc_fd, &rmp) != MTP_PP_SUCCESS) {
+	    pfatal("could not get rmc config packet");
+	}
+	else {
+	    int lpc;
+	    
+	    FD_SET(emc_fd, &readfds);
+	    rmc_config = rmp->data.config_rmc;
+	    
+	    for (lpc = 0; lpc < rmc_config->num_robots; lpc++) {
+		struct gorobot_conn *gc = &gorobot_connections[lpc];
+		struct mtp_request_position mrp;
+		struct mtp_packet *qmp, *qrmp;
+		
+		info(" robot[%d] = %d %s\n",
+		     lpc,
+		     rmc_config->robots[lpc].id,
+		     rmc_config->robots[lpc].hostname);
+
+		gc->gc_robot = &rmc_config->robots[lpc];
+		if (mygethostbyname(&saddr,
+				    rmc_config->robots[lpc].hostname,
+				    GOR_SERVERPORT) == 0) {
+		    fatal("bad gorobot hostname: %s\n",
+			  rmc_config->robots[lpc].hostname);
+		}
+		else if ((gc->gc_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+		    fatal("socket");
+		}
+		else if (connect(gc->gc_fd,
+				 (struct sockaddr *)&saddr,
+				 sizeof(saddr)) == -1) {
+		    fatal("connect");
+		}
+		else {
+		    FD_SET(gc->gc_fd, &readfds);
+		}
+
+		mrp.robot_id = gc->gc_robot->id;
+		if ((qmp = mtp_make_packet(MTP_REQUEST_POSITION,
+					   MTP_ROLE_RMC,
+					   &mrp)) == NULL) {
+		    fatal("cannot allocate packet");
+		}
+		else if (mtp_send_packet(emc_fd, qmp) != MTP_PP_SUCCESS) {
+		    fatal("request id failed");
+		}
+		else if (mtp_receive_packet(emc_fd, &qrmp) != MTP_PP_SUCCESS) {
+		    fatal("request id response failed");
+		}
+		else if (qrmp->opcode != MTP_UPDATE_POSITION) {
+		    fatal("request didn't evoke an update? %d %s\n",
+			  qrmp->opcode,
+			  qrmp->data.control->msg);
+		}
+		else {
+		    gc->gc_actual_pos = qrmp->data.update_position->position;
+
+		    info(" robot[%d].x = %f\n", lpc, gc->gc_actual_pos.x);
+		    info(" robot[%d].y = %f\n", lpc, gc->gc_actual_pos.y);
+		    info(" robot[%d].theta = %f\n",
+			 lpc,
+			 gc->gc_actual_pos.theta);
+		}
+
+		mtp_free_packet(qrmp);
+		qrmp = NULL;
+		
+		mtp_free_packet(qmp);
+		qmp = NULL;
+	    }
+	}
+    
+	free(mp);
+	mp = NULL;
+    }
+
+    while (looping) {
+	fd_set rreadyfds = readfds;
+	int rc;
+
+	rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, NULL);
+
+	if (rc > 0) {
+	    int lpc;
+	    
+	    if (FD_ISSET(emc_fd, &rreadyfds)) {
+		struct mtp_packet *mp = NULL;
+
+		if (mtp_receive_packet(emc_fd, &mp) != MTP_PP_SUCCESS) {
+		    errorc("bad packet from emc!\n");
+		}
+		else {
+		    struct gorobot_conn *gc;
+		    
+		    switch (mp->opcode) {
+		    case MTP_COMMAND_GOTO:
+			if ((gc = find_gorobot(mp->data.command_goto->
+					       robot_id)) == NULL) {
+			    error("uknnown robot %d\n",
+				  mp->data.command_goto->robot_id);
+			}
+			else if (cmp_pos(&gc->gc_actual_pos,
+					 &mp->data.command_goto->position)) {
+			    struct mtp_update_position mup;
+			    struct mtp_packet *rmp;
+			    
+			    info("robot %d is already there\n",
+				 mp->data.command_goto->robot_id);
+			    
+			    mup.robot_id = gc->gc_robot->id;
+			    mup.position = gc->gc_actual_pos;
+			    mup.status = MTP_POSITION_STATUS_COMPLETE;
+			    if ((rmp = mtp_make_packet(MTP_UPDATE_POSITION,
+						       MTP_ROLE_RMC,
+						       &mup)) == NULL) {
+				error("cannot allocate reply packet\n");
+			    }
+			    else if (mtp_send_packet(emc_fd, rmp) !=
+				     MTP_PP_SUCCESS) {
+				error("cannot send reply packet\n");
+			    }
+
+			    mtp_free_packet(rmp);
+			    rmp = NULL;
+			}
+			else {
+			    struct mtp_command_stop mcs;
+			    struct mtp_packet *smp;
+
+			    info("gonna move\n");
+			    
+			    gc->gc_intended_pos =
+				mp->data.command_goto->position;
+			    gc->gc_flags |= GCF_PENDING_POSITION;
+			    gc->gc_flags &= ~GCF_REFINING_POSITION;
+			    gc->gc_tries_remaining = 0;
+
+			    mcs.command_id = 1;
+			    mcs.robot_id = gc->gc_robot->id;
+
+			    if ((smp = mtp_make_packet(MTP_COMMAND_STOP,
+						       MTP_ROLE_RMC,
+						       &mcs)) == NULL) {
+				error("cannot allocate stop packet");
+			    }
+			    else if (mtp_send_packet(gc->gc_fd, smp) !=
+				     MTP_PP_SUCCESS) {
+				error("cannot send reply packet\n");
+			    }
+			    
+			    mtp_free_packet(smp);
+			    smp = NULL;
+			}
+			break;
+		    case MTP_COMMAND_STOP:
+			if ((gc = find_gorobot(mp->data.command_goto->
+					       robot_id)) == NULL) {
+			    error("uknnown robot %d\n",
+				  mp->data.command_goto->robot_id);
+			}
+			else {
+			    struct mtp_command_stop mcs;
+			    struct mtp_packet *smp;
+			    
+			    gc->gc_flags &= ~GCF_PENDING_POSITION;
+			    gc->gc_flags &= ~GCF_REFINING_POSITION;
+			    gc->gc_tries_remaining = 0;
+
+			    mcs.command_id = 1;
+			    mcs.robot_id = gc->gc_robot->id;
+
+			    if ((smp = mtp_make_packet(MTP_COMMAND_STOP,
+						       MTP_ROLE_RMC,
+						       &mcs)) == NULL) {
+				error("cannot allocate stop packet");
+			    }
+			    else if (mtp_send_packet(gc->gc_fd, smp) !=
+				     MTP_PP_SUCCESS) {
+				error("cannot send reply packet\n");
+			    }
+			    
+			    mtp_free_packet(smp);
+			    smp = NULL;
+			}
+			break;
+		    case MTP_UPDATE_POSITION:
+			if ((gc = find_gorobot(mp->data.update_position->
+					       robot_id)) == NULL) {
+			    error("uknnown robot %d\n",
+				  mp->data.update_position->robot_id);
+			}
+			else {
+			    gc->gc_actual_pos =
+				mp->data.update_position->position;
+
+			    info("position update %f\n", gc->gc_actual_pos.x);
+
+			    if (gc->gc_flags & GCF_REFINING_POSITION) {
+				gc->gc_tries_remaining -= 1;
+
+				if (gc->gc_tries_remaining == 0) {
+				    struct mtp_update_position mup;
+				    struct mtp_packet *ump;
+				    
+				    info("didn't make it it\n");
+				    
+				    gc->gc_flags &= ~GCF_REFINING_POSITION;
+
+				    mup.robot_id = gc->gc_robot->id;
+				    mup.position = gc->gc_actual_pos;
+				    mup.status = MTP_POSITION_STATUS_ERROR;
+				    
+				    if ((ump = mtp_make_packet(
+					MTP_UPDATE_POSITION,
+					MTP_ROLE_RMC,
+					&mup)) == NULL) {
+					fatal("cannot allocate packet");
+				    }
+				    else if (mtp_send_packet(emc_fd, ump) !=
+					     MTP_PP_SUCCESS) {
+					fatal("request id failed");
+				    }
+				    
+				    mtp_free_packet(ump);
+				    ump = NULL;
+				}
+				else if (cmp_pos(&gc->gc_actual_pos,
+						 &gc->gc_intended_pos)) {
+				    struct mtp_update_position mup;
+				    struct mtp_packet *ump;
+
+				    info("made it\n");
+				    
+				    gc->gc_flags &= ~GCF_REFINING_POSITION;
+
+				    mup.robot_id = gc->gc_robot->id;
+				    mup.position = gc->gc_actual_pos;
+				    mup.status = MTP_POSITION_STATUS_COMPLETE;
+				    
+				    if ((ump = mtp_make_packet(
+					MTP_UPDATE_POSITION,
+					MTP_ROLE_RMC,
+					&mup)) == NULL) {
+					fatal("cannot allocate packet");
+				    }
+				    else if (mtp_send_packet(emc_fd, ump) !=
+					     MTP_PP_SUCCESS) {
+					fatal("request id failed");
+				    }
+				    
+				    mtp_free_packet(ump);
+				    ump = NULL;
+				}
+				else {
+				    struct mtp_command_goto mcg;
+				    struct mtp_packet *gmp;
+
+				    info("moving again\n");
+				    
+				    mcg.command_id = 1;
+				    mcg.robot_id = gc->gc_robot->id;
+				    conv_pos(&mcg.position,
+					     &gc->gc_intended_pos);
+				    if ((gmp = mtp_make_packet(
+					MTP_COMMAND_GOTO,
+					MTP_ROLE_RMC,
+					&mcg)) == NULL) {
+					fatal("cannot allocate packet");
+				    }
+				    else if (mtp_send_packet(gc->gc_fd, gmp) !=
+					     MTP_PP_SUCCESS) {
+					fatal("request id failed");
+				    }
+				    
+				    mtp_free_packet(gmp);
+				    gmp = NULL;
+				}
+			    }
+			}
+			break;
+		    default:
+			warning("unhandled emc packet %d\n", mp->opcode);
+			break;
+		    }
+		}
+
+		mtp_free_packet(mp);
+		mp = NULL;
+	    }
+
+	    for (lpc = 0; lpc < rmc_config->num_robots; lpc++) {
+		struct gorobot_conn *gc = &gorobot_connections[lpc];
+		
+		if (FD_ISSET(gc->gc_fd, &rreadyfds)) {
+		    struct mtp_packet *mp = NULL;
+
+		    if (mtp_receive_packet(gc->gc_fd, &mp) != MTP_PP_SUCCESS) {
+			fatal("bad packet from gorobot!\n");
+		    }
+		    else if (mp->opcode == MTP_UPDATE_POSITION) {
+			switch (mp->data.update_position->status) {
+			case MTP_POSITION_STATUS_IDLE:
+			    /* Response to a COMMAND_STOP. */
+			    if (gc->gc_flags & GCF_PENDING_POSITION) {
+				struct mtp_command_goto mcg;
+				struct mtp_packet *gmp;
+
+				info("starting move\n");
+
+				mcg.command_id = 1;
+				mcg.robot_id = gc->gc_robot->id;
+				conv_pos(&mcg.position, &gc->gc_intended_pos);
+				if ((gmp = mtp_make_packet(MTP_COMMAND_GOTO,
+							   MTP_ROLE_RMC,
+							   &mcg)) == NULL) {
+				    fatal("cannot allocate packet");
+				}
+				else if (mtp_send_packet(gc->gc_fd, gmp) !=
+					 MTP_PP_SUCCESS) {
+				    fatal("request id failed");
+				}
+
+				mtp_free_packet(gmp);
+				gmp = NULL;
+
+				gc->gc_flags &= ~GCF_PENDING_POSITION;
+				gc->gc_flags |= GCF_REFINING_POSITION;
+				gc->gc_tries_remaining = MAX_GOTO_RETRIES;
+			    }
+			    break;
+			case MTP_POSITION_STATUS_ERROR:
+			    /* XXX */
+			    break;
+			case MTP_POSITION_STATUS_COMPLETE:
+			    info("gorobot finished %d\n", lpc);
+			    
+			    if (gc->gc_flags & GCF_REFINING_POSITION) {
+				struct mtp_request_position mrp;
+				struct mtp_packet *rmp;
+
+				mrp.robot_id = gc->gc_robot->id;
+
+				info("requesting position %d\n", mrp.robot_id);
+				
+				if ((rmp = mtp_make_packet(
+					MTP_REQUEST_POSITION,
+					MTP_ROLE_RMC,
+					&mrp)) == NULL) {
+				    fatal("cannot allocate packet");
+				}
+				else if (mtp_send_packet(emc_fd, rmp) !=
+					 MTP_PP_SUCCESS) {
+				    fatal("request id failed");
+				}
+
+				mtp_free_packet(rmp);
+				rmp = NULL;
+			    }
+			    break;
+			default:
+			    break;
+			}
+		    }
+		    else {
+			warning("unhandled emc packet %d\n", mp->opcode);
+		    }
+		    
+		    mtp_free_packet(mp);
+		    mp = NULL;
+		}
+	    }
+	}
+	else {
+	    errorc("accept\n");
+	}
+    }
+  
+    return retval;
+}
+
+#if 0
 int main(int argc, char **argv) {
+  int retval = EXIT_SUCCESS;
+
+  
   /* You are watching RMCD */
 
   // miscellaneous administration junk
-  int quitmain = 0;     // quit main loop
   int retval = 0;       // return value
   int cpacket_rcvd = 0; // configuration packet received
 
@@ -348,3 +936,4 @@ int main(int argc, char **argv) {
   printf("RMCD exiting without complaint.\n");
   return 0; // hope to see you soon
 }
+#endif

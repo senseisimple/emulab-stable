@@ -1,0 +1,44 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= robots/primotion
+
+include $(OBJDIR)/Makeconf
+
+SUBDIRS = dgrobot
+PROGS = gorobot
+TESTS = test_gorobot.sh
+
+all: all-subdirs $(PROGS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CXXFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
+CXXFLAGS	       += -I${SRCDIR}/../mtp
+CXXFLAGS	       += -DGROBOT_SIM
+
+LDFLAGS		= -L../mtp -Ldgrobot
+
+LIBS	 += -lmtp -ldgrobot
+
+test_gorobot.sh: gorobot
+
+gorobot: gorobot.o ../mtp/libmtp.a dgrobot/libdgrobot.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ gorobot.o $(LIBS)
+
+clean: clean-subdirs
+	rm -f *.o
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS)

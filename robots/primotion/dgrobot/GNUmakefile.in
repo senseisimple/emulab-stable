@@ -1,0 +1,30 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= robots/primotion/dgrobot
+
+include $(OBJDIR)/Makeconf
+
+DGLIBS = libdgrobot.a
+
+all: $(DGLIBS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+OBJS		= grobot_sim.o
+CXXFLAGS      += -O -g -Wall -I${OBJDIR} -I/usr/local/include
+
+grobot_sim.o:	grobot.h
+
+libdgrobot.a: $(OBJS)
+	$(AR) crv $@ $^
+	$(RANLIB) $@
+
+clean:
+	/bin/rm -f *.o *.a $(MTPPROGS)

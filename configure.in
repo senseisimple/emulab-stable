@@ -615,7 +615,9 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	mote/GNUmakefile mote/tbuisp \
 	robots/GNUmakefile robots/mtp/GNUmakefile robots/emc/GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
-	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh "
+	robots/vmcd/GNUmakefile robots/vmcd/test_vmc-client.sh \
+	robots/rmcd/GNUmakefile robots/primotion/GNUmakefile \
+	robots/primotion/test_gorobot.sh robots/primotion/dgrobot/GNUmakefile "
 
 #
 # Do this for easy distclean.

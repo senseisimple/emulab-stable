@@ -3,6 +3,10 @@
 #ifndef __MTP_H__
 #define __MTP_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* version number */
 #define MTP_VERSION   0x1
 
@@ -69,7 +73,7 @@
  * :-)  Obey the protocol or prepare to have your connection terminated!
  */
 #define MTP_PACKET_MAXLEN 32768
-#define MTP_PACKET_HEADER_LEN  7
+#define MTP_PACKET_HEADER_LEN  8
 #define MTP_PACKET_HEADER_OFFSET_LENGTH  0
 #define MTP_PACKET_HEADER_OFFSET_OPCODE  4
 #define MTP_PACKET_HEADER_OFFSET_VERSION 5
@@ -198,5 +202,8 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp);
 /* data's type is known by opcode! */
 int mtp_calc_size(int opcode,void *data);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

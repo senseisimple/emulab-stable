@@ -10,13 +10,15 @@
 #ifndef GROBOT_H
 #define GROBOT_H
 
+class grobot;
+
+#if !defined(GROBOT_SIM)
 #include "acpGarcia.h"
 #include "acpValue.h"
 
-class grobot;
-
 #include "gcallbacks.h"
 #include "gbehaviors.h"
+#endif
 
 #include <math.h>
 #include <iostream>
@@ -52,8 +54,9 @@ class grobot {
     void setCBexec(int id);
     void setCBstatus(int id, int stat);
 
-     
+#if !defined(GROBOT_SIM)
     acpGarcia garcia;
+#endif
     
   private:
     void createNULLbehavior();
@@ -86,7 +89,7 @@ class grobot {
     int gotom1;       // status for move segment of a goto command
     int gotop2;       // status for second pivot of a goto command
     
-    
+#if !defined(GROBOT_SIM)
     // Garcia stuff
     acpObject *pBehavior;         // Garcia behavior
      
@@ -99,8 +102,7 @@ class grobot {
     
     aIOLib ioRef;                 // Garcia Input/Output reference
     aErr err;                     // Garcia Error
-    
-
+#endif
     
 };
 

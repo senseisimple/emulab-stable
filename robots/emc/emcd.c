@@ -735,7 +735,8 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	  else {
 	    // add descriptor to list, etc:
 	    rmc_data.sock_fd = fd;
-	    rmc_data.position_list = robot_list_create();
+	    if (rmc_data.position_list == NULL)
+	      rmc_data.position_list = robot_list_create();
 
 	    retval = 1;
 	  }
@@ -755,7 +756,7 @@ int unknown_client_callback(elvin_io_handler_t handler,
 					 emulab_callback,
 					 NULL,
 					 eerror) == NULL) {
-	      error("unable to add elvin io handler");
+	error("unable to add elvin io handler");
       }
       else {
 	emulab_sock = fd;
@@ -859,6 +860,8 @@ int rmc_callback(elvin_io_handler_t handler,
   mtp_packet_t *mp = NULL;
   int rc, retval = 0;
 
+  info("rmc packet\n");
+  
   if (((rc = mtp_receive_packet(fd, &mp)) != MTP_PP_SUCCESS) ||
       (mp->version != MTP_VERSION)) {
     error("invalid client %p\n", mp);
@@ -877,10 +880,16 @@ int rmc_callback(elvin_io_handler_t handler,
 	struct mtp_update_position up_copy;
 	struct mtp_packet *wb;
 	
+	info("request pos\n");
+	
 	vmc_up = (struct mtp_update_position *)
 	  robot_list_search(vmc_data.position_list, my_id);
 	rmc_up = (struct mtp_update_position *)
 	  robot_list_search(rmc_data.position_list, my_id);
+
+	if (vmc_up != NULL) {
+	  rmc_up = vmc_up; // XXX prefer vmc?
+	}
 	
 	if (rmc_up != NULL) {
 	  // since VMC isn't hooked in, we simply write back the rmc posit
@@ -891,8 +900,10 @@ int rmc_callback(elvin_io_handler_t handler,
 	  wb = mtp_make_packet(MTP_UPDATE_POSITION, MTP_ROLE_EMC, &up_copy);
 	  mtp_send_packet(fd, wb);
 	}
-	else {
+	else  {
 	  struct mtp_control mc;
+
+	  info("no updates for %d\n", my_id);
 
 	  mc.id = -1;
 	  mc.code = -1;
@@ -924,6 +935,18 @@ int rmc_callback(elvin_io_handler_t handler,
 	  malloc(sizeof(struct mtp_update_position));
 	*up_copy = *(mp->data.update_position);
 	robot_list_append(rmc->position_list, my_id, up_copy);
+
+	info("update pos\n");
+	
+	switch (mp->data.update_position->status) {
+	case MTP_POSITION_STATUS_ERROR:
+	case MTP_POSITION_STATUS_COMPLETE:
+	  if (emulab_sock != -1) {
+	    info("complete!\n");
+	    mtp_send_packet(emulab_sock, mp);
+	  }
+	  break;
+	}
 	
 	// also, if status is MTP_POSITION_STATUS_COMPLETE || 
 	// MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
@@ -959,7 +982,7 @@ int rmc_callback(elvin_io_handler_t handler,
   mp = NULL;
 
   if (!retval) {
-    info("dropping connection %d\n", fd);
+    info("dropping rmc connection %d\n", fd);
 
     elvin_sync_remove_io_handler(handler, eerror);
 
@@ -977,12 +1000,62 @@ int emulab_callback(elvin_io_handler_t handler,
 		    void *rock,
 		    elvin_error_t eerror)
 {
-  char buf[1024];
-  int retval = 0;
+  mtp_packet_t *mp = NULL;
+  int rc, retval = 0;
   
-  printf("emulab callback\n");
-  read(fd, buf, sizeof(buf));
+  if (((rc = mtp_receive_packet(fd, &mp)) != MTP_PP_SUCCESS) ||
+      (mp->version != MTP_VERSION)) {
+    error("invalid client %p\n", mp);
+  }
+  else {
+    switch (mp->opcode) {
+    case MTP_COMMAND_GOTO:
+      if (rmc_data.sock_fd == -1) {
+	error("no rmcd yet\n");
+      }
+      else if (mtp_send_packet(rmc_data.sock_fd, mp) != MTP_PP_SUCCESS) {
+	error("could not forward packet to rmcd\n");
+      }
+      else {
+	info("forwarded goto\n");
+	
+	retval = 1;
+      }
+      break;
+    default:
+      {
+	struct mtp_packet *wb;
+	struct mtp_control c;
+	
+	error("received bogus opcode from VMC: %d\n", mp->opcode);
+	
+	c.id = -1;
+	c.code = -1;
+	c.msg = "protocol error: bad opcode";
+	wb = mtp_make_packet(MTP_CONTROL_ERROR, MTP_ROLE_EMC, &c);
+	mtp_send_packet(fd, wb);
 
+	free(wb);
+	wb = NULL;
+      }
+      break;
+    }
+  }
+  
+  mtp_free_packet(mp);
+  mp = NULL;
+
+  if (!retval) {
+    info("dropping emulab connection %d\n", fd);
+
+    elvin_sync_remove_io_handler(handler, eerror);
+
+    emulab_sock = -1;
+    
+    close(fd);
+    fd = -1;
+  }
+  
   return retval;
 }
 
@@ -1017,6 +1090,10 @@ int vmc_callback(elvin_io_handler_t handler,
 	  malloc(sizeof(struct mtp_update_position));
 	*up_copy = *(mp->data.update_position);
 	robot_list_append(vmc->position_list, my_id, up_copy);
+
+	info("update for %d %p\n",
+	     my_id,
+	     robot_list_search(vmc_data.position_list, my_id));
 	
 	// also, if status is MTP_POSITION_STATUS_COMPLETE || 
 	// MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
@@ -1052,7 +1129,7 @@ int vmc_callback(elvin_io_handler_t handler,
   mp = NULL;
 
   if (!retval) {
-    info("dropping connection %d\n", fd);
+    info("dropping vmc connection %d\n", fd);
 
     elvin_sync_remove_io_handler(handler, eerror);
 

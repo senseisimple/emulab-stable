@@ -1,8 +1,7 @@
 
-#include "config.h"
-
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
@@ -17,8 +16,11 @@ static int readall(int fd,char *buffer,unsigned int len)
   assert(fd >= 0);
   assert(buffer != NULL);
 
-  while ((rc = read(fd,&buffer[off],len - off)) > 0) {
-    off += rc;
+  while (((rc = read(fd,&buffer[off],len - off)) > 0) ||
+	 ((rc == -1) && (errno == EINTR))) {
+    if (rc > 0) {
+      off += rc;
+    }
   }
 
   if (rc < 0) {
@@ -70,7 +72,7 @@ int mtp_receive_packet(int fd,struct mtp_packet **packet) {
     // copy the header bytes to the new buf
     memcpy(buf,&clength,4);
     
-    retval = readall(fd,(void*)&buf[MTP_PACKET_HEADER_OFFSET_OPCODE],remaining_length);
+    retval = readall(fd,&buf[MTP_PACKET_HEADER_OFFSET_OPCODE],remaining_length);
     if (retval == -1) {
       free(buf);
       return MTP_PP_ERROR_READ;
@@ -128,6 +130,7 @@ int endian() {
   __z.d = val; \
   if (endian() == 1) { \
     memcpy((char *)((buf)+(idx)),__z.c,sizeof(double)); \
+    idx += 8; \
   } \
   else { \
     *((int *)((buf)+(idx))) = htonl(*((int *)(__z.c + 4))); \
@@ -146,6 +149,7 @@ int endian() {
   if (endian() == 1) { \
 	memcpy((char *)(__z.c),(char *)((buf)+(idx)),sizeof(double)); \
 	val = __z.d; \
+    idx += 8; \
   } \
   else { \
     *((int *)(__z.c + 4)) = htonl(*((int *)((buf) + (idx)))); \
@@ -188,7 +192,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
       packet->opcode == MTP_CONTROL_INIT ||
       packet->opcode == MTP_CONTROL_CLOSE) {
     struct mtp_control *data = packet->data.control;
-
+    int len;
+    
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
     buf[MTP_PACKET_HEADER_OFFSET_VERSION] = (char)(packet->version);
@@ -203,7 +208,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     i += 4;
     // write msg field
     strcpy(&buf[i],data->msg);
-    i += strlen(&buf[i]) + 1;
+    len = strlen(&buf[i]) + 1;
+    i += (len + 3) & ~3;
   }
   else if (packet->opcode == MTP_CONFIG_RMC) {
     struct mtp_config_rmc *data = packet->data.config_rmc;
@@ -219,12 +225,15 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     i += 4;
     // now write the list
     for (j = 0; j < data->num_robots; ++j) {
+      int len;
+      
       // write the id field
       *((int *)(buf+i)) = htonl(data->robots[j].id);
       i += 4;
       // write the hostname field
       strcpy(&buf[i],data->robots[j].hostname);
-      i += strlen(&buf[i]) + 1;
+      len = strlen(&buf[i]) + 1;
+      i += (len + 3) & ~3;
     }
     // now write the global_bound data
     encode_float32(buf, i, data->box.horizontal);
@@ -244,12 +253,15 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     i += 4;
     // now write the list
     for (j = 0; j < data->num_robots; ++j) {
+      int len;
+      
       // write the id field
       *((int *)(buf+i)) = htonl(data->robots[j].id);
       i += 4;
       // write the hostname field
       strcpy(&buf[i],data->robots[j].hostname);
-      i += strlen(&buf[i]) + 1;
+      len = strlen(&buf[i]) + 1;
+      i += (len + 3) & ~3;
     }
     
   }
@@ -336,11 +348,11 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     i += 4;
     *((int *)(buf+i)) = htonl(data->robot_id);
     i += 4;
+    
     encode_float32(buf, i, data->position.x);
     encode_float32(buf, i, data->position.y);
     encode_float32(buf, i, data->position.theta);
-	encode_float64(buf, i, data->position.timestamp);
-
+    encode_float64(buf, i, data->position.timestamp);
   }
   else if (packet->opcode == MTP_COMMAND_STOP) {
     struct mtp_command_stop *data = packet->data.command_stop;
@@ -429,7 +441,7 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       len = strlen(buf+i) + 1;
       data->robots[j].hostname = (char *)malloc(sizeof(char)*len);
       memcpy(data->robots[j].hostname,buf+i,len);
-      i += len;
+      i += (len + 3) & ~3;
     }
     // write the global_coord box
     decode_float32(buf, i, data->box.horizontal);
@@ -455,7 +467,7 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       len = strlen(buf+i) + 1;
       data->robots[j].hostname = (char *)malloc(sizeof(char)*len);
       memcpy(data->robots[j].hostname,buf+i,len);
-      i += len;
+      i += (len + 3) & ~3;
     }
 
   }
@@ -476,7 +488,7 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
     }
     packet->data.request_id = data;
 
-	data->request_id = ntohl(*((int *)(buf+i)));
+    data->request_id = ntohl(*((int *)(buf+i)));
     i += 4;
     decode_float32(buf, i, data->position.x);
     decode_float32(buf, i, data->position.y);
@@ -688,18 +700,24 @@ int mtp_calc_size(int opcode,void *data) {
       opcode == MTP_CONTROL_INIT ||
       opcode == MTP_CONTROL_CLOSE) {
     struct mtp_control *c = (struct mtp_control *)data;
+    int len;
+    
     assert(c->msg);
     retval += 8;
-    retval += strlen(c->msg) + 1;
+    len = strlen(c->msg) + 1;
+    retval += (len + 3) & ~3;
   }
   else if (opcode == MTP_CONFIG_RMC) {
     struct mtp_config_rmc *c = (struct mtp_config_rmc *)data;
     retval += 4;
     for (i = 0; i < c->num_robots; ++i) {
+      int len;
+      
       assert(c->robots[i].hostname);
       
       retval += 4;
-      retval += strlen(c->robots[i].hostname) + 1;
+      len = strlen(c->robots[i].hostname) + 1;
+      retval += (len + 3) & ~3;
     }
     retval += 8;
   }
@@ -707,10 +725,13 @@ int mtp_calc_size(int opcode,void *data) {
     struct mtp_config_vmc *c = (struct mtp_config_vmc *)data;
     retval += 4;
     for (i = 0; i < c->num_robots; ++i) {
+      int len;
+      
       assert(c->robots[i].hostname);
       
       retval += 4;
-      retval += strlen(c->robots[i].hostname) + 1;
+      len = strlen(c->robots[i].hostname) + 1;
+      retval += (len + 3) & ~3;
     }
   }
   else if (opcode == MTP_REQUEST_POSITION) {

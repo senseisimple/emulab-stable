@@ -9,10 +9,279 @@
  * 2004/12/09
  */
  
-#include "dgrobot/commotion.h"
+#include <stdio.h>
+#include <assert.h>
+#include <sys/types.h>
+
+#include <unistd.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
+
+#include <string.h>
+#include <sys/socket.h>
+
+#include "mtp.h"
+#include "dgrobot/grobot.h"
 
 #define GOR_SERVERPORT 2531
 
+static int debug = 0;
+
+static int looping = 1;
+
+static int robot_id = -1;
+
+static void sigquit(int signal)
+{
+    looping = 0;
+}
+
+static void usage(void)
+{
+    fprintf(stderr,
+	    "Usage: gorobot ...\n");
+}
+
+int main(int argc, char *argv[])
+{
+    int c, serv_sock = -1, port = GOR_SERVERPORT, on_off = 1;
+    char *logfile = NULL, *pidfile = NULL;
+    int retval = EXIT_SUCCESS;
+    struct sockaddr_in saddr;
+    
+    while ((c = getopt(argc, argv, "hdp:l:i:")) != -1) {
+	switch (c) {
+	case 'h':
+	    usage();
+	    exit(0);
+	    break;
+	case 'd':
+	    debug += 1;
+	    break;
+	case 'l':
+	    logfile = optarg;
+	    break;
+	case 'i':
+	    pidfile = optarg;
+	    break;
+	case 'p':
+	    if (sscanf(optarg, "%d", &port) != 1) {
+		fprintf(stderr,
+			"error: -p option is not a number: %s\n",
+			optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	}
+    }
+    
+    if (!debug) {
+	/* Become a daemon */
+	daemon(0, 0);
+
+	if (logfile) {
+	    FILE *file;
+
+	    if ((file = fopen(logfile, "w")) != NULL) {
+		dup2(fileno(file), 1);
+		dup2(fileno(file), 2);
+		stdout = file;
+		stderr = file;
+	    }
+	}
+    }
+
+    if (pidfile) {
+	FILE *fp;
+	
+	if ((fp = fopen(pidfile, "w")) != NULL) {
+	    fprintf(fp, "%d\n", getpid());
+	    (void) fclose(fp);
+	}
+    }
+
+    printf("Listenting on %d\n", port);
+
+    signal(SIGQUIT, sigquit);
+    signal(SIGTERM, sigquit);
+    signal(SIGINT, sigquit);
+    
+    signal(SIGPIPE, SIG_IGN);
+
+    memset(&saddr, 0, sizeof(saddr));
+#if !defined(linux)
+    saddr.sin_len = sizeof(saddr);
+#endif
+    saddr.sin_family = AF_INET;
+    saddr.sin_port = htons(port);
+    saddr.sin_addr.s_addr = INADDR_ANY;
+
+    if ((serv_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	perror("socket");
+    }
+    else if (setsockopt(serv_sock,
+			SOL_SOCKET,
+			SO_REUSEADDR,
+			&on_off,
+			sizeof(on_off)) == -1) {
+	perror("setsockopt");
+    }
+    else if (bind(serv_sock, (struct sockaddr *)&saddr, sizeof(saddr)) == -1) {
+	perror("bind");
+    }
+    else if (listen(serv_sock, 5) == -1) {
+	perror("listen");
+    }
+    else {
+	fd_set readfds, clientfds;
+	grobot bot;
+	
+	FD_ZERO(&readfds);
+	FD_ZERO(&clientfds);
+	FD_SET(serv_sock, &readfds);
+
+	while (looping) {
+	    struct timeval tv_zero = { 0, 0 };
+	    fd_set rreadyfds = readfds;
+	    int rc;
+
+	    rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, &tv_zero);
+	    if (rc > 0) {
+		int lpc;
+
+		if (FD_ISSET(serv_sock, &rreadyfds)) {
+                    struct sockaddr_in peer_sin;
+                    socklen_t slen;
+                    int cfd;
+                    
+                    slen = sizeof(peer_sin);
+                    if ((cfd = accept(serv_sock,
+				      (struct sockaddr *)&peer_sin,
+				      &slen)) == -1) {
+                        perror("accept");
+                    }
+                    else {
+                        FD_SET(cfd, &readfds);
+                        FD_SET(cfd, &clientfds);
+                    }
+		}
+
+		for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+		    if ((lpc != serv_sock) && FD_ISSET(lpc, &rreadyfds)) {
+			struct mtp_packet *mp = NULL;
+
+			if (mtp_receive_packet(lpc, &mp) != MTP_PP_SUCCESS) {
+			    perror("receive");
+			    close(lpc);
+			    FD_CLR(lpc, &clientfds);
+			    FD_CLR(lpc, &readfds);
+			}
+			else {
+			    // XXX handle client request.
+			    switch (mp->opcode) {
+			    case MTP_COMMAND_GOTO:
+				printf("goin\n");
+				
+				robot_id = mp->data.command_goto->robot_id;
+				bot.estop();
+				bot.dgoto(mp->data.command_goto->position.x,
+					  mp->data.command_goto->position.y,
+					  mp->data.command_goto->position.
+					  theta);
+				break;
+			    case MTP_COMMAND_STOP:
+				{
+				    struct mtp_update_position mup;
+				    struct mtp_packet *ump;
+
+				    printf("stoppin\n");
+				    
+				    bot.estop();
+				    
+				    mup.robot_id = robot_id;
+				    bot.getDisplacement(mup.position.x,
+							mup.position.y);
+				    mup.position.theta = 0;
+				    mup.status = MTP_POSITION_STATUS_IDLE;
+				    if ((ump = mtp_make_packet(
+					MTP_UPDATE_POSITION,
+					MTP_ROLE_RMC,
+					&mup)) == NULL) {
+					fprintf(stderr,
+						"error: unable to make update position packet\n");
+				    }
+				    else {
+					char buffer[1024], *buf = buffer;
+					int lpc, len;
+					
+					len = mtp_encode_packet(&buf, ump);
+					for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+					    if (FD_ISSET(lpc, &clientfds)) {
+						write(lpc, buffer, len);
+					    }
+					}
+					
+					mtp_free_packet(ump);
+					ump = NULL;
+				    }
+				}
+				break;
+			    }
+			}
+			mtp_free_packet(mp);
+			mp = NULL;
+		    }
+		}
+	    }
+
+	    bot.sleepy();
+
+	    if ((rc = bot.getGOTOstatus()) != 0) {
+		struct mtp_update_position mup;
+		struct mtp_packet *mp;
+
+		mup.robot_id = robot_id;
+		bot.getDisplacement(mup.position.x, mup.position.y);
+		mup.position.theta = 0;
+		if (rc < 0) {
+		    mup.status = MTP_POSITION_STATUS_ERROR;
+		}
+		else {
+		    mup.status = MTP_POSITION_STATUS_COMPLETE;
+		}
+		if ((mp = mtp_make_packet(MTP_UPDATE_POSITION,
+					  MTP_ROLE_RMC,
+					  &mup)) == NULL) {
+		    fprintf(stderr,
+			    "error: unable to make update position packet\n");
+		}
+		else {
+		    char buffer[1024], *buf = buffer;
+		    int lpc, len;
+
+		    len = mtp_encode_packet(&buf, mp);
+		    for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+			if (FD_ISSET(lpc, &clientfds)) {
+			    write(lpc, buffer, len);
+			}
+		    }
+		    
+		    mtp_free_packet(mp);
+		    mp = NULL;
+		}
+	    }
+	}
+    }
+
+    return retval;
+}
+
+#if 0
 int main(int argc, char **argv) {
 
   float dx, dy, dr; // relative x, y coordinates and orientation
@@ -263,3 +532,4 @@ int main(int argc, char **argv) {
   
   return 0;
 }
+#endif

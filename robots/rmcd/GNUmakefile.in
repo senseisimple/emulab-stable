@@ -11,9 +11,25 @@ SUBDIR		= robots/rmcd
 
 include $(OBJDIR)/Makeconf
 
-all:
+PROGS = rmcd
+TESTS = test_rmcd.sh
+
+all: $(PROGS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
+CFLAGS	       += -I${SRCDIR}/../mtp
+CFLAGS	       += -I${SRCDIR}/../../lib/libtb
+
+LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib
+
+LIBS	 += -lmtp -ltb
+
+test_rmcd.sh: rmcd
+
+rmcd: rmcd.o ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ rmcd.o $(LIBS)
 
 clean:
 	rm -f *.o

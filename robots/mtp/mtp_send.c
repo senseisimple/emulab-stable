@@ -1,6 +1,4 @@
 
-#include "config.h"
-
 #include <errno.h>
 #include <float.h>
 #include <stdio.h>
@@ -508,7 +506,9 @@ static int interpret_options(int *argcp, char ***argvp)
 
     if (fd == -1) {
 	memset(&sin, 0, sizeof(sin));
+#if !defined(linux)
 	sin.sin_len = sizeof(sin);
+#endif
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(args.port);
 	
@@ -554,7 +554,9 @@ static int interpret_options(int *argcp, char ***argvp)
 	}
     }
 
+#if !defined(linux)
     optreset = 1;
+#endif
     optind = 1;
     
     return retval;

@@ -10,8 +10,9 @@ HOSTPATH=/z/garcia/brainstem
 
 # Build for Stargate:
 ARCH=ARM
-CC=/usr/local/arm/3.4.1/bin/arm-linux-g++
-CFLAGS=-DaUNIX -s -static
+CC=/usr/local/arm/3.4.1/bin/arm-linux-gcc
+CXX=/usr/local/arm/3.4.1/bin/arm-linux-g++
+CXXFLAGS = -DaUNIX -s -static
 
 # Build for i386:
 #ARCH=i686
@@ -19,7 +20,7 @@ CFLAGS=-DaUNIX -s -static
 #CFLAGS=-DaUNIX -g
 
 
-INCLUDES=-I$(HOSTPATH)/aCommon \
+CXXFLAGS += -I$(HOSTPATH)/aCommon \
 	 -I$(HOSTPATH)/aUnix \
 	 -I$(HOSTPATH)/aIO/aCommon \
 	 -I$(HOSTPATH)/aIO/aUnix \
@@ -30,23 +31,23 @@ INCLUDES=-I$(HOSTPATH)/aCommon \
 	 -I$(HOSTPATH)/aGarcia/aGarcia \
 	 -I$(HOSTPATH)/aGarcia/aUnix \
 	 -I$(HOSTPATH)/aGarcia/aCommon \
+	 -I../mtp \
 	 -I./
 
-LIBRARIES=\
+LIBRARIES =\
 	-laGarcia \
 	-laStem \
 	-laIO \
 	-laUI \
 	-lpthread \
-	-lm \
-	-I.
-          
-VPATH=$(HOSTPATH)/aCommon:$(HOSTPATH)/aUnix
+	-lm
 
-LDFLAGS=-L$(HOSTPATH)/aRelease/aUnix/$(ARCH)/
+VPATH=$(HOSTPATH)/aCommon:$(HOSTPATH)/aUnix:dgrobot:../mtp
+
+LDFLAGS += -L$(HOSTPATH)/aRelease/aUnix/$(ARCH)/
 
 OBJECTSREQ=grobot gcallbacks gbehaviors simplepath
-OBJECTS=grobot.o gcallbacks.o gbehaviors.o simplepath.o
+OBJECTS=grobot.o gcallbacks.o gbehaviors.o simplepath.o mtp.o
 
 all: commotion pathmotion circle gorobot gorobotc
 
@@ -56,17 +57,19 @@ commotion: $(OBJECTSREQ)
 
 pathmotion: $(OBJECTSREQ)
 	$(CC) -o pathmotion $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) pathmotion.cc $(LIBRARIES)
-        
+
 circle: $(OBJECTSREQ)
 	$(CC) -o circle $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) circle.cc $(LIBRARIES)
-        
-gorobot: $(OBJECTSREQ)
-	$(CC) -o gorobot $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) gorobot.cc $(LIBRARIES)
-        
+
+gorobot: $(OBJECTS)
+	$(CXX) -o gorobot $(OBJECTS) $(CXXFLAGS) $(LDFLAGS) gorobot.cc $(LIBRARIES)
+
+mtp_send: mtp.o
+	$(CC) -o mtp_send $(CXXFLAGS) $(LDFLAGS) ../mtp/mtp_send.c $<
+
 gorobotc: $(OBJECTSREQ)
 	$(CC) -o gorobotc $(OBJECTS) $(INCLUDES) $(CFLAGS) $(LDFLAGS) gorobotc.cc $(LIBRARIES)
 
-        
 # %.o : %.c
 # 	$(CC) $(CFLAGS) -c -o $@ $< $(INCLUDES)
 # 
@@ -75,7 +78,7 @@ gorobotc: $(OBJECTSREQ)
 
 grobot:
 	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/grobot.cc
-        
+
 gcallbacks:
 	$(CC) -c $(INCLUDES) $(CFLAGS) dgrobot/gcallbacks.cc
 
