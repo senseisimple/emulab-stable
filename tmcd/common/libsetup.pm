@@ -1782,7 +1782,7 @@ sub dotarballs ()
     if (! @tarballs) {
 	return 0;
     }
-    
+
     #
     # Use tmcc to copy tarfiles for remote/jailed nodes,
     # otherwise access via NFS.
@@ -1791,9 +1791,12 @@ sub dotarballs ()
     # to avoid the stupid changing-exports-file server race
     # (install-tarfile knows how to deal with said race when copying).
     #
-    my $installoption = "c";
+    my $installoption = "-c";
     if (JAILED() || PLAB()) {
-	$installoption .= "-t";
+	$installoption .= " -t";
+	if (my $id = PLAB()) {
+	    $installoption .= " -n $id";
+	}
     }
 
     open(TARBALL, ">" . TMTARBALLS)
