@@ -62,9 +62,14 @@
 #define DOSPTYP_OPENBSD 0xa6
 #endif
 
+#define ISBSD(t)	((t) == DOSPTYP_386BSD || (t) == DOSPTYP_OPENBSD)
+
 #ifndef NDOSPART
 #define NDOSPART	4
 #endif
+
+/* 0 == false for all, ~0 == true for all, else true for those set */
+typedef uint32_t partmap_t[NDOSPART];
 
 char	*infilename;
 int	infd, outfd, outcanseek;
@@ -78,11 +83,12 @@ int     maxmode   = 0;
 int     slice     = 0;
 int	level	  = 4;
 long	dev_bsize = 1;
-int	ignore[NDOSPART], forceraw[NDOSPART];
 int	oldstyle  = 0;
 int	frangesize= 64;	/* 32k */
-int	safewrites= 1;
+int	forcereads= 0;
+int	retrywrites= 1;
 off_t	datawritten;
+partmap_t ignore, forceraw;
 
 #define sectobytes(s)	((off_t)(s) * secsize)
 #define bytestosec(b)	(uint32_t)((b) / secsize)
@@ -143,9 +149,10 @@ int	read_raw(void);
 int	compress_image(void);
 void	usage(void);
 
+#define IORETRIES	10
+
 #ifdef linux
 #define devlseek	lseek
-#define devread		read
 #else
 static inline off_t devlseek(int fd, off_t off, int whence)
 {
@@ -155,32 +162,86 @@ static inline off_t devlseek(int fd, off_t off, int whence)
 	assert(noff == (off_t)-1 || (noff & (DEV_BSIZE-1)) == 0);
 	return noff;
 }
-
-static inline int devread(int fd, void *buf, size_t size)
-{
-	assert((size & (DEV_BSIZE-1)) == 0);
-	return read(fd, buf, size);
-}
 #endif
+
+/*
+ * Wrap up read in a retry mechanism to persist in the face of IO errors,
+ * even faking data if requested.
+ */
+ssize_t
+devread(int fd, void *buf, size_t nbytes)
+{
+	int		cc, i, count;
+	off_t		startoffset;
+
+#ifndef linux
+	assert((nbytes & (DEV_BSIZE-1)) == 0);
+#endif
+	if (!forcereads)
+		return read(fd, buf, nbytes);
+
+	if ((startoffset = lseek(fd, (off_t) 0, SEEK_CUR)) < 0) {
+		perror("devread: seeking to get input file ptr");
+		exit(1);
+	}
+
+	count = 0;
+	for (i = 0; i < IORETRIES; i++) {
+		while (nbytes) {
+			cc = read(fd, buf, nbytes);
+			if (cc == 0)
+				break;
+
+			if (cc > 0) {
+				nbytes -= cc;
+				buf    += cc;
+				count  += cc;
+				continue;
+			}
+
+			if (i == 0) 
+				fprintf(stderr, "read failed: %s, "
+					"will retry %d more times\n",
+					strerror(errno), IORETRIES-1);
+	
+			nbytes += count;
+			buf    -= count;
+			count   = 0;
+			goto again;
+		}
+		return count;
+
+	again:
+		if (lseek(fd, startoffset, SEEK_SET) < 0) {
+			perror("devread: seeking to set file ptr");
+			exit(1);
+		}
+	}
+
+	fprintf(stderr, "devread: read failed in sector range [%u-%u], "
+		"returning zeros\n",
+		bytestosec(startoffset), bytestosec(startoffset+nbytes));
+	memset(buf, 0, nbytes);
+	return nbytes;
+}
 
 /*
  * Wrap up write in a retry mechanism to protect against transient NFS
  * errors causing a fatal error. 
  */
 ssize_t
-mywrite(int fd, const void *buf, size_t nbytes)
+devwrite(int fd, const void *buf, size_t nbytes)
 {
 	int		cc, i, count = 0;
 	off_t		startoffset = 0;
-	int		maxretries = 10;
 
-	if (outcanseek &&
+	if (retrywrites && outcanseek &&
 	    ((startoffset = lseek(fd, (off_t) 0, SEEK_CUR)) < 0)) {
-		perror("mywrite: seeking to get output file ptr");
+		perror("devwrite: seeking to get output file ptr");
 		exit(1);
 	}
 
-	for (i = 0; i < maxretries; i++) {
+	for (i = 0; i < IORETRIES; i++) {
 		while (nbytes) {
 			cc = write(fd, buf, nbytes);
 
@@ -190,13 +251,9 @@ mywrite(int fd, const void *buf, size_t nbytes)
 				count  += cc;
 				continue;
 			}
-			if (!safewrites) {
-				if (cc < 0)
-					perror("mywrite: writing");
-				else 
-					fprintf(stderr, "mywrite: writing\n");
-				exit(1);
-			}
+
+			if (!retrywrites)
+				return cc;
 
 			if (i == 0) 
 				perror("write error: will retry");
@@ -207,7 +264,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 			count   = 0;
 			goto again;
 		}
-		if (safewrites && fsync(fd) < 0) {
+		if (retrywrites && fsync(fd) < 0) {
 			perror("fsync error: will retry");
 			sleep(1);
 			nbytes += count;
@@ -219,7 +276,7 @@ mywrite(int fd, const void *buf, size_t nbytes)
 		return count;
 	again:
 		if (lseek(fd, startoffset, SEEK_SET) < 0) {
-			perror("mywrite: seeking to set file ptr");
+			perror("devwrite: seeking to set file ptr");
 			exit(1);
 		}
 	}
@@ -229,7 +286,32 @@ mywrite(int fd, const void *buf, size_t nbytes)
 }
 
 /* Map partition number to letter */
-#define BSDPARTNAME(i)       ("ABCDEFGHIJKLMNOP"[(i)])
+#define BSDPARTNAME(i)       ("abcdefghijklmnop"[(i)])
+
+static int
+setpartition(partmap_t map, char *str)
+{
+	int dospart;
+	char bsdpart;
+
+	bsdpart = str[1];
+	str[1] = '\0';
+	dospart = atoi(optarg);
+	if (dospart < 1 || dospart > 4)
+		return EINVAL;
+
+	/* common case: apply to complete DOS partition */
+	if (bsdpart == '\0') {
+		map[dospart-1] = ~0;
+		return 0;
+	}
+
+	if (bsdpart < 'a' || bsdpart > 'p')
+		return EINVAL;
+
+	map[dospart-1] |= (1 << (bsdpart - 'a'));
+	return 0;
+}
 
 int
 main(argc, argv)
@@ -243,7 +325,7 @@ main(argc, argv)
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1F:DR:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1F:DR:X")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -252,7 +334,7 @@ main(argc, argv)
 			info++;
 			break;
 		case 'D':
-			safewrites = 0;
+			retrywrites = 0;
 			break;
 		case 'd':
 			debug++;
@@ -283,16 +365,12 @@ main(argc, argv)
 			inputmaxsec = atoi(optarg);
 			break;
 		case 'I':
-			rval = atoi(optarg);
-			if (rval < 1 || rval > 4)
+			if (setpartition(ignore, optarg))
 				usage();
-			ignore[rval-1] = 1;
 			break;
 		case 'R':
-			rval = atoi(optarg);
-			if (rval < 1 || rval > 4)
+			if (setpartition(forceraw, optarg))
 				usage();
-			forceraw[rval-1] = 1;
 			break;
 		case '1':
 			oldstyle = 1;
@@ -301,6 +379,9 @@ main(argc, argv)
 			frangesize = atoi(optarg);
 			if (frangesize < 0)
 				usage();
+			break;
+		case 'X':
+			forcereads++;
 			break;
 		case 'h':
 		case '?':
@@ -358,6 +439,11 @@ main(argc, argv)
 	else
 		rval = read_image();
 #endif
+	if (rval) {
+		fprintf(stderr, "* * * Aborting * * *\n");
+		exit(1);
+	}
+
 	sortrange(skips, 1);
 	if (debug)
 		dumpskips();
@@ -381,7 +467,7 @@ main(argc, argv)
 	else {
 		outfd = fileno(stdout);
 		outcanseek = 0;
-		safewrites = 0;
+		retrywrites = 0;
 	}
 	compress_image();
 	
@@ -484,15 +570,19 @@ read_image()
 		u_int32_t	start = doslabel.parts[i].dp_start;
 		u_int32_t	size  = doslabel.parts[i].dp_size;
 
-		if (slicemode && i != (slice - 1) /* DOS Numbering */)
+		if (slicemode && (i + 1) != slice)
 			continue;
 		
-		if (ignore[i])
-			type = DOSPTYP_UNUSED;
-		else if (forceraw[i]) {
-			fprintf(stderr,
-				"  Slice %d, Forcing raw compression\n", i+1);
-			goto skipcheck;
+		if (ignore[i]) {
+			if (!ISBSD(type) || ignore[i] == ~0)
+				type = DOSPTYP_UNUSED;
+		} else if (forceraw[i]) {
+			if (!ISBSD(type) || forceraw[i] == ~0) {
+				fprintf(stderr,
+					"  Slice %d, forcing raw compression\n",
+					i + 1);
+				goto skipcheck;
+			}
 		}
 
 		switch (type) {
@@ -521,14 +611,16 @@ read_image()
 		default:
 			fprintf(stderr,
 				"  Slice %d is an unknown type (%x), "
-				"performing raw compression.\n",
-				i + 1 /* DOS Numbering */, type);
+				"forcing raw compression.\n",
+				i + 1, type);
 			break;
 		}
 		if (rval) {
-			warnx("Stopping zip at Slice %d",
-			      i + 1 /* DOS Number */);
-			return rval;
+			fprintf(stderr,
+				"  Filesystem specific error in Slice %d, "
+				"use -R%d to force raw compression.\n",
+				i + 1, i + 1);
+			break;
 		}
 		
 	skipcheck:
@@ -627,7 +719,7 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size, int bsdtype)
 		 */
 		if (bsdtype == DOSPTYP_OPENBSD && i >= 8 && i < 16) {
 			if (debug)
-				fprintf(stderr, "    %c   skipping, "
+				fprintf(stderr, "    '%c'   skipping, "
 					"OpenBSD mapping of DOS partition %d\n",
 					BSDPARTNAME(i), i - 6);
 			continue;
@@ -637,7 +729,7 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size, int bsdtype)
 			/* XXX silence gcc about dktypenames */
 			rval = DKMAXTYPES;
 
-			fprintf(stderr, "    %c ", BSDPARTNAME(i));
+			fprintf(stderr, "    '%c' ", BSDPARTNAME(i));
 
 			fprintf(stderr, "  start %9d, size %9d\t(%s)\n",
 			   dlabel.label.d_partitions[i].p_offset,
@@ -645,9 +737,21 @@ read_bsdslice(int slice, u_int32_t start, u_int32_t size, int bsdtype)
 			   fstypenames[dlabel.label.d_partitions[i].p_fstype]);
 		}
 
-		rval = read_bsdpartition(&dlabel.label, i);
-		if (rval)
-			return rval;
+		if (ignore[slice] & (1 << i)) {
+			fprintf(stderr, "  Slice %d BSD partition '%c' ignored,"
+				" NOT SAVING.\n",
+				slice + 1, BSDPARTNAME(i));
+			addskip(dlabel.label.d_partitions[i].p_offset,
+				dlabel.label.d_partitions[i].p_size);
+		} else if (forceraw[slice] & (1 << i)) {
+			fprintf(stderr, "  Slice %d BSD partition '%c',"
+				" forcing raw compression.\n",
+				slice + 1, BSDPARTNAME(i));
+		} else {
+			rval = read_bsdpartition(&dlabel.label, i);
+			if (rval)
+				return rval;
+		}
 	}
 	
 	/*
@@ -710,29 +814,29 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 	}
 
 	if (dlabel->d_partitions[part].p_fstype != FS_BSDFFS) {
-		warnx("BSD Partition %c: Not a BSD Filesystem",
+		warnx("BSD Partition '%c': Not a BSD Filesystem",
 		      BSDPARTNAME(part));
 		return 1;
 	}
 
 	if (devlseek(infd, sectobytes(offset) + SBOFF, SEEK_SET) < 0) {
-		warnx("BSD Partition %c: Could not seek to superblock",
+		warnx("BSD Partition '%c': Could not seek to superblock",
 		      BSDPARTNAME(part));
 		return 1;
 	}
 
 	if ((cc = devread(infd, &fs, SBSIZE)) < 0) {
-		warn("BSD Partition %c: Could not read superblock",
+		warn("BSD Partition '%c': Could not read superblock",
 		     BSDPARTNAME(part));
 		return 1;
 	}
 	if (cc != SBSIZE) {
-		warnx("BSD Partition %c: Truncated superblock",
+		warnx("BSD Partition '%c': Truncated superblock",
 		      BSDPARTNAME(part));
 		return 1;
 	}
  	if (fs.fs.fs_magic != FS_MAGIC) {
-		warnx("BSD Partition %c: Bad magic number in superblock",
+		warnx("BSD Partition '%c': Bad magic number in superblock",
 		      BSDPARTNAME(part));
  		return 1;
  	}
@@ -749,17 +853,17 @@ read_bsdpartition(struct disklabel *dlabel, int part)
 		dboff = fsbtodb(&fs.fs, cgbase(&fs.fs, i)) + offset;
 
 		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
-			warn("BSD Partition %c: Could not seek to cg %d",
+			warn("BSD Partition '%c': Could not seek to cg %d",
 			     BSDPARTNAME(part), i);
 			return 1;
 		}
 		if ((cc = devread(infd, &cg, fs.fs.fs_bsize)) < 0) {
-			warn("BSD Partition %c: Could not read cg %d",
+			warn("BSD Partition '%c': Could not read cg %d",
 			     BSDPARTNAME(part), i);
 			return 1;
 		}
 		if (cc != fs.fs.fs_bsize) {
-			warn("BSD Partition %c: Truncated cg %d",
+			warn("BSD Partition '%c': Truncated cg %d",
 			     BSDPARTNAME(part), i);
 			return 1;
 		}
@@ -2018,7 +2122,16 @@ compress_image(void)
 		/*
 		 * Write out the finished chunk to disk.
 		 */
-		mywrite(outfd, output_buffer, sizeof(output_buffer));
+		cc = devwrite(outfd, output_buffer, sizeof(output_buffer));
+		if (cc != sizeof(output_buffer)) {
+			if (cc < 0)
+				perror("chunk write");
+			else
+				fprintf(stderr,
+					"chunk write: short write (%d bytes)\n",
+					cc);
+			exit(1);
+		}
 
 		/*
 		 * Moving to the next block. Reserve the header area.
@@ -2099,7 +2212,16 @@ compress_image(void)
 		 * Write out the finished chunk to disk, and
 		 * start over from the beginning of the buffer.
 		 */
-		mywrite(outfd, output_buffer, sizeof(output_buffer));
+		cc = devwrite(outfd, output_buffer, sizeof(output_buffer));
+		if (cc != sizeof(output_buffer)) {
+			if (cc < 0)
+				perror("chunk write");
+			else
+				fprintf(stderr,
+					"chunk write: short write (%d bytes)\n",
+					cc);
+			exit(1);
+		}
 		buffer_offset = 0;
 	}
 
@@ -2147,7 +2269,7 @@ compress_image(void)
 		assert(blkhdr->blockindex == i);
 		blkhdr->blocktotal = count;
 		
-		if ((cc = mywrite(outfd, buf, sizeof(blockhdr_t))) < 0) {
+		if ((cc = devwrite(outfd, buf, sizeof(blockhdr_t))) < 0) {
 			perror("writing new subblock header");
 			exit(1);
 		}

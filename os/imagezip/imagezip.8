@@ -12,7 +12,6 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl dhiorv
-.Op Fl F Ar sectors
 .Op Fl I Ar slice
 .Op Fl R Ar slice
 .Op Fl s Ar slice
@@ -137,10 +136,13 @@ Print a usage message.
 .It Fl I Ar slice
 In full disk mode, tells
 .Nm
-to skip a specific slice.  This option can be given multiple times to
-skip multiple slices.
-The slice number should be the DOS partition number which ranges from 1 to 4.
-Incompatible with
+to skip a specific slice or BSD partition within a slice.
+This option can be given multiple times to skip multiple slices or partitions.
+The slice number should be the DOS partition number which ranges from 1 to 4,
+optionally followed by a BSD partition letter ('a' through 'p').
+The latter form only applies to slices with BSD disklabels and allows skipping
+subsets of a slice.
+This option is incompatible with
 .Fl s .
 .It Fl i
 Prints a variety of diagnostic information about what
@@ -163,11 +165,14 @@ In full disk mode, tells
 .Nm
 to force raw (ala
 .Fl r )
-compression of a specific slice.
+compression of a specific slice or BSD partition within a slice.
 This option can be given multiple times to force raw compression of
-multiple slices.
-The slice number should be the DOS partition number which ranges from 1 to 4.
-Incompatible with
+multiple slices or partitions.
+The slice number should be the DOS partition number which ranges from 1 to 4,
+optionally followed by a BSD partition letter ('a' through 'p').
+The latter form only applies to slices with BSD disklabels and allows skipping
+subsets of a slice.
+This option is incompatible with
 .Fl s .
 .It Fl s Ar slice
 Create a slice image containing only the indicated slice.
@@ -204,6 +209,18 @@ how many sectors to compress in full disk mode.  Can be used to compress
 a subset of a disk.
 Incompatible with
 .Fl s .
+.It Fl D
+Allow ``dangerous'' writes.
+The default output behavior for
+.Nm
+is to perform an
+.Xr fsync 2
+after every chunk write to the image file and to retry such writes that fail
+up to 10 times before giving up.
+This is a concession to the common case of writing the output
+file across NFS, where transient, asynchronously reported errors may occur.
+With this option, writes are attempted only once and no fsync is done,
+resulting in faster operation.
 .It Fl F Ar sectors
 The minimum length in sectors that a free range needs to be before it
 is recorded as a free range.  Ranges shorter than this length are
@@ -223,6 +240,16 @@ is a Linux filesystem slice.  Should be used only when the device does
 not contain a DOS partition table and really does contains a Linux filesystem.
 Incompatible with
 .Fl b .
+.It Fl X
+Try e(X)tremely hard to read data from the input device,
+returning success even if a read fails.
+The default input behavior for
+.Nm
+is to attempt input device reads only once, aborting if a read fails.
+With this option, a failing device read will be retried up to 10 times.
+If a read still fails, a block of zeros will be returned instead of the data.
+This is a desperation measure for those who want to salvage as much data
+as possible from a failed disk.
 .El
 .Sh DIAGNOSTICS
 The
