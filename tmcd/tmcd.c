@@ -2372,7 +2372,6 @@ COMMAND_PROTOTYPE(dostate)
 	tuple->objtype   = "TBNODESTATE";
 	tuple->objname	 = nodeid;
 	tuple->eventtype = newstate;
-	printf("Newstate is (%s)\n",newstate);
 
 	if (myevent_send(tuple)) {
 		syslog(LOG_ERR,"dostate: Error sending event\n");
