@@ -58,10 +58,10 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(INSTALL_DIR)/control_interface
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 /etc/start_if.fxp0
-	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp2 /etc/start_if.fxp2
+	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 /etc/start_if.fxp1
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 /etc/start_if.fxp4
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0 /etc/start_if.xl0
 	$(INSTALL) -m 755 $(SRCDIR)/rc.route $(INSTALL_DIR)/rc.route
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(INSTALL_DIR)/gated_fxp0.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp2.conf $(INSTALL_DIR)/gated_fxp2.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(INSTALL_DIR)/gated_fxp1.conf
 	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(INSTALL_DIR)/gated_fxp4.conf

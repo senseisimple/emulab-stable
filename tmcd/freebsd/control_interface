@@ -7,7 +7,7 @@ if [ "$NODETYPE" = 'pc600' ]; then
 elif [ "$NODETYPE" = 'pc850' ]; then
     echo 'fxp0'
 elif [ "$NODETYPE" = 'pcL440GX' ]; then
-    echo 'fxp2'
+    echo 'fxp1'
 elif [ "$NODETYPE" = 'pc1500' ]; then
     echo 'xl0'
 fi
