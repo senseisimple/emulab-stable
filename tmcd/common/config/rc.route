@@ -450,6 +450,8 @@ sub ddijkstra ($)
 	}
     }
     close(MAP);
+    undef($topomap);
+    undef(%lans);
 
     #
     # Now run the dijkstra program on the input. 
