@@ -1,15 +1,22 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
+use Getopt::Std;
 
 #
 # Audit the DB, looking for things we want to catch. Run once a day from cron.
-# 
+#
+sub usage() {
+    print STDOUT "Usage: audit [-d]\n".
+	"Use the -d option to see debugging output instead of emailing it.\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
 
 #
 # Configure variables
@@ -40,6 +47,21 @@ if ($UID != 0) {
 }
 
 #
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+
+#
 # Form a temp name.
 #
 my $logname = TBMakeLogname("audit");
@@ -48,9 +70,11 @@ my $query_result;
 #
 # Reopen both stdout and stderr so that we can record all the output for
 # later mailing.
-# 
-#open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-#open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+#
+if (! $debug) {
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+}
 
 #
 # Look for experiments running longer than 1 day, using real nodes.
@@ -95,12 +119,13 @@ if ($query_result->numrows) {
 #
 # Send email if anything was reported.
 #
-if (-s $logname) {
+if (!$debug && -s $logname) {
     SENDMAIL($TBOPS, "Testbed Audit Results", "Testbed Audit Results",
 	     $TBOPS, undef, ($logname));
 }
 
-unlink("$logname");
+unlink("$logname")
+    if (-e $logname);
 exit 0;
 
 sub fatal($) {
@@ -108,6 +133,7 @@ sub fatal($) {
 
     print STDERR "$msg\n";
     SENDMAIL($TBOPS, "Testbed Audit Failed", $msg, undef, undef, ($logname));
-    unlink("$logname");
+    unlink("$logname")
+	if (-e $logname);
     exit(1);
 }
