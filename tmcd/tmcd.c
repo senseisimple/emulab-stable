@@ -112,6 +112,7 @@ typedef struct {
 	int		update_accounts;
 	char		nodeid[TBDB_FLEN_NODEID];
 	char		vnodeid[TBDB_FLEN_NODEID];
+	char		pnodeid[TBDB_FLEN_NODEID]; /* XXX */
 	char		pid[TBDB_FLEN_PID];
 	char		eid[TBDB_FLEN_EID];
 	char		gid[TBDB_FLEN_GID];
@@ -909,6 +910,12 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 
 	/*
+	 * Virtual nodes, do not return interface table info. No point.
+	 */
+	if (reqp->isvnode)
+		goto doveths;
+
+	/*
 	 * Need to know the control network for the machine since
 	 * we don't want to mess with that.
 	 */
@@ -989,8 +996,20 @@ COMMAND_PROTOTYPE(doifconfig)
 	mysql_free_result(res);
 
 	/* Veth interfaces are new. */
+ doveths:
 	if (vers < 10)
 		return 0;
+
+	/*
+	 * Outside a vnode, return only those veths that have vnode=NULL,
+	 * which indicates its an emulated interface on a physical node. When
+	 * inside a vnode, only return veths for which vnode=curvnode,
+	 * which are the interfaces that correspond to a jail node.
+	 */
+	if (reqp->isvnode)
+		sprintf(buf, "v.vnode_id='%s'", reqp->vnodeid);
+	else
+		strcpy(buf, "v.vnode_id is NULL");
 
 	/*
 	 * Find all the veth interfaces.
@@ -999,8 +1018,8 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "  from veth_interfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
-			 "where v.node_id='%s'",
-			 4, reqp->nodeid);
+			 "where v.node_id='%s' and %s",
+			 4, reqp->pnodeid, buf);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1641,7 +1660,18 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	 * entries added/deleted on the fly. I avoided that cause I view
 	 * the interfaces table as static and pertaining to physical
 	 * interfaces.
+	 *
+	 * Outside a vnode, return only those linkdelays for veths that have
+	 * vnode=NULL, which indicates its an emulated interface on a
+	 * physical node. When inside a vnode, only return veths for which
+	 * vnode=curvnode, which are the interfaces that correspond to a
+	 * jail node.
 	 */
+	if (reqp->isvnode)
+		sprintf(buf, "and v.vnode_id='%s'", reqp->vnodeid);
+	else
+		strcpy(buf, "and v.vnode_id is NULL");
+
 	res = mydb_query("select i.MAC,type,vlan,vnode,d.ip,netmask, "
 		 "pipe,delay,bandwidth,lossrate, "
 		 "rpipe,rdelay,rbandwidth,rlossrate, "
@@ -1653,8 +1683,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 "left join veth_interfaces as v on "
 		 " v.node_id=d.node_id and v.iface=d.iface and v.IP=d.ip "
-		 " where d.node_id='%s'",	 
-		 28, reqp->nodeid);
+		 "where d.node_id='%s' %s",
+		 28, reqp->pnodeid, buf);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);
@@ -3435,10 +3465,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 
 	/*
 	 * I love a good query!
+	 *
+	 * XXX Locally, the jail flag is not set on the phys node, only
+	 * on the virtnodes. This is okay since all the routines that
+	 * check jailflag also check to see if its a vnode or physnode. 
 	 */
 	if (reqp->isvnode) {
 		res = mydb_query("select t.class,t.type,np.node_id,"
-				 " np.jailflag,r.pid,r.eid,r.vname, "
+				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
 				 " np.role "
 				 " from nodes as nv "
@@ -3526,9 +3560,11 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	strncpy(reqp->role, row[10], sizeof(reqp->role));
 	reqp->iscontrol = (! strcasecmp(reqp->role,  "ctrlnode") ? 1 : 0);
 
-	/* If a vnode, copy into the nodeid. Eventually split this */
-	if (reqp->isvnode)
-		strcpy(reqp->nodeid, reqp->vnodeid);
+	/* If a vnode, copy into the nodeid. Eventually split this properly */
+	strcpy(reqp->pnodeid, reqp->nodeid);
+	if (reqp->isvnode) {
+		strcpy(reqp->nodeid,  reqp->vnodeid);
+	}
 	
 	return 0;
 }
@@ -4331,6 +4367,8 @@ COMMAND_PROTOTYPE(dojailconfig)
 		error("JAILCONFIG: %s: Node is free\n", reqp->nodeid);
 		return 1;
 	}
+	if (!reqp->jailflag)
+		return 0;
 
 	/*
 	 * Get the portrange for the experiment. Cons up the other params I
