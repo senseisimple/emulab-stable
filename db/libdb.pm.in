@@ -752,6 +752,10 @@ sub TBProjAccessCheck($$$$)
     elsif ($access_type == TB_PROJECT_DELUSER) {
 	$mintrust = PROJMEMBERTRUST_PROJROOT;
     }
+    elsif ($access_type == TB_PROJECT_MAKEGROUP ||
+	   $access_type == TB_PROJECT_DELGROUP) {
+	$mintrust = PROJMEMBERTRUST_GROUPROOT;
+    }
     else {
 	die("*** Unexpected access type: $access_type!");
     }
