@@ -33,7 +33,7 @@ del types
 
 hvmain = _hv.hvmain
 
-hvkill = _hv.hvkill
+hvKill = _hv.hvKill
 
 hvReadFile = _hv.hvReadFile
 
@@ -104,6 +104,7 @@ class HypView(_object):
     def setHiliteCallback(*args): return _hv.HypView_setHiliteCallback(*args)
     def setLabelToRight(*args): return _hv.HypView_setLabelToRight(*args)
     def setPickCallback(*args): return _hv.HypView_setPickCallback(*args)
+    def setFrameEndCallback(*args): return _hv.HypView_setFrameEndCallback(*args)
     def addSpanPolicy(*args): return _hv.HypView_addSpanPolicy(*args)
     def clearSpanPolicy(*args): return _hv.HypView_clearSpanPolicy(*args)
     def getDynamicFrameTime(*args): return _hv.HypView_getDynamicFrameTime(*args)

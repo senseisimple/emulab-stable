@@ -159,6 +159,7 @@ public:
   void newSphereColor();
   void setPickCallback(void (*fp)(const string &,int,int));
   void setHiliteCallback(void (*fp)(const string &,int,int));
+  void setFrameEndCallback(void (*fp)(int));
   void setSelected(HypNode *n, bool on);
 
   //--------------------------------------------------------------------------
@@ -277,6 +278,7 @@ private:
 
   void (*pickCallback)(const string &,int,int);
   void (*hiliteCallback)(const string &,int,int);
+  void (*frameEndCallback)(int);
 
   void frameBegin();
   void frameContinue();

@@ -1175,6 +1175,17 @@ void HypViewer::setHiliteCallback(void (*fp)(const string &,int,int))
 }
 
 //----------------------------------------------------------------------------
+//  void HypViewer::setFrameEndCallback(void (*fp)(int))  
+//............................................................................
+//  
+//----------------------------------------------------------------------------
+void HypViewer::setFrameEndCallback(void (*fp)(int))
+{
+  frameEndCallback = fp;
+  return;
+}
+
+//----------------------------------------------------------------------------
 //         void HypViewer::mouse(int btn, int state, int x, int y,         
 //                               int shift, int control)                   
 //............................................................................
@@ -1981,6 +1992,9 @@ int HypViewer::flashLink(HypNode *fromnode, HypNode *tonode)
 #ifndef PyHack
     if (!pick && !idleframe)
       glutSwapBuffers();
+#else
+    // No need to drag all of wxGLCanvas in here.  Call a simple function above.
+    (*frameEndCallback)(0);
 #endif
     return;
   }

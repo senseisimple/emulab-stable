@@ -701,16 +701,17 @@ SWIG_Python_InstallConstants(PyObject *d, swig_const_info constants[]) {
 /* -------- TYPES TABLE (BEGIN) -------- */
 
 #define  SWIGTYPE_p_f_r_q_const__string_int_int__void swig_types[0] 
-#define  SWIGTYPE_p_timeval swig_types[1] 
-#define  SWIGTYPE_p_HypGraph swig_types[2] 
-#define  SWIGTYPE_p_HypView swig_types[3] 
-#define  SWIGTYPE_p_HWND swig_types[4] 
-#define  SWIGTYPE_p_HGLRC swig_types[5] 
-#define  SWIGTYPE_p_p_char swig_types[6] 
-#define  SWIGTYPE_p_HDC swig_types[7] 
-#define  SWIGTYPE_p_string swig_types[8] 
-#define  SWIGTYPE_p_istream swig_types[9] 
-static swig_type_info *swig_types[11];
+#define  SWIGTYPE_p_f_int__void swig_types[1] 
+#define  SWIGTYPE_p_timeval swig_types[2] 
+#define  SWIGTYPE_p_HypGraph swig_types[3] 
+#define  SWIGTYPE_p_HypView swig_types[4] 
+#define  SWIGTYPE_p_HWND swig_types[5] 
+#define  SWIGTYPE_p_HGLRC swig_types[6] 
+#define  SWIGTYPE_p_p_char swig_types[7] 
+#define  SWIGTYPE_p_HDC swig_types[8] 
+#define  SWIGTYPE_p_string swig_types[9] 
+#define  SWIGTYPE_p_istream swig_types[10] 
+static swig_type_info *swig_types[12];
 
 /* -------- TYPES TABLE (END) -------- */
 
@@ -742,8 +743,8 @@ NAMESPACEHACK
 
 #include "HypView.h"
 
-extern HypView *hvmain(int,char *[],int,int,int);
-extern void hvkill(HypView *);
+extern HypView *hvMain(int,char *[],int,int,int);
+extern void hvKill(HypView *);
 extern int hvReadFile(char *,int,int);
 extern char *getSelected();
 extern char *getGraphCenter();
@@ -808,7 +809,7 @@ extern void selectCB(std::string const &,int,int);
 #ifdef __cplusplus
 extern "C" {
 #endif
-static PyObject *_wrap_hvmain(PyObject *self, PyObject *args) {
+static PyObject *_wrap_hvMain(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     int arg1 ;
     char **arg2 ;
@@ -818,7 +819,7 @@ static PyObject *_wrap_hvmain(PyObject *self, PyObject *args) {
     HypView *result;
     PyObject * obj0 = 0 ;
     
-    if(!PyArg_ParseTuple(args,(char *)"Oiii:hvmain",&obj0,&arg3,&arg4,&arg5)) goto fail;
+    if(!PyArg_ParseTuple(args,(char *)"Oiii:hvMain",&obj0,&arg3,&arg4,&arg5)) goto fail;
     {
         /* Check if is a list */
         if (PyList_Check(obj0)) {
@@ -841,7 +842,7 @@ static PyObject *_wrap_hvmain(PyObject *self, PyObject *args) {
             return NULL;
         }
     }
-    result = (HypView *)hvmain(arg1,arg2,arg3,arg4,arg5);
+    result = (HypView *)hvMain(arg1,arg2,arg3,arg4,arg5);
     
     resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_HypView, 0);
     return resultobj;
@@ -850,14 +851,14 @@ static PyObject *_wrap_hvmain(PyObject *self, PyObject *args) {
 }
 
 
-static PyObject *_wrap_hvkill(PyObject *self, PyObject *args) {
+static PyObject *_wrap_hvKill(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     HypView *arg1 = (HypView *) 0 ;
     PyObject * obj0 = 0 ;
     
-    if(!PyArg_ParseTuple(args,(char *)"O:hvkill",&obj0)) goto fail;
+    if(!PyArg_ParseTuple(args,(char *)"O:hvKill",&obj0)) goto fail;
     if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
-    hvkill(arg1);
+    hvKill(arg1);
     
     Py_INCREF(Py_None); resultobj = Py_None;
     return resultobj;
@@ -2391,6 +2392,25 @@ static PyObject *_wrap_HypView_setPickCallback(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *_wrap_HypView_setFrameEndCallback(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    HypView *arg1 = (HypView *) 0 ;
+    void (*arg2)(int) = (void (*)(int)) 0 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:HypView_setFrameEndCallback",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_p_f_int__void,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    (arg1)->setFrameEndCallback(arg2);
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_HypView_addSpanPolicy(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     HypView *arg1 = (HypView *) 0 ;
@@ -3296,8 +3316,8 @@ static PyObject * HypView_swigregister(PyObject *self, PyObject *args) {
     return Py_BuildValue((char *)"");
 }
 static PyMethodDef SwigMethods[] = {
-	 { (char *)"hvmain", _wrap_hvmain, METH_VARARGS },
-	 { (char *)"hvkill", _wrap_hvkill, METH_VARARGS },
+	 { (char *)"hvMain", _wrap_hvMain, METH_VARARGS },
+	 { (char *)"hvKill", _wrap_hvKill, METH_VARARGS },
 	 { (char *)"hvReadFile", _wrap_hvReadFile, METH_VARARGS },
 	 { (char *)"getSelected", _wrap_getSelected, METH_VARARGS },
 	 { (char *)"getGraphCenter", _wrap_getGraphCenter, METH_VARARGS },
@@ -3354,6 +3374,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"HypView_setHiliteCallback", _wrap_HypView_setHiliteCallback, METH_VARARGS },
 	 { (char *)"HypView_setLabelToRight", _wrap_HypView_setLabelToRight, METH_VARARGS },
 	 { (char *)"HypView_setPickCallback", _wrap_HypView_setPickCallback, METH_VARARGS },
+	 { (char *)"HypView_setFrameEndCallback", _wrap_HypView_setFrameEndCallback, METH_VARARGS },
 	 { (char *)"HypView_addSpanPolicy", _wrap_HypView_addSpanPolicy, METH_VARARGS },
 	 { (char *)"HypView_clearSpanPolicy", _wrap_HypView_clearSpanPolicy, METH_VARARGS },
 	 { (char *)"HypView_getDynamicFrameTime", _wrap_HypView_getDynamicFrameTime, METH_VARARGS },
@@ -3411,6 +3432,7 @@ static PyMethodDef SwigMethods[] = {
 /* -------- TYPE CONVERSION AND EQUIVALENCE RULES (BEGIN) -------- */
 
 static swig_type_info _swigt__p_f_r_q_const__string_int_int__void[] = {{"_p_f_r_q_const__string_int_int__void", 0, "void (*)(string const &,int,int)", 0},{"_p_f_r_q_const__string_int_int__void"},{0}};
+static swig_type_info _swigt__p_f_int__void[] = {{"_p_f_int__void", 0, "void (*)(int)", 0},{"_p_f_int__void"},{0}};
 static swig_type_info _swigt__p_timeval[] = {{"_p_timeval", 0, "timeval *", 0},{"_p_timeval"},{0}};
 static swig_type_info _swigt__p_HypGraph[] = {{"_p_HypGraph", 0, "HypGraph *", 0},{"_p_HypGraph"},{0}};
 static swig_type_info _swigt__p_HypView[] = {{"_p_HypView", 0, "HypView *", 0},{"_p_HypView"},{0}};
@@ -3423,6 +3445,7 @@ static swig_type_info _swigt__p_istream[] = {{"_p_istream", 0, "istream *", 0},{
 
 static swig_type_info *swig_types_initial[] = {
 _swigt__p_f_r_q_const__string_int_int__void, 
+_swigt__p_f_int__void, 
 _swigt__p_timeval, 
 _swigt__p_HypGraph, 
 _swigt__p_HypView, 

@@ -793,6 +793,10 @@ public:
   // bindCallback() documentation for more details. 
   void setPickCallback(void (*fp)(const string &,int,int));
 
+  /// Set the highlight callback to a function pointer.  Windowing system
+  // interface code may call this in HypViewer::FrameEnd().
+  void setFrameEndCallback(void (*fp)(int));
+
 
   // GROUP: HypData 
   //

@@ -51,12 +51,19 @@ NAMESPACEHACK
 }
 
 // It's easier to return the pointer to the HypView object rather than access the global.
-extern HypView  *hvmain(int argc, char *argv[], int window, int width, int height);
-extern void hvkill(HypView *hv);
+//extern HypView  *hvmain(int argc, char *argv[], int window, int width, int height);
+
+#ifndef WIN32
+extern HypView *hvMain(int argc, char *argv[], void *window, int width, int height);
+#else
+extern HypView *hvMain(int argc, char *argv[], int window,  int width, int height);
+#endif
 //extern int hvmain(int argc, char *argv[]);
 //%include "cpointer.i"
 //%pointer_class(HypView,hvp)
 //extern HypView *hv;
+
+extern void hvKill(HypView *hv);
 
 // Separate out file reading from the main program.
 extern int hvReadFile(char *fname, int width, int height);

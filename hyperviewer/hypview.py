@@ -22,6 +22,7 @@
 import string
 import sys
 import types
+import os
 
 import hv
 # Constants from HypData.h
@@ -110,7 +111,6 @@ class hvApp(wxApp):
 		exptError = '%s %s\n%s' % tuple(filename[1:4])
 		print exptError
 		self.frame.shutdown()
-		pass
 	    else:
 		if not self.frame.ReadTopFile("wxHyperViewer", filename):
 		    #print "Could not open ", filename # Already printed error in C++.
@@ -156,7 +156,9 @@ class hvFrame(hvFrameUI):
 	EVT_CHAR(self.CountGenNode, self.OnCountGenNode_CHAR)
 	EVT_SPINCTRL(self.CountGenLink, -1, self.OnCountGenLink)
 	EVT_CHAR(self.CountGenLink, self.OnCountGenLink_CHAR)
-
+	EVT_SCROLL_ENDSCROLL(self.AnimStepCount, self.OnAnimStepCount)	  # Windows
+	EVT_SLIDER(self.AnimStepCount, -1, self.OnAnimStepCount)	  # GTK
+	
 	# Other events.
 	EVT_CLOSE(self, self.OnExit)
 	# These do nothing until the vwr is instantiated below.
@@ -185,26 +187,32 @@ class hvFrame(hvFrameUI):
 	self.hypView.SetCurrent()   
 
 	# Get window info from the wxWindow base class of the wxGLCanvas object.
-	# GetHandler returns the platform-specific handle of the physical window:
-	# HWND for Windows, Widget for Motif or GtkWidget for GTK.
-	window = self.hypView.GetHandle()
+	if os.name == 'nt':
+	    # GetHandler returns the platform-specific handle of the physical window:
+	    # HWND for Windows, Widget for Motif or GtkWidget for GTK.
+	    window = self.hypView.GetHandle()
+	else:
+	    # The wxGLCanvas has the graphics context and does the SwapBuffers for us on GTK.
+	    window = self.hypView.this
+	    pass
+	##print "self.hypView", self.hypView, "window", window
 	# GetSizeTuple is the wxPython version of GetSize.  Returns size of the
 	# entire window in pixels, including title bar, border, scrollbars, etc.
 	width, height = self.hypView.GetSizeTuple()
 
 	# Instantiate and initialize the SWIG'ed C++ HypView object, loading graph data.
 	if self.vwr is not None:
-	    # Give up on hvReadFile; the cleanup logic is busted.  Always make a new HypView.
+	    ### Give up on hvReadFile; the cleanup logic is busted.  Always make a new HypView.
 	    ##print "hvkill", self.vwr
-	    hv.hvkill(self.vwr)
+	    ##hv.hvKill(self.vwr)  ## And don't even clean up the old one.
 
-	    # This is *really* evil... It fails every other time, so do it twice.
-	    self.vwr = hv.hvmain([str(name), str(file)], # Must be non-unicode strings.
+	    # This is *really* evil... It still fails every other time, so do it twice.  :-(
+	    self.vwr = hv.hvMain([str(name), str(file)], # Must be non-unicode strings.
 				 window, width, height)  # Win32 needs the window info.
-	    hv.hvkill(self.vwr)
+	    ##hv.hvKill(self.vwr)
 	    self.vwr = None
 
-	self.vwr = hv.hvmain([str(name), str(file)], # Must be non-unicode strings.
+	self.vwr = hv.hvMain([str(name), str(file)], # Must be non-unicode strings.
 			     window, width, height)  # Win32 needs the window info.
 	if self.vwr is None:			# Must have been a problem....
 	    return False
@@ -214,7 +222,7 @@ class hvFrame(hvFrameUI):
 	self.DrawGL()				# Show the graph.
 	
 	# Don't connect up the mouse events before the HyperView data is loaded!
-	EVT_LEFT_DOWN(self.hypView, self.OnClick)	
+	EVT_LEFT_DOWN(self.hypView, self.OnClick)
 	EVT_LEFT_UP(self.hypView, self.OnClick)
 	EVT_MIDDLE_DOWN(self.hypView, self.OnClick)
 	EVT_MIDDLE_UP(self.hypView, self.OnClick)
@@ -390,7 +398,20 @@ class hvFrame(hvFrameUI):
 	key = keyEvent.GetKeyCode()
 	if ord('0') <= key <= ord('9') or key in (WXK_BACK, WXK_TAB) or key >= WXK_DELETE:
 	    keyEvent.Skip()		# Skip actually means to process the event...
+	    pass
+	pass
 
+    ##
+    # Handle changes in the number of steps per second in animated moves.
+    def OnAnimStepCount(self, scrollEvent):
+	if self.vwr is None:
+	    return
+	# Convert from steps/second to fraction-of-a-second-per-step.
+	stepsPerSec = self.AnimStepCount.GetValue()
+	self.vwr.setGotoStepSize(1.0 / stepsPerSec)
+        ##print "OnAnimStepCount", stepsPerSec, self.vwr.getGotoStepSize()
+	pass
+    
     ##
     # Menu items issue commands from the menu bar.
     def OnExit(self, cmdEvent):
@@ -410,7 +431,6 @@ class hvFrame(hvFrameUI):
 	if mouseEvent.LeftDown():
 	    btnNum = 0
 	    btnState = 0
-	    pass
 	elif mouseEvent.LeftUp():
 	    btnNum = 0
 	    btnState = 1
@@ -420,7 +440,6 @@ class hvFrame(hvFrameUI):
 	elif mouseEvent.MiddleDown():
 	    btnNum = 1
 	    btnState = 0
-	    pass
 	elif mouseEvent.MiddleUp():
 	    btnNum = 1
 	    btnState = 1
@@ -449,7 +468,6 @@ class hvFrame(hvFrameUI):
 	# Hyperviewer calls motion when a mouse button is clicked "active"
 	if mouseEvent.LeftIsDown() or mouseEvent.MiddleIsDown():
 	    self.vwr.motion(mouseEvent.GetX(), mouseEvent.GetY(), 0, 0)
-	    pass
 	else:
 	    # "passive" mouse motion is when there is no button clicked.
 	    ##print "passive", mouseEvent.GetX(), mouseEvent.GetY()
@@ -515,6 +533,7 @@ class hvOpen(OpenDialogUI):
 	else:
 	    fileError = "Could not open " + file
 	    self.FileMsg.SetLabel(fileError)
+	    pass
 	pass
     
     ##
@@ -528,6 +547,7 @@ class hvOpen(OpenDialogUI):
 	    msg = "Enter a project name and experiment."
 	else:
 	    msg = 'Getting experiment %s/%s.' % (project, experiment)
+	    pass
 	print msg
 	self.ExperimentMsg.SetLabel(msg)
 	self.Refresh()
@@ -544,7 +564,6 @@ class hvOpen(OpenDialogUI):
 	elif self.app.frame.ReadTopFile("wxHyperViewer", hypfile):
 	    self.Hide();		# Success.
 	    self.ExperimentMsg.SetLabel(" ")
-	    pass
 	else:
 	    fileError = "Could not open " + hypfile
 	    print fileError

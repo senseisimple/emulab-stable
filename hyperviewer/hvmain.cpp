@@ -21,19 +21,28 @@
 #include <iostream>
 NAMESPACEHACK
 
+#if 1
+#include "wx/setup.h"
+#include "wx/glcanvas.h"
+#endif
+
 extern "C" {
 #include <stdlib.h>
+
 #if 0
 #include <GL/glut.h>
 #endif
+
 #ifndef WIN32
 #include <ieeefp.h>
 #endif
+
 #ifdef HYPFREE
 #include <floatingpoint.h>
 #endif
 #include <errno.h>
 }
+
 #ifdef HYPIRIX
 #include <fstream.h>
 #else
@@ -46,7 +55,8 @@ extern "C" {
 
 //char prevsel[1024];
 string prevsel;
-auto_ptr<HypView> hv;
+auto_ptr<HypView> hv;  // We own this; make sure the pointed-to HypView will be deleted.
+wxGLCanvas *glcanvas;  // We don't own this, so don't wrap it in an auto_ptr.
 
 char const *getSelected(){
   return prevsel.c_str();
@@ -66,6 +76,11 @@ void selectCB(const string & id, int shift, int control) {
   hv->drawFrame();
   hv->idle(1);
   prevsel = id;
+}
+
+void frameEndCB(int) {
+  //printf("frameEndCB glcanvas=0x%x\n", glcanvas);
+  glcanvas->SwapBuffers();
 }
 
 void display() { hv->drawFrame(); }
@@ -130,11 +145,7 @@ void PrintAllocations()
 #if 0
 int main(int argc, char *argv[]) {
 #else
-void hvkill(HypView * /*hv*/) {
-//  delete( hv );
-}
-
-HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
+HypView *hvMain(int argc, char *argv[], void * window, int width, int height) {
 #endif
   char *fname;
   if (argc > 1) 
@@ -187,7 +198,13 @@ HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
   inFile.close();
 #endif
 #ifndef WIN32
-  //printf("hvmain width=%d, height=%d\n", width, height);
+  // OK, this is nuts...  The canvas pointer comes through byte-swapped and shifted 4 bits!
+  int canvas; char *w = (char *)&window, *c = (char *)&canvas; int *ic = (int *)&canvas;
+  c[0] = w[3]; c[3] = w[0]; c[1] = w[2]; c[2] = w[1]; *ic = (*ic >> 4) & 0xfffffff;
+  glcanvas = (wxGLCanvas *)canvas;
+  //printf("hvmain window=0x%x, canvas=0x%x, width=%d, height=%d\n", window, canvas, width, height);
+
+  hv->setFrameEndCallback(frameEndCB);
   hv->afterRealize();
 #else
   //printf("hvmain ctx=0x%x, width=%d, height=%d\n", width, height);
@@ -262,7 +279,9 @@ HypView *hvmain(int argc, char *argv[], int window, int width, int height) {
 #endif
 }
 
-
+void hvKill(HypView * /*hv*/) {
+  delete hv.get();
+}
 
 int hvReadFile(char *fname, int width, int height) {
   ifstream inFile(fname);

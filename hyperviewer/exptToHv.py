@@ -9,6 +9,7 @@ import sets
 import string
 import fnmatch
 import os
+import os.path
 
 from sshxmlrpc import *
 from emulabclient import *
@@ -17,7 +18,9 @@ from emulabclient import *
 PACKAGE_VERSION = 0.1                   # The package version number
 XMLRPC_SERVER   = "boss.emulab.net"     # Default server
 xmlrpc_server   = XMLRPC_SERVER         # User supplied server name.
-if os.environ.has_key("USER"):          # User login ID to use.
+if os.environ.has_key("EMULAB_USER"):    # Emulab user login ID to use.
+    login_id    = os.environ["EMULAB_USER"]
+elif os.environ.has_key("USER"):          # User login ID to use.
     login_id    = os.environ["USER"]      # Unix shells.
 elif os.environ.has_key("USERNAME"):
     login_id    = os.environ["USERNAME"]  # Windows.
@@ -52,12 +55,15 @@ def addConnection(graph, h1, h2):
         graph[h1].add(h2)
     else:
         graph[h1] = sets.Set([h2])
+        pass
 
     # Make back-connections as well for an undirected (bi-directed) graph.
     if h2 in graph:
         graph[h2].add(h1)
     else:
         graph[h2] = sets.Set([h1])
+        pass
+    pass
 
 ## getExperiment - Make the request from the server.  Reconstitute a topology graph
 ## from the host interface list, and traverse it to write HyperViewer .hyp file.
@@ -119,7 +125,6 @@ def getExperiment(project, experiment, root=""):
             hosts.add(h1)
             hosts.add(h2)
             addConnection(graph, h1, h2)
-            pass
         else:
             # Lan nodes are are links with more than two interfaces as members.
             lans.add(link)
@@ -133,7 +138,6 @@ def getExperiment(project, experiment, root=""):
     if root == "":
         if len(lans) > 0:
             root = lans.copy().pop()
-            pass
         else:
             root = hosts.copy().pop()
             pass
@@ -178,10 +182,11 @@ def getExperiment(project, experiment, root=""):
     
     if os.name == "nt":
         tmpdir = "C:\\temp\\"
-        pass
     else:
         tmpdir = "/tmp/"
         pass
+    if not os.path.exists(tmpdir):
+        tmpdir = ""                     # Default to the current directory.
     hypfile = tmpdir + experiment + '.hyp'
     outfile = file(hypfile, 'w')
     graph2 = {}

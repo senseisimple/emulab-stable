@@ -74,7 +74,7 @@ class OpenDialogUI(wxDialog):
         self.label_8 = wxStaticText(self, -1, "Root (optional):")
         self.ExperimentRoot = wxTextCtrl(self, -1, "", style=wxTE_PROCESS_ENTER)
         self.OpenExperiment = wxButton(self, -1, "Retrieve experiment")
-        self.ExperimentMsg = wxStaticText(self, -1, "")
+        self.ExperimentMsg = wxStaticText(self, -1, " \n ")
 
         self.__set_properties()
         self.__do_layout()
@@ -83,7 +83,7 @@ class OpenDialogUI(wxDialog):
     def __set_properties(self):
         # begin wxGlade: OpenDialogUI.__set_properties
         self.SetTitle("Open HyperViewer Data")
-        self.SetSize((387, 310))
+        self.SetSize((387, 351))
         self.FileToOpen.SetFocus()
         # end wxGlade
 
@@ -162,7 +162,7 @@ class hvFrameUI(wxFrame):
         self.label_4 = wxStaticText(self.Controls, -1, "  Node depth")
         self.CountGenLink = wxSpinCtrl(self.Controls, -1, "30", min=1, max=30)
         self.label_5 = wxStaticText(self.Controls, -1, "  Link depth")
-        self.AnimStepCount = wxSlider(self.Controls, -1, 12, 1, 100)
+        self.AnimStepCount = wxSlider(self.Controls, -1, 12, 1, 100, style=wxSL_HORIZONTAL|wxSL_LABELS)
         self.label_6 = wxStaticText(self.Controls, -1, "    Animation frames")
         self.static_line_2 = wxStaticLine(self.Controls, -1)
         self.HelpButton = wxButton(self.Controls, -1, "Help")
@@ -198,7 +198,7 @@ class hvFrameUI(wxFrame):
         self.CountGenLink.SetToolTipString("Generation Link Limit")
         self.label_5.SetToolTipString("Generation Link Limit")
         self.AnimStepCount.SetSize((150, 40))
-        self.AnimStepCount.SetToolTipString("Number of frames per animation")
+        self.AnimStepCount.SetToolTipString("Number of frames per second in animated moves")
         self.label_6.SetToolTipString("Number of frames per animation")
         self.window_1.SetSize((760, 619))
         self.window_1.SplitVertically(self.panel_1, self.Controls)
