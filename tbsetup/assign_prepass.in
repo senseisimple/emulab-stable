@@ -944,9 +944,6 @@ sub combine_links($) {
 
 	    # We do this to get a canonical src, dst ordering
 	    my ($csrc, $cdst) = sort { $a cmp $b } ($src, $dst);
-	    if ($src != $csrc) {
-		$link->{'reversed'} = 1;
-	    }
 	    push @{$links{$csrc}{$cdst}}, $link;
 	    $totallinks++;
 	}
@@ -1047,6 +1044,12 @@ sub make_link_conglomerates(@) {
 	    # XXX - Handle flags
 	    # Add to the nodes list
 	    push @{$conglomerate->{'links'}}, $link;
+
+	    # Figure out if it points in the same direction as the rest of the
+	    # links in the conglomerate
+	    if ($link->{'src'} ne $conglomerate->{'src'}) {
+		$link->{'reversed'} = 1;
+	    }
 	}
     }
 
