@@ -78,6 +78,46 @@ ricci       2003/06/26 13:13:16 MDT
   the original score. The usefulness of this feature in debugging
   scoring problems cannot be understated...
 
+
+stoller     2003/06/30 11:33:58 MDT
+
+  Modified files:
+    .                    GNUmakefile.in configure configure.in 
+    db                   xmlconvert.in 
+    tbsetup              GNUmakefile.in batchexp.in nscheck.in 
+    tbsetup/ns2ir        GNUmakefile.in lanlink.tcl node.tcl 
+                         parse-ns.in parse.tcl.in program.tcl 
+                         sim.tcl.in tb_compat.tcl.in traffic.tcl 
+                         vtype.tcl 
+    testsuite/tests/db1  test 
+  Added files:
+    tbsetup/ns2ir        parse.proxy.in 
+  Log:
+  Make the new parser live on mini. New parser ssh'es over to ops to
+  do the actual parse, as the user. The parser now spits out XML instead of
+  DB queries, and the wrapper on boss converts that to DB insertions after
+  verification, using the new xmlconvert script. There are some makefile
+  changes as well to install the new parser on ops via NFS, since
+  otherwise the parser could intolerably out of date on ops!
+
+
+stoller     2003/06/26 15:30:02 MDT
+
+  Modified files:
+    db                   GNUmakefile.in 
+  Added files:
+    db                   xmlconvert.in 
+  Log:
+  New script. Convert experiment to "well formed" XML, and back again.
+  The conversion from XML to an experiment representation updates the
+  DB, although the experiment has to exist, and only certain fields can
+  be updated. For the rest of the virtual toplogy, the old toplogy is
+  deleted, and the new one installed. Use with caution. This is intended
+  to be hooked to the parser, and later to the vis tool so that it does
+  not need to have to do its own NS parsing, but can simply interpret the
+  XML. 
+  
+
 stoller     2003/05/1 09:09:12 MDT
 	
   Modified files:
