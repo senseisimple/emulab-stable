@@ -65,6 +65,7 @@ Simulator instproc make-simulated {args} {
     uplevel 1 eval $args
 }
 
+### end of tb_compat default
 # LINKTEST FUNCTIONS
 
 # holds a pair of simplex links.
@@ -78,6 +79,9 @@ variable last_link {}
 variable hosts
 variable lans
 variable links
+# optional items
+variable synserver {}
+variable rtproto {}
 
 rename set real_set
 proc set {args} {
@@ -240,6 +244,12 @@ Simulator instproc run {args} {
 
 }
 
+# store the rtproto
+Simulator instproc rtproto {arg} {
+    global rtproto
+    set rtproto $arg
+}
+
 # update lt_links such that lans become new links containing destination hosts
 # delay: sum both delays
 # loss:  product both losses
@@ -286,7 +296,7 @@ proc join_lans {} {
 
 
 proc output {} {
-    global hosts lans links lt_links
+    global hosts lans links lt_links synserver rtproto
 
     foreach name [array names hosts] {
 	puts "h $hosts($name)"
@@ -294,6 +304,12 @@ proc output {} {
     foreach link $lt_links {
 	puts "[$link toString]"
 
+    }
+    if { [llength $synserver]>0} {
+	puts "y $synserver"
+    }
+    if { [llength $rtproto]>0} {
+	puts "r $rtproto"
     }
 }
 #
@@ -330,7 +346,7 @@ proc tb-set-link-loss {args} {
 proc tb-set-lan-loss {lan rate} {
     global lt_links
 
-    # netbed-implenetation detail: set loss to 1-sqrt(1-L)
+    # netbed-implentation detail: set loss to 1-sqrt(1-L)
     set a [expr 1.0 - $rate]
     set b [expr sqrt ($a)]
     set newloss [expr 1.0 - $b]
@@ -384,3 +400,9 @@ proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fr
 
 
 }
+
+proc tb-set-sync-server {svr} {
+    global synserver hosts
+    real_set synserver $hosts($svr)
+}
+

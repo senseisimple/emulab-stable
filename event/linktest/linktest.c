@@ -4,10 +4,6 @@
  * All rights reserved.
  */
 
-/*
- * Program to start Linktest scripts.
- *
- */
 #include <stdio.h>
 #include <ctype.h>
 #include <netdb.h>
@@ -23,15 +19,13 @@
 #include "tbdefs.h"
 #include "log.h"
 #include "event.h"
-
-/* (temporarily) hardcoded path until I find a better place to put this
- *  (such as /var/emulab/somewhere?)*/
-#define  PATH_LINKTEST "/users/davidand/testbed/event/linktest/linktest.pl"
+#include "linktest.h"
 
 static void	callback(event_handle_t handle,
 			 event_notification_t notification, void *data);
 
-static void     start_linktest( char* args);
+static void
+start_linktest(char *args);
 
 void
 usage(char *progname)
@@ -42,7 +36,8 @@ usage(char *progname)
 	exit(-1);
 }
 
-int main(int argc, char **argv) {
+int
+main(int argc, char **argv) {
 	event_handle_t handle;
 	address_tuple_t	tuple;
 	char *server = NULL;
@@ -54,7 +49,7 @@ int main(int argc, char **argv) {
 	char buf[BUFSIZ];
 	
 	progname = argv[0];
-	
+
 	while ((c = getopt(argc, argv, "s:p:e:")) != -1) {
 	  switch (c) {
 	  case 's':
@@ -196,15 +191,8 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
 }
 
-/*
- * Start up the linktest script and wait for it to complete
- */
 static void
-start_linktest( char* args) {
-  if( !fork()) {
-    info ("starting linktest");
-    execl(PATH_LINKTEST, NULL);
-  }
-  wait(NULL);
-  info ("linktest completed\n");
+start_linktest(char *args) {
+  info("starting linktest.\n");
+  info(LINKTEST_SCRIPT);
 }

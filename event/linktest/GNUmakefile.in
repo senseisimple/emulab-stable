@@ -10,11 +10,10 @@ OBJDIR		= ../..
 SUBDIR		= event/linktest
 
 SYSTEM	       := $(shell uname -s)
-TESTS	= linktest
 
 include $(OBJDIR)/Makeconf
 
-all:	$(TESTS)
+all:	script
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -30,16 +29,22 @@ ifeq ($(SYSTEM),Linux)
 LIBS     += -ldl
 endif
 
-linktest:		linktest.o
-	$(CC) $(LDFLAGS) -o $@ linktest.o $(LIBS)
+OBJS	= linktest.o
+TESTS	 = linktest
 
-$(TESTS):	../lib/libevent.a ../lib/event.h
+$(TESTS):	$(OBJS) script
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+
+$(OBJS):	linktest.h ../lib/libevent.a ../lib/event.h
+
+script:	linktest.pl
+	chmod 755 linktest.pl
 
 install:
 
 client-install: 
-	$(INSTALL_TEST) linktest \
-			$(DESTDIR)$(CLIENT_BINDIR)/linktest
+	$(INSTALL_TEST) $(TESTS) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(TESTS)
 
 clean:
 	/bin/rm -f *.o $(TESTS)
