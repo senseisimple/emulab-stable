@@ -183,7 +183,7 @@ if ($isbatchexpt && $ebatchstate ne BATCHSTATE_TERMINATING) {
     if ($ebatchstate ne BATCHSTATE_POSTED) {
 	#
 	# Daemon does the rest ... Exit with non zero status so that caller
-	# knows (web server) that the batch experiement cannot be ended
+	# knows (web server) that the batch experiment cannot be ended
 	# at this time.
 	#
 	print "Batch Experiment $eid in project $pid is currently running.\n".
@@ -191,14 +191,9 @@ if ($isbatchexpt && $ebatchstate ne BATCHSTATE_TERMINATING) {
 	      "torn down and you can reuse the experiment name\n";
 	exit(0);
     }
-    DBQueryFatal("unlock tables");
-
     #
-    # Cleanup Experiment state.
+    # Let termination proceed normally. 
     # 
-    TBExptDestroy($pid, $eid);
-    
-    exit(1);
 }
 
 #

@@ -53,8 +53,7 @@ use libtestbed;
 $libdb::DBQUERY_MAXTRIES = 10;
 
 my $tbbindir = "$TB/bin/";
-my $batchdir = "$TB/batch";
-my $startexp = "$TB/bin/startexp";
+my $swapexp  = "$TB/bin/swapexp";
 my $endexp   = "$TB/bin/endexp";
 my $savelogs = "$TB/bin/savelogs";
 my $avail    = "$TB/sbin/avail";
@@ -349,9 +348,9 @@ sub startexp($)
     my $attempts  = $exphash{'attempts'};
 
     #
-    # Try to start the experiment. 
+    # Try to swap the experiment in. 
     #
-    system("$startexp -b -g $gid $pid $eid $nsfile");
+    system("$swapexp -b -s in $pid $eid");
     $exit_status = $? >> 8;
     $running     = 1;
     if ($exit_status) {
@@ -429,7 +428,7 @@ sub startexp($)
 	# There is some state that needs to be reset so that another
 	# attempt can be made.
 	# 
-	SetExpState($pid, $eid, EXPTSTATE_NEW);
+	SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 	TBSetBatchState($pid, $eid, $BSTATE_POSTED);
 	    
 	exit($exit_status);
@@ -491,17 +490,12 @@ sub cancelexp($$)
     
     TBSetBatchState($pid, $eid, $BSTATE_TERMINATING);
     
-    if ($running) {
-	system("$endexp -b $pid $eid");
-	if ($?) {
-	    #
-	    # TB admin is going to have to clean up. 
-	    # 
-	    fatal("Terminating Batch Mode experiment $pid/$eid");
-	}
-    }
-    else {
-	TBExptDestroy($pid, $eid);
+    system("$endexp -b $pid $eid");
+    if ($?) {
+	#
+	# TB admin is going to have to clean up. 
+	# 
+	fatal("Terminating Batch Mode experiment $pid/$eid");
     }
     donotify("Your Batch Mode experiment has been canceled!", "Canceled", 0);
    

@@ -21,7 +21,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: startexp [-b | -f] [-g gid] <pid> <eid> <nsfile>\n";
+	"Usage: startexp [-f [-b]] [-g gid] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
 my  $optlist = "bg:f";
@@ -94,10 +94,9 @@ if (defined($options{"b"})) {
 if (defined($options{"f"})) {
     $frontend = 1;
 }
-if ($batch && $frontend) {
+if ($batch && !$frontend) {
     usage();
 }
-
 if (defined($options{"g"})) {
     $gid = $options{"g"};
 }
@@ -281,14 +280,6 @@ else {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_START, 0);
 }
 
-#
-# In batchmode, send the report to stdout for the batch daemon.
-#
-if ($batch) {
-    system("$tbdir/tbreport -b $pid $eid");
-    print STDOUT "\n\n";
-}
-
 # Yippie!
 print STDOUT "Setup Success\n";
 
@@ -380,6 +371,13 @@ sub fatal()
     }
 
     #
+    # Must clean state.
+    #
+    if ($estate ne EXPTSTATE_NEW) {
+	tbendit();
+    }
+
+    #
     # In batch mode, exit. Must unlock the experiment since the record
     # is kept by the batch system until it is finished or canceled.
     # The batch daemon might terminate the experiment based on the error.
@@ -387,13 +385,6 @@ sub fatal()
     if ($batch) {
 	TBUnLockExp($pid, $eid);
 	exit($errorstat);
-    }
-
-    #
-    # If we got far enough to allocate nodes, must run tbend.
-    #
-    if ($estate ne EXPTSTATE_NEW) {
-	tbendit();
     }
 
     #

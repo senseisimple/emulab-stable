@@ -224,11 +224,17 @@ if ($immediate) {
     if (system("$startexp $farg -g $gid $pid $eid $nsfile")) {
 	fatal("Failed to start experiment $pid/$eid!");
     }
-    exit(0);
 }
-
-if (! TBSetBatchState($pid, $eid, BATCHSTATE_POSTED)) {
-    fatal("DB Error in batch system insertion!");
+else {
+    #
+    # Preload the experiment in the foreground. User sees parse errors
+    # right away, and the experiment is now in the system so we can look
+    # at it.
+    # 
+    if (system("$startexp -f -b -g $gid $pid $eid $nsfile")) {
+	fatal("Failed to preload batch experiment $pid/$eid!");
+    }
+    TBSetBatchState($pid, $eid, BATCHSTATE_POSTED);
 }
 
 exit(0);

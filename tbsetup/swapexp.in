@@ -16,11 +16,11 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-i] [-r] <-s in | out | restart | modify> " .
-	         "<pid> <eid> [<nsfile>]\n";
+    print STDOUT "Usage: swapexp [-b] [-i] [-r] ".
+	"<-s in | out | restart | modify> <pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
-my  $optlist = "s:ir";
+my  $optlist = "s:irb";
 
 #
 # Configure variables
@@ -82,6 +82,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"i"})) {
     $idleswap = 1;
 }
+if (defined($options{"b"})) {
+    $batch = 1;
+}
 if (defined($options{"r"})) {
     $reboot = 1;
 }
@@ -92,6 +95,10 @@ if (defined($options{"s"})) {
 	$inout ne "in"      &&
 	$inout ne "restart" &&
 	$inout ne "modify") {
+	usage();
+    }
+    if ($batch &&
+	($inout ne "out" && $inout ne "in")) {
 	usage();
     }
 }
@@ -203,9 +210,10 @@ if (defined($hashrow{'expt_locked'})) {
 }
 
 #
-# Disallow batch experiment swaps for now.
+# Do not allow the user to swap a batch experiment. It has to come via
+# the batch daemon. 
 #
-if ($isbatchexpt) {
+if ($isbatchexpt && !$batch) {
     die("*** $0:\n".
 	"    Batch experiments cannot be swapped or modified yet!");
 }
@@ -557,7 +565,7 @@ sub fatal($)
     #
     if ($batch) {
 	TBUnLockExp($pid, $eid);
-	exit(-1);
+	exit($errorstat);
     }
 
     #
@@ -591,7 +599,7 @@ sub fatal($)
 	TBExptDestroy($pid, $eid);
     }
 
-    exit(-1);
+    exit($errorstat);
 }
 
 
