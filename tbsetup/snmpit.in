@@ -1092,7 +1092,7 @@ sub doTrunkEnable($$@) {
     #
     my $stack = $$stacks[0];
     print "Enabling trunking on $port ...\n";
-    return $stack->enableTrunking($port,@vlans);
+    return !($stack->enableTrunking($port,@vlans));
 }
 
 #
