@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: mkacct,v 1.23 2000-11-27 22:34:23 kwright Exp $
+### $Id: mkacct,v 1.24 2000-11-29 21:35:33 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -30,7 +30,9 @@ if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) {
 }
 
 ##
-## Check for valid user
+## Check for valid user. This script is setuid tbroot but
+## the effective userid must be a user in the experiment.
+## Add check for latter. -lkw 11/29/00
 ##
 open(WHO,"/usr/bin/whoami 2>&1 |");
 chop($_ = <WHO>);
@@ -168,9 +170,11 @@ while (@row = $sth->fetchrow_array) {
 ## IP address.  
 ##
 ##push(@nodes, $control_node);
-push(@nodes, "155.99.212.74"); 
-print " 155.99.212.74";
-print "\n";
+## Note: Commented out on 11/28 because it was thought to
+## be better to 
+#push(@nodes, "155.99.212.74"); 
+#print " 155.99.212.74";
+#print "\n";
 
 
 ##
@@ -359,3 +363,4 @@ foreach $IP (@nodes) {
 }
 
 
+exit(0);

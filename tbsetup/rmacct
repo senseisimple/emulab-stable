@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: rmacct,v 1.5 2000-11-28 23:11:12 kwright Exp $
+### $Id: rmacct,v 1.6 2000-11-29 21:35:33 kwright Exp $
 ###
 ### rmacct - Removes accounts for all users in given experiment.
 ###
@@ -280,3 +280,5 @@ foreach $user (@users) {
     }
 }
 print "\n";
+
+exit(0);
