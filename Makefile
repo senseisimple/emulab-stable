@@ -2,7 +2,11 @@
 
 .PHONY: all lib/sql.so assign/assign 
 
-install: all 
+install:
+	@echo "Is Leigh going to yell at you for doing this?"
+	@echo "Did you remember to do a cvs update?"
+
+install-ifyoudare: all 
 	install -c assign/assign /usr/testbed/bin
 
 	install -c db/avail /usr/testbed/bin
