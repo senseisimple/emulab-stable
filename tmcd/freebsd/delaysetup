@@ -1,0 +1,581 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Setup/Update the system with new delays. Use -u for update mode, which
+# means to run the scripts so that the delays are installed.
+#
+sub usage()
+{
+    print "Usage: delaysetup [-u]\n";
+    exit(1);
+}
+my $optlist = "u";
+my $update  = 0;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"u"})) {
+    $update = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Delay node configuration goop.
+#
+my $KERNEL100   = "/kernel.100HZ";
+my $KERNEL1000  = "/kernel.1000HZ";
+my $KERNEL10000 = "/kernel.10000HZ";
+my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
+my @KERNELS     = ($KERNEL100, $KERNEL1000, $KERNEL10000, $KERNELDELAY); 
+my $kernel      = $KERNEL100;
+my $TMDELMAP	= $libsetup::TMDELMAP;	# Really comes from libloc.
+
+# This should never happen!
+if (REMOTE() || MFS()) {
+    print "Skipping delay configuration on remote/MFS node!\n";
+    return 0;
+}
+
+#
+# Update the delays configuration. Also run the the commands to make
+# the changes.
+#
+DelaySetup();
+LinkDelaySetup();
+
+if ($update) {
+    #
+    # Only one of these files will actually exist, since a node cannot
+    # be a delay node *and* have linkdelays. 
+    #
+    system(TMDELAY)
+	if (-e TMDELAY);
+	
+    system(TMLINKDELAY)
+	if (-e TMLINKDELAY);
+}
+exit(0);
+
+#
+# This sets up delays on a delay node. 
+# 
+sub DelaySetup()
+{
+    my @delays;
+    my $checkreplace;
+    my $kernel;
+
+    # Lets clean out old instructions.
+    unlink TMDELAY;
+
+    my $TM = OPENTMCC(TMCCCMD_DELAY);
+    while (<$TM>) {
+	push(@delays, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (@delays) {
+	my $count    = 69;
+	my $mindelay = 10000;
+
+	open(MAP, ">$TMDELMAP")
+	    or die("Could not open $TMDELMAP");
+    
+	open(DEL, ">" . TMDELAY)
+	    or die("Could not open " . TMDELAY . ": $!");
+	
+	print DEL "#!/bin/sh\n";
+	print DEL "sysctl -w net.link.ether.bridge=0\n";
+	print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
+	print DEL "sysctl -w net.link.ether.bridge_cfg=";
+
+	foreach $delay (@delays) {
+	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
+	    my $iface1 = findiface($1);
+	    my $iface2 = findiface($2);
+
+	    print DEL "$iface1:$count,$iface2:$count,";
+	    $count++;
+	}
+	print DEL "\n";
+	print DEL "sysctl -w net.link.ether.bridge=1\n";
+	print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+	print DEL "ipfw -f flush\n";
+
+ 	#
+ 	# If we are in a new-style image that uses a polling-based kernel
+ 	# turn on polling.
+ 	#
+ 	if (-e $KERNELDELAY) {
+ 	    print DEL "sysctl -w kern.polling.enable=1\n";
+ 	}
+
+	$count = 69;
+	foreach $delay (@delays) {
+	    my $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
+	    $pat .= q(PIPE0=(\d+) DELAY0=([\d\.]+) BW0=(\d+) PLR0=([\d\.]+) );
+	    $pat .= q(PIPE1=(\d+) DELAY1=([\d\.]+) BW1=(\d+) PLR1=([\d\.]+) );
+	    $pat .= q(LINKNAME=([-\d\w]+) );
+	    $pat .= q(RED0=(\d) RED1=(\d) );
+	    $pat .= q(LIMIT0=(\d+) );
+	    $pat .= q(MAXTHRESH0=(\d+) MINTHRESH0=(\d+) WEIGHT0=([\d\.]+) );
+	    $pat .= q(LINTERM0=(\d+) QINBYTES0=(\d+) BYTES0=(\d+) );
+	    $pat .= q(MEANPSIZE0=(\d+) WAIT0=(\d+) SETBIT0=(\d+) );
+	    $pat .= q(DROPTAIL0=(\d+) GENTLE0=(\d+) );
+	    $pat .= q(LIMIT1=(\d+) );
+	    $pat .= q(MAXTHRESH1=(\d+) MINTHRESH1=(\d+) WEIGHT1=([\d\.]+) );
+	    $pat .= q(LINTERM1=(\d+) QINBYTES1=(\d+) BYTES1=(\d+) );
+	    $pat .= q(MEANPSIZE1=(\d+) WAIT1=(\d+) SETBIT1=(\d+) );
+	    $pat .= q(DROPTAIL1=(\d+) GENTLE1=(\d+) );
+	    $pat .= q(VNODE0=([-\d\w]+) VNODE1=([-\d\w]+));
+	    
+	    $delay =~ /$pat/;
+
+	    #
+	    # tmcd returns the interfaces as MAC addrs.
+	    # 
+	    my $iface1 = findiface($1);
+	    my $iface2 = findiface($2);
+	    my $p1        = $3;
+	    my $delay1    = $4;
+	    my $bandw1    = $5;
+	    my $plr1      = $6;
+	    my $p2        = $7;
+	    my $delay2    = $8;
+	    my $bandw2    = $9;
+	    my $plr2      = $10;
+	    my $linkname  = $11;
+	    my $red1      = $12;
+	    my $red2      = $13;
+		
+	    #
+	    # Only a few of these NS RED params make sense for dummynet,
+	    # but they all come through; someday they might be used.
+	    #
+	    my $limit1     = $14;
+	    my $maxthresh1 = $15;
+	    my $minthresh1 = $16;
+	    my $weight1    = $17;
+	    my $linterm1   = $18;
+	    my $qinbytes1  = $19;
+	    my $bytes1     = $20;
+	    my $meanpsize1 = $21;
+	    my $wait1      = $22;
+	    my $setbit1    = $23;
+	    my $droptail1  = $24;
+	    my $gentle1    = $25;
+	    my $limit2     = $26;
+	    my $maxthresh2 = $27;
+	    my $minthresh2 = $28;
+	    my $weight2    = $29;
+	    my $linterm2   = $30;
+	    my $qinbytes2  = $31;
+	    my $bytes2     = $32;
+	    my $meanpsize2 = $33;
+	    my $wait2      = $34;
+	    my $setbit2    = $35;
+	    my $droptail2  = $36;
+	    my $gentle2    = $37;
+	    my $vnode0     = $38;
+	    my $vnode1     = $39;
+	    
+	    #
+	    # Delays are floating point numbers (unit is ms). ipfw does not
+	    # support floats, so apply a cheesy rounding function to convert
+            # to an integer (since perl does not have a builtin way to
+	    # properly round a floating point number to an integer).
+	    #
+	    $delay1 = int($delay1 + 0.5);
+	    $delay2 = int($delay2 + 0.5);
+
+	    #
+	    # Qsizes are in slots or packets. My perusal of the 4.3 code
+	    # shows the limits are 50 < slots <= 100 or 0 <= bytes <= 1MB.
+	    #
+	    my $queue1 = "";
+	    my $queue2 = "";
+	    if ($qinbytes1) {
+		if ($limit1 <= 0 || $limit1 > (1024 * 1024)) {
+		    print "Q limit $limit1 for pipe $p1 is bogus.\n";
+		}
+		else {
+		    $queue1 = "queue ${limit1}bytes";
+		}
+	    }
+	    elsif ($limit1 != 0) {
+		if ($limit1 < 0 || $limit1 > 100) {
+		    print "Q limit $limit1 for pipe $p1 is bogus.\n";
+		}
+		else {
+		    $queue1 = "queue $limit1";
+		}
+	    }
+	    if ($qinbytes2) {
+		if ($limit2 <= 0 || $limit2 > (1024 * 1024)) {
+		    print "Q limit $limit2 for pipe $p2 is bogus.\n";
+		}
+		else {
+		    $queue2 = "queue ${limit2}bytes";
+		}
+	    }
+	    elsif ($limit2 != 0) {
+		if ($limit2 < 0 || $limit2 > 100) {
+		    print "Q limit $limit2 for pipe $p2 is bogus.\n";
+		}
+		else {
+		    $queue2 = "queue $limit2";
+		}
+	    }
+
+	    #
+	    # RED/GRED stuff
+	    #
+	    my $redparams1 = "";
+	    my $redparams2 = "";
+	    if ($red1) {
+		if ($gentle1) {
+		    $redparams1 = "gred ";
+		}
+		else {
+		    $redparams1 = "red ";
+		}
+		my $max_p = 1 / $linterm1;
+		$redparams1 .= "$weight1/$minthresh1/$maxthresh1/$max_p";
+	    }
+	    if ($red2) {
+		if ($gentle2) {
+		    $redparams2 = "gred ";
+		}
+		else {
+		    $redparams2 = "red ";
+		}
+		my $max_p = 1 / $linterm2;
+		$redparams2 .= "$weight2/$minthresh2/$maxthresh2/$max_p";
+	    }
+
+	    print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex";
+	    print DEL "\n";
+	    print DEL "ifconfig $iface2 media 100baseTX mediaopt full-duplex";
+	    print DEL "\n";
+	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
+	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
+	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
+	    print DEL "bw ${bandw1}Kbit/s plr $plr1 $queue1 $redparams1\n";
+	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
+	    print DEL "bw ${bandw2}Kbit/s plr $plr2 $queue2 $redparams2\n";
+
+	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
+	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1 ";
+	    print STDOUT "$queue1 $redparams1\n";
+	    print STDOUT "  $iface1/$iface2 pipe $p2 config delay ";
+	    print STDOUT "${delay2}ms bw ${bandw2}Kbit/s plr $plr2 ";
+	    print STDOUT "$queue2 $redparams2\n";
+
+	    print MAP "$linkname duplex $vnode0 $vnode1 ".
+		"$iface1 $iface2 $p1 $p2\n";
+
+	    $count++;
+	}
+	#
+	# If a delay node, then lets report status and ready in so that batch
+	# experiments do not become stuck.
+	#
+	printf DEL "%s %s\n", TMCC(), TMCCCMD_READY();
+	printf DEL "%s %s 0\n", TMCC(), TMCCCMD_STARTSTAT();
+
+	print DEL "echo \"Delay Configuration Complete\"\n";
+	close(DEL);
+	chmod(0755, TMDELAY);
+	close(MAP);
+    
+	#
+	# Now do kernel configuration. All of the above work is wasted,
+	# but such is life.
+	#
+ 	if (-e $KERNELDELAY) {
+ 	    $kernel = $KERNELDELAY;
+ 	} else {
+ 	    $kernel = $KERNEL1000;
+ 	}
+	$checkreplace = 1;
+    }
+    else {
+	return 0;
+    }
+
+    print STDOUT "Checking kernel configuration ... \n";
+    if ($checkreplace) {
+	#
+	# Make sure we are running the correct kernel. 
+	#
+	if (-e $kernel) {
+	    if (system("cmp -s /kernel $kernel") != 0) {
+		if (system("cp -f /kernel /kernel.save")) {
+		    print STDOUT
+			"Could not backup /kernel! Aborting kernel change\n";
+		}
+		else {
+		    if (system("cp -f $kernel /kernel")) {
+			print STDOUT "Could not cp $kernel to /kernel! ".
+			    "Aborting kernel change\n";
+		    }
+		    else {
+			system("sync");
+			system("reboot");
+			#
+			# Make sure that, even if the reboot command returns
+			# before the node is totally down, this process doesn't
+			# exit (otherwise, we would proceed with testbed setup)
+			#
+			sleep(10000);
+		    }
+		}
+	    }
+	}
+	else {
+	    print STDOUT "Kernel $kernel does not exist!\n";
+	}
+    }
+    return 0;
+}
+
+#
+# This sets up linkdelays on an experimental node.
+# 
+sub LinkDelaySetup()
+{
+    my @delays;
+    my $checkreplace;
+    my $kernel;
+
+    # Lets clean out old instructions.
+    unlink TMLINKDELAY;
+
+    my $TM = OPENTMCC(TMCCCMD_LINKDELAYS);
+    while (<$TM>) {
+	push(@delays, $_);
+    }
+    CLOSETMCC($TM);
+
+    if (@delays) {
+	open(MAP, ">$TMDELMAP")
+	    or die("Could not open $TMDELMAP");
+    
+	open(DEL, ">" . TMLINKDELAY)
+	    or die("Could not open " . TMLINKDELAY . ": $!");
+	
+	print DEL "#!/bin/sh\n";
+
+	foreach $delay (@delays) {
+	    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
+	    $pat .= q(LINKNAME=([-\d\w]+) VNODE=([-\d\w]+) );
+	    $pat .= q(INET=([0-9.]*) MASK=([0-9.]*) );
+	    $pat .= q(PIPE=(\d+) DELAY=([\d\.]+) BW=(\d+) PLR=([\d\.]+) );
+	    $pat .= q(RPIPE=(\d+) RDELAY=([\d\.]+) RBW=(\d+) RPLR=([\d\.]+) );
+	    $pat .= q(RED=(\d) LIMIT=(\d+) );
+	    $pat .= q(MAXTHRESH=(\d+) MINTHRESH=(\d+) WEIGHT=([\d\.]+) );
+	    $pat .= q(LINTERM=(\d+) QINBYTES=(\d+) BYTES=(\d+) );
+	    $pat .= q(MEANPSIZE=(\d+) WAIT=(\d+) SETBIT=(\d+) );
+	    $pat .= q(DROPTAIL=(\d+) GENTLE=(\d+));
+	    
+	    $delay =~ /$pat/;
+
+	    #
+	    # tmcd returns the interfaces as MAC addrs.
+	    # 
+	    my $iface     = findiface($1);
+	    my $type      = $2;
+	    my $linkname  = $3;
+	    my $vnode     = $4;
+	    my $inet      = $5;
+	    my $mask      = $6;
+	    my $pipeno    = $7;
+	    my $delay     = $8;
+	    my $bandw     = $9;
+	    my $plr       = $10;
+	    my $rpipeno   = $11;
+	    my $rdelay    = $12;
+	    my $rbandw    = $13;
+	    my $rplr      = $14;
+	    my $red       = $15;
+		
+	    #
+	    # Only a few of these NS RED params make sense for dummynet,
+	    # but they all come through; someday they might be used.
+	    #
+	    my $limit     = $16;
+	    my $maxthresh = $17;
+	    my $minthresh = $18;
+	    my $weight    = $19;
+	    my $linterm   = $20;
+	    my $qinbytes  = $21;
+	    my $bytes     = $22;
+	    my $meanpsize = $23;
+	    my $wait      = $24;
+	    my $setbit    = $25;
+	    my $droptail  = $26;
+	    my $gentle    = $27;
+
+	    #
+	    # Delays are floating point numbers (unit is ms). ipfw does not
+	    # support floats, so apply a cheesy rounding function to convert
+            # to an integer (since perl does not have a builtin way to
+	    # properly round a floating point number to an integer).
+	    #
+	    $delay  = int($delay + 0.5);
+	    $rdelay = int($rdelay + 0.5);
+
+	    #
+	    # Qsizes are in slots or packets. My perusal of the 4.3 code
+	    # shows the limits are 50 < slots <= 100 or 0 <= bytes <= 1MB.
+	    #
+	    my $queue = "";
+	    if ($qinbytes) {
+		if ($limit <= 0 || $limit > (1024 * 1024)) {
+		    print "Q limit $limit for pipe $pipeno is bogus.\n";
+		}
+		else {
+		    $queue = "queue ${limit}bytes";
+		}
+	    }
+	    elsif ($limit != 0) {
+		if ($limit < 0 || $limit > 100) {
+		    print "Q limit $limit for pipe $pipeno is bogus.\n";
+		}
+		else {
+		    $queue = "queue $limit";
+		}
+	    }
+
+	    #
+	    # RED/GRED stuff
+	    #
+	    my $redparams = "";
+	    if ($red) {
+		if ($gentle) {
+		    $redparams = "gred ";
+		}
+		else {
+		    $redparams = "red ";
+		}
+		my $max_p = 1 / $linterm;
+		$redparams .= "$weight/$minthresh/$maxthresh/$max_p";
+	    }
+
+	    print DEL "ifconfig $iface media 100baseTX mediaopt full-duplex";
+	    print DEL "\n";
+
+	    print DEL "ipfw add pipe $pipeno ip from any to ".
+		      "$inet:$mask out xmit $iface\n";
+
+	    print DEL "ipfw pipe $pipeno config delay ${delay}ms ";
+	    print DEL "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
+
+	    if ($type eq "duplex") {
+		#
+		# Want to force the reverse side to 1 queue slot to enforce
+		# the proper bandwidth. Not ideal. 
+		# 
+		print DEL "ipfw add pipe $rpipeno ip from $inet:$mask ".
+		    "to $inet in recv $iface\n";
+
+		print DEL "ipfw pipe $rpipeno config delay ${rdelay}ms ".
+		    "bw ${rbandw}Kbit/s plr $rplr queue 4\n";
+	    }
+
+	    print STDOUT "  $iface pipe $pipeno config delay ";
+	    print STDOUT "${delay}ms bw ${bandw}Kbit/s plr $plr ";
+	    print STDOUT "$queue $redparams\n";
+	    if ($type eq "duplex") {
+		print STDOUT "  $iface pipe $rpipeno config delay ".
+		    "${rdelay}ms bw ${rbandw}Kbit/s plr $rplr queue 4\n";
+	    }
+
+	    if ($type eq "duplex") {
+		print MAP "$linkname duplex $vnode $vnode $iface $iface ".
+		    "$pipeno $rpipeno\n";
+	    }
+	    else {
+		print MAP "$linkname simplex $vnode $iface $pipeno\n";
+	    }
+	}
+	print DEL "echo \"Delay Configuration Complete\"\n";
+	close(DEL);
+	chmod(0755, TMLINKDELAY);
+	close(MAP);
+    
+	#
+	# Now do kernel configuration. All of the above work is wasted,
+	# but such is life.
+	#
+	$kernel = $KERNEL1000;
+	$checkreplace = 1;
+    }
+    else {
+	return 0;
+    }
+
+    print STDOUT "Checking kernel configuration ... \n";
+    if ($checkreplace) {
+	#
+	# Make sure we are running the correct kernel. 
+	#
+	if (-e $kernel) {
+	    if (system("cmp -s /kernel $kernel") != 0) {
+		if (system("cp -f /kernel /kernel.save")) {
+		    print STDOUT
+			"Could not backup /kernel! Aborting kernel change\n";
+		}
+		else {
+		    if (system("cp -f $kernel /kernel")) {
+			print STDOUT "Could not cp $kernel to /kernel! ".
+			    "Aborting kernel change\n";
+		    }
+		    else {
+			system("sync");
+			system("reboot");
+			#
+			# Make sure that, even if the reboot command returns
+			# before the node is totally down, this process doesn't
+			# exit (otherwise, we would proceed with testbed setup)
+			#
+			sleep(10000);
+		    }
+		}
+	    }
+	}
+	else {
+	    print STDOUT "Kernel $kernel does not exist!\n";
+	}
+    }
+    return 0;
+}

@@ -32,13 +32,23 @@ if [ -x $BOOTDIR/rc.ifc ]; then
         $BOOTDIR/rc.ifc
 fi
 
-# Note: no routing on delay nodes
-if [ -x $BOOTDIR/rc.delay ]; then
-        echo "Setting up Testbed delay configuration ..."
-        $BOOTDIR/rc.delay
-elif [ -x $BOOTDIR/rc.route ]; then
-        echo "Setting up Testbed interface routing ..."
-	$BOOTDIR/rc.route enable
+if [ -x $BINDIR/delaysetup ]; then
+	echo "Checking Testbed delay configuration ..."
+	$BINDIR/delaysetup
+
+	if [ -x $BOOTDIR/rc.linkdelay ]; then
+	        echo "Setting up Testbed link delays ..."
+	        $BOOTDIR/rc.linkdelay
+	fi
+
+	# Note: no routing on delay nodes
+	if [ -x $BOOTDIR/rc.delay ]; then
+	        echo "Setting up Testbed delays ..."
+	        $BOOTDIR/rc.delay
+	elif [ -x $BOOTDIR/rc.route ]; then
+	        echo "Setting up Testbed interface routing ..."
+		$BOOTDIR/rc.route enable
+	fi
 fi
 
 if [ -x $BOOTDIR/rc.rpm  ]; then

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -15,22 +15,22 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( libsetup_init inform_reboot cleanup_node check_status
-	 create_nicknames doifconfig dohostnames
+	 doifconfig dohostnames check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd vnodesetup
-	 jailedsetup dojailconfig
+	 jailedsetup dojailconfig JailedNFSMounts findiface
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
-	 TMTRAFFICCONFIG TMROUTECONFIG
+	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY
 
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
 	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
-	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE
+	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE TMCCCMD_LINKDELAYS
 
        );
 
@@ -159,6 +159,8 @@ sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
 sub TMTRAFFICCONFIG()	{ CONFDIR() . "/rc.traffic";}
 sub TMTUNNELCONFIG()	{ CONFDIR() . "/rc.tunnel";}
 sub TMVTUNDCONFIG()	{ CONFDIR() . "/vtund.conf";}
+sub TMDELAY()		{ CONFDIR() . "/rc.delay";}
+sub TMLINKDELAY()	{ CONFDIR() . "/rc.linkdelay";}
 
 #
 # Whether or not to use SFS (the self-certifying file system).  If this
@@ -174,7 +176,7 @@ my $USESFS		= 1;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 7; };
+sub TMCD_VERSION()	{ 8; };
 
 #
 # These are the TMCC commands. 
@@ -202,6 +204,7 @@ sub TMCCCMD_ISALIVE()   { "isalive"; }
 sub TMCCCMD_SFSHOSTID()	{ "sfshostid"; }
 sub TMCCCMD_SFSMOUNTS() { "sfsmounts"; }
 sub TMCCCMD_JAILCONFIG(){ "jailconfig"; }
+sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
 
 #
 # Some things never change.
@@ -214,7 +217,7 @@ my $VTUND       = "/usr/local/sbin/vtund";
 # This is a debugging thing for my home network.
 # 
 #my $NODE	= "-p 7778 REDIRECT=192.168.100.1";
-#my $NODE	= "-p 7779";
+my $NODE	= "-p 7778";
 $NODE		= "";
 
 # Locals
@@ -240,6 +243,14 @@ sub REMOTE()	{ if (-e "$ETCDIR/isrem") { return 1; } else { return 0; } }
 # Are we jailed? See above.
 #
 sub JAILED()	{ if ($injail) { return $vnodeid; } else { return 0; } }
+
+#
+# Do not try this on the MFS since it has such a wimpy perl installation.
+#
+if (!MFS()) {
+    require Socket;
+    import Socket;
+}
 
 #
 # Open a TMCC connection and return the "stream pointer". Caller is
@@ -339,6 +350,7 @@ sub cleanup_node ($) {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
     unlink TMROUTECONFIG, TMTRAFFICCONFIG, TMTUNNELCONFIG;
+    unlink TMDELAY, TMLINKDELAY;
     unlink TMMOUNTDB . ".db";
     unlink TMSFSMOUNTDB . ".db";
 
@@ -363,23 +375,23 @@ sub cleanup_node ($) {
 }
 
 #
-# Check node allocation.
+# Check node allocation. If the nickname file has been created, use
+# that to avoid load on tmcd.
 #
 # Returns 0 if node is free. Returns list (pid/eid/vname) if allocated.
 #
 sub check_status ()
 {
-    my $TM;
-    
-    $TM = OPENTMCC(TMCCCMD_STATUS);
+    my $TM = OPENTMCC(TMCCCMD_STATUS);
     $_  = <$TM>;
     CLOSETMCC($TM);
 
     if ($_ =~ /^FREE/) {
+	unlink TMNICKNAME;
 	return 0;
     }
     
-    if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*) NICKNAME=([-\@\w.]*)/) {
+    if ($_ =~ /ALLOCATED=([-\@\w]*)\/([-\@\w]*) NICKNAME=([-\@\w]*)/) {
 	$pid   = $1;
 	$eid   = $2;
 	$vname = $3;
@@ -388,20 +400,35 @@ sub check_status ()
 	warn "*** WARNING: Error getting reservation status\n";
 	return 0;
     }
+    
+    #
+    # Stick our nickname in a file in case someone wants it.
+    #
+    if (! -e TMNICKNAME) {
+	system("echo '$vname.$eid.$pid' > " . TMNICKNAME());
+    }
     return ($pid, $eid, $vname);
 }
 
 #
-# Stick our nickname in a file in case someone wants it.
-#
-sub create_nicknames()
+# Check cached nickname. Its okay if we have been deallocated and the info
+# is stale. The node will notice that later.
+# 
+sub check_nickname()
 {
-    open(NICK, ">" . TMNICKNAME)
-	or die("Could not open nickname file: $!");
-    print NICK "$vname.$eid.$pid\n";
-    close(NICK);
+    if (-e TMNICKNAME) {
+	my $nickfile = TMNICKNAME;
+	my $nickinfo = `cat $nickfile`;
 
-    return 0;
+	if ($nickinfo =~ /([-\@\w]*)\.([-\@\w]*)\.([-\@\w]*)/) {
+	    $vname = $1;
+	    $eid   = $2;
+	    $pid   = $3;
+
+	    return ($pid, $eid, $vname);
+	}
+    }
+    return check_status();
 }
 
 #
@@ -463,12 +490,16 @@ sub domounts()
     # currently mounted, and can be mounted, add it to the DB.
     # 
     while (($remote, $local) = each %mounts) {
-	if (system("$MOUNT | $EGREP ' $local '") == 0) {
-	    $MDB{$remote} = $local;
+	if (defined($MDB{$remote})) {
 	    next;
 	}
 
-	if (! -e $local) {
+	if (! -d $local) {
+	    # Leftover SFS link.
+	    if (-l $local) {
+		unlink($local) or
+		    warn "*** WARNING: Could not unlink $local: $!\n";
+	    }
 	    if (! os_mkdir($local, "0770")) {
 		warn "*** WARNING: Could not make directory $local: $!\n";
 		next;
@@ -492,11 +523,6 @@ sub domounts()
     #
     while (($remote, $local) = each %MDB) {
 	if (defined($mounts{$remote})) {
-	    next;
-	}
-
-	if (system("$MOUNT | $EGREP ' $local '")) {
-	    $deletes{$remote} = $local;
 	    next;
 	}
 
@@ -616,6 +642,60 @@ sub domounts()
 }
 
 #
+# Aux function called from the mkjail code to do the NFS mounts outside
+# of a jail, and return the list of mounts that were created. This
+# will hopefully go away some point with better SFS support inside of
+# jails. Local only.
+# 
+sub JailedNFSMounts($$)
+{
+    my ($vid, $rootpath) = @_;
+    my $TM;
+    my %mounts;
+    my @mountlist = ();
+
+    #
+    # Set global vnodeid for tmcc commands.
+    #
+    $vnodeid  = $vid;
+
+    #
+    # No NFS mounts on remote nodes.
+    # 
+    if (REMOTE()) {
+	return ();
+    }
+
+    $TM = OPENTMCC(TMCCCMD_MOUNTS, "USESFS=0");
+
+    while (<$TM>) {
+	if ($_ =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+	    $mounts{$1} = $2;
+	}
+    }
+    CLOSETMCC($TM);
+    
+    while (my ($remote, $path) = each %mounts) {
+	$local = "$rootpath/$path";
+	    
+	if (! -e $local) {
+	    if (! os_mkdir($local, "0770")) {
+		warn "*** WARNING: Could not make directory $local: $!\n";
+		next;
+	    }
+	}
+	
+	print STDOUT "  Mounting $remote on $local\n";
+	if (system("$MOUNT $remote $local")) {
+	    warn "*** WARNING: Could not $MOUNT $remote on $local: $!\n";
+	    next;
+	}
+	push(@mountlist, $path);
+    }
+    return @mountlist;
+}
+
+#
 # Do SFS hostid setup.
 # Creates an SFS host key for this node, if it doesn't already exist,
 # and sends it to TMCD
@@ -633,9 +713,19 @@ sub dosfshostid ()
     }
 
     # Give hostid to TMCD
-    $myhostid = `sfskey hostid - 2>/dev/null`;
+    if (-d "/usr/local/lib/sfs-0.6") {
+	$myhostid = `sfskey hostid - 2>/dev/null`;
+    }
+    else {
+	$myhostid = `sfskey hostid -s authserv - 2>/dev/null`;
+    }
     if (! $?) {
 	if ( $myhostid =~ /^([-\.\w_]*:[a-z0-9]*)$/ ) {
+	    $myhostid = $1;
+	    print STDOUT "  Hostid: $myhostid\n";
+	    RUNTMCC(TMCCCMD_SFSHOSTID, "$myhostid");
+	}
+	elsif ( $myhostid =~ /^(@[-\.\w_]*,[a-z0-9]*)$/ ) {
 	    $myhostid = $1;
 	    print STDOUT "  Hostid: $myhostid\n";
 	    RUNTMCC(TMCCCMD_SFSHOSTID, "$myhostid");
@@ -667,8 +757,6 @@ sub doifconfig ()
     if (MFS()) {
 	return 1;
     }
-    require Socket;
-    import Socket;
     
     $TM = OPENTMCC(TMCCCMD_IFC);
 
@@ -687,7 +775,7 @@ sub doifconfig ()
 	# Note that speed has a units spec: (K|M)bps
 	# 
 	$pat  = q(INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
-	$pat .= q(SPEED=(\w*) DUPLEX=(\w*));
+	$pat .= q(SPEED=(\w*) DUPLEX=(\w*) IPALIASES="(.*)");
 	
 	if ($_ =~ /$pat/) {
 	    my $iface;
@@ -697,13 +785,15 @@ sub doifconfig ()
 	    my $mac      = $4;
 	    my $speed    = $5; 
 	    my $duplex   = $6;
+	    my $aliases  = $7;
 	    my $routearg = inet_ntoa(inet_aton($inet) & inet_aton($mask));
 
 	    if ($iface = findiface($mac)) {
 		my $ifline =
-		    os_ifconfig_line($iface, $inet, $mask, $speed, $duplex);
+		    os_ifconfig_line($iface, $inet,
+				     $mask, $speed, $duplex, $aliases);
 		    
-		print STDOUT "  $ifline\n";
+		print STDOUT "  $iface $inet $aliases\n";
 		print IFC "$ifline\n";
 		print IFC TMROUTECONFIG . " $routearg up\n";
 	    }
@@ -1209,7 +1299,7 @@ sub doaccounts()
 	    # Skip ssh stuff if a local node or not updating (if the
 	    # user did not exist, $doupdate will be true).
 	    # 
-	    if ((!REMOTE() && !JAILED()) || !$doupdate) {
+	    if (!REMOTE() || !$doupdate) {
 		next;
 	    }
 
@@ -1272,15 +1362,7 @@ sub doaccounts()
 	    print SFSKEYS "$key\n";
 	}
 	close(SFSKEYS);
-	    
-	# Because sfs_users only contains public keys, sfs_users.pub is
-	# exactly the same
-	if (system("cp -p -f ${sfsusers}.new ${sfsusers}.pub.new")) {
-	    warn("*** WARNING Could not copy ${sfsusers}.new to ".
-		 "${sfsusers}.pub.new: $!\n");
-	    goto bad;
-	}
-	    
+
 	if (!chown(0, 0, "${sfsusers}.new")) {
 	    warn("*** WARNING: Could not chown ${sfsusers}.new: $!\n");
 	    goto bad;
@@ -1290,15 +1372,29 @@ sub doaccounts()
 	    goto bad;
 	}
 	    
-	if (!chown(0, 0, "${sfsusers}.pub.new")) {
-	    warn("*** WARNING: Could not chown ${sfsusers}.pub.new: $!\n");
+	#
+	# If there is an update script, its the new version of SFS.
+	# Run that script to convert the keys over. At some point ops
+	# and the DB will be converted too, and this can go away.
+	#
+	if (-x "/usr/local/lib/sfs/upgradedb.pl") {
+	    system("/usr/local/lib/sfs/upgradedb.pl ${sfsusers}.new");
+	    system("rm -f ${sfsusers}.new.v1-saved-1");
+	}
+
+	# Because sfs_users only contains public keys, sfs_users.pub is
+	# exactly the same
+	if (system("cp -p -f ${sfsusers}.new ${sfsusers}.pub.new")) {
+	    warn("*** WARNING Could not copy ${sfsusers}.new to ".
+		 "${sfsusers}.pub.new: $!\n");
 	    goto bad;
 	}
+	    
 	if (!chmod(0644, "${sfsusers}.pub.new")) {
 	    warn("*** WARNING: Could not chmod ${sfsusers}.pub.new: $!\n");
 	    goto bad;
 	}
-	    
+
 	# Save off old key files and move in new ones
 	foreach my $keyfile ("${sfsusers}", "${sfsusers}.pub") {
 	    if (-e $keyfile) {
@@ -1453,8 +1549,6 @@ sub dotrafficconfig()
     if (MFS()) {
 	return 1;
     }
-    require Socket;
-    import Socket;
     
     $TM = OPENTMCC(TMCCCMD_BOSSINFO);
     my $bossinfo = <$TM>;
@@ -1473,7 +1567,7 @@ sub dotrafficconfig()
     }
 
     CLOSETMCC($TM);
-    my ($pid, $eid, $vname) = check_status();
+    my ($pid, $eid, $vname) = check_nickname();
 
     my $cmdline = "$BINDIR/trafgen -s $boss";
     if ($pid) {
@@ -1638,8 +1732,6 @@ sub dotunnels()
     if (MFS()) {
 	return 1;
     }
-    require Socket;
-    import Socket;
     
     $TM = OPENTMCC(TMCCCMD_TUNNEL);
     while (<$TM>) {
@@ -1650,7 +1742,7 @@ sub dotunnels()
     if (! @tunnels) {
 	return 0;
     }
-    my ($pid, $eid, $vname) = check_status();
+    my ($pid, $eid, $vname) = check_nickname();
 
     open(RC, ">" . TMTUNNELCONFIG)
 	or die("Could not open " . TMTUNNELCONFIG . ": $!");
@@ -1774,6 +1866,47 @@ sub dojailconfig()
 }
 
 #
+# Setup interface configuration inside of a jail. Okay, all we really
+# do is set up a bunch of routing calls, like doifconfig does above.
+# We get the list of "interfaces" from the jailconfig file, but maybe
+# it should be rolled into doifconfig instead?
+#
+sub dojailifconfig()
+{
+    if (! -e TMJAILCONFIG) {
+	dojailconfig();
+	if (! -e TMJAILCONFIG) {
+	    return 0;
+	}
+    }
+
+    my $fname    = TMJAILCONFIG();
+    my $ipstring = `grep IPADDRS $fname`;
+
+    if (defined($ipstring) && $ipstring =~ /^(.*)="(.+)"$/) {
+	my @iplist = split(",", $2);
+
+	if (@iplist) {
+	    open(IFC, ">" . TMIFC)
+		or die("Could not open " . TMIFC . ": $!");
+	    print IFC "#!/bin/sh\n";
+
+	    foreach my $ip (@iplist) {
+		if ($ip =~ /^([0-9\.]+)$/) {
+		    my $routearg = inet_ntoa(inet_aton($1) &
+					     inet_aton("255.255.255.0"));
+
+		    print IFC TMROUTECONFIG . " $routearg up\n";
+		}
+	    }
+	    close(IFC);
+	    chmod(0755, TMIFC);
+	}
+    }
+    return 0;
+}
+
+#
 # Boot Startup code. This is invoked from the setup OS dependent script,
 # and this fires up all the stuff above.
 #
@@ -1799,11 +1932,6 @@ sub bootsetup()
     # Cleanup node. Flag indicates to gently clean ...
     # 
     cleanup_node(0);
-
-    #
-    # Setup a nicknames file. 
-    #
-    create_nicknames();
 
     if ($USESFS) {
 	if (! MFS()) {
@@ -1944,8 +2072,11 @@ sub nodeupdateaux()
     # Mount the project and user directories and symlink SFS "mounted"
     # directories
     #
-    print STDOUT "Mounting project and home directories ... \n";
-    domounts();
+    if (! JAILED()) {
+	# not inside a jail though, not yet!
+	print STDOUT "Mounting project and home directories ... \n";
+	domounts();
+    }
 
     #
     # Host names configuration (/etc/hosts). 
@@ -2006,11 +2137,6 @@ sub jailedsetup()
 	print STDOUT "  Allocated! $pid/$eid/$vname\n";
 
 	#
-	# Setup a nicknames file. 
-	#
-	create_nicknames();
-
-	#
 	# Setup SFS hostid.
 	#
 	if ($USESFS) {
@@ -2018,11 +2144,23 @@ sub jailedsetup()
 	    dosfshostid();
 	}
 
+#	print STDOUT "Mounting project and home directories ... \n";
+#	domounts();
+
+	print STDOUT "Checking Testbed jail configuration ...\n";
+	dojailconfig();
+	
+	print STDOUT "Checking Testbed ifconfig configuration ...\n";
+	dojailifconfig();
+
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();
 
 	print STDOUT "Checking Testbed Tarball configuration ... \n";
 	dotarballs();
+
+	print STDOUT "Checking Testbed routing configuration ... \n";
+	dorouterconfig();
 
 	print STDOUT "Checking Testbed traffic generation configuration ...\n";
 	dotrafficconfig();
@@ -2122,74 +2260,15 @@ sub startcmdstatus($)
 }
 
 #
-# Install deltas. Return 0 if nothing happened. Return -1 if there was
-# an error. Return 1 if deltas installed, which tells the caller to reboot.
-#
-# This is going to get invoked very early in the boot process, possibly
-# before the normal client initialization. So we have to do a few things
-# to make things are consistent. 
+# Install deltas is deprecated.
 #
 sub install_deltas ()
 {
-    my @deltas = ();
-    my $reboot = 0;
-
     #
-    # Inform the master that we have rebooted.
+    # No longer supported, but be sure to return 0.
     #
-    inform_reboot();
-
-    #
-    # Check allocation. Exit now if not allocated.
-    #
-    if (! check_status()) {
-	return 0;
-    }
-
-    #
-    # Now do the actual delta install.
-    # 
-    my $TM = OPENTMCC(TMCCCMD_DELTA);
-    while (<$TM>) {
-	push(@deltas, $_);
-    }
-    CLOSETMCC($TM);
-
-    #
-    # No deltas. Just exit and let the boot continue.
-    #
-    if (! @deltas) {
-	return 0;
-    }
-
-    #
-    # Mount the project directory.
-    #
-    domounts();
-
-    #
-    # Install all the deltas, and hope they all install okay. We reboot
-    # if any one does an actual install (they may already be installed).
-    # If any fails, then give up.
-    # 
-    foreach $delta (@deltas) {
-	if ($delta =~ /DELTA=(.+)/) {
-	    print STDOUT  "Installing DELTA $1 ...\n";
-
-	    system(sprintf($DELTAINSTALL, $1));
-	    my $status = $? >> 8;
-	    if ($status == 0) {
-		$reboot = 1;
-	    }
-	    else {
-		if ($status < 0) {
-		    print STDOUT "Failed to install DELTA $1. Help!\n";
-		    return -1;
-		}
-	    }
-	}
-    }
-    return $reboot;
+    print "*** WARNING: No longer supporting testbed deltas!\n";
+    return 0;
 }
 
 #
