@@ -1,0 +1,8 @@
+To build the trafgen application.
+
+1. Download tg2.0 and unpack in tg2.0 subdirctory.
+
+2. Apply the patch:
+	patch -P0 < tg.patch
+
+3. Thats it!

@@ -1,0 +1,78 @@
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/trafgen
+TGSRCDIR	= $(SRCDIR)/tg2.0/src/tg
+PROGRAMS	= trafgen
+
+vpath %.c	$(TGSRCDIR)
+vpath %.l	$(TGSRCDIR)
+vpath %.y	$(TGSRCDIR)
+
+OBJS = \
+	buffer_generic.o \
+	decode.o \
+	distribution.o \
+	log.o \
+	prot_ipport.o \
+	prot_dgram.o \
+	prot_stream.o \
+	prot_tcp.o \
+	prot_test.o \
+	prot_udp.o \
+	protocol.o \
+	tg.o \
+	event.o
+
+include $(OBJDIR)/Makeconf
+
+all:	tg2.0 $(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS   += -DDEBUG
+CFLAGS	 += -O -g -static -pthread #-Wall
+CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
+CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += `elvin-config --cflags vin4mt`
+CFLAGS	 += -DFREEBSD -DUSEEVENTS
+
+YCFLAGS	 += -I. -DFREEBSD -DUSEEVENTS
+
+LDFLAGS  += -pthread -L../lib -L${OBJDIR}/lib/libtb
+LIBS     += -levent -ltb
+LIBS     += -lcipher -lc_r
+LIBS	 += -ll -lcompat
+
+#
+# XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
+#     build on freebsd. I made a vain attempt to filter it out, but
+#     gave up quickly. Deal with it later. 
+#
+#LIBS     += `elvin-config --libs vin4mt`
+LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
+
+lex.yy.c: scan.l
+	@echo 'Expect non-portable character class warning (ASCII assumed).'
+	flex -l $<
+
+tg.o: tg.y lex.yy.c
+	@echo Expect -no- shift/reduce conflicts.
+	yacc -vd $<
+	$(CC) -g -o tg.o $(YCFLAGS) -c y.tab.c
+
+trafgen:	$(OBJS)
+	$(CC) $(LDFLAGS) -static -o $@ $(OBJS) $(LIBS)
+
+$(PROGRAMS):	../lib/libevent.a ../lib/event.h
+
+install:
+
+clean:
+	/bin/rm -f lex.yy.c y.* *.o $(PROGRAMS)
+
+tg2.0:
+	@echo ""
+	@echo "WARNING! You must first install the tg2.0 distribution"
+	@echo "WARNING! See $(SRCDIR)/README"
+	@echo ""
