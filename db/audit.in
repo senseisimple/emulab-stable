@@ -136,7 +136,7 @@ if ($query_result->numrows) {
     print "\n";
     print "----------------------------------------------------------------\n";
     print "\n";
-    print "Nodes stuck in emulab-ops/hwdown:\n";
+    print "Local nodes stuck in $DPID/$DEID:\n";
     
     while (my ($node_id) = $query_result->fetchrow()) {
 	print "$node_id ";
