@@ -18,7 +18,7 @@ my $TB       = "@prefix@";
 my $PROJROOT = "/proj";
 my $TFTPROOT = "/tftpboot";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
-		"groups");
+		"groups", "tiplogs");
 
 #
 # Untaint the path
