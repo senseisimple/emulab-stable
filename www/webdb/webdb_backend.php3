@@ -489,109 +489,124 @@ function manageData_submit( $cmd ) {
 
 
 /////////////// MAIN
-$body = "";
-$title_header = "";
-$body_header  = "";
 
+function webdb_backend_main() {
+  global $body, $title_header, $body_header, $dbname, $action;
+  global $readTablePerm, $addEditRowPerm, $deleteRowPerm;
+  global $tablename, $orderby;
+  global $mysqlHandle;
 
-if ($dbname == "") {
-  // if there are no params, helpfully default them into tbdb. 
-  if ($action == "") {
-    $dbname = "tbdb";
-  }
-} else { 
-  $dbname = sanitizeSQLName( $dbname ); 
-  if (strstr($dbname,"tbdb") == FALSE) {
-	$body .= "<h3>Sorry, due to security concerns," .
-                 " you may only view databases with names" .
-		 " containing the substring \"tbdb\";<br>" .
-                 " Defaulting to \"tbdb\".</h3>\n";
-	$dbname = "tbdb";
-  }
-} 
+  $body = "";
+  $title_header = "";
+  $body_header  = "";
 
-if ($tablename != "") { $tablename = sanitizeSQLName( $tablename ); }
-if ($orderby   != "") { $orderby   = sanitizeSQLName( $orderby ); }
-
-$title_header = "MySQL";
-$body_header  = linkToViewServer("MySQL");
-if ($dbname) {
-  $body_header  .= "::" . linkToViewDB( $dbname, $dbname );
-  $title_header .= "::" . $dbname;
-  if ($tablename) {
-    $body_header  = "Table " . $body_header  . "::" . linkToViewTable( $tablename, $dbname, $tablename );
-    $title_header = "Table " . $title_header . "::" . $tablename;
-  } else {
-    $body_header  = "Database " . $body_header;
-    $title_header = "Database " . $title_header;
-  }
-} else {
-  $body_header  = "Server " . $body_header;
-  $title_header = "Server " . $title_header;  
-}
-
-$HOSTNAME = "localhost";
-//echo "<!--";
-$mysqlHandle = mysql_pconnect( $HOSTNAME, $USERNAME, $PASSWORD );
-//echo "-->";
-if ($mysqlHandle == false) {
-  seterror( "Couldn't connect to MySQL server." );
-} else {
-  if ($dbname != "") {
-    mysql_select_db( $dbname );
-  }
-
-  $readTablePerm  = 1;
-  $addEditRowPerm = 0;
-  $deleteRowPerm  = 0;
-
-  // get permissions.
-  $query   = "SELECT * FROM webdb_table_permissions WHERE table_name=" . quoteForSQL( $tablename );
-  $pResult = mysql_query( $query ); 
-  if ($pResult != FALSE && mysql_num_rows($pResult) > 0) {
-    $field = mysql_fetch_array( $pResult );
-    if ($field["allow_read"] != "1") { $readTablePerm = 0; }
-    if ($field["allow_row_add_edit"] == "1") { $addEditRowPerm = 1; }
-    if ($field["allow_row_delete"] == "1") { $deleteRowPerm = 1; } 
+  if ($dbname == "") {
+    // if there are no params, helpfully default them into tbdb. 
+    if ($action == "") {
+      $dbname = "tbdb";
+    }
+  } else { 
+    $dbname = sanitizeSQLName( $dbname ); 
+    if (strstr($dbname,"tbdb") == FALSE) {
+	  $body .= "<h3>Sorry, due to security concerns," .
+                   " you may only view databases with names" .
+	  	   " containing the substring \"tbdb\";<br>" .
+                   " Defaulting to \"tbdb\".</h3>\n";
+	  $dbname = "tbdb";
+    }
   } 
 
-  if ($action == "" || $action == "view") {
-    if ($dbname == "") {
-      listDatabases(); 
+  if ($tablename != "") { $tablename = sanitizeSQLName( $tablename ); }
+  if ($orderby   != "") { $orderby   = sanitizeSQLName( $orderby ); }
+
+  $title_header = "MySQL";
+  $body_header  = linkToViewServer("MySQL");
+  if ($dbname) {
+    $body_header  .= "::" . linkToViewDB( $dbname, $dbname );
+    $title_header .= "::" . $dbname;
+    if ($tablename) {
+      $body_header  = "Table " . $body_header  . "::" . linkToViewTable( $tablename, $dbname, $tablename );
+      $title_header = "Table " . $title_header . "::" . $tablename;
     } else {
-      if ($tablename == "") {
-        if (assertViewPermission()) { listTables(); }
-      } else {
-        if (assertViewPermission()) { viewData(); }	  
-      }
-    }
-  } else if( $action == "addData" ) {
-    if (assertAddEditPermission()) { manageData( "add" ); }
-  } else if( $action == "addData_submit" ) {
-    if (assertAddEditPermission()) { 
-	$success = manageData_submit( "add" );
-	if ($success == 1 && $readTablePerm != 0) {
-  	  viewData();
-	}
-    }
-  } else if( $action == "editData" ) {
-    if (assertAddEditPermission()) { manageData( "edit" ); }
-  } else if( $action == "editData_submit" ) {
-    if (assertAddEditPermission()) { 
-	$success = manageData_submit( "edit" );
-	if ($success == 1 && $readTablePerm != 0) {
-	  viewData();
-	}
-    }
-  } else if( $action == "deleteData" ) {
-    if (assertDeletePermission()) { 
-	$success = deleteData(); 
-	if ($success == 1 && $readTablePerm != 0) {
-	  viewData();
-	}
+      $body_header  = "Database " . $body_header;
+      $title_header = "Database " . $title_header;
     }
   } else {
-    seterror("Undefined command '$action'");
+    $body_header  = "Server " . $body_header;
+    $title_header = "Server " . $title_header;  
   }
-  mysql_close( $mysqlHandle);
+
+  $HOSTNAME = "localhost";
+  //echo "<!--";
+  $mysqlHandle = mysql_pconnect( $HOSTNAME, $USERNAME, $PASSWORD );
+  //echo "-->";
+  if ($mysqlHandle == false) {
+    seterror( "Couldn't connect to MySQL server." );
+  } else {
+    if ($dbname != "") {
+      mysql_select_db( $dbname );
+    }
+
+    $readTablePerm  = 1;
+    $addEditRowPerm = 0;
+    $deleteRowPerm  = 0;
+
+    // get permissions.
+    $query   = "SELECT * FROM webdb_table_permissions WHERE table_name=" . quoteForSQL( $tablename );
+    $pResult = mysql_query( $query ); 
+    if ($pResult != FALSE && mysql_num_rows($pResult) > 0) {
+      $field = mysql_fetch_array( $pResult );
+      if ($field["allow_read"] != "1") { $readTablePerm = 0; }
+      if ($field["allow_row_add_edit"] == "1") { $addEditRowPerm = 1; }
+      if ($field["allow_row_delete"] == "1") { $deleteRowPerm = 1; } 
+    } 
+
+    if ($action == "" || $action == "view") {
+      if ($dbname == "") {
+        listDatabases(); 
+      } else {
+        if ($tablename == "") {
+          if (assertViewPermission()) { listTables(); }
+        } else {
+          if (assertViewPermission()) { viewData(); }	  
+        }
+      }
+    } else if( $action == "addData" ) {
+      if (assertAddEditPermission()) { manageData( "add" ); }
+    } else if( $action == "addData_submit" ) {
+      if (assertAddEditPermission()) { 
+  	  $success = manageData_submit( "add" );
+	  if ($success == 1 && $readTablePerm != 0) {
+  	    viewData();
+	  }
+      }
+    } else if( $action == "editData" ) {
+      if (assertAddEditPermission()) { manageData( "edit" ); }
+    } else if( $action == "editData_submit" ) {
+      if (assertAddEditPermission()) { 
+	  $success = manageData_submit( "edit" );
+	  if ($success == 1 && $readTablePerm != 0) {
+	    viewData();
+	  }
+      }
+    } else if( $action == "deleteData" ) {
+      if (assertDeletePermission()) { 
+	  $success = deleteData(); 
+	  if ($success == 1 && $readTablePerm != 0) {
+	    viewData();
+	  }
+      }
+    } else {
+      seterror("Undefined command '$action'");
+    }
+    mysql_close( $mysqlHandle);
+  }
 }
+
+
+
+
+
+
+
+

@@ -17,7 +17,10 @@ echo "<html>
       <head>\n";
 
 chdir("webdb");
+
 include "webdb_backend.php3";
+
+webdb_backend_main();
 
 ?>    
     <title>WebDb - <?php echo $title_header ?></title>
@@ -67,3 +70,13 @@ include "webdb_backend.php3";
     <hr><p>based on mysql.php3 by SooMin Kim.</p>
   </body>
 </html>
+
+
+
+
+
+
+
+
+
+
