@@ -4,6 +4,8 @@ DEVICE="eth0"
 
 if [ "`control_interface`" = "$DEVICE" ]; then
 	BOOTPROTO="dhcp"
+	NEEDHOSTNAME=""
+	hostname emulab-localhost
 fi
 ONBOOT="yes"
 IPADDR=""
