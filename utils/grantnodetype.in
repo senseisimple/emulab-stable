@@ -1,0 +1,162 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+#
+# Grant permission to use types/class of nodes. If given a specific
+# "type", then grant permission to use just that type. If its a class, then
+# permission to use all of the types in that class, the class itself, and any
+# aux nodetypes for the type/class (node_types_auxtypes table). 
+#
+sub usage()
+{
+    print STDERR "Usage: grantnodetype [-h] -p <pid> <type>\n";
+    print STDERR "	-h   This message\n";
+    exit(-1);
+}
+my $optlist  = "hp:dn";
+my $impotent = 0;
+my $debug    = 0;
+my %newtypes = ();
+my $pid;
+
+#
+# Please do not run as root. Hard to track what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSADDR	= "@BOSSNODE@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{h})) {
+    usage();
+}
+if (defined($options{n})) {
+    $impotent = 1;
+}
+if (defined($options{d})) {
+    $debug = 1;
+}
+if (defined($options{p})) {
+    $pid = $options{p};
+}
+if (scalar(@ARGV) != 1 || !defined($pid)) {
+    usage();
+}
+my $type = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+if ($type =~ /^([-\w]+)$/) {
+    $type = $1;
+}
+else {
+    die("Tainted type name: $type");
+}
+
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Tainted pid name: $pid");
+}
+
+# Only admin types can do this.
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You are not allowed to grant permission to use node types!\n");
+}
+
+#
+# Check to make sure a valid type in the node_types table.
+#
+my $query_result =
+    DBQueryFatal("select distinct type,class from node_types ".
+		 "where type='$type' or class='$type'");
+
+if (! $query_result->num_rows) {
+    die("*** $0:\n".
+	"    No such type/class $type in the types table!\n");
+}
+
+while (my ($nodetype,$nodeclass) = $query_result->fetchrow_array()) {
+    if ($nodeclass eq $type) {
+	#
+	# Grant permission to this class/type, and all of the aux types for it.
+	#
+	$newtypes{$nodetype} = 1
+	    if (!defined($newtypes{$nodetype}));
+	$newtypes{$nodeclass} = 1
+	    if ($nodeclass ne $nodetype && !defined($newtypes{$nodeclass}));
+
+	my $aux_result =
+	    DBQueryFatal("select auxtype from node_types_auxtypes ".
+			 "where type='$type'");
+
+	while (my ($auxtype) = $aux_result->fetchrow_array()) {
+	    $newtypes{$auxtype} = 1
+		if (!defined($newtypes{$auxtype}));
+	}
+    }
+    else {
+	#
+	# A single type. Just grant permission to the type itself.
+	#
+	$newtypes{$type} = 1
+	    if (!defined($newtypes{$type}));
+    }
+}
+
+#
+# Run the queries.
+# 
+foreach my $newtype (keys(%newtypes)) {
+    print STDERR "Granting permission to use type $newtype\n"
+	if ($debug);
+    DBQueryFatal("replace into nodetypeXpid_permissions ".
+		 "(pid, type) ".
+		 "values ('$pid', '$newtype')")
+	if (!$impotent);
+}
+
+exit(0);
