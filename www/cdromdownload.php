@@ -14,7 +14,7 @@ PAGEHEADER("Download the latest CD image");
 ?>
 If you have a CD-R drive you can burn your own installation disk.<br>
 <br>
-The latest CD image is <a href=/images/netbed-0.1.iso>netbed-0.1.iso</a>.
+The latest CD image is <a href=/images/netbed-0.2.iso>netbed-0.2.iso</a>.
 <?php
 #
 # Standard Footer.
