@@ -1,0 +1,478 @@
+#!/usr/bin/perl -w
+
+#
+# schemadiff - Find the differences between two database schemas, as reported
+# by mysqldump. Can print out a summary of changes, or SQL commands to make
+# the necessary changes
+#
+
+use strict;
+use Getopt::Std; 
+
+#
+# Default settings for the options
+#
+my $debug = 0;
+my $sql = 1;
+
+#
+# Process command-line args
+#
+my %opt;
+getopts('hds', \%opt); 
+if ($opt{h}) {
+    exit &usage;
+}
+if ($opt{d}) {
+    $debug = 1;
+}
+if ($opt{s}) {
+    $sql = 0;
+}
+
+if (@ARGV != 2) {
+    exit &usage
+}
+
+my ($file1,$file2) = @ARGV;
+
+
+#
+# Read in the two schemas. They are returned as references to hashes, as
+# documented below in the read_schema function
+#
+my $schema1 = read_schema($file1);
+my $schema2 = read_schema($file2);
+
+#
+# Find out which tables have been created or deleted. We get back a list
+# of tables that are common to both schemas, which we can use to tell
+# the other functions which tables to operate on.
+#
+my @common_tables = compare_tables($schema1,$schema2);
+
+#
+# Next, we compare the columns in each of the columns
+#
+compare_columns($schema1,$schema2,@common_tables);
+
+#
+# Finally, we check to see if they have the same keys
+#
+compare_keys($schema1,$schema2,@common_tables);
+
+#
+# XXX: We could also compare the table types - however, it seems somewhat
+# dangerous to go around changing table types. We can easily add this feature 
+# in if we ever need it (for example, if we start using the special features
+# of InnoDB tables)
+#
+
+######################################################################
+# Subs
+######################################################################
+
+#
+# Given a filename, read the schema into a structure. This structure consists 
+# of a hash, indexed by table name. Each table is a hash ref containing:
+# PRIMARY: A hash containing the primary keys. Indexed by key, value is
+#       set to 1 for all keys that are primary
+# KEYS: Indexed by key, value is the name of the key if any, or 1 if it
+#       has no keys
+# COLUMNS: A hash reference, indexed by column, containing the create 
+#       definition for that column
+# ORDERED_COLUMNS: An array reference, containing all of the columns in
+#       their original order, so that we can try to keep the column order
+#       the same for table creation and column addition. Each column is
+#       an array reference, the first element being the column name, and the
+#       second being the create definition
+# TYPE: A scalar, containing the type of the table
+sub read_schema($) {
+    #
+    # Open up the file
+    #
+    my $filename = shift;
+    open(FH,"<$filename") or die "Unable to open $filename: $!\n";
+
+    my $create_table = 0;
+    my $table_name = "";
+    my %tables = ();
+
+    while (<FH>) {
+	chomp;
+	#
+	# Determine which type of line this is. Our (really simple) parsing
+	# differs depending on whether or not we're in a create definition.
+	#
+	if (!$create_table) {
+	    if (/^\s*$/ || /^\s*#/ || /^INSERT INTO/) {
+		# An insert statement, a comment, or a blank line. Do nothing.
+	    } elsif (/^CREATE TABLE (\w+) \($/) {
+
+		# Start of a new table definition
+		$create_table = 1;
+		$table_name = $1;
+		debug("Entering table $table_name\n");
+
+	    } else {
+
+		warn "Found a line I don't know what to do with!\n";
+		die "$_\n";
+
+	    }
+	} else {
+	    #
+	    # If we are in a table creation statement, we need to find out
+	    # what this line is trying to do...
+	    #
+	    if (/^\s*PRIMARY KEY\s*\((.+)\),?$/) {
+
+		# A primary key
+		my $key = $1;
+		debug("Putting primary key $key in table $table_name\n");
+		$tables{$table_name}{PRIMARY}{$key} = 1;
+
+	    } elsif (/^\s*(KEY|INDEX)\s*(\w+)?\s*\((.+[^,])\),?$/) {
+
+		# A key/index (synonmyms)
+		my ($name, $key) = ($2, $3);
+		debug("Putting key $key in table $table_name\n");
+
+		if ($name) {
+		    $tables{$table_name}{KEYS}{$key} = $name;
+		} else { 
+		    die "Found a key without a name: $key\n";
+		}
+
+	    } elsif (/^\s*(\w+)\s+(.+[^,]),?$/) {
+
+		# A column definition
+		my ($name, $definition) = ($1, $2);
+		debug("Found column $name with type $definition\n");
+		$tables{$table_name}{COLUMNS}{$name} = $definition;
+
+		push @{ $tables{$table_name}{ORDERED_COLUMNS} },
+		    [$name, $definition];
+
+	    } elsif (/^\) TYPE=(\w+);/) {
+
+		# The end of the table definition
+		my $type = $1;
+		$create_table = 0;
+		debug("Leaving table $table_name (type $type)\n");
+		$tables{$table_name}{TYPE} = $type;
+
+	    } else {
+
+		warn "Found a line I don't know what to do with!\n";
+		die "$_\n";
+
+	    }
+	}
+    }
+
+    #
+    # Whew, all done!
+    #
+    close (FH);
+    return \%tables;
+}
+
+#
+# Compare the list of tables in the two given schemas. Returns a list of
+# tables that are in both schemas
+#
+sub compare_tables($$) {
+    my ($schema1,$schema2) = @_;
+
+    #
+    # Find the difference in tables
+    #
+    my ($removed, $added, $common) = diff_keys($schema1,$schema2);
+
+    #
+    # Removed tables are easy to handle 
+    #
+    foreach my $table (@$removed) {
+	print "# Table $table was removed\n";
+	if ($sql) {
+	    print "DROP TABLE $table;\n\n";
+	}
+    }
+
+    #
+    #
+    #
+    foreach my $table (@$added) {
+	print "# Table $table was added\n";
+	if ($sql) {
+	    print "CREATE TABLE $table (\n";
+
+	    #
+	    # We put all of the lines in an array, so that we can use a join
+	    # to put them together (otherwise, it's awkward to figure out 
+	    # which is the last, for comma-seperarating purposes)
+	    #
+	    my @out = ();
+
+	    #
+	    # We use the ORDERED_COLUMNS member so that we end up with the
+	    # same column order as the original table
+	    #
+	    foreach my $aref (@{ $schema2->{$table}{ORDERED_COLUMNS} }) {
+		my ($name, $def) = @$aref;
+		push @out, "  $name $def";
+	    }
+
+	    foreach my $primary (keys %{$schema2->{$table}{PRIMARY}}) {
+		push @out, "  PRIMARY KEY (" . $primary . ")";
+	    }
+
+	    foreach my $key (keys %{$schema2->{$table}{KEYS}}) {
+		my $name = $schema2->{$table}{KEYS}{$key};
+		push @out, "  KEY $name (" . $key . ")";
+	    }
+
+	    # XXX: Could include type here
+	    print join(",\n",@out), "\n);\n\n"
+	}
+    }
+
+    #
+    # Let the caller know which tables were in both schemas
+    #
+    return @$common;
+}
+
+#
+# Compare the keys (indexes) of two schemas. Only operates on tables given
+# in the third argument, so that tables that have been added or removed can
+# be ignored
+#
+sub compare_keys($$@) {
+    my ($schema1,$schema2,@tables) = @_;
+
+    #
+    # Check the primary keys
+    #
+    foreach my $table (@tables) {
+	my ($removed, $added, $common) =
+	    diff_keys($schema1->{$table}{PRIMARY},$schema2->{$table}{PRIMARY});
+
+	foreach my $key (@$removed) {
+	    print "# Primary key ($key) was removed from table $table\n";
+	    if ($sql) {
+		print "ALTER TABLE $table DROP PRIMARY KEY;\n\n";
+	    }
+	}
+
+	foreach my $key (@$added) {
+	    print "# Primary key ($key) was added to table $table\n";
+	    if ($sql) {
+		print "ALTER TABLE $table ADD PRIMARY KEY ($key);\n\n";
+	    }
+	}
+
+    }
+
+    #
+    # Check the regular keys
+    #
+    foreach my $table (@tables) {
+	my ($added, $removed, $common) =
+	    diff_keys($schema1->{$table}{KEYS},$schema2->{$table}{KEYS});
+
+	foreach my $key (@$added) {
+	    my $name = $schema1->{$table}{KEYS}{$key};
+	    print "# Key $name ($key) was added to table $table\n";
+	    if ($sql) {
+		print "ALTER TABLE $table ADD INDEX $key ($key);\n\n";
+	    }
+	}
+
+	foreach my $key (@$removed) {
+	    my $name = $schema2->{$table}{KEYS}{$key};
+	    print "# Key $name ($key) was removed from table $table\n";
+	    if ($sql) {
+		print "ALTER TABLE $table DROP INDEX $name ($key);\n\n";
+	    }
+	}
+
+    }
+}
+
+sub compare_columns($$@) {
+    my ($schema1,$schema2,@tables) = @_;
+
+    #
+    # Check the regular keys
+    #
+    foreach my $table (@tables) {
+	my ($removed, $added, $common) =
+	    diff_keys($schema1->{$table}{COLUMNS},$schema2->{$table}{COLUMNS});
+
+	#
+	# Look for columns that may have had their names changed. This
+	# involves finding two tables that have identical definitions, but
+	# different names. These will be in @$added and @$removed.
+	#
+	my $i = 0; # We have to iterate by index, so we can remove elements
+	ADDED: while ($i < @$added) {
+
+	    my $new_definition = $schema2->{$table}{COLUMNS}{$added->[$i]};
+
+	    my $j = 0;
+	    while ($j < @$removed) {
+		my $old_definition =
+		    $schema1->{$table}{COLUMNS}{$removed->[$j]};
+
+		if ($old_definition eq $new_definition) {
+		    #
+		    # Found a renamed column
+		    #
+		    my $oldname = $removed->[$j];
+		    my $newname = $added->[$i];
+
+		    print "# Column $oldname was renamed to $newname\n";
+		    if ($sql) {
+			print "ALTER TABLE $table CHANGE COLUMN $oldname " .
+			    "$newname $new_definition;\n\n";
+		    }
+
+		    #
+		    # Pull this element out of the two lists, since it wasn't
+		    # really added or removed
+		    #
+		    splice(@$added,$i);
+		    splice(@$removed,$j);
+		    next ADDED;
+
+		} else {
+		    $j++;
+		}
+	    }
+
+	    $i++;
+	}
+
+	debug("Added is: ",join(',',@$added),"\n");
+	debug("Removed is: ",join(',',@$removed),"\n");
+
+	#
+	# Make hashes of the added and removed lists to make for quick
+	# lookup
+	#
+	my %added;
+	foreach my $column (@$added) { $added{$column} = 1; }
+	my %removed;
+	foreach my $column (@$removed) { $removed{$column} = 1; }
+
+	#
+	# Handle columns that were added.
+	# Go through the columns in order, so that we (1) preserve the order,
+	# and (2) don't attempt to use an AFTER clause referencing a table
+	# that does not exist.
+	#
+	my $last_column = undef;
+	foreach my $column (@{ $schema2->{$table}{ORDERED_COLUMNS} }) {
+	    my ($name, $definition) = @$column;
+	    if ($added{$name}) {
+		print "# Column $name was added to table $table\n";
+		if ($sql) {
+		    my $location;
+		    if ($last_column) {
+			$location = "AFTER $last_column";
+		    } else {
+			$location = "FIRST";
+		    }
+		    print "ALTER TABLE $table ADD COLUMN $name " . 
+		    	"$definition $location;\n\n";
+		}
+	    }
+	    $last_column = $name;
+	}
+
+	#
+	# Handle columns that were removed
+	#
+	foreach my $column (@$removed) {
+	    print "# Column $column was removed from table $table\n";
+	    if ($sql) {
+		print "ALTER TABLE $table DROP COLUMN $column;\n\n";
+	    }
+	}
+	
+	#
+	# Look through the columns that are in both, so that we can tell
+	# if the definition for any have changed
+	#
+	foreach my $column (@$common) {
+	    if ($schema1->{$table}{COLUMNS}{$column} ne
+		    $schema2->{$table}{COLUMNS}{$column} ) {
+		print "# Column $column in table $table has changed\n";
+		if ($sql) {
+		    print "ALTER TABLE $table MODIFY $column ",
+		    $schema2->{$table}{COLUMNS}{$column}, ";\n\n";
+		}
+	    }
+	}
+
+    }
+}
+
+#
+# Given two different hash references, return refereces to three keys:
+# The keys that are in the first hash, but not the second
+# The keys that are in the second hash, but not the first
+# They keys that are in both hashes
+#
+sub diff_keys($$) {
+    my ($hash1,$hash2) = (@_);
+    my (@first_only,@second_only,@common);
+
+    #
+    # Go through the first hash, looking for both keys that aren't in the
+    # second, and keys that both have in common
+    #
+    foreach my $key (keys %$hash1) {
+	if (!exists($hash2->{$key})) {
+	    push @first_only, $key;
+	} else {
+	    push @common, $key;
+	}
+    }
+
+    #
+    # Make a pass through the second, looking for keys that are unique to it
+    #
+    foreach my $key (keys %$hash2) {
+	if (!exists($hash1->{$key})) {
+	    push @second_only, $key;
+	}
+    }
+
+    return (\@first_only,\@second_only,\@common);
+}
+
+#
+# Usage message
+#
+sub usage() {
+    print "usage: $0 [-h] [-s] [-d] <file1> <file2>\n";
+    print "Prints on stdout a set of SQL commands to change the database\n";
+    print "from file1 so that it has the same schema as the database from\n";
+    print "file2 (same argument order as diff)\n\n";
+    print "-h    This message\n";
+    print "-s    Summary: Don't print SQL statments to apply changes\n";
+    print "-d    Turn on debugging output\n";
+    return 1;
+}
+
+#
+# Print the message, only if the gloabal $debug variable is set
+#
+sub debug(@) {
+    if ($debug) {
+	print @_;
+    }
+}
