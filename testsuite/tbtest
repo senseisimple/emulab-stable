@@ -140,6 +140,7 @@ if ($mode eq "run") {
 } elsif ($mode eq "single") {
     if ($#ARGV == -1) {show_help;}
     (@tests) = @ARGV;
+    $testlist = "N/A";
 } elsif ($mode eq "finish") {
     if ($#ARGV != -1) {show_help;}
 } else {
