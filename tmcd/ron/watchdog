@@ -40,6 +40,7 @@ use libsetup;
 my $timeout = (60 * 30);	# In seconds of course. 
 my $logname = "/tmp/emulab-watchdog.debug";
 my $vndir   = "/var/testbed";
+my $pidfile = "/var/run/emulab-watchdog.pid";
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -66,6 +67,16 @@ if (1 && TBBackGround($logname)) {
     #
     exit(0);
 }
+
+#
+# Write our pid into the pid file so we can be killed later (when the
+# experiment is torn down). We must do this first so that we can be
+# killed before we change the sig handlers
+#
+open(PFILE, "> $pidfile")
+    or die("Could not open $pidfile: $!");
+print PFILE "$PID\n";
+close(PFILE);
 
 #
 #
