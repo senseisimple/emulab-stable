@@ -119,9 +119,9 @@ def do_method(server, method_and_args):
 # 
 try:
     # Parse the options,
-    opts, req_args = getopt.getopt(sys.argv[1:],
-                                   "dhVs:l:a",
-                                   [ "help", "version", "server=", "login=", ])
+    opts, req_args =  getopt.getopt(sys.argv[1:],
+                      "dhVs:l:am:",
+                      [ "help", "version", "server=", "login=", "module="])
     # ... act on them appropriately, and
     for opt, val in opts:
         if opt in ("-h", "--help"):
