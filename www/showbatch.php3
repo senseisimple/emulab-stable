@@ -67,6 +67,7 @@ $creator   = $exprow[creator_uid];
 $numpcs    = $exprow[numpcs];
 $numsharks = $exprow[numsharks];
 $status    = $exprow[status];
+$attempts  = $exprow[attempts];
 
 #
 # Generate the table.
@@ -117,6 +118,11 @@ echo  "<tr>
 echo "<tr>
           <td>Status: </td>
           <td class=\"left\">$status</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Start Attempts: </td>
+          <td class=\"left\">$attempts</td>
       </tr>\n";
 
 echo "</table>\n";
