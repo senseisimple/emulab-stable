@@ -57,6 +57,9 @@ common-install:	dir-install
 sup-install:	dir-install
 
 bin-install:	dir-install
+	# These are found in the /share/windows directory.
+	$(INSTALL) -m 755 $(SRCDIR)/WSName.exe $(BINDIR)/WSName.exe
+	$(INSTALL) -m 755 $(SRCDIR)/addusers.exe $(BINDIR)/addusers.exe
 
 etc-install:	dir-install sysetc-remove sysetc-install
 
@@ -65,13 +68,15 @@ sysetc-install:	dir-install ###ifcfgs
 sysetc-remove:
 
 script-install:	dir-install $(SCRIPTS)
-	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp-user $(BINDIR)/rc/rc.cygwinxp-user
-	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwinxp
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/emount $(BINDIR)/emount
-	$(INSTALL) -m 755 $(SRCDIR)/eumount $(BINDIR)/eumount
 	$(INSTALL) -m 755 $(SRCDIR)/startsshd $(BINDIR)/startsshd
 	$(INSTALL) -m 755 $(SRCDIR)/stopsshd $(BINDIR)/stopsshd
+	-mkdir -m 755 /sbin
+	$(INSTALL) -m 755 $(SRCDIR)/reboot /sbin/reboot
+	ln -f -s /bin/shutdown /sbin/shutdown
+	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwinxp
+	# The following will fail if the user login script is still busy in a shell.
+	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp-user $(BINDIR)/rc/rc.cygwinxp-user
 
 sfs-install:
 

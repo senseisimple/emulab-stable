@@ -32,14 +32,17 @@ if [ $running ]; then
     kill $pid
 fi
 
-# Hijack the file permissions needed for sshd to run as this user.
+# Set permissions on the key files needed for sshd to start up as this user.
+# Can't steal permissions on the system ones, disables root@boss management via ssh.
+# These copies were made as root after configuring sshd.
 user=`id -un`
-chown $user /etc/ssh*key
-chmod o-r /etc/ssh*key
-chown $user /var/empty
-chmod go-w /var/empty
+chown $user /etc/ssh*key.user
+chmod o-r /etc/ssh*key.user
 
 # Start sshd in the background, orphaned so it doesn't get SIGINT from here.
 # The pidfile is updated by sshd itself.
+# Don't use privilege separation, because it requires taking ownership of
+# /var/empty, which kills key exchange for the SYSTEM root sshd.
 echo "Starting new sshd daemon as $user."
-(CYGWIN="ntsec tty" /usr/sbin/sshd &)
+(CYGWIN="ntsec tty" /usr/sbin/sshd -p 2222 -o "UsePrivilegeSeparation no" \
+	-h /etc/ssh_host_key.user -h /etc/ssh_host_dsa_key.user  &)

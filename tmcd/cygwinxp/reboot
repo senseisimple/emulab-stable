@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Installed as /sbin/reboot on CygWin, invoked with no arguments by Emulab.
+#
+# The CygWin /bin/reboot is a symlink to their shutdown.exe, not the Windows one.
+# It requires a shutdown time argument.  Give it one here.
+#
+# Supplying this also means we don't have to put the CygWin bin first on
+# the Windows path with the possibility of causing other problems.
+
+/bin/shutdown -r -f now

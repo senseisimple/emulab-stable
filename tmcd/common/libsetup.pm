@@ -23,7 +23,7 @@ use Exporter;
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
-	 MFS REMOTE CONTROL JAILED PLAB LOCALROOTFS IXP USESFS 
+	 MFS REMOTE CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP USESFS 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST
 
 	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
@@ -254,6 +254,11 @@ sub REMOTE()	{ if (-e "$ETCDIR/isrem") { return 1; } else { return 0; } }
 # Same for a control node.
 #
 sub CONTROL()	{ if (-e "$ETCDIR/isctrl") { return 1; } else { return 0; } }
+
+#
+# Same for a Windows (CygWinXP) node.
+#
+sub WINDOWS()	{ if (-e "$ETCDIR/iscygwin") { return 1; } else { return 0; } }
 
 #
 # Are we jailed? See above.

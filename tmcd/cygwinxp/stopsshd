@@ -20,10 +20,3 @@ if [ $running ]; then
     ps -ef | awk '$2=='$pid'{print}'
     kill $pid
 fi
-
-# Restore the file permissions needed for sshd to run as a service.
-user=`id -un`
-chown SYSTEM /etc/ssh*key
-chmod o-r /etc/ssh*key
-chown SYSTEM /var/empty
-chmod go-w /var/empty

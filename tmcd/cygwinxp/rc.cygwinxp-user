@@ -11,37 +11,29 @@
 
 PATH=/usr/local/etc/emulab:$PATH
 
-# Mounts are local to the Win32 login session context.
-if [ -e /cygdrive/s ]; then /cygdrive/c/SFU/common/umount S: > /dev/null; fi
-echo emount fs.emulab.net:/share /share
-emount fs.emulab.net:/share /share
-
-if [ -e /cygdrive/p ]; then /cygdrive/c/SFU/common/umount P: > /dev/null ; fi
-proj=`tmcc.bin status | sed 's|ALLOCATED=\([^/]*\)/.*|\1|'`
-echo emount fs.emulab.net:/q/proj/$proj /proj/$proj
-emount fs.emulab.net:/q/proj/$proj /proj/$proj
-
-# Where do we find out the group information for an optional Q: mount?
-
-if [ -e /cygdrive/h ]; then /cygdrive/c/SFU/common/umount H: > /dev/null ; fi
-creator=`tmcc.bin creator | sed 's|.*CREATOR=\([^ ]*\).*|\1|'`
-echo emount fs.emulab.net:/users/$creator /users/$creator
-emount fs.emulab.net:/users/$creator /users/$creator
-
-if [ -e /cygdrive/i ]; then /cygdrive/c/SFU/common/umount I: > /dev/null ; fi
-swapper=`tmcc.bin creator | sed 's|.*SWAPPER=\([^ ]*\).*|\1|'`
-if [ $swapper != $creator ]; then
-    echo emount fs.emulab.net:/users/$swapper /users/$swapper
-    emount fs.emulab.net:/users/$swapper /users/$swapper
-fi
-
-# Make sure the user's homedir is mounted if neither creator nor swapper.
-if [ -e /cygdrive/j ]; then /cygdrive/c/SFU/common/umount J: > /dev/null ; fi
+# Root has a local home directory, and is handled by the SYSTEM sshd on port 22.
 user=`id -un`
-if [[ $user != $creator && $user != $swapper && $user != root ]]; then
-    echo emount -d J: fs.emulab.net:/users/$user /users/$user
-    emount -d J: fs.emulab.net:/users/$user /users/$user
+if [ $user = root ]; then
+    exit 0
 fi
+
+# Shares are local to the Win32 login session context.
+# We must process a user name and password for the first one to be opened.
+###host=fs
+host=pc88
+pswd=`tmcc accounts | awk '/LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
+echo "Connecting to //$host as $user."
+while ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no > /dev/null
+do
+    read -p "Connection failed, try again? [y]: " -n 1 chr
+    echo ""
+    if [[ "$chr" != [yY] ]]; then break; fi
+    echo ""
+    echo "Re-trying Connection to //$host as $user."
+done
+
+# Set the homedir for ssh in case we don't get through rc.mounts .
+ln -f -s //$host/$user /users/$user
 
 # Run the SSH daemon in the Win32 login session context, so ssh client sessions
 # will see the same set of mounts when they come in AS THIS SAME USER.
@@ -49,6 +41,7 @@ echo ""
 startsshd
 
 echo ""
-echo "Hit <Enter> to dismiss this window."
+echo "Hit <Enter> to stop the sshd when you're ready to log out."
 read
 
+stopsshd

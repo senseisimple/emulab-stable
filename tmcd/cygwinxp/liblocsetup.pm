@@ -20,7 +20,8 @@ use Exporter;
 	 os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_getnfsmounts os_getnfsmountpoints os_noisycmd
+	 os_groupdel os_samba_mount 
+	 os_getnfsmounts os_getnfsmountpoints os_noisycmd
 	 os_fwconfig_line os_fwrouteconfig_line
        );
 
@@ -44,7 +45,7 @@ BEGIN
 }
 
 #
-# Various programs and things specific to Linux and that we want to export.
+# Various programs and things specific to CygWin on XP and that we want to export.
 # 
 $CP		= "/bin/cp";
 $LN		= "/bin/ln";
@@ -542,7 +543,47 @@ sub MapShell($)
    return $fullpath;
 }
 
-# Extract the local mount point from a remote mount path.
+sub os_samba_mount($$)
+{
+    my ($local, $host, $verbose) = @_;
+
+    # Make the CygWin symlink from the local path to the driveletter automount point.
+    my $localdir = $sambapath = $local;
+    $localdir =~ s|(.*)/.*|$1|;
+    $sambapath =~ s|.*/(.*)|//$host/$1|;
+    if (length($localdir) && ! -e $localdir) {
+	print "os_samba_mount: Making CygWin '$localdir' directory for symlinks.\n"
+	    if ($verbose);
+	if (! os_mkdir($localdir, "0777")) { # Writable so anybody can make symlinks.
+	    print STDERR "os_samba_mount: Failed CygWin mkdir, $cmd.\n";
+	    exit(1);
+	}
+    }
+    if (-e $local) {
+	print "Removing previous CygWin symlink '$local'.\n"
+	    if ($verbose);
+	$cmd = "$CHOWN `id -un` $local";
+	if (system($cmd) != 0) {
+	    print STDERR 
+		"os_samba_mount: Failed to take ownership of symlink, $cmd.\n";
+	}
+	$cmd = "$RM -f $local";
+	if (system($cmd) != 0) {
+	    print STDERR 
+		"os_samba_mount: Failed to remove previous CygWin symlink, $cmd.\n";
+	    exit(1);
+	}
+    }
+    print "Making CygWin symlink '$local' to '$sambapath'.\n"
+	if ($verbose);
+    $cmd = "$LN -f -s $sambapath $local";
+    if (system($cmd) != 0) {
+	print STDERR "os_samba_mount: Failed CygWin symlink, $cmd.\n";
+	exit(1);
+    }
+}
+
+# Extract the local mount point from a remote NFS mount path.
 sub os_mountlocal($)
 {
     my ($remote) = @_;

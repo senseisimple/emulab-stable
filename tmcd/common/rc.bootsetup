@@ -146,7 +146,7 @@ sub doboot()
 	}
     }
 
-    if (-x "$BINDIR/tbshutdown") {
+    if (-x "$BINDIR/tbshutdown" && ! WINDOWS()) {
         print("Starting up shutdown notification daemon\n");
         system("$BINDIR/tbshutdown");
 	if ($?) {
@@ -154,7 +154,7 @@ sub doboot()
 	}
     }
 
-    if (-x "$RCDIR/rc.ipod") {
+    if (-x "$RCDIR/rc.ipod" && ! WINDOWS()) {
 	print("Setting up Ping of Death\n");
 	system("$RCDIR/rc.ipod");
 	# This is allowed to fail; ipod might not be supported.
@@ -172,13 +172,13 @@ sub doboot()
     #
     # This stuff is run regardless of reservation status.
     #
-    if (-x "$RCDIR/rc.healthd") {
+    if (-x "$RCDIR/rc.healthd" && ! WINDOWS()) {
 	print("Starting node health monitoring daemon\n");
 	system("$RCDIR/rc.healthd start");
 	# If it fails, that is okay. Keep going.
     }
     
-    if (-x "$RCDIR/rc.slothd") {
+    if (-x "$RCDIR/rc.slothd" && ! WINDOWS()) {
 	print("Starting slothd usage detector\n");
 	system("$RCDIR/rc.slothd start");
 	if ($?) {
@@ -186,7 +186,7 @@ sub doboot()
 	}
     }
 
-    if (-x "$BINDIR/watchdog") {
+    if (-x "$BINDIR/watchdog" && ! WINDOWS()) {
         print("Starting testbed update watchdog\n");
 	system("$BINDIR/watchdog start");
 	if ($?) {
@@ -214,7 +214,7 @@ sub doboot()
     #
     # Start the elvin proxy.
     #
-    if (-x "$BINDIR/evproxy") {
+    if (-x "$BINDIR/evproxy" && ! WINDOWS()) {
 	print("Starting elvin proxy daemon\n");
 	system("$BINDIR/evproxy -s event-server -e $pid/$eid");
 	if ($?) {
@@ -236,7 +236,7 @@ sub doboot()
     # Start the linktest daemon. This script will exit without running
     # linktest is the node is hosting SIM or JAILS.
     #
-    if (-x "$RCDIR/rc.linktest") {
+    if (-x "$RCDIR/rc.linktest" && ! WINDOWS()) {
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
 	    fatal("Error running $RCDIR/rc.linktest");

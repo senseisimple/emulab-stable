@@ -4,13 +4,37 @@
 # Copyright (c) 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
-# CygWin startup.  Run as a service named EmulabStartup.
+# rc.cygwinxp - CygWin-specific startup.  Run by rc.bootsetup on CygWin.
 
-# Make sure the node name is right.
-nodeid=`/usr/local/etc/emulab/tmcc.bin nodeid`
-hostname=`/bin/hostname`
-# Do some logging.
+# Enable logging.
 logfile=/var/log/EmulabStartup.log
+chmod -f g+w $logfile
+
+# Enable WINDOWS() in libsetup.pm .
+iscygwin=/etc/emulab/iscygwin
+chmod -f g+w $iscygwin
+uname -r > $iscygwin
+chmod g+w $iscygwin
+
+# Set up for autologin as the swapin user.
+tmcc=/usr/local/etc/emulab/tmcc.bin
+swapper=`$tmcc creator | sed 's|.*SWAPPER=\([^ ]*\).*|\1|'`
+echo "`date`: Set to autologin as $swapper." >> $logfile
+autologin=/tmp/autologin.reg
+rm -f $autologin
+cat <<EOF > $autologin
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="1"
+"DefaultUserName"="$swapper"
+EOF
+chmod g+rw $autologin
+regedit -s $autologin
+
+# Make sure the computer name is right, reboots to change it if necessary.
+nodeid=`$tmcc nodeid`
+hostname=`/bin/hostname`
 datehost="`date`: Host name '$hostname'"
 if [ $nodeid == $hostname ]; then
     echo "$datehost matches nodeid '$nodeid'." >> $logfile
