@@ -10,6 +10,7 @@
 #               through tbs_out.  Returns 1 on failure and 0 on success.
 
 my $LOGFILE;
+my $logging = 0;
 
 sub tbs_initdbi {
     my($dbname) = $_[0];
@@ -27,6 +28,7 @@ sub tbs_initlog {
 	print STDERR "Could not open $logfile for writing.\n";
 	exit(1);
     };
+    $logging = 1;
 }
 
 sub tbs_prefix {
@@ -39,7 +41,9 @@ sub tbs_prefix {
 sub tbs_out {
     my($s) = $_[0];
     print $s;
-    print LOGFILE $s;
+    if ($logging) {
+	print LOGFILE $s;
+    }
 };
 
 sub tbs_exec {

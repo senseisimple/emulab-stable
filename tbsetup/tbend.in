@@ -15,23 +15,35 @@ push(@INC,$TBSETUPLIB);
 require libtbsetup;
 require 'ctime.pl';
 
-if ($#ARGV != 1) {
-    print STDERR "Syntax: $0 pid eid\n";
+if ($#ARGV < 1 || $#ARGV > 2 ||
+    ($#ARGV == 2 && $ARGV[0] ne "-nologfile")) {
+    print STDERR "Syntax: $0 [-nologfile] pid eid\n";
     exit(1);
 }
-($pid,$eid) = @ARGV;
+
+if ($#ARGV == 2) {
+    $pid   = $ARGV[1];
+    $eid   = $ARGV[2];
+    $dolog = 0;
+}
+else {
+    ($pid,$eid) = @ARGV;
+    $dolog = 1;
+}
 
 use DBI;
 $dbh=&tbs_initdbi($TBDB);
 
 $prefix = "$pid-$eid";
-$logfile = "$prefix-end.log";
 
-&tbs_initlog($logfile);
+if ($dolog) {
+    $logfile = "$prefix-end.log";
+    &tbs_initlog($logfile);
 
-&tbs_out("Id:  $prefix\n");
-&tbs_out("Log: $logfile\n");
-&tbs_out("\n");
+    &tbs_out("Id:  $prefix\n");
+    &tbs_out("Log: $logfile\n");
+    &tbs_out("\n");
+}
 
 &tbs_out("Ending Testbed run for $prefix. " . &ctime(time) . "\n");
 
