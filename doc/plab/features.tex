@@ -1,0 +1,52 @@
+\section{Features}
+
+\subsection{Creating slices}
+
+\subsubsection{Resource assignment}
+
+Users of Emulab's PlanetLab interface have three choices for selecting the
+nodes that will be used for their slice.
+
+The most basic method is to manually chose nodes, as is done with the
+PlanetLab's own current interface. This is accomplished by using Emulab's
+'tb-fix-node' syntax. In addition to letting the user manually select nodes,
+this method gives the user the opportunity to run their own selection algorithm
+before submitting their experiment specification to Emulab.
+
+Second, node selection can be done in a link-centric fashion. In this method,
+the user specifies a set of virtual nodes, and a set of virtual links between
+these nodes. Each virtual link can have a bandwidth, latency, and packet loss
+rate specified for it. Emulab then matches, as best it can, these desired to
+link characteristics to end-to-end characteristics observed between PlanetLab
+nodes, gathered from third-party sensors. Emulab uses a custom mapper based on
+a genetic algorithm to find a good match. If support for creating tunnels is
+added to PlanetLab at some point in the future, we will optionally set up
+tunnels to create an overlay network that matches the experimenter's virtual
+topology.
+
+The third, and most often used method of node selection is node-centric. In
+this scheme, users ask for a set of virtual nodes, with no specific links
+between them. Emulab's type system is used to select nodes with varying levels
+of specificity - for example, a user can ask for a 'pcplab' node to get any
+node in PlanetLab.  Or, they can ask for a 'pcplabinet' node to get a node on
+the commodity Internet, or a 'pcplabdsl' node to get a node on a DSL line.
+This is done using Emulab's 'tb-set-node-hardware' syntax.
+
+This data is then fed to Emulab's resource mapper, assign. Assign uses
+simulated annealing, a randomized heuristic algorithm to find a good mapping.
+(See "A Solver for the Network Testbed Mapping Problem", Ricci, Lepreau,
+Alfeld, SIGCOMM CCR April 2003.) Assign takes into account several mapping
+goals, and can easily be expanded to take others into account as well.  At the
+present time, it attempts to balance the following goals:
+
+\begin{itemize}
+\item Meeting type constraints mentioned above
+\item Spreading slices out over the maximum possible number of distinct sites
+\itme Choosing nodes with low CPU and memory loads - Emulab can do admission
+    control for experiments, if there are not enough planetlab nodes available
+    with a specified CPU load or free memory
+\end{itemize}
+
+\subsection{Maintainin slices}
+
+\subsection{Controlling slices}
