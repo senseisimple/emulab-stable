@@ -621,6 +621,25 @@ CREATE TABLE scheduled_reloads (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'state_timeouts'
+#
+
+CREATE TABLE state_timeouts (
+  state varchar(20) default NULL,
+  timeout int(11) default NULL,
+  action mediumtext
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'state_transitions'
+#
+
+CREATE TABLE state_transitions (
+  state1 varchar(20) default NULL,
+  state2 varchar(20) default NULL
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'switch_stack_types'
 #
 
