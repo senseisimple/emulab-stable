@@ -16,7 +16,8 @@ $drewheader       = 0;
 $BASEPATH	  = "";
 
 #
-# TOPBARCELL - Make a cell for the topbar
+# TOPBARCELL - Make a cell for the topbar. Actually, the name lies, it can be
+# used for cells in a bottombar too.
 #
 function TOPBARCELL($contents) {
     echo "<td class=\"topbaropt\">";
@@ -117,46 +118,11 @@ function WRITEPLABTOPBAR() {
     global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
 
-    #
-    # get post time of most recent news;
-    # get both displayable version and age in days.
-    #
-    $query_result = 
-	DBQueryFatal("SELECT DATE_FORMAT(date, '%M&nbsp;%e') AS prettydate, ".
-		     " (TO_DAYS(NOW()) - TO_DAYS(date)) AS age ".
-		     "FROM webnews ".
-		     "ORDER BY date DESC ".
-		     "LIMIT 1");
-    $newsDate = "";
-    $newNews  = 0;
+    WRITETOPBARBUTTON("Create a Slice",
+        $TBBASE, "plab_ez.php3");
 
-    if ($login_uid) {
-	$newsBase = $TBBASE; 
-    } else {
-	$newsBase = $TBDOCBASE;
-    }
-
-    if ($row = mysql_fetch_array($query_result)) {
-	$newsDate = "(".$row[prettydate].")";
-	if ($row[age] < 7) {
-	    $newNews = 1;
-	}
-    }
-
-    WRITETOPBARBUTTON("Create a PlanetLab Slice",
-        $TBBASE, "plab_advanced.php3");
-
-    WRITETOPBARBUTTON("PlanetLab Nodes",
+    WRITETOPBARBUTTON("Nodes",
         $TBBASE, "plabmetrics.php3");
-
-    WRITETOPBARBUTTON("Docs", $TBDOCBASE, "doc.php3");
-
-    if ($newNews) {
-	WRITETOPBARBUTTON_NEW("News", $newsBase, "news.php3");
-    } else {
-	WRITETOPBARBUTTON("News", $newsBase, "news.php3");
-    }
-
 
     WRITETOPBARBUTTON("My Testbed",
 	$TBBASE,
@@ -166,8 +132,67 @@ function WRITEPLABTOPBAR() {
     WRITETOPBARBUTTON("Advanced Experiment",
         $TBBASE, "beginexp.php3");
 
+    if ($login_status & CHECKLOGIN_TRUSTED) {
+	# Only project/group leaders can do these options
+	# Show a "new" icon if there are people waiting for approval
+	$query_result =
+	DBQueryFatal("select g.* from group_membership as authed ".
+		     "left join group_membership as g on ".
+		     " g.pid=authed.pid and g.gid=authed.gid ".
+		     "left join users as u on u.uid=g.uid ".
+		     "where u.status!='".
+		     TBDB_USERSTATUS_UNVERIFIED . "' and ".
+		     " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
+		     "' and g.uid!='$login_uid' and ".
+		     "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
+		     "  and authed.uid='$login_uid' and ".
+		     "  (authed.trust='group_root' or ".
+		     "   authed.trust='project_root') ".
+		     "ORDER BY g.uid,g.pid,g.gid");
+	if (mysql_num_rows($query_result) > 0) {
+	     WRITETOPBARBUTTON_NEW("Approve Users",
+				   $TBBASE, "approveuser_form.php3");
+	} else {
+	    WRITETOPBARBUTTON("Approve Users",
+			       $TBBASE, "approveuser_form.php3");
+	}
+    }
+
+    WRITETOPBARBUTTON("Log Out", $TBBASE, "logout.php3?next_page=" .
+	urlencode($TBBASE . "/login_plab.php3"));
+
     echo "</table>\n";
     echo "<br>\n";
+
+}
+
+
+#
+# Put a few things that PlanetLab users should see, but are non-essential,
+# across the bottom of the page rather than the top
+#
+function WRITEPLABBOTTOMBAR() {
+    global $login_status, $login_uid;
+    global $TBBASE, $TBDOCBASE, $BASEPATH;
+    global $THISHOMEBASE;
+
+    if ($login_uid) {
+	$newsBase = $TBBASE; 
+    } else {
+	$newsBase = $TBDOCBASE;
+    }
+
+    echo "
+	    <center>
+	    <br>
+	    <font size=-1>
+	    [ <a href='$TBDOCBASE/doc.php3'>
+		Documentation</a> ]
+	    [ <a href='$newsBase/news.php3'>
+		News</a> ]
+	    </font>
+	    <br>
+	    </center>\n";
 
 }
 
@@ -579,7 +604,7 @@ function FINISHSIDEBAR()
 #
 # Spit out a vanilla page header.
 #
-function PAGEHEADER($title,$view = array()) {
+function PAGEHEADER($title, $view = NULL) {
     global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
     global $BASEPATH, $SSL_PROTOCOL, $drewheader;
     global $TBMAINSITE;
@@ -613,6 +638,13 @@ function PAGEHEADER($title,$view = array()) {
 	if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
 	    $login_uid = $known_uid;
 	}
+    }
+
+    #
+    # If no view options were specified, get the ones for the current user
+    #
+    if (!$view) {
+	$view = GETUSERVIEW();
     }
 
     #
@@ -690,18 +722,29 @@ function ENDPAGE() {
 #
 # Spit out a vanilla page footer.
 #
-function PAGEFOOTER() {
+function PAGEFOOTER($view = NULL) {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE;
     global $TBMAINSITE, $SSL_PROTOCOL;
+
+    if (!$view) {
+	$view = GETUSERVIEW();
+    }
 
     $today = getdate();
     $year  = $today["year"];
 
-    echo "<!-- end content -->
+    echo "<!-- end content -->\n";
+    if ($view['show_bottombar'] == "plab") {
+	WRITEPLABBOTTOMBAR();
+    }
+
+    echo "
               </td>
             </tr>
             <tr>
-              <td colspan=2 class=contentbody>
+              <td colspan=2 class=contentbody>\n";
+    if (!$view['hide_copyright']) {
+	echo "
 	        <center>
                 <font size=-1>
 		[ <a href=http://www.cs.utah.edu/flux/>
@@ -718,7 +761,9 @@ function PAGEFOOTER() {
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </font>
                 <br>
-		</center>
+		</center>\n";
+    }
+    echo "
                 <p align=right>
 		  <font size=-2>
                     Problems?
@@ -839,6 +884,20 @@ function SUBMENUEND_2B() {
   </td>
   <td class="stealth" valign=top align=left width='85%'>
 <?php
+}
+
+#
+# Get a view, for use with PAGEHEADER and PAGEFOOTER, for the current user
+#
+function GETUSERVIEW() {
+    if (GETUID() && ISPLABUSER()) {
+	return array('hide_sidebar' => 1, 'hide_banner' => 1,
+	    'show_topbar' => "plab", 'show_bottombar' => 'plab',
+	    'hide_copyright' => 1);
+    } else {
+	# Most users get the default view
+	return array();
+    }
 }
 
 ?>
