@@ -151,7 +151,7 @@ use Exporter;
 	 TBExptRestoreVirtualState
 
 	 TBExptRemovePhysicalState TBExptBackupPhysicalState 
-	 TBExptRestorePhysicalState
+	 TBExptRestorePhysicalState TBExptClearBackupState
 
 	 TBExptPortRange
 
@@ -2547,6 +2547,20 @@ sub TBGetSiteVar($)
 		   "linkdelays",
 		   "portmap");
 
+#
+# Clear the backup crap we create below. 
+# 
+sub TBExptClearBackupState($$)
+{
+    my ($pid, $eid) = @_;
+    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
+    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
+
+    system("/bin/rm -rf $pstateDir")
+	if (-e $pstateDir);
+    system("/bin/rm -rf $vstateDir")
+	if (-e $vstateDir);
+}
 
 #
 # Remove the virtual state of an experiment from the DB,
@@ -2561,7 +2575,6 @@ sub TBExptRemoveVirtualState($$)
 	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
 	    or $errors++;
     }
-
     return $errors;
 }
 		   
@@ -2578,106 +2591,89 @@ sub TBExptRemovePhysicalState($$)
 	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
 	    or $errors++;
     }
-
     return $errors;
 }
 
 #
 # Backs up specified virtual state of pid/eid into directory in tmp.
 #
-sub TBExptBackupVirtualState($$$)
+sub TBExptBackupVirtualState($$)
 {
-    my ($pid, $eid, $backupid) = @_;
-    my $errors = 0;
+    my ($pid, $eid) = @_;
+    my $errors    = 0;
+    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
 
-    my $backupDir = "/tmp/vstate-$pid-$eid-$backupid";
+    if (! -e $vstateDir) {
+	mkdir($vstateDir, 0777)
+	    or return 1;
+	
+	chmod(0777, $vstateDir)
+	    or return 1;
+    }
 
-    mkdir($backupDir, 0777)
-	or $errors++;
-
-    if (! $errors) {
-	chmod 0777, $backupDir
+    foreach $table (@virtualTables) {
+	DBQueryWarn("SELECT * FROM $table ".
+		    "WHERE pid='$pid' AND eid='$eid' ".
+		    "INTO OUTFILE '$vstateDir/$table' ")
 	    or $errors++;
     }
-
-    if (! $errors) {
-	foreach $table (@virtualTables) {
-	    DBQueryWarn("SELECT * FROM $table ".
-			"WHERE pid='$pid' AND eid='$eid' ".
-			"INTO OUTFILE '$backupDir/$table' ")
-		or $errors++;
-	}
-    }
-
     return $errors;
 }
 
 #
 # Backs up specified physical state of pid/eid into directory in tmp.
 #
-sub TBExptBackupPhysicalState($$$)
+sub TBExptBackupPhysicalState($$)
 {
-    my ($pid, $eid, $backupid) = @_;
-    my $errors = 0;
+    my ($pid, $eid) = @_;
+    my $errors    = 0;
+    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
 
-    my $backupDir = "/tmp/pstate-$pid-$eid-$backupid";
-
-    mkdir($backupDir, 0777)
-	or $errors++;
-
-    if (! $errors) {
-	chmod 0777, $backupDir
-	    or $errors++;
+    if (! -e $pstateDir) {
+	mkdir($pstateDir, 0777)
+	    or return 1;
+	
+	chmod(0777, $pstateDir)
+	    or return 1;
     }
-
-    if (! $errors) {
-	foreach $table (@physicalTables) {
-	    DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
-			"INTO OUTFILE '$backupDir/$table' ")
-		or $errors++;
-	}
-    }
-
-    return $errors;
-}
-
-#
-# Restores backed up virtual state of pid/eid from directory in /tmp.
-#
-sub TBExptRestoreVirtualState($$$)
-{
-    my ($pid, $eid, $backupid) = @_;
-    my $errors = 0;
-    my $backupDir = "/tmp/vstate-$pid-$eid-$backupid";
-
-    foreach $table (@virtualTables) {
-	DBQueryWarn("LOAD DATA INFILE '$backupDir/$table' INTO TABLE $table") 
-	    or $errors++;
-	unlink("$backupDir/$table");
-    }
-
-    rmdir("$backupDir");
-
-    return $errors;
-}
-
-#
-# Restores backed up virtual state of pid/eid from directory in /tmp.
-#
-sub TBExptRestorePhysicalState($$$)
-{
-    my ($pid, $eid, $backupid) = @_;
-    my $errors = 0;
-    my $backupDir = "/tmp/pstate-$pid-$eid-$backupid";
 
     foreach $table (@physicalTables) {
-	DBQueryWarn("LOAD DATA INFILE '$backupDir/$table' INTO TABLE $table")
+	DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
+		    "INTO OUTFILE '$pstateDir/$table' ")
 	    or $errors++;
-	unlink("$backupDir/$table");
     }
+    return $errors;
+}
 
-    rmdir("$backupDir");
+#
+# Restores backed up virtual state of pid/eid from directory in /tmp.
+#
+sub TBExptRestoreVirtualState($$)
+{
+    my ($pid, $eid) = @_;
+    my $errors    = 0;
+    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
 
+    foreach $table (@virtualTables) {
+	DBQueryWarn("LOAD DATA INFILE '$vstateDir/$table' INTO TABLE $table") 
+	    or $errors++;
+    }
+    return $errors;
+}
+
+#
+# Restores backed up virtual state of pid/eid from directory in /tmp.
+#
+sub TBExptRestorePhysicalState($$)
+{
+    my ($pid, $eid) = @_;
+    my $errors    = 0;
+    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
+
+    foreach $table (@physicalTables) {
+	DBQueryWarn("LOAD DATA INFILE '$pstateDir/$table' INTO TABLE $table")
+	    or $errors++;
+    }
     return $errors;
 }
 
