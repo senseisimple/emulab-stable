@@ -12,7 +12,9 @@
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
+#ifdef GRAPHVIZ_SUPPORT
 #include <boost/graph/graphviz.hpp>
+#endif
 
 #include <fstream.h>
 #include <iostream.h>
@@ -315,8 +317,10 @@ void print_help()
   cout << "  -l <time>   - Limit runtime." << endl;
 #endif
   cout << "  -s <seed>   - Set the seed." << endl;
+#ifdef GRAPHVIZ_SUPPORT
   cout << "  -v <viz>    - Produce graphviz files with given prefix." <<
     endl;
+#endif
   cout << "  -r          - Don't allow trivial links." << endl;
   cout << "  -p          - Disable pclasses." << endl;
   cout << "  -d          - Enable dynamic pclasses." << endl;
@@ -649,7 +653,9 @@ void status_report(int signal) {
 int main(int argc,char **argv)
 {
   int seed = 0;
+#ifdef GRAPHVIZ_SUPPORT
   crope viz_prefix;
+#endif
   bool scoring_selftest = false;
   bool prechecks_only = false;
   
@@ -664,9 +670,11 @@ int main(int argc,char **argv)
 	print_help();
       }
       break;
+#ifdef GRAPHVIZ_SUPPORT
     case 'v':
       viz_prefix = optarg;
       break;
+#endif
 #ifdef TIME_TERMINATE
     case 'l':
       if (sscanf(optarg,"%lf",&timelimit) != 1) {
@@ -733,11 +741,13 @@ int main(int argc,char **argv)
     }
   }
 
+#ifdef GRAPHVIZ_SUPPORT
   if (viz_prefix.size() == 0) {
     if (getenv("ASSIGN_GRAPHVIZ") != NULL) {
       viz_prefix = getenv("ASSIGN_GRAPHVIZ");
     }
   }
+#endif
 
   if (argc == 0) {
     print_help();
@@ -809,6 +819,7 @@ int main(int argc,char **argv)
 #endif
 
   // Output graphviz if necessary
+#ifdef GRAPHVIZ_SUPPORT
   if (viz_prefix.size() != 0) {
     crope vviz = viz_prefix + "_virtual.viz";
     crope pviz = viz_prefix + "_physical.viz";
@@ -824,6 +835,7 @@ int main(int argc,char **argv)
     write_graphviz(sfile,SG,svertex_writer(),sedge_writer(),graph_writer());
     sfile.close();
   }
+#endif
 
   // Handle the initial temperature, if one was given - a NULL initial temp.
   // means that we should start with the normal melting procedure
@@ -866,6 +878,7 @@ int main(int argc,char **argv)
     print_solution_summary();
   }
 
+#ifdef GRAPHVIZ_SUPPORT
   if (viz_prefix.size() != 0) {
     crope aviz = viz_prefix + "_solution.viz";
     ofstream afile;
@@ -874,6 +887,7 @@ int main(int argc,char **argv)
 		   solution_edge_writer(),graph_writer());
     afile.close();
   }
+#endif
   
   if (violated != 0) {
       exit(EXIT_RETRYABLE);
