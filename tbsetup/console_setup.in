@@ -72,25 +72,30 @@ foreach my $node (@nodes) {
     }
 
     #
-    # Need the project for the node since that is the group.
+    # We need to know all of the tiplines associated with this node,
+    # and where they live. There might not be any at all, in which
+    # case we are done. This query could probably be rolled into the
+    # next query, but that would be confusing.
     #
-    # HACK! If its a shark shelf, then need a wildcard query so we can
-    # find the nodes.
+    $tiplines_result =
+	DBQueryFatal("select tipname,server from tiplines ".
+		     "where node_id='$node'");
+
+    if (! $tiplines_result->numrows) {
+	next;
+    }
+
     #
-    if ($node =~ /sh\d+/) {
-	$db_result =
-	    DBQueryFatal("select pid from reserved ".
-			 "where node_id like '$node%'");
-    }
-    else {
-	$db_result =
-	    DBQueryFatal("select g.unix_name from groups as g ".
-			 "left join experiments as e ".
-			 " on g.pid=e.pid and g.gid=e.gid ".
-			 "left join reserved as r ".
-			 " on e.pid=r.pid and e.eid=r.eid ".
-			 "where r.node_id='$node'");
-    }
+    # Determine the unix group for the node. 
+    #
+    $db_result =
+	DBQueryFatal("select g.unix_name from groups as g ".
+		     "left join experiments as e ".
+		     " on g.pid=e.pid and g.gid=e.gid ".
+		     "left join reserved as r ".
+		     " on e.pid=r.pid and e.eid=r.eid ".
+		     "where r.node_id='$node'");
+
     if ($db_result->numrows > 0) {
 	@row = $db_result->fetchrow_array();
 	$pid = $row[0];
@@ -100,25 +105,21 @@ foreach my $node (@nodes) {
     }
 
     #
-    # Now we need to know *where* the tip line lives, since there are
-    # multiple tip servers. We want to group these still, so use an
-    # array of command arguments, indexed by the tip server.
+    # For each tipline associated with the node (might be more than one),
+    # we want to issue the proxy command. However, we want to group all
+    # commands for each server together to avoid a zillion ssh calls. So,
+    # use an array of command arguments, indexed by the tip server.
     #
-    $db_result =
-	DBQueryFatal("select server from tiplines where node_id='$node'");
-    
-    if ($db_result->numrows == 0) {
-	print STDERR "*** No tip server defined for $node\n";
-	exit 1;
-    }
-    @row    = $db_result->fetchrow_array();
-    $server = $row[0];
+    while (@row = $tiplines_result->fetchrow_array()) {
+	my $tipname = $row[0];
+	my $server  = $row[1];
 
-    if (defined($cmdargs{$server})) {
-	$cmdargs{$server} = $cmdargs{$server} . " $node $pid";
-    }
-    else {
-	$cmdargs{$server} = "$node $pid ";
+	if (defined($cmdargs{$server})) {
+	    $cmdargs{$server} = $cmdargs{$server} . " $tipname $pid";
+	}
+	else {
+	    $cmdargs{$server} = "$tipname $pid ";
+	}
     }
 }
 

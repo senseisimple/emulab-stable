@@ -54,6 +54,7 @@ int
 main(int argc, char **argv)
 {
 	MYSQL_RES		*res;	
+	MYSQL_ROW		row;
 	int			tcpsock, ch;
 	int			length, i, err = 0;
 	struct sockaddr_in	name;
@@ -125,8 +126,9 @@ main(int argc, char **argv)
 		int		   clientsock, length = sizeof(client);
 		int		   cc;
 		whoami_t	   whoami;
-		unsigned char	   buf[BUFSIZ];
+		unsigned char	   buf[BUFSIZ], node_id[64];
 		secretkey_t        secretkey;
+		tipowner_t	   tipown;
 
 		if ((clientsock = accept(tcpsock,
 					 (struct sockaddr *)&client,
@@ -159,11 +161,11 @@ main(int argc, char **argv)
 		if ((cc = read(clientsock, &whoami, sizeof(whoami))) <= 0) {
 			if (cc < 0)
 				syslog(LOG_ERR, "Reading request: %m");
-			syslog(LOG_ERR, "Connection aborted");
+			syslog(LOG_ERR, "Connection aborted (read)");
 			goto done;
 		}
 		if (cc != sizeof(whoami)) {
-			syslog(LOG_ERR, "Wrong byte count!");
+			syslog(LOG_ERR, "Wrong byte count (read)!");
 			goto done;
 		}
 
@@ -173,19 +175,52 @@ main(int argc, char **argv)
 		 * message in the log file. Local tip will still work but
 		 * remote tip will not.
 		 */
-		res = mydb_query("select server from tiplines "
-				 "where node_id='%s'",
-				 1, whoami.nodeid);
+		res = mydb_query("select server,node_id from tiplines "
+				 "where tipname='%s'",
+				 2, whoami.name);
 		if (!res) {
 			syslog(LOG_ERR, "DB Error getting tiplines for %s!",
-			       whoami.nodeid);
+			       whoami.name);
 			goto done;
 		}
 		if ((int)mysql_num_rows(res) == 0) {
 			syslog(LOG_ERR, "No tipline info for %s!",
-			       whoami.nodeid);
+			       whoami.name);
 			mysql_free_result(res);
 			goto done;
+		}
+		row = mysql_fetch_row(res);
+		strcpy(node_id, row[1]);
+		mysql_free_result(res);
+
+		/*
+		 * Figure out current owner. Might not be a reserved node,
+		 * in which case set it to root/wheel by default. 
+		 */
+		res = mydb_query("select g.unix_gid from groups as g "
+				 "left join experiments as e "
+				 " on g.pid=e.pid and g.gid=e.gid "
+				 "left join reserved as r "
+				 " on e.pid=r.pid and e.eid=r.eid "
+				 "where r.node_id='%s'",
+				 1, node_id);
+
+		if (!res) {
+			syslog(LOG_ERR, "DB Error getting info for %s/%s!",
+			       node_id, whoami.name);
+			goto done;
+		}
+		if ((int)mysql_num_rows(res)) {
+			row = mysql_fetch_row(res);
+			tipown.uid = 0;
+			tipown.gid = atoi(row[0]);
+		}
+		else {
+			/*
+			 * Default to root/root.
+			 */
+			tipown.uid = 0;
+			tipown.gid = 0;
 		}
 		mysql_free_result(res);
 
@@ -194,17 +229,33 @@ main(int argc, char **argv)
 		 */
 		if (mydb_update("update tiplines set portnum=%d, "
 				"keylen=%d, keydata='%s' "
-				"where node_id='%s'", 
+				"where tipname='%s'", 
 				whoami.portnum,
 				whoami.key.keylen, whoami.key.key,
-				whoami.nodeid)) {
+				whoami.name)) {
 			syslog(LOG_ERR, "DB Error updating tiplines for %s!",
-			       whoami.nodeid);
+			       whoami.name);
 			goto done;
 		}
-		syslog(LOG_INFO, "Nodeid %s, Portnum %d, Keylen %d, Key %s\n",
-		       whoami.nodeid, whoami.portnum,
-		       whoami.key.keylen, whoami.key.key);
+
+		/*
+		 * And now send the reply.
+		 */
+		if ((cc = write(clientsock, &tipown, sizeof(tipown))) <= 0) {
+			if (cc < 0)
+				syslog(LOG_ERR, "Writing reply: %m");
+			syslog(LOG_ERR, "Connection aborted (write)");
+			goto done;
+		}
+		if (cc != sizeof(tipown)) {
+			syslog(LOG_ERR, "Wrong byte count (write)!");
+			goto done;
+		}
+
+		syslog(LOG_INFO,
+		       "Tipline %s/%s, Port %d, Keylen %d, Key %s, Group %d\n",
+		       node_id, whoami.name, whoami.portnum,
+		       whoami.key.keylen, whoami.key.key, tipown.gid);
 	done:
 		close(clientsock);
 	}

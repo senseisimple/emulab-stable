@@ -21,7 +21,7 @@
 #define ACLPATH		LOGPATH
 
 /*
- * The key is transferred in ascii text.
+ * The key is transferred from capture to capserver in ascii text.
  */
 typedef struct {
 	int		keylen;		/* of the key string */
@@ -30,10 +30,18 @@ typedef struct {
 #define DEFAULTKEYLEN	32
 
 /*
+ * The capserver then returns this structure as part of the handshake.
+ */
+typedef struct {
+	uid_t		uid;
+	gid_t		gid;
+} tipowner_t;
+
+/*
  * The remote capture sends this back when it starts up
  */
 typedef struct {
-	char		nodeid[64];
+	char		name[64];	/* "tipname" in tiplines table */
 	int		portnum;
 	secretkey_t	key;
 } whoami_t;

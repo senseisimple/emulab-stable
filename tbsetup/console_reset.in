@@ -68,17 +68,6 @@ while (@nodes) {
     while ($i < 10 && @nodes > 0) {
 	my $node = shift(@nodes);
 	
-	#
-	# Another classic shark hack. Only add shelves to the list.
-	# 
-	if ($node =~ /(sh\d+)-\d+/) {
-	    if (defined($shelves{$1})) {
-		next;
-	    }
-	    $shelves{$1} = $1;
-	    $node = $1;
-	}
-	    
 	push(@batch, $node);
 	$i++;
     }

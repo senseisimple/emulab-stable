@@ -133,26 +133,8 @@ DBQueryFatal("unlock tables");
 ######################################################################
 
 if (!$error && @nodes) {
-    my @conlist=();
-    my @sharks=();
-
-    foreach $n ( @nodes ) { 
-	if ($n =~ /(sh\d+)/) {
-	    # Its a shark - do the shelf if it hasn't been done yet
-	    my $shelf = $1;
-	    if (!(join(",",@sharks) =~ /\b$shelf\b/)) {
-		push(@sharks,$shelf);
-		push(@conlist,$shelf);
-	    }
-	}
-	else {
-	    push(@conlist,$n);
-	}
-    }
-    if ($debug) { print "Console setup list: @conlist\n"; }
-
-    system("$consetup @conlist") == 0 or
-	print STDERR "WARNING: $consetup @conlist failed!\n";
+    system("$consetup @nodes") == 0 or
+	print STDERR "WARNING: $consetup @nodes failed!\n";
 }
 
 if ($debug) { print "Returning with value $error\n"; }

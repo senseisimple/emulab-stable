@@ -2,18 +2,20 @@
 use English;
 
 #
-# usage: console_setup node1 pid1 node2 pid2 ...
+# usage: console_setup.proxy tipname group tipname group ...
 #
-# This script runs on plastic where the tip lines are and the capture
-# processes are running. Since plastic does not have access to the DB
-# we invoke this from paper in nalloc/nfree, giving it a list of node/pid
-# pairs to set. Only use can run this script.
+# This script runs on the tip servers, which is where the capture processes
+# are running. Since the tip servers do not have direct access to the DB
+# this invoked from the boss node. For each tip device, specify the group
+# the associated files should be in. This script will send the proper signal
+# to the capture process, and then reset the files to the proper group.
+#
 #
 my $TIPLOGDIR   = "/var/log/tiplogs";
 my $TIPDEVDIR   = "/dev/tip";
 my $TBPID	= "flux";
 my $dbg		= 1;
-my %nodepid     = ();
+my %tipgroup    = ();
 my $failures    = 0;
 
 # un-taint path
@@ -21,9 +23,7 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 sub usage {
-    die("Usage: console_setup node project_id [node pid node pid ...]\n".
-	"Enables project members to access consoles logs of nodes.\n".
-	"This script must be run as root, typically from paper.\n");
+    die("Usage: console_setup.proxy tipname group [tipname group ...]\n");
 }
 
 if ( $#ARGV < 1) {
@@ -35,18 +35,18 @@ while ($#ARGV >= 0) {
 	usage();
     }
     
-    $node = shift;
-    $pid  = shift;
+    $name = shift;
+    $grp  = shift;
 
     # untaint the args.
-    if ($node =~ /^([-\@\w.]+)$/) {
-	$node = $1;
+    if ($name =~ /^([-\@\w.]+)$/) {
+	$name = $1;
     }
-    if ($pid =~ /^([-\@\w.]+)$/) {
-	$pid = $1;
+    if ($grp =~ /^([-\@\w.]+)$/) {
+	$grp = $1;
     }
     
-    $nodepid{$node} = $pid;
+    $tipgroup{$name} = $grp;
 }
 
 #
@@ -63,18 +63,18 @@ if (! chdir($TIPLOGDIR)) {
 #
 # Well, do it.
 # 
-foreach my $node ( keys %nodepid ) {
-    my $pid        = $nodepid{$node};
-    my $filename   = "${node}.run";
-    my $tipdevname = "$TIPDEVDIR/$node";
-    my $aclname    = "${node}.acl";
+foreach my $tipname ( keys %tipgroup ) {
+    my $grp        = $tipgroup{$tipname};
+    my $filename   = "${tipname}.run";
+    my $tipdevname = "$TIPDEVDIR/$tipname";
+    my $aclname    = "${tipname}.acl";
 
     #
     # Find out the current group setting for the file. 
     #
     if (! -e $filename) {
 	print STDERR
-	    "*** Console log for $node does not exist! Skipping ...\n";
+	    "*** Console log for $tipname does not exist! Skipping ...\n";
 	$failures++;
 	next;
     }
@@ -86,7 +86,7 @@ foreach my $node ( keys %nodepid ) {
     # in rolling the file. Inconvenient for the user to have the log keep
     # rolling.
     #
-    if (getgrgid($gid) eq $pid) {
+    if (getgrgid($gid) eq $grp) {
 	goto setperms;
     }
 
@@ -94,19 +94,37 @@ foreach my $node ( keys %nodepid ) {
 	die("Could not unlink run file $filename");
 
     #
-    # Now send a USR1 signal to the capture process so that it opens
-    # a new run file.
+    # Unlink this so current user gets old version not new one. 
+    # 
+    if (-e $aclname) {
+	unlink($aclname) or
+	    die("Could not unlink run file $aclname");
+    }
+
     #
-    $procid = `cat ${node}.pid`;
+    # Remove group access from the tty device.  This renders the device
+    # inaccessible to both old and new users while we revoke access from
+    # any current tip user.
+    #
+    if (-e $tipdevname) {
+	chmod(0600, $tipdevname) or
+	    die("Could not chmod(0600) $tipdevname: $!");
+    }
+
+    #
+    # Now send a USR2 signal to the capture process. This will shutdown
+    # any attached tip, and reopen the run file.
+    #
+    $procid = `cat ${tipname}.pid`;
     $procid =~ s/\n//;
     # untaint
     if ($procid =~ /^([-\@\w.]+)$/) {
 	$procid = $1;
     }
-    kill('USR1', $procid) or
-	die("Could not signal(USR1) process $procid for log $filename");
+    kill('USR2', $procid) or
+	die("Could not signal(USR2) process $procid for log $filename");
     # Give capture the chance to react.
-    # Don't use sleep cause 1 second too long wait when doing 25 nodes!
+    # Don't use sleep cause 1 second too long wait when doing 25 devices!
     select(undef, undef, undef, 0.2);
 
     #
@@ -121,40 +139,11 @@ foreach my $node ( keys %nodepid ) {
     # The new log should exist now. Set its group, and just to be safe
     # set its mode too. 
     #
-    $gid = getgrnam($pid);
+    $gid = getgrnam($grp);
     chown(0, $gid, $filename) or
 	die("Could not chown(0, $gid) $filename: $!");
     chmod(0640, $filename) or
 	die("Could not chmod(0640) $filename: $!");
-
-    #
-    # Remove group access from the tty device.  This renders the device
-    # inaccessible to both old and new users while we revoke access from
-    # any current tip user.
-    #
-    if (-e $tipdevname) {
-	chmod(0600, $tipdevname) or
-	    die("Could not chmod(0600) $tipdevname: $!");
-    }
-
-    #
-    # Ditto for the "acl" file, which is how socket based tip/capture enforce
-    # protection of the console line.
-    #
-    if (-e $aclname) {
-	chmod(0600, $aclname) or
-	    die("Could not chmod(0600) $aclname: $!");
-    }
-
-    #
-    # Now send a USR2 signal to the capture process so that it closes down
-    # any tip thats attached to it.
-    #
-    kill('USR2', $procid) or
-	die("Could not signal(USR2) process $procid for log $filename");
-    # Give capture the chance to react.
-    # Don't use sleep cause 1 second too long wait when doing 25 nodes!
-    select(undef, undef, undef, 0.2);
 
     #
     # Set the mode and group on the tty that tip is going to use. This

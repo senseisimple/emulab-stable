@@ -99,12 +99,16 @@ char	*Machine;
 int	logfd, runfd, devfd, ptyfd;
 int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
 #ifdef  USESOCKETS
-char	          *Bossnode = BOSSNODE;
+char		  *Bossnode = BOSSNODE;
+char		  *Aclname;
+int		   serverport = SERVERPORT;
 int		   sockfd, tipactive, portnum;
 struct sockaddr_in tipclient;
 secretkey_t	   secretkey;
 char		   ourhostname[MAXHOSTNAMELEN];
 int		   needshake;
+gid_t		   tipgid;
+uid_t		   tipuid;
 #endif
 
 int
@@ -122,12 +126,15 @@ main(argc, argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:it")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:itp:")) != EOF)
 		switch (op) {
-
 #ifdef	USESOCKETS
 		case 'b':
 			Bossnode = optarg;
+			break;
+
+		case 'p':
+			serverport = atoi(optarg);
 			break;
 #endif
 		case 'H':
@@ -194,12 +201,17 @@ main(argc, argv)
 		die("%s: chmod: %s", Logname, geterr(errno));
 
 	if (runfile) {
-		if ((runfd = open(Runname,O_WRONLY|O_CREAT|O_APPEND,0640)) < 0)
+		unlink(Runname);
+		
+		if ((runfd = open(Runname,O_WRONLY|O_CREAT|O_APPEND,0600)) < 0)
 			die("%s: open: %s", Runname, geterr(errno));
-		if (chmod(Runname, 0640) < 0)
-			die("%s: chmod: %s", Runname, geterr(errno));
+		if (fchmod(runfd, 0640) < 0)
+			die("%s: fchmod: %s", Runname, geterr(errno));
 	}
 #ifdef  USESOCKETS
+	(void) sprintf(strbuf, ACLNAME, ACLPATH, Machine);
+	Aclname = newstr(strbuf);
+	
 	/*
 	 * Create and bind our socket.
 	 */
@@ -624,10 +636,20 @@ newrun(int sig)
 	close(runfd);
 	unlink(Runname);
 
-	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0640)) < 0)
+	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0600)) < 0)
 		die("%s: open: %s", Runname, geterr(errno));
-	if (chmod(Runname, 0640) < 0)
-		die("%s: chmod: %s", Runname, geterr(errno));
+
+#ifdef  USESOCKETS
+	/*
+	 * Set owner/group of the new run file. Avoid race in which a
+	 * user can get the new file before the chmod, by creating 0600
+	 * and doing the chmod below.
+	 */
+	if (fchown(runfd, tipuid, tipgid) < 0)
+		die("%s: fchown: %s", Runname, geterr(errno));
+#endif
+	if (fchmod(runfd, 0640) < 0)
+		die("%s: fchmod: %s", Runname, geterr(errno));
 	
 	dolog(LOG_NOTICE, "new run started");
 }
@@ -652,6 +674,10 @@ terminate(int sig)
 	}
 	else
 		dolog(LOG_INFO, "revoked");
+
+	tipuid = tipgid = 0;
+	if (runfile)
+		newrun(sig);
 
 	/* Must be done *after* all the above stuff is done! */
 	createkey();
@@ -1042,7 +1068,7 @@ int
 createkey()
 {
 	int			cc, i, fd;
-	unsigned char		buf[BUFSIZ], aclname[BUFSIZ];
+	unsigned char		buf[BUFSIZ];
 	FILE		       *fp;
 
 	/*
@@ -1087,17 +1113,27 @@ createkey()
 	 * This is still secure in that we rely on unix permission, which
 	 * is how most of our security is based anyway.
 	 */
-	(void) sprintf(aclname, ACLNAME, ACLPATH, Machine);
 
 	/*
 	 * We want to control the mode bits when this file is created.
 	 * Sure, could change the umask, but I hate that function.
 	 */
-	(void) unlink(aclname);
-	if ((fd = open(aclname, O_WRONLY|O_CREAT|O_TRUNC, 0640)) < 0)
-		die("%s: open: %s", aclname, geterr(errno));
+	(void) unlink(Aclname);
+	if ((fd = open(Aclname, O_WRONLY|O_CREAT|O_TRUNC, 0600)) < 0)
+		die("%s: open: %s", Aclname, geterr(errno));
+
+	/*
+	 * Set owner/group of the new run file. Avoid race in which a
+	 * user can get the new file before the chmod, by creating 0600
+	 * and doing the chmod after.
+	 */
+	if (fchown(fd, tipuid, tipgid) < 0)
+		die("%s: fchown: %s", Runname, geterr(errno));
+	if (fchmod(fd, 0640) < 0)
+		die("%s: fchmod: %s", Runname, geterr(errno));
+	
 	if ((fp = fdopen(fd, "w")) == NULL)
-		die("fdopen(%s)", aclname, geterr(errno));
+		die("fdopen(%s)", Aclname, geterr(errno));
 
 	fprintf(fp, "host:   %s\n", ourhostname);
 	fprintf(fp, "port:   %d\n", portnum);
@@ -1126,6 +1162,12 @@ deadboss()
 	longjmp(deadline, 1);
 }
 
+/*
+ * Tell the capserver our new secret key, and receive the setup info
+ * back (owner/group of the tty/acl/run file). The handshake might be
+ * delayed, so we continue to operate, and when we do handshake, set
+ * the files properly.
+ */
 int
 handshake()
 {
@@ -1133,6 +1175,7 @@ handshake()
 	struct sockaddr_in	name;
 	struct hostent	       *he;
 	whoami_t		whoami;
+	tipowner_t		tipown;
 
 	/*
 	 * Global. If we fail, we keep trying from the main loop. This
@@ -1152,7 +1195,7 @@ handshake()
 	    return 0;
 
 	/* Our whoami info. */
-	strcpy(whoami.nodeid, Machine);
+	strcpy(whoami.name, Machine);
 	whoami.portnum = portnum;
 	memcpy(&whoami.key, &secretkey, sizeof(secretkey));
 
@@ -1180,7 +1223,7 @@ handshake()
 	}
 	memcpy ((char *)&name.sin_addr, he->h_addr, he->h_length);
 	name.sin_family = AF_INET;
-	name.sin_port   = htons(SERVERPORT);
+	name.sin_port   = htons(serverport);
 
 	if (connect(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
 		warn("connect(bossnode): %s", geterr(errno));
@@ -1197,8 +1240,34 @@ handshake()
 		close(sock);
 		goto done;
 	}
+	
+	if ((cc = read(sock, &tipown, sizeof(tipown))) != sizeof(tipown)) {
+		if (cc < 0)
+			warn("read(bossnode): %s", geterr(errno));
+		else
+			warn("read(bossnode): Failed");
+		err = -1;
+		close(sock);
+		goto done;
+	}
+	tipuid = tipown.uid;
+	tipgid = tipown.gid;
+	
 	close(sock);
 	needshake = 0;
+	dolog(LOG_INFO,
+	      "Handshake complete. Owner %d, Group %d", tipuid, tipgid);
+
+	/*
+	 * Now that we have owner/group info, set the runfile and aclfile.
+	 */
+	if (runfile &&
+	    chown(Runname, tipuid, tipgid) < 0)
+		die("%s: chown: %s", Runname, geterr(errno));
+
+	if (chown(Aclname, tipuid, tipgid) < 0)
+		die("%s: chown: %s", Aclname, geterr(errno));
+
  done:
 	alarm(0);
 	signal(SIGALRM, SIG_DFL);

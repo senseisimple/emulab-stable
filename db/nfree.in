@@ -326,30 +326,8 @@ foreach my $n (@freed_nodes) {
 ######################################################################
 
 if (@freed_nodes) {
-    my @conlist=();
-    my @sharks=();
-
-    foreach my $n ( @freed_nodes ) {
-	# Shark hack
-	if ($n =~ /(sh\d+)/) {
-	    # Its a shark - do the shelf if it hasn't been done yet
-	    my $shelf = $1;
-	    if (!(join(",",@sharks) =~ /\b$shelf\b/)) {
-		push(@sharks,$shelf);
-		push(@conlist,$shelf);
-	    }
-	}
-	# End shark hack
-	else {
-	    push(@conlist,$n);
-	}
-    }
-
-    #
-    # Finally, run the actual command
-    #
-    system("$consetup @conlist") == 0 ||
-	print STDERR "WARNING: $consetup @conlist failed!\n";
+    system("$consetup @freed_nodes") == 0 ||
+	print STDERR "WARNING: $consetup @freed_nodes failed!\n";
 }
 
 exit($error);
