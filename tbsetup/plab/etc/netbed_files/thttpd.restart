@@ -1,0 +1,39 @@
+#!/bin/sh
+
+MAIL_WARNINGS_TO=testbed-ops@emulab.net
+BASE=/home/utah1/netbed_files
+LOGDIR=$BASE/log
+LOGFILE=$LOGDIR/thttpd.log
+PIDFILE=$LOGDIR/thttpd.pid
+DOCDIR=$BASE/www
+PORT=1492
+HTTPD_COMMAND="$BASE/sbin/thttpd -p $PORT -d $DOCDIR -h localhost -l $LOGFILE -i $PIDFILE"
+INSTALLCRON=$BASE/sbin/installcron.sh
+
+WGET_COMMAND="/usr/bin/wget -q -O /dev/null localhost:$PORT/"
+
+#
+# Install a crontab that starts the webserver at boot time
+#
+$INSTALLCRON
+
+#
+# Kill the old one
+#
+if [ -e $PIDFILE ]; then
+	kill -USR1 `cat $PIDFILE`;
+fi
+
+#
+# Run the new one
+#
+$HTTPD_COMMAND
+
+#
+# Make sure it started
+#
+if $WGET_COMMAND; then
+        ERRSTR="thttpd on `hostname` failed to start"
+        echo $ERRSTR
+	echo "$ERRSTR" | mail -s "$ERRSTR" $MAIL_WARNINGS_TO
+fi;

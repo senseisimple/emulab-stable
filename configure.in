@@ -58,6 +58,7 @@ AC_SUBST(TBMAINSITE)
 AC_SUBST(SFSSUPPORT)
 AC_SUBST(PLABSUPPORT)
 AC_SUBST(TBLOGFACIL)
+AC_SUBST(PLAB_ROOTBALL)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -98,6 +99,7 @@ JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
+PLAB_ROOTBALL="plabroot-8.tgz"
 TBLOGFACIL="local5"
 
 #
@@ -456,6 +458,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
 	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
+	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
+	tbsetup/plab/etc/netbed_files/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \

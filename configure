@@ -867,6 +867,7 @@ fi
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -906,6 +907,7 @@ JAILIPMASK=255.240.0.0
 IPBASE=10
 SFSSUPPORT=1
 PLABSUPPORT=0
+PLAB_ROOTBALL="plabroot-8.tgz"
 TBLOGFACIL="local5"
 
 #
@@ -1288,7 +1290,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1291: checking for a BSD compatible install" >&5
+echo "configure:1294: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1413,6 +1415,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
 	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
+	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
+	tbsetup/plab/etc/netbed_files/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/openbsd/GNUmakefile \
 	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
@@ -1629,6 +1633,7 @@ s%@TBMAINSITE@%$TBMAINSITE%g
 s%@SFSSUPPORT@%$SFSSUPPORT%g
 s%@PLABSUPPORT@%$PLABSUPPORT%g
 s%@TBLOGFACIL@%$TBLOGFACIL%g
+s%@PLAB_ROOTBALL@%$PLAB_ROOTBALL%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g

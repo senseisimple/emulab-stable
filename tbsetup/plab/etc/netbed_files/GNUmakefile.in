@@ -1,0 +1,53 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../../..
+SUBDIR		= tbsetup/plab/etc/netbed_files
+ROOTBALL	= @PLAB_ROOTBALL@
+
+include $(OBJDIR)/Makeconf
+
+SBIN_STUFF      = installcron.sh thttpd.restart thttpd
+FILES_DIR	= $(INSTALL_ETCDIR)/plab/netbed_files
+SBIN_DIR	= $(FILES_DIR)/sbin
+LOG_DIR		= $(FILES_DIR)/log
+WWW_DIR		= $(FILES_DIR)/www
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+mkdirs: $(LOG_DIR) $(WWW_DIR)
+
+rootball-link:
+	-ln -s $(INSTALL_ETCDIR)/plab/$(ROOTBALL) $(WWW_DIR)/$(ROOTBALL)
+
+install: sbin-install mkdirs rootball-link
+
+sbin-install: $(addprefix $(SBIN_DIR)/, $(SBIN_STUFF))
+
+#
+# We have to change perms on these files, because rsync will preserve them
+#
+post-install: 
+	chmod 770 $(FILES_DIR)
+	chmod 770 $(SBIN_DIR)
+	chmod 770 $(LOG_DIR)
+	chmod 775 $(WWW_DIR)
+
+all: $(SBIN_STUFF)
+
+$(SBIN_DIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(SBIN_DIR)
+	$(INSTALL_PROGRAM) $< $@
+
+$(LOG_DIR):
+	mkdir -p $@
+
+$(WWW_DIR):
+	mkdir -p $@
+

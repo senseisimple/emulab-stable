@@ -28,6 +28,11 @@ cacert.pem
 	http://www.planet-lab.org/dotplanetlab/base/cacert.pem (see
 	plkeygen:getbsae in the dslice source)
 
+netbed_files
+
+	This directory, in the install tree, will be rsync'ed to a
+	directory of the same name on the plabnetlab nodes
+
 Note that all of the *.pem files created by plkeygen are dropped in
 ~/.planetlab, so they have to be moved to this directory to be used.
 
