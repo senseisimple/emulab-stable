@@ -295,13 +295,15 @@ sub AddUser()
     if (system("$ADDKEY -i $user")) {
 	fatal("Could not generate initial ssh key for $user");
     }
+    # Add to elists.
+    system("$GENELISTS -n $user");
     $EUID = 0;
 
     # SFS key.
     if ($CONTROL ne $BOSSNODE) {
 	GenerateSFSKey();
     }
-    
+
     return UpdatePassword();
 }
 
@@ -343,6 +345,12 @@ sub DelUser()
 	}
     }
     $UID = $SAVEUID;
+
+    $EUID = $UID;
+    # Remove from elists.
+    system("$GENELISTS -n $user");
+    $EUID = 0;
+    
     $sfsupdate = 1;
     return 0;
 }
@@ -429,6 +437,12 @@ sub UpdateUser(;$)
 	}
     }
     $UID = $SAVEUID;
+
+    $EUID = $UID;
+    # Update elists in case email changed. 
+    system("$GENELISTS -n $user");
+    $EUID = 0;
+    
     return 0;
 }
 
