@@ -407,7 +407,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tools/pcapper/GNUmakefile \
 	$eventfiles \
 	$winfiles \
-	apache/GNUmakefile apache/apache.conf \
+	apache/GNUmakefile apache/httpd.conf \
 	install/ops-install "
 
 #

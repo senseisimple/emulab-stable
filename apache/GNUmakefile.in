@@ -8,7 +8,7 @@ SUBDIR		= apache
 
 include $(OBJDIR)/Makeconf
 
-CONFIG_FILES	= apache.conf
+CONFIG_FILES	= httpd.conf
 #
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
