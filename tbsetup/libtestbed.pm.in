@@ -2,15 +2,9 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-use English;
-use POSIX qw(strftime);
-use POSIX qw(setsid);
-use Fcntl;
-use IO::Handle;
 
 package libtestbed;
 use Exporter;
@@ -21,16 +15,33 @@ use Exporter;
 	 TBMakeLogname TB_BOSSNODE TB_OPSEMAIL TBGenSecretKey TBDebugTimeStamp
 	 TBDebugTimeStampsOn );
 
+# After package decl.
+use English;
+use POSIX qw(strftime);
+use POSIX qw(setsid);
+use Fcntl;
+use IO::Handle;
+use File::Basename;
+
 my $MAILTAG  = "@OURDOMAIN@";
 my $BOSSNODE = "@BOSSNODE@";
 my $TIMESTAMPS = "@TIMESTAMPS@";
 my $TBOPSEMAIL = "@TBOPSEMAIL@";
+my $SCRIPTNAME = "Unknown";
 
 # Hostname of our boss node
 sub TB_BOSSNODE()	{ $BOSSNODE; }
 
 # Testbed ops email address
 sub TB_OPSEMAIL()	{ $TBOPSEMAIL; }
+
+# Untainted scriptname for email below.
+if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
+    $SCRIPTNAME = basename($1);
+}
+else {
+    $SCRIPTNAME = "Tainted";
+}
 
 # A library of useful stuff.
 
@@ -63,6 +74,7 @@ sub SENDMAIL($$$;$$@)
     if (defined($Headers)) {
 	print MAIL "$Headers\n";
     }
+    print MAIL "X-NetBed: $SCRIPTNAME\n";
     print MAIL "\n";
     print MAIL "$Message\n";
     print MAIL "\n";
@@ -115,6 +127,7 @@ sub OPENMAIL($$;$$)
     if (defined($Headers)) {
 	print MAIL "$Headers\n";
     }
+    print MAIL "X-NetBed: $SCRIPTNAME\n";
     print MAIL "\n";
 
     return(*MAIL);
