@@ -43,8 +43,9 @@ use libtestbed;
 use English;
 
 # Constants
+my $MBKERNEL = TB_OSID_MBKERNEL;
 my %osidmap = # Map some magic OSIDs to op_modes
-    ( (TB_OSID_MBKERNEL) => "MINIMAL");
+    ( $MBKERNEL => "MINIMAL");
 
 # Global vars
 my $d=0; # debug/verbose
@@ -220,7 +221,7 @@ sub node_opmode() {
 
 sub os_opmode() {
     my $osid = shift || "";
-    if ($pathmode) { return $osidmap{TB_OSID_MBKERNEL}; }
+    if ($pathmode) { return $osidmap{$MBKERNEL}; }
     if (defined($osidmap{$osid})) { return $osidmap{$osid}; }
     my $cmd = "select op_mode from os_info where osid='$osid';";
     my $q = DBQueryFatal($cmd);
