@@ -33,9 +33,15 @@ EmulabCheckIPConfig()
 			echo 'Remove the CD and reboot'
 			exit 1
 			;;
+		12)
+			# Useful for debugging, and basically harmless.
+			# since a root password is required.
+			echo 'Installation aborted'
+			echo 'Continuing to boot from CD'
+			return 0
+			;;
 		*)
 			echo 'Error in testbed configuration program'
-			#reboot
 			echo 'Reboot failed. HELP!'
 			exit 1
 			;;

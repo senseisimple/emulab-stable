@@ -25,6 +25,16 @@ sub usage()
 my  $optlist = "";
 
 #
+# Catch ^C and exit with error. This will cause the CDROM to boot to
+# the login prompt, but thats okay.
+# 
+sub handler () {
+    $SIG{INT} = 'IGNORE';
+    exit(1);
+}
+$SIG{INT}  = \&handler;
+
+#
 # Turn off line buffering on output
 #
 STDOUT->autoflush(1);
@@ -243,13 +253,16 @@ if ($needstore) {
 	# Its going to get overwritten anyway. 
 	# 
 	mysystem("disklabel -w -r ${blockdevice}s1 auto");
-
     }
-    
+
     #
     # Turn slice2 into a filesystem we can stash the image on.
     # This slice is reserved forever! But its only 1gig.
     #
+    # Make it active so that the machine will not boot without the cd.
+    #
+    mysystem("echo \"a 2\" | fdisk -f - $rawbootdisk");
+    
     mysystem("disklabel -w -r ${blockdevice}s2 auto");
     fatal("Failed to put a disklabel on ${blockdevice}s2!")
 	if ($?);
@@ -724,6 +737,7 @@ sub MakeFS($$)
     #
     if ($config{"slicex_tarball"}) {
 	my $tarball = $config{"slicex_tarball"};
+	my $tarhash = $config{"slicex_md5"};
 	    
 	mysystem("mount /dev/${blockdevice}${foo} /mnt");
 	fatal("Failed to mount /dev/${blockdevice}${foo} on /mnt!")
@@ -737,6 +751,20 @@ sub MakeFS($$)
 	# If told to use a local image from the CDROM, its really easy!
 	# 
 	if (! ($tarball =~ /^http:.*$/ || $tarball =~ /^ftp:.*$/)) {
+	    #
+	    # First, check the hash if provided.
+	    #
+	    if (defined($tarhash)) {
+		print "Checking MD5 hash of the tarball.\n";
+		print $PATIENCEMSG;
+
+		my $hval = `md5 -q /$tarball`;
+		chomp($hval);
+
+		fatal("Tarball has invalid hash!")
+		    if ($tarhash ne $hval);
+	    }
+
 	    print "Unpacking $tarball to $mntpoint.\n";
 	    print $PATIENCEMSG;
 	
@@ -745,6 +773,7 @@ sub MakeFS($$)
 		if ($?);
 	}
 	else {
+	  again:
 	    #
 	    # Transfer the image to the temp store and then unzip to the slice.
 	    #
@@ -755,6 +784,23 @@ sub MakeFS($$)
 	    mysystem("$wget -nv -O /mnt/slicex.tar.gz $tarball");
 	    fatal("Failed to transfer tarball!")
 		if ($?);
+
+	    #
+	    # If an md5 hash was provided, compare it.
+	    #
+	    if (defined($tarhash)) {
+		print "Checking MD5 hash of the tarball.\n";
+		print $PATIENCEMSG;
+
+		my $hval = `md5 -q /mnt/slicex.tar.gz`;
+		chomp($hval);
+
+		if ($tarhash ne $hval) {
+		    print "*** Invalid hash! Getting the tarball again.\n";
+		    sleep(60);
+		    goto again;
+		}
+	    }
 
 	    print "Unpacking tarball.\n";
 	    print $PATIENCEMSG;

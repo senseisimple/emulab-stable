@@ -103,9 +103,18 @@ if (@ARGV != 0) {
     usage();
 }
 
-BootFromCD();
+#
+# Catch ^C and exit with special status. See exit(13) below.
+# The wrapper script looks these exits!
+# 
+sub handler () {
+    $SIG{INT} = 'IGNORE';
+    exit(12);
+}
+$SIG{INT}  = \&handler;
 
-# Done!
+# Do it.
+BootFromCD();
 exit(0);
 
 sub BootFromCD()
@@ -171,7 +180,7 @@ sub BootFromCD()
     #
     if (WriteRCFiles() < 0) {
 	print "Could not write rc files.\n";
-	Reboot();
+	exit(-1);
     }
     
     #
@@ -180,7 +189,7 @@ sub BootFromCD()
     # 
     if (WriteConfigFile($softconfig) < 0) {
 	print "Could not write soft config file.\n";
-	Reboot();
+	exit(-1);
     }
     return 0;
 }
@@ -655,11 +664,4 @@ sub Prompt($$;$)
     }
 
     return $_;
-}
-
-sub Reboot()
-{
-    print "Rebooting ... \n";
-    #system("/sbin/reboot");
-    exit(-1);
 }
