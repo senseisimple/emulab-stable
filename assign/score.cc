@@ -56,7 +56,9 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
-double fd_score(tb_vnode *vnode,tb_pnode *pnoder,int &out_fd_violated);
+double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &out_fd_violated);
+inline void add_global_fds(tb_vnode *vnode,tb_pnode *pnode);
+inline void remove_global_fds(tb_vnode *vnode,tb_pnode *pnode);
 void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
 	tb_vnode *src_vnode, tb_vnode *dst_vnode);
 void unscore_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
@@ -83,6 +85,12 @@ void score_link_endpoints(pedge pe);
 #else
 #define SDEBUG(a) 
 #endif
+
+/*
+ * For features and desires that have a some sort of global impact
+ */
+typedef hash_map<crope,unsigned int> fd_count_map;
+fd_count_map global_fd_set;
 
 /*
  * score()
@@ -455,6 +463,7 @@ void remove_node(vvertex vv)
    */
   int fd_violated;
   double fds=fd_score(vnode,pnode,fd_violated);
+  remove_global_fds(vnode,pnode);
   SSUB(fds);
   violated -= fd_violated;
   vinfo.desires -= fd_violated;
@@ -1013,6 +1022,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   violated--;
 
   // features/desires
+  add_global_fds(vnode,pnode);
   int fd_violated;
   double fds = fd_score(vnode,pnode,fd_violated);
   SADD(fds);
@@ -1496,17 +1506,53 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
   if (!pnode->features.empty()) {
     for (feature_it = pnode->features.begin();
 	feature_it != pnode->features.end();++feature_it) {
-      desire_it = vnode->desires.find((*feature_it).first);
-      SDEBUG(cerr << "  feature = " << (*feature_it).first
+      crope feature_name = (*feature_it).first;
+      value = (*feature_it).second;
+      SDEBUG(cerr << "  feature = " << feature_name
 	  << " " << (*feature_it).second << endl);
 
-      if (desire_it == vnode->desires.end()) {
-	// Unused feature.  Add weight
-	SDEBUG(cerr << "    unused" << endl);
-	value = (*feature_it).second;
-	fd_score+=SCORE_FEATURE*value;
-	if (value >= FD_VIOLATION_WEIGHT) {
-	  fd_violated++;
+      if (feature_name[0] == '*') {
+	SDEBUG(cerr << "    global" << endl);
+	// Handle features with global scope - for now, these don't have
+	// desires to go with them, but we may want to change that at some
+	// point
+	  switch (feature_name[1]) {
+	    case '&': // A 'one is okay' feature - only score if we have more
+	              // than one pnode with this feature
+	      SDEBUG(cerr << "    'one is okay'" << endl);
+	      if (global_fd_set[feature_name] > 1) {
+		SDEBUG(cerr << "      but more than one" << endl);
+		fd_score+=SCORE_FEATURE*value;
+		if (value >= FD_VIOLATION_WEIGHT) {
+		  fd_violated++;
+		}
+	      }
+	      break;
+	    case '!': // A 'more than one is okay' feature - if we already have one,
+	              // a second doesn't incur further penalty
+	      SDEBUG(cerr << "    ' more than one is okay'" << endl);
+	      if (global_fd_set[feature_name] == 1) {
+		SDEBUG(cerr << "      but only one" << endl);
+		fd_score+=SCORE_FEATURE*value;
+		if (value >= FD_VIOLATION_WEIGHT) {
+		  fd_violated++;
+		}
+	      }
+	      break;
+	    default:
+	      // Global features are required to have some kind of type
+	      cerr << "Bad global feature " << (*feature_it).first << endl;
+	      exit(2);
+	  }
+      } else {
+	desire_it = vnode->desires.find(feature_name);
+	if (desire_it == vnode->desires.end()) {
+	  // Unused feature.  Add weight
+	  SDEBUG(cerr << "    unused" << endl);
+	  fd_score+=SCORE_FEATURE*value;
+	  if (value >= FD_VIOLATION_WEIGHT) {
+	    fd_violated++;
+	  }
 	}
       }
     }
@@ -1514,6 +1560,36 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 
   SDEBUG(cerr << "  Total feature score: " << fd_score << endl);
   return fd_score;
+}
+
+/*
+ * For now, in these function, which simply keep the global_fd_set
+ * data structure up to date, we ignore vnodes desires - however, we may
+ * decide to change this someday if we use global features for some other
+ * purpose
+ */
+void add_global_fds(tb_vnode *vnode,tb_pnode *pnode) {
+  tb_pnode::features_map::iterator feature_it;
+  if (!pnode->features.empty()) {
+    for (feature_it = pnode->features.begin();
+	feature_it != pnode->features.end();++feature_it) {
+      if (feature_it->first[0] == '*') {
+	global_fd_set[feature_it->first]++;
+      }
+    }
+  }
+}
+void remove_global_fds(tb_vnode *vnode,tb_pnode *pnode) {
+  tb_pnode::features_map::iterator feature_it;
+  if (!pnode->features.empty()) {
+    for (feature_it = pnode->features.begin();
+	feature_it != pnode->features.end();++feature_it) {
+      if (feature_it->first[0] == '*') {
+	global_fd_set[feature_it->first]--;
+	assert(global_fd_set[feature_it->first] >= 0);
+      }
+    }
+  }
 }
 
 /* make_lan_node(vvertex vv)
