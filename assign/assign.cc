@@ -408,6 +408,11 @@ int assign()
 
 	bestscore = score();
 	absbest = bestscore;
+	node n3;
+	forall_nodes(n3, G) {
+		absnodes[n3] = G[n3].partition();
+		absphys[n3] = physnodes[n3];
+	}
 
 	if (bestscore == 0) {
 #ifdef VERBOSE
