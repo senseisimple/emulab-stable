@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Kernel, jail, netstat, route, ifconfig, ipfw, header files.
@@ -973,17 +973,24 @@ sub addroutestorc($rc)
     open(RC, ">$rc") or
 	fatal("Could not open $rc to append static routes");
 
+    #
+    # XXX use address for localhost.  For some reason the route command is
+    # going to the DNS before using the hosts file, despite the host.conf
+    # file.
+    # 
+    my $localhost = "127.0.0.1";
+
     my $routerip  = getcnetrouter($USEVCNETROUTES);
     my $hostip    = `cat $BOOTDIR/myip`;
     chomp($hostip);
 
     #
     # First the set of routes that all jails get. 
-    # 
+    #
     print RC "static_routes=\"default lo0 host\"\n";
     print RC "route_default=\"default $routerip\"\n";
-    print RC "route_lo0=\"localhost -interface lo0\"\n";
-    print RC "route_host=\"$hostip localhost\"\n";
+    print RC "route_lo0=\"$localhost -interface lo0\"\n";
+    print RC "route_host=\"$hostip $localhost\"\n";
 
     if ($IP ne $hostip) {
 	#
@@ -995,7 +1002,15 @@ sub addroutestorc($rc)
 	#
 	# All other jails are reachable via the control net interface.
 	#
-	print RC "static_routes=\"\$static_routes privnet\"\n";
+	# N.B. privnet is setup first even before the default route.
+	# This is because the gateway for the default route is on the
+	# privnet, but our control net interface is not (because it has
+	# a 255.255.255.255 netmask by virtue of being an alias on the
+	# real control interface).  Thus there is no way to use the
+	# default route until the privnet route is up (ARP complains
+	# about "host is not on local network").
+	#
+	print RC "static_routes=\"privnet \$static_routes\"\n";
 	print RC "route_privnet=\"-net $IP -interface $phys_cnet_if $IPMASK\"\n";
 	#
 	# If using the virtual control net for routes, also make sure that
@@ -1016,7 +1031,7 @@ sub addroutestorc($rc)
     # interface!
     # 
     foreach my $ip (@jailips) {
-	print RC "static_routes=\"ip${count} \$static_routes\"\n";
+	print RC "static_routes=\"\$static_routes ip${count}\"\n";
 	print RC "route_ip${count}=\"$ip -interface lo0\"\n";
 	$count++;
     }
