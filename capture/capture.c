@@ -103,6 +103,7 @@ sigset_t actionsigmask;
 sigset_t allsigmask;
 #ifdef  USESOCKETS
 char		  *Bossnode = BOSSNODE;
+struct sockaddr_in Bossaddr;
 char		  *Aclname;
 int		   serverport = SERVERPORT;
 int		   sockfd, tipactive, portnum;
@@ -256,6 +257,17 @@ main(int argc, char **argv)
 			die("%s: fchmod: %s", Runname, geterr(errno));
 	}
 #ifdef  USESOCKETS
+	/*
+	 * Verify the bossnode and stash the address info
+	 */
+	he = gethostbyname(Bossnode);
+	if (he == 0) {
+		die("gethostbyname(%s): %s", Bossnode, hstrerror(h_errno));
+	}
+	memcpy ((char *)&Bossaddr.sin_addr, he->h_addr, he->h_length);
+	Bossaddr.sin_family = AF_INET;
+	Bossaddr.sin_port   = htons(serverport);
+
 	(void) sprintf(strbuf, ACLNAME, ACLPATH, Machine);
 	Aclname = newstr(strbuf);
 	
@@ -1347,7 +1359,6 @@ int
 handshake(void)
 {
 	int			sock, cc, err = 0;
-	struct sockaddr_in	name;
 	struct hostent	       *he;
 	whoami_t		whoami;
 	tipowner_t		tipown;
@@ -1397,26 +1408,18 @@ handshake(void)
 	}
 	alarm(5);
 
-	/* Need to map the hostname. */
-	he = gethostbyname(Bossnode);
-	if (! he) {
-		die("gethostbyname(bossnode): %s", hstrerror(h_errno));
-	}
-	memcpy ((char *)&name.sin_addr, he->h_addr, he->h_length);
-	name.sin_family = AF_INET;
-	name.sin_port   = htons(serverport);
-
-	if (connect(sock, (struct sockaddr *) &name, sizeof(name)) < 0) {
-		warn("connect(bossnode): %s", geterr(errno));
+	if (connect(sock, (struct sockaddr *)&Bossaddr, sizeof(Bossaddr)) < 0) {
+		warn("connect(%s): %s", Bossnode, geterr(errno));
 		err = -1;
+		close(sock);
 		goto done;
 	}
 
 	if ((cc = write(sock, &whoami, sizeof(whoami))) != sizeof(whoami)) {
 		if (cc < 0)
-			warn("write(bossnode): %s", geterr(errno));
+			warn("write(%s): %s", Bossnode, geterr(errno));
 		else
-			warn("write(bossnode): Failed");
+			warn("write(%s): Failed", Bossnode);
 		err = -1;
 		close(sock);
 		goto done;
@@ -1424,30 +1427,29 @@ handshake(void)
 	
 	if ((cc = read(sock, &tipown, sizeof(tipown))) != sizeof(tipown)) {
 		if (cc < 0)
-			warn("read(bossnode): %s", geterr(errno));
+			warn("read(%s): %s", Bossnode, geterr(errno));
 		else
-			warn("read(bossnode): Failed");
+			warn("read(%s): Failed", Bossnode);
 		err = -1;
 		close(sock);
 		goto done;
 	}
-	tipuid = tipown.uid;
-	tipgid = tipown.gid;
-	
 	close(sock);
-	needshake = 0;
-	dolog(LOG_INFO,
-	      "Handshake complete. Owner %d, Group %d", tipuid, tipgid);
 
 	/*
 	 * Now that we have owner/group info, set the runfile and aclfile.
 	 */
-	if (runfile &&
-	    chown(Runname, tipuid, tipgid) < 0)
+	tipuid = tipown.uid;
+	tipgid = tipown.gid;
+	if (runfile && chown(Runname, tipuid, tipgid) < 0)
 		die("%s: chown: %s", Runname, geterr(errno));
 
 	if (chown(Aclname, tipuid, tipgid) < 0)
 		die("%s: chown: %s", Aclname, geterr(errno));
+
+	dolog(LOG_INFO,
+	      "Handshake complete. Owner %d, Group %d", tipuid, tipgid);
+	needshake = 0;
 
  done:
 	alarm(0);
