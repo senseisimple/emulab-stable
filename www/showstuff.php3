@@ -26,7 +26,7 @@ function SHOWPROJECT($pid, $thisuid) {
           <table align=center cellpadding=2 border=1>\n";
     
     $proj_created	= $row[created];
-    $proj_expires	= $row[expires];
+    #$proj_expires	= $row[expires];
     $proj_name		= stripslashes($row[name]);
     $proj_URL		= $row[URL];
     $proj_public        = $row[public];
@@ -115,10 +115,10 @@ function SHOWPROJECT($pid, $thisuid) {
               <td class=\"left\">$proj_created</td>
           </tr>\n";
     
-    echo "<tr>
-              <td>Expires: </td>
-              <td class=\"left\">$proj_expires</td>
-          </tr>\n";
+    #echo "<tr>
+    #          <td>Expires: </td>
+    #          <td class=\"left\">$proj_expires</td>
+    #      </tr>\n";
     
     echo "<tr>
               <td>Experiments Created:</td>
@@ -356,7 +356,7 @@ function SHOWUSER($uid) {
 	DBQueryFatal("SELECT * from users where uid='$uid'");
 
     $row	= mysql_fetch_array($userinfo_result);
-    $usr_expires = $row[usr_expires];
+    #$usr_expires = $row[usr_expires];
     $usr_email   = $row[usr_email];
     $usr_URL     = $row[usr_URL];
     $usr_addr    = stripslashes($row[usr_addr]);
@@ -423,10 +423,10 @@ function SHOWUSER($uid) {
               <td><A href='$usr_URL'>$usr_URL</A></td>
           </tr>\n";
     
-    echo "<tr>
-              <td>Expiration date:</td>
-              <td>$usr_expires</td>
-          </tr>\n";
+    #echo "<tr>
+    #          <td>Expiration date:</td>
+    #          <td>$usr_expires</td>
+    #      </tr>\n";
     
     echo "<tr>
               <td>Address 1:</td>
@@ -520,7 +520,7 @@ function SHOWEXP($pid, $eid) {
     }
 
     $exp_gid     = $exprow[gid];
-    $exp_expires = $exprow[expt_expires];
+    #$exp_expires = $exprow[expt_expires];
     $exp_name    = stripslashes($exprow[expt_name]);
     $exp_created = $exprow[expt_created];
     $exp_start   = $exprow[expt_start];
@@ -583,10 +583,10 @@ function SHOWEXP($pid, $eid) {
             <td class=\"left\">$exp_created</td>
           </tr>\n";
 
-    echo "<tr>
-            <td>Expires: </td>
-            <td class=\"left\">$exp_expires</td>
-          </tr>\n";
+    #echo "<tr>
+    #        <td>Expires: </td>
+    #        <td class=\"left\">$exp_expires</td>
+    #      </tr>\n";
 
     echo "<tr>
             <td>Started: </td>
