@@ -10,7 +10,7 @@ require("defs.php3");
 $printable = $_GET['printable'];
 $docname   = $_GET['docname'];
 
-# Pedantic page arument checking. Good practice!
+# Pedantic page argument checking. Good practice!
 if (!isset($docname) ||
     (isset($printable) && !($printable == "1" || $printable == "0"))) {
     PAGEARGERROR();

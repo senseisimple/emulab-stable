@@ -11,7 +11,7 @@ chdir("tutorial");
 # Page arguments.
 $printable = $_GET['printable'];
 
-# Pedantic page arument checking. Good practice!
+# Pedantic page argument checking. Good practice!
 if (isset($printable) && !($printable == "1" || $printable == "0")) {
     PAGEARGERROR();
 }
