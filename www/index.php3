@@ -73,14 +73,14 @@ elseif ($uid = GETUID()) {
 # So I can test on my home machine easily. This *is* required to make the
 # the frames work correctly.
 # 
-echo "<base href=\"$TBBASE\" target=\"dynamic\">\n";
-?>
+echo "<base href=\"$TBBASE/\" target=\"dynamic\">\n";
 
-</head>
-<body>
-<basefont size=5>
-<a href="welcome.html"><b>Emulab.Net Home</b></a>
-<basefont size=4>
+echo "</head>
+        <body>
+          <basefont size=5>
+          <a href=\"$TBBASE/welcome.html\"><b>Emulab.Net Home</b></a>
+          <basefont size=4>\n";
+?>
 
 <?php
 if (isset($uid)) {
