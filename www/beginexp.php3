@@ -618,13 +618,9 @@ elseif (isset($nsdata) && strcmp($nsdata, "")) {
 }
 else {
     #
-    # I am going to allow shell experiments to be created (No NS file),
-    # but only by admin types.
+    # Not allowed anymore!
     #
-    if (! ISADMIN($uid)) {
-	RESPIT("NS File", "You must provide an NS file");
-    }
-    $nonsfile = 1;
+    RESPIT("NS File", "You must provide an NS file. No nodes is fine.");
 }
 
 #
