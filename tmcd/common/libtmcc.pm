@@ -28,7 +28,7 @@ use Exporter;
 	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT TMCCCMD_EVENTKEY TMCCCMD_ROUTELIST
 	     TMCCCMD_ROLE TMCCCMD_RUSAGE TMCCCMD_WATCHDOGINFO TMCCCMD_HOSTKEYS
 	     TMCCCMD_FIREWALLINFO TMCCCMD_EMULABCONFIG
-	     TMCCCMD_CREATOR
+	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO
 	     );
 
 # Must come after package declaration!
@@ -158,6 +158,7 @@ my %commandset =
       "firewallinfo"	=> {TAG => "firewallinfo"},
       "emulabconfig"	=> {TAG => "emulabconfig"},
       "creator"		=> {TAG => "creator"},
+      "hostinfo"	=> {TAG => "hostinfo"},
     );
 
 #
@@ -204,6 +205,7 @@ sub TMCCCMD_HOSTKEYS()  { $commandset{"hostkeys"}->{TAG}; }
 sub TMCCCMD_FIREWALLINFO(){ $commandset{"firewallinfo"}->{TAG}; }
 sub TMCCCMD_EMULABCONFIG(){ $commandset{"emulabconfig"}->{TAG}; }
 sub TMCCCMD_CREATOR     (){ $commandset{"creator"}->{TAG}; }
+sub TMCCCMD_HOSTINFO    (){ $commandset{"hostinfo"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library

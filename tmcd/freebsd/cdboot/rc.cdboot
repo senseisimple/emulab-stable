@@ -136,6 +136,16 @@ sub doboot()
     $bootdev = WhichRawDisk();
     print("Using $bootdev for config sector ...\n");
 
+    #
+    # Report back the CD version
+    # XXX may want to consider not doing then on every boot
+    #
+    if (-e "$ETCDIR/emuboot-volid") {
+	my $cdversion = `cat $ETCDIR/emuboot-volid`;
+	chomp($cdversion);
+	tmcc(TMCCCMD_HOSTINFO, "CDVERSION=$cdversion");
+    }
+
   bootinfo:
     #
     # If this is first install on this disk, or if the disk has just been

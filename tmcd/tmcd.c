@@ -226,6 +226,7 @@ COMMAND_PROTOTYPE(dodoginfo);
 COMMAND_PROTOTYPE(dohostkeys);
 COMMAND_PROTOTYPE(dotmcctest);
 COMMAND_PROTOTYPE(dofwinfo);
+COMMAND_PROTOTYPE(dohostinfo);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -300,6 +301,7 @@ struct command {
         { "hostkeys",     FULLCONFIG_NONE, 0, dohostkeys},
         { "tmcctest",     FULLCONFIG_NONE, F_MINLOG, dotmcctest},
         { "firewallinfo", FULLCONFIG_ALL,  0, dofwinfo},
+        { "hostinfo",     FULLCONFIG_NONE, 0, dohostinfo},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5024,6 +5026,28 @@ COMMAND_PROTOTYPE(dodoginfo)
 	if (verbose)
 		info("%s", buf);
 
+	return 0;
+}
+
+/*
+ * Stash info returned by the host into the DB
+ * Right now we only recognize CDVERSION=<str> for CD booted systems.
+ */
+COMMAND_PROTOTYPE(dohostinfo)
+{
+	char		*bp, buf[MYBUFSIZE];
+
+	bp = rdata;
+	if (sscanf(bp, "CDVERSION=%31[a-zA-Z0-9-]", buf) == 1) {
+		if (verbose)
+			info("HOSTINFO CDVERSION=%s\n", buf);
+		if (mydb_update("update nodes set cd_version='%s' "
+				"where node_id='%s'",
+				buf, reqp->nodeid)) {
+			error("HOSTINFO: %s: DB update failed\n", reqp->nodeid);
+			return 1;
+		}
+	}
 	return 0;
 }
 
