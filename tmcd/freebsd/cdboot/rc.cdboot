@@ -1,0 +1,402 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use File::Basename;
+use Fcntl;
+
+#
+# This script is run directly from boot. It should NOT be run after
+# that since some stuff is not setup to properly restart yet. For
+# general reconfig or update, use rc.config instead.
+#
+sub usage()
+{
+    print "Usage: " . scriptname() . "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist    = "";
+my $action     = "boot";
+my $debug      = 1;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $RCDIR   = "$BINDIR/rc";
+
+#
+# Disk related parameters
+#
+
+# where to find kernel config output
+my $dmesgcmd = "/sbin/dmesg";
+my $dmesgfile = "/var/run/dmesg.boot";
+
+# preferred ordering of disks to use
+my @preferred = ("ar", "aacd", "amrd", "mlxd", "twed", "ad", "da");
+
+# ordered list of disks found and hash of sizes
+my @disklist;
+my %disksize;
+
+# min disk size we can use (in MB)
+my $MINDISKSIZE = 8000;
+
+my $defrawdisk	= "/dev/ad0";
+my $rawbootdisk;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    /^rawdisk$/i && do {
+	WhichRawDisk();
+	print "$rawbootdisk\n";
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my $bootdev;
+    
+    #
+    # The CD does some different stuff.
+    #
+    print("Doing Testbed Setup on a CD\n");
+
+    # Get the boss info for below.
+    my ($bossname, $bossip) = tmccbossinfo();
+    if (!defined($bossname)) {
+	fatal("Could not determine the name of the boss server!");
+    }
+
+    # Will not return until it gets something it likes.
+    $bootdev = WhichRawDisk();
+    print("Using $bootdev for config sector ...\n");
+
+    #
+    # If this is first install on this disk, or if the disk has just been
+    # loaded, initialize the magic sector so that it boots from the CD.
+    # We might reset that below. 
+    #
+    system("tbbootconfig -v $bootdev");
+    if ($?) {
+	print("No valid boot config on $bootdev; initializing ...\n");
+	system("tbbootconfig -d -f -c 1 -k 0 -m 1 $bootdev");
+	if ($?) {
+	    print("Error running tbbootconfig; falling back to MFS boot\n");
+	    goto mfs;
+	}
+    }
+
+    #
+    # Use the bootinfo client to find out what we should do. Note that
+    # like the PXE version, this client will block when told to WAIT
+    # by the bootinfo server, returning only when bootinfo says that the node
+    # should boot (has been allocated or needs to be reloaded).
+    #
+    my $bootwhat = `bootinfoclient -s $bossname`;
+    if ($?) {
+	print("Error running bootinfoclient; falling back to MFS boot\n");
+	goto mfs;
+    }
+    chomp($bootwhat);
+
+    if ($debug) {
+	print("Bootinfo returned '$bootwhat'\n");
+	sleep(30);
+    }
+
+    if ($bootwhat eq "reboot") {
+	print("Bootinfo says to reboot ... so thats what we gonna do!\n");
+	system("sync");
+	system("reboot");
+	sleep(10000);
+    }
+    elsif ($bootwhat =~ /^partition:(\d)$/) {
+	print("Bootinfo says to boot slice $1!\n");
+	system("tbbootconfig -d -c 0 -k $1 -m 1 $bootdev");
+	if ($?) {
+	    print("Error running tbbootconfig; falling back to MFS boot\n");
+	    goto mfs;
+	}
+	system("sync");
+	system("reboot");
+	sleep(10000);
+    }
+    elsif ($bootwhat =~ /^mfs:[-\w\.]*:(.*)$/) {
+	print("Bootinfo says to boot MFS $1!\n");
+	my $mfs = basename($1);
+
+	#
+	# We know about a couple of different MFSs, but thats it!
+	#
+	if ($mfs eq "newnode") {
+	    system("$BINDIR/newclient");
+	}
+	elsif ($mfs eq "frisbee") {
+	    #
+	    # Run the frisbee script. If all goes well it will reboot.
+	    # Any problems we land back here, so go into the MFS so we
+	    # can possibly diagnose the problem.
+	    #
+	    system("$RCDIR/rc.frisbee");
+	    goto mfs;
+	}
+	elsif ($mfs eq "freebsd") {
+	    goto mfs;
+	}
+	else {
+	    # Default to FreeBSD MFS.
+	    goto mfs;
+	}
+    }
+
+    #
+    # At this point, chain over to the MFS boot, since the CD mirrors
+    # that when doing a standard BSD boot.
+    #
+  mfs:
+    if (-x "$RCDIR/rc.mfs") {
+	print("Switching over to MFS boot setup\n");
+	system("$RCDIR/rc.mfs");
+	# Fall through on failure.
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}
+
+#
+# Which raw disk. Prompt if we cannot come up with a good guess.
+# Note: raw and block devices are one in the same now.
+#
+sub WhichRawDisk()
+{
+    #
+    # Find the list of configured disks
+    #
+    my @list = DiskList();
+
+    #
+    # Search the drives looking for one with a valid header.
+    # 
+    foreach my $disk (@list) {
+	my $guess = "/dev/${disk}";
+
+	system("tbbootconfig -v $guess");
+	if (! $?) {
+	    $rawbootdisk = $guess;
+	    goto gotone;
+	}
+    }
+
+    #
+    # None with configuration info, just use the first existing disk
+    # which is large enough and is actually accessible.
+    #
+    foreach my $disk (@list) {
+	my $guess = "/dev/${disk}";
+
+	if (DiskSize($disk) >= $MINDISKSIZE && DiskReadable($disk)) {
+	    #
+	    # Allow for overiding the guess, with short timeout.
+	    #
+	    $rawbootdisk = Prompt("Which Disk Device is the boot device?",
+				  "$guess", 10);
+	    goto gotone;
+	}
+    }
+  gotone:
+    
+    #
+    # If still not defined, then loop forever.
+    # 
+    while (!defined($rawbootdisk) || ! -e $rawbootdisk) {
+	$rawbootdisk = Prompt("Which Disk Device is the boot device?",
+			      $defrawdisk);
+    }
+    return $rawbootdisk;
+}
+
+#
+# Create a list of all disks and their sizes.
+#
+sub DiskList()
+{
+    if (-x $dmesgcmd) {
+	GetDisks($dmesgcmd);
+    }
+
+    # if we didn't grab anything there, try the /var/run file
+    if (@disklist == 0 && -r $dmesgfile) {
+	GetDisks("cat $dmesgfile");
+    }
+
+    return @disklist;
+}
+
+sub DiskSize($)
+{
+    my ($name) = @_;
+
+    if (defined($disksize{$name})) {
+	return $disksize{$name};
+    }
+    return 0;
+}
+
+sub DiskReadable($)
+{
+    my ($disk) = @_;
+    my $dev = "/dev/$disk";
+
+    if (!system("dd if=$dev of=/dev/null bs=512 count=32 >/dev/null 2>&1")) {
+	return(1);
+    }
+    return(0);
+}
+
+sub GetDisks($)
+{
+    my ($cmd) = @_;
+    my @units = (0, 1, 2, 3);
+    my @cmdout = `$cmd`;
+
+    #
+    # Arbitrary: we prefer disk type over unit number;
+    # e.g. ad1 is better than da0.
+    #
+    foreach my $disk (@preferred) {
+	foreach my $unit (@units) {
+	    my $dmesgpat = "^($disk$unit):.* (\\d+)MB.*\$";
+	    foreach my $line (@cmdout) {
+		if ($line =~ /$dmesgpat/) {
+		    my $name = $1;
+		    my $size = $2;
+		    if (!defined($disksize{$name})) {
+			push(@disklist, $name);
+		    }
+		    $disksize{$name} = $size;
+		}
+	    }
+	}
+    }
+}
+
+#
+# Spit out a prompt and a default answer. If optional timeout supplied,
+# then wait that long before returning the default. Otherwise, wait forever.
+#
+sub Prompt($$;$)
+{
+    my ($prompt, $default, $timeout) = @_;
+
+    if (!defined($timeout)) {
+	$timeout = 10000000;
+    }
+
+    print "$prompt";
+    if (defined($default)) {
+	print " [$default]";
+    }
+    print ": ";
+
+    eval {
+	local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+	
+	alarm $timeout;
+	$_ = <STDIN>;
+	alarm 0;
+    };
+    if ($@) {
+	if ($@ ne "alarm\n") {
+	    die("Unexpected interrupt in prompt\n");
+	}
+	#
+	# Timed out.
+	#
+	print "\n";
+	return $default;
+    }
+    return undef
+	if (!defined($_));
+	
+    chomp();
+    if ($_ eq "") {
+	return $default;
+    }
+
+    return $_;
+}

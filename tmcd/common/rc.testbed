@@ -13,6 +13,14 @@
 . /etc/emulab/paths.sh
 
 #
+# First check for cdboot.
+#
+if [ -x $BINDIR/rc/rc.cdboot ]; then
+	$BINDIR/rc/rc.cdboot
+	exit 0
+fi
+
+#
 # If on the MFS, skip this stuff and just do the MFS setup stuff.
 #
 if [ -e $ETCDIR/ismfs ]; then

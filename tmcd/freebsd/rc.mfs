@@ -94,9 +94,7 @@ sub doboot()
     if (-x "$RCDIR/rc.ipod") {
 	print("Setting up Ping of Death\n");
 	system("$RCDIR/rc.ipod");
-	if ($?) {
-	    fatal("Error running $RCDIR/rc.ipod");
-	}
+	# This is allowed to fail; ipod might not be supported.
     }
 
     # Now we get into the real work.

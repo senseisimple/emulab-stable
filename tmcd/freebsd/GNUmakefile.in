@@ -28,7 +28,7 @@ all:	supfile injail $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DESTDIR		=
+DESTDIR		= 
 SYSETCDIR	= $(DESTDIR)/etc
 JAILDIR		= $(SYSETCDIR)/jail
 ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
@@ -49,6 +49,30 @@ mfs-install:	common-install etc-install \
 			script-install bin-install
 	cp $(SRCDIR)/mfs-rc.conf $(SYSETCDIR)/rc.conf
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
+
+cdboot-install:	common-install etc-install \
+			script-install bin-install
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdroot $(SYSETCDIR)/rc.cdroot
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
+	cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab
+	cp $(SRCDIR)/cdboot/fstab.lbs $(SYSETCDIR)/fstab.lbs
+	cp $(SRCDIR)/cdboot/loader.conf $(DESTDIR)/boot/loader.conf
+	cp $(SRCDIR)/cdboot/loader.rc.lbs $(DESTDIR)/boot/loader.rc.lbs
+	cp $(SRCDIR)/cdboot/.profile $(DESTDIR)/.profile
+	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
+	(cd ../../sensors/slothd; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../pxe; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../os/frisbee.redux; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../cdrom/tbbootconfig;$(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../tools/teachswitch; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	$(INSTALL) -m 755 $(SRCDIR)/../../install/newclient $(BINDIR)/newclient
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/users
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/proj
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/groups
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/share
 
 control-install:	dir-install
 	cp /dev/null $(ETCDIR)/isctrl
@@ -82,7 +106,7 @@ dir-install:
 	ln -s emulab $(DESTDIR)/usr/local/etc/testbed
 
 common-install:	dir-install
-	(cd ../common; $(MAKE) local-install)
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile

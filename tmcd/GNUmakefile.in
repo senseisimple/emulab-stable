@@ -29,6 +29,11 @@ SSLFLAGS = -DWITHSSL
 TMLIBS	+= -lssl -lcrypto
 SSLOBJ   = ssl.o
 ifeq ($(SYSTEM),Linux)
+NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+ifeq ($(NEEDKERB),0)
+ CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+ TMLIBS   += `/usr/kerberos/bin/krb5-config --libs krb5`
+endif
 TMLIBS  += -ldl
 MDSUBDIR  = linux
 endif

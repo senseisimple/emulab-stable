@@ -117,6 +117,7 @@ if [ x"$ADDRESS" != x ]; then
 		echo "Image load complete, rebooting ...";
 		$BINDIR/tmcc state RELOADDONE;
 		/sbin/reboot;
+		sleep 100;
 		;;
 	*)
 		echo "Frisbee run failed, status $?"

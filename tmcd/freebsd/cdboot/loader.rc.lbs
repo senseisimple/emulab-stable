@@ -1,0 +1,15 @@
+\ Loader.rc
+\ $FreeBSD: src/sys/boot/forth/loader.rc,v 1.2 1999/11/24 17:59:37 dcs Exp $
+\
+\ Includes additional commands
+include /boot/loader.4th
+
+\ Reads and processes loader.rc
+start
+
+\ Do the testbed boot thing. Note that this file is not actually installed
+\ on the CD. Its just for my disk based version. On the CD, loader.rc is
+\ modified in the boot floopy image.
+testbed_boot
+
+
