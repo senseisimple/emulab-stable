@@ -30,6 +30,7 @@ my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
 my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
+my $ADMINGRP= "@TBADMINGROUP@";
 
 my $SSH     = "$TB/bin/sshtb";
 my $USERMOD = "/usr/sbin/pw usermod";
@@ -275,7 +276,20 @@ foreach my $uid (@userlist) {
     # users can have more unix groups than just the projects/groups they are
     # in. These groups must already exist. 
     #
-    if ((my @extragrouplist = TBUnixGroupList($uid))) {
+    my @extragrouplist = TBUnixGroupList($uid);
+
+    #
+    # Add special admin group. Check to make sure that its not a dup
+    # since the above mechanism could cause a duplicate entry. No big
+    # deal to catch it.
+    #
+    if (TBAdmin($uid)) {
+	if (! grep(/^${ADMINGRP}$/, @extragrouplist)) {
+	    push(@extragrouplist, $ADMINGRP);
+	}
+    }
+    
+    if (@extragrouplist) {
 	print "Adding extra groups to list: @extragrouplist\n";
     
 	if ($grouplist) {
