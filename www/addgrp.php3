@@ -18,11 +18,11 @@ if ( ereg("php3\?([[:alnum:]]+)",$REQUEST_URI,$Vals) ) {
   <H1 align="center">Apply to Use the Utah&nbsp;Network&nbsp;Testbed</h1>
   </td></tr>
 <tr><td align="center" colspan="4">
-Only fields marked with * are required</td></tr>
+Fields marked with * are required; those marked + are highly recommended.</td></tr>
   <form action=grpadded.php3 method="post">
-	<tr><td colspan=2>Project Information</td>
+	<tr><td colspan=2>Project Information <em>(replace the example entries)</em></td>
   <td colspan=2>Project Head Information</td></tr>
-  <tr><td>*Name:</td><td><input type="text" name="gid" value="TestNet-One">
+  <tr><td>*Name (no blanks):</td><td><input type="text" name="gid" value="ucb-omcast">
       </td>
   <td>*Username:</td><td class="left">
   <?php
@@ -38,7 +38,7 @@ Only fields marked with * are required</td></tr>
     echo "<input type=\"text\" name=\"grp_head_uid\"></td></tr>\n";
 	}
 echo "<tr><td>*Long name:</td><td>
-      <input type=\"text\" name=\"grp_name\" value=\"Test Networks One\">
+      <input type=\"text\" name=\"grp_name\" value=\"UCB Overlay Multicast\">
       </td>
       <td>*Full Name:</td><td class=\"left\">";
 if (isset($row)) {
@@ -47,8 +47,8 @@ if (isset($row)) {
   echo "<input type=\"text\"";
 }
 echo "name=\"usr_name\"></td></tr>
-<tr><td>URL:</td><td><input type=\"text\" name=\"grp_URL\"
-                 value=\"http://www.testnetworks.org\">
+<tr><td>+URL:</td><td><input type=\"text\" name=\"grp_URL\"
+                 value=\"http://www.cs.berkeley.edu/netgrp/omcast/\">
                  </td>
 <td>*Email<br>Address:</td><td class=\"left\">";
 if (isset($row)) {
@@ -57,19 +57,19 @@ if (isset($row)) {
   echo "<input type=\"text\" ";
 }
 echo "name=\"email\"></td></tr>
-<tr><td>When&nbsp;do&nbsp;you<br>expect&nbsp;to&nbsp;be&nbsp;done<br>using&nbsp;the&nbsp;testbed?</td>
+<tr><td>When do&nbsp;you<br>expect&nbsp;to&nbsp;be&nbsp;done<br>using&nbsp;the&nbsp;testbed?</td>
 <td><input type=\"text\" value=";  #set a default expiration date 
 $mytime = date("m/d/Y", time() + (86400 * 90)); #add 30 days 
 echo "\"$mytime\""; 
 echo "name=\"grp_expires\"></td>
-	<td>*Mailing<br>Address:</td><td class=\"left\">";
+	<td>*Postal<br>Address:</td><td class=\"left\">";
 if (isset($row)) {
   echo "<input type=\"readonly\" value=\"$row[usr_addr]\" name=\"usr_addr\">";
 } else {
 		echo "<input type=\"text\"  name=\"usr_addr\">";
 }
 echo "</td></tr>
-<tr><td>*Your Research<br>Affiliation:</td><td><input type=\"text\" name=\"grp_affil\" value=\"UofX Networks Group\"></td>
+<tr><td>*Your institutional<br>affiliation:</td><td><input type=\"text\" name=\"grp_affil\" value=\"UCB Networks Group\"></td>
 	<td>*Phone #:</td><td class=\"left\"><input ";
 if (isset($row)) {
   echo "type=\"readonly\" value=\"$row[usr_phone]\"";
@@ -91,8 +91,11 @@ if (isset($row)) {
 }
 ?>
 name="password2">&nbsp;</td></tr>
-<tr><td colspan="4">*Please describe how and why you plan 
-to use the Testbed:</td></tr> 
+<tr><td colspan="4">*Please describe how and why you'd like
+to use the testbed, including an estimate of the number of nodes
+and their type.  If the research is sponsored (funded),
+list the sponsors.
+</td></tr> 
 <tr><td colspan="4" class="left"><textarea name="why"
 rows="10" cols="70"></textarea></td></tr>
   <tr><td colspan="4" align="center"><b><input type="submit" 
@@ -101,4 +104,3 @@ value="Submit"></b></td></tr>
   </table>
 </body>
 </html>
-
