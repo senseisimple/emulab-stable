@@ -1595,10 +1595,13 @@ sub OSFeatureSupported($$) {
 	return 0;
     }
 
-    foreach my $osfeature (split(',', $query_result->fetchrow_array())) {
-	if ($feature eq $osfeature) {
-	    return 1;
-	}
+    my $osfeatures = $query_result->fetchrow_array();
+    if (defined($osfeatures)) {
+	foreach my $osfeature (split(',', $osfeatures)) {
+	    if ($feature eq $osfeature) {
+		return 1; 
+	    }
+	} 
     }
     return 0;
 }
