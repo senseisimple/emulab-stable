@@ -198,9 +198,7 @@ if ($nsfile_string) {
 # so that the batch daemon will see it and act.
 # 
 if ($immediate) {
-    system("$startexp -g $gid $pid $eid $nsfile");
-
-    if ($?) {
+    if (system("$startexp -g $gid $pid $eid $nsfile")) {
 	#
 	# Save a copy of the failed experiment directory for debugging. 
 	#
