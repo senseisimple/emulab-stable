@@ -1,0 +1,19 @@
+# A test IR for assign.tcl
+
+START topology
+START nodes
+A pc lAC
+B pc lBC
+C pc lAC lBC lCD
+D pc lDE lDF lCD
+E pc lDE
+F pc lDF
+END nodes
+START links
+lAC A -1 C -1 100 100 10 10
+lBC B -1 C -1 100 100 10 10
+lCD C -1 D -1 50 50 150 200
+lDE D -1 E -1 100 100 10 10
+lDF D -1 F -1 100 100 10 10
+END links
+END topology
