@@ -11,6 +11,7 @@ table { border: 0px; background-color: #99A}
 table.nogrid { border: solid 1px #669; background-color:#99A; }
 table.stealth { border: 0px; background-color:#FFF; }
 td.stealth { background-color:#FFF; }
+img.stealth { background-color:#FFF; }
 
 td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
 

@@ -227,7 +227,7 @@ if (mysql_num_rows($experiments_result)) {
     # Now shove out the column headers.
     #
 if ($thumb && !$idle) {
-    echo "<table border=2 cols=0
+    echo "<table border=2 cols=2
                  cellpadding=2 cellspacing=2 align=center><tr>";
 
     $thumbCount = 0;
@@ -247,13 +247,20 @@ if ($thumb && !$idle) {
 #	echo "<tr
 
 	echo "<td>".
-             "<table border=0 cellpadding=0 cellspacing=0 style='margin: 2px;' width=100%><tr>".
-	     "<td width=128>".
-	     "<img border=1 width=128 height=128 style='background-color:#FFF;' ".
-	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' align=center></td>" .
-	     "<td style='padding: 8px;'><b><a href='showproject.php3?pid=$pid'>$pid</a>/".
-             "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></h4><br />\n".
-	     "<b><font size=-1>$name</font></b><br />\n";
+             "<table border=0 cellpadding=4 cellspacing=0>".
+	     "<tr>".
+	     "<td width=128 align=center>".
+	     "<img border=1 width=128 height=128 class='stealth' ".
+	     " src='top2image.php3?pid=$pid&eid=$eid&thumb=128' />".
+             "</td>" .
+	     "<td align=left class='paddedcell'>".
+	     "<b>".
+ 	     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+             "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
+	     "</b>".
+	     "<br />\n".
+	     "<b><font size=-1>$name</font></b>".
+             "<br />\n";
 
 	# echo "<font size=-2>Using 69 PCs</font>\n";
 
