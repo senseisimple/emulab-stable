@@ -171,6 +171,7 @@ if (mysql_num_rows($experiments_result)) {
       echo "<center><b>Experiments that have been idle at least 24 hours</b></center><p>\n";
     }
     
+    $idlemark = "<b>*</b>";
     #
     # Okay, I decided to do this as one big query instead of a zillion
     # per-exp queries in the loop below. No real reason, except my personal
@@ -239,6 +240,7 @@ if (mysql_num_rows($experiments_result)) {
 	$name = stripslashes($row["expt_name"]);
 	$date = $row["d"];
 	$state= $row["state"];
+	$isidle = $row["swap_requests"];
 	$daysidle=0;
 	
 	if ($isadmin) {
@@ -337,7 +339,8 @@ if (mysql_num_rows($experiments_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>\n";
-
+	
+	if ($isidle) { $nodes = $nodes.$idlemark; }
 	# If multiple classes, then hightlight the number.
 	if ($special)
             echo "<td><font color=red>$nodes</font></td>\n";
@@ -356,6 +359,8 @@ if (mysql_num_rows($experiments_result)) {
 
     echo "<ol>
              <li><font color=red>Red</font> indicates nodes other than PCs.
+                 A $idlemark mark by the node count indicates that the
+                 experiment is currently considered idle.
           </ol>\n";
     
     echo "<center><b>Node Totals</b></center>\n";
