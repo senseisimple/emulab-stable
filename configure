@@ -1206,6 +1206,7 @@ else
 		    event/nsetrafgen/GNUmakefile \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
+		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated";
 
 	optional_subdirs="$optional_subdirs event";
@@ -1293,7 +1294,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1297: checking for a BSD compatible install" >&5
+echo "configure:1298: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6

@@ -320,6 +320,7 @@ else
 		    event/nsetrafgen/GNUmakefile \
                     event/delay-agent/GNUmakefile \
 		    event/program-agent/GNUmakefile \
+		    event/stated/waitForState \
 		    event/stated/GNUmakefile event/stated/stated";
 
 	optional_subdirs="$optional_subdirs event";
