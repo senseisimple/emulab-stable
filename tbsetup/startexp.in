@@ -194,9 +194,9 @@ my $autoswaptime= $row{'autoswap_timeout'} / 60.0;
 
 my $swapsettings = 
  #"Name:        $expt_name\n" .
-  "Swappable:   $swappable".($swappablebit ? "\n" : " (Reason: '$noswap')\n").
+  "Swappable:   $swappable".($swappablebit ? "\n" : " (Reason: $noswap)\n").
   "Idle-Swap:   $idleswap".
-  ($idleswapbit ? ", at $idleswaptime hours\n" : " (Reason: '$noidleswap')\n").
+  ($idleswapbit ? ", at $idleswaptime hours\n" : " (Reason: $noidleswap)\n").
   "Auto-Swap:   $autoswap".
   ($autoswapbit ? ", at $autoswaptime hours\n" : "\n");
 
