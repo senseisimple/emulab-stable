@@ -1,0 +1,179 @@
+This file documents the compile-time options for assign, and known caveats.
+
+Clearly, there are WAY too many of these! Many of these can/should be make into
+runtime options, or eliminated altogether.
+
+Debugging/Extra Output
+----------------------
+VERBOSE			Like the name suggests...
+DEBUG_TSTEP		Print debugging information about temperature steps
+STATS                   Print some stats each step - similar to DEBUG_TSTEP
+PCLASS_DEBUG		Print out pclasses once they've been determined
+GRAPH_DEBUG		Print out the switch graph
+DUMP_GRAPH		Print out the physical graph
+ROB_DEBUG		Rob's very own debugging output - miscellaneous junk
+SCORE_DEBUG		Print some messages about certain scoring events
+SCORE_DEBUG_LOTS	Print virtual and physical nodes/links being scored
+SCORE_DEBUG_MORE        Print every time we add or subtract the score!
+GNUPLOT_OUTPUT		Create scores.out, temp.out, delta.out, which are
+			written every time a transition is accepted, in a form
+			that gnuplot likes
+VIZ_LINK_LABELS		When producing graphviz output, label the links
+
+Cooling Schedule Options
+------------------------
+
+These four constitute the new, from the literature, cooling schedule:
+MELT			Start with a melting phase, in which we accept all
+			transitions, and decide on an initial temperature.
+			Standard SA stuff.
+CHILL			Rather than a simple multiplicative decrease in 
+			temperature, uses a function from the literature that
+			picks the new temperature based on the score change
+			in the previous temperature stop
+NEIGHBOR_LENGTH		Base the length of the Markov chains on the approximate
+			size of the neighborhood structure - simply the number
+			of vnodes * the number of pclasses
+EPSILON_TERMINATE	Use a delta function, which is compared against a
+			constant, epsilon, to determine when we're done, instead
+			of stopping at a static temperature
+
+PHYS_CHAIN_LEN		Make the length of Markov chains (iters. at each
+			temperature step) dependent on the size of the physical
+			graph. Not for use with the new cooling schedule
+USE_OPTIMAL		Exit early if we hit a lower bound we've computed on
+			the score. Not very maintainable, so not recommended
+TIME_TERMINATE		Add support for terminating after a given time - bad,
+			because it doesn't alter the cooling schedule at all
+TIME_TARGET		Better than TIME_TERMINATE, because it times the melting
+			run and then does a simple multiplicative decrease
+			cooling schedule, attempting to hit the target time. Not
+			very accurate
+LOCAL_DERIVATIVE	Use the local derivative for EPSILON_TERMINATE - default
+			is to use the total temperature delta divided by the
+			total temperature delta
+ALLOW_NEGATIVE_DELTA    I was having some trouble with EPSILON_TERMINATE -
+			the average score was getting temporarily worse by
+			a small amount, causing early termination. If this
+			variable is not set, the delta function must be
+			positive for it to trigger termination
+LOW_TEMP_STOP		Stop at a lower-than-normal temperature. Not for use
+			with the new cooling schedule
+RANDOM_ASSIGNMENT	Perform a pseudo-random assignment by exiting as soon
+			as we get violation-free solution
+REALLY_RANDOM_ASSIGNMENT Like RANDOM_ASSIGNMENT, but exits even if there are
+			violations
+FINISH_HILLCLIMB	When we would normally terminate, go back to the best
+			solution and keep going for a while - the idea is to
+			do a hillclimb from there. Seems like a good idea, but
+			not well tested
+
+SA Mechanics Options
+--------------------
+NO_REVERT		Normal behavior is to revert to the best solution at
+			the end of each temperature step. This is somewhat
+			questionable, so setting this disables it. You should
+			set REVERT_LAST if this is set!
+REVERT_LAST		Revert to best solution at the end of the last
+			temperature step - only needed with NO_REVERT
+REVERT_VIOLATIONS	Exclusive with  NO_REVERT - revert at the end of the
+			temperature step if the best solution has fewer
+			violations, but ignore the score
+PCLASS_SIZE_BALANCE	Weight pclasses by size, instead of giving them equal
+			weights, so that we're more likely to pick a pclass
+			that has more members. Of dubious value
+FIND_PNODE_SEARCH	To find a pnode, assign normally picks the first one
+			in a pclass - this can cause problems, since this
+			can result in a pclass getting 'stuck' - all attempts
+			to map to it fail, because the front pnode has vnodes
+			assigned to it that prevent mapping. This option causes
+			a linear search through the pnode members for one that
+			can be used. Theoretically can increase runtime, but
+			in practice, does not, and fixes otherwise unmappable
+			topologies.
+LOAD_BALANCE		Normally, when multiplexing, assign tends to minimize
+			the number of pnodes used. This option attempts (with
+			limited success) to load-balance across the smallest
+			number of pnodes possible instead. Requires
+			FIND_PNODE_SEARCH . Intended for ModelNet-type mapping
+FIX_LAN_NODES		Normally, LAN nodes are annealed just like normal nodes.
+			This option treats them like fixed nodes - they are only
+			moved during LAN migration. Not clear if this is a good
+			idea or not, so it's off by default
+AUTO_MIGRATE		Performs LAN migration every time a node in the LAN is
+			re-assigned. This is quite heavyweight, so it increases
+			runtime quite a bit, and doesn't seem to improve scores
+			that much. Probably, LAN migration should be made more
+			lightweight so that this can be turned on without much
+			computation time penalty
+FREE_IMMEDIATELY	When assign picks a vnode to re-map, it waits until
+			after finding a replacement pnode to free the original
+			mapping. This solves the exact-fit problem in which
+			nodes being remapped always pick the old mapping again,
+			since the just-freed pnode is the only one free. This
+			option reverts to the old behavior, in which the unmap
+			is done immediately, before picking a new pnode
+ALLOW_TRIVIAL_DEFAULT   The new behavior for trivial links is that a vlink must
+			be specially marked in order for assign to be allowed to
+			satisfy it with a trivial link. This reverts to the old
+			behavior in which all vlinks are allowed to be mapped to
+			trivial links by default.
+PER_VNODE_TT		Normally, assign keeps a 'type table' indicating which
+			pnodes are potential matches by type - eg., there is
+			a list of all pc850 nodes. This option builds this table
+			for each node, instead of for each type. This helps
+			greatly when there are nodes of the same type, but with
+			different numbers of interfaces. Also provides some
+			helpful information up-from about which nodes cannot
+			be mapped, and could be used to prune down the size of
+			the search space, since we can ignore nodes that are not
+			in any node's TT. Unfortunately, breaks vclasses, so 
+			it's off for now
+SMART_UNMAP		When assign decides that it needs to unmap some existing
+			mapping, because there are no potential matches for a
+			vnode, causes it to intelligently unmap a pnode that
+			could be a match for the current vnode, rather than
+			picking one a random. Requires PER_VNODE_TT
+
+Scoring Options
+---------------
+NO_VIOLATIONS		Removes special treatment for violations - we still keep
+			track of them, but they don't affect whether a solution
+			is accepted. Makes assign behave more like traditional
+			simulated annealing
+FIX_PLINK_ENDPOINTS	Allows the 'fixends' option to a plink that specifies
+			that all vlinks mapped to that plink must have endpoints
+			on the same pnodes - essentially, an interface can only
+			talked to one other interface. Useful for ModelNet-type
+			mapping, and potentially useful for jails, vlinks, and
+			NSE
+FIX_PLINKS_DEFAULT	Makes the 'fixends' option the default on all plinks.
+			Requires FIX_PLINK_ENDPOINTS
+PENALIZE_UNUSED_INTERFACES Apply a penalty for every interface not used. Should
+			favor not wasting interfaces, but its affects on the
+			overall scoring function are not well-studied
+NO_PCLASS_PENALTY	Turn off the penalty for using pclasses - intended to
+			get consistent scores between runs using and not using
+			pclasses
+INTERSWITCH_LENGTH	Scale the cost for using interswitch links by the length
+			of the interswitch path. ie. if a a vlink crosses from
+			a first switch, through a second, to a third, it incurs
+			the interswitch penalty two times. Without this option,
+			assign only assesses the penalty once, no matter how
+			long the interswitch path
+PENALIZE_BANDWIDTH	Penalize based on the bandwidth of links that, for
+			example, cross interswitch links, not just the number
+			of links. Will need to be in place when we do gigabit,
+			but not well tested yet
+
+Bugfixes
+--------
+FIX_SHARED_INTERFACES	Fix a bug in which assign was happily re-using
+			interfaces for more than one vlink, without penalty.
+			Should be the default
+PNODE_SWITCH_LOAD	When putting a pnode back into a pclass list, swith the
+			order in which it is inserted, based on its current
+			load. Should be the default
+PNODE_ALWAYS_FRONT	Always put a pnode into the front of its pclass list,
+			regardless of whether it is being used or not. Only for
+			debugging PNODE_SWITCH_LOAD - should go away
