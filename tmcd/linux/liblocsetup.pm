@@ -103,9 +103,9 @@ sub os_cleanup_node ($) {
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$)
+sub os_ifconfig_line($$$$$$)
 {
-    my ($iface, $inet, $mask, $speed, $duplex) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases) = @_;
     my ($ifc, $miirest, $miisleep, $miisetspd, $media);
 
     #
