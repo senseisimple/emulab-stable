@@ -41,7 +41,7 @@ A. Load the image on a testbed machine.
 We will assume the machine is called "pc1" in the following directions.
 
 * Put the Utah-provided generic image in /usr/testbed/images on your
-  file server machine.  The generic image will be loaded, and the custom
+  boss machine.  The generic image will be loaded, and the custom
   image saved, using this directory.
 
 * Boot pc1 into the admin MFS as described above
@@ -81,6 +81,14 @@ We will assume the machine is called "pc1" in the following directions.
 	< /usr/testbed/images/FBSD410+RHL90-GENERIC.ndz
 
   Image loading should take anywhere from 45 seconds, to several minutes.
+
+  If the ssh returns with "Killed" then imageunzip ran out of memory.
+  By default, imageunzip will consume memory without bound for buffering
+  of pending disk writes.  If it grow too big, the system will kill it.
+  In this case, retry the imageunzip with "-W <num-MB>" where <num-MB>
+  is a number of MB maximum to use for disk buffering.  If the node you
+  Using about half of the available physical memory should be safe
+  (e.g., if the machine are loading has 512MB of memory, try "-W 256").
 
 Now you can begin customizing the FreeBSD and Linux partitions.
 
