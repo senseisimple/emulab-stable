@@ -44,6 +44,7 @@ char *usagestr =
  " -s server	   Specify a sync server to connect to\n"
  " -p portnum	   Specify a port number to connect to\n"
  " -i count	   Initialize named barrier to count waiters\n"
+ " -a              Master returns immediately when initializing barrier\n"
  " -u		   Use UDP instead of TCP\n"
  "\n";
 
@@ -65,11 +66,15 @@ main(int argc, char **argv)
 	int			useudp  = 0;
 	char			*server = NULL;
 	int			initme  = 0;
+	int			nowait  = 0;
 	char			*barrier= DEFAULT_BARRIER;
 	barrier_req_t		barrier_req;
 	
-	while ((ch = getopt(argc, argv, "ds:p:ui:n:")) != -1)
+	while ((ch = getopt(argc, argv, "ds:p:ui:n:a")) != -1)
 		switch(ch) {
+		case 'a':
+			nowait++;
+			break;
 		case 'd':
 			debug++;
 			break;
@@ -141,10 +146,13 @@ main(int argc, char **argv)
 	/*
 	 * Build up the request structure to send to the server.
 	 */
+	bzero(&barrier_req, sizeof(barrier_req));
 	strcpy(barrier_req.name, barrier);
 	if (initme) {
 		barrier_req.request = BARRIER_INIT;
 		barrier_req.count   = initme;
+		if (nowait)
+			barrier_req.flags = BARRIER_INIT_NOWAIT;
 	}
 	else
 		barrier_req.request = BARRIER_WAIT;

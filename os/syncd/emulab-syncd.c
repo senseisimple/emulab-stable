@@ -25,8 +25,10 @@
 #include "log.h"
 
 int		debug = 0;
+static int	portnum = SERVER_PORTNUM;
 static int      handle_request(int, struct sockaddr_in *, barrier_req_t *,int);
 static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
+static void     release_client(int sock, struct in_addr ip, int istcp);
 int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 
@@ -80,7 +82,6 @@ int
 main(int argc, char **argv)
 {
 	int			tcpsock, udpsock, i, fdcount, ch;
-	int			portnum = SERVER_PORTNUM;
 	FILE			*fp;
 	char			buf[BUFSIZ];
 	extern char		build_info[];
@@ -301,7 +302,7 @@ handle_request(int sock, struct sockaddr_in *client,
 {
 	barrier_ctrl_t	   *barrierp = allbarriers;
 	barrier_ctrl_t	   *tmp;
-	int		   i, foo = 1;
+	int		   i;
 
 	/*
 	 * Find the control structure. Since a waiter can check in before
@@ -334,6 +335,15 @@ handle_request(int sock, struct sockaddr_in *client,
 			     inet_ntoa(client->sin_addr),
 			     barrierp->name, barrier_reqp->count,
 			     barrierp->count);
+
+		if (barrier_reqp->flags & BARRIER_INIT_NOWAIT) {
+			info("%s: Barrier Master not waiting: %s\n",
+			     inet_ntoa(client->sin_addr),
+			     barrierp->name);
+			
+			release_client(sock, client->sin_addr, istcp);
+			goto check;
+		}
 	}
 	else if (barrier_reqp->request == BARRIER_WAIT) {
 		barrierp->count -= 1;
@@ -364,36 +374,18 @@ handle_request(int sock, struct sockaddr_in *client,
 	 * value to make it "easy" for the waiter to notice an error,
 	 * say if the server node goes down or the daemon dies.
 	 */
+ check:
 	if (barrierp->count != 0)
 		return 0;
 
 	for (i = 0; i < barrierp->index; i++) {
-		int thissock = barrierp->waiters[i].sock;
-		int err;
-
 		if (debug)
 			info("%s: releasing %s\n", barrierp->name,
 			     inet_ntoa(barrierp->waiters[i].ipaddr));
-				     
-		if (barrierp->waiters[i].istcp) {
-			if ((err = write(thissock, &foo, sizeof(foo))) <= 0) {
-				if (err < 0) {
-					errorc("writing to TCP client");
-				}
-				error("write to TCP client aborted");
-			}
-			close(thissock);
-		}
-		else {
-			client->sin_addr.s_addr =
-				barrierp->waiters[i].ipaddr.s_addr;
-				
-			err = sendto(thissock, &foo, sizeof(foo), 0,
-				     (struct sockaddr *)client,
-				     sizeof(*client));
-			if (err < 0)
-				errorc("writing to UDP client");
-		}
+
+		release_client(barrierp->waiters[i].sock,
+			       barrierp->waiters[i].ipaddr,
+			       barrierp->waiters[i].istcp);
 	}
 
 	/*
@@ -415,4 +407,47 @@ handle_request(int sock, struct sockaddr_in *client,
 	}
 	return 0;
 }
+
+/*
+ * Release a single client from a barrier at a time.
+ */
+static void
+release_client(int sock, struct in_addr ipaddr, int istcp)
+{
+	int	err, foo = 1;
+	
+	if (istcp) {
+		if ((err = write(sock, &foo, sizeof(foo))) <= 0) {
+			if (err < 0) {
+				errorc("writing to TCP client");
+			}
+			error("write to TCP client aborted");
+		}
+		close(sock);
+	}
+	else {
+		struct sockaddr_in	client;
+		
+		client.sin_addr    = ipaddr;
+		client.sin_family  = AF_INET;
+		client.sin_port    = htons(portnum);
+
+		err = sendto(sock, &foo, sizeof(foo), 0,
+			     (struct sockaddr *)&client,
+			     sizeof(client));
+		if (err < 0)
+			errorc("writing to UDP client");
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
 

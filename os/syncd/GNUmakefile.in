@@ -19,10 +19,10 @@ all:	emulab-syncd emulab-sync
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-emulab-syncd:	emulab-syncd.o version.o 
+emulab-syncd:	emulab-syncd.o version.o decls.h
 	$(CC) $(CFLAGS) emulab-syncd.o version.o $(LIBS) -o emulab-syncd
 
-emulab-sync:	emulab-sync.o version.o 
+emulab-sync:	emulab-sync.o version.o decls.h
 	$(CC) $(CFLAGS) emulab-sync.o version.o $(LIBS) -o emulab-sync
 
 version.c: emulab-syncd.c 

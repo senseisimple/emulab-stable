@@ -13,12 +13,19 @@
  */
 typedef struct {
 	char		name[64];	/* An arbitrary string */
-	int		request;	/* Either init or wait */
+	short		request;	/* Either init or wait */
+	short		flags;		/* See below */
 	int		count;		/* Number of waiters */
 } barrier_req_t;
 
-#define BARRIER_INIT	1
-#define BARRIER_WAIT	2
+/* Request */
+#define BARRIER_INIT		1
+#define BARRIER_WAIT		2
+
+/* Flags */
+#define BARRIER_INIT_NOWAIT	0x1	/* Initializer does not wait! */
+
+/* Default name is not specified */
 #define DEFAULT_BARRIER "barrier"
 
 /* Info */
