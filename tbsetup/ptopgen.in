@@ -16,12 +16,14 @@ sub usage()
 	  "       -e include given experiment's resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
 	  "       -v Include stuff for topologies with virtual nodes\n".
+	  "       -r Include stuff for topologies with widearea nodes\n".
 	  "       -m Override multiplex_factor\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:";
+my $optlist = "s:e:m:vp:r";
 my $mfactor;
 my $virtstuff = 0;
+my $widearea  = 0;
 
 #
 # Turn off line buffering on output
@@ -78,6 +80,9 @@ if (defined($options{"m"})) {
 }
 if (defined($options{"v"})) {
     $virtstuff = 1;
+}
+if (defined($options{"r"})) {
+    $widearea = 1;
 }
 if (defined($options{"p"})) {
     $pid = $options{"p"};
@@ -165,29 +170,13 @@ else {
     }
 }
 
-# Find available nodes
+# Find available nodes.
 #
-# VIRTNODES HACK: If the node is a virtual node, then in addition to
-# to being free, the underlying physnode has to either be free, or
-# not in the hwdown group. Either way, the the underlying physnode has
-# to be "up", as determined by the autostatus stuff; this will prevent us
-# from allocating a dead virtual node to an experiment. 
-# This is especially hacky. We need another mechanism for this. We only
-# add virtnodes when assign says we need them. This reduces the problem
-# size for assign! Also note that local virtnodes never go into the
-# ptop file. 
+# This first query deals with just local nodes. Local nodes can host
+# virtnodes, according to the delay_capacity in the types table. 
 #
-my $virtnode_condition = "";
 
-if ($virtstuff) {
-    $virtnode_condition = " or ".
-	"       (a.role='virtnode' and t.isremotenode=1 and ".
-	"        ns.status='up' and ".
-	"        (m.node_id is null or ".
-	"         m.pid!='$DEADPID' or m.eid!='$DEADEID')) ";
-}
-
-# the ordinary free condition for a node
+# the ordinary free condition for a local node.
 my $free_condition = "(b.node_id is null)";
 
 # if the user has specified an exempt pid/eid, 
@@ -202,16 +191,16 @@ $result =
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
-		 "left join node_status as ns on a.phys_nodeid=ns.node_id ".
 		 "left join node_types as t on t.type=a.type ".
 		 "where $free_condition and ".
-		 "      (a.role='testnode' $virtnode_condition)");
+		 "      (a.role='testnode' and t.isremotenode=0)");
 
 #
 # Scan the results, checking permissions and adding to the list
 # You get to use a node type if no pid was specified (that is, you get
-# to use all nodes), or if there is no entry as all in 
-
+# to use all nodes), or if there is no entry in the perms table for
+# the type/class of node.
+#
 while (($node,$type,$physnode,$class,$issubnode) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
@@ -221,17 +210,17 @@ while (($node,$type,$physnode,$class,$issubnode) = $result->fetchrow_array) {
     }
 }
 
-$sharklinks = "";
-
-# XXX NSE hack
-
-
 foreach $node (keys(%nodes)) {
     my $type = $nodes{$node};
     
-    my @types = ("$type:1","$classes{$type}:1");
+    my @types = ("$type:1");
     my @features;
     my @flags;
+
+    # Might be equal, which assign would sum as two, not one!
+    if ($type ne $classes{$type}) {
+	push(@types, "$classes{$type}:1");
+    }
 
     $delay_capacity = $nodetypes{$type};
     $virtnode_capacity = $virtcapacity{$type};
@@ -298,6 +287,76 @@ foreach $node (keys(%nodes)) {
 
 
     print "$text\n";
+}
+
+#
+# Widearea Nodes. Includes plab nodes. Note that widearea nodes are never
+# allocated directly (they are in a holding experiment), but assign deals
+# with it by allocating multiple vnodes on a pnode.
+#
+# The underlying physnode has to be "up", as determined by the
+# autostatus stuff; this will prevent us from allocating a dead
+# virtual node to an experiment.  This is especially hacky. We need
+# another mechanism for this. We only add virtnodes when assign says
+# we need them. This reduces the problem size for assign.
+#
+if ($widearea) {
+    $result =
+	DBQueryFatal("select count(a.node_id),a.type,a.phys_nodeid,aa.type ".
+		     "  from nodes as a ".
+ 		     "left join reserved as b on a.node_id=b.node_id ".
+		     "left join nodes as aa on aa.node_id=a.phys_nodeid ".
+		     "left join reserved as m on a.phys_nodeid=m.node_id ".
+		     "left join node_status as ns on ".
+		     "     a.phys_nodeid=ns.node_id ".
+		     "left join node_types as t on t.type=a.type ".
+		     "where  (a.role='virtnode' and t.isremotenode=1 and ".
+		     "        ns.status='up' and ".
+		     "        (b.node_id is null and ".
+		     "         !(m.pid='$DEADPID' and m.eid='$DEADEID'))) ".
+		     "group by a.phys_nodeid");
+    
+    while (($count,$type,$physnode,$ptype) = $result->fetchrow_array) {
+	my @types;
+	my @features;
+	my @flags;
+
+	$virtnode_capacity = min($count, $virtcapacity{$ptype});
+
+	@types = ("$type:$virtnode_capacity");	
+
+	# Might be equal, which assign would sum as two, not one!
+	if ($type ne $classes{$type}) {
+	    push(@types, "$classes{$type}:$virtnode_capacity");
+	}
+
+	#
+	# Add any auxiliary types.
+	#
+	# XXX These come from the physnode, not the vnode. 
+	#
+	if ($auxtypes{$physnode}) {
+	    foreach my $auxtype (@{$auxtypes{$physnode}}) {
+		my ($type,$num) = split(":", $auxtype);
+
+		push(@types, "$type:$virtnode_capacity");
+	    }
+	}
+
+	# Add trivial bw spec.
+	push @flags, "trivial_bw:400000";
+
+	# Add features
+	if (defined($features{$type})) {
+	    push @features, "$features{$type}";
+	}
+
+	my $text = "node $physnode " .
+	           join(" ",@types) . " - " . join(" ",@features) .
+		   " - " . join(" ",@flags);
+
+	print "$text\n";
+    }
 }
 
 # Read interfaces
@@ -421,8 +480,6 @@ foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
     print "link link-$interconnect $src $dst $interconnects{$interconnect} 0 0 1\n";
 }
-
-print $sharklinks;
 
 # Print out links
 sub get_iface {
