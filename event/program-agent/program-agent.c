@@ -81,10 +81,15 @@ main(int argc, char **argv)
 
 	if (debug) 
 		loginit(0, 0);
-	else if (logfile)
-		loginit(0, logfile);
-	else
-		loginit(1, "program-agent");
+	else {
+		/* Become a daemon */
+		daemon(0, 0);
+
+		if (logfile)
+			loginit(0, logfile);
+		else
+			loginit(1, "program-agent");
+	}
 
 	/*
 	 * Get our IP address. Thats how we name ourselves to the
@@ -322,7 +327,7 @@ start_program(char *objname, char *args)
 	 * I have no idea how SIGCHLD and Elvin interact, and I am not
 	 * in the mood to find out!
 	 */
-	execl(_PATH_CSHELL, "csh", "-c", pinfo->cmdline, (char *)NULL);
+	execl(_PATH_CSHELL, "csh", "-f", "-c", pinfo->cmdline, (char *)NULL);
 
 	/* Ug */
 	pfatal("start_program: exec failed: %s", pinfo->cmdline);
