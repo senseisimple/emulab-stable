@@ -1,0 +1,144 @@
+Authenticated ICMP Ping of Death Specification
+
+The IPOD is designed to provide remote machine reboot at the kernel level.
+This allows for non-powercycle reboots of many wedged machine problems,
+but not all.  (Any system administrator who has found themselves 20 miles
+away from a machine that pings but otherwise doesn't respond has thought
+of this!)
+
+The design of the IPOD needs to prevent spoofing and replay attacks, but
+no confidentiality is needed.
+
+
+Summary:
+
+Via an authenticated, encrypted out-of-band channel (ssh, ssl), the
+administrator preconfigures an IPOD code (key) on the target machine,
+and tells it the host from which the IPOD may be sent.  When the
+machine needs to be rebooted, the administrator sends an ICMP message
+of type 6, subtype 6 containing the key.  The machine checks the key
+against its stored code, and if they match, the kernel reboots.
+The reboot does NOT attempt to perform a graceful shutdown (e.g.,
+syncing the disks) it is essentially a hardware reset.
+
+
+Authentication mechanisms:
+
+The IPOD employs two authentication mechanisms.  The first is a check
+of the host from which the IPOD packet came.  Host in this case is an
+address/mask pair so it is possible to allow an IPOD packet from a
+subnet as well as from an individual host.  This level of authentication
+is sufficient in an environment in which IP address spoofing is not
+possible.
+
+The second mechanism is the aforementioned key, which must be
+communicated securely to the client at client boot time.  This provides
+a degree of security when IP spoofing cannot be prevented.  By changing
+the key at each reboot, replay attacks can be avoided.
+
+
+System interfaces:
+
+In Linux and FreeBSD, IPOD is configured via the sysctl interface
+using five variables:
+
+version (read-only):
+    Tells the version of the IPOD implementation in use.  Current
+    version is 2.
+
+enabled (read-write):
+    If set to zero, ICMP type 6 subtype 6 packets are treated
+    as normal for the OS.  If set to one, an IPOD check is performed
+    and the machine rebooted if necessary.  Default value is zero.
+
+host (read-write):
+mask (read-write):
+    The usual address and netmask combination.  An address of ~0,
+    is considered invalid and IPOD is disabled as though the enabled
+    MIB were set to zero.  Default values for both host and mask are ~0.
+
+key (write-only):
+    A 32-byte ASCII string.  If set to the null string, no key check
+    is made and the machine is rebooted if the host/mask check was
+    successful.  Default value is "SETMETOSOMETHINGTHIRTYTWOBYTES!!"
+    (Should probably be random instead.)
+
+The exact sysctl names for these variables are different in Linux/BSD.
+For FreeBSD:
+
+net.inet.icmp.ipod.version	# a signed int
+net.inet.icmp.ipod.enabled	# a signed int
+net.inet.icmp.ipod.host		# a signed int, ugh!
+net.inet.icmp.ipod.mask		# a signed int, ugh!
+net.inet.icmp.ipod.key		# a string
+
+and Linux:
+
+net.ipv4.icmp_ipod_version	# a signed int
+net.ipv4.icmp_ipod_enabled	# a signed int
+net.ipv4.icmp_ipod_host		# a signed int, ugh!
+net.ipv4.icmp_ipod_mask		# a signed int, ugh!
+net.ipv4.icmp_ipod_key		# a string
+
+
+Packet format:
+
+A standard ICMP packet, addressed directly to the destination node.
+ICMP type is 6, ICMP code is 6.  Length of the ICMP must be at least
+32 bytes if key checking is enabled.
+
+
+Use in Netbed:
+
+At boot, a node checks in with Netbed Central ("boss" node) over a
+secure SSL connection using the TMCD protocol ("tmcc ipodinfo").  During
+this checkin, the boss generates a random key for the IPOD, stores the key
+in its database, and replies to the node sending the key and its own IP
+information.  The node parses the addr/mask/key information and configures
+the kernel using sysctls.  If the node cannot contact Netbed Central,
+it does not configure an IPOD key and IPOD processing is disabled.
+(Perhaps a better way to do this would be a challenge-response protocol,
+but that might add complexity, and the goal of IPOD is to be completely
+simple.)
+
+
+Checking the IPOD:
+
+	doit = 0;
+
+	/*
+	 * If IPOD not enabled or wrong ICMP code, ignore.
+	 */
+	if (!ipod_enabled || icp->icmp_code != 6)
+		return;
+
+	/*
+	 * First check the source address info.
+	 * If host not set, ignore.
+	 */
+	if (ipod_host != 0xffffffff &&
+	    (ntohl(ip->ip_src.s_addr) & ipod_mask) == ipod_host) {
+		/*
+		 * Now check the key if enabled.
+		 * If packet doesn't contain enough data or key
+		 * is otherwise invalid, ignore.
+		 */
+		if (IPOD_CHECK_KEY) {
+			if (ip->ip_len >= strlen(ipod_key) &&
+			    IPOD_VALID_KEY(icp->icmp_data))
+				doit = 1;
+		} else {
+			doit = 1;
+		}
+	}
+
+
+	if (doit) {
+		ipod_enabled = 0;
+		printf("IPOD: reboot forced by %lx...\n",
+		       ntohl(ip->ip_src.s_addr));
+		cpu_reset();
+	} else {
+		log(LOG_ERR, "IPOD: from %lx rejected\n",
+		    ntohl(ip->ip_src.s_addr));
+	}
