@@ -1040,6 +1040,13 @@ sub jailsetup()
     # Need to unify this with jailname.
     system("echo '$vnodeid' > " . TMNODEID());
 
+    #
+    # Always remove the old nickname file.  No need to worry about a project
+    # change at this level (see bootsetup) but we do need to make sure we
+    # pick up on a vnode/jail being reassigned to a different virtual node.
+    #
+    unlink TMNICKNAME;
+
     print STDOUT "Checking Testbed reservation status ... \n";
     if (! check_status()) {
 	print STDOUT "  Free!\n";
@@ -1073,6 +1080,13 @@ sub vnodejailsetup($)
 	die("*** $0:\n".
 	    "    No such directory: " . JAILDIR() . "\n");
     }
+
+    #
+    # Always remove the old nickname file.  No need to worry about a project
+    # change at this level (see bootsetup) but we do need to make sure we
+    # pick up on a vnode/jail being reassigned to a different virtual node.
+    #
+    unlink TMNICKNAME;
 
     # Do not bother if somehow got released.
     if (! check_status()) {
