@@ -162,6 +162,12 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
     return 0;
 }
 
+# Handy default wrapper.
+function TBvalid_slot($token, $table, $slot) {
+    return TBcheck_dbslot($token, $table, $slot,
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+
 # Handy wrappers for checking various fields.
 function TBvalid_uid($token) {
     return TBcheck_dbslot($token, "users", "uid",
