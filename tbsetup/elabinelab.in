@@ -16,13 +16,14 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT "Usage: elabinelab [-d] [-g] pid eid\n";
-    print STDOUT "       elabinelab [-d] [-k] pid eid\n";
+    print STDOUT "       elabinelab [-d] [-k | -f] pid eid\n";
  
     exit(-1);
 }
-my $optlist  = "dgk";
+my $optlist  = "dgkf";
 my $debug    = 1;
 my $killmode = 0;
+my $fwboot   = 0;
 my $dbgooonly= 0;
 
 #
@@ -100,6 +101,9 @@ if (defined($options{"d"})) {
 if (defined($options{"k"})) {
     $killmode = 1;
 }
+if (defined($options{"f"})) {
+    $fwboot = 1;
+}
 if (! @ARGV) {
     usage();
 }
@@ -155,6 +159,23 @@ exit(0)
 #
 my $firewall;
 my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
+
+#
+# Presetup; turn off firewall.
+#
+if ($fwboot) {
+    exit(0)
+	if (!$firewalled);
+    
+    print "Turning off firewall rules on $firewall\n";
+    $UID = 0;
+    system("$SSH -host $firewall ipfw add 1 allow all from any to any");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error turning off firewall rules ($firewall)!\n");
+    }
+    exit(0);
+}
 
 #
 # If we are going to start an inner experiment, grab the stuff we need
@@ -226,21 +247,13 @@ exit(0)
     if ($dbgooonly);
 
 #
-# For SSH below
+# For SSH and SCP below
 #
 $UID = 0;
 
 #
-# If firewalled, turn off the firewall during the setup.
-#
-if ($firewalled) {
-    print "Turning off firewall rules on $firewall\n";
-    system("$SSH -host $firewall ipfw add 1 allow all from any to any");
-    if ($?) {
-	die("*** $0:\n".
-	    "    Error turning off firewall rules ($firewall)!\n");
-    }
-}
+# The firewall should be off at this point; called from os_setup with -f.
+# 
 
 #
 # This is temporary. I think I will switch this over to grabbing the latest
@@ -406,7 +419,12 @@ if (defined($elabinelab_eid)) {
 }
 
 #
-# Turn the firewall back on. 
+# Turn the firewall back on.
+#
+# XXX If this fails, we have to do something much stronger! We do not want
+# nodes coming up and starting something if the firewall is not active.
+# Maybe hit the panic button from here (turning off the control network).
+#
 #
 if ($firewalled) {
     print "Turning firewall back on\n";

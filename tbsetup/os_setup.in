@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -65,6 +65,7 @@ TBDebugTimeStampsOn();
 my $vnode_setup = "$TB/sbin/vnode_setup";
 my $osselect    = "$TB/bin/os_select";
 my $nodereboot  = "$TB/bin/node_reboot";
+my $elab_setup  = "$TB/sbin/elabinelab";
 my $dbg		= 0;
 my $failed      = 0;
 my $noretry     = 0;
@@ -163,6 +164,22 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 my $user_email_to = "$user_name <$user_email>";
 
 TBDebugTimeStamp("os_setup started");
+
+#
+# See if the experiment is firewalled
+#
+my $firewall;
+my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
+
+#
+# Ditto ElabinElab.
+#
+my $elabinelab;
+
+if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
+    die("*** $0:\n".
+	"    Could not get elabinelab status for experiment $pid/$eid\n");
+}
 
 #
 # Get the set of nodes, as well as the nodes table information for them.
@@ -616,9 +633,24 @@ TBDebugTimeStamp("rebooting/reloading finished");
 # above? So that they enter a reasonably known state before we try to tear
 # things down. Otherwise we could end up power cycling nodes a lot more often.
 # This should probably be handled in other ways, say via stated or the alloc
-# state machine. 
+# state machine.
 #
 my @nodelist = keys(%nodes);
+
+#
+# Firewall stuff. If there is a firewall, we want to wait for that node
+# first, so reorder the list. 
+#
+if ($firewalled) {
+    my @tmp = ();
+
+    foreach my $node (@nodelist) {
+	push(@tmp, $node)
+	    if ($node ne $firewall);
+    }
+    unshift(@tmp, $firewall);
+    @nodelist = @tmp;
+}
 
 #
 # Now lets wait for them to come back alive. Set up a retry list though
@@ -652,10 +684,9 @@ while ( @nodelist ) {
 
     if (!TBNodeStateWait($node, $wstart, (60*7), \$actual_state,
 			 (TBDB_NODESTATE_TBFAILED, TBDB_NODESTATE_ISUP))) {
-	print "state is $actual_state\n";
-	
 	if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
-	    print "*** WARNING: $node reported a TBFAILED event; not retrying\n";
+	    print "*** WARNING: $node reported a TBFAILED event; ".
+		"not retrying\n";
 	    $retries{$node} = 0;
 	    goto tbfailed;
 	}
@@ -663,6 +694,17 @@ while ( @nodelist ) {
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
+
+	#
+	# Firewall has booted. 
+	# 
+	if ($firewalled && $node eq $firewall) {
+	    if (!FirewallBoot()) {
+		print "*** WARNING: Firewall Boot Setup failed!\n";
+		$failed++;
+		$noretry = 1;
+	    }
+	}
 	next;
     }
 
@@ -1050,4 +1092,29 @@ sub ForkCmd($) {
 
     system($cmd);
     exit($? >> 8);
+}
+
+#
+# A firewall has booted up. Might need to do something.
+#
+sub FirewallBoot()
+{
+    #
+    # The only case that currently matters is if the experiment is
+    # elabinelab. In this case we want to turn off the firewall so 
+    # the nodes can boot/reload normally. Later, after we set up the
+    # inner elab, we turn the firewall back on.
+    #
+    return 1
+	if (!$elabinelab);
+
+    #
+    # We use the elabinelab program to do this, since it knows what it
+    # might want to do (and helpfully, is setuid so it can ssh over). 
+    #
+    system("$elab_setup -f $pid $eid");
+    return 0
+	if ($?);
+    
+    return 1;
 }
