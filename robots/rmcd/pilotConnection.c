@@ -1269,6 +1269,7 @@ void pc_handle_signal(fd_set *rready, fd_set *wready)
 		struct mtp_packet mp;
 
 		if (mtp_receive_packet(mh, &mp) != MTP_PP_SUCCESS) {
+		  fatal("lost pilot connection");
 		    pc->pc_flags &= ~PCF_CONNECTED;
 		    pc->pc_flags |= PCF_CONNECTING;
 		}
