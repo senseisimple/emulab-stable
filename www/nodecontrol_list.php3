@@ -87,8 +87,22 @@ if (mysql_num_rows($query_result) == 0) {
     PAGEFOOTER();
 }
 
+#
+# First count up free nodes.
+#
+$free = 0;
+while ($row = mysql_fetch_array($query_result)) {
+    $pid                = $row[pid];
+    $status             = $row[status];
+
+    if (!$pid && $status == "up") {
+	$free++;
+    }
+}
+mysql_data_seek($query_result, 0);
+
 echo "<center><b>
-       View: $view\n";
+       View: $view<br>($free Free)\n";
 
 if (! strcmp($showtype, "widearea")) {
     echo "<br>
@@ -115,7 +129,7 @@ else {
     echo "<th align=center>Free?</th>\n";
 }    
 echo "</tr>\n";
-    
+
 while ($row = mysql_fetch_array($query_result)) {
     $node_id            = $row[node_id]; 
     $phys_nodeid        = $row[phys_nodeid]; 
