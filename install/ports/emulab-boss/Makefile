@@ -8,6 +8,7 @@ CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
+COMMENT=	"Meta-port for an emulab boss node"
 
 #
 # We set this so that the mysql server port doesn't do name resolution

@@ -12,6 +12,7 @@ MAINTAINER=	ricci@cs.utah.edu
 RESTRICTED=	"License prohibits redistribution"
 NO_PACKAGE=	"Binary redistribution prohibited"
 NO_CDROM=	"License prohibits redistribution"
+COMMENT=	"Libraries for the elvin messaging system"
 
 .include <bsd.port.pre.mk>
 

@@ -8,6 +8,7 @@ CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
+COMMENT=	"Meta-port for an emulab ops node"
 
 MAINTAINER=	ricci@cs.utah.edu
 
