@@ -33,15 +33,15 @@ my $result = DBQueryFatal($query);
 ############################## Determine pingable/unpingable nodes
 my (@newlyUp, @newlyDown, @newlyPD, @newlyUnpingable) = ();
 
-my $fpingPID = &open2("FOUT","FIN","$fping"); # Throws an exception on failure
+my $fpingPID = &open2("FOUT","FIN","$fping 2>&1"); # Throws an exception on failure
 
 my %oldStatus = (); # Status of node from the DB, so we can tell if it changed
 
 while (my %row = $result->fetchhash) {
 	my $node = $row{node_id};
+	$oldStatus{$node} = $row{status};
 	if ($row{osfeatures} && ($row{osfeatures} =~ /ping/)) {
 		# We have a node that should be capable of returning pings
-		$oldStatus{$node} = $row{status};
 		print FIN $node,"\n"; # Give fping another node to ping
 	} else {
 		# This node can't return pings
@@ -56,6 +56,8 @@ close(FIN); # Tell fping we're done giving it nodes
 while (<FOUT>) { # Read fping results
 	chomp;
 	my ($node,$status) = split /\s+/,$_,2;
+	# Skip ICMP messages
+	next if ($node eq "ICMP");
 	
 	if ($status eq "is alive") {
 		if ($oldStatus{$node} ne "up") {
