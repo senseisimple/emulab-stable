@@ -91,12 +91,12 @@ if (mysql_num_rows($query_result)) {
            align='center'>\n";
 
     echo "<tr>
-              <td><a href='showimageid_list.php3?&sortby=name'>
-                  Image</td>
-              <td><a href='showimageid_list.php3?&sortby=pid'>
-                  PID</td>
-              <td><a href='showimageid_list.php3?&sortby=desc'>
-                  Description</td>
+              <th><a href='showimageid_list.php3?&sortby=name'>
+                  Image</th>
+              <th><a href='showimageid_list.php3?&sortby=pid'>
+                  PID</th>
+              <th><a href='showimageid_list.php3?&sortby=desc'>
+                  Description</th>
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
