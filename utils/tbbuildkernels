@@ -42,6 +42,12 @@ build_kernel($MAINKERNEL,1);
 install_kernel($MAINKERNEL,1,["kernel", @MAINKERNEL_ALIASES]);
 
 #
+# Clean up kernel.old and modules.old
+#
+system "rm -f /kernel.old" and die "Unable to remove /kernel.old\n";
+system "rm -rf /modules.old" and die "Unable to remove /modules.old\n";
+
+#
 # Now, build the rest!
 #
 while (my ($name,$install_locations) = each %OTHER_KERNELS) {
