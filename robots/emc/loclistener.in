@@ -153,6 +153,11 @@ class LocationInfoUpdater(EventClient):
                 if not (update.has_key("loc_x") and update.has_key("loc_y")):
                     return
 
+                if (update.has_key("loc_x") and update.has_key("loc_y") and
+                    not update.has_key("orientation")):
+                    update["orientation"] = "0.0"
+                    pass
+                
                 if event.getEventType() == "SETDEST":
                     table_name = "nodes"
                     
@@ -172,6 +177,7 @@ class LocationInfoUpdater(EventClient):
                     pass
                 else:
                     table_name = "location_info"
+                    update["stamp"] = "UNIX_TIMESTAMP(now())"
                     pass
 
                 if len(update) > 0:
