@@ -241,7 +241,7 @@ while (@sortednodes) {
 	# continue on. We don't wait for them to go down or reboot.
         #
 	info("Force mode: power cycle ".join(" ",@batch));
-	system("$power cycle @batch");
+	PowerCycle(@batch);
 	if ($?) {
 	    exit ($? >> 8);
 	}
@@ -275,12 +275,17 @@ while (@sortednodes) {
 #
 # Wait for all the reboot children to exit before continuing.
 #
+my @needPowercycle = ();
 if (! $force) {
     foreach my $node ( sort(keys(%realnodes)) ) {
 	my $mypid     = $pids{$node};
 
 	waitpid($mypid, 0);
-	if ($?) {
+	my $status = $? >> 8;
+	if ($status == 2) {
+	    # Child signaled to us that this node needs a power cycle
+	    push @needPowercycle, $node;
+	} elsif ($?) {
 	    $failed++;
 	    print STDERR "Reboot of node $node failed!\n";
 	}
@@ -288,6 +293,13 @@ if (! $force) {
 	    print STDOUT "$node rebooting ...\n";
 	}
     }
+}
+
+#
+# Power cycle nodes that couldn't be brought down any other way
+#
+if (@needPowercycle) {
+    PowerCycle(@needPowercycle);
 }
 
 #
@@ -363,10 +375,8 @@ sub RebootNode {
     if (! DoesPing($pc)) {
 	info("$pc appears dead: power cycle");
 	print STDERR "$pc appears to be dead. Power cycling ...\n" if $debug;
-	if (PowerCycle($pc)) {
-	    exit(-1);
-	}
-	exit(0);
+	# Signal to the parent that the node needs to be power cycled
+	exit(2);
     }
 
     #
@@ -466,11 +476,7 @@ sub RebootNode {
 
     info("$pc: ipod failed ... power cycle");
     print STDERR "$pc is still running. Power cycling ...\n" if $debug;
-    if (PowerCycle($pc)) {
-	info("$pc: power cycle failed!");
-	exit(-1);
-    }
-    exit(0);
+    exit(2);
 }
 
 #
@@ -528,9 +534,11 @@ sub RebootVNode($$) {
 # Power cycle a PC using the testbed power program.
 #
 sub PowerCycle {
-    my ($pc) = @_;
+    my @pcs = @_;
 
-    system("$power cycle $pc");
+    my $pcstring = join(" ",@pcs);
+
+    system("$power cycle $pcstring");
     return $? >> 8;
 }
 
