@@ -8,6 +8,7 @@
 # @created: 10/13/03
 use strict;
 use Class::Struct;
+use Getopt::Std;
 use constant ERROR_LOG => "/tmp/linktest.log";
 use constant RUDE_LOG  => "/tmp/rude.log";
 use constant CRUDE_DAT => "/tmp/crude.dat"; # crude binary 
@@ -16,8 +17,8 @@ use constant RUDE_CFG  => "/tmp/rude.cfg";
 use constant PATHRATE_DAT => "/tmp/pathrate.dat";
 use constant SEND_RATE => 400; # rude sends 1 more than specified here.
 use constant PACK_COUNT => 401;
-use constant HI_BW => 90000000; # pathrate test only accurate 1-90 Mbps
-use constant LO_BW =>  1000000;
+#use constant HI_BW => 90000000; # pathrate test only accurate 1-90 Mbps
+#use constant LO_BW =>  1000000;
 use constant BSD => "FreeBSD";
 use constant LAT_TOL => 0.71; # units of ms
 use constant DEBUG => 1;
@@ -35,6 +36,7 @@ my $eid; # experiment id
 my $pid; # project id
 my $gid; # group id
 my $platform; #results of uname
+my $testlevel=99; #default all tests
 
 my @verts; # verts: list of text strings containing host names.
            # sorted alphabetically
@@ -69,26 +71,22 @@ my $lt_path = "/users/davidand/testbed/event/linktest";
 # Main control
 ##############################################################################
 
+&init;
+
+my %options=();
+getopts("f:cl:",\%options);
+
+# usage: f=filename, c= count synchs and exit, l=test level 1-3
+
 # if there is an arg, just count steps and return.
 # this was a quick hack to survey number of synch steps on production files.
 # figure out which file to use
 # get the nsfile path 
-if (@ARGV) {
-    $ns_file = $ARGV[0];
-    die "could not find $ns_file" unless -e $ns_file;
-    &get_topo();
-    &debug_top();
-    &count_steps();
-    exit(0);
-}
-    
-# init global scalars
-&init;
-
-if ( defined($ENV{TEST_NS_SCRIPT}) ) {
-    $ns_file = $ENV{TEST_NS_SCRIPT};
+if(defined $options{f}){
+    $ns_file = $options{f};
     die "could not find $ns_file" unless -e $ns_file;
 } else {
+
     # TODO: support groups!
     # if they modified, use the modify; else use the default.
     my $modname = "/proj/$pid/exp/$eid/tbdata/" . $eid . "-modify.ns";
@@ -102,28 +100,48 @@ if ( defined($ENV{TEST_NS_SCRIPT}) ) {
 # init topology
 &get_topo;
 
+if(defined $options{c}){
+    &debug_top();
+    &count_steps();
+    exit(0);
+}
+
+if(defined $options{l}) {
+    if($options{l}=~/(\d)/){
+       $testlevel=$1;
+    }
+}
+    
 # is there a synch server? if not that's a problem (unless have a default)
 die "no synch server defined in: $ns_file\n" unless defined($synserv);
 
-&debug_top;
-&debug("stat_rt_test\n");
-&stat_rt_test if defined($rtproto) && $rtproto eq "Static";
-&debug("onehop_test\n");
-&onehop_test;
+#&debug_top;
 
+    if($testlevel >= 1) {
 
-# had problems with ntpq so use ping instead for latency on BSD.
-&debug("ping_latency_test\n");
-&ping_latency_test;
+	&debug("stat_rt_test\n");
+	&stat_rt_test if defined($rtproto) && $rtproto eq "Static";
 
-my $testcount = @verts;
-&barrier_name($synserv,$testcount);
+	&debug("onehop_test\n");
+	&onehop_test;
+    }
 
-&debug("stream_test\n");
-&stream_test;
-&debug("bw_test\n");
-&bw_test;
+    if ($testlevel >=2) {
+	&debug("ping_latency_test\n");
+	&ping_latency_test;
+    }
+
+    if ($testlevel >=3) {
+	&debug("stream_test\n");
+	&stream_test; 
+    }
+
+    if( $testlevel >=4) {
+	&debug("bw_test\n");
+	&bw_test if $testlevel >=3;
+    }
 &debug("all done\n");
+
 
 ##############################################################################
 # Test procedures
@@ -190,10 +208,8 @@ sub stream_test {
 
     # all nodes will execute the same reductions on the edge list
     # on their own so that the number of barriers is the same.
-    while(@edge_copy) {
+    while(&has_elems(\@edge_copy)) {
 	my $edge = &get_assign(\@edge_copy);
-	my $edgecount = @edge_copy;
-	&debug("remaining in edge_copy after assign: $edgecount\n");
 	if(defined($edge)) {
 	    
 	    # unique barrier for this test.
@@ -224,7 +240,7 @@ sub stream_test {
 		my $crude_pid = fork();
 		if(!$crude_pid) {
 		    unlink CRUDE_DAT if -e CRUDE_DAT;
-		    open(STDOUT, ">/dev/null") unless DEBUG; # redirct output to null
+		    open(STDOUT, ">/dev/null") ; # redirct output to null
 		    exec "crude -l " . CRUDE_DAT;
 		}
 		&barrier_name($barrier_name,2);
@@ -234,9 +250,9 @@ sub stream_test {
 		# analyze log for loss.
 		&analyze_stream($edge,0);
 	    }
-	    # all nodes wait for the streams to complete
-	    &barrier();
 	}
+	# all nodes wait for the sub-syncs to complete
+	&barrier();
     }
 }
 
@@ -245,10 +261,11 @@ sub ping_latency_test {
 
     # all nodes will execute the same reductions on the edge list
     # on their own so that the number of barriers is the same.
-    while(@edge_copy) {
+    while(&has_elems(\@edge_copy)) {
+
 	my ($edge,$other_edge) = &get_twoway_assign(\@edge_copy);
 	if(defined($edge) && defined($other_edge)) {
-	    
+
 	    # do a RTT test for the link and see if it adds up.
 	    if($hostname eq $edge->src ) {
 		my $cmd;
@@ -268,7 +285,7 @@ sub ping_latency_test {
 			$expected *= 1000 ; # units of ms
 			my $bestfit = $expected + (-0.10888 - 0.00236 * $expected)  ;
 			my $diff = abs($bestfit - $mean);
-			&debug("pinglat mean: $mean expected $bestfit $diff\n");
+			&debug("latency (ping): " . $edge->src . " to " . $edge->dst . " $mean expected $bestfit $diff\n");
 			if($diff>LAT_TOL) {
 			    &error("Latency test outside of best fit line by: $diff\n");
 			}
@@ -291,58 +308,50 @@ sub bw_test {
     #   analyze log results 
 
     my @edge_copy;
-    my $needed = 0;
     my $snd_pid = undef;
 
-    # check first to see if bw test is ever needed.
-    @edge_copy = @edges;
-    while(@edge_copy && !$needed) {
-	my $edge = &get_assign(\@edge_copy);
-	if(defined($edge)
-	   && $hostname eq $edge->dst
-	   && $edge->bw <= HI_BW
-	   && $edge->bw >= LO_BW) {
-	    $needed = 1;
-	}
+    # assume BW test will be needed.
+    $snd_pid = fork();
+    if(!$snd_pid) {
+	open(STDOUT, ">/dev/null"); # redirct output to null
+	exec "pathrate_snd -i";
     }
 
-    if($needed) {
-	$snd_pid = fork();
-	if(!$snd_pid) {
-	    open(STDOUT, ">/dev/null") unless DEBUG; # redirct output to null
-	    exec "pathrate_snd -i";
-	}
-	# wait for sender ready.
-	sleep(1);
-    }
-
+    # wait for sender ready.
+    sleep(2);
     &barrier();
 
     @edge_copy = @edges;
 
     # all nodes will execute the same reductions on the edge list
     # on their own so that the number of barriers is the same.
-    while(@edge_copy) {
-	my $edge = &get_assign(\@edge_copy);
-	if(defined($edge)) {
+    while(&has_elems(\@edge_copy)) {
+#	my $edge = &get_assign(\@edge_copy);
 
-	    # determine if this machine is the source or the dest.
-	    if($hostname eq $edge->src
-	       && $edge->bw <= HI_BW
-	       && $edge->bw >= LO_BW) {
+	my ($edge,$other_edge) = &get_twoway_assign(\@edge_copy);
+	if(defined($edge) && defined($other_edge)) {
+
+	    &debug("bw: $hostname: edge: " . $edge->src . "\t" . $edge->dst . "\n");
+	    &debug("bw: $hostname: other_edge: " . $other_edge->src . "\t" . $other_edge->dst . "\n\n");
+
+	    if($hostname eq $edge->src) {
 		my $cmd = "pathrate_rcv -Q -s " . $edge->dst . " -q -O "
-		    . PATHRATE_DAT . " >/dev/null";
+		    . PATHRATE_DAT;
+		&debug("$cmd");
 		system "$cmd";
 		&analyze_bw($edge);
-		
+	    } elsif($hostname eq $other_edge->src) {
+		my $cmd = "pathrate_rcv -Q -s " . $other_edge->dst . " -q -O "
+		    . PATHRATE_DAT;
+		&debug("$cmd");
+		system "$cmd";
+		&analyze_bw($other_edge);
 	    }
 	}
 	&barrier();
     }
 
-    if(defined($snd_pid)) {
-	system "kill -9 $snd_pid";
-    }
+    system "kill -9 $snd_pid";
 
 }
 
@@ -358,6 +367,7 @@ sub get_topo {
     # in the experiment directory, execute the ns script with my hacked tb_compat.tcl
     chdir($lt_path);
     
+    die "ns file not defined\n" unless defined ($ns_file);
     die "could not find NS script: $ns_file\n" unless -e $ns_file;
 
     my @ns_output = `$ns_cmd $ns_file`;
@@ -426,12 +436,11 @@ sub barrier {
     die "wrong number of args!" if @_;
     my $name = "allnodes";
     my $count = @verts - 1;
-    &debug("wait for barrier $name\n");
     my $cmd;
     if($hostname eq $synserv) {
-	$cmd = "emulab-sync -s $synserv -n $name -i $count";
+	$cmd = "emulab-sync -n $name -i $count";
     } else {
-	$cmd = "emulab-sync -s $synserv -n $name";
+	$cmd = "emulab-sync -n $name";
     }
     system $cmd;
 
@@ -444,13 +453,13 @@ sub barrier_name {
     die "wrong number of args" unless @_ == 2;
     my ($name, $count) = @_;
     $count -= 1;
-    &debug("wait for barrier $name\n");
     my $cmd;
     if($hostname eq $name) {
-	$cmd = "emulab-sync -s $synserv -n $name -i $count";
+	$cmd = "emulab-sync -n $name -i $count";
     } else {
-	$cmd = "emulab-sync -s $synserv -n $name";
+	$cmd = "emulab-sync -n $name";
     }
+    &debug("cmd: $cmd\n");
     system $cmd;
 }
 
@@ -520,6 +529,14 @@ sub ping_node {
 sub get_assign {
     my ($todo_ref) = @_; # must maintain sorted order invariant
     my $task = undef;
+    my @thisrun;
+
+#    &debug("oneway assign:\n");
+#    foreach my $edge (@{$todo_ref}) {
+#	if(defined($edge)){
+#	    &debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
+#	}
+#    }
 
     # build a fresh hash to see which nodes are in use.
     my %inuse;
@@ -529,14 +546,31 @@ sub get_assign {
 
     for(my $i=0;$i<@{$todo_ref};$i++) {
 	my $edge = @{$todo_ref}[$i];
-	if(!(
-	     $inuse{$edge->src} || $inuse {$edge->dst})) {
+	if(defined($edge) && !($inuse{$edge->src} || $inuse {$edge->dst})) {
 	    $inuse{$edge->src} = 1;
 	    $inuse{$edge->dst} = 1;
-	    $task = @{$todo_ref}[$i];
-	    splice(@{$todo_ref},$i,1); 
+	    push @thisrun,$edge;
+	    @{$todo_ref}[$i] = undef;
 	}
     }
+
+#    &debug("thisrun:\n");
+#    foreach my $edge (@thisrun) {
+#	&debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
+#    }
+
+
+    # figure out the tasks for this particular host.
+    foreach my $edge (@thisrun) {
+	if($hostname eq $edge->src || $hostname eq $edge->dst ) {
+	    $task = $edge;
+	}
+    }
+
+ #   &debug("$hostname:\n");
+ #   if(defined($task)) {
+#	&debug("\t" . $task->src . "\t" . $task->dst . "\n\n");
+#    }
 
     # each machine should reduce the todo list the same way due to
     # alphabetic sorting of info from the ns file.
@@ -544,12 +578,22 @@ sub get_assign {
     return $task; # or undef if no jobs left for this machine.
 }
 
-# like above get assign but returns a pair of edges.
+
+
+# note, broken.
 sub get_twoway_assign {
 
     my ($todo_ref) = @_; # must maintain sorted order invariant
     my $task = undef;
     my $other_task = undef;
+    my @thisrun;
+
+#    &debug("twoway assign:\n");
+#    foreach my $edge (@{$todo_ref}) {
+#	if(defined($edge)){
+#	    &debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
+#	}
+#    }
 
     # build a fresh hash to see which nodes are in use.
     my %inuse;
@@ -559,26 +603,52 @@ sub get_twoway_assign {
 
     for(my $i=0;$i<@{$todo_ref};$i++) {
 	my $edge = @{$todo_ref}[$i];
-	if(!(
-	     $inuse{$edge->src} || $inuse {$edge->dst})) {
+	if(defined($edge) && !($inuse{$edge->src} || $inuse {$edge->dst})) {
 	    $inuse{$edge->src} = 1;
 	    $inuse{$edge->dst} = 1;
+	    push @thisrun, $edge;
+	    @{$todo_ref}[$i]=undef;
 
-	    $task = @{$todo_ref}[$i];
-	    splice(@{$todo_ref},$i,1); 
-
-	    for(my $j=0;$j<@{$todo_ref};$j++) {
-		my $other_edge = @{$todo_ref}[$j];
-		if($other_edge->src eq $task->dst
-		   && $other_edge->dst eq $task->src) {
-		    $other_task = @{$todo_ref}[$j];
-		    splice(@{$todo_ref},$j,1); 
+	    # get the other side
+	    for(my $j=$i;$j<@{$todo_ref};$j++) {
+		my $otheredge = @{$todo_ref}[$j];
+		if(defined($otheredge)
+		   && $edge->src eq  $otheredge->dst
+		   && $edge->dst eq $otheredge->src) {
+		    push @thisrun,$otheredge;
+		    @{$todo_ref}[$j] = undef;
 		}
-
 	    }
-
+	    
 	}
     }
+
+#    &debug("thisrun:\n");
+#    foreach my $edge (@thisrun) {
+#	&debug("\t" . $edge->src . "\t" . $edge->dst . "\n");
+#    }
+
+
+    # figure out the tasks for this particular host.
+    foreach my $edge (@thisrun) {
+	if($hostname eq $edge->src || $hostname eq $edge->dst) {
+	    $task = $edge;
+	}
+    }
+    if(defined($task)) {
+	foreach my $edge (@thisrun) {
+	    if($task->dst eq $edge->src && $task->src eq $edge->dst) {
+		$other_task = $edge;
+	    }
+	}
+    }
+
+#    &debug("$hostname:\n");
+#    if(defined($task) && defined($other_task)) {
+#	&debug("\t" . $task->src . "\t" . $task->dst . "\n" .
+#	       "\t" . $other_task->src . "\t" . $other_task->dst . "\n\n");
+#    }
+
 
     # each machine should reduce the todo list the same way due to
     # alphabetic sorting of info from the ns file.
@@ -586,6 +656,16 @@ sub get_twoway_assign {
     return ($task,$other_task); # or undef if no jobs left for this machine.
 
 
+}
+
+sub has_elems {
+    my ($todo_ref) = @_;
+    foreach (@{$todo_ref}) {
+	if(defined($_)) {
+	    return 1;
+	}
+    }
+    return 0;
 }
 
 
@@ -665,7 +745,7 @@ sub analyze_stream {
     my $sd = sqrt( $expected * (1 - $edge->loss));
     my $actual = PACK_COUNT - $count;
     my $tol = &round((3 * $sd));
-    &debug("loss: actual: $actual expected: $expected tolerance: $tol\n");
+    &debug("loss: " . $edge->src . " to " . $edge->dst . " actual: $actual expected: $expected tolerance: $tol\n");
     if($actual > ($expected + $tol)
        || 
        $actual < ($expected - $tol)
@@ -697,7 +777,8 @@ sub analyze_bw {
 #    &debug($edge->bw . " lo $lo hi $hi\n");
     $lo -= 3; # units of mb
     $hi += 3;
-    &debug("bandwidth: $lo Mb to $hi Mb\n");
+    &debug("bandwidth: " . $edge->src . " to " . $edge->dst . " $lo Mb to $hi Mb\texpected: " . ($edge->bw / 1000000)
+	   . " Mb\n" );
     if($edge->bw > ($hi * 1000000)
        || 
        $edge->bw < ($lo * 1000000)) {
@@ -730,7 +811,7 @@ sub count_steps {
     my @edge_copy = @edges;
     my $count = 0;
 
-    while(@edge_copy) {
+    while(&has_elems(\@edge_copy)) {
 	&get_assign(\@edge_copy);
 	$count++;
     }   
@@ -738,7 +819,7 @@ sub count_steps {
     @edge_copy = @edges;
     $count = 0;
 
-    while(@edge_copy) {
+    while(&has_elems(\@edge_copy)) {
 	&get_twoway_assign(\@edge_copy);
 	$count++;
     }   
