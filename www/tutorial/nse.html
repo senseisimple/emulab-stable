@@ -42,33 +42,40 @@ hardware emulation. The advantages of such an integrated experiment are:
 <p>
 The primary advantage of using Emulab to perform such experiments is the
 complete automation that we have built when we integrated NSE. Here is
-a list of items that an experimenter using NSE outside Emulab will have to
-worry about:
+a list of issues that we have addressed since our first version of Emulab NSE
+integration:
 
 <ol>
-    <li> Explicit specification of TAP agents to capture and
-    and inject live packets. This includes network
-    interfaces, their hardware addresses and IP addresses </li>
-    <li> Manual setup of routing for live packets both in NSE and on PC hosts </li>
-    <li> Limited scalability with a single instance of NSE </li>
-    <li> In order to scale to larger topologies and simulation workloads 
-    that would otherwise overload a single instance of NSE (causing it to fall behind
-    real-time), a natural solution would be to distribute the load across a distributed
-    set of PCs.  However, it is difficult and tedious to manually setup multiple distributed
-    instances of NSE.  </li>
-    <li> Even if the above were achieved, simulator packets cannot be transported
-    from one simulator to another; Only live packets from real protocol endpoints
-    can be opaquely transported across multiple NSE instances. </li>
-    <li> It is not always possible to ensure correct routing of simulator 
-    injected packets on a PC with multiple network interfaces </li>
+<li> Support for multiple distributed NSE instances in the same experiment
+in order to scale to larger topologies. </li>
+<ul>
+    <li> Support for an NS duplex-link between simulated nodes on different
+    physical hosts (i.e. NSE instances)</li>
+    <li> Encapsulate/Decapsulate simulator packets to support arbitrary
+    traffic agents to talk to each other across physical hosts 
+    (i.e. NSE instances) </li>
+    <li> Use IP address based routes for global routing of packets </li>
+</ul>
+<li> Use multiple routing table support that we added in FreeBSD to ensure
+correct routing of live packets injected into the network. This was a
+problem with NSE in certain configurations on a multi-homed PC host</li>
+<li> Use Virtual Ethernet Device that we added in FreeBSD in order to 
+multiplex virtual links on physical links</li>
+<li> NSE is integrated with Emulab's event system to deliver events in 
+<code>$ns at</code> statements. This is necessary since NSE is distributed
+and events need to be delivered to different instances. A central event scheduler
+is responsible for the delivery of such events at the right time. </li>
 </ol>
 
-In Emulab, we deal with all the above issues and provide an environment for
-integrated experiments with real PC nodes, <a href="docwrapper.php3?docname=vnodes.html">
-    multiplexed virtual nodes</a> and of course simulated resources. Simulated
-resources such as nodes are abstractions that do not have nearly the same level of virtualization as
-real PCs or virtual nodes. There is no equivalent of logging in, running unmodified applications, etc. 
-on a simulated node.
+<p>
+Some of the issues addressed were common with <a href="docwrapper.php3?docname=vnodes.html">
+    multiplexed virtual nodes</a>. Thus
+our solutions such as multiple-routing-table and virtual-ethernet-device support
+are used in both simulation and virtual-node subsystems. This enables large scale integrated experiments
+that includes PC nodes, virtual nodes and simulated resources all in the same experiment.
+Note that simulated resources such as nodes are abstractions that do not have nearly the same level 
+of virtualization as real PCs or virtual nodes. There is no equivalent of logging in, running 
+unmodified applications, etc. on a simulated node.
 </p>
 
 <p>
@@ -80,6 +87,24 @@ falls behind real-time), will cause the system to re-map more conservatively. Re
     technical details</a> section for the gory details.
 </p>
 
+<p>
+An experimenter can also guide initial mapping by specifying
+the maximum co-location factor. The number of simulation objects that
+can be supported without falling behind real time depends on
+the amount of external traffic and the number of internal
+simulation events that need to be processed. Please read 
+<a href="#scaling">nse scaling</a> and <a href="#accuracy">
+    nse accuracy and capacity</a> to get some idea on what values to
+specify for co-location factors.
+</p>
+
+<p>
+The output from the simulation including errors such as the ones that
+report inability to keep up with real time are logged into a file 
+<code>/proj/&lt;project_name&gt;/exp/&lt;experiment_name&gt;/logs/nse-simhost-0...n.log
+</code>
+</p>
+
 <a NAME="use"></a>
 <h2>Use</h2>
 
@@ -89,8 +114,19 @@ enclose a block of NS Tcl code in <code>$ns make-simulated {
 }</code>. You specify connections between simulated and physical nodes as usual.
 Multiple <code>make-simulated</code> blocks are allowed in a single experiment
 which results in the concatenation of all such blocks.
+</p>
+
+<p>
+  <br>
+    <img src="dumbell.png"  alt="&lt;DUMBELL TOPOLOGY&gt;"><br><br>
+    <b>Figure 1.</b> A hybrid experiment with simulation and emulation
+  <br>
+</p>
+
+<p>
 The following code gives an example of an experiment with a dumbell
-topology comprised of both real PC nodes and simulated nodes:
+topology comprised of both real PC nodes and simulated nodes. This is 
+illustrated in Figure 1.
 </p>
 
 <code><pre>
@@ -190,26 +226,10 @@ are automatically allocated by the system. The code in the
 re-parsed into two Tcl sub-specifications, of which each is
 fed into an instance of NSE running on the simulation host.
 Depending on how the mapping happens, there can either be one 
-or two simulated links that cross PCs. Simulator packet flows
+or two simulated links that cross PCs. In Figure 1, we have
+one such link that cross PCs. Simulator packet flows
 that cross such links are automatically compressed, encapsulated
 in an IP packet and shipped over the physical link.
-
-<p>
-A hybrid experiment like this causes the simulation to run in
-best effort real time. The number of simulation objects that
-can be supported without falling behind real time depends on
-the amount of external traffic and the number of internal
-simulation events that need to be processed. Please read 
-<a href="#scaling">nse scaling</a> and <a href="#accuracy">
-    nse accuracy and capacity</a> to get an idea.
-</p>
-
-<p>
-The output from the simulation including errors such as the ones that
-report inability to keep up with real time are logged into a file 
-<code>/proj/&lt;project_name&gt;/exp/&lt;experiment_name&gt;/logs/nse-simhost-0..n.log
-</code>
-</p>
 
 <p>
 <i>
@@ -219,7 +239,12 @@ problems in this system. Here are some caveats:
 <ul>
 <li>
 Enabling NS tracing causes huge file I/O overhead resulting in 
-nse not keeping up with real time. Therefore, do not enable tracing.
+nse not keeping up with real time. Therefore, do not enable tracing. </li>
+<li> There is no support for NS's dynamic routing. Only static routing is 
+supported </li>
+<li> The support for automatic parsing of simulation specifications to generate 
+sub-specifications of Tcl code is still in beta. We will enhance it
+as the usage requires it</li>
 
 </ul>
 
