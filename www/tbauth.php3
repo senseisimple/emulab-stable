@@ -34,6 +34,7 @@ define("CHECKLOGIN_FROZEN",		0x02000);
 define("CHECKLOGIN_ISADMIN",		0x04000);
 define("CHECKLOGIN_TRUSTED",		0x08000);
 define("CHECKLOGIN_CVSWEB",		0x10000);
+define("CHECKLOGIN_ADMINOFF",		0x20000);
 
 #
 # Generate a hash value suitable for authorization. We use the results of
@@ -111,7 +112,7 @@ function CHECKLOGIN($uid) {
     # 
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
-		     "       status,admin,cvsweb,g.trust ".
+		     "       status,admin,cvsweb,g.trust,adminoff ".
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -140,6 +141,7 @@ function CHECKLOGIN($uid) {
 	    ! strcmp($row[6], "group_root")) {
 	    $trusted = 1;
 	}
+	$adminoff= $row[7];
     }
 
     #
@@ -205,6 +207,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_PSWDEXPIRED;
     if ($admin)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ISADMIN;
+    if ($adminoff)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_ADMINOFF;
     if ($trusted)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_TRUSTED;
     if ($cvsweb)
@@ -256,7 +260,8 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
     # Check other conditions.
     #
     if ($status & CHECKLOGIN_PSWDEXPIRED)
-        USERERROR("Your password has expired. Please change it now!", 1);
+        USERERROR("Your password has expired. ".
+		  "<a href=moduserinfo.php3>Please change it now!</a>", 1);
     if ($status & CHECKLOGIN_FROZEN)
         USERERROR("Your account has been frozen!", 1);
     if ($status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER))
@@ -287,7 +292,7 @@ function ISADMIN($uid) {
 	TBERROR("ISADMIN: $uid is not logged in!", 1);
 
     return (($CHECKLOGIN_STATUS &
-	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN)) ==
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN|CHECKLOGIN_ADMINOFF)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
 }
 
@@ -368,6 +373,11 @@ function DOLOGIN($uid, $password) {
 	# 
 	$timeout = time() + (60 * 60 * 24 * 32);
 	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
+
+	#
+	# Clear adminoff on new logins.
+	#
+	DBQueryFatal("update users set adminoff=0 where uid='$uid'");
 
 	return 0;
     }

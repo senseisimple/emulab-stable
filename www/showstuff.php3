@@ -333,6 +333,8 @@ function SHOWUSER($uid) {
     $usr_title   = $row[usr_title];
     $usr_affil   = $row[usr_affil];
     $status      = $row[status];
+    $admin       = $row[admin];
+    $adminoff    = $row[adminoff];
 
     #
     # Last Login info.
@@ -405,6 +407,17 @@ function SHOWUSER($uid) {
               <td>Status:</td>
               <td>$status</td>
           </tr>\n";
+
+    if ($admin) {
+	$onoff = ($adminoff ? "Off" : "On");
+	$flip  = ($adminoff ? 0 : 1);
+	echo "<tr>
+                  <td>Admin (on/off):</td>
+                  <td>Yes
+                      <a href=adminmode.php3?target_uid=$uid&adminoff=$flip>
+                         ($onoff)</td>
+              </tr>\n";
+    }
     
     echo "<tr>
               <td>Last Web Login:</td>

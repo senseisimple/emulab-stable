@@ -110,7 +110,7 @@ function WRITESIDEBAR() {
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
 	    
-		if ($login_status & CHECKLOGIN_ISADMIN) {
+		if (ISADMIN($login_uid)) {
 		    WRITESIDEBARBUTTON("New Project Approval",
 				       $TBBASE, "approveproject_list.php3");
 		}
@@ -128,7 +128,7 @@ function WRITESIDEBAR() {
 		WRITESIDEBARBUTTON("Project Information",
 				   $TBBASE, "showproject_list.php3");
 	    
-		if ($login_status & CHECKLOGIN_ISADMIN) {
+		if (ISADMIN($login_uid)) {
 		    WRITESIDEBARBUTTON("User List",
 				       $TBBASE, "showuser_list.php3");
 		}

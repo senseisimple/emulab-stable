@@ -75,7 +75,7 @@ function SPITFORM($uid, $key, $failed)
                          value=\"$uid\"
                          name=uid size=$TBDB_UIDLEN></td>
           </tr>
-              <tr>
+          <tr>
               <td>Password:</td>
               <td><input type=password name=password size=12></td>
           </tr>
@@ -94,7 +94,7 @@ function SPITFORM($uid, $key, $failed)
 #
 # Do not bother if NOLOGINS!
 #
-if (NOLOGINS()) {
+if (0 && NOLOGINS()) {
     PAGEHEADER("Login");
 	    
     echo "<center>
