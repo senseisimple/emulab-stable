@@ -52,6 +52,9 @@ Node instproc init {s} {
     # Sorta ditto for virt.
     $self set isvirt 0
 
+    # If hosting a virtual node (or nodes).
+    $self set virthost 0
+
     # If osid remains blank when updatedb is called it is changed
     # to the default OS based on it's type (taken from node_types
     # table).
@@ -119,16 +122,29 @@ Node instproc updatedb {DB} {
     $self instvar routelist
     $self instvar sim
     $self instvar realtime
+    $self instvar isvirt
+    $self instvar virthost
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
-
+    
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
     if {$osid == {}} {
 	sql query $DB "select osid from node_types where type = \"$type\""
 	set osid [sql fetchrow $DB]
 	sql endquery $DB
+    } else {
+	# Do not allow user to set os for virt nodes at this time.
+	if {$isvirt} {
+	    perror "You may not specify an OS for virtual nodes ($self)!"
+	    return
+	}
+	# Do not allow user to set os for host running virt nodes.
+	if {$virthost} {
+	    perror "You may not specify an OS for hosting virtnodes ($self)!"
+	    return
+	}
     }
 
     # We need to generate the IP column from our iplist.
@@ -256,6 +272,19 @@ Node instproc set_hwtype {hwtype isrem isv} {
     set type $hwtype
     set isremote $isrem
     set isvirt $isv
+}
+
+#
+# Fix a node. Watch for fixing a node to another node, in which case
+# we are putting virtual (jailed) nodes on a real node. 
+#
+Node instproc set_fixed {pnode} {
+    $self instvar fixed
+    
+    if {[$pnode info class] == "Node"} {
+	$pnode set virthost 1
+    }
+    set fixed $pnode
 }
 
 #

@@ -385,7 +385,7 @@ proc tb-fix-node {vnode pnode} {
 	perror "\[tb-fix-node] $node is not a node."
 	return
     }
-    $vnode set fixed $pnode
+    $vnode set_fixed $pnode
 }
 
 proc tb-make-soft-vtype {name types} {
