@@ -119,6 +119,7 @@ class hvFrame(hvFrameUI):
 	self.vwr = None		# Load data under the File menu now.
 
 	# Control events.  (HyperViewer events are connected after loading data.)
+	# (These EVT_ handler functions are defined in site-packages/wxPython/wx.py .)
 	EVT_CHECKBOX(self.DrawSphere, -1, self.OnDrawSphere)
 	EVT_CHECKBOX(self.DrawNodes, -1, self.OnDrawNodes)
 	EVT_CHECKBOX(self.DrawLinks, -1, self.OnDrawLinks)
@@ -130,13 +131,15 @@ class hvFrame(hvFrameUI):
 	EVT_BUTTON(self.ShowLinksOut, -1, self.OnShowLinksOut)
 	EVT_BUTTON(self.HideLinksOut, -1, self.OnHideLinksOut)
 	EVT_BUTTON(self.HelpButton, -1, self.OnUsage)
-	EVT_COMBOBOX(self.LabelsMode, -1, self.OnLabelsMode)
+	EVT_CHOICE(self.LabelsMode, -1, self.OnLabelsMode)
 	EVT_MENU(self, 1, self.OnOpen)
 	EVT_MENU(self, 2, self.OnExit)
 	EVT_MENU(self, 3, self.OnUsage)
 	EVT_SPINCTRL(self.CountGenNode, -1, self.OnCountGenNode)
+	EVT_CHAR(self.CountGenNode, self.OnCountGenNode_CHAR)
 	EVT_SPINCTRL(self.CountGenLink, -1, self.OnCountGenLink)
-	
+	EVT_CHAR(self.CountGenLink, self.OnCountGenLink_CHAR)
+
 	# Other events.
 	EVT_CLOSE(self, self.OnExit)
 	# These do nothing until the vwr is instantiated below.
@@ -201,10 +204,20 @@ class hvFrame(hvFrameUI):
 	    self.NodeName.Clear()
 	    self.NodeName.WriteText(node)
 	    self.ChildCount.SetLabel(str(self.vwr.getChildCount(node)))
+
+	    linksIn = self.vwr.getIncomingCount(node)
 	    self.LabelLinksIn.SetLabel(
-		"    Non-tree Links in:	 " + str(self.vwr.getIncomingCount(node)))
+		"Non-tree Links in: " + str(linksIn))
+	    self.ShowLinksIn.Enable(linksIn > 0)
+	    self.HideLinksIn.Enable(linksIn > 0)
+	    self.DescendLinksIn.Enable(linksIn > 0)
+
+	    linksOut = self.vwr.getOutgoingCount(node)
 	    self.LabelLinksOut.SetLabel(
-		"    Non-tree Links out:  " + str(self.vwr.getOutgoingCount(node)))
+		"Non-tree Links out: " + str(linksOut))
+	    self.ShowLinksOut.Enable(linksOut > 0)
+	    self.HideLinksOut.Enable(linksOut > 0)
+	    self.DescendLinksOut.Enable(linksOut > 0)
 	pass
     
     ##
@@ -258,12 +271,44 @@ class hvFrame(hvFrameUI):
     ##
     # Spin controls set integer state.
     def OnCountGenNode(self, spinEvent):
+	##print "OnCountGenNode", self.vwr
+	if self.vwr is None:
+	    return
 	self.vwr.setGenerationNodeLimit(self.CountGenNode.GetValue())
 	self.DrawGL()
+	pass
     def OnCountGenLink(self, spinEvent):
+	##print "OnCountGenLink", self.vwr
+	if self.vwr is None:
+	    return
 	self.vwr.setGenerationLinkLimit(self.CountGenLink.GetValue())
 	self.DrawGL()
-    
+	pass
+
+    ##
+    # Actions for <ENTER> keypress in numeric fields.
+    def OnCountGenNode_CHAR(self, keyEvent):
+	key = keyEvent.GetKeyCode()
+	if key == WXK_RETURN:
+	    self.OnCountGenNode(keyEvent)
+	    pass
+	self.OnCharDigitsOnly(keyEvent)
+	pass
+    def OnCountGenLink_CHAR(self, keyEvent):
+	key = keyEvent.GetKeyCode()
+	if key == WXK_RETURN:
+	    self.OnCountGenLink(keyEvent)
+	    pass
+	self.OnCharDigitsOnly(keyEvent)
+	pass
+
+    ##
+    # Disable typing non-digits in numeric fields.
+    def OnCharDigitsOnly(self, keyEvent):
+	key = keyEvent.GetKeyCode()
+	if ord('0') <= key <= ord('9') or key in (WXK_BACK, WXK_TAB) or key >= WXK_DELETE:
+	    keyEvent.Skip()		# Skip actually means to process the event...
+
     ##
     # Menu items issue commands from the menu bar.
     def OnExit(self, cmdEvent):
@@ -358,19 +403,30 @@ class hvOpen(OpenDialogUI):
 	OpenDialogUI.__init__(self, *args, **kwds)
 	    
 	EVT_BUTTON(self.OpenFile, -1, self.OnOpenFile)
+	EVT_TEXT_ENTER(self.FileToOpen, -1, self.OnOpenFile)
+
 	EVT_BUTTON(self.OpenExperiment, -1, self.OnOpenExperiment)
+	EVT_TEXT_ENTER(self.ProjectName, -1, self.OnOpenExperiment)
+	EVT_TEXT_ENTER(self.ExperimentName, -1, self.OnOpenExperiment)
+	EVT_TEXT_ENTER(self.ExperimentRoot, -1, self.OnOpenExperiment)
+
 	pass
     
     ##
     # Get topology data from a file.
     def OnOpenFile(self, cmdEvent):
 	file = self.FileToOpen.GetLineText(0)
-	msg = 'Reading topology file "%s".' % file
+	if file == "":
+	    msg = "Enter a file path."
+	else:
+	    msg = 'Reading topology file "%s".' % file
 	print msg
 	self.FileMsg.SetLabel(msg)
 	self.Refresh()
 	self.Update()
-
+	if file == "":
+	    return
+	
 	if self.app.frame.ReadTopFile("wxHyperViewer", file):
 	    self.Hide();		# Success.
 	    self.FileMsg.SetLabel(" ")
@@ -386,12 +442,17 @@ class hvOpen(OpenDialogUI):
 	experiment = self.ExperimentName.GetLineText(0)
 	root = self.ExperimentRoot.GetLineText(0)
 
-	msg = 'Getting experiment %s/%s.' % (project, experiment)
+	if project == "" or experiment == "":
+	    msg = "Enter a project name and experiment."
+	else:
+	    msg = 'Getting experiment %s/%s.' % (project, experiment)
 	print msg
 	self.ExperimentMsg.SetLabel(msg)
 	self.Refresh()
 	self.Update()
-
+	if project == "" or experiment == "":
+	    return
+	
 	hypfile = exptToHv.getExperiment(project, experiment, root)
 	if type(hypfile) is types.ListType:
 	    exptError = '%s %s\n%s' % tuple(hypfile[1:4])
