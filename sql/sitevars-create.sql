@@ -41,3 +41,5 @@ INSERT INTO sitevariables VALUES ('plab/message',NULL,'','Message to display at 
 INSERT INTO sitevariables VALUES ('node/ssh_pubkey',NULL,'','Boss SSH public key to install on nodes');
 INSERT INTO sitevariables VALUES ('general/autoswap_threshold',NULL,'16','Number of hours before an experiment is forcibly swapped');
 INSERT INTO sitevariables VALUES ('general/autoswap_mode',NULL,'0','Control whether autoswap defaults to on or off in the Begin Experiment page');
+INSERT INTO sitevariables VALUES ('webcam/anyone_can_view',NULL,'0','Turn webcam viewing on/off for mere users; default is off');
+INSERT INTO sitevariables VALUES ('webcam/admins_can_view',NULL,'1','Turn webcam viewing on/off for admin users; default is on');

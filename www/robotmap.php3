@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -205,6 +205,11 @@ echo "  Click on the dots below to see information about the robot\n";
 echo "  <br>\n";
 echo "  Click elsewhere to get its x,y location.\n";
 echo "  <br>\n";
+if ($isadmin || TBWebdbAllowed($uid)) {
+    echo "  There is a nifty <a href=webcam.php3>webcam image</a> of the";
+    echo "   robots too\n";
+    echo "  <br>\n";
+}
 
 if (isset($map_x) && isset($map_y)) {
 #    $map_y = $max_y - $map_y;

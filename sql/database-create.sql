@@ -2034,6 +2034,17 @@ CREATE TABLE vlans (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `webcams`
+--
+
+CREATE TABLE webcams (
+  id int(11) unsigned NOT NULL default '0',
+  server varchar(64) NOT NULL default '',
+  last_update datetime default NULL,
+  PRIMARY KEY  (id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `webdb_table_permissions`
 --
 

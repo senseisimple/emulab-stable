@@ -2262,5 +2262,18 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.296: Fix virt_vtypes table.
 
-         alter table virt_vtypes change eid eid varchar(32) NOT NULL default '';
+         alter table virt_vtypes change eid eid varchar(32) NOT NULL \
+                default '';
+
+1.297: Add webcams support.
+
+         CREATE TABLE webcams (
+          id int(11) unsigned NOT NULL default '0',
+          server varchar(64) NOT NULL default '',
+          last_update datetime default NULL,
+          PRIMARY KEY  (id)
+         ) TYPE=MyISAM;
+
+
+
 

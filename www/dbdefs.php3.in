@@ -1827,7 +1827,7 @@ function TBGetSiteVar($name)
 	if (isset($defaultvalue)) { return $defaultvalue; }
     }
     
-    TBERROR("Attempted to fetch unknown site variable '$name'!");
+    TBERROR("Attempted to fetch unknown site variable '$name'!", 1);
 }
 
 #
@@ -1901,6 +1901,20 @@ function TBExptFirewall($pid, $eid) {
 	return 0;
    
     return 1;
+}
+
+#
+# See if user has enough permission to view the webcams. If not an admin
+# person, then must be a project with permission to use the robots.
+# Eventually this needs to be a much more restrictive test.
+#
+function TBWebCamAllowed($uid) {
+    $query_result =
+	DBQueryFatal("select distinct class from group_membership as g ".
+		     "left join nodetypeXpid_permissions as p on g.pid=p.pid ".
+		     "left join node_types as nt on nt.type=p.type ".
+		     "where uid='$uid' and class='robot'");
+    return mysql_num_rows($query_result);
 }
 
 #
