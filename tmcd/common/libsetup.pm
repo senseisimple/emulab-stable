@@ -21,6 +21,8 @@ use Exporter;
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh
 
+	 TBDebugTimeStamp TBDebugTimeStampsOn
+
 	 MFS REMOTE CONTROL JAILED PLAB LOCALROOTFS IXP USESFS 
 	 SIMTRAFGEN SIMHOST ISDELAYNODE
 
@@ -35,6 +37,9 @@ use English;
 
 # The tmcc library.
 use libtmcc;
+
+# For timestamps
+use POSIX qw(strftime);
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -227,6 +232,12 @@ if (defined($ENV{'TMCCARGS'})) {
 my $pid		= "";
 my $eid		= "";
 my $vname	= "";
+my $TIMESTAMPS  = 0;
+
+# Allow override from the environment;
+if (defined($ENV{'TIMESTAMPS'})) {
+    $TIMESTAMPS = $ENV{'TIMESTAMPS'};
+}
 
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
@@ -1185,6 +1196,49 @@ sub TBForkCmd($) {
 
     system($cmd);
     exit($? >> 8);
+}
+
+#
+# Return a timestamp. We don't care about day/date/year. Just the time mam.
+# 
+# TBTimeStamp()
+#
+my $imported_hires = 0;
+
+sub TBTimeStamp()
+{
+    # To avoid problems with images not having the module installed yet.
+    if (! $imported_hires) {
+	require Time::HiRes;
+	import Time::HiRes;
+	$imported_hires = 1;
+    }
+    my ($seconds, $microseconds) = Time::HiRes::gettimeofday();
+    
+    return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
+}
+
+#
+# Print out a timestamp if the TIMESTAMPS configure variable was set.
+# 
+# usage: void TBDebugTimeStamp(@)
+#
+sub TBDebugTimeStamp(@)
+{
+    my @strings = @_;
+    if ($TIMESTAMPS) {
+	print "TIMESTAMP: ", TBTimeStamp(), " ", join("",@strings), "\n";
+    }
+}
+
+#
+# Turn on timestamps locally. We could do this globally by using an
+# env variable to pass it along, but lets see if we need that.
+# 
+sub TBDebugTimeStampsOn()
+{
+    $TIMESTAMPS = 1;
+    $ENV{'TIMESTAMPS'} = "1";
 }
 
 1;
