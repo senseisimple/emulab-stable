@@ -21,9 +21,9 @@ my  $optlist = "dn";
 #
 my $TB		= "@prefix@";
 my $wansolve    = "$TB/libexec/wanlinksolve";
-my $wansolveargs= "-m 4 -2 7 -v";
+my $wansolveargs= "-m 4 -v";
 my $waninfo     = "$TB/libexec/wanlinkinfo";
-my $waninfoargs = "-b -m";
+my $waninfoargs = "-b -m -p";
 
 #
 # Testbed Support libraries
@@ -109,6 +109,11 @@ my %mappings;
 # Use latest data flag. From the experiments table.
 my $uselatestwadata	 = 0;
 
+# Wan solver weights. Also from the experiments table.
+my $wa_delay_solverweight = 1.0;
+my $wa_bw_solverweight    = 7.0;
+my $wa_plr_solverweight   = 500.0;
+
 #
 # A node record (poor man struct). We create a hashed array of these,
 # indexed by the vnode name.
@@ -153,15 +158,27 @@ sub newvlan ($) {
 }
 
 #
-# Get the flag uselatest data flag.
+# Get the various bits we need from the experiments table.
 #
 $query_result =
-    DBQueryFatal("select uselatestwadata from experiments ".
+    DBQueryFatal("select uselatestwadata,wa_delay_solverweight, ".
+		 "  wa_bw_solverweight,wa_plr_solverweight ".
+		 " from experiments ".
 		 "where pid='$pid' and eid='$eid'");
-($uselatestwadata) = $query_result->fetchrow_array();
+($uselatestwadata,$wa_delay_solverweight,
+ $wa_bw_solverweight,$wa_plr_solverweight) = $query_result->fetchrow_array();
 if ($uselatestwadata) {
     printdb("Using latest widearea data.\n");
 }
+printdb("Solver weights:\n");
+printdb("  Delay:    $wa_delay_solverweight\n");
+printdb("  BW:       $wa_bw_solverweight\n");
+printdb("  PLR:      $wa_plr_solverweight\n");
+
+# Add the args for the solver.
+$wansolveargs .= " -1 $wa_delay_solverweight";
+$wansolveargs .= " -2 $wa_bw_solverweight";
+$wansolveargs .= " -3 $wa_plr_solverweight";
 
 #
 # Get type map.
@@ -560,12 +577,13 @@ sub runwansolver() {
     }
 
     #
-    # Now create the latency and bandwidth matricies. We need to map all local
+    # Now create the delay,bw,and plr matricies. We need to map all local
     # nodes onto a single row/column. For that, we use the $seenboss value; all
     # local node names are mapped into that name in the matrix (2D hash).
     #
     my %latmatrix	= ();
     my %bwmatrix	= ();
+    my %plrmatrix     	= ();
 
     foreach my $vnode1 (keys(%virtnodes)) {
 	my $rowname = (!isremotenode($vnode1) ? $seenboss : $vnode1);
@@ -575,8 +593,9 @@ sub runwansolver() {
 	    my $colname = (!isremotenode($vnode2) ? $seenboss : $vnode2);
 
 	    if ($colname eq $rowname) {
-		$latmatrix{$rowname}{$colname} = -1;
-		$bwmatrix{$rowname}{$colname}  = -1;
+		$latmatrix{$rowname}{$colname}  = -1;
+		$bwmatrix{$rowname}{$colname}   = -1;
+		$plrmatrix{$rowname}{$colname}  = -1;
 		next;
 	    }
 	    if (!defined($virtlan)) {
@@ -587,12 +606,17 @@ sub runwansolver() {
 		if (!defined($bwmatrix{$rowname}{$colname})) {
 		    $bwmatrix{$rowname}{$colname} = -1;
 		}
+		if (!defined($plrmatrix{$rowname}{$colname})) {
+		    $plrmatrix{$rowname}{$colname} = -1;
+		}
 		next;
 	    }
 	    $latmatrix{$rowname}{$colname} =
 		findlinkvalue($virtlan, "delay", $vnode1, $vnode2);
 	    $bwmatrix{$rowname}{$colname} =
 		findlinkvalue($virtlan, "bw", $vnode1, $vnode2);
+	    $plrmatrix{$rowname}{$colname} =
+		findlinkvalue($virtlan, "plr", $vnode1, $vnode2);
 	}
     }
 
@@ -612,6 +636,15 @@ sub runwansolver() {
 	foreach my $vnode2 (sort(keys(%{ $bwmatrix{$vnode1}}))) {
 	    printdb("$vnode1:$vnode2($bwmatrix{$vnode1}{$vnode2})  ");
 	    print INPUT "$bwmatrix{$vnode1}{$vnode2}  ";
+	}
+	print INPUT "\n";
+	printdb("\n");
+    }
+
+    foreach my $vnode1 (sort(keys(%plrmatrix))) {
+	foreach my $vnode2 (sort(keys(%{ $plrmatrix{$vnode1}}))) {
+	    printdb("$vnode1:$vnode2($plrmatrix{$vnode1}{$vnode2})  ");
+	    print INPUT "$plrmatrix{$vnode1}{$vnode2}  ";
 	}
 	print INPUT "\n";
 	printdb("\n");
@@ -811,6 +844,9 @@ sub findlinkvalue($$$$)
     }
     elsif ($param eq "delay") {
 	return $param1{DELAY} + $param2{RDELAY};
+    }
+    elsif ($param eq "plr") {
+	return 1 - (1 - $param1{PLR}) * (1 - $param2{RPLR});
     }
     else {
 	die("*** $0:\n".

@@ -10,14 +10,15 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: wanlinkinfo [-d] [-m] [-b] [-l] [-r]\n".
+	"Usage: wanlinkinfo [-d] [-m] [-b] [-l] [-p] [-r]\n".
 	"       Use -m to output virtual node counts per phys node.\n".
         "       Use -b to output bandwidth matrix.\n".
+        "       Use -p to output plr matrix.\n".
         "       Use -r to remove boss from matrix.\n".
         "       Use -l to use the latest data instead of aged data.\n";
     exit(-1);
 }
-my  $optlist = "dmblr";
+my  $optlist = "dmblrp";
 
 #
 # Configure variables
@@ -34,6 +35,7 @@ use libtestbed;
 # Locals
 my $debug	= 0;
 my $dobw	= 0;
+my $doplr	= 0;
 my $dovirt	= 0;
 my $dolatest	= 0;
 my $noboss	= 0;
@@ -73,19 +75,23 @@ if (defined($options{"l"})) {
 if (defined($options{"r"})) {
     $noboss = 1;
 }
+if (defined($options{"p"})) {
+    $doplr = 1;
+}
 
 my $result =
-    DBQueryFatal("SELECT node_id1,iface1,node_id2,iface2,time,bandwidth " .
-		 "FROM " .
+    DBQueryFatal("SELECT node_id1,iface1,node_id2,iface2,time, " .
+		 "       bandwidth,lossrate FROM " .
 		 ($dolatest ? "widearea_recent " : "widearea_delays ") .
 		 ($noboss ? "where node_id1!='boss' and ".
 		  "                node_id2!='boss'" : ""));
 
 my %nodename = ();
 my %speeds   = ();
-my %bws   = ();
+my %bws      = ();
+my %plrs     = ();
 
-while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw) =
+while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw, $plr) =
        $result->fetchrow) {
     my $msectime = $time * 1000;
     my $glom1    = $node_id1 . ":" . $iface1;
@@ -97,6 +103,7 @@ while (my ($node_id1, $iface1, $node_id2, $iface2, $time, $bw) =
 
     $speeds{ $glom1 . "+" . $glom2 } = $msectime;
     $bws{ $glom1 . "+" . $glom2 } = $bw;
+    $plrs{ $glom1 . "+" . $glom2 } = $plr;
 }
 
 print scalar( keys %nodename ) . "\n";
@@ -149,6 +156,19 @@ if ($dobw) {
 		$s = $bws{ $i . "+" . $j };
 	    } 
 	    print sprintf( "%-6i ", $s );
+	}
+	print "\n";
+    }
+}
+
+if ($doplr) {
+    foreach my $i (sort (keys %nodename)) {
+	foreach my $j (sort (keys %nodename)) {
+	    my $s = "0";
+	    if (exists $plrs{ $i."+".$j } ) {
+		$s = $plrs{ $i . "+" . $j };
+	    } 
+	    print sprintf( "%.3f ", $s );
 	}
 	print "\n";
     }
