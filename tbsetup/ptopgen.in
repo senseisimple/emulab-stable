@@ -361,9 +361,15 @@ if ($widearea) {
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:400000";
 
+	# Indicate that these nodes are beautiful and unique snowflakes
+	push @flags, "unique";
+
 	# Add features
-	if (defined($features{$type})) {
-	    push @features, "$features{$type}";
+	if (defined($type_features{$type})) {
+	    push @features, @{$type_features{$type}};
+	}
+	if (defined($features{$physnode})) {
+	    push @features, @{$features{$physnode}};
 	}
 
 	my $text = "node $physnode " .
