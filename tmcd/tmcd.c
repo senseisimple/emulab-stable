@@ -1323,21 +1323,28 @@ COMMAND_PROTOTYPE(dohosts)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	char		pid[64], eid[64], gid[64];
+	char		pid[TBDB_FLEN_PID];
+	char		eid[TBDB_FLEN_EID], gid[TBDB_FLEN_GID];
 	int		nrows;
 	int		rv = 0;
 
 	/*
 	 * We build up a canonical host table using this data structure.
+	 * There is one item per node/iface. We need a shared structure
+	 * though for each node, to allow us to compute the aliases.
 	 */
+	struct shareditem {
+		char	*firstvlan;	/* The first vlan to another node */
+	};
 	struct hostentry {
-		char	nodeid[32];
-		char	vname[32];
-		char	vlan[32];
+		char	nodeid[TBDB_FLEN_NODEID];
+		char	vname[TBDB_FLEN_VNAME];
+		char	vlan[TBDB_FLEN_VNAME];
 		int	virtiface;
 		int	connected;
-		struct in_addr	 ipaddr;
-		struct hostentry *next;
+		struct in_addr	  ipaddr;
+		struct shareditem *shared;
+		struct hostentry  *next;
 	} *hosts = 0, *host;
 
 	/*
@@ -1371,12 +1378,19 @@ COMMAND_PROTOTYPE(dohosts)
 	 * Parse the list, creating an entry for each node/IP pair.
 	 */
 	while (nrows--) {
-		char		 *bp, *ip, *cp;
+		char		  *bp, *ip, *cp;
+		struct shareditem *shareditem;
 		
 		row = mysql_fetch_row(res);
 		if (!row[0] || !row[0][0] ||
 		    !row[1] || !row[1][0])
 			continue;
+
+		if (! (shareditem = (struct shareditem *)
+		       calloc(1, sizeof(*shareditem)))) {
+			error("HOSTNAMES: Out of memory for shareditem!\n");
+			exit(1);
+		}
 
 		bp = row[1];
 		while (bp) {
@@ -1396,6 +1410,7 @@ COMMAND_PROTOTYPE(dohosts)
 			strcpy(host->vname, row[0]);
 			strcpy(host->nodeid, row[2]);
 			host->virtiface = atoi(cp);
+			host->shared = shareditem;
 			inet_aton(ip, &host->ipaddr);
 			host->next = hosts;
 			hosts = host;
@@ -1472,16 +1487,24 @@ COMMAND_PROTOTYPE(dohosts)
 			struct hostentry *tmphost = hosts;
 
 			while (tmphost) {
-				if (tmphost->vlan &&
+				if (strlen(tmphost->vlan) &&
 				    strcmp(host->vlan, tmphost->vlan) == 0 &&
-				    strcmp(host->nodeid, tmphost->nodeid)
-				    /*  && host->connected == 0 */) {
+				    strcmp(host->nodeid, tmphost->nodeid) &&
+				    (!tmphost->shared->firstvlan ||
+				     !strcmp(tmphost->vlan,
+					     tmphost->shared->firstvlan))) {
 					tmphost->connected = 1;
+					
 					/*
 					 * Use as flag to ensure only first
-					 * link flagged as connected.
+					 * link flagged as connected (gets
+					 * an alias), but since a vlan could
+					 * be a real lan with more than one
+					 * other member, must tag all the
+					 * members.
 					 */
-					host->connected    = 1;
+					tmphost->shared->firstvlan =
+						tmphost->vlan;
 				}
 				tmphost = tmphost->next;
 			}
@@ -1502,27 +1525,27 @@ COMMAND_PROTOTYPE(dohosts)
 	 */
 	host = hosts;
 	while (host) {
+		char	*alias = " ";
+
+		if ((host->shared->firstvlan &&
+		     !strcmp(host->shared->firstvlan, host->vlan)) ||
+		    /* First interface on this node gets an alias */
+		    (!strcmp(host->nodeid, nodeid) && !host->virtiface))
+			alias = host->vname;
+		
 		/* Old format */
 		if (vers == 2) {
 			sprintf(buf,
 				"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
 				host->vname, host->virtiface,
-				inet_ntoa(host->ipaddr),
-				(host->connected &&
-				 (strcmp(host->nodeid, nodeid) ||
-				  host->virtiface == 0)) ?
-				 host->vname : " ");
+				inet_ntoa(host->ipaddr), alias);
 		}
 		else {
 			sprintf(buf,
 				"NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n",
 				host->vname, host->vlan,
 				inet_ntoa(host->ipaddr),
-				host->vname, host->virtiface,
-				(host->connected &&
-				 (strcmp(host->nodeid, nodeid) ||
-				  host->virtiface == 0)) ?
-				 host->vname : " ");
+				host->vname, host->virtiface, alias);
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
 		info("HOSTNAMES: %s", buf);
