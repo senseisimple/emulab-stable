@@ -224,10 +224,9 @@ if { $simcode_present == 1 } {
     exec sysctl -w net.inet.ip.forwarding=0 net.inet.ip.fastforwarding=0
     
     # Now, we configure IPTaps for links between real and simulated nodes
-    set nodelist [Node info instances]
     set i 0    
     
-    foreach nodeinst [Node info instances] {
+    foreach nodeinst [concat [Node info instances] [Node/MobileNode info instances]] {
 	if { [$nodeinst info vars nsenode_ipaddrlist] == {} } {
 	    continue
 	}

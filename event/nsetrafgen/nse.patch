@@ -1,6 +1,6 @@
 diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
 --- dist-ns-allinone-2.1b9/install	Mon Apr 22 18:42:09 2002
-+++ ns-allinone-2.1b9/install	Thu Jun 13 21:46:32 2002
++++ ns-allinone-2.1b9/install	Wed Jun 19 12:06:51 2002
 @@ -39,224 +39,82 @@
  
  # Get current path
@@ -415,14 +415,14 @@ diff -ru dist-ns-allinone-2.1b9/install ns-allinone-2.1b9/install
  echo "----------------------------------------------------------------------------------"
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/Makefile.in
 --- dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Mon Mar 18 15:39:26 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Thu Jun 13 18:46:54 2002
++++ ns-allinone-2.1b9/ns-2.1b9/Makefile.in	Wed Jun 19 12:09:34 2002
 @@ -78,6 +78,14 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
-+CFLAGS += -DUSEEVENTS -DUSEROUTES
++CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb
 +LIB += `elvin-config --libs vin4c`
 +STATIC += -static
@@ -431,20 +431,29 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/Makefile.in ns-allinone-2.1b9/ns-2.1b9/
  # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
  # Also, gcc does not remove the .o before forking 'as', which can be a
  # problem if you don't own the file but can write to the directory.
-@@ -285,6 +293,10 @@
+@@ -266,6 +274,8 @@
+ #	sensor-nets/tags.o sensor-nets/sensor-query.o \
+ #	sensor-nets/flood-agent.o \
+ 
++OBJ_CC += ../../tbevent.o 
++
+ # what was here before is now in emulate/
+ OBJ_C =
+ 
+@@ -285,6 +295,10 @@
  	emulate/nat.o  \
  	emulate/iptap.o \
  	emulate/tcptap.o
 +
 +##### nse with event system
-+OBJ_EMULATE_CC += ../../tbevent.o ../../tbnexthop.o
++OBJ_EMULATE_CC += ../../tbnexthop.o
 +####
  
  OBJ_EMULATE_C = \
  	emulate/inet.o
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Fri Aug 14 14:09:33 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Thu Jun 13 20:01:59 2002
++++ ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc	Wed Jun 19 12:06:51 2002
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -456,7 +465,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/apps/telnet.cc ns-allinone-2.1b9/ns-2.1
  		timer_.resched(t);
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Apr 10 16:43:49 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Thu Jun 13 19:39:42 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc	Wed Jun 19 12:06:51 2002
 @@ -44,11 +44,22 @@
  #include "config.h"
  #include "scheduler.h"
@@ -609,7 +618,8 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  	while (1) {
  		sync();
 +#ifndef USEEVENTS
-+		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
+ 		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
+-			return (1);
 +  		        return(1);
 +#else
 +		
@@ -743,7 +753,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +		// first handle any "old events"
 +		//
 +		while ((p = deque()) != NULL && (p->time_ <= now)) {
-+			dispatch(p);
++			dispatch(p, clock_);
 +		}
 +
 +		//
@@ -758,7 +768,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +				//
 +				// proper time to dispatch sim event... do so
 +				//
-+				dispatch(p);
++				dispatch(p, clock_);
 +			} else {
 +				//
 +				// there was a simulator event which fired, and
@@ -798,8 +808,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
 +	while (1) {
 +		sync();
 +#ifndef USEEVENTS
- 		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
--			return (1);
++		if (Tcl_DoOneEvent(TCL_DONT_WAIT) == 1)
 +  		        return(1);
 +#else
 +		
@@ -816,7 +825,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/scheduler.cc ns-allinone-2.1b9/n
  	}
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Fri Aug  3 16:56:48 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Thu Jun 13 19:05:33 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc	Wed Jun 19 12:06:51 2002
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -835,7 +844,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/tclAppInit.cc ns-allinone-2.1b9/
  }
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Fri Sep 11 19:32:28 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Thu Jun 13 15:37:27 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc	Wed Jun 19 12:06:51 2002
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -879,7 +888,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.cc ns-allinone-2.1
 +#endif
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Nov  2 15:46:37 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Thu Jun 13 15:37:02 2002
++++ ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h	Wed Jun 19 12:06:51 2002
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -898,7 +907,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/common/timer-handler.h ns-allinone-2.1b
  #endif /* timer_handler_h */
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Thu Jun 13 16:16:09 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc	Wed Jun 19 12:06:51 2002
 @@ -37,11 +37,42 @@
  #endif
  
@@ -1141,7 +1150,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.cc ns-allinone-2.1b9/ns-2
    return 0;
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Thu Jun 13 14:55:46 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h	Wed Jun 19 12:06:51 2002
 @@ -38,24 +38,35 @@
  
  #include "tap.h"
@@ -1181,7 +1190,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/iptap.h ns-allinone-2.1b9/ns-2.
    void recvpkt();
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Thu Jun 13 15:31:39 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc	Wed Jun 19 12:06:51 2002
 @@ -57,10 +57,18 @@
  
  #ifdef __cplusplus
@@ -1285,7 +1294,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net-pcap.cc ns-allinone-2.1b9/n
  // PcapLiveNetwork: a live network tap
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b9/emulate/net.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Fri May 22 20:44:57 1998
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Thu Jun 13 19:23:55 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/net.h	Wed Jun 19 12:06:51 2002
 @@ -64,4 +64,102 @@
  protected:
  	int mode_;	// read/write bits (from fcntl.h)
@@ -1391,7 +1400,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/net.h ns-allinone-2.1b9/ns-2.1b
  #endif
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Tue May 15 15:19:27 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Thu Jun 13 16:13:31 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc	Wed Jun 19 12:06:51 2002
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -1527,7 +1536,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.cc ns-allinone-2.1b9/ns-2.1
  		    name(), p->accessdata(), hc->size(), strerror(errno));
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Tue May 15 15:23:38 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Thu Jun 13 14:56:34 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h	Wed Jun 19 12:06:51 2002
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -1542,7 +1551,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tap.h ns-allinone-2.1b9/ns-2.1b
  
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Fri Sep 21 11:55:34 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Thu Jun 13 15:14:09 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc	Wed Jun 19 12:06:51 2002
 @@ -91,6 +91,12 @@
        }
        return (TCL_OK);
@@ -1716,7 +1725,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.cc ns-allinone-2.1b9/ns-
  }
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Fri Jan 11 15:06:09 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Thu Jun 13 15:20:40 2002
++++ ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h	Wed Jun 19 12:06:51 2002
 @@ -38,6 +38,7 @@
  
  #include "tap.h"
@@ -1725,16 +1734,35 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/emulate/tcptap.h ns-allinone-2.1b9/ns-2
  #include <netinet/ip.h>
  #include <netinet/tcp.h>
  #include <sys/socket.h>
-Only in ns-allinone-2.1b9/ns-2.1b9: gen
-Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/cmu-scen-gen/setdest: Makefile
-Only in ns-allinone-2.1b9/ns-2.1b9/indep-utils/cmu-scen-gen/setdest: calcdest
-Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/dec: Makefile
-Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/epa: Makefile
-Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/nlanr: Makefile
-Only in dist-ns-allinone-2.1b9/ns-2.1b9/indep-utils/webtrace-conv/ucb: Makefile
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h ns-allinone-2.1b9/ns-2.1b9/link/delay.h
+--- dist-ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Sun Nov  1 18:03:33 1998
++++ ns-allinone-2.1b9/ns-2.1b9/link/delay.h	Wed Jun 19 12:06:51 2002
+@@ -44,6 +44,10 @@
+ #include "ip.h"
+ #include "connector.h"
+ 
++#ifdef ADD_ETHER_OVERHEAD
++#include <net/ethernet.h>
++#endif
++
+ class LinkDelay : public Connector {
+  public:
+ 	LinkDelay();
+@@ -52,7 +56,11 @@
+ 	void handle(Event* e);
+ 	double delay() { return delay_; }
+ 	inline double txtime(Packet* p) {
++#ifndef ADD_ETHER_OVERHEAD
+ 		return (8. * hdr_cmn::access(p)->size() / bandwidth_);
++#else
++		return (8. * (hdr_cmn::access(p)->size() + ETHER_HDR_LEN) / bandwidth_);
++#endif
+ 	}
+ 	double bandwidth() const { return bandwidth_; }
+ 	void pktintran(int src, int group);
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Wed Apr 10 16:44:10 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Thu Jun 13 16:01:30 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl	Wed Jun 19 12:06:51 2002
 @@ -66,6 +66,7 @@
  CMUTrace set debug_ false
  
@@ -1743,10 +1771,9 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcl/lib/ns-default.tcl ns-allinone-2.1b
  
  #
  # Queues and associated
-Only in ns-allinone-2.1b9/ns-2.1b9/tcl/test: all.nam
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Mar 20 19:14:56 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Thu Jun 13 18:10:01 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc	Wed Jun 19 12:06:51 2002
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -2223,7 +2250,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.cc ns-allinone-2.1b9/ns-2.
  //if (int(t_seqno_) > 1)
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Sun Dec  2 19:41:16 2001
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Thu Jun 13 18:13:10 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h	Wed Jun 19 12:06:51 2002
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -2259,7 +2286,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp-full.h ns-allinone-2.1b9/ns-2.1
  	virtual void oldack() {			// what to do on old ack
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Fri Mar 29 19:40:43 2002
-+++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Thu Jun 13 17:37:43 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h	Wed Jun 19 12:06:51 2002
 @@ -54,6 +54,8 @@
  	int ackno_;             /* ACK number for FullTcp */
  	int hlen_;              /* header len (bytes) for FullTcp */
@@ -2279,7 +2306,7 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tcp/tcp.h ns-allinone-2.1b9/ns-2.1b9/tc
  /* these are used to mark packets as to why we xmitted them */
 diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.1b9/tools/random.cc
 --- dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Tue Aug  8 23:51:14 2000
-+++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Thu Jun 13 19:04:19 2002
++++ ns-allinone-2.1b9/ns-2.1b9/tools/random.cc	Wed Jun 19 12:06:51 2002
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -2294,3 +2321,15 @@ diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/tools/random.cc ns-allinone-2.1b9/ns-2.
 +#endif
  
  #endif /* !WIN32 */
+diff -ru dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc
+--- dist-ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Mon Apr  1 16:07:28 2002
++++ ns-allinone-2.1b9/ns-2.1b9/trace/cmu-trace.cc	Wed Jun 19 12:10:28 2002
+@@ -826,6 +826,8 @@
+ 			break;
+ 		case PT_GAF:
+ 			break;
++		case PT_LIVE:
++			break;
+ 		default:
+ 			fprintf(stderr, "%s - invalid packet type (%s).\n",
+ 				__PRETTY_FUNCTION__, packet_info.name(ch->ptype()));
