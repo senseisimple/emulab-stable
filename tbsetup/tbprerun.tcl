@@ -156,11 +156,11 @@ if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
     exit 1
 }
 
-outs "Parsing OS information."
-if {[catch "exec $handle_os $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error parsing OS information. ($err)"
-    exit 1
-}
+#outs "Parsing OS information."
+#if {[catch "exec $handle_os $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
+#    outs stderr "Error parsing OS information. ($err)"
+#    exit 1
+#}
 
 outs "Setup finished - $irFile generated."
 
