@@ -152,7 +152,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	WRITESIDEBARBUTTON("Papers (May 1)", $TBDOCBASE, "pubs.php3");
-	WRITESIDEBARBUTTON("Software", $TBDOCBASE, "software.php3");
+	WRITESIDEBARBUTTON_NEW("Software", $TBDOCBASE, "software.php3");
 	WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
 	WRITESIDEBARBUTTON("Photo Gallery", $TBDOCBASE, "gallery/gallery.php3");
 	WRITESIDEBARBUTTON_NEW("Emulab Users", $TBDOCBASE,
