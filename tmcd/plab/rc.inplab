@@ -214,6 +214,13 @@ sub doplabconfig()
 	# Set SSH port
 	print RC "setconfigopt /etc/ssh/sshd_config Port $sshdport\n";
 
+        # Start syslogd
+        print RC "touch /var/log/messages";
+        print RC "touch /var/log/maillog";
+        print RC "touch /var/log/secure";
+        print RC "touch /var/log/cron";
+        print RC "/sbin/syslogd";
+
 	# Start sshd
 	print RC "/etc/init.d/sshd restart\n";
     }
