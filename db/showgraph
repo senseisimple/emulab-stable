@@ -41,8 +41,8 @@ open(TMP,">$filename");
 
 print TMP "graph: {\n  orientation: left_to_right\n".
     "  title: \"Testbed Database Relational Graph - ".$date."\"\n";
-print TMP "  display_edge_labels: yes\n  scaling: 0.5\n";
-print TMP "  height: 950\n width: 500\n";
+print TMP "  display_edge_labels: yes\n  scaling: 0.45\n";
+print TMP "  height: 1000\n width: 500\n";
 print TMP "  priority_phase: yes\n  straight_phase: yes\n";
 print TMP "  crossingweight: barymedian\n  splines: yes\n";
 print TMP "  layoutalgorithm: minbackward\n  arrowmode: fixed\n";
@@ -90,7 +90,7 @@ my %sortlist = ("nodes",2,"interfaces",10,"ip_list",14,"node_types",4,
 		"quick_clean",39,"trusted",40,"users",41,"grp_memb",45,
 		"groups",42,"proj_memb",46,"projects",43,"proj_grps",47,
 		"experiments",44,"log",48,"login",49,"ssh_host_keys",50,
-		"outlets",31
+		"outlets",31,"partitions",52
 		);
 sub mysort {
     if(!defined $sortlist{"\L$a"}) {
@@ -111,7 +111,7 @@ foreach $col ( sort keys %tablecols) {
     @tables= sort mysort split('\.',$tablecols{$col});
     foreach $tbl (sort mysort @tables) {
 	if (@tables < 2 || 
-	    $tbl=~/^grp|delta_|nodes|log|wir|int|proj_|exper|res|out/i ) {
+	    $tbl=~/^grp|delta_|nodes|log|exper|proj_|res|out|part/i ) {
 	    print TMP "  edge: { sourcename: \"$col\" ".
 		"targetname: \"$tbl\" }\n";
 	} else {
