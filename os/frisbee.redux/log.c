@@ -41,17 +41,18 @@ void
 log(const char *fmt, ...)
 {
 	va_list args;
+	char	buf[BUFSIZ];
 
 	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
 	if (!usesyslog) {
-		vfprintf(stderr, fmt, args);
+		fputs(buf, stderr);
 		fputc('\n', stderr);
-		fflush(stderr);
 	}
 	else
-		vsyslog(LOG_INFO, fmt, args);
-	       
-	va_end(args);
+		syslog(LOG_INFO, "%s", buf);
 }
 
 void
