@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -1069,7 +1069,98 @@ file.</i>
 <h2>Custom OS Images</h2>
 </center>
 
-Sorry, this section of the documentation is still under construction.
-In the meantime, please check the documentation for creating your own
-custom disk images at <a href="https://www.emulab.net/newimageid_explain.php3">
+Emulab allows you to create your own disk images and load them on your
+experimental nodes, automatically when your experiment is created or
+swapped in. Once you have created a custom disk image (and the
+associated <a href="https://www.emulab.net/newimageid_explain.php3">
+image/osid descriptor</a> for it, you can use that OSID in your NS
+file. When your experiment is swapped in, the testbed system will
+arrange for your disks to be loaded in parallel using a locally
+written multicast disk loading protocol. Experience has shown that it
+is much faster to load a disk image on 10 nodes at once, then it is to
+load a bunch of RPMS or tarballs on each node as it boots. So, while
+it may seem like overkill to create your own disk image, we can assure
+you it is not!
+
+<p>
+The most common approach is to use the <a
+href='newimageid_ez.php3'>New Image Descriptor</a> form to create
+a disk image that contains a customized version of the standard Redhat
+Linux partition or the FreeBSD partition. Or, you can start from
+scratch and load your own operating system in any of the DOS
+partitions, and then capture that partition when you are done. Either
+way, all you need to do is enter the node name in the form, and the
+testbed system will create the image for you automatically, notifying
+you via email when it is finished.  You can then use that image in
+subsequent experiments by specifying the descriptor name in your NS
+file with the
+<a href="tutorial/docwrapper.php3?docname=nscommands.html#OS">
+<tt>tb-set-node-os</tt></a> directive. When the experiment is
+configured, the proper image will be loaded on each node automatically by
+the Testbed system.
+
+<p>
+A typical approach to creating your own disk image using one of the
+default images as a base, goes like this:
+
+<p>
+<blockquote>
+<ol>
+<li> Create a single-node Linux or FreeBSD experiment. In your NS
+     file, use the appropriate <tt>tb-set-node-os</tt> directive.
+     For example, one of the following statements:
+
+     <code><pre>
+     tb-set-node-os $NodeA FBSD-STD
+     tb-set-node-os $NodeA RHL-STD		</code></pre>
+
+<li> After your experiment has swapped in (you have received the email
+     saying it is running), log into the node and load all of the RPMS
+     and software packages that you wish to load. Be sure to arrange
+     for any programs that need to be started at boot time. It is a
+     good idea to reboot the node and make sure that everything is
+     running as you want it to when it comes up.
+
+<li> Note the physical (pcXX) name of the machine used!
+
+<li> Create an image descriptor and image using the
+     <a href="https://www.emulab.net/newimageid_ez.php3">New Image
+     Descriptor</a> form. For "which DOS partition" select 1 if you
+     are customizing the FreeBSD slice, or 2 if you are customizing
+     the Linux slice. Since you are customizing one of the base
+     images, you should select all four OS features, operational mode
+     "NormalV1", and all four node types (pc600, etc.). Leave the last
+     two check boxes alone. <br>
+
+     <br>
+     Where it asks for "Node to Create Image from," fill in the node
+     you have just customized ((pcXX noted in previous step). Then
+     click the submit button.
+
+<li> Wait for the email saying the image creation is done.
+
+<li> Now you can create a second single-node experiment to test your
+     new image. In your .ns file, use <tt>tb-set-node-os</tt> to
+     select the OSID that you just created. Be sure to remove any RPM
+     or tarball directives. Submit that NS file and wait for the email
+     notification. Then log into the new node and check to make sure
+     everything is running normally.
+
+<li> If everything is going well, terminate both of these single-node
+     experiments. If not, release the experiment created in the
+     previous step, and then go back and fix the original node (pcXX
+     above). Recreate the image as needed:
+
+     <code><pre>
+     create_image -p &lt;pid&gt &lt;imageid&gt &lt;node&gt  </pre></code>
+
+<li> Once your image is working properly, you can use it in any NS
+     file by using the <tt>tb-set-node-os</tt>. 
+
+</ol>
+</blockquote>
+
+More information on creating and loading your own disk images can be
+found at <a href="https://www.emulab.net/newimageid_explain.php3">
 https://www.emulab.net/newimageid_explain.php3.</a>
+
