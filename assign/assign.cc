@@ -420,7 +420,6 @@ REDO_SEARCH:
 		}
 		double acceptchance = 1 - (*it)->current_load * 1.0
 		    / (*it)->max_load;
-		//double acceptchance = 1.0 / (*acceptable_types)[i]->members[vn->type]->L.size();
 
 	        int p = 1000 * acceptchance;
 		if ((std::random() % 1000) < (1000 * acceptchance)) {
@@ -625,7 +624,6 @@ void anneal()
   int nincreases, ndecreases;
   double avgincrease;
   double avgscore;
-//  float avgscoresquared;
   double initialavg;
   double stddev;
   bool finished;
@@ -672,7 +670,6 @@ void anneal()
 
   melt_trans = neighborsize;
 #ifdef EPSILON_TERMINATE
-//  while ((initialavg) && ((temp * avgscore / initialavg) >= epsilon)) {
   while(1) {
 #else
   while (temp >= temp_stop) {
@@ -779,7 +776,6 @@ void anneal()
 	if (oldassigned) {
 	  RDEBUG(cout << "removing: !lan, oldassigned" << endl;)
 	  remove_node(vv);
-	  //unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
 	}
 #endif
 	if (newpnode == NULL) {
@@ -795,62 +791,44 @@ void anneal()
 
 	  freednode = true;
 
-	  //cout << "Finding a replacement node for " << vn->name << endl;
-
-	  //cerr << "Starting" << endl;
 	  tt_entry tt = vnode_type_table[vn->name];
-	  //cerr << "Got TT" << endl;
 	  int size = tt.first;
 	  pclass_vector *acceptable_types = tt.second;
-	  //cerr << "Got AT" << endl;
 	  // Find a node to kick out
 	  bool foundnode = false;
 	  int offi = std::rand();
 	  int index;
-	  //cerr << "Starting " << size << endl;
 	  for (int i = 0; i < size; i++) {
 	      index = (i + offi) % size;
-	      //cout << "On " << index << endl;
 	      if ((*acceptable_types)[index]->used_members.find(vn->type) ==
 		      (*acceptable_types)[index]->used_members.end()) {
-		  //cout << "Can't find type" << endl;
 		  continue;
 	      }
 	      if ((*acceptable_types)[index]->used_members[vn->type]->size() == 0) {
-		  //cout << "used_members empty" << endl;
 		  continue;
 	      }
-	      //cerr << "Works!" << endl;
 	      foundnode = true;
 	      break;
 	  }
 
-	  //cerr << "Got i " << i << endl;
 	  if (foundnode) {
 	      assert((*acceptable_types)[index]->used_members[vn->type]->size());
 	      tb_pclass::tb_pnodeset::iterator it = (*acceptable_types)[index]->used_members[vn->type]->begin();
 	      int j = std::rand() % (*acceptable_types)[index]->used_members[vn->type]->size();
-	      //cerr << "Used members: " << (*acceptable_types)[i]->used_members[vn->type]->size() << endl;
 	      while (j > 0) {
 		  it++;
 		  j--;
-		  //cerr << "Skipping" << endl;
 	      }
-	      //cerr << "Got it" << endl;
 	      tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
 	      int k = std::rand() % (*it)->assigned_nodes.size();
 	      while (k > 0) {
 		  it2++;
 		  k--;
-		  //cerr << "Skipping" << endl;
 	      }
-	      //cerr << "Got it2" << endl;
 	      tb_vnode *kickout = *it2;
-	      //cerr << "Kicking out " << kickout->name << " on " << (*it)->name <<  endl;
 	      assert(kickout->assigned);
 	      vvertex toremove = vname2vertex[kickout->name];
 	      newpnode = *it;
-	      //cerr << "Got vvertex" << endl;
 	      remove_node(toremove);
 	      unassigned_nodes.push(vvertex_int_pair(toremove,
 			  std::random()));
@@ -858,7 +836,6 @@ void anneal()
 	      cerr << "Failed to find a replacement!" << endl;
 	  }
 
-	  //cerr << "Done" << endl;
 #else
 	  int start = std::random()%nnodes;
 	  int toremove = start;
@@ -880,10 +857,8 @@ void anneal()
 	      bool keepgoing = false;
 	      if (get(vvertex_pmap,virtual_nodes[toremove])->fixed) {
 		  keepgoing = true;
-		  //cout << "keepgoing: fixed" << endl;
 	      } else if (! get(vvertex_pmap,virtual_nodes[toremove])->assigned) {
 		  keepgoing = true;
-		  //cout << "keepgoing: !assigned" << endl;
 	      } else {
 		  pvertex pv = get(vvertex_pmap,virtual_nodes[toremove])->assignment;
 		  tb_pnode *pn = get(pvertex_pmap,pv);
@@ -895,7 +870,6 @@ void anneal()
 		  }
 		  if (j == acceptable_types->size()) {
 		      keepgoing = true;
-		      //cout << "keepgoing: wrongtype" << endl;
 		  }
 	      }
 
@@ -924,7 +898,6 @@ void anneal()
 #endif /* SMART_UNMAP */
 #ifndef SMART_UNMAP
 	} else {
-	  //printf("Found an old node!\n");
 #else
 	}
 #endif
@@ -947,17 +920,8 @@ void anneal()
 #endif
       }
 
-	/*
-#ifdef FREE_IMMEDIATELY
-      if (oldassigned) {
-	remove_node(vv);
-      }
-#endif
-*/
-
 #ifdef FIX_LAN_NODES
       // OK, we're going to do something silly here: Migrate LAN nodes!
-      //cout << "Migrating: " << unassigned_nodes.size() << " nodes free" << endl;
       vvertex_iterator lanvertex_it,end_lanvertex_it;
       vvertex_list migrate_lan_nodes;
       tie(lanvertex_it,end_lanvertex_it) = vertices(VG);
@@ -981,21 +945,8 @@ void anneal()
 #endif
 
       newscore = get_score();
-      /*
-      if (melting) {
-        printf("Melting: Adding %f to avgscore\n",newscore);
-	melttrials++;
-	avgscore += newscore;
-      }
-      */
       assert(newscore >= 0);
 
-//      avgscore = avgscore * (trans -1) / trans + newscore / trans;
-//      avgscoresquared = avgscoresquared * (trans -1) / trans
-//	+ (newscore * newscore) / trans;
-      //avgscore = avgscore + newscore / neighborsize;
-//      avgscoresquared = avgscoresquared + (newscore * newscore) / neighborsize;
-      
       // Negative means bad
       scorediff = bestscore - newscore;
       // This looks funny, because < 0 means worse, which means an increase in
@@ -1063,10 +1014,7 @@ void anneal()
 	fprintf(scoresout,"%f\n",newscore);
 	fprintf(deltaout,"%f\n",-scorediff);
 #endif
-	//if (!melting) {
-	    //printf("Adding %f to avgscore\n",newscore);
 	avgscore += newscore;
-	//}
 
 	accepts++;
 
@@ -1117,14 +1065,11 @@ void anneal()
       }
 
       if (melting) {
-	//cout << "Melt: avgi " << avgincrease << " nin " << nincreases << " ndec "
-	// << ndecreases << " X0 " << X0 << endl;
 	temp = avgincrease /
 	  log(nincreases/ (nincreases * X0 - ndecreases * (1 - X0)));
 	if (!(temp > 0.0)) {
 	    temp = 0.0;
 	}
-	//cout << "New melting temp is " << temp << endl;
       }
 #ifdef TIME_TERMINATE
       if (timelimit && ((used_time() - timestart) > timelimit)) {
@@ -1150,16 +1095,8 @@ void anneal()
 #endif
 
 NOTQUITEDONE:
-   /* if (melting) {
-	printf("Melting: avgscore: %f = %f / %i\n",avgscore / melttrials,avgscore,melttrials);
-      avgscore = avgscore / melttrials;
-    } else {
-    */
       RDEBUG(printf("avgscore: %f = %f / %i\n",avgscore / (accepts +1),avgscore,accepts+1);)
       avgscore = avgscore / (accepts +1);
-      /*
-    }
-    */
 
     if (melting) {
       melting = false;
@@ -1234,10 +1171,6 @@ NOTQUITEDONE:
     for (int j = 0; j < nhist; j++) {
       smoothedavg += avghist[(hstart + j) % MAX_AVG_HIST] / (nhist + 1);
     }
-    /*
-    printf("smooth: avgscore %f, smoothedavg %f, hstart %i, nhist %i\n",avgscore,
-	smoothedavg,hstart,nhist);
-    */
 
     avghist[(hstart + nhist) % MAX_AVG_HIST] = avgscore;
     if (nhist < MAX_AVG_HIST) {
@@ -1263,7 +1196,7 @@ NOTQUITEDONE:
        printf("epsilon: (%f) %f / %f * %f / %f < %f (%f)\n", fabs(deltaavg), temp, initialavg,
 	   deltaavg, deltatemp, epsilon,(temp / initialavg) * (deltaavg/ deltatemp));
     )
-    if ((tsteps >= mintsteps) && // (temp <= min_temp_end) &&
+    if ((tsteps >= mintsteps) &&
 #ifdef ALLOW_NEGATIVE_DELTA
 	((fabs(deltaavg) < 0.0000001)
 	 || (fabs((temp / initialavg) * (deltaavg/ deltatemp)) < epsilon))) {
@@ -1309,10 +1242,6 @@ NOTQUITEDONE:
     }
 
     // Only revert if the best configuration has better violations
-    /*
-    if ((NO_REVERT || (REVERT_LAST && (temp >= temp_stop)) ||
-	(REVERT_VIOLATIONS && (absbestviolated > violated))) && !forcerevert) {
-	*/
     vvertex_list lan_nodes;
     vvertex_iterator vvertex_it,end_vvertex_it;
     if (!revert) {
