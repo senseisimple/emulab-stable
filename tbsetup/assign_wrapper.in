@@ -292,10 +292,12 @@ my %lannodes = ();
 # satisfy the estimates for physical nodes.
 my $minimum_nodes;
 my $maximum_nodes;
-my $remotecount  = 0;
-my $virtcount    = 0;
-my $plabcount    = 0;
-my $needwanassign= 0;
+my $reserved_pcount  = 0;
+my $reserved_vcount  = 0;
+my $remotecount      = 0;
+my $virtcount        = 0;
+my $plabcount        = 0;
+my $needwanassign    = 0;
 
 #
 # This is for stats gathering. It might duplicate other stuff, but
@@ -517,7 +519,7 @@ sub RunAssign ($)
 		     " and a.role='testnode' and a.type!='dnard'");
     $numnodes = $numnodes_result->numrows;
     
-    if ($numnodes < $minimum_nodes) {
+    if ($numnodes < ($minimum_nodes - $reserved_pcount)) {
 	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	      "Insufficient nodes available.");
     }
@@ -3761,9 +3763,6 @@ sub physnodenextpipe($)  {
 # 
 sub LoadCurrent()
 {
-    my $reserved_pcount  = 0;
-    my $reserved_vcount  = 0;
-
     printdb "Fixing previously allocated nodes.\n";
     
     my $query_result = 
