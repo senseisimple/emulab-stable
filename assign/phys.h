@@ -14,6 +14,8 @@
  * This sorting is required by the assignment routine.
  */
 
+#include <LEDA/graph_alg.h>
+
 class toponode {
 public:
 	toponode();
