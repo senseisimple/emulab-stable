@@ -65,6 +65,7 @@ VLAN Control:
   -t <pid> <eid>    Create all VLANs from database tables for an experiment
   -r <pid> <eid>    Remove all VLANs from database tables for an experiment
   -l                List all VLANs
+  -w                Used with -l, includes device-specific VLAN number
   -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
                         and put [ports] in it
   -y <type>         When used with -m, the new VLAN becomes a private VLAN
@@ -97,7 +98,7 @@ END
 
 my %opt = ();
 GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','n','o=s@','p=s',
-    'r','s','t','u=s','v','y=s','x=s','z=s');
+    'r','s','t','u=s','v','w','y=s','x=s','z=s');
 # Unused: b,f,j,q,w
 
 if ($opt{h}) {
@@ -527,10 +528,10 @@ sub doListVlans ($) {
     # the results from each stack, based on the VLAN identifier
     #
     foreach my $stack (@$stacks) {
-	# TODO: Add a way to print ddep 
 	my @vlanList = $stack->listVlans();
 	foreach my $vlan (@vlanList) {
 	    my ($id,$ddep,$memberref) = @$vlan;
+	    ${$vlans{$id}}[0] = $ddep;
 	    push @{${$vlans{$id}}[1]}, @$memberref;
 	}
     }
@@ -539,21 +540,40 @@ sub doListVlans ($) {
     # These need to be declared here for the benefit of the format string
     # See perlform(1) for help with formats
     #
-    my ($vlan_id,$pideid,$vname,$members);
-    print << "END";
+    my ($vlan_id,$ddep,$pideid,$vname,$members);
+    #
+    # Check to see if they want device-specific VLAN numbers, which makes the
+    # display more cramped, but is useful for debugging
+    #
+    if (!$opt{w}) { 
+	print << "END";
 VLAN     Project/Experiment VName     Members
 --------------------------------------------------------------------------------
 END
-    format vlanlist =
+	format vlanlist =
 @<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $vlan_id,$pideid,           $vname,   $members
 ~~                                    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                       $members
 .
+	$FORMAT_NAME = 'vlanlist';
+    } else {
+    	print << "END";
+VLAN     Number Project/Experiment VName     Members
+--------------------------------------------------------------------------------
+END
+	format vlanlist2 =
+@<<<<<<< @<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$vlan_id,$ddep, $pideid,           $vname,   $members
+~~                                           ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                             $members
+.
+	$FORMAT_NAME = 'vlanlist2';
+}
 
-    $FORMAT_NAME = 'vlanlist';
     foreach $vlan_id (sort {tbsort($a,$b)} keys %vlans) {
-	my ($ddep,$memberref) = @{$vlans{$vlan_id}};
+	my $memberref;
+	($ddep,$memberref) = @{$vlans{$vlan_id}};
 
 	#
 	# Find which, if any, experiment this VLAN belongs to.
