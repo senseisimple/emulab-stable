@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -29,19 +29,20 @@ define("CHECKLOGIN_MODMASK",		0xffff00);
 # as a bit field in the top part. This is intended to localize as
 # many queries related to login as possible. 
 #
-define("CHECKLOGIN_NEWUSER",		0x00100);
-define("CHECKLOGIN_UNVERIFIED",		0x00200);
-define("CHECKLOGIN_UNAPPROVED",		0x00400);
-define("CHECKLOGIN_ACTIVE",		0x00800);
-define("CHECKLOGIN_USERSTATUS",		0x00f00);
-define("CHECKLOGIN_PSWDEXPIRED",	0x01000);
-define("CHECKLOGIN_FROZEN",		0x02000);
-define("CHECKLOGIN_ISADMIN",		0x04000);
-define("CHECKLOGIN_TRUSTED",		0x08000);
-define("CHECKLOGIN_CVSWEB",		0x10000);
-define("CHECKLOGIN_ADMINOFF",		0x20000);
-define("CHECKLOGIN_WEBONLY",		0x40000);
-define("CHECKLOGIN_PLABUSER",		0x80000);
+define("CHECKLOGIN_NEWUSER",		0x000100);
+define("CHECKLOGIN_UNVERIFIED",		0x000200);
+define("CHECKLOGIN_UNAPPROVED",		0x000400);
+define("CHECKLOGIN_ACTIVE",		0x000800);
+define("CHECKLOGIN_USERSTATUS",		0x000f00);
+define("CHECKLOGIN_PSWDEXPIRED",	0x001000);
+define("CHECKLOGIN_FROZEN",		0x002000);
+define("CHECKLOGIN_ISADMIN",		0x004000);
+define("CHECKLOGIN_TRUSTED",		0x008000);
+define("CHECKLOGIN_CVSWEB",		0x010000);
+define("CHECKLOGIN_ADMINOFF",		0x020000);
+define("CHECKLOGIN_WEBONLY",		0x040000);
+define("CHECKLOGIN_PLABUSER",		0x080000);
+define("CHECKLOGIN_STUDLY",		0x100000);
 
 #
 # Constants for tracking possible login attacks.
@@ -148,7 +149,7 @@ function CHECKLOGIN($uid) {
     $query_result =
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
-		     "       user_interface, n.type " .
+		     "       user_interface,n.type,u.stud " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -163,9 +164,10 @@ function CHECKLOGIN($uid) {
     
     #
     # Scan the rows. All the info is duplicate, except for the trust
-    # values. 
+    # values and the pid. pid is a hack.
     #
     $trusted = 0;
+    
     while ($row = mysql_fetch_array($query_result)) {
 	$expired = $row[0];
 	$hashkey = $row[1];
@@ -183,6 +185,7 @@ function CHECKLOGIN($uid) {
 	$interface= $row[9];
 
 	$type     = $row[10];
+	$stud     = $row[11];
 
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
@@ -292,6 +295,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_WEBONLY;
     if ($trusted)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_TRUSTED;
+    if ($stud)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_STUDLY;
     if ($cvsweb)
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_CVSWEB;
     if ($interface == TBDB_USER_INTERFACE_PLAB)

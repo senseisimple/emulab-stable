@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -376,7 +376,7 @@ function WRITESIDEBAR() {
 
 		WRITESIDEBARDIVIDER();
 
-                if (ISADMINISTRATOR()) {
+                if ($login_status & CHECKLOGIN_STUDLY) {
  		    WRITESIDEBARBUTTON("Begin an Experiment",
 				       $TBBASE, "beginexp_html.php3");
                 }
