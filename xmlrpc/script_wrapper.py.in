@@ -645,7 +645,7 @@ class delay_config:
         for linkparam in req_args[1:]:
             plist = string.split(linkparam, "=", 1)
             if len(plist) != 2:
-                print ("Parameter, '" + param
+                print ("Parameter, '" + linkparam
                        + "', is not of the form: param=value!")
                 self.usage();
                 return -1
