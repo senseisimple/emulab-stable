@@ -77,8 +77,9 @@
   <p><b>Format:</b></p>
   <p><code>#TB create-os <i>label</i> <i>imagepath</i> <i>partition</i></code></p>
   <p>Creates a custom OS called <i>label</i>, for use in <a href="#set-node-os"><code>set-node-os</code></a>
-     commands. XXX <i>imagepath</i> is a path to the image on <code>ops.emulab.net</code> in your user
+     commands.  XXX <i>imagepath</i> is a path to the image on <code>ops.emulab.net</code> in your user
      subdirectory. XXX something about <i>partition</i></p>
+XXX Talk to Leigh
   <p><b>Example:</b></p>
   <p><code>#TB create-os MY-CUSTOM-OS XXX/XXX XXX</code></p>
 
@@ -108,7 +109,7 @@
   <h3>set-link-loss</h3>
   <p><b>Format:</b></p>
   <p><code>#TB set-link-loss <i>source</i> <i>dest</i> <i>rate</i></code></p>
-  <p>XXX Sets the loss rate of a link. <i>Rate</i> is between 0.0 and 1.0.</p>
+  <p>Sets the loss rate of a link. <i>Rate</i> is between 0.0 and 1.0.</p>
   <p><b>Example:</b></p>
   <p><code>#TB set-link-loss node1 node12 0.1</code></p>
 
@@ -117,9 +118,10 @@
   <h3>set-lan-loss</h3>
   <p><b>Format:</b></p>
   <p><code>#TB set-lan-loss <i>source</i> <i>dest</i> <i>rate</i></code></p>
-  <p>XXX Sets the loss rate of a lan. <i>Rate</i> is between 0.0 and 1.0.</p>
+  <p>Sets the loss rate of a lan (as specified using the NS command
+make-lan). <i>Rate</i> is between 0.0 and 1.0.</p>
   <p><b>Example:</b></p>
-  <p><code>#TB set-lan-loss XXX 0.7</code></p>
+  <p><code>#TB set-lan-loss lan1 node1 0.7</code></p>
 
 </body>
 </html>
