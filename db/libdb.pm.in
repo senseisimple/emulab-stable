@@ -92,6 +92,8 @@ use Exporter;
 	 TBDB_TBCONTROL_RESET TBDB_TBCONTROL_RELOADDONE 
 	 TBDB_TBCONTROL_TIMEOUT TBDB_NO_STATE_TIMEOUT
 
+	 TBDB_LOWVPORT TBDB_MAXVPORT TBDB_PORTRANGE
+
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
@@ -106,7 +108,7 @@ use Exporter;
 	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
-	 TBExptDestroy
+	 TBExptDestroy TBIPtoNodeID
 
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID
@@ -379,6 +381,17 @@ sub TBDB_WIDEAREA_LOCALNODE     { "boss"; }
 # We should list all of the DB limits.
 #
 sub DBLIMIT_NSFILESIZE()	{ (1024 * 16); }
+
+#
+# Virtual nodes must operate within a restricted port range. The range
+# is effective across all virtual nodes in the experiment. When an
+# experiment is swapped in, allocate a subrange from this and setup
+# all the vnodes to allocate from that range. We tell the user this
+# range so this they can set up their programs to operate in that range.
+#
+sub TBDB_LOWVPORT()		{ 30000; }
+sub TBDB_MAXVPORT()		{ 60000; }
+sub TBDB_PORTRANGE()		{ 256;   }
 
 #
 # Auth stuff.
@@ -1789,18 +1802,18 @@ sub TBIsNodeRemote($)
 }
 
 #
-# Is a node virtual (or "multiplexed"). 
+# Is a node virtual (or "multiplexed"). Optionally return jailflag.
 #
-# usage TBIsNodeVirtual(char *node)
+# usage TBIsNodeVirtual(char *node, int *jailed)
 #        Returns 1 if yes.
 #        Returns 0 if no.
 #
-sub TBIsNodeVirtual($)
+sub TBIsNodeVirtual($;$)
 {
-    my ($nodeid) = @_;
+    my ($nodeid, $jailed) = @_;
 
     my $query_result =
-	DBQueryFatal("select isvirtnode from node_types as t ".
+	DBQueryFatal("select isvirtnode,n.jailflag from node_types as t ".
 		     "left join nodes as n on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
 
@@ -1809,6 +1822,9 @@ sub TBIsNodeVirtual($)
     }
     
     my @row = $query_result->fetchrow_array();
+    if (defined($jailed)) {
+	$$jailed = $row[1];
+    }
     return($row[0]);
 }
 
@@ -2029,6 +2045,35 @@ sub TBControlNetIP($$)
     my @row = $query_result->fetchrow_array();
     if (defined($row[0])) {
 	$$pip = $row[0];
+	return 1;
+    }
+    return 0;
+}
+
+#
+# Map network IP for a node to its nodeid
+#
+# usage TBIPtoNodeID(char *ip, char \*nodeid)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBIPtoNodeID($$)
+{
+    my ($ip, $pnodeid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select n.node_id from interfaces as i ".
+		     "left join nodes as n on n.node_id=i.node_id ".
+		     "left join node_types as t ".
+		     "   on t.type=n.type and i.card=t.control_net ".
+		     "where i.IP='$ip'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    if (defined($row[0])) {
+	$$pnodeid = $row[0];
 	return 1;
     }
     return 0;

@@ -25,8 +25,6 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $named_setup = "$TB/sbin/named_setup";
-my $FIRSTIPPORT = 40000;
-my $PERNODEPORTS= 256;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -54,10 +52,15 @@ if ($UID != getpwnam("nobody") && !TBAdmin($UID)) {
 my $nodetype;
 my $nodeip;
 my $fromweb = 0;
+my $reuse   = 0;
 my $nickname;
 my $nodename;
 my $nodevtype;
 my $nodevname;
+my $pid;
+my $eid;
+my $nextid;
+my $nextpri;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -150,46 +153,10 @@ if (defined($nodevtype)) {
 	      "    No such nodevtype $nodevtype is defined in the DB!\n");
     }
 }
-
-#
-# We need the next id and priority.
-# 
-DBQueryFatal("lock tables nextfreenode write");
-
-$query_result =
-    DBQueryFatal("select nextid,nextpri from nextfreenode ".
-		 "where nodetype='$nodetype'");
-
-if (!$query_result->numrows) {
-    fatal("nodetype $nodetype is not in the nextfreenode table!");
-}
-my %row     = $query_result->fetchhash();
-my $nextid  = $row{'nextid'};
-my $nextpri = $row{'nextpri'};
-
-DBQueryFatal("update nextfreenode ".
-	     "set nextid=nextid+1,nextpri=nextpri+1 ".
-	     "where nodetype='$nodetype'");
-
-DBQueryFatal("unlock tables");
-
-#
-# Form a new node name! Bogus. need more DB state.
-#
-if ($nodetype =~ /^pc(\w+)$/) {
-    $nodename = "${1}${nextid}";
-}
 else {
-    fatal("Could not determine a name from type for $nodetype!");
-}
-if (!defined($nickname)) {
-    $nickname = $nodename;
-}
-
-#
-# Create the virtual type name. Again, this is bogus.
-#
-if (!defined($nodevtype)) {
+    #
+    # Create the virtual type name. Again, this is bogus.
+    #
     if ($nodetype eq "pcwa") {
 	$nodevtype = "pcvwainet";
     }    
@@ -197,45 +164,9 @@ if (!defined($nodevtype)) {
 	$nodevtype = "pcvroninet";
     }
 }
-
-#
-# Enter the records
-#
-print "Creating widearea node $nodename ...\n";
-DBQueryFatal("insert into nodes ".
-	     "(node_id, type, phys_nodeid, role, priority, ".
-	     " status, op_mode, def_boot_osid) ".
-	     "values ('$nodename', '$nodetype', '$nodename', ".
-	     "        'testnode', $nextpri, 'down', 'NORMAL', '$defosid') ");
-
-for ($i = 1; $i < 9; $i++) {
-    my $priority  = ($nextpri * 100) + $i;
-    $nodevname = "v${nodename}-${i}";
-
-    # Per vnode ports.
-    my $portlow  = $FIRSTIPPORT + (($i - 1) * $PERNODEPORTS);
-    my $porthigh = $portlow + $PERNODEPORTS - 1;
-	
-    print "Creating widearea virtual node $nodevname ...\n";
-    DBQueryFatal("insert into nodes ".
-		 "(node_id, type, phys_nodeid, role, priority, ".
-		 " status, op_mode, def_boot_osid, update_accounts, ".
-		 " ipport_low, ipport_high) ".
-		 "values ('$nodevname', '$nodevtype', '$nodename', ".
-		 "        'virtnode', $priority, 'down', 'NORMAL', ".
-		 "        '$defosid', 1, $portlow, $porthigh) ");
-}
-
-DBQueryFatal("insert into interfaces ".
-	     "(node_id, card, port, IP, interface_type, iface) ".
-	     "values ('$nodename', $control_net, 1, '$nodeip', ".
-	     "        'fxp', 'eth0')");
-
 #
 # Again, this is bogus.
 #
-my $pid;
-my $eid;
 if ($nodetype eq "pcwa") {
     $pid = "emulab-ops";
     $eid = "widearea-nodes";
@@ -244,15 +175,120 @@ else {
     $pid = "ron";
     $eid = "all";
 }
-DBQueryFatal("insert into reserved ".
-	     "(node_id, pid, eid, rsrv_time, vname) ".
-	     "values ('$nodename', '$pid', '$eid', now(), '$nickname')");
+
+#
+# Lets see if a known IP. If so we want to reuse the existing record.
+#
+if (TBIPtoNodeID($nodeip, \$nodename)) {
+    #
+    # We need the existing priority for creating the vnodes below.
+    #
+    $query_result =
+	DBQueryFatal("select priority from nodes where node_id='$nodename'");
+
+    my %row  = $query_result->fetchhash();
+    $nextpri = $row{'priority'};
+    $reuse   = 1;
+}
+else {
+    #
+    # We need the next id and priority.
+    # 
+    DBQueryFatal("lock tables nextfreenode write");
+
+    $query_result =
+	DBQueryFatal("select nextid,nextpri from nextfreenode ".
+		     "where nodetype='$nodetype'");
+
+    if (!$query_result->numrows) {
+	fatal("nodetype $nodetype is not in the nextfreenode table!");
+    }
+    my %row  = $query_result->fetchhash();
+    $nextid  = $row{'nextid'};
+    $nextpri = $row{'nextpri'};
+
+    DBQueryFatal("update nextfreenode ".
+		 "set nextid=nextid+1,nextpri=nextpri+1 ".
+		 "where nodetype='$nodetype'");
+
+    DBQueryFatal("unlock tables");
+
+    #
+    # Form a new node name! Bogus. need more DB state.
+    #
+    if ($nodetype =~ /^pc(\w+)$/) {
+	$nodename = "${1}${nextid}";
+    }
+    else {
+	fatal("Could not determine a name from type for $nodetype!");
+    }
+}
+
+if (!defined($nickname)) {
+    $nickname = $nodename;
+}
+
+#
+# Enter the records
+#
+if ($reuse) {
+    print "Reusing exiting record for $nodename. IP=$nodeip\n";
+}
+else {
+    print "Creating widearea node $nodename ...\n";
+    DBQueryFatal("insert into nodes ".
+		 "(node_id, type, phys_nodeid, role, priority, ".
+		 " status, op_mode, def_boot_osid) ".
+		 "values ('$nodename', '$nodetype', '$nodename', ".
+		 "        'testnode', $nextpri, 'down', 'NORMAL', ".
+		 "        '$defosid') ");
+
+    DBQueryFatal("insert into interfaces ".
+		 "(node_id, card, port, IP, interface_type, iface) ".
+		 "values ('$nodename', $control_net, 1, '$nodeip', ".
+		 "        'fxp', 'eth0')");
+
+    DBQueryFatal("insert into reserved ".
+		 "(node_id, pid, eid, rsrv_time, vname) ".
+		 "values ('$nodename', '$pid', '$eid', now(), '$nickname')");
+
+}
+
+#
+# Always create these. I'll kill off the old ones as needed for now.
+# 
+for ($i = 1; $i < 9; $i++) {
+    my $priority  = ($nextpri * 100) + $i;
+    $nodevname = "v${nodename}-${i}";
+
+    if (TBValidNodeName($nodevname)) {
+	next;
+    }
+    print "Creating widearea virtual node $nodevname ...\n";
+    DBQueryFatal("insert into nodes ".
+		 "(node_id, type, phys_nodeid, role, priority, ".
+		 " status, op_mode, def_boot_osid, update_accounts) ".
+		 "values ('$nodevname', '$nodevtype', '$nodename', ".
+		 "        'virtnode', $priority, 'down', 'NORMAL', ".
+		 "        '$defosid', 1) ");
+}
 
 #
 # Lets log it.
 #
-SENDMAIL($TBLOGS, "New WA node created",
-	 "New Wide Area node has been created.\n".
+my $subject;
+my $message;
+if ($reuse) {
+    $subject = "Existing WA node has reinstalled";
+    $message = "Existing WA node has been reinstalled";
+}
+else {
+    $subject = "New WA node created";
+    $message = "New Wide Area node has been created";
+}
+
+SENDMAIL($TBLOGS, $subject,
+	 "$message\n".
 	 "\n".
 	 "Type:      $nodetype\n".
 	 "Name:      $nodename\n".
