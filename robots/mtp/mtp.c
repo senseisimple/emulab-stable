@@ -38,6 +38,20 @@ static char *mtp_role_strings[MTP_ROLE_MAX] = {
     "robot"
 };
 
+/**
+ * Human readable names for the MTP statuses.
+ */
+static char *mtp_status_strings[] = {
+    "unknown",
+    "NONE",
+    "idle",
+    "moving",
+    "error",
+    "complete",
+    "contact",
+    "aborted",
+};
+
 static int mtp_read(char *handle, char *data, int len)
 {
     mtp_handle_t mh = (mtp_handle_t)handle;
@@ -273,6 +287,7 @@ mtp_error_t mtp_receive_packet(mtp_handle_t mh, struct mtp_packet *packet)
 	retval = MTP_PP_SUCCESS;
     }
     else if (mh->mh_flags & MHF_EOF) {
+	fprintf(stderr, "mtp: EOF for %d\n", mh->mh_fd);
 	retval = MTP_PP_ERROR_EOF;
     }
     else {
@@ -698,18 +713,16 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	}
 	for (lpc = 0;
 	     lpc < mp->data.mtp_payload_u.config_rmc.bounds.bounds_len;
-	     ++lpc
-	     ) {
+	     ++lpc) {
 	    struct mtp_config_rmc *mcr = &mp->data.mtp_payload_u.config_rmc;
 	    
 	    fprintf(file,
-		    "  bound[%d]:\tx=%f,y=%f,width=%f,height=%f\n",
+		    "  bound[%d]:\tx=%.2f, y=%.2f, width=%.2f, height=%.2f\n",
 		    lpc,
 		    mcr->bounds.bounds_val[lpc].x,
 		    mcr->bounds.bounds_val[lpc].y,
 		    mcr->bounds.bounds_val[lpc].width,
-		    mcr->bounds.bounds_val[lpc].height
-		    );
+		    mcr->bounds.bounds_val[lpc].height);
 	}
 	for (lpc = 0;
 	     lpc < mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_len;
@@ -717,7 +730,7 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    struct mtp_config_rmc *mcr = &mp->data.mtp_payload_u.config_rmc;
 	    
 	    fprintf(file,
-		    "  obstacle[%d]:\t%d %f/%f x %f/%f\n",
+		    "  obstacle[%d]:\t%d %.2f/%.2f x %.2f/%.2f\n",
 		    lpc,
 		    mcr->obstacles.obstacles_val[lpc].id,
 		    mcr->obstacles.obstacles_val[lpc].xmin,
@@ -756,14 +769,18 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		"  x:\t\t%f\n"
 		"  y:\t\t%f\n"
 		"  theta:\t%f\n"
-		"  status:\t%d\n"
+		"  status:\t%s\n"
 		"  timestamp:\t%f\n"
 		"  command_id:\t%d\n",
 		mp->data.mtp_payload_u.update_position.robot_id,
 		mp->data.mtp_payload_u.update_position.position.x,
 		mp->data.mtp_payload_u.update_position.position.y,
 		mp->data.mtp_payload_u.update_position.position.theta,
-		mp->data.mtp_payload_u.update_position.status,
+		((mp->data.mtp_payload_u.update_position.status ==
+		  MTP_POSITION_STATUS_CYCLE_COMPLETE) ?
+		 "cycle-complete" :
+		 mtp_status_strings[mp->data.mtp_payload_u.update_position.
+				   status + 1]),
 		mp->data.mtp_payload_u.update_position.position.timestamp,
 		mp->data.mtp_payload_u.update_position.command_id);
 	break;
@@ -907,17 +924,20 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
     case MTP_WIGGLE_STATUS:
 	fprintf(file,
 		" opcode:\twiggle-status\n"
-		"  id:\t%d\n"
-		"  status:\t%d\n",
+		"  id:\t\t%d\n"
+		"  status:\t%s\n",
 		mp->data.mtp_payload_u.wiggle_status.robot_id,
-		mp->data.mtp_payload_u.wiggle_status.status
-		);
+		((mp->data.mtp_payload_u.wiggle_status.status ==
+		  MTP_POSITION_STATUS_CYCLE_COMPLETE) ?
+		 "cycle-complete" :
+		 mtp_status_strings[mp->data.mtp_payload_u.wiggle_status.
+				   status + 1]));
 	break;
 	
     case MTP_REQUEST_REPORT:
 	fprintf(file,
 		" opcode:\trequest-report\n"
-		"  id:\t%d\n",
+		"  id:\t\t%d\n",
 		mp->data.mtp_payload_u.request_report.robot_id);
 	break;
 
