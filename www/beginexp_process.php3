@@ -68,6 +68,15 @@ $nonsfile = 0;
 if (!isset($exp_nsfile) ||
     strcmp($exp_nsfile, "") == 0 ||
     strcmp($exp_nsfile, "none") == 0) {
+
+    #
+    # Catch an invalid filename and quit now.
+    #
+    if (strcmp($exp_nsfile_name, "")) {
+        USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
+                  "valid filename. Please go back and try again.", 1);
+    }
+
     $nonsfile = 1;
 }
 
