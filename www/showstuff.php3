@@ -688,7 +688,9 @@ function SHOWEXP($pid, $eid) {
 function SHOWNODES($pid, $eid) {
     global $TBDBNAME;
     global $TBOPSPID;
-		
+    global $altnodesort;
+    global $SCRIPT_NAME;
+    
     $reserved_result =
 	DBQueryFatal("SELECT * FROM reserved WHERE ".
 		     "eid='$eid' and pid='$pid'");
@@ -697,20 +699,25 @@ function SHOWNODES($pid, $eid) {
     # since it won't be defined. But we do want to know when the node
     # entered the experiment, since it won't match the experiment's
     # swapin date.
-    $nodename="Node Name";
+    $nodename="<a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=1\">".
+	"Node Name</a>";
     $vnamefield="vname";
     if (!strcmp($pid, $TBOPSPID)) {
       $nodename="Reserve Time";
       $vnamefield="rsrvtime";
     }
-    
+
     if (mysql_num_rows($reserved_result)) {
+
+	if (!isset($altnodesort)) { $altnodesort = 1; }
+	
 	echo "<center>
               <h3>Reserved Nodes</h3>
               </center>
               <table align=center border=1>
               <tr>
-                <th>Node ID</th>
+                <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=0\">".
+	            "Node ID</a></th>
                 <th>$nodename</th>
                 <th>Type</th>
                 <th>Default OSID</th>
@@ -719,15 +726,21 @@ function SHOWNODES($pid, $eid) {
                 <th>Startup<br>Status[<b>1</b>]</th>
                 <th>Ready<br>Status[<b>2</b>]</th>
               </tr>\n";
+
+	$sort = "type,priority";
+	if ($altnodesort==1) {
+	    $sort = "vname";
+	} # Can add other alt sorts here too
+	
 	
 	$query_result =
-	    DBQueryFatal("SELECT nodes.*,reserved.vname, ".
+	    DBQueryFatal("SELECT nodes.*,reserved.*, ".
 	        "date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 	        "FROM nodes LEFT JOIN node_activity ".
 		"on nodes.node_id=node_activity.node_id ".
 		"LEFT JOIN reserved ON nodes.node_id=reserved.node_id ".
 	        "WHERE reserved.eid=\"$eid\" and reserved.pid=\"$pid\" ".
-	        "ORDER BY type,priority");
+	        "ORDER BY $sort");
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];
