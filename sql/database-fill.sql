@@ -686,6 +686,7 @@ REPLACE INTO table_regex VALUES ('virt_node_startloc','floor','text','regex','^[
 REPLACE INTO table_regex VALUES ('virt_node_startloc','loc_x','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','loc_y','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','orientation','float','redirect','default:float',0,0,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','parent','text','regex','^[-\\w\\(\\)]+$',1,64,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
