@@ -49,6 +49,11 @@ DHCP/BOOTP packets. Since the nodes will DHCP from boss, it is important that
 there not be another DHCP server (ie. one for another part of your lab)
 answering their requests.
 
+(6) Boss and ops should have their own local disk space - in particular, the
+/usr/testbed directory cannot be shared between them. It may be possible to
+use an external machines (other than ops) as a fileserver - talk to Utah abut
+this if you'd like to try.
+
 ##### Other docs:
 Useful summary info and diagrams can be found in "build-operate.ppt" and
 "security-all.ppt" in http://www.cs.utah.edu/flux/testbed-docs/internals/
