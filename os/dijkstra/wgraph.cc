@@ -74,8 +74,11 @@ void insert_edge(graph * g, int x, int y, bool directed, int w)
 //int w;                                  /* edge weight */
 {
         if (g->degree[x] > MAXDEGREE)
-                printf("Warning: insertion(%d,%d) exceeds degree bound\n",x,y);
-
+        {
+            cerr << "ddijk: maximum degree for " << x << " was exceeded." << endl;
+            exit(1);
+//                printf("Warning: insertion(%d,%d) exceeds degree bound\n",x,y);
+        }
         g->edges[x][g->degree[x]].v = y;
         g->edges[x][g->degree[x]].weight = w;
         /*g->edges[x][g->degree[x]].in = false;*/
