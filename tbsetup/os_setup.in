@@ -39,7 +39,6 @@ use libtestbed;
 my $nodereboot	= "$TB/bin/node_reboot";
 my $os_load	= "$TB/bin/os_load";
 my $vnode_setup = "$TB/sbin/vnode_setup";
-my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my $failed      = 0;
 my @nodes       = ();
@@ -513,7 +512,7 @@ sub WaitTillAlive ($) {
     #
     # Seems like a long time to wait, but it ain't!
     # 
-    my $maxwait = (60 * 5);
+    my $maxwait = (60 * 7);
 
     #
     # Start a counter going, relative to the time we rebooted the first
@@ -523,20 +522,16 @@ sub WaitTillAlive ($) {
     my $minutes   = 0;
 
     #
-    # Sigh, a long ping results in the script waiting until all the
-    # packets are sent from all the pings, before it will exit. So,
-    # loop doing a bunch of shorter pings.
+    # Wait for the node to finish booting, as recorded in database
     #
     while (1) {
-	system("$ping -q -c 4 -t 4 $pc >/dev/null 2>&1");
-	$status = $? >> 8;
+	my $state;
+	if (!TBGetNodeEventState($pc,\$state)) {
+	    print "*** Error getting event state for $pc.\n";
+	    return 1;
+	}
 
-	#
-	# Returns 0 if any packets are returned. Returns 2 if pingable
-	# but no packets are returned. Other non-zero error codes indicate
-	# other problems.  Any non-zero return indicates "not pingable" to us.
-	# 
-	if (! $status) {
+	if ($state eq TBDB_NODESTATE_ISUP) {
 	    print "$pc is alive and well\n" if $dbg;
 	    return 0;
 	}
