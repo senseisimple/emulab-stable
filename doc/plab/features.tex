@@ -9,8 +9,25 @@ His service taxonomy:
 Slice == Experiment Portal
     Create expt/slice
         Resource Discovery [w/ Monitoring Service]
+		Uses info from monitoring service
+		Monitoring service:
+			Node liveness, node resource availability (cpu/mem via loadavg, disk),
+			e2e health, pair-wise paths.
         Resource Allocation
+		Uses info from monitoring service
+		Three ways, can be mixed
+			fixed, site/node-centric (w/ types), link-centric [works?  no tunnels?]
+		   port space (ssh; extend)
+		Can mix with Emulab nodes (works?)
+
+	*Admission control and optional queuing (queuing and retry service)
+
         Boot Slice [w/ Environment Service]
+
+    Node/slice management (``environment service'')
+	Node initialization
+		Emulab state, per-user state
+		Startup command
 
     Maintain expt/slice
         Software Upgrades [w/ Environment Service]
@@ -20,6 +37,15 @@ Slice == Experiment Portal
     *Control expt/slice
         Node 
         Expt
+
+    *Naming service
+	Virtual (DNS) or physical
+
+    *Admin management service/interface
+	Resource alloc params
+	Admission control parameters
+	Queue retry params
+
 
 * = Not in llp's taxonomy; Elab-only
 
