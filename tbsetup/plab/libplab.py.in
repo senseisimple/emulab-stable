@@ -22,6 +22,11 @@ import nodemgr, nodemgrproxy
 import lease
 import string
 import traceback
+import xmlrpclib
+import socket
+import signal
+
+from warnings import warn
 
 #
 # Constants
@@ -30,7 +35,10 @@ import traceback
 LEASELEN = 14*24*60*60   # Two weeks (maximum lease length)
 AGENTIP = "dslice.planet-lab.org"
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
-RENEW_TIMEOUT = 1*60     # Give the node 1 minute to respond
+
+DEF_TIMEOUT    = 1*60     # default timeout interval
+RENEW_TIMEOUT = 1*60     # give the node manager a minute to respond to renew
+FREE_TIMEOUT  = 1*60     # give the node manager a minute to respond to free
 
 TBOPS = "@TBOPSEMAIL@".replace("\\","")
 MAILTAG = "@THISHOMEBASE@"
@@ -49,6 +57,7 @@ LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 ALLOWED_NODES = ()
 NUMVNODES = 20
 
+PLABNODE = "@prefix@/sbin/plabnode"
 DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
 SSH = "@prefix@/bin/sshtb"
 NAMED_SETUP = "@prefix@/sbin/named_setup"
@@ -60,7 +69,12 @@ ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
 DEF_ROOTBALL_NAME = "plabroot-8.tgz"
 
-FREETRIES = 3
+#
+# How many seconds to sleep between failures and how many times to try
+# commands to both the dslice agent, and individual node managers.
+#
+DEF_SLEEPINT = 5
+DEF_TRIES = 3
 
 verbose = 0
 debug = 0
@@ -68,88 +82,15 @@ debug = 0
 #
 # Disable line buffering
 #
-
 sys.stdout = os.fdopen(sys.stdout.fileno(), sys.stdout.mode, 0)
 
 #
-# Database functions
+# Ensure SIGPIPE doesn't bite us:
 #
-
-__dbName = "@TBDBNAME@"
-__dbQueryMaxtries = 1
-__dbConnMaxtries = 5
-
-__dbConnection = None
-
-def TBDBConnect():
-    global __dbConnection
-    
-    if __dbConnection:
-        return
-
-    # Create a DB username for accounting purposes
-    uid = os.getuid()
-    try:
-        name = pwd.getpwuid(uid)[0]
-    except KeyError:
-        name = "uid%d" % uid
-    dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
-
-    if debug:
-        print "Connecting to db %s as %s" % (__dbName, dbuser)
-
-    # Connect, with retries
-    for tries in range(__dbConnMaxtries):
-        try:
-            __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
-        except MySQLdb.MySQLError:
-            time.sleep(1)
-        else:
-            break
-    else:
-        raise RuntimeError, "Cannot connect to DB after several attempts!"
-
-def DBQueryFatal(queryPat, querySub = (), asDict = False):
-    TBDBConnect()
-    
-    if asDict:
-        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
-    else:
-        cursor = __dbConnection.cursor()
-
-    if debug:
-        print "Executing DB query %s" % queryPat
-
-    tries = __dbQueryMaxtries
-    while tries:
-        try:
-            cursor.execute(queryPat, querySub)
-            ret = cursor.fetchall()
-            if debug:
-                rs = `ret`
-                if len(rs) > 60:
-                    rs = rs[:60] + "..."
-                print "Result: %s" % rs
-            return ret
-        except MySQLdb.MySQLError:
-            tries -= 1
-            if tries == 0:
-                raise
-            else:
-                time.sleep(1)
-                try:
-                    __dbConnection.ping()
-                except MySQLdb.MySQLError: pass
-    raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
-
-def DBQuery(*args):
-    try:
-        ret = DBQueryFatal(*args)
-    except MySQLdb.MySQLError:
-        return None
+signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
 #
-# General stuff
+# General library functions
 #
 
 def handleArgs(args):
@@ -173,6 +114,24 @@ def handleArgs(args):
 def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
     """
     Sends email to someone about something :)
+
+    This function is similar to its perl library counterpart.
+
+    ARGS:
+
+     To:      <string> Email address of recipient.
+     Subj:    <string> Subject of email.
+     Msg:     <string> Message text.
+     From:    <string> Email address of sender (optional).
+     Headers: <string> Extra header strings (must newline terminate all but
+                       the last one) (optional).
+     Files:   <tuple>  List of files to append to message body (optional).
+     
+    RETURNS:
+     Always returns 1
+
+    SIDE EFFECTS:
+     Can raise exceptions via called methods/functions.
     """
     Tag = MAILTAG.upper()
     # damn, no good way to tell if this fails
@@ -212,6 +171,355 @@ def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
     sm.close()
     
     return 1
+
+#
+# Termination signals, and global var to track if we got one when
+# they are disabled with disable_sigs
+#
+TERMSIGS = (signal.SIGTERM, signal.SIGHUP, signal.SIGINT)
+gotsig = 0
+
+class SignalInterrupt(Exception):
+    def __init__(self, signum):
+        self.signum = signum
+
+#
+# Keep track of last terminal signal received
+#
+def localSigHandler(signum, frame):
+    """
+    Keep track of received signals.
+    """
+    global gotsig
+    gotsig = signum
+    if verbose:
+        print "Caught signal %s" % signum
+
+def disable_sigs(sigs):
+    """
+    Put signal watcher into place.  I wish you could just temporarily
+    block (but not ignore) signals in python - alas.
+    """
+    osigs = {}
+    for sig in sigs:
+        osigs[sig] = signal.signal(sig, localSigHandler)
+    return osigs
+
+def enable_sigs(osigs):
+    """
+    Reinstate old signal handlers and then raise an exception if
+    one was caught while we had them disabled.
+    """
+    global gotsig
+    
+    for sig,handler in osigs.items():
+        signal.signal(sig, handler)
+
+    if gotsig:
+        tmp = gotsig
+        gotsig = 0
+        raise SignalInterrupt(tmp)
+
+
+#
+# Local timeout error class and generic alarm handler
+# Also listed are a couple of state saving vars for the alarm handler
+# when the local one is installed.  The *_alarm calls are nestable
+#
+class TimeoutError: pass
+def alrmhandler(signum, frame):
+    if debug:
+        print "Timeout! Raising TimeoutError."
+    raise TimeoutError
+
+oalrmhandlerstk = []  # alarm handler stack
+oalrmtmostk = []      # alarm timeout stack
+
+def enable_alarm():
+    """
+    Install a little local alarm handler, stash away old one, and
+    it's pending alarm timeout (if set).
+    """
+    global oalrmhandlerstk, oalrmtmostk
+    oalrmhandlerstk.append(signal.signal(signal.SIGALRM, alrmhandler))
+    oalrmtmo = signal.alarm(0)
+    if oalrmtmo:
+        oalrmtmo += time.time()
+    oalrmtmostk.append(oalrmtmo)
+
+def disable_alarm():
+    """
+    Restore old handler and timeout.  If the old timeout has passed, warn,
+    and send the alarm signal immediately.
+    """
+    signal.signal(signal.SIGALRM, oalrmhandlerstk.pop())
+    oalrmtmo = oalrmtmostk.pop()
+    if oalrmtmo:
+        diff = oalrmtmo - time.time()
+        if diff > 0:
+            signal.alarm(diff)
+        else:
+            warn("missed a timeout deadline, sending SIGALRM immediately!")
+            os.kill(os.getpid(), signal.SIGALRM)
+    
+
+def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
+            disable_sigs_parent=(), disable_sigs_child=()):
+    """
+    Fork and run the given command, and optionally timeout in the parent.
+
+    ARGS:
+     cmd: <bound method | function> command to run.
+     args: <tuple> arguments to the above command.
+     timeout: <int> seconds to wait for child/command to complete
+              before killing it off and returning
+     disable_sigs_parent: <tuple of ints> signals to disable in parent
+     disable_sigs_child:  <tuple of ints> signals to disable in child
+
+    RETURNS:
+     return code of forked command (1 if exception is caught, or different
+     if user supplied command does its own exit()).
+
+    SIDE EFFECTS:
+     Forks child process to run provided command.  Blocks signals
+     if instructed to with disable_sigs() (does an enable_sigs() before
+     returning).
+    """
+    osigs = None
+    childpid = os.fork()
+
+    # parent
+    if childpid:
+        gotexc = 0
+        exval = (0,0)
+        if disable_sigs_parent:
+            osigs = disable_sigs(disable_sigs_parent)
+        enable_alarm()
+        signal.alarm(timeout)
+        while 1:
+            try:
+                exval = os.waitpid(childpid, 0)
+            except TimeoutError:
+                print "Timeout waiting for command completion: %s" % \
+                      cmd.func_name
+                gotexc = 1
+                break
+            except OSError, e:
+                if e.errno == 4:
+                    continue
+                else:
+                    gotexc = 1
+                    break
+            except:
+                gotexc = 1
+                break
+            else:
+                break
+
+        if gotexc:
+            signal.alarm(0)
+            tb = "".join(traceback.format_exception_only(*sys.exc_info()[:2]))
+            print "Exception caught while trying to " \
+                  "run command %s\n%s" % (cmd.func_name, tb)
+            try: os.kill(childpid, signal.SIGUSR1)
+            except: pass
+            try: os.wait()
+            except: pass
+        else:
+            if debug:
+                if os.WIFEXITED(exval[1]):
+                    print "Process complete, exit value: %d" % \
+                          os.WEXITSTATUS(exval[1])
+                if os.WIFSIGNALED(exval[1]):
+                    print "Process signalled: %d" % \
+                          os.WTERMSIG(exval[1])
+
+        disable_alarm()
+        if osigs:
+            enable_sigs(osigs)
+        return gotexc | exval[1]
+
+    # child
+    else:
+        def sigusrexit(signum, frame):
+            if debug:
+                print "Received SIGUSR1, bailing out"
+            os._exit(1)
+
+        retval = 1
+        if disable_sigs_child:
+            osigs = disable_sigs(disable_sigs_child)
+        signal.signal(signal.SIGUSR1, sigusrexit)
+        try:
+            if type(args) == tuple:
+                retval = cmd(*args)
+            else:
+                retval = cmd(args)
+        except:
+            traceback.print_exception(*sys.exc_info())
+        os._exit(retval)
+
+
+#
+# Database functions
+#
+
+__dbName = "@TBDBNAME@"
+__dbQueryMaxtries = 1
+__dbConnMaxtries = 5
+
+__dbConnection = None
+
+def TBDBConnect():
+    global __dbConnection
+    
+    if __dbConnection:
+        return
+
+    # Create a DB username for accounting purposes
+    uid = os.getuid()
+    try:
+        name = pwd.getpwuid(uid)[0]
+    except KeyError:
+        name = "uid%d" % uid
+    dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
+
+    if debug:
+        print "Connecting to db %s as %s" % (__dbName, dbuser)
+
+    # Connect, with retries
+    for tries in range(__dbConnMaxtries):
+        try:
+            __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
+        except:
+            time.sleep(1)
+        else:
+            break
+    else:
+        raise RuntimeError, "Cannot connect to DB after several attempts!"
+
+def DBQueryFatal(queryPat, querySub = (), asDict = False):
+    TBDBConnect()
+    
+    if asDict:
+        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
+    else:
+        cursor = __dbConnection.cursor()
+
+    if debug:
+        print "Executing DB query %s" % queryPat
+
+    tries = __dbQueryMaxtries
+    while tries:
+        try:
+            cursor.execute(queryPat, querySub)
+            ret = cursor.fetchall()
+            if debug:
+                rs = `ret`
+                if len(rs) > 60:
+                    rs = rs[:60] + "..."
+                print "Result: %s" % rs
+            return ret
+        except MySQLdb.MySQLError:
+            tries -= 1
+            if tries == 0:
+                raise
+            else:
+                time.sleep(1)
+                try:
+                    __dbConnection.ping()
+                except MySQLdb.MySQLError: pass
+    tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
+    SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg)
+    raise RuntimeError, "Aah!  Escaped DBQueryFatal loop"
+
+def DBQuery(*args):
+    try:
+        ret = DBQueryFatal(*args)
+    except MySQLdb.MySQLError:
+        return None
+
+
+def tryXmlrpcCmd(cmd, args = (),
+                 inittries = DEF_TRIES,
+                 sleepint = DEF_SLEEPINT,
+                 raisefault = False):
+    """
+    This helper/wrapper function's job is to invoke the commands to the
+    central agent, or local node manager, taking steps to retry and
+    recover from failure.
+
+    ARGS:
+     cmd:        <bound method | function> command to try.
+     args:       <tuple> arguments to pass to the above command.
+     inittries:  <int> number of retries before the function gives up
+                 and reraises the last caught exception.
+     sleepint:   <int> how long to sleep (in seconds) between retries.
+     raisefault: <boolean> indicates whether or not to reraise an
+                 xmlrpclib Fault exception when caught.  When true it
+                 also adds a new 'triesleft' member to the Fault class
+                 instance containing the number of attempts this
+                 function had remaining when the Fault exception was
+                 encountered.
+
+    RETURNS:
+     This function returns the result returned by the passed in command.
+
+    SIDE EFFECTS:
+     Invokes the passed in command with the passed in arguments.
+     Catches protocol/socket exceptions for command retry.
+     (Optionally) catches xmlrpclib.Fault exceptions for command retry.
+     Adds a 'triesleft' member to all exceptions reraised prior to tries=0.
+     Understands TimeoutError exceptions, and will reraise them.
+     
+    """
+
+    tries = inittries
+    
+    if debug:
+        print "About to perform command %s with args:\n\t%s" % \
+              (cmd, args)
+    while 1:
+        tries = tries - 1
+        try:
+            if args:
+                # have to differentiate since the '*' operator wants
+                # a tuple - throws an exception if its operand isn't
+                if type(args) == tuple:
+                    return cmd(*args)
+                else:
+                    return cmd(args)
+            else:
+                return cmd()
+        except xmlrpclib.Fault, e:
+            if raisefault:
+                e.triesleft = tries
+                raise xmlrpclib.Fault, e
+            print "XML-RPC Fault happened while executing agent " \
+                  "command: %s args: %s" % (cmd.func_name, args)
+            print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
+        except TimeoutError, e:
+            if debug:
+                print "Caught a timeout error, setting triesleft and raising."
+            e.triesleft = tries
+            raise TimeoutError, e
+        except (socket.error, xmlrpclib.ProtocolError), e:
+            print "Encountered problem communicating with agent " \
+                  "while executing command: %s args: %s" % \
+                  (cmd.func_name, args)
+            if debug:
+                print "Exception is of type: %s" % e
+                    
+        if tries > 0:
+            print "Sleeping for %s seconds, then retrying %s command" % \
+                  (sleepint, cmd.func_name)
+            time.sleep(sleepint)
+        else:
+            # XXX: perhaps this should raise its own, new type of
+            # exception.
+            print "Giving up after %s tries" % inittries
+            raise
+
 
 #
 # Plab abstraction
@@ -269,9 +577,9 @@ class Plab:
         dslices)
         """
         print "Getting free Plab nodes ..."
-        agent = self._createAgentProxy(insecure = True)
         try:
-            avail = agent.getads()
+            agent = self._createAgentProxy(insecure = True)
+            avail = tryXmlrpcCmd(agent.getads)
         except:
             extype, exval, extrace = sys.exc_info()
             print "Error talking to dslice agent: %s: %s" % (extype, exval)
@@ -279,11 +587,12 @@ class Plab:
                 print extrace
             print "Going back to sleep until next scheduled poll"
             return
-        
+
         if debug:
             print "Got advertisement list:"
             print avail
 
+# pinging disabled for now since many sites block ICMP
 #        if debug:
 #            print "Pinging nodes in advertisement list"
 #        avail = self.__getPingStatus(avail)
@@ -476,75 +785,93 @@ class Plab:
         adds some additional fields that newwanode doesn't, and takes
         advantage of the fact that the Plab nodes may be added in bulk.
         """
+        # block out common termination signals while adding a node
+        osigs = disable_sigs(TERMSIGS)
         defosid, controliface = self.__getNodetypeInfo()
         id, priority = self.__nextFreeNodeid()
         nodeid = "plab%d" % id
         hostname = string.replace(hostname, ".", "-")
         print "Creating pnode %s as %s, priority %d." % (ip, nodeid, priority)
 
-        DBQueryFatal("insert into nodes"
-                     " (node_id, type, phys_nodeid, role, priority,"
-                     "  op_mode, def_boot_osid,"
-                     "  allocstate, allocstate_timestamp,"
-                     "  eventstate, state_timestamp)"
-                     " values (%s, %s, %s, %s, %s,"
-                     "  %s, %s, %s, now(), %s, now())",
-                     (nodeid, 'pcplabphys', nodeid, 'testnode', priority*100,
-                      'ALWAYSUP', defosid,
-                      'FREE_CLEAN',
-                      'ISUP'))
-
-        DBQueryFatal("insert into interfaces"
-                     " (node_id, card, port, IP, interface_type, iface, role)"
-                     " values (%s, %s, %s, %s, %s, %s, %s)",
-                     (nodeid, 0, 1, ip, 'fxp', controliface, 'ctrl'))
-
-        DBQueryFatal("insert into reserved"
-                     " (node_id, pid, eid, rsrv_time, vname)"
-                     " values (%s, %s, %s, now(), %s)",
-                     (nodeid, RESERVED_PID, RESERVED_EID, hostname))
-
-        DBQueryFatal("insert into node_auxtypes"
-                     " (node_id, type, count)"
-                     " values (%s, %s, %s)",
-                     (nodeid, linktype, 1))
-
-        DBQueryFatal("insert into node_status"
-                     " (node_id, status, status_timestamp)"
-                     " values (%s, %s, now())",
-                     (nodeid, 'up'))
-
-        vnodetype = "pcplab"
-        vnodeid = ""
-        for n in range(NUMVNODES):
-            vprio = (priority * 100) + (n+1)
-            sshdport = 38000+(n+1)
-            vnodeid = "%s-%d" % (nodeid, n+1)
-            if verbose:
-                print "Creating vnode %s, priority %d" % (vnodeid, vprio)
-
+        try:
             DBQueryFatal("insert into nodes"
                          " (node_id, type, phys_nodeid, role, priority,"
-                         "  op_mode, def_boot_osid, update_accounts,"
+                         "  op_mode, def_boot_osid,"
                          "  allocstate, allocstate_timestamp,"
-                         "  eventstate, state_timestamp, sshdport)"
+                         "  eventstate, state_timestamp)"
                          " values (%s, %s, %s, %s, %s,"
-                         "  %s, %s, %s, %s, now(), %s, now(), %s)",
-                         (vnodeid, vnodetype, nodeid, 'virtnode', vprio,
-                          'PCVM', defosid, 1,
+                         "  %s, %s, %s, now(), %s, now())",
+                         (nodeid, 'pcplabphys', nodeid,
+                          'testnode', priority*100,
+                          'ALWAYSUP', defosid,
                           'FREE_CLEAN',
-                          'SHUTDOWN', sshdport))
+                          'ISUP'))
 
+            DBQueryFatal("insert into interfaces"
+                         " (node_id, card, port, IP, interface_type,"
+                         " iface, role)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (nodeid, 0, 1, ip, 'fxp', controliface, 'ctrl'))
+
+            DBQueryFatal("insert into reserved"
+                         " (node_id, pid, eid, rsrv_time, vname)"
+                         " values (%s, %s, %s, now(), %s)",
+                         (nodeid, RESERVED_PID, RESERVED_EID, hostname))
+
+            DBQueryFatal("insert into node_auxtypes"
+                         " (node_id, type, count)"
+                         " values (%s, %s, %s)",
+                         (nodeid, linktype, 1))
+            
             DBQueryFatal("insert into node_status"
                          " (node_id, status, status_timestamp)"
                          " values (%s, %s, now())",
-                         (vnodeid, 'up'))
+                         (nodeid, 'up'))
 
-        # Now, put the last vnode created into the special monitoring expt.
-        DBQueryFatal("insert into reserved"
-                     " (node_id, pid, eid, rsrv_time, vname)"
-                     " values (%s, %s, %s, now(), %s)",
-                     (vnodeid, MONITOR_PID, MONITOR_EID, vnodeid))
+            vnodetype = "pcplab"
+            vnodeid = ""
+            for n in range(NUMVNODES):
+                vprio = (priority * 100) + (n+1)
+                sshdport = 38000+(n+1)
+                vnodeid = "%s-%d" % (nodeid, n+1)
+                if verbose:
+                    print "Creating vnode %s, priority %d" % (vnodeid, vprio)
+                    
+                DBQueryFatal("insert into nodes"
+                             " (node_id, type, phys_nodeid, role, priority,"
+                             "  op_mode, def_boot_osid, update_accounts,"
+                             "  allocstate, allocstate_timestamp,"
+                             "  eventstate, state_timestamp, sshdport)"
+                             " values (%s, %s, %s, %s, %s,"
+                             "  %s, %s, %s, %s, now(), %s, now(), %s)",
+                             (vnodeid, vnodetype, nodeid, 'virtnode', vprio,
+                              'PCVM', defosid, 1,
+                              'FREE_CLEAN',
+                              'SHUTDOWN', sshdport))
+                
+                DBQueryFatal("insert into node_status"
+                             " (node_id, status, status_timestamp)"
+                             " values (%s, %s, now())",
+                             (vnodeid, 'up'))
+                
+            # Now, put the last vnode created into the special monitoring expt.
+            DBQueryFatal("insert into reserved"
+                         " (node_id, pid, eid, rsrv_time, vname)"
+                         " values (%s, %s, %s, now(), %s)",
+                         (vnodeid, MONITOR_PID, MONITOR_EID, vnodeid))
+            
+        except:
+            print "Error adding PLAB node to DB: someone needs to clean up!"
+            tbmsg = "".join(traceback.format_exception(*sys.exc_info()))
+            SENDMAIL(TBOPS, "Error adding new plab node to DB: %s\n" %
+                     nodeid, "Some operation failed while trying to add a"
+                     " newly discovered plab node to the DB:\n %s"
+                     "\n Please clean up!\n" % tbmsg)
+            enable_sigs(osigs)
+            raise
+
+        # last but not least, unblock signals
+        enable_sigs(osigs)
 
     def __getNodetypeInfo(self):
         """
@@ -580,6 +907,7 @@ class Plab:
                          " where nodetype = 'pcplab'")
             ((nodeid, priority), ) = res
         finally:
+            print "Getting/updating next free nodeid for plab failed!"
             DBQueryFatal("unlock tables")
         return nodeid, priority
 
@@ -591,15 +919,6 @@ class Plab:
         # Ugh, MySQL doesn't know UTC until v4.1.1, and unix_timestamp()
         # returns the local time
         import time
-        from signal import signal, alarm, SIGALRM
-        from traceback import format_exception_only
-        from xmlrpclib import Fault
-
-        # Setup alarm handler
-        class TimeoutError(StandardError): pass
-        def alrmhandler(signum, frame): raise TimeoutError
-        signal(SIGALRM, alrmhandler)
-
         endtime = int(time.mktime(time.gmtime())) + RENEW_TIME
         res = DBQueryFatal("select pid, eid, node_id from plab_slice_nodes"
                            " where %s > unix_timestamp(leaseend)",
@@ -612,19 +931,7 @@ class Plab:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
-            alarm(RENEW_TIMEOUT)
-            try:
-                node.renew()
-            except TimeoutError:
-                print "Timeout waiting for renewal of sliver %s" % nodeid
-            except Fault, e:
-                print "Got XMLRPC fault while renewing %s:\n\t%s" % \
-                      (nodeid, e.faultString)
-            except:
-                tb = "".join(format_exception_only(*sys.exc_info()[:2]))
-                print "unknown exception while trying to renew %s\n%s" % \
-                      (nodeid, tb)
-            alarm(0)
+            node.renew()
 
     def _createAgentProxy(self, insecure = False):
         """
@@ -642,6 +949,7 @@ class Plab:
             self.__agentProxy = agentproxy.agentproxy(*args)
         return self.__agentProxy
 
+
 #
 # Slice abstraction
 #
@@ -656,14 +964,13 @@ class Slice:
         Creates a new slice that initially contains no nodes.  Don't call
         this directly, use Plab.createSlice instead.
         """
-        # self.slicename = "emulab_%s_%s" % (self.pid, self.eid)
         res = DBQueryFatal("select idx from experiments "
                               "where pid=%s "
                               "and eid=%s",
                               (self.pid, self.eid))
-        if len(res) == 0:
+        if not len(res):
             raise RuntimeError, "Didn't get any results while looking for idx"
-        ((eindex, ), ) = res
+        eindex = res[0][0]
         self.slicename = "emulab_%s" % eindex
         print "Creating Plab slice %s." % self.slicename
         self.privkey, self.pubkey = self.__genKeypair()
@@ -709,13 +1016,26 @@ class Slice:
         res = DBQueryFatal("select node_id from plab_slice_nodes"
                            " where slicename = %s",
                            (self.slicename))
+        print "\tRemoving any remaining nodes in slice.."
         for (nodeid,) in res:
             node = self.loadNode(nodeid)
             node.free()
             del node  # Encourage the GC'er
 
-        DBQueryFatal("delete from plab_slices where slicename = %s",
-                     (self.slicename,))
+        print "\tRemoving slice DB entry."
+        osigs = disable_sigs(TERMSIGS)
+        try:
+            DBQueryFatal("delete from plab_slices where slicename = %s",
+                         (self.slicename,))
+        except:
+            print "Error deleting slice from DB!"
+            tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+            SENDMAIL(TBOPS, "Error deleting slice from DB",
+                     "Slice deletion error:\n\n%s" % tbstr)
+            enable_sigs(osigs)
+            raise
+        
+        enable_sigs(osigs)
 
     def createNode(self, nodeid):
         """
@@ -788,6 +1108,7 @@ class Node:
         self.ip = self.__findIP()
         self.__nodemgrProxy = None
 
+    # XXX: may want to rethink signal handling here.
     def _create(self):
         """
         Creates a new node.  This physically allocates the node into the
@@ -795,10 +1116,21 @@ class Node:
         node setup is performed.  Don't call this directly, use
         Slice.createNode instead.
         """
+        
+        # First, make sure there isn't already an entry in the DB
+        try:
+            self._load()
+        except:
+            pass
+        else:
+            raise RuntimeError, "Entry for plab node %s already exists " \
+                  "in the DB" % self.nodeid
+
+        # Now get a ticket, and redeem it for a vm lease
         print "Creating Plab node %s on %s." % (self.nodeid, self.ip)
         agent = self.plab._createAgentProxy()
-        tickets = agent.newtickets(self.slice.slicename, 1, LEASELEN,
-                                   (self.ip,))
+        tickets = tryXmlrpcCmd(agent.newtickets,
+                               (self.slice.slicename, 1, LEASELEN, (self.ip,)))
         assert (len(tickets) == 1), "%d tickets returned" % len(tickets)
         self.ticketdata = tickets[0]
         if debug:
@@ -806,26 +1138,58 @@ class Node:
             print self.ticketdata
 
         nodemgr = self._createNodemgrProxy()
-        try:
-            self.leasedata = nodemgr.newleasevm(self.ticketdata,
-                                                self.slice.privkey,
-                                                self.slice.pubkey)
-            if debug:
-                print "Obtained lease/vm:"
-                print self.leasedata
-            self.lease = lease.lease(self.leasedata)
-            # Note that the lease's end_time happens to be formatted the
-            # same as a SQL DATETIME (how conspicuously convenient...)
-            DBQueryFatal("insert into plab_slice_nodes"
-                         " (pid, eid, slicename, node_id,"
-                         " ticketdata, leasedata, leaseend)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (self.slice.pid, self.slice.eid, self.slice.slicename,
-                          self.nodeid, self.ticketdata, self.leasedata,
-                          self.lease.end_time))
-        except:
-            self.free()
-            raise
+        self.leasedata = None
+        
+        tries = DEF_TRIES
+        while 1:
+            try:
+                self.leasedata = tryXmlrpcCmd(nodemgr.newleasevm,
+                                              (self.ticketdata,
+                                               self.slice.privkey,
+                                               self.slice.pubkey),
+                                              inittries = tries,
+                                              raisefault = True)
+
+            # We may have actually gotten the lease/vm even though
+            # the xmlrpc call appeared to fail.  We check for this
+            # condition here, which will show up on subsequent allocation
+            # attempts.
+            except xmlrpclib.Fault, e:
+                if e.faultString.find("already exists") != -1:
+                    print "Lease for %s already exists!" % self.nodeid
+                    nodeleases = tryXmlrpcCmd(nodemgr.getleases)
+                    for mylease in nodeleases:
+                        if mylease.find(self.slice.slicename) != -1:
+                            self.leasedata = mylease
+                            break
+                    else:
+                        raise RuntimeError, "Whoop!  Couldn't find my lease " \
+                              "even though it was supposed to be present!"
+                    break
+                elif e.triesleft > 0:
+                    tries = e.triesleft
+                else:
+                    raise
+            # success
+            else:
+                break
+
+        # Good, we have a lease; now put an entry into the DB
+        if debug:
+            print "Obtained lease/vm:"
+            print self.leasedata
+        self.lease = lease.lease(self.leasedata)
+        # Note that the lease's end_time happens to be formatted the
+        # same as a SQL DATETIME (how conspicuously convenient...)
+        DBQueryFatal("insert into plab_slice_nodes"
+                     " (pid, eid, slicename, node_id,"
+                     " ticketdata, leasedata, leaseend)"
+                     " values (%s, %s, %s, %s, %s, %s, %s)",
+                     (self.slice.pid, self.slice.eid,
+                      self.slice.slicename, self.nodeid,
+                      self.ticketdata, self.leasedata,
+                      self.lease.end_time))
+
 
     def _load(self):
         """
@@ -847,45 +1211,70 @@ class Node:
                "Node %s loaded by slice %s, but claims to be in slice %s" % \
                (self.nodeid, self.slice.slicename, slicename)
         self.lease = lease.lease(self.leasedata)
-        
+
     def free(self):
         """
         Frees the node and kills the VM.  Note that this does not
-        shutdown anything inside the vserver.
+        shutdown anything inside the vserver.  Warning: forks a process
+        to carry out the actual work!
         """
+        ForkCmd(self._free, timeout=FREE_TIMEOUT,
+                disable_sigs_parent=TERMSIGS, disable_sigs_child=TERMSIGS)
+        
+    def _free(self):
+        """
+        Frees the node and kills the VM.  Note that this does not
+        shutdown anything inside the vserver.  Don't call this directly;
+        instead, use Node.free()
+        """
+        ret = None
+        deleted = 0
+
         print "Freeing Plab node %s." % self.nodeid
-        # XXX Should this wait a bit before nuking the VM?
+        
+        # Get node manager handle
         nodemgr = self._createNodemgrProxy()
-        freetries = FREETRIES
+
+        # Remove the DB entry first.
+        try:
+            DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
+                         (self.nodeid,))
+        except:
+            print "Uh oh, couldn't remove plab sliver record from the DB!"
+            tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+            SENDMAIL(TBOPS, "Error: Couldn't remove plab vnode from DB",
+                     "Unable to delete entry for sliver %s from the DB:"
+                     "\n\n%s" % (self.nodeid, tbstr))
+
+        tries = DEF_TRIES
         while 1:
             try:
-                ret = nodemgr.deletelease(self.slice.slicename)
+                ret = tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
+                                   inittries = tries, raisefault = 1)
+            except xmlrpclib.Fault, e:
+                if e.faultString.find("does not exist") != -1:
+                    print "Lease for %s did not exist on node" % self.nodeid
+                    deleted = 1
+                    break
+                elif e.triesleft > 0:
+                    tries = e.triesleft
+                else:
+                    break
             except:
                 print "Warning: couldn't delete the lease for %s on %s" % \
                       (self.slice.slicename, self.nodeid)
-            else:
-                break
-
-            freetries = freetries - 1
-            if freetries > 0:
-                print "\t%s tries left." % freetries
-                time.sleep(1)
-            else:
-                print "Error: couldn't delete plab lease for " \
-                      "vnode %s after %s tries." % (self.nodeid, FREETRIES)
-                print "Sending email"
-                einfo = sys.exc_info()
-                estrs = traceback.format_exception(einfo[0],einfo[1],einfo[2])
-                tbstr = "".join(estrs)
+                tbstr = "".join(traceback.format_exception(*sys.exc_info()))
                 SENDMAIL(TBOPS, "Sliver lease deletion failed on %s, "
                          "dslice %s" % (self.nodeid, self.slice.slicename),
                          "Sliver lease deletion failed:\n\n%s" % tbstr)
-                return None
-        
-        if debug:
+                break
+            else:
+                deleted = 1
+                break
+
+        if deleted and debug:
             print "Deleted lease/VM: %s" % `ret`
-        DBQueryFatal("delete from plab_slice_nodes where node_id = %s",
-                     (self.nodeid,))
+
         return ret
 
     def addKey(self, identityfile):
@@ -904,15 +1293,44 @@ class Node:
                   identityfile
         pubkey = file(identityfile, "rb").read().strip()
         nodemgr = self._createNodemgrProxy()
-        ret = nodemgr.addkey(self.slice.slicename, pubkey)
+        ret = tryXmlrpcCmd(nodemgr.addkey, (self.slice.slicename, pubkey))
         if debug:
             print "Added key: %s" % `ret`
         return ret
 
     def renew(self):
+        """
+        Renew the lease for this node.  Note that this method
+        forks and runs another private method to actually do the
+        work!
+        """
+        ForkCmd(node.renew, timeout = RENEW_TIMEOUT,
+                disable_sigs_parent = TERMSIGS)
+
+    def _renew(self):
+        """
+        Renew the lease for node belonging to this instance.  Don't
+        call this directly; instead, use Node.renew()
+        """
         print "Renewing lease on Plab node %s." % self.nodeid
         nodemgr = self._createNodemgrProxy()
-        self.leasedata = nodemgr.renewlease(self.slice.slicename)
+
+        tries = DEF_TRIES
+        while 1:
+            try:
+                self.leasedata = tryXmlrpcCmd(nodemgr.renewlease,
+                                              self.slice.slicename,
+                                              inittries = tries,
+                                              raisefault = True)
+            except xmlrpclib.Fault, e:
+                if e.faultString.find("does not exist") != -1:
+                    print "No lease found on %s for slice %s" % \
+                          (self.nodeid, self.slice.slicename)
+                    return
+                elif e.triesleft > 0:
+                    tries = e.triesleft
+                else:
+                    raise                    
         if debug:
             print "Obtained new lease:"
             print self.leasedata
@@ -933,11 +1351,6 @@ class Node:
         self.__perform("-tt sh /tmp/fixsudo.sh")
         self.addToGroup(self.slice.slicename, "root")
         self.unpackTgz(rootballpath, rootballname)
-        # No longer needed..
-        # Ugh
-        # if verbose:
-        #    print "Installing suidperl RPM"
-        # self.__perform("sudo rpm -U /tmp/perl-suidperl-*.rpm")
 
     def addToGroup(self, user, group):
         if verbose:

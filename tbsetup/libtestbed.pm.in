@@ -13,7 +13,7 @@ use Exporter;
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
 	 TBMakeLogname TB_BOSSNODE TB_OPSEMAIL TBGenSecretKey TBDebugTimeStamp
-	 TBDebugTimeStampsOn );
+	 TBDebugTimeStampsOn TBForkCmd);
 
 # After package decl.
 use English;
@@ -261,6 +261,55 @@ sub TBGenSecretKey()
     my $key=`/bin/dd if=/dev/urandom count=128 bs=1 2> /dev/null | /sbin/md5`;
     chomp($key);
     return $key;
+}
+
+#
+# Fork+exec a command and return its exit value.  This is similar to
+# system(), but does not use a shell to invoke the command.  The function
+# exits with the return value from wait().
+#
+# If the second optional param is passed and true, then
+# a signal handler for TERM will be installed, and the
+# child process will be sent a SIGTERM if this (the calling)
+# process gets one. The handler exits with the exit status returned by 
+# wait() after sending the signal.
+#
+sub TBForkCmd($;$) {
+    my ($cmd, $dokill) = @_;
+
+    my $childpid = fork();
+        
+    if ($childpid) {
+        my $handler = sub {
+            kill("TERM", $childpid);
+            my $exstat = wait();
+            print STDERR "*** $0:\n".
+                "    Command terminated: $cmd.\n"; 
+            exit($exstat);
+        };
+        local $SIG{TERM} = \&$handler if (defined($dokill) && $dokill);
+
+        my $waitpid = wait();
+        my $exitstatus = $?;
+        if ($waitpid < 0) {
+            die("*** $0:\n".
+                "    Uh oh, wait() returned a negative number");
+        }
+        elsif ($waitpid != $childpid) {
+            warn("*** $0:\n".
+                "    pid returned by wait() != pid ".
+                "from fork(): $waitpid $childpid");
+        }
+        return $exitstatus;
+    }
+    else {
+        exec($cmd);
+        die("*** $0:\n".
+            "    exec of $cmd failed!\n");
+    }
+
+    # NOTREACHED
+    return(0);
 }
 
 1;

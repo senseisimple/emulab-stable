@@ -32,35 +32,12 @@ def main(args):
     slice = plab.loadSlice(pid, eid)
 
     if command == "alloc":
+        node = slice.createNode(nodeid)
+        node.addKey("/root/.ssh/identity.pub")
+        
         while 1:
             try:
-                node = slice.createNode(nodeid)
-            except xmlrpclib.Fault, e:
-                print "XML-RPC Fault happened while attempting " \
-                      "node alloc for %s" % nodeid
-                print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
-            except (socket.error, xmlrpclib.ProtocolError):
-                print "Encountered problem communicating with an agent " \
-                      "while setting up plab vnode %s" % nodeid
-            else:
-                break
-            
-            alloctries = alloctries - 1
-            if alloctries > 0:
-                print "Sleeping for %s seconds, then retrying alloc on %s" % \
-                      (SLEEPINT, nodeid)
-                time.sleep(SLEEPINT)
-            else:
-                print "Giving up after %s tries" % TRIES
-                raise
-
-
-        while 1:
-            try:
-                node.addKey("/root/.ssh/identity.pub")
                 node.emulabify()
-                # XXX This file is redundant
-                # node.putConfig("/etc/vnodeid", nodeid)
                 # Note that vnode_setup boots the node
             except:
                 print "Node setup failed on %s" % nodeid
@@ -78,12 +55,20 @@ def main(args):
                 node.free()
                 raise
 
+    elif command == "renew":
+        try:
+            node = slice.loadNode(nodeid)
+        except:
+            print "renew: Node %s isn't allocated" % nodeid
+            sys.exit(1)
+        node.renew()
+
     elif command == "free":
         try:
             node = slice.loadNode(nodeid)
         except:
-            print "Node %s wasn't really allocated" % nodeid
-            sys.exit(0)
+            print "free: Node %s wasn't really allocated" % nodeid
+            sys.exit(1)
 
         node.free()
 

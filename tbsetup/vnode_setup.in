@@ -273,6 +273,7 @@ foreach my $node (@nodes) {
 
 }
 
+
 my $children = 0;
 my %child_vnodes = ();
 while (1) {
@@ -313,13 +314,14 @@ while (1) {
 		[$vnode, $pnode, $mode, $jailed, $plab, time()];
 	    $children++;
 	} else {
+            my $exval = 0;
 	    # Must change our real UID to root so that ssh will work.
 	    $UID = 0;
 
 	    if ($plab && $mode eq "setup") {
-		if (system("$TB/sbin/plabnode alloc $pid $eid $vnode")) {
-		    print "*** $0:\n" .
-			  "    Plab node allocation failed\n";
+		if (TBForkCmd("$TB/sbin/plabnode alloc $pid $eid $vnode", 1)) {
+		    print STDERR "*** $0:\n" .
+                        "    Plab node allocation failed\n";
 		    # Should check DB state instead.
 		    exit(99);
 		}
@@ -332,12 +334,18 @@ while (1) {
 		$args   .= ($jailed   ? "-j " : " ");
 		$args   .= ($plab     ? "-p " : " ");
 		$args   .= "$vnode ";
-	
-		exec("$ssh -host $vnode $CLIENT_BIN/vnodesetup $args");
-		die("*** $0:\n".
-		    "    exec failed!\n");
-	    }
-	    exit(0);
+                
+		$exval = TBForkCmd("$ssh -host $vnode ".
+                                 "$CLIENT_BIN/vnodesetup $args",1);
+            }
+
+            # Free the plab node lease if necessary.
+            if ($plab && ($mode eq "teardown" || $mode eq "cleanup")) {
+                exec("$TB/sbin/plabnode free $pid $eid $vnode");
+                die("*** $0:\n".
+                    "    exec failed!\n");
+            }
+	    exit($exval);
 	}
     } else {
 	#
@@ -419,22 +427,6 @@ while (1) {
 	}
 
 	if ($plab) {
-	    #
-	    # I am totally unhappy with this mess.
-	    #
-	    if ((($mode eq "teardown") || ($mode eq "cleanup")) ||
-		($exitstatus && (($exitstatus >> 8) != 99))) {
-		#
-		# Besides teardown/cleanup, we want to do this if the
-		# vnode setup on the node failed, but only if the
-		# plabnode alloc worked (it can fail too, exits with 99).
-		# 
-		if (system("$TB/sbin/plabnode free $pid $eid $vnode")) {
-		    warn("*** $0:\n".
-			 "    Plab node free of $vnode failed");
-		}
-	    }
-	    
 	    #
 	    # If the node was in the setup process, then mark its allocstate
 	    # as down so os_setup knows not to bother waiting for it. DEAD

@@ -10,6 +10,10 @@ import libplab
 GETFREE_PERIOD = 2*60
 RENEW_PERIOD = 60*60
 
+# maximum number of times (in a row) the daemon loop can
+# catch an exception before bailing out.
+MAXCONSECEXC = 3
+
 def usage(me):
     print "Usage: %s [ -vd ] { getfree [-u] | renew }" % me
     print "  Passing -u to getfree will cause it to only update"
@@ -71,12 +75,40 @@ def doDaemon(func, period, logname):
     calls the given func every period seconds.
     """
     import time
+    import traceback
+
+    consecexc = MAXCONSECEXC
 
     if not libplab.debug:
         daemonize(logname)
     while True:
         start = time.clock()
-        func()
+        try:
+            func()
+        except libplab.SignalInterrupt, e:
+            print "Received signal %s in daemon loop, exiting." % e.signum
+            sys.exit(0)
+        except KeyboardInterrupt:
+            print "Received keyboard interrupt in daemon loop, exiting."
+            sys.exit(1)
+        except:
+            print "Exception caught in plab daemon loop:"
+            print "".join(traceback.format_exception(*sys.exc_info()))
+            consecexc -= 1
+            if consecexc > 0:
+                print "Going back to sleep until next scheduled run"
+            else:
+                print "Too many consecutive exceptions seen, bailing out!"
+                libplab.SENDMAIL(libplab.TBOPS, "Plabdaemon Exiting",
+                                 "The plab %s daemon has seen too many "
+                                 "consecutive exceptions and is bailing out."
+                                 "Someone needs to check the log!" %
+                                 func.func_name)
+                raise
+
+        else:
+            consecexc = MAXCONSECEXC
+            
         end = time.clock()
         if end - start < period:
             wait = period - (end - start)
@@ -107,7 +139,7 @@ def main(args):
         elif command == "renew":
             doDaemon(plab.renew, RENEW_PERIOD, "plabrenew")
         else:
-            usage(ms)
+            usage(me)
     except getopt.GetoptError:
         usage(me)
 
