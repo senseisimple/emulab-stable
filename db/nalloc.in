@@ -2,6 +2,9 @@
 use Mysql;
 use English;
 
+# debug
+my $d = 0;
+
 #
 # Configure variables
 #
@@ -38,7 +41,8 @@ $cmd = "lock tables nodes read, reserved write";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
-foreach my $n (@node_names) { 
+foreach my $n (@node_names) {
+  if ($n =~ /(sh\d+)/ ) { $n = $1."-1"; }
   $sth = $dbh->query("select * from reserved where node_id='$n'");
   if ($sth->numrows > 0) {
     $cmd="select * from reserved where node_id='$n' and eid='$eid' and pid='$pid'";
@@ -78,6 +82,8 @@ foreach my $n (@node_names) {
   }
 }
 
+print "List Ready: @vals\nError=$error\n" if $d;
+
 if (!$error && @vals) {
   print "Reserving nodes...";
   $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
@@ -96,7 +102,7 @@ $sth = $dbh->query($cmd)
 if (!$error && @nodes) {
     my @conlist=();
     my @sharks=();
-    
+
     foreach $n ( @nodes ) { 
 	if ($n =~ /(sh\d+)/) {
 	    # Its a shark - do the shelf if it hasn't been done yet
@@ -110,6 +116,8 @@ if (!$error && @nodes) {
 	    push(@conlist,$n);
 	}
     }
+    print "Console setup list: @conlist\n" if $d;
+
     system("$consetup @conlist") == 0 or
 	print STDERR "WARNING: $consetup @conlist failed!\n";
 
