@@ -380,13 +380,6 @@ sub fatal()
     }
 
     #
-    # If we got far enough to allocate nodes, must run tbend.
-    #
-    if ($estate ne EXPTSTATE_NEW) {
-	tbendit();
-    }
-
-    #
     # In batch mode, exit. Must unlock the experiment since the record
     # is kept by the batch system until it is finished or canceled.
     # The batch daemon might terminate the experiment based on the error.
@@ -394,6 +387,13 @@ sub fatal()
     if ($batch) {
 	TBUnLockExp($pid, $eid);
 	exit($errorstat);
+    }
+
+    #
+    # If we got far enough to allocate nodes, must run tbend.
+    #
+    if ($estate ne EXPTSTATE_NEW) {
+	tbendit();
     }
 
     #

@@ -8,6 +8,10 @@
 
 use English;
 
+# Returns 0 on success.
+# Returns 1 on non-assign_wrapper failure.
+# Returns (1 | assign_wrapper's errorcode) on assign_wrapper failure.
+
 # XXX: handle error cases for update? (backup the db?)
 # XXX: Shouldn't do idempotent stuff twice for update.
 # XXX: repush/calc routing for update??? (tbprerun)
@@ -368,10 +372,7 @@ if (! $errors) {
 if (defined $nextState) {
     if (! SetExpState($pid, $eid, $nextState)) {
 	print STDERR "*** Failed to set experiment state.\n";
-	#
-	# Don't obliterate a meaningful error code if this happens.
-	#
-	if (! $errors) { $errors = 1; }
+	$errors = 1;
     }
 }
 
@@ -383,14 +384,15 @@ if ($errors) {
     print "Failingly finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("tbswap $swapop finished (failed)");
 
-    # pass this info along.
-    $errors |= $assignWrapperErrorCode;
+    # pass assign wrapper info along.
+    # other codes in 'errors' (3 or 7) are meaningless and
+    # should just be reported as 1's.
+    exit( 1 | $assignWrapperErrorCode );
 } else {
     print "Successfully finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("tbswap $swapop finished (succeeded)");
+    exit( 0 );
 }
-
-exit($errors);
 
 #################################
 
