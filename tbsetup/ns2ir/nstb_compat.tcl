@@ -44,6 +44,7 @@ proc tb-set-noshaping {link onoff} {}
 proc tb-set-useveth {link onoff} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
+proc tb-set-node-startcmd {node cmd} {}
 
 Class Program
 

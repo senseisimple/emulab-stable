@@ -638,10 +638,13 @@ proc tb-set-sync-server {node} {
 # command above, but we have to keep that one around for a while. This
 # new version dispatched to the node object, which uses a program object.
 # 
-proc tb-set-node-startcommand {node command} {
+proc tb-set-node-startcmd {node command} {
     if {[$node info class] != "Node"} {
-	perror "\[tb-set-node-startcommand] $node is not a node."
+	perror "\[tb-set-node-startcmd] $node is not a node."
 	return
     }
-    return [$node start-command $command]
+    set command "($command ; /usr/local/etc/emulab/batchcmddone \$?)"
+    set newprog [$node start-command $command]
+
+    return $newprog
 }
