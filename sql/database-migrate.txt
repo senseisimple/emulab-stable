@@ -998,3 +998,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table virt_node_desires drop primary key;
        alter table virt_node_desires add primary key(pid,eid,vname,desire);
+
+1.190: Add an index...
+
+       alter table testbed_stats add key (exptidx);

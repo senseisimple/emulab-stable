@@ -1220,7 +1220,8 @@ CREATE TABLE testbed_stats (
   exitcode tinyint(3) default '0',
   uid varchar(8) NOT NULL default '',
   PRIMARY KEY  (idx),
-  KEY rsrcidx (rsrcidx)
+  KEY rsrcidx (rsrcidx),
+  KEY exptidx (exptidx)
 ) TYPE=MyISAM;
 
 --
