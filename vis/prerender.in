@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -429,12 +429,17 @@ foreach $node (keys %nodes) {
     }
 }
 
-### Generate thumbnail, if called for.
+# Generate thumbnail, if called for. The .png file is put into the work
+# directory, so it is copied off to the users and the archive directory. 
 
 if ($thumb) {
-    if (system("$THUMB_CMD $pid $eid > @prefix@/www/thumbs/tn$thumb.png")) {
+    my $workdir = TBExptWorkDir($pid, $eid);
+    my $fname   = "$workdir/$eid.png";
+	
+    if (system("$THUMB_CMD $pid $eid > $fname")) {
 	print STDERR "Error generating thumbnail.\n";
     }
+    system("cp -pf $fname @prefix@/www/thumbs/tn$thumb.png");
 }
 
 ### Success!!
