@@ -12,10 +12,11 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT "Usage: node_reboot [-d] node [node ...]\n" .
-	"Use the -d option to turn on debugging\n";
+	"Use the -d option to turn on debugging\n" .
+	"Use the -f option to shoot the node in the head\n";
     exit(-1);
 }
-my  $optlist = "d";
+my  $optlist = "df";
 
 #
 # Configure variables
@@ -31,6 +32,7 @@ my %pids	= ();
 my @row;
 my @nodes       = ();
 my $debug       = 0;
+my $force       = 0;
 my $failed      = 0;
 
 # un-taint path
@@ -65,7 +67,10 @@ if (@ARGV == 0) {
     usage();
 }
 if (defined($options{"d"})) {
-    $debug = $options{"d"};
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
 }
 
 # Untaint the nodes.
@@ -110,6 +115,15 @@ if ($UID != 0) {
 	    }
 	}
     }
+}
+
+#
+# In force mode, just call the power program for the whole bunch and
+# be done with it.
+#
+if ($force) {
+    system("$power cycle @nodes");
+    exit $? >> 8;
 }
 
 #
