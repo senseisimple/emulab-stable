@@ -57,7 +57,6 @@
 
 int		debug = 0;
 static int	insecure = 0;
-static int	portnum = TBSERVER_PORT;
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
@@ -70,15 +69,16 @@ static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock);
 static void	udpserver(int sock);
 static int      handle_request(int, struct sockaddr_in *, char *, int);
+static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
 int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
+static int	safesymlink(char *name1, char *name2);
 
 /* thread support */
 #define MAXCHILDREN	25
 #define MINCHILDREN	5
-static int	udpchild;
 static int	numchildren;
 static int	maxchildren = 15;
 static volatile int killme;
@@ -196,9 +196,10 @@ cleanup()
 int
 main(int argc, char **argv)
 {
-	int			tcpsock, udpsock, ch;
-	int			length, i, status, pid;
-	struct sockaddr_in	name;
+	int			tcpsock, udpsock, i, ch, foo[4];
+	int			alttcpsock, altudpsock;
+	int			status, pid;
+	int			portnum = TBSERVER_PORT;
 	FILE			*fp;
 	char			buf[BUFSIZ];
 	struct hostent		*he;
@@ -290,6 +291,102 @@ main(int argc, char **argv)
 	}
 	memcpy((char *)&myipaddr, he->h_addr, he->h_length);
 
+	if (makesockets(portnum, &udpsock, &tcpsock) < 0 ||
+	    makesockets(TBSERVER_PORT2, &altudpsock, &alttcpsock) < 0) {
+		error("Could not make sockets!");
+		exit(1);
+	}
+
+	signal(SIGTERM, cleanup);
+	signal(SIGINT, cleanup);
+	signal(SIGHUP, cleanup);
+
+	/*
+	 * Stash the pid away.
+	 */
+	sprintf(buf, "%s/tmcd.pid", _PATH_VARRUN);
+	fp = fopen(buf, "w");
+	if (fp != NULL) {
+		fprintf(fp, "%d\n", getpid());
+		(void) fclose(fp);
+	}
+
+	/*
+	 * Now fork a set of children to handle requests. We keep the
+	 * pool at a set level. No need to get too fancy at this point,
+	 * although this approach *is* rather bogus. 
+	 */
+	bzero(foo, sizeof(foo));
+	while (1) {
+		while (!killme && numchildren < maxchildren) {
+			int which = 0;
+			if (!foo[1])
+				which = 1;
+			else if (! foo[2])
+				which = 2;
+			else if (! foo[3])
+				which = 3;
+			
+			if ((pid = fork()) < 0) {
+				errorc("forking server");
+				goto done;
+			}
+			if (pid) {
+				foo[which] = pid;
+				numchildren++;
+				continue;
+			}
+			/* Child does useful work! Never Returns! */
+			signal(SIGTERM, SIG_DFL);
+			signal(SIGINT, SIG_DFL);
+			signal(SIGHUP, SIG_DFL);
+			
+			switch (which) {
+			case 0: tcpserver(tcpsock);
+				break;
+			case 1: udpserver(udpsock);
+				break;
+			case 2: udpserver(altudpsock);
+				break;
+			case 3: tcpserver(alttcpsock);
+				break;
+			}
+			exit(-1);
+		}
+
+		/*
+		 * Parent waits.
+		 */
+		pid = waitpid(-1, &status, 0);
+		if (pid < 0) {
+			errorc("waitpid failed");
+			continue;
+		}
+		error("server %d exited with status 0x%x!\n", pid, status);
+		numchildren--;
+		for (i = 0; i < (sizeof(foo)/sizeof(int)); i++) {
+			if (foo[i] == pid)
+				foo[i] = 0;
+		}
+		if (killme && !numchildren)
+			break;
+	}
+ done:
+	CLOSE(tcpsock);
+	close(udpsock);
+	info("daemon terminating\n");
+	exit(0);
+}
+
+/*
+ * Create sockets on specified port.
+ */
+static int
+makesockets(int portnum, int *udpsockp, int *tcpsockp)
+{
+	struct sockaddr_in	name;
+	int			length, i, udpsock, tcpsock;
+
 	/*
 	 * Setup TCP socket for incoming connections.
 	 */
@@ -352,69 +449,9 @@ main(int argc, char **argv)
 	}
 	info("listening on UDP port %d\n", ntohs(name.sin_port));
 
-	signal(SIGTERM, cleanup);
-	signal(SIGINT, cleanup);
-	signal(SIGHUP, cleanup);
-
-	/*
-	 * Stash the pid away.
-	 */
-	sprintf(buf, "%s/tmcd.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
-	if (fp != NULL) {
-		fprintf(fp, "%d\n", getpid());
-		(void) fclose(fp);
-	}
-
-	/*
-	 * Now fork a set of children to handle requests. We keep the
-	 * pool at a set level. No need to get too fancy at this point. 
-	 */
-	while (1) {
-		while (!killme && numchildren < maxchildren) {
-			int doudp = (udpchild ? 0 : 1);
-			if ((pid = fork()) < 0) {
-				errorc("forking server");
-				goto done;
-			}
-			if (pid) {
-				if (doudp)
-					udpchild = pid;
-				numchildren++;
-				continue;
-			}
-			/* Child does useful work! Never Returns! */
-			signal(SIGTERM, SIG_DFL);
-			signal(SIGINT, SIG_DFL);
-			signal(SIGHUP, SIG_DFL);
-			
-			if (doudp) 
-				udpserver(udpsock);
-			else
-				tcpserver(tcpsock);
-			exit(-1);
-		}
-
-		/*
-		 * Parent waits.
-		 */
-		pid = waitpid(-1, &status, 0);
-		if (pid < 0) {
-			errorc("waitpid failed");
-			continue;
-		}
-		error("server %d exited with status 0x%x!\n", pid, status);
-		numchildren--;
-		if (pid == udpchild)
-			udpchild = 0;
-		if (killme && !numchildren)
-			break;
-	}
- done:
-	CLOSE(tcpsock);
-	close(udpsock);
-	info("daemon terminating\n");
-	exit(0);
+	*tcpsockp = tcpsock;
+	*udpsockp = udpsock;
+	return 0;
 }
 
 /*
@@ -428,14 +465,14 @@ udpserver(int sock)
 	struct sockaddr_in	client;
 	int			length, cc;
 	
-	info("udpserver starting\n");
+	info("udpserver starting: pid=%d sock=%d\n", getpid(), sock);
 
 	/*
 	 * Wait for udp connections.
 	 */
 	while (1) {
 		length = sizeof(client);		
-		cc = recvfrom(sock, buf, MYBUFSIZE - 1,
+		cc = recvfrom(sock, buf, sizeof(buf) - 1,
 			      0, (struct sockaddr *)&client, &length);
 		if (cc <= 0) {
 			if (cc < 0)
@@ -459,7 +496,7 @@ tcpserver(int sock)
 	struct sockaddr_in	client;
 	int			length, cc, newsock;
 	
-	info("tcpserver starting\n");
+	info("tcpserver starting: pid=%d sock=%d\n", getpid(), sock);
 
 	/*
 	 * Wait for TCP connections.
@@ -475,7 +512,7 @@ tcpserver(int sock)
 		/*
 		 * Read in the command request.
 		 */
-		if ((cc = READ(newsock, buf, MYBUFSIZE - 1)) <= 0) {
+		if ((cc = READ(newsock, buf, sizeof(buf) - 1)) <= 0) {
 			if (cc < 0)
 				errorc("Reading TCP request");
 			error("TCP connection aborted\n");
@@ -2289,6 +2326,32 @@ dosfshostiddead()
 	longjmp(sfshostiddeadline, 1);
 }
 
+static int
+safesymlink(char *name1, char *name2)
+{
+	/*
+	 * Really, there should be a cleaner way of doing this, but
+	 * this works, at least for now.  Perhaps using the DB and a
+	 * symlinking deamon alone would be better.
+	 */
+	if (setjmp(sfshostiddeadline) == 0) {
+		sfshostiddeadfl = 0;
+		signal(SIGALRM, dosfshostiddead);
+		alarm(1);
+
+		unlink(name2);
+		if (symlink(name1, name2) < 0) {
+			sfshostiddeadfl = 1;
+		}
+	}
+	alarm(0);
+	if (sfshostiddeadfl) {
+		errorc("symlinking %s to %s", name2, name1);
+		return -1;
+	}
+	return 0;
+}
+
 /*
  * Create dirsearch entry for node.
  */
@@ -2329,27 +2392,9 @@ COMMAND_PROTOTYPE(dosfshostid)
 	// sprintf(dspath, "/proj/%s/.sfs/%s/%s", pid, eid, nickname);
 	sprintf(dspath, "/proj/.sfs/%s.%s.%s", nickname, eid, pid);
 	
-	/*
-	 * Really, there should be a cleaner way of doing this, but
-	 * this works, at least for now.  Perhaps using the DB and a
-	 * symlinking deamon alone would be better.
-	 */
-	if (setjmp(sfshostiddeadline) == 0) {
-		sfshostiddeadfl = 0;
-		signal(SIGALRM, dosfshostiddead);
-		alarm(1);
-
-		unlink(dspath);
-		if (symlink(sfspath, dspath) < 0) {
-			sfshostiddeadfl = 1;
-		}
-	}
-	alarm(0);
-	if (sfshostiddeadfl) {
-		errorc("symlinking %s to %s", dspath, sfspath);
+	if (safesymlink(sfspath, dspath) < 0) {
 		return 1;
 	}
-
 	return 0;
 }
 
