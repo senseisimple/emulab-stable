@@ -1,0 +1,207 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Create a delta
+#
+# usage: create-delta <destination filename>
+#
+# XXX - The destination filename must start with /proj.
+#       We dump per filesystem, which means a delta can be installed only
+#       on machines that look like the original wrt. partitions. 
+#
+sub usage()
+{
+    print STDOUT "Usage: create-delta <destination filename>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# No configure vars.
+#
+my $FSTAB       = "/etc/fstab";
+my $deltafile   = "";
+my $deltadir    = ".";
+my $indexfile   = "delta.index";
+my $template    = "delta.dump";
+my $dumpfile;
+
+#
+# Must be running as root to work. 
+#
+if ($EUID != 0) {
+    die("Must be run as root! Try using sudo or su1!");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+$deltafile = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($deltafile =~ /^([-\w.\/]+)$/) {
+    $deltafile = $1;
+}
+else {
+    fatal("Tainted tempfile name: $deltafile");
+}
+
+#
+# Lets not overwrite an existing delta. Force user to move it. 
+# 
+if (-e $deltafile) {
+    fatal("$deltafile already exists. Please remove it first.");
+}
+
+#
+# The delta file may only go into a /proj directory.
+#
+if (! ($deltafile =~ /^\/proj\//)) {
+    fatal("The destination file must reside in /proj");
+}
+
+#
+# We need the directory the delta is going into so that we can create
+# temporary files for each paritition dump.
+#
+if ($deltafile =~ /^(.+)\/.*$/) {
+    $deltadir = $1;
+}
+else {
+    fatal("Could not determine the directory component of $deltafile");
+}
+
+#
+# Parse /etc/fstab to see what filesystems need to be dumped out.
+# If the image was created properly, there will already be (better be)
+# level 0 entries in the dumpdates file too. 
+#
+my @fslist=();
+open(TAB, "$FSTAB") or
+    fatal("Could not open $FSTAB: $!");
+
+while (<TAB>) {
+    if ($_ =~ /^([\w\/]+)[\s]+([\w\/]+).*(\d).*\d$/) {
+	if ($3 != 0) {
+	    push(@fslist, $2);
+	}
+    }
+}
+close(TAB);
+
+#
+# Chdir into the directory. Makes life easier.
+#
+chdir($deltadir) or
+    fatal("Could not chdir to $deltadir");
+
+#
+# Generate an index file. The first line of the index is our OSNAME, along
+# with a (mostly) unique value to prevent multiple installations of the same
+# delta. That would tend to mess people up, I would think.  The rest of the
+# index contains pairs of filesystem name and tarfile entry, so that the
+# install script can find the right file in the tarball.
+#
+open(INDEX, ">$indexfile") or
+    fatal("Could not open $indexfile: $!");
+
+#
+# Form the identifier. Get some random numbers from /dev/urandom and run
+# that into md5 (mostly to convert to an ascii string!).
+#
+my $ident;
+if ($OSNAME eq "freebsd") {
+    $ident = `dd if=/dev/urandom bs=1b count=2 | md5`;
+    chop $ident;
+}
+elsif ($OSNAME eq "linux") {
+    my $res = `dd if=/dev/urandom bs=1b count=2 | md5sum`;
+    ($ident,undef) = split(' ', $res);
+}
+else {
+    fatal("Could not generate a unique identifier!");
+}
+print INDEX "$OSNAME    $ident\n";
+
+my $count = 0;
+foreach $fs (@fslist) {
+    print INDEX "$fs    $template.$count\n";
+    $count++;
+}
+close(INDEX);
+
+#
+# Shove the index into the tar file, which also creates the tar file.
+#
+if (system("tar -cf $deltafile $indexfile")) {
+    fatal("Could not create initial delta file $deltafile\n");
+}
+
+#
+# Now dump each filesystem to a temporary file. 
+#
+$count = 0;
+foreach $fs (@fslist) {
+    print "Gathering files on $fs ...\n";
+    $dumpfile = "$template.$count";
+
+    if (system("dump -1 -a -f - -b 64 $fs | gzip > $dumpfile")) {
+	fatal("Could not create dump of $fs");
+    }
+    
+    #
+    # Check to make sure something happened.
+    #
+    if (-s $dumpfile <= 64) {
+	fatal("Dump for $fs is too small to be valid!");
+    }
+
+    #
+    # Append to the tar file.
+    #
+    if (system("tar -rf $deltafile $dumpfile")) {
+	fatal("Could not append dump for $fs to delta file $deltafile");
+    }
+    unlink("$dumpfile") or
+	fatal("Could not unlink $dumpfile");
+    $count++;
+}
+
+#
+# Remove the temporaries.
+#
+unlink($indexfile);
+
+exit 0;
+
+sub fatal {
+    local($msg) = $_[0];
+
+    print STDERR "$msg\n";
+    exit(1);
+}
+

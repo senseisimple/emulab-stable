@@ -1,0 +1,208 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+use POSIX 'setsid';
+
+#
+# Install a delta. This script is run from the setup code on client nodes.
+#
+# usage: install-delta <delta filename>
+#
+# Exit Value Matters!: 0 if delta installed.
+#                      1 if delta already installed
+#                     -1 if something goes wrong.
+#
+# To ensure safety, the delta filename must start with /proj.
+# 
+# 
+#
+sub usage()
+{
+    print STDOUT "Usage: install-delta <delta filename>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# No configure vars.
+#
+my $IDENTFILE   = "/var/db/testbed.deltas";
+my $deltafile   = "";
+my $indexfile   = "delta.index";
+my $dumpfile;
+my %fslist      = ();
+my $os;
+my $ident;
+
+#
+# Must be running as root to work. 
+#
+if ($EUID != 0) {
+    die("Must be run as root! Try using sudo or su1!");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+$deltafile = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($deltafile =~ /^([-\w.\/]+)$/) {
+    $deltafile = $1;
+}
+else {
+    fatal("Tainted tempfile name: $deltafile");
+}
+
+#
+# The delta file may only come from a /proj directory.
+#
+if (! ($deltafile =~ /^\/proj\//)) {
+    fatal("The delta file must reside in /proj");
+}
+
+#
+# Make sure its really there.
+#
+if (! -r $deltafile) {
+    fatal("$deltafile does not exist or is not accessible!");
+}
+
+#
+# Suck out the index file from the tarball. This tells us how many
+# partitions and where they belong. We use the -O option which tells
+# tar to send the file to stdout so we can read it in from the pipe.
+#
+open(TAR, "tar Oxf $deltafile $indexfile |") or
+    fatal("Could not start tar to read index file");
+
+my $first = 1;
+while (<TAR>) {
+    my($fs, $fname);
+    chop;
+    
+    #
+    # Untaint the beast.
+    #
+    if ($_ =~ /^([\w\/]+)\s*([\w.]+)$/) {
+	$fs    = $1;
+	$fname = $2;
+    }
+    else {
+	fatal("Tainted index entry: $_");
+    }
+
+    #
+    # Get the OS and Key which are the first entry.
+    # 
+    if ($first) {
+	$os    = $fs;
+	$ident = $fname;
+	$first = 0;
+	next;
+    }
+
+    $fslist{$fs} = $fname;
+}
+close(TAR);
+
+#
+# Check that the OS is correct!
+#
+if ($os ne $OSNAME) {
+    fatal("This delta is not for $OSNAME. Its for $os.");
+}
+
+#
+# Check to make sure this key has not already been installed. Update
+# the file now. If the restore fails, we got big problems.
+#
+if (-e $IDENTFILE) {
+    if (! `egrep -q -s '^${ident}' $IDENTFILE`) {
+	print STDOUT "Delta $deltafile has already been installed!\n";
+	exit(1);
+    }
+}
+system("echo \"$ident\" >> $IDENTFILE") == 0 or
+    fatal("Could not update $IDENTFILE");
+
+#
+# Foreach partition, suck out the compressed dump file from the tarball,
+# and run it into restore. 
+#
+$count = 0;
+foreach $fs (keys(%fslist)) {
+    $dumpfile = $fslist{$fs};
+
+    print "Installing files on $fs from $dumpfile\n";
+
+    chdir($fs) or
+	fatal("Could not chdir to $fs: $!");
+
+    #
+    # Big sigh. Restore opens /dev/tty to ask a silly y/n question.
+    # fork a child and disconnect it from /dev/tty (with setsid) so that
+    # restore will just blow by the question.
+    #
+    my $childpid = open(POOH, "-|");
+    if (! defined($childpid)) {
+	fatal("Could not fork child!");
+    }
+
+    if ($childpid) {
+	while (<POOH>) {
+	    print $_;
+	}
+	close(POOH);
+	if ($? >> 8) {
+	    fatal("Restore failed!");
+	}
+    }
+    else {
+	open(STDIN, "/dev/null") or
+	    fatal("Cannot read /dev/null: $!");
+	open(STDERR, ">&STDOUT") or
+	    fatal("Cannot dup stdout: $!");
+	$| = 1;
+	setsid() or
+	    fatal("setsid failed: $!");
+	    
+	system("tar Oxf $deltafile $dumpfile | gunzip | restore -x -f - -y");
+	
+	exit($? >> 8);
+    }
+
+    $count++;
+}
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    print STDERR "$msg\n";
+    exit(-1);
+}
+

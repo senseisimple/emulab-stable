@@ -23,6 +23,10 @@ install: $(INSTALL_SBINDIR)/split-image.sh
 control-install: 
 	@$(MAKE) -C imagezip install
 
+client-install: 
+	$(INSTALL_PROGRAM) create-delta /usr/local/bin/create-delta
+	$(INSTALL_PROGRAM) install-delta /usr/local/bin/install-delta
+
 clean:		subdir-clean
 
 subdir-clean:
