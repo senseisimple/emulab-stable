@@ -252,20 +252,32 @@ my $virtnode_id  = 0;
 
 my %alreadyAllocated = ();
 
+if ($updating) {
+    printdb "Fixing previously allocated nodes.\n";
+	$result = 
+	    DBQueryFatal("SELECT vname, node_id ".
+			 "FROM reserved ".
+			 "WHERE pid='$pid' AND eid='$eid'");
+    
+    while (($vname,$reserved) = $result->fetchrow_array) {
+	$fixed_nodes{$vname} = $reserved;    
+	$alreadyAllocated{$reserved} = 1;
+    }
+    $result->finish;
+}
+
+
 printdb "Loading virt_nodes.\n";
 $result =
     DBQueryFatal("select distinct vn.vname,vn.ips,vn.type,vn.fixed, ".
-		 " nt.isremotenode,nt.isvirtnode,rv.node_id ".
+		 " nt.isremotenode,nt.isvirtnode ".
 		 " from virt_nodes as vn ".
 		 "left join node_types as nt on ".
 		 " nt.type=vn.type or nt.class=vn.type ".
-                 "left join reserved as rv on ".
-                 " rv.pid = vn.pid and ".
-                 " rv.eid = vn.eid and ".
-                 " rv.vname = vn.vname ".
-		 "where vn.pid='$pid' and vn.eid='$eid'");
+		 "where vn.pid='$pid' and vn.eid='$eid' ".
+		 "order by vn.vname");
 
-while (($vname,$ips,$type,$fixed,$isremote,$isvirt,$reserved) = 
+while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = 
         $result->fetchrow_array){
     if (defined($fixed) && $fixed eq "") {
 	undef($fixed);
@@ -319,11 +331,6 @@ while (($vname,$ips,$type,$fixed,$isremote,$isvirt,$reserved) =
     $virtcount++
 	if ($isvirt);
 
-    if ($updating && $reserved) {
-	$fixed = $reserved;
-	$alreadyAllocated{$reserved} = 1;
-    }
-
     if (defined($fixed)) {
 	$fixed_nodes{$vname} = $fixed;
     }
@@ -334,7 +341,8 @@ printdb "Loading virt_lans.\n";
 $result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
 		 "rdelay,rbandwidth,rlossrate,widearea " .
-		 "from virt_lans where pid='$pid' and eid='$eid'");
+		 "from virt_lans where pid='$pid' and eid='$eid' ".
+                 "order by vname,member");
 
 #
 # REMOTENODE HACK: Remote nodes are special.
