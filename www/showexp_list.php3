@@ -29,6 +29,8 @@ if (! isset($sortby))
     $sortby = "normal";
 if (! isset($thumb)) 
     $thumb = 0;
+if (! isset($noignore)) 
+    $noignore = 0;
 
 echo "<b>Show: ";
 
@@ -281,7 +283,10 @@ if (mysql_num_rows($experiments_result)) {
           </center>\n";
 
     if ($idle) {
-      echo "<p><center><b>Experiments that have been idle at least $idlehours hours</b></center></p><br />\n";
+      echo "<p><center><b>Experiments that have been idle at least 
+$idlehours hours</b><br><a class='static' 
+href='showexp_list.php3?showtype=idle&sortby=$sortby&thumb=$thumb&noignore=1'>
+Include idle-ignore experiments</a></center></p><br />\n";
     }
     
     $idlemark = "<b>*</b>";
@@ -531,23 +536,23 @@ if ($thumb && !$idle) {
 	    $stale = TBGetExptIdleStale($pid,$eid);
 	    $ignore = TBGetExptIdleIgnore($pid,$eid);
 	    # If it is ignored, skip it now.
-	    if ($ignore) { continue; }
+	    if ($ignore && !$noignore) { continue; }
 	    #$lastlogin .= "<td align=center>$daysidle</td>\n";
 	    if (isset($perexp_usage["$pid:$eid"]) &&
 		isset($perexp_usage["$pid:$eid"]["pc"])) {
 	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
 	    } else { $pcs=0; }
 	    $foo = "<td align=center valign=center>\n";
+	    $label = "";
+	    if ($stale) { $label .= "stale "; }
+	    if ($ignore) { $label .= "ignore "; }
+	    if (!$swappable) { $label .= "unswap. "; }
+	    if ($label == "") { $label = "&nbsp;"; }
  	    if ($inactive && !$stale && !$ignore && !$toosoon && $pcs) {
 		$fooswap = "<td><a ".
 		    "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
-		    "<img border=0 src=\"redball.gif\"></a></td>\n" ;
+		    "<img border=0 src=\"redball.gif\"></a> $label</td>\n" ;
 	    } else {
-		$label = "";
-		if ($stale) { $label .= "stale "; }
-		if ($ignore) { $label .= "ignore "; }
-		if (!$swappable) { $label .= "unswap. "; }
-		if ($label == "") { $label = "&nbsp;"; }
 		$fooswap = "<td>$label</td>";
 		if (!$pcs) { $foo .= "(no PCs)\n"; }
 		else { $foo .="&nbsp;"; }
