@@ -67,7 +67,7 @@ HTTPD_PORT = "1492"
 HTTP_PATH = "/" # ensure this ends in a slash
 ROOTBALL_HTTP_URLPATH = HTTPD_SITE + HTTPD_PORT + HTTP_PATH
 
-DEF_ROOTBALL_NAME = @PLAB_ROOTBALL@
+DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
 
 #
 # How many seconds to sleep between failures and how many times to try
@@ -277,8 +277,10 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
      disable_sigs_child:  <tuple of ints> signals to disable in child
 
     RETURNS:
-     return code of forked command (1 if exception is caught, or different
-     if user supplied command does its own exit()).
+     two element tuple.  The first element is a boolean, indicating whether
+     or not an exception was caught while executing the command.  The second
+     element is the return code from the command (which could be meaningless
+     if an exception was caught).
 
     SIDE EFFECTS:
      Forks child process to run provided command.  Blocks signals
@@ -291,20 +293,21 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
     # parent
     if childpid:
         gotexc = 0
-        exval = (0,0)
+        exval = 256
         if disable_sigs_parent:
             osigs = disable_sigs(disable_sigs_parent)
         enable_alarm()
         signal.alarm(timeout)
         while 1:
             try:
-                exval = os.waitpid(childpid, 0)
+                exval = os.waitpid(childpid, 0)[1]
             except TimeoutError:
                 print "Timeout waiting for command completion: %s" % \
                       cmd.func_name
                 gotexc = 1
                 break
             except OSError, e:
+                # Interrupted syscall: just jump back on it.
                 if e.errno == 4:
                     continue
                 else:
@@ -323,21 +326,21 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
                   "run command %s\n%s" % (cmd.func_name, tb)
             try: os.kill(childpid, signal.SIGUSR1)
             except: pass
-            try: os.wait()
-            except: pass
+            try: exval = os.wait()[1]
+            except: exval = 256
         else:
             if debug:
-                if os.WIFEXITED(exval[1]):
+                if os.WIFEXITED(exval):
                     print "Process complete, exit value: %d" % \
-                          os.WEXITSTATUS(exval[1])
-                if os.WIFSIGNALED(exval[1]):
+                          os.WEXITSTATUS(exval)
+                if os.WIFSIGNALED(exval):
                     print "Process signalled: %d" % \
-                          os.WTERMSIG(exval[1])
+                          os.WTERMSIG(exval)
 
         disable_alarm()
         if osigs:
             enable_sigs(osigs)
-        return gotexc | exval[1]
+        return (gotexc, os.WEXITSTATUS(exval))
 
     # child
     else:
@@ -496,7 +499,7 @@ def tryXmlrpcCmd(cmd, args = (),
                 e.triesleft = tries
                 raise xmlrpclib.Fault, e
             print "XML-RPC Fault happened while executing agent " \
-                  "command: %s args: %s" % (cmd.func_name, args)
+                  "command: %s" % cmd.func_name
             print "\tCode: %s, Error: %s" % (e.faultCode, e.faultString)
         except TimeoutError, e:
             if debug:
@@ -505,8 +508,7 @@ def tryXmlrpcCmd(cmd, args = (),
             raise TimeoutError, e
         except (socket.error, xmlrpclib.ProtocolError), e:
             print "Encountered problem communicating with agent " \
-                  "while executing command: %s args: %s" % \
-                  (cmd.func_name, args)
+                  "while executing command: %s" % cmd.func_name
             if debug:
                 print "Exception is of type: %s" % e
                     
@@ -931,7 +933,11 @@ class Plab:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
-            node.renew()
+            if node.renew():
+                print "Failed to renew lease for %s" % nodeid
+                SENDMAIL(TBOPS, "Lease renewal failed: %s" % nodeid,
+                         "Failed to renew lease on %s for %s/%s" %
+                         (nodeid, pid, eid))
 
     def _createAgentProxy(self, insecure = False):
         """
@@ -1218,8 +1224,10 @@ class Node:
         shutdown anything inside the vserver.  Warning: forks a process
         to carry out the actual work!
         """
-        ForkCmd(self._free, timeout=FREE_TIMEOUT,
-                disable_sigs_parent=TERMSIGS, disable_sigs_child=TERMSIGS)
+        res = ForkCmd(self._free, timeout=FREE_TIMEOUT,
+                      disable_sigs_parent=TERMSIGS,
+                      disable_sigs_child=TERMSIGS)
+        return res[0] | res[1]
         
     def _free(self):
         """
@@ -1227,7 +1235,6 @@ class Node:
         shutdown anything inside the vserver.  Don't call this directly;
         instead, use Node.free()
         """
-        ret = None
         deleted = 0
 
         print "Freeing Plab node %s." % self.nodeid
@@ -1249,8 +1256,8 @@ class Node:
         tries = DEF_TRIES
         while 1:
             try:
-                ret = tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
-                                   inittries = tries, raisefault = 1)
+                tryXmlrpcCmd(nodemgr.deletelease, self.slice.slicename,
+                             inittries = tries, raisefault = 1)
             except xmlrpclib.Fault, e:
                 if e.faultString.find("does not exist") != -1:
                     print "Lease for %s did not exist on node" % self.nodeid
@@ -1272,10 +1279,7 @@ class Node:
                 deleted = 1
                 break
 
-        if deleted and debug:
-            print "Deleted lease/VM: %s" % `ret`
-
-        return ret
+        return not deleted
 
     def addKey(self, identityfile):
         """
@@ -1304,8 +1308,9 @@ class Node:
         forks and runs another private method to actually do the
         work!
         """
-        ForkCmd(node.renew, timeout = RENEW_TIMEOUT,
-                disable_sigs_parent = TERMSIGS)
+        res = ForkCmd(node.renew, timeout = RENEW_TIMEOUT,
+                      disable_sigs_parent = TERMSIGS)
+        return res[0] | res[1]
 
     def _renew(self):
         """
@@ -1326,7 +1331,7 @@ class Node:
                 if e.faultString.find("does not exist") != -1:
                     print "No lease found on %s for slice %s" % \
                           (self.nodeid, self.slice.slicename)
-                    return
+                    return 1
                 elif e.triesleft > 0:
                     tries = e.triesleft
                 else:
@@ -1338,6 +1343,7 @@ class Node:
         DBQueryFatal("update plab_slice_nodes"
                      " set leasedata = %s, leaseend = %s",
                      (self.leasedata, self.lease.end_time))
+        return 0
 
     def emulabify(self, rootballpath = DEFAULT_DATA_PATH,
                   rootballname = DEF_ROOTBALL_NAME):
