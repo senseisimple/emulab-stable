@@ -378,14 +378,22 @@ if (!$TESTMODE) {
 print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
 
 sleep(2);
-my $waitstart = time;
 
 #
-# Now lets wait for them to come back alive.
+# Now lets wait for them to come back alive. Set up a retry list though
+# so that we can give each node at least 1 second chance. Avoids pointless
+# experiment failures.
 #
+my %retries;
+my %waitstart;
 foreach my $node ( @nodes ) {
-    my $failmesg;
-    
+    $retries{$node} = 1;
+    $waitstart{$node} = time;
+}
+
+while ( @nodes ) {
+    my $node = shift(@nodes);
+
     #
     # Don't bother to wait for nodes that are running foreign OSs since
     # we are not going to deal with them anyway later in the process.
@@ -401,11 +409,25 @@ foreach my $node ( @nodes ) {
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	next;
     }
+
+    if ($retries{$node}) {
+	$retries{$node} -= 1;
+
+	print "*** Rebooting $node and waiting again ...\n";
+	
+	if (system("$nodereboot $node") == 0) {
+	    push(@nodes, $node);
+	    $waitstart{$node} = time;
+	    next;
+	}
+	# Fall through on failure.
+    }
+
     SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
-
-    print STDOUT "*** Oops, $node may be down. ".
-	         "This has been reported to testbed-ops.\n";
-
+	
+    print "*** WARNING: $node may be down.\n".
+	  "    This has been reported to testbed-ops.\n";
+	
     if ($canfail{$node}) {
 	# Send mail to testbed-ops and to the user about it.
 	my ($user) = getpwuid($UID);
@@ -424,23 +446,20 @@ foreach my $node ( @nodes ) {
 		 0,
 		 "Cc: $TBOPS");
 
-	print STDERR "*** Continuing with experiment setup anyway ...\n";
+	print "*** Continuing with experiment setup anyway ...\n";
+	next;
     }
-    else {
-	# Reserve it to down experiment.
-	MarkNodeDown($node);
 
-	# Send mail to testbed-ops about it
-	SENDMAIL($TBOPS, "Node $node is down",
-		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
-		 "Please look into this matter. $node has been reserved\n".
-		 "by the Testbed until this matter has been resolved.\n\n".
-		 "Thanks\n".
-		 "Testbed Operations\n");
+    # Reserve it to down experiment.
+    MarkNodeDown($node);
 
-	print STDERR "*** Experiment will be terminated automatically.\n";
-	$failed++;
-    }
+    # Send mail to testbed-ops about it
+    SENDMAIL($TBOPS, "Node $node is down",
+	     "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
+	     "$node has been taken out of the pool until this matter ".
+	     "is resolved.\n");
+
+    print "*** Experiment will be terminated automatically.\n";
 }
 
 print STDOUT "OS Setup Done!\n";
@@ -449,7 +468,7 @@ exit $failed;
 #
 # Wait for a node to come back alive.
 # 
-sub WaitTillAlive {
+sub WaitTillAlive ($) {
     my ($pc) = @_;
 
     print STDERR "Waiting for $pc to come alive\n" if $dbg;
@@ -485,7 +504,7 @@ sub WaitTillAlive {
 	    return 0;
 	}
 	
-	$waittime = time - $waitstart;
+	$waittime = time - $waitstart{$pc};
 	if ($waittime > $maxwait) {
 	    $minutes = int($waittime / 60);
 	    print "*** $pc appears dead - its been $minutes minute(s).\n";
