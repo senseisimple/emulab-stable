@@ -92,12 +92,15 @@
 #include <unistd.h>
 #include <assert.h>
 #include <math.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 // To keep things lightweight, 
 // structures are statically sized to
 // accommodate up to MAX_NODES nodes.
 // These could be changed to STL vectors in the future.
-#define MAX_NODES 20
+#define MAX_NODES 32
 #define MAX_DIMENSIONS 2
 
 // default rounds to keep going without finding a better solution.
@@ -544,10 +547,21 @@ void usage( char * appname )
   exit(1);
 }
 
+unsigned int msecscpu()
+{
+  struct rusage r;
+
+  getrusage( 0, &r );
+
+  return r.ru_utime.tv_sec * 1000 + 
+         r.ru_utime.tv_usec / 1000;
+}
+
 int main( int argc, char ** argv )
 {
   int available = 0;
   int fixedNodeCount = 0;
+  unsigned int bestSpeed = 0;
 
   verbose = 0;
   dimensions = 1;
@@ -586,7 +600,7 @@ int main( int argc, char ** argv )
   }
 
 
-  char line[1024];
+  char line[4096];
 
   {
     if (verbose > 1) { printf("How many physical nodes?\n"); }
@@ -744,6 +758,7 @@ int main( int argc, char ** argv )
 	  printf("Better solution found in round %i (error %4.3f)\n", 
 		 i, currentPool[0].error);
 	}
+	bestSpeed = msecscpu();
 	last = currentPool[0].error;
 	highestFoundRound = i;
       }
@@ -813,7 +828,10 @@ int main( int argc, char ** argv )
     printf("\n");
 
     // dump a detailed report of the returned solution's errors.
-    if (verbose > 1) { calcError<true>( &(currentPool[0]) ); }
+    if (verbose > 1) { 
+      calcError<true>( &(currentPool[0]) ); 
+      printf("Found in %i msecs\n", bestSpeed );
+    }
   }
 
   if (verbose > 1) { printf("Bye now.\n"); }
