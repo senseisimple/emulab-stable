@@ -148,65 +148,57 @@ TBDebugTimeStamp("prerender started in background");
 print "Precomputing visualization ...\n";
 system("prerender -t $pid $eid");
 
-TBDebugTimeStamp("routes started");
-print "Setting up static routes (if requested) ... \n";
+#
+# See if using the new ipassign.
+#
+my $query_result =
+    DBQueryWarn("select use_ipassign, ipassign_args " .
+		"from experiments where pid='$pid' and eid='$eid'");
 
-#
-# Find out which route calculator we're supposed to use
-#
-my $result = DBQueryWarn("select use_ipassign, ipassign_args " .
-    "from experiments where pid='$pid' and eid='$eid'");
-if (!$result || ($result->num_rows() != 1)) {
+if (!$query_result || ($query_result->num_rows() != 1)) {
 	cleanup();
 	die("*** $0:\n".
-	    "    Error determining route calculator!\n");
+	    "    Error getting ipassign arguments!\n");
 }
-my ($use_ipassign, $ipassign_args) = $result->fetchrow();
+my ($use_ipassign, $ipassign_args) = $query_result->fetchrow();
 if ($use_ipassign) {
     if (!defined $ipassign_args) {
 	$ipassign_args = "";
     }
+    TBDebugTimeStamp("ipassign_wrapper started");
+    print "Doing IP assignment ...\n";
+    
     if (system("ipassign_wrapper $ipassign_args $pid $eid")) {
 	cleanup();
 	die("*** $0:\n".
-	    "    Static route calculation failed!\n");
-    }
-} else {
-    if (system("staticroutes $pid $eid")) {
-	cleanup();
-	die("*** $0:\n".
-	    "    Static route calculation failed!\n");
+	    "    ipassign_wrapper failed!\n");
     }
 }
 
 #
-# Generate a linkmap for new router calculation. This is done as an option
-# to staticroutes, and is really fast, so we can do it all the time. We
-# of course have to run it after ipassign_wrapper runs so that the IPs are
-# set. Note the routertype slot in the DB indicates to not generate static
-# routes now, when we are using the new distributed Dijkstra setup.
-#
-# Eventually staticroutes and ipassign_wrapper should look at routertype
-# slot and generate this map when it equals 'static-ddijk'.
-#
-if (system("staticroutes -j -f $pid $eid")) {
+# Fire up the route calculator. 
+# 
+TBDebugTimeStamp("static route calculator started");
+print "Setting up static routes (if requested) ... \n";
+
+if (system("staticroutes $pid $eid")) {
     cleanup();
     die("*** $0:\n".
-	"    staticroutes linkmap generation failed!\n");
+	"    Static route calculation failed!\n");
 }
 
 #
 # Generate a topo map that is used by the remote nodes to create the
 # routes (ddijk) and the /etc/hosts file.
 #
+TBDebugTimeStamp("gentopofile started");
+print "Generating topomap ...\n";
+
 if (system("gentopofile $pid $eid")) {
     cleanup();
     die("*** $0:\n".
 	"    gentopofile failed!\n");
 }
-
-TBDebugTimeStamp("routes finished");
-print "Static routing done! " . TBTimeStamp() . "\n";
 
 TBDebugTimeStamp("tbprerun finished");
 print "Pre run finished. " . TBTimeStamp() . "\n";
