@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -123,6 +123,21 @@ TBDebugTimeStamp("portstats finished");
 print "Rebooting all nodes\n";
 TBDebugTimeStamp("node reboot started");
 foreach my $node ( @nodes ) {
+    #
+    # Must duplicate a check that would be done in node_reboot if we
+    # gave it the entire list. No point in rebooting local jails.
+    #
+    my $jailed;
+    
+    if (TBIsNodeVirtual($node, \$jailed)) {
+	if (! $jailed) {
+	    next;
+	}
+	if (! TBIsNodeRemote($node) {
+	    next;
+	}
+    }
+    
     if (system("$nodereboot $node")) {
 	die("*** $0:\n".
 	    "    Failed to reboot node $node!\n");
