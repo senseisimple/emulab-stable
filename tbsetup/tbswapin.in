@@ -53,11 +53,6 @@ sub cleanup {
 	if (system("snmpit -r $pid $eid")) {
 	    print STDERR "*** Failed to clean up VLANs\n";
 	}
-
-	print STDERR "Backing up VLAN configuration\n";
-	if (system("savevlans")) {
-	    print STDERR "*** WARNING: Failed to back up VLAN configuration\n";
-	}
     }
     
     print STDERR "Freeing up nodes.\n";
@@ -126,14 +121,6 @@ if (system("snmpit -t $pid $eid")) {
 # An error now means that the VLANS need to be cleaned up.
 #
 $cleanvlans = 1;
-
-print "Backing up VLAN configuration.\n";
-if (system("savevlans")) {
-    print STDERR "*** WARNING: Failed to back up VLAN configuration.\n";
-    #
-    # This is a non-fatal error.
-    # 
-}
 
 print "Setting up mountpoints.\n";
 if (system("exports_setup")) {

@@ -94,11 +94,6 @@ if (! $TESTMODE) {
 	print STDERR "*** Failed to reset VLANs.\n";
 	$errors = 1;
     }
-    
-    print "Backing up VLAN configuration.\n";
-    if (system("savevlans")) {
-	print STDERR "*** WARNING: Failed to back up VLAN configuration.\n";
-    }
 }
     
 print "Freeing resources.\n";
