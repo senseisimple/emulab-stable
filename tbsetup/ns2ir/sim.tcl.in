@@ -622,3 +622,10 @@ Simulator instproc add_program {prog} {
     $self instvar prog_list
     set prog_list($prog) {}
 }
+
+# cost
+# Set the cost for a link
+Simulator instproc cost {src dst c} {
+    set reallink [$self find_link $src $dst]
+    $reallink set cost([list $src [$reallink get_port $src]]) $c
+}

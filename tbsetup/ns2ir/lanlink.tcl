@@ -134,6 +134,7 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar rdelay
     $self instvar loss
     $self instvar rloss
+    $self instvar cost
 
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
@@ -143,6 +144,7 @@ LanLink instproc init {s nodes bw d type} {
 	set rdelay($nodepair) [expr $d / 2.0]
 	set loss($nodepair) 0
 	set rloss($nodepair) 0
+	set cost($nodepair) 1
 	lappend nodelist $nodepair
     }
 }
@@ -224,6 +226,19 @@ LanLink instproc get_subnet {} {
 
     return [$node ip $port]
 }
+
+#
+# Set the routing cost for all interfaces on this LAN
+#
+LanLink instproc cost {c} {
+    $self instvar nodelist
+    $self instvar cost
+
+    foreach nodeport $nodelist {
+	set cost($nodeport) $c
+    }
+}
+
 
 Link instproc rename {old new} {
     $self next $old $new
@@ -334,11 +349,12 @@ LanLink instproc updatedb {DB} {
     $self instvar rdelay
     $self instvar loss
     $self instvar rloss
+    $self instvar cost
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport))"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport))"
     }
 }
