@@ -190,6 +190,12 @@ if ($mereuser &&
 # We test this by creating the file. Its going to get wiped anyway.
 #
 my $filename = $imageid_row{'path'};
+my $isglobal = $imageid_row{'global'};
+
+#
+# If a global image, make up a name. Admin person will need to copy image
+# to boss.
+#
 
 # Untaint. Very silly.
 if ($filename =~ /^([-\w\.\/\+]+)$/) {
@@ -410,7 +416,8 @@ if ($cursize > $maximagesize) {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
 
-print "Image creation succeeded.  Final size: $cursize bytes. \n";
+print "Image creation succeeded. ".
+      "Final size: " . (stat($filename))[7] . " bytes.\n";
 
 SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
