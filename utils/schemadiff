@@ -77,8 +77,7 @@ compare_keys($schema1,$schema2,@common_tables);
 # of a hash, indexed by table name. Each table is a hash ref containing:
 # PRIMARY: A hash containing the primary keys. Indexed by key, value is
 #       set to 1 for all keys that are primary
-# KEYS: Indexed by key, value is the name of the key if any, or 1 if it
-#       has no keys
+# KEYS: Indexed by key name, value is the columns used by the key
 # COLUMNS: A hash reference, indexed by column, containing the create 
 #       definition for that column
 # ORDERED_COLUMNS: An array reference, containing all of the columns in
@@ -139,7 +138,7 @@ sub read_schema($) {
 		debug("Putting key $key in table $table_name\n");
 
 		if ($name) {
-		    $tables{$table_name}{KEYS}{$key} = $name;
+		    $tables{$table_name}{KEYS}{$name} = $key;
 		} else { 
 		    die "Found a key without a name: $key\n";
 		}
@@ -228,8 +227,8 @@ sub compare_tables($$) {
 		push @out, "  PRIMARY KEY (" . $primary . ")";
 	    }
 
-	    foreach my $key (keys %{$schema2->{$table}{KEYS}}) {
-		my $name = $schema2->{$table}{KEYS}{$key};
+	    foreach my $name (keys %{$schema2->{$table}{KEYS}}) {
+		my $key = $schema2->{$table}{KEYS}{$name};
 		push @out, "  KEY $name (" . $key . ")";
 	    }
 
@@ -279,28 +278,35 @@ sub compare_keys($$@) {
     # Check the regular keys
     #
     foreach my $table (@tables) {
-	my ($added, $removed, $common) =
+	my ($removed, $added, $common) =
 	    diff_keys($schema1->{$table}{KEYS},$schema2->{$table}{KEYS});
 
-	foreach my $key (@$added) {
-	    my $name = $schema1->{$table}{KEYS}{$key};
+	foreach my $name (@$added) {
+	    my $key = $schema2->{$table}{KEYS}{$name};
 	    print "# Key $name ($key) was added to table $table\n";
 	    if ($sql) {
-		print "ALTER TABLE $table ADD INDEX $key ($key);\n\n";
+		print "ALTER TABLE $table ADD INDEX $name ($key);\n\n";
 	    }
 	}
 
-	foreach my $key (@$removed) {
-	    my $name = $schema2->{$table}{KEYS}{$key};
+	foreach my $name (@$removed) {
+	    my $key = $schema1->{$table}{KEYS}{$name};
 	    print "# Key $name ($key) was removed from table $table\n";
 	    if ($sql) {
-		print "ALTER TABLE $table DROP INDEX $name ($key);\n\n";
+		print "ALTER TABLE $table DROP INDEX $name;\n\n";
 	    }
 	}
 
     }
 }
 
+#
+# Compare the columns of two schemas. Only operates on tables given
+# in the third argument, so that tables that have been added or removed can
+# be ignored. In addition to added and removed columns, it detects changed
+# (same name but different definitions) and renamed (same definition but 
+# different names) columns
+#
 sub compare_columns($$@) {
     my ($schema1,$schema2,@tables) = @_;
 
@@ -421,7 +427,7 @@ sub compare_columns($$@) {
 }
 
 #
-# Given two different hash references, return refereces to three keys:
+# Given two different hash references, return refereces to three arrays:
 # The keys that are in the first hash, but not the second
 # The keys that are in the second hash, but not the first
 # They keys that are in both hashes
