@@ -434,6 +434,12 @@ If you want to schedule starts and stops using dynamic events:
 	tevc -e testbed/myexp now prog0 start
 	tevc -e testbed/myexp now prog1 start
 	tevc -e testbed/myexp +20 prog1 stop</code></pre>
+
+If you want to change the command that is run (override the command
+you specified in your NS file), then:
+
+	<code><pre>
+	tevc -e testbed/myexp now prog0 start COMMAND='ls >/tmp/foo'</code></pre>
 	
 Some points worth mentioning:
 
@@ -450,5 +456,7 @@ Some points worth mentioning:
 <li> The "stop" command is implemented by sending a SIGTERM to the
      process group leader (the csh process). If the SIGTERM fails, a
      SIGKILL is sent.
+
+<li> If you override 
 </ul>
 
