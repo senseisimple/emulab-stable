@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -171,20 +171,38 @@ echo "<center>
       <h3>Profile</h3>
       </center>\n";
 
-SHOWUSER($target_uid);
-
+SUBPAGESTART();
+SUBMENUSTART("User Options");
 #
-# Edit option.
-#
-if ($isadmin ||
-    TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
+# Permission check not needed; if the user can view this page, they can
+# generally access these subpages, but if not, the subpage will still whine.
+# 
+WRITESUBMENUBUTTON("Edit Profile",  "moduserinfo.php3?target_uid=$target_uid");
 
-    echo "<br><br><center>
-           <A href='moduserinfo.php3?target_uid=$target_uid'>
-              Edit Profile?</a>
-         </center>\n";
+if ($isadmin || !strcmp($uid, $target_uid)) {
+    WRITESUBMENUBUTTON("Edit SSH Keys",
+		       "showpubkeys.php3?target_uid=$target_uid");
+    WRITESUBMENUBUTTON("Edit SFS Keys",
+		       "showsfskeys.php3?target_uid=$target_uid");
 }
-    
+
+if ($isadmin) {
+    if (!strcmp(TBUserStatus($target_uid), TBDB_USERSTATUS_FROZEN)) {
+	WRITESUBMENUBUTTON("Thaw User",
+		   "freezeuser.php3?target_uid=$target_uid&action=thaw");
+    }
+    else {
+	WRITESUBMENUBUTTON("Freeze User",
+		   "freezeuser.php3?target_uid=$target_uid&action=freeze");
+    }
+    WRITESUBMENUBUTTON("Delete User",
+		       "deleteuser.php3?target_uid=$target_uid");
+}
+SUBMENUEND();
+
+SHOWUSER($target_uid);
+SUBPAGEEND();
+
 #
 # Standard Testbed Footer
 # 
