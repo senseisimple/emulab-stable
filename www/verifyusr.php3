@@ -7,8 +7,9 @@ include("defs.php3");
 PAGEHEADER("Confirm Verification");
 
 #
-# Only known and logged in users can be verified. UID came in as a post var.
+# Only known and logged in users can be verified. 
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #

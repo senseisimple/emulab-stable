@@ -42,8 +42,11 @@ $THISHOMEBASE   = "Emulab.Net";
 $THISPROJECT    = "The Utah Network Testbed";
 
 #
-# Links back to Flux web Pages
-#
+# This just spits out an email address in a page, so it does not need
+# to be configured per development tree. It could be though ...
+# 
+$TBMAILADDR     = "<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+                   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>";
 
 #
 # Database constants and the like.

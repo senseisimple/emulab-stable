@@ -56,6 +56,7 @@ if ($retval) {
           }
     echo "</XMP>\n";
     
+    PAGEFOOTER();
     die("");
 }
 

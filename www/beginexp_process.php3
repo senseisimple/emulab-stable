@@ -36,9 +36,9 @@ if (!isset($exp_created) ||
 }
 
 #
-# Only known and logged in users can begin experiments. Name came in as
-# a POST var.
+# Only known and logged in users can begin experiments. 
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -210,9 +210,8 @@ if ($nonsfile) {
 }
 
 echo "<center><br>";
-echo "<h3>Starting experiment configuration. Please wait a moment ...
-          </center><br><br>
-      </h3>";
+echo "<h2>Starting experiment configuration. Please wait a moment ...
+      </h2></center>";
 
 flush();
 
@@ -260,15 +259,19 @@ if ($retval) {
     $query_result = mysql_db_query($TBDBNAME,
 	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
 
+    PAGEFOOTER();
     die("");
 }
 
-echo "<center><br>";
-echo "<h2>Experiment `$exp_id' in project `$exp_pid' is configuring!<br><br>
-          You will be notified via email when the experiment has been fully<br>
-	  configured and you are able to proceed.<br>";
-echo "</h2>";
-echo "</center>\n";
+echo "<br><br>";
+echo "<h3>
+        Experiment `$exp_id' in project `$exp_pid' is configuring!<br><br>
+        You will be notified via email when the experiment has been fully
+	configured and you are able to proceed. This typically takes less
+        than 10 minutes, depending on the number of nodes you have requested.
+        If you do not receive email notification within a reasonable amount
+        of time, please contact $TBMAILADDR.
+      </h3>\n";
 
 #
 # Standard Testbed Footer

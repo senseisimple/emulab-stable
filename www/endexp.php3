@@ -156,9 +156,8 @@ $gid = $row[0];
 #   tbstopit <pid> <eid>
 #
 echo "<center><br>";
-echo "<h3>Starting experiment termination. Please wait a moment ...
-          </center><br><br>
-      </h3>";
+echo "<h2>Starting experiment termination. Please wait a moment ...
+      </h2></center>";
 
 flush();
 
@@ -183,15 +182,19 @@ if ($retval) {
           }
     echo "</XMP>\n";
 
+    PAGEFOOTER();
     die("");
 }
 
-echo "<center><br>";
-echo "<h2>Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
-          You will be notified via email when the experiment has been torn<br>
-	  down, and you can reuse the experiment name.<br>";
-echo "</h2>";
-echo "</center>\n";
+echo "<br><br>";
+echo "<h3>
+        Experiment `$exp_eid' in project `$exp_pid' is terminating!<br><br>
+        You will be notified via email when the experiment has been torn
+	down, and you can reuse the experiment name.
+        This typically takes less than 5 minutes.
+        If you do not receive email notification within a reasonable amount
+        of time, please contact $TBMAILADDR.
+      </h3>\n";
 
 #
 # Standard Testbed Footer

@@ -1,0 +1,27 @@
+<html>
+<head>
+	<title>Emulab.Net - Access Error</title>
+</head>
+<body bgcolor="#EEEEFF">
+<basefont size=4>
+
+<center>
+<h2>
+Access Error!
+</h2>
+</center>
+
+<h3>
+The URL you gave:
+http://www.emulab.net<!--#echo var="REQUEST_URI" -->
+is not available or is broken.
+</h3>
+
+Please contact 
+<a href="mailto:testbed-ops@fast.cs.utah.edu">
+Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+if you didn't merely mis-type something.
+<p>
+
+</body>
+</html>

@@ -12,24 +12,15 @@ PAGEHEADER("New User Verification");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-?>
+echo "<p><h3>
+      The purpose of this page is to verify, for security purposes, that
+      information given in your application is correct. If you never
+      received a key at the email address given on your application, please
+      contact $TBMAILADDR for further assistance.
+      </h3><p>\n";
 
-<p>
-The purpose of this page is to verify, for security purposes, that
-information given in your application is correct. If you never
-received a key at the email address given on your application, please
-contact <a href="mailto:testbed-ops@flux.cs.utah.edu"> Testbed Ops
-(testbed-ops@flux.cs.utah.edu)</a> for further assistance.
-<p>
-
-<?php
 echo "<table align=\"center\" border=\"1\">
       <form action=\"verifyusr.php3\" method=\"post\">\n";
-
-echo "<tr>
-          <td>Username:</td>
-          <td><input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
-      </tr>\n";
 
 echo "<tr>
           <td>Key:</td>

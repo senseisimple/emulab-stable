@@ -117,8 +117,7 @@ $gid = $row[0];
 #
 echo "<center><br>";
 echo "<h3>Starting Batch Mode Experiment Cancelation. Please wait a moment ...
-          </center><br><br>
-      </h3>";
+      </h3></center>\n";
 
 flush();
 
@@ -143,10 +142,11 @@ if ($retval && $retval != 1) {
           }
     echo "</XMP>\n";
 
+    PAGEFOOTER();
     die("");
 }
 
-echo "<center><h2><br>";
+echo "<br><br><h2>
 #
 # Exit status 0 means cancelation was immediate.
 # Exit status 1 means the experiment was running, and will terminate later.
@@ -154,14 +154,16 @@ echo "<center><h2><br>";
 if ($retval) {
 	echo "Cancelation has started<br><br>
               You will be notified via email when the process has completed,
-    	      and you can reuse the experiment name.<br><br>
-              This might take a few minutes. Please be patient.\n";
+    	      and you can reuse the experiment name.
+              This typically takes less than 5 minutes.
+              If you do not receive email notification within a reasonable
+              amount of time, please contact $TBMAILADDR.\n";
 }
 else {
 	echo "Batchmode Experiment $exp_eid in project $exp_pid has
               been canceled!\n";
 }
-echo "</center></h2>\n";
+echo "</h2>\n";
 
 #
 # Standard Testbed Footer

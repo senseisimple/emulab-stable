@@ -32,9 +32,9 @@ if (!isset($exp_name) ||
 }
 
 #
-# Only known and logged in users can begin experiments. Name came in as
-# a POST var.
+# Only known and logged in users can begin experiments.
 #
+$uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
@@ -141,9 +141,8 @@ chmod($tmpfname, 0666);
 chmod($exp_nsfile, 0666);
 
 echo "<center><br>";
-echo "<h3>Starting batch experiment setup. Please wait a moment ...
-          </center><br><br>
-      </h3>";
+echo "<h2>Starting batch experiment setup. Please wait a moment ...
+      </h2></center>";
 
 flush();
 
@@ -175,14 +174,19 @@ if ($retval) {
           }
     echo "</XMP>\n";
     
+    PAGEFOOTER();
     die("");
 }
 
-echo "<center><br>";
-echo "<h2>Experiment `$exp_id' in project `$exp_pid' has been batched!<br><br>
-          You will be notified via email when the experiment has been run<br>";
-echo "</h2>";
-echo "</center>\n";
+echo "<br><br>";
+echo "<h2>
+       Experiment `$exp_id' in project `$exp_pid' has been batched!<br><br>
+       Your experiment will be run when enough resources become available.
+       This might happen immediately, or it may take hours or days.
+       You will be notified via email when the experiment has been run.
+       If you do not receive email notification within a reasonable amount
+       of time, please contact $TBMAILADDR.
+      </h2>\n";
 
 #
 # Standard Testbed Footer

@@ -42,15 +42,6 @@ echo "<form enctype=\"multipart/form-data\"
             action=\"beginexp_process.php3\" method=\"post\">\n";
 
 #
-# UID to feed back. 
-# 
-echo "<tr>
-          <td>*Username:</td>
-          <td class=\"left\"> 
-              <input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
-      </tr>\n";
-
-#
 # Select Project
 #
 echo "<tr>

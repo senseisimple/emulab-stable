@@ -26,6 +26,7 @@ FILES  += $(wildcard $(SRCDIR)/*.jpg)
 FILES  += $(wildcard $(SRCDIR)/*.gif)
 FILES  += $(wildcard $(SRCDIR)/*.html)
 FILES  += $(wildcard $(SRCDIR)/*.php3)
+FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml
 
 PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)

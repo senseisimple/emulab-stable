@@ -169,7 +169,7 @@ function WRITESIDEBAR() {
     #
     # Now the login/logout box. Remember, already inside a table.
     # 
-    echo "<form action=\"index.php3\" method=post>\n";
+    echo "<form action=\"${TBBASE}index.php3\" method=post>\n";
     if ($login_status == $STATUS_LOGGEDIN) {
 	echo "<tr>
                 <td><input type=hidden name=uid value=\"$uid\"></td>
@@ -440,7 +440,7 @@ function ENDPAGE() {
 # Spit out a vanilla page footer.
 #
 function PAGEFOOTER() {
-    global $TBBASE;
+    global $TBBASE, $TBMAILADDR;
 
     ENDPAGE();
 
@@ -454,9 +454,8 @@ function PAGEFOOTER() {
           </center>
          <p align=right>
          <font size=-2>
-          Problems? Contact
-                    <a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
-                       Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+          Problems? Contact $TBMAILADDR
+          </font>
           </body>
           </html>\n";
 }
