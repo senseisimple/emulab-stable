@@ -1,0 +1,56 @@
+##### Configuration suggestions for Cisco switches
+##### Last updated February 27, 2002
+
+This file contains some configuration guidelines that we (Utah) have found
+useful to improve the performance of our Cisco swtiches.
+
+All commands given are to be typed at the (enable) prompt on your cisco
+switches. They are for CatOS - switches that run IOS may not have these
+commands.
+
+<ports> means a list of ports, which on the CatOS command line, can include
+lists and rages, such as "3/1,3/2" or "3/1-48" or "3/1-48,4/1-48,5/1-48"
+
+##### Allowing ports to come up quicker
+
+This one is useful on both the experimental and control nets:
+    set spantree portfast <ports> enable
+Use this on all ports that are directly connected to nodes, servers, power
+controllers - anything that is not another switch. Normally, the switch waits
+a while (several seconds) when a port first comes up before forwarding traffic
+from this port - it does so to prevent loops in the switch topolgy. The main
+place you will see the benefit of this is on the control net - with portfast
+disabled, the first few DHCP packets sent by booting nodes will get dropped,
+causing the DHCP to take much longer than necessary.
+
+##### Reducing stray traffic
+
+Disable spanning tree (STP.) If on, STP sends out pakcets approximately every
+two seconds on every port. You can disable it on all VLANs with the command
+    set spantree disable all
+There are two major consequences (for our purposes) of disabling STP:
+    1) You cannot have _any_ loops in your switch toplogy, or bad things will
+	happen.
+    2) VLAN pruning on trunks won't work, causing broadcast traffic to be
+	forwarded accross trunks that it does not need to cross. We've added
+	features to snmpit to manually do STP's job in this case, so this
+	problem is taken care of.
+You must have STP disabled on _all_ switches that are trunked together! If it
+is enabled on even one, STP traffic will be seen on all of them. 
+
+The switch doesn't trust you to use portfast responsibly. So, it has a
+'bpdu-guard' feature that helps guard against loops. Turn off this feature
+with the command:
+    set spantree portfast bpdu-guard disable
+
+Cisco uses a protocol called 'CDP' to discover other Cisco devices. This sends
+out small packets every two minutes. You can disable it with:
+    set cdp disable <ports>
+Ideally, you should only disable CDP on ports that don't have other Cisco 
+devices attached, but in practice, running with CDP disabled on all ports is
+fine.
+
+Switch ports will, by default, try to negotiate trunking and channeling.
+Cisco provides a handy macro:
+    set port host <ports>
+to disable both of these. Also enables portfast on the ports.
