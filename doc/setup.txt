@@ -146,31 +146,16 @@ rc.d script in the rc.d/ directory of the testbed CVS tree)
 
 Apache - You should have installed apache with mod_ssl, and php3 (NOTE: Version
 3.0.17 is known to have broken file uploading support. Use 3.0.16 or 3.0.18 -
-newer versions are likely to work as well.) Make sure to copy over the old
-apache.conf file, and SSL certificates. If generating new ones, the importnat
-Apache configuration options to set (and our values for them) are: (NOTE: these
-were taken directly from our config file, but they should make sense if you
-have experience with Apache config files)
-ServerAdmin	webadmin@fast.cs.utah.edu
-DocumentRoot	"/usr/testbed/www"
-<Directory "/usr/testbed/www">
-	Options Indexes FollowSymLinks MultiViews
-	AllowOverride All
-	Order allow,deny
-	Allow from all
-</Directory>
-ErrorLog /usr/testbed/log/apache_error_log
-CustomLog /usr/testbed/log/apache_access_log combined
-<VirtualHost _default_:443>
-DocumentRoot "/usr/testbed/www"
-ServerName www.emulab.net
-ServerAdmin testbed-ops@fast.cs.utah.edu
-ErrorLog /usr/testbed/log/apache_error_log
-TransferLog /usr/testbed/log/apache_access_log
-...
-</VirtualHost>
-Make sure SSL and mod_php are enabled (which is done for you if you install the
-FreeBSD port)
+newer versions are likely to work as well.) We have an auto-generated config
+file that you can install by changing to the apache subdir of your build tree
+and running 'gmake install'. Some apache installtions may expect to find their
+config file at /usr/local/etc/apache/httpd.conf, rather than apache.conf (where
+ours gets installed.) Just symlink apache.conf to httpd.conf if you have
+trouble with this. Also our config file expects to find SSL certificates in:
+/usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
+SSLCertificateKeyFile /usr/local/etc/apache/ssl.key/www.<sitename>.net.key
+(where <sitename> is OURSITE from the configure defs file.) Make sure yours
+go there, or edit the apache.conf file appropriately.
 
 Cron jobs: We currently have two cron jobs running for the testbed. Both can be
 run out of /etc/crontab
