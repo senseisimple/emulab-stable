@@ -1009,8 +1009,8 @@ while (1) {
     # if updating (-u), include any resources that may already be
     # allocated to experiment in the PTOP results.
     #
-    my $ptopargs = "";
-    $ptopargs   .= "-e $pid/$eid "
+    my $ptopargs = "-p $pid ";
+    $ptopargs   .= "-e $eid "
 	if ($updating);
     $ptopargs   .= "-m $multiplex_factor "
 	if (defined($multiplex_factor));

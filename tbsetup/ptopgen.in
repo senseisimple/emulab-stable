@@ -11,17 +11,22 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: ptopgen [-v] [-s switch] [-e pid/eid] [-m factor]\n" .
-                 "       -e include given experiment's resources\n" .
-                 "          in the ptopfile (as if they were free)\n" .
-		 "       -v Include stuff for topologies with virtual nodes\n".
-		 "       -m Override multiplex_factor\n";
+    print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor]\n" .
+	  "       -p include nodes the project has permission to use\n".
+	  "       -e include given experiment's resources\n" .
+	  "          in the ptopfile (as if they were free)\n" .
+	  "       -v Include stuff for topologies with virtual nodes\n".
+	  "       -m Override multiplex_factor\n");
     exit(-1);
 }
-my $optlist = "s:e:m:v";
+my $optlist = "s:e:m:vp:";
 my $mfactor;
 my $virtstuff = 0;
 
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 # Settings - Change these to your particular network.
 
@@ -43,15 +48,16 @@ use libdb;
 
 my $TRACK_INTERSWITCH_BANDWIDTH = "@TRACK_INTERSWITCH_BANDWIDTH@";
 
-%switches=();
-%used_switches=();
-my $switchtouse;
+my %switches	  = ();
+my %used_switches = ();
+my %permissions   = ();
 
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
 
-my $exempt_pid;
+my $pid;
 my $exempt_eid;
+my $switchtouse;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -73,10 +79,13 @@ if (defined($options{"m"})) {
 if (defined($options{"v"})) {
     $virtstuff = 1;
 }
-
+if (defined($options{"p"})) {
+    $pid = $options{"p"};
+}
 if (defined($options{"e"})) {
-    ($exempt_pid, $exempt_eid) = split( /\//, $options{"e"} );
-    if (!defined($exempt_eid)) { usage(); }
+    $exempt_eid = $options{"e"};
+    usage()
+	if (!defined($pid));
 }
 
 # Read class/type maps
@@ -87,8 +96,45 @@ while (($class,$type,$delaycapacity,$vcap) = $result->fetchrow_array) {
     $classes{$type} = $class;
     $nodetypes{$type} = $delaycapacity;
     $virtcapacity{$type} = $vcap;
+
+    # Default is permission to use all types,classes. 
+    $permissions{$class} = 1;
+    $permissions{$type}  = 1;
 }
-$result->finish;
+
+#
+# Read the features table for each type.
+# 
+$result = DBQueryFatal("select type, feature, weight from node_type_features");
+while (my ($type, $feature, $weight) = $result->fetchrow()) {
+    if (! defined($features{$type})) {
+	$features{$type} = "$feature:$weight";
+	next;
+    }
+    $features{$type} .= " $feature:$weight";
+}
+
+#
+# Read the permission table if given a pid. If there is an entry in
+# the table for a type/class, then permission is granted only if there
+# is a record with the pid. If not, remove the permission granted above.
+# 
+if (defined($pid)) {
+    $result =
+	DBQueryFatal("select type from nodetypeXpid_permissions");
+    
+    while (my ($type) = $result->fetchrow_array) {
+	$permissions{$type} = 0;
+    }
+    
+    $result =
+	DBQueryFatal("select type from nodetypeXpid_permissions ".
+		     "where pid='$pid'");
+    
+    while (my ($type) = $result->fetchrow_array) {
+	$permissions{$type} = 1;
+    }
+}
 
 # switches can't delay
 $nodetypes{"switch"} = 0;
@@ -106,7 +152,6 @@ else {
 	print "node $switch switch:1 *lan:*\n";
 	$switches{$switch} = 1;
     }
-    $result->finish;
 }
 
 # Find available nodes
@@ -116,11 +161,18 @@ else {
 # not in the hwdown group. Either way, the the underlying physnode has
 # to be "up", as determined by the autostatus stuff; this will prevent us
 # from allocating a dead virtual node to an experiment. 
-# This is especially hacky. We need another mechanism for this.
+# This is especially hacky. We need another mechanism for this. We only
+# add virtnodes when assign says we need them. This reduces the problem
+# size for assign!
 #
-my $pc601hack_only = "a.type='pc601' and";
-my $pc601hack_none = "a.type!='pc601' and";
-my $pcvmhack       = "(t.class!='pcvm') and ";
+my $virtnode_condition = "";
+
+if ($virtstuff) {
+    $virtnode_condition = " or ".
+	"       (a.role='virtnode' and ns.status='up' and ".
+	"        (m.node_id is null or ".
+	"         m.pid!='$DEADPID' or m.eid!='$DEADEID')) ";
+}
 
 # the ordinary free condition for a node
 my $free_condition = "(b.node_id is null)";
@@ -129,34 +181,28 @@ my $free_condition = "(b.node_id is null)";
 # then view any node which is reserved to that experiment as available.
 if (defined($exempt_eid)) {
     $free_condition = "($free_condition or ".
-	"(b.pid='$exempt_pid' and b.eid='$exempt_eid'))"; 
+	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
 
 $result =
-    DBQueryFatal("select a.node_id,a.type from nodes as a ".
+    DBQueryFatal("select a.node_id,a.type,t.class from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join node_status as ns on a.phys_nodeid=ns.node_id ".
 		 "left join node_types as t on t.type=a.type ".
-		 "where $free_condition and $pcvmhack ".
-		 "      $pc601hack_none ".
-		 "      (a.role='testnode' or ".
-		 "       (a.role='virtnode' and ns.status='up' and ".
-		 "        (m.node_id is null or ".
-		 "         m.pid!='$DEADPID' or m.eid!='$DEADEID')))");
+		 "where $free_condition and ".
+		 "      (a.role='testnode' $virtnode_condition)");
 
-while (($node,$type) = $result->fetchrow_array) {
-    # Shark hack
-    if (($shelf,$number) = ($node =~ /^sh(\d+)-(\d+)/)) {
-	if ($number == 1) {
-	    $nodes{"sh$shelf"} = "shark-shelf";
-	}
-    } else {
-	$nodes{$node} = $type;
-    }
+#
+# Scan the results, checking permissions and adding to the list
+# You get to use a node type if no pid was specified (that is, you get
+# to use all nodes), or if there is no entry as all in 
+
+while (($node,$type,$class) = $result->fetchrow_array) {
+    $nodes{$node} = $type
+	if (!defined($pid) ||
+	    ($permissions{$type} && $permissions{$class}));
 }
-$result->finish;
-
 
 $sharklinks = "";
 
@@ -164,52 +210,53 @@ $sharklinks = "";
 
 
 foreach $node (keys(%nodes)) {
-    if ($node =~ /^sh/) {
-	print "node $node shark-shelf:1\n";
-    } else {
-	$text = "node $node $nodes{$node}:1 $classes{$nodes{$node}}:1";
-	$delay_capacity = $nodetypes{$nodes{$node}};
-	$virtnode_capacity = $virtcapacity{$nodes{$node}};
-	if ($delay_capacity > 0) {
-	    $text .= " delay:$delay_capacity";
+    my $type = $nodes{$node};
+    
+    $text = "node $node $type:1 $classes{$type}:1";
+    $delay_capacity = $nodetypes{$type};
+    $virtnode_capacity = $virtcapacity{$type};
+    
+    if ($delay_capacity > 0) {
+	$text .= " delay:$delay_capacity";
 	    
-            #################################################################
-            ### NSE Node hack. Instead of adding sim nodes into the
-            ### database schema, I'm just adding it here for now
-            ### untill we can figure out how to add sim nodes into the
-            ### nodes table.  One assumption is that if we the node
-            ### type can support delay nodes, then it is a local node
-            ### and therefore we can support sim nodes
-            #################################################################
-            $text .= " sim:100000";
-	}
-
-	$features = get_features($node,$nodes{$node});
-
-	if ($virtstuff && $virtnode_capacity > 0) {
-	    #
-	    # Ditto for jailed nodes
-	    #
-	    if (defined($mfactor)) {
-		$text .= " pcvm:$mfactor";
-	    }
-	    else {
-		$text .= " pcvm:$virtnode_capacity";
-	    }
-	    $text .= " *lan:*";
-	    # Add features
-	    if ($features) {
-		$text .= " - $features";
-	    } else {
-		$text .= " -";
-	    }
-	    # Add trivial bw spec.
-	    $text .= " - trivial_bw:400000";
-	} else {
-	    $text .= " - $features";
-	}
-	print "$text\n";
+	#################################################################
+	### NSE Node hack. Instead of adding sim nodes into the
+	### database schema, I'm just adding it here for now
+	### untill we can figure out how to add sim nodes into the
+	### nodes table.  One assumption is that if we the node
+	### type can support delay nodes, then it is a local node
+	### and therefore we can support sim nodes
+	#################################################################
+	$text .= " sim:100000";
     }
+
+    if ($virtstuff && $virtnode_capacity > 0) {
+	#
+	# Ditto for jailed nodes
+	#
+	if (defined($mfactor)) {
+	    $text .= " pcvm:$mfactor";
+	}
+	else {
+	    $text .= " pcvm:$virtnode_capacity";
+	}
+	$text .= " *lan:*";
+	# Add features
+	if (defined($features{$type})) {
+	    $text .= " - $features{$type}";
+	} else {
+	    $text .= " -";
+	}
+	# Add trivial bw spec.
+	$text .= " - trivial_bw:400000";
+    } else {
+	if (defined($features{$type})) {
+	    $text .= " - $features{$type}";
+	} else {
+	    $text .= " -";
+	}
+    }
+    print "$text\n";
 }
 
 # Read interfaces
@@ -221,14 +268,12 @@ while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
 	$interfacetypes{"$node:$card:$port"} = $type;
     }
 }
-$result->finish;
 
 # Read interface types
 $result = DBQueryFatal("SELECT type,max_speed from interface_types");
 while (($type,$speed) = $result->fetchrow_array) {
     $interfacespeeds{$type} = $speed;
 }
-$result->finish;
 
 # Read interface switches
 $result = DBQueryFatal("SELECT node_id1, iface, node_id2 FROM wires AS w " .
@@ -238,16 +283,12 @@ while (($node,$iface,$switch) = $result->fetchrow_array) {
 	$interfaceswitches{"$node:$iface"} = $switch;
     }
 }
-$result->finish;
 
 # Read interface cards and ports
 $result = DBQueryFatal("SELECT node_id, iface, card, port FROM interfaces");
 while (($node,$iface,$card,$port) = $result->fetchrow_array) {
     $interfacecardports{"$node:$iface"} = [$card,$port];
 }
-$result->finish;
-
-
 
 $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\" or type=\"Trunk\"");
@@ -285,7 +326,6 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	}
     } 
 }
-$result->finish;
 
 #
 # If we're supposed to track interswitch bandwidth, subtract out the amount
@@ -386,22 +426,4 @@ sub get_ifacecardport {
     } else {
 	return ();
     }
-}
-
-sub get_features {
-    my ($node, $type) = (@_);
-    #
-    # We don't actually have a per-node feature table yet, so the node is
-    # ignored.
-    #
-
-    my @features;
-    my $result = DBQueryFatal("select feature, weight from " .
-	"node_type_features where type='$type'");
-    while (my ($feature, $weight) = $result->fetchrow()) {
-	push @features, "$feature:$weight";
-    }
-
-    return join(" ",@features);
-
 }
