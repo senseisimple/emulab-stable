@@ -162,6 +162,16 @@ int parse_top(tb_vgraph &VG, istream& i)
 	}
 
 	vedge e;
+	// Check to make sure the nodes in the link actually exist
+	if (vname2vertex.find(src) == vname2vertex.end()) {
+	  top_error("Bad link line, non-existent node.");
+	  continue;
+	}
+	if (vname2vertex.find(dst) == vname2vertex.end()) {
+	  top_error("Bad link line, non-existent node.");
+	  continue;
+	}
+
 	vvertex node1 = vname2vertex[src];
 	vvertex node2 = vname2vertex[dst];
 	e = add_edge(node1,node2,VG).first;

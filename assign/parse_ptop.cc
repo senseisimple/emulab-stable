@@ -193,6 +193,16 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
       }
 
 #define ISSWITCH(n) (n->types.find("switch") != n->types.end())
+      // Check to make sure the nodes in the link actually exist
+      if (pname2vertex.find(src) == pname2vertex.end()) {
+	  ptop_error("Bad link line, non-existent node.");
+	  continue;
+      }
+      if (pname2vertex.find(dst) == pname2vertex.end()) {
+	  ptop_error("Bad link line, non-existent node.");
+	  continue;
+      }
+
       pvertex srcv = pname2vertex[src];
       pvertex dstv = pname2vertex[dst];
       tb_pnode *srcnode = get(pvertex_pmap,srcv);
