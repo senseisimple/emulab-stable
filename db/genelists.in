@@ -155,7 +155,7 @@ if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
 my $now = time;
 utime $now, $now, $lockfile;
 
-foreach my $active ( "active", "recent", "all" ) {
+foreach my $active ( "active", "recent_users", "recent_projects", "all" ) {
     my $progarg;
     my $userlist;
     
@@ -176,7 +176,7 @@ foreach my $active ( "active", "recent", "all" ) {
 	            "$TBACTIVE";
 	$progarg  = "emulab-active-users";
     }
-    elsif ($active eq "recent") {
+    elsif ($active eq "recent_users") {
 	my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
 	print "Getting Recently Active Users\n" if $d;
 	# Recently active users on the testbed
@@ -191,6 +191,27 @@ foreach my $active ( "active", "recent", "all" ) {
 	$userlist = "$TBOPS\n".
 	            "$TBACTIVE";
 	$progarg  = "emulab-recently-active-users";
+    }
+    elsif ($active eq "recent_projects") {
+	my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
+	print "Getting Recently Active Users\n" if $d;
+	# Recently active projects (members) on the testbed
+	if (! ($query_result =
+	       DBQuery("select distinct u.usr_email from testbed_stats as t ".
+		       "left join experiment_stats as s on ".
+		       "     s.exptidx=t.exptidx ".
+		       "left join group_membership as p ".
+		       "     on s.pid=p.pid and p.pid=p.gid ".
+		       "left join users as u on u.uid=p.uid ".
+		       "where u.status='active' and ".
+		       "      ((UNIX_TIMESTAMP(now()) - ".
+		       "        UNIX_TIMESTAMP(t.end_time)) <= $limit) ".
+		       "order by u.usr_email"))) {
+	    DBFatal("Getting Recently Active Projects!");
+	}
+	$userlist = "$TBOPS\n".
+	            "$TBACTIVE";
+	$progarg  = "emulab-recently-active-projects";
     }
     elsif ($active eq "all") {
 	print "Getting All Users\n" if $d;
