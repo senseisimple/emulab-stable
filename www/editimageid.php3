@@ -17,6 +17,7 @@ PAGEHEADER("Edit Image Descriptor");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
 # Verify form arguments.
@@ -95,7 +96,7 @@ $query_string = "$query_string WHERE imageid='$imageid'";
 
 $insert_result = DBQueryFatal($query_string);
 
-SHOWIMAGEID($imageid, 0);
+SHOWIMAGEID($imageid, 0, $isadmin);
 
 #
 # Edit option.

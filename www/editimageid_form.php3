@@ -17,6 +17,7 @@ PAGEHEADER("Edit Image Descriptor");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
 
 #
 # Verify form arguments.
@@ -37,7 +38,7 @@ if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
     USERERROR("You do not have permission to access ImageID $imageid!", 1);
 }
 
-SHOWIMAGEID($imageid, 1);
+SHOWIMAGEID($imageid, 1, $isadmin);
 
 #
 # Standard Testbed Footer

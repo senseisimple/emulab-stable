@@ -844,7 +844,7 @@ function SHOWOSINFO($osid) {
 #
 # Show ImageID record.
 #
-function SHOWIMAGEID($imageid, $edit) {
+function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
     global $TBDBNAME;
 		
     $query_result =
@@ -1045,7 +1045,7 @@ function SHOWIMAGEID($imageid, $edit) {
             <td>Load Address: </td>
             <td class=left>\n";
 
-    if ($edit) {
+    if ($edit && $isadmin) {
 	echo "<input type=text name=loadaddr size=20
                      maxlength=256 value='$loadaddr'>";
     }
