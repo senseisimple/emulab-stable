@@ -27,6 +27,7 @@ example:
 	@$(MAKE) -C example all
 
 trafgen:
+	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
 	@$(MAKE) -C trafgen all
 
 delay-agent:
