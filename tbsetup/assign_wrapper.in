@@ -125,7 +125,8 @@ sub printdb {
 #  ips is indexed by nodeport and contains the IP addresses.
 #  lans is indexed by virtual lan and is a list of nodeport members.
 #  delayinfo is indexed by virtual lan:node:port and is a list of delay,
-#    bandwidth, lossrate.
+#    bandwidth, lossrate, rdelay, rbandwidth, rlossrate.  Where r* indicates
+#    switch->node and the others indicate node->switch.
 #  okbandwidths is indexed by bandwidth and is just a set.
 #  lannodes is indexed by physical name is the set of lan nodes.
 #  interfacespeed is indexed by type and contains the bandwidth.
@@ -200,14 +201,17 @@ while (($vname,$ips,$type,$fixed) = $result->fetchrow_array) {
 $result->finish;
 
 printdb "Loading virt_lans.\n";
-$result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate" .
-		     " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
-while (($vname,$member,$delay,$bandwidth,$lossrate) = $result->fetchrow_array) {
+$result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate," .
+		       "rdelay,rbandwidth,rlossrate" .
+		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
+while (($vname,$member,$delay,$bandwidth,$lossrate,
+	$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array) {
     if (! defined($lans{$vname})) {
 	$lans{$vname} = [];
     }
     push(@{$lans{$vname}},$member);
-    $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate];
+    $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate,
+				    $rdelay,$rbandwidth,$rlossrate];
     ($node,$port) = split(":",$member);
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
@@ -226,7 +230,7 @@ while (($vname,$member,$delay,$bandwidth,$lossrate) = $result->fetchrow_array) {
     }
     push(@{$nodelans{$node}},"$port:$vname");
     printdb "  portbw of $member = $portbw{$member}\n";
-    printdb "  $vname $member - $delay $bandwidth $lossrate\n";
+    printdb "  $vname $member - $delay $bandwidth $lossrate $rdelay $rbandwidth $rlossrate\n";
     printdb "    Added $port:$vname to nodelans of $node\n";
 }
 $result->finish;
@@ -251,7 +255,7 @@ foreach $lan (keys(%lans)) {
 	    join(" ",@$sharks) . ")\n";
 	$sharkshelfid++;
 	$sharkshelves{$shelfid} = $sharks;
-	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0];
+	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0,0,$S100Kbs,0.0];
 	push(@$realmembers,"$shelfid:uplink");
 	$nodes{$shelfid} = "shark-shelf";
     }
@@ -312,19 +316,32 @@ foreach $lan (keys(%lans)) {
 	($nodeport0,$nodeport1) = @members;
 	$node0 = (split(":",$nodeport0))[0];
 	$node1 = (split(":",$nodeport1))[0];
-	($delay0,$bw0,$loss0) = @{$delayinfo{"$lan:$nodeport0"}};
-	($delay1,$bw1,$loss1) = @{$delayinfo{"$lan:$nodeport1"}};
-	$delay = $delay0+$delay1;
-	$loss = 1-(1-$loss0)*(1-$loss1);
-	$bw = &min($bw0,$bw1);
-	$bandwidth = &getbandwidth(&min($bw0,$bw1));
-	if (($delay >= $delaythresh) ||
+	($delay0,$bw0,$loss0,
+	 $rdelay0,$rbw0,$rloss0) = @{$delayinfo{"$lan:$nodeport0"}};
+	($delay1,$bw1,$loss1,
+	 $rdelay1,$rbw1,$rloss1) = @{$delayinfo{"$lan:$nodeport1"}};
+	# Here the r's aregoing to be 1->0 and the others 0->1
+	$delay = $delay0+$rdelay1;
+	$loss = 1-(1-$loss0)*(1-$rloss1);
+	$bw = &min($bw0,$rbw1);
+	$rdelay = $rdelay0+$delay1;
+	$rloss = 1-(1-$rloss0)*(1-$loss1);
+	$rbw = &min($rbw0,$bw1);
+	$bandwidth = &getbandwidth(&min($bw0,$rbw1));
+	$rbandwidth = &getbandwidth(&min($rbw0,$bw1));
+	if ((($delay >= $delaythresh) ||
 	    (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
 	    (($delaywithswitch == 0) && 
 	     (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
-	    ($loss != 0)) {
+	     ($loss != 0)) || 
+	    (($rdelay >= $delaythresh) ||
+	     (($rbw != $S100Kbs) && ($rbw != $S10Kbs)) ||
+	     (($delaywithswitch == 0) && 
+	      (($rbw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
+	     ($rloss != 0))) {
 	    $delayname = "tbsdelay$delayid";
-	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss];
+	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss,
+						 $rdelay,$rbw,$rloss];
 	    printdb "Delay node linksdelaysrc/$lan ($delayname) = " . 
 		join(" ",@{$delaynodes{"linksdelaysrc/$lan"}}) . "\n";
 	    $delayid++;
@@ -349,19 +366,28 @@ foreach $lan (keys(%lans)) {
 	print TOPFILE "node lan/$lan lan\n";
 	$lannodes{"lan/$lan"} = 1;
 	foreach $member (@members) {
-	    ($delay,$bw,$loss) = @{$delayinfo{"$lan:$member"}};
+	    ($delay,$bw,$loss,
+	     $rdelay,$rbw,$rloss) = @{$delayinfo{"$lan:$member"}};
 	    $bandwidth = &getbandwidth($bw);
+	    $rbandwidth = &getbandwidth($rbw);
 	    ($node) = (split(":",$member))[0];
 # XXX The expression below should be modified for better bandwidth support.
 # Probably needs to happen post assign somehow.
-	    if (($delay >= $delaythresh) ||
+	    if ((($delay >= $delaythresh) ||
 		(($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
 		(($delaywithswitch == 0) && 
 		 (($bw != $S100Kbs) && (($sharks == 0) ||
 					($nonsharks > 1)))) ||
-		($loss != 0)) {
+		($loss != 0)) || 
+		(($rdelay >= $delaythresh) ||
+		 (($rbw != $S100Kbs) && ($rbw != $S10Kbs))  ||
+		 (($delaywithswitch == 0) && 
+		  (($rbw != $S100Kbs) && (($sharks == 0) ||
+					 ($nonsharks > 1)))) ||
+		 ($loss != 0))) {
 		$delayname = "tbdelay$delayid";
-		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss];
+		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss,
+							    $rdelay,$rbw,$rloss];
 		printdb "Delay node linkdelaysrc/$lan/$member ($delayname) " .
 		    " = " . join(" ",@{$delaynodes{"linkdelaysrc/$lan/$member"}}) . "\n";
 		$delayid++;
@@ -650,11 +676,13 @@ foreach $plink (keys(%plinks)) {
 	printdb "    $vlanid = $lan, \[$nodeportC, $nodeportD\]\n";
 	$vlanid++;
 
-	($delay,$bandwidth,$lossrate) = @{$delaynodes{$plink}};
+	($delay,$bandwidth,$lossrate,
+	 $rdelay,$rbandwidth,$rlossrate) = @{$delaynodes{$plink}};
 	$delays{$delayid} = [$nodeB,$portB,$portD,$lan,
-			     $delay,$bandwidth,$lossrate];
+			     $delay,$bandwidth,$lossrate,
+			     $rdelay,$rbandwidth,$rlossrate];
 	printdb "  Delays: $delayid = \[$nodeB,$portB,$portD,$lan" .
-	    ",$delay,$bandwidth,$lossrate\]\n";
+	    ",$delay,$bandwidth,$lossrate,$rdelay,$rbandwidth,$rlossrate\]\n";
 	$delayid++;
 
 	$virtA = &find_vport($p2vmap{$nodeA},$lan);
@@ -688,11 +716,13 @@ foreach $plink (keys(%plinks)) {
 	push(@$members,$nodeportD);
 	printdb "    $lan = $lan, \[" . join(" ",@$members) . "\]\n"; 
 
-	($delay,$bandwidth,$loss) = @{$delaynodes{$plink}};
+	($delay,$bandwidth,$loss,
+	 $rdelay,$rbandwidth,$rloss) = @{$delaynodes{$plink}};
 	$delays{$delayid} = [$nodeB,$portB,$portD,$lan,
-			     $delay,$bandwidth,$loss];
+			     $delay,$bandwidth,$loss,
+			     $rdelay,$rbandwidth,$rloss];
 	printdb "  Delays: $delayid = \[$nodeB,$portB,$portD,$lan," .
-	    "$delay,$loss\]\n";
+	    "$delay,$bandwidth,$loss,$rdelay,$rbandwidth,$rloss\]\n";
 	$delayid++;
 	
 	$virt = &find_vport($p2vmap{$nodeA},$lan);
@@ -828,18 +858,20 @@ foreach $vlan (keys(%vlans)) {
 my $pipeid = 100;
 
 foreach $delay (keys(%delays)) {
-    ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate) = 
+    # So r* indicates int1->int0 and others are int0->int1
+    ($pnode,$int0,$int1,$vname,$delay,$bandwidth,$lossrate,
+     $rdelay,$rbandwidth,$rlossrate) = 
 	@{$delays{$delay}};
     my $pipe0 = $pipeid;
     my $pipe1 = $pipeid + 10;
     $pipeid += 100;
     DBQueryFatal("insert into delays" .
-	     " (pid,eid,node_id,vname,iface0,iface1" .
-	     ",pipe0,delay0,bandwidth0,lossrate0" .
-	     ",pipe1,delay1,bandwidth1,lossrate1)" .
-	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
-	     ",$pipe0,$delay,$bandwidth,$lossrate".
-	     ",$pipe1,$delay,$bandwidth,$lossrate)");
+		 " (pid,eid,node_id,vname,iface0,iface1" .
+		 ",pipe0,delay0,bandwidth0,lossrate0" .
+		 ",pipe1,delay1,bandwidth1,lossrate1)" .
+		 " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
+		 ",$pipe0,$delay,$bandwidth,$lossrate".
+		 ",$pipe1,$rdelay,$rbandwidth,$rlossrate)");
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
     #       100Mbs on the delay node ports. This is to ensure that
