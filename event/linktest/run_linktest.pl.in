@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+#
+# wrapper for running linktest that includes
+# an extra event for reporting completion.
+#
+# TODO: consider timeout overall
+
+use strict;
+use Getopt::Std;
+
+sub usage {
+    warn "Usage: $0 [-s server] [-q] -e pid/eid\n";
+    return 1;
+}
+
+my $server;
+my %opt = ();
+getopts("s:e:q",\%opt);
+if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+exit &usage unless ($opt{e});
+
+my ($pid,$eid) = split(/\//,$opt{e});
+
+my $linktest_path; # path to linktest data.
+$linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
+
+# send the startup event.
+# note, want to redo this not to be so wasteful. just want 
+# to make sure the forked proc dies if the script gets sigint.
+my $cmd = "ltevent -s $server -e $pid/$eid -x START";
+if(defined($opt{q})) {
+    $cmd .= " STARTAT=1 STOPAT=3";
+}
+`$cmd`;
+
+# wait for the shutdown event.
+`ltevent -s $server -e $pid/$eid -w STOP`;
+
+# analyze results of the run
+exit &analyze;
+
+sub analyze {
+    my @dir_contents;
+    opendir (DIR,$linktest_path) || die "cannot open Linktest directory.";
+    @dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
+    closedir(DIR);
+
+    foreach my $file (@dir_contents)
+    {
+	system "cat $linktest_path/$file";
+	
+    }
+    if(@dir_contents) {
+	return 1;
+    } else {
+	print "No errors\n";
+	return 0;
+    }
+}
+
+
+
+
+
