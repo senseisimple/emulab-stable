@@ -229,7 +229,10 @@ if ($waitmode) {
 # Create an experiment record. The pid/eid has to be unique, so lock the
 # table for the check/insert.
 #
-DBQueryFatal("lock tables experiments write");
+DBQueryFatal("lock tables experiments write, ".
+	     "            experiment_stats write, ".
+	     "            experiment_resources write, ".
+	     "            testbed_stats read");
 
 $query_result =
     DBQueryFatal("SELECT pid,eid FROM experiments ".
@@ -242,19 +245,48 @@ if ($query_result->numrows) {
 }
 
 #
+# Grab the next highest index to use. We used to use an auto_increment
+# field in the table, but if the DB is ever "dropped" and recreated,
+# it will reuse indicies that are crossed referenced in the other two
+# tables.
+#
+$query_result =
+    DBQueryFatal("select MAX(exptidx) from experiment_stats");
+my ($exptidx) = $query_result->fetchrow_array();
+$exptidx++;
+
+#
+# Lets be really sure!
+#
+foreach my $table ("experiments", "experiment_stats", "experiment_resources",
+		   "testbed_stats") {
+
+    my $slot = (($table eq "experiments") ? "idx" : "exptidx");
+	
+    $query_result =
+	DBQueryFatal("select * from $table where ${slot}=$exptidx");
+    
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	die("*** $0:\n".
+	    "    Experiment index $exptidx exists in $table; this is bad!\n");
+    }
+}
+
+#
 # Insert the record. This reserves the pid/eid for us. If its a batchmode
 # experiment, we will update the record later so that the batch daemon
 # will recognize it. We insert the record as locked and ACTIVATING so that
 # no one can mess with the experiment until later. 
 #
 if (! DBQueryWarn("INSERT INTO experiments ".
-		  "(eid, pid, gid, expt_created, expt_name,".
+		  "(idx, eid, pid, gid, expt_created, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
 		  " idle_ignore, keyhash, expt_locked, eventkey,".
 		  " noswap_reason, noidleswap_reason, batchmode, ".
 		  " linktest_level) ".
-		  "VALUES ('$eid', '$pid', '$gid', now(), ".
+		  "VALUES ($exptidx, '$eid', '$pid', '$gid', now(), ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
@@ -262,34 +294,44 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "$noidleswap_reason, $batchmode, $linktest)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
-	"    Database error inserting record for $pid/$eid!\n");
-}
-
-if (! DBQueryWarn("unlock tables")) {
-    fatal("Unexpected DB Error!");
+	"    DB error inserting experiment record for $pid/$eid!\n");
 }
 
 #
 # Create an experiment_resources record for the above record.
 #
-if (! DBQueryWarn("insert into experiment_resources (idx, tstamp, exptidx) ".
-		  "select 0, now(), idx from experiments ".
-		  "where pid='$pid' and eid='$eid'")) {
+$query_result =
+    DBQueryWarn("insert into experiment_resources (tstamp, exptidx) ".
+		"values (now(), $exptidx)");
+
+if (!$query_result) {
+    DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
     DBQueryWarn("unlock tables");
-    fatal("DB error inserting experiment resources record for $pid/$eid!");
+    die("*** $0:\n".
+	"    DB error inserting experiment resources record for $pid/$eid!");
 }
+my $rsrcidx = $query_result->insertid;
 
 #
 # Now create an experiment_stats record to match.
 #
 if (! DBQueryWarn("insert into experiment_stats ".
-		  "(eid, pid, creator, gid, created, batch, exptidx,rsrcidx) ".
-		  "select '$eid', '$pid', '$dbuid', '$gid', now(), ".
-		  "$batchmode, e.idx,r.idx from experiments as e ".
-		  "left join experiment_resources as r on e.idx=r.exptidx ".
-		  "where pid='$pid' and eid='$eid'")) {
+		  "(eid, pid, creator, gid, created, batch, exptidx, rsrcidx) ".
+		  "values('$eid', '$pid', '$dbuid', '$gid', now(), ".
+		  "$batchmode, $exptidx, $rsrcidx)")) {
+    DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
+    DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
     DBQueryWarn("unlock tables");
-    fatal("DB error inserting experiment stats record for $pid/$eid!");
+    die("*** $0:\n".
+	"    DB error inserting experiment stats record for $pid/$eid!");
+}
+
+if (! DBQueryWarn("unlock tables")) {
+    DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
+    DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
+    DBQueryWarn("delete from experiment_stats where exptidx=$exptidx");
+    die("*** $0:\n".
+	"    DB error unlocking tables!");
 }
 
 #
@@ -645,23 +687,24 @@ sub fatal($)
     # via the exit code).
     # 
     if (!$committed) {
-	if (($query_result =
-	     DBQueryWarn("select idx from experiments ".
-			 "where pid='$pid' and eid='$eid'"))) {
-
-	    my ($idx) = $query_result->fetchrow_array;
-
-	    if (defined($idx) && $idx) {
-		DBQueryWarn("DELETE from experiment_stats ".
-			    "WHERE eid='$eid' and pid='$pid' and exptidx=$idx");
-		DBQueryWarn("DELETE from experiment_resources ".
-			    "WHERE exptidx=$idx");
-	    }
-	}
 	#
-	# Clear the record and cleanup.
+	# Clear the experiment record and cleanup directories
 	#
 	TBExptDestroy($pid, $eid);
+
+	#
+	# Now we can clean up the stats records. 
+	#
+	DBQueryWarn("DELETE from experiment_resources ".
+		    "WHERE exptidx=$rsrcidx");
+	
+	DBQueryWarn("DELETE from testbed_stats ".
+		    "WHERE exptidx=$exptidx");
+
+	# This must be last cause it provides the unique exptidx above.
+	DBQueryWarn("DELETE from experiment_stats ".
+		    "WHERE eid='$eid' and pid='$pid' and exptidx=$exptidx");
+
 	exit($errorstat);
     }
 
