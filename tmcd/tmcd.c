@@ -710,13 +710,9 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 	}
 	else if (!reqp->islocal) {
-		if (!istcp) {
-			/*
-			 * Simple "isalive" support for remote nodes.
-			 */
-			doisalive(sock, reqp, rdata, istcp, version);
-			goto skipit;
-		}
+		if (!istcp)
+			goto execute;
+		
 		error("%s: Remote node connected without SSL!\n",reqp->nodeid);
 		if (!insecure)
 			goto skipit;
@@ -726,14 +722,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * When not compiled for ssl, do not allow remote connections.
 	 */
 	if (!reqp->islocal) {
-		if (!istcp) {
-			/*
-			 * Simple "isup" daemon support!
-			 */
-			doisalive(sock, reqp, rdata, istcp, version);
-			goto skipit;
-		}
-		error("%s: Remote node connected without SSL!\n",reqp->nodeid);
+		error("%s: Remote node connection not allowed (Define SSL)!\n",
+		      reqp->nodeid);
 		if (!insecure)
 			goto skipit;
 	}
@@ -772,6 +762,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Figure out what command was given.
 	 */
+ execute:
 	for (i = 0; i < numcommands; i++)
 		if (strncmp(bp, command_array[i].cmdname,
 			    strlen(command_array[i].cmdname)) == 0)
@@ -779,6 +770,15 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 
 	if (i == numcommands) {
 		info("%s: INVALID REQUEST: %.8s\n", reqp->nodeid, bp);
+		goto skipit;
+	}
+
+	/*
+	 * XXX: We allow remote nodes to use UDP for isalive only!
+	 */
+	if (!istcp && !reqp->islocal && command_array[i].func != doisalive) {
+		error("%s: Invalid request (%s) from remote node using UDP!\n",
+		      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
 	}
 
