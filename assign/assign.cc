@@ -26,6 +26,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <signal.h>
+#include <sys/signal.h>
 
 using namespace boost;
 
@@ -554,6 +556,13 @@ int mapping_precheck() {
 #endif
 }
 
+// Signal handler - add a convneint way to kill assign and make it return an
+// unretryable error
+void exit_unretryable(int signal) {
+    cerr << "Killed with signal " << signal << " - exiting!" << endl;
+    _exit(3);
+}
+
 int main(int argc,char **argv)
 {
   int seed = 0;
@@ -631,6 +640,14 @@ int main(int argc,char **argv)
   if (argc == 0) {
     print_help();
   }
+
+
+  // Set up a signal handler for USR1 that exits with an unretryable error
+  struct sigaction action;
+  action.sa_handler = exit_unretryable;
+  sigemptyset(&action.sa_mask);
+  action.sa_flags = 0;
+  sigaction(SIGUSR1,&action,NULL);
 
   // Convert options to the common.h parameters.
   parse_options(argv, options, noptions);
