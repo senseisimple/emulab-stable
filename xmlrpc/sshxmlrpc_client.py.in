@@ -86,7 +86,12 @@ def usage():
 #
 def do_method(server, method_and_args):
     # Get a pointer to the function we want to invoke.
-    meth = getattr(server, method_and_args[0])
+    methodname = method_and_args[0]
+    if methodname.count(".") == 0:
+        methodname = module + "." + methodname
+        pass
+    
+    meth = getattr(server, methodname)
 
     # Pop off the method, and then convert the rest of the arguments.
     # Be sure to add the version.
@@ -109,9 +114,9 @@ def do_method(server, method_and_args):
         # If the first character of the argument looks like a dictionary,
         # try to evaluate it.
         #
-        if value[0] == "{":
-            value = eval(value);
-            pass
+  #      if value[0] == '{':
+  #         value = eval(value);
+  #         pass
     
         params[plist[0]] = value
         pass
@@ -201,6 +206,10 @@ except getopt.error, e:
     sys.exit(2)
     pass
 
+# This is parsed by the Proxy object.
+URI = "ssh://" + login_id + "@" + xmlrpc_server + "/xmlrpc";
+
+# All of this admin cruft is totally ignored if you are not a testbed admin.
 if admin:
     path = SERVER_PATH
     if devel:
@@ -213,12 +222,11 @@ if admin:
             pass
         pass
     path += "/" + SERVER_DIR
+    URI +=  "/server"
     pass
 
 # Get a handle on the server,
-server = SSHServerProxy("ssh://" + login_id + "@" + xmlrpc_server +
-                        "/xmlrpc/" + module,
-                        path=path,
+server = SSHServerProxy(URI, path=path,
                         user_agent="sshxmlrpc_client-v0.1")
 
 if len(req_args):

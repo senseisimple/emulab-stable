@@ -167,6 +167,11 @@ def CheckRequiredArgs(argdict, arglist):
 # Check user permission to access an experiment.
 # 
 def CheckExptPermission(pid, eid):
+    if not (re.match("^[-\w]*$", pid) and
+            re.match("^[-\w]*$", eid)):
+        return EmulabResponse(RESPONSE_BADARGS,
+                  output="Illegal characters in project and/or experiment IDs!")
+    
     res = DBQueryFatal("SELECT gid FROM experiments "
                        "WHERE pid=%s and eid=%s",
                        (pid, eid))
@@ -187,6 +192,32 @@ def CheckExptPermission(pid, eid):
                               output=("You do not have permission to " +
                                       "access experiment: " + pid + "/" + eid))
     return None
+
+#
+# This is a wrapper class so that you can invoke methods in dotted form.
+# For example experiment.swapexp(...).
+#
+class EmulabServer:
+    def __init__(self):
+        self.instances = {};
+        self.instances["emulab"]     = emulab();
+        self.instances["user"]       = user();
+        self.instances["fs"]         = fs();
+        self.instances["imageid"]    = imageid();
+        self.instances["osid"]       = osid();
+        self.instances["experiment"] = experiment();
+        self.instances["node"]       = node();
+        return
+
+    def __getattr__(self, name):
+        dotted = name.split(".");
+        if len(dotted) != 2:
+            raise AttributeError("Bad name '%s'" % name)
+        if not self.instances.has_key(dotted[0]):
+            raise AttributeError("unknown subclass '%s'" % name)
+        
+        return getattr(self.instances[dotted[0]], dotted[1]);
+    pass
 
 #
 # This class implements the server side of the XMLRPC interface to emulab as a
@@ -921,6 +952,18 @@ class experiment:
         if (argerror):
             return argerror
 
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        if not (argdict["direction"] == "in" or
+                argdict["direction"] == "out"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="direction must be 'in' or 'out'");
+
         argstr = "-q"
         for opt, val in argdict.items():
             if opt == "wait":
@@ -958,6 +1001,13 @@ class experiment:
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
             return argerror
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
 
         nsfilename = None
         argstr     = "-q"
@@ -1028,6 +1078,13 @@ class experiment:
         if (argerror):
             return argerror
 
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
         argstr = "-q"
         for opt, val in argdict.items():
             if opt == "wait":
@@ -1041,6 +1098,57 @@ class experiment:
         argstr += " " + escapeshellarg(argdict["exp"])
 
         (exitval, output) = runcommand(TBDIR + "/bin/endexp " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Get textual info from tbreport and send back as string
+    #
+    def expinfo(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp", "show"))
+        if (argerror):
+            return argerror
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        argstr = ""
+        tokens = argdict["show"].split(",")
+        for show in tokens:
+            if show == "nodeinfo":
+                argstr += " -n"
+                pass
+            elif show == "mapping":
+                argstr += " -m"
+                pass
+            elif show == "linkinfo":
+                argstr += " -l"
+                pass
+            elif show == "shaping":
+                argstr += " -d"
+                pass
+            pass
+
+        argstr += " " + escapeshellarg(argdict["proj"])
+        argstr += " " + escapeshellarg(argdict["exp"])
+
+        (exitval, output) = runcommand(TBDIR + "/bin/tbreport " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         

@@ -43,6 +43,7 @@ my $USERNODE    = "@USERNODE@";
 		"swapexp"	=> "$TB/bin/swapexp",
 		"endexp"	=> "$TB/bin/endexp",
 		"tbreport"	=> "$TB/bin/tbreport",
+		"xmlrpc"        => "$TB/sbin/sshxmlrpc_server.py",
 		"xmlrpc/experiment" => "$TB/sbin/sshxmlrpc_server.py",
 		"xmlrpc/node"   => "$TB/sbin/sshxmlrpc_server.py",
 		"xmlrpc/imageid" => "$TB/sbin/sshxmlrpc_server.py",
@@ -148,8 +149,11 @@ do {{
 	# xmlrpc is special for now, while we use paperbag for it.
 	# Pass the second token as the first arg to the server.
 	if ($command =~ /^xmlrpc\/(\w*)$/) {
-	        unshift(@args, $1);
+	        @args = ($1);
 		$command = "xmlrpc/$1";
+	}
+	elsif ($command eq "xmlrpc") {
+	        @args = ();
 	}
 	else {
 	    # Strip off all path information from the command

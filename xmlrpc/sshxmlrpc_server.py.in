@@ -11,12 +11,17 @@ import socket
 import sshxmlrpc
 from emulabserver import *
 
-DEFAULT_MODULE = "experiment"
+#
+# By default, run a wrapper class that includes all off the modules.
+# The client can invoke methods of the form experiment.swapexp when
+# the server is invoked in this manner.
+# 
+DEFAULT_MODULE = "EmulabServer"
 module         = DEFAULT_MODULE
 
 #
-# Optional argument indicates what module the server wants to use. This
-# will probably change a lot in the future!
+# Optional argument indicates the specific module the server wants to use.
+# This form should be deprecated, I think. 
 #
 if len(sys.argv) > 1:
     module = sys.argv[1]
