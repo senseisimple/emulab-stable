@@ -96,6 +96,10 @@ use Exporter;
 	 TBDB_ALLOCSTATE_RES_REBOOT_DIRTY TBDB_ALLOCSTATE_RES_REBOOT_CLEAN 
 	 TBDB_ALLOCSTATE_RES_READY TBDB_ALLOCSTATE_UNKNOWN
 
+	 TBDB_STATS_PRELOAD TBDB_STATS_START TBDB_STATS_TERMINATE
+	 TBDB_STATS_SWAPIN TBDB_STATS_SWAPOUT TBDB_STATS_SWAPMODIFY
+	 TBDB_STATS_FLAGS_IDLESWAP
+
 	 TBDB_EXPT_WORKDIR
 	 TBSetNodeEventState TBGetNodeEventState
 	 TBSetNodeAllocState TBGetNodeAllocState
@@ -135,7 +139,7 @@ use Exporter;
 
 	 TBSiteVarExists TBGetSiteVar
 
-	 TBActivityReport
+	 TBActivityReport GatherSwapStats
 	 );
 
 # Must come after package declaration!
@@ -437,6 +441,17 @@ sub DBLIMIT_NSFILESIZE()	{ (1024 * 16); }
 sub TBDB_LOWVPORT()		{ 30000; }
 sub TBDB_MAXVPORT()		{ 60000; }
 sub TBDB_PORTRANGE()		{ 256;   }
+
+#
+# STATS constants.
+#
+sub TBDB_STATS_PRELOAD()	{ "preload"; }
+sub TBDB_STATS_START()		{ "start"; }
+sub TBDB_STATS_TERMINATE()	{ "destroy"; }
+sub TBDB_STATS_SWAPIN()		{ "swapin"; }
+sub TBDB_STATS_SWAPOUT()	{ "swapout"; }
+sub TBDB_STATS_SWAPMODIFY()	{ "swapmodify"; }
+sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
 
 #
 # Auth stuff.
@@ -2920,6 +2935,187 @@ sub TBActivityReport($)
 			"where node_id='$node'");
 }
 
+#
+# Gather Swap stats.
+#
+# usage: GatherExptStats(char *pid, char *eid, char *uid,
+#			 char *mode, int code, int flags)
+#        Mode is one of preload, start, in, out, modify, end.
+#
+sub GatherSwapStats($$$$$;$)
+{
+    my ($pid, $eid, $uid, $mode, $ecode, $flags) = @_;
+    my ($pnodes,$vnodes,$duration);
+
+    # Optional argument to modify the stats gathering. 
+    $flags = 0
+	if (!defined($flags));
+    
+    local $DBQUERY_MAXTRIES = 5;
+
+    my $query_result =
+	DBQueryWarn("select gid,idx from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+    if (!$query_result || !$query_result->numrows) {
+	return;
+    }
+    my ($gid,$idx) = $query_result->fetchrow_array;
+
+    #
+    # A non-zero ecode indicates error. If op is a preload/swapin/start/modify
+    # then we do not want to gather anymore stats beyond the error code
+    # since the results are not well defined. swapout,terminate
+    # errors do normal processing. 
+    #
+    if (0 && $ecode) {
+	DBQueryWarn("update experiment_stats set ".
+		    "  swap_errors=swap_errors+1, ".
+		    "  swap_exitcode=$ecode ".
+		    "where pid='$pid' and eid='$eid' and idx=idx");
+
+	if ($mode eq TBDB_STATS_SWAPIN ||
+	    $mode eq TBDB_STATS_START ||
+	    $mode eq TBDB_STATS_PRELOAD ||
+	    $mode eq TBDB_STATS_SWAPMODIFY) {
+	    goto logit;
+	}
+    }
+
+    #
+    # Termination is easy; just one field to update.
+    #
+    if ($mode eq TBDB_STATS_TERMINATE) {
+	DBQueryWarn("update experiment_stats ".
+		    "set destroyed=now() ".
+		    "where pid='$pid' and eid='$eid' and idx=idx");
+    }
+
+    #
+    # On a swapout, update the duration counters. We want to update the
+    # aggregates too below, so get the numbers we need for that first.
+    #
+    $pnodes   = 0;
+    $vnodes   = 0;
+    $duration = 0;
+    
+    if ($mode eq TBDB_STATS_SWAPOUT) {
+	$query_result =
+	    DBQueryWarn("select pnodes,vnodes, ".
+			"       UNIX_TIMESTAMP(now()) - ".
+			"       UNIX_TIMESTAMP(swapin_last) ".
+			" from experiment_stats ".
+			"where pid='$pid' and eid='$eid' and idx=idx");
+
+	if ($query_result && $query_result->numrows) {
+	    ($pnodes,$vnodes,$duration) = $query_result->fetchrow_array;
+	    # Might happen if swapin stats got losts.
+	    $duration = 0
+		if (! defined($duration));
+	}
+
+	#
+	# Increment idleswap indicator, but only valid on swapout.
+	#
+	if (0) {
+	if ($flags & $TBDB_STATS_FLAGS_IDLESWAP) {
+	    DBQueryWarn("update experiment_stats ".
+			"set idle_swaps=idle_swaps+1 ".
+			"where pid='$pid' and eid='$eid' and idx=idx");
+	}
+        }
+    }
+
+    #
+    # Per project/group/user aggregates.
+    # 
+    if ($mode eq TBDB_STATS_PRELOAD ||
+	$mode eq TBDB_STATS_START ||
+	$mode eq TBDB_STATS_SWAPOUT ||
+	$mode eq TBDB_STATS_SWAPIN ||
+	$mode eq TBDB_STATS_SWAPMODIFY) {
+	DBQueryWarn("update project_stats ".
+		    "set expt${mode}_count=expt${mode}_count+1, ".
+		    "    expt${mode}_last=now(), ".
+		    "    allexpt_duration=allexpt_duration+${duration}, ".
+		    "    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		    "    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		    "    allexpt_vnode_duration=".
+		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		    "    allexpt_pnode_duration=".
+		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		"where pid='$pid'");
+	DBQueryWarn("update group_stats ".
+		    "set expt${mode}_count=expt${mode}_count+1, ".
+		    "    expt${mode}_last=now(), ".
+		    "    allexpt_duration=allexpt_duration+${duration}, ".
+		    "    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		    "    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		    "    allexpt_vnode_duration=".
+		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		    "    allexpt_pnode_duration=".
+		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		    "where pid='$pid' and gid='$gid'");
+	DBQueryWarn("update user_stats ".
+		    "set expt${mode}_count=expt${mode}_count+1, ".
+		    "    expt${mode}_last=now(), ".
+		    "    allexpt_duration=allexpt_duration+${duration}, ".
+		    "    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		    "    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		    "    allexpt_vnode_duration=".
+		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		    "    allexpt_pnode_duration=".
+		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		    "where uid='$uid'");
+
+	#
+	# Update the per-experiment record.
+	# Note that we map start into swapin. 
+	#
+	if ($mode eq TBDB_STATS_SWAPOUT ||
+	    $mode eq TBDB_STATS_SWAPIN ||
+	    $mode eq TBDB_STATS_SWAPMODIFY) {
+	    my $tmp = $mode;
+	    if ($mode eq TBDB_STATS_START) {
+		$tmp = TBDB_STATS_SWAPIN;
+	    }
+	
+	    DBQueryWarn("update experiment_stats ".
+			"set ${tmp}_count=${tmp}_count+1, ".
+			"    ${tmp}_last=now(), ".
+			"    swapin_duration=swapin_duration+${duration} ".
+			"where pid='$pid' and eid='$eid' and idx=idx");
+	}
+    }
+
+    #
+    # On successful swapin, get the number of pnodes. assign_wrapper
+    # has filled in everything else, but until the experiment actually
+    # succeeds in swapping, do not set the pnode count. This intent
+    # is to avoid counting experiments that ultimately fail as taking
+    # up physical resources, but I think this is misguided.
+    # 
+    if ($mode eq TBDB_STATS_START ||
+	$mode eq TBDB_STATS_SWAPIN ||
+	$mode eq TBDB_STATS_SWAPMODIFY) {
+	$query_result =
+	    DBQueryWarn("select r.node_id from reserved as r ".
+			"left join nodes as n on r.node_id=n.node_id ".
+			"where r.pid='$pid' and r.eid='$eid' and ".
+			"      n.role='testnode'");
+
+	if ($query_result) {
+	    my $pnodes = $query_result->numrows;
+
+	    DBQueryWarn("update experiment_stats set pnodes=$pnodes ".
+			"where pid='$pid' and eid='$eid' and idx=idx");
+	}
+    }
+
+    #
+    # Okay, to make Jay happy, append info to a log file.
+    #
+  logit:
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 
