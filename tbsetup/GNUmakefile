@@ -6,11 +6,12 @@ include ../GNUmakerules
 
 SUBDIRS		= checkpass
 SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
-		  mkacct rmacct delay_setup ifc_setup ifc_filegen \
+		  delay_setup ifc_setup ifc_filegen \
 		  ir2ifc power resetvlans savevlans snmpit tbend \
-		  tbprerun tbreport vpower vsnmpit killtip
+		  tbprerun tbreport vpower vsnmpit killtip 
 DATAFILES	= default.ifc
-SUSCRIPTS	= mkprojdir os_setup
+SUSCRIPTS	= mkprojdir os_setup mkacct-ctrl mkacct rmacct \
+	          mkacct-ctrl
 
 all:	$(BINS) $(SUBDIRS)
 
@@ -56,6 +57,12 @@ $(INSTALL_LIBTBDIR)/%: %.tcl
 post-install: 
 	chown root $(INSTALL_BINDIR)/mkprojdir
 	chmod u+s $(INSTALL_BINDIR)/mkprojdir
+	chown root $(INSTALL_BINDIR)/mkacct-ctrl
+	chmod u+s $(INSTALL_BINDIR)/mkacct-ctrl
+	chown root $(INSTALL_BINDIR)/mkacct
+	chmod u+s $(INSTALL_BINDIR)/mkacct
+	chown root $(INSTALL_BINDIR)/rmacct
+	chmod u+s $(INSTALL_BINDIR)/rmacct
 	chown root $(INSTALL_BINDIR)/os_setup
 	chmod u+s $(INSTALL_BINDIR)/os_setup
 	chown root $(INSTALL_LIBTBDIR)/os_setup
