@@ -86,8 +86,9 @@ if (defined($options{"d"})) {
 #
 my $logfile = "$TB/log/plabmonitord";
 my @oldnodes = ();
-my $LOOPINT = 1800;  # 1/2 hour between successive loops.
-my $BATCHNUM = 40;
+my $LOOPSLEEP = 1800;  # 1/2 hour between successive loops.
+my $PAUSETIME = 120;   # 2 minute pause after running vnode_setup
+my $BATCHNUM = 40;     # degree of parallelization
 
 #
 # daemonize
@@ -113,6 +114,7 @@ while (1) {
           "----------------\n";
     print "Starting plabmonitord loop at ". TimeStamp() ."\n";
 
+    # Get entries for plab physnodes in hwdown.
     my $query_result =
 	DBQueryWarn("select r1.node_id,n1.phys_nodeid from reserved as r1 ".
 		    "left join nodes as n1 on n1.node_id=r1.node_id ".
@@ -129,7 +131,8 @@ while (1) {
     }
 
     #
-    # Build up current node list
+    # Build up current node list.  We prefer to try nodes that haven't
+    # failed in previous iterations (the newly dead).
     #
     my @nodes = ();
     while (my ($vnode,$pnode) = $query_result->fetchrow_array()) {
@@ -143,9 +146,14 @@ while (1) {
         }
     }
 
+    # We're done with last run's failed node list.  Clear it since it
+    # will be built again this run.
     @oldnodes = ();
 
+    # Run through the nodes in parallelized batches
     while (my @batch = splice(@nodes,0,$BATCHNUM)) {
+        # Do some initial checks on the nodes and remove those that
+        # fail these from testing this time around.
         my @batch2 = grep(nodeprecheck($_), @batch);
         my @vnodes = map {$_->[0]} @batch2;
         my @pnodes = map {$_->[1]} @batch2;
@@ -157,13 +165,16 @@ while (1) {
             TimeStamp() . "\n";
     
         #
-        # Try to setup the vnodes.
+        # Try to setup this batch of vnodes.
         #
         system("vnode_setup -f -d -n $BATCHNUM $PLABMOND_PID $PLABMOND_EID @vnodes");
 
         print "sleeping for a bit.\n"
             if ($debug);
-        sleep(180); # wait a bit..
+        sleep($PAUSETIME); # wait a bit to let final stragglers check in.
+
+        # Check the nodes to find out which are up, and which failed
+        # in the vnode_setup we just ran.
         print "Checking vnode_setup run status\n";
         my @failed = grep(nodepostalloc($_), @batch2);
         
@@ -172,8 +183,9 @@ while (1) {
             my @fvnodes = map {$_->[0]} @failed;
             my @fpnodes = map {$_->[1]} @failed;
             
-            print "vnode_setup failed for the following vnodes: @fvnodes\n";
-            system("vnode_setup -f -d -k $PLABMOND_PID $PLABMOND_EID @fvnodes");
+            print "### vnode_setup failed for the following vnodes: @fvnodes\n";
+            print "### Proceding to tear them down.\n";
+            system("vnode_setup -f -d -k -n $BATCHNUM $PLABMOND_PID $PLABMOND_EID @fvnodes");
         }
 
         # Keep track of failed nodes for next daemon loop iteration.
@@ -181,28 +193,32 @@ while (1) {
     }
 
   loop:
-    my $leftover = $LOOPINT - (time() - $start);
-    $leftover = ($leftover > 0) ? $leftover : 0;
-    print "Sleeping for $leftover seconds.\n";
-    sleep($leftover);
+    # Wait a while between setup attempts to let PLAB deallocation percolate.
+    print "Sleeping for $LOOPSLEEP seconds.\n";
+    sleep($LOOPSLEEP);
 }
 
-
+#
+# Check vnode status, moving nodes back into production if they booted up,
+# and leaving them in hwdown if they didn't.
+#
 sub nodepostalloc($) {
     my ($vnode, $pnode) = @{$_[0]};
+    my $revive = 0;
     my $retval = 1;
     my $state = TBDB_NODESTATE_UNKNOWN();
 
+    # Did the node send ISUP (boot up completely)?
     if (TBGetNodeEventState($vnode, \$state) && 
         $state eq TBDB_NODESTATE_ISUP()) 
     {
         $revive = 1;
     }
 
-    print "State for $vnode is $state\n";
+    print "State for $vnode is $state\n" if $debug;
 
     #
-    # That all worked. Move the pnode out of hwdown and back into
+    # It came up! Move the pnode out of hwdown and back into
     # normal holding experiment.
     #
     if ($revive &&
@@ -220,6 +236,8 @@ sub nodepostalloc($) {
                  "$pnode has been brought back from the afterworld!",
                  $TBOPS);
         $retval = 0;
+
+    # It didn't come up..
     } else {
         print "Leaving $pnode in hwdown!\n";
         $retval = 1
@@ -229,6 +247,10 @@ sub nodepostalloc($) {
 }
 
 
+#
+# Preliminary checks:
+# * make sure pnode is still in hwdown
+#
 sub nodeprecheck($) {
     my ($vnode, $pnode) = @{$_[0]};
     my $retval = 1;
@@ -246,19 +268,21 @@ sub nodeprecheck($) {
                                    "pid = '$NODEDEAD_PID' and ".
                                    "eid = '$NODEDEAD_EID'");
     if (!$query_result) {
-        print "Node entry DB check failed!  Waiting a bit ...\n";
-        return;
+        print "Node $pnode entry DB check failed!  Skipping it ...\n";
+        $retval = 0;
     }
         
-    if (!$query_result->num_rows()) {
+    elsif (!$query_result->num_rows()) {
         print "Node was removed out from under us! Continuing on ...\n";
-        return;
+        $retval = 0;
     }
 
     return $retval;
 }
 
-    
+#
+# send mail with given message, and exit (also printing message).
+#    
 sub fatal($)
 {
     local($msg) = $_[0];
@@ -267,6 +291,10 @@ sub fatal($)
     die($msg);
 }
 
+#
+# Helper function - see if item is first element in any member of 
+# an array of tuples.
+#
 sub search($@)
 {
     $target = shift;

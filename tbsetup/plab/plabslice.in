@@ -1,5 +1,10 @@
 #!/usr/local/bin/python
 # -*- python -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 import sys
 sys.path.append("@prefix@/lib")

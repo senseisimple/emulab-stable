@@ -1,4 +1,10 @@
 # -*- python -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 """
 Library for interfacing with Plab.  This abstracts out the concepts of
 Plab central, slices, and nodes.  All data (except static things like
@@ -116,6 +122,9 @@ signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 # Plab abstraction
 #
 
+#
+# Class responsible for parsing planetlab sites file
+#
 class siteParser:
 
     def __init__(self):
@@ -261,15 +270,21 @@ class Plab:
             print known
             pass
 
-        # Add new nodes
+        # Create list of nodes to add or update
         toadd = []  # List of node entries to add to DB
-        toupdate = [] # List of node entries to update in the DB
         for nodeent in avail:
+            # Replace sequences of bad chars in the site entity with
+            # a single "-".
             nodeent['SITE'] = BADSITECHARS.sub("-", nodeent['SITE'])
             nid = nodeent['NODEID']
+            # If we don't know about this node, then add it and mark
+            # that we are _not_ doing an update.
             if not known.has_key(nid):
                 toadd.append((nodeent, False))
                 pass
+            # If we do know abou this node, check to see if any of its
+            # attributes have changed, and if so, add it to the list and
+            # mark if for update.
             else:
                 kent = known[nid]
                 if kent['HNAME'] != nodeent['HNAME'] or \
@@ -279,24 +294,30 @@ class Plab:
                     pass
                 pass
             pass
-                
+
+        # Process the add/update list - add to, or update in the DB.
         if len(toadd):
+            # Are we ignoring new entries?
             if ignorenew:
                 if libtestbed.gv.verbose:
                     print "%d new Plab nodes, but ignored for now" % len(toadd)
                     pass
                 pass
+            # If not ignoring, do the addition/update.
             else:
                 addstr = ""
                 updstr = ""
                 print "There are %d new/changed Plab nodes." % len(toadd)
                 for nodeent, update in toadd:
+                    # Get the linktype here so we can report it in email.
                     self.__findLinkType(nodeent)
                     if libtestbed.gv.debug:
                         print "Found linktype %s for node %s" % \
                               (nodeent['LINKTYPE'], nodeent['IP'])
-                        pass                    
+                        pass
+                    # Add/update the node in the DB.
                     self.__addNode(nodeent, update)
+                    # Rest of block adds a line for the add/update messages.
                     nodestr = "%s\t\t%s\t\t%s\t\t%s\t\t%s\n" % \
                               (nodeent['NODEID'],
                                nodeent['IP'],
@@ -311,8 +332,10 @@ class Plab:
                         pass
                     pass
 
+                # We need to update DNS since we've added hosts..
                 print "Forcing a named map update ..."
                 os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
+                # Now announce that we've added/updated nodes.
                 SENDMAIL(TBOPS,
                          "Plab nodes have been added/updated in the DB.",
                          "The following plab nodes have been added to the DB:\n"

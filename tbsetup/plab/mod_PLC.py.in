@@ -1,4 +1,9 @@
 # -*- python -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 import sys
 sys.path.append("@prefix@/lib")
@@ -227,16 +232,40 @@ class mod_PLC:
 
     def freeNode(self, node):
         agent = PLCagent(node.slice.slicename)
-        try:
-            res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP)
-            if libtestbed.gv.debug:
-                print res
+        tries = 3
+        while 1:
+            TIMESTAMP("freenode %s try %d started." % (node.nodeid,
+                                                         DEF_TRIES-tries+1))
+            try:
+                res = tryXmlrpcCmd(agent.UnAssignNodes, node.IP,
+                                   inittries=tries, raisefault=True)
+                if libtestbed.gv.debug:
+                    print res
+                    pass
                 pass
+            
+            # Node may not actually be assigned to the slice, causing
+            # the xmlrpc call to fail stating this fact.  If it ain't
+            # here, then we're done.
+            except xmlrpclib.Fault, e:
+                if e.faultString.find("not assigned") != -1:
+                    print "%s isn't allocate to PLC slice %s." % \
+                          (node.nodeid, node.slice.slicename)
+                    break
+                elif e.triesleft > 0:
+                    tries = e.triesleft
+                else:
+                    print "Failed to release node %s from slice %s" % \
+                          (node.nodeid, node.slice.slicename)
+                    raise
+                pass
+            # success
+            else:
+                break
+            
             pass
-        except:
-            print "Failed to release node %s from slice %s" % \
-                  (node.nodeid, node.slice.slicename)
-            raise
+
+        TIMESTAMP("freenode %s finished." % node.nodeid)
         return res
 
     def renewNode(self, node, length = 0):
