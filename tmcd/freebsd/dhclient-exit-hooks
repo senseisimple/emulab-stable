@@ -6,6 +6,7 @@
 rm -f /etc/testbed/bossip
 if [ x"$reason" = xREBOOT ]; then
 	echo $new_dhcp_server_identifier > /etc/testbed/bossip
+	echo $new_host_name > /etc/testbed/realname
 fi
 
 #
