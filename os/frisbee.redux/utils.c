@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/sysctl.h>
@@ -60,16 +61,21 @@ sleeptime(unsigned int usecs, char *str, int doround)
 	int nusecs;
 
 	if (clockres_us == 0) {
+#ifndef linux
 		struct clockinfo ci;
 		int cisize = sizeof(ci);
 
 		ci.hz = 0;
-		if (sysctlbyname("kern.clockrate", &ci, &cisize, 0, 0) < 0 ||
-		    ci.hz == 0) {
+		if (sysctlbyname("kern.clockrate", &ci, &cisize, 0, 0) == 0 &&
+		    ci.hz > 0)
+			clockres_us = ci.tick;
+		else
+#endif
+		{
 			warning("cannot get clock resolution, assuming 100HZ");
 			clockres_us = 10000;
-		} else
-			clockres_us = ci.tick;
+		}
+
 		if (debug)
 			log("clock resolution: %d us", clockres_us);
 	}
