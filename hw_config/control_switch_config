@@ -1,0 +1,90 @@
+begin
+!
+# ***** NON-DEFAULT CONFIGURATION *****
+!
+!
+#time: Fri Dec 29 2000, 15:03:54 
+!
+#version 5.4(2)
+!
+set password $2$CBqb$bI4.FGawQpKvYt4H2Vjlu1
+set enablepass $2$6IJa$lG/BsSWPWfcMKzu9Tx7pG1
+set banner motd ^C
+
+Utah Network Testbed
+Cat6509 #2
+
+Authorized Access Only.  Individuals without authorization may be
+subject to monitoring or logging, and all logs may be turned
+over to law enforcement agencies.
+
+Be nice to our switch, we like it a lot.
+Thank you!
+
+^C
+!
+#!
+#vtp
+set vtp domain Testbed
+set vlan 1 name default type ethernet mtu 1500 said 100001 state active 
+set vlan 666 name power type ethernet mtu 1500 said 100666 state active 
+set vlan 1002 name fddi-default type fddi mtu 1500 said 101002 state active 
+set vlan 1004 name fddinet-default type fpeinet mtu 1500 said 101004 state active stp ieee 
+set vlan 1005 name trnet-default type trbrf mtu 1500 said 101005 state active stp ibm 
+set vlan 1003 name token-ring-default type trcrf mtu 1500 said 101003 state active mode srb aremaxhop 7 stemaxhop 7 backupcrf off 
+!
+#ip
+set interface sc0 1 155.99.214.176/255.255.255.0 155.99.214.255
+
+set ip route 0.0.0.0/0.0.0.0         155.99.214.61  
+!
+#dns
+set ip dns server 155.99.214.70 primary
+set ip dns server 155.99.214.74
+set ip dns enable
+set ip dns domain cs.utah.edu
+!
+#spantree
+#vlan 1
+set spantree disable    1
+#vlan 666
+set spantree disable    666
+#vlan 1003
+set spantree disable    1003
+#vlan 1005
+set spantree disable    1005
+!
+#set boot command
+set boot config-register 0x102
+set boot system flash bootflash:cat6000-sup.5-4-2.bin
+!
+#port channel
+set port channel 1/1-2 1
+!
+# default port status is enable
+!
+!
+#module 1 : 2-port 1000BaseX Supervisor
+!
+#module 2 : 16-port 1000BaseSX Ethernet
+!
+#module 3 : 48-port 10/100BaseTX Ethernet
+set spantree portfast    3/1-20,3/29-48 enable
+!
+#module 4 : 48-port 10/100BaseTX Ethernet
+set vlan 666  4/30-48
+!
+#module 5 : 2-port SM OC-12 ATM
+!
+#module 6 : 48-port 10/100BaseTX Ethernet
+!
+#module 7 empty
+!
+#module 8 empty
+!
+#module 9 empty
+!
+#module 15 : 1-port Multilayer Switch Feature Card
+!
+#module 16 empty
+end

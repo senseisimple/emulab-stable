@@ -1,0 +1,217 @@
+begin
+!
+# ***** NON-DEFAULT CONFIGURATION *****
+!
+!
+#time: Fri Dec 29 2000, 13:59:17 
+!
+#version 5.4(2)
+!       
+set password $2$LJq5$mAYH.S7WxBr44qFGSR07S.
+set enablepass $2$MZ85$J5n98Z.cDFDdPwNcmYukt1
+set banner motd ^C
+        
+Utah Network Testbed
+Cat6509 #1
+        
+Authorized Access Only.  Individuals without authorization may be
+subject to monitoring or logging, and all logs may be turned
+over to law enforcement agencies.
+        
+Be nice to our switch, we like it a lot.
+Thank you!
+^C      
+!       
+#!      
+#snmp   
+set snmp community read-write     moo,utah
+set snmp community read-write-all public
+!       
+#vtp
+set vtp domain Testbed
+set vtp mode transparent
+set vlan 1 name default type ethernet mtu 1500 said 100001 state active 
+!
+#ip
+set interface sc0 1 155.99.214.175/255.255.255.0 155.99.214.255
+
+set ip route 0.0.0.0/0.0.0.0         155.99.214.61  
+!
+#dns
+set ip dns server 155.99.212.1 primary
+set ip dns enable
+set ip dns domain cs.utah.edu
+!
+#spantree
+#vlan 2
+set spantree disable    2
+#vlan 3
+set spantree disable    3
+#vlan 4
+set spantree disable    4
+#vlan 5
+set spantree disable    5
+#vlan 6
+set spantree disable    6
+#vlan 7
+set spantree disable    7
+#vlan 8
+set spantree disable    8
+#vlan 9
+set spantree disable    9
+set spantree hello    10    9
+#vlan 10
+set spantree disable    10
+#vlan 11
+set spantree disable    11
+!
+#ntp
+set summertime enable 
+!
+#set boot command
+set boot config-register 0x102
+set boot system flash bootflash:cat6000-sup.5-4-2.bin
+!
+#port channel
+set port channel 1/1-2 2
+set port channel 3/1-4 112
+set port channel 3/5-8 113
+set port channel 3/9-12 114
+set port channel 3/13-16 115
+set port channel 3/17-20 116
+set port channel 3/21-24 117
+set port channel 3/25-28 118
+set port channel 3/29-32 119
+set port channel 3/33-36 120
+set port channel 3/37-40 121
+set port channel 3/41-44 122
+set port channel 3/45-48 123
+set port channel 4/1-4 124
+set port channel 4/5-8 125
+set port channel 4/9-12 126
+set port channel 4/13-16 127
+set port channel 4/17-20 128
+set port channel 4/21-24 129
+set port channel 4/25-28 130
+set port channel 4/29-32 131
+set port channel 4/33-36 132
+set port channel 4/3 440 133
+set port channel 4/41-44 134
+set port channel 4/45-48 135
+set port channel 5/1-4 221
+set port channel 5/5-8 222
+set port channel 5/9-12 223
+set port channel 5/13-16 224
+set port channel 5/17-20 225
+set port channel 5/21-24 226
+set port channel 5/25-28 227
+set port channel 5/29-32 228
+set port channel 5/33-36 229
+set port channel 5/37-40 230
+set port channel 5/41-44 231
+set port channel 5/45-48 232
+set port channel 7/1-4 233
+set port channel 7/5-8 234
+set port channel 7/9-12 235
+set port channel 7/13-16 236
+set port channel 7/17-20 237
+set port channel 7/21-24 238
+set port channel 7/25-28 239
+set port channel 7/29-32 240
+set port channel 7/33-36 241
+set port channel 7/37-40 242
+set port channel 7/41-44 243
+set port channel 7/45-48 244
+set port channel 6/1-4 245
+set port channel 6/5-8 246
+set port channel 6/9-12 247
+set port channel 6/13-16 216 
+set port channel 6/17-20 249
+set port channel 6/21-24 250
+set port channel 6/25-28 251
+set port channel 6/29-32 252
+set port channel 6/33-36 253
+set port channel 6/37-40 254
+set port channel 6/41-44 255
+set port channel 6/45-48 256
+set port channel 8/1-4 257
+set port channel 8/5-8 258
+set port channel 8/9-12 259
+set port channel 8/13-16 260
+set port channel 8/17-20 261
+set port channel 8/21-24 262
+set port channel 8/25-28 263
+set port channel 8/29-32 264
+set port channel 8/33-36 265
+set port channel 8/37-40 266
+set port channel 8/41-44 267
+set port channel 8/45-48 268
+set port channel 9/1-4 269
+set port channel 9/5-8 270
+set port channel 9/9-12 271
+set port channel 9/13-16 272
+set port channel 9/17-20 273
+set port channel 9/21-24 274
+set port channel 9/25-28 275
+set port channel 9/29-32 276
+set port channel 9/33-36 277
+set port channel 9/37-40 278
+set port channel 9/41-44 279
+set port channel 9/45-48 280
+!
+# default port status is enable
+!
+!
+#module 1 : 2-port 1000BaseX Supervisor
+!
+#module 2 empty
+!
+#module 3 : 48-port 10/100BaseTX Ethernet
+set vlan 2    3/26
+set vlan 3    3/20
+set vlan 4    3/28
+set vlan 5    3/34
+set vlan 6    3/41
+set vlan 8    3/25,3/33
+set vlan 9    3/27,3/35
+set vlan 10   3/29,3/37
+set vlan 11   3/31,3/39
+set port disable    3/3,3/5,3/7,3/10,3/15,3/30,3/32,3/36,3/38,3/40,3/42-48
+
+set trunk 3/13 off negotiate 1-1005
+!
+#module 4 : 48-port 10/100BaseTX Ethernet
+set vlan 2    4/26
+set port disable    4/1-25,4/27-48
+
+!
+#module 5 : 48-port 10/100BaseTX Ethernet
+set vlan 4    5/25
+set vlan 5    5/33
+set vlan 6    5/35
+set port disable    5/1-24,5/26-32,5/34,5/36-48
+
+!
+#module 6 : 48-port 10/100BaseTX Ethernet
+set vlan 7    6/28,6/33-34
+set port disable    6/1-27,6/29-32,6/35-48
+
+!
+#module 7 : 48-port 10/100BaseTX Ethernet
+set vlan 7    7/41
+set port disable    7/1-40,7/42-48
+
+!
+#module 8 : 48-port 10/100BaseTX Ethernet
+set port disable    8/1-35,8/37-48
+
+!
+#module 9 : 48-port 10/100BaseTX Ethernet
+set vlan 3    9/41
+set port disable    9/5-40,9/42-48
+
+!
+#module 15 empty
+!
+#module 16 empty
+end

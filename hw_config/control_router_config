@@ -1,0 +1,37 @@
+!
+version 12.0
+no service pad
+service timestamps debug uptime
+service timestamps log uptime
+no service password-encryption
+!
+hostname Router
+!
+boot system flash bootflash:c6msfc-is-mz.120-7.XE1
+enable secret 5 $1$NCwC$wAUNcbSRjOKth.51HEpIo1
+!
+ip subnet-zero
+ip cef
+!
+!
+!
+!
+interface Vlan1
+ ip address 155.99.214.253 255.255.255.0
+ no ip directed-broadcast
+!         
+interface Vlan666
+ ip address 155.101.128.1 255.255.255.0
+ no ip directed-broadcast
+!
+ip classless
+ip route 155.99.214.91 255.255.255.255 Vlan666
+no ip http server
+!
+!
+line con 0
+ transport input none
+line vty 0 4
+ login
+!
+end
