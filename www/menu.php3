@@ -239,6 +239,7 @@ function WRITESIDEBAR() {
 	DBQueryFatal("SELECT DATE_FORMAT(date, '%M&nbsp;%e') AS prettydate, ".
 		     " (TO_DAYS(NOW()) - TO_DAYS(date)) AS age ".
 		     "FROM webnews ".
+		     "WHERE archived=0 ".
 		     "ORDER BY date DESC ".
 		     "LIMIT 1");
     $newsDate = "";
