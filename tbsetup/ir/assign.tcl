@@ -22,7 +22,7 @@ if {[file dirname [info script]] == "."} {
 if {[file exists $updir/../assign/assign]} {
     set assign "$updir/../assign/assign"
 } else {
-    set assign "$updir/lib/assign"
+    set assign "$updir/../assign"
 }
 
 set maxrun 5
