@@ -73,6 +73,7 @@ int	level	  = 4;
 long	dev_bsize = 1;
 int	ignore[NDOSPART];
 int	oldstyle  = 0;
+int	frangesize= 64;	/* 32k */
 
 #define sectobytes(s)	((off_t)(s) * secsize)
 #define bytestosec(b)	(uint32_t)((b) / secsize)
@@ -228,7 +229,7 @@ main(argc, argv)
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1")) != -1)
+	while ((ch = getopt(argc, argv, "vlbdihrs:c:z:oI:1F:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -272,6 +273,11 @@ main(argc, argv)
 			break;
 		case '1':
 			oldstyle = 1;
+			break;
+		case 'F':
+			frangesize = atoi(optarg);
+			if (frangesize < 0)
+				usage();
 			break;
 		case 'h':
 		case '?':
@@ -768,31 +774,24 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 		fprintf(stderr, "                 ");
 	for (count = i = 0; i < max; i++)
 		if (isset(p, i)) {
+			unsigned long dboff, dbcount;
+
 			j = i;
 			while ((i+1)<max && isset(p, i+1))
 				i++;
-#if 1
-			if (i != j && i-j >= 31) {
-#else
-			if (i-j >= 0) {
-#endif
-				unsigned long	dboff =
-					dbstart + fsbtodb(fsp, j);
 
-				unsigned long	dbcount =
-					fsbtodb(fsp, (i-j) + 1);
+			dboff = dbstart + fsbtodb(fsp, j);
+			dbcount = fsbtodb(fsp, (i-j) + 1);
 					
-				if (debug > 2) {
-					if (count)
-						fprintf(stderr, ",%s",
-							count % 4 ? " " :
-							"\n                 ");
-					fprintf(stderr,
-						"%lu:%ld", dboff, dbcount);
-				}
-				addskip(dboff, dbcount);
-				count++;
+			if (debug > 2) {
+				if (count)
+					fprintf(stderr, ",%s",
+						count % 4 ?
+						" " : "\n                 ");
+				fprintf(stderr, "%lu:%ld", dboff, dbcount);
 			}
+			addskip(dboff, dbcount);
+			count++;
 		}
 	if (debug > 2)
 		fprintf(stderr, "\n");
@@ -969,37 +968,36 @@ read_linuxgroup(struct ext2_super_block *super,
 		fprintf(stderr, "                 ");
 	for (count = i = 0; i < max; i++)
 		if (!isset(p, i)) {
+			unsigned long dboff;
+			int dbcount;
+
 			j = i;
 			while ((i+1)<max && !isset(p, i+1))
 				i++;
-			if (i != j && i-j >= 7) {
-				unsigned long	dboff;
-				int		dbcount;
 
-				/*
-				 * The offset of this free range, relative
-				 * to the start of the disk, is the slice
-				 * offset, plus the offset of the group itself,
-				 * plus the index of the first free block in
-				 * the current range.
-				 */
-				dboff = sliceoffset +
-					LINUX_FSBTODB(index * max) +
-					LINUX_FSBTODB(j);
+			/*
+			 * The offset of this free range, relative
+			 * to the start of the disk, is the slice
+			 * offset, plus the offset of the group itself,
+			 * plus the index of the first free block in
+			 * the current range.
+			 */
+			dboff = sliceoffset +
+				LINUX_FSBTODB(index * max) +
+				LINUX_FSBTODB(j);
 
-				dbcount = LINUX_FSBTODB((i-j) + 1);
+			dbcount = LINUX_FSBTODB((i-j) + 1);
 					
-				if (debug > 2) {
-					if (count)
-						fprintf(stderr, ",%s",
-							count % 4 ? " " :
-							"\n                 ");
-					fprintf(stderr, "%lu:%d %d:%d",
-					       dboff, dbcount, j, i);
-				}
-				addskip(dboff, dbcount);
-				count++;
+			if (debug > 2) {
+				if (count)
+					fprintf(stderr, ",%s",
+						count % 4 ?
+						" " : "\n                 ");
+				fprintf(stderr, "%lu:%d %d:%d",
+					dboff, dbcount, j, i);
 			}
+			addskip(dboff, dbcount);
+			count++;
 		}
 	if (debug > 2)
 		fprintf(stderr, "\n");
@@ -1323,8 +1321,14 @@ addskip(uint32_t start, uint32_t size)
 {
 	struct range	   *skip;
 
+	if (size < frangesize)
+		return;
+
 	if ((skip = (struct range *) malloc(sizeof(*skip))) == NULL) {
-		fprintf(stderr, "Out of memory!\n");
+		fprintf(stderr, "No memory for skip range, "
+			"try again with '-F <numsect>'\n"
+			"where <numsect> is greater than the current %d\n",
+			frangesize);
 		exit(1);
 	}
 	

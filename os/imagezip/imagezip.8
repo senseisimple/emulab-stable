@@ -12,6 +12,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl dhiorv
+.Op Fl F Ar sectors
 .Op Fl I Ar slice
 .Op Fl s Ar slice
 .Op Fl z Ar level
@@ -191,6 +192,16 @@ how many sectors to compress in full disk mode.  Can be used to compress
 a subset of a disk.
 Incompatible with
 .Fl s .
+.It Fl F Ar sectors
+The minimum length in sectors that a free range needs to be before it
+is recorded as a free range.  Ranges shorter than this length are
+.Dq forgotten
+and wind up being compressed as allocated data.  This option has the
+effect of combining multiple, short allocated ranges into a single,
+longer range resulting in more efficient disk writes in
+.Xr imageunzip .
+A value of zero will cause all free blocks to be recorded accurately
+in the resulting image.  The default value is 64 (32KB).
 .It Fl l
 Tells
 .Nm
