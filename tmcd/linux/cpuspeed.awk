@@ -1,5 +1,9 @@
 #!/usr/bin/awk -f
 
+/^cpu MHz.*1[45][0-9][0-9]\.[0-9]+$/ {
+    print "1500";
+    next
+}
 /^cpu MHz.*8[0-9][0-9]\.[0-9]+$/ {
     print "850";
     next
