@@ -265,6 +265,7 @@ sub TMCCCMD_SYNCSERVER(){ "syncserver"; }
 # Some things never change.
 # 
 my $TARINSTALL  = "/usr/local/bin/install-tarfile %s %s %s";
+my $RPMINSTALL  = "/usr/local/bin/install-rpm %s %s";
 my $VTUND       = "/usr/local/sbin/vtund";
 
 #
@@ -1744,14 +1745,30 @@ sub dorpms ()
 	return 0;
     }
     
+    #
+    # Use tmcc to copy rpms for remote/jailed nodes,
+    # otherwise access via NFS.
+    #
+    # XXX for now we always copy the rpm when using NFS
+    # to avoid the stupid changing-exports-file server race
+    # (install-tarfile knows how to deal with said race when copying).
+    #
+    my $installoption = "-c";
+    if (JAILED() || PLAB()) {
+	$installoption .= " -t";
+	if (my $id = PLAB()) {
+	    $installoption .= " -n $id";
+	}
+    }
+
     open(RPM, ">" . TMRPM)
 	or die("Could not open " . TMRPM . ": $!");
     print RPM "#!/bin/sh\n";
     
     foreach my $rpm (@rpms) {
 	if ($rpm =~ /RPM=(.+)/) {
-	    my $rpmline = os_rpminstall_line($1);
-		    
+	    my $rpmline = sprintf($RPMINSTALL, $installoption, $1);
+
 	    print STDOUT "  $rpmline\n";
 	    print RPM    "echo \"Installing RPM $1\"\n";
 	    print RPM    "$rpmline\n";
