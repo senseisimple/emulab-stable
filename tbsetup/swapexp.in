@@ -654,6 +654,7 @@ if (! $batch) {
 	    if (! $quiet);
 	exit($? >> 8);
     }
+    TBdbfork();
 }
 
 #

@@ -415,6 +415,7 @@ if (my $childpid = TBBackGround($logname)) {
 	if (! $quiet);
     exit($? >> 8);
 }
+TBdbfork();
 
 # We are committed now. Affects how fatal() operates.
 $committed = 1;

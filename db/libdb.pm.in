@@ -1362,6 +1362,13 @@ sub TBLockExp($$;$)
 	$query_result->numrows == 0) {
 	return 0;
     }
+    if ($EVENTSYS && defined($newstate)) {
+	EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		       objname   => "$pid/$eid",
+		       eventtype => $newstate,
+		       expt      => "$pid/$eid",
+		       host      => $BOSSNODE);
+    }
     return 1;
 }
 
@@ -1412,6 +1419,13 @@ sub TBUnLockExp($$;$)
     if (! $query_result ||
 	$query_result->numrows == 0) {
 	return 0;
+    }
+    if ($EVENTSYS && defined($newstate)) {
+	EventSendFatal(objtype   => TBDB_TBEVENT_EXPTSTATE,
+		       objname   => "$pid/$eid",
+		       eventtype => $newstate,
+		       expt      => "$pid/$eid",
+		       host      => $BOSSNODE);
     }
     return 1;
 }
