@@ -33,6 +33,8 @@ using namespace __gnu_cxx;
 #include <hash_map>
 #endif
 
+#include "featuredesire.h"
+
 // Icky, but I can't include virtual.h here
 class tb_vnode;
 typedef hash_set<tb_vnode*,hashptr<tb_vnode*> > tb_vnode_set;
@@ -127,14 +129,12 @@ public:
 	  }
   };
 
-  typedef hash_map<crope,type_record*> types_map;
-  typedef hash_map<crope,double> features_map;
-
   // contains max nodes for each type
+  typedef hash_map<crope,type_record*> types_map;
   types_map types;
 
   // contains cost of each feature
-  features_map features;
+  node_feature_set features;
 
   crope name;			// name of the node
   bool typed;			// has it been typed
@@ -211,9 +211,9 @@ public:
 	   it!=node.types.end();it++) 
 	o << "    " << (*it).first << " -> " << (*it).second << endl;
       o << "  Features:" << endl;
-      for (features_map::const_iterator it = node.features.begin();
-	   it!=node.features.end();it++) 
-	cout << "    " << (*it).first << " -> " << (*it).second << endl;
+      for (node_feature_set::const_iterator it = node.features.begin();
+	   it != node.features.end(); it++) 
+	cout << "    " << it->name() << " -> " << it->cost() << endl;
       o << "  Current Type: " << node.current_type << endl; /* <<
 	" (" << node.current_load << "/" << node.max_load << ")" <<  endl; */
       o << "  switches=";

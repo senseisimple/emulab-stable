@@ -148,10 +148,12 @@ int parse_top(tb_vgraph &VG, istream& i)
 		      top_error("Bad desire, bad weight.");
 		      gweight = 0;
 		  }
-		  v->desires[desirename] = gweight;
+		  v->desires.push_front(
+			  tb_node_featuredesire(desirename,gweight));
 	      }
 	  }
 	}
+	v->desires.sort();
       }
     } else if (command.compare("link") == 0) {
       if (parsed_line.size() < 8) {

@@ -123,6 +123,8 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
     }
   }
 
+  // Commented out for now because it's too slow!
+#if 0
   // Check for 'local' desires - the reason we take the time to do this here is
   // that they are actually, in many ways, like types with vn->typecount > 1.
   if (matched && !vn->desires.empty()) {
@@ -130,12 +132,7 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
     for (desire_it = vn->desires.begin();
 	desire_it != vn->desires.end();
 	desire_it++) {
-      if (desire_it->first[0] != '?') {
-	continue;
-      }
-      if (desire_it->first[1] != '+') {
-	continue;
-      }
+      if (desire_it->is_l_additive() {
       tb_pnode::features_map::iterator feature_it =
 	pn->features.find(desire_it->first);
       if (feature_it == pn->features.end()) {
@@ -159,6 +156,7 @@ inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
       }
     }
   }
+#endif
 
   return matched;
 }

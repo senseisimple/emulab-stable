@@ -102,29 +102,22 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
   }
 
   // check features
-  for (tb_pnode::features_map::iterator it=a->features.begin();
-       it != a->features.end();++it) {
-    const crope &a_feature = (*it).first;
-    const double a_weight = (*it).second;
-    
-    tb_pnode::features_map::iterator bit;
-    bit = b->features.find(a_feature);
-    if ((bit == b->features.end()) || ((*bit).second != a_weight)) 
-      return 0;
-  }
+  tb_featuredesire_set_iterator fdit(a->features.begin(),a->features.end(),
+	  b->features.begin(),b->features.end());
 
-  // have to go both ways in case the second node has a feature the first
-  // doesn't
-  for (tb_pnode::features_map::iterator it=b->features.begin();
-       it != b->features.end();++it) {
-    const crope &b_feature = (*it).first;
-    const double b_weight = (*it).second;
-    
-    tb_pnode::features_map::iterator ait;
-    ait = a->features.find(b_feature);
-    if (ait == a->features.end()) {
-      return 0;
-    }
+  while (!fdit.done()) {
+      if (fdit.membership() == tb_featuredesire_set_iterator::BOTH) {
+	  // Great, we've got a feature that's in both, just make sure that
+	  // the two are equivalent (score, etc.)
+	  if (!fdit.both_equiv()) {
+	      return 0;
+	  }
+      } else {
+	  // Got a feature that's in one but not the other
+	  return 0;
+      }
+
+      fdit++;
   }
 
   // Check links

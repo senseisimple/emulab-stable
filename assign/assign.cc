@@ -27,6 +27,7 @@
 #include <signal.h>
 #include <sys/signal.h>
 #include <queue>
+#include <algorithm>
 
 using namespace boost;
 
@@ -429,7 +430,7 @@ int mapping_precheck() {
 	int matched_bw = 0;
 	// Keep track of desires had how many 'hits', so that we can tell
 	// if any simply were not matched
-	tb_vnode::desires_count_map matched_desires;
+	map<crope,int> matched_desires;
 
 	// Keep track of which link types had how many 'hits', so that we can
 	// tell which type(s) caused this node to fail
@@ -493,52 +494,41 @@ int mapping_precheck() {
 		    }
 		}
 
-		//
-		// Check features and desires
-		//
+		/*
+		 * Check features and desires
+		*/
 
-		// Desires first
-		for (tb_vnode::desires_map::iterator desire_it = v->desires.begin();
-			desire_it != v->desires.end();
-			desire_it++) {
-		    crope name = (*desire_it).first;
-		    float value = (*desire_it).second;
-		    // Only check for desires that would result in a violation if
-		    // unsatisfied
-		    if (value >= FD_VIOLATION_WEIGHT) {
-			if (matched_desires.find(name) == matched_desires.end()) {
-			    matched_desires[name] = 0;
+		tb_featuredesire_set_iterator
+		    fdit(v->desires.begin(),v->desires.end(),
+			 pnode->features.begin(),pnode->features.end());
+		for (;!fdit.done();fdit++) {
+		    // Skip 'local' and 'global' features
+		    if (fdit->is_global() || fdit->is_local()) {
+			continue;
+		    }
+		    // Only check for FDs that would result in a violation if
+		    // unmatched.
+		    if (fdit.either_violateable()) {
+			// We look for violateable desires on vnodes so that we
+			// can report them to the user
+			if (fdit.membership() ==
+				tb_featuredesire_set_iterator::BOTH &&
+				fdit.membership() ==
+				tb_featuredesire_set_iterator::FIRST_ONLY &&
+				fdit.first_iterator()->is_violateable() &&
+				matched_desires.find(fdit->name())
+				== matched_desires.end()) {
+			    matched_desires[fdit->name()] = 0;
 			}
-			tb_pnode::features_map::iterator feature_it =
-			    pnode->features.find(name);
-			if (feature_it != pnode->features.end()) {
-			    matched_desires[name]++;
+			if (fdit.membership() ==
+				tb_featuredesire_set_iterator::BOTH) {
+			    matched_desires[fdit->name()]++;
 			} else {
 			    potential_match = false;
 			}
 		    }
 		}
-
-		// Next, features
-		for (tb_pnode::features_map::iterator feature_it = pnode->features.begin();
-			feature_it != pnode->features.end(); feature_it++) {
-		    crope name = (*feature_it).first;
-		    float value = (*feature_it).second;
-		    // Skip 'local' and 'global' features
-		    if (name[0] == '*' || name[0] == '?') {
-			continue;
-		    }
-		    // Only check for feature that would result in a violation if
-		    // undesired
-		    if (value >= FD_VIOLATION_WEIGHT) {
-			tb_vnode::desires_map::iterator desire_it =
-			    v->desires.find(name);
-			if (desire_it == v->desires.end()) {
-			    potential_match = false;
-			}
-		    }
-		}
-
+		
 		// Check link types
 		tb_vnode::link_counts_map::iterator vit;
 		for (vit = v->link_counts.begin(); vit != v->link_counts.end();
@@ -604,7 +594,7 @@ int mapping_precheck() {
 		cout << "      Too much bandwidth on emulated links!" << endl;
 	    }
 
-	    for (tb_vnode::desires_count_map::iterator dit = matched_desires.begin();
+	    for (map<crope,int>::iterator dit = matched_desires.begin();
 		    dit != matched_desires.end();
 		    dit++) {
 		if (dit->second == 0) {

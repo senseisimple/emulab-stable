@@ -21,6 +21,8 @@ using namespace __gnu_cxx;
 #endif
 
 #include "config.h"
+#include <utility>
+#include <rope>
 
 #include <boost/graph/adjacency_list.hpp>
 
@@ -218,5 +220,8 @@ template <class T> struct hashptr {
 #else
 #define HASH_MAP
 #endif
+
+// For use in functions that want to return a score/violations pair
+typedef pair<double,int> score_and_violations;
 
 #endif
