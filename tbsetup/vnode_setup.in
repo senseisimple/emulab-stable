@@ -18,10 +18,10 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: vnode_setup [-f] [-k] [-n <number>] <pid> <eid> [node ...]\n";
+    print STDOUT "Usage: vnode_setup [-f] [-k] [-n <numbatch>] [-w <wait_time>] <pid> <eid> [node ...]\n";
     exit(-1);
 }
-my  $optlist = "fdkn:";
+my  $optlist = "fdkn:w:";
 
 #
 # We don't want to run this script unless its the real version.
@@ -47,9 +47,8 @@ my $force       = 0;
 my $failed      = 0;
 my $killmode    = 0;
 my $numbatch    = 10;
+my $childwait   = 120;
 my $dbuid;
-
-my $CHILD_TIMEOUT = 960;  # 15 + 1 mins slop - plab needs a LOOOONNNGG TIME....
 
 #
 # Load the Testbed support stuff. 
@@ -91,6 +90,14 @@ if (defined($options{"n"})) {
     }
     else {
         die ("*** Bad data in numbatch: $options{'n'}");
+    }
+}
+if (defined($options{"w"})) {
+    if ($options{"w"} =~ /^(\d+)$/) {
+        $childwait = $1;
+    }
+    else {
+        die ("*** Bad data in wait_time: $options{'w'}");
     }
 }
 
@@ -273,6 +280,8 @@ foreach my $node (@nodes) {
     # When setting up a vnode, force its event state into SHUTDOWN since
     # no telling what its initial state is. 
     # 
+    # XXX: Don't we always want to set this?
+    #
     if ($mode eq "teardown" || $mode eq "reboot") {
 	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
     }
@@ -287,7 +296,8 @@ foreach my $node (@nodes) {
 
 my $children = 0;
 my %child_vnodes = ();
-print "Running at parallelization: $numbatch\n";
+print "vnode_setup running at parallelization: $numbatch ". 
+    "wait_time: $childwait\n";
 while (1) {
 
     # Space out the invocation of child processes a little.
@@ -334,6 +344,10 @@ while (1) {
 	    $UID = 0;
 
 	    if ($plab && $mode eq "setup") {
+                # Make sure vnode is in the proper state before trying to
+                # bring it up.
+                # XXX: do this for all vnodes (see above)?
+                TBSetNodeEventState($vnode, TBDB_NODESTATE_SHUTDOWN);
 		if (TBForkCmd("$TB/sbin/plabnode ". 
                               ($force ? "-f" : "").
                               " alloc $pid $eid $vnode", 1)) {
@@ -397,7 +411,7 @@ while (1) {
 	# back around the loop
 	#
 	my $now = time();
-	my $waittime = ($oldest + $CHILD_TIMEOUT) - time();
+	my $waittime = ($oldest + $childwait) - time();
 
 	#
 	# Kill of the oldest if he gets too old while we're waiting

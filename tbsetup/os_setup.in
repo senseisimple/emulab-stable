@@ -749,9 +749,19 @@ elsif ($failed && @vnodelist) {
 	"failures!\n";
 }
 elsif (@vnodelist) {
+    my $vnode_setup_args = ""; # add any generic args here.
+
     print "Setting up virtual testbed nodes ...\n";
 
-    system("$vnode_setup $pid $eid");
+    # If there are any plab vnodes, we have to adjust batching and timeouts
+    # accordingly.
+    if (grep($_, values(%plabvnodes))) {
+        my $plabnumbatch = TBGetSiteVar("plab/setup/vnode_batch_size");
+        my $plabwait     = TBGetSiteVar("plab/setup/vnode_wait_time");        
+        $vnode_setup_args .= " -n $plabnumbatch -w $plabwait ";
+    }
+
+    system("$vnode_setup $vnode_setup_args $pid $eid");
     if ($?) {
 	die_noretry("*** $0:\n".
 	    "    Vnode setup failed!");
