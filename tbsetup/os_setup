@@ -67,7 +67,7 @@ if ($UID != 0) {
     }
     @row = $db_result->fetchrow_array();
     if ($row[0] ne "$me") {
-	print STDOUT "Checking for admin status ...\n" if $dbg;
+	print STDERR "Checking for admin status ...\n" if $dbg;
 	$db_result = $DB->query("select admin from users where uid='$me'");
         @row = $db_result->fetchrow_array();
 	if ($row[0] != 1) {
@@ -215,10 +215,12 @@ foreach my $node ( keys %nodeos ) {
     my $os	= $nodeos{$node};
     my $path    = $nodepath{$node};
 
+    print STDOUT "Changing default OS for $pc to $os:$path ".
+	         "and rebooting ...\n";
+
     #
     # database goo. Reset the OS stuff.
     #
-    print STDERR "Changing default OS for $pc to $os:$path\n";
     $sth = $DB->query("update nodes set ".
 		      "def_boot_image_id='$os',def_boot_path='$path' ".
 		      "where node_id='$pc'");
@@ -232,7 +234,7 @@ foreach my $node ( keys %nodeos ) {
 	# not ready to do that. Just skip the node and let the user deal
 	# with it.
 	#
-	printf STDERR "Skipping $node. You will need to load the OS.\n";
+	printf STDOUT "Skipping $node. You will need to load the OS.\n";
 	next;
     }
 
@@ -298,6 +300,8 @@ foreach my $node ( keys %nodeos ) {
     PowerCycle($pc);
 }
 
+print STDOUT "Waiting for testbed nodes to finish rebooting ...\n";
+
 #
 # Now lets wait for them to come back alive.
 #
@@ -309,14 +313,15 @@ foreach my $node ( keys %nodeos ) {
     # we are not going to deal with them anyway later in the process.
     #
     if ($waitfor{$pc} == 0) {
-	print STDERR "Not waiting for $pc to come alive. Foreign OS.\n";
+	print STDOUT "Not waiting for $pc to come alive. Foreign OS.\n";
 	next;
     }	
 
     if (WaitTillAlive($pc) == 0) {
-	print STDERR "Yippie! $pc is alive and well\n";
+	print STDOUT "$pc is alive and well\n";
 	next;
     }
+    print STDOUT "$pc is not responding. Better check into it\n";
     die("Oops, $pc did not come back alive!");
 }
 
