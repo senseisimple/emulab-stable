@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 
-
 #
 # Linux specific routines and constants for the client bootime setup stuff.
 #
@@ -16,7 +15,7 @@ use Exporter;
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line enable_ipod
+	 os_rpminstall_line
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel
@@ -25,11 +24,21 @@ use Exporter;
 # Must come after package declaration!
 use English;
 
-#
-# This is the Linux dependent part of the setup library. 
-# 
-my $SETUPDIR = "/etc/rc.d/testbed";
-libsetup::libsetup_init($SETUPDIR);
+# Load up the paths. Its conditionalized to be compatabile with older images.
+# Note this file has probably already been loaded by the caller.
+BEGIN
+{
+    if (-e "/etc/emulab/paths.pm") {
+	require "/etc/emulab/paths.pm";
+	import emulabpaths;
+    }
+    else {
+	my $ETCDIR  = "/etc/rc.d/testbed";
+	my $BINDIR  = "/etc/rc.d/testbed";
+	my $VARDIR  = "/etc/rc.d/testbed";
+	my $BOOTDIR = "/etc/rc.d/testbed";
+    }
+}
 
 #
 # Various programs and things specific to Linux and that we want to export.
@@ -38,16 +47,16 @@ $CP		= "/bin/cp";
 $EGREP		= "/bin/egrep -q";
 $MOUNT		= "/bin/mount";
 $UMOUNT		= "/bin/umount";
-$TMPASSWD	= "$SETUPDIR/passwd";
+$TMPASSWD	= "$ETCDIR/passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
 
 #
 # These are not exported
 #
-my $TMGROUP	= "$SETUPDIR/group";
-my $TMSHADOW    = "/etc/rc.d/testbed/shadow";
-my $TMGSHADOW   = "/etc/rc.d/testbed/gshadow";
+my $TMGROUP	= "$ETCDIR/group";
+my $TMSHADOW    = "$ETCDIR/shadow";
+my $TMGSHADOW   = "$ETCDIR/gshadow";
 my $USERADD     = "/usr/sbin/useradd";
 my $USERDEL     = "/usr/sbin/userdel";
 my $USERMOD     = "/usr/sbin/usermod";
@@ -262,45 +271,8 @@ sub os_setup()
 }
     
 #
-# OS dependent "ICMP Ping of Death" support
-#
-
-use Socket;
-
-sub enable_ipod()
-{
-    if (system("sysctl net.ipv4.icmp_ipod_host >/dev/null")) {
-	warn "*** WARNING: IPOD sysctls not supported in the kernel\n";
-	return -1;
-    }
-
-    my ($bname, $bip) = split(/ /, `/etc/rc.d/testbed/tmcc bossinfo`);
-    if (!defined($bip)) {
-	warn "*** WARNING: could not determine boss node, IPOD not enabled\n";
-	return -1;
-    }
-    my $ipuint = unpack("N", inet_aton($bip));
-
-    # XXX arg to sysctl must be a signed 32-bit int, so we must "cast"
-    my $sysctlcmd = sprintf("sysctl -w net.ipv4.icmp_ipod_host=%d", $ipuint);
-
-    if (system($sysctlcmd . ">/dev/null")) {
-	warn "*** WARNING: could not set IPOD host to $bip ($ipuint)\n";
-	return -1;
-    }
-    if (system("sysctl -w net.ipv4.icmp_ipod_enabled=1 >/dev/null")) {
-	warn "*** WARNING: could not enable IPOD\n";
-	return -1;
-    }
-
-    print STDOUT "IPOD enabled from $bip\n";
-    return 0;
-}
-
-#
 # OS dependent, routing-related commands
 #
-
 sub os_routing_enable_forward()
 {
     my $cmd;
@@ -316,7 +288,7 @@ sub os_routing_enable_gated()
     # XXX hack to avoid gated dying mysteriously with TCP/611 already in use
     $cmd = "sleep 3\n    ";
     $cmd .= "(ps alxww ; netstat -na) > /tmp/gated.state\n    ";
-    $cmd .= "$GATED -f $SETUPDIR/gated_`$SETUPDIR/control_interface`.conf";
+    $cmd .= "$GATED -f $BINDIR/gated_`$BINDIR/control_interface`.conf";
     return $cmd;
 }
 
