@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.4 2002-01-29 12:15:19 imurdock Exp $
+ * $Id: event.h,v 1.5 2002-01-31 12:42:51 imurdock Exp $
  */
 
 #ifndef __EVENT_H__
@@ -13,6 +13,10 @@
 
 #include <stdio.h>
 #include <elvin/elvin.h>
+
+#ifndef MAXHOSTNAMELEN
+#define MAXHOSTNAMELEN 64
+#endif /* MAXHOSTNAMELEN */
 
 /* Handle to the event server: */
 struct event_handle {
@@ -27,8 +31,12 @@ typedef elvin_notification_t event_notification_t;
 /* Event subscription: */
 typedef elvin_subscription_t event_subscription_t;
 
+/* The "any host" string: */
+#define EVENT_HOST_ANY "*"
+
 /* Supported event types: */
 typedef enum {
+    EVENT_NULL,
     EVENT_TEST,
     EVENT_SCHEDULE,
     EVENT_TRAFGEN_START,
@@ -45,13 +53,6 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
                                         event_notification_t notification,
                                         char *host, event_type_t type,
                                         void *data);
-
-/*
- * Event notification attribute definitions:
- */
-
-/* The "any host" string: */
-#define EVENT_HOST_ANY "*"
 
 /*
  * Debugging and tracing definitions:
