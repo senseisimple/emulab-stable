@@ -30,6 +30,8 @@ my $sth = "";
 my $self = (getpwuid($UID))[0]
   || die "Cannot figure out who you are!\n";
 
+if ($d) { print "You are '$self', expt '$eid', proj '$pid'\n"; }
+
 $cmd = "select uid from proj_memb as pm left join experiments as e on ".
   "e.pid=pm.pid where e.eid='$eid' and uid='$self' and e.pid='$pid'";
 $sth = $dbh->query($cmd);

@@ -1031,7 +1031,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \
 	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
-	tbsetup/sched_reload tbsetup/reload_daemon \
+	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/killbatchexp tbsetup/batch_daemon \
 	tbsetup/webbatchexp tbsetup/webkillbatchexp \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \

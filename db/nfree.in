@@ -53,7 +53,8 @@ if ($sth->numrows < 1) {
 }
  
 $cmd = "lock tables nodes write, node_types read, reloads read, ".
-  "interfaces write, delays write, reserved write, last_reservation write";
+  "interfaces write, delays write, reserved write, last_reservation write,".
+  "next_reserve read";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
@@ -68,6 +69,7 @@ if ($#node_names == -1) {
 }
 
 my %reloads = ();
+my %reserves= ();
 foreach my $n (@node_names) { 
   $sth = $dbh->query("select * from reserved where node_id='$n' ".
 		     "and eid='$eid' and pid='$pid'");
@@ -88,10 +90,10 @@ foreach my $n (@node_names) {
   $sth = $dbh->query($cmd)
     || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	&& $error++);
-  
+
   if ( ($sth->num_rows()) > 0) {
     my @reload;
-    print "Adding reloads for $n to the list.\n";
+    print "Adding reload for $n to the list.\n";
     my $i = 0;
     my $max = $sth->num_rows();
     while ( $i < $max  ) {
@@ -109,16 +111,34 @@ foreach my $n (@node_names) {
       }
     }
   } else {
-    # No reloads to be done, so really free the node
-    # This little sillyness is for disk reloading. Remember the last
-    # project a node was reserved into. 
-    $cmd = "insert into last_reservation values ('$n', '$pid')";
-    $dbh->query($cmd);
-    print "Releasing node '$n'...";
-    $cmd = "delete from reserved where node_id='$n' and eid='$eid'";
-    $sth = $dbh->query($cmd) && print "Succeeded.\n"
+    # If the node has a next_reserve entry, change the reservation and start it
+    $cmd = "select node_id,pid,eid from next_reserve where node_id='$n'";
+    $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++);
+    if ( ($sth->num_rows()) > 0) {
+      my @reserve;
+      print "Adding next reservation for $n to the list.\n";
+      my $i = 0;
+      my $max = $sth->num_rows();
+      while ( $i < $max  ) {
+	$i++;
+	@reserve = $sth->fetchrow_array();
+	my ($node, $next_pid, $next_eid) = @reserve;
+	$reserves{$node} = "$next_pid:$next_eid";
+      }
+    } else {
+      # No reloads or reservation changes, so really free the node
+      # This little sillyness is for disk reloading. Remember the last
+      # project a node was reserved into.
+      $cmd = "insert into last_reservation values ('$n', '$pid')";
+      $dbh->query($cmd);
+      print "Releasing node '$n'...";
+      $cmd = "delete from reserved where node_id='$n' and eid='$eid'";
+      $sth = $dbh->query($cmd) && print "Succeeded.\n"
+	|| (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	    && $error++);
+    }
   }
 
   if (! ($n =~ /sh\d+/)) { #If its not a shark
@@ -177,10 +197,10 @@ foreach $reload ( keys %reloads ) {
   print STDERR "Reload for @list complete.\n";
 }
 
-if ( @reloaded > 0 ) {
+if ( (@reloaded > 0) || (keys %reserves > 0) ) {
   print "Locking tables.\n";
   $cmd = "lock tables nodes read, node_types read, reloads read, ".
-    "interfaces write, reserved write";
+    "interfaces write, reserved write, next_reserve write";
   $sth = $dbh->query($cmd) 
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
   
@@ -194,6 +214,21 @@ if ( @reloaded > 0 ) {
 	  && $error++ && next);
   }
   
+  foreach $n ( keys %reserves ) {
+    my ($next_pid,$next_eid) = split (":",$reserves{$n});
+    # Change reservation (don't delete or we'll get races)
+    print "Changing reservation for $n to $next_pid/$next_eid...\n";
+    $cmd = "update reserved set pid='$next_pid',eid='$next_eid' where ".
+      "node_id='$n'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++ && next);
+    $cmd = "delete from next_reserve where node_id='$n'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++ && next);
+  }
+
   print "Unlocking tables.\n";
   $cmd = "unlock tables";
   $sth = $dbh->query($cmd) 

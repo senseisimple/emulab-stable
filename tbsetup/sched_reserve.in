@@ -1,0 +1,101 @@
+#!/usr/bin/perl -wT
+use English;
+
+# Schedule the reservation of a node. If the node is not currently in use,
+# nalloc will be called to reserve the node immediately. If the node is 
+# currently reserved, an entry will be added to the next_reserve table, and
+# when the node is freed it will be reserved to the given experiment.
+#
+# usage: sched_reserve <pid> <eid> <node> [<node> ...]
+
+sub usage() {
+  die("Usage: sched_reserve <pid> <eid> <node> [<node> ...]\n".
+      "Reserves nodes to eid when the are free.\n");
+}
+
+# Configure variables
+my $TB     = "@prefix@";
+
+# Load the Testbed support stuff.
+push(@INC, "$TB/lib");
+require libdb;
+
+my $nalloc      = "$TB/bin/nalloc";
+my $debug       = 0;
+my @nodes       = ();
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1;				#Turn off line buffering on output
+
+if (@ARGV < 2) {
+  usage();
+}
+
+# Untaint args.
+my $pid   = shift;
+if ($pid =~ /^([-\@\w.\+]+)$/) {
+  $pid = $1;
+} else {
+  die("Bad data in pid '$pid'.");
+}
+
+my $eid   = shift;
+if ($eid =~ /^([-\@\w.\+]+)$/) {
+  $eid = $1;
+} else {
+  die("Bad data in eid '$eid'.");
+}
+
+foreach my $node ( @ARGV ) {
+  if ($node =~ /^([-\@\w]+)$/) {
+    $node = $1;
+  } else {
+    die("Bad node name '$node'.");
+  }
+  push(@nodes, $node);
+}
+
+# Root and admin types can do whatever they want.
+# Mere users cannot schedule reservations (yet?)
+if ($UID && !TBAdmin($UID)) {
+  die("Only root or TB administrators can schedule reservations.\n");
+}
+
+foreach my $node (@nodes) {
+  my $pc = $node;
+  my $allocated = 0;
+
+  $sth = DBQueryFatal("select * from nodes where node_id='$pc'");
+  if ($sth->num_rows() != 1) {
+    print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
+    next;
+  }
+
+  print "Checking if $pc is reserved...";
+  $sth = DBQueryFatal("select * from reserved where node_id='$pc'");
+
+  if ( ($sth->num_rows()) < 1) {
+    print "Available - Reserving...\n";
+    print STDERR "Using proj $pid, expt $eid, I am ",`whoami`;
+    my $cmd = "$nalloc $pid $eid $pc";
+    if ( system($cmd) != 0 ) {
+      print STDERR "WARNING: Could not reserve $pc!\n";
+    }
+  } else {
+    $sth = DBQueryFatal("select * from reserved where node_id='$pc' and ".
+		       "pid='$pid' and eid='$eid'");
+    if ( ($sth->num_rows()) < 1) {
+      print "Reserved  - Scheduling next reservation...\n";
+      $sth = DBQueryFatal("replace into next_reserve (node_id,pid,eid) ".
+			  "values ('$pc','$pid','$eid')");
+    } else {
+      print "Reserved  - Already reserved to $pid/$eid\n";
+    }
+  }
+}
+
+# If I haven't died yet, then this was successful.
+exit 0;
