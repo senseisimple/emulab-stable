@@ -338,7 +338,7 @@ if ($showlinks) {
 
     if ($result->numrows) {
 	print  "Virtual Queue Info:\n";
-	printf "%-15s %-15s %-10s %-7s %s\n",
+	printf "%-15s %-15s %-15s %-7s %s\n",
 	       "ID", "Member", "Q Limit", "Type",
 	       "weight/min_th/max_th/linterm";
 	print  "--------------- --------------- ---------- ".
@@ -348,8 +348,8 @@ if ($showlinks) {
 		$q_weight,$q_linterm,$q_qinbytes,$q_red,$q_gentle)
 	       = $result->fetchrow_array()) {
 
-	    printf("%-15s %-15s %-10s %-7s %s\n", $vname, $member,
-		   $q_limit . ($q_qinbytes ? "b" : "s"),
+	    printf("%-15s %-15s %-15s %-7s %s\n", $vname, $member,
+		   $q_limit . ($q_qinbytes ? " bytes" : " slots"),
 		   ($q_red ? ($q_gentle ? "GRED" : "RED") : "Tail"),
 		   ($q_red ? "$q_weight/$q_minthresh/$q_maxthresh/$q_linterm" :
 		    "0/0/0/0"));
