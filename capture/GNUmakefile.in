@@ -23,8 +23,7 @@ capture: capture.c
 #
 # Do not install by default.
 #
-install:
-real-install:	all
+install:	all
 	install -s capture $(DESTDIR)/usr/site/bin
 
 clean:

@@ -5,13 +5,7 @@ SUBDIR		= tip
 
 include $(OBJDIR)/Makeconf
 
-#
-# Do not build tip in general build. All this kludgery is to make sure
-# that if we build on paper but install it on plastic, tip will get
-# built over there and not here. 3.4 vs 4.1 problems. Big Sigh. 
-# 
-all:
-	@echo "TIP cannot be built or installed on the ops node"
+all:	tip
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -25,23 +19,12 @@ OBJS = cmds.o cmdtab.o hunt.o partab.o \
 #
 LIBS=
 
-tip: $(OBJS)
-	$(CC) -o tip $(OBJS) $(LIBS)
-
-tip.static: $(OBJS)
-	$(CC) -static -o tip.static $(OBJS) $(LIBS)
+tip:	$(OBJS)
+	$(CC) -static -o tip $(OBJS) $(LIBS)
 
 $(OBJS): tipconf.h tip.h
 
-install:
-	@echo "TIP cannot be built or installed on the ops node"
-
-#
-# Control node installation (okay, plastic)
-#
-control-install:	tip.static
-	-mkdir -p $(INSTALL_BINDIR)
-	$(INSTALL_PROGRAM) tip.static $(INSTALL_BINDIR)/tip
+install:	all $(INSTALL_BINDIR)/tip
 
 clean:
-	rm -f $(OBJS) tip tip.static
+	rm -f $(OBJS) tip
