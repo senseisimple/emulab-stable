@@ -133,7 +133,20 @@ tb_pnode *find_pnode(tb_vnode *vn)
   
   int i = std::random()%num_types;
   int first = i;
+  bool first_time_through = true;
   for (;;) {
+
+    // Stopping condition - stop if we're back to the first one, and this isn't
+    // our first time through the loop
+    if (i == first) {
+      if (first_time_through) {
+	first_time_through = false;
+      } else {
+	// Couldn't find a sutable node
+	return NULL;
+      }
+    }
+
     i = (i+1)%num_types;
 
     // Skip pclasses that have been disabled
@@ -231,13 +244,6 @@ REDO_SEARCH:
       RDEBUG(cout << " to " << newpnode->name << endl;)
       return newpnode;
     }
-
-#ifndef PCLASS_SIZE_BALANCE
-    if (i == first) {
-	// couldn't find one
-	return NULL;
-    }
-#endif
   }
 }
 
