@@ -42,8 +42,10 @@ class hvApp(wxApp):
     # The app initialization.
     def OnInit(self):
 	
-	# Given command-line argument(s), attempt to read in a topology.
-	filename = filearg = project = experiment = root = None
+	filename = filearg = default_project = project = experiment = root = None
+	if os.environ.has_key("EMULAB_PROJECT"):    # Default project name to use.
+	    default_project = project = os.environ["EMULAB_PROJECT"]
+
 	# Any dash argument prints a usage message and exits.
 	if len(sys.argv) == 2 and sys.argv[1][0] == '-': 
 	    print '''Hyperviewer usage:
@@ -58,6 +60,7 @@ class hvApp(wxApp):
 	    sys.exit()
 	    pass
 	
+	# Given command-line argument(s), attempt to read in a topology.
 	# One command-line argument: read from a .hyp file.
 	# (File/experiment input is also in the OnOpenFile and OnOpenExperiment methods.)
 	elif len(sys.argv) == 2:
@@ -68,6 +71,8 @@ class hvApp(wxApp):
 	# Two args: read an experiment from the DB via XML-RPC, and make a .hyp file.
 	elif len(sys.argv) == 3:
 	    project = sys.argv[1]
+	    if project == "":
+		project = default_project
 	    experiment = sys.argv[2]
 	    print "Getting project:", project + ", experiment:", experiment
 	    filename = exptToHv.getExperiment(project, experiment)
@@ -76,6 +81,8 @@ class hvApp(wxApp):
 	# Three args: experiment from database, with optional graph root node.
 	elif len(sys.argv) == 4:
 	    project = sys.argv[1]
+	    if project == "":
+		project = default_project
 	    experiment = sys.argv[2]
 	    root = sys.argv[3]
 	    print "Getting project:", project + ", experiment:", experiment \
@@ -93,15 +100,18 @@ class hvApp(wxApp):
 	# Initialize the text fields in the File/Open dialog.
 	if filearg:
 	    self.openDialog.FileToOpen.SetValue(filearg) 
+        self.openDialog.LoginName.SetValue(exptToHv.login_id)
 	if project:
 	    self.openDialog.ProjectName.SetValue(project)
+	elif default_project:
+	    self.openDialog.ProjectName.SetValue(default_project)
 	if experiment:
 	    self.openDialog.ExperimentName.SetValue(experiment)
 	    self.openDialog.ExperimentName.SetFocus()
 	if root:
 	    self.openDialog.ExperimentRoot.SetValue(root)
 	
-	# Make it visible.
+	# Make the top-level window visible.
 	self.frame.Show()
 	self.SetTopWindow(self.frame)
 
@@ -557,6 +567,7 @@ class hvOpen(OpenDialogUI):
 	EVT_TEXT_ENTER(self.FileToOpen, -1, self.OnOpenFile)
 
 	EVT_BUTTON(self.OpenExperiment, -1, self.OnOpenExperiment)
+	EVT_TEXT_ENTER(self.LoginName, -1, self.OnLoginName)
 	EVT_TEXT_ENTER(self.ProjectName, -1, self.OnOpenExperiment)
 	EVT_TEXT_ENTER(self.ExperimentName, -1, self.OnOpenExperiment)
 	EVT_TEXT_ENTER(self.ExperimentRoot, -1, self.OnOpenExperiment)
@@ -586,6 +597,12 @@ class hvOpen(OpenDialogUI):
 	    self.FileMsg.SetLabel(fileError)
 	    pass
 	pass
+    
+    ##
+    # Change the SSH login name.
+    def OnLoginName(self, cmdEvent):
+        exptToHv.login_id = self.LoginName.GetLineText(0)
+        pass
     
     ##
     # Get topology data for an experiment from the database via XML-RPC.

@@ -67,6 +67,8 @@ class OpenDialogUI(wxDialog):
         self.FileToOpen = wxTextCtrl(self, -1, "", style=wxTE_PROCESS_ENTER)
         self.OpenFile = wxButton(self, -1, "Open Data File")
         self.FileMsg = wxStaticText(self, -1, "")
+        self.label_3 = wxStaticText(self, -1, "SSH login name:", style=wxALIGN_RIGHT)
+        self.LoginName = wxTextCtrl(self, -1, "", style=wxTE_PROCESS_ENTER)
         self.label_2 = wxStaticText(self, -1, "Project name:", style=wxALIGN_RIGHT)
         self.ProjectName = wxTextCtrl(self, -1, "", style=wxTE_PROCESS_ENTER)
         self.label_7 = wxStaticText(self, -1, "Experiment name:")
@@ -83,7 +85,7 @@ class OpenDialogUI(wxDialog):
     def __set_properties(self):
         # begin wxGlade: OpenDialogUI.__set_properties
         self.SetTitle("Open HyperViewer Data")
-        self.SetSize((387, 351))
+        self.SetSize((430, 372))
         self.FileToOpen.SetFocus()
         # end wxGlade
 
@@ -91,17 +93,19 @@ class OpenDialogUI(wxDialog):
         # begin wxGlade: OpenDialogUI.__do_layout
         sizer_4 = wxBoxSizer(wxVERTICAL)
         ExperimentOpening = wxStaticBoxSizer(wxStaticBox(self, -1, "Experiment to retrieve:"), wxVERTICAL)
-        grid_sizer_1 = wxFlexGridSizer(3, 2, 10, 10)
+        grid_sizer_1 = wxFlexGridSizer(4, 2, 10, 10)
         FileOpening = wxStaticBoxSizer(wxStaticBox(self, -1, "File for HyperViewer data:"), wxVERTICAL)
-        FileOpening.Add(self.FileToOpen, 0, wxEXPAND, 0)
+        FileOpening.Add(self.FileToOpen, 0, wxTOP|wxEXPAND, 5)
         FileOpening.Add(self.OpenFile, 0, wxTOP|wxALIGN_CENTER_HORIZONTAL, 10)
         FileOpening.Add(self.FileMsg, 0, 0, 0)
         sizer_4.Add(FileOpening, 0, wxALL|wxEXPAND, 10)
-        grid_sizer_1.Add(self.label_2, 0, 0, 0)
+        grid_sizer_1.Add(self.label_3, 0, wxALIGN_CENTER_VERTICAL, 0)
+        grid_sizer_1.Add(self.LoginName, 0, wxTOP|wxEXPAND, 5)
+        grid_sizer_1.Add(self.label_2, 0, wxALIGN_CENTER_VERTICAL, 0)
         grid_sizer_1.Add(self.ProjectName, 0, wxEXPAND, 0)
-        grid_sizer_1.Add(self.label_7, 0, 0, 0)
+        grid_sizer_1.Add(self.label_7, 0, wxALIGN_CENTER_VERTICAL, 0)
         grid_sizer_1.Add(self.ExperimentName, 0, wxEXPAND, 0)
-        grid_sizer_1.Add(self.label_8, 0, 0, 0)
+        grid_sizer_1.Add(self.label_8, 0, wxALIGN_CENTER_VERTICAL, 0)
         grid_sizer_1.Add(self.ExperimentRoot, 0, wxEXPAND, 0)
         grid_sizer_1.AddGrowableCol(1)
         ExperimentOpening.Add(grid_sizer_1, 0, wxEXPAND, 0)
