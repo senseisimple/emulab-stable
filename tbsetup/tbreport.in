@@ -226,7 +226,8 @@ if ($showlinks) {
 
     my $result =
 	DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
-		     "from virt_lans where pid='$pid' and eid='$eid'");
+		     "from virt_lans where pid='$pid' and eid='$eid'".
+		     "order by vname");
 
     if ($result->numrows) {
 	print  "Lan/Link Info:\n";
@@ -297,7 +298,7 @@ if ($showlinks) {
 	print  "--------------- --------------- --------------- --------- ".
 		"--------- ---------\n";
 
-	foreach my $link (keys %links) {
+	foreach my $link (sort keys %links) {
 	    my ($node1, $node2) = @{$links{$link}};
 	    my ($virt1,$pname1,$card1) = @$node1;
 	    my ($virt2,$pname2,$card2) = @$node2;
