@@ -168,7 +168,8 @@ main(int argc, char **argv)
 		}
 		count++;
 		if ((count % 10) == 0)
-			info("Waiting for nodes in %s/%s to come up ...\n");
+			info("Waiting for nodes in %s/%s to come up ...\n",
+			     pid, eid);
 
 		sleep(1);
 	}
@@ -421,7 +422,7 @@ get_static_events(event_handle_t handle)
 	/*
 	 * Pad the start time out a bit to give this code a chance to run.
 	 */
-	now.tv_sec += 10;
+	now.tv_sec += 30;
 	
 	while (nrows) {
 		double		firetime;
