@@ -152,9 +152,11 @@ sub TBDBConnect()
     }
     my $dbuser = "$scriptname:$name";
 
-    
-    while ($maxtries && !defined($DB)) {
+    while ($maxtries) {
 	$DB = Mysql->connect("localhost", $DBNAME, $dbuser, "none");
+	if (defined($DB)) {
+	    last;
+	}
 	$maxtries--;
 	sleep(1);
     }
