@@ -110,21 +110,28 @@ function NLCEMPTY()
 
 <tr>
 
-<?php NLCH1("Introduction") ?>
+<?php NLCH1("Preface") ?>
 
 <?php NLCBODYBEGIN() ?>
-<!-- Center -->
 
-
-<em>Preface</em>:
 We have deployed and opened to public external use a small version of
 what will grow into a large mobile robotic wireless testbed.  The
 small version (4 Motes and 4 Stargates on 4 robots, all remotely
 controllable) is in an open area within our offices; the big one will
 be elsewhere.
 
+<?php NLCBODYEND() ?>
 
-<h4>How to Use It</h4>
+<?php NLCEMPTY() ?>
+
+</tr>
+
+<tr>
+
+<?php NLCH1("Introduction") ?>
+
+<?php NLCBODYBEGIN() ?>
+<!-- Center -->
 
 In addition to <a href="docwrapper.php3?docname=wireless.html">fixed wireless
 nodes</a> (currently predominantly 802.11), Emulab also features wireless nodes attached
@@ -332,7 +339,7 @@ Now that you have a node allocated, let's make it mobile.  During swap-in,
 Emulab will start moving the node to its initial position.  You can watch its
 progress by using the "Robot Map" menu item on the experiment page and checking
 out the <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> or
-the <a href="<?php echo $TBBASE ?>/robotrack.php3">applet version of the map</a>
+the <a href="<?php echo $TBBASE ?>/robotrack/robotrack.php3">applet version of the map</a>
 that updates in real time.
 
 <p>
