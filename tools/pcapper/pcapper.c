@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -224,10 +224,15 @@ extern int opterr;
 extern int optreset;
 
 /*
- * Lock used to make sure that the threads don't clobber the pakcet counts.
+ * Lock used to make sure that the threads don't clobber the packet counts.
  * We just use one big fat lock for all of them.
  */
 pthread_mutex_t lock;
+
+/*
+ * Condition variable for device threads to wait on for activity.
+ */
+pthread_cond_t cond;
 
 /*
  * Pakcet counts for the three types of packets that we care about. 
@@ -244,6 +249,11 @@ pcap_t *pcap_devs[MAX_INTERFACES];
  * An array of 'bools', indicating if any client is using that number.
  */
 int client_connected[MAX_CLIENTS];
+
+/*
+ * Number of active clients.  When count is zero, the device is closed.
+ */
+volatile int active;
 
 int MAX(int a, int b) { if ((a) > (b)) return (a); else return (b); }
 
@@ -388,6 +398,7 @@ int main (int argc, char **argv) {
 	bzero(client_connected,sizeof(client_connected));
 
 	pthread_mutex_init(&lock,NULL);
+	pthread_cond_init(&cond,NULL);
 
 #ifdef EMULAB
 	/*
@@ -667,6 +678,7 @@ int main (int argc, char **argv) {
 		args->cli = 0;
 		args->interval = filetime;
 		client_connected[0] = 1;
+		active = 1;
 		pthread_create(&thread,NULL,feedclient,args);
 	}
 
@@ -729,6 +741,13 @@ int main (int argc, char **argv) {
 			if (!client_connected[i]) {
 				/* printf("New client is %i\n",i); */
 				client_connected[i] = 1;
+				if (active >= MAX_CLIENTS) {
+					fprintf(stderr, "active count screwed\n");
+					exit(1);
+				}
+				if (++active == 1)
+					pthread_cond_broadcast(&cond);
+				printf("Now have %d clients\n", active);
 				break;
 			}
 		}
@@ -766,6 +785,7 @@ void *feedclient(void *args) {
 	int i;
 	struct timeval next_time, now, interval_tv;
 	int dropped;
+	int called = 0;
 
 	s_args = (struct feedclient_args*)args;
 	cli = s_args->cli;
@@ -901,11 +921,17 @@ void *feedclient(void *args) {
 
 		/*
 		 * Drop information is not kept per-interface, so we just
-		 * grab it from one of them.
+		 * grab it from one of them.  Note that since we close all
+		 * devices when no one is active, it is possible that the
+		 * device threads have not yet reopened their devices when
+		 * we reach here.
 		 */
-		if (pcap_stats(pcap_devs[0],&ps)) {
-			printf("Unable to get stats\n");
-			exit(1);
+		if (pcap_devs[0] == 0 || pcap_stats(pcap_devs[0], &ps)) {
+			if (!called) {
+				fprintf(stderr,
+					"WARNING: unable to get drop stats\n");
+				called = 1;
+			}
 		}
 
 		/*
@@ -927,7 +953,15 @@ void *feedclient(void *args) {
 				perror("write");
 			}
 			/* printf("Client %i disconnected\n",cli);*/
+			pthread_mutex_lock(&lock);
+			if (client_connected[cli] == 0 || active <= 0) {
+				fprintf(stderr, "active count screwed\n");
+				exit(1);
+			}
 			client_connected[cli] = 0;
+			active--;
+			printf("Now have %d clients\n", active);
+			pthread_mutex_unlock(&lock);
 			/*
 			 * Client disconnected - exit the loop
 			 */
@@ -958,15 +992,21 @@ void *readpackets(void *args) {
 	    sizeof(struct tcphdr);
 	sargs = (struct readpackets_args*)args;
 
+ again:
+	pthread_mutex_lock(&lock);
+	while (active == 0)
+		pthread_cond_wait(&cond, &lock);
+	pthread_mutex_unlock(&lock);
+
 	/*
 	 * NOTE: We set the timeout to a full second - if we set it lower, we
 	 * don't get to see packets until a certain number have been buffered
 	 * up, for some reason.
 	 */
-	dev = pcap_open_live(sargs->devname,size,1,1,ebuf);
-
+	dev = pcap_open_live(sargs->devname, size, 1, 1, ebuf);
 	if (!dev) {
-		fprintf(stderr,"Failed to open %s: %s\n",sargs->devname,ebuf);
+		fprintf(stderr, "Failed to open %s: %s\n",
+			sargs->devname, ebuf);
 		exit(1);
 	}
 
@@ -984,14 +1024,23 @@ void *readpackets(void *args) {
 	pcap_lookupnet(sargs->devname, &net, &mask, ebuf);
 	pcap_compile(dev, &filter, "", 0, net);
 	pcap_setfilter(dev, &filter);
+	pcap_freecode(&filter);
 #endif
 
-	if (pcap_loop((pcap_t *)dev,-1,got_packet,&(sargs->index))) {
-		printf("Failed to start pcap_loop for %s\n",sargs->devname);
-		exit(1);
+	/*
+	 * We don't bother to lock the access to active.  If it gets cleared
+	 * immediately after a test, we make an extra loop.  If it gets set
+	 * immediately after, we do an extra open/close of the device.
+	 * Neither case is life threatening.
+	 */
+	while (active > 0) {
+		if (pcap_dispatch(dev, -1, got_packet, &sargs->index) < 0) {
+			printf("pcap_dispatch failed for %s\n", sargs->devname);
+			exit(1);
+		}
 	}
-
-	return NULL;
+	pcap_close(dev);
+	goto again;
 }
 
 /*
@@ -1135,7 +1184,6 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 		}
 	}
 	pthread_mutex_unlock(&lock);
-
 }
 
 /*
