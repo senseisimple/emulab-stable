@@ -157,7 +157,7 @@ sub doboot()
 
     if ($debug) {
 	print("Bootinfo returned '$bootwhat'\n");
-	sleep(30);
+	sleep(10);
     }
 
     if ($bootwhat eq "reboot") {
@@ -167,7 +167,11 @@ sub doboot()
 	sleep(10000);
     }
     elsif ($bootwhat =~ /^partition:(\d)$/) {
-	print("Bootinfo says to boot slice $1!\n");
+	print("Bootinfo says to boot slice $1! Checking MBR first ...\n");
+	if (VerifyMBR($bootdev, $1) < 0) {
+	    print("Partition $1 on $bootdev not valid; falling back to MFS\n");
+	    goto mfs;
+	}
 	system("tbbootconfig -d -c 0 -k $1 -m 1 $bootdev");
 	if ($?) {
 	    print("Error running tbbootconfig; falling back to MFS boot\n");
@@ -405,4 +409,37 @@ sub Prompt($$;$)
     }
 
     return $_;
+}
+
+sub VerifyMBR($$)
+{
+    my ($bootdev, $partition) = @_;
+
+    if (!open(FDISK, "fdisk -s $bootdev |")) {
+	print("Failed to run fdisk on $bootdev!");
+	return -1;
+    }
+
+    # First line looks like "/dev/ad0: 5005 cyl 255 hd 63 sec"
+    my $line = <FDISK>;
+    if (!defined($line)) {
+	print("No fdisk summary info for MBR on $bootdev!\n");
+	goto bad;
+    }
+    if (! ($line =~ /^.*cyl (\d*) hd (\d*) sec/)) {
+	print("Invalid fdisk summary info for MBR on $bootdev!\n");
+	goto bad;
+    }
+    while (<FDISK>) {
+	if ($_ =~ /^\s*(\d):\s*\d*\s*\d*\s*0x[\w]*\s*0x[\w]*$/) {
+	    if ($1 == $partition) {
+		close(FDISK);
+		return 0;
+	    }
+	}
+    }
+    print("No such partition in fdisk summary info for MBR on $bootdev!\n");
+  bad:
+    close(FDISK);
+    return -1;
 }
