@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -62,7 +62,8 @@ if ($speclocal) {
     # is a security worry, but good to enforce it anyway.
     #
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
-        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile)) {
+        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
+        ! ereg("^$TBGROUP_DIR/.*" ,$exp_localnsfile)) {
 	USERERROR("You must specify a server resident in file in either ".
                   "$TBUSER_DIR/ or $TBPROJ_DIR/", 1);
     }
