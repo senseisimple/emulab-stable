@@ -31,9 +31,9 @@ if (!isset($exp_pideid) ||
 # First get the project (PID) from the form parameter, which came in
 # as <pid>$$<eid>.
 #
-$exp_eid = strstr($exp_pideid, "$$");
+$exp_eid = strstr($exp_pideid, "\$\$");
 $exp_eid = substr($exp_eid, 2);
-$exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "$$", 0));
+$exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "\$\$", 0));
 
 #
 # Check to make sure thats this is a valid PID/EID tuple.
