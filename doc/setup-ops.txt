@@ -50,6 +50,16 @@ ln -s /z/proj /proj
 It's simplest if you don't create any users yet, and just log in a root for the
 time being. Our software will create users later, once you get boss set up.
 
+We occasionally run into problems with certain FreeBSD ports. Also, you're going
+to want the latest security updates. So, you should at the very least bring
+your ports collection up to date using:
+http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/cvsup.html
+
+It is also a good idea to bring your base system up to date with the -STABLE
+branch.  Instructions for doing this can be found at:
+http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/cutting-edge.html
+
+
 ##### Step 1 - Unpacking and running configure
 
 At this point, you'll need to make a 'defs' file - see setup.txt for
