@@ -438,6 +438,8 @@ CREATE TABLE nodes (
   next_pxe_boot_path text,
   bios_version varchar(64) default NULL,
   eventstatus tinytext,
+  state varchar(10) default NULL,
+  state_timestamp int(10) unsigned default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
