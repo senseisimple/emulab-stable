@@ -51,13 +51,6 @@ if (&tbs_exec("resetvlans " . join(" ",@nodes))) {
     exit(1);
 }
 
-&tbs_out("Removing delay entries\n");
-foreach (@nodes) {
-    $sth = $dbh->prepare("DELETE FROM delays WHERE node_id = \"$_\"");
-    $sth->execute;
-    $sth->finish;
-}
-
 &tbs_out("Freeing resources\n");
 if (&tbs_exec("nfree $pid $eid")) {
     &tbs_out("Failed to free resources.\n");
