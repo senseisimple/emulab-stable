@@ -176,6 +176,27 @@ if (isset($last_notitles) && $last_notitles != "") {
 else {
     unset($last_notitles);
 }
+if (isset($last_ghost) && $last_ghost !== "") {  # "0" is a valid value.
+    # Sanitize for the shell.
+    if (!preg_match("/^[01]$/", $last_ghost)) {
+	PAGEARGERROR("Invalid last_ghost argument.");
+    }
+}
+else {
+    unset($last_ghost);
+}
+
+# With image checkboxes, we have two names: ghost_on and ghost_off.
+if (isset($ghost_on_x)) {
+    $ghost = 1;
+}
+elseif (isset($ghost_off_x)) {
+    $ghost = 0;
+}
+else {
+    # Default the ghosting checkbox state to checked the first time through.
+    $ghost = (isset($last_ghost) ? $last_ghost : 1);	
+}
 
 #
 # Figure out what channels are in use for the current building. We only
@@ -268,11 +289,6 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 }
 $uniqueid = $matches[1];
 
-# Default the ghosting checkbox state to checked the first time through.
-if (!isset($last_ghost)) {
-    $ghost = 1;	
-}
-
 $perl_args = "-o $prefix " .
 	     # From clicking on a zoom button.
 	     (isset($scale) ? "-s $scale " : "") .
@@ -286,7 +302,7 @@ $perl_args = "-o $prefix " .
 	     (isset($last_x) ? "-C $last_x,$last_y " : "") .
 	     (isset($last_x_off) ? "-O $last_x_off,$last_y_off " : "") .
 	     (isset($last_notitles) && $last_notitles ? "-T " : "") .
-	     (isset($ghost) ? "-g " : "") .
+	     ($ghost ? "-g " : "") .
 
 	     (isset($pid) ? "-e $pid,$eid " : "") .
 	     (isset($floor) ? "-f $floor " : "") .
@@ -373,21 +389,8 @@ else {
 
 echo "</td> <td style=\" background-color: transparent\"> &nbsp; &nbsp; </td> <td>\n";
 
-# Script action to activate controls that do not normally submit, like checkboxes.
-echo "<SCRIPT LANGUAGE=JavaScript>
-    <!--
-	function NormalSubmit(theform) {
-	    theform.target='_self';
-	    theform.submit();
-	}
-    //-->
-  </SCRIPT>\n";
-
 # Wrap the image and zoom controls together in an input form.
-echo "<form enctype=multipart/form-data
-      name=myform 
-      method=\"get\" 
-      action=\"floormap.php3#zoom\">\n";
+echo "<form method=\"get\" action=\"floormap.php3#zoom\">\n";
 
 # Zoom controls may be clicked to set a new scale.  Otherwise, it persists.
 $curr_scale = (isset($scale) ? $scale : (isset($last_scale) ? $last_scale : 1));
@@ -402,7 +405,7 @@ echo "                   name=\"scale_" . max($curr_scale-1,0) . "\"><br></td>\n
 for ($i = 0; $i <= 5; $i++) {
     $img = "btn_scale_" . $i . "_" . ($curr_scale==$i?"brt":"dim") . ".jpg";
     echo "        <td><input type=\"image\" src=\"floormap/$img\"\n";
-    echo "             name=\"scale_$i\"><br></td>\n";
+    echo "                   name=\"scale_$i\"><br></td>\n";
 }
 echo "        <td><input type=\"image\" src=\"floormap/btn_zoom_in.jpg\"\n";
 echo "                   name=\"scale_" . min($curr_scale+1,5) . "\"><br></td>\n";
@@ -437,10 +440,14 @@ echo "  Click on the dots below to see information about the node.\n";
 echo "  <br>\n";
 echo "  Clicks elsewhere on the map set the center point for a zoomed-in view.\n";
 echo "  <br>\n";
-# The checkbox value is sent when the box is checked; nothing is sent otherwise.
-echo "  <input name=ghost type=checkbox value=\"1\"
-          onchange=\"NormalSubmit(myform);\"" .
-	  (isset($ghost) ? " checked" : "") . ">\n"; # Current checkbox state.
+# Couldn't get JavaScript submit on checkbox to be portable to IE with map in form.
+# Just use image buttons to show and invert the checkbox state.  That works.
+if ($ghost) {
+    echo " <input type=image src=\"floormap/cb_checked.gif\" name=ghost_off>\n";
+}
+else {
+    echo " <input type=image src=\"floormap/cb_unchecked.gif\" name=ghost_on>\n";
+}
 echo "  Show nodes on other floors as hollow dots.\n";
 echo "  <br>\n";
 echo "  <input name=map type=image style=\"border: 2px solid\" ";
