@@ -29,6 +29,12 @@ if (! count($projlist)) {
 	      "you have permission to create new OS Descriptors!", 1);
 }
 
+$osid_result =
+    DBQueryFatal("select * from os_info ".
+		 "where (path='' or path is NULL) and ".
+		 "      version!='' and version is not NULL ".
+		 "order by osid");
+
 ?>
 <blockquote><blockquote>
 Use this page to create a customized Operating System Descriptor,
@@ -199,6 +205,9 @@ if ($isadmin) {
                   (no disk reload required)</td>
               <td><input type=checkbox name=os_clean value=Yep> Yes</td>
           </tr>\n";
+
+
+    WRITEOSIDMENU("NextOsid", "nextosid", $osid_result, "none");
 }
 
 echo "<tr>

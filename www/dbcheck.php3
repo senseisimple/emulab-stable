@@ -242,3 +242,7 @@ function TBvalid_num_ron($token) {
     return TBcheck_dbslot($token, "projects", "num_ron",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_osid($token) {
+    return TBcheck_dbslot($token, "os_info", "osid",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}

@@ -185,6 +185,23 @@ elseif (! $osid_opmodes[$OS] && !$isadmin) {
     USERERROR("Operational Mode (o_mode) - Not enough permission", 1);
 }
 
+# Check nextosid. Only admin users, and only allowed if no version is given.
+
+if (isset($nextosid)) {
+    if ($nextosid == "" || $nextosid == "none") {
+	unset($nextosid);
+    }
+    elseif (!$isadmin) {
+	USERERROR("Setting nextosid requires admin mode!", 1);
+    }
+    elseif (!TBvalid_osid($nextosid)) {
+	USERERROR("NextOsid: ". TBFieldErrorString(), 1);
+    }
+    elseif (! TBValidOSID($nextosid)) {
+	USERERROR("NextOsid: $nextosid is not a known osid!", 1);
+    }
+}
+
 #
 # And insert the record!
 #
@@ -225,6 +242,10 @@ $query_result =
 	         "        '$uid', $os_mustclean, now())");
 
 DBQueryFatal("unlock tables");
+
+if (isset($nextosid)) {
+    DBQueryFatal("update os_info set nextosid='$nextosid' where osid='$osid'");
+}
 
 SUBPAGESTART();
 SUBMENUSTART("More Options");

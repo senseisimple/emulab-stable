@@ -32,3 +32,37 @@ $osid_opmodes["MINIMAL"]	= 1;
 $osid_opmodes["NORMAL"]		= 1;
 
 define("TBDB_DEFAULT_OSID_OPMODE",	"NORMALv2");
+
+#
+# Helper function to write out a menu.
+#
+function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
+{
+    echo "<tr>
+            <td>*$caption:</td>";
+    echo "  <td><select name=\"$value\">
+                <option value=X>Please Select </option>\n";
+
+    mysql_data_seek($osid_result, 0);
+
+    while ($row = mysql_fetch_array($osid_result)) {
+	$osid   = $row[osid];
+	$osname = $row[osname];
+	$pid    = $row[pid];
+	$selected = "";
+
+	if (strcmp($previous, "$osid") == 0)
+	    $selected = "selected";
+
+	echo "<option $selected value='$osid'>$pid - $osname</option>\n";
+    }
+    $selected = "";
+    if (strcmp($previous, "none") == 0)
+	$selected = "selected";
+	
+    echo "         <option $selected value=none>No OS</option>\n";
+    echo "       </select>";
+    echo "    </td>
+          </tr>\n";
+}
+

@@ -1,11 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+include("osiddefs.php3");
 
 #
 # Standard Testbed Header
@@ -38,39 +39,6 @@ $types_result =
     DBQueryFatal("select distinct n.type from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "where nt.imageable=1");
-
-#
-# Helper function to write out a menu.
-#
-function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
-{
-    echo "<tr>
-            <td>*$caption:</td>";
-    echo "  <td><select name=\"formfields[$value]\">
-                <option value=X>Please Select </option>\n";
-
-    mysql_data_seek($osid_result, 0);
-
-    while ($row = mysql_fetch_array($osid_result)) {
-	$osid   = $row[osid];
-	$osname = $row[osname];
-	$pid    = $row[pid];
-	$selected = "";
-
-	if (strcmp($previous, "$osid") == 0)
-	    $selected = "selected";
-
-	echo "<option $selected value='$osid'>$pid - $osname</option>\n";
-    }
-    $selected = "";
-    if (strcmp($previous, "none") == 0)
-	$selected = "selected";
-	
-    echo "         <option $selected value=none>No OS</option>\n";
-    echo "       </select>";
-    echo "    </td>
-          </tr>\n";
-}
 
 #
 # Spit the form out using the array of data. 
@@ -314,16 +282,16 @@ function SPITFORM($formfields, $errors)
     echo "    </td>
           </tr>\n";
 
-    WRITEOSIDMENU("Partition 1 OS[<b>2</b>]",
-		  "part1_osid", $osid_result, $formfields[part1_osid]);
-    WRITEOSIDMENU("Partition 2 OS",
-		  "part2_osid", $osid_result, $formfields[part2_osid]);
-    WRITEOSIDMENU("Partition 3 OS",
-		  "part3_osid", $osid_result, $formfields[part3_osid]);
-    WRITEOSIDMENU("Partition 4 OS",
-		  "part4_osid", $osid_result, $formfields[part4_osid]);
-    WRITEOSIDMENU("Boot OS[<b>3</b>]",
-		  "default_osid", $osid_result, $formfields[default_osid]);
+    WRITEOSIDMENU("Partition 1 OS[<b>2</b>]", "formfields[part1_osid]",
+		  $osid_result, $formfields[part1_osid]);
+    WRITEOSIDMENU("Partition 2 OS", "formfields[part2_osid]",
+		  $osid_result, $formfields[part2_osid]);
+    WRITEOSIDMENU("Partition 3 OS", "formfields[part3_osid]",
+		  $osid_result, $formfields[part3_osid]);
+    WRITEOSIDMENU("Partition 4 OS", "formfields[part4_osid]",
+		  $osid_result, $formfields[part4_osid]);
+    WRITEOSIDMENU("Boot OS[<b>3</b>]", "formfields[default_osid]",
+		  $osid_result, $formfields[default_osid]);
 
     #
     # Path to image.
