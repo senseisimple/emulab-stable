@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: rmacct-ctrl,v 1.1 2000-12-14 16:35:44 kwright Exp $
+### $Id: rmacct-ctrl,v 1.2 2000-12-18 20:44:21 kwright Exp $
 
 use English;
 use Mysql;
@@ -12,7 +12,7 @@ my $YES      = "YES";
 my $NO       = "NO";
 
 my $user;              # kwright
-my $project;           # lkwbox
+my $project = 0;       # lkwbox
 my $pid;               # 6009
 
 my $dbh;               # database handle 
@@ -71,22 +71,24 @@ sub check_credentials() {
 	print "Testbed admin user allowed.\n";
 	return;
     } 
+
     #
-    # Last resort: check if group_root for $project
+    # Last resort: check if group_root for $project.
     #
-    $db_query = "select trust from proj_memb where uid='$me' and pid='$project'";
-    $sth      = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting trust for $me in $project.\n";
-    @db_row   = $sth->fetchrow_array();
-    if ($db_row[0] eq "group_root") {
-	print "Group_root privileges allowed.\n";
-	return;
+    if ( $project ) {
+	$db_query = "select trust from proj_memb where uid='$me' and pid='$project'";
+	$sth      = $dbh->query($db_query);
+	@db_row   = $sth->fetchrow_array();
+	if ($db_row[0] eq "group_root") {
+	    print "Group_root privileges allowed.\n";
+	    return;
+	}
     }
 
     #
     # If  we're here, we do not have the correct credentials
     #
-    print "Not root, a TB admin user, or group_root for $pid. Failed.\n";   
+    print "Not root, a TB admin user, or group_root for project. Failed.\n";   
     exit(1);
 }
 
@@ -96,31 +98,27 @@ sub check_credentials() {
 # 
 sub dowork() {
 
-    my $control_node;
-    my $group_number;   # 601
+    my $control_node = 0;
+    my $group_number;         # 601
 
     #
     # Find control node.
     # Note: In the end, I simply assign to 'plastic' as control nodes
     #       not yet set in the database. 12/14/00 -lkw 
     #
-    $db_query     = "select control_node from projects where pid='$project'";
-    $sth          = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting control_node.\n";
-    @db_row       = $sth->fetchrow_array();
-    $control_node = $db_row[0];
-    $control_node = "plastic";           # see note above  
+    if ( $project ) {
+	$db_query  = "select control_node from projects where pid='$project'";
+	$sth       = $dbh->query($db_query);
+	if ( got_tuples($sth) ) {                 # see note above
+	    @db_row       = $sth->fetchrow_array();
+	    $control_node = $db_row[0];
+	} else {
+	    # print "No control node for project $project in database.\n";
+	}
+    }
+    $control_node = "plastic";                     # see note above.
 
-    #
-    # Get group number just to make sure there's a group around.
-    #
-    $db_query       = "select unix_gid from projects where pid='$project'";
-    $sth            = $dbh->query($db_query);
-    got_tuples($sth) or die "$0: Error selecting group number.\n";
-    @db_row         = $sth->fetchrow_array();
-    $group_number   = $db_row[0];
-
-    # XXX: I assume FreeBSD. Its 
+    # I assume FreeBSD. Its 
     # firmly entrenched as our control node OS. -lkw
 
     # The following user/group creation commands must be done as root. 
@@ -139,18 +137,20 @@ sub dowork() {
     #
     # Delete user on control node. 
     #
-    print "Deleting user $user from $control_node.\n";
-    $cmd = "/usr/local/bin/sshtb $control_node " .
-	      "/usr/sbin/pw userdel $user ";
-    open(PWDEL, "$cmd 2>&1 |") or die "$0: Could not open pw userdel.";
-    while (<PWDEL>) { print "$_"; }
-    close(PWDEL);
+    if ( $control_node ) {
+	print "Deleting user $user from $control_node.\n";
+	$cmd = "/usr/local/bin/sshtb $control_node " .
+	    "/usr/sbin/pw userdel $user ";
+	open(PWDEL, "$cmd 2>&1 |") or die "$0: Could not open pw userdel.";
+	while (<PWDEL>) { print "$_"; }
+	close(PWDEL);
+    }
 
     #
     # Remove group name if the project is being deleted
     # 
 
-    if ( $rmgroup eq $YES ) {
+    if ( $project ) {
 
 	print "Removing group $project from paper.\n";
 	open(DELGROUPP, "/usr/sbin/pw groupdel $project 2>&1 |");
@@ -164,7 +164,8 @@ sub dowork() {
     }
 
     # Problem: root will own this dir, but we have to be root to
-    # rename in $USERROOT.
+    # rename in $USERROOT and we can't chown to anything reasonalble 
+    # since this user won't be around.
     #
     # Run commands below as the user
     # $EUID = $UID_save;
@@ -202,32 +203,26 @@ sub sanitize() {
     delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
     ## check usage
-    if ($#ARGV < 2) { 
-	die("Usage: rmacct-ctrl <project> <username> <yes/no>\n" .
-	    "\tDeletes given user account on appropriate control node.\n");
-    }
-
-    ## sanitize project
-    if ( $ARGV[0] =~ /^([A-Za-z0-9-]+)$/ ) {
-	$project = $1;
-    } else {
-	die "$0: Project argument $ARGV[0] has invalid characters.\n";
+    if ($#ARGV < 0) { 
+	die("Usage: rmacct-ctrl <username> [<project>]\n" .
+	    "\tDeletes given user account on appropriate control node.\n" .
+	    "\tIf project given, deletes the project's group.\n");
     }
 
     ## sanitize user 
-    if ( $ARGV[1] =~ /^([a-z0-9]+)$/i ) {
+    if ( $ARGV[0] =~ /^([a-z0-9]+)$/i ) {
 	$user = $1;
     } else {
-	die "$0: User argument $ARGV[1] has invalid characters.\n";
+	die "$0: User argument $ARGV[0] has invalid characters.\n";
     }
 
-    ## sanitize the yes/no
-     if ( $ARGV[2] =~ /^(yes)$/i ) {
-	 $rmgroup = $YES;
-    } elsif ( $ARGV[2] =~ /^(no)$/i ) {
-	$rmgroup = $NO;
-    } else {
-	die "$0: User argument $ARGV[2] should be 'yes' or 'no'.\n";
+    ## sanitize project, if there is one.
+    if ( $#ARGV == 1  ) {
+	if ( $ARGV[1] =~ /^([A-Za-z0-9-]+)$/ ) {
+	    $project = $1;
+	} else {
+	    die "$0: Project argument $ARGV[0] has invalid characters.\n";
+	}
     }
 
     ## effective uid must be root
