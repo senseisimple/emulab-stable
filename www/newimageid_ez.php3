@@ -327,10 +327,23 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
+    # Node to Create image from.
+    #
+    echo "<tr>
+              <td>Node to Create Image from[<b>2</b>]:</td>
+              <td class=left>
+                  <input type=text
+                         name=\"formfields[node]\"
+                         value=\"" . $formfields[node] . "\"
+	                 size=$TBDB_NODEIDLEN maxlength=$TBDB_NODEIDLEN>
+              </td>
+          </tr>\n";
+
+    #
     # OS Features.
     # 
     echo "<tr>
-              <td>OS Features[<b>2</b>]:</td>
+              <td>OS Features[<b>3</b>]:</td>
               <td>";
 
     reset($featurelist);
@@ -352,7 +365,7 @@ function SPITFORM($formfields, $errors)
     # Operational Mode
     # 
     echo "<tr>
-             <td>*Operational Mode[<b>3</b>]:</td>
+             <td>*Operational Mode[<b>4</b>]:</td>
              <td><select name=\"formfields[op_mode]\">
                    <option value=none>Please Select </option>\n";
 
@@ -373,7 +386,7 @@ function SPITFORM($formfields, $errors)
     # Node Types.
     #
     echo "<tr>
-              <td>Node Types[<b>4</b>]:</td>
+              <td>Node Types[<b>5</b>]:</td>
               <td>\n";
 
     mysql_data_seek($types_result, 0);
@@ -381,7 +394,8 @@ function SPITFORM($formfields, $errors)
         $type    = $row[type];
         $checked = "";
 
-        if (strcmp($formfields["mtype_$type"], "Yep") == 0)
+        if (strcmp($formfields["mtype_$type"], "Yep") == 0
+	    || strcmp($formfields["mtype_all"], "Yep") == 0)
 	    $checked = "checked";
     
         echo "<input $checked type=checkbox
@@ -390,19 +404,6 @@ function SPITFORM($formfields, $errors)
               </input>\n";
     }
     echo "    </td>
-          </tr>\n";
-
-    #
-    # Node to Create image from.
-    #
-    echo "<tr>
-              <td>Node to Create Image from[<b>5</b>]:</td>
-              <td class=left>
-                  <input type=text
-                         name=\"formfields[node]\"
-                         value=\"" . $formfields[node] . "\"
-	                 size=$TBDB_NODEIDLEN maxlength=$TBDB_NODEIDLEN>
-              </td>
           </tr>\n";
 
     #
@@ -496,33 +497,46 @@ function SPITFORM($formfields, $errors)
   	         <ul>
  		    <li> if you customized one of our standard Linux
 		         images (RHL-*) then it is partition 2.
-
+	            </li>
                     <li> if you customized one of our standard BSD
  		         images (FBSD-*) then it is partition 1.
-
+	            </li>
                     <li> otherwise, feel free to ask us!
+		    </li>
                  </ul>
+             </li>
+             <li> If you already have a node customized, enter that node
+                  name (pcXXX) and the image will be auto created for you.
+                  Notification of completion will be sent to you via email. 
+	     </li>
              <li> Guidelines for setting OS features for your OS:
                   (Most images should mark all four of these.)
-                <ol type=a>
-                  <li> Mark ping and/or ssh if they are supported.
+                <ul>
+                  <li> Mark ping and/or ssh if they are supported. 
+		  </li>
                   <li> If you use one of our standard Linux or FreeBSD
                        kernels, or started from our kernel configs, mark ipod.
+		  </li>
                   <li> If it is based on one of our standard Linux or
                        FreeBSD images (or otherwise
                        sends its own ISUP notification), mark isup.
-                </ol>
+		  </li>
+                </ul>
+	     </li>
              <li> Guidelines for setting Operational Mode for your OS:
                   (Most images should use NORMALv1.)
-                <ol type=a>
+                <ul>
                   <li> If it is based on a testbed image (one of our
                        RedHat Linux or FreeBSD images)  use the same
                        op_mode as that image (should be NORMALv1,
                        or NORMAL for old images. Select it from the
                        <a href=\"$TBBASE/showosid_list.php3\"
                        >OS Descriptor List</a> to find out).
-                  <li> If not, use MINIMAL.
-                </ol>
+		  </li>
+                  <li> If not, use MINIMAL. 
+		  </li>
+                </ul>
+	     </li>
              <li> Specify the node types that this image will be able
                   to work on (can be loaded on and expected to work).
                   Typically, images will work on all of the \"pc\" types when
@@ -530,15 +544,15 @@ function SPITFORM($formfields, $errors)
                   if you are installing your own OS from scratch, or you are
                   using DOS partition four, then this might not be true.
                   Feel free to ask us!
-             <li> If you already have a node customized, enter that node
-                  name (pcXXX) and the image will be auto created for you.
-                  Notification of completion will be sent to you via email. 
+	     </li>
              <li> If you need to snapshot the entire disk (including the MBR),
                   check this option. <b>Most users will not need to check this
                   option. Please ask us first to make sure</b>.
+	     </li>
              <li> If your image contains software that is only licensed to run
 	  	  on a limited number of nodes at a time, you can put this
 		  number here. Most users will want to leave this option blank.
+	     </li>
           </ol>
           </blockquote></h4>\n";
 }
@@ -555,6 +569,10 @@ if (! $submit) {
     $defaults[os_feature_ssh]  = "checked";
     $defaults[os_feature_ipod] = "checked";
     $defaults[os_feature_isup] = "checked";
+
+    # mtype_all is a "fake" variable which makes all
+    # mtypes checked in the virgin form.
+    $defaults[mtype_all] = "Yep";
 
     #
     # For users that are in one project and one subgroup, it is usually
