@@ -1,0 +1,77 @@
+Observed Failure modes in the Plantelab programmatic interface
+
+dslice:
+
+* Improperly initialized vservers; broken passwd file
+
+* No vserver setup at all; vserver creation race
+
+* Incomplete dslice service deployment (coverage not 100%)
+
+PLC (where do we start :)
+
+* NodeID is a moving target
+
+There is no one identifier that is gauranteed to remain fixed in the PLC
+database for any particular node.  Node index, IP, and hostname can and
+have been observed to change (sometimes two simultaneously).
+
+* Disappearing slices
+
+We have seen slices simply cease to exist before they have expired.
+
+* Renewal mechanism does not enforce stated policy limits on duration.
+
+Leases can be pushed far into the future despite the state two month
+maximum (enforced by the PLC web interface, but not the prog API).
+
+* InstantiateSliver(): "node is not responding"
+
+The reason behind this is not always clear.  Our three try redundancy
+doesn't seem to help in this case, though trying perhaps five minutes later
+sometimes succeeds.
+
+* InstantiateSliver(): indefinite hang
+
+We've seen this one often; a call to IS simply hangs and doesn't return in
+a reasonable amount of time (we've let the call sit for an hour at most).
+Seems to imply a lack of robustness in the IS semantics (duh..)
+
+* InstantiateSliver(): "error"
+
+A grossly defined condition that is often recoverable upon trying the
+operation again after a few second delay.
+
+* Inaccessible slivers:
+
+Newly created slivers are not always accessible via ssh.  Access is simply
+denied, even though the node is listed as a member of the slice in PLC.  This
+condition is rarely seen.
+
+* Delayed sliver reaping leads to dirty reassignment:
+
+If an attempt is made to create a sliver on a particular node for a
+particular slice on which the sliver was recently (< 20 minutes)
+deallocated, the deallocated, "dirty" sliver will be reinstated into
+the slice instead of a pristine, newly created vserver.
+
+* Disappearing Slivers
+
+Sometimes slivers in a particular slice will be blown away and replaced by
+clean vservers, destroying any OOB data/state previously setup in the sliver.
+
+* Incomplete sliver setup:
+
+Even after InstantiateSliver() returns successfully for a particular
+sliver, there are times when the sliver is not accessible via ssh.
+Its likely that boss' public key did not properly get associated, or
+the sliver didn't actually get created.  There are likely other
+failures that can be attributed to this problem which I have not
+identified here.
+
+* Disappearing Nodes:
+
+As PLC has no callback mechanisms to alert users of changes in node status,
+the occasional PLC node ID change or removal will cause the corresponding
+sliver to get silently yanked out from under the slice.
+
