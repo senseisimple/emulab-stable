@@ -1,0 +1,103 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# A perl module to power cycle nodes using email to the operators.
+
+package power_mail;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( mailctrl );
+
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+my $WWW      = "@WWW@";
+my $TBOPS      = "@TBOPSEMAIL@";
+my $default_tries = 10;
+
+# Turn off line buffering on output
+$| = 1;
+
+# usage: mailctrl(cmd, nodes)
+# cmd = { "cycle" | "on" | "off" }
+# nodes = list of one or more physcial node names
+#
+# Returns 0 on success. Non-zero on failure.
+# 
+sub mailctrl($@) {
+    my ($cmd, @nodes) = @_;
+
+    my %actual = ();
+
+    # Check to see if we have to send mail first.
+    foreach my $node (@nodes) {
+
+	my $dbres = DBQueryFatal(
+		"select (CURRENT_TIMESTAMP - last_power) < 500 " .
+		"from outlets where node_id='$node'");
+	
+	if ($dbres->num_rows() == 0) {
+	    print "Unknown node $node";
+	    next;
+	}
+	
+	($ok) = $dbres->fetchrow();
+
+	if (!$ok) {
+	    $actual{$node} = 1;
+	}
+    }
+
+    if (scalar(keys %actual)) {
+	print "Sending mail to the operators\n";
+	
+	SENDMAIL($TBOPS,
+		 "Power $cmd nodes: " . join(" ",@nodes),
+		 "Someone needs to power $cmd the following nodes:\n" .
+		 "\t" . join(" ",@nodes) . "\n" .
+		 "\nAnd update power time through this web page:\n" .
+		 "\n  https://$WWW/powertime.php3?node_id=" . join(",",@nodes),
+		 $TBOPS);
+	
+	foreach my $node (keys %actual) {
+	    my $tries = $default_tries;
+	    my $ok = 0;
+	    
+	    print "Waiting for node $node\n";
+	    
+	    while (!$ok) {
+		my $dbres = DBQueryFatal(
+			"select (CURRENT_TIMESTAMP - last_power) < 500 " .
+			"from outlets where node_id='$node'");
+		
+		if ($dbres->num_rows() == 0) {
+		    print "Unknown node $node";
+		    next;
+		}
+		
+		($ok) = $dbres->fetchrow();
+		
+		if ($tries == 0) {
+		    print "No more tries left for $node...";
+		    return 1;
+		}
+		elsif (!$ok) {
+		    $tries -= 1;
+		    print "Sleeping for 30 seconds.\n";
+		    sleep(30);
+		}
+	    }
+	}
+    }
+
+    return 0;
+}
+
+1;

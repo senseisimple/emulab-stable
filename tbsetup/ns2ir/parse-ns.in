@@ -449,6 +449,18 @@ sub GenDefsFile($)
     }
     print TCL "\n";
 
+    print TCL "# Cameras\n";
+    $query_result = DBQueryFatal(
+	"select name,building,loc_x,loc_y,width,height from cameras");
+    while (my ($name,$building,$loc_x,$loc_y,$width,$height) = 
+	   $query_result->fetchrow_array()) {
+	print TCL "set cameras($name,$building,x) $loc_x\n";
+	print TCL "set cameras($name,$building,y) $loc_y\n";
+	print TCL "set cameras($name,$building,width) $width\n";
+	print TCL "set cameras($name,$building,height) $height\n";
+    }
+    print TCL "\n";
+
     if (defined($pid)) {
 	print TCL "# OSIDs\n";
 	$query_result =

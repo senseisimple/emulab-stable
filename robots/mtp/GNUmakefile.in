@@ -22,6 +22,7 @@ JARS = $(TESTBED_SRCDIR)/www/mtp.jar
 endif
 
 all client: $(MTPLIBS) $(MTPPROGS) $(JARS)
+client-install:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

@@ -26,7 +26,7 @@ TESTS += test_vmcd.sh test_vmcd2.sh test_vmcd3.sh test_vmcd4.sh
 endif
 
 all: $(PROGS)
-client:
+client client-install:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

@@ -27,6 +27,7 @@ SUBDIRS	= tbsetdest $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
 
 all:		all-subdirs
 client:		client-subdirs
+client-install:	client-install-subdirs
 check:		check-subdirs
 install:	install-subdirs
 

@@ -15,7 +15,7 @@ PROGS = rmcd
 TESTS = test_rmcd.sh test_rmcd2.sh
 
 all: $(PROGS)
-client:
+client client-install:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

@@ -323,17 +323,17 @@ RPC_cameralist(FILE *emcd_config, char *area)
 		ulxr::RpcString tmp;
 		ulxr::Struct attr;
 		int port;
-		
+
 		attr = cameras.getItem(lpc);
-		tmp = attr.getMember("host");
+		tmp = attr.getMember("hostname");
 		port = ((ulxr::Integer)attr.getMember("port")).getInteger();
 		fprintf(emcd_config,
 			"camera %s %s %d %f %f %f %f\n",
 			area,
 			tmp.getString().c_str(),
 			port,
-			((ulxr::Double)attr.getMember("x")).getDouble(),
-			((ulxr::Double)attr.getMember("y")).getDouble(),
+			((ulxr::Double)attr.getMember("loc_x")).getDouble(),
+			((ulxr::Double)attr.getMember("loc_y")).getDouble(),
 			((ulxr::Double)attr.getMember("width")).getDouble(),
 			((ulxr::Double)attr.getMember("height")).getDouble());
 	}

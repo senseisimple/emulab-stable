@@ -95,3 +95,15 @@ made a fake /sbin/consoletype
 copied /etc/sysconfig/network from a pc
 
 added /var/tmp, /var/db to /etc/rcS.d/S05mountall.sh for install-tarfile
+
+rsync flags: -avzpog --exclude-from=garcia.exclude
+
+contents of garcia.exclude:
+/proj/*
+/share/*
+/var/*
+/proc/*
+/users/*
+/dev/*
+/tmp/*
+/mnt/*

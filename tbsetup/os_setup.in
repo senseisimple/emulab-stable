@@ -223,7 +223,8 @@ while (my %row = $db_result->fetchhash()) {
     elsif ($class eq "robot") {
 	print "Skipping os_setup for $node cause its a robot.\n";
 	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY);
-	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY;
+	$reboots{$node} = 1;
 	next;
     }
     elsif ($subnode) {

@@ -30,7 +30,7 @@ client-install: client
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CXXFLAGS	+= -O -g -Wall -I${OBJDIR} -I/usr/local/include
-CXXFLAGS	+= -I${SRCDIR}/../mtp -I../mtp
+CXXFLAGS	+= -I${SRCDIR}/../mtp -I../mtp -pthread -D_REENTRANT
 
 LDFLAGS		= -L../mtp -Ldgrobot
 
@@ -68,7 +68,7 @@ LDFLAGS += \
 	-laStem \
 	-laIO \
 	-laUI \
-	-lpthread \
+	-pthread \
 	-lm
 endif
 

@@ -63,6 +63,7 @@ Topography instproc initialized {} {
 
 Topography instproc checkdest {obj x y} {
     var_import ::TBCOMPAT::obstacles
+    var_import ::TBCOMPAT::cameras
     $self instvar area_name
     $self instvar width
     $self instvar height
@@ -82,12 +83,32 @@ Topography instproc checkdest {obj x y} {
 	    set id [lindex [split $key ,] 0]
 	    
 	    if {($x >= $obstacles($id,$area_name,x1)) &&
-	        ($x < $obstacles($id,$area_name,x2)) &&
+	        ($x <= $obstacles($id,$area_name,x2)) &&
 	        ($y >= $obstacles($id,$area_name,y1)) &&
-	        ($y < $obstacles($id,$area_name,y2))} {
+	        ($y <= $obstacles($id,$area_name,y2))} {
 		    perror "Destination $x,$y puts $obj in obstacle $value."
 		    return 0
 	    }
+	}
+	
+	set camlist [array get cameras *,$area_name,x]
+	set in_cam ""
+	foreach {key value} $camlist {
+	    set id [lindex [split $key ,] 0]
+
+	    if {($x >= $cameras($id,$area_name,x)) &&
+	        ($x < [expr $cameras($id,$area_name,x) + \
+		       $cameras($id,$area_name,width)]) &&
+	        ($y >= $cameras($id,$area_name,y)) &&
+	        ($y < [expr $cameras($id,$area_name,y) + \
+		       $cameras($id,$area_name,height)])} {
+		set in_cam $id
+	    }
+	}
+
+	if {$in_cam == ""} {
+	    perror "Destination $x,$y is out of view of the tracking cameras";
+	    return 0
 	}
     }
     return 1

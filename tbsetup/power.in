@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,6 +28,7 @@ use libdb;
 use libxmlrpc;
 use power_rpc27;
 use power_sgmote;
+use power_mail;
 use snmpit_apc;
 use libtestbed;
 use strict;
@@ -210,7 +211,8 @@ foreach my $node (@machines) {
 	if (! ($time_ok || ($UID == 0)) ) {
 	    warn "$node was power cycled recently. Skipping...\n";
 	    next;
-	} else {
+	} elsif ( $power_id ne "mail" ) {
+	    print "updating last_power\n";
 	    DBQueryFatal("update outlets set last_power=CURRENT_TIMESTAMP " .
 			 "where node_id = '$node'");
 	}
@@ -240,21 +242,32 @@ foreach my $power_id (keys %outlets) {
     }
     my $nodestr = join(",",@nodes);
 
-    #
-    # Find out some information about this power controller
-    #
-    my $result = DBQueryFatal("select n.type, i.IP, t.class ". 
-	"from nodes as n " .
-	"left join interfaces as i on n.node_id=i.node_id " .
-	"left join node_types as t on n.type=t.type " .
-	"where n.node_id='$power_id'");
-    if ($result->num_rows() == 0) {
-	warn "No entry found for power controller $power_id. Skipping " .
-	    "$nodestr\n";
-	$exitval++;
-	next;
+    my $type;
+    my $IP;
+    my $class;
+
+    if ($power_id eq "mail") {
+	$type = "mail";
+	$IP = "";
+	$class = "";
     }
-    my ($type, $IP, $class) = $result->fetchrow();
+    else {
+	#
+	# Find out some information about this power controller
+	#
+	my $result = DBQueryFatal("select n.type, i.IP, t.class ". 
+		"from nodes as n " .
+		"left join interfaces as i on n.node_id=i.node_id " .
+		"left join node_types as t on n.type=t.type " .
+		"where n.node_id='$power_id'");
+	if ($result->num_rows() == 0) {
+	    warn "No entry found for power controller $power_id. Skipping " .
+		"$nodestr\n";
+	    $exitval++;
+	    next;
+	}
+	($type, $IP, $class) = $result->fetchrow();
+    }
 
     #
     # Finally, we look at the controller type and construct the proper type
@@ -282,6 +295,11 @@ foreach my $power_id (keys %outlets) {
 	# XXX: 'garcia' is temporary until stargates are subnodes of
 	# garcias
 	if (sgmotectrl($op,@nodes)) {
+	    print "Control of $nodestr failed.\n"; $exitval++;
+	    $errors++;
+	}
+    } elsif ($type eq "mail") {
+	if (mailctrl($op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
 	    $errors++;
 	}

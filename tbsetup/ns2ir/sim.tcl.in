@@ -1161,15 +1161,14 @@ Simulator instproc make_event {outer event} {
 		    }
 		    set x [lindex $evargs 0]
 		    set y [lindex $evargs 1]
-		    if {$x < 0 || $x >= [$topo set width]} {
-			perror "$x is out of bounds for node $obj"
-			return
-		    }
-		    if {$y < 0 || $y >= [$topo set height]} {
-			perror "$x is out of bounds for node $obj"
+		    if {! [$topo checkdest $self $x $y]} {
 			return
 		    }
 		    set speed [lindex $evargs 2]
+		    if {$speed != 0.0 && $speed != 0.1} {
+			perror "Speed is currently locked at 0.0 or 0.1"
+			return
+		    }
 		    ::GLOBALS::named-args [lrange $evargs 3 end] {
 			-orientation 0
 		    }

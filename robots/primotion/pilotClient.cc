@@ -16,6 +16,8 @@
 
 #include "pilotClient.hh"
 
+extern int debug;
+
 /**
  * Callback passed to the wheelManager when performing movements.
  */
@@ -52,7 +54,7 @@ void pilotMoveCallback::call(int status)
     pilotClient::iterator i;
     mtp_packet_t mp;
     mtp_status_t ms;
-    
+
     switch (status) {
     case aGARCIA_ERRFLAG_NORMAL:
 	ms = MTP_POSITION_STATUS_COMPLETE;

@@ -12,7 +12,9 @@
 
 #include "config.h"
 
+#include <errno.h>
 #include <stdio.h>
+#include <fcntl.h>
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
@@ -23,6 +25,9 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
+#include <list>
+#include <algorithm>
 
 #include "acpGarcia.h"
 #include "acpValue.h"
@@ -37,6 +42,8 @@
  */
 #define PILOT_PORT 2531
 
+static const char *DEFAULT_LOG_PATH = "/tmp/garcia-pilot.log";
+
 /**
  * Default path to the battery log.
  */
@@ -48,6 +55,9 @@ static const char *BATTERY_LOG_PATH = "/var/log/battery.log";
  * @see sigquit
  */
 static volatile int looping = 1;
+
+extern char **environ;
+static char **reexec_argv;
 
 /**
  * Signal handler for SIGINT, SIGTERM, and SIGQUIT signals.  Sets looping to
@@ -89,13 +99,19 @@ static void sigdebug(int sig)
  * Signal handler for SIGSEGV and SIGBUS, just prints out the signal number and
  * aborts.
  */
-static void sigpanic(int sig)
+static void sigpanic(int signum)
 {
-    fprintf(stderr,
-	    "panic: signal=%d\n",
-	    sig);
+    char msg[128];
+    
+    snprintf(msg, sizeof(msg), "panic: %d; reexec'ing\n", signum);
+    write(1, msg, strlen(msg));
 
-    abort();
+    execve(reexec_argv[0], reexec_argv, environ);
+
+    snprintf(msg, sizeof(msg), "reexec failed %s\n", strerror(errno));
+    write(1, msg, strlen(msg));
+
+    exit(1);
 }
 
 /**
@@ -119,14 +135,20 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
-    int c, port = PILOT_PORT, serv_sock, on_off = 1;
-    const char *logfile = NULL, *pidfile = NULL;
+    int lpc, c, port = PILOT_PORT, serv_sock, on_off = 1;
+    const char *logfile = DEFAULT_LOG_PATH, *pidfile = NULL;
     const char *batteryfile = BATTERY_LOG_PATH;
     int retval = EXIT_SUCCESS;
+    std::list<int> fd_list;
     unsigned long now;
     FILE *batterylog;
     aIOLib ioRef;
+    sigset_t ss;
     aErr err;
+
+    reexec_argv = argv;
+    sigfillset(&ss);
+    sigprocmask(SIG_UNBLOCK, &ss, NULL);
 
     while ((c = getopt(argc, argv, "hdp:l:i:b:")) != -1) {
 	switch (c) {
@@ -167,7 +189,7 @@ int main(int argc, char *argv[])
 
     if (!debug) {
 	/* Become a daemon */
-	daemon(0, 0);
+	daemon(1, 0);
 
 	if (logfile) {
 	    int logfd;
@@ -187,7 +209,6 @@ int main(int argc, char *argv[])
 	FILE *fp;
 	
 	if ((fp = fopen(pidfile, "w")) != NULL) {
-	    fprintf(fp, "%d\n", getpid());
 	    (void) fclose(fp);
 	}
     }
@@ -198,16 +219,24 @@ int main(int argc, char *argv[])
 		batteryfile);
     }
 
+    for (lpc = 3; lpc < 32; lpc++) {
+	struct stat st;
+	
+	if (fstat(lpc, &st) == 0) {
+	    fd_list.push_back(lpc);
+	}
+    }
+
     acpGarcia garcia;
     
-    signal(SIGUSR1, sigdebug);
+    signal(SIGHUP, sigdebug);
 
     signal(SIGQUIT, sigquit);
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
 
-    signal(SIGSEGV, (void (*)(int))sigpanic);
-    signal(SIGBUS, (void (*)(int))sigpanic);
+    signal(SIGSEGV, sigpanic);
+    signal(SIGBUS, sigpanic);
     
     signal(SIGPIPE, SIG_IGN);
     
@@ -271,12 +300,61 @@ int main(int argc, char *argv[])
 	    FD_ZERO(&readfds);
 	    FD_ZERO(&writefds);
 	    FD_SET(serv_sock, &readfds);
+
+	    for (lpc = 3; lpc < 32; lpc++) {
+		struct stat st;
+		
+		if ((fstat(lpc, &st) == 0) &&
+		    (std::find(fd_list.begin(),
+			       fd_list.end(),
+			       lpc) == fd_list.end())) {
+		    fcntl(lpc, F_SETFD, 1);
+		}
+	    }
+	    
+	    for (lpc = 3; lpc < 128; lpc++) {
+		struct sockaddr_in sin;
+		socklen_t sin_len;
+		
+		sin_len = sizeof(sin);
+		if ((lpc != serv_sock) &&
+		    (getpeername(lpc,
+				 (struct sockaddr *)&sin,
+				 &sin_len) == 0)) {
+		    struct mtp_packet ump;
+		    
+		    if (debug) {
+			printf("recovered client: %s:%d\n",
+			       inet_ntoa(sin.sin_addr),
+			       ntohs(sin.sin_port));
+		    }
+		    
+		    pilotClient *pc = new pilotClient(lpc, wm, db);
+		    pc->setFD(&readfds);
+		    pc->setFD(&writefds);
+		    clients.push_back(pc);
+
+		    mtp_init_packet(&ump,
+				    MA_Opcode, MTP_UPDATE_POSITION,
+				    MA_Role, MTP_ROLE_ROBOT,
+				    MA_Status, MTP_POSITION_STATUS_IDLE,
+				    MA_CommandID, 0,
+				    MA_TAG_DONE);
+		    mtp_send_packet(pc->getHandle(), &ump);
+		}
+	    }
 	    
 	    wm.setDashboard(&db);
 	    do {
 		fd_set rreadyfds = readfds, wreadyfds = writefds;
 		struct timeval tv_zero = { 0, 0 };
 		int rc;
+
+		if (debug == 3) {
+		    int *i = 0;
+		    
+		    *i = 1;
+		}
 		
 		/* Poll the file descriptors, don't block */
 		rc = select(FD_SETSIZE,
@@ -381,8 +459,10 @@ int main(int argc, char *argv[])
 
     aIO_ReleaseLibRef(ioRef, &err);
 
-    fclose(batterylog);
-    batterylog = NULL;
+    if (batterylog) {
+	fclose(batterylog);
+	batterylog = NULL;
+    }
     
     return retval;
 }

@@ -19,6 +19,8 @@
 #include "dashboard.hh"
 #include "wheelManager.hh"
 
+extern int debug;
+
 /**
  * An "execute" callback for a garcia behavior.
  */
@@ -301,8 +303,16 @@ void wheelManager::stop(void)
 
 void wheelManager::motionStarted(void)
 {
+    if (debug) {
+	fprintf(stderr, "debug: motion started\n");
+    }
+    
     if ((this->wm_last_status != aGARCIA_ERRFLAG_NORMAL) &&
 	(this->wm_last_status != aGARCIA_ERRFLAG_ABORT)) {
+	if (debug) {
+	    fprintf(stderr, "debug: clear error LED\n");
+	}
+	
 	this->wm_dashboard->remUserLEDClient(&this->wm_error_notice);
 	this->wm_last_status = 0;
     }
@@ -315,9 +325,17 @@ void wheelManager::motionFinished(int status, wmCallback *callback)
 {
     this->wm_last_status = status;
 
+    if (debug) {
+	fprintf(stderr, "debug: motion finished -- %d\n", status);
+    }
+    
     if (status != aGARCIA_ERRFLAG_WONTEXECUTE) {
 	if ((this->wm_last_status != aGARCIA_ERRFLAG_NORMAL) &&
 	    (this->wm_last_status != aGARCIA_ERRFLAG_ABORT)) {
+	    if (debug) {
+		fprintf(stderr, "debug: set error LED\n");
+	    }
+	    
 	    this->wm_dashboard->addUserLEDClient(&this->wm_error_notice);
 	}
 	

@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 PROGS = tbsetdest
 
 all: $(PROGS)
-client:
+client client-install:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
