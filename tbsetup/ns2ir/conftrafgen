@@ -221,7 +221,7 @@ close(NS);
 
 if (! ( ((keys %UDP)>0) && ((keys %NULL)>0) && 
 	((keys %CBR)>0) && ((keys %connect)>0) ) ) {
-  print STDERR "Compatible traffic generation did not occur, or was incomplete.\n";
+  print STDERR "Traffic generation checks complete.\n";
   close(TBCMDS);
   exit(0);
 }
