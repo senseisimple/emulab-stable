@@ -56,7 +56,14 @@ if ($imageid =~ /^([-\@\w\+.]+)$/) {
 # Grab the filename to give to frisbee
 my $filename = &get_filename($imageid);
 
-# Make sure that the user can read the image file or bomb out right now.
+#
+# Make sure that the user has sufficient permissions, and read the image file
+# or bomb out right now.
+#
+if (!TBImageIDAccessCheck($UID,$imageid,TB_IMAGEID_ACCESS)) {
+	die("*** You do not have pemssion to load $imageid on nodes\n");
+}
+
 if (! -R $filename) {
 	die("*** You do not have permission to read the image file for\n".
 	    "imageid $imageid: $filename\n");
