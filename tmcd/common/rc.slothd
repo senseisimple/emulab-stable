@@ -1,0 +1,62 @@
+#!/bin/sh
+
+USAGE="usage: $0 (start|stop|restart)"
+
+if [ $# -lt 1 ]
+then
+        echo $USAGE
+        exit 1
+fi
+
+. /etc/emulab/paths.sh
+
+ARGS=
+SEDCMD='sed -e s/^.*=\(.*\)/\1/'
+
+start () {
+        for arg in `${BINDIR}/tmcc sdparams`
+        do
+                case $arg in
+                        reg*)
+                                ARGS="$ARGS -i `echo $arg | $SEDCMD`"
+                                ;;
+                        agg*)
+                                ARGS="$ARGS -g `echo $arg | $SEDCMD`"
+                                ;;
+                        load*)
+                                ARGS="$ARGS -l `echo $arg | $SEDCMD`"
+                                ;;
+                        expt*)
+                                ARGS="$ARGS -c `echo $arg | $SEDCMD`"
+                                ;;
+                        ctl*)
+                                ARGS="$ARGS -n `echo $arg | $SEDCMD`"
+                                ;;
+                esac
+        done
+
+        ${BINDIR}/slothd ${ARGS}
+}
+
+stop () {
+        kill `cat /var/run/slothd.pid`
+}
+
+case $1 in
+        start)
+                start
+                ;;
+        stop)
+                stop
+                ;;
+        restart)
+                stop
+                sleep 1
+                start
+                ;;
+        *)
+                echo "Command $1 not valid"
+                echo $USAGE
+                exit 1
+                ;;
+esac

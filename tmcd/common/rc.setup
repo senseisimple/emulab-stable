@@ -66,11 +66,11 @@ if [ -x $BINDIR/rc.healthd ]; then
 	$BINDIR/rc.healthd start
 fi
 
-if [ -x $BINDIR/slothd ]; then
+if [ -x $BINDIR/rc.slothd ]; then
 	echo "Starting usage detector ..."
-        killall slothd
+        killall slothd > /dev/null 2>&1
         rm -f /var/run/slothd.pid
-	$BINDIR/slothd
+	$BINDIR/rc.slothd start
 fi
 
 if [ -x $BINDIR/watchdog  ]; then

@@ -76,6 +76,7 @@ local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(BINDIR)/rc.delta
 	$(INSTALL) -m 755 $(SRCDIR)/rc.progagent $(BINDIR)/rc.progagent
 	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(BINDIR)/rc.setup
+	$(INSTALL) -m 755 $(SRCDIR)/rc.slothd $(BINDIR)/rc.slothd
 	# Symlink this cause we invoke it from boss, and its too much
 	# of a hassle to worry about right now.
 	rm -f $(ETCDIR)/update
