@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 require("defs.php3");
+require("newnode-defs.php3");
 
 #
 # Note - this script is not meant to be called by humans! It returns no useful
@@ -18,6 +19,7 @@ require("defs.php3");
 #
 # Find all interfaces
 #
+$interfaces = array();
 foreach ($HTTP_GET_VARS as $key => $value) {
     if (preg_match("/iface(name|mac)(\d+)/",$key,$matches)) {
         $vartype = $matches[1];
@@ -50,6 +52,15 @@ $IP = guess_IP("pc",$node_num);
 $type = guess_node_type($cpuspeed,$disksize);
 
 #
+# Try to figure out which switch ports it's plugged into
+#
+$mac_list = array();
+foreach ($interfaces as $interface) {
+	$mac_list[$interface["type"]] = "";
+}
+find_switch_macs($mac_list);
+
+#
 # Stash this information in the database
 #
 DBQueryFatal("insert into new_nodes set node_id='$hostname', type='$type', " .
@@ -63,8 +74,18 @@ foreach ($interfaces as $interface) {
 	$iface = $interface["iface"];
 	$mac = $interface["mac"];
 	$type = $interface["type"];
-	DBQueryFatal("insert into new_interfaces set new_node_id=$new_node_id, "
-	    . "iface='$iface', mac='$mac', interface_type='$type'");
+	if ($mac_list[$mac]["switch"]) {
+	    DBQueryFatal("insert into new_interfaces set " .
+		"new_node_id=$new_node_id, iface='$iface', mac='$mac', " .
+		"interface_type='$type', ".
+		"switch_id='$mac_list[$mac][switch]', " .
+		"switch_card='$mac_list[$mac][card]', " .
+		"switch_port='$mac_list[$mac][port]'");
+	} else {
+	    DBQueryFatal("insert into new_interfaces set " .
+		"new_node_id=$new_node_id, iface='$iface', mac='$mac', " .
+		"interface_type='$type'");
+	}
 }
 
 #
@@ -104,105 +125,6 @@ function find_free_id($prefix) {
 
     return $node_number;
 
-}
-
-function guess_IP ($prefix, $number) {
-
-    $hostname = $prefix . $number;
-
-    #
-    # First, let's see if they've already added to to DNS - the PHP
-    # gethostbyname has a really dumb way to return failure - it just
-    # gives you the hostname back.
-    #
-    $IP = gethostbyname($hostname);
-    if (strcmp($IP,$hostname)) {
-    	return $IP;
-    }
-
-    #
-    # Okay, no such luck. We'll go backwards through the host list until
-    # we find the previous node with an established IP, then add our offset
-    # onto that
-    #
-    $i = $number - 1;
-    $IP = "";
-    while ($i > 0) {
-        $query_result = DBQueryFatal("select IP from interfaces as i " .
-		"left join nodes as n on i.node_id = n.node_id left join " .
-		"node_types as nt on n.type = nt.type " .
-		"where n.node_id='$prefix$i' and i.card = nt.control_net");
-        if (mysql_num_rows($query_result)) {
-	    $row = mysql_fetch_array($query_result);
-	    $IP = $row[IP];
-	    break;
-	}
-	$i--;
-    }
-
-    if ($i <= 0) {
-    	return 0;
-    }
-
-    #
-    # Parse the IP we got into the last octet and everything else. Note that we
-    # don't really do the IP address calcuation correctly - just an
-    # approximation of the right thing.
-    #
-    list($oct1,$oct2,$oct3,$oct4) = explode(".",$IP);
-    $oct4 += $number - $i;
-
-    # We don't yet wrap - it may not be OK to do
-    if ($oct4 > 254) {
-        return 0;
-    }
-
-    return "$oct1.$oct2.$oct3.$oct4";
-    
-}
-
-function guess_node_type($proc,$disk) {
-
-    #
-    # Allow the reported speed to differ from the one in the database
-    #
-    $fudge_factor = .05;
-
-    #
-    # Convert disk size from megabytes to gigabtypes
-    #
-    $disk /= 1000.0;
-
-    #
-    # Go through node types and try to find a single one that matches
-    # this node's processor speed. This is a totally bogus way to do this,
-    # but it's the best we got for now.
-    #
-    $node_type = "";
-    $query_result = DBQueryFatal("select type, speed, HD from node_types " .
-	"where !isvirtnode and !isremotenode");
-    while ($row = mysql_fetch_array($query_result)) {
-        $speed = $row["speed"];
-	$type = $row["type"];
-	$HD = $row["HD"];
-	echo "Checking $speed vs $proc, $HD vs $disk\n";
-	if (($proc > ($speed * (1.0 - $fudge_factor))) &&
-	    ($proc < ($speed * (1.0 + $fudge_factor))) &&
-	    ($disk > ($HD * (1.0 - $fudge_factor))) &&
-	    ($disk < ($HD * (1.0 + $fudge_factor)))) {
-	    if ($node_type != "") {
-	        # We found two potential matches, choose neither
-		echo "Found a second match ($type), bailing\n";
-		return "";
-	    } else {
-		echo "Found a first match ($type)\n";
-	        $node_type = $type;
-	    }
-	}
-    }
-
-    echo "Returning $node_type\n";
-    return $node_type;
 }
 
 ?>

@@ -39,23 +39,6 @@ if (@ARGV < 1) {
 my @node_ids = @ARGV;
 
 #
-# Start this party by getting MAC addresses from the switches
-#
-print "Getting MAC addresses from the switches (this could take a while!)\n";
-open(MAC,"$switchmac |") or die "Unable to fork: $!\n";
-my %wires;
-my @lines = ('000000000000,intel1/1.17,1,unknown');
-while (my $line = <MAC>) {
-    chomp $line;
-    my ($MAC,$switchport,$vlan,$iface) = split /,/, $line;
-    if ($switchport !~ /^([\w-]+)\/(\d+)\.(\d+)$/) {
-	die "Bad line from $switchmac: $line\n";
-    }
-    my ($switch, $card, $port) = ($1,$2,$3);
-    $wires{$MAC} = [$switch, $card, $port];
-}
-
-#
 # Now, loop through the nodes given, and add each one
 #
 my @succeeded_nodes;
@@ -98,7 +81,8 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Grab the node's MACs from the new_interfaces table
     #
-    $query_result = DBQueryFatal("SELECT iface, MAC, interface_type " .
+    $query_result = DBQueryFatal("SELECT iface, MAC, interface_type, " .
+	"switch_id, switch_card, switch_port " .
 	"FROM new_interfaces WHERE new_node_id='$new_node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: Must have at least one interface!\n";
@@ -106,7 +90,8 @@ NODE: foreach my $node_id (@node_ids) {
     }
 
     my %interfaces;
-    while (my ($iface, $MAC, $iface_type) = $query_result->fetchrow()) {
+    while (my ($iface, $MAC, $iface_type, $switch_id, $switch_card,
+	    $switch_port) = $query_result->fetchrow()) {
 	#
 	# Get some more information about this interface type
 	#
@@ -123,21 +108,9 @@ NODE: foreach my $node_id (@node_ids) {
 	#
 	# Stash it away...
 	#
-	$interfaces{$iface} = [$MAC, $iface_type, $max_speed, $full_duplex];
+	$interfaces{$iface} = [$MAC, $iface_type, $max_speed, $full_duplex,
+		$switch_id, $switch_card, $switch_port];
 
-	#
-	# Check to see if we have wires for all of the interfaces - we can ignore
-	# the control net, it's OK if we don't have that one.
-	#
-	if ($iface eq "eth$control_net") {
-	    next NODE;
-	}
-
-	if (!$wires{$MAC}) {
-	    print "Node $node_id failed: Could not find switch port for ".
-		"$MAC ($iface)\n";
-	    next NODE;
-	}
     }
 
     #
@@ -159,7 +132,8 @@ NODE: foreach my $node_id (@node_ids) {
 	"phys_nodeid='$node_id', role='testnode', priority=$priority");
 
     while (my ($iface, $aref) = each %interfaces) {
-	my ($MAC, $iface_type, $speed, $duplex) = @$aref;
+	my ($MAC, $iface_type, $speed, $duplex, $switch_id, $switch_card,
+	    $switch_port) = @$aref;
 	$iface =~ /(\d+)$/;
 	my $card = $1;
 	my $iface_IP = "";
@@ -173,12 +147,10 @@ NODE: foreach my $node_id (@node_ids) {
 	    "interface_type='$iface_type', iface='$iface', " .
 	    "current_speed='$speed', duplex=$duplex");
 
-	if ($card != $control_net) {
-	    my ($switch, $card2, $port2) = @{$wires{$MAC}};
-	    DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
-		"node_id1='$node_id', card1=$card, port1=1, node_id2='$switch', " .
-		"card2=$card2, port2=$port2");
-	}
+	DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
+	    "node_id1='$node_id', card1=$card, port1=1, " .
+	    "node_id2='$switch_id', card2='$switch_card', " .
+	    "port2='$switch_port'");
     }
 
     #
@@ -186,7 +158,7 @@ NODE: foreach my $node_id (@node_ids) {
     #
 
     #
-    # Put the node into hwdown and schedule a reload for it
+    # Schedule a reload for it
     #
     system "$nalloc emulab-ops hwdown $node_id";
     system "$sched_reload $node_id";
@@ -195,7 +167,7 @@ NODE: foreach my $node_id (@node_ids) {
     # Remove the node from the new_ tables
     #
     DBQueryFatal("DELETE FROM new_nodes WHERE new_node_id=$new_node_id");
-    DBQueryFatal("DELETE FROM new_interfaces WHERE node_id=$new_node_id");
+    DBQueryFatal("DELETE FROM new_interfaces WHERE new_node_id=$new_node_id");
 
     print "$node_id succesfully added!";
 
@@ -238,5 +210,8 @@ if (! -f $dhcpd_template) {
 }
 
 #
-# TODO - add nodes to named?
+# TODO -
+#    add nodes to named?
+#    disable interfaces
+#    console setup
 #

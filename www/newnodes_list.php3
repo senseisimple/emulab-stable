@@ -1,0 +1,359 @@
+<?PHP
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+require("defs.php3");
+require("newnode-defs.php3");
+
+#
+# List the nodes that have checked in and are awaint being added the the real
+# testbed
+#
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Testbed Nodes");
+
+#
+# Only admins can see this page
+#
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
+if (! $isadmin) {
+    USERERROR("You do not have admin privileges!", 1);
+}
+
+#
+# XXX - a hack
+#
+$gid = "nobody";
+
+#
+# Start out by performing any operations they may have asked for
+#
+if ($selected) {
+    $selected_nodes = $selected;
+} else {
+    $selected_nodes = array();
+}
+
+#
+# Build up a handy little clause for these nodes to be used in WHEREs
+#
+if (count($selected_nodes)) {
+    $equal_clauses = array();
+    foreach ($selected_nodes as $node) {
+	$equal_clauses[] = "new_node_id=$node";
+	$equal_clauses_qualified[] = "n.new_node_id=$node";
+    }
+    $whereclause = implode(" OR ",$equal_clauses);
+    $whereclause_qualified = implode(" OR ",$equal_clauses_qualified);
+}
+
+#
+# Delete nodes
+#
+if ($delete) {
+    DBQueryFatal("DELETE FROM new_nodes WHERE $whereclause");
+    DBQueryFatal("DELETE FROM new_interfaces WHERE $whereclause");
+}
+
+#
+# Recalculate IPs
+#
+if ($calc) {
+   $query_result = DBQueryFatal("SELECT new_node_id, node_id FROM new_nodes " .
+   	"WHERE $whereclause ORDER BY new_node_id");
+    while ($row = mysql_fetch_array($query_result)) {
+        $id   = $row["new_node_id"];
+        $name = $row["node_id"];
+	if (preg_match("/^(.*\D)(\d+)$/",$name,$matches)) {
+	    $prefix = $matches[1];
+	    $number = $matches[2];
+	    $newIP = guess_IP($prefix,$number);
+	    if (!$newIP) {
+	       echo "<h4>Failed to guess IP for $name!</h4>";
+	    } else {
+		DBQueryFatal("UPDATE new_nodes SET IP='$newIP' WHERE " .
+		    "new_node_id='$id'");
+	    }
+	} else {
+	    echo "Unable to understand the node name $name";
+	}
+    }
+}
+
+#
+# Create the nodes in the real database
+#
+if ($create) {
+    $nodenames = array();
+    $query_result = DBQueryFatal("SELECT node_id FROM new_nodes " .
+	"WHERE $whereclause");
+    while ($row = mysql_fetch_array($query_result)) {
+        $nodenames[] = $row["node_id"];
+    }
+    $nodelist = implode(" ",$nodenames);
+    echo "<h3>Creating nodes - this could take a while, please wait</h3>\n";
+    echo "<hr>\n";
+    echo "<pre>\n";
+    passthru("$TBSUEXEC_PATH $uid $gid newnode $nodelist 2>&1");
+    echo "</pre>\n";
+    echo "<hr>\n";
+}
+
+#
+# Look for the nodes on the switch again
+#
+if ($research) {
+    #
+    # Get the MACs we're supposed to be looking for
+    #
+    $query_result = DBQueryFatal("SELECT i.mac, i.new_node_id, n.node_id, " .
+	"i.iface FROM new_interfaces as i LEFT JOIN new_nodes as n " .
+	"ON i.new_node_id = n.new_node_id WHERE $whereclause_qualified");
+    $mac_list = array();
+    while ($row = mysql_fetch_array($query_result)) {
+        $mac_list[$row["mac"]] = array( "new_node_id" => $row["new_node_id"],
+	    "node_id" => $row["node_id"], "iface" => $row["iface"]);
+    }
+
+    echo "<h3>Looking for MACs, this could take a while...</h3>";
+    find_switch_macs($mac_list);
+    foreach ($mac_list as $mac => $switchport) {
+        if (in_array("switch",$switchport)) {
+	    DBQueryFatal("UPDATE new_interfaces SET " .
+		"switch_id='$switchport[switch]', " .
+		"switch_card='$switchport[card]', " .
+		"switch_port='$switchport[port]', ".
+		"WHERE new_node_id='$switchport[new_node_id]' " .
+		"AND iface='$switchport[iface]'");
+	} else {
+	    echo "<h4>Unable to find $switchport[node_id]:$switchport[iface] " .
+		"on switches, not updating</h4>\n";
+	}
+    }
+}
+
+#
+# Swap the IDs and IPs of two nodes
+#
+if ($swap) {
+    if (count($selected_nodes) != 2) {
+       USERERROR("Exactly two nodes must be selected for swapping",0);
+    } else {
+	$id1 = $selected_nodes[0];
+	$id2 = $selected_nodes[1];
+	$query_result = DBQueryFatal("SELECT node_id, IP FROM new_nodes " .
+		"WHERE new_node_id=$id1");
+	$row = mysql_fetch_array($query_result);
+	$node_id1 = $row["node_id"];
+	$IP1 = $row["IP"];
+	$query_result = DBQueryFatal("SELECT node_id, IP FROM new_nodes " .
+		"WHERE new_node_id=$id2");
+	$row = mysql_fetch_array($query_result);
+	$node_id2 = $row["node_id"];
+	$IP2 = $row["IP"];
+
+	DBQueryFatal("UPDATE new_nodes SET node_id='$node_id2', IP='$IP2' " .
+		"WHERE new_node_id=$id1");
+	DBQueryFatal("UPDATE new_nodes SET node_id='$node_id1', IP='$IP1' " .
+		"WHERE new_node_id=$id2");
+    }
+}
+
+#
+# Change node types
+#
+if ($newtype) {
+    DBQueryFatal("UPDATE new_nodes SET type='$newtype' WHERE $whereclause");
+}
+
+#
+# Change node name prefix
+#
+if ($newprefix || $addnumber) {
+   $query_result = DBQueryFatal("SELECT new_node_id, node_id FROM new_nodes " .
+   	"WHERE $whereclause");
+    while ($row = mysql_fetch_array($query_result)) {
+    	$id    = $row['new_node_id'];
+	$name  = $row['node_id'];
+	if (preg_match("/^(.*\D)(\d+)$/",$name,$matches)) {
+	    $prefix = $matches[1];
+	    $number = $matches[2];
+	    if ($addnumber) {
+	        $number = $number + $addnumber;
+	    }
+	    if ($newprefix) {
+	        $prefix = $newprefix;
+	    }
+	    $newname = $prefix . $number;
+	    DBQueryFatal("UPDATE new_nodes SET node_id='$newname' " .
+		"WHERE new_node_id='$id'");
+	} else {
+	    echo "Unable to understand the node name $name";
+	}
+    }
+}
+
+$query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
+	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
+	"i.switch_id, i.switch_card, i.switch_port " .
+	"FROM new_nodes AS n " .
+	"LEFT JOIN node_types AS t on n.type=t.type " .
+	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
+	"    AND t.control_iface = i.iface " .
+	"ORDER BY n.new_node_id");
+
+?>
+
+<form action="newnodes_list.php3" method="get" name="nodeform">
+
+<script language="JavaScript">
+<!--
+function selectAll(form) {
+    for (i = 0; i < form.length; i++)
+	form[i].checked = true ;
+}
+
+function deselectAll(form) {
+    for (i = 0; i < form.length; i++)
+	form[i].checked = false ;
+}
+-->
+</script>
+
+<table>
+	<tr>
+	    <th></th>
+	    <th>ID</th>
+	    <th>Node ID</th>
+	    <th>Type</th>
+	    <th>IP</th>
+	    <th>Control MAC</th>
+	    <th>Control Port</th>
+	    <th>Interfaces</th>
+	    <th>Created</th>
+	</tr>
+
+<?
+
+while ($row = mysql_fetch_array($query_result)) {
+	$id         = $row["new_node_id"];
+	$node_id    = $row["node_id"];
+	$type       = $row["type"];
+	$IP         = $row["IP"];
+	$created    = $row["created"];
+	$mac        = $row["MAC"];
+	if ($row["switch_id"]) {
+	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
+	} else {
+	    $port = "unknown";
+	}
+	$checked = in_array($id,$selected_nodes) ? "checked" : "";
+
+        $iface_query_result = DBQueryFatal("SELECT COUNT(*) AS count " .
+	    "FROM new_interfaces WHERE new_node_id=$id");
+        $iface_row = mysql_fetch_array($iface_query_result);
+	$interfaces = $iface_row["count"];
+
+	echo "	<tr>\n";
+	echo "		<td><input type=\"checkbox\" name=\"selected[]\" " .
+	    "value='$id' $checked></td>\n";
+	echo "		<td><a href=\"newnode_edit.php3?id=$id\">$id</a></td>\n";
+	echo "		<td>$node_id</td>\n";
+	echo "		<td>$type</td>\n";
+	echo "		<td>$IP</td>\n";
+	echo "          <td>$mac</td>\n";
+	echo "          <td>$port</td>\n";
+	echo "		<td>$interfaces</td>\n";
+	echo "		<td>$created</td>\n";
+	echo "	</tr>\n";
+}
+
+?>
+
+<tr>
+    <td align="center" colspan=9>
+    <input type="button" name="SelectAll" value="Select All"
+	onClick="selectAll(document.nodeform.elements['selected[]'])">
+    &nbsp;
+    <input type="button" name="DeselectAll" value="Deselect All"
+	onClick="deselectAll(document.nodeform.elements['selected[]'])">
+    </td>
+</tr>
+
+</table>
+
+<br>
+<center>
+<table>
+
+<tr>
+    <td colspan=2 align="center"><b>Actions</b></th>
+</tr>
+
+<tr>
+    <th>Set Type</th>
+    <td><input type="text" width="10" name="newtype"></td>
+</tr>
+
+<tr>
+    <th>Set Node ID Prefix</th>
+    <td><input type="text" width="10" name="newprefix"></td>
+</tr>
+
+<tr>
+    <th>Add to Node ID</th>
+    <td><input type="text" width="10" name="addnumber"></td>
+</tr>
+
+<tr>
+    <td colspan=2 align="center">
+    <input type="submit" value="Update selected nodes" name="submit">
+    </td>
+</tr>
+
+<tr>
+    <td colspan=2 align="center">
+    <input type="submit" value="Recalculate IPs for selected nodes" name="calc">
+    </td>
+</tr>
+
+<tr>
+    <td colspan=2 align="center">
+    <input type="submit" value="Swap Node IDs and IPs for selected nodes" name="swap">
+    </td>
+</tr>
+
+<tr>
+    <td colspan=2 align="center">
+    <input type="submit" value="Re-search switches for selected nodes" name="research">
+    </td>
+</tr>
+
+<tr>
+    <td colspan=2 align="center">
+    <input type="submit" value="Create selected nodes" name="create">
+    &nbsp;
+    <input type="submit" value="Delete selected nodes" name="delete">
+    </td>
+</tr>
+
+</table>
+</center>
+
+</form>
+
+<?
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+
+?>
