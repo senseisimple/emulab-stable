@@ -498,7 +498,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 		 */
 		if (reportbad) {
 			if (detail)
-				fprintf(stderr, "%s: bad hash [%u-%u]\n",
+				fprintf(stderr, "%s: bad hash for sectors [%u-%u]\n",
 					name, badstart, badstart + badsize - 1);
 			reportbad = inbad = 0;
 		}
@@ -507,7 +507,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	 * Finished on a sour note, report the final bad stretch.
 	 */
 	if (inbad && detail)
-		fprintf(stderr, "%s: bad hash [%u-%u]\n",
+		fprintf(stderr, "%s: bad hash for sectors [%u-%u]\n",
 			name, badstart, badstart + badsize - 1);
 
 	stopreader();
