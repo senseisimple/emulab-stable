@@ -89,7 +89,7 @@ foreach pair $nodemap {
 #}
 
 outs "Setting up VLANs"
-if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2>@ $tmpio" err]} {
+if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2>@ $tmpioFP" err]} {
     readfifo $tmpioFP
     outs stderr "Error running $snmpit. ($err)"
     exit 1
