@@ -84,14 +84,15 @@ if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.12&detail=$detail'>112%</a>
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.25&detail=$detail'>125%</a>
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.50&detail=$detail'>150%</a>
+	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.75&detail=$detail'>175%</a>
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.00&detail=$detail'>200%</a>
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.50&detail=$detail'>250%</a>
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=3.00&detail=$detail'>300%</a>
 	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=4.00&detail=$detail'>400%</a>
 	      <br>";
     if ($detail == 0) {
-	if ($zoom < 1.5) {
-      	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.50&detail=1'>More detail (and zoom)</a>";
+	if ($zoom < 1.75) {
+      	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.75&detail=1'>More detail (and zoom)</a>";
 	} else {
     	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=1'>More detail</a>";
 	}
