@@ -270,7 +270,7 @@ function WRITESIDEBAR() {
 	$rootEmulab = 0;
     }
 
-    WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
+    WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3?stayhome=1");
 
 
     if ($rootEmulab) {
