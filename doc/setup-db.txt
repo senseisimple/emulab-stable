@@ -20,8 +20,8 @@ you'll need to set it yourself, or run 'perl firstuser'.) This script will let
 you create the first user and project in the database. By default, it will grab
 information about the account it's being run as (probably you,) or you can
 supply a username, an encrypted password string (grab it from a password file,)
-etc. This script will also prompt you to create the first project - we suggest
-you create an 'emulab-ops' project.
+etc. This script will also prompt you to create the first project - create the
+project 'emulab-ops', which is a meta-project for holding experiments.
 
 If you want to make sure that this account is a member of any Unix groups (such
 as wheel,) run 'unixgroups -a <uid> <gid> ...'
@@ -31,11 +31,11 @@ as wheel,) run 'unixgroups -a <uid> <gid> ...'
 At this point, you should get the webserver up and running on your boss node.
 Again, instructions are in the boss setup documentation.
 
-Go to the web interface, and log in as the admin account you created. Create
-two projects: One for the administrators at your site (we call ours 'testbed'),
-and another meta-project called 'emulab-ops'. As soon as you've sent the
-request to sart each project, you can just use the 'New Project Approval' link
-to make them active.
+Go to the web interface, and log in as the admin account you created. Create a
+project for the administrators at your site (we call ours 'testbed', you can
+call yours whatever you call your project or group).  As soon as you've sent
+the request to sart the project, you can use the 'New Project Approval' link to
+make it active.
 
 Others at your site can now apply to join your project.
 
