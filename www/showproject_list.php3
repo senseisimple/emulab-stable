@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -29,6 +29,8 @@ if (!isset($splitview) || !$isadmin)
     $splitview = 0;
 if (!isset($sortby))
     $sortby = "pid";
+$eorder = 0;
+$norder = 0;
 
 if ($isadmin) {
     if (! $splitview) {
@@ -53,25 +55,76 @@ elseif (! strcmp($sortby, "idle"))
     $order = "idle";
 elseif (! strcmp($sortby, "created"))
     $order = "p.expt_count DESC";
-elseif (! strcmp($sortby, "running"))
-    $order = "ecount DESC";
-elseif (! strcmp($sortby, "nodes"))
-    $order = "ncount DESC";
+elseif (! strcmp($sortby, "running")) {
+    $eorder = 1;
+    $order  = "p.pid";
+}
+elseif (! strcmp($sortby, "nodes")) {
+    $norder = 1;
+    $order  = "p.pid";
+}
 else 
     $order = "p.pid";
 
+$allproj_result =
+    DBQueryFatal("SELECT pid,expt_count FROM projects as p");
+
+#
+# This is summary info, indexed by the pid, so no need to alter it
+# for admin vs non-admin. Thats handled in the project query below.
+#
+$ecounts = array();
+$ncounts = array();
+
+$query_result =
+    DBQueryFatal("select e.pid, count(distinct e.eid) as ecount ".
+		 "from experiments as e group by e.pid");
+
+while ($row = mysql_fetch_array($query_result)) {
+    $pid   = $row[0];
+    $count = $row[1];
+
+    $ecounts[$pid] = $count;
+}
+
+$query_result =
+    DBQueryFatal("select r.pid, count(distinct r.node_id) as ncount ".
+		 "from reserved as r group by r.pid");
+
+while ($row = mysql_fetch_array($query_result)) {
+    $pid   = $row[0];
+    $count = $row[1];
+
+    $ncounts[$pid] = $count;
+}
+
+while ($projectrow = mysql_fetch_array($allproj_result)) {
+    $pid = $projectrow[pid];
+
+    if (!isset($ecounts[$pid])) 
+	$ecounts[$pid] = 0;
+	    
+    if (!isset($ncounts[$pid])) 
+	$ncounts[$pid] = 0;
+}
+
+if ($eorder) 
+     arsort($ecounts, SORT_NUMERIC);
+
+if ($norder) 
+     arsort($ncounts, SORT_NUMERIC);
+
 if ($isadmin) {
-    $query_result =
-	DBQueryFatal("SELECT pid,expt_count FROM projects as p");
+    mysql_data_seek($allproj_result, 0);
     
     #
     # Process the query results for active projects so I can generate a
     # summary block (as per Jays request).
     #
-    $total_projects  = mysql_num_rows($query_result);
+    $total_projects  = mysql_num_rows($allproj_result);
     $active_projects = 0;
 
-    while ($projectrow = mysql_fetch_array($query_result)) {
+    while ($projectrow = mysql_fetch_array($allproj_result)) {
 	$expt_count = $projectrow[expt_count];
 
 	if ($expt_count > 0) {
@@ -99,7 +152,7 @@ if ($isadmin) {
 
 function GENPLIST ($query_result)
 {
-    global $isadmin, $splitview;
+    global $isadmin, $splitview, $eorder, $ecounts, $norder, $ncounts;
 
     echo "<table width='100%' border=2
                  cellpadding=2 cellspacing=2 align=center>
@@ -130,6 +183,22 @@ function GENPLIST ($query_result)
              Nodes</a></th>\n";
 
     #
+    # This ordering stuff is a pain cause of the split joins, but a combined
+    # join takes too long (hammers the DB to hard).
+    #
+    $projectrows = array();
+    while ($projectrow = mysql_fetch_array($query_result)) {
+	$pid = $projectrow[pid];
+
+	$projectrows[$pid] = $projectrow;
+    }
+    $showby = $projectrows;
+    if ($eorder)
+	$showby = $ecounts;
+    if ($norder)
+	$showby = $ncounts;
+
+    #
     # Admin users get other fields.
     # 
     if ($isadmin) {
@@ -137,16 +206,16 @@ function GENPLIST ($query_result)
     }
     echo "</tr>\n";
 
-    while ($projectrow = mysql_fetch_array($query_result)) {
-	$pid        = $projectrow[pid];
+    while (list($pid, $foo) = each($showby)) {
+	$projectrow = $projectrows[$pid];
 	$headuid    = $projectrow[head_uid];
 	$Pname      = stripslashes($projectrow[name]);
 	$approved   = $projectrow[approved];
 	$expt_count = $projectrow[expt_count];
 	$public     = $projectrow[public];
-	$ecount     = $projectrow[ecount];
-	$ncount     = $projectrow[ncount];
 	$idle       = $projectrow[idle];
+	$ecount     = $ecounts[$pid];
+	$ncount     = $ncounts[$pid];
 
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -184,16 +253,13 @@ function GENPLIST ($query_result)
 #
 if (! $isadmin) {
     $query_result =
-	DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
-		     "count(distinct e.eid) as ecount, ".
+	DBQueryFatal("SELECT p.*, ".
 		     "IF(p.expt_last, ".
 		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
 		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
 		     "FROM projects as p ".
 		     "left join group_membership as g on ".
 		     " p.pid=g.pid and g.pid=g.gid ".
-		     "left join experiments as e on e.pid=p.pid ".
-		     "left join reserved as r on r.pid=p.pid ".
 		     "where g.uid='$uid' and g.trust!='none' ".
 		     "group by p.pid order by $order");
 				   
@@ -206,16 +272,13 @@ if (! $isadmin) {
 else {
     if ($splitview) {
 	$query_result =
-	    DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
-		     "count(distinct e.eid) as ecount, ".
-		     "IF(p.expt_last, ".
-		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
-		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
-		     "FROM projects as p ".
-		     "left join experiments as e on e.pid=p.pid ".
-		     "left join reserved as r on r.pid=p.pid ".
-		     "where expt_count>0 ".
-		     "group by p.pid order by $order");
+	    DBQueryFatal("SELECT p.*, ".
+			 "IF(p.expt_last, ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+			 "FROM projects as p ".
+			 "where expt_count>0 ".
+			 "group by p.pid order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<center>
@@ -225,16 +288,13 @@ else {
 	}
 
 	$query_result =
-	    DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
-		     "count(distinct e.eid) as ecount, ".
-		     "IF(p.expt_last, ".
-		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
-		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
-		     "FROM projects as p ".
-		     "left join experiments as e on e.pid=p.pid ".
-		     "left join reserved as r on r.pid=p.pid ".
-		     "where expt_count=0 ".
-		     "group by p.pid order by $order");
+	    DBQueryFatal("SELECT p.*, ".
+			 "IF(p.expt_last, ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+			 "FROM projects as p ".
+			 "where expt_count=0 ".
+			 "group by p.pid order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<br><center>
@@ -246,15 +306,12 @@ else {
     }
     else {
 	$query_result =
-	    DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
-		     "count(distinct e.eid) as ecount, ".
-		     "IF(p.expt_last, ".
-		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
-		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
-		     " FROM projects as p ".
-		     "left join experiments as e on e.pid=p.pid ".
-		     "left join reserved as r on r.pid=p.pid ".
-		     "group by p.pid order by $order");
+	    DBQueryFatal("select p.*, ".
+			 "IF(p.expt_last, ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+			 " FROM projects as p ".
+			 "group by p.pid order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    GENPLIST($query_result);
